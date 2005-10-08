@@ -44,16 +44,6 @@ union irq_ctx {
 
 static union irq_ctx *hardirq_ctx[NR_CPUS];
 static union irq_ctx *softirq_ctx[NR_CPUS];
-#ifdef	CONFIG_KDB
-const char *kdba_irq_ctx_type(int cpu, struct thread_info *tinfo)
-{
-	if (tinfo == &hardirq_ctx[cpu]->tinfo)
-		return "hardirq_ctx";
-	if (tinfo == &softirq_ctx[cpu]->tinfo)
-		return "softirq_ctx";
-	return NULL;
-}
-#endif	/* CONFIG_KDB */
 #endif
 
 /*

@@ -47,7 +47,6 @@ static LIST_HEAD(input_dev_list);
 static LIST_HEAD(input_handler_list);
 
 static struct input_handler *input_table[8];
-static atomic_t input_device_num = ATOMIC_INIT(0);
 
 void input_event(struct input_dev *dev, unsigned int type, unsigned int code, int value)
 {
@@ -87,6 +86,15 @@ void input_event(struct input_dev *dev, unsigned int type, unsigned int code, in
 				dev->repeat_key = code;
 				mod_timer(&dev->timer, jiffies + msecs_to_jiffies(dev->rep[REP_DELAY]));
 			}
+
+			break;
+
+		case EV_SW:
+
+			if (code > SW_MAX || !test_bit(code, dev->swbit) || !!test_bit(code, dev->sw) == value)
+				return;
+
+			change_bit(code, dev->sw);
 
 			break;
 
@@ -300,6 +308,7 @@ static struct input_device_id *input_match_device(struct input_device_id *id, st
 		MATCH_BIT(ledbit, LED_MAX);
 		MATCH_BIT(sndbit, SND_MAX);
 		MATCH_BIT(ffbit,  FF_MAX);
+		MATCH_BIT(swbit,  SW_MAX);
 
 		return id;
 	}
@@ -342,27 +351,52 @@ static struct input_device_id *input_match_device(struct input_device_id *id, st
 			SPRINTF_BIT_A(bit, name, max); \
 	} while (0)
 
-static int __input_hotplug(struct input_dev *dev, char **envp, int num_envp,
-			   char *buffer, int buffer_size)
+static void input_call_hotplug(char *verb, struct input_dev *dev)
 {
-	char *scratch;
-	int i = 0, j;
-	scratch = buffer;
+	char *argv[3], **envp, *buf, *scratch;
+	int i = 0, j, value;
 
-	if (!dev)
-		return -ENODEV;
+	if (!hotplug_path[0]) {
+		printk(KERN_ERR "input.c: calling hotplug without a hotplug agent defined\n");
+		return;
+	}
+	if (in_interrupt()) {
+		printk(KERN_ERR "input.c: calling hotplug from interrupt\n");
+		return;
+	}
+	if (!current->fs->root) {
+		printk(KERN_WARNING "input.c: calling hotplug without valid filesystem\n");
+		return;
+	}
+	if (!(envp = (char **) kmalloc(20 * sizeof(char *), GFP_KERNEL))) {
+		printk(KERN_ERR "input.c: not enough memory allocating hotplug environment\n");
+		return;
+	}
+	if (!(buf = kmalloc(1024, GFP_KERNEL))) {
+		kfree (envp);
+		printk(KERN_ERR "input.c: not enough memory allocating hotplug environment\n");
+		return;
+	}
+
+	argv[0] = hotplug_path;
+	argv[1] = "input";
+	argv[2] = NULL;
+
+	envp[i++] = "HOME=/";
+	envp[i++] = "PATH=/sbin:/bin:/usr/sbin:/usr/bin";
+
+	scratch = buf;
+
+	envp[i++] = scratch;
+	scratch += sprintf(scratch, "ACTION=%s", verb) + 1;
 
 	envp[i++] = scratch;
 	scratch += sprintf(scratch, "PRODUCT=%x/%x/%x/%x",
 		dev->id.bustype, dev->id.vendor, dev->id.product, dev->id.version) + 1;
 
-#ifdef INPUT_DEBUG
-	printk(KERN_DEBUG "%s: PRODUCT %x/%x/%x/%x\n", __FUNCTION__,
-		dev->id.bustype, dev->id.vendor, dev->id.product, dev->id.version);
-#endif
 	if (dev->name) {
 		envp[i++] = scratch;
-		scratch += sprintf(scratch, "NAME=\"%s\"", dev->name) + 1;
+		scratch += sprintf(scratch, "NAME=%s", dev->name) + 1;
 	}
 
 	if (dev->phys) {
@@ -378,129 +412,27 @@ static int __input_hotplug(struct input_dev *dev, char **envp, int num_envp,
 	SPRINTF_BIT_A2(ledbit, "LED=", LED_MAX, EV_LED);
 	SPRINTF_BIT_A2(sndbit, "SND=", SND_MAX, EV_SND);
 	SPRINTF_BIT_A2(ffbit,  "FF=",  FF_MAX, EV_FF);
+	SPRINTF_BIT_A2(swbit,  "SW=",  SW_MAX, EV_SW);
 
 	envp[i++] = NULL;
 
-	return 0;
-}
-
-int input_hotplug(struct class_device *cdev, char **envp, int num_envp,
-		  char *buffer, int buffer_size)
-{
-	struct input_dev *dev;
-
-	if (!cdev)
-		return -ENODEV;
 #ifdef INPUT_DEBUG
-	printk(KERN_DEBUG "%s: entered for dev %p\n", __FUNCTION__, 
-		&cdev->dev);
+	printk(KERN_DEBUG "input.c: calling %s %s [%s %s %s %s %s]\n",
+		argv[0], argv[1], envp[0], envp[1], envp[2], envp[3], envp[4]);
 #endif
 
-	dev = container_of(cdev,struct input_dev,cdev);
+	value = call_usermodehelper(argv [0], argv, envp, 0);
 
-	return __input_hotplug(dev, envp, num_envp, buffer, buffer_size);
+	kfree(buf);
+	kfree(envp);
+
+#ifdef INPUT_DEBUG
+	if (value != 0)
+		printk(KERN_DEBUG "input.c: hotplug returned %d\n", value);
+#endif
 }
 
-#else
-int input_hotplug(struct class_device *cdev, char **envp, int num_envp,
-		  char *buffer, int buffer_size)
-{
-	return 0;
-}
-#endif /* CONFIG_HOTPLUG */
-
-#define INPUT_ATTR_BIT_B(bit, max) \
-	do { \
-		for (i = NBITS(max) - 1; i >= 0; i--) \
-			if (dev->bit[i]) break; \
-		for (; i >= 0; i--) \
-			len += sprintf(buf + len, "%lx ", dev->bit[i]); \
-		if (len) len += sprintf(buf + len, "\n"); \
-	} while (0)
-
-#define INPUT_ATTR_BIT_B2(bit, max, ev) \
-	do { \
-		if (test_bit(ev, dev->evbit)) \
-			INPUT_ATTR_BIT_B(bit, max); \
-	} while (0)
-
-
-static ssize_t input_class_show_ev(struct class_device *class_dev, char *buf)
-{
-	struct input_dev *dev = container_of(class_dev, struct input_dev,cdev);
-	int i, len = 0;
-
-	INPUT_ATTR_BIT_B(evbit, EV_MAX);
-	return len;
-}
-
-#define INPUT_CLASS_ATTR_BIT(_name,_bit) \
-static ssize_t input_class_show_##_bit(struct class_device *class_dev, \
-				       char *buf) \
-{ \
-	struct input_dev *dev = container_of(class_dev,struct input_dev,cdev); \
-	int i, len = 0; \
-\
-	INPUT_ATTR_BIT_B2(_bit##bit, _name##_MAX, EV_##_name); \
-	return len; \
-}
-
-INPUT_CLASS_ATTR_BIT(KEY,key)
-INPUT_CLASS_ATTR_BIT(REL,rel)
-INPUT_CLASS_ATTR_BIT(ABS,abs)
-INPUT_CLASS_ATTR_BIT(MSC,msc)
-INPUT_CLASS_ATTR_BIT(LED,led)
-INPUT_CLASS_ATTR_BIT(SND,snd)
-INPUT_CLASS_ATTR_BIT(FF,ff)
-
-static ssize_t input_class_show_phys(struct class_device *class_dev, char *buf)
-{
-	struct input_dev *dev = container_of(class_dev,struct input_dev,cdev);
-
-	return sprintf(buf, "%s\n", dev->phys ? dev->phys : "(none)" );
-}
-
-static ssize_t input_class_show_name(struct class_device *class_dev, char *buf)
-{
-	struct input_dev *dev = container_of(class_dev,struct input_dev,cdev);
-
-	return sprintf(buf, "%s\n", dev->name ? dev->name : "(none)" );
-}
-
-static ssize_t input_class_show_product(struct class_device *class_dev, char *buf)
-{
-	struct input_dev *dev = container_of(class_dev,struct input_dev,cdev);
-
-	return sprintf(buf, "%x/%x/%x/%x\n", dev->id.bustype, dev->id.vendor, 
-			dev->id.product, dev->id.version);
-}
-
-static struct class_device_attribute input_device_class_attrs[] = {
-	__ATTR( product, S_IRUGO, input_class_show_product, NULL) ,
-	__ATTR( phys, S_IRUGO, input_class_show_phys, NULL ),
-	__ATTR( name, S_IRUGO, input_class_show_name, NULL) ,
-	__ATTR( ev, S_IRUGO, input_class_show_ev, NULL) ,
-	__ATTR( key, S_IRUGO, input_class_show_key, NULL) ,
-	__ATTR( rel, S_IRUGO, input_class_show_rel, NULL) ,
-	__ATTR( abs, S_IRUGO, input_class_show_abs, NULL) ,
-	__ATTR( msc, S_IRUGO, input_class_show_msc, NULL) ,
-	__ATTR( led, S_IRUGO, input_class_show_led, NULL) ,
-	__ATTR( snd, S_IRUGO, input_class_show_snd, NULL) ,
-	__ATTR( ff, S_IRUGO, input_class_show_ff, NULL) ,
-	__ATTR_NULL,
-};
-
-static void input_device_class_release( struct class_device *class_dev )
-{
-	put_device(class_dev->dev);
-}
-
-static struct class input_device_class = {
-	.name =		"input_device",
-	.hotplug = 	input_hotplug,
-	.release = 	input_device_class_release,
-	.class_dev_attrs = input_device_class_attrs,
-};
+#endif
 
 #ifdef CONFIG_PROC_FS
 
@@ -569,6 +501,7 @@ static int input_devices_read(char *buf, char **start, off_t pos, int count, int
 		SPRINTF_BIT_B2(ledbit, "LED=", LED_MAX, EV_LED);
 		SPRINTF_BIT_B2(sndbit, "SND=", SND_MAX, EV_SND);
 		SPRINTF_BIT_B2(ffbit,  "FF=",  FF_MAX, EV_FF);
+		SPRINTF_BIT_B2(swbit,  "SW=",  SW_MAX, EV_SW);
 
 		len += sprintf(buf + len, "\n");
 
@@ -679,18 +612,6 @@ void input_register_device(struct input_dev *dev)
 	struct input_handler *handler;
 	struct input_device_id *id;
 
-	dev->cdev.class = &input_device_class;
-	
-	dev->cdev.dev = get_device(dev->dev);
-	sprintf(dev->cdev.class_id, "input%d", 
-		atomic_inc_return(&input_device_num));
-
-	if (class_device_register(&dev->cdev)) {
-		if (dev->dev)
-			put_device(dev->dev);
-		return;
-	}
-
 	set_bit(EV_SYN, dev->evbit);
 
 	init_MUTEX(&dev->sem);
@@ -717,6 +638,10 @@ void input_register_device(struct input_dev *dev)
 				if ((handle = handler->connect(handler, dev, id)))
 					input_link_handle(handle);
 
+#ifdef CONFIG_HOTPLUG
+	input_call_hotplug("add", dev);
+#endif
+
 	input_wakeup_procfs_readers();
 }
 
@@ -735,9 +660,11 @@ void input_unregister_device(struct input_dev *dev)
 		handle->handler->disconnect(handle);
 	}
 
-	list_del_init(&dev->node);
+#ifdef CONFIG_HOTPLUG
+	input_call_hotplug("remove", dev);
+#endif
 
-	class_device_unregister(&dev->cdev);
+	list_del_init(&dev->node);
 
 	input_wakeup_procfs_readers();
 }
@@ -833,30 +760,25 @@ static int __init input_init(void)
 		return PTR_ERR(input_class);
 	}
 
-	err = class_register(&input_device_class);
-	if (err)
-		goto fail1;
-
 	err = input_proc_init();
 	if (err)
-		goto fail2;
+		goto fail1;
 
 	err = register_chrdev(INPUT_MAJOR, "input", &input_fops);
 	if (err) {
 		printk(KERN_ERR "input: unable to register char major %d", INPUT_MAJOR);
-		goto fail3;
+		goto fail2;
 	}
 
 	err = devfs_mk_dir("input");
 	if (err)
-		goto fail4;
+		goto fail3;
 
 	return 0;
 
- fail4:	unregister_chrdev(INPUT_MAJOR, "input");
- fail3:	input_proc_exit();
- fail2:	class_unregister(&input_device_class);
- fail1:	class_destroy(input_class); 
+ fail3:	unregister_chrdev(INPUT_MAJOR, "input");
+ fail2:	input_proc_exit();
+ fail1:	class_destroy(input_class);
 	return err;
 }
 
@@ -865,7 +787,6 @@ static void __exit input_exit(void)
 	input_proc_exit();
 	devfs_remove("input");
 	unregister_chrdev(INPUT_MAJOR, "input");
-	class_unregister(&input_device_class);
 	class_destroy(input_class);
 }
 

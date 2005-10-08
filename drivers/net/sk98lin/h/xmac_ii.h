@@ -2,8 +2,8 @@
  *
  * Name:	xmac_ii.h
  * Project:	Gigabit Ethernet Adapters, Common Modules
- * Version:	$Revision: 2.11 $
- * Date:	$Date: 2005/01/04 14:14:20 $
+ * Version:	$Revision: 1.52 $
+ * Date:	$Date: 2003/10/02 16:35:50 $
  * Purpose:	Defines and Macros for Gigabit Ethernet Controller
  *
  ******************************************************************************/
@@ -11,12 +11,13 @@
 /******************************************************************************
  *
  *	(C)Copyright 1998-2002 SysKonnect.
- *	(C)Copyright 2002-2004 Marvell.
+ *	(C)Copyright 2002-2003 Marvell.
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
  *	the Free Software Foundation; either version 2 of the License, or
  *	(at your option) any later version.
+ *
  *	The information in this file is provided "AS IS" without warranty.
  *
  ******************************************************************************/
@@ -448,7 +449,7 @@ extern "C" {
 /*
  * Receive Frame Status Encoding
  */
-#define XMR_FS_LEN_MSK	(0x3fffUL<<18)	/* Bit 31..18:	Rx Frame Length */
+#define XMR_FS_LEN	(0x3fffUL<<18)	/* Bit 31..18:	Rx Frame Length */
 #define XMR_FS_2L_VLAN	(1L<<17)	/* Bit 17:	tagged wh 2Lev VLAN ID*/
 #define XMR_FS_1L_VLAN	(1L<<16)	/* Bit 16:	tagged wh 1Lev VLAN ID*/
 #define XMR_FS_BC		(1L<<15)	/* Bit 15:	Broadcast Frame */
@@ -467,8 +468,6 @@ extern "C" {
 #define XMR_FS_FCS_ERR	(1L<<2)		/* Bit  2:	Frame Check Sequ Err */
 #define XMR_FS_ERR		(1L<<1)		/* Bit  1:	Frame Error */
 #define XMR_FS_MCTRL	(1L<<0)		/* Bit  0:	MAC Control Packet */
-
-#define XMR_FS_LEN_SHIFT	18
 
 /*
  * XMR_FS_ERR will be set if
@@ -511,7 +510,7 @@ extern "C" {
 #define PHY_BCOM_NEPG		0x07	/* 16 bit r/w	Next Page Register */
 #define PHY_BCOM_NEPG_LP	0x08	/* 16 bit r/o	Next Page Link Partner */
 	/* Broadcom-specific registers */
-#define PHY_BCOM_1000T_CTRL	0x09	/* 16 bit r/w	1000Base-T Control Reg */
+#define PHY_BCOM_1000T_CTRL	0x09	/* 16 bit r/w	1000Base-T Ctrl Reg */
 #define PHY_BCOM_1000T_STAT	0x0a	/* 16 bit r/o	1000Base-T Status Reg */
 	/* 0x0b - 0x0e:		reserved */
 #define PHY_BCOM_EXT_STAT	0x0f	/* 16 bit r/o	Extended Status Reg */
@@ -542,32 +541,24 @@ extern "C" {
 #define PHY_MARV_NEPG		0x07	/* 16 bit r/w	Next Page Register */
 #define PHY_MARV_NEPG_LP	0x08	/* 16 bit r/o	Next Page Link Partner */
 	/* Marvel-specific registers */
-#define PHY_MARV_1000T_CTRL	0x09	/* 16 bit r/w	1000Base-T Control Reg */
+#define PHY_MARV_1000T_CTRL	0x09	/* 16 bit r/w	1000Base-T Ctrl Reg */
 #define PHY_MARV_1000T_STAT	0x0a	/* 16 bit r/o	1000Base-T Status Reg */
 	/* 0x0b - 0x0e:		reserved */
 #define PHY_MARV_EXT_STAT	0x0f	/* 16 bit r/o	Extended Status Reg */
-#define PHY_MARV_PHY_CTRL	0x10	/* 16 bit r/w	PHY Specific Control Reg */
-#define PHY_MARV_PHY_STAT	0x11	/* 16 bit r/o	PHY Specific Status Reg */
+#define PHY_MARV_PHY_CTRL	0x10	/* 16 bit r/w	PHY Specific Ctrl Reg */
+#define PHY_MARV_PHY_STAT	0x11	/* 16 bit r/o	PHY Specific Stat Reg */
 #define PHY_MARV_INT_MASK	0x12	/* 16 bit r/w	Interrupt Mask Reg */
 #define PHY_MARV_INT_STAT	0x13	/* 16 bit r/o	Interrupt Status Reg */
 #define PHY_MARV_EXT_CTRL	0x14	/* 16 bit r/w	Ext. PHY Specific Ctrl */
 #define PHY_MARV_RXE_CNT	0x15	/* 16 bit r/w	Receive Error Counter */
 #define PHY_MARV_EXT_ADR	0x16	/* 16 bit r/w	Ext. Ad. for Cable Diag. */
-#define PHY_MARV_PORT_IRQ	0x17	/* 16 bit r/o	Port 0 IRQ (88E1111 only) */
+	/* 0x17:		reserved */
 #define PHY_MARV_LED_CTRL	0x18	/* 16 bit r/w	LED Control Reg */
 #define PHY_MARV_LED_OVER	0x19	/* 16 bit r/w	Manual LED Override Reg */
 #define PHY_MARV_EXT_CTRL_2	0x1a	/* 16 bit r/w	Ext. PHY Specific Ctrl 2 */
 #define PHY_MARV_EXT_P_STAT	0x1b	/* 16 bit r/w	Ext. PHY Spec. Stat Reg */
 #define PHY_MARV_CABLE_DIAG	0x1c	/* 16 bit r/o	Cable Diagnostic Reg */
-#define PHY_MARV_PAGE_ADDR	0x1d	/* 16 bit r/w	Extended Page Address Reg */
-#define PHY_MARV_PAGE_DATA	0x1e	/* 16 bit r/w	Extended Page Data Reg */
-
-/* for 10/100 Fast Ethernet PHY (88E3082 only) */
-#define PHY_MARV_FE_LED_PAR	0x16	/* 16 bit r/w	LED Parallel Select Reg. */
-#define PHY_MARV_FE_LED_SER	0x17	/* 16 bit r/w	LED Stream Select S. LED */
-#define PHY_MARV_FE_VCT_TX	0x1a	/* 16 bit r/w	VCT Reg. for TXP/N Pins */
-#define PHY_MARV_FE_VCT_RX	0x1b	/* 16 bit r/o	VCT Reg. for RXP/N Pins */
-#define PHY_MARV_FE_SPEC_2	0x1c	/* 16 bit r/w	Specific Control Reg. 2 */
+	/* 0x1d - 0x1f:		reserved */
 
 /*----------------------------------------------------------------------------*/
 /*
@@ -583,9 +574,9 @@ extern "C" {
 #define PHY_LONE_NEPG		0x07	/* 16 bit r/w	Next Page Register */
 #define PHY_LONE_NEPG_LP	0x08	/* 16 bit r/o	Next Page Link Partner */
 	/* Level One-specific registers */
-#define PHY_LONE_1000T_CTRL	0x09	/* 16 bit r/w	1000Base-T Control Reg */
+#define PHY_LONE_1000T_CTRL	0x09	/* 16 bit r/w	1000Base-T Control Reg*/
 #define PHY_LONE_1000T_STAT	0x0a	/* 16 bit r/o	1000Base-T Status Reg */
-	/* 0x0b - 0x0e:		reserved */
+	/* 0x0b -0x0e:		reserved */
 #define PHY_LONE_EXT_STAT	0x0f	/* 16 bit r/o	Extended Status Reg */
 #define PHY_LONE_PORT_CFG	0x10	/* 16 bit r/w	Port Configuration Reg*/
 #define PHY_LONE_Q_STAT		0x11	/* 16 bit r/o	Quick Status Reg */
@@ -594,7 +585,7 @@ extern "C" {
 #define PHY_LONE_LED_CFG	0x14	/* 16 bit r/w	LED Configuration Reg */
 #define PHY_LONE_PORT_CTRL	0x15	/* 16 bit r/w	Port Control Reg */
 #define PHY_LONE_CIM		0x16	/* 16 bit r/o	CIM Reg */
-	/* 0x17 - 0x1c:		reserved */
+	/* 0x17 -0x1c:		reserved */
 
 /*----------------------------------------------------------------------------*/
 /*
@@ -612,14 +603,14 @@ extern "C" {
 	/* National-specific registers */
 #define PHY_NAT_1000T_CTRL	0x09	/* 16 bit r/w	1000Base-T Control Reg */
 #define PHY_NAT_1000T_STAT	0x0a	/* 16 bit r/o	1000Base-T Status Reg */
-	/* 0x0b - 0x0e:		reserved */
+	/* 0x0b -0x0e:		reserved */
 #define PHY_NAT_EXT_STAT	0x0f	/* 16 bit r/o	Extended Status Register */
 #define PHY_NAT_EXT_CTRL1	0x10	/* 16 bit r/o	Extended Control Reg1 */
 #define PHY_NAT_Q_STAT1		0x11	/* 16 bit r/o	Quick Status Reg1 */
 #define PHY_NAT_10B_OP		0x12	/* 16 bit r/o	10Base-T Operations Reg */
 #define PHY_NAT_EXT_CTRL2	0x13	/* 16 bit r/o	Extended Control Reg1 */
 #define PHY_NAT_Q_STAT2		0x14	/* 16 bit r/o	Quick Status Reg2 */
-	/* 0x15 - 0x18:		reserved */
+	/* 0x15 -0x18:		reserved */
 #define PHY_NAT_PHY_ADDR	0x19	/* 16 bit r/o	PHY Address Register */
 
 
@@ -627,7 +618,7 @@ extern "C" {
 
 /*
  * PHY bit definitions
- * Bits defined as PHY_X_..., PHY_B_..., PHY_L_..., PHY_N_... or PHY_M_... are
+ * Bits defined as PHY_X_..., PHY_B_..., PHY_L_... or PHY_N_... are
  * XMAC/Broadcom/LevelOne/National/Marvell-specific.
  * All other are general.
  */
@@ -638,14 +629,14 @@ extern "C" {
 /*****  PHY_LONE_CTRL	16 bit r/w	PHY Control Register *****/
 #define PHY_CT_RESET	(1<<15)	/* Bit 15: (sc)	clear all PHY related regs */
 #define PHY_CT_LOOP		(1<<14)	/* Bit 14:	enable Loopback over PHY */
-#define PHY_CT_SPS_LSB	(1<<13) /* Bit 13:	Speed select, lower bit */
+#define PHY_CT_SPS_LSB	(1<<13) /* Bit 13: (BC,L1) Speed select, lower bit */
 #define PHY_CT_ANE		(1<<12)	/* Bit 12:	Auto-Negotiation Enabled */
-#define PHY_CT_PDOWN	(1<<11)	/* Bit 11:	Power Down Mode */
-#define PHY_CT_ISOL		(1<<10)	/* Bit 10:	Isolate Mode */
-#define PHY_CT_RE_CFG	(1<<9)	/* Bit  9:	(sc) Restart Auto-Negotiation */
+#define PHY_CT_PDOWN	(1<<11)	/* Bit 11: (BC,L1) Power Down Mode */
+#define PHY_CT_ISOL		(1<<10)	/* Bit 10: (BC,L1) Isolate Mode */
+#define PHY_CT_RE_CFG	(1<<9)	/* Bit  9: (sc) Restart Auto-Negotiation */
 #define PHY_CT_DUP_MD	(1<<8)	/* Bit  8:	Duplex Mode */
-#define PHY_CT_COL_TST	(1<<7)	/* Bit  7:	Collision Test enabled */
-#define PHY_CT_SPS_MSB	(1<<6)	/* Bit  6:	Speed select, upper bit */
+#define PHY_CT_COL_TST	(1<<7)	/* Bit  7: (BC,L1) Collision Test enabled */
+#define PHY_CT_SPS_MSB	(1<<6)	/* Bit  6: (BC,L1) Speed select, upper bit */
 								/* Bit  5..0:	reserved */
 
 #define PHY_CT_SP1000	PHY_CT_SPS_MSB	/* enable speed of 1000 Mbps */
@@ -658,25 +649,25 @@ extern "C" {
 /*****  PHY_MARV_STAT	16 bit r/w	PHY Status Register *****/
 /*****  PHY_LONE_STAT	16 bit r/w	PHY Status Register *****/
 								/* Bit 15..9:	reserved */
-				/*	(BC/L1) 100/10 Mbps cap bits ignored */
+				/*	(BC/L1) 100/10 Mbps cap bits ignored*/
 #define PHY_ST_EXT_ST	(1<<8)	/* Bit  8:	Extended Status Present */
 								/* Bit  7:	reserved */
-#define PHY_ST_PRE_SUP	(1<<6)	/* Bit  6:	Preamble Suppression */
+#define PHY_ST_PRE_SUP	(1<<6)	/* Bit  6: (BC/L1) preamble suppression */
 #define PHY_ST_AN_OVER	(1<<5)	/* Bit  5:	Auto-Negotiation Over */
 #define PHY_ST_REM_FLT	(1<<4)	/* Bit  4:	Remote Fault Condition Occured */
 #define PHY_ST_AN_CAP	(1<<3)	/* Bit  3:	Auto-Negotiation Capability */
 #define PHY_ST_LSYNC	(1<<2)	/* Bit  2:	Link Synchronized */
-#define PHY_ST_JAB_DET	(1<<1)	/* Bit  1:	Jabber Detected */
+#define PHY_ST_JAB_DET	(1<<1)	/* Bit  1: (BC/L1) Jabber Detected */
 #define PHY_ST_EXT_REG	(1<<0)	/* Bit  0:	Extended Register available */
 
 
-/*****  PHY_XMAC_ID1		16 bit r/o	PHY ID1 Register */
-/*****  PHY_BCOM_ID1		16 bit r/o	PHY ID1 Register */
-/*****  PHY_MARV_ID1		16 bit r/o	PHY ID1 Register */
-/*****  PHY_LONE_ID1		16 bit r/o	PHY ID1 Register */
+/*****	PHY_XMAC_ID1		16 bit r/o	PHY ID1 Register */
+/*****	PHY_BCOM_ID1		16 bit r/o	PHY ID1 Register */
+/*****	PHY_MARV_ID1		16 bit r/o	PHY ID1 Register */
+/*****	PHY_LONE_ID1		16 bit r/o	PHY ID1 Register */
 #define PHY_I1_OUI_MSK	(0x3f<<10)	/* Bit 15..10:	Organization Unique ID */
 #define PHY_I1_MOD_NUM	(0x3f<<4)	/* Bit  9.. 4:	Model Number */
-#define PHY_I1_REV_MSK	0xf			/* Bit  3.. 0:	Revision Number */
+#define PHY_I1_REV_MSK	0x0f		/* Bit  3.. 0:	Revision Number */
 
 /* different Broadcom PHY Ids */
 #define PHY_BCOM_ID1_A1		0x6041
@@ -684,19 +675,11 @@ extern "C" {
 #define PHY_BCOM_ID1_C0		0x6044
 #define PHY_BCOM_ID1_C5		0x6047
 
-/* different Marvell PHY Ids */
-#define PHY_MARV_ID0_VAL	0x0141		/* Marvell Unique Identifier */
-
-#define PHY_MARV_ID1_B0		0x0C23		/* Yukon (PHY 88E1011) */
-#define PHY_MARV_ID1_B2		0x0C25		/* Yukon-Plus (PHY 88E1011) */
-#define PHY_MARV_ID1_C2		0x0CC2		/* Yukon-EC (PHY 88E1111) */
-#define PHY_MARV_ID1_Y2		0x0C91		/* Yukon-2 (PHY 88E1112) */
-
 
 /*****  PHY_XMAC_AUNE_ADV	16 bit r/w	Auto-Negotiation Advertisement *****/
 /*****  PHY_XMAC_AUNE_LP	16 bit r/o	Link Partner Ability Reg *****/
 #define PHY_AN_NXT_PG	(1<<15)	/* Bit 15:	Request Next Page */
-#define PHY_X_AN_ACK	(1<<14)	/* Bit 14:	(ro) Acknowledge Received */
+#define PHY_X_AN_ACK	(1<<14)	/* Bit 14: (ro)	Acknowledge Received */
 #define PHY_X_AN_RFB	(3<<12)	/* Bit 13..12:	Remote Fault Bits */
 								/* Bit 11.. 9:	reserved */
 #define PHY_X_AN_PAUSE	(3<<7)	/* Bit  8.. 7:	Pause Bits */
@@ -844,7 +827,7 @@ extern "C" {
 #define PHY_B_PEC_BY_MLT3	(1<<8)	/* Bit  8:	Bypass MLT3 Encoder */
 #define PHY_B_PEC_BY_RXA	(1<<7)	/* Bit  7:	Bypass Rx Alignm. */
 #define PHY_B_PEC_RES_SCR	(1<<6)	/* Bit  6:	Reset Scrambler */
-#define PHY_B_PEC_EN_LTR	(1<<5)	/* Bit  5:	Enable LED Traffic Mode */
+#define PHY_B_PEC_EN_LTR	(1<<5)	/* Bit  5:	Ena LED Traffic Mode */
 #define PHY_B_PEC_LED_ON	(1<<4)	/* Bit  4:	Force LED's on */
 #define PHY_B_PEC_LED_OFF	(1<<3)	/* Bit  3:	Force LED's off */
 #define PHY_B_PEC_EX_IPG	(1<<2)	/* Bit  2:	Extend Tx IPG Mode */
@@ -998,7 +981,7 @@ extern "C" {
 #define PHY_L_QS_DUP_MOD	(1<<9)	/* Bit  9:	Full/Half Duplex */
 #define PHY_L_QS_AN			(1<<8)	/* Bit  8:	AutoNeg is On */
 #define PHY_L_QS_AN_C		(1<<7)	/* Bit  7:	AN is Complete */
-#define PHY_L_QS_LLE		(7<<4)	/* Bit  6..4:	Line Length Estim. */
+#define PHY_L_QS_LLE		(7<<4)	/* Bit  6:	Line Length Estim. */
 #define PHY_L_QS_PAUSE		(1<<3)	/* Bit  3:	LP advertised Pause */
 #define PHY_L_QS_AS_PAUSE	(1<<2)	/* Bit  2:	LP adv. asym. Pause */
 #define PHY_L_QS_ISOLATE	(1<<1)	/* Bit  1:	CIM Isolated */
@@ -1046,8 +1029,9 @@ extern "C" {
 									/* Bit  9..0:	not described */
 
 /*****  PHY_LONE_CIM		16 bit r/o	CIM Reg *****/
-#define PHY_L_CIM_ISOL		(0xff<<8)	/* Bit 15..8:	Isolate Count */
-#define PHY_L_CIM_FALSE_CAR	0xff		/* Bit  7..0:	False Carrier Count */
+#define PHY_L_CIM_ISOL		(255<<8)/* Bit 15..8:	Isolate Count */
+#define PHY_L_CIM_FALSE_CAR	(255<<0)/* Bit  7..0:	False Carrier Count */
+
 
 /*
  * Pause Bits (PHY_L_AN_ASP and PHY_L_AN_PC) encoding
@@ -1056,6 +1040,7 @@ extern "C" {
 #define PHY_L_P_SYM_MD		(1<<10)	/* Bit 11..10:	symmetric Pause Mode */
 #define PHY_L_P_ASYM_MD		(2<<10)	/* Bit 11..10:	asymmetric Pause Mode */
 #define PHY_L_P_BOTH_MD		(3<<10)	/* Bit 11..10:	both Pause Mode */
+
 
 /*
  * National-Specific
@@ -1101,24 +1086,22 @@ extern "C" {
  */
 /*****  PHY_MARV_AUNE_ADV	16 bit r/w	Auto-Negotiation Advertisement *****/
 /*****  PHY_MARV_AUNE_LP	16 bit r/w	Link Part Ability Reg *****/
-#define PHY_M_AN_NXT_PG		BIT_15S	/* Request Next Page */
-#define PHY_M_AN_ACK		BIT_14S	/* (ro)	Acknowledge Received */
-#define PHY_M_AN_RF			BIT_13S	/* Remote Fault */
-								/* Bit 12:	reserved */
-#define PHY_M_AN_ASP		BIT_11S	/* Asymmetric Pause */
-#define PHY_M_AN_PC			BIT_10S	/* MAC Pause implemented */
-#define PHY_M_AN_100_T4		BIT_9S	/* Not cap. 100Base-T4 (always 0) */
-#define PHY_M_AN_100_FD		BIT_8S	/* Advertise 100Base-TX Full Duplex */
-#define PHY_M_AN_100_HD		BIT_7S	/* Advertise 100Base-TX Half Duplex */
-#define PHY_M_AN_10_FD		BIT_6S	/* Advertise 10Base-TX Full Duplex */
-#define PHY_M_AN_10_HD		BIT_5S	/* Advertise 10Base-TX Half Duplex */
-#define PHY_M_AN_SEL_MSK	(0x1f<<4)	/* Bit  4.. 0: Selector Field Mask */
+#define PHY_M_AN_NXT_PG		BIT_15	/* Request Next Page */
+#define PHY_M_AN_ACK		BIT_14	/* (ro)	Acknowledge Received */
+#define PHY_M_AN_RF			BIT_13	/* Remote Fault */
+									/* Bit 12:	reserved */
+#define PHY_M_AN_ASP		BIT_11	/* Asymmetric Pause */
+#define PHY_M_AN_PC			BIT_10	/* MAC Pause implemented */
+#define PHY_M_AN_100_FD		BIT_8	/* Advertise 100Base-TX Full Duplex */
+#define PHY_M_AN_100_HD		BIT_7	/* Advertise 100Base-TX Half Duplex */
+#define PHY_M_AN_10_FD		BIT_6	/* Advertise 10Base-TX Full Duplex */
+#define PHY_M_AN_10_HD		BIT_5	/* Advertise 10Base-TX Half Duplex */
 
 /* special defines for FIBER (88E1011S only) */
-#define PHY_M_AN_ASP_X		BIT_8S	/* Asymmetric Pause */
-#define PHY_M_AN_PC_X		BIT_7S	/* MAC Pause implemented */
-#define PHY_M_AN_1000X_AHD	BIT_6S	/* Advertise 10000Base-X Half Duplex */
-#define PHY_M_AN_1000X_AFD	BIT_5S	/* Advertise 10000Base-X Full Duplex */
+#define PHY_M_AN_ASP_X		BIT_8	/* Asymmetric Pause */
+#define PHY_M_AN_PC_X		BIT_7	/* MAC Pause implemented */
+#define PHY_M_AN_1000X_AHD	BIT_6	/* Advertise 10000Base-X Half Duplex */
+#define PHY_M_AN_1000X_AFD	BIT_5	/* Advertise 10000Base-X Full Duplex */
 
 /* Pause Bits (PHY_M_AN_ASP_X and PHY_M_AN_PC_X) encoding */
 #define PHY_M_P_NO_PAUSE_X	(0<<7)	/* Bit  8.. 7:	no Pause Mode */
@@ -1128,162 +1111,105 @@ extern "C" {
 
 /*****  PHY_MARV_1000T_CTRL	16 bit r/w	1000Base-T Control Reg *****/
 #define PHY_M_1000C_TEST	(7<<13)	/* Bit 15..13:	Test Modes */
-#define PHY_M_1000C_MSE		BIT_12S	/* Manual Master/Slave Enable */
-#define PHY_M_1000C_MSC		BIT_11S	/* M/S Configuration (1=Master) */
-#define PHY_M_1000C_MPD		BIT_10S	/* Multi-Port Device */
-#define PHY_M_1000C_AFD		BIT_9S	/* Advertise Full Duplex */
-#define PHY_M_1000C_AHD		BIT_8S	/* Advertise Half Duplex */
+#define PHY_M_1000C_MSE		(1<<12)	/* Bit 12:	Manual Master/Slave Enable */
+#define PHY_M_1000C_MSC		(1<<11)	/* Bit 11:	M/S Configuration (1=Master) */
+#define PHY_M_1000C_MPD		(1<<10)	/* Bit 10:	Multi-Port Device */
+#define PHY_M_1000C_AFD		(1<<9)	/* Bit  9:	Advertise Full Duplex */
+#define PHY_M_1000C_AHD		(1<<8)	/* Bit  8:	Advertise Half Duplex */
 									/* Bit  7..0:	reserved */
 
 /*****  PHY_MARV_PHY_CTRL	16 bit r/w	PHY Specific Ctrl Reg *****/
-#define PHY_M_PC_TX_FFD_MSK	(3<<14)	/* Bit 15..14: Tx FIFO Depth Mask */
-#define PHY_M_PC_RX_FFD_MSK	(3<<12)	/* Bit 13..12: Rx FIFO Depth Mask */
-#define PHY_M_PC_ASS_CRS_TX	BIT_11S	/* Assert CRS on Transmit */
-#define PHY_M_PC_FL_GOOD	BIT_10S	/* Force Link Good */
-#define PHY_M_PC_EN_DET_MSK	(3<<8)	/* Bit  9.. 8: Energy Detect Mask */
-#define PHY_M_PC_ENA_EXT_D	BIT_7S	/* Enable Ext. Distance (10BT) */
-#define PHY_M_PC_MDIX_MSK	(3<<5)	/* Bit  6.. 5: MDI/MDIX Config. Mask */
-#define PHY_M_PC_DIS_125CLK	BIT_4S	/* Disable 125 CLK */
-#define PHY_M_PC_MAC_POW_UP	BIT_3S	/* MAC Power up */
-#define PHY_M_PC_SQE_T_ENA	BIT_2S	/* SQE Test Enabled */
-#define PHY_M_PC_POL_R_DIS	BIT_1S	/* Polarity Reversal Disabled */
-#define PHY_M_PC_DIS_JABBER	BIT_0S	/* Disable Jabber */
+#define PHY_M_PC_TX_FFD_MSK	(3<<14)	/* Bit 15..14:	Tx FIFO Depth Mask */
+#define PHY_M_PC_RX_FFD_MSK	(3<<12)	/* Bit 13..12:	Rx FIFO Depth Mask */
+#define PHY_M_PC_ASS_CRS_TX	(1<<11)	/* Bit 11:	Assert CRS on Transmit */
+#define PHY_M_PC_FL_GOOD	(1<<10)	/* Bit 10:	Force Link Good */
+#define PHY_M_PC_EN_DET_MSK	(3<<8)	/* Bit  9.. 8:	Energy Detect Mask */
+#define PHY_M_PC_ENA_EXT_D	(1<<7)	/* Bit  7:	Enable Ext. Distance (10BT) */
+#define PHY_M_PC_MDIX_MSK	(3<<5)	/* Bit  6.. 5:	MDI/MDIX Config. Mask */
+#define PHY_M_PC_DIS_125CLK	(1<<4)	/* Bit  4:	Disable 125 CLK */
+#define PHY_M_PC_MAC_POW_UP	(1<<3)	/* Bit  3:	MAC Power up */
+#define PHY_M_PC_SQE_T_ENA	(1<<2)	/* Bit  2:	SQE Test Enabled */
+#define PHY_M_PC_POL_R_DIS	(1<<1)	/* Bit  1:	Polarity Reversal Disabled */
+#define PHY_M_PC_DIS_JABBER	(1<<0)	/* Bit  0:	Disable Jabber */
 
 #define PHY_M_PC_EN_DET			SHIFT8(2)	/* Energy Detect (Mode 1) */
 #define PHY_M_PC_EN_DET_PLUS	SHIFT8(3)	/* Energy Detect Plus (Mode 2) */
 
-#define PHY_M_PC_MDI_XMODE(x)	(SHIFT5(x) & PHY_M_PC_MDIX_MSK)	
-
-#define PHY_M_PC_MAN_MDI	0		/* 00 = Manual MDI configuration */
+#define PHY_M_PC_MDI_XMODE(x)	SHIFT5(x)	
+#define PHY_M_PC_MAN_MDI	0    	/* 00 = Manual MDI configuration */
 #define PHY_M_PC_MAN_MDIX	1		/* 01 = Manual MDIX configuration */
 #define PHY_M_PC_ENA_AUTO	3		/* 11 = Enable Automatic Crossover */
 
-/* for Yukon-2 Gigabit Ethernet PHY (88E1112 only) */
-#define PHY_M_PC_DIS_LINK_P	BIT_15S	/* Disable Link Pulses */
-#define PHY_M_PC_DSC_MSK	(7<<12)	/* Bit 14..12:	Downshift Counter */
-#define PHY_M_PC_DOWN_S_ENA	BIT_11S	/* Downshift Enable */
-									/* !!! Errata in spec. (1 = disable) */
-
-#define PHY_M_PC_DSC(x)			(SHIFT12(x) & PHY_M_PC_DSC_MSK)
-										/* 000=1x; 001=2x; 010=3x; 011=4x */
-										/* 100=5x; 101=6x; 110=7x; 111=8x */
-
-/* for 10/100 Fast Ethernet PHY (88E3082 only) */
-#define PHY_M_PC_ENA_DTE_DT	BIT_15S	/* Enable Data Terminal Equ. (DTE) Detect */
-#define PHY_M_PC_ENA_ENE_DT	BIT_14S	/* Enable Energy Detect (sense & pulse) */
-#define PHY_M_PC_DIS_NLP_CK	BIT_13S	/* Disable Normal Link Puls (NLP) Check */
-#define PHY_M_PC_ENA_LIP_NP	BIT_12S	/* Enable Link Partner Next Page Reg. */
-#define PHY_M_PC_DIS_NLP_GN	BIT_11S	/* Disable Normal Link Puls Generation */
-
-#define PHY_M_PC_DIS_SCRAMB	BIT_9S	/* Disable Scrambler */
-#define PHY_M_PC_DIS_FEFI	BIT_8S	/* Disable Far End Fault Indic. (FEFI) */
-
-#define PHY_M_PC_SH_TP_SEL	BIT_6S	/* Shielded Twisted Pair Select */
-#define PHY_M_PC_RX_FD_MSK	(3<<2)	/* Bit  3.. 2: Rx FIFO Depth Mask */
-
 /*****  PHY_MARV_PHY_STAT	16 bit r/o	PHY Specific Status Reg *****/
-#define PHY_M_PS_SPEED_MSK	(3<<14)	/* Bit 15..14: Speed Mask */
-#define PHY_M_PS_SPEED_1000	BIT_15S	/*		10 = 1000 Mbps */
-#define PHY_M_PS_SPEED_100	BIT_14S	/*		01 =  100 Mbps */
-#define PHY_M_PS_SPEED_10	0		/*		00 =   10 Mbps */
-#define PHY_M_PS_FULL_DUP	BIT_13S	/* Full Duplex */
-#define PHY_M_PS_PAGE_REC	BIT_12S	/* Page Received */
-#define PHY_M_PS_SPDUP_RES	BIT_11S	/* Speed & Duplex Resolved */
-#define PHY_M_PS_LINK_UP	BIT_10S	/* Link Up */
-#define PHY_M_PS_CABLE_MSK	(7<<7)	/* Bit  9.. 7: Cable Length Mask */
-#define PHY_M_PS_MDI_X_STAT	BIT_6S	/* MDI Crossover Stat (1=MDIX) */
-#define PHY_M_PS_DOWNS_STAT	BIT_5S	/* Downshift Status (1=downsh.) */
-#define PHY_M_PS_ENDET_STAT	BIT_4S	/* Energy Detect Status (1=act) */
-#define PHY_M_PS_TX_P_EN	BIT_3S	/* Tx Pause Enabled */
-#define PHY_M_PS_RX_P_EN	BIT_2S	/* Rx Pause Enabled */
-#define PHY_M_PS_POL_REV	BIT_1S	/* Polarity Reversed */
-#define PHY_M_PS_JABBER		BIT_0S	/* Jabber */
+#define PHY_M_PS_SPEED_MSK	(3<<14)	/* Bit 15..14:	Speed Mask */
+#define PHY_M_PS_SPEED_1000	(1<<15)	/*       10 = 1000 Mbps */
+#define PHY_M_PS_SPEED_100	(1<<14)	/*       01 =  100 Mbps */
+#define PHY_M_PS_SPEED_10	0		/*       00 =   10 Mbps */
+#define PHY_M_PS_FULL_DUP	(1<<13)	/* Bit 13:	Full Duplex */
+#define PHY_M_PS_PAGE_REC	(1<<12)	/* Bit 12:	Page Received */
+#define PHY_M_PS_SPDUP_RES	(1<<11)	/* Bit 11:	Speed & Duplex Resolved */
+#define PHY_M_PS_LINK_UP	(1<<10)	/* Bit 10:	Link Up */
+#define PHY_M_PS_CABLE_MSK	(3<<7)	/* Bit  9.. 7:	Cable Length Mask */
+#define PHY_M_PS_MDI_X_STAT	(1<<6)	/* Bit  6:	MDI Crossover Stat (1=MDIX) */
+#define PHY_M_PS_DOWNS_STAT	(1<<5)	/* Bit  5:	Downshift Status (1=downsh.) */
+#define PHY_M_PS_ENDET_STAT	(1<<4)	/* Bit  4:	Energy Detect Status (1=act) */
+#define PHY_M_PS_TX_P_EN	(1<<3)	/* Bit  3:	Tx Pause Enabled */
+#define PHY_M_PS_RX_P_EN	(1<<2)	/* Bit  2:	Rx Pause Enabled */
+#define PHY_M_PS_POL_REV	(1<<1)	/* Bit  1:	Polarity Reversed */
+#define PHY_M_PC_JABBER		(1<<0)	/* Bit  0:	Jabber */
 
 #define PHY_M_PS_PAUSE_MSK	(PHY_M_PS_TX_P_EN | PHY_M_PS_RX_P_EN)
 
-/* for 10/100 Fast Ethernet PHY (88E3082 only) */
-#define PHY_M_PS_DTE_DETECT	BIT_15S	/* Data Terminal Equipment (DTE) Detected */
-#define PHY_M_PS_RES_SPEED	BIT_14S	/* Resolved Speed (1=100 Mbps, 0=10 Mbps */
-
 /*****  PHY_MARV_INT_MASK	16 bit r/w	Interrupt Mask Reg *****/
 /*****  PHY_MARV_INT_STAT	16 bit r/o	Interrupt Status Reg *****/
-#define PHY_M_IS_AN_ERROR	BIT_15S	/* Auto-Negotiation Error */
-#define PHY_M_IS_LSP_CHANGE	BIT_14S	/* Link Speed Changed */
-#define PHY_M_IS_DUP_CHANGE	BIT_13S	/* Duplex Mode Changed */
-#define PHY_M_IS_AN_PR		BIT_12S	/* Page Received */
-#define PHY_M_IS_AN_COMPL	BIT_11S	/* Auto-Negotiation Completed */
-#define PHY_M_IS_LST_CHANGE	BIT_10S	/* Link Status Changed */
-#define PHY_M_IS_SYMB_ERROR	BIT_9S	/* Symbol Error */
-#define PHY_M_IS_FALSE_CARR	BIT_8S	/* False Carrier */
-#define PHY_M_IS_FIFO_ERROR	BIT_7S	/* FIFO Overflow/Underrun Error */
-#define PHY_M_IS_MDI_CHANGE	BIT_6S	/* MDI Crossover Changed */
-#define PHY_M_IS_DOWNSH_DET	BIT_5S	/* Downshift Detected */
-#define PHY_M_IS_END_CHANGE	BIT_4S	/* Energy Detect Changed */
-								/* Bit   3:	reserved */
-#define PHY_M_IS_DTE_CHANGE	BIT_2S	/* DTE Power Det. Status Changed */
-									/* (88E1111 only) */
-#define PHY_M_IS_POL_CHANGE	BIT_1S	/* Polarity Changed */
-#define PHY_M_IS_JABBER		BIT_0S	/* Jabber */
+#define PHY_M_IS_AN_ERROR	(1<<15)	/* Bit 15:	Auto-Negotiation Error */
+#define PHY_M_IS_LSP_CHANGE	(1<<14)	/* Bit 14:	Link Speed Changed */
+#define PHY_M_IS_DUP_CHANGE	(1<<13)	/* Bit 13:	Duplex Mode Changed */
+#define PHY_M_IS_AN_PR		(1<<12)	/* Bit 12:	Page Received */
+#define PHY_M_IS_AN_COMPL	(1<<11)	/* Bit 11:	Auto-Negotiation Completed */
+#define PHY_M_IS_LST_CHANGE	(1<<10)	/* Bit 10:	Link Status Changed */
+#define PHY_M_IS_SYMB_ERROR	(1<<9)	/* Bit  9:	Symbol Error */
+#define PHY_M_IS_FALSE_CARR	(1<<8)	/* Bit  8:	False Carrier */
+#define PHY_M_IS_FIFO_ERROR	(1<<7)	/* Bit  7:	FIFO Overflow/Underrun Error */
+#define PHY_M_IS_MDI_CHANGE	(1<<6)	/* Bit  6:	MDI Crossover Changed */
+#define PHY_M_IS_DOWNSH_DET	(1<<5)	/* Bit  5:	Downshift Detected */
+#define PHY_M_IS_END_CHANGE	(1<<4)	/* Bit  4:	Energy Detect Changed */
+									/* Bit  3..2:	reserved */
+#define PHY_M_IS_POL_CHANGE	(1<<1)	/* Bit  1:	Polarity Changed */
+#define PHY_M_IS_JABBER		(1<<0)	/* Bit  0:	Jabber */
 
 #define PHY_M_DEF_MSK		(PHY_M_IS_AN_ERROR | PHY_M_IS_AN_PR | \
 							PHY_M_IS_LST_CHANGE | PHY_M_IS_FIFO_ERROR)
 
 /*****  PHY_MARV_EXT_CTRL	16 bit r/w	Ext. PHY Specific Ctrl *****/
-#define PHY_M_EC_ENA_BC_EXT	BIT_15S	/* Enable Block Carr. Ext. (88E1111 only) */
-#define PHY_M_EC_ENA_LIN_LB	BIT_14S	/* Enable Line Loopback (88E1111 only) */
-								/* Bit 13:	reserved */
-#define PHY_M_EC_DIS_LINK_P	BIT_12S	/* Disable Link Pulses (88E1111 only) */
-#define PHY_M_EC_M_DSC_MSK	(3<<10)	/* Bit 11..10:	Master Downshift Counter */
-									/* (88E1011 only) */
-#define PHY_M_EC_S_DSC_MSK	(3<<8)	/* Bit  9.. 8:	Slave  Downshift Counter */
-									/* (88E1011 only) */
-#define PHY_M_EC_DSC_MSK_2	(7<<9)	/* Bit 11.. 9:	Downshift Counter */
-									/* (88E1111 only) */
-#define PHY_M_EC_DOWN_S_ENA	BIT_8S	/* Downshift Enable (88E1111 only) */
-									/* !!! Errata in spec. (1 = disable) */
-#define PHY_M_EC_RX_TIM_CT	BIT_7S	/* RGMII Rx Timing Control*/
+#define PHY_M_EC_M_DSC_MSK	(3<<10)	/* Bit 11..10:	Master downshift counter */
+#define PHY_M_EC_S_DSC_MSK	(3<<8)	/* Bit  9.. 8:	Slave  downshift counter */
 #define PHY_M_EC_MAC_S_MSK	(7<<4)	/* Bit  6.. 4:	Def. MAC interface speed */
-#define PHY_M_EC_FIB_AN_ENA	BIT_3S	/* Fiber Auto-Neg. Enable (88E1011S only) */
-#define PHY_M_EC_DTE_D_ENA	BIT_2S	/* DTE Detect Enable (88E1111 only) */
-#define PHY_M_EC_TX_TIM_CT	BIT_1S	/* RGMII Tx Timing Control */
-#define PHY_M_EC_TRANS_DIS	BIT_0S	/* Transmitter Disable (88E1111 only) */
+#define PHY_M_EC_FIB_AN_ENA	(1<<3)	/* Bit  3:	Fiber Auto-Neg. Enable */
 
-#define PHY_M_EC_M_DSC(x)		(SHIFT10(x) & PHY_M_EC_M_DSC_MSK)
-									/* 00=1x; 01=2x; 10=3x; 11=4x */
-#define PHY_M_EC_S_DSC(x)		(SHIFT8(x) & PHY_M_EC_S_DSC_MSK)
-									/* 00=dis; 01=1x; 10=2x; 11=3x */
-#define PHY_M_EC_MAC_S(x)		(SHIFT4(x) & PHY_M_EC_MAC_S_MSK)
-									/* 01X=0; 110=2.5; 111=25 (MHz) */
+#define PHY_M_EC_M_DSC(x)		SHIFT10(x)	/* 00=1x; 01=2x; 10=3x; 11=4x */
+#define PHY_M_EC_S_DSC(x)		SHIFT8(x)	/* 00=dis; 01=1x; 10=2x; 11=3x */
+#define PHY_M_EC_MAC_S(x)		SHIFT4(x)	/* 01X=0; 110=2.5; 111=25 (MHz) */
 
-#define PHY_M_EC_DSC_2(x)		(SHIFT9(x) & PHY_M_EC_DSC_MSK_2)
-									/* 000=1x; 001=2x; 010=3x; 011=4x */
-									/* 100=5x; 101=6x; 110=7x; 111=8x */
 #define MAC_TX_CLK_0_MHZ	2
 #define MAC_TX_CLK_2_5_MHZ	6
 #define MAC_TX_CLK_25_MHZ	7
 
 /*****  PHY_MARV_LED_CTRL	16 bit r/w	LED Control Reg *****/
-#define PHY_M_LEDC_DIS_LED	BIT_15S	/* Disable LED */
-#define PHY_M_LEDC_PULS_MSK	(7<<12)	/* Bit 14..12: Pulse Stretch Mask */
-#define PHY_M_LEDC_F_INT	BIT_11S	/* Force Interrupt */
-#define PHY_M_LEDC_BL_R_MSK	(7<<8)	/* Bit 10.. 8: Blink Rate Mask */
-#define PHY_M_LEDC_DP_C_LSB	BIT_7S	/* Duplex Control (LSB, 88E1111 only) */
-#define PHY_M_LEDC_TX_C_LSB	BIT_6S	/* Tx Control (LSB, 88E1111 only) */
-#define PHY_M_LEDC_LK_C_MSK	(7<<3)	/* Bit  5.. 3: Link Control Mask */
-									/* (88E1111 only) */
-								/* Bit  7.. 5:	reserved (88E1011 only) */
-#define PHY_M_LEDC_LINK_MSK	(3<<3)	/* Bit  4.. 3: Link Control Mask */
-									/* (88E1011 only) */
-#define PHY_M_LEDC_DP_CTRL	BIT_2S	/* Duplex Control */
-#define PHY_M_LEDC_DP_C_MSB	BIT_2S	/* Duplex Control (MSB, 88E1111 only) */
-#define PHY_M_LEDC_RX_CTRL	BIT_1S	/* Rx Activity / Link */
-#define PHY_M_LEDC_TX_CTRL	BIT_0S	/* Tx Activity / Link */
-#define PHY_M_LEDC_TX_C_MSB	BIT_0S	/* Tx Control (MSB, 88E1111 only) */
+#define PHY_M_LEDC_DIS_LED	(1<<15)	/* Bit 15:	Disable LED */
+#define PHY_M_LEDC_PULS_MSK	(7<<12)	/* Bit 14..12:  Pulse Stretch Mask */
+#define PHY_M_LEDC_F_INT	(1<<11)	/* Bit 11:	Force Interrupt */
+#define PHY_M_LEDC_BL_R_MSK	(7<<8)	/* Bit 10.. 8:  Blink Rate Mask */
+									/* Bit  7.. 5:	reserved */
+#define PHY_M_LEDC_LINK_MSK	(3<<3)	/* Bit  4.. 3:	Link Control Mask */
+#define PHY_M_LEDC_DP_CTRL	(1<<2)	/* Bit  2:	Duplex Control */
+#define PHY_M_LEDC_RX_CTRL	(1<<1)	/* Bit  1:	Rx activity / Link */
+#define PHY_M_LEDC_TX_CTRL	(1<<0)	/* Bit  0:	Tx activity / Link */
 
-#define PHY_M_LED_PULS_DUR(x)	(SHIFT12(x) & PHY_M_LEDC_PULS_MSK)
+#define PHY_M_LED_PULS_DUR(x)	SHIFT12(x)	/* Pulse Stretch Duration */
 
-#define PULS_NO_STR		0		/* no pulse stretching */
-#define PULS_21MS		1		/* 21 ms to 42 ms */
+#define	PULS_NO_STR		0		/* no pulse stretching */
+#define	PULS_21MS		1		/* 21 ms to 42 ms */
 #define PULS_42MS		2		/* 42 ms to 84 ms */
 #define PULS_84MS		3		/* 84 ms to 170 ms */
 #define PULS_170MS		4		/* 170 ms to 340 ms */
@@ -1291,7 +1217,7 @@ extern "C" {
 #define PULS_670MS		6		/* 670 ms to 1.3 s */
 #define PULS_1300MS		7		/* 1.3 s to 2.7 s */
 
-#define PHY_M_LED_BLINK_RT(x)	(SHIFT8(x) & PHY_M_LEDC_BL_R_MSK)
+#define PHY_M_LED_BLINK_RT(x)	SHIFT8(x)	/* Blink Rate */
 
 #define BLINK_42MS		0		/* 42 ms */
 #define BLINK_84MS		1		/* 84 ms */
@@ -1301,8 +1227,6 @@ extern "C" {
 								/* values 5 - 7: reserved */
 
 /*****  PHY_MARV_LED_OVER	16 bit r/w	Manual LED Override Reg *****/
-#define PHY_M_LED_MO_SGMII(x)	SHIFT14(x)	/* Bit 15..14:  SGMII AN Timer */
-										/* Bit 13..12:	reserved */
 #define PHY_M_LED_MO_DUP(x)		SHIFT10(x)	/* Bit 11..10:  Duplex */
 #define PHY_M_LED_MO_10(x)		SHIFT8(x)	/* Bit  9.. 8:  Link 10 */
 #define PHY_M_LED_MO_100(x)		SHIFT6(x)	/* Bit  7.. 6:  Link 100 */
@@ -1316,35 +1240,30 @@ extern "C" {
 #define MO_LED_ON			3
 
 /*****  PHY_MARV_EXT_CTRL_2	16 bit r/w	Ext. PHY Specific Ctrl 2 *****/
-								/* Bit 15.. 7:	reserved */
-#define PHY_M_EC2_FI_IMPED	BIT_6S	/* Fiber Input  Impedance */
-#define PHY_M_EC2_FO_IMPED	BIT_5S	/* Fiber Output Impedance */
-#define PHY_M_EC2_FO_M_CLK	BIT_4S	/* Fiber Mode Clock Enable */
-#define PHY_M_EC2_FO_BOOST	BIT_3S	/* Fiber Output Boost */
+									/* Bit 15.. 7:	reserved */
+#define PHY_M_EC2_FI_IMPED	(1<<6)	/* Bit  6:	Fiber Input  Impedance */
+#define PHY_M_EC2_FO_IMPED	(1<<5)	/* Bit  5:	Fiber Output Impedance */
+#define PHY_M_EC2_FO_M_CLK	(1<<4)	/* Bit  4:	Fiber Mode Clock Enable */
+#define PHY_M_EC2_FO_BOOST	(1<<3)	/* Bit  3:	Fiber Output Boost */
 #define PHY_M_EC2_FO_AM_MSK	7		/* Bit  2.. 0:	Fiber Output Amplitude */
 
-/*****  PHY_MARV_EXT_P_STAT 16 bit r/w	Ext. PHY Specific Status *****/
-#define PHY_M_FC_AUTO_SEL	BIT_15S	/* Fiber/Copper Auto Sel. Dis. */
-#define PHY_M_FC_AN_REG_ACC	BIT_14S	/* Fiber/Copper AN Reg. Access */
-#define PHY_M_FC_RESOLUTION	BIT_13S	/* Fiber/Copper Resolution */
-#define PHY_M_SER_IF_AN_BP	BIT_12S	/* Ser. IF AN Bypass Enable */
-#define PHY_M_SER_IF_BP_ST	BIT_11S	/* Ser. IF AN Bypass Status */
-#define PHY_M_IRQ_POLARITY	BIT_10S	/* IRQ polarity */
-#define PHY_M_DIS_AUT_MED	BIT_9S	/* Disable Aut. Medium Reg. Selection */
-									/* (88E1111 only) */
-								/* Bit  9.. 4: reserved (88E1011 only) */
-#define PHY_M_UNDOC1		BIT_7S	/* undocumented bit !! */
-#define PHY_M_DTE_POW_STAT	BIT_4S	/* DTE Power Status (88E1111 only) */
-#define PHY_M_MODE_MASK		0xf		/* Bit  3.. 0: copy of HWCFG MODE[3:0] */
+/*****	PHY_MARV_EXT_P_STAT 16 bit r/w	Ext. PHY Specific Status *****/
+#define PHY_M_FC_AUTO_SEL	(1<<15)	/* Bit 15:	Fiber/Copper Auto Sel. dis. */
+#define PHY_M_FC_AN_REG_ACC (1<<14) /* Bit 14:	Fiber/Copper Autoneg. reg acc */
+#define PHY_M_FC_RESULUTION (1<<13)	/* Bit 13:	Fiber/Copper Resulution */
+#define PHY_M_SER_IF_AN_BP  (1<<12) /* Bit 12:	Ser IF autoneg. bypass enable */
+#define PHY_M_SER_IF_BP_ST	(1<<11) /* Bit 11:	Ser IF autoneg. bypass status */
+#define PHY_M_IRQ_POLARITY	(1<<10) /* Bit 10:	IRQ polarity */
+									/* Bit 9..4: reserved */
+#define PHY_M_UNDOC1		(1<< 7) /* undocumented bit !! */
+#define PHY_M_MODE_MASK		(0xf<<0)/* Bit 3..0: copy of HWCFG MODE[3:0] */
+
 
 /*****  PHY_MARV_CABLE_DIAG	16 bit r/o	Cable Diagnostic Reg *****/
-#define PHY_M_CABD_ENA_TEST	BIT_15S		/* Enable Test (Page 0) */
-#define PHY_M_CABD_DIS_WAIT	BIT_15S		/* Disable Waiting Period (Page 1) */
-										/* (88E1111 only) */
-#define PHY_M_CABD_STAT_MSK	(3<<13)		/* Bit 14..13: Status Mask */
-#define PHY_M_CABD_AMPL_MSK	(0x1f<<8)	/* Bit 12.. 8: Amplitude Mask */
-										/* (88E1111 only) */
-#define PHY_M_CABD_DIST_MSK	0xff		/* Bit  7.. 0: Distance Mask */
+#define PHY_M_CABD_ENA_TEST	(1<<15)	/* Bit 15:	Enable Test */
+#define PHY_M_CABD_STAT_MSK	(3<<13)	/* Bit 14..13:	Status */
+									/* Bit 12.. 8:	reserved */
+#define PHY_M_CABD_DIST_MSK	0xff	/* Bit  7.. 0:	Distance */
 
 /* values for Cable Diagnostic Status (11=fail; 00=OK; 10=open; 01=short) */
 #define CABD_STAT_NORMAL	0
@@ -1352,72 +1271,6 @@ extern "C" {
 #define CABD_STAT_OPEN		2
 #define CABD_STAT_FAIL		3
 
-/* for 10/100 Fast Ethernet PHY (88E3082 only) */
-/*****  PHY_MARV_FE_LED_PAR		16 bit r/w	LED Parallel Select Reg. *****/
-									/* Bit 15..12: reserved (used internally) */
-#define PHY_M_FELP_LED2_MSK	(0xf<<8)	/* Bit 11.. 8: LED2 Mask (LINK) */
-#define PHY_M_FELP_LED1_MSK	(0xf<<4)	/* Bit  7.. 4: LED1 Mask (ACT) */
-#define PHY_M_FELP_LED0_MSK	0xf			/* Bit  3.. 0: LED0 Mask (SPEED) */
-
-#define PHY_M_FELP_LED2_CTRL(x)	(SHIFT8(x) & PHY_M_FELP_LED2_MSK)
-#define PHY_M_FELP_LED1_CTRL(x)	(SHIFT4(x) & PHY_M_FELP_LED1_MSK)
-#define PHY_M_FELP_LED0_CTRL(x)	(SHIFT0(x) & PHY_M_FELP_LED0_MSK)
-
-#define LED_PAR_CTRL_COLX	0x00
-#define LED_PAR_CTRL_ERROR	0x01
-#define LED_PAR_CTRL_DUPLEX	0x02
-#define LED_PAR_CTRL_DP_COL	0x03
-#define LED_PAR_CTRL_SPEED	0x04
-#define LED_PAR_CTRL_LINK	0x05
-#define LED_PAR_CTRL_TX		0x06
-#define LED_PAR_CTRL_RX		0x07
-#define LED_PAR_CTRL_ACT	0x08
-#define LED_PAR_CTRL_LNK_RX	0x09
-#define LED_PAR_CTRL_LNK_AC	0x0a
-#define LED_PAR_CTRL_ACT_BL	0x0b
-#define LED_PAR_CTRL_TX_BL	0x0c
-#define LED_PAR_CTRL_RX_BL	0x0d
-#define LED_PAR_CTRL_COL_BL	0x0e
-#define LED_PAR_CTRL_INACT	0x0f
-
-/*****  PHY_MARV_FE_SPEC_2		16 bit r/w	Specific Control Reg. 2 *****/
-#define PHY_M_FESC_DIS_WAIT	BIT_2S		/* Disable TDR Waiting Period */
-#define PHY_M_FESC_ENA_MCLK	BIT_1S		/* Enable MAC Rx Clock in sleep mode */
-#define PHY_M_FESC_SEL_CL_A	BIT_0S		/* Select Class A driver (100B-TX) */
-
-/* for Yukon-2 Gigabit Ethernet PHY (88E1112 only) */
-/*****  PHY_MARV_PHY_CTRL (page 2)		16 bit r/w	MAC Specific Ctrl *****/
-#define PHY_M_MAC_MD_MSK	(7<<7)		/* Bit  9.. 7: Mode Select Mask */
-#define PHY_M_MAC_MD_AUTO		3	/* Auto Copper/1000Base-X */
-#define PHY_M_MAC_MD_COPPER		5	/* Copper only */
-#define PHY_M_MAC_MD_1000BX		7	/* 1000Base-X only */
-#define PHY_M_MAC_MODE_SEL(x)	(SHIFT7(x) & PHY_M_MAC_MD_MSK)
-
-/*****  PHY_MARV_PHY_CTRL (page 3)		16 bit r/w	LED Control Reg. *****/
-#define PHY_M_LEDC_LOS_MSK	(0xf<<12)	/* Bit 15..12: LOS LED Ctrl. Mask */
-#define PHY_M_LEDC_INIT_MSK	(0xf<<8)	/* Bit 11.. 8: INIT LED Ctrl. Mask */
-#define PHY_M_LEDC_STA1_MSK	(0xf<<4)	/* Bit  7.. 4: STAT1 LED Ctrl. Mask */
-#define PHY_M_LEDC_STA0_MSK	0xf			/* Bit  3.. 0: STAT0 LED Ctrl. Mask */
-
-#define PHY_M_LEDC_LOS_CTRL(x)	(SHIFT12(x) & PHY_M_LEDC_LOS_MSK)
-#define PHY_M_LEDC_INIT_CTRL(x)	(SHIFT8(x) & PHY_M_LEDC_INIT_MSK)
-#define PHY_M_LEDC_STA1_CTRL(x)	(SHIFT4(x) & PHY_M_LEDC_STA1_MSK)
-#define PHY_M_LEDC_STA0_CTRL(x)	(SHIFT0(x) & PHY_M_LEDC_STA0_MSK)
-
-/*****  PHY_MARV_PHY_STAT (page 3)		16 bit r/w	Polarity Control Reg. *****/
-#define PHY_M_POLC_LS1M_MSK	(0xf<<12)	/* Bit 15..12: LOS,STAT1 Mix % Mask */
-#define PHY_M_POLC_IS0M_MSK	(0xf<<8)	/* Bit 11.. 8: INIT,STAT0 Mix % Mask */
-#define PHY_M_POLC_LOS_MSK	(0x3<<6)	/* Bit  7.. 6: LOS Pol. Ctrl. Mask */
-#define PHY_M_POLC_INIT_MSK	(0x3<<4)	/* Bit  5.. 4: INIT Pol. Ctrl. Mask */
-#define PHY_M_POLC_STA1_MSK	(0x3<<2)	/* Bit  3.. 2: STAT1 Pol. Ctrl. Mask */
-#define PHY_M_POLC_STA0_MSK	0x3			/* Bit  1.. 0: STAT0 Pol. Ctrl. Mask */
-
-#define PHY_M_POLC_LS1_P_MIX(x)	(SHIFT12(x) & PHY_M_POLC_LS1M_MSK)
-#define PHY_M_POLC_IS0_P_MIX(x)	(SHIFT8(x) & PHY_M_POLC_IS0M_MSK)
-#define PHY_M_POLC_LOS_CTRL(x)	(SHIFT6(x) & PHY_M_POLC_LOS_MSK)
-#define PHY_M_POLC_INIT_CTRL(x)	(SHIFT4(x) & PHY_M_POLC_INIT_MSK)
-#define PHY_M_POLC_STA1_CTRL(x)	(SHIFT2(x) & PHY_M_POLC_STA1_MSK)
-#define PHY_M_POLC_STA0_CTRL(x)	(SHIFT0(x) & PHY_M_POLC_STA0_MSK)
 
 /*
  * GMAC registers
@@ -1578,159 +1431,141 @@ extern "C" {
  */
 
 /*	GM_GP_STAT	16 bit r/o	General Purpose Status Register */
-#define GM_GPSR_SPEED		BIT_15S	/* Port Speed (1 = 100 Mbps) */
-#define GM_GPSR_DUPLEX		BIT_14S	/* Duplex Mode (1 = Full) */
-#define GM_GPSR_FC_TX_DIS	BIT_13S	/* Tx Flow-Control Mode Disabled */
-#define GM_GPSR_LINK_UP		BIT_12S	/* Link Up Status */
-#define GM_GPSR_PAUSE		BIT_11S	/* Pause State */
-#define GM_GPSR_TX_ACTIVE	BIT_10S	/* Tx in Progress */
-#define GM_GPSR_EXC_COL		BIT_9S	/* Excessive Collisions Occured */
-#define GM_GPSR_LAT_COL		BIT_8S	/* Late Collisions Occured */
-								/* Bit   7.. 6:	reserved */
-#define GM_GPSR_PHY_ST_CH	BIT_5S	/* PHY Status Change */
-#define GM_GPSR_GIG_SPEED	BIT_4S	/* Gigabit Speed (1 = 1000 Mbps) */
-#define GM_GPSR_PART_MODE	BIT_3S	/* Partition mode */
-#define GM_GPSR_FC_RX_DIS	BIT_2S	/* Rx Flow-Control Mode Disabled */
-								/* Bit   2.. 0:	reserved */
-
+#define GM_GPSR_SPEED		(1<<15) /* Bit 15:	Port Speed (1 = 100 Mbps) */
+#define GM_GPSR_DUPLEX		(1<<14) /* Bit 14:	Duplex Mode (1 = Full) */
+#define GM_GPSR_FC_TX_DIS	(1<<13) /* Bit 13:	Tx Flow-Control Mode Disabled */
+#define GM_GPSR_LINK_UP		(1<<12)	/* Bit 12:	Link Up Status */
+#define GM_GPSR_PAUSE		(1<<11)	/* Bit 11:	Pause State */
+#define GM_GPSR_TX_ACTIVE	(1<<10)	/* Bit 10:	Tx in Progress */
+#define GM_GPSR_EXC_COL		(1<<9)	/* Bit  9:	Excessive Collisions Occured */
+#define GM_GPSR_LAT_COL		(1<<8)	/* Bit  8:	Late Collisions Occured */
+								/* Bit  7..6:	reserved */
+#define GM_GPSR_PHY_ST_CH	(1<<5)	/* Bit  5:	PHY Status Change */
+#define GM_GPSR_GIG_SPEED	(1<<4)	/* Bit  4:	Gigabit Speed (1 = 1000 Mbps) */
+#define GM_GPSR_PART_MODE	(1<<3)	/* Bit  3:	Partition mode */
+#define GM_GPSR_FC_RX_DIS	(1<<2)	/* Bit  2:	Rx Flow-Control Mode Disabled */
+#define GM_GPSR_PROM_EN		(1<<1)	/* Bit  1:	Promiscuous Mode Enabled */
+								/* Bit  0:	reserved */
+	
 /*	GM_GP_CTRL	16 bit r/w	General Purpose Control Register */
-#define GM_GPCR_RMII_PH_ENA	BIT_15S	/* Enable RMII for PHY (Yukon-FE only) */
-#define GM_GPCR_RMII_LB_ENA	BIT_14S	/* Enable RMII Loopback (Yukon-FE only) */
-#define GM_GPCR_FC_TX_DIS	BIT_13S	/* Disable Tx Flow-Control Mode */
-#define GM_GPCR_TX_ENA		BIT_12S	/* Enable Transmit */
-#define GM_GPCR_RX_ENA		BIT_11S	/* Enable Receive */
-								/* Bit 10:	reserved */
-#define GM_GPCR_LOOP_ENA	BIT_9S	/* Enable MAC Loopback Mode */
-#define GM_GPCR_PART_ENA	BIT_8S	/* Enable Partition Mode */
-#define GM_GPCR_GIGS_ENA	BIT_7S	/* Gigabit Speed (1000 Mbps) */
-#define GM_GPCR_FL_PASS		BIT_6S	/* Force Link Pass */
-#define GM_GPCR_DUP_FULL	BIT_5S	/* Full Duplex Mode */
-#define GM_GPCR_FC_RX_DIS	BIT_4S	/* Disable Rx Flow-Control Mode */
-#define GM_GPCR_SPEED_100	BIT_3S	/* Port Speed 100 Mbps */
-#define GM_GPCR_AU_DUP_DIS	BIT_2S	/* Disable Auto-Update Duplex */
-#define GM_GPCR_AU_FCT_DIS	BIT_1S	/* Disable Auto-Update Flow-C. */
-#define GM_GPCR_AU_SPD_DIS	BIT_0S	/* Disable Auto-Update Speed */
+								/* Bit 15:	reserved */
+#define GM_GPCR_PROM_ENA	(1<<14)	/* Bit 14:	Enable Promiscuous Mode */
+#define GM_GPCR_FC_TX_DIS	(1<<13) /* Bit 13:	Disable Tx Flow-Control Mode */
+#define GM_GPCR_TX_ENA		(1<<12) /* Bit 12:	Enable Transmit */
+#define GM_GPCR_RX_ENA		(1<<11) /* Bit 11:	Enable Receive */
+#define GM_GPCR_BURST_ENA	(1<<10)	/* Bit 10:	Enable Burst Mode */
+#define GM_GPCR_LOOP_ENA	(1<<9)	/* Bit  9:	Enable MAC Loopback Mode */
+#define GM_GPCR_PART_ENA	(1<<8)	/* Bit  8:	Enable Partition Mode */
+#define GM_GPCR_GIGS_ENA	(1<<7)	/* Bit  7:	Gigabit Speed (1000 Mbps) */
+#define GM_GPCR_FL_PASS		(1<<6)	/* Bit  6:	Force Link Pass */
+#define GM_GPCR_DUP_FULL	(1<<5)	/* Bit  5:	Full Duplex Mode */
+#define GM_GPCR_FC_RX_DIS	(1<<4)	/* Bit  4:	Disable Rx Flow-Control Mode */
+#define GM_GPCR_SPEED_100	(1<<3)  /* Bit  3:	Port Speed 100 Mbps */
+#define GM_GPCR_AU_DUP_DIS	(1<<2)	/* Bit  2:	Disable Auto-Update Duplex */
+#define GM_GPCR_AU_FCT_DIS	(1<<1)	/* Bit  1:	Disable Auto-Update Flow-C. */
+#define GM_GPCR_AU_SPD_DIS	(1<<0)	/* Bit  0:	Disable Auto-Update Speed */
 
 #define GM_GPCR_SPEED_1000	(GM_GPCR_GIGS_ENA | GM_GPCR_SPEED_100)
 #define GM_GPCR_AU_ALL_DIS	(GM_GPCR_AU_DUP_DIS | GM_GPCR_AU_FCT_DIS |\
 							 GM_GPCR_AU_SPD_DIS)
-
+	
 /*	GM_TX_CTRL				16 bit r/w	Transmit Control Register */
-#define GM_TXCR_FORCE_JAM	BIT_15S	/* Force Jam / Flow-Control */
-#define GM_TXCR_CRC_DIS		BIT_14S	/* Disable insertion of CRC */
-#define GM_TXCR_PAD_DIS		BIT_13S	/* Disable padding of packets */
-#define GM_TXCR_COL_THR_MSK	(7<<10)	/* Bit 12..10: Collision Threshold Mask */
-								/* Bit   9.. 8:	reserved */
-#define GM_TXCR_PAD_PAT_MSK	0xff	/* Bit  7.. 0: Padding Pattern Mask */
-									/* (Yukon-2 only) */
+#define GM_TXCR_FORCE_JAM	(1<<15)	/* Bit 15:	Force Jam / Flow-Control */
+#define GM_TXCR_CRC_DIS		(1<<14)	/* Bit 14:	Disable insertion of CRC */
+#define GM_TXCR_PAD_DIS		(1<<13)	/* Bit 13:	Disable padding of packets */
+#define GM_TXCR_COL_THR_MSK	(1<<10)	/* Bit 12..10:	Collision Threshold */
 
 #define TX_COL_THR(x)		(SHIFT10(x) & GM_TXCR_COL_THR_MSK)
 
 #define TX_COL_DEF			0x04
-
+	
 /*	GM_RX_CTRL				16 bit r/w	Receive Control Register */
-#define GM_RXCR_UCF_ENA		BIT_15S	/* Enable Unicast filtering */
-#define GM_RXCR_MCF_ENA		BIT_14S	/* Enable Multicast filtering */
-#define GM_RXCR_CRC_DIS		BIT_13S	/* Remove 4-byte CRC */
-#define GM_RXCR_PASS_FC		BIT_12S	/* Pass FC packets to FIFO (Yukon-1 only) */
-								/* Bit  11.. 0:	reserved */
-
+#define GM_RXCR_UCF_ENA		(1<<15)	/* Bit 15:	Enable Unicast filtering */
+#define GM_RXCR_MCF_ENA		(1<<14)	/* Bit 14:	Enable Multicast filtering */
+#define GM_RXCR_CRC_DIS		(1<<13)	/* Bit 13:	Remove 4-byte CRC */
+#define GM_RXCR_PASS_FC		(1<<12)	/* Bit 12:	Pass FC packets to FIFO */
+	
 /*	GM_TX_PARAM				16 bit r/w	Transmit Parameter Register */
-#define GM_TXPA_JAMLEN_MSK	(3<<14)		/* Bit 15..14: Jam Length Mask */
-#define GM_TXPA_JAMIPG_MSK	(0x1f<<9)	/* Bit 13.. 9: Jam IPG Mask */
-#define GM_TXPA_JAMDAT_MSK	(0x1f<<4)	/* Bit  8.. 4: IPG Jam to Data Mask */
-#define GM_TXPA_BO_LIM_MSK	0x0f		/* Bit  3.. 0: Backoff Limit Mask */
-										/* (Yukon-2 only) */
+#define GM_TXPA_JAMLEN_MSK	(0x03<<14)	/* Bit 15..14:	Jam Length */
+#define GM_TXPA_JAMIPG_MSK	(0x1f<<9)	/* Bit 13..9:	Jam IPG */
+#define GM_TXPA_JAMDAT_MSK	(0x1f<<4)	/* Bit  8..4:	IPG Jam to Data */
+								/* Bit  3..0:	reserved */
 
 #define TX_JAM_LEN_VAL(x)	(SHIFT14(x) & GM_TXPA_JAMLEN_MSK)
 #define TX_JAM_IPG_VAL(x)	(SHIFT9(x) & GM_TXPA_JAMIPG_MSK)
 #define TX_IPG_JAM_DATA(x)	(SHIFT4(x) & GM_TXPA_JAMDAT_MSK)
-#define TX_BACK_OFF_LIM(x)	((x) & GM_TXPA_BO_LIM_MSK)
 
 #define TX_JAM_LEN_DEF		0x03
 #define TX_JAM_IPG_DEF		0x0b
 #define TX_IPG_JAM_DEF		0x1c
-#define TX_BOF_LIM_DEF		0x04
 
 /*	GM_SERIAL_MODE			16 bit r/w	Serial Mode Register */
-#define GM_SMOD_DATABL_MSK	(0x1f<<11)	/* Bit 15..11:	Data Blinder */
-										/* r/o on Yukon, r/w on Yukon-EC */
-#define GM_SMOD_LIMIT_4		BIT_10S	/* 4 consecutive Tx trials */
-#define GM_SMOD_VLAN_ENA	BIT_9S	/* Enable VLAN  (Max. Frame Len) */
-#define GM_SMOD_JUMBO_ENA	BIT_8S	/* Enable Jumbo (Max. Frame Len) */
-								/* Bit   7.. 5:	reserved */
-#define GM_SMOD_IPG_MSK		0x1f	/* Bit  4.. 0:	Inter-Packet Gap (IPG) */
-
+#define GM_SMOD_DATABL_MSK	(0x1f<<11)	/* Bit 15..11:	Data Blinder (r/o) */
+#define GM_SMOD_LIMIT_4		(1<<10)	/* Bit 10:	4 consecutive Tx trials */
+#define GM_SMOD_VLAN_ENA	(1<<9)	/* Bit  9:	Enable VLAN  (Max. Frame Len) */
+#define GM_SMOD_JUMBO_ENA	(1<<8)	/* Bit  8:	Enable Jumbo (Max. Frame Len) */
+								/* Bit  7..5:	reserved */
+#define GM_SMOD_IPG_MSK		0x1f	/* Bit 4..0:	Inter-Packet Gap (IPG) */
+	
 #define DATA_BLIND_VAL(x)	(SHIFT11(x) & GM_SMOD_DATABL_MSK)
-#define IPG_DATA_VAL(x)		((x) & GM_SMOD_IPG_MSK)
-
 #define DATA_BLIND_DEF		0x04
+
+#define IPG_DATA_VAL(x)		(x & GM_SMOD_IPG_MSK)
 #define IPG_DATA_DEF		0x1e
 
 /*	GM_SMI_CTRL				16 bit r/w	SMI Control Register */
 #define GM_SMI_CT_PHY_A_MSK	(0x1f<<11)	/* Bit 15..11:	PHY Device Address */
 #define GM_SMI_CT_REG_A_MSK	(0x1f<<6)	/* Bit 10.. 6:	PHY Register Address */
-#define GM_SMI_CT_OP_RD		BIT_5S	/* OpCode Read (0=Write)*/
-#define GM_SMI_CT_RD_VAL	BIT_4S	/* Read Valid (Read completed) */
-#define GM_SMI_CT_BUSY		BIT_3S	/* Busy (Operation in progress) */
-								/* Bit   2.. 0:	reserved */
-
+#define GM_SMI_CT_OP_RD		(1<<5)	/* Bit  5:	OpCode Read (0=Write)*/
+#define GM_SMI_CT_RD_VAL	(1<<4)	/* Bit  4:	Read Valid (Read completed) */
+#define GM_SMI_CT_BUSY		(1<<3)	/* Bit  3:	Busy (Operation in progress) */
+								/* Bit   2..0:	reserved */
+	
 #define GM_SMI_CT_PHY_AD(x)	(SHIFT11(x) & GM_SMI_CT_PHY_A_MSK)
 #define GM_SMI_CT_REG_AD(x)	(SHIFT6(x) & GM_SMI_CT_REG_A_MSK)
 
 	/*	GM_PHY_ADDR				16 bit r/w	GPHY Address Register */
-								/* Bit  15.. 6:	reserved */
-#define GM_PAR_MIB_CLR		BIT_5S	/* Set MIB Clear Counter Mode */
-#define GM_PAR_MIB_TST		BIT_4S	/* MIB Load Counter (Test Mode) */
-								/* Bit   3.. 0:	reserved */
-
+								/* Bit  15..6:	reserved */
+#define GM_PAR_MIB_CLR		(1<<5)	/* Bit  5:	Set MIB Clear Counter Mode */
+#define GM_PAR_MIB_TST		(1<<4)	/* Bit  4:	MIB Load Counter (Test Mode) */
+								/* Bit   3..0:	reserved */
+	
 /* Receive Frame Status Encoding */
-#define GMR_FS_LEN_MSK	(0xffffUL<<16)	/* Bit 31..16:	Rx Frame Length */
+#define GMR_FS_LEN	(0xffffUL<<16)	/* Bit 31..16:	Rx Frame Length */
 								/* Bit  15..14:	reserved */
-#define GMR_FS_VLAN			BIT_13	/* VLAN Packet */
-#define GMR_FS_JABBER		BIT_12	/* Jabber Packet */
-#define GMR_FS_UN_SIZE		BIT_11	/* Undersize Packet */
-#define GMR_FS_MC			BIT_10	/* Multicast Packet */
-#define GMR_FS_BC			BIT_9	/* Broadcast Packet */
-#define GMR_FS_RX_OK		BIT_8	/* Receive OK (Good Packet) */
-#define GMR_FS_GOOD_FC		BIT_7	/* Good Flow-Control Packet */
-#define GMR_FS_BAD_FC		BIT_6	/* Bad  Flow-Control Packet */
-#define GMR_FS_MII_ERR		BIT_5	/* MII Error */
-#define GMR_FS_LONG_ERR		BIT_4	/* Too Long Packet */
-#define GMR_FS_FRAGMENT		BIT_3	/* Fragment */
+#define GMR_FS_VLAN		(1L<<13)	/* Bit 13:	VLAN Packet */
+#define GMR_FS_JABBER	(1L<<12)	/* Bit 12:	Jabber Packet */
+#define GMR_FS_UN_SIZE	(1L<<11)	/* Bit 11:	Undersize Packet */
+#define GMR_FS_MC		(1L<<10)	/* Bit 10:	Multicast Packet */
+#define GMR_FS_BC		(1L<<9)		/* Bit  9:	Broadcast Packet */
+#define GMR_FS_RX_OK	(1L<<8)		/* Bit  8:	Receive OK (Good Packet) */
+#define GMR_FS_GOOD_FC	(1L<<7)		/* Bit  7:	Good Flow-Control Packet */
+#define GMR_FS_BAD_FC	(1L<<6)		/* Bit  6:	Bad  Flow-Control Packet */
+#define GMR_FS_MII_ERR	(1L<<5)		/* Bit  5:	MII Error */
+#define GMR_FS_LONG_ERR	(1L<<4)		/* Bit  4:	Too Long Packet */
+#define GMR_FS_FRAGMENT	(1L<<3)		/* Bit  3:	Fragment */
 								/* Bit  2:	reserved */
-#define GMR_FS_CRC_ERR		BIT_1	/* CRC Error */
-#define GMR_FS_RX_FF_OV		BIT_0	/* Rx FIFO Overflow */
-
-#define GMR_FS_LEN_SHIFT	16
+#define GMR_FS_CRC_ERR	(1L<<1)		/* Bit  1:	CRC Error */
+#define GMR_FS_RX_FF_OV	(1L<<0)		/* Bit  0:	Rx FIFO Overflow */
 
 /*
  * GMR_FS_ANY_ERR (analogous to XMR_FS_ANY_ERR)
  */
-#ifdef SK_DIAG
-#define GMR_FS_ANY_ERR		( \
-			GMR_FS_RX_FF_OV | \
-			GMR_FS_CRC_ERR | \
-			GMR_FS_FRAGMENT | \
+#define GMR_FS_ANY_ERR	(GMR_FS_CRC_ERR | \
+			GMR_FS_LONG_ERR | \
 			GMR_FS_MII_ERR | \
 			GMR_FS_BAD_FC | \
 			GMR_FS_GOOD_FC | \
 			GMR_FS_JABBER)
-#else
-#define GMR_FS_ANY_ERR		( \
+
+/* Rx GMAC FIFO Flush Mask (default) */
+#define RX_FF_FL_DEF_MSK	(GMR_FS_CRC_ERR | \
 			GMR_FS_RX_FF_OV | \
-			GMR_FS_CRC_ERR | \
-			GMR_FS_FRAGMENT | \
-			GMR_FS_LONG_ERR | \
 			GMR_FS_MII_ERR | \
 			GMR_FS_BAD_FC | \
 			GMR_FS_GOOD_FC | \
 			GMR_FS_UN_SIZE | \
 			GMR_FS_JABBER)
-#endif
-
-/* Rx GMAC FIFO Flush Mask (default) */
-#define RX_FF_FL_DEF_MSK	GMR_FS_ANY_ERR
 
 /* typedefs *******************************************************************/
 

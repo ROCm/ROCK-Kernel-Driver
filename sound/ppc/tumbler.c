@@ -48,9 +48,6 @@
 #define DBG(fmt...)
 #endif
 
-/* Define this if to toggle off DRC automatically when headphone is plugged in */
-/* #define AUTO_TOGGLE_DRC */
-
 /* i2c address for tumbler */
 #define TAS_I2C_ADDR	0x34
 
@@ -951,9 +948,6 @@ static void device_change_handler(void *self)
 			msleep(10);
 		check_mute(chip, &mix->amp_mute, 1, mix->auto_mute_notify,
 			   chip->speaker_sw_ctl);
-#ifdef AUTO_TOGGLE_DRC
-		mix->drc_enable = 0;
-#endif
 	} else {
 		/* unmute speaker, mute others */
 		check_mute(chip, &mix->amp_mute, 0, mix->auto_mute_notify,
@@ -965,21 +959,16 @@ static void device_change_handler(void *self)
 		if (mix->line_mute.addr != 0)
 			check_mute(chip, &mix->line_mute, 1, mix->auto_mute_notify,
 				   chip->lineout_sw_ctl);
-#ifdef AUTO_TOGGLE_DRC
-		mix->drc_enable = 1;
-#endif
 	}
-	if (mix->auto_mute_notify) {
+	if (mix->auto_mute_notify)
 		snd_ctl_notify(chip->card, SNDRV_CTL_EVENT_MASK_VALUE,
 				       &chip->hp_detect_ctl->id);
-#ifdef AUTO_TOGGLE_DRC
+
+#ifdef CONFIG_SND_POWERMAC_AUTO_DRC
+	mix->drc_enable = ! (headphone || lineout);
+	if (mix->auto_mute_notify)
 		snd_ctl_notify(chip->card, SNDRV_CTL_EVENT_MASK_VALUE,
 			       &chip->drc_sw_ctl->id);
-#endif
-	}
-
-#ifdef AUTO_TOGGLE_DRC
-	/* first set the DRC so the speaker do not explode -ReneR */
 	if (chip->model == PMAC_TUMBLER)
 		tumbler_set_drc(mix);
 	else
@@ -1084,7 +1073,7 @@ static long tumbler_find_device(const char *device, const char *platform, pmac_g
 		gp->inactive_val = (*base) ? 0x4 : 0x5;
 	} else {
 		u32 *prop = NULL;
-		gp->active_state = 1;
+		gp->active_state = 0;
 		gp->active_val = 0x4;
 		gp->inactive_val = 0x5;
 		/* Here are some crude hacks to extract the GPIO polarity and
@@ -1386,7 +1375,7 @@ int __init snd_pmac_tumbler_init(pmac_t *chip)
 		mix->drc_range = (TAS3001_DRC_MAX * 6) / 10;
 	else
 		mix->drc_range = (TAS3004_DRC_MAX * 6) / 10;
-	mix->drc_enable = 1; /* will be changed later if AUTO_TOGGLE_DRC is set */
+	mix->drc_enable = 1; /* will be changed later if AUTO_DRC is set */
 	if (chip->model == PMAC_TUMBLER)
 		tumbler_set_drc(mix);
 	else

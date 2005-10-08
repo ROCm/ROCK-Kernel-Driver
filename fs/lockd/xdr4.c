@@ -125,7 +125,7 @@ nlm4_decode_lock(u32 *p, struct nlm_lock *lock)
 	struct file_lock	*fl = &lock->fl;
 	__s64			len, start, end;
 
-	if (!(p = xdr_decode_string(p, &lock->caller,
+	if (!(p = xdr_decode_string_inplace(p, &lock->caller,
 					    &lock->len, NLM_MAXSTRLEN))
 	 || !(p = nlm4_decode_fh(p, &lock->fh))
 	 || !(p = nlm4_decode_oh(p, &lock->oh)))
@@ -306,7 +306,7 @@ nlm4svc_decode_shareargs(struct svc_rqst *rqstp, u32 *p, nlm_args *argp)
 	lock->fl.fl_pid = ~(u32) 0;
 
 	if (!(p = nlm4_decode_cookie(p, &argp->cookie))
-	 || !(p = xdr_decode_string(p, &lock->caller,
+	 || !(p = xdr_decode_string_inplace(p, &lock->caller,
 					    &lock->len, NLM_MAXSTRLEN))
 	 || !(p = nlm4_decode_fh(p, &lock->fh))
 	 || !(p = nlm4_decode_oh(p, &lock->oh)))
@@ -340,7 +340,7 @@ nlm4svc_decode_notify(struct svc_rqst *rqstp, u32 *p, struct nlm_args *argp)
 {
 	struct nlm_lock	*lock = &argp->lock;
 
-	if (!(p = xdr_decode_string(p, &lock->caller,
+	if (!(p = xdr_decode_string_inplace(p, &lock->caller,
 					    &lock->len, NLM_MAXSTRLEN)))
 		return 0;
 	argp->state = ntohl(*p++);
@@ -350,7 +350,7 @@ nlm4svc_decode_notify(struct svc_rqst *rqstp, u32 *p, struct nlm_args *argp)
 int
 nlm4svc_decode_reboot(struct svc_rqst *rqstp, u32 *p, struct nlm_reboot *argp)
 {
-	if (!(p = xdr_decode_string(p, &argp->mon, &argp->len, SM_MAXSTRLEN)))
+	if (!(p = xdr_decode_string_inplace(p, &argp->mon, &argp->len, SM_MAXSTRLEN)))
 		return 0;
 	argp->state = ntohl(*p++);
 	/* Preserve the address in network byte order */

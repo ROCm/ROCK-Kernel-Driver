@@ -1,5 +1,7 @@
 /*
  * Copyright (c) 2004, 2005 Topspin Communications.  All rights reserved.
+ * Copyright (c) 2005 Sun Microsystems, Inc. All rights reserved.
+ * Copyright (c) 2004 Voltaire, Inc. All rights reserved.
  *
  * This software is available to you under a choice of one of two
  * licenses.  You may choose to be licensed under the terms of the GNU
@@ -143,7 +145,7 @@ static struct ipoib_mcast *ipoib_mcast_alloc(struct net_device *dev,
 
 	mcast->dev = dev;
 	mcast->created = jiffies;
-	mcast->backoff = HZ;
+	mcast->backoff = 1;
 	mcast->logcount = 0;
 
 	INIT_LIST_HEAD(&mcast->list);
@@ -357,7 +359,7 @@ static int ipoib_mcast_sendonly_join(struct ipoib_mcast *mcast)
 
 	rec.mgid     = mcast->mcmember.mgid;
 	rec.port_gid = priv->local_gid;
-	rec.pkey     = be16_to_cpu(priv->pkey);
+	rec.pkey     = cpu_to_be16(priv->pkey);
 
 	ret = ib_sa_mcmember_rec_set(priv->ca, priv->port, &rec,
 				     IB_SA_MCMEMBER_REC_MGID		|
@@ -394,7 +396,7 @@ static void ipoib_mcast_join_complete(int status,
 			IPOIB_GID_ARG(mcast->mcmember.mgid), status);
 
 	if (!status && !ipoib_mcast_join_finish(mcast, mcmember)) {
-		mcast->backoff = HZ;
+		mcast->backoff = 1;
 		down(&mcast_mutex);
 		if (test_bit(IPOIB_MCAST_RUN, &priv->flags))
 			queue_work(ipoib_workqueue, &priv->mcast_task);
@@ -457,7 +459,7 @@ static void ipoib_mcast_join(struct net_device *dev, struct ipoib_mcast *mcast,
 
 	rec.mgid     = mcast->mcmember.mgid;
 	rec.port_gid = priv->local_gid;
-	rec.pkey     = be16_to_cpu(priv->pkey);
+	rec.pkey     = cpu_to_be16(priv->pkey);
 
 	comp_mask =
 		IB_SA_MCMEMBER_REC_MGID		|
@@ -494,7 +496,7 @@ static void ipoib_mcast_join(struct net_device *dev, struct ipoib_mcast *mcast,
 		if (test_bit(IPOIB_MCAST_RUN, &priv->flags))
 			queue_delayed_work(ipoib_workqueue,
 					   &priv->mcast_task,
-					   mcast->backoff);
+					   mcast->backoff * HZ);
 		up(&mcast_mutex);
 	} else
 		mcast->query_id = ret;
@@ -596,7 +598,7 @@ int ipoib_mcast_start_thread(struct net_device *dev)
 	return 0;
 }
 
-int ipoib_mcast_stop_thread(struct net_device *dev)
+int ipoib_mcast_stop_thread(struct net_device *dev, int flush)
 {
 	struct ipoib_dev_priv *priv = netdev_priv(dev);
 	struct ipoib_mcast *mcast;
@@ -608,7 +610,8 @@ int ipoib_mcast_stop_thread(struct net_device *dev)
 	cancel_delayed_work(&priv->mcast_task);
 	up(&mcast_mutex);
 
-	flush_workqueue(ipoib_workqueue);
+	if (flush)
+		flush_workqueue(ipoib_workqueue);
 
 	if (priv->broadcast && priv->broadcast->query) {
 		ib_sa_cancel_query(priv->broadcast->query_id, priv->broadcast->query);
@@ -646,7 +649,7 @@ static int ipoib_mcast_leave(struct net_device *dev, struct ipoib_mcast *mcast)
 
 	rec.mgid     = mcast->mcmember.mgid;
 	rec.port_gid = priv->local_gid;
-	rec.pkey     = be16_to_cpu(priv->pkey);
+	rec.pkey     = cpu_to_be16(priv->pkey);
 
 	/* Remove ourselves from the multicast group */
 	ret = ipoib_mcast_detach(dev, be16_to_cpu(mcast->mcmember.mlid),
@@ -830,7 +833,7 @@ void ipoib_mcast_restart_task(void *dev_ptr)
 
 	ipoib_dbg_mcast(priv, "restarting multicast task\n");
 
-	ipoib_mcast_stop_thread(dev);
+	ipoib_mcast_stop_thread(dev, 0);
 
 	spin_lock_irqsave(&priv->lock, flags);
 

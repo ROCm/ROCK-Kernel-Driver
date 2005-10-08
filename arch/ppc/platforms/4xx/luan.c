@@ -28,7 +28,6 @@
 #include <linux/delay.h>
 #include <linux/ide.h>
 #include <linux/initrd.h>
-#include <linux/irq.h>
 #include <linux/seq_file.h>
 #include <linux/root_dev.h>
 #include <linux/tty.h>
@@ -52,13 +51,6 @@
 #include <syslib/ibm44x_common.h>
 #include <syslib/ibm440gx_common.h>
 #include <syslib/ibm440sp_common.h>
-
-/*
- * This is a horrible kludge, we eventually need to abstract this
- * generic PHY stuff, so the  standard phy mode defines can be
- * easily used from arch code.
- */
-#include "../../../../drivers/net/ibm_emac/ibm_emac_phy.h"
 
 bd_t __res;
 

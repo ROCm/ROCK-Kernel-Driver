@@ -131,6 +131,8 @@ config NET_SB1000
 
 	source "drivers/net/arcnet/Kconfig"
 
+source "drivers/net/phy/Kconfig"
+
 #
 #	Ethernet
 #
@@ -395,7 +397,7 @@ config SUN3LANCE
 	  If you're not building a kernel for a Sun 3, say N.
 
 config SUN3_82586
-	tristate "Sun3 on-board Intel 82586 support"
+	bool "Sun3 on-board Intel 82586 support"
 	depends on NET_ETHERNET && SUN3
 	help
 	  This driver enables support for the on-board Intel 82586 based
@@ -445,7 +447,7 @@ config NET_SB1250_MAC
 
 config SGI_IOC3_ETH
 	bool "SGI IOC3 Ethernet"
-	depends on NET_ETHERNET && PCI && SGI_IP27
+	depends on NET_ETHERNET && PCI && SGI_IP27 && BROKEN
 	select CRC32
 	select MII
 	help
@@ -545,6 +547,14 @@ config SUNGEM
 	help
 	  Support for the Sun GEM chip, aka Sun GigabitEthernet/P 2.0.  See also
 	  <http://www.sun.com/products-n-solutions/hardware/docs/pdf/806-3985-10.pdf>.
+
+config CASSINI
+	tristate "Sun Cassini support"
+	depends on NET_ETHERNET && PCI
+	select CRC32
+	help
+	  Support for the Sun Cassini chip, aka Sun GigaSwift Ethernet. See also
+	  <http://www.sun.com/products-n-solutions/hardware/docs/pdf/817-4341-10.pdf>
 
 config NET_VENDOR_3COM
 	bool "3COM cards"
@@ -1736,11 +1746,18 @@ config 68360_ENET
 	  the Motorola 68360 processor.
 
 config FEC
-	bool "FEC ethernet controller (of ColdFire 5272)"
-	depends on M5272 || M5282
+	bool "FEC ethernet controller (of ColdFire CPUs)"
+	depends on M523x || M527x || M5272 || M528x
 	help
 	  Say Y here if you want to use the built-in 10/100 Fast ethernet
-	  controller on the Motorola ColdFire 5272 processor.
+	  controller on some Motorola ColdFire processors.
+
+config FEC2
+	bool "Second FEC ethernet controller (on some ColdFire CPUs)"
+	depends on FEC
+	help
+	  Say Y here if you want to use the second built-in 10/100 Fast
+	  ethernet controller on some Motorola ColdFire processors.
 
 config NE_H8300
 	tristate "NE2000 compatible support for H8/300"
@@ -1921,6 +1938,20 @@ config R8169_VLAN
 	  
 	  If in doubt, say Y.
 
+config SIS190
+	tristate "SiS190/SiS191 gigabit ethernet support"
+	depends on PCI
+	select CRC32
+	select MII
+	---help---
+	  Say Y here if you have a SiS 190 PCI Fast Ethernet adapter or
+	  a SiS 191 PCI Gigabit Ethernet adapter. Both are expected to
+	  appear in lan on motherboard designs which are based on SiS 965
+	  and SiS 966 south bridge.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called sis190.  This is recommended.
+
 config SKGE
 	tristate "New SysKonnect GigaEthernet support (EXPERIMENTAL)"
 	depends on PCI && EXPERIMENTAL
@@ -1928,12 +1959,11 @@ config SKGE
 	---help---
 	  This driver support the Marvell Yukon or SysKonnect SK-98xx/SK-95xx
 	  and related Gigabit Ethernet adapters. It is a new smaller driver
-	  driver with better performance and more complete ethtool support.
+	  with better performance and more complete ethtool support.
 
 	  It does not support the link failover and network management 
 	  features that "portable" vendor supplied sk98lin driver does.
 	
-
 config SK98LIN
 	tristate "Marvell Yukon Chipset / SysKonnect SK-98xx Support"
 	depends on PCI
@@ -1943,22 +1973,6 @@ config SK98LIN
 	  by this driver:
 	    - 3Com 3C940 Gigabit LOM Ethernet Adapter
 	    - 3Com 3C941 Gigabit LOM Ethernet Adapter
-	    - 88E8021 Marvell 1000 Mbit PCI-X, single Port Copper 
-	    - 88E8021 Marvell 1000 Mbit PCI-X, single Port Fiber LX 
-	    - 88E8021 Marvell 1000 Mbit PCI-X, single Port Fiber SX 
-	    - 88E8022 Marvell 1000 Mbit PCI-X, dual Port Copper 
-	    - 88E8022 Marvell 1000 Mbit PCI-X, dual Port Copper (Gateway) 
-	    - 88E8022 Marvell 1000 Mbit PCI-X, dual Port Fiber LX 
-	    - 88E8022 Marvell 1000 Mbit PCI-X, dual Port Fiber SX 
-	    - 88E8061 Marvell 1000 Mbit PCI-E, single Port Copper 
-	    - 88E8061 Marvell 1000 Mbit PCI-E, single Port Fiber LX 
-	    - 88E8061 Marvell 1000 Mbit PCI-E, single Port Fiber SX 
-	    - 88E8062 Marvell 1000 Mbit PCI-E, dual Port Copper 
-	    - 88E8062 Marvell 1000 Mbit PCI-E, dual Port Copper (Gateway) 
-	    - 88E8062 Marvell 1000 Mbit PCI-E, dual Port Fiber LX 
-	    - 88E8062 Marvell 1000 Mbit PCI-E, dual Port Fiber SX 
-	    - Abocom EFE3K - 10/100 Ethernet Expresscard
-	    - Abocom EGE5K - Giga Ethernet Expresscard
 	    - Allied Telesyn AT-2970LX Gigabit Ethernet Adapter
 	    - Allied Telesyn AT-2970LX/2SC Gigabit Ethernet Adapter
 	    - Allied Telesyn AT-2970SX Gigabit Ethernet Adapter
@@ -1969,79 +1983,31 @@ config SK98LIN
 	    - Allied Telesyn AT-2971T Gigabit Ethernet Adapter
 	    - Belkin Gigabit Desktop Card 10/100/1000Base-T Adapter, Copper RJ-45
 	    - DGE-530T Gigabit Ethernet Adapter
-	    - DGE-560T Gigabit Ethernet Adapter
 	    - EG1032 v2 Instant Gigabit Network Adapter
 	    - EG1064 v2 Instant Gigabit Network Adapter
-	    - Marvell 88E8001 Gigabit Ethernet Controller (Abit)
-	    - Marvell 88E8001 Gigabit Ethernet Controller (Albatron)
-	    - Marvell 88E8001 Gigabit Ethernet Controller (Asus)
-	    - Marvell 88E8001 Gigabit Ethernet Controller (Chaintech)
-	    - Marvell 88E8001 Gigabit Ethernet Controller (ECS)
-	    - Marvell 88E8001 Gigabit Ethernet Controller (Epox)
-	    - Marvell 88E8001 Gigabit Ethernet Controller (Foxconn)
-	    - Marvell 88E8001 Gigabit Ethernet Controller (Gigabyte)
-	    - Marvell 88E8001 Gigabit Ethernet Controller (Iwill)
-	    - Marvell 88E8035 Fast Ethernet Controller (LGE)
-	    - Marvell 88E8035 Fast Ethernet Controller (Toshiba)
-	    - Marvell 88E8036 Fast Ethernet Controller (Arima)
-	    - Marvell 88E8036 Fast Ethernet Controller (Compal)
-	    - Marvell 88E8036 Fast Ethernet Controller (Inventec)
-	    - Marvell 88E8036 Fast Ethernet Controller (LGE)
-	    - Marvell 88E8036 Fast Ethernet Controller (Mitac)
-	    - Marvell 88E8036 Fast Ethernet Controller (Panasonic)
-	    - Marvell 88E8036 Fast Ethernet Controller (Quanta)
-	    - Marvell 88E8036 Fast Ethernet Controller (Toshiba)
-	    - Marvell 88E8036 Fast Ethernet Controller (Wistron)
-	    - Marvell 88E8050 Gigabit Ethernet Controller (Gateway)
-	    - Marvell 88E8050 Gigabit Ethernet Controller (Intel)
-	    - Marvell 88E8052 Gigabit Ethernet Controller (ASRock)
-	    - Marvell 88E8052 Gigabit Ethernet Controller (Aopen)
-	    - Marvell 88E8052 Gigabit Ethernet Controller (Asus)
-	    - Marvell 88E8052 Gigabit Ethernet Controller (Gateway)
-	    - Marvell 88E8052 Gigabit Ethernet Controller (Gigabyte)
-	    - Marvell 88E8052 Gigabit Ethernet Controller (MSI)
-	    - Marvell 88E8052 Gigabit Ethernet Controller (Wistron)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (ASRock)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (Albatron)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (Aopen)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (Arima)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (Asus)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (Chaintech)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (Clevo)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (Compal)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (DFI)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (ECS)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (Epox)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (Gigabyte)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (Inventec)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (LGE)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (MSI)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (Mitac)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (Panasonic)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (Quanta)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (SOYO)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (Shuttle)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (Toshiba)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (Trigem)
-	    - Marvell RDK-8001 
+	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (Abit)
+	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (Albatron)
+	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (Asus)
+	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (ECS)
+	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (Epox)
+	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (Foxconn)
+	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (Gigabyte)
+	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (Iwill)
+	    - Marvell 88E8050 Gigabit LOM Ethernet Adapter (Intel)
 	    - Marvell RDK-8001 Adapter
 	    - Marvell RDK-8002 Adapter
-	    - Marvell RDK-8003 
 	    - Marvell RDK-8003 Adapter
 	    - Marvell RDK-8004 Adapter
 	    - Marvell RDK-8006 Adapter
 	    - Marvell RDK-8007 Adapter
 	    - Marvell RDK-8008 Adapter
 	    - Marvell RDK-8009 Adapter
-	    - Marvell RDK-8010 
+	    - Marvell RDK-8010 Adapter
 	    - Marvell RDK-8011 Adapter
 	    - Marvell RDK-8012 Adapter
-	    - Marvell RDK-8035 
-	    - Marvell RDK-8036 
-	    - Marvell RDK-8052 
-	    - Marvell RDK-8053 
-	    - Marvell Yukon Gigabit Ethernet 10/100/1000Base-T Controller (32 bit)
-	    - Marvell Yukon Gigabit Ethernet 10/100/1000Base-T Controller (64 bit)
+	    - Marvell RDK-8052 Adapter
+	    - Marvell Yukon Gigabit Ethernet 10/100/1000Base-T Adapter (32 bit)
+	    - Marvell Yukon Gigabit Ethernet 10/100/1000Base-T Adapter (64 bit)
 	    - N-Way PCI-Bus Giga-Card 1000/100/10Mbps(L)
 	    - SK-9521 10/100/1000Base-T Adapter
 	    - SK-9521 V2.0 10/100/1000Base-T Adapter
@@ -2061,37 +2027,21 @@ config SK98LIN
 	    - SK-9871 Gigabit Ethernet Server Adapter (SK-NET GE-ZX)
 	    - SK-9871 V2.0 Gigabit Ethernet 1000Base-ZX Adapter
 	    - SK-9872 Gigabit Ethernet Server Adapter (SK-NET GE-ZX dual link)
-	    - SK-9S21 Server Adapter 
-	    - SK-9S22 Server Adapter 
-	    - SK-9S24 Server Adapter 
-	    - SK-9S34 Server Adapter 
-	    - SK-9S81 Server Adapter 
-	    - SK-9S82 Server Adapter 
-	    - SK-9S91 Server Adapter 
-	    - SK-9S92 Server Adapter 
 	    - SMC EZ Card 1000 (SMC9452TXV.2)
 	  
 	  The adapters support Jumbo Frames.
 	  The dual link adapters support link-failover and dual port features.
 	  Both Marvell Yukon and SysKonnect SK-98xx/SK-95xx adapters support 
 	  the scatter-gather functionality with sendfile(). Please refer to 
-	  Documentation/networking/sk98lin.txt for more information about
+	  <file:Documentation/networking/sk98lin.txt> for more information about
 	  optional driver parameters.
 	  Questions concerning this driver may be addressed to:
-	      linux@syskonnect.de
+	      <linux@syskonnect.de>
 	  
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read Documentation/modules.txt. This is recommended.
-	  The module will be called sk98lin. This is recommended.
-
-config SK98LIN_NAPI
-	bool "Use Rx polling (NAPI)"
-	depends on SK98LIN
-	help
-	  NAPI is a new driver API designed to reduce CPU and interrupt load
-	  when the driver is receiving lots of packets from the card.
-
+	  say M here and read <file:Documentation/kbuild/modules.txt>. The module will
+	  be called sk98lin. This is recommended.
 
 config VIA_VELOCITY
 	tristate "VIA Velocity support"
@@ -2122,6 +2072,13 @@ config BNX2
 
 	  To compile this driver as a module, choose M here: the module
 	  will be called bnx2.  This is recommended.
+
+config SPIDER_NET
+	tristate "Spider Gigabit Ethernet driver"
+	depends on PCI && PPC_BPA
+	help
+	  This driver supports the Gigabit Ethernet chips present on the
+	  Cell Processor-Based Blades from IBM.
 
 config GIANFAR
 	tristate "Gianfar Ethernet"
@@ -2171,6 +2128,25 @@ endmenu
 
 menu "Ethernet (10000 Mbit)"
 	depends on !UML
+
+config CHELSIO_T1
+        tristate "Chelsio 10Gb Ethernet support"
+        depends on PCI
+        help
+          This driver supports Chelsio N110 and N210 models 10Gb Ethernet
+          cards. More information about adapter features and performance
+          tuning is in <file:Documentation/networking/cxgb.txt>.
+
+          For general information about Chelsio and our products, visit
+          our website at <http://www.chelsio.com>.
+
+          For customer support, please visit our customer support page at
+          <http://www.chelsio.com/support.htm>.
+
+          Please send feedback to <linux-bugs@chelsio.com>.
+
+          To compile this driver as a module, choose M here: the module
+          will be called cxgb.
 
 config IXGB
 	tristate "Intel(R) PRO/10GbE support"
@@ -2497,12 +2473,6 @@ config PPP_BSDCOMP
 	  Note that the BSD compression code will always be compiled as a
 	  module; it is called bsd_comp and will show up in the directory
 	  modules once you have said "make modules". If unsure, say N.
-
-config PPP_MPPE
-       tristate "PPP MPPE compression (encryption)"
-       depends on PPP
-       ---help---
-         Support for the MPPE Encryption protocol.
 
 config PPPOE
 	tristate "PPP over Ethernet (EXPERIMENTAL)"

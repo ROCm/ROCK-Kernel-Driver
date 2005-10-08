@@ -61,13 +61,6 @@ archmrproper:
 archclean:
 	$(Q)$(MAKE) $(clean)=$(boot)
 
-prepare: include/asm-$(ARCH)/asm-offsets.h
-
-include/asm-$(ARCH)/asm-offsets.h: arch/$(ARCH)/kernel/asm-offsets.s \
-				   $(objtree)/include/asm \
-				   $(objtree)/include/linux/version.h
-	$(call filechk,gen-asm-offsets)
-
 vmlinux.srec vmlinux.bin: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
 
@@ -75,5 +68,3 @@ define archhelp
   echo  'vmlinux.bin  - Create raw binary'
   echo  'vmlinux.srec - Create srec binary'
 endef
-
-CLEAN_FILES += include/asm-$(ARCH)/asm-offsets.h

@@ -1,5 +1,8 @@
 /*
  * Copyright (c) 2004, 2005 Topspin Communications.  All rights reserved.
+ * Copyright (c) 2005 Sun Microsystems, Inc. All rights reserved.
+ * Copyright (c) 2005 Mellanox Technologies. All rights reserved.
+ * Copyright (c) 2004, 2005 Voltaire, Inc. All rights reserved.
  *
  * This software is available to you under a choice of one of two
  * licenses.  You may choose to be licensed under the terms of the GNU
@@ -35,7 +38,7 @@
 #include <linux/delay.h>
 #include <linux/dma-mapping.h>
 
-#include <ib_cache.h>
+#include <rdma/ib_cache.h>
 
 #include "ipoib.h"
 
@@ -429,7 +432,7 @@ int ipoib_ib_dev_down(struct net_device *dev)
 		flush_workqueue(ipoib_workqueue);
 	}
 
-	ipoib_mcast_stop_thread(dev);
+	ipoib_mcast_stop_thread(dev, 1);
 
 	/*
 	 * Flush the multicast groups first so we stop any multicast joins. The
@@ -596,7 +599,7 @@ void ipoib_ib_dev_cleanup(struct net_device *dev)
 
 	ipoib_dbg(priv, "cleaning up ib_dev\n");
 
-	ipoib_mcast_stop_thread(dev);
+	ipoib_mcast_stop_thread(dev, 1);
 
 	/* Delete the broadcast address and the local address */
 	ipoib_mcast_dev_down(dev);

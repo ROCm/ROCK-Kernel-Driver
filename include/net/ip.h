@@ -30,8 +30,6 @@
 #include <linux/netdevice.h>
 #include <linux/inetdevice.h>
 #include <linux/in_route.h>
-#include <linux/netfilter.h>
-#include <linux/netfilter_ipv4.h>
 #include <net/route.h>
 #include <net/arp.h>
 #include <net/snmp.h>
@@ -47,7 +45,6 @@ struct inet_skb_parm
 #define IPSKB_TRANSLATED	2
 #define IPSKB_FORWARDED		4
 #define IPSKB_XFRM_TUNNEL_SIZE	8
-#define IPSKB_XFRM_TRANSFORMED	16
 };
 
 struct ipcm_cookie
@@ -89,7 +86,7 @@ extern int		ip_build_and_send_pkt(struct sk_buff *skb, struct sock *sk,
 					      u32 saddr, u32 daddr,
 					      struct ip_options *opt);
 extern int		ip_rcv(struct sk_buff *skb, struct net_device *dev,
-			       struct packet_type *pt);
+			       struct packet_type *pt, struct net_device *orig_dev);
 extern int		ip_local_deliver(struct sk_buff *skb);
 extern int		ip_mr_input(struct sk_buff *skb);
 extern int		ip_output(struct sk_buff *skb);
@@ -143,8 +140,6 @@ struct ip_reply_arg {
 void ip_send_reply(struct sock *sk, struct sk_buff *skb, struct ip_reply_arg *arg,
 		   unsigned int len); 
 
-extern int ip_finish_output(struct sk_buff *skb);
-
 struct ipv4_config
 {
 	int	log_martians;
@@ -167,6 +162,24 @@ DECLARE_SNMP_STAT(struct linux_mib, net_statistics);
 extern int sysctl_local_port_range[2];
 extern int sysctl_ip_default_ttl;
 extern int sysctl_ip_nonlocal_bind;
+
+/* From ip_fragment.c */
+extern int sysctl_ipfrag_high_thresh; 
+extern int sysctl_ipfrag_low_thresh;
+extern int sysctl_ipfrag_time;
+extern int sysctl_ipfrag_secret_interval;
+
+/* From inetpeer.c */
+extern int inet_peer_threshold;
+extern int inet_peer_minttl;
+extern int inet_peer_maxttl;
+extern int inet_peer_gc_mintime;
+extern int inet_peer_gc_maxtime;
+
+/* From ip_output.c */
+extern int sysctl_ip_dynaddr;
+
+extern void ipfrag_init(void);
 
 #ifdef CONFIG_INET
 /* The function in 2.2 was invalid, producing wrong result for
@@ -215,16 +228,6 @@ static inline void ip_select_ident_more(struct iphdr *iph, struct dst_entry *dst
 	} else
 		__ip_select_ident(iph, dst, more);
 }
-
-#ifdef CONFIG_NETFILTER
-extern int ip_dst_output(struct sk_buff *skb);
-#else
-static inline int ip_dst_output(struct sk_buff *skb)
-{
-	return NF_HOOK_COND(PF_INET, NF_IP_POST_ROUTING, skb, NULL,
-	                    skb->dst->dev, dst_output, skb->dst->xfrm != NULL);
-}
-#endif
 
 /*
  *	Map a multicast IP onto multicast MAC for type ethernet.
@@ -332,7 +335,10 @@ extern void ip_options_build(struct sk_buff *skb, struct ip_options *opt, u32 da
 extern int ip_options_echo(struct ip_options *dopt, struct sk_buff *skb);
 extern void ip_options_fragment(struct sk_buff *skb);
 extern int ip_options_compile(struct ip_options *opt, struct sk_buff *skb);
-extern int ip_options_get(struct ip_options **optp, unsigned char *data, int optlen, int user);
+extern int ip_options_get(struct ip_options **optp,
+			  unsigned char *data, int optlen);
+extern int ip_options_get_from_user(struct ip_options **optp,
+				    unsigned char __user *data, int optlen);
 extern void ip_options_undo(struct ip_options * opt);
 extern void ip_forward_options(struct sk_buff *skb);
 extern int ip_options_rcv_srr(struct sk_buff *skb);
@@ -363,5 +369,10 @@ int ipv4_doint_and_flush_strategy(ctl_table *table, int __user *name, int nlen,
 				  void __user *oldval, size_t __user *oldlenp,
 				  void __user *newval, size_t newlen, 
 				  void **context);
+#ifdef CONFIG_PROC_FS
+extern int ip_misc_proc_init(void);
+#endif
+
+extern struct ctl_table ipv4_table[];
 
 #endif	/* _IP_H */

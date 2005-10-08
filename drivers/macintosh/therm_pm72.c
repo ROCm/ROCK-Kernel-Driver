@@ -2017,7 +2017,6 @@ static struct of_device_id fcu_match[] =
 	},
 	{},
 };
-MODULE_DEVICE_TABLE (of, fcu_match);
 
 static struct of_platform_driver fcu_of_platform_driver = 
 {
@@ -2052,7 +2051,7 @@ static int __init therm_pm72_init(void)
 			    return -ENODEV;
 		}
 	}
-	of_dev = of_platform_device_create(np, "temperature");
+	of_dev = of_platform_device_create(np, "temperature", NULL);
 	if (of_dev == NULL) {
 		printk(KERN_ERR "Can't register FCU platform device !\n");
 		return -ENODEV;

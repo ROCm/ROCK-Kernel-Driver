@@ -354,19 +354,6 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
 				| (value & 0xfffc);
 			break;
 
-		case R_PPC64_TOC16:
-			/* Subtact TOC pointer */
-			value -= my_r2(sechdrs, me);
-			if (value + 0x8000 > 0xffff) {
-				printk("%s: bad TOC16 relocation (%lu)\n",
-					me->name, value);
-				return -ENOEXEC;
-			}
-			*((uint16_t *) location)
-				= (*((uint16_t *) location) & ~0xffff)
-				| (value & 0xffff);
-			break;
-
 		case R_PPC_REL24:
 			/* FIXME: Handle weak symbols here --RR */
 			if (sym->st_shndx == SHN_UNDEF) {

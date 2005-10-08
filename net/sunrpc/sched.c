@@ -34,10 +34,10 @@ static int			rpc_task_id;
 #define RPC_BUFFER_MAXSIZE	(2048)
 #define RPC_BUFFER_POOLSIZE	(8)
 #define RPC_TASK_POOLSIZE	(8)
-static kmem_cache_t	*rpc_task_slabp;
-static kmem_cache_t	*rpc_buffer_slabp;
-static mempool_t	*rpc_task_mempool;
-static mempool_t	*rpc_buffer_mempool;
+static kmem_cache_t	*rpc_task_slabp __read_mostly;
+static kmem_cache_t	*rpc_buffer_slabp __read_mostly;
+static mempool_t	*rpc_task_mempool __read_mostly;
+static mempool_t	*rpc_buffer_mempool __read_mostly;
 
 static void			__rpc_default_timer(struct rpc_task *task);
 static void			rpciod_killall(void);
@@ -602,8 +602,7 @@ static int __rpc_execute(struct rpc_task *task)
 		/*
 		 * Garbage collection of pending timers...
 		 */
-		if (RPC_IS_RUNNING(task))
-			rpc_delete_timer(task);
+		rpc_delete_timer(task);
 
 		/*
 		 * Execute any pending callback.

@@ -12,6 +12,8 @@
 #include <linux/slab.h>
 #include <linux/kernel.h>
 
+static struct file_operations fuse_direct_io_file_operations;
+
 int fuse_open_common(struct inode *inode, struct file *file, int isdir)
 {
 	struct fuse_conn *fc = get_fuse_conn(inode);
@@ -20,6 +22,10 @@ int fuse_open_common(struct inode *inode, struct file *file, int isdir)
 	struct fuse_open_out outarg;
 	struct fuse_file *ff;
 	int err;
+
+	/* VFS checks this, but only _after_ ->open() */
+	if (file->f_flags & O_DIRECT)
+		return -EINVAL;
 
 	err = generic_file_open(inode, file);
 	if (err)
@@ -61,12 +67,14 @@ int fuse_open_common(struct inode *inode, struct file *file, int isdir)
 	req->out.args[0].value = &outarg;
 	request_send(fc, req);
 	err = req->out.h.error;
-	if (!err && !(fc->flags & FUSE_KERNEL_CACHE))
-		invalidate_inode_pages(inode->i_mapping);
 	if (err) {
 		fuse_request_free(ff->release_req);
 		kfree(ff);
 	} else {
+		if (!isdir && (outarg.open_flags & FOPEN_DIRECT_IO))
+			file->f_op = &fuse_direct_io_file_operations;
+		if (!(outarg.open_flags & FOPEN_KEEP_CACHE))
+			invalidate_inode_pages(inode->i_mapping);
 		ff->fh = outarg.fh;
 		file->private_data = ff;
 	}
@@ -240,6 +248,7 @@ static int fuse_readpage(struct file *file, struct page *page)
 	fuse_put_request(fc, req);
 	if (!err)
 		SetPageUptodate(page);
+	fuse_invalidate_attr(inode); /* atime changed */
  out:
 	unlock_page(page);
 	return err;
@@ -308,6 +317,7 @@ static int fuse_readpages(struct file *file, struct address_space *mapping,
 	if (!err && data.req->num_pages)
 		err = fuse_send_readpages(data.req, file, inode);
 	fuse_put_request(fc, data.req);
+	fuse_invalidate_attr(inode); /* atime changed */
 	return err;
 }
 
@@ -376,8 +386,8 @@ static int fuse_commit_write(struct file *file, struct page *page,
 			clear_page_dirty(page);
 			SetPageUptodate(page);
 		}
-	} else if (err == -EINTR || err == -EIO)
-		fuse_invalidate_attr(inode);
+	}
+	fuse_invalidate_attr(inode);
 	return err;
 }
 
@@ -469,8 +479,8 @@ static ssize_t fuse_direct_io(struct file *file, const char __user *buf,
 		if (write && pos > i_size_read(inode))
 			i_size_write(inode, pos);
 		*ppos = pos;
-	} else if (write && (res == -EINTR || res == -EIO))
-		fuse_invalidate_attr(inode);
+	}
+	fuse_invalidate_attr(inode);
 
 	return res;
 }
@@ -544,12 +554,6 @@ static struct address_space_operations fuse_file_aops  = {
 
 void fuse_init_file_inode(struct inode *inode)
 {
-	struct fuse_conn *fc = get_fuse_conn(inode);
-
-	if (fc->flags & FUSE_DIRECT_IO)
-		inode->i_fop = &fuse_direct_io_file_operations;
-	else {
-		inode->i_fop = &fuse_file_operations;
-		inode->i_data.a_ops = &fuse_file_aops;
-	}
+	inode->i_fop = &fuse_file_operations;
+	inode->i_data.a_ops = &fuse_file_aops;
 }

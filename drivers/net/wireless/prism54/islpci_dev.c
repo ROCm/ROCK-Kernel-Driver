@@ -53,9 +53,7 @@ static struct net_device_stats *islpci_statistics(struct net_device *);
  * Of course, this is not the final/real MAC address. It doesn't
  * matter, as you are suppose to be able to change it anytime via
  * ndev->set_mac_address. Jean II */
-/* Set dummy address to 00:00:00:00:00:00 so tools have a chance
-   to find out that this is no real mac address - jg */
-static const unsigned char	dummy_mac[6] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+static const unsigned char	dummy_mac[6] = { 0x00, 0x30, 0xB4, 0x00, 0x00, 0x00 };
 
 static int
 isl_upload_firmware(islpci_private *priv)
@@ -817,7 +815,6 @@ islpci_setup(struct pci_dev *pdev)
 	ndev->open = &islpci_open;
 	ndev->stop = &islpci_close;
 	ndev->get_stats = &islpci_statistics;
-	ndev->get_wireless_stats = &prism54_get_wireless_stats;
 	ndev->do_ioctl = &prism54_ioctl;
 	ndev->wireless_handlers =
 	    (struct iw_handler_def *) &prism54_handler_def;
@@ -846,6 +843,8 @@ islpci_setup(struct pci_dev *pdev)
 	/* Add pointers to enable iwspy support. */
 	priv->wireless_data.spy_data = &priv->spy_data;
 	ndev->wireless_data = &priv->wireless_data;
+#else  /* WIRELESS_EXT > 16 */
+	ndev->get_wireless_stats = &prism54_get_wireless_stats;
 #endif /* WIRELESS_EXT > 16 */
 
 	/* save the start and end address of the PCI memory area */

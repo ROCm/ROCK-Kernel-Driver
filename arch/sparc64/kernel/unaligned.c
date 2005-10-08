@@ -180,17 +180,18 @@ static void __attribute_used__ unaligned_panic(char *str, struct pt_regs *regs)
 	die_if_kernel(str, regs);
 }
 
-extern void do_int_load(unsigned long *dest_reg, int size,
-			unsigned long *saddr, int is_signed, int asi);
+extern int do_int_load(unsigned long *dest_reg, int size,
+		       unsigned long *saddr, int is_signed, int asi);
 	
-extern void __do_int_store(unsigned long *dst_addr, int size,
-			   unsigned long *src_val, int asi);
+extern int __do_int_store(unsigned long *dst_addr, int size,
+			  unsigned long src_val, int asi);
 
-static inline void do_int_store(int reg_num, int size, unsigned long *dst_addr,
-				struct pt_regs *regs, int asi)
+static inline int do_int_store(int reg_num, int size, unsigned long *dst_addr,
+			       struct pt_regs *regs, int asi, int orig_asi)
 {
 	unsigned long zero = 0;
-	unsigned long *src_val = &zero;
+	unsigned long *src_val_p = &zero;
+	unsigned long src_val;
 
 	if (size == 16) {
 		size = 8;
@@ -198,9 +199,27 @@ static inline void do_int_store(int reg_num, int size, unsigned long *dst_addr,
 		        (unsigned)fetch_reg(reg_num, regs) : 0)) << 32) |
 			(unsigned)fetch_reg(reg_num + 1, regs);
 	} else if (reg_num) {
-		src_val = fetch_reg_addr(reg_num, regs);
+		src_val_p = fetch_reg_addr(reg_num, regs);
 	}
-	__do_int_store(dst_addr, size, src_val, asi);
+	src_val = *src_val_p;
+	if (unlikely(asi != orig_asi)) {
+		switch (size) {
+		case 2:
+			src_val = swab16(src_val);
+			break;
+		case 4:
+			src_val = swab32(src_val);
+			break;
+		case 8:
+			src_val = swab64(src_val);
+			break;
+		case 16:
+		default:
+			BUG();
+			break;
+		};
+	}
+	return __do_int_store(dst_addr, size, src_val, asi);
 }
 
 static inline void advance(struct pt_regs *regs)
@@ -223,14 +242,14 @@ static inline int ok_for_kernel(unsigned int insn)
 	return !floating_point_load_or_store_p(insn);
 }
 
-void kernel_mna_trap_fault(void)
+static void kernel_mna_trap_fault(void)
 {
 	struct pt_regs *regs = current_thread_info()->kern_una_regs;
 	unsigned int insn = current_thread_info()->kern_una_insn;
-	unsigned long g2 = regs->u_regs[UREG_G2];
-	unsigned long fixup = search_extables_range(regs->tpc, &g2);
+	const struct exception_table_entry *entry;
 
-	if (!fixup) {
+	entry = search_exception_tables(regs->tpc);
+	if (!entry) {
 		unsigned long address;
 
 		address = compute_effective_address(regs, insn,
@@ -251,9 +270,8 @@ void kernel_mna_trap_fault(void)
 	        die_if_kernel("Oops", regs);
 		/* Not reached */
 	}
-	regs->tpc = fixup;
+	regs->tpc = entry->fixup;
 	regs->tnpc = regs->tpc + 4;
-	regs->u_regs [UREG_G2] = g2;
 
 	regs->tstate &= ~TSTATE_ASI;
 	regs->tstate |= (ASI_AIUS << 24UL);
@@ -275,7 +293,8 @@ asmlinkage void kernel_unaligned_trap(struct pt_regs *regs, unsigned int insn, u
 
 		kernel_mna_trap_fault();
 	} else {
-		unsigned long addr;
+		unsigned long addr, *reg_addr;
+		int orig_asi, asi, err;
 
 		addr = compute_effective_address(regs, insn,
 						 ((insn >> 25) & 0x1f));
@@ -285,25 +304,59 @@ asmlinkage void kernel_unaligned_trap(struct pt_regs *regs, unsigned int insn, u
 		       regs->tpc, dirstrings[dir], addr, size,
 		       regs->u_regs[UREG_RETPC]);
 #endif
+		orig_asi = asi = decode_asi(insn, regs);
+		switch (asi) {
+		case ASI_NL:
+		case ASI_AIUPL:
+		case ASI_AIUSL:
+		case ASI_PL:
+		case ASI_SL:
+		case ASI_PNFL:
+		case ASI_SNFL:
+			asi &= ~0x08;
+			break;
+		};
 		switch (dir) {
 		case load:
-			do_int_load(fetch_reg_addr(((insn>>25)&0x1f), regs),
-				    size, (unsigned long *) addr,
-				    decode_signedness(insn),
-				    decode_asi(insn, regs));
+			reg_addr = fetch_reg_addr(((insn>>25)&0x1f), regs);
+			err = do_int_load(reg_addr, size,
+					  (unsigned long *) addr,
+					  decode_signedness(insn), asi);
+			if (likely(!err) && unlikely(asi != orig_asi)) {
+				unsigned long val_in = *reg_addr;
+				switch (size) {
+				case 2:
+					val_in = swab16(val_in);
+					break;
+				case 4:
+					val_in = swab32(val_in);
+					break;
+				case 8:
+					val_in = swab64(val_in);
+					break;
+				case 16:
+				default:
+					BUG();
+					break;
+				};
+				*reg_addr = val_in;
+			}
 			break;
 
 		case store:
-			do_int_store(((insn>>25)&0x1f), size,
-				     (unsigned long *) addr, regs,
-				     decode_asi(insn, regs));
+			err = do_int_store(((insn>>25)&0x1f), size,
+					   (unsigned long *) addr, regs,
+					   asi, orig_asi);
 			break;
 
 		default:
 			panic("Impossible kernel unaligned trap.");
 			/* Not reached... */
 		}
-		advance(regs);
+		if (unlikely(err))
+			kernel_mna_trap_fault();
+		else
+			advance(regs);
 	}
 }
 
@@ -349,9 +402,9 @@ int handle_popc(u32 insn, struct pt_regs *regs)
 
 extern void do_fpother(struct pt_regs *regs);
 extern void do_privact(struct pt_regs *regs);
-extern void data_access_exception(struct pt_regs *regs,
-				  unsigned long sfsr,
-				  unsigned long sfar);
+extern void spitfire_data_access_exception(struct pt_regs *regs,
+					   unsigned long sfsr,
+					   unsigned long sfar);
 
 int handle_ldf_stq(u32 insn, struct pt_regs *regs)
 {
@@ -394,14 +447,14 @@ int handle_ldf_stq(u32 insn, struct pt_regs *regs)
 				break;
 			}
 		default:
-			data_access_exception(regs, 0, addr);
+			spitfire_data_access_exception(regs, 0, addr);
 			return 1;
 		}
 		if (put_user (first >> 32, (u32 __user *)addr) ||
 		    __put_user ((u32)first, (u32 __user *)(addr + 4)) ||
 		    __put_user (second >> 32, (u32 __user *)(addr + 8)) ||
 		    __put_user ((u32)second, (u32 __user *)(addr + 12))) {
-		    	data_access_exception(regs, 0, addr);
+		    	spitfire_data_access_exception(regs, 0, addr);
 		    	return 1;
 		}
 	} else {
@@ -414,7 +467,7 @@ int handle_ldf_stq(u32 insn, struct pt_regs *regs)
 			do_privact(regs);
 			return 1;
 		} else if (asi > ASI_SNFL) {
-			data_access_exception(regs, 0, addr);
+			spitfire_data_access_exception(regs, 0, addr);
 			return 1;
 		}
 		switch (insn & 0x180000) {
@@ -431,7 +484,7 @@ int handle_ldf_stq(u32 insn, struct pt_regs *regs)
 				err |= __get_user (data[i], (u32 __user *)(addr + 4*i));
 		}
 		if (err && !(asi & 0x2 /* NF */)) {
-			data_access_exception(regs, 0, addr);
+			spitfire_data_access_exception(regs, 0, addr);
 			return 1;
 		}
 		if (asi & 0x8) /* Little */ {
@@ -534,7 +587,7 @@ void handle_lddfmna(struct pt_regs *regs, unsigned long sfar, unsigned long sfsr
 		*(u64 *)(f->regs + freg) = value;
 		current_thread_info()->fpsaved[0] |= flag;
 	} else {
-daex:		data_access_exception(regs, sfsr, sfar);
+daex:		spitfire_data_access_exception(regs, sfsr, sfar);
 		return;
 	}
 	advance(regs);
@@ -578,7 +631,7 @@ void handle_stdfmna(struct pt_regs *regs, unsigned long sfar, unsigned long sfsr
 		    __put_user ((u32)value, (u32 __user *)(sfar + 4)))
 			goto daex;
 	} else {
-daex:		data_access_exception(regs, sfsr, sfar);
+daex:		spitfire_data_access_exception(regs, sfsr, sfar);
 		return;
 	}
 	advance(regs);

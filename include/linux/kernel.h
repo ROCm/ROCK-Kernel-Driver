@@ -171,7 +171,6 @@ extern int oops_in_progress;		/* If set, an oops, panic(), BUG() or die() is in 
 extern int panic_timeout;
 extern int panic_on_oops;
 extern int tainted;
-extern int unsupported;
 extern const char *print_tainted(void);
 extern void add_taint(unsigned);
 
@@ -190,8 +189,6 @@ extern enum system_states {
 #define TAINT_FORCED_RMMOD		(1<<3)
 #define TAINT_MACHINE_CHECK		(1<<4)
 #define TAINT_BAD_PAGE			(1<<5)
-#define TAINT_NO_SUPPORT		(1<<6)
-#define TAINT_EXTERNAL_SUPPORT		(1<<7)
 
 extern void dump_stack(void);
 
@@ -310,8 +307,8 @@ struct sysinfo {
 	char _f[20-2*sizeof(long)-sizeof(int)];	/* Padding: libc5 uses this.. */
 };
 
-extern void BUILD_BUG(void);
-#define BUILD_BUG_ON(condition) do { if (condition) BUILD_BUG(); } while(0)
+/* Force a compilation error if condition is false */
+#define BUILD_BUG_ON(condition) ((void)sizeof(char[1 - 2*!!(condition)]))
 
 #ifdef CONFIG_SYSCTL
 extern int randomize_va_space;

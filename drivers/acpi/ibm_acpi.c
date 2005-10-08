@@ -2,7 +2,7 @@
  *  ibm_acpi.c - IBM ThinkPad ACPI Extras
  *
  *
- *  Copyright (C) 2004 Borislav Deianov <borislav@users.sf.net>
+ *  Copyright (C) 2004-2005 Borislav Deianov <borislav@users.sf.net>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -19,11 +19,12 @@
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#define IBM_VERSION "0.11"
+#define IBM_VERSION "0.12a"
 
 /*
  *  Changelog:
- *
+ *  
+ *  2005-08-17  0.12	fix compilation on 2.6.13-rc kernels
  *  2005-03-17	0.11	support for 600e, 770x
  *			    thanks to Jamie Lentin <lentinj@dial.pipex.com>
  *			support for 770e, G41
@@ -122,8 +123,8 @@ static acpi_handle root_handle = NULL;
  * A20m, A21e, A21m, A21p, A22p, A30, A30p, A31, A31p
  * G40, G41
  * R30, R31, R32, R40, R40e, R50, R50e, R50p, R51
- * T20, T21, T22, T23, T30, T40, T40p, T41, T41p, T42, T42p
- * X20, X22, X24, X30, X31, X40
+ * T20, T21, T22, T23, T30, T40, T40p, T41, T41p, T42, T42p, T43
+ * X20, X21, X22, X23, X24, X30, X31, X40
  *
  * The following models have no supported features:
  *
@@ -134,96 +135,83 @@ static acpi_handle root_handle = NULL;
  * A20p, A22e, A22m
  * R52
  * S31
- * T43, T43p
- * X21, X23
+ * T43p
  */
 
-IBM_HANDLE(ec, root,
-	   "\\_SB.PCI0.ISA.EC0",   /* 240, 240x */
-	   "\\_SB.PCI.ISA.EC",     /* 570 */
-	   "\\_SB.PCI0.ISA0.EC0",  /* 600e/x, 770e, 770x */
-	   "\\_SB.PCI0.ISA.EC",    /* A21e, A2xm/p, T20-22, X20 */
-	   "\\_SB.PCI0.AD4S.EC0",  /* i1400, R30 */
-	   "\\_SB.PCI0.ICH3.EC0",  /* R31 */
-	   "\\_SB.PCI0.LPC.EC",    /* all others */
-);
+IBM_HANDLE(ec, root, "\\_SB.PCI0.ISA.EC0",	/* 240, 240x */
+	   "\\_SB.PCI.ISA.EC",	/* 570 */
+	   "\\_SB.PCI0.ISA0.EC0",	/* 600e/x, 770e, 770x */
+	   "\\_SB.PCI0.ISA.EC",	/* A21e, A2xm/p, T20-22, X20-21 */
+	   "\\_SB.PCI0.AD4S.EC0",	/* i1400, R30 */
+	   "\\_SB.PCI0.ICH3.EC0",	/* R31 */
+	   "\\_SB.PCI0.LPC.EC",	/* all others */
+    );
 
-IBM_HANDLE(vid, root, 
-	   "\\_SB.PCI.AGP.VGA",	   /* 570 */
-	   "\\_SB.PCI0.AGP0.VID0", /* 600e/x, 770x */
-	   "\\_SB.PCI0.VID0",      /* 770e */
-	   "\\_SB.PCI0.VID",       /* A21e, G4x, R50e, X30, X40 */
-	   "\\_SB.PCI0.AGP.VID",   /* all others */
-);                                 /* R30, R31 */
+IBM_HANDLE(vid, root, "\\_SB.PCI.AGP.VGA",	/* 570 */
+	   "\\_SB.PCI0.AGP0.VID0",	/* 600e/x, 770x */
+	   "\\_SB.PCI0.VID0",	/* 770e */
+	   "\\_SB.PCI0.VID",	/* A21e, G4x, R50e, X30, X40 */
+	   "\\_SB.PCI0.AGP.VID",	/* all others */
+    );				/* R30, R31 */
 
-IBM_HANDLE(vid2, root, "\\_SB.PCI0.AGPB.VID"); /* G41 */
+IBM_HANDLE(vid2, root, "\\_SB.PCI0.AGPB.VID");	/* G41 */
 
-IBM_HANDLE(cmos, root,
-	   "\\UCMS",               /* R50, R50e, R50p, R51, T4x, X31, X40 */
-	   "\\CMOS",               /* A3x, G4x, R32, T23, T30, X22, X24, X30 */
-	   "\\CMS",                /* R40, R40e */
-);                                 /* all others */
+IBM_HANDLE(cmos, root, "\\UCMS",	/* R50, R50e, R50p, R51, T4x, X31, X40 */
+	   "\\CMOS",		/* A3x, G4x, R32, T23, T30, X22-24, X30 */
+	   "\\CMS",		/* R40, R40e */
+    );				/* all others */
 
-IBM_HANDLE(dock, root,
-	   "\\_SB.GDCK",           /* X30, X31, X40 */
-	   "\\_SB.PCI0.DOCK",      /* 600e/x,770e,770x,A2xm/p,T20-22,X20 */
-	   "\\_SB.PCI0.PCI1.DOCK", /* all others */
-	   "\\_SB.PCI.ISA.SLCE",   /* 570 */
-);                                 /* A21e,G4x,R30,R31,R32,R40,R40e,R50e */
+IBM_HANDLE(dock, root, "\\_SB.GDCK",	/* X30, X31, X40 */
+	   "\\_SB.PCI0.DOCK",	/* 600e/x,770e,770x,A2xm/p,T20-22,X20-21 */
+	   "\\_SB.PCI0.PCI1.DOCK",	/* all others */
+	   "\\_SB.PCI.ISA.SLCE",	/* 570 */
+    );				/* A21e,G4x,R30,R31,R32,R40,R40e,R50e */
 
-IBM_HANDLE(bay, root,
-	   "\\_SB.PCI.IDE.SECN.MAST",   /* 570 */
-	   "\\_SB.PCI0.IDE0.IDES.IDSM", /* 600e/x, 770e, 770x */
-	   "\\_SB.PCI0.IDE0.SCND.MSTR", /* all others */
-);                                      /* A21e, R30, R31 */
+IBM_HANDLE(bay, root, "\\_SB.PCI.IDE.SECN.MAST",	/* 570 */
+	   "\\_SB.PCI0.IDE0.IDES.IDSM",	/* 600e/x, 770e, 770x */
+	   "\\_SB.PCI0.IDE0.SCND.MSTR",	/* all others */
+    );				/* A21e, R30, R31 */
 
-IBM_HANDLE(bay_ej, bay,
-	   "_EJ3",                 /* 600e/x, A2xm/p, A3x */
-	   "_EJ0",                 /* all others */
-);                                 /* 570,A21e,G4x,R30,R31,R32,R40e,R50e */
+IBM_HANDLE(bay_ej, bay, "_EJ3",	/* 600e/x, A2xm/p, A3x */
+	   "_EJ0",		/* all others */
+    );				/* 570,A21e,G4x,R30,R31,R32,R40e,R50e */
 
-IBM_HANDLE(bay2, root,
-	   "\\_SB.PCI0.IDE0.PRIM.SLAV", /* A3x, R32 */
-	   "\\_SB.PCI0.IDE0.IDEP.IDPS", /* 600e/x, 770e, 770x */
-);                                      /* all others */
+IBM_HANDLE(bay2, root, "\\_SB.PCI0.IDE0.PRIM.SLAV",	/* A3x, R32 */
+	   "\\_SB.PCI0.IDE0.IDEP.IDPS",	/* 600e/x, 770e, 770x */
+    );				/* all others */
 
-IBM_HANDLE(bay2_ej, bay2,
-	   "_EJ3",                 /* 600e/x, 770e, A3x */
-	   "_EJ0",                 /* 770x */
-);                                 /* all others */
+IBM_HANDLE(bay2_ej, bay2, "_EJ3",	/* 600e/x, 770e, A3x */
+	   "_EJ0",		/* 770x */
+    );				/* all others */
 
 /* don't list other alternatives as we install a notify handler on the 570 */
-IBM_HANDLE(pci,  root, "\\_SB.PCI"); /* 570 */
+IBM_HANDLE(pci, root, "\\_SB.PCI");	/* 570 */
 
-IBM_HANDLE(hkey, ec,
-	   "\\_SB.HKEY",          /* 600e/x, 770e, 770x */
-	   "^HKEY",               /* R30, R31 */
-	   "HKEY",                /* all others */
-);                                /* 570 */
+IBM_HANDLE(hkey, ec, "\\_SB.HKEY",	/* 600e/x, 770e, 770x */
+	   "^HKEY",		/* R30, R31 */
+	   "HKEY",		/* all others */
+    );				/* 570 */
 
-IBM_HANDLE(lght, root, "\\LGHT"); /* A21e, A2xm/p, T20-22, X20 */
-IBM_HANDLE(ledb, ec,   "LEDB");   /* G4x */
+IBM_HANDLE(lght, root, "\\LGHT");	/* A21e, A2xm/p, T20-22, X20-21 */
+IBM_HANDLE(ledb, ec, "LEDB");	/* G4x */
 
-IBM_HANDLE(led, ec,
-	   "SLED",                /* 570 */
-	   "SYSL",                /* 600e/x,770e,770x,A21e,A2xm/p,T20-22,X20 */
-	   "LED",                 /* all others */
-);                                /* R30, R31 */
+IBM_HANDLE(led, ec, "SLED",	/* 570 */
+	   "SYSL",		/* 600e/x, 770e, 770x, A21e, A2xm/p, T20-22, X20-21 */
+	   "LED",		/* all others */
+    );				/* R30, R31 */
 
-IBM_HANDLE(beep, ec,   "BEEP");   /* all except R30, R31 */
-IBM_HANDLE(ecrd, ec,   "ECRD");   /* 570 */
-IBM_HANDLE(ecwr, ec,   "ECWR");   /* 570 */
-IBM_HANDLE(fans, ec,   "FANS");   /* X31, X40 */
+IBM_HANDLE(beep, ec, "BEEP");	/* all except R30, R31 */
+IBM_HANDLE(ecrd, ec, "ECRD");	/* 570 */
+IBM_HANDLE(ecwr, ec, "ECWR");	/* 570 */
+IBM_HANDLE(fans, ec, "FANS");	/* X31, X40 */
 
-IBM_HANDLE(gfan, ec,
-	   "GFAN",                /* 570 */
-	   "\\FSPD",              /* 600e/x, 770e, 770x */
-);                                /* all others */
+IBM_HANDLE(gfan, ec, "GFAN",	/* 570 */
+	   "\\FSPD",		/* 600e/x, 770e, 770x */
+    );				/* all others */
 
-IBM_HANDLE(sfan, ec,
-	   "SFAN",                /* 570 */
-	   "JFNS",                /* 770x-JL */
-);                                /* all others */
+IBM_HANDLE(sfan, ec, "SFAN",	/* 570 */
+	   "JFNS",		/* 770x-JL */
+    );				/* all others */
 
 #define IBM_HKEY_HID	"IBM0068"
 #define IBM_PCI_HID	"PNP0A03"
@@ -234,13 +222,13 @@ struct ibm_struct {
 
 	char *hid;
 	struct acpi_driver *driver;
-	
-	int  (*init)   (void);
-	int  (*read)   (char *);
-	int  (*write)  (char *);
-	void (*exit)   (void);
 
-	void (*notify) (struct ibm_struct *, u32);	
+	int (*init) (void);
+	int (*read) (char *);
+	int (*write) (char *);
+	void (*exit) (void);
+
+	void (*notify) (struct ibm_struct *, u32);
 	acpi_handle *handle;
 	int type;
 	struct acpi_device *device;
@@ -263,15 +251,15 @@ static int acpi_evalf(acpi_handle handle,
 		      void *res, char *method, char *fmt, ...)
 {
 	char *fmt0 = fmt;
-        struct acpi_object_list	params;
-        union acpi_object	in_objs[IBM_MAX_ACPI_ARGS];
-        struct acpi_buffer	result, *resultp;
-        union acpi_object	out_obj;
-        acpi_status		status;
-	va_list			ap;
-	char			res_type;
-	int			success;
-	int			quiet;
+	struct acpi_object_list params;
+	union acpi_object in_objs[IBM_MAX_ACPI_ARGS];
+	struct acpi_buffer result, *resultp;
+	union acpi_object out_obj;
+	acpi_status status;
+	va_list ap;
+	char res_type;
+	int success;
+	int quiet;
 
 	if (!*fmt) {
 		printk(IBM_ERR "acpi_evalf() called with empty format\n");
@@ -297,7 +285,7 @@ static int acpi_evalf(acpi_handle handle,
 			in_objs[params.count].integer.value = va_arg(ap, int);
 			in_objs[params.count++].type = ACPI_TYPE_INTEGER;
 			break;
-		/* add more types as needed */
+			/* add more types as needed */
 		default:
 			printk(IBM_ERR "acpi_evalf() called "
 			       "with invalid format character '%c'\n", c);
@@ -316,15 +304,15 @@ static int acpi_evalf(acpi_handle handle,
 	status = acpi_evaluate_object(handle, method, &params, resultp);
 
 	switch (res_type) {
-	case 'd':	/* int */
+	case 'd':		/* int */
 		if (res)
 			*(int *)res = out_obj.integer.value;
 		success = status == AE_OK && out_obj.type == ACPI_TYPE_INTEGER;
 		break;
-	case 'v':	/* void */
+	case 'v':		/* void */
 		success = status == AE_OK;
 		break;
-	/* add more types as needed */
+		/* add more types as needed */
 	default:
 		printk(IBM_ERR "acpi_evalf() called "
 		       "with invalid format character '%c'\n", res_type);
@@ -407,10 +395,10 @@ static int hotkey_set(int status, int mask)
 		return 0;
 
 	if (hotkey_mask_supported)
-		for (i=0; i<32; i++) {
+		for (i = 0; i < 32; i++) {
 			int bit = ((1 << i) & mask) != 0;
 			if (!acpi_evalf(hkey_handle,
-					NULL, "MHKM", "vdd", i+1, bit))
+					NULL, "MHKM", "vdd", i + 1, bit))
 				return 0;
 		}
 
@@ -423,17 +411,17 @@ static int hotkey_init(void)
 	hotkey_supported = hkey_handle != NULL;
 
 	if (hotkey_supported) {
-	        /* mask not supported on 570, 600e/x, 770e, 770x, A21e, A2xm/p
-		   A30, R30, R31, T20-22, X20, X22, X24*/
+		/* mask not supported on 570, 600e/x, 770e, 770x, A21e, A2xm/p,
+		   A30, R30, R31, T20-22, X20-21, X22-24 */
 		hotkey_mask_supported =
-			acpi_evalf(hkey_handle, NULL, "DHKN", "qv");
+		    acpi_evalf(hkey_handle, NULL, "DHKN", "qv");
 
 		if (!hotkey_get(&hotkey_orig_status, &hotkey_orig_mask))
 			return -ENODEV;
 	}
 
 	return 0;
-}	
+}
 
 static int hotkey_read(char *p)
 {
@@ -480,7 +468,7 @@ static int hotkey_write(char *buf)
 			status = 0;
 		} else if (strlencmp(cmd, "reset") == 0) {
 			status = hotkey_orig_status;
-			mask   = hotkey_orig_mask;
+			mask = hotkey_orig_mask;
 		} else if (sscanf(cmd, "0x%x", &mask) == 1) {
 			/* mask set */
 		} else if (sscanf(cmd, "%x", &mask) == 1) {
@@ -494,7 +482,7 @@ static int hotkey_write(char *buf)
 		return -EIO;
 
 	return 0;
-}	
+}
 
 static void hotkey_exit(void)
 {
@@ -511,7 +499,7 @@ static void hotkey_notify(struct ibm_struct *ibm, u32 event)
 	else {
 		printk(IBM_ERR "unknown hotkey event %d\n", event);
 		acpi_bus_generate_event(ibm->device, event, 0);
-	}	
+	}
 }
 
 static int bluetooth_supported;
@@ -519,9 +507,9 @@ static int bluetooth_supported;
 static int bluetooth_init(void)
 {
 	/* bluetooth not supported on 570, 600e/x, 770e, 770x, A21e, A2xm/p,
-	   G4x, R30, R31, R40e, R50e, T20-22, X20 */
+	   G4x, R30, R31, R40e, R50e, T20-22, X20-21 */
 	bluetooth_supported = hkey_handle &&
-		acpi_evalf(hkey_handle, NULL, "GBDC", "qv");
+	    acpi_evalf(hkey_handle, NULL, "GBDC", "qv");
 
 	return 0;
 }
@@ -574,7 +562,7 @@ static int bluetooth_write(char *buf)
 	}
 
 	if (do_cmd && !acpi_evalf(hkey_handle, NULL, "SBDC", "vd", status))
-	    return -EIO;
+		return -EIO;
 
 	return 0;
 }
@@ -644,10 +632,9 @@ static int video_autosw(void)
 
 	if (video_supported == VIDEO_570)
 		acpi_evalf(vid_handle, &autosw, "SWIT", "d");
-	else if (video_supported == VIDEO_770 ||
-		 video_supported == VIDEO_NEW)
+	else if (video_supported == VIDEO_770 || video_supported == VIDEO_NEW)
 		acpi_evalf(vid_handle, &autosw, "^VDEE", "d");
-	
+
 	return autosw & 1;
 }
 
@@ -671,7 +658,7 @@ static int video_read(char *p)
 	len += sprintf(p + len, "commands:\tlcd_enable, lcd_disable\n");
 	len += sprintf(p + len, "commands:\tcrt_enable, crt_disable\n");
 	if (video_supported == VIDEO_NEW)
-		len += sprintf(p+len, "commands:\tdvi_enable, dvi_disable\n");
+		len += sprintf(p + len, "commands:\tdvi_enable, dvi_disable\n");
 	len += sprintf(p + len, "commands:\tauto_enable, auto_disable\n");
 	len += sprintf(p + len, "commands:\tvideo_switch, expand_toggle\n");
 
@@ -686,8 +673,8 @@ static int video_switch(void)
 	if (!acpi_evalf(vid_handle, NULL, "_DOS", "vd", 1))
 		return -EIO;
 	ret = video_supported == VIDEO_570 ?
-		acpi_evalf(ec_handle, NULL, "_Q16", "v") :
-		acpi_evalf(vid_handle, NULL, "VSWT", "v");
+	    acpi_evalf(ec_handle, NULL, "_Q16", "v") :
+	    acpi_evalf(vid_handle, NULL, "VSWT", "v");
 	acpi_evalf(vid_handle, NULL, "_DOS", "vd", autosw);
 
 	return ret;
@@ -708,7 +695,7 @@ static int video_switch2(int status)
 	int ret;
 
 	if (video_supported == VIDEO_570) {
-		ret = acpi_evalf(NULL, NULL, 
+		ret = acpi_evalf(NULL, NULL,
 				 "\\_SB.PHS2", "vdd", 0x8b, status | 0x80);
 	} else if (video_supported == VIDEO_770) {
 		int autosw = video_autosw();
@@ -721,7 +708,7 @@ static int video_switch2(int status)
 		acpi_evalf(vid_handle, NULL, "_DOS", "vd", autosw);
 	} else {
 		ret = acpi_evalf(NULL, NULL, "\\VUPS", "vd", 0x80) &&
-		      acpi_evalf(NULL, NULL, "\\VSDS", "vdd", status, 1);
+		    acpi_evalf(NULL, NULL, "\\VSDS", "vdd", status, 1);
 	}
 
 	return ret;
@@ -824,7 +811,7 @@ static int light_write(char *buf)
 	int cmos_cmd, lght_cmd;
 	char *cmd;
 	int success;
-	
+
 	if (!light_supported)
 		return -ENODEV;
 
@@ -837,10 +824,10 @@ static int light_write(char *buf)
 			lght_cmd = 0;
 		} else
 			return -EINVAL;
-		
+
 		success = cmos_handle ?
-			acpi_evalf(cmos_handle, NULL, NULL, "vd", cmos_cmd) :
-			acpi_evalf(lght_handle, NULL, NULL, "vd", lght_cmd);
+		    acpi_evalf(cmos_handle, NULL, NULL, "vd", cmos_cmd) :
+		    acpi_evalf(lght_handle, NULL, NULL, "vd", lght_cmd);
 		if (!success)
 			return -EIO;
 	}
@@ -897,27 +884,27 @@ static int dock_write(char *buf)
 	}
 
 	return 0;
-}	
+}
 
 static void dock_notify(struct ibm_struct *ibm, u32 event)
 {
 	int docked = dock_docked();
 	int pci = ibm->hid && strstr(ibm->hid, IBM_PCI_HID);
 
-	if (event == 1 && !pci)     /* 570 */
-		acpi_bus_generate_event(ibm->device, event, 1); /* button */
-	else if (event == 1 && pci) /* 570 */
-		acpi_bus_generate_event(ibm->device, event, 3); /* dock */
+	if (event == 1 && !pci)	/* 570 */
+		acpi_bus_generate_event(ibm->device, event, 1);	/* button */
+	else if (event == 1 && pci)	/* 570 */
+		acpi_bus_generate_event(ibm->device, event, 3);	/* dock */
 	else if (event == 3 && docked)
-		acpi_bus_generate_event(ibm->device, event, 1); /* button */
+		acpi_bus_generate_event(ibm->device, event, 1);	/* button */
 	else if (event == 3 && !docked)
-		acpi_bus_generate_event(ibm->device, event, 2); /* undock */
+		acpi_bus_generate_event(ibm->device, event, 2);	/* undock */
 	else if (event == 0 && docked)
-		acpi_bus_generate_event(ibm->device, event, 3); /* dock */
+		acpi_bus_generate_event(ibm->device, event, 3);	/* dock */
 	else {
 		printk(IBM_ERR "unknown dock event %d, status %d\n",
 		       event, _sta(dock_handle));
-		acpi_bus_generate_event(ibm->device, event, 0); /* unknown */
+		acpi_bus_generate_event(ibm->device, event, 0);	/* unknown */
 	}
 }
 
@@ -929,14 +916,14 @@ static int bay_eject2_supported;
 static int bay_init(void)
 {
 	bay_status_supported = bay_handle &&
-		acpi_evalf(bay_handle, NULL, "_STA", "qv");
+	    acpi_evalf(bay_handle, NULL, "_STA", "qv");
 	bay_status2_supported = bay2_handle &&
-		acpi_evalf(bay2_handle, NULL, "_STA", "qv");
+	    acpi_evalf(bay2_handle, NULL, "_STA", "qv");
 
 	bay_eject_supported = bay_handle && bay_ej_handle &&
-		(strlencmp(bay_ej_path, "_EJ0") == 0 || experimental);
+	    (strlencmp(bay_ej_path, "_EJ0") == 0 || experimental);
 	bay_eject2_supported = bay2_handle && bay2_ej_handle &&
-		(strlencmp(bay2_ej_path, "_EJ0") == 0 || experimental);
+	    (strlencmp(bay2_ej_path, "_EJ0") == 0 || experimental);
 
 	return 0;
 }
@@ -956,7 +943,7 @@ static int bay_read(char *p)
 	if (bay_status2_supported)
 		len += sprintf(p + len, "status2:\t%s\n", occupied2 ?
 			       "occupied" : "unoccupied");
-	
+
 	eject = bay_eject_supported && occupied;
 	eject2 = bay_eject2_supported && occupied2;
 
@@ -978,8 +965,7 @@ static int bay_write(char *buf)
 		return -ENODEV;
 
 	while ((cmd = next_cmd(&buf))) {
-		if (bay_eject_supported &&
-		    strlencmp(cmd, "eject") == 0) {
+		if (bay_eject_supported && strlencmp(cmd, "eject") == 0) {
 			if (!acpi_evalf(bay_ej_handle, NULL, NULL, "vd", 1))
 				return -EIO;
 		} else if (bay_eject2_supported &&
@@ -991,7 +977,7 @@ static int bay_write(char *buf)
 	}
 
 	return 0;
-}	
+}
 
 static void bay_notify(struct ibm_struct *ibm, u32 event)
 {
@@ -1003,7 +989,7 @@ static int cmos_read(char *p)
 	int len = 0;
 
 	/* cmos not supported on 570, 600e/x, 770e, 770x, A21e, A2xm/p,
-	   R30, R31, T20-22, X20 */
+	   R30, R31, T20-22, X20-21 */
 	if (!cmos_handle)
 		len += sprintf(p + len, "status:\t\tnot supported\n");
 	else {
@@ -1042,7 +1028,7 @@ static int cmos_write(char *buf)
 	}
 
 	return 0;
-}	
+}
 
 static int led_supported;
 
@@ -1059,7 +1045,7 @@ static int led_init(void)
 		/* 570 */
 		led_supported = LED_570;
 	else if (strlencmp(led_path, "SYSL") == 0)
-		/* 600e/x, 770e, 770x, A21e, A2xm/p, T20-22, X20 */
+		/* 600e/x, 770e, 770x, A21e, A2xm/p, T20-22, X20-21 */
 		led_supported = LED_OLD;
 	else
 		/* all others */
@@ -1083,14 +1069,14 @@ static int led_read(char *p)
 	if (led_supported == LED_570) {
 		/* 570 */
 		int i, status;
-		for (i=0; i<8; i++) {
+		for (i = 0; i < 8; i++) {
 			if (!acpi_evalf(ec_handle,
 					&status, "GLED", "dd", 1 << i))
 				return -EIO;
 			len += sprintf(p + len, "%d:\t\t%s\n",
 				       i, led_status(status));
 		}
-	}				
+	}
 
 	len += sprintf(p + len, "commands:\t"
 		       "<led> on, <led> off, <led> blink (<led> is 0-7)\n");
@@ -1100,9 +1086,9 @@ static int led_read(char *p)
 
 /* off, on, blink */
 static const int led_sled_arg1[] = { 0, 1, 3 };
-static const int led_exp_hlbl[]  = { 0, 0, 1 }; /* led# * */
-static const int led_exp_hlcl[]  = { 0, 1, 1 }; /* led# * */
-static const int led_led_arg1[]  = { 0, 0x80, 0xc0 };
+static const int led_exp_hlbl[] = { 0, 0, 1 };	/* led# * */
+static const int led_exp_hlcl[] = { 0, 1, 1 };	/* led# * */
+static const int led_led_arg1[] = { 0, 0x80, 0xc0 };
 
 #define EC_HLCL 0x0c
 #define EC_HLBL 0x0d
@@ -1140,9 +1126,11 @@ static int led_write(char *buf)
 			led = 1 << led;
 			ret = ec_write(EC_HLMS, led);
 			if (ret >= 0)
-				ret = ec_write(EC_HLBL, led*led_exp_hlbl[ind]);
+				ret =
+				    ec_write(EC_HLBL, led * led_exp_hlbl[ind]);
 			if (ret >= 0)
-				ret = ec_write(EC_HLCL, led*led_exp_hlcl[ind]);
+				ret =
+				    ec_write(EC_HLCL, led * led_exp_hlcl[ind]);
 			if (ret < 0)
 				return ret;
 		} else {
@@ -1154,7 +1142,7 @@ static int led_write(char *buf)
 	}
 
 	return 0;
-}	
+}
 
 static int beep_read(char *p)
 {
@@ -1189,9 +1177,9 @@ static int beep_write(char *buf)
 	}
 
 	return 0;
-}	
+}
 
-static int acpi_ec_read(int i, u8 *p)
+static int acpi_ec_read(int i, u8 * p)
 {
 	int v;
 
@@ -1244,12 +1232,12 @@ static int thermal_read(char *p)
 		int i, t;
 		char tmpi[] = "TMPi";
 		s8 tmp[8];
-		
+
 		if (thermal_updt_supported)
 			if (!acpi_evalf(ec_handle, NULL, "UPDT", "v"))
 				return -EIO;
 
-		for (i=0; i<8; i++) {
+		for (i = 0; i < 8; i++) {
 			tmpi[3] = '0' + i;
 			if (!acpi_evalf(ec_handle, &t, tmpi, "d"))
 				return -EIO;
@@ -1279,9 +1267,9 @@ static int ecdump_read(char *p)
 	len += sprintf(p + len, "EC      "
 		       " +00 +01 +02 +03 +04 +05 +06 +07"
 		       " +08 +09 +0a +0b +0c +0d +0e +0f\n");
-	for (i=0; i<256; i+=16) {
+	for (i = 0; i < 256; i += 16) {
 		len += sprintf(p + len, "EC 0x%02x:", i);
-		for (j=0; j<16; j++) {
+		for (j = 0; j < 16; j++) {
 			if (!acpi_ec_read(i + j, &v))
 				break;
 			if (v != ecdump_regs[i + j])
@@ -1301,7 +1289,7 @@ static int ecdump_read(char *p)
 		       " (<offset> is 00-ff, <value> is 00-ff)\n");
 	len += sprintf(p + len, "commands:\t0x<offset> <value>  "
 		       " (<offset> is 00-ff, <value> is 0-255)\n");
-#endif	
+#endif
 	return len;
 }
 
@@ -1325,7 +1313,7 @@ static int ecdump_write(char *buf)
 	}
 
 	return 0;
-}	
+}
 
 static int brightness_offset = 0x31;
 
@@ -1360,7 +1348,7 @@ static int brightness_write(char *buf)
 		if (!acpi_ec_read(brightness_offset, &level))
 			return -EIO;
 		level &= 7;
-	
+
 		if (strlencmp(cmd, "up") == 0) {
 			new_level = level == 7 ? 7 : level + 1;
 		} else if (strlencmp(cmd, "down") == 0) {
@@ -1420,7 +1408,7 @@ static int volume_write(char *buf)
 			return -EIO;
 		new_mute = mute = level & 0x40;
 		new_level = level = level & 0xf;
-	
+
 		if (strlencmp(cmd, "up") == 0) {
 			if (mute)
 				new_mute = 0;
@@ -1439,7 +1427,7 @@ static int volume_write(char *buf)
 		} else
 			return -EINVAL;
 
-		if (new_level != level) { /* mute doesn't change */
+		if (new_level != level) {	/* mute doesn't change */
 			cmos_cmd = new_level > level ? VOLUME_UP : VOLUME_DOWN;
 			inc = new_level > level ? 1 : -1;
 
@@ -1458,12 +1446,12 @@ static int volume_write(char *buf)
 				return -EIO;
 		}
 
-		if (new_mute != mute) { /* level doesn't change */
+		if (new_mute != mute) {	/* level doesn't change */
 			cmos_cmd = new_mute ? VOLUME_MUTE : VOLUME_UP;
 
 			if (!cmos_eval(cmos_cmd) ||
 			    !acpi_ec_write(volume_offset, level + new_mute))
-					return -EIO;
+				return -EIO;
 		}
 	}
 
@@ -1493,7 +1481,7 @@ static int fan_read(char *p)
 			len += sprintf(p + len, "status:\t\t%s\n",
 				       enabled(status, 7));
 
-		if (!acpi_ec_read(fan_rpm_offset,     &lo) ||
+		if (!acpi_ec_read(fan_rpm_offset, &lo) ||
 		    !acpi_ec_read(fan_rpm_offset + 1, &hi))
 			len += sprintf(p + len, "speed:\t\tunreadable\n");
 		else
@@ -1524,23 +1512,21 @@ static int fan_write(char *buf)
 	while ((cmd = next_cmd(&buf))) {
 		if (sfan_handle &&
 		    sscanf(cmd, "level %d", &level) == 1 &&
-		    level >=0 && level <= 7) {
+		    level >= 0 && level <= 7) {
 			/* 570, 770x-JL */
 			if (!acpi_evalf(sfan_handle, NULL, NULL, "vd", level))
 				return -EIO;
-		} else if (!gfan_handle &&
-			   strlencmp(cmd, "enable") == 0) {
+		} else if (!gfan_handle && strlencmp(cmd, "enable") == 0) {
 			/* all except 570, 600e/x, 770e, 770x */
 			if (!acpi_ec_write(fan_status_offset, 0x80))
 				return -EIO;
-		} else if (!gfan_handle &&
-			   strlencmp(cmd, "disable") == 0) {
+		} else if (!gfan_handle && strlencmp(cmd, "disable") == 0) {
 			/* all except 570, 600e/x, 770e, 770x */
 			if (!acpi_ec_write(fan_status_offset, 0x00))
 				return -EIO;
 		} else if (fans_handle &&
-		    sscanf(cmd, "speed %d", &speed) == 1 &&
-		    speed >= 0 && speed <= 65535) {
+			   sscanf(cmd, "speed %d", &speed) == 1 &&
+			   speed >= 0 && speed <= 65535) {
 			/* X31, X40 */
 			if (!acpi_evalf(fans_handle, NULL, NULL, "vddd",
 					speed, speed, speed))
@@ -1554,109 +1540,109 @@ static int fan_write(char *buf)
 
 static struct ibm_struct ibms[] = {
 	{
-		.name	= "driver",
-		.init	= driver_init,
-		.read	= driver_read,
-	},
+	 .name = "driver",
+	 .init = driver_init,
+	 .read = driver_read,
+	 },
 	{
-		.name	= "hotkey",
-		.hid	= IBM_HKEY_HID,
-		.init	= hotkey_init,
-		.read	= hotkey_read,
-		.write	= hotkey_write,
-		.exit	= hotkey_exit,
-		.notify	= hotkey_notify,
-		.handle	= &hkey_handle,
-		.type	= ACPI_DEVICE_NOTIFY,
-	},
+	 .name = "hotkey",
+	 .hid = IBM_HKEY_HID,
+	 .init = hotkey_init,
+	 .read = hotkey_read,
+	 .write = hotkey_write,
+	 .exit = hotkey_exit,
+	 .notify = hotkey_notify,
+	 .handle = &hkey_handle,
+	 .type = ACPI_DEVICE_NOTIFY,
+	 },
 	{
-		.name	= "bluetooth",
-		.init	= bluetooth_init,
-		.read	= bluetooth_read,
-		.write	= bluetooth_write,
-	},
+	 .name = "bluetooth",
+	 .init = bluetooth_init,
+	 .read = bluetooth_read,
+	 .write = bluetooth_write,
+	 },
 	{
-		.name	= "video",
-		.init	= video_init,
-		.read	= video_read,
-		.write	= video_write,
-		.exit	= video_exit,
-	},
+	 .name = "video",
+	 .init = video_init,
+	 .read = video_read,
+	 .write = video_write,
+	 .exit = video_exit,
+	 },
 	{
-		.name	= "light",
-		.init	= light_init,
-		.read	= light_read,
-		.write	= light_write,
-	},
+	 .name = "light",
+	 .init = light_init,
+	 .read = light_read,
+	 .write = light_write,
+	 },
 	{
-		.name	= "dock",
-		.read	= dock_read,
-		.write	= dock_write,
-		.notify	= dock_notify,
-		.handle	= &dock_handle,
-		.type	= ACPI_SYSTEM_NOTIFY,
-	},
+	 .name = "dock",
+	 .read = dock_read,
+	 .write = dock_write,
+	 .notify = dock_notify,
+	 .handle = &dock_handle,
+	 .type = ACPI_SYSTEM_NOTIFY,
+	 },
 	{
-		.name	= "dock",
-		.hid	= IBM_PCI_HID,
-		.notify	= dock_notify,
-		.handle	= &pci_handle,
-		.type	= ACPI_SYSTEM_NOTIFY,
-	},
+	 .name = "dock",
+	 .hid = IBM_PCI_HID,
+	 .notify = dock_notify,
+	 .handle = &pci_handle,
+	 .type = ACPI_SYSTEM_NOTIFY,
+	 },
 	{
-		.name	= "bay",
-		.init	= bay_init,
-		.read	= bay_read,
-		.write	= bay_write,
-		.notify	= bay_notify,
-		.handle	= &bay_handle,
-		.type	= ACPI_SYSTEM_NOTIFY,
-	},
+	 .name = "bay",
+	 .init = bay_init,
+	 .read = bay_read,
+	 .write = bay_write,
+	 .notify = bay_notify,
+	 .handle = &bay_handle,
+	 .type = ACPI_SYSTEM_NOTIFY,
+	 },
 	{
-		.name	= "cmos",
-		.read	= cmos_read,
-		.write	= cmos_write,
-	},
+	 .name = "cmos",
+	 .read = cmos_read,
+	 .write = cmos_write,
+	 },
 	{
-		.name	= "led",
-		.init	= led_init,
-		.read	= led_read,
-		.write	= led_write,
-	},
+	 .name = "led",
+	 .init = led_init,
+	 .read = led_read,
+	 .write = led_write,
+	 },
 	{
-		.name	= "beep",
-		.read	= beep_read,
-		.write	= beep_write,
-	},
+	 .name = "beep",
+	 .read = beep_read,
+	 .write = beep_write,
+	 },
 	{
-		.name   = "thermal",
-		.init   = thermal_init,
-		.read   = thermal_read,
-	},
+	 .name = "thermal",
+	 .init = thermal_init,
+	 .read = thermal_read,
+	 },
 	{
-		.name	= "ecdump",
-		.read	= ecdump_read,
-		.write	= ecdump_write,
-		.experimental = 1,
-	},
+	 .name = "ecdump",
+	 .read = ecdump_read,
+	 .write = ecdump_write,
+	 .experimental = 1,
+	 },
 	{
-		.name	= "brightness",
-		.read	= brightness_read,
-		.write	= brightness_write,
-		.experimental = 1,
-	},
+	 .name = "brightness",
+	 .read = brightness_read,
+	 .write = brightness_write,
+	 .experimental = 1,
+	 },
 	{
-		.name	= "volume",
-		.read	= volume_read,
-		.write	= volume_write,
-		.experimental = 1,
-	},
+	 .name = "volume",
+	 .read = volume_read,
+	 .write = volume_write,
+	 .experimental = 1,
+	 },
 	{
-		.name   = "fan",
-		.read   = fan_read,
-		.write	= fan_write,
-		.experimental = 1,
-	},
+	 .name = "fan",
+	 .read = fan_read,
+	 .write = fan_write,
+	 .experimental = 1,
+	 },
 };
 
 static int dispatch_read(char *page, char **start, off_t off, int count,
@@ -1664,7 +1650,7 @@ static int dispatch_read(char *page, char **start, off_t off, int count,
 {
 	struct ibm_struct *ibm = (struct ibm_struct *)data;
 	int len;
-	
+
 	if (!ibm || !ibm->read)
 		return -EINVAL;
 
@@ -1684,7 +1670,7 @@ static int dispatch_read(char *page, char **start, off_t off, int count,
 	return len;
 }
 
-static int dispatch_write(struct file *file, const char __user *userbuf,
+static int dispatch_write(struct file *file, const char __user * userbuf,
 			  unsigned long count, void *data)
 {
 	struct ibm_struct *ibm = (struct ibm_struct *)data;
@@ -1698,9 +1684,9 @@ static int dispatch_write(struct file *file, const char __user *userbuf,
 	if (!kernbuf)
 		return -ENOMEM;
 
-        if (copy_from_user(kernbuf, userbuf, count)) {
+	if (copy_from_user(kernbuf, userbuf, count)) {
 		kfree(kernbuf);
-                return -EFAULT;
+		return -EFAULT;
 	}
 
 	kernbuf[count] = 0;
@@ -1711,7 +1697,7 @@ static int dispatch_write(struct file *file, const char __user *userbuf,
 
 	kfree(kernbuf);
 
-        return ret;
+	return ret;
 }
 
 static void dispatch_notify(acpi_handle handle, u32 event, void *data)
@@ -1752,7 +1738,7 @@ static int __init setup_notify(struct ibm_struct *ibm)
 	return 0;
 }
 
-static int ibmacpi_device_add(struct acpi_device *device)
+static int __init ibm_device_add(struct acpi_device *device)
 {
 	return 0;
 }
@@ -1770,7 +1756,7 @@ static int __init register_driver(struct ibm_struct *ibm)
 	memset(ibm->driver, 0, sizeof(struct acpi_driver));
 	sprintf(ibm->driver->name, "%s/%s", IBM_NAME, ibm->name);
 	ibm->driver->ids = ibm->hid;
-	ibm->driver->ops.add = &ibmacpi_device_add;
+	ibm->driver->ops.add = &ibm_device_add;
 
 	ret = acpi_bus_register_driver(ibm->driver);
 	if (ret < 0) {
@@ -1850,20 +1836,20 @@ static void ibm_exit(struct ibm_struct *ibm)
 }
 
 static void __init ibm_handle_init(char *name,
-				   acpi_handle *handle, acpi_handle parent,
+				   acpi_handle * handle, acpi_handle parent,
 				   char **paths, int num_paths, char **path)
 {
 	int i;
 	acpi_status status;
 
-	for (i=0; i<num_paths; i++) {
+	for (i = 0; i < num_paths; i++) {
 		status = acpi_get_handle(parent, paths[i], handle);
 		if (ACPI_SUCCESS(status)) {
 			*path = paths[i];
 			return;
 		}
 	}
-	
+
 	*handle = NULL;
 }
 
@@ -1875,7 +1861,7 @@ static int set_ibm_param(const char *val, struct kernel_param *kp)
 {
 	unsigned int i;
 
-	for (i=0; i<ARRAY_SIZE(ibms); i++)
+	for (i = 0; i < ARRAY_SIZE(ibms); i++)
 		if (strcmp(ibms[i].name, kp->name) == 0 && ibms[i].write) {
 			if (strlen(val) > sizeof(ibms[i].param) - 2)
 				return -ENOSPC;
@@ -1883,7 +1869,7 @@ static int set_ibm_param(const char *val, struct kernel_param *kp)
 			strcat(ibms[i].param, ",");
 			return 0;
 		}
-			
+
 	return -EINVAL;
 }
 
@@ -1908,7 +1894,7 @@ static void acpi_ibm_exit(void)
 {
 	int i;
 
-	for (i=ARRAY_SIZE(ibms)-1; i>=0; i--)
+	for (i = ARRAY_SIZE(ibms) - 1; i >= 0; i--)
 		ibm_exit(&ibms[i]);
 
 	remove_proc_entry(IBM_DIR, acpi_root_dir);
@@ -1920,6 +1906,11 @@ static int __init acpi_ibm_init(void)
 
 	if (acpi_disabled)
 		return -ENODEV;
+
+	if (!acpi_specific_hotkey_enabled) {
+		printk(IBM_ERR "using generic hotkey driver\n");
+		return -ENODEV;
+	}
 
 	/* ec is required because many other handles are relative to it */
 	IBM_HANDLE_INIT(ec);
@@ -1957,8 +1948,8 @@ static int __init acpi_ibm_init(void)
 		return -ENODEV;
 	}
 	proc_dir->owner = THIS_MODULE;
-	
-	for (i=0; i<ARRAY_SIZE(ibms); i++) {
+
+	for (i = 0; i < ARRAY_SIZE(ibms); i++) {
 		ret = ibm_init(&ibms[i]);
 		if (ret >= 0 && *ibms[i].param)
 			ret = ibms[i].write(ibms[i].param);

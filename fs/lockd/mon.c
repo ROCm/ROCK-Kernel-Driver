@@ -3,10 +3,6 @@
  *
  * The kernel statd client.
  *
- * When using the kernel statd service, none of the
- * stuff inside this file is used.
- * Instead look at statd.c
- *
  * Copyright (C) 1996, Olaf Kirch <okir@monad.swb.de>
  */
 
@@ -22,33 +18,19 @@
 #define NLMDBG_FACILITY		NLMDBG_MONITOR
 
 static struct rpc_clnt *	nsm_create(void);
-static int			__nsm_monitor(struct nlm_host *);
-static int			__nsm_unmonitor(struct nlm_host *);
 
 static struct rpc_program	nsm_program;
 
 /*
  * Local NSM state
- * This should really be initialized somehow.
  */
 u32				nsm_local_state;
-
-/*
- * Initialize lockd for RPC statd upcalls
- */
-int
-nsm_statd_upcalls_init()
-{
-	nsm_monitor = __nsm_monitor;
-	nsm_unmonitor = __nsm_unmonitor;
-	return 0;
-}
 
 /*
  * Common procedure for SM_MON/SM_UNMON calls
  */
 static int
-nsm_mon_unmon(struct nsm_handle *nsm, u32 proc, struct nsm_res *res)
+nsm_mon_unmon(struct nlm_host *host, u32 proc, struct nsm_res *res)
 {
 	struct rpc_clnt	*clnt;
 	int		status;
@@ -60,10 +42,10 @@ nsm_mon_unmon(struct nsm_handle *nsm, u32 proc, struct nsm_res *res)
 		goto out;
 	}
 
-	memset(&args, 0, sizeof(args));
-	args.mon_name = nsm->sm_name;
+	args.addr = host->h_addr.sin_addr.s_addr;
+	args.proto= (host->h_proto<<1) | host->h_server;
 	args.prog = NLM_PROGRAM;
-	args.vers = 3;
+	args.vers = host->h_version;
 	args.proc = NLMPROC_NSM_NOTIFY;
 	memset(res, 0, sizeof(*res));
 
@@ -81,25 +63,19 @@ nsm_mon_unmon(struct nsm_handle *nsm, u32 proc, struct nsm_res *res)
  * Set up monitoring of a remote host
  */
 int
-__nsm_monitor(struct nlm_host *host)
+nsm_monitor(struct nlm_host *host)
 {
-	struct nsm_handle *nsm;
 	struct nsm_res	res;
 	int		status;
 
 	dprintk("lockd: nsm_monitor(%s)\n", host->h_name);
-	if ((nsm = host->h_nsmhandle) == NULL)
-		BUG();
 
-	if (nsm->sm_monitored)
-		return 0;
-
-	status = nsm_mon_unmon(nsm, SM_MON, &res);
+	status = nsm_mon_unmon(host, SM_MON, &res);
 
 	if (status < 0 || res.status != 0)
 		printk(KERN_NOTICE "lockd: cannot monitor %s\n", host->h_name);
 	else
-		nsm->sm_monitored = 1;
+		host->h_monitored = 1;
 	return status;
 }
 
@@ -107,27 +83,18 @@ __nsm_monitor(struct nlm_host *host)
  * Cease to monitor remote host
  */
 int
-__nsm_unmonitor(struct nlm_host *host)
+nsm_unmonitor(struct nlm_host *host)
 {
-	struct nsm_handle *nsm;
 	struct nsm_res	res;
-	int		status = 0;
+	int		status;
 
-	nsm = host->h_nsmhandle;
-	host->h_nsmhandle = NULL;
+	dprintk("lockd: nsm_unmonitor(%s)\n", host->h_name);
 
-	if (nsm && atomic_read(&nsm->sm_count) == 1
-	 && nsm->sm_monitored && !nsm->sm_sticky) {
-		dprintk("lockd: nsm_unmonitor(%s)\n", host->h_name);
-		status = nsm_mon_unmon(nsm, SM_UNMON, &res);
-		if (status < 0) {
-			printk(KERN_NOTICE "lockd: cannot unmonitor %s\n",
-				       	host->h_name);
-		} else {
-			nsm->sm_monitored = 0;
-		}
-	}
-	nsm_release(nsm);
+	status = nsm_mon_unmon(host, SM_UNMON, &res);
+	if (status < 0)
+		printk(KERN_NOTICE "lockd: cannot unmonitor %s\n", host->h_name);
+	else
+		host->h_monitored = 0;
 	return status;
 }
 
@@ -171,7 +138,7 @@ out_err:
 static u32 *
 xdr_encode_common(struct rpc_rqst *rqstp, u32 *p, struct nsm_args *argp)
 {
-	char	buffer[20], *name;
+	char	buffer[20];
 
 	/*
 	 * Use the dotted-quad IP address of the remote host as
@@ -179,13 +146,8 @@ xdr_encode_common(struct rpc_rqst *rqstp, u32 *p, struct nsm_args *argp)
 	 * hostname first for whatever remote hostname it receives,
 	 * so this works alright.
 	 */
-	if (nsm_use_hostnames) {
-		name = argp->mon_name;
-	} else {
-		sprintf(buffer, "%u.%u.%u.%u", NIPQUAD(argp->addr));
-		name = buffer;
-	}
-	if (!(p = xdr_encode_string(p, name))
+	sprintf(buffer, "%u.%u.%u.%u", NIPQUAD(argp->addr));
+	if (!(p = xdr_encode_string(p, buffer))
 	 || !(p = xdr_encode_string(p, system_utsname.nodename)))
 		return ERR_PTR(-EIO);
 	*p++ = htonl(argp->prog);

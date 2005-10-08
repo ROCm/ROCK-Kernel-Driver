@@ -15,9 +15,7 @@ export AWK
 
 CHECKFLAGS	+= -m64 -D__ia64=1 -D__ia64__=1 -D_LP64 -D__LP64__
 
-ifndef CONFIG_DEBUG_INFO
-OBJCOPYFLAGS	:= --strip-debug
-endif
+OBJCOPYFLAGS	:= --strip-all
 LDFLAGS_vmlinux	:= -static
 LDFLAGS_MODULE	+= -T $(srctree)/arch/ia64/module.lds
 AFLAGS_KERNEL	:= -mconstant-gp
@@ -60,7 +58,6 @@ core-$(CONFIG_IA64_HP_ZX1)	+= arch/ia64/dig/
 core-$(CONFIG_IA64_HP_ZX1_SWIOTLB) += arch/ia64/dig/
 core-$(CONFIG_IA64_SGI_SN2)	+= arch/ia64/sn/
 
-drivers-$(CONFIG_KDB)		+= arch/$(ARCH)/kdb/
 drivers-$(CONFIG_PCI)		+= arch/ia64/pci/
 drivers-$(CONFIG_IA64_HP_SIM)	+= arch/ia64/hp/sim/
 drivers-$(CONFIG_IA64_HP_ZX1)	+= arch/ia64/hp/common/ arch/ia64/hp/zx1/
@@ -85,26 +82,7 @@ unwcheck: vmlinux
 archclean:
 	$(Q)$(MAKE) $(clean)=$(boot)
 
-CLEAN_FILES += include/asm-ia64/.offsets.h.stamp vmlinux.gz bootloader
-
-MRPROPER_FILES += include/asm-ia64/offsets.h
-
-prepare: include/asm-ia64/offsets.h
-
-arch/ia64/kernel/asm-offsets.s: $(objtree)/include/asm \
-				$(objtree)/include/linux/version.h \
-				include/config/MARKER
-
-include/asm-ia64/offsets.h: arch/ia64/kernel/asm-offsets.s
-	$(call filechk,gen-asm-offsets)
-
-arch/ia64/kernel/asm-offsets.s: include/asm-ia64/.offsets.h.stamp
-
-include/asm-ia64/.offsets.h.stamp:
-	mkdir -p include/asm-ia64
-	[ -s include/asm-ia64/offsets.h ] \
-	 || echo "#define IA64_TASK_SIZE 0" > include/asm-ia64/offsets.h
-	touch $@
+CLEAN_FILES += vmlinux.gz bootloader
 
 boot:	lib/lib.a vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $@

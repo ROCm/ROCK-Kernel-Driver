@@ -224,23 +224,6 @@ int hugetlb_report_node_meminfo(int nid, char *buf)
 		nid, free_huge_pages_node[nid]);
 }
 
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#include <linux/kdbprivate.h>
-/* Like hugetlb_report_meminfo() but using kdb_printf() */
-void
-kdb_hugetlb_report_meminfo(void)
-{
-	kdb_printf(
-		"HugePages_Total: %5lu\n"
-		"HugePages_Free:  %5lu\n"
-		"Hugepagesize:    %5lu kB\n",
-		nr_huge_pages,
-		free_huge_pages,
-		HPAGE_SIZE/1024);
-}
-#endif	/* CONFIG_KDB */
-
 int is_hugepage_mem_enough(size_t size)
 {
 	return (size + ~HPAGE_MASK)/HPAGE_SIZE <= free_huge_pages;
@@ -377,8 +360,6 @@ int hugetlb_prefault(struct address_space *mapping, struct vm_area_struct *vma)
 			ret = -ENOMEM;
 			goto out;
 		}
-		if (! pte_none(*pte))
-			hugetlb_clean_stale_pgtable(pte);
 
 		idx = ((addr - vma->vm_start) >> HPAGE_SHIFT)
 			+ (vma->vm_pgoff >> (HPAGE_SHIFT - PAGE_SHIFT));

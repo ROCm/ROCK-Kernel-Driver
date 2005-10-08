@@ -15,9 +15,6 @@ EXPORT_SYMBOL(ndisc_mc_map);
 EXPORT_SYMBOL(register_inet6addr_notifier);
 EXPORT_SYMBOL(unregister_inet6addr_notifier);
 EXPORT_SYMBOL(ip6_route_output);
-#ifdef CONFIG_NETFILTER
-EXPORT_SYMBOL(ip6_route_me_harder);
-#endif
 EXPORT_SYMBOL(addrconf_lock);
 EXPORT_SYMBOL(ipv6_setsockopt);
 EXPORT_SYMBOL(ipv6_getsockopt);
@@ -38,4 +35,3 @@ EXPORT_SYMBOL(xfrm6_rcv);
 #endif
 EXPORT_SYMBOL(rt6_lookup);
 EXPORT_SYMBOL(ipv6_push_nfrag_opts);
-EXPORT_SYMBOL(ip6_dst_lookup);

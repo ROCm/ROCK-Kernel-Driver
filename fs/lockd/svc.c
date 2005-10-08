@@ -32,7 +32,6 @@
 #include <linux/sunrpc/svc.h>
 #include <linux/sunrpc/svcsock.h>
 #include <linux/lockd/lockd.h>
-#include <linux/lockd/sm_inter.h>
 #include <linux/nfs.h>
 
 #define NLMDBG_FACILITY		NLMDBG_SVC
@@ -40,7 +39,6 @@
 #define ALLOWED_SIGS		(sigmask(SIGKILL))
 
 static struct svc_program	nlmsvc_program;
-extern struct svc_program	nsmsvc_program;
 
 struct nlmsvc_binding *		nlmsvc_ops;
 EXPORT_SYMBOL(nlmsvc_ops);
@@ -61,9 +59,6 @@ static DECLARE_WAIT_QUEUE_HEAD(lockd_exit);
 static unsigned long		nlm_grace_period;
 static unsigned long		nlm_timeout = LOCKD_DFLT_TIMEO;
 static int			nlm_udpport, nlm_tcpport;
-int				nlm_max_hosts = 256;
-int				nsm_use_hostnames = 1;
-static int			nsm_use_kstatd = 1;
 
 /*
  * Constants needed for the sysctl interface.
@@ -121,20 +116,13 @@ lockd(struct svc_rqst *rqstp)
 
 	daemonize("lockd");
 
-	/* Set up statd */
-	if (nsm_use_kstatd && nsm_kernel_statd_init() < 0)
-		nsm_use_kstatd = 0;
-	if (nsm_use_kstatd == 0)
-		nsm_statd_upcalls_init();
-
 	/* Process request with signals blocked, but allow SIGKILL.  */
 	allow_signal(SIGKILL);
 
 	/* kick rpciod */
 	rpciod_up();
 
-	dprintk("NFS locking%s service started (ver " LOCKD_VERSION ").\n",
-			nsm_use_kstatd? " and status" : "");
+	dprintk("NFS locking service started (ver " LOCKD_VERSION ").\n");
 
 	if (!nlm_timeout)
 		nlm_timeout = LOCKD_DFLT_TIMEO;
@@ -224,7 +212,6 @@ int
 lockd_up(void)
 {
 	static int		warned;
-	struct svc_program *	prog;
 	struct svc_serv *	serv;
 	int			error = 0;
 
@@ -248,12 +235,8 @@ lockd_up(void)
 		printk(KERN_WARNING
 			"lockd_up: no pid, %d users??\n", nlmsvc_users);
 
-	/* Register NLM program and possibly NSM (if using kstatd) */
 	error = -ENOMEM;
-	prog = &nlmsvc_program;
-	if (nsm_use_kstatd)
-		prog = &nsmsvc_program;
-	serv = svc_create(prog, LOCKD_BUFSIZE);
+	serv = svc_create(&nlmsvc_program, LOCKD_BUFSIZE);
 	if (!serv) {
 		printk(KERN_WARNING "lockd_up: create service failed\n");
 		goto out;
@@ -384,31 +367,6 @@ static ctl_table nlm_sysctls[] = {
 		.extra1		= (int *) &nlm_port_min,
 		.extra2		= (int *) &nlm_port_max,
 	},
-	{
-		.ctl_name	= CTL_UNNUMBERED,
-		.procname	= "nlm_max_hosts",
-		.data		= &nlm_max_hosts,
-		.maxlen		= sizeof(int),
-		.mode		= 0644,
-		.proc_handler	= &proc_dointvec,
-	},
-	{
-		.ctl_name	= CTL_UNNUMBERED,
-		.procname	= "nsm_use_hostnames",
-		.data		= &nsm_use_hostnames,
-		.maxlen		= sizeof(int),
-		.mode		= 0644,
-		.proc_handler	= &proc_dointvec,
-	},
-	{
-		.ctl_name	= CTL_UNNUMBERED,
-		.procname	= "nsm_use_kstatd",
-		.data		= &nsm_use_kstatd,
-		.maxlen		= sizeof(int),
-		.mode		= 0444,
-		.proc_handler	= &proc_dointvec,
-	},
-
 	{ .ctl_name = 0 }
 };
 
@@ -497,7 +455,6 @@ module_param_call(nlm_udpport, param_set_port, param_get_int,
 		  &nlm_udpport, 0644);
 module_param_call(nlm_tcpport, param_set_port, param_get_int,
 		  &nlm_tcpport, 0644);
-module_param(nsm_use_kstatd, int, 0444);
 
 /*
  * Initialising and terminating the module.
@@ -561,31 +518,4 @@ static struct svc_program	nlmsvc_program = {
 	.pg_class		= "nfsd",		/* share authentication with nfsd */
 	.pg_stats		= &nlmsvc_stats,	/* stats table */
 	.pg_authenticate = &lockd_authenticate	/* export authentication */
-};
-
-/*
- * Define NSM program and procedures
- */
-static struct svc_version	nsmsvc_version1 = {
-		.vs_vers	= 1,
-		.vs_nproc	= 7,
-		.vs_proc	= nsmsvc_procedures,
-		.vs_xdrsize	= SMSVC_XDRSIZE,
-};
-static struct svc_version *	nsmsvc_version[] = {
-	[1] = &nsmsvc_version1,
-};
-
-static struct svc_stat		nsmsvc_stats;
-
-#define SM_NRVERS	(sizeof(nsmsvc_version)/sizeof(nsmsvc_version[0]))
-struct svc_program	nsmsvc_program = {
-	.pg_next		= &nlmsvc_program,
-	.pg_prog		= SM_PROGRAM,		/* program number */
-	.pg_nvers		= SM_NRVERS,		/* number of entries in nlmsvc_version */
-	.pg_vers		= nsmsvc_version,	/* version table */
-	.pg_name		= "statd",		/* service name */
-	.pg_class		= "nfsd",		/* share authentication with nfsd */
-	.pg_stats		= &nsmsvc_stats,	/* stats table */
-	.pg_authenticate	= &statd_authenticate	/* no authentication :-( */
 };

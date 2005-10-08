@@ -207,27 +207,25 @@ void pgd_ctor(void *pgd, kmem_cache_t *cache, unsigned long unused)
 {
 	unsigned long flags;
 
-	if (!HAVE_SHARED_KERNEL_PMD)
+	if (PTRS_PER_PMD == 1) {
+		memset(pgd, 0, USER_PTRS_PER_PGD*sizeof(pgd_t));
 		spin_lock_irqsave(&pgd_lock, flags);
+	}
 
-	memcpy((pgd_t *)pgd + USER_PTRS_PER_PGD,
+	clone_pgd_range((pgd_t *)pgd + USER_PTRS_PER_PGD,
 			swapper_pg_dir + USER_PTRS_PER_PGD,
-			(PTRS_PER_PGD - USER_PTRS_PER_PGD) * sizeof(pgd_t));
-
-	if (HAVE_SHARED_KERNEL_PMD)
+			KERNEL_PGD_PTRS);
+	if (PTRS_PER_PMD > 1)
 		return;
 
 	pgd_list_add(pgd);
 	spin_unlock_irqrestore(&pgd_lock, flags);
-	memset(pgd, 0, USER_PTRS_PER_PGD*sizeof(pgd_t));
 }
 
+/* never called when PTRS_PER_PMD > 1 */
 void pgd_dtor(void *pgd, kmem_cache_t *cache, unsigned long unused)
 {
 	unsigned long flags; /* can be called from interrupt context */
-
-	if (HAVE_SHARED_KERNEL_PMD)
-		return;
 
 	spin_lock_irqsave(&pgd_lock, flags);
 	pgd_list_del(pgd);
@@ -236,29 +234,12 @@ void pgd_dtor(void *pgd, kmem_cache_t *cache, unsigned long unused)
 
 pgd_t *pgd_alloc(struct mm_struct *mm)
 {
-	int i = 0;
+	int i;
 	pgd_t *pgd = kmem_cache_alloc(pgd_cache, GFP_KERNEL);
 
 	if (PTRS_PER_PMD == 1 || !pgd)
 		return pgd;
 
-	if (!HAVE_SHARED_KERNEL_PMD) {
-		/* alloc and copy kernel pmd */
-		unsigned long flags;
-		pgd_t *copy_pgd = pgd_offset_k(PAGE_OFFSET);
-		pud_t *copy_pud = pud_offset(copy_pgd, PAGE_OFFSET);
-		pmd_t *copy_pmd = pmd_offset(copy_pud, PAGE_OFFSET);
-		pmd_t *pmd = kmem_cache_alloc(pmd_cache, GFP_KERNEL);
-		if (0 == pmd)
-			goto out_oom;
-
-		spin_lock_irqsave(&pgd_lock, flags);
-		memcpy(pmd, copy_pmd, PAGE_SIZE);
-		spin_unlock_irqrestore(&pgd_lock, flags);
-		set_pgd(&pgd[USER_PTRS_PER_PGD], __pgd(1 + __pa(pmd)));
-	}
-
-	/* alloc user pmds */
 	for (i = 0; i < USER_PTRS_PER_PGD; ++i) {
 		pmd_t *pmd = kmem_cache_alloc(pmd_cache, GFP_KERNEL);
 		if (!pmd)
@@ -279,16 +260,9 @@ void pgd_free(pgd_t *pgd)
 	int i;
 
 	/* in the PAE case user pgd entries are overwritten before usage */
-	if (PTRS_PER_PMD > 1) {
-		for (i = 0; i < USER_PTRS_PER_PGD; ++i) {
-			pmd_t *pmd = (void *)__va(pgd_val(pgd[i])-1);
-			kmem_cache_free(pmd_cache, pmd);
-		}
-		if (!HAVE_SHARED_KERNEL_PMD) {
-			pmd_t *pmd = (void *)__va(pgd_val(pgd[USER_PTRS_PER_PGD])-1);
-			kmem_cache_free(pmd_cache, pmd);
-		}
-	}
+	if (PTRS_PER_PMD > 1)
+		for (i = 0; i < USER_PTRS_PER_PGD; ++i)
+			kmem_cache_free(pmd_cache, (void *)__va(pgd_val(pgd[i])-1));
 	/* in the non-PAE case, free_pgtables() clears user pgd entries */
 	kmem_cache_free(pgd_cache, pgd);
 }

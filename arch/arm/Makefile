@@ -175,10 +175,10 @@ else
 endif
 	@touch $@
 
-prepare: maketools include/asm-arm/.arch
+archprepare: maketools
 
 .PHONY: maketools FORCE
-maketools: include/asm-arm/constants.h $(objtree)/include/linux/version.h FORCE
+maketools: include/linux/version.h include/asm-arm/.arch FORCE
 	$(Q)$(MAKE) $(build)=arch/arm/tools include/asm-arm/mach-types.h
 
 # Convert bzImage to zImage
@@ -190,7 +190,7 @@ zImage Image xipImage bootpImage uImage: vmlinux
 zinstall install: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $@
 
-CLEAN_FILES += include/asm-arm/constants.h* include/asm-arm/mach-types.h \
+CLEAN_FILES += include/asm-arm/mach-types.h \
 	       include/asm-arm/arch include/asm-arm/.arch
 
 # We use MRPROPER_FILES and CLEAN_FILES now
@@ -201,12 +201,6 @@ archclean:
 bp:;	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/bootpImage
 i zi:;	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $@
 
-arch/$(ARCH)/kernel/asm-offsets.s: $(objtree)/include/asm \
-				   $(objtree)/include/linux/version.h \
-				   include/asm-arm/.arch
-
-include/asm-$(ARCH)/constants.h: arch/$(ARCH)/kernel/asm-offsets.s
-	$(call filechk,gen-asm-offsets)
 
 define archhelp
   echo  '* zImage        - Compressed kernel image (arch/$(ARCH)/boot/zImage)'

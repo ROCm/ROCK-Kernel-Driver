@@ -111,7 +111,8 @@ struct ip6t_counters
 #define IP6T_F_PROTO		0x01	/* Set if rule cares about upper 
 					   protocols */
 #define IP6T_F_TOS		0x02	/* Match the TOS. */
-#define IP6T_F_MASK		0x03	/* All possible flag bits mask. */
+#define IP6T_F_GOTO		0x04	/* Set if jump is a goto */
+#define IP6T_F_MASK		0x07	/* All possible flag bits mask. */
 
 /* Values for "inv" field in struct ip6t_ip6. */
 #define IP6T_INV_VIA_IN		0x01	/* Invert the sense of IN IFACE. */
@@ -454,6 +455,9 @@ extern unsigned int ip6t_do_table(struct sk_buff **pskb,
 
 /* Check for an extension */
 extern int ip6t_ext_hdr(u8 nexthdr);
+/* find specified header and get offset to it */
+extern int ipv6_find_hdr(const struct sk_buff *skb, unsigned int *offset,
+			 u8 target);
 
 #define IP6T_ALIGN(s) (((s) + (__alignof__(struct ip6t_entry)-1)) & ~(__alignof__(struct ip6t_entry)-1))
 

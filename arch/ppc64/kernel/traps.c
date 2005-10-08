@@ -30,6 +30,7 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/delay.h>
+#include <linux/kprobes.h>
 #include <asm/kdebug.h>
 
 #include <asm/pgtable.h>
@@ -74,7 +75,6 @@ int register_die_notifier(struct notifier_block *nb)
 	spin_unlock_irqrestore(&die_notifier_lock, flags);
 	return err;
 }
-EXPORT_SYMBOL(register_die_notifier);
 
 /*
  * Trap & Exception support
@@ -221,7 +221,7 @@ void instruction_breakpoint_exception(struct pt_regs *regs)
 	_exception(SIGTRAP, regs, TRAP_BRKPT, regs->nip);
 }
 
-void single_step_exception(struct pt_regs *regs)
+void __kprobes single_step_exception(struct pt_regs *regs)
 {
 	regs->msr &= ~MSR_SE;  /* Turn off 'trace' bit */
 
@@ -399,7 +399,7 @@ check_bug_trap(struct pt_regs *regs)
 	return 0;
 }
 
-void program_check_exception(struct pt_regs *regs)
+void __kprobes program_check_exception(struct pt_regs *regs)
 {
 	if (debugger_fault_handler(regs))
 		return;

@@ -14,6 +14,10 @@ config X86
 	  486, 586, Pentiums, and various instruction-set-compatible chips by
 	  AMD, Cyrix, and others.
 
+config SEMAPHORE_SLEEPERS
+	bool
+	default y
+
 config MMU
 	bool
 	default y
@@ -30,6 +34,10 @@ config GENERIC_ISA_DMA
 	default y
 
 config GENERIC_IOMAP
+	bool
+	default y
+
+config ARCH_MAY_HAVE_PC_FDC
 	bool
 	default y
 
@@ -487,19 +495,6 @@ config SMP
 
 	  If you don't know what to do here, say N.
 
-config SMP_ALTERNATIVES
-	bool "SMP alternatives support (EXPERIMENTAL)"
-	depends on SMP && EXPERIMENTAL
-	help
-	  Try to reduce the overhead of running an SMP kernel on a uniprocessor
-	  host slightly by replacing certain key instruction sequences
-	  according to whether we currently have more than one CPU available.
-	  This should provide a noticeable boost to performance when
-	  running SMP kernels on UP machines, and have negligible impact
-	  when running on an true SMP host.
-
-          If unsure, say N.
-
 config NR_CPUS
 	int "Maximum number of CPUs (2-255)"
 	range 2 255
@@ -538,15 +533,6 @@ config X86_UP_APIC
 	  all. The local APIC supports CPU-generated self-interrupts (timer,
 	  performance counters), and the NMI watchdog which detects hard
 	  lockups.
-
-config X86_APIC_OFF
-        bool "Disable local/IO APIC by default" 
-	depends on X86_LOCAL_APIC  && !SMP
-	default n
-	help
-	  When this option is enabled the IO/local APIC code is compiled in, but 
-	  only enabled when the kernel is booted with "apic" on the kernel 
-	  command line  or an DMI entry forced APIC mode. 
 
 config X86_UP_IOAPIC
 	bool "IO-APIC support on uniprocessors"
@@ -770,16 +756,13 @@ config X86_PAE
 	depends on HIGHMEM64G
 	default y
 
-config PROC_MM
-	bool "/proc/mm support"
-	default y
-
 # Common NUMA Features
 config NUMA
 	bool "Numa Memory Allocation and Scheduler Support"
 	depends on SMP && HIGHMEM64G && (X86_NUMAQ || X86_GENERICARCH || (X86_SUMMIT && ACPI))
 	default n if X86_PC
 	default y if (X86_NUMAQ || X86_SUMMIT)
+	select SPARSEMEM_STATIC
 
 # Need comments to help the hapless user trying to turn on NUMA support
 comment "NUMA (NUMA-Q) requires SMP, 64GB highmem support"
@@ -924,11 +907,6 @@ config IRQBALANCE
 	help
  	  The default yes will allow the kernel to do irq load balancing.
 	  Saying no will keep the kernel from doing irq load balancing.
-
-config HAVE_DEC_LOCK
-	bool
-	depends on (SMP || PREEMPT) && X86_CMPXCHG
-	default y
 
 # turning this on wastes a bunch of space.
 # Summit needs it only when NUMA is on
@@ -1229,7 +1207,6 @@ config PCI_DIRECT
 config PCI_MMCONFIG
 	bool
 	depends on PCI && ACPI && (PCI_GOMMCONFIG || PCI_GOANY)
-	select ACPI_BOOT
 	default y
 
 source "drivers/pci/pcie/Kconfig"
@@ -1337,6 +1314,11 @@ config GENERIC_HARDIRQS
 
 config GENERIC_IRQ_PROBE
 	bool
+	default y
+
+config GENERIC_PENDING_IRQ
+	bool
+	depends on GENERIC_HARDIRQS && SMP
 	default y
 
 config X86_SMP

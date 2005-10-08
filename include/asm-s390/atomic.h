@@ -90,10 +90,6 @@ static __inline__ int atomic_dec_and_test(volatile atomic_t * v)
 {
 	return __CS_LOOP(v, 1, "sr") == 0;
 }
-static __inline__ int atomic_sub_and_test(int i, atomic_t * v)
-{
-	return __CS_LOOP(v, i, "sr") == 0;
-}
 static __inline__ void atomic_clear_mask(unsigned long mask, atomic_t * v)
 {
 	       __CS_LOOP(v, ~mask, "nr");

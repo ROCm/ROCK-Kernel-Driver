@@ -24,6 +24,7 @@
 #include <linux/module.h>
 #include <linux/blkdev.h>
 #include <linux/kernel.h>
+#include <linux/kthread.h>
 #include <linux/string.h>
 #include <linux/mm.h>
 #include <linux/init.h>
@@ -97,6 +98,7 @@ int scsi_host_set_state(struct Scsi_Host *shost, enum scsi_host_state state)
 		switch (oldstate) {
 		case SHOST_CREATED:
 		case SHOST_RUNNING:
+		case SHOST_CANCEL_RECOVERY:
 			break;
 		default:
 			goto illegal;
@@ -106,12 +108,31 @@ int scsi_host_set_state(struct Scsi_Host *shost, enum scsi_host_state state)
 	case SHOST_DEL:
 		switch (oldstate) {
 		case SHOST_CANCEL:
+		case SHOST_DEL_RECOVERY:
 			break;
 		default:
 			goto illegal;
 		}
 		break;
 
+	case SHOST_CANCEL_RECOVERY:
+		switch (oldstate) {
+		case SHOST_CANCEL:
+		case SHOST_RECOVERY:
+			break;
+		default:
+			goto illegal;
+		}
+		break;
+
+	case SHOST_DEL_RECOVERY:
+		switch (oldstate) {
+		case SHOST_CANCEL_RECOVERY:
+			break;
+		default:
+			goto illegal;
+		}
+		break;
 	}
 	shost->shost_state = state;
 	return 0;
@@ -133,13 +154,24 @@ EXPORT_SYMBOL(scsi_host_set_state);
  **/
 void scsi_remove_host(struct Scsi_Host *shost)
 {
+	unsigned long flags;
 	down(&shost->scan_mutex);
-	scsi_host_set_state(shost, SHOST_CANCEL);
+	spin_lock_irqsave(shost->host_lock, flags);
+	if (scsi_host_set_state(shost, SHOST_CANCEL))
+		if (scsi_host_set_state(shost, SHOST_CANCEL_RECOVERY)) {
+			spin_unlock_irqrestore(shost->host_lock, flags);
+			up(&shost->scan_mutex);
+			return;
+		}
+	spin_unlock_irqrestore(shost->host_lock, flags);
 	up(&shost->scan_mutex);
 	scsi_forget_host(shost);
 	scsi_proc_host_rm(shost);
 
-	scsi_host_set_state(shost, SHOST_DEL);
+	spin_lock_irqsave(shost->host_lock, flags);
+	if (scsi_host_set_state(shost, SHOST_DEL))
+		BUG_ON(scsi_host_set_state(shost, SHOST_DEL_RECOVERY));
+	spin_unlock_irqrestore(shost->host_lock, flags);
 
 	transport_unregister_device(&shost->shost_gendev);
 	class_device_unregister(&shost->shost_classdev);
@@ -225,15 +257,8 @@ static void scsi_host_dev_release(struct device *dev)
 	struct Scsi_Host *shost = dev_to_shost(dev);
 	struct device *parent = dev->parent;
 
-	if (shost->ehandler) {
-		DECLARE_COMPLETION(sem);
-		shost->eh_notify = &sem;
-		shost->eh_kill = 1;
-		up(shost->eh_wait);
-		wait_for_completion(&sem);
-		shost->eh_notify = NULL;
-	}
-
+	if (shost->ehandler)
+		kthread_stop(shost->ehandler);
 	if (shost->work_q)
 		destroy_workqueue(shost->work_q);
 
@@ -263,7 +288,6 @@ struct Scsi_Host *scsi_host_alloc(struct scsi_host_template *sht, int privsize)
 {
 	struct Scsi_Host *shost;
 	int gfp_mask = GFP_KERNEL, rval;
-	DECLARE_COMPLETION(complete);
 
 	if (sht->unchecked_isa_dma && privsize)
 		gfp_mask |= __GFP_DMA;
@@ -369,12 +393,12 @@ struct Scsi_Host *scsi_host_alloc(struct scsi_host_template *sht, int privsize)
 	snprintf(shost->shost_classdev.class_id, BUS_ID_SIZE, "host%d",
 		  shost->host_no);
 
-	shost->eh_notify = &complete;
-	rval = kernel_thread(scsi_error_handler, shost, 0);
-	if (rval < 0)
+	shost->ehandler = kthread_run(scsi_error_handler, shost,
+			"scsi_eh_%d", shost->host_no);
+	if (IS_ERR(shost->ehandler)) {
+		rval = PTR_ERR(shost->ehandler);
 		goto fail_destroy_freelist;
-	wait_for_completion(&complete);
-	shost->eh_notify = NULL;
+	}
 
 	scsi_proc_hostdir_add(shost->hostt);
 	return shost;

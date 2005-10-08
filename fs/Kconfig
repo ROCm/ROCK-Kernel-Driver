@@ -70,7 +70,6 @@ config FS_XIP
 
 config EXT3_FS
 	tristate "Ext3 journalling file system support"
-	select JBD
 	help
 	  This is the journaling version of the Second extended file system
 	  (often called ext3), the de facto standard Linux file system
@@ -139,21 +138,23 @@ config EXT3_FS_SECURITY
 	  extended attributes for file security labels, say N.
 
 config JBD
+# CONFIG_JBD could be its own option (even modular), but until there are
+# other users than ext3, we will simply make it be the same as CONFIG_EXT3_FS
+# dep_tristate '  Journal Block Device support (JBD for ext3)' CONFIG_JBD $CONFIG_EXT3_FS
 	tristate
 	default EXT3_FS
 	help
 	  This is a generic journaling layer for block devices.  It is
-	  currently used by the ext3 and OCFS2 file systems, but it could
-	  also be used to add journal support to other file systems or block
-	  devices such as RAID or LVM.
+	  currently used by the ext3 file system, but it could also be used to
+	  add journal support to other file systems or block devices such as
+	  RAID or LVM.
 
-	  If you are using the ext3 or OCFS2 file systems, you need to
-	  say Y here. If you are not using ext3 OCFS2 then you will probably
-	  want to say N.
+	  If you are using the ext3 file system, you need to say Y here. If
+	  you are not using ext3 then you will probably want to say N.
 
 	  To compile this device as a module, choose M here: the module will be
-	  called jbd.  If you are compiling ext3 or OCFS2 into the kernel,
-	  you cannot compile this code as a module.
+	  called jbd.  If you are compiling ext3 into the kernel, you cannot
+	  compile this code as a module.
 
 config JBD_DEBUG
 	bool "JBD (ext3) debugging support"
@@ -177,8 +178,6 @@ config FS_MBCACHE
 	depends on EXT2_FS_XATTR || EXT3_FS_XATTR
 	default y if EXT2_FS=y || EXT3_FS=y
 	default m if EXT2_FS=m || EXT3_FS=m
-
-source "fs/reiser4/Kconfig"
 
 config REISERFS_FS
 	tristate "Reiserfs support"
@@ -205,18 +204,6 @@ config REISERFS_FS
 
 	  If you like it, you can pay us to add new features to it that you
 	  need, buy a support contract, or pay us to port it to another OS.
-
-config REISERFS_CC_REDUCE_OPTIMZE
-	bool "Reduce CC optimization level to workaround compiler bugs"
-	depends on PPC32
-	default n
-	help
-	  gcc -O2 (the kernel default) is overaggressive on ppc32 when many inline
-	  functions are used.  This causes the compiler to advance the stack
-	  pointer out of the available stack space, corrupting kernel space,
-	  and causing a panic. Since this behavior only affects ppc32, this ifeq
-	  will work around it. If any other architecture displays this behavior,
-	  add it here.
 
 config REISERFS_CHECK
 	bool "Enable reiserfs debug mode"
@@ -339,39 +326,6 @@ config FS_POSIX_ACL
 
 source "fs/xfs/Kconfig"
 
-config OCFS2_FS
-	tristate "OCFS2 file system support (EXPERIMENTAL)"
-	depends on NET && EXPERIMENTAL
-	select CONFIGFS_FS
-	select JBD
-	select CRC32
-	select INET
-	help
-	  OCFS2 is a general purpose extent based shared disk cluster file
-	  system with many similarities to ext3. It supports 64 bit inode
-	  numbers, and has automatically extending metadata groups which may
-	  also make it attractive for non-clustered use.
-
-	  You'll want to install the ocfs2-tools package in order to at least
-	  get "mount.ocfs2".
-
-	  Project web page:    http://oss.oracle.com/projects/ocfs2
-	  Tools web page:      http://oss.oracle.com/projects/ocfs2-tools
-	  OCFS2 mailing lists: http://oss.oracle.com/projects/ocfs2/mailman/
-
-	  Note: Features which OCFS2 does not support yet:
-	          - extended attributes
-	          - readonly mount
-		  - shared writeable mmap
-	          - loopback is supported, but data written will not
-	            be cluster coherent.
-	          - quotas
-	          - cluster aware flock
-	          - Directory change notification (F_NOTIFY)
-	          - Distributed Caching (F_SETLEASE/F_GETLEASE/break_lease)
-	          - POSIX ACLs
-	          - readpages / writepages (not user visible)
-
 config MINIX_FS
 	tristate "Minix fs support"
 	help
@@ -428,10 +382,8 @@ config QUOTA
 	  usage (also called disk quotas). Currently, it works for the
 	  ext2, ext3, and reiserfs file system. ext3 also supports journalled
 	  quotas for which you don't need to run quotacheck(8) after an unclean
-	  shutdown. You need additional software in order to use quota support
-	  (you can download sources from
-	  <http://www.sf.net/projects/linuxquota/>). For further details, read
-	  the Quota mini-HOWTO, available from
+	  shutdown.
+	  For further details, read the Quota mini-HOWTO, available from
 	  <http://www.tldp.org/docs.html#howto>, or the documentation provided
 	  with the quota tools. Probably the quota support is only useful for
 	  multi user systems. If unsure, say N.
@@ -449,8 +401,7 @@ config QFMT_V2
 	depends on QUOTA
 	help
 	  This quota format allows using quotas with 32-bit UIDs/GIDs. If you
-	  need this functionality say Y here. Note that you will need recent
-	  quota utilities (>= 3.01) for new quota format with this kernel.
+	  need this functionality say Y here.
 
 config QUOTACTL
 	bool
@@ -467,12 +418,6 @@ config DNOTIFY
 	  dnotify.
 
 	  Because of this, if unsure, say Y.
-
-config SUBFS_FS
-	tristate "subfs file system support"
-	help
-	  If you don't know whether you need it, then you don't need it:
-	  answer N.
 
 config AUTOFS_FS
 	tristate "Kernel automounter support"
@@ -526,6 +471,9 @@ config FUSE_FS
 	  There's also companion library: libfuse.  This library along with
 	  utilities is available from the FUSE homepage:
 	  <http://fuse.sourceforge.net/>
+
+	  See <file:Documentation/filesystems/fuse.txt> for more information.
+	  See <file:Documentation/Changes> for needed library/utility version.
 
 	  If you want to develop a userspace FS, or if you want to use
 	  a filesystem based on FUSE, answer Y or M.
@@ -848,28 +796,6 @@ config SYSFS
 
 	Designers of embedded systems may wish to say N here to conserve space.
 
-config DEVPTS_FS_XATTR
-	bool "/dev/pts Extended Attributes"
-	depends on UNIX98_PTYS
-	help
-	  Extended attributes are name:value pairs associated with inodes by
-	  the kernel or by users (see the attr(5) manual page, or visit
-	  <http://acl.bestbits.at/> for details).
-
-	  If unsure, say N.
-
-config DEVPTS_FS_SECURITY
-	bool "/dev/pts Security Labels"
-	depends on DEVPTS_FS_XATTR
-	help
-	  Security labels support alternative access control models
-	  implemented by security modules like SELinux.  This option
-	  enables an extended attribute handler for file security
-	  labels in the /dev/pts filesystem.
-
-	  If you are not using a security module that requires using
-	  extended attributes for file security labels, say N.
-
 config TMPFS
 	bool "Virtual memory file system support (former shm fs)"
 	help
@@ -881,40 +807,6 @@ config TMPFS
 	  lost.
 
 	  See <file:Documentation/filesystems/tmpfs.txt> for details.
-
-config TMPFS_XATTR
-	bool "tmpfs Extended Attributes"
-	depends on TMPFS
-	help
-	  Extended attributes are name:value pairs associated with inodes by
-	  the kernel or by users (see the attr(5) manual page, or visit
-	  <http://acl.bestbits.at/> for details).
-
-	  If unsure, say N.
-
-config TMPFS_POSIX_ACL
-	bool "tmpfs POSIX Access Control Lists"
-	depends on TMPFS_XATTR
-	select GENERIC_ACL
-	help
-	  POSIX Access Control Lists (ACLs) support permissions for users and
-	  groups beyond the owner/group/world scheme.
-
-	  To learn more about Access Control Lists, visit the POSIX ACLs for
-	  Linux website <http://acl.bestbits.at/>.
-
-	  If you don't know what Access Control Lists are, say N.
-
-config TMPFS_SECURITY
-	bool "tmpfs Security Labels"
-	depends on TMPFS_XATTR
-	help
-	  Security labels support alternative access control models
-	  implemented by security modules like SELinux.  This option
-	  enables an extended attribute handler for file security
-	  labels in the tmpfs filesystem.
-	  If you are not using a security module that requires using
-	  extended attributes for file security labels, say N.
 
 config HUGETLBFS
 	bool "HugeTLB file system support"
@@ -937,17 +829,15 @@ config RAMFS
 	  To compile this as a module, choose M here: the module will be called
 	  ramfs.
 
-config CONFIGFS_FS
-	tristate "Userspace-driven configuration filesystem (EXPERIMENTAL)"
-	depends on EXPERIMENTAL
-	help
-	  configfs is a ram-based filesystem that provides the converse
-	  of sysfs's functionality. Where sysfs is a filesystem-based
-	  view of kernel objects, configfs is a filesystem-based manager
-	  of kernel objects, or config_items.
+config RELAYFS_FS
+	tristate "Relayfs file system support"
+	---help---
+	  Relayfs is a high-speed data relay filesystem designed to provide
+	  an efficient mechanism for tools and facilities to relay large
+	  amounts of data from kernel space to user space.
 
-	  Both sysfs and configfs can and should exist together on the
-	  same system. One is not a replacement for the other.
+	  To compile this code as a module, choose M here: the module will be
+	  called relayfs.
 
 	  If unsure, say N.
 
@@ -1829,9 +1719,16 @@ config AFS_FS
 config RXRPC
 	tristate
 
-config GENERIC_ACL
-	bool
-	select FS_POSIX_ACL
+config 9P_FS
+	tristate "Plan 9 Resource Sharing Support (9P2000) (Experimental)"
+	depends on INET && EXPERIMENTAL
+	help
+	  If you say Y here, you will get experimental support for
+	  Plan 9 resource sharing via the 9P2000 protocol.
+
+	  See <http://v9fs.sf.net> for more information.
+
+	  If unsure, say N.
 
 endmenu
 

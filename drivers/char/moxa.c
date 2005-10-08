@@ -339,7 +339,7 @@ static int __init moxa_init(void)
 
 	init_MUTEX(&moxaBuffSem);
 	moxaDriver->owner = THIS_MODULE;
-	moxaDriver->name = "ttya";
+	moxaDriver->name = "ttyMX";
 	moxaDriver->devfs_name = "tts/a";
 	moxaDriver->major = ttymajor;
 	moxaDriver->minor_start = 0;
@@ -832,8 +832,6 @@ static int moxa_ioctl(struct tty_struct *tty, struct file *file,
 	case TIOCSSERIAL:
 		return moxa_set_serial_info(ch, argp);
 	default:
-		if(!capable(CAP_SYS_RAWIO))
-			return -EPERM;
 		retval = MoxaDriverIoctl(cmd, arg, port);
 	}
 	return (retval);

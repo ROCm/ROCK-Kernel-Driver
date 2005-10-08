@@ -30,6 +30,8 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
+#include <linux/delay.h>
+
 #include "xfs.h"
 
 #include "xfs_macros.h"
@@ -505,9 +507,9 @@ xfs_iget(
 	vnode_t		*vp = NULL;
 	int		error;
 
-retry:
 	XFS_STATS_INC(xs_ig_attempts);
 
+retry:
 	if ((inode = iget_locked(XFS_MTOVFS(mp)->vfs_super, ino))) {
 		bhv_desc_t	*bdp;
 		xfs_inode_t	*ip;
@@ -524,26 +526,17 @@ retry:
 				iput(inode);
 			}
 		} else {
-			/* These are true if the inode is in inactive or
-			 * reclaim. The linux inode is about to go away,
-			 * wait for that path to finish, and try again.
-			 */
-			if (vp->v_flag & (VINACT | VRECLM)) {
-				vn_wait(vp);
-				iput(inode);
-				goto retry;
-			}
 			/*
 			 * If the inode is not fully constructed due to
-			 * filehandle mismatches wait for the inode to go
+			 * filehandle mistmatches wait for the inode to go
 			 * away and try again.
 			 *
-			 * iget_locked will call wait_on_freeing_inode
+			 * iget_locked will call __wait_on_freeing_inode
 			 * to wait for the inode to go away.
 			 */
 			if (is_bad_inode(inode) ||
 			    ((bdp = vn_bhv_lookup(VN_BHV_HEAD(vp),
-						&xfs_vnodeops)) == NULL)) {
+						  &xfs_vnodeops)) == NULL)) {
 				iput(inode);
 				delay(1);
 				goto retry;

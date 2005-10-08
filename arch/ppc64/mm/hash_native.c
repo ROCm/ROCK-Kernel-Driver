@@ -51,7 +51,6 @@ long native_hpte_insert(unsigned long hpte_group, unsigned long va,
 			unsigned long prpn, unsigned long vflags,
 			unsigned long rflags)
 {
-	unsigned long arpn = physRpn_to_absRpn(prpn);
 	hpte_t *hptep = htab_address + hpte_group;
 	unsigned long hpte_v, hpte_r;
 	int i;
@@ -74,7 +73,7 @@ long native_hpte_insert(unsigned long hpte_group, unsigned long va,
 	hpte_v = (va >> 23) << HPTE_V_AVPN_SHIFT | vflags | HPTE_V_VALID;
 	if (vflags & HPTE_V_LARGE)
 		va &= ~(1UL << HPTE_V_AVPN_SHIFT);
-	hpte_r = (arpn << HPTE_R_RPN_SHIFT) | rflags;
+	hpte_r = (prpn << HPTE_R_RPN_SHIFT) | rflags;
 
 	hptep->r = hpte_r;
 	/* Guarantee the second dword is visible before the valid bit */
@@ -344,9 +343,7 @@ static void native_flush_hash_range(unsigned long context,
 	hpte_t *hptep;
 	unsigned long hpte_v;
 	struct ppc64_tlb_batch *batch = &__get_cpu_var(ppc64_tlb_batch);
-
-	/* XXX fix for large ptes */
-	unsigned long large = 0;
+	unsigned long large = batch->large;
 
 	local_irq_save(flags);
 
@@ -408,7 +405,7 @@ static void native_flush_hash_range(unsigned long context,
 		asm volatile("ptesync":::"memory");
 
 		for (i = 0; i < j; i++)
-			__tlbie(batch->vaddr[i], 0);
+			__tlbie(batch->vaddr[i], large);
 
 		asm volatile("eieio; tlbsync; ptesync":::"memory");
 

@@ -754,7 +754,7 @@ static int idedisk_issue_flush(request_queue_t *q, struct gendisk *disk,
 
 	idedisk_prepare_flush(q, rq);
 
-	ret = blk_execute_rq(q, disk, rq);
+	ret = blk_execute_rq(q, disk, rq, 0);
 
 	/*
 	 * if we failed and caller wants error offset, get it
@@ -1001,7 +1001,7 @@ static void idedisk_setup (ide_drive_t *drive)
 	 * LBA48 is not available so we don't need to recheck that.
 	 */
 	barrier = 0;
-	if (ide_id_has_flush_cache(id) && !drive->noflush)
+	if (ide_id_has_flush_cache(id))
 		barrier = 1;
 	if (drive->addressing == 1) {
 		/* Can't issue the correct flush ? */
@@ -1179,10 +1179,6 @@ static int idedisk_media_changed(struct gendisk *disk)
 		drive->attach = 0;
 		return 0;
 	}
-	/* We get reliably notified from PCMCIA layer */
-	if (drive->is_flash)
-		return 0;
-
 	/* if removable, always assume it was changed */
 	return drive->removable;
 }

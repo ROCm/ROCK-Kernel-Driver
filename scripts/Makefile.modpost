@@ -36,6 +36,7 @@
 _modpost: __modpost
 
 include .config
+include scripts/Kbuild.include
 include scripts/Makefile.lib
 
 symverfile := $(objtree)/Module.symvers
@@ -54,8 +55,6 @@ quiet_cmd_modpost = MODPOST
         $(if $(CONFIG_MODVERSIONS),-m)             \
 	$(if $(CONFIG_MODULE_SRCVERSION_ALL),-a,)  \
 	$(if $(KBUILD_EXTMOD),-i,-o) $(symverfile) \
-	-s $(firstword $(wildcard $(dir $(MODVERDIR))/Module.supported \
-				  $(objtree)/Module.supported /dev/null)) \
 	$(filter-out FORCE,$^)
 
 .PHONY: __modpost

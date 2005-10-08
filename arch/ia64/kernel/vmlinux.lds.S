@@ -29,7 +29,6 @@ SECTIONS
 	*(.exit.text)
 	*(.exit.data)
 	*(.exitcall.exit)
-	*(.kdb_exitcall.exit)
 	*(.IA_64.unwind.exit.text)
 	*(.IA_64.unwind_info.exit.text)
 	}
@@ -49,6 +48,7 @@ SECTIONS
 	*(.text)
 	SCHED_TEXT
 	LOCK_TEXT
+	KPROBES_TEXT
 	*(.gnu.linkonce.t*)
     }
   .text2 : AT(ADDR(.text2) - LOAD_OFFSET)
@@ -153,12 +153,6 @@ SECTIONS
 	  *(.initcall6.init)
 	  *(.initcall7.init)
 	  __initcall_end = .;
-	}
-  .kdb_initcall.init : AT(ADDR(.kdb_initcall.init) - LOAD_OFFSET)
-	{
-	  __kdb_initcall_start = .;
-	  *(.kdb_initcall.init)
-	  __kdb_initcall_end = .;
 	}
    __con_initcall_start = .;
   .con_initcall.init : AT(ADDR(.con_initcall.init) - LOAD_OFFSET)

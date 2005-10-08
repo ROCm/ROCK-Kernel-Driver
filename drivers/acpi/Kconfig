@@ -3,7 +3,6 @@
 #
 
 menu "ACPI (Advanced Configuration and Power Interface) Support"
-	depends on PM
 	depends on !X86_VISWS
 	depends on !IA64_HP_SIM
 	depends on IA64 || X86
@@ -11,6 +10,8 @@ menu "ACPI (Advanced Configuration and Power Interface) Support"
 config ACPI
 	bool "ACPI Support"
 	depends on IA64 || X86
+	select PM
+	select PCI
 
 	default y
 	---help---
@@ -43,20 +44,10 @@ config ACPI
 
 if ACPI
 
-config ACPI_BOOT
-	bool
-	default y
-
-config ACPI_INTERPRETER
-	bool
-	default y
-
-if ACPI_INTERPRETER
-
 config ACPI_SLEEP
-	bool "Sleep States (EXPERIMENTAL)"
+	bool "Sleep States"
 	depends on X86 && (!SMP || SUSPEND_SMP)
-	depends on EXPERIMENTAL && PM
+	depends on PM
 	default y
 	---help---
 	  This option adds support for ACPI suspend states. 
@@ -90,16 +81,16 @@ config ACPI_SLEEP_PROC_SLEEP
 config ACPI_AC
 	tristate "AC Adapter"
 	depends on X86
-	default m
+	default y
 	help
 	  This driver adds support for the AC Adapter object, which indicates
-	  whether a system is on AC, or not.  Typically, only mobile systems 
-	  have this object, since desktops are always on AC.
+	  whether a system is on AC, or not. If you have a system that can
+	  switch between A/C and battery, say Y.
 
 config ACPI_BATTERY
 	tristate "Battery"
 	depends on X86
-	default m
+	default y
 	help
 	  This driver adds support for battery information through
 	  /proc/acpi/battery. If you have a mobile system with a battery, 
@@ -107,18 +98,17 @@ config ACPI_BATTERY
 
 config ACPI_BUTTON
 	tristate "Button"
-	default m
+	default y
 	help
-	  This driver registers for events based on buttons, such as the
-	  power, sleep, and lid switch.  In the future, a daemon will read
-	  /proc/acpi/event and perform user-defined actions such as shutting
-	  down the system.  Until then, you can cat it, and see output when
-	  a button is pressed.
+	  This driver handles events on the power, sleep and lid buttons.
+	  A daemon reads /proc/acpi/event and perform user-defined actions
+	  such as shutting down the system.  This is necessary for
+	  software controlled poweroff.
 
 config ACPI_VIDEO
 	tristate "Video"
-	depends on EXPERIMENTAL
-	default m
+	depends on X86
+	default y
 	help
 	  This driver implement the ACPI Extensions For Display Adapters
 	  for integrated graphics devices on motherboard, as specified in
@@ -129,10 +119,9 @@ config ACPI_VIDEO
 	  for your integrated video device.
 
 config ACPI_HOTKEY
-	tristate "Generic Hotkey"
-	depends on ACPI_INTERPRETER
+	tristate "Generic Hotkey (EXPERIMENTAL)"
 	depends on EXPERIMENTAL
-	depends on !IA64_SGI_SN
+	depends on X86
 	default n
 	help
 	  Experimental consolidated hotkey driver.
@@ -140,31 +129,30 @@ config ACPI_HOTKEY
 
 config ACPI_FAN
 	tristate "Fan"
-	default m
+	default y
 	help
 	  This driver adds support for ACPI fan devices, allowing user-mode 
 	  applications to perform basic fan control (on, off, status).
 
 config ACPI_PROCESSOR
 	tristate "Processor"
-	default m
+	default y
 	help
 	  This driver installs ACPI as the idle handler for Linux, and uses
 	  ACPI C2 and C3 processor states to save power, on systems that
-	  support it.
+	  support it.  It is required by several flavors of cpufreq
+	  Performance-state drivers.
 
 config ACPI_HOTPLUG_CPU
-	bool "Processor Hotplug (EXPERIMENTAL)"
-	depends on ACPI_PROCESSOR && HOTPLUG_CPU && EXPERIMENTAL
+	bool
+	depends on ACPI_PROCESSOR && HOTPLUG_CPU
 	select ACPI_CONTAINER
-	default n
-	 ---help---
-	 Select this option if your platform support physical CPU hotplug.
+	default y
 
 config ACPI_THERMAL
 	tristate "Thermal Zone"
 	depends on ACPI_PROCESSOR
-	default m
+	default y
 	help
 	  This driver adds support for ACPI thermal zones.  Most mobile and
 	  some desktop systems support ACPI thermal zones.  It is HIGHLY
@@ -180,7 +168,7 @@ config ACPI_NUMA
 config ACPI_ASUS
         tristate "ASUS/Medion Laptop Extras"
 	depends on X86
-	default m
+	default y
         ---help---
           This driver provides support for extra features of ACPI-compatible
           ASUS laptops. As some of Medion laptops are made by ASUS, it may also
@@ -209,7 +197,7 @@ config ACPI_ASUS
 config ACPI_IBM
 	tristate "IBM ThinkPad Laptop Extras"
 	depends on X86
-	default m
+	default y
 	---help---
 	  This is a Linux ACPI driver for the IBM ThinkPad laptops. It adds
 	  support for Fn-Fx key combinations, Bluetooth control, video
@@ -222,7 +210,7 @@ config ACPI_IBM
 config ACPI_TOSHIBA
 	tristate "Toshiba Laptop Extras"
 	depends on X86
-	default m
+	default y
 	---help---
 	  This driver adds support for access to certain system settings
 	  on "legacy free" Toshiba laptops.  These laptops can be recognized by
@@ -246,35 +234,6 @@ config ACPI_TOSHIBA
 	  If you have a legacy free Toshiba laptop (such as the Libretto L1
 	  series), say Y.
 
-config ACPI_SONY
-	tristate "Sony Laptop Extras" 
-	depends on X86
-	default m
-	  ---help---
-	  This mini-driver drives the ACPI SNC device present in the
-	  ACPI BIOS of the Sony Vaio laptops.
-
-	  It gives access to some extra laptop functionalities. In
-	  its current form, the only thing this driver does is letting 
-	  the user set or query the screen brightness.
-
-	  Read <file:Documentation/acpi/sony_acpi.txt> for more information.
-
-config ACPI_PCC
-        tristate "Panasonic Laptop Extras"
-        depends on X86
-        default m
-           ---help---
-           This driver implements hotkey functionality and access to
-	   various hardware (e.g. LCD brightness) for the
-           Panasonic R1 (N variant), R2, R3, T2, W2, and Y2 laptops.
-
-           Further details and user space tools are available at
-           <http://www.da-cha.org/letsnote/>.
-
-	   If you have one of the above listed Panasonic laptops
-	   say Y or M here.
-
 config ACPI_CUSTOM_DSDT
 	bool "Include Custom DSDT"
 	depends on !STANDALONE
@@ -291,8 +250,7 @@ config ACPI_CUSTOM_DSDT_FILE
 	  Enter the full path name to the file wich includes the AmlCode declaration.
 
 config ACPI_BLACKLIST_YEAR
-	int "Disable ACPI for systems before Jan 1st this year"
-	depends on ACPI_INTERPRETER
+	int "Disable ACPI for systems before Jan 1st this year" if X86
 	default 0
 	help
 	  enter a 4-digit year, eg. 2001 to disable ACPI by default
@@ -310,20 +268,6 @@ config ACPI_DEBUG
 	  of verbosity. Saying Y enables these statements. This will increase
 	  your kernel size by around 50K.
 
-config ACPI_DEBUG_LITE
-        bool "Print ACPI errors and warnings"
-        depends on ACPI
-        default n
-        help
-          Full ACPI_DEBUG output slows down the system significantly,
-	  even if not enabled during runtime.
-	  This variable takes care that errors and warnings will still be printed,
-	  but higher debug levels can not be enabled any more during runtime.
-
-config ACPI_BUS
-	bool
-	default y
-
 config ACPI_EC
 	bool
 	depends on X86
@@ -337,10 +281,6 @@ config ACPI_POWER
 	bool
 	default y
 
-config ACPI_PCI
-	bool
-	default PCI
-
 config ACPI_SYSTEM
 	bool
 	default y
@@ -348,14 +288,11 @@ config ACPI_SYSTEM
 	  This driver will enable your system to shut down using ACPI, and
 	  dump your ACPI DSDT table using /proc/acpi/dsdt.
 
-endif	# ACPI_INTERPRETER
-
 config X86_PM_TIMER
 	bool "Power Management Timer Support"
 	depends on X86
-	depends on ACPI_BOOT && EXPERIMENTAL
 	depends on !X86_64
-	default n
+	default y
 	help
 	  The Power Management Timer is available on all ACPI-capable,
 	  in most cases even if ACPI is unusable or blacklisted.
@@ -403,18 +340,5 @@ config ACPI_HOTPLUG_MEMORY
 	  command: 
 		$>modprobe acpi_memhotplug 
 endif	# ACPI
-
-config ACPI_INITRD
-	bool "Read DSDT from initrd or initramfs"
-	depends on ACPI && BLK_DEV_INITRD && !ACPI_CUSTOM_DSDT
-	default n
-	help
-	  The DSDT (Differentiated System Description Table) often needs to be
-	  overridden because of broken BIOS implementations. If you want to use
-	  a customized DSDT, please use the mkinitrd tool (mkinitrd package) to 
-	  attach the DSDT to the initrd or initramfs 
-	  (see http://gaugusch.at/kernel.shtml for details)
-	  If there is no DSDT found in the initrd, the DSDT from the BIOS is
-	  used. It is safe to say yes here.
 
 endmenu

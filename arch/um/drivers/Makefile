@@ -13,14 +13,9 @@ mcast-objs := mcast_kern.o mcast_user.o
 net-objs := net_kern.o net_user.o
 mconsole-objs := mconsole_kern.o mconsole_user.o
 hostaudio-objs := hostaudio_kern.o
-ubd-objs := ubd_kern.o ubd_user.o
+ubd-objs := ubd_kern.o
 port-objs := port_kern.o port_user.o
 harddog-objs := harddog_kern.o harddog_user.o
-x11-objs := x11_kern.o x11_user.o \
-	../../../drivers/video/cfbfillrect.o \
-	../../../drivers/video/cfbcopyarea.o \
-	../../../drivers/video/cfbimgblt.o \
-	../../../drivers/video/softcursor.o 
 
 LDFLAGS_pcap.o := -r $(shell $(CC) $(CFLAGS) -print-file-name=libpcap.a)
 
@@ -53,7 +48,6 @@ obj-$(CONFIG_NULL_CHAN) += null.o
 obj-$(CONFIG_PORT_CHAN) += port.o
 obj-$(CONFIG_PTY_CHAN) += pty.o
 obj-$(CONFIG_TTY_CHAN) += tty.o 
-obj-$(CONFIG_X11_FB) += x11.o
 obj-$(CONFIG_XTERM_CHAN) += xterm.o xterm_kern.o
 obj-$(CONFIG_UML_WATCHDOG) += harddog.o
 obj-$(CONFIG_BLK_DEV_COW_COMMON) += cow_user.o

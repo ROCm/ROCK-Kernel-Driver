@@ -187,8 +187,6 @@ int noautodma = 0;
 int noautodma = 1;
 #endif
 
-int noraid = 0;
-
 EXPORT_SYMBOL(noautodma);
 
 /*
@@ -197,12 +195,6 @@ EXPORT_SYMBOL(noautodma);
 ide_hwif_t ide_hwifs[MAX_HWIFS];	/* master data repository */
 
 EXPORT_SYMBOL(ide_hwifs);
-
-/*
- * The ide_probe_function takes too much time ...
- */
-int ide_wait_ms = 5;
-EXPORT_SYMBOL(ide_wait_ms);
 
 /*
  * Do not even *think* about calling this!
@@ -811,7 +803,6 @@ found:
 	hwif->irq = hw->irq;
 	hwif->noprobe = 0;
 	hwif->chipset = hw->chipset;
-	hwif->gendev.parent = hw->dev;
 
 	if (!initializing) {
 		probe_hwif_init_with_fixup(hwif, fixup);
@@ -1238,7 +1229,7 @@ static int generic_ide_suspend(struct device *dev, pm_message_t state)
 	rq.special = &args;
 	rq.pm = &rqpm;
 	rqpm.pm_step = ide_pm_state_start_suspend;
-	rqpm.pm_state = state;
+	rqpm.pm_state = state.event;
 
 	return ide_do_drive_cmd(drive, &rq, ide_wait);
 }
@@ -1257,7 +1248,7 @@ static int generic_ide_resume(struct device *dev)
 	rq.special = &args;
 	rq.pm = &rqpm;
 	rqpm.pm_step = ide_pm_state_start_resume;
-	rqpm.pm_state = 0;
+	rqpm.pm_state = PM_EVENT_ON;
 
 	return ide_do_drive_cmd(drive, &rq, ide_head_wait);
 }
@@ -1563,18 +1554,6 @@ static int __init ide_setup(char *s)
 	}
 #endif /* CONFIG_BLK_DEV_IDEPCI */
 
-	if (!strcmp(s, "ide=noraid")) {
-		noraid = 1;
-		return 1;
-	}
-
-	if (!strncmp(s, "idewait=", 8)) {
-		char *dummy;
-		ide_wait_ms = simple_strtol(s+8, &dummy, 10);
-		printk(KERN_INFO " : Wait for %i ms\n", ide_wait_ms);
-		return 1;
-	}
-
 	/*
 	 * Look for drive options:  "hdx="
 	 */
@@ -1582,7 +1561,7 @@ static int __init ide_setup(char *s)
 		const char *hd_words[] = {
 			"none", "noprobe", "nowerr", "cdrom", "serialize",
 			"autotune", "noautotune", "minus8", "swapdata", "bswap",
-			"noflush", "remap", "remap63", "scsi", NULL };
+			"minus11", "remap", "remap63", "scsi", NULL };
 		unit = s[2] - 'a';
 		hw   = unit / MAX_DRIVES;
 		unit = unit % MAX_DRIVES;
@@ -1620,9 +1599,6 @@ static int __init ide_setup(char *s)
 			case -9: /* "swapdata" */
 			case -10: /* "bswap" */
 				drive->bswap = 1;
-				goto done;
-			case -11: /* "noflush" */
-				drive->noflush = 1;
 				goto done;
 			case -12: /* "remap" */
 				drive->remap_0_to_1 = 1;

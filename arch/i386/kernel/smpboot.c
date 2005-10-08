@@ -42,11 +42,7 @@
 #include <linux/sched.h>
 #include <linux/kernel_stat.h>
 #include <linux/smp_lock.h>
-#include <linux/irq.h>
 #include <linux/bootmem.h>
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#endif	/* CONFIG_KDB */
 #include <linux/notifier.h>
 #include <linux/cpu.h>
 #include <linux/percpu.h>
@@ -91,6 +87,8 @@ EXPORT_SYMBOL(cpu_online_map);
 cpumask_t cpu_callin_map;
 cpumask_t cpu_callout_map;
 EXPORT_SYMBOL(cpu_callout_map);
+cpumask_t cpu_possible_map;
+EXPORT_SYMBOL(cpu_possible_map);
 static cpumask_t smp_commenced_mask;
 
 /* TSC's upper 32 bits can't be written in eariler CPU (before prescott), there
@@ -203,7 +201,7 @@ static void __devinit smp_store_cpu_info(int id)
 				goto valid_k7;
 
 		/* If we get here, it's not a certified SMP capable AMD system. */
-		tainted |= TAINT_UNSAFE_SMP;
+		add_taint(TAINT_UNSAFE_SMP);
 	}
 
 valid_k7:
@@ -432,11 +430,6 @@ static void __devinit smp_callin(void)
 	 * Allow the master to continue.
 	 */
 	cpu_set(cpuid, cpu_callin_map);
-
-#ifdef	CONFIG_KDB
-	/* Activate any preset global breakpoints on this cpu */
-	kdb(KDB_REASON_SILENT, 0, 0);
-#endif	/* CONFIG_KDB */
 
 	/*
 	 *      Synchronize the TSC with the BP
@@ -1025,8 +1018,8 @@ int __devinit smp_prepare_cpu(int cpu)
 	tsc_sync_disabled = 1;
 
 	/* init low mem mapping */
-	memcpy(swapper_pg_dir, swapper_pg_dir + USER_PGD_PTRS,
-			sizeof(swapper_pg_dir[0]) * KERNEL_PGD_PTRS);
+	clone_pgd_range(swapper_pg_dir, swapper_pg_dir + USER_PGD_PTRS,
+			KERNEL_PGD_PTRS);
 	flush_tlb_all();
 	schedule_work(&task);
 	wait_for_completion(&done);
@@ -1192,11 +1185,6 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 		if (max_cpus <= cpucount+1)
 			continue;
 
-#ifdef CONFIG_SMP_ALTERNATIVES
-		if (kicked == 1)
-			prepare_for_smp();
-#endif
-
 		if (((cpu = alloc_cpu_id()) <= 0) || do_boot_cpu(apicid, cpu))
 			printk("CPU #%d not responding - cannot use it.\n",
 								apicid);
@@ -1278,6 +1266,7 @@ void __devinit smp_prepare_boot_cpu(void)
 	cpu_set(smp_processor_id(), cpu_online_map);
 	cpu_set(smp_processor_id(), cpu_callout_map);
 	cpu_set(smp_processor_id(), cpu_present_map);
+	cpu_set(smp_processor_id(), cpu_possible_map);
 	per_cpu(cpu_state, smp_processor_id()) = CPU_ONLINE;
 }
 
@@ -1340,8 +1329,7 @@ void __cpu_die(unsigned int cpu)
 			printk ("CPU %d is now offline\n", cpu);
 			return;
 		}
-		current->state = TASK_UNINTERRUPTIBLE;
-		schedule_timeout(HZ/10);
+		msleep(100);
 	}
  	printk(KERN_ERR "CPU %u didn't die...\n", cpu);
 }
@@ -1366,11 +1354,6 @@ int __devinit __cpu_up(unsigned int cpu)
 		local_irq_enable();
 		return -EIO;
 	}
-
-#ifdef CONFIG_SMP_ALTERNATIVES
-	if (num_online_cpus() == 1)
-		prepare_for_smp();
-#endif
 
 	local_irq_enable();
 	per_cpu(cpu_state, cpu) = CPU_UP_PREPARE;

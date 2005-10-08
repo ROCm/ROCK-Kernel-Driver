@@ -130,18 +130,6 @@ ENTRY(ret_from_fork)
 	popl %eax
 	jmp syscall_exit
 
-#if defined(CONFIG_KDB)
-ENTRY(kdb_call)
-	pushl %eax              # save orig EAX
-	SAVE_ALL
-	pushl %esp              # struct pt_regs
-	pushl $0                # error_code
-	pushl $7                # KDB_REASON_ENTRY
-	call  kdb
-	addl  $12,%esp          # remove args
-	jmp restore_all
-#endif
-
 /*
  * Return to user mode is not as complex as all this looks,
  * but we want the default path for a system call return to
@@ -331,7 +319,7 @@ work_notifysig:				# deal with pending signals and
 					# vm86-space
 	xorl %edx, %edx
 	call do_notify_resume
-	jmp restore_all
+	jmp resume_userspace
 
 	ALIGN
 work_notifysig_v86:
@@ -341,7 +329,7 @@ work_notifysig_v86:
 	movl %eax, %esp
 	xorl %edx, %edx
 	call do_notify_resume
-	jmp restore_all
+	jmp resume_userspace
 
 	# perform syscall exit tracing
 	ALIGN
@@ -351,18 +339,12 @@ syscall_trace_entry:
 	xorl %edx,%edx
 	call do_syscall_trace
 	cmpl $0, %eax
-	jne syscall_skip		# ret != 0 -> running under PTRACE_SYSEMU,
+	jne resume_userspace		# ret != 0 -> running under PTRACE_SYSEMU,
 					# so must skip actual syscall
 	movl ORIG_EAX(%esp), %eax
 	cmpl $(nr_syscalls), %eax
 	jnae syscall_call
 	jmp syscall_exit
-syscall_skip:
-	cli				# make sure we don't miss an interrupt
-					# setting need_resched or sigpending
-					# between sampling and the iret
-	movl TI_flags(%ebp), %ecx
-	jmp work_pending
 
 	# perform syscall exit tracing
 	ALIGN
@@ -525,7 +507,7 @@ label:						\
 	pushl $__KERNEL_CS;			\
 	pushl $sysenter_past_esp
 
-ENTRY(debug)
+KPROBE_ENTRY(debug)
 	cmpl $sysenter_entry,(%esp)
 	jne debug_stack_correct
 	FIX_STACK(12, debug_stack_correct, debug_esp_fix_insn)
@@ -536,7 +518,7 @@ debug_stack_correct:
 	movl %esp,%eax			# pt_regs pointer
 	call do_debug
 	jmp ret_from_exception
-
+	.previous .text
 /*
  * NMI is doubly nasty. It can happen _while_ we're handling
  * a debug fault, and the debug fault hasn't yet been able to
@@ -609,13 +591,14 @@ nmi_16bit_stack:
 	.long 1b,iret_exc
 .previous
 
-ENTRY(int3)
+KPROBE_ENTRY(int3)
 	pushl $-1			# mark this as an int
 	SAVE_ALL
 	xorl %edx,%edx		# zero error code
 	movl %esp,%eax		# pt_regs pointer
 	call do_int3
 	jmp ret_from_exception
+	.previous .text
 
 ENTRY(overflow)
 	pushl $0
@@ -649,33 +632,19 @@ ENTRY(stack_segment)
 	pushl $do_stack_segment
 	jmp error_code
 
-ENTRY(general_protection)
+KPROBE_ENTRY(general_protection)
 	pushl $do_general_protection
 	jmp error_code
+	.previous .text
 
 ENTRY(alignment_check)
 	pushl $do_alignment_check
 	jmp error_code
 
-#if defined(CONFIG_KDB)
-ENTRY(page_fault_mca)
-	pushl %ecx
-	pushl %edx
-	pushl %eax
-	movl  $473,%ecx
-	rdmsr
-	andl  $0xfffffffe,%eax		/* Disable last branch recording */
-	wrmsr
-	popl  %eax
-	popl  %edx
-	popl  %ecx
+KPROBE_ENTRY(page_fault)
 	pushl $do_page_fault
 	jmp error_code
-#endif
-
-ENTRY(page_fault)
-	pushl $do_page_fault
-	jmp error_code
+	.previous .text
 
 #ifdef CONFIG_X86_MCE
 ENTRY(machine_check)

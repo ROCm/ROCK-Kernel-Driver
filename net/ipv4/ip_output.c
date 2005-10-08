@@ -69,13 +69,10 @@
 #include <net/ip.h>
 #include <net/protocol.h>
 #include <net/route.h>
-#include <net/tcp.h>
-#include <net/udp.h>
 #include <linux/skbuff.h>
 #include <net/sock.h>
 #include <net/arp.h>
 #include <net/icmp.h>
-#include <net/raw.h>
 #include <net/checksum.h>
 #include <net/inetpeer.h>
 #include <net/checksum.h>
@@ -84,12 +81,8 @@
 #include <linux/netfilter_bridge.h>
 #include <linux/mroute.h>
 #include <linux/netlink.h>
+#include <linux/tcp.h>
 
-/*
- *      Shall we try to damage output packets if routing dev changes?
- */
-
-int sysctl_ip_dynaddr;
 int sysctl_ip_default_ttl = IPDEFTTL;
 
 /* Generate a checksum for an outgoing IP datagram. */
@@ -119,15 +112,6 @@ static inline int ip_select_ttl(struct inet_sock *inet, struct dst_entry *dst)
 		ttl = dst_metric(dst, RTAX_HOPLIMIT);
 	return ttl;
 }
-
-#ifdef CONFIG_NETFILTER
-/* out-of-line copy is only required with netfilter */
-int ip_dst_output(struct sk_buff *skb)
-{
-	return NF_HOOK_COND(PF_INET, NF_IP_POST_ROUTING, skb, NULL,
-	                    skb->dst->dev, dst_output, skb->dst->xfrm != NULL);
-}
-#endif
 
 /* 
  *		Add an ip header to a skbuff and send it out.
@@ -171,8 +155,10 @@ int ip_build_and_send_pkt(struct sk_buff *skb, struct sock *sk,
 
 	/* Send it out. */
 	return NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, skb, NULL, rt->u.dst.dev,
-		       ip_dst_output);
+		       dst_output);
 }
+
+EXPORT_SYMBOL_GPL(ip_build_and_send_pkt);
 
 static inline int ip_finish_output2(struct sk_buff *skb)
 {
@@ -214,7 +200,7 @@ static inline int ip_finish_output2(struct sk_buff *skb)
 	return -EINVAL;
 }
 
-int ip_finish_output(struct sk_buff *skb)
+static inline int ip_finish_output(struct sk_buff *skb)
 {
 	struct net_device *dev = skb->dst->dev;
 
@@ -285,7 +271,7 @@ int ip_mc_output(struct sk_buff *skb)
 		return ip_finish_output(skb);
 }
 
-static inline int ip_output2(struct sk_buff *skb)
+int ip_output(struct sk_buff *skb)
 {
 	IP_INC_STATS(IPSTATS_MIB_OUTREQUESTS);
 
@@ -293,16 +279,6 @@ static inline int ip_output2(struct sk_buff *skb)
 		return ip_fragment(skb, ip_finish_output);
 	else
 		return ip_finish_output(skb);
-}
-
-int ip_output(struct sk_buff *skb)
-{
-	int transformed = IPCB(skb)->flags & IPSKB_XFRM_TRANSFORMED;
-
-	if (transformed)
-		nf_reset(skb);
-	return NF_HOOK_COND(PF_INET, NF_IP_LOCAL_OUT, skb, NULL,
-	                    skb->dst->dev, ip_output2, transformed);
 }
 
 int ip_queue_xmit(struct sk_buff *skb, int ipfragok)
@@ -348,8 +324,7 @@ int ip_queue_xmit(struct sk_buff *skb, int ipfragok)
 			if (ip_route_output_flow(&rt, &fl, sk, 0))
 				goto no_route;
 		}
-		__sk_dst_set(sk, &rt->u.dst);
-		tcp_v4_setup_caps(sk, &rt->u.dst);
+		sk_setup_caps(sk, &rt->u.dst);
 	}
 	skb->dst = dst_clone(&rt->u.dst);
 
@@ -385,7 +360,7 @@ packet_routed:
 	skb->priority = sk->sk_priority;
 
 	return NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, skb, NULL, rt->u.dst.dev,
-		       ip_dst_output);
+		       dst_output);
 
 no_route:
 	IP_INC_STATS(IPSTATS_MIB_OUTNOROUTES);
@@ -411,7 +386,6 @@ static void ip_copy_metadata(struct sk_buff *to, struct sk_buff *from)
 #endif
 #ifdef CONFIG_NETFILTER
 	to->nfmark = from->nfmark;
-	to->nfcache = from->nfcache;
 	/* Connection association is same as pre-frag packet */
 	nf_conntrack_put(to->nfct);
 	to->nfct = from->nfct;
@@ -599,7 +573,7 @@ slow_path:
 		 */
 
 		if ((skb2 = alloc_skb(len+hlen+ll_rs, GFP_ATOMIC)) == NULL) {
-			NETDEBUG(printk(KERN_INFO "IP: frag: no memory for new fragment!\n"));
+			NETDEBUG(KERN_INFO "IP: frag: no memory for new fragment!\n");
 			err = -ENOMEM;
 			goto fail;
 		}
@@ -1205,7 +1179,7 @@ int ip_push_pending_frames(struct sock *sk)
 
 	/* Netfilter gets whole the not fragmented skb. */
 	err = NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, skb, NULL, 
-		      skb->dst->dev, ip_dst_output);
+		      skb->dst->dev, dst_output);
 	if (err) {
 		if (err > 0)
 			err = inet->recverr ? net_xmit_errno(err) : 0;
@@ -1348,12 +1322,7 @@ void __init ip_init(void)
 #endif
 }
 
-EXPORT_SYMBOL(ip_finish_output);
 EXPORT_SYMBOL(ip_fragment);
 EXPORT_SYMBOL(ip_generic_getfrag);
 EXPORT_SYMBOL(ip_queue_xmit);
 EXPORT_SYMBOL(ip_send_check);
-
-#ifdef CONFIG_SYSCTL
-EXPORT_SYMBOL(sysctl_ip_default_ttl);
-#endif

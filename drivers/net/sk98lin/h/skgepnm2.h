@@ -2,8 +2,8 @@
  *
  * Name:	skgepnm2.h
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
- * Version:	$Revision: 2.4 $
- * Date:	$Date: 2005/05/03 06:42:43 $
+ * Version:	$Revision: 1.36 $
+ * Date:	$Date: 2003/05/23 12:45:13 $
  * Purpose:	Defines for Private Network Management Interface
  *
  ****************************************************************************/
@@ -28,13 +28,8 @@
 /*
  * General definitions
  */
-#define SK_PNMI_CHIPSET_XMAC		1	/* XMAC11800FP */
-#define SK_PNMI_CHIPSET_YUKON		2	/* YUKON */
-#define SK_PNMI_CHIPSET_YUKON_LITE	3	/* YUKON-Lite (Rev. A1-A3) */
-#define SK_PNMI_CHIPSET_YUKON_LP	4	/* YUKON-LP */
-#define SK_PNMI_CHIPSET_YUKON_XL	5	/* YUKON-2 XL */
-#define SK_PNMI_CHIPSET_YUKON_EC	6	/* YUKON-2 EC */
-#define SK_PNMI_CHIPSET_YUKON_FE	7	/* YUKON-2 FE */
+#define SK_PNMI_CHIPSET_XMAC	1	/* XMAC11800FP */
+#define SK_PNMI_CHIPSET_YUKON	2	/* YUKON */
 
 #define	SK_PNMI_BUS_PCI		1	/* PCI bus*/
 
@@ -75,9 +70,9 @@
 /*
  * VCT internal status values
  */
-#define SK_PNMI_VCT_PENDING		0x20
-#define SK_PNMI_VCT_TEST_DONE	0x40
-#define SK_PNMI_VCT_LINK		0x80
+#define SK_PNMI_VCT_PENDING	32
+#define SK_PNMI_VCT_TEST_DONE	64
+#define SK_PNMI_VCT_LINK	128
 
 /*
  * Internal table definitions
@@ -328,7 +323,7 @@ typedef struct s_PnmiStatAddr {
 						vSt, \
 						pAC->Pnmi.MacUpdatedFlag, \
 						pAC->Pnmi.RlmtUpdatedFlag, \
-						pAC->Pnmi.SirqUpdatedFlag));}}
+						pAC->Pnmi.SirqUpdatedFlag))}}
 
 #else	/* !DEBUG */
 

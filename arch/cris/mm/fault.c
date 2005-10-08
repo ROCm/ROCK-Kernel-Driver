@@ -253,7 +253,7 @@ do_page_fault(unsigned long address, struct pt_regs *regs,
 		if (address + PAGE_SIZE < rdusp())
 			goto bad_area;
 	}
-	if (expand_stack(vma, address, NULL))
+	if (expand_stack(vma, address))
 		goto bad_area;
 
 	/*

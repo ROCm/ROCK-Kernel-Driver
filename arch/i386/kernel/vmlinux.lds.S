@@ -22,6 +22,7 @@ SECTIONS
 	*(.text)
 	SCHED_TEXT
 	LOCK_TEXT
+	KPROBES_TEXT
 	*(.fixup)
 	*(.gnu.warning)
 	} = 0x9090
@@ -32,13 +33,6 @@ SECTIONS
   __start___ex_table = .;
   __ex_table : AT(ADDR(__ex_table) - LOAD_OFFSET) { *(__ex_table) }
   __stop___ex_table = .;
-
-  . = ALIGN(16);
-  __start_smp_alternatives_table = .;
-  __smp_alternatives : AT(ADDR(__smp_alternatives) - LOAD_OFFSET) { *(__smp_alternatives) }
-  __stop_smp_alternatives_table = .;
-
-  __smp_replacements : AT(ADDR(__smp_replacements) - LOAD_OFFSET) { *(__smp_replacements) }
 
   RODATA
 
@@ -103,11 +97,6 @@ SECTIONS
 	*(.con_initcall.init)
   }
   __con_initcall_end = .;
-  __kdb_initcall_start = .;
-  .kdb_initcall.init : AT(ADDR(.kdb_initcall.init) - LOAD_OFFSET) {
-	*(.kdb_initcall.init)
-  }
-  __kdb_initcall_end = .;
   SECURITY_INIT
   . = ALIGN(4);
   __alt_instructions = .;
@@ -155,12 +144,7 @@ SECTIONS
 	*(.exitcall.exit)
 	}
 
-  /* Stabs debugging sections.  */
-  .stab 0 : { *(.stab) }
-  .stabstr 0 : { *(.stabstr) }
-  .stab.excl 0 : { *(.stab.excl) }
-  .stab.exclstr 0 : { *(.stab.exclstr) }
-  .stab.index 0 : { *(.stab.index) }
-  .stab.indexstr 0 : { *(.stab.indexstr) }
-  .comment 0 : { *(.comment) }
+  STABS_DEBUG
+
+  DWARF_DEBUG
 }

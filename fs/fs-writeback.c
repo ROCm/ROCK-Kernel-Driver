@@ -283,6 +283,8 @@ __writeback_single_inode(struct inode *inode,
  * WB_SYNC_HOLD is a hack for sys_sync(): reattach the inode to sb->s_dirty so
  * that it can be located for waiting on in __writeback_single_inode().
  *
+ * Called under inode_lock.
+ *
  * If `bdi' is non-zero then we're being asked to writeback a specific queue.
  * This function assumes that the blockdev superblock's inodes are backed by
  * a variety of queues, so all inodes are searched.  For other superblocks,
@@ -298,12 +300,10 @@ __writeback_single_inode(struct inode *inode,
  * on the writer throttling path, and we get decent balancing between many
  * throttled threads: we don't want them all piling up on __wait_on_inode.
  */
-void
-generic_sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)
+static void
+sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)
 {
 	const unsigned long start = jiffies;	/* livelock avoidance */
-
-	spin_lock(&inode_lock);
 
 	if (!wbc->for_kupdate || list_empty(&sb->s_io))
 		list_splice_init(&sb->s_dirty, &sb->s_io);
@@ -384,18 +384,7 @@ generic_sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)
 		if (wbc->nr_to_write <= 0)
 			break;
 	}
-	spin_unlock(&inode_lock);
 	return;		/* Leave any unwritten inodes on s_io */
-}
-EXPORT_SYMBOL(generic_sync_sb_inodes);
-
-static void
-sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)
-{
-	if (sb->s_op->sync_inodes)
-		sb->s_op->sync_inodes(sb, wbc);
-	else
-		generic_sync_sb_inodes(sb, wbc);
 }
 
 /*
@@ -437,8 +426,11 @@ restart:
 			 * be unmounted by the time it is released.
 			 */
 			if (down_read_trylock(&sb->s_umount)) {
-				if (sb->s_root)
+				if (sb->s_root) {
+					spin_lock(&inode_lock);
 					sync_sb_inodes(sb, wbc);
+					spin_unlock(&inode_lock);
+				}
 				up_read(&sb->s_umount);
 			}
 			spin_lock(&sb_lock);
@@ -474,7 +466,9 @@ void sync_inodes_sb(struct super_block *sb, int wait)
 			(inodes_stat.nr_inodes - inodes_stat.nr_unused) +
 			nr_dirty + nr_unstable;
 	wbc.nr_to_write += wbc.nr_to_write / 2;		/* Bit more for luck */
+	spin_lock(&inode_lock);
 	sync_sb_inodes(sb, &wbc);
+	spin_unlock(&inode_lock);
 }
 
 /*

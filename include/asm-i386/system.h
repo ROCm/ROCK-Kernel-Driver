@@ -5,7 +5,7 @@
 #include <linux/kernel.h>
 #include <asm/segment.h>
 #include <asm/cpufeature.h>
-#include <asm/smp_alt.h>
+#include <linux/bitops.h> /* for LOCK_PREFIX */
 
 #ifdef __KERNEL__
 
@@ -14,8 +14,7 @@ extern struct task_struct * FASTCALL(__switch_to(struct task_struct *prev, struc
 
 #define switch_to(prev,next,last) do {					\
 	unsigned long esi,edi;						\
-	asm volatile("pushfl\n\t"					\
-		     "pushl %%ebp\n\t"					\
+	asm volatile("pushl %%ebp\n\t"					\
 		     "movl %%esp,%0\n\t"	/* save ESP */		\
 		     "movl %5,%%esp\n\t"	/* restore ESP */	\
 		     "movl $1f,%1\n\t"		/* save EIP */		\
@@ -23,7 +22,6 @@ extern struct task_struct * FASTCALL(__switch_to(struct task_struct *prev, struc
 		     "jmp __switch_to\n"				\
 		     "1:\t"						\
 		     "popl %%ebp\n\t"					\
-		     "popfl"						\
 		     :"=m" (prev->thread.esp),"=m" (prev->thread.eip),	\
 		      "=a" (last),"=S" (esi),"=D" (edi)			\
 		     :"m" (next->thread.esp),"m" (next->thread.eip),	\
@@ -93,13 +91,13 @@ static inline unsigned long _get_base(char * addr)
 		".align 4\n\t"			\
 		".long 1b,3b\n"			\
 		".previous"			\
-		: :"m" (value))
+		: :"rm" (value))
 
 /*
  * Save a segment register away
  */
 #define savesegment(seg, value) \
-	asm volatile("mov %%" #seg ",%0":"=m" (value))
+	asm volatile("mov %%" #seg ",%0":"=rm" (value))
 
 /*
  * Clear and set 'TS' bit respectively
@@ -107,13 +105,33 @@ static inline unsigned long _get_base(char * addr)
 #define clts() __asm__ __volatile__ ("clts")
 #define read_cr0() ({ \
 	unsigned int __dummy; \
-	__asm__( \
+	__asm__ __volatile__( \
 		"movl %%cr0,%0\n\t" \
 		:"=r" (__dummy)); \
 	__dummy; \
 })
 #define write_cr0(x) \
-	__asm__("movl %0,%%cr0": :"r" (x));
+	__asm__ __volatile__("movl %0,%%cr0": :"r" (x));
+
+#define read_cr2() ({ \
+	unsigned int __dummy; \
+	__asm__ __volatile__( \
+		"movl %%cr2,%0\n\t" \
+		:"=r" (__dummy)); \
+	__dummy; \
+})
+#define write_cr2(x) \
+	__asm__ __volatile__("movl %0,%%cr2": :"r" (x));
+
+#define read_cr3() ({ \
+	unsigned int __dummy; \
+	__asm__ ( \
+		"movl %%cr3,%0\n\t" \
+		:"=r" (__dummy)); \
+	__dummy; \
+})
+#define write_cr3(x) \
+	__asm__ __volatile__("movl %0,%%cr3": :"r" (x));
 
 #define read_cr4() ({ \
 	unsigned int __dummy; \
@@ -123,7 +141,7 @@ static inline unsigned long _get_base(char * addr)
 	__dummy; \
 })
 #define write_cr4(x) \
-	__asm__("movl %0,%%cr4": :"r" (x));
+	__asm__ __volatile__("movl %0,%%cr4": :"r" (x));
 #define stts() write_cr0(8 | read_cr0())
 
 #endif	/* __KERNEL__ */
@@ -249,19 +267,19 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
 	unsigned long prev;
 	switch (size) {
 	case 1:
-		__asm__ __volatile__(LOCK "cmpxchgb %b1,%2"
+		__asm__ __volatile__(LOCK_PREFIX "cmpxchgb %b1,%2"
 				     : "=a"(prev)
 				     : "q"(new), "m"(*__xg(ptr)), "0"(old)
 				     : "memory");
 		return prev;
 	case 2:
-		__asm__ __volatile__(LOCK "cmpxchgw %w1,%2"
+		__asm__ __volatile__(LOCK_PREFIX "cmpxchgw %w1,%2"
 				     : "=a"(prev)
 				     : "q"(new), "m"(*__xg(ptr)), "0"(old)
 				     : "memory");
 		return prev;
 	case 4:
-		__asm__ __volatile__(LOCK "cmpxchgl %1,%2"
+		__asm__ __volatile__(LOCK_PREFIX "cmpxchgl %1,%2"
 				     : "=a"(prev)
 				     : "q"(new), "m"(*__xg(ptr)), "0"(old)
 				     : "memory");
@@ -425,55 +443,11 @@ struct alt_instr {
 #endif
 
 #ifdef CONFIG_SMP
-#define smp_wmb()	wmb()
-#if defined(CONFIG_SMP_ALTERNATIVES) && !defined(MODULE)
-#define smp_alt_mb(instr)                                           \
-__asm__ __volatile__("6667:\nnop\nnop\nnop\nnop\nnop\nnop\n6668:\n" \
-		     ".section __smp_alternatives,\"a\"\n"          \
-		     ".long 6667b\n"                                \
-                     ".long 6673f\n"                                \
-		     ".previous\n"                                  \
-		     ".section __smp_replacements,\"a\"\n"          \
-		     "6673:.byte 6668b-6667b\n"                     \
-		     ".byte 6670f-6669f\n"                          \
-		     ".byte 6671f-6670f\n"                          \
-                     ".byte 0\n"                                    \
-		     ".byte %c0\n"                                  \
-		     "6669:lock;addl $0,0(%%esp)\n"                 \
-		     "6670:" instr "\n"                             \
-		     "6671:\n"                                      \
-		     ".previous\n"                                  \
-		     :                                              \
-		     : "i" (X86_FEATURE_XMM2)                       \
-		     : "memory")
-#define smp_rmb() smp_alt_mb("lfence")
-#define smp_mb()  smp_alt_mb("mfence")
-#define set_mb(var, value) do {                                     \
-unsigned long __set_mb_temp;                                        \
-__asm__ __volatile__("6667:movl %1, %0\n6668:\n"                    \
-		     ".section __smp_alternatives,\"a\"\n"          \
-		     ".long 6667b\n"                                \
-		     ".long 6673f\n"                                \
-		     ".previous\n"                                  \
-		     ".section __smp_replacements,\"a\"\n"          \
-		     "6673: .byte 6668b-6667b\n"                    \
-		     ".byte 6670f-6669f\n"                          \
-		     ".byte 0\n"                                    \
-		     ".byte 6671f-6670f\n"                          \
-		     ".byte -1\n"                                   \
-		     "6669: xchg %1, %0\n"                          \
-		     "6670:movl %1, %0\n"                           \
-		     "6671:\n"                                      \
-		     ".previous\n"                                  \
-		     : "=m" (var), "=r" (__set_mb_temp)             \
-		     : "1" (value)                                  \
-		     : "memory"); } while (0)
-#else
-#define smp_rmb()	rmb()
 #define smp_mb()	mb()
-#define set_mb(var, value) do { xchg(&var, value); } while (0)
-#endif
+#define smp_rmb()	rmb()
+#define smp_wmb()	wmb()
 #define smp_read_barrier_depends()	read_barrier_depends()
+#define set_mb(var, value) do { xchg(&var, value); } while (0)
 #else
 #define smp_mb()	barrier()
 #define smp_rmb()	barrier()
@@ -491,6 +465,8 @@ __asm__ __volatile__("6667:movl %1, %0\n6668:\n"                    \
 #define local_irq_enable()	__asm__ __volatile__("sti": : :"memory")
 /* used in the idle loop; sti takes one instruction cycle to complete */
 #define safe_halt()		__asm__ __volatile__("sti; hlt": : :"memory")
+/* used when interrupts are already enabled or to shutdown the processor */
+#define halt()			__asm__ __volatile__("hlt": : :"memory")
 
 #define irqs_disabled()			\
 ({					\

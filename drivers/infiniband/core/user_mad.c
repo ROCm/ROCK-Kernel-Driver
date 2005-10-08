@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2004 Topspin Communications.  All rights reserved.
- * Copyright (c) 2005 Voltaire, Inc. All rights reserved.
+ * Copyright (c) 2005 Voltaire, Inc. All rights reserved. 
  * Copyright (c) 2005 Sun Microsystems, Inc. All rights reserved.
  *
  * This software is available to you under a choice of one of two
@@ -49,8 +49,8 @@
 #include <asm/uaccess.h>
 #include <asm/semaphore.h>
 
-#include <ib_mad.h>
-#include <ib_user_mad.h>
+#include <rdma/ib_mad.h>
+#include <rdma/ib_user_mad.h>
 
 MODULE_AUTHOR("Roland Dreier");
 MODULE_DESCRIPTION("InfiniBand userspace MAD packet access");
@@ -271,7 +271,7 @@ static ssize_t ib_umad_write(struct file *filp, const char __user *buf,
 	struct ib_send_wr *bad_wr;
 	struct ib_rmpp_mad *rmpp_mad;
 	u8 method;
-	u64 *tid;
+	__be64 *tid;
 	int ret, length, hdr_len, data_len, rmpp_hdr_size;
 	int rmpp_active = 0;
 
@@ -316,7 +316,7 @@ static ssize_t ib_umad_write(struct file *filp, const char __user *buf,
 	if (packet->mad.hdr.grh_present) {
 		ah_attr.ah_flags = IB_AH_GRH;
 		memcpy(ah_attr.grh.dgid.raw, packet->mad.hdr.gid, 16);
-		ah_attr.grh.flow_label 	   = packet->mad.hdr.flow_label;
+		ah_attr.grh.flow_label 	   = be32_to_cpu(packet->mad.hdr.flow_label);
 		ah_attr.grh.hop_limit  	   = packet->mad.hdr.hop_limit;
 		ah_attr.grh.traffic_class  = packet->mad.hdr.traffic_class;
 	}
@@ -334,10 +334,11 @@ static ssize_t ib_umad_write(struct file *filp, const char __user *buf,
 			ret = -EINVAL;
 			goto err_ah;
 		}
-		/* Validate that management class can support RMPP */
+
+		/* Validate that the management class can support RMPP */
 		if (rmpp_mad->mad_hdr.mgmt_class == IB_MGMT_CLASS_SUBN_ADM) {
 			hdr_len = offsetof(struct ib_sa_mad, data);
-			data_len = length;
+			data_len = length - hdr_len;
 		} else if ((rmpp_mad->mad_hdr.mgmt_class >= IB_MGMT_CLASS_VENDOR_RANGE2_START) &&
 			    (rmpp_mad->mad_hdr.mgmt_class <= IB_MGMT_CLASS_VENDOR_RANGE2_END)) {
 				hdr_len = offsetof(struct ib_vendor_mad, data);

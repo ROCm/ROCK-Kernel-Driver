@@ -81,25 +81,6 @@ int tulip_mdio_read(struct net_device *dev, int phy_id, int location)
 		return retval & 0xffff;
 	}
 
-	if(tp->chip_id == ULI526X && tp->revision >= 0x40) {
-		int value;
-		int i = 1000;
-		
-		value = ioread32(ioaddr + CSR9);
-		iowrite32(value & 0xFFEFFFFF, ioaddr + CSR9);
-		
-		value = (phy_id << 21) | (location << 16) | 0x08000000;
-		iowrite32(value, ioaddr + CSR10);
-		
-		while(--i > 0) {
-			mdio_delay();
-			if(ioread32(ioaddr + CSR10) & 0x10000000)
-				break;
-		}
-		retval = ioread32(ioaddr + CSR10);
-		spin_unlock_irqrestore(&tp->mii_lock, flags);
-		return retval & 0xFFFF;
-	}
 	/* Establish sync by sending at least 32 logic ones. */
 	for (i = 32; i >= 0; i--) {
 		iowrite32(MDIO_ENB | MDIO_DATA_WRITE1, mdio_addr);
@@ -156,23 +137,6 @@ void tulip_mdio_write(struct net_device *dev, int phy_id, int location, int val)
 			if ( ! (ioread32(ioaddr + 0xA0) & 0x80000000))
 				break;
 		} while (--i > 0);
-		spin_unlock_irqrestore(&tp->mii_lock, flags);
-		return;
-	}
-	if (tp->chip_id == ULI526X && tp->revision >= 0x40) {
-		int value;
-		int i = 1000;
-		
-		value = ioread32(ioaddr + CSR9);
-		iowrite32(value & 0xFFEFFFFF, ioaddr + CSR9);
-		
-		value = (phy_id << 21) | (location << 16) | 0x04000000 | (val & 0xFFFF);
-		iowrite32(value, ioaddr + CSR10);
-		
-		while(--i > 0) {
-			if (ioread32(ioaddr + CSR10) & 0x10000000)
-				break;
-		}
 		spin_unlock_irqrestore(&tp->mii_lock, flags);
 		return;
 	}
@@ -521,11 +485,10 @@ void __devinit tulip_find_mii (struct net_device *dev, int board_idx)
 		/* Enable autonegotiation: some boards default to off. */
 		if (tp->default_port == 0) {
 			new_bmcr = mii_reg0 | BMCR_ANENABLE;
-			/* DM9161E PHY seems to need to restart
-			 * autonegotiation even if it defaults to enabled.
-			 */
-			new_bmcr |= BMCR_ANRESTART;
-			ane_switch = 1;
+			if (new_bmcr != mii_reg0) {
+				new_bmcr |= BMCR_ANRESTART;
+				ane_switch = 1;
+			}
 		}
 		/* ...or disable nway, if forcing media */
 		else {

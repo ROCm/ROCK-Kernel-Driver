@@ -87,7 +87,7 @@
 #define UART_TX_READY(s)	(((s) & UART_TSR_TX_LEVEL_MSK) < 15)
 //#define UART_TX_EMPTY(p)	((UART_GET_FR(p) & UART00_UARTFR_TMSK) == 0)
 
-static void uart00_stop_tx(struct uart_port *port, unsigned int tty_stop)
+static void uart00_stop_tx(struct uart_port *port)
 {
 	UART_PUT_IEC(port, UART_IEC_TIE_MSK);
 }
@@ -199,7 +199,7 @@ static void uart00_tx_chars(struct uart_port *port)
 		return;
 	}
 	if (uart_circ_empty(xmit) || uart_tx_stopped(port)) {
-		uart00_stop_tx(port, 0);
+		uart00_stop_tx(port);
 		return;
 	}
 
@@ -218,10 +218,10 @@ static void uart00_tx_chars(struct uart_port *port)
 		uart_write_wakeup(port);
 
 	if (uart_circ_empty(xmit))
-		uart00_stop_tx(port, 0);
+		uart00_stop_tx(port);
 }
 
-static void uart00_start_tx(struct uart_port *port, unsigned int tty_start)
+static void uart00_start_tx(struct uart_port *port)
 {
 	UART_PUT_IES(port, UART_IES_TIE_MSK);
 	uart00_tx_chars(port);
@@ -553,16 +553,16 @@ static void uart00_console_write(struct console *co, const char *s, unsigned cou
 	 *	Now, do each character
 	 */
 	for (i = 0; i < count; i++) {
+		do {
+			status = UART_GET_TSR(port);
+		} while (!UART_TX_READY(status));
+		UART_PUT_CHAR(port, s[i]);
 		if (s[i] == '\n') {
 			do {
 				status = UART_GET_TSR(port);
 			} while (!UART_TX_READY(status));
 			UART_PUT_CHAR(port, '\r');
 		}
-		do {
-			status = UART_GET_TSR(port);
-		} while (!UART_TX_READY(status));
-		UART_PUT_CHAR(port, s[i]);
 	}
 
 	/*

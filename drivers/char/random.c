@@ -273,7 +273,7 @@ static int random_write_wakeup_thresh = 128;
 
 static int trickle_thresh __read_mostly = INPUT_POOL_WORDS * 28;
 
-DEFINE_PER_CPU(int, trickle_count) = 0;
+static DEFINE_PER_CPU(int, trickle_count) = 0;
 
 /*
  * A pool of size .poolwords is stirred with a primitive polynomial
@@ -1587,6 +1587,40 @@ u32 secure_tcpv6_port_ephemeral(const __u32 *saddr, const __u32 *daddr, __u16 dp
 	return twothirdsMD4Transform(daddr, hash);
 }
 EXPORT_SYMBOL(secure_tcpv6_port_ephemeral);
+#endif
+
+#if defined(CONFIG_IP_DCCP) || defined(CONFIG_IP_DCCP_MODULE)
+/* Similar to secure_tcp_sequence_number but generate a 48 bit value
+ * bit's 32-47 increase every key exchange
+ *       0-31  hash(source, dest)
+ */
+u64 secure_dccp_sequence_number(__u32 saddr, __u32 daddr,
+				__u16 sport, __u16 dport)
+{
+	struct timeval tv;
+	u64 seq;
+	__u32 hash[4];
+	struct keydata *keyptr = get_keyptr();
+
+	hash[0] = saddr;
+	hash[1] = daddr;
+	hash[2] = (sport << 16) + dport;
+	hash[3] = keyptr->secret[11];
+
+	seq = half_md4_transform(hash, keyptr->secret);
+	seq |= ((u64)keyptr->count) << (32 - HASH_BITS);
+
+	do_gettimeofday(&tv);
+	seq += tv.tv_usec + tv.tv_sec * 1000000;
+	seq &= (1ull << 48) - 1;
+#if 0
+	printk("dccp init_seq(%lx, %lx, %d, %d) = %d\n",
+	       saddr, daddr, sport, dport, seq);
+#endif
+	return seq;
+}
+
+EXPORT_SYMBOL(secure_dccp_sequence_number);
 #endif
 
 #endif /* CONFIG_INET */

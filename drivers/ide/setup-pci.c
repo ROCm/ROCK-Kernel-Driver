@@ -800,18 +800,10 @@ static LIST_HEAD(ide_pci_drivers);
  *
  *	Returns are the same as for pci_register_driver
  */
-extern int noraid;
+
 int ide_pci_register_driver(struct pci_driver *driver)
 {
-	if (noraid) {
-		struct pci_device_id *id;
-
-		for (id = (struct pci_device_id *) driver->id_table; id->vendor; id++) {
-			id->class = PCI_CLASS_STORAGE_IDE << 8;
-			id->class_mask = 0xffff00;
-		}
-	}
-	if (!pre_init)
+	if(!pre_init)
 		return pci_module_init(driver);
 	list_add_tail(&driver->node, &ide_pci_drivers);
 	return 0;

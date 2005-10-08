@@ -32,6 +32,10 @@ struct fuse_mount_data {
 	unsigned rootmode;
 	unsigned user_id;
 	unsigned group_id;
+	unsigned fd_present : 1;
+	unsigned rootmode_present : 1;
+	unsigned user_id_present : 1;
+	unsigned group_id_present : 1;
 	unsigned flags;
 	unsigned max_read;
 };
@@ -169,6 +173,7 @@ struct inode *fuse_iget(struct super_block *sb, unsigned long nodeid,
 		return NULL;
 
 	if ((inode->i_state & I_NEW)) {
+		inode->i_flags |= S_NOATIME|S_NOCMTIME;
 		inode->i_generation = generation;
 		inode->i_data.backing_dev_info = &fc->bdi;
 		fuse_init_inode(inode, attr);
@@ -253,8 +258,6 @@ enum {
 	OPT_GROUP_ID,
 	OPT_DEFAULT_PERMISSIONS,
 	OPT_ALLOW_OTHER,
-	OPT_KERNEL_CACHE,
-	OPT_DIRECT_IO,
 	OPT_MAX_READ,
 	OPT_ERR
 };
@@ -266,8 +269,6 @@ static match_table_t tokens = {
 	{OPT_GROUP_ID,			"group_id=%u"},
 	{OPT_DEFAULT_PERMISSIONS,	"default_permissions"},
 	{OPT_ALLOW_OTHER,		"allow_other"},
-	{OPT_KERNEL_CACHE,		"kernel_cache"},
-	{OPT_DIRECT_IO,			"direct_io"},
 	{OPT_MAX_READ,			"max_read=%u"},
 	{OPT_ERR,			NULL}
 };
@@ -276,7 +277,6 @@ static int parse_fuse_opt(char *opt, struct fuse_mount_data *d)
 {
 	char *p;
 	memset(d, 0, sizeof(struct fuse_mount_data));
-	d->fd = -1;
 	d->max_read = ~0;
 
 	while ((p = strsep(&opt, ",")) != NULL) {
@@ -292,24 +292,28 @@ static int parse_fuse_opt(char *opt, struct fuse_mount_data *d)
 			if (match_int(&args[0], &value))
 				return 0;
 			d->fd = value;
+			d->fd_present = 1;
 			break;
 
 		case OPT_ROOTMODE:
 			if (match_octal(&args[0], &value))
 				return 0;
 			d->rootmode = value;
+			d->rootmode_present = 1;
 			break;
 
 		case OPT_USER_ID:
 			if (match_int(&args[0], &value))
 				return 0;
 			d->user_id = value;
+			d->user_id_present = 1;
 			break;
 
 		case OPT_GROUP_ID:
 			if (match_int(&args[0], &value))
 				return 0;
 			d->group_id = value;
+			d->group_id_present = 1;
 			break;
 
 		case OPT_DEFAULT_PERMISSIONS:
@@ -318,14 +322,6 @@ static int parse_fuse_opt(char *opt, struct fuse_mount_data *d)
 
 		case OPT_ALLOW_OTHER:
 			d->flags |= FUSE_ALLOW_OTHER;
-			break;
-
-		case OPT_KERNEL_CACHE:
-			d->flags |= FUSE_KERNEL_CACHE;
-			break;
-
-		case OPT_DIRECT_IO:
-			d->flags |= FUSE_DIRECT_IO;
 			break;
 
 		case OPT_MAX_READ:
@@ -338,7 +334,9 @@ static int parse_fuse_opt(char *opt, struct fuse_mount_data *d)
 			return 0;
 		}
 	}
-	if (d->fd == -1)
+
+	if (!d->fd_present || !d->rootmode_present ||
+	    !d->user_id_present || !d->group_id_present)
 		return 0;
 
 	return 1;
@@ -354,10 +352,6 @@ static int fuse_show_options(struct seq_file *m, struct vfsmount *mnt)
 		seq_puts(m, ",default_permissions");
 	if (fc->flags & FUSE_ALLOW_OTHER)
 		seq_puts(m, ",allow_other");
-	if (fc->flags & FUSE_KERNEL_CACHE)
-		seq_puts(m, ",kernel_cache");
-	if (fc->flags & FUSE_DIRECT_IO)
-		seq_puts(m, ",direct_io");
 	if (fc->max_read != ~0)
 		seq_printf(m, ",max_read=%u", fc->max_read);
 	return 0;
@@ -407,7 +401,7 @@ static struct fuse_conn *new_conn(void)
 		}
 		fc->bdi.ra_pages = (VM_MAX_READAHEAD * 1024) / PAGE_CACHE_SIZE;
 		fc->bdi.unplug_io_fn = default_unplug_io_fn;
-		fc->reqctr = 1;
+		fc->reqctr = 0;
 	}
 	return fc;
 }

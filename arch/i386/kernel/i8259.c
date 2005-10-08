@@ -16,7 +16,6 @@
 #include <asm/atomic.h>
 #include <asm/system.h>
 #include <asm/io.h>
-#include <asm/irq.h>
 #include <asm/timer.h>
 #include <asm/pgtable.h>
 #include <asm/delay.h>
@@ -24,8 +23,6 @@
 #include <asm/apic.h>
 #include <asm/arch_hooks.h>
 #include <asm/i8259.h>
-
-#include <linux/irq.h>
 
 #include <io_ports.h>
 
@@ -415,10 +412,6 @@ void __init init_IRQ(void)
 		int vector = FIRST_EXTERNAL_VECTOR + i;
 		if (i >= NR_IRQS)
 			break;
-#ifdef	CONFIG_KDB
-		if (vector == KDBENTER_VECTOR)
-			continue;
-#endif
 		if (vector != SYSCALL_VECTOR) 
 			set_intr_gate(vector, interrupt[i]);
 	}

@@ -2,8 +2,8 @@
  *
  * Name:	skdrv1st.h
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
- * Version:	$Revision: 1.5.2.5 $
- * Date:	$Date: 2005/04/11 09:00:53 $
+ * Version:	$Revision: 1.4 $
+ * Date:	$Date: 2003/11/12 14:28:14 $
  * Purpose:	First header file for driver and all other modules
  *
  ******************************************************************************/
@@ -11,7 +11,7 @@
 /******************************************************************************
  *
  *	(C)Copyright 1998-2002 SysKonnect GmbH.
- *	(C)Copyright 2002-2005 Marvell.
+ *	(C)Copyright 2002-2003 Marvell.
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
@@ -19,6 +19,20 @@
  *	(at your option) any later version.
  *
  *	The information in this file is provided "AS IS" without warranty.
+ *
+ ******************************************************************************/
+
+/******************************************************************************
+ *
+ * Description:
+ *
+ * This is the first include file of the driver, which includes all
+ * neccessary system header files and some of the GEnesis header files.
+ * It also defines some basic items.
+ *
+ * Include File Hierarchy:
+ *
+ *	see skge.c
  *
  ******************************************************************************/
 
@@ -44,9 +58,6 @@ typedef struct s_AC	SK_AC;
 
 #define SK_ADDR_EQUAL(a1,a2)		(!memcmp(a1,a2,6))
 
-#define SK_STRNCMP(s1,s2,len)		strncmp(s1,s2,len)
-#define SK_STRCPY(dest,src)		strcpy(dest,src)
-
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
@@ -55,9 +66,10 @@ typedef struct s_AC	SK_AC;
 #include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/pci.h>
+#include <linux/bitops.h>
 #include <asm/byteorder.h>
-#include <asm/bitops.h>
 #include <asm/io.h>
+#include <asm/irq.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
@@ -67,17 +79,17 @@ typedef struct s_AC	SK_AC;
 #include <net/checksum.h>
 
 #define SK_CS_CALCULATE_CHECKSUM
-#define SkCsCalculateChecksum(p,l)	(~csum_fold(csum_partial(p, l, 0)))
+#ifndef CONFIG_X86_64
+#define SkCsCalculateChecksum(p,l)	((~ip_compute_csum(p, l)) & 0xffff)
+#else
+#define SkCsCalculateChecksum(p,l)	((~ip_fast_csum(p, l)) & 0xffff)
+#endif
 
 #include	"h/sktypes.h"
 #include	"h/skerror.h"
 #include	"h/skdebug.h"
 #include	"h/lm80.h"
 #include	"h/xmac_ii.h"
-
-#ifndef SK_BMU_RX_WM_PEX
-#define SK_BMU_RX_WM_PEX 0x80
-#endif
 
 #ifdef __LITTLE_ENDIAN
 #define SK_LITTLE_ENDIAN
@@ -98,7 +110,7 @@ typedef struct s_AC	SK_AC;
 #define SK_MAX_MACS		2
 #define SK_MAX_NETS		2
 
-#define SK_IOC			char*
+#define SK_IOC			char __iomem *
 
 typedef struct s_DrvRlmtMbuf SK_MBUF;
 
@@ -177,8 +189,3 @@ extern void SkErrorLog(SK_AC*, int, int, char*);
 
 #endif
 
-/*******************************************************************************
- *
- * End of file
- *
- ******************************************************************************/

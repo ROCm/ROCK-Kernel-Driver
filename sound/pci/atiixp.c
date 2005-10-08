@@ -1427,7 +1427,7 @@ static int snd_atiixp_suspend(snd_card_t *card, pm_message_t state)
 	snd_atiixp_aclink_down(chip);
 	snd_atiixp_chip_stop(chip);
 
-	pci_set_power_state(chip->pci, 3);
+	pci_set_power_state(chip->pci, PCI_D3hot);
 	pci_disable_device(chip->pci);
 	return 0;
 }
@@ -1438,7 +1438,7 @@ static int snd_atiixp_resume(snd_card_t *card)
 	int i;
 
 	pci_enable_device(chip->pci);
-	pci_set_power_state(chip->pci, 0);
+	pci_set_power_state(chip->pci, PCI_D0);
 	pci_set_master(chip->pci);
 
 	snd_atiixp_aclink_reset(chip);
@@ -1531,7 +1531,7 @@ static int __devinit snd_atiixp_create(snd_card_t *card,
 	if ((err = pci_enable_device(pci)) < 0)
 		return err;
 
-	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
+	chip = kzalloc(sizeof(*chip), GFP_KERNEL);
 	if (chip == NULL) {
 		pci_disable_device(pci);
 		return -ENOMEM;
@@ -1645,6 +1645,7 @@ static void __devexit snd_atiixp_remove(struct pci_dev *pci)
 
 static struct pci_driver driver = {
 	.name = "ATI IXP AC97 controller",
+	.owner = THIS_MODULE,
 	.id_table = snd_atiixp_ids,
 	.probe = snd_atiixp_probe,
 	.remove = __devexit_p(snd_atiixp_remove),

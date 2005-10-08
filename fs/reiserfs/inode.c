@@ -35,11 +35,11 @@ void reiserfs_delete_inode(struct inode *inode)
 
 	truncate_inode_pages(&inode->i_data, 0);
 
+	reiserfs_write_lock(inode->i_sb);
 
 	/* The = 0 happens when we abort creating a new inode for some reason like lack of space.. */
 	if (!(inode->i_state & I_NEW) && INODE_PKEY(inode)->k_objectid != 0) {	/* also handles bad_inode case */
 		down(&inode->i_sem);
-		reiserfs_write_lock(inode->i_sb);
 
 		reiserfs_delete_xattrs(inode);
 
@@ -72,7 +72,6 @@ void reiserfs_delete_inode(struct inode *inode)
 	} else {
 		/* no object items are in the tree */
 		;
-		reiserfs_write_lock(inode->i_sb);
 	}
       out:
 	clear_inode(inode);	/* note this must go after the journal_end to prevent deadlock */

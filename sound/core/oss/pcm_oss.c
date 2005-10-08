@@ -850,7 +850,9 @@ static ssize_t snd_pcm_oss_write1(snd_pcm_substream_t *substream, const char __u
 					return xfer > 0 ? xfer : -EAGAIN;
 			}
 		} else {
-			tmp = snd_pcm_oss_write2(substream, (const char *)buf, runtime->oss.period_bytes, 0);
+			tmp = snd_pcm_oss_write2(substream,
+						 (const char __force *)buf,
+						 runtime->oss.period_bytes, 0);
 			if (tmp <= 0)
 				return xfer > 0 ? (snd_pcm_sframes_t)xfer : tmp;
 			runtime->oss.bytes += tmp;
@@ -926,7 +928,8 @@ static ssize_t snd_pcm_oss_read1(snd_pcm_substream_t *substream, char __user *bu
 			xfer += tmp;
 			runtime->oss.buffer_used -= tmp;
 		} else {
-			tmp = snd_pcm_oss_read2(substream, (char *)buf, runtime->oss.period_bytes, 0);
+			tmp = snd_pcm_oss_read2(substream, (char __force *)buf,
+						runtime->oss.period_bytes, 0);
 			if (tmp <= 0)
 				return xfer > 0 ? (snd_pcm_sframes_t)xfer : tmp;
 			runtime->oss.bytes += tmp;
@@ -1737,7 +1740,7 @@ static int snd_pcm_oss_open_file(struct file *file,
 	snd_assert(rpcm_oss_file != NULL, return -EINVAL);
 	*rpcm_oss_file = NULL;
 
-	pcm_oss_file = kcalloc(1, sizeof(*pcm_oss_file), GFP_KERNEL);
+	pcm_oss_file = kzalloc(sizeof(*pcm_oss_file), GFP_KERNEL);
 	if (pcm_oss_file == NULL)
 		return -ENOMEM;
 

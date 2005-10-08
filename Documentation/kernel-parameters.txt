@@ -233,12 +233,6 @@ running once the system is up.
 	apm=		[APM] Advanced Power Management
 			See header of arch/i386/kernel/apm.c.
 
-	apic		[UP,APIC,i386] Tells the kernel to make use of the APIC on
-	                uniprocessor systems. When CONFIG_X86_APIC_OFF is set it 
-			needs this parameter to really activate it (needed to 
-			avoid problems with certain machines). This enables IO 
-			and local APICs.
-
 	applicom=	[HW]
 			Format: <mem>,<irq>
  
@@ -564,6 +558,7 @@ running once the system is up.
 			     keyboard and can not control its state
 			     (Don't attempt to blink the leds)
 	i8042.noaux	[HW] Don't check for auxiliary (== mouse) port
+	i8042.nokbd	[HW] Don't check/create keyboard port
 	i8042.nomux	[HW] Don't check presence of an active multiplexing
 			     controller
 	i8042.nopnp	[HW] Don't use ACPIPnP / PnPBIOS to discover KBD/AUX
@@ -1189,6 +1184,11 @@ running once the system is up.
 			New name for the ramdisk parameter.
 			See Documentation/ramdisk.txt.
 
+	rdinit=		[KNL]
+			Format: <full_path>
+			Run specified binary instead of /init from the ramdisk,
+			used for early userspace startup. See initrd.
+
 	reboot=		[BUGS=IA-32,BUGS=ARM,BUGS=IA-64] Rebooting mode
 			Format: <reboot_mode>[,<reboot_mode2>[,...]]
 			See arch/*/kernel/reboot.c.
@@ -1445,12 +1445,6 @@ running once the system is up.
 
 	stram_swap=	[HW,M68k]
 
-	unsupported	Allow loading of unsupported kernel modules:
-			0 = only allow supported modules,
-			1 = warn when loading unsupported modules,
-			2 = don't warn.
-			
-
 	swiotlb=	[IA-64] Number of I/O TLB slabs
  
 	switches=	[HW,M68k]
@@ -1505,7 +1499,6 @@ running once the system is up.
 			Format: <io>,<irq>
 
 	usb-handoff	[HW] Enable early USB BIOS -> OS handoff
-	usb-no-handoff	[HW] Disable early USB BIOS -> OS handoff
 
 	usbhid.mousepoll=
 			[USBHID] The interval which mice are to be polled at.

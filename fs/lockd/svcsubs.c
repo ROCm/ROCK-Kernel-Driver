@@ -90,7 +90,7 @@ nlm_lookup_file(struct svc_rqst *rqstp, struct nlm_file **result,
 	 * the file.
 	 */
 	if ((nfserr = nlmsvc_ops->fopen(rqstp, f, &file->f_file)) != 0) {
-		dprintk("lockd: open failed (error %d)\n", nfserr);
+		dprintk("lockd: open failed (nfserr %d)\n", ntohl(nfserr));
 		goto out_free;
 	}
 
@@ -287,12 +287,10 @@ nlmsvc_free_host_resources(struct nlm_host *host)
 {
 	dprintk("lockd: nlmsvc_free_host_resources\n");
 
-	if (nlm_traverse_files(host, NLM_ACT_UNLOCK)) {
+	if (nlm_traverse_files(host, NLM_ACT_UNLOCK))
 		printk(KERN_WARNING
-			"lockd: couldn't remove all locks held by %s\n",
+			"lockd: couldn't remove all locks held by %s",
 			host->h_name);
-		BUG();
-	}
 }
 
 /*
@@ -303,20 +301,9 @@ nlmsvc_invalidate_all(void)
 {
 	struct nlm_host *host;
 	while ((host = nlm_find_client()) != NULL) {
-		host->h_expires = 0;
 		nlmsvc_free_host_resources(host);
-		/* Do not unmonitor the host */
-		if (host->h_nsmhandle)
-			host->h_nsmhandle->sm_sticky = 1;
-		if (atomic_read(&host->h_count) != 1) {
-			/* Whatever is holding references to this host,
-			 * it seems likely we're going to leak memory
-			 * or worse */
-			printk(KERN_WARNING "lockd: host has reference count %u "
-				"after nlmsvc_free_host_resources!\n",
-				atomic_read(&host->h_count));
-
-		}
+		host->h_expires = 0;
+		host->h_killed = 1;
 		nlm_release_host(host);
 	}
 }

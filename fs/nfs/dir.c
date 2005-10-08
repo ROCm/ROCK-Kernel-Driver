@@ -1550,15 +1550,8 @@ go_ahead:
 		shrink_dcache_parent(old_dentry);
 	}
 
-	/* d_delete will currently not do a dentry_iput
-	 * because new_dentry->d_count is at least 2 when
-	 * we get here. As a matter of caution
-	 * let's grab a reference to the inode anyway.
-	 */
-	if (new_inode && igrab(new_inode)) {
-		nfs_begin_data_update(new_inode);
+	if (new_inode)
 		d_delete(new_dentry);
-	}
 
 	nfs_begin_data_update(old_dir);
 	nfs_begin_data_update(new_dir);
@@ -1568,17 +1561,6 @@ go_ahead:
 	nfs_end_data_update(old_inode);
 	nfs_end_data_update(new_dir);
 	nfs_end_data_update(old_dir);
-
-	if (new_inode) {
-		/* If this was the last reference to the inode make
-		 * sure the VFS zaps it and all associated caches.
-		 */
-		if (error == 0)
-			new_inode->i_nlink--;
-		nfs_end_data_update(new_inode);  
-		iput(new_inode);
-	}
-
 out:
 	if (rehash)
 		d_rehash(rehash);

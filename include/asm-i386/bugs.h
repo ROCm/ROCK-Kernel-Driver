@@ -107,7 +107,6 @@ static void __init check_fpu(void)
 		"fninit"
 		: "=m" (*&boot_cpu_data.fdiv_bug)
 		: "m" (*&x), "m" (*&y));
-	stts();
 	if (boot_cpu_data.fdiv_bug)
 		printk("Hmm, FPU with FDIV bug.\n");
 }
@@ -119,7 +118,10 @@ static void __init check_hlt(void)
 		printk("disabled\n");
 		return;
 	}
-	__asm__ __volatile__("hlt ; hlt ; hlt ; hlt");
+	halt();
+	halt();
+	halt();
+	halt();
 	printk("OK.\n");
 }
 

@@ -32,7 +32,6 @@
 #include <linux/module.h>
 #include <linux/delay.h>
 #include <linux/ide.h>
-#include <linux/irq.h>
 #include <linux/console.h>
 #include <linux/seq_file.h>
 #include <linux/root_dev.h>
@@ -465,7 +464,8 @@ void __init
 chrp_init2(void)
 {
 #ifdef CONFIG_NVRAM
-	chrp_nvram_init();
+// XX replace this in a more saner way
+//	pmac_nvram_init();
 #endif
 
 	request_region(0x20,0x20,"pic1");

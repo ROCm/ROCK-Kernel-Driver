@@ -65,6 +65,16 @@ static int generic_probe (struct device *dev)
 }
 static int generic_remove (struct device *dev)
 {
+	struct usb_device *udev = to_usb_device(dev);
+
+	/* if this is only an unbind, not a physical disconnect, then
+	 * unconfigure the device */
+	if (udev->state == USB_STATE_CONFIGURED)
+		usb_set_configuration(udev, 0);
+
+	/* in case the call failed or the device was suspended */
+	if (udev->state >= USB_STATE_CONFIGURED)
+		usb_disable_device(udev, 0);
 	return 0;
 }
 
@@ -293,7 +303,7 @@ int usb_driver_claim_interface(struct usb_driver *driver,
 	/* if interface was already added, bind now; else let
 	 * the future device_add() bind it, bypassing probe()
 	 */
-	if (klist_node_attached(&dev->knode_bus))
+	if (device_is_registered(dev))
 		device_bind_driver(dev);
 
 	return 0;
@@ -326,8 +336,8 @@ void usb_driver_release_interface(struct usb_driver *driver,
 	if (iface->condition != USB_INTERFACE_BOUND)
 		return;
 
-	/* release only after device_add() */
-	if (klist_node_attached(&dev->knode_bus)) {
+	/* don't release if the interface hasn't been added yet */
+	if (device_is_registered(dev)) {
 		iface->condition = USB_INTERFACE_UNBINDING;
 		device_release_driver(dev);
 	}
@@ -912,7 +922,7 @@ int usb_trylock_device(struct usb_device *udev)
  * is neither BINDING nor BOUND.  Rather than sleeping to wait for the
  * lock, the routine polls repeatedly.  This is to prevent deadlock with
  * disconnect; in some drivers (such as usb-storage) the disconnect()
- * callback will block waiting for a device reset to complete.
+ * or suspend() method will block waiting for a device reset to complete.
  *
  * Returns a negative error code for failure, otherwise 1 or 0 to indicate
  * that the device will or will not have to be unlocked.  (0 can be
@@ -922,6 +932,8 @@ int usb_trylock_device(struct usb_device *udev)
 int usb_lock_device_for_reset(struct usb_device *udev,
 		struct usb_interface *iface)
 {
+	unsigned long jiffies_expire = jiffies + HZ;
+
 	if (udev->state == USB_STATE_NOTATTACHED)
 		return -ENODEV;
 	if (udev->state == USB_STATE_SUSPENDED)
@@ -938,6 +950,12 @@ int usb_lock_device_for_reset(struct usb_device *udev,
 	}
 
 	while (!usb_trylock_device(udev)) {
+
+		/* If we can't acquire the lock after waiting one second,
+		 * we're probably deadlocked */
+		if (time_after(jiffies, jiffies_expire))
+			return -EBUSY;
+
 		msleep(15);
 		if (udev->state == USB_STATE_NOTATTACHED)
 			return -ENODEV;
@@ -1400,7 +1418,7 @@ static int usb_generic_suspend(struct device *dev, pm_message_t message)
 	driver = to_usb_driver(dev->driver);
 
 	/* there's only one USB suspend state */
-	if (intf->dev.power.power_state)
+	if (intf->dev.power.power_state.event)
 		return 0;
 
 	if (driver->suspend)

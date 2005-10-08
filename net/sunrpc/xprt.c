@@ -75,6 +75,7 @@
 
 #define XPRT_MAX_BACKOFF	(8)
 #define XPRT_IDLE_TIMEOUT	(5*60*HZ)
+#define XPRT_MAX_RESVPORT	(800)
 
 /*
  * Local functions
@@ -1514,7 +1515,7 @@ xprt_setup(int proto, struct sockaddr_in *ap, struct rpc_timeout *to)
 	xprt->timer.function = xprt_init_autodisconnect;
 	xprt->timer.data = (unsigned long) xprt;
 	xprt->last_used = jiffies;
-	xprt->port = xprt_max_resvport;
+	xprt->port = XPRT_MAX_RESVPORT;
 
 	/* Set timeout parameters */
 	if (to) {
@@ -1562,10 +1563,8 @@ static inline int xprt_bindresvport(struct rpc_xprt *xprt, struct socket *sock)
 			xprt->port = port;
 			return 0;
 		}
-		if (port <= xprt_min_resvport)
-			port = xprt_max_resvport;
-		else
-			port--;
+		if (--port == 0)
+			port = XPRT_MAX_RESVPORT;
 	} while (err == -EADDRINUSE && port != xprt->port);
 
 	printk("RPC: Can't bind to reserved port (%d).\n", -err);

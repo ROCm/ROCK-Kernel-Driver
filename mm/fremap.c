@@ -20,8 +20,6 @@
 #include <asm/cacheflush.h>
 #include <asm/tlbflush.h>
 
-extern unsigned long max_mapnr;
-
 static inline void zap_pte(struct mm_struct *mm, struct vm_area_struct *vma,
 			unsigned long addr, pte_t *ptep)
 {

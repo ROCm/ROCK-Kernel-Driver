@@ -17,7 +17,6 @@
 #include <linux/audit.h>
 #include <linux/seccomp.h>
 #include <linux/signal.h>
-#include <linux/proc_mm.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -660,58 +659,6 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 					(struct user_desc __user *) data);
 		break;
 
-#ifdef CONFIG_PROC_MM
-	case PTRACE_FAULTINFO: {
-		struct ptrace_faultinfo fault;
-
-		fault = ((struct ptrace_faultinfo)
-			{ .is_write	= child->thread.error_code,
-			  .addr		= child->thread.cr2 });
-		ret = copy_to_user((unsigned long *) data, &fault,
-				   sizeof(fault));
-		if(ret)
-			break;
-		break;
-	}
-
-	case PTRACE_SIGPENDING:
-		ret = copy_to_user((unsigned long *) data,
-				   &child->pending.signal,
-				   sizeof(child->pending.signal));
-		break;
-
-	case PTRACE_LDT: {
-		struct ptrace_ldt ldt;
-
-		if(copy_from_user(&ldt, (unsigned long *) data,
-				  sizeof(ldt))){
-			ret = -EIO;
-			break;
-		}
-		ret = __modify_ldt(child->mm, ldt.func, ldt.ptr, ldt.bytecount);
-		break;
-	}
-
-	case PTRACE_SWITCH_MM: {
-		struct mm_struct *old = child->mm;
-		struct mm_struct *new = proc_mm_get_mm(data);
-
-		if(IS_ERR(new)){
-			ret = PTR_ERR(new);
-			break;
-		}
-
-		atomic_inc(&new->mm_users);
-		task_lock(child);
-		child->mm = new;
-		child->active_mm = new;
-		task_unlock(child);
-		mmput(old);
-		ret = 0;
-		break;
-	}
-#endif
-
 	default:
 		ret = ptrace_request(child, request, addr, data);
 		break;
@@ -747,22 +694,31 @@ void send_sigtrap(struct task_struct *tsk, struct pt_regs *regs, int error_code)
 __attribute__((regparm(3)))
 int do_syscall_trace(struct pt_regs *regs, int entryexit)
 {
-	int is_sysemu = test_thread_flag(TIF_SYSCALL_EMU), ret = 0;
-	/* With TIF_SYSCALL_EMU set we want to ignore TIF_SINGLESTEP */
+	int is_sysemu = test_thread_flag(TIF_SYSCALL_EMU);
+	/*
+	 * With TIF_SYSCALL_EMU set we want to ignore TIF_SINGLESTEP for syscall
+	 * interception
+	 */
 	int is_singlestep = !is_sysemu && test_thread_flag(TIF_SINGLESTEP);
+	int ret = 0;
 
 	/* do the secure computing check first */
-	secure_computing(regs->orig_eax);
+	if (!entryexit)
+		secure_computing(regs->orig_eax);
 
 	if (unlikely(current->audit_context)) {
 		if (entryexit)
-			audit_syscall_exit(current, AUDITSC_RESULT(regs->eax), regs->eax);
-		/* With TIF_SYSCALL_AUDIT | TIF_SINGLESTEP &&
-		 * !TIF_SYSCALL_EMU we come in here, but must not
-		 * continue with ptrace_notify().
-		 * In the SINGLESTEP && ! _AUDIT case (i.e. normal one),
-		 * entry.S will call us only on syscall exit and not on
-		 * the syscall entry path, so let's be consistent.
+			audit_syscall_exit(current, AUDITSC_RESULT(regs->eax),
+						regs->eax);
+		/* Debug traps, when using PTRACE_SINGLESTEP, must be sent only
+		 * on the syscall exit path. Normally, when TIF_SYSCALL_AUDIT is
+		 * not used, entry.S will call us only on syscall exit, not
+		 * entry; so when TIF_SYSCALL_AUDIT is used we must avoid
+		 * calling send_sigtrap() on syscall entry.
+		 *
+		 * Note that when PTRACE_SYSEMU_SINGLESTEP is used,
+		 * is_singlestep is false, despite his name, so we will still do
+		 * the correct thing.
 		 */
 		else if (is_singlestep)
 			goto out;
@@ -781,13 +737,13 @@ int do_syscall_trace(struct pt_regs *regs, int entryexit)
 	if (is_singlestep)
 		send_sigtrap(current, regs, 0);
 
-	if (!test_thread_flag(TIF_SYSCALL_TRACE) && !is_sysemu)
+ 	if (!test_thread_flag(TIF_SYSCALL_TRACE) && !is_sysemu)
 		goto out;
 
 	/* the 0x80 provides a way for the tracing parent to distinguish
 	   between a syscall stop and SIGTRAP delivery */
 	/* Note that the debugger could change the result of test_thread_flag!*/
-	ptrace_notify(SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD) ? 0x80 : 0));
+	ptrace_notify(SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD) ? 0x80:0));
 
 	/*
 	 * this isn't the same as continuing with a signal, but it will do
@@ -799,7 +755,7 @@ int do_syscall_trace(struct pt_regs *regs, int entryexit)
 		current->exit_code = 0;
 	}
 	ret = is_sysemu;
- out:
+out:
 	if (unlikely(current->audit_context) && !entryexit)
 		audit_syscall_entry(current, AUDIT_ARCH_I386, regs->orig_eax,
 				    regs->ebx, regs->ecx, regs->edx, regs->esi);
@@ -808,6 +764,7 @@ int do_syscall_trace(struct pt_regs *regs, int entryexit)
 
 	regs->orig_eax = -1; /* force skip of syscall restarting */
 	if (unlikely(current->audit_context))
-		audit_syscall_exit(current, AUDITSC_RESULT(regs->eax), regs->eax);
+		audit_syscall_exit(current, AUDITSC_RESULT(regs->eax),
+				regs->eax);
 	return 1;
 }

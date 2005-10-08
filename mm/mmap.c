@@ -61,9 +61,8 @@ pgprot_t protection_map[16] = {
 
 int sysctl_overcommit_memory = OVERCOMMIT_GUESS;  /* heuristic overcommit */
 int sysctl_overcommit_ratio = 50;	/* default is 50% */
-int sysctl_max_map_count = DEFAULT_MAX_MAP_COUNT;
+int sysctl_max_map_count __read_mostly = DEFAULT_MAX_MAP_COUNT;
 atomic_t vm_committed_space = ATOMIC_INIT(0);
-int heap_stack_gap = 1;
 
 /*
  * Check that a process has enough memory to allocate a new virtual
@@ -204,13 +203,6 @@ static void remove_vm_struct(struct vm_area_struct *vma)
 	kmem_cache_free(vm_area_cachep, vma);
 }
 
-/*
- *  sys_brk() for the most part doesn't need the global kernel
- *  lock, except when an application is doing something nasty
- *  like trying to un-brk an area that has already been mapped
- *  to a regular file.  in this case, the unmapping will need
- *  to invoke file system routines that need the global lock.
- */
 asmlinkage unsigned long sys_brk(unsigned long brk)
 {
 	unsigned long rlim, retval;
@@ -869,11 +861,11 @@ void __vm_stat_account(struct mm_struct *mm, unsigned long flags,
  * The caller must hold down_write(current->mm->mmap_sem).
  */
 
-unsigned long __do_mmap_pgoff(struct mm_struct *mm, struct file * file,
-			    unsigned long addr, unsigned long len,
-			    unsigned long prot, unsigned long flags,
-			    unsigned long pgoff)
+unsigned long do_mmap_pgoff(struct file * file, unsigned long addr,
+			unsigned long len, unsigned long prot,
+			unsigned long flags, unsigned long pgoff)
 {
+	struct mm_struct * mm = current->mm;
 	struct vm_area_struct * vma, * prev;
 	struct inode *inode;
 	unsigned int vm_flags;
@@ -1148,7 +1140,7 @@ unacct_error:
 	return error;
 }
 
-EXPORT_SYMBOL(__do_mmap_pgoff);
+EXPORT_SYMBOL(do_mmap_pgoff);
 
 /* Get an address range which is currently unmapped.
  * For shmat() with addr=0.
@@ -1190,7 +1182,6 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr,
 full_search:
 	for (vma = find_vma(mm, addr); ; vma = vma->vm_next) {
 		/* At this point:  (!vma || addr < vma->vm_end). */
-		unsigned long __heap_stack_gap;
 		if (TASK_SIZE - len < addr) {
 			/*
 			 * Start a new search - just in case we missed
@@ -1204,13 +1195,7 @@ full_search:
 			}
 			return -ENOMEM;
 		}
-		if (!vma)
-			goto got_it;
-		__heap_stack_gap = 0;
-		if (vma->vm_flags & VM_GROWSDOWN)
-			__heap_stack_gap = heap_stack_gap << PAGE_SHIFT;
-		if (addr + len + __heap_stack_gap <= vma->vm_start) {
-		got_it:
+		if (!vma || addr + len <= vma->vm_start) {
 			/*
 			 * Remember the place where we stopped the search:
 			 */
@@ -1495,17 +1480,12 @@ static int acct_stack_growth(struct vm_area_struct * vma, unsigned long size, un
 }
 
 #ifdef CONFIG_STACK_GROWSUP
-int expand_stack(struct vm_area_struct * vma, unsigned long address,
-		 struct vm_area_struct * prev_vma)
+/*
+ * vma is the first one with address > vma->vm_end.  Have to extend vma.
+ */
+int expand_stack(struct vm_area_struct * vma, unsigned long address)
 {
 	int error;
-
-	/*
-	 * If you re-use the heap-stack-gap for a growsup stack you
-	 * should implement the feature for growsup too and remove
-	 * this WARN_ON.
-	 */
-	WARN_ON(prev_vma);
 
 	if (!(vma->vm_flags & VM_GROWSUP))
 		return -EFAULT;
@@ -1551,7 +1531,7 @@ find_extend_vma(struct mm_struct *mm, unsigned long addr)
 	vma = find_vma_prev(mm, addr, &prev);
 	if (vma && (vma->vm_start <= addr))
 		return vma;
-	if (!prev || expand_stack(prev, addr, NULL))
+	if (!prev || expand_stack(prev, addr))
 		return NULL;
 	if (prev->vm_flags & VM_LOCKED) {
 		make_pages_present(addr, prev->vm_end);
@@ -1559,8 +1539,10 @@ find_extend_vma(struct mm_struct *mm, unsigned long addr)
 	return prev;
 }
 #else
-int expand_stack(struct vm_area_struct *vma, unsigned long address,
-		 struct vm_area_struct *prev_vma)
+/*
+ * vma is the first one with address < vma->vm_start.  Have to extend vma.
+ */
+int expand_stack(struct vm_area_struct *vma, unsigned long address)
 {
 	int error;
 
@@ -1584,9 +1566,6 @@ int expand_stack(struct vm_area_struct *vma, unsigned long address,
 	if (address < vma->vm_start) {
 		unsigned long size, grow;
 
-		error = -ENOMEM;
-		if (prev_vma && unlikely(prev_vma->vm_end + (heap_stack_gap << PAGE_SHIFT) > address))
-			goto out_unlock;
 		size = vma->vm_end - address;
 		grow = (vma->vm_start - address) >> PAGE_SHIFT;
 
@@ -1596,7 +1575,6 @@ int expand_stack(struct vm_area_struct *vma, unsigned long address,
 			vma->vm_pgoff -= grow;
 		}
 	}
- out_unlock:
 	anon_vma_unlock(vma);
 	return error;
 }
@@ -1604,7 +1582,7 @@ int expand_stack(struct vm_area_struct *vma, unsigned long address,
 struct vm_area_struct *
 find_extend_vma(struct mm_struct * mm, unsigned long addr)
 {
-	struct vm_area_struct * vma, * prev_vma;
+	struct vm_area_struct * vma;
 	unsigned long start;
 
 	addr &= PAGE_MASK;
@@ -1616,8 +1594,7 @@ find_extend_vma(struct mm_struct * mm, unsigned long addr)
 	if (!(vma->vm_flags & VM_GROWSDOWN))
 		return NULL;
 	start = vma->vm_start;
-	find_vma_prev(mm, addr, &prev_vma);
-	if (expand_stack(vma, addr, prev_vma))
+	if (expand_stack(vma, addr))
 		return NULL;
 	if (vma->vm_flags & VM_LOCKED) {
 		make_pages_present(addr, start);
@@ -1663,7 +1640,7 @@ static void unmap_vma_list(struct mm_struct *mm, struct vm_area_struct *vma)
 /*
  * Get rid of page table information in the indicated region.
  *
- * Called with the page table lock held.
+ * Called with the mm semaphore held.
  */
 static void unmap_region(struct mm_struct *mm,
 		struct vm_area_struct *vma, struct vm_area_struct *prev,
@@ -2015,6 +1992,9 @@ int insert_vm_struct(struct mm_struct * mm, struct vm_area_struct * vma)
 	}
 	__vma = find_vma_prepare(mm,vma->vm_start,&prev,&rb_link,&rb_parent);
 	if (__vma && __vma->vm_start < vma->vm_end)
+		return -ENOMEM;
+	if ((vma->vm_flags & VM_ACCOUNT) &&
+	     security_vm_enough_memory(vma_pages(vma)))
 		return -ENOMEM;
 	vma_link(mm, vma, prev, rb_link, rb_parent);
 	return 0;

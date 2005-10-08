@@ -17,6 +17,8 @@
 #include <linux/file.h>
 #include <linux/slab.h>
 
+MODULE_ALIAS_MISCDEV(FUSE_MINOR);
+
 static kmem_cache_t *fuse_req_cachep;
 
 static inline struct fuse_conn *fuse_get_conn(struct file *file)
@@ -669,7 +671,7 @@ static ssize_t fuse_dev_read(struct file *file, char __user *buf,
 }
 
 /* Look up request on processing list by unique ID */
-static struct fuse_req *request_find(struct fuse_conn *fc, unsigned unique)
+static struct fuse_req *request_find(struct fuse_conn *fc, u64 unique)
 {
 	struct list_head *entry;
 

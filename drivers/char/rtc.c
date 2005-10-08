@@ -974,18 +974,6 @@ no_irq:
 
 #endif /* __sparc__ vs. others */
 
-#ifdef CONFIG_XEN
-	/* If reads just return 0xff, the RTC is disfunctional */
-	if (CMOS_READ(RTC_YEAR) == 0xff) {
-		printk(KERN_WARNING "rtc: Got 0xff, disable\n");
-#ifdef RTC_IRQ
-		free_irq(RTC_IRQ, NULL);
-#endif
-		release_region(RTC_PORT(0), RTC_IO_EXTENT);
-		return -ENODEV;
-	}
-#endif
-
 	if (misc_register(&rtc_dev)) {
 #ifdef RTC_IRQ
 		free_irq(RTC_IRQ, NULL);

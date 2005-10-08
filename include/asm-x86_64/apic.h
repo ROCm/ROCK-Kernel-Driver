@@ -113,7 +113,6 @@ extern int disable_timer_pin_1;
 
 #endif /* CONFIG_X86_LOCAL_APIC */
 
-#define esr_disable 0
 extern unsigned boot_cpu_id;
 
 #endif /* __ASM_APIC_H */

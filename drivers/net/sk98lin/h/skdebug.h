@@ -2,8 +2,8 @@
  *
  * Name:	skdebug.h
  * Project:	Gigabit Ethernet Adapters, Common Modules
- * Version:	$Revision: 2.3 $
- * Date:	$Date: 2005/01/25 16:44:28 $
+ * Version:	$Revision: 1.14 $
+ * Date:	$Date: 2003/05/13 17:26:00 $
  * Purpose:	SK specific DEBUG support
  *
  ******************************************************************************/
@@ -11,12 +11,13 @@
 /******************************************************************************
  *
  *	(C)Copyright 1998-2002 SysKonnect.
- *	(C)Copyright 2002-2005 Marvell.
+ *	(C)Copyright 2002-2003 Marvell.
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
  *	the Free Software Foundation; either version 2 of the License, or
  *	(at your option) any later version.
+ *
  *	The information in this file is provided "AS IS" without warranty.
  *
  ******************************************************************************/
@@ -27,9 +28,9 @@
 #ifdef	DEBUG
 #ifndef SK_DBG_MSG
 #define SK_DBG_MSG(pAC,comp,cat,arg) \
-		if ( ((comp) & SK_DBG_CHKMOD(pAC)) &&	\
-		      ((cat) & SK_DBG_CHKCAT(pAC)) ) {	\
-			SK_DBG_PRINTF arg;		\
+		if ( ((comp) & SK_DBG_CHKMOD(pAC)) && 	\
+		      ((cat) & SK_DBG_CHKCAT(pAC)) ) { 	\
+			SK_DBG_PRINTF arg ;		\
 		}
 #endif
 #else
@@ -57,13 +58,6 @@
 #define SK_DBGMOD_ADDR	0x00000080L	/* ADDR module */
 #define SK_DBGMOD_PECP	0x00000100L	/* PECP module */
 #define SK_DBGMOD_POWM	0x00000200L	/* Power Management module */
-#ifdef SK_ASF
-#define SK_DBGMOD_ASF	0x00000400L	/* ASF module */
-#endif
-#ifdef SK_LBFO
-#define SK_DBGMOD_LACP	0x00000800L	/* link aggregation control protocol */
-#define SK_DBGMOD_FD	0x00001000L	/* frame distributor (link aggregation) */
-#endif /* SK_LBFO */
 
 /* Debug events */
 

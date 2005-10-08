@@ -24,7 +24,6 @@
 
 #include <asm/machvec.h>
 #include <asm/page.h>
-#include <asm/segment.h>
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/sal.h>
@@ -499,13 +498,11 @@ pcibios_enable_device (struct pci_dev *dev, int mask)
 	return acpi_pci_irq_enable(dev);
 }
 
-#ifdef CONFIG_ACPI_DEALLOCATE_IRQ
 void
 pcibios_disable_device (struct pci_dev *dev)
 {
 	acpi_pci_irq_disable(dev);
 }
-#endif /* CONFIG_ACPI_DEALLOCATE_IRQ */
 
 void
 pcibios_align_resource (void *data, struct resource *res,

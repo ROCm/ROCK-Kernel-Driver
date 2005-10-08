@@ -56,13 +56,6 @@
 #define access_ok(type,addr,size) \
 	__access_ok(((__force unsigned long)(addr)),(size),get_fs())
 
-/* this function will go away soon - use access_ok() instead */
-static inline int __deprecated verify_area(int type, const void __user *addr, unsigned long size)
-{
-	return access_ok(type,addr,size) ? 0 : -EFAULT;
-}
-
-
 /*
  * The exception table consists of pairs of addresses: the first is the
  * address of an instruction that is allowed to fault, and the second is
@@ -171,7 +164,8 @@ do {									\
 
 #define __get_user_nocheck(x,ptr,size)				\
 ({								\
-	long __gu_err, __gu_val;				\
+	long __gu_err;						\
+	unsigned long __gu_val;					\
 	might_sleep();						\
 	__get_user_size(__gu_val,(ptr),(size),__gu_err,-EFAULT);\
 	(x) = (__typeof__(*(ptr)))__gu_val;			\
@@ -180,7 +174,8 @@ do {									\
 
 #define __get_user_check(x,ptr,size)					\
 ({									\
-	long __gu_err = -EFAULT, __gu_val = 0;				\
+	long __gu_err = -EFAULT;					\
+	unsigned long __gu_val = 0;					\
 	const __typeof__(*(ptr)) __user *__gu_addr = (ptr);		\
 	might_sleep();							\
 	if (access_ok(VERIFY_READ,__gu_addr,size))			\

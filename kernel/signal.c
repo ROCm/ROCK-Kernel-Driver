@@ -25,7 +25,6 @@
 #include <linux/posix-timers.h>
 #include <linux/signal.h>
 #include <linux/audit.h>
-#include <linux/suspend.h>
 #include <asm/param.h>
 #include <asm/uaccess.h>
 #include <asm/unistd.h>
@@ -679,7 +678,7 @@ static int check_kill_permission(int sig, struct siginfo *info,
 
 /* forward decl */
 static void do_notify_parent_cldstop(struct task_struct *tsk,
-				     struct task_struct *parent,
+				     int to_self,
 				     int why);
 
 /*
@@ -730,14 +729,7 @@ static void handle_stop_signal(int sig, struct task_struct *p)
 			p->signal->group_stop_count = 0;
 			p->signal->flags = SIGNAL_STOP_CONTINUED;
 			spin_unlock(&p->sighand->siglock);
-			if (p->ptrace & PT_PTRACED)
-				do_notify_parent_cldstop(p, p->parent,
-							 CLD_STOPPED);
-			else
-				do_notify_parent_cldstop(
-					p->group_leader,
-					p->group_leader->real_parent,
-							 CLD_STOPPED);
+			do_notify_parent_cldstop(p, (p->ptrace & PT_PTRACED), CLD_STOPPED);
 			spin_lock(&p->sighand->siglock);
 		}
 		rm_from_queue(SIG_KERNEL_STOP_MASK, &p->signal->shared_pending);
@@ -778,14 +770,7 @@ static void handle_stop_signal(int sig, struct task_struct *p)
 			p->signal->flags = SIGNAL_STOP_CONTINUED;
 			p->signal->group_exit_code = 0;
 			spin_unlock(&p->sighand->siglock);
-			if (p->ptrace & PT_PTRACED)
-				do_notify_parent_cldstop(p, p->parent,
-							 CLD_CONTINUED);
-			else
-				do_notify_parent_cldstop(
-					p->group_leader,
-					p->group_leader->real_parent,
-							 CLD_CONTINUED);
+			do_notify_parent_cldstop(p, (p->ptrace & PT_PTRACED), CLD_CONTINUED);
 			spin_lock(&p->sighand->siglock);
 		} else {
 			/*
@@ -951,26 +936,23 @@ force_sig_specific(int sig, struct task_struct *t)
  * as soon as they're available, so putting the signal on the shared queue
  * will be equivalent to sending it to one such thread.
  */
-#define wants_signal(sig, p, mask) 			\
-	(!sigismember(&(p)->blocked, sig)		\
-	 && !((p)->state & mask)			\
-	 && !((p)->flags & PF_EXITING)			\
-	 && (task_curr(p) || !signal_pending(p)))
-
+static inline int wants_signal(int sig, struct task_struct *p)
+{
+	if (sigismember(&p->blocked, sig))
+		return 0;
+	if (p->flags & PF_EXITING)
+		return 0;
+	if (sig == SIGKILL)
+		return 1;
+	if (p->state & (TASK_STOPPED | TASK_TRACED))
+		return 0;
+	return task_curr(p) || !signal_pending(p);
+}
 
 static void
 __group_complete_signal(int sig, struct task_struct *p)
 {
-	unsigned int mask;
 	struct task_struct *t;
-
-	/*
-	 * Don't bother traced and stopped tasks (but
-	 * SIGKILL will punch through that).
-	 */
-	mask = TASK_STOPPED | TASK_TRACED;
-	if (sig == SIGKILL)
-		mask = 0;
 
 	/*
 	 * Now find a thread we can wake up to take the signal off the queue.
@@ -978,7 +960,7 @@ __group_complete_signal(int sig, struct task_struct *p)
 	 * If the main thread wants the signal, it gets first crack.
 	 * Probably the least surprising to the average bear.
 	 */
-	if (wants_signal(sig, p, mask))
+	if (wants_signal(sig, p))
 		t = p;
 	else if (thread_group_empty(p))
 		/*
@@ -996,7 +978,7 @@ __group_complete_signal(int sig, struct task_struct *p)
 			t = p->signal->curr_target = p;
 		BUG_ON(t->tgid != p->tgid);
 
-		while (!wants_signal(sig, t, mask)) {
+		while (!wants_signal(sig, t)) {
 			t = next_thread(t);
 			if (t == p->signal->curr_target)
 				/*
@@ -1381,16 +1363,16 @@ send_sigqueue(int sig, struct sigqueue *q, struct task_struct *p)
 	unsigned long flags;
 	int ret = 0;
 
-	/*
-	 * We need the tasklist lock even for the specific
-	 * thread case (when we don't need to follow the group
-	 * lists) in order to avoid races with "p->sighand"
-	 * going away or changing from under us.
-	 */
 	BUG_ON(!(q->flags & SIGQUEUE_PREALLOC));
-	read_lock(&tasklist_lock);  
+	read_lock(&tasklist_lock);
+
+	if (unlikely(p->flags & PF_EXITING)) {
+		ret = -1;
+		goto out_err;
+	}
+
 	spin_lock_irqsave(&p->sighand->siglock, flags);
-	
+
 	if (unlikely(!list_empty(&q->list))) {
 		/*
 		 * If an SI_TIMER entry is already queue just increment
@@ -1400,7 +1382,7 @@ send_sigqueue(int sig, struct sigqueue *q, struct task_struct *p)
 			BUG();
 		q->info.si_overrun++;
 		goto out;
-	} 
+	}
 	/* Short-circuit ignored signals.  */
 	if (sig_ignored(p, sig)) {
 		ret = 1;
@@ -1415,8 +1397,10 @@ send_sigqueue(int sig, struct sigqueue *q, struct task_struct *p)
 
 out:
 	spin_unlock_irqrestore(&p->sighand->siglock, flags);
+out_err:
 	read_unlock(&tasklist_lock);
-	return(ret);
+
+	return ret;
 }
 
 int
@@ -1543,13 +1527,19 @@ void do_notify_parent(struct task_struct *tsk, int sig)
 	spin_unlock_irqrestore(&psig->siglock, flags);
 }
 
-static void
-do_notify_parent_cldstop(struct task_struct *tsk, struct task_struct *parent,
-			 int why)
+static void do_notify_parent_cldstop(struct task_struct *tsk, int to_self, int why)
 {
 	struct siginfo info;
 	unsigned long flags;
+	struct task_struct *parent;
 	struct sighand_struct *sighand;
+
+	if (to_self)
+		parent = tsk->parent;
+	else {
+		tsk = tsk->group_leader;
+		parent = tsk->real_parent;
+	}
 
 	info.si_signo = SIGCHLD;
 	info.si_errno = 0;
@@ -1619,8 +1609,7 @@ static void ptrace_stop(int exit_code, int nostop_code, siginfo_t *info)
 		   !(current->ptrace & PT_ATTACHED)) &&
 	    (likely(current->parent->signal != current->signal) ||
 	     !unlikely(current->signal->flags & SIGNAL_GROUP_EXIT))) {
-		do_notify_parent_cldstop(current, current->parent,
-					 CLD_TRAPPED);
+		do_notify_parent_cldstop(current, 1, CLD_TRAPPED);
 		read_unlock(&tasklist_lock);
 		schedule();
 	} else {
@@ -1669,25 +1658,25 @@ void ptrace_notify(int exit_code)
 static void
 finish_stop(int stop_count)
 {
+	int to_self;
+
 	/*
 	 * If there are no other threads in the group, or if there is
 	 * a group stop in progress and we are the last to stop,
 	 * report to the parent.  When ptraced, every thread reports itself.
 	 */
-	if (stop_count < 0 || (current->ptrace & PT_PTRACED)) {
-		read_lock(&tasklist_lock);
-		do_notify_parent_cldstop(current, current->parent,
-					 CLD_STOPPED);
-		read_unlock(&tasklist_lock);
-	}
-	else if (stop_count == 0) {
-		read_lock(&tasklist_lock);
-		do_notify_parent_cldstop(current->group_leader,
-					 current->group_leader->real_parent,
-					 CLD_STOPPED);
-		read_unlock(&tasklist_lock);
-	}
+	if (stop_count < 0 || (current->ptrace & PT_PTRACED))
+		to_self = 1;
+	else if (stop_count == 0)
+		to_self = 0;
+	else
+		goto out;
 
+	read_lock(&tasklist_lock);
+	do_notify_parent_cldstop(current, to_self, CLD_STOPPED);
+	read_unlock(&tasklist_lock);
+
+out:
 	schedule();
 	/*
 	 * Now we don't run again until continued.
@@ -1774,7 +1763,8 @@ do_signal_stop(int signr)
 				 * stop is always done with the siglock held,
 				 * so this check has no races.
 				 */
-				if (t->state < TASK_STOPPED) {
+				if (!t->exit_state &&
+				    !(t->state & (TASK_STOPPED|TASK_TRACED))) {
 					stop_count++;
 					signal_wake_up(t, 0);
 				}
@@ -2229,8 +2219,7 @@ sys_rt_sigtimedwait(const sigset_t __user *uthese,
 			recalc_sigpending();
 			spin_unlock_irq(&current->sighand->siglock);
 
-			current->state = TASK_INTERRUPTIBLE;
-			timeout = schedule_timeout(timeout);
+			timeout = schedule_timeout_interruptible(timeout);
 
 			try_to_freeze();
 			spin_lock_irq(&current->sighand->siglock);
@@ -2253,8 +2242,6 @@ sys_rt_sigtimedwait(const sigset_t __user *uthese,
 		if (timeout)
 			ret = -EINTR;
 	}
-	if (current->flags & PF_FREEZE)
-		refrigerator();
 
 	return ret;
 }
@@ -2674,52 +2661,3 @@ void __init signals_init(void)
 				  __alignof__(struct sigqueue),
 				  SLAB_PANIC, NULL, NULL);
 }
-
-#ifdef CONFIG_KDB
-#include <linux/kdb.h>
-/*
- * kdb_send_sig_info
- *
- *	Allows kdb to send signals without exposing signal internals.
- *
- * Inputs:
- *	t	task
- *	siginfo	signal information
- *	seqno	current kdb sequence number (avoid including kdbprivate.h)
- * Outputs:
- *	None.
- * Returns:
- *	None.
- * Locking:
- *	Checks if the required locks are available before calling the main
- *	signal code, to avoid kdb deadlocks.
- * Remarks:
- */
-void
-kdb_send_sig_info(struct task_struct *t, struct siginfo *info, int seqno)
-{
-	static struct task_struct *kdb_prev_t;
-	static int kdb_prev_seqno;
-	int sig, new_t;
-	if (!spin_trylock(&t->sighand->siglock)) {
-		kdb_printf("Can't do kill command now.\n"
-			"The sigmask lock is held somewhere else in kernel, try again later\n");
-		return;
-	}
-	spin_unlock(&t->sighand->siglock);
-	new_t = kdb_prev_t != t || kdb_prev_seqno != seqno;
-	kdb_prev_t = t;
-	kdb_prev_seqno = seqno;
-	if (t->state != TASK_RUNNING && new_t) {
-		kdb_printf("Process is not RUNNING, sending a signal from kdb risks deadlock\n"
-			   "on the run queue locks.  The signal has _not_ been sent.\n"
-			   "Reissue the kill command if you want to risk the deadlock.\n");
-		return;
-	}
-	sig = info->si_signo;
-	if (send_sig_info(sig, info, t))
-		kdb_printf("Fail to deliver Signal %d to process %d.\n", sig, t->pid);
-	else
-		kdb_printf("Signal %d is sent to process %d.\n", sig, t->pid);
-}
-#endif	/* CONFIG_KDB */

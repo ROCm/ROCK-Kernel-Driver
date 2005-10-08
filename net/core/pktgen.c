@@ -186,7 +186,7 @@
 
 /* Used to help with determining the pkts on receive */
 #define PKTGEN_MAGIC 0xbe9be955
-#define PG_PROC_DIR "pktgen"
+#define PG_PROC_DIR "net/pktgen"
 
 #define MAX_CFLOWS  65536
 
@@ -503,7 +503,7 @@ static int pg_delay_d = 0;
 static int pg_clone_skb_d = 0;
 static int debug = 0;
 
-static spinlock_t _thread_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(_thread_lock);
 static struct pktgen_thread *pktgen_threads = NULL;
 
 static char module_fname[128];
@@ -1452,8 +1452,7 @@ static int proc_thread_write(struct file *file, const char __user *user_buffer,
 		thread_lock();
 		t->control |= T_REMDEV;
 		thread_unlock();
-		current->state = TASK_INTERRUPTIBLE;
-		schedule_timeout(HZ/8);  /* Propagate thread->control  */
+		schedule_timeout_interruptible(msecs_to_jiffies(125));  /* Propagate thread->control  */
 		ret = count;
                 sprintf(pg_result, "OK: rem_device_all");
 		goto out;
@@ -1477,18 +1476,7 @@ static int proc_thread_write(struct file *file, const char __user *user_buffer,
 
 static int create_proc_dir(void)
 {
-        int     len;
-        /*  does proc_dir already exists */
-        len = strlen(PG_PROC_DIR);
-
-        for (pg_proc_dir = proc_net->subdir; pg_proc_dir; pg_proc_dir=pg_proc_dir->next) {
-                if ((pg_proc_dir->namelen == len) &&
-		    (! memcmp(pg_proc_dir->name, PG_PROC_DIR, len))) 
-                        break;
-        }
-        
-        if (!pg_proc_dir) 
-                pg_proc_dir = create_proc_entry(PG_PROC_DIR, S_IFDIR, proc_net);
+	pg_proc_dir = proc_mkdir(PG_PROC_DIR, NULL);
         
         if (!pg_proc_dir) 
                 return -ENODEV;
@@ -1498,7 +1486,7 @@ static int create_proc_dir(void)
 
 static int remove_proc_dir(void)
 {
-        remove_proc_entry(PG_PROC_DIR, proc_net);
+        remove_proc_entry(PG_PROC_DIR, NULL);
         return 0;
 }
 
@@ -1716,10 +1704,9 @@ static void spin(struct pktgen_dev *pkt_dev, __u64 spin_until_us)
 	printk(KERN_INFO "sleeping for %d\n", (int)(spin_until_us - now));
 	while (now < spin_until_us) {
 		/* TODO: optimise sleeping behavior */
-		if (spin_until_us - now > (1000000/HZ)+1) {
-			current->state = TASK_INTERRUPTIBLE;
-			schedule_timeout(1);
-		} else if (spin_until_us - now > 100) {
+		if (spin_until_us - now > jiffies_to_usecs(1)+1)
+			schedule_timeout_interruptible(1);
+		else if (spin_until_us - now > 100) {
 			do_softirq();
 			if (!pkt_dev->running)
 				return;
@@ -2449,8 +2436,7 @@ static void pktgen_run_all_threads(void)
 	}
 	thread_unlock();
 
-	current->state = TASK_INTERRUPTIBLE;
-	schedule_timeout(HZ/8);  /* Propagate thread->control  */
+	schedule_timeout_interruptible(msecs_to_jiffies(125));  /* Propagate thread->control  */
 			
 	pktgen_wait_all_threads_run();
 }
@@ -2911,7 +2897,7 @@ static int pktgen_add_device(struct pktgen_thread *t, const char* ifname)
                 pkt_dev->udp_dst_max = 9;
 
                 strncpy(pkt_dev->ifname, ifname, 31);
-                sprintf(pkt_dev->fname, "net/%s/%s", PG_PROC_DIR, ifname);
+                sprintf(pkt_dev->fname, "%s/%s", PG_PROC_DIR, ifname);
 
                 if (! pktgen_setup_dev(pkt_dev)) {
                         printk("pktgen: ERROR: pktgen_setup_dev failed.\n");
@@ -2984,7 +2970,7 @@ static int pktgen_create_thread(const char* name, int cpu)
         spin_lock_init(&t->if_lock);
 	t->cpu = cpu;
         
-        sprintf(t->fname, "net/%s/%s", PG_PROC_DIR, t->name);
+        sprintf(t->fname, "%s/%s", PG_PROC_DIR, t->name);
         t->proc_ent = create_proc_entry(t->fname, 0600, NULL);
         if (!t->proc_ent) {
                 printk("pktgen: cannot create %s procfs entry.\n", t->fname);
@@ -3067,7 +3053,7 @@ static int __init pg_init(void)
 
 	create_proc_dir();
 
-        sprintf(module_fname, "net/%s/pgctrl", PG_PROC_DIR);
+        sprintf(module_fname, "%s/pgctrl", PG_PROC_DIR);
         module_proc_ent = create_proc_entry(module_fname, 0600, NULL);
         if (!module_proc_ent) {
                 printk("pktgen: ERROR: cannot create %s procfs entry.\n", module_fname);

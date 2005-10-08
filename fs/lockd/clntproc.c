@@ -207,7 +207,7 @@ nlmclnt_proc(struct inode *inode, int cmd, struct file_lock *fl)
 	/* Retrieve transport protocol from NFS client */
 	proto = NFS_CLIENT(inode)->cl_xprt->prot;
 
-	if (!(host = nlmclnt_lookup_host(NFS_ADDR(inode), proto, vers, nfssrv->hostname)))
+	if (!(host = nlmclnt_lookup_host(NFS_ADDR(inode), proto, vers)))
 		return -ENOLCK;
 
 	/* Create RPC client handle if not there, and copy soft
@@ -299,8 +299,7 @@ nlmclnt_alloc_call(void)
 			return call;
 		}
 		printk("nlmclnt_alloc_call: failed, waiting for memory\n");
-		current->state = TASK_INTERRUPTIBLE;
-		schedule_timeout(5*HZ);
+		schedule_timeout_interruptible(5*HZ);
 	}
 	return NULL;
 }
@@ -557,7 +556,7 @@ nlmclnt_lock(struct nlm_rqst *req, struct file_lock *fl)
 	long timeout;
 	int status;
 
-	if (nsm_monitor(host) < 0) {
+	if (!host->h_monitored && nsm_monitor(host) < 0) {
 		printk(KERN_NOTICE "lockd: failed to monitor %s\n",
 					host->h_name);
 		status = -ENOLCK;

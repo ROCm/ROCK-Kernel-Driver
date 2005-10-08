@@ -40,30 +40,17 @@ MODULE_LICENSE("GPL");
 #define DEBUGP(format, args...)
 #endif
 
-static int maybe_reroute(struct sk_buff *skb)
-{
-	if (skb->nfcache & NFC_ALTERED){
-		if (ip6_route_me_harder(skb) != 0){
-			kfree_skb(skb);
-			return -EINVAL;
-		}
-	}
-
-	return dst_output(skb);
-}
-
 /* Send RST reply */
 static void send_reset(struct sk_buff *oldskb)
 {
 	struct sk_buff *nskb;
 	struct tcphdr otcph, *tcph;
-	unsigned int otcplen, tcphoff, hh_len;
-	int needs_ack;
+	unsigned int otcplen, hh_len;
+	int tcphoff, needs_ack;
 	struct ipv6hdr *oip6h = oldskb->nh.ipv6h, *ip6h;
 	struct dst_entry *dst = NULL;
 	u8 proto;
 	struct flowi fl;
-	int err;
 
 	if ((!(ipv6_addr_type(&oip6h->saddr) & IPV6_ADDR_UNICAST)) ||
 	    (!(ipv6_addr_type(&oip6h->daddr) & IPV6_ADDR_UNICAST))) {
@@ -72,8 +59,7 @@ static void send_reset(struct sk_buff *oldskb)
 	}
 
 	proto = oip6h->nexthdr;
-	tcphoff = ipv6_skip_exthdr(oldskb, ((u8*)(oip6h+1) - oldskb->data),
-				   &proto);
+	tcphoff = ipv6_skip_exthdr(oldskb, ((u8*)(oip6h+1) - oldskb->data), &proto);
 
 	if ((tcphoff < 0) || (tcphoff > oldskb->len)) {
 		DEBUGP("ip6t_REJECT: Can't get TCP header.\n");
@@ -89,11 +75,8 @@ static void send_reset(struct sk_buff *oldskb)
 		return;
 	}
 
-	if (skb_copy_bits(oldskb, tcphoff, &otcph, sizeof(struct tcphdr))) {
-		if (net_ratelimit())
-			printk("ip6t_REJECT: Can't copy tcp header\n");
-		return;
-	}
+	if (skb_copy_bits(oldskb, tcphoff, &otcph, sizeof(struct tcphdr)))
+		BUG();
 
 	/* No RST for RST. */
 	if (otcph.rst) {
@@ -114,17 +97,11 @@ static void send_reset(struct sk_buff *oldskb)
 	ipv6_addr_copy(&fl.fl6_dst, &oip6h->saddr);
 	fl.fl_ip_sport = otcph.dest;
 	fl.fl_ip_dport = otcph.source;
-	err = ip6_dst_lookup(NULL, &dst, &fl);
-	if (err) {
-		if (net_ratelimit())
-			printk("ip6t_REJECT: can't find dst. err = %d\n", err);
+	dst = ip6_route_output(NULL, &fl);
+	if (dst == NULL)
 		return;
-	}
-
-	if (xfrm_lookup(&dst, &fl, NULL, 0)) {
-		dst_release(dst);
+	if (dst->error || xfrm_lookup(&dst, &fl, NULL, 0))
 		return;
-	}
 
 	hh_len = (dst->dev->hard_header_len + 15)&~15;
 	nskb = alloc_skb(hh_len + 15 + dst->header_len + sizeof(struct ipv6hdr)
@@ -184,7 +161,7 @@ static void send_reset(struct sk_buff *oldskb)
 						   sizeof(struct tcphdr), 0));
 
 	NF_HOOK(PF_INET6, NF_IP6_LOCAL_OUT, nskb, NULL, nskb->dst->dev,
-		maybe_reroute);
+		dst_output);
 }
 
 static inline void

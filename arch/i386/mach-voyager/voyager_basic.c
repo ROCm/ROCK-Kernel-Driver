@@ -27,7 +27,6 @@
 #include <asm/voyager.h>
 #include <asm/vic.h>
 #include <linux/pm.h>
-#include <linux/irq.h>
 #include <asm/tlbflush.h>
 #include <asm/arch_hooks.h>
 #include <asm/i8253.h>
@@ -234,10 +233,9 @@ voyager_power_off(void)
 #endif
 	}
 	/* and wait for it to happen */
-	for(;;) {
-		__asm("cli");
-		__asm("hlt");
-	}
+	local_irq_disable();
+	for(;;)
+		halt();
 }
 
 /* copied from process.c */
@@ -278,10 +276,9 @@ machine_restart(char *cmd)
 		outb(basebd | 0x08, VOYAGER_MC_SETUP);
 		outb(0x02, catbase + 0x21);
 	}
-	for(;;) {
-		asm("cli");
-		asm("hlt");
-	}
+	local_irq_disable();
+	for(;;)
+		halt();
 }
 
 void

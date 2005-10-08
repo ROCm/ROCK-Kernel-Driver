@@ -421,11 +421,6 @@ int setup_arg_pages(struct linux_binprm *bprm,
 	if (!mpnt)
 		return -ENOMEM;
 
-	if (security_vm_enough_memory(arg_size >> PAGE_SHIFT)) {
-		kmem_cache_free(vm_area_cachep, mpnt);
-		return -ENOMEM;
-	}
-
 	memset(mpnt, 0, sizeof(*mpnt));
 
 	down_write(&mm->mmap_sem);
@@ -797,6 +792,7 @@ no_thread_group:
 static inline void flush_old_files(struct files_struct * files)
 {
 	long j = -1;
+	struct fdtable *fdt;
 
 	spin_lock(&files->file_lock);
 	for (;;) {
@@ -804,12 +800,13 @@ static inline void flush_old_files(struct files_struct * files)
 
 		j++;
 		i = j * __NFDBITS;
-		if (i >= files->max_fds || i >= files->max_fdset)
+		fdt = files_fdtable(files);
+		if (i >= fdt->max_fds || i >= fdt->max_fdset)
 			break;
-		set = files->close_on_exec->fds_bits[j];
+		set = fdt->close_on_exec->fds_bits[j];
 		if (!set)
 			continue;
-		files->close_on_exec->fds_bits[j] = 0;
+		fdt->close_on_exec->fds_bits[j] = 0;
 		spin_unlock(&files->file_lock);
 		for ( ; set ; i++,set >>= 1) {
 			if (set & 1) {

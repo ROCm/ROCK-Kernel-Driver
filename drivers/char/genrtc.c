@@ -504,27 +504,12 @@ static struct miscdevice rtc_gen_dev =
 static int __init rtc_generic_init(void)
 {
 	int retval;
-#ifdef CONFIG_XEN
-	struct rtc_time tm;
-	unsigned int flags;
-#endif
 
 	printk(KERN_INFO "Generic RTC Driver v%s\n", RTC_VERSION);
 
 	retval = misc_register(&rtc_gen_dev);
 	if (retval < 0)
 		return retval;
-
-#ifdef CONFIG_XEN
-	/* If we just read 0xff from the ioports,
-	 * the RTC is disfunctional */
-	flags = get_rtc_time(&tm);
-	if (tm.tm_year == 165 || tm.tm_year == 255) {
-		printk(KERN_WARNING "genrtc: Got 0xff, disable\n");
-		misc_deregister(&rtc_gen_dev);
-		return -ENODEV;
-	}
-#endif
 
 	retval = gen_rtc_proc_init();
 	if (retval) {

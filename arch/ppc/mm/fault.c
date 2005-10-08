@@ -95,7 +95,7 @@ static int store_updates_sp(struct pt_regs *regs)
 int do_page_fault(struct pt_regs *regs, unsigned long address,
 		  unsigned long error_code)
 {
-	struct vm_area_struct * vma, * prev_vma;
+	struct vm_area_struct * vma;
 	struct mm_struct *mm = current->mm;
 	siginfo_t info;
 	int code = SEGV_MAPERR;
@@ -175,8 +175,7 @@ int do_page_fault(struct pt_regs *regs, unsigned long address,
 		    && (!user_mode(regs) || !store_updates_sp(regs)))
 			goto bad_area;
 	}
-	find_vma_prev(mm, address, &prev_vma);
-	if (expand_stack(vma, address, prev_vma))
+	if (expand_stack(vma, address))
 		goto bad_area;
 
 good_area:
@@ -279,11 +278,7 @@ bad_area:
 
 	/* User mode accesses cause a SIGSEGV */
 	if (user_mode(regs)) {
-		info.si_signo = SIGSEGV;
-		info.si_errno = 0;
-		info.si_code = code;
-		info.si_addr = (void __user *) address;
-		force_sig_info(SIGSEGV, &info, current);
+		_exception(SIGSEGV, regs, code, address);
 		return 0;
 	}
 

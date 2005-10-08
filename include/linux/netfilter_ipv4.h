@@ -7,9 +7,9 @@
 
 #include <linux/config.h>
 #include <linux/netfilter.h>
-#include <linux/netdevice.h>
-#include <net/protocol.h>
 
+/* only for userspace compatibility */
+#ifndef __KERNEL__
 /* IP Cache bits. */
 /* Src IP address. */
 #define NFC_IP_SRC		0x0001
@@ -37,6 +37,7 @@
 #define NFC_IP_DST_PT		0x0400
 /* Something else about the proto */
 #define NFC_IP_PROTO_UNKNOWN	0x2000
+#endif /* ! __KERNEL__ */
 
 /* IP Hooks */
 /* After promisc drops, checksum checks. */
@@ -79,63 +80,6 @@ enum nf_ip_hook_priorities {
 #ifdef __KERNEL__
 extern int ip_route_me_harder(struct sk_buff **pskb);
 
-/* Call this before modifying an existing IP packet: ensures it is
-   modifiable and linear to the point you care about (writable_len).
-   Returns true or false. */
-extern int skb_ip_make_writable(struct sk_buff **pskb,
-				unsigned int writable_len);
-
-#if defined(CONFIG_XFRM) && defined(CONFIG_NETFILTER)
-#include <net/route.h>
-#include <net/xfrm.h>
-
-static inline int nf_hook_input_cond(struct sk_buff *skb)
-{
-	return !skb->sp || skb->sp->decap_done;
-}
-
-static inline int
-nf_xfrm_local_done(struct sk_buff *skb, struct net_protocol *ipprot)
-{
-	return skb->sp && !skb->sp->decap_done
-	       && (!ipprot || !ipprot->xfrm_prot);
-}
-
-static inline int nf_xfrm_nonlocal_done(struct sk_buff *skb)
-{
-	return skb->sp && !skb->sp->decap_done
-	       && !(((struct rtable *)skb->dst)->rt_flags & RTCF_LOCAL);
-}
-
-extern int nf_rcv_postxfrm_local(struct sk_buff *skb);
-extern int nf_rcv_postxfrm_nonlocal(struct sk_buff *skb);
-#else /* CONFIG_XFRM */
-static inline int nf_hook_input_cond(struct sk_buff *skb)
-{
-	return 1;
-}
-
-static inline int
-nf_xfrm_local_done(struct sk_buff *skb, struct net_protocol *ipprot)
-{
-	return 0;
-}
-
-static inline int nf_xfrm_nonlocal_done(struct sk_buff *skb)
-{
-	return 0;
-}
-
-static inline int nf_rcv_postxfrm_local(struct sk_buff *skb)
-{
-	return 0;
-}
-
-static inline int nf_rcv_postxfrm_nonlocal(struct sk_buff *skb)
-{
-	return 0; 
-}
-#endif /* CONFIG_XFRM */
 #endif /*__KERNEL__*/
 
 #endif /*__LINUX_IP_NETFILTER_H*/

@@ -199,7 +199,7 @@ good_area:
 
 check_expansion:
 	vma = prev_vma;
-	if (vma && (expand_stack(vma, address, NULL) == 0))
+	if (vma && (expand_stack(vma, address) == 0))
 		goto good_area;
 
 /*

@@ -100,17 +100,8 @@ kernel_install: vmlinux
 
 install: kernel_install modules_install
 
-prepare: include/asm-parisc/offsets.h
-
-arch/parisc/kernel/asm-offsets.s: $(objtree)/include/asm \
-				  $(objtree)/include/linux/version.h \
-				  include/config/MARKER
-
-include/asm-parisc/offsets.h: arch/parisc/kernel/asm-offsets.s
-	$(call filechk,gen-asm-offsets)
-
 CLEAN_FILES	+= lifimage
-MRPROPER_FILES	+= palo.conf include/asm-parisc/offsets.h
+MRPROPER_FILES	+= palo.conf
 
 define archhelp
 	@echo  '* vmlinux	- Uncompressed kernel image (./vmlinux)'

@@ -10,13 +10,16 @@ menu "IPv6: Netfilter Configuration (EXPERIMENTAL)"
 #  dep_tristate '  FTP protocol support' CONFIG_IP6_NF_FTP $CONFIG_IP6_NF_CONNTRACK
 #fi
 config IP6_NF_QUEUE
-	tristate "Userspace queueing via NETLINK"
+	tristate "IP6 Userspace queueing via NETLINK (OBSOLETE)"
 	---help---
 
 	  This option adds a queue handler to the kernel for IPv6
-	  packets which lets us to receive the filtered packets
-	  with QUEUE target using libiptc as we can do with
-	  the IPv4 now.
+	  packets which enables users to receive the filtered packets
+	  with QUEUE target using libipq.
+
+	  THis option enables the old IPv6-only "ip6_queue" implementation
+	  which has been obsoleted by the new "nfnetlink_queue" code (see
+	  CONFIG_NETFILTER_NETLINK_QUEUE).
 
 	  (C) Fernando Anton 2001
 	  IPv64 Project - Work based in IPv64 draft by Arturo Azcorra.
@@ -111,16 +114,6 @@ config IP6_NF_MATCH_OWNER
 
 	  To compile it as a module, choose M here.  If unsure, say N.
 
-config IP6_NF_MATCH_POLICY
-	tristate "IPsec policy match support"
-	depends on IP6_NF_IPTABLES && XFRM
-	help
-	  Policy matching allows you to match packets based on the
-	  IPsec policy that was used during decapsulation/will
-	  be used during encapsulation.
-
-	  To compile it as a module, choose M here.  If unsure, say N.
-
 #  dep_tristate '  MAC address match support' CONFIG_IP6_NF_MATCH_MAC $CONFIG_IP6_NF_IPTABLES
 config IP6_NF_MATCH_MARK
 	tristate "netfilter MARK match support"
@@ -207,15 +200,25 @@ config IP6_NF_TARGET_LOG
 	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP6_NF_TARGET_REJECT
-	tristate  'REJECT target support'
+	tristate "REJECT target support"
 	depends on IP6_NF_FILTER
 	help
 	  The REJECT target allows a filtering rule to specify that an ICMPv6
 	  error should be issued in response to an incoming packet, rather
 	  than silently being dropped.
-	
-	  If you want to compile it as a module, say M here and read
-	  Documentation/modules.txt.  If unsure, say `N'.
+
+	  To compile it as a module, choose M here.  If unsure, say N.
+
+config IP6_NF_TARGET_NFQUEUE
+	tristate "NFQUEUE Target Support"
+	depends on IP_NF_IPTABLES
+	help
+	  This Target replaced the old obsolete QUEUE target.
+
+	  As opposed to QUEUE, it supports 65535 different queues,
+	  not just one.
+
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 #  if [ "$CONFIG_IP6_NF_FILTER" != "n" ]; then
 #    dep_tristate '    REJECT target support' CONFIG_IP6_NF_TARGET_REJECT $CONFIG_IP6_NF_FILTER
@@ -247,6 +250,22 @@ config IP6_NF_TARGET_MARK
 
 	  To compile it as a module, choose M here.  If unsure, say N.
 
+config IP6_NF_TARGET_HL
+	tristate  'HL (hoplimit) target support'
+	depends on IP6_NF_MANGLE
+	help
+	  This option adds a `HL' target, which enables the user to decrement
+	  the hoplimit value of the IPv6 header or set it to a given (lower)
+	  value.
+	
+	  While it is safe to decrement the hoplimit value, this option also
+	  enables functionality to increment and set the hoplimit value of the
+	  IPv6 header to arbitrary values.  This is EXTREMELY DANGEROUS since
+	  you can easily create immortal packets that loop forever on the
+	  network.  
+
+	  To compile it as a module, choose M here.  If unsure, say N.
+
 #dep_tristate '  LOG target support' CONFIG_IP6_NF_TARGET_LOG $CONFIG_IP6_NF_IPTABLES
 config IP6_NF_RAW
 	tristate  'raw table support (required for TRACE)'
@@ -258,20 +277,6 @@ config IP6_NF_RAW
 	
 	  If you want to compile it as a module, say M here and read
 	  <file:Documentation/modules.txt>.  If unsure, say `N'.
-
-config NF_CONNTRACK_IPV6
-	tristate "IPv6 support on new connection tracking (EXPERIMENTAL)"
-	depends on EXPERIMENTAL && NF_CONNTRACK
-	---help---
-	  Connection tracking keeps a record of what packets have passed
-	  through your machine, in order to figure out how they are related
-	  into connections.
-
-	  This is IPv6 support on Layer 3 independent connection tracking.
-	  Layer 3 independent connection tracking is experimental scheme
-	  which generalize ip_conntrack to support other layer 3 protocols.
-
-	  To compile it as a module, choose M here.  If unsure, say N.
 
 endmenu
 

@@ -1,5 +1,11 @@
 menu "SCSI device support"
 
+config RAID_ATTRS
+	tristate "RAID Transport Class"
+	default n
+	---help---
+	  Provides RAID
+
 config SCSI
 	tristate "SCSI device support"
 	---help---
@@ -223,52 +229,18 @@ config SCSI_FC_ATTRS
 
 config SCSI_ISCSI_ATTRS
 	tristate "iSCSI Transport Attributes"
-	depends on SCSI && NET
+	depends on SCSI
 	help
 	  If you wish to export transport-specific information about
 	  each attached iSCSI device to sysfs, say Y.
 	  Otherwise, say N.
 
-config ISCSI_TCP
-	tristate "iSCSI Initiator over TCP/IP"
-	depends on SCSI && INET && SCSI_ISCSI_ATTRS
-	select CRYPTO
-	select CRYPTO_MD5
-	select CRYPTO_CRC32C
+config SCSI_SAS_ATTRS
+	tristate "SAS Transport Attributes"
+	depends on SCSI
 	help
-	 The iSCSI Driver provides a host with the ability to access storage
-	 through an IP network. The driver uses the iSCSI protocol to transport
-	 SCSI requests and responses over a TCP/IP network between the host
-	 (the "initiator") and "targets".  Architecturally, the iSCSI driver
-	 combines with the host's TCP/IP stack, network drivers, and Network
-	 Interface Card (NIC) to provide the same functions as a SCSI or a
-	 Fibre Channel (FC) adapter driver with a Host Bus Adapter (HBA).
-
-	 To compile this driver as a module, choose M here: the
-	 module will be called iscsi_tcp.
-
-	 The userspace component needed to initialize the driver, documentation,
-	 and sample configuration files can be found here:
-
-	 http://linux-iscsi.sf.net
-
-config ISCSI_TARGET
-	tristate "iSCSI Target over TCP/IP"
-	depends on SCSI && INET
-	help
-	 The iSCSI Enterprise Target is an open source iSCSI target
-	 with professional features. It is aimed at working well in
-	 enterprise environment under real workload, and is scalable
-	 and versatile enough to meet the challenge of future storage
-	 needs and developements.
-
-	 To compile this driver as a module, choose M here: the
-	 module will be called iscsi_trgt.
-
-	 The userspace component needed to initialize the driver, documentation,
-	 and sample configuration files can be found here:
-
-	 http://iscsitarget.sf.net
+	  If you wish to export transport-specific information about
+	  each attached SAS device to sysfs, say Y.
 
 endmenu
 
@@ -291,7 +263,7 @@ config SCSI_DECNCR
 
 config SCSI_DECSII
 	tristate "DEC SII Scsi Driver"
-	depends on MACH_DECSTATION && SCSI && MIPS32
+	depends on MACH_DECSTATION && SCSI && 32BIT
 
 config BLK_DEV_3W_XXXX_RAID
 	tristate "3ware 5/6/7/8xxx ATA-RAID support"
@@ -497,6 +469,15 @@ config SCSI_ATA_PIIX
 	  This option enables support for ICH5 Serial ATA.
 	  If PATA support was enabled previously, this enables
 	  support for select Intel PIIX/ICH PATA host controllers.
+
+	  If unsure, say N.
+
+config SCSI_SATA_MV
+	tristate "Marvell SATA support"
+	depends on SCSI_SATA && PCI && EXPERIMENTAL
+	help
+	  This option enables support for the Marvell Serial ATA family.
+	  Currently supports 88SX[56]0[48][01] chips.
 
 	  If unsure, say N.
 
@@ -1358,8 +1339,6 @@ config SCSI_LPFC
 	help
           This lpfc driver supports the Emulex LightPulse
           Family of Fibre Channel PCI host adapters.
-
-source "drivers/scsi/qla4xxx/Kconfig"
 
 config SCSI_SEAGATE
 	tristate "Seagate ST-02 and Future Domain TMC-8xx SCSI support"

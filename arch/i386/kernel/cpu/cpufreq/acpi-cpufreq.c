@@ -167,37 +167,38 @@ acpi_processor_set_performance (
 
 	/*
 	 * Assume the write went through when acpi_pstate_strict is not used.
-	 * As read status_register is an expensive operation and there
+	 * As read status_register is an expensive operation and there 
 	 * are no specific error cases where an IO port write will fail.
 	 */
-   if (acpi_pstate_strict) {
-	/*
-	 * Then we read the 'status_register' and compare the value with the
-	 * target state's 'status' to make sure the transition was successful.
-	 * Note that we'll poll for up to 1ms (100 cycles of 10us) before
-	 * giving up.
-	 */
+	if (acpi_pstate_strict) {
+		/* Then we read the 'status_register' and compare the value 
+		 * with the target state's 'status' to make sure the 
+		 * transition was successful.
+		 * Note that we'll poll for up to 1ms (100 cycles of 10us) 
+		 * before giving up.
+		 */
 
-	port = data->acpi_data.status_register.address;
-	bit_width = data->acpi_data.status_register.bit_width;
+		port = data->acpi_data.status_register.address;
+		bit_width = data->acpi_data.status_register.bit_width;
 
-	dprintk("Looking for 0x%08x from port 0x%04x\n",
-		(u32) data->acpi_data.states[state].status, port);
+		dprintk("Looking for 0x%08x from port 0x%04x\n",
+			(u32) data->acpi_data.states[state].status, port);
 
-	for (i=0; i<100; i++) {
-		ret = acpi_processor_read_port(port, bit_width, &value);
-		if (ret) {	
-			dprintk("Invalid port width 0x%04x\n", bit_width);
-			retval = ret;
-			goto migrate_end;
+		for (i=0; i<100; i++) {
+			ret = acpi_processor_read_port(port, bit_width, &value);
+			if (ret) {	
+				dprintk("Invalid port width 0x%04x\n", bit_width);
+				retval = ret;
+				goto migrate_end;
+			}
+			if (value == (u32) data->acpi_data.states[state].status)
+				break;
+			udelay(10);
 		}
-		if (value == (u32) data->acpi_data.states[state].status)
-			break;
-		udelay(10);
+	} else {
+		i = 0;
+		value = (u32) data->acpi_data.states[state].status;
 	}
-   } else {
-       value = (u32) data->acpi_data.states[state].status;
-   }
 
 	/* notify cpufreq */
 	cpufreq_notify_transition(&cpufreq_freqs, CPUFREQ_POSTCHANGE);

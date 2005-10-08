@@ -66,11 +66,7 @@ extern void path_release(struct nameidata *);
 extern void path_release_on_umount(struct nameidata *);
 
 extern struct dentry * lookup_one_len(const char *, struct dentry *, int);
-extern struct dentry * __lookup_hash(struct qstr *, struct dentry *, struct nameidata *);
-static inline struct dentry * lookup_hash(struct qstr *name, struct dentry *base)
-{
-	return __lookup_hash(name, base, NULL);
-}
+extern struct dentry * lookup_hash(struct qstr *, struct dentry *);
 
 extern int follow_down(struct vfsmount **, struct dentry **);
 extern int follow_up(struct vfsmount **, struct dentry **);

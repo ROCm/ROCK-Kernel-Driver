@@ -48,8 +48,8 @@ static int reiserfs_file_release(struct inode *inode, struct file *filp)
 		return 0;
 	}
 
-	down(&inode->i_sem);
 	reiserfs_write_lock(inode->i_sb);
+	down(&inode->i_sem);
 	/* freeing preallocation only involves relogging blocks that
 	 * are already in the current transaction.  preallocation gets
 	 * freed at the end of each transaction, so it is impossible for
@@ -130,7 +130,7 @@ static int reiserfs_sync_file(struct file *p_s_filp,
 	reiserfs_write_lock(p_s_inode->i_sb);
 	barrier_done = reiserfs_commit_for_inode(p_s_inode);
 	reiserfs_write_unlock(p_s_inode->i_sb);
-	if (barrier_done != 1 && reiserfs_barrier_flush(p_s_inode->i_sb))
+	if (barrier_done != 1)
 		blkdev_issue_flush(p_s_inode->i_sb->s_bdev, NULL);
 	if (barrier_done < 0)
 		return barrier_done;
@@ -859,7 +859,7 @@ static int reiserfs_submit_file_region_for_write(struct reiserfs_transaction_han
 			mark_inode_dirty(inode);
 			reiserfs_write_unlock(inode->i_sb);
 		} else
-			inode->i_sb->s_op->dirty_inode(inode);
+			mark_inode_dirty(inode);
 
 		sd_update = 1;
 	}
@@ -1284,23 +1284,6 @@ static ssize_t reiserfs_file_write(struct file *file,	/* the file we are going t
 	struct page *prepared_pages[REISERFS_WRITE_PAGES_AT_A_TIME];
 	struct reiserfs_transaction_handle th;
 	th.t_trans_id = 0;
-
-	/* If a filesystem is converted from 3.5 to 3.6, we'll have v3.5 items
-	* lying around (most of the disk, in fact). Despite the filesystem
-	* now being a v3.6 format, the old items still can't support large
-	* file sizes. Catch this case here, as the rest of the VFS layer is
-	* oblivious to the different limitations between old and new items.
-	* reiserfs_setattr catches this for truncates. This chunk is lifted
-	* from generic_write_checks. */
-	if (get_inode_item_key_version (inode) == KEY_FORMAT_3_5 && 
-		*ppos + count > MAX_NON_LFS) {
-		if (*ppos >= MAX_NON_LFS) {
-			send_sig(SIGXFSZ, current, 0);
-			return -EFBIG;
-		}
-		if (count > MAX_NON_LFS - (unsigned long)*ppos)
-			count = MAX_NON_LFS - (unsigned long)*ppos;
-	}
 
 	if (file->f_flags & O_DIRECT) {	// Direct IO needs treatment
 		ssize_t result, after_file_end = 0;

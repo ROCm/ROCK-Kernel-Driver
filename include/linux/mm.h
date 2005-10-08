@@ -136,6 +136,7 @@ extern unsigned int kobjsize(const void *objp);
 #define VM_EXEC		0x00000004
 #define VM_SHARED	0x00000008
 
+/* mprotect() hardcodes VM_MAYREAD >> 4 == VM_READ, and so for r/w/x bits. */
 #define VM_MAYREAD	0x00000010	/* limits for mprotect() etc */
 #define VM_MAYWRITE	0x00000020
 #define VM_MAYEXEC	0x00000040
@@ -350,7 +351,8 @@ static inline void put_page(struct page *page)
  * only one copy in memory, at most, normally.
  *
  * For the non-reserved pages, page_count(page) denotes a reference count.
- *   page_count() == 0 means the page is free.
+ *   page_count() == 0 means the page is free. page->lru is then used for
+ *   freelist management in the buddy allocator.
  *   page_count() == 1 means the page is used for exactly one purpose
  *   (e.g. a private data page of one process).
  *
@@ -376,10 +378,8 @@ static inline void put_page(struct page *page)
  * attaches, plus 1 if `private' contains something, plus one for
  * the page cache itself.
  *
- * All pages belonging to an inode are in these doubly linked lists:
- * mapping->clean_pages, mapping->dirty_pages and mapping->locked_pages;
- * using the page->list list_head. These fields are also used for
- * freelist managemet (when page_count()==0).
+ * Instead of keeping dirty/clean pages in per address-space lists, we instead
+ * now tag pages as dirty/under writeback in the radix tree.
  *
  * There is also a per-mapping radix tree mapping index to the page
  * in memory if present. The tree is rooted at mapping->root.  
@@ -759,9 +759,6 @@ struct shrinker;
 extern struct shrinker *set_shrinker(int, shrinker_t);
 extern void remove_shrinker(struct shrinker *shrinker);
 
-extern long do_mprotect(struct mm_struct *mm, unsigned long start,
-			size_t len, unsigned long prot);
-
 /*
  * On a two-level or three-level page table, this ends up being trivial. Thus
  * the inlining and the symmetry break with pte_alloc_map() that does all
@@ -844,15 +841,9 @@ extern int may_expand_vm(struct mm_struct *mm, unsigned long npages);
 
 extern unsigned long get_unmapped_area(struct file *, unsigned long, unsigned long, unsigned long, unsigned long);
 
-extern unsigned long __do_mmap_pgoff(struct mm_struct *mm, struct file *file,
-				   unsigned long addr, unsigned long len,
-				   unsigned long prot, unsigned long flag,
-				   unsigned long pgoff);
-static inline unsigned long do_mmap_pgoff(struct file *file, unsigned long addr,
+extern unsigned long do_mmap_pgoff(struct file *file, unsigned long addr,
 	unsigned long len, unsigned long prot,
-	unsigned long flag, unsigned long pgoff) {
-	return __do_mmap_pgoff(current->mm, file, addr, len, prot, flag, pgoff);
-}
+	unsigned long flag, unsigned long pgoff);
 
 static inline unsigned long do_mmap(struct file *file, unsigned long addr,
 	unsigned long len, unsigned long prot,
@@ -874,8 +865,6 @@ extern unsigned long do_brk(unsigned long, unsigned long);
 /* filemap.c */
 extern unsigned long page_unuse(struct page *);
 extern void truncate_inode_pages(struct address_space *, loff_t);
-extern void truncate_inode_pages_range(struct address_space *,
-				       loff_t lstart, loff_t lend);
 
 /* generic vm_area_ops exported for stackable file systems */
 extern struct page *filemap_nopage(struct vm_area_struct *, unsigned long, int *);
@@ -905,10 +894,7 @@ void handle_ra_miss(struct address_space *mapping,
 unsigned long max_sane_readahead(unsigned long nr);
 
 /* Do stack extension */
-#define EXPAND_STACK_HAS_3_ARGS
-extern int heap_stack_gap;
-extern int expand_stack(struct vm_area_struct * vma, unsigned long address,
-			struct vm_area_struct * prev_vma);
+extern int expand_stack(struct vm_area_struct * vma, unsigned long address);
 
 /* Look up the first VMA which satisfies  addr < vm_end,  NULL if none. */
 extern struct vm_area_struct * find_vma(struct mm_struct * mm, unsigned long addr);
@@ -940,13 +926,6 @@ extern struct page * follow_page(struct mm_struct *mm, unsigned long address,
 extern int check_user_page_readable(struct mm_struct *mm, unsigned long address);
 int remap_pfn_range(struct vm_area_struct *, unsigned long,
 		unsigned long, unsigned long, pgprot_t);
-
-static inline __deprecated /* since 25 Sept 2004 -- wli */
-int remap_page_range(struct vm_area_struct *vma, unsigned long uvaddr,
-			unsigned long paddr, unsigned long size, pgprot_t prot)
-{
-	return remap_pfn_range(vma, uvaddr, paddr >> PAGE_SHIFT, size, prot);
-}
 
 #ifdef CONFIG_PROC_FS
 void __vm_stat_account(struct mm_struct *, unsigned long, struct file *, long);

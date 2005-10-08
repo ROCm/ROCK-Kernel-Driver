@@ -57,8 +57,6 @@
 #include <asm/uaccess.h>
 #include <asm/io.h>
 
-extern int ide_wait_ms;
-
 /**
  *	generic_id		-	add a generic drive id
  *	@drive:	drive to make an ID block for
@@ -320,7 +318,7 @@ static int actual_try_to_identify (ide_drive_t *drive, u8 cmd)
 	u8 s = 0, a = 0;
 
 	/* take a deep breath */
-	msleep(ide_wait_ms);
+	msleep(50);
 
 	if (IDE_CONTROL_REG) {
 		a = hwif->INB(IDE_ALTSTATUS_REG);
@@ -355,11 +353,11 @@ static int actual_try_to_identify (ide_drive_t *drive, u8 cmd)
 			return 1;
 		}
 		/* give drive a breather */
-		msleep(ide_wait_ms);
+		msleep(50);
 	} while ((hwif->INB(hd_status)) & BUSY_STAT);
 
 	/* wait for IRQ and DRQ_STAT */
-	msleep(ide_wait_ms);
+	msleep(50);
 	if (OK_STAT((hwif->INB(IDE_STATUS_REG)), DRQ_STAT, BAD_R_STAT)) {
 		unsigned long flags;
 
@@ -479,15 +477,15 @@ static int do_probe (ide_drive_t *drive, u8 cmd)
 	/* needed for some systems
 	 * (e.g. crw9624 as drive0 with disk as slave)
 	 */
-	msleep(ide_wait_ms);
+	msleep(50);
 	SELECT_DRIVE(drive);
-	msleep(ide_wait_ms);
+	msleep(50);
 	if (hwif->INB(IDE_SELECT_REG) != drive->select.all && !drive->present) {
 		if (drive->select.b.unit != 0) {
 			/* exit with drive0 selected */
 			SELECT_DRIVE(&hwif->drives[0]);
 			/* allow BUSY_STAT to assert & clear */
-			msleep(ide_wait_ms);
+			msleep(50);
 		}
 		/* no i/f present: mmm.. this should be a 4 -ml */
 		return 3;
@@ -510,14 +508,14 @@ static int do_probe (ide_drive_t *drive, u8 cmd)
 			printk("%s: no response (status = 0x%02x), "
 				"resetting drive\n", drive->name,
 				hwif->INB(IDE_STATUS_REG));
-			msleep(ide_wait_ms);
+			msleep(50);
 			hwif->OUTB(drive->select.all, IDE_SELECT_REG);
-			msleep(ide_wait_ms);
+			msleep(50);
 			hwif->OUTB(WIN_SRST, IDE_COMMAND_REG);
 			timeout = jiffies;
 			while (((hwif->INB(IDE_STATUS_REG)) & BUSY_STAT) &&
 			       time_before(jiffies, timeout + WAIT_WORSTCASE))
-				msleep(ide_wait_ms);
+				msleep(50);
 			rc = try_to_identify(drive, cmd);
 		}
 		if (rc == 1)
@@ -532,7 +530,7 @@ static int do_probe (ide_drive_t *drive, u8 cmd)
 	if (drive->select.b.unit != 0) {
 		/* exit with drive0 selected */
 		SELECT_DRIVE(&hwif->drives[0]);
-		msleep(ide_wait_ms);
+		msleep(50);
 		/* ensure drive irq is clear */
 		(void) hwif->INB(IDE_STATUS_REG);
 	}
@@ -549,7 +547,7 @@ static void enable_nest (ide_drive_t *drive)
 
 	printk("%s: enabling %s -- ", hwif->name, drive->id->model);
 	SELECT_DRIVE(drive);
-	msleep(ide_wait_ms);
+	msleep(50);
 	hwif->OUTB(EXABYTE_ENABLE_NEST, IDE_COMMAND_REG);
 	timeout = jiffies + WAIT_WORSTCASE;
 	do {
@@ -557,10 +555,10 @@ static void enable_nest (ide_drive_t *drive)
 			printk("failed (timeout)\n");
 			return;
 		}
-		msleep(ide_wait_ms);
+		msleep(50);
 	} while ((hwif->INB(IDE_STATUS_REG)) & BUSY_STAT);
 
-	msleep(ide_wait_ms);
+	msleep(50);
 
 	if (!OK_STAT((hwif->INB(IDE_STATUS_REG)), 0, BAD_STAT)) {
 		printk("failed (status = 0x%02x)\n", hwif->INB(IDE_STATUS_REG));
@@ -839,7 +837,7 @@ static void probe_hwif(ide_hwif_t *hwif)
 		udelay(10);
 		hwif->OUTB(8, hwif->io_ports[IDE_CONTROL_OFFSET]);
 		do {
-			msleep(ide_wait_ms);
+			msleep(50);
 			stat = hwif->INB(hwif->io_ports[IDE_STATUS_OFFSET]);
 		} while ((stat & BUSY_STAT) && time_after(timeout, jiffies));
 

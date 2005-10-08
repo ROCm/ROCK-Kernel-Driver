@@ -6,7 +6,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.64 $
+ * $Revision: 1.65 $
  */
 
 #ifndef DASD_INT_H
@@ -15,7 +15,7 @@
 #ifdef __KERNEL__
 
 /* erp debugging in dasd.c and dasd_3990_erp.c */
-/* #define ERP_DEBUG */
+#define ERP_DEBUG
 
 
 /* we keep old device allocation scheme; IOW, minors are still in 0..255 */
@@ -286,6 +286,7 @@ struct dasd_device {
 	unsigned int bp_block;		/* bytes per block */
 	unsigned int s2b_shift;		/* log2 (bp_block/512) */
 	unsigned long flags;		/* per device flags */
+	unsigned short features;        /* copy of devmap-features (read-only!) */
 
 	/* Device discipline stuff. */
 	struct dasd_discipline *discipline;

@@ -33,15 +33,10 @@
 #include <linux/module.h>
 #include <linux/usb.h>
 #include <linux/input.h>
+#include <linux/usb_input.h>
 
 /* Apple has powerbooks which have the keyboard with different Product IDs */
 #define APPLE_VENDOR_ID		0x05AC
-#define ATP_12INCH_ID1		0x030A
-#define ATP_15INCH_ID1		0x020E
-#define ATP_15INCH_ID2		0x020F
-#define ATP_17INCH_ID1		0xFFFF /* XXX need a tester !!! */
-
-#define ATP_DRIVER_VERSION	0x0007 /* 00.07 */
 
 #define ATP_DEVICE(prod)					\
 	.match_flags = USB_DEVICE_ID_MATCH_DEVICE |   		\
@@ -54,13 +49,10 @@
 
 /* table of devices that work with this driver */
 static struct usb_device_id atp_table [] = {
-	{ ATP_DEVICE(ATP_12INCH_ID1) },
-	{ ATP_DEVICE(ATP_15INCH_ID1) },
-	{ ATP_DEVICE(ATP_15INCH_ID2) },
-#if 0
-	Disabled until someone gives us the real USB id and tests the driver
-	{ ATP_DEVICE(ATP_17INCH_ID1) },
-#endif
+	{ ATP_DEVICE(0x020E) },
+	{ ATP_DEVICE(0x020F) },
+	{ ATP_DEVICE(0x030A) },
+	{ ATP_DEVICE(0x030B) },
 	{ }					/* Terminating entry */
 };
 MODULE_DEVICE_TABLE (usb, atp_table);
@@ -122,7 +114,7 @@ struct atp {
 		int i;							\
 		printk("appletouch: %s %lld", msg, (long long)jiffies); \
 		for (i = 0; i < ATP_XSENSORS + ATP_YSENSORS; i++)	\
-			printk("%02x ", tab[i]); 			\
+			printk(" %02x", tab[i]); 			\
 		printk("\n"); 						\
 	}
 
@@ -222,6 +214,18 @@ static void atp_complete(struct urb* urb, struct pt_regs* regs)
 		dev->valid = 1;
 		dev->x_old = dev->y_old = -1;
 		memcpy(dev->xy_old, dev->xy_cur, sizeof(dev->xy_old));
+
+		/* 17" Powerbooks have 10 extra X sensors */
+		for (i = 16; i < ATP_XSENSORS; i++)
+			if (dev->xy_cur[i]) {
+				printk("appletouch: 17\" model detected.\n");
+				input_set_abs_params(&dev->input, ABS_X, 0,
+				     		     (ATP_XSENSORS - 1) *
+						     ATP_XFACT - 1,
+						     ATP_FUZZ, 0);
+				break;
+			}
+
 		goto exit;
 	}
 
@@ -371,24 +375,18 @@ static int atp_probe(struct usb_interface *iface, const struct usb_device_id *id
 	dev->input.open = atp_open;
 	dev->input.close = atp_close;
 
-	dev->input.id.bustype = BUS_USB;
-	dev->input.id.vendor = id->idVendor;
-	dev->input.id.product = id->idProduct;
-	dev->input.id.version = ATP_DRIVER_VERSION;
+	usb_to_input_id(dev->udev, &dev->input.id);
 
 	set_bit(EV_ABS, dev->input.evbit);
-	if (id->idProduct == ATP_17INCH_ID1)
-		input_set_abs_params(&dev->input, ABS_X, 0,
-				     (ATP_XSENSORS - 1) * ATP_XFACT - 1,
-				     ATP_FUZZ, 0);
-	else
-		/* 12" and 15" Powerbooks only have 16 x sensors */
-		input_set_abs_params(&dev->input, ABS_X, 0,
-				     (16 - 1) * ATP_XFACT - 1,
-				     ATP_FUZZ, 0);
+
+	/*
+	 * 12" and 15" Powerbooks only have 16 x sensors,
+	 * 17" models are detected later.
+	 */
+	input_set_abs_params(&dev->input, ABS_X, 0,
+			     (16 - 1) * ATP_XFACT - 1, ATP_FUZZ, 0);
 	input_set_abs_params(&dev->input, ABS_Y, 0,
-			     (ATP_YSENSORS - 1) * ATP_YFACT - 1,
-			     ATP_FUZZ, 0);
+			     (ATP_YSENSORS - 1) * ATP_YFACT - 1, ATP_FUZZ, 0);
 	input_set_abs_params(&dev->input, ABS_PRESSURE, 0, ATP_PRESSURE, 0, 0);
 
 	set_bit(EV_KEY, dev->input.evbit);

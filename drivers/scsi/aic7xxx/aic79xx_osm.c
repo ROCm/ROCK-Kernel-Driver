@@ -48,21 +48,10 @@
 
 static struct scsi_transport_template *ahd_linux_transport_template = NULL;
 
-/*
- * Include aiclib.c as part of our
- * "module dependencies are hard" work around.
- */
-#include "aiclib.c"
-
 #include <linux/init.h>		/* __setup */
 #include <linux/mm.h>		/* For fetching system memory size */
 #include <linux/blkdev.h>		/* For block_size() */
 #include <linux/delay.h>	/* For ssleep/msleep */
-
-/*
- * Lock protecting manipulation of the ahd softc list.
- */
-spinlock_t ahd_list_spinlock;
 
 /*
  * Bucket size for counting good commands in between bad ones.
@@ -303,13 +292,6 @@ static uint32_t aic79xx_pci_parity = ~0;
 uint32_t aic79xx_allow_memio = ~0;
 
 /*
- * aic79xx_detect() has been run, so register all device arrivals
- * immediately with the system rather than deferring to the sorted
- * attachment performed by aic79xx_detect().
- */
-int aic79xx_detect_complete;
-
-/*
  * So that we can set how long each device is given as a selection timeout.
  * The table of values goes like this:
  *   0 - 256ms
@@ -384,10 +366,10 @@ static int ahd_linux_run_command(struct ahd_softc*,
 				 struct ahd_linux_device *,
 				 struct scsi_cmnd *);
 static void ahd_linux_setup_tag_info_global(char *p);
-static aic_option_callback_t ahd_linux_setup_tag_info;
-static aic_option_callback_t ahd_linux_setup_iocell_info;
 static int  aic79xx_setup(char *c);
-static int  ahd_linux_next_unit(void);
+
+static int ahd_linux_unit;
+
 
 /****************************** Inlines ***************************************/
 static __inline void ahd_linux_unmap_scb(struct ahd_softc*, struct scb*);
@@ -416,50 +398,6 @@ ahd_linux_unmap_scb(struct ahd_softc *ahd, struct scb *scb)
 /******************************** Macros **************************************/
 #define BUILD_SCSIID(ahd, cmd)						\
 	((((cmd)->device->id << TID_SHIFT) & TID) | (ahd)->our_id)
-
-/*
- * Try to detect an Adaptec 79XX controller.
- */
-static int
-ahd_linux_detect(struct scsi_host_template *template)
-{
-	struct	ahd_softc *ahd;
-	int     found;
-	int	error = 0;
-
-	/*
-	 * If we've been passed any parameters, process them now.
-	 */
-	if (aic79xx)
-		aic79xx_setup(aic79xx);
-
-	template->proc_name = "aic79xx";
-
-	/*
-	 * Initialize our softc list lock prior to
-	 * probing for any adapters.
-	 */
-	ahd_list_lockinit();
-
-#ifdef CONFIG_PCI
-	error = ahd_linux_pci_init();
-	if (error)
-		return error;
-#endif
-
-	/*
-	 * Register with the SCSI layer all
-	 * controllers we've found.
-	 */
-	found = 0;
-	TAILQ_FOREACH(ahd, &ahd_tailq, links) {
-
-		if (ahd_linux_register_host(ahd, template) == 0)
-			found++;
-	}
-	aic79xx_detect_complete++;
-	return found;
-}
 
 /*
  * Return a string describing the driver.
@@ -760,6 +698,7 @@ ahd_linux_bus_reset(struct scsi_cmnd *cmd)
 struct scsi_host_template aic79xx_driver_template = {
 	.module			= THIS_MODULE,
 	.name			= "aic79xx",
+	.proc_name		= "aic79xx",
 	.proc_info		= ahd_linux_proc_info,
 	.info			= ahd_linux_info,
 	.queuecommand		= ahd_linux_queue,
@@ -960,6 +899,86 @@ ahd_linux_setup_tag_info(u_long arg, int instance, int targ, int32_t value)
 	}
 }
 
+static char *
+ahd_parse_brace_option(char *opt_name, char *opt_arg, char *end, int depth,
+		       void (*callback)(u_long, int, int, int32_t),
+		       u_long callback_arg)
+{
+	char	*tok_end;
+	char	*tok_end2;
+	int      i;
+	int      instance;
+	int	 targ;
+	int	 done;
+	char	 tok_list[] = {'.', ',', '{', '}', '\0'};
+
+	/* All options use a ':' name/arg separator */
+	if (*opt_arg != ':')
+		return (opt_arg);
+	opt_arg++;
+	instance = -1;
+	targ = -1;
+	done = FALSE;
+	/*
+	 * Restore separator that may be in
+	 * the middle of our option argument.
+	 */
+	tok_end = strchr(opt_arg, '\0');
+	if (tok_end < end)
+		*tok_end = ',';
+	while (!done) {
+		switch (*opt_arg) {
+		case '{':
+			if (instance == -1) {
+				instance = 0;
+			} else {
+				if (depth > 1) {
+					if (targ == -1)
+						targ = 0;
+				} else {
+					printf("Malformed Option %s\n",
+					       opt_name);
+					done = TRUE;
+				}
+			}
+			opt_arg++;
+			break;
+		case '}':
+			if (targ != -1)
+				targ = -1;
+			else if (instance != -1)
+				instance = -1;
+			opt_arg++;
+			break;
+		case ',':
+		case '.':
+			if (instance == -1)
+				done = TRUE;
+			else if (targ >= 0)
+				targ++;
+			else if (instance >= 0)
+				instance++;
+			opt_arg++;
+			break;
+		case '\0':
+			done = TRUE;
+			break;
+		default:
+			tok_end = end;
+			for (i = 0; tok_list[i]; i++) {
+				tok_end2 = strchr(opt_arg, tok_list[i]);
+				if ((tok_end2) && (tok_end2 < tok_end))
+					tok_end = tok_end2;
+			}
+			callback(callback_arg, instance, targ,
+				 simple_strtol(opt_arg, NULL, 0));
+			opt_arg = tok_end;
+			break;
+		}
+	}
+	return (opt_arg);
+}
+
 /*
  * Handle Linux boot parameters. This routine allows for assigning a value
  * to a parameter with a ':' between the parameter and the value.
@@ -1017,18 +1036,18 @@ aic79xx_setup(char *s)
 		if (strncmp(p, "global_tag_depth", n) == 0) {
 			ahd_linux_setup_tag_info_global(p + n);
 		} else if (strncmp(p, "tag_info", n) == 0) {
-			s = aic_parse_brace_option("tag_info", p + n, end,
+			s = ahd_parse_brace_option("tag_info", p + n, end,
 			    2, ahd_linux_setup_tag_info, 0);
 		} else if (strncmp(p, "slewrate", n) == 0) {
-			s = aic_parse_brace_option("slewrate",
+			s = ahd_parse_brace_option("slewrate",
 			    p + n, end, 1, ahd_linux_setup_iocell_info,
 			    AIC79XX_SLEWRATE_INDEX);
 		} else if (strncmp(p, "precomp", n) == 0) {
-			s = aic_parse_brace_option("precomp",
+			s = ahd_parse_brace_option("precomp",
 			    p + n, end, 1, ahd_linux_setup_iocell_info,
 			    AIC79XX_PRECOMP_INDEX);
 		} else if (strncmp(p, "amplitude", n) == 0) {
-			s = aic_parse_brace_option("amplitude",
+			s = ahd_parse_brace_option("amplitude",
 			    p + n, end, 1, ahd_linux_setup_iocell_info,
 			    AIC79XX_AMPLITUDE_INDEX);
 		} else if (p[n] == ':') {
@@ -1072,7 +1091,7 @@ ahd_linux_register_host(struct ahd_softc *ahd, struct scsi_host_template *templa
 	host->max_lun = AHD_NUM_LUNS;
 	host->max_channel = 0;
 	host->sg_tablesize = AHD_NSEG;
-	ahd_set_unit(ahd, ahd_linux_next_unit());
+	ahd_set_unit(ahd, ahd_linux_unit++);
 	sprintf(buf, "scsi%d", host->host_no);
 	new_name = malloc(strlen(buf) + 1, M_DEVBUF, M_NOWAIT);
 	if (new_name != NULL) {
@@ -1098,29 +1117,6 @@ ahd_linux_get_memsize(void)
 
 	si_meminfo(&si);
 	return ((uint64_t)si.totalram << PAGE_SHIFT);
-}
-
-/*
- * Find the smallest available unit number to use
- * for a new device.  We don't just use a static
- * count to handle the "repeated hot-(un)plug"
- * scenario.
- */
-static int
-ahd_linux_next_unit(void)
-{
-	struct ahd_softc *ahd;
-	int unit;
-
-	unit = 0;
-retry:
-	TAILQ_FOREACH(ahd, &ahd_tailq, links) {
-		if (ahd->unit == unit) {
-			unit++;
-			goto retry;
-		}
-	}
-	return (unit);
 }
 
 /*
@@ -2326,8 +2322,6 @@ done:
 	return (retval);
 }
 
-static void ahd_linux_exit(void);
-
 static void ahd_linux_set_width(struct scsi_target *starget, int width)
 {
 	struct Scsi_Host *shost = dev_to_shost(starget->dev.parent);
@@ -2757,22 +2751,31 @@ static struct spi_function_template ahd_linux_transport_functions = {
 	.show_hold_mcs	= 1,
 };
 
-
-
 static int __init
 ahd_linux_init(void)
 {
-	ahd_linux_transport_template = spi_attach_transport(&ahd_linux_transport_functions);
+	int	error = 0;
+
+	/*
+	 * If we've been passed any parameters, process them now.
+	 */
+	if (aic79xx)
+		aic79xx_setup(aic79xx);
+
+	ahd_linux_transport_template =
+		spi_attach_transport(&ahd_linux_transport_functions);
 	if (!ahd_linux_transport_template)
 		return -ENODEV;
+
 	scsi_transport_reserve_target(ahd_linux_transport_template,
 				      sizeof(struct ahd_linux_target));
 	scsi_transport_reserve_device(ahd_linux_transport_template,
 				      sizeof(struct ahd_linux_device));
-	if (ahd_linux_detect(&aic79xx_driver_template) > 0)
-		return 0;
-	ahd_linux_exit();
-	return -ENODEV;
+
+	error = ahd_linux_pci_init();
+	if (error)
+		spi_release_transport(ahd_linux_transport_template);
+	return error;
 }
 
 static void __exit

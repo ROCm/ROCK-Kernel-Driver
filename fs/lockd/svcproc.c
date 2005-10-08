@@ -22,8 +22,7 @@
 
 #define NLMDBG_FACILITY		NLMDBG_CLIENT
 
-static u32	nlmsvc_callback(struct svc_rqst *, u32,
-			struct nlm_res *, const char *);
+static u32	nlmsvc_callback(struct svc_rqst *, u32, struct nlm_res *);
 static void	nlmsvc_callback_exit(struct rpc_task *);
 
 #ifdef CONFIG_LOCKD_V4
@@ -71,8 +70,8 @@ nlmsvc_retrieve_args(struct svc_rqst *rqstp, struct nlm_args *argp,
 		return nlm_lck_denied_nolocks;
 
 	/* Obtain host handle */
-	if (!(host = nlmsvc_lookup_host(rqstp, lock->caller))
-	 || (argp->monitor && nsm_monitor(host) < 0))
+	if (!(host = nlmsvc_lookup_host(rqstp))
+	 || (argp->monitor && !host->h_monitored && nsm_monitor(host) < 0))
 		goto no_locks;
 	*hostp = host;
 
@@ -277,8 +276,7 @@ nlmsvc_proc_test_msg(struct svc_rqst *rqstp, struct nlm_args *argp,
 	memset(&res, 0, sizeof(res));
 
 	if ((stat = nlmsvc_proc_test(rqstp, argp, &res)) == 0)
-		stat = nlmsvc_callback(rqstp, NLMPROC_TEST_RES, &res,
-				argp->lock.caller);
+		stat = nlmsvc_callback(rqstp, NLMPROC_TEST_RES, &res);
 	return stat;
 }
 
@@ -293,8 +291,7 @@ nlmsvc_proc_lock_msg(struct svc_rqst *rqstp, struct nlm_args *argp,
 	memset(&res, 0, sizeof(res));
 
 	if ((stat = nlmsvc_proc_lock(rqstp, argp, &res)) == 0)
-		stat = nlmsvc_callback(rqstp, NLMPROC_LOCK_RES, &res,
-				argp->lock.caller);
+		stat = nlmsvc_callback(rqstp, NLMPROC_LOCK_RES, &res);
 	return stat;
 }
 
@@ -309,8 +306,7 @@ nlmsvc_proc_cancel_msg(struct svc_rqst *rqstp, struct nlm_args *argp,
 	memset(&res, 0, sizeof(res));
 
 	if ((stat = nlmsvc_proc_cancel(rqstp, argp, &res)) == 0)
-		stat = nlmsvc_callback(rqstp, NLMPROC_CANCEL_RES, &res,
-				argp->lock.caller);
+		stat = nlmsvc_callback(rqstp, NLMPROC_CANCEL_RES, &res);
 	return stat;
 }
 
@@ -325,8 +321,7 @@ nlmsvc_proc_unlock_msg(struct svc_rqst *rqstp, struct nlm_args *argp,
 	memset(&res, 0, sizeof(res));
 
 	if ((stat = nlmsvc_proc_unlock(rqstp, argp, &res)) == 0)
-		stat = nlmsvc_callback(rqstp, NLMPROC_UNLOCK_RES, &res,
-				argp->lock.caller);
+		stat = nlmsvc_callback(rqstp, NLMPROC_UNLOCK_RES, &res);
 	return stat;
 }
 
@@ -341,8 +336,7 @@ nlmsvc_proc_granted_msg(struct svc_rqst *rqstp, struct nlm_args *argp,
 	memset(&res, 0, sizeof(res));
 
 	if ((stat = nlmsvc_proc_granted(rqstp, argp, &res)) == 0)
-		stat = nlmsvc_callback(rqstp, NLMPROC_GRANTED_RES, &res,
-				argp->lock.caller);
+		stat = nlmsvc_callback(rqstp, NLMPROC_GRANTED_RES, &res);
 	return stat;
 }
 
@@ -451,6 +445,9 @@ nlmsvc_proc_sm_notify(struct svc_rqst *rqstp, struct nlm_reboot *argp,
 					      void	        *resp)
 {
 	struct sockaddr_in	saddr = rqstp->rq_addr;
+	int			vers = argp->vers;
+	int			prot = argp->proto >> 1;
+	struct nlm_host		*host;
 
 	dprintk("lockd: SM_NOTIFY     called\n");
 	if (saddr.sin_addr.s_addr != htonl(INADDR_LOOPBACK)
@@ -462,7 +459,23 @@ nlmsvc_proc_sm_notify(struct svc_rqst *rqstp, struct nlm_reboot *argp,
 		return rpc_system_err;
 	}
 
-	nlm_host_rebooted(&saddr, argp->mon, argp->state);
+	/* Obtain the host pointer for this NFS server and try to
+	 * reclaim all locks we hold on this server.
+	 */
+	saddr.sin_addr.s_addr = argp->addr;
+	if ((argp->proto & 1)==0) {
+		if ((host = nlmclnt_lookup_host(&saddr, prot, vers)) != NULL) {
+			nlmclnt_recovery(host, argp->state);
+			nlm_release_host(host);
+		}
+	} else {
+		/* If we run on an NFS server, delete all locks held by the client */
+		if ((host = nlm_lookup_host(1, &saddr, prot, vers)) != NULL) {
+			nlmsvc_free_host_resources(host);
+			nlm_release_host(host);
+		}
+	}
+
 	return rpc_success;
 }
 
@@ -486,8 +499,7 @@ nlmsvc_proc_granted_res(struct svc_rqst *rqstp, struct nlm_res  *argp,
  * This is the generic lockd callback for async RPC calls
  */
 static u32
-nlmsvc_callback(struct svc_rqst *rqstp, u32 proc, struct nlm_res *resp,
-		const char *hostname)
+nlmsvc_callback(struct svc_rqst *rqstp, u32 proc, struct nlm_res *resp)
 {
 	struct nlm_host	*host;
 	struct nlm_rqst	*call;
@@ -496,8 +508,7 @@ nlmsvc_callback(struct svc_rqst *rqstp, u32 proc, struct nlm_res *resp,
 		return rpc_system_err;
 
 	host = nlmclnt_lookup_host(&rqstp->rq_addr,
-				rqstp->rq_prot, rqstp->rq_vers,
-				NULL);
+				rqstp->rq_prot, rqstp->rq_vers);
 	if (!host) {
 		kfree(call);
 		return rpc_system_err;

@@ -1,9 +1,10 @@
 /* TTL modification target for IP tables
- * (C) 2000 by Harald Welte <laforge@gnumonks.org>
+ * (C) 2000,2005 by Harald Welte <laforge@netfilter.org>
  *
- * Version: 1.8
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  *
- * This software is distributed under the terms of GNU GPL
  */
 
 #include <linux/module.h>
@@ -14,22 +15,25 @@
 #include <linux/netfilter_ipv4/ip_tables.h>
 #include <linux/netfilter_ipv4/ipt_TTL.h>
 
-MODULE_AUTHOR("Harald Welte <laforge@gnumonks.org>");
+MODULE_AUTHOR("Harald Welte <laforge@netfilter.org>");
 MODULE_DESCRIPTION("IP tables TTL modification module");
 MODULE_LICENSE("GPL");
 
-static unsigned int ipt_ttl_target(struct sk_buff **pskb,
-		                           const struct net_device *in,
-                                   const struct net_device *out,
-                                   unsigned int hooknum,
-                                   const void *targinfo,
-                                   void *userinfo)
+static unsigned int 
+ipt_ttl_target(struct sk_buff **pskb, const struct net_device *in, 
+		const struct net_device *out, unsigned int hooknum, 
+		const void *targinfo, void *userinfo)
 {
-	struct iphdr *iph = (*pskb)->nh.iph;
+	struct iphdr *iph;
 	const struct ipt_TTL_info *info = targinfo;
 	u_int16_t diffs[2];
 	int new_ttl;
-			 
+
+	if (!skb_make_writable(pskb, (*pskb)->len))
+		return NF_DROP;
+
+	iph = (*pskb)->nh.iph;
+
 	switch (info->mode) {
 		case IPT_TTL_SET:
 			new_ttl = info->ttl;
@@ -55,8 +59,7 @@ static unsigned int ipt_ttl_target(struct sk_buff **pskb,
 		diffs[1] = htons(((unsigned)iph->ttl) << 8);
 		iph->check = csum_fold(csum_partial((char *)diffs,
 						    sizeof(diffs),
-				 	            iph->check^0xFFFF));
-									                	(*pskb)->nfcache |= NFC_ALTERED;
+						    iph->check^0xFFFF));
 	}
 
 	return IPT_CONTINUE;
@@ -71,36 +74,35 @@ static int ipt_ttl_checkentry(const char *tablename,
 	struct ipt_TTL_info *info = targinfo;
 
 	if (targinfosize != IPT_ALIGN(sizeof(struct ipt_TTL_info))) {
-		printk(KERN_WARNING "TTL: targinfosize %u != %Zu\n",
+		printk(KERN_WARNING "ipt_TTL: targinfosize %u != %Zu\n",
 				targinfosize,
 				IPT_ALIGN(sizeof(struct ipt_TTL_info)));
-		return 0;	
-	}	
+		return 0;
+	}
 
 	if (strcmp(tablename, "mangle")) {
-		printk(KERN_WARNING "TTL: can only be called from \"mangle\" table, not \"%s\"\n", tablename);
+		printk(KERN_WARNING "ipt_TTL: can only be called from "
+			"\"mangle\" table, not \"%s\"\n", tablename);
 		return 0;
 	}
 
 	if (info->mode > IPT_TTL_MAXMODE) {
-		printk(KERN_WARNING "TTL: invalid or unknown Mode %u\n", 
+		printk(KERN_WARNING "ipt_TTL: invalid or unknown Mode %u\n", 
 			info->mode);
 		return 0;
 	}
 
-	if ((info->mode != IPT_TTL_SET) && (info->ttl == 0)) {
-		printk(KERN_WARNING "TTL: increment/decrement doesn't make sense with value 0\n");
+	if ((info->mode != IPT_TTL_SET) && (info->ttl == 0))
 		return 0;
-	}
-	
+
 	return 1;
 }
 
-static struct ipt_target ipt_TTL = {
-    .name       = "TTL", 
-	.target     = ipt_ttl_target,
-    .checkentry = ipt_ttl_checkentry,
-    .me = THIS_MODULE
+static struct ipt_target ipt_TTL = { 
+	.name 		= "TTL",
+	.target 	= ipt_ttl_target, 
+	.checkentry 	= ipt_ttl_checkentry, 
+	.me 		= THIS_MODULE,
 };
 
 static int __init init(void)

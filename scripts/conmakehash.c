@@ -33,7 +33,7 @@ void usage(char *argv0)
 
 int getunicode(char **p0)
 {
-  unsigned char *p = *((unsigned char **)p0);
+  char *p = *p0;
 
   while (*p == ' ' || *p == '\t')
     p++;
@@ -41,8 +41,8 @@ int getunicode(char **p0)
       !isxdigit(p[2]) || !isxdigit(p[3]) || !isxdigit(p[4]) ||
       !isxdigit(p[5]) || isxdigit(p[6]))
     return -1;
-  *p0 = (char *)(p+6);
-  return strtol((char *)(p+2),0,16);
+  *p0 = p+6;
+  return strtol(p+2,0,16);
 }
 
 unicode unitable[MAX_FONTLEN][255];

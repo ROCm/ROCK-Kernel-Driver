@@ -21,7 +21,13 @@ ifeq ($(CONFIG_REISERFS_FS_POSIX_ACL),y)
 reiserfs-objs += xattr_acl.o
 endif
 
-ifeq ($(CONFIG_REISERFS_CC_REDUCE_OPTIMZE),y)
+# gcc -O2 (the kernel default)  is overaggressive on ppc32 when many inline
+# functions are used.  This causes the compiler to advance the stack
+# pointer out of the available stack space, corrupting kernel space,
+# and causing a panic. Since this behavior only affects ppc32, this ifeq
+# will work around it. If any other architecture displays this behavior,
+# add it here.
+ifeq ($(CONFIG_PPC32),y)
 EXTRA_CFLAGS := -O1
 endif
 

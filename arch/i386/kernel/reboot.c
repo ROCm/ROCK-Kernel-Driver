@@ -4,10 +4,6 @@
 
 #include <linux/config.h>
 #include <linux/mm.h>
-#include <linux/config.h>
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#endif	/* CONFIG_KDB */
 #include <linux/module.h>
 #include <linux/delay.h>
 #include <linux/init.h>
@@ -15,8 +11,10 @@
 #include <linux/mc146818rtc.h>
 #include <linux/efi.h>
 #include <linux/dmi.h>
+#include <linux/ctype.h>
 #include <asm/uaccess.h>
 #include <asm/apic.h>
+#include <asm/desc.h>
 #include "mach_reboot.h"
 #include <linux/reboot_fixups.h>
 
@@ -31,8 +29,6 @@ static int reboot_thru_bios;
 
 #ifdef CONFIG_SMP
 static int reboot_cpu = -1;
-/* shamelessly grabbed from lib/vsprintf.c for readability */
-#define is_digit(c)	((c) >= '0' && (c) <= '9')
 #endif
 static int __init reboot_setup(char *str)
 {
@@ -52,9 +48,9 @@ static int __init reboot_setup(char *str)
 			break;
 #ifdef CONFIG_SMP
 		case 's': /* "smp" reboot by executing reset on BSP or other CPU*/
-			if (is_digit(*(str+1))) {
+			if (isdigit(*(str+1))) {
 				reboot_cpu = (int) (*(str+1) - '0');
-				if (is_digit(*(str+2))) 
+				if (isdigit(*(str+2)))
 					reboot_cpu = reboot_cpu*10 + (int)(*(str+2) - '0');
 			}
 				/* we will leave sorting out the final value 
@@ -246,13 +242,13 @@ void machine_real_restart(unsigned char *code, int length)
 
 	/* Set up the IDT for real mode. */
 
-	__asm__ __volatile__ ("lidt %0" : : "m" (real_mode_idt));
+	load_idt(&real_mode_idt);
 
 	/* Set up a GDT from which we can load segment descriptors for real
 	   mode.  The GDT is not used in real mode; it is just needed here to
 	   prepare the descriptors. */
 
-	__asm__ __volatile__ ("lgdt %0" : : "m" (real_mode_gdt));
+	load_gdt(&real_mode_gdt);
 
 	/* Load the data segment registers, and thus the descriptors ready for
 	   real mode.  The base address of each segment is 0x100, 16 times the
@@ -305,14 +301,6 @@ void machine_shutdown(void)
 	 * all of the others, and disable their local APICs.
 	 */
 
-#ifdef	CONFIG_KDB
-	/*
-	 * If this restart is occuring while kdb is running (e.g. reboot
-	 * command), the other CPU's are already stopped.  Don't try to
-	 * stop them yet again.
-	 */
-	if (!KDB_IS_RUNNING())
-#endif	/* CONFIG_KDB */
 	smp_send_stop();
 #endif /* CONFIG_SMP */
 
@@ -328,7 +316,7 @@ void machine_emergency_restart(void)
 	if (!reboot_thru_bios) {
 		if (efi_enabled) {
 			efi.reset_system(EFI_RESET_COLD, EFI_SUCCESS, 0, NULL);
-			__asm__ __volatile__("lidt %0": :"m" (no_idt));
+			load_idt(&no_idt);
 			__asm__ __volatile__("int3");
 		}
 		/* rebooting needs to touch the page at absolute addr 0 */
@@ -337,7 +325,7 @@ void machine_emergency_restart(void)
 			mach_reboot_fixups(); /* for board specific fixups */
 			mach_reboot();
 			/* That didn't work - force a triple fault.. */
-			__asm__ __volatile__("lidt %0": :"m" (no_idt));
+			load_idt(&no_idt);
 			__asm__ __volatile__("int3");
 		}
 	}

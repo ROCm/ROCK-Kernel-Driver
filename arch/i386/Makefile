@@ -57,7 +57,6 @@ cflags-$(CONFIG_MWINCHIP2)	+= $(call cc-option,-march=winchip2,-march=i586)
 cflags-$(CONFIG_MWINCHIP3D)	+= $(call cc-option,-march=winchip2,-march=i586)
 cflags-$(CONFIG_MCYRIXIII)	+= $(call cc-option,-march=c3,-march=i486) $(align)-functions=0 $(align)-jumps=0 $(align)-loops=0
 cflags-$(CONFIG_MVIAC3_2)	+= $(call cc-option,-march=c3-2,-march=i686)
-cflags-$(CONFIG_KDB)		+= $(call cc-option,-fno-optimize-sibling-calls,)
 
 # AMD Elan support
 cflags-$(CONFIG_X86_ELAN)	+= -march=i486
@@ -73,12 +72,6 @@ cflags-$(CONFIG_REGPARM) 	+= $(shell if [ $(GCC_VERSION) -ge 0300 ] ; then echo 
 # Disable unit-at-a-time mode, it makes gcc use a lot more stack
 # due to the lack of sharing of stacklots.
 CFLAGS += $(call cc-option,-fno-unit-at-a-time)
-
-# m586 and genericarch is likely a distribution kernel. optimize for the
-# most common CPU (686)
-ifeq ($(CONFIG_X86_GENERICARCH),y)
-cflags-$(CONFIG_M586) += $(call cc-option,-mtune=i686)
-endif
 
 CFLAGS += $(cflags-y)
 
@@ -130,7 +123,6 @@ drivers-$(CONFIG_PCI)			+= arch/i386/pci/
 # must be linked after kernel/
 drivers-$(CONFIG_OPROFILE)		+= arch/i386/oprofile/
 drivers-$(CONFIG_PM)			+= arch/i386/power/
-drivers-$(CONFIG_KDB)			+= arch/i386/kdb/
 
 CFLAGS += $(mflags-y)
 AFLAGS += $(mflags-y)
@@ -163,16 +155,6 @@ fdimage fdimage144 fdimage288: vmlinux
 install: vmlinux
 install kernel_install:
 	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(KBUILD_IMAGE) install
-
-prepare: include/asm-$(ARCH)/asm_offsets.h
-CLEAN_FILES += include/asm-$(ARCH)/asm_offsets.h
-
-arch/$(ARCH)/kernel/asm-offsets.s: $(objtree)/include/asm \
-				   $(objtree)/include/linux/version.h \
-				   include/config/MARKER
-
-include/asm-$(ARCH)/asm_offsets.h: arch/$(ARCH)/kernel/asm-offsets.s
-	$(call filechk,gen-asm-offsets)
 
 archclean:
 	$(Q)$(MAKE) $(clean)=arch/i386/boot

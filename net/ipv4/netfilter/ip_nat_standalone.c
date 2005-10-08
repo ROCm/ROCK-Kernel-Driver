@@ -73,8 +73,6 @@ ip_nat_fn(unsigned int hooknum,
 	IP_NF_ASSERT(!((*pskb)->nh.iph->frag_off
 		       & htons(IP_MF|IP_OFFSET)));
 
-	(*pskb)->nfcache |= NFC_UNKNOWN;
-
 	/* If we had a hardware checksum before, it's now invalid */
 	if ((*pskb)->ip_summed == CHECKSUM_HW)
 		if (skb_checksum_help(*pskb, (out == NULL)))
@@ -110,8 +108,8 @@ ip_nat_fn(unsigned int hooknum,
 	case IP_CT_RELATED:
 	case IP_CT_RELATED+IP_CT_IS_REPLY:
 		if ((*pskb)->nh.iph->protocol == IPPROTO_ICMP) {
-			if (!icmp_reply_translation(pskb, ct, maniptype,
-						    CTINFO2DIR(ctinfo)))
+			if (!ip_nat_icmp_reply_translation(pskb, ct, maniptype,
+							   CTINFO2DIR(ctinfo)))
 				return NF_DROP;
 			else
 				return NF_ACCEPT;
@@ -125,8 +123,12 @@ ip_nat_fn(unsigned int hooknum,
 		if (!ip_nat_initialized(ct, maniptype)) {
 			unsigned int ret;
 
-			/* LOCAL_IN hook doesn't have a chain!  */
-			if (hooknum == NF_IP_LOCAL_IN)
+			if (unlikely(is_confirmed(ct)))
+				/* NAT module was loaded late */
+				ret = alloc_null_binding_confirmed(ct, info,
+				                                   hooknum);
+			else if (hooknum == NF_IP_LOCAL_IN)
+				/* LOCAL_IN hook doesn't have a chain!  */
 				ret = alloc_null_binding(ct, info, hooknum);
 			else
 				ret = ip_nat_rule_find(pskb, hooknum,
@@ -150,7 +152,7 @@ ip_nat_fn(unsigned int hooknum,
 	}
 
 	IP_NF_ASSERT(info);
-	return nat_packet(ct, ctinfo, hooknum, pskb);
+	return ip_nat_packet(ct, ctinfo, hooknum, pskb);
 }
 
 static unsigned int
@@ -176,47 +178,6 @@ ip_nat_in(unsigned int hooknum,
 	return ret;
 }
 
-struct nat_route_key
-{
-	u_int32_t addr;
-#ifdef CONFIG_XFRM
-	u_int16_t port;
-#endif
-};
-
-static inline void
-nat_route_key_get(struct sk_buff *skb, struct nat_route_key *key, int which)
-{
-	struct iphdr *iph = skb->nh.iph;
-
-	key->addr = which ? iph->daddr : iph->saddr;
-#ifdef CONFIG_XFRM
-	key->port = 0;
-	if (iph->protocol == IPPROTO_TCP || iph->protocol == IPPROTO_UDP) {
-		u_int16_t *ports = (u_int16_t *)(skb->nh.raw + iph->ihl*4);
-		key->port = ports[which];
-	}
-#endif
-}
-
-static inline int
-nat_route_key_compare(struct sk_buff *skb, struct nat_route_key *key, int which)
-{
-	struct iphdr *iph = skb->nh.iph;
-
-	if (key->addr != (which ? iph->daddr : iph->saddr))
-		return 1;
-#ifdef CONFIG_XFRM
-	if (iph->protocol == IPPROTO_TCP || iph->protocol == IPPROTO_UDP) {
-		u_int16_t *ports = (u_int16_t *)(skb->nh.raw + iph->ihl*4);
-		if (key->port != ports[which])
-			return 1;
-	}
-#endif
-
-	return 0;
-}
-
 static unsigned int
 ip_nat_out(unsigned int hooknum,
 	   struct sk_buff **pskb,
@@ -224,9 +185,6 @@ ip_nat_out(unsigned int hooknum,
 	   const struct net_device *out,
 	   int (*okfn)(struct sk_buff *))
 {
-	struct nat_route_key key;
-	unsigned int ret;
-
 	/* root is playing with raw sockets. */
 	if ((*pskb)->len < sizeof(struct iphdr)
 	    || (*pskb)->nh.iph->ihl * 4 < sizeof(struct iphdr))
@@ -249,29 +207,7 @@ ip_nat_out(unsigned int hooknum,
 			return NF_STOLEN;
 	}
 
-	nat_route_key_get(*pskb, &key, 0);
-	ret = ip_nat_fn(hooknum, pskb, in, out, okfn);
-
-	if (ret != NF_DROP && ret != NF_STOLEN
-	    && nat_route_key_compare(*pskb, &key, 0)) {
-		if (ip_route_me_harder(pskb) != 0)
-			ret = NF_DROP;
-#ifdef CONFIG_XFRM
-		/*
-		 * POST_ROUTING hook is called with fixed outfn, we need
-		 * to manually confirm the packet and direct it to the
-		 * transformers if a policy matches.
-		 */
-		else if ((*pskb)->dst->xfrm != NULL) {
-			ret = ip_conntrack_confirm(pskb);
-			if (ret != NF_DROP) {
-				dst_output(*pskb);
-				ret = NF_STOLEN;
-			}
-		}
-#endif
-	}
-	return ret;
+	return ip_nat_fn(hooknum, pskb, in, out, okfn);
 }
 
 static unsigned int
@@ -281,7 +217,7 @@ ip_nat_local_fn(unsigned int hooknum,
 		const struct net_device *out,
 		int (*okfn)(struct sk_buff *))
 {
-	struct nat_route_key key;
+	u_int32_t saddr, daddr;
 	unsigned int ret;
 
 	/* root is playing with raw sockets. */
@@ -289,14 +225,14 @@ ip_nat_local_fn(unsigned int hooknum,
 	    || (*pskb)->nh.iph->ihl * 4 < sizeof(struct iphdr))
 		return NF_ACCEPT;
 
-	nat_route_key_get(*pskb, &key, 1);
-	ret = ip_nat_fn(hooknum, pskb, in, out, okfn);
+	saddr = (*pskb)->nh.iph->saddr;
+	daddr = (*pskb)->nh.iph->daddr;
 
+	ret = ip_nat_fn(hooknum, pskb, in, out, okfn);
 	if (ret != NF_DROP && ret != NF_STOLEN
-	    && nat_route_key_compare(*pskb, &key, 1)) {
-		if (ip_route_me_harder(pskb) != 0)
-			ret = NF_DROP;
-	}
+	    && ((*pskb)->nh.iph->saddr != saddr
+		|| (*pskb)->nh.iph->daddr != daddr))
+		return ip_route_me_harder(pskb) == 0 ? ret : NF_DROP;
 	return ret;
 }
 
@@ -389,15 +325,10 @@ static int init_or_cleanup(int init)
 		printk("ip_nat_init: can't setup rules.\n");
 		goto cleanup_nothing;
 	}
-	ret = ip_nat_init();
-	if (ret < 0) {
-		printk("ip_nat_init: can't setup rules.\n");
-		goto cleanup_rule_init;
-	}
 	ret = nf_register_hook(&ip_nat_in_ops);
 	if (ret < 0) {
 		printk("ip_nat_init: can't register in hook.\n");
-		goto cleanup_nat;
+		goto cleanup_rule_init;
 	}
 	ret = nf_register_hook(&ip_nat_out_ops);
 	if (ret < 0) {
@@ -438,8 +369,6 @@ static int init_or_cleanup(int init)
 	nf_unregister_hook(&ip_nat_out_ops);
  cleanup_inops:
 	nf_unregister_hook(&ip_nat_in_ops);
- cleanup_nat:
-	ip_nat_cleanup();
  cleanup_rule_init:
 	ip_nat_rule_cleanup();
  cleanup_nothing:
@@ -459,12 +388,4 @@ static void __exit fini(void)
 module_init(init);
 module_exit(fini);
 
-EXPORT_SYMBOL(ip_nat_setup_info);
-EXPORT_SYMBOL(ip_nat_protocol_register);
-EXPORT_SYMBOL(ip_nat_protocol_unregister);
-EXPORT_SYMBOL(ip_nat_cheat_check);
-EXPORT_SYMBOL(ip_nat_mangle_tcp_packet);
-EXPORT_SYMBOL(ip_nat_mangle_udp_packet);
-EXPORT_SYMBOL(ip_nat_used_tuple);
-EXPORT_SYMBOL(ip_nat_follow_master);
 MODULE_LICENSE("GPL");

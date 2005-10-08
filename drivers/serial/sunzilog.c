@@ -684,7 +684,7 @@ static void sunzilog_set_mctrl(struct uart_port *port, unsigned int mctrl)
 }
 
 /* The port lock is held and interrupts are disabled.  */
-static void sunzilog_stop_tx(struct uart_port *port, unsigned int tty_stop)
+static void sunzilog_stop_tx(struct uart_port *port)
 {
 	struct uart_sunzilog_port *up = (struct uart_sunzilog_port *) port;
 
@@ -692,7 +692,7 @@ static void sunzilog_stop_tx(struct uart_port *port, unsigned int tty_stop)
 }
 
 /* The port lock is held and interrupts are disabled.  */
-static void sunzilog_start_tx(struct uart_port *port, unsigned int tty_start)
+static void sunzilog_start_tx(struct uart_port *port)
 {
 	struct uart_sunzilog_port *up = (struct uart_sunzilog_port *) port;
 	struct zilog_channel __iomem *channel = ZILOG_CHANNEL_FROM_PORT(port);
@@ -1350,9 +1350,9 @@ sunzilog_console_write(struct console *con, const char *s, unsigned int count)
 
 	spin_lock_irqsave(&up->port.lock, flags);
 	for (i = 0; i < count; i++, s++) {
+		sunzilog_put_char(channel, *s);
 		if (*s == 10)
 			sunzilog_put_char(channel, 13);
-		sunzilog_put_char(channel, *s);
 	}
 	udelay(2);
 	spin_unlock_irqrestore(&up->port.lock, flags);

@@ -49,22 +49,6 @@
 #include <linux/delay.h> /* for mdelay */
 #include <linux/miscdevice.h>
 #include <linux/serial_core.h>
-#ifdef CONFIG_KDB
-#include <linux/kdb.h>
-#include <linux/kdbprivate.h>
-#include <linux/serial_reg.h>
-/*
- * kdb_serial_line records the serial line number of the first serial console.
- * NOTE: The kernel ignores characters on the serial line unless a user space
- * program has opened the line first.  To enter kdb before user space has opened
- * the serial line, you can use the 'kdb=early' flag to lilo and set the
- * appropriate breakpoints.
- */
-
-static int  kdb_serial_line = -1;
-static char *kdb_serial_ptr = (char *)kdb_serial_str;
-#endif /* CONFIG_KDB */
-
 
 #include <asm/io.h>
 #include <asm/sn/simulator.h>
@@ -275,10 +259,9 @@ static unsigned int snp_tx_empty(struct uart_port *port)
 /**
  * snp_stop_tx - stop the transmitter - no-op for us
  * @port: Port to operat eon - we ignore - no-op function
- * @tty_stop: Set to 1 if called via uart_stop
  *
  */
-static void snp_stop_tx(struct uart_port *port, unsigned int tty_stop)
+static void snp_stop_tx(struct uart_port *port)
 {
 }
 
@@ -341,10 +324,9 @@ static void snp_stop_rx(struct uart_port *port)
 /**
  * snp_start_tx - Start transmitter
  * @port: Port to operate on
- * @tty_stop: Set to 1 if called via uart_start
  *
  */
-static void snp_start_tx(struct uart_port *port, unsigned int tty_stop)
+static void snp_start_tx(struct uart_port *port)
 {
 	if (sal_console_port.sc_ops->sal_wakeup_transmit)
 		sal_console_port.sc_ops->sal_wakeup_transmit(&sal_console_port,
@@ -506,26 +488,6 @@ sn_receive_chars(struct sn_cons_port *port, struct pt_regs *regs,
 			       "obtaining data from the console (0x%0x)\n", ch);
 			break;
 		}
-#ifdef CONFIG_KDB
-	if (kdb_on == 1) {
-		if (ch == *kdb_serial_ptr) {
-			if (!(*++kdb_serial_ptr)) {
-				spin_unlock_irqrestore(&port->sc_port.lock, flags);
-				if (!regs) {
-					KDB_STATE_SET(KEYBOARD);
-					KDB_ENTER();   /* to get some registers */
-				} else
-					kdb(KDB_REASON_KEYBOARD, 0, regs);
-				kdb_serial_ptr = (char *)kdb_serial_str;
-				spin_lock_irqsave(&port->sc_port.lock, flags);
-				break;
-			}
-		}
-		else
-			kdb_serial_ptr = (char *)kdb_serial_str;
-	}
-#endif /* CONFIG_KDB */
-
 #ifdef CONFIG_MAGIC_SYSRQ
                 if (sysrq_requested) {
                         unsigned long sysrq_timeout = sysrq_requested + HZ*5;
@@ -651,7 +613,7 @@ static void sn_transmit_chars(struct sn_cons_port *port, int raw)
 		uart_write_wakeup(&port->sc_port);
 
 	if (uart_circ_empty(xmit))
-		snp_stop_tx(&port->sc_port, 0);	/* no-op for us */
+		snp_stop_tx(&port->sc_port);	/* no-op for us */
 }
 
 /**
@@ -1085,15 +1047,6 @@ sn_sal_console_write(struct console *co, const char *s, unsigned count)
  */
 static int __init sn_sal_console_setup(struct console *co, char *options)
 {
-#ifdef CONFIG_KDB
-	/*
-	* Remember the line number of the first serial
-	* console.  We'll make this the kdb serial console too.
-	*/
-	if (kdb_serial_line == -1) {
-		kdb_serial_line = co->index;
-	}
-#endif /* CONFIG_KDB */
 	return 0;
 }
 
@@ -1169,31 +1122,3 @@ static int __init sn_sal_serial_console_init(void)
 }
 
 console_initcall(sn_sal_serial_console_init);
-
-#ifdef	CONFIG_KDB
-int
-l1_control_in_polled(int offset)
-{
-	int sal_call_status = 0, input;
-	int ret = 0;
-	if (offset == UART_LSR) {
-		ret = (UART_LSR_THRE | UART_LSR_TEMT);	/* can send anytime */
-		sal_call_status = ia64_sn_console_check(&input);
-		if (!sal_call_status && input) {
-			/* input pending */
-			ret |= UART_LSR_DR;
-		}
-	}
-	return ret;
-}
-
-int
-l1_serial_in_polled(void)
-{
-	int ch;
-	if (!ia64_sn_console_getc(&ch))
-		return ch;
-	else
-		return 0;
-}
-#endif /* CONFIG_KDB */

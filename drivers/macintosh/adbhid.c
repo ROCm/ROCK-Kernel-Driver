@@ -1195,13 +1195,9 @@ init_ms_a3(int id)
 
 static int __init adbhid_init(void)
 {
-#ifdef CONFIG_PPC32
+#ifndef CONFIG_MAC
 	if ( (_machine != _MACH_chrp) && (_machine != _MACH_Pmac) )
 	    return 0;
-#endif
-#ifdef CONFIG_PPC64
-	if (_machine != _MACH_Pmac)
-		return 0;
 #endif
 
 	led_request.complete = 1;

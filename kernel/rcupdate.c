@@ -45,6 +45,7 @@
 #include <linux/percpu.h>
 #include <linux/notifier.h>
 #include <linux/rcupdate.h>
+#include <linux/rcuref.h>
 #include <linux/cpu.h>
 
 /* Definition for rcupdate control block. */
@@ -72,6 +73,19 @@ DEFINE_PER_CPU(struct rcu_data, rcu_bh_data) = { 0L };
 static DEFINE_PER_CPU(struct tasklet_struct, rcu_tasklet) = {NULL};
 static int maxbatch = 10;
 
+#ifndef __HAVE_ARCH_CMPXCHG
+/*
+ * We use an array of spinlocks for the rcurefs -- similar to ones in sparc
+ * 32 bit atomic_t implementations, and a hash function similar to that
+ * for our refcounting needs.
+ * Can't help multiprocessors which donot have cmpxchg :(
+ */
+
+spinlock_t __rcuref_hash[RCUREF_HASH_SIZE] = {
+	[0 ... (RCUREF_HASH_SIZE-1)] = SPIN_LOCK_UNLOCKED
+};
+#endif
+
 /**
  * call_rcu - Queue an RCU callback for invocation after a grace period.
  * @head: structure to be used for queueing the RCU updates.
@@ -97,10 +111,6 @@ void fastcall call_rcu(struct rcu_head *head,
 	rdp->nxttail = &head->next;
 	local_irq_restore(flags);
 }
-
-static atomic_t rcu_barrier_cpu_count;
-static struct semaphore rcu_barrier_sema;
-static struct completion rcu_barrier_completion;
 
 /**
  * call_rcu_bh - Queue an RCU for invocation after a quicker grace period.
@@ -132,42 +142,6 @@ void fastcall call_rcu_bh(struct rcu_head *head,
 	rdp->nxttail = &head->next;
 	local_irq_restore(flags);
 }
-
-static void rcu_barrier_callback(struct rcu_head *notused)
-{
-	if (atomic_dec_and_test(&rcu_barrier_cpu_count))
-		complete(&rcu_barrier_completion);
-}
-
-/*
- * Called with preemption disabled, and from cross-cpu IRQ context.
- */
-static void rcu_barrier_func(void *notused)
-{
-	int cpu = smp_processor_id();
-	struct rcu_data *rdp = &per_cpu(rcu_data, cpu);
-	struct rcu_head *head;
-
-	head = &rdp->barrier;
-	atomic_inc(&rcu_barrier_cpu_count);
-	call_rcu(head, rcu_barrier_callback);
-}
-
-/**
- * rcu_barrier - Wait until all the in-flight RCUs are complete.
- */
-void rcu_barrier(void)
-{
-	BUG_ON(in_interrupt());
-	/* Take cpucontrol semaphore to protect against CPU hotplug */
-	down(&rcu_barrier_sema);
-	init_completion(&rcu_barrier_completion);
-	atomic_set(&rcu_barrier_cpu_count, 0);
-	on_each_cpu(rcu_barrier_func, NULL, 0, 1);
-	wait_for_completion(&rcu_barrier_completion);
-	up(&rcu_barrier_sema);
-}
-EXPORT_SYMBOL_GPL(rcu_barrier);
 
 /*
  * Invoke the completed RCU callbacks. They are expected to be in
@@ -242,11 +216,8 @@ static void rcu_start_batch(struct rcu_ctrlblk *rcp, struct rcu_state *rsp,
  */
 static void cpu_quiet(int cpu, struct rcu_ctrlblk *rcp, struct rcu_state *rsp)
 {
-	cpumask_t mask;
-
 	cpu_clear(cpu, rsp->cpumask);
-	cpus_andnot(mask, rsp->cpumask, nohz_cpu_mask);
-	if (cpus_empty(mask)) {
+	if (cpus_empty(rsp->cpumask)) {
 		/* batch completed ! */
 		rcp->completed = rcp->cur;
 		rcu_start_batch(rcp, rsp, 0);
@@ -466,7 +437,6 @@ static struct notifier_block __devinitdata rcu_nb = {
  */
 void __init rcu_init(void)
 {
-	sema_init(&rcu_barrier_sema, 1);
 	rcu_cpu_notify(&rcu_nb, CPU_UP_PREPARE,
 			(void *)(long)smp_processor_id());
 	/* Register notifier for non-boot CPUs */

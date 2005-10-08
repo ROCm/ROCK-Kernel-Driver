@@ -12,7 +12,7 @@ enum ip6t_reject_with {
 };
 
 struct ip6t_reject_info {
-	enum ip6t_reject_with with;      /* reject type */
+	u_int32_t	with;	/* reject type */
 };
 
 #endif /*_IP6T_REJECT_H*/

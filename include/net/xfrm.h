@@ -193,8 +193,6 @@ struct xfrm_policy_afinfo {
 
 extern int xfrm_policy_register_afinfo(struct xfrm_policy_afinfo *afinfo);
 extern int xfrm_policy_unregister_afinfo(struct xfrm_policy_afinfo *afinfo);
-extern struct xfrm_policy_afinfo *xfrm_policy_get_afinfo(unsigned short family);
-extern void xfrm_policy_put_afinfo(struct xfrm_policy_afinfo *afinfo);
 extern void km_policy_notify(struct xfrm_policy *xp, int dir, struct km_event *c);
 extern void km_state_notify(struct xfrm_state *x, struct km_event *c);
 
@@ -565,9 +563,6 @@ struct sec_path
 {
 	atomic_t		refcnt;
 	int			len;
-#ifdef CONFIG_NETFILTER
-	int			decap_done;
-#endif
 	struct sec_decap_state	x[XFRM_MAX_DEPTH];
 };
 
@@ -823,7 +818,6 @@ extern void xfrm6_init(void);
 extern void xfrm6_fini(void);
 extern void xfrm_state_init(void);
 extern void xfrm4_state_init(void);
-extern void xfrm4_state_fini(void);
 extern void xfrm6_state_init(void);
 extern void xfrm6_state_fini(void);
 

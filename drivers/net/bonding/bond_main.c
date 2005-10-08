@@ -1604,6 +1604,44 @@ static int bond_sethwaddr(struct net_device *bond_dev, struct net_device *slave_
 	return 0;
 }
 
+#define BOND_INTERSECT_FEATURES \
+	(NETIF_F_SG|NETIF_F_IP_CSUM|NETIF_F_NO_CSUM|NETIF_F_HW_CSUM)
+
+/* 
+ * Compute the features available to the bonding device by 
+ * intersection of all of the slave devices' BOND_INTERSECT_FEATURES.
+ * Call this after attaching or detaching a slave to update the 
+ * bond's features.
+ */
+static int bond_compute_features(struct bonding *bond)
+{
+	int i;
+	struct slave *slave;
+	struct net_device *bond_dev = bond->dev;
+	int features = bond->bond_features;
+
+	bond_for_each_slave(bond, slave, i) {
+		struct net_device * slave_dev = slave->dev;
+		if (i == 0) {
+			features |= BOND_INTERSECT_FEATURES;
+		}
+		features &=
+			~(~slave_dev->features & BOND_INTERSECT_FEATURES);
+	}
+
+	/* turn off NETIF_F_SG if we need a csum and h/w can't do it */
+	if ((features & NETIF_F_SG) && 
+		!(features & (NETIF_F_IP_CSUM |
+			      NETIF_F_NO_CSUM |
+			      NETIF_F_HW_CSUM))) {
+		features &= ~NETIF_F_SG;
+	}
+
+	bond_dev->features = features;
+
+	return 0;
+}
+
 /* enslave device <slave> to bond device <master> */
 static int bond_enslave(struct net_device *bond_dev, struct net_device *slave_dev)
 {
@@ -1615,7 +1653,8 @@ static int bond_enslave(struct net_device *bond_dev, struct net_device *slave_de
 	int old_features = bond_dev->features;
 	int res = 0;
 
-	if (slave_dev->do_ioctl == NULL) {
+	if (!bond->params.use_carrier && slave_dev->ethtool_ops == NULL &&
+		slave_dev->do_ioctl == NULL) {
 		printk(KERN_WARNING DRV_NAME
 		       ": Warning : no link monitoring support for %s\n",
 		       slave_dev->name);
@@ -1810,6 +1849,8 @@ static int bond_enslave(struct net_device *bond_dev, struct net_device *slave_de
 
 	new_slave->delay = 0;
 	new_slave->link_failure_count = 0;
+
+	bond_compute_features(bond);
 
 	if (bond->params.miimon && !bond->params.use_carrier) {
 		link_reporting = bond_check_dev_link(bond, slave_dev, 1);
@@ -2015,7 +2056,7 @@ err_free:
 
 err_undo_flags:
 	bond_dev->features = old_features;
-
+ 
 	return res;
 }
 
@@ -2099,6 +2140,8 @@ static int bond_release(struct net_device *bond_dev, struct net_device *slave_de
 
 	/* release the slave from its bond */
 	bond_detach_slave(bond, slave);
+
+	bond_compute_features(bond);
 
 	if (bond->primary_slave == slave) {
 		bond->primary_slave = NULL;
@@ -2242,6 +2285,8 @@ static int bond_release_all(struct net_device *bond_dev)
 			 */
 			bond_alb_deinit_slave(bond, slave);
 		}
+
+		bond_compute_features(bond);
 
 		/* now that the slave is detached, unlock and perform
 		 * all the undo steps that should not be called from
@@ -2835,6 +2880,7 @@ static void bond_arp_send_all(struct bonding *bond, struct slave *slave)
 		 * This target is not on a VLAN
 		 */
 		if (rt->u.dst.dev == bond->dev) {
+			ip_rt_put(rt);
 			dprintk("basa: rtdev == bond->dev: arp_send\n");
 			bond_arp_send(slave->dev, ARPOP_REQUEST, targets[i],
 				      bond->master_ip, 0);
@@ -2854,6 +2900,7 @@ static void bond_arp_send_all(struct bonding *bond, struct slave *slave)
 		}
 
 		if (vlan_id) {
+			ip_rt_put(rt);
 			bond_arp_send(slave->dev, ARPOP_REQUEST, targets[i],
 				      vlan->vlan_ip, vlan_id);
 			continue;
@@ -2865,6 +2912,7 @@ static void bond_arp_send_all(struct bonding *bond, struct slave *slave)
 			       bond->dev->name, NIPQUAD(fl.fl4_dst),
 			       rt->u.dst.dev ? rt->u.dst.dev->name : "NULL");
 		}
+		ip_rt_put(rt);
 	}
 }
 
@@ -3588,6 +3636,7 @@ static int bond_master_netdev_event(unsigned long event, struct net_device *bond
 static int bond_slave_netdev_event(unsigned long event, struct net_device *slave_dev)
 {
 	struct net_device *bond_dev = slave_dev->master;
+	struct bonding *bond = bond_dev->priv;
 
 	switch (event) {
 	case NETDEV_UNREGISTER:
@@ -3625,6 +3674,9 @@ static int bond_slave_netdev_event(unsigned long event, struct net_device *slave
 		/*
 		 * TODO: handle changing the primary's name
 		 */
+		break;
+	case NETDEV_FEAT_CHANGE:
+		bond_compute_features(bond);
 		break;
 	default:
 		break;
@@ -4526,6 +4578,11 @@ static inline void bond_set_mode_ops(struct bonding *bond, int mode)
 	}
 }
 
+static struct ethtool_ops bond_ethtool_ops = {
+	.get_tx_csum		= ethtool_op_get_tx_csum,
+	.get_sg			= ethtool_op_get_sg,
+};
+
 /*
  * Does not allocate but creates a /proc entry.
  * Allowed to fail.
@@ -4555,6 +4612,7 @@ static int __init bond_init(struct net_device *bond_dev, struct bond_params *par
 	bond_dev->stop = bond_close;
 	bond_dev->get_stats = bond_get_stats;
 	bond_dev->do_ioctl = bond_do_ioctl;
+	bond_dev->ethtool_ops = &bond_ethtool_ops;
 	bond_dev->set_multicast_list = bond_set_multicast_list;
 	bond_dev->change_mtu = bond_change_mtu;
 	bond_dev->set_mac_address = bond_set_mac_address;
@@ -4590,6 +4648,8 @@ static int __init bond_init(struct net_device *bond_dev, struct bond_params *par
 	bond_dev->features |= (NETIF_F_HW_VLAN_TX |
 			       NETIF_F_HW_VLAN_RX |
 			       NETIF_F_HW_VLAN_FILTER);
+
+	bond->bond_features = bond_dev->features;
 
 #ifdef CONFIG_PROC_FS
 	bond_create_proc_entry(bond);
@@ -4980,6 +5040,14 @@ static int __init bonding_init(void)
 	return 0;
 
 out_err:
+	/*
+	 * rtnl_unlock() will run netdev_run_todo(), putting the
+	 * thus-far-registered bonding devices into a state which
+	 * unregigister_netdevice() will accept
+	 */
+	rtnl_unlock();
+	rtnl_lock();
+
 	/* free and unregister all bonds that were successfully added */
 	bond_free_all();
 

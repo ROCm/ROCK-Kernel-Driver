@@ -871,38 +871,6 @@ static void __init detect_byte_swap(pmac_t *chip)
 		chip->can_duplex = 0;
 }
 
-static struct of_device_id alsa_match[] =
-{
-	{
-	.compatible	= "awacs"
-	},
-	{
-	.compatible	= "screamer"
-	},
-	{
-	.compatible	= "burgundy"
-	},
-	{
-	.compatible	= "daca"
-	},
-	{
-	.compatible	= "tumbler"
-	},
-	{
-	.compatible	= "snapper"
-	},
-	{
-	.compatible	= "AOAKeylargo"
-	},
-	{
-	.compatible	= "AOAbase"
-	},
-	{
-	.compatible	= "AOAK2"
-	},
-	{},
-};
-MODULE_DEVICE_TABLE (of, alsa_match);
 
 /*
  * detect a sound chip
@@ -979,7 +947,7 @@ static int __init snd_pmac_detect(pmac_t *chip)
 	/* This should be verified on older screamers */
 	if (device_is_compatible(sound, "screamer")) {
 		chip->model = PMAC_SCREAMER;
-		chip->can_byte_swap = 0; /* FIXME: check this */
+		// chip->can_byte_swap = 0; /* FIXME: check this */
 	}
 	if (device_is_compatible(sound, "burgundy")) {
 		chip->model = PMAC_BURGUNDY;
@@ -1192,7 +1160,7 @@ int __init snd_pmac_new(snd_card_t *card, pmac_t **chip_return)
 	snd_runtime_check(chip_return, return -EINVAL);
 	*chip_return = NULL;
 
-	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
+	chip = kzalloc(sizeof(*chip), GFP_KERNEL);
 	if (chip == NULL)
 		return -ENOMEM;
 	chip->card = card;

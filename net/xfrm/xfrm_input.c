@@ -12,7 +12,7 @@
 #include <net/ip.h>
 #include <net/xfrm.h>
 
-static kmem_cache_t *secpath_cachep;
+static kmem_cache_t *secpath_cachep __read_mostly;
 
 void __secpath_destroy(struct sec_path *sp)
 {
@@ -31,9 +31,6 @@ struct sec_path *secpath_dup(struct sec_path *src)
 	if (!sp)
 		return NULL;
 
-#ifdef CONFIG_NETFILTER
-	sp->decap_done = 0;
-#endif
 	sp->len = 0;
 	if (src) {
 		int i;

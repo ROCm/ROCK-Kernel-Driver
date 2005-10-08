@@ -21,11 +21,14 @@ CC		:= $(CC) -m32
 endif
 
 LDFLAGS_vmlinux	:= -Ttext $(KERNELLOAD) -Bstatic
-CPPFLAGS	+= -Iarch/$(ARCH)
+# The -Iarch/$(ARCH)/include is temporary while we are merging
+CPPFLAGS	+= -Iarch/$(ARCH) -Iarch/$(ARCH)/include
 AFLAGS		+= -Iarch/$(ARCH)
 CFLAGS		+= -Iarch/$(ARCH) -msoft-float -pipe \
 		-ffixed-r2 -mmultiple
 CPP		= $(CC) -E $(CFLAGS)
+# Temporary hack until we have migrated to asm-powerpc
+LINUXINCLUDE    += -Iarch/$(ARCH)/include
 
 CHECKFLAGS	+= -D__powerpc__
 
@@ -36,7 +39,6 @@ endif
 cpu-as-$(CONFIG_PPC64BRIDGE)	+= -Wa,-mppc64bridge
 cpu-as-$(CONFIG_4xx)		+= -Wa,-m405
 cpu-as-$(CONFIG_6xx)		+= -Wa,-maltivec
-cpu-as-$(CONFIG_6xx)		+= -mcpu=powerpc
 cpu-as-$(CONFIG_POWER4)		+= -Wa,-maltivec
 cpu-as-$(CONFIG_E500)		+= -Wa,-me500
 cpu-as-$(CONFIG_E200)		+= -Wa,-me200
@@ -102,15 +104,16 @@ endef
 
 archclean:
 	$(Q)$(MAKE) $(clean)=arch/ppc/boot
+	# Temporary hack until we have migrated to asm-powerpc
+	$(Q)rm -rf arch/$(ARCH)/include
 
-prepare: include/asm-$(ARCH)/offsets.h checkbin
+archprepare: checkbin
 
-arch/$(ARCH)/kernel/asm-offsets.s: $(objtree)/include/asm \
-				   $(objtree)/include/linux/version.h \
-				   include/config/MARKER
-
-include/asm-$(ARCH)/offsets.h: arch/$(ARCH)/kernel/asm-offsets.s
-	$(call filechk,gen-asm-offsets)
+# Temporary hack until we have migrated to asm-powerpc
+include/asm: arch/$(ARCH)/include/asm
+arch/$(ARCH)/include/asm:
+	$(Q)if [ ! -d arch/$(ARCH)/include ]; then mkdir -p arch/$(ARCH)/include; fi
+	$(Q)ln -fsn $(srctree)/include/asm-powerpc arch/$(ARCH)/include/asm
 
 # Use the file '.tmp_gas_check' for binutils tests, as gas won't output
 # to stdout and these checks are run even on install targets.
@@ -136,6 +139,5 @@ checkbin:
 		false ; \
 	fi
 
-CLEAN_FILES +=	arch/$(ARCH)/kernel/asm-offsets.s \
-		$(TOUT)
-MRPROPER_FILES += include/asm-$(ARCH)/offsets.h
+CLEAN_FILES += $(TOUT)
+

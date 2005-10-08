@@ -54,29 +54,6 @@ struct pt_regs {
 #define PTRACE_GET_THREAD_AREA    25
 #define PTRACE_SET_THREAD_AREA    26
 
-enum EFLAGS {
-        EF_CF   = 0x00000001,
-        EF_PF   = 0x00000004,
-        EF_AF   = 0x00000010,
-        EF_ZF   = 0x00000040,
-        EF_SF   = 0x00000080,
-        EF_TF   = 0x00000100,
-        EF_IE   = 0x00000200,
-        EF_DF   = 0x00000400,
-        EF_OF   = 0x00000800,
-        EF_IOPL = 0x00003000,
-        EF_IOPL_RING0 = 0x00000000,
-        EF_IOPL_RING1 = 0x00001000,
-        EF_IOPL_RING2 = 0x00002000,
-        EF_NT   = 0x00004000,   /* nested task */
-        EF_RF   = 0x00010000,   /* resume */
-        EF_VM   = 0x00020000,   /* virtual mode */
-        EF_AC   = 0x00040000,   /* alignment */
-        EF_VIF  = 0x00080000,   /* virtual interrupt */
-        EF_VIP  = 0x00100000,   /* virtual interrupt pending */
-        EF_ID   = 0x00200000,   /* id */
-};
-
 #ifdef __KERNEL__
 
 #include <asm/vm86.h>
@@ -84,6 +61,13 @@ enum EFLAGS {
 struct task_struct;
 extern void send_sigtrap(struct task_struct *tsk, struct pt_regs *regs, int error_code);
 
+/*
+ * user_mode_vm(regs) determines whether a register set came from user mode.
+ * This is true if V8086 mode was enabled OR if the register set was from
+ * protected mode with RPL-3 CS value.  This tricky test checks that with
+ * one comparison.  Many places in the kernel can bypass this full check
+ * if they have already ruled out V8086 mode, so user_mode(regs) can be used.
+ */
 static inline int user_mode(struct pt_regs *regs)
 {
 	return (regs->xcs & 3) != 0;
@@ -99,27 +83,5 @@ extern unsigned long profile_pc(struct pt_regs *regs);
 #define profile_pc(regs) instruction_pointer(regs)
 #endif
 #endif /* __KERNEL__ */
-
-/*For SKAS3 support.*/
-#ifndef _LINUX_PTRACE_STRUCT_DEF
-#define _LINUX_PTRACE_STRUCT_DEF
-
-#define PTRACE_FAULTINFO	  52
-#define PTRACE_SIGPENDING	  53
-#define PTRACE_LDT		  54
-#define PTRACE_SWITCH_MM 	  55
-
-struct ptrace_faultinfo {
-	int is_write;
-	unsigned long addr;
-};
-
-struct ptrace_ldt {
-	int func;
-  	void *ptr;
-	unsigned long bytecount;
-};
-
-#endif /*ifndef _LINUX_PTRACE_STRUCT_DEF*/
 
 #endif

@@ -31,10 +31,6 @@
 #include <asm/div64.h>
 #include "internal.h"
 
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#endif
-
 void get_vmalloc_info(struct vmalloc_info *vmi)
 {
 	struct vm_struct *vma;
@@ -51,9 +47,6 @@ void get_vmalloc_info(struct vmalloc_info *vmi)
 
 		prev_end = VMALLOC_START;
 
-#ifdef	CONFIG_KDB
-		if (!KDB_IS_RUNNING())
-#endif
 		read_lock(&vmlist_lock);
 
 		for (vma = vmlist; vma; vma = vma->next) {
@@ -79,9 +72,6 @@ void get_vmalloc_info(struct vmalloc_info *vmi)
 		if (VMALLOC_END - prev_end > vmi->largest_chunk)
 			vmi->largest_chunk = VMALLOC_END - prev_end;
 
-#ifdef	CONFIG_KDB
-		if (!KDB_IS_RUNNING())
-#endif
 		read_unlock(&vmlist_lock);
 	}
 }

@@ -902,7 +902,6 @@ smb_newconn(struct smb_sb_info *server, struct smb_conn_opt *opt)
 
 	/* chain into the data_ready callback */
 	server->data_ready = xchg(&sk->sk_data_ready, smb_data_ready);
-	server->write_space = xchg(&sk->sk_write_space, smb_write_space);
 
 	/* check if we have an old smbmount that uses seconds for the 
 	   serverzone */
@@ -2398,8 +2397,7 @@ smb_proc_readdir_long(struct file *filp, void *dirent, filldir_t filldir,
 		if (req->rq_rcls == ERRSRV && req->rq_err == ERRerror) {
 			/* a damn Win95 bug - sometimes it clags if you 
 			   ask it too fast */
-			current->state = TASK_INTERRUPTIBLE;
-			schedule_timeout(HZ/5);
+			schedule_timeout_interruptible(msecs_to_jiffies(200));
 			continue;
                 }
 

@@ -218,7 +218,7 @@ void bmwrite(struct net_device *dev, unsigned long reg_offset, unsigned data )
 
 
 static inline
-volatile unsigned short bmread(struct net_device *dev, unsigned long reg_offset )
+unsigned short bmread(struct net_device *dev, unsigned long reg_offset )
 {
 	return in_le16((void __iomem *)dev->base_addr + reg_offset);
 }
@@ -1658,7 +1658,6 @@ static struct of_device_id bmac_match[] =
 	},
 	{},
 };
-MODULE_DEVICE_TABLE (of, bmac_match);
 
 static struct macio_driver bmac_driver = 
 {

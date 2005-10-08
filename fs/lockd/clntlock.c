@@ -172,10 +172,13 @@ void nlmclnt_mark_reclaim(struct nlm_host *host)
 static inline
 void nlmclnt_prepare_reclaim(struct nlm_host *host, u32 newstate)
 {
+	host->h_monitored = 0;
+	host->h_nsmstate = newstate;
+	host->h_state++;
 	host->h_nextrebind = 0;
 	nlm_rebind_host(host);
 	nlmclnt_mark_reclaim(host);
-	dprintk("lockd: reclaiming locks for host %s\n", host->h_name);
+	dprintk("NLM: reclaiming locks for host %s", host->h_name);
 }
 
 /*
@@ -185,8 +188,12 @@ void nlmclnt_prepare_reclaim(struct nlm_host *host, u32 newstate)
 void
 nlmclnt_recovery(struct nlm_host *host, u32 newstate)
 {
-	nlmclnt_prepare_reclaim(host, newstate);
-	if (!host->h_reclaiming++) {
+	if (host->h_reclaiming++) {
+		if (host->h_nsmstate == newstate)
+			return;
+		nlmclnt_prepare_reclaim(host, newstate);
+	} else {
+		nlmclnt_prepare_reclaim(host, newstate);
 		nlm_get_host(host);
 		__module_get(THIS_MODULE);
 		if (kernel_thread(reclaimer, host, CLONE_KERNEL) < 0)

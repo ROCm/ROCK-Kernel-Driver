@@ -1,5 +1,7 @@
 /*
  * Copyright (c) 2004, 2005 Topspin Communications.  All rights reserved.
+ * Copyright (c) 2005 Sun Microsystems, Inc. All rights reserved.
+ * Copyright (c) 2004 Voltaire, Inc. All rights reserved.
  *
  * This software is available to you under a choice of one of two
  * licenses.  You may choose to be licensed under the terms of the GNU
@@ -49,9 +51,9 @@
 #include <asm/atomic.h>
 #include <asm/semaphore.h>
 
-#include <ib_verbs.h>
-#include <ib_pack.h>
-#include <ib_sa.h>
+#include <rdma/ib_verbs.h>
+#include <rdma/ib_pack.h>
+#include <rdma/ib_sa.h>
 
 /* constants */
 
@@ -88,8 +90,8 @@ enum {
 /* structs */
 
 struct ipoib_header {
-	u16 proto;
-	u16 reserved;
+	__be16	proto;
+	u16	reserved;
 };
 
 struct ipoib_pseudoheader {
@@ -255,7 +257,7 @@ void ipoib_mcast_send(struct net_device *dev, union ib_gid *mgid,
 
 void ipoib_mcast_restart_task(void *dev_ptr);
 int ipoib_mcast_start_thread(struct net_device *dev);
-int ipoib_mcast_stop_thread(struct net_device *dev);
+int ipoib_mcast_stop_thread(struct net_device *dev, int flush);
 
 void ipoib_mcast_dev_down(struct net_device *dev);
 void ipoib_mcast_dev_flush(struct net_device *dev);

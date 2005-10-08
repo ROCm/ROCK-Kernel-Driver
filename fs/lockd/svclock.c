@@ -177,8 +177,7 @@ nlmsvc_create_block(struct svc_rqst *rqstp, struct nlm_file *file,
 
 	/* Create host handle for callback */
 	host = nlmclnt_lookup_host(&rqstp->rq_addr,
-				rqstp->rq_prot, rqstp->rq_vers,
-				lock->caller);
+				rqstp->rq_prot, rqstp->rq_vers);
 	if (host == NULL)
 		return NULL;
 

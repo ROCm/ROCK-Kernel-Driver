@@ -96,6 +96,8 @@ static int fuse_lookup_iget(struct inode *dir, struct dentry *entry,
 	fuse_lookup_init(req, dir, entry, &outarg);
 	request_send(fc, req);
 	err = req->out.h.error;
+	if (!err && (!outarg.nodeid || outarg.nodeid == FUSE_ROOT_ID))
+		err = -EIO;
 	if (!err) {
 		inode = fuse_iget(dir->i_sb, outarg.nodeid, outarg.generation,
 				  &outarg.attr);
@@ -151,6 +153,10 @@ static int create_new_entry(struct fuse_conn *fc, struct fuse_req *req,
 	if (err) {
 		fuse_put_request(fc, req);
 		return err;
+	}
+	if (!outarg.nodeid || outarg.nodeid == FUSE_ROOT_ID) {
+		fuse_put_request(fc, req);
+		return -EIO;
 	}
 	inode = fuse_iget(dir->i_sb, outarg.nodeid, outarg.generation,
 			  &outarg.attr);
@@ -552,6 +558,7 @@ static int fuse_readdir(struct file *file, void *dstbuf, filldir_t filldir)
 				    filldir);
 
 	__free_page(page);
+	fuse_invalidate_attr(inode); /* atime changed */
 	return err;
 }
 
@@ -585,6 +592,7 @@ static char *read_link(struct dentry *dentry)
 		link[req->out.args[0].size] = '\0';
  out:
 	fuse_put_request(fc, req);
+	fuse_invalidate_attr(inode); /* atime changed */
 	return link;
 }
 
@@ -594,13 +602,13 @@ static void free_link(char *link)
 		free_page((unsigned long) link);
 }
 
-static int fuse_follow_link(struct dentry *dentry, struct nameidata *nd)
+static void *fuse_follow_link(struct dentry *dentry, struct nameidata *nd)
 {
 	nd_set_link(nd, read_link(dentry));
-	return 0;
+	return NULL;
 }
 
-static void fuse_put_link(struct dentry *dentry, struct nameidata *nd)
+static void fuse_put_link(struct dentry *dentry, struct nameidata *nd, void *c)
 {
 	free_link(nd_get_link(nd));
 }

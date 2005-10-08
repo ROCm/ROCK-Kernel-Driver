@@ -1,25 +1,35 @@
 /*
-   libata-core.c - helper library for ATA
-
-   Copyright 2003-2004 Red Hat, Inc.  All rights reserved.
-   Copyright 2003-2004 Jeff Garzik
-
-   The contents of this file are subject to the Open
-   Software License version 1.1 that can be found at
-   http://www.opensource.org/licenses/osl-1.1.txt and is included herein
-   by reference.
-
-   Alternatively, the contents of this file may be used under the terms
-   of the GNU General Public License version 2 (the "GPL") as distributed
-   in the kernel source COPYING file, in which case the provisions of
-   the GPL are applicable instead of the above.  If you wish to allow
-   the use of your version of this file only under the terms of the
-   GPL and not to allow others to use your version of this file under
-   the OSL, indicate your decision by deleting the provisions above and
-   replace them with the notice and other provisions required by the GPL.
-   If you do not delete the provisions above, a recipient may use your
-   version of this file under either the OSL or the GPL.
-
+ *  libata-core.c - helper library for ATA
+ *
+ *  Maintained by:  Jeff Garzik <jgarzik@pobox.com>
+ *    		    Please ALWAYS copy linux-ide@vger.kernel.org
+ *		    on emails.
+ *
+ *  Copyright 2003-2004 Red Hat, Inc.  All rights reserved.
+ *  Copyright 2003-2004 Jeff Garzik
+ *
+ *
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2, or (at your option)
+ *  any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program; see the file COPYING.  If not, write to
+ *  the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
+ *
+ *
+ *  libata documentation is available via 'make {ps|pdf}docs',
+ *  as Documentation/DocBook/libata.*
+ *
+ *  Hardware documentation available from http://www.t13.org/ and
+ *  http://www.sata-io.org/
+ *
  */
 
 #include <linux/config.h>
@@ -64,6 +74,10 @@ static void __ata_qc_complete(struct ata_queued_cmd *qc);
 
 static unsigned int ata_unique_id = 1;
 static struct workqueue_struct *ata_wq;
+
+int atapi_enabled = 0;
+module_param(atapi_enabled, int, 0444);
+MODULE_PARM_DESC(atapi_enabled, "Enable discovery of ATAPI devices (0=off, 1=on)");
 
 MODULE_AUTHOR("Jeff Garzik");
 MODULE_DESCRIPTION("Library module for ATA devices");
@@ -1304,12 +1318,12 @@ static inline u8 ata_dev_knobble(struct ata_port *ap)
 /**
  * 	ata_dev_config - Run device specific handlers and check for
  * 			 SATA->PATA bridges
- * 	@ap: Bus 
+ * 	@ap: Bus
  * 	@i:  Device
  *
  * 	LOCKING:
  */
- 
+
 void ata_dev_config(struct ata_port *ap, unsigned int i)
 {
 	/* limit bridge transfers to udma5, 200 sectors */
@@ -2462,11 +2476,10 @@ static int ata_pio_complete (struct ata_port *ap)
 	u8 drv_stat;
 
 	/*
-	 * This is purely hueristic.  This is a fast path.
-	 * Sometimes when we enter, BSY will be cleared in
-	 * a chk-status or two.  If not, the drive is probably seeking
-	 * or something.  Snooze for a couple msecs, then
-	 * chk-status again.  If still busy, fall back to
+	 * This is purely heuristic.  This is a fast path.  Sometimes when
+	 * we enter, BSY will be cleared in a chk-status or two.  If not,
+	 * the drive is probably seeking or something.  Snooze for a couple
+	 * msecs, then chk-status again.  If still busy, fall back to
 	 * PIO_ST_POLL state.
 	 */
 	drv_stat = ata_busy_wait(ap, ATA_BUSY | ATA_DRQ, 10);
@@ -2525,7 +2538,7 @@ void swap_buf_le16(u16 *buf, unsigned int buf_words)
  *	@ap: port to read/write
  *	@buf: data buffer
  *	@buflen: buffer length
- *	@do_write: read/write
+ *	@write_data: read/write
  *
  *	Transfer data from/to the device data register by MMIO.
  *
@@ -2571,7 +2584,7 @@ static void ata_mmio_data_xfer(struct ata_port *ap, unsigned char *buf,
  *	@ap: port to read/write
  *	@buf: data buffer
  *	@buflen: buffer length
- *	@do_write: read/write
+ *	@write_data: read/write
  *
  *	Transfer data from/to the device data register by PIO.
  *
@@ -2703,7 +2716,7 @@ static void __atapi_pio_bytes(struct ata_queued_cmd *qc, unsigned int bytes)
 
 next_sg:
 	if (unlikely(qc->cursg >= qc->n_elem)) {
-		/* 
+		/*
 		 * The end of qc->sg is reached and the device expects
 		 * more data to transfer. In order not to overrun qc->sg
 		 * and fulfill length specified in the byte count register,
@@ -2715,7 +2728,7 @@ next_sg:
 		unsigned int i;
 
 		if (words) /* warning if bytes > 1 */
-			printk(KERN_WARNING "ata%u: %u bytes trailing data\n", 
+			printk(KERN_WARNING "ata%u: %u bytes trailing data\n",
 			       ap->id, bytes);
 
 		for (i = 0; i < words; i++)
@@ -2911,7 +2924,7 @@ fsm_start:
 
 	if (timeout)
 		queue_delayed_work(ata_wq, &ap->pio_task, timeout);
-	else if (likely(!qc_completed))
+	else if (!qc_completed)
 		goto fsm_start;
 }
 
@@ -2994,19 +3007,20 @@ static void ata_qc_timeout(struct ata_queued_cmd *qc)
 	if (qc->dev->class == ATA_DEV_ATAPI && qc->scsicmd) {
 		struct scsi_cmnd *cmd = qc->scsicmd;
 
-		/* finish completing original command */
-		spin_lock_irqsave(&host_set->lock, flags);
-		__ata_qc_complete(qc);
-		spin_unlock_irqrestore(&host_set->lock, flags);
+		if (!(cmd->eh_eflags & SCSI_EH_CANCEL_CMD)) {
 
-		if (!SCSI_SENSE_VALID(cmd)) {
+			/* finish completing original command */
+			spin_lock_irqsave(&host_set->lock, flags);
+			__ata_qc_complete(qc);
+			spin_unlock_irqrestore(&host_set->lock, flags);
+
 			atapi_request_sense(ap, dev, cmd);
-		
-			cmd->result = (CHECK_CONDITION << 1) | (DID_OK << 16);
-		}
-		scsi_finish_command(cmd);
 
-		goto out;
+			cmd->result = (CHECK_CONDITION << 1) | (DID_OK << 16);
+			scsi_finish_command(cmd);
+
+			goto out;
+		}
 	}
 
 	spin_lock_irqsave(&host_set->lock, flags);
@@ -3026,7 +3040,7 @@ static void ata_qc_timeout(struct ata_queued_cmd *qc)
 		host_stat = ap->ops->bmdma_status(ap);
 
 		/* before we do anything else, clear DMA-Start bit */
-		ap->ops->bmdma_stop(ap);
+		ap->ops->bmdma_stop(qc);
 
 		/* fall through */
 
@@ -3220,9 +3234,9 @@ void ata_qc_complete(struct ata_queued_cmd *qc, u8 drv_stat)
 	if (likely(qc->flags & ATA_QCFLAG_DMAMAP))
 		ata_sg_clean(qc);
 
-	/*
-	 * atapi: Inactivate qc to prevent the interrupt handler from
-	 * racing with the error handling and atapi_request_sense() later.
+	/* atapi: mark qc as inactive to prevent the interrupt handler
+	 * from completing the command twice later, before the error handler
+	 * is called. (when rc != 0 and atapi request sense is needed)
 	 */
 	qc->flags &= ~ATA_QCFLAG_ACTIVE;
 
@@ -3408,7 +3422,7 @@ static void ata_bmdma_setup_mmio (struct ata_queued_cmd *qc)
 }
 
 /**
- *	ata_bmdma_start - Start a PCI IDE BMDMA transaction
+ *	ata_bmdma_start_mmio - Start a PCI IDE BMDMA transaction
  *	@qc: Info associated with this ATA transaction.
  *
  *	LOCKING:
@@ -3579,7 +3593,7 @@ u8 ata_bmdma_status(struct ata_port *ap)
 
 /**
  *	ata_bmdma_stop - Stop PCI IDE BMDMA transfer
- *	@ap: Port associated with this ATA transaction.
+ *	@qc: Command we are ending DMA for
  *
  *	Clears the ATA_DMA_START flag in the dma control register
  *
@@ -3589,8 +3603,9 @@ u8 ata_bmdma_status(struct ata_port *ap)
  *	spin_lock_irqsave(host_set lock)
  */
 
-void ata_bmdma_stop(struct ata_port *ap)
+void ata_bmdma_stop(struct ata_queued_cmd *qc)
 {
+	struct ata_port *ap = qc->ap;
 	if (ap->flags & ATA_FLAG_MMIO) {
 		void __iomem *mmio = (void __iomem *) ap->ioaddr.bmdma_addr;
 
@@ -3642,7 +3657,7 @@ inline unsigned int ata_host_intr (struct ata_port *ap,
 			goto idle_irq;
 
 		/* before we do anything else, clear DMA-Start bit */
-		ap->ops->bmdma_stop(ap);
+		ap->ops->bmdma_stop(qc);
 
 		/* fall through */
 
@@ -3814,104 +3829,6 @@ err_out:
  *	LOCKING:
  */
 
-/*
- * Execute a 'simple' command, that only consists of the opcode 'cmd' itself,
- * without filling any other registers
- */
-static int ata_do_simple_cmd(struct ata_port *ap, struct ata_device *dev,
-			     u8 cmd)
-{
-	DECLARE_COMPLETION(wait);
-	struct ata_queued_cmd *qc;
-	unsigned long flags;
-	int rc;
-
-	while ((qc = ata_qc_new_init(ap, dev)) == NULL)
-		msleep(10);
-
-	qc->tf.command = cmd;
-	qc->tf.flags |= ATA_TFLAG_DEVICE;
-	qc->tf.protocol = ATA_PROT_NODATA;
-
-	qc->waiting = &wait;
-	qc->complete_fn = ata_qc_complete_noop;
-
-	spin_lock_irqsave(&ap->host_set->lock, flags);
-	rc = ata_qc_issue(qc);
-	spin_unlock_irqrestore(&ap->host_set->lock, flags);
-
-	if (!rc)
-		wait_for_completion(&wait);
-
-	return rc;
-}
-
-static int ata_flush_cache(struct ata_port *ap, struct ata_device *dev)
-{
-	u8 cmd;
-
-	if (!ata_try_flush_cache(dev))
-		return 0;
-
-	if (ata_id_has_flush_ext(dev->id))
-		cmd = ATA_CMD_FLUSH_EXT;
-	else
-		cmd = ATA_CMD_FLUSH;
-
-	return ata_do_simple_cmd(ap, dev, cmd);
-}
-
-static int ata_standby_drive(struct ata_port *ap, struct ata_device *dev)
-{
-	return ata_do_simple_cmd(ap, dev, ATA_CMD_STANDBYNOW1);
-}
-
-static int ata_start_drive(struct ata_port *ap, struct ata_device *dev)
-{
-	return ata_do_simple_cmd(ap, dev, ATA_CMD_IDLEIMMEDIATE);
-}
-
-/**
- *	ata_device_resume - wakeup a previously suspended devices
- *
- *	Kick the drive back into action, by sending it an idle immediate
- *	command and making sure its transfer mode matches between drive
- *	and host.
- *
- */
-int ata_device_resume(struct ata_port *ap, struct ata_device *dev)
-{
-	if (ap->flags & ATA_FLAG_SUSPENDED) {
-		ap->flags &= ~ATA_FLAG_SUSPENDED;
-		ata_set_mode(ap);
-	}
-	if (!ata_dev_present(dev))
-		return 0;
-	if (dev->class == ATA_DEV_ATA)
-		ata_start_drive(ap, dev);
-
-	return 0;
-}
-
-/**
- *	ata_device_suspend - prepare a device for suspend
- *
- *	Flush the cache on the drive, if appropriate, then issue a
- *	standbynow command.
- *
- */
-int ata_device_suspend(struct ata_port *ap, struct ata_device *dev)
-{
-	if (!ata_dev_present(dev))
-		return 0;
-	if (dev->class == ATA_DEV_ATA)
-		ata_flush_cache(ap, dev);
-
-	ata_standby_drive(ap, dev);
-	ap->flags |= ATA_FLAG_SUSPENDED;
-	return 0;
-}
-
 int ata_port_start (struct ata_port *ap)
 {
 	struct device *dev = ap->host_set->dev;
@@ -4013,7 +3930,6 @@ static void ata_host_init(struct ata_port *ap, struct Scsi_Host *host,
 	ap->mwdma_mask = ent->mwdma_mask;
 	ap->udma_mask = ent->udma_mask;
 	ap->flags |= ent->host_flags;
-	ap->flags |= ent->port_flags[port_no];
 	ap->ops = ent->port_ops;
 	ap->cbl = ATA_CBL_NONE;
 	ap->active_tag = ATA_TAG_POISON;
@@ -4216,6 +4132,53 @@ err_out:
 }
 
 /**
+ *	ata_host_set_remove - PCI layer callback for device removal
+ *	@host_set: ATA host set that was removed
+ *
+ *	Unregister all objects associated with this host set. Free those 
+ *	objects.
+ *
+ *	LOCKING:
+ *	Inherited from calling layer (may sleep).
+ */
+
+
+void ata_host_set_remove(struct ata_host_set *host_set)
+{
+	struct ata_port *ap;
+	unsigned int i;
+
+	for (i = 0; i < host_set->n_ports; i++) {
+		ap = host_set->ports[i];
+		scsi_remove_host(ap->host);
+	}
+
+	free_irq(host_set->irq, host_set);
+
+	for (i = 0; i < host_set->n_ports; i++) {
+		ap = host_set->ports[i];
+
+		ata_scsi_release(ap->host);
+
+		if ((ap->flags & ATA_FLAG_NO_LEGACY) == 0) {
+			struct ata_ioports *ioaddr = &ap->ioaddr;
+
+			if (ioaddr->cmd_addr == 0x1f0)
+				release_region(0x1f0, 8);
+			else if (ioaddr->cmd_addr == 0x170)
+				release_region(0x170, 8);
+		}
+
+		scsi_host_put(ap->host);
+	}
+
+	if (host_set->ops->host_stop)
+		host_set->ops->host_stop(host_set);
+
+	kfree(host_set);
+}
+
+/**
  *	ata_scsi_release - SCSI layer callback hook for host unload
  *	@host: libata host to be unloaded
  *
@@ -4297,6 +4260,15 @@ ata_probe_ent_alloc(struct device *dev, struct ata_port_info *port)
 
 
 
+#ifdef CONFIG_PCI
+
+void ata_pci_host_stop (struct ata_host_set *host_set)
+{
+	struct pci_dev *pdev = to_pci_dev(host_set->dev);
+
+	pci_iounmap(pdev, host_set->mmio_base);
+}
+
 /**
  *	ata_pci_init_native_mode - Initialize native-mode driver
  *	@pdev:  pci device to be initialized
@@ -4309,7 +4281,6 @@ ata_probe_ent_alloc(struct device *dev, struct ata_port_info *port)
  *	ata_probe_ent structure should then be freed with kfree().
  */
 
-#ifdef CONFIG_PCI
 struct ata_probe_ent *
 ata_pci_init_native_mode(struct pci_dev *pdev, struct ata_port_info **port)
 {
@@ -4547,39 +4518,8 @@ void ata_pci_remove_one (struct pci_dev *pdev)
 {
 	struct device *dev = pci_dev_to_dev(pdev);
 	struct ata_host_set *host_set = dev_get_drvdata(dev);
-	struct ata_port *ap;
-	unsigned int i;
 
-	for (i = 0; i < host_set->n_ports; i++) {
-		ap = host_set->ports[i];
-
-		scsi_remove_host(ap->host);
-	}
-
-	free_irq(host_set->irq, host_set);
-
-	for (i = 0; i < host_set->n_ports; i++) {
-		ap = host_set->ports[i];
-
-		ata_scsi_release(ap->host);
-
-		if ((ap->flags & ATA_FLAG_NO_LEGACY) == 0) {
-			struct ata_ioports *ioaddr = &ap->ioaddr;
-
-			if (ioaddr->cmd_addr == 0x1f0)
-				release_region(0x1f0, 8);
-			else if (ioaddr->cmd_addr == 0x170)
-				release_region(0x170, 8);
-		}
-
-		scsi_host_put(ap->host);
-	}
-
-	if (host_set->ops->host_stop)
-		host_set->ops->host_stop(host_set);
-
-	kfree(host_set);
-
+	ata_host_set_remove(host_set);
 	pci_release_regions(pdev);
 	pci_disable_device(pdev);
 	dev_set_drvdata(dev, NULL);
@@ -4618,23 +4558,6 @@ int pci_test_config_bits(struct pci_dev *pdev, struct pci_bits *bits)
 
 	return (tmp == bits->val) ? 1 : 0;
 }
-
-int ata_pci_device_suspend(struct pci_dev *pdev, pm_message_t state)
-{
-	pci_save_state(pdev);
-	pci_disable_device(pdev);
-	pci_set_power_state(pdev, PCI_D3hot);
-	return 0;
-}
-
-int ata_pci_device_resume(struct pci_dev *pdev)
-{
-	pci_set_power_state(pdev, PCI_D0);
-	pci_restore_state(pdev);
-	pci_enable_device(pdev);
-	pci_set_master(pdev);
-	return 0;
-}
 #endif /* CONFIG_PCI */
 
 
@@ -4666,6 +4589,7 @@ module_exit(ata_exit);
 EXPORT_SYMBOL_GPL(ata_std_bios_param);
 EXPORT_SYMBOL_GPL(ata_std_ports);
 EXPORT_SYMBOL_GPL(ata_device_add);
+EXPORT_SYMBOL_GPL(ata_host_set_remove);
 EXPORT_SYMBOL_GPL(ata_sg_init);
 EXPORT_SYMBOL_GPL(ata_sg_init_one);
 EXPORT_SYMBOL_GPL(ata_qc_complete);
@@ -4709,14 +4633,8 @@ EXPORT_SYMBOL_GPL(ata_scsi_simulate);
 
 #ifdef CONFIG_PCI
 EXPORT_SYMBOL_GPL(pci_test_config_bits);
+EXPORT_SYMBOL_GPL(ata_pci_host_stop);
 EXPORT_SYMBOL_GPL(ata_pci_init_native_mode);
 EXPORT_SYMBOL_GPL(ata_pci_init_one);
 EXPORT_SYMBOL_GPL(ata_pci_remove_one);
-EXPORT_SYMBOL_GPL(ata_pci_device_suspend);
-EXPORT_SYMBOL_GPL(ata_pci_device_resume);
 #endif /* CONFIG_PCI */
-
-EXPORT_SYMBOL_GPL(ata_device_suspend);
-EXPORT_SYMBOL_GPL(ata_device_resume);
-EXPORT_SYMBOL_GPL(ata_scsi_device_suspend);
-EXPORT_SYMBOL_GPL(ata_scsi_device_resume);

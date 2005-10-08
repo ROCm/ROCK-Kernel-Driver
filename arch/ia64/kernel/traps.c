@@ -14,10 +14,8 @@
 #include <linux/tty.h>
 #include <linux/vt_kern.h>		/* For unblank_screen() */
 #include <linux/module.h>       /* for EXPORT_SYMBOL */
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#endif	/* CONFIG_KDB */
 #include <linux/hardirq.h>
+#include <linux/kprobes.h>
 
 #include <asm/fpswa.h>
 #include <asm/ia32.h>
@@ -43,7 +41,6 @@ int register_die_notifier(struct notifier_block *nb)
 	spin_unlock_irqrestore(&die_notifier_lock, flags);
 	return err;
 }
-EXPORT_SYMBOL(register_die_notifier);
 
 void __init
 trap_init (void)
@@ -115,9 +112,6 @@ die (const char *str, struct pt_regs *regs, long err)
 	bust_spinlocks(0);
 	die.lock_owner = -1;
 	spin_unlock_irq(&die.lock);
-#ifdef	CONFIG_KDB
-	(void)kdb(KDB_REASON_OOPS, err, regs);
-#endif	/* CONFIG_KDB */
   	do_exit(SIGSEGV);
 }
 
@@ -129,7 +123,7 @@ die_if_kernel (char *str, struct pt_regs *regs, long err)
 }
 
 void
-ia64_bad_break (unsigned long break_num, struct pt_regs *regs)
+__kprobes ia64_bad_break (unsigned long break_num, struct pt_regs *regs)
 {
 	siginfo_t siginfo;
 	int sig, code;
@@ -232,14 +226,6 @@ ia64_bad_break (unsigned long break_num, struct pt_regs *regs)
 		if (break_num < 0x80000) {
 			sig = SIGILL; code = __ILL_BREAK;
 		} else {
-#ifdef	CONFIG_KDB
-			if (break_num == KDB_BREAK_ENTER &&
-			    kdb(KDB_REASON_ENTER, break_num, regs))
-				return;		/* kdb handled it */
-			if (break_num == KDB_BREAK_BREAK &&
-			    kdb(KDB_REASON_BREAK, break_num, regs))
-				return;		/* kdb handled it */
-#endif	/* CONFIG_KDB */
 			sig = SIGTRAP; code = TRAP_BRKPT;
 		}
 	}
@@ -459,7 +445,7 @@ ia64_illegal_op_fault (unsigned long ec, long arg1, long arg2, long arg3,
 	return rv;
 }
 
-void
+void __kprobes
 ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 	    unsigned long iim, unsigned long itir, long arg5, long arg6,
 	    long arg7, struct pt_regs regs)
@@ -598,10 +584,6 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 				      return;
 			      siginfo.si_code = TRAP_TRACE; ifa = 0; break;
 		}
-#ifdef	CONFIG_KDB
-		if (!user_mode(&regs) && kdb(KDB_REASON_DEBUG, vector, &regs))
-			return;	/* kdb handled this */
-#endif	/* CONFIG_KDB */
 		siginfo.si_signo = SIGTRAP;
 		siginfo.si_errno = 0;
 		siginfo.si_addr  = (void __user *) ifa;

@@ -120,7 +120,6 @@ typedef struct scsi_cmnd      *ahd_io_ctx_t;
 
 /************************* Configuration Data *********************************/
 extern uint32_t aic79xx_allow_memio;
-extern int aic79xx_detect_complete;
 extern struct scsi_host_template aic79xx_driver_template;
 
 /***************************** Bus Space/DMA **********************************/
@@ -254,38 +253,7 @@ ahd_scb_timer_reset(struct scb *scb, u_int usec)
 /***************************** SMP support ************************************/
 #include <linux/spinlock.h>
 
-#define AHD_SCSI_HAS_HOST_LOCK 1
-
 #define AIC79XX_DRIVER_VERSION "1.3.11"
-
-/**************************** Front End Queues ********************************/
-/*
- * Data structure used to cast the Linux struct scsi_cmnd to something
- * that allows us to use the queue macros.  The linux structure has
- * plenty of space to hold the links fields as required by the queue
- * macros, but the queue macors require them to have the correct type.
- */
-struct ahd_cmd_internal {
-	/* Area owned by the Linux scsi layer. */
-	uint8_t	private[offsetof(struct scsi_cmnd, SCp.Status)];
-	union {
-		STAILQ_ENTRY(ahd_cmd)	ste;
-		LIST_ENTRY(ahd_cmd)	le;
-		TAILQ_ENTRY(ahd_cmd)	tqe;
-	} links;
-	uint32_t			end;
-};
-
-struct ahd_cmd {
-	union {
-		struct ahd_cmd_internal	icmd;
-		struct scsi_cmnd	scsi_cmd;
-	} un;
-};
-
-#define acmd_icmd(cmd) ((cmd)->un.icmd)
-#define acmd_scsi_cmd(cmd) ((cmd)->un.scsi_cmd)
-#define acmd_links un.icmd.links
 
 /*************************** Device Data Structures ***************************/
 /*
@@ -297,13 +265,10 @@ struct ahd_cmd {
  */
 
 typedef enum {
-	AHD_DEV_UNCONFIGURED	 = 0x01,
 	AHD_DEV_FREEZE_TIL_EMPTY = 0x02, /* Freeze queue until active == 0 */
-	AHD_DEV_TIMER_ACTIVE	 = 0x04, /* Our timer is active */
 	AHD_DEV_Q_BASIC		 = 0x10, /* Allow basic device queuing */
 	AHD_DEV_Q_TAGGED	 = 0x20, /* Allow full SCSI2 command queueing */
 	AHD_DEV_PERIODIC_OTAG	 = 0x40, /* Send OTAG to prevent starvation */
-	AHD_DEV_SLAVE_CONFIGURED = 0x80	 /* slave_configure() has been called */
 } ahd_linux_dev_flags;
 
 struct ahd_linux_target;
@@ -432,7 +397,6 @@ struct ahd_platform_data {
 	uint32_t		 irq;		/* IRQ for this adapter */
 	uint32_t		 bios_address;
 	uint32_t		 mem_busaddr;	/* Mem Base Addr */
-	uint64_t		 hw_dma_mask;
 #define	AHD_SCB_UP_EH_SEM 0x1
 	uint32_t		 flags;
 };
@@ -567,17 +531,6 @@ void	ahd_format_transinfo(struct info_str *info,
 			     struct ahd_transinfo *tinfo);
 
 /******************************** Locking *************************************/
-/* Lock protecting internal data structures */
-static __inline void ahd_lockinit(struct ahd_softc *);
-static __inline void ahd_lock(struct ahd_softc *, unsigned long *flags);
-static __inline void ahd_unlock(struct ahd_softc *, unsigned long *flags);
-
-/* Lock held during ahd_list manipulation and ahd softc frees */
-extern spinlock_t ahd_list_spinlock;
-static __inline void ahd_list_lockinit(void);
-static __inline void ahd_list_lock(unsigned long *flags);
-static __inline void ahd_list_unlock(unsigned long *flags);
-
 static __inline void
 ahd_lockinit(struct ahd_softc *ahd)
 {
@@ -594,24 +547,6 @@ static __inline void
 ahd_unlock(struct ahd_softc *ahd, unsigned long *flags)
 {
 	spin_unlock_irqrestore(&ahd->platform_data->spin_lock, *flags);
-}
-
-static __inline void
-ahd_list_lockinit(void)
-{
-	spin_lock_init(&ahd_list_spinlock);
-}
-
-static __inline void
-ahd_list_lock(unsigned long *flags)
-{
-	spin_lock_irqsave(&ahd_list_spinlock, *flags);
-}
-
-static __inline void
-ahd_list_unlock(unsigned long *flags)
-{
-	spin_unlock_irqrestore(&ahd_list_spinlock, *flags);
 }
 
 /******************************* PCI Definitions ******************************/
