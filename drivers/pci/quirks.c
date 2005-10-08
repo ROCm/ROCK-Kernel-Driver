@@ -959,13 +959,23 @@ static void __init quirk_sis_96x_smbus(struct pci_dev *dev)
 #define EHCI_USBLEGCTLSTS	4		/* legacy control/status */
 #define EHCI_USBLEGCTLSTS_SOOE	(1 << 13)	/* SMI on ownership change */
 
+#if defined(__i386__) || defined(__x86_64__)
+int usb_early_handoff __devinitdata = 1;	/* Do handoff by default */
+#else
 int usb_early_handoff __devinitdata = 0;
+#endif
 static int __init usb_handoff_early(char *str)
 {
 	usb_early_handoff = 1;
 	return 0;
 }
 __setup("usb-handoff", usb_handoff_early);
+static int __init usb_no_handoff_early(char *str)
+{
+	usb_early_handoff = 0;
+	return 0;
+}
+__setup("usb-no-handoff", usb_no_handoff_early);
 
 static void __devinit quirk_usb_handoff_uhci(struct pci_dev *pdev)
 {

@@ -113,6 +113,25 @@ UNUSUAL_DEV(  0x0424, 0x0fdc, 0x0210, 0x0210,
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_SINGLE_LUN ),
 
+/* https://bugzilla.novell.com/show_bug.cgi?id=105878 */
+/*
+* T:  Bus=02 Lev=01 Prnt=01 Port=01 Cnt=01 Dev#=  2 Spd=12  MxCh= 0
+* D:  Ver= 1.10 Cls=00(>ifc ) Sub=00 Prot=00 MxPS=64 #Cfgs=  1
+* P:  Vendor=0424 ProdID=0fdc Rev= 2.10
+* S:  Manufacturer=SMSC
+* S:  Product=FDC GOLD-2.30
+* C:* #Ifs= 1 Cfg#= 1 Atr=80 MxPwr=500mA
+* I:  If#= 0 Alt= 0 #EPs= 3 Cls=08(stor.) Sub=04 Prot=00 Driver=usb-storage
+* E:  Ad=82(I) Atr=02(Bulk) MxPS=  64 Ivl=0ms
+* E:  Ad=01(O) Atr=02(Bulk) MxPS=  64 Ivl=0ms
+* E:  Ad=83(I) Atr=03(Int.) MxPS=   2 Ivl=127ms
+*/
+UNUSUAL_DEV(  0x0424, 0x0fdc, 0x0210, 0x0210,
+		"SMSC",
+		"FDC GOLD-2.30",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_SINGLE_LUN ),
+
 #ifdef CONFIG_USB_STORAGE_DPCM
 UNUSUAL_DEV(  0x0436, 0x0005, 0x0100, 0x0100,
 		"Microtech",
@@ -179,6 +198,12 @@ UNUSUAL_DEV(  0x04b0, 0x0405, 0x0100, 0x0100,
 		"NIKON DSC D70",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_CAPACITY),
+
+UNUSUAL_DEV(  0x0409, 0x0040, 0x0150, 0x0150,
+		"NEC",
+		"NEC USB UF000x",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_SINGLE_LUN),
 
 /* BENQ DC5330
  * Reported by Manuel Fombuena <mfombuena@ya.com> and

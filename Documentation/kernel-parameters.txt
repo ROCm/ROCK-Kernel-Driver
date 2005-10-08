@@ -1499,6 +1499,7 @@ running once the system is up.
 			Format: <io>,<irq>
 
 	usb-handoff	[HW] Enable early USB BIOS -> OS handoff
+	usb-no-handoff	[HW] Disable early USB BIOS -> OS handoff
 
 	usbhid.mousepoll=
 			[USBHID] The interval which mice are to be polled at.
