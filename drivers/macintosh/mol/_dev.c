@@ -153,7 +153,7 @@ arch_handle_ioctl( kernel_vars_t *kv, int cmd, int p1, int p2, int p3 )
 
 	switch( cmd ) {
 	case MOL_IOCTL_GET_DIRTY_FBLINES:  /* short *retbuf, int size -- npairs */
-		if( verify_area(VERIFY_WRITE, (short*)p1, p2) )
+		if( access_ok(VERIFY_WRITE, (short*)p1, p2) )
 			break;
 		ret = get_dirty_fb_lines( kv, (short*)p1, p2 );
 		break;
@@ -188,7 +188,7 @@ arch_handle_ioctl( kernel_vars_t *kv, int cmd, int p1, int p2, int p3 )
 		break;
 
 	case MOL_IOCTL_SET_RAM: /* void ( char *lvbase, size_t size ) */
-		if( verify_area(VERIFY_WRITE, (char*)p1, p2) )
+		if( access_ok(VERIFY_WRITE, (char*)p1, p2) )
 			break;
 		kv->mmu.linux_ram_base = (char*)p1;
 		kv->mmu.ram_size = p2;
