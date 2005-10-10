@@ -871,6 +871,38 @@ static void __init detect_byte_swap(pmac_t *chip)
 		chip->can_duplex = 0;
 }
 
+static struct of_device_id alsa_match[] =
+{
+	{
+	.compatible	= "awacs"
+	},
+	{
+	.compatible	= "screamer"
+	},
+	{
+	.compatible	= "burgundy"
+	},
+	{
+	.compatible	= "daca"
+	},
+	{
+	.compatible	= "tumbler"
+	},
+	{
+	.compatible	= "snapper"
+	},
+	{
+	.compatible	= "AOAKeylargo"
+	},
+	{
+	.compatible	= "AOAbase"
+	},
+	{
+	.compatible	= "AOAK2"
+	},
+	{},
+};
+MODULE_DEVICE_TABLE (of, alsa_match);
 
 /*
  * detect a sound chip

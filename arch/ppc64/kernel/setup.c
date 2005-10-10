@@ -92,6 +92,8 @@ extern void udbg_init_maple_realmode(void);
 	do { udbg_putc = call_rtas_display_status_delay; } while(0)
 #endif
 
+extern int xmon_no_auto_backtrace;
+
 /* extern void *stab; */
 extern unsigned long klimit;
 
@@ -807,6 +809,9 @@ early_param("mem", early_parsemem);
 #endif /* CONFIG_PPC_ISERIES */
 
 #ifdef CONFIG_PPC_MULTIPLATFORM
+int do_not_try_pc_legacy_8250_console;
+EXPORT_SYMBOL(do_not_try_pc_legacy_8250_console);
+
 static int __init set_preferred_console(void)
 {
 	struct device_node *prom_stdout = NULL;
@@ -905,9 +910,15 @@ static int __init set_preferred_console(void)
 #endif /* CONFIG_PPC_PSERIES */
 #ifdef CONFIG_SERIAL_PMACZILOG_CONSOLE
 	else if (strcmp(name, "ch-a") == 0)
+	{
+		do_not_try_pc_legacy_8250_console = 1;
 		offset = 0;
+	}
 	else if (strcmp(name, "ch-b") == 0)
+	{
+		do_not_try_pc_legacy_8250_console = 1;
 		offset = 1;
+	}
 #endif /* CONFIG_SERIAL_PMACZILOG_CONSOLE */
 	else
 		goto not_found;
@@ -1298,6 +1309,8 @@ static int __init early_xmon(char *p)
 			xmon_init(1);
 		if (strncmp(p, "off", 3) == 0)
 			xmon_init(0);
+		if (strncmp(p, "nobt", 4) == 0)
+			xmon_no_auto_backtrace = 1;
 		if (strncmp(p, "early", 5) != 0)
 			return 0;
 	}

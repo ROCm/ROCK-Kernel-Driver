@@ -682,6 +682,10 @@ void __init pmac_pcibios_fixup(void)
 
 	for_each_pci_dev(dev)
 		pmac_pci_read_irq_line(dev);
+	request_region(0x0UL, 0x10000UL, "reserved legacy io");
+#ifdef CONFIG_SERIAL_CORE_CONSOLE
+	do_not_try_pc_legacy_8250_console = 1;
+#endif
 }
 
 static void __init pmac_fixup_phb_resources(void)

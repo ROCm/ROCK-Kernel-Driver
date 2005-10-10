@@ -1073,7 +1073,7 @@ static long tumbler_find_device(const char *device, const char *platform, pmac_g
 		gp->inactive_val = (*base) ? 0x4 : 0x5;
 	} else {
 		u32 *prop = NULL;
-		gp->active_state = 0;
+		gp->active_state = 1;
 		gp->active_val = 0x4;
 		gp->inactive_val = 0x5;
 		/* Here are some crude hacks to extract the GPIO polarity and

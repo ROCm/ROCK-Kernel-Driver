@@ -2017,6 +2017,7 @@ static struct of_device_id fcu_match[] =
 	},
 	{},
 };
+MODULE_DEVICE_TABLE (of, fcu_match);
 
 static struct of_platform_driver fcu_of_platform_driver = 
 {

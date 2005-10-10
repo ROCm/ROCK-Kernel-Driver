@@ -713,6 +713,7 @@ static struct of_device_id i2c_keywest_match[] =
 	},
 	{},
 };
+MODULE_DEVICE_TABLE (of, i2c_keywest_match);
 
 static struct macio_driver i2c_keywest_macio_driver = 
 {
