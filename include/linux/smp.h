@@ -99,6 +99,7 @@ void smp_prepare_boot_cpu(void);
 static inline void smp_send_reschedule(int cpu) { }
 #define num_booting_cpus()			1
 #define smp_prepare_boot_cpu()			do {} while (0)
+static inline void cpu_die(void) { }
 
 #endif /* !SMP */
 

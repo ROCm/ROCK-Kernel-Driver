@@ -66,11 +66,7 @@ extern struct klock_info_struct klock_info;
 
 #endif /* __ASSEMBLY__ */
 
-#else /* !(CONFIG_SMP) */
-
-static inline void cpu_die(void) { }
-
-#endif /* !(CONFIG_SMP) */
+#endif /* CONFIG_SMP */
 
 #endif /* !(_PPC_SMP_H) */
 #endif /* __KERNEL__ */
