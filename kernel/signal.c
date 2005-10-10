@@ -262,7 +262,7 @@ next_signal(struct sigpending *pending, sigset_t *mask)
 	return sig;
 }
 
-static struct sigqueue *__sigqueue_alloc(struct task_struct *t, unsigned int __nocast flags,
+static struct sigqueue *__sigqueue_alloc(struct task_struct *t, gfp_t flags,
 					 int override_rlimit)
 {
 	struct sigqueue *q = NULL;
@@ -578,7 +578,8 @@ int dequeue_signal(struct task_struct *tsk, sigset_t *mask, siginfo_t *info)
  		 * is to alert stop-signal processing code when another
  		 * processor has come along and cleared the flag.
  		 */
- 		tsk->signal->flags |= SIGNAL_STOP_DEQUEUED;
+ 		if (!(tsk->signal->flags & SIGNAL_GROUP_EXIT))
+ 			tsk->signal->flags |= SIGNAL_STOP_DEQUEUED;
  	}
 	if ( signr &&
 	     ((info->si_code & __SI_MASK) == __SI_TIMER) &&
