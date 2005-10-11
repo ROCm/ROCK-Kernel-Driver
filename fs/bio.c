@@ -997,6 +997,15 @@ void bio_endio(struct bio *bio, unsigned int bytes_done, int error)
 	bio->bi_size -= bytes_done;
 	bio->bi_sector += (bytes_done >> 9);
 
+	if (bio_data_dir(bio) == READ)
+		/*
+		 * If the current cpu has written to the page by hand
+		 * without dma, we must enforce ordering to be sure
+		 * this written data will be visible before we expose
+		 * the page contents to other cpus (for example with
+		 * a set_pte).
+		 */
+		smp_wmb();
 	if (bio->bi_end_io)
 		bio->bi_end_io(bio, bytes_done, error);
 }
