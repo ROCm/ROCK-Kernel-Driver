@@ -431,6 +431,12 @@ config DNOTIFY
 
 	  Because of this, if unsure, say Y.
 
+config SUBFS_FS
+	tristate "subfs file system support"
+	help
+	  If you don't know whether you need it, then you don't need it:
+	  answer N.
+
 config AUTOFS_FS
 	tristate "Kernel automounter support"
 	help
