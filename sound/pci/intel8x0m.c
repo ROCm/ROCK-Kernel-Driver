@@ -3,7 +3,7 @@
  *
  *	Copyright (c) 2000 Jaroslav Kysela <perex@suse.cz>
  *
- *   This is modified (by Sasha Khapyorsky <sashak@smlink.com>) version
+ *   This is modified (by Sasha Khapyorsky <sashak@alsa-project.org>) version
  *   of ALSA ICH sound driver intel8x0.c .
  *
  *
@@ -56,19 +56,20 @@ MODULE_SUPPORTED_DEVICE("{{Intel,82801AA-ICH},"
 		"{NVidia,NForce3 Modem},"
 		"{AMD,AMD768}}");
 
-static int index[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = -2}; /* Exclude the first card */
-static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
-static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
-static int ac97_clock[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
+static int index = -2; /* Exclude the first card */
+static char *id = SNDRV_DEFAULT_STR1;	/* ID for this card */
+static int ac97_clock = 0;
 
-module_param_array(index, int, NULL, 0444);
+module_param(index, int, 0444);
 MODULE_PARM_DESC(index, "Index value for Intel i8x0 modemcard.");
-module_param_array(id, charp, NULL, 0444);
+module_param(id, charp, 0444);
 MODULE_PARM_DESC(id, "ID string for Intel i8x0 modemcard.");
-module_param_array(enable, bool, NULL, 0444);
-MODULE_PARM_DESC(enable, "Enable Intel i8x0 modemcard.");
-module_param_array(ac97_clock, int, NULL, 0444);
+module_param(ac97_clock, int, 0444);
 MODULE_PARM_DESC(ac97_clock, "AC'97 codec clock (0 = auto-detect).");
+
+/* just for backward compatibility */
+static int enable;
+module_param(enable, int, 0444);
 
 /*
  *  Direct registers
@@ -746,6 +747,7 @@ static int __devinit snd_intel8x0_pcm1(intel8x0_t *chip, int device, struct ich_
 
 	pcm->private_data = chip;
 	pcm->info_flags = 0;
+	pcm->dev_class = SNDRV_PCM_CLASS_MODEM;
 	if (rec->suffix)
 		sprintf(pcm->name, "%s - %s", chip->card->shortname, rec->suffix);
 	else
@@ -854,7 +856,6 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock)
 	if ((err = snd_ac97_bus(chip->card, 0, &ops, chip, &pbus)) < 0)
 		goto __err;
 	pbus->private_free = snd_intel8x0_mixer_free_ac97_bus;
-	pbus->shared_type = AC97_SHARED_TYPE_ICH;	/* shared with audio driver */
 	if (ac97_clock >= 8000 && ac97_clock <= 48000)
 		pbus->clock = ac97_clock;
 	chip->ac97_bus = pbus;
@@ -1263,20 +1264,12 @@ static struct shortname_table {
 static int __devinit snd_intel8x0m_probe(struct pci_dev *pci,
 					const struct pci_device_id *pci_id)
 {
-	static int dev;
 	snd_card_t *card;
 	intel8x0_t *chip;
 	int err;
 	struct shortname_table *name;
 
-	if (dev >= SNDRV_CARDS)
-		return -ENODEV;
-	if (!enable[dev]) {
-		dev++;
-		return -ENOENT;
-	}
-
-	card = snd_card_new(index[dev], id[dev], THIS_MODULE, 0);
+	card = snd_card_new(index, id, THIS_MODULE, 0);
 	if (card == NULL)
 		return -ENOMEM;
 
@@ -1295,7 +1288,7 @@ static int __devinit snd_intel8x0m_probe(struct pci_dev *pci,
 		return err;
 	}
 
-	if ((err = snd_intel8x0_mixer(chip, ac97_clock[dev])) < 0) {
+	if ((err = snd_intel8x0_mixer(chip, ac97_clock)) < 0) {
 		snd_card_free(card);
 		return err;
 	}
@@ -1314,7 +1307,6 @@ static int __devinit snd_intel8x0m_probe(struct pci_dev *pci,
 		return err;
 	}
 	pci_set_drvdata(pci, card);
-	dev++;
 	return 0;
 }
 
