@@ -44,6 +44,8 @@
 #include <asm/uaccess.h>
 
 #include <linux/efi.h>
+#include <linux/initrd.h>
+#include <linux/syscalls.h>
 
 #define _COMPONENT		ACPI_OS_SERVICES
 ACPI_MODULE_NAME("osl")
@@ -243,6 +245,79 @@ acpi_os_predefined_override(const struct acpi_predefined_names *init_val,
 
 	return AE_OK;
 }
+#ifdef CONFIG_ACPI_INITRD
+static const char signature[] = "INITRDDSDT123DSDT123";
+static char ramfs_dsdt_name[] = "/DSDT.aml";
+
+static char *acpi_find_dsdt_initrd(void)
+{
+	char *dsdt_start = NULL;
+	char *dsdt_buffer = NULL;
+	unsigned long len = 0, len2 = 0;
+	int fd;
+	struct kstat stat;
+
+	/* try to get dsdt from tail of initrd */
+	if ((fd = sys_open(ramfs_dsdt_name, O_RDONLY, 0)) < 0) {
+		if (initrd_start) {
+			char *data = (char *)initrd_start;
+
+			printk(KERN_INFO PREFIX "Looking for DSDT in initrd...");
+
+			/* Search for the start signature */
+			while (data < (char *)initrd_end - sizeof(signature) - 4) {
+				if (!memcmp(data, signature, sizeof(signature))) {
+					data += sizeof(signature);
+					if (!memcmp(data, "DSDT", 4))
+						dsdt_start = data;
+					break;
+				}
+				data++;
+			}
+
+			if (dsdt_start){
+				printk(" found at offset %zu",
+				       dsdt_start - (char *)initrd_start);
+				len = (char*) initrd_end - dsdt_start;
+				printk(", size: %lu bytes\n", len);
+				dsdt_buffer = ACPI_MEM_ALLOCATE(len + 1);
+				memcpy(dsdt_buffer, dsdt_start, len);
+				*(dsdt_buffer + len + 1)= '\0';
+			} else
+				printk(" not found!\n");
+		}
+	} else {
+		printk(KERN_INFO PREFIX "Looking for DSDT in initramfs...");
+		if (vfs_stat(ramfs_dsdt_name, &stat) < 0){
+			printk ("error getting stats for file %s\n", ramfs_dsdt_name);
+			return NULL;
+		}
+
+		len = stat.size;
+		dsdt_buffer = ACPI_MEM_ALLOCATE(len + 1);
+		if (!dsdt_buffer) {
+			printk("Could not allocate %lu bytes of memory\n", len);
+			return NULL;
+		}
+		printk (" found %s ...", ramfs_dsdt_name);
+
+		len2 = sys_read (fd, (char __user *) dsdt_buffer, len);
+		if (len2 < len ){
+			printk("\n" PREFIX "Error trying to read %lu bytes from %s\n",
+			       len, ramfs_dsdt_name);
+			ACPI_MEM_FREE (dsdt_buffer);
+			dsdt_buffer = NULL;
+		} else {
+			printk(" successfully read %lu bytes from %s\n",
+			       len, ramfs_dsdt_name);
+			*(dsdt_buffer + len + 1) = '\0';
+		}
+	}
+	if (!dsdt_buffer)
+		printk(" not found!\n");
+	return dsdt_buffer;
+}
+#endif
 
 acpi_status
 acpi_os_table_override(struct acpi_table_header * existing_table,
@@ -251,14 +326,16 @@ acpi_os_table_override(struct acpi_table_header * existing_table,
 	if (!existing_table || !new_table)
 		return AE_BAD_PARAMETER;
 
-#ifdef CONFIG_ACPI_CUSTOM_DSDT
-	if (strncmp(existing_table->signature, "DSDT", 4) == 0)
-		*new_table = (struct acpi_table_header *)AmlCode;
-	else
-		*new_table = NULL;
-#else
 	*new_table = NULL;
+	if (strncmp(existing_table->signature, "DSDT", 4) == 0)
+#ifdef CONFIG_ACPI_CUSTOM_DSDT
+		*new_table = (struct acpi_table_header *)AmlCode;
+#elif defined(CONFIG_ACPI_INITRD)
+		*new_table = (struct acpi_table_header*)acpi_find_dsdt_initrd();
 #endif
+	if (*new_table)
+		printk(KERN_INFO PREFIX "Using customized DSDT\n");
+
 	return AE_OK;
 }
 
