@@ -359,6 +359,11 @@ CFLAGS 		:= -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -ffreestanding
 AFLAGS		:= -D__ASSEMBLY__
 
+# Warn about unsupported modules in kernels built inside Autobuild
+ifneq ($(wildcard /.buildenv),)
+CFLAGS		+= -DUNSUPPORTED_MODULES=1
+endif
+
 export	VERSION PATCHLEVEL SUBLEVEL EXTRAVERSION LOCALVERSION KERNELRELEASE \
 	ARCH CONFIG_SHELL HOSTCC HOSTCFLAGS CROSS_COMPILE AS LD CC \
 	CPP AR NM STRIP OBJCOPY OBJDUMP MAKE AWK GENKSYMS PERL UTS_MACHINE \

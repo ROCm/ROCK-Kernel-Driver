@@ -446,6 +446,50 @@ static char *get_modinfo(void *modinfo, unsigned long modinfo_len,
 	return NULL;
 }
 
+static struct {
+	void *file;
+	unsigned long size;
+} supp;
+
+const char *
+supported(struct module *mod)
+{
+	unsigned long pos = 0;
+	char *line;
+
+	/* In a first shot, do a simple linear scan. */
+	while ((line = get_next_line(&pos, supp.file, supp.size))) {
+		const char *basename, *how = "yes";
+		char *l = line;
+
+		/* optional type-of-support flag */
+		for (l = line; *l != '\0'; l++) {
+			if (*l == ' ' || *l == '\t') {
+				*l = '\0';
+				how = l + 1;
+				break;
+			}
+		}
+
+		/* skip directory components */
+		if ((l = strrchr(line, '/')))
+			line = l + 1;
+		/* strip .ko extension */
+		l = line + strlen(line);
+		if (l - line > 3 && !strcmp(l-3, ".ko"))
+			*(l-3) = '\0';
+
+		/* skip directory components */
+		if ((basename = strrchr(mod->name, '/')))
+			basename++;
+		else
+			basename = mod->name;
+		if (!strcmp(basename, line))
+			return how;
+	}
+	return NULL;
+}
+
 void
 read_symbols(char *modname)
 {
@@ -550,6 +594,14 @@ add_header(struct buffer *b, struct module *mod)
 			      " .exit = cleanup_module,\n"
 			      "#endif\n");
 	buf_printf(b, "};\n");
+}
+
+void
+add_supported_flag(struct buffer *b, struct module *mod)
+{
+	const char *how = supported(mod);
+	if (how)
+		buf_printf(b, "\nMODULE_INFO(supported, \"%s\");\n", how);
 }
 
 /* Record CRCs for unresolved symbols */
@@ -683,6 +735,14 @@ write_if_changed(struct buffer *b, const char *fname)
 }
 
 void
+read_supported(const char *fname)
+{
+	supp.file = grab_file(fname, &supp.size);
+	if (!supp.file)
+		; /* ignore error */
+}
+
+void
 read_dump(const char *fname)
 {
 	unsigned long size, pos = 0;
@@ -756,9 +816,10 @@ main(int argc, char **argv)
 	struct buffer buf = { };
 	char fname[SZ];
 	char *dump_read = NULL, *dump_write = NULL;
+	char *supp = NULL;
 	int opt;
 
-	while ((opt = getopt(argc, argv, "i:mo:a")) != -1) {
+	while ((opt = getopt(argc, argv, "i:mo:as:")) != -1) {
 		switch(opt) {
 			case 'i':
 				dump_read = optarg;
@@ -772,10 +833,16 @@ main(int argc, char **argv)
 			case 'a':
 				all_versions = 1;
 				break;
+			case 's':
+				supp = optarg;
+				break;
 			default:
 				exit(1);
 		}
 	}
+
+	if (supp)
+		read_supported(supp);
 
 	if (dump_read)
 		read_dump(dump_read);
@@ -791,6 +858,7 @@ main(int argc, char **argv)
 		buf.pos = 0;
 
 		add_header(&buf, mod);
+		add_supported_flag(&buf, mod);
 		add_versions(&buf, mod);
 		add_depends(&buf, mod, modules);
 		add_moddevtable(&buf, mod);
