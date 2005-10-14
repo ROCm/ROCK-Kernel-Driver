@@ -15,7 +15,9 @@ export AWK
 
 CHECKFLAGS	+= -m64 -D__ia64=1 -D__ia64__=1 -D_LP64 -D__LP64__
 
-OBJCOPYFLAGS	:= --strip-all
+ifndef CONFIG_DEBUG_INFO
+OBJCOPYFLAGS	:= --strip-debug
+endif
 LDFLAGS_vmlinux	:= -static
 LDFLAGS_MODULE	+= -T $(srctree)/arch/ia64/module.lds
 AFLAGS_KERNEL	:= -mconstant-gp
