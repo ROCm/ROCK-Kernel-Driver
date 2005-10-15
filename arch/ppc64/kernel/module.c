@@ -341,6 +341,19 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
 			*(unsigned long *)location = my_r2(sechdrs, me);
 			break;
 
+		case R_PPC64_TOC16:
+			/* Subtact TOC pointer */
+			value -= my_r2(sechdrs, me);
+			if (value + 0x8000 > 0xffff) {
+				printk("%s: bad TOC16 relocation (%lu)\n",
+				       me->name, value);
+				return -ENOEXEC;
+			}
+			*((uint16_t *) location)
+				= (*((uint16_t *) location) & ~0xffff)
+				| (value & 0xffff);
+			break;
+
 		case R_PPC64_TOC16_DS:
 			/* Subtact TOC pointer */
 			value -= my_r2(sechdrs, me);
@@ -352,19 +365,6 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
 			*((uint16_t *) location)
 				= (*((uint16_t *) location) & ~0xfffc)
 				| (value & 0xfffc);
-			break;
-
-		case R_PPC64_TOC16:
-			/* Subtact TOC pointer */
-			value -= my_r2(sechdrs, me);
-			if (value + 0x8000 > 0xffff) {
-				printk("%s: bad TOC16 relocation (%lu)\n",
-					me->name, value);
-				return -ENOEXEC;
-			}
-			*((uint16_t *) location)
-				= (*((uint16_t *) location) & ~0xffff)
-				| (value & 0xffff);
 			break;
 
 		case R_PPC_REL24:
