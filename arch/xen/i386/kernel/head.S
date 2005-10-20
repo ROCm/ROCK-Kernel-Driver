@@ -21,7 +21,7 @@
 #include <linux/linkage.h>
 #include <asm/segment.h>
 #include <asm/thread_info.h>
-#include <asm/asm_offsets.h>
+#include <asm/asm-offsets.h>
 #include <asm-xen/xen-public/arch-x86_32.h>
 
 /*

@@ -52,11 +52,11 @@ arch/xen/arch:
 arch/$(XENARCH)/kernel/asm-offsets.s: include/asm include/linux/version.h \
 				   include/config/MARKER
 
-include/asm-$(ARCH)/asm_offsets.h: arch/$(XENARCH)/kernel/asm-offsets.s
+include/asm-$(ARCH)/asm-offsets.h: arch/$(XENARCH)/kernel/asm-offsets.s
 	$(call filechk,gen-asm-offsets)
 
 prepare: include/.asm-ignore include/asm-xen/asm \
-	arch/xen/arch include/asm-$(ARCH)/asm_offsets.h include2/asm ;
+	arch/xen/arch include/asm-$(ARCH)/asm-offsets.h include2/asm ;
 
 all: vmlinuz
 
