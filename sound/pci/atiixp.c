@@ -58,7 +58,7 @@ MODULE_PARM_DESC(spdif_aclink, "S/PDIF over AC-link.");
 
 /* just for backward compatibility */
 static int enable;
-module_param(enable, int, 0444);
+module_param(enable, bool, 0444);
 
 
 /*
@@ -330,8 +330,7 @@ static int snd_atiixp_update_bits(atiixp_t *chip, unsigned int reg,
 
 /* delay for one tick */
 #define do_delay() do { \
-	set_current_state(TASK_UNINTERRUPTIBLE); \
-	schedule_timeout(1); \
+	schedule_timeout_uninterruptible(1); \
 } while (0)
 
 

@@ -92,9 +92,9 @@ static int snd_ymfpci_codec_ready(ymfpci_t *chip, int secondary)
 		if ((snd_ymfpci_readw(chip, reg) & 0x8000) == 0)
 			return 0;
 		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(1);
+		schedule_timeout_uninterruptible(1);
 	} while (time_before(jiffies, end_time));
-	snd_printk("codec_ready: codec %i is not ready [0x%x]\n", secondary, snd_ymfpci_readw(chip, reg));
+	snd_printk(KERN_ERR "codec_ready: codec %i is not ready [0x%x]\n", secondary, snd_ymfpci_readw(chip, reg));
 	return -EBUSY;
 }
 
@@ -728,8 +728,7 @@ static void snd_ymfpci_irq_wait(ymfpci_t *chip)
 		init_waitqueue_entry(&wait, current);
 		add_wait_queue(&chip->interrupt_sleep, &wait);
 		atomic_inc(&chip->interrupt_sleep_count);
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(HZ/20);
+		schedule_timeout_uninterruptible(msecs_to_jiffies(50));
 		remove_wait_queue(&chip->interrupt_sleep, &wait);
 	}
 }
@@ -1851,9 +1850,7 @@ static int snd_ymfpci_timer_start(snd_timer_t *timer)
 	unsigned int count;
 
 	chip = snd_timer_chip(timer);
-	count = timer->sticks - 1;
-	if (count == 0) /* minimum time is 20.8 us */
-		count = 1;
+	count = (timer->sticks << 1) - 1;
 	spin_lock_irqsave(&chip->reg_lock, flags);
 	snd_ymfpci_writew(chip, YDSXGR_TIMERCOUNT, count);
 	snd_ymfpci_writeb(chip, YDSXGR_TIMERCTRL, 0x03);
@@ -1877,14 +1874,14 @@ static int snd_ymfpci_timer_precise_resolution(snd_timer_t *timer,
 					       unsigned long *num, unsigned long *den)
 {
 	*num = 1;
-	*den = 96000;
+	*den = 48000;
 	return 0;
 }
 
 static struct _snd_timer_hardware snd_ymfpci_timer_hw = {
 	.flags = SNDRV_TIMER_HW_AUTO,
-	.resolution = 10417, /* 1/2fs = 10.41666...us */
-	.ticks = 65536,
+	.resolution = 20833, /* 1/fs = 20.8333...us */
+	.ticks = 0x8000,
 	.start = snd_ymfpci_timer_start,
 	.stop = snd_ymfpci_timer_stop,
 	.precise_resolution = snd_ymfpci_timer_precise_resolution,
@@ -2290,12 +2287,12 @@ int __devinit snd_ymfpci_create(snd_card_t * card,
 	pci_set_master(pci);
 
 	if ((chip->res_reg_area = request_mem_region(chip->reg_area_phys, 0x8000, "YMFPCI")) == NULL) {
-		snd_printk("unable to grab memory region 0x%lx-0x%lx\n", chip->reg_area_phys, chip->reg_area_phys + 0x8000 - 1);
+		snd_printk(KERN_ERR "unable to grab memory region 0x%lx-0x%lx\n", chip->reg_area_phys, chip->reg_area_phys + 0x8000 - 1);
 		snd_ymfpci_free(chip);
 		return -EBUSY;
 	}
 	if (request_irq(pci->irq, snd_ymfpci_interrupt, SA_INTERRUPT|SA_SHIRQ, "YMFPCI", (void *) chip)) {
-		snd_printk("unable to grab IRQ %d\n", pci->irq);
+		snd_printk(KERN_ERR "unable to grab IRQ %d\n", pci->irq);
 		snd_ymfpci_free(chip);
 		return -EBUSY;
 	}

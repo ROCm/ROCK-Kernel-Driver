@@ -845,7 +845,7 @@ static int snd_generic_resume(struct device *dev, u32 level)
 	card = get_snd_generic_card(dev);
 	if (card->power_state == SNDRV_CTL_POWER_D0)
 		return 0;
-	if (card->pm_suspend)
+	if (card->pm_resume)
 		card->pm_resume(card);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
 	return 0;
