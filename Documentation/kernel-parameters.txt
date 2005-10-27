@@ -234,6 +234,12 @@ running once the system is up.
 	apm=		[APM] Advanced Power Management
 			See header of arch/i386/kernel/apm.c.
 
+	apic		[UP,APIC,i386] Tells the kernel to make use of the APIC on
+	                uniprocessor systems. When CONFIG_X86_APIC_OFF is set it 
+			needs this parameter to really activate it (needed to 
+			avoid problems with certain machines). This enables IO 
+			and local APICs.
+
 	applicom=	[HW]
 			Format: <mem>,<irq>
 

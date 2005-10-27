@@ -709,7 +709,11 @@ static void apic_pm_activate(void) { }
 
 static int __init apic_set_verbosity(char *str)
 {
-	if (strcmp("debug", str) == 0)
+	if (*str == '=') 
+		str++;
+	if (*str == 0) 
+		;/* parsed early already */
+	else if (strcmp("debug", str) == 0)
 		apic_verbosity = APIC_DEBUG;
 	else if (strcmp("verbose", str) == 0)
 		apic_verbosity = APIC_VERBOSE;
@@ -720,15 +724,20 @@ static int __init apic_set_verbosity(char *str)
 	return 0;
 }
 
-__setup("apic=", apic_set_verbosity);
+__setup("apic", apic_set_verbosity);
 
 static int __init detect_init_APIC (void)
 {
 	u32 h, l, features;
-
+#ifdef CONFIG_X86_APIC_OFF
+	/* Disabled by kernel option? */
+	if (enable_local_apic < 1)
+		return -1;
+#else
 	/* Disabled by kernel option? */
 	if (enable_local_apic < 0)
 		return -1;
+#endif
 
 	switch (boot_cpu_data.x86_vendor) {
 	case X86_VENDOR_AMD:
@@ -817,8 +826,6 @@ void __init init_apic_mappings(void)
 		apic_phys = mp_lapic_addr;
 
 	set_fixmap_nocache(FIX_APIC_BASE, apic_phys);
-	printk(KERN_DEBUG "mapped APIC to %08lx (%08lx)\n", APIC_BASE,
-	       apic_phys);
 
 	/*
 	 * Fetch the APIC ID of the BSP in case we have a
@@ -851,8 +858,6 @@ fake_ioapic_page:
 				ioapic_phys = __pa(ioapic_phys);
 			}
 			set_fixmap_nocache(idx, ioapic_phys);
-			printk(KERN_DEBUG "mapped IOAPIC to %08lx (%08lx)\n",
-			       __fix_to_virt(idx), ioapic_phys);
 			idx++;
 		}
 	}
@@ -1259,11 +1264,21 @@ fastcall void smp_error_interrupt(struct pt_regs *regs)
  */
 int __init APIC_init_uniprocessor (void)
 {
+#ifdef CONFIG_X86_APIC_OFF
+	if (enable_local_apic <= 0) { 
+		clear_bit(X86_FEATURE_APIC, boot_cpu_data.x86_capability);
+		nr_ioapics = 0;
+		return -1;
+	}
+#endif
+
 	if (enable_local_apic < 0)
 		clear_bit(X86_FEATURE_APIC, boot_cpu_data.x86_capability);
 
-	if (!smp_found_config && !cpu_has_apic)
+	if (!smp_found_config && !cpu_has_apic) { 
+		nr_ioapics = 0;
 		return -1;
+	}
 
 	/*
 	 * Complain if the BIOS pretends there is one.
@@ -1271,6 +1286,8 @@ int __init APIC_init_uniprocessor (void)
 	if (!cpu_has_apic && APIC_INTEGRATED(apic_version[boot_cpu_physical_apicid])) {
 		printk(KERN_ERR "BIOS bug, local APIC #%d not detected!...\n",
 			boot_cpu_physical_apicid);
+		nr_ioapics = 0;
+		clear_bit(X86_FEATURE_APIC, boot_cpu_data.x86_capability);
 		return -1;
 	}
 

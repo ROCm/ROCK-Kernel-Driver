@@ -37,6 +37,9 @@
 int apic_verbosity;
 
 int disable_apic_timer __initdata;
+/* just used to communicate with shared i386 code: */
+int enable_local_apic = 1; 
+
 
 /* Using APIC to generate smp_local_timer_interrupt? */
 int using_apic_timer = 0;
@@ -1041,6 +1044,7 @@ int __init APIC_init_uniprocessor (void)
 	}
 	if (!cpu_has_apic) { 
 		disable_apic = 1;
+		enable_local_apic = -1; 
 		printk(KERN_INFO "Apic disabled by BIOS\n");
 		return -1;
 	}
@@ -1067,12 +1071,14 @@ int __init APIC_init_uniprocessor (void)
 
 static __init int setup_disableapic(char *str) 
 { 
+	enable_local_apic = -1;
 	disable_apic = 1;
 	return 0;
 } 
 
 static __init int setup_nolapic(char *str) 
 { 
+	enable_local_apic = -1;
 	disable_apic = 1;
 	return 0;
 } 

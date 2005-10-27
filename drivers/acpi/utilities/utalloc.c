@@ -571,6 +571,8 @@ static struct acpi_debug_mem_block *acpi_ut_find_allocation(void *allocation)
 
 	ACPI_FUNCTION_ENTRY();
 
+	return NULL;
+
 	element = acpi_gbl_global_list->list_head;
 
 	/* Search for the address. */

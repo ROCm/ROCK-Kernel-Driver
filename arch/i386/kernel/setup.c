@@ -818,7 +818,7 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 		}
 
 		/* Limit ACPI just to boot-time to enable HT */
-		else if (!memcmp(from, "acpi=ht", 7)) {
+		else if (!memcmp(from, "acpi=ht", 7) || !memcmp(from,"acpi=oldboot",12)) {
 			if (!acpi_force)
 				disable_acpi();
 			acpi_ht = 1;
@@ -857,6 +857,9 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 		/* disable IO-APIC */
 		else if (!memcmp(from, "noapic", 6))
 			disable_ioapic_setup();
+ 		/* SUSE specific option */
+ 		else if (!memcmp(from, "apic", 4))
+ 		        lapic_enable();
 #endif /* CONFIG_X86_IO_APIC */
 #endif /* CONFIG_ACPI */
 

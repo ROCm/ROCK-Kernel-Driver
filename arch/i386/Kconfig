@@ -534,6 +534,15 @@ config X86_UP_APIC
 	  performance counters), and the NMI watchdog which detects hard
 	  lockups.
 
+config X86_APIC_OFF
+        bool "Disable local/IO APIC by default" 
+	depends on X86_LOCAL_APIC  && !SMP
+	default n
+	help
+	  When this option is enabled the IO/local APIC code is compiled in, but 
+	  only enabled when the kernel is booted with "apic" on the kernel 
+	  command line  or an DMI entry forced APIC mode. 
+
 config X86_UP_IOAPIC
 	bool "IO-APIC support on uniprocessors"
 	depends on X86_UP_APIC

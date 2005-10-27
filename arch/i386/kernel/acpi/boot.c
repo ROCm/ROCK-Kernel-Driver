@@ -803,6 +803,18 @@ static void __init acpi_process_madt(void)
 #ifdef CONFIG_X86_LOCAL_APIC
 	int count, error;
 
+	/* 
+	 * Warning, broken error handling here.
+	 * When X86_APIC_OFF is not set and the APIC initialization
+	 * later fails then the ACPI state will be all messed up.
+	 */
+#ifdef CONFIG_X86_APIC_OFF
+	if (enable_local_apic <= 0) { 
+		printk(KERN_INFO "ACPI: local apic disabled\n");
+		return;
+	}
+#endif	   
+
 	count = acpi_table_parse(ACPI_APIC, acpi_parse_madt);
 	if (count >= 1) {
 
