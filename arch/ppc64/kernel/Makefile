@@ -60,6 +60,7 @@ obj-$(CONFIG_MPIC)		+= mpic.o
 obj-$(CONFIG_PPC_PMAC)		+= pmac_setup.o pmac_feature.o pmac_pci.o \
 				   pmac_time.o pmac_nvram.o pmac_low_i2c.o \
 				   udbg_scc.o
+obj-$(CONFIG_CPU_FREQ_PMAC)	+= pmac_cpufreq.o
 
 obj-$(CONFIG_PPC_MAPLE)		+= maple_setup.o maple_pci.o maple_time.o \
 				   udbg_16550.o

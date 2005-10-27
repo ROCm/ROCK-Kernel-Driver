@@ -177,6 +177,9 @@
 #define SPRN_CTRLT	0x098
 #define   CTRL_RUNLATCH	0x1
 
+#define SPRN_SCOMC	0x114
+#define SPRN_SCOMD	0x115
+
 /* Performance monitor SPRs */
 #define SPRN_SIAR	780
 #define SPRN_SDAR	781
@@ -535,6 +538,9 @@ static inline void ppc64_runlatch_off(void)
 		mtspr(SPRN_CTRLT, ctrl);
 	}
 }
+
+extern unsigned long scom970_read(unsigned int address);
+extern void scom970_write(unsigned int address, unsigned long value);
 
 #endif /* __KERNEL__ */
 

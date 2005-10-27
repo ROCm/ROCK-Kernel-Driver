@@ -159,6 +159,17 @@ config KEXEC
 	  support.  As of this writing the exact hardware interface is
 	  strongly in flux, so no good recommendation can be made.
 
+source "drivers/cpufreq/Kconfig"
+
+config CPU_FREQ_PMAC
+	bool "Support for Apple G5"
+	depends on CPU_FREQ && PPC_PMAC64
+	select CPU_FREQ_TABLE
+	help
+	  This adds support for frequency switching on some Apple G5
+          machine. This is currently very experimental and works only
+          on some iMac G5.
+
 config IBMVIO
 	depends on PPC_PSERIES || PPC_ISERIES
 	bool
