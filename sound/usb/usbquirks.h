@@ -1056,15 +1056,6 @@ YAMAHA_DEVICE(0x7010, "UB99"),
 		}
 	}
 },
-	/* TODO: add Edirol UA-101 support */
-	/* TODO: add Roland G-70 support */
-	/* TODO: add Roland V-SYNTH XT support */
-	/* TODO: add BOSS GT-PRO support */
-	/* TODO: add Edirol PC-50 support */
-	/* TODO: add Edirol PC-80 support */
-	/* TODO: add Edirol UA-1EX support */
-	/* TODO: add Edirol UM-3 support */
-	/* TODO: add Edirol MD-P1 support */
 
 /* Guillemot devices */
 {
@@ -1086,6 +1077,15 @@ YAMAHA_DEVICE(0x7010, "UB99"),
 		}
 	}
 },
+	/* TODO: add Edirol UA-101 support */
+	/* TODO: add Roland G-70 support */
+	/* TODO: add Roland V-SYNTH XT support */
+	/* TODO: add BOSS GT-PRO support */
+	/* TODO: add Edirol PC-50 support */
+	/* TODO: add Edirol PC-80 support */
+	/* TODO: add Edirol UA-1EX support */
+	/* TODO: add Edirol UM-3 support */
+	/* TODO: add Edirol MD-P1 support */
 
 /* Midiman/M-Audio devices */
 {

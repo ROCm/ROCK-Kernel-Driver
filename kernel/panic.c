@@ -105,6 +105,12 @@ NORET_TYPE void panic(const char * fmt, ...)
 		 * We can't use the "normal" timers since we just panicked..
 	 	 */
 		printk(KERN_EMERG "Rebooting in %d seconds..",panic_timeout);
+#ifdef CONFIG_BOOTSPLASH
+		{
+			extern int splash_verbose(void);
+			(void)splash_verbose();
+		}
+#endif
 		for (i = 0; i < panic_timeout*1000; ) {
 			touch_nmi_watchdog();
 			i += panic_blink(i);
@@ -129,6 +135,12 @@ NORET_TYPE void panic(const char * fmt, ...)
         disabled_wait(caller);
 #endif
 	local_irq_enable();
+#ifdef CONFIG_BOOTSPLASH
+	{
+		extern int splash_verbose(void);
+		(void)splash_verbose();
+	}
+#endif
 	for (i = 0;;) {
 		i += panic_blink(i);
 		mdelay(1);

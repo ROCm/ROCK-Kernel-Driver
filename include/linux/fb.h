@@ -739,6 +739,14 @@ struct fb_info {
 	void *fbcon_par;                /* fbcon use-only private area */
 	/* From here on everything is device dependent */
 	void *par;	
+#ifdef CONFIG_BOOTSPLASH
+	struct splash_data *splash_data;
+	unsigned char *splash_pic;
+	int splash_pic_size;
+	int splash_bytes;
+	char *silent_screen_base;	/* real screen base */
+	char fb_cursordata[64];
+#endif
 };
 
 #ifdef MODULE

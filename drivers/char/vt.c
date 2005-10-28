@@ -3260,6 +3260,31 @@ void vcs_scr_writew(struct vc_data *vc, u16 val, u16 *org)
 	}
 }
 
+#ifdef CONFIG_BOOTSPLASH
+void con_remap_def_color(struct vc_data *vc, int new_color)
+{
+       unsigned short *sbuf = vc->vc_screenbuf;
+       unsigned c, len = vc->vc_screenbuf_size >> 1;
+       int old_color;
+
+       if (sbuf) {
+	       old_color = vc->vc_def_color << 8;
+	       new_color <<= 8;
+	       while(len--) {
+		       c = *sbuf;
+		       if (((c ^ old_color) & 0xf000) == 0)
+			       *sbuf ^= (old_color ^ new_color) & 0xf000; 
+		       if (((c ^ old_color) & 0x0f00) == 0)
+			       *sbuf ^= (old_color ^ new_color) & 0x0f00;
+		       sbuf++;
+	       }
+	       new_color >>= 8;
+       }
+       vc->vc_def_color = vc->vc_color = new_color;
+       update_attr(vc);
+}
+#endif
+
 /*
  *	Visible symbols for modules
  */

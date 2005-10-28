@@ -205,7 +205,10 @@ static int vesafb_setcolreg(unsigned regno, unsigned red, unsigned green,
     return 0;
 }
 
-static struct fb_ops vesafb_ops = {
+#ifndef CONFIG_BOOTSPLASH
+static
+#endif
+struct fb_ops vesafb_ops = {
 	.owner		= THIS_MODULE,
 	.fb_setcolreg	= vesafb_setcolreg,
 	.fb_pan_display	= vesafb_pan_display,
@@ -291,6 +294,9 @@ static int __init vesafb_probe(struct device *device)
 	 *                 option to simply use size_total as that
 	 *                 wastes plenty of kernel address space. */
 	size_remap  = size_vmode * 2;
+#ifdef CONFIG_BOOTSPLASH
+	size_remap *= 2;	/* some more for the images */
+#endif
 	if (vram_remap)
 		size_remap = vram_remap * 1024 * 1024;
 	if (size_remap < size_vmode)

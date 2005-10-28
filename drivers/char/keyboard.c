@@ -1072,6 +1072,15 @@ static void kbd_keycode(unsigned int keycode, int down,
 	}
 #endif	/* CONFIG_KDB */
 
+#ifdef CONFIG_BOOTSPLASH
+	/* This code has to be redone for some non-x86 platforms */
+	if (down == 1 && (keycode == 0x3c || keycode == 0x01)) {        /* F2 and ESC on PC keyboard */
+		extern int splash_verbose(void);
+		if (splash_verbose())
+			return; 
+	}       
+#endif
+
 #ifdef CONFIG_MAGIC_SYSRQ	       /* Handle the SysRq Hack */
 	if (keycode == KEY_SYSRQ && (sysrq_down || (down == 1 && sysrq_alt))) {
 		sysrq_down = down;
