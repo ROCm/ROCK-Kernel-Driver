@@ -370,6 +370,21 @@ asmlinkage long sys_syslog(int type, char __user * buf, int len)
 	return do_syslog(type, buf, len);
 }
 
+#ifdef CONFIG_DEBUG_KERNEL
+/* Its very handy to be able to view the syslog buffer during debug.
+ * But do_syslog() uses locks so it cannot be used during debugging.
+ * Instead, provide the start and end of the physical and logical logs.
+ * This is equivalent to do_syslog(3).
+ */
+void debugger_syslog_data(char *syslog_data[4])
+{
+	syslog_data[0] = log_buf;
+	syslog_data[1] = log_buf + log_buf_len;
+	syslog_data[2] = log_buf + log_end - (logged_chars < log_buf_len ? logged_chars : log_buf_len);
+	syslog_data[3] = log_buf + log_end;
+}
+#endif   /* CONFIG_DEBUG_KERNEL */
+
 /*
  * Call the console drivers on a range of log_buf
  */
