@@ -256,9 +256,10 @@ static int vio_bus_match(struct device *dev, struct device_driver *drv)
 	return (ids != NULL) && (vio_match_device(ids, vio_dev) != NULL);
 }
 
-static int pseries_vio_hotplug (struct device *dev, char **envp, int num_envp,
+static int vio_hotplug (struct device *dev, char **envp, int num_envp,
                           char *buffer, int buffer_size)
 {
+#ifdef CONFIG_PPC_PSERIES
 	const struct vio_dev *vio_dev = to_vio_dev(dev);
 	char *cp;
 	int length;
@@ -279,10 +280,13 @@ static int pseries_vio_hotplug (struct device *dev, char **envp, int num_envp,
 		return -ENOMEM;
 	envp[1] = NULL;
 	return 0;
+#else
+	return -ENODEV;
+#endif
 }
 
 struct bus_type vio_bus_type = {
 	.name = "vio",
-	.hotplug = pseries_vio_hotplug,
+	.hotplug = vio_hotplug,
 	.match = vio_bus_match,
 };
