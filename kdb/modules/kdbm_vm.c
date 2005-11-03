@@ -686,7 +686,7 @@ kdbm_sh(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 
 	kdb_printf("Scsi_Host at 0x%lx\n", addr);
 	kdb_printf("host_queue = 0x%p\n", sh.__devices.next);
-	kdb_printf("ehandler = 0x%p  eh_action = 0x%p\n",
+	kdb_printf("ehandler = 0x%p eh_action = 0x%p\n",
 		   sh.ehandler, sh.eh_action);
 	kdb_printf("eh_active = 0x%d host_wait = 0x%p hostt = 0x%p\n",
 		   sh.eh_active, &sh.host_wait, sh.hostt);

@@ -340,6 +340,11 @@ static void usb_kbd_disconnect(struct usb_interface *intf)
 	struct usb_kbd *kbd = usb_get_intfdata (intf);
 
 	usb_set_intfdata(intf, NULL);
+#ifdef CONFIG_KDB_USB
+       /* Unlink the KDB USB struct */
+       if (kbd && kbd->irq == kdb_usb_infos.urb)
+               memset(&kdb_usb_infos, 0, sizeof(kdb_usb_infos));
+#endif /* CONFIG_KDB_USB */
 	if (kbd) {
 		usb_kill_urb(kbd->irq);
 		input_unregister_device(kbd->dev);

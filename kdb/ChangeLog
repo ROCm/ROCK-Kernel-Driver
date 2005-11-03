@@ -1,3 +1,23 @@
+2005-10-28 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.14-common-1.
+
+2005-10-21 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.14-rc5-common-1.
+
+2005-10-11 Keith Owens  <kaos@sgi.com>
+
+	* Handle removal of USB keyboard.  Aaron Young, SGI.
+	* kdb v4.4-2.6.14-rc4-common-1.
+
+2005-10-05 Keith Owens  <kaos@sgi.com>
+
+	* Extend kdb_notifier_list() codes to include dumping.
+	* Use emergency_restart() for reboot, it can be called from interrupt
+	  context, unlike machine_restart().
+	* kdb v4.4-2.6.14-rc3-common-1.
+
 2005-09-21 Keith Owens  <kaos@sgi.com>
 
 	* Support kdb_current_task in register display and modify commands.

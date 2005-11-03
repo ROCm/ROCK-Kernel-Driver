@@ -147,7 +147,7 @@ enum
 	KERN_SETUID_DUMPABLE=69, /* int: behaviour of dumps for setuid core */
 	KERN_SPIN_RETRY=70,	/* int: number of spinlock retries */
 	KERN_UNSUPPORTED=71,	/* int: allow loading of unsupported modules */
-	KERN_KDB=72,		/* int: kdb on/off */
+	KERN_KDB=71,		/* int: kdb on/off */
 };
 
 

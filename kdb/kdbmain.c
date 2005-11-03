@@ -1080,6 +1080,7 @@ static void
 kdb_do_dump(struct pt_regs *regs)
 {
 #if defined(CONFIG_CRASH_DUMP) || defined(CONFIG_CRASH_DUMP_MODULE)
+	notifier_call_chain(&kdb_notifier_list, KDB_EVENT_DUMPING, NULL);
 	kdb_printf("Forcing dump (if configured)\n");
 	console_loglevel = 8;	/* to see the dump messages */
 	dump("kdb_do_dump", regs);
@@ -1110,8 +1111,8 @@ kdb_do_dump(struct pt_regs *regs)
 static int
 kdb_reboot(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 {
-	notifier_call_chain(&kdb_notifier_list, 2, NULL);
-	machine_restart(0);
+	notifier_call_chain(&kdb_notifier_list, KDB_EVENT_REBOOTING, NULL);
+	emergency_restart();
 	kdb_printf("Hmm, kdb_reboot did not reboot, spinning here\n");
 	while (1) {};
 	/* NOTREACHED */
@@ -1906,7 +1907,7 @@ kdb(kdb_reason_t reason, int error, struct pt_regs *regs)
 		kdb_initial_cpu = smp_processor_id();
 		++kdb_seqno;
 		spin_unlock(&kdb_lock);
-		notifier_call_chain(&kdb_notifier_list, 1, NULL);
+		notifier_call_chain(&kdb_notifier_list, KDB_EVENT_ENTERED, NULL);
 	}
 
 	if (smp_processor_id() == kdb_initial_cpu
@@ -1984,7 +1985,7 @@ kdb(kdb_reason_t reason, int error, struct pt_regs *regs)
 			/* Wait until all the other processors leave kdb */
 			while (kdb_previous_event() != 1)
 				;
-			notifier_call_chain(&kdb_notifier_list, 0, NULL);
+			notifier_call_chain(&kdb_notifier_list, KDB_EVENT_EXITING, NULL);
 			kdb_initial_cpu = -1;	/* release kdb control */
 			KDB_DEBUG_STATE("kdb 13", reason);
 		}

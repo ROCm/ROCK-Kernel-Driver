@@ -74,7 +74,7 @@ static int get_usb_char(void)
 	extern u_short plain_map[], shift_map[], ctrl_map[];
 
 	/* Is USB initialized ? */
-	if(!kdb_usb_infos.poll_func)
+	if (!kdb_usb_infos.poll_func || !kdb_usb_infos.urb || !kdb_usb_infos.buffer)
 		return -1;
 
 	/* Transfer char if they are present */

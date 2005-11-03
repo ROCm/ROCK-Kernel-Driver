@@ -140,9 +140,8 @@ extern void smp_kdb_stop(void);
 extern void kdb_enablehwfault(void);
 
 /*
- * Let other code know that kdb is in control.  Routines registered
- * on this list are called from the initial cpu with 1 when kdb is
- * entered, 0 when kdb exits, 2 when kdb is about to reboot the machine.
+ * Let other code know that kdb is in control.  Routines registered on this
+ * list are called from the initial cpu with one of the KDB_EVENT codes below.
  *
  * WARNING: If a module registers itself on this list (or any notifier
  * list) then there is a race condition.  The module could be in the
@@ -154,6 +153,11 @@ extern void kdb_enablehwfault(void);
  */
 
 extern struct notifier_block *kdb_notifier_list;
+
+#define KDB_EVENT_EXITING	0
+#define KDB_EVENT_ENTERED	1
+#define KDB_EVENT_REBOOTING	2
+#define KDB_EVENT_DUMPING	3
 
 #ifdef CONFIG_KDB_USB
 #include <linux/usb.h>

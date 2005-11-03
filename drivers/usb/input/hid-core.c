@@ -1811,6 +1811,12 @@ static void hid_disconnect(struct usb_interface *intf)
 	if (!hid)
 		return;
 
+#ifdef CONFIG_KDB_USB
+	/* Unlink the KDB USB struct */
+	if (hid->urbin == kdb_usb_infos.urb)
+		memset(&kdb_usb_infos, 0, sizeof(kdb_usb_infos));
+#endif
+
 	usb_set_intfdata(intf, NULL);
 	usb_kill_urb(hid->urbin);
 	usb_kill_urb(hid->urbout);
