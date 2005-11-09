@@ -945,6 +945,23 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 			continue;
 		}
 
+#ifdef CONFIG_XEN
+                if (vma && (vma->vm_flags & VM_FOREIGN)) {
+			struct page **map = vma->vm_private_data;
+			int offset = (start - vma->vm_start) >> PAGE_SHIFT;
+
+			if (map[offset] != NULL) {
+				if (pages)
+					pages[i] = map[offset];
+				if (vmas)
+					vmas[i] = vma;
+				i++;
+				start += PAGE_SIZE;
+				len--;
+				continue;
+			}
+                }
+#endif
 		if (!vma || (vma->vm_flags & VM_IO)
 				|| !(flags & vma->vm_flags))
 			return i ? : -EFAULT;
@@ -1195,6 +1212,106 @@ int remap_pfn_range(struct vm_area_struct *vma, unsigned long addr,
 }
 EXPORT_SYMBOL(remap_pfn_range);
 
+#ifdef CONFIG_XEN
+static inline int generic_pte_range(struct mm_struct *mm,
+                                    pmd_t *pmd,
+                                    unsigned long addr,
+                                    unsigned long end,
+                                    pte_fn_t fn, void *data)
+{
+	pte_t *pte;
+        int err;
+        struct page *pte_page;
+
+        pte = (mm == &init_mm) ?
+                pte_alloc_kernel(mm, pmd, addr) :
+                pte_alloc_map(mm, pmd, addr);
+        if (!pte)
+                return -ENOMEM;
+
+        pte_page = pmd_page(*pmd);
+
+        do {
+                err = fn(pte, pte_page, addr, data);
+		if (err)
+                        break;
+        } while (pte++, addr += PAGE_SIZE, addr != end);
+
+        if (mm != &init_mm)
+                pte_unmap(pte-1);
+        return err;
+
+}
+
+static inline int generic_pmd_range(struct mm_struct *mm,
+                                    pud_t *pud,
+                                    unsigned long addr,
+                                    unsigned long end,
+                                    pte_fn_t fn, void *data)
+{
+	pmd_t *pmd;
+	unsigned long next;
+        int err;
+
+	pmd = pmd_alloc(mm, pud, addr);
+	if (!pmd)
+		return -ENOMEM;
+	do {
+		next = pmd_addr_end(addr, end);
+                err = generic_pte_range(mm, pmd, addr, next, fn, data);
+                if (err)
+                    break;
+	} while (pmd++, addr = next, addr != end);
+	return err;
+}
+
+static inline int generic_pud_range(struct mm_struct *mm, pgd_t *pgd,
+                                    unsigned long addr,
+                                    unsigned long end,
+                                    pte_fn_t fn, void *data)
+{
+	pud_t *pud;
+	unsigned long next;
+        int err;
+
+	pud = pud_alloc(mm, pgd, addr);
+	if (!pud)
+		return -ENOMEM;
+	do {
+		next = pud_addr_end(addr, end);
+		err = generic_pmd_range(mm, pud, addr, next, fn, data);
+                if (err)
+			break;
+	} while (pud++, addr = next, addr != end);
+	return err;
+}
+
+/*
+ * Scan a region of virtual memory, filling in page tables as necessary
+ * and calling a provided function on each leaf page table.
+ */
+int generic_page_range(struct mm_struct *mm, unsigned long addr,
+                  unsigned long size, pte_fn_t fn, void *data)
+{
+	pgd_t *pgd;
+	unsigned long next;
+	unsigned long end = addr + size;
+	int err;
+
+	BUG_ON(addr >= end);
+	pgd = pgd_offset(mm, addr);
+	spin_lock(&mm->page_table_lock);
+	do {
+		next = pgd_addr_end(addr, end);
+		err = generic_pud_range(mm, pgd, addr, next, fn, data);
+		if (err)
+			break;
+	} while (pgd++, addr = next, addr != end);
+	spin_unlock(&mm->page_table_lock);
+	return err;
+}
+#endif
+
 /*
  * Do pte_mkwrite, but only if the vma says VM_WRITE.  We do this when
  * servicing faults for write access.  In the normal case, do always want
@@ -1250,8 +1367,18 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 	unsigned long pfn = pte_pfn(pte);
 	pte_t entry;
 	int ret;
+#ifdef CONFIG_XEN
+	struct page invalid_page;
+#endif
 
 	if (unlikely(!pfn_valid(pfn))) {
+#ifdef CONFIG_XEN
+		/* This can happen with /dev/mem (PROT_WRITE, MAP_PRIVATE). */
+		invalid_page.flags = (1<<PG_reserved) | (1<<PG_locked);
+		old_page = &invalid_page;
+	} else {
+		old_page = pfn_to_page(pfn);
+#else
 		/*
 		 * This should really halt the system so it can be debugged or
 		 * at least the kernel stops what it's doing before it corrupts
@@ -1262,8 +1389,11 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 				address);
 		spin_unlock(&mm->page_table_lock);
 		return VM_FAULT_OOM;
+#endif
 	}
+#ifndef CONFIG_XEN
 	old_page = pfn_to_page(pfn);
+#endif
 
 	if (PageAnon(old_page) && !TestSetPageLocked(old_page)) {
 		int reuse = can_share_swap_page(old_page);
@@ -1299,7 +1429,17 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 		new_page = alloc_page_vma(GFP_HIGHUSER, vma, address);
 		if (!new_page)
 			goto no_new_page;
+#ifndef CONFIG_XEN
 		copy_user_highpage(new_page, old_page, address);
+#else
+		if (old_page == &invalid_page) {
+			char *vto = kmap_atomic(new_page, KM_USER1);
+			copy_page(vto, (void *)(address & PAGE_MASK));
+			kunmap_atomic(vto, KM_USER1);
+		} else {
+			copy_user_highpage(new_page, old_page, address);
+		}
+#endif
 	}
 	/*
 	 * Re-check the pte - we dropped the lock

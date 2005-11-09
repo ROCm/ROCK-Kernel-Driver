@@ -4,7 +4,7 @@
  * Communication via Xen event channels.
  * Also definitions for the device that demuxes notifications to userspace.
  * 
- * Copyright (c) 2004, K A Fraser
+ * Copyright (c) 2004-2005, K A Fraser
  * 
  * This file may be distributed separately from the Linux kernel, or
  * incorporated into other software packages, subject to the following license:
@@ -33,9 +33,9 @@
 
 #include <linux/config.h>
 #include <linux/interrupt.h>
-#include <asm-xen/hypervisor.h>
+#include <asm/hypervisor.h>
 #include <asm/ptrace.h>
-#include <asm-xen/synch_bitops.h>
+#include <asm/synch_bitops.h>
 #include <asm-xen/xen-public/event_channel.h>
 #include <linux/smp.h>
 
@@ -43,32 +43,48 @@
  * LOW-LEVEL DEFINITIONS
  */
 
-/* Dynamically bind a VIRQ source to Linux IRQ space. */
-extern int  bind_virq_to_irq(int virq);
-extern void unbind_virq_from_irq(int virq);
-
-/* Dynamically bind an IPI source to Linux IRQ space. */
-extern int  bind_ipi_to_irq(int ipi);
-extern void unbind_ipi_from_irq(int ipi);
-
-/* Dynamically bind an event-channel port to Linux IRQ space. */
-extern int  bind_evtchn_to_irq(unsigned int evtchn);
-extern void unbind_evtchn_from_irq(unsigned int evtchn);
+/*
+ * Dynamically bind an event source to an IRQ-like callback handler.
+ * On some platforms this may not be implemented via the Linux IRQ subsystem.
+ * The IRQ argument passed to the callback handler is the same as returned
+ * from the bind call. It may not correspond to a Linux IRQ number.
+ * Returns IRQ or negative errno.
+ * UNBIND: Takes IRQ to unbind from; automatically closes the event channel.
+ */
+extern int bind_evtchn_to_irqhandler(
+	unsigned int evtchn,
+	irqreturn_t (*handler)(int, void *, struct pt_regs *),
+	unsigned long irqflags,
+	const char *devname,
+	void *dev_id);
+extern int bind_virq_to_irqhandler(
+	unsigned int virq,
+	unsigned int cpu,
+	irqreturn_t (*handler)(int, void *, struct pt_regs *),
+	unsigned long irqflags,
+	const char *devname,
+	void *dev_id);
+extern int bind_ipi_to_irqhandler(
+	unsigned int ipi,
+	unsigned int cpu,
+	irqreturn_t (*handler)(int, void *, struct pt_regs *),
+	unsigned long irqflags,
+	const char *devname,
+	void *dev_id);
 
 /*
- * Dynamically bind an event-channel port to an IRQ-like callback handler.
- * On some platforms this may not be implemented via the Linux IRQ subsystem.
- * You *cannot* trust the irq argument passed to the callback handler.
+ * Common unbind function for all event sources. Takes IRQ to unbind from.
+ * Automatically closes the underlying event channel (even for bindings
+ * made with bind_evtchn_to_irqhandler()).
  */
-extern int  bind_evtchn_to_irqhandler(
-    unsigned int evtchn,
-    irqreturn_t (*handler)(int, void *, struct pt_regs *),
-    unsigned long irqflags,
-    const char *devname,
-    void *dev_id);
-extern void unbind_evtchn_from_irqhandler(unsigned int evtchn, void *dev_id);
+extern void unbind_from_irqhandler(unsigned int irq, void *dev_id);
 
-extern void irq_suspend(void);
+/*
+ * Unlike notify_remote_via_evtchn(), this is safe to use across
+ * save/restore. Notifications on a broken connection are silently dropped.
+ */
+void notify_remote_via_irq(int irq);
+
 extern void irq_resume(void);
 
 /* Entry point for notifications into Linux subsystems. */
@@ -79,57 +95,53 @@ void evtchn_device_upcall(int port);
 
 static inline void mask_evtchn(int port)
 {
-    shared_info_t *s = HYPERVISOR_shared_info;
-    synch_set_bit(port, &s->evtchn_mask[0]);
+	shared_info_t *s = HYPERVISOR_shared_info;
+	synch_set_bit(port, &s->evtchn_mask[0]);
 }
 
 static inline void unmask_evtchn(int port)
 {
-    shared_info_t *s = HYPERVISOR_shared_info;
-    vcpu_info_t *vcpu_info = &s->vcpu_data[smp_processor_id()];
+	shared_info_t *s = HYPERVISOR_shared_info;
+	vcpu_info_t *vcpu_info = &s->vcpu_data[smp_processor_id()];
 
-    synch_clear_bit(port, &s->evtchn_mask[0]);
+	synch_clear_bit(port, &s->evtchn_mask[0]);
 
-    /*
-     * The following is basically the equivalent of 'hw_resend_irq'. Just like
-     * a real IO-APIC we 'lose the interrupt edge' if the channel is masked.
-     */
-    if (  synch_test_bit        (port,    &s->evtchn_pending[0]) && 
-         !synch_test_and_set_bit(port>>5, &vcpu_info->evtchn_pending_sel) )
-    {
-        vcpu_info->evtchn_upcall_pending = 1;
-        if ( !vcpu_info->evtchn_upcall_mask )
-            force_evtchn_callback();
-    }
+	/*
+	 * The following is basically the equivalent of 'hw_resend_irq'. Just
+	 * like a real IO-APIC we 'lose the interrupt edge' if the channel is
+	 * masked.
+	 */
+	if (synch_test_bit(port, &s->evtchn_pending[0]) && 
+	    !synch_test_and_set_bit(port / BITS_PER_LONG,
+				    &vcpu_info->evtchn_pending_sel)) {
+		vcpu_info->evtchn_upcall_pending = 1;
+		if (!vcpu_info->evtchn_upcall_mask)
+			force_evtchn_callback();
+	}
 }
 
 static inline void clear_evtchn(int port)
 {
-    shared_info_t *s = HYPERVISOR_shared_info;
-    synch_clear_bit(port, &s->evtchn_pending[0]);
+	shared_info_t *s = HYPERVISOR_shared_info;
+	synch_clear_bit(port, &s->evtchn_pending[0]);
 }
 
-static inline int notify_via_evtchn(int port)
+static inline void notify_remote_via_evtchn(int port)
 {
-    evtchn_op_t op;
-    op.cmd = EVTCHNOP_send;
-    op.u.send.local_port = port;
-    return HYPERVISOR_event_channel_op(&op);
+	evtchn_op_t op;
+	op.cmd         = EVTCHNOP_send,
+	op.u.send.port = port;
+	(void)HYPERVISOR_event_channel_op(&op);
 }
-
-/*
- * CHARACTER-DEVICE DEFINITIONS
- */
-
-/* /dev/xen/evtchn resides at device number major=10, minor=201 */
-#define EVTCHN_MINOR 201
-
-/* /dev/xen/evtchn ioctls: */
-/* EVTCHN_RESET: Clear and reinit the event buffer. Clear error condition. */
-#define EVTCHN_RESET  _IO('E', 1)
-/* EVTCHN_BIND: Bind to teh specified event-channel port. */
-#define EVTCHN_BIND   _IO('E', 2)
-/* EVTCHN_UNBIND: Unbind from the specified event-channel port. */
-#define EVTCHN_UNBIND _IO('E', 3)
 
 #endif /* __ASM_EVTCHN_H__ */
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

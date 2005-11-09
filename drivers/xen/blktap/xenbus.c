@@ -59,7 +59,8 @@ static int blkback_remove(struct xenbus_device *dev)
 }
 
 /* Front end tells us frame. */
-static void frontend_changed(struct xenbus_watch *watch, const char *node)
+static void frontend_changed(struct xenbus_watch *watch,
+			     const char **vec, unsigned int len)
 {
 	unsigned long ring_ref;
 	unsigned int evtchn;
@@ -68,7 +69,7 @@ static void frontend_changed(struct xenbus_watch *watch, const char *node)
 		= container_of(watch, struct backend_info, watch);
 
 	/* If other end is gone, delete ourself. */
-	if (node && !xenbus_exists(be->frontpath, "")) {
+	if (vec && !xenbus_exists(be->frontpath, "")) {
 		xenbus_rm(be->dev->nodename, "");
 		device_unregister(&be->dev->dev);
 		return;
@@ -106,7 +107,8 @@ abort:
    We provide event channel and device details to front end.
    Frontend supplies shared frame and event channel.
  */
-static void backend_changed(struct xenbus_watch *watch, const char *node)
+static void backend_changed(struct xenbus_watch *watch,
+			    const char **vec, unsigned int len)
 {
 	int err;
 	char *p;
@@ -129,7 +131,7 @@ static void backend_changed(struct xenbus_watch *watch, const char *node)
 		}
 
 		/* Pass in NULL node to skip exist test. */
-		frontend_changed(&be->watch, NULL);
+		frontend_changed(&be->watch, NULL, 0);
 	}
 }
 
@@ -172,6 +174,7 @@ static int blkback_probe(struct xenbus_device *dev,
 	be->dev = dev;
 	be->backend_watch.node = dev->nodename;
 	be->backend_watch.callback = backend_changed;
+	/* Registration implicitly fires backend_changed once */
 	err = register_xenbus_watch(&be->backend_watch);
 	if (err) {
 		be->backend_watch.node = NULL;
@@ -193,8 +196,6 @@ static int blkback_probe(struct xenbus_device *dev,
 	}
 
 	dev->data = be;
-
-	backend_changed(&be->backend_watch, dev->nodename);
 	return 0;
 
  free_be:
@@ -223,3 +224,13 @@ void blkif_xenbus_init(void)
 {
 	xenbus_register_backend(&blkback);
 }
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

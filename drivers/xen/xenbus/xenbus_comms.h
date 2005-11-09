@@ -30,7 +30,6 @@
 
 int xs_init(void);
 int xb_init_comms(void);
-void xb_suspend_comms(void);
 
 /* Low level routines. */
 int xb_write(const void *data, unsigned len);
@@ -39,3 +38,13 @@ int xs_input_avail(void);
 extern wait_queue_head_t xb_waitq;
 
 #endif /* _XENBUS_COMMS_H */
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

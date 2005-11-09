@@ -54,6 +54,14 @@ config X86_PC
 	help
 	  Choose this option if your computer is a standard PC or compatible.
 
+config X86_XEN
+	bool "Xen-compatible"
+	select X86_UP_APIC if !SMP && XEN_PRIVILEGED_GUEST
+	select X86_UP_IOAPIC if !SMP && XEN_PRIVILEGED_GUEST
+	help
+	  Choose this option is you plan to run this kernel on top of Xen
+	  Hypervisor.
+
 config X86_ELAN
 	bool "AMD Elan"
 	help
@@ -452,6 +460,7 @@ config X86_OOSTORE
 
 config HPET_TIMER
 	bool "HPET Timer Support"
+	depends on !X86_XEN
 	help
 	  This enables the use of the HPET for the kernel's internal timer.
 	  HPET is the next generation timer replacing legacy 8254s.
@@ -495,6 +504,19 @@ config SMP
 
 	  If you don't know what to do here, say N.
 
+config SMP_ALTERNATIVES
+	bool "SMP alternatives support (EXPERIMENTAL)"
+	depends on SMP && EXPERIMENTAL
+	help
+	  Try to reduce the overhead of running an SMP kernel on a uniprocessor
+	  host slightly by replacing certain key instruction sequences
+	  according to whether we currently have more than one CPU available.
+	  This should provide a noticeable boost to performance when
+	  running SMP kernels on UP machines, and have negligible impact
+	  when running on an true SMP host.
+
+          If unsure, say N.
+	  
 config NR_CPUS
 	int "Maximum number of CPUs (2-255)"
 	range 2 255
@@ -511,7 +533,7 @@ config NR_CPUS
 
 config SCHED_SMT
 	bool "SMT (Hyperthreading) scheduler support"
-	depends on SMP
+	depends on SMP && !X86_XEN
 	default off
 	help
 	  SMT scheduler support improves the CPU scheduler's decision making
@@ -523,7 +545,7 @@ source "kernel/Kconfig.preempt"
 
 config X86_UP_APIC
 	bool "Local APIC support on uniprocessors"
-	depends on !SMP && !(X86_VISWS || X86_VOYAGER)
+	depends on !SMP && !(X86_VISWS || X86_VOYAGER || XEN_UNPRIVILEGED_GUEST)
 	help
 	  A local APIC (Advanced Programmable Interrupt Controller) is an
 	  integrated interrupt controller in the CPU. If you have a single-CPU
@@ -557,12 +579,12 @@ config X86_UP_IOAPIC
 
 config X86_LOCAL_APIC
 	bool
-	depends on X86_UP_APIC || ((X86_VISWS || SMP) && !X86_VOYAGER)
+	depends on X86_UP_APIC || ((X86_VISWS || SMP) && !(X86_VOYAGER || XEN_UNPRIVILEGED_GUEST))
 	default y
 
 config X86_IO_APIC
 	bool
-	depends on X86_UP_IOAPIC || (SMP && !(X86_VISWS || X86_VOYAGER))
+	depends on X86_UP_IOAPIC || (SMP && !(X86_VISWS || X86_VOYAGER || XEN_UNPRIVILEGED_GUEST))
 	default y
 
 config X86_VISWS_APIC
@@ -577,7 +599,7 @@ config X86_TSC
 
 config X86_MCE
 	bool "Machine Check Exception"
-	depends on !X86_VOYAGER
+	depends on !(X86_VOYAGER || X86_XEN)
 	---help---
 	  Machine Check Exception support allows the processor to notify the
 	  kernel if it detects a problem (e.g. overheating, component failure).
@@ -825,7 +847,7 @@ config HAVE_ARCH_EARLY_PFN_TO_NID
 
 config HIGHPTE
 	bool "Allocate 3rd-level pagetables from highmem"
-	depends on HIGHMEM4G || HIGHMEM64G
+	depends on (HIGHMEM4G || HIGHMEM64G) && !X86_XEN
 	help
 	  The VM uses one page table entry for each page of physical memory.
 	  For systems with a lot of RAM, this can be wasteful of precious
@@ -911,7 +933,7 @@ config EFI
 
 config IRQBALANCE
  	bool "Enable kernel irq balancing"
-	depends on SMP && X86_IO_APIC
+	depends on SMP && X86_IO_APIC && !X86_XEN
 	default y
 	help
  	  The default yes will allow the kernel to do irq load balancing.
@@ -995,14 +1017,16 @@ endmenu
 
 
 menu "Power management options (ACPI, APM)"
-	depends on !X86_VOYAGER
+	depends on !(X86_VOYAGER || XEN_UNPRIVILEGED_GUEST)
 
+if !X86_XEN
 source kernel/power/Kconfig
+endif
 
 source "drivers/acpi/Kconfig"
 
 menu "APM (Advanced Power Management) BIOS Support"
-depends on PM && !X86_VISWS
+depends on PM && !(X86_VISWS || X86_XEN)
 
 config APM
 	tristate "APM (Advanced Power Management) BIOS support"
@@ -1154,6 +1178,7 @@ source "arch/i386/kernel/cpu/cpufreq/Kconfig"
 endmenu
 
 menu "Bus options (PCI, PCMCIA, EISA, MCA, ISA)"
+	depends on !XEN_UNPRIVILEGED_GUEST
 
 config PCI
 	bool "PCI support" if !X86_VISWS
@@ -1205,7 +1230,7 @@ endchoice
 
 config PCI_BIOS
 	bool
-	depends on !X86_VISWS && PCI && (PCI_GOBIOS || PCI_GOANY)
+	depends on !(X86_VISWS || X86_XEN) && PCI && (PCI_GOBIOS || PCI_GOANY)
 	default y
 
 config PCI_DIRECT
@@ -1224,11 +1249,12 @@ source "drivers/pci/Kconfig"
 
 config ISA_DMA_API
 	bool
+	depends on !X86_XEN
 	default y
 
 config ISA
 	bool "ISA support"
-	depends on !(X86_VOYAGER || X86_VISWS)
+	depends on !(X86_VOYAGER || X86_VISWS || X86_XEN)
 	help
 	  Find out whether you have ISA slots on your motherboard.  ISA is the
 	  name of a bus system, i.e. the way the CPU talks to the other stuff
@@ -1304,13 +1330,17 @@ source "drivers/Kconfig"
 
 source "fs/Kconfig"
 
+if !X86_XEN
 source "arch/i386/oprofile/Kconfig"
+endif
 
 source "arch/i386/Kconfig.debug"
 
 source "security/Kconfig"
 
 source "crypto/Kconfig"
+
+source "drivers/xen/Kconfig"
 
 source "lib/Kconfig"
 
@@ -1337,7 +1367,7 @@ config X86_SMP
 
 config X86_HT
 	bool
-	depends on SMP && !(X86_VISWS || X86_VOYAGER)
+	depends on SMP && !(X86_VISWS || X86_VOYAGER || X86_XEN)
 	default y
 
 config X86_BIOS_REBOOT

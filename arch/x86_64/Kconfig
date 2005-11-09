@@ -97,6 +97,13 @@ config GENERIC_CPU
 
 endchoice
 
+config X86_64_XEN
+	bool "Enable Xen compatible kernel"
+	select SWIOTLB if XEN_PHYSDEV_ACCESS
+	select DUMMY_IOMMU if XEN_PHYSDEV_ACCESS
+	help
+	  This option will compile a kernel compatible with Xen hypervisor
+
 #
 # Define implied options from the CPU selection here
 #
@@ -168,10 +175,17 @@ config EISA
 
 config X86_IO_APIC
 	bool
+	depends !XEN_UNPRIVILEGED_GUEST
 	default y
+
+config X86_XEN_GENAPIC
+	bool
+	depends X86_64_XEN
+	default XEN_PRIVILEGED_GUEST || SMP
 
 config X86_LOCAL_APIC
 	bool
+	depends !XEN_UNPRIVILEGED_GUEST
 	default y
 
 config MTRR
@@ -216,7 +230,7 @@ config SMP
 
 config SCHED_SMT
 	bool "SMT (Hyperthreading) scheduler support"
-	depends on SMP
+	depends on SMP && !X86_64_XEN
 	default n
 	help
 	  SMT scheduler support improves the CPU scheduler's decision making
@@ -229,7 +243,7 @@ source "kernel/Kconfig.preempt"
 config K8_NUMA
        bool "K8 NUMA support"
        select NUMA
-       depends on SMP
+       depends on SMP && !X86_64_XEN
        help
 	  Enable NUMA (Non Unified Memory Architecture) support for
 	  AMD Opteron Multiprocessor systems. The kernel will try to allocate
@@ -241,7 +255,7 @@ config K8_NUMA
 config NUMA_EMU
 	bool "NUMA emulation support"
 	select NUMA
-	depends on SMP
+	depends on SMP && !X86_64_XEN
 	help
 	  Enable NUMA emulation. A flat machine will be split
 	  into virtual nodes when booted with "numa=fake=N", where N is the
@@ -301,6 +315,7 @@ config HOTPLUG_CPU
 
 config HPET_TIMER
 	bool
+	depends on !X86_64_XEN
 	default y
 	help
 	  Use the IA-PC HPET (High Precision Event Timer) to manage
@@ -332,7 +347,7 @@ config HPET_EMULATE_RTC
 config GART_IOMMU
 	bool "IOMMU support"
 	default y
-	depends on PCI
+	depends on PCI && !X86_64_XEN
 	help
 	  Support the IOMMU. Needed to run systems with more than 3GB of memory
 	  properly with 32-bit PCI devices that do not support DAC (Double Address
@@ -359,6 +374,7 @@ config DUMMY_IOMMU
 
 config X86_MCE
 	bool "Machine check support" if EMBEDDED
+	depends on !X86_64_XEN
 	default y
 	help
 	   Include a machine check error handler to report hardware errors.
@@ -368,7 +384,7 @@ config X86_MCE
 
 config X86_MCE_INTEL
 	bool "Intel MCE features"
-	depends on X86_MCE && X86_LOCAL_APIC
+	depends on X86_MCE && X86_LOCAL_APIC && !X86_64_XEN
 	default y
 	help
 	   Additional support for intel specific MCE features such as
@@ -446,9 +462,11 @@ config GENERIC_PENDING_IRQ
 
 menu "Power management options"
 
+if !X86_64_XEN
 source kernel/power/Kconfig
 
 source "drivers/acpi/Kconfig"
+endif
 
 source "arch/x86_64/kernel/cpufreq/Kconfig"
 
@@ -479,6 +497,7 @@ config UNORDERED_IO
 	 from i386. Requires that the driver writer used memory barriers
 	 properly.
 
+if !X86_64_XEN
 source "drivers/pci/pcie/Kconfig"
 
 source "drivers/pci/Kconfig"
@@ -486,6 +505,7 @@ source "drivers/pci/Kconfig"
 source "drivers/pcmcia/Kconfig"
 
 source "drivers/pci/hotplug/Kconfig"
+endif
 
 endmenu
 
@@ -539,5 +559,7 @@ source "arch/x86_64/Kconfig.debug"
 source "security/Kconfig"
 
 source "crypto/Kconfig"
+
+source "drivers/xen/Kconfig"
 
 source "lib/Kconfig"

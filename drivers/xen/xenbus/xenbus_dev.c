@@ -5,6 +5,7 @@
  * to xenstore.
  * 
  * Copyright (c) 2005, Christian Limpach
+ * Copyright (c) 2005, Rusty Russell, IBM Corporation
  * 
  * This file may be distributed separately from the Linux kernel, or
  * incorporated into other software packages, subject to the following license:
@@ -36,119 +37,160 @@
 #include <linux/wait.h>
 #include <linux/fs.h>
 
-#include "xenstored.h"
 #include "xenbus_comms.h"
 
 #include <asm/uaccess.h>
+#include <asm/hypervisor.h>
 #include <asm-xen/xenbus.h>
-#include <asm-xen/linux-public/xenbus_dev.h>
 #include <asm-xen/xen_proc.h>
+#include <asm/hypervisor.h>
+
+struct xenbus_dev_transaction {
+	struct list_head list;
+	struct xenbus_transaction *handle;
+};
 
 struct xenbus_dev_data {
-	int in_transaction;
+	/* In-progress transaction. */
+	struct list_head transactions;
+
+	/* Partial request. */
+	unsigned int len;
+	union {
+		struct xsd_sockmsg msg;
+		char buffer[PAGE_SIZE];
+	} u;
+
+	/* Response queue. */
+#define MASK_READ_IDX(idx) ((idx)&(PAGE_SIZE-1))
+	char read_buffer[PAGE_SIZE];
+	unsigned int read_cons, read_prod;
+	wait_queue_head_t read_waitq;
 };
 
 static struct proc_dir_entry *xenbus_dev_intf;
 
-void *xs_talkv(enum xsd_sockmsg_type type, const struct kvec *iovec,
-	       unsigned int num_vecs, unsigned int *len);
-
-static int xenbus_dev_talkv(struct xenbus_dev_data *u, unsigned long data)
-{
-	struct xenbus_dev_talkv xt;
-	unsigned int len;
-	void *resp, *base;
-	struct kvec *iovec;
-	int ret = -EFAULT, v = 0;
-
-	if (copy_from_user(&xt, (void *)data, sizeof(xt)))
-		return -EFAULT;
-
-	iovec = kmalloc(xt.num_vecs * sizeof(struct kvec), GFP_KERNEL);
-	if (iovec == NULL)
-		return -ENOMEM;
-
-	if (copy_from_user(iovec, xt.iovec,
-			   xt.num_vecs * sizeof(struct kvec)))
-		goto out;
-
-	for (v = 0; v < xt.num_vecs; v++) {
-		base = iovec[v].iov_base;
-		iovec[v].iov_base = kmalloc(iovec[v].iov_len, GFP_KERNEL);
-		if (iovec[v].iov_base == NULL ||
-		    copy_from_user(iovec[v].iov_base, base, iovec[v].iov_len))
-		{
-			if (iovec[v].iov_base)
-				kfree(iovec[v].iov_base);
-			else
-				ret = -ENOMEM;
-			v--;
-			goto out;
-		}
-	}
-
-	resp = xs_talkv(xt.type, iovec, xt.num_vecs, &len);
-	if (IS_ERR(resp)) {
-		ret = PTR_ERR(resp);
-		goto out;
-	}
-
-	switch (xt.type) {
-	case XS_TRANSACTION_START:
-		u->in_transaction = 1;
-		break;
-	case XS_TRANSACTION_END:
-		u->in_transaction = 0;
-		break;
-	default:
-		break;
-	}
-
-	ret = len;
-	if (len > xt.len)
-		len = xt.len;
-
-	if (copy_to_user(xt.buf, resp, len))
-		ret = -EFAULT;
-
-	kfree(resp);
- out:
-	while (v-- > 0)
-		kfree(iovec[v].iov_base);
-	kfree(iovec);
-	return ret;
-}
-
-static int xenbus_dev_ioctl(struct inode *inode, struct file *filp,
-			    unsigned int cmd, unsigned long data)
+static ssize_t xenbus_dev_read(struct file *filp,
+			       char __user *ubuf,
+			       size_t len, loff_t *ppos)
 {
 	struct xenbus_dev_data *u = filp->private_data;
-	int ret = -ENOSYS;
+	int i;
 
-	switch (cmd) {
-	case IOCTL_XENBUS_DEV_TALKV:
-		ret = xenbus_dev_talkv(u, data);
+	if (wait_event_interruptible(u->read_waitq,
+				     u->read_prod != u->read_cons))
+		return -EINTR;
+
+	for (i = 0; i < len; i++) {
+		if (u->read_cons == u->read_prod)
+			break;
+		put_user(u->read_buffer[MASK_READ_IDX(u->read_cons)], ubuf+i);
+		u->read_cons++;
+	}
+
+	return i;
+}
+
+static void queue_reply(struct xenbus_dev_data *u,
+			char *data, unsigned int len)
+{
+	int i;
+
+	for (i = 0; i < len; i++, u->read_prod++)
+		u->read_buffer[MASK_READ_IDX(u->read_prod)] = data[i];
+
+	BUG_ON((u->read_prod - u->read_cons) > sizeof(u->read_buffer));
+
+	wake_up(&u->read_waitq);
+}
+
+static ssize_t xenbus_dev_write(struct file *filp,
+				const char __user *ubuf,
+				size_t len, loff_t *ppos)
+{
+	struct xenbus_dev_data *u = filp->private_data;
+	struct xenbus_dev_transaction *trans;
+	void *reply;
+	int err = 0;
+
+	if ((len + u->len) > sizeof(u->u.buffer))
+		return -EINVAL;
+
+	if (copy_from_user(u->u.buffer + u->len, ubuf, len) != 0)
+		return -EFAULT;
+
+	u->len += len;
+	if (u->len < (sizeof(u->u.msg) + u->u.msg.len))
+		return len;
+
+	switch (u->u.msg.type) {
+	case XS_TRANSACTION_START:
+	case XS_TRANSACTION_END:
+	case XS_DIRECTORY:
+	case XS_READ:
+	case XS_GET_PERMS:
+	case XS_RELEASE:
+	case XS_GET_DOMAIN_PATH:
+	case XS_WRITE:
+	case XS_MKDIR:
+	case XS_RM:
+	case XS_SET_PERMS:
+		reply = xenbus_dev_request_and_reply(&u->u.msg);
+		if (IS_ERR(reply)) {
+			err = PTR_ERR(reply);
+		} else {
+			if (u->u.msg.type == XS_TRANSACTION_START) {
+				trans = kmalloc(sizeof(*trans), GFP_KERNEL);
+				trans->handle = (struct xenbus_transaction *)
+					simple_strtoul(reply, NULL, 0);
+				list_add(&trans->list, &u->transactions);
+			} else if (u->u.msg.type == XS_TRANSACTION_END) {
+				list_for_each_entry(trans, &u->transactions,
+						    list)
+					if ((unsigned long)trans->handle ==
+					    (unsigned long)u->u.msg.tx_id)
+						break;
+				BUG_ON(&trans->list == &u->transactions);
+				list_del(&trans->list);
+				kfree(trans);
+			}
+			queue_reply(u, (char *)&u->u.msg, sizeof(u->u.msg));
+			queue_reply(u, (char *)reply, u->u.msg.len);
+			kfree(reply);
+		}
 		break;
+
 	default:
-		ret = -EINVAL;
+		err = -EINVAL;
 		break;
 	}
-	return ret;
+
+	if (err == 0) {
+		u->len = 0;
+		err = len;
+	}
+
+	return err;
 }
 
 static int xenbus_dev_open(struct inode *inode, struct file *filp)
 {
 	struct xenbus_dev_data *u;
 
+	if (xen_start_info->store_evtchn == 0)
+		return -ENOENT;
+
+	nonseekable_open(inode, filp);
+
 	u = kmalloc(sizeof(*u), GFP_KERNEL);
 	if (u == NULL)
 		return -ENOMEM;
 
 	memset(u, 0, sizeof(*u));
+	INIT_LIST_HEAD(&u->transactions);
+	init_waitqueue_head(&u->read_waitq);
 
 	filp->private_data = u;
-
-	down(&xenbus_lock);
 
 	return 0;
 }
@@ -156,11 +198,13 @@ static int xenbus_dev_open(struct inode *inode, struct file *filp)
 static int xenbus_dev_release(struct inode *inode, struct file *filp)
 {
 	struct xenbus_dev_data *u = filp->private_data;
+	struct xenbus_dev_transaction *trans, *tmp;
 
-	if (u->in_transaction)
-		xenbus_transaction_end(1);
-
-	up(&xenbus_lock);
+	list_for_each_entry_safe(trans, tmp, &u->transactions, list) {
+		xenbus_transaction_end(trans->handle, 1);
+		list_del(&trans->list);
+		kfree(trans);
+	}
 
 	kfree(u);
 
@@ -168,9 +212,10 @@ static int xenbus_dev_release(struct inode *inode, struct file *filp)
 }
 
 static struct file_operations xenbus_dev_file_ops = {
-	ioctl: xenbus_dev_ioctl,
-	open: xenbus_dev_open,
-	release: xenbus_dev_release
+	.read = xenbus_dev_read,
+	.write = xenbus_dev_write,
+	.open = xenbus_dev_open,
+	.release = xenbus_dev_release,
 };
 
 static int __init
@@ -184,3 +229,13 @@ xenbus_dev_init(void)
 }
 
 __initcall(xenbus_dev_init);
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

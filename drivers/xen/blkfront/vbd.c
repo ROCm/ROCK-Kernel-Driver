@@ -65,7 +65,7 @@ static struct xlbd_type_info xlbd_vbd_type = {
 };
 
 static struct xlbd_major_info *major_info[NUM_IDE_MAJORS + NUM_SCSI_MAJORS +
-					  NUM_VBD_MAJORS];
+					 NUM_VBD_MAJORS];
 
 #define XLBD_MAJOR_IDE_START	0
 #define XLBD_MAJOR_SCSI_START	(NUM_IDE_MAJORS)
@@ -160,7 +160,8 @@ xlbd_get_major_info(int vdevice)
 
 	mi = ((major_info[index] != NULL) ? major_info[index] :
 	      xlbd_alloc_major_info(major, minor, index));
-	mi->usage++;
+	if (mi)
+		mi->usage++;
 	return mi;
 }
 
@@ -238,6 +239,7 @@ xlvbd_alloc_gendisk(int minor, blkif_sector_t capacity, int vdevice,
 	gd->first_minor = minor;
 	gd->fops = &xlvbd_block_fops;
 	gd->private_data = info;
+	gd->driverfs_dev = &(info->xbdev->dev);
 	set_capacity(gd, capacity);
 
 	if (xlvbd_init_blk_queue(gd, sector_size)) {
@@ -309,3 +311,13 @@ xlvbd_del(struct blkfront_info *info)
 
 	bdput(bd);
 }
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

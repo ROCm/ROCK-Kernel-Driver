@@ -45,8 +45,9 @@
 #include <linux/blkdev.h>
 #include <linux/major.h>
 #include <linux/devfs_fs_kernel.h>
-#include <asm-xen/hypervisor.h>
+#include <asm/hypervisor.h>
 #include <asm-xen/xenbus.h>
+#include <asm-xen/gnttab.h>
 #include <asm-xen/xen-public/xen.h>
 #include <asm-xen/xen-public/io/blkif.h>
 #include <asm-xen/xen-public/io/ring.h>
@@ -122,7 +123,7 @@ struct blkfront_info
 	int backend_id;
 	int ring_ref;
 	blkif_front_ring_t ring;
-	unsigned int evtchn;
+	unsigned int evtchn, irq;
 	struct xlbd_major_info *mi;
 	request_queue_t *rq;
 	struct work_struct work;
@@ -145,4 +146,15 @@ extern void do_blkif_request (request_queue_t *rq);
 int xlvbd_add(blkif_sector_t capacity, int device,
 	      u16 vdisk_info, u16 sector_size, struct blkfront_info *info);
 void xlvbd_del(struct blkfront_info *info);
+
 #endif /* __XEN_DRIVERS_BLOCK_H__ */
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

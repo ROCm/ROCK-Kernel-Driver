@@ -189,6 +189,8 @@ enum {
  *	@local_df: allow local fragmentation
  *	@cloned: Head may be cloned (check refcnt to be sure)
  *	@nohdr: Payload reference only, must not modify header
+ *	@proto_csum_valid: Protocol csum validated since arriving at localhost
+ *	@proto_csum_blank: Protocol csum must be added before leaving localhost
  *	@pkt_type: Packet class
  *	@ip_summed: Driver fed us an IP checksum
  *	@priority: Packet queueing priority
@@ -261,7 +263,14 @@ struct sk_buff {
 				nohdr:1,
 				nfctinfo:3;
 	__u8			pkt_type:3,
+#ifndef CONFIG_XEN
 				fclone:2;
+#else
+				fclone:2,
+				proto_csum_valid:1,
+				proto_csum_blank:1;
+				/* 1 bit spare */
+#endif
 	__be16			protocol;
 
 	void			(*destructor)(struct sk_buff *skb);
@@ -317,7 +326,8 @@ static inline struct sk_buff *alloc_skb_fclone(unsigned int size,
 
 extern struct sk_buff *alloc_skb_from_cache(kmem_cache_t *cp,
 					    unsigned int size,
-					    gfp_t priority);
+					    gfp_t priority,
+					    int fclone);
 extern void	       kfree_skbmem(struct sk_buff *skb);
 extern struct sk_buff *skb_clone(struct sk_buff *skb,
 				 gfp_t priority);
