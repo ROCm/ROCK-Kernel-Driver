@@ -371,8 +371,7 @@ void __free_pages_ok(struct page *page, unsigned int order)
 	LIST_HEAD(list);
 	int i;
 
-	if (arch_free_page(page, order))
-		return;
+	arch_free_page(page, order);
 
 	mod_page_state(pgfree, 1 << order);
 
@@ -645,8 +644,7 @@ static void fastcall free_hot_cold_page(struct page *page, int cold)
 	struct per_cpu_pages *pcp;
 	unsigned long flags;
 
-	if (arch_free_page(page, 0))
-		return;
+	arch_free_page(page, 0);
 
 	kernel_map_pages(page, 1, 0);
 	inc_page_state(pgfree);

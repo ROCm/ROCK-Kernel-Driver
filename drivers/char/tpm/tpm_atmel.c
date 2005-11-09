@@ -54,7 +54,7 @@ static int tpm_atml_recv(struct tpm_chip *chip, u8 * buf, size_t count)
 	for (i = 0; i < 6; i++) {
 		status = inb(chip->vendor->base + 1);
 		if ((status & ATML_STATUS_DATA_AVAIL) == 0) {
-			dev_err(chip->dev,
+			dev_err(&chip->pci_dev->dev,
 				"error reading header\n");
 			return -EIO;
 		}
@@ -66,12 +66,12 @@ static int tpm_atml_recv(struct tpm_chip *chip, u8 * buf, size_t count)
 	size = be32_to_cpu(*native_size);
 
 	if (count < size) {
-		dev_err(chip->dev,
+		dev_err(&chip->pci_dev->dev,
 			"Recv size(%d) less than available space\n", size);
 		for (; i < size; i++) {	/* clear the waiting data anyway */
 			status = inb(chip->vendor->base + 1);
 			if ((status & ATML_STATUS_DATA_AVAIL) == 0) {
-				dev_err(chip->dev,
+				dev_err(&chip->pci_dev->dev,
 					"error reading data\n");
 				return -EIO;
 			}
@@ -83,7 +83,7 @@ static int tpm_atml_recv(struct tpm_chip *chip, u8 * buf, size_t count)
 	for (; i < size; i++) {
 		status = inb(chip->vendor->base + 1);
 		if ((status & ATML_STATUS_DATA_AVAIL) == 0) {
-			dev_err(chip->dev,
+			dev_err(&chip->pci_dev->dev,
 				"error reading data\n");
 			return -EIO;
 		}
@@ -93,7 +93,7 @@ static int tpm_atml_recv(struct tpm_chip *chip, u8 * buf, size_t count)
 	/* make sure data available is gone */
 	status = inb(chip->vendor->base + 1);
 	if (status & ATML_STATUS_DATA_AVAIL) {
-		dev_err(chip->dev, "data available is stuck\n");
+		dev_err(&chip->pci_dev->dev, "data available is stuck\n");
 		return -EIO;
 	}
 
@@ -104,9 +104,9 @@ static int tpm_atml_send(struct tpm_chip *chip, u8 * buf, size_t count)
 {
 	int i;
 
-	dev_dbg(chip->dev, "tpm_atml_send:\n");
+	dev_dbg(&chip->pci_dev->dev, "tpm_atml_send: ");
 	for (i = 0; i < count; i++) {
-		dev_dbg(chip->dev, "%d 0x%x(%d)\n",  i, buf[i], buf[i]);
+		dev_dbg(&chip->pci_dev->dev, "0x%x(%d) ", buf[i], buf[i]);
 		outb(buf[i], chip->vendor->base);
 	}
 
@@ -116,11 +116,6 @@ static int tpm_atml_send(struct tpm_chip *chip, u8 * buf, size_t count)
 static void tpm_atml_cancel(struct tpm_chip *chip)
 {
 	outb(ATML_STATUS_ABORT, chip->vendor->base + 1);
-}
-
-static u8 tpm_atml_status(struct tpm_chip *chip)
-{
-	return inb(chip->vendor->base + 1);
 }
 
 static struct file_operations atmel_ops = {
@@ -151,7 +146,6 @@ static struct tpm_vendor_specific tpm_atmel = {
 	.recv = tpm_atml_recv,
 	.send = tpm_atml_send,
 	.cancel = tpm_atml_cancel,
-	.status = tpm_atml_status,
 	.req_complete_mask = ATML_STATUS_BUSY | ATML_STATUS_DATA_AVAIL,
 	.req_complete_val = ATML_STATUS_DATA_AVAIL,
 	.req_canceled = ATML_STATUS_READY,
@@ -193,7 +187,7 @@ static int __devinit tpm_atml_init(struct pci_dev *pci_dev,
 		goto out_err;
 	}
 
-	if ((rc = tpm_register_hardware(&pci_dev->dev, &tpm_atmel)) < 0)
+	if ((rc = tpm_register_hardware(pci_dev, &tpm_atmel)) < 0)
 		goto out_err;
 
 	dev_info(&pci_dev->dev,
@@ -204,14 +198,6 @@ static int __devinit tpm_atml_init(struct pci_dev *pci_dev,
 out_err:
 	pci_disable_device(pci_dev);
 	return rc;
-}
-
-static void __devexit tpm_atml_remove(struct pci_dev *pci_dev) 
-{
-	struct tpm_chip *chip = pci_get_drvdata(pci_dev);
-
-	if ( chip )
-		tpm_remove_hardware(chip->dev);
 }
 
 static struct pci_device_id tpm_pci_tbl[] __devinitdata = {
@@ -234,7 +220,7 @@ static struct pci_driver atmel_pci_driver = {
 	.name = "tpm_atmel",
 	.id_table = tpm_pci_tbl,
 	.probe = tpm_atml_init,
-	.remove = __devexit_p(tpm_atml_remove),
+	.remove = __devexit_p(tpm_remove),
 	.suspend = tpm_pm_suspend,
 	.resume = tpm_pm_resume,
 };
@@ -249,7 +235,7 @@ static void __exit cleanup_atmel(void)
 	pci_unregister_driver(&atmel_pci_driver);
 }
 
-fs_initcall(init_atmel);
+module_init(init_atmel);
 module_exit(cleanup_atmel);
 
 MODULE_AUTHOR("Leendert van Doorn (leendert@watson.ibm.com)");

@@ -132,8 +132,6 @@ LIST_HEAD(tty_drivers);			/* linked list of tty drivers */
    vt.c for deeply disgusting hack reasons */
 DECLARE_MUTEX(tty_sem);
 
-int console_use_vt = 1;
-
 #ifdef CONFIG_UNIX98_PTYS
 extern struct tty_driver *ptm_driver;	/* Unix98 pty masters; for /dev/ptmx */
 extern int pty_limit;		/* Config limit on Unix98 ptys */
@@ -1830,7 +1828,7 @@ retry_open:
 		goto got_driver;
 	}
 #ifdef CONFIG_VT
-	if (console_use_vt && (device == MKDEV(TTY_MAJOR,0))) {
+	if (device == MKDEV(TTY_MAJOR,0)) {
 		extern struct tty_driver *console_driver;
 		driver = console_driver;
 		index = fg_console;
@@ -3019,8 +3017,6 @@ static int __init tty_init(void)
 #endif
 
 #ifdef CONFIG_VT
-	if (!console_use_vt)
-		goto out_vt;
 	cdev_init(&vc0_cdev, &console_fops);
 	if (cdev_add(&vc0_cdev, MKDEV(TTY_MAJOR, 0), 1) ||
 	    register_chrdev_region(MKDEV(TTY_MAJOR, 0), 1, "/dev/vc/0") < 0)
@@ -3029,7 +3025,6 @@ static int __init tty_init(void)
 	class_device_create(tty_class, NULL, MKDEV(TTY_MAJOR, 0), NULL, "tty0");
 
 	vty_init();
- out_vt:
 #endif
 	return 0;
 }
