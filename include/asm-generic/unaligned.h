@@ -78,7 +78,7 @@ static inline void __ustw(__u16 val, __u16 *addr)
 
 #define __get_unaligned(ptr, size) ({		\
 	const void *__gu_p = ptr;		\
-	unsigned long val;			\
+	__u64 val;				\
 	switch (size) {				\
 	case 1:					\
 		val = *(const __u8 *)__gu_p;	\
