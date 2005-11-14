@@ -4,17 +4,12 @@
 #include <linux/config.h>
 #include <linux/compiler.h>
 #include <asm/processor.h>
+#include <asm/smp_alt.h>
 
 /*
  * Atomic operations that C can't guarantee us.  Useful for
  * resource counting etc..
  */
-
-#ifdef CONFIG_SMP
-#define LOCK "lock ; "
-#else
-#define LOCK ""
-#endif
 
 /*
  * Make sure gcc doesn't try to be clever and move things around

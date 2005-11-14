@@ -7,7 +7,7 @@ EXTRA_CFLAGS += -DOCFS2_CDSL
 # This is a huge kludge, but it will go away when the kernel API catches up
 # Without in-kernel integration, this is normally hidden away in the OCFS2
 # configure/Makefile mess.
-KAPI_INCLUDE_DIR = fs/ocfs2/kapi-compat/include
+KAPI_INCLUDE_DIR = $(srctree)/fs/ocfs2/kapi-compat/include
 EXTRA_CFLAGS += -include $(KAPI_INCLUDE_DIR)/assert_spin_locked.h
 EXTRA_CFLAGS += -include $(KAPI_INCLUDE_DIR)/journal_access.h
 EXTRA_CFLAGS += -include $(KAPI_INCLUDE_DIR)/kref_init.h
