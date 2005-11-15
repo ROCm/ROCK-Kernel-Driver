@@ -243,7 +243,7 @@ int setup_irq(unsigned int irq, struct irqaction * new)
 #ifndef CONFIG_XEN
 static
 #endif
-int teardown_irq(unsigned int irq, struct irqaction * old)
+int teardown_irq(unsigned int irq, struct irqaction * old, void *dev_id)
 {
 	struct irq_desc *desc;
 	struct irqaction **p;
@@ -325,7 +325,7 @@ void free_irq(unsigned int irq, void *dev_id)
 
 		spin_unlock_irqrestore(&desc->lock,flags);
 
-		if (teardown_irq(irq, action) == 0)
+		if (teardown_irq(irq, action, dev_id) == 0)
 			kfree(action);
 		return;
 	}

@@ -94,7 +94,7 @@ irq_descp (int irq)
 
 extern int setup_irq(unsigned int irq, struct irqaction * new);
 #ifdef CONFIG_XEN
-extern int teardown_irq(unsigned int irq, struct irqaction * old);
+extern int teardown_irq(unsigned int irq, struct irqaction * old, void *dev_id);
 #endif
 
 #ifdef CONFIG_GENERIC_HARDIRQS

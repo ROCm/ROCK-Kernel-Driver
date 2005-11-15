@@ -18,7 +18,7 @@ i386-obj-y			:= time.o
 s-obj-y	:=
 
 #obj-$(CONFIG_X86_MCE)         += mce.o
-#obj-$(CONFIG_MTRR)		+= ../../i386/kernel/cpu/mtrr/
+obj-$(CONFIG_MTRR)		+= ../../../i386/kernel/cpu/mtrr/
 obj-$(CONFIG_ACPI)		+= acpi/
 c-obj-$(CONFIG_X86_MSR)		+= msr.o
 obj-$(CONFIG_MICROCODE)		+= microcode.o
