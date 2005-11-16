@@ -602,7 +602,8 @@ static int __rpc_execute(struct rpc_task *task)
 		/*
 		 * Garbage collection of pending timers...
 		 */
-		rpc_delete_timer(task);
+		if (RPC_IS_RUNNING(task))
+			rpc_delete_timer(task);
 
 		/*
 		 * Execute any pending callback.

@@ -32,6 +32,7 @@
 #include <linux/lockd/bind.h>
 #include <linux/smp_lock.h>
 #include <linux/seq_file.h>
+#include <linux/sysctl.h>
 #include <linux/mount.h>
 #include <linux/nfs_idmap.h>
 #include <linux/vfs.h>
@@ -2062,11 +2063,43 @@ static void nfs_destroy_inodecache(void)
 }
 
 /*
+ * NFS sysctls
+ */
+static struct ctl_table_header *nfs_sysctl_table;
+
+static ctl_table nfs_sysctls[] = {
+	{ .ctl_name = 0 }
+};
+
+static ctl_table nfs_sysctl_dir[] = {
+	{
+		.ctl_name	= -2,
+		.procname	= "nfs",
+		.mode		= 0555,
+		.child		= nfs_sysctls,
+	},
+	{ .ctl_name = 0 }
+};
+
+static ctl_table nfs_sysctl_root[] = {
+	{
+		.ctl_name	= CTL_FS,
+		.procname	= "fs",
+		.mode		= 0555,
+		.child		= nfs_sysctl_dir,
+	},
+	{ .ctl_name = 0 }
+};
+
+/*
  * Initialize NFS
  */
 static int __init init_nfs_fs(void)
 {
 	int err;
+
+	if (nfs_sysctls[0].ctl_name)
+		nfs_sysctl_table = register_sysctl_table(nfs_sysctl_root, 0);
 
 	err = nfs_init_nfspagecache();
 	if (err)
@@ -2115,6 +2148,10 @@ out2:
 out3:
 	nfs_destroy_nfspagecache();
 out4:
+	if (nfs_sysctl_table)
+		unregister_sysctl_table(nfs_sysctl_table);
+	nfs_sysctl_table = NULL;
+
 	return err;
 }
 
@@ -2132,6 +2169,10 @@ static void __exit exit_nfs_fs(void)
 #endif
 	unregister_filesystem(&nfs_fs_type);
 	unregister_nfs4fs();
+
+	if (nfs_sysctl_table)
+		unregister_sysctl_table(nfs_sysctl_table);
+	nfs_sysctl_table = NULL;
 }
 
 /* Not quite true; I just maintain it */

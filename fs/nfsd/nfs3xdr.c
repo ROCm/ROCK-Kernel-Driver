@@ -29,6 +29,14 @@
 #endif
 
 
+/* By default, READDIRPLUS will return up the the max blocksize
+ * worth of data. Some Solaris clients do not seem to be able
+ * to grok this, and will retry the request forever.
+ * This allows to dumb the Linux nfsd down to a reply size
+ * that works (eg 8192).
+ */
+unsigned int	nfsd_max_readdirplus = NFSSVC_MAXBLKSIZE;
+
 /*
  * Mapping of S_IF* types to NFS file types
  */
@@ -569,7 +577,7 @@ nfs3svc_decode_readdirplusargs(struct svc_rqst *rqstp, u32 *p,
 	args->dircount = ntohl(*p++);
 	args->count    = ntohl(*p++);
 
-	len = (args->count > NFSSVC_MAXBLKSIZE) ? NFSSVC_MAXBLKSIZE :
+	len = (args->count > nfsd_max_readdirplus) ? nfsd_max_readdirplus :
 						  args->count;
 	args->count = len;
 

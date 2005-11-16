@@ -1550,8 +1550,13 @@ go_ahead:
 		shrink_dcache_parent(old_dentry);
 	}
 
-	if (new_inode)
+	if (new_inode) {
+		/* If this is the last reference to the inode make
+		 * sure the VFS zaps it and all associated caches.
+		 */
+		new_inode->i_nlink--;
 		d_delete(new_dentry);
+	}
 
 	nfs_begin_data_update(old_dir);
 	nfs_begin_data_update(new_dir);

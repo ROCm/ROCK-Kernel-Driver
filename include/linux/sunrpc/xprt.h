@@ -227,6 +227,9 @@ void			xprt_sock_setbufsize(struct rpc_xprt *);
 					(test_and_clear_bit(XPRT_CONNECT, &(xp)->sockstate))
 #define xprt_clear_connected(xp)	(clear_bit(XPRT_CONNECT, &(xp)->sockstate))
 
+extern unsigned int	xprt_min_resvport;
+extern unsigned int	xprt_max_resvport;
+
 #endif /* __KERNEL__*/
 
 #endif /* _LINUX_SUNRPC_XPRT_H */

@@ -902,6 +902,7 @@ smb_newconn(struct smb_sb_info *server, struct smb_conn_opt *opt)
 
 	/* chain into the data_ready callback */
 	server->data_ready = xchg(&sk->sk_data_ready, smb_data_ready);
+	server->write_space = xchg(&sk->sk_write_space, smb_write_space);
 
 	/* check if we have an old smbmount that uses seconds for the 
 	   serverzone */

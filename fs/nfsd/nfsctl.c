@@ -69,6 +69,9 @@ static ssize_t write_threads(struct file *file, char *buf, size_t size);
 static ssize_t write_leasetime(struct file *file, char *buf, size_t size);
 static ssize_t write_recoverydir(struct file *file, char *buf, size_t size);
 
+
+extern unsigned int	nfsd_max_readdirplus;
+
 static ssize_t (*write_op[])(struct file *, char *, size_t) = {
 	[NFSD_Svc] = write_svc,
 	[NFSD_Add] = write_add,
@@ -411,6 +414,43 @@ static struct file_system_type nfsd_fs_type = {
 	.kill_sb	= kill_litter_super,
 };
 
+ /*
+ * NFS sysctls
+ */
+static struct ctl_table_header *nfs_sysctl_table;
+
+static ctl_table nfs_sysctls[] = {
+	{
+		.ctl_name	= -2,
+		.procname	= "nfsd_max_readdirplus",
+		.data		= &nfsd_max_readdirplus,
+		.maxlen		= sizeof(nfsd_max_readdirplus),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{ .ctl_name = 0 }
+};
+
+static ctl_table nfs_sysctl_dir[] = {
+	{
+		.ctl_name	= -2,
+		.procname	= "nfs",
+		.mode		= 0555,
+		.child		= nfs_sysctls,
+	},
+	{ .ctl_name = 0 }
+};
+
+static ctl_table nfs_sysctl_root[] = {
+	{
+		.ctl_name	= CTL_FS,
+		.procname	= "fs",
+		.mode		= 0555,
+		.child		= nfs_sysctl_dir,
+	},
+	{ .ctl_name = 0 }
+};
+
 static int __init init_nfsd(void)
 {
 	int retval;
@@ -422,6 +462,8 @@ static int __init init_nfsd(void)
 	nfsd_lockd_init();	/* lockd->nfsd callbacks */
 	nfs4_state_init();	/* NFSv4 locking state */
 	nfsd_idmap_init();      /* Name to ID mapping */
+	if (nfs_sysctls[0].ctl_name)
+		nfs_sysctl_table = register_sysctl_table(nfs_sysctl_root, 0);
 	if (proc_mkdir("fs/nfs", NULL)) {
 		struct proc_dir_entry *entry;
 		entry = create_proc_entry("fs/nfs/exports", 0, NULL);
@@ -436,6 +478,9 @@ static int __init init_nfsd(void)
 		remove_proc_entry("fs/nfs", NULL);
 		nfsd_stat_shutdown();
 		nfsd_lockd_shutdown();
+		if (nfs_sysctl_table)
+			unregister_sysctl_table(nfs_sysctl_table);
+		nfs_sysctl_table = NULL;
 	}
 	return retval;
 }
@@ -450,6 +495,9 @@ static void __exit exit_nfsd(void)
 	nfsd_lockd_shutdown();
 	nfsd_idmap_shutdown();
 	unregister_filesystem(&nfsd_fs_type);
+	if (nfs_sysctl_table)
+		unregister_sysctl_table(nfs_sysctl_table);
+	nfs_sysctl_table = NULL;
 }
 
 MODULE_AUTHOR("Olaf Kirch <okir@monad.swb.de>");
