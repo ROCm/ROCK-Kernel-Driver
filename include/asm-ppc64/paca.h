@@ -22,7 +22,7 @@
 #include	<asm/iSeries/ItLpRegSave.h>
 #include	<asm/mmu.h>
 
-register struct paca_struct * volatile local_paca asm("r13");
+register struct paca_struct *local_paca asm("r13");
 #define get_paca()	local_paca
 
 struct task_struct;
