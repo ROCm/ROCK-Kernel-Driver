@@ -46,13 +46,15 @@
 #define NFSDBG_FACILITY		NFSDBG_VFS
 #define NFS_PARANOIA 1
 
-/* Maximum number of readahead requests
- * FIXME: this should really be a sysctl so that users may tune it to suit
- *        their needs. People that do NFS over a slow network, might for
- *        instance want to reduce it to something closer to 1 for improved
- *        interactive response.
+/* Maximum number of readahead requests.
+ *
+ * People who do NFS over a slow network may want to reduce it to
+ * something closer to 1 for improved interactive response.
  */
-#define NFS_MAX_READAHEAD	(RPC_DEF_SLOT_TABLE - 1)
+static unsigned int	nfs_max_readahead = RPC_DEF_SLOT_TABLE - 1;
+static unsigned int	nfs_max_readahead_min = 0;
+static unsigned int	nfs_max_readahead_max = RPC_MAX_SLOT_TABLE - 1;
+
 
 static void nfs_invalidate_inode(struct inode *);
 static int nfs_update_inode(struct inode *, struct nfs_fattr *, unsigned long);
@@ -339,7 +341,7 @@ nfs_sb_init(struct super_block *sb, rpc_authflavor_t authflavor)
 		server->acdirmin = server->acdirmax = 0;
 		sb->s_flags |= MS_SYNCHRONOUS;
 	}
-	server->backing_dev_info.ra_pages = server->rpages * NFS_MAX_READAHEAD;
+	server->backing_dev_info.ra_pages = server->rpages * nfs_max_readahead;
 
 	sb->s_maxbytes = fsinfo.maxfilesize;
 	if (sb->s_maxbytes > MAX_LFS_FILESIZE) 
@@ -2064,10 +2066,24 @@ static void nfs_destroy_inodecache(void)
 
 /*
  * NFS sysctls
+ * It's a bit awkward to duplicate the fs/nfs structs for
+ * sunrpc, nfs, nfsd and lockd - it may be easier to
+ * consolidate this in the sunrpc module.
  */
 static struct ctl_table_header *nfs_sysctl_table;
 
 static ctl_table nfs_sysctls[] = {
+	{
+		.ctl_name	= -2,
+		.procname	= "nfs_max_readahead",
+		.data		= &nfs_max_readahead,
+		.maxlen		= sizeof(unsigned int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec_minmax,
+		.strategy	= &sysctl_intvec,
+		.extra1		= &nfs_max_readahead_min,
+		.extra2		= &nfs_max_readahead_max
+	},
 	{ .ctl_name = 0 }
 };
 
