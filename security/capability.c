@@ -24,30 +24,28 @@
 #include <linux/ptrace.h>
 #include <linux/moduleparam.h>
 
-static struct security_operations capability_ops = {
-	.ptrace =			cap_ptrace,
-	.capget =			cap_capget,
-	.capset_check =			cap_capset_check,
-	.capset_set =			cap_capset_set,
-	.capable =			cap_capable,
-	.settime =			cap_settime,
-	.netlink_send =			cap_netlink_send,
-	.netlink_recv =			cap_netlink_recv,
+/* Note: Capabilities are default now, even if CONFIG_SECURITY
+ * is enabled and no LSM is loaded. (Previously, the dummy
+ * functions would have been called in that case which resulted
+ * in a slightly unusable system.)
+ * The capability LSM may still be compiled and loaded; it won't
+ * make a difference though except for slowing down some operations
+ * a tiny bit and (more severly) for disallowing loading another LSM.
+ * To have it as LSM may still be useful: It could be stacked on top
+ * of another LSM (if the other LSM allows this or if the stacker
+ * is used).
+ * If the capability LSM is loaded, we do NOT register the 
+ * capability_security_ops but a second structure capability_ops
+ * that has identical entries. We need to differentiate
+ * between capabilities used as default and used as LSM as in
+ * the latter case replacing it by just loading another LSM is
+ * not possible.
+ */
 
-	.bprm_apply_creds =		cap_bprm_apply_creds,
-	.bprm_set_security =		cap_bprm_set_security,
-	.bprm_secureexec =		cap_bprm_secureexec,
-
-	.inode_setxattr =		cap_inode_setxattr,
-	.inode_removexattr =		cap_inode_removexattr,
-
-	.task_post_setuid =		cap_task_post_setuid,
-	.task_reparent_to_init =	cap_task_reparent_to_init,
-
-	.syslog =                       cap_syslog,
-
-	.vm_enough_memory =             cap_vm_enough_memory,
-};
+/* Struct from commoncaps */
+extern struct security_operations capability_security_ops;
+/* Struct to hold the copy */
+static struct security_operations capability_ops;
 
 #define MY_NAME __stringify(KBUILD_MODNAME)
 
@@ -64,6 +62,7 @@ static int __init capability_init (void)
 		printk(KERN_INFO "Capabilities disabled at initialization\n");
 		return 0;
 	}
+	memcpy(&capability_ops, &capability_security_ops, sizeof(capability_ops));
 	/* register ourselves with the security framework */
 	if (register_security (&capability_ops)) {
 		/* try registering with primary module */

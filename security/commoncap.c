@@ -325,6 +325,41 @@ int cap_vm_enough_memory(long pages)
 	return __vm_enough_memory(pages, cap_sys_admin);
 }
 
+#ifdef CONFIG_SECURITY
+struct security_operations capability_security_ops = {
+	.ptrace =			cap_ptrace,
+	.capget =			cap_capget,
+	.capset_check =			cap_capset_check,
+	.capset_set =			cap_capset_set,
+	.capable =			cap_capable,
+	.settime =			cap_settime,
+	.netlink_send =			cap_netlink_send,
+	.netlink_recv =			cap_netlink_recv,
+
+	.bprm_apply_creds =		cap_bprm_apply_creds,
+	.bprm_set_security =		cap_bprm_set_security,
+	.bprm_secureexec =		cap_bprm_secureexec,
+
+	.inode_setxattr =		cap_inode_setxattr,
+	.inode_removexattr =		cap_inode_removexattr,
+
+	.task_post_setuid =		cap_task_post_setuid,
+	.task_reparent_to_init =	cap_task_reparent_to_init,
+
+	.syslog =                       cap_syslog,
+
+	.vm_enough_memory =             cap_vm_enough_memory,
+};
+
+EXPORT_SYMBOL(capability_security_ops);
+/* Note: capability_security_ops is the default for security_ops
+ * now which gets used if no LSM is loaded.
+ * If capability is loaded, a copy of capability_security_ops
+ * is registered, so we know whether or not we use a non-default
+ * security_ops. If we don't, replacement is not possible.
+ */
+#endif
+
 EXPORT_SYMBOL(cap_capable);
 EXPORT_SYMBOL(cap_settime);
 EXPORT_SYMBOL(cap_ptrace);

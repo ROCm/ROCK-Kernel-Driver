@@ -21,8 +21,9 @@
 #define SECURITY_FRAMEWORK_VERSION	"1.0.0"
 
 /* things that live in dummy.c */
-extern struct security_operations dummy_security_ops;
 extern void security_fixup_ops(struct security_operations *ops);
+/* default security ops */
+extern struct security_operations capability_security_ops;
 
 struct security_operations *security_ops;	/* Initialized to NULL */
 
@@ -55,13 +56,15 @@ int __init security_init(void)
 	printk(KERN_INFO "Security Framework v" SECURITY_FRAMEWORK_VERSION
 	       " initialized\n");
 
-	if (verify(&dummy_security_ops)) {
+	if (verify(&capability_security_ops)) {
 		printk(KERN_ERR "%s could not verify "
-		       "dummy_security_ops structure.\n", __FUNCTION__);
+		       "capability_security_ops structure.\n", __FUNCTION__);
 		return -EIO;
 	}
 
-	security_ops = &dummy_security_ops;
+	security_ops = &capability_security_ops;
+
+	/* Initialize compiled-in security modules */
 	do_security_initcalls();
 
 	return 0;
@@ -87,7 +90,7 @@ int register_security(struct security_operations *ops)
 		return -EINVAL;
 	}
 
-	if (security_ops != &dummy_security_ops)
+	if (security_ops != &capability_security_ops)
 		return -EAGAIN;
 
 	security_ops = ops;
@@ -104,18 +107,18 @@ int register_security(struct security_operations *ops)
  *
  * If @ops does not match the valued previously passed to register_security()
  * an error is returned.  Otherwise the default security options is set to the
- * the dummy_security_ops structure, and 0 is returned.
+ * the capability_security_ops structure, and 0 is returned.
  */
 int unregister_security(struct security_operations *ops)
 {
 	if (ops != security_ops) {
 		printk(KERN_INFO "%s: trying to unregister "
-		       "a security_opts structure that is not "
+		       "a security_ops structure that is not "
 		       "registered, failing.\n", __FUNCTION__);
 		return -EINVAL;
 	}
 
-	security_ops = &dummy_security_ops;
+	security_ops = &capability_security_ops;
 
 	return 0;
 }
