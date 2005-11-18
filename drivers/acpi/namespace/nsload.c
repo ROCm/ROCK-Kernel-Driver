@@ -44,6 +44,7 @@
 #include <acpi/acpi.h>
 #include <acpi/acnamesp.h>
 #include <acpi/acdispat.h>
+#include <acpi/actables.h>
 
 #define _COMPONENT          ACPI_NAMESPACE
 ACPI_MODULE_NAME("nsload")
@@ -76,6 +77,8 @@ acpi_ns_load_table(struct acpi_table_desc *table_desc,
 		   struct acpi_namespace_node *node)
 {
 	acpi_status status;
+	struct acpi_table_desc          *table_desc_loaded;
+	int                             count;
 
 	ACPI_FUNCTION_TRACE("ns_load_table");
 
@@ -105,6 +108,31 @@ acpi_ns_load_table(struct acpi_table_desc *table_desc,
 		ACPI_REPORT_WARNING(("Zero-length AML block in table [%4.4s]\n",
 				     table_desc->pointer->signature));
 		return_ACPI_STATUS(AE_OK);
+	}
+
+	/*
+	 * Check whether the table already exists -> then deny loading it again
+	 * Use OEM id and revision id of the table to identify uniqueness.
+	 */
+	table_desc_loaded = acpi_gbl_table_lists[table_desc->type].next;
+	for (count = 0;
+	     count < acpi_gbl_table_lists[table_desc->type].count
+	       && table_desc_loaded != NULL;
+	     count++){
+		table_desc_loaded = acpi_gbl_table_lists[table_desc->type].next;
+		if (table_desc_loaded->loaded_into_namespace
+		    && table_desc_loaded->pointer->revision ==
+			       table_desc->pointer->revision
+		    && table_desc_loaded->pointer->checksum ==
+			       table_desc->pointer->checksum
+		    && !memcmp(table_desc_loaded->pointer->oem_table_id, 
+			       table_desc->pointer->oem_table_id, 8)
+			){
+			ACPI_REPORT_WARNING (("Table %s has already been loaded (not bad)\n", 
+					      table_desc->pointer->oem_table_id));
+			return (AE_OK);
+		}
+		table_desc_loaded = table_desc_loaded->next;
 	}
 
 	/*
