@@ -154,10 +154,10 @@ do {												\
 # define __put_user_size(val, addr, n, err)							\
 do {												\
 	register long __pu_r8 asm ("r8") = 0;							\
-	asm volatile ("\n[1:]\tst"#n" %1=%r2%P1\t// %0 gets overwritten by exception handler\n"	\
+	asm volatile ("\n[1:]\tst"#n" [%1]=%r2\t// %0 gets overwritten by exception handler\n"	\
 		      "\t.xdata4 \"__ex_table\", 1b-., 1f-.\n"					\
 		      "[1:]"									\
-		      : "=r"(__pu_r8) : "m"(__m(addr)), "rO"(val), "0"(__pu_r8));		\
+		      : "=r"(__pu_r8) : "r"(addr), "rO"(val), "0"(__pu_r8));		\
 	(err) = __pu_r8;									\
 } while (0)
 
