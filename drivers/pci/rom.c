@@ -233,7 +233,7 @@ void pci_cleanup_rom(struct pci_dev *pdev)
 	}
 }
 
-EXPORT_SYMBOL_GPL(pci_map_rom);
-EXPORT_SYMBOL_GPL(pci_map_rom_copy);
-EXPORT_SYMBOL_GPL(pci_unmap_rom);
-EXPORT_SYMBOL_GPL(pci_remove_rom);
+EXPORT_SYMBOL(pci_map_rom);
+EXPORT_SYMBOL(pci_map_rom_copy);
+EXPORT_SYMBOL(pci_unmap_rom);
+EXPORT_SYMBOL(pci_remove_rom);

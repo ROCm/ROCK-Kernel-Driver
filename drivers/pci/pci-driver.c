@@ -512,11 +512,11 @@ static int __init pci_driver_init(void)
 
 postcore_initcall(pci_driver_init);
 
-EXPORT_SYMBOL_GPL(pci_match_id);
-EXPORT_SYMBOL_GPL(pci_match_device);
-EXPORT_SYMBOL_GPL(pci_register_driver);
-EXPORT_SYMBOL_GPL(pci_unregister_driver);
-EXPORT_SYMBOL_GPL(pci_dev_driver);
-EXPORT_SYMBOL_GPL(pci_bus_type);
-EXPORT_SYMBOL_GPL(pci_dev_get);
-EXPORT_SYMBOL_GPL(pci_dev_put);
+EXPORT_SYMBOL(pci_match_id);
+EXPORT_SYMBOL(pci_match_device);
+EXPORT_SYMBOL(pci_register_driver);
+EXPORT_SYMBOL(pci_unregister_driver);
+EXPORT_SYMBOL(pci_dev_driver);
+EXPORT_SYMBOL(pci_bus_type);
+EXPORT_SYMBOL(pci_dev_get);
+EXPORT_SYMBOL(pci_dev_put);

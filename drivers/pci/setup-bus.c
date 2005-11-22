@@ -129,7 +129,7 @@ void pci_setup_cardbus(struct pci_bus *bus)
 					region.end);
 	}
 }
-EXPORT_SYMBOL_GPL(pci_setup_cardbus);
+EXPORT_SYMBOL(pci_setup_cardbus);
 
 /* Initialize bridges with base/limit values we have collected.
    PCI-to-PCI Bridge Architecture Specification rev. 1.1 (1998)
@@ -493,7 +493,7 @@ pci_bus_size_bridges(struct pci_bus *bus)
 		break;
 	}
 }
-EXPORT_SYMBOL_GPL(pci_bus_size_bridges);
+EXPORT_SYMBOL(pci_bus_size_bridges);
 
 void __devinit
 pci_bus_assign_resources(struct pci_bus *bus)
@@ -526,7 +526,7 @@ pci_bus_assign_resources(struct pci_bus *bus)
 		}
 	}
 }
-EXPORT_SYMBOL_GPL(pci_bus_assign_resources);
+EXPORT_SYMBOL(pci_bus_assign_resources);
 
 void __init
 pci_assign_unassigned_resources(void)

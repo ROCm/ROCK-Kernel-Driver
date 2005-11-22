@@ -199,7 +199,7 @@ void pci_walk_bus(struct pci_bus *top, void (*cb)(struct pci_dev *, void *),
 }
 EXPORT_SYMBOL_GPL(pci_walk_bus);
 
-EXPORT_SYMBOL_GPL(pci_bus_alloc_resource);
+EXPORT_SYMBOL(pci_bus_alloc_resource);
 EXPORT_SYMBOL_GPL(pci_bus_add_device);
-EXPORT_SYMBOL_GPL(pci_bus_add_devices);
-EXPORT_SYMBOL_GPL(pci_enable_bridges);
+EXPORT_SYMBOL(pci_bus_add_devices);
+EXPORT_SYMBOL(pci_enable_bridges);

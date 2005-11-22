@@ -18,7 +18,7 @@
 
 /* Ugh.  Need to stop exporting this to modules. */
 LIST_HEAD(pci_root_buses);
-EXPORT_SYMBOL_GPL(pci_root_buses);
+EXPORT_SYMBOL(pci_root_buses);
 
 LIST_HEAD(pci_devices);
 
@@ -991,13 +991,13 @@ struct pci_bus * __devinit pci_scan_bus_parented(struct device *parent,
 		b->subordinate = pci_scan_child_bus(b);
 	return b;
 }
-EXPORT_SYMBOL_GPL(pci_scan_bus_parented);
+EXPORT_SYMBOL(pci_scan_bus_parented);
 
 #ifdef CONFIG_HOTPLUG
-EXPORT_SYMBOL_GPL(pci_add_new_bus);
-EXPORT_SYMBOL_GPL(pci_do_scan_bus);
-EXPORT_SYMBOL_GPL(pci_scan_slot);
-EXPORT_SYMBOL_GPL(pci_scan_bridge);
-EXPORT_SYMBOL_GPL(pci_scan_single_device);
+EXPORT_SYMBOL(pci_add_new_bus);
+EXPORT_SYMBOL(pci_do_scan_bus);
+EXPORT_SYMBOL(pci_scan_slot);
+EXPORT_SYMBOL(pci_scan_bridge);
+EXPORT_SYMBOL(pci_scan_single_device);
 EXPORT_SYMBOL_GPL(pci_scan_child_bus);
 #endif

@@ -1113,7 +1113,7 @@ void msi_remove_pci_irq_vectors(struct pci_dev* dev)
 	}
 }
 
-EXPORT_SYMBOL_GPL(pci_enable_msi);
-EXPORT_SYMBOL_GPL(pci_disable_msi);
-EXPORT_SYMBOL_GPL(pci_enable_msix);
-EXPORT_SYMBOL_GPL(pci_disable_msix);
+EXPORT_SYMBOL(pci_enable_msi);
+EXPORT_SYMBOL(pci_disable_msi);
+EXPORT_SYMBOL(pci_enable_msix);
+EXPORT_SYMBOL(pci_disable_msix);
