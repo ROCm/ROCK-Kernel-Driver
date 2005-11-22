@@ -1179,6 +1179,10 @@ static int idedisk_media_changed(struct gendisk *disk)
 		drive->attach = 0;
 		return 0;
 	}
+	/* We get reliably notified from PCMCIA layer */
+	if (drive->is_flash)
+		return 0;
+
 	/* if removable, always assume it was changed */
 	return drive->removable;
 }
