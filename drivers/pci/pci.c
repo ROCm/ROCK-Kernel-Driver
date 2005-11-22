@@ -405,7 +405,7 @@ pci_power_t pci_choose_state(struct pci_dev *dev, pm_message_t state)
 	return PCI_D0;
 }
 
-EXPORT_SYMBOL(pci_choose_state);
+EXPORT_SYMBOL_GPL(pci_choose_state);
 
 /**
  * pci_save_state - save the PCI configuration space of a device before suspending
@@ -890,36 +890,36 @@ __setup("pci=", pci_setup);
 #if defined(CONFIG_ISA) || defined(CONFIG_EISA)
 /* FIXME: Some boxes have multiple ISA bridges! */
 struct pci_dev *isa_bridge;
-EXPORT_SYMBOL(isa_bridge);
+EXPORT_SYMBOL_GPL(isa_bridge);
 #endif
 
 EXPORT_SYMBOL_GPL(pci_restore_bars);
-EXPORT_SYMBOL(pci_enable_device_bars);
-EXPORT_SYMBOL(pci_enable_device);
-EXPORT_SYMBOL(pci_disable_device);
-EXPORT_SYMBOL(pci_max_busnr);
-EXPORT_SYMBOL(pci_bus_max_busnr);
-EXPORT_SYMBOL(pci_find_capability);
-EXPORT_SYMBOL(pci_bus_find_capability);
-EXPORT_SYMBOL(pci_release_regions);
-EXPORT_SYMBOL(pci_request_regions);
-EXPORT_SYMBOL(pci_release_region);
-EXPORT_SYMBOL(pci_request_region);
-EXPORT_SYMBOL(pci_set_master);
-EXPORT_SYMBOL(pci_set_mwi);
-EXPORT_SYMBOL(pci_clear_mwi);
+EXPORT_SYMBOL_GPL(pci_enable_device_bars);
+EXPORT_SYMBOL_GPL(pci_enable_device);
+EXPORT_SYMBOL_GPL(pci_disable_device);
+EXPORT_SYMBOL_GPL(pci_max_busnr);
+EXPORT_SYMBOL_GPL(pci_bus_max_busnr);
+EXPORT_SYMBOL_GPL(pci_find_capability);
+EXPORT_SYMBOL_GPL(pci_bus_find_capability);
+EXPORT_SYMBOL_GPL(pci_release_regions);
+EXPORT_SYMBOL_GPL(pci_request_regions);
+EXPORT_SYMBOL_GPL(pci_release_region);
+EXPORT_SYMBOL_GPL(pci_request_region);
+EXPORT_SYMBOL_GPL(pci_set_master);
+EXPORT_SYMBOL_GPL(pci_set_mwi);
+EXPORT_SYMBOL_GPL(pci_clear_mwi);
 EXPORT_SYMBOL_GPL(pci_intx);
-EXPORT_SYMBOL(pci_set_dma_mask);
-EXPORT_SYMBOL(pci_set_consistent_dma_mask);
-EXPORT_SYMBOL(pci_assign_resource);
-EXPORT_SYMBOL(pci_find_parent_resource);
+EXPORT_SYMBOL_GPL(pci_set_dma_mask);
+EXPORT_SYMBOL_GPL(pci_set_consistent_dma_mask);
+EXPORT_SYMBOL_GPL(pci_assign_resource);
+EXPORT_SYMBOL_GPL(pci_find_parent_resource);
 
-EXPORT_SYMBOL(pci_set_power_state);
-EXPORT_SYMBOL(pci_save_state);
-EXPORT_SYMBOL(pci_restore_state);
-EXPORT_SYMBOL(pci_enable_wake);
+EXPORT_SYMBOL_GPL(pci_set_power_state);
+EXPORT_SYMBOL_GPL(pci_save_state);
+EXPORT_SYMBOL_GPL(pci_restore_state);
+EXPORT_SYMBOL_GPL(pci_enable_wake);
 
 /* Quirk info */
 
-EXPORT_SYMBOL(isa_dma_bridge_buggy);
-EXPORT_SYMBOL(pci_pci_problems);
+EXPORT_SYMBOL_GPL(isa_dma_bridge_buggy);
+EXPORT_SYMBOL_GPL(pci_pci_problems);

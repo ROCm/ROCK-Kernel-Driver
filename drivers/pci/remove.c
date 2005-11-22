@@ -55,7 +55,7 @@ int pci_remove_device_safe(struct pci_dev *dev)
 	pci_destroy_dev(dev);
 	return 0;
 }
-EXPORT_SYMBOL(pci_remove_device_safe);
+EXPORT_SYMBOL_GPL(pci_remove_device_safe);
 
 void pci_remove_bus(struct pci_bus *pci_bus)
 {
@@ -70,7 +70,7 @@ void pci_remove_bus(struct pci_bus *pci_bus)
 	sysfs_remove_link(&pci_bus->class_dev.kobj, "bridge");
 	class_device_unregister(&pci_bus->class_dev);
 }
-EXPORT_SYMBOL(pci_remove_bus);
+EXPORT_SYMBOL_GPL(pci_remove_bus);
 
 /**
  * pci_remove_bus_device - remove a PCI device and any children
@@ -118,5 +118,5 @@ void pci_remove_behind_bridge(struct pci_dev *dev)
 	}
 }
 
-EXPORT_SYMBOL(pci_remove_bus_device);
-EXPORT_SYMBOL(pci_remove_behind_bridge);
+EXPORT_SYMBOL_GPL(pci_remove_bus_device);
+EXPORT_SYMBOL_GPL(pci_remove_behind_bridge);

@@ -54,9 +54,9 @@ PCI_OP_WRITE(byte, u8, 1)
 PCI_OP_WRITE(word, u16, 2)
 PCI_OP_WRITE(dword, u32, 4)
 
-EXPORT_SYMBOL(pci_bus_read_config_byte);
-EXPORT_SYMBOL(pci_bus_read_config_word);
-EXPORT_SYMBOL(pci_bus_read_config_dword);
-EXPORT_SYMBOL(pci_bus_write_config_byte);
-EXPORT_SYMBOL(pci_bus_write_config_word);
-EXPORT_SYMBOL(pci_bus_write_config_dword);
+EXPORT_SYMBOL_GPL(pci_bus_read_config_byte);
+EXPORT_SYMBOL_GPL(pci_bus_read_config_word);
+EXPORT_SYMBOL_GPL(pci_bus_read_config_dword);
+EXPORT_SYMBOL_GPL(pci_bus_write_config_byte);
+EXPORT_SYMBOL_GPL(pci_bus_write_config_word);
+EXPORT_SYMBOL_GPL(pci_bus_write_config_dword);

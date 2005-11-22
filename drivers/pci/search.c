@@ -376,14 +376,14 @@ exit:
 	spin_unlock(&pci_bus_lock);
 	return found;
 }
-EXPORT_SYMBOL(pci_dev_present);
+EXPORT_SYMBOL_GPL(pci_dev_present);
 
-EXPORT_SYMBOL(pci_find_bus);
-EXPORT_SYMBOL(pci_find_next_bus);
-EXPORT_SYMBOL(pci_find_device);
-EXPORT_SYMBOL(pci_find_device_reverse);
-EXPORT_SYMBOL(pci_find_slot);
-EXPORT_SYMBOL(pci_get_device);
-EXPORT_SYMBOL(pci_get_subsys);
-EXPORT_SYMBOL(pci_get_slot);
-EXPORT_SYMBOL(pci_get_class);
+EXPORT_SYMBOL_GPL(pci_find_bus);
+EXPORT_SYMBOL_GPL(pci_find_next_bus);
+EXPORT_SYMBOL_GPL(pci_find_device);
+EXPORT_SYMBOL_GPL(pci_find_device_reverse);
+EXPORT_SYMBOL_GPL(pci_find_slot);
+EXPORT_SYMBOL_GPL(pci_get_device);
+EXPORT_SYMBOL_GPL(pci_get_subsys);
+EXPORT_SYMBOL_GPL(pci_get_slot);
+EXPORT_SYMBOL_GPL(pci_get_class);

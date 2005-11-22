@@ -176,7 +176,7 @@ acpi_status pci_osc_support_set(u32 flags)
 	ctrlset_buf[OSC_CONTROL_TYPE] = temp;
 	return AE_OK;
 }
-EXPORT_SYMBOL(pci_osc_support_set);
+EXPORT_SYMBOL_GPL(pci_osc_support_set);
 
 /**
  * pci_osc_control_set - commit requested control to Firmware
@@ -208,7 +208,7 @@ acpi_status pci_osc_control_set(u32 flags)
 	
 	return status;
 }
-EXPORT_SYMBOL(pci_osc_control_set);
+EXPORT_SYMBOL_GPL(pci_osc_control_set);
 
 /*
  * _SxD returns the D-state with the highest power

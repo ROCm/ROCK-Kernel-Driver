@@ -1517,7 +1517,7 @@ void pci_fixup_device(enum pci_fixup_pass pass, struct pci_dev *dev)
 	pci_do_fixups(dev, start, end);
 }
 
-EXPORT_SYMBOL(pcie_mch_quirk);
+EXPORT_SYMBOL_GPL(pcie_mch_quirk);
 #ifdef CONFIG_HOTPLUG
-EXPORT_SYMBOL(pci_fixup_device);
+EXPORT_SYMBOL_GPL(pci_fixup_device);
 #endif
