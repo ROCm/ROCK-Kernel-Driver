@@ -40,7 +40,7 @@
 
 #undef DEBUG
 #undef DEBUG_HARD
-#undef USE_CTRL_O_SYSRQ
+#define USE_CTRL_O_SYSRQ
 
 #include <linux/config.h>
 #include <linux/module.h>
