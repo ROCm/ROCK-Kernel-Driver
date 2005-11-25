@@ -887,6 +887,16 @@ config SCSI_IBMVSCSI
 	  To compile this driver as a module, choose M here: the
 	  module will be called ibmvscsic.
 
+config SCSI_IBMVSCSIS
+	tristate "IBM Virtual SCSI Server support"
+	depends on PPC_PSERIES
+	help
+	  This is the IBM Virtual SCSI Server which can be configured using
+	  the ppc64-utils package available at
+	  http://techsupport.services.ibm.com/server/lopdiags
+	  To compile this driver as a module, choose M here: the
+	  module will be called ibmvscsis.
+
 config SCSI_INITIO
 	tristate "Initio 9100U(W) support"
 	depends on PCI && SCSI

@@ -53,6 +53,13 @@ enum srp_descriptor_formats {
 	SRP_INDIRECT_BUFFER = 0x02
 };
 
+enum srp_task_attributes {
+	SRP_SIMPLE_TASK = 0,
+	SRP_HEAD_TASK = 1,
+	SRP_ORDERED_TASK = 2,
+	SRP_ACA_TASK = 4
+};
+
 struct memory_descriptor {
 	u64 virtual_address;
 	u32 memory_handle;
@@ -174,7 +181,7 @@ struct srp_rsp {
 	u32 data_out_residual_count;
 	u32 sense_data_list_length;
 	u32 response_data_list_length;
-	u8 sense_and_response_data[18];
+	u8 sense_and_response_data[SCSI_SENSE_BUFFERSIZE];
 };
 
 struct srp_cred_req {

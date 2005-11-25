@@ -33,6 +33,7 @@
 #include <linux/list.h>
 #include <linux/completion.h>
 #include <linux/interrupt.h>
+#include <scsi/scsi_cmnd.h>
 #include "viosrp.h"
 
 struct scsi_cmnd;
