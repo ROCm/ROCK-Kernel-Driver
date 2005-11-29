@@ -1,10 +1,6 @@
 /* -*- mode: c; c-basic-offset: 8; -*-
  * vim: noexpandtab sw=8 ts=8 sts=0:
  *
- * aio.h
- *
- * Function prototypes
- *
  * Copyright (C) 2002, 2004, 2005 Oracle.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or
@@ -23,15 +19,23 @@
  * Boston, MA 021110-1307, USA.
  */
 
-#ifndef OCFS2_AIO_H
-#define OCFS2_AIO_H
+#ifndef OCFS2_AOPS_H
+#define OCFS2_AOPS_H
 
-ssize_t ocfs2_file_aio_write(struct kiocb *iocb, const char __user *buf,
-			     size_t count, loff_t pos);
-ssize_t ocfs2_file_aio_read(struct kiocb *iocb, char __user *buf, size_t count,
-			    loff_t pos);
+int ocfs2_prepare_write(struct file *file, struct page *page,
+			unsigned from, unsigned to);
 
-void okp_teardown_from_list(void *data);
-void ocfs2_wait_for_okp_destruction(ocfs2_super *osb);
+struct ocfs2_journal_handle *ocfs2_start_walk_page_trans(struct inode *inode,
+							 struct page *page,
+							 unsigned from,
+							 unsigned to);
 
-#endif /* OCFS2_AIO_H */
+/* all ocfs2_dio_end_io()'s fault */
+#define ocfs2_iocb_is_rw_locked(iocb) \
+	test_bit(0, (unsigned long *)&iocb->private)
+#define ocfs2_iocb_set_rw_locked(iocb) \
+	set_bit(0, (unsigned long *)&iocb->private)
+#define ocfs2_iocb_clear_rw_locked(iocb) \
+	clear_bit(0, (unsigned long *)&iocb->private)
+
+#endif /* OCFS2_FILE_H */

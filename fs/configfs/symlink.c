@@ -247,62 +247,6 @@ static int configfs_getlink(struct dentry *dentry, char * path)
 
 }
 
-/* Hacks */
-#define HAVE_GENERIC_READLINK
-#define NEW_FOLLOW_LINK_API
-
-#ifndef HAVE_GENERIC_READLINK
-int configfs_readlink(struct dentry *dentry, char __user *buffer, int buflen)
-{
-	int error = 0;
-	unsigned long page = get_zeroed_page(GFP_KERNEL);
-
-	if (!page)
-		return -ENOMEM;
-
-	error = configfs_getlink(dentry, (char *) page);
-	if (!error)
-		error = vfs_readlink(dentry, buffer, buflen, (char *) page);
-
-	free_page(page);
-
-	return error;
-}
-
-int configfs_follow_link(struct dentry *dentry, struct nameidata *nd)
-{
-	int error = 0;
-	unsigned long page = get_zeroed_page(GFP_KERNEL);
-
-	if (!page)
-		return -ENOMEM;
-
-	error = configfs_getlink(dentry, (char *) page);
-	if (!error)
-		error = vfs_follow_link(nd, (char *) page);
-
-	free_page(page);
-
-	return error;
-}
-#elif !defined(NEW_FOLLOW_LINK_API)
-static int configfs_follow_link(struct dentry *dentry, struct nameidata *nd)
-{
-	int error = -ENOMEM;
-	unsigned long page = get_zeroed_page(GFP_KERNEL);
-	if (page)
-		error = configfs_getlink(dentry, (char *)page);
-	nd_set_link(nd, error ? ERR_PTR(error) : (char *)page);
-	return 0;
-}
-
-static void configfs_put_link(struct dentry *dentry, struct nameidata *nd)
-{
-	char *page = nd_get_link(nd);
-	if (!IS_ERR(page))
-		free_page((unsigned long)page);
-}
-#else
 static void *configfs_follow_link(struct dentry *dentry, struct nameidata *nd)
 {
 	int error = -ENOMEM;
@@ -328,15 +272,9 @@ static void configfs_put_link(struct dentry *dentry, struct nameidata *nd,
 		free_page(page);
 	}
 }
-#endif
 
 struct inode_operations configfs_symlink_inode_operations = {
 	.follow_link = configfs_follow_link,
-#ifndef HAVE_GENERIC_READLINK
-	.readlink = configfs_readlink,
-#else
 	.readlink = generic_readlink,
 	.put_link = configfs_put_link,
-#endif
 };
-

@@ -637,16 +637,16 @@ void dlm_lock_put(struct dlm_lock *lock);
 void dlm_lock_attach_lockres(struct dlm_lock *lock,
 			     struct dlm_lock_resource *res);
 
-int dlm_create_lock_handler(o2net_msg *msg, u32 len, void *data);
-int dlm_convert_lock_handler(o2net_msg *msg, u32 len, void *data);
-int dlm_proxy_ast_handler(o2net_msg *msg, u32 len, void *data);
+int dlm_create_lock_handler(struct o2net_msg *msg, u32 len, void *data);
+int dlm_convert_lock_handler(struct o2net_msg *msg, u32 len, void *data);
+int dlm_proxy_ast_handler(struct o2net_msg *msg, u32 len, void *data);
 
 void dlm_revert_pending_convert(struct dlm_lock_resource *res,
 				struct dlm_lock *lock);
 void dlm_revert_pending_lock(struct dlm_lock_resource *res,
 			     struct dlm_lock *lock);
 
-int dlm_unlock_lock_handler(o2net_msg *msg, u32 len, void *data);
+int dlm_unlock_lock_handler(struct o2net_msg *msg, u32 len, void *data);
 void dlm_commit_pending_cancel(struct dlm_lock_resource *res,
 			       struct dlm_lock *lock);
 void dlm_commit_pending_unlock(struct dlm_lock_resource *res,
@@ -750,15 +750,15 @@ void dlm_lockres_release_ast(struct dlm_ctxt *dlm,
 			     struct dlm_lock_resource *res);
 void __dlm_lockres_reserve_ast(struct dlm_lock_resource *res);
 
-int dlm_master_request_handler(o2net_msg *msg, u32 len, void *data);
-int dlm_assert_master_handler(o2net_msg *msg, u32 len, void *data);
-int dlm_migrate_request_handler(o2net_msg *msg, u32 len, void *data);
-int dlm_mig_lockres_handler(o2net_msg *msg, u32 len, void *data);
-int dlm_master_requery_handler(o2net_msg *msg, u32 len, void *data);
-int dlm_request_all_locks_handler(o2net_msg *msg, u32 len, void *data);
-int dlm_reco_data_done_handler(o2net_msg *msg, u32 len, void *data);
-int dlm_begin_reco_handler(o2net_msg *msg, u32 len, void *data);
-int dlm_finalize_reco_handler(o2net_msg *msg, u32 len, void *data);
+int dlm_master_request_handler(struct o2net_msg *msg, u32 len, void *data);
+int dlm_assert_master_handler(struct o2net_msg *msg, u32 len, void *data);
+int dlm_migrate_request_handler(struct o2net_msg *msg, u32 len, void *data);
+int dlm_mig_lockres_handler(struct o2net_msg *msg, u32 len, void *data);
+int dlm_master_requery_handler(struct o2net_msg *msg, u32 len, void *data);
+int dlm_request_all_locks_handler(struct o2net_msg *msg, u32 len, void *data);
+int dlm_reco_data_done_handler(struct o2net_msg *msg, u32 len, void *data);
+int dlm_begin_reco_handler(struct o2net_msg *msg, u32 len, void *data);
+int dlm_finalize_reco_handler(struct o2net_msg *msg, u32 len, void *data);
 
 int dlm_dispatch_assert_master(struct dlm_ctxt *dlm,
 			       struct dlm_lock_resource *res,

@@ -1,0 +1,126 @@
+
+For now this just documents locking ordering.  The intent is to have a 
+dense enough markup that one can visualize an entire path in a reasonably
+sized terminal.  So:
+
+ (  - lock
+ )  - unlock
+ () - lock and unlock without anything interesting in between
+ +  - descending into another function
+
+worst case buffered file write (extending, buf from mmaped ocfs2)
++ ocfs2_file_aio_write
+  ( i_sem
+  ( rw_lock
+  ( meta_lock
+  + ocfs2_extend_allocation
+    () ip_alloc_sem
+  ) meta_lock
+  + generic_file_aio_write_nolock
+    + ocfs2_prepare_write
+      ( meta_lock
+      ( ip_alloc_sem
+      ) ip_alloc_sem
+      ) meta_lock
+    + ocfs2_nopage
+      + filemap_nopage
+        + ocfs2_readpage
+          ( meta_lock
+          ( ip_alloc_sem
+          ( data_lock
+          ) data_lock
+          ) ip_alloc_sem
+          ) meta_lock
+    + ocfs2_commit_write
+      ( meta_lock
+      ( data_lock
+      ) data_lock
+      ) meta_lock
+  ) rw_lock
+  ) i_sem
+
+O_DIRECT file write:
++ ocfs2_file_aio_write
+  ( i_sem
+  ( i_alloc_sem
+  ( rw_lock
+  () meta_lock
+  + __blkdev_direct_IO
+    + ocfs2_direct_io_get_blocks
+      ( meta_lock
+      ( ip_alloc_sem
+      ) ip_alloc_sem
+      ) meta_lock
+  ) i_sem
++ dio_complete
+  + ocfs2_dio_end_io
+    ) rw_lock
+    ) i_alloc_sem
+
+buffered file read (nopage when buf is mmaped):
++ ocfs2_file_aio_read
+  + generic_file_aio_read
+    + ocfs2_readpage
+      ( meta_lock
+      ( ip_alloc_sem
+      ( data_lock
+      ) data_lock
+      ) ip_alloc_sem
+      ) meta_lock
+    + ocfs2_nopage
+      + filemap_nopage
+        + ocfs2_readpage
+          ( meta_lock
+          ( ip_alloc_sem
+          ( data_lock
+          ) data_lock
+          ) ip_alloc_sem
+          ) meta_lock
+
+O_DIRECT file read:
++ ocfs2_file_aio_read
+  ( i_alloc_sem
+  ) rw_lock
+  + __blkdev_direct_IO
+    + ocfs2_direct_io_get_blocks
+      ( meta_lock
+      ( ip_alloc_sem
+      ) ip_alloc_sem
+      ) meta_lock
++ dio_complete
+  + ocfs2_dio_end_io
+    ) i_alloc_sem
+    ) rw_lock
+
+truncate:
++ do_truncate
+  ( i_sem
+  + notify_change
+    ( i_alloc_sem
+    + ocfs2_setattr
+      ( rw_lock
+      ( meta_lock
+      + ocfs2_truncate_file
+        () data_lock
+      ) meta_lock
+      ) rw_lock
+    ) i_alloc_sem
+  ) i_sem
+
+readpage: (via sendfile, sys_readahead, fault->nopage)
++ ocfs2_readpage
+      ( meta_lock
+      ( ip_alloc_sem
+      ( data_lock
+      ) data_lock
+      ) ip_alloc_sem
+      ) meta_lock
+
+Lock Ordering - The Short Story:
+i_sem -> i_alloc_sem -> rw_lock -> meta_lock -> ip_alloc_sem -> data_lock
+
+.. make this prettier ..
+
+-- Locks and what they cover --
+
+

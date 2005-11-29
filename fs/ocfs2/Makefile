@@ -1,4 +1,4 @@
-OCFS2_BUILD_VERSION="\"1.3.0 svn 2673\""
+OCFS2_BUILD_VERSION="\"1.3.2 svn 2710\""
 EXTRA_CFLAGS += -Ifs/ocfs2
 
 EXTRA_CFLAGS += -DCATCH_BH_JBD_RACES
@@ -11,15 +11,15 @@ KAPI_INCLUDE_DIR = $(srctree)/fs/ocfs2/kapi-compat/include
 EXTRA_CFLAGS += -include $(KAPI_INCLUDE_DIR)/assert_spin_locked.h
 EXTRA_CFLAGS += -include $(KAPI_INCLUDE_DIR)/journal_access.h
 EXTRA_CFLAGS += -include $(KAPI_INCLUDE_DIR)/kref_init.h
-EXTRA_CFLAGS += -include $(KAPI_INCLUDE_DIR)/kref_put.h
+#EXTRA_CFLAGS += -include $(KAPI_INCLUDE_DIR)/kref_put.h
 #EXTRA_CFLAGS += -include $(KAPI_INCLUDE_DIR)/sparse_endian_types.h
+#EXTRA_CFLAGS += -include $(KAPI_INCLUDE_DIR)/kzalloc.h
 
 EXTRA_CFLAGS += -DOCFS2_BUILD_VERSION=$(OCFS2_BUILD_VERSION)
 
 obj-$(CONFIG_OCFS2_FS) += ocfs2.o
 
 ocfs2-objs := \
-       aio.o                   \
        alloc.o                 \
        aops.o                  \
        buffer_head_io.o        \

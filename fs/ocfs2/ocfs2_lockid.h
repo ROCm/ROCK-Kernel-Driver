@@ -40,6 +40,7 @@ enum ocfs2_lock_type {
 	OCFS2_LOCK_TYPE_DATA,
 	OCFS2_LOCK_TYPE_SUPER,
 	OCFS2_LOCK_TYPE_RENAME,
+	OCFS2_LOCK_TYPE_RW,
 	OCFS2_NUM_LOCK_TYPES
 };
 
@@ -58,6 +59,9 @@ static inline char ocfs2_lock_type_char(enum ocfs2_lock_type type)
 			break;
 		case OCFS2_LOCK_TYPE_RENAME:
 			c = 'R';
+			break;
+		case OCFS2_LOCK_TYPE_RW:
+			c = 'W';
 			break;
 		default:
 			c = '\0';

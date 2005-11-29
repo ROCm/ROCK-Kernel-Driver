@@ -37,7 +37,7 @@
 #include <linux/inet.h>
 #include <linux/in.h>
 
-typedef struct _o2net_msg
+struct o2net_msg
 {
 	__be16 magic;
 	__be16 data_len;
@@ -48,11 +48,11 @@ typedef struct _o2net_msg
 	__be32 key;
 	__be32 msg_num;
 	__u8  buf[0];
-} o2net_msg;
+};
 
-typedef int (o2net_msg_handler_func)(o2net_msg *msg, u32 len, void *data);
+typedef int (o2net_msg_handler_func)(struct o2net_msg *msg, u32 len, void *data);
 
-#define O2NET_MAX_PAYLOAD_BYTES  (4096 - sizeof(o2net_msg))
+#define O2NET_MAX_PAYLOAD_BYTES  (4096 - sizeof(struct o2net_msg))
 
 /* TODO: figure this out.... */
 static inline int o2net_link_down(int err, struct socket *sock)

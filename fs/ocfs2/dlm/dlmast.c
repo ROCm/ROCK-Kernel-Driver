@@ -114,9 +114,22 @@ static void __dlm_queue_ast(struct dlm_ctxt *dlm, struct dlm_lock *lock)
 
 	/* check to see if this ast obsoletes the bast */
 	if (dlm_should_cancel_bast(dlm, lock)) {
+		struct dlm_lock_resource *res = lock->lockres;
+		mlog(0, "%s: cancelling bast for %.*s\n",
+		     dlm->name, res->lockname.len, res->lockname.name);
 		lock->bast_pending = 0;
 		list_del_init(&lock->bast_list);
 		lock->ml.highest_blocked = LKM_IVMODE;
+		/* removing lock from list, remove a ref.  guaranteed
+		 * this won't be the last ref because of the get above,
+		 * so res->spinlock will not be taken here */
+		dlm_lock_put(lock);
+		/* free up the reserved bast that we are cancelling.
+		 * guaranteed that this will not be the last reserved
+		 * ast because *both* an ast and a bast were reserved 
+		 * to get to this point.  the res->spinlock will not be
+		 * taken here */
+		dlm_lockres_release_ast(dlm, res);
 	}
 	list_add_tail(&lock->ast_list, &dlm->pending_asts);
 	lock->ast_pending = 1;
@@ -248,7 +261,7 @@ void dlm_do_local_bast(struct dlm_ctxt *dlm, struct dlm_lock_resource *res,
 
 
 
-int dlm_proxy_ast_handler(o2net_msg *msg, u32 len, void *data)
+int dlm_proxy_ast_handler(struct o2net_msg *msg, u32 len, void *data)
 {
 	int ret;
 	unsigned int locklen;

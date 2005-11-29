@@ -318,14 +318,9 @@ clear_fields:
 	ip->ip_dlm = NULL;
 }
 
-#define BACKING_DEV_CAPABILITIES
 static struct backing_dev_info dlmfs_backing_dev_info = {
 	.ra_pages	= 0,	/* No readahead */
-#ifdef BACKING_DEV_CAPABILITIES
 	.capabilities	= BDI_CAP_NO_ACCT_DIRTY | BDI_CAP_NO_WRITEBACK,
-#else
-	.memory_backed	= 1,	/* Does not contribute to dirty memory */
-#endif
 };
 
 static struct inode *dlmfs_get_root_inode(struct super_block *sb)

@@ -123,13 +123,22 @@ void configfs_release_fs(void)
 	simple_release_fs(&configfs_mount, &configfs_mnt_count);
 }
 
+
+static decl_subsys(config, NULL, NULL);
+
 static int __init configfs_init(void)
 {
 	int err;
 
+	kset_set_kset_s(&config_subsys, kernel_subsys);
+	err = subsystem_register(&config_subsys);
+	if (err)
+		return err;
+
 	err = register_filesystem(&configfs_fs_type);
 	if (err) {
-                printk(KERN_ERR "configfs: Unable to register filesystem!\n");
+		printk(KERN_ERR "configfs: Unable to register filesystem!\n");
+		subsystem_unregister(&config_subsys);
 	}
 
 	return err;
@@ -137,7 +146,8 @@ static int __init configfs_init(void)
 
 static void __exit configfs_exit(void)
 {
-        unregister_filesystem(&configfs_fs_type);
+	unregister_filesystem(&configfs_fs_type);
+	subsystem_unregister(&config_subsys);
 }
 
 MODULE_AUTHOR("Oracle");

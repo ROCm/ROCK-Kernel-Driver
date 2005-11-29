@@ -38,7 +38,17 @@
 #define O2NET_KEEPALIVE_DELAY_SECS	5
 #define O2NET_IDLE_TIMEOUT_SECS		10
 
-#define O2NET_PROTOCOL_VERSION 1ULL
+/* 
+ * This version number represents quite a lot, unfortunately.  It not
+ * only represents the raw network message protocol on the wire but also
+ * locking semantics of the file system using the protocol.  It should 
+ * be somewhere else, I'm sure, but right now it isn't.
+ *
+ * New in version 2:
+ * 	- full 64 bit i_size in the metadata lock lvbs
+ * 	- introduction of "rw" lock and pushing meta/data locking down
+ */
+#define O2NET_PROTOCOL_VERSION 2ULL
 struct o2net_handshake {
 	__be64	protocol_version;
 	__be64	connector_id;

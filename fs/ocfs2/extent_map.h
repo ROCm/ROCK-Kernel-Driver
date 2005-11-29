@@ -34,7 +34,8 @@ void exit_ocfs2_extent_maps(void);
  * in the process of being updated.
  */
 int ocfs2_extent_map_init(struct inode *inode);
-int ocfs2_extent_map_append(struct inode *inode, ocfs2_extent_rec *rec,
+int ocfs2_extent_map_append(struct inode *inode,
+			    struct ocfs2_extent_rec *rec,
 			    u32 new_clusters);
 int ocfs2_extent_map_get_blocks(struct inode *inode,
 				u64 v_blkno, int count,

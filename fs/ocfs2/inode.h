@@ -31,46 +31,46 @@ struct ocfs2_inode_info
 {
 	u64			ip_blkno;
 
-	struct ocfs2_lock_res	ip_meta_lockres;
-	struct ocfs2_lock_res	ip_data_lockres;
+	struct ocfs2_lock_res		ip_rw_lockres;
+	struct ocfs2_lock_res		ip_meta_lockres;
+	struct ocfs2_lock_res		ip_data_lockres;
 
 	/* protects allocation changes on this inode. */
-	struct rw_semaphore	ip_alloc_sem;
+	struct rw_semaphore		ip_alloc_sem;
 
 	/* These fields are protected by ip_lock */
-	spinlock_t		ip_lock;
-	u32			ip_open_count;
-	u32			ip_clusters;
-	loff_t			ip_mmu_private;
-	struct ocfs2_extent_map	ip_map;
-	struct list_head	ip_io_markers;
-	int			ip_orphaned_slot;
+	spinlock_t			ip_lock;
+	u32				ip_open_count;
+	u32				ip_clusters;
+	struct ocfs2_extent_map		ip_map;
+	struct list_head		ip_io_markers;
+	int				ip_orphaned_slot;
 
-	struct semaphore	ip_io_sem;
+	struct semaphore		ip_io_sem;
 
 	/* Used by the journalling code to attach an inode to a
 	 * handle.  These are protected by ip_io_sem in order to lock
 	 * out other I/O to the inode until we either commit or
 	 * abort. */
-	struct list_head	ip_handle_list;
-	ocfs2_journal_handle	*ip_handle;
+	struct list_head		ip_handle_list;
+	struct ocfs2_journal_handle	*ip_handle;
 
-	u32			ip_flags; /* see below */
+	u32				ip_flags; /* see below */
 
 	/* protected by recovery_lock. */
-	struct inode		*ip_next_orphan;
+	struct inode			*ip_next_orphan;
 
-	u32			ip_dir_start_lookup;
+	u32				ip_dir_start_lookup;
 
 	/* next two are protected by trans_inc_lock */
 	/* which transaction were we created on? Zero if none. */
-	unsigned long		ip_created_trans;
+	unsigned long			ip_created_trans;
 	/* last transaction we were a part of. */
-	unsigned long		ip_last_trans;
+	unsigned long			ip_last_trans;
 
 	struct ocfs2_caching_info	ip_metadata_cache;
 
-	struct inode		vfs_inode;
+	struct inode			vfs_inode;
 };
 
 /*
@@ -121,13 +121,13 @@ struct buffer_head *ocfs2_bread(struct inode *inode, int block,
 void ocfs2_clear_inode(struct inode *inode);
 void ocfs2_delete_inode(struct inode *inode);
 void ocfs2_drop_inode(struct inode *inode);
-struct inode *ocfs2_iget(ocfs2_super *osb, u64 feoff);
-struct inode *ocfs2_ilookup_for_vote(ocfs2_super *osb,
+struct inode *ocfs2_iget(struct ocfs2_super *osb, u64 feoff);
+struct inode *ocfs2_ilookup_for_vote(struct ocfs2_super *osb,
 				     u64 blkno,
 				     int delete_vote);
 int ocfs2_inode_init_private(struct inode *inode);
 int ocfs2_inode_revalidate(struct dentry *dentry);
-int ocfs2_populate_inode(struct inode *inode, ocfs2_dinode *fe,
+int ocfs2_populate_inode(struct inode *inode, struct ocfs2_dinode *fe,
 			 int create_ino);
 void ocfs2_read_inode(struct inode *inode);
 void ocfs2_read_inode2(struct inode *inode, void *opaque);
@@ -135,8 +135,8 @@ ssize_t ocfs2_rw_direct(int rw, struct file *filp, char *buf,
 			size_t size, loff_t *offp);
 void ocfs2_sync_blockdev(struct super_block *sb);
 void ocfs2_refresh_inode(struct inode *inode,
-			 ocfs2_dinode *fe);
-int ocfs2_mark_inode_dirty(ocfs2_journal_handle *handle,
+			 struct ocfs2_dinode *fe);
+int ocfs2_mark_inode_dirty(struct ocfs2_journal_handle *handle,
 			   struct inode *inode,
 			   struct buffer_head *bh);
 int ocfs2_aio_read(struct file *file, struct kiocb *req, struct iocb *iocb);

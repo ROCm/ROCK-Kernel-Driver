@@ -238,23 +238,23 @@ static unsigned char ocfs2_type_by_mode[S_IFMT >> S_SHIFT] = {
  * On disk extent record for OCFS2
  * It describes a range of clusters on disk.
  */
-typedef struct _ocfs2_extent_rec {
+struct ocfs2_extent_rec {
 /*00*/	__le32 e_cpos;		/* Offset into the file, in clusters */
 	__le32 e_clusters;	/* Clusters covered by this extent */
 	__le64 e_blkno;		/* Physical disk offset, in blocks */
 /*10*/
-} ocfs2_extent_rec;
+};
 
-typedef struct _ocfs2_chain_rec {
+struct ocfs2_chain_rec {
 	__le32 c_free;	/* Number of free bits in this chain. */
 	__le32 c_total;	/* Number of total bits in this chain */
 	__le64 c_blkno;	/* Physical disk offset (blocks) of 1st group */
-} ocfs2_chain_rec;
+};
 
-typedef struct _ocfs2_truncate_rec {
+struct ocfs2_truncate_rec {
 	__le32 t_start;		/* 1st cluster in this log */
 	__le32 t_clusters;	/* Number of total clusters covered */
-} ocfs2_truncate_rec;
+};
 
 /*
  * On disk extent list for OCFS2 (node in the tree).  Note that this
@@ -262,7 +262,7 @@ typedef struct _ocfs2_truncate_rec {
  * offsets are relative to ocfs2_dinode.id2.i_list or
  * ocfs2_extent_block.h_list, respectively.
  */
-typedef struct _ocfs2_extent_list {
+struct ocfs2_extent_list {
 /*00*/	__le16 l_tree_depth;		/* Extent tree depth from this
 					   point.  0 means data extents
 					   hang directly off this
@@ -272,39 +272,39 @@ typedef struct _ocfs2_extent_list {
 	__le16 l_reserved1;
 	__le64 l_reserved2;		/* Pad to
 					   sizeof(ocfs2_extent_rec) */
-/*10*/	ocfs2_extent_rec l_recs[0];	/* Extent records */
-} ocfs2_extent_list;
+/*10*/	struct ocfs2_extent_rec l_recs[0];	/* Extent records */
+};
 
 /*
  * On disk allocation chain list for OCFS2.  Note that this is
  * contained inside ocfs2_dinode, so the offsets are relative to
  * ocfs2_dinode.id2.i_chain.
  */
-typedef struct _ocfs2_chain_list {
+struct ocfs2_chain_list {
 /*00*/	__le16 cl_cpg;			/* Clusters per Block Group */
 	__le16 cl_bpc;			/* Bits per cluster */
-	__le16 cl_count;			/* Total chains in this list */
-	__le16 cl_next_free_rec;		/* Next unused chain slot */
+	__le16 cl_count;		/* Total chains in this list */
+	__le16 cl_next_free_rec;	/* Next unused chain slot */
 	__le64 cl_reserved1;
-/*10*/	ocfs2_chain_rec cl_recs[0];	/* Chain records */
-} ocfs2_chain_list;
+/*10*/	struct ocfs2_chain_rec cl_recs[0];	/* Chain records */
+};
 
 /*
  * On disk deallocation log for OCFS2.  Note that this is
  * contained inside ocfs2_dinode, so the offsets are relative to
  * ocfs2_dinode.id2.i_dealloc.
  */
-typedef struct _ocfs2_truncate_log {
-/*00*/	__le16 tl_count;			/* Total records in this log */
+struct ocfs2_truncate_log {
+/*00*/	__le16 tl_count;		/* Total records in this log */
 	__le16 tl_used;			/* Number of records in use */
 	__le32 tl_reserved1;
-/*08*/	ocfs2_truncate_rec tl_recs[0];	/* Truncate records */
-} ocfs2_truncate_log;
+/*08*/	struct ocfs2_truncate_rec tl_recs[0];	/* Truncate records */
+};
 
 /*
  * On disk extent block (indirect block) for OCFS2
  */
-typedef struct _ocfs2_extent_block
+struct ocfs2_extent_block
 {
 /*00*/	__u8 h_signature[8];		/* Signature for verification */
 	__le64 h_reserved1;
@@ -318,16 +318,16 @@ typedef struct _ocfs2_extent_block
 	__le64 h_next_leaf_blk;		/* Offset on disk, in blocks,
 					   of next leaf header pointing
 					   to data */
-/*30*/	ocfs2_extent_list h_list;	/* Extent record list */
+/*30*/	struct ocfs2_extent_list h_list;	/* Extent record list */
 /* Actual on-disk size is one block */
-} ocfs2_extent_block;
+};
 
 /*
  * On disk superblock for OCFS2
  * Note that it is contained inside an ocfs2_dinode, so all offsets
  * are relative to the start of ocfs2_dinode.id2.
  */
-typedef struct _ocfs2_super_block {
+struct ocfs2_super_block {
 /*00*/	__le16 s_major_rev_level;
 	__le16 s_minor_rev_level;
 	__le16 s_mnt_count;
@@ -355,26 +355,26 @@ typedef struct _ocfs2_super_block {
 /*50*/	__u8  s_label[OCFS2_MAX_VOL_LABEL_LEN];	/* Label for mounting, etc. */
 /*90*/	__u8  s_uuid[OCFS2_VOL_UUID_LEN];	/* 128-bit uuid */
 /*A0*/
-} ocfs2_super_block;
+};
 
 /*
  * Local allocation bitmap for OCFS2 slots
  * Note that it exists inside an ocfs2_dinode, so all offsets are
  * relative to the start of ocfs2_dinode.id2.
  */
-typedef struct _ocfs2_local_alloc
+struct ocfs2_local_alloc
 {
 /*00*/	__le32 la_bm_off;	/* Starting bit offset in main bitmap */
 	__le16 la_size;		/* Size of included bitmap, in bytes */
 	__le16 la_reserved1;
 	__le64 la_reserved2;
 /*10*/	__u8   la_bitmap[0];
-} ocfs2_local_alloc;
+};
 
 /*
  * On disk inode for OCFS2
  */
-typedef struct _ocfs2_dinode {
+struct ocfs2_dinode {
 /*00*/	__u8 i_signature[8];		/* Signature for validation */
 	__le32 i_generation;		/* Generation number */
 	__le16 i_suballoc_slot;		/* Slot suballocator this inode
@@ -420,15 +420,15 @@ typedef struct _ocfs2_dinode {
 		} journal1;
 	} id1;				/* Inode type dependant 1 */
 /*C0*/	union {
-		ocfs2_super_block  i_super;
-		ocfs2_local_alloc  i_lab;
-		ocfs2_chain_list   i_chain;
-		ocfs2_extent_list  i_list;
-		ocfs2_truncate_log i_dealloc;
-		__u8               i_symlink[0];
+		struct ocfs2_super_block	i_super;
+		struct ocfs2_local_alloc	i_lab;
+		struct ocfs2_chain_list		i_chain;
+		struct ocfs2_extent_list	i_list;
+		struct ocfs2_truncate_log	i_dealloc;
+		__u8               		i_symlink[0];
 	} id2;
 /* Actual on-disk size is one block */
-} ocfs2_dinode;
+};
 
 /*
  * On-disk directory entry structure for OCFS2
@@ -447,7 +447,7 @@ struct ocfs2_dir_entry {
 /*
  * On disk allocator group structure for OCFS2
  */
-typedef struct _ocfs2_group_desc
+struct ocfs2_group_desc
 {
 /*00*/	__u8    bg_signature[8];        /* Signature for validation */
 	__le16   bg_size;                /* Size of included bitmap in
@@ -465,13 +465,13 @@ typedef struct _ocfs2_group_desc
 	__le64   bg_blkno;               /* Offset on disk, in blocks */
 /*30*/	__le64   bg_reserved2[2];
 /*40*/	__u8    bg_bitmap[0];
-} ocfs2_group_desc;
+};
 
 #ifdef __KERNEL__
 static inline int ocfs2_fast_symlink_chars(struct super_block *sb)
 {
 	return  sb->s_blocksize -
-		 offsetof(struct _ocfs2_dinode, id2.i_symlink);
+		 offsetof(struct ocfs2_dinode, id2.i_symlink);
 }
 
 static inline int ocfs2_extent_recs_per_inode(struct super_block *sb)
@@ -479,9 +479,9 @@ static inline int ocfs2_extent_recs_per_inode(struct super_block *sb)
 	int size;
 
 	size = sb->s_blocksize -
-		offsetof(struct _ocfs2_dinode, id2.i_list.l_recs);
+		offsetof(struct ocfs2_dinode, id2.i_list.l_recs);
 
-	return size / sizeof(struct _ocfs2_extent_rec);
+	return size / sizeof(struct ocfs2_extent_rec);
 }
 
 static inline int ocfs2_chain_recs_per_inode(struct super_block *sb)
@@ -489,9 +489,9 @@ static inline int ocfs2_chain_recs_per_inode(struct super_block *sb)
 	int size;
 
 	size = sb->s_blocksize -
-		offsetof(struct _ocfs2_dinode, id2.i_chain.cl_recs);
+		offsetof(struct ocfs2_dinode, id2.i_chain.cl_recs);
 
-	return size / sizeof(struct _ocfs2_chain_rec);
+	return size / sizeof(struct ocfs2_chain_rec);
 }
 
 static inline u16 ocfs2_extent_recs_per_eb(struct super_block *sb)
@@ -499,9 +499,9 @@ static inline u16 ocfs2_extent_recs_per_eb(struct super_block *sb)
 	int size;
 
 	size = sb->s_blocksize -
-		offsetof(struct _ocfs2_extent_block, h_list.l_recs);
+		offsetof(struct ocfs2_extent_block, h_list.l_recs);
 
-	return size / sizeof(struct _ocfs2_extent_rec);
+	return size / sizeof(struct ocfs2_extent_rec);
 }
 
 static inline u16 ocfs2_local_alloc_size(struct super_block *sb)
@@ -509,7 +509,7 @@ static inline u16 ocfs2_local_alloc_size(struct super_block *sb)
 	u16 size;
 
 	size = sb->s_blocksize -
-		offsetof(struct _ocfs2_dinode, id2.i_lab.la_bitmap);
+		offsetof(struct ocfs2_dinode, id2.i_lab.la_bitmap);
 
 	return size;
 }
@@ -519,7 +519,7 @@ static inline int ocfs2_group_bitmap_size(struct super_block *sb)
 	int size;
 
 	size = sb->s_blocksize -
-		offsetof(struct _ocfs2_group_desc, bg_bitmap);
+		offsetof(struct ocfs2_group_desc, bg_bitmap);
 
 	return size;
 }
@@ -529,14 +529,14 @@ static inline int ocfs2_truncate_recs_per_inode(struct super_block *sb)
 	int size;
 
 	size = sb->s_blocksize -
-		offsetof(struct _ocfs2_dinode, id2.i_dealloc.tl_recs);
+		offsetof(struct ocfs2_dinode, id2.i_dealloc.tl_recs);
 
-	return size / sizeof(struct _ocfs2_truncate_rec);
+	return size / sizeof(struct ocfs2_truncate_rec);
 }
 #else
 static inline int ocfs2_fast_symlink_chars(int blocksize)
 {
-	return blocksize - offsetof(struct _ocfs2_dinode, id2.i_symlink);
+	return blocksize - offsetof(struct ocfs2_dinode, id2.i_symlink);
 }
 
 static inline int ocfs2_extent_recs_per_inode(int blocksize)
@@ -544,9 +544,9 @@ static inline int ocfs2_extent_recs_per_inode(int blocksize)
 	int size;
 
 	size = blocksize -
-		offsetof(struct _ocfs2_dinode, id2.i_list.l_recs);
+		offsetof(struct ocfs2_dinode, id2.i_list.l_recs);
 
-	return size / sizeof(struct _ocfs2_extent_rec);
+	return size / sizeof(struct ocfs2_extent_rec);
 }
 
 static inline int ocfs2_chain_recs_per_inode(int blocksize)
@@ -554,9 +554,9 @@ static inline int ocfs2_chain_recs_per_inode(int blocksize)
 	int size;
 
 	size = blocksize -
-		offsetof(struct _ocfs2_dinode, id2.i_chain.cl_recs);
+		offsetof(struct ocfs2_dinode, id2.i_chain.cl_recs);
 
-	return size / sizeof(struct _ocfs2_chain_rec);
+	return size / sizeof(struct ocfs2_chain_rec);
 }
 
 static inline int ocfs2_extent_recs_per_eb(int blocksize)
@@ -564,9 +564,9 @@ static inline int ocfs2_extent_recs_per_eb(int blocksize)
 	int size;
 
 	size = blocksize -
-		offsetof(struct _ocfs2_extent_block, h_list.l_recs);
+		offsetof(struct ocfs2_extent_block, h_list.l_recs);
 
-	return size / sizeof(struct _ocfs2_extent_rec);
+	return size / sizeof(struct ocfs2_extent_rec);
 }
 
 static inline int ocfs2_local_alloc_size(int blocksize)
@@ -574,7 +574,7 @@ static inline int ocfs2_local_alloc_size(int blocksize)
 	int size;
 
 	size = blocksize -
-		offsetof(struct _ocfs2_dinode, id2.i_lab.la_bitmap);
+		offsetof(struct ocfs2_dinode, id2.i_lab.la_bitmap);
 
 	return size;
 }
@@ -584,7 +584,7 @@ static inline int ocfs2_group_bitmap_size(int blocksize)
 	int size;
 
 	size = blocksize -
-		offsetof(struct _ocfs2_group_desc, bg_bitmap);
+		offsetof(struct ocfs2_group_desc, bg_bitmap);
 
 	return size;
 }
@@ -594,9 +594,9 @@ static inline int ocfs2_truncate_recs_per_inode(int blocksize)
 	int size;
 
 	size = blocksize -
-		offsetof(struct _ocfs2_dinode, id2.i_dealloc.tl_recs);
+		offsetof(struct ocfs2_dinode, id2.i_dealloc.tl_recs);
 
-	return size / sizeof(struct _ocfs2_truncate_rec);
+	return size / sizeof(struct ocfs2_truncate_rec);
 }
 #endif  /* __KERNEL__ */
 

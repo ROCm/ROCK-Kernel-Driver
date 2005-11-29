@@ -317,6 +317,7 @@ static void __dlm_put_mle(struct dlm_master_list_entry *mle)
 
 	assert_spin_locked(&dlm->spinlock);
 	assert_spin_locked(&dlm->master_lock);
+	BUG_ON(!atomic_read(&mle->mle_refs.refcount));
 
 	kref_put(&mle->mle_refs, dlm_mle_release);
 }
@@ -1228,7 +1229,7 @@ out:
  *
  * if possible, TRIM THIS DOWN!!!
  */
-int dlm_master_request_handler(o2net_msg *msg, u32 len, void *data)
+int dlm_master_request_handler(struct o2net_msg *msg, u32 len, void *data)
 {
 	u8 response = DLM_MASTER_RESP_MAYBE;
 	struct dlm_ctxt *dlm = data;
@@ -1507,7 +1508,7 @@ static int dlm_do_assert_master(struct dlm_ctxt *dlm, const char *lockname,
  *
  * if possible, TRIM THIS DOWN!!!
  */
-int dlm_assert_master_handler(o2net_msg *msg, u32 len, void *data)
+int dlm_assert_master_handler(struct o2net_msg *msg, u32 len, void *data)
 {
 	struct dlm_ctxt *dlm = data;
 	struct dlm_master_list_entry *mle = NULL;
@@ -1630,10 +1631,11 @@ ok:
 	// mlog(0, "woo!  got an assert_master from node %u!\n",
 	// 	     assert->node_idx);
 	if (mle) {
-		int block;
+		int extra_ref;
 		
 		spin_lock(&mle->spinlock);
-		block = !!(mle->type == DLM_MLE_BLOCK);
+		extra_ref = !!(mle->type == DLM_MLE_BLOCK
+			       || mle->type == DLM_MLE_MIGRATION);
 		mle->master = assert->node_idx;
 		atomic_set(&mle->woken, 1);
 		wake_up(&mle->wq);
@@ -1654,9 +1656,9 @@ ok:
 		dlm_mle_detach_hb_events(dlm, mle);
 		dlm_put_mle(mle);
 		
-		if (block) {
+		if (extra_ref) {
 			/* the assert master message now balances the extra
-		 	 * ref given by the master request message.
+		 	 * ref given by the master / migration request message.
 		 	 * if this is the last put, it will be removed
 		 	 * from the list. */
 			dlm_put_mle(mle);
@@ -2270,7 +2272,7 @@ static int dlm_do_migrate_request(struct dlm_ctxt *dlm,
  * we will have no mle in the list to start with.  now we can add an mle for
  * the migration and this should be the only one found for those scanning the
  * list.  */
-int dlm_migrate_request_handler(o2net_msg *msg, u32 len, void *data)
+int dlm_migrate_request_handler(struct o2net_msg *msg, u32 len, void *data)
 {
 	struct dlm_ctxt *dlm = data;
 	struct dlm_lock_resource *res = NULL;

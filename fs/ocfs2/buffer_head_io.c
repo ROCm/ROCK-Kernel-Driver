@@ -39,7 +39,7 @@
 
 #include "buffer_head_io.h"
 
-int ocfs2_write_block(ocfs2_super *osb, struct buffer_head *bh,
+int ocfs2_write_block(struct ocfs2_super *osb, struct buffer_head *bh,
 		      struct inode *inode)
 {
 	int ret = 0;
@@ -88,7 +88,7 @@ out:
 	return ret;
 }
 
-int ocfs2_read_blocks(ocfs2_super *osb, u64 block, int nr,
+int ocfs2_read_blocks(struct ocfs2_super *osb, u64 block, int nr,
 		      struct buffer_head *bhs[], int flags,
 		      struct inode *inode)
 {

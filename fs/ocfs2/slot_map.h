@@ -37,14 +37,14 @@ struct ocfs2_slot_info {
 	s16 si_global_node_nums[OCFS2_MAX_SLOTS];
 };
 
-int ocfs2_init_slot_info(ocfs2_super *osb);
+int ocfs2_init_slot_info(struct ocfs2_super *osb);
 void ocfs2_free_slot_info(struct ocfs2_slot_info *si);
 
-int ocfs2_find_slot(ocfs2_super *osb);
-void ocfs2_put_slot(ocfs2_super *osb);
+int ocfs2_find_slot(struct ocfs2_super *osb);
+void ocfs2_put_slot(struct ocfs2_super *osb);
 
 void ocfs2_update_slot_info(struct ocfs2_slot_info *si);
-int ocfs2_update_disk_slots(ocfs2_super *osb,
+int ocfs2_update_disk_slots(struct ocfs2_super *osb,
 			    struct ocfs2_slot_info *si);
 
 s16 ocfs2_node_num_to_slot(struct ocfs2_slot_info *si,
@@ -52,7 +52,7 @@ s16 ocfs2_node_num_to_slot(struct ocfs2_slot_info *si,
 void ocfs2_clear_slot(struct ocfs2_slot_info *si,
 		      s16 slot_num);
 
-void ocfs2_populate_mounted_map(ocfs2_super *osb);
+void ocfs2_populate_mounted_map(struct ocfs2_super *osb);
 
 static inline int ocfs2_is_empty_slot(struct ocfs2_slot_info *si,
 				      int slot_num)

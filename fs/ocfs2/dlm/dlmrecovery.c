@@ -618,7 +618,7 @@ static int dlm_request_all_locks(struct dlm_ctxt *dlm, u8 request_from,
 
 }
 
-int dlm_request_all_locks_handler(o2net_msg *msg, u32 len, void *data)
+int dlm_request_all_locks_handler(struct o2net_msg *msg, u32 len, void *data)
 {
 	struct dlm_ctxt *dlm = data;
 	struct dlm_lock_request *lr = (struct dlm_lock_request *)msg->buf;
@@ -726,7 +726,7 @@ static int dlm_send_all_done_msg(struct dlm_ctxt *dlm, u8 dead_node, u8 send_to)
 }
 
 
-int dlm_reco_data_done_handler(o2net_msg *msg, u32 len, void *data)
+int dlm_reco_data_done_handler(struct o2net_msg *msg, u32 len, void *data)
 {
 	struct dlm_ctxt *dlm = data;
 	struct dlm_reco_data_done *done = (struct dlm_reco_data_done *)msg->buf;
@@ -1012,7 +1012,7 @@ int dlm_send_one_lockres(struct dlm_ctxt *dlm, struct dlm_lock_resource *res,
  * do we spin?  returning an error only delays the problem really
  */
 
-int dlm_mig_lockres_handler(o2net_msg *msg, u32 len, void *data)
+int dlm_mig_lockres_handler(struct o2net_msg *msg, u32 len, void *data)
 {
 	struct dlm_ctxt *dlm = data;
 	struct dlm_migratable_lockres *mres =
@@ -1292,7 +1292,7 @@ static int dlm_do_master_requery(struct dlm_ctxt *dlm,
 /* this function cannot error, so unless the sending
  * or receiving of the message failed, the owner can
  * be trusted */
-int dlm_master_requery_handler(o2net_msg *msg, u32 len, void *data)
+int dlm_master_requery_handler(struct o2net_msg *msg, u32 len, void *data)
 {
 	struct dlm_ctxt *dlm = data;
 	struct dlm_master_requery *req = (struct dlm_master_requery *)msg->buf;
@@ -1996,7 +1996,7 @@ static int dlm_send_begin_reco_message(struct dlm_ctxt *dlm, u8 dead_node)
 	return ret;
 }
 
-int dlm_begin_reco_handler(o2net_msg *msg, u32 len, void *data)
+int dlm_begin_reco_handler(struct o2net_msg *msg, u32 len, void *data)
 {
 	struct dlm_ctxt *dlm = data;
 	struct dlm_begin_reco *br = (struct dlm_begin_reco *)msg->buf;
@@ -2069,7 +2069,7 @@ static int dlm_send_finalize_reco_message(struct dlm_ctxt *dlm)
 	return ret;
 }
 
-int dlm_finalize_reco_handler(o2net_msg *msg, u32 len, void *data)
+int dlm_finalize_reco_handler(struct o2net_msg *msg, u32 len, void *data)
 {
 	struct dlm_ctxt *dlm = data;
 	struct dlm_finalize_reco *fr = (struct dlm_finalize_reco *)msg->buf;

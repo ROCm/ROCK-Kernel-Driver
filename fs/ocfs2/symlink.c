@@ -87,7 +87,7 @@ static char *ocfs2_fast_symlink_getlink(struct inode *inode,
 {
 	int status;
 	char *link = NULL;
-	ocfs2_dinode *fe;
+	struct ocfs2_dinode *fe;
 
 	mlog_entry_void();
 
@@ -102,7 +102,7 @@ static char *ocfs2_fast_symlink_getlink(struct inode *inode,
 		goto bail;
 	}
 
-	fe = (ocfs2_dinode *) (*bh)->b_data;
+	fe = (struct ocfs2_dinode *) (*bh)->b_data;
 	link = (char *) fe->id2.i_symlink;
 bail:
 	mlog_exit(status);
@@ -213,7 +213,7 @@ sym_nodenum(char *str, void *data)
 	unsigned int l;
 	char buf[10];
 	struct inode *inode = data;
-	ocfs2_super *osb = OCFS2_SB(inode->i_sb);
+	struct ocfs2_super *osb = OCFS2_SB(inode->i_sb);
 
 	l = sprintf(buf, "%lu", (unsigned long)osb->node_num);
 
@@ -377,15 +377,8 @@ bail:
 }
 #endif
 
-#define NEW_FOLLOW_LINK_API
-
-#ifndef NEW_FOLLOW_LINK_API
-static int ocfs2_follow_link(struct dentry *dentry,
-			     struct nameidata *nd)
-#else
 static void *ocfs2_follow_link(struct dentry *dentry,
 			       struct nameidata *nd)
-#endif
 {
 	int status;
 	char *link;
@@ -418,11 +411,7 @@ bail:
 	if (bh)
 		brelse(bh);
 
-#ifndef NEW_FOLLOW_LINK_API
-	return status;
-#else
 	return ERR_PTR(status);
-#endif
 }
 
 struct inode_operations ocfs2_symlink_inode_operations = {

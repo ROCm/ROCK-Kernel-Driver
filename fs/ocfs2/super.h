@@ -28,7 +28,7 @@
 
 extern struct workqueue_struct *ocfs2_wq;
 
-int ocfs2_publish_get_mount_state(ocfs2_super *osb,
+int ocfs2_publish_get_mount_state(struct ocfs2_super *osb,
 				  int node_num);
 
 void __ocfs2_error(struct super_block *sb,

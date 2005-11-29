@@ -26,41 +26,41 @@
 #ifndef OCFS2_HEARTBEAT_H
 #define OCFS2_HEARTBEAT_H
 
-void ocfs2_init_node_maps(ocfs2_super *osb);
+void ocfs2_init_node_maps(struct ocfs2_super *osb);
 
-void ocfs2_setup_hb_callbacks(ocfs2_super *osb);
-int ocfs2_register_hb_callbacks(ocfs2_super *osb);
-void ocfs2_clear_hb_callbacks(ocfs2_super *osb);
-void ocfs2_stop_heartbeat(ocfs2_super *osb);
+void ocfs2_setup_hb_callbacks(struct ocfs2_super *osb);
+int ocfs2_register_hb_callbacks(struct ocfs2_super *osb);
+void ocfs2_clear_hb_callbacks(struct ocfs2_super *osb);
+void ocfs2_stop_heartbeat(struct ocfs2_super *osb);
 
 /* node map functions - used to keep track of mounted and in-recovery
  * nodes. */
 void ocfs2_node_map_init(struct ocfs2_node_map *map);
-int ocfs2_node_map_is_empty(ocfs2_super *osb,
+int ocfs2_node_map_is_empty(struct ocfs2_super *osb,
 			    struct ocfs2_node_map *map);
-void ocfs2_node_map_set_bit(ocfs2_super *osb,
+void ocfs2_node_map_set_bit(struct ocfs2_super *osb,
 			    struct ocfs2_node_map *map,
 			    int bit);
-void ocfs2_node_map_clear_bit(ocfs2_super *osb,
+void ocfs2_node_map_clear_bit(struct ocfs2_super *osb,
 			      struct ocfs2_node_map *map,
 			      int bit);
-int ocfs2_node_map_test_bit(ocfs2_super *osb,
+int ocfs2_node_map_test_bit(struct ocfs2_super *osb,
 			    struct ocfs2_node_map *map,
 			    int bit);
-int ocfs2_node_map_iterate(ocfs2_super *osb,
+int ocfs2_node_map_iterate(struct ocfs2_super *osb,
 			   struct ocfs2_node_map *map,
 			   int idx);
-static inline int ocfs2_node_map_first_set_bit(ocfs2_super *osb,
+static inline int ocfs2_node_map_first_set_bit(struct ocfs2_super *osb,
 					       struct ocfs2_node_map *map)
 {
 	return ocfs2_node_map_iterate(osb, map, 0);
 }
-int ocfs2_recovery_map_set(ocfs2_super *osb,
+int ocfs2_recovery_map_set(struct ocfs2_super *osb,
 			   int num);
-void ocfs2_recovery_map_clear(ocfs2_super *osb,
+void ocfs2_recovery_map_clear(struct ocfs2_super *osb,
 			      int num);
 /* returns 1 if bit is the only bit set in target, 0 otherwise */
-int ocfs2_node_map_is_only(ocfs2_super *osb,
+int ocfs2_node_map_is_only(struct ocfs2_super *osb,
 			   struct ocfs2_node_map *target,
 			   int bit);
 

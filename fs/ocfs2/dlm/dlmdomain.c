@@ -68,10 +68,10 @@ static DECLARE_WAIT_QUEUE_HEAD(dlm_domain_events);
 
 #define DLM_DOMAIN_BACKOFF_MS 200
 
-static int dlm_query_join_handler(o2net_msg *msg, u32 len, void *data);
-static int dlm_assert_joined_handler(o2net_msg *msg, u32 len, void *data);
-static int dlm_cancel_join_handler(o2net_msg *msg, u32 len, void *data);
-static int dlm_exit_domain_handler(o2net_msg *msg, u32 len, void *data);
+static int dlm_query_join_handler(struct o2net_msg *msg, u32 len, void *data);
+static int dlm_assert_joined_handler(struct o2net_msg *msg, u32 len, void *data);
+static int dlm_cancel_join_handler(struct o2net_msg *msg, u32 len, void *data);
+static int dlm_exit_domain_handler(struct o2net_msg *msg, u32 len, void *data);
 
 static void dlm_unregister_domain_handlers(struct dlm_ctxt *dlm);
 
@@ -378,7 +378,7 @@ static void __dlm_print_nodes(struct dlm_ctxt *dlm)
 	}
 }
 
-static int dlm_exit_domain_handler(o2net_msg *msg, u32 len, void *data)
+static int dlm_exit_domain_handler(struct o2net_msg *msg, u32 len, void *data)
 {
 	struct dlm_ctxt *dlm = data;
 	unsigned int node;
@@ -540,7 +540,7 @@ void dlm_unregister_domain(struct dlm_ctxt *dlm)
 }
 EXPORT_SYMBOL_GPL(dlm_unregister_domain);
 
-static int dlm_query_join_handler(o2net_msg *msg, u32 len, void *data)
+static int dlm_query_join_handler(struct o2net_msg *msg, u32 len, void *data)
 {
 	struct dlm_query_join_request *query;
 	enum dlm_query_join_response response;
@@ -601,7 +601,7 @@ respond:
 	return response;
 }
 
-static int dlm_assert_joined_handler(o2net_msg *msg, u32 len, void *data)
+static int dlm_assert_joined_handler(struct o2net_msg *msg, u32 len, void *data)
 {
 	struct dlm_assert_joined *assert;
 	struct dlm_ctxt *dlm = NULL;
@@ -636,7 +636,7 @@ static int dlm_assert_joined_handler(o2net_msg *msg, u32 len, void *data)
 	return 0;
 }
 
-static int dlm_cancel_join_handler(o2net_msg *msg, u32 len, void *data)
+static int dlm_cancel_join_handler(struct o2net_msg *msg, u32 len, void *data)
 {
 	struct dlm_cancel_join *cancel;
 	struct dlm_ctxt *dlm = NULL;
