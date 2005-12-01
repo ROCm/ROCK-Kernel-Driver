@@ -232,6 +232,7 @@ void device_initialize(struct device *dev)
 		   klist_children_put);
 	INIT_LIST_HEAD(&dev->dma_pools);
 	init_MUTEX(&dev->sem);
+	device_init_wakeup(dev, 0);
 }
 
 /**
@@ -406,11 +407,11 @@ static struct device * next_device(struct klist_iter * i)
 
 /**
  *	device_for_each_child - device child iterator.
- *	@dev:	parent struct device.
+ *	@parent: parent struct device.
  *	@data:	data for the callback.
  *	@fn:	function to be called for each device.
  *
- *	Iterate over @dev's child devices, and call @fn for each,
+ *	Iterate over @parent's child devices, and call @fn for each,
  *	passing it @data.
  *
  *	We check the return of @fn each time. If it returns anything

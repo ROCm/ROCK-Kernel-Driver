@@ -377,7 +377,7 @@ static int input_devices_read(char *buf, char **start, off_t pos, int count, int
 
 	list_for_each_entry(dev, &input_dev_list, node) {
 
-		path = dev->dynalloc ? kobject_get_path(&dev->cdev.kobj, GFP_KERNEL) : NULL;
+		path = kobject_get_path(&dev->cdev.kobj, GFP_KERNEL);
 
 		len = sprintf(buf, "I: Bus=%04x Vendor=%04x Product=%04x Version=%04x\n",
 			dev->id.bustype, dev->id.vendor, dev->id.product, dev->id.version);
@@ -536,7 +536,7 @@ static struct attribute *input_dev_attrs[] = {
 	NULL
 };
 
-static struct attribute_group input_dev_group = {
+static struct attribute_group input_dev_attr_group = {
 	.attrs	= input_dev_attrs,
 };
 
@@ -669,7 +669,7 @@ static int input_dev_hotplug(struct class_device *cdev, char **envp,
 		INPUT_ADD_HOTPLUG_VAR("NAME=\"%s\"", dev->name);
 	if (dev->phys)
 		INPUT_ADD_HOTPLUG_VAR("PHYS=\"%s\"", dev->phys);
-	if (dev->phys)
+	if (dev->uniq)
 		INPUT_ADD_HOTPLUG_VAR("UNIQ=\"%s\"", dev->uniq);
 
 	INPUT_ADD_HOTPLUG_BM_VAR("EV=", dev->evbit, EV_MAX);
@@ -717,39 +717,24 @@ struct input_dev *input_allocate_device(void)
 	return dev;
 }
 
-static void input_register_classdevice(struct input_dev *dev)
+int input_register_device(struct input_dev *dev)
 {
 	static atomic_t input_no = ATOMIC_INIT(0);
-	const char *path;
-
-	__module_get(THIS_MODULE);
-
-	dev->dev = dev->cdev.dev;
-
-	snprintf(dev->cdev.class_id, sizeof(dev->cdev.class_id),
-		 "input%ld", (unsigned long) atomic_inc_return(&input_no) - 1);
-
-	path = kobject_get_path(&dev->cdev.class->subsys.kset.kobj, GFP_KERNEL);
-	printk(KERN_INFO "input: %s/%s as %s\n",
-		dev->name ? dev->name : "Unspecified device",
-		path ? path : "", dev->cdev.class_id);
-	kfree(path);
-
-	class_device_add(&dev->cdev);
-	sysfs_create_group(&dev->cdev.kobj, &input_dev_group);
-	sysfs_create_group(&dev->cdev.kobj, &input_dev_id_attr_group);
-	sysfs_create_group(&dev->cdev.kobj, &input_dev_caps_attr_group);
-}
-
-void input_register_device(struct input_dev *dev)
-{
 	struct input_handle *handle;
 	struct input_handler *handler;
 	struct input_device_id *id;
+	const char *path;
+	int error;
 
-	set_bit(EV_SYN, dev->evbit);
+	if (!dev->dynalloc) {
+		printk(KERN_WARNING "input: device %s is statically allocated, will not register\n"
+			"Please convert to input_allocate_device() or contact dtor_core@ameritech.net\n",
+			dev->name ? dev->name : "<Unknown>");
+		return -EINVAL;
+	}
 
 	init_MUTEX(&dev->sem);
+	set_bit(EV_SYN, dev->evbit);
 
 	/*
 	 * If delay and period are pre-set by the driver, then autorepeating
@@ -767,8 +752,32 @@ void input_register_device(struct input_dev *dev)
 	INIT_LIST_HEAD(&dev->h_list);
 	list_add_tail(&dev->node, &input_dev_list);
 
-	if (dev->dynalloc)
-		input_register_classdevice(dev);
+	dev->cdev.class = &input_class;
+	snprintf(dev->cdev.class_id, sizeof(dev->cdev.class_id),
+		 "input%ld", (unsigned long) atomic_inc_return(&input_no) - 1);
+
+	error = class_device_add(&dev->cdev);
+	if (error)
+		return error;
+
+	error = sysfs_create_group(&dev->cdev.kobj, &input_dev_attr_group);
+	if (error)
+		goto fail1;
+
+	error = sysfs_create_group(&dev->cdev.kobj, &input_dev_id_attr_group);
+	if (error)
+		goto fail2;
+
+	error = sysfs_create_group(&dev->cdev.kobj, &input_dev_caps_attr_group);
+	if (error)
+		goto fail3;
+
+	__module_get(THIS_MODULE);
+
+	path = kobject_get_path(&dev->cdev.kobj, GFP_KERNEL);
+	printk(KERN_INFO "input: %s as %s\n",
+		dev->name ? dev->name : "Unspecified device", path ? path : "N/A");
+	kfree(path);
 
 	list_for_each_entry(handler, &input_handler_list, node)
 		if (!handler->blacklist || !input_match_device(handler->blacklist, dev))
@@ -776,8 +785,14 @@ void input_register_device(struct input_dev *dev)
 				if ((handle = handler->connect(handler, dev, id)))
 					input_link_handle(handle);
 
-
 	input_wakeup_procfs_readers();
+
+	return 0;
+
+ fail3:	sysfs_remove_group(&dev->cdev.kobj, &input_dev_id_attr_group);
+ fail2:	sysfs_remove_group(&dev->cdev.kobj, &input_dev_attr_group);
+ fail1:	class_device_del(&dev->cdev);
+	return error;
 }
 
 void input_unregister_device(struct input_dev *dev)
@@ -797,11 +812,10 @@ void input_unregister_device(struct input_dev *dev)
 
 	list_del_init(&dev->node);
 
-	if (dev->dynalloc) {
-		sysfs_remove_group(&dev->cdev.kobj, &input_dev_caps_attr_group);
-		sysfs_remove_group(&dev->cdev.kobj, &input_dev_id_attr_group);
-		class_device_unregister(&dev->cdev);
-	}
+	sysfs_remove_group(&dev->cdev.kobj, &input_dev_caps_attr_group);
+	sysfs_remove_group(&dev->cdev.kobj, &input_dev_id_attr_group);
+	sysfs_remove_group(&dev->cdev.kobj, &input_dev_attr_group);
+	class_device_unregister(&dev->cdev);
 
 	input_wakeup_procfs_readers();
 }

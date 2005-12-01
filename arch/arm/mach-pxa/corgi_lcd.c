@@ -17,11 +17,12 @@
 
 #include <linux/delay.h>
 #include <linux/kernel.h>
-#include <linux/device.h>
+#include <linux/platform_device.h>
 #include <linux/module.h>
+#include <linux/string.h>
 #include <asm/arch/akita.h>
 #include <asm/arch/corgi.h>
-#include <asm/arch/hardware.h>
+#include <asm/hardware.h>
 #include <asm/arch/pxa-regs.h>
 #include <asm/arch/sharpsl.h>
 #include <asm/arch/spitz.h>

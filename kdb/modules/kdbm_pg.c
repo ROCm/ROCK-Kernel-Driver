@@ -224,7 +224,7 @@ kdbm_page(int argc, const char **argv, const char **envp,
 	if (page_has_buffers(&page))
 		kdb_printf("  buffers 0x%p\n", page_buffers(&page));
 	else
-		kdb_printf("  private 0x%lx\n", page.private);
+		kdb_printf("  private 0x%lx\n", page.u.private);
 
 	return 0;
 }
@@ -356,8 +356,8 @@ kdbm_show_page(struct page *page, int first)
 	kdb_page_flags(page, Reclaim);
 	if (page_has_buffers(page))
 		do_buffer((unsigned long) page_buffers(page));
-	else if (page->private)
-		kdb_printf(" private= 0x%lx", page->private);
+	else if (page->u.private)
+		kdb_printf(" private= 0x%lx", page->u.private);
 	kdb_printf("\n");
 #undef kdb_page_flags
 }

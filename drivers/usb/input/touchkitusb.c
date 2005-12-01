@@ -30,10 +30,6 @@
 #include <linux/input.h>
 #include <linux/module.h>
 #include <linux/init.h>
-
-#if !defined(DEBUG) && defined(CONFIG_USB_DEBUG)
-#define DEBUG
-#endif
 #include <linux/usb.h>
 #include <linux/usb_input.h>
 
@@ -75,7 +71,9 @@ struct touchkit_usb {
 
 static struct usb_device_id touchkit_devices[] = {
 	{USB_DEVICE(0x3823, 0x0001)},
+	{USB_DEVICE(0x0123, 0x0001)},
 	{USB_DEVICE(0x0eef, 0x0001)},
+	{USB_DEVICE(0x0eef, 0x0002)},
 	{}
 };
 

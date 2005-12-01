@@ -719,22 +719,9 @@ static int dn_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 	if (saddr->sdn_flags & ~SDF_WILD)
 		return -EINVAL;
 
-#if 1
 	if (!capable(CAP_NET_BIND_SERVICE) && (saddr->sdn_objnum ||
 	    (saddr->sdn_flags & SDF_WILD)))
 		return -EACCES;
-#else
-	/*
-	 * Maybe put the default actions in the default security ops for
-	 * dn_prot_sock ? Would be nice if the capable call would go there
-	 * too.
-	 */
-	if (security_dn_prot_sock(saddr) &&
-	    !capable(CAP_NET_BIND_SERVICE) || 
-	    saddr->sdn_objnum || (saddr->sdn_flags & SDF_WILD))
-		return -EACCES;
-#endif
-
 
 	if (!(saddr->sdn_flags & SDF_WILD)) {
 		if (dn_ntohs(saddr->sdn_nodeaddrl)) {
@@ -1677,16 +1664,14 @@ static int dn_recvmsg(struct kiocb *iocb, struct socket *sock,
 		goto out;
 	}
 
+	if (sk->sk_shutdown & RCV_SHUTDOWN) {
+		rv = 0;
+		goto out;
+	}
+
 	rv = dn_check_state(sk, NULL, 0, &timeo, flags);
 	if (rv)
 		goto out;
-
-	if (sk->sk_shutdown & RCV_SHUTDOWN) {
-		if (!(flags & MSG_NOSIGNAL))
-			send_sig(SIGPIPE, current, 0);
-		rv = -EPIPE;
-		goto out;
-	}
 
 	if (flags & ~(MSG_PEEK|MSG_OOB|MSG_WAITALL|MSG_DONTWAIT|MSG_NOSIGNAL)) {
 		rv = -EOPNOTSUPP;
@@ -1941,6 +1926,8 @@ static int dn_sendmsg(struct kiocb *iocb, struct socket *sock,
 
 	if (sk->sk_shutdown & SEND_SHUTDOWN) {
 		err = -EPIPE;
+		if (!(flags & MSG_NOSIGNAL))
+			send_sig(SIGPIPE, current, 0);
 		goto out_err;
 	}
 

@@ -275,9 +275,6 @@ static inline void rfcomm_session_hold(struct rfcomm_session *s)
 	atomic_inc(&s->refcnt);
 }
 
-/* ---- RFCOMM chechsum ---- */
-extern u8 rfcomm_crc_table[];
-
 /* ---- RFCOMM sockets ---- */
 struct sockaddr_rc {
 	sa_family_t	rc_family;
@@ -353,7 +350,5 @@ struct rfcomm_dev_list_req {
 int  rfcomm_dev_ioctl(struct sock *sk, unsigned int cmd, void __user *arg);
 int  rfcomm_init_ttys(void);
 void rfcomm_cleanup_ttys(void);
-
-extern struct proc_dir_entry *proc_bt_rfcomm;
 
 #endif /* __RFCOMM_H */

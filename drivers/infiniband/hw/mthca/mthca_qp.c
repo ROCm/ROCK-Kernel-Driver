@@ -36,6 +36,8 @@
  */
 
 #include <linux/init.h>
+#include <linux/string.h>
+#include <linux/slab.h>
 
 #include <rdma/ib_verbs.h>
 #include <rdma/ib_cache.h>
@@ -338,8 +340,7 @@ static const struct {
 				[UC]  = (IB_QP_AV                  |
 					 IB_QP_PATH_MTU            |
 					 IB_QP_DEST_QPN            |
-					 IB_QP_RQ_PSN              |
-					 IB_QP_MAX_DEST_RD_ATOMIC),
+					 IB_QP_RQ_PSN),
 				[RC]  = (IB_QP_AV                  |
 					 IB_QP_PATH_MTU            |
 					 IB_QP_DEST_QPN            |
@@ -368,8 +369,7 @@ static const struct {
 			.trans = MTHCA_TRANS_RTR2RTS,
 			.req_param = {
 				[UD]  = IB_QP_SQ_PSN,
-				[UC]  = (IB_QP_SQ_PSN            |
-					 IB_QP_MAX_QP_RD_ATOMIC),
+				[UC]  = IB_QP_SQ_PSN,
 				[RC]  = (IB_QP_TIMEOUT           |
 					 IB_QP_RETRY_CNT         |
 					 IB_QP_RNR_RETRY         |
@@ -446,8 +446,6 @@ static const struct {
 				[UD]  = (IB_QP_PKEY_INDEX            |
 					 IB_QP_QKEY),
 				[UC]  = (IB_QP_AV                    |
-					 IB_QP_MAX_QP_RD_ATOMIC      |
-					 IB_QP_MAX_DEST_RD_ATOMIC    |
 					 IB_QP_CUR_STATE             |
 					 IB_QP_ALT_PATH              |
 					 IB_QP_ACCESS_FLAGS          |
@@ -478,7 +476,7 @@ static const struct {
 			.opt_param = {
 				[UD]  = (IB_QP_CUR_STATE             |
 					 IB_QP_QKEY),
-				[UC]  = (IB_QP_CUR_STATE),
+				[UC]  = IB_QP_CUR_STATE,
 				[RC]  = (IB_QP_CUR_STATE             |
 					 IB_QP_MIN_RNR_TIMER),
 				[MLX] = (IB_QP_CUR_STATE             |
@@ -583,6 +581,13 @@ int mthca_modify_qp(struct ib_qp *ibqp, struct ib_qp_attr *attr, int attr_mask)
 			  cur_state, new_state,
 			  attr_mask & ~(req_param | opt_param |
 						 IB_QP_STATE));
+		return -EINVAL;
+	}
+
+	if ((attr_mask & IB_QP_PKEY_INDEX) && 
+	     attr->pkey_index >= dev->limits.pkey_table_len) {
+		mthca_dbg(dev, "PKey index (%u) too large. max is %d\n",
+			  attr->pkey_index,dev->limits.pkey_table_len-1); 
 		return -EINVAL;
 	}
 
@@ -725,14 +730,15 @@ int mthca_modify_qp(struct ib_qp *ibqp, struct ib_qp_attr *attr, int attr_mask)
 	}
 
 	if (attr_mask & IB_QP_ACCESS_FLAGS) {
+		qp_context->params2 |=
+			cpu_to_be32(attr->qp_access_flags & IB_ACCESS_REMOTE_WRITE ?
+				    MTHCA_QP_BIT_RWE : 0);
+
 		/*
-		 * Only enable RDMA/atomics if we have responder
-		 * resources set to a non-zero value.
+		 * Only enable RDMA reads and atomics if we have
+		 * responder resources set to a non-zero value.
 		 */
 		if (qp->resp_depth) {
-			qp_context->params2 |=
-				cpu_to_be32(attr->qp_access_flags & IB_ACCESS_REMOTE_WRITE ?
-					    MTHCA_QP_BIT_RWE : 0);
 			qp_context->params2 |=
 				cpu_to_be32(attr->qp_access_flags & IB_ACCESS_REMOTE_READ ?
 					    MTHCA_QP_BIT_RRE : 0);
@@ -754,22 +760,19 @@ int mthca_modify_qp(struct ib_qp *ibqp, struct ib_qp_attr *attr, int attr_mask)
 		if (qp->resp_depth && !attr->max_dest_rd_atomic) {
 			/*
 			 * Lowering our responder resources to zero.
-			 * Turn off RDMA/atomics as responder.
-			 * (RWE/RRE/RAE in params2 already zero)
+			 * Turn off reads RDMA and atomics as responder.
+			 * (RRE/RAE in params2 already zero)
 			 */
-			qp_param->opt_param_mask |= cpu_to_be32(MTHCA_QP_OPTPAR_RWE |
-								MTHCA_QP_OPTPAR_RRE |
+			qp_param->opt_param_mask |= cpu_to_be32(MTHCA_QP_OPTPAR_RRE |
 								MTHCA_QP_OPTPAR_RAE);
 		}
 
 		if (!qp->resp_depth && attr->max_dest_rd_atomic) {
 			/*
 			 * Increasing our responder resources from
-			 * zero.  Turn on RDMA/atomics as appropriate.
+			 * zero.  Turn on RDMA reads and atomics as
+			 * appropriate.
 			 */
-			qp_context->params2 |=
-				cpu_to_be32(qp->atomic_rd_en & IB_ACCESS_REMOTE_WRITE ?
-					    MTHCA_QP_BIT_RWE : 0);
 			qp_context->params2 |=
 				cpu_to_be32(qp->atomic_rd_en & IB_ACCESS_REMOTE_READ ?
 					    MTHCA_QP_BIT_RRE : 0);
@@ -777,8 +780,7 @@ int mthca_modify_qp(struct ib_qp *ibqp, struct ib_qp_attr *attr, int attr_mask)
 				cpu_to_be32(qp->atomic_rd_en & IB_ACCESS_REMOTE_ATOMIC ?
 					    MTHCA_QP_BIT_RAE : 0);
 
-			qp_param->opt_param_mask |= cpu_to_be32(MTHCA_QP_OPTPAR_RWE |
-								MTHCA_QP_OPTPAR_RRE |
+			qp_param->opt_param_mask |= cpu_to_be32(MTHCA_QP_OPTPAR_RRE |
 								MTHCA_QP_OPTPAR_RAE);
 		}
 
@@ -880,6 +882,50 @@ int mthca_modify_qp(struct ib_qp *ibqp, struct ib_qp_attr *attr, int attr_mask)
 	return err;
 }
 
+static void mthca_adjust_qp_caps(struct mthca_dev *dev,
+				 struct mthca_pd *pd,
+				 struct mthca_qp *qp)
+{
+	int max_data_size;
+
+	/*
+	 * Calculate the maximum size of WQE s/g segments, excluding
+	 * the next segment and other non-data segments.
+	 */
+	max_data_size = min(dev->limits.max_desc_sz, 1 << qp->sq.wqe_shift) -
+		sizeof (struct mthca_next_seg);
+
+	switch (qp->transport) {
+	case MLX:
+		max_data_size -= 2 * sizeof (struct mthca_data_seg);
+		break;
+
+	case UD:
+		if (mthca_is_memfree(dev))
+			max_data_size -= sizeof (struct mthca_arbel_ud_seg);
+		else
+			max_data_size -= sizeof (struct mthca_tavor_ud_seg);
+		break;
+
+	default:
+		max_data_size -= sizeof (struct mthca_raddr_seg);
+		break;
+	}
+
+	/* We don't support inline data for kernel QPs (yet). */
+	if (!pd->ibpd.uobject)
+		qp->max_inline_data = 0;
+        else
+		qp->max_inline_data = max_data_size - MTHCA_INLINE_HEADER_SIZE;
+
+	qp->sq.max_gs = min_t(int, dev->limits.max_sg,
+			      max_data_size / sizeof (struct mthca_data_seg));
+	qp->rq.max_gs = min_t(int, dev->limits.max_sg,
+			       (min(dev->limits.max_desc_sz, 1 << qp->rq.wqe_shift) -
+				sizeof (struct mthca_next_seg)) /
+			       sizeof (struct mthca_data_seg));
+}
+
 /*
  * Allocate and register buffer for WQEs.  qp->rq.max, sq.max,
  * rq.max_gs and sq.max_gs must all be assigned.
@@ -897,26 +943,52 @@ static int mthca_alloc_wqe_buf(struct mthca_dev *dev,
 	size = sizeof (struct mthca_next_seg) +
 		qp->rq.max_gs * sizeof (struct mthca_data_seg);
 
+	if (size > dev->limits.max_desc_sz)
+		return -EINVAL;
+
 	for (qp->rq.wqe_shift = 6; 1 << qp->rq.wqe_shift < size;
 	     qp->rq.wqe_shift++)
 		; /* nothing */
 
-	size = sizeof (struct mthca_next_seg) +
-		qp->sq.max_gs * sizeof (struct mthca_data_seg);
+	size = qp->sq.max_gs * sizeof (struct mthca_data_seg);
 	switch (qp->transport) {
 	case MLX:
 		size += 2 * sizeof (struct mthca_data_seg);
 		break;
+
 	case UD:
-		if (mthca_is_memfree(dev))
-			size += sizeof (struct mthca_arbel_ud_seg);
-		else
-			size += sizeof (struct mthca_tavor_ud_seg);
+		size += mthca_is_memfree(dev) ?
+			sizeof (struct mthca_arbel_ud_seg) :
+			sizeof (struct mthca_tavor_ud_seg);
 		break;
+
+	case UC:
+		size += sizeof (struct mthca_raddr_seg);
+		break;
+
+	case RC:
+		size += sizeof (struct mthca_raddr_seg);
+		/*
+		 * An atomic op will require an atomic segment, a
+		 * remote address segment and one scatter entry.
+		 */
+		size = max_t(int, size,
+			     sizeof (struct mthca_atomic_seg) +
+			     sizeof (struct mthca_raddr_seg) +
+			     sizeof (struct mthca_data_seg));
+		break;
+
 	default:
-		/* bind seg is as big as atomic + raddr segs */
-		size += sizeof (struct mthca_bind_seg);
+		break;
 	}
+
+	/* Make sure that we have enough space for a bind request */
+	size = max_t(int, size, sizeof (struct mthca_bind_seg));
+
+	size += sizeof (struct mthca_next_seg);
+
+	if (size > dev->limits.max_desc_sz)
+		return -EINVAL;
 
 	for (qp->sq.wqe_shift = 6; 1 << qp->sq.wqe_shift < size;
 	     qp->sq.wqe_shift++)
@@ -1061,6 +1133,8 @@ static int mthca_alloc_qp_common(struct mthca_dev *dev,
 		return ret;
 	}
 
+	mthca_adjust_qp_caps(dev, pd, qp);
+
 	/*
 	 * If this is a userspace QP, we're done now.  The doorbells
 	 * will be allocated and buffers will be initialized in
@@ -1112,8 +1186,10 @@ static int mthca_set_qp_size(struct mthca_dev *dev, struct ib_qp_cap *cap,
 			     struct mthca_qp *qp)
 {
 	/* Sanity check QP size before proceeding */
-	if (cap->max_send_wr  > 65536 || cap->max_recv_wr  > 65536 ||
-	    cap->max_send_sge > 64    || cap->max_recv_sge > 64)
+	if (cap->max_send_wr  > dev->limits.max_wqes ||
+	    cap->max_recv_wr  > dev->limits.max_wqes ||
+	    cap->max_send_sge > dev->limits.max_sg   ||
+	    cap->max_recv_sge > dev->limits.max_sg)
 		return -EINVAL;
 
 	if (mthca_is_memfree(dev)) {
@@ -1479,8 +1555,8 @@ int mthca_tavor_post_send(struct ib_qp *ibqp, struct ib_send_wr *wr,
 				}
 
 				wqe += sizeof (struct mthca_atomic_seg);
-				size += sizeof (struct mthca_raddr_seg) / 16 +
-					sizeof (struct mthca_atomic_seg);
+				size += (sizeof (struct mthca_raddr_seg) +
+					 sizeof (struct mthca_atomic_seg)) / 16;
 				break;
 
 			case IB_WR_RDMA_WRITE:
@@ -1630,6 +1706,7 @@ int mthca_tavor_post_receive(struct ib_qp *ibqp, struct ib_recv_wr *wr,
 {
 	struct mthca_dev *dev = to_mdev(ibqp->device);
 	struct mthca_qp *qp = to_mqp(ibqp);
+	__be32 doorbell[2];
 	unsigned long flags;
 	int err = 0;
 	int nreq;
@@ -1647,6 +1724,22 @@ int mthca_tavor_post_receive(struct ib_qp *ibqp, struct ib_recv_wr *wr,
 	ind = qp->rq.next_ind;
 
 	for (nreq = 0; wr; ++nreq, wr = wr->next) {
+		if (unlikely(nreq == MTHCA_TAVOR_MAX_WQES_PER_RECV_DB)) {
+			nreq = 0;
+
+			doorbell[0] = cpu_to_be32((qp->rq.next_ind << qp->rq.wqe_shift) | size0);
+			doorbell[1] = cpu_to_be32(qp->qpn << 8);
+
+			wmb();
+
+			mthca_write64(doorbell,
+				      dev->kar + MTHCA_RECEIVE_DOORBELL,
+				      MTHCA_GET_DOORBELL_LOCK(&dev->doorbell_lock));
+
+			qp->rq.head += MTHCA_TAVOR_MAX_WQES_PER_RECV_DB;
+			size0 = 0;
+		}
+
 		if (mthca_wq_overflow(&qp->rq, nreq, qp->ibqp.recv_cq)) {
 			mthca_err(dev, "RQ %06x full (%u head, %u tail,"
 					" %d max, %d nreq)\n", qp->qpn,
@@ -1704,8 +1797,6 @@ int mthca_tavor_post_receive(struct ib_qp *ibqp, struct ib_recv_wr *wr,
 
 out:
 	if (likely(nreq)) {
-		__be32 doorbell[2];
-
 		doorbell[0] = cpu_to_be32((qp->rq.next_ind << qp->rq.wqe_shift) | size0);
 		doorbell[1] = cpu_to_be32((qp->qpn << 8) | nreq);
 
@@ -1799,8 +1890,8 @@ int mthca_arbel_post_send(struct ib_qp *ibqp, struct ib_send_wr *wr,
 				}
 
 				wqe += sizeof (struct mthca_atomic_seg);
-				size += sizeof (struct mthca_raddr_seg) / 16 +
-					sizeof (struct mthca_atomic_seg);
+				size += (sizeof (struct mthca_raddr_seg) +
+					 sizeof (struct mthca_atomic_seg)) / 16;
 				break;
 
 			case IB_WR_RDMA_READ:

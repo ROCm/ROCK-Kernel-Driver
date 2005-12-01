@@ -28,19 +28,6 @@
 #define BUS_ID_SIZE		KOBJ_NAME_LEN
 
 
-enum {
-	SUSPEND_NOTIFY,
-	SUSPEND_SAVE_STATE,
-	SUSPEND_DISABLE,
-	SUSPEND_POWER_DOWN,
-};
-
-enum {
-	RESUME_POWER_ON,
-	RESUME_RESTORE_STATE,
-	RESUME_ENABLE,
-};
-
 struct device;
 struct device_driver;
 struct class;
@@ -115,8 +102,8 @@ struct device_driver {
 	int	(*probe)	(struct device * dev);
 	int	(*remove)	(struct device * dev);
 	void	(*shutdown)	(struct device * dev);
-	int	(*suspend)	(struct device * dev, pm_message_t state, u32 level);
-	int	(*resume)	(struct device * dev, u32 level);
+	int	(*suspend)	(struct device * dev, pm_message_t state);
+	int	(*resume)	(struct device * dev);
 };
 
 
@@ -203,6 +190,30 @@ struct class_device_attribute class_device_attr_##_name = 	\
 extern int class_device_create_file(struct class_device *,
 				    const struct class_device_attribute *);
 
+/**
+ * struct class_device - class devices
+ * @class: pointer to the parent class for this class device.  This is required.
+ * @devt: for internal use by the driver core only.
+ * @node: for internal use by the driver core only.
+ * @kobj: for internal use by the driver core only.
+ * @devt_attr: for internal use by the driver core only.
+ * @dev: if set, a symlink to the struct device is created in the sysfs
+ * directory for this struct class device.
+ * @class_data: pointer to whatever you want to store here for this struct
+ * class_device.  Use class_get_devdata() and class_set_devdata() to get and
+ * set this pointer.
+ * @parent: pointer to a struct class_device that is the parent of this struct
+ * class_device.  If NULL, this class_device will show up at the root of the
+ * struct class in sysfs (which is probably what you want to have happen.)
+ * @release: pointer to a release function for this struct class_device.  If
+ * set, this will be called instead of the class specific release function.
+ * Only use this if you want to override the default release function, like
+ * when you are nesting class_device structures.
+ * @hotplug: pointer to a hotplug function for this struct class_device.  If
+ * set, this will be called instead of the class specific hotplug function.
+ * Only use this if you want to override the default hotplug function, like
+ * when you are nesting class_device structures.
+ */
 struct class_device {
 	struct list_head	node;
 
@@ -384,32 +395,6 @@ extern int (*platform_notify_remove)(struct device * dev);
 extern struct device * get_device(struct device * dev);
 extern void put_device(struct device * dev);
 
-
-/* drivers/base/platform.c */
-
-struct platform_device {
-	const char	* name;
-	u32		id;
-	struct device	dev;
-	u32		num_resources;
-	struct resource	* resource;
-};
-
-#define to_platform_device(x) container_of((x), struct platform_device, dev)
-
-extern int platform_device_register(struct platform_device *);
-extern void platform_device_unregister(struct platform_device *);
-
-extern struct bus_type platform_bus_type;
-extern struct device platform_bus;
-
-extern struct resource *platform_get_resource(struct platform_device *, unsigned int, unsigned int);
-extern int platform_get_irq(struct platform_device *, unsigned int);
-extern struct resource *platform_get_resource_byname(struct platform_device *, unsigned int, char *);
-extern int platform_get_irq_byname(struct platform_device *, char *);
-extern int platform_add_devices(struct platform_device **, int);
-
-extern struct platform_device *platform_device_register_simple(char *, unsigned int, struct resource *, unsigned int);
 
 /* drivers/base/power.c */
 extern void device_shutdown(void);

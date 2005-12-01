@@ -24,6 +24,7 @@ cpumask_t __cacheline_aligned pending_irq_cpumask[NR_IRQS];
 
 /**
  *	synchronize_irq - wait for pending IRQ handlers (on other CPUs)
+ *	@irq: interrupt number to wait for
  *
  *	This function waits for any pending IRQ handlers for this interrupt
  *	to complete before returning. If you use this function while
@@ -34,6 +35,9 @@ cpumask_t __cacheline_aligned pending_irq_cpumask[NR_IRQS];
 void synchronize_irq(unsigned int irq)
 {
 	struct irq_desc *desc = irq_desc + irq;
+
+	if (irq >= NR_IRQS)
+		return;
 
 	while (desc->status & IRQ_INPROGRESS)
 		cpu_relax();
@@ -58,6 +62,9 @@ void disable_irq_nosync(unsigned int irq)
 {
 	irq_desc_t *desc = irq_desc + irq;
 	unsigned long flags;
+
+	if (irq >= NR_IRQS)
+		return;
 
 	spin_lock_irqsave(&desc->lock, flags);
 	if (!desc->depth++) {
@@ -85,6 +92,9 @@ void disable_irq(unsigned int irq)
 {
 	irq_desc_t *desc = irq_desc + irq;
 
+	if (irq >= NR_IRQS)
+		return;
+
 	disable_irq_nosync(irq);
 	if (desc->action)
 		synchronize_irq(irq);
@@ -106,6 +116,9 @@ void enable_irq(unsigned int irq)
 {
 	irq_desc_t *desc = irq_desc + irq;
 	unsigned long flags;
+
+	if (irq >= NR_IRQS)
+		return;
 
 	spin_lock_irqsave(&desc->lock, flags);
 	switch (desc->depth) {
@@ -151,14 +164,9 @@ int can_request_irq(unsigned int irq, unsigned long irqflags)
 	return !action;
 }
 
-/**
- *	setup_irq - register an irqaction structure
- *	@irq: Interrupt to register
- *	@irqaction: The irqaction structure to be registered
- *
- *	Normally called by request_irq, this function can be used
- *	directly to allocate special interrupts that are part of the
- *	architecture.
+/*
+ * Internal function to register an irqaction - typically used to
+ * allocate special interrupts that are part of the architecture.
  */
 int setup_irq(unsigned int irq, struct irqaction * new)
 {
@@ -166,6 +174,9 @@ int setup_irq(unsigned int irq, struct irqaction * new)
 	struct irqaction *old, **p;
 	unsigned long flags;
 	int shared = 0;
+
+	if (irq >= NR_IRQS)
+		return -EINVAL;
 
 	if (desc->handler == &no_irq_type)
 		return -ENOSYS;
@@ -227,30 +238,28 @@ int setup_irq(unsigned int irq, struct irqaction * new)
 	return 0;
 }
 
-/*
- *	teardown_irq - unregister an irqaction
- *	@irq: Interrupt line being freed
- *	@old: Pointer to the irqaction that is to be unregistered
+/**
+ *	free_irq - free an interrupt
+ *	@irq: Interrupt line to free
+ *	@dev_id: Device identity to free
  *
- *	This function is called by free_irq and does the actual
- *	business of unregistering the handler. It exists as a 
- *	seperate function to enable handlers to be unregistered 
- *	for irqactions that have been allocated statically at 
- *	boot time.
+ *	Remove an interrupt handler. The handler is removed and if the
+ *	interrupt line is no longer in use by any driver it is disabled.
+ *	On a shared IRQ the caller must ensure the interrupt is disabled
+ *	on the card it drives before calling this function. The function
+ *	does not return until any executing interrupts for this IRQ
+ *	have completed.
  *
  *	This function must not be called from interrupt context.
  */
-#ifndef CONFIG_XEN
-static
-#endif
-int teardown_irq(unsigned int irq, struct irqaction * old, void *dev_id)
+void free_irq(unsigned int irq, void *dev_id)
 {
 	struct irq_desc *desc;
 	struct irqaction **p;
 	unsigned long flags;
 
 	if (irq >= NR_IRQS)
-		return -ENOENT;
+		return;
 
 	desc = irq_desc + irq;
 	spin_lock_irqsave(&desc->lock,flags);
@@ -262,7 +271,7 @@ int teardown_irq(unsigned int irq, struct irqaction * old, void *dev_id)
 			struct irqaction **pp = p;
 
 			p = &action->next;
-			if (action != old)
+			if (action->dev_id != dev_id)
 				continue;
 
 			/* Found it - now remove it from the list of entries */
@@ -286,52 +295,13 @@ int teardown_irq(unsigned int irq, struct irqaction * old, void *dev_id)
 
 			/* Make sure it's not being used on another CPU */
 			synchronize_irq(irq);
-			return 0;
-		}
-		printk(KERN_ERR "Trying to teardown free IRQ%d\n",irq);
-		spin_unlock_irqrestore(&desc->lock,flags);
-		return -ENOENT;
-	}
-}
-
-/**
- *	free_irq - free an interrupt
- *	@irq: Interrupt line to free
- *	@dev_id: Device identity to free
- *
- *	Remove an interrupt handler. The handler is removed and if the
- *	interrupt line is no longer in use by any driver it is disabled.
- *	On a shared IRQ the caller must ensure the interrupt is disabled
- *	on the card it drives before calling this function. The function
- *	does not return until any executing interrupts for this IRQ
- *	have completed.
- *
- *	This function must not be called from interrupt context.
- */
-void free_irq(unsigned int irq, void *dev_id)
-{
-	struct irq_desc *desc;
-	struct irqaction *action;
-	unsigned long flags;
-
-	if (irq >= NR_IRQS)
-		return;
-
-	desc = irq_desc + irq;
-	spin_lock_irqsave(&desc->lock,flags);
-	for (action = desc->action; action != NULL; action = action->next) {
-		if (action->dev_id != dev_id)
-			continue;
-
-		spin_unlock_irqrestore(&desc->lock,flags);
-
-		if (teardown_irq(irq, action, dev_id) == 0)
 			kfree(action);
+			return;
+		}
+		printk(KERN_ERR "Trying to free free IRQ%d\n",irq);
+		spin_unlock_irqrestore(&desc->lock,flags);
 		return;
 	}
-	printk(KERN_ERR "Trying to free free IRQ%d\n",irq);
-	spin_unlock_irqrestore(&desc->lock,flags);
-	return;
 }
 
 EXPORT_SYMBOL(free_irq);

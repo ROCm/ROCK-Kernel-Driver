@@ -254,8 +254,7 @@ struct sctp_chunk *sctp_make_init(const struct sctp_association *asoc,
 	aiparam.adaption_ind = htonl(sp->adaption_ind);
 	sctp_addto_chunk(retval, sizeof(aiparam), &aiparam);
 nodata:
-	if (addrs.v)
-		kfree(addrs.v);
+	kfree(addrs.v);
 	return retval;
 }
 
@@ -347,8 +346,7 @@ struct sctp_chunk *sctp_make_init_ack(const struct sctp_association *asoc,
 nomem_chunk:
 	kfree(cookie);
 nomem_cookie:
-	if (addrs.v)
-		kfree(addrs.v);
+	kfree(addrs.v);
 	return retval;
 }
 
@@ -554,7 +552,7 @@ struct sctp_chunk *sctp_make_datafrag_empty(struct sctp_association *asoc,
 	dp.ppid   = sinfo->sinfo_ppid;
 
 	/* Set the flags for an unordered send.  */
-	if (sinfo->sinfo_flags & MSG_UNORDERED) {
+	if (sinfo->sinfo_flags & SCTP_UNORDERED) {
 		flags |= SCTP_DATA_UNORDERED;
 		dp.ssn = 0;
 	} else

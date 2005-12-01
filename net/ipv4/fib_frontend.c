@@ -266,8 +266,7 @@ int ip_rt_ioctl(unsigned int cmd, void __user *arg)
 				if (tb)
 					err = tb->tb_insert(tb, &req.rtm, &rta, &req.nlh, NULL);
 			}
-			if (rta.rta_mx)
-				kfree(rta.rta_mx);
+			kfree(rta.rta_mx);
 		}
 		rtnl_unlock();
 		return err;
@@ -408,7 +407,7 @@ static void fib_magic(int cmd, int type, u32 dst, int dst_len, struct in_ifaddr 
 		tb->tb_delete(tb, &req.rtm, &rta, &req.nlh, NULL);
 }
 
-static void fib_add_ifaddr(struct in_ifaddr *ifa)
+void fib_add_ifaddr(struct in_ifaddr *ifa)
 {
 	struct in_device *in_dev = ifa->ifa_dev;
 	struct net_device *dev = in_dev->dev;
@@ -591,7 +590,7 @@ static int fib_inetaddr_event(struct notifier_block *this, unsigned long event, 
 		break;
 	case NETDEV_DOWN:
 		fib_del_ifaddr(ifa);
-		if (ifa->ifa_dev && ifa->ifa_dev->ifa_list == NULL) {
+		if (ifa->ifa_dev->ifa_list == NULL) {
 			/* Last address was deleted from this interface.
 			   Disable IP.
 			 */

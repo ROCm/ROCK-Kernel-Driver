@@ -133,7 +133,7 @@ struct audit_buffer {
 	struct list_head     list;
 	struct sk_buff       *skb;	/* formatted skb ready to send */
 	struct audit_context *ctx;	/* NULL or associated context */
-	int		     gfp_mask;
+	gfp_t		     gfp_mask;
 };
 
 static void audit_set_pid(struct audit_buffer *ab, pid_t pid)
@@ -647,7 +647,7 @@ static inline void audit_get_stamp(struct audit_context *ctx,
  * will be written at syscall exit.  If there is no associated task, tsk
  * should be NULL. */
 
-struct audit_buffer *audit_log_start(struct audit_context *ctx, int gfp_mask,
+struct audit_buffer *audit_log_start(struct audit_context *ctx, gfp_t gfp_mask,
 				     int type)
 {
 	struct audit_buffer	*ab	= NULL;
@@ -731,8 +731,8 @@ static inline int audit_expand(struct audit_buffer *ab, int extra)
  * room in the audit buffer, more room will be allocated and vsnprint
  * will be called a second time.  Currently, we assume that a printk
  * can't format message larger than 1024 bytes, so we don't either. */
-void audit_log_vformat(struct audit_buffer *ab, const char *fmt,
-		       va_list args)
+static void audit_log_vformat(struct audit_buffer *ab, const char *fmt,
+			      va_list args)
 {
 	int len, avail;
 	struct sk_buff *skb;
@@ -879,7 +879,7 @@ void audit_log_end(struct audit_buffer *ab)
 /* Log an audit record.  This is a convenience function that calls
  * audit_log_start, audit_log_vformat, and audit_log_end.  It may be
  * called in any context. */
-void audit_log(struct audit_context *ctx, int gfp_mask, int type, 
+void audit_log(struct audit_context *ctx, gfp_t gfp_mask, int type, 
 	       const char *fmt, ...)
 {
 	struct audit_buffer *ab;
@@ -893,11 +893,3 @@ void audit_log(struct audit_context *ctx, int gfp_mask, int type,
 		audit_log_end(ab);
 	}
 }
-
-EXPORT_SYMBOL_GPL(audit_log_start);
-EXPORT_SYMBOL_GPL(audit_log_vformat);
-EXPORT_SYMBOL_GPL(audit_log_format);
-EXPORT_SYMBOL_GPL(audit_log_untrustedstring);
-EXPORT_SYMBOL_GPL(audit_log_d_path);
-EXPORT_SYMBOL_GPL(audit_log_end);
-EXPORT_SYMBOL_GPL(audit_log);

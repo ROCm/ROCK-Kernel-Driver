@@ -22,7 +22,6 @@
  * instead which is a bit of an overkill imho
  */
 
-#include <linux/config.h>
 #include <linux/types.h>
 #include <linux/errno.h>
 #include <linux/kernel.h>
@@ -33,6 +32,7 @@
 #include <linux/jiffies.h>
 #include <linux/reboot.h>
 #include <linux/device.h>
+#include <linux/platform_device.h>
 
 #include "windfarm.h"
 
@@ -106,11 +106,9 @@ static int wf_thread_func(void *data)
 			next += HZ;
 		}
 
-		set_current_state(TASK_INTERRUPTIBLE);
 		delay = next - jiffies;
 		if (delay <= HZ)
-			schedule_timeout(delay);
-		set_current_state(TASK_RUNNING);
+			schedule_timeout_interruptible(delay);
 
 		/* there should be no signal, but oh well */
 		if (signal_pending(current)) {

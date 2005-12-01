@@ -515,7 +515,7 @@ config SCSI_ATA_PIIX
 	  If unsure, say N.
 
 config SCSI_SATA_MV
-	tristate "Marvell SATA support"
+	tristate "Marvell SATA support (HIGHLY EXPERIMENTAL)"
 	depends on SCSI_SATA && PCI && EXPERIMENTAL
 	help
 	  This option enables support for the Marvell Serial ATA family.
@@ -531,11 +531,11 @@ config SCSI_SATA_NV
 
 	  If unsure, say N.
 
-config SCSI_SATA_PROMISE
-	tristate "Promise SATA TX2/TX4 support"
+config SCSI_PDC_ADMA
+	tristate "Pacific Digital ADMA support"
 	depends on SCSI_SATA && PCI
 	help
-	  This option enables support for Promise Serial ATA TX2/TX4.
+	  This option enables support for Pacific Digital ADMA controllers
 
 	  If unsure, say N.
 
@@ -544,6 +544,14 @@ config SCSI_SATA_QSTOR
 	depends on SCSI_SATA && PCI
 	help
 	  This option enables support for Pacific Digital Serial ATA QStor.
+
+	  If unsure, say N.
+
+config SCSI_SATA_PROMISE
+	tristate "Promise SATA TX2/TX4 support"
+	depends on SCSI_SATA && PCI
+	help
+	  This option enables support for Promise Serial ATA TX2/TX4.
 
 	  If unsure, say N.
 
@@ -560,6 +568,14 @@ config SCSI_SATA_SIL
 	depends on SCSI_SATA && PCI && EXPERIMENTAL
 	help
 	  This option enables support for Silicon Image Serial ATA.
+
+	  If unsure, say N.
+
+config SCSI_SATA_SIL24
+	tristate "Silicon Image 3124/3132 SATA support"
+	depends on SCSI_SATA && PCI && EXPERIMENTAL
+	help
+	  This option enables support for Silicon Image 3124/3132 Serial ATA.
 
 	  If unsure, say N.
 
@@ -1307,27 +1323,6 @@ config SCSI_QLOGIC_FAS
 	  To compile this driver as a module, choose M here: the
 	  module will be called qlogicfas.
 
-config SCSI_QLOGIC_ISP
-	tristate "Qlogic ISP SCSI support (old driver)"
-	depends on PCI && SCSI && BROKEN
-	---help---
-	  This driver works for all QLogic PCI SCSI host adapters (IQ-PCI,
-	  IQ-PCI-10, IQ_PCI-D) except for the PCI-basic card.  (This latter
-	  card is supported by the "AM53/79C974 PCI SCSI" driver.)
-
-	  If you say Y here, make sure to choose "BIOS" at the question "PCI
-	  access mode".
-
-	  Please read the file <file:Documentation/scsi/qlogicisp.txt>.  You
-	  should also read the SCSI-HOWTO, available from
-	  <http://www.tldp.org/docs.html#howto>.
-
-	  To compile this driver as a module, choose M here: the
-	  module will be called qlogicisp.
-
-	  These days the hardware is also supported by the more modern qla1280
-	  driver.  In doubt use that one instead of qlogicisp.
-
 config SCSI_QLOGIC_FC
 	tristate "Qlogic ISP FC SCSI support"
 	depends on PCI && SCSI
@@ -1353,14 +1348,6 @@ config SCSI_QLOGIC_1280
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called qla1280.
-
-config SCSI_QLOGIC_1280_1040
-	bool "Qlogic QLA 1020/1040 SCSI support"
-	depends on SCSI_QLOGIC_1280 && SCSI_QLOGIC_ISP!=y
-	help
-	  Say Y here if you have a QLogic ISP1020/1040 SCSI host adapter and
-	  do not want to use the old driver.  This option enables support in
-	  the qla1280 driver for those host adapters.
 
 config SCSI_QLOGICPTI
 	tristate "PTI Qlogic, ISP Driver"

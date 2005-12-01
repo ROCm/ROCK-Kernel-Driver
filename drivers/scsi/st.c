@@ -3577,7 +3577,8 @@ static long st_compat_ioctl(struct file *file, unsigned int cmd, unsigned long a
 static struct st_buffer *
  new_tape_buffer(int from_initialization, int need_dma, int max_sg)
 {
-	int i, priority, got = 0, segs = 0;
+	int i, got = 0, segs = 0;
+	gfp_t priority;
 	struct st_buffer *tb;
 
 	if (from_initialization)
@@ -3610,7 +3611,8 @@ static struct st_buffer *
 /* Try to allocate enough space in the tape buffer */
 static int enlarge_buffer(struct st_buffer * STbuffer, int new_size, int need_dma)
 {
-	int segs, nbr, max_segs, b_size, priority, order, got;
+	int segs, nbr, max_segs, b_size, order, got;
+	gfp_t priority;
 
 	if (new_size <= STbuffer->buffer_size)
 		return 1;
@@ -4105,8 +4107,7 @@ out_free_tape:
 	write_unlock(&st_dev_arr_lock);
 out_put_disk:
 	put_disk(disk);
-	if (tpnt)
-		kfree(tpnt);
+	kfree(tpnt);
 out_buffer_free:
 	kfree(buffer);
 out:
@@ -4521,12 +4522,16 @@ static int sgl_unmap_user_pages(struct scatterlist *sgl, const unsigned int nr_p
 	int i;
 
 	for (i=0; i < nr_pages; i++) {
-		if (dirtied && !PageReserved(sgl[i].page))
-			SetPageDirty(sgl[i].page);
+		struct page *page = sgl[i].page;
+
+		/* XXX: just for debug. Remove when PageReserved is removed */
+		BUG_ON(PageReserved(page));
+		if (dirtied)
+			SetPageDirty(page);
 		/* FIXME: cache flush missing for rw==READ
 		 * FIXME: call the correct reference counting function
 		 */
-		page_cache_release(sgl[i].page);
+		page_cache_release(page);
 	}
 
 	return 0;

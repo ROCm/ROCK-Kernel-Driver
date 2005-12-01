@@ -119,5 +119,5 @@ __kernel_rt_sigreturn:
 	.align 4
 .LENDFDE3:
 
-#include <vsyscall-note.S>
+#include "../../i386/kernel/vsyscall-note.S"
 

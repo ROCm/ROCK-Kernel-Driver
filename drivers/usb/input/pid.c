@@ -37,8 +37,6 @@
 #include "hid.h"
 #include "pid.h"
 
-#define DEBUG
-
 #define CHECK_OWNERSHIP(i, hid_pid)	\
 	((i) < FF_EFFECTS_MAX && i >= 0 && \
 	test_bit(FF_PID_FLAGS_USED, &hid_pid->effects[(i)].flags) && \
@@ -198,7 +196,7 @@ static int hid_pid_upload_effect(struct input_dev *dev,
 		}
 
 		effect->id = id;
-		dev_dbg(&pid_private->hid->dev->dev, "effect ID is %d\n.", id);
+		dev_dbg(&pid_private->hid->dev->dev, "effect ID is %d.\n", id);
 		pid_private->effects[id].owner = current->pid;
 		pid_private->effects[id].flags = (1 << FF_PID_FLAGS_USED);
 		spin_unlock_irqrestore(&pid_private->lock, flags);

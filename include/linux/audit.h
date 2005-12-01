@@ -73,8 +73,6 @@
 #define AUDIT_SELINUX_ERR	1401	/* Internal SE Linux Errors */
 #define AUDIT_AVC_PATH		1402	/* dentry, vfsmount pair from avc */
 
-#define AUDIT_SD		1500	/* AppArmor (SubDomain) audit */
-
 #define AUDIT_KERNEL		2000	/* Asynchronous audit record. NOT A REQUEST. */
 
 /* Rule flags */
@@ -262,13 +260,11 @@ extern int audit_filter_user(struct netlink_skb_parms *cb, int type);
 #ifdef CONFIG_AUDIT
 /* These are defined in audit.c */
 				/* Public API */
-extern void		    audit_log(struct audit_context *ctx, int gfp_mask,
+extern void		    audit_log(struct audit_context *ctx, gfp_t gfp_mask,
 				      int type, const char *fmt, ...)
 				      __attribute__((format(printf,4,5)));
 
-extern struct audit_buffer *audit_log_start(struct audit_context *ctx, int gfp_mask, int type);
-extern void		    audit_log_vformat(struct audit_buffer *ab, 
-					      const char *fmt, va_list args);
+extern struct audit_buffer *audit_log_start(struct audit_context *ctx, gfp_t gfp_mask, int type);
 extern void		    audit_log_format(struct audit_buffer *ab,
 					     const char *fmt, ...)
 			    __attribute__((format(printf,2,3)));

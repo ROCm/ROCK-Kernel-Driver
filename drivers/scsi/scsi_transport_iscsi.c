@@ -21,8 +21,11 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 #include <linux/module.h>
+#include <linux/string.h>
+#include <linux/slab.h>
 #include <linux/mempool.h>
 #include <net/tcp.h>
+
 #include <scsi/scsi.h>
 #include <scsi/scsi_host.h>
 #include <scsi/scsi_device.h>

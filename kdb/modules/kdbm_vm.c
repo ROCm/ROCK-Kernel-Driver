@@ -542,8 +542,8 @@ kdbm_filp(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 
 	kdb_printf("File Pointer at 0x%lx\n", addr);
 
-	kdb_printf(" f_list.nxt = 0x%p f_list.prv = 0x%p\n",
-					f.f_list.next, f.f_list.prev);
+	kdb_printf(" fu_list.nxt = 0x%p fu_list.prv = 0x%p\n",
+					f.f_u.fu_list.next, f.f_u.fu_list.prev);
 
 	kdb_printf(" f_dentry = 0x%p f_vfsmnt = 0x%p f_op = 0x%p\n",
 					f.f_dentry, f.f_vfsmnt, f.f_op);
@@ -688,8 +688,8 @@ kdbm_sh(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 	kdb_printf("host_queue = 0x%p\n", sh.__devices.next);
 	kdb_printf("ehandler = 0x%p eh_action = 0x%p\n",
 		   sh.ehandler, sh.eh_action);
-	kdb_printf("eh_active = 0x%d host_wait = 0x%p hostt = 0x%p\n",
-		   sh.eh_active, &sh.host_wait, sh.hostt);
+	kdb_printf("host_wait = 0x%p hostt = 0x%p\n",
+		   &sh.host_wait, sh.hostt);
 	kdb_printf("host_failed = %d  host_no = %d resetting = %d\n",
 		   sh.host_failed, sh.host_no, sh.resetting);
 	kdb_printf("max id/lun/channel = [%d/%d/%d]  this_id = %d\n",

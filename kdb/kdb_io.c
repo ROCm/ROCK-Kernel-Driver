@@ -470,6 +470,7 @@ kdb_printf(const char *fmt, ...)
 	struct console *c = console_drivers;
 	static DEFINE_SPINLOCK(kdb_printf_lock);
 
+	preempt_disable();
 	/* Serialize kdb_printf if multiple cpus try to write at once.
 	 * But if any cpu goes recursive in kdb, just print the output,
 	 * even if it is interleaved with any other text.
@@ -595,6 +596,7 @@ kdb_printf(const char *fmt, ...)
 		KDB_STATE_CLEAR(PRINTF_LOCK);
 		atomic_dec(&kdb_event);
 	}
+	preempt_enable();
 	if (do_longjmp)
 #ifdef KDB_HAVE_LONGJMP
 		kdba_longjmp(&kdbjmpbuf[smp_processor_id()], 1)

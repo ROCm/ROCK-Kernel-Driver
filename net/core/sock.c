@@ -940,7 +940,7 @@ static struct sk_buff *sock_alloc_send_pskb(struct sock *sk,
 					    int noblock, int *errcode)
 {
 	struct sk_buff *skb;
-	unsigned int gfp_mask;
+	gfp_t gfp_mask;
 	long timeo;
 	int err;
 
@@ -1242,8 +1242,7 @@ static void sock_def_write_space(struct sock *sk)
 
 static void sock_def_destruct(struct sock *sk)
 {
-	if (sk->sk_protinfo)
-		kfree(sk->sk_protinfo);
+	kfree(sk->sk_protinfo);
 }
 
 void sk_send_sigurg(struct sock *sk)

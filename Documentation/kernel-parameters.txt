@@ -1466,8 +1466,6 @@ running once the system is up.
 	stifb=		[HW]
 			Format: bpp:<bpp1>[:<bpp2>[:<bpp3>...]]
 
-	stram_swap=	[HW,M68k]
-
 	unsupported	Allow loading of unsupported kernel modules:
 			0 = only allow supported modules,
 			1 = warn when loading unsupported modules,
@@ -1528,9 +1526,6 @@ running once the system is up.
 
 	uart6850=	[HW,OSS]
 			Format: <io>,<irq>
-
-	usb-handoff	[HW] Enable early USB BIOS -> OS handoff
-	usb-no-handoff	[HW] Disable early USB BIOS -> OS handoff
 
 	usbhid.mousepoll=
 			[USBHID] The interval which mice are to be polled at.

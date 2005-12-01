@@ -231,9 +231,6 @@ extern struct page *mem_map_zero;
 #define pte_pfn(x)		((pte_val(x) & _PAGE_PADDR)>>PAGE_SHIFT)
 #define pte_page(x)		pfn_to_page(pte_pfn(x))
 
-#define page_pte_prot(page, prot)	mk_pte(page, prot)
-#define page_pte(page)			page_pte_prot(page, __pgprot(0))
-
 static inline pte_t pte_modify(pte_t orig_pte, pgprot_t new_prot)
 {
 	pte_t __pte;
@@ -350,16 +347,6 @@ extern unsigned long find_ecache_flush_span(unsigned long size);
 
 struct vm_area_struct;
 extern void update_mmu_cache(struct vm_area_struct *, unsigned long, pte_t);
-
-/* Make a non-present pseudo-TTE. */
-static inline pte_t mk_pte_io(unsigned long page, pgprot_t prot, int space)
-{
-	pte_t pte;
-	pte_val(pte) = (((page) | pgprot_val(prot) | _PAGE_E) &
-			~(unsigned long)_PAGE_CACHE);
-	pte_val(pte) |= (((unsigned long)space) << 32);
-	return pte;
-}
 
 /* Encode and de-code a swap entry */
 #define __swp_type(entry)	(((entry).val >> PAGE_SHIFT) & 0xffUL)

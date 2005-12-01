@@ -35,6 +35,7 @@
 #include "linux/blkpg.h"
 #include "linux/genhd.h"
 #include "linux/spinlock.h"
+#include "linux/platform_device.h"
 #include "asm/segment.h"
 #include "asm/uaccess.h"
 #include "asm/irq.h"
@@ -822,9 +823,10 @@ static int ubd_mc_init(void)
 
 __initcall(ubd_mc_init);
 
-static struct device_driver ubd_driver = {
-	.name  = DRIVER_NAME,
-	.bus   = &platform_bus_type,
+static struct platform_driver ubd_driver = {
+	.driver = {
+		.name  = DRIVER_NAME,
+	},
 };
 
 int ubd_init(void)
@@ -849,7 +851,7 @@ int ubd_init(void)
 		if (register_blkdev(fake_major, "ubd"))
 			return -1;
 	}
-	driver_register(&ubd_driver);
+	platform_driver_register(&ubd_driver);
 	for (i = 0; i < MAX_DEV; i++) 
 		ubd_add(i);
 	return 0;

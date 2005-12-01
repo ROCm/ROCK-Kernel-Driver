@@ -2378,6 +2378,7 @@ static unsigned fib_flag_trans(int type, u32 mask, const struct fib_info *fi)
  */
 static int fib_route_seq_show(struct seq_file *seq, void *v)
 {
+	const struct fib_trie_iter *iter = seq->private;
 	struct leaf *l = v;
 	int i;
 	char bf[128];
@@ -2389,6 +2390,8 @@ static int fib_route_seq_show(struct seq_file *seq, void *v)
 		return 0;
 	}
 
+	if (iter->trie == trie_local)
+		return 0;
 	if (IS_TNODE(l))
 		return 0;
 
@@ -2404,7 +2407,7 @@ static int fib_route_seq_show(struct seq_file *seq, void *v)
 		prefix = htonl(l->key);
 
 		list_for_each_entry_rcu(fa, &li->falh, fa_list) {
-			const struct fib_info *fi = rcu_dereference(fa->fa_info);
+			const struct fib_info *fi = fa->fa_info;
 			unsigned flags = fib_flag_trans(fa->fa_type, mask, fi);
 
 			if (fa->fa_type == RTN_BROADCAST

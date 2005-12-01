@@ -7,7 +7,6 @@
  * Released under the term of the GNU GPL v2.
  */
 
-#include <linux/config.h>
 #include <linux/types.h>
 #include <linux/errno.h>
 #include <linux/kernel.h>

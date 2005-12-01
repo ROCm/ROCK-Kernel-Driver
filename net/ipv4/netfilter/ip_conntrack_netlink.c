@@ -27,12 +27,10 @@
 #include <linux/errno.h>
 #include <linux/netlink.h>
 #include <linux/spinlock.h>
+#include <linux/interrupt.h>
 #include <linux/notifier.h>
-#include <linux/rtnetlink.h>
 
 #include <linux/netfilter.h>
-#include <linux/netfilter_ipv4.h>
-#include <linux/netfilter_ipv4/ip_tables.h>
 #include <linux/netfilter_ipv4/ip_conntrack.h>
 #include <linux/netfilter_ipv4/ip_conntrack_core.h>
 #include <linux/netfilter_ipv4/ip_conntrack_helper.h>
@@ -62,11 +60,13 @@ ctnetlink_dump_tuples_proto(struct sk_buff *skb,
 
 	NFA_PUT(skb, CTA_PROTO_NUM, sizeof(u_int8_t), &tuple->dst.protonum);
 
+	/* If no protocol helper is found, this function will return the
+	 * generic protocol helper, so proto won't *ever* be NULL */
 	proto = ip_conntrack_proto_find_get(tuple->dst.protonum);
-	if (likely(proto && proto->tuple_to_nfattr)) {
+	if (likely(proto->tuple_to_nfattr))
 		ret = proto->tuple_to_nfattr(skb, tuple);
-		ip_conntrack_proto_put(proto);
-	}
+	
+	ip_conntrack_proto_put(proto);
 
 	return ret;
 
@@ -131,9 +131,11 @@ ctnetlink_dump_protoinfo(struct sk_buff *skb, const struct ip_conntrack *ct)
 
 	struct nfattr *nest_proto;
 	int ret;
-	
-	if (!proto || !proto->to_nfattr)
+
+	if (!proto->to_nfattr) {
+		ip_conntrack_proto_put(proto);
 		return 0;
+	}
 	
 	nest_proto = NFA_NEST(skb, CTA_PROTOINFO);
 
@@ -178,7 +180,7 @@ ctnetlink_dump_counters(struct sk_buff *skb, const struct ip_conntrack *ct,
 {
 	enum ctattr_type type = dir ? CTA_COUNTERS_REPLY: CTA_COUNTERS_ORIG;
 	struct nfattr *nest_count = NFA_NEST(skb, type);
-	u_int64_t tmp;
+	u_int32_t tmp;
 
 	tmp = htonl(ct->counters[dir].packets);
 	NFA_PUT(skb, CTA_COUNTERS32_PACKETS, sizeof(u_int32_t), &tmp);
@@ -470,7 +472,7 @@ out:
 }
 #endif
 
-static const int cta_min_ip[CTA_IP_MAX] = {
+static const size_t cta_min_ip[CTA_IP_MAX] = {
 	[CTA_IP_V4_SRC-1]	= sizeof(u_int32_t),
 	[CTA_IP_V4_DST-1]	= sizeof(u_int32_t),
 };
@@ -482,9 +484,7 @@ ctnetlink_parse_tuple_ip(struct nfattr *attr, struct ip_conntrack_tuple *tuple)
 
 	DEBUGP("entered %s\n", __FUNCTION__);
 
-	
-	if (nfattr_parse_nested(tb, CTA_IP_MAX, attr) < 0)
-		goto nfattr_failure;
+	nfattr_parse_nested(tb, CTA_IP_MAX, attr);
 
 	if (nfattr_bad_size(tb, CTA_IP_MAX, cta_min_ip))
 		return -EINVAL;
@@ -500,12 +500,9 @@ ctnetlink_parse_tuple_ip(struct nfattr *attr, struct ip_conntrack_tuple *tuple)
 	DEBUGP("leaving\n");
 
 	return 0;
-
-nfattr_failure:
-	return -1;
 }
 
-static const int cta_min_proto[CTA_PROTO_MAX] = {
+static const size_t cta_min_proto[CTA_PROTO_MAX] = {
 	[CTA_PROTO_NUM-1]	= sizeof(u_int16_t),
 	[CTA_PROTO_SRC_PORT-1]	= sizeof(u_int16_t),
 	[CTA_PROTO_DST_PORT-1]	= sizeof(u_int16_t),
@@ -524,8 +521,7 @@ ctnetlink_parse_tuple_proto(struct nfattr *attr,
 
 	DEBUGP("entered %s\n", __FUNCTION__);
 
-	if (nfattr_parse_nested(tb, CTA_PROTO_MAX, attr) < 0)
-		goto nfattr_failure;
+	nfattr_parse_nested(tb, CTA_PROTO_MAX, attr);
 
 	if (nfattr_bad_size(tb, CTA_PROTO_MAX, cta_min_proto))
 		return -EINVAL;
@@ -536,15 +532,12 @@ ctnetlink_parse_tuple_proto(struct nfattr *attr,
 
 	proto = ip_conntrack_proto_find_get(tuple->dst.protonum);
 
-	if (likely(proto && proto->nfattr_to_tuple)) {
+	if (likely(proto->nfattr_to_tuple))
 		ret = proto->nfattr_to_tuple(tb, tuple);
-		ip_conntrack_proto_put(proto);
-	}
+	
+	ip_conntrack_proto_put(proto);
 	
 	return ret;
-
-nfattr_failure:
-	return -1;
 }
 
 static inline int
@@ -558,8 +551,7 @@ ctnetlink_parse_tuple(struct nfattr *cda[], struct ip_conntrack_tuple *tuple,
 
 	memset(tuple, 0, sizeof(*tuple));
 
-	if (nfattr_parse_nested(tb, CTA_TUPLE_MAX, cda[type-1]) < 0)
-		goto nfattr_failure;
+	nfattr_parse_nested(tb, CTA_TUPLE_MAX, cda[type-1]);
 
 	if (!tb[CTA_TUPLE_IP-1])
 		return -EINVAL;
@@ -586,13 +578,10 @@ ctnetlink_parse_tuple(struct nfattr *cda[], struct ip_conntrack_tuple *tuple,
 	DEBUGP("leaving\n");
 
 	return 0;
-
-nfattr_failure:
-	return -1;
 }
 
 #ifdef CONFIG_IP_NF_NAT_NEEDED
-static const int cta_min_protonat[CTA_PROTONAT_MAX] = {
+static const size_t cta_min_protonat[CTA_PROTONAT_MAX] = {
 	[CTA_PROTONAT_PORT_MIN-1]	= sizeof(u_int16_t),
 	[CTA_PROTONAT_PORT_MAX-1]	= sizeof(u_int16_t),
 };
@@ -606,15 +595,12 @@ static int ctnetlink_parse_nat_proto(struct nfattr *attr,
 
 	DEBUGP("entered %s\n", __FUNCTION__);
 
-	if (nfattr_parse_nested(tb, CTA_PROTONAT_MAX, attr) < 0)
-		goto nfattr_failure;
+	nfattr_parse_nested(tb, CTA_PROTONAT_MAX, attr);
 
 	if (nfattr_bad_size(tb, CTA_PROTONAT_MAX, cta_min_protonat))
-		goto nfattr_failure;
+		return -EINVAL;
 
 	npt = ip_nat_proto_find_get(ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.protonum);
-	if (!npt)
-		return 0;
 
 	if (!npt->nfattr_to_range) {
 		ip_nat_proto_put(npt);
@@ -629,10 +615,12 @@ static int ctnetlink_parse_nat_proto(struct nfattr *attr,
 
 	DEBUGP("leaving\n");
 	return 0;
-
-nfattr_failure:
-	return -1;
 }
+
+static const size_t cta_min_nat[CTA_NAT_MAX] = {
+	[CTA_NAT_MINIP-1]       = sizeof(u_int32_t),
+	[CTA_NAT_MAXIP-1]       = sizeof(u_int32_t),
+};
 
 static inline int
 ctnetlink_parse_nat(struct nfattr *cda[],
@@ -645,8 +633,10 @@ ctnetlink_parse_nat(struct nfattr *cda[],
 
 	memset(range, 0, sizeof(*range));
 	
-	if (nfattr_parse_nested(tb, CTA_NAT_MAX, cda[CTA_NAT-1]) < 0)
-		goto nfattr_failure;
+	nfattr_parse_nested(tb, CTA_NAT_MAX, cda[CTA_NAT-1]);
+
+	if (nfattr_bad_size(tb, CTA_NAT_MAX, cta_min_nat))
+		return -EINVAL;
 
 	if (tb[CTA_NAT_MINIP-1])
 		range->min_ip = *(u_int32_t *)NFA_DATA(tb[CTA_NAT_MINIP-1]);
@@ -668,9 +658,6 @@ ctnetlink_parse_nat(struct nfattr *cda[],
 
 	DEBUGP("leaving\n");
 	return 0;
-
-nfattr_failure:
-	return -1;
 }
 #endif
 
@@ -681,8 +668,7 @@ ctnetlink_parse_help(struct nfattr *attr, char **helper_name)
 
 	DEBUGP("entered %s\n", __FUNCTION__);
 
-	if (nfattr_parse_nested(tb, CTA_HELP_MAX, attr) < 0)
-		goto nfattr_failure;
+	nfattr_parse_nested(tb, CTA_HELP_MAX, attr);
 
 	if (!tb[CTA_HELP_NAME-1])
 		return -EINVAL;
@@ -690,10 +676,15 @@ ctnetlink_parse_help(struct nfattr *attr, char **helper_name)
 	*helper_name = NFA_DATA(tb[CTA_HELP_NAME-1]);
 
 	return 0;
-
-nfattr_failure:
-	return -1;
 }
+
+static const size_t cta_min[CTA_MAX] = {
+	[CTA_STATUS-1] 		= sizeof(u_int32_t),
+	[CTA_TIMEOUT-1] 	= sizeof(u_int32_t),
+	[CTA_MARK-1]		= sizeof(u_int32_t),
+	[CTA_USE-1]		= sizeof(u_int32_t),
+	[CTA_ID-1]		= sizeof(u_int32_t)
+};
 
 static int
 ctnetlink_del_conntrack(struct sock *ctnl, struct sk_buff *skb, 
@@ -705,6 +696,9 @@ ctnetlink_del_conntrack(struct sock *ctnl, struct sk_buff *skb,
 	int err = 0;
 
 	DEBUGP("entered %s\n", __FUNCTION__);
+
+	if (nfattr_bad_size(cda, CTA_MAX, cta_min))
+		return -EINVAL;
 
 	if (cda[CTA_TUPLE_ORIG-1])
 		err = ctnetlink_parse_tuple(cda, &tuple, CTA_TUPLE_ORIG);
@@ -788,6 +782,9 @@ ctnetlink_get_conntrack(struct sock *ctnl, struct sk_buff *skb,
 		return 0;
 	}
 
+	if (nfattr_bad_size(cda, CTA_MAX, cta_min))
+		return -EINVAL;
+
 	if (cda[CTA_TUPLE_ORIG-1])
 		err = ctnetlink_parse_tuple(cda, &tuple, CTA_TUPLE_ORIG);
 	else if (cda[CTA_TUPLE_REPLY-1])
@@ -807,7 +804,7 @@ ctnetlink_get_conntrack(struct sock *ctnl, struct sk_buff *skb,
 	ct = tuplehash_to_ctrack(h);
 
 	err = -ENOMEM;
-	skb2 = alloc_skb(NLMSG_GOODSIZE, GFP_ATOMIC);
+	skb2 = alloc_skb(NLMSG_GOODSIZE, GFP_KERNEL);
 	if (!skb2) {
 		ip_conntrack_put(ct);
 		return -ENOMEM;
@@ -818,7 +815,7 @@ ctnetlink_get_conntrack(struct sock *ctnl, struct sk_buff *skb,
 				  IPCTNL_MSG_CT_NEW, 1, ct);
 	ip_conntrack_put(ct);
 	if (err <= 0)
-		goto out;
+		goto free;
 
 	err = netlink_unicast(ctnl, skb2, NETLINK_CB(skb).pid, MSG_DONTWAIT);
 	if (err < 0)
@@ -827,10 +824,10 @@ ctnetlink_get_conntrack(struct sock *ctnl, struct sk_buff *skb,
 	DEBUGP("leaving\n");
 	return 0;
 
+free:
+	kfree_skb(skb2);
 out:
-	if (skb2)
-		kfree_skb(skb2);
-	return -1;
+	return err;
 }
 
 static inline int
@@ -960,21 +957,15 @@ ctnetlink_change_protoinfo(struct ip_conntrack *ct, struct nfattr *cda[])
 	u_int16_t npt = ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.protonum;
 	int err = 0;
 
-	if (nfattr_parse_nested(tb, CTA_PROTOINFO_MAX, attr) < 0)
-		goto nfattr_failure;
+	nfattr_parse_nested(tb, CTA_PROTOINFO_MAX, attr);
 
 	proto = ip_conntrack_proto_find_get(npt);
-	if (!proto)
-		return -EINVAL;
 
 	if (proto->from_nfattr)
 		err = proto->from_nfattr(tb, ct);
 	ip_conntrack_proto_put(proto); 
 
 	return err;
-
-nfattr_failure:
-	return -ENOMEM;
 }
 
 static int
@@ -1007,6 +998,11 @@ ctnetlink_change_conntrack(struct ip_conntrack *ct, struct nfattr *cda[])
 		if (err < 0)
 			return err;
 	}
+
+#if defined(CONFIG_IP_NF_CONNTRACK_MARK)
+	if (cda[CTA_MARK-1])
+		ct->mark = ntohl(*(u_int32_t *)NFA_DATA(cda[CTA_MARK-1]));
+#endif
 
 	DEBUGP("all done\n");
 	return 0;
@@ -1051,6 +1047,11 @@ ctnetlink_create_conntrack(struct nfattr *cda[],
 	if (ct->helper)
 		ip_conntrack_helper_put(ct->helper);
 
+#if defined(CONFIG_IP_NF_CONNTRACK_MARK)
+	if (cda[CTA_MARK-1])
+		ct->mark = ntohl(*(u_int32_t *)NFA_DATA(cda[CTA_MARK-1]));
+#endif
+
 	DEBUGP("conntrack with id %u inserted\n", ct->id);
 	return 0;
 
@@ -1068,6 +1069,9 @@ ctnetlink_new_conntrack(struct sock *ctnl, struct sk_buff *skb,
 	int err = 0;
 
 	DEBUGP("entered %s\n", __FUNCTION__);
+
+	if (nfattr_bad_size(cda, CTA_MAX, cta_min))
+		return -EINVAL;
 
 	if (cda[CTA_TUPLE_ORIG-1]) {
 		err = ctnetlink_parse_tuple(cda, &otuple, CTA_TUPLE_ORIG);
@@ -1274,6 +1278,11 @@ out:
 	return skb->len;
 }
 
+static const size_t cta_min_exp[CTA_EXPECT_MAX] = {
+	[CTA_EXPECT_TIMEOUT-1]          = sizeof(u_int32_t),
+	[CTA_EXPECT_ID-1]               = sizeof(u_int32_t)
+};
+
 static int
 ctnetlink_get_expect(struct sock *ctnl, struct sk_buff *skb, 
 		     struct nlmsghdr *nlh, struct nfattr *cda[], int *errp)
@@ -1284,6 +1293,9 @@ ctnetlink_get_expect(struct sock *ctnl, struct sk_buff *skb,
 	int err = 0;
 
 	DEBUGP("entered %s\n", __FUNCTION__);
+
+	if (nfattr_bad_size(cda, CTA_EXPECT_MAX, cta_min_exp))
+		return -EINVAL;
 
 	if (nlh->nlmsg_flags & NLM_F_DUMP) {
 		struct nfgenmsg *msg = NLMSG_DATA(nlh);
@@ -1315,6 +1327,14 @@ ctnetlink_get_expect(struct sock *ctnl, struct sk_buff *skb,
 	if (!exp)
 		return -ENOENT;
 
+	if (cda[CTA_EXPECT_ID-1]) {
+		u_int32_t id = *(u_int32_t *)NFA_DATA(cda[CTA_EXPECT_ID-1]);
+		if (exp->id != ntohl(id)) {
+			ip_conntrack_expect_put(exp);
+			return -ENOENT;
+		}
+	}	
+
 	err = -ENOMEM;
 	skb2 = alloc_skb(NLMSG_GOODSIZE, GFP_KERNEL);
 	if (!skb2)
@@ -1325,21 +1345,16 @@ ctnetlink_get_expect(struct sock *ctnl, struct sk_buff *skb,
 				      nlh->nlmsg_seq, IPCTNL_MSG_EXP_NEW,
 				      1, exp);
 	if (err <= 0)
-		goto out;
-
-	ip_conntrack_expect_put(exp);
-
-	err = netlink_unicast(ctnl, skb2, NETLINK_CB(skb).pid, MSG_DONTWAIT);
-	if (err < 0)
 		goto free;
 
-	return err;
+	ip_conntrack_expect_put(exp);
 
+	return netlink_unicast(ctnl, skb2, NETLINK_CB(skb).pid, MSG_DONTWAIT);
+
+free:
+	kfree_skb(skb2);
 out:
 	ip_conntrack_expect_put(exp);
-free:
-	if (skb2)
-		kfree_skb(skb2);
 	return err;
 }
 
@@ -1351,6 +1366,9 @@ ctnetlink_del_expect(struct sock *ctnl, struct sk_buff *skb,
 	struct ip_conntrack_tuple tuple;
 	struct ip_conntrack_helper *h;
 	int err;
+
+	if (nfattr_bad_size(cda, CTA_EXPECT_MAX, cta_min_exp))
+		return -EINVAL;
 
 	if (cda[CTA_EXPECT_TUPLE-1]) {
 		/* delete a single expect by tuple */
@@ -1395,7 +1413,7 @@ ctnetlink_del_expect(struct sock *ctnl, struct sk_buff *skb,
 				ip_conntrack_expect_put(exp);
 			}
 		}
-		write_unlock(&ip_conntrack_lock);
+		write_unlock_bh(&ip_conntrack_lock);
 	} else {
 		/* This basically means we have to flush everything*/
 		write_lock_bh(&ip_conntrack_lock);
@@ -1481,6 +1499,9 @@ ctnetlink_new_expect(struct sock *ctnl, struct sk_buff *skb,
 
 	DEBUGP("entered %s\n", __FUNCTION__);	
 
+	if (nfattr_bad_size(cda, CTA_EXPECT_MAX, cta_min_exp))
+		return -EINVAL;
+
 	if (!cda[CTA_EXPECT_TUPLE-1]
 	    || !cda[CTA_EXPECT_MASK-1]
 	    || !cda[CTA_EXPECT_MASTER-1])
@@ -1523,29 +1544,22 @@ static struct notifier_block ctnl_notifier_exp = {
 
 static struct nfnl_callback ctnl_cb[IPCTNL_MSG_MAX] = {
 	[IPCTNL_MSG_CT_NEW]		= { .call = ctnetlink_new_conntrack,
-					    .attr_count = CTA_MAX,
-					    .cap_required = CAP_NET_ADMIN },
+					    .attr_count = CTA_MAX, },
 	[IPCTNL_MSG_CT_GET] 		= { .call = ctnetlink_get_conntrack,
-					    .attr_count = CTA_MAX,
-					    .cap_required = CAP_NET_ADMIN },
+					    .attr_count = CTA_MAX, },
 	[IPCTNL_MSG_CT_DELETE]  	= { .call = ctnetlink_del_conntrack,
-					    .attr_count = CTA_MAX,
-					    .cap_required = CAP_NET_ADMIN },
+					    .attr_count = CTA_MAX, },
 	[IPCTNL_MSG_CT_GET_CTRZERO] 	= { .call = ctnetlink_get_conntrack,
-					    .attr_count = CTA_MAX,
-					    .cap_required = CAP_NET_ADMIN },
+					    .attr_count = CTA_MAX, },
 };
 
 static struct nfnl_callback ctnl_exp_cb[IPCTNL_MSG_EXP_MAX] = {
 	[IPCTNL_MSG_EXP_GET]		= { .call = ctnetlink_get_expect,
-					    .attr_count = CTA_EXPECT_MAX,
-					    .cap_required = CAP_NET_ADMIN },
+					    .attr_count = CTA_EXPECT_MAX, },
 	[IPCTNL_MSG_EXP_NEW]		= { .call = ctnetlink_new_expect,
-					    .attr_count = CTA_EXPECT_MAX,
-					    .cap_required = CAP_NET_ADMIN },
+					    .attr_count = CTA_EXPECT_MAX, },
 	[IPCTNL_MSG_EXP_DELETE]		= { .call = ctnetlink_del_expect,
-					    .attr_count = CTA_EXPECT_MAX,
-					    .cap_required = CAP_NET_ADMIN },
+					    .attr_count = CTA_EXPECT_MAX, },
 };
 
 static struct nfnetlink_subsystem ctnl_subsys = {
@@ -1561,6 +1575,8 @@ static struct nfnetlink_subsystem ctnl_exp_subsys = {
 	.cb_count			= IPCTNL_MSG_EXP_MAX,
 	.cb				= ctnl_exp_cb,
 };
+
+MODULE_ALIAS_NFNL_SUBSYS(NFNL_SUBSYS_CTNETLINK);
 
 static int __init ctnetlink_init(void)
 {

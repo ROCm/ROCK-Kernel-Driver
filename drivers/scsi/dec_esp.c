@@ -133,7 +133,7 @@ static struct scsi_host_template driver_template = {
 #include "scsi_module.c"
 
 /***************************************************************** Detection */
-static int dec_esp_detect(Scsi_Host_Template * tpnt)
+static int dec_esp_detect(struct scsi_host_template * tpnt)
 {
 	struct NCR_ESP *esp;
 	struct ConfigDev *esp_dev;
@@ -230,7 +230,7 @@ static int dec_esp_detect(Scsi_Host_Template * tpnt)
 			mem_start = get_tc_base_addr(slot);
 
 			/* Store base addr into esp struct */
-			esp->slot = PHYSADDR(mem_start);
+			esp->slot = CPHYSADDR(mem_start);
 
 			esp->dregs = 0;
 			esp->eregs = (void *)CKSEG1ADDR(mem_start +

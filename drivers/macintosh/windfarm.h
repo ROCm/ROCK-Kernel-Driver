@@ -1,3 +1,12 @@
+/*
+ * Windfarm PowerMac thermal control.
+ *
+ * (c) Copyright 2005 Benjamin Herrenschmidt, IBM Corp.
+ *                    <benh@kernel.crashing.org>
+ *
+ * Released under the term of the GNU GPL v2.
+ */
+
 #ifndef __WINDFARM_H__
 #define __WINDFARM_H__
 
@@ -21,7 +30,7 @@ struct wf_control_ops {
 	s32			(*get_min)(struct wf_control *ct);
 	s32			(*get_max)(struct wf_control *ct);
 	void			(*release)(struct wf_control *ct);
-        struct module           *owner;
+	struct module		*owner;
 };
 
 struct wf_control {
@@ -70,7 +79,7 @@ struct wf_sensor;
 struct wf_sensor_ops {
 	int			(*get_value)(struct wf_sensor *sr, s32 *val);
 	void			(*release)(struct wf_sensor *sr);
-        struct module           *owner;
+	struct module		*owner;
 };
 
 struct wf_sensor {

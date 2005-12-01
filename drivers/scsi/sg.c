@@ -49,6 +49,7 @@ static int sg_version_num = 30533;	/* 2 digits for each component */
 #include <linux/seq_file.h>
 #include <linux/blkdev.h>
 #include <linux/delay.h>
+#include <linux/scatterlist.h>
 
 #include "scsi.h"
 #include <scsi/scsi_dbg.h>
@@ -66,10 +67,6 @@ static char *sg_version_date = "20050908";
 static int sg_proc_init(void);
 static void sg_proc_cleanup(void);
 #endif
-
-#ifndef LINUX_VERSION_CODE
-#include <linux/version.h>
-#endif				/* LINUX_VERSION_CODE */
 
 #define SG_ALLOW_DIO_DEF 0
 #define SG_ALLOW_DIO_CODE /* compile out by commenting this define */
@@ -475,8 +472,7 @@ sg_read(struct file *filp, char __user *buf, size_t count, loff_t * ppos)
 	sg_finish_rem_req(srp);
 	retval = count;
 free_old_hdr:
-	if (old_hdr)
-		kfree(old_hdr);
+	kfree(old_hdr);
 	return retval;
 }
 
@@ -1702,10 +1698,8 @@ exit_sg(void)
 	sg_sysfs_valid = 0;
 	unregister_chrdev_region(MKDEV(SCSI_GENERIC_MAJOR, 0),
 				 SG_MAX_DEVS);
-	if (sg_dev_arr != NULL) {
-		kfree((char *) sg_dev_arr);
-		sg_dev_arr = NULL;
-	}
+	kfree((char *)sg_dev_arr);
+	sg_dev_arr = NULL;
 	sg_dev_max = 0;
 }
 
@@ -1882,13 +1876,17 @@ st_unmap_user_pages(struct scatterlist *sgl, const unsigned int nr_pages,
 	int i;
 
 	for (i=0; i < nr_pages; i++) {
-		if (dirtied && !PageReserved(sgl[i].page))
-			SetPageDirty(sgl[i].page);
-		/* unlock_page(sgl[i].page); */
+		struct page *page = sgl[i].page;
+
+		/* XXX: just for debug. Remove when PageReserved is removed */
+		BUG_ON(PageReserved(page));
+		if (dirtied)
+			SetPageDirty(page);
+		/* unlock_page(page); */
 		/* FIXME: cache flush missing for rw==READ
 		 * FIXME: call the correct reference counting function
 		 */
-		page_cache_release(sgl[i].page);
+		page_cache_release(page);
 	}
 
 	return 0;
@@ -1988,9 +1986,7 @@ sg_build_indirect(Sg_scatter_hold * schp, Sg_fd * sfp, int buff_size)
 				if (!p)
 					break;
 			}
-			sclp->page = virt_to_page(p);
-			sclp->offset = offset_in_page(p);
-			sclp->length = ret_sz;
+			sg_set_buf(sclp, p, ret_sz);
 
 			SCSI_LOG_TIMEOUT(5, printk("sg_build_build: k=%d, a=0x%p, len=%d\n",
 					  k, sg_scatg2virt(sclp), ret_sz));
@@ -2640,7 +2636,7 @@ static char *
 sg_page_malloc(int rqSz, int lowDma, int *retSzp)
 {
 	char *resp = NULL;
-	int page_mask;
+	gfp_t page_mask;
 	int order, a_size;
 	int resSz = rqSz;
 

@@ -1089,8 +1089,8 @@ static void ide_device_shutdown(struct device *dev)
 }
 
 static ide_driver_t idedisk_driver = {
-	.owner			= THIS_MODULE,
 	.gen_driver = {
+		.owner		= THIS_MODULE,
 		.name		= "ide-disk",
 		.bus		= &ide_bus_type,
 		.probe		= ide_disk_probe,
@@ -1219,7 +1219,7 @@ static int ide_disk_probe(struct device *dev)
 	if (drive->media != ide_disk)
 		goto failed;
 
-	idkp = kmalloc(sizeof(*idkp), GFP_KERNEL);
+	idkp = kzalloc(sizeof(*idkp), GFP_KERNEL);
 	if (!idkp)
 		goto failed;
 
@@ -1231,8 +1231,6 @@ static int ide_disk_probe(struct device *dev)
 	ide_init_disk(g, drive);
 
 	ide_register_subdriver(drive, &idedisk_driver);
-
-	memset(idkp, 0, sizeof(*idkp));
 
 	kref_init(&idkp->kref);
 
@@ -1272,7 +1270,7 @@ static void __exit idedisk_exit (void)
 	driver_unregister(&idedisk_driver.gen_driver);
 }
 
-static int idedisk_init (void)
+static int __init idedisk_init(void)
 {
 	return driver_register(&idedisk_driver.gen_driver);
 }

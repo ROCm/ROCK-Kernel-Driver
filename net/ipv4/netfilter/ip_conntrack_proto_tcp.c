@@ -99,7 +99,7 @@ unsigned long ip_ct_tcp_timeout_close =        10 SECS;
    to ~13-30min depending on RTO. */
 unsigned long ip_ct_tcp_timeout_max_retrans =     5 MINS;
  
-static unsigned long * tcp_timeouts[]
+static const unsigned long * tcp_timeouts[]
 = { NULL,                              /*      TCP_CONNTRACK_NONE */
     &ip_ct_tcp_timeout_syn_sent,       /*      TCP_CONNTRACK_SYN_SENT, */
     &ip_ct_tcp_timeout_syn_recv,       /*      TCP_CONNTRACK_SYN_RECV, */
@@ -170,7 +170,7 @@ enum tcp_bit_set {
  *	if they are invalid
  *	or we do not support the request (simultaneous open)
  */
-static enum tcp_conntrack tcp_conntracks[2][6][TCP_CONNTRACK_MAX] = {
+static const enum tcp_conntrack tcp_conntracks[2][6][TCP_CONNTRACK_MAX] = {
 	{
 /* ORIGINAL */
 /* 	     sNO, sSS, sSR, sES, sFW, sCW, sLA, sTW, sCL, sLI	*/
@@ -357,6 +357,10 @@ nfattr_failure:
 	return -1;
 }
 
+static const size_t cta_min_tcp[CTA_PROTOINFO_TCP_MAX] = {
+	[CTA_PROTOINFO_TCP_STATE-1]	= sizeof(u_int8_t),
+};
+
 static int nfattr_to_tcp(struct nfattr *cda[], struct ip_conntrack *ct)
 {
 	struct nfattr *attr = cda[CTA_PROTOINFO_TCP-1];
@@ -367,8 +371,10 @@ static int nfattr_to_tcp(struct nfattr *cda[], struct ip_conntrack *ct)
 	if (!attr)
 		return 0;
 
-        if (nfattr_parse_nested(tb, CTA_PROTOINFO_TCP_MAX, attr) < 0)
-                goto nfattr_failure;
+        nfattr_parse_nested(tb, CTA_PROTOINFO_TCP_MAX, attr);
+
+	if (nfattr_bad_size(tb, CTA_PROTOINFO_TCP_MAX, cta_min_tcp))
+		return -EINVAL;
 
 	if (!tb[CTA_PROTOINFO_TCP_STATE-1])
 		return -EINVAL;
@@ -379,9 +385,6 @@ static int nfattr_to_tcp(struct nfattr *cda[], struct ip_conntrack *ct)
 	write_unlock_bh(&tcp_lock);
 
 	return 0;
-
-nfattr_failure:
-	return -1;
 }
 #endif
 
@@ -814,7 +817,7 @@ void ip_conntrack_tcp_update(struct sk_buff *skb,
 #define	TH_CWR	0x80
 
 /* table of valid flag combinations - ECE and CWR are always valid */
-static u8 tcp_valid_flags[(TH_FIN|TH_SYN|TH_RST|TH_PUSH|TH_ACK|TH_URG) + 1] =
+static const u8 tcp_valid_flags[(TH_FIN|TH_SYN|TH_RST|TH_PUSH|TH_ACK|TH_URG) + 1] =
 {
 	[TH_SYN]			= 1,
 	[TH_SYN|TH_ACK]			= 1,

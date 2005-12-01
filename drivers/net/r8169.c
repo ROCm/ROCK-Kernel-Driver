@@ -1027,6 +1027,7 @@ static struct ethtool_ops rtl8169_ethtool_ops = {
 	.get_strings		= rtl8169_get_strings,
 	.get_stats_count	= rtl8169_get_stats_count,
 	.get_ethtool_stats	= rtl8169_get_ethtool_stats,
+	.get_perm_addr		= ethtool_op_get_perm_addr,
 };
 
 static void rtl8169_write_gmii_reg_bit(void __iomem *ioaddr, int reg, int bitnum,
@@ -1345,10 +1346,8 @@ rtl8169_init_board(struct pci_dev *pdev, struct net_device **dev_out,
 	} else {
 		if (netif_msg_probe(tp)) {
 			printk(KERN_ERR PFX
-			       "Cannot find PowerManagement capability. "
-			       "Aborting.\n");
+			       "PowerManagement capability not found.\n");
 		}
-		goto err_out_mwi;
 	}
 
 	/* make sure PCI base addr 1 is MMIO */
@@ -1511,6 +1510,7 @@ rtl8169_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	/* Get MAC address.  FIXME: read EEPROM */
 	for (i = 0; i < MAC_ADDR_LEN; i++)
 		dev->dev_addr[i] = RTL_R8(MAC0 + i);
+	memcpy(dev->perm_addr, dev->dev_addr, dev->addr_len);
 
 	dev->open = rtl8169_open;
 	dev->hard_start_xmit = rtl8169_start_xmit;
@@ -2514,7 +2514,7 @@ rtl8169_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 	} while (boguscnt > 0);
 
 	if (boguscnt <= 0) {
-		if (net_ratelimit() && netif_msg_intr(tp)) {
+		if (netif_msg_intr(tp) && net_ratelimit() ) {
 			printk(KERN_WARNING
 			       "%s: Too much work at interrupt!\n", dev->name);
 		}

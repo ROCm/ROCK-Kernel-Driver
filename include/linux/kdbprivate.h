@@ -409,7 +409,12 @@ extern void kdb_ps1(const struct task_struct *p);
 extern int kdb_parse(const char *cmdstr, struct pt_regs *regs);
 extern void kdb_print_nameval(const char *name, unsigned long val);
 extern void kdb_send_sig_info(struct task_struct *p, struct siginfo *info, int seqno);
+#ifdef CONFIG_SWAP
 extern void kdb_si_swapinfo(struct sysinfo *);
+#else
+#include <linux/swap.h>
+#define kdb_si_swapinfo(x) si_swapinfo(x)
+#endif
 extern void kdb_meminfo_read_proc(void);
 #ifdef	CONFIG_HUGETLB_PAGE
 extern void kdb_hugetlb_report_meminfo(void);

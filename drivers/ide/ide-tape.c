@@ -4748,8 +4748,8 @@ static ide_proc_entry_t idetape_proc[] = {
 static int ide_tape_probe(struct device *);
 
 static ide_driver_t idetape_driver = {
-	.owner			= THIS_MODULE,
 	.gen_driver = {
+		.owner		= THIS_MODULE,
 		.name		= "ide-tape",
 		.bus		= &ide_bus_type,
 		.probe		= ide_tape_probe,
@@ -4850,7 +4850,7 @@ static int ide_tape_probe(struct device *dev)
 		printk(KERN_WARNING "ide-tape: Use drive %s with ide-scsi emulation and osst.\n", drive->name);
 		printk(KERN_WARNING "ide-tape: OnStream support will be removed soon from ide-tape!\n");
 	}
-	tape = (idetape_tape_t *) kmalloc (sizeof (idetape_tape_t), GFP_KERNEL);
+	tape = (idetape_tape_t *) kzalloc (sizeof (idetape_tape_t), GFP_KERNEL);
 	if (tape == NULL) {
 		printk(KERN_ERR "ide-tape: %s: Can't allocate a tape structure\n", drive->name);
 		goto failed;
@@ -4863,8 +4863,6 @@ static int ide_tape_probe(struct device *dev)
 	ide_init_disk(g, drive);
 
 	ide_register_subdriver(drive, &idetape_driver);
-
-	memset(tape, 0, sizeof(*tape));
 
 	kref_init(&tape->kref);
 
@@ -4918,10 +4916,7 @@ static void __exit idetape_exit (void)
 	unregister_chrdev(IDETAPE_MAJOR, "ht");
 }
 
-/*
- *	idetape_init will register the driver for each tape.
- */
-static int idetape_init (void)
+static int __init idetape_init(void)
 {
 	int error = 1;
 	idetape_sysfs_class = class_create(THIS_MODULE, "ide_tape");
