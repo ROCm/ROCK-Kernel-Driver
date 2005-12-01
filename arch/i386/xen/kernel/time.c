@@ -218,7 +218,8 @@ int read_current_timer(unsigned long *timer_val)
 void init_cpu_khz(void)
 {
 	u64 __cpu_khz = 1000000ULL << 32;
-	struct vcpu_time_info *info = &HYPERVISOR_shared_info->vcpu_time[0];
+	struct vcpu_time_info *info;
+	info = &HYPERVISOR_shared_info->vcpu_info[0].time;
 	do_div(__cpu_khz, info->tsc_to_system_mul);
 	if ( info->tsc_shift < 0 )
 		cpu_khz = __cpu_khz << -info->tsc_shift;
@@ -295,7 +296,7 @@ static void get_time_values_from_xen(void)
 	struct vcpu_time_info   *src;
 	struct shadow_time_info *dst;
 
-	src = &s->vcpu_time[smp_processor_id()];
+	src = &s->vcpu_info[smp_processor_id()].time;
 	dst = &per_cpu(shadow_time, smp_processor_id());
 
 	do {
@@ -317,7 +318,7 @@ static inline int time_values_up_to_date(int cpu)
 	struct vcpu_time_info   *src;
 	struct shadow_time_info *dst;
 
-	src = &HYPERVISOR_shared_info->vcpu_time[cpu]; 
+	src = &HYPERVISOR_shared_info->vcpu_info[cpu].time;
 	dst = &per_cpu(shadow_time, cpu); 
 
 	return (dst->version == src->version);

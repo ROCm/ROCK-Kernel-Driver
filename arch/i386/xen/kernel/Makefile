@@ -9,7 +9,7 @@ extra-y := head.o init_task.o ../../kernel/vmlinux.lds
 
 obj-y	:= process.o entry.o traps.o \
 		time.o ioport.o ldt.o setup.o \
-		pci-dma.o irq.o quirks.o
+		pci-dma.o irq.o quirks.o fixup.o
 
 c-obj-y	:= semaphore.o signal.o vm86.o \
 		ptrace.o sys_i386.o \
@@ -41,7 +41,7 @@ obj-y				+= vsyscall.o
 c-obj-$(CONFIG_ACPI_SRAT) 	+= srat.o
 c-obj-$(CONFIG_HPET_TIMER) 	+= time_hpet.o
 c-obj-$(CONFIG_EFI) 		+= efi.o efi_stub.o
-c-obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
+obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
 c-obj-$(CONFIG_SMP_ALTERNATIVES)+= smpalts.o
 obj-$(CONFIG_SWIOTLB)		+= swiotlb.o
 

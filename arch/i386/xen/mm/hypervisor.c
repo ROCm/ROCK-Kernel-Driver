@@ -37,16 +37,10 @@
 #include <asm-xen/balloon.h>
 #include <asm-xen/xen-public/memory.h>
 #include <linux/module.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 #include <linux/percpu.h>
 #include <asm/tlbflush.h>
-#endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-#define pte_offset_kernel pte_offset
-#define pud_t pgd_t
-#define pud_offset(d, va) d
-#elif defined(CONFIG_X86_64)
+#ifdef CONFIG_X86_64
 #define pmd_val_ma(v) (v).pmd
 #else
 #ifdef CONFIG_X86_PAE
@@ -314,7 +308,8 @@ static void contiguous_bitmap_clear(
 }
 
 /* Ensure multi-page extents are contiguous in machine memory. */
-void xen_create_contiguous_region(unsigned long vstart, unsigned int order)
+int xen_create_contiguous_region(
+	unsigned long vstart, unsigned int order, unsigned int address_bits)
 {
 	pgd_t         *pgd; 
 	pud_t         *pud; 
@@ -341,17 +336,18 @@ void xen_create_contiguous_region(unsigned long vstart, unsigned int order)
 		mfn = pte_mfn(*pte);
 		BUG_ON(HYPERVISOR_update_va_mapping(
 			vstart + (i*PAGE_SIZE), __pte_ma(0), 0));
-		phys_to_machine_mapping[(__pa(vstart)>>PAGE_SHIFT)+i] =
-			INVALID_P2M_ENTRY;
+		set_phys_to_machine((__pa(vstart)>>PAGE_SHIFT)+i,
+			INVALID_P2M_ENTRY);
 		BUG_ON(HYPERVISOR_memory_op(
 			XENMEM_decrease_reservation, &reservation) != 1);
 	}
 
 	/* 2. Get a new contiguous memory extent. */
 	reservation.extent_order = order;
-	reservation.address_bits = 31; /* aacraid limitation */
-	BUG_ON(HYPERVISOR_memory_op(
-		XENMEM_increase_reservation, &reservation) != 1);
+	reservation.address_bits = address_bits;
+	if (HYPERVISOR_memory_op(XENMEM_increase_reservation,
+				 &reservation) != 1)
+		goto fail;
 
 	/* 3. Map the new extent in place of old pages. */
 	for (i = 0; i < (1<<order); i++) {
@@ -359,7 +355,7 @@ void xen_create_contiguous_region(unsigned long vstart, unsigned int order)
 			vstart + (i*PAGE_SIZE),
 			pfn_pte_ma(mfn+i, PAGE_KERNEL), 0));
 		xen_machphys_update(mfn+i, (__pa(vstart)>>PAGE_SHIFT)+i);
-		phys_to_machine_mapping[(__pa(vstart)>>PAGE_SHIFT)+i] = mfn+i;
+		set_phys_to_machine((__pa(vstart)>>PAGE_SHIFT)+i, mfn+i);
 	}
 
 	flush_tlb_all();
@@ -367,6 +363,28 @@ void xen_create_contiguous_region(unsigned long vstart, unsigned int order)
 	contiguous_bitmap_set(__pa(vstart) >> PAGE_SHIFT, 1UL << order);
 
 	balloon_unlock(flags);
+
+	return 0;
+
+ fail:
+	reservation.extent_order = 0;
+	reservation.address_bits = 0;
+
+	for (i = 0; i < (1<<order); i++) {
+		BUG_ON(HYPERVISOR_memory_op(
+			XENMEM_increase_reservation, &reservation) != 1);
+		BUG_ON(HYPERVISOR_update_va_mapping(
+			vstart + (i*PAGE_SIZE),
+			pfn_pte_ma(mfn, PAGE_KERNEL), 0));
+		xen_machphys_update(mfn, (__pa(vstart)>>PAGE_SHIFT)+i);
+		set_phys_to_machine((__pa(vstart)>>PAGE_SHIFT)+i, mfn);
+	}
+
+	flush_tlb_all();
+
+	balloon_unlock(flags);
+
+	return -ENOMEM;
 }
 
 void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
@@ -398,8 +416,8 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 		mfn = pte_mfn(*pte);
 		BUG_ON(HYPERVISOR_update_va_mapping(
 			vstart + (i*PAGE_SIZE), __pte_ma(0), 0));
-		phys_to_machine_mapping[(__pa(vstart)>>PAGE_SHIFT)+i] =
-			INVALID_P2M_ENTRY;
+		set_phys_to_machine((__pa(vstart)>>PAGE_SHIFT)+i,
+			INVALID_P2M_ENTRY);
 		BUG_ON(HYPERVISOR_memory_op(
 			XENMEM_decrease_reservation, &reservation) != 1);
 	}
@@ -412,7 +430,7 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 			vstart + (i*PAGE_SIZE),
 			pfn_pte_ma(mfn, PAGE_KERNEL), 0));
 		xen_machphys_update(mfn, (__pa(vstart)>>PAGE_SHIFT)+i);
-		phys_to_machine_mapping[(__pa(vstart)>>PAGE_SHIFT)+i] = mfn;
+		set_phys_to_machine((__pa(vstart)>>PAGE_SHIFT)+i, mfn);
 	}
 
 	flush_tlb_all();

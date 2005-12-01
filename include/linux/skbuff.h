@@ -1035,7 +1035,7 @@ static inline struct sk_buff *__dev_alloc_skb(unsigned int length,
 	return skb;
 }
 #else
-extern struct sk_buff *__dev_alloc_skb(unsigned int length, int gfp_mask);
+extern struct sk_buff *__dev_alloc_skb(unsigned int length, gfp_t gfp_mask);
 #endif
 
 /**

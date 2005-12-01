@@ -113,14 +113,11 @@ struct blk_shadow {
 struct blkfront_info
 {
 	struct xenbus_device *xbdev;
-	/* We watch the backend */
-	struct xenbus_watch watch;
 	dev_t dev;
+ 	struct gendisk *gd;
 	int vdevice;
 	blkif_vdev_t handle;
 	int connected;
-	char *backend;
-	int backend_id;
 	int ring_ref;
 	blkif_front_ring_t ring;
 	unsigned int evtchn, irq;
@@ -130,6 +127,12 @@ struct blkfront_info
 	struct gnttab_free_callback callback;
 	struct blk_shadow shadow[BLK_RING_SIZE];
 	unsigned long shadow_free;
+
+	/**
+	 * The number of people holding this device open.  We won't allow a
+	 * hot-unplug unless this is 0.
+	 */
+	int users;
 };
 
 extern spinlock_t blkif_io_lock;

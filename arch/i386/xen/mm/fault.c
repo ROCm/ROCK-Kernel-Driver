@@ -221,6 +221,7 @@ fastcall void do_invalid_op(struct pt_regs *, unsigned long);
 static void dump_fault_path(unsigned long address)
 {
 	unsigned long *p, page;
+	unsigned long mfn; 
 
 	preempt_disable();
 	page = __pa(per_cpu(cur_pgd, smp_processor_id()));
@@ -230,20 +231,22 @@ static void dump_fault_path(unsigned long address)
 	p += (address >> 30) * 2;
 	printk(KERN_ALERT "%08lx -> *pde = %08lx:%08lx\n", page, p[1], p[0]);
 	if (p[0] & 1) {
-		page = p[0] & PAGE_MASK;
-		address &= 0x3fffffff;
-		page = machine_to_phys(page);
+		mfn  = (p[0] >> PAGE_SHIFT) | ((p[1] & 0x7) << 20); 
+		page = mfn_to_pfn(mfn) << PAGE_SHIFT; 
 		p  = (unsigned long *)__va(page);
+		address &= 0x3fffffff;
 		p += (address >> 21) * 2;
-		printk(KERN_ALERT "%08lx -> *pme = %08lx:%08lx\n", page, p[1], p[0]);
+		printk(KERN_ALERT "%08lx -> *pme = %08lx:%08lx\n", 
+		       page, p[1], p[0]);
 #ifndef CONFIG_HIGHPTE
 		if (p[0] & 1) {
-			page = p[0] & PAGE_MASK;
-			address &= 0x001fffff;
-			page = machine_to_phys(page);
+			mfn  = (p[0] >> PAGE_SHIFT) | ((p[1] & 0x7) << 20); 
+			page = mfn_to_pfn(mfn) << PAGE_SHIFT; 
 			p  = (unsigned long *) __va(page);
+			address &= 0x001fffff;
 			p += (address >> 12) * 2;
-			printk(KERN_ALERT "%08lx -> *pte = %08lx:%08lx\n", page, p[1], p[0]);
+			printk(KERN_ALERT "%08lx -> *pte = %08lx:%08lx\n",
+			       page, p[1], p[0]);
 		}
 #endif
 	}
@@ -293,13 +296,16 @@ static void dump_fault_path(unsigned long address)
  *	bit 2 == 0 means kernel, 1 means user-mode
  */
 fastcall void __kprobes do_page_fault(struct pt_regs *regs,
-				      unsigned long error_code,
-				      unsigned long address)
+				      unsigned long error_code)
 {
 	struct task_struct *tsk;
 	struct mm_struct *mm;
 	struct vm_area_struct * vma;
+	unsigned long address;
 	int write, si_code;
+
+	address = HYPERVISOR_shared_info->vcpu_info[
+		smp_processor_id()].arch.cr2;
 
 	/* Set the "privileged fault" bit to something sane. */
 	error_code &= ~4;
@@ -310,11 +316,9 @@ fastcall void __kprobes do_page_fault(struct pt_regs *regs,
 	if (notify_die(DIE_PAGE_FAULT, "page fault", regs, error_code, 14,
 					SIGSEGV) == NOTIFY_STOP)
 		return;
-#if 0
 	/* It's safe to allow irq's after cr2 has been saved */
 	if (regs->eflags & (X86_EFLAGS_IF|VM_MASK))
 		local_irq_enable();
-#endif
 
 	tsk = current;
 

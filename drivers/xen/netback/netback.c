@@ -99,29 +99,6 @@ static unsigned long alloc_mfn(void)
 	return mfn;
 }
 
-#if 0
-static void free_mfn(unsigned long mfn)
-{
-	unsigned long flags;
-	struct xen_memory_reservation reservation = {
-		.extent_start = &mfn,
-		.nr_extents   = 1,
-		.extent_order = 0,
-		.domid        = DOMID_SELF
-	};
-	spin_lock_irqsave(&mfn_lock, flags);
-	if ( alloc_index != MAX_MFN_ALLOC )
-		mfn_list[alloc_index++] = mfn;
-	else {
-		int ret;
-		ret = HYPERVISOR_memory_op(XENMEM_decrease_reservation,
-					    &reservation);
-		BUG_ON(ret != 1);
-	}
-	spin_unlock_irqrestore(&mfn_lock, flags);
-}
-#endif
-
 static inline void maybe_schedule_tx_action(void)
 {
 	smp_mb();
@@ -248,8 +225,7 @@ static void net_rx_action(unsigned long unused)
 		 * Set the new P2M table entry before reassigning the old data
 		 * page. Heed the comment in pgtable-2level.h:pte_page(). :-)
 		 */
-		phys_to_machine_mapping[__pa(skb->data) >> PAGE_SHIFT] =
-			new_mfn;
+		set_phys_to_machine(__pa(skb->data) >> PAGE_SHIFT, new_mfn);
 
 		MULTI_update_va_mapping(mcl, vdata,
 					pfn_pte_ma(new_mfn, PAGE_KERNEL), 0);
@@ -288,28 +264,19 @@ static void net_rx_action(unsigned long unused)
 	ret = HYPERVISOR_multicall(rx_mcl, mcl - rx_mcl);
 	BUG_ON(ret != 0);
 
-	mcl = rx_mcl;
-	if( HYPERVISOR_grant_table_op(GNTTABOP_transfer, grant_rx_op, 
-				      gop - grant_rx_op)) { 
-		/*
-		 * The other side has given us a bad grant ref, or has no 
-		 * headroom, or has gone away. Unfortunately the current grant
-		 * table code doesn't inform us which is the case, so not much
-		 * we can do. 
-		 */
-		DPRINTK("net_rx: transfer to DOM%u failed; dropping (up to) "
-			"%d packets.\n",
-			grant_rx_op[0].domid, gop - grant_rx_op); 
-	}
-	gop = grant_rx_op;
+	ret = HYPERVISOR_grant_table_op(GNTTABOP_transfer, grant_rx_op, 
+					gop - grant_rx_op);
+	BUG_ON(ret != 0);
 
+	mcl = rx_mcl;
+	gop = grant_rx_op;
 	while ((skb = __skb_dequeue(&rxq)) != NULL) {
 		netif   = netdev_priv(skb->dev);
 		size    = skb->tail - skb->data;
 
 		/* Rederive the machine addresses. */
-		new_mfn = mcl[0].args[1] >> PAGE_SHIFT;
-		old_mfn = 0; /* XXX Fix this so we can free_mfn() on error! */
+		new_mfn = mcl->args[1] >> PAGE_SHIFT;
+		old_mfn = gop->mfn;
 		atomic_set(&(skb_shinfo(skb)->dataref), 1);
 		skb_shinfo(skb)->nr_frags = 0;
 		skb_shinfo(skb)->frag_list = NULL;
@@ -318,14 +285,18 @@ static void net_rx_action(unsigned long unused)
 		netif->stats.tx_packets++;
 
 		/* The update_va_mapping() must not fail. */
-		BUG_ON(mcl[0].result != 0);
+		BUG_ON(mcl->result != 0);
 
 		/* Check the reassignment error code. */
 		status = NETIF_RSP_OKAY;
-		if(gop->status != 0) { 
+		if (gop->status != 0) { 
 			DPRINTK("Bad status %d from grant transfer to DOM%u\n",
 				gop->status, netif->domid);
-			/* XXX SMH: should free 'old_mfn' here */
+			/*
+                         * Page no longer belongs to us unless GNTST_bad_page,
+                         * but that should be a fatal error anyway.
+                         */
+			BUG_ON(gop->status == GNTST_bad_page);
 			status = NETIF_RSP_ERROR; 
 		}
 		irq = netif->irq;
@@ -631,9 +602,9 @@ static void net_tx_action(unsigned long unused)
 				pending_idx;
 			continue;
 		}
-		phys_to_machine_mapping[
-			__pa(MMAP_VADDR(pending_idx)) >> PAGE_SHIFT] =
-			FOREIGN_FRAME(mop->dev_bus_addr >> PAGE_SHIFT);
+		set_phys_to_machine(
+			__pa(MMAP_VADDR(pending_idx)) >> PAGE_SHIFT,
+			FOREIGN_FRAME(mop->dev_bus_addr >> PAGE_SHIFT));
 		grant_tx_ref[pending_idx] = mop->handle;
 
 		data_len = (txreq.size > PKT_PROT_LEN) ?

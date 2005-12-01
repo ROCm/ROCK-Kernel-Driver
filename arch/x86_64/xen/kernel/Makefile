@@ -18,7 +18,7 @@ i386-obj-y			:= time.o
 s-obj-y	:=
 
 #obj-$(CONFIG_X86_MCE)         += mce.o
-obj-$(CONFIG_MTRR)		+= ../../../i386/kernel/cpu/mtrr/
+obj-$(CONFIG_MTRR)		+= ../../../i386/xen/kernel/cpu/mtrr/
 obj-$(CONFIG_ACPI)		+= acpi/
 c-obj-$(CONFIG_X86_MSR)		+= msr.o
 obj-$(CONFIG_MICROCODE)		+= microcode.o
@@ -50,10 +50,10 @@ bootflag-y			+= ../../../i386/kernel/bootflag.o
 cpuid-$(subst m,y,$(CONFIG_X86_CPUID))  += ../../../i386/kernel/cpuid.o
 topology-y                     += ../../../i386/mach-default/topology.o
 #swiotlb-$(CONFIG_SWIOTLB)      += ../../../ia64/lib/swiotlb.o
-microcode-$(subst m,y,$(CONFIG_MICROCODE))  += ../../../i386/kernel/microcode.o
+microcode-$(subst m,y,$(CONFIG_MICROCODE))  += ../../../i386/xen/kernel/microcode.o
 intel_cacheinfo-y		+= ../../../i386/kernel/cpu/intel_cacheinfo.o
-quirks-y			+= ../../../i386/kernel/quirks.o
-msr-$(subst m,y,$(CONFIG_X86_MSR))  += ../../i386/kernel/msr.o
+quirks-y			+= ../../../i386/xen/kernel/quirks.o
+msr-$(subst m,y,$(CONFIG_X86_MSR))  += ../../../i386/kernel/msr.o
 
 c-link	:= init_task.o
 s-link	:= vsyscall.o 

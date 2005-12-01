@@ -55,7 +55,7 @@ archdir := x86_64
 else
 archdir := x86_64/xen
 arch/x86_64/kernel/vmlinux.lds: arch/x86_64/kernel/vmlinux.lds.S
-CPPFLAGS := -D__KERNEL__ -Iinclude/asm/mach-xen -I$(objtree)/include2/asm/mach-xen $(LINUXINCLUDE)
+CPPFLAGS := -D__KERNEL__ -Iinclude$(if $(KBUILD_SRC),2)/asm/mach-xen $(LINUXINCLUDE)
 LDFLAGS_vmlinux := -e _start
 endif
 
@@ -80,6 +80,9 @@ all: vmlinuz
 
 vmlinuz: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $@
+
+install: vmlinuz
+	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(BOOTIMAGE) $@
 else
 all: bzImage
 

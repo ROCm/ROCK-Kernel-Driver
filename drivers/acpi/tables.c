@@ -572,7 +572,7 @@ static int __init acpi_table_get_sdt(struct acpi_table_rsdp *rsdp)
  * 
  * result: sdt_entry[] is initialized
  */
-#if CONFIG_XEN
+#if defined(CONFIG_X86_XEN) || defined(CONFIG_X86_64_XEN)
 #define acpi_rsdp_phys_to_va(rsdp_phys) (__fix_to_virt(FIX_ACPI_RSDP_PAGE) + \
 					   (rsdp_phys & ~PAGE_MASK))
 #else

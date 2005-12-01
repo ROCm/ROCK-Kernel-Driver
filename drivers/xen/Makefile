@@ -1,7 +1,9 @@
 
+obj-y	+= net_driver_util.o
 obj-y	+= util.o
 
 obj-y	+= core/
+obj-y	+= char/
 obj-y	+= console/
 obj-y	+= evtchn/
 obj-y	+= balloon/

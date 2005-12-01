@@ -377,9 +377,9 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 	for (i = 0; i < nseg; i++) {
 		if (likely(map[i].handle >= 0)) {
 			pending_handle(pending_idx, i) = map[i].handle;
-			phys_to_machine_mapping[__pa(MMAP_VADDR(
-				pending_idx, i)) >> PAGE_SHIFT] =
-				FOREIGN_FRAME(map[i].dev_bus_addr>>PAGE_SHIFT);
+			set_phys_to_machine(__pa(MMAP_VADDR(
+				pending_idx, i)) >> PAGE_SHIFT,
+				FOREIGN_FRAME(map[i].dev_bus_addr>>PAGE_SHIFT));
 			fas        = req->frame_and_sects[i];
 			seg[i].buf = map[i].dev_bus_addr | 
 				(blkif_first_sect(fas) << 9);
@@ -520,7 +520,7 @@ static int __init blkif_init(void)
 	spin_lock_init(&blkio_schedule_list_lock);
 	INIT_LIST_HEAD(&blkio_schedule_list);
 
-	ret = kernel_thread(blkio_schedule, 0, CLONE_FS | CLONE_FILES);
+	ret = kernel_thread(blkio_schedule, NULL, CLONE_FS | CLONE_FILES);
 	BUG_ON(ret < 0);
 
 	blkif_xenbus_init();

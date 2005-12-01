@@ -120,7 +120,7 @@ boot				:= arch/i386/xen/boot
 core				:= arch/i386/xen/kernel/ arch/i386/xen/mm/
 pci				:= arch/i386/xen/pci/
 arch/i386/kernel/vmlinux.lds: arch/i386/kernel/vmlinux.lds.S
-CPPFLAGS        := -D__KERNEL__ -Iinclude/asm-i386/mach-xen -I$(objtree)/include2/asm/mach-xen $(LINUXINCLUDE)
+CPPFLAGS        := -D__KERNEL__ -Iinclude$(if $(KBUILD_SRC),2)/asm/mach-xen $(LINUXINCLUDE)
 endif
 
 # generic subarchitecture

@@ -19,6 +19,12 @@ c-obj-$(CONFIG_IA32_AOUT) += ia32_aout.o
 $(obj)/syscall32_syscall.o: \
 	$(foreach F,int80 sysenter syscall,$(obj)/vsyscall-$F.so)
 
+# syscall32.c currently contains inline asm which has .incbin directives.
+# This defeats ccache's signature checks, and also breaks distcc.
+# Make sure neither ccache nor distcc compiles this file.
+#
+$(obj)/syscall32.o: override CC := env CCACHE_DISABLE=1 DISTCC_HOSTS=localhost $(CC)
+
 # Teach kbuild about targets
 targets := $(foreach F,int80 sysenter syscall,vsyscall-$F.o vsyscall-$F.so)
 
@@ -49,9 +55,9 @@ $(patsubst %.o,$(obj)/%.c,$(c-obj-y) $(c-link)) $(patsubst %.o,$(obj)/%.S,$(s-ob
 	@ln -fsn $(srctree)/arch/x86_64/ia32/$(notdir $@) $@
 
 $(obj)/vsyscall-int80.o $(obj)/vsyscall-sysenter.o $(obj)/vsyscall-syscall.o: \
-	$(obj)/vsyscall-sigreturn.S $(obj)/../../../i386/kernel/vsyscall-note.S
+	$(obj)/vsyscall-sigreturn.S $(obj)/../../../i386/xen/kernel/vsyscall-note.S
 
-$(obj)/../../../i386/kernel/vsyscall-note.S:
+$(obj)/../../../i386/xen/kernel/vsyscall-note.S:
 	@ln -fsn $(srctree)/arch/i386/kernel/$(notdir $@) $@
 
 obj-y	+= $(c-obj-y) $(s-obj-y)

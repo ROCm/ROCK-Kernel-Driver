@@ -121,8 +121,7 @@ static inline void xen_io_apic_write(unsigned int apic, unsigned int reg, unsign
 
 #define clear_IO_APIC() ((void)0)
 
-#endif /* !CONFIG_XEN */
-
+#else
 
 #ifdef CONFIG_SMP
 static void set_ioapic_affinity_irq(unsigned int irq, cpumask_t mask)
@@ -150,6 +149,8 @@ static void set_ioapic_affinity_irq(unsigned int irq, cpumask_t mask)
 	spin_unlock_irqrestore(&ioapic_lock, flags);
 }
 #endif
+
+#endif /* !CONFIG_XEN */
 
 /*
  * The common case is 1:1 IRQ<->pin mappings. Sometimes there are

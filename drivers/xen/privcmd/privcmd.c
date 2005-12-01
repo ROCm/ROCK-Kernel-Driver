@@ -32,24 +32,19 @@
 #include <asm-xen/xen-public/dom0_ops.h>
 #include <asm-xen/xen_proc.h>
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-#define pud_t pgd_t
-#define pud_offset(d, va) d
-#endif
-
 static struct proc_dir_entry *privcmd_intf;
 
 static int privcmd_ioctl(struct inode *inode, struct file *file,
                          unsigned int cmd, unsigned long data)
 {
 	int ret = -ENOSYS;
+	void __user *udata = (void __user *) data;
 
 	switch (cmd) {
 	case IOCTL_PRIVCMD_HYPERCALL: {
 		privcmd_hypercall_t hypercall;
   
-		if (copy_from_user(&hypercall, (void *)data,
-				   sizeof(hypercall)))
+		if (copy_from_user(&hypercall, udata, sizeof(hypercall)))
 			return -EFAULT;
 
 #if defined(__i386__)
@@ -102,10 +97,11 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 	case IOCTL_PRIVCMD_MMAP: {
 #define PRIVCMD_MMAP_SZ 32
 		privcmd_mmap_t mmapcmd;
-		privcmd_mmap_entry_t msg[PRIVCMD_MMAP_SZ], *p;
+		privcmd_mmap_entry_t msg[PRIVCMD_MMAP_SZ];
+		privcmd_mmap_entry_t __user *p;
 		int i, rc;
 
-		if (copy_from_user(&mmapcmd, (void *)data, sizeof(mmapcmd)))
+		if (copy_from_user(&mmapcmd, udata, sizeof(mmapcmd)))
 			return -EFAULT;
 
 		p = mmapcmd.entry;
@@ -151,11 +147,12 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 		mmu_update_t u;
 		privcmd_mmapbatch_t m;
 		struct vm_area_struct *vma = NULL;
-		unsigned long *p, addr;
-		unsigned long mfn, ptep;
+		unsigned long __user *p;
+		unsigned long addr, mfn; 
+		uint64_t ptep;
 		int i;
 
-		if (copy_from_user(&m, (void *)data, sizeof(m))) {
+		if (copy_from_user(&m, udata, sizeof(m))) {
 			ret = -EFAULT;
 			goto batch_err;
 		}
@@ -212,20 +209,6 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 		       ret, vma, m.addr, m.num, m.arr,
 		       vma ? vma->vm_start : 0, vma ? vma->vm_end : 0);
 		break;
-	}
-	break;
-#endif
-
-#ifndef __ia64__
-	case IOCTL_PRIVCMD_GET_MACH2PHYS_START_MFN: {
-		unsigned long m2pv = (unsigned long)machine_to_phys_mapping;
-		pgd_t *pgd = pgd_offset_k(m2pv);
-		pud_t *pud = pud_offset(pgd, m2pv);
-		pmd_t *pmd = pmd_offset(pud, m2pv);
-		unsigned long m2p_start_mfn =
-			(*(unsigned long *)pmd) >> PAGE_SHIFT; 
-		ret = put_user(m2p_start_mfn, (unsigned long *)data) ?
-			-EFAULT: 0;
 	}
 	break;
 #endif
