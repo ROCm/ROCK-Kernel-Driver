@@ -60,6 +60,7 @@ extern int smp_hw_index[];
 
 #else /* !(CONFIG_SMP) */
 
+static inline void cpu_die(void) { }
 #define get_hard_smp_processor_id(cpu) 0
 #define set_hard_smp_processor_id(cpu, phys)
 #define hard_smp_processor_id() 0
