@@ -3098,7 +3098,8 @@ static void deactivate_device(struct vdev *vdev)
 /*
  * Callback when a scsi_device gets added to the system
  */
-static int add_scsi_device(struct class_device *cdev)
+static int add_scsi_device(struct class_device *cdev, 
+			   struct class_interface *cl_intf)
 {
 	struct scsi_device *sdev = to_scsi_device(cdev->dev);
 	struct scsi_dev_node * sdevnode =
@@ -3120,7 +3121,8 @@ static int add_scsi_device(struct class_device *cdev)
 /*
  * Callback when a scsi_device gets removed from the system
  */
-static void rem_scsi_device(struct class_device *cdev)
+static void rem_scsi_device(struct class_device *cdev, 
+			    struct class_interface *cl_intf)
 {
 	struct scsi_dev_node *tmp_sdn;
 	struct scsi_device *sdev = to_scsi_device(cdev->dev);
@@ -3719,10 +3721,13 @@ static struct vio_device_id ibmvscsis_device_table[] __devinitdata = {
 MODULE_DEVICE_TABLE(vio, ibmvscsis_device_table);
 
 static struct vio_driver ibmvscsis_driver = {
-	.name = "ibmvscsis",
 	.id_table = ibmvscsis_device_table,
 	.probe = ibmvscsis_probe,
 	.remove = ibmvscsis_remove,
+        .driver = {
+		.name = "ibmvscsi",
+		.owner = THIS_MODULE,
+        },
 };
 
 static int mod_init(void)
