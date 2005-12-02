@@ -816,7 +816,6 @@ static struct of_device_id media_bay_match[] =
 	},
 	{},
 };
-MODULE_DEVICE_TABLE (of, media_bay_match);
 
 static struct macio_driver media_bay_driver =
 {

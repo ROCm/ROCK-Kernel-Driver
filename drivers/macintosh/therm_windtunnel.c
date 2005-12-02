@@ -467,7 +467,6 @@ static struct of_device_id therm_of_match[] = {{
 	.compatible	= "adm1030"
     }, {}
 };
-MODULE_DEVICE_TABLE (of, therm_of_match);
 
 static struct of_platform_driver therm_of_driver = {
 	.name		= "temperature",
