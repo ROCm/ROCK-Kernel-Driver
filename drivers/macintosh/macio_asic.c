@@ -133,10 +133,11 @@ static int macio_hotplug (struct device *dev, char **envp, int num_envp,
 {
 	struct macio_dev * macio_dev;
 	struct of_device * of;
-	char *scratch, *compat;
+	char *scratch, *compat, *compat2;
 	int i = 0;
+	int l;
 	int length = 0;
-	int cplen, seen = 0;
+	int cplen, cplen2, seen = 0;
 
 	if (!dev)
 		return -ENODEV;
@@ -170,8 +171,9 @@ static int macio_hotplug (struct device *dev, char **envp, int num_envp,
          * up using a number of environment variables instead. */
 
 	compat = (char *) get_property(of->node, "compatible", &cplen);
+	compat2 = compat;
+	cplen2= cplen;
 	while (compat && cplen > 0) {
-		int l;
                 envp[i++] = scratch;
 		length += scnprintf (scratch, buffer_size - length,
 		                     "OF_COMPATIBLE_%d=%s", seen, compat);
@@ -192,6 +194,26 @@ static int macio_hotplug (struct device *dev, char **envp, int num_envp,
 		return -ENOMEM;
 	++length;
 	scratch += length;
+
+	envp[i++] = scratch;
+	length += scnprintf (scratch, buffer_size - length,
+			     "MODALIAS=of:N%sT%s", of->node->name, of->node->type);
+	if ((buffer_size - length <= 0) || (i >= num_envp))
+		return -ENOMEM;
+	if (!compat2) {
+		compat2 = "";
+		cplen2 = 1;
+	}
+	while (cplen2 > 0) {
+		length += snprintf (scratch, buffer_size - length,
+				"C%s", compat2);
+		if (buffer_size - length <= 0)
+			return -ENOMEM;
+		scratch += length;
+		l = strlen (compat2) + 1;
+		compat2 += l;
+		cplen2 -= l;
+	}
 
 	envp[i] = NULL;
 
