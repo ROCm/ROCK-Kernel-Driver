@@ -57,8 +57,7 @@ static inline void scsi_log_completion(struct scsi_cmnd *cmd, int disposition)
 
 /* scsi_devinfo.c */
 extern int scsi_get_device_flags(struct scsi_device *sdev,
-				 const unsigned char *vendor,
-				 const unsigned char *model);
+				 unsigned char *vendor, unsigned char *model);
 extern int __init scsi_init_devinfo(void);
 extern void scsi_exit_devinfo(void);
 

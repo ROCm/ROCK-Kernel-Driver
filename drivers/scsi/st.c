@@ -17,7 +17,7 @@
    Last modified: 18-JAN-1998 Richard Gooch <rgooch@atnf.csiro.au> Devfs support
  */
 
-static char *verstr = "20051129";
+static char *verstr = "20050830";
 
 #include <linux/module.h>
 
@@ -134,7 +134,7 @@ static struct st_dev_parm {
 #endif
 /* Bit reversed order to get same names for same minors with all
    mode counts */
-static const char *st_formats[] = {
+static char *st_formats[] = {
 	"",  "r", "k", "s", "l", "t", "o", "u",
 	"m", "v", "p", "x", "a", "y", "q", "z"}; 
 
@@ -187,7 +187,6 @@ static int append_to_buffer(const char __user *, struct st_buffer *, int);
 static int from_buffer(struct st_buffer *, char __user *, int);
 static void move_buffer_data(struct st_buffer *, int);
 static void buf_to_sg(struct st_buffer *, unsigned int);
-static void release_buffering(struct scsi_tape *, int);
 
 static int st_map_user_pages(struct scatterlist *, const unsigned int, 
 			     unsigned long, size_t, int, unsigned long);
@@ -555,7 +554,6 @@ static int write_behind_check(struct scsi_tape * STp)
 
 	(STp->buffer)->syscall_result = st_chk_result(STp, SRpnt);
 	scsi_release_request(SRpnt);
-	release_buffering(STp, 0);
 
 	STbuffer->buffer_bytes -= STbuffer->writing;
 	STps = &(STp->ps[STp->partition]);
@@ -1451,15 +1449,14 @@ static int setup_buffering(struct scsi_tape *STp, const char __user *buf,
 
 
 /* Can be called more than once after each setup_buffer() */
-static void release_buffering(struct scsi_tape *STp, int is_read)
+static void release_buffering(struct scsi_tape *STp)
 {
 	struct st_buffer *STbp;
 
 	STbp = STp->buffer;
 	if (STbp->do_dio) {
-		sgl_unmap_user_pages(&(STbp->sg[0]), STbp->do_dio, is_read);
+		sgl_unmap_user_pages(&(STbp->sg[0]), STbp->do_dio, 0);
 		STbp->do_dio = 0;
-		STbp->sg_segs = 0;
 	}
 }
 
@@ -1472,7 +1469,7 @@ st_write(struct file *filp, const char __user *buf, size_t count, loff_t * ppos)
 	ssize_t i, do_count, blks, transfer;
 	ssize_t retval;
 	int undone, retry_eot = 0, scode;
-	int async_write = 0;
+	int async_write;
 	unsigned char cmd[MAX_COMMAND_SIZE];
 	const char __user *b_point;
 	struct scsi_request *SRpnt = NULL;
@@ -1625,7 +1622,6 @@ st_write(struct file *filp, const char __user *buf, size_t count, loff_t * ppos)
 				   STp->device->timeout, MAX_WRITE_RETRIES, !async_write);
 		if (!SRpnt) {
 			retval = STbp->syscall_result;
-			async_write = 0;
 			goto out;
 		}
 		if (async_write) {
@@ -1733,8 +1729,7 @@ st_write(struct file *filp, const char __user *buf, size_t count, loff_t * ppos)
  out:
 	if (SRpnt != NULL)
 		scsi_release_request(SRpnt);
-	if (!async_write)
-		release_buffering(STp, 0);
+	release_buffering(STp);
 	up(&STp->lock);
 
 	return retval;
@@ -1792,7 +1787,7 @@ static long read_tape(struct scsi_tape *STp, long count,
 	SRpnt = *aSRpnt;
 	SRpnt = st_do_scsi(SRpnt, STp, cmd, bytes, DMA_FROM_DEVICE,
 			   STp->device->timeout, MAX_RETRIES, 1);
-	release_buffering(STp, 1);
+	release_buffering(STp);
 	*aSRpnt = SRpnt;
 	if (!SRpnt)
 		return STbp->syscall_result;
@@ -2063,7 +2058,7 @@ st_read(struct file *filp, char __user *buf, size_t count, loff_t * ppos)
 		SRpnt = NULL;
 	}
 	if (do_dio) {
-		release_buffering(STp, 1);
+		release_buffering(STp);
 		STbp->buffer_bytes = 0;
 	}
 	up(&STp->lock);
@@ -3675,7 +3670,6 @@ static void normalize_buffer(struct st_buffer * STbuffer)
 	}
 	STbuffer->frp_segs = STbuffer->orig_frp_segs;
 	STbuffer->frp_sg_current = 0;
-	STbuffer->sg_segs = 0;
 }
 
 
@@ -4515,6 +4509,7 @@ static int sgl_map_user_pages(struct scatterlist *sgl, const unsigned int max_pa
 	if (res > 0) {
 		for (j=0; j < res; j++)
 			page_cache_release(pages[j]);
+		res = 0;
 	}
 	kfree(pages);
 	return res;
@@ -4530,8 +4525,6 @@ static int sgl_unmap_user_pages(struct scatterlist *sgl, const unsigned int nr_p
 	for (i=0; i < nr_pages; i++) {
 		struct page *page = sgl[i].page;
 
-		/* XXX: just for debug. Remove when PageReserved is removed */
-		BUG_ON(PageReserved(page));
 		if (dirtied)
 			SetPageDirty(page);
 		/* FIXME: cache flush missing for rw==READ
