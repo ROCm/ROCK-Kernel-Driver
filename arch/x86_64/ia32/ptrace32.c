@@ -18,6 +18,8 @@
 #include <linux/unistd.h>
 #include <linux/mm.h>
 #include <linux/ptrace.h>
+#include <linux/types.h>
+#include <linux/proc_mm.h>
 #include <asm/ptrace.h>
 #include <asm/compat.h>
 #include <asm/uaccess.h>
@@ -27,6 +29,7 @@
 #include <asm/debugreg.h>
 #include <asm/i387.h>
 #include <asm/fpu32.h>
+#include <asm/desc.h>
 
 /* determines which flags the user has access to. */
 /* 1 = access 0 = no access */
@@ -251,6 +254,11 @@ asmlinkage long sys32_ptrace(long request, u32 pid, u32 addr, u32 data)
 	case PTRACE_SETFPXREGS:
 	case PTRACE_GETFPXREGS:
 	case PTRACE_GETEVENTMSG:
+#ifdef CONFIG_PROC_MM
+	case PTRACE_FAULTINFO:
+	case PTRACE_LDT:
+	case PTRACE_SWITCH_MM:
+#endif
 		break;
 	} 
 
@@ -363,6 +371,65 @@ asmlinkage long sys32_ptrace(long request, u32 pid, u32 addr, u32 data)
 		ret = 0; 
 		break;
 	}
+#ifdef CONFIG_PROC_MM
+	case PTRACE_EX_FAULTINFO: {
+		struct ptrace_ex_faultinfo32 fault;
+
+		fault = ((struct ptrace_ex_faultinfo32)
+			{ .is_write	= (compat_int_t) child->thread.error_code,
+			  .addr		= (compat_uptr_t) child->thread.cr2,
+			  .trap_no	= (compat_int_t) child->thread.trap_no });
+		ret = copy_to_user((unsigned long *) datap, &fault,
+				   sizeof(fault));
+		break;
+	}
+
+	case PTRACE_FAULTINFO: {
+		struct ptrace_faultinfo32 fault;
+
+		fault = ((struct ptrace_faultinfo32)
+			{ .is_write	= (compat_int_t) child->thread.error_code,
+			  .addr		= (compat_uptr_t) child->thread.cr2 });
+		ret = copy_to_user((unsigned long *) datap, &fault,
+				   sizeof(fault));
+		break;
+	}
+
+	case PTRACE_LDT: {
+		struct ptrace_ldt32 ldt;
+
+		if(copy_from_user(&ldt, (unsigned long *) datap,
+				  sizeof(ldt))){
+			ret = -EIO;
+			break;
+		}
+		ret = __modify_ldt(child->mm, ldt.func, compat_ptr(ldt.ptr), ldt.bytecount);
+		break;
+	}
+
+	case PTRACE_SWITCH_MM: {
+		struct mm_struct *old = child->mm;
+		struct mm_struct *new = proc_mm_get_mm(data);
+
+		if(IS_ERR(new)){
+			ret = PTR_ERR(new);
+			break;
+		}
+
+		atomic_inc(&new->mm_users);
+
+		lock_fix_dumpable_setting(child, new);
+
+		child->mm = new;
+		child->active_mm = new;
+
+		task_unlock(child);
+
+		mmput(old);
+		ret = 0;
+		break;
+	}
+#endif
 
 	case PTRACE_GETEVENTMSG:
 		ret = put_user(child->ptrace_message,(unsigned int __user *)compat_ptr(data));

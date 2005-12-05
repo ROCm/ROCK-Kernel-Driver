@@ -8,12 +8,27 @@
 #include <asm/pda.h>
 #include <asm/pgtable.h>
 #include <asm/tlbflush.h>
+#include <asm/semaphore.h>
 
 /*
  * possibly do the LDT unload here?
+ * Used for LDT initialization/destruction. You cannot copy an LDT with
+ * init_new_context, since it thinks you are passing it a new LDT and won't
+ * deallocate its old content.
  */
+
 int init_new_context(struct task_struct *tsk, struct mm_struct *mm);
 void destroy_context(struct mm_struct *mm);
+
+/* LDT initialization for a clean environment - needed for SKAS.*/
+static inline void init_new_empty_context(struct mm_struct *mm)
+{
+	init_MUTEX(&mm->context.sem);
+	mm->context.size = 0;
+}
+
+/* LDT copy for SKAS - for the above problem.*/
+int copy_context(struct mm_struct *mm, struct mm_struct *old_mm);
 
 #ifdef CONFIG_SMP
 
@@ -37,6 +52,9 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 			     struct task_struct *tsk)
 {
 	unsigned cpu = smp_processor_id();
+#ifdef CONFIG_SMP
+	prev = read_pda(active_mm);
+#endif
 	if (likely(prev != next)) {
 		/* stop flush ipis for the previous mm */
 		clear_bit(cpu, &prev->cpu_vm_mask);
@@ -53,8 +71,6 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 #ifdef CONFIG_SMP
 	else {
 		write_pda(mmu_state, TLBSTATE_OK);
-		if (read_pda(active_mm) != next)
-			out_of_line_bug();
 		if(!test_and_set_bit(cpu, &next->cpu_vm_mask)) {
 			/* We were in lazy tlb mode and leave_mm disabled 
 			 * tlb flush IPI delivery. We must reload CR3

@@ -97,6 +97,13 @@ config GENERIC_CPU
 
 endchoice
 
+config X86_64_XEN
+	bool "Enable Xen compatible kernel"
+	select SWIOTLB if XEN_PHYSDEV_ACCESS
+	select DUMMY_IOMMU if XEN_PHYSDEV_ACCESS
+	help
+	  This option will compile a kernel compatible with Xen hypervisor
+
 #
 # Define implied options from the CPU selection here
 #
@@ -168,10 +175,17 @@ config EISA
 
 config X86_IO_APIC
 	bool
+	depends !XEN_UNPRIVILEGED_GUEST
 	default y
+
+config X86_XEN_GENAPIC
+	bool
+	depends X86_64_XEN
+	default XEN_PRIVILEGED_GUEST || SMP
 
 config X86_LOCAL_APIC
 	bool
+	depends !XEN_UNPRIVILEGED_GUEST
 	default y
 
 config MTRR
@@ -216,7 +230,7 @@ config SMP
 
 config SCHED_SMT
 	bool "SMT (Hyperthreading) scheduler support"
-	depends on SMP
+	depends on SMP && !X86_64_XEN
 	default n
 	help
 	  SMT scheduler support improves the CPU scheduler's decision making
@@ -228,7 +242,7 @@ source "kernel/Kconfig.preempt"
 
 config NUMA
        bool "Non Uniform Memory Access (NUMA) Support"
-       depends on SMP
+       depends on SMP && !X86_64_XEN
        help
 	 Enable NUMA (Non Uniform Memory Access) support. The kernel 
 	 will try to allocate memory used by a CPU on the local memory 
@@ -318,6 +332,7 @@ config HOTPLUG_CPU
 
 config HPET_TIMER
 	bool
+	depends on !X86_64_XEN
 	default y
 	help
 	  Use the IA-PC HPET (High Precision Event Timer) to manage
@@ -349,7 +364,7 @@ config HPET_EMULATE_RTC
 config GART_IOMMU
 	bool "IOMMU support"
 	default y
-	depends on PCI
+	depends on PCI && !X86_64_XEN
 	help
 	  Support the IOMMU. Needed to run systems with more than 3GB of memory
 	  properly with 32-bit PCI devices that do not support DAC (Double Address
@@ -374,8 +389,29 @@ config DUMMY_IOMMU
 	  of memory and any 32-bit devices. Don't turn on unless you know what you
 	  are doing.
 
+config PROC_MM
+	bool "/proc/mm support"
+	default y
+
+config PROC_MM_DUMPABLE
+	bool "Make UML childs /proc/<pid> completely browsable"
+	default n
+	help
+	  If in doubt, say N.
+
+	  This fiddles with some settings to make sure /proc/<pid> is completely
+	  browsable by who started UML, at the expense of some additional
+	  locking (maybe this could slow down the runned UMLs of a few percents,
+	  I've not tested this).
+
+	  Also, if there is a bug in this feature, there is some little
+	  possibility to do privilege escalation if you have UML installed
+	  setuid (which you shouldn't have done) or if UML changes uid on
+	  startup (which will be a good thing, when enabled) ...
+
 config X86_MCE
 	bool "Machine check support" if EMBEDDED
+	depends on !X86_64_XEN
 	default y
 	help
 	   Include a machine check error handler to report hardware errors.
@@ -385,7 +421,7 @@ config X86_MCE
 
 config X86_MCE_INTEL
 	bool "Intel MCE features"
-	depends on X86_MCE && X86_LOCAL_APIC
+	depends on X86_MCE && X86_LOCAL_APIC && !X86_64_XEN
 	default y
 	help
 	   Additional support for intel specific MCE features such as
@@ -471,9 +507,11 @@ config GENERIC_PENDING_IRQ
 
 menu "Power management options"
 
+if !X86_64_XEN
 source kernel/power/Kconfig
 
 source "drivers/acpi/Kconfig"
+endif
 
 source "arch/x86_64/kernel/cpufreq/Kconfig"
 
@@ -504,6 +542,7 @@ config UNORDERED_IO
 	 from i386. Requires that the driver writer used memory barriers
 	 properly.
 
+if !X86_64_XEN
 source "drivers/pci/pcie/Kconfig"
 
 source "drivers/pci/Kconfig"
@@ -511,6 +550,7 @@ source "drivers/pci/Kconfig"
 source "drivers/pcmcia/Kconfig"
 
 source "drivers/pci/hotplug/Kconfig"
+endif
 
 endmenu
 
@@ -577,5 +617,7 @@ source "arch/x86_64/Kconfig.debug"
 source "security/Kconfig"
 
 source "crypto/Kconfig"
+
+source "drivers/xen/Kconfig"
 
 source "lib/Kconfig"

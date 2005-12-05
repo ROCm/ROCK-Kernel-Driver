@@ -19,6 +19,7 @@
 
 #include <asm/uaccess.h>
 #include <asm/ia32.h>
+#include <asm/proc_mm.h>
 
 /*
  * sys_pipe() is the normal C calling standard for creating
@@ -37,7 +38,7 @@ asmlinkage long sys_pipe(int __user *fildes)
 	return error;
 }
 
-asmlinkage long sys_mmap(unsigned long addr, unsigned long len, unsigned long prot, unsigned long flags,
+long do64_mmap(struct mm_struct *mm, unsigned long addr, unsigned long len, unsigned long prot, unsigned long flags,
 	unsigned long fd, unsigned long off)
 {
 	long error;
@@ -55,14 +56,20 @@ asmlinkage long sys_mmap(unsigned long addr, unsigned long len, unsigned long pr
 		if (!file)
 			goto out;
 	}
-	down_write(&current->mm->mmap_sem);
-	error = do_mmap_pgoff(file, addr, len, prot, flags, off >> PAGE_SHIFT);
-	up_write(&current->mm->mmap_sem);
+	down_write(&mm->mmap_sem);
+	error = __do_mmap_pgoff(mm, file, addr, len, prot, flags, off >> PAGE_SHIFT);
+	up_write(&mm->mmap_sem);
 
 	if (file)
 		fput(file);
 out:
 	return error;
+}
+
+asmlinkage long sys_mmap(unsigned long addr, unsigned long len, unsigned long prot, unsigned long flags,
+	unsigned long fd, unsigned long off)
+{
+	return do64_mmap(current->mm, addr, len, prot, flags, fd, off);
 }
 
 static void find_start_end(unsigned long flags, unsigned long *begin,

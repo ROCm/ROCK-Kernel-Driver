@@ -64,6 +64,59 @@ struct pt_regs {
 /* top of stack page */ 
 };
 
+/* Stolen from
+#include <linux/compat.h>; we can't include it because
+there is a nasty ciclic include chain.
+*/
+
+#include <asm/types.h>
+
+#define		compat_int_t	s32
+#define		compat_long_t	s32
+#define		compat_uint_t	u32
+#define		compat_ulong_t	u32
+#define		compat_uptr_t	u32
+
+struct ptrace_faultinfo32 {
+	compat_int_t is_write;
+	compat_ulong_t addr;
+};
+
+struct ptrace_ex_faultinfo32 {
+	compat_int_t is_write;
+	compat_ulong_t addr;
+	compat_int_t trap_no;
+};
+
+struct ptrace_ldt32 {
+	compat_int_t func;
+	compat_uptr_t ptr; /*Actually a void pointer on i386, but must be converted.*/
+	compat_ulong_t bytecount;
+};
+
+struct ptrace_faultinfo {
+	int is_write;
+	unsigned long addr;
+};
+
+struct ptrace_ex_faultinfo {
+	int is_write;
+	unsigned long addr;
+	int trap_no;
+};
+
+struct ptrace_ldt {
+	int func;
+  	void *ptr;
+	unsigned long bytecount;
+};
+
+#undef	compat_int_t
+#undef	compat_long_t
+#undef	compat_uint_t
+#undef	compat_ulong_t
+#undef	compat_uptr_t
+
 #endif
 
 /* Arbitrarily choose the same ptrace numbers as used by the Sparc code. */
@@ -73,6 +126,12 @@ struct pt_regs {
 #define PTRACE_SETFPREGS          15
 #define PTRACE_GETFPXREGS         18
 #define PTRACE_SETFPXREGS         19
+
+#define PTRACE_FAULTINFO 52
+/* 53 was used for PTRACE_SIGPENDING, don't reuse it. */
+#define PTRACE_LDT 54
+#define PTRACE_SWITCH_MM 55
+#define PTRACE_EX_FAULTINFO	  56
 
 /* only useful for access 32bit programs */
 #define PTRACE_GET_THREAD_AREA    25

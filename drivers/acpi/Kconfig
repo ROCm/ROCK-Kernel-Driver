@@ -46,7 +46,7 @@ if ACPI
 
 config ACPI_SLEEP
 	bool "Sleep States"
-	depends on X86 && (!SMP || SUSPEND_SMP)
+	depends on X86 && (!SMP || SUSPEND_SMP) && !XEN
 	depends on PM
 	default y
 	---help---

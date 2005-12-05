@@ -833,11 +833,10 @@ sys32_adjtimex(struct timex32 __user *utp)
 	return ret;
 }
 
-asmlinkage long sys32_mmap2(unsigned long addr, unsigned long len,
-	unsigned long prot, unsigned long flags,
+long do32_mmap2(struct mm_struct *mm, unsigned long addr,
+	unsigned long len, unsigned long prot, unsigned long flags,
 	unsigned long fd, unsigned long pgoff)
 {
-	struct mm_struct *mm = current->mm;
 	unsigned long error;
 	struct file * file = NULL;
 
@@ -849,12 +848,21 @@ asmlinkage long sys32_mmap2(unsigned long addr, unsigned long len,
 	}
 
 	down_write(&mm->mmap_sem);
-	error = do_mmap_pgoff(file, addr, len, prot, flags, pgoff);
+	error = __do_mmap_pgoff(mm, file, addr, len, prot, flags, pgoff);
 	up_write(&mm->mmap_sem);
 
 	if (file)
 		fput(file);
 	return error;
+}
+
+/* XXX: this wrapper can be probably removed, we can simply use the 64-bit
+ * version.*/
+asmlinkage long sys32_mmap2(unsigned long addr, unsigned long len,
+	unsigned long prot, unsigned long flags,
+	unsigned long fd, unsigned long pgoff)
+{
+	return do32_mmap2(current->mm, addr, len, prot, flags, fd, pgoff);
 }
 
 asmlinkage long sys32_olduname(struct oldold_utsname __user * name)

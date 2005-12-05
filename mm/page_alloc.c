@@ -399,7 +399,8 @@ void __free_pages_ok(struct page *page, unsigned int order)
 	int i;
 	int reserved = 0;
 
-	arch_free_page(page, order);
+	if (arch_free_page(page, order))
+		return;
 
 #ifndef CONFIG_MMU
 	if (order > 0)
@@ -683,7 +684,8 @@ static void fastcall free_hot_cold_page(struct page *page, int cold)
 	struct per_cpu_pages *pcp;
 	unsigned long flags;
 
-	arch_free_page(page, 0);
+	if (arch_free_page(page, 0))
+		return;
 
 	if (PageAnon(page))
 		page->mapping = NULL;

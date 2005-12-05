@@ -40,6 +40,7 @@
 
 #include <linux/list.h>
 #include <linux/spinlock.h>
+#include <asm/smp_alt.h>
 
 struct rwsem_waiter;
 
@@ -99,7 +100,7 @@ static inline void __down_read(struct rw_semaphore *sem)
 {
 	__asm__ __volatile__(
 		"# beginning down_read\n\t"
-LOCK_PREFIX	"  incl      (%%eax)\n\t" /* adds 0x00000001, returns the old value */
+LOCK	        "  incl      (%%eax)\n\t" /* adds 0x00000001, returns the old value */
 		"  js        2f\n\t" /* jump if we weren't granted the lock */
 		"1:\n\t"
 		LOCK_SECTION_START("")
@@ -130,7 +131,7 @@ static inline int __down_read_trylock(struct rw_semaphore *sem)
 		"  movl	     %1,%2\n\t"
 		"  addl      %3,%2\n\t"
 		"  jle	     2f\n\t"
-LOCK_PREFIX	"  cmpxchgl  %2,%0\n\t"
+LOCK	        "  cmpxchgl  %2,%0\n\t"
 		"  jnz	     1b\n\t"
 		"2:\n\t"
 		"# ending __down_read_trylock\n\t"
@@ -150,7 +151,7 @@ static inline void __down_write(struct rw_semaphore *sem)
 	tmp = RWSEM_ACTIVE_WRITE_BIAS;
 	__asm__ __volatile__(
 		"# beginning down_write\n\t"
-LOCK_PREFIX	"  xadd      %%edx,(%%eax)\n\t" /* subtract 0x0000ffff, returns the old value */
+LOCK	        "  xadd      %%edx,(%%eax)\n\t" /* subtract 0x0000ffff, returns the old value */
 		"  testl     %%edx,%%edx\n\t" /* was the count 0 before? */
 		"  jnz       2f\n\t" /* jump if we weren't granted the lock */
 		"1:\n\t"
@@ -188,7 +189,7 @@ static inline void __up_read(struct rw_semaphore *sem)
 	__s32 tmp = -RWSEM_ACTIVE_READ_BIAS;
 	__asm__ __volatile__(
 		"# beginning __up_read\n\t"
-LOCK_PREFIX	"  xadd      %%edx,(%%eax)\n\t" /* subtracts 1, returns the old value */
+LOCK	        "  xadd      %%edx,(%%eax)\n\t" /* subtracts 1, returns the old value */
 		"  js        2f\n\t" /* jump if the lock is being waited upon */
 		"1:\n\t"
 		LOCK_SECTION_START("")
@@ -214,7 +215,7 @@ static inline void __up_write(struct rw_semaphore *sem)
 	__asm__ __volatile__(
 		"# beginning __up_write\n\t"
 		"  movl      %2,%%edx\n\t"
-LOCK_PREFIX	"  xaddl     %%edx,(%%eax)\n\t" /* tries to transition 0xffff0001 -> 0x00000000 */
+LOCK	        "  xaddl     %%edx,(%%eax)\n\t" /* tries to transition 0xffff0001 -> 0x00000000 */
 		"  jnz       2f\n\t" /* jump if the lock is being waited upon */
 		"1:\n\t"
 		LOCK_SECTION_START("")
@@ -239,7 +240,7 @@ static inline void __downgrade_write(struct rw_semaphore *sem)
 {
 	__asm__ __volatile__(
 		"# beginning __downgrade_write\n\t"
-LOCK_PREFIX	"  addl      %2,(%%eax)\n\t" /* transitions 0xZZZZ0001 -> 0xYYYY0001 */
+LOCK	        "  addl      %2,(%%eax)\n\t" /* transitions 0xZZZZ0001 -> 0xYYYY0001 */
 		"  js        2f\n\t" /* jump if the lock is being waited upon */
 		"1:\n\t"
 		LOCK_SECTION_START("")
@@ -263,7 +264,7 @@ LOCK_PREFIX	"  addl      %2,(%%eax)\n\t" /* transitions 0xZZZZ0001 -> 0xYYYY0001
 static inline void rwsem_atomic_add(int delta, struct rw_semaphore *sem)
 {
 	__asm__ __volatile__(
-LOCK_PREFIX	"addl %1,%0"
+LOCK	          "addl %1,%0"
 		: "=m"(sem->count)
 		: "ir"(delta), "m"(sem->count));
 }
@@ -276,7 +277,7 @@ static inline int rwsem_atomic_update(int delta, struct rw_semaphore *sem)
 	int tmp = delta;
 
 	__asm__ __volatile__(
-LOCK_PREFIX	"xadd %0,(%2)"
+LOCK  	          "xadd %0,(%2)"
 		: "+r"(tmp), "=m"(sem->count)
 		: "r"(sem), "m"(sem->count)
 		: "memory");
