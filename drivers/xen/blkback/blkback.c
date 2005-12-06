@@ -31,10 +31,16 @@
 static unsigned long mmap_vstart;
 #define MMAP_PAGES						\
 	(MAX_PENDING_REQS * BLKIF_MAX_SEGMENTS_PER_REQUEST)
+#ifdef __ia64__
+static void *pending_vaddrs[MMAP_PAGES];
+#define MMAP_VADDR(_idx, _i) \
+	(unsigned long)(pending_vaddrs[((_idx) * BLKIF_MAX_SEGMENTS_PER_REQUEST) + (_i)])
+#else
 #define MMAP_VADDR(_req,_seg)						\
 	(mmap_vstart +							\
 	 ((_req) * BLKIF_MAX_SEGMENTS_PER_REQUEST * PAGE_SIZE) +	\
 	 ((_seg) * PAGE_SIZE))
+#endif
 
 /*
  * Each outstanding request that we've passed to the lower device layers has a 
@@ -82,10 +88,10 @@ static inline void flush_plugged_queue(void)
  * handle returned must be used to unmap the frame. This is needed to
  * drop the ref count on the frame.
  */
-static u16 pending_grant_handles[MMAP_PAGES];
+static grant_handle_t pending_grant_handles[MMAP_PAGES];
 #define pending_handle(_idx, _i) \
     (pending_grant_handles[((_idx) * BLKIF_MAX_SEGMENTS_PER_REQUEST) + (_i)])
-#define BLKBACK_INVALID_HANDLE (0xFFFF)
+#define BLKBACK_INVALID_HANDLE (~0)
 
 #ifdef CONFIG_XEN_BLKDEV_TAP_BE
 /*
@@ -108,7 +114,7 @@ static void fast_flush_area(int idx, int nr_pages)
 {
 	struct gnttab_unmap_grant_ref unmap[BLKIF_MAX_SEGMENTS_PER_REQUEST];
 	unsigned int i, invcount = 0;
-	u16 handle;
+	grant_handle_t handle;
 	int ret;
 
 	for (i = 0; i < nr_pages; i++) {
@@ -290,22 +296,23 @@ static int do_block_io_op(blkif_t *blkif, int max_to_do)
 {
 	blkif_back_ring_t *blk_ring = &blkif->blk_ring;
 	blkif_request_t *req;
-	RING_IDX i, rp;
+	RING_IDX rc, rp;
 	int more_to_do = 0;
 
+	rc = blk_ring->req_cons;
 	rp = blk_ring->sring->req_prod;
 	rmb(); /* Ensure we see queued requests up to 'rp'. */
 
-	for (i = blk_ring->req_cons; 
-	     (i != rp) && !RING_REQUEST_CONS_OVERFLOW(blk_ring, i);
-	     i++) {
+	while ((rc != rp) && !RING_REQUEST_CONS_OVERFLOW(blk_ring, rc)) {
 		if ((max_to_do-- == 0) ||
 		    (NR_PENDING_REQS == MAX_PENDING_REQS)) {
 			more_to_do = 1;
 			break;
 		}
-        
-		req = RING_GET_REQUEST(blk_ring, i);
+
+		req = RING_GET_REQUEST(blk_ring, rc);
+		blk_ring->req_cons = ++rc; /* before make_response() */
+
 		switch (req->operation) {
 		case BLKIF_OP_READ:
 		case BLKIF_OP_WRITE:
@@ -321,7 +328,6 @@ static int do_block_io_op(blkif_t *blkif, int max_to_do)
 		}
 	}
 
-	blk_ring->req_cons = i;
 	return more_to_do;
 }
 
@@ -329,7 +335,6 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 {
 	extern void ll_rw_block(int rw, int nr, struct buffer_head * bhs[]); 
 	int operation = (req->operation == BLKIF_OP_WRITE) ? WRITE : READ;
-	unsigned long fas = 0;
 	int i, pending_idx = pending_ring[MASK_PEND_IDX(pending_cons)];
 	pending_req_t *pending_req;
 	struct gnttab_map_grant_ref map[BLKIF_MAX_SEGMENTS_PER_REQUEST];
@@ -356,16 +361,17 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 	preq.nr_sects      = 0;
 
 	for (i = 0; i < nseg; i++) {
-		fas         = req->frame_and_sects[i];
-		seg[i].nsec = blkif_last_sect(fas) - blkif_first_sect(fas) + 1;
+		seg[i].nsec = req->seg[i].last_sect -
+			req->seg[i].first_sect + 1;
 
-		if (seg[i].nsec <= 0)
+		if ((req->seg[i].last_sect >= (PAGE_SIZE >> 9)) ||
+		    (seg[i].nsec <= 0))
 			goto bad_descriptor;
 		preq.nr_sects += seg[i].nsec;
 
 		map[i].host_addr = MMAP_VADDR(pending_idx, i);
 		map[i].dom = blkif->domid;
-		map[i].ref = blkif_gref_from_fas(fas);
+		map[i].ref = req->seg[i].gref;
 		map[i].flags = GNTMAP_host_map;
 		if ( operation == WRITE )
 			map[i].flags |= GNTMAP_readonly;
@@ -375,14 +381,17 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 	BUG_ON(ret);
 
 	for (i = 0; i < nseg; i++) {
-		if (likely(map[i].handle >= 0)) {
+		if (likely(map[i].status == 0)) {
 			pending_handle(pending_idx, i) = map[i].handle;
+#ifdef __ia64__
+			MMAP_VADDR(pending_idx,i) = gnttab_map_vaddr(map[i]);
+#else
 			set_phys_to_machine(__pa(MMAP_VADDR(
 				pending_idx, i)) >> PAGE_SHIFT,
 				FOREIGN_FRAME(map[i].dev_bus_addr>>PAGE_SHIFT));
-			fas        = req->frame_and_sects[i];
-			seg[i].buf = map[i].dev_bus_addr | 
-				(blkif_first_sect(fas) << 9);
+#endif
+			seg[i].buf = map[i].dev_bus_addr |
+				(req->seg[i].first_sect << 9);
 		} else {
 			errors++;
 		}
@@ -472,20 +481,42 @@ static void make_response(blkif_t *blkif, unsigned long id,
 	blkif_response_t *resp;
 	unsigned long     flags;
 	blkif_back_ring_t *blk_ring = &blkif->blk_ring;
+	int notify;
+
+	spin_lock_irqsave(&blkif->blk_ring_lock, flags);
 
 	/* Place on the response ring for the relevant domain. */ 
-	spin_lock_irqsave(&blkif->blk_ring_lock, flags);
 	resp = RING_GET_RESPONSE(blk_ring, blk_ring->rsp_prod_pvt);
 	resp->id        = id;
 	resp->operation = op;
 	resp->status    = st;
-	wmb(); /* Ensure other side can see the response fields. */
 	blk_ring->rsp_prod_pvt++;
-	RING_PUSH_RESPONSES(blk_ring);
+	RING_PUSH_RESPONSES_AND_CHECK_NOTIFY(blk_ring, notify);
+
+	if (blk_ring->rsp_prod_pvt == blk_ring->req_cons) {
+		/*
+		 * Tail check for pending requests. Allows frontend to avoid
+		 * notifications if requests are already in flight (lower
+		 * overheads and promotes batching).
+		 */
+		int more_to_do;
+		RING_FINAL_CHECK_FOR_REQUESTS(blk_ring, more_to_do);
+		if (more_to_do) {
+			add_to_blkdev_list_tail(blkif);
+			maybe_trigger_blkio_schedule();
+		}
+	}
+	else if (!__on_blkdev_list(blkif)
+		 && RING_HAS_UNCONSUMED_REQUESTS(blk_ring)) {
+		/* Keep pulling requests as they become available... */
+		add_to_blkdev_list_tail(blkif);
+		maybe_trigger_blkio_schedule();
+	}
+
 	spin_unlock_irqrestore(&blkif->blk_ring_lock, flags);
 
-	/* Kick the relevant domain. */
-	notify_remote_via_irq(blkif->irq);
+	if (notify)
+		notify_remote_via_irq(blkif->irq);
 }
 
 void blkif_deschedule(blkif_t *blkif)
@@ -507,9 +538,22 @@ static int __init blkif_init(void)
 
 	blkif_interface_init();
 
+#ifdef __ia64__
+    {
+	extern unsigned long alloc_empty_foreign_map_page_range(unsigned long pages);
+	int i;
+
+	mmap_vstart =  alloc_empty_foreign_map_page_range(MMAP_PAGES);
+	printk("Allocated mmap_vstart: 0x%lx\n", mmap_vstart);
+	for(i = 0; i < MMAP_PAGES; i++)
+	    pending_vaddrs[i] = mmap_vstart + (i << PAGE_SHIFT);
+	BUG_ON(mmap_vstart == NULL);
+    }
+#else
 	page = balloon_alloc_empty_page_range(MMAP_PAGES);
 	BUG_ON(page == NULL);
 	mmap_vstart = (unsigned long)pfn_to_kaddr(page_to_pfn(page));
+#endif
 
 	pending_cons = 0;
 	pending_prod = MAX_PENDING_REQS;
