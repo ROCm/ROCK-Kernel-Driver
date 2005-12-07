@@ -1805,15 +1805,12 @@ void __init setup_arch(char **cmdline_p)
 	op.u.set_iopl.iopl = 1;
 	HYPERVISOR_physdev_op(&op);
 
-#ifdef CONFIG_ACPI_BOOT
+#ifdef CONFIG_ACPI
 	if (!(xen_start_info->flags & SIF_INITDOMAIN)) {
 		printk(KERN_INFO "ACPI in unprivileged domain disabled\n");
 		acpi_disabled = 1;
 		acpi_ht = 0;
 	}
-#endif
-
-#ifdef CONFIG_ACPI
 	/*
 	 * Parse the ACPI tables for possible boot-time SMP configuration.
 	 */
@@ -1853,7 +1850,7 @@ void __init setup_arch(char **cmdline_p)
 #endif
 #endif
 	} else {
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
+#ifdef CONFIG_XEN_PHYSDEV_ACCESS
 		extern const struct consw xennull_con;
 		extern int console_use_vt;
 #if defined(CONFIG_VGA_CONSOLE)

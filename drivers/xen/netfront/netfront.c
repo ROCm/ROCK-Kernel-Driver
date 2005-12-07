@@ -77,7 +77,7 @@
     } while (0)
 
 /* Allow headroom on each rx pkt for Ethernet header, alignment padding, ... */
-#define RX_HEADROOM 200
+#define RX_HEADROOM 512
 
 static unsigned long rx_pfn_array[NET_RX_RING_SIZE];
 static multicall_entry_t rx_mcl[NET_RX_RING_SIZE+1];

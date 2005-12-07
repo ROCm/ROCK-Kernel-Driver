@@ -119,6 +119,7 @@ config X86_L1_CACHE_SHIFT
 
 config X86_TSC
 	bool
+	depends on !X86_64_XEN
 	default y
 
 config X86_GOOD_APIC
@@ -190,6 +191,7 @@ config X86_LOCAL_APIC
 
 config MTRR
 	bool "MTRR (Memory Type Range Register) support"
+	depends on !X86_64_XEN
 	---help---
 	  On Intel P6 family processors (Pentium Pro, Pentium II and later)
 	  the Memory Type Range Registers (MTRRs) may be used to control
@@ -312,6 +314,7 @@ config NR_CPUS
 	int "Maximum number of CPUs (2-256)"
 	range 2 256
 	depends on SMP
+	default "16" if X86_64_XEN
 	default "8"
 	help
 	  This allows you to specify the maximum number of CPUs which this
@@ -344,7 +347,7 @@ config HPET_TIMER
 
 config X86_PM_TIMER
 	bool "PM timer"
-	depends on ACPI
+	depends on ACPI && !X86_64_XEN
 	default y
 	help
 	  Support the ACPI PM timer for time keeping. This is slow,
@@ -421,7 +424,7 @@ config X86_MCE
 
 config X86_MCE_INTEL
 	bool "Intel MCE features"
-	depends on X86_MCE && X86_LOCAL_APIC && !X86_64_XEN
+	depends on X86_MCE && X86_LOCAL_APIC
 	default y
 	help
 	   Additional support for intel specific MCE features such as
@@ -509,11 +512,13 @@ menu "Power management options"
 
 if !X86_64_XEN
 source kernel/power/Kconfig
-
-source "drivers/acpi/Kconfig"
 endif
 
+source "drivers/acpi/Kconfig"
+
+if !X86_64_XEN
 source "arch/x86_64/kernel/cpufreq/Kconfig"
+endif
 
 endmenu
 

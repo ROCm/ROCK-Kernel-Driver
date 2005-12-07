@@ -299,6 +299,11 @@ config X86_VISWS_APIC
 	depends on X86_VISWS
 	default y
 
+config X86_TSC
+	bool
+	depends on (MWINCHIP3D || MWINCHIP2 || MCRUSOE || MEFFICEON || MCYRIXIII || MK7 || MK6 || MPENTIUM4 || MPENTIUMM || MPENTIUMIII || MPENTIUMII || M686 || M586MMX || M586TSC || MK8 || MVIAC3_2 || MGEODEGX1) && !X86_NUMAQ && !X86_XEN
+	default y
+
 config X86_MCE
 	bool "Machine Check Exception"
 	depends on !(X86_VOYAGER || X86_XEN)
@@ -391,6 +396,7 @@ config X86_REBOOTFIXUPS
 
 config MICROCODE
 	tristate "/dev/cpu/microcode - Intel IA32 CPU microcode support"
+	depends on !XEN_UNPRIVILEGED_GUEST
 	---help---
 	  If you say Y here and also to "/dev file system support" in the
 	  'File systems' section, you will be able to update the microcode on
@@ -408,6 +414,7 @@ config MICROCODE
 
 config X86_MSR
 	tristate "/dev/cpu/*/msr - Model-specific register support"
+	depends on !X86_XEN
 	help
 	  This device gives privileged processes access to the x86
 	  Model-Specific Registers (MSRs).  It is a character device with
@@ -422,6 +429,11 @@ config X86_CPUID
 	  be executed on a specific processor.  It is a character device
 	  with major 203 and minors 0 to 31 for /dev/cpu/0/cpuid to
 	  /dev/cpu/31/cpuid.
+
+config SWIOTLB
+	bool
+	depends on X86_PRIVILEGED_GUEST
+	default y
 
 source "drivers/firmware/Kconfig"
 
@@ -578,6 +590,7 @@ config HIGHPTE
 
 config MATH_EMULATION
 	bool "Math emulation"
+	depends on !X86_XEN
 	---help---
 	  Linux can emulate a math coprocessor (used for floating point
 	  operations) if you don't have one. 486DX and Pentium processors have
@@ -603,6 +616,8 @@ config MATH_EMULATION
 
 config MTRR
 	bool "MTRR (Memory Type Range Register) support"
+	depends on XEN_PRIVILEGED_GUEST
+	default y if X86_XEN
 	---help---
 	  On Intel P6 family processors (Pentium Pro, Pentium II and later)
 	  the Memory Type Range Registers (MTRRs) may be used to control
@@ -637,7 +652,7 @@ config MTRR
 
 config EFI
 	bool "Boot from EFI support (EXPERIMENTAL)"
-	depends on ACPI
+	depends on ACPI && !X86_XEN
 	default n
 	---help---
 	This enables the the kernel to boot on EFI platforms using
@@ -938,6 +953,7 @@ choice
 
 config PCI_GOBIOS
 	bool "BIOS"
+	depends on !X86_XEN
 
 config PCI_GOMMCONFIG
 	bool "MMConfig"

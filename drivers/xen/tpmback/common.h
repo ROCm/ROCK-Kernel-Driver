@@ -12,6 +12,7 @@
 #include <linux/slab.h>
 #include <asm-xen/evtchn.h>
 #include <asm-xen/driver_util.h>
+#include <asm-xen/xen-public/grant_table.h>
 #include <asm-xen/xen-public/io/tpmif.h>
 #include <asm/io.h>
 #include <asm/pgalloc.h>
@@ -54,7 +55,7 @@ typedef struct tpmif_st {
 
 	struct work_struct work;
 
-	u16 shmem_handle;
+	grant_handle_t shmem_handle;
 	grant_ref_t shmem_ref;
 } tpmif_t;
 
