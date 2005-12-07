@@ -616,7 +616,7 @@ config MATH_EMULATION
 
 config MTRR
 	bool "MTRR (Memory Type Range Register) support"
-	depends on XEN_PRIVILEGED_GUEST
+	depends on (XEN_PRIVILEGED_GUEST || !X86_XEN)
 	default y if X86_XEN
 	---help---
 	  On Intel P6 family processors (Pentium Pro, Pentium II and later)
