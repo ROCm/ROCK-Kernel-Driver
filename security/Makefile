@@ -4,6 +4,7 @@
 
 obj-$(CONFIG_KEYS)			+= keys/
 subdir-$(CONFIG_SECURITY_SELINUX)	+= selinux
+subdir-$(CONFIG_SECURITY_SUBDOMAIN)	+= subdomain
 
 # We always need commoncap as it's default
 obj-y		+= commoncap.o

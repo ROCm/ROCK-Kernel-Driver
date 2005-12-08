@@ -45,7 +45,8 @@ static int event;
 static struct list_head *mount_hashtable;
 static int hash_mask __read_mostly, hash_bits __read_mostly;
 static kmem_cache_t *mnt_cache;
-static struct rw_semaphore namespace_sem;
+struct rw_semaphore namespace_sem;
+EXPORT_SYMBOL_GPL(namespace_sem);
 
 static inline unsigned long hash(struct vfsmount *mnt, struct dentry *dentry)
 {

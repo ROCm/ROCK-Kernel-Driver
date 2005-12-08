@@ -5,6 +5,9 @@
 #include <linux/mount.h>
 #include <linux/sched.h>
 
+/* exported for AppArmor (SubDomain) */
+extern struct rw_semaphore namespace_sem;
+
 struct namespace {
 	atomic_t		count;
 	struct vfsmount *	root;

@@ -87,6 +87,7 @@ config SECURITY_SECLVL
 	  If you are unsure how to answer this question, answer N.
 
 source security/selinux/Kconfig
+source security/subdomain/Kconfig
 
 endmenu
 
