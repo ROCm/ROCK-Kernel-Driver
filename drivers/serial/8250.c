@@ -1183,6 +1183,13 @@ receive_chars(struct uart_8250_port *up, int *status, struct pt_regs *regs)
 			kdb_serial_ptr = kdb_serial_str;
 		}
 #endif	/* CONFIG_KDB */
+
+#if defined(CONFIG_MAGIC_SYSRQ) && defined(CONFIG_SERIAL_CORE_CONSOLE)
+		/* Handle the SysRq ^O Hack, but only on the system console */
+		if (ch == '\x0f' && uart_handle_break(&up->port))
+			goto ignore_char;
+#endif
+
 		flag = TTY_NORMAL;
 		up->port.icount.rx++;
 
