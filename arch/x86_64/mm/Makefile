@@ -7,6 +7,5 @@ obj-$(CONFIG_HUGETLB_PAGE) += hugetlbpage.o
 obj-$(CONFIG_NUMA) += numa.o
 obj-$(CONFIG_K8_NUMA) += k8topology.o
 obj-$(CONFIG_ACPI_NUMA) += srat.o
-obj-$(CONFIG_PROC_MM) += proc_mm.o
 
 hugetlbpage-y = ../../i386/mm/hugetlbpage.o

@@ -84,33 +84,4 @@ extern unsigned long profile_pc(struct pt_regs *regs);
 #endif
 #endif /* __KERNEL__ */
 
-/*For SKAS3 support.*/
-#ifndef _LINUX_PTRACE_STRUCT_DEF
-#define _LINUX_PTRACE_STRUCT_DEF
-
-#define PTRACE_FAULTINFO	  52
-/* 53 was used for PTRACE_SIGPENDING, don't reuse it. */
-#define PTRACE_LDT		  54
-#define PTRACE_SWITCH_MM 	  55
-#define PTRACE_EX_FAULTINFO	  56
-
-struct ptrace_faultinfo {
-	int is_write;
-	unsigned long addr;
-};
-
-struct ptrace_ex_faultinfo {
-	int is_write;
-	unsigned long addr;
-	int trap_no;
-};
-
-struct ptrace_ldt {
-	int func;
-  	void *ptr;
-	unsigned long bytecount;
-};
-
-#endif /*ifndef _LINUX_PTRACE_STRUCT_DEF*/
-
 #endif

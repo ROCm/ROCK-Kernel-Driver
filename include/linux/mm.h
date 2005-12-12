@@ -752,9 +752,6 @@ int __pmd_alloc(struct mm_struct *mm, pud_t *pud, unsigned long address);
 int __pte_alloc(struct mm_struct *mm, pmd_t *pmd, unsigned long address);
 int __pte_alloc_kernel(pmd_t *pmd, unsigned long address);
 
-extern long do_mprotect(struct mm_struct *mm, unsigned long start,
-			size_t len, unsigned long prot);
-
 /*
  * The following ifdef needed to get the 4level-fixup.h header to work.
  * Remove it when 4level-fixup.h has been removed.
@@ -878,15 +875,9 @@ extern int may_expand_vm(struct mm_struct *mm, unsigned long npages);
 
 extern unsigned long get_unmapped_area(struct file *, unsigned long, unsigned long, unsigned long, unsigned long);
 
-extern unsigned long __do_mmap_pgoff(struct mm_struct *mm, struct file *file,
-				   unsigned long addr, unsigned long len,
-				   unsigned long prot, unsigned long flag,
-				   unsigned long pgoff);
-static inline unsigned long do_mmap_pgoff(struct file *file, unsigned long addr,
+extern unsigned long do_mmap_pgoff(struct file *file, unsigned long addr,
 	unsigned long len, unsigned long prot,
-	unsigned long flag, unsigned long pgoff) {
-	return __do_mmap_pgoff(current->mm, file, addr, len, prot, flag, pgoff);
-}
+	unsigned long flag, unsigned long pgoff);
 
 static inline unsigned long do_mmap(struct file *file, unsigned long addr,
 	unsigned long len, unsigned long prot,

@@ -56,8 +56,8 @@ struct x11_kerndata {
 	struct list_head	  mappings;
 
 	/* input drivers */
-	struct input_dev          kbd;
-	struct input_dev          mouse;
+	struct input_dev          *kbd;
+	struct input_dev          *mouse;
 };
 
 void x11_update_screen(struct x11_kerndata *kd)
@@ -123,18 +123,18 @@ void x11_kbd_input(struct x11_kerndata *kd, int key, int down)
 			       __FUNCTION__, key-KEY_MAX);
 		return;
 	}
-	input_report_key(&kd->kbd,key,down);
-	input_sync(&kd->kbd);
+	input_report_key(kd->kbd,key,down);
+	input_sync(kd->kbd);
 }
 
 void x11_mouse_input(struct x11_kerndata *kd, int key, int down,
 		     int x, int y)
 {
 	if (key != KEY_RESERVED)
-		input_report_key(&kd->mouse, key, down);
-	input_report_abs(&kd->mouse, ABS_X, x);
-	input_report_abs(&kd->mouse, ABS_Y, y);
-	input_sync(&kd->mouse);
+		input_report_key(kd->mouse, key, down);
+	input_report_abs(kd->mouse, ABS_X, x);
+	input_report_abs(kd->mouse, ABS_Y, y);
+	input_sync(kd->mouse);
 }
 
 void x11_cad(struct x11_kerndata *kd)
@@ -156,13 +156,13 @@ static int x11_setcolreg(unsigned regno, unsigned red, unsigned green,
 	case 16:
 		if (info->var.red.offset == 10) {
 			/* 1:5:5:5 */
-			((u32*) (info->pseudo_palette))[regno] =	
+			((u32*) (info->pseudo_palette))[regno] =
 				((red   & 0xf800) >>  1) |
 				((green & 0xf800) >>  6) |
 				((blue  & 0xf800) >> 11);
 		} else {
 			/* 0:5:6:5 */
-			((u32*) (info->pseudo_palette))[regno] =	
+			((u32*) (info->pseudo_palette))[regno] =
 				((red   & 0xf800)      ) |
 				((green & 0xfc00) >>  5) |
 				((blue  & 0xf800) >> 11);
@@ -288,7 +288,7 @@ x11_fb_vm_nopage(struct vm_area_struct *vma, unsigned long vaddr,
 		y2 = kd->var->yres;
 	x11_fb_refresh(kd, y1, y2 - y1);
 	up(&kd->mm_lock);
-	
+
 	if (type)
 		*type = VM_FAULT_MINOR;
 	return page;
@@ -352,7 +352,7 @@ int x11_mmap(struct fb_info *p, struct file *file,
 
 out:
 	up(&kd->mm_lock);
-	return retval;	
+	return retval;
 }
 
 /* ------------------------------------------------------------------ */
@@ -381,11 +381,15 @@ static int __init x11_probe(struct device *device)
 {
 	struct x11_kerndata *kd;
 	int i;
-	
-	kd = kmalloc(sizeof(*kd),GFP_KERNEL);
+
+	kd = kzalloc(sizeof(*kd),GFP_KERNEL);
 	if (NULL == kd)
 		return -ENOMEM;
-	memset(kd,0,sizeof(*kd));
+
+	kd->kbd   = input_allocate_device();
+	kd->mouse = input_allocate_device();
+	if (NULL == kd->kbd || NULL == kd->mouse)
+		goto fail_free;
 
 	kd->win = x11_open(x11_width, x11_height);
 	if (NULL == kd->win) {
@@ -410,7 +414,7 @@ static int __init x11_probe(struct device *device)
 		goto fail_vfree;
 	for (i = 0; i < kd->nr_pages; i++)
 		kd->pages[i] = vmalloc_to_page(kd->fb + i*PAGE_SIZE);
-	
+
 	/* framebuffer setup */
 	kd->info = framebuffer_alloc(sizeof(u32) * 256, device);
 	kd->info->pseudo_palette = kd->info->par;
@@ -430,35 +434,34 @@ static int __init x11_probe(struct device *device)
 	       kd->var->red.length, kd->var->green.length, kd->var->blue.length);
 
 	/* keyboard setup */
-        init_input_dev(&kd->kbd);
-	set_bit(EV_KEY, kd->kbd.evbit);
+	set_bit(EV_KEY, kd->kbd->evbit);
 	for (i = 0; i < KEY_MAX; i++)
-		set_bit(i, kd->kbd.keybit);
-	kd->kbd.id.bustype = BUS_HOST;
-	kd->kbd.name = DRIVER_NAME " virtual keyboard";
-	kd->kbd.phys = DRIVER_NAME "/input0";
-	kd->kbd.dev  = device;
-	input_register_device(&kd->kbd);
+		set_bit(i, kd->kbd->keybit);
+	kd->kbd->id.bustype = BUS_HOST;
+	kd->kbd->name = DRIVER_NAME " virtual keyboard";
+	kd->kbd->phys = DRIVER_NAME "/input0";
+	kd->kbd->cdev.dev = device;
+	input_register_device(kd->kbd);
 
 	/* mouse setup */
-        init_input_dev(&kd->mouse);
-	set_bit(EV_ABS,     kd->mouse.evbit);
-	set_bit(EV_KEY,     kd->mouse.evbit);
-	set_bit(BTN_TOUCH,  kd->mouse.keybit);
-	set_bit(BTN_LEFT,   kd->mouse.keybit);
-	set_bit(BTN_MIDDLE, kd->mouse.keybit);
-	set_bit(BTN_RIGHT,  kd->mouse.keybit);
-	set_bit(ABS_X,      kd->mouse.absbit);
-	set_bit(ABS_Y,      kd->mouse.absbit);
-	kd->mouse.absmin[ABS_X] = 0;
-	kd->mouse.absmax[ABS_X] = kd->var->xres;
-	kd->mouse.absmin[ABS_Y] = 0;
-	kd->mouse.absmax[ABS_Y] = kd->var->yres;
-	kd->mouse.id.bustype = BUS_HOST;
-	kd->mouse.name = DRIVER_NAME " virtual mouse";
-	kd->mouse.phys = DRIVER_NAME "/input1";
-	kd->mouse.dev  = device;
-	input_register_device(&kd->mouse);
+        init_input_dev(kd->mouse);
+	set_bit(EV_ABS,     kd->mouse->evbit);
+	set_bit(EV_KEY,     kd->mouse->evbit);
+	set_bit(BTN_TOUCH,  kd->mouse->keybit);
+	set_bit(BTN_LEFT,   kd->mouse->keybit);
+	set_bit(BTN_MIDDLE, kd->mouse->keybit);
+	set_bit(BTN_RIGHT,  kd->mouse->keybit);
+	set_bit(ABS_X,      kd->mouse->absbit);
+	set_bit(ABS_Y,      kd->mouse->absbit);
+	kd->mouse->absmin[ABS_X] = 0;
+	kd->mouse->absmax[ABS_X] = kd->var->xres;
+	kd->mouse->absmin[ABS_Y] = 0;
+	kd->mouse->absmax[ABS_Y] = kd->var->yres;
+	kd->mouse->id.bustype = BUS_HOST;
+	kd->mouse->name = DRIVER_NAME " virtual mouse";
+	kd->mouse->phys = DRIVER_NAME "/input1";
+	kd->mouse->cdev.dev = device;
+	input_register_device(kd->mouse);
 
 	/* misc common kernel stuff */
 	init_MUTEX(&kd->mm_lock);
@@ -479,6 +482,10 @@ fail_vfree:
 fail_close:
 	x11_close(kd->win);
 fail_free:
+	if (kd->kbd)
+		input_free_device(kd->kbd);
+	if (kd->mouse)
+		input_free_device(kd->mouse);
 	kfree(kd);
 	return -ENODEV;
 }
@@ -528,7 +535,7 @@ static int x11_setup(char *str)
 		x11_enable = 1;
 		console_use_vt = 1;
 		conswitchp = &dummy_con;
-#endif  
+#endif
 		return 0;
 	}
 	return -1;

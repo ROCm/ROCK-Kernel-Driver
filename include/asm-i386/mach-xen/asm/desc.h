@@ -159,9 +159,6 @@ static inline unsigned long get_desc_base(unsigned long *desc)
 	return base;
 }
 
-extern int __modify_ldt(struct mm_struct * mm, int func, void __user *ptr,
-		      unsigned long bytecount);
-
 #endif /* !__ASSEMBLY__ */
 
 #endif

@@ -13,7 +13,6 @@ i386-obj-y := hypervisor.o ioremap.o
 #c-obj-$(CONFIG_HUGETLB_PAGE) += hugetlbpage.o
 c-obj-$(CONFIG_NUMA) += numa.o
 c-obj-$(CONFIG_K8_NUMA) += k8topology.o
-c-obj-$(CONFIG_PROC_MM) += proc_mm.o
 
 hugetlbpage-y = ../../../i386/mm/hugetlbpage.o
 

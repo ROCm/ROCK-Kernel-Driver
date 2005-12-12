@@ -392,26 +392,6 @@ config DUMMY_IOMMU
 	  of memory and any 32-bit devices. Don't turn on unless you know what you
 	  are doing.
 
-config PROC_MM
-	bool "/proc/mm support"
-	default y
-
-config PROC_MM_DUMPABLE
-	bool "Make UML childs /proc/<pid> completely browsable"
-	default n
-	help
-	  If in doubt, say N.
-
-	  This fiddles with some settings to make sure /proc/<pid> is completely
-	  browsable by who started UML, at the expense of some additional
-	  locking (maybe this could slow down the runned UMLs of a few percents,
-	  I've not tested this).
-
-	  Also, if there is a bug in this feature, there is some little
-	  possibility to do privilege escalation if you have UML installed
-	  setuid (which you shouldn't have done) or if UML changes uid on
-	  startup (which will be a good thing, when enabled) ...
-
 config X86_MCE
 	bool "Machine check support" if EMBEDDED
 	depends on !X86_64_XEN

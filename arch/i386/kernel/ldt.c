@@ -28,12 +28,11 @@ static void flush_ldt(void *null)
 }
 #endif
 
-static int alloc_ldt(struct mm_struct *mm, int mincount, int reload)
+static int alloc_ldt(mm_context_t *pc, int mincount, int reload)
 {
 	void *oldldt;
 	void *newldt;
 	int oldsize;
-	mm_context_t * pc = &mm->context;
 
 	if (mincount <= pc->size)
 		return 0;
@@ -60,15 +59,13 @@ static int alloc_ldt(struct mm_struct *mm, int mincount, int reload)
 #ifdef CONFIG_SMP
 		cpumask_t mask;
 		preempt_disable();
-		if (&current->active_mm->context == pc)
-			load_LDT(pc);
+		load_LDT(pc);
 		mask = cpumask_of_cpu(smp_processor_id());
-		if (!cpus_equal(mm->cpu_vm_mask, mask))
+		if (!cpus_equal(current->mm->cpu_vm_mask, mask))
 			smp_call_function(flush_ldt, NULL, 1, 1);
 		preempt_enable();
 #else
-		if (&current->active_mm->context == pc)
-			load_LDT(pc);
+		load_LDT(pc);
 #endif
 	}
 	if (oldsize) {
@@ -80,12 +77,12 @@ static int alloc_ldt(struct mm_struct *mm, int mincount, int reload)
 	return 0;
 }
 
-static inline int copy_ldt(struct mm_struct *new, struct mm_struct *old)
+static inline int copy_ldt(mm_context_t *new, mm_context_t *old)
 {
-	int err = alloc_ldt(new, old->context.size, 0);
+	int err = alloc_ldt(new, old->size, 0);
 	if (err < 0)
 		return err;
-	memcpy(new->context.ldt, old->context.ldt, old->context.size*LDT_ENTRY_SIZE);
+	memcpy(new->ldt, old->ldt, old->size*LDT_ENTRY_SIZE);
 	return 0;
 }
 
@@ -93,22 +90,20 @@ static inline int copy_ldt(struct mm_struct *new, struct mm_struct *old)
  * we do not have to muck with descriptors here, that is
  * done in switch_mm() as needed.
  */
-int copy_context(struct mm_struct *mm, struct mm_struct *old_mm)
+int init_new_context(struct task_struct *tsk, struct mm_struct *mm)
 {
+	struct mm_struct * old_mm;
 	int retval = 0;
 
+	init_MUTEX(&mm->context.sem);
+	mm->context.size = 0;
+	old_mm = current->mm;
 	if (old_mm && old_mm->context.size > 0) {
 		down(&old_mm->context.sem);
-		retval = copy_ldt(mm, old_mm);
+		retval = copy_ldt(&mm->context, &old_mm->context);
 		up(&old_mm->context.sem);
 	}
 	return retval;
-}
-
-int init_new_context(struct task_struct *tsk, struct mm_struct *mm)
-{
-	init_new_empty_context(mm);
-	return copy_context(mm, current->mm);
 }
 
 /*
@@ -127,11 +122,11 @@ void destroy_context(struct mm_struct *mm)
 	}
 }
 
-static int read_ldt(struct mm_struct * mm, void __user * ptr,
-		    unsigned long bytecount)
+static int read_ldt(void __user * ptr, unsigned long bytecount)
 {
 	int err;
 	unsigned long size;
+	struct mm_struct * mm = current->mm;
 
 	if (!mm->context.size)
 		return 0;
@@ -180,8 +175,9 @@ static int read_default_ldt(void __user * ptr, unsigned long bytecount)
 	return err;
 }
 
-static int write_ldt(struct mm_struct * mm, void __user * ptr, unsigned long bytecount, int oldmode)
+static int write_ldt(void __user * ptr, unsigned long bytecount, int oldmode)
 {
+	struct mm_struct * mm = current->mm;
 	__u32 entry_1, entry_2;
 	int error;
 	struct user_desc ldt_info;
@@ -205,7 +201,7 @@ static int write_ldt(struct mm_struct * mm, void __user * ptr, unsigned long byt
 
 	down(&mm->context.sem);
 	if (ldt_info.entry_number >= mm->context.size) {
-		error = alloc_ldt(mm, ldt_info.entry_number+1, 1);
+		error = alloc_ldt(&current->mm->context, ldt_info.entry_number+1, 1);
 		if (error < 0)
 			goto out_unlock;
 	}
@@ -235,33 +231,23 @@ out:
 	return error;
 }
 
-int __modify_ldt(struct mm_struct * mm, int func, void __user *ptr,
-	       unsigned long bytecount)
+asmlinkage int sys_modify_ldt(int func, void __user *ptr, unsigned long bytecount)
 {
 	int ret = -ENOSYS;
 
 	switch (func) {
 	case 0:
-		ret = read_ldt(mm, ptr, bytecount);
+		ret = read_ldt(ptr, bytecount);
 		break;
 	case 1:
-		ret = write_ldt(mm, ptr, bytecount, 1);
+		ret = write_ldt(ptr, bytecount, 1);
 		break;
 	case 2:
 		ret = read_default_ldt(ptr, bytecount);
 		break;
 	case 0x11:
-		ret = write_ldt(mm, ptr, bytecount, 0);
+		ret = write_ldt(ptr, bytecount, 0);
 		break;
 	}
-	return ret;
-}
-
-asmlinkage int sys_modify_ldt(int func, void __user *ptr, unsigned long bytecount)
-{
-	int ret = __modify_ldt(current->mm, func, ptr, bytecount);
-	/* A tail call would reorder parameters on the stack and they would then
-	 * be restored at the wrong places. */
-	prevent_tail_call(ret);
 	return ret;
 }

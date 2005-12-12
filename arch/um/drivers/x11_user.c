@@ -28,9 +28,9 @@ struct x11_window {
 
 	/* framebuffer -- x11 */
 	XImage                    *ximage;
-	unsigned char             *xidata;
+	char                      *xidata;
 	XShmSegmentInfo           shminfo;
-	
+
 	/* framebuffer -- kernel */
 	struct fb_fix_screeninfo  fix;
         struct fb_var_screeninfo  var;
@@ -181,7 +181,7 @@ static void x11_kbd_send(struct x11_window *win, struct x11_kerndata *kd,
 			 int keycode, int updown)
 {
 	int key = KEY_RESERVED;
-	
+
 	if (keycode < sizeof(x11_keymap)/sizeof(x11_keymap[0]))
 		key = x11_keymap[keycode];
 	if (KEY_RESERVED == key)
@@ -238,7 +238,7 @@ static void x11_mouse(struct x11_window *win, struct x11_kerndata *kd,
 		      XEvent *e)
 {
 	int key = KEY_RESERVED;
-	
+
 	if (e->xbutton.button < sizeof(x11_mousemap)/sizeof(x11_mousemap[0]))
 		key = x11_mousemap[e->xbutton.button];
 	x11_mouse_input(kd, key, e->type == ButtonPress,
@@ -268,7 +268,7 @@ static void init_color(int32_t mask, struct fb_bitfield *bf)
 			bf->offset++;
 	}
 }
-    
+
 struct x11_window *x11_open(int width, int height)
 {
 	char *title = "user mode linux framebuffer";
@@ -278,11 +278,11 @@ struct x11_window *x11_open(int width, int height)
 	XVisualInfo *info, template;
 	void *old_handler;
 	int n,bytes_pp;
-	
+
 	win = malloc(sizeof(*win));
 	if (NULL == win)
 		goto fail;
-	
+
 	win->dpy = XOpenDisplay(NULL);
 	if (NULL == win->dpy)
 		goto fail_free;
@@ -347,7 +347,7 @@ shm_error:
 	XSetErrorHandler(old_handler);
 
 	memset(&win->shminfo,0,sizeof(win->shminfo));
-	if (NULL == (win->xidata = malloc(width * height * 
+	if (NULL == (win->xidata = malloc(width * height *
 					  (win->vi.depth > 16) ? 4 : 2)))
 		goto fail_free;
 
@@ -370,7 +370,7 @@ have_ximage:
 	init_color(win->vi.red_mask,   &win->var.red);
 	init_color(win->vi.green_mask, &win->var.green);
 	init_color(win->vi.blue_mask,  &win->var.blue);
-	
+
 	win->var.activate       = FB_ACTIVATE_NOW;
 	win->var.height		= -1;
 	win->var.width		= -1;
@@ -384,11 +384,11 @@ have_ximage:
 	win->fix.line_length    = win->ximage->bytes_per_line;
 	win->fix.smem_start     = 0;
 	win->fix.smem_len       = win->fix.line_length * win->var.yres;
-	
+
 	strcpy(win->fix.id,"x11");
 	win->fix.type		= FB_TYPE_PACKED_PIXELS;
 	win->fix.accel		= FB_ACCEL_NONE;
-	
+
 	/* create + init window */
 	hints.flags      = PMinSize | PMaxSize;
 	hints.min_width  = width;
@@ -396,7 +396,7 @@ have_ximage:
 	hints.max_width  = width;
 	hints.max_height = height;
 	XStringListToTextProperty(&title,1,&prop);
-	
+
 	win->root  = RootWindow(win->dpy, DefaultScreen(win->dpy));
 	win->win = XCreateSimpleWindow(win->dpy, win->root,
 				       0, 0, width, height,
@@ -416,7 +416,7 @@ have_ximage:
 
 	XFlush(win->dpy);
 	return win;
-	
+
 fail_free:
 	free(win);
 fail:
@@ -476,7 +476,7 @@ int x11_has_data(struct x11_window *win, struct x11_kerndata *kd)
 {
 	XEvent e;
 	int count = 0;
-	
+
 	while (True == XCheckMaskEvent(win->dpy, ~0, &e)) {
 		count++;
 		switch (e.type) {

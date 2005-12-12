@@ -20,9 +20,3 @@ obj-$(CONFIG_SHMEM) += shmem.o
 obj-$(CONFIG_TINY_SHMEM) += tiny-shmem.o
 obj-$(CONFIG_MEMORY_HOTPLUG) += memory_hotplug.o
 obj-$(CONFIG_FS_XIP) += filemap_xip.o
-
-obj-$(CONFIG_PROC_MM)	+= proc_mm.o
-
-ifeq ($(CONFIG_PROC_MM),y)
-obj-m			+= proc_mm-mod.o
-endif
