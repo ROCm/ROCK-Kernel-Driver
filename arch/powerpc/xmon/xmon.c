@@ -774,9 +774,6 @@ cmds(struct pt_regs *excp)
 			case 'd':
 				memops(cmd);
 				break;
-		case 'D':
-			xmon_show_dmesg();
-			break;
 			case 'l':
 				memlocate();
 				break;
@@ -793,6 +790,9 @@ cmds(struct pt_regs *excp)
 			break;
 		case 'd':
 			dump();
+			break;
+		case 'D':
+			xmon_show_dmesg();
 			break;
 		case 'l':
 			symbol_lookup();
