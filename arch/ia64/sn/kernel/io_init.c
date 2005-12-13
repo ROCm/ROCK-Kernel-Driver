@@ -433,8 +433,7 @@ void sn_pci_controller_fixup(int segment, int busnum, struct pci_bus *bus)
 	/* Allocate a sn_pci_controller, which has a pci_controller struct
 	 * as the first member.
 	 */
-	sn_controller =
-	    kcalloc(1, sizeof(struct sn_pci_controller), GFP_KERNEL);
+	sn_controller = kzalloc(sizeof(struct sn_pci_controller), GFP_KERNEL);
 	if (!sn_controller)
 		BUG();
 	INIT_LIST_HEAD(&sn_controller->pcidev_info);

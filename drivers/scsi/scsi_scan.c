@@ -276,8 +276,6 @@ static struct scsi_device *scsi_alloc_sdev(struct scsi_target *starget,
 			/*
 			 * if LLDD reports slave not present, don't clutter
 			 * console with alloc failure messages
-
-
 			 */
 			if (ret == -ENXIO)
 				display_failure_msg = 0;
