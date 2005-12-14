@@ -934,8 +934,6 @@ static int snd_trident_synth_new_device(struct snd_seq_device *dev)
 {
 	struct snd_trident *trident;
 	int client, i;
-	struct snd_seq_client_callback callbacks;
-	struct snd_seq_client_info cinfo;
 	struct snd_seq_port_subscribe sub;
 	struct snd_simple_ops *simpleops;
 	char *str;
@@ -947,26 +945,16 @@ static int snd_trident_synth_new_device(struct snd_seq_device *dev)
 	trident->synth.seq_client = -1;
 
 	/* allocate new client */
-	memset(&callbacks, 0, sizeof(callbacks));
-	callbacks.private_data = trident;
-	callbacks.allow_output = callbacks.allow_input = 1;
-	client = trident->synth.seq_client =
-	    snd_seq_create_kernel_client(trident->card, 1, &callbacks);
-	if (client < 0)
-		return client;
-
-	/* change name of client */
-	memset(&cinfo, 0, sizeof(cinfo));
-	cinfo.client = client;
-	cinfo.type = KERNEL_CLIENT;
 	str = "???";
 	switch (trident->device) {
 	case TRIDENT_DEVICE_ID_DX:	str = "Trident 4DWave-DX"; break;
 	case TRIDENT_DEVICE_ID_NX:	str = "Trident 4DWave-NX"; break;
 	case TRIDENT_DEVICE_ID_SI7018:	str = "SiS 7018"; break;
 	}
-	sprintf(cinfo.name, str);
-	snd_seq_kernel_client_ctl(client, SNDRV_SEQ_IOCTL_SET_CLIENT_INFO, &cinfo);
+	client = trident->synth.seq_client =
+		snd_seq_create_kernel_client(trident->card, 1, str);
+	if (client < 0)
+		return client;
 
 	for (i = 0; i < 4; i++)
 		snd_trident_synth_create_port(trident, i);

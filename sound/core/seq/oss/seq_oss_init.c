@@ -65,39 +65,23 @@ int __init
 snd_seq_oss_create_client(void)
 {
 	int rc;
-	struct snd_seq_client_callback callback;
-	struct snd_seq_client_info *info;
 	struct snd_seq_port_info *port;
 	struct snd_seq_port_callback port_callback;
 
-	info = kmalloc(sizeof(*info), GFP_KERNEL);
 	port = kmalloc(sizeof(*port), GFP_KERNEL);
-	if (!info || !port) {
+	if (!port) {
 		rc = -ENOMEM;
 		goto __error;
 	}
 
 	/* create ALSA client */
-	memset(&callback, 0, sizeof(callback));
-
-	callback.private_data = NULL;
-	callback.allow_input = 1;
-	callback.allow_output = 1;
-
-	rc = snd_seq_create_kernel_client(NULL, SNDRV_SEQ_CLIENT_OSS, &callback);
+	rc = snd_seq_create_kernel_client(NULL, SNDRV_SEQ_CLIENT_OSS,
+					  "OSS sequencer");
 	if (rc < 0)
 		goto __error;
 
 	system_client = rc;
 	debug_printk(("new client = %d\n", rc));
-
-	/* set client information */
-	memset(info, 0, sizeof(*info));
-	info->client = system_client;
-	info->type = KERNEL_CLIENT;
-	strcpy(info->name, "OSS sequencer");
-
-	rc = call_ctl(SNDRV_SEQ_IOCTL_SET_CLIENT_INFO, info);
 
 	/* look up midi devices */
 	snd_seq_oss_midi_lookup_ports(system_client);
@@ -131,7 +115,6 @@ snd_seq_oss_create_client(void)
 
  __error:
 	kfree(port);
-	kfree(info);
 	return rc;
 }
 
