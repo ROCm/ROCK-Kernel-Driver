@@ -43,12 +43,13 @@ FILE *debugfile;
 int cur_line = 1;
 char *cur_filename, *output_directory;
 
-int flag_debug, flag_dump_defs, flag_warnings;
+int flag_debug, flag_dump_defs, flag_dump_types, flag_warnings;
 
 static int errors;
 static int nsyms;
 
 static struct symbol *expansion_trail;
+static struct symbol *visited_symbols;
 
 static const char * const symbol_type_name[] = {
   "normal", "typedef", "enum", "struct", "union"
@@ -178,6 +179,7 @@ add_symbol(const char *name, enum symbol_type type, struct string_list *defn, in
   sym->type = type;
   sym->defn = defn;
   sym->expansion_trail = NULL;
+  sym->visited = NULL;
   sym->is_extern = is_extern;
 
   sym->hash_next = symtab[h];
@@ -262,27 +264,12 @@ equal_list(struct string_list *a, struct string_list *b)
 static inline void
 print_node(FILE *f, struct string_list *list)
 {
-  switch (list->tag)
+  if (list->tag != SYM_NORMAL)
     {
-    case SYM_STRUCT:
-      putc('s', f);
-      goto printit;
-    case SYM_UNION:
-      putc('u', f);
-      goto printit;
-    case SYM_ENUM:
-      putc('e', f);
-      goto printit;
-    case SYM_TYPEDEF:
-      putc('t', f);
-      goto printit;
-
-    printit:
+      putc(symbol_type_name[list->tag][0], f);
       putc('#', f);
-    case SYM_NORMAL:
-      fputs(list->string, f);
-      break;
     }
+  fputs(list->string, f);
 }
 
 void
@@ -318,8 +305,9 @@ print_list(FILE *f, struct string_list *list)
 }
 
 static unsigned long
-expand_and_crc_list(struct string_list *list, unsigned long crc)
+expand_and_crc_sym(struct symbol *sym, unsigned long crc)
 {
+  struct string_list *list = sym->defn;
   struct string_list **e, **b;
   struct string_list *tmp, **tmp2;
   int elem = 1;
@@ -367,7 +355,7 @@ expand_and_crc_list(struct string_list *list, unsigned long crc)
 	    {
 	      subsym->expansion_trail = expansion_trail;
 	      expansion_trail = subsym;
-	      crc = expand_and_crc_list(subsym->defn, crc);
+	      crc = expand_and_crc_sym(subsym, crc);
 	    }
 	  break;
 
@@ -418,11 +406,22 @@ expand_and_crc_list(struct string_list *list, unsigned long crc)
 	    {
 	      subsym->expansion_trail = expansion_trail;
 	      expansion_trail = subsym;
-	      crc = expand_and_crc_list(subsym->defn, crc);
+	      crc = expand_and_crc_sym(subsym, crc);
 	    }
 	  break;
 	}
     }
+
+  {
+    static struct symbol **end = &visited_symbols;
+
+    if (!sym->visited)
+      {
+	*end = sym;
+	end = &sym->visited;
+	sym->visited = (struct symbol *)-1L;
+      }
+  }
 
   return crc;
 }
@@ -444,7 +443,7 @@ export_symbol(const char *name)
 
       expansion_trail = (struct symbol *)-1L;
 
-      crc = expand_and_crc_list(sym->defn, 0xffffffff) ^ 0xffffffff;
+      crc = expand_and_crc_sym(sym, 0xffffffff) ^ 0xffffffff;
 
       sym = expansion_trail;
       while (sym != (struct symbol *)-1L)
@@ -525,6 +524,7 @@ void genksyms_usage(void)
 int
 main(int argc, char **argv)
 {
+  FILE *dumpfile = NULL;
   int o;
 
 #ifdef __GNU_LIBRARY__
@@ -533,12 +533,13 @@ main(int argc, char **argv)
     {"warnings", 0, 0, 'w'},
     {"quiet", 0, 0, 'q'},
     {"dump", 0, 0, 'D'},
+    {"dump-types", 1, 0, 'T'},
     {"version", 0, 0, 'V'},
     {"help", 0, 0, 'h'},
     {0, 0, 0, 0}
   };
 
-  while ((o = getopt_long(argc, argv, "dwqVDk:p:",
+  while ((o = getopt_long(argc, argv, "dwqVDT:k:p:",
 			  &long_opts[0], NULL)) != EOF)
 #else  /* __GNU_LIBRARY__ */
   while ((o = getopt(argc, argv, "dwqVDk:p:")) != EOF)
@@ -560,6 +561,15 @@ main(int argc, char **argv)
       case 'D':
 	flag_dump_defs = 1;
 	break;
+      case 'T':
+	flag_dump_types = 1;
+	dumpfile = fopen(optarg, "w");
+	if (!dumpfile)
+	  {
+	    perror(optarg);
+	    return 1;
+	  }
+	break;
       case 'h':
 	genksyms_usage();
 	return 0;
@@ -580,6 +590,27 @@ main(int argc, char **argv)
     }
 
   yyparse();
+
+  if (flag_dump_types && visited_symbols)
+    {
+      while (visited_symbols != (struct symbol *)-1L)
+	{
+	  struct symbol *sym = visited_symbols;
+
+	  if (sym->type != SYM_NORMAL)
+	    {
+	      putc(symbol_type_name[sym->type][0], dumpfile);
+	      putc('#', dumpfile);
+	    }
+	  fputs(sym->name, dumpfile);
+	  putc(' ', dumpfile);
+	  print_list(dumpfile, sym->defn);
+	  putc('\n', dumpfile);
+
+	  visited_symbols = sym->visited;
+	  sym->visited = NULL;
+	}
+    }
 
   if (flag_debug)
     {

@@ -853,6 +853,8 @@ export CPPFLAGS_vmlinux.lds += -P -C -U$(ARCH)
 	$(Q)$(MAKE) $(build)=$(@D) $@
 %.i: %.c scripts FORCE
 	$(Q)$(MAKE) $(build)=$(@D) $@
+%.symtypes: %.c scripts FORCE
+	$(Q)$(MAKE) $(build)=$(@D) $@
 %.o: %.c scripts FORCE
 	$(Q)$(MAKE) $(build)=$(@D) $@
 %.ko: scripts FORCE
@@ -1015,7 +1017,8 @@ clean: archclean $(clean-dirs)
 	$(call cmd,rmfiles)
 	@find . $(RCS_FIND_IGNORE) \
 	 	\( -name '*.[oas]' -o -name '*.ko' -o -name '.*.cmd' \
-		-o -name '.*.d' -o -name '.*.tmp' -o -name '*.mod.c' \) \
+		-o -name '.*.d' -o -name '.*.tmp' -o -name '*.mod.c' \
+		-o -name '*.symtypes' \) \
 		-type f -print | xargs rm -f
 
 # mrproper - Delete all generated files, including .config

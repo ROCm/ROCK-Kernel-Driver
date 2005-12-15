@@ -46,6 +46,7 @@ struct symbol
   enum symbol_type type;
   struct string_list *defn;
   struct symbol *expansion_trail;
+  struct symbol *visited;
   int is_extern;
 };
 
