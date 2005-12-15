@@ -2147,7 +2147,7 @@ int reiserfs_truncate_file(struct inode *p_s_inode, int update_timestamps)
 	    journal_end(&th, p_s_inode->i_sb, JOURNAL_PER_BALANCE_CNT * 2 + 1);
 	if (error)
 		goto out;
-	
+
 	/* check reiserfs_do_truncate after ending the transaction */
 	if (err2) {
 		error = err2;
