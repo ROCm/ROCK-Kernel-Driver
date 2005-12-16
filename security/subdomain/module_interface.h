@@ -12,7 +12,7 @@ enum sd_code {
 	SD_U16,
 	SD_U32,
 	SD_U64,
-	SD_NAME,		/* same as string except it is items name */
+	SD_NAME,	/* same as string except it is items name */
 	SD_DYN_STRING,
 	SD_STATIC_BLOB,
 	SD_STRUCT,

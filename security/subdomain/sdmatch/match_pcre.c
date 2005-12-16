@@ -17,8 +17,9 @@ void *ptr=NULL;
 
 	if (entry_type == sd_entry_pattern) {
 		ptr = kmalloc(sizeof(struct sdmatch_entry), GFP_KERNEL);
-
-		if (!ptr)
+		if (ptr)
+			memset(ptr, 0, sizeof(struct sdmatch_entry));
+		else
 			ptr=ERR_PTR(-ENOMEM);
 	} else if (entry_type != sd_entry_literal &&
 		   entry_type != sd_entry_tailglob) {
@@ -30,6 +31,11 @@ void *ptr=NULL;
 
 void sdmatch_free(void *ptr)
 {
+	if (ptr) {
+		struct sdmatch_entry *ed = (struct sdmatch_entry *) ptr;
+		kfree(ed->pattern);
+		kfree(ed->compiled);	/* allocated by SD_READ_X */
+	}
 	kfree(ptr);
 }
 
@@ -100,7 +106,9 @@ int sdmatch_serialize(void *entry_extradata, struct sd_ext *e,
 
 done:
 	if (error != 0 && ed) {
+		kfree(ed->pattern); /* allocated by SD_READ_X */
 		kfree(ed->compiled);
+		ed->pattern = NULL;
 		ed->compiled = NULL;
 	}
 

@@ -72,6 +72,4 @@ enum entry_t {
 	sd_entry_invalid
 };
 
-#endif				/* ! _IMMUNIX_H */
-
-/*======================================================================*/
+#endif /* _IMMUNIX_H */

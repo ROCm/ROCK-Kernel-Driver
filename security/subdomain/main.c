@@ -42,54 +42,9 @@ struct sdprofile *null_profile;
  */
 struct sdprofile *null_complain_profile;
 
-/* temp define for syslog workaround */
-#define SYSLOG_TEMPFIX
-
 /***************************
  * PRIVATE UTILITY FUNCTIONS
  **************************/
-
-#ifdef SYSLOG_TEMPFIX
-/* Horrible hack
- * Syslog (not syslog-ng) has a bug where it escapes uneven numbers of %
- * symbols.  So we force an enen number here by escaping.
- * This code will GO AWAY once syslog bug is fixed
- */
-static __INLINE__ const char *_escape_percent(const char *name)
-{
-	int count = 0, len = 0;
-	const char *sptr;
-	char *dptr, *newname = (char *)name;
-
-	sptr = name;
-	while (*sptr) {
-		if (*sptr == '%')
-			count++;
-
-		len++;
-		sptr++;
-	}
-
-	if (count) {
-		newname = kmalloc(len + count + 1, GFP_KERNEL);
-		if (newname) {
-			sptr = name;
-			dptr = newname;
-
-			while (*sptr) {
-				if (*sptr == '%') {
-					*dptr++ = '%';
-				}
-
-				*dptr++ = *sptr++;
-			}
-			*dptr = 0;
-		}
-	}
-
-	return (const char *)newname;
-}
-#endif // SYSLOG_TEMPFIX
 
 /*
  * sd_taskattr_access:
@@ -98,7 +53,7 @@ static __INLINE__ const char *_escape_percent(const char *name)
  *
  * Determine if request is for write access to /proc/self/attr/current
  */
-static __INLINE__ int sd_taskattr_access(const char *procrelname)
+static inline int sd_taskattr_access(const char *procrelname)
 {
 /*
  * assumes a 32bit pid, which requires max 10 decimal digits to represent
@@ -118,7 +73,7 @@ static __INLINE__ int sd_taskattr_access(const char *procrelname)
  * @profile: profile
  * @name: filename
  */
-static __INLINE__ int sd_file_mode(struct sdprofile *profile, const char *name)
+static inline int sd_file_mode(struct sdprofile *profile, const char *name)
 {
 	struct list_head *lh;
 	int mode = 0;
@@ -167,8 +122,8 @@ out:
  *       else
  *          *xmod = SD_MAY_EXEC
  */
-static __INLINE__ int sd_get_execmode(struct subdomain *sd, const char *name,
-				      int *xmod)
+static inline int sd_get_execmode(struct subdomain *sd, const char *name,
+				  int *xmod)
 {
 	struct sdprofile *profile;
 	struct list_head *lh;
@@ -203,14 +158,12 @@ static __INLINE__ int sd_get_execmode(struct subdomain *sd, const char *name,
 		    sdmatch_match(name, entry->filename,
 				  entry->entry_type, entry->extradata)) {
 			if (match &&
-			    SD_EXEC_MASK(entry->mode) != SD_EXEC_MASK(match->mode)) {
+			    SD_EXEC_MASK(entry->mode) !=
+			    SD_EXEC_MASK(match->mode))
 				pattern_match_invalid = 1;
-			} else {
-				/* got a pattern match, keep searching for an
-				 * exact match
-				 */
+			else
+				/* keep searching for an exact match */
 				match = entry;
-			}
 		} else if ((entry->entry_type == sd_entry_literal ||
 			    (!pattern_match_invalid &&
 			     entry->entry_type == sd_entry_tailglob)) &&
@@ -219,21 +172,21 @@ static __INLINE__ int sd_get_execmode(struct subdomain *sd, const char *name,
 					  entry->extradata)) {
 			if (entry->entry_type == sd_entry_literal) {
 				/* got an exact match -- there can be only
-				 * one, asserted a profile load time
+				 * one, asserted at profile load time
 				 */
 				match = entry;
 				pattern_match_invalid = 0;
 				break;
 			} else {
 				if (match &&
-				    SD_EXEC_MASK(entry->mode) != SD_EXEC_MASK(match->mode)) {
+				    SD_EXEC_MASK(entry->mode) !=
+				    SD_EXEC_MASK(match->mode))
 					pattern_match_invalid = 1;
-				} else {
+				else
 					/* got a tailglob match, keep searching
 					 * for an exact match
 					 */
 					match = entry;
-				}
 			}
 		}
 
@@ -247,17 +200,19 @@ static __INLINE__ int sd_get_execmode(struct subdomain *sd, const char *name,
 		/* check for qualifiers, if present
 		 * we just return the qualifier
 		 */
-		if (mode & ~SD_MAY_EXEC) {
+		if (mode & ~SD_MAY_EXEC)
 			mode = mode & ~SD_MAY_EXEC;
-		}
 
 		*xmod = mode;
 	} else if (!match) {
-		SD_DEBUG("%s: Unable to find execute entry in profile for image '%s'\n",
+		SD_DEBUG("%s: Unable to find execute entry in profile "
+			 "for image '%s'\n",
 			 __FUNCTION__,
 			 name);
 	} else if (pattern_match_invalid) {
-		SD_WARN("%s: Inconsistency in profile %s. Two (or more) patterns specify conflicting exec qualifiers ('u', 'i' or 'p') for image %s\n",
+		SD_WARN("%s: Inconsistency in profile %s. "
+			"Two (or more) patterns specify conflicting exec "
+			"qualifiers ('u', 'i' or 'p') for image %s\n",
 			__FUNCTION__,
 			sd->active->name,
 			name);
@@ -282,7 +237,7 @@ not_confined:
  *
  * Returned value of 0 indicates no need to perform a perm check.
  */
-static __INLINE__ int sd_filter_mask(int mask, struct inode *inode)
+static inline int sd_filter_mask(int mask, struct inode *inode)
 {
 	if (mask) {
 		int elim=MAY_APPEND;
@@ -310,42 +265,18 @@ static __INLINE__ int sd_filter_mask(int mask, struct inode *inode)
  * Prints out the status of the attribute change request.  Only prints
  * accepted when in audit mode.
  */
-static __INLINE__ void sd_attr_trace(struct subdomain *sd, const char *name,
-				     struct iattr *iattr, int error)
+static inline void sd_attr_trace(struct subdomain *sd, const char *name,
+				 struct iattr *iattr, int error)
 {
 	const char *status = "AUDITING";
-#ifdef SYSLOG_TEMPFIX
-	const char *newname;
-#endif
 
-	if (error) {
+	if (error)
 		status = SUBDOMAIN_COMPLAIN(sd) ? "PERMITTING" : "REJECTING";
-	} else if (!SUBDOMAIN_AUDIT(sd)) {
+	else if (!SUBDOMAIN_AUDIT(sd))
 		return;
-	}
-#ifdef SYSLOG_TEMPFIX
-	newname = _escape_percent(name);
 
-	SD_WARN("%s%s attribute (%s%s%s%s%s%s%s) change to %s (%s(%d) profile %s active %s)\n",
-		status,
-		newname != name ? "-SYSLOGFIX" : "",
-		iattr->ia_valid & ATTR_MODE ? "mode," : "",
-		iattr->ia_valid & ATTR_UID ? "uid," : "",
-		iattr->ia_valid & ATTR_GID ? "gid," : "",
-		iattr->ia_valid & ATTR_SIZE ? "size," : "",
-		((iattr->ia_valid & ATTR_ATIME_SET)
-		 || (iattr->ia_valid & ATTR_ATIME)) ? "atime," : "",
-		((iattr->ia_valid & ATTR_MTIME_SET)
-		 || (iattr->ia_valid & ATTR_MTIME)) ? "mtime," : "",
-		iattr->ia_valid & ATTR_CTIME ? "ctime," : "",
-		newname ? newname : "KMALLOC-ERROR",
-		current->comm, current->pid,
-		sd->profile->name, sd->active->name);
-
-	if (newname != name)
-		kfree(newname);
-#else
-	SD_WARN("%s attribute (%s%s%s%s%s%s%s) change to %s (%s(%d) profile %s active %s)\n",
+	SD_WARN("%s attribute (%s%s%s%s%s%s%s) change to %s (%s(%d) "
+		"profile %s active %s)\n",
 		status,
 		iattr->ia_valid & ATTR_MODE ? "mode," : "",
 		iattr->ia_valid & ATTR_UID ? "uid," : "",
@@ -358,7 +289,6 @@ static __INLINE__ void sd_attr_trace(struct subdomain *sd, const char *name,
 		iattr->ia_valid & ATTR_CTIME ? "ctime," : "",
 		name, current->comm, current->pid,
 		sd->profile->name, sd->active->name);
-#endif
 }
 
 /**
@@ -371,8 +301,8 @@ static __INLINE__ void sd_attr_trace(struct subdomain *sd, const char *name,
  * Prints out the status of the attribute change request.  Only prints
  * accepted when in audit mode.
  */
-static __INLINE__ void sd_xattr_trace(struct subdomain *sd, const char *name,
-				      const char *xattr, int mask, int error)
+static inline void sd_xattr_trace(struct subdomain *sd, const char *name,
+				  const char *xattr, int mask, int error)
 {
 	const char *status = "AUDITING";
 
@@ -382,7 +312,8 @@ static __INLINE__ void sd_xattr_trace(struct subdomain *sd, const char *name,
 		return;
 	}
 
-	SD_WARN("%s %s%s access to %s extended attribute %s (%s(%d) profile %s active %s)\n",
+	SD_WARN("%s %s%s access to %s extended attribute %s (%s(%d) "
+		"profile %s active %s)\n",
 		status,
 		mask & SD_MAY_READ  ? "r" : "",
 		mask & SD_MAY_WRITE ? "w" : "",
@@ -401,36 +332,16 @@ static __INLINE__ void sd_xattr_trace(struct subdomain *sd, const char *name,
  * Prints out the status of the permission request.  Only prints
  * accepted when in audit mode.
  */
-static __INLINE__ void sd_file_perm_trace(struct subdomain *sd,
-					  const char *name, int mask, int error)
+static inline void sd_file_perm_trace(struct subdomain *sd,
+				      const char *name, int mask, int error)
 {
 	const char *status = "AUDITING";
-#ifdef SYSLOG_TEMPFIX
-	const char *newname;
-#endif
 
-	if (error) {
+	if (error)
 		status = SUBDOMAIN_COMPLAIN(sd) ? "PERMITTING" : "REJECTING";
-	} else if (!SUBDOMAIN_AUDIT(sd)) {
+	else if (!SUBDOMAIN_AUDIT(sd))
 		return;
-	}
-#ifdef SYSLOG_TEMPFIX
-	newname = _escape_percent(name);
 
-	SD_WARN("%s%s %s%s%s%s access to %s (%s(%d) profile %s active %s)\n",
-		status,
-		newname != name ? "-SYSLOGFIX"  : "",
-		mask & SD_MAY_READ  ? "r" : "",
-		mask & SD_MAY_WRITE ? "w" : "",
-		mask & SD_MAY_EXEC  ? "x" : "",
-		mask & SD_MAY_LINK  ? "l" : "",
-		newname ? newname : "KMALLOC-ERROR",
-		current->comm, current->pid,
-		sd->profile->name, sd->active->name);
-
-	if (newname != name)
-		kfree(newname);
-#else
 	SD_WARN("%s %s%s%s%s access to %s (%s(%d) profile %s active %s)\n",
 		status,
 		mask & SD_MAY_READ  ? "r" : "",
@@ -439,7 +350,6 @@ static __INLINE__ void sd_file_perm_trace(struct subdomain *sd,
 		mask & SD_MAY_LINK  ? "l" : "",
 		name, current->comm, current->pid,
 		sd->profile->name, sd->active->name);
-#endif
 }
 
 /**
@@ -452,43 +362,16 @@ static __INLINE__ void sd_file_perm_trace(struct subdomain *sd,
  * Prints out the status of the permission request.  Only prints
  * accepted when in audit mode.
  */
-static __INLINE__ void sd_link_perm_trace(struct subdomain *sd,
-					  const char *lname, const char *tname,
-					  int error)
+static inline void sd_link_perm_trace(struct subdomain *sd,
+				      const char *lname, const char *tname,
+				      int error)
 {
 	const char *status = "AUDITING";
-#ifdef SYSLOG_TEMPFIX
-	const char *newlname,
-	     	   *newtname;
-#endif
 
-	if (error) {
+	if (error)
 		status = SUBDOMAIN_COMPLAIN(sd) ? "PERMITTING" : "REJECTING";
-	} else if (!SUBDOMAIN_AUDIT(sd)) {
+	else if (!SUBDOMAIN_AUDIT(sd))
 		return;
-	}
-#ifdef SYSLOG_TEMPFIX
-	newlname = _escape_percent(lname);
-	newtname = _escape_percent(tname);
-
-	SD_WARN("%s%s link access from %s to %s (%s(%d) profile %s active %s)\n",
-		status,
-		newlname != lname || newtname != tname ? "-SYSLOGFIX" : "",
-		newlname ? newlname : "KMALLOC-ERROR",
-		newtname ? newtname : "KMALLOC-ERROR",
-		current->comm, current->pid,
-		sd->profile->name, sd->active->name);
-
-	if (newlname != lname)
-		kfree(newlname);
-
-	if (newtname != tname)
-		kfree(newtname);
-#else
-	SD_WARN("%s link access from %s to %s (%s(%d) profile %s active %s)\n",
-		status, lname, tname, current->comm, current->pid,
-		sd->profile->name, sd->active->name);
-#endif
 }
 
 /*************************
@@ -526,9 +409,8 @@ static int sd_link_perm(struct subdomain *sd,
 
 out:
 	sd_link_perm_trace(sd, link, target, error);
-	if (SUBDOMAIN_COMPLAIN(sd)) {
+	if (SUBDOMAIN_COMPLAIN(sd))
 		error = 0;
-	}
 	return error;
 }
 
@@ -602,8 +484,9 @@ int sd_file_perm(struct subdomain *sd, const char *name, int mask, int log)
 
 	error = 0;
 
-	// should not enter with other than R/W/X/L
-	BUG_ON(mask & ~(SD_MAY_READ | SD_MAY_WRITE | SD_MAY_EXEC | SD_MAY_LINK));
+	/* should not enter with other than R/W/X/L */
+	BUG_ON(mask &
+	       ~(SD_MAY_READ | SD_MAY_WRITE | SD_MAY_EXEC | SD_MAY_LINK));
 
 	/* not confined */
 	if (!__sd_is_confined(sd)) {
@@ -617,9 +500,8 @@ int sd_file_perm(struct subdomain *sd, const char *name, int mask, int log)
 	 */
 	if (mask == MAY_WRITE && strncmp(PROCPFX, name, PROCLEN) == 0 &&
 	    (!list_empty(&sd->profile->sub) || SUBDOMAIN_COMPLAIN(sd)) &&
-	    sd_taskattr_access(name + PROCLEN)) {
+	    sd_taskattr_access(name + PROCLEN))
 		goto done_notrace;
-	}
 
 	error = -EACCES;
 
@@ -633,9 +515,8 @@ int sd_file_perm(struct subdomain *sd, const char *name, int mask, int log)
 
 		/* do we have to accumulate this bit?
 		 * or have we already accumulated it (shortcut below)? */
-		if (!(mask & (1 << i)) || mode & (1 << i)) {
+		if (!(mask & (1 << i)) || mode & (1 << i))
 			continue;
-		}
 
 		list_for_each(lh, &profile->file_entryp[i]) {
 			struct sd_entry *entry;
@@ -668,9 +549,8 @@ done:
 	if (log) {
 		sd_file_perm_trace(sd, name, mask, error);
 
-		if (SUBDOMAIN_COMPLAIN(sd)) {
+		if (SUBDOMAIN_COMPLAIN(sd))
 			error = 0;
-		}
 	}
 
 done_notrace:
@@ -708,21 +588,20 @@ int sd_attr(struct subdomain *sd, struct dentry *dentry, struct iattr *iattr)
 			error = sd_file_perm(sd, name, MAY_WRITE, 0);
 
 			/* access via any path is enough */
-			if (error) {
+			if (error)
 				sd_attr_trace(sd, name, iattr, error);
-			}
 
 			sd_put_name(name);
 
-			if (!error) {
+			if (!error)
 				break;
-			}
 		}
 
 	} while (name);
 
 	if ((sdpath_error = sd_path_end(&data)) != 0) {
-		SD_ERROR("%s: An error occured while translating dentry %p inode# %lu to a pathname. Error %d\n",
+		SD_ERROR("%s: An error occured while translating dentry %p "
+			 "inode# %lu to a pathname. Error %d\n",
 			 __FUNCTION__,
 			 dentry,
 			 dentry->d_inode->i_ino,
@@ -731,9 +610,8 @@ int sd_attr(struct subdomain *sd, struct dentry *dentry, struct iattr *iattr)
 		error = sdpath_error;
 	}
 
-	if (SUBDOMAIN_COMPLAIN(sd)) {
+	if (SUBDOMAIN_COMPLAIN(sd))
 		error = 0;
-	}
 
 out:
 	return error;
@@ -771,7 +649,8 @@ int sd_xattr(struct subdomain *sd, struct dentry *dentry, const char *attr,
 	} while (name);
 
 	if ((sdpath_error = sd_path_end(&data)) != 0) {
-		SD_ERROR("%s: An error occured while translating dentry %p inode# %lu to a pathname. Error %d\n",
+		SD_ERROR("%s: An error occured while translating dentry %p "
+			 "inode# %lu to a pathname. Error %d\n",
 			 __FUNCTION__,
 			 dentry,
 			 dentry->d_inode->i_ino,
@@ -866,7 +745,8 @@ int sd_perm_dentry(struct subdomain *sd, struct dentry *dentry, int mask)
 	} while (name);
 
 	if ((sdpath_error = sd_path_end(&data)) != 0) {
-		SD_ERROR("%s: An error occured while translating dentry %p inode# %lu to a pathname. Error %d\n",
+		SD_ERROR("%s: An error occured while translating dentry %p "
+			 "inode# %lu to a pathname. Error %d\n",
 			 __FUNCTION__,
 			 dentry,
 			 dentry->d_inode->i_ino,
@@ -900,19 +780,18 @@ int sd_capability(struct subdomain *sd, int cap)
 		error = cap_raised(sd->active->capabilities, cap) ? 0 : -EPERM;
 
 		if (error || SUBDOMAIN_AUDIT(sd)) {
-			if (error == 0) {	/* AUDIT */
+			if (error == 0)
 				status = "AUDITING";
-			}
 
-			SD_WARN("%s access to capability '%s' (%s(%d) profile %s active %s)\n",
+			SD_WARN("%s access to capability '%s' (%s(%d) "
+				"profile %s active %s)\n",
 				status,
 				capability_to_name(cap),
 				current->comm, current->pid,
 				sd->profile->name, sd->active->name);
 
-			if (SUBDOMAIN_COMPLAIN(sd)) {
+			if (SUBDOMAIN_COMPLAIN(sd))
 				error = 0;
-			}
 		}
 	}
 
@@ -959,14 +838,15 @@ int sd_link(struct subdomain *sd, struct dentry *link, struct dentry *target)
 					sd_put_name(iname);
 
 					/* access via any path is enough */
-					if (!error) {
+					if (!error)
 						done = 1;
-					}
 				}
 			} while (!done && iname);
 
 			if ((sdpath_error = sd_path_end(&idata)) != 0) {
-				SD_ERROR("%s: An error occured while translating inner dentry %p inode %lu to a pathname. Error %d\n",
+				SD_ERROR("%s: An error occured while "
+					 "translating inner dentry %p "
+					 "inode %lu to a pathname. Error %d\n",
 					 __FUNCTION__,
 					 target,
 					 target->d_inode->i_ino,
@@ -978,12 +858,12 @@ int sd_link(struct subdomain *sd, struct dentry *link, struct dentry *target)
 			}
 			sd_put_name(oname);
 
-		} // name
-
+		}
 	} while (!done && oname);
 
 	if ((sdpath_error = sd_path_end(&odata)) != 0) {
-		SD_ERROR("%s: An error occured while translating outer dentry %p inode %lu to a pathname. Error %d\n",
+		SD_ERROR("%s: An error occured while translating outer "
+			 "dentry %p inode %lu to a pathname. Error %d\n",
 			 __FUNCTION__,
 			 link,
 			 link->d_inode->i_ino,
@@ -1025,15 +905,15 @@ int sd_fork(struct task_struct *p)
 		 * that it's active/profile are null and therefore a replace
 		 * cannot happen.
 		 */
-		SD_RLOCK;
+		read_lock(&sd_lock);
 		sd_switch(newsd, sd->profile, sd->active);
 		newsd->sd_hat_magic = sd->sd_hat_magic;
-		SD_RUNLOCK;
+		read_unlock(&sd_lock);
 
-		if (SUBDOMAIN_COMPLAIN(sd) && sd->active == null_complain_profile) {
+		if (SUBDOMAIN_COMPLAIN(sd) &&
+		    sd->active == null_complain_profile)
 			SD_WARN("LOGPROF-HINT fork pid=%d child=%d\n",
 				current->pid, p->pid);
-		}
 	}
 	p->security = newsd;
 	return 0;
@@ -1055,6 +935,7 @@ int sd_register(struct file *filp)
 	struct subdomain *sd, sdcopy;
 	struct sdprofile *newprofile = NULL, unconstrained_flag;
 	int 	error = -ENOMEM,
+		exec_mode = 0,
 		findprofile = 0,
 		findprofile_mandatory = 0,
 		issdcopy = 1,
@@ -1064,13 +945,13 @@ int sd_register(struct file *filp)
 
 	sd = get_sdcopy(&sdcopy);
 
-	/* Must have a SubDomain:
-	 * XXX  tony 10/2003
-	 * XXX  How is it possible to get here without a Subdomain?
-	 */
 	if (sd) {
 		complain = SUBDOMAIN_COMPLAIN(sd);
 	} else {
+		/* task has no subdomain.  This can happen when a task is
+		 * created when subdomain is not loaded.  Allocate and
+		 * attach a subdomain to the task
+		 */
 		issdcopy = 0;
 
 		sd = alloc_subdomain(current);
@@ -1091,138 +972,142 @@ int sd_register(struct file *filp)
 
 	error = 0;
 
-	/* determine what mode inherit, unconstrained or mandatory
-	 * an image is to be loaded in
-	 */
-	if (__sd_is_confined(sd)) {
-		int exec_mode = 0;
-
-		if (sd_get_execmode(sd, filename, &exec_mode)) {
-			switch (exec_mode) {
-			case SD_EXEC_INHERIT:
-				/* do nothing - setting of profile
-				 * already handed in sd_fork
-				 */
-				SD_DEBUG("%s: INHERIT %s\n",
-					 __FUNCTION__,
-					 filename);
-				break;
-
-			case SD_EXEC_UNCONSTRAINED:
-				SD_DEBUG("%s: UNCONSTRAINED %s\n",
-					 __FUNCTION__,
-					 filename);
-
-				/* unload profile */
-				newprofile = &unconstrained_flag;
-				break;
-
-			case SD_EXEC_PROFILE:
-				SD_DEBUG("%s: PROFILE %s\n",
-					 __FUNCTION__,
-					 filename);
-
-				findprofile = 1;
-				findprofile_mandatory = 1;
-				break;
-
-			case SD_MAY_EXEC:
-				/* this should not happen, entries
-				 * with just EXEC only should be
-				 * rejected at profile load time
-				 */
-				SD_ERROR("%s: Rejecting exec(2) of image '%s'. Mode SD_MAY_EXEC without exec qualifier is invalid (internal error) (%s(%d) profile %s active %s\n",
-					 __FUNCTION__,
-					 filename,
-					 current->comm, current->pid,
-					 sd->profile->name, sd->active->name);
-				error = -EPERM;
-				break;
-
-			default:
-				SD_ERROR("%s: Rejecting exec(2) of image '%s'. Unknown exec qualifier %x (internal error) (%s (pid %d) profile %s active %s)\n",
-					 __FUNCTION__,
-					 filename,
-					 exec_mode,
-					 current->comm, current->pid,
-					 sd->profile->name, sd->active->name);
-				error = -EPERM;
-				break;
-			}
-
-		} else {	/* !sd_get_execmode(sd, filename, &exec_mode) */
-
-			if (complain) {
-				/* There was no entry in calling profile
-				 * describing mode to execute image in.
-				 * Drop into null-profile
-				 */
-				newprofile = get_sdprofile(null_complain_profile);
-			} else {
-				SD_WARN("%s: Rejecting exec(2) of image '%s', Unable to determine exec qualifier (%s (pid %d) profile %s active %s)\n",
-					__FUNCTION__,
-					filename,
-					current->comm, current->pid,
-					sd->profile->name, sd->active->name);
-				error = -EPERM;
-			}
-		}
-
-	} else { /* __sd_is_confined(sd) */
-
-		/* unconfined task, load profile if it exists */
+	if (!__sd_is_confined(sd)) {
+		/* Unconfined task, load profile if it exists */
 		findprofile = 1;
+		goto find_profile;
 	}
 
-	/* mode has been determined,  try to locate profile if necessary */
-
-find_profile:
-
-	if (findprofile) {
-		newprofile = sd_profilelist_find(filename);
-		if (newprofile) {
-			SD_DEBUG("%s: setting profile %s\n",
-				 __FUNCTION__, newprofile->name);
-		} else if (findprofile_mandatory) {
-			/* Profile (mandatory) could not be found */
-
-			if (complain) {
-				SD_WARN("LOGPROF-HINT missing_mandatory_profile image=%s pid=%d profile=%s active=%s\n",
-					filename,
-					current->pid,
-					sd->profile->name,
-					sd->active->name);
-
-				newprofile = get_sdprofile(null_complain_profile);
-			} else {
-				SD_WARN("REJECTING exec(2) of image '%s', Profile mandatory (exec qualifier 'p' specified) and not found (%s(%d) profile %s active %s)\n",
-					filename,
-					current->comm, current->pid,
-					sd->profile->name, sd->active->name);
-				error = -EPERM;
-			}
-		} else {
-			/* Profile (non-mandatory) could not be found */
-
-			/* Only way we can get into this code is if task
-			 * is unconstrained.
+	/* Confined task, determine what mode inherit, unconstrained or
+	 * mandatory to load new profile
+	 */
+	if (sd_get_execmode(sd, filename, &exec_mode)) {
+		switch (exec_mode) {
+		case SD_EXEC_INHERIT:
+			/* do nothing - setting of profile
+			 * already handed in sd_fork
 			 */
-
-			BUG_ON(__sd_is_confined(sd));
-
-			SD_DEBUG("%s: No profile found for exec image %s\n",
+			SD_DEBUG("%s: INHERIT %s\n",
 				 __FUNCTION__,
 				 filename);
-		} /* profile */
-	} /* findprofile */
+			break;
 
+		case SD_EXEC_UNCONSTRAINED:
+			SD_DEBUG("%s: UNCONSTRAINED %s\n",
+				 __FUNCTION__,
+				 filename);
+
+			/* unload profile */
+			newprofile = &unconstrained_flag;
+			break;
+
+		case SD_EXEC_PROFILE:
+			SD_DEBUG("%s: PROFILE %s\n",
+				 __FUNCTION__,
+				 filename);
+
+			findprofile = 1;
+			findprofile_mandatory = 1;
+			break;
+
+		case SD_MAY_EXEC:
+			/* this should not happen, entries
+			 * with just EXEC only should be
+			 * rejected at profile load time
+			 */
+			SD_ERROR("%s: Rejecting exec(2) of image '%s'. "
+				"SD_MAY_EXEC without exec qualifier invalid "
+				"(%s(%d) profile %s active %s\n",
+				 __FUNCTION__,
+				 filename,
+				 current->comm, current->pid,
+				 sd->profile->name, sd->active->name);
+			error = -EPERM;
+			break;
+
+		default:
+			SD_ERROR("%s: Rejecting exec(2) of image '%s'. "
+				 "Unknown exec qualifier %x "
+				 "(%s (pid %d) profile %s active %s)\n",
+				 __FUNCTION__,
+				 filename,
+				 exec_mode,
+				 current->comm, current->pid,
+				 sd->profile->name, sd->active->name);
+			error = -EPERM;
+			break;
+		}
+
+	} else if (complain) {
+		/* There was no entry in calling profile
+		 * describing mode to execute image in.
+		 * Drop into null-profile
+		 */
+		newprofile = get_sdprofile(null_complain_profile);
+	} else {
+		SD_WARN("%s: Rejecting exec(2) of image '%s'. "
+			"Unable to determine exec qualifier "
+			"(%s (pid %d) profile %s active %s)\n",
+			__FUNCTION__,
+			filename,
+			current->comm, current->pid,
+			sd->profile->name, sd->active->name);
+		error = -EPERM;
+	}
+
+
+find_profile:
+	if (!findprofile)
+		goto apply_profile;
+
+	/* Locate new profile */
+	newprofile = sd_profilelist_find(filename);
+	if (newprofile) {
+		SD_DEBUG("%s: setting profile %s\n",
+			 __FUNCTION__, newprofile->name);
+	} else if (findprofile_mandatory) {
+		/* Profile (mandatory) could not be found */
+
+		if (complain) {
+			SD_WARN("LOGPROF-HINT missing_mandatory_profile "
+				"image=%s pid=%d profile=%s active=%s\n",
+				filename,
+				current->pid,
+				sd->profile->name,
+				sd->active->name);
+
+			newprofile = get_sdprofile(null_complain_profile);
+		} else {
+			SD_WARN("REJECTING exec(2) of image '%s'. "
+				"Profile mandatory and not found "
+				"(%s(%d) profile %s active %s)\n",
+				filename,
+				current->comm, current->pid,
+				sd->profile->name, sd->active->name);
+			error = -EPERM;
+		}
+	} else {
+		/* Profile (non-mandatory) could not be found */
+
+		/* Only way we can get into this code is if task
+		 * is unconstrained.
+		 */
+
+		BUG_ON(__sd_is_confined(sd));
+
+		SD_DEBUG("%s: No profile found for exec image %s\n",
+			 __FUNCTION__,
+			 filename);
+	} /* newprofile */
+
+
+apply_profile:
 	/* Apply profile if necessary */
 	if (newprofile) {
 		struct subdomain *latest_sd;
 
-		if (newprofile == &unconstrained_flag) {
+		if (newprofile == &unconstrained_flag)
 			newprofile = NULL;
-		}
 
 		/* grab a write lock
 		 *
@@ -1242,7 +1127,7 @@ find_profile:
 		 *   having to hold a write lock around all this code.
 		 */
 
-		SD_WLOCK;
+		write_lock(&sd_lock);
 
 		/* task is guaranteed to have a SubDomain (->security)
 		 * by this point
@@ -1265,7 +1150,7 @@ find_profile:
 				/* Race, profile was removed, not replaced.
 				 * Redo with error checking
 				 */
-				SD_WUNLOCK;
+				write_unlock(&sd_lock);
 				goto find_profile;
 			}
 		}
@@ -1282,19 +1167,17 @@ find_profile:
 		sd_switch(latest_sd, newprofile, newprofile);
 		put_sdprofile(newprofile);
 
-		if (complain && newprofile == null_complain_profile) {
+		if (complain && newprofile == null_complain_profile)
 			SD_WARN("LOGPROF-HINT changing_profile pid=%d\n",
 				current->pid);
-		}
 
-		SD_WUNLOCK;
+		write_unlock(&sd_lock);
 	}
 
 	sd_put_name(filename);
 
-	if (issdcopy) {
+	if (issdcopy)
 		put_sdcopy(sd);
-	}
 
 out:
 	return error;
@@ -1334,7 +1217,7 @@ void sd_release(struct task_struct *p)
  *
  * Switch to a new hat.  Return 0 on success, error otherwise.
  */
-static __INLINE__ int do_change_hat(const char *hat_name, struct subdomain *sd)
+static inline int do_change_hat(const char *hat_name, struct subdomain *sd)
 {
 	struct sdprofile *sub;
 	struct sdprofile *p = sd->active;
@@ -1355,14 +1238,17 @@ static __INLINE__ int do_change_hat(const char *hat_name, struct subdomain *sd)
 		 * out to the parent profile (assuming magic != NULL)
 		 */
 		if (SUBDOMAIN_COMPLAIN(sd)) {
-			SD_WARN("LOGPROF-HINT unknown_hat %s pid=%d profile=%s active=%s\n",
+			SD_WARN("LOGPROF-HINT unknown_hat %s "
+				"pid=%d profile=%s active=%s\n",
 				hat_name,
 				current->pid,
 				sd->profile->name,
 				sd->active->name);
 			sd->active = get_sdprofile(null_complain_profile);
 		} else {
-			SD_DEBUG("%s: Unknown hatname '%s'. Changing to NULL profile (%s(%d) profile %s active %s)\n",
+			SD_DEBUG("%s: Unknown hatname '%s'. "
+				"Changing to NULL profile "
+				"(%s(%d) profile %s active %s)\n",
 				 __FUNCTION__,
 				 hat_name,
 				 current->comm, current->pid,
@@ -1417,7 +1303,9 @@ int sd_change_hat(const char *hat_name, __u32 hat_magic)
 		goto out;
 	}
 
-	/* Check whether current domain is parent or one of the sibling children */
+	/* Check whether current domain is parent
+	 * or one of the sibling children
+	 */
 	if (sd->profile == sd->active) {
 		/*
 		 * parent
@@ -1468,8 +1356,10 @@ int sd_change_hat(const char *hat_name, __u32 hat_magic)
 				/* change to another (sibling) profile */
 				error = do_change_hat(hat_name, sd);
 			}
-		} else if (sd->sd_hat_magic) {	/* hat_magic != sd->sd_hat_magic */
-			SD_ERROR("KILLING process %s(%d) Invalid change_hat() magic# 0x%x (hatname %s profile %s active %s)\n",
+		} else if (sd->sd_hat_magic) {
+			SD_ERROR("KILLING process %s(%d) "
+				 "Invalid change_hat() magic# 0x%x "
+				 "(hatname %s profile %s active %s)\n",
 				 current->comm, current->pid,
 				 hat_magic,
 				 hat_name ? hat_name : "NULL",
@@ -1478,7 +1368,9 @@ int sd_change_hat(const char *hat_name, __u32 hat_magic)
 			/* terminate current process */
 			(void)send_sig_info(SIGKILL, NULL, current);
 		} else {	/* sd->sd_hat_magic == NULL */
-			SD_ERROR("KILLING process %s(%d) Task was confined to current subprofile (profile %s active %s)\n",
+			SD_ERROR("KILLING process %s(%d) "
+				 "Task was confined to current subprofile "
+				 "(profile %s active %s)\n",
 				 current->comm, current->pid,
 				 sd->profile->name, sd->active->name);
 

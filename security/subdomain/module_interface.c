@@ -42,23 +42,10 @@ struct sd_taskreplace_data {
 /* inlines must be forward of there use in newer version of gcc,
    just forward declaring with a prototype won't work anymore */
 
-/**
- * put_name - release name obtained by get_name
- * @name: pointer to memory allocated for name by get_name
- *
- * Simple wrapper for kfree.
- */
-static __INLINE__ void put_name(char *name)
-{
-	if (name) {
-		kfree(name);
-	}
-}
-
-static __INLINE__ void put_sd_entry(struct sd_entry *entry)
+static inline void free_sd_entry(struct sd_entry *entry)
 {
 	if (entry) {
-		put_name(entry->filename);
+		kfree(entry->filename);
 		sdmatch_free(entry->extradata);
 		kfree(entry);
 	}
@@ -71,7 +58,7 @@ static __INLINE__ void put_sd_entry(struct sd_entry *entry)
  * file entry structure.  Structure is zeroed.  Returns new structure on
  * success, NULL on failure.
  */
-static __INLINE__ struct sd_entry *alloc_sd_entry(void)
+static inline struct sd_entry *alloc_sd_entry(void)
 {
 	struct sd_entry *entry;
 
@@ -89,17 +76,6 @@ static __INLINE__ struct sd_entry *alloc_sd_entry(void)
 }
 
 /**
- * put_iface - free interface name (simple kfree() wrapper)
- * @iface: pointer to interface name
- */
-static __INLINE__ void put_iface(char *iface)
-{
-	if (iface) {
-		kfree(iface);
-	}
-}
-
-/**
  * free_sdprofile - free sdprofile structure
  */
 void free_sdprofile(struct sdprofile *profile)
@@ -114,7 +90,8 @@ void free_sdprofile(struct sdprofile *profile)
 
 	/* profile is still on global profile list -- invalid */
 	if (!list_empty(&profile->list)) {
-		SD_ERROR("%s: internal error, profile '%s' still on global list\n",
+		SD_ERROR("%s: internal error, "
+			 "profile '%s' still on global list\n",
 			 __FUNCTION__,
 			 profile->name);
 		BUG();
@@ -126,19 +103,13 @@ void free_sdprofile(struct sdprofile *profile)
 			SD_DEBUG("freeing sd_entry: %p %s\n",
 				 sdent->filename, sdent->filename);
 		list_del_init(&sdent->list);
-		put_sd_entry(sdent);
+		free_sd_entry(sdent);
 	}
 
 	list_for_each_safe(lh, tmp, &profile->sub) {
 		struct sdprofile *p = list_entry(lh, struct sdprofile, list);
 		list_del_init(&p->list);
 		put_sdprofile(p);
-	}
-
-	if (profile->sub_name) {
-		SD_DEBUG("%s: %s %s\n", __FUNCTION__, profile->name,
-			 profile->sub_name);
-		kfree(profile->sub_name);
 	}
 
 	if (profile->name) {
@@ -155,9 +126,9 @@ void free_sdprofile(struct sdprofile *profile)
  *
  * @sd: task's subdomain
  */
-static __INLINE__ void task_remove(struct subdomain *sd)
+static inline void task_remove(struct subdomain *sd)
 {
-	/* SD_WLOCK held here */
+	/* write_lock(&sd_lock) held here */
 	SD_DEBUG("%s: removing profile from task %s(%d) profile %s active %s\n",
 		 __FUNCTION__,
 		 sd->task->comm,
@@ -180,14 +151,14 @@ static int taskremove_iter(struct subdomain *sd, void *cookie)
 	struct sdprofile *old_profile = (struct sdprofile *)cookie;
 	int remove = 0;
 
-	SD_WLOCK;
+	write_lock(&sd_lock);
 
 	if (__sd_is_confined(sd) && sd->profile == old_profile) {
 		remove = 1;	/* remove item from list */
 		task_remove(sd);
 	}
 
-	SD_WUNLOCK;
+	write_unlock(&sd_lock);
 
 	return remove;
 }
@@ -199,11 +170,12 @@ static int taskremove_iter(struct subdomain *sd, void *cookie)
  * @sd: task's subdomain
  * @new: old profile
  */
-static __INLINE__ void task_replace(struct subdomain *sd, struct sdprofile *new)
+static inline void task_replace(struct subdomain *sd, struct sdprofile *new)
 {
 	struct sdprofile *nactive = NULL;
 
-	SD_DEBUG("%s: replacing profile for task %s(%d) profile=%s (%p) active=%s (%p)\n",
+	SD_DEBUG("%s: replacing profile for task %s(%d) "
+		 "profile=%s (%p) active=%s (%p)\n",
 		 __FUNCTION__,
 		 sd->task->comm, sd->task->pid,
 		 sd->profile->name, sd->profile,
@@ -216,11 +188,10 @@ static __INLINE__ void task_replace(struct subdomain *sd, struct sdprofile *new)
 		nactive = __sd_find_profile(sd->active->name, &new->sub);
 
 		if (!nactive) {
-			if (new->flags.complain) {
+			if (new->flags.complain)
 				nactive = get_sdprofile(null_complain_profile);
-			} else {
+			else
 				nactive = get_sdprofile(null_profile);
-			}
 		}
 	}
 	sd_switch(sd, new, nactive);
@@ -239,13 +210,12 @@ static int taskreplace_iter(struct subdomain *sd, void *cookie)
 {
 	struct sd_taskreplace_data *data = (struct sd_taskreplace_data *)cookie;
 
-	SD_WLOCK;
+	write_lock(&sd_lock);
 
-	if (__sd_is_confined(sd) && sd->profile == data->old_profile) {
+	if (__sd_is_confined(sd) && sd->profile == data->old_profile)
 		task_replace(sd, data->new_profile);
-	}
 
-	SD_WUNLOCK;
+	write_unlock(&sd_lock);
 
 	return 0;
 }
@@ -272,7 +242,7 @@ static inline u64 convert64(char *data)
 }
 
 
-static __INLINE__ int sd_inbounds(struct sd_ext *e, size_t size)
+static inline int sd_inbounds(struct sd_ext *e, size_t size)
 {
 	return (e->pos + size <= e->end);
 }
@@ -430,7 +400,7 @@ fail:
  * in the data stream.
  * @e: extent information
  */
-static __INLINE__ int sd_activate_net_entry(struct sd_ext *e)
+static inline int sd_activate_net_entry(struct sd_ext *e)
 {
 	SD_READ_X(e, SD_STRUCT, NULL, "ne");
 	SD_READ_X(e, SD_U32, NULL, NULL);
@@ -451,7 +421,7 @@ fail:
 	return 0;
 }
 
-static __INLINE__ struct sd_entry *sd_activate_file_entry(struct sd_ext *e)
+static inline struct sd_entry *sd_activate_file_entry(struct sd_ext *e)
 {
 	struct sd_entry *entry = NULL;
 
@@ -505,13 +475,13 @@ static __INLINE__ struct sd_entry *sd_activate_file_entry(struct sd_ext *e)
 
 fail:
 	sdmatch_free(entry->extradata);
-	put_sd_entry(entry);
+	free_sd_entry(entry);
 	return NULL;
 }
 
-static __INLINE__ int check_rule_and_add(struct sd_entry *file_entry,
-					 struct sdprofile *profile,
-					 const char **message)
+static inline int check_rule_and_add(struct sd_entry *file_entry,
+				     struct sdprofile *profile,
+				     const char **message)
 {
 	/* verify consistency of x, px, ix, ux for entry against
 	   possible duplicates for this entry */
@@ -539,18 +509,17 @@ static __INLINE__ int check_rule_and_add(struct sd_entry *file_entry,
 	 * permission bits. This allows more rapid searching.
 	 */
 	for (i = 0; i <= POS_SD_FILE_MAX; i++) {
-		if (mode & (1 << i)) {
+		if (mode & (1 << i))
 			/* profile->file_entryp[i] initially set to
 			 * NULL in alloc_sdprofile() */
 			list_add(&file_entry->listp[i],
 				 &profile->file_entryp[i]);
-		}
 	}
 
 	return 1;
 
 out:
-	put_sd_entry(file_entry);
+	free_sd_entry(file_entry);
 	return 0;
 }
 
@@ -674,7 +643,7 @@ out:
 
 ssize_t sd_file_prof_add(void *data, size_t size)
 {
-	struct sdprofile *profile = NULL, *old_profile = NULL;
+	struct sdprofile *profile = NULL;
 
 	struct sd_ext e = { data, data + size, data };
 	ssize_t error;
@@ -685,17 +654,12 @@ ssize_t sd_file_prof_add(void *data, size_t size)
 		return error;
 	}
 
-	old_profile = sd_profilelist_find(profile->name);
-
-	if (old_profile) {
-		SD_WARN("%s: trying to add profile (%s) that "
-			"already exists.\n", __FUNCTION__, profile->name);
-		put_sdprofile(old_profile);
+	if (!sd_profilelist_add(profile)) {
+		SD_WARN("trying to add profile (%s) that already exists.\n",
+			profile->name);
 		free_sdprofile(profile);
 		return -EEXIST;
 	}
-
-	sd_profilelist_add(profile);
 
 	return size;
 }
@@ -772,10 +736,9 @@ ssize_t sd_file_prof_remove(const char *name, size_t size)
 	old_profile = sd_profilelist_find(name);
 
 	if (old_profile) {
-		if (sd_profilelist_remove(name) != 0) {
+		if (sd_profilelist_remove(name) != 0)
 			SD_WARN("%s: race trying to remove profile (%s)\n",
 				__FUNCTION__, name);
-		}
 
 		/* remove profile from any tasks using it */
 		sd_subdomainlist_iterateremove(taskremove_iter,

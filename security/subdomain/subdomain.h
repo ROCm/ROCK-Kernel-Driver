@@ -12,8 +12,6 @@
 #ifndef __SUBDOMAIN_H
 #define __SUBDOMAIN_H
 
-#define __INLINE__ inline
-
 /* defn of iattr */
 #include <linux/fs.h>
 
@@ -24,14 +22,20 @@ extern int subdomain_complain;	/* 0 or 1 */
 extern int subdomain_audit;	/* 0 or 1 */
 
 #define SD_UNCONSTRAINED "unconstrained"
+
 /* $ echo -n subdomain.o | md5sum | cut -c -8 */
 #define  SD_ID_MAGIC		0x8c235e38
 
-#define PROFILE_COMPLAIN(_profile) (subdomain_complain == 1 || ((_profile) && (_profile)->flags.complain))
+#define PROFILE_COMPLAIN(_profile) \
+	(subdomain_complain == 1 || ((_profile) && (_profile)->flags.complain))
 
-#define SUBDOMAIN_COMPLAIN(_sd) (subdomain_complain == 1 || ((_sd) && (_sd)->active && (_sd)->active->flags.complain))
+#define SUBDOMAIN_COMPLAIN(_sd) \
+	(subdomain_complain == 1 || \
+	 ((_sd) && (_sd)->active && (_sd)->active->flags.complain))
 
-#define SUBDOMAIN_AUDIT(_sd) (subdomain_audit == 1 || ((_sd) && (_sd)->active && (_sd)->active->flags.audit))
+#define SUBDOMAIN_AUDIT(_sd) \
+	(subdomain_audit == 1 || \
+	 ((_sd) && (_sd)->active && (_sd)->active->flags.audit))
 
 /*
  * DEBUG remains global (no per profile flag) since it is mostly used in sysctl
@@ -46,13 +50,6 @@ extern int subdomain_audit;	/* 0 or 1 */
 #define SD_INFO(fmt, args...)	printk(KERN_INFO "SubDomain: " fmt, ##args)
 #define SD_WARN(fmt, args...)	printk(KERN_WARNING "SubDomain: " fmt, ##args)
 #define SD_ERROR(fmt, args...)	printk(KERN_ERR "SubDomain: " fmt, ##args)
-
-// Lock protecting access to 'struct subdomain' accesses
-extern rwlock_t sd_lock;
-#define SD_RLOCK read_lock(&sd_lock)
-#define SD_RUNLOCK read_unlock(&sd_lock)
-#define SD_WLOCK write_lock(&sd_lock)
-#define SD_WUNLOCK write_unlock(&sd_lock)
 
 /* basic SubDomain data structures */
 
@@ -98,7 +95,6 @@ struct sd_entry {
  */
 struct sdprofile {
 	char *name;			/* profile name */
-	char *sub_name;			/* XXX WTF? */
 
 	struct list_head file_entry;	/* file ACL */
 	struct list_head file_entryp[POS_SD_FILE_MAX + 1];
@@ -147,6 +143,9 @@ struct sd_path_data {
 #define SD_SUBDOMAIN(sec)	((struct subdomain*)(sec))
 #define SD_PROFILE(sec)		((struct sdprofile*)(sec))
 
+/* Lock protecting access to 'struct subdomain' accesses */
+extern rwlock_t sd_lock;
+
 extern struct sdprofile *null_profile;
 extern struct sdprofile *null_complain_profile;
 
@@ -175,7 +174,7 @@ extern int sd_associate_filp(struct file *filp);
 
 /* list.c */
 extern struct sdprofile *sd_profilelist_find(const char *name);
-extern void sd_profilelist_add(struct sdprofile *profile);
+extern int sd_profilelist_add(struct sdprofile *profile);
 extern int sd_profilelist_remove(const char *name);
 extern void sd_profilelist_release(void);
 extern struct sdprofile *sd_profilelist_replace(struct sdprofile *profile);
@@ -208,4 +207,4 @@ extern const char *capability_to_name(unsigned int cap);
 extern const char *subdomain_version(void);
 extern const char *subdomain_version_nl(void);
 
-#endif				// __SUBDOMAIN_H
+#endif				/* __SUBDOMAIN_H */

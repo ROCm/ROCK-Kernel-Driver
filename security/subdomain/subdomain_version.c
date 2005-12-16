@@ -21,7 +21,8 @@ MODULE_VERSION(SUBDOMAIN_VERSION);
 /* subdomain_version_str exists to allow a strings on module to
  * see SUBDOMAIN_VERSION= prefix
  */
-static const char *subdomain_version_str = SUBDOMAIN_VERSION_STR_PFX SUBDOMAIN_VERSION;
+static const char *subdomain_version_str =
+		SUBDOMAIN_VERSION_STR_PFX SUBDOMAIN_VERSION;
 
 /* subdomain_version_str_nl exists to allow an easy way to get a newline
  * terminated string without having to do dynamic memory allocation

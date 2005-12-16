@@ -12,7 +12,7 @@
 
 #include <linux/namespace.h>
 
-static __INLINE__ int __sd_is_confined(struct subdomain *sd)
+static inline int __sd_is_confined(struct subdomain *sd)
 {
 	int rc = 0;
 
@@ -25,54 +25,71 @@ static __INLINE__ int __sd_is_confined(struct subdomain *sd)
 }
 
 /**
- *  sd_is_confined - is process confined
+ *  sd_is_confined
  *  @sd: subdomain
  *
- *  Check if @sd contains a valid profile.
+ *  Check if @sd is confined (contains a valid profile)
  *  Return 1 if confined, 0 otherwise.
  */
-static __INLINE__ int sd_is_confined(void)
+static inline int sd_is_confined(void)
 {
 	struct subdomain *sd = SD_SUBDOMAIN(current->security);
 	return __sd_is_confined(sd);
 }
 
-/**
- * sd_sub_defined - check if there is at least one subprofile defined
- *
- * Return 1 if there is at least one SubDomain subprofile defined,
- * 0 otherwise.
- *Used to obtain
- */
-static __INLINE__ int __sd_sub_defined(struct subdomain *sd)
+static inline int __sd_sub_defined(struct subdomain *sd)
 {
-	if (__sd_is_confined(sd) && !list_empty(&sd->profile->sub))
-		return 1;
-
-	return 0;
+	return __sd_is_confined(sd) && !list_empty(&sd->profile->sub);
 }
 
-static __INLINE__ int sd_sub_defined(void)
+/**
+ * sd_sub_defined
+ * @sd: subdomain
+ *
+ * Check if @sd has at least one subprofile
+ * Return 1 if true, 0 otherwise
+ */
+static inline int sd_sub_defined(void)
 {
 	struct subdomain *sd = SD_SUBDOMAIN(current->security);
 	return __sd_sub_defined(sd);
 }
 
-static __INLINE__ struct sdprofile *get_sdprofile(struct sdprofile *p)
+/**
+ * get_sdprofile
+ * @p: profile
+ *
+ * Increment refcount on profile
+ */
+static inline struct sdprofile *get_sdprofile(struct sdprofile *p)
 {
 	if (p)
 		atomic_inc(&p->count);
 	return p;
 }
 
-static __INLINE__ void put_sdprofile(struct sdprofile *p)
+/**
+ * put_sdprofile
+ * @p: profile
+ *
+ * Decrement refcount on profile
+ */
+static inline void put_sdprofile(struct sdprofile *p)
 {
 	if (p)
 		if (atomic_dec_and_test(&p->count))
 			free_sdprofile(p);
 }
 
-static __INLINE__ void sd_switch(struct subdomain *sd,
+/**
+ * sd_switch
+ * @sd: subdomain to switch
+ * @profile: new profile
+ * @active:  new active
+ *
+ * Change subdomain to use new profiles.
+ */
+static inline void sd_switch(struct subdomain *sd,
 		      		 struct sdprofile *profile,
 				 struct sdprofile *active)
 {
@@ -84,7 +101,13 @@ static __INLINE__ void sd_switch(struct subdomain *sd,
 	sd->active = get_sdprofile(active);
 }
 
-static __INLINE__ void sd_switch_unconfined(struct subdomain *sd)
+/**
+ * sd_switch_unconfined
+ * @sd: subdomain to switch
+ *
+ * Change subdomain to unconfined
+ */
+static inline void sd_switch_unconfined(struct subdomain *sd)
 {
 	sd_switch(sd, NULL, NULL);
 
@@ -92,8 +115,13 @@ static __INLINE__ void sd_switch_unconfined(struct subdomain *sd)
 	sd->sd_hat_magic = 0;
 }
 
-/* simple struct subdomain alloc/free wrappers */
-static __INLINE__ struct subdomain *alloc_subdomain(struct task_struct *tsk)
+/**
+ * alloc_subdomain
+ * @tsk: task struct
+ *
+ * Allocate a new subdomain including a backpointer to it's referring task.
+ */
+static inline struct subdomain *alloc_subdomain(struct task_struct *tsk)
 {
 	struct subdomain *sd;
 
@@ -117,19 +145,25 @@ out:
 	return sd;
 }
 
-static __INLINE__ void free_subdomain(struct subdomain *sd)
+/**
+ * free_subdomain
+ * @sd: subdomain
+ *
+ * Free a subdomain previously allocated by alloc_subdomain
+ */
+static inline void free_subdomain(struct subdomain *sd)
 {
 	sd_subdomainlist_remove(sd);
 	kfree(sd);
 }
 
 /**
- * alloc_sdprofile - allocate new empty profile
+ * alloc_sdprofile
  *
- * This routine allocates, initializes, and returns a new zeored
- * profile structure. Returns NULL on failure.
+ * Allocate, initialize and return a new zeroed profile.
+ * Returns NULL on failure.
  */
-static __INLINE__ struct sdprofile *alloc_sdprofile(void)
+static inline struct sdprofile *alloc_sdprofile(void)
 {
 	struct sdprofile *profile;
 
@@ -150,15 +184,24 @@ static __INLINE__ struct sdprofile *alloc_sdprofile(void)
 }
 
 /**
- * sd_put_name - release name (really just free_page)
+ * sd_put_name
  * @name: name to release.
+ *
+ * Release space (free_page) allocated to hold pathname
  */
-static __INLINE__ void sd_put_name(char *name)
+static inline void sd_put_name(char *name)
 {
 	free_page((unsigned long)name);
 }
 
-static __INLINE__ struct sdprofile *__sd_find_profile(const char *name,
+/** __sd_find_profile
+ * @name: name of profile to find
+ * @head: list to search
+ *
+ * Return reference counted copy of profile. NULL if not found
+ * Caller must hold any necessary locks
+ */
+static inline struct sdprofile *__sd_find_profile(const char *name,
 						      struct list_head *head)
 {
 	struct list_head *lh;
@@ -180,7 +223,7 @@ static __INLINE__ struct sdprofile *__sd_find_profile(const char *name,
 	return NULL;
 }
 
-static __INLINE__ struct subdomain *__get_sdcopy(struct subdomain *new,
+static inline struct subdomain *__get_sdcopy(struct subdomain *new,
 						 struct task_struct *tsk)
 {
 	struct subdomain *old, *temp = NULL;
@@ -193,11 +236,10 @@ static __INLINE__ struct subdomain *__get_sdcopy(struct subdomain *new,
 
 		new->active = get_sdprofile(old->active);
 
-		if (old->profile == old->active) {
+		if (old->profile == old->active)
 			new->profile = new->active;
-		} else {
+		else
 			new->profile = get_sdprofile(old->profile);
-		}
 
 		temp = new;
 	}
@@ -205,35 +247,47 @@ static __INLINE__ struct subdomain *__get_sdcopy(struct subdomain *new,
 	return temp;
 }
 
-static __INLINE__ struct subdomain *get_sdcopy(struct subdomain *new)
+/** get_sdcopy
+ * @new: subdomain to hold copy
+ *
+ * Make copy of current subdomain containing refcounted profile and active
+ * Used to protect readers against racing writers (changehat and profile
+ * replacement).
+ */
+static inline struct subdomain *get_sdcopy(struct subdomain *new)
 {
 	struct subdomain *temp;
 
-	SD_RLOCK;
+	read_lock(&sd_lock);
 
 	temp = __get_sdcopy(new, current);
 
-	SD_RUNLOCK;
+	read_unlock(&sd_lock);
 
 	return temp;
 }
 
-static __INLINE__ void put_sdcopy(struct subdomain *temp)
+/** get_sdcopy
+ * @temp: subdomain to drop refcounts on
+ *
+ * Drop refcounted profile/active in copy of subdomain made by get_sdcopy
+ */
+static inline void put_sdcopy(struct subdomain *temp)
 {
 	if (temp) {
 		put_sdprofile(temp->active);
-		if (temp->active != temp->profile) {
+		if (temp->active != temp->profile)
 			(void)put_sdprofile(temp->profile);
-		}
 	}
 }
 
-/* sd_path_begin2
- * Setup data for iterating over paths to dentry (sd_path_getname)
- * @rdentry is used to obtain the filesystem root dentry
- * @dentry is the actual dentry object we want to obtain pathnames to.
+/** sd_path_begin2
+ * @rdentry: filesystem root dentry (searching for vfsmnts matching this)
+ * @dentry: dentry object to obtain pathname from (relative to matched vfsmnt)
+ *
+ * Setup data for iterating over vfsmounts (in current tasks namespace).
  */
-static __INLINE__ void sd_path_begin2(struct dentry *rdentry,
+static inline void sd_path_begin2(struct dentry *rdentry,
 				      struct dentry *dentry,
 				      struct sd_path_data *data)
 {
@@ -248,22 +302,40 @@ static __INLINE__ void sd_path_begin2(struct dentry *rdentry,
 	down_read(&namespace_sem);
 }
 
-/* sd_path_begin
- * Setup data for iterating over paths to dentry (sd_path_getname)
- * @dentry is used both for obtaining the filesystem root
- *  and also for the actual dentry object we want to obtain pathnames to.
+/** sd_path_begin
+ * @dentry filesystem root dentry and object to obtain pathname from
+ *
+ * Utility function for calling _sd_path_begin for when the dentry we are
+ * looking for and the root are the same (this is the usual case).
  */
-static __INLINE__ void sd_path_begin(struct dentry *dentry,
+static inline void sd_path_begin(struct dentry *dentry,
 				     struct sd_path_data *data)
 {
 	sd_path_begin2(dentry, dentry, data);
 }
 
-/* sd_path_getname
- * Return the next pathname that dentry (from sd_path_begin) may be reached
- * through.  If no more paths exists or in the case of error, NULL is returned.
+/** sd_path_end
+ * @data: data object previously initialized by sd_path_begin
+ *
+ * End iterating over vfsmounts.
+ * If an error occured in begin or get, it is returned. Otherwise 0.
  */
-static __INLINE__ char *sd_path_getname(struct sd_path_data *data)
+static inline int sd_path_end(struct sd_path_data *data)
+{
+	up_read(&namespace_sem);
+	dput(data->root);
+
+	return data->errno;
+}
+
+/** sd_path_getname
+ * @data: data object previously initialized by sd_path_begin
+ *
+ * Return the next mountpoint which has the same root dentry as data->root.
+ * If no more mount points exist (or in case of error) NULL is returned
+ * (caller should call sd_path_end() and inspect return code to differentiate)
+ */
+static inline char *sd_path_getname(struct sd_path_data *data)
 {
 	char *name = NULL;
 	struct vfsmount *mnt;
@@ -277,9 +349,8 @@ static __INLINE__ char *sd_path_getname(struct sd_path_data *data)
 
 		if (mnt->mnt_root == data->root) {
 			name = __sd_get_name(data->dentry, mnt);
-			if (!name) {
+			if (!name)
 				data->errno = -ENOMEM;
-			}
 			break;
 		}
 	}
@@ -287,47 +358,4 @@ static __INLINE__ char *sd_path_getname(struct sd_path_data *data)
 	return name;
 }
 
-/* sd_path_getmnt
- * Return the next mountpoint which has the same root dentry as was passed
- * to sd_path_begin2. If no more mount points exist, NULL is returned.
- */
-static __INLINE__ struct vfsmount *sd_path_getmnt(struct sd_path_data *data)
-{
-	struct vfsmount *mnt = NULL;
-
-	while (data->pos != data->head) {
-		mnt = list_entry(data->pos, struct vfsmount, mnt_list);
-
-		/* advance to next -- so that it is done before we break */
-		data->pos = data->pos->next;
-		prefetch(data->pos->next);
-
-		if (mnt->mnt_root == data->root) {
-			mntget(mnt);
-			break;
-		}
-	}
-
-	return mnt;
-}
-
-/* sd_path_end
- * end iterating over the namespace
- * release all dentries and semaphores that were allocated by sd_path_begin
- * If an error occured in a previous sd_path_getmnt it is returned.
- * Otherwise 0 is returned
- */
-static __INLINE__ int sd_path_end(struct sd_path_data *data)
-{
-	up_read(&namespace_sem);
-	dput(data->root);
-
-	return data->errno;
-}
-
-static __INLINE__ int isblank(unsigned char c)
-{
-	return c == ' ' || c == '\t';
-}
-
-#endif				/* __INLINE_H__ */
+#endif /* __INLINE_H__ */

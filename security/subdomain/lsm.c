@@ -30,7 +30,7 @@
 #include "subdomain.h"
 #include "inline.h"
 
-/* main SD lock, manipulated by SD_[RW]LOCK and SD_[RW]UNLOCK (see subdomain.h) */
+/* main SD lock [see get_sdcopy and put_sdcopy] */
 rwlock_t sd_lock = RW_LOCK_UNLOCKED;
 
 /* Flag values, also controllable via subdomainfs/control. We
@@ -80,26 +80,24 @@ __setup("subdomain_audit=", sd_auditmode);
 static int subdomain_ptrace(struct task_struct *parent,
 			    struct task_struct *child)
 {
-	/* XXX This only protects TRACEME and ATTACH.  We used to guard
-	 * all of sys_ptrace(2)...
-	 */
 	int error;
 	struct subdomain *sd;
 
 	error = cap_ptrace(parent, child);
 
-	SD_RLOCK;
+	read_lock(&sd_lock);
 
 	sd = SD_SUBDOMAIN(current->security);
 
 	if (!error && __sd_is_confined(sd)) {
-		SD_WARN("REJECTING access to syscall 'ptrace' (%s(%d) profile %s active %s)\n",
+		SD_WARN("REJECTING access to syscall 'ptrace' (%s(%d) "
+			"profile %s active %s)\n",
 			current->comm, current->pid,
 			sd->profile->name, sd->active->name);
 		error = -EPERM;
 	}
 
-	SD_RUNLOCK;
+	read_unlock(&sd_lock);
 
 	return error;
 }
@@ -139,9 +137,9 @@ static int subdomain_capable(struct task_struct *tsk, int cap)
 	if (error == 0) {
 		struct subdomain *sd, sdcopy;
 
-		SD_RLOCK;
+		read_lock(&sd_lock);
 		sd = __get_sdcopy(&sdcopy, tsk);
-		SD_RUNLOCK;
+		read_unlock(&sd_lock);
 
 		error = sd_capability(sd, cap);
 
@@ -156,18 +154,19 @@ static int subdomain_sysctl(struct ctl_table *table, int op)
 	int error = 0;
 	struct subdomain *sd;
 
-	SD_RLOCK;
+	read_lock(&sd_lock);
 
 	sd = SD_SUBDOMAIN(current->security);
 
 	if ((op & 002) && __sd_is_confined(sd) && !capable(CAP_SYS_ADMIN)) {
-		SD_WARN("REJECTING access to syscall 'sysctl (write)' (%s(%d) profile %s active %s)\n",
+		SD_WARN("REJECTING access to syscall 'sysctl (write)' (%s(%d) "
+			"profile %s active %s)\n",
 			current->comm, current->pid,
 			sd->profile->name, sd->active->name);
 		error = -EPERM;
 	}
 
-	SD_RUNLOCK;
+	read_unlock(&sd_lock);
 
 	return error;
 }
@@ -209,18 +208,19 @@ static int subdomain_sb_mount(char *dev_name, struct nameidata *nd, char *type,
 	int error = 0;
 	struct subdomain *sd;
 
-	SD_RLOCK;
+	read_lock(&sd_lock);
 
 	sd = SD_SUBDOMAIN(current->security);
 
 	if (__sd_is_confined(sd)) {
-		SD_WARN("REJECTING access to syscall 'mount' (%s(%d) profile %s active %s)\n",
+		SD_WARN("REJECTING access to syscall 'mount' (%s(%d) "
+			"profile %s active %s)\n",
 			current->comm, current->pid,
 			sd->profile->name, sd->active->name);
 		error = -EPERM;
 	}
 
-	SD_RUNLOCK;
+	read_unlock(&sd_lock);
 
 	return error;
 }
@@ -230,18 +230,19 @@ static int subdomain_umount(struct vfsmount *mnt, int flags)
 	int error = 0;
 	struct subdomain *sd;
 
-	SD_RLOCK;
+	read_lock(&sd_lock);
 
 	sd = SD_SUBDOMAIN(current->security);
 
 	if (__sd_is_confined(sd)) {
-		SD_WARN("REJECTING access to syscall 'umount' (%s(%d) profile %s active %s)\n",
+		SD_WARN("REJECTING access to syscall 'umount' (%s(%d) "
+			"profile %s active %s)\n",
 			current->comm, current->pid,
 			sd->profile->name, sd->active->name);
 		error = -EPERM;
 	}
 
-	SD_RUNLOCK;
+	read_unlock(&sd_lock);
 
 	return error;
 }
@@ -346,9 +347,8 @@ static int subdomain_inode_rename(struct inode *old_inode,
 	error = sd_perm_dentry(sd, old_dentry,
 			       MAY_READ | MAY_WRITE | SD_MAY_LINK);
 
-	if (!error) {
+	if (!error)
 		error = sd_perm_dentry(sd, new_dentry, MAY_WRITE);
-	}
 
 	put_sdcopy(sd);
 
@@ -481,9 +481,8 @@ static int subdomain_file_alloc_security(struct file *file)
 
 	sd = get_sdcopy(&sdcopy);
 
-	if (__sd_is_confined(sd)) {
+	if (__sd_is_confined(sd))
 		file->f_security = get_sdprofile(sd->active);
-	}
 
 	put_sdcopy(sd);
 
@@ -575,11 +574,11 @@ static int subdomain_getprocattr(struct task_struct *p, char *name, void *value,
 		goto out;
 	}
 
-	SD_RLOCK;
+	read_lock(&sd_lock);
 
 	sd = __get_sdcopy(&sdcopy, p);
 
-	SD_RUNLOCK;
+	read_unlock(&sd_lock);
 
 	error = sd_getprocattr(sd, str, size);
 	put_sdcopy(sd);
@@ -616,7 +615,8 @@ static int subdomain_setprocattr(struct task_struct *p, char *name, void *value,
 
 		/* Only the current process may change it's hat */
 		if (current != p) {
-			SD_WARN("%s: Attempt by foreign task %s(%d) [user %d] to changehat of task %s(%d)\n",
+			SD_WARN("%s: Attempt by foreign task %s(%d) "
+				"[user %d] to changehat of task %s(%d)\n",
 				__FUNCTION__,
 				current->comm,
 				current->pid,
@@ -629,10 +629,9 @@ static int subdomain_setprocattr(struct task_struct *p, char *name, void *value,
 		}
 
 		error = sd_setprocattr_changehat(hatinfo, infosize);
-		if (error == 0) {
+		if (error == 0)
 			/* success, set return to #bytes in orig request */
 			error = size;
-		}
 
 	/* SET NEW PROFILE */
 	} else if (size > strlen(cmd_setprofile) &&
@@ -644,7 +643,8 @@ static int subdomain_setprocattr(struct task_struct *p, char *name, void *value,
 		 */
 
 		if (!capable(CAP_SYS_ADMIN)) {
-			SD_WARN("%s: Unprivileged attempt by task %s(%d) [user %d] to assign new profile to task %s(%d)\n",
+			SD_WARN("%s: Unprivileged attempt by task %s(%d) "
+				"[user %d] to assign profile to task %s(%d)\n",
 				__FUNCTION__,
 				current->comm,
 				current->pid,
@@ -655,23 +655,23 @@ static int subdomain_setprocattr(struct task_struct *p, char *name, void *value,
 			goto out;
 		}
 
-		SD_RLOCK;
+		read_lock(&sd_lock);
 		confined = sd_is_confined();
-		SD_RUNLOCK;
+		read_unlock(&sd_lock);
 
 		if (!confined) {
 			char *profile = cmd + strlen(cmd_setprofile);
 			size_t profilesize = size - strlen(cmd_setprofile);
 
 			error = sd_setprocattr_setprofile(p, profile, profilesize);
-			if (error == 0) {
+			if (error == 0)
 				/* success,
 				 * set return to #bytes in orig request
 				 */
 				error = size;
-			}
 		} else {
-			SD_WARN("%s: Attempt by confined task %s(%d) [user %d] to assign new profile to task %s(%d)\n",
+			SD_WARN("%s: Attempt by confined task %s(%d) "
+				"[user %d] to assign profile to task %s(%d)\n",
 				__FUNCTION__,
 				current->comm,
 				current->pid,
@@ -683,7 +683,8 @@ static int subdomain_setprocattr(struct task_struct *p, char *name, void *value,
 		}
 	} else {
 		/* unknown operation */
-		SD_WARN("%s: Unknown setprocattr command '%.*s' by task %s(%d) [user %d] for task %s(%d)\n",
+		SD_WARN("%s: Unknown setprocattr command '%.*s' by task %s(%d) "
+			"[user %d] for task %s(%d)\n",
 			__FUNCTION__,
 			size < 16 ? (int)size : 16,
 			cmd,
@@ -771,7 +772,8 @@ static int __init subdomain_init(void)
 	}
 
 	null_profile->name = kstrdup("null-profile", GFP_KERNEL);
-	null_complain_profile->name = kstrdup("null-complain-profile", GFP_KERNEL);
+	null_complain_profile->name =
+		kstrdup("null-complain-profile", GFP_KERNEL);
 	if (!null_profile->name || !null_complain_profile->name) {
 		error = -ENOMEM;
 		goto dealloc_out;
@@ -814,10 +816,11 @@ createfs_out:
 
 static int subdomain_exit_removeall_iter(struct subdomain *sd, void *cookie)
 {
-	/* SD_WLOCK held here */
+	/* write_lock(&sd_lock) held here */
 
 	if (__sd_is_confined(sd)) {
-		SD_DEBUG("%s: Dropping profiles %s(%d) profile %s(%p) active %s(%p)\n",
+		SD_DEBUG("%s: Dropping profiles %s(%d) "
+			 "profile %s(%p) active %s(%p)\n",
 			 __FUNCTION__,
 			 sd->task->comm, sd->task->pid,
 			 sd->profile->name, sd->profile,
@@ -842,9 +845,9 @@ static void __exit subdomain_exit(void)
 	 * reattached
 	 */
 
-	SD_WLOCK;
+	write_lock(&sd_lock);
 	sd_subdomainlist_iterate(subdomain_exit_removeall_iter, NULL);
-	SD_WUNLOCK;
+	write_unlock(&sd_lock);
 
 	/* Free up list of active subdomain */
 	sd_subdomainlist_release();

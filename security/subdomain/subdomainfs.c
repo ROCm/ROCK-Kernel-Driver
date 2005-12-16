@@ -158,9 +158,8 @@ static ssize_t sd_version_read(struct file *file, char __user *buf,
 
 	err = copy_to_user(buf, version + offset, size);
 
-	if (err) {
+	if (err)
 		return -EFAULT;
-	}
 
 	*ppos += size;
 
@@ -173,10 +172,9 @@ static ssize_t sd_profile_load(struct file *f, const char __user *buf,
 	void *data;
 	ssize_t error = -EFAULT;
 
-	if (*pos != 0) {
+	if (*pos != 0)
 		/* only writes from pos 0, that is complete writes */
 		return -ESPIPE;
-	}
 
 	/* Don't allow confined processes to load profiles.
 	 * No sane person would add rules allowing this to a profile
@@ -215,10 +213,9 @@ static ssize_t sd_profile_replace(struct file *f, const char __user *buf,
 	void *data;
 	ssize_t error = -EFAULT;
 
-	if (*pos != 0) {
+	if (*pos != 0)
 		/* only writes from pos 0, that is complete writes */
 		return -ESPIPE;
-	}
 
 	/* Don't allow confined processes to replace profiles */
 	if (sd_is_confined()) {
@@ -254,10 +251,9 @@ static ssize_t sd_profile_remove(struct file *f, const char __user *buf,
 	char *data;
 	ssize_t error = -EFAULT;
 
-	if (*pos != 0) {
+	if (*pos != 0)
 		/* only writes from pos 0, that is complete writes */
 		return -ESPIPE;
-	}
 
 	/* Don't allow confined processes to remove profiles */
 	if (sd_is_confined()) {
@@ -309,13 +305,12 @@ static void clear_subdomainfs(void)
 		unsigned int index;
 
 		if (root_entries[i].mode == S_IFDIR) {
-			if (root_entries[i].name) {
-				// defer dir free till all sub-entries freed
+			if (root_entries[i].name)
+				/* defer dir free till all sub-entries freed */
 				continue;
-			} else {
-				// cleanup parent
+			else
+				/* cleanup parent */
 				index = root_entries[i].parent_index;
-			}
 		} else {
 			index = i;
 		}
@@ -404,9 +399,8 @@ static int populate_subdomainfs(struct dentry *root)
 		struct dentry *parent;
 
 		/* end of directory ? */
-		if (!ENT.name) {
+		if (!ENT.name)
 			continue;
-		}
 
 		parent = root_entries[ENT.parent_index].dentry;
 
@@ -419,7 +413,8 @@ static int populate_subdomainfs(struct dentry *root)
 		if (!ENT.dentry)
 			goto cleanup_error;
 
-		SD_DEBUG("%s: added subdomainfs entry name=%s mode=%x dentry=%p [parent %p]\n",
+		SD_DEBUG("%s: added subdomainfs entry "
+			 "name=%s mode=%x dentry=%p [parent %p]\n",
 			__FUNCTION__, ENT.name, ENT.mode|ENT.access,
 			ENT.dentry, parent);
 	}
@@ -435,22 +430,20 @@ error:
 
 int create_subdomainfs(void)
 {
-	if (SDFS_DENTRY) {
+	if (SDFS_DENTRY)
 		SD_ERROR("%s: Subdomain securityfs already exists\n",
 			__FUNCTION__);
-	} else if (!populate_subdomainfs(sdfs_dentry)) {
+	else if (!populate_subdomainfs(sdfs_dentry))
 		SD_ERROR("%s: Error populating Subdomain securityfs\n",
 			__FUNCTION__);
-	}
 
 	return (SDFS_DENTRY != NULL);
 }
 
 int destroy_subdomainfs(void)
 {
-	if (SDFS_DENTRY) {
+	if (SDFS_DENTRY)
 		clear_subdomainfs();
-	}
 
 	return 1;
 }

@@ -72,7 +72,7 @@ extern unsigned int sdmatch_match(const char *pathname, const char *entry_name,
  * sd_getentry_type - return string representation of entry_t
  * @etype: entry type
  */
-static __INLINE__ const char *sd_getentry_type(enum entry_t etype)
+static inline const char *sd_getentry_type(enum entry_t etype)
 {
 	const char *etype_names[] = {
 		"sd_entry_literal",
@@ -95,7 +95,7 @@ static __INLINE__ const char *sd_getentry_type(enum entry_t etype)
  * @entry_name: name from sd_entry
  * @etype: type of entry
  */
-static __INLINE__ int sdmatch_match_common(const char *path,
+static inline int sdmatch_match_common(const char *path,
 					   const char *entry_name,
 			   		   enum entry_t etype)
 {
