@@ -372,6 +372,10 @@ static inline void sd_link_perm_trace(struct subdomain *sd,
 		status = SUBDOMAIN_COMPLAIN(sd) ? "PERMITTING" : "REJECTING";
 	else if (!SUBDOMAIN_AUDIT(sd))
 		return;
+
+	SD_WARN("%s link access from %s to %s (%s(%d) profile %s active %s)\n",
+		status, lname, tname, current->comm, current->pid,
+		sd->profile->name, sd->active->name);
 }
 
 /*************************
