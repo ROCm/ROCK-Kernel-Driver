@@ -77,7 +77,7 @@
 
 #include <asm/uaccess.h>
 
-static int max_loop = 8;
+static int max_loop = 64;
 static struct loop_device *loop_dev;
 static struct gendisk **disks;
 
