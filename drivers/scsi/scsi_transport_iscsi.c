@@ -21,11 +21,8 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 #include <linux/module.h>
-#include <linux/string.h>
-#include <linux/slab.h>
 #include <linux/mempool.h>
 #include <net/tcp.h>
-
 #include <scsi/scsi.h>
 #include <scsi/scsi_host.h>
 #include <scsi/scsi_device.h>
@@ -117,6 +114,8 @@ show_transport_attr(caps, "0x%x");
 show_transport_attr(max_lun, "%d");
 show_transport_attr(max_conn, "%d");
 show_transport_attr(max_cmd_len, "%d");
+show_transport_attr(af, "%d");
+show_transport_attr(rdma, "%d");
 
 static struct attribute *iscsi_transport_attrs[] = {
 	&class_device_attr_handle.attr,
@@ -124,6 +123,8 @@ static struct attribute *iscsi_transport_attrs[] = {
 	&class_device_attr_max_lun.attr,
 	&class_device_attr_max_conn.attr,
 	&class_device_attr_max_cmd_len.attr,
+	&class_device_attr_af.attr,
+	&class_device_attr_rdma.attr,
 	NULL,
 };
 
@@ -249,7 +250,7 @@ static inline struct list_head *skb_to_lh(struct sk_buff *skb)
 }
 
 static void*
-mempool_zone_alloc_skb(gfp_t gfp_mask, void *pool_data)
+mempool_zone_alloc_skb(unsigned int gfp_mask, void *pool_data)
 {
 	struct mempool_zone *zone = pool_data;
 
@@ -1234,7 +1235,7 @@ static __init int iscsi_transport_init(void)
 		goto unregister_session_class;
 
 	nls = netlink_kernel_create(NETLINK_ISCSI, 1, iscsi_if_rx,
-				    THIS_MODULE);
+			THIS_MODULE);
 	if (!nls) {
 		err = -ENOBUFS;
 		goto unregister_notifier;
