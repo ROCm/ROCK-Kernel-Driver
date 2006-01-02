@@ -29,6 +29,7 @@
 #include <linux/initrd.h>
 #include <linux/bitops.h>
 #include <linux/module.h>
+#include <linux/kexec.h>
 
 #include <asm/prom.h>
 #include <asm/rtas.h>
@@ -37,6 +38,7 @@
 #include <asm/processor.h>
 #include <asm/irq.h>
 #include <asm/io.h>
+#include <asm/kdump.h>
 #include <asm/smp.h>
 #include <asm/system.h>
 #include <asm/mmu.h>
@@ -565,7 +567,10 @@ static int __init interpret_root_props(struct device_node *np,
 	unsigned int *rp;
 	int rpsize = (naddrc + nsizec) * sizeof(unsigned int);
 
-	rp = (unsigned int *) get_property(np, "reg", &l);
+	rp = (unsigned int *) get_property(np, "linux,usable-memory", &l);
+	if (rp == NULL)
+		rp = (unsigned int *) get_property(np, "reg", &l);
+
 	if (rp != 0 && l >= rpsize) {
 		i = 0;
 		adr = (struct address_range *) (*mem_start);
@@ -1197,6 +1202,16 @@ static int __init early_init_dt_scan_chosen(unsigned long node,
 	}
 #endif /* CONFIG_PPC_RTAS */
 
+#ifdef CONFIG_KEXEC
+       lprop = (u64*)of_get_flat_dt_prop(node, "linux,crashkernel-base", NULL);
+       if (lprop)
+               crashk_res.start = *lprop;
+
+       lprop = (u64*)of_get_flat_dt_prop(node, "linux,crashkernel-size", NULL);
+       if (lprop)
+               crashk_res.end = crashk_res.start + *lprop - 1;
+#endif
+
 	/* break now */
 	return 1;
 }
@@ -1263,7 +1278,9 @@ static int __init early_init_dt_scan_memory(unsigned long node,
 	} else if (strcmp(type, "memory") != 0)
 		return 0;
 
-	reg = (cell_t *)of_get_flat_dt_prop(node, "reg", &l);
+	reg = (cell_t *)of_get_flat_dt_prop(node, "linux,usable-memory", &l);
+	if (reg == NULL)
+		reg = (cell_t *)of_get_flat_dt_prop(node, "reg", &l);
 	if (reg == NULL)
 		return 0;
 
@@ -1335,11 +1352,14 @@ void __init early_init_devtree(void *params)
 	of_scan_flat_dt(early_init_dt_scan_memory, NULL);
 	lmb_enforce_memory_limit(memory_limit);
 	lmb_analyze();
-	lmb_reserve(0, __pa(klimit));
 
 	DBG("Phys. mem: %lx\n", lmb_phys_mem_size());
 
 	/* Reserve LMB regions used by kernel, initrd, dt, etc... */
+	lmb_reserve(PHYSICAL_START, __pa(klimit) - PHYSICAL_START);
+#ifdef CONFIG_CRASH_DUMP
+	lmb_reserve(0, KDUMP_RESERVE_LIMIT);
+#endif
 	early_reserve_mem();
 
 	DBG("Scanning CPUs ...\n");

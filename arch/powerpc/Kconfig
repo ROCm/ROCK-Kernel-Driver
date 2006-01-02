@@ -50,7 +50,7 @@ config PPC
 
 config EARLY_PRINTK
 	bool
-	default y if PPC64
+	default y
 
 config COMPAT
 	bool
@@ -379,10 +379,28 @@ config CELL_IIC
 	bool
 	default y
 
+config CRASH_DUMP
+	bool "kernel crash dumps (EXPERIMENTAL)"
+	depends on PPC_MULTIPLATFORM
+	depends on EXPERIMENTAL
+	help
+	  Build a kernel suitable for use as a kdump capture kernel.
+	  The kernel will be linked at a different address than normal, and
+	  so can only be used for Kdump.
+
+	  Don't change this unless you know what you are doing.
+
 config IBMVIO
 	depends on PPC_PSERIES || PPC_ISERIES
 	bool
 	default y
+
+config IBMEBUS
+	depends on PPC_PSERIES
+	bool "Support for GX bus based adapters"
+	default y
+	help
+	  Bus device driver for GX bus based adapters.
 
 config PPC_MPC106
 	bool

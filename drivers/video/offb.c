@@ -326,7 +326,7 @@ static void __init offb_init_nodriver(struct device_node *dp)
 	int *pp, i;
 	unsigned int len;
 	int width = 640, height = 480, depth = 8, pitch;
-	unsigned int rsize, *up, addr_prop = 0;
+	unsigned int rsize, *up;
 	unsigned long address = 0;
 
 	if ((pp = (int *) get_property(dp, "depth", &len)) != NULL
@@ -346,69 +346,63 @@ static void __init offb_init_nodriver(struct device_node *dp)
 	} else
 		pitch = width;
 
-	rsize = (unsigned long)pitch * (unsigned long)height *
+       rsize = (unsigned long)pitch * (unsigned long)height *
                (unsigned long)(depth / 8);
 
-	/* Ok, now we try to figure out the address of the framebuffer.
-	 *
-	 * Unfortunately, Open Firmware doesn't provide a standard way to do
-	 * so. All we can do is a dodgy heuristic that happens to work in
-	 * practice. On most machines, the "address" property contains what
-	 * we need, though not on Matrox cards found in IBM machines. What I've
-	 * found that appears to give good results is to go through the PCI
-	 * ranges and pick one that is both big enough and if possible encloses
-	 * the "address" property. If none match, we pick the biggest
-	 */
-	up = (unsigned int *) get_property(dp, "address", &len);
-	if (up && len == sizeof(unsigned int))
-		addr_prop = *up;
-
+       /* Try to match device to a PCI device in order to get a properly
+	* translated address rather then trying to decode the open firmware
+	* stuff in various incorrect ways
+	*/
 #ifdef CONFIG_PCI
-	/* Try to locate the PCI device if any */
-	{
-		struct pci_dev *pdev = NULL;
+       /* First try to locate the PCI device if any */
+       {
+               struct pci_dev *pdev = NULL;
 
-		for_each_pci_dev(pdev) {
-			if (dp == pci_device_to_OF_node(pdev))
-				break;
-		}
-		if (pdev) {
-			unsigned long max_size = 0;
-
-			for (i = 0; i < 6 && address == 0; i++) {
-				int match_addrp = 0;
-
-				if (!pci_resource_flags(pdev, i)&IORESOURCE_MEM)
-					continue;
-				if (pci_resource_len(pdev, i) < rsize)
-					continue;
-				if (addr_prop && pci_resource_start(pdev, i) <=
-				    addr_prop && (pci_resource_start(pdev, i) +
-						  pci_resource_len(pdev, i) >
-						  addr_prop))
-					match_addrp = 1;
-				if (match_addrp) {
-					address = addr_prop;
-					break;
-				}
-				if (pci_resource_len(pdev, i) > max_size) {
-					max_size = pci_resource_len(pdev, i);
-					address = 0;
-				}
-				if (address == 0)
-					address = pci_resource_start(pdev, i);
-			}
-			pci_dev_put(pdev);
-		}
+	       for_each_pci_dev(pdev) {
+                       if (dp == pci_device_to_OF_node(pdev))
+                               break;
+	       }
+               if (pdev) {
+                       for (i = 0; i < 6 && address == 0; i++) {
+                               if ((pci_resource_flags(pdev, i) &
+				    IORESOURCE_MEM) &&
+				   (pci_resource_len(pdev, i) >= rsize))
+                                       address = pci_resource_start(pdev, i);
+                       }
+		       pci_dev_put(pdev);
+               }
         }
 #endif /* CONFIG_PCI */
 
-	if (address == 0 && addr_prop)
-		address = (u_long)addr_prop;
+	if (address == 0 &&
+	    (up = (unsigned *) get_property(dp, "address", &len)) != NULL &&
+	    len == sizeof(unsigned))
+		address = (u_long) * up;
+	if (address == 0) {
+		for (i = 0; i < dp->n_addrs; ++i)
+			if (dp->addrs[i].size >=
+			    pitch * height * depth / 8)
+				break;
+		if (i >= dp->n_addrs) {
+			printk(KERN_ERR
+			       "no framebuffer address found for %s\n",
+			       dp->full_name);
+			return;
+		}
 
-	if (address != 0)
-		offb_init_fb(dp->name, dp->full_name, width, height, depth,
-			     pitch, address, dp);
+		address = (u_long) dp->addrs[i].address;
+
+#ifdef CONFIG_PPC64
+		address += ((struct pci_dn *)dp->data)->phb->pci_mem_offset;
+#endif
+
+		/* kludge for valkyrie */
+		if (strcmp(dp->name, "valkyrie") == 0)
+			address += 0x1000;
+	}
+	offb_init_fb(dp->name, dp->full_name, width, height, depth,
+		     pitch, address, dp);
+
 }
 
 static void __init offb_init_fb(const char *name, const char *full_name,

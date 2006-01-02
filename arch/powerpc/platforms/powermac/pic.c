@@ -471,7 +471,7 @@ void __init pmac_pic_init(void)
 				setup_irq(nmi_irq, &xmon_action);
 			}
 		}
-#endif	/* CONFIG_XMON */
+#endif	/* defined(CONFIG_XMON) && defined(CONFIG_PPC32) */
 		return;
 	}
 	irqctrler = NULL;

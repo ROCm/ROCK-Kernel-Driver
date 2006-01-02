@@ -16,8 +16,8 @@
 #include <linux/console.h>
 #include <asm/processor.h>
 
-void (*udbg_putc)(unsigned char c);
-unsigned char (*udbg_getc)(void);
+void (*udbg_putc)(char c);
+int (*udbg_getc)(void);
 int (*udbg_getc_poll)(void);
 
 /* udbg library, used by xmon et al */
@@ -57,8 +57,8 @@ int udbg_write(const char *s, int n)
 
 int udbg_read(char *buf, int buflen)
 {
-	char c, *p = buf;
-	int i;
+	char *p = buf;
+	int i, c;
 
 	if (!udbg_getc)
 		return 0;
@@ -66,8 +66,11 @@ int udbg_read(char *buf, int buflen)
 	for (i = 0; i < buflen; ++i) {
 		do {
 			c = udbg_getc();
+			if (c == -1 && i == 0)
+				return -1;
+
 		} while (c == 0x11 || c == 0x13);
-		if (c == 0)
+		if (c == 0 || c == -1)
 			break;
 		*p++ = c;
 	}
@@ -78,7 +81,7 @@ int udbg_read(char *buf, int buflen)
 #define UDBG_BUFSIZE 256
 void udbg_printf(const char *fmt, ...)
 {
-	unsigned char buf[UDBG_BUFSIZE];
+	char buf[UDBG_BUFSIZE];
 	va_list args;
 
 	va_start(args, fmt);
@@ -99,7 +102,7 @@ static void udbg_console_write(struct console *con, const char *s,
 static struct console udbg_console = {
 	.name	= "udbg",
 	.write	= udbg_console_write,
-	.flags	= CON_PRINTBUFFER,
+	.flags	= CON_PRINTBUFFER | CON_ENABLED,
 	.index	= -1,
 };
 
@@ -116,6 +119,8 @@ void __init disable_early_printk(void)
 /* called by setup_system */
 void register_early_udbg_console(void)
 {
+	if (early_console_initialized)
+		return;
 	early_console_initialized = 1;
 	register_console(&udbg_console);
 }

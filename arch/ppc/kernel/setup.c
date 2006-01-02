@@ -510,8 +510,6 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 
 #ifdef CONFIG_SERIAL_CORE_CONSOLE
 extern char *of_stdout_device;
-int do_not_try_pc_legacy_8250_console;
-EXPORT_SYMBOL(do_not_try_pc_legacy_8250_console);
 
 static int __init set_preferred_console(void)
 {
@@ -519,16 +517,8 @@ static int __init set_preferred_console(void)
 	char *name;
 	int offset = 0;
 
-	/*
-	 * this happens if booted with BootX
-	 * do not run serial8250_console_init
-	 */
 	if (of_stdout_device == NULL)
-	{
-		if (_MACH_Pmac == _machine)
-			do_not_try_pc_legacy_8250_console = 1;
 		return -ENODEV;
-	}
 
 	/* The user has requested a console so this is already set up. */
 	if (strstr(saved_command_line, "console="))
@@ -565,15 +555,9 @@ static int __init set_preferred_console(void)
 			}
 		}
 	} else if (strcmp(name, "ch-a") == 0)
-	{
-		do_not_try_pc_legacy_8250_console = 1;
 		offset = 0;
-	}
 	else if (strcmp(name, "ch-b") == 0)
-	{
-		do_not_try_pc_legacy_8250_console = 1;
 		offset = 1;
-	}
 	else
 		return -ENODEV;
 	return add_preferred_console("ttyS", offset, NULL);
@@ -759,6 +743,9 @@ void __init setup_arch(char **cmdline_p)
 
 	/* so udelay does something sensible, assume <= 1000 bogomips */
 	loops_per_jiffy = 500000000 / HZ;
+
+	if (ppc_md.init_early)
+		ppc_md.init_early();
 
 #ifdef CONFIG_PPC_MULTIPLATFORM
 	/* This could be called "early setup arch", it must be done

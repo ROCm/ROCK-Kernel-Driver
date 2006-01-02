@@ -841,9 +841,6 @@ pmac_pcibios_fixup(void)
 	/* Fixup interrupts according to OF tree */
 	pcibios_fixup_OF_interrupts();
 	request_region(0x0UL, 0x10000UL, "reserved legacy io");
-#ifdef CONFIG_SERIAL_CORE_CONSOLE
-	do_not_try_pc_legacy_8250_console = 1;
-#endif
 }
 
 #ifdef CONFIG_PPC64
