@@ -654,32 +654,22 @@ static int mv643xx_eth_open(struct net_device *dev)
 	unsigned int port_num = mp->port_num;
 	int err;
 
-	spin_lock_irq(&mp->lock);
-
 	err = request_irq(dev->irq, mv643xx_eth_int_handler,
 			SA_SHIRQ | SA_SAMPLE_RANDOM, dev->name, dev);
-
 	if (err) {
 		printk(KERN_ERR "Can not assign IRQ number to MV643XX_eth%d\n",
 								port_num);
-		err = -EAGAIN;
-		goto out;
+		return -EAGAIN;
 	}
+
+	spin_lock_irq(&mp->lock);
 
 	if (mv643xx_eth_real_open(dev)) {
 		printk("%s: Error opening interface\n", dev->name);
+		free_irq(dev->irq, dev);
 		err = -EBUSY;
-		goto out_free;
 	}
 
-	spin_unlock_irq(&mp->lock);
-
-	return 0;
-
-out_free:
-	free_irq(dev->irq, dev);
-
-out:
 	spin_unlock_irq(&mp->lock);
 
 	return err;
