@@ -275,13 +275,13 @@ int snd_register_device(int type, struct snd_card *card, int dev,
 		devfs_mk_cdev(MKDEV(major, minor), S_IFCHR | device_mode, "snd/%s", name);
 	if (card) {
 		device = card->dev;
-		class_device = card->parent_device;
+		/* class_device = card->parent_device; */
 	}
 	class_device = class_device_create(sound_class, class_device,
 					   MKDEV(major, minor), device,
 					   "%s", name);
-	if (type == SNDRV_DEVICE_TYPE_CONTROL)
-		card->parent_device = class_device;
+	/* if (type == SNDRV_DEVICE_TYPE_CONTROL)
+		card->parent_device = class_device; */
 
 	up(&sound_mutex);
 	return 0;

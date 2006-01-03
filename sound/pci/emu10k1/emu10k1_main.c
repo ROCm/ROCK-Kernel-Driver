@@ -92,6 +92,30 @@ void snd_emu10k1_voice_init(struct snd_emu10k1 * emu, int ch)
 	}
 }
 
+static unsigned int spi_dac_init[] = {
+		0x00ff,
+		0x02ff,
+		0x0400,
+		0x0520,
+		0x0600,
+		0x08ff,
+		0x0aff,
+		0x0cff,
+		0x0eff,
+		0x10ff,
+		0x1200,
+		0x1400,
+		0x1480,
+		0x1800,
+		0x1aff,
+		0x1cff,
+		0x1e00,
+		0x0530,
+		0x0602,
+		0x0622,
+		0x1400,
+};
+	
 static int snd_emu10k1_init(struct snd_emu10k1 *emu, int enable_ir, int resume)
 {
 	unsigned int silent_page;
@@ -181,7 +205,28 @@ static int snd_emu10k1_init(struct snd_emu10k1 *emu, int enable_ir, int resume)
 		tmp = inl(emu->port + A_IOCFG) & ~0x8; /* Clear bit 3 */
 		outl(tmp, emu->port + A_IOCFG);
 	}
+	if (emu->card_capabilities->spi_dac) { /* Audigy 2 ZS Notebook with DAC Wolfson WM8768/WM8568 */
+		int size, n;
 
+		size = ARRAY_SIZE(spi_dac_init);
+		for (n=0; n < size; n++)
+			snd_emu10k1_spi_write(emu, spi_dac_init[n]);
+
+		snd_emu10k1_ptr20_write(emu, 0x60, 0, 0x10);
+		/* Enable GPIOs
+		 * GPIO0: Unknown
+		 * GPIO1: Speakers-enabled.
+		 * GPIO2: Unknown
+		 * GPIO3: Unknown
+		 * GPIO4: IEC958 Output on.
+		 * GPIO5: Unknown
+		 * GPIO6: Unknown
+		 * GPIO7: Unknown
+		 */
+		outl(0x76, emu->port + A_IOCFG); /* Windows uses 0x3f76 */
+
+	}
+	
 	snd_emu10k1_ptr_write(emu, PTB, 0, emu->ptb_pages.addr);
 	snd_emu10k1_ptr_write(emu, TCB, 0, 0);	/* taken from original driver */
 	snd_emu10k1_ptr_write(emu, TCBS, 0, 4);	/* taken from original driver */
@@ -731,6 +776,12 @@ static int snd_emu10k1_dev_free(struct snd_device *device)
 static struct snd_emu_chip_details emu_chip_details[] = {
 	/* Audigy 2 Value AC3 out does not work yet. Need to find out how to turn off interpolators.*/
 	/* Tested by James@superbug.co.uk 3rd July 2005 */
+	/* DSP: CA0108-IAT
+	 * DAC: CS4382-KQ
+	 * ADC: Philips 1361T
+	 * AC97: STAC9750
+	 * CA0151: None
+	 */
 	{.vendor = 0x1102, .device = 0x0008, .subsystem = 0x10011102,
 	 .driver = "Audigy2", .name = "Audigy 2 Value [SB0400]", 
 	 .id = "Audigy2",
@@ -739,14 +790,24 @@ static struct snd_emu_chip_details emu_chip_details[] = {
 	 .spk71 = 1,
 	 .ac97_chip = 1} ,
 	/* Audigy 2 ZS Notebook Cardbus card.*/
-	/* Tested by James@superbug.co.uk 30th October 2005 */
-	/* Not working yet, but progressing. */
+	/* Tested by James@superbug.co.uk 22th December 2005 */
+	/* Audio output 7.1/Headphones working.
+	 * Digital output working. (AC3 not checked, only PCM)
+	 * Audio inputs not tested.
+	 */ 
+	/* DSP: Tiny2
+	 * DAC: Wolfson WM8768/WM8568
+	 * ADC: Wolfson WM8775
+	 * AC97: None
+	 * CA0151: None
+	 */
 	{.vendor = 0x1102, .device = 0x0008, .subsystem = 0x20011102,
 	 .driver = "Audigy2", .name = "Audigy 2 ZS Notebook [SB0530]", 
 	 .id = "Audigy2",
 	 .emu10k2_chip = 1,
 	 .ca0108_chip = 1,
 	 .ca_cardbus_chip = 1,
+	 .spi_dac = 1,
 	 .spk71 = 1} ,
 	{.vendor = 0x1102, .device = 0x0008, 
 	 .driver = "Audigy2", .name = "Audigy 2 Value [Unknown]", 
@@ -799,6 +860,14 @@ static struct snd_emu_chip_details emu_chip_details[] = {
 	 .spk71 = 1,
 	 .spdif_bug = 1,
 	 .ac97_chip = 1} ,
+	/* Audigy 2 */
+	/* Tested by James@superbug.co.uk 3rd July 2005 */
+	/* DSP: CA0102-IAT
+	 * DAC: CS4382-KQ
+	 * ADC: Philips 1361T
+	 * AC97: STAC9721
+	 * CA0151: Yes
+	 */
 	{.vendor = 0x1102, .device = 0x0004, .subsystem = 0x10071102,
 	 .driver = "Audigy2", .name = "Audigy 2 [SB0240]", 
 	 .id = "Audigy2",
@@ -872,6 +941,14 @@ static struct snd_emu_chip_details emu_chip_details[] = {
 	 .sblive51 = 1} ,
 	{.vendor = 0x1102, .device = 0x0002, .subsystem = 0x80691102,
 	 .driver = "EMU10K1", .name = "SBLive! Value [SB0101]", 
+	 .id = "Live",
+	 .emu10k1_chip = 1,
+	 .ac97_chip = 1,
+	 .sblive51 = 1} ,
+	/* Tested by ALSA bug#1680 26th December 2005 */
+	/* note: It really has SB0220 written on the card. */
+	{.vendor = 0x1102, .device = 0x0002, .subsystem = 0x80661102,
+	 .driver = "EMU10K1", .name = "SB Live 5.1 Dell OEM [SB0220]", 
 	 .id = "Live",
 	 .emu10k1_chip = 1,
 	 .ac97_chip = 1,
