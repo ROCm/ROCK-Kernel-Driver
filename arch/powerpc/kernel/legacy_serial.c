@@ -409,6 +409,47 @@ static int __init serial_dev_init(void)
 }
 arch_initcall(serial_dev_init);
 
+#if defined(CONFIG_PPC_PSERIES) && defined(CONFIG_SERIAL_8250_CONSOLE)
+/*
+ * Handle the SysRq ^O Hack also via ttyS0 on POWER4 systems
+ * but only on the system console, see asm/serial.h
+ * If they run in FullSystemPartition mode, the firmware console comes in via ttyS0
+ * But BREAK does not work via the HMC, to trigger sysrq.
+ * Affected Models:
+ * p690 7040-681
+ * p670 7040-671
+ * p655 7039-651
+ * p650 7038-6M2
+ * p630 7028-6E4 tower
+ * p630 7028-6C4 rack
+ * p615 7029-6E3 tower
+ * p615 7029-6C3 rack
+ */
+int power4_sysrq_via_ctrl_o;
+
+static void detect_power4_console(void)
+{
+	struct device_node *root;
+	char *model;
+
+	root = of_find_node_by_path("/");
+	if (root) {
+		model = get_property(root, "model", NULL);
+		if (model) {
+			if(!strcmp(model, "IBM,7040-681") ||
+			   !strcmp(model, "IBM,7040-671") ||
+			   !strcmp(model, "IBM,7039-651") ||
+			   !strcmp(model, "IBM,7038-6M2") ||
+			   !strcmp(model, "IBM,7028-6E4") ||
+			   !strcmp(model, "IBM,7028-6C4") ||
+			   !strcmp(model, "IBM,7029-6E3") ||
+			   !strcmp(model, "IBM,7029-6C3"))
+				power4_sysrq_via_ctrl_o = 1;
+		}
+		of_node_put(root);
+	}
+}
+#endif
 
 /*
  * This is called very early, as part of console_init() (typically just after
@@ -475,6 +516,9 @@ static int __init check_legacy_serial_console(void)
 		}
 		if (i >= legacy_serial_count)
 			goto not_found;
+#ifdef CONFIG_PPC_PSERIES
+		detect_power4_console();
+#endif
 	}
 #endif /* CONFIG_SERIAL_8250_CONSOLE */
 #ifdef CONFIG_SERIAL_PMACZILOG_CONSOLE

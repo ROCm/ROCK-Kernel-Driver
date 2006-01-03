@@ -98,6 +98,8 @@ static unsigned int share_irqs = SERIAL8250_SHARE_IRQS;
 #define CONFIG_SERIAL_MANY_PORTS 1
 #endif
 
+#define arch_8250_sysrq_via_ctrl_o(a,b) (0)
+
 /*
  * HUB6 is always on.  This will be removed once the header
  * files have been cleaned.
@@ -1179,13 +1181,8 @@ receive_chars(struct uart_8250_port *up, int *status, struct pt_regs *regs)
 			kdb_serial_ptr = kdb_serial_str;
 		}
 #endif	/* CONFIG_KDB */
-
-#if defined(CONFIG_MAGIC_SYSRQ) && defined(CONFIG_SERIAL_CORE_CONSOLE)
-		/* Handle the SysRq ^O Hack, but only on the system console */
-		if (ch == '\x0f' && uart_handle_break(&up->port))
+		if (arch_8250_sysrq_via_ctrl_o(ch, &up->port))
 			goto ignore_char;
-#endif
-
 		flag = TTY_NORMAL;
 		up->port.icount.rx++;
 
