@@ -1636,6 +1636,20 @@ qla2x00_free_device(scsi_qla_host_t *ha)
 	pci_disable_device(ha->pdev);
 }
 
+static inline void
+qla2x00_schedule_rport_del(struct scsi_qla_host *ha, fc_port_t *fcport)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&fcport->rport_lock, flags);
+	if (fcport->rport) {
+		fcport->drport = fcport->rport;
+		fcport->rport = NULL;
+	}
+	spin_unlock_irqrestore(&fcport->rport_lock, flags);
+	schedule_work(&fcport->rport_del_work);
+}
+
 /*
  * qla2x00_mark_device_lost Updates fcport state when device goes offline.
  *
@@ -1648,8 +1662,8 @@ qla2x00_free_device(scsi_qla_host_t *ha)
 void qla2x00_mark_device_lost(scsi_qla_host_t *ha, fc_port_t *fcport,
     int do_login)
 {
-	if (atomic_read(&fcport->state) == FCS_ONLINE && fcport->rport)
-		schedule_work(&fcport->rport_del_work);
+	if (atomic_read(&fcport->state) == FCS_ONLINE)
+		qla2x00_schedule_rport_del(ha, fcport);
 
 	/*
 	 * We may need to retry the login, so don't change the state of the
@@ -1710,8 +1724,8 @@ qla2x00_mark_all_devices_lost(scsi_qla_host_t *ha)
 		 */
 		if (atomic_read(&fcport->state) == FCS_DEVICE_DEAD)
 			continue;
-		if (atomic_read(&fcport->state) == FCS_ONLINE && fcport->rport)
-			schedule_work(&fcport->rport_del_work);
+		if (atomic_read(&fcport->state) == FCS_ONLINE)
+			qla2x00_schedule_rport_del(ha, fcport);
 		atomic_set(&fcport->state, FCS_DEVICE_LOST);
 	}
 }
