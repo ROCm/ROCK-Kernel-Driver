@@ -91,7 +91,7 @@ union acpi_parse_object;
 #define MAX_MUTEX                       12
 #define NUM_MUTEX                       MAX_MUTEX+1
 
-#if defined(ACPI_DEBUG_OUTPUT) || defined(ACPI_DEBUGGER)
+#if defined(ACPI_DEBUG_OUTPUT) || defined(ACPI_DEBUGGER) || defined(ACPI_DEBUG_LITE)
 #ifdef DEFINE_ACPI_GLOBALS
 
 /* Names for the mutexes used in the subsystem */

@@ -172,7 +172,12 @@
 
 /* Defaults for debug_level, debug and normal */
 
+#ifdef CONFIG_ACPI_DEBUG_LITE
+/* Don't print warnings and other noise by default. Can be still enabled on the command line. */
+#define ACPI_DEBUG_DEFAULT          (ACPI_LV_INIT | ACPI_LV_ERROR)
+#else
 #define ACPI_DEBUG_DEFAULT          (ACPI_LV_INIT | ACPI_LV_WARN | ACPI_LV_ERROR | ACPI_LV_DEBUG_OBJECT)
+#endif
 #define ACPI_NORMAL_DEFAULT         (ACPI_LV_INIT | ACPI_LV_WARN | ACPI_LV_ERROR | ACPI_LV_DEBUG_OBJECT)
 #define ACPI_DEBUG_ALL              (ACPI_LV_AML_DISASSEMBLE | ACPI_LV_ALL_EXCEPTIONS | ACPI_LV_ALL)
 

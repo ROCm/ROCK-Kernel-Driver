@@ -692,7 +692,7 @@ char *acpi_ut_get_descriptor_name(void *object)
 
 }
 
-#if defined(ACPI_DEBUG_OUTPUT) || defined(ACPI_DEBUGGER)
+#if defined(ACPI_DEBUG_OUTPUT) || defined(ACPI_DEBUGGER) || defined(ACPI_DEBUG_LITE)
 /*
  * Strings and procedures used for debug only
  */

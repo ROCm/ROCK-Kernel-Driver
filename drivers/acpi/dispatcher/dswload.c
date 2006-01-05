@@ -727,8 +727,10 @@ acpi_status acpi_ds_load2_end_op(struct acpi_walk_state *walk_state)
 	ACPI_FUNCTION_TRACE("ds_load2_end_op");
 
 	op = walk_state->op;
+#ifdef ACPI_DEBUG_OUTPUT
 	ACPI_DEBUG_PRINT((ACPI_DB_DISPATCH, "Opcode [%s] Op %p State %p\n",
 			  walk_state->op_info->name, op, walk_state));
+#endif
 
 	/* Check if opcode had an associated namespace object */
 

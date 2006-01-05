@@ -44,6 +44,10 @@
 #include <acpi/acpi.h>
 #include <acpi/acnamesp.h>
 
+#ifdef CONFIG_ACPI_DEBUG_LITE
+#define acpi_ut_get_mutex_name(x) NULL
+#endif
+
 #define _COMPONENT          ACPI_UTILITIES
 ACPI_MODULE_NAME("utmisc")
 
@@ -876,6 +880,8 @@ acpi_ut_report_warning(char *module_name, u32 line_number, u32 component_id)
 
 	acpi_os_printf("%8s-%04d: *** Warning: ", module_name, line_number);
 }
+
+EXPORT_SYMBOL(acpi_ut_report_warning);
 
 /*******************************************************************************
  *

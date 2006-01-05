@@ -236,27 +236,27 @@ acpi_status acpi_ut_acquire_mutex(acpi_mutex_handle mutex_id)
 			}
 		}
 	}
-#endif
-
 	ACPI_DEBUG_PRINT((ACPI_DB_MUTEX,
 			  "Thread %X attempting to acquire Mutex [%s]\n",
 			  this_thread_id, acpi_ut_get_mutex_name(mutex_id)));
+#endif
 
 	status = acpi_os_wait_semaphore(acpi_gbl_mutex_info[mutex_id].mutex,
 					1, ACPI_WAIT_FOREVER);
 	if (ACPI_SUCCESS(status)) {
+#ifdef ACPI_DEBUG_OUTPUT
 		ACPI_DEBUG_PRINT((ACPI_DB_MUTEX,
 				  "Thread %X acquired Mutex [%s]\n",
 				  this_thread_id,
 				  acpi_ut_get_mutex_name(mutex_id)));
+#endif
 
 		acpi_gbl_mutex_info[mutex_id].use_count++;
 		acpi_gbl_mutex_info[mutex_id].thread_id = this_thread_id;
 	} else {
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
-				  "Thread %X could not acquire Mutex [%s] %s\n",
+				  "Thread %X could not acquire Mutex %s\n",
 				  this_thread_id,
-				  acpi_ut_get_mutex_name(mutex_id),
 				  acpi_format_exception(status)));
 	}
 
@@ -283,9 +283,12 @@ acpi_status acpi_ut_release_mutex(acpi_mutex_handle mutex_id)
 	ACPI_FUNCTION_NAME("ut_release_mutex");
 
 	this_thread_id = acpi_os_get_thread_id();
+
+#ifdef ACPI_DEBUG_OUTPUT
 	ACPI_DEBUG_PRINT((ACPI_DB_MUTEX,
 			  "Thread %X releasing Mutex [%s]\n", this_thread_id,
 			  acpi_ut_get_mutex_name(mutex_id)));
+#endif
 
 	if (mutex_id > MAX_MUTEX) {
 		return (AE_BAD_PARAMETER);
@@ -296,8 +299,7 @@ acpi_status acpi_ut_release_mutex(acpi_mutex_handle mutex_id)
 	 */
 	if (acpi_gbl_mutex_info[mutex_id].thread_id == ACPI_MUTEX_NOT_ACQUIRED) {
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
-				  "Mutex [%s] is not acquired, cannot release\n",
-				  acpi_ut_get_mutex_name(mutex_id)));
+				  "Mutex is not acquired, cannot release\n"));
 
 		return (AE_NOT_ACQUIRED);
 	}
@@ -339,15 +341,17 @@ acpi_status acpi_ut_release_mutex(acpi_mutex_handle mutex_id)
 
 	if (ACPI_FAILURE(status)) {
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
-				  "Thread %X could not release Mutex [%s] %s\n",
+				  "Thread %X could not release Mutex %s\n",
 				  this_thread_id,
-				  acpi_ut_get_mutex_name(mutex_id),
 				  acpi_format_exception(status)));
 	} else {
+#ifdef ACPI_DEBUG_OUTPUT
 		ACPI_DEBUG_PRINT((ACPI_DB_MUTEX,
 				  "Thread %X released Mutex [%s]\n",
 				  this_thread_id,
 				  acpi_ut_get_mutex_name(mutex_id)));
+#endif
+
 	}
 
 	return (status);

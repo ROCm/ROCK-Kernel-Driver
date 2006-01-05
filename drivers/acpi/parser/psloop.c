@@ -375,6 +375,7 @@ acpi_status acpi_ps_parse_loop(struct acpi_walk_state *walk_state)
 
 			op->common.aml_offset = walk_state->aml_offset;
 
+#ifdef ACPI_DEBUG_OUTPUT
 			if (walk_state->op_info) {
 				ACPI_DEBUG_PRINT((ACPI_DB_PARSE,
 						  "Opcode %4.4X [%s] Op %p Aml %p aml_offset %5.5X\n",
@@ -383,6 +384,7 @@ acpi_status acpi_ps_parse_loop(struct acpi_walk_state *walk_state)
 						  parser_state->aml,
 						  op->common.aml_offset));
 			}
+#endif
 		}
 
 		/*
