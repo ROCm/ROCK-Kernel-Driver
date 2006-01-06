@@ -56,7 +56,6 @@ struct o2nm_node;
 typedef void (o2hb_cb_func)(struct o2nm_node *, int, void *);
 
 extern spinlock_t o2hb_live_lock;
-extern struct rw_semaphore o2hb_callback_sem;
 
 struct o2hb_callback_func {
 	u32			hc_magic;
