@@ -23,12 +23,14 @@
 #ifndef O2CLUSTER_QUORUM_H
 #define O2CLUSTER_QUORUM_H
 
-int o2quo_init(void);
+void o2quo_init(void);
 void o2quo_exit(void);
 
-/* we're delaying our quorum decision so that heartbeat will have timed
- * out truly dead nodes by the time we come around to making decisions
- * on their number */
-#define O2NET_QUORUM_DELAY_MS	((o2hb_dead_threshold + 2) * O2HB_REGION_TIMEOUT_MS)
+void o2quo_hb_up(u8 node);
+void o2quo_hb_down(u8 node);
+void o2quo_hb_still_up(u8 node);
+void o2quo_conn_up(u8 node);
+void o2quo_conn_err(u8 node);
+void o2quo_disk_timeout(void);
 
 #endif /* O2CLUSTER_QUORUM_H */

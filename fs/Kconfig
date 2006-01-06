@@ -368,28 +368,6 @@ config OCFS2_FS
 	          - POSIX ACLs
 	          - readpages / writepages (not user visible)
 
-config OCFS2_FS_O2CB
-	tristate "O2CB Kernelspace Clustering"
-	depends on OCFS2_FS
-	default y
-	help
-	  OCFS2 includes a simple kernelspace clustering package that requires
-	  a very small userspace complement to configure it. However, it is
-	  not as flexible as an external cluster manager, and is only
-	  limited to maintaining a cluster for OCFS2 file systems.
-	  If you are not using an external clustering package, choose
-	  this option.
-
-config OCFS2_FS_USERSPACE_CLUSTER
-	tristate "Userspace Clustering"
-	depends on OCFS2_FS
-	default y
-	help
-	  This option will allow OCFS2 to use userspace clustering services
-	  via configfs and sysfs. Currently, the only supported userspace
-	  clustering agent is the Linux-HA project from http://www.linux-ha.org.
-	  If you are using a userspace cluster manager, choose this option.
-
 config MINIX_FS
 	tristate "Minix fs support"
 	help
