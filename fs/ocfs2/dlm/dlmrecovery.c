@@ -411,8 +411,13 @@ static int dlm_remaster_locks(struct dlm_ctxt *dlm, u8 dead_node)
 
 		status = dlm_request_all_locks(dlm, ndata->node_num, dead_node);
 		if (status < 0) {
-			destroy = 1;
-			goto leave;
+			mlog_errno(status);
+			if (dlm_is_host_down(status))
+				ndata->state = DLM_RECO_NODE_DATA_DEAD;
+			else {
+				destroy = 1;
+				goto leave;
+			}
 		}
 
 		switch (ndata->state) {
@@ -609,6 +614,8 @@ static int dlm_request_all_locks(struct dlm_ctxt *dlm, u8 request_from,
 	ret = DLM_NOLOCKMGR;
 	ret = o2net_send_message(DLM_LOCK_REQUEST_MSG, dlm->key,
 				 &lr, sizeof(lr), request_from, NULL);
+
+	/* negative status is handled by caller */
 	if (ret < 0)
 		mlog_errno(ret);
 
@@ -720,6 +727,7 @@ static int dlm_send_all_done_msg(struct dlm_ctxt *dlm, u8 dead_node, u8 send_to)
 
 	ret = o2net_send_message(DLM_RECO_DATA_DONE_MSG, dlm->key, &done_msg,
 				 sizeof(done_msg), send_to, &tmpret);
+	/* negative status is ignored by the caller */
 	if (ret >= 0)
 		ret = tmpret;
 	return ret;
@@ -858,6 +866,8 @@ static int dlm_send_mig_lockres_msg(struct dlm_ctxt *dlm,
 	ret = o2net_send_message(DLM_MIG_LOCKRES_MSG, dlm->key, mres,
 				 sz, send_to, &status);
 	if (ret < 0) {
+		/* XXX: negative status is not handled.
+		 * this will end up killing this node. */
 		mlog_errno(ret);
 	} else {
 		/* might get an -ENOMEM back here */
@@ -1245,6 +1255,9 @@ static int dlm_lockres_master_requery(struct dlm_ctxt *dlm,
 	spin_unlock(&dlm->spinlock);
 
 	while ((nodenum = dlm_node_iter_next(&iter)) >= 0) {
+		/* do not send to self */
+		if (nodenum == dlm->node_num)
+			continue;
 		ret = dlm_do_master_requery(dlm, res, nodenum, real_master);
 		if (ret < 0) {
 			mlog_errno(ret);
@@ -1275,6 +1288,7 @@ static int dlm_do_master_requery(struct dlm_ctxt *dlm,
 
 	ret = o2net_send_message(DLM_MASTER_REQUERY_MSG, dlm->key,
 				 &req, sizeof(req), nodenum, &status);
+	/* XXX: negative status not handled properly here. */
 	if (ret < 0)
 		mlog_errno(ret);
 	else {
@@ -1974,6 +1988,7 @@ static int dlm_send_begin_reco_message(struct dlm_ctxt *dlm, u8 dead_node)
 			  nodenum);
 		ret = o2net_send_message(DLM_BEGIN_RECO_MSG, dlm->key,
 					 &br, sizeof(br), nodenum, &status);
+		/* negative status is handled ok by caller here */
 		if (ret >= 0)
 			ret = status;
 		if (ret < 0) {
@@ -2058,8 +2073,17 @@ static int dlm_send_finalize_reco_message(struct dlm_ctxt *dlm)
 			continue;
 		ret = o2net_send_message(DLM_FINALIZE_RECO_MSG, dlm->key,
 					 &fr, sizeof(fr), nodenum, &status);
-		if (ret >= 0)
+		if (ret >= 0) {
 			ret = status;
+			if (dlm_is_host_down(ret)) {
+				/* this has no effect on this recovery 
+				 * session, so set the status to zero to 
+				 * finish out the last recovery */
+				mlog(ML_ERROR, "node %u went down after this "
+				     "node finished recovery.\n", nodenum);
+				ret = 0;
+			}
+		}
 		if (ret < 0) {
 			mlog_errno(ret);
 			break;

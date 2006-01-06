@@ -28,6 +28,8 @@
 
 #include "ver.h"
 
+#define CLUSTER_BUILD_VERSION "1.3.3"
+
 #define VERSION_STR "OCFS2 Node Manager " CLUSTER_BUILD_VERSION
 
 void cluster_print_version(void)
@@ -37,6 +39,4 @@ void cluster_print_version(void)
 
 MODULE_DESCRIPTION(VERSION_STR);
 
-#ifdef MODULE_VERSION
 MODULE_VERSION(CLUSTER_BUILD_VERSION);
-#endif

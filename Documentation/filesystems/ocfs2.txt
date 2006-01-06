@@ -1,126 +1,55 @@
+OCFS2 filesystem
+==================
+OCFS2 is a general purpose extent based shared disk cluster file
+system with many similarities to ext3. It supports 64 bit inode
+numbers, and has automatically extending metadata groups which may
+also make it attractive for non-clustered use.
 
-For now this just documents locking ordering.  The intent is to have a 
-dense enough markup that one can visualize an entire path in a reasonably
-sized terminal.  So:
+You'll want to install the ocfs2-tools package in order to at least
+get "mount.ocfs2" and "ocfs2_hb_ctl".
 
- (  - lock
- )  - unlock
- () - lock and unlock without anything interesting in between
- +  - descending into another function
+Project web page:    http://oss.oracle.com/projects/ocfs2
+Tools web page:      http://oss.oracle.com/projects/ocfs2-tools
+OCFS2 mailing lists: http://oss.oracle.com/projects/ocfs2/mailman/
 
-worst case buffered file write (extending, buf from mmaped ocfs2)
-+ ocfs2_file_aio_write
-  ( i_sem
-  ( rw_lock
-  ( meta_lock
-  + ocfs2_extend_allocation
-    () ip_alloc_sem
-  ) meta_lock
-  + generic_file_aio_write_nolock
-    + ocfs2_prepare_write
-      ( meta_lock
-      ( ip_alloc_sem
-      ) ip_alloc_sem
-      ) meta_lock
-    + ocfs2_nopage
-      + filemap_nopage
-        + ocfs2_readpage
-          ( meta_lock
-          ( ip_alloc_sem
-          ( data_lock
-          ) data_lock
-          ) ip_alloc_sem
-          ) meta_lock
-    + ocfs2_commit_write
-      ( meta_lock
-      ( data_lock
-      ) data_lock
-      ) meta_lock
-  ) rw_lock
-  ) i_sem
+All code copyright 2005 Oracle except when otherwise noted.
 
-O_DIRECT file write:
-+ ocfs2_file_aio_write
-  ( i_sem
-  ( i_alloc_sem
-  ( rw_lock
-  () meta_lock
-  + __blkdev_direct_IO
-    + ocfs2_direct_io_get_blocks
-      ( meta_lock
-      ( ip_alloc_sem
-      ) ip_alloc_sem
-      ) meta_lock
-  ) i_sem
-+ dio_complete
-  + ocfs2_dio_end_io
-    ) rw_lock
-    ) i_alloc_sem
+CREDITS:
+Lots of code taken from ext3 and other projects.
 
-buffered file read (nopage when buf is mmaped):
-+ ocfs2_file_aio_read
-  + generic_file_aio_read
-    + ocfs2_readpage
-      ( meta_lock
-      ( ip_alloc_sem
-      ( data_lock
-      ) data_lock
-      ) ip_alloc_sem
-      ) meta_lock
-    + ocfs2_nopage
-      + filemap_nopage
-        + ocfs2_readpage
-          ( meta_lock
-          ( ip_alloc_sem
-          ( data_lock
-          ) data_lock
-          ) ip_alloc_sem
-          ) meta_lock
+Authors in alphabetical order:
+Joel Becker   <joel.becker@oracle.com>
+Zach Brown    <zach.brown@oracle.com>
+Mark Fasheh   <mark.fasheh@oracle.com>
+Kurt Hackel   <kurt.hackel@oracle.com>
+Sunil Mushran <sunil.mushran@oracle.com>
+Manish Singh  <manish.singh@oracle.com>
 
-O_DIRECT file read:
-+ ocfs2_file_aio_read
-  ( i_alloc_sem
-  ) rw_lock
-  + __blkdev_direct_IO
-    + ocfs2_direct_io_get_blocks
-      ( meta_lock
-      ( ip_alloc_sem
-      ) ip_alloc_sem
-      ) meta_lock
-+ dio_complete
-  + ocfs2_dio_end_io
-    ) i_alloc_sem
-    ) rw_lock
+Caveats
+=======
+Features which OCFS2 does not support yet:
+	- sparse files
+	- extended attributes
+	- shared writeable mmap
+	- loopback is supported, but data written will not
+	  be cluster coherent.
+	- quotas
+	- cluster aware flock
+	- Directory change notification (F_NOTIFY)
+	- Distributed Caching (F_SETLEASE/F_GETLEASE/break_lease)
+	- POSIX ACLs
+	- readpages / writepages (not user visible)
 
-truncate:
-+ do_truncate
-  ( i_sem
-  + notify_change
-    ( i_alloc_sem
-    + ocfs2_setattr
-      ( rw_lock
-      ( meta_lock
-      + ocfs2_truncate_file
-        () data_lock
-      ) meta_lock
-      ) rw_lock
-    ) i_alloc_sem
-  ) i_sem
+Mount options
+=============
 
-readpage: (via sendfile, sys_readahead, fault->nopage)
-+ ocfs2_readpage
-      ( meta_lock
-      ( ip_alloc_sem
-      ( data_lock
-      ) data_lock
-      ) ip_alloc_sem
-      ) meta_lock
+OCFS2 supports the following mount options:
+(*) == default
 
-Lock Ordering - The Short Story:
-i_sem -> i_alloc_sem -> rw_lock -> meta_lock -> ip_alloc_sem -> data_lock
-
-.. make this prettier ..
-
--- Locks and what they cover --
-
-
+barrier=1		This enables/disables barriers. barrier=0 disables it,
+			barrier=1 enables it.
+errors=remount-ro(*)	Remount the filesystem read-only on an error.
+errors=panic		Panic and halt the machine if an error occurs.
+intr		(*)	Allow signals to interrupt cluster operations.
+nointr			Do not allow signals to interrupt cluster
+			operations.

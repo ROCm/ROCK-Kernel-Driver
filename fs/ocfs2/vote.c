@@ -344,7 +344,6 @@ static void ocfs2_process_dentry_request(struct inode *inode,
 		if (new_nlink == 0) {
 			spin_lock(&oi->ip_lock);
 			oi->ip_flags |= OCFS2_INODE_MAYBE_ORPHANED;
-
 			spin_unlock(&OCFS2_I(inode)->ip_lock);
 		}
 	}

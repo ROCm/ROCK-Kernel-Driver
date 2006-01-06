@@ -48,6 +48,7 @@
 #include "dlmapi.h"
 #include "dlmcommon.h"
 #include "dlmdebug.h"
+#include "dlmdomain.h"
 
 #define MLOG_MASK_PREFIX (ML_DLM|ML_DLM_MASTER)
 #include "cluster/masklog.h"
@@ -140,12 +141,17 @@ void dlm_print_one_mle(struct dlm_master_list_entry *mle)
 	struct kref *k;
 
 	k = &mle->mle_refs;
-	type = (mle->type == DLM_MLE_BLOCK ? "BLK" : "MAS");
+	if (mle->type == DLM_MLE_BLOCK)
+		type = "BLK";
+	else if (mle->type == DLM_MLE_MASTER)
+		type = "MAS";
+	else
+		type = "MIG";
 	refs = atomic_read(&k->refcount);
 	master = mle->master;
 	attached = (list_empty(&mle->hb_events) ? 'N' : 'Y');
 
-	if (mle->type == DLM_MLE_BLOCK) {
+	if (mle->type != DLM_MLE_MASTER) {
 		namelen = mle->u.name.len;
 		name = mle->u.name.name;
 	} else {
@@ -172,9 +178,6 @@ static void dlm_dump_mles(struct dlm_ctxt *dlm)
 	}
 	spin_unlock(&dlm->master_lock);
 }
-
-extern spinlock_t dlm_domain_lock;
-extern struct list_head dlm_domains;
 
 int dlm_dump_all_mles(const char __user *data, unsigned int len)
 {
@@ -217,7 +220,7 @@ static int dlm_do_master_request(struct dlm_master_list_entry *mle, int to);
 static int dlm_wait_for_lock_mastery(struct dlm_ctxt *dlm,
 				     struct dlm_lock_resource *res,
 				     struct dlm_master_list_entry *mle,
-				     int blocked);
+				     int *blocked);
 static int dlm_restart_lock_mastery(struct dlm_ctxt *dlm,
 				    struct dlm_lock_resource *res,
 				    struct dlm_master_list_entry *mle,
@@ -358,7 +361,7 @@ static void dlm_init_mle(struct dlm_master_list_entry *mle,
 	spin_lock_init(&mle->spinlock);
 	init_waitqueue_head(&mle->wq);
 	atomic_set(&mle->woken, 0);
-	kref_init(&mle->mle_refs, dlm_mle_release);
+	kref_init(&mle->mle_refs);
 	memset(mle->response_map, 0, sizeof(mle->response_map));
 	mle->master = O2NM_MAX_NODES;
 	mle->new_master = O2NM_MAX_NODES;
@@ -481,7 +484,7 @@ static void dlm_mle_release(struct kref *kref)
 	mle = container_of(kref, struct dlm_master_list_entry, mle_refs);
 	dlm = mle->dlm;
 
-	if (mle->type == DLM_MLE_BLOCK) {
+	if (mle->type != DLM_MLE_MASTER) {
 		mlog(0, "calling mle_release for %.*s, type %d\n",
 		     mle->u.name.len, mle->u.name.name, mle->type);
 	} else {
@@ -612,7 +615,7 @@ static void dlm_init_lockres(struct dlm_ctxt *dlm,
 	atomic_set(&res->asts_reserved, 0);
 	res->migration_pending = 0;
 
-	kref_init(&res->refs, dlm_lockres_release);
+	kref_init(&res->refs);
 
 	/* just for consistency */
 	spin_lock(&res->spinlock);
@@ -673,6 +676,7 @@ struct dlm_lock_resource * dlm_get_lock_resource(struct dlm_ctxt *dlm,
 	int ret, nodenum;
 	struct dlm_node_iter iter;
 	unsigned int namelen;
+	int tries = 0;
 
 	BUG_ON(!lockid);
 
@@ -756,6 +760,7 @@ lookup:
 		/* make sure this does not get freed below */
 		alloc_mle = NULL;
 		dlm_init_mle(mle, DLM_MLE_MASTER, dlm, res, NULL, 0);
+		set_bit(dlm->node_num, mle->maybe_map);
 		list_add(&mle->list, &dlm->master_list);
 	}
 
@@ -793,20 +798,21 @@ redo_request:
 
 wait:
 	/* keep going until the response map includes all nodes */
-	ret = dlm_wait_for_lock_mastery(dlm, res, mle, blocked);
+	ret = dlm_wait_for_lock_mastery(dlm, res, mle, &blocked);
 	if (ret < 0) {
-		if (blocked) {
-		       	if (mle->type == DLM_MLE_MASTER) {
-				mlog(0, "mle changed to a MASTER due "
-				     "to node death. restart.\n");
-				goto redo_request;
-			}
-			/* should never happen for a BLOCK */
-			mlog(ML_ERROR, "mle type=%d\n", mle->type);
-			BUG();
+		mlog(0, "%s:%.*s: node map changed, redo the "
+		     "master request now, blocked=%d\n",
+		     dlm->name, res->lockname.len,
+		     res->lockname.name, blocked);
+		if (++tries > 20) {
+			mlog(ML_ERROR, "%s:%.*s: spinning on "
+			     "dlm_wait_for_lock_mastery, blocked=%d\n", 
+			     dlm->name, res->lockname.len, 
+			     res->lockname.name, blocked);
+			dlm_print_one_lock_resource(res);
+			/* dlm_print_one_mle(mle); */
+			tries = 0;
 		}
-		mlog(0, "node map changed, redo the "
-		     "master request now\n");
 		goto redo_request;
 	}
 
@@ -840,7 +846,7 @@ leave:
 static int dlm_wait_for_lock_mastery(struct dlm_ctxt *dlm,
 				     struct dlm_lock_resource *res,
 				     struct dlm_master_list_entry *mle,
-				     int blocked)
+				     int *blocked)
 {
 	u8 m;
 	int ret, bit;
@@ -868,14 +874,25 @@ recheck:
 
 	/* restart if we hit any errors */
 	if (map_changed) {
-		mlog(0, "node map changed, restarting\n");
-		ret = dlm_restart_lock_mastery(dlm, res, mle, blocked);
+		int b;
+		mlog(0, "%s: %.*s: node map changed, restarting\n",
+		     dlm->name, res->lockname.len, res->lockname.name);
+		ret = dlm_restart_lock_mastery(dlm, res, mle, *blocked);
+		b = (mle->type == DLM_MLE_BLOCK);
+		if ((*blocked && !b) || (!*blocked && b)) {
+			mlog(0, "%s:%.*s: status change: old=%d new=%d\n", 
+			     dlm->name, res->lockname.len, res->lockname.name,
+			     *blocked, b);
+			*blocked = b;
+		}
 		spin_unlock(&mle->spinlock);
 		if (ret < 0) {
 			mlog_errno(ret);
 			goto leave;
 		}
-		mlog(0, "restart lock mastery succeeded, rechecking now\n");
+		mlog(0, "%s:%.*s: restart lock mastery succeeded, "
+		     "rechecking now\n", dlm->name, res->lockname.len,
+		     res->lockname.name);
 		goto recheck;
 	}
 
@@ -886,7 +903,7 @@ recheck:
 	} else {
 		sleep = 1;
 		/* have all nodes responded? */
-		if (voting_done && !blocked) {
+		if (voting_done && !*blocked) {
 			bit = find_next_bit(mle->maybe_map, O2NM_MAX_NODES, 0);
 			if (dlm->node_num <= bit) {
 				/* my node number is lowest.
@@ -1100,6 +1117,7 @@ static int dlm_restart_lock_mastery(struct dlm_ctxt *dlm,
 				memcpy(mle->vote_map, mle->node_map,
 				       sizeof(mle->node_map));
 				mle->u.res = res;
+				set_bit(dlm->node_num, mle->maybe_map);
 
 				ret = -EAGAIN;
 				goto next;
@@ -1144,7 +1162,7 @@ static int dlm_do_master_request(struct dlm_master_list_entry *mle, int to)
 
 	BUG_ON(mle->type == DLM_MLE_MIGRATION);
 
-	if (mle->type == DLM_MLE_BLOCK) {
+	if (mle->type != DLM_MLE_MASTER) {
 		request.namelen = mle->u.name.len;
 		memcpy(request.name, mle->u.name.name, request.namelen);
 	} else {

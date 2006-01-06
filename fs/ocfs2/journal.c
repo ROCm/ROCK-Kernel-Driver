@@ -405,11 +405,11 @@ int ocfs2_journal_access(struct ocfs2_journal_handle *handle,
 	switch (type) {
 	case OCFS2_JOURNAL_ACCESS_CREATE:
 	case OCFS2_JOURNAL_ACCESS_WRITE:
-		status = kapi_journal_get_write_access(handle->k_handle, bh);
+		status = journal_get_write_access(handle->k_handle, bh);
 		break;
 
 	case OCFS2_JOURNAL_ACCESS_UNDO:
-		status = kapi_journal_get_undo_access(handle->k_handle, bh);
+		status = journal_get_undo_access(handle->k_handle, bh);
 		break;
 
 	default:

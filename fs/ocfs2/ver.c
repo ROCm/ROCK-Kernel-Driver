@@ -29,7 +29,9 @@
 
 #include "ver.h"
 
-#define VERSION_STR "OCFS2 " OCFS2_BUILD_VERSION 
+#define OCFS2_BUILD_VERSION "1.3.3"
+
+#define VERSION_STR "OCFS2 " OCFS2_BUILD_VERSION
 
 void ocfs2_print_version(void)
 {
@@ -38,6 +40,4 @@ void ocfs2_print_version(void)
 
 MODULE_DESCRIPTION(VERSION_STR);
 
-#ifdef MODULE_VERSION
 MODULE_VERSION(OCFS2_BUILD_VERSION);
-#endif

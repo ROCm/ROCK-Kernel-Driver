@@ -278,3 +278,4 @@ struct inode_operations configfs_symlink_inode_operations = {
 	.readlink = generic_readlink,
 	.put_link = configfs_put_link,
 };
+

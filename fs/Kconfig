@@ -140,7 +140,6 @@ config EXT3_FS_SECURITY
 
 config JBD
 	tristate
-	default EXT3_FS
 	help
 	  This is a generic journaling layer for block devices.  It is
 	  currently used by the ext3 and OCFS2 file systems, but it could
@@ -148,7 +147,7 @@ config JBD
 	  devices such as RAID or LVM.
 
 	  If you are using the ext3 or OCFS2 file systems, you need to
-	  say Y here. If you are not using ext3 or OCFS2 then you will probably
+	  say Y here. If you are not using ext3 OCFS2 then you will probably
 	  want to say N.
 
 	  To compile this device as a module, choose M here: the module will be
@@ -338,37 +337,58 @@ config FS_POSIX_ACL
 source "fs/xfs/Kconfig"
 
 config OCFS2_FS
-       tristate "OCFS2 file system support (EXPERIMENTAL)"
-       depends on NET && EXPERIMENTAL
-       select CONFIGFS_FS
-       select JBD
-       select CRC32
-       select INET
-       help
-         OCFS2 is a general purpose extent based shared disk cluster file
-         system with many similarities to ext3. It supports 64 bit inode
-         numbers, and has automatically extending metadata groups which may
-         also make it attractive for non-clustered use.
+	tristate "OCFS2 file system support (EXPERIMENTAL)"
+	depends on NET && EXPERIMENTAL
+	select CONFIGFS_FS
+	select JBD
+	select CRC32
+	select INET
+	help
+	  OCFS2 is a general purpose extent based shared disk cluster file
+	  system with many similarities to ext3. It supports 64 bit inode
+	  numbers, and has automatically extending metadata groups which may
+	  also make it attractive for non-clustered use.
 
-         You'll want to install the ocfs2-tools package in order to at least
-         get "mount.ocfs2".
+	  You'll want to install the ocfs2-tools package in order to at least
+	  get "mount.ocfs2".
 
-         Project web page:    http://oss.oracle.com/projects/ocfs2
-         Tools web page:      http://oss.oracle.com/projects/ocfs2-tools
-         OCFS2 mailing lists: http://oss.oracle.com/projects/ocfs2/mailman/
+	  Project web page:    http://oss.oracle.com/projects/ocfs2
+	  Tools web page:      http://oss.oracle.com/projects/ocfs2-tools
+	  OCFS2 mailing lists: http://oss.oracle.com/projects/ocfs2/mailman/
 
-         Note: Features which OCFS2 does not support yet:
-                 - extended attributes
-                 - readonly mount
-                 - shared writeable mmap
-                 - loopback is supported, but data written will not
-                   be cluster coherent.
-                 - quotas
-                 - cluster aware flock
-                 - Directory change notification (F_NOTIFY)
-                 - Distributed Caching (F_SETLEASE/F_GETLEASE/break_lease)
-                 - POSIX ACLs
-                 - readpages / writepages (not user visible)
+	  Note: Features which OCFS2 does not support yet:
+	          - extended attributes
+		  - shared writeable mmap
+	          - loopback is supported, but data written will not
+	            be cluster coherent.
+	          - quotas
+	          - cluster aware flock
+	          - Directory change notification (F_NOTIFY)
+	          - Distributed Caching (F_SETLEASE/F_GETLEASE/break_lease)
+	          - POSIX ACLs
+	          - readpages / writepages (not user visible)
+
+config OCFS2_FS_O2CB
+	tristate "O2CB Kernelspace Clustering"
+	depends on OCFS2_FS
+	default y
+	help
+	  OCFS2 includes a simple kernelspace clustering package that requires
+	  a very small userspace complement to configure it. However, it is
+	  not as flexible as an external cluster manager, and is only
+	  limited to maintaining a cluster for OCFS2 file systems.
+	  If you are not using an external clustering package, choose
+	  this option.
+
+config OCFS2_FS_USERSPACE_CLUSTER
+	tristate "Userspace Clustering"
+	depends on OCFS2_FS
+	default y
+	help
+	  This option will allow OCFS2 to use userspace clustering services
+	  via configfs and sysfs. Currently, the only supported userspace
+	  clustering agent is the Linux-HA project from http://www.linux-ha.org.
+	  If you are using a userspace cluster manager, choose this option.
 
 config MINIX_FS
 	tristate "Minix fs support"
@@ -880,20 +900,6 @@ config RAMFS
 	  To compile this as a module, choose M here: the module will be called
 	  ramfs.
 
-config CONFIGFS_FS
-       tristate "Userspace-driven configuration filesystem (EXPERIMENTAL)"
-       depends on EXPERIMENTAL
-       help
-         configfs is a ram-based filesystem that provides the converse
-         of sysfs's functionality. Where sysfs is a filesystem-based
-         view of kernel objects, configfs is a filesystem-based manager
-         of kernel objects, or config_items.
-
-         Both sysfs and configfs can and should exist together on the
-         same system. One is not a replacement for the other.
-
-         If unsure, say N.
-
 config RELAYFS_FS
 	tristate "Relayfs file system support"
 	---help---
@@ -903,6 +909,20 @@ config RELAYFS_FS
 
 	  To compile this code as a module, choose M here: the module will be
 	  called relayfs.
+
+	  If unsure, say N.
+
+config CONFIGFS_FS
+	tristate "Userspace-driven configuration filesystem (EXPERIMENTAL)"
+	depends on EXPERIMENTAL
+	help
+	  configfs is a ram-based filesystem that provides the converse
+	  of sysfs's functionality. Where sysfs is a filesystem-based
+	  view of kernel objects, configfs is a filesystem-based manager
+	  of kernel objects, or config_items.
+
+	  Both sysfs and configfs can and should exist together on the
+	  same system. One is not a replacement for the other.
 
 	  If unsure, say N.
 

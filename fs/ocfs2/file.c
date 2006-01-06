@@ -139,7 +139,6 @@ int ocfs2_set_inode_size(struct ocfs2_journal_handle *handle,
 	int status;
 
 	mlog_entry_void();
-
 	i_size_write(inode, new_i_size);
 	inode->i_blocks = ocfs2_align_bytes_to_sectors(new_i_size);
 	inode->i_ctime = inode->i_mtime = CURRENT_TIME;
@@ -856,6 +855,71 @@ bail:
 	return err;
 }
 
+static int ocfs2_write_remove_suid(struct inode *inode)
+{
+	int ret;
+	struct buffer_head *bh = NULL;
+	struct ocfs2_inode_info *oi = OCFS2_I(inode);
+	struct ocfs2_journal_handle *handle;
+	struct ocfs2_super *osb = OCFS2_SB(inode->i_sb);
+	struct ocfs2_dinode *di;
+
+	mlog_entry("(Inode %"MLFu64", mode 0%o)\n", oi->ip_blkno,
+		   inode->i_mode);
+
+	handle = ocfs2_start_trans(osb, NULL, OCFS2_INODE_UPDATE_CREDITS);
+	if (handle == NULL) {
+		ret = -ENOMEM;
+		mlog_errno(ret);
+		goto out;
+	}
+
+	ret = ocfs2_read_block(osb, oi->ip_blkno, &bh, OCFS2_BH_CACHED, inode);
+	if (ret < 0) {
+		mlog_errno(ret);
+		goto out_trans;
+	}
+
+	ret = ocfs2_journal_access(handle, inode, bh,
+				   OCFS2_JOURNAL_ACCESS_WRITE);
+	if (ret < 0) {
+		mlog_errno(ret);
+		goto out_bh;
+	}
+
+	inode->i_mode &= ~S_ISUID;
+	if ((inode->i_mode & S_ISGID) && (inode->i_mode & S_IXGRP))
+		inode->i_mode &= ~S_ISGID;
+
+	di = (struct ocfs2_dinode *) bh->b_data;
+	di->i_mode = cpu_to_le16(inode->i_mode);
+
+	ret = ocfs2_journal_dirty(handle, bh);
+	if (ret < 0)
+		mlog_errno(ret);
+out_bh:
+	brelse(bh);
+out_trans:
+	ocfs2_commit_trans(handle);
+out:
+	mlog_exit(ret);
+	return ret;
+}
+
+static inline int ocfs2_write_should_remove_suid(struct inode *inode)
+{
+	mode_t mode = inode->i_mode;
+
+	if (!capable(CAP_FSETID)) {
+		if (unlikely(mode & S_ISUID))
+			return 1;
+
+		if (unlikely((mode & S_ISGID) && (mode & S_IXGRP)))
+			return 1;
+	}
+	return 0;
+}
+
 static ssize_t ocfs2_file_aio_write(struct kiocb *iocb,
 				    const char __user *buf,
 				    size_t count,
@@ -894,7 +958,6 @@ static ssize_t ocfs2_file_aio_write(struct kiocb *iocb,
 		filp->f_flags &= ~O_DIRECT;
 #endif
 
-
 	down(&inode->i_sem);
 	/* to match setattr's i_sem -> i_alloc_sem -> rw_lock ordering */
 	if (filp->f_flags & O_DIRECT) {
@@ -923,6 +986,29 @@ static ssize_t ocfs2_file_aio_write(struct kiocb *iocb,
 			meta_level = -1;
 			mlog_errno(ret);
 			goto out;
+		}
+
+		/* Clear suid / sgid if necessary. We do this here
+		 * instead of later in the write path because
+		 * remove_suid() calls ->setattr without any hint that
+		 * we may have already done our cluster locking. Since
+		 * ocfs2_setattr() *must* take cluster locks to
+		 * proceeed, this will lead us to recursively lock the
+		 * inode. There's also the dinode i_size state which
+		 * can be lost via setattr during extending writes (we
+		 * set inode->i_size at the end of a write. */
+		if (ocfs2_write_should_remove_suid(inode)) {
+			if (meta_level == 0) {
+				ocfs2_meta_unlock(inode, meta_level);
+				meta_level = 1;
+				continue;
+			}
+
+			ret = ocfs2_write_remove_suid(inode);
+			if (ret < 0) {
+				mlog_errno(ret);
+				goto out;
+			}
 		}
 
 		/* work on a copy of ppos until we're sure that we won't have

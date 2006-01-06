@@ -48,6 +48,7 @@
 #include <linux/workqueue.h>
 
 #include "heartbeat.h"
+#include "disk_heartbeat.h"
 #include "nodemanager.h"
 #define MLOG_MASK_PREFIX ML_QUORUM
 #include "masklog.h"
@@ -63,7 +64,13 @@ static struct o2quo_state {
 	unsigned long		qs_conn_bm[BITS_TO_LONGS(O2NM_MAX_NODES)];
 	int			qs_holds;
 	unsigned long		qs_hold_bm[BITS_TO_LONGS(O2NM_MAX_NODES)];
+	struct work_struct	qs_node_work[O2NM_MAX_NODES];
 } o2quo_state;
+
+static struct o2hb_callback_func o2quo_hb_up_cb, o2quo_hb_down_cb;
+static struct o2hb_callback_func o2quo_hb_conn_up, o2quo_hb_conn_down;
+#define O2QUO_HB_PRI 0x1
+#define O2QUO_DELAY_MS   ((o2hb_dead_threshold + 2) * O2HB_REGION_TIMEOUT_MS)
 
 /* this is horribly heavy-handed.  It should instead flip the file
  * system RO and call some userspace script. */
@@ -73,19 +80,6 @@ static void o2quo_fence_self(void)
 	 * threads can still schedule, etc, etc */
 	o2hb_stop_all_regions();
 	panic("ocfs2 is very sorry to be fencing this system by panicing\n");
-}
-
-/* Indicate that a timeout occured on a hearbeat region write. The
- * other nodes in the cluster may consider us dead at that time so we
- * want to "fence" ourselves so that we don't scribble on the disk
- * after they think they've recovered us. This can't solve all
- * problems related to writeout after recovery but this hack can at
- * least close some of those gaps. When we have real fencing, this can
- * go away as our node would be fenced externally before other nodes
- * begin recovery. */
-void o2quo_disk_timeout(void)
-{
-	o2quo_fence_self();
 }
 
 static void o2quo_make_decision(void *arg)
@@ -184,7 +178,7 @@ static void o2quo_clear_hold(struct o2quo_state *qs, u8 node)
  * the connection.  the hold will be droped in conn_up or hb_down.  it might be
  * perpetuated by con_err until hb_down.  if we already have a conn, we might
  * be dropping a hold that conn_up got. */
-void o2quo_hb_up(u8 node)
+void o2quo_hb_up(struct o2nm_node *_node, int node, void *data)
 {
 	struct o2quo_state *qs = &o2quo_state;
 
@@ -208,9 +202,14 @@ void o2quo_hb_up(u8 node)
 
 /* hb going down releases any holds we might have had due to this node from
  * conn_up, conn_err, or hb_up */
-void o2quo_hb_down(u8 node)
+void o2quo_hb_down(struct o2nm_node *_node, int node, void *data)
 {
 	struct o2quo_state *qs = &o2quo_state;
+
+	if (node == o2nm_this_node()) {
+		o2quo_fence_self();
+		return;
+	}
 
 	spin_lock(&qs->qs_lock);
 
@@ -226,6 +225,8 @@ void o2quo_hb_down(u8 node)
 	o2quo_clear_hold(qs, node);
 
 	spin_unlock(&qs->qs_lock);
+
+	cancel_delayed_work(&qs->qs_node_work[node]);
 }
 
 /* this tells us that we've decided that the node is still heartbeating
@@ -233,9 +234,10 @@ void o2quo_hb_down(u8 node)
  * and indicates that we must now make a quorum decision in the future,
  * though we might be doing so after waiting for holds to drain.  Here
  * we'll be dropping the hold from conn_err. */
-void o2quo_hb_still_up(u8 node)
+void o2quo_hb_still_up(void *arg)
 {
 	struct o2quo_state *qs = &o2quo_state;
+	u8 node = (u8)(long)arg;
 
 	spin_lock(&qs->qs_lock);
 
@@ -252,7 +254,7 @@ void o2quo_hb_still_up(u8 node)
  * hb_up or hb_down.  it might be perpetuated by con_err until hb_down.  if
  * it's already heartbeating we we might be dropping a hold that conn_up got.
  * */
-void o2quo_conn_up(u8 node)
+void o2quo_conn_up(struct o2nm_node *_node, int node, void *data)
 {
 	struct o2quo_state *qs = &o2quo_state;
 
@@ -278,7 +280,7 @@ void o2quo_conn_up(u8 node)
  * still heartbeating we grab a hold that will delay decisions until either the
  * node stops heartbeating from hb_down or the caller decides that the node is
  * still up and calls still_up */
-void o2quo_conn_err(u8 node)
+void o2quo_conn_err(struct o2nm_node *_node, int node, void *data)
 {
 	struct o2quo_state *qs = &o2quo_state;
 
@@ -299,17 +301,78 @@ void o2quo_conn_err(u8 node)
 		o2quo_set_hold(qs, node);
 
 	spin_unlock(&qs->qs_lock);
+
+	schedule_delayed_work(&qs->qs_node_work[node],
+	                      msecs_to_jiffies(O2QUO_DELAY_MS));
 }
 
-void o2quo_init(void)
+static void o2quo_unregister_hb_callbacks(void)
+{
+	int ret;
+
+	ret = o2hb_unregister_callback(&o2quo_hb_conn_up);
+	if (ret < 0)
+		mlog(ML_ERROR, "Status return %d unregistering heartbeat "
+		     "conn up callback!\n", ret);
+
+	ret = o2hb_unregister_callback(&o2quo_hb_conn_down);
+	if (ret < 0)
+		mlog(ML_ERROR, "Status return %d unregistering heartbeat "
+		     "conn down callback!\n", ret);
+	ret = o2hb_unregister_callback(&o2quo_hb_up_cb);
+	if (ret < 0)
+		mlog(ML_ERROR, "Status return %d unregistering heartbeat up "
+		     "callback!\n", ret);
+
+	ret = o2hb_unregister_callback(&o2quo_hb_down_cb);
+	if (ret < 0)
+		mlog(ML_ERROR, "Status return %d unregistering heartbeat down "
+		     "callback!\n", ret);
+}
+
+static int o2quo_register_hb_callbacks(void)
+{
+	int ret;
+
+	o2hb_setup_callback(&o2quo_hb_down_cb, O2HB_NODE_DOWN_CB,
+	                    o2quo_hb_down, NULL, O2QUO_HB_PRI, NULL);
+	o2hb_setup_callback(&o2quo_hb_up_cb, O2HB_NODE_UP_CB,
+	                    o2quo_hb_up, NULL, O2QUO_HB_PRI, NULL);
+	o2hb_setup_callback(&o2quo_hb_conn_down, O2HB_CONN_DOWN_CB,
+	                    o2quo_conn_err, NULL, O2QUO_HB_PRI, NULL);
+	o2hb_setup_callback(&o2quo_hb_conn_up, O2HB_CONN_UP_CB,
+	                    o2quo_conn_up, NULL, O2QUO_HB_PRI, NULL);
+
+	ret = o2hb_register_callback(&o2quo_hb_up_cb);
+	if (ret == 0)
+		ret = o2hb_register_callback(&o2quo_hb_down_cb);
+	if (ret == 0)
+		ret = o2hb_register_callback(&o2quo_hb_conn_up);
+	if (ret == 0)
+		ret = o2hb_register_callback(&o2quo_hb_conn_down);
+
+	if (ret)
+		o2quo_unregister_hb_callbacks();
+
+	return ret;
+}
+
+
+int o2quo_init(void)
 {
 	struct o2quo_state *qs = &o2quo_state;
+	int i;
 
 	spin_lock_init(&qs->qs_lock);
 	INIT_WORK(&qs->qs_work, o2quo_make_decision, NULL);
+	for (i = 0; i < O2NM_MAX_NODES; i++)
+		INIT_WORK(&qs->qs_node_work[i], o2quo_hb_still_up, (void *)i);
+
+	return o2quo_register_hb_callbacks();
 }
 
 void o2quo_exit(void)
 {
 	flush_scheduled_work();
+	o2quo_unregister_hb_callbacks();
 }

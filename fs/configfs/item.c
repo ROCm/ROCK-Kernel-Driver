@@ -49,7 +49,7 @@ static void config_item_release(struct kref *kref);
  */
 void config_item_init(struct config_item * item)
 {
-	kref_init(&item->ci_kref, config_item_release);
+	kref_init(&item->ci_kref);
 	INIT_LIST_HEAD(&item->ci_entry);
 }
 

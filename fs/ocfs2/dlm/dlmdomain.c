@@ -307,6 +307,8 @@ restart:
 		while (!list_empty(&dlm->resources[i])) {
 			res = list_entry(dlm->resources[i].next,
 				     struct dlm_lock_resource, list);
+			/* need reference when manually grabbing lockres */
+			dlm_lockres_get(res);
 			/* this should unhash the lockres
 			 * and exit with dlm->spinlock */
 			mlog(0, "purging res=%p\n", res);
@@ -320,9 +322,11 @@ restart:
 				spin_unlock(&dlm->spinlock);
 				dlm_kick_thread(dlm, res);
 				wait_event(dlm->ast_wq, !dlm_lockres_is_dirty(dlm, res));
+				dlm_lockres_put(res);
 				goto restart;
 			}
 			dlm_purge_lockres(dlm, res);
+			dlm_lockres_put(res);
 		}
 	}
 	spin_unlock(&dlm->spinlock);
@@ -556,7 +560,7 @@ static int dlm_query_join_handler(struct o2net_msg *msg, u32 len, void *data)
 	 * to back off and try again.  This gives heartbeat a chance
 	 * to catch up.
 	 */
-	if (!o2hb_check_node_heartbeating(query->node_idx)) {
+	if (!o2hb_check_node_heartbeating(query->domain, query->node_idx)) {
 		mlog(0, "node %u is not in our live map yet\n",
 		     query->node_idx);
 
@@ -872,7 +876,8 @@ static int dlm_try_to_join_domain(struct dlm_ctxt *dlm)
 	/* group sem locking should work for us here -- we're already
 	 * registered for heartbeat events so filling this should be
 	 * atomic wrt getting those handlers called. */
-	o2hb_fill_node_map(dlm->live_nodes_map, sizeof(dlm->live_nodes_map));
+	o2hb_fill_node_map(dlm->name, dlm->live_nodes_map,
+	                   sizeof(dlm->live_nodes_map));
 
 	spin_lock(&dlm->spinlock);
 	memcpy(ctxt->live_map, dlm->live_nodes_map, sizeof(ctxt->live_map));
@@ -964,13 +969,14 @@ static int dlm_register_domain_handlers(struct dlm_ctxt *dlm)
 	mlog(0, "registering handlers.\n");
 
 	o2hb_setup_callback(&dlm->dlm_hb_down, O2HB_NODE_DOWN_CB,
-			    dlm_hb_node_down_cb, dlm, DLM_HB_NODE_DOWN_PRI);
+			    dlm_hb_node_down_cb, dlm,
+			    DLM_HB_NODE_DOWN_PRI, NULL);
 	status = o2hb_register_callback(&dlm->dlm_hb_down);
 	if (status)
 		goto bail;
 
 	o2hb_setup_callback(&dlm->dlm_hb_up, O2HB_NODE_UP_CB,
-			    dlm_hb_node_up_cb, dlm, DLM_HB_NODE_UP_PRI);
+			    dlm_hb_node_up_cb, dlm, DLM_HB_NODE_UP_PRI, NULL);
 	status = o2hb_register_callback(&dlm->dlm_hb_up);
 	if (status)
 		goto bail;
@@ -1233,7 +1239,7 @@ static struct dlm_ctxt *dlm_alloc_ctxt(const char *domain,
 	INIT_LIST_HEAD(&dlm->work_list);
 	INIT_WORK(&dlm->dispatched_work, dlm_dispatch_work, dlm);
 
-	kref_init(&dlm->dlm_refs, dlm_ctxt_release);
+	kref_init(&dlm->dlm_refs);
 	dlm->dlm_state = DLM_CTXT_NEW;
 
 	INIT_LIST_HEAD(&dlm->dlm_eviction_callbacks);
@@ -1261,7 +1267,7 @@ struct dlm_ctxt * dlm_register_domain(const char *domain,
 		goto leave;
 	}
 
-	if (!o2hb_check_local_node_heartbeating()) {
+	if (!o2hb_check_local_node_heartbeating(domain)) {
 		mlog(ML_ERROR, "the local node has not been configured, or is "
 		     "not heartbeating\n");
 		ret = -EPROTO;

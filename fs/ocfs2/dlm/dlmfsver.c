@@ -28,6 +28,8 @@
 
 #include "dlmfsver.h"
 
+#define DLM_BUILD_VERSION "1.3.3"
+
 #define VERSION_STR "OCFS2 DLMFS " DLM_BUILD_VERSION
 
 void dlmfs_print_version(void)
@@ -37,6 +39,4 @@ void dlmfs_print_version(void)
 
 MODULE_DESCRIPTION(VERSION_STR);
 
-#ifdef MODULE_VERSION
 MODULE_VERSION(DLM_BUILD_VERSION);
-#endif

@@ -1528,7 +1528,6 @@ static int ocfs2_meta_lock_update(struct inode *inode,
 		ocfs2_refresh_inode(inode, fe);
 	}
 
-
 	status = 0;
 bail_refresh:
 	ocfs2_complete_lock_res_refresh(lockres, status);
@@ -1837,7 +1836,7 @@ struct ocfs2_dlm_debug *ocfs2_new_dlm_debug(void)
 		goto out;
 	}
 
-	kref_init(&dlm_debug->d_refcnt, ocfs2_dlm_debug_free);
+	kref_init(&dlm_debug->d_refcnt);
 	INIT_LIST_HEAD(&dlm_debug->d_lockres_tracking);
 	dlm_debug->d_locking_state = NULL;
 out:
@@ -2102,8 +2101,11 @@ int ocfs2_dlm_init(struct ocfs2_super *osb)
 
 	status = 0;
 bail:
-	if (status < 0)
+	if (status < 0) {
 		ocfs2_dlm_shutdown_debug(osb);
+		if (osb->vote_task)
+			kthread_stop(osb->vote_task);
+	}
 
 	mlog_exit(status);
 	return status;

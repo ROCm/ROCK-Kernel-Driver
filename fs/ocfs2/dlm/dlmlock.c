@@ -352,7 +352,7 @@ static void dlm_init_lock(struct dlm_lock *newlock, int type,
 	newlock->cancel_pending = 0;
 	newlock->lksb_kernel_allocated = 0;
 
-	kref_init(&newlock->lock_refs, dlm_lock_release);
+	kref_init(&newlock->lock_refs);
 }
 
 struct dlm_lock * dlm_new_lock(int type, u8 node, u64 cookie,

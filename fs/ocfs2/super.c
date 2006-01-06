@@ -138,17 +138,10 @@ static struct super_operations ocfs2_sops = {
 	.remount_fs	= ocfs2_remount,
 };
 
-#ifdef OCFS2_ORACORE_WORKAROUNDS
-#define OCFS_SUPER_MAGIC		0xa156f7eb
-#endif
-
 enum {
 	Opt_barrier,
 	Opt_err_panic,
 	Opt_err_ro,
-#ifdef OCFS2_ORACORE_WORKAROUNDS
-	Opt_datavolume,
-#endif
 	Opt_intr,
 	Opt_nointr,
 	Opt_hb_none,
@@ -162,9 +155,6 @@ static match_table_t tokens = {
 	{Opt_barrier, "barrier=%u"},
 	{Opt_err_panic, "errors=panic"},
 	{Opt_err_ro, "errors=remount-ro"},
-#ifdef OCFS2_ORACORE_WORKAROUNDS
-	{Opt_datavolume, "datavolume"},
-#endif
 	{Opt_intr, "intr"},
 	{Opt_nointr, "nointr"},
 	{Opt_hb_none, OCFS2_HB_NONE},
@@ -525,6 +515,27 @@ bail:
 	return status;
 }
 
+void
+copy_uuid_from_super(char *buf, struct buffer_head *bh)
+{
+	struct ocfs2_dinode *di = NULL;
+	int i;
+	char *ptr;
+	int ret;
+	di = (struct ocfs2_dinode *)bh->b_data;
+
+	for (i = 0, ptr = buf; i < OCFS2_VOL_UUID_LEN; i++) {
+		/* print with null */
+		ret = snprintf(ptr, 3, "%02X", di->id2.i_super.s_uuid[i]);
+		if (ret != 2) { /* drop super cleans up */
+			memset (buf, 0, OCFS2_VOL_UUID_LEN * 2);
+			return;
+		}
+		/* then only advance past the last char */
+		ptr += 2;
+	}
+}
+
 static int ocfs2_fill_super(struct super_block *sb, void *data, int silent)
 {
 	struct dentry *root;
@@ -533,15 +544,9 @@ static int ocfs2_fill_super(struct super_block *sb, void *data, int silent)
 	struct inode *inode = NULL;
 	struct ocfs2_super *osb = NULL;
 	struct buffer_head *bh = NULL;
+	char uuid[33];
 
 	mlog_entry("%p, %p, %i", sb, data, silent);
-
-	/* for now we only have one cluster/node, make sure we see it
-	 * in the heartbeat universe */
-	if (!o2hb_check_local_node_heartbeating()) {
-		status = -EINVAL;
-		goto read_super_error;
-	}
 
 	/* probe for superblock */
 	status = ocfs2_sb_probe(sb, &bh, &sector_size);
@@ -549,6 +554,17 @@ static int ocfs2_fill_super(struct super_block *sb, void *data, int silent)
 		mlog(ML_ERROR, "superblock probe failed!\n");
 		goto read_super_error;
 	}
+
+	copy_uuid_from_super(uuid, bh);
+
+#if 0
+	/* for now we only have one cluster/node, make sure we see it
+	 * in the heartbeat universe */
+	if (!o2hb_check_local_node_heartbeating(uuid)) {
+		status = -EINVAL;
+		goto read_super_error;
+	}
+#endif
 
 	status = ocfs2_initialize_super(sb, bh, sector_size);
 	osb = OCFS2_SB(sb);
@@ -565,12 +581,7 @@ static int ocfs2_fill_super(struct super_block *sb, void *data, int silent)
 	}
 	osb->s_mount_opt = parsed_opt;
 
-#ifdef OCFS2_ORACORE_WORKAROUNDS
-	if (osb->s_mount_opt & OCFS2_MOUNT_COMPAT_OCFS)
-		sb->s_magic = OCFS_SUPER_MAGIC;
-	else
-#endif
-		sb->s_magic = OCFS2_SUPER_MAGIC;
+	sb->s_magic = OCFS2_SUPER_MAGIC;
 
 	/* Hard readonly mode only if: bdev_read_only, MS_RDONLY,
 	 * heartbeat=none */
@@ -768,17 +779,6 @@ static int ocfs2_parse_options(struct super_block *sb,
 		case Opt_data_writeback:
 			*mount_opt |= OCFS2_MOUNT_DATA_WRITEBACK;
 			break;
-#ifdef OCFS2_ORACORE_WORKAROUNDS
-		case Opt_datavolume:
-			if (is_remount) {
-				mlog(ML_ERROR, "Cannot specifiy datavolume "
-				     "on remount.\n");
-				status = 0;
-				goto bail;
-			}
-			*mount_opt |= OCFS2_MOUNT_COMPAT_OCFS;
-			break;
-#endif
 		default:
 			mlog(ML_ERROR,
 			     "Unrecognized mount option \"%s\" "
@@ -914,12 +914,7 @@ static int ocfs2_statfs(struct super_block *sb, struct kstatfs *buf)
 	numbits = le32_to_cpu(bm_lock->id1.bitmap1.i_total);
 	freebits = numbits - le32_to_cpu(bm_lock->id1.bitmap1.i_used);
 
-#ifdef OCFS2_ORACORE_WORKAROUNDS
-	if (osb->s_mount_opt & OCFS2_MOUNT_COMPAT_OCFS)
-		buf->f_type = OCFS_SUPER_MAGIC;
-	else
-#endif
-		buf->f_type = OCFS2_SUPER_MAGIC;
+	buf->f_type = OCFS2_SUPER_MAGIC;
 	buf->f_bsize = sb->s_blocksize;
 	buf->f_namelen = OCFS2_MAX_FILENAME_LEN;
 	buf->f_blocks = ((sector_t) numbits) *
@@ -1328,8 +1323,6 @@ static int ocfs2_initialize_super(struct super_block *sb,
 	osb->local_alloc_state = OCFS2_LA_UNUSED;
 	osb->local_alloc_bh = NULL;
 
-	ocfs2_setup_hb_callbacks(osb);
-
 	init_waitqueue_head(&osb->osb_mount_event);
 
 	osb->vol_label = kmalloc(OCFS2_MAX_VOL_LABEL_LEN, GFP_KERNEL);
@@ -1347,6 +1340,21 @@ static int ocfs2_initialize_super(struct super_block *sb,
 	}
 
 	di = (struct ocfs2_dinode *)bh->b_data;
+
+	if (ocfs2_setup_osb_uuid(osb, di->id2.i_super.s_uuid,
+				 sizeof(di->id2.i_super.s_uuid))) {
+		mlog(ML_ERROR, "Out of memory trying to setup our uuid.\n");
+		status = -ENOMEM;
+		goto bail;
+	}
+
+	/* This moves way down here because we need the UUID to do it */
+	if (ocfs2_setup_hb_callbacks(osb)) {
+		mlog(ML_ERROR, "Could not find heartbeat group for file "
+		     "system %s\n", osb->uuid_str);
+		status = -EINVAL;
+		goto bail;
+	}
 
 	osb->max_slots = le16_to_cpu(di->id2.i_super.s_max_slots);
 	if (osb->max_slots > OCFS2_MAX_SLOTS || osb->max_slots == 0) {
@@ -1426,13 +1434,6 @@ static int ocfs2_initialize_super(struct super_block *sb,
 		mlog(ML_ERROR, "Volume might try to write to blocks beyond "
 		     "what jbd can address in 32 bits.\n");
 		status = -EINVAL;
-		goto bail;
-	}
-
-	if (ocfs2_setup_osb_uuid(osb, di->id2.i_super.s_uuid,
-				 sizeof(di->id2.i_super.s_uuid))) {
-		mlog(ML_ERROR, "Out of memory trying to setup our uuid.\n");
-		status = -ENOMEM;
 		goto bail;
 	}
 
