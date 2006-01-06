@@ -267,6 +267,10 @@ union nfsd3_xdrstore {
 
 #define NFS3_SVC_XDRSIZE		sizeof(union nfsd3_xdrstore)
 
+extern unsigned int			nfsd_readdirplus_max;
+extern unsigned int			nfsd_readdirplus_max_ub;
+extern unsigned int			nfsd_readdirplus_max_lb;
+
 int nfs3svc_decode_fhandle(struct svc_rqst *, u32 *, struct nfsd_fhandle *);
 int nfs3svc_decode_sattrargs(struct svc_rqst *, u32 *,
 				struct nfsd3_sattrargs *);

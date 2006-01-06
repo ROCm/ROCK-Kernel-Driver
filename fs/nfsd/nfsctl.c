@@ -31,6 +31,7 @@
 #include <linux/nfsd/nfsd.h>
 #include <linux/nfsd/cache.h>
 #include <linux/nfsd/xdr.h>
+#include <linux/nfsd/xdr3.h>
 #include <linux/nfsd/syscall.h>
 #include <linux/nfsd/interface.h>
 
@@ -81,9 +82,6 @@ static ssize_t write_versions(struct file *file, char *buf, size_t size);
 static ssize_t write_leasetime(struct file *file, char *buf, size_t size);
 static ssize_t write_recoverydir(struct file *file, char *buf, size_t size);
 #endif
-
-
-extern unsigned int	nfsd_max_readdirplus;
 
 static ssize_t (*write_op[])(struct file *, char *, size_t) = {
 	[NFSD_Svc] = write_svc,
@@ -513,42 +511,25 @@ static struct file_system_type nfsd_fs_type = {
  /*
  * NFS sysctls
  */
-static struct ctl_table_header *nfs_sysctl_table;
+static struct ctl_table_header *nfsd_sysctl_table;
 
-static ctl_table nfs_sysctls[] = {
+static ctl_table nfsd_sysctls[] = {
 	{
 		.ctl_name	= -2,
-		.procname	= "nfsd_max_readdirplus",
-		.data		= &nfsd_max_readdirplus,
-		.maxlen		= sizeof(nfsd_max_readdirplus),
+		.procname	= "nfsd_readdirplus_max",
+		.data		= &nfsd_readdirplus_max,
+		.maxlen		= sizeof(nfsd_readdirplus_max),
 		.mode		= 0644,
-		.proc_handler	= &proc_dointvec,
-	},
-	{ .ctl_name = 0 }
-};
-
-static ctl_table nfs_sysctl_dir[] = {
-	{
-		.ctl_name	= -2,
-		.procname	= "nfs",
-		.mode		= 0555,
-		.child		= nfs_sysctls,
-	},
-	{ .ctl_name = 0 }
-};
-
-static ctl_table nfs_sysctl_root[] = {
-	{
-		.ctl_name	= CTL_FS,
-		.procname	= "fs",
-		.mode		= 0555,
-		.child		= nfs_sysctl_dir,
+		.proc_handler	= &proc_dointvec_minmax,
+		.extra1		= &nfsd_readdirplus_max_lb,
+		.extra2		= &nfsd_readdirplus_max_ub,
 	},
 	{ .ctl_name = 0 }
 };
 
 static int __init init_nfsd(void)
 {
+	struct ctl_path ctl_path[] = { { CTL_FS, "fs", 0555 }, { -2, "nfs", 0555 }, { 0 } };
 	int retval;
 	printk(KERN_INFO "Installing knfsd (copyright (C) 1996 okir@monad.swb.de).\n");
 
@@ -558,8 +539,7 @@ static int __init init_nfsd(void)
 	nfsd_lockd_init();	/* lockd->nfsd callbacks */
 	nfs4_state_init();	/* NFSv4 locking state */
 	nfsd_idmap_init();      /* Name to ID mapping */
-	if (nfs_sysctls[0].ctl_name)
-		nfs_sysctl_table = register_sysctl_table(nfs_sysctl_root, 0);
+	nfsd_sysctl_table = register_sysctl_table_path(nfsd_sysctls, ctl_path);
 	if (proc_mkdir("fs/nfs", NULL)) {
 		struct proc_dir_entry *entry;
 		entry = create_proc_entry("fs/nfs/exports", 0, NULL);
@@ -574,9 +554,9 @@ static int __init init_nfsd(void)
 		remove_proc_entry("fs/nfs", NULL);
 		nfsd_stat_shutdown();
 		nfsd_lockd_shutdown();
-		if (nfs_sysctl_table)
-			unregister_sysctl_table(nfs_sysctl_table);
-		nfs_sysctl_table = NULL;
+		if (nfsd_sysctl_table)
+			unregister_sysctl_table(nfsd_sysctl_table);
+		nfsd_sysctl_table = NULL;
 	}
 	return retval;
 }
@@ -591,9 +571,9 @@ static void __exit exit_nfsd(void)
 	nfsd_lockd_shutdown();
 	nfsd_idmap_shutdown();
 	unregister_filesystem(&nfsd_fs_type);
-	if (nfs_sysctl_table)
-		unregister_sysctl_table(nfs_sysctl_table);
-	nfs_sysctl_table = NULL;
+	if (nfsd_sysctl_table)
+		unregister_sysctl_table(nfsd_sysctl_table);
+	nfsd_sysctl_table = NULL;
 }
 
 MODULE_AUTHOR("Olaf Kirch <okir@monad.swb.de>");

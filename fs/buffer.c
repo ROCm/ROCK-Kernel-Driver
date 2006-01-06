@@ -185,6 +185,7 @@ int fsync_super(struct super_block *sb)
 
 	return sync_blockdev(sb->s_bdev);
 }
+EXPORT_SYMBOL_GPL(fsync_super);
 
 /*
  * Write out and wait upon all dirty data associated with this

@@ -168,34 +168,24 @@ void nlmclnt_mark_reclaim(struct nlm_host *host)
 }
 
 /*
- * Someone has sent us an SM_NOTIFY. Ensure we bind to the new port number,
- * that we mark locks for reclaiming, and that we bump the pseudo NSM state.
- */
-static inline
-void nlmclnt_prepare_reclaim(struct nlm_host *host, u32 newstate)
-{
-	host->h_monitored = 0;
-	host->h_nsmstate = newstate;
-	host->h_state++;
-	host->h_nextrebind = 0;
-	nlm_rebind_host(host);
-	nlmclnt_mark_reclaim(host);
-	dprintk("NLM: reclaiming locks for host %s", host->h_name);
-}
-
-/*
  * Reclaim all locks on server host. We do this by spawning a separate
  * reclaimer thread.
  */
 void
-nlmclnt_recovery(struct nlm_host *host, u32 newstate)
+nlmclnt_recovery(struct nlm_host *host)
 {
-	if (host->h_reclaiming++) {
-		if (host->h_nsmstate == newstate)
-			return;
-		nlmclnt_prepare_reclaim(host, newstate);
-	} else {
-		nlmclnt_prepare_reclaim(host, newstate);
+	dprintk("lockd: reclaiming locks for host %s", host->h_name);
+
+	/* Force a portmapp getport - the peer's lockd will
+	 * most likely end up on a different port.
+	 */
+	host->h_nextrebind = jiffies;
+	nlm_rebind_host(host);
+
+	/* Mark locks for reclaim */
+	nlmclnt_mark_reclaim(host);
+
+	if (!host->h_reclaiming++) {
 		nlm_get_host(host);
 		__module_get(THIS_MODULE);
 		if (kernel_thread(reclaimer, host, CLONE_KERNEL) < 0)

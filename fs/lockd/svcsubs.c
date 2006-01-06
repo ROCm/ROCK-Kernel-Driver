@@ -25,9 +25,9 @@
 /*
  * Global file hash table
  */
-#define FILE_HASH_BITS		5
+#define FILE_HASH_BITS		7
 #define FILE_NRHASH		(1<<FILE_HASH_BITS)
-static struct nlm_file *	nlm_files[FILE_NRHASH];
+static struct hlist_head	nlm_files[FILE_NRHASH];
 static DECLARE_MUTEX(nlm_file_sema);
 
 #ifdef NFSD_DEBUG
@@ -82,6 +82,7 @@ u32
 nlm_lookup_file(struct svc_rqst *rqstp, struct nlm_file **result,
 					struct nfs_fh *f)
 {
+	struct hlist_node *pos;
 	struct nlm_file	*file;
 	unsigned int	hash;
 	u32		nfserr;
@@ -93,21 +94,21 @@ nlm_lookup_file(struct svc_rqst *rqstp, struct nlm_file **result,
 	/* Lock file table */
 	down(&nlm_file_sema);
 
-	for (file = nlm_files[hash]; file; file = file->f_next)
+	hlist_for_each_entry(file, pos, &nlm_files[hash], f_list)
 		if (!nfs_compare_fh(&file->f_handle, f))
 			goto found;
 
 	nlm_debug_print_fh("creating file for", f);
 
 	nfserr = nlm_lck_denied_nolocks;
-	file = (struct nlm_file *) kmalloc(sizeof(*file), GFP_KERNEL);
+	file = (struct nlm_file *) kzalloc(sizeof(*file), GFP_KERNEL);
 	if (!file)
 		goto out_unlock;
 
-	memset(file, 0, sizeof(*file));
 	memcpy(&file->f_handle, f, sizeof(struct nfs_fh));
-	file->f_hash = hash;
 	init_MUTEX(&file->f_sema);
+	INIT_HLIST_NODE(&file->f_list);
+	INIT_LIST_HEAD(&file->f_blocks);
 
 	/* Open the file. Note that this must not sleep for too long, else
 	 * we would lock up lockd:-) So no NFS re-exports, folks.
@@ -116,12 +117,11 @@ nlm_lookup_file(struct svc_rqst *rqstp, struct nlm_file **result,
 	 * the file.
 	 */
 	if ((nfserr = nlmsvc_ops->fopen(rqstp, f, &file->f_file)) != 0) {
-		dprintk("lockd: open failed (nfserr %d)\n", ntohl(nfserr));
+		dprintk("lockd: open failed (error %d)\n", nfserr);
 		goto out_free;
 	}
 
-	file->f_next = nlm_files[hash];
-	nlm_files[hash] = file;
+	hlist_add_head(&file->f_list, &nlm_files[hash]);
 
 found:
 	dprintk("lockd: found file %p (count %d)\n", file, file->f_count);
@@ -150,22 +150,14 @@ out_free:
 static inline void
 nlm_delete_file(struct nlm_file *file)
 {
-	struct nlm_file	**fp, *f;
-
 	nlm_debug_print_file("closing file", file);
-
-	fp = nlm_files + file->f_hash;
-	while ((f = *fp) != NULL) {
-		if (f == file) {
-			*fp = file->f_next;
-			nlmsvc_ops->fclose(file->f_file);
-			kfree(file);
-			return;
-		}
-		fp = &f->f_next;
+	if (!hlist_unhashed(&file->f_list)) {
+		hlist_del(&file->f_list);
+		nlmsvc_ops->fclose(file->f_file);
+		kfree(file);
+	} else {
+		printk(KERN_WARNING "lockd: attempt to release unknown file!\n");
 	}
-
-	printk(KERN_WARNING "lockd: attempt to release unknown file!\n");
 }
 
 /*
@@ -173,7 +165,8 @@ nlm_delete_file(struct nlm_file *file)
  * action.
  */
 static int
-nlm_traverse_locks(struct nlm_host *host, struct nlm_file *file, int action)
+nlm_traverse_locks(struct nlm_host *host, struct nlm_file *file,
+			nlm_host_visitor_t fn)
 {
 	struct inode	 *inode = nlmsvc_file_inode(file);
 	struct file_lock *fl;
@@ -187,16 +180,16 @@ again:
 
 		/* update current lock count */
 		file->f_locks++;
-		lockhost = (struct nlm_host *) fl->fl_owner;
-		if (action == NLM_ACT_MARK)
-			lockhost->h_inuse = 1;
-		else if (action == NLM_ACT_CHECK)
-			return 1;
-		else if (action == NLM_ACT_UNLOCK) {
-			struct file_lock lock = *fl;
 
-			if (host && lockhost != host)
-				continue;
+		/* No host check means we just check for the
+		 * existence of any resources tied to this file.
+		 */
+		if (fn == NULL)
+			return 1;
+
+		lockhost = (struct nlm_host *) fl->fl_owner;
+		if (fn(lockhost, host)) {
+			struct file_lock lock = *fl;
 
 			lock.fl_type  = F_UNLCK;
 			lock.fl_start = 0;
@@ -217,48 +210,53 @@ again:
  * Operate on a single file
  */
 static inline int
-nlm_inspect_file(struct nlm_host *host, struct nlm_file *file, int action)
+nlm_inspect_file(struct nlm_host *host, struct nlm_file *file, nlm_host_visitor_t fn)
 {
-	if (action == NLM_ACT_CHECK) {
+	if (fn == NULL) {
+		struct inode *inode = nlmsvc_file_inode(file);
+		struct file_lock *fl;
+		int	flags = 0;
+
 		/* Fast path for mark and sweep garbage collection */
-		if (file->f_count || file->f_blocks || file->f_shares)
+		if (file->f_count || list_empty(&file->f_blocks) || file->f_shares)
 			return 1;
+		for (fl = inode->i_flock; fl; fl = fl->fl_next)
+			flags |= fl->fl_flags;
+		return (flags & FL_LOCKD);
 	} else {
-		if (nlmsvc_traverse_blocks(host, file, action)
-		 || nlmsvc_traverse_shares(host, file, action))
+		if (nlmsvc_traverse_blocks(host, file, fn)
+		 || nlmsvc_traverse_shares(host, file, fn))
 			return 1;
 	}
-	return nlm_traverse_locks(host, file, action);
+	return nlm_traverse_locks(host, file, fn);
 }
 
 /*
  * Loop over all files in the file table.
  */
 static int
-nlm_traverse_files(struct nlm_host *host, int action)
+nlm_traverse_files(struct nlm_host *host, nlm_host_visitor_t fn)
 {
-	struct nlm_file	*file, **fp;
+	struct hlist_node *pos, *next;
+	struct nlm_file	*file;
 	int		i;
 
 	down(&nlm_file_sema);
 	for (i = 0; i < FILE_NRHASH; i++) {
-		fp = nlm_files + i;
-		while ((file = *fp) != NULL) {
+		hlist_for_each_entry_safe(file, pos, next, &nlm_files[i], f_list) {
 			/* Traverse locks, blocks and shares of this file
 			 * and update file->f_locks count */
-			if (nlm_inspect_file(host, file, action)) {
+			if (nlm_inspect_file(host, file, fn)) {
 				up(&nlm_file_sema);
 				return 1;
 			}
 
 			/* No more references to this file. Let go of it. */
-			if (!file->f_blocks && !file->f_locks
+			if (list_empty(&file->f_blocks) && !file->f_locks
 			 && !file->f_shares && !file->f_count) {
-				*fp = file->f_next;
+				hlist_del(&file->f_list);
 				nlmsvc_ops->fclose(file->f_file);
 				kfree(file);
-			} else {
-				fp = &file->f_next;
 			}
 		}
 	}
@@ -286,11 +284,45 @@ nlm_release_file(struct nlm_file *file)
 
 	/* If there are no more locks etc, delete the file */
 	if(--file->f_count == 0) {
-		if(!nlm_inspect_file(NULL, file, NLM_ACT_CHECK))
+		if(!nlm_inspect_file(NULL, file, NULL))
 			nlm_delete_file(file);
 	}
 
 	up(&nlm_file_sema);
+}
+
+/*
+ * Helpers function for resource traversal
+ *
+ * nlmsvc_mark_host:
+ *	used by the garbage collector; simply sets h_inuse.
+ *	Always returns 0.
+ *
+ * nlmsvc_same_host:
+ *	returns 1 iff the two hosts match. Used to release
+ *	all resources bound to a specific host.
+ *
+ * nlmsvc_is_client:
+ *	returns 1 iff the host is a client.
+ *	Used by nlmsvc_invalidate_all
+ */
+static int
+nlmsvc_mark_host(struct nlm_host *host, struct nlm_host *dummy)
+{
+	host->h_inuse = 1;
+	return 0;
+}
+
+static int
+nlmsvc_same_host(struct nlm_host *host, struct nlm_host *other)
+{
+	return host == other;
+}
+
+static int
+nlmsvc_is_client(struct nlm_host *host, struct nlm_host *dummy)
+{
+	return host->h_server;
 }
 
 /*
@@ -300,8 +332,7 @@ void
 nlmsvc_mark_resources(void)
 {
 	dprintk("lockd: nlmsvc_mark_resources\n");
-
-	nlm_traverse_files(NULL, NLM_ACT_MARK);
+	nlm_traverse_files(NULL, nlmsvc_mark_host);
 }
 
 /*
@@ -312,23 +343,23 @@ nlmsvc_free_host_resources(struct nlm_host *host)
 {
 	dprintk("lockd: nlmsvc_free_host_resources\n");
 
-	if (nlm_traverse_files(host, NLM_ACT_UNLOCK))
+	if (nlm_traverse_files(host, nlmsvc_same_host)) {
 		printk(KERN_WARNING
-			"lockd: couldn't remove all locks held by %s",
+			"lockd: couldn't remove all locks held by %s\n",
 			host->h_name);
+		BUG();
+	}
 }
 
 /*
- * delete all hosts structs for clients
+ * Delete all hosts structs for clients
  */
 void
 nlmsvc_invalidate_all(void)
 {
-	struct nlm_host *host;
-	while ((host = nlm_find_client()) != NULL) {
-		nlmsvc_free_host_resources(host);
-		host->h_expires = 0;
-		host->h_killed = 1;
-		nlm_release_host(host);
-	}
+	/* Release all locks held by a NFS clients */
+	nlm_traverse_files(NULL, nlmsvc_is_client);
+
+	/* Then destroy the host handles */
+	nlm_destroy_clients();
 }

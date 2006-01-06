@@ -2129,9 +2129,6 @@ static void nfs_destroy_inodecache(void)
 
 /*
  * NFS sysctls
- * It's a bit awkward to duplicate the fs/nfs structs for
- * sunrpc, nfs, nfsd and lockd - it may be easier to
- * consolidate this in the sunrpc module.
  */
 static struct ctl_table_header *nfs_sysctl_table;
 
@@ -2150,35 +2147,15 @@ static ctl_table nfs_sysctls[] = {
 	{ .ctl_name = 0 }
 };
 
-static ctl_table nfs_sysctl_dir[] = {
-	{
-		.ctl_name	= -2,
-		.procname	= "nfs",
-		.mode		= 0555,
-		.child		= nfs_sysctls,
-	},
-	{ .ctl_name = 0 }
-};
-
-static ctl_table nfs_sysctl_root[] = {
-	{
-		.ctl_name	= CTL_FS,
-		.procname	= "fs",
-		.mode		= 0555,
-		.child		= nfs_sysctl_dir,
-	},
-	{ .ctl_name = 0 }
-};
-
 /*
  * Initialize NFS
  */
 static int __init init_nfs_fs(void)
 {
+	struct ctl_path ctl_path[] = { { CTL_FS, "fs", 0555 }, { -2, "nfs", 0555 }, { 0 } };
 	int err;
 
-	if (nfs_sysctls[0].ctl_name)
-		nfs_sysctl_table = register_sysctl_table(nfs_sysctl_root, 0);
+	nfs_sysctl_table = register_sysctl_table_path(nfs_sysctls, ctl_path);
 
 	err = nfs_init_nfspagecache();
 	if (err)

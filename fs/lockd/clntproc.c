@@ -34,14 +34,14 @@ static void	nlmclnt_locks_init_private(struct file_lock *fl, struct nlm_host *ho
 /*
  * Cookie counter for NLM requests
  */
-static u32	nlm_cookie = 0x1234;
+static atomic_t	nlm_cookie = ATOMIC_INIT(0x1234);
 
-static inline void nlmclnt_next_cookie(struct nlm_cookie *c)
+void nlmclnt_next_cookie(struct nlm_cookie *c)
 {
-	memcpy(c->data, &nlm_cookie, 4);
-	memset(c->data+4, 0, 4);
+	u32	cookie = atomic_inc_return(&nlm_cookie);
+
+	memcpy(c->data, &cookie, 4);
 	c->len=4;
-	nlm_cookie++;
 }
 
 static struct nlm_lockowner *nlm_get_lockowner(struct nlm_lockowner *lockowner)
@@ -206,7 +206,9 @@ nlmclnt_proc(struct inode *inode, int cmd, struct file_lock *fl)
 	/* Retrieve transport protocol from NFS client */
 	proto = NFS_CLIENT(inode)->cl_xprt->prot;
 
-	if (!(host = nlmclnt_lookup_host(NFS_ADDR(inode), proto, vers)))
+	host = nlmclnt_lookup_host(NFS_ADDR(inode), proto, vers,
+				nfssrv->hostname, strlen(nfssrv->hostname));
+	if (host == NULL)
 		return -ENOLCK;
 
 	/* Create RPC client handle if not there, and copy soft
@@ -555,7 +557,7 @@ nlmclnt_lock(struct nlm_rqst *req, struct file_lock *fl)
 	long timeout;
 	int status;
 
-	if (!host->h_monitored && nsm_monitor(host) < 0) {
+	if (nsm_monitor(host) < 0) {
 		printk(KERN_NOTICE "lockd: failed to monitor %s\n",
 					host->h_name);
 		status = -ENOLCK;

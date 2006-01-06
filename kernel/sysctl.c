@@ -130,6 +130,7 @@ static int parse_table(int __user *, int, void __user *, size_t __user *, void _
 		       ctl_table *, void **);
 static int proc_doutsstring(ctl_table *table, int write, struct file *filp,
 		  void __user *buffer, size_t *lenp, loff_t *ppos);
+static void __insert_sysctl_table(struct ctl_table_header *, int);
 
 static ctl_table root_table[];
 static struct ctl_table_header root_table_header =
@@ -1297,6 +1298,74 @@ struct ctl_table_header *register_sysctl_table(ctl_table * table,
 	if (!tmp)
 		return NULL;
 	tmp->ctl_table = table;
+	__insert_sysctl_table(tmp, insert_at_head);
+	return tmp;
+}
+
+/**
+ * register_sysctl_table_path - register a systl table below a given node
+ * @npath: The number of entries in the path array.
+ * @path: An array of ctl_path items. We assume that the procname strings
+ *        are valid for the lifetime of the registration.
+ * @table: the table structure to register
+ *
+ * This works like register_sysctl_table except that the table isn't
+ * registered at the sysctl root, but at the specified location in the
+ * sysctl hierarchy
+ */
+struct ctl_table_header *register_sysctl_table_path(ctl_table *table,
+				struct ctl_path *path)
+{
+	struct ctl_table_header *header;
+	struct ctl_table *new, **prevp;
+	unsigned int	n, npath;
+
+	/* Count the path components. If the path is empty,
+	 * fall back to the normal register_sysctl_table() */
+	for (npath = 0; path[npath].procname; ++npath)
+		;
+
+	if (npath == 0)
+		return register_sysctl_table(table, 0);
+
+	/* For each path component, allocate a 2-element ctl_table array.
+	 * The first array element will be filled with the sysctl entry
+	 * for this, the second will be the sentinel (ctl_name == 0).
+	 *
+	 * We allocate everything in one go so that we don't have to
+	 * worry about freeing additional memory in unregister_sysctl_table.
+	 */
+	header = kzalloc(sizeof(struct ctl_table_header)
+			+ 2 * npath * sizeof(struct ctl_table), GFP_KERNEL);
+	if (!header)
+		return NULL;
+	new = (struct ctl_table *) (header + 1);
+
+	/* Now connect the dots */
+	prevp = &header->ctl_table;
+	for (n = 0; n < npath; ++n, ++path) {
+		/* Copy the procname */
+		new->procname = path->procname;
+		new->ctl_name = path->ctl_name;
+		new->mode     = path->mode;
+
+		*prevp = new;
+		prevp = &new->child;
+
+		new += 2;
+	}
+
+	*prevp = table;
+	__insert_sysctl_table(header, 0);
+	return header;
+}
+
+/*
+ * Insert ctl_table_header into hierarchy
+ */
+void __insert_sysctl_table(struct ctl_table_header * tmp,
+			int insert_at_head)
+{
 	INIT_LIST_HEAD(&tmp->ctl_entry);
 	tmp->used = 0;
 	tmp->unregistering = NULL;
@@ -1307,9 +1376,8 @@ struct ctl_table_header *register_sysctl_table(ctl_table * table,
 		list_add_tail(&tmp->ctl_entry, &root_table_header.ctl_entry);
 	spin_unlock(&sysctl_lock);
 #ifdef CONFIG_PROC_FS
-	register_proc_table(table, proc_sys_root, tmp);
+	register_proc_table(tmp->ctl_table, proc_sys_root, tmp);
 #endif
-	return tmp;
 }
 
 /**
@@ -2433,6 +2501,12 @@ struct ctl_table_header * register_sysctl_table(ctl_table * table,
 	return NULL;
 }
 
+struct ctl_table_header * register_sysctl_table_path(ctl_table * table,
+						struct ctl_path * path)
+{
+	return NULL;
+}
+
 void unregister_sysctl_table(struct ctl_table_header * table)
 {
 }
@@ -2452,6 +2526,7 @@ EXPORT_SYMBOL(proc_dostring);
 EXPORT_SYMBOL(proc_doulongvec_minmax);
 EXPORT_SYMBOL(proc_doulongvec_ms_jiffies_minmax);
 EXPORT_SYMBOL(register_sysctl_table);
+EXPORT_SYMBOL(register_sysctl_table_path);
 EXPORT_SYMBOL(sysctl_intvec);
 EXPORT_SYMBOL(sysctl_jiffies);
 EXPORT_SYMBOL(sysctl_ms_jiffies);

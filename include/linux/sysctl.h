@@ -974,8 +974,18 @@ struct ctl_table_header
 	struct completion *unregistering;
 };
 
+/* struct ctl_path describes where in the hierarchy a table is added */
+struct ctl_path
+{
+	int ctl_name;
+	const char *procname;
+	mode_t mode;
+};
+
 struct ctl_table_header * register_sysctl_table(ctl_table * table, 
 						int insert_at_head);
+struct ctl_table_header * register_sysctl_table_path(ctl_table *table,
+						struct ctl_path *path);
 void unregister_sysctl_table(struct ctl_table_header * table);
 
 #else /* __KERNEL__ */
