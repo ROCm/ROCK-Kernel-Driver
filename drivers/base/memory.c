@@ -29,7 +29,7 @@ static struct sysdev_class memory_sysdev_class = {
 	set_kset_name(MEMORY_CLASS_NAME),
 };
 
-static char *memory_hotplug_name(struct kset *kset, struct kobject *kobj)
+static const char *memory_hotplug_name(struct kset *kset, struct kobject *kobj)
 {
 	return MEMORY_CLASS_NAME;
 }
