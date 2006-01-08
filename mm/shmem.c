@@ -28,6 +28,8 @@
 #include <linux/init.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/fs.h>
+#include <linux/xattr.h>
+#include <linux/generic_acl.h>
 #include <linux/mm.h>
 #include <linux/mman.h>
 #include <linux/file.h>
@@ -175,6 +177,7 @@ static struct address_space_operations shmem_aops;
 static struct file_operations shmem_file_operations;
 static struct inode_operations shmem_inode_operations;
 static struct inode_operations shmem_dir_inode_operations;
+static struct inode_operations shmem_special_inode_operations;
 static struct vm_operations_struct shmem_vm_ops;
 
 static struct backing_dev_info shmem_backing_dev_info  __read_mostly = {
@@ -614,13 +617,15 @@ done2:
 	}
 }
 
+extern struct generic_acl_operations shmem_acl_ops;
+
 static int shmem_notify_change(struct dentry *dentry, struct iattr *attr)
 {
 	struct inode *inode = dentry->d_inode;
 	struct page *page = NULL;
 	int error;
 
-	if (attr->ia_valid & ATTR_SIZE) {
+	if (S_ISREG(inode->i_mode) && (attr->ia_valid & ATTR_SIZE)) {
 		if (attr->ia_size < inode->i_size) {
 			/*
 			 * If truncating down to a partial page, then
@@ -653,6 +658,10 @@ static int shmem_notify_change(struct dentry *dentry, struct iattr *attr)
 	error = inode_change_ok(inode, attr);
 	if (!error)
 		error = inode_setattr(inode, attr);
+#ifdef CONFIG_TMPFS_POSIX_ACL
+	if (!error && (attr->ia_valid & ATTR_MODE))
+		error = generic_acl_chmod(inode, &shmem_acl_ops);
+#endif
 	if (page)
 		page_cache_release(page);
 	return error;
@@ -1296,6 +1305,7 @@ shmem_get_inode(struct super_block *sb, int mode, dev_t dev)
 
 		switch (mode & S_IFMT) {
 		default:
+			inode->i_op = &shmem_special_inode_operations;
 			init_special_inode(inode, mode, dev);
 			break;
 		case S_IFREG:
@@ -1614,7 +1624,11 @@ shmem_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t dev)
 				iput(inode);
 				return error;
 			}
-			error = 0;
+		}
+		error = shmem_acl_init(inode, dir);
+		if (error) {
+			iput(inode);
+			return error;
 		}
 		if (dir->i_mode & S_ISGID) {
 			inode->i_gid = dir->i_gid;
@@ -1828,6 +1842,46 @@ static struct inode_operations shmem_symlink_inode_operations = {
 	.put_link	= shmem_put_link,
 };
 
+#ifdef CONFIG_TMPFS_POSIX_ACL
+static size_t shmem_xattr_security_list(struct inode *inode, char *list,
+					size_t list_len, const char *name,
+					size_t name_len)
+{
+	return security_inode_listsecurity(inode, list, list_len);
+}
+
+static int shmem_xattr_security_get(struct inode *inode, const char *name,
+				    void *buffer, size_t size)
+{
+	if (strcmp(name, "") == 0)
+		return -EINVAL;
+	return security_inode_getsecurity(inode, name, buffer, size,
+					  -EOPNOTSUPP);
+}
+
+static int shmem_xattr_security_set(struct inode *inode, const char *name,
+				    const void *value, size_t size, int flags)
+{
+	if (strcmp(name, "") == 0)
+		return -EINVAL;
+	return security_inode_setsecurity(inode, name, value, size, flags);
+}
+
+struct xattr_handler shmem_xattr_security_handler = {
+	.prefix = XATTR_SECURITY_PREFIX,
+	.list   = shmem_xattr_security_list,
+	.get    = shmem_xattr_security_get,
+	.set    = shmem_xattr_security_set,
+};
+
+static struct xattr_handler *shmem_xattr_handlers[] = {
+	&shmem_xattr_acl_access_handler,
+	&shmem_xattr_acl_default_handler,
+	&shmem_xattr_security_handler,
+	NULL
+};
+#endif
+
 static int shmem_parse_options(char *options, int *mode, uid_t *uid, gid_t *gid, unsigned long *blocks, unsigned long *inodes)
 {
 	char *this_char, *value, *rest;
@@ -1995,6 +2049,10 @@ static int shmem_fill_super(struct super_block *sb,
 	sb->s_blocksize_bits = PAGE_CACHE_SHIFT;
 	sb->s_magic = TMPFS_MAGIC;
 	sb->s_op = &shmem_ops;
+#ifdef CONFIG_TMPFS_POSIX_ACL
+	sb->s_xattr = shmem_xattr_handlers;
+	sb->s_flags |= MS_POSIXACL;
+#endif
 
 	inode = shmem_get_inode(sb, S_IFDIR | mode, 0);
 	if (!inode)
@@ -2031,6 +2089,7 @@ static void shmem_destroy_inode(struct inode *inode)
 		/* only struct inode is valid if it's an inline symlink */
 		mpol_free_shared_policy(&SHMEM_I(inode)->policy);
 	}
+	shmem_acl_destroy_inode(inode);
 	kmem_cache_free(shmem_inode_cachep, SHMEM_I(inode));
 }
 
@@ -2041,6 +2100,10 @@ static void init_once(void *foo, kmem_cache_t *cachep, unsigned long flags)
 	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
 	    SLAB_CTOR_CONSTRUCTOR) {
 		inode_init_once(&p->vfs_inode);
+#ifdef CONFIG_TMPFS_POSIX_ACL
+		p->i_acl = NULL;
+		p->i_default_acl = NULL;
+#endif
 	}
 }
 
@@ -2083,6 +2146,13 @@ static struct file_operations shmem_file_operations = {
 static struct inode_operations shmem_inode_operations = {
 	.truncate	= shmem_truncate,
 	.setattr	= shmem_notify_change,
+#ifdef CONFIG_TMPFS_POSIX_ACL
+	.setxattr	= generic_setxattr,
+	.getxattr	= generic_getxattr,
+	.listxattr	= generic_listxattr,
+	.removexattr	= generic_removexattr,
+	.permission	= shmem_permission,
+#endif
 };
 
 static struct inode_operations shmem_dir_inode_operations = {
@@ -2096,6 +2166,25 @@ static struct inode_operations shmem_dir_inode_operations = {
 	.rmdir		= shmem_rmdir,
 	.mknod		= shmem_mknod,
 	.rename		= shmem_rename,
+#endif
+#ifdef CONFIG_TMPFS_POSIX_ACL
+	.setattr	= shmem_notify_change,
+	.setxattr	= generic_setxattr,
+	.getxattr	= generic_getxattr,
+	.listxattr	= generic_listxattr,
+	.removexattr	= generic_removexattr,
+	.permission	= shmem_permission,
+#endif
+};
+
+static struct inode_operations shmem_special_inode_operations = {
+#ifdef CONFIG_TMPFS_POSIX_ACL
+	.setattr	= shmem_notify_change,
+	.setxattr	= generic_setxattr,
+	.getxattr	= generic_getxattr,
+	.listxattr	= generic_listxattr,
+	.removexattr	= generic_removexattr,
+	.permission	= shmem_permission,
 #endif
 };
 
