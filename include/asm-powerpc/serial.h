@@ -20,7 +20,7 @@ extern void find_legacy_serial_ports(void);
 #if defined(SUPPORT_SYSRQ) && defined(CONFIG_PPC_PSERIES)
 #undef arch_8250_sysrq_via_ctrl_o
 extern int power4_sysrq_via_ctrl_o;
-#define arch_8250_sysrq_via_ctrl_o(ch, port) ((ch) == '\x0f' && uart_handle_break((port)) && power4_sysrq_via_ctrl_o)
+#define arch_8250_sysrq_via_ctrl_o(ch, port) ((ch) == '\x0f' && power4_sysrq_via_ctrl_o && uart_handle_break((port)))
 #endif
 
 #endif /* _PPC64_SERIAL_H */
