@@ -59,6 +59,9 @@
 #include <asm/div64.h>
 #include <linux/blkdev.h> /* sector_div */
 
+void (*do_eop_acct) (int, struct task_struct *) = NULL;
+EXPORT_SYMBOL_GPL(do_eop_acct);
+
 /*
  * These constants control the amount of freespace that suspend and
  * resume the process accounting system, and the time delay between
@@ -549,9 +552,15 @@ static void do_acct_process(long exitcode, struct file *file)
  *
  * handles process accounting for an exiting task
  */
-void acct_process(long exitcode)
+void acct_process(struct task_struct *tsk, long exitcode, int last_thread)
 {
 	struct file *file = NULL;
+
+	if (do_eop_acct)
+		do_eop_acct(exitcode, tsk);
+
+	if (!last_thread)
+		return;
 
 	/*
 	 * accelerate the common fastpath:

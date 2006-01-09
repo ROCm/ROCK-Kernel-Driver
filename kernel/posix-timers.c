@@ -1219,6 +1219,7 @@ int do_posix_clock_monotonic_gettime(struct timespec *tp)
 {
 	return do_posix_clock_monotonic_get(CLOCK_MONOTONIC, tp);
 }
+EXPORT_SYMBOL_GPL(do_posix_clock_monotonic_gettime);
 
 int do_posix_clock_nosettime(clockid_t clockid, struct timespec *tp)
 {

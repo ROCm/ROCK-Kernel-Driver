@@ -123,7 +123,7 @@ struct vfsmount;
 struct super_block;
 extern void acct_auto_close_mnt(struct vfsmount *m);
 extern void acct_auto_close(struct super_block *sb);
-extern void acct_process(long exitcode);
+extern void acct_process(struct task_struct *tsk, long exitcode, int last_thread);
 extern void acct_update_integrals(struct task_struct *tsk);
 extern void acct_clear_integrals(struct task_struct *tsk);
 #else
@@ -200,6 +200,13 @@ static inline u64 nsec_to_AHZ(u64 x)
 #endif
 	return x;
 }
+
+/*
+ * extern declaration that provides the hook needed for processing of
+ * end-of-process accounting record
+ *
+ */
+extern void (*do_eop_acct) (int, struct task_struct *);
 
 #endif  /* __KERNEL */
 

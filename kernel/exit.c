@@ -847,8 +847,8 @@ fastcall NORET_TYPE void do_exit(long code)
 	if (group_dead) {
  		del_timer_sync(&tsk->signal->real_timer);
 		exit_itimers(tsk->signal);
-		acct_process(code);
 	}
+	acct_process(tsk, code, group_dead);
 	exit_mm(tsk);
 
 	exit_sem(tsk);
