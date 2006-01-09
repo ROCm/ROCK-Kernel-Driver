@@ -5937,7 +5937,6 @@ static void ipw_abort_scan(struct ipw_priv *priv)
 		return;
 	}
 	priv->status |= STATUS_SCAN_ABORTING;
-	wake_up_interruptible(&priv->wait_state);
 
 	err = ipw_send_scan_abort(priv);
 	if (err)
@@ -8930,7 +8929,6 @@ static int ipw_request_direct_scan(struct ipw_priv *priv, char *essid,
 	    (priv->status & STATUS_EXIT_PENDING))
 		return 0;
 
-again:
 	down(&priv->sem);
 
 	if (priv->status & STATUS_RF_KILL_MASK) {
@@ -8942,20 +8940,12 @@ again:
 	IPW_DEBUG_HC("starting request direct scan!\n");
 
 	if (priv->status & (STATUS_SCANNING | STATUS_SCAN_ABORTING)) {
-		/* We should not sleep with the semaphore help.
-		 * Otherwise we will block a worker thread, deadlocking
-		 * most of the system.
+		/* We should not sleep here; otherwise we will block most
+		 * of the system (for instance, we hold rtnl_lock when we
+		 * get here).
 		 */
-		up(&priv->sem);
-		err = wait_event_interruptible(priv->wait_state,
-					       !(priv->
-						 status & (STATUS_SCANNING |
-							   STATUS_SCAN_ABORTING)));
-		if (err) {
-			IPW_DEBUG_HC("aborting direct scan");
-			return err;
-		}
-		goto again;
+		err = -EAGAIN;
+		goto done;
 	}
 	memset(&scan, 0, sizeof(scan));
 
