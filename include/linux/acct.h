@@ -129,7 +129,7 @@ extern void acct_clear_integrals(struct task_struct *tsk);
 #else
 #define acct_auto_close_mnt(x)	do { } while (0)
 #define acct_auto_close(x)	do { } while (0)
-#define acct_process(x)		do { } while (0)
+#define acct_process(tsk,exitcode,last_thread)		do { } while (0)
 #define acct_update_integrals(x)		do { } while (0)
 #define acct_clear_integrals(task)	do { } while (0)
 #endif
