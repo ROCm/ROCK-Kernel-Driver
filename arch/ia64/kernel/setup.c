@@ -74,6 +74,7 @@ DEFINE_PER_CPU(unsigned long, local_per_cpu_offset);
 DEFINE_PER_CPU(unsigned long, ia64_phys_stacked_size_p8);
 unsigned long ia64_cycles_per_usec;
 struct ia64_boot_param *ia64_boot_param;
+EXPORT_SYMBOL_GPL(ia64_boot_param);
 struct screen_info screen_info;
 unsigned long vga_console_iobase;
 unsigned long vga_console_membase;
