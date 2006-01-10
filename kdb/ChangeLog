@@ -1,3 +1,54 @@
+2006-01-08 Keith Owens  <kaos@sgi.com>
+
+	* kdb mainline invokes DIE_KDEBUG_ENTER and DIE_KDEBUG_LEAVE via
+	  notify_die.
+	* Move xpc debug support from xpc to mainline kdb.
+	* kdbm_cm.c: check if file_lock_operations or lock_manager_operations
+	  are set before dereferencing them.  Felix Blyakher, SGI.
+	* kdb v4.4-2.6.15-common-2.
+
+2006-01-04 Keith Owens  <kaos@sgi.com>
+
+	* Print all buffers on a page in inode pages and update formatting to be
+	  legible, too.  David Chinner, SGI.
+	* Update page flags in kdbm_pg.
+	* Remove inline from *.c files.
+	* kdb v4.4-2.6.15-common-1.
+
+2005-12-25 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.15-rc7-common-1.
+
+2005-12-20 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.15-rc6-common-1.
+
+2005-12-10 Keith Owens  <kaos@sgi.com>
+
+	* Update mapping of flags to strings in kdbm_pg.c and kdbm_vm.c.
+	* kdb v4.4-2.6.15-rc5-common-3.
+
+2005-12-06 Keith Owens  <kaos@sgi.com>
+
+	* Add RECOVERY flag to global KDB flags.
+	* Add kdb_{save,restore}_flags.
+	* kdb v4.4-2.6.15-rc5-common-2.
+
+2005-12-05 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.15-rc5-common-1.
+
+2005-12-02 Keith Owens  <kaos@sgi.com>
+
+	* kdbm_vm.c: offsets of page macros should be unsigned long.  Reported
+	  by Dean Nelson, SGI.
+	* kdb v4.4-2.6.15-rc4-common-1.
+
+2005-11-30 Keith Owens  <kaos@sgi.com>
+
+	* New follow_page() API.
+	* kdb v4.4-2.6.15-rc3-common-1.
+
 2005-11-21 Keith Owens  <kaos@sgi.com>
 
 	* kdb v4.4-2.6.15-rc2-common-1.

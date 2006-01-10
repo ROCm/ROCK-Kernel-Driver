@@ -5,7 +5,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (c) 1999-2004 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 1999-2006 Silicon Graphics, Inc.  All Rights Reserved.
  */
 
 #include <linux/types.h>
@@ -44,7 +44,8 @@ kdba_pod(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 static int __init
 kdba_pod_init(void)
 {
-	kdb_register("pod", kdba_pod, 0, "Enter POD", 0);
+	if (ia64_platform_is("sn2"))
+		kdb_register("pod", kdba_pod, 0, "Enter POD", 0);
 
 	return 0;
 }
@@ -57,7 +58,8 @@ kdba_pod_init(void)
 static void __exit
 kdba_pod_exit(void)
 {
-	kdb_unregister("pod");
+	if (ia64_platform_is("sn2"))
+		kdb_unregister("pod");
 }
 
 kdb_module_init(kdba_pod_init)

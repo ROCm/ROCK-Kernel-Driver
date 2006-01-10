@@ -81,6 +81,12 @@ config KDB_MODULES
 	  be compiled, as free standing modules (select M) or built into the
 	  kernel (select Y).  If unsure say M.
 
+config KDB_MODULES_XP
+	tristate
+	depends on KDB_MODULES && IA64_SGI_SN_XP
+	default y if (KDB_MODULES = y && IA64_SGI_SN_XP = y)
+	default m
+
 config KDB_OFF
 	bool "KDB off by default"
 	depends on KDB

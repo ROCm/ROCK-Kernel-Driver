@@ -5,7 +5,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (c) 1999-2004 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 1999-2006 Silicon Graphics, Inc.  All Rights Reserved.
  */
 
 #include <linux/config.h>
@@ -1494,4 +1494,72 @@ kdba_set_current_task(const struct task_struct *p)
 		return;
 	}
 	kdb_current_regs = NULL;
+}
+
+/*
+ * asm-i386 uaccess.h supplies __copy_to_user which relies on MMU to
+ * trap invalid addresses in the _xxx fields.  Verify the other address
+ * of the pair is valid by accessing the first and last byte ourselves,
+ * then any access violations should only be caused by the _xxx
+ * addresses,
+ */
+
+int
+kdba_putarea_size(unsigned long to_xxx, void *from, size_t size)
+{
+	mm_segment_t oldfs = get_fs();
+	int r;
+	char c;
+	c = *((volatile char *)from);
+	c = *((volatile char *)from + size - 1);
+
+	if (to_xxx < PAGE_OFFSET) {
+		return kdb_putuserarea_size(to_xxx, from, size);
+	}
+
+	set_fs(KERNEL_DS);
+	r = __copy_to_user_inatomic((void *)to_xxx, from, size);
+	set_fs(oldfs);
+	return r;
+}
+
+int
+kdba_getarea_size(void *to, unsigned long from_xxx, size_t size)
+{
+	mm_segment_t oldfs = get_fs();
+	int r;
+	*((volatile char *)to) = '\0';
+	*((volatile char *)to + size - 1) = '\0';
+
+	if (from_xxx < PAGE_OFFSET) {
+		return kdb_getuserarea_size(to, from_xxx, size);
+	}
+
+	set_fs(KERNEL_DS);
+	switch (size) {
+	case 1:
+		r = __copy_to_user_inatomic(to, (void *)from_xxx, 1);
+		break;
+	case 2:
+		r = __copy_to_user_inatomic(to, (void *)from_xxx, 2);
+		break;
+	case 4:
+		r = __copy_to_user_inatomic(to, (void *)from_xxx, 4);
+		break;
+	case 8:
+		r = __copy_to_user_inatomic(to, (void *)from_xxx, 8);
+		break;
+	default:
+		r = __copy_to_user_inatomic(to, (void *)from_xxx, size);
+		break;
+	}
+	set_fs(oldfs);
+	return r;
+}
+
+int
+kdba_verify_rw(unsigned long addr, size_t size)
+{
+	unsigned char data[size];
+	return(kdba_getarea_size(data, addr, size) || kdba_putarea_size(addr, data, size));
 }

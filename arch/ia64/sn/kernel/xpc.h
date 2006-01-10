@@ -669,6 +669,7 @@ extern void xpc_activate_partition(struct xpc_partition *);
 extern void xpc_activate_kthreads(struct xpc_channel *, int);
 extern void xpc_create_kthreads(struct xpc_channel *, int);
 extern void xpc_disconnect_wait(int);
+extern int xpc_kdebug_force_disengage(void);
 
 
 /* found in xpc_partition.c */

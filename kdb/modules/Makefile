@@ -3,7 +3,7 @@
 # License.  See the file "COPYING" in the main directory of this archive
 # for more details.
 #
-# Copyright (c) 1999-2004 Silicon Graphics, Inc.  All Rights Reserved.
+# Copyright (c) 1999-2006 Silicon Graphics, Inc.  All Rights Reserved.
 #
 
 obj-$(CONFIG_KDB_MODULES) += kdbm_pg.o kdbm_task.o kdbm_vm.o kdbm_sched.o
@@ -12,4 +12,6 @@ ifndef CONFIG_X86_64
 obj-$(CONFIG_KDB_MODULES) += kdbm_x86.o
 endif
 endif
-CFLAGS_kdbm_vm.o	+= -I $(TOPDIR)/drivers/scsi
+obj-$(CONFIG_KDB_MODULES_XP) += kdbm_xpc.o
+CFLAGS_kdbm_vm.o	+= -I $(srctree)/drivers/scsi
+CFLAGS_kdbm_xpc.o	+= -I $(srctree)/arch/ia64/sn/kernel

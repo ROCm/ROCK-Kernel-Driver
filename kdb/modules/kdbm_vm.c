@@ -3,7 +3,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (c) 1999-2004 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 1999-2006 Silicon Graphics, Inc.  All Rights Reserved.
  */
 
 #include <linux/blkdev.h>
@@ -40,10 +40,21 @@ static struct __vmflags vmflags[] = {
 	{ VM_GROWSDOWN, "GROWSDOWN" },
 	{ VM_GROWSUP, "GROWSUP" },
 	{ VM_SHM, "SHM" },
+	{ VM_PFNMAP, "PFNMAP" },
 	{ VM_DENYWRITE, "DENYWRITE" },
 	{ VM_EXECUTABLE, "EXECUTABLE" },
 	{ VM_LOCKED, "LOCKED" },
 	{ VM_IO , "IO " },
+	{ VM_SEQ_READ , "SEQ_READ " },
+	{ VM_RAND_READ , "RAND_READ " },
+	{ VM_DONTCOPY , "DONTCOPY " },
+	{ VM_DONTEXPAND , "DONTEXPAND " },
+	{ VM_RESERVED , "RESERVED " },
+	{ VM_ACCOUNT , "ACCOUNT " },
+	{ VM_HUGETLB , "HUGETLB " },
+	{ VM_NONLINEAR , "NONLINEAR " },
+	{ VM_MAPPED_COPY , "MAPPED_COPY " },
+	{ VM_INSERTPAGE , "INSERTPAGE " },
 	{ 0, "" }
 };
 
@@ -415,16 +426,16 @@ kdbm_rpte(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 	kdb_printf("pfn              vaddr%*s pte\n",
 		   (int)(2*sizeof(unsigned long) + 2 - 5), " ");
 
-	for (g = 0, pgd = pgd_offset(mm, 0); g < PTRS_PER_PGD; ++g, ++pgd) {
+	for (g = 0, pgd = pgd_offset(mm, 0UL); g < PTRS_PER_PGD; ++g, ++pgd) {
 		if (pgd_none(*pgd) || pgd_bad(*pgd))
 			continue;
-		for (u = 0, pud = pud_offset(pgd, 0); u < PTRS_PER_PUD; ++u, ++pud) {
+		for (u = 0, pud = pud_offset(pgd, 0UL); u < PTRS_PER_PUD; ++u, ++pud) {
 			if (pud_none(*pud) || pud_bad(*pud))
 				continue;
-			for (m = 0, pmd = pmd_offset(pud, 0); m < PTRS_PER_PMD; ++m, ++pmd) {
+			for (m = 0, pmd = pmd_offset(pud, 0UL); m < PTRS_PER_PMD; ++m, ++pmd) {
 				if (pmd_none(*pmd) || pmd_bad(*pmd))
 					continue;
-				for (t = 0, pte = pte_offset_map(pmd, 0); t < PTRS_PER_PTE; ++t, ++pte) {
+				for (t = 0, pte = pte_offset_map(pmd, 0UL); t < PTRS_PER_PTE; ++t, ++pte) {
 					if (pte_none(*pte))
 						continue;
 					if (pte_pfn(*pte) < pfn || pte_pfn(*pte) >= (pfn + npages))
@@ -591,14 +602,20 @@ kdbm_fl(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 	kdb_printf(" fl_type = %d fl_start = 0x%llx fl_end = 0x%llx\n",
 			fl.fl_type, fl.fl_start, fl.fl_end);
 
-	kdb_printf(" file_lock_operations\n");
-	kdb_printf("   fl_insert = 0x%p fl_remove = 0x%p fl_copy_lock = 0x%p fl_release_private = 0x%p\n",
+	kdb_printf(" file_lock_operations");
+	if (fl.fl_ops)
+		kdb_printf("\n   fl_insert = 0x%p fl_remove = 0x%p fl_copy_lock = 0x%p fl_release_private = 0x%p\n",
 			fl.fl_ops->fl_insert, fl.fl_ops->fl_remove,
 			fl.fl_ops->fl_copy_lock, fl.fl_ops->fl_release_private);
+	else
+		kdb_printf("   empty\n");
 
-	kdb_printf(" lock_manager_operations\n");
-	kdb_printf("   fl_compare_owner = 0x%p fl_notify = 0x%p\n",
+	kdb_printf(" lock_manager_operations");
+	if (fl.fl_lmops)
+		kdb_printf("\n   fl_compare_owner = 0x%p fl_notify = 0x%p\n",
 			fl.fl_lmops->fl_compare_owner, fl.fl_lmops->fl_notify);
+	else
+		kdb_printf("   empty\n");
 
 	kdb_printf(" fl_fasync = 0x%p fl_break 0x%lx\n",
 			fl.fl_fasync, fl.fl_break_time);

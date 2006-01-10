@@ -1085,7 +1085,7 @@ static struct page * kdb_get_one_user_page(const struct task_struct *tsk, unsign
 	if (!vma || (vma->vm_flags & VM_IO) || !(flags & vma->vm_flags))
 		return NULL;
 
-	return kdb_follow_page(mm, start, write);
+	return follow_page(vma, start, write ? FOLL_WRITE : 0);
 }
 
 int kdb_getuserarea_size(void *to, unsigned long from, size_t size)
@@ -1144,7 +1144,7 @@ static u32 dah_first;
  * only try once.
  */
 static DEFINE_SPINLOCK(dap_lock);
-static inline
+static
 int get_dap_lock(void)
 {
 	static int dap_locked = -1;
@@ -1262,4 +1262,24 @@ void kdb_initsupport()
 	h->next = 0;
 	h->size = sizeof(debug_alloc_pool_aligned) - sizeof(*h);
 	dah_first = 0;
+}
+
+/* Maintain a small stack of kdb_flags to allow recursion without disturbing
+ * the global kdb state.
+ */
+
+static int kdb_flags_stack[4], kdb_flags_index;
+
+void
+kdb_save_flags(void)
+{
+	BUG_ON(kdb_flags_index >= ARRAY_SIZE(kdb_flags_stack));
+	kdb_flags_stack[kdb_flags_index++] = kdb_flags;
+}
+
+void
+kdb_restore_flags(void)
+{
+	BUG_ON(kdb_flags_index <= 0);
+	kdb_flags = kdb_flags_stack[--kdb_flags_index];
 }

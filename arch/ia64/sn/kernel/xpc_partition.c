@@ -49,9 +49,11 @@ u64 xpc_prot_vec[MAX_NUMNODES];
 
 /* this partition's reserved page pointers */
 struct xpc_rsvd_page *xpc_rsvd_page;
+EXPORT_SYMBOL_GPL(xpc_rsvd_page);
 static u64 *xpc_part_nasids;
 static u64 *xpc_mach_nasids;
 struct xpc_vars *xpc_vars;
+EXPORT_SYMBOL_GPL(xpc_vars);
 struct xpc_vars_part *xpc_vars_part;
 
 static int xp_nasid_mask_bytes;	/* actual size in bytes of nasid mask */
@@ -65,6 +67,7 @@ static int xp_nasid_mask_words;	/* actual size in words of nasid mask */
  * another variable.
  */
 struct xpc_partition xpc_partitions[XP_MAX_PARTITIONS + 1];
+EXPORT_SYMBOL_GPL(xpc_partitions);
 
 
 /*

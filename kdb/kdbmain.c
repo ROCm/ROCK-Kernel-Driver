@@ -42,6 +42,7 @@
 #endif
 
 #include <asm/system.h>
+#include <asm/kdebug.h>
 
 /*
  * Kernel debugger state flags
@@ -1157,6 +1158,27 @@ kdb_local(kdb_reason_t reason, int error, struct pt_regs *regs, kdb_dbtrap_t db_
 	int diag;
 	struct task_struct *kdb_current = kdb_curr_task(smp_processor_id());
 
+	/* If kdb has been entered for an event which has been/will be
+	 * recovered then silently return.  We have to get this far into kdb in
+	 * order to synchronize all the cpus, typically only one cpu (monarch)
+	 * knows that the event is recoverable but the other cpus (slaves) may
+	 * also be driven into kdb before that decision is made by the monarch.
+	 *
+	 * To pause in kdb even for recoverable events, 'set RECOVERY_PAUSE 1'
+	 */
+	if (reason == KDB_REASON_ENTER
+	    && KDB_FLAG(RECOVERY)
+	    && !KDB_FLAG(CATASTROPHIC)) {
+		int recovery_pause = 0;
+		kdbgetintenv("RECOVERY_PAUSE", &recovery_pause);
+		if (recovery_pause == 0)
+			reason = KDB_REASON_SILENT;
+		else
+			kdb_printf("%s: Recoverable error detected but"
+				   " RECOVERY_PAUSE is set, staying in KDB\n",
+				   __FUNCTION__);
+	}
+
 	kdb_go_count = 0;
 	if (reason != KDB_REASON_DEBUG &&
 	    reason != KDB_REASON_SILENT) {
@@ -1907,7 +1929,8 @@ kdb(kdb_reason_t reason, int error, struct pt_regs *regs)
 		kdb_initial_cpu = smp_processor_id();
 		++kdb_seqno;
 		spin_unlock(&kdb_lock);
-		notifier_call_chain(&kdb_notifier_list, KDB_EVENT_ENTERED, NULL);
+		notifier_call_chain(&kdb_notifier_list, KDB_EVENT_ENTERED, NULL);	/* to be phased out */
+		notify_die(DIE_KDEBUG_ENTER, "KDEBUG ENTER", regs, error, 0, 0);
 	}
 
 	if (smp_processor_id() == kdb_initial_cpu
@@ -1985,7 +2008,8 @@ kdb(kdb_reason_t reason, int error, struct pt_regs *regs)
 			/* Wait until all the other processors leave kdb */
 			while (kdb_previous_event() != 1)
 				;
-			notifier_call_chain(&kdb_notifier_list, KDB_EVENT_EXITING, NULL);
+			notifier_call_chain(&kdb_notifier_list, KDB_EVENT_EXITING, NULL);	/* to be phased out */
+			notify_die(DIE_KDEBUG_LEAVE, "KDEBUG LEAVE", regs, error, 0, 0);
 			kdb_initial_cpu = -1;	/* release kdb control */
 			KDB_DEBUG_STATE("kdb 13", reason);
 		}

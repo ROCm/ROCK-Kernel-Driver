@@ -12,6 +12,7 @@ obj-y	 := kdba_bt.o kdba_bp.o kdba_io.o kdbasupport.o \
 # fru does not compile on 2.6.
 # obj-$(CONFIG_IA64_SGI_SN2) += kdba_fru.o
 obj-$(CONFIG_IA64_SGI_SN2) += kdba_pod.o
+obj-$(CONFIG_IA64_GENERIC) += kdba_pod.o
 
 override CFLAGS := $(CFLAGS:%-pg=% )
 

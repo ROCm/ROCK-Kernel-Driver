@@ -1,3 +1,51 @@
+2006-01-10 Keith Owens  <kaos@sgi.com>
+
+	* Build kdba_pod for generic as well as sn2 kernels and test at run
+	  time if the platform is sn2.
+	* kdb v4.4-2.6.15-ia64-3.
+
+2006-01-08 Keith Owens  <kaos@sgi.com>
+
+	* Convert xpc to use DIE_KDEBUG_ENTER and DIE_KDEBUG_LEAVE.
+	* Add debug option for xpc.
+	* break.b always sets a debug trap number of 0 , so pass that to kdb as
+	  well as the normal kdb traaps.
+	* kdb v4.4-2.6.15-ia64-2.
+
+2006-01-04 Keith Owens  <kaos@sgi.com>
+
+	* Remove some inlines and the last vestige of CONFIG_NUMA_REPLICATE.
+	* Read the keyboard acknowledgment after sending a character.  SuSE
+	  Bugzilla 60240.
+	* kdb v4.4-2.6.15-ia64-1.
+
+2005-12-25 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.15-rc7-ia64-1.
+
+2005-12-20 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.15-rc6-ia64-1.
+
+2005-12-06 Keith Owens  <kaos@sgi.com>
+
+	* Use RECOVERY flag in MCA handler.
+	* kdb v4.4-2.6.15-rc5-ia64-2.
+
+2005-12-05 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.15-rc5-ia64-1.
+
+2005-12-02 Keith Owens  <kaos@sgi.com>
+
+	* Reinstate hook for debug trap, the patch chunk was accidentally
+	  dropped in 2.6.15-rc1.
+	* kdb v4.4-2.6.15-rc4-ia64-1.
+
+2005-11-30 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.15-rc3-ia64-1.
+
 2005-11-21 Keith Owens  <kaos@sgi.com>
 
 	* kdb v4.4-2.6.15-rc2-ia64-1.

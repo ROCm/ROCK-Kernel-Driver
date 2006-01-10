@@ -1,3 +1,35 @@
+2006-01-08 Keith Owens  <kaos@sgi.com>
+
+	* Add DIE_KDEBUG_ENTER and DIE_KDEBUG_LEAVE to notify_die.
+	* kdb v4.4-2.6.15-i386-2.
+
+2006-01-04 Keith Owens  <kaos@sgi.com>
+
+	* Remove some inlines and the last vestige of CONFIG_NUMA_REPLICATE.
+	* Read the keyboard acknowledgment after sending a character.  SuSE
+	  Bugzilla 60240.
+	* kdb v4.4-2.6.15-i386-1.
+
+2005-12-25 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.15-rc7-i386-1.
+
+2005-12-20 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.15-rc6-i386-1.
+
+2005-12-05 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.15-rc5-i386-1.
+
+2005-12-02 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.15-rc4-i386-1.
+
+2005-11-30 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.15-rc3-i386-1.
+
 2005-11-21 Keith Owens  <kaos@sgi.com>
 
 	* kdb v4.4-2.6.15-rc2-i386-1.

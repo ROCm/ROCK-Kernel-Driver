@@ -77,8 +77,12 @@ extern const char *kdb_diemsg;
 #define KDB_FLAG_NOIPI		(1 << 3)	/* Do not send IPIs */
 #define KDB_FLAG_ONLY_DO_DUMP	(1 << 4)	/* Only do a dump, used when kdb is off */
 #define KDB_FLAG_NO_CONSOLE	(1 << 5)	/* No console is available, kdb is disabled */
+#define KDB_FLAG_RECOVERY	(1 << 6)	/* kdb is being entered for an error which has been recovered */
 
 extern volatile int kdb_flags;			/* Global flags, see kdb_state for per cpu state */
+
+extern void kdb_save_flags(void);
+extern void kdb_restore_flags(void);
 
 #define KDB_FLAG(flag)		(kdb_flags & KDB_FLAG_##flag)
 #define KDB_FLAG_SET(flag)	((void)(kdb_flags |= KDB_FLAG_##flag))

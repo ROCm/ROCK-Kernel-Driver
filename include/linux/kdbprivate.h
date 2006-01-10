@@ -488,6 +488,15 @@ extern void kdba_set_current_task(const struct task_struct *);
 extern const struct task_struct *kdb_current_task;
 extern struct pt_regs *kdb_current_regs;
 
-extern struct page * kdb_follow_page(struct mm_struct *, unsigned long, int); /* from mm/memory.c */
+/* Functions to safely read and write kernel areas.  The {to,from}_xxx
+ * addresses are not necessarily valid, these functions must check for
+ * validity.  If the arch already supports get and put routines with suitable
+ * validation and/or recovery on invalid addresses then use those routines,
+ * otherwise check it yourself.
+ */
+
+extern int kdba_putarea_size(unsigned long to_xxx, void *from, size_t size);
+extern int kdba_getarea_size(void *to, unsigned long from_xxx, size_t size);
+extern int kdba_verify_rw(unsigned long addr, size_t size);
 
 #endif	/* !_KDBPRIVATE_H */

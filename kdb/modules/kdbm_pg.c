@@ -26,30 +26,34 @@ MODULE_LICENSE("GPL");
 /* Standard Linux page stuff */
 
 #ifndef CONFIG_DISCONTIGMEM
+/* From include/linux/page_flags.h */
 static char *pg_flag_vals[] = {
 	"PG_locked", "PG_error", "PG_referenced", "PG_uptodate",
 	"PG_dirty", "PG_lru", "PG_active", "PG_slab",
-	"PG_highmem", "PG_checked", "PG_arch_1", "PG_reserved",
-	"PG_private", "PG_writeback", "PG_nosave", "PG_chainlock",
-	"PG_direct", "PG_mappedtodisk", "PG_reclaim", "PG_compound",
+	"PG_checked", "PG_arch_1", "PG_reserved", "PG_private",
+	"PG_writeback", "PG_nosave", "PG_compound", "PG_swapcache",
+	"PG_mappedtodisk", "PG_reclaim", "PG_nosave_free", "PG_uncached",
 	NULL };
 #endif
 
+/* From include/linux/buffer_head.h */
 static char *bh_state_vals[] = {
 	"Uptodate", "Dirty", "Lock", "Req",
-	"Mapped", "New", "Async_read", "Async_write",
-	"Delay", "Boundary", "Write_EIO", "Ordered", "Eopnotsupp",
-	"Private",
+	"Uptodate_Lock", "Mapped", "New", "Async_read",
+	"Async_write", "Delay", "Boundary", "Write_EIO",
+	"Ordered", "Eopnotsupp", "Private",
 	NULL };
 
+/* From include/linux/bio.h */
 static char *bio_flag_vals[] = {
 	"Uptodate", "RW_block", "EOF", "Seg_valid",
 	"Cloned", "Bounced", "User_mapped", "Eopnotsupp",
 	NULL };
 
+/* From include/linux/fs.h */
 static char *inode_flag_vals[] = {
 	"I_DIRTY_SYNC", "I_DIRTY_DATASYNC", "I_DIRTY_PAGES", "I_LOCK",
-	"I_FREEING", "I_CLEAR", "I_NEW",
+	"I_FREEING", "I_CLEAR", "I_NEW", "I_WILL_FREE",
 	NULL };
 
 static char *map_flags(unsigned long flags, char *mapping[])
@@ -318,7 +322,7 @@ do_buffer(unsigned long addr)
 	if (kdb_getarea(bh, addr))
 		return;
 
-	kdb_printf(" bh 0x%lx bno %8llu [%s]", addr,
+	kdb_printf("\tbh 0x%lx bno %8llu [%s]\n", addr,
 		 (unsigned long long)bh.b_blocknr,
 		 map_flags(bh.b_state, bh_state_vals));
 }
@@ -342,7 +346,6 @@ kdbm_show_page(struct page *page, int first)
 	kdb_page_flags(page, LRU);
 	kdb_page_flags(page, Active);
 	kdb_page_flags(page, Slab);
-	kdb_page_flags(page, HighMem);
 	kdb_page_flags(page, Checked);
 	if (page->flags & (1UL << PG_arch_1))
 		kdb_printf(" arch_1");
@@ -354,10 +357,22 @@ kdbm_show_page(struct page *page, int first)
 	kdb_page_flags(page, SwapCache);
 	kdb_page_flags(page, MappedToDisk);
 	kdb_page_flags(page, Reclaim);
-	if (page_has_buffers(page))
-		do_buffer((unsigned long) page_buffers(page));
-	else if (page->u.private)
+	kdb_page_flags(page, NosaveFree);
+	kdb_page_flags(page, Uncached);
+
+	/* PageHighMem is not a flag any more, but treat it as one */
+	kdb_page_flags(page, HighMem);
+
+	if (page_has_buffers(page)) {
+		struct buffer_head *head, *bh;
+		kdb_printf("\n");
+		head = bh = page_buffers(page);
+		do {
+			do_buffer((unsigned long) bh);
+		} while ((bh = bh->b_this_page) != head);
+	} else if (page->u.private) {
 		kdb_printf(" private= 0x%lx", page->u.private);
+	}
 	kdb_printf("\n");
 #undef kdb_page_flags
 }

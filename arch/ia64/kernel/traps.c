@@ -149,6 +149,10 @@ __kprobes ia64_bad_break (unsigned long break_num, struct pt_regs *regs)
 		if (notify_die(DIE_BREAK, "break 0", regs, break_num, TRAP_BRKPT, SIGTRAP)
 			       	== NOTIFY_STOP)
 			return;
+#ifdef	CONFIG_KDB
+		if (kdb(KDB_REASON_ENTER, break_num, regs))
+			return;		/* kdb handled it */
+#endif	/* CONFIG_KDB */
 		die_if_kernel("bugcheck!", regs, break_num);
 		sig = SIGILL; code = ILL_ILLOPC;
 		break;
@@ -579,6 +583,10 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 		if (notify_die(DIE_FAULT, "ia64_fault", &regs, vector, siginfo.si_code, SIGTRAP)
 			       	== NOTIFY_STOP)
 			return;
+#ifdef	CONFIG_KDB
+		if (!user_mode(&regs) && kdb(KDB_REASON_DEBUG, vector, &regs))
+			return; /* kdb handled this */
+#endif	/* CONFIG_KDB */
 		siginfo.si_signo = SIGTRAP;
 		siginfo.si_errno = 0;
 		siginfo.si_addr  = (void __user *) ifa;

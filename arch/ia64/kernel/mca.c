@@ -1044,11 +1044,16 @@ ia64_mca_handler(struct pt_regs *regs, struct switch_stack *sw,
 		ia64_mca_spin(__FUNCTION__);
 
 #ifdef	CONFIG_KDB
-	if (!recover)
+	kdb_save_flags();
+	KDB_FLAG_CLEAR(CATASTROPHIC);
+	KDB_FLAG_CLEAR(RECOVERY);
+	if (recover)
+		KDB_FLAG_SET(RECOVERY);
+	else
 		KDB_FLAG_SET(CATASTROPHIC);
 	KDB_FLAG_SET(NOIPI);		/* do not send IPI for MCA/INIT events */
 	KDB_ENTER();
-	KDB_FLAG_CLEAR(NOIPI);
+	kdb_restore_flags();
 #endif	/* CONFIG_KDB */
 
 	set_curr_task(cpu, previous_current);

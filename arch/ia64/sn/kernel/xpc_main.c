@@ -82,6 +82,10 @@ struct device *xpc_part = &xpc_part_dbg_subname;
 struct device *xpc_chan = &xpc_chan_dbg_subname;
 
 
+static int xpc_kdebug_ignore;
+static int xpc_kdebug_entered;
+
+
 /* systune related variables for /proc/sys directories */
 
 static int xpc_hb_interval = XPC_HB_DEFAULT_INTERVAL;
@@ -1000,11 +1004,13 @@ xpc_do_exit(enum xpc_retval reason)
 	del_timer_sync(&xpc_hb_timer);
 	DBUG_ON(xpc_vars->heartbeating_to_mask != 0);
 
-	/* take ourselves off of the reboot_notifier_list */
-	(void) unregister_reboot_notifier(&xpc_reboot_notifier);
+	if (reason == xpcUnloading) {
+		/* take ourselves off of the reboot_notifier_list */
+		(void) unregister_reboot_notifier(&xpc_reboot_notifier);
 
-	/* take ourselves off of the die_notifier list */
-	(void) unregister_die_notifier(&xpc_die_notifier);
+		/* take ourselves off of the die_notifier list */
+		(void) unregister_die_notifier(&xpc_die_notifier);
+	}
 
 	/* close down protections for IPI operations */
 	xpc_restrict_IPI_ops();
@@ -1020,7 +1026,36 @@ xpc_do_exit(enum xpc_retval reason)
 
 
 /*
- * Called when the system is about to be either restarted or halted.
+ * This function is called when the system is being rebooted in a normal
+ * fashion.
+ */
+static int
+xpc_system_reboot(struct notifier_block *nb, unsigned long event, void *unused)
+{
+	enum xpc_retval reason;
+
+
+	switch (event) {
+	case SYS_RESTART:
+		reason = xpcSystemReboot;
+		break;
+	case SYS_HALT:
+		reason = xpcSystemHalt;
+		break;
+	case SYS_POWER_OFF:
+		reason = xpcSystemPoweroff;
+		break;
+	default:
+		reason = xpcSystemGoingDown;
+	}
+
+	xpc_do_exit(reason);
+	return NOTIFY_DONE;
+}
+
+
+/*
+ * Notify other partitions to disengage from all references to our memory.
  */
 static void
 xpc_die_disengage(void)
@@ -1077,35 +1112,12 @@ xpc_die_disengage(void)
 
 
 /*
- * This function is called when the system is being rebooted.
- */
-static int
-xpc_system_reboot(struct notifier_block *nb, unsigned long event, void *unused)
-{
-	enum xpc_retval reason;
-
-
-	switch (event) {
-	case SYS_RESTART:
-		reason = xpcSystemReboot;
-		break;
-	case SYS_HALT:
-		reason = xpcSystemHalt;
-		break;
-	case SYS_POWER_OFF:
-		reason = xpcSystemPoweroff;
-		break;
-	default:
-		reason = xpcSystemGoingDown;
-	}
-
-	xpc_do_exit(reason);
-	return NOTIFY_DONE;
-}
-
-
-/*
- * This function is called when the system is being rebooted.
+ * This function is called when the system is being restarted or halted due
+ * to some sort of system failure. If this is the case we need to notify the
+ * other partitions to disengage from all references to our memory.
+ * This function can also be called when our heartbeater could be offlined
+ * for a time. In this case we need to notify other partitions to not worry
+ * about the lack of a heartbeat.
  */
 static int
 xpc_system_die(struct notifier_block *nb, unsigned long event, void *unused)
@@ -1115,11 +1127,29 @@ xpc_system_die(struct notifier_block *nb, unsigned long event, void *unused)
 	case DIE_MACHINE_HALT:
 		xpc_die_disengage();
 		break;
+
+	case DIE_KDEBUG_ENTER:
+		xpc_kdebug_entered = 1;
+
+		/* Should lack of heartbeat be ignored by other partitions? */
+		if (!xpc_kdebug_ignore) {
+			break;
+		}
+		/* fall through */
 	case DIE_MCA_MONARCH_ENTER:
 	case DIE_INIT_MONARCH_ENTER:
 		xpc_vars->heartbeat++;
 		xpc_vars->heartbeat_offline = 1;
 		break;
+
+	case DIE_KDEBUG_LEAVE:
+		xpc_kdebug_entered = 0;
+
+		/* Is lack of heartbeat being ignored by other partitions? */
+		if (!xpc_kdebug_ignore) {
+			break;
+		}
+		/* fall through */
 	case DIE_MCA_MONARCH_LEAVE:
 	case DIE_INIT_MONARCH_LEAVE:
 		xpc_vars->heartbeat++;
@@ -1129,6 +1159,21 @@ xpc_system_die(struct notifier_block *nb, unsigned long event, void *unused)
 
 	return NOTIFY_DONE;
 }
+
+
+int
+xpc_kdebug_force_disengage(void)
+{
+	if (!xpc_kdebug_entered) {
+		/* not being called from kdebug */
+		return 1;
+	}
+
+	xpc_vars->heartbeat_offline = 0;
+	xpc_die_disengage();
+	return 0;
+}
+EXPORT_SYMBOL_GPL(xpc_kdebug_force_disengage);
 
 
 int __init
@@ -1343,4 +1388,8 @@ MODULE_PARM_DESC(xpc_hb_check_interval, "Number of seconds between "
 module_param(xpc_disengage_request_timelimit, int, 0);
 MODULE_PARM_DESC(xpc_disengage_request_timelimit, "Number of seconds to wait "
 		"for disengage request to complete.");
+
+module_param(xpc_kdebug_ignore, int, 0);
+MODULE_PARM_DESC(xpc_kdebug_ignore, "Should lack of heartbeat be ignored by "
+		"other partitions when dropping into kdebug.");
 
