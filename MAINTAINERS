@@ -2981,6 +2981,14 @@ L:	linux-xfs@oss.sgi.com
 W:	http://oss.sgi.com/projects/xfs
 S:	Supported
 
+DMAPI
+P:	Silicon Graphics Inc
+M:	xfs-masters@oss.sgi.com
+M:	bobo@sgi.com
+L:	linux-xfs@oss.sgi.com
+W:	http://oss.sgi.com/projects/xfs
+S:	Supported
+
 X86 3-LEVEL PAGING (PAE) SUPPORT
 P:	Ingo Molnar
 M:	mingo@redhat.com

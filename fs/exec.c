@@ -492,6 +492,13 @@ struct file *open_exec(const char *name)
 			if (!err) {
 				file = nameidata_to_filp(&nd, O_RDONLY);
 				if (!IS_ERR(file)) {
+					if (file->f_op && file->f_op->open_exec) {
+						err = file->f_op->open_exec(inode);
+						if (err) {
+							fput(file);
+							return ERR_PTR(err);
+						}
+					}
 					err = deny_write_access(file);
 					if (err) {
 						fput(file);

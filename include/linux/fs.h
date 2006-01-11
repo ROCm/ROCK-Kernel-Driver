@@ -1026,6 +1026,8 @@ struct file_operations {
 	int (*check_flags)(int);
 	int (*dir_notify)(struct file *filp, unsigned long arg);
 	int (*flock) (struct file *, int, struct file_lock *);
+#define HAVE_FOP_OPEN_EXEC
+	int (*open_exec) (struct inode *);
 };
 
 struct inode_operations {

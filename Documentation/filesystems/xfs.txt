@@ -57,6 +57,10 @@ When mounting an XFS filesystem, the following options are accepted.
 	of zero is used, the value selected by the default algorithm
 	will be displayed in /proc/mounts.
 
+  dmapi
+	Enable the DMAPI (Data Management API) event callouts.
+	Use with the "mtpt" option.
+
   ikeep/noikeep
 	When inode clusters are emptied of inodes, keep them around
 	on the disk (ikeep) - this is the traditional XFS behaviour
@@ -108,6 +112,11 @@ When mounting an XFS filesystem, the following options are accepted.
 	section, and a real-time section.  The real-time section is
 	optional, and the log section can be separate from the data
 	section or contained within it.
+
+  mtpt=mountpoint
+	Use with the "dmapi" option.  The value specified here will be
+	included in the DMAPI mount event, and should be the path of
+	the actual mountpoint that is used.
 
   mtpt=mountpoint
 	Use with the "dmapi" option.  The value specified here will be

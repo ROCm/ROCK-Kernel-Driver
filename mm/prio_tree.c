@@ -11,6 +11,7 @@
  * 02Feb2004	Initial version
  */
 
+#include <linux/module.h>
 #include <linux/mm.h>
 #include <linux/prio_tree.h>
 
@@ -205,3 +206,4 @@ struct vm_area_struct *vma_prio_tree_next(struct vm_area_struct *vma,
 	} else
 		return NULL;
 }
+EXPORT_SYMBOL(vma_prio_tree_next);
