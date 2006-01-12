@@ -395,8 +395,7 @@ struct page *vm_normal_page(struct vm_area_struct *vma, unsigned long addr, pte_
 	 * Remove this test eventually!
 	 */
 	if (unlikely(!pfn_valid(pfn))) {
-		if (!vma->vm_flags & VM_RESERVED)
-			print_bad_pte(vma, pte, addr);
+		print_bad_pte(vma, pte, addr);
 		return NULL;
 	}
 
@@ -1011,23 +1010,6 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 			continue;
 		}
 
-#ifdef CONFIG_XEN
-                if (vma && (vma->vm_flags & VM_FOREIGN)) {
-			struct page **map = vma->vm_private_data;
-			int offset = (start - vma->vm_start) >> PAGE_SHIFT;
-
-			if (map[offset] != NULL) {
-				if (pages)
-					pages[i] = map[offset];
-				if (vmas)
-					vmas[i] = vma;
-				i++;
-				start += PAGE_SIZE;
-				len--;
-				continue;
-			}
-                }
-#endif
 		if (!vma || (vma->vm_flags & (VM_IO | VM_PFNMAP))
 				|| !(vm_flags & vma->vm_flags))
 			return i ? : -EFAULT;
@@ -1367,104 +1349,6 @@ int remap_pfn_range(struct vm_area_struct *vma, unsigned long addr,
 }
 EXPORT_SYMBOL(remap_pfn_range);
 
-#ifdef CONFIG_XEN
-static inline int generic_pte_range(struct mm_struct *mm,
-                                    pmd_t *pmd,
-                                    unsigned long addr,
-                                    unsigned long end,
-                                    pte_fn_t fn, void *data)
-{
-	pte_t *pte;
-        int err;
-        struct page *pte_page;
-
-        pte = (mm == &init_mm) ?
-                pte_alloc_kernel(pmd, addr) :
-                pte_alloc_map(mm, pmd, addr);
-        if (!pte)
-                return -ENOMEM;
-
-        pte_page = pmd_page(*pmd);
-
-        do {
-                err = fn(pte, pte_page, addr, data);
-		if (err)
-                        break;
-        } while (pte++, addr += PAGE_SIZE, addr != end);
-
-        if (mm != &init_mm)
-                pte_unmap(pte-1);
-        return err;
-
-}
-
-static inline int generic_pmd_range(struct mm_struct *mm,
-                                    pud_t *pud,
-                                    unsigned long addr,
-                                    unsigned long end,
-                                    pte_fn_t fn, void *data)
-{
-	pmd_t *pmd;
-	unsigned long next;
-        int err;
-
-	pmd = pmd_alloc(mm, pud, addr);
-	if (!pmd)
-		return -ENOMEM;
-	do {
-		next = pmd_addr_end(addr, end);
-                err = generic_pte_range(mm, pmd, addr, next, fn, data);
-                if (err)
-                    break;
-	} while (pmd++, addr = next, addr != end);
-	return err;
-}
-
-static inline int generic_pud_range(struct mm_struct *mm, pgd_t *pgd,
-                                    unsigned long addr,
-                                    unsigned long end,
-                                    pte_fn_t fn, void *data)
-{
-	pud_t *pud;
-	unsigned long next;
-        int err;
-
-	pud = pud_alloc(mm, pgd, addr);
-	if (!pud)
-		return -ENOMEM;
-	do {
-		next = pud_addr_end(addr, end);
-		err = generic_pmd_range(mm, pud, addr, next, fn, data);
-                if (err)
-			break;
-	} while (pud++, addr = next, addr != end);
-	return err;
-}
-
-/*
- * Scan a region of virtual memory, filling in page tables as necessary
- * and calling a provided function on each leaf page table.
- */
-int generic_page_range(struct mm_struct *mm, unsigned long addr,
-                  unsigned long size, pte_fn_t fn, void *data)
-{
-	pgd_t *pgd;
-	unsigned long next;
-	unsigned long end = addr + size;
-	int err;
-
-	BUG_ON(addr >= end);
-	pgd = pgd_offset(mm, addr);
-	do {
-		next = pgd_addr_end(addr, end);
-		err = generic_pud_range(mm, pgd, addr, next, fn, data);
-		if (err)
-			break;
-	} while (pgd++, addr = next, addr != end);
-	return err;
-}
-#endif
-
 /*
  * handle_pte_fault chooses page fault handler according to an entry
  * which was read non-atomically.  Before making any commitment, on
@@ -1615,7 +1499,7 @@ gotten:
 		update_mmu_cache(vma, address, entry);
 		lazy_mmu_prot_update(entry);
 		lru_cache_add_active(new_page);
-		page_add_anon_rmap(new_page, vma, address);
+		page_add_new_anon_rmap(new_page, vma, address);
 
 		/* Free the old page.. */
 		new_page = old_page;
@@ -1887,8 +1771,31 @@ out_big:
 out_busy:
 	return -ETXTBSY;
 }
-
 EXPORT_SYMBOL(vmtruncate);
+
+int vmtruncate_range(struct inode *inode, loff_t offset, loff_t end)
+{
+	struct address_space *mapping = inode->i_mapping;
+
+	/*
+	 * If the underlying filesystem is not going to provide
+	 * a way to truncate a range of blocks (punch a hole) -
+	 * we should return failure right now.
+	 */
+	if (!inode->i_op || !inode->i_op->truncate_range)
+		return -ENOSYS;
+
+	mutex_lock(&inode->i_mutex);
+	down_write(&inode->i_alloc_sem);
+	unmap_mapping_range(mapping, offset, (end - offset), 1);
+	truncate_inode_pages_range(mapping, offset, end);
+	inode->i_op->truncate_range(inode, offset, end);
+	up_write(&inode->i_alloc_sem);
+	mutex_unlock(&inode->i_mutex);
+
+	return 0;
+}
+EXPORT_SYMBOL(vmtruncate_range);
 
 /* 
  * Primitive swap readahead code. We simply read an aligned block of
@@ -2071,8 +1978,7 @@ static int do_anonymous_page(struct mm_struct *mm, struct vm_area_struct *vma,
 			goto release;
 		inc_mm_counter(mm, anon_rss);
 		lru_cache_add_active(page);
-		SetPageReferenced(page);
-		page_add_anon_rmap(page, vma, address);
+		page_add_new_anon_rmap(page, vma, address);
 	} else {
 		/* Map the ZERO_PAGE - vm_page_prot is readonly */
 		page = ZERO_PAGE(address);
@@ -2203,7 +2109,7 @@ retry:
 		if (anon) {
 			inc_mm_counter(mm, anon_rss);
 			lru_cache_add_active(new_page);
-			page_add_anon_rmap(new_page, vma, address);
+			page_add_new_anon_rmap(new_page, vma, address);
 		} else {
 			inc_mm_counter(mm, file_rss);
 			page_add_file_rmap(new_page);
@@ -2361,6 +2267,8 @@ int __handle_mm_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 
 	return handle_pte_fault(mm, vma, address, pte, pmd, write_access);
 }
+
+EXPORT_SYMBOL_GPL(__handle_mm_fault);
 
 #ifndef __PAGETABLE_PUD_FOLDED
 /*

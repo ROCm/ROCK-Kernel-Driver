@@ -91,6 +91,8 @@
 #include <linux/if_arp.h>
 #include <linux/rtnetlink.h>
 #include <linux/times.h>
+
+#include <net/arp.h>
 #include <net/ip.h>
 #include <net/protocol.h>
 #include <net/route.h>
@@ -343,7 +345,7 @@ static int igmpv3_sendpack(struct sk_buff *skb)
 	pig->csum = ip_compute_csum((void *)skb->h.igmph, igmplen);
 
 	return NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, skb, NULL, skb->dev,
-	               ip_dst_output);
+		       dst_output);
 }
 
 static int grec_size(struct ip_mc_list *pmc, int type, int gdel, int sdel)
@@ -674,7 +676,7 @@ static int igmp_send_report(struct in_device *in_dev, struct ip_mc_list *pmc,
 	ih->csum=ip_compute_csum((void *)ih, sizeof(struct igmphdr));
 
 	return NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, skb, NULL, rt->u.dst.dev,
-	               ip_dst_output);
+		       dst_output);
 }
 
 static void igmp_gq_timer_expire(unsigned long data)
@@ -973,7 +975,7 @@ static void igmpv3_add_delrec(struct in_device *in_dev, struct ip_mc_list *im)
 	 * for deleted items allows change reports to use common code with
 	 * non-deleted or query-response MCA's.
 	 */
-	pmc = (struct ip_mc_list *)kmalloc(sizeof(*pmc), GFP_KERNEL);
+	pmc = kmalloc(sizeof(*pmc), GFP_KERNEL);
 	if (!pmc)
 		return;
 	memset(pmc, 0, sizeof(*pmc));
@@ -1153,7 +1155,7 @@ void ip_mc_inc_group(struct in_device *in_dev, u32 addr)
 		}
 	}
 
-	im = (struct ip_mc_list *)kmalloc(sizeof(*im), GFP_KERNEL);
+	im = kmalloc(sizeof(*im), GFP_KERNEL);
 	if (!im)
 		goto out;
 
@@ -1474,7 +1476,7 @@ static int ip_mc_add1_src(struct ip_mc_list *pmc, int sfmode,
 		psf_prev = psf;
 	}
 	if (!psf) {
-		psf = (struct ip_sf_list *)kmalloc(sizeof(*psf), GFP_ATOMIC);
+		psf = kmalloc(sizeof(*psf), GFP_ATOMIC);
 		if (!psf)
 			return -ENOBUFS;
 		memset(psf, 0, sizeof(*psf));
@@ -1657,7 +1659,7 @@ int ip_mc_join_group(struct sock *sk , struct ip_mreqn *imr)
 	err = -ENOBUFS;
 	if (count >= sysctl_igmp_max_memberships)
 		goto done;
-	iml = (struct ip_mc_socklist *)sock_kmalloc(sk,sizeof(*iml),GFP_KERNEL);
+	iml = sock_kmalloc(sk,sizeof(*iml),GFP_KERNEL);
 	if (iml == NULL)
 		goto done;
 
@@ -1821,8 +1823,7 @@ int ip_mc_source(int add, int omode, struct sock *sk, struct
 
 		if (psl)
 			count += psl->sl_max;
-		newpsl = (struct ip_sf_socklist *)sock_kmalloc(sk,
-			IP_SFLSIZE(count), GFP_KERNEL);
+		newpsl = sock_kmalloc(sk, IP_SFLSIZE(count), GFP_KERNEL);
 		if (!newpsl) {
 			err = -ENOBUFS;
 			goto done;
@@ -1905,8 +1906,8 @@ int ip_mc_msfilter(struct sock *sk, struct ip_msfilter *msf, int ifindex)
 		goto done;
 	}
 	if (msf->imsf_numsrc) {
-		newpsl = (struct ip_sf_socklist *)sock_kmalloc(sk,
-				IP_SFLSIZE(msf->imsf_numsrc), GFP_KERNEL);
+		newpsl = sock_kmalloc(sk, IP_SFLSIZE(msf->imsf_numsrc),
+							   GFP_KERNEL);
 		if (!newpsl) {
 			err = -ENOBUFS;
 			goto done;

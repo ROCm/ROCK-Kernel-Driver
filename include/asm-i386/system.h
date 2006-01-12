@@ -5,7 +5,7 @@
 #include <linux/kernel.h>
 #include <asm/segment.h>
 #include <asm/cpufeature.h>
-#include <asm/smp_alt.h>
+#include <linux/bitops.h> /* for LOCK_PREFIX */
 
 #ifdef __KERNEL__
 
@@ -54,23 +54,7 @@ __asm__ __volatile__ ("movw %%dx,%1\n\t" \
         ); } while(0)
 
 #define set_base(ldt,base) _set_base( ((char *)&(ldt)) , (base) )
-#define set_limit(ldt,limit) _set_limit( ((char *)&(ldt)) , ((limit)-1)>>12 )
-
-static inline unsigned long _get_base(char * addr)
-{
-	unsigned long __base;
-	__asm__("movb %3,%%dh\n\t"
-		"movb %2,%%dl\n\t"
-		"shll $16,%%edx\n\t"
-		"movw %1,%%dx"
-		:"=&d" (__base)
-		:"m" (*((addr)+2)),
-		 "m" (*((addr)+4)),
-		 "m" (*((addr)+7)));
-	return __base;
-}
-
-#define get_base(ldt) _get_base( ((char *)&(ldt)) )
+#define set_limit(ldt,limit) _set_limit( ((char *)&(ldt)) , ((limit)-1) )
 
 /*
  * Load a segment. Fall back on loading the zero
@@ -140,6 +124,19 @@ static inline unsigned long _get_base(char * addr)
 		:"=r" (__dummy)); \
 	__dummy; \
 })
+
+#define read_cr4_safe() ({			      \
+	unsigned int __dummy;			      \
+	/* This could fault if %cr4 does not exist */ \
+	__asm__("1: movl %%cr4, %0		\n"   \
+		"2:				\n"   \
+		".section __ex_table,\"a\"	\n"   \
+		".long 1b,2b			\n"   \
+		".previous			\n"   \
+		: "=r" (__dummy): "0" (0));	      \
+	__dummy;				      \
+})
+
 #define write_cr4(x) \
 	__asm__ __volatile__("movl %0,%%cr4": :"r" (x));
 #define stts() write_cr0(8 | read_cr0())
@@ -274,19 +271,19 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
 	unsigned long prev;
 	switch (size) {
 	case 1:
-		__asm__ __volatile__(LOCK "cmpxchgb %b1,%2"
+		__asm__ __volatile__(LOCK_PREFIX "cmpxchgb %b1,%2"
 				     : "=a"(prev)
 				     : "q"(new), "m"(*__xg(ptr)), "0"(old)
 				     : "memory");
 		return prev;
 	case 2:
-		__asm__ __volatile__(LOCK "cmpxchgw %w1,%2"
+		__asm__ __volatile__(LOCK_PREFIX "cmpxchgw %w1,%2"
 				     : "=a"(prev)
 				     : "r"(new), "m"(*__xg(ptr)), "0"(old)
 				     : "memory");
 		return prev;
 	case 4:
-		__asm__ __volatile__(LOCK "cmpxchgl %1,%2"
+		__asm__ __volatile__(LOCK_PREFIX "cmpxchgl %1,%2"
 				     : "=a"(prev)
 				     : "r"(new), "m"(*__xg(ptr)), "0"(old)
 				     : "memory");
@@ -339,7 +336,7 @@ static inline unsigned long long __cmpxchg64(volatile void *ptr, unsigned long l
 				      unsigned long long new)
 {
 	unsigned long long prev;
-	__asm__ __volatile__(LOCK "cmpxchg8b %3"
+	__asm__ __volatile__(LOCK_PREFIX "cmpxchg8b %3"
 			     : "=A"(prev)
 			     : "b"((unsigned long)new),
 			       "c"((unsigned long)(new >> 32)),
@@ -506,55 +503,11 @@ struct alt_instr {
 #endif
 
 #ifdef CONFIG_SMP
-#define smp_wmb()	wmb()
-#if defined(CONFIG_SMP_ALTERNATIVES) && !defined(MODULE)
-#define smp_alt_mb(instr)                                           \
-__asm__ __volatile__("6667:\nnop\nnop\nnop\nnop\nnop\nnop\n6668:\n" \
-		     ".section __smp_alternatives,\"a\"\n"          \
-		     ".long 6667b\n"                                \
-                     ".long 6673f\n"                                \
-		     ".previous\n"                                  \
-		     ".section __smp_replacements,\"a\"\n"          \
-		     "6673:.byte 6668b-6667b\n"                     \
-		     ".byte 6670f-6669f\n"                          \
-		     ".byte 6671f-6670f\n"                          \
-                     ".byte 0\n"                                    \
-		     ".byte %c0\n"                                  \
-		     "6669:lock;addl $0,0(%%esp)\n"                 \
-		     "6670:" instr "\n"                             \
-		     "6671:\n"                                      \
-		     ".previous\n"                                  \
-		     :                                              \
-		     : "i" (X86_FEATURE_XMM2)                       \
-		     : "memory")
-#define smp_rmb() smp_alt_mb("lfence")
-#define smp_mb()  smp_alt_mb("mfence")
-#define set_mb(var, value) do {                                     \
-unsigned long __set_mb_temp;                                        \
-__asm__ __volatile__("6667:movl %1, %0\n6668:\n"                    \
-		     ".section __smp_alternatives,\"a\"\n"          \
-		     ".long 6667b\n"                                \
-		     ".long 6673f\n"                                \
-		     ".previous\n"                                  \
-		     ".section __smp_replacements,\"a\"\n"          \
-		     "6673: .byte 6668b-6667b\n"                    \
-		     ".byte 6670f-6669f\n"                          \
-		     ".byte 0\n"                                    \
-		     ".byte 6671f-6670f\n"                          \
-		     ".byte -1\n"                                   \
-		     "6669: xchg %1, %0\n"                          \
-		     "6670:movl %1, %0\n"                           \
-		     "6671:\n"                                      \
-		     ".previous\n"                                  \
-		     : "=m" (var), "=r" (__set_mb_temp)             \
-		     : "1" (value)                                  \
-		     : "memory"); } while (0)
-#else
-#define smp_rmb()	rmb()
 #define smp_mb()	mb()
-#define set_mb(var, value) do { xchg(&var, value); } while (0)
-#endif
+#define smp_rmb()	rmb()
+#define smp_wmb()	wmb()
 #define smp_read_barrier_depends()	read_barrier_depends()
+#define set_mb(var, value) do { xchg(&var, value); } while (0)
 #else
 #define smp_mb()	barrier()
 #define smp_rmb()	barrier()

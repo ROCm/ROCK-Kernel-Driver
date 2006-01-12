@@ -370,8 +370,8 @@ kdbm_show_page(struct page *page, int first)
 		do {
 			do_buffer((unsigned long) bh);
 		} while ((bh = bh->b_this_page) != head);
-	} else if (page->u.private) {
-		kdb_printf(" private= 0x%lx", page->u.private);
+	} else if (page->private) {
+		kdb_printf(" private= 0x%lx", page->private);
 	}
 	kdb_printf("\n");
 #undef kdb_page_flags

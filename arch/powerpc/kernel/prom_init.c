@@ -558,7 +558,8 @@ unsigned long prom_memparse(const char *ptr, const char **retptr)
 static void __init early_cmdline_parse(void)
 {
 	struct prom_t *_prom = &RELOC(prom);
-	char *opt, *p;
+	const char *opt;
+	char *p;
 	int l = 0;
 
 	RELOC(prom_cmd_line[0]) = 0;
@@ -1539,6 +1540,8 @@ static int __init prom_find_machine_type(void)
 #ifdef CONFIG_PPC64
 			if (strstr(p, RELOC("Momentum,Maple")))
 				return PLATFORM_MAPLE;
+			if (strstr(p, RELOC("IBM,CPB")))
+				return PLATFORM_CELL;
 #endif
 			i += sl + 1;
 		}

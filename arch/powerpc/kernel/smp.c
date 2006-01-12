@@ -31,6 +31,7 @@
 #include <linux/sysdev.h>
 #include <linux/cpu.h>
 #include <linux/notifier.h>
+#include <linux/topology.h>
 
 #include <asm/ptrace.h>
 #include <asm/atomic.h>
@@ -470,10 +471,6 @@ int __devinit __cpu_up(unsigned int cpu)
 	if (smp_ops->cpu_bootable && !smp_ops->cpu_bootable(cpu))
 		return -EINVAL;
 
-#ifdef CONFIG_PPC64
-	paca[cpu].default_decr = tb_ticks_per_jiffy;
-#endif
-
 	/* Make sure callin-map entry is 0 (can be leftover a CPU
 	 * hotplug
 	 */
@@ -572,6 +569,8 @@ void __init smp_cpus_done(unsigned int max_cpus)
 	smp_ops->setup_cpu(boot_cpuid);
 
 	set_cpus_allowed(current, old_mask);
+
+	dump_numa_cpu_topology();
 }
 
 #ifdef CONFIG_HOTPLUG_CPU

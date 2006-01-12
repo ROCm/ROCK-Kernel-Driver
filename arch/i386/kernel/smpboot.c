@@ -911,6 +911,12 @@ static int __devinit do_boot_cpu(int apicid, int cpu)
 	unsigned long start_eip;
 	unsigned short nmi_high = 0, nmi_low = 0;
 
+	if (!cpu_gdt_descr[cpu].address &&
+	    !(cpu_gdt_descr[cpu].address = get_zeroed_page(GFP_KERNEL))) {
+		printk("Failed to allocate GDT for CPU %d\n", cpu);
+		return 1;
+	}
+
 	++cpucount;
 
 	/*
@@ -1220,11 +1226,6 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 		if (max_cpus <= cpucount+1)
 			continue;
 
-#ifdef CONFIG_SMP_ALTERNATIVES
-		if (kicked == 1)
-			prepare_for_smp();
-#endif
-
 		if (((cpu = alloc_cpu_id()) <= 0) || do_boot_cpu(apicid, cpu))
 			printk("CPU #%d not responding - cannot use it.\n",
 								apicid);
@@ -1402,11 +1403,6 @@ int __devinit __cpu_up(unsigned int cpu)
 		local_irq_enable();
 		return -EIO;
 	}
-
-#ifdef CONFIG_SMP_ALTERNATIVES
-	if (num_online_cpus() == 1)
-		prepare_for_smp();
-#endif
 
 	local_irq_enable();
 	per_cpu(cpu_state, cpu) = CPU_UP_PREPARE;

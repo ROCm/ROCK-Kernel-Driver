@@ -13,6 +13,7 @@
 #include <linux/pagemap.h>
 #include <linux/swap.h>
 #include <linux/syscalls.h>
+#include <linux/capability.h>
 #include <linux/init.h>
 #include <linux/file.h>
 #include <linux/fs.h>
@@ -1935,10 +1936,6 @@ void exit_mmap(struct mm_struct *mm)
 	struct vm_area_struct *vma = mm->mmap;
 	unsigned long nr_accounted = 0;
 	unsigned long end;
-
-#ifdef arch_exit_mmap
-	arch_exit_mmap(mm);
-#endif
 
 	lru_add_drain();
 	flush_cache_mm(mm);

@@ -123,6 +123,7 @@ enum {
 					     * proper HSM is in place. */
 	ATA_FLAG_DEBUGMSG	= (1 << 10),
 	ATA_FLAG_NO_ATAPI	= (1 << 11), /* No ATAPI support */
+
 	ATA_FLAG_SUSPENDED	= (1 << 12), /* port is suspended */
 
 	ATA_QCFLAG_ACTIVE	= (1 << 1), /* cmd not yet ack'd to scsi lyer */
@@ -137,6 +138,8 @@ enum {
 	ATA_TMOUT_BOOT_QUICK	= 7 * HZ,	/* hueristic */
 	ATA_TMOUT_CDB		= 30 * HZ,
 	ATA_TMOUT_CDB_QUICK	= 5 * HZ,
+	ATA_TMOUT_INTERNAL	= 30 * HZ,
+	ATA_TMOUT_INTERNAL_QUICK = 5 * HZ,
 
 	/* ATA bus states */
 	BUS_UNKNOWN		= 0,
@@ -196,7 +199,7 @@ struct ata_port;
 struct ata_queued_cmd;
 
 /* typedefs */
-typedef int (*ata_qc_cb_t) (struct ata_queued_cmd *qc, unsigned int err_mask);
+typedef int (*ata_qc_cb_t) (struct ata_queued_cmd *qc);
 
 struct ata_ioports {
 	unsigned long		cmd_addr;
@@ -281,9 +284,9 @@ struct ata_queued_cmd {
 	/* DO NOT iterate over __sg manually, use ata_for_each_sg() */
 	struct scatterlist	*__sg;
 
-	ata_qc_cb_t		complete_fn;
+	unsigned int		err_mask;
 
-	struct completion	*waiting;
+	ata_qc_cb_t		complete_fn;
 
 	void			*private_data;
 };
@@ -332,8 +335,6 @@ struct ata_port {
 
 	u8			ctl;	/* cache of ATA control register */
 	u8			last_ctl;	/* Cache last written value */
-	unsigned int		bus_state;
-	unsigned int		port_state;
 	unsigned int		pio_mask;
 	unsigned int		mwdma_mask;
 	unsigned int		udma_mask;
@@ -485,9 +486,10 @@ extern void ata_bmdma_start (struct ata_queued_cmd *qc);
 extern void ata_bmdma_stop(struct ata_queued_cmd *qc);
 extern u8   ata_bmdma_status(struct ata_port *ap);
 extern void ata_bmdma_irq_clear(struct ata_port *ap);
-extern void ata_qc_complete(struct ata_queued_cmd *qc, unsigned int err_mask);
+extern void ata_qc_complete(struct ata_queued_cmd *qc);
 extern void ata_eng_timeout(struct ata_port *ap);
-extern void ata_scsi_simulate(u16 *id, struct scsi_cmnd *cmd,
+extern void ata_scsi_simulate(struct ata_port *ap, struct ata_device *dev,
+			      struct scsi_cmnd *cmd,
 			      void (*done)(struct scsi_cmnd *));
 extern int ata_std_bios_param(struct scsi_device *sdev,
 			      struct block_device *bdev,
@@ -677,6 +679,7 @@ static inline void ata_qc_reinit(struct ata_queued_cmd *qc)
 	qc->cursect = qc->cursg = qc->cursg_ofs = 0;
 	qc->nsect = 0;
 	qc->nbytes = qc->curbytes = 0;
+	qc->err_mask = 0;
 
 	ata_tf_init(qc->ap, &qc->tf, qc->dev->devno);
 }

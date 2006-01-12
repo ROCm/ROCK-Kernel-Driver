@@ -37,7 +37,7 @@
 
 #define PREFIX			"ACPI: "
 
-#define ACPI_MAX_TABLES		256
+#define ACPI_MAX_TABLES		128
 
 static char *acpi_table_signatures[ACPI_TABLE_COUNT] = {
 	[ACPI_TABLE_UNKNOWN] = "????",
@@ -74,7 +74,7 @@ struct acpi_table_sdt {
 static unsigned long sdt_pa;	/* Physical Address */
 static unsigned long sdt_count;	/* Table count */
 
-static struct acpi_table_sdt sdt_entry[ACPI_MAX_TABLES];
+static struct acpi_table_sdt sdt_entry[ACPI_MAX_TABLES] __initdata;
 
 void acpi_table_print(struct acpi_table_header *header, unsigned long phys_addr)
 {
@@ -572,12 +572,6 @@ static int __init acpi_table_get_sdt(struct acpi_table_rsdp *rsdp)
  * 
  * result: sdt_entry[] is initialized
  */
-#if defined(CONFIG_X86_XEN) || defined(CONFIG_X86_64_XEN)
-#define acpi_rsdp_phys_to_va(rsdp_phys) (__fix_to_virt(FIX_ACPI_RSDP_PAGE) + \
-					   (rsdp_phys & ~PAGE_MASK))
-#else
-#define acpi_rsdp_phys_to_va(rsdp_phys) __va(rsdp_phys)
-#endif
 
 int __init acpi_table_init(void)
 {
@@ -593,7 +587,7 @@ int __init acpi_table_init(void)
 		return -ENODEV;
 	}
 
-	rsdp = (struct acpi_table_rsdp *)acpi_rsdp_phys_to_va(rsdp_phys);
+	rsdp = (struct acpi_table_rsdp *)__va(rsdp_phys);
 	if (!rsdp) {
 		printk(KERN_WARNING PREFIX "Unable to map RSDP\n");
 		return -ENODEV;

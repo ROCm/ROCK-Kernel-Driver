@@ -12,7 +12,7 @@
 #include <linux/config.h>
 #include <linux/smp.h>
 
-#if !defined(CONFIG_ARCH_S390)
+#if !defined(CONFIG_S390)
 
 #include <linux/linkage.h>
 #include <linux/cache.h>
@@ -94,9 +94,6 @@ irq_descp (int irq)
 #include <asm/hw_irq.h> /* the arch dependent stuff */
 
 extern int setup_irq(unsigned int irq, struct irqaction * new);
-#ifdef CONFIG_XEN
-extern int teardown_irq(unsigned int irq, struct irqaction * old, void *dev_id);
-#endif
 
 #ifdef CONFIG_GENERIC_HARDIRQS
 extern cpumask_t irq_affinity[NR_IRQS];
@@ -224,6 +221,17 @@ extern void note_interrupt(unsigned int irq, irq_desc_t *desc,
 extern int can_request_irq(unsigned int irq, unsigned long irqflags);
 
 extern void init_irq_proc(void);
+
+#ifdef CONFIG_AUTO_IRQ_AFFINITY
+extern int select_smp_affinity(unsigned int irq);
+#else
+static inline int
+select_smp_affinity(unsigned int irq)
+{
+	return 1;
+}
+#endif
+
 #endif
 
 extern hw_irq_controller no_irq_type;  /* needed in every arch ? */

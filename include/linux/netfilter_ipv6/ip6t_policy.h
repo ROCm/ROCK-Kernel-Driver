@@ -1,20 +1,20 @@
 #ifndef _IP6T_POLICY_H
 #define _IP6T_POLICY_H
 
-#define POLICY_MAX_ELEM	4
+#define IP6T_POLICY_MAX_ELEM	4
 
 enum ip6t_policy_flags
 {
-	POLICY_MATCH_IN		= 0x1,
-	POLICY_MATCH_OUT	= 0x2,
-	POLICY_MATCH_NONE	= 0x4,
-	POLICY_MATCH_STRICT	= 0x8,
+	IP6T_POLICY_MATCH_IN		= 0x1,
+	IP6T_POLICY_MATCH_OUT		= 0x2,
+	IP6T_POLICY_MATCH_NONE		= 0x4,
+	IP6T_POLICY_MATCH_STRICT	= 0x8,
 };
 
 enum ip6t_policy_modes
 {
-	POLICY_MODE_TRANSPORT,
-	POLICY_MODE_TUNNEL
+	IP6T_POLICY_MODE_TRANSPORT,
+	IP6T_POLICY_MODE_TUNNEL
 };
 
 struct ip6t_policy_spec
@@ -44,7 +44,7 @@ struct ip6t_policy_elem
 
 struct ip6t_policy_info
 {
-	struct ip6t_policy_elem pol[POLICY_MAX_ELEM];
+	struct ip6t_policy_elem pol[IP6T_POLICY_MAX_ELEM];
 	u_int16_t flags;
 	u_int16_t len;
 };

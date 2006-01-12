@@ -1,6 +1,6 @@
 /* IP tables module for matching IPsec policy
  *
- * Copyright (c) 2004 Patrick McHardy, <kaber@trash.net>
+ * Copyright (c) 2004,2005 Patrick McHardy, <kaber@trash.net>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -15,48 +15,27 @@
 #include <net/xfrm.h>
 
 #include <linux/netfilter_ipv6.h>
-#include <linux/netfilter_ipv6/ip6t_policy.h>
 #include <linux/netfilter_ipv6/ip6_tables.h>
+#include <linux/netfilter_ipv6/ip6t_policy.h>
 
 MODULE_AUTHOR("Patrick McHardy <kaber@trash.net>");
 MODULE_DESCRIPTION("IPtables IPsec policy matching module");
 MODULE_LICENSE("GPL");
 
 
-static inline int ip6_masked_addrcmp(struct in6_addr addr1,
-                                     struct in6_addr mask,
-                                     struct in6_addr addr2)
-{
-	int i;
-
-	for (i = 0; i < 16; i++) {
-		if ((addr1.s6_addr[i] & mask.s6_addr[i]) !=
-		    (addr2.s6_addr[i] & mask.s6_addr[i]))
-			return 1;
-	}
-	return 0;
-}
-
-
 static inline int
 match_xfrm_state(struct xfrm_state *x, const struct ip6t_policy_elem *e)
 {
-#define MISMATCH(x,y)	(e->match.x && ((e->x != (y)) ^ e->invert.x))
+#define MATCH_ADDR(x,y,z)	(!e->match.x || \
+				 ((ip6_masked_addrcmp((z), &e->x, &e->y)) == 0) ^ e->invert.x)
+#define MATCH(x,y)		(!e->match.x || ((e->x == (y)) ^ e->invert.x))
 	
-	struct in6_addr xfrm_saddr, xfrm_daddr;
-	
-	if ((e->match.saddr
-	     && (ip6_masked_addrcmp(xfrm_saddr, e->saddr, e->smask))
-	        ^ e->invert.saddr ) ||
-	    (e->match.daddr
-	     && (ip6_masked_addrcmp(xfrm_daddr, e->daddr, e->dmask))
-	        ^ e->invert.daddr ) ||
-	    MISMATCH(proto, x->id.proto) ||
-	    MISMATCH(mode, x->props.mode) ||
-	    MISMATCH(spi, x->id.spi) ||
-	    MISMATCH(reqid, x->props.reqid))
-		return 0;
-	return 1;
+	return MATCH_ADDR(saddr, smask, (struct in6_addr *)&x->props.saddr.a6) &&
+	       MATCH_ADDR(daddr, dmask, (struct in6_addr *)&x->id.daddr.a6) &&
+	       MATCH(proto, x->id.proto) &&
+	       MATCH(mode, x->props.mode) &&
+	       MATCH(spi, x->id.spi) &&
+	       MATCH(reqid, x->props.reqid);
 }
 
 static int
@@ -64,7 +43,7 @@ match_policy_in(const struct sk_buff *skb, const struct ip6t_policy_info *info)
 {
 	const struct ip6t_policy_elem *e;
 	struct sec_path *sp = skb->sp;
-	int strict = info->flags & POLICY_MATCH_STRICT;
+	int strict = info->flags & IP6T_POLICY_MATCH_STRICT;
 	int i, pos;
 
 	if (sp == NULL)
@@ -93,7 +72,7 @@ match_policy_out(const struct sk_buff *skb, const struct ip6t_policy_info *info)
 {
 	const struct ip6t_policy_elem *e;
 	struct dst_entry *dst = skb->dst;
-	int strict = info->flags & POLICY_MATCH_STRICT;
+	int strict = info->flags & IP6T_POLICY_MATCH_STRICT;
 	int i, pos;
 
 	if (dst->xfrm == NULL)
@@ -126,17 +105,14 @@ static int match(const struct sk_buff *skb,
 	const struct ip6t_policy_info *info = matchinfo;
 	int ret;
 
-	if (info->flags & POLICY_MATCH_IN)
+	if (info->flags & IP6T_POLICY_MATCH_IN)
 		ret = match_policy_in(skb, info);
 	else
 		ret = match_policy_out(skb, info);
 
-	if (ret < 0) {
-		if (info->flags & POLICY_MATCH_NONE)
-			ret = 1;
-		else
-			ret = 0;
-	} else if (info->flags & POLICY_MATCH_NONE)
+	if (ret < 0)
+		ret = info->flags & IP6T_POLICY_MATCH_NONE ? 1 : 0;
+	else if (info->flags & IP6T_POLICY_MATCH_NONE)
 		ret = 0;
 
 	return ret;
@@ -149,28 +125,28 @@ static int checkentry(const char *tablename, const struct ip6t_ip6 *ip,
 	struct ip6t_policy_info *info = matchinfo;
 
 	if (matchsize != IP6T_ALIGN(sizeof(*info))) {
-		printk(KERN_ERR "ip6t_policy: matchsize %u != %u\n",
+		printk(KERN_ERR "ip6t_policy: matchsize %u != %zu\n",
 		       matchsize, IP6T_ALIGN(sizeof(*info)));
 		return 0;
 	}
-	if (!(info->flags & (POLICY_MATCH_IN|POLICY_MATCH_OUT))) {
+	if (!(info->flags & (IP6T_POLICY_MATCH_IN|IP6T_POLICY_MATCH_OUT))) {
 		printk(KERN_ERR "ip6t_policy: neither incoming nor "
 		                "outgoing policy selected\n");
 		return 0;
 	}
 	if (hook_mask & (1 << NF_IP6_PRE_ROUTING | 1 << NF_IP6_LOCAL_IN)
-	    && info->flags & POLICY_MATCH_OUT) {
+	    && info->flags & IP6T_POLICY_MATCH_OUT) {
 		printk(KERN_ERR "ip6t_policy: output policy not valid in "
 		                "PRE_ROUTING and INPUT\n");
 		return 0;
 	}
 	if (hook_mask & (1 << NF_IP6_POST_ROUTING | 1 << NF_IP6_LOCAL_OUT)
-	    && info->flags & POLICY_MATCH_IN) {
+	    && info->flags & IP6T_POLICY_MATCH_IN) {
 		printk(KERN_ERR "ip6t_policy: input policy not valid in "
 		                "POST_ROUTING and OUTPUT\n");
 		return 0;
 	}
-	if (info->len > POLICY_MAX_ELEM) {
+	if (info->len > IP6T_POLICY_MAX_ELEM) {
 		printk(KERN_ERR "ip6t_policy: too many policy elements\n");
 		return 0;
 	}
@@ -178,8 +154,7 @@ static int checkentry(const char *tablename, const struct ip6t_ip6 *ip,
 	return 1;
 }
 
-static struct ip6t_match policy_match =
-{
+static struct ip6t_match policy_match = {
 	.name		= "policy",
 	.match		= match,
 	.checkentry 	= checkentry,

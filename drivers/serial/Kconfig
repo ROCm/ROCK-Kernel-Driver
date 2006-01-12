@@ -10,7 +10,7 @@ menu "Serial drivers"
 # The new 8250/16550 serial drivers
 config SERIAL_8250
 	tristate "8250/16550 and compatible serial support"
-	depends on (BROKEN || !(SPARC || XEN_DISABLE_SERIAL))
+	depends on (BROKEN || !SPARC)
 	select SERIAL_CORE
 	---help---
 	  This selects whether you want to include the driver for the standard
@@ -94,6 +94,16 @@ config SERIAL_8250_NR_UARTS
 	  to support.  This includes any ports discovered via ACPI or
 	  PCI enumeration and any ports that may be added at run-time
 	  via hot-plug, or any ISA multi-port serial cards.
+
+config SERIAL_8250_RUNTIME_UARTS
+	int "Number of 8250/16550 serial ports to register at runtime"
+	depends on SERIAL_8250
+	default "4"
+	help
+	  Set this to the maximum number of serial ports you want
+	  the kernel to register at boot time.  This can be overriden
+	  with the module parameter "nr_uarts", or boot-time parameter
+	  8250.nr_uarts
 
 config SERIAL_8250_EXTENDED
 	bool "Extended 8250/16550 serial driver options"
@@ -355,29 +365,6 @@ config SERIAL_21285_CONSOLE
 	  (/dev/tty0) will still be used as the system console by default, but
 	  you can alter that using a kernel command line option such as
 	  "console=ttyFB". (Try "man bootparam" or see the documentation of
-	  your boot loader (lilo or loadlin) about how to pass options to the
-	  kernel at boot time.)
-
-config SERIAL_UART00
-	bool "Excalibur serial port (uart00) support"
-	depends on ARM && ARCH_CAMELOT
-	select SERIAL_CORE
-	help
-	  Say Y here if you want to use the hard logic uart on Excalibur. This
-	  driver also supports soft logic implementations of this uart core.
-
-config SERIAL_UART00_CONSOLE
-	bool "Support for console on Excalibur serial port"
-	depends on SERIAL_UART00
-	select SERIAL_CORE_CONSOLE
-	help
-	  Say Y here if you want to support a serial console on an Excalibur
-	  hard logic uart or uart00 IP core.
-
-	  Even if you say Y here, the currently visible virtual console
-	  (/dev/tty0) will still be used as the system console by default, but
-	  you can alter that using a kernel command line option such as
-	  "console=ttyS1". (Try "man bootparam" or see the documentation of
 	  your boot loader (lilo or loadlin) about how to pass options to the
 	  kernel at boot time.)
 
@@ -872,7 +859,7 @@ config SERIAL_VR41XX_CONSOLE
 
 config SERIAL_JSM
         tristate "Digi International NEO PCI Support"
-	depends on PCI
+	depends on PCI && BROKEN
         select SERIAL_CORE
         help
           This is a driver for Digi International's Neo series

@@ -7,6 +7,7 @@
  * by doing ".balign 32" must match in both versions of the page.
  */
 
+	.code32
 	.section .text.sigreturn,"ax"
 	.balign 32
 	.globl __kernel_sigreturn
@@ -119,5 +120,5 @@ __kernel_rt_sigreturn:
 	.align 4
 .LENDFDE3:
 
-#include <vsyscall-note.S>
+#include "../../i386/kernel/vsyscall-note.S"
 

@@ -36,6 +36,7 @@
 #include <linux/utsname.h>
 #include <linux/random.h>
 #include <linux/kprobes.h>
+#include <linux/notifier.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -50,12 +51,11 @@
 #include <asm/desc.h>
 #include <asm/proto.h>
 #include <asm/ia32.h>
+#include <asm/idle.h>
 
 asmlinkage extern void ret_from_fork(void);
 
 unsigned long kernel_thread_flags = CLONE_VM | CLONE_UNTRACED;
-
-static atomic_t hlt_counter = ATOMIC_INIT(0);
 
 unsigned long boot_option_idle_override = 0;
 EXPORT_SYMBOL(boot_option_idle_override);
@@ -66,19 +66,49 @@ EXPORT_SYMBOL(boot_option_idle_override);
 void (*pm_idle)(void);
 static DEFINE_PER_CPU(unsigned int, cpu_idle_state);
 
-void disable_hlt(void)
+static struct notifier_block *idle_notifier;
+static DEFINE_SPINLOCK(idle_notifier_lock);
+
+void idle_notifier_register(struct notifier_block *n)
 {
-	atomic_inc(&hlt_counter);
+	unsigned long flags;
+	spin_lock_irqsave(&idle_notifier_lock, flags);
+	notifier_chain_register(&idle_notifier, n);
+	spin_unlock_irqrestore(&idle_notifier_lock, flags);
+}
+EXPORT_SYMBOL_GPL(idle_notifier_register);
+
+void idle_notifier_unregister(struct notifier_block *n)
+{
+	unsigned long flags;
+	spin_lock_irqsave(&idle_notifier_lock, flags);
+	notifier_chain_unregister(&idle_notifier, n);
+	spin_unlock_irqrestore(&idle_notifier_lock, flags);
+}
+EXPORT_SYMBOL(idle_notifier_unregister);
+
+enum idle_state { CPU_IDLE, CPU_NOT_IDLE };
+static DEFINE_PER_CPU(enum idle_state, idle_state) = CPU_NOT_IDLE;
+
+void enter_idle(void)
+{
+	__get_cpu_var(idle_state) = CPU_IDLE;
+	notifier_call_chain(&idle_notifier, IDLE_START, NULL);
 }
 
-EXPORT_SYMBOL(disable_hlt);
-
-void enable_hlt(void)
+static void __exit_idle(void)
 {
-	atomic_dec(&hlt_counter);
+	__get_cpu_var(idle_state) = CPU_NOT_IDLE;
+	notifier_call_chain(&idle_notifier, IDLE_END, NULL);
 }
 
-EXPORT_SYMBOL(enable_hlt);
+/* Called from interrupts to signify idle end */
+void exit_idle(void)
+{
+	if (current->pid | read_pda(irqcount))
+		return;
+	__exit_idle();
+}
 
 /*
  * We use this if we don't have any better
@@ -88,21 +118,16 @@ void default_idle(void)
 {
 	local_irq_enable();
 
-	if (!atomic_read(&hlt_counter)) {
-		clear_thread_flag(TIF_POLLING_NRFLAG);
-		smp_mb__after_clear_bit();
-		while (!need_resched()) {
-			local_irq_disable();
-			if (!need_resched())
-				safe_halt();
-			else
-				local_irq_enable();
-		}
-		set_thread_flag(TIF_POLLING_NRFLAG);
-	} else {
-		while (!need_resched())
-			cpu_relax();
+	clear_thread_flag(TIF_POLLING_NRFLAG);
+	smp_mb__after_clear_bit();
+	while (!need_resched()) {
+		local_irq_disable();
+		if (!need_resched())
+			safe_halt();
+		else
+			local_irq_enable();
 	}
+	set_thread_flag(TIF_POLLING_NRFLAG);
 }
 
 /*
@@ -157,7 +182,7 @@ EXPORT_SYMBOL_GPL(cpu_idle_wait);
 DECLARE_PER_CPU(int, cpu_state);
 
 #include <asm/nmi.h>
-/* We don't actually take CPU down, just spin without interrupts. */
+/* We halt the CPU with physical CPU hotplug */
 static inline void play_dead(void)
 {
 	idle_task_exit();
@@ -166,8 +191,9 @@ static inline void play_dead(void)
 	/* Ack it */
 	__get_cpu_var(cpu_state) = CPU_DEAD;
 
+	local_irq_disable();
 	while (1)
-		safe_halt();
+		halt();
 }
 #else
 static inline void play_dead(void)
@@ -200,7 +226,9 @@ void cpu_idle (void)
 				idle = default_idle;
 			if (cpu_is_offline(smp_processor_id()))
 				play_dead();
+			enter_idle();
 			idle();
+			__exit_idle();
 		}
 
 		preempt_enable_no_resched();

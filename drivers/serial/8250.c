@@ -67,6 +67,8 @@ static const char *kdb_serial_ptr = kdb_serial_str;
  */
 static unsigned int share_irqs = SERIAL8250_SHARE_IRQS;
 
+static unsigned int nr_uarts = CONFIG_SERIAL_8250_RUNTIME_UARTS;
+
 /*
  * Debugging.
  */
@@ -311,7 +313,7 @@ static inline int map_8250_out_reg(struct uart_8250_port *up, int offset)
 
 #endif
 
-static _INLINE_ unsigned int serial_in(struct uart_8250_port *up, int offset)
+static unsigned int serial_in(struct uart_8250_port *up, int offset)
 {
 	offset = map_8250_in_reg(up, offset) << up->port.regshift;
 
@@ -336,7 +338,7 @@ static _INLINE_ unsigned int serial_in(struct uart_8250_port *up, int offset)
 	}
 }
 
-static _INLINE_ void
+static void
 serial_out(struct uart_8250_port *up, int offset, int value)
 {
 	offset = map_8250_out_reg(up, offset) << up->port.regshift;
@@ -1146,7 +1148,7 @@ static void serial8250_enable_ms(struct uart_port *port)
 	serial_out(up, UART_IER, up->ier);
 }
 
-static _INLINE_ void
+static void
 receive_chars(struct uart_8250_port *up, int *status, struct pt_regs *regs)
 {
 	struct tty_struct *tty = up->port.info->tty;
@@ -1155,19 +1157,6 @@ receive_chars(struct uart_8250_port *up, int *status, struct pt_regs *regs)
 	char flag;
 
 	do {
-		/* The following is not allowed by the tty layer and
-		   unsafe. It should be fixed ASAP */
-		if (unlikely(tty->flip.count >= TTY_FLIPBUF_SIZE)) {
-			if (tty->low_latency) {
-				spin_unlock(&up->port.lock);
-				tty_flip_buffer_push(tty);
-				spin_lock(&up->port.lock);
-			}
-			/*
-			 * If this failed then we will throw away the
-			 * bytes but must do so to clear interrupts
-			 */
-		}
 		ch = serial_inp(up, UART_RX);
 #ifdef	CONFIG_KDB
 		if ((up->port.line == kdb_serial_line) && kdb_on == 1) {
@@ -1246,7 +1235,7 @@ receive_chars(struct uart_8250_port *up, int *status, struct pt_regs *regs)
 	*status = lsr;
 }
 
-static _INLINE_ void transmit_chars(struct uart_8250_port *up)
+static void transmit_chars(struct uart_8250_port *up)
 {
 	struct circ_buf *xmit = &up->port.info->xmit;
 	int count;
@@ -1284,25 +1273,24 @@ static _INLINE_ void transmit_chars(struct uart_8250_port *up)
 		__stop_tx(up);
 }
 
-static _INLINE_ void check_modem_status(struct uart_8250_port *up)
+static unsigned int check_modem_status(struct uart_8250_port *up)
 {
-	int status;
+	unsigned int status = serial_in(up, UART_MSR);
 
-	status = serial_in(up, UART_MSR);
+	if (status & UART_MSR_ANY_DELTA && up->ier & UART_IER_MSI) {
+		if (status & UART_MSR_TERI)
+			up->port.icount.rng++;
+		if (status & UART_MSR_DDSR)
+			up->port.icount.dsr++;
+		if (status & UART_MSR_DDCD)
+			uart_handle_dcd_change(&up->port, status & UART_MSR_DCD);
+		if (status & UART_MSR_DCTS)
+			uart_handle_cts_change(&up->port, status & UART_MSR_CTS);
 
-	if ((status & UART_MSR_ANY_DELTA) == 0)
-		return;
+		wake_up_interruptible(&up->port.info->delta_msr_wait);
+	}
 
-	if (status & UART_MSR_TERI)
-		up->port.icount.rng++;
-	if (status & UART_MSR_DDSR)
-		up->port.icount.dsr++;
-	if (status & UART_MSR_DDCD)
-		uart_handle_dcd_change(&up->port, status & UART_MSR_DCD);
-	if (status & UART_MSR_DCTS)
-		uart_handle_cts_change(&up->port, status & UART_MSR_CTS);
-
-	wake_up_interruptible(&up->port.info->delta_msr_wait);
+	return status;
 }
 
 /*
@@ -1311,7 +1299,11 @@ static _INLINE_ void check_modem_status(struct uart_8250_port *up)
 static inline void
 serial8250_handle_port(struct uart_8250_port *up, struct pt_regs *regs)
 {
-	unsigned int status = serial_inp(up, UART_LSR);
+	unsigned int status;
+
+	spin_lock(&up->port.lock);
+
+	status = serial_inp(up, UART_LSR);
 
 	DEBUG_INTR("status = %x...", status);
 
@@ -1320,6 +1312,8 @@ serial8250_handle_port(struct uart_8250_port *up, struct pt_regs *regs)
 	check_modem_status(up);
 	if (status & UART_LSR_THRE)
 		transmit_chars(up);
+
+	spin_unlock(&up->port.lock);
 }
 
 /*
@@ -1355,9 +1349,7 @@ static irqreturn_t serial8250_interrupt(int irq, void *dev_id, struct pt_regs *r
 
 		iir = serial_in(up, UART_IIR);
 		if (!(iir & UART_IIR_NO_INT)) {
-			spin_lock(&up->port.lock);
 			serial8250_handle_port(up, regs);
-			spin_unlock(&up->port.lock);
 
 			handled = 1;
 
@@ -1456,11 +1448,8 @@ static void serial8250_timeout(unsigned long data)
 	unsigned int iir;
 
 	iir = serial_in(up, UART_IIR);
-	if (!(iir & UART_IIR_NO_INT)) {
-		spin_lock(&up->port.lock);
+	if (!(iir & UART_IIR_NO_INT))
 		serial8250_handle_port(up, NULL);
-		spin_unlock(&up->port.lock);
-	}
 
 	timeout = up->port.timeout;
 	timeout = timeout > 6 ? (timeout / 2 - 2) : 1;
@@ -1527,10 +1516,10 @@ static unsigned int serial8250_tx_empty(struct uart_port *port)
 static unsigned int serial8250_get_mctrl(struct uart_port *port)
 {
 	struct uart_8250_port *up = (struct uart_8250_port *)port;
-	unsigned char status;
+	unsigned int status;
 	unsigned int ret;
 
-	status = serial_in(up, UART_MSR);
+	status = check_modem_status(up);
 
 	ret = 0;
 	if (status & UART_MSR_DCD)
@@ -2252,7 +2241,7 @@ static void __init serial8250_isa_init_ports(void)
 		return;
 	first = 0;
 
-	for (i = 0; i < UART_NR; i++) {
+	for (i = 0; i < nr_uarts; i++) {
 		struct uart_8250_port *up = &serial8250_ports[i];
 
 		up->port.line = i;
@@ -2271,7 +2260,7 @@ static void __init serial8250_isa_init_ports(void)
 	}
 
 	for (i = 0, up = serial8250_ports;
-	     i < ARRAY_SIZE(old_serial_port) && i < UART_NR;
+	     i < ARRAY_SIZE(old_serial_port) && i < nr_uarts;
 	     i++, up++) {
 		up->port.iobase   = old_serial_port[i].port;
 		up->port.irq      = irq_canonicalize(old_serial_port[i].irq);
@@ -2293,7 +2282,7 @@ serial8250_register_ports(struct uart_driver *drv, struct device *dev)
 
 	serial8250_isa_init_ports();
 
-	for (i = 0; i < UART_NR; i++) {
+	for (i = 0; i < nr_uarts; i++) {
 		struct uart_8250_port *up = &serial8250_ports[i];
 
 		up->port.dev = dev;
@@ -2365,7 +2354,7 @@ static int serial8250_console_setup(struct console *co, char *options)
 	 * if so, search for the first available port that does have
 	 * console support.
 	 */
-	if (co->index >= UART_NR)
+	if (co->index >= nr_uarts)
 		co->index = 0;
 	port = &serial8250_ports[co->index].port;
 	if (!port->iobase && !port->membase)
@@ -2425,11 +2414,9 @@ static int __init find_port(struct uart_port *p)
 	int line;
 	struct uart_port *port;
 
-	for (line = 0; line < UART_NR; line++) {
+	for (line = 0; line < nr_uarts; line++) {
 		port = &serial8250_ports[line].port;
-		if (p->iotype == port->iotype &&
-		    p->iobase == port->iobase &&
-		    p->membase == port->membase)
+		if (uart_match_port(p, port))
 			return line;
 	}
 	return -ENODEV;
@@ -2549,7 +2536,7 @@ static int __devexit serial8250_remove(struct platform_device *dev)
 {
 	int i;
 
-	for (i = 0; i < UART_NR; i++) {
+	for (i = 0; i < nr_uarts; i++) {
 		struct uart_8250_port *up = &serial8250_ports[i];
 
 		if (up->port.dev == &dev->dev)
@@ -2616,7 +2603,7 @@ static struct uart_8250_port *serial8250_find_match_or_unused(struct uart_port *
 	/*
 	 * First, find a port entry which matches.
 	 */
-	for (i = 0; i < UART_NR; i++)
+	for (i = 0; i < nr_uarts; i++)
 		if (uart_match_port(&serial8250_ports[i].port, port))
 			return &serial8250_ports[i];
 
@@ -2625,7 +2612,7 @@ static struct uart_8250_port *serial8250_find_match_or_unused(struct uart_port *
 	 * free entry.  We look for one which hasn't been previously
 	 * used (indicated by zero iobase).
 	 */
-	for (i = 0; i < UART_NR; i++)
+	for (i = 0; i < nr_uarts; i++)
 		if (serial8250_ports[i].port.type == PORT_UNKNOWN &&
 		    serial8250_ports[i].port.iobase == 0)
 			return &serial8250_ports[i];
@@ -2634,7 +2621,7 @@ static struct uart_8250_port *serial8250_find_match_or_unused(struct uart_port *
 	 * That also failed.  Last resort is to find any entry which
 	 * doesn't have a real port associated with it.
 	 */
-	for (i = 0; i < UART_NR; i++)
+	for (i = 0; i < nr_uarts; i++)
 		if (serial8250_ports[i].port.type == PORT_UNKNOWN)
 			return &serial8250_ports[i];
 
@@ -2719,8 +2706,11 @@ static int __init serial8250_init(void)
 {
 	int ret, i;
 
+	if (nr_uarts > UART_NR)
+		nr_uarts = UART_NR;
+
 	printk(KERN_INFO "Serial: 8250/16550 driver $Revision: 1.90 $ "
-		"%d ports, IRQ sharing %sabled\n", (int) UART_NR,
+		"%d ports, IRQ sharing %sabled\n", nr_uarts,
 		share_irqs ? "en" : "dis");
 
 	for (i = 0; i < NR_IRQS; i++)
@@ -2779,6 +2769,9 @@ MODULE_DESCRIPTION("Generic 8250/16x50 serial driver $Revision: 1.90 $");
 module_param(share_irqs, uint, 0644);
 MODULE_PARM_DESC(share_irqs, "Share IRQs with other non-8250/16x50 devices"
 	" (unsafe)");
+
+module_param(nr_uarts, uint, 0644);
+MODULE_PARM_DESC(nr_uarts, "Maximum number of UARTs supported. (1-" __MODULE_STRING(CONFIG_SERIAL_8250_NR_UARTS) ")");
 
 #ifdef CONFIG_SERIAL_8250_RSA
 module_param_array(probe_rsa, ulong, &probe_rsa_count, 0444);

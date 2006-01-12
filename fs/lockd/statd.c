@@ -160,7 +160,7 @@ nsm_unlink(struct nsm_handle *nsm)
 		goto exit;
 
 	if (nd.last_type == LAST_NORM && !nd.last.name[nd.last.len]) {
-		down(&nd.dentry->d_inode->i_sem);
+		mutex_lock(&nd.dentry->d_inode->i_mutex);
 
 		dentry = lookup_hash(&nd);
 		if (!IS_ERR(dentry)) {
@@ -171,7 +171,7 @@ nsm_unlink(struct nsm_handle *nsm)
 		} else {
 			res = PTR_ERR(dentry);
 		}
-		up(&nd.dentry->d_inode->i_sem);
+		mutex_unlock(&nd.dentry->d_inode->i_mutex);
 	} else {
 		res = -EISDIR;
 	}
@@ -358,7 +358,7 @@ static int
 nsmsvc_decode_stat_chge(struct svc_rqst *rqstp, u32 *p, struct nsm_args *argp)
 {
 	/* Skip over the client's mon_name */
-	p = xdr_decode_string(p, &argp->mon_name, &argp->mon_name_len, SM_MAXSTRLEN);
+	p = xdr_decode_string_inplace(p, &argp->mon_name, &argp->mon_name_len, SM_MAXSTRLEN);
 	if (p == NULL)
 		return 0;
 

@@ -75,6 +75,7 @@
 #include <asm/uaccess.h>
 #include <asm/system.h>
 #include <linux/bitops.h>
+#include <linux/capability.h>
 #include <linux/config.h>
 #include <linux/cpu.h>
 #include <linux/types.h>
@@ -114,12 +115,6 @@
 #include <net/iw_handler.h>
 #endif	/* CONFIG_NET_RADIO */
 #include <asm/current.h>
-
-#ifdef CONFIG_XEN
-#include <net/ip.h>
-#include <linux/tcp.h>
-#include <linux/udp.h>
-#endif
 
 /*
  *	The list of packet types we will receive (as opposed to discard)
@@ -632,7 +627,7 @@ struct net_device * dev_get_by_flags(unsigned short if_flags, unsigned short mas
  *	Network device names need to be valid file names to
  *	to allow sysfs to work
  */
-static int dev_valid_name(const char *name)
+int dev_valid_name(const char *name)
 {
 	return !(*name == '\0' 
 		 || !strcmp(name, ".")
@@ -1098,15 +1093,12 @@ int skb_checksum_help(struct sk_buff *skb, int inward)
 			goto out;
 	}
 
-	if (offset > (int)skb->len)
-		BUG();
+	BUG_ON(offset > (int)skb->len);
 	csum = skb_checksum(skb, offset, skb->len-offset, 0);
 
 	offset = skb->tail - skb->h.raw;
-	if (offset <= 0)
-		BUG();
-	if (skb->csum + 2 > offset)
-		BUG();
+	BUG_ON(offset <= 0);
+	BUG_ON(skb->csum + 2 > offset);
 
 	*(u16*)(skb->h.raw + skb->csum) = csum_fold(csum);
 	skb->ip_summed = CHECKSUM_NONE;
@@ -1267,37 +1259,6 @@ int dev_queue_xmit(struct sk_buff *skb)
 	    (!(dev->features & NETIF_F_SG) || illegal_highdma(dev, skb)) &&
 	    __skb_linearize(skb, GFP_ATOMIC))
 		goto out_kfree_skb;
-
-#ifdef CONFIG_XEN
-	/* If a checksum-deferred packet is forwarded to a device that needs a
-	 * checksum, correct the pointers and force checksumming.
-	 */
-	if (skb->proto_csum_blank) {
-		if (skb->protocol != htons(ETH_P_IP))
-			goto out_kfree_skb;
-		skb->h.raw = (unsigned char *)skb->nh.iph + 4*skb->nh.iph->ihl;
-		if (skb->h.raw >= skb->tail)
-			goto out_kfree_skb;
-		switch (skb->nh.iph->protocol) {
-		case IPPROTO_TCP:
-			skb->csum = offsetof(struct tcphdr, check);
-			break;
-		case IPPROTO_UDP:
-			skb->csum = offsetof(struct udphdr, check);
-			break;
-		default:
-			if (net_ratelimit())
-				printk(KERN_ERR "Attempting to checksum a non-"
-				       "TCP/UDP packet, dropping a protocol"
-				       " %d packet", skb->nh.iph->protocol);
-			rc = -EPROTO;
-			goto out_kfree_skb;
-		}
-		if ((skb->h.raw + skb->csum + 2) > skb->tail)
-			goto out_kfree_skb;
-		skb->ip_summed = CHECKSUM_HW;
-	}
-#endif
 
 	/* If packet is not checksummed and device does not support
 	 * checksumming for this protocol, complete checksumming here.
@@ -1645,19 +1606,6 @@ int netif_receive_skb(struct sk_buff *skb)
 	if (skb->tc_verd & TC_NCLS) {
 		skb->tc_verd = CLR_TC_NCLS(skb->tc_verd);
 		goto ncls;
-	}
-#endif
-
-#ifdef CONFIG_XEN
-	switch (skb->ip_summed) {
-	case CHECKSUM_UNNECESSARY:
-		skb->proto_csum_valid = 1;
-		break;
-	case CHECKSUM_HW:
-		/* XXX Implement me. */
-	default:
-		skb->proto_csum_valid = 0;
-		break;
 	}
 #endif
 
@@ -3320,13 +3268,13 @@ EXPORT_SYMBOL(__dev_get_by_index);
 EXPORT_SYMBOL(__dev_get_by_name);
 EXPORT_SYMBOL(__dev_remove_pack);
 EXPORT_SYMBOL(__skb_linearize);
+EXPORT_SYMBOL(dev_valid_name);
 EXPORT_SYMBOL(dev_add_pack);
 EXPORT_SYMBOL(dev_alloc_name);
 EXPORT_SYMBOL(dev_close);
 EXPORT_SYMBOL(dev_get_by_flags);
 EXPORT_SYMBOL(dev_get_by_index);
 EXPORT_SYMBOL(dev_get_by_name);
-EXPORT_SYMBOL(dev_ioctl);
 EXPORT_SYMBOL(dev_open);
 EXPORT_SYMBOL(dev_queue_xmit);
 EXPORT_SYMBOL(dev_remove_pack);

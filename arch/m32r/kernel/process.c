@@ -50,6 +50,10 @@ unsigned long thread_saved_pc(struct task_struct *tsk)
  * Powermanagement idle function, if any..
  */
 void (*pm_idle)(void) = NULL;
+EXPORT_SYMBOL(pm_idle);
+
+void (*pm_power_off)(void) = NULL;
+EXPORT_SYMBOL(pm_power_off);
 
 void disable_hlt(void)
 {
@@ -254,14 +258,6 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long spu,
 	tsk->thread.lr = (unsigned long)ret_from_fork;
 
 	return 0;
-}
-
-/*
- * fill in the user structure for a core dump..
- */
-void dump_thread(struct pt_regs * regs, struct user * dump)
-{
-	/* M32R_FIXME */
 }
 
 /*

@@ -303,17 +303,6 @@ receive_chars(struct uart_txx9_port *up, unsigned int *status, struct pt_regs *r
 	char flag;
 
 	do {
-		/* The following is not allowed by the tty layer and
-		   unsafe. It should be fixed ASAP */
-		if (unlikely(tty->flip.count >= TTY_FLIPBUF_SIZE)) {
-			if (tty->low_latency) {
-				spin_unlock(&up->port.lock);
-				tty_flip_buffer_push(tty);
-				spin_lock(&up->port.lock);
-			}
-			/* If this failed then we will throw away the
-			   bytes but must do so to clear interrupts */
-		}
 		ch = sio_in(up, TXX9_SIRFIFO);
 		flag = TTY_NORMAL;
 		up->port.icount.rx++;
@@ -1195,7 +1184,7 @@ static int __init serial_txx9_init(void)
 		serial_txx9_register_ports(&serial_txx9_reg);
 
 #ifdef ENABLE_SERIAL_TXX9_PCI
-		ret = pci_module_init(&serial_txx9_pci_driver);
+		ret = pci_register_driver(&serial_txx9_pci_driver);
 #endif
 	}
 	return ret;

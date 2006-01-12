@@ -69,6 +69,7 @@
 #include <asm/smp.h>
 
 #include "plpar_wrappers.h"
+#include "ras.h"
 
 #ifdef DEBUG
 #define DBG(fmt...) udbg_printf(fmt)
@@ -79,9 +80,6 @@
 extern void find_udbg_vterm(void);
 
 int fwnmi_active;  /* TRUE if an FWNMI handler is present */
-
-extern void pSeries_system_reset_exception(struct pt_regs *regs);
-extern int pSeries_machine_check_exception(struct pt_regs *regs);
 
 static void pseries_shared_idle(void);
 static void pseries_dedicated_idle(void);
@@ -324,15 +322,18 @@ static  void __init pSeries_discover_pic(void)
 	ppc64_interrupt_controller = IC_INVALID;
 	for (np = NULL; (np = of_find_node_by_name(np, "interrupt-controller"));) {
 		typep = (char *)get_property(np, "compatible", NULL);
-		if (strstr(typep, "open-pic"))
+		if (strstr(typep, "open-pic")) {
 			ppc64_interrupt_controller = IC_OPEN_PIC;
-		else if (strstr(typep, "ppc-xicp"))
+			break;
+		} else if (strstr(typep, "ppc-xicp")) {
 			ppc64_interrupt_controller = IC_PPC_XIC;
-		else
-			printk("pSeries_discover_pic: failed to recognize"
-			       " interrupt-controller\n");
-		break;
+			break;
+		}
 	}
+	if (ppc64_interrupt_controller == IC_INVALID)
+		printk("pSeries_discover_pic: failed to recognize"
+			" interrupt-controller\n");
+
 }
 
 static void pSeries_mach_cpu_die(void)

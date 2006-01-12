@@ -103,7 +103,7 @@ static const struct pci_device_id cciss_pci_device_id[] = {
 };
 MODULE_DEVICE_TABLE(pci, cciss_pci_device_id);
 
-#define NR_PRODUCTS (sizeof(products)/sizeof(struct board_type))
+#define NR_PRODUCTS ARRAY_SIZE(products)
 
 /*  board_id = Subsystem Device ID & Vendor ID
  *  product = Marketing Name for the board
@@ -153,6 +153,7 @@ static int cciss_open(struct inode *inode, struct file *filep);
 static int cciss_release(struct inode *inode, struct file *filep);
 static int cciss_ioctl(struct inode *inode, struct file *filep, 
 		unsigned int cmd, unsigned long arg);
+static int cciss_getgeo(struct block_device *bdev, struct hd_geometry *geo);
 
 static int revalidate_allvol(ctlr_info_t *host);
 static int cciss_revalidate(struct gendisk *disk);
@@ -194,6 +195,7 @@ static struct block_device_operations cciss_fops  = {
 	.open		= cciss_open, 
 	.release       	= cciss_release,
         .ioctl		= cciss_ioctl,
+        .getgeo		= cciss_getgeo,
 #ifdef CONFIG_COMPAT
 	.compat_ioctl   = cciss_compat_ioctl,
 #endif
@@ -633,6 +635,20 @@ static int cciss_ioctl32_big_passthru(struct file *file, unsigned cmd, unsigned 
 	return err;
 }
 #endif
+
+static int cciss_getgeo(struct block_device *bdev, struct hd_geometry *geo)
+{
+	drive_info_struct *drv = get_drv(bdev->bd_disk);
+
+	if (!drv->cylinders)
+		return -ENXIO;
+
+	geo->heads = drv->heads;
+	geo->sectors = drv->sectors;
+	geo->cylinders = drv->cylinders;
+	return 0;
+}
+
 /*
  * ioctl 
  */
@@ -651,21 +667,6 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 #endif /* CCISS_DEBUG */ 
 	
 	switch(cmd) {
-	case HDIO_GETGEO:
-	{
-                struct hd_geometry driver_geo;
-                if (drv->cylinders) {
-                        driver_geo.heads = drv->heads;
-                        driver_geo.sectors = drv->sectors;
-                        driver_geo.cylinders = drv->cylinders;
-                } else
-			return -ENXIO;
-                driver_geo.start= get_start_sect(inode->i_bdev);
-                if (copy_to_user(argp, &driver_geo, sizeof(struct hd_geometry)))
-                        return  -EFAULT;
-                return(0);
-	}
-
 	case CCISS_GETPCIINFO:
 	{
 		cciss_pci_info_struct pciinfo;
@@ -2177,16 +2178,48 @@ static inline void resend_cciss_cmd( ctlr_info_t *h, CommandList_struct *c)
 
 	start_io(h);
 }
+
+static void cciss_softirq_done(struct request *rq)
+{
+	CommandList_struct *cmd = rq->completion_data;
+	ctlr_info_t *h = hba[cmd->ctlr];
+	u64bit temp64;
+	int i, ddir;
+
+	if (cmd->Request.Type.Direction == XFER_READ)
+		ddir = PCI_DMA_FROMDEVICE;
+	else
+		ddir = PCI_DMA_TODEVICE;
+
+	/* command did not need to be retried */
+	/* unmap the DMA mapping for all the scatter gather elements */
+	for(i=0; i<cmd->Header.SGList; i++) {
+		temp64.val32.lower = cmd->SG[i].Addr.lower;
+		temp64.val32.upper = cmd->SG[i].Addr.upper;
+		pci_unmap_page(h->pdev, temp64.val, cmd->SG[i].Len, ddir);
+	}
+
+	complete_buffers(rq->bio, rq->errors);
+
+#ifdef CCISS_DEBUG
+	printk("Done with %p\n", rq);
+#endif /* CCISS_DEBUG */ 
+
+	spin_lock_irq(&h->lock);
+	end_that_request_last(rq, rq->errors);
+	cmd_free(h, cmd,1);
+	spin_unlock_irq(&h->lock);
+}
+
 /* checks the status of the job and calls complete buffers to mark all 
- * buffers for the completed job. 
+ * buffers for the completed job. Note that this function does not need
+ * to hold the hba/queue lock.
  */ 
 static inline void complete_command( ctlr_info_t *h, CommandList_struct *cmd,
 		int timeout)
 {
 	int status = 1;
-	int i;
 	int retry_cmd = 0;
-	u64bit temp64;
 		
 	if (timeout)
 		status = 0; 
@@ -2294,24 +2327,10 @@ static inline void complete_command( ctlr_info_t *h, CommandList_struct *cmd,
 		resend_cciss_cmd(h,cmd);
 		return;
 	}	
-	/* command did not need to be retried */
-	/* unmap the DMA mapping for all the scatter gather elements */
-	for(i=0; i<cmd->Header.SGList; i++) {
-		temp64.val32.lower = cmd->SG[i].Addr.lower;
-		temp64.val32.upper = cmd->SG[i].Addr.upper;
-		pci_unmap_page(hba[cmd->ctlr]->pdev,
-			temp64.val, cmd->SG[i].Len,
-			(cmd->Request.Type.Direction == XFER_READ) ?
-				PCI_DMA_FROMDEVICE : PCI_DMA_TODEVICE);
-	}
-	complete_buffers(cmd->rq->bio, status);
 
-#ifdef CCISS_DEBUG
-	printk("Done with %p\n", cmd->rq);
-#endif /* CCISS_DEBUG */ 
-
-	end_that_request_last(cmd->rq);
-	cmd_free(h,cmd,1);
+	cmd->rq->completion_data = cmd;
+	cmd->rq->errors = status;
+	blk_complete_request(cmd->rq);
 }
 
 /* 
@@ -2832,7 +2851,7 @@ static int cciss_pci_init(ctlr_info_t *c, struct pci_dev *pdev)
 	c->board_id = board_id;
 
 #ifdef CCISS_DEBUG
-	print_cfg_table(c->cfgtable); 
+	print_cfg_table(c->cfgtable);
 #endif /* CCISS_DEBUG */
 
 	for(i=0; i<NR_PRODUCTS; i++) {
@@ -3117,7 +3136,7 @@ static int __devinit cciss_init_one(struct pci_dev *pdev,
 	 * 8 controller support.
 	 */
 	if (i < MAX_CTLR_ORIG)
-		hba[i]->major = MAJOR_NR + i;
+		hba[i]->major = COMPAQ_CISS_MAJOR + i;
 	rc = register_blkdev(hba[i]->major, hba[i]->devname);
 	if(rc == -EBUSY || rc == -EINVAL) {
 		printk(KERN_ERR
@@ -3198,15 +3217,17 @@ static int __devinit cciss_init_one(struct pci_dev *pdev,
 		drv->queue = q;
 
 		q->backing_dev_info.ra_pages = READ_AHEAD;
-	blk_queue_bounce_limit(q, hba[i]->pdev->dma_mask);
+		blk_queue_bounce_limit(q, hba[i]->pdev->dma_mask);
 
-	/* This is a hardware imposed limit. */
-	blk_queue_max_hw_segments(q, MAXSGENTRIES);
+		/* This is a hardware imposed limit. */
+		blk_queue_max_hw_segments(q, MAXSGENTRIES);
 
-	/* This is a limit in the driver and could be eliminated. */
-	blk_queue_max_phys_segments(q, MAXSGENTRIES);
+		/* This is a limit in the driver and could be eliminated. */
+		blk_queue_max_phys_segments(q, MAXSGENTRIES);
 
-	blk_queue_max_sectors(q, 512);
+		blk_queue_max_sectors(q, 512);
+
+		blk_queue_softirq_done(q, cciss_softirq_done);
 
 		q->queuedata = hba[i];
 		sprintf(disk->disk_name, "cciss/c%dd%d", i, j);
@@ -3339,7 +3360,7 @@ static int __init cciss_init(void)
 	printk(KERN_INFO DRIVER_NAME "\n");
 
 	/* Register for our PCI devices */
-	return pci_module_init(&cciss_pci_driver);
+	return pci_register_driver(&cciss_pci_driver);
 }
 
 static void __exit cciss_cleanup(void)

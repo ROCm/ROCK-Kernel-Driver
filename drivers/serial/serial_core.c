@@ -1440,6 +1440,7 @@ uart_block_til_ready(struct file *filp, struct uart_state *state)
 		 * modem is ready for us.
 		 */
 		spin_lock_irq(&port->lock);
+		port->ops->enable_ms(port);
 		mctrl = port->ops->get_mctrl(port);
 		spin_unlock_irq(&port->lock);
 		if (mctrl & TIOCM_CAR)
@@ -2307,7 +2308,7 @@ int uart_match_port(struct uart_port *port1, struct uart_port *port2)
 		return (port1->iobase == port2->iobase) &&
 		       (port1->hub6   == port2->hub6);
 	case UPIO_MEM:
-		return (port1->membase == port2->membase);
+		return (port1->mapbase == port2->mapbase);
 	}
 	return 0;
 }

@@ -75,7 +75,6 @@
 #include <asm/iommu.h>
 #include <asm/smu.h>
 #include <asm/pmc.h>
-#include <asm/mpic.h>
 #include <asm/lmb.h>
 #include <asm/udbg.h>
 
@@ -346,7 +345,7 @@ void __init pmac_setup_arch(void)
 
 #ifdef CONFIG_SMP
 	/* Check for Core99 */
-	if (find_devices("uni-n") || find_devices("u3"))
+	if (find_devices("uni-n") || find_devices("u3") || find_devices("u4"))
 		smp_ops = &core99_smp_ops;
 #ifdef CONFIG_PPC32
 	else
@@ -636,14 +635,8 @@ static void __init pmac_init_early(void)
 	/* Setup interrupt mapping options */
 	ppc64_interrupt_controller = IC_OPEN_PIC;
 
-	iommu_init_early_u3();
+	iommu_init_early_dart();
 #endif
-}
-
-static void __init pmac_progress(char *s, unsigned short hex)
-{
-	udbg_puts(s);
-	udbg_puts("\n");
 }
 
 /*
@@ -657,35 +650,14 @@ static int pmac_check_legacy_ioport(unsigned int baseport)
 
 static int __init pmac_declare_of_platform_devices(void)
 {
-	struct device_node *np, *npp;
+	struct device_node *np;
 
-	np = find_devices("uni-n");
-	if (np) {
-		for (np = np->child; np != NULL; np = np->sibling)
-			if (strncmp(np->name, "i2c", 3) == 0) {
-				of_platform_device_create(np, "uni-n-i2c",
-							  NULL);
-				break;
-			}
-	}
-	np = find_devices("valkyrie");
+	np = of_find_node_by_name(NULL, "valkyrie");
 	if (np)
 		of_platform_device_create(np, "valkyrie", NULL);
-	np = find_devices("platinum");
+	np = of_find_node_by_name(NULL, "platinum");
 	if (np)
 		of_platform_device_create(np, "platinum", NULL);
-
-	npp = of_find_node_by_name(NULL, "u3");
-	if (npp) {
-		for (np = NULL; (np = of_get_next_child(npp, np)) != NULL;) {
-			if (strncmp(np->name, "i2c", 3) == 0) {
-				of_platform_device_create(np, "u3-i2c", NULL);
-				of_node_put(np);
-				break;
-			}
-		}
-		of_node_put(npp);
-	}
         np = of_find_node_by_type(NULL, "smu");
         if (np) {
 		of_platform_device_create(np, "smu", NULL);
@@ -712,7 +684,7 @@ static int __init pmac_probe(int platform)
 	 * occupies having to be broken up so the DART itself is not
 	 * part of the cacheable linar mapping
 	 */
-	alloc_u3_dart_table();
+	alloc_dart_table();
 #endif
 
 #ifdef CONFIG_PMAC_SMU
@@ -734,10 +706,11 @@ static int pmac_pci_probe_mode(struct pci_bus *bus)
 	struct device_node *node = bus->sysdata;
 
 	/* We need to use normal PCI probing for the AGP bus,
-	   since the device for the AGP bridge isn't in the tree. */
-	if (bus->self == NULL && device_is_compatible(node, "u3-agp"))
+	 * since the device for the AGP bridge isn't in the tree.
+	 */
+	if (bus->self == NULL && (device_is_compatible(node, "u3-agp") ||
+				  device_is_compatible(node, "u4-pcie")))
 		return PCI_PROBE_NORMAL;
-
 	return PCI_PROBE_DEVTREE;
 }
 #endif
@@ -751,7 +724,7 @@ struct machdep_calls __initdata pmac_md = {
 	.init_early		= pmac_init_early,
 	.show_cpuinfo		= pmac_show_cpuinfo,
 	.init_IRQ		= pmac_pic_init,
-	.get_irq		= mpic_get_irq,	/* changed later */
+	.get_irq		= NULL,	/* changed later */
 	.pcibios_fixup		= pmac_pcibios_fixup,
 	.restart		= pmac_restart,
 	.power_off		= pmac_power_off,
@@ -763,7 +736,7 @@ struct machdep_calls __initdata pmac_md = {
 	.calibrate_decr		= pmac_calibrate_decr,
 	.feature_call		= pmac_do_feature_call,
 	.check_legacy_ioport	= pmac_check_legacy_ioport,
-	.progress		= pmac_progress,
+	.progress		= udbg_progress,
 #ifdef CONFIG_PPC64
 	.pci_probe_mode		= pmac_pci_probe_mode,
 	.idle_loop		= native_idle,

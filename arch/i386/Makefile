@@ -39,8 +39,8 @@ include $(srctree)/arch/i386/Makefile.cpu
 
 # -mregparm=3 works ok on gcc-3.0 and later
 #
-GCC_VERSION			:= $(call cc-version)
-cflags-$(CONFIG_REGPARM) 	+= $(shell if [ $(GCC_VERSION) -ge 0300 ] ; then echo "-mregparm=3"; fi ;)
+cflags-$(CONFIG_REGPARM) += $(shell if [ $(call cc-version) -ge 0300 ] ; then \
+                            echo "-mregparm=3"; fi ;)
 
 # Disable unit-at-a-time mode, it makes gcc use a lot more stack
 # due to the lack of sharing of stacklots.
@@ -56,11 +56,6 @@ CFLAGS += $(cflags-y)
 
 # Default subarch .c files
 mcore-y  := mach-default
-
-head-y	:= arch/i386/kernel/head.o arch/i386/kernel/init_task.o
-boot	:= arch/i386/boot
-core	:= arch/i386/kernel/ arch/i386/mm/
-pci	:= arch/i386/pci/
 
 # Voyager subarch support
 mflags-$(CONFIG_X86_VOYAGER)	:= -Iinclude/asm-i386/mach-voyager
@@ -82,19 +77,6 @@ mcore-$(CONFIG_X86_BIGSMP)	:= mach-default
 mflags-$(CONFIG_X86_SUMMIT) := -Iinclude/asm-i386/mach-summit
 mcore-$(CONFIG_X86_SUMMIT)  := mach-default
 
-# Xen subarch support
-mflags-$(CONFIG_X86_XEN)	:= -Iinclude/asm-i386/mach-xen
-mcore-$(CONFIG_X86_XEN)		:= mach-xen
-head-$(CONFIG_X86_XEN)		:= arch/i386/xen/kernel/head.o \
-				   arch/i386/xen/kernel/init_task.o
-ifdef CONFIG_X86_XEN
-boot				:= arch/i386/xen/boot
-core				:= arch/i386/xen/kernel/ arch/i386/xen/mm/
-pci				:= arch/i386/xen/pci/
-arch/i386/kernel/vmlinux.lds: arch/i386/kernel/vmlinux.lds.S
-CPPFLAGS        := -D__KERNEL__ -Iinclude$(if $(KBUILD_SRC),2)/asm/mach-xen $(LINUXINCLUDE)
-endif
-
 # generic subarchitecture
 mflags-$(CONFIG_X86_GENERICARCH) := -Iinclude/asm-i386/mach-generic
 mcore-$(CONFIG_X86_GENERICARCH) := mach-default
@@ -108,12 +90,15 @@ core-$(CONFIG_X86_ES7000)	:= arch/i386/mach-es7000/
 # default subarch .h files
 mflags-y += -Iinclude/asm-i386/mach-default
 
+head-y := arch/i386/kernel/head.o arch/i386/kernel/init_task.o
+
 libs-y 					+= arch/i386/lib/
-core-y					+= $(core) \
+core-y					+= arch/i386/kernel/ \
+					   arch/i386/mm/ \
 					   arch/i386/$(mcore-y)/ \
 					   arch/i386/crypto/
 drivers-$(CONFIG_MATH_EMULATION)	+= arch/i386/math-emu/
-drivers-$(CONFIG_PCI)			+= $(pci)
+drivers-$(CONFIG_PCI)			+= arch/i386/pci/
 # must be linked after kernel/
 drivers-$(CONFIG_OPROFILE)		+= arch/i386/oprofile/
 drivers-$(CONFIG_PM)			+= arch/i386/power/
@@ -122,17 +107,10 @@ drivers-$(CONFIG_KDB)			+= arch/i386/kdb/
 CFLAGS += $(mflags-y)
 AFLAGS += $(mflags-y)
 
+boot := arch/i386/boot
+
 .PHONY: zImage bzImage compressed zlilo bzlilo \
-	zdisk bzdisk fdimage fdimage144 fdimage288 install kernel_install
-
-ifdef CONFIG_X86_XEN
-.PHONY: vmlinuz
-all: vmlinuz
-
-vmlinuz: vmlinux
-	$(Q)$(MAKE) $(build)=$(boot) vmlinuz
-
-else
+	zdisk bzdisk fdimage fdimage144 fdimage288 install
 
 all: bzImage
 
@@ -154,10 +132,7 @@ zdisk bzdisk: vmlinux
 fdimage fdimage144 fdimage288: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(KBUILD_IMAGE) $@
 
-endif
-
-install: vmlinux
-install kernel_install:
+install:
 	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(KBUILD_IMAGE) install
 
 archclean:

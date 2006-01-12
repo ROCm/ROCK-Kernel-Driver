@@ -36,9 +36,18 @@
 struct scoop_pcmcia_config *platform_scoop_config;
 #define SCOOP_DEV platform_scoop_config->devs
 
-static void sharpsl_pcmcia_init_reset(struct scoop_pcmcia_dev *scoopdev)
+static void sharpsl_pcmcia_init_reset(struct soc_pcmcia_socket *skt)
 {
+	struct scoop_pcmcia_dev *scoopdev = &SCOOP_DEV[skt->nr];
+
 	reset_scoop(scoopdev->dev);
+
+	/* Shared power controls need to be handled carefully */
+	if (platform_scoop_config->power_ctrl)
+		platform_scoop_config->power_ctrl(scoopdev->dev, 0x0000, skt->nr);
+	else
+		write_scoop_reg(scoopdev->dev, SCOOP_CPR, 0x0000);
+
 	scoopdev->keep_vs = NO_KEEP_VS;
 	scoopdev->keep_rd = 0;
 }
@@ -208,26 +217,17 @@ static int sharpsl_pcmcia_configure_socket(struct soc_pcmcia_socket *skt,
 
 static void sharpsl_pcmcia_socket_init(struct soc_pcmcia_socket *skt)
 {
-	sharpsl_pcmcia_init_reset(&SCOOP_DEV[skt->nr]);
+	sharpsl_pcmcia_init_reset(skt);
 
 	/* Enable interrupt */
 	write_scoop_reg(SCOOP_DEV[skt->nr].dev, SCOOP_IMR, 0x00C0);
 	write_scoop_reg(SCOOP_DEV[skt->nr].dev, SCOOP_MCR, 0x0101);
 	SCOOP_DEV[skt->nr].keep_vs = NO_KEEP_VS;
-
-	if (machine_is_collie())
-		/* We need to disable SS_OUTPUT_ENA here. */
-		write_scoop_reg(SCOOP_DEV[skt->nr].dev, SCOOP_CPR, read_scoop_reg(SCOOP_DEV[skt->nr].dev, SCOOP_CPR) & ~0x0080);
 }
 
 static void sharpsl_pcmcia_socket_suspend(struct soc_pcmcia_socket *skt)
 {
-	/* CF_BUS_OFF */
-	sharpsl_pcmcia_init_reset(&SCOOP_DEV[skt->nr]);
-
-	if (machine_is_collie())
-		/* We need to disable SS_OUTPUT_ENA here. */
-		write_scoop_reg(SCOOP_DEV[skt->nr].dev, SCOOP_CPR, read_scoop_reg(SCOOP_DEV[skt->nr].dev, SCOOP_CPR) & ~0x0080);
+	sharpsl_pcmcia_init_reset(skt);
 }
 
 static struct pcmcia_low_level sharpsl_pcmcia_ops = {
@@ -264,11 +264,10 @@ static int __init sharpsl_pcmcia_init(void)
 	int ret;
 
 	sharpsl_pcmcia_ops.nr=platform_scoop_config->num_devs;
-	sharpsl_pcmcia_device = kmalloc(sizeof(*sharpsl_pcmcia_device), GFP_KERNEL);
+	sharpsl_pcmcia_device = kzalloc(sizeof(*sharpsl_pcmcia_device), GFP_KERNEL);
 	if (!sharpsl_pcmcia_device)
 		return -ENOMEM;
 
-	memset(sharpsl_pcmcia_device, 0, sizeof(*sharpsl_pcmcia_device));
 	sharpsl_pcmcia_device->name = "pxa2xx-pcmcia";
 	sharpsl_pcmcia_device->dev.platform_data = &sharpsl_pcmcia_ops;
 	sharpsl_pcmcia_device->dev.parent=platform_scoop_config->devs[0].dev;

@@ -36,7 +36,8 @@ static int legacy_serial_console = -1;
 
 static int __init add_legacy_port(struct device_node *np, int want_index,
 				  int iotype, phys_addr_t base,
-				  phys_addr_t taddr, unsigned long irq)
+				  phys_addr_t taddr, unsigned long irq,
+				  unsigned int flags)
 {
 	u32 *clk, *spd, clock = BASE_BAUD * 16;
 	int index;
@@ -90,7 +91,7 @@ static int __init add_legacy_port(struct device_node *np, int want_index,
 	legacy_serial_ports[index].iotype = iotype;
 	legacy_serial_ports[index].uartclk = clock;
 	legacy_serial_ports[index].irq = irq;
-	legacy_serial_ports[index].flags = ASYNC_BOOT_AUTOCONF;
+	legacy_serial_ports[index].flags = flags;
 	legacy_serial_infos[index].taddr = taddr;
 	legacy_serial_infos[index].np = of_node_get(np);
 	legacy_serial_infos[index].clock = clock;
@@ -107,8 +108,35 @@ static int __init add_legacy_port(struct device_node *np, int want_index,
 	return index;
 }
 
+static int __init add_legacy_soc_port(struct device_node *np,
+				      struct device_node *soc_dev)
+{
+	phys_addr_t addr;
+	u32 *addrp;
+	unsigned int flags = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_SHARE_IRQ;
+
+	/* We only support ports that have a clock frequency properly
+	 * encoded in the device-tree.
+	 */
+	if (get_property(np, "clock-frequency", NULL) == NULL)
+		return -1;
+
+	/* Get the address */
+	addrp = of_get_address(soc_dev, 0, NULL, NULL);
+	if (addrp == NULL)
+		return -1;
+
+	addr = of_translate_address(soc_dev, addrp);
+
+	/* Add port, irq will be dealt with later. We passed a translated
+	 * IO port value. It will be fixed up later along with the irq
+	 */
+	return add_legacy_port(np, -1, UPIO_MEM, addr, addr, NO_IRQ, flags);
+}
+
+#ifdef CONFIG_ISA
 static int __init add_legacy_isa_port(struct device_node *np,
-				      struct device_node *isa_bridge)
+				      struct device_node *isa_brg)
 {
 	u32 *reg;
 	char *typep;
@@ -137,10 +165,12 @@ static int __init add_legacy_isa_port(struct device_node *np,
 	taddr = of_translate_address(np, reg);
 
 	/* Add port, irq will be dealt with later */
-	return add_legacy_port(np, index, UPIO_PORT, reg[1], taddr, NO_IRQ);
+	return add_legacy_port(np, index, UPIO_PORT, reg[1], taddr, NO_IRQ, UPF_BOOT_AUTOCONF);
 
 }
+#endif
 
+#ifdef CONFIG_PCI
 static int __init add_legacy_pci_port(struct device_node *np,
 				      struct device_node *pci_dev)
 {
@@ -204,8 +234,9 @@ static int __init add_legacy_pci_port(struct device_node *np,
 	/* Add port, irq will be dealt with later. We passed a translated
 	 * IO port value. It will be fixed up later along with the irq
 	 */
-	return add_legacy_port(np, index, iotype, base, addr, NO_IRQ);
+	return add_legacy_port(np, index, iotype, base, addr, NO_IRQ, UPF_BOOT_AUTOCONF);
 }
+#endif
 
 /*
  * This is called very early, as part of setup_system() or eventually
@@ -218,7 +249,7 @@ static int __init add_legacy_pci_port(struct device_node *np,
  */
 void __init find_legacy_serial_ports(void)
 {
-	struct device_node *np, *stdout;
+	struct device_node *np, *stdout = NULL;
 	char *path;
 	int index;
 
@@ -226,15 +257,26 @@ void __init find_legacy_serial_ports(void)
 
 	/* Now find out if one of these is out firmware console */
 	path = (char *)get_property(of_chosen, "linux,stdout-path", NULL);
-	if (path == NULL) {
+	if (path != NULL) {
+		stdout = of_find_node_by_path(path);
+		if (stdout)
+			DBG("stdout is %s\n", stdout->full_name);
+	} else {
 		DBG(" no linux,stdout-path !\n");
-		return;
-	}
-	stdout = of_find_node_by_path(path);
-	if (stdout) {
-		DBG("stdout is %s\n", stdout->full_name);
 	}
 
+	/* First fill our array with SOC ports */
+	for (np = NULL; (np = of_find_compatible_node(np, "serial", "ns16550")) != NULL;) {
+		struct device_node *soc = of_get_parent(np);
+		if (soc && !strcmp(soc->type, "soc")) {
+			index = add_legacy_soc_port(np, np);
+			if (index >= 0 && np == stdout)
+				legacy_serial_console = index;
+		}
+		of_node_put(soc);
+	}
+
+#ifdef CONFIG_ISA
 	/* First fill our array with ISA ports */
 	for (np = NULL; (np = of_find_node_by_type(np, "serial"));) {
 		struct device_node *isa = of_get_parent(np);
@@ -245,7 +287,9 @@ void __init find_legacy_serial_ports(void)
 		}
 		of_node_put(isa);
 	}
+#endif
 
+#ifdef CONFIG_PCI
 	/* Next, try to locate PCI ports */
 	for (np = NULL; (np = of_find_all_nodes(np));) {
 		struct device_node *pci, *parent = of_get_parent(np);
@@ -275,6 +319,7 @@ void __init find_legacy_serial_ports(void)
 			legacy_serial_console = index;
 		of_node_put(parent);
 	}
+#endif
 
 	DBG("legacy_serial_console = %d\n", legacy_serial_console);
 
@@ -338,6 +383,7 @@ static void __init fixup_port_pio(int index,
 				  struct device_node *np,
 				  struct plat_serial8250_port *port)
 {
+#ifdef CONFIG_PCI
 	struct pci_controller *hose;
 
 	DBG("fixup_port_pio(%d)\n", index);
@@ -354,6 +400,7 @@ static void __init fixup_port_pio(int index,
 		    index, port->iobase, port->iobase + offset);
 		port->iobase += offset;
 	}
+#endif
 }
 
 static void __init fixup_port_mmio(int index,
@@ -476,6 +523,11 @@ static int __init check_legacy_serial_console(void)
 
 	if (!of_chosen) {
 		DBG(" of_chosen is NULL !\n");
+		return -ENODEV;
+	}
+
+	if (legacy_serial_console < 0) {
+		DBG(" legacy_serial_console not found !\n");
 		return -ENODEV;
 	}
 	/* We are getting a weird phandle from OF ... */

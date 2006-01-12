@@ -9,6 +9,7 @@
 #include <linux/pfkeyv2.h>
 #include <linux/random.h>
 #include <net/icmp.h>
+#include <net/protocol.h>
 #include <net/udp.h>
 
 /* decapsulation data for use when post-processing */
@@ -465,7 +466,6 @@ static struct net_protocol esp4_protocol = {
 	.handler	=	xfrm4_rcv,
 	.err_handler	=	esp4_err,
 	.no_policy	=	1,
-	.xfrm_prot	=	1,
 };
 
 static int __init esp4_init(void)

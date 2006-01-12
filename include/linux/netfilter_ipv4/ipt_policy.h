@@ -1,20 +1,20 @@
 #ifndef _IPT_POLICY_H
 #define _IPT_POLICY_H
 
-#define POLICY_MAX_ELEM	4
+#define IPT_POLICY_MAX_ELEM	4
 
 enum ipt_policy_flags
 {
-	POLICY_MATCH_IN		= 0x1,
-	POLICY_MATCH_OUT	= 0x2,
-	POLICY_MATCH_NONE	= 0x4,
-	POLICY_MATCH_STRICT	= 0x8,
+	IPT_POLICY_MATCH_IN	= 0x1,
+	IPT_POLICY_MATCH_OUT	= 0x2,
+	IPT_POLICY_MATCH_NONE	= 0x4,
+	IPT_POLICY_MATCH_STRICT	= 0x8,
 };
 
 enum ipt_policy_modes
 {
-	POLICY_MODE_TRANSPORT,
-	POLICY_MODE_TUNNEL
+	IPT_POLICY_MODE_TRANSPORT,
+	IPT_POLICY_MODE_TUNNEL
 };
 
 struct ipt_policy_spec
@@ -44,7 +44,7 @@ struct ipt_policy_elem
 
 struct ipt_policy_info
 {
-	struct ipt_policy_elem pol[POLICY_MAX_ELEM];
+	struct ipt_policy_elem pol[IPT_POLICY_MAX_ELEM];
 	u_int16_t flags;
 	u_int16_t len;
 };

@@ -835,7 +835,7 @@ config PROC_KCORE
 
 config PROC_VMCORE
         bool "/proc/vmcore support (EXPERIMENTAL)"
-        depends on PROC_FS && EMBEDDED && EXPERIMENTAL && CRASH_DUMP
+        depends on PROC_FS && EXPERIMENTAL && CRASH_DUMP
         help
         Exports the dump image of crashed kernel in ELF format.
 
@@ -891,7 +891,6 @@ config TMPFS_POSIX_ACL
 config HUGETLBFS
 	bool "HugeTLB file system support"
 	depends X86 || IA64 || PPC64 || SPARC64 || SUPERH || BROKEN
-	depends !XEN
 
 config HUGETLB_PAGE
 	def_bool HUGETLBFS

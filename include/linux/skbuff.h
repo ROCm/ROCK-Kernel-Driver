@@ -32,7 +32,6 @@
 
 #define HAVE_ALLOC_SKB		/* For the drivers to know */
 #define HAVE_ALIGNABLE_SKB	/* Ditto 8)		   */
-#define SLAB_SKB 		/* Slabified skbuffs 	   */
 
 #define CHECKSUM_NONE 0
 #define CHECKSUM_HW 1
@@ -134,7 +133,7 @@ struct skb_frag_struct {
  */
 struct skb_shared_info {
 	atomic_t	dataref;
-	unsigned int	nr_frags;
+	unsigned short	nr_frags;
 	unsigned short	tso_size;
 	unsigned short	tso_segs;
 	unsigned short  ufo_size;
@@ -190,8 +189,6 @@ enum {
  *	@local_df: allow local fragmentation
  *	@cloned: Head may be cloned (check refcnt to be sure)
  *	@nohdr: Payload reference only, must not modify header
- *	@proto_csum_valid: Protocol csum validated since arriving at localhost
- *	@proto_csum_blank: Protocol csum must be added before leaving localhost
  *	@pkt_type: Packet class
  *	@fclone: skbuff clone status
  *	@ip_summed: Driver fed us an IP checksum
@@ -254,7 +251,7 @@ struct sk_buff {
 	 * want to keep them across layers you have to do a skb_clone()
 	 * first. This is owned by whoever has the skb queued ATM.
 	 */
-	char			cb[40];
+	char			cb[48];
 
 	unsigned int		len,
 				data_len,
@@ -268,13 +265,7 @@ struct sk_buff {
 				nfctinfo:3;
 	__u8			pkt_type:3,
 				fclone:2,
-#ifndef CONFIG_XEN
 				ipvs_property:1;
-#else
-				ipvs_property:1,
-				proto_csum_valid:1,
-				proto_csum_blank:1;
-#endif
 	__be16			protocol;
 
 	void			(*destructor)(struct sk_buff *skb);
@@ -330,8 +321,7 @@ static inline struct sk_buff *alloc_skb_fclone(unsigned int size,
 
 extern struct sk_buff *alloc_skb_from_cache(kmem_cache_t *cp,
 					    unsigned int size,
-					    gfp_t priority,
-					    int fclone);
+					    gfp_t priority);
 extern void	       kfree_skbmem(struct sk_buff *skb);
 extern struct sk_buff *skb_clone(struct sk_buff *skb,
 				 gfp_t priority);
@@ -1061,7 +1051,7 @@ static inline struct sk_buff *__dev_alloc_skb(unsigned int length,
 	return skb;
 }
 #else
-extern struct sk_buff *__dev_alloc_skb(unsigned int length, gfp_t gfp_mask);
+extern struct sk_buff *__dev_alloc_skb(unsigned int length, int gfp_mask);
 #endif
 
 /**
@@ -1248,6 +1238,8 @@ extern int	       skb_copy_and_csum_datagram_iovec(struct sk_buff *skb,
 							int hlen,
 							struct iovec *iov);
 extern void	       skb_free_datagram(struct sock *sk, struct sk_buff *skb);
+extern void	       skb_kill_datagram(struct sock *sk, struct sk_buff *skb,
+					 unsigned int flags);
 extern unsigned int    skb_checksum(const struct sk_buff *skb, int offset,
 				    int len, unsigned int csum);
 extern int	       skb_copy_bits(const struct sk_buff *skb, int offset,

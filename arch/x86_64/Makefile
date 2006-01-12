@@ -31,6 +31,7 @@ cflags-$(CONFIG_MK8) += $(call cc-option,-march=k8)
 cflags-$(CONFIG_MPSC) += $(call cc-option,-march=nocona)
 CFLAGS += $(cflags-y)
 
+CFLAGS += -m64
 CFLAGS += -mno-red-zone
 CFLAGS += -mcmodel=kernel
 CFLAGS += -pipe
@@ -38,8 +39,10 @@ CFLAGS += -pipe
 # actually it makes the kernel smaller too.
 CFLAGS += -fno-reorder-blocks	
 CFLAGS += -Wno-sign-compare
-ifneq ($(CONFIG_DEBUG_INFO),y)
+ifneq ($(CONFIG_UNWIND_INFO),y)
 CFLAGS += -fno-asynchronous-unwind-tables
+endif
+ifneq ($(CONFIG_DEBUG_INFO),y)
 # -fweb shrinks the kernel a bit, but the difference is very small
 # it also messes up debugging, so don't use it for now.
 #CFLAGS += $(call cc-option,-fweb)
@@ -50,40 +53,24 @@ CFLAGS += $(call cc-option,-funit-at-a-time)
 # prevent gcc from generating any FP code by mistake
 CFLAGS += $(call cc-option,-mno-sse -mno-mmx -mno-sse2 -mno-3dnow,)
 
-ifndef CONFIG_XEN
-archdir := x86_64
-else
-archdir := x86_64/xen
-arch/x86_64/kernel/vmlinux.lds: arch/x86_64/kernel/vmlinux.lds.S
-CPPFLAGS := -D__KERNEL__ -Iinclude$(if $(KBUILD_SRC),2)/asm/mach-xen $(LINUXINCLUDE)
-LDFLAGS_vmlinux := -e _start
-endif
+AFLAGS += -m64
 
-head-y := arch/$(archdir)/kernel/head.o arch/$(archdir)/kernel/head64.o arch/$(archdir)/kernel/init_task.o
+head-y := arch/x86_64/kernel/head.o arch/x86_64/kernel/head64.o arch/x86_64/kernel/init_task.o
 
 libs-y 					+= arch/x86_64/lib/
-core-y					+= arch/$(archdir)/kernel/ \
-					   arch/$(archdir)/mm/ \
+core-y					+= arch/x86_64/kernel/ \
+					   arch/x86_64/mm/ \
 					   arch/x86_64/crypto/
-core-$(CONFIG_IA32_EMULATION)		+= arch/$(archdir)/ia32/
-drivers-$(CONFIG_PCI)			+= arch/$(archdir)/pci/
+core-$(CONFIG_IA32_EMULATION)		+= arch/x86_64/ia32/
+drivers-$(CONFIG_PCI)			+= arch/x86_64/pci/
 drivers-$(CONFIG_OPROFILE)		+= arch/x86_64/oprofile/
 
-boot := arch/$(archdir)/boot
+boot := arch/x86_64/boot
 
 .PHONY: bzImage bzlilo install archmrproper \
 	fdimage fdimage144 fdimage288 archclean
 
 #Default target when executing "make"
-ifdef CONFIG_XEN
-all: vmlinuz
-
-vmlinuz: vmlinux
-	$(Q)$(MAKE) $(build)=$(boot) $@
-
-install: vmlinuz
-	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(BOOTIMAGE) $@
-else
 all: bzImage
 
 BOOTIMAGE                     := arch/x86_64/boot/bzImage
@@ -98,9 +85,11 @@ bzlilo: vmlinux
 bzdisk: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(BOOTIMAGE) zdisk
 
-install fdimage fdimage144 fdimage288: vmlinux
+fdimage fdimage144 fdimage288: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(BOOTIMAGE) $@
-endif
+
+install:
+	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(BOOTIMAGE) $@ 
 
 archclean:
 	$(Q)$(MAKE) $(clean)=$(boot)

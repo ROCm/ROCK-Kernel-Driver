@@ -746,7 +746,8 @@ iSeries_secondary_smp_loop:
 decrementer_iSeries_masked:
 	li	r11,1
 	stb	r11,PACALPPACA+LPPACADECRINT(r13)
-	lwz	r12,PACADEFAULTDECR(r13)
+	LOADBASE(r12,tb_ticks_per_jiffy)
+	lwz	r12,OFF(tb_ticks_per_jiffy)(r12)
 	mtspr	SPRN_DEC,r12
 	/* fall through */
 
@@ -1505,11 +1506,13 @@ _STATIC(__mmu_off)
  *
  */
 _GLOBAL(__start_initialization_multiplatform)
+#ifdef CONFIG_PPC_MULTIPLATFORM
 	/*
 	 * Are we booted from a PROM Of-type client-interface ?
 	 */
 	cmpldi	cr0,r5,0
 	bne	.__boot_from_prom		/* yes -> prom */
+#endif
 
 	/* Save parameters */
 	mr	r31,r3
@@ -1530,6 +1533,7 @@ _GLOBAL(__start_initialization_multiplatform)
 	bl	.__mmu_off
 	b	.__after_prom_start
 
+#ifdef CONFIG_PPC_MULTIPLATFORM
 _STATIC(__boot_from_prom)
 	/* Save parameters */
 	mr	r31,r3
@@ -1562,6 +1566,7 @@ _STATIC(__boot_from_prom)
 	bl	.prom_init
 	/* We never return */
 	trap
+#endif
 
 /*
  * At this point, r3 contains the physical address we are running at,
@@ -1866,7 +1871,7 @@ _STATIC(start_here_multiplatform)
 	mulli	r13,r27,PACA_SIZE	/* Calculate vaddr of right paca */
 	add	r13,r13,r24		/* for this processor.		 */
 	add	r13,r13,r26		/* convert to physical addr	 */
-	mtspr	SPRN_SPRG3,r13		/* PPPBBB: Temp... -Peter */
+	mtspr	SPRN_SPRG3,r13
 	
 	/* Do very early kernel initializations, including initial hash table,
 	 * stab and slb setup before we turn on relocation.	*/

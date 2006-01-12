@@ -655,7 +655,7 @@ static void hwif_release_dev (struct device *dev)
 {
 	ide_hwif_t *hwif = container_of(dev, ide_hwif_t, gendev);
 
-	up(&hwif->gendev_rel_sem);
+	complete(&hwif->gendev_rel_comp);
 }
 
 static void hwif_register (ide_hwif_t *hwif)
@@ -1011,6 +1011,8 @@ static int ide_init_queue(ide_drive_t *drive)
 	blk_queue_max_hw_segments(q, max_sg_entries);
 	blk_queue_max_phys_segments(q, max_sg_entries);
 
+	blk_queue_softirq_done(q, ide_softirq_done);
+
 	/* assign drive queue */
 	drive->queue = q;
 
@@ -1325,7 +1327,7 @@ static void drive_release_dev (struct device *dev)
 	drive->queue = NULL;
 	spin_unlock_irq(&ide_lock);
 
-	up(&drive->gendev_rel_sem);
+	complete(&drive->gendev_rel_comp);
 }
 
 /*

@@ -126,22 +126,12 @@ CPPFLAGS_vmlinux.lds = -U$(SUBARCH) \
 #The wrappers will select whether using "malloc" or the kernel allocator.
 LINK_WRAPS = -Wl,--wrap,malloc -Wl,--wrap,free -Wl,--wrap,calloc
 
-ifeq ($(SUBARCH),x86_64)
-  libdir = lib64
-else
-  libdir = lib
-endif
-UML_LIBS := -L/usr/$(libdir) -lutil
-ifeq ($(CONFIG_X11_FB),y)
-UML_LIBS += -L/usr/X11R6/$(libdir) -lX11 -lXext
-endif
-
 CFLAGS_vmlinux := $(LINK-y) $(LINK_WRAPS)
 define cmd_vmlinux__
 	$(CC) $(CFLAGS_vmlinux) -o $@ \
 	-Wl,-T,$(vmlinux-lds) $(vmlinux-init) \
 	-Wl,--start-group $(vmlinux-main) -Wl,--end-group \
-	$(UML_LIBS) \
+	-lutil \
 	$(filter-out $(vmlinux-lds) $(vmlinux-init) $(vmlinux-main) \
 	FORCE ,$^) ; rm -f linux
 endef
@@ -199,6 +189,12 @@ define filechk_umlconfig
 	sed 's/ CONFIG/ UML_CONFIG/'
 endef
 
+$(ARCH_DIR)/include/uml-config.h : include/linux/autoconf.h
+	$(call filechk,umlconfig)
+
+$(ARCH_DIR)/user-offsets.s: $(ARCH_DIR)/sys-$(SUBARCH)/user-offsets.c
+	$(CC) $(USER_CFLAGS) -S -o $@ $<
+
 define filechk_gen-asm-offsets
         (set -e; \
          echo "/*"; \
@@ -212,24 +208,13 @@ define filechk_gen-asm-offsets
          echo ""; )
 endef
 
-$(ARCH_DIR)/include/uml-config.h : include/linux/autoconf.h
-	$(call filechk,umlconfig)
-
-$(ARCH_DIR)/user-offsets.s: $(ARCH_DIR)/sys-$(SUBARCH)/user-offsets.c
-	$(CC) $(USER_CFLAGS) -S -o $@ $<
-
 $(ARCH_DIR)/include/user_constants.h: $(ARCH_DIR)/user-offsets.s
 	$(call filechk,gen-asm-offsets)
 
 CLEAN_FILES += $(ARCH_DIR)/user-offsets.s
 
-$(ARCH_DIR)/kernel-offsets.s: $(ARCH_DIR)/sys-$(SUBARCH)/kernel-offsets.c \
-				   archprepare
-	$(CC) $(CFLAGS) $(NOSTDINC_FLAGS) $(CPPFLAGS) -S -o $@ $<
-
-$(ARCH_DIR)/include/kern_constants.h: $(ARCH_DIR)/kernel-offsets.s
-	$(call filechk,gen-asm-offsets)
-
-CLEAN_FILES += $(ARCH_DIR)/kernel-offsets.s
+$(ARCH_DIR)/include/kern_constants.h:
+	@echo '  SYMLINK $@'
+	$(Q) ln -sf ../../../include/asm-um/asm-offsets.h $@
 
 export SUBARCH USER_CFLAGS OS

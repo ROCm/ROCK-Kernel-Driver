@@ -335,6 +335,7 @@ work_notifysig:				# deal with pending signals and
 
 	ALIGN
 work_notifysig_v86:
+#ifdef CONFIG_VM86
 	pushl %ecx			# save ti_flags for do_notify_resume
 	call save_v86_state		# %eax contains pt_regs pointer
 	popl %ecx
@@ -342,6 +343,7 @@ work_notifysig_v86:
 	xorl %edx, %edx
 	call do_notify_resume
 	jmp resume_userspace
+#endif
 
 	# perform syscall exit tracing
 	ALIGN
@@ -685,6 +687,7 @@ ENTRY(spurious_interrupt_bug)
 	pushl $do_spurious_interrupt_bug
 	jmp error_code
 
+.section .rodata,"a"
 #include "syscall_table.S"
 
 syscall_table_size=(.-sys_call_table)

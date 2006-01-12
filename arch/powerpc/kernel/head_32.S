@@ -120,10 +120,12 @@ __start:
  * because OF may have I/O devices mapped into that area
  * (particularly on CHRP).
  */
+#ifdef CONFIG_PPC_MULTIPLATFORM
 	cmpwi	0,r5,0
 	beq	1f
 	bl	prom_init
 	trap
+#endif
 
 /*
  * Check for BootX signature when supporting PowerMac and branch to
@@ -466,15 +468,10 @@ SystemCall:
  * by executing an altivec instruction.
  */
 	. = 0xf00
-	b	Trap_0f
+	b	PerformanceMonitor
 
 	. = 0xf20
 	b	AltiVecUnavailable
-
-Trap_0f:
-	EXCEPTION_PROLOG
-	addi	r3,r1,STACK_FRAME_OVERHEAD
-	EXC_XFER_EE(0xf00, unknown_exception)
 
 /*
  * Handle TLB miss for instruction on 603/603e.
@@ -718,6 +715,11 @@ AltiVecUnavailable:
 	bne	load_up_altivec		/* if from user, just load it up */
 #endif /* CONFIG_ALTIVEC */
 	EXC_XFER_EE_LITE(0xf20, altivec_unavailable_exception)
+
+PerformanceMonitor:
+	EXCEPTION_PROLOG
+	addi	r3,r1,STACK_FRAME_OVERHEAD
+	EXC_XFER_STD(0xf00, performance_monitor_exception)
 
 #ifdef CONFIG_ALTIVEC
 /* Note that the AltiVec support is closely modeled after the FP

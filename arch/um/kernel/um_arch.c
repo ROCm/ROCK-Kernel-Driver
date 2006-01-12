@@ -14,7 +14,6 @@
 #include "linux/bootmem.h"
 #include "linux/spinlock.h"
 #include "linux/utsname.h"
-#include "linux/console.h"
 #include "linux/sysrq.h"
 #include "linux/seq_file.h"
 #include "linux/delay.h"
@@ -59,7 +58,7 @@ static void add_arg(char *arg)
 	strcat(command_line, arg);
 }
 
-struct cpuinfo_um boot_cpu_data = {
+struct cpuinfo_um boot_cpu_data = { 
 	.loops_per_jiffy	= 0,
 	.ipi_pipe		= { -1, -1 }
 };
@@ -147,22 +146,22 @@ void set_cmdline(char *cmd)
 
 	if(CHOOSE_MODE(honeypot, 0)) return;
 
-	umid = get_umid(1);
-	if(umid != NULL){
-		snprintf(argv1_begin,
-			 (argv1_end - argv1_begin) * sizeof(*ptr),
+	umid = get_umid();
+	if(*umid != '\0'){
+		snprintf(argv1_begin, 
+			 (argv1_end - argv1_begin) * sizeof(*ptr), 
 			 "(%s) ", umid);
 		ptr = &argv1_begin[strlen(argv1_begin)];
 	}
 	else ptr = argv1_begin;
 
 	snprintf(ptr, (argv1_end - ptr) * sizeof(*ptr), "[%s]", cmd);
-	memset(argv1_begin + strlen(argv1_begin), '\0',
+	memset(argv1_begin + strlen(argv1_begin), '\0', 
 	       argv1_end - argv1_begin - strlen(argv1_begin));
 #endif
 }
 
-static char *usage_string =
+static char *usage_string = 
 "User Mode Linux v%s\n"
 "	available at http://user-mode-linux.sourceforge.net/\n\n";
 
@@ -207,7 +206,7 @@ static int __init uml_ncpus_setup(char *line, int *add)
 
 __uml_setup("ncpus=", uml_ncpus_setup,
 "ncpus=<# of desired CPUs>\n"
-"    This tells an SMP kernel how many virtual processors to start.\n\n"
+"    This tells an SMP kernel how many virtual processors to start.\n\n" 
 );
 #endif
 
@@ -243,10 +242,6 @@ static int __init mode_tt_setup(char *line, int *add)
 	printf("CONFIG_MODE_SKAS disabled - 'mode=tt' redundant\n");
 	return(0);
 }
-
-#else
-
-#error Either CONFIG_MODE_TT or CONFIG_MODE_SKAS must be enabled
 
 #endif
 #endif
@@ -364,6 +359,11 @@ int linux_main(int argc, char **argv)
 	uml_start = CHOOSE_MODE_PROC(set_task_sizes_tt, set_task_sizes_skas, 0,
 				     &host_task_size, &task_size);
 
+	/*
+ 	 * Setting up handlers to 'sig_info' struct
+ 	 */
+	os_fill_handlinfo(handlinfo_kern);
+
 	brk_start = (unsigned long) sbrk(0);
 	CHOOSE_MODE_PROC(before_mem_tt, before_mem_skas, brk_start);
 	/* Increase physical memory size for exec-shield users
@@ -388,7 +388,7 @@ int linux_main(int argc, char **argv)
 	argv1_begin = argv[1];
 	argv1_end = &argv[1][strlen(argv[1])];
 #endif
-
+  
 	highmem = 0;
 	iomem_size = (iomem_size + PAGE_SIZE - 1) & PAGE_MASK;
 	max_physmem = get_kmem_end() - uml_physmem - iomem_size - MIN_VMALLOC;
@@ -457,8 +457,6 @@ static struct notifier_block panic_exit_notifier = {
 	.priority 		= 0
 };
 
-extern int console_use_vt; /* FIXME */
-
 void __init setup_arch(char **cmdline_p)
 {
 	notifier_chain_register(&panic_notifier_list, &panic_exit_notifier);
@@ -466,9 +464,6 @@ void __init setup_arch(char **cmdline_p)
         strlcpy(saved_command_line, command_line, COMMAND_LINE_SIZE);
  	*cmdline_p = command_line;
 	setup_hostinfo();
-#if defined(CONFIG_DUMMY_CONSOLE)
-	console_use_vt = 0;
-#endif
 }
 
 void __init check_bugs(void)

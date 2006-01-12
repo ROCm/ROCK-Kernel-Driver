@@ -27,6 +27,7 @@
 #include <linux/smp_lock.h>
 #include <asm/mmu_context.h>
 #include <linux/interrupt.h>
+#include <linux/capability.h>
 #include <linux/completion.h>
 #include <linux/kernel_stat.h>
 #include <linux/security.h>
@@ -175,6 +176,13 @@ static unsigned int task_timeslice(task_t *p)
 }
 #define task_hot(p, now, sd) ((long long) ((now) - (p)->last_ran)	\
 				< (long long) (sd)->cache_hot_time)
+
+void __put_task_struct_cb(struct rcu_head *rhp)
+{
+	__put_task_struct(container_of(rhp, struct task_struct, rcu));
+}
+
+EXPORT_SYMBOL_GPL(__put_task_struct_cb);
 
 /*
  * These are the runqueue data structures:
@@ -3972,12 +3980,12 @@ asmlinkage long sys_sched_setaffinity(pid_t pid, unsigned int len,
  * method, such as ACPI for e.g.
  */
 
-cpumask_t cpu_present_map;
+cpumask_t cpu_present_map __read_mostly;
 EXPORT_SYMBOL(cpu_present_map);
 
 #ifndef CONFIG_SMP
-cpumask_t cpu_online_map = CPU_MASK_ALL;
-cpumask_t cpu_possible_map = CPU_MASK_ALL;
+cpumask_t cpu_online_map __read_mostly = CPU_MASK_ALL;
+cpumask_t cpu_possible_map __read_mostly = CPU_MASK_ALL;
 #endif
 
 long sched_getaffinity(pid_t pid, cpumask_t *mask)
@@ -4379,6 +4387,7 @@ void show_state(void)
 	} while_each_thread(g, p);
 
 	read_unlock(&tasklist_lock);
+	mutex_debug_show_all_locks();
 }
 
 /**

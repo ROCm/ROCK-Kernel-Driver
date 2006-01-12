@@ -61,9 +61,11 @@ struct cpuinfo_x86 {
 	int 	x86_cache_size;  /* in KB - valid for CPUS which support this
 				    call  */
 	int 	x86_cache_alignment;	/* In bytes */
-	int	fdiv_bug;
-	int	f00f_bug;
-	int	coma_bug;
+	char	fdiv_bug;
+	char	f00f_bug;
+	char	coma_bug;
+	char	pad0;
+	int	x86_power;
 	unsigned long loops_per_jiffy;
 	unsigned char x86_max_cores;	/* cpuid returned max cores value */
 	unsigned char booted_cores;	/* number of cores as seen by OS */
@@ -279,9 +281,11 @@ static inline void clear_in_cr4 (unsigned long mask)
 	outb((data), 0x23); \
 } while (0)
 
-static inline void serialize_cpu(void)
+/* Stop speculative execution */
+static inline void sync_core(void)
 {
-	 __asm__ __volatile__ ("cpuid" : : : "ax", "bx", "cx", "dx");
+	int tmp;
+	asm volatile("cpuid" : "=a" (tmp) : "0" (1) : "ebx","ecx","edx","memory");
 }
 
 static inline void __monitor(const void *eax, unsigned long ecx,

@@ -214,14 +214,14 @@ static struct dentry *subfs_lookup(struct inode *dir,
 	struct vfsmount *child;
 
 	/* This is ugly, but prevents a lockup during mount. */
-	up(&dir->i_sem);
+	mutex_unlock(&dir->i_mutex);
 	if (down_interruptible(&sfs_mnt->sem)) {
-		down(&dir->i_sem);/*put the dir sem back down if interrupted*/
+		mutex_lock(&dir->i_mutex);/*put the dir sem back down if interrupted*/
 		return ERR_PTR(-ERESTARTSYS);
 	}
 	child = get_child_mount(sfs_mnt, nd->mnt);
 	up(&sfs_mnt->sem);
-	down(&dir->i_sem);
+	mutex_lock(&dir->i_mutex);
 	if (IS_ERR(child))
 		return (void *) child;
 	subfs_send_signal();

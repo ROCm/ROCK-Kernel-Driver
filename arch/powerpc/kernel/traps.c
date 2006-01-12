@@ -231,8 +231,10 @@ void _exception(int signr, struct pt_regs *regs, int code, unsigned long addr)
 void system_reset_exception(struct pt_regs *regs)
 {
 	/* See if any machine dependent calls */
-	if (ppc_md.system_reset_exception)
-		ppc_md.system_reset_exception(regs);
+	if (ppc_md.system_reset_exception) {
+		if (ppc_md.system_reset_exception(regs))
+			return;
+	}
 
 	die("System Reset", regs, SIGABRT);
 
@@ -902,12 +904,10 @@ void altivec_unavailable_exception(struct pt_regs *regs)
 	die("Unrecoverable VMX/Altivec Unavailable Exception", regs, SIGABRT);
 }
 
-#if defined(CONFIG_PPC64) || defined(CONFIG_E500)
 void performance_monitor_exception(struct pt_regs *regs)
 {
 	perf_irq(regs);
 }
-#endif
 
 #ifdef CONFIG_8xx
 void SoftwareEmulation(struct pt_regs *regs)

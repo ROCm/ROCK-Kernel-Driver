@@ -51,8 +51,12 @@
 #include "xfs_buf_item.h"
 #include "xfs_utils.h"
 
+#include <linux/capability.h>
 #include <linux/xattr.h>
 #include <linux/namei.h>
+
+#define IS_NOATIME(inode) ((inode->i_sb->s_flags & MS_NOATIME) ||	\
+	(S_ISDIR(inode->i_mode) && inode->i_sb->s_flags & MS_NODIRATIME))
 
 /*
  * Change the requested timestamp in the given inode.
@@ -203,7 +207,7 @@ validate_fields(
 		ip->i_nlink = va.va_nlink;
 		ip->i_blocks = va.va_nblocks;
 
-		/* we're under i_sem so i_size can't change under us */
+		/* we're under i_mutex so i_size can't change under us */
 		if (i_size_read(ip) != va.va_size)
 			i_size_write(ip, va.va_size);
 	}

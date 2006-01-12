@@ -469,8 +469,7 @@ static s32 i801_access(struct i2c_adapter * adap, u16 addr,
 		return -1;
 	}
 
-	if (hwpec)
-		outb_p(1, SMBAUXCTL);	/* enable hardware PEC */
+	outb_p(hwpec, SMBAUXCTL);	/* enable/disable hardware PEC */
 
 	if(block)
 		ret = i801_block_transaction(data, read_write, size, hwpec);
@@ -478,9 +477,6 @@ static s32 i801_access(struct i2c_adapter * adap, u16 addr,
 		outb_p(xact | ENABLE_INT9, SMBHSTCNT);
 		ret = i801_transaction();
 	}
-
-	if (hwpec)
-		outb_p(0, SMBAUXCTL);	/* disable hardware PEC */
 
 	if(block)
 		return ret;

@@ -28,6 +28,7 @@
 #include <net/xfrm.h>
 #include <net/icmp.h>
 #include <net/ipcomp.h>
+#include <net/protocol.h>
 
 struct ipcomp_tfms {
 	struct list_head list;
@@ -485,7 +486,6 @@ static struct net_protocol ipcomp4_protocol = {
 	.handler	=	xfrm4_rcv,
 	.err_handler	=	ipcomp4_err,
 	.no_policy	=	1,
-	.xfrm_prot	=	1,
 };
 
 static int __init ipcomp4_init(void)

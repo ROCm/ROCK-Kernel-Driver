@@ -34,7 +34,7 @@
 
 #ifdef DEBUG
 #include <asm/udbg.h>
-#define DBG(fmt...) udbg_printf(fmt)
+#define DBG(fmt...) printk(fmt)
 #else
 #define DBG(fmt...)
 #endif
@@ -251,7 +251,7 @@ void pcibios_free_controller(struct pci_controller *phb)
 		kfree(phb);
 }
 
-static void __init pcibios_claim_one_bus(struct pci_bus *b)
+void __devinit pcibios_claim_one_bus(struct pci_bus *b)
 {
 	struct pci_dev *dev;
 	struct pci_bus *child_bus;
@@ -271,6 +271,9 @@ static void __init pcibios_claim_one_bus(struct pci_bus *b)
 	list_for_each_entry(child_bus, &b->children, node)
 		pcibios_claim_one_bus(child_bus);
 }
+#ifdef CONFIG_HOTPLUG
+EXPORT_SYMBOL_GPL(pcibios_claim_one_bus);
+#endif
 
 #ifndef CONFIG_PPC_ISERIES
 static void __init pcibios_claim_of_setup(void)
@@ -323,6 +326,7 @@ static void pci_parse_of_addrs(struct device_node *node, struct pci_dev *dev)
 	addrs = (u32 *) get_property(node, "assigned-addresses", &proplen);
 	if (!addrs)
 		return;
+	DBG("    parse addresses (%d bytes) @ %p\n", proplen, addrs);
 	for (; proplen >= 20; proplen -= 20, addrs += 5) {
 		flags = pci_parse_of_flags(addrs[0]);
 		if (!flags)
@@ -332,6 +336,9 @@ static void pci_parse_of_addrs(struct device_node *node, struct pci_dev *dev)
 		if (!size)
 			continue;
 		i = addrs[0] & 0xff;
+		DBG("  base: %llx, size: %llx, i: %x\n",
+		    (unsigned long long)base, (unsigned long long)size, i);
+
 		if (PCI_BASE_ADDRESS_0 <= i && i <= PCI_BASE_ADDRESS_5) {
 			res = &dev->resource[(i - PCI_BASE_ADDRESS_0) >> 2];
 		} else if (i == dev->rom_base_reg) {
@@ -362,6 +369,8 @@ struct pci_dev *of_create_pci_dev(struct device_node *node,
 	if (type == NULL)
 		type = "";
 
+	DBG("    create device, devfn: %x, type: %s\n", devfn, type);
+
 	memset(dev, 0, sizeof(struct pci_dev));
 	dev->bus = bus;
 	dev->sysdata = node;
@@ -375,11 +384,13 @@ struct pci_dev *of_create_pci_dev(struct device_node *node,
 	dev->subsystem_vendor = get_int_prop(node, "subsystem-vendor-id", 0);
 	dev->subsystem_device = get_int_prop(node, "subsystem-id", 0);
 
-	dev->cfg_size = 256; /*pci_cfg_space_size(dev);*/
+	dev->cfg_size = pci_cfg_space_size(dev);
 
 	sprintf(pci_name(dev), "%04x:%02x:%02x.%d", pci_domain_nr(bus),
 		dev->bus->number, PCI_SLOT(devfn), PCI_FUNC(devfn));
 	dev->class = get_int_prop(node, "class-code", 0);
+
+	DBG("    class: 0x%x\n", dev->class);
 
 	dev->current_state = 4;		/* unknown power state */
 
@@ -402,6 +413,8 @@ struct pci_dev *of_create_pci_dev(struct device_node *node,
 
 	pci_parse_of_addrs(node, dev);
 
+	DBG("    adding to system ...\n");
+
 	pci_device_add(dev, bus);
 
 	/* XXX pci_scan_msi_device(dev); */
@@ -418,15 +431,21 @@ void __devinit of_scan_bus(struct device_node *node,
 	int reglen, devfn;
 	struct pci_dev *dev;
 
+	DBG("of_scan_bus(%s) bus no %d... \n", node->full_name, bus->number);
+
 	while ((child = of_get_next_child(node, child)) != NULL) {
+		DBG("  * %s\n", child->full_name);
 		reg = (u32 *) get_property(child, "reg", &reglen);
 		if (reg == NULL || reglen < 20)
 			continue;
 		devfn = (reg[0] >> 8) & 0xff;
+
 		/* create a new pci_dev for this device */
 		dev = of_create_pci_dev(child, bus, devfn);
 		if (!dev)
 			continue;
+		DBG("dev header type: %x\n", dev->hdr_type);
+
 		if (dev->hdr_type == PCI_HEADER_TYPE_BRIDGE ||
 		    dev->hdr_type == PCI_HEADER_TYPE_CARDBUS)
 			of_scan_pci_bridge(child, dev);
@@ -446,16 +465,18 @@ void __devinit of_scan_pci_bridge(struct device_node *node,
 	unsigned int flags;
 	u64 size;
 
+	DBG("of_scan_pci_bridge(%s)\n", node->full_name);
+
 	/* parse bus-range property */
 	busrange = (u32 *) get_property(node, "bus-range", &len);
 	if (busrange == NULL || len != 8) {
-		printk(KERN_ERR "Can't get bus-range for PCI-PCI bridge %s\n",
+		printk(KERN_DEBUG "Can't get bus-range for PCI-PCI bridge %s\n",
 		       node->full_name);
 		return;
 	}
 	ranges = (u32 *) get_property(node, "ranges", &len);
 	if (ranges == NULL) {
-		printk(KERN_ERR "Can't get ranges for PCI-PCI bridge %s\n",
+		printk(KERN_DEBUG "Can't get ranges for PCI-PCI bridge %s\n",
 		       node->full_name);
 		return;
 	}
@@ -509,10 +530,13 @@ void __devinit of_scan_pci_bridge(struct device_node *node,
 	}
 	sprintf(bus->name, "PCI Bus %04x:%02x", pci_domain_nr(bus),
 		bus->number);
+	DBG("    bus name: %s\n", bus->name);
 
 	mode = PCI_PROBE_NORMAL;
 	if (ppc_md.pci_probe_mode)
 		mode = ppc_md.pci_probe_mode(bus);
+	DBG("    probe mode: %d\n", mode);
+
 	if (mode == PCI_PROBE_DEVTREE)
 		of_scan_bus(node, bus);
 	else if (mode == PCI_PROBE_NORMAL)
@@ -527,6 +551,8 @@ void __devinit scan_phb(struct pci_controller *hose)
 	struct device_node *node = hose->arch_data;
 	int i, mode;
 	struct resource *res;
+
+	DBG("Scanning PHB %s\n", node ? node->full_name : "<NO NAME>");
 
 	bus = pci_create_bus(NULL, hose->first_busno, hose->ops, node);
 	if (bus == NULL) {
@@ -552,8 +578,9 @@ void __devinit scan_phb(struct pci_controller *hose)
 
 	mode = PCI_PROBE_NORMAL;
 #ifdef CONFIG_PPC_MULTIPLATFORM
-	if (ppc_md.pci_probe_mode)
+	if (node && ppc_md.pci_probe_mode)
 		mode = ppc_md.pci_probe_mode(bus);
+	DBG("    probe mode: %d\n", mode);
 	if (mode == PCI_PROBE_DEVTREE) {
 		bus->subordinate = hose->last_busno;
 		of_scan_bus(node, bus);
@@ -842,8 +869,7 @@ pgprot_t pci_phys_mem_access_prot(struct file *file,
  * Returns a negative error code on failure, zero on success.
  */
 int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
-			enum pci_mmap_state mmap_state,
-			int write_combine)
+			enum pci_mmap_state mmap_state, int write_combine)
 {
 	unsigned long offset = vma->vm_pgoff << PAGE_SHIFT;
 	struct resource *rp;
@@ -896,6 +922,25 @@ static void __devinit pci_process_ISA_OF_ranges(struct device_node *isa_node,
 				      unsigned long phb_io_base_phys,
 				      void __iomem * phb_io_base_virt)
 {
+	/* Remove these asap */
+
+	struct pci_address {
+		u32 a_hi;
+		u32 a_mid;
+		u32 a_lo;
+	};
+
+	struct isa_address {
+		u32 a_hi;
+		u32 a_lo;
+	};
+
+	struct isa_range {
+		struct isa_address isa_addr;
+		struct pci_address pci_addr;
+		unsigned int size;
+	};
+
 	struct isa_range *range;
 	unsigned long pci_addr;
 	unsigned int isa_addr;
@@ -1323,15 +1368,17 @@ struct pci_controller* pci_find_hose_for_OF_device(struct device_node* node)
 
 #endif /* CONFIG_PPC_MULTIPLATFORM */
 
-unsigned int pci_address_to_pio(phys_addr_t address)
+unsigned long pci_address_to_pio(phys_addr_t address)
 {
 	struct pci_controller *hose, *tmp;
 
 	list_for_each_entry_safe(hose, tmp, &hose_list, list_node) {
 		if (address >= hose->io_base_phys &&
-		    address < (hose->io_base_phys + hose->pci_io_size))
-			return (unsigned int)hose->io_base_virt +
-				(address - hose->io_base_phys);
+		    address < (hose->io_base_phys + hose->pci_io_size)) {
+			unsigned long base =
+				(unsigned long)hose->io_base_virt - pci_io_base;
+			return base + (address - hose->io_base_phys);
+		}
 	}
 	return (unsigned int)-1;
 }

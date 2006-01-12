@@ -227,7 +227,13 @@ struct tss_struct {
 extern struct cpuinfo_x86 boot_cpu_data;
 DECLARE_PER_CPU(struct tss_struct,init_tss);
 
+#ifdef CONFIG_X86_VSMP
+#define ARCH_MIN_TASKALIGN	(1 << INTERNODE_CACHE_SHIFT)
+#define ARCH_MIN_MMSTRUCT_ALIGN	(1 << INTERNODE_CACHE_SHIFT)
+#else
 #define ARCH_MIN_TASKALIGN	16
+#define ARCH_MIN_MMSTRUCT_ALIGN	0
+#endif
 
 struct thread_struct {
 	unsigned long	rsp0;
@@ -273,8 +279,6 @@ struct thread_struct {
 #define DEBUG_STACK 4 
 #define MCE_STACK 5
 #define N_EXCEPTION_STACKS 5  /* hw limit: 7 */
-#define EXCEPTION_STKSZ (PAGE_SIZE << EXCEPTION_STACK_ORDER)
-#define EXCEPTION_STACK_ORDER 0 
 
 #define start_thread(regs,new_rip,new_rsp) do { \
 	asm volatile("movl %0,%%fs; movl %0,%%es; movl %0,%%ds": :"r" (0));	 \

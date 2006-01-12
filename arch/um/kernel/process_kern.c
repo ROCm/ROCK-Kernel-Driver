@@ -36,7 +36,6 @@
 #include "kern_util.h"
 #include "kern.h"
 #include "signal_kern.h"
-#include "signal_user.h"
 #include "init.h"
 #include "irq_user.h"
 #include "mem_user.h"
@@ -323,10 +322,6 @@ int user_context(unsigned long sp)
 	stack = sp & (PAGE_MASK << CONFIG_KERNEL_STACK_ORDER);
 	return(stack != (unsigned long) current_thread);
 }
-
-extern void remove_umid_dir(void);
-
-__uml_exitcall(remove_umid_dir);
 
 extern exitcall_t __uml_exitcall_begin, __uml_exitcall_end;
 

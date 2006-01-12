@@ -503,7 +503,7 @@ pcibios_allocate_resources(int pass)
 	u16 command;
 	struct resource *r;
 
-	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
+	for_each_pci_dev(dev) {
 		pci_read_config_word(dev, PCI_COMMAND, &command);
 		for (idx = 0; idx < 6; idx++) {
 			r = &dev->resource[idx];
@@ -540,7 +540,7 @@ pcibios_assign_resources(void)
 	int idx;
 	struct resource *r;
 
-	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
+	for_each_pci_dev(dev) {
 		int class = dev->class >> 8;
 
 		/* Don't touch classless devices and host bridges */
@@ -867,14 +867,15 @@ pci_device_from_OF_node(struct device_node* node, u8* bus, u8* devfn)
 	 */
 	if (!pci_to_OF_bus_map)
 		return 0;
-	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
-		if (pci_to_OF_bus_map[dev->bus->number] != *bus)
-			continue;
-		if (dev->devfn != *devfn)
-			continue;
-		*bus = dev->bus->number;
-		return 0;
-	}
+
+	for_each_pci_dev(dev)
+		if (pci_to_OF_bus_map[dev->bus->number] == *bus &&
+				dev->devfn == *devfn) {
+			*bus = dev->bus->number;
+			pci_dev_put(dev);
+			return 0;
+		}
+
 	return -ENODEV;
 }
 EXPORT_SYMBOL(pci_device_from_OF_node);
@@ -941,7 +942,7 @@ pci_process_bridge_OF_ranges(struct pci_controller *hose,
 	while (ranges && (rlen -= np * sizeof(unsigned int)) >= 0) {
 		res = NULL;
 		size = ranges[na+4];
-		switch (ranges[0] >> 24) {
+		switch ((ranges[0] >> 24) & 0x3) {
 		case 1:		/* I/O space */
 			if (ranges[2] != 0)
 				break;
@@ -955,6 +956,8 @@ pci_process_bridge_OF_ranges(struct pci_controller *hose,
 			res = &hose->io_resource;
 			res->flags = IORESOURCE_IO;
 			res->start = ranges[2];
+			DBG("PCI: IO 0x%lx -> 0x%lx\n",
+				    res->start, res->start + size - 1);
 			break;
 		case 2:		/* memory space */
 			memno = 0;
@@ -972,7 +975,11 @@ pci_process_bridge_OF_ranges(struct pci_controller *hose,
 			if (memno < 3) {
 				res = &hose->mem_resources[memno];
 				res->flags = IORESOURCE_MEM;
+				if(ranges[0] & 0x40000000)
+					res->flags |= IORESOURCE_PREFETCH;
 				res->start = ranges[na+2];
+				DBG("PCI: MEM[%d] 0x%lx -> 0x%lx\n", memno,
+					    res->start, res->start + size - 1);
 			}
 			break;
 		}
@@ -1805,7 +1812,7 @@ void pci_iounmap(struct pci_dev *dev, void __iomem *addr)
 EXPORT_SYMBOL(pci_iomap);
 EXPORT_SYMBOL(pci_iounmap);
 
-unsigned int pci_address_to_pio(phys_addr_t address)
+unsigned long pci_address_to_pio(phys_addr_t address)
 {
 	struct pci_controller* hose = hose_head;
 
@@ -1813,9 +1820,11 @@ unsigned int pci_address_to_pio(phys_addr_t address)
 		unsigned int size = hose->io_resource.end -
 			hose->io_resource.start + 1;
 		if (address >= hose->io_base_phys &&
-		    address < (hose->io_base_phys + size))
-			return (unsigned int)hose->io_base_virt +
-				(address - hose->io_base_phys);
+		    address < (hose->io_base_phys + size)) {
+			unsigned long base =
+				(unsigned long)hose->io_base_virt - _IO_BASE;
+			return base + (address - hose->io_base_phys);
+		}
 	}
 	return (unsigned int)-1;
 }

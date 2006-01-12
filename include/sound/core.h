@@ -134,7 +134,6 @@ struct snd_card {
 	wait_queue_head_t shutdown_sleep;
 	struct work_struct free_workq;	/* for free in workqueue */
 	struct device *dev;
-	struct class_device *parent_device;
 
 #ifdef CONFIG_PM
 	unsigned int power_state;	/* power state */
@@ -318,7 +317,7 @@ void snd_verbose_printd(const char *file, int line, const char *format, ...)
 #ifdef CONFIG_SND_VERBOSE_PRINTK
 /**
  * snd_printd - debug printk
- * @format: format string
+ * @fmt: format string
  *
  * Compiled only when Works like snd_printk() for debugging purpose.
  * Ignored when CONFIG_SND_DEBUG is not set.
@@ -332,7 +331,6 @@ void snd_verbose_printd(const char *file, int line, const char *format, ...)
 /**
  * snd_assert - run-time assertion macro
  * @expr: expression
- * @args...: the action
  *
  * This macro checks the expression in run-time and invokes the commands
  * given in the rest arguments if the assertion is failed.
