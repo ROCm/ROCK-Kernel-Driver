@@ -37,6 +37,8 @@ int nf_rcv_postxfrm_local(struct sk_buff *skb)
 	ip_send_check(skb->nh.iph);
         return nf_rcv_postxfrm_nonlocal(skb);
 }
+
+EXPORT_SYMBOL_GPL(nf_rcv_postxfrm_local);
 #endif CONFIG_XFRM
 
 #ifdef CONFIG_XFRM
