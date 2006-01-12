@@ -11,7 +11,76 @@
 #include <linux/udp.h>
 #include <linux/icmp.h>
 #include <net/route.h>
+#include <net/xfrm.h>
+#include <net/ip.h>
 #include <linux/ip.h>
+
+#ifdef CONFIG_XFRM
+inline int nf_rcv_postxfrm_nonlocal(struct sk_buff *skb)
+{
+        skb->sp->decap_done = 1;
+        dst_release(skb->dst);
+        skb->dst = NULL;
+        nf_reset(skb);
+        return netif_rx(skb);
+}
+
+int nf_rcv_postxfrm_local(struct sk_buff *skb)
+{
+        __skb_push(skb, skb->data - skb->nh.raw);
+        /* Fix header len and checksum if last xfrm was transport mode */
+        if (!skb->sp->x[skb->sp->len - 1].xvec->props.mode) {
+                skb->nh.iph->tot_len = htons(skb->len);
+        }
+	/* Unconditionally do the checksum; the packet
+	 * may have been fragmented. Icky. */
+	ip_send_check(skb->nh.iph);
+        return nf_rcv_postxfrm_nonlocal(skb);
+}
+#endif CONFIG_XFRM
+
+#ifdef CONFIG_XFRM
+#ifdef CONFIG_IP_NF_NAT_NEEDED
+#include <linux/netfilter_ipv4/ip_conntrack.h>
+#include <linux/netfilter_ipv4/ip_nat.h>
+
+void nf_nat_decode_session4(struct sk_buff *skb, struct flowi *fl)
+{
+	struct ip_conntrack *ct;
+	struct ip_conntrack_tuple *t;
+	enum ip_conntrack_info ctinfo;
+	enum ip_conntrack_dir dir;
+	int known_proto;
+	int statusbit;
+
+	ct = ip_conntrack_get(skb, &ctinfo);
+	if (ct == NULL || !(ct->status & IPS_NAT_MASK))
+		return;
+
+	dir = CTINFO2DIR(ctinfo);
+	t = &ct->tuplehash[dir].tuple;
+	known_proto = t->dst.protonum == IPPROTO_TCP ||
+	              t->dst.protonum == IPPROTO_UDP;
+
+	if (dir == IP_CT_DIR_REPLY)
+		statusbit = IPS_SRC_NAT;
+        else
+		statusbit = IPS_DST_NAT;
+	if (ct->status & statusbit) {
+		fl->fl4_dst = t->dst.ip;
+		if (known_proto)
+			fl->fl_ip_dport = t->dst.u.tcp.port;
+	}
+
+	statusbit ^= IPS_NAT_MASK;
+	if (ct->status & statusbit) {
+		fl->fl4_src = t->src.ip;
+		if (known_proto)
+                        fl->fl_ip_sport = t->src.u.tcp.port;
+        }
+}
+#endif /* CONFIG_IP_NF_NAT_NEEDED */
+#endif
 
 /* route_me_harder function, used by iptable_nat, iptable_mangle + ip_queue */
 int ip_route_me_harder(struct sk_buff **pskb)
@@ -33,7 +102,6 @@ int ip_route_me_harder(struct sk_buff **pskb)
 #ifdef CONFIG_IP_ROUTE_FWMARK
 		fl.nl_u.ip4_u.fwmark = (*pskb)->nfmark;
 #endif
-		fl.proto = iph->protocol;
 		if (ip_route_output_key(&rt, &fl) != 0)
 			return -1;
 
@@ -59,6 +127,20 @@ int ip_route_me_harder(struct sk_buff **pskb)
 	
 	if ((*pskb)->dst->error)
 		return -1;
+
+#ifdef CONFIG_XFRM
+	if (!(IPCB(*pskb)->flags & IPSKB_XFRM_TRANSFORMED)) {
+		struct xfrm_policy_afinfo *afinfo;
+
+		afinfo = xfrm_policy_get_afinfo(AF_INET);
+		if (afinfo != NULL) {
+			afinfo->decode_session(*pskb, &fl);
+			xfrm_policy_put_afinfo(afinfo);
+			if (xfrm_lookup(&(*pskb)->dst, &fl, (*pskb)->sk, 0) != 0)
+				return -1;
+		}
+	}
+#endif
 
 	/* Change in oif may mean change in hh_len. */
 	hh_len = (*pskb)->dst->dev->hard_header_len;

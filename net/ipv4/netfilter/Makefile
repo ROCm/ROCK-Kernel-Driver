@@ -74,6 +74,7 @@ obj-$(CONFIG_IP_NF_MATCH_ADDRTYPE) += ipt_addrtype.o
 obj-$(CONFIG_IP_NF_MATCH_PHYSDEV) += ipt_physdev.o
 obj-$(CONFIG_IP_NF_MATCH_COMMENT) += ipt_comment.o
 obj-$(CONFIG_IP_NF_MATCH_STRING) += ipt_string.o
+obj-$(CONFIG_IP_NF_MATCH_POLICY) += ipt_policy.o
 
 # targets
 obj-$(CONFIG_IP_NF_TARGET_REJECT) += ipt_REJECT.o
