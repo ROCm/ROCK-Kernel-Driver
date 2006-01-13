@@ -194,6 +194,8 @@ static DECLARE_WAIT_QUEUE_HEAD(ms_wait);
  */
 #define MAX_ERRORS 12
 
+#define custom amiga_custom
+
 /* Prevent "aliased" accesses. */
 static int fd_ref[4] = { 0,0,0,0 };
 static int fd_device[4] = { 0, 0, 0, 0 };
@@ -1439,6 +1441,7 @@ static int fd_ioctl(struct inode *inode, struct file *filp,
 {
 	int drive = iminor(inode) & 3;
 	static struct floppy_struct getprm;
+	void __user *argp = (void __user *)param;
 
 	switch(cmd){
 	case FDFMTBEG:
@@ -1484,9 +1487,7 @@ static int fd_ioctl(struct inode *inode, struct file *filp,
 		getprm.head=unit[drive].type->heads;
 		getprm.sect=unit[drive].dtype->sects * unit[drive].type->sect_mult;
 		getprm.size=unit[drive].blocks;
-		if (copy_to_user((void *)param,
-				 (void *)&getprm,
-				 sizeof(struct floppy_struct)))
+		if (copy_to_user(argp, &getprm, sizeof(struct floppy_struct)))
 			return -EFAULT;
 		break;
 	case FDSETPRM:
@@ -1498,8 +1499,7 @@ static int fd_ioctl(struct inode *inode, struct file *filp,
 		break;
 #ifdef RAW_IOCTL
 	case IOCTL_RAW_TRACK:
-		if (copy_to_user((void *)param, raw_buf,
-				 unit[drive].type->read_size))
+		if (copy_to_user(argp, raw_buf, unit[drive].type->read_size))
 			return -EFAULT;
 		else
 			return unit[drive].type->read_size;
@@ -1653,12 +1653,6 @@ static struct block_device_operations floppy_fops = {
 	.getgeo		= fd_getgeo,
 	.media_changed	= amiga_floppy_change,
 };
-
-void __init amiga_floppy_setup (char *str, int *ints)
-{
-	printk (KERN_INFO "amiflop: Setting default df0 to %x\n", ints[1]);
-	fd_def_df0 = ints[1];
-}
 
 static int __init fd_probe_drives(void)
 {
@@ -1845,4 +1839,18 @@ void cleanup_module(void)
 	unregister_blkdev(FLOPPY_MAJOR, "fd");
 }
 #endif
+
+#else
+static int __init amiga_floppy_setup (char *str)
+{
+	int n;
+	if (!MACH_IS_AMIGA)
+		return 0;
+	if (!get_option(&str, &n))
+		return 0;
+	printk (KERN_INFO "amiflop: Setting default df0 to %x\n", n);
+	fd_def_df0 = n;
+}
+
+__setup("floppy=", amiga_floppy_setup);
 #endif

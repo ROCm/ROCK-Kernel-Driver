@@ -126,8 +126,7 @@ asmlinkage int sys32_ptrace(int request, int pid, int addr, int data)
 		struct pt_regs *regs;
 		unsigned int tmp;
 
-		regs = (struct pt_regs *) ((unsigned long) child->thread_info +
-		       THREAD_SIZE - 32 - sizeof(struct pt_regs));
+		regs = task_pt_regs(child);
 		ret = 0;  /* Default return value. */
 
 		switch (addr) {
@@ -259,8 +258,7 @@ asmlinkage int sys32_ptrace(int request, int pid, int addr, int data)
 	case PTRACE_POKEUSR: {
 		struct pt_regs *regs;
 		ret = 0;
-		regs = (struct pt_regs *) ((unsigned long) child->thread_info +
-		       THREAD_SIZE - 32 - sizeof(struct pt_regs));
+		regs = task_pt_regs(child);
 
 		switch (addr) {
 		case 0 ... 31:
@@ -377,7 +375,7 @@ asmlinkage int sys32_ptrace(int request, int pid, int addr, int data)
 		break;
 
 	case PTRACE_GET_THREAD_AREA:
-		ret = put_user(child->thread_info->tp_value,
+		ret = put_user(task_thread_info(child)->tp_value,
 				(unsigned int __user *) (unsigned long) data);
 		break;
 
@@ -391,7 +389,7 @@ asmlinkage int sys32_ptrace(int request, int pid, int addr, int data)
 		break;
 
 	case PTRACE_GET_THREAD_AREA_3264:
-		ret = put_user(child->thread_info->tp_value,
+		ret = put_user(task_thread_info(child)->tp_value,
 				(unsigned long __user *) (unsigned long) data);
 		break;
 

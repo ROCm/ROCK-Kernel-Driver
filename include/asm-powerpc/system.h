@@ -133,6 +133,14 @@ extern int fix_alignment(struct pt_regs *);
 extern void cvt_fd(float *from, double *to, struct thread_struct *thread);
 extern void cvt_df(double *from, float *to, struct thread_struct *thread);
 
+#ifndef CONFIG_SMP
+extern void discard_lazy_cpu_state(void);
+#else
+static inline void discard_lazy_cpu_state(void)
+{
+}
+#endif
+
 #ifdef CONFIG_ALTIVEC
 extern void flush_altivec_to_thread(struct task_struct *);
 #else
@@ -174,6 +182,16 @@ extern struct task_struct *__switch_to(struct task_struct *,
 struct thread_struct;
 extern struct task_struct *_switch(struct thread_struct *prev,
 				   struct thread_struct *next);
+
+/*
+ * On SMP systems, when the scheduler does migration-cost autodetection,
+ * it needs a way to flush as much of the CPU's caches as possible.
+ *
+ * TODO: fill this in!
+ */
+static inline void sched_cacheflush(void)
+{
+}
 
 extern unsigned int rtas_data;
 extern int mem_init_done;	/* set on boot once kmalloc can be called */

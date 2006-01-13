@@ -164,7 +164,7 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
 	} else if (verify_stack(fp)) {
 		printk("invalid frame pointer 0x%08x", fp);
 		ok = 0;
-	} else if (fp < (unsigned long)(tsk->thread_info + 1))
+	} else if (fp < (unsigned long)end_of_stack(tsk))
 		printk("frame pointer underflow");
 	printk("\n");
 
@@ -210,7 +210,7 @@ static void __die(const char *str, int err, struct thread_info *thread, struct p
 
 	if (!user_mode(regs) || in_interrupt()) {
 		dump_mem("Stack: ", regs->ARM_sp,
-			 THREAD_SIZE + (unsigned long)tsk->thread_info);
+			 THREAD_SIZE + (unsigned long)task_stack_page(tsk));
 		dump_backtrace(regs, tsk);
 		dump_instr(regs);
 	}

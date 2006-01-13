@@ -317,7 +317,7 @@ static void release_output_lock(void)
 }
 #endif
 
-int xmon_core(struct pt_regs *regs, int fromipi)
+static int xmon_core(struct pt_regs *regs, int fromipi)
 {
 	int cmd = 0;
 	unsigned long msr;
@@ -534,7 +534,7 @@ xmon_irq(int irq, void *d, struct pt_regs *regs)
 	return IRQ_HANDLED;
 }
 
-int xmon_bpt(struct pt_regs *regs)
+static int xmon_bpt(struct pt_regs *regs)
 {
 	struct bpt *bp;
 	unsigned long offset;
@@ -560,7 +560,7 @@ int xmon_bpt(struct pt_regs *regs)
 	return 1;
 }
 
-int xmon_sstep(struct pt_regs *regs)
+static int xmon_sstep(struct pt_regs *regs)
 {
 	if (user_mode(regs))
 		return 0;
@@ -568,7 +568,7 @@ int xmon_sstep(struct pt_regs *regs)
 	return 1;
 }
 
-int xmon_dabr_match(struct pt_regs *regs)
+static int xmon_dabr_match(struct pt_regs *regs)
 {
 	if ((regs->msr & (MSR_IR|MSR_PR|MSR_SF)) != (MSR_IR|MSR_SF))
 		return 0;
@@ -578,7 +578,7 @@ int xmon_dabr_match(struct pt_regs *regs)
 	return 1;
 }
 
-int xmon_iabr_match(struct pt_regs *regs)
+static int xmon_iabr_match(struct pt_regs *regs)
 {
 	if ((regs->msr & (MSR_IR|MSR_PR|MSR_SF)) != (MSR_IR|MSR_SF))
 		return 0;
@@ -588,7 +588,7 @@ int xmon_iabr_match(struct pt_regs *regs)
 	return 1;
 }
 
-int xmon_ipi(struct pt_regs *regs)
+static int xmon_ipi(struct pt_regs *regs)
 {
 #ifdef CONFIG_SMP
 	if (in_xmon && !cpu_isset(smp_processor_id(), cpus_in_xmon))
@@ -597,7 +597,7 @@ int xmon_ipi(struct pt_regs *regs)
 	return 0;
 }
 
-int xmon_fault_handler(struct pt_regs *regs)
+static int xmon_fault_handler(struct pt_regs *regs)
 {
 	struct bpt *bp;
 	unsigned long offset;

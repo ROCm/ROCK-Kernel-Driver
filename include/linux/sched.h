@@ -631,7 +631,14 @@ struct sched_domain {
 
 extern void partition_sched_domains(cpumask_t *partition1,
 				    cpumask_t *partition2);
-#endif /* CONFIG_SMP */
+
+/*
+ * Maximum cache size the migration-costs auto-tuning code will
+ * search from:
+ */
+extern unsigned int max_cache_size;
+
+#endif	/* CONFIG_SMP */
 
 
 struct io_context;			/* See blkdev.h */
@@ -689,8 +696,11 @@ struct task_struct {
 
 	int lock_depth;		/* BKL lock depth */
 
-#if defined(CONFIG_SMP) && defined(__ARCH_WANT_UNLOCKED_CTXSW)
+#if defined(CONFIG_SMP)
+	int last_waker_cpu;	/* CPU that last woke this task up */
+#if defined(__ARCH_WANT_UNLOCKED_CTXSW)
 	int oncpu;
+#endif
 #endif
 	int prio, static_prio;
 	struct list_head run_list;
@@ -1230,6 +1240,7 @@ static inline void task_unlock(struct task_struct *p)
 #ifndef __HAVE_THREAD_FUNCTIONS
 
 #define task_thread_info(task) (task)->thread_info
+#define task_stack_page(task) ((void*)((task)->thread_info))
 
 static inline void setup_thread_stack(struct task_struct *p, struct task_struct *org)
 {

@@ -296,7 +296,7 @@ asmlinkage void do_ptrace(struct pt_regs *regs)
 	case PTRACE_GETREGS: {
 		struct pt_regs32 __user *pregs =
 			(struct pt_regs32 __user *) addr;
-		struct pt_regs *cregs = child->thread_info->kregs;
+		struct pt_regs *cregs = task_pt_regs(child);
 		int rval;
 
 		if (__put_user(tstate_to_psr(cregs->tstate), (&pregs->psr)) ||
@@ -320,11 +320,11 @@ asmlinkage void do_ptrace(struct pt_regs *regs)
 
 	case PTRACE_GETREGS64: {
 		struct pt_regs __user *pregs = (struct pt_regs __user *) addr;
-		struct pt_regs *cregs = child->thread_info->kregs;
+		struct pt_regs *cregs = task_pt_regs(child);
 		unsigned long tpc = cregs->tpc;
 		int rval;
 
-		if ((child->thread_info->flags & _TIF_32BIT) != 0)
+		if ((task_thread_info(child)->flags & _TIF_32BIT) != 0)
 			tpc &= 0xffffffff;
 		if (__put_user(cregs->tstate, (&pregs->tstate)) ||
 		    __put_user(tpc, (&pregs->tpc)) ||
@@ -348,7 +348,7 @@ asmlinkage void do_ptrace(struct pt_regs *regs)
 	case PTRACE_SETREGS: {
 		struct pt_regs32 __user *pregs =
 			(struct pt_regs32 __user *) addr;
-		struct pt_regs *cregs = child->thread_info->kregs;
+		struct pt_regs *cregs = task_pt_regs(child);
 		unsigned int psr, pc, npc, y;
 		int i;
 
@@ -381,7 +381,7 @@ asmlinkage void do_ptrace(struct pt_regs *regs)
 
 	case PTRACE_SETREGS64: {
 		struct pt_regs __user *pregs = (struct pt_regs __user *) addr;
-		struct pt_regs *cregs = child->thread_info->kregs;
+		struct pt_regs *cregs = task_pt_regs(child);
 		unsigned long tstate, tpc, tnpc, y;
 		int i;
 
@@ -395,7 +395,7 @@ asmlinkage void do_ptrace(struct pt_regs *regs)
 			pt_error_return(regs, EFAULT);
 			goto out_tsk;
 		}
-		if ((child->thread_info->flags & _TIF_32BIT) != 0) {
+		if ((task_thread_info(child)->flags & _TIF_32BIT) != 0) {
 			tpc &= 0xffffffff;
 			tnpc &= 0xffffffff;
 		}
@@ -430,11 +430,11 @@ asmlinkage void do_ptrace(struct pt_regs *regs)
 			} fpq[16];
 		};
 		struct fps __user *fps = (struct fps __user *) addr;
-		unsigned long *fpregs = child->thread_info->fpregs;
+		unsigned long *fpregs = task_thread_info(child)->fpregs;
 
 		if (copy_to_user(&fps->regs[0], fpregs,
 				 (32 * sizeof(unsigned int))) ||
-		    __put_user(child->thread_info->xfsr[0], (&fps->fsr)) ||
+		    __put_user(task_thread_info(child)->xfsr[0], (&fps->fsr)) ||
 		    __put_user(0, (&fps->fpqd)) ||
 		    __put_user(0, (&fps->flags)) ||
 		    __put_user(0, (&fps->extra)) ||
@@ -452,11 +452,11 @@ asmlinkage void do_ptrace(struct pt_regs *regs)
 			unsigned long fsr;
 		};
 		struct fps __user *fps = (struct fps __user *) addr;
-		unsigned long *fpregs = child->thread_info->fpregs;
+		unsigned long *fpregs = task_thread_info(child)->fpregs;
 
 		if (copy_to_user(&fps->regs[0], fpregs,
 				 (64 * sizeof(unsigned int))) ||
-		    __put_user(child->thread_info->xfsr[0], (&fps->fsr))) {
+		    __put_user(task_thread_info(child)->xfsr[0], (&fps->fsr))) {
 			pt_error_return(regs, EFAULT);
 			goto out_tsk;
 		}
@@ -477,7 +477,7 @@ asmlinkage void do_ptrace(struct pt_regs *regs)
 			} fpq[16];
 		};
 		struct fps __user *fps = (struct fps __user *) addr;
-		unsigned long *fpregs = child->thread_info->fpregs;
+		unsigned long *fpregs = task_thread_info(child)->fpregs;
 		unsigned fsr;
 
 		if (copy_from_user(fpregs, &fps->regs[0],
@@ -486,11 +486,11 @@ asmlinkage void do_ptrace(struct pt_regs *regs)
 			pt_error_return(regs, EFAULT);
 			goto out_tsk;
 		}
-		child->thread_info->xfsr[0] &= 0xffffffff00000000UL;
-		child->thread_info->xfsr[0] |= fsr;
-		if (!(child->thread_info->fpsaved[0] & FPRS_FEF))
-			child->thread_info->gsr[0] = 0;
-		child->thread_info->fpsaved[0] |= (FPRS_FEF | FPRS_DL);
+		task_thread_info(child)->xfsr[0] &= 0xffffffff00000000UL;
+		task_thread_info(child)->xfsr[0] |= fsr;
+		if (!(task_thread_info(child)->fpsaved[0] & FPRS_FEF))
+			task_thread_info(child)->gsr[0] = 0;
+		task_thread_info(child)->fpsaved[0] |= (FPRS_FEF | FPRS_DL);
 		pt_succ_return(regs, 0);
 		goto out_tsk;
 	}
@@ -501,17 +501,17 @@ asmlinkage void do_ptrace(struct pt_regs *regs)
 			unsigned long fsr;
 		};
 		struct fps __user *fps = (struct fps __user *) addr;
-		unsigned long *fpregs = child->thread_info->fpregs;
+		unsigned long *fpregs = task_thread_info(child)->fpregs;
 
 		if (copy_from_user(fpregs, &fps->regs[0],
 				   (64 * sizeof(unsigned int))) ||
-		    __get_user(child->thread_info->xfsr[0], (&fps->fsr))) {
+		    __get_user(task_thread_info(child)->xfsr[0], (&fps->fsr))) {
 			pt_error_return(regs, EFAULT);
 			goto out_tsk;
 		}
-		if (!(child->thread_info->fpsaved[0] & FPRS_FEF))
-			child->thread_info->gsr[0] = 0;
-		child->thread_info->fpsaved[0] |= (FPRS_FEF | FPRS_DL | FPRS_DU);
+		if (!(task_thread_info(child)->fpsaved[0] & FPRS_FEF))
+			task_thread_info(child)->gsr[0] = 0;
+		task_thread_info(child)->fpsaved[0] |= (FPRS_FEF | FPRS_DL | FPRS_DU);
 		pt_succ_return(regs, 0);
 		goto out_tsk;
 	}
@@ -562,8 +562,8 @@ asmlinkage void do_ptrace(struct pt_regs *regs)
 #ifdef DEBUG_PTRACE
 		printk("CONT: %s [%d]: set exit_code = %x %lx %lx\n", child->comm,
 			child->pid, child->exit_code,
-			child->thread_info->kregs->tpc,
-			child->thread_info->kregs->tnpc);
+			task_pt_regs(child)->tpc,
+			task_pt_regs(child)->tnpc);
 		       
 #endif
 		wake_up_process(child);

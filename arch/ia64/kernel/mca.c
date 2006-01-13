@@ -815,7 +815,7 @@ ia64_mca_modify_original_stack(struct pt_regs *regs,
 			l = strlen(previous_current->comm);
 		snprintf(comm, sizeof(comm), "%s %*s %d",
 			current->comm, l, previous_current->comm,
-			previous_current->thread_info->cpu);
+			task_thread_info(previous_current)->cpu);
 	}
 	memcpy(current->comm, comm, sizeof(current->comm));
 
@@ -1500,7 +1500,7 @@ format_mca_init_stack(void *mca_data, unsigned long offset,
 	struct task_struct *p = (struct task_struct *)((char *)mca_data + offset);
 	struct thread_info *ti;
 	memset(p, 0, KERNEL_STACK_SIZE);
-	ti = (struct thread_info *)((char *)p + IA64_TASK_SIZE);
+	ti = task_thread_info(p);
 	ti->flags = _TIF_MCA_INIT;
 	ti->preempt_count = 1;
 	ti->task = p;
