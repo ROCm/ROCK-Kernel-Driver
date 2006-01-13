@@ -314,12 +314,27 @@ static uint32_t aic79xx_seltime;
  */
 uint32_t aic79xx_periodic_otag;
 
+/* Some storage boxes are using an LSI chip which has a bug making it
+ * impossible to use aic79xx Rev B chip in 320 speeds.  The following
+ * storage boxes have been reported to be buggy:
+ * EonStor 3U 16-Bay: U16U-G3A3
+ * EonStor 2U 12-Bay: U12U-G3A3
+ * SentinelRAID: 2500F R5 / R6
+ * SentinelRAID: 2500F R1
+ * SentinelRAID: 2500F/1500F
+ * SentinelRAID: 150F
+ * 
+ * To get around this LSI bug, you can set your board to 160 mode
+ * or you can enable the SLOWCRC bit.
+ */
+uint32_t aic79xx_slowcrc;
+
 /*
  * Module information and settable options.
  */
 static char *aic79xx = NULL;
 
-MODULE_AUTHOR("Maintainer: Justin T. Gibbs <gibbs@scsiguy.com>");
+MODULE_AUTHOR("Maintainer: Luben Tuikov <luben_tuikov@adaptec.com>");
 MODULE_DESCRIPTION("Adaptec Aic790X U320 SCSI Host Bus Adapter driver");
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_VERSION(AIC79XX_DRIVER_VERSION);
@@ -343,6 +358,7 @@ MODULE_PARM_DESC(aic79xx,
 "	amplitude:<int>		Set the signal amplitude (0-7).\n"
 "	seltime:<int>		Selection Timeout:\n"
 "				(0/256ms,1/128ms,2/64ms,3/32ms)\n"
+"	slowcrc			Turn on the SLOWCRC bit (Rev B only)\n"		 
 "\n"
 "	Sample /etc/modprobe.conf line:\n"
 "		Enable verbose logging\n"
@@ -1003,6 +1019,7 @@ aic79xx_setup(char *s)
 		{ "slewrate", NULL },
 		{ "precomp", NULL },
 		{ "amplitude", NULL },
+		{ "slowcrc", &aic79xx_slowcrc },
 	};
 
 	end = strchr(s, '\0');
@@ -1468,13 +1485,38 @@ ahd_linux_run_command(struct ahd_softc *ahd, struct ahd_linux_device *dev,
 	if ((tstate->auto_negotiate & mask) != 0) {
 		scb->flags |= SCB_AUTO_NEGOTIATE;
 		scb->hscb->control |= MK_MESSAGE;
+		} else if (cmd->cmnd[0] == INQUIRY
+			&& (tinfo->curr.offset != 0
+			 || tinfo->curr.width != MSG_EXT_WDTR_BUS_8_BIT
+			 || tinfo->curr.ppr_options != 0)
+			&& (tinfo->curr.ppr_options & MSG_EXT_PPR_IU_REQ)==0) {
+			/*
+			 * The SCSI spec requires inquiry
+			 * commands to complete without
+			 * reporting unit attention conditions.
+			 * Because of this, an inquiry command
+			 * that occurs just after a device is
+			 * reset will result in a data phase
+			 * with mismatched negotiated rates.
+			 * The core already forces a renegotiation
+			 * for reset events that are visible to
+			 * our controller or that we initiate,
+			 * but a third party device reset or a
+			 * hot-plug insertion can still cause this
+			 * issue.  Therefore, we force a re-negotiation
+			 * for every inquiry command unless we
+			 * are async.
+			 */
+			scb->flags |= SCB_NEGOTIATE;
+			scb->hscb->control |= MK_MESSAGE;
 	}
 
 	if ((dev->flags & (AHD_DEV_Q_TAGGED|AHD_DEV_Q_BASIC)) != 0) {
-		int	msg_bytes;
+		int	msg_bytes = 0;
 		uint8_t tag_msgs[2];
 
-		msg_bytes = scsi_populate_tag_msg(cmd, tag_msgs);
+		if (cmd->request)
+			msg_bytes = scsi_populate_tag_msg(cmd, tag_msgs);
 		if (msg_bytes && tag_msgs[0] != MSG_SIMPLE_TASK) {
 			hscb->control |= tag_msgs[0];
 			if (tag_msgs[0] == MSG_ORDERED_TASK)
@@ -2058,6 +2100,7 @@ ahd_linux_queue_recovery_cmd(struct scsi_cmnd *cmd, scb_flag flag)
 	int    paused;
 	int    wait;
 	int    disconnected;
+	int    found;
 	ahd_mode_state saved_modes;
 	unsigned long flags;
 
@@ -2176,7 +2219,8 @@ ahd_linux_queue_recovery_cmd(struct scsi_cmnd *cmd, scb_flag flag)
 	last_phase = ahd_inb(ahd, LASTPHASE);
 	saved_scbptr = ahd_get_scbptr(ahd);
 	active_scbptr = saved_scbptr;
-	if (disconnected && (ahd_inb(ahd, SEQ_FLAGS) & NOT_IDENTIFIED) == 0) {
+	if (disconnected && ((last_phase != P_BUSFREE) || 
+			     (ahd_inb(ahd, SEQ_FLAGS) & NOT_IDENTIFIED) == 0)) {
 		struct scb *bus_scb;
 
 		bus_scb = ahd_lookup_scb(ahd, active_scbptr);
@@ -2194,28 +2238,41 @@ ahd_linux_queue_recovery_cmd(struct scsi_cmnd *cmd, scb_flag flag)
 	 * bus or is in the disconnected state.
 	 */
 	saved_scsiid = ahd_inb(ahd, SAVED_SCSIID);
-	if (last_phase != P_BUSFREE
-	 && (SCB_GET_TAG(pending_scb) == active_scbptr
+	if (SCB_GET_TAG(pending_scb) == active_scbptr
 	     || (flag == SCB_DEVICE_RESET
-		 && SCSIID_TARGET(ahd, saved_scsiid) == scmd_id(cmd)))) {
+		 && SCSIID_TARGET(ahd, saved_scsiid) == scmd_id(cmd))) {
 
 		/*
 		 * We're active on the bus, so assert ATN
 		 * and hope that the target responds.
 		 */
 		pending_scb = ahd_lookup_scb(ahd, active_scbptr);
-		pending_scb->flags |= SCB_RECOVERY_SCB|flag;
+		pending_scb->flags |= SCB_RECOVERY_SCB|SCB_DEVICE_RESET;
 		ahd_outb(ahd, MSG_OUT, HOST_MSG);
 		ahd_outb(ahd, SCSISIGO, last_phase|ATNO);
-		scmd_printk(KERN_INFO, cmd, "Device is active, asserting ATN\n");
+		scmd_printk(KERN_INFO, cmd, "BDR message in message buffer\n");
 		wait = TRUE;
+	} else if (last_phase != P_BUSFREE
+		   && ahd_inb(ahd, SCSIPHASE) == 0) {
+		/*
+		 * SCB is not identified, there
+		 * is no pending REQ, and the sequencer
+		 * has not seen a busfree.  Looks like
+		 * a stuck connection waiting to
+		 * go busfree.  Reset the bus.
+		 */
+		found = ahd_reset_channel(ahd, cmd->device->channel + 'A',
+					  /*Initiate Reset*/TRUE);
+		printf("%s: Issued Channel %c Bus Reset. "
+		       "%d SCBs aborted\n", ahd_name(ahd),
+		       cmd->device->channel + 'A', found);
 	} else if (disconnected) {
 
 		/*
 		 * Actually re-queue this SCB in an attempt
 		 * to select the device before it reconnects.
 		 */
-		pending_scb->flags |= SCB_RECOVERY_SCB|SCB_ABORT;
+		pending_scb->flags |= SCB_RECOVERY_SCB|flag;
 		ahd_set_scbptr(ahd, SCB_GET_TAG(pending_scb));
 		pending_scb->hscb->cdb_len = 0;
 		pending_scb->hscb->task_attribute = 0;
@@ -2296,16 +2353,17 @@ done:
 		timer.expires = jiffies + (5 * HZ);
 		timer.function = ahd_linux_sem_timeout;
 		add_timer(&timer);
-		printf("Recovery code sleeping\n");
+		printf("%s: Recovery code sleeping\n", ahd_name(ahd));
 		down(&ahd->platform_data->eh_sem);
-		printf("Recovery code awake\n");
+		printf("%s: Recovery code awake\n", ahd_name(ahd));
         	ret = del_timer_sync(&timer);
 		if (ret == 0) {
-			printf("Timer Expired\n");
+			printf("%s: Timer Expired (active %d)\n",
+			       ahd_name(ahd), dev->active);
 			retval = FAILED;
 		}
 	}
-		ahd_unlock(ahd, &flags);
+	ahd_unlock(ahd, &flags);
 	return (retval);
 }
 
