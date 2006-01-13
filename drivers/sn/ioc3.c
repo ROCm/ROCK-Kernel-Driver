@@ -62,7 +62,7 @@ static int nic_reset(struct ioc3_driver_data *idd)
         return presence;
 }
 
-static inline int nic_read_bit(struct ioc3_driver_data *idd)
+static int nic_read_bit(struct ioc3_driver_data *idd)
 {
 	int result;
 	unsigned long flags;
@@ -77,7 +77,7 @@ static inline int nic_read_bit(struct ioc3_driver_data *idd)
 	return result;
 }
 
-static inline void nic_write_bit(struct ioc3_driver_data *idd, int bit)
+static void nic_write_bit(struct ioc3_driver_data *idd, int bit)
 {
 	if (bit)
 		idd->vma->mcr = mcr_pack(6, 110);
@@ -371,8 +371,7 @@ static void probe_nic(struct ioc3_driver_data *idd)
 
 /* Interrupts */
 
-static inline void
-write_ireg(struct ioc3_driver_data *idd, uint32_t val, int which)
+static void write_ireg(struct ioc3_driver_data *idd, uint32_t val, int which)
 {
 	unsigned long flags;
 
@@ -543,7 +542,9 @@ int ioc3_register_submodule(struct ioc3_submodule *is)
 void ioc3_unregister_submodule(struct ioc3_submodule *is)
 {
 	struct ioc3_driver_data *idd;
+	unsigned long flags;
 
+	write_lock_irqsave(&ioc3_submodules_lock, flags);
 	if(ioc3_submodules[is->id]==is)
 		ioc3_submodules[is->id]=NULL;
 	else
@@ -551,6 +552,7 @@ void ioc3_unregister_submodule(struct ioc3_submodule *is)
 			"IOC3 submodule %s has wrong ID.\n",is->name);
 	if(ioc3_ethernet==is)
 		ioc3_ethernet = NULL;
+	write_unlock_irqrestore(&ioc3_submodules_lock, flags);
 
 	/* Remove submodule for each IOC3 */
 	down_read(&ioc3_devices_rwsem);

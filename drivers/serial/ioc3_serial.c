@@ -1391,7 +1391,7 @@ static int receive_chars(struct uart_port *the_port)
 {
 	struct tty_struct *tty;
 	unsigned char ch[MAX_CHARS];
-	int read_count = 0, request_count = MAX_CHARS, flip = 0;
+	int read_count = 0, read_room, flip = 0;
 	struct uart_info *info = the_port->info;
 	struct ioc3_port *port = get_ioc3_port(the_port);
 	unsigned long pflags;
@@ -1408,25 +1408,18 @@ static int receive_chars(struct uart_port *the_port)
 	spin_lock_irqsave(&the_port->lock, pflags);
 	tty = info->tty;
 
-	if (request_count > TTY_FLIPBUF_SIZE - tty->flip.count)
-		request_count = TTY_FLIPBUF_SIZE - tty->flip.count;
-
-	if (request_count > 0) {
-		read_count = do_read(the_port, ch, request_count);
-		if (read_count > 0) {
-			flip = 1;
-			memcpy(tty->flip.char_buf_ptr, ch, read_count);
-			memset(tty->flip.flag_buf_ptr, TTY_NORMAL, read_count);
-			tty->flip.char_buf_ptr += read_count;
-			tty->flip.flag_buf_ptr += read_count;
-			tty->flip.count += read_count;
-			the_port->icount.rx += read_count;
-		}
+	read_count = do_read(the_port, ch, MAX_CHARS);
+	if (read_count > 0) {
+		flip = 1;
+		read_room = tty_buffer_request_room(tty, read_count);
+		tty_insert_flip_string(tty, ch, read_room);
+		the_port->icount.rx += read_count;
 	}
 	spin_unlock_irqrestore(&the_port->lock, pflags);
 
 	if (flip)
 		tty_flip_buffer_push(tty);
+
 	return read_count;
 }
 
@@ -1438,7 +1431,7 @@ static int receive_chars(struct uart_port *the_port)
  * @regs: pt_regs
  */
 
-static int inline
+static int
 ioc3uart_intr_one(struct ioc3_submodule *is,
 			struct ioc3_driver_data *idd,
 			unsigned int pending, struct pt_regs *regs)
