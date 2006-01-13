@@ -7,7 +7,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999-2001
  *
- * $Revision: 1.172 $
+ * $Revision: 1.173 $
  */
 
 #include <linux/config.h>
@@ -19,6 +19,7 @@
 #include <linux/slab.h>
 #include <linux/buffer_head.h>
 #include <linux/hdreg.h>
+#include <linux/notifier.h>
 
 #include <asm/ccwdev.h>
 #include <asm/ebcdic.h>
@@ -58,6 +59,7 @@ static void dasd_int_handler(struct ccw_device *, unsigned long, struct irb *);
 static void dasd_flush_ccw_queue(struct dasd_device *, int);
 static void dasd_tasklet(struct dasd_device *);
 static void do_kick_device(void *data);
+static void dasd_disable_eer(struct dasd_device *device);
 
 /*
  * SECTION: Operations on the device structure.
@@ -152,6 +154,8 @@ dasd_state_new_to_known(struct dasd_device *device)
 static inline void
 dasd_state_known_to_new(struct dasd_device * device)
 {
+	/* disable extended error reporting for this device */
+	dasd_disable_eer(device);
 	/* Forget the discipline information. */
 	device->discipline = NULL;
 	device->state = DASD_STATE_NEW;
@@ -871,6 +875,9 @@ dasd_handle_state_change_pending(struct dasd_device *device)
 	struct dasd_ccw_req *cqr;
 	struct list_head *l, *n;
 
+	/* first of all call extended error reporting */
+	dasd_write_eer_trigger(DASD_EER_STATECHANGE, device, NULL);
+
 	device->stopped &= ~DASD_STOPPED_PENDING;
 
         /* restart all 'running' IO on queue */
@@ -1090,6 +1097,19 @@ restart:
 			}
 			goto restart;
 		}
+
+		/* first of all call extended error reporting */
+		if (device->eer && cqr->status == DASD_CQR_FAILED) {
+			dasd_write_eer_trigger(DASD_EER_FATALERROR,
+					       device, cqr);
+
+			/* restart request  */
+			cqr->status = DASD_CQR_QUEUED;
+			cqr->retries = 255;
+			device->stopped |= DASD_STOPPED_QUIESCE;
+			goto restart;
+		}
+
 		/* Process finished ERP request. */
 		if (cqr->refers) {
 			__dasd_process_erp(device, cqr);
@@ -1227,7 +1247,8 @@ __dasd_start_head(struct dasd_device * device)
 	cqr = list_entry(device->ccw_queue.next, struct dasd_ccw_req, list);
         /* check FAILFAST */
 	if (device->stopped & ~DASD_STOPPED_PENDING &&
-	    test_bit(DASD_CQR_FLAGS_FAILFAST, &cqr->flags)) {
+	    test_bit(DASD_CQR_FLAGS_FAILFAST, &cqr->flags) &&
+	    (!device->eer)) {
 		cqr->status = DASD_CQR_FAILED;
 		dasd_schedule_bh(device);
 	}
@@ -1945,6 +1966,9 @@ dasd_generic_notify(struct ccw_device *cdev, int event)
 	switch (event) {
 	case CIO_GONE:
 	case CIO_NO_PATH:
+		/* first of all call extended error reporting */
+		dasd_write_eer_trigger(DASD_EER_NOPATH, device, NULL);
+
 		if (device->state < DASD_STATE_BASIC)
 			break;
 		/* Device is active. We want to keep it. */
@@ -2001,6 +2025,51 @@ dasd_generic_auto_online (struct ccw_driver *dasd_discipline_driver)
 	driver_for_each_device(drv, NULL, NULL, __dasd_auto_online);
 	put_driver(drv);
 }
+
+/*
+ * notifications for extended error reports
+ */
+static struct notifier_block *dasd_eer_chain;
+
+int
+dasd_register_eer_notifier(struct notifier_block *nb)
+{
+	return notifier_chain_register(&dasd_eer_chain, nb);
+}
+
+int
+dasd_unregister_eer_notifier(struct notifier_block *nb)
+{
+	return notifier_chain_unregister(&dasd_eer_chain, nb);
+}
+
+/*
+ * Notify the registered error reporting module of a problem
+ */
+void
+dasd_write_eer_trigger(unsigned int id, struct dasd_device *device,
+		       struct dasd_ccw_req *cqr)
+{
+	if (device->eer) {
+		struct dasd_eer_trigger temp;
+		temp.id = id;
+		temp.device = device;
+		temp.cqr = cqr;
+		notifier_call_chain(&dasd_eer_chain, DASD_EER_TRIGGER,
+				    (void *)&temp);
+	}
+}
+
+/*
+ * Tell the registered error reporting module to disable error reporting for
+ * a given device and to cleanup any private data structures on that device.
+ */
+static void
+dasd_disable_eer(struct dasd_device *device)
+{
+	notifier_call_chain(&dasd_eer_chain, DASD_EER_DISABLE, (void *)device);
+}
+
 
 static int __init
 dasd_init(void)
@@ -2082,6 +2151,11 @@ EXPORT_SYMBOL_GPL(dasd_generic_notify);
 EXPORT_SYMBOL_GPL(dasd_generic_set_online);
 EXPORT_SYMBOL_GPL(dasd_generic_set_offline);
 EXPORT_SYMBOL_GPL(dasd_generic_auto_online);
+
+EXPORT_SYMBOL(dasd_register_eer_notifier);
+EXPORT_SYMBOL(dasd_unregister_eer_notifier);
+EXPORT_SYMBOL(dasd_write_eer_trigger);
+
 
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.

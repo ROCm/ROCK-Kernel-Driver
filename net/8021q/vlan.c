@@ -450,6 +450,9 @@ static struct net_device *register_vlan_device(const char *eth_IF_name,
 	new_dev->flags = real_dev->flags;
 	new_dev->flags &= ~IFF_UP;
 
+	/* ipv6 shared card related stuff */
+	new_dev->dev_id = real_dev->dev_id;
+
 	new_dev->state = real_dev->state & VLAN_LINK_STATE_MASK;
 
 	/* need 4 bytes for extra VLAN header info,

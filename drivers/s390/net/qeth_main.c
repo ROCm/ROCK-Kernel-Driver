@@ -1,6 +1,6 @@
 /*
  *
- * linux/drivers/s390/net/qeth_main.c ($Revision: 1.251 $)
+ * linux/drivers/s390/net/qeth_main.c ($Revision: 1.252.2.1 $)
  *
  * Linux on zSeries OSA Express and HiperSockets support
  *
@@ -12,7 +12,7 @@
  *			  Frank Pavlic (fpavlic@de.ibm.com) and
  *		 	  Thomas Spatzier <tspat@de.ibm.com>
  *
- *    $Revision: 1.251 $	 $Date: 2005/05/04 20:19:18 $
+ *    $Revision: 1.252.2.1 $	 $Date: 2006/01/04 17:59:20 $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -73,7 +73,7 @@
 #include "qeth_eddp.h"
 #include "qeth_tso.h"
 
-#define VERSION_QETH_C "$Revision: 1.251 $"
+#define VERSION_QETH_C "$Revision: 1.252.2.1 $"
 static const char *version = "qeth S/390 OSA-Express driver";
 
 /**
@@ -7069,6 +7069,7 @@ qeth_start_ipa_multicast(struct qeth_card *card)
 	} else {
 		PRINT_INFO("Multicast enabled\n");
 		card->dev->flags |= IFF_MULTICAST;
+		card->dev->features |= NETIF_F_MC_ALL;
 	}
 	return rc;
 }
@@ -7460,7 +7461,8 @@ qeth_softsetup_card(struct qeth_card *card)
 		card->dev->features |=
 			NETIF_F_HW_VLAN_FILTER |
 			NETIF_F_HW_VLAN_TX |
-			NETIF_F_HW_VLAN_RX;
+			NETIF_F_HW_VLAN_RX |
+			NETIF_F_MC_ALL;
 		card->dev->flags|=IFF_MULTICAST|IFF_BROADCAST;
 		card->info.broadcast_capable=1;
 		if ((rc = qeth_layer2_initialize(card))) {

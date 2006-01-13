@@ -11,7 +11,7 @@
  *			  Frank Pavlic (fpavlic@de.ibm.com) and
  *		 	  Martin Schwidefsky <schwidefsky@de.ibm.com>
  *
- *    $Revision: 1.99 $	 $Date: 2005/05/11 08:10:17 $
+ *    $Revision: 1.102 $	 $Date: 2006/01/04 12:21:29 $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -59,7 +59,7 @@
 /**
  * initialization string for output
  */
-#define VERSION_LCS_C  "$Revision: 1.99 $"
+#define VERSION_LCS_C  "$Revision: 1.102 $"
 
 static char version[] __initdata = "LCS driver ("VERSION_LCS_C "/" VERSION_LCS_H ")";
 static char debug_buffer[255];
@@ -101,9 +101,9 @@ lcs_register_debug_facility(void)
 		return -ENOMEM;
 	}
 	debug_register_view(lcs_dbf_setup, &debug_hex_ascii_view);
-	debug_set_level(lcs_dbf_setup, 4);
+	debug_set_level(lcs_dbf_setup, 2);
 	debug_register_view(lcs_dbf_trace, &debug_hex_ascii_view);
-	debug_set_level(lcs_dbf_trace, 4);
+	debug_set_level(lcs_dbf_trace, 2);
 	return 0;
 }
 
@@ -1295,9 +1295,8 @@ lcs_set_multicast_list(struct net_device *dev)
         LCS_DBF_TEXT(4, trace, "setmulti");
         card = (struct lcs_card *) dev->priv;
 
-        if (!lcs_set_thread_start_bit(card, LCS_SET_MC_THREAD)) {
+        if (!lcs_set_thread_start_bit(card, LCS_SET_MC_THREAD)) 
 		schedule_work(&card->kernel_thread_starter);
-	}
 }
 
 #endif /* CONFIG_IP_MULTICAST */
@@ -2197,8 +2196,10 @@ lcs_new_device(struct ccwgroup_device *ccwgdev)
 	SET_MODULE_OWNER(dev);
 	memcpy(card->dev->dev_addr, card->mac, LCS_MAC_LENGTH);
 #ifdef CONFIG_IP_MULTICAST
-	if (!lcs_check_multicast_support(card))
+	if (!lcs_check_multicast_support(card)) {
 		card->dev->set_multicast_list = lcs_set_multicast_list;
+		card->dev->features |= NETIF_F_MC_ALL; 
+	}
 #endif
 netdev_out:
 	lcs_set_allowed_threads(card,0xffffffff);
@@ -2322,7 +2323,6 @@ __init lcs_init_module(void)
 		PRINT_ERR("Initialization failed\n");
 		return rc;
 	}
-
 	return 0;
 }
 

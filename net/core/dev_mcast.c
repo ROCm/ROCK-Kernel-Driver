@@ -145,6 +145,8 @@ int dev_mc_delete(struct net_device *dev, void *addr, int alen, int glbl)
 	}
 	err = -ENOENT;
 done:
+	if (dev->features & NETIF_F_MC_ALL)
+		__dev_mc_upload(dev);
 	spin_unlock_bh(&dev->xmit_lock);
 	return err;
 }
@@ -193,6 +195,9 @@ int dev_mc_add(struct net_device *dev, void *addr, int alen, int glbl)
 	return 0;
 
 done:
+	if (dev->features & NETIF_F_MC_ALL)
+		__dev_mc_upload(dev);
+
 	spin_unlock_bh(&dev->xmit_lock);
 	kfree(dmi1);
 	return err;

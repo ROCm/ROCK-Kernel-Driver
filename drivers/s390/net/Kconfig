@@ -60,6 +60,17 @@ config CLAW
 	  To compile as a module choose M here:  The module will be called
 	  claw.ko to compile into the kernel choose Y
 
+config MPC
+	tristate "MPC SNA device support"
+	depends on NETDEVICES
+	help
+	  This driver supports channel-to-channel MPC SNA devices.
+	  MPC is a SNA protocol device used by Comm Server for Linux.
+	  If you don't have Comm Server for Linux you don't need the device.
+	  To compile as a module choose M here:  The module will be called
+	  ctcmpc.ko to compile into the kernel choose Y
+	  If you do not need SNA MPC device just say N
+
 config QETH
 	tristate "Gigabit Ethernet device support"
 	depends on NETDEVICES && IP_MULTICAST && QDIO
