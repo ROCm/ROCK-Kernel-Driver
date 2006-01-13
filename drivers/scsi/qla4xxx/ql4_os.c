@@ -2022,13 +2022,11 @@ qla4xxx_eh_device_reset(struct scsi_cmnd *cmd)
 	 * If we are coming down the EH path, wait for all commands to complete
 	 * for the device.
 	 */
-	if (cmd->device->host->eh_active) {
-		if (qla4xxx_eh_wait_for_active_target_commands(ha,
-		    cmd->device->id, cmd->device->lun)) {
+	if (qla4xxx_eh_wait_for_active_target_commands(ha,
+		cmd->device->id, cmd->device->lun)) {
 			ql4_printk(KERN_INFO, ha,
 			    "DEVICE RESET FAILED - waiting for commands.\n");
-			goto eh_dev_reset_done;
-		}
+		goto eh_dev_reset_done;
 	}
 
 	ql4_printk(KERN_INFO, ha,
