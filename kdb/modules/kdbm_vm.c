@@ -495,7 +495,7 @@ kdbm_print_dentry(unsigned long daddr)
 					d.d_lru.next, d.d_lru.prev);
 
 	kdb_printf(" d_child.nxt = 0x%p d_child.prv = 0x%p\n",
-					d.d_child.next, d.d_child.prev);
+					d.d_u.d_child.next, d.d_u.d_child.prev);
 
 	kdb_printf(" d_subdirs.nxt = 0x%p d_subdirs.prv = 0x%p\n",
 					d.d_subdirs.next, d.d_subdirs.prev);
