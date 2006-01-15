@@ -3,6 +3,7 @@
 
 #include <linux/file.h>
 #include <linux/rcupdate.h>
+#include <linux/pagg.h>
 
 #define INIT_FDTABLE \
 {							\
@@ -121,6 +122,7 @@ extern struct group_info init_groups;
 	.journal_info	= NULL,						\
 	.cpu_timers	= INIT_CPU_TIMERS(tsk.cpu_timers),		\
 	.fs_excl	= ATOMIC_INIT(0),				\
+	INIT_TASK_PAGG(tsk)						\
 }
 
 

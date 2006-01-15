@@ -1,0 +1,32 @@
+Linux Process Aggregates (PAGG)
+-------------------------------
+
+The process aggregates infrastructure, or PAGG, provides a generalized
+mechanism for providing arbitrary process groups in Linux.  PAGG consists
+of a series of functions for registering and unregistering support
+for new types of process aggregation containers with the kernel.
+This is similar to the support currently provided within Linux that
+allows for dynamic support of filesystems, block and character devices,
+symbol tables, network devices, serial devices, and execution domains.
+This implementation of PAGG provides developers the basic hooks necessary
+to implement kernel modules for specific process containers, such as
+the job container.
+
+The do_fork function in the kernel was altered to support PAGG.  If a
+process is attached to any PAGG containers and subsequently forks a
+child process, the child process will also be attached to the same PAGG
+containers.  The PAGG containers involved during the fork are notified
+that a new process has been attached.  The notification is accomplished
+via a callback function provided by the PAGG module.
+
+The do_exit function in the kernel has also been altered.  If a process
+is attached to any PAGG containers and that process is exiting, the PAGG
+containers are notified that a process has detached from the container.
+The notification is accomplished via a callback function provided by
+the PAGG module.
+
+The sys_execve function has been modified to support an optional callout
+that can be run when a process in a pagg list does an exec.  It can be
+used, for example, by other kernel modules that wish to do advanced CPU
+placement on multi-processor systems (just one example).
+

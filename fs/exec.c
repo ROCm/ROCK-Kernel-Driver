@@ -49,6 +49,7 @@
 #include <linux/rmap.h>
 #include <linux/acct.h>
 #include <linux/cn_proc.h>
+#include <linux/pagg.h>
 
 #include <asm/uaccess.h>
 #include <asm/mmu_context.h>
@@ -1205,6 +1206,7 @@ int do_execve(char * filename,
 
 		/* execve success */
 		security_bprm_free(bprm);
+		pagg_exec(current);
 		acct_update_integrals(current);
 		kfree(bprm);
 		return retval;

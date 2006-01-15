@@ -871,6 +871,11 @@ struct task_struct {
 #endif
 	atomic_t fs_excl;	/* holding fs exclusive resources */
 	struct rcu_head rcu;
+#ifdef CONFIG_PAGG
+/* List of pagg (process aggregate) attachments */
+	struct list_head pagg_list;
+	struct rw_semaphore pagg_sem;
+#endif
 };
 
 static inline pid_t process_group(struct task_struct *tsk)

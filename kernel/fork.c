@@ -44,6 +44,7 @@
 #include <linux/rmap.h>
 #include <linux/acct.h>
 #include <linux/cn_proc.h>
+#include <linux/pagg.h>
 
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
@@ -154,6 +155,9 @@ void __init fork_init(unsigned long mempages)
 	init_task.signal->rlim[RLIMIT_NPROC].rlim_max = max_threads/2;
 	init_task.signal->rlim[RLIMIT_SIGPENDING] =
 		init_task.signal->rlim[RLIMIT_NPROC];
+
+	/* Initialize the pagg list in pid 0 before it can clone itself. */
+	INIT_PAGG_LIST(current);
 }
 
 static struct task_struct *dup_task_struct(struct task_struct *orig)
@@ -1050,6 +1054,15 @@ static task_t *copy_process(unsigned long clone_flags,
 	/* Perform scheduler related setup. Assign this task to a CPU. */
 	sched_fork(p, clone_flags);
 
+	/*
+	 * call pagg modules to properly attach new process to the same
+	 * process aggregate containers as the parent process.
+	 * Fail the fork on error.
+	 */
+	retval = pagg_attach(p, current);
+	if (retval)
+		goto bad_fork_cleanup_namespace;
+
 	/* Need tasklist lock for parent etc handling! */
 	write_lock_irq(&tasklist_lock);
 
@@ -1155,6 +1168,7 @@ static task_t *copy_process(unsigned long clone_flags,
 	return p;
 
 bad_fork_cleanup_namespace:
+	pagg_detach(p);
 	exit_namespace(p);
 bad_fork_cleanup_keys:
 	exit_keys(p);

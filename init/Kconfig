@@ -165,6 +165,15 @@ config BSD_PROCESS_ACCT_V3
 	  for processing it. A preliminary version of these tools is available
 	  at <http://www.physik3.uni-rostock.de/tim/kernel/utils/acct/>.
 
+config PAGG
+	bool "Support for process aggregates (PAGGs)"
+	depends on IA64
+	help
+	  Say Y here if you will be loading modules which provide support
+	  for process aggregate containers.  Examples of such modules include the
+	  Linux Jobs module and the Linux Array Sessions module.  If you will not
+	  be using such modules, say N.
+
 config SYSCTL
 	bool "Sysctl support"
 	---help---

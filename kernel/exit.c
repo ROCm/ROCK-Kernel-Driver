@@ -34,6 +34,7 @@
 #include <linux/signal.h>
 #include <linux/cn_proc.h>
 #include <linux/mutex.h>
+#include <linux/pagg.h>
 
 #include <asm/uaccess.h>
 #include <asm/unistd.h>
@@ -869,6 +870,7 @@ fastcall NORET_TYPE void do_exit(long code)
 
 	tsk->exit_code = code;
 	proc_exit_connector(tsk);
+	pagg_detach(tsk);
 	exit_notify(tsk);
 #ifdef CONFIG_NUMA
 	mpol_free(tsk->mempolicy);
