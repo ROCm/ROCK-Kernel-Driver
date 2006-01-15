@@ -390,6 +390,27 @@ sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)
 	return;		/* Leave any unwritten inodes on s_io */
 }
 
+void
+writeback_bdev(struct super_block *sb)
+{
+	struct address_space *mapping = sb->s_bdev->bd_inode->i_mapping;
+	filemap_flush(mapping);
+	blk_run_address_space(mapping);
+}
+
+void
+writeback_inode(struct inode *inode)
+{
+
+	struct address_space *mapping = inode->i_mapping;
+	struct writeback_control wbc = {
+		.sync_mode = WB_SYNC_NONE,
+		.nr_to_write = 0,
+	};
+	sync_inode(inode, &wbc);
+	filemap_fdatawrite(mapping);
+}
+
 /*
  * Start writeback of dirty pagecache data against all unlocked inodes.
  *

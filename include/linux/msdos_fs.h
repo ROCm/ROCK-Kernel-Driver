@@ -203,6 +203,7 @@ struct fat_mount_options {
 		 unicode_xlate:1, /* create escape sequences for unhandled Unicode */
 		 numtail:1,       /* Does first alias have a numeric '~1' type tail? */
 		 atari:1,         /* Use Atari GEMDOS variation of MS-DOS fs */
+		 flush:1,	  /* write things quickly */
 		 nocase:1;	  /* Does this need case conversion? 0=need case conversion*/
 };
 

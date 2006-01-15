@@ -24,6 +24,7 @@
 #include <linux/vfs.h>
 #include <linux/parser.h>
 #include <linux/uio.h>
+#include <linux/writeback.h>
 #include <asm/unaligned.h>
 
 #ifndef CONFIG_FAT_DEFAULT_IOCHARSET
@@ -860,7 +861,7 @@ enum {
 	Opt_charset, Opt_shortname_lower, Opt_shortname_win95,
 	Opt_shortname_winnt, Opt_shortname_mixed, Opt_utf8_no, Opt_utf8_yes,
 	Opt_uni_xl_no, Opt_uni_xl_yes, Opt_nonumtail_no, Opt_nonumtail_yes,
-	Opt_obsolate, Opt_err,
+	Opt_obsolate, Opt_flush, Opt_err,
 };
 
 static match_table_t fat_tokens = {
@@ -892,7 +893,8 @@ static match_table_t fat_tokens = {
 	{Opt_obsolate, "cvf_format=%20s"},
 	{Opt_obsolate, "cvf_options=%100s"},
 	{Opt_obsolate, "posix"},
-	{Opt_err, NULL}
+	{Opt_flush, "flush"},
+	{Opt_err, NULL},
 };
 static match_table_t msdos_tokens = {
 	{Opt_nodots, "nodots"},
@@ -1032,6 +1034,9 @@ static int parse_options(char *options, int is_vfat, int silent, int *debug,
 			if (match_int(&args[0], &option))
 				return 0;
 			opts->codepage = option;
+			break;
+		case Opt_flush:
+			opts->flush = 1;
 			break;
 
 		/* msdos specific */
