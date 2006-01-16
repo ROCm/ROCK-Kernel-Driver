@@ -673,7 +673,7 @@ static void do_recovery(struct mirror_set *ms)
 	if (!ms->in_sync &&
 	    (log->type->get_sync_count(log) == ms->nr_regions)) {
 		/* the sync is complete */
-		dm_table_event(ms->ti->table, NULL);
+		dm_table_event(ms->ti->table);
 		ms->in_sync = 1;
 	}
 }

@@ -236,5 +236,10 @@ config DM_MULTIPATH_EMC
 	---help---
 	  Multipath support for EMC CX/AX series hardware.
 
+config DM_NL_EVT
+	bool "DM netlink events (EXPERIMENTAL)"
+	depends on BLK_DEV_DM && EXPERIMENTAL
+	---help---
+	Generate netlink events for DM events.
 endmenu
 

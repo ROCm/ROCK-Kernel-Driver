@@ -3,7 +3,7 @@
 #
 
 dm-mod-objs	:= dm.o dm-table.o dm-target.o dm-linear.o dm-stripe.o \
-		   dm-ioctl.o dm-io.o kcopyd.o dm-netlink.o
+		   dm-ioctl.o dm-io.o kcopyd.o
 dm-multipath-objs := dm-hw-handler.o dm-path-selector.o dm-mpath.o
 dm-snapshot-objs := dm-snap.o dm-exception-store.o
 dm-mirror-objs	:= dm-log.o dm-raid1.o
@@ -44,6 +44,10 @@ quiet_cmd_unroll = UNROLL  $@
 
 ifeq ($(CONFIG_ALTIVEC),y)
 altivec_flags := -maltivec -mabi=altivec
+endif
+
+ifeq ($(CONFIG_DM_NL_EVT),y)
+dm-mod-objs			+= dm-netlink.o
 endif
 
 targets += raid6int1.c

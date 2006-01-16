@@ -49,22 +49,22 @@ static struct mp_zone z_dm_evt;
 static void* mp_zone_alloc_dm_evt(unsigned int gfp_mask,
 				    void *pool_data)
 {
-	struct dm_evt *evt = NULL;
+	struct dm_evt *evt;
 	struct mp_zone *zone = pool_data;
 
 	evt = kmem_cache_alloc(zone->cache, gfp_mask);
 	if (!evt)
 		goto out;
 
-
 	evt->skb = alloc_skb(zone->size, gfp_mask);
 	if (!evt->skb)
 		goto cache_out;
+	return evt;
 
 cache_out:
 	kmem_cache_free(zone->cache, evt);
 out:
-	return evt;
+	return NULL;
 }
 
 static void mp_zone_free_dm_evt(void *element, void *pool_data)

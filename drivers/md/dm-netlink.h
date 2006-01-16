@@ -28,8 +28,31 @@ struct dm_evt {
 	struct sk_buff *skb;
 };
 
+#ifdef CONFIG_DM_NL_EVT
 void dm_send_evt(struct dm_evt *);
 struct dm_evt *dm_path_fail_evt(char*, int);
 struct dm_evt *dm_path_reinstate_evt(char*);
+int dm_nl_init(void);
+void dm_nl_exit(void);
+#else
+static inline void dm_send_evt(struct dm_evt *evt)
+{
+}
+static inline struct dm_evt *dm_path_fail_evt(char* dm_name, int blk_err)
+{
+	return NULL;
+}
+static inline struct dm_evt *dm_path_reinstate_evt(char* dm_name)
+{
+	return NULL;
+}
+static inline int __init dm_nl_init(void)
+{
+	return 0;
+}
+static inline void dm_nl_exit(void)
+{
+}
+#endif
 
 #endif /* DM_NETLINK_H */

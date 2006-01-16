@@ -181,6 +181,7 @@ static struct multipath *alloc_multipath(void)
 		m->queue_io = 1;
 		INIT_WORK(&m->process_queued_ios, process_queued_ios, m);
 		INIT_WORK(&m->trigger_event, trigger_event, m);
+		INIT_LIST_HEAD(&m->evt_list);
 		m->mpio_pool = mempool_create(MIN_IOS, mempool_alloc_slab,
 					      mempool_free_slab, _mpio_cache);
 		if (!m->mpio_pool) {
@@ -429,17 +430,20 @@ out:
 static void trigger_event(void *data)
 {
 	unsigned long flags;
-	struct dm_evt *evt = NULL;
 	struct multipath *m = (struct multipath *) data;
+	struct dm_evt *evt, *next;
+	LIST_HEAD(events);
 
 	spin_lock_irqsave(&m->lock, flags);
-	if (!list_empty(&m->evt_list)) {
-		evt = list_entry(m->evt_list.next, struct dm_evt, elist);
-		list_del_init(&evt->elist);
-	}
+	list_splice_init(&m->evt_list, &events);
 	spin_unlock_irqrestore(&m->lock, flags);
 
-	dm_table_event(m->ti->table, evt);
+	list_for_each_entry_safe(evt, next, &events, elist) {
+		list_del_init(&evt->elist);
+		dm_send_evt(evt);
+	}
+
+	dm_table_event(m->ti->table);
 }
 
 /*-----------------------------------------------------------------
@@ -832,7 +836,7 @@ static int __fail_path(struct pgpath *pgpath, struct bio *bio)
 		m->current_pgpath = NULL;
 
 	/* Get error data from bio when available */
-	evt = dm_path_fail_evt(pgpath->path.dev->name, 0x5A5A5A5A);
+	evt = dm_path_fail_evt(pgpath->path.dev->name, 0);
 	if (evt)
 		list_add(&evt->elist, &m->evt_list);
 	queue_work(kmultipathd, &m->trigger_event);
@@ -882,7 +886,9 @@ static int reinstate_path(struct pgpath *pgpath)
 
 	evt = dm_path_reinstate_evt(pgpath->path.dev->name);
 	if (evt)
-		queue_work(kmultipathd, &m->trigger_event);
+		list_add(&evt->elist, &m->evt_list);
+
+	queue_work(kmultipathd, &m->trigger_event);
 
 out:
 	spin_unlock_irqrestore(&m->lock, flags);

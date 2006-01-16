@@ -654,7 +654,7 @@ static void pending_complete(struct pending_exception *pe, int success)
 
 		error_bios(bio_list_get(&pe->snapshot_bios));
 
-		dm_table_event(s->table, NULL);
+		dm_table_event(s->table);
 	}
 
  out:

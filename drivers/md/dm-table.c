@@ -775,7 +775,7 @@ void dm_table_event_callback(struct dm_table *t,
 	up(&_event_lock);
 }
 
-void dm_table_event(struct dm_table *t, struct dm_evt *evt)
+void dm_table_event(struct dm_table *t)
 {
 	/*
 	 * You can no longer call dm_table_event() from interrupt
@@ -787,9 +787,6 @@ void dm_table_event(struct dm_table *t, struct dm_evt *evt)
 	if (t->event_fn)
 		t->event_fn(t->event_context);
 	up(&_event_lock);
-
-	if (evt)
-		dm_send_evt(evt);
 }
 
 sector_t dm_table_get_size(struct dm_table *t)
