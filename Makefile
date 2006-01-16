@@ -341,12 +341,8 @@ ifneq ($(wildcard /.buildenv),)
 CFLAGS		+= -DUNSUPPORTED_MODULES=1
 endif
 
-ifneq ($(wildcard $(srctree)/rpm-release),)
-RPM_RELEASE := -$(shell cat $(srctree)/rpm-release)
-endif
-
-KERNELRELEASE=$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)$(RPM_RELEASE)$(LOCALVERSION)
-
+# Read KERNELRELEASE from .kernelrelease (if it exists)
+KERNELRELEASE = $(shell cat .kernelrelease 2> /dev/null)
 
 export	VERSION PATCHLEVEL SUBLEVEL KERNELRELEASE \
 	ARCH CONFIG_SHELL HOSTCC HOSTCFLAGS CROSS_COMPILE AS LD CC \
@@ -1318,7 +1314,7 @@ checkstack:
 	$(PERL) $(src)/scripts/checkstack.pl $(ARCH)
 
 kernelrelease:
-	@echo $(KERNELRELEASE)
+	@echo $(kernelrelease)
 kernelversion:
 	@echo $(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)
 
