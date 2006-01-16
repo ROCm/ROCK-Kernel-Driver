@@ -1340,6 +1340,7 @@ static int tcp_v6_init_sock(struct sock *sk)
 	struct tcp_sock *tp = tcp_sk(sk);
 
 	skb_queue_head_init(&tp->out_of_order_queue);
+	skb_queue_head_init(&tp->async_wait_queue);
 	tcp_init_xmit_timers(sk);
 	tcp_prequeue_init(tp);
 

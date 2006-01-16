@@ -71,6 +71,7 @@
 #include <net/inet_common.h>
 #include <net/timewait_sock.h>
 #include <net/xfrm.h>
+#include <net/netdma.h>
 
 #include <linux/inet.h>
 #include <linux/ipv6.h>
@@ -981,6 +982,11 @@ int tcp_v4_do_rcv(struct sock *sk, struct sk_buff *skb)
 {
 	if (sk->sk_state == TCP_ESTABLISHED) { /* Fast path */
 		TCP_CHECK_TIMER(sk);
+
+#ifdef CONFIG_NET_DMA
+		dma_async_try_early_copy(sk, skb);
+#endif
+
 		if (tcp_rcv_established(sk, skb, skb->h.th, skb->len))
 			goto reset;
 		TCP_CHECK_TIMER(sk);
@@ -1090,10 +1096,19 @@ process:
 	bh_lock_sock(sk);
 	ret = 0;
 	if (!sock_owned_by_user(sk)) {
-		if (!tcp_prequeue(sk, skb))
+#ifdef CONFIG_NET_DMA
+		struct tcp_sock *tp = tcp_sk(sk);
+		if (tp->ucopy.dma_chan)
 			ret = tcp_v4_do_rcv(sk, skb);
+		else
+#endif
+		{
+			if (!tcp_prequeue(sk, skb))
+			ret = tcp_v4_do_rcv(sk, skb);
+		}
 	} else
 		sk_add_backlog(sk, skb);
+
 	bh_unlock_sock(sk);
 
 	sock_put(sk);
@@ -1238,6 +1253,7 @@ static int tcp_v4_init_sock(struct sock *sk)
 	struct tcp_sock *tp = tcp_sk(sk);
 
 	skb_queue_head_init(&tp->out_of_order_queue);
+	skb_queue_head_init(&tp->async_wait_queue);
 	tcp_init_xmit_timers(sk);
 	tcp_prequeue_init(tp);
 
@@ -1290,6 +1306,9 @@ int tcp_v4_destroy_sock(struct sock *sk)
 
 	/* Cleans up our, hopefully empty, out_of_order_queue. */
   	__skb_queue_purge(&tp->out_of_order_queue);
+
+	/* Cleans up our async_wait_queue */
+  	__skb_queue_purge(&tp->async_wait_queue);
 
 	/* Clean prequeue, it must be empty really */
 	__skb_queue_purge(&tp->ucopy.prequeue);

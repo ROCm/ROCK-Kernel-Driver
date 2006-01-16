@@ -262,7 +262,7 @@
 #include <net/tcp.h>
 #include <net/xfrm.h>
 #include <net/ip.h>
-
+#include <net/netdma.h>
 
 #include <asm/uaccess.h>
 #include <asm/ioctls.h>
@@ -936,12 +936,12 @@ static int tcp_recv_urg(struct sock *sk, long timeo,
  * calculation of whether or not we must ACK for the sake of
  * a window update.
  */
-static void cleanup_rbuf(struct sock *sk, int copied)
+void tcp_cleanup_rbuf(struct sock *sk, int copied)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
 	int time_to_ack = 0;
 
-#if TCP_DEBUG
+#if TCP_DEBUG && !defined(CONFIG_NET_DMA)
 	struct sk_buff *skb = skb_peek(&sk->sk_receive_queue);
 
 	BUG_TRAP(!skb || before(tp->copied_seq, TCP_SKB_CB(skb)->end_seq));
@@ -1085,7 +1085,7 @@ int tcp_read_sock(struct sock *sk, read_descriptor_t *desc,
 
 	/* Clean up data we have read: This will do ACK frames. */
 	if (copied)
-		cleanup_rbuf(sk, copied);
+		tcp_cleanup_rbuf(sk, copied);
 	return copied;
 }
 
@@ -1132,6 +1132,19 @@ int tcp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 
 	target = sock_rcvlowat(sk, flags & MSG_WAITALL, len);
 
+#ifdef CONFIG_NET_DMA
+	tp->ucopy.dma_chan = NULL;
+	if ((len > sysctl_tcp_dma_copybreak) && !(flags & MSG_PEEK) && !sysctl_tcp_low_latency) {
+		tp->ucopy.dma_chan = get_softnet_dma();
+		if (tp->ucopy.dma_chan) {
+			if (dma_lock_iovec_pages(msg->msg_iov, len,
+			    &tp->ucopy.locked_list))
+				/* fallback to no-dma */
+				tp->ucopy.dma_chan = NULL;
+		}
+	}
+#endif
+
 	do {
 		struct sk_buff *skb;
 		u32 offset;
@@ -1161,7 +1174,12 @@ int tcp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 				       "seq %X\n", *seq, TCP_SKB_CB(skb)->seq);
 				break;
 			}
-			offset = *seq - TCP_SKB_CB(skb)->seq;
+
+			if (!skb->copied_early)
+				offset = *seq - TCP_SKB_CB(skb)->seq;
+			else
+				offset = 0;
+
 			if (skb->h.th->syn)
 				offset--;
 			if (offset < skb->len)
@@ -1219,7 +1237,7 @@ int tcp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 			}
 		}
 
-		cleanup_rbuf(sk, copied);
+		tcp_cleanup_rbuf(sk, copied);
 
 		if (!sysctl_tcp_low_latency && tp->ucopy.task == user_recv) {
 			/* Install new reader */
@@ -1273,6 +1291,8 @@ int tcp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 		} else
 			sk_wait_data(sk, &timeo);
 
+		tp->ucopy.wakeup = 0;
+
 		if (user_recv) {
 			int chunk;
 
@@ -1304,8 +1324,12 @@ do_prequeue:
 		}
 		continue;
 
-	found_ok_skb:
+found_ok_skb:
 		/* Ok so how much can we use? */
+		if (skb->copied_early) {
+			used = skb->len;
+			goto skip_copy;
+		}
 		used = skb->len - offset;
 		if (len < used)
 			used = len;
@@ -1328,13 +1352,33 @@ do_prequeue:
 		}
 
 		if (!(flags & MSG_TRUNC)) {
-			err = skb_copy_datagram_iovec(skb, offset,
-						      msg->msg_iov, used);
-			if (err) {
-				/* Exception. Bailout! */
-				if (!copied)
-					copied = -EFAULT;
-				break;
+			if (tp->ucopy.dma_chan) {
+				tp->ucopy.dma_cookie = dma_skb_copy_datagram_iovec(
+					tp->ucopy.dma_chan, skb, offset,
+					msg->msg_iov, used,
+					tp->ucopy.locked_list);
+
+				if (tp->ucopy.dma_cookie < 0) {
+
+					printk(KERN_ALERT "dma_cookie < 0\n");
+
+					/* Exception. Bailout! */
+					if (!copied)
+						copied = -EFAULT;
+					break;
+				}
+				if ((offset + used) == skb->len)
+					skb->copied_early = 1;
+
+			} else {
+				err = skb_copy_datagram_iovec(skb, offset,
+						msg->msg_iov, used);
+				if (err) {
+					/* Exception. Bailout! */
+					if (!copied)
+						copied = -EFAULT;
+					break;
+				}
 			}
 		}
 
@@ -1354,15 +1398,27 @@ skip_copy:
 
 		if (skb->h.th->fin)
 			goto found_fin_ok;
-		if (!(flags & MSG_PEEK))
-			sk_eat_skb(sk, skb);
+		if (!(flags & MSG_PEEK)) {
+			if (!skb->copied_early)
+				sk_eat_skb(sk, skb);
+			else {
+				__skb_unlink(skb, &sk->sk_receive_queue);
+				__skb_queue_tail(&tp->async_wait_queue, skb);
+			}
+		}
 		continue;
 
 	found_fin_ok:
 		/* Process the FIN. */
 		++*seq;
-		if (!(flags & MSG_PEEK))
-			sk_eat_skb(sk, skb);
+		if (!(flags & MSG_PEEK)) {
+			if (!skb->copied_early)
+				sk_eat_skb(sk, skb);
+			else {
+				__skb_unlink(skb, &sk->sk_receive_queue);
+				__skb_queue_tail(&tp->async_wait_queue, skb);
+			}
+		}
 		break;
 	} while (len > 0);
 
@@ -1385,12 +1441,41 @@ skip_copy:
 		tp->ucopy.len = 0;
 	}
 
+
+#ifdef CONFIG_NET_DMA
+	if (tp->ucopy.dma_chan) {
+		struct sk_buff *skb;
+		dma_cookie_t done, used;
+
+		dma_async_memcpy_issue_pending(tp->ucopy.dma_chan);
+
+		while (dma_async_memcpy_complete(tp->ucopy.dma_chan,
+		                                 tp->ucopy.dma_cookie, &done,
+		                                 &used) == DMA_IN_PROGRESS) {
+			/* do partial cleanup of async_wait_queue */
+			while ((skb = skb_peek(&tp->async_wait_queue)) &&
+			       (dma_async_is_complete(skb->dma_cookie, done,
+			                              used) == DMA_SUCCESS)) {
+				__skb_dequeue(&tp->async_wait_queue);
+				kfree_skb(skb);
+			}
+		}
+
+		/* Safe to free early-copied skbs now */
+		__skb_queue_purge(&tp->async_wait_queue);
+		dma_unlock_iovec_pages(tp->ucopy.locked_list);
+		dma_chan_put(tp->ucopy.dma_chan);
+		tp->ucopy.dma_chan = NULL;
+		tp->ucopy.locked_list = NULL;
+	}
+#endif
+
 	/* According to UNIX98, msg_name/msg_namelen are ignored
 	 * on connected socket. I was just happy when found this 8) --ANK
 	 */
 
 	/* Clean up data we have read: This will do ACK frames. */
-	cleanup_rbuf(sk, copied);
+	tcp_cleanup_rbuf(sk, copied);
 
 	TCP_CHECK_TIMER(sk);
 	release_sock(sk);
@@ -1652,6 +1737,7 @@ int tcp_disconnect(struct sock *sk, int flags)
 	__skb_queue_purge(&sk->sk_receive_queue);
 	sk_stream_writequeue_purge(sk);
 	__skb_queue_purge(&tp->out_of_order_queue);
+	__skb_queue_purge(&tp->async_wait_queue);
 
 	inet->dport = 0;
 
@@ -1856,7 +1942,7 @@ int tcp_setsockopt(struct sock *sk, int level, int optname, char __user *optval,
 			    (TCPF_ESTABLISHED | TCPF_CLOSE_WAIT) &&
 			    inet_csk_ack_scheduled(sk)) {
 				icsk->icsk_ack.pending |= ICSK_ACK_PUSHED;
-				cleanup_rbuf(sk, 1);
+				tcp_cleanup_rbuf(sk, 1);
 				if (!(val & 1))
 					icsk->icsk_ack.pingpong = 1;
 			}

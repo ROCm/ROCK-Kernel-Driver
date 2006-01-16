@@ -18,6 +18,7 @@
 #define _LINUX_TCP_H
 
 #include <linux/types.h>
+#include <linux/dmaengine.h>
 #include <asm/byteorder.h>
 
 struct tcphdr {
@@ -233,6 +234,12 @@ struct tcp_sock {
 		struct iovec		*iov;
 		int			memory;
 		int			len;
+
+		/* members for async copy */
+		struct dma_chan		*dma_chan;
+		int			wakeup;
+		struct dma_locked_list	*locked_list;
+		dma_cookie_t		dma_cookie;
 	} ucopy;
 
 	__u32	snd_wl1;	/* Sequence for window update		*/
@@ -277,6 +284,7 @@ struct tcp_sock {
 	__u32	snd_cwnd_stamp;
 
 	struct sk_buff_head	out_of_order_queue; /* Out of order segments go here */
+	struct sk_buff_head	async_wait_queue; /* DMA unfinished segments go here */
 
  	__u32	rcv_wnd;	/* Current receiver window		*/
 	__u32	rcv_wup;	/* rcv_nxt on last window update sent	*/
