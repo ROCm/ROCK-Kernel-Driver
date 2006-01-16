@@ -225,6 +225,7 @@ CLEAN_FILES += $(ARCH_DIR)/user-offsets.s
 
 $(ARCH_DIR)/include/kern_constants.h:
 	@echo '  SYMLINK $@'
+	$(Q) mkdir -p $(ARCH_DIR)/include
 	$(Q) ln -sf ../../../include/asm-um/asm-offsets.h $@
 
 export SUBARCH USER_CFLAGS OS
