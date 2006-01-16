@@ -37,7 +37,7 @@
 #include <linux/nmi.h>
 #include <linux/ptrace.h>
 #include <linux/sysctl.h>
-#ifdef CONFIG_LKCD
+#if defined(CONFIG_LKCD) || defined(CONFIG_LKCD_MODULE)
 #include <linux/dump.h>
 #endif
 
@@ -64,7 +64,6 @@ static volatile int kdb_new_cpu;		/* Which cpu to switch to */
 volatile int kdb_state[NR_CPUS];		/* Per cpu state */
 
 const struct task_struct *kdb_current_task;
-EXPORT_SYMBOL(kdb_current_task);
 struct pt_regs *kdb_current_regs;
 
 #ifdef	CONFIG_KDB_OFF
@@ -1081,7 +1080,7 @@ handle_ctrl_cmd(char *cmd)
 static void
 kdb_do_dump(struct pt_regs *regs)
 {
-#ifdef CONFIG_LKCD
+#if defined(CONFIG_LKCD) || defined(CONFIG_LKCD_MODULE)
 	notifier_call_chain(&kdb_notifier_list, KDB_EVENT_DUMPING, NULL);
 	kdb_printf("Forcing dump (if configured)\n");
 	console_loglevel = 8;	/* to see the dump messages */
@@ -1167,6 +1166,7 @@ kdb_local(kdb_reason_t reason, int error, struct pt_regs *regs, kdb_dbtrap_t db_
 	 *
 	 * To pause in kdb even for recoverable events, 'set RECOVERY_PAUSE 1'
 	 */
+	KDB_DEBUG_STATE("kdb_local 1", reason);
 	if (reason == KDB_REASON_ENTER
 	    && KDB_FLAG(RECOVERY)
 	    && !KDB_FLAG(CATASTROPHIC)) {
@@ -1180,6 +1180,7 @@ kdb_local(kdb_reason_t reason, int error, struct pt_regs *regs, kdb_dbtrap_t db_
 				   __FUNCTION__);
 	}
 
+	KDB_DEBUG_STATE("kdb_local 2", reason);
 	kdb_go_count = 0;
 	if (reason != KDB_REASON_DEBUG &&
 	    reason != KDB_REASON_SILENT) {
@@ -1208,12 +1209,14 @@ kdb_local(kdb_reason_t reason, int error, struct pt_regs *regs, kdb_dbtrap_t db_
 			/*
 			 * In the midst of ssb command. Just return.
 			 */
+			KDB_DEBUG_STATE("kdb_local 3", reason);
 			return KDB_CMD_SSB;	/* Continue with SSB command */
 
 			break;
 		case KDB_DB_SS:
 			break;
 		case KDB_DB_SSBPT:
+			KDB_DEBUG_STATE("kdb_local 4", reason);
 			return 1;	/* kdba_db_trap did the work */
 		default:
 			kdb_printf("kdb: Bad result from kdba_db_trap: %d\n",
@@ -1235,10 +1238,12 @@ kdb_local(kdb_reason_t reason, int error, struct pt_regs *regs, kdb_dbtrap_t db_
 		KDB_STATE_SET(KEYBOARD);
 		kdb_printf("due to Keyboard Entry\n");
 		break;
+	case KDB_REASON_ENTER_SLAVE:	/* drop through, slaves only get released via cpu switch */
 	case KDB_REASON_SWITCH:
 		kdb_printf("due to cpu switch\n");
 		if (KDB_STATE(GO_SWITCH)) {
 			KDB_STATE_CLEAR(GO_SWITCH);
+			KDB_DEBUG_STATE("kdb_local 5", reason);
 			return KDB_CMD_GO;
 		}
 		break;
@@ -1270,6 +1275,7 @@ kdb_local(kdb_reason_t reason, int error, struct pt_regs *regs, kdb_dbtrap_t db_
 		 */
 		if (db_result != KDB_DB_BPT) {
 			kdb_printf("kdb: error return from kdba_bp_trap: %d\n", db_result);
+			KDB_DEBUG_STATE("kdb_local 6", reason);
 			return 0;	/* Not for us, dismiss it */
 		}
 		break;
@@ -1277,10 +1283,12 @@ kdb_local(kdb_reason_t reason, int error, struct pt_regs *regs, kdb_dbtrap_t db_
 		kdb_printf("due to Recursion @ " kdb_machreg_fmt "\n", kdba_getpc(regs));
 		break;
 	case KDB_REASON_SILENT:
+		KDB_DEBUG_STATE("kdb_local 7", reason);
 		return KDB_CMD_GO;	/* Silent entry, silent exit */
 		break;
 	default:
 		kdb_printf("kdb: unexpected reason code: %d\n", reason);
+		KDB_DEBUG_STATE("kdb_local 8", reason);
 		return 0;	/* Not for us, dismiss it */
 	}
 
@@ -1377,6 +1385,7 @@ do_full_getstr:
 
 	kdba_local_arch_cleanup();
 
+	KDB_DEBUG_STATE("kdb_local 9", diag);
 	return diag;
 }
 
@@ -1526,7 +1535,6 @@ kdb_main_loop(kdb_reason_t reason, kdb_reason_t reason2, int error,
 	      kdb_dbtrap_t db_result, struct pt_regs *regs)
 {
 	int result = 1;
-	int wait_for_cpus = reason != KDB_REASON_SILENT;
 	/* Stay in kdb() until 'go', 'ss[b]' or an error */
 	while (1) {
 		/*
@@ -1548,10 +1556,7 @@ kdb_main_loop(kdb_reason_t reason, kdb_reason_t reason2, int error,
 		if (KDB_STATE(LEAVING))
 			break;	/* Another cpu said 'go' */
 
-		if (wait_for_cpus) {
-			wait_for_cpus = 0;
-			kdb_wait_for_cpus();
-		}
+		kdb_wait_for_cpus();
 		/* Still using kdb, this processor is in control */
 		result = kdb_local(reason2, error, regs, db_result);
 		KDB_DEBUG_STATE("kdb_main_loop 3", result);
@@ -1911,6 +1916,7 @@ kdb(kdb_reason_t reason, int error, struct pt_regs *regs)
 			spin_lock(&kdb_lock);
 		}
 		reason = KDB_REASON_SWITCH;
+		KDB_STATE_SET(HOLD_CPU);
 		spin_unlock(&kdb_lock);
 	}
 

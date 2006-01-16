@@ -1,3 +1,11 @@
+2006-01-11 Keith Owens  <kaos@sgi.com>
+
+	* Plug a timing race between KDB_ENTER_SLAVE and KDB_ENTER, and allow
+	  the cpu command to switch to a slave cpu.
+	* KDB_REASON_SILENT now waits for other cpus, to avoid spurious NMI
+	  events that were seen on some Xeon systems.
+	* kdb v4.4-2.6.15-common-3.
+
 2006-01-08 Keith Owens  <kaos@sgi.com>
 
 	* kdb mainline invokes DIE_KDEBUG_ENTER and DIE_KDEBUG_LEAVE via
