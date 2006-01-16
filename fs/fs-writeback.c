@@ -389,7 +389,6 @@ sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)
 	}
 	return;		/* Leave any unwritten inodes on s_io */
 }
-EXPORT_SYMBOL_GPL(writeback_bdev);
 
 void
 writeback_bdev(struct super_block *sb)
@@ -398,6 +397,7 @@ writeback_bdev(struct super_block *sb)
 	filemap_flush(mapping);
 	blk_run_address_space(mapping);
 }
+EXPORT_SYMBOL_GPL(writeback_bdev);
 
 void
 writeback_inode(struct inode *inode)
@@ -411,6 +411,7 @@ writeback_inode(struct inode *inode)
 	sync_inode(inode, &wbc);
 	filemap_fdatawrite(mapping);
 }
+EXPORT_SYMBOL_GPL(writeback_inode);
 
 /*
  * Start writeback of dirty pagecache data against all unlocked inodes.
@@ -467,7 +468,6 @@ restart:
 	}
 	spin_unlock(&sb_lock);
 }
-EXPORT_SYMBOL_GPL(writeback_inode);
 
 /*
  * writeback and wait upon the filesystem's dirty inodes.  The caller will
