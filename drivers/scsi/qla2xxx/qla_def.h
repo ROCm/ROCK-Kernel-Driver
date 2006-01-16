@@ -1680,8 +1680,7 @@ typedef struct fc_port {
 	uint8_t mp_byte;		/* multi-path byte (not used) */
     	uint8_t cur_path;		/* current path id */
 
-	spinlock_t rport_lock;
-	struct fc_rport *rport, *drport;
+	struct fc_rport *rport;
 	u32 supported_classes;
 	struct work_struct rport_add_work;
 	struct work_struct rport_del_work;

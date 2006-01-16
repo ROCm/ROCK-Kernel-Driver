@@ -18,7 +18,7 @@
 #include <linux/kdb.h>
 #include <linux/kdbprivate.h>
 #include <asm/sn/sn_sal.h>
-#include "xpc.h"
+#include <asm/sn/xpc.h>
 
 
 MODULE_AUTHOR("SGI");

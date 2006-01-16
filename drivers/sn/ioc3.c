@@ -62,7 +62,7 @@ static int nic_reset(struct ioc3_driver_data *idd)
         return presence;
 }
 
-static int nic_read_bit(struct ioc3_driver_data *idd)
+static inline int nic_read_bit(struct ioc3_driver_data *idd)
 {
 	int result;
 	unsigned long flags;
@@ -77,7 +77,7 @@ static int nic_read_bit(struct ioc3_driver_data *idd)
 	return result;
 }
 
-static void nic_write_bit(struct ioc3_driver_data *idd, int bit)
+static inline void nic_write_bit(struct ioc3_driver_data *idd, int bit)
 {
 	if (bit)
 		idd->vma->mcr = mcr_pack(6, 110);
@@ -371,7 +371,8 @@ static void probe_nic(struct ioc3_driver_data *idd)
 
 /* Interrupts */
 
-static void write_ireg(struct ioc3_driver_data *idd, uint32_t val, int which)
+static inline void
+write_ireg(struct ioc3_driver_data *idd, uint32_t val, int which)
 {
 	unsigned long flags;
 
@@ -734,12 +735,14 @@ static int ioc3_probe(struct pci_dev *pdev, const struct pci_device_id *pci_id)
 	}
 
 	/* Add this IOC3 to all submodules */
+	read_lock(&ioc3_submodules_lock);
 	for(id=0;id<IOC3_MAX_SUBMODULES;id++)
 		if(ioc3_submodules[id] && ioc3_submodules[id]->probe) {
 			idd->active[id] = 1;
 			idd->active[id] = !ioc3_submodules[id]->probe
 						(ioc3_submodules[id], idd);
 		}
+	read_unlock(&ioc3_submodules_lock);
 
 	printk(KERN_INFO "IOC3 Master Driver loaded for %s\n", pci_name(pdev));
 
@@ -764,6 +767,7 @@ static void ioc3_remove(struct pci_dev *pdev)
 	idd = pci_get_drvdata(pdev);
 
 	/* Remove this IOC3 from all submodules */
+	read_lock(&ioc3_submodules_lock);
 	for(id=0;id<IOC3_MAX_SUBMODULES;id++)
 		if(idd->active[id]) {
 			if(ioc3_submodules[id] && ioc3_submodules[id]->remove)
@@ -777,6 +781,7 @@ static void ioc3_remove(struct pci_dev *pdev)
 					        pci_name(pdev));
 			idd->active[id] = 0;
 		}
+	read_unlock(&ioc3_submodules_lock);
 
 	/* Clear and disable all IRQs */
 	write_ireg(idd, ~0, IOC3_W_IEC);
@@ -838,9 +843,9 @@ MODULE_AUTHOR("Stanislaw Skowronek <skylark@linux-mips.org>");
 MODULE_DESCRIPTION("PCI driver for SGI IOC3");
 MODULE_LICENSE("GPL");
 
-EXPORT_SYMBOL_GPL(ioc3_register_submodule);
-EXPORT_SYMBOL_GPL(ioc3_unregister_submodule);
-EXPORT_SYMBOL_GPL(ioc3_ack);
-EXPORT_SYMBOL_GPL(ioc3_gpcr_set);
-EXPORT_SYMBOL_GPL(ioc3_disable);
-EXPORT_SYMBOL_GPL(ioc3_enable);
+EXPORT_SYMBOL(ioc3_register_submodule);
+EXPORT_SYMBOL(ioc3_unregister_submodule);
+EXPORT_SYMBOL(ioc3_ack);
+EXPORT_SYMBOL(ioc3_gpcr_set);
+EXPORT_SYMBOL(ioc3_disable);
+EXPORT_SYMBOL(ioc3_enable);

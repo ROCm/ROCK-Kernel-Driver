@@ -262,19 +262,11 @@ static void __init find_early_table_space(unsigned long end)
 	tables = round_up(puds * sizeof(pud_t), PAGE_SIZE) +
 		 round_up(pmds * sizeof(pmd_t), PAGE_SIZE);
 
-	/* Put page tables beyond the DMA zones if possible.
-	   RED-PEN might be better to spread them out more over
-	   memory to avoid hotspots */
-	if (end > MAX_DMA32_PFN<<PAGE_SHIFT)
-		start = MAX_DMA32_PFN << PAGE_SHIFT;
-	else if (end > MAX_DMA_PFN << PAGE_SHIFT)
-		start = MAX_DMA_PFN << PAGE_SHIFT;
-	else
-		start = 0x8000;
-
-	table_start = find_e820_area(start, end, tables);
-	if (table_start == -1)
-		table_start = find_e820_area(0x8000, end, tables);
+ 	/* RED-PEN putting page tables only on node 0 could
+ 	   cause a hotspot and fill up ZONE_DMA. The page tables
+ 	   need roughly 0.5KB per GB. */
+ 	start = 0x8000;
+ 	table_start = find_e820_area(start, end, tables);
 	if (table_start == -1UL)
 		panic("Cannot find space for the kernel page tables");
 
@@ -539,8 +531,9 @@ void mark_rodata_ro(void)
 #ifdef CONFIG_BLK_DEV_INITRD
 void free_initrd_mem(unsigned long start, unsigned long end)
 {
-	if (start < (unsigned long)&_end)
+	if (__pa(start) < __pa((unsigned long)&_end))
 		return;
+
 	printk ("Freeing initrd memory: %ldk freed\n", (end - start) >> 10);
 	for (; start < end; start += PAGE_SIZE) {
 		ClearPageReserved(virt_to_page(start));

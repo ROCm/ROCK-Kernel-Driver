@@ -5,7 +5,7 @@
 
 #include "schid.h"
 
-#define VERSION_CIO_QDIO_H "$Revision: 1.41.2.1 $"
+#define VERSION_CIO_QDIO_H "$Revision: 1.40 $"
 
 #ifdef CONFIG_QDIO_DEBUG
 #define QDIO_VERBOSE_LEVEL 9

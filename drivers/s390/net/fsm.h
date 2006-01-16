@@ -1,4 +1,4 @@
-/* $Id: fsm.h,v 1.2.2.1 2006/01/04 17:59:19 mschwide Exp $
+/* $Id: fsm.h,v 1.1.1.1 2002/03/13 19:33:09 mschwide Exp $
  */
 #ifndef _FSM_H_
 #define _FSM_H_

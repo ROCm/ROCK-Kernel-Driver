@@ -1014,11 +1014,13 @@ qla24xx_update_fw_options(scsi_qla_host_t *ha)
 	int rval;
 
 	/* Update Serial Link options. */
-	if ((ha->fw_seriallink_options24[0] & BIT_0) == 0)
+	if ((le16_to_cpu(ha->fw_seriallink_options24[0]) & BIT_0) == 0)
 		return;
 
-	rval = qla2x00_set_serdes_params(ha, ha->fw_seriallink_options24[1],
-	    ha->fw_seriallink_options24[2], ha->fw_seriallink_options24[3]);
+	rval = qla2x00_set_serdes_params(ha,
+	    le16_to_cpu(ha->fw_seriallink_options24[1]),
+	    le16_to_cpu(ha->fw_seriallink_options24[2]),
+	    le16_to_cpu(ha->fw_seriallink_options24[3]));
 	if (rval != QLA_SUCCESS) {
 		qla_printk(KERN_WARNING, ha,
 		    "Unable to update Serial Link options (%x).\n", rval);
@@ -1686,16 +1688,10 @@ static void
 qla2x00_rport_del(void *data)
 {
 	fc_port_t *fcport = data;
-	struct fc_rport *rport;
-	unsigned long flags;
 
-	spin_lock_irqsave(&fcport->rport_lock, flags);
-	rport = fcport->drport;
-	fcport->drport = NULL;
-	spin_unlock_irqrestore(&fcport->rport_lock, flags);
-	if (rport)
-		fc_remote_port_delete(rport);
-
+	if (fcport->rport)
+		fc_remote_port_delete(fcport->rport);
+	fcport->rport = NULL;
 }
 
 /**
@@ -1723,7 +1719,6 @@ qla2x00_alloc_fcport(scsi_qla_host_t *ha, gfp_t flags)
 	atomic_set(&fcport->state, FCS_UNCONFIGURED);
 	fcport->flags = FCF_RLC_SUPPORT;
 	fcport->supported_classes = FC_COS_UNSPECIFIED;
-	spin_lock_init(&fcport->rport_lock);
 	INIT_WORK(&fcport->rport_add_work, qla2x00_rport_add, fcport);
 	INIT_WORK(&fcport->rport_del_work, qla2x00_rport_del, fcport);
 
@@ -1946,6 +1941,9 @@ qla2x00_configure_local_loop(scsi_qla_host_t *ha)
 			    "information -- get_port_database=%x, "
 			    "loop_id=0x%04x\n",
 			    ha->host_no, rval2, new_fcport->loop_id));
+			DEBUG2(printk("scsi(%ld): Scheduling resync...\n",
+			    ha->host_no));
+			set_bit(LOOP_RESYNC_NEEDED, &ha->dpc_flags);
 			continue;
 		}
 
@@ -2087,10 +2085,10 @@ qla2x00_reg_remote_port(scsi_qla_host_t *ha, fc_port_t *fcport)
 	struct fc_rport_identifiers rport_ids;
 	struct fc_rport *rport;
 
-	if (fcport->drport)
-		qla2x00_rport_del(fcport);
-	if (fcport->rport)
-		return;
+	if (fcport->rport) {
+		fc_remote_port_delete(fcport->rport);
+		fcport->rport = NULL;
+	}
 
 	rport_ids.node_name = wwn_to_u64(fcport->node_name);
 	rport_ids.port_name = wwn_to_u64(fcport->port_name);
@@ -2655,14 +2653,11 @@ qla2x00_device_resync(scsi_qla_host_t *ha)
 
 		switch (format) {
 		case 0:
-
-			if (0) {
-#if 0
-			if (!IS_QLA2100(ha) && !IS_QLA2200(ha) &&
+			if (ql2xprocessrscn &&
+			    !IS_QLA2100(ha) && !IS_QLA2200(ha) &&
 			    !IS_QLA6312(ha) && !IS_QLA6322(ha) &&
 			    !IS_QLA24XX(ha) && !IS_QLA25XX(ha) &&
 			    ha->flags.init_done) {
-#endif
 				/* Handle port RSCN via asyncronous IOCBs */
 				rval2 = qla2x00_handle_port_rscn(ha, rscn_entry,
 				    NULL, 0);
@@ -3413,6 +3408,8 @@ qla24xx_nvram_config(scsi_qla_host_t *ha)
 	ha->node_name = icb->node_name;
 	ha->port_name = icb->port_name;
 
+	icb->execution_throttle = __constant_cpu_to_le16(0xFFFF);
+
 	ha->retry_count = le16_to_cpu(nv->login_retry_count);
 
 	/* Set minimum login_timeout to 4 seconds. */
@@ -3678,8 +3675,8 @@ qla24xx_load_risc_flash(scsi_qla_host_t *ha, uint32_t *srisc_addr)
 			for (i = 0; i < dlen; i++)
 				dcode[i] = swab32(dcode[i]);
 
-			rval = qla2x00_load_ram_ext(ha, ha->request_dma,
-			    risc_addr, dlen);
+			rval = qla2x00_load_ram(ha, ha->request_dma, risc_addr,
+			    dlen);
 			if (rval) {
 				DEBUG(printk("scsi(%ld):[ERROR] Failed to load "
 				    "segment %d of firmware\n", ha->host_no,
@@ -3879,8 +3876,8 @@ qla24xx_load_risc(scsi_qla_host_t *ha, uint32_t *srisc_addr)
 			for (i = 0; i < dlen; i++)
 				dcode[i] = swab32(fwcode[i]);
 
-			rval = qla2x00_load_ram_ext(ha, ha->request_dma,
-			    risc_addr, dlen);
+			rval = qla2x00_load_ram(ha, ha->request_dma, risc_addr,
+			    dlen);
 			if (rval) {
 				DEBUG(printk("scsi(%ld):[ERROR] Failed to load "
 				    "segment %d of firmware\n", ha->host_no,

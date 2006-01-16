@@ -1431,7 +1431,7 @@ static int receive_chars(struct uart_port *the_port)
  * @regs: pt_regs
  */
 
-static int
+static int inline
 ioc3uart_intr_one(struct ioc3_submodule *is,
 			struct ioc3_driver_data *idd,
 			unsigned int pending, struct pt_regs *regs)

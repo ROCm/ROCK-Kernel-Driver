@@ -519,15 +519,13 @@ qla2x00_async_event(scsi_qla_host_t *ha, uint16_t *mb)
 		 * us, create a new entry in our rscn fcports list and handle
 		 * the event like an RSCN.
 		 */
-		if (0) {
-#if 0
-		if (!IS_QLA2100(ha) && !IS_QLA2200(ha) && !IS_QLA6312(ha) &&
+		if (ql2xprocessrscn &&
+		    !IS_QLA2100(ha) && !IS_QLA2200(ha) && !IS_QLA6312(ha) &&
 		    !IS_QLA6322(ha) && !IS_QLA24XX(ha) && !IS_QLA25XX(ha) &&
 		    ha->flags.init_done && mb[1] != 0xffff &&
 		    ((ha->operating_mode == P2P && mb[1] != 0) ||
 		    (ha->operating_mode != P2P && mb[1] !=
 			SNS_FIRST_LOOP_ID)) && (mb[2] == 6 || mb[2] == 7)) {
-#endif
 			int rval;
 			fc_port_t *rscn_fcport;
 
@@ -966,15 +964,16 @@ qla2x00_status_entry(scsi_qla_host_t *ha, void *pkt)
 		break;
 
 	case CS_DATA_UNDERRUN:
-		DEBUG2(printk(KERN_INFO
-		    "scsi(%ld:%d:%d) UNDERRUN status detected 0x%x-0x%x.\n",
-		    ha->host_no, cp->device->id, cp->device->lun, comp_status,
-		    scsi_status));
-
 		resid = resid_len;
 		if (scsi_status & SS_RESIDUAL_UNDER) {
 			cp->resid = resid;
 			CMD_RESID_LEN(cp) = resid;
+		} else {
+			DEBUG2(printk(KERN_INFO
+			    "scsi(%ld:%d:%d) UNDERRUN status detected "
+			    "0x%x-0x%x.\n", ha->host_no, cp->device->id,
+			    cp->device->lun, comp_status, scsi_status));
+
 		}
 
 		/*

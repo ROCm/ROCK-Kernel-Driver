@@ -252,7 +252,7 @@ ahd_scb_timer_reset(struct scb *scb, u_int usec)
 /***************************** SMP support ************************************/
 #include <linux/spinlock.h>
 
-#define AIC79XX_DRIVER_VERSION "2.0.14"
+#define AIC79XX_DRIVER_VERSION "3.0"
 
 /*************************** Device Data Structures ***************************/
 /*
