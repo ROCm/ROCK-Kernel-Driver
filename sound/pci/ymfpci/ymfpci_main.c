@@ -536,13 +536,17 @@ static void snd_ymfpci_pcm_init_voice(struct snd_ymfpci_pcm *ypcm, unsigned int 
 			}
 		}
 		if (ypcm->output_rear) {
+			/* The SPDIF out channels seem to be swapped, so we have
+			 * to swap them here, too.  The rear analog out channels
+			 * will be wrong, but otherwise AC3 would not work.
+			 */
 			if (use_left) {
-				bank->eff2_gain =
-				bank->eff2_gain_end = vol_left;
+				bank->eff3_gain =
+				bank->eff3_gain_end = vol_left;
 			}
 			if (use_right) {
-				bank->eff3_gain =
-				bank->eff3_gain_end = vol_right;
+				bank->eff2_gain =
+				bank->eff2_gain_end = vol_right;
 			}
 		}
 	}
@@ -1229,6 +1233,7 @@ static int snd_ymfpci_spdif_default_get(struct snd_kcontrol *kcontrol,
 	spin_lock_irq(&chip->reg_lock);
 	ucontrol->value.iec958.status[0] = (chip->spdif_bits >> 0) & 0xff;
 	ucontrol->value.iec958.status[1] = (chip->spdif_bits >> 8) & 0xff;
+	ucontrol->value.iec958.status[3] = IEC958_AES3_CON_FS_48000;
 	spin_unlock_irq(&chip->reg_lock);
 	return 0;
 }
@@ -1303,6 +1308,7 @@ static int snd_ymfpci_spdif_stream_get(struct snd_kcontrol *kcontrol,
 	spin_lock_irq(&chip->reg_lock);
 	ucontrol->value.iec958.status[0] = (chip->spdif_pcm_bits >> 0) & 0xff;
 	ucontrol->value.iec958.status[1] = (chip->spdif_pcm_bits >> 8) & 0xff;
+	ucontrol->value.iec958.status[3] = IEC958_AES3_CON_FS_48000;
 	spin_unlock_irq(&chip->reg_lock);
 	return 0;
 }
