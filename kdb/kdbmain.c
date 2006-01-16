@@ -37,7 +37,7 @@
 #include <linux/nmi.h>
 #include <linux/ptrace.h>
 #include <linux/sysctl.h>
-#if defined(CONFIG_CRASH_DUMP) || defined(CONFIG_CRASH_DUMP_MODULE)
+#ifdef CONFIG_LKCD
 #include <linux/dump.h>
 #endif
 
@@ -1080,7 +1080,7 @@ handle_ctrl_cmd(char *cmd)
 static void
 kdb_do_dump(struct pt_regs *regs)
 {
-#if defined(CONFIG_CRASH_DUMP) || defined(CONFIG_CRASH_DUMP_MODULE)
+#ifdef CONFIG_LKCD
 	notifier_call_chain(&kdb_notifier_list, KDB_EVENT_DUMPING, NULL);
 	kdb_printf("Forcing dump (if configured)\n");
 	console_loglevel = 8;	/* to see the dump messages */
