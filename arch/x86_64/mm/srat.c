@@ -15,6 +15,7 @@
 #include <linux/bitmap.h>
 #include <linux/module.h>
 #include <linux/topology.h>
+#include <linux/bootmem.h>
 #include <asm/proto.h>
 #include <asm/numa.h>
 #include <asm/e820.h>
@@ -24,6 +25,9 @@ static struct acpi_table_slit *acpi_slit;
 static nodemask_t nodes_parsed __initdata;
 static nodemask_t nodes_found __initdata;
 static struct node nodes[MAX_NUMNODES] __initdata;
+struct node nodes_add[MAX_NUMNODES] __initdata;
+static int found_add_area __initdata;
+int ignore_hotadd __initdata;
 static u8 pxm2node[256] = { [0 ... 255] = 0xff };
 
 static int node_to_pxm(int n);
@@ -166,10 +170,28 @@ acpi_numa_memory_affinity_init(struct acpi_table_memory_affinity *ma)
 	}
 	start = ma->base_addr_lo | ((u64)ma->base_addr_hi << 32);
 	end = start + (ma->length_lo | ((u64)ma->length_hi << 32));
-	/* It is fine to add this area to the nodes data it will be used later*/
-	if (ma->flags.hot_pluggable == 1)
-		printk(KERN_INFO "SRAT: hot plug zone found %lx - %lx \n",
-				start, end);
+
+	/* 
+	 * It is fine to add this area to the nodes data it will be used later
+	 * This code supports one contigious hot add area per node.
+	 */
+
+	if (ma->flags.hot_pluggable == 1 && !ignore_hotadd) {
+		found_add_area=1;
+		if (nodes_add[node].start == nodes_add[node].end ) {
+			nodes_add[node].start = start;
+			nodes_add[node].end = end;	
+		} else {
+			if (nodes_add[node].start + 1 == end)
+				nodes_add[node].start = start;
+			if (nodes_add[node].end + 1 == start)
+				nodes_add[node].end = end;
+		}
+		if (nodes_add[node].end > end_pfn)
+			end_pfn = nodes_add[node].end;
+		printk(KERN_INFO "SRAT: hot plug zone found %Lx - %Lx \n",
+				nodes_add[node].start, nodes_add[node].end);
+	}
 	i = conflicting_nodes(start, end);
 	if (i == node) {
 		printk(KERN_WARNING
@@ -235,7 +257,8 @@ int __init acpi_scan_nodes(unsigned long start, unsigned long end)
 
 	/* First clean up the node list */
 	for_each_node_mask(i, nodes_parsed) {
-		cutoff_node(i, start, end);
+		if (!found_add_area)
+			cutoff_node(i, start, end);
 		if (nodes[i].start == nodes[i].end)
 			node_clear(i, nodes_parsed);
 	}
@@ -277,6 +300,18 @@ static int node_to_pxm(int n)
        return 0;
 }
 
+void __init srat_reserve_add_area(int nodeid)
+{
+	if (found_add_area) {
+		printk ("Reserving hot-add memory space node %d pages %08Lx to" 
+			" %08Lx\n", nodeid, nodes_add[nodeid].start, 
+			nodes_add[nodeid].end);
+
+		reserve_bootmem_node(NODE_DATA(nodeid), nodes_add[nodeid].start,
+			       nodes_add[nodeid].end - nodes_add[nodeid].start);
+	}
+}
+
 int __node_distance(int a, int b)
 {
 	int index;
@@ -286,5 +321,4 @@ int __node_distance(int a, int b)
 	index = acpi_slit->localities * node_to_pxm(a);
 	return acpi_slit->entry[index + node_to_pxm(b)];
 }
-
 EXPORT_SYMBOL(__node_distance);

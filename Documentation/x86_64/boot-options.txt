@@ -135,6 +135,9 @@ NUMA
 
   numa=fake=X   Fake X nodes and ignore NUMA setup of the actual machine.
 
+  numa=ignorehotadd Ignore hot add memory in SRAT. This will disable memory
+                hotplug      [SUSE extension for now]
+
 ACPI
 
   acpi=off	Don't enable ACPI

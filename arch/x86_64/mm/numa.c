@@ -143,6 +143,7 @@ void __init setup_node_bootmem(int nodeid, unsigned long start, unsigned long en
 
 	reserve_bootmem_node(NODE_DATA(nodeid), nodedata_phys, pgdat_size); 
 	reserve_bootmem_node(NODE_DATA(nodeid), bootmap_start, bootmap_pages<<PAGE_SHIFT);
+	srat_reserve_add_area(nodeid);
 	node_set_online(nodeid);
 } 
 
@@ -326,6 +327,8 @@ __init int numa_setup(char *opt)
 #ifdef CONFIG_ACPI_NUMA
  	if (!strncmp(opt,"noacpi",6))
  		acpi_numa = -1;
+	if (!strncmp(opt,"ignorehotadd",13))
+		ignore_hotadd = 1;
 #endif
 	return 1;
 } 
