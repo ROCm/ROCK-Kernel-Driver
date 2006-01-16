@@ -21,14 +21,4 @@ config NET_DMA
 	  offload receive copy-to-user operations, freeing CPU cycles.
 	  Since this is the main user of the DMA engine, it should be enabled;
 	  say Y here.
-
-comment "DMA Devices"
-
-config INTEL_IOATDMA
-	tristate "Intel I/OAT DMA support"
-	depends on DMA_ENGINE
-	default m
-	---help---
-	  Enable support for the Intel I/OAT DMA engine.
-
 endmenu
