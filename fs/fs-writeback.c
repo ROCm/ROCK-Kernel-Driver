@@ -389,6 +389,7 @@ sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)
 	}
 	return;		/* Leave any unwritten inodes on s_io */
 }
+EXPORT_SYMBOL_GPL(writeback_bdev);
 
 void
 writeback_bdev(struct super_block *sb)
@@ -466,6 +467,7 @@ restart:
 	}
 	spin_unlock(&sb_lock);
 }
+EXPORT_SYMBOL_GPL(writeback_inode);
 
 /*
  * writeback and wait upon the filesystem's dirty inodes.  The caller will
