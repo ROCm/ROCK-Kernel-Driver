@@ -64,6 +64,7 @@ static volatile int kdb_new_cpu;		/* Which cpu to switch to */
 volatile int kdb_state[NR_CPUS];		/* Per cpu state */
 
 const struct task_struct *kdb_current_task;
+EXPORT_SYMBOL(kdb_current_task);
 struct pt_regs *kdb_current_regs;
 
 #ifdef	CONFIG_KDB_OFF
