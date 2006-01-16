@@ -323,7 +323,7 @@ static int dm_hash_rename(const char *old, const char *new)
 	 */
 	table = dm_get_table(hc->md);
 	if (table) {
-		dm_table_event(table);
+		dm_table_event(table, NULL);
 		dm_table_put(table);
 	}
 
