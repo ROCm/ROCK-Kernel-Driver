@@ -117,6 +117,9 @@ BUFFER_FNS(PrivateStart, unwritten);
 #define xfs_panic_mask		xfs_params.panic_mask.val
 #define xfs_error_level		xfs_params.error_level.val
 #define xfs_syncd_centisecs	xfs_params.syncd_timer.val
+#define xfs_probe_dmapi		xfs_params.probe_dmapi.val
+#define xfs_probe_ioops		xfs_params.probe_ioops.val
+#define xfs_probe_quota		xfs_params.probe_quota.val
 #define xfs_stats_clear		xfs_params.stats_clear.val
 #define xfs_inherit_sync	xfs_params.inherit_sync.val
 #define xfs_inherit_nodump	xfs_params.inherit_nodump.val

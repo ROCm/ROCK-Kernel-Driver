@@ -199,6 +199,8 @@ typedef int	(*vop_fid2_t)(bhv_desc_t *, struct fid *);
 typedef int	(*vop_release_t)(bhv_desc_t *);
 typedef int	(*vop_rwlock_t)(bhv_desc_t *, vrwlock_t);
 typedef void	(*vop_rwunlock_t)(bhv_desc_t *, vrwlock_t);
+typedef	int	(*vop_frlock_t)(bhv_desc_t *, int, struct file_lock *,int,
+				xfs_off_t, struct cred *);
 typedef int	(*vop_bmap_t)(bhv_desc_t *, xfs_off_t, ssize_t, int,
 				struct xfs_iomap *, int *);
 typedef int	(*vop_reclaim_t)(bhv_desc_t *);
@@ -244,6 +246,7 @@ typedef struct vnodeops {
 	vop_fid2_t		vop_fid2;
 	vop_rwlock_t		vop_rwlock;
 	vop_rwunlock_t		vop_rwunlock;
+	vop_frlock_t		vop_frlock;
 	vop_bmap_t		vop_bmap;
 	vop_reclaim_t		vop_reclaim;
 	vop_attr_get_t		vop_attr_get;
@@ -357,6 +360,7 @@ typedef struct vnodeops {
 #define IO_ISAIO	0x00001		/* don't wait for completion */
 #define IO_ISDIRECT	0x00004		/* bypass page cache */
 #define IO_INVIS	0x00020		/* don't update inode timestamps */
+#define IO_ISLOCKED	0x00800		/* don't do inode locking */
 
 /*
  * Flags for VOP_IFLUSH call

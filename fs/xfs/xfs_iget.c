@@ -492,7 +492,7 @@ xfs_iget(
 	XFS_STATS_INC(xs_ig_attempts);
 
 retry:
-	if ((inode = iget_locked(XFS_MTOVFS(mp)->vfs_super, ino))) {
+	if ((inode = VFS_GET_INODE(XFS_MTOVFS(mp), ino, 0))) {
 		xfs_inode_t	*ip;
 
 		vp = LINVFS_GET_VP(inode);

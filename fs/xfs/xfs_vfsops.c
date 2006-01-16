@@ -1981,6 +1981,7 @@ vfsops_t xfs_vfsops = {
 	.vfs_vget		= xfs_vget,
 	.vfs_dmapiops		= (vfs_dmapiops_t)fs_nosys,
 	.vfs_quotactl		= (vfs_quotactl_t)fs_nosys,
+	.vfs_get_inode		= xfs_get_inode,
 	.vfs_init_vnode		= xfs_initialize_vnode,
 	.vfs_force_shutdown	= xfs_do_force_shutdown,
 	.vfs_freeze		= xfs_freeze,

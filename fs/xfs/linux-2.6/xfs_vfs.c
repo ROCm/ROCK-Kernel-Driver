@@ -184,6 +184,19 @@ vfs_quotactl(
 	return ((*bhvtovfsops(next)->vfs_quotactl)(next, cmd, id, addr));
 }
 
+struct inode *
+vfs_get_inode(
+	struct bhv_desc		*bdp,
+	xfs_ino_t		ino,
+	int			fl)
+{
+	struct bhv_desc		*next = bdp;
+
+	while (! (bhvtovfsops(next))->vfs_get_inode)
+		next = BHV_NEXTNULL(next);
+	return ((*bhvtovfsops(next)->vfs_get_inode)(next, ino, fl));
+}
+
 void
 vfs_init_vnode(
 	struct bhv_desc		*bdp,
@@ -270,6 +283,98 @@ vfs_insertbhv(
 	bhv_insert_initial(&vfsp->vfs_bh, bdp);
 }
 
+/*
+ * Implementation for behaviours-as-modules
+ */
+
+typedef struct bhv_module_list {
+	struct list_head	bm_list;
+	struct module *		bm_module;
+	const char *		bm_name;
+	void *			bm_ops;
+} bhv_module_list_t;
+STATIC DEFINE_SPINLOCK(bhv_lock);
+STATIC struct list_head bhv_list = LIST_HEAD_INIT(bhv_list);
+
+void
+bhv_module_init(
+	const char		*name,
+	struct module		*module,
+	const void		*ops)
+{
+	bhv_module_list_t	*bm, *entry, *n;
+
+	bm = kmem_alloc(sizeof(struct bhv_module_list), KM_SLEEP);
+	INIT_LIST_HEAD(&bm->bm_list);
+	bm->bm_module = module;
+	bm->bm_name = name;
+	bm->bm_ops = (void *)ops;
+
+	spin_lock(&bhv_lock);
+	list_for_each_entry_safe(entry, n, &bhv_list, bm_list)
+		BUG_ON(strcmp(entry->bm_name, name) == 0);
+	list_add(&bm->bm_list, &bhv_list);
+	spin_unlock(&bhv_lock);
+}
+
+void
+bhv_module_exit(
+	const char		*name)
+{
+	bhv_module_list_t	*entry, *n;
+
+	spin_lock(&bhv_lock);
+	list_for_each_entry_safe(entry, n, &bhv_list, bm_list)
+		if (strcmp(entry->bm_name, name) == 0)
+			list_del(&entry->bm_list);
+	spin_unlock(&bhv_lock);
+}
+
+STATIC void *
+bhv_insert_module(
+	const char		*name,
+	const char		*modname)
+{
+	bhv_module_list_t	*entry, *n;
+	void			*ops = NULL;
+
+	spin_lock(&bhv_lock);
+	list_for_each_entry_safe(entry, n, &bhv_list, bm_list)
+		if (strcmp(entry->bm_name, name) == 0 &&
+		    try_module_get(entry->bm_module))
+			ops = entry->bm_ops;
+	spin_unlock(&bhv_lock);
+	return ops;
+}
+
+STATIC void
+bhv_remove_module(
+	const char		*name)
+{
+	bhv_module_list_t	*entry, *n;
+
+	spin_lock(&bhv_lock);
+	list_for_each_entry_safe(entry, n, &bhv_list, bm_list)
+		if (strcmp(entry->bm_name, name) == 0)
+		    module_put(entry->bm_module);
+	spin_unlock(&bhv_lock);
+}
+
+STATIC void *
+bhv_lookup_module(
+	const char		*name,
+	const char		*module)
+{
+	void			*ops;
+
+	ops = bhv_insert_module(name, module);
+	if (!ops && module) {
+		request_module("%s", module);
+		ops = bhv_insert_module(name, module);
+	}
+	return ops;
+}
+
 void
 bhv_remove_vfsops(
 	struct vfs		*vfsp,
@@ -278,10 +383,14 @@ bhv_remove_vfsops(
 	struct bhv_desc		*bhv;
 
 	bhv = bhv_lookup_range(&vfsp->vfs_bh, pos, pos);
-	if (!bhv)
-		return;
-	bhv_remove(&vfsp->vfs_bh, bhv);
-	kmem_free(bhv, sizeof(*bhv));
+	if (bhv) {
+		struct bhv_module	*bm;
+
+		bm = (bhv_module_t *) BHV_PDATA(bhv);
+		bhv_remove(&vfsp->vfs_bh, bhv);
+		bhv_remove_module(bm->bm_name);
+		kmem_free(bhv, sizeof(*bhv));
+	}
 }
 
 void
@@ -293,11 +402,31 @@ bhv_remove_all_vfsops(
 
 	bhv_remove_vfsops(vfsp, VFS_POSITION_QM);
 	bhv_remove_vfsops(vfsp, VFS_POSITION_DM);
+	bhv_remove_vfsops(vfsp, VFS_POSITION_IO);
 	if (!freebase)
 		return;
 	mp = XFS_BHVTOM(bhv_lookup(VFS_BHVHEAD(vfsp), &xfs_vfsops));
 	VFS_REMOVEBHV(vfsp, &mp->m_bhv);
 	xfs_mount_free(mp, 0);
+}
+
+void
+bhv_get_vfsops(
+	struct vfs		*vfsp,
+	const char		*name,
+	const char		*module)
+{
+	struct bhv_vfsops	*ops;
+
+	ops = (struct bhv_vfsops *) bhv_lookup_module(name, module);
+	if (ops) {
+		struct bhv_module	*bm;
+
+		bm = kmem_alloc(sizeof(struct bhv_module), KM_SLEEP);
+		bm->bm_name = name;
+		bhv_desc_init(&bm->bm_desc, bm, vfsp, ops);
+		bhv_insert(&vfsp->vfs_bh, &bm->bm_desc);
+	}
 }
 
 void
@@ -308,6 +437,10 @@ bhv_insert_all_vfsops(
 
 	mp = xfs_mount_init();
 	vfs_insertbhv(vfsp, &mp->m_bhv, &xfs_vfsops, mp);
-	vfs_insertdmapi(vfsp);
-	vfs_insertquota(vfsp);
+	bhv_get_vfsops(vfsp, XFS_DMOPS,
+		xfs_probe_dmapi ? XFS_DM_MODULE : NULL);
+	bhv_get_vfsops(vfsp, XFS_QMOPS,
+		xfs_probe_quota ? XFS_QM_MODULE : NULL);
+	bhv_get_vfsops(vfsp, XFS_IOOPS,
+		xfs_probe_ioops ? XFS_IO_MODULE : NULL);
 }

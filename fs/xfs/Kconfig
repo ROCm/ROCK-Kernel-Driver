@@ -1,6 +1,7 @@
 config XFS_FS
 	tristate "XFS filesystem support"
 	select EXPORTFS if NFSD!=n
+	select DMAPI if XFS_DMAPI
 	help
 	  XFS is a high performance journaling filesystem which originated
 	  on the SGI IRIX platform.  It is completely multi-threaded, can
@@ -24,7 +25,7 @@ config XFS_EXPORT
 	default y
 
 config XFS_QUOTA
-	bool "XFS Quota support"
+	tristate "XFS Quota support"
 	depends on XFS_FS
 	help
 	  If you say Y here, you will be able to set limits for disk usage on
@@ -39,6 +40,19 @@ config XFS_QUOTA
 	  README.quota in the xfsprogs package.  XFS quota can be used either
 	  with or without the generic quota support enabled (CONFIG_QUOTA) -
 	  they are completely independent subsystems.
+
+config XFS_DMAPI
+	bool "DMAPI support"
+	depends on XFS_FS
+	help
+	  The Data Management API is a system interface used to implement
+	  the interface defined in the X/Open document:
+	  "Systems Management: Data Storage Management (XDSM) API",
+	  dated February 1997.  This interface is used by hierarchical
+	  storage management systems.
+	  You should enable generic DMAPI support for this.
+
+	  If unsure, say N.
 
 config XFS_SECURITY
 	bool "XFS Security Label support"
@@ -80,3 +94,29 @@ config XFS_RT
 	  functional, and may cause serious problems.
 
 	  If unsure, say N.
+
+config XFS_DEBUG
+	bool "XFS Debugging support (EXPERIMENTAL)"
+	depends on XFS_FS && EXPERIMENTAL
+	help
+	  Say Y here to get an XFS build with many debugging features,
+	  including ASSERT checks, function wrappers around macros,
+	  and extra sanity-checking functions in various code paths.
+
+	  Note that the resulting code will be HUGE and SLOW, and probably
+	  not useful unless you are debugging a particular problem.
+
+	  Say N unless you are an XFS developer, or you play one on TV.
+
+config XFS_TRACE
+	bool "XFS Tracing support (EXPERIMENTAL)"
+	depends on XFS_FS && EXPERIMENTAL
+	help
+	  Say Y here to get an XFS build with activity tracing enabled.	
+	  Enabling this option will attach historical information to XFS
+	  inodes, buffers, certain locks, the log, the IO path, and a
+	  few other key areas within XFS.  These traces can be examined
+	  using the kdb kernel debugger.
+
+	  Say N unless you are an XFS developer.
+
