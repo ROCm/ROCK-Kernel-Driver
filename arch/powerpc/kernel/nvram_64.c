@@ -34,6 +34,15 @@
 
 #undef DEBUG_NVRAM
 
+/*
+ * Old nvsetenv versions expect us to be able to return 8kb
+ * of data in a single read, so use that as a limit for short
+ * reads.
+ * We can't simply use the requested size because large
+ * kmalloc allocations often fail.
+ */
+#define NVRAM_ALLOC_SIZE 8192
+
 static int nvram_scan_partitions(void);
 static int nvram_setup_partition(void);
 static int nvram_create_os_partition(void);
@@ -94,7 +103,7 @@ static ssize_t dev_nvram_read(struct file *file, char __user *buf,
 		goto out;
 
 	count = min_t(size_t, count, size - *ppos);
-	count = min(count, PAGE_SIZE);
+	count = min(count, NVRAM_ALLOC_SIZE);
 
 	ret = -ENOMEM;
 	tmp = kmalloc(count, GFP_KERNEL);
@@ -131,7 +140,7 @@ static ssize_t dev_nvram_write(struct file *file, const char __user *buf,
 		goto out;
 
 	count = min_t(size_t, count, size - *ppos);
-	count = min(count, PAGE_SIZE);
+	count = min(count, NVRAM_ALLOC_SIZE);
 
 	ret = -ENOMEM;
 	tmp = kmalloc(count, GFP_KERNEL);
