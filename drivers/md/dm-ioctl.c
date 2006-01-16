@@ -240,7 +240,7 @@ static void __hash_remove(struct hash_cell *hc)
 
 	table = dm_get_table(hc->md);
 	if (table) {
-		dm_table_event(table);
+		dm_table_event(table, NULL);
 		dm_table_put(table);
 	}
 

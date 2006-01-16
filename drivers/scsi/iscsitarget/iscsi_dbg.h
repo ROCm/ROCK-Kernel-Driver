@@ -36,7 +36,7 @@ do {								\
 	}							\
 } while (0)
 
-#if D_IOV
+#ifdef D_IOV
 static inline void iscsi_dump_iov(struct msghdr *msg)
 {
 	int i;
@@ -48,7 +48,7 @@ static inline void iscsi_dump_iov(struct msghdr *msg)
 #define iscsi_dump_iov(x) do {} while (0)
 #endif
 
-#if D_DUMP_PDU
+#ifdef D_DUMP_PDU
 static void iscsi_dump_char(int ch)
 {
 	static unsigned char text[16];

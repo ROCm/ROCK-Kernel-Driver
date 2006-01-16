@@ -14,6 +14,7 @@
 #include <linux/device-mapper.h>
 #include <linux/list.h>
 #include <linux/blkdev.h>
+#include "dm-netlink.h"
 
 #define DM_NAME "device-mapper"
 #define DMWARN(f, x...) printk(KERN_WARNING DM_NAME ": " f "\n" , ## x)
@@ -109,7 +110,7 @@ int dm_table_add_target(struct dm_table *t, const char *type,
 int dm_table_complete(struct dm_table *t);
 void dm_table_event_callback(struct dm_table *t,
 			     void (*fn)(void *), void *context);
-void dm_table_event(struct dm_table *t);
+void dm_table_event(struct dm_table *t, struct dm_evt *evt);
 sector_t dm_table_get_size(struct dm_table *t);
 struct dm_target *dm_table_get_target(struct dm_table *t, unsigned int index);
 struct dm_target *dm_table_find_target(struct dm_table *t, sector_t sector);
@@ -192,5 +193,8 @@ void dm_stripe_exit(void);
 
 void *dm_vcalloc(unsigned long nmemb, unsigned long elem_size);
 union map_info *dm_get_mapinfo(struct bio *bio);
+
+int dm_nl_init(void);
+void dm_nl_exit(void);
 
 #endif

@@ -1688,10 +1688,16 @@ static void
 qla2x00_rport_del(void *data)
 {
 	fc_port_t *fcport = data;
+	struct fc_rport *rport;
+	unsigned long flags;
 
-	if (fcport->rport)
-		fc_remote_port_delete(fcport->rport);
-	fcport->rport = NULL;
+	spin_lock_irqsave(&fcport->rport_lock, flags);
+	rport = fcport->drport;
+	fcport->drport = NULL;
+	spin_unlock_irqrestore(&fcport->rport_lock, flags);
+	if (rport)
+		fc_remote_port_delete(rport);
+
 }
 
 /**
@@ -1719,6 +1725,7 @@ qla2x00_alloc_fcport(scsi_qla_host_t *ha, gfp_t flags)
 	atomic_set(&fcport->state, FCS_UNCONFIGURED);
 	fcport->flags = FCF_RLC_SUPPORT;
 	fcport->supported_classes = FC_COS_UNSPECIFIED;
+	spin_lock_init(&fcport->rport_lock);
 	INIT_WORK(&fcport->rport_add_work, qla2x00_rport_add, fcport);
 	INIT_WORK(&fcport->rport_del_work, qla2x00_rport_del, fcport);
 
@@ -2085,10 +2092,10 @@ qla2x00_reg_remote_port(scsi_qla_host_t *ha, fc_port_t *fcport)
 	struct fc_rport_identifiers rport_ids;
 	struct fc_rport *rport;
 
-	if (fcport->rport) {
-		fc_remote_port_delete(fcport->rport);
-		fcport->rport = NULL;
-	}
+	if (fcport->drport)
+		qla2x00_rport_del(fcport);
+	if (fcport->rport)
+		return;
 
 	rport_ids.node_name = wwn_to_u64(fcport->node_name);
 	rport_ids.port_name = wwn_to_u64(fcport->port_name);

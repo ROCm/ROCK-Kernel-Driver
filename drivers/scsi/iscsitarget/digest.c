@@ -233,15 +233,22 @@ static void digest_data(struct crypto_tfm *tfm, struct iscsi_cmnd *cmnd,
 int digest_rx_data(struct iscsi_cmnd *cmnd)
 {
 	struct tio *tio;
+	struct iscsi_cmnd *scsi_cmnd;
+	struct iscsi_data *req;
 	u32 offset, crc;
 
-	if (cmnd_opcode(cmnd) == ISCSI_OP_SCSI_DATA_OUT) {
-		struct iscsi_cmnd *scsi_cmnd = cmnd->req;
-		struct iscsi_data *req = (struct iscsi_data *)&cmnd->pdu.bhs;
-
+	switch (cmnd_opcode(cmnd)) {
+	case ISCSI_OP_SCSI_REJECT:
+	case ISCSI_OP_PDU_REJECT:
+	case ISCSI_OP_DATA_REJECT:
+		return 0;
+	case ISCSI_OP_SCSI_DATA_OUT:
+		scsi_cmnd = cmnd->req;
+		req = (struct iscsi_data *) &cmnd->pdu.bhs;
 		tio = scsi_cmnd->tio;
 		offset = be32_to_cpu(req->offset);
-	} else {
+		break;
+	default:
 		tio = cmnd->tio;
 		offset = 0;
 	}

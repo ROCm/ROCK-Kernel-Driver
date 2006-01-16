@@ -164,6 +164,7 @@ int (*_inits[])(void) __initdata = {
 	dm_linear_init,
 	dm_stripe_init,
 	dm_interface_init,
+	dm_nl_init,
 };
 
 void (*_exits[])(void) = {
@@ -172,6 +173,7 @@ void (*_exits[])(void) = {
 	dm_linear_exit,
 	dm_stripe_exit,
 	dm_interface_exit,
+	dm_nl_exit,
 };
 
 static int __init dm_init(void)

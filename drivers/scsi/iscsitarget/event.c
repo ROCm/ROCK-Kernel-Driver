@@ -95,7 +95,8 @@ int event_send(u32 tid, u64 sid, u32 cid, u32 state, int atomic)
 
 int event_init(void)
 {
-	if (!(nl = netlink_kernel_create(NETLINK_IET, 1, event_recv, THIS_MODULE)))
+	nl = netlink_kernel_create(NETLINK_IET, 1, event_recv, THIS_MODULE);
+	if (!nl)
 		return -ENOMEM;
 	else
 		return 0;
