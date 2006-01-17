@@ -34,6 +34,13 @@ SECTIONS
   __ex_table : AT(ADDR(__ex_table) - LOAD_OFFSET) { *(__ex_table) }
   __stop___ex_table = .;
 
+  . = ALIGN(16);
+  __start_smp_alternatives_table = .;
+  __smp_alternatives : AT(ADDR(__smp_alternatives) - LOAD_OFFSET) { *(__smp_alternatives) }
+  __stop_smp_alternatives_table = .;
+
+  __smp_replacements : AT(ADDR(__smp_replacements) - LOAD_OFFSET) { *(__smp_replacements) }
+
   RODATA
 
   /* writeable */

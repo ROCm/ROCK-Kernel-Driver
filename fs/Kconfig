@@ -891,6 +891,7 @@ config TMPFS_POSIX_ACL
 config HUGETLBFS
 	bool "HugeTLB file system support"
 	depends X86 || IA64 || PPC64 || SPARC64 || SUPERH || BROKEN
+	depends !XEN
 
 config HUGETLB_PAGE
 	def_bool HUGETLBFS

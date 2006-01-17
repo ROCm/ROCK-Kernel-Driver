@@ -108,6 +108,7 @@ static inline int valid_mmap_phys_addr_range(unsigned long addr, size_t *size)
 }
 #endif
 
+#ifndef ARCH_HAS_DEV_MEM
 /*
  * This funcion reads the *physical* memory. The f_pos points directly to the 
  * memory location. 
@@ -232,6 +233,7 @@ static ssize_t write_mem(struct file * file, const char __user * buf,
 	*ppos += written;
 	return written;
 }
+#endif
 
 #ifndef __HAVE_PHYS_MEM_ACCESS_PROT
 static pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
@@ -773,6 +775,7 @@ static int open_port(struct inode * inode, struct file * filp)
 #define open_kmem	open_mem
 #define open_oldmem	open_mem
 
+#ifndef ARCH_HAS_DEV_MEM
 static struct file_operations mem_fops = {
 	.llseek		= memory_lseek,
 	.read		= read_mem,
@@ -780,6 +783,9 @@ static struct file_operations mem_fops = {
 	.mmap		= mmap_mem,
 	.open		= open_mem,
 };
+#else
+extern struct file_operations mem_fops;
+#endif
 
 static struct file_operations kmem_fops = {
 	.llseek		= memory_lseek,

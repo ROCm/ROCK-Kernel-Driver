@@ -119,6 +119,12 @@ config GENERIC_CPU
 
 endchoice
 
+config X86_64_XEN
+	bool "Enable Xen compatible kernel"
+	select SWIOTLB if XEN_PHYSDEV_ACCESS
+	help
+	  This option will compile a kernel compatible with Xen hypervisor
+
 #
 # Define implied options from the CPU selection here
 #
@@ -134,6 +140,7 @@ config X86_L1_CACHE_SHIFT
 
 config X86_TSC
 	bool
+	depends on !X86_64_XEN
 	default y
 
 config X86_GOOD_APIC
@@ -190,14 +197,22 @@ config EISA
 
 config X86_IO_APIC
 	bool
+	depends !XEN_UNPRIVILEGED_GUEST
 	default y
+
+config X86_XEN_GENAPIC
+	bool
+	depends X86_64_XEN
+	default XEN_PRIVILEGED_GUEST || SMP
 
 config X86_LOCAL_APIC
 	bool
+	depends !XEN_UNPRIVILEGED_GUEST
 	default y
 
 config MTRR
 	bool "MTRR (Memory Type Range Register) support"
+	depends on !X86_64_XEN
 	---help---
 	  On Intel P6 family processors (Pentium Pro, Pentium II and later)
 	  the Memory Type Range Registers (MTRRs) may be used to control
@@ -238,7 +253,7 @@ config SMP
 
 config SCHED_SMT
 	bool "SMT (Hyperthreading) scheduler support"
-	depends on SMP
+	depends on SMP && !X86_64_XEN
 	default n
 	help
 	  SMT scheduler support improves the CPU scheduler's decision making
@@ -250,7 +265,7 @@ source "kernel/Kconfig.preempt"
 
 config NUMA
        bool "Non Uniform Memory Access (NUMA) Support"
-       depends on SMP
+       depends on SMP && !X86_64_XEN
        help
 	 Enable NUMA (Non Uniform Memory Access) support. The kernel 
 	 will try to allocate memory used by a CPU on the local memory 
@@ -325,6 +340,7 @@ config NR_CPUS
 	int "Maximum number of CPUs (2-256)"
 	range 2 256
 	depends on SMP
+	default "16" if X86_64_XEN
 	default "8"
 	help
 	  This allows you to specify the maximum number of CPUs which this
@@ -345,6 +361,7 @@ config HOTPLUG_CPU
 
 config HPET_TIMER
 	bool
+	depends on !X86_64_XEN
 	default y
 	help
 	  Use the IA-PC HPET (High Precision Event Timer) to manage
@@ -356,7 +373,7 @@ config HPET_TIMER
 
 config X86_PM_TIMER
 	bool "PM timer"
-	depends on ACPI
+	depends on ACPI && !X86_64_XEN
 	default y
 	help
 	  Support the ACPI PM timer for time keeping. This is slow,
@@ -377,7 +394,7 @@ config GART_IOMMU
 	bool "K8 GART IOMMU support"
 	default y
 	select SWIOTLB
-	depends on PCI
+	depends on PCI && !X86_64_XEN
 	help
 	  Support the IOMMU. Needed to run systems with more than 3GB of memory
 	  properly with 32-bit PCI devices that do not support DAC (Double Address
@@ -395,6 +412,7 @@ config SWIOTLB
 
 config X86_MCE
 	bool "Machine check support" if EMBEDDED
+	depends on !X86_64_XEN
 	default y
 	help
 	   Include a machine check error handler to report hardware errors.
@@ -504,11 +522,15 @@ config GENERIC_PENDING_IRQ
 
 menu "Power management options"
 
+if !X86_64_XEN
 source kernel/power/Kconfig
+endif
 
 source "drivers/acpi/Kconfig"
 
+if !X86_64_XEN
 source "arch/x86_64/kernel/cpufreq/Kconfig"
+endif
 
 endmenu
 
@@ -537,6 +559,7 @@ config UNORDERED_IO
 	 from i386. Requires that the driver writer used memory barriers
 	 properly.
 
+if !X86_64_XEN
 source "drivers/pci/pcie/Kconfig"
 
 source "drivers/pci/Kconfig"
@@ -544,6 +567,7 @@ source "drivers/pci/Kconfig"
 source "drivers/pcmcia/Kconfig"
 
 source "drivers/pci/hotplug/Kconfig"
+endif
 
 endmenu
 
@@ -605,5 +629,7 @@ source "arch/x86_64/Kconfig.debug"
 source "security/Kconfig"
 
 source "crypto/Kconfig"
+
+source "drivers/xen/Kconfig"
 
 source "lib/Kconfig"

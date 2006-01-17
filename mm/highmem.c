@@ -152,6 +152,17 @@ start:
 	return vaddr;
 }
 
+#ifdef CONFIG_XEN
+void kmap_flush_unused(void)
+{
+	spin_lock(&kmap_lock);
+	flush_all_zero_pkmaps();
+	spin_unlock(&kmap_lock);
+}
+
+EXPORT_SYMBOL(kmap_flush_unused);
+#endif
+
 void fastcall *kmap_high(struct page *page)
 {
 	unsigned long vaddr;

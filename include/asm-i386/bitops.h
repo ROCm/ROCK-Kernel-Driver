@@ -7,6 +7,7 @@
 
 #include <linux/config.h>
 #include <linux/compiler.h>
+#include <asm/smp_alt.h>
 
 /*
  * These have to be done with inline assembly: that way the bit-setting
@@ -15,12 +16,6 @@
  *
  * bit 0 is the LSB of addr; bit 32 is the LSB of (addr+1).
  */
-
-#ifdef CONFIG_SMP
-#define LOCK_PREFIX "lock ; "
-#else
-#define LOCK_PREFIX ""
-#endif
 
 #define ADDR (*(volatile long *) addr)
 
@@ -41,7 +36,7 @@
  */
 static inline void set_bit(int nr, volatile unsigned long * addr)
 {
-	__asm__ __volatile__( LOCK_PREFIX
+	__asm__ __volatile__( LOCK
 		"btsl %1,%0"
 		:"+m" (ADDR)
 		:"Ir" (nr));
@@ -76,7 +71,7 @@ static inline void __set_bit(int nr, volatile unsigned long * addr)
  */
 static inline void clear_bit(int nr, volatile unsigned long * addr)
 {
-	__asm__ __volatile__( LOCK_PREFIX
+	__asm__ __volatile__( LOCK
 		"btrl %1,%0"
 		:"+m" (ADDR)
 		:"Ir" (nr));
@@ -121,7 +116,7 @@ static inline void __change_bit(int nr, volatile unsigned long * addr)
  */
 static inline void change_bit(int nr, volatile unsigned long * addr)
 {
-	__asm__ __volatile__( LOCK_PREFIX
+	__asm__ __volatile__( LOCK
 		"btcl %1,%0"
 		:"+m" (ADDR)
 		:"Ir" (nr));
@@ -140,7 +135,7 @@ static inline int test_and_set_bit(int nr, volatile unsigned long * addr)
 {
 	int oldbit;
 
-	__asm__ __volatile__( LOCK_PREFIX
+	__asm__ __volatile__( LOCK
 		"btsl %2,%1\n\tsbbl %0,%0"
 		:"=r" (oldbit),"+m" (ADDR)
 		:"Ir" (nr) : "memory");
@@ -180,7 +175,7 @@ static inline int test_and_clear_bit(int nr, volatile unsigned long * addr)
 {
 	int oldbit;
 
-	__asm__ __volatile__( LOCK_PREFIX
+	__asm__ __volatile__( LOCK
 		"btrl %2,%1\n\tsbbl %0,%0"
 		:"=r" (oldbit),"+m" (ADDR)
 		:"Ir" (nr) : "memory");
@@ -231,7 +226,7 @@ static inline int test_and_change_bit(int nr, volatile unsigned long* addr)
 {
 	int oldbit;
 
-	__asm__ __volatile__( LOCK_PREFIX
+	__asm__ __volatile__( LOCK
 		"btcl %2,%1\n\tsbbl %0,%0"
 		:"=r" (oldbit),"+m" (ADDR)
 		:"Ir" (nr) : "memory");

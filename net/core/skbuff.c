@@ -132,6 +132,7 @@ void skb_under_panic(struct sk_buff *skb, int sz, void *here)
  *	Buffers may only be allocated from interrupts using a @gfp_mask of
  *	%GFP_ATOMIC.
  */
+#ifndef CONFIG_HAVE_ARCH_ALLOC_SKB
 struct sk_buff *__alloc_skb(unsigned int size, gfp_t gfp_mask,
 			    int fclone)
 {
@@ -180,10 +181,14 @@ struct sk_buff *__alloc_skb(unsigned int size, gfp_t gfp_mask,
 out:
 	return skb;
 nodata:
-	kmem_cache_free(skbuff_head_cache, skb);
+	if (fclone)
+		kmem_cache_free(skbuff_fclone_cache, skb);
+	else
+		kmem_cache_free(skbuff_head_cache, skb);
 	skb = NULL;
 	goto out;
 }
+#endif /* !CONFIG_HAVE_ARCH_ALLOC_SKB */
 
 /**
  *	alloc_skb_from_cache	-	allocate a network buffer
@@ -201,14 +206,20 @@ nodata:
  */
 struct sk_buff *alloc_skb_from_cache(kmem_cache_t *cp,
 				     unsigned int size,
-				     gfp_t gfp_mask)
+				     gfp_t gfp_mask,
+				     int fclone)
 {
 	struct sk_buff *skb;
 	u8 *data;
 
 	/* Get the HEAD */
-	skb = kmem_cache_alloc(skbuff_head_cache,
-			       gfp_mask & ~__GFP_DMA);
+	if (fclone)
+		skb = kmem_cache_alloc(skbuff_fclone_cache,
+				       gfp_mask & ~__GFP_DMA);
+	else
+		skb = kmem_cache_alloc(skbuff_head_cache,
+				       gfp_mask & ~__GFP_DMA);
+
 	if (!skb)
 		goto out;
 
@@ -225,7 +236,15 @@ struct sk_buff *alloc_skb_from_cache(kmem_cache_t *cp,
 	skb->data = data;
 	skb->tail = data;
 	skb->end  = data + size;
+	if (fclone) {
+		struct sk_buff *child = skb + 1;
+		atomic_t *fclone_ref = (atomic_t *) (child + 1);
 
+		skb->fclone = SKB_FCLONE_ORIG;
+		atomic_set(fclone_ref, 1);
+
+		child->fclone = SKB_FCLONE_UNAVAILABLE;
+	}
 	atomic_set(&(skb_shinfo(skb)->dataref), 1);
 	skb_shinfo(skb)->nr_frags  = 0;
 	skb_shinfo(skb)->tso_size = 0;
@@ -234,7 +253,10 @@ struct sk_buff *alloc_skb_from_cache(kmem_cache_t *cp,
 out:
 	return skb;
 nodata:
-	kmem_cache_free(skbuff_head_cache, skb);
+	if (fclone)
+		kmem_cache_free(skbuff_fclone_cache, skb);
+	else
+		kmem_cache_free(skbuff_head_cache, skb);
 	skb = NULL;
 	goto out;
 }
@@ -442,6 +464,10 @@ struct sk_buff *skb_clone(struct sk_buff *skb, gfp_t gfp_mask)
 	C(input_dev);
 #endif
 
+#endif
+#ifdef CONFIG_XEN
+	C(proto_csum_valid);
+	C(proto_csum_blank);
 #endif
 	C(truesize);
 	atomic_set(&n->users, 1);
