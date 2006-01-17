@@ -149,9 +149,7 @@ static char *ipw2100_translate_scan(struct ieee80211_device *ieee,
 		iwe.u.qual.updated |= IW_QUAL_QUAL_INVALID |
 		    IW_QUAL_LEVEL_INVALID;
 		iwe.u.qual.qual = 0;
-		iwe.u.qual.level = 0;
 	} else {
-		iwe.u.qual.level = network->stats.rssi;
 		if (ieee->perfect_rssi == ieee->worst_rssi)
 			iwe.u.qual.qual = 100;
 		else
@@ -177,6 +175,13 @@ static char *ipw2100_translate_scan(struct ieee80211_device *ieee,
 		iwe.u.qual.noise = 0;
 	} else {
 		iwe.u.qual.noise = network->stats.noise;
+	}
+
+	if (!(network->stats.mask & IEEE80211_STATMASK_SIGNAL)) {
+		iwe.u.qual.updated |= IW_QUAL_LEVEL_INVALID;
+		iwe.u.qual.level = 0;
+	} else {
+		iwe.u.qual.level = network->stats.signal;
 	}
 
 	start = iwe_stream_add_event(start, stop, &iwe, IW_EV_QUAL_LEN);
@@ -229,8 +234,32 @@ static char *ipw2100_translate_scan(struct ieee80211_device *ieee,
 	if (iwe.u.data.length)
 		start = iwe_stream_add_point(start, stop, &iwe, custom);
 
+	/* Add spectrum management information */
+	iwe.cmd = -1;
+	p = custom;
+	p += snprintf(p, MAX_CUSTOM_LEN - (p - custom), " Channel flags: ");
+
+	if (ieee80211_get_channel_flags(ieee, network->channel) &
+	    IEEE80211_CH_INVALID) {
+		iwe.cmd = IWEVCUSTOM;
+		p += snprintf(p, MAX_CUSTOM_LEN - (p - custom), "INVALID ");
+	}
+
+	if (ieee80211_get_channel_flags(ieee, network->channel) &
+	    IEEE80211_CH_RADAR_DETECT) {
+		iwe.cmd = IWEVCUSTOM;
+		p += snprintf(p, MAX_CUSTOM_LEN - (p - custom), "DFS ");
+	}
+
+	if (iwe.cmd == IWEVCUSTOM) {
+		iwe.u.data.length = p - custom;
+		start = iwe_stream_add_point(start, stop, &iwe, custom);
+	}
+
 	return start;
 }
+
+#define SCAN_ITEM_SIZE 128
 
 int ieee80211_wx_get_scan(struct ieee80211_device *ieee,
 			  struct iw_request_info *info,
@@ -238,9 +267,10 @@ int ieee80211_wx_get_scan(struct ieee80211_device *ieee,
 {
 	struct ieee80211_network *network;
 	unsigned long flags;
+	int err = 0;
 
 	char *ev = extra;
-	char *stop = ev + IW_SCAN_MAX_DATA;
+	char *stop = ev + wrqu->data.length;
 	int i = 0;
 
 	IEEE80211_DEBUG_WX("Getting scan\n");
@@ -249,6 +279,11 @@ int ieee80211_wx_get_scan(struct ieee80211_device *ieee,
 
 	list_for_each_entry(network, &ieee->network_list, list) {
 		i++;
+		if (stop - ev < SCAN_ITEM_SIZE) {
+			err = -E2BIG;
+			break;
+		}
+
 		if (ieee->scan_age == 0 ||
 		    time_after(network->last_scanned + ieee->scan_age, jiffies))
 			ev = ipw2100_translate_scan(ieee, ev, stop, network);
@@ -270,7 +305,7 @@ int ieee80211_wx_get_scan(struct ieee80211_device *ieee,
 
 	IEEE80211_DEBUG_WX("exit: %d networks returned.\n", i);
 
-	return 0;
+	return err;
 }
 
 int ieee80211_wx_set_encode(struct ieee80211_device *ieee,

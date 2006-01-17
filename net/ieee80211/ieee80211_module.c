@@ -82,10 +82,30 @@ static int ieee80211_networks_allocate(struct ieee80211_device *ieee)
 	return 0;
 }
 
+void ieee80211_network_reset(struct ieee80211_network *network)
+{
+	if (!network) {
+		printk(KERN_ERR "aye! network is null???");
+		return;
+	}
+	if (network->ibss_dfs) {
+		printk(KERN_ERR "ibss_dfs = %p\n", network->ibss_dfs);
+		kfree(network->ibss_dfs);
+		network->ibss_dfs = NULL;
+	}
+}
+
 static inline void ieee80211_networks_free(struct ieee80211_device *ieee)
 {
+	int i;
+
 	if (!ieee->networks)
 		return;
+
+	for (i = 0; i < MAX_NETWORK_COUNT; i++)
+		if (ieee->networks[i].ibss_dfs)
+			kfree(ieee->networks[i].ibss_dfs);
+
 	kfree(ieee->networks);
 	ieee->networks = NULL;
 }
