@@ -1,5 +1,5 @@
 /*****************************************************************************
-Copyright(c) 2004 - 2005 Intel Corporation. All rights reserved.
+Copyright(c) 2004 - 2006 Intel Corporation. All rights reserved.
 
 This program is free software; you can redistribute it and/or modify it
 under the terms of the GNU General Public License as published by the Free
@@ -90,6 +90,7 @@ static struct dma_chan * dma_client_chan_alloc(struct dma_client *client)
 {
 	struct dma_device *device;
 	struct dma_chan *chan;
+	unsigned long flags;
 
 	/* Find a channel, any DMA engine will do */
 	list_for_each_entry(device, &dma_device_list, global_node) {
@@ -102,7 +103,9 @@ static struct dma_chan * dma_client_chan_alloc(struct dma_client *client)
 				kref_init(&chan->refcount);
 				INIT_RCU_HEAD(&chan->rcu);
 				chan->client = client;
+				spin_lock_irqsave(&client->lock, flags);
 				list_add_tail(&chan->client_node, &client->channels);
+				spin_unlock_irqrestore(&client->lock, flags);
 				return chan;
 			}
 		}
@@ -144,6 +147,7 @@ static void dma_chans_rebalance(void)
 {
 	struct dma_client *client;
 	struct dma_chan *chan;
+	unsigned long flags;
 
 	spin_lock(&dma_list_lock);
 	list_for_each_entry(client, &dma_client_list, global_node) {
@@ -158,8 +162,10 @@ static void dma_chans_rebalance(void)
 		}
 
 		while (client->chans_desired < client->chan_count) {
+			spin_lock_irqsave(&client->lock, flags);
 			chan = list_entry(client->channels.next, struct dma_chan, client_node);
 			list_del(&chan->client_node);
+			spin_unlock_irqrestore(&client->lock, flags);
 			client->chan_count--;
 			client->event_callback(client, chan, DMA_RESOURCE_REMOVED);
 			dma_client_chan_free(chan);
@@ -181,6 +187,7 @@ struct dma_client * dma_async_client_register(dma_event_callback event_callback)
 		return NULL;
 
 	INIT_LIST_HEAD(&client->channels);
+	spin_lock_init(&client->lock);
 
 	client->chans_desired = 0;
 	client->chan_count = 0;
@@ -202,13 +209,16 @@ struct dma_client * dma_async_client_register(dma_event_callback event_callback)
 void dma_async_client_unregister(struct dma_client *client)
 {
 	struct dma_chan *chan, *_chan;
+	unsigned long flags;
 
 	if (!client)
 		return;
 
+	spin_lock_irqsave(&client->lock, flags);
 	list_for_each_entry_safe(chan, _chan, &client->channels, client_node) {
 		dma_client_chan_free(chan);
 	}
+	spin_unlock_irqrestore(&client->lock, flags);
 
 	spin_lock(&dma_list_lock);
 	list_del(&client->global_node);
@@ -285,20 +295,23 @@ static void dma_async_device_cleanup(struct kref *kref) {
 void dma_async_device_unregister(struct dma_device* device)
 {
 	struct dma_chan *chan;
+	unsigned long flags;
+
+	spin_lock(&dma_list_lock);
+	list_del(&device->global_node);
+	spin_unlock(&dma_list_lock);
 
 	list_for_each_entry(chan, &device->channels, device_node) {
 		if (chan->client) {
+			spin_lock_irqsave(&chan->client->lock, flags);
 			list_del(&chan->client_node);
 			chan->client->chan_count--;
+			spin_unlock_irqrestore(&chan->client->lock, flags);
 			chan->client->event_callback(chan->client, chan, DMA_RESOURCE_REMOVED);
 			dma_client_chan_free(chan);
 		}
 		class_device_unregister(&chan->class_dev);
 	}
-
-	spin_lock(&dma_list_lock);
-	list_del(&device->global_node);
-	spin_unlock(&dma_list_lock);
 
 	dma_chans_rebalance();
 

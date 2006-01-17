@@ -1764,8 +1764,10 @@ out:
 	 * There may not be any more sk_buffs comming right now, so push
 	 * any pending DMA copies to hardware
 	 */
+	spin_lock(&net_dma_client->lock);
 	list_for_each_entry(chan, &net_dma_client->channels, client_node)
 		dma_async_memcpy_issue_pending(chan);
+	spin_unlock(&net_dma_client->lock);
 #endif
 	local_irq_enable();
 	return;
@@ -3223,6 +3225,7 @@ static void net_dma_rebalance(void)
 {
 	unsigned int cpu, i, n;
 	struct dma_chan *chan;
+	unsigned long flags;
 
 	lock_cpu_hotplug();
 
@@ -3236,6 +3239,7 @@ static void net_dma_rebalance(void)
 	i = 0;
 	cpu = first_cpu(cpu_online_map);
 
+	spin_lock_irqsave(&net_dma_client->lock, flags);
 	list_for_each_entry(chan, &net_dma_client->channels, client_node) {
 		/* cpus_clear(chan->cpumask); */
 		n = ((num_online_cpus() / net_dma_count) + (i < (num_online_cpus() % net_dma_count) ? 1 : 0));
@@ -3248,6 +3252,7 @@ static void net_dma_rebalance(void)
 		}
 		i++;
 	}
+	spin_unlock_irqrestore(&net_dma_client->lock, flags);
 
 	unlock_cpu_hotplug();
 }

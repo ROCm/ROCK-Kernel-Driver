@@ -1138,9 +1138,11 @@ int tcp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 		tp->ucopy.dma_chan = get_softnet_dma();
 		if (tp->ucopy.dma_chan) {
 			if (dma_lock_iovec_pages(msg->msg_iov, len,
-			    &tp->ucopy.locked_list))
+			    &tp->ucopy.locked_list)) {
 				/* fallback to no-dma */
 				tp->ucopy.dma_chan = NULL;
+				dma_chan_put(tp->ucopy.dma_chan);
+			}
 		}
 	}
 #endif

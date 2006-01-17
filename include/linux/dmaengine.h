@@ -1,5 +1,5 @@
 /*****************************************************************************
-Copyright(c) 2004 - 2005 Intel Corporation. All rights reserved.
+Copyright(c) 2004 - 2006 Intel Corporation. All rights reserved.
 
 This program is free software; you can redistribute it and/or modify it
 under the terms of the GNU General Public License as published by the Free
@@ -118,6 +118,7 @@ typedef void (*dma_event_callback) (struct dma_client *client,
  * @event_callback: func ptr to call when something happens
  * @chan_count: number of chans allocated
  * @chans_desired: number of chans requested. Can be +/- chan_count
+ * @lock: protects access to the channels list
  * @channels: the list of DMA channels allocated
  * @global_node: list_head for global dma_client_list
  */
@@ -126,6 +127,7 @@ struct dma_client {
 	unsigned int		chan_count;
 	unsigned int		chans_desired;
 
+	spinlock_t		lock;
 	struct list_head	channels;
 	struct list_head	global_node;
 };
