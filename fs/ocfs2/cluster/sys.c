@@ -29,6 +29,7 @@
 #include <linux/kobject.h>
 #include <linux/sysfs.h>
 
+#include "heartbeat.h"
 #include "ocfs2_nodemanager.h"
 #include "masklog.h"
 #include "sys.h"
@@ -52,8 +53,22 @@ static ssize_t o2cb_interface_revision_show(char *buf)
 
 static O2CB_ATTR(interface_revision, S_IFREG | S_IRUGO, o2cb_interface_revision_show, NULL);
 
+static ssize_t o2cb_heartbeat_mode_show(char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%s\n", o2hb_heartbeat_mode());
+}
+
+static ssize_t o2cb_heartbeat_mode_store(const char * buffer, size_t count)
+{
+	return o2hb_set_heartbeat_mode(buffer, count);
+}
+
+static O2CB_ATTR(heartbeat_mode, S_IFREG | S_IRUGO | S_IWUSR,
+                 o2cb_heartbeat_mode_show, o2cb_heartbeat_mode_store);
+
 static struct attribute *o2cb_attrs[] = {
 	&o2cb_attr_interface_revision.attr,
+	&o2cb_attr_heartbeat_mode.attr,
 	NULL,
 };
 

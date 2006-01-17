@@ -27,7 +27,9 @@
 #include "endian.h"
 #include "tcp.h"
 #include "nodemanager.h"
+#include "quorum.h"
 #include "heartbeat.h"
+#include "disk_heartbeat.h"
 #include "masklog.h"
 #include "sys.h"
 #include "ver.h"
@@ -35,7 +37,7 @@
 /* for now we operate under the assertion that there can be only one
  * cluster active at a time.  Changing this will require trickling
  * cluster references throughout where nodes are looked up */
-static struct o2nm_cluster *o2nm_single_cluster = NULL;
+struct o2nm_cluster *o2nm_single_cluster = NULL;
 
 #define OCFS2_MAX_HB_CTL_PATH 256
 static char ocfs2_hb_ctl_path[OCFS2_MAX_HB_CTL_PATH] = "/sbin/ocfs2_hb_ctl";
@@ -96,17 +98,6 @@ const char *o2nm_get_hb_ctl_path(void)
 	return ocfs2_hb_ctl_path;
 }
 EXPORT_SYMBOL_GPL(o2nm_get_hb_ctl_path);
-
-struct o2nm_cluster {
-	struct config_group	cl_group;
-	unsigned		cl_has_local:1;
-	u8			cl_local_node;
-	rwlock_t		cl_nodes_lock;
-	struct o2nm_node  	*cl_nodes[O2NM_MAX_NODES];
-	struct rb_root		cl_node_ip_tree;
-	/* this bitmap is part of a hack for disk bitmap.. will go eventually. - zab */
-	unsigned long	cl_nodes_bitmap[BITS_TO_LONGS(O2NM_MAX_NODES)];
-};
 
 struct o2nm_node *o2nm_get_node_by_num(u8 node_num)
 {
@@ -225,11 +216,6 @@ static struct o2nm_cluster *to_o2nm_cluster(struct config_item *item)
 		container_of(to_config_group(item), struct o2nm_cluster,
 			     cl_group)
 		: NULL;
-}
-
-static struct o2nm_node *to_o2nm_node(struct config_item *item)
-{
-	return item ? container_of(item, struct o2nm_node, nd_item) : NULL;
 }
 
 static void o2nm_node_release(struct config_item *item)
@@ -700,6 +686,7 @@ static void o2nm_cluster_group_drop_item(struct config_group *group, struct conf
 	BUG_ON(o2nm_single_cluster != cluster);
 	o2nm_single_cluster = NULL;
 
+	o2hb_free_hb_set(cluster->cl_group.default_groups[1]);
 	for (i = 0; cluster->cl_group.default_groups[i]; i++) {
 		killme = &cluster->cl_group.default_groups[i]->cg_item;
 		cluster->cl_group.default_groups[i] = NULL;
@@ -737,9 +724,9 @@ static void __exit exit_o2nm(void)
 
 	/* XXX sync with hb callbacks and shut down hb? */
 	o2net_unregister_hb_callbacks();
+	o2hb_disk_heartbeat_exit();
 	configfs_unregister_subsystem(&o2nm_cluster_group.cs_subsys);
 	o2cb_sys_shutdown();
-
 	o2net_exit();
 }
 
@@ -750,6 +737,10 @@ static int __init init_o2nm(void)
 	cluster_print_version();
 
 	o2hb_init();
+	ret = o2hb_disk_heartbeat_init();
+	if (ret)
+		return ret;
+
 	o2net_init();
 
 	ocfs2_table_header = register_sysctl_table(ocfs2_root_table, 0);
