@@ -187,8 +187,8 @@ acpi_numa_memory_affinity_init(struct acpi_table_memory_affinity *ma)
 			if (nodes_add[node].end + 1 == start)
 				nodes_add[node].end = end;
 		}
-		if (nodes_add[node].end > end_pfn)
-			end_pfn = nodes_add[node].end;
+		if ((nodes_add[node].end >> PAGE_SHIFT) > end_pfn)
+			end_pfn = nodes_add[node].end >> PAGE_SHIFT;
 		printk(KERN_INFO "SRAT: hot plug zone found %Lx - %Lx \n",
 				nodes_add[node].start, nodes_add[node].end);
 	}
@@ -302,7 +302,7 @@ static int node_to_pxm(int n)
 
 void __init srat_reserve_add_area(int nodeid)
 {
-	if (found_add_area) {
+	if (found_add_area && nodes_add[nodeid].end) {
 		printk ("Reserving hot-add memory space node %d pages %08Lx to" 
 			" %08Lx\n", nodeid, nodes_add[nodeid].start, 
 			nodes_add[nodeid].end);
