@@ -372,7 +372,7 @@ config HPET_TIMER
 	  <http://www.intel.com/hardwaredesign/hpetspec.htm>.
 
 config X86_PM_TIMER
-	bool "PM timer"
+	bool "PM timer" if EMBEDDED
 	depends on ACPI && !X86_64_XEN
 	default y
 	help

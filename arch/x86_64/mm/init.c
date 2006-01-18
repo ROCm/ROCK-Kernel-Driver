@@ -182,7 +182,7 @@ static  struct temp_map {
 	{}
 }; 
 
-static __meminit void *alloc_low_page(int *index, unsigned long *phys) 
+static __meminit void *alloc_low_page(int *index, unsigned long *phys)
 { 
 	struct temp_map *ti;
 	int i; 
@@ -248,7 +248,7 @@ static void __meminit
 phys_pmd_update(pud_t *pud, unsigned long address, unsigned long end)
 {
 	pmd_t *pmd = pmd_offset(pud, (unsigned long)__va(address));
-	
+
 	if (pmd_none(*pmd)) {
 		spin_lock(&init_mm.page_table_lock);
 		phys_pmd_init(pmd, address, end);
@@ -277,7 +277,7 @@ static void __meminit phys_pud_init(pud_t *pud, unsigned long address, unsigned 
 		if (paddr >= end)
 			break;
 
-		if (!after_bootmem && !e820_mapped(paddr, paddr+PUD_SIZE, 0)) { 
+		if (!after_bootmem && !e820_mapped(paddr, paddr+PUD_SIZE, 0)) {
 			set_pud(pud, __pud(0)); 
 			continue;
 		} 
@@ -477,7 +477,7 @@ void __init clear_kernel_mapping(unsigned long address, unsigned long size)
 	__flush_tlb_all();
 } 
 
-/* 
+/*
  * Memory hotplug specific functions
  * These are only for non-NUMA machines right now.
  */
@@ -626,9 +626,8 @@ void mark_rodata_ro(void)
 #ifdef CONFIG_BLK_DEV_INITRD
 void free_initrd_mem(unsigned long start, unsigned long end)
 {
-	if (__pa(start) < __pa((unsigned long)&_end))
+	if (start >= end)
 		return;
-
 	printk ("Freeing initrd memory: %ldk freed\n", (end - start) >> 10);
 	for (; start < end; start += PAGE_SIZE) {
 		ClearPageReserved(virt_to_page(start));
