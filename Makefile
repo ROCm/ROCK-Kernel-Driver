@@ -1314,7 +1314,7 @@ checkstack:
 	$(PERL) $(src)/scripts/checkstack.pl $(ARCH)
 
 kernelrelease:
-	@echo $(kernelrelease)
+	@echo $(KERNELRELEASE)
 kernelversion:
 	@echo $(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)
 
