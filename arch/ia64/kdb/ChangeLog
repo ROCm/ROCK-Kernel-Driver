@@ -1,3 +1,13 @@
+2006-01-19 Keith Owens  <kaos@sgi.com>
+
+	* Add back some kdb changes to xpc_main that were lost due to a patch
+	  conflict.
+	* kdb v4.4-2.6.16-rc1-ia64-2.
+
+2006-01-18 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.16-rc1-ia64-1.
+
 2006-01-10 Keith Owens  <kaos@sgi.com>
 
 	* Build kdba_pod for generic as well as sn2 kernels and test at run

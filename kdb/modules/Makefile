@@ -14,4 +14,3 @@ endif
 endif
 obj-$(CONFIG_KDB_MODULES_XP) += kdbm_xpc.o
 CFLAGS_kdbm_vm.o	+= -I $(srctree)/drivers/scsi
-CFLAGS_kdbm_xpc.o	+= -I $(srctree)/arch/ia64/sn/kernel

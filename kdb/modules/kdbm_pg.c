@@ -228,7 +228,7 @@ kdbm_page(int argc, const char **argv, const char **envp,
 	if (page_has_buffers(&page))
 		kdb_printf("  buffers 0x%p\n", page_buffers(&page));
 	else
-		kdb_printf("  private 0x%lx\n", page.private);
+		kdb_printf("  private 0x%lx\n", page.u.private);
 
 	return 0;
 }
@@ -370,9 +370,14 @@ kdbm_show_page(struct page *page, int first)
 		do {
 			do_buffer((unsigned long) bh);
 		} while ((bh = bh->b_this_page) != head);
-	} else if (page->private) {
-		kdb_printf(" private= 0x%lx", page->private);
+	} else if (page_private(page)) {
+		kdb_printf(" private= 0x%lx", page_private(page));
 	}
+	/* Cannot use page_mapping(page) here, it needs swapper_space which is
+	 * not exported.
+	 */
+	if (page->mapping)
+		kdb_printf(" mapping= %p", page->mapping);
 	kdb_printf("\n");
 #undef kdb_page_flags
 }

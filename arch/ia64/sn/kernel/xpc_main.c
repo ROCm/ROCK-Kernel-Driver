@@ -83,8 +83,6 @@ struct device *xpc_chan = &xpc_chan_dbg_subname;
 
 
 static int xpc_kdebug_ignore;
-
-
 static int xpc_kdebug_entered;
 
 
@@ -1171,6 +1169,8 @@ xpc_system_die(struct notifier_block *nb, unsigned long event, void *unused)
 		break;
 
 	case DIE_KDEBUG_ENTER:
+		xpc_kdebug_entered = 1;
+
 		/* Should lack of heartbeat be ignored by other partitions? */
 		if (!xpc_kdebug_ignore) {
 			break;
@@ -1183,6 +1183,8 @@ xpc_system_die(struct notifier_block *nb, unsigned long event, void *unused)
 		break;
 
 	case DIE_KDEBUG_LEAVE:
+		xpc_kdebug_entered = 0;
+
 		/* Is lack of heartbeat being ignored by other partitions? */
 		if (!xpc_kdebug_ignore) {
 			break;

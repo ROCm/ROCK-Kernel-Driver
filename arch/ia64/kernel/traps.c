@@ -149,10 +149,6 @@ __kprobes ia64_bad_break (unsigned long break_num, struct pt_regs *regs)
 		if (notify_die(DIE_BREAK, "break 0", regs, break_num, TRAP_BRKPT, SIGTRAP)
 			       	== NOTIFY_STOP)
 			return;
-#ifdef	CONFIG_KDB
-		if (kdb(KDB_REASON_ENTER, break_num, regs))
-			return;		/* kdb handled it */
-#endif	/* CONFIG_KDB */
 		die_if_kernel("bugcheck!", regs, break_num);
 		sig = SIGILL; code = ILL_ILLOPC;
 		break;

@@ -1,3 +1,7 @@
+2006-01-18 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.16-rc1-i386-1.
+
 2006-01-08 Keith Owens  <kaos@sgi.com>
 
 	* Add DIE_KDEBUG_ENTER and DIE_KDEBUG_LEAVE to notify_die.

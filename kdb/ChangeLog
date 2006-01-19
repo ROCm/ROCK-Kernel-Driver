@@ -1,3 +1,7 @@
+2006-01-18 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.16-common-1.
+
 2006-01-11 Keith Owens  <kaos@sgi.com>
 
 	* Plug a timing race between KDB_ENTER_SLAVE and KDB_ENTER, and allow

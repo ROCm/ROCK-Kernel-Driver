@@ -108,7 +108,7 @@ config KDB_CONTINUE_CATASTROPHIC
 	  This integer controls the behaviour of kdb when the kernel gets a
 	  catastrophic error, i.e. for a panic, oops, NMI or other watchdog
 	  tripping.  CONFIG_KDB_CONTINUE_CATASTROPHIC interacts with
-	  /proc/sys/kernel/kdb and CONFIG_CRASH_DUMP (if your kernel has the
+	  /proc/sys/kernel/kdb and CONFIG_LKCD (if your kernel has the
 	  LKCD patch).
 	  When KDB is active (/proc/sys/kernel/kdb == 1) and a catastrophic
 	  error occurs, nothing extra happens until you type 'go'.
