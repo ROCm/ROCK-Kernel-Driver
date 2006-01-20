@@ -228,7 +228,7 @@ kdbm_page(int argc, const char **argv, const char **envp,
 	if (page_has_buffers(&page))
 		kdb_printf("  buffers 0x%p\n", page_buffers(&page));
 	else
-		kdb_printf("  private 0x%lx\n", page.u.private);
+		kdb_printf("  private 0x%lx\n", page_private(&page));
 
 	return 0;
 }
