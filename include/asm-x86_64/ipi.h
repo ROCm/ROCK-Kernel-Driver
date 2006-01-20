@@ -113,12 +113,14 @@ static inline void send_IPI_mask_sequence(cpumask_t mask, int vector)
 		 */
 		cfg = __prepare_ICR(0, vector, APIC_DEST_PHYSICAL);
 
+#ifdef DUMP_VECTOR
 		if (vector == DUMP_VECTOR) {
 			/*
 			 * Setup DUMP IPI to be delivered as an NMI
 			 */
 			cfg = (cfg&~APIC_VECTOR_MASK)|APIC_DM_NMI;
 		}
+#endif
 
 		/*
 		 * Send the IPI. The write to APIC_ICR fires this off.

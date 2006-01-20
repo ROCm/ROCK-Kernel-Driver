@@ -407,7 +407,8 @@ static irqreturn_t xics_ipi_action(int irq, void *dev_id, struct pt_regs *regs)
 			smp_message_recv(PPC_MSG_MIGRATE_TASK, regs);
 		}
 #endif
-#if defined(CONFIG_DEBUGGER) || defined(CONFIG_KEXEC) || defined(CONFIG_LKCD_DUMP) || defined(CONFIG_LKCD_DUMP_MODULE)
+#if defined(CONFIG_DEBUGGER) || defined(CONFIG_KEXEC) ||
+		defined(CONFIG_LKCD_DUMP) || defined(CONFIG_LKCD_DUMP_MODULE)
 		if (test_and_clear_bit(PPC_MSG_DEBUGGER_BREAK,
 				       &xics_ipi_message[cpu].value)) {
 			mb();
