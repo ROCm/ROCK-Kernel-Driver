@@ -63,10 +63,10 @@ static unsigned char ocfs2_filetype_table[] = {
 	DT_UNKNOWN, DT_REG, DT_DIR, DT_CHR, DT_BLK, DT_FIFO, DT_SOCK, DT_LNK
 };
 
-static int ocfs2_extend_dir(struct ocfs2_super *osb,
-			    struct inode *dir,
-			    struct buffer_head *parent_fe_bh,
-			    struct buffer_head **new_de_bh);
+static int ocfs2_extend_dir(ocfs2_super *osb,
+			   struct inode *dir,
+			   struct buffer_head *parent_fe_bh,
+			   struct buffer_head **new_de_bh);
 /*
  * ocfs2_readdir()
  *
@@ -212,7 +212,7 @@ int ocfs2_find_files_on_disk(const char *name,
 			     struct ocfs2_dir_entry **dirent)
 {
 	int status = -ENOENT;
-	struct ocfs2_super *osb = OCFS2_SB(inode->i_sb);
+	ocfs2_super *osb = OCFS2_SB(inode->i_sb);
 
 	mlog_entry("(osb=%p, parent=%"MLFu64", name='%.*s', blkno=%p, "
 		   "inode=%p)\n",
@@ -340,11 +340,11 @@ int ocfs2_empty_dir(struct inode *inode)
 
 /* returns a bh of the 1st new block in the allocation. */
 int ocfs2_do_extend_dir(struct super_block *sb,
-			struct ocfs2_journal_handle *handle,
+			ocfs2_journal_handle *handle,
 			struct inode *dir,
 			struct buffer_head *parent_fe_bh,
-			struct ocfs2_alloc_context *data_ac,
-			struct ocfs2_alloc_context *meta_ac,
+			ocfs2_alloc_context *data_ac,
+			ocfs2_alloc_context *meta_ac,
 			struct buffer_head **new_bh)
 {
 	int status;
@@ -356,9 +356,9 @@ int ocfs2_do_extend_dir(struct super_block *sb,
 	spin_unlock(&OCFS2_I(dir)->ip_lock);
 
 	if (extend) {
-		status = ocfs2_do_extend_allocation(OCFS2_SB(sb), dir, 1,
-						    parent_fe_bh, handle,
-						    data_ac, meta_ac, NULL);
+		status = ocfs2_extend_allocation(OCFS2_SB(sb), dir, 1,
+						 parent_fe_bh, handle,
+						 data_ac, meta_ac, NULL);
 		BUG_ON(status == -EAGAIN);
 		if (status < 0) {
 			mlog_errno(status);
@@ -387,7 +387,7 @@ bail:
 }
 
 /* assumes you already have a cluster lock on the directory. */
-static int ocfs2_extend_dir(struct ocfs2_super *osb,
+static int ocfs2_extend_dir(ocfs2_super *osb,
 			    struct inode *dir,
 			    struct buffer_head *parent_fe_bh,
 			    struct buffer_head **new_de_bh)
@@ -395,10 +395,10 @@ static int ocfs2_extend_dir(struct ocfs2_super *osb,
 	int status = 0;
 	int credits, num_free_extents;
 	loff_t dir_i_size;
-	struct ocfs2_dinode *fe = (struct ocfs2_dinode *) parent_fe_bh->b_data;
-	struct ocfs2_alloc_context *data_ac = NULL;
-	struct ocfs2_alloc_context *meta_ac = NULL;
-	struct ocfs2_journal_handle *handle = NULL;
+	ocfs2_dinode *fe = (ocfs2_dinode *) parent_fe_bh->b_data;
+	ocfs2_alloc_context *data_ac = NULL;
+	ocfs2_alloc_context *meta_ac = NULL;
+	ocfs2_journal_handle *handle = NULL;
 	struct buffer_head *new_bh = NULL;
 	struct ocfs2_dir_entry * de;
 	struct super_block *sb = osb->sb;
@@ -514,7 +514,7 @@ bail:
  * Search the dir for a good spot, extending it if necessary. The
  * block containing an appropriate record is returned in ret_de_bh.
  */
-int ocfs2_prepare_dir_for_insert(struct ocfs2_super *osb,
+int ocfs2_prepare_dir_for_insert(ocfs2_super *osb,
 				 struct inode *dir,
 				 struct buffer_head *parent_fe_bh,
 				 const char *name,
@@ -524,7 +524,7 @@ int ocfs2_prepare_dir_for_insert(struct ocfs2_super *osb,
 	unsigned long offset;
 	struct buffer_head * bh = NULL;
 	unsigned short rec_len;
-	struct ocfs2_dinode *fe;
+	ocfs2_dinode *fe;
 	struct ocfs2_dir_entry *de;
 	struct super_block *sb;
 	int status;
@@ -535,7 +535,7 @@ int ocfs2_prepare_dir_for_insert(struct ocfs2_super *osb,
 	     namelen, OCFS2_I(dir)->ip_blkno);
 
 	BUG_ON(!S_ISDIR(dir->i_mode));
-	fe = (struct ocfs2_dinode *) parent_fe_bh->b_data;
+	fe = (ocfs2_dinode *) parent_fe_bh->b_data;
 	BUG_ON(le64_to_cpu(fe->i_size) != i_size_read(dir));
 
 	sb = dir->i_sb;

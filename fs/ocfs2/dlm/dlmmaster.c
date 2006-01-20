@@ -48,7 +48,6 @@
 #include "dlmapi.h"
 #include "dlmcommon.h"
 #include "dlmdebug.h"
-#include "dlmdomain.h"
 
 #define MLOG_MASK_PREFIX (ML_DLM|ML_DLM_MASTER)
 #include "cluster/masklog.h"
@@ -89,19 +88,16 @@ struct dlm_master_list_entry
 	} u;
 };
 
-static void dlm_mle_node_down(struct dlm_ctxt *dlm,
-			      struct dlm_master_list_entry *mle,
-			      struct o2nm_node *node,
-			      int idx);
-static void dlm_mle_node_up(struct dlm_ctxt *dlm,
-			    struct dlm_master_list_entry *mle,
-			    struct o2nm_node *node,
-			    int idx);
+void dlm_print_one_mle(struct dlm_master_list_entry *mle);
 
-static void dlm_assert_master_worker(struct dlm_work_item *item, void *data);
-static int dlm_do_assert_master(struct dlm_ctxt *dlm, const char *lockname,
-				unsigned int namelen, void *nodemap,
-				u32 flags);
+void dlm_mle_node_down(struct dlm_ctxt *dlm,
+		       struct dlm_master_list_entry *mle,
+		       struct o2nm_node *node,
+		       int idx);
+void dlm_mle_node_up(struct dlm_ctxt *dlm,
+		     struct dlm_master_list_entry *mle,
+		     struct o2nm_node *node,
+		     int idx);
 
 static inline int dlm_mle_equal(struct dlm_ctxt *dlm,
 				struct dlm_master_list_entry *mle,
@@ -126,9 +122,6 @@ static inline int dlm_mle_equal(struct dlm_ctxt *dlm,
 	}
 	return 1;
 }
-
-#if 0
-/* Code here is included but defined out as it aids debugging */
 
 void dlm_print_one_mle(struct dlm_master_list_entry *mle)
 {
@@ -164,6 +157,9 @@ void dlm_print_one_mle(struct dlm_master_list_entry *mle)
 		  namelen, namelen, name);
 }
 
+			      
+static void dlm_dump_mles(struct dlm_ctxt *dlm);
+
 static void dlm_dump_mles(struct dlm_ctxt *dlm)
 {
 	struct dlm_master_list_entry *mle;
@@ -178,6 +174,9 @@ static void dlm_dump_mles(struct dlm_ctxt *dlm)
 	}
 	spin_unlock(&dlm->master_lock);
 }
+
+extern spinlock_t dlm_domain_lock;
+extern struct list_head dlm_domains;
 
 int dlm_dump_all_mles(const char __user *data, unsigned int len)
 {
@@ -194,8 +193,6 @@ int dlm_dump_all_mles(const char __user *data, unsigned int len)
 	return len;
 }
 EXPORT_SYMBOL_GPL(dlm_dump_all_mles);
-
-#endif  /*  0  */
 
 
 static kmem_cache_t *dlm_mle_cache = NULL;
@@ -428,9 +425,8 @@ void dlm_hb_event_notify_attached(struct dlm_ctxt *dlm, int idx, int node_up)
 	}
 }
 
-static void dlm_mle_node_down(struct dlm_ctxt *dlm,
-			      struct dlm_master_list_entry *mle,
-			      struct o2nm_node *node, int idx)
+void dlm_mle_node_down(struct dlm_ctxt *dlm, struct dlm_master_list_entry *mle,
+		       struct o2nm_node *node, int idx)
 {
 	spin_lock(&mle->spinlock);
 
@@ -442,9 +438,8 @@ static void dlm_mle_node_down(struct dlm_ctxt *dlm,
 	spin_unlock(&mle->spinlock);
 }
 
-static void dlm_mle_node_up(struct dlm_ctxt *dlm,
-			    struct dlm_master_list_entry *mle,
-			    struct o2nm_node *node, int idx)
+void dlm_mle_node_up(struct dlm_ctxt *dlm, struct dlm_master_list_entry *mle,
+		     struct o2nm_node *node, int idx)
 {
 	spin_lock(&mle->spinlock);
 
@@ -587,9 +582,8 @@ void dlm_lockres_put(struct dlm_lock_resource *res)
 	kref_put(&res->refs, dlm_lockres_release);
 }
 
-static void dlm_init_lockres(struct dlm_ctxt *dlm,
-			     struct dlm_lock_resource *res,
-			     const char *name, unsigned int namelen)
+void dlm_init_lockres(struct dlm_ctxt *dlm, struct dlm_lock_resource *res,
+		      const char *name, unsigned int namelen)
 {
 	char *qname;
 
@@ -810,7 +804,7 @@ wait:
 			     dlm->name, res->lockname.len, 
 			     res->lockname.name, blocked);
 			dlm_print_one_lock_resource(res);
-			/* dlm_print_one_mle(mle); */
+			dlm_print_one_mle(mle);
 			tries = 0;
 		}
 		goto redo_request;
@@ -1050,17 +1044,10 @@ static int dlm_restart_lock_mastery(struct dlm_ctxt *dlm,
 	node = dlm_bitmap_diff_iter_next(&bdi, &sc);
 	while (node >= 0) {
 		if (sc == NODE_UP) {
-			/* a node came up.  easy.  might not even need
-			 * to talk to it if its node number is higher
-			 * or if we are already blocked. */
-			mlog(0, "node up! %d\n", node);
-			if (blocked)
-				goto next;
-
-			if (node > dlm->node_num) {
-				mlog(0, "node > this node. skipping.\n");
-				goto next;
-			}
+			/* a node came up.  clear any old vote from
+			 * the response map and set it in the vote map
+			 * then restart the mastery. */
+			mlog(ML_NOTICE, "node %d up while restarting\n", node);
 
 			/* redo the master request, but only for the new node */
 			mlog(0, "sending request to new node\n");
@@ -1247,7 +1234,7 @@ out:
  *
  * if possible, TRIM THIS DOWN!!!
  */
-int dlm_master_request_handler(struct o2net_msg *msg, u32 len, void *data)
+int dlm_master_request_handler(o2net_msg *msg, u32 len, void *data)
 {
 	u8 response = DLM_MASTER_RESP_MAYBE;
 	struct dlm_ctxt *dlm = data;
@@ -1470,9 +1457,9 @@ send_response:
  * can periodically run all locks owned by this node
  * and re-assert across the cluster...
  */
-static int dlm_do_assert_master(struct dlm_ctxt *dlm, const char *lockname,
-				unsigned int namelen, void *nodemap,
-				u32 flags)
+int dlm_do_assert_master(struct dlm_ctxt *dlm, const char *lockname,
+			 unsigned int namelen, void *nodemap,
+			 u32 flags)
 {
 	struct dlm_assert_master assert;
 	int to, tmpret;
@@ -1526,7 +1513,7 @@ static int dlm_do_assert_master(struct dlm_ctxt *dlm, const char *lockname,
  *
  * if possible, TRIM THIS DOWN!!!
  */
-int dlm_assert_master_handler(struct o2net_msg *msg, u32 len, void *data)
+int dlm_assert_master_handler(o2net_msg *msg, u32 len, void *data)
 {
 	struct dlm_ctxt *dlm = data;
 	struct dlm_master_list_entry *mle = NULL;
@@ -1728,7 +1715,7 @@ int dlm_dispatch_assert_master(struct dlm_ctxt *dlm,
 	return 0;
 }
 
-static void dlm_assert_master_worker(struct dlm_work_item *item, void *data)
+void dlm_assert_master_worker(struct dlm_work_item *item, void *data)
 {
 	struct dlm_ctxt *dlm = data;
 	int ret = 0;
@@ -2005,6 +1992,15 @@ fail:
 				break;
 
 			mlog(0, "timed out during migration\n");
+			/* avoid hang during shutdown when migrating lockres 
+			 * to a node which also goes down */
+			if (dlm_is_node_dead(dlm, target)) {
+				mlog(0, "%s:%.*s: expected migration target %u "
+				     "is no longer up.  restarting.\n",
+				     dlm->name, res->lockname.len,
+				     res->lockname.name, target);
+				ret = -ERESTARTSYS;
+			}
 		}
 		if (ret == -ERESTARTSYS) {
 			/* migration failed, detach and clean up mle */
@@ -2240,10 +2236,8 @@ static u8 dlm_pick_migration_target(struct dlm_ctxt *dlm,
 
 /* this is called by the new master once all lockres
  * data has been received */
-static int dlm_do_migrate_request(struct dlm_ctxt *dlm,
-				  struct dlm_lock_resource *res,
-				  u8 master, u8 new_master,
-				  struct dlm_node_iter *iter)
+int dlm_do_migrate_request(struct dlm_ctxt *dlm, struct dlm_lock_resource *res,
+			   u8 master, u8 new_master, struct dlm_node_iter *iter)
 {
 	struct dlm_migrate_request migrate;
 	int ret, status = 0;
@@ -2290,7 +2284,7 @@ static int dlm_do_migrate_request(struct dlm_ctxt *dlm,
  * we will have no mle in the list to start with.  now we can add an mle for
  * the migration and this should be the only one found for those scanning the
  * list.  */
-int dlm_migrate_request_handler(struct o2net_msg *msg, u32 len, void *data)
+int dlm_migrate_request_handler(o2net_msg *msg, u32 len, void *data)
 {
 	struct dlm_ctxt *dlm = data;
 	struct dlm_lock_resource *res = NULL;

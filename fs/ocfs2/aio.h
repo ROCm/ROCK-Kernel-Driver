@@ -1,11 +1,11 @@
 /* -*- mode: c; c-basic-offset: 8; -*-
  * vim: noexpandtab sw=8 ts=8 sts=0:
  *
- * ver.c
+ * aio.h
  *
- * version string
+ * Function prototypes
  *
- * Copyright (C) 2002, 2005 Oracle.  All rights reserved.
+ * Copyright (C) 2002, 2004, 2005 Oracle.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public
@@ -23,26 +23,15 @@
  * Boston, MA 021110-1307, USA.
  */
 
-#include <linux/module.h>
-#include <linux/kernel.h>
+#ifndef OCFS2_AIO_H
+#define OCFS2_AIO_H
 
-#include "ver.h"
+ssize_t ocfs2_file_aio_write(struct kiocb *iocb, const char __user *buf,
+			     size_t count, loff_t pos);
+ssize_t ocfs2_file_aio_read(struct kiocb *iocb, char __user *buf, size_t count,
+			    loff_t pos);
 
-#define CLUSTER_BUILD_VERSION "1.1.7-SLES"
-#define CLUSTER_BUILD_DATE    "Mon Jan 16 11:58:10 PST 2006"
-#define CLUSTER_BUILD_MD5     "sles"
+void okp_teardown_from_list(void *data);
+void ocfs2_wait_for_okp_destruction(ocfs2_super *osb);
 
-#define VERSION_STR "OCFS2 Node Manager " \
-	CLUSTER_BUILD_VERSION " " CLUSTER_BUILD_DATE \
-	" (build " CLUSTER_BUILD_MD5 ")"
-
-void cluster_print_version(void)
-{
-	printk(KERN_INFO "%s\n", VERSION_STR);
-}
-
-MODULE_DESCRIPTION(VERSION_STR);
-
-#ifdef MODULE_VERSION
-MODULE_VERSION(CLUSTER_BUILD_VERSION);
-#endif
+#endif /* OCFS2_AIO_H */

@@ -634,30 +634,37 @@ struct dlm_lock * dlm_new_lock(int type, u8 node, u64 cookie,
 void dlm_lock_get(struct dlm_lock *lock);
 void dlm_lock_put(struct dlm_lock *lock);
 
+void dlm_lock_detach_lockres(struct dlm_lock *lock);
 void dlm_lock_attach_lockres(struct dlm_lock *lock,
 			     struct dlm_lock_resource *res);
 
-int dlm_create_lock_handler(struct o2net_msg *msg, u32 len, void *data);
-int dlm_convert_lock_handler(struct o2net_msg *msg, u32 len, void *data);
-int dlm_proxy_ast_handler(struct o2net_msg *msg, u32 len, void *data);
+int dlm_create_lock_handler(o2net_msg *msg, u32 len, void *data);
+int dlm_convert_lock_handler(o2net_msg *msg, u32 len, void *data);
+int dlm_proxy_ast_handler(o2net_msg *msg, u32 len, void *data);
 
 void dlm_revert_pending_convert(struct dlm_lock_resource *res,
 				struct dlm_lock *lock);
 void dlm_revert_pending_lock(struct dlm_lock_resource *res,
 			     struct dlm_lock *lock);
 
-int dlm_unlock_lock_handler(struct o2net_msg *msg, u32 len, void *data);
+int dlm_unlock_lock_handler(o2net_msg *msg, u32 len, void *data);
 void dlm_commit_pending_cancel(struct dlm_lock_resource *res,
 			       struct dlm_lock *lock);
 void dlm_commit_pending_unlock(struct dlm_lock_resource *res,
 			       struct dlm_lock *lock);
 
+void dlm_shuffle_lists(struct dlm_ctxt *dlm,
+		       struct dlm_lock_resource *res);
 int dlm_launch_thread(struct dlm_ctxt *dlm);
 void dlm_complete_thread(struct dlm_ctxt *dlm);
+void dlm_flush_asts(struct dlm_ctxt *dlm);
+int dlm_flush_lockres_asts(struct dlm_ctxt *dlm, struct dlm_lock_resource *res);
 int dlm_launch_recovery_thread(struct dlm_ctxt *dlm);
 void dlm_complete_recovery_thread(struct dlm_ctxt *dlm);
 void dlm_wait_for_recovery(struct dlm_ctxt *dlm);
+int dlm_is_node_dead(struct dlm_ctxt *dlm, u8 node);
 
+void dlm_get(struct dlm_ctxt *dlm);
 void dlm_put(struct dlm_ctxt *dlm);
 struct dlm_ctxt *dlm_grab(struct dlm_ctxt *dlm);
 int dlm_domain_fully_joined(struct dlm_ctxt *dlm);
@@ -691,7 +698,9 @@ struct dlm_lock_resource *dlm_new_lockres(struct dlm_ctxt *dlm,
 					  const char *name,
 					  unsigned int namelen);
 
+void __dlm_queue_ast(struct dlm_ctxt *dlm, struct dlm_lock *lock);
 void dlm_queue_ast(struct dlm_ctxt *dlm, struct dlm_lock *lock);
+void __dlm_queue_bast(struct dlm_ctxt *dlm, struct dlm_lock *lock);
 void dlm_queue_bast(struct dlm_ctxt *dlm, struct dlm_lock *lock);
 void dlm_do_local_ast(struct dlm_ctxt *dlm,
 		      struct dlm_lock_resource *res,
@@ -731,13 +740,17 @@ void __dlm_print_one_lock_resource(struct dlm_lock_resource *res);
 
 u8 dlm_nm_this_node(struct dlm_ctxt *dlm);
 void dlm_kick_thread(struct dlm_ctxt *dlm, struct dlm_lock_resource *res);
+void __dlm_kick_thread(struct dlm_ctxt *dlm, struct dlm_lock_resource *res);
 void __dlm_dirty_lockres(struct dlm_ctxt *dlm, struct dlm_lock_resource *res);
 
 
 int dlm_nm_init(struct dlm_ctxt *dlm);
 int dlm_heartbeat_init(struct dlm_ctxt *dlm);
+void __dlm_hb_node_down(struct dlm_ctxt *dlm, int idx);
 void dlm_hb_node_down_cb(struct o2nm_node *node, int idx, void *data);
 void dlm_hb_node_up_cb(struct o2nm_node *node, int idx, void *data);
+int dlm_hb_node_dead(struct dlm_ctxt *dlm, int node);
+int __dlm_hb_node_dead(struct dlm_ctxt *dlm, int node);
 
 int dlm_lockres_is_dirty(struct dlm_ctxt *dlm, struct dlm_lock_resource *res);
 int dlm_migrate_lockres(struct dlm_ctxt *dlm,
@@ -750,21 +763,22 @@ void dlm_lockres_release_ast(struct dlm_ctxt *dlm,
 			     struct dlm_lock_resource *res);
 void __dlm_lockres_reserve_ast(struct dlm_lock_resource *res);
 
-int dlm_master_request_handler(struct o2net_msg *msg, u32 len, void *data);
-int dlm_assert_master_handler(struct o2net_msg *msg, u32 len, void *data);
-int dlm_migrate_request_handler(struct o2net_msg *msg, u32 len, void *data);
-int dlm_mig_lockres_handler(struct o2net_msg *msg, u32 len, void *data);
-int dlm_master_requery_handler(struct o2net_msg *msg, u32 len, void *data);
-int dlm_request_all_locks_handler(struct o2net_msg *msg, u32 len, void *data);
-int dlm_reco_data_done_handler(struct o2net_msg *msg, u32 len, void *data);
-int dlm_begin_reco_handler(struct o2net_msg *msg, u32 len, void *data);
-int dlm_finalize_reco_handler(struct o2net_msg *msg, u32 len, void *data);
+int dlm_master_request_handler(o2net_msg *msg, u32 len, void *data);
+int dlm_assert_master_handler(o2net_msg *msg, u32 len, void *data);
+int dlm_migrate_request_handler(o2net_msg *msg, u32 len, void *data);
+int dlm_mig_lockres_handler(o2net_msg *msg, u32 len, void *data);
+int dlm_master_requery_handler(o2net_msg *msg, u32 len, void *data);
+int dlm_request_all_locks_handler(o2net_msg *msg, u32 len, void *data);
+int dlm_reco_data_done_handler(o2net_msg *msg, u32 len, void *data);
+int dlm_begin_reco_handler(o2net_msg *msg, u32 len, void *data);
+int dlm_finalize_reco_handler(o2net_msg *msg, u32 len, void *data);
 
 int dlm_dispatch_assert_master(struct dlm_ctxt *dlm,
 			       struct dlm_lock_resource *res,
 			       int ignore_higher,
 			       u8 request_from,
 			       u32 flags);
+void dlm_assert_master_worker(struct dlm_work_item *item, void *data);
 
 
 int dlm_send_one_lockres(struct dlm_ctxt *dlm,
@@ -774,6 +788,11 @@ int dlm_send_one_lockres(struct dlm_ctxt *dlm,
 			 u8 flags);
 void dlm_move_lockres_to_recovery_list(struct dlm_ctxt *dlm,
 				       struct dlm_lock_resource *res);
+
+void dlm_init_lockres(struct dlm_ctxt *dlm,
+		      struct dlm_lock_resource *res,
+		      const char *name,
+		      unsigned int namelen);
 
 /* will exit holding res->spinlock, but may drop in function */
 void __dlm_wait_on_lockres_flags(struct dlm_lock_resource *res, int flags);
@@ -791,9 +810,22 @@ static inline void __dlm_wait_on_lockres(struct dlm_lock_resource *res)
 int dlm_init_mle_cache(void);
 void dlm_destroy_mle_cache(void);
 void dlm_hb_event_notify_attached(struct dlm_ctxt *dlm, int idx, int node_up);
+int dlm_do_assert_master(struct dlm_ctxt *dlm,
+			 const char *lockname,
+			 unsigned int namelen,
+			 void *nodemap,
+			 u32 flags);
+int dlm_do_migrate_request(struct dlm_ctxt *dlm,
+			   struct dlm_lock_resource *res,
+			   u8 master,
+			   u8 new_master,
+			   struct dlm_node_iter *iter);
 void dlm_clean_master_list(struct dlm_ctxt *dlm,
 			   u8 dead_node);
 int dlm_lock_basts_flushed(struct dlm_ctxt *dlm, struct dlm_lock *lock);
+
+
+int dlm_dump_all_mles(const char __user *data, unsigned int len);
 
 
 static inline const char * dlm_lock_mode_name(int mode)

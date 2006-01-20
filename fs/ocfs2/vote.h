@@ -28,7 +28,7 @@
 #define VOTE_H
 
 int ocfs2_vote_thread(void *arg);
-static inline void ocfs2_kick_vote_thread(struct ocfs2_super *osb)
+static inline void ocfs2_kick_vote_thread(ocfs2_super *osb)
 {
 	spin_lock(&osb->vote_task_lock);
 	/* make sure the voting thread gets a swipe at whatever changes
@@ -44,13 +44,13 @@ int ocfs2_request_unlink_vote(struct inode *inode,
 			      unsigned int nlink);
 int ocfs2_request_rename_vote(struct inode *inode,
 			      struct dentry *dentry);
-int ocfs2_request_mount_vote(struct ocfs2_super *osb);
-int ocfs2_request_umount_vote(struct ocfs2_super *osb);
-int ocfs2_register_net_handlers(struct ocfs2_super *osb);
-void ocfs2_unregister_net_handlers(struct ocfs2_super *osb);
+int ocfs2_request_mount_vote(ocfs2_super *osb);
+int ocfs2_request_umount_vote(ocfs2_super *osb);
+int ocfs2_register_net_handlers(ocfs2_super *osb);
+void ocfs2_unregister_net_handlers(ocfs2_super *osb);
 
 void ocfs2_mark_inode_remotely_deleted(struct inode *inode);
 
-void ocfs2_remove_node_from_vote_queues(struct ocfs2_super *osb,
+void ocfs2_remove_node_from_vote_queues(ocfs2_super *osb,
 					int node_num);
 #endif

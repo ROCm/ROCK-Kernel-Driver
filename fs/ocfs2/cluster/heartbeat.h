@@ -100,11 +100,14 @@ int o2hb_register_callback(struct o2hb_callback_func *hc);
 int o2hb_unregister_callback(struct o2hb_callback_func *hc);
 int o2hb_fill_node_map(const char *resource, unsigned long *map,
 			unsigned bytes);
+int o2hb_fill_node_map_from_callback(const char *resource, unsigned long *map,
+                                     unsigned bytes);
 void o2hb_init(void);
 int o2hb_check_node_heartbeating(const char *resource, u8 node_num);
 int o2hb_check_node_heartbeating_from_callback(const char *resource,
                                                u8 node_num);
 int o2hb_check_local_node_heartbeating(const char *resource);
+int o2hb_check_local_node_heartbeating_from_callback(const char *resource);
 
 const char *o2hb_heartbeat_mode(void);
 int o2hb_set_heartbeat_mode(const char *type, size_t count);

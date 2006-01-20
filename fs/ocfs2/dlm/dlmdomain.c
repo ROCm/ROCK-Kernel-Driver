@@ -68,10 +68,10 @@ static DECLARE_WAIT_QUEUE_HEAD(dlm_domain_events);
 
 #define DLM_DOMAIN_BACKOFF_MS 200
 
-static int dlm_query_join_handler(struct o2net_msg *msg, u32 len, void *data);
-static int dlm_assert_joined_handler(struct o2net_msg *msg, u32 len, void *data);
-static int dlm_cancel_join_handler(struct o2net_msg *msg, u32 len, void *data);
-static int dlm_exit_domain_handler(struct o2net_msg *msg, u32 len, void *data);
+static int dlm_query_join_handler(o2net_msg *msg, u32 len, void *data);
+static int dlm_assert_joined_handler(o2net_msg *msg, u32 len, void *data);
+static int dlm_cancel_join_handler(o2net_msg *msg, u32 len, void *data);
+static int dlm_exit_domain_handler(o2net_msg *msg, u32 len, void *data);
 
 static void dlm_unregister_domain_handlers(struct dlm_ctxt *dlm);
 
@@ -163,7 +163,7 @@ static struct dlm_ctxt * __dlm_lookup_domain_full(const char *domain, int len)
 }
 
 /* For null terminated domain strings ONLY */
-static struct dlm_ctxt * __dlm_lookup_domain(const char *domain)
+struct dlm_ctxt * __dlm_lookup_domain(const char *domain)
 {
 	assert_spin_locked(&dlm_domain_lock);
 
@@ -264,6 +264,13 @@ struct dlm_ctxt *dlm_grab(struct dlm_ctxt *dlm)
 	spin_unlock(&dlm_domain_lock);
 
 	return target;
+}
+
+void dlm_get(struct dlm_ctxt *dlm)
+{
+	spin_lock(&dlm_domain_lock);
+	__dlm_get(dlm);
+	spin_unlock(&dlm_domain_lock);
 }
 
 int dlm_domain_fully_joined(struct dlm_ctxt *dlm)
@@ -382,7 +389,7 @@ static void __dlm_print_nodes(struct dlm_ctxt *dlm)
 	}
 }
 
-static int dlm_exit_domain_handler(struct o2net_msg *msg, u32 len, void *data)
+static int dlm_exit_domain_handler(o2net_msg *msg, u32 len, void *data)
 {
 	struct dlm_ctxt *dlm = data;
 	unsigned int node;
@@ -544,7 +551,7 @@ void dlm_unregister_domain(struct dlm_ctxt *dlm)
 }
 EXPORT_SYMBOL_GPL(dlm_unregister_domain);
 
-static int dlm_query_join_handler(struct o2net_msg *msg, u32 len, void *data)
+static int dlm_query_join_handler(o2net_msg *msg, u32 len, void *data)
 {
 	struct dlm_query_join_request *query;
 	enum dlm_query_join_response response;
@@ -573,8 +580,11 @@ static int dlm_query_join_handler(struct o2net_msg *msg, u32 len, void *data)
 	spin_lock(&dlm_domain_lock);
 	dlm = __dlm_lookup_domain_full(query->domain, query->name_len);
 	/* Once the dlm ctxt is marked as leaving then we don't want
-	 * to be put in someone's domain map. */
+	 * to be put in someone's domain map. 
+	 * Also, explicitly disallow joining at certain troublesome
+	 * times (ie. during recovery). */
 	if (dlm && dlm->dlm_state != DLM_CTXT_LEAVING) {
+		int bit = query->node_idx;
 		spin_lock(&dlm->spinlock);
 
 		if (dlm->dlm_state == DLM_CTXT_NEW &&
@@ -585,6 +595,19 @@ static int dlm_query_join_handler(struct o2net_msg *msg, u32 len, void *data)
 			response = JOIN_OK_NO_MAP;
 		} else if (dlm->joining_node != DLM_LOCK_RES_OWNER_UNKNOWN) {
 			/* Disallow parallel joins. */
+			response = JOIN_DISALLOW;
+		} else if (dlm->reco.state & DLM_RECO_STATE_ACTIVE) {
+			mlog(ML_NOTICE, "node %u trying to join, but recovery "
+			     "is ongoing.\n", bit);
+			response = JOIN_DISALLOW;
+		} else if (test_bit(bit, dlm->recovery_map)) {
+			mlog(ML_NOTICE, "node %u trying to join, but it "
+			     "still needs recovery.\n", bit);
+			response = JOIN_DISALLOW;
+		} else if (test_bit(bit, dlm->domain_map)) {
+			mlog(ML_NOTICE, "node %u trying to join, but it "
+			     "is still in the domain! needs recovery?\n",
+			     bit);
 			response = JOIN_DISALLOW;
 		} else {
 			/* Alright we're fully a part of this domain
@@ -605,7 +628,7 @@ respond:
 	return response;
 }
 
-static int dlm_assert_joined_handler(struct o2net_msg *msg, u32 len, void *data)
+static int dlm_assert_joined_handler(o2net_msg *msg, u32 len, void *data)
 {
 	struct dlm_assert_joined *assert;
 	struct dlm_ctxt *dlm = NULL;
@@ -640,7 +663,7 @@ static int dlm_assert_joined_handler(struct o2net_msg *msg, u32 len, void *data)
 	return 0;
 }
 
-static int dlm_cancel_join_handler(struct o2net_msg *msg, u32 len, void *data)
+static int dlm_cancel_join_handler(o2net_msg *msg, u32 len, void *data)
 {
 	struct dlm_cancel_join *cancel;
 	struct dlm_ctxt *dlm = NULL;
@@ -1455,11 +1478,14 @@ static int __init dlm_init(void)
 		return -1;
 	}
 
+	dlm_init_proc();
+
 	return 0;
 }
 
 static void __exit dlm_exit (void)
 {
+	dlm_remove_proc();
 	dlm_unregister_net_handlers();
 	dlm_destroy_mle_cache();
 }

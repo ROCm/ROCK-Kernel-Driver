@@ -53,7 +53,7 @@ static void __ocfs2_fill_slot(struct ocfs2_slot_info *si,
  * nodes. Should be holding an EX on super block. assumes slot info is
  * up to date. Note that we call this *after* we find a slot, so our
  * own node should be set in the map too... */
-void ocfs2_populate_mounted_map(struct ocfs2_super *osb)
+void ocfs2_populate_mounted_map(ocfs2_super *osb)
 {
 	int i;
 	struct ocfs2_slot_info *si = osb->slot_info;
@@ -87,7 +87,7 @@ void ocfs2_update_slot_info(struct ocfs2_slot_info *si)
 
 /* post the our slot info stuff into it's destination bh and write it
  * out. */
-int ocfs2_update_disk_slots(struct ocfs2_super *osb,
+int ocfs2_update_disk_slots(ocfs2_super *osb,
 			    struct ocfs2_slot_info *si)
 {
 	int status, i;
@@ -167,7 +167,7 @@ void ocfs2_clear_slot(struct ocfs2_slot_info *si,
 	spin_unlock(&si->si_lock);
 }
 
-int ocfs2_init_slot_info(struct ocfs2_super *osb)
+int ocfs2_init_slot_info(ocfs2_super *osb)
 {
 	int status, i;
 	u64 blkno;
@@ -228,7 +228,7 @@ void ocfs2_free_slot_info(struct ocfs2_slot_info *si)
 	kfree(si);
 }
 
-int ocfs2_find_slot(struct ocfs2_super *osb)
+int ocfs2_find_slot(ocfs2_super *osb)
 {
 	int status;
 	s16 slot;
@@ -275,7 +275,7 @@ bail:
 	return status;
 }
 
-void ocfs2_put_slot(struct ocfs2_super *osb)
+void ocfs2_put_slot(ocfs2_super *osb)
 {
 	int status;
 	struct ocfs2_slot_info *si = osb->slot_info;

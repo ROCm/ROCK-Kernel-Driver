@@ -182,6 +182,7 @@ int o2hb_fill_node_map(const char *resource, unsigned long *map, unsigned bytes)
 }
 EXPORT_SYMBOL_GPL(o2hb_fill_node_map);
 
+
 const char *o2hb_heartbeat_mode(void)
 {
 	const char *ret = "";
@@ -446,3 +447,11 @@ int o2hb_check_local_node_heartbeating(const char *resource)
 	return __o2hb_check_node_heartbeating(resource, o2nm_this_node(), 1);
 }
 EXPORT_SYMBOL_GPL(o2hb_check_local_node_heartbeating);
+
+/* Makes sure our local node is configured with a node number, and is
+ * heartbeating. */
+int o2hb_check_local_node_heartbeating_from_callback(const char *resource)
+{
+	return __o2hb_check_node_heartbeating(resource, o2nm_this_node(), 0);
+}
+EXPORT_SYMBOL_GPL(o2hb_check_local_node_heartbeating_from_callback);

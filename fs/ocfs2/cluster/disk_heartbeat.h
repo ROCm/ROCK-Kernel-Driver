@@ -36,6 +36,7 @@ extern unsigned int o2hb_dead_threshold;
 #define O2HB_MIN_DEAD_THRESHOLD	  2
 #define O2HB_MAX_WRITE_TIMEOUT_MS (O2HB_REGION_TIMEOUT_MS * (o2hb_dead_threshold - 1))
 void o2hb_stop_all_regions(void);
+void o2hb_dead_threshold_set(unsigned int threshold);
 int o2hb_disk_heartbeat_init(void);
 void o2hb_disk_heartbeat_exit(void);
 

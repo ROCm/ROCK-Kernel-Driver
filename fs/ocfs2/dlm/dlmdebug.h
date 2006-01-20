@@ -25,6 +25,8 @@
 #ifndef DLMDEBUG_H
 #define DLMDEBUG_H
 
+void dlm_remove_proc(void);
+void dlm_init_proc(void);
 void dlm_dump_lock_resources(struct dlm_ctxt *dlm);
 
 #endif

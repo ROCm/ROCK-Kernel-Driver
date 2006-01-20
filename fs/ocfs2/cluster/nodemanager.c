@@ -22,6 +22,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/sysctl.h>
+#include <linux/proc_fs.h>
 #include <linux/configfs.h>
 
 #include "endian.h"
@@ -31,8 +32,8 @@
 #include "heartbeat.h"
 #include "disk_heartbeat.h"
 #include "masklog.h"
-#include "sys.h"
 #include "ver.h"
+#include "sys.h"
 
 /* for now we operate under the assertion that there can be only one
  * cluster active at a time.  Changing this will require trickling
@@ -639,7 +640,7 @@ static struct config_group *o2nm_cluster_group_make_group(struct config_group *g
 	struct config_group *o2hb_group = NULL, *ret = NULL;
 	void *defs = NULL;
 
-	/* this runs under the parent dir's i_mutex; there can be only
+	/* this runs under the parent dir's i_sem; there can be only
 	 * one caller in here at a time */
 	if (o2nm_single_cluster)
 		goto out; /* ENOSPC */
@@ -717,6 +718,18 @@ static struct o2nm_cluster_group o2nm_cluster_group = {
 	},
 };
 
+#define O2NM_PROC_PATH "fs/ocfs2_nodemanager"
+static struct proc_dir_entry *o2nm_proc;
+
+#define O2NM_VERSION_PROC_NAME "interface_revision"
+#define O2NM_HB_DEAD_THRESHOLD_NAME "hb_dead_threshold"
+
+static void o2nm_remove_proc(struct proc_dir_entry *parent)
+{
+	remove_proc_entry(O2NM_VERSION_PROC_NAME, parent);
+	remove_proc_entry(O2NM_HB_DEAD_THRESHOLD_NAME, parent);
+}
+
 static void __exit exit_o2nm(void)
 {
 	if (ocfs2_table_header)
@@ -726,8 +739,101 @@ static void __exit exit_o2nm(void)
 	o2net_unregister_hb_callbacks();
 	o2hb_disk_heartbeat_exit();
 	configfs_unregister_subsystem(&o2nm_cluster_group.cs_subsys);
-	o2cb_sys_shutdown();
+	o2nm_remove_proc(o2nm_proc);
+	mlog_remove_proc(o2nm_proc);
+	o2net_proc_exit(o2nm_proc);
+	remove_proc_entry(O2NM_PROC_PATH, NULL);
 	o2net_exit();
+}
+
+static int o2nm_proc_read_uint(char *page, char **start, off_t off,
+			       int count, int *eof, unsigned int data)
+{
+	int len;
+
+	len = sprintf(page, "%u\n", data);
+	if (len < 0)
+		return len;
+
+	if (len <= off + count)
+		*eof = 1;
+
+	*start = page + off;
+
+	len -= off;
+
+	if (len > count)
+		len = count;
+
+	if (len < 0)
+		len = 0;
+
+	return len;
+}
+
+static int o2nm_proc_version(char *page, char **start, off_t off,
+			     int count, int *eof, void *data)
+{
+	return o2nm_proc_read_uint(page, start, off, count, eof,
+				   O2NM_API_VERSION);
+}
+
+static int o2nm_proc_threshold(char *page, char **start, off_t off,
+			       int count, int *eof, void *data)
+{
+	return o2nm_proc_read_uint(page, start, off, count, eof,
+				   o2hb_dead_threshold);
+}
+
+static int o2nm_proc_write_threshold(struct file *file,
+				     const char __user *buffer,
+				     unsigned long count, void *data)
+{
+	char buf[32];
+	char *p = buf;
+	unsigned long tmp;
+
+	if (count > ARRAY_SIZE(buf) - 1)
+		count = ARRAY_SIZE(buf) - 1;
+
+	if (copy_from_user(buf, buffer, count))
+		return -EFAULT;
+
+	buf[ARRAY_SIZE(buf) - 1] = '\0';
+
+	tmp = simple_strtoul(p, &p, 10);
+	if (!p || (*p && (*p != '\n')))
+                return -EINVAL;
+
+	/* this will validate ranges for us. */
+	o2hb_dead_threshold_set((unsigned int) tmp);
+
+	return count;
+}
+
+static int o2nm_init_proc(struct proc_dir_entry *parent)
+{
+	struct proc_dir_entry *p;
+
+	p = create_proc_read_entry(O2NM_VERSION_PROC_NAME,
+				   S_IFREG | S_IRUGO,
+				   parent,
+				   o2nm_proc_version,
+				   NULL);
+	if (!p)
+		return -ENOMEM;
+
+	p = create_proc_read_entry(O2NM_HB_DEAD_THRESHOLD_NAME,
+				   S_IFREG | S_IRUGO | S_IWUSR, parent,
+				   o2nm_proc_threshold,
+				   NULL);
+	if (!p) {
+		remove_proc_entry(O2NM_VERSION_PROC_NAME, parent);
+		return -ENOMEM;
+	}
+	p->write_proc = o2nm_proc_write_threshold;
+
+	return 0;
 }
 
 static int __init init_o2nm(void)
@@ -739,7 +845,7 @@ static int __init init_o2nm(void)
 	o2hb_init();
 	ret = o2hb_disk_heartbeat_init();
 	if (ret)
-		return ret;
+		goto out;
 
 	o2net_init();
 
@@ -747,7 +853,7 @@ static int __init init_o2nm(void)
 	if (!ocfs2_table_header) {
 		printk(KERN_ERR "nodemanager: unable to register sysctl\n");
 		ret = -ENOMEM; /* or something. */
-		goto out;
+		goto out_o2net;
 	}
 
 	ret = o2net_register_hb_callbacks();
@@ -762,15 +868,44 @@ static int __init init_o2nm(void)
 		goto out_callbacks;
 	}
 
+	o2nm_proc = proc_mkdir(O2NM_PROC_PATH, NULL);
+	if (o2nm_proc == NULL) {
+		ret = -ENOMEM; /* shrug */
+		goto out_subsys;
+	}
+
+	ret = mlog_init_proc(o2nm_proc);
+	if (ret)
+		goto out_remove;
+
+	ret = o2net_proc_init(o2nm_proc);
+	if (ret)
+		goto out_mlog;
+
+	ret = o2nm_init_proc(o2nm_proc);
+	if (ret)
+		goto out_proc;
+
 	ret = o2cb_sys_init();
-	if (!ret)
+	if (ret == 0)
 		goto out;
 
+	o2nm_remove_proc(o2nm_proc);
+out_proc:
+	o2net_proc_exit(o2nm_proc);
+out_mlog:
+	mlog_remove_proc(o2nm_proc);
+out_remove:
+	remove_proc_entry(O2NM_PROC_PATH, NULL);
+out_subsys:
 	configfs_unregister_subsystem(&o2nm_cluster_group.cs_subsys);
 out_callbacks:
 	o2net_unregister_hb_callbacks();
 out_sysctl:
 	unregister_sysctl_table(ocfs2_table_header);
+out_o2net:
+	o2net_exit();
+	o2hb_disk_heartbeat_exit();
 out:
 	return ret;
 }

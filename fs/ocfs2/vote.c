@@ -132,7 +132,7 @@ struct ocfs2_net_wait_ctxt {
 	struct ocfs2_net_response_cb *n_callback;
 };
 
-static void ocfs2_process_mount_request(struct ocfs2_super *osb,
+static void ocfs2_process_mount_request(ocfs2_super *osb,
 					unsigned int node_num)
 {
 	mlog(0, "MOUNT vote from node %u\n", node_num);
@@ -148,7 +148,7 @@ static void ocfs2_process_mount_request(struct ocfs2_super *osb,
 	ocfs2_node_map_clear_bit(osb, &osb->umount_map, node_num);
 }
 
-static void ocfs2_process_umount_request(struct ocfs2_super *osb,
+static void ocfs2_process_umount_request(ocfs2_super *osb,
 					 unsigned int node_num)
 {
 	mlog(0, "UMOUNT vote from node %u\n", node_num);
@@ -349,7 +349,7 @@ static void ocfs2_process_dentry_request(struct inode *inode,
 	}
 }
 
-static void ocfs2_process_vote(struct ocfs2_super *osb,
+static void ocfs2_process_vote(ocfs2_super *osb,
 			       struct ocfs2_vote_msg *msg)
 {
 	int net_status, vote_response;
@@ -482,7 +482,7 @@ respond:
 		iput(inode);
 }
 
-static void ocfs2_vote_thread_do_work(struct ocfs2_super *osb)
+static void ocfs2_vote_thread_do_work(ocfs2_super *osb)
 {
 	unsigned long processed;
 	struct ocfs2_lock_res *lockres;
@@ -531,7 +531,7 @@ static void ocfs2_vote_thread_do_work(struct ocfs2_super *osb)
 	mlog_exit_void();
 }
 
-static int ocfs2_vote_thread_lists_empty(struct ocfs2_super *osb)
+static int ocfs2_vote_thread_lists_empty(ocfs2_super *osb)
 {
 	int empty = 0;
 
@@ -544,7 +544,7 @@ static int ocfs2_vote_thread_lists_empty(struct ocfs2_super *osb)
 	return empty;
 }
 
-static int ocfs2_vote_thread_should_wake(struct ocfs2_super *osb)
+static int ocfs2_vote_thread_should_wake(ocfs2_super *osb)
 {
 	int should_wake = 0;
 
@@ -559,7 +559,7 @@ static int ocfs2_vote_thread_should_wake(struct ocfs2_super *osb)
 int ocfs2_vote_thread(void *arg)
 {
 	int status = 0;
-	struct ocfs2_super *osb = arg;
+	ocfs2_super *osb = arg;
 
 	/* only quit once we've been asked to stop and there is no more
 	 * work available */
@@ -598,7 +598,7 @@ bail:
 	return w;
 }
 
-static unsigned int ocfs2_new_response_id(struct ocfs2_super *osb)
+static unsigned int ocfs2_new_response_id(ocfs2_super *osb)
 {
 	unsigned int ret;
 
@@ -609,7 +609,7 @@ static unsigned int ocfs2_new_response_id(struct ocfs2_super *osb)
 	return ret;
 }
 
-static void ocfs2_dequeue_net_wait_ctxt(struct ocfs2_super *osb,
+static void ocfs2_dequeue_net_wait_ctxt(ocfs2_super *osb,
 					struct ocfs2_net_wait_ctxt *w)
 {
 	spin_lock(&osb->net_response_lock);
@@ -617,7 +617,7 @@ static void ocfs2_dequeue_net_wait_ctxt(struct ocfs2_super *osb,
 	spin_unlock(&osb->net_response_lock);
 }
 
-static void ocfs2_queue_net_wait_ctxt(struct ocfs2_super *osb,
+static void ocfs2_queue_net_wait_ctxt(ocfs2_super *osb,
 				      struct ocfs2_net_wait_ctxt *w)
 {
 	spin_lock(&osb->net_response_lock);
@@ -626,7 +626,7 @@ static void ocfs2_queue_net_wait_ctxt(struct ocfs2_super *osb,
 	spin_unlock(&osb->net_response_lock);
 }
 
-static void __ocfs2_mark_node_responded(struct ocfs2_super *osb,
+static void __ocfs2_mark_node_responded(ocfs2_super *osb,
 					struct ocfs2_net_wait_ctxt *w,
 					int node_num)
 {
@@ -639,7 +639,7 @@ static void __ocfs2_mark_node_responded(struct ocfs2_super *osb,
 
 /* Intended to be called from the node down callback, we fake remove
  * the node from all our response contexts */
-void ocfs2_remove_node_from_vote_queues(struct ocfs2_super *osb,
+void ocfs2_remove_node_from_vote_queues(ocfs2_super *osb,
 					int node_num)
 {
 	struct list_head *p;
@@ -656,7 +656,7 @@ void ocfs2_remove_node_from_vote_queues(struct ocfs2_super *osb,
 	spin_unlock(&osb->net_response_lock);
 }
 
-static int ocfs2_broadcast_vote(struct ocfs2_super *osb,
+static int ocfs2_broadcast_vote(ocfs2_super *osb,
 				struct ocfs2_vote_msg *request,
 				unsigned int response_id,
 				int *response,
@@ -735,7 +735,7 @@ bail:
 	return status;
 }
 
-static struct ocfs2_vote_msg * ocfs2_new_vote_request(struct ocfs2_super *osb,
+static struct ocfs2_vote_msg * ocfs2_new_vote_request(ocfs2_super *osb,
 						      u64 blkno,
 						      unsigned int generation,
 						      enum ocfs2_vote_request type,
@@ -764,7 +764,7 @@ static struct ocfs2_vote_msg * ocfs2_new_vote_request(struct ocfs2_super *osb,
 
 /* Complete the buildup of a new vote request and process the
  * broadcast return value. */
-static int ocfs2_do_request_vote(struct ocfs2_super *osb,
+static int ocfs2_do_request_vote(ocfs2_super *osb,
 				 struct ocfs2_vote_msg *request,
 				 struct ocfs2_net_response_cb *callback)
 {
@@ -795,7 +795,7 @@ static int ocfs2_request_vote(struct inode *inode,
 			      struct ocfs2_net_response_cb *callback)
 {
 	int status;
-	struct ocfs2_super *osb = OCFS2_SB(inode->i_sb);
+	ocfs2_super *osb = OCFS2_SB(inode->i_sb);
 
 	if (ocfs2_inode_is_new(inode))
 		return 0;
@@ -859,7 +859,7 @@ int ocfs2_request_delete_vote(struct inode *inode)
 {
 	int orphaned_slot, status;
 	struct ocfs2_net_response_cb delete_cb;
-	struct ocfs2_super *osb = OCFS2_SB(inode->i_sb);
+	ocfs2_super *osb = OCFS2_SB(inode->i_sb);
 	struct ocfs2_vote_msg *request;
 
 	spin_lock(&OCFS2_I(inode)->ip_lock);
@@ -910,7 +910,7 @@ int ocfs2_request_unlink_vote(struct inode *inode,
 			      unsigned int nlink)
 {
 	int status;
-	struct ocfs2_super *osb = OCFS2_SB(inode->i_sb);
+	ocfs2_super *osb = OCFS2_SB(inode->i_sb);
 	struct ocfs2_vote_msg *request;
 
 	if (dentry->d_name.len > OCFS2_VOTE_FILENAME_LEN)
@@ -934,7 +934,7 @@ int ocfs2_request_rename_vote(struct inode *inode,
 			      struct dentry *dentry)
 {
 	int status;
-	struct ocfs2_super *osb = OCFS2_SB(inode->i_sb);
+	ocfs2_super *osb = OCFS2_SB(inode->i_sb);
 	struct ocfs2_vote_msg *request;
 
 	if (dentry->d_name.len > OCFS2_VOTE_FILENAME_LEN)
@@ -954,7 +954,7 @@ int ocfs2_request_rename_vote(struct inode *inode,
 	return status;
 }
 
-int ocfs2_request_mount_vote(struct ocfs2_super *osb)
+int ocfs2_request_mount_vote(ocfs2_super *osb)
 {
 	int status;
 	struct ocfs2_vote_msg *request = NULL;
@@ -990,7 +990,7 @@ bail:
 	return status;
 }
 
-int ocfs2_request_umount_vote(struct ocfs2_super *osb)
+int ocfs2_request_umount_vote(ocfs2_super *osb)
 {
 	int status;
 	struct ocfs2_vote_msg *request = NULL;
@@ -1024,7 +1024,7 @@ bail:
 }
 
 /* TODO: This should eventually be a hash table! */
-static struct ocfs2_net_wait_ctxt * __ocfs2_find_net_wait_ctxt(struct ocfs2_super *osb,
+static struct ocfs2_net_wait_ctxt * __ocfs2_find_net_wait_ctxt(ocfs2_super *osb,
 							       u32 response_id)
 {
 	struct list_head *p;
@@ -1061,13 +1061,13 @@ static inline int ocfs2_translate_response(int response)
 	return ret;
 }
 
-static int ocfs2_handle_response_message(struct o2net_msg *msg,
+static int ocfs2_handle_response_message(o2net_msg *msg,
 					 u32 len,
 					 void *data)
 {
 	unsigned int response_id, node_num;
 	int response_status;
-	struct ocfs2_super *osb = data;
+	ocfs2_super *osb = data;
 	struct ocfs2_response_msg *resp;
 	struct ocfs2_net_wait_ctxt * w;
 	struct ocfs2_net_response_cb *resp_cb;
@@ -1116,12 +1116,12 @@ bail:
 	return 0;
 }
 
-static int ocfs2_handle_vote_message(struct o2net_msg *msg,
+static int ocfs2_handle_vote_message(o2net_msg *msg,
 				     u32 len,
 				     void *data)
 {
 	int status;
-	struct ocfs2_super *osb = data;
+	ocfs2_super *osb = data;
 	struct ocfs2_vote_work *work;
 
 	work = kmalloc(sizeof(struct ocfs2_vote_work), GFP_KERNEL);
@@ -1158,7 +1158,7 @@ bail:
 	return status;
 }
 
-void ocfs2_unregister_net_handlers(struct ocfs2_super *osb)
+void ocfs2_unregister_net_handlers(ocfs2_super *osb)
 {
 	if (!osb->net_key)
 		return;
@@ -1171,7 +1171,7 @@ void ocfs2_unregister_net_handlers(struct ocfs2_super *osb)
 	osb->net_key = 0;
 }
 
-int ocfs2_register_net_handlers(struct ocfs2_super *osb)
+int ocfs2_register_net_handlers(ocfs2_super *osb)
 {
 	int status = 0;
 

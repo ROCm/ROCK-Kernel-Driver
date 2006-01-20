@@ -91,7 +91,7 @@ static int dlm_should_cancel_bast(struct dlm_ctxt *dlm, struct dlm_lock *lock)
 	return 0;
 }
 
-static void __dlm_queue_ast(struct dlm_ctxt *dlm, struct dlm_lock *lock)
+void __dlm_queue_ast(struct dlm_ctxt *dlm, struct dlm_lock *lock)
 {
 	mlog_entry_void();
 
@@ -149,7 +149,7 @@ void dlm_queue_ast(struct dlm_ctxt *dlm, struct dlm_lock *lock)
 }
 
 
-static void __dlm_queue_bast(struct dlm_ctxt *dlm, struct dlm_lock *lock)
+void __dlm_queue_bast(struct dlm_ctxt *dlm, struct dlm_lock *lock)
 {
 	mlog_entry_void();
 
@@ -261,7 +261,7 @@ void dlm_do_local_bast(struct dlm_ctxt *dlm, struct dlm_lock_resource *res,
 
 
 
-int dlm_proxy_ast_handler(struct o2net_msg *msg, u32 len, void *data)
+int dlm_proxy_ast_handler(o2net_msg *msg, u32 len, void *data)
 {
 	int ret;
 	unsigned int locklen;

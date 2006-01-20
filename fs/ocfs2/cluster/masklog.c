@@ -33,134 +33,195 @@ EXPORT_SYMBOL_GPL(mlog_and_bits);
 struct mlog_bits mlog_not_bits = MLOG_BITS_RHS(MLOG_INITIAL_NOT_MASK);
 EXPORT_SYMBOL_GPL(mlog_not_bits);
 
-static ssize_t mlog_mask_show(u64 mask, char *buf)
+static char *mlog_bit_names[MLOG_MAX_BITS];
+
+static void *mlog_name_from_pos(loff_t *caller_pos)
 {
+	loff_t pos = *caller_pos;
+	while (pos < ARRAY_SIZE(mlog_bit_names) && mlog_bit_names[pos] == NULL)
+		pos++;
+
+	if (pos >= ARRAY_SIZE(mlog_bit_names))
+		return NULL;
+
+	*caller_pos = pos;
+	return &mlog_bit_names[pos];
+}
+
+static void *mlog_seq_start(struct seq_file *seq, loff_t *pos)
+{
+	return mlog_name_from_pos(pos);
+}
+
+static void *mlog_seq_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	(*pos)++;
+	return mlog_name_from_pos(pos);
+}
+
+static int mlog_seq_show(struct seq_file *seq, void *v)
+{
+	char **name = v;
+	int bit = name - mlog_bit_names;
 	char *state;
 
-	if (__mlog_test_u64(mask, mlog_and_bits))
+	if (__mlog_test_u64((u64)1 << bit, mlog_and_bits))
 		state = "allow";
-	else if (__mlog_test_u64(mask, mlog_not_bits))
+	else if (__mlog_test_u64((u64)1 << bit, mlog_not_bits))
 		state = "deny";
 	else
 		state = "off";
 
-	return snprintf(buf, PAGE_SIZE, "%s\n", state);
+	seq_printf(seq, "%s %s\n", *name, state);
+	return 0;
 }
 
-static ssize_t mlog_mask_store(u64 mask, const char *buf, size_t count)
+static void mlog_seq_stop(struct seq_file *p, void *v)
 {
-	if (!strnicmp(buf, "allow", 5)) {
-		__mlog_set_u64(mask, mlog_and_bits);
-		__mlog_clear_u64(mask, mlog_not_bits);
-	} else if (!strnicmp(buf, "deny", 4)) {
-		__mlog_set_u64(mask, mlog_not_bits);
-		__mlog_clear_u64(mask, mlog_and_bits);
-	} else if (!strnicmp(buf, "off", 3)) {
-		__mlog_clear_u64(mask, mlog_not_bits);
-		__mlog_clear_u64(mask, mlog_and_bits);
+}
+
+static struct seq_operations mlog_seq_ops = {
+	.start = mlog_seq_start,
+	.next = mlog_seq_next,
+	.stop = mlog_seq_stop,
+	.show = mlog_seq_show,
+};
+
+static int mlog_fop_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &mlog_seq_ops);
+}
+
+static ssize_t mlog_fop_write(struct file *filp, const char __user *buf,
+			      size_t count, loff_t *pos)
+{
+	char *name;
+	char str[32], *mask, *val;
+	unsigned i, masklen, namelen;
+
+	if (count == 0)
+		return 0;
+
+	/* count at least mask + space + 3 for "off" */
+	if (*pos != 0 || count < 5 || count >= sizeof(str))
+		return -EINVAL;
+
+	if (copy_from_user(str, buf, count))
+		return -EFAULT;
+
+	str[count] = '\0';
+
+	mask = str;
+	val = strchr(str, ' ');
+	if (val == NULL)
+		return -EINVAL;
+	*val = '\0';
+	val++;
+
+	if (strlen(val) == 0)
+		return -EINVAL;
+
+	masklen = strlen(mask);
+
+	for (i = 0; i < ARRAY_SIZE(mlog_bit_names); i++) {
+		name = mlog_bit_names[i];
+
+		if (name == NULL)
+			continue;
+
+		namelen = strlen(name);
+
+		if (namelen != masklen
+		    || strnicmp(mask, name, namelen))
+			continue;
+		break;
+	}
+	if (i == ARRAY_SIZE(mlog_bit_names))
+		return -EINVAL;
+
+	if (!strnicmp(val, "allow", 5)) {
+		__mlog_set_u64((u64)1 << i, mlog_and_bits);
+		__mlog_clear_u64((u64)1 << i, mlog_not_bits);
+	} else if (!strnicmp(val, "deny", 4)) {
+		__mlog_set_u64((u64)1 << i, mlog_not_bits);
+		__mlog_clear_u64((u64)1 << i, mlog_and_bits);
+	} else if (!strnicmp(val, "off", 3)) {
+		__mlog_clear_u64((u64)1 << i, mlog_not_bits);
+		__mlog_clear_u64((u64)1 << i, mlog_and_bits);
 	} else
 		return -EINVAL;
 
+	*pos += count;
 	return count;
 }
 
-struct mlog_attribute {
-	struct attribute attr;
-	u64 mask;
+static struct file_operations mlog_seq_fops = {
+	.owner = THIS_MODULE,
+	.open = mlog_fop_open,
+	.read = seq_read,
+	.write = mlog_fop_write,
+	.llseek = seq_lseek,
+	.release = seq_release,
 };
 
-#define to_mlog_attr(_attr) container_of(_attr, struct mlog_attribute, attr)
+#define set_a_string(which) do {					\
+	struct mlog_bits _bits = {{0,}, };				\
+	int _bit;							\
+	__mlog_set_u64(ML_##which, _bits);				\
+	_bit = find_first_bit(_bits.words, MLOG_MAX_BITS);		\
+	mlog_bit_names[_bit] = #which;					\
+} while (0)
 
-#define define_mask(_name) {			\
-	.attr = {				\
-		.name = #_name,			\
-		.mode = S_IRUGO | S_IWUSR,	\
-	},					\
-	.mask = ML_##_name,			\
-}
+#define LOGMASK_PROC_NAME "log_mask"
 
-static struct mlog_attribute mlog_attrs[MLOG_MAX_BITS] = {
-	define_mask(ENTRY),
-	define_mask(EXIT),
-	define_mask(TCP),
-	define_mask(MSG),
-	define_mask(SOCKET),
-	define_mask(HEARTBEAT),
-	define_mask(HB_BIO),
-	define_mask(DLMFS),
-	define_mask(DLM),
-	define_mask(DLM_DOMAIN),
-	define_mask(DLM_THREAD),
-	define_mask(DLM_MASTER),
-	define_mask(DLM_RECOVERY),
-	define_mask(AIO),
-	define_mask(JOURNAL),
-	define_mask(DISK_ALLOC),
-	define_mask(SUPER),
-	define_mask(FILE_IO),
-	define_mask(EXTENT_MAP),
-	define_mask(DLM_GLUE),
-	define_mask(BH_IO),
-	define_mask(UPTODATE),
-	define_mask(NAMEI),
-	define_mask(INODE),
-	define_mask(VOTE),
-	define_mask(DCACHE),
-	define_mask(CONN),
-	define_mask(QUORUM),
-	define_mask(EXPORT),
-	define_mask(ERROR),
-	define_mask(NOTICE),
-	define_mask(KTHREAD),
-};
-
-static struct attribute *mlog_attr_ptrs[MLOG_MAX_BITS] = {NULL, };
-
-static ssize_t mlog_show(struct kobject *obj, struct attribute *attr,
-			 char *buf)
+void mlog_remove_proc(struct proc_dir_entry *parent)
 {
-	struct mlog_attribute *mlog_attr = to_mlog_attr(attr);
-
-	return mlog_mask_show(mlog_attr->mask, buf);
+	remove_proc_entry(LOGMASK_PROC_NAME, parent);
 }
 
-static ssize_t mlog_store(struct kobject *obj, struct attribute *attr,
-			  const char *buf, size_t count)
+int mlog_init_proc(struct proc_dir_entry *parent)
 {
-	struct mlog_attribute *mlog_attr = to_mlog_attr(attr);
+	struct proc_dir_entry *p;
 
-	return mlog_mask_store(mlog_attr->mask, buf, count);
+	set_a_string(ENTRY);
+	set_a_string(EXIT);
+	set_a_string(TCP);
+	set_a_string(MSG);
+	set_a_string(SOCKET);
+	set_a_string(HEARTBEAT);
+	set_a_string(HB_BIO);
+	set_a_string(DLMFS);
+	set_a_string(DLM);
+	set_a_string(DLM_DOMAIN);
+	set_a_string(DLM_THREAD);
+	set_a_string(DLM_MASTER);
+	set_a_string(DLM_RECOVERY);
+	set_a_string(AIO);
+	set_a_string(JOURNAL);
+	set_a_string(DISK_ALLOC);
+	set_a_string(SUPER);
+	set_a_string(FILE_IO);
+	set_a_string(EXTENT_MAP);
+	set_a_string(DLM_GLUE);
+	set_a_string(BH_IO);
+	set_a_string(UPTODATE);
+	set_a_string(NAMEI);
+	set_a_string(INODE);
+	set_a_string(VOTE);
+	set_a_string(DCACHE);
+	set_a_string(CONN);
+	set_a_string(QUORUM);
+	set_a_string(EXPORT);
+	set_a_string(ERROR);
+	set_a_string(NOTICE);
+	set_a_string(KTHREAD);
+
+	p = create_proc_entry(LOGMASK_PROC_NAME, S_IRUGO, parent);
+	if (p == NULL)
+		return -ENOMEM;
+
+	p->proc_fops = &mlog_seq_fops;
+
+	return 0;
 }
-
-static struct sysfs_ops mlog_attr_ops = {
-	.show  = mlog_show,
-	.store = mlog_store,
-};
-
-static struct kobj_type mlog_ktype = {
-	.default_attrs = mlog_attr_ptrs,
-	.sysfs_ops     = &mlog_attr_ops,
-};
-
-static struct kset mlog_kset = {
-	.kobj   = {.name = "logmask", .ktype = &mlog_ktype},
-};
-
-int mlog_sys_init(struct subsystem *o2cb_subsys)
-{
-	int i = 0;
-
-	while (mlog_attrs[i].attr.mode) {
-		mlog_attr_ptrs[i] = &mlog_attrs[i].attr;
-		i++;
-	}
-	mlog_attr_ptrs[i] = NULL;
-
-	mlog_kset.subsys = o2cb_subsys;
-	return kset_register(&mlog_kset);
-}
-
-void mlog_sys_shutdown(void)
-{
-	kset_unregister(&mlog_kset);
-}
+EXPORT_SYMBOL_GPL(mlog_init_proc);

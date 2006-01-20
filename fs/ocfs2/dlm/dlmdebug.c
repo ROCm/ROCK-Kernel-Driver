@@ -30,6 +30,7 @@
 #include <linux/utsname.h>
 #include <linux/sysctl.h>
 #include <linux/spinlock.h>
+#include <linux/proc_fs.h>
 
 #include "cluster/heartbeat.h"
 #include "cluster/nodemanager.h"
@@ -44,6 +45,176 @@
 
 #define MLOG_MASK_PREFIX ML_DLM
 #include "cluster/masklog.h"
+
+static int dlm_dump_all_lock_resources(const char __user *data,
+					unsigned int len);
+static void dlm_dump_purge_list(struct dlm_ctxt *dlm);
+static int dlm_dump_all_purge_lists(const char __user *data, unsigned int len);
+static int dlm_trigger_migration(const char __user *data, unsigned int len);
+static int dlm_dump_one_lock_resource(const char __user *data,
+				       unsigned int len);
+
+static int dlm_parse_domain_and_lockres(char *buf, unsigned int len,
+					struct dlm_ctxt **dlm,
+					struct dlm_lock_resource **res);
+
+typedef int (dlm_debug_func_t)(const char __user *data, unsigned int len);
+
+struct dlm_debug_funcs
+{
+	char key;
+	dlm_debug_func_t *func;
+};
+
+static struct dlm_debug_funcs dlm_debug_map[] = {
+	{ 'r', dlm_dump_all_lock_resources },
+	{ 'R', dlm_dump_one_lock_resource },
+	{ 'm', dlm_dump_all_mles },
+	{ 'p', dlm_dump_all_purge_lists  },
+	{ 'M', dlm_trigger_migration },
+};
+static int dlm_debug_map_sz = (sizeof(dlm_debug_map) /
+			       sizeof(struct dlm_debug_funcs));
+
+static ssize_t write_dlm_debug(struct file *file, const char __user *buf,
+			       size_t count, loff_t *ppos)
+{
+	int i;
+	char c;
+	dlm_debug_func_t *fn;
+	int ret;
+
+	mlog(0, "(%p, %p, %u, %lld)\n",
+		  file, buf, (unsigned int)count, (long long)*ppos);
+	ret = 0;
+	if (count<=0)
+		goto done;
+
+	ret = -EFAULT;
+	if (get_user(c, buf))
+		goto done;
+
+	ret = count;
+	for (i=0; i < dlm_debug_map_sz; i++) {
+		struct dlm_debug_funcs *d = &dlm_debug_map[i];
+		if (c == d->key) {
+			fn = d->func;
+			if (fn)
+				ret = (fn)(buf, count);
+			goto done;
+		}
+	}
+done:
+	return ret;
+}
+
+static struct file_operations dlm_debug_operations = {
+	.write          = write_dlm_debug,
+};
+
+#define OCFS2_DLM_PROC_PATH "fs/ocfs2_dlm"
+#define DLM_DEBUG_PROC_NAME "debug"
+static struct proc_dir_entry *ocfs2_dlm_proc;
+
+void dlm_remove_proc(void)
+{
+	if (ocfs2_dlm_proc) {
+		remove_proc_entry(DLM_DEBUG_PROC_NAME, ocfs2_dlm_proc);
+		remove_proc_entry(OCFS2_DLM_PROC_PATH, NULL);
+	}
+}
+
+void dlm_init_proc(void)
+{
+	struct proc_dir_entry *entry;
+
+	ocfs2_dlm_proc = proc_mkdir(OCFS2_DLM_PROC_PATH, NULL);
+	if (!ocfs2_dlm_proc) {
+		mlog_errno(-ENOMEM);
+		return;
+	}
+
+	entry = create_proc_entry(DLM_DEBUG_PROC_NAME, S_IWUSR,
+				  ocfs2_dlm_proc);
+	if (entry)
+		entry->proc_fops = &dlm_debug_operations;
+}
+
+/* lock resource printing is usually very important (printed
+ * right before a BUG in some cases), but we'd like to be
+ * able to shut it off if needed, hence the KERN_NOTICE level */
+static int dlm_dump_all_lock_resources(const char __user *data,
+				       unsigned int len)
+{
+	struct dlm_ctxt *dlm;
+	struct list_head *iter;
+
+	mlog(ML_NOTICE, "dumping ALL dlm state for node %s\n",
+		  system_utsname.nodename);
+	spin_lock(&dlm_domain_lock);
+	list_for_each(iter, &dlm_domains) {
+		dlm = list_entry (iter, struct dlm_ctxt, list);
+		dlm_dump_lock_resources(dlm);
+	}
+	spin_unlock(&dlm_domain_lock);
+	return len;
+}
+
+static int dlm_dump_one_lock_resource(const char __user *data,
+				       unsigned int len)
+{
+	struct dlm_ctxt *dlm;
+	struct dlm_lock_resource *res;
+	char *buf = NULL;
+	int ret = -EINVAL;
+	int tmpret;
+
+	if (len >= PAGE_SIZE-1) {
+		mlog(ML_ERROR, "user passed too much data: %d bytes\n", len);
+		goto leave;
+	}
+	if (len < 5) {
+		mlog(ML_ERROR, "user passed too little data: %d bytes\n", len);
+		goto leave;
+	}
+	buf = kmalloc(len+1, GFP_KERNEL);
+	if (!buf) {
+		mlog(ML_ERROR, "could not alloc %d bytes\n", len+1);
+		ret = -ENOMEM;
+		goto leave;
+	}
+	if (strncpy_from_user(buf, data, len) < len) {
+		mlog(ML_ERROR, "failed to get all user data.  done.\n");
+		goto leave;
+	}
+	buf[len]='\0';
+	mlog(0, "got this data from user: %s\n", buf);
+
+	if (*buf != 'R') {
+		mlog(0, "bad data\n");
+		goto leave;
+	}
+
+	tmpret = dlm_parse_domain_and_lockres(buf, len, &dlm, &res);
+	if (tmpret < 0) {
+		mlog(0, "bad data\n");
+		goto leave;
+	}
+
+	mlog(ML_NOTICE, "struct dlm_ctxt: %s, node=%u, key=%u\n",
+		dlm->name, dlm->node_num, dlm->key);
+
+	dlm_print_one_lock_resource(res);
+	dlm_lockres_put(res);
+	dlm_put(dlm);
+	ret = len;
+
+leave:
+	if (buf)
+		kfree(buf);
+	return ret;
+}
+
 
 void dlm_print_one_lock_resource(struct dlm_lock_resource *res)
 {
@@ -108,6 +279,7 @@ void __dlm_print_one_lock_resource(struct dlm_lock_resource *res)
 	}
 }
 
+
 void dlm_print_one_lock(struct dlm_lock *lockid)
 {
 	dlm_print_one_lock_resource(lockid->lockres);
@@ -137,6 +309,165 @@ void dlm_dump_lock_resources(struct dlm_ctxt *dlm)
 		}
 	}
 	spin_unlock(&dlm->spinlock);
+}
+
+static void dlm_dump_purge_list(struct dlm_ctxt *dlm)
+{
+	struct list_head *iter;
+	struct dlm_lock_resource *lockres;
+
+	mlog(ML_NOTICE, "Purge list for DLM Domain \"%s\"\n", dlm->name);
+	mlog(ML_NOTICE, "Last_used\tName\n");
+
+	spin_lock(&dlm->spinlock);
+	list_for_each(iter, &dlm->purge_list) {
+		lockres = list_entry(iter, struct dlm_lock_resource, purge);
+
+		spin_lock(&lockres->spinlock);
+		mlog(ML_NOTICE, "%lu\t%.*s\n", lockres->last_used,
+		       lockres->lockname.len, lockres->lockname.name);
+		spin_unlock(&lockres->spinlock);
+	}
+	spin_unlock(&dlm->spinlock);
+}
+
+static int dlm_dump_all_purge_lists(const char __user *data, unsigned int len)
+{
+	struct dlm_ctxt *dlm;
+	struct list_head *iter;
+
+	spin_lock(&dlm_domain_lock);
+	list_for_each(iter, &dlm_domains) {
+		dlm = list_entry (iter, struct dlm_ctxt, list);
+		dlm_dump_purge_list(dlm);
+	}
+	spin_unlock(&dlm_domain_lock);
+	return len;
+}
+
+static int dlm_parse_domain_and_lockres(char *buf, unsigned int len,
+					struct dlm_ctxt **dlm,
+					struct dlm_lock_resource **res)
+{
+	char *resname;
+	char *domainname;
+	char *tmp;
+	int ret = -EINVAL;
+
+	*dlm = NULL;
+	*res = NULL;
+
+	tmp = buf;
+	tmp++;
+	if (*tmp != ' ') {
+		mlog(0, "bad data\n");
+		goto leave;
+	}
+	tmp++;
+	domainname = tmp;
+
+	while (*tmp) {
+		if (*tmp == ' ')
+			break;
+		tmp++;
+	}
+	if (!*tmp || !*(tmp+1)) {
+		mlog(0, "bad data\n");
+		goto leave;
+	}
+
+	*tmp = '\0';  // null term the domainname
+	tmp++;
+	resname = tmp;
+	while (*tmp) {
+		if (*tmp == '\n' ||
+		    *tmp == ' ' ||
+		    *tmp == '\r') {
+			*tmp = '\0';
+			break;
+		}
+		tmp++;
+	}
+
+	mlog(0, "now looking up domain %s, lockres %s\n",
+	       domainname, resname);
+	spin_lock(&dlm_domain_lock);
+	*dlm = __dlm_lookup_domain(domainname);
+	spin_unlock(&dlm_domain_lock);
+
+	if (!dlm_grab(*dlm)) {
+		mlog(ML_ERROR, "bad dlm!\n");
+		*dlm = NULL;
+		goto leave;
+	}
+
+	*res = dlm_lookup_lockres(*dlm, resname, strlen(resname));
+	if (!*res) {
+		mlog(ML_ERROR, "bad lockres!\n");
+		dlm_put(*dlm);
+		*dlm = NULL;
+		goto leave;
+	}
+
+	mlog(0, "found dlm=%p, lockres=%p\n", *dlm, *res);
+	ret = 0;
+
+leave:
+	return ret;
+}
+
+static int dlm_trigger_migration(const char __user *data, unsigned int len)
+{
+	struct dlm_lock_resource *res;
+	struct dlm_ctxt *dlm;
+	char *buf = NULL;
+	int ret = -EINVAL;
+	int tmpret;
+
+	if (len >= PAGE_SIZE-1) {
+		mlog(ML_ERROR, "user passed too much data: %d bytes\n", len);
+		goto leave;
+	}
+	if (len < 5) {
+		mlog(ML_ERROR, "user passed too little data: %d bytes\n", len);
+		goto leave;
+	}
+	buf = kmalloc(len+1, GFP_KERNEL);
+	if (!buf) {
+		mlog(ML_ERROR, "could not alloc %d bytes\n", len+1);
+		ret = -ENOMEM;
+		goto leave;
+	}
+	if (strncpy_from_user(buf, data, len) < len) {
+		mlog(ML_ERROR, "failed to get all user data.  done.\n");
+		goto leave;
+	}
+	buf[len]='\0';
+	mlog(0, "got this data from user: %s\n", buf);
+
+	if (*buf != 'M') {
+		mlog(0, "bad data\n");
+		goto leave;
+	}
+
+	tmpret = dlm_parse_domain_and_lockres(buf, len, &dlm, &res);
+	if (tmpret < 0) {
+		mlog(0, "bad data\n");
+		goto leave;
+	}
+	tmpret = dlm_migrate_lockres(dlm, res, O2NM_MAX_NODES);
+	mlog(0, "dlm_migrate_lockres returned %d\n", tmpret);
+	if (tmpret < 0)
+		mlog(ML_ERROR, "failed to migrate %.*s: %d\n",
+		     res->lockname.len, res->lockname.name, tmpret);
+	dlm_lockres_put(res);
+	dlm_put(dlm);
+	ret = len;
+
+leave:
+	if (buf)
+		kfree(buf);
+	return ret;
 }
 
 static const char *dlm_errnames[] = {
@@ -229,6 +560,7 @@ static const char *dlm_errmsgs[] = {
 	[DLM_MAXSTATS] = 		"invalid error number",
 };
 
+
 const char *dlm_errmsg(enum dlm_status err)
 {
 	if (err >= DLM_MAXSTATS || err < 0)
@@ -244,3 +576,4 @@ const char *dlm_errname(enum dlm_status err)
 	return dlm_errnames[err];
 }
 EXPORT_SYMBOL_GPL(dlm_errname);
+

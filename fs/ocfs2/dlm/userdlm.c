@@ -27,7 +27,7 @@
  * Boston, MA 021110-1307, USA.
  */
 
-#include <linux/signal.h>
+#include <asm/signal.h>
 
 #include <linux/module.h>
 #include <linux/fs.h>

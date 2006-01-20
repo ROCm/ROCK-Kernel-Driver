@@ -62,7 +62,6 @@ static enum dlm_status dlm_send_remote_lock_request(struct dlm_ctxt *dlm,
 static void dlm_init_lock(struct dlm_lock *newlock, int type,
 			  u8 node, u64 cookie);
 static void dlm_lock_release(struct kref *kref);
-static void dlm_lock_detach_lockres(struct dlm_lock *lock);
 
 /* Tell us whether we can grant a new lock request.
  * locking:
@@ -314,7 +313,7 @@ void dlm_lock_attach_lockres(struct dlm_lock *lock,
 }
 
 /* drop ref on lockres, if there is still one associated with lock */
-static void dlm_lock_detach_lockres(struct dlm_lock *lock)
+void dlm_lock_detach_lockres(struct dlm_lock *lock)
 {
 	struct dlm_lock_resource *res;
 
@@ -390,7 +389,7 @@ struct dlm_lock * dlm_new_lock(int type, u8 node, u64 cookie,
  *   held on exit:  none
  * returns: DLM_NORMAL, DLM_SYSERR, DLM_IVLOCKID, DLM_NOTQUEUED
  */
-int dlm_create_lock_handler(struct o2net_msg *msg, u32 len, void *data)
+int dlm_create_lock_handler(o2net_msg *msg, u32 len, void *data)
 {
 	struct dlm_ctxt *dlm = data;
 	struct dlm_create_lock *create = (struct dlm_create_lock *)msg->buf;

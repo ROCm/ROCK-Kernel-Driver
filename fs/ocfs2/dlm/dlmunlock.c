@@ -188,6 +188,19 @@ static enum dlm_status dlmunlock_common(struct dlm_ctxt *dlm,
 			actions &= ~(DLM_UNLOCK_REMOVE_LOCK|
 				     DLM_UNLOCK_REGRANT_LOCK|
 				     DLM_UNLOCK_CLEAR_CONVERT_TYPE);
+		} else if (status == DLM_RECOVERING || 
+			   status == DLM_MIGRATING || 
+			   status == DLM_FORWARD) {
+			/* must clear the actions because this unlock
+			 * is about to be retried.  cannot free or do
+			 * any list manipulation. */
+			mlog(0, "%s:%.*s: clearing actions, %s\n",
+			     dlm->name, res->lockname.len,
+			     res->lockname.name,
+			     status==DLM_RECOVERING?"recovering":
+			     (status==DLM_MIGRATING?"migrating":
+			      "forward"));
+			actions = 0;
 		}
 		if (flags & LKM_CANCEL)
 			lock->cancel_pending = 0;
@@ -362,7 +375,7 @@ static enum dlm_status dlm_send_remote_unlock_request(struct dlm_ctxt *dlm,
  * returns: DLM_NORMAL, DLM_BADARGS, DLM_IVLOCKID,
  *          return value from dlmunlock_master
  */
-int dlm_unlock_lock_handler(struct o2net_msg *msg, u32 len, void *data)
+int dlm_unlock_lock_handler(o2net_msg *msg, u32 len, void *data)
 {
 	struct dlm_ctxt *dlm = data;
 	struct dlm_unlock_lock *unlock = (struct dlm_unlock_lock *)msg->buf;

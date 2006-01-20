@@ -1,7 +1,11 @@
 /* -*- mode: c; c-basic-offset: 8; -*-
  * vim: noexpandtab sw=8 ts=8 sts=0:
  *
- * Copyright (C) 2002, 2004, 2005 Oracle.  All rights reserved.
+ * proc.h
+ *
+ * Function prototypes
+ *
+ * Copyright (C) 2002, 2004 Oracle.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public
@@ -19,23 +23,12 @@
  * Boston, MA 021110-1307, USA.
  */
 
-#ifndef OCFS2_AOPS_H
-#define OCFS2_AOPS_H
+#ifndef OCFS2_PROC_H
+#define OCFS2_PROC_H
 
-int ocfs2_prepare_write(struct file *file, struct page *page,
-			unsigned from, unsigned to);
+void ocfs2_proc_add_volume(ocfs2_super *osb);
+void ocfs2_proc_deinit(void);
+int ocfs2_proc_init(void);
+void ocfs2_proc_remove_volume(ocfs2_super *osb);
 
-struct ocfs2_journal_handle *ocfs2_start_walk_page_trans(struct inode *inode,
-							 struct page *page,
-							 unsigned from,
-							 unsigned to);
-
-/* all ocfs2_dio_end_io()'s fault */
-#define ocfs2_iocb_is_rw_locked(iocb) \
-	test_bit(0, (unsigned long *)&iocb->private)
-#define ocfs2_iocb_set_rw_locked(iocb) \
-	set_bit(0, (unsigned long *)&iocb->private)
-#define ocfs2_iocb_clear_rw_locked(iocb) \
-	clear_bit(0, (unsigned long *)&iocb->private)
-
-#endif /* OCFS2_FILE_H */
+#endif /* OCFS2_PROC_H */

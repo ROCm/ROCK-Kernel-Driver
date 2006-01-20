@@ -39,56 +39,112 @@
 
 #include "buffer_head_io.h"
 
-int ocfs2_write_block(struct ocfs2_super *osb, struct buffer_head *bh,
-		      struct inode *inode)
+void ocfs2_end_buffer_io_sync(struct buffer_head *bh,
+			      int uptodate)
 {
-	int ret = 0;
+	if (!uptodate)
+		mlog_errno(-EIO);
 
-	mlog_entry("(bh->b_blocknr = %llu, inode=%p)\n",
-		   (unsigned long long)bh->b_blocknr, inode);
+	if (uptodate)
+		set_buffer_uptodate(bh);
+	else
+		clear_buffer_uptodate(bh);
+	unlock_buffer(bh);
+}
 
-	BUG_ON(bh->b_blocknr < OCFS2_SUPER_BLOCK_BLKNO);
-	BUG_ON(buffer_jbd(bh));
+int ocfs2_write_blocks(ocfs2_super *osb, struct buffer_head *bhs[],
+		       int nr, struct inode *inode)
+{
+	int status = 0;
+	int i;
+	struct buffer_head *bh;
+
+	mlog_entry("(bh[0]->b_blocknr = %llu, nr=%d, inode=%p)\n",
+		   (unsigned long long)bhs[0]->b_blocknr, nr, inode);
+
+	if (osb == NULL || osb->sb == NULL || bhs == NULL) {
+		status = -EINVAL;
+		mlog_errno(status);
+		goto bail;
+	}
 
 	/* No need to check for a soft readonly file system here. non
 	 * journalled writes are only ever done on system files which
 	 * can get modified during recovery even if read-only. */
 	if (ocfs2_is_hard_readonly(osb)) {
-		ret = -EROFS;
-		goto out;
+		status = -EROFS;
+		goto bail;
 	}
 
-	down(&OCFS2_I(inode)->ip_io_sem);
+	if (inode)
+		down(&OCFS2_I(inode)->ip_io_sem);
+	for (i = 0 ; i < nr ; i++) {
+		bh = bhs[i];
+		if (bh == NULL) {
+			if (inode)
+				up(&OCFS2_I(inode)->ip_io_sem);
+			status = -EIO;
+			mlog_errno(status);
+			goto bail;
+		}
 
-	lock_buffer(bh);
-	set_buffer_uptodate(bh);
+		if (unlikely(bh->b_blocknr < OCFS2_SUPER_BLOCK_BLKNO)) {
+			BUG();
+			status = -EIO;
+			mlog_errno(status);
+			goto bail;
+		}
 
-	/* remove from dirty list before I/O. */
-	clear_buffer_dirty(bh);
+		if (unlikely(buffer_jbd(bh))) {
+			/* What are you thinking?! */
+			mlog(ML_ERROR, "trying to write a jbd managed bh "
+				       "(blocknr = %llu), nr=%d\n",
+			     (unsigned long long)bh->b_blocknr, nr);
+			BUG();
+		}
 
-	get_bh(bh); /* for end_buffer_write_sync() */                   
-	bh->b_end_io = end_buffer_write_sync;
-	submit_bh(WRITE, bh);
+		lock_buffer(bh);
 
-	wait_on_buffer(bh);
+		set_buffer_uptodate(bh);
 
-	if (buffer_uptodate(bh)) {
-		ocfs2_set_buffer_uptodate(inode, bh);
-	} else {
-		/* We don't need to remove the clustered uptodate
-		 * information for this bh as it's not marked locally
-		 * uptodate. */
-		ret = -EIO;
-		brelse(bh);
+		/* remove from dirty list before I/O. */
+		clear_buffer_dirty(bh);
+
+		bh->b_end_io = ocfs2_end_buffer_io_sync;
+		submit_bh(WRITE, bh);
 	}
 
-	up(&OCFS2_I(inode)->ip_io_sem);
-out:
-	mlog_exit(ret);
-	return ret;
+	for (i = (nr - 1) ; i >= 0; i--) {
+		bh = bhs[i];
+
+		wait_on_buffer(bh);
+
+		if (!buffer_uptodate(bh)) {
+			/* Status won't be cleared from here on out,
+			 * so we can safely record this and loop back
+			 * to cleanup the other buffers. Don't need to
+			 * remove the clustered uptodate information
+			 * for this bh as it's not marked locally
+			 * uptodate. */
+			status = -EIO;
+			brelse(bh);
+			bhs[i] = NULL;
+			continue;
+		}
+
+		if (inode)
+			ocfs2_set_buffer_uptodate(inode, bh);
+	}
+	if (inode)
+		up(&OCFS2_I(inode)->ip_io_sem);
+
+bail:
+
+	mlog_exit(status);
+	return status;
 }
 
-int ocfs2_read_blocks(struct ocfs2_super *osb, u64 block, int nr,
+int ocfs2_read_blocks(ocfs2_super *osb, u64 block, int nr,
 		      struct buffer_head *bhs[], int flags,
 		      struct inode *inode)
 {
@@ -182,8 +238,7 @@ int ocfs2_read_blocks(struct ocfs2_super *osb, u64 block, int nr,
 #endif
 			}
 			clear_buffer_uptodate(bh);
-			get_bh(bh); /* for end_buffer_read_sync() */
-			bh->b_end_io = end_buffer_read_sync;
+			bh->b_end_io = ocfs2_end_buffer_io_sync;
 			if (flags & OCFS2_BH_READAHEAD)
 				submit_bh(READA, bh);
 			else

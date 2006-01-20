@@ -43,7 +43,7 @@ static int ocfs2_dentry_revalidate(struct dentry *dentry,
 {
 	struct inode *inode = dentry->d_inode;
 	int ret = 0;    /* if all else fails, just return false */
-	struct ocfs2_super *osb;
+	ocfs2_super *osb;
 
 	mlog_entry("(0x%p, '%.*s')\n", dentry,
 		   dentry->d_name.len, dentry->d_name.name);

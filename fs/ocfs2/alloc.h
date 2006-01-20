@@ -26,19 +26,19 @@
 #ifndef OCFS2_ALLOC_H
 #define OCFS2_ALLOC_H
 
-struct ocfs2_alloc_context;
-int ocfs2_insert_extent(struct ocfs2_super *osb,
-			struct ocfs2_journal_handle *handle,
+struct _ocfs2_alloc_context;
+int ocfs2_insert_extent(ocfs2_super *osb,
+			ocfs2_journal_handle *handle,
 			struct inode *inode,
 			struct buffer_head *fe_bh,
 			u64 blkno,
 			u32 new_clusters,
-			struct ocfs2_alloc_context *meta_ac);
-int ocfs2_num_free_extents(struct ocfs2_super *osb,
+			struct _ocfs2_alloc_context *meta_ac);
+int ocfs2_num_free_extents(ocfs2_super *osb,
 			   struct inode *inode,
-			   struct ocfs2_dinode *fe);
+			   ocfs2_dinode *fe);
 /* how many new metadata chunks would an allocation need at maximum? */
-static inline int ocfs2_extend_meta_needed(struct ocfs2_dinode *fe)
+static inline int ocfs2_extend_meta_needed(ocfs2_dinode *fe)
 {
 	/*
 	 * Rather than do all the work of determining how much we need
@@ -51,16 +51,16 @@ static inline int ocfs2_extend_meta_needed(struct ocfs2_dinode *fe)
 	return le16_to_cpu(fe->id2.i_list.l_tree_depth) + 2;
 }
 
-int ocfs2_truncate_log_init(struct ocfs2_super *osb);
-void ocfs2_truncate_log_shutdown(struct ocfs2_super *osb);
-void ocfs2_schedule_truncate_log_flush(struct ocfs2_super *osb,
+int ocfs2_truncate_log_init(ocfs2_super *osb);
+void ocfs2_truncate_log_shutdown(ocfs2_super *osb);
+void ocfs2_schedule_truncate_log_flush(ocfs2_super *osb,
 				       int cancel);
-int ocfs2_flush_truncate_log(struct ocfs2_super *osb);
-int ocfs2_begin_truncate_log_recovery(struct ocfs2_super *osb,
+int ocfs2_flush_truncate_log(ocfs2_super *osb);
+int ocfs2_begin_truncate_log_recovery(ocfs2_super *osb,
 				      int slot_num,
-				      struct ocfs2_dinode **tl_copy);
-int ocfs2_complete_truncate_log_recovery(struct ocfs2_super *osb,
-					 struct ocfs2_dinode *tl_copy);
+				      ocfs2_dinode **tl_copy);
+int ocfs2_complete_truncate_log_recovery(ocfs2_super *osb,
+					 ocfs2_dinode *tl_copy);
 
 struct ocfs2_truncate_context {
 	struct inode *tc_ext_alloc_inode;
@@ -70,11 +70,13 @@ struct ocfs2_truncate_context {
 	struct buffer_head *tc_last_eb_bh;
 };
 
-int ocfs2_prepare_truncate(struct ocfs2_super *osb,
+void ocfs2_free_truncate_context(struct ocfs2_truncate_context *tc);
+
+int ocfs2_prepare_truncate(ocfs2_super *osb,
 			   struct inode *inode,
 			   struct buffer_head *fe_bh,
 			   struct ocfs2_truncate_context **tc);
-int ocfs2_commit_truncate(struct ocfs2_super *osb,
+int ocfs2_commit_truncate(ocfs2_super *osb,
 			  struct inode *inode,
 			  struct buffer_head *fe_bh,
 			  struct ocfs2_truncate_context *tc);

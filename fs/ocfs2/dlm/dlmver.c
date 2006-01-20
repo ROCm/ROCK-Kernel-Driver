@@ -28,9 +28,12 @@
 
 #include "dlmver.h"
 
-#define DLM_BUILD_VERSION "1.3.3"
+#define DLM_BUILD_VERSION "1.1.7-SLES"
+#define DLM_BUILD_DATE    "Mon Jan 16 11:58:10 PST 2006"
+#define DLM_BUILD_MD5     "sles"
 
-#define VERSION_STR "OCFS2 DLM " DLM_BUILD_VERSION
+#define VERSION_STR "OCFS2 DLM " \
+	DLM_BUILD_VERSION " " DLM_BUILD_DATE " (build " DLM_BUILD_MD5 ")"
 
 void dlm_print_version(void)
 {
@@ -39,4 +42,6 @@ void dlm_print_version(void)
 
 MODULE_DESCRIPTION(VERSION_STR);
 
+#ifdef MODULE_VERSION
 MODULE_VERSION(DLM_BUILD_VERSION);
+#endif

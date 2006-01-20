@@ -22,6 +22,8 @@
 #ifndef O2CLUSTER_TCP_INTERNAL_H
 #define O2CLUSTER_TCP_INTERNAL_H
 
+#define O2NET_MAX_CONNECT_ATTEMPTS	5
+
 #define O2NET_MSG_MAGIC           ((u16)0xfa55)
 #define O2NET_MSG_STATUS_MAGIC    ((u16)0xfa56)
 #define O2NET_MSG_KEEP_REQ_MAGIC  ((u16)0xfa57)
@@ -33,17 +35,7 @@
 #define O2NET_KEEPALIVE_DELAY_SECS	5
 #define O2NET_IDLE_TIMEOUT_SECS		10
 
-/* 
- * This version number represents quite a lot, unfortunately.  It not
- * only represents the raw network message protocol on the wire but also
- * locking semantics of the file system using the protocol.  It should 
- * be somewhere else, I'm sure, but right now it isn't.
- *
- * New in version 2:
- * 	- full 64 bit i_size in the metadata lock lvbs
- * 	- introduction of "rw" lock and pushing meta/data locking down
- */
-#define O2NET_PROTOCOL_VERSION 2ULL
+#define O2NET_PROTOCOL_VERSION 1ULL
 struct o2net_handshake {
 	__be64	protocol_version;
 	__be64	connector_id;
@@ -124,6 +116,8 @@ struct o2net_sock_container {
 	void			(*sc_state_change)(struct sock *sk);
 	void			(*sc_data_ready)(struct sock *sk, int bytes);
 
+	struct list_head	sc_net_proc_item;
+
 	struct timeval 		sc_tv_timer;
 	struct timeval 		sc_tv_data_ready;
 	struct timeval 		sc_tv_advance_start;
@@ -160,5 +154,21 @@ struct o2net_status_wait {
 	wait_queue_head_t	ns_wq;
 	struct list_head	ns_node_item;
 };
+
+/* just for state dumps */
+struct o2net_send_tracking {
+	struct list_head		st_net_proc_item;
+	struct task_struct		*st_task;
+	struct o2net_sock_container	*st_sc;
+	u32				st_msg_type;
+	u32				st_msg_key;
+	u8				st_node;
+	struct timeval			st_sock_time;
+	struct timeval			st_send_time;
+	struct timeval			st_status_time;
+};
+
+void o2net_proc_add_sc(struct o2net_sock_container *sc);
+void o2net_proc_del_sc(struct o2net_sock_container *sc);
 
 #endif /* O2CLUSTER_TCP_INTERNAL_H */

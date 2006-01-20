@@ -27,5 +27,6 @@
 #define OCFS2_VER_H
 
 void ocfs2_print_version(void);
+int ocfs2_str_version(char *buf);
 
 #endif /* OCFS2_VER_H */

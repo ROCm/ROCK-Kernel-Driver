@@ -61,7 +61,7 @@ static void __ocfs2_node_map_dup(struct ocfs2_node_map *target,
 static void __ocfs2_node_map_set(struct ocfs2_node_map *target,
 				 struct ocfs2_node_map *from);
 
-void ocfs2_init_node_maps(struct ocfs2_super *osb)
+void ocfs2_init_node_maps(ocfs2_super *osb)
 {
 	spin_lock_init(&osb->node_map_lock);
 	ocfs2_node_map_init(&osb->mounted_map);
@@ -70,7 +70,7 @@ void ocfs2_init_node_maps(struct ocfs2_super *osb)
 }
 
 static void ocfs2_do_node_down(int node_num,
-			       struct ocfs2_super *osb)
+			       ocfs2_super *osb)
 {
 	BUG_ON(osb->node_num == node_num);
 
@@ -110,7 +110,7 @@ static void ocfs2_hb_node_down_cb(struct o2nm_node *node,
 				  int node_num,
 				  void *data)
 {
-	ocfs2_do_node_down(node_num, (struct ocfs2_super *) data);
+	ocfs2_do_node_down(node_num, (ocfs2_super *) data);
 }
 
 /* Called from the dlm when it's about to evict a node. We may also
@@ -118,7 +118,7 @@ static void ocfs2_hb_node_down_cb(struct o2nm_node *node,
 static void ocfs2_dlm_eviction_cb(int node_num,
 				  void *data)
 {
-	struct ocfs2_super *osb = (struct ocfs2_super *) data;
+	ocfs2_super *osb = (ocfs2_super *) data;
 	struct super_block *sb = osb->sb;
 
 	mlog(ML_NOTICE, "device (%u,%u): dlm has evicted node %d\n",
@@ -131,7 +131,7 @@ static void ocfs2_hb_node_up_cb(struct o2nm_node *node,
 				int node_num,
 				void *data)
 {
-	struct ocfs2_super *osb = data;
+	ocfs2_super *osb = data;
 
 	BUG_ON(osb->node_num == node_num);
 
@@ -139,7 +139,7 @@ static void ocfs2_hb_node_up_cb(struct o2nm_node *node,
 	ocfs2_node_map_clear_bit(osb, &osb->umount_map, node_num);
 }
 
-int ocfs2_setup_hb_callbacks(struct ocfs2_super *osb)
+int ocfs2_setup_hb_callbacks(ocfs2_super *osb)
 {
 	osb->osb_hb_res = o2hb_heartbeat_resource_get_by_name(osb->uuid_str);
 
@@ -163,7 +163,7 @@ int ocfs2_setup_hb_callbacks(struct ocfs2_super *osb)
 }
 
 /* Most functions here are just stubs for now... */
-int ocfs2_register_hb_callbacks(struct ocfs2_super *osb)
+int ocfs2_register_hb_callbacks(ocfs2_super *osb)
 {
 	int status;
 
@@ -181,7 +181,7 @@ bail:
 	return status;
 }
 
-void ocfs2_clear_hb_callbacks(struct ocfs2_super *osb)
+void ocfs2_clear_hb_callbacks(ocfs2_super *osb)
 {
 	int status;
 
@@ -196,7 +196,7 @@ void ocfs2_clear_hb_callbacks(struct ocfs2_super *osb)
 	o2hb_heartbeat_resource_put(osb->osb_hb_res);
 }
 
-void ocfs2_stop_heartbeat(struct ocfs2_super *osb)
+void ocfs2_stop_heartbeat(ocfs2_super *osb)
 {
 	int ret;
 	char *argv[5], *envp[3];
@@ -240,7 +240,7 @@ static inline void __ocfs2_node_map_set_bit(struct ocfs2_node_map *map,
 	set_bit(bit, map->map);
 }
 
-void ocfs2_node_map_set_bit(struct ocfs2_super *osb,
+void ocfs2_node_map_set_bit(ocfs2_super *osb,
 			    struct ocfs2_node_map *map,
 			    int bit)
 {
@@ -258,7 +258,7 @@ static inline void __ocfs2_node_map_clear_bit(struct ocfs2_node_map *map,
 	clear_bit(bit, map->map);
 }
 
-void ocfs2_node_map_clear_bit(struct ocfs2_super *osb,
+void ocfs2_node_map_clear_bit(ocfs2_super *osb,
 			      struct ocfs2_node_map *map,
 			      int bit)
 {
@@ -270,7 +270,7 @@ void ocfs2_node_map_clear_bit(struct ocfs2_super *osb,
 	spin_unlock(&osb->node_map_lock);
 }
 
-int ocfs2_node_map_test_bit(struct ocfs2_super *osb,
+int ocfs2_node_map_test_bit(ocfs2_super *osb,
 			    struct ocfs2_node_map *map,
 			    int bit)
 {
@@ -294,7 +294,7 @@ static inline int __ocfs2_node_map_is_empty(struct ocfs2_node_map *map)
 	return 1;
 }
 
-int ocfs2_node_map_is_empty(struct ocfs2_super *osb,
+int ocfs2_node_map_is_empty(ocfs2_super *osb,
 			    struct ocfs2_node_map *map)
 {
 	int ret;
@@ -314,7 +314,7 @@ static void __ocfs2_node_map_dup(struct ocfs2_node_map *target,
 }
 
 /* returns 1 if bit is the only bit set in target, 0 otherwise */
-int ocfs2_node_map_is_only(struct ocfs2_super *osb,
+int ocfs2_node_map_is_only(ocfs2_super *osb,
 			   struct ocfs2_node_map *target,
 			   int bit)
 {
@@ -345,7 +345,7 @@ static void __ocfs2_node_map_set(struct ocfs2_node_map *target,
 
 /* Returns whether the recovery bit was actually set - it may not be
  * if a node is still marked as needing recovery */
-int ocfs2_recovery_map_set(struct ocfs2_super *osb,
+int ocfs2_recovery_map_set(ocfs2_super *osb,
 			   int num)
 {
 	int set = 0;
@@ -364,13 +364,13 @@ int ocfs2_recovery_map_set(struct ocfs2_super *osb,
 	return set;
 }
 
-void ocfs2_recovery_map_clear(struct ocfs2_super *osb,
+void ocfs2_recovery_map_clear(ocfs2_super *osb,
 			      int num)
 {
 	ocfs2_node_map_clear_bit(osb, &osb->recovery_map, num);
 }
 
-int ocfs2_node_map_iterate(struct ocfs2_super *osb,
+int ocfs2_node_map_iterate(ocfs2_super *osb,
 			   struct ocfs2_node_map *map,
 			   int idx)
 {

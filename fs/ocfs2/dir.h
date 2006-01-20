@@ -37,18 +37,18 @@ int ocfs2_find_files_on_disk(const char *name,
 			     struct buffer_head **dirent_bh,
 			     struct ocfs2_dir_entry **dirent);
 int ocfs2_readdir(struct file *filp, void *dirent, filldir_t filldir);
-int ocfs2_prepare_dir_for_insert(struct ocfs2_super *osb,
+int ocfs2_prepare_dir_for_insert(ocfs2_super *osb,
 				 struct inode *dir,
 				 struct buffer_head *parent_fe_bh,
 				 const char *name,
 				 int namelen,
 				 struct buffer_head **ret_de_bh);
-struct ocfs2_alloc_context;
+struct _ocfs2_alloc_context;
 int ocfs2_do_extend_dir(struct super_block *sb,
-			struct ocfs2_journal_handle *handle,
+			ocfs2_journal_handle *handle,
 			struct inode *dir,
 			struct buffer_head *parent_fe_bh,
-			struct ocfs2_alloc_context *data_ac,
-			struct ocfs2_alloc_context *meta_ac,
+			struct _ocfs2_alloc_context *data_ac,
+			struct _ocfs2_alloc_context *meta_ac,
 			struct buffer_head **new_bh);
 #endif /* OCFS2_DIR_H */

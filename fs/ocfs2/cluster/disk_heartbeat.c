@@ -57,7 +57,7 @@ unsigned int o2hb_dead_threshold = O2HB_DEFAULT_DEAD_THRESHOLD;
  * No locking or otherwise interesting code is required for reading
  * o2hb_dead_threshold as it can't change once regions are active and
  * it's not interesting to anyone until then anyway. */
-static void o2hb_dead_threshold_set(unsigned int threshold)
+void o2hb_dead_threshold_set(unsigned int threshold)
 {
 	if (threshold > O2HB_MIN_DEAD_THRESHOLD) {
 		spin_lock(&o2hb_live_lock);

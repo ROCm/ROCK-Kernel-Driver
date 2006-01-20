@@ -37,17 +37,18 @@ enum ocfs2_journal_state {
 	OCFS2_JOURNAL_IN_SHUTDOWN,
 };
 
-struct ocfs2_super;
-struct ocfs2_dinode;
-struct ocfs2_journal_handle;
+struct _ocfs2_super;
+struct _ocfs2_dinode;
+struct _ocfs2_journal_handle;
 
-struct ocfs2_journal {
+typedef struct _ocfs2_journal ocfs2_journal;
+struct _ocfs2_journal {
 	enum ocfs2_journal_state   j_state;    /* Journals current state   */
 
 	journal_t                 *j_journal; /* The kernels journal type */
 	struct inode              *j_inode;   /* Kernel inode pointing to
 					       * this journal             */
-	struct ocfs2_super        *j_osb;     /* pointer to the super
+	struct _ocfs2_super        *j_osb;     /* pointer to the super
 					       * block for the node
 					       * we're currently
 					       * running on -- not
@@ -71,7 +72,7 @@ struct ocfs2_journal {
 extern spinlock_t trans_inc_lock;
 
 /* wrap j_trans_id so we never have it equal to zero. */
-static inline unsigned long ocfs2_inc_trans_id(struct ocfs2_journal *j)
+static inline unsigned long ocfs2_inc_trans_id(ocfs2_journal *j)
 {
 	unsigned long old_id;
 	spin_lock(&trans_inc_lock);
@@ -82,7 +83,7 @@ static inline unsigned long ocfs2_inc_trans_id(struct ocfs2_journal *j)
 	return old_id;
 }
 
-static inline void ocfs2_set_inode_lock_trans(struct ocfs2_journal *journal,
+static inline void ocfs2_set_inode_lock_trans(ocfs2_journal *journal,
 					      struct inode *inode)
 {
 	spin_lock(&trans_inc_lock);
@@ -98,7 +99,7 @@ static inline void ocfs2_set_inode_lock_trans(struct ocfs2_journal *journal,
 static inline int ocfs2_inode_fully_checkpointed(struct inode *inode)
 {
 	int ret;
-	struct ocfs2_journal *journal = OCFS2_SB(inode->i_sb)->journal;
+	ocfs2_journal *journal = OCFS2_SB(inode->i_sb)->journal;
 
 	spin_lock(&trans_inc_lock);
 	ret = time_after(journal->j_trans_id, OCFS2_I(inode)->ip_last_trans);
@@ -127,8 +128,8 @@ static inline int ocfs2_inode_is_new(struct inode *inode)
 	return ret;
 }
 
-static inline void ocfs2_inode_set_new(struct ocfs2_super *osb,
-				       struct inode *inode)
+static inline void ocfs2_inode_set_new(ocfs2_super *osb,
+				      struct inode *inode)
 {
 	spin_lock(&trans_inc_lock);
 	OCFS2_I(inode)->ip_created_trans = osb->journal->j_trans_id;
@@ -137,14 +138,15 @@ static inline void ocfs2_inode_set_new(struct ocfs2_super *osb,
 
 extern kmem_cache_t *ocfs2_lock_cache;
 
-struct ocfs2_journal_lock {
+typedef struct _ocfs2_journal_lock ocfs2_journal_lock;
+struct _ocfs2_journal_lock {
 	struct inode     *jl_inode;
 	struct list_head  jl_lock_list;
 };
 
-struct ocfs2_journal_handle {
+struct _ocfs2_journal_handle {
 	handle_t            *k_handle; /* kernel handle.                */
-	struct ocfs2_journal        *journal;
+	ocfs2_journal        *journal;
 	u32                 flags;     /* see flags below.              */
 	int                 max_buffs; /* Buffs reserved by this handle */
 
@@ -160,12 +162,12 @@ struct ocfs2_journal_handle {
 #define OCFS2_HANDLE_STARTED			1
 /* should we sync-commit this handle? */
 #define OCFS2_HANDLE_SYNC			2
-static inline int ocfs2_handle_started(struct ocfs2_journal_handle *handle)
+static inline int ocfs2_handle_started(ocfs2_journal_handle *handle)
 {
 	return handle->flags & OCFS2_HANDLE_STARTED;
 }
 
-static inline void ocfs2_handle_set_sync(struct ocfs2_journal_handle *handle, int sync)
+static inline void ocfs2_handle_set_sync(ocfs2_journal_handle *handle, int sync)
 {
 	if (sync)
 		handle->flags |= OCFS2_HANDLE_SYNC;
@@ -192,20 +194,20 @@ void ocfs2_complete_recovery(void *data);
  *                          event on.
  *  ocfs2_start_checkpoint - Kick the commit thread to do a checkpoint.
  */
-void   ocfs2_set_journal_params(struct ocfs2_super *osb);
-int    ocfs2_journal_init(struct ocfs2_journal *journal,
+void   ocfs2_set_journal_params(ocfs2_super *osb);
+int    ocfs2_journal_init(ocfs2_journal *journal,
 			  int *dirty);
-void   ocfs2_journal_shutdown(struct ocfs2_super *osb);
-int    ocfs2_journal_wipe(struct ocfs2_journal *journal,
+void   ocfs2_journal_shutdown(struct _ocfs2_super *osb);
+int    ocfs2_journal_wipe(ocfs2_journal *journal,
 			  int full);
-int    ocfs2_journal_load(struct ocfs2_journal *journal);
-int    ocfs2_check_journals_nolocks(struct ocfs2_super *osb);
-void   ocfs2_recovery_thread(struct ocfs2_super *osb,
+int    ocfs2_journal_load(ocfs2_journal *journal);
+int    ocfs2_check_journals_nolocks(ocfs2_super *osb);
+void   ocfs2_recovery_thread(struct _ocfs2_super *osb,
 			     int node_num);
-int    ocfs2_mark_dead_nodes(struct ocfs2_super *osb);
-void   ocfs2_complete_mount_recovery(struct ocfs2_super *osb);
+int    ocfs2_mark_dead_nodes(ocfs2_super *osb);
+void   ocfs2_complete_mount_recovery(ocfs2_super *osb);
 
-static inline void ocfs2_start_checkpoint(struct ocfs2_super *osb)
+static inline void ocfs2_start_checkpoint(struct _ocfs2_super *osb)
 {
 	atomic_set(&osb->needs_checkpoint, 1);
 	wake_up(&osb->checkpoint_event);
@@ -213,7 +215,7 @@ static inline void ocfs2_start_checkpoint(struct ocfs2_super *osb)
 
 static inline void ocfs2_checkpoint_inode(struct inode *inode)
 {
-	struct ocfs2_super *osb = OCFS2_SB(inode->i_sb);
+	ocfs2_super *osb = OCFS2_SB(inode->i_sb);
 
 	if (!ocfs2_inode_fully_checkpointed(inode)) {
 		/* WARNING: This only kicks off a single
@@ -249,8 +251,6 @@ static inline void ocfs2_checkpoint_inode(struct inode *inode)
  *                          buffer. Will have to call ocfs2_journal_dirty once
  *                          we've actually dirtied it. Type is one of . or .
  *  ocfs2_journal_dirty    - Mark a journalled buffer as having dirty data.
- *  ocfs2_journal_dirty_data - Indicate that a data buffer should go out before
- *                             the current handle commits.
  *  ocfs2_handle_add_lock  - Sometimes we need to delay lock release
  *                          until after a transaction has been completed. Use
  *                          ocfs2_handle_add_lock to indicate that a lock needs
@@ -262,13 +262,13 @@ static inline void ocfs2_checkpoint_inode(struct inode *inode)
 /* You must always start_trans with a number of buffs > 0, but it's
  * perfectly legal to go through an entire transaction without having
  * dirtied any buffers. */
-struct ocfs2_journal_handle *ocfs2_alloc_handle(struct ocfs2_super *osb);
-struct ocfs2_journal_handle *ocfs2_start_trans(struct ocfs2_super *osb,
-					       struct ocfs2_journal_handle *handle,
-					       int max_buffs);
-void			     ocfs2_commit_trans(struct ocfs2_journal_handle *handle);
-int			     ocfs2_extend_trans(struct ocfs2_journal_handle *handle,
-						int nblocks);
+ocfs2_journal_handle *ocfs2_alloc_handle(ocfs2_super *osb);
+ocfs2_journal_handle *ocfs2_start_trans(struct _ocfs2_super *osb,
+					ocfs2_journal_handle *handle,
+					int max_buffs);
+void                 ocfs2_commit_trans(ocfs2_journal_handle *handle);
+int                  ocfs2_extend_trans(ocfs2_journal_handle *handle,
+					int nblocks);
 
 /*
  * Create access is for when we get a newly created buffer and we're
@@ -285,7 +285,7 @@ int			     ocfs2_extend_trans(struct ocfs2_journal_handle *handle,
 #define OCFS2_JOURNAL_ACCESS_WRITE  1
 #define OCFS2_JOURNAL_ACCESS_UNDO   2
 
-int                  ocfs2_journal_access(struct ocfs2_journal_handle *handle,
+int                  ocfs2_journal_access(ocfs2_journal_handle *handle,
 					  struct inode *inode,
 					  struct buffer_head *bh,
 					  int type);
@@ -308,17 +308,15 @@ int                  ocfs2_journal_access(struct ocfs2_journal_handle *handle,
  *	<modify the bh>
  * 	ocfs2_journal_dirty(handle, bh);
  */
-int                  ocfs2_journal_dirty(struct ocfs2_journal_handle *handle,
+int                  ocfs2_journal_dirty(ocfs2_journal_handle *handle,
 					 struct buffer_head *bh);
-int                  ocfs2_journal_dirty_data(handle_t *handle,
-					      struct buffer_head *bh);
-int                  ocfs2_handle_add_lock(struct ocfs2_journal_handle *handle,
+int                  ocfs2_handle_add_lock(ocfs2_journal_handle *handle,
 					   struct inode *inode);
 /*
  * Use this to protect from other processes reading buffer state while
  * it's in flight.
  */
-void                 ocfs2_handle_add_inode(struct ocfs2_journal_handle *handle,
+void                 ocfs2_handle_add_inode(ocfs2_journal_handle *handle,
 					    struct inode *inode);
 
 /*
@@ -380,7 +378,7 @@ void                 ocfs2_handle_add_inode(struct ocfs2_journal_handle *handle,
 			     + OCFS2_UNLINK_CREDITS)
 
 static inline int ocfs2_calc_extend_credits(struct super_block *sb,
-					    struct ocfs2_dinode *fe,
+					    ocfs2_dinode *fe,
 					    u32 bits_wanted)
 {
 	int bitmap_blocks, sysfile_bitmap_blocks, dinode_blocks;
@@ -430,8 +428,8 @@ static inline int ocfs2_calc_group_alloc_credits(struct super_block *sb,
 
 static inline int ocfs2_calc_tree_trunc_credits(struct super_block *sb,
 						unsigned int clusters_to_del,
-						struct ocfs2_dinode *fe,
-						struct ocfs2_extent_list *last_el)
+						ocfs2_dinode *fe,
+						ocfs2_extent_list *last_el)
 {
  	/* for dinode + all headers in this pass + update to next leaf */
 	u16 next_free = le16_to_cpu(last_el->l_next_free_rec);

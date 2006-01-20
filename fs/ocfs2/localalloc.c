@@ -47,33 +47,33 @@
 
 #define OCFS2_LOCAL_ALLOC(dinode)	(&((dinode)->id2.i_lab))
 
-static inline int ocfs2_local_alloc_window_bits(struct ocfs2_super *osb);
+static inline int ocfs2_local_alloc_window_bits(ocfs2_super *osb);
 
-static u32 ocfs2_local_alloc_count_bits(struct ocfs2_dinode *alloc);
+static u32 ocfs2_local_alloc_count_bits(ocfs2_dinode *alloc);
 
-static int ocfs2_local_alloc_find_clear_bits(struct ocfs2_super *osb,
-					     struct ocfs2_dinode *alloc,
+static int ocfs2_local_alloc_find_clear_bits(ocfs2_super *osb,
+					     ocfs2_dinode *alloc,
 					     u32 numbits);
 
-static void ocfs2_clear_local_alloc(struct ocfs2_dinode *alloc);
+static void ocfs2_clear_local_alloc(ocfs2_dinode *alloc);
 
-static int ocfs2_sync_local_to_main(struct ocfs2_super *osb,
-				    struct ocfs2_journal_handle *handle,
-				    struct ocfs2_dinode *alloc,
+static int ocfs2_sync_local_to_main(ocfs2_super *osb,
+				    ocfs2_journal_handle *handle,
+				    ocfs2_dinode *alloc,
 				    struct inode *main_bm_inode,
 				    struct buffer_head *main_bm_bh);
 
-static int ocfs2_local_alloc_reserve_for_window(struct ocfs2_super *osb,
-						struct ocfs2_journal_handle *handle,
-						struct ocfs2_alloc_context **ac,
+static int ocfs2_local_alloc_reserve_for_window(ocfs2_super *osb,
+						ocfs2_journal_handle *handle,
+						ocfs2_alloc_context **ac,
 						struct inode **bitmap_inode,
 						struct buffer_head **bitmap_bh);
 
-static int ocfs2_local_alloc_new_window(struct ocfs2_super *osb,
-					struct ocfs2_journal_handle *handle,
-					struct ocfs2_alloc_context *ac);
+static int ocfs2_local_alloc_new_window(ocfs2_super *osb,
+					ocfs2_journal_handle *handle,
+					ocfs2_alloc_context *ac);
 
-static int ocfs2_local_alloc_slide_window(struct ocfs2_super *osb,
+static int ocfs2_local_alloc_slide_window(ocfs2_super *osb,
 					  struct inode *local_alloc_inode);
 
 /*
@@ -83,7 +83,7 @@ static int ocfs2_local_alloc_slide_window(struct ocfs2_super *osb,
  * been chosen so that most allocations, including new block groups go
  * through local alloc.
  */
-static inline int ocfs2_local_alloc_window_bits(struct ocfs2_super *osb)
+static inline int ocfs2_local_alloc_window_bits(ocfs2_super *osb)
 {
 	BUG_ON(osb->s_clustersize_bits < 12);
 
@@ -94,7 +94,7 @@ static inline int ocfs2_local_alloc_window_bits(struct ocfs2_super *osb)
  * Tell us whether a given allocation should use the local alloc
  * file. Otherwise, it has to go to the main bitmap.
  */
-int ocfs2_alloc_should_use_local(struct ocfs2_super *osb, u64 bits)
+int ocfs2_alloc_should_use_local(ocfs2_super *osb, u64 bits)
 {
 	int la_bits = ocfs2_local_alloc_window_bits(osb);
 
@@ -111,14 +111,14 @@ int ocfs2_alloc_should_use_local(struct ocfs2_super *osb, u64 bits)
 	return 1;
 }
 
-int ocfs2_load_local_alloc(struct ocfs2_super *osb)
+int ocfs2_load_local_alloc(ocfs2_super *osb)
 {
 	int status = 0;
-	struct ocfs2_dinode *alloc = NULL;
+	ocfs2_dinode *alloc = NULL;
 	struct buffer_head *alloc_bh = NULL;
 	u32 num_used;
 	struct inode *inode = NULL;
-	struct ocfs2_local_alloc *la;
+	ocfs2_local_alloc *la;
 
 	mlog_entry_void();
 
@@ -138,7 +138,7 @@ int ocfs2_load_local_alloc(struct ocfs2_super *osb)
 		goto bail;
 	}
 
-	alloc = (struct ocfs2_dinode *) alloc_bh->b_data;
+	alloc = (ocfs2_dinode *) alloc_bh->b_data;
 	la = OCFS2_LOCAL_ALLOC(alloc);
 
 	if (!(le32_to_cpu(alloc->i_flags) &
@@ -193,16 +193,16 @@ bail:
  * local_alloc_bh is optional. If not passed, we will simply use the
  * one off osb. If you do pass it however, be warned that it *will* be
  * returned brelse'd and NULL'd out.*/
-void ocfs2_shutdown_local_alloc(struct ocfs2_super *osb)
+void ocfs2_shutdown_local_alloc(ocfs2_super *osb)
 {
 	int status;
-	struct ocfs2_journal_handle *handle = NULL;
+	ocfs2_journal_handle *handle = NULL;
 	struct inode *local_alloc_inode = NULL;
 	struct buffer_head *bh = NULL;
 	struct buffer_head *main_bm_bh = NULL;
 	struct inode *main_bm_inode = NULL;
-	struct ocfs2_dinode *alloc_copy = NULL;
-	struct ocfs2_dinode *alloc = NULL;
+	ocfs2_dinode *alloc_copy = NULL;
+	ocfs2_dinode *alloc = NULL;
 
 	mlog_entry_void();
 
@@ -253,7 +253,7 @@ void ocfs2_shutdown_local_alloc(struct ocfs2_super *osb)
 	}
 
 	bh = osb->local_alloc_bh;
-	alloc = (struct ocfs2_dinode *) bh->b_data;
+	alloc = (ocfs2_dinode *) bh->b_data;
 
 	alloc_copy = kmalloc(bh->b_size, GFP_KERNEL);
 	if (!alloc_copy) {
@@ -312,14 +312,14 @@ bail:
  * we kmalloc a copy of the local alloc before it's change for the
  * caller to process with ocfs2_complete_local_alloc_recovery
  */
-int ocfs2_begin_local_alloc_recovery(struct ocfs2_super *osb,
+int ocfs2_begin_local_alloc_recovery(ocfs2_super *osb,
 				     int slot_num,
-				     struct ocfs2_dinode **alloc_copy)
+				     ocfs2_dinode **alloc_copy)
 {
 	int status = 0;
 	struct buffer_head *alloc_bh = NULL;
 	struct inode *inode = NULL;
-	struct ocfs2_dinode *alloc;
+	ocfs2_dinode *alloc;
 
 	mlog_entry("(slot_num = %d)\n", slot_num);
 
@@ -350,7 +350,7 @@ int ocfs2_begin_local_alloc_recovery(struct ocfs2_super *osb,
 	}
 	memcpy((*alloc_copy), alloc_bh->b_data, alloc_bh->b_size);
 
-	alloc = (struct ocfs2_dinode *) alloc_bh->b_data;
+	alloc = (ocfs2_dinode *) alloc_bh->b_data;
 	ocfs2_clear_local_alloc(alloc);
 
 	status = ocfs2_write_block(osb, alloc_bh, inode);
@@ -381,11 +381,11 @@ bail:
  * recovery map. Dlm locks will no longer stall, so lets clear out the
  * main bitmap.
  */
-int ocfs2_complete_local_alloc_recovery(struct ocfs2_super *osb,
-					struct ocfs2_dinode *alloc)
+int ocfs2_complete_local_alloc_recovery(ocfs2_super *osb,
+				       ocfs2_dinode *alloc)
 {
 	int status;
-	struct ocfs2_journal_handle *handle = NULL;
+	ocfs2_journal_handle *handle = NULL;
 	struct buffer_head *main_bm_bh = NULL;
 	struct inode *main_bm_inode = NULL;
 
@@ -451,13 +451,13 @@ bail:
  * We will add ourselves to the transaction passed in, but may start
  * our own in order to shift windows.
  */
-int ocfs2_reserve_local_alloc_bits(struct ocfs2_super *osb,
-				   struct ocfs2_journal_handle *passed_handle,
+int ocfs2_reserve_local_alloc_bits(ocfs2_super *osb,
+				   ocfs2_journal_handle *passed_handle,
 				   u32 bits_wanted,
-				   struct ocfs2_alloc_context *ac)
+				   ocfs2_alloc_context *ac)
 {
 	int status;
-	struct ocfs2_dinode *alloc;
+	ocfs2_dinode *alloc;
 	struct inode *local_alloc_inode;
 	unsigned int free_bits;
 
@@ -489,7 +489,7 @@ int ocfs2_reserve_local_alloc_bits(struct ocfs2_super *osb,
 		goto bail;
 	}
 
-	alloc = (struct ocfs2_dinode *) osb->local_alloc_bh->b_data;
+	alloc = (ocfs2_dinode *) osb->local_alloc_bh->b_data;
 
 	if (le32_to_cpu(alloc->id1.bitmap1.i_used) !=
 	    ocfs2_local_alloc_count_bits(alloc)) {
@@ -528,9 +528,9 @@ bail:
 	return status;
 }
 
-int ocfs2_claim_local_alloc_bits(struct ocfs2_super *osb,
-				 struct ocfs2_journal_handle *handle,
-				 struct ocfs2_alloc_context *ac,
+int ocfs2_claim_local_alloc_bits(ocfs2_super *osb,
+				 ocfs2_journal_handle *handle,
+				 ocfs2_alloc_context *ac,
 				 u32 min_bits,
 				 u32 *bit_off,
 				 u32 *num_bits)
@@ -539,15 +539,15 @@ int ocfs2_claim_local_alloc_bits(struct ocfs2_super *osb,
 	struct inode *local_alloc_inode;
 	u32 bits_wanted;
 	void *bitmap;
-	struct ocfs2_dinode *alloc;
-	struct ocfs2_local_alloc *la;
+	ocfs2_dinode *alloc;
+	ocfs2_local_alloc *la;
 
 	mlog_entry_void();
 	BUG_ON(ac->ac_which != OCFS2_AC_USE_LOCAL);
 
 	bits_wanted = ac->ac_bits_wanted - ac->ac_bits_given;
 	local_alloc_inode = ac->ac_inode;
-	alloc = (struct ocfs2_dinode *) osb->local_alloc_bh->b_data;
+	alloc = (ocfs2_dinode *) osb->local_alloc_bh->b_data;
 	la = OCFS2_LOCAL_ALLOC(alloc);
 
 	start = ocfs2_local_alloc_find_clear_bits(osb, alloc, bits_wanted);
@@ -590,12 +590,12 @@ bail:
 	return status;
 }
 
-static u32 ocfs2_local_alloc_count_bits(struct ocfs2_dinode *alloc)
+static u32 ocfs2_local_alloc_count_bits(ocfs2_dinode *alloc)
 {
 	int i;
 	u8 *buffer;
 	u32 count = 0;
-	struct ocfs2_local_alloc *la = OCFS2_LOCAL_ALLOC(alloc);
+	ocfs2_local_alloc *la = OCFS2_LOCAL_ALLOC(alloc);
 
 	mlog_entry_void();
 
@@ -607,8 +607,8 @@ static u32 ocfs2_local_alloc_count_bits(struct ocfs2_dinode *alloc)
 	return count;
 }
 
-static int ocfs2_local_alloc_find_clear_bits(struct ocfs2_super *osb,
-					     struct ocfs2_dinode *alloc,
+static int ocfs2_local_alloc_find_clear_bits(ocfs2_super *osb,
+					     ocfs2_dinode *alloc,
 					     u32 numbits)
 {
 	int numfound, bitoff, left, startoff, lastzero;
@@ -666,9 +666,9 @@ bail:
 	return bitoff;
 }
 
-static void ocfs2_clear_local_alloc(struct ocfs2_dinode *alloc)
+static void ocfs2_clear_local_alloc(ocfs2_dinode *alloc)
 {
-	struct ocfs2_local_alloc *la = OCFS2_LOCAL_ALLOC(alloc);
+	ocfs2_local_alloc *la = OCFS2_LOCAL_ALLOC(alloc);
 	int i;
 	mlog_entry_void();
 
@@ -706,9 +706,9 @@ static void ocfs2_verify_zero_bits(unsigned long *bitmap,
  * assumes you've already locked the main bitmap -- the bitmap inode
  * passed is used for caching.
  */
-static int ocfs2_sync_local_to_main(struct ocfs2_super *osb,
-				    struct ocfs2_journal_handle *handle,
-				    struct ocfs2_dinode *alloc,
+static int ocfs2_sync_local_to_main(ocfs2_super *osb,
+				    ocfs2_journal_handle *handle,
+				    ocfs2_dinode *alloc,
 				    struct inode *main_bm_inode,
 				    struct buffer_head *main_bm_bh)
 {
@@ -717,7 +717,7 @@ static int ocfs2_sync_local_to_main(struct ocfs2_super *osb,
 	u64 la_start_blk;
 	u64 blkno;
 	void *bitmap;
-	struct ocfs2_local_alloc *la = OCFS2_LOCAL_ALLOC(alloc);
+	ocfs2_local_alloc *la = OCFS2_LOCAL_ALLOC(alloc);
 
 	mlog_entry("total = %u, COUNT = %u, used = %u\n",
 		   le32_to_cpu(alloc->id1.bitmap1.i_total),
@@ -776,15 +776,15 @@ bail:
 	return status;
 }
 
-static int ocfs2_local_alloc_reserve_for_window(struct ocfs2_super *osb,
-						struct ocfs2_journal_handle *handle,
-						struct ocfs2_alloc_context **ac,
+static int ocfs2_local_alloc_reserve_for_window(ocfs2_super *osb,
+						ocfs2_journal_handle *handle,
+						ocfs2_alloc_context **ac,
 						struct inode **bitmap_inode,
 						struct buffer_head **bitmap_bh)
 {
 	int status;
 
-	*ac = kcalloc(1, sizeof(struct ocfs2_alloc_context), GFP_KERNEL);
+	*ac = kcalloc(1, sizeof(ocfs2_alloc_context), GFP_KERNEL);
 	if (!(*ac)) {
 		status = -ENOMEM;
 		mlog_errno(status);
@@ -819,18 +819,18 @@ bail:
 /*
  * pass it the bitmap lock in lock_bh if you have it.
  */
-static int ocfs2_local_alloc_new_window(struct ocfs2_super *osb,
-					struct ocfs2_journal_handle *handle,
-					struct ocfs2_alloc_context *ac)
+static int ocfs2_local_alloc_new_window(ocfs2_super *osb,
+					ocfs2_journal_handle *handle,
+					ocfs2_alloc_context *ac)
 {
 	int status = 0;
 	u32 cluster_off, cluster_count;
-	struct ocfs2_dinode *alloc = NULL;
-	struct ocfs2_local_alloc *la;
+	ocfs2_dinode *alloc = NULL;
+	ocfs2_local_alloc *la;
 
 	mlog_entry_void();
 
-	alloc = (struct ocfs2_dinode *) osb->local_alloc_bh->b_data;
+	alloc = (ocfs2_dinode *) osb->local_alloc_bh->b_data;
 	la = OCFS2_LOCAL_ALLOC(alloc);
 
 	if (alloc->id1.bitmap1.i_total)
@@ -873,16 +873,16 @@ bail:
 
 /* Note that we do *NOT* lock the local alloc inode here as
  * it's been locked already for us. */
-static int ocfs2_local_alloc_slide_window(struct ocfs2_super *osb,
-					  struct inode *local_alloc_inode)
+static int ocfs2_local_alloc_slide_window(ocfs2_super *osb,
+					 struct inode *local_alloc_inode)
 {
 	int status = 0;
 	struct buffer_head *main_bm_bh = NULL;
 	struct inode *main_bm_inode = NULL;
-	struct ocfs2_journal_handle *handle = NULL;
-	struct ocfs2_dinode *alloc;
-	struct ocfs2_dinode *alloc_copy = NULL;
-	struct ocfs2_alloc_context *ac = NULL;
+	ocfs2_journal_handle *handle = NULL;
+	ocfs2_dinode *alloc;
+	ocfs2_dinode *alloc_copy = NULL;
+	ocfs2_alloc_context *ac = NULL;
 
 	mlog_entry_void();
 
@@ -913,7 +913,7 @@ static int ocfs2_local_alloc_slide_window(struct ocfs2_super *osb,
 		goto bail;
 	}
 
-	alloc = (struct ocfs2_dinode *) osb->local_alloc_bh->b_data;
+	alloc = (ocfs2_dinode *) osb->local_alloc_bh->b_data;
 
 	/* We want to clear the local alloc before doing anything
 	 * else, so that if we error later during this operation,

@@ -28,7 +28,7 @@
  *
  *  Portions Copyright (C) 2001 Compaq Computer Corporation
  *
- *  ocfs2 symlink handling code.
+ *  ocfs2 symlink handling code, including CDSL support
  *
  *  Copyright (C) 2004, 2005 Oracle.
  *
@@ -87,7 +87,7 @@ static char *ocfs2_fast_symlink_getlink(struct inode *inode,
 {
 	int status;
 	char *link = NULL;
-	struct ocfs2_dinode *fe;
+	ocfs2_dinode *fe;
 
 	mlog_entry_void();
 
@@ -102,7 +102,7 @@ static char *ocfs2_fast_symlink_getlink(struct inode *inode,
 		goto bail;
 	}
 
-	fe = (struct ocfs2_dinode *) (*bh)->b_data;
+	fe = (ocfs2_dinode *) (*bh)->b_data;
 	link = (char *) fe->id2.i_symlink;
 bail:
 	mlog_exit(status);
@@ -135,6 +135,245 @@ out:
 	return ret;
 }
 
+struct ocfs2_symlink_ops {
+	const char *name;
+	const unsigned int len;
+	unsigned int (*subst_fn) (char *str, void *data);
+};
+
+/**
+ *** sym_hostname - Substitute system host name
+ *** @str: String for result
+ *** @len: Length of result buffer
+ ***
+ *** Returns: Length of hostname
+ ***/
+static unsigned int
+sym_hostname(char *str, void *data)
+{
+	  unsigned int l = strlen(system_utsname.nodename);
+
+	  if (str)
+		memcpy(str, system_utsname.nodename, l);
+
+	  return l;
+}
+
+/**
+ *** sym_machine - Substitute machine type
+ *** @str: String for result
+ *** @len: Length of result buffer
+ ***
+ *** Returns: Length of machine type
+ ***/
+
+static unsigned int
+sym_machine(char *str, void *data)
+{
+	unsigned int l = strlen(system_utsname.machine);
+
+	if (str)
+	       memcpy(str, system_utsname.machine, l);
+
+	return l;
+}
+
+/**
+ *** sym_os - Substitute OS name
+ *** @str: String for result
+ *** @len: Length of result buffer
+ ***
+ *** Returns: Length of OS name
+ ***/
+
+static unsigned int
+sym_os(char *str, void *data)
+{
+	unsigned int l = strlen(system_utsname.sysname);
+
+	if (str)
+	       memcpy(str, system_utsname.sysname, l);
+
+	return l;
+}
+
+/**
+ *** sym_nodenum - Substitute node number
+ *** @str: String for result
+ *** @len: Length of result buffer
+ ***
+ *** Returns: Length of  nodeNum
+ ***/
+
+static unsigned int
+sym_nodenum(char *str, void *data)
+{
+	unsigned int l;
+	char buf[10];
+	struct inode *inode = data;
+	ocfs2_super *osb = OCFS2_SB(inode->i_sb);
+
+	l = sprintf(buf, "%lu", (unsigned long)osb->node_num);
+
+	if (str) {
+	      memcpy(str, buf, l);
+	      str[l] = '\0';
+	}
+
+	return l;
+}
+
+static unsigned int
+sym_system(char *str, void *data)
+{
+	unsigned int ml = strlen(system_utsname.machine);
+	unsigned int sl = strlen(system_utsname.sysname);
+	unsigned int l = ml + sl + 1;
+
+	if (str) {
+	       memcpy(str, system_utsname.machine, ml);
+	       str[ml] = '_';
+	       memcpy(str + ml + 1, system_utsname.sysname, sl);
+	       str[l] = '\0';
+	};
+
+	return l;
+}
+
+static unsigned int
+sym_uid(char *str, void *data)
+{
+	unsigned int l;
+	char buf[10];
+
+	l = sprintf(buf, "%lu", (unsigned long)current->fsuid);
+
+	if (str) {
+	      memcpy(str, buf, l);
+	      str[l] = '\0';
+	}
+
+	return l;
+}
+
+static unsigned int
+sym_gid(char *str, void *data)
+{
+	unsigned int l;
+	char buf[10];
+
+	l = sprintf(buf, "%lu", (unsigned long)current->fsgid);
+
+	if (str) {
+	      memcpy(str, buf, l);
+	      str[l] = '\0';
+	}
+
+	return l;
+}
+
+static struct ocfs2_symlink_ops symlink_ops[] = {
+	{"hostname}", 9, sym_hostname},
+	{"mach}", 5, sym_machine},
+	{"os}", 3, sym_os},
+	{"nodenum}", 8, sym_nodenum},
+	{"sys}", 4, sym_system},
+	{"uid}", 4, sym_uid},
+	{"gid}", 4, sym_gid},
+	{NULL, 0, NULL}
+};
+
+
+/**
+ *** ocfs2_link_expand - Expand a context sensitive symlink
+ *** @ops: The symlink substitution operations table
+ *** @out: Buffer to place result in
+ *** @in: Buffer to get symlink from
+ ***
+ *** Returns: 0 or error code
+ ***/
+
+static void ocfs2_link_expand(struct ocfs2_symlink_ops *ops, char *out, char *in, struct inode *inode)
+{
+	unsigned int i;
+
+	while (*in) {
+		*out++ = *in;
+		if (*in++ != '{')
+			continue;
+
+		for (i = 0; ops[i].name; i++) {
+			if (memcmp(in, ops[i].name, ops[i].len) == 0) {
+				out--;
+				out += ops[i].subst_fn(out, inode);
+				in += ops[i].len;
+			}
+		}
+	}
+
+	*out = 0;
+}
+
+
+/**
+ *** ocfs2_link_size - Return expanded size required to store a symlink
+ *** @str: The symlink
+ *** @ops: The symlink substitution operations table
+ ***
+ *** Returns: The size of the expanded symlink.
+ ***/
+
+
+static unsigned int ocfs2_link_size(struct ocfs2_symlink_ops *ops, char *str, struct inode *inode)
+{
+	unsigned int len = 0;
+	unsigned int i;
+
+	while (*str) {
+		len++;
+		if (*str++ != '{')
+			continue;
+
+		for (i = 0; ops[i].name; i++) {
+			if (memcmp(str, ops[i].name, ops[i].len) == 0) {
+				len--;
+				len += ops[i].subst_fn(NULL, inode);
+				str += ops[i].len;
+				break;
+			}
+		}
+	}
+
+	return len + 1;
+}
+
+static inline int ocfs2_cdsl_follow_link(struct nameidata *nd,
+					 char *old_link,
+					 struct inode *inode)
+{
+	int status;
+	char *new_link;
+	unsigned int len;
+
+	len = ocfs2_link_size(symlink_ops, old_link, inode);
+	new_link = kmalloc(len, GFP_KERNEL);
+	if (new_link == NULL) {
+		status = -ENOMEM;
+		mlog_errno(status);
+		goto bail;
+	}
+
+	ocfs2_link_expand(symlink_ops, new_link, old_link, inode);
+
+	status = vfs_follow_link(nd, new_link);
+	if (status < 0)
+		mlog_errno(status);
+
+	kfree(new_link);
+bail:
+	return status;
+}
+
 static void *ocfs2_follow_link(struct dentry *dentry,
 			       struct nameidata *nd)
 {
@@ -154,7 +393,7 @@ static void *ocfs2_follow_link(struct dentry *dentry,
 		goto bail;
 	}
 
-	status = vfs_follow_link(nd, link);
+	status = ocfs2_cdsl_follow_link(nd, link, inode);
 	if (status)
 		mlog_errno(status);
 bail:

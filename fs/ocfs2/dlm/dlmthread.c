@@ -52,9 +52,10 @@
 #define MLOG_MASK_PREFIX (ML_DLM|ML_DLM_THREAD)
 #include "cluster/masklog.h"
 
-static int dlm_thread(void *data);
+extern spinlock_t dlm_domain_lock;
+extern struct list_head dlm_domains;
 
-static void dlm_flush_asts(struct dlm_ctxt *dlm);
+static int dlm_thread(void *data);
 
 #define dlm_lock_is_remote(dlm, lock)     ((lock)->ml.node != (dlm)->node_num)
 
@@ -235,8 +236,7 @@ static void dlm_run_purge_list(struct dlm_ctxt *dlm,
 	spin_unlock(&dlm->spinlock);
 }
 
-static void dlm_shuffle_lists(struct dlm_ctxt *dlm,
-			      struct dlm_lock_resource *res)
+void dlm_shuffle_lists(struct dlm_ctxt *dlm, struct dlm_lock_resource *res)
 {
 	struct dlm_lock *lock, *target;
 	struct list_head *iter;
@@ -412,6 +412,15 @@ void dlm_kick_thread(struct dlm_ctxt *dlm, struct dlm_lock_resource *res)
 	wake_up(&dlm->dlm_thread_wq);
 }
 
+void __dlm_kick_thread(struct dlm_ctxt *dlm, struct dlm_lock_resource *res)
+{
+	mlog_entry("dlm=%p, res=%p\n", dlm, res);
+	if (res)
+		__dlm_dirty_lockres(dlm, res);
+
+	wake_up(&dlm->dlm_thread_wq);
+}
+
 void __dlm_dirty_lockres(struct dlm_ctxt *dlm, struct dlm_lock_resource *res)
 {
 	mlog_entry("dlm=%p, res=%p\n", dlm, res);
@@ -463,7 +472,14 @@ static int dlm_dirty_list_empty(struct dlm_ctxt *dlm)
 	return empty;
 }
 
-static void dlm_flush_asts(struct dlm_ctxt *dlm)
+int dlm_flush_lockres_asts(struct dlm_ctxt *dlm, struct dlm_lock_resource *res)
+{
+	dlm_flush_asts(dlm);
+	/* still need to implement dlm_flush_lockres_asts */
+	return 0;
+}
+
+void dlm_flush_asts(struct dlm_ctxt *dlm)
 {
 	int ret;
 	struct dlm_lock *lock;

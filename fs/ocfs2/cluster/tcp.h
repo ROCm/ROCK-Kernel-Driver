@@ -37,7 +37,7 @@
 #include <linux/inet.h>
 #include <linux/in.h>
 
-struct o2net_msg
+typedef struct _o2net_msg
 {
 	__be16 magic;
 	__be16 data_len;
@@ -48,7 +48,7 @@ struct o2net_msg
 	__be32 key;
 	__be32 msg_num;
 	__u8  buf[0];
-};
+} o2net_msg;
 
 enum o2net_notifier_type {
 	O2NET_CONN_UP,
@@ -57,9 +57,9 @@ enum o2net_notifier_type {
 	O2NET_MAX_NOTIFIER,
 };
 
-typedef int (o2net_msg_handler_func)(struct o2net_msg *msg, u32 len, void *data);
+typedef int (o2net_msg_handler_func)(o2net_msg *msg, u32 len, void *data);
 
-#define O2NET_MAX_PAYLOAD_BYTES  (4096 - sizeof(struct o2net_msg))
+#define O2NET_MAX_PAYLOAD_BYTES  (4096 - sizeof(o2net_msg))
 
 /* TODO: figure this out.... */
 static inline int o2net_link_down(int err, struct socket *sock)
@@ -120,5 +120,9 @@ int o2net_init(void);
 void o2net_exit(void);
 int o2net_proc_init(struct proc_dir_entry *parent);
 void o2net_proc_exit(struct proc_dir_entry *parent);
+
+struct o2net_send_tracking;
+void o2net_proc_add_nst(struct o2net_send_tracking *nst);
+void o2net_proc_del_nst(struct o2net_send_tracking *nst);
 
 #endif /* O2CLUSTER_TCP_H */

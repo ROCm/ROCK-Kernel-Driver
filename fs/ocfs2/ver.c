@@ -29,15 +29,25 @@
 
 #include "ver.h"
 
-#define OCFS2_BUILD_VERSION "1.3.3"
+#define OCFS2_BUILD_VERSION "1.1.7-SLES"
+#define OCFS2_BUILD_DATE    "Mon Jan 16 11:58:10 PST 2006"
+#define OCFS2_BUILD_MD5     "sles"
 
-#define VERSION_STR "OCFS2 " OCFS2_BUILD_VERSION
+#define VERSION_STR "OCFS2 " \
+	OCFS2_BUILD_VERSION " " OCFS2_BUILD_DATE " (build " OCFS2_BUILD_MD5 ")"
 
 void ocfs2_print_version(void)
 {
 	printk(KERN_INFO "%s\n", VERSION_STR);
 }
 
+int ocfs2_str_version(char *buf)
+{
+	return sprintf(buf, "%s\n", VERSION_STR);
+}
+
 MODULE_DESCRIPTION(VERSION_STR);
 
+#ifdef MODULE_VERSION
 MODULE_VERSION(OCFS2_BUILD_VERSION);
+#endif
