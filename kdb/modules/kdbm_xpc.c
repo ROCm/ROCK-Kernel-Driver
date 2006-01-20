@@ -548,10 +548,10 @@ kdbm_xpc_print_channel(struct xpc_channel *ch)
 	kdb_printf("\tnotify_queue=0x%p\n", (void *) ch->notify_queue);
 	kdb_printf("\tfunc=0x%p\n", (void *) ch->func);
 	kdb_printf("\tkey=0x%p\n", ch->key);
-	kdb_printf("\t&msg_to_pull_sema=0x%p\n",
-					(void *) &ch->msg_to_pull_sema);
-	kdb_printf("\t&wdisconnect_sema=0x%p\n",
-					(void *) &ch->wdisconnect_sema);
+	kdb_printf("\t&msg_to_pull_mutex=0x%p\n",
+					(void *) &ch->msg_to_pull_mutex);
+	kdb_printf("\t&wdisconnect_wait=0x%p\n",
+					(void *) &ch->wdisconnect_wait);
 	kdb_printf("\tlocal_GP=0x%p (%ld:%ld)\n", (void *) ch->local_GP,
 						ch->local_GP->get,
 						ch->local_GP->put);
