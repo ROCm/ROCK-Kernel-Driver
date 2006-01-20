@@ -2322,6 +2322,27 @@ mptscsih_change_queue_depth(struct scsi_device *sdev, int qdepth)
 	return sdev->queue_depth;
 }
 
+/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+/*
+ *	OS entry point to poll whether the adapter has raised an interrupt,
+ *	and if so, handle it.  Called repeatedly after I/O commands are
+ *	issued to this adapter.
+ */
+void
+mptscsih_poll(struct scsi_device *sdev)
+{
+	MPT_SCSI_HOST  *hd;
+
+	hd = (MPT_SCSI_HOST *) sdev->host->hostdata;
+	if (!hd)
+		return;
+
+	/* check interrupt pending */
+	mpt_poll_interrupt(hd->ioc);
+}
+/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+
+
 /*
  *	OS entry point to adjust the queue_depths on a per-device basis.
  *	Called once per device the bus scan. Use it to force the queue_depth
@@ -4020,6 +4041,9 @@ mptscsih_domainValidation(void *arg)
 	}
 	spin_unlock_irqrestore(&dvtaskQ_lock, flags);
 
+	if (lkcd_dump_mode())
+		return;
+
 	/* For this ioc, loop through all devices and do dv to each device.
 	 * When complete with this ioc, search through the ioc list, and
 	 * for each scsi ioc found, do dv for all devices. Exit when no
@@ -5620,5 +5644,6 @@ EXPORT_SYMBOL(mptscsih_event_process);
 EXPORT_SYMBOL(mptscsih_ioc_reset);
 EXPORT_SYMBOL(mptscsih_change_queue_depth);
 EXPORT_SYMBOL(mptscsih_timer_expired);
+EXPORT_SYMBOL(mptscsih_poll);
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/

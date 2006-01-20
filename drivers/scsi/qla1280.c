@@ -4485,6 +4485,32 @@ qla1280_get_token(char *str)
 	return ret;
 }
 
+
+/**************************************************************************
+ *   qla1280_dump_poll
+ *     Handle pending interrupts and complete commands, if any.  LKCD uses
+ *     this to perform crash dump I/O while interrupts are disabled.
+ **************************************************************************/
+static void
+qla1280_dump_poll(struct scsi_device *device)
+{
+	struct scsi_qla_host *ha;
+	struct device_reg *reg;
+	u16 data;
+
+	ha = (struct scsi_qla_host *)device->host->hostdata;
+	reg = ha->iobase;
+
+	/* Check for pending interrupts. */
+	data = qla1280_debounce_register(&reg->istatus);
+	if (data & RISC_INT) {
+		qla1280_isr(ha, &ha->done_q);
+	}
+	if (!list_empty(&ha->done_q))
+		qla1280_done(ha);
+}
+
+
 #if LINUX_VERSION_CODE >= 0x020600
 static struct scsi_host_template qla1280_driver_template = {
 	.module			= THIS_MODULE,
@@ -4503,6 +4529,7 @@ static struct scsi_host_template qla1280_driver_template = {
 	.sg_tablesize		= SG_ALL,
 	.cmd_per_lun		= 1,
 	.use_clustering		= ENABLE_CLUSTERING,
+	.dump_poll		= qla1280_dump_poll,
 };
 #else
 static struct scsi_host_template qla1280_driver_template = {

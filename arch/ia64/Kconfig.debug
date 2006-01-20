@@ -2,6 +2,46 @@ menu "Kernel hacking"
 
 source "lib/Kconfig.debug"
 
+config LKCD_DUMP
+       tristate "LKCD crash dump support (EXPERIMENTAL)"
+       depends on EXPERIMENTAL
+       default n
+       ---help---
+         Say Y here to enable saving an image of system memory when a panic
+         or other error occurs. Dumps can also be forced with the SysRq+d
+         key if MAGIC_SYSRQ is enabled.
+
+config KERNTYPES
+        bool
+        depends on LKCD_DUMP
+        default y
+
+config LKCD_DUMP_BLOCKDEV
+       tristate "LKCD crash dump block device driver"
+       depends on LKCD_DUMP
+       help
+         Say Y to allow saving crash dumps directly to a disk device.
+
+config LKCD_DUMP_NETDEV
+       tristate "LKCD crash dump network device driver"
+       depends on LKCD_DUMP
+       help
+        Say Y to allow saving crash dumps over a network device.
+
+config LKCD_DUMP_COMPRESS_RLE
+       tristate "LKCD crash dump RLE compression"
+       depends on LKCD_DUMP
+       help
+         Say Y to allow saving dumps with Run Length Encoding compression.
+
+config LKCD_DUMP_COMPRESS_GZIP
+       tristate "LKCD crash dump GZIP compression"
+       select ZLIB_INFLATE
+       select ZLIB_DEFLATE
+       depends on LKCD_DUMP
+       help
+         Say Y to allow saving dumps with Gnu Zip compression.
+
 choice
 	prompt "Physical memory granularity"
 	default IA64_GRANULE_64MB

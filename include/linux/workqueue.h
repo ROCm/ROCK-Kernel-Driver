@@ -90,4 +90,7 @@ static inline int cancel_delayed_work(struct work_struct *work)
 	return ret;
 }
 
+extern void dump_clear_workqueue(void);
+extern void dump_run_workqueue(void);
+
 #endif

@@ -3290,7 +3290,7 @@ mpt_diag_reset(MPT_ADAPTER *ioc, int ignore, int sleepFlag)
 		 *
 		 */
 		CHIPREG_WRITE32(&ioc->chip->Diagnostic, diag0val | MPI_DIAG_DISABLE_ARM);
-		mdelay(1);
+		MPT_MDELAY(1);
 
 		/*
 		 * Now hit the reset bit in the Diagnostic register
@@ -6348,6 +6348,23 @@ mpt_sp_ioc_info(MPT_ADAPTER *ioc, u32 ioc_status, MPT_FRAME_HDR *mf)
 }
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+/**
+ *	mpt_poll_interrupt - Check if the adapter has raised an interrupt and
+ *	if so, call the interrupt handler.
+ *	@ioc: Pointer to MPT_ADAPTER structure
+ */
+void
+mpt_poll_interrupt(MPT_ADAPTER *ioc)
+{
+	u32 intstat;
+
+	intstat = CHIPREG_READ32(&ioc->chip->IntStatus);
+
+	if (intstat & MPI_HIS_REPLY_MESSAGE_INTERRUPT)
+		mpt_interrupt(0, ioc, NULL);
+}
+
+/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 EXPORT_SYMBOL(mpt_attach);
 EXPORT_SYMBOL(mpt_detach);
 #ifdef CONFIG_PM
@@ -6445,6 +6462,8 @@ fusion_exit(void)
 	procmpt_destroy();
 #endif
 }
+
+EXPORT_SYMBOL_GPL(mpt_poll_interrupt);
 
 module_init(fusion_init);
 module_exit(fusion_exit);

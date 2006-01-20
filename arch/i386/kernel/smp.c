@@ -20,6 +20,7 @@
 #include <linux/interrupt.h>
 #include <linux/cpu.h>
 #include <linux/module.h>
+#include <linux/dump.h>
 
 #include <asm/mtrr.h>
 #include <asm/tlbflush.h>
@@ -148,6 +149,14 @@ void __send_IPI_shortcut(unsigned int shortcut, int vector)
 	 */
 	cfg = __prepare_ICR(shortcut, vector);
 
+	if (vector == DUMP_VECTOR) {
+		/*
+		 * Setup DUMP IPI to be delivered as an NMI
+		 */
+		cfg = (cfg&~APIC_VECTOR_MASK)|APIC_DM_NMI;
+	}
+
+
 #ifdef	CONFIG_KDB
 	if (vector == KDB_VECTOR) {
 		/*
@@ -243,7 +252,15 @@ void send_IPI_mask_sequence(cpumask_t mask, int vector)
 				cfg = (cfg&~APIC_VECTOR_MASK)|APIC_DM_NMI;
 			}
 #endif	/* CONFIG_KDB */
-			
+
+
+			if (vector == DUMP_VECTOR) {
+				/*
+				 * Setup DUMP IPI to be delivered as an NMI
+				 */
+				cfg = (cfg&~APIC_VECTOR_MASK)|APIC_DM_NMI;
+			}
+
 			/*
 			 * Send the IPI. The write to APIC_ICR fires this off.
 			 */
@@ -538,6 +555,11 @@ void unlock_ipi_call_lock(void)
 
 static struct call_data_struct * call_data;
 
+void dump_send_ipi(void)
+{
+	send_IPI_allbutself(DUMP_VECTOR);
+}
+
 /*
  * this function sends a 'generic call function' IPI to all other CPUs
  * in the system.
@@ -598,7 +620,7 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 }
 EXPORT_SYMBOL(smp_call_function);
 
-static void stop_this_cpu (void * dummy)
+void stop_this_cpu (void * dummy)
 {
 	/*
 	 * Remove this CPU:
@@ -659,4 +681,3 @@ fastcall void smp_call_function_interrupt(struct pt_regs *regs)
 		atomic_inc(&call_data->finished);
 	}
 }
-

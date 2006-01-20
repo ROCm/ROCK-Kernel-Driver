@@ -32,6 +32,7 @@
 #include <linux/delay.h>
 #include <linux/kprobes.h>
 #include <linux/kexec.h>
+#include <linux/dump.h>
 
 #include <asm/kdebug.h>
 #include <asm/pgtable.h>
@@ -157,6 +158,7 @@ int die(const char *str, struct pt_regs *regs, long err)
 		printk("\n");
 	print_modules();
 	show_regs(regs);
+	dump((char *)str, regs);
 	bust_spinlocks(0);
 
 	if (!crash_dump_start && kexec_should_crash(current)) {

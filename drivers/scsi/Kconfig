@@ -61,6 +61,18 @@ config BLK_DEV_SD
 	  In this case, do not compile the driver for your SCSI host adapter
 	  (below) as a module either.
 
+config SCSI_DUMP
+	tristate "SCSI dump support"
+	depends on LKCD_DUMP_BLOCKDEV && SCSI
+	help
+	   If you want to be able to use LKCD to write crash dumps to
+	   SCSI disks using polling I/O (i.e. with interrupts disabled),
+	   say Y here.
+
+	   This option is only useful if your low-level disk driver supports
+	   polling I/O.  If it doesn't, LKCD will fall back to ordinary
+	   interrupt-driven I/O.
+
 config CHR_DEV_ST
 	tristate "SCSI tape support"
 	depends on SCSI

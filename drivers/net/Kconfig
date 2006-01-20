@@ -2699,7 +2699,7 @@ config NETCONSOLE
 endif #NETDEVICES
 
 config NETPOLL
-	def_bool NETCONSOLE
+	def_bool NETCONSOLE || LKCD_DUMP_NETDEV
 
 config NETPOLL_RX
 	bool "Netpoll support for trapping incoming packets"

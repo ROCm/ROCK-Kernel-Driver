@@ -1,5 +1,7 @@
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/nmi.h>
+#include <linux/irq.h>
 #include <asm/checksum.h>
 #include <asm/desc.h>
 
@@ -32,3 +34,21 @@ EXPORT_SYMBOL(__read_lock_failed);
 #endif
 
 EXPORT_SYMBOL(csum_partial);
+
+#ifdef CONFIG_LKCD_DUMP_MODULE
+#ifdef CONFIG_SMP
+extern irq_desc_t irq_desc[NR_IRQS];
+extern cpumask_t irq_affinity[NR_IRQS];
+extern void stop_this_cpu(void *);
+extern void dump_send_ipi(void);
+EXPORT_SYMBOL_GPL(irq_desc);
+EXPORT_SYMBOL_GPL(irq_affinity);
+EXPORT_SYMBOL_GPL(stop_this_cpu);
+EXPORT_SYMBOL_GPL(dump_send_ipi);
+#endif
+extern int page_is_ram(unsigned long);
+EXPORT_SYMBOL_GPL(page_is_ram);
+#ifdef ARCH_HAS_NMI_WATCHDOG
+EXPORT_SYMBOL_GPL(touch_nmi_watchdog);
+#endif
+#endif

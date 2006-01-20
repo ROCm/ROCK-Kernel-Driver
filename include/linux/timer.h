@@ -98,4 +98,7 @@ extern void init_timers(void);
 extern void run_local_timers(void);
 extern int it_real_fn(void *);
 
+extern void dump_clear_timers(void);
+extern void dump_run_timers(void);
+
 #endif

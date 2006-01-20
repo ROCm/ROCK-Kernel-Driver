@@ -23,8 +23,10 @@
 int panic_timeout;
 int panic_on_oops;
 int tainted;
+void (*dump_function_ptr)(const char *, const struct pt_regs *) = 0;
 
 EXPORT_SYMBOL(panic_timeout);
+EXPORT_SYMBOL_GPL(dump_function_ptr);
 
 struct notifier_block *panic_notifier_list;
 
@@ -78,6 +80,8 @@ NORET_TYPE void panic(const char * fmt, ...)
 	printk(KERN_EMERG "Kernel panic - not syncing: %s\n",buf);
 	bust_spinlocks(0);
 
+	notifier_call_chain(&panic_notifier_list, 0, buf);
+
 	/*
 	 * If we have crashed and we have a crash kernel loaded let it handle
 	 * everything else.
@@ -94,7 +98,6 @@ NORET_TYPE void panic(const char * fmt, ...)
 	smp_send_stop();
 #endif
 
-	notifier_call_chain(&panic_notifier_list, 0, buf);
 
 	if (!panic_blink)
 		panic_blink = no_blink;

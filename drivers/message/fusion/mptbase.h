@@ -1026,6 +1026,7 @@ extern int	 mpt_read_ioc_pg_3(MPT_ADAPTER *ioc);
 extern int	 mptbase_sas_persist_operation(MPT_ADAPTER *ioc, u8 persist_opcode);
 extern int	 mptbase_GetFcPortPage0(MPT_ADAPTER *ioc, int portnum);
 extern int	 mpt_alt_ioc_wait(MPT_ADAPTER *ioc);
+extern void	 mpt_poll_interrupt(MPT_ADAPTER *ioc);
 
 /*
  *  Public data decl's...
@@ -1035,6 +1036,29 @@ extern struct proc_dir_entry	*mpt_proc_root_dir;
 
 extern int		  mpt_lan_index;	/* needed by mptlan.c */
 extern int		  mpt_stm_index;	/* needed by mptstm.c */
+
+/*
+ *  Dump stuff...
+ */
+#include <linux/diskdump.h>
+
+#define MPT_HOST_LOCK(host_lock)		\
+	if (lkcd_dump_mode()) 			\
+		spin_lock(host_lock);		\
+	else					\
+		spin_lock_irq(host_lock);
+
+#define MPT_HOST_UNLOCK(host_lock)		\
+	if (lkcd_dump_mode())			\
+		spin_unlock(host_lock);		\
+	else					\
+		spin_unlock_irq(host_lock);
+
+#define MPT_MDELAY(n)				\
+	if (lkcd_dump_mode())			\
+		diskdump_mdelay(n);		\
+	else					\
+		mdelay(n);
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 #endif		/* } __KERNEL__ */

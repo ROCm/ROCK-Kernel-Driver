@@ -65,6 +65,7 @@
 #include <scsi/scsi_host.h>
 #include <scsi/scsi_tcq.h>
 #include <scsi/scsi_request.h>
+#include <linux/diskdump.h>
 
 #include "scsi_priv.h"
 #include "scsi_logging.h"
@@ -753,6 +754,9 @@ static void scsi_done(struct scsi_cmnd *cmd)
 void __scsi_done(struct scsi_cmnd *cmd)
 {
 	struct request *rq = cmd->request;
+
+	if (lkcd_dump_mode())
+		return;
 
 	/*
 	 * Set the serial numbers back to zero

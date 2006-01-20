@@ -38,6 +38,7 @@ static inline int scsi_sense_valid(struct scsi_sense_hdr *sshdr)
 extern void scsi_report_bus_reset(struct Scsi_Host *, int);
 extern void scsi_report_device_reset(struct Scsi_Host *, int, int);
 extern int scsi_block_when_processing_errors(struct scsi_device *);
+extern int scsi_decide_disposition(struct scsi_cmnd *);
 extern int scsi_normalize_sense(const u8 *sense_buffer, int sb_len,
 		struct scsi_sense_hdr *sshdr);
 extern int scsi_request_normalize_sense(struct scsi_request *sreq,

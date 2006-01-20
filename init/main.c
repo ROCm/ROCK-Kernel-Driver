@@ -109,6 +109,15 @@ enum system_states system_state;
 EXPORT_SYMBOL(system_state);
 
 /*
+ * The kernel_magic value represents the address of _end, which allows
+ * namelist tools to "match" each other respectively.  That way a tool
+ * that looks at /dev/mem can verify that it is using the right System.map
+ * file -- if kernel_magic doesn't equal the namelist value of _end,
+ * something's wrong.
+ */
+unsigned long *kernel_magic = &_end;
+
+/*
  * Boot command-line arguments
  */
 #define MAX_INIT_ARGS CONFIG_INIT_ENV_ARG_LIMIT

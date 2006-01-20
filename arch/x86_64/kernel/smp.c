@@ -19,6 +19,7 @@
 #include <linux/kernel_stat.h>
 #include <linux/mc146818rtc.h>
 #include <linux/interrupt.h>
+#include <linux/dump.h>
 
 #include <asm/mtrr.h>
 #include <asm/pgalloc.h>
@@ -281,6 +282,12 @@ void flush_tlb_all(void)
 	on_each_cpu(do_flush_tlb_all, NULL, 1, 1);
 }
 
+/* void dump_send_ipi(int (*dump_ipi_handler)(struct pt_regs *)); */
+void dump_send_ipi(void)
+{
+	send_IPI_allbutself(DUMP_VECTOR);
+}
+
 /*
  * this function sends a 'reschedule' IPI to another CPU.
  * it goes straight through and wastes no time serializing
@@ -442,6 +449,18 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 	__smp_call_function(func,info,nonatomic,wait);
 	spin_unlock(&call_lock);
 	return 0;
+}
+
+void stop_this_cpu(void* dummy)
+{
+	/*
+	 * Remove this CPU:
+	 */
+	cpu_clear(smp_processor_id(), cpu_online_map);
+	local_irq_disable();
+	disable_local_APIC();
+	for (;;) 
+		asm("hlt"); 
 }
 
 void smp_stop_cpu(void)

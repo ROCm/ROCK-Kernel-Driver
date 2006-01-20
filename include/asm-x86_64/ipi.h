@@ -70,6 +70,13 @@ static inline void __send_IPI_shortcut(unsigned int shortcut, int vector, unsign
 	 */
 	cfg = __prepare_ICR(shortcut, vector, dest);
 
+	if (vector == DUMP_VECTOR) {
+		/*
+		 * Setup DUMP IPI to be delivered as an NMI
+		 */
+		cfg = (cfg&~APIC_VECTOR_MASK)|APIC_DM_NMI;
+	}
+
 	/*
 	 * Send the IPI. The write to APIC_ICR fires this off.
 	 */
@@ -105,6 +112,13 @@ static inline void send_IPI_mask_sequence(cpumask_t mask, int vector)
 		 * program the ICR
 		 */
 		cfg = __prepare_ICR(0, vector, APIC_DEST_PHYSICAL);
+
+		if (vector == DUMP_VECTOR) {
+			/*
+			 * Setup DUMP IPI to be delivered as an NMI
+			 */
+			cfg = (cfg&~APIC_VECTOR_MASK)|APIC_DM_NMI;
+		}
 
 		/*
 		 * Send the IPI. The write to APIC_ICR fires this off.

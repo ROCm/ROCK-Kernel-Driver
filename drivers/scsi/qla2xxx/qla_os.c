@@ -93,6 +93,7 @@ static int qla2xxx_eh_bus_reset(struct scsi_cmnd *);
 static int qla2xxx_eh_host_reset(struct scsi_cmnd *);
 static int qla2x00_loop_reset(scsi_qla_host_t *ha);
 static int qla2x00_device_reset(scsi_qla_host_t *, fc_port_t *);
+static void qla2x00_dump_poll(struct scsi_device *sdev);
 
 static int qla2x00_change_queue_depth(struct scsi_device *, int);
 static int qla2x00_change_queue_type(struct scsi_device *, int);
@@ -124,6 +125,7 @@ static struct scsi_host_template qla2x00_driver_template = {
 	 */
 	.max_sectors		= 0xFFFF,
 	.shost_attrs		= qla2x00_host_attrs,
+	.dump_poll		= qla2x00_dump_poll,
 };
 
 static struct scsi_host_template qla24xx_driver_template = {
@@ -2093,6 +2095,21 @@ qla2x00_free_sp_pool( scsi_qla_host_t *ha)
 		mempool_destroy(ha->srb_mempool);
 		ha->srb_mempool = NULL;
 	}
+}
+
+/*
+ * qla2x00_dump_poll
+ *	Used by LKCD to complete I/O during a crash dump.
+ *
+ * Input:
+ *	sdev = device to which we're dumping.
+ */
+static void
+qla2x00_dump_poll(struct scsi_device *sdev)
+{
+	scsi_qla_host_t *ha = to_qla_host(sdev->host);
+
+	qla2x00_poll(ha);
 }
 
 /**************************************************************************

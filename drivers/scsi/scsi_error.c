@@ -24,6 +24,7 @@
 #include <linux/interrupt.h>
 #include <linux/blkdev.h>
 #include <linux/delay.h>
+#include <linux/diskdump.h>
 
 #include <scsi/scsi.h>
 #include <scsi/scsi_dbg.h>
@@ -422,6 +423,9 @@ static int scsi_eh_completed_normally(struct scsi_cmnd *scmd)
  **/
 static void scsi_eh_done(struct scsi_cmnd *scmd)
 {
+	 if (lkcd_dump_mode())
+                return;
+
 	struct completion     *eh_action;
 
 	SCSI_LOG_ERROR_RECOVERY(3,
@@ -1318,6 +1322,8 @@ int scsi_decide_disposition(struct scsi_cmnd *scmd)
 		return SUCCESS;
 	}
 }
+
+EXPORT_SYMBOL_GPL(scsi_decide_disposition);
 
 /**
  * scsi_eh_lock_door - Prevent medium removal for the specified device

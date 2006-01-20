@@ -148,6 +148,7 @@ enum
 	KERN_SPIN_RETRY=70,	/* int: number of spinlock retries */
 	KERN_UNSUPPORTED=71,	/* int: allow loading of unsupported modules */
 	KERN_KDB=72,		/* int: kdb on/off */
+	KERN_DUMP=73,		/* directory: dump parameters */
 };
 
 

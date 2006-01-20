@@ -16,7 +16,8 @@
 #   $1 - kernel version
 #   $2 - kernel image file
 #   $3 - kernel map file
-#   $4 - default install path (blank if root directory)
+#   $4 - kernel type file
+#   $5 - default install path (blank if root directory)
 #
 
 # User may have a custom install script
@@ -26,13 +27,13 @@ if [ -x /sbin/${CROSS_COMPILE}installkernel ]; then exec /sbin/${CROSS_COMPILE}i
 
 # Default install - same as make zlilo
 
-if [ -f $4/vmlinuz ]; then
-	mv $4/vmlinuz $4/vmlinuz.old
+if [ -f $5/vmlinuz ]; then
+	mv $5/vmlinuz $5/vmlinuz.old
 fi
 
-if [ -f $4/System.map ]; then
-	mv $4/System.map $4/System.old
+if [ -f $5/System.map ]; then
+	mv $5/System.map $5/System.old
 fi
 
-cat $2 > $4/vmlinuz
-cp $3 $4/System.map
+cat $2 > $5/vmlinuz
+cp $3 $5/System.map

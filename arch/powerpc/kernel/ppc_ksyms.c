@@ -254,3 +254,15 @@ EXPORT_SYMBOL(intercept_table);
 EXPORT_SYMBOL(__mtdcr);
 EXPORT_SYMBOL(__mfdcr);
 #endif
+
+#ifdef CONFIG_LKCD_DUMP_MODULE
+extern int dump_page_is_ram(unsigned long);
+EXPORT_SYMBOL_GPL(dump_page_is_ram);
+#ifdef CONFIG_SMP
+EXPORT_SYMBOL_GPL(irq_affinity);
+extern void stop_this_cpu(void *);
+extern void dump_send_ipi(int (*dump_ipi_callback)(struct pt_regs *));
+EXPORT_SYMBOL_GPL(stop_this_cpu);
+EXPORT_SYMBOL_GPL(dump_send_ipi);
+#endif
+#endif

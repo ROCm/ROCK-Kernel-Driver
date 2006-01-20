@@ -27,6 +27,7 @@
 #include <linux/spinlock.h>
 #include <linux/interrupt.h>
 #include <linux/module.h>
+#include <linux/dump.h>
 #include <linux/moduleparam.h>
 #include <linux/nmi.h>
 #include <linux/kprobes.h>
@@ -416,6 +417,7 @@ void __die(const char * str, struct pt_regs * regs, long err)
 	printk("\n");
 	notify_die(DIE_OOPS, str, regs, err, current->thread.trap_no, SIGSEGV);
 	show_registers(regs);
+	dump((char *)str, regs); 
 	/* Executive summary in case the oops scrolled away */
 	printk(KERN_ALERT "RIP ");
 	printk_address(regs->rip); 
@@ -444,6 +446,7 @@ void die_nmi(char *str, struct pt_regs *regs)
 	show_registers(regs);
 	if (panic_on_timeout || panic_on_oops)
 		panic("nmi watchdog");
+	dump(str ,regs);
 	printk("console shuts up ...\n");
 	oops_end(flags);
 	do_exit(SIGSEGV);

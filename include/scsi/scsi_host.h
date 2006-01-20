@@ -433,6 +433,38 @@ struct scsi_host_template {
 	 * module_init/module_exit.
 	 */
 	struct list_head legacy_hosts;
+
+	/* operations for dump */
+
+	/*
+	 * Called to set up the device at the beginning of a crash dump.
+	 * Can be used to perform a host reset, purge any outstanding
+	 * commands so dump I/O can begin, etc.
+	 *
+	 * Status: OPTIONAL
+	 */
+	int (* dump_quiesce)(struct scsi_device *);
+
+	/*
+	 * Called after a crash dump is completed.  Can be used to
+	 * synchronize caches if applicable.
+	 *
+	 * Status: OPTIONAL
+	 */
+	int (* dump_shutdown)(struct scsi_device *);
+
+	/*
+	 * Called during a crash dump after each command is issued
+	 * (repeatedly, until the command completes).  Typically calls
+	 * the interrupt handler so that any pending interrupts will get
+	 * processed despite irqs being disabled.
+	 *
+	 * Any driver which wants to support crash dumps using polling I/O
+	 * needs to implement this method.
+	 *
+	 * Status: OPTIONAL
+	 */
+	void (* dump_poll)(struct scsi_device *);
 };
 
 /*

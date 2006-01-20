@@ -28,6 +28,7 @@
 #include <linux/utsname.h>
 #include <linux/kprobes.h>
 #include <linux/kexec.h>
+#include <linux/dump.h>
 
 #ifdef CONFIG_EISA
 #include <linux/ioport.h>
@@ -388,6 +389,8 @@ void die(const char * str, struct pt_regs * regs, long err)
 	if (kexec_should_crash(current))
 		crash_kexec(regs);
 
+	dump((char *)str, regs);
+
 	if (in_interrupt())
 		panic("Fatal exception in interrupt");
 
@@ -633,6 +636,7 @@ void die_nmi (struct pt_regs *regs, const char *msg)
 	kdb(KDB_REASON_NMI, 0, regs);
 #endif	/* CONFIG_KDB */
 	printk(KERN_EMERG "console shuts up ...\n");
+	dump((char *)msg, regs);
 	console_silent();
 	spin_unlock(&nmi_print_lock);
 	bust_spinlocks(0);

@@ -2,4 +2,13 @@ menu "Kernel hacking"
 
 source "lib/Kconfig.debug"
 
+config KERNTYPES
+	bool "Kerntypes debugging information"
+	default y
+	---help---
+	  Say Y here to save additional kernel debugging information in the
+	  file init/kerntypes.o. This information is used by crash analysis
+	  tools such as lcrash to assign structures to kernel addresses.
+
+
 endmenu

@@ -43,6 +43,7 @@
 #include <linux/interrupt.h>
 #include <linux/dma-mapping.h>
 #include <linux/device.h>
+#include <scsi/scsi_device.h>
 #include <scsi/scsi_host.h>
 #include <linux/libata.h>
 
@@ -217,6 +218,34 @@ static irqreturn_t vsc_sata_interrupt (int irq, void *dev_instance,
 	return IRQ_RETVAL(handled);
 }
 
+static int
+vsc_dump_quiesce(struct scsi_device *device)
+{
+	struct ata_port *ap = (struct ata_port *) device->host->hostdata;
+	struct ata_host_set *host_set = ap->host_set;
+
+	/*
+	 * Give the device 1 second to finish whatever it might be doing,
+	 * then deal with any pending interrupts.
+	 */
+	mdelay(1000);
+	vsc_sata_interrupt(0, host_set, NULL);
+
+	ap->qactive = 0;
+	ap->active_tag = ATA_TAG_POISON;
+
+	return 0;
+}
+
+static void
+vsc_dump_poll(struct scsi_device *device)
+{
+	struct ata_port *ap = (struct ata_port *) device->host->hostdata;
+	struct ata_host_set *host_set = ap->host_set;
+
+	vsc_sata_interrupt(0, host_set, NULL);
+}
+
 
 static struct scsi_host_template vsc_sata_sht = {
 	.module			= THIS_MODULE,
@@ -235,6 +264,9 @@ static struct scsi_host_template vsc_sata_sht = {
 	.dma_boundary		= ATA_DMA_BOUNDARY,
 	.slave_configure	= ata_scsi_slave_config,
 	.bios_param		= ata_std_bios_param,
+	.dump_quiesce		= vsc_dump_quiesce,
+	.dump_poll		= vsc_dump_poll,
+
 };
 
 

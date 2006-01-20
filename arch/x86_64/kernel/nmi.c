@@ -24,6 +24,7 @@
 #include <linux/sysdev.h>
 #include <linux/nmi.h>
 #include <linux/sysctl.h>
+#include <linux/dump.h>
 
 #include <asm/smp.h>
 #include <asm/mtrr.h>

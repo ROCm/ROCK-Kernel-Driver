@@ -19,6 +19,7 @@
 #endif	/* CONFIG_KDB */
 #include <linux/hardirq.h>
 #include <linux/kprobes.h>
+#include <linux/dump.h>
 
 #include <asm/fpswa.h>
 #include <asm/ia32.h>
@@ -113,15 +114,16 @@ die (const char *str, struct pt_regs *regs, long err)
 			current->comm, current->pid, str, err, ++die_counter);
 		(void) notify_die(DIE_OOPS, (char *)str, regs, err, 255, SIGSEGV);
 		show_regs(regs);
+#ifdef	CONFIG_KDB
+		(void)kdb(KDB_REASON_OOPS, err, regs);
+#endif	/* CONFIG_KDB */
+		dump((char *)str, regs);
   	} else
 		printk(KERN_ERR "Recursive die() failure, output suppressed\n");
 
 	bust_spinlocks(0);
 	die.lock_owner = -1;
 	spin_unlock_irq(&die.lock);
-#ifdef	CONFIG_KDB
-	(void)kdb(KDB_REASON_OOPS, err, regs);
-#endif	/* CONFIG_KDB */
   	do_exit(SIGSEGV);
 }
 

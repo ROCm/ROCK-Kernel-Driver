@@ -28,6 +28,7 @@
 #include <linux/writeback.h>
 #include <linux/interrupt.h>
 #include <linux/cpu.h>
+#include <linux/dump.h>
 
 /*
  * for max sense size
@@ -2953,7 +2954,10 @@ void generic_make_request(struct bio *bio)
 	sector_t maxsector;
 	int ret, nr_sectors = bio_sectors(bio);
 
-	might_sleep();
+#if defined(CONFIG_LKCD_DUMP) || defined(CONFIG_LKCD_DUMP_MODULE)
+	if (likely(!dump_oncpu))
+#endif
+	    might_sleep();
 	/* Test device or partition size, when known. */
 	maxsector = bio->bi_bdev->bd_inode->i_size >> 9;
 	if (maxsector) {

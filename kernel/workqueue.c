@@ -497,6 +497,39 @@ int current_is_keventd(void)
 
 }
 
+static struct cpu_workqueue_struct saved_cwq;
+
+void dump_clear_workqueue(void)
+{
+	int cpu = smp_processor_id();
+	struct cpu_workqueue_struct *cwq;
+
+	cwq = per_cpu_ptr(keventd_wq->cpu_wq, cpu);
+	memcpy(&saved_cwq, cwq, sizeof(saved_cwq));
+	spin_lock_init(&cwq->lock);
+	INIT_LIST_HEAD(&cwq->worklist);
+	init_waitqueue_head(&cwq->more_work);
+	init_waitqueue_head(&cwq->work_done);
+}
+
+void dump_run_workqueue(void)
+{
+	int cpu = smp_processor_id();
+	struct cpu_workqueue_struct *cwq;
+
+	cwq = per_cpu_ptr(keventd_wq->cpu_wq, cpu);
+	while (!list_empty(&cwq->worklist)) {
+		struct work_struct *work = list_entry(cwq->worklist.next,
+						struct work_struct, entry);
+		void (*f) (void *) = work->func;
+		void *data = work->data;
+
+		list_del_init(cwq->worklist.next);
+		clear_bit(0, &work->pending);
+		f(data);
+	}
+}
+
 #ifdef CONFIG_HOTPLUG_CPU
 /* Take the work from this (downed) CPU. */
 static void take_over_work(struct workqueue_struct *wq, unsigned int cpu)
@@ -586,3 +619,6 @@ EXPORT_SYMBOL(schedule_work);
 EXPORT_SYMBOL(schedule_delayed_work);
 EXPORT_SYMBOL(schedule_delayed_work_on);
 EXPORT_SYMBOL(flush_scheduled_work);
+
+EXPORT_SYMBOL_GPL(dump_clear_workqueue);
+EXPORT_SYMBOL_GPL(dump_run_workqueue);

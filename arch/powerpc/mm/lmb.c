@@ -297,3 +297,31 @@ void __init lmb_enforce_memory_limit(unsigned long memory_limit)
 		break;
 	}
 }
+
+
+/*
+ * This is the copy of page_is_ram (mm/init.c). The difference is 
+ * it identifies all memory holes.
+ */
+int dump_page_is_ram(unsigned long pfn)
+{
+        int i;
+	unsigned long paddr = (pfn << PAGE_SHIFT);
+
+	for (i=0; i < lmb.memory.cnt ;i++) {
+		unsigned long base;
+
+#ifdef CONFIG_MSCHUNKS
+		base = lmb.memory.region[i].physbase;
+#else
+		base = lmb.memory.region[i].base;
+#endif
+		if ((paddr >= base) &&
+			(paddr < (base + lmb.memory.region[i].size))) {
+			return 1;
+		}
+	}
+
+	return 0;
+}
+

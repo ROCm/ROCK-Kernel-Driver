@@ -1129,6 +1129,12 @@ unsigned int nr_free_pages(void)
 
 EXPORT_SYMBOL(nr_free_pages);
 
+#ifdef CONFIG_LKCD_DUMP_MODULE
+/* This symbol has to be exported to use 'for_each_pgdat' macro by modules. */
+EXPORT_SYMBOL_GPL(pgdat_list);
+#endif
+
+
 #ifdef CONFIG_NUMA
 unsigned int nr_free_pages_pgdat(pg_data_t *pgdat)
 {

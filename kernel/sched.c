@@ -53,6 +53,12 @@
 
 #include <asm/unistd.h>
 
+/* used to soft spin in sched while dump is in progress */
+unsigned long dump_oncpu;
+EXPORT_SYMBOL_GPL(dump_oncpu);
+unsigned long dump_polling_oncpu;
+EXPORT_SYMBOL_GPL(dump_polling_oncpu);
+
 /*
  * Convert user-nice values [ -20 ... 0 ... 19 ]
  * to static priority [ MAX_RT_PRIO..MAX_PRIO-1 ],
@@ -185,90 +191,7 @@ void __put_task_struct_cb(struct rcu_head *rhp)
 
 EXPORT_SYMBOL_GPL(__put_task_struct_cb);
 
-/*
- * These are the runqueue data structures:
- */
-
-#define BITMAP_SIZE ((((MAX_PRIO+1+7)/8)+sizeof(long)-1)/sizeof(long))
-
-typedef struct runqueue runqueue_t;
-
-struct prio_array {
-	unsigned int nr_active;
-	unsigned long bitmap[BITMAP_SIZE];
-	struct list_head queue[MAX_PRIO];
-};
-
-/*
- * This is the main, per-CPU runqueue data structure.
- *
- * Locking rule: those places that want to lock multiple runqueues
- * (such as the load balancing or the thread migration code), lock
- * acquire operations must be ordered by ascending &runqueue.
- */
-struct runqueue {
-	spinlock_t lock;
-
-	/*
-	 * nr_running and cpu_load should be in the same cacheline because
-	 * remote CPUs use both these fields when doing load calculation.
-	 */
-	unsigned long nr_running;
-#ifdef CONFIG_SMP
-	unsigned long prio_bias;
-	unsigned long cpu_load[3];
-#endif
-	unsigned long long nr_switches;
-
-	/*
-	 * This is part of a global counter where only the total sum
-	 * over all CPUs matters. A task can increase this counter on
-	 * one CPU and if it got migrated afterwards it may decrease
-	 * it on another CPU. Always updated under the runqueue lock:
-	 */
-	unsigned long nr_uninterruptible;
-
-	unsigned long expired_timestamp;
-	unsigned long long timestamp_last_tick;
-	task_t *curr, *idle;
-	struct mm_struct *prev_mm;
-	prio_array_t *active, *expired, arrays[2];
-	int best_expired_prio;
-	atomic_t nr_iowait;
-
-#ifdef CONFIG_SMP
-	struct sched_domain *sd;
-
-	/* For active balancing */
-	int active_balance;
-	int push_cpu;
-
-	task_t *migration_thread;
-	struct list_head migration_queue;
-#endif
-
-#ifdef CONFIG_SCHEDSTATS
-	/* latency stats */
-	struct sched_info rq_sched_info;
-
-	/* sys_sched_yield() stats */
-	unsigned long yld_exp_empty;
-	unsigned long yld_act_empty;
-	unsigned long yld_both_empty;
-	unsigned long yld_cnt;
-
-	/* schedule() stats */
-	unsigned long sched_switch;
-	unsigned long sched_cnt;
-	unsigned long sched_goidle;
-
-	/* try_to_wake_up() stats */
-	unsigned long ttwu_cnt;
-	unsigned long ttwu_local;
-#endif
-};
-
-static DEFINE_PER_CPU(struct runqueue, runqueues);
+DEFINE_PER_CPU(struct runqueue, runqueues);
 
 /*
  * The domain tree (rq->sd) is protected by RCU's quiescent state transition.
@@ -2974,6 +2897,19 @@ asmlinkage void __sched schedule(void)
 	int cpu, idx, new_prio;
 
 	/*
+	 * If a crash dump is in progress, schedule()
+	 * is a no-op for the dumping cpu, and all
+	 * other cpus are forced to wait until the dump
+	 * completes.
+	 */
+	if (unlikely(dump_oncpu))
+		if (dump_oncpu == smp_processor_id()+1)
+			return;
+		else
+			while (dump_oncpu)
+				cpu_relax();
+
+	/*
 	 * Test if we are atomic.  Since do_exit() needs to call into
 	 * schedule() atomically, we ignore that path for now.
 	 * Otherwise, whine if we are scheduling when we should not be.
@@ -3143,6 +3079,8 @@ switch_tasks:
 	preempt_enable_no_resched();
 	if (unlikely(test_thread_flag(TIF_NEED_RESCHED)))
 		goto need_resched;
+
+	return;
 }
 
 EXPORT_SYMBOL(schedule);

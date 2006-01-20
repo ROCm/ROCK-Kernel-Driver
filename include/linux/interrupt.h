@@ -292,4 +292,7 @@ extern int probe_irq_off(unsigned long);	/* returns 0 or negative on failure */
 extern unsigned int probe_irq_mask(unsigned long);	/* returns mask of ISA interrupts */
 #endif
 
+extern void dump_clear_tasklet(void);
+extern void dump_run_tasklet(void);
+
 #endif

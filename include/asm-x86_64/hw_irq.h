@@ -35,10 +35,15 @@ struct hw_interrupt_type;
 
 #define IA32_SYSCALL_VECTOR	0x80
 
-
 /*
  * Vectors 0x20-0x2f are used for ISA interrupts.
  */
+
+/* FIXME: LKCD We are out of free vectors 0xf0-0xf9, was using 0xf9
+ * for now and because I don't know any better I'm going to 
+ * hijack a ISA vector. 
+ */
+#define DUMP_VECTOR			0x20
 
 /*
  * Special IRQ vectors used by the SMP architecture, 0xf0-0xff

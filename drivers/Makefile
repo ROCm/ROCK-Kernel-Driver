@@ -75,4 +75,5 @@ obj-y				+= firmware/
 obj-$(CONFIG_CRYPTO)		+= crypto/
 obj-$(CONFIG_SUPERH)		+= sh/
 obj-$(CONFIG_DMA_ENGINE)	+= dma/
+obj-$(CONFIG_LKCD_DUMP)		+= dump/
 
