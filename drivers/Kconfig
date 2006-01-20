@@ -79,6 +79,8 @@ endif
 
 source "drivers/sn/Kconfig"
 
+source "drivers/edac/Kconfig"
+
 source "drivers/dma/Kconfig"
 
 endmenu
