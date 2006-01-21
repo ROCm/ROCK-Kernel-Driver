@@ -979,12 +979,29 @@ static void __init pcibios_fixup_OF_interrupts(void)
 		pci_write_config_byte(dev, PCI_INTERRUPT_LINE, dev->irq);
 	}
 }
+/*
+ * if both serial drivers exists, 8250 will be inited first
+ * it claims ttyS0 and pmac_zilog init fails
+ */
+#ifdef CONFIG_SERIAL_8250
+int do_not_try_pc_legacy_8250;
+EXPORT_SYMBOL(do_not_try_pc_legacy_8250);
+#endif
 
 void __init pmac_pcibios_fixup(void)
 {
+#ifdef CONFIG_ISAPNP
+	/* avoid a warning during boot */
+	extern int isapnp_disable;
+	isapnp_disable = 1;
+#endif
+#if defined(CONFIG_SERIAL_8250) && defined(CONFIG_SERIAL_PMACZILOG)
+	do_not_try_pc_legacy_8250 = 1;
+#endif
+	request_region(0x0UL, 0x10000UL, "reserved legacy io");
+
 	/* Fixup interrupts according to OF tree */
 	pcibios_fixup_OF_interrupts();
-	request_region(0x0UL, 0x10000UL, "reserved legacy io");
 }
 
 #ifdef CONFIG_PPC64
