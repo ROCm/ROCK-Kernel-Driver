@@ -143,18 +143,21 @@ static void dentry_iput(struct dentry * dentry)
  * no dcache lock, please.
  */
 
-static void dput_locked(struct dentry *dentry, struct list_head *list)
+void dput(struct dentry *dentry)
 {
 	if (!dentry)
 		return;
 
-	if (!atomic_dec_and_test(&dentry->d_count))
+repeat:
+	if (atomic_read(&dentry->d_count) == 1)
+		might_sleep();
+	if (!atomic_dec_and_lock(&dentry->d_count, &dcache_lock))
 		return;
 
-repeat:
 	spin_lock(&dentry->d_lock);
 	if (atomic_read(&dentry->d_count)) {
 		spin_unlock(&dentry->d_lock);
+		spin_unlock(&dcache_lock);
 		return;
 	}
 
@@ -174,54 +177,32 @@ repeat:
   		dentry_stat.nr_unused++;
   	}
  	spin_unlock(&dentry->d_lock);
+	spin_unlock(&dcache_lock);
 	return;
 
 unhash_it:
 	__d_drop(dentry);
 
 kill_it: {
+		struct dentry *parent;
+
 		/* If dentry was on d_lru list
 		 * delete it from there
 		 */
   		if (!list_empty(&dentry->d_lru)) {
-  			list_del_init(&dentry->d_lru);
+  			list_del(&dentry->d_lru);
   			dentry_stat.nr_unused--;
   		}
   		list_del(&dentry->d_u.d_child);
 		dentry_stat.nr_dentry--;	/* For d_free, below */
-		/* at this point nobody can reach this dentry */
-		list_add(&dentry->d_lru, list);
-		spin_unlock(&dentry->d_lock);
-		if (dentry == dentry->d_parent)
+		/*drops the locks, at that point nobody can reach this dentry */
+		dentry_iput(dentry);
+		parent = dentry->d_parent;
+		d_free(dentry);
+		if (dentry == parent)
 			return;
-		dentry = dentry->d_parent;
-		if (atomic_dec_and_test(&dentry->d_count))
-			goto repeat;
-		/* out */
-	}
-}
-
-void dput(struct dentry *dentry)
-{
-	LIST_HEAD(free_list);
-
-	if (!dentry)
-		return;
-
-	if (atomic_add_unless(&dentry->d_count, -1, 1))
-		return;
-
-	spin_lock(&dcache_lock);
-	dput_locked(dentry, &free_list);
-	spin_unlock(&dcache_lock);
-
-	if (!list_empty(&free_list)) {
-		struct dentry *dentry, *p;
-		list_for_each_entry_safe(dentry, p, &free_list, d_lru) {
-			list_del(&dentry->d_lru);
-			dentry_iput(dentry);
-			d_free(dentry);
-		}
+		dentry = parent;
+		goto repeat;
 	}
 }
 
@@ -383,29 +364,16 @@ restart:
  */
 static inline void prune_one_dentry(struct dentry * dentry)
 {
-	LIST_HEAD(free_list);
+	struct dentry * parent;
 
 	__d_drop(dentry);
 	list_del(&dentry->d_u.d_child);
 	dentry_stat.nr_dentry--;	/* For d_free, below */
-
-	/* dput the parent here before we release dcache_lock */
-	if (dentry != dentry->d_parent)
-		dput_locked(dentry->d_parent, &free_list);
-
-	dentry_iput(dentry);		/* drop locks */
+	dentry_iput(dentry);
+	parent = dentry->d_parent;
 	d_free(dentry);
-
-	if (!list_empty(&free_list)) {
-		struct dentry *tmp, *p;
-
-		list_for_each_entry_safe(tmp, p, &free_list, d_lru) {
-			list_del(&tmp->d_lru);
-			dentry_iput(tmp);
-			d_free(tmp);
-		}
-	}
-
+	if (parent != dentry)
+		dput(parent);
 	spin_lock(&dcache_lock);
 }
 
