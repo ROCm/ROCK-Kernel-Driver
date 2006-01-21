@@ -126,7 +126,10 @@ void get_safe_registers(unsigned long *regs)
 {
 	memcpy(regs, exec_regs, HOST_FRAME_SIZE * sizeof(unsigned long));
 }
-
+/* from glibc 2.3 as found in sles9-i386 */
+#define JB_PC 5
+#define JB_SP 4
+#define JB_BP 3
 void get_thread_regs(union uml_pt_regs *uml_regs, void *buffer)
 {
 	struct __jmp_buf_tag *jmpbuf = buffer;
