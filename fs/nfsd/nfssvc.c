@@ -163,6 +163,7 @@ nfsd_svc(unsigned short port, int nrservs)
 		 */
 		found_one = 0;
 
+#if defined(CONFIG_NFSD_V2_ACL) || defined(CONFIG_NFSD_V3_ACL)
 		for (i = NFSD_MINVERS; i < NFSD_NRVERS; i++) {
 			if (NFSCTL_VERISSET(nfsd_versbits, i)) {
 				nfsd_program.pg_vers[i] = nfsd_version[i];
@@ -192,6 +193,7 @@ nfsd_svc(unsigned short port, int nrservs)
 				nfsd_acl_program.pg_vers[i] =
 					nfsd_acl_version[i];
 		}
+#endif
 
 		atomic_set(&nfsd_busy, 0);
 		error = -ENOMEM;
