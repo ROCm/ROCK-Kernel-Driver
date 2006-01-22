@@ -188,8 +188,9 @@ static inline struct sdprofile *alloc_sdprofile(void)
  * @name: name to release.
  *
  * Release space (free_page) allocated to hold pathname
+ * name may be NULL (checked for by free_page)
  */
-static inline void sd_put_name(char *name)
+static inline void sd_put_name(const char *name)
 {
 	free_page((unsigned long)name);
 }
@@ -204,14 +205,13 @@ static inline void sd_put_name(char *name)
 static inline struct sdprofile *__sd_find_profile(const char *name,
 						      struct list_head *head)
 {
-	struct list_head *lh;
+	struct sdprofile *p;
 
 	if (!name || !head)
 		return NULL;
 
 	SD_DEBUG("%s: finding profile %s\n", __FUNCTION__, name);
-	list_for_each(lh, head) {
-		struct sdprofile *p = list_entry(lh, struct sdprofile, list);
+	list_for_each_entry(p, head, list) {
 		if (!strcmp(p->name, name)) {
 			/* return refcounted object */
 			p = get_sdprofile(p);
@@ -257,12 +257,13 @@ static inline struct subdomain *__get_sdcopy(struct subdomain *new,
 static inline struct subdomain *get_sdcopy(struct subdomain *new)
 {
 	struct subdomain *temp;
+	unsigned long flags;
 
-	read_lock(&sd_lock);
+	read_lock_irqsave(&sd_lock, flags);
 
 	temp = __get_sdcopy(new, current);
 
-	read_unlock(&sd_lock);
+	read_unlock_irqrestore(&sd_lock, flags);
 
 	return temp;
 }
@@ -348,7 +349,7 @@ static inline char *sd_path_getname(struct sd_path_data *data)
 		prefetch(data->pos->next);
 
 		if (mnt->mnt_root == data->root) {
-			name = __sd_get_name(data->dentry, mnt);
+			name = sd_get_name(data->dentry, mnt);
 			if (!name)
 				data->errno = -ENOMEM;
 			break;

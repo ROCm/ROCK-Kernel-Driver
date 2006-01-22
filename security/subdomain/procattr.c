@@ -78,6 +78,7 @@ int sd_setprocattr_changehat(char *hatinfo, size_t infosize)
 	char *token = NULL, *hat, *smagic, *tmp;
 	__u32 magic;
 	int rc, len, consumed;
+	unsigned long flags;
 
 	SD_DEBUG("%s: %p %zd\n", __FUNCTION__, hatinfo, infosize);
 
@@ -153,9 +154,9 @@ int sd_setprocattr_changehat(char *hatinfo, size_t infosize)
 	SD_DEBUG("%s: Magic 0x%x Hat '%s'\n",
 		 __FUNCTION__, magic, hat ? hat : NULL);
 
-	write_lock(&sd_lock);
+	write_lock_irqsave(&sd_lock, flags);
 	error = sd_change_hat(hat, magic);
-	write_unlock(&sd_lock);
+	write_unlock_irqrestore(&sd_lock, flags);
 
 out:
 	if (token) {
@@ -173,6 +174,7 @@ int sd_setprocattr_setprofile(struct task_struct *p, char *profilename,
 	struct sdprofile *profile;
 	struct subdomain *sd;
 	char *name = NULL;
+	unsigned long flags;
 
 	SD_DEBUG("%s: current %s(%d)\n",
 		 __FUNCTION__, current->comm, current->pid);
@@ -217,7 +219,7 @@ int sd_setprocattr_setprofile(struct task_struct *p, char *profilename,
 	}
 
 
-	write_lock(&sd_lock);
+	write_lock_irqsave(&sd_lock, flags);
 
 	sd = SD_SUBDOMAIN(p->security);
 
@@ -246,7 +248,7 @@ int sd_setprocattr_setprofile(struct task_struct *p, char *profilename,
 				__FUNCTION__, p->comm, p->pid);
 
 			/* unlock so we can safely GFP_KERNEL */
-			write_unlock(&sd_lock);
+			write_unlock_irqrestore(&sd_lock, flags);
 
 			sd = alloc_subdomain(p);
 			if (!sd) {
@@ -263,7 +265,7 @@ int sd_setprocattr_setprofile(struct task_struct *p, char *profilename,
 				goto out;
 			}
 
-			write_lock(&sd_lock);
+			write_lock_irqsave(&sd_lock, flags);
 			if (!SD_SUBDOMAIN(p->security)) {
 				p->security = sd;
 			} else { /* race */
@@ -300,7 +302,7 @@ int sd_setprocattr_setprofile(struct task_struct *p, char *profilename,
 		sd->sd_hat_magic = 0;
 	}
 
-	write_unlock(&sd_lock);
+	write_unlock_irqrestore(&sd_lock, flags);
 
 out:
 	kfree(name);

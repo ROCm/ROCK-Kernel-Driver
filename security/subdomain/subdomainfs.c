@@ -115,6 +115,8 @@ static struct root_entry {
 				       &subdomain_audit},
 	{"debug",    	S_IFREG, 0640, &subdomainfs_control_fops,
 				       &subdomain_debug},
+	{"logsyscall", 	S_IFREG, 0640, &subdomainfs_control_fops,
+				       &subdomain_logsyscall},
 	{NULL,       	S_IFDIR, 0},
 
 	/* root end */
@@ -143,27 +145,9 @@ static ssize_t sd_version_read(struct file *file, char __user *buf,
 			       size_t size, loff_t *ppos)
 {
 	const char *version = subdomain_version_nl();
-	size_t maxlen = strlen(version);
-	loff_t offset = *ppos;
-	int err;
 
-	/* loff_t is signed */
-	if (offset < 0)
-		return -EFAULT;
-
-	if (offset >= maxlen)
-		return 0;
-
-	size = min(maxlen - (size_t) offset, size);
-
-	err = copy_to_user(buf, version + offset, size);
-
-	if (err)
-		return -EFAULT;
-
-	*ppos += size;
-
-	return size;
+	return simple_read_from_buffer(buf, size, ppos, version,
+				       strlen(version));
 }
 
 static ssize_t sd_profile_load(struct file *f, const char __user *buf,

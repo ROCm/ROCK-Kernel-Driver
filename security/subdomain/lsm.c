@@ -33,48 +33,59 @@
 /* main SD lock [see get_sdcopy and put_sdcopy] */
 rwlock_t sd_lock = RW_LOCK_UNLOCKED;
 
-/* Flag values, also controllable via subdomainfs/control. We
- * explicitly do not allow these to be modifiable when exported via
+/* Flag values, also controllable via subdomainfs/control.
+ * We explicitly do not allow these to be modifiable when exported via
  * /sys/modules/parameters, as we want to do additional mediation and
  * don't want to add special path code. */
 
 /* Complain mode (used to be 'bitch' mode) */
 int subdomain_complain = 0;
+module_param_named(complain, subdomain_complain, int, S_IRUSR);
+MODULE_PARM_DESC(subdomain_complain, "Toggle SubDomain complain mode");
+
 /* Debug mode */
 int subdomain_debug = 0;
+module_param_named(debug, subdomain_debug, int, S_IRUSR);
+MODULE_PARM_DESC(subdomain_debug, "Toggle SubDomain debug mode");
+
 /* Audit mode */
 int subdomain_audit = 0;
-
-module_param_named(complain, subdomain_complain, int, S_IRUSR);
-MODULE_PARM_DESC(subdomain_complain, "Toggle SubDomain Complain Mode");
-module_param_named(debug, subdomain_debug, int, S_IRUSR);
-MODULE_PARM_DESC(subdomain_debug, "Toggle SubDomain Debug Mode");
 module_param_named(audit, subdomain_audit, int, S_IRUSR);
-MODULE_PARM_DESC(subdomain_audit, "Toggle SubDomain Audit Mode");
+MODULE_PARM_DESC(subdomain_audit, "Toggle SubDomain audit mode");
+
+/* Syscall logging mode */
+int subdomain_logsyscall = 0;
+module_param_named(logsyscall, subdomain_logsyscall, int, S_IRUSR);
+MODULE_PARM_DESC(subdomain_logsyscall, "Toggle SubDomain logsyscall mode");
+
 #ifndef MODULE
-static int __init sd_complainmode(char *str)
+static int __init sd_getopt_complain(char *str)
 {
 	get_option(&str, &subdomain_complain);
 	return 1;
 }
+__setup("subdomain_complain=", sd_getopt_complain);
 
-__setup("subdomain_complain=", sd_complainmode);
-
-static int __init sd_debugmode(char *str)
+static int __init sd_getopt_debug(char *str)
 {
 	get_option(&str, &subdomain_debug);
 	return 1;
 }
+__setup("subdomain_debug=", sd_getopt_debug);
 
-__setup("subdomain_debug=", sd_debugmode);
-
-static int __init sd_auditmode(char *str)
+static int __init sd_getopt_audit(char *str)
 {
 	get_option(&str, &subdomain_audit);
 	return 1;
 }
+__setup("subdomain_audit=", sd_getopt_audit);
 
-__setup("subdomain_audit=", sd_auditmode);
+static int __init sd_getopt_logsyscall(char *str)
+{
+	get_option(&str, &subdomain_logsyscall);
+	return 1;
+}
+__setup("subdomain_logsyscall=", sd_getopt_logsyscall);
 #endif
 
 static int subdomain_ptrace(struct task_struct *parent,
@@ -82,22 +93,20 @@ static int subdomain_ptrace(struct task_struct *parent,
 {
 	int error;
 	struct subdomain *sd;
+	unsigned long flags;
 
 	error = cap_ptrace(parent, child);
 
-	read_lock(&sd_lock);
+	read_lock_irqsave(&sd_lock, flags);
 
 	sd = SD_SUBDOMAIN(current->security);
 
 	if (!error && __sd_is_confined(sd)) {
-		SD_WARN("REJECTING access to syscall 'ptrace' (%s(%d) "
-			"profile %s active %s)\n",
-			current->comm, current->pid,
-			sd->profile->name, sd->active->name);
-		error = -EPERM;
+		error = sd_audit_syscallreject(sd, "ptrace");
+		WARN_ON(error != -EPERM);
 	}
 
-	read_unlock(&sd_lock);
+	read_unlock_irqrestore(&sd_lock, flags);
 
 	return error;
 }
@@ -136,10 +145,11 @@ static int subdomain_capable(struct task_struct *tsk, int cap)
 
 	if (error == 0) {
 		struct subdomain *sd, sdcopy;
+		unsigned long flags;
 
-		read_lock(&sd_lock);
+		read_lock_irqsave(&sd_lock, flags);
 		sd = __get_sdcopy(&sdcopy, tsk);
-		read_unlock(&sd_lock);
+		read_unlock_irqrestore(&sd_lock, flags);
 
 		error = sd_capability(sd, cap);
 
@@ -153,20 +163,18 @@ static int subdomain_sysctl(struct ctl_table *table, int op)
 {
 	int error = 0;
 	struct subdomain *sd;
+	unsigned long flags;
 
-	read_lock(&sd_lock);
+	read_lock_irqsave(&sd_lock, flags);
 
 	sd = SD_SUBDOMAIN(current->security);
 
 	if ((op & 002) && __sd_is_confined(sd) && !capable(CAP_SYS_ADMIN)) {
-		SD_WARN("REJECTING access to syscall 'sysctl (write)' (%s(%d) "
-			"profile %s active %s)\n",
-			current->comm, current->pid,
-			sd->profile->name, sd->active->name);
-		error = -EPERM;
+		error = sd_audit_syscallreject(sd, "sysctl (write)");
+		WARN_ON(error != -EPERM);
 	}
 
-	read_unlock(&sd_lock);
+	read_unlock_irqrestore(&sd_lock, flags);
 
 	return error;
 }
@@ -207,20 +215,18 @@ static int subdomain_sb_mount(char *dev_name, struct nameidata *nd, char *type,
 {
 	int error = 0;
 	struct subdomain *sd;
+	unsigned long lockflags;
 
-	read_lock(&sd_lock);
+	read_lock_irqsave(&sd_lock, lockflags);
 
 	sd = SD_SUBDOMAIN(current->security);
 
 	if (__sd_is_confined(sd)) {
-		SD_WARN("REJECTING access to syscall 'mount' (%s(%d) "
-			"profile %s active %s)\n",
-			current->comm, current->pid,
-			sd->profile->name, sd->active->name);
-		error = -EPERM;
+		error = sd_audit_syscallreject(sd, "mount");
+		WARN_ON(error != -EPERM);
 	}
 
-	read_unlock(&sd_lock);
+	read_unlock_irqrestore(&sd_lock, lockflags);
 
 	return error;
 }
@@ -229,20 +235,18 @@ static int subdomain_umount(struct vfsmount *mnt, int flags)
 {
 	int error = 0;
 	struct subdomain *sd;
+	unsigned long lockflags;
 
-	read_lock(&sd_lock);
+	read_lock_irqsave(&sd_lock, lockflags);
 
 	sd = SD_SUBDOMAIN(current->security);
 
 	if (__sd_is_confined(sd)) {
-		SD_WARN("REJECTING access to syscall 'umount' (%s(%d) "
-			"profile %s active %s)\n",
-			current->comm, current->pid,
-			sd->profile->name, sd->active->name);
-		error = -EPERM;
+		error = sd_audit_syscallreject(sd, "umount");
+		WARN_ON(error != -EPERM);
 	}
 
-	read_unlock(&sd_lock);
+	read_unlock_irqrestore(&sd_lock, lockflags);
 
 	return error;
 }
@@ -255,7 +259,7 @@ static int subdomain_inode_mkdir(struct inode *inode, struct dentry *dentry,
 
 	sd = get_sdcopy(&sdcopy);
 
-	error = sd_perm_dentry(sd, dentry, MAY_WRITE);
+	error = sd_perm_dir(sd, dentry, SD_DIR_MKDIR);
 
 	put_sdcopy(sd);
 
@@ -404,7 +408,7 @@ static int subdomain_inode_setxattr(struct dentry *dentry, char *name,
 		struct subdomain sdcopy, *sd;
 
 		sd = get_sdcopy(&sdcopy);
-		error = sd_xattr(sd, dentry, name, MAY_WRITE);
+		error = sd_xattr(sd, dentry, name, SD_XATTR_SET);
 		put_sdcopy(sd);
 	}
 
@@ -419,7 +423,7 @@ static int subdomain_inode_getxattr(struct dentry *dentry, char *name)
 		struct subdomain sdcopy, *sd;
 
 		sd = get_sdcopy(&sdcopy);
-		error = sd_xattr(sd, dentry, name, MAY_READ);
+		error = sd_xattr(sd, dentry, name, SD_XATTR_GET);
 		put_sdcopy(sd);
 	}
 
@@ -433,7 +437,7 @@ static int subdomain_inode_listxattr(struct dentry *dentry)
 		struct subdomain sdcopy, *sd;
 
 		sd = get_sdcopy(&sdcopy);
-		error = sd_xattr(sd, dentry, NULL, MAY_READ);
+		error = sd_xattr(sd, dentry, NULL, SD_XATTR_LIST);
 		put_sdcopy(sd);
 	}
 
@@ -448,7 +452,7 @@ static int subdomain_inode_removexattr(struct dentry *dentry, char *name)
 		struct subdomain sdcopy, *sd;
 
 		sd = get_sdcopy(&sdcopy);
-		error = sd_xattr(sd, dentry, name, MAY_WRITE);
+		error = sd_xattr(sd, dentry, name, SD_XATTR_REMOVE);
 		put_sdcopy(sd);
 	}
 
@@ -556,6 +560,7 @@ static int subdomain_getprocattr(struct task_struct *p, char *name, void *value,
 	int error;
 	struct subdomain sdcopy, *sd;
 	char *str = value;
+	unsigned long flags;
 
 	/* Subdomain only supports the "current" process attribute */
 	if (strcmp(name, "current") != 0) {
@@ -574,11 +579,11 @@ static int subdomain_getprocattr(struct task_struct *p, char *name, void *value,
 		goto out;
 	}
 
-	read_lock(&sd_lock);
+	read_lock_irqsave(&sd_lock, flags);
 
 	sd = __get_sdcopy(&sdcopy, p);
 
-	read_unlock(&sd_lock);
+	read_unlock_irqrestore(&sd_lock, flags);
 
 	error = sd_getprocattr(sd, str, size);
 	put_sdcopy(sd);
@@ -637,6 +642,7 @@ static int subdomain_setprocattr(struct task_struct *p, char *name, void *value,
 	} else if (size > strlen(cmd_setprofile) &&
 		   strncmp(cmd, cmd_setprofile, strlen(cmd_setprofile)) == 0) {
 		int confined;
+		unsigned long flags;
 
 		/* only an unconfined process with admin capabilities
 		 * may change the profile of another task
@@ -655,9 +661,9 @@ static int subdomain_setprocattr(struct task_struct *p, char *name, void *value,
 			goto out;
 		}
 
-		read_lock(&sd_lock);
+		read_lock_irqsave(&sd_lock, flags);
 		confined = sd_is_confined();
-		read_unlock(&sd_lock);
+		read_unlock_irqrestore(&sd_lock, flags);
 
 		if (!confined) {
 			char *profile = cmd + strlen(cmd_setprofile);
@@ -794,6 +800,11 @@ static int __init subdomain_init(void)
 		subdomain_version(),
 		subdomain_complain ? complainmsg : "");
 
+	sd_audit_message(NULL, 0,
+		"SubDomain (version %s) initialized%s\n",
+		subdomain_version(),
+		subdomain_complain ? complainmsg : "");
+
 	/* DONE */
 	return error;
 
@@ -833,6 +844,8 @@ static int subdomain_exit_removeall_iter(struct subdomain *sd, void *cookie)
 
 static void __exit subdomain_exit(void)
 {
+	unsigned long flags;
+
 	/* Remove profiles from the global profile list.
 	 * This is just for tidyness as there is no way to reference this
 	 * list once the SubDomain lsm hooks are detached (below)
@@ -845,9 +858,9 @@ static void __exit subdomain_exit(void)
 	 * reattached
 	 */
 
-	write_lock(&sd_lock);
+	write_lock_irqsave(&sd_lock, flags);
 	sd_subdomainlist_iterate(subdomain_exit_removeall_iter, NULL);
-	write_unlock(&sd_lock);
+	write_unlock_irqrestore(&sd_lock, flags);
 
 	/* Free up list of active subdomain */
 	sd_subdomainlist_release();
@@ -859,7 +872,10 @@ static void __exit subdomain_exit(void)
 
 	if (unregister_security(&subdomain_ops))
 		SD_WARN("Unable to properly unregister SubDomain\n");
+
 	SD_INFO("SubDomain protection removed\n");
+	sd_audit_message(NULL, 0,
+		"SubDomain protection removed\n");
 }
 
 security_initcall(subdomain_init);

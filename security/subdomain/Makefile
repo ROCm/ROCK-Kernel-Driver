@@ -1,7 +1,7 @@
 # Makefile for SubDomain Linux Security Module
 #
 
-SUBDOMAINVER=2.0-16.43r5938
+SUBDOMAINVER=2.0-18.43r6110
 
 EXTRA_CFLAGS += -DSUBDOMAIN_VERSION=\"${SUBDOMAINVER}\" -Wwrite-strings
 

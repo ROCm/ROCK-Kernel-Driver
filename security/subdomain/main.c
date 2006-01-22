@@ -11,6 +11,7 @@
 
 #include <linux/security.h>
 #include <linux/namei.h>
+#include <linux/audit.h>
 
 #include "immunix.h"
 #include "subdomain.h"
@@ -46,7 +47,7 @@ struct sdprofile *null_complain_profile;
  * PRIVATE UTILITY FUNCTIONS
  **************************/
 
-/*
+/**
  * sd_taskattr_access:
  * @name: name of file to check permission
  * @mask: permission mask requested for file
@@ -75,7 +76,7 @@ static inline int sd_taskattr_access(const char *procrelname)
  */
 static inline int sd_file_mode(struct sdprofile *profile, const char *name)
 {
-	struct list_head *lh;
+	struct sd_entry *entry;
 	int mode = 0;
 
 	SD_DEBUG("%s: %s\n", __FUNCTION__, name);
@@ -88,9 +89,7 @@ static inline int sd_file_mode(struct sdprofile *profile, const char *name)
 		SD_DEBUG("%s: no profile\n", __FUNCTION__);
 		goto out;
 	}
-	list_for_each(lh, &profile->file_entry) {
-		struct sd_entry *entry = list_entry(lh, struct sd_entry, list);
-
+	list_for_each_entry(entry, &profile->file_entry, list) {
 		if (sdmatch_match(name, entry->filename,
 				  entry->entry_type, entry->extradata))
 			mode |= entry->mode;
@@ -99,7 +98,7 @@ out:
 	return mode;
 }
 
-/*
+/**
  * sd_get_execmode - calculate what qualifier to apply to an exec
  * @sd: subdomain to search
  * @name: name of file to exec
@@ -126,7 +125,7 @@ static inline int sd_get_execmode(struct subdomain *sd, const char *name,
 				  int *xmod)
 {
 	struct sdprofile *profile;
-	struct list_head *lh;
+	struct sd_entry *entry;
 	struct sd_entry *match = NULL;
 
 	int pattern_match_invalid = 0, rc = 0;
@@ -149,10 +148,8 @@ static inline int sd_get_execmode(struct subdomain *sd, const char *name,
 	 * is returned.
 	 */
 
-	list_for_each(lh, &profile->file_entryp[POS_SD_MAY_EXEC]) {
-		struct sd_entry *entry;
-		entry = list_entry(lh, struct sd_entry,
-				   listp[POS_SD_MAY_EXEC]);
+	list_for_each_entry(entry, &profile->file_entryp[POS_SD_MAY_EXEC],
+			    listp[POS_SD_MAY_EXEC]) {
 		if (!pattern_match_invalid &&
 		    entry->entry_type == sd_entry_pattern &&
 		    sdmatch_match(name, entry->filename,
@@ -240,7 +237,7 @@ not_confined:
 static inline int sd_filter_mask(int mask, struct inode *inode)
 {
 	if (mask) {
-		int elim=MAY_APPEND;
+		int elim = MAY_APPEND;
 
 		if (inode && S_ISDIR(inode->i_mode))
 			elim |= (MAY_EXEC | MAY_WRITE);
@@ -251,136 +248,105 @@ static inline int sd_filter_mask(int mask, struct inode *inode)
 	return mask;
 }
 
-/****************************
- * INTERNAL TRACING FUNCTIONS
- ***************************/
-
-/**
- * sd_attr_trace - trace attempt to change file attributes
- * @sd: SubDomain to check against
- * @name: file requested
- * @iattr: requested new modes
- * @error: error flag
- *
- * Prints out the status of the attribute change request.  Only prints
- * accepted when in audit mode.
- */
-static inline void sd_attr_trace(struct subdomain *sd, const char *name,
-				 struct iattr *iattr, int error)
+static inline void sd_permerror2result(int perm_result, struct sd_audit *sa)
 {
-	const char *status = "AUDITING";
-
-	if (error)
-		status = SUBDOMAIN_COMPLAIN(sd) ? "PERMITTING" : "REJECTING";
-	else if (!SUBDOMAIN_AUDIT(sd))
-		return;
-
-	SD_WARN("%s attribute (%s%s%s%s%s%s%s) change to %s (%s(%d) "
-		"profile %s active %s)\n",
-		status,
-		iattr->ia_valid & ATTR_MODE ? "mode," : "",
-		iattr->ia_valid & ATTR_UID ? "uid," : "",
-		iattr->ia_valid & ATTR_GID ? "gid," : "",
-		iattr->ia_valid & ATTR_SIZE ? "size," : "",
-		((iattr->ia_valid & ATTR_ATIME_SET)
-		 || (iattr->ia_valid & ATTR_ATIME)) ? "atime," : "",
-		((iattr->ia_valid & ATTR_MTIME_SET)
-		 || (iattr->ia_valid & ATTR_MTIME)) ? "mtime," : "",
-		iattr->ia_valid & ATTR_CTIME ? "ctime," : "",
-		name, current->comm, current->pid,
-		sd->profile->name, sd->active->name);
-}
-
-/**
- * sd_xattr_trace - trace attempt to change file attributes
- * @sd: SubDomain to check against
- * @name: file requested
- * @iattr: requested new modes
- * @error: error flag
- *
- * Prints out the status of the attribute change request.  Only prints
- * accepted when in audit mode.
- */
-static inline void sd_xattr_trace(struct subdomain *sd, const char *name,
-				  const char *xattr, int mask, int error)
-{
-	const char *status = "AUDITING";
-
-	if (error) {
-		status = SUBDOMAIN_COMPLAIN(sd) ? "PERMITTING" : "REJECTING";
-	} else if (!SUBDOMAIN_AUDIT(sd)) {
-		return;
+	if (perm_result == 0) {	/* success */
+		sa->result = 1;
+		sa->errorcode = 0;
+	} else { /* -ve internal error code or +ve mask of denied perms */
+		sa->result = 0;
+		sa->errorcode = perm_result;
 	}
-
-	SD_WARN("%s %s%s access to %s extended attribute %s (%s(%d) "
-		"profile %s active %s)\n",
-		status,
-		mask & SD_MAY_READ  ? "r" : "",
-		mask & SD_MAY_WRITE ? "w" : "",
-		name, xattr,
-		current->comm, current->pid,
-		sd->profile->name, sd->active->name);
-}
-
-/**
- * sd_file_perm_trace - trace permission
- * @sd: SubDomain to check against
- * @name: file requested
- * @mask: requested permission
- * @error: error flag
- *
- * Prints out the status of the permission request.  Only prints
- * accepted when in audit mode.
- */
-static inline void sd_file_perm_trace(struct subdomain *sd,
-				      const char *name, int mask, int error)
-{
-	const char *status = "AUDITING";
-
-	if (error)
-		status = SUBDOMAIN_COMPLAIN(sd) ? "PERMITTING" : "REJECTING";
-	else if (!SUBDOMAIN_AUDIT(sd))
-		return;
-
-	SD_WARN("%s %s%s%s%s access to %s (%s(%d) profile %s active %s)\n",
-		status,
-		mask & SD_MAY_READ  ? "r" : "",
-		mask & SD_MAY_WRITE ? "w" : "",
-		mask & SD_MAY_EXEC  ? "x" : "",
-		mask & SD_MAY_LINK  ? "l" : "",
-		name, current->comm, current->pid,
-		sd->profile->name, sd->active->name);
-}
-
-/**
- * sd_link_perm_trace - trace link permission
- * @sd: current SubDomain
- * @lname: name requested as new link
- * @tname: name requested as new link's target
- * @error: error status
- *
- * Prints out the status of the permission request.  Only prints
- * accepted when in audit mode.
- */
-static inline void sd_link_perm_trace(struct subdomain *sd,
-				      const char *lname, const char *tname,
-				      int error)
-{
-	const char *status = "AUDITING";
-
-	if (error)
-		status = SUBDOMAIN_COMPLAIN(sd) ? "PERMITTING" : "REJECTING";
-	else if (!SUBDOMAIN_AUDIT(sd))
-		return;
-
-	SD_WARN("%s link access from %s to %s (%s(%d) profile %s active %s)\n",
-		status, lname, tname, current->comm, current->pid,
-		sd->profile->name, sd->active->name);
 }
 
 /*************************
  * MAIN INTERNAL FUNCTIONS
  ************************/
+
+/**
+ * sd_file_perm - calculate access mode for file
+ * @subdomain: current subdomain
+ * @name: name of file to calculate mode for
+ * @mask: permission mask requested for file
+ *
+ * Search the sd_entry list in @profile.
+ * Search looking to verify all permissions passed in mask.
+ * Perform the search by looking at the partitioned list of entries, one
+ * partition per permission bit.
+ *
+ * Return 0 on success, else mask of non-allowed permissions
+ */
+static unsigned int sd_file_perm(struct subdomain *sd, const char *name,
+				 int mask)
+{
+	struct sdprofile *profile;
+	int i, error = 0, mode;
+
+#define PROCPFX "/proc/"
+#define PROCLEN sizeof(PROCPFX) - 1
+
+	SD_DEBUG("%s: %s 0x%x\n", __FUNCTION__, name, mask);
+
+	/* should not enter with other than R/W/X/L */
+	BUG_ON(mask &
+	       ~(SD_MAY_READ | SD_MAY_WRITE | SD_MAY_EXEC | SD_MAY_LINK));
+
+	/* not confined */
+	if (!__sd_is_confined(sd)) {
+		/* exit with access allowed */
+		SD_DEBUG("%s: not confined\n", __FUNCTION__);
+		goto done;
+	}
+
+	/* Special case access to /proc/self/attr/current
+	 * Currently we only allow access if opened O_WRONLY
+	 */
+	if (mask == MAY_WRITE && strncmp(PROCPFX, name, PROCLEN) == 0 &&
+	    (!list_empty(&sd->profile->sub) || SUBDOMAIN_COMPLAIN(sd)) &&
+	    sd_taskattr_access(name + PROCLEN))
+		goto done;
+
+	profile = sd->active;
+
+	mode = 0;
+
+	/* iterate over partition, one permission bit at a time */
+	for (i = 0; i <= POS_SD_FILE_MAX; i++) {
+		struct sd_entry *entry;
+
+		/* do we have to accumulate this bit?
+		 * or have we already accumulated it (shortcut below)? */
+		if (!(mask & (1 << i)) || mode & (1 << i))
+			continue;
+
+		list_for_each_entry(entry, &profile->file_entryp[i],
+				    listp[i]) {
+			if (sdmatch_match(name, entry->filename,
+				entry->entry_type, entry->extradata)) {
+				/* Shortcut, accumulate all bits present */
+				mode |= entry->mode;
+
+				/*
+				 * Mask bits are overloaded
+				 * MAY_{EXEC,WRITE,READ,APPEND} are used by
+				 * kernel, other values are used locally only.
+				 */
+				if ((mode & mask) == mask) {
+					SD_DEBUG("MATCH! %s=0x%x [total mode=0x%x]\n",
+						 name, mask, mode);
+
+					goto done;
+				}
+			}
+		}
+	}
+
+	/* return permissions not satisfied */
+	error = mask & ~mode;
+
+done:
+	return error;
+}
 
 /**
  * sd_link_perm - test permission to link to a file
@@ -395,26 +361,94 @@ static inline void sd_link_perm_trace(struct subdomain *sd,
 static int sd_link_perm(struct subdomain *sd,
 			const char *link, const char *target)
 {
-	int l_mode, t_mode, error = -EPERM;
+	int l_mode, t_mode, ret;
 	struct sdprofile *profile = sd->active;
 
-	error = -EPERM;
 	l_mode = sd_file_mode(profile, link);
-	if (!(l_mode & SD_MAY_LINK))
-		goto out;
-	/* ok, mask off link bit */
-	l_mode &= ~SD_MAY_LINK;
+	if (l_mode & SD_MAY_LINK) {
+		/* mask off link bit */
+		l_mode &= ~SD_MAY_LINK;
 
-	t_mode = sd_file_mode(profile, target);
-	t_mode &= ~SD_MAY_LINK;
+		t_mode = sd_file_mode(profile, target);
+		t_mode &= ~SD_MAY_LINK;
 
-	if (l_mode == t_mode)
-		error = 0;
+		ret = (l_mode == t_mode);
+	} else {
+		ret = 0;
+	}
 
-out:
-	sd_link_perm_trace(sd, link, target, error);
-	if (SUBDOMAIN_COMPLAIN(sd))
-		error = 0;
+	return ret;
+}
+
+/**
+ * _sd_perm_dentry
+ * @sd: current SubDomain
+ * @dentry: requested dentry
+ * @mask: mask of requested operations
+ * @pname: pointer to hold matched pathname (if any)
+ *
+ * Helper function.  Obtain pathname for specified dentry. Verify if profile
+ * authorizes mask operations on pathname (due to lack of vfsmnt it is sadly
+ * necessary to search mountpoints in namespace -- when nameidata is passed
+ * more fully, this code can go away).  If more than one mountpoint matches
+ * but none satisfy the profile, only the first pathname (mountpoint) is
+ * returned for subsequent logging.
+ *
+ * Return 0 (success), +ve (mask of permissions not satisfied) or -ve (system
+ * error, most likely -ENOMEM).
+ */
+static int _sd_perm_dentry(struct subdomain *sd, struct dentry *dentry,
+			   int mask, const char **pname)
+{
+	char *name = NULL, *failed_name = NULL;
+	struct sd_path_data data;
+	int error = 0, failed_error = 0, sdpath_error,
+	    sdcomplain = SUBDOMAIN_COMPLAIN(sd);
+
+	/* search all paths to dentry */
+
+	sd_path_begin(dentry, &data);
+	do {
+		name = sd_path_getname(&data);
+		if (name) {
+			/* error here is 0 (success) or +ve (mask of perms) */
+			error = sd_file_perm(sd, name, mask);
+
+			/* access via any path is enough */
+			if (sdcomplain || error == 0)
+				break; /* Caller must free name */
+
+			/* Already have an path that failed? */
+			if (failed_name) {
+				sd_put_name(name);
+			} else {
+				failed_name = name;
+				failed_error = error;
+			}
+		}
+	} while (name);
+
+	if ((sdpath_error = sd_path_end(&data)) != 0) {
+		SD_ERROR("%s: An error occured while translating dentry %p "
+			 "inode# %lu to a pathname. Error %d\n",
+			 __FUNCTION__,
+			 dentry,
+			 dentry->d_inode->i_ino,
+			 sdpath_error);
+
+		WARN_ON(name);	/* name should not be set if error */
+		error = sdpath_error;
+		name = NULL;
+	} else if (name) {
+		if (failed_name)
+			sd_put_name(failed_name);
+	} else {
+		name = failed_name;
+		error = failed_error;
+	}
+
+	*pname = name;
+
 	return error;
 }
 
@@ -423,14 +457,239 @@ out:
  *************************/
 
 /**
- * __sd_get_name - retrieve fully qualified path name
+ * sd_audit_message - Log a message to the audit subsystem
+ * @sd: current SubDomain
+ * @flags: audit flags
+ * @fmt: varargs fmt
+ */
+int sd_audit_message(struct subdomain *sd, int flags, const char *fmt, ...)
+{
+	int ret;
+	struct sd_audit sa;
+
+	sa.type = SD_AUDITTYPE_MSG;
+	sa.name = fmt;
+	va_start(sa.vaval, fmt);
+	sa.flags = flags;
+	sa.errorcode = 0;
+	sa.result = 0;	/* fake failure: force message to be logged */
+
+	ret = sd_audit(sd, &sa);
+
+	va_end(sa.vaval);
+
+	return ret;
+}
+
+/**
+ * sd_audit_syscallreject - Log a syscall rejection to the audit subsystem
+ * @sd: current SubDomain
+ * @msg: string describing syscall being rejected
+ */
+int sd_audit_syscallreject(struct subdomain *sd, const char *msg)
+{
+	struct sd_audit sa;
+
+	sa.type = SD_AUDITTYPE_SYSCALL;
+	sa.name = msg;
+	sa.flags = 0;
+	sa.errorcode = 0;
+	sa.result = 0; /* failure */
+
+	return sd_audit(sd, &sa);
+}
+
+/**
+ * sd_audit - Log an audit event to the audit subsystem
+ * @sd: current SubDomain
+ * @sa: audit event
+ */
+int sd_audit(struct subdomain *sd, const struct sd_audit *sa)
+{
+	struct audit_buffer *ab = NULL;
+	struct audit_context *ctx;
+
+	const char *logcls;
+	unsigned int flags;
+	int sdaudit = 0,
+	    sdcomplain = 0,
+	    error = -EINVAL,
+	    opspec_error = -EACCES;
+
+	/* XXX, investigate when it's safe to use GFP_KERNEL. For sure not
+	 * safe from sd_capability as scheduler spinlock can be held
+	 */
+	const int gfp_mask = GFP_ATOMIC;
+
+	WARN_ON(sa->type >= SD_AUDITTYPE__END);
+
+	/*
+	 * sa->result:	  1 success, 0 failure
+	 * sa->errorcode: success: 0
+	 *		  failure: +ve mask of failed permissions or -ve
+	 *		  system error
+	 */
+
+	if (likely(sa->result)) {
+		if (likely(!SUBDOMAIN_AUDIT(sd))) {
+			/* nothing to log */
+			error = 0;
+			goto out;
+		} else {
+			sdaudit = 1;
+			logcls = "AUDITING";
+		}
+	} else if (sa->errorcode < 0) {
+		audit_log(current->audit_context, gfp_mask, AUDIT_SD,
+			"Internal error auditing event type %d (error %d)\n",
+			sa->type, sa->errorcode);
+		SD_ERROR("Internal error auditing event type %d (error %d)\n",
+			sa->type, sa->errorcode);
+		error = sa->errorcode;
+		goto out;
+	} else if (sa->type == SD_AUDITTYPE_SYSCALL) {
+		/* Currently SD_AUDITTYPE_SYSCALL is for rejects only.
+		 * Values set by sd_audit_syscallreject will get us here.
+		 */
+		logcls = "REJECTING";
+	} else {
+		sdcomplain = SUBDOMAIN_COMPLAIN(sd);
+		logcls = sdcomplain ? "PERMITTING" : "REJECTING";
+	}
+
+	/* In future extend w/ per-profile flags
+	 * (flags |= sa->active->flags)
+	 */
+	flags = sa->flags;
+	if (subdomain_logsyscall)
+		flags |= SD_AUDITFLAG_AUDITSS_SYSCALL;
+
+
+	/* Force full audit syscall logging regardless of global setting if
+	 * we are rejecting a syscall
+	 */
+	if (sa->type == SD_AUDITTYPE_SYSCALL) {
+		ctx = current->audit_context;
+	} else {
+		ctx = (flags & SD_AUDITFLAG_AUDITSS_SYSCALL) ?
+			current->audit_context : NULL;
+	}
+
+	ab = audit_log_start(ctx, gfp_mask, AUDIT_SD);
+
+	if (!ab) {
+		SD_ERROR("Unable to log event (%d) to audit subsys\n",
+			sa->type);
+		goto out;
+	}
+
+	/* messages get special handling */
+	if (sa->type == SD_AUDITTYPE_MSG) {
+		audit_log_vformat(ab, sa->name, sa->vaval);
+		audit_log_end(ab);
+		error = 0;
+		goto out;
+	}
+
+	/* log operation */
+
+	audit_log_format(ab, "%s ", logcls);	/* REJECTING/ALLOWING/etc */
+
+	if (sa->type == SD_AUDITTYPE_FILE) {
+		int perm = sdaudit ? sa->ival : sa->errorcode;
+
+		audit_log_format(ab, "%s%s%s%s access to %s ",
+			perm & SD_MAY_READ  ? "r" : "",
+			perm & SD_MAY_WRITE ? "w" : "",
+			perm & SD_MAY_EXEC  ? "x" : "",
+			perm & SD_MAY_LINK  ? "l" : "",
+			sa->name);
+
+		opspec_error = -EPERM;
+
+	} else if (sa->type == SD_AUDITTYPE_DIR) {
+		audit_log_format(ab, "%s on %s ",
+			sa->ival == SD_DIR_MKDIR ? "mkdir" : "rmdir",
+			sa->name);
+
+	} else if (sa->type == SD_AUDITTYPE_ATTR) {
+		struct iattr *iattr = (struct iattr*)sa->pval;
+
+		audit_log_format(ab,
+			"attribute (%s%s%s%s%s%s%s) change to %s ",
+			iattr->ia_valid & ATTR_MODE ? "mode," : "",
+			iattr->ia_valid & ATTR_UID ? "uid," : "",
+			iattr->ia_valid & ATTR_GID ? "gid," : "",
+			iattr->ia_valid & ATTR_SIZE ? "size," : "",
+			((iattr->ia_valid & ATTR_ATIME_SET) ||
+			 (iattr->ia_valid & ATTR_ATIME)) ? "atime," : "",
+			((iattr->ia_valid & ATTR_MTIME_SET) ||
+			 (iattr->ia_valid & ATTR_MTIME)) ? "mtime," : "",
+			iattr->ia_valid & ATTR_CTIME ? "ctime," : "",
+			sa->name);
+
+	} else if (sa->type == SD_AUDITTYPE_XATTR) {
+		const char *fmt;
+		switch (sa->ival) {
+			case SD_XATTR_GET: fmt = "xattr get";
+			case SD_XATTR_SET: fmt = "xattr set";
+			case SD_XATTR_LIST: fmt = "xattr list";
+			case SD_XATTR_REMOVE: fmt = "xattr remove";
+			default:
+				fmt = "xattr <unknown>";
+		}
+
+		audit_log_format(ab, "%s on %s ", fmt, sa->name);
+
+	} else if (sa->type == SD_AUDITTYPE_LINK) {
+		audit_log_format(ab,
+			"link access from %s to %s ",
+			sa->name,
+			(char*)sa->pval);
+
+	} else if (sa->type == SD_AUDITTYPE_CAP) {
+		audit_log_format(ab,
+			"access to capability '%s' ",
+			capability_to_name(sa->ival));
+
+		opspec_error = -EPERM;
+	} else if (sa->type == SD_AUDITTYPE_SYSCALL) {
+		audit_log_format(ab, "access to syscall '%s' ", sa->name);
+
+		opspec_error = -EPERM;
+	} else {
+		/* -EINVAL -- will WARN_ON above */
+		goto out;
+	}
+
+	audit_log_format(ab, "(%s(%d) ", current->comm, current->pid);
+
+	if (0)
+		audit_log_format(ab, "[global deny])\n");
+	else
+		audit_log_format(ab, "profile %s active %s)\n",
+			sd->profile->name, sd->active->name);
+
+	audit_log_end(ab);
+
+	if (sdcomplain)
+		error = 0;
+	else
+		error = sa->result ? 0 : opspec_error;
+
+out:
+	return error;
+}
+
+/**
+ * sd_get_name - retrieve fully qualified path name
  * @dentry: relative path element
  * @mnt: where in tree
  *
  * Returns fully qualified path name on sucess, NULL on failure.
  * sd_put_name must be used to free allocated buffer.
  */
-char *__sd_get_name(struct dentry *dentry, struct vfsmount *mnt)
+char *sd_get_name(struct dentry *dentry, struct vfsmount *mnt)
 {
 	char *page, *name = NULL;
 
@@ -463,208 +722,61 @@ out:
  * GLOBAL PERMISSION CHECK FUNCTIONS
  ***********************************/
 
-/*
- * sd_file_perm - calculate access mode for file
- * @subdomain: current subdomain
- * @name: name of file to calculate mode for
- * @mask: permission mask requested for file
- * @log:  log errors
- *
- * Search the sd_entry list in @profile.
- * Search looking to verify all permissions passed in mask.
- * Perform the search by looking at the partitioned list of entries, one
- * partition per permission bit.
- * Return 0 on access allowed, < 0 on error.
- */
-int sd_file_perm(struct subdomain *sd, const char *name, int mask, int log)
-{
-	struct sdprofile *profile;
-	int i, error, mode;
-
-#define PROCPFX "/proc/"
-#define PROCLEN sizeof(PROCPFX) - 1
-
-	SD_DEBUG("%s: %s 0x%x\n", __FUNCTION__, name, mask);
-
-	error = 0;
-
-	/* should not enter with other than R/W/X/L */
-	BUG_ON(mask &
-	       ~(SD_MAY_READ | SD_MAY_WRITE | SD_MAY_EXEC | SD_MAY_LINK));
-
-	/* not confined */
-	if (!__sd_is_confined(sd)) {
-		/* exit with access allowed */
-		SD_DEBUG("%s: not confined\n", __FUNCTION__);
-		goto done_notrace;
-	}
-
-	/* Special case access to /proc/self/attr/current
-	 * Currently we only allow access if opened O_WRONLY
-	 */
-	if (mask == MAY_WRITE && strncmp(PROCPFX, name, PROCLEN) == 0 &&
-	    (!list_empty(&sd->profile->sub) || SUBDOMAIN_COMPLAIN(sd)) &&
-	    sd_taskattr_access(name + PROCLEN))
-		goto done_notrace;
-
-	error = -EACCES;
-
-	profile = sd->active;
-
-	mode = 0;
-
-	/* iterate over partition, one permission bit at a time */
-	for (i = 0; i <= POS_SD_FILE_MAX; i++) {
-		struct list_head *lh;
-
-		/* do we have to accumulate this bit?
-		 * or have we already accumulated it (shortcut below)? */
-		if (!(mask & (1 << i)) || mode & (1 << i))
-			continue;
-
-		list_for_each(lh, &profile->file_entryp[i]) {
-			struct sd_entry *entry;
-			entry = list_entry(lh, struct sd_entry, listp[i]);
-
-			if (sdmatch_match(name, entry->filename,
-				entry->entry_type, entry->extradata)) {
-				/* Shortcut, accumulate all bits present */
-				mode |= entry->mode;
-
-				/*
-				 * Mask bits are overloaded
-				 * MAY_{EXEC,WRITE,READ,APPEND} are used by
-				 * kernel, other values are used locally only.
-				 */
-				if ((mode & mask) == mask) {
-					SD_DEBUG("MATCH! %s=0x%x [total mode=0x%x]\n",
-						 name, mask, mode);
-
-					error = 0;
-					goto done;
-				}
-			}
-		}
-	}
-	/* error: only log permissions that weren't granted */
-	mask &= ~mode;
-
-done:
-	if (log) {
-		sd_file_perm_trace(sd, name, mask, error);
-
-		if (SUBDOMAIN_COMPLAIN(sd))
-			error = 0;
-	}
-
-done_notrace:
-	return error;
-}
-
 /**
  * sd_attr - check whether attribute change allowed
  * @sd: SubDomain to check against to check against
  * @dentry: file to check
  * @iattr: attribute changes requested
- *
- * This function is a replica of sd_perm. In fact, calling sd_perm(MAY_WRITE)
- * will achieve the same access control, but logging would appear to indicate
- * success/failure of a "w" rather than an attribute change.  Also, this way we
- * can log a single message indicating success/failure and also what attribite
- * changes were attempted.
  */
 int sd_attr(struct subdomain *sd, struct dentry *dentry, struct iattr *iattr)
 {
-	int error = 0, sdpath_error;
-	struct sd_path_data data;
-	char *name;
+	int error = 0, permerror;
+	struct sd_audit sa;
 
-	/* if not confined or empty mask permission granted */
-	if (!__sd_is_confined(sd) || !iattr)
+	if (!__sd_is_confined(sd))
 		goto out;
 
-	/* search all paths to dentry */
+	sa.type = SD_AUDITTYPE_ATTR;
+	sa.pval = iattr;
+	sa.flags = 0;
 
-	sd_path_begin(dentry, &data);
-	do {
-		name = sd_path_getname(&data);
-		if (name) {
-			error = sd_file_perm(sd, name, MAY_WRITE, 0);
+	permerror = _sd_perm_dentry(sd, dentry, MAY_WRITE, &sa.name);
+	sd_permerror2result(permerror, &sa);
 
-			/* access via any path is enough */
-			if (error)
-				sd_attr_trace(sd, name, iattr, error);
+	error = sd_audit(sd, &sa);
 
-			sd_put_name(name);
-
-			if (!error)
-				break;
-		}
-
-	} while (name);
-
-	if ((sdpath_error = sd_path_end(&data)) != 0) {
-		SD_ERROR("%s: An error occured while translating dentry %p "
-			 "inode# %lu to a pathname. Error %d\n",
-			 __FUNCTION__,
-			 dentry,
-			 dentry->d_inode->i_ino,
-			 sdpath_error);
-
-		error = sdpath_error;
-	}
-
-	if (SUBDOMAIN_COMPLAIN(sd))
-		error = 0;
+	sd_put_name(sa.name);
 
 out:
 	return error;
 }
 
-int sd_xattr(struct subdomain *sd, struct dentry *dentry, const char *attr,
-	     int flags)
+int sd_xattr(struct subdomain *sd, struct dentry *dentry, const char *xattr,
+	     int xattroptype)
 {
-	int error = 0, sdpath_error;
-	struct sd_path_data data;
-	char *name;
+	int error = 0, permerror, mask = 0;
+	struct sd_audit sa;
 
 	/* if not confined or empty mask permission granted */
 	if (!__sd_is_confined(sd))
 		goto out;
 
-	/* search all paths to dentry */
+	if (xattroptype == SD_XATTR_GET || xattroptype == SD_XATTR_LIST)
+		mask = MAY_READ;
+	else if (xattroptype == SD_XATTR_SET || xattroptype == SD_XATTR_REMOVE)
+		mask = MAY_WRITE;
 
-	sd_path_begin(dentry, &data);
-	do {
-		name = sd_path_getname(&data);
-		if (name) {
-			error = sd_file_perm(sd, name, flags, 0);
+	sa.type = SD_AUDITTYPE_XATTR;
+	sa.ival = xattroptype;
+	sa.pval = xattr;
+	sa.flags = 0;
 
-			/* access via any path is enough */
-			if (error)
-				sd_xattr_trace(sd, name, attr, flags, error);
+	permerror = _sd_perm_dentry(sd, dentry, mask, &sa.name);
+	sd_permerror2result(permerror, &sa);
 
-			sd_put_name(name);
+	error = sd_audit(sd, &sa);
 
-			if (!error)
-				break;
-		}
-
-	} while (name);
-
-	if ((sdpath_error = sd_path_end(&data)) != 0) {
-		SD_ERROR("%s: An error occured while translating dentry %p "
-			 "inode# %lu to a pathname. Error %d\n",
-			 __FUNCTION__,
-			 dentry,
-			 dentry->d_inode->i_ino,
-			 sdpath_error);
-
-		error = sdpath_error;
-	}
-
-	if (SUBDOMAIN_COMPLAIN(sd))
-		error = 0;
+	sd_put_name(sa.name);
 
 out:
 	return error;
@@ -677,15 +789,14 @@ out:
  * @mnt: mountpoint
  * @mask: access mode requested
  *
- * This checks that the @inode is in the current subdomain, @sd, and
- * that it can be accessed in the mode requested by @mask.  Returns 0 on
- * success.
+ * Determine if access (mask) for dentry is authorized by subdomain sd.
+ * Result, 0 (success), -ve (error)
  */
 int sd_perm(struct subdomain *sd, struct dentry *dentry, struct vfsmount *mnt,
 	    int mask)
 {
-	char *name = NULL;
-	int error = 0;
+	int error = 0, permerror;
+	struct sd_audit sa;
 
 	if (!__sd_is_confined(sd))
 		goto out;
@@ -693,13 +804,18 @@ int sd_perm(struct subdomain *sd, struct dentry *dentry, struct vfsmount *mnt,
 	if ((mask = sd_filter_mask(mask, dentry->d_inode)) == 0)
 		goto out;
 
-	error = -ENOMEM;
+	sa.type = SD_AUDITTYPE_FILE;
+	sa.name = sd_get_name(dentry, mnt);
+	sa.ival = mask;
+	sa.flags = 0;
 
-	name = __sd_get_name(dentry, mnt);
-	if (name) {
-		error = sd_file_perm(sd, name, mask, 1);
-		sd_put_name(name);
-	}
+	permerror = (sa.name ? sd_file_perm(sd, sa.name, mask) : -ENOMEM);
+
+	sd_permerror2result(permerror, &sa);
+
+	error = sd_audit(sd, &sa);
+
+	sd_put_name(sa.name);
 
 out:
 	return error;
@@ -721,11 +837,19 @@ int sd_perm_nameidata(struct subdomain *sd, struct nameidata *nd, int mask)
 	return error;
 }
 
+/**
+ * sd_perm_dentry - file permissions interface when no vfsmnt available
+ * @sd: current SubDomain
+ * @dentry: requested dentry
+ * @mask: access mode requested
+ *
+ * Determine if access (mask) for dentry is authorized by subdomain sd.
+ * Result, 0 (success), -ve (error)
+ */
 int sd_perm_dentry(struct subdomain *sd, struct dentry *dentry, int mask)
 {
-	char *name;
-	struct sd_path_data data;
-	int error = 0, sdpath_error;
+	int error = 0, permerror;
+	struct sd_audit sa;
 
 	if (!__sd_is_confined(sd))
 		goto out;
@@ -733,31 +857,55 @@ int sd_perm_dentry(struct subdomain *sd, struct dentry *dentry, int mask)
 	if ((mask = sd_filter_mask(mask, dentry->d_inode)) == 0)
 		goto out;
 
-	/* search all paths to dentry */
+	sa.type = SD_AUDITTYPE_FILE;
+	sa.ival = mask;
+	sa.flags = 0;
 
-	sd_path_begin(dentry, &data);
-	do {
-		name = sd_path_getname(&data);
-		if (name) {
-			error = sd_file_perm(sd, name, mask, 1);
-			sd_put_name(name);
+	permerror = _sd_perm_dentry(sd, dentry, mask, &sa.name);
+	sd_permerror2result(permerror, &sa);
 
-			/* access via any path is enough */
-			if (!error)
-				break;
-		}
-	} while (name);
+	error = sd_audit(sd, &sa);
 
-	if ((sdpath_error = sd_path_end(&data)) != 0) {
-		SD_ERROR("%s: An error occured while translating dentry %p "
-			 "inode# %lu to a pathname. Error %d\n",
-			 __FUNCTION__,
-			 dentry,
-			 dentry->d_inode->i_ino,
-			 sdpath_error);
+	sd_put_name(sa.name);
 
-		error = sdpath_error;
-	}
+out:
+	return error;
+}
+
+/**
+ * sd_perm_dir
+ * @sd: current SubDomain
+ * @dentry: requested dentry
+ * @mode: SD_DIR_MKDIR or SD_DIR_RMDIR
+ *
+ * Determine if directory operation (make/remove) for dentry is authorized
+ * by subdomain sd.
+ * Result, 0 (success), -ve (error)
+ */
+int sd_perm_dir(struct subdomain *sd, struct dentry *dentry, int diroptype)
+{
+	int error = 0, permerror, mask;
+	struct sd_audit sa;
+
+	BUG_ON(diroptype != SD_DIR_MKDIR && diroptype != SD_DIR_RMDIR);
+
+	if (!__sd_is_confined(sd))
+		goto out;
+
+	mask = MAY_WRITE;
+	if (diroptype == SD_DIR_RMDIR)
+		mask |= SD_MAY_LINK;
+
+	sa.type = SD_AUDITTYPE_DIR;
+	sa.ival = diroptype;
+	sa.flags = 0;
+
+	permerror = _sd_perm_dentry(sd, dentry, mask, &sa.name);
+	sd_permerror2result(permerror, &sa);
+
+	error = sd_audit(sd, &sa);
+
+	sd_put_name(sa.name);
 
 out:
 	return error;
@@ -769,34 +917,23 @@ out:
  * @cap: capability to be tested
  *
  * Look up capability in active profile capability set.
- * Return 0 if valid, -EPERM if invalid
+ * Return 0 (success), -EPERM (error)
  */
-
 int sd_capability(struct subdomain *sd, int cap)
 {
 	int error = 0;
 
 	if (__sd_is_confined(sd)) {
-		const char *status;
+		struct sd_audit sa;
 
-		status = SUBDOMAIN_COMPLAIN(sd) ? "PERMITTING" : "REJECTING";
+		sa.type = SD_AUDITTYPE_CAP;
+		sa.name = NULL;
+		sa.ival = cap;
+		sa.flags = 0;
+		sa.errorcode = 0;
+		sa.result = cap_raised(sd->active->capabilities, cap);
 
-		error = cap_raised(sd->active->capabilities, cap) ? 0 : -EPERM;
-
-		if (error || SUBDOMAIN_AUDIT(sd)) {
-			if (error == 0)
-				status = "AUDITING";
-
-			SD_WARN("%s access to capability '%s' (%s(%d) "
-				"profile %s active %s)\n",
-				status,
-				capability_to_name(cap),
-				current->comm, current->pid,
-				sd->profile->name, sd->active->name);
-
-			if (SUBDOMAIN_COMPLAIN(sd))
-				error = 0;
-		}
+		error = sd_audit(sd, &sa);
 	}
 
 	return error;
@@ -813,12 +950,16 @@ int sd_capability(struct subdomain *sd, int cap)
  */
 int sd_link(struct subdomain *sd, struct dentry *link, struct dentry *target)
 {
-	char *iname, *oname;
+	char *iname = NULL, *oname = NULL,
+	     *failed_iname = NULL, *failed_oname = NULL;
+	unsigned int result = 0;
+	int error, sdpath_error, errorcode = 0, match = 0,
+	    sdcomplain = SUBDOMAIN_COMPLAIN(sd);
 	struct sd_path_data idata, odata;
-	int error = 0, sdpath_error, done;
+	struct sd_audit sa;
 
 	if (!__sd_is_confined(sd))
-		goto out;
+		return 0;
 
 	/* Perform nested lookup for names.
 	 * This is necessary in the case where /dev/block is mounted
@@ -826,27 +967,41 @@ int sd_link(struct subdomain *sd, struct dentry *link, struct dentry *target)
 	 * This allows us to detect links where src/dest are on different
 	 * mounts.   N.B no support yet for links across bind mounts of
 	 * the form mount -bind /mnt/subpath /mnt2
+	 *
+	 * Getting direct access to vfsmounts (via nameidata) for link and
+	 * target would allow all this uglyness to go away.
+	 *
+ 	 * If more than one mountpoint matches but none satisfy the profile,
+	 * only the first pathname (mountpoint) is logged.
 	 */
 
-	done = 0;
 	sd_path_begin2(target, link, &odata);
 	do {
 		oname = sd_path_getname(&odata);
-
 		if (oname) {
 			sd_path_begin(target, &idata);
 			do {
 				iname = sd_path_getname(&idata);
 				if (iname) {
-					error = sd_link_perm(sd, oname, iname);
-					sd_put_name(iname);
+					result = sd_link_perm(sd, oname, iname);
 
 					/* access via any path is enough */
-					if (!error)
-						done = 1;
-				}
-			} while (!done && iname);
+					if (result || sdcomplain) {
+						match = 1;
+						break;
+					}
 
+					/* Already have an path that failed? */
+					if (failed_iname) {
+						sd_put_name(iname);
+					} else {
+						failed_iname = iname;
+						failed_oname = oname;
+					}
+				}
+			} while (iname && !match);
+
+			/* should not be possible if we matched */
 			if ((sdpath_error = sd_path_end(&idata)) != 0) {
 				SD_ERROR("%s: An error occured while "
 					 "translating inner dentry %p "
@@ -856,16 +1011,22 @@ int sd_link(struct subdomain *sd, struct dentry *link, struct dentry *target)
 					 target->d_inode->i_ino,
 					 sdpath_error);
 
-				(void)sd_path_end(&odata);
-				error = sdpath_error;
-				goto out;
+				/* name should not be set if error */
+				WARN_ON(iname);
+
+				errorcode = sdpath_error;
 			}
-			sd_put_name(oname);
 
+			/* don't release if we're saving it */
+			if (!match && failed_oname != oname)
+				sd_put_name(oname);
 		}
-	} while (!done && oname);
+	} while (oname && !match);
 
-	if ((sdpath_error = sd_path_end(&odata)) != 0) {
+	if (errorcode != 0) {
+		/* inner error */
+		(void)sd_path_end(&odata);
+	} else if ((sdpath_error = sd_path_end(&odata)) != 0) {
 		SD_ERROR("%s: An error occured while translating outer "
 			 "dentry %p inode %lu to a pathname. Error %d\n",
 			 __FUNCTION__,
@@ -873,10 +1034,41 @@ int sd_link(struct subdomain *sd, struct dentry *link, struct dentry *target)
 			 link->d_inode->i_ino,
 			 sdpath_error);
 
-		error = sdpath_error;
+		errorcode = sdpath_error;
 	}
 
-out:
+	if (errorcode != 0) {
+		/* inner or outer error */
+		result = 0;
+	} else if (match) {
+		result = 1;
+	} else {
+		/* failed to match */
+		WARN_ON(iname);
+		WARN_ON(oname);
+
+		result = 0;
+		iname = failed_iname;
+		oname = failed_oname;
+	}
+
+	sa.type = SD_AUDITTYPE_LINK;
+	sa.name = oname;	/* link */
+	sa.pval = iname;	/* target */
+	sa.flags = 0;
+	sa.errorcode = errorcode;
+	sa.result = result;
+
+	error = sd_audit(sd, &sa);
+
+	if (failed_oname != oname)
+		sd_put_name(failed_oname);
+	if (failed_iname != iname)
+		sd_put_name(failed_iname);
+
+	sd_put_name(oname);
+	sd_put_name(iname);
+
 	return error;
 }
 
@@ -904,19 +1096,22 @@ int sd_fork(struct task_struct *p)
 		return -ENOMEM;
 
 	if (sd) {
+		unsigned long flags;
+
 		/* Can get away with a read rather than write lock here
 		 * as we just allocated newsd above, so we can guarantee
 		 * that it's active/profile are null and therefore a replace
 		 * cannot happen.
 		 */
-		read_lock(&sd_lock);
+		read_lock_irqsave(&sd_lock, flags);
 		sd_switch(newsd, sd->profile, sd->active);
 		newsd->sd_hat_magic = sd->sd_hat_magic;
-		read_unlock(&sd_lock);
+		read_unlock_irqrestore(&sd_lock, flags);
 
 		if (SUBDOMAIN_COMPLAIN(sd) &&
 		    sd->active == null_complain_profile)
-			SD_WARN("LOGPROF-HINT fork pid=%d child=%d\n",
+			LOG_HINT(sd, HINT_FORK,
+				"pid=%d child=%d\n",
 				current->pid, p->pid);
 	}
 	p->security = newsd;
@@ -968,7 +1163,7 @@ int sd_register(struct file *filp)
 		current->security = sd;
 	}
 
-	filename = __sd_get_name(filp->f_dentry, filp->f_vfsmnt);
+	filename = sd_get_name(filp->f_dentry, filp->f_vfsmnt);
 	if (!filename) {
 		SD_WARN("%s: Failed to get filename\n", __FUNCTION__);
 		goto out;
@@ -1073,7 +1268,7 @@ find_profile:
 		/* Profile (mandatory) could not be found */
 
 		if (complain) {
-			SD_WARN("LOGPROF-HINT missing_mandatory_profile "
+			LOG_HINT(sd, HINT_MANDPROF,
 				"image=%s pid=%d profile=%s active=%s\n",
 				filename,
 				current->pid,
@@ -1109,6 +1304,7 @@ apply_profile:
 	/* Apply profile if necessary */
 	if (newprofile) {
 		struct subdomain *latest_sd;
+		unsigned long flags;
 
 		if (newprofile == &unconstrained_flag)
 			newprofile = NULL;
@@ -1131,7 +1327,7 @@ apply_profile:
 		 *   having to hold a write lock around all this code.
 		 */
 
-		write_lock(&sd_lock);
+		write_lock_irqsave(&sd_lock, flags);
 
 		/* task is guaranteed to have a SubDomain (->security)
 		 * by this point
@@ -1154,7 +1350,7 @@ apply_profile:
 				/* Race, profile was removed, not replaced.
 				 * Redo with error checking
 				 */
-				write_unlock(&sd_lock);
+				write_unlock_irqrestore(&sd_lock, flags);
 				goto find_profile;
 			}
 		}
@@ -1172,10 +1368,11 @@ apply_profile:
 		put_sdprofile(newprofile);
 
 		if (complain && newprofile == null_complain_profile)
-			SD_WARN("LOGPROF-HINT changing_profile pid=%d\n",
+			LOG_HINT(latest_sd, HINT_CHGPROF,
+				"pid=%d\n",
 				current->pid);
 
-		write_unlock(&sd_lock);
+		write_unlock_irqrestore(&sd_lock, flags);
 	}
 
 	sd_put_name(filename);
@@ -1242,8 +1439,9 @@ static inline int do_change_hat(const char *hat_name, struct subdomain *sd)
 		 * out to the parent profile (assuming magic != NULL)
 		 */
 		if (SUBDOMAIN_COMPLAIN(sd)) {
-			SD_WARN("LOGPROF-HINT unknown_hat %s "
-				"pid=%d profile=%s active=%s\n",
+			LOG_HINT(sd, HINT_UNKNOWN_HAT,
+ 				"%s pid=%d "
+				"profile=%s active=%s\n",
 				hat_name,
 				current->pid,
 				sd->profile->name,

@@ -17,9 +17,12 @@
 
 #include "immunix.h"
 
-extern int subdomain_debug;	/* 0 or 1 */
-extern int subdomain_complain;	/* 0 or 1 */
-extern int subdomain_audit;	/* 0 or 1 */
+/* Control parameters (0 or 1), settable thru module/boot flags or
+ * via /sys/kernel/security/subdomain/control */
+extern int subdomain_complain;
+extern int subdomain_debug;
+extern int subdomain_audit;
+extern int subdomain_logsyscall;
 
 #define SD_UNCONSTRAINED "unconstrained"
 
@@ -149,12 +152,71 @@ extern rwlock_t sd_lock;
 extern struct sdprofile *null_profile;
 extern struct sdprofile *null_complain_profile;
 
+/** sd_audit
+ *
+ * Auditing structure
+ */
+
+struct sd_audit {
+	unsigned short type, flags;
+	unsigned int result;
+	int errorcode;
+
+	const char *name;
+	unsigned int ival;
+	union{
+		const void *pval;
+		va_list vaval;
+	};
+};
+
+/* audit types */
+#define SD_AUDITTYPE_FILE	1
+#define SD_AUDITTYPE_DIR	2
+#define SD_AUDITTYPE_ATTR	3
+#define SD_AUDITTYPE_XATTR	4
+#define SD_AUDITTYPE_LINK	5
+#define SD_AUDITTYPE_CAP	6
+#define SD_AUDITTYPE_MSG	7
+#define SD_AUDITTYPE_SYSCALL	8
+#define SD_AUDITTYPE__END	9
+
+/* audit flags */
+#define SD_AUDITFLAG_AUDITSS_SYSCALL 1 /* log syscall context */
+#define SD_AUDITFLAG_LOGERR	     2 /* log operations that failed due to
+					   non permission errors  */
+
+#define HINT_UNKNOWN_HAT "unknown_hat"
+#define HINT_FORK "fork"
+#define HINT_MANDPROF "missing_mandatory_profile"
+#define HINT_CHGPROF "changing_profile"
+
+#define LOG_HINT(sd, hint, fmt, args...) \
+	do {\
+		sd_audit_message(sd, 0, \
+			"LOGPROF-HINT " hint " " fmt, ##args);\
+	} while(0)
+
+/* diroptype */
+#define SD_DIR_MKDIR 0
+#define SD_DIR_RMDIR 1
+
+/* xattroptype */
+#define SD_XATTR_GET    0
+#define SD_XATTR_SET    1
+#define SD_XATTR_LIST   2
+#define SD_XATTR_REMOVE 3
+
 /* main.c */
-extern char *__sd_get_name(struct dentry *dentry, struct vfsmount *mnt);
+extern int sd_audit_message(struct subdomain *, int, const char *, ...);
+extern int sd_audit_syscallreject(struct subdomain *, const char *);
+extern int sd_audit(struct subdomain *, const struct sd_audit *);
+extern char *sd_get_name(struct dentry *dentry, struct vfsmount *mnt);
+
 extern int sd_attr(struct subdomain *sd, struct dentry *dentry,
 		   struct iattr *iattr);
 extern int sd_xattr(struct subdomain *sd, struct dentry *dentry,
-		    const char *attr, int flags);
+		    const char *xattr, int xattroptype);
 extern int sd_capability(struct subdomain *sd, int cap);
 extern int sd_perm(struct subdomain *sd, struct dentry *dentry,
 		   struct vfsmount *mnt, int mask);
@@ -162,8 +224,8 @@ extern int sd_perm_nameidata(struct subdomain *sd, struct nameidata *nd,
 			     int mask);
 extern int sd_perm_dentry(struct subdomain *sd, struct dentry *dentry,
 			  int mask);
-extern int sd_file_perm(struct subdomain *sd, const char *name,
-			int mask, int log);
+extern int sd_perm_dir(struct subdomain *sd, struct dentry *dentry,
+		       int diroptype);
 extern int sd_link(struct subdomain *sd,
 		   struct dentry *link, struct dentry *target);
 extern int sd_fork(struct task_struct *p);

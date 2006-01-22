@@ -9,6 +9,8 @@
  *	SubDomain userspace policy interface
  */
 
+#include <asm/unaligned.h>
+
 #include "subdomain.h"
 #include "immunix.h"
 #include "inline.h"
@@ -17,22 +19,7 @@
 
 /* sd_code defined in module_interface.h */
 
-const int sdcode_size[] = { 1, 2, 4, 8, 2, 2, 4, 0, 0, 0, 0, 0, 0 };
-
-const char *sd_code_names[] = {
-	"SD_U8",
-	"SD_U16",
-	"SD_U32",
-	"SD_U64",
-	"SD_NAME",
-	"SD_STRING",
-	"SD_BLOB",
-	"SD_STRUCT",
-	"SD_STRUCTEND",
-	"SD_LIST",
-	"SD_LISTEND",
-	"SD_OFFSET"
-};
+const int sdcode_datasize[] = { 1, 2, 4, 8, 2, 2, 4, 0, 0, 0, 0, 0, 0 };
 
 struct sd_taskreplace_data {
 	struct sdprofile *old_profile;
@@ -80,8 +67,8 @@ static inline struct sd_entry *alloc_sd_entry(void)
  */
 void free_sdprofile(struct sdprofile *profile)
 {
-	struct sd_entry *sdent;
-	struct list_head *lh, *tmp;
+	struct sd_entry *sdent, *tmp;
+	struct sdprofile *p, *ptmp;
 
 	SD_DEBUG("%s(%p)\n", __FUNCTION__, profile);
 
@@ -97,8 +84,7 @@ void free_sdprofile(struct sdprofile *profile)
 		BUG();
 	}
 
-	list_for_each_safe(lh, tmp, &profile->file_entry) {
-		sdent = list_entry(lh, struct sd_entry, list);
+	list_for_each_entry_safe(sdent, tmp, &profile->file_entry, list) {
 		if (sdent->filename)
 			SD_DEBUG("freeing sd_entry: %p %s\n",
 				 sdent->filename, sdent->filename);
@@ -106,8 +92,7 @@ void free_sdprofile(struct sdprofile *profile)
 		free_sd_entry(sdent);
 	}
 
-	list_for_each_safe(lh, tmp, &profile->sub) {
-		struct sdprofile *p = list_entry(lh, struct sdprofile, list);
+	list_for_each_entry_safe(p, ptmp, &profile->sub, list) {
 		list_del_init(&p->list);
 		put_sdprofile(p);
 	}
@@ -150,15 +135,16 @@ static int taskremove_iter(struct subdomain *sd, void *cookie)
 {
 	struct sdprofile *old_profile = (struct sdprofile *)cookie;
 	int remove = 0;
+	unsigned long flags;
 
-	write_lock(&sd_lock);
+	write_lock_irqsave(&sd_lock, flags);
 
 	if (__sd_is_confined(sd) && sd->profile == old_profile) {
 		remove = 1;	/* remove item from list */
 		task_remove(sd);
 	}
 
-	write_unlock(&sd_lock);
+	write_unlock_irqrestore(&sd_lock, flags);
 
 	return remove;
 }
@@ -209,38 +195,17 @@ static inline void task_replace(struct subdomain *sd, struct sdprofile *new)
 static int taskreplace_iter(struct subdomain *sd, void *cookie)
 {
 	struct sd_taskreplace_data *data = (struct sd_taskreplace_data *)cookie;
+	unsigned long flags;
 
-	write_lock(&sd_lock);
+	write_lock_irqsave(&sd_lock, flags);
 
 	if (__sd_is_confined(sd) && sd->profile == data->old_profile)
 		task_replace(sd, data->new_profile);
 
-	write_unlock(&sd_lock);
+	write_unlock_irqrestore(&sd_lock, flags);
 
 	return 0;
 }
-
-static inline u16 convert16(char *data)
-{
-	u16 tmp;
-	memcpy(&tmp, data, sizeof(tmp));
-	return le16_to_cpu(tmp);
-}
-
-static inline u32 convert32(char *data)
-{
-	u32 tmp;
-	memcpy(&tmp, data, sizeof(tmp));
-	return le32_to_cpu(tmp);
-}
-
-static inline u64 convert64(char *data)
-{
-	u64 tmp;
-	memcpy(&tmp, data, sizeof(tmp));
-	return le64_to_cpu(tmp);
-}
-
 
 static inline int sd_inbounds(struct sd_ext *e, size_t size)
 {
@@ -264,14 +229,14 @@ static void sdconvert(enum sd_code code, void *dest, void *src)
 	case SD_U16:
 	case SD_NAME:
 	case SD_DYN_STRING:
-		*(u16 *)dest = convert16(src);
+		*(u16 *)dest = le16_to_cpu(get_unaligned((u16 *)src));
 		break;
 	case SD_U32:
 	case SD_STATIC_BLOB:
-		*(u32 *)dest = convert32(src);
+		*(u32 *)dest = le32_to_cpu(get_unaligned((u32 *)src));
 		break;
 	case SD_U64:
-		*(u64 *)dest = convert64(src);
+		*(u64 *)dest = le64_to_cpu(get_unaligned((u64 *)src));
 		break;
 	default:
 		/* nop - all other type codes do not have a trailing value */
@@ -296,7 +261,7 @@ static u32 sd_is_X(struct sd_ext *e, enum sd_code code, void *data)
 {
 	void *pos = e->pos;
 	int ret = 0;
-	if (!sd_inbounds(e, SD_CODE_BYTE + sdcode_size[code]))
+	if (!sd_inbounds(e, SD_CODE_BYTE + sdcode_datasize[code]))
 		goto fail;
 	if (code != *(u8 *)e->pos)
 		goto out;
@@ -304,19 +269,19 @@ static u32 sd_is_X(struct sd_ext *e, enum sd_code code, void *data)
 	if (code == SD_NAME) {
 		u16 size;
 		/* name codes are followed by X bytes */
-		size = convert16(e->pos);
+		size = le16_to_cpu(get_unaligned((u16 *)e->pos));
 		if (!sd_inbounds(e, (size_t) size))
 			goto fail;
 		if (data)
 			*(u16 *)data = size;
-		e->pos += sdcode_size[code];
-		ret = 1 + sdcode_size[code];
+		e->pos += sdcode_datasize[code];
+		ret = 1 + sdcode_datasize[code];
 	} else if (code == SD_DYN_STRING) {
 		u16 size;
 		char *str;
 		/* strings codes are followed by X bytes */
-		size = convert16(e->pos);
-		e->pos += sdcode_size[code];
+		size = le16_to_cpu(get_unaligned((u16 *)e->pos));
+		e->pos += sdcode_datasize[code];
 		if (!sd_inbounds(e, (size_t) size))
 			goto fail;
 		if (data) {
@@ -333,8 +298,8 @@ static u32 sd_is_X(struct sd_ext *e, enum sd_code code, void *data)
 	} else if (code == SD_STATIC_BLOB) {
 		u32 size;
 		/* blobs are followed by X bytes, that can be 2^32 */
-		size = convert32(e->pos);
-		e->pos += sdcode_size[code];
+		size = le32_to_cpu(get_unaligned((u32 *)e->pos));
+		e->pos += sdcode_datasize[code];
 		if (!sd_inbounds(e, (size_t) size))
 			goto fail;
 		if (data)
@@ -344,8 +309,8 @@ static u32 sd_is_X(struct sd_ext *e, enum sd_code code, void *data)
 	} else {
 		if (data)
 			sdconvert(code, data, e->pos);
-		e->pos += sdcode_size[code];
-		ret = 1 + sdcode_size[code];
+		e->pos += sdcode_datasize[code];
+		ret = 1 + sdcode_datasize[code];
 	}
 out:
 	return ret;

@@ -77,15 +77,14 @@ int sd_profilelist_add(struct sdprofile *profile)
 int sd_profilelist_remove(const char *name)
 {
 	struct sdprofile *profile = NULL;
-	struct list_head *lh, *tmp;
+	struct sdprofile *p, *tmp;
 	int error = -ENOENT;
 
 	if (!name)
 		goto out;
 
 	write_lock(&profile_lock);
-	list_for_each_safe(lh, tmp, &profile_list) {
-		struct sdprofile *p = list_entry(lh, struct sdprofile, list);
+	list_for_each_entry_safe(p, tmp, &profile_list, list) {
 		if (!strcmp(p->name, name)) {
 			list_del_init(&p->list);
 			profile = p;
@@ -137,13 +136,12 @@ struct sdprofile *sd_profilelist_replace(struct sdprofile *profile)
  */
 void sd_profilelist_release(void)
 {
-	struct list_head *lh, *tmp;
+	struct sdprofile *p, *tmp;
 
 	write_lock(&profile_lock);
-	list_for_each_safe(lh, tmp, &profile_list) {
-		struct sdprofile *profile = list_entry(lh, struct sdprofile, list);
-		list_del_init(&profile->list);
-		put_sdprofile(profile);
+	list_for_each_entry_safe(p, tmp, &profile_list, list) {
+		list_del_init(&p->list);
+		put_sdprofile(p);
 	}
 	write_unlock(&profile_lock);
 }
@@ -156,14 +154,16 @@ void sd_profilelist_release(void)
  */
 void sd_subdomainlist_add(struct subdomain *sd)
 {
+	unsigned long flags;
+
 	if (!sd) {
 		SD_INFO("%s: bad subdomain\n", __FUNCTION__);
 		return;
 	}
 
-	write_lock(&subdomain_lock);
+	write_lock_irqsave(&subdomain_lock, flags);
 	list_add(&sd->list, &subdomain_list);
-	write_unlock(&subdomain_lock);
+	write_unlock_irqrestore(&subdomain_lock, flags);
 }
 
 /**
@@ -174,22 +174,22 @@ void sd_subdomainlist_add(struct subdomain *sd)
  */
 int sd_subdomainlist_remove(struct subdomain *sd)
 {
-	struct list_head *lh, *tmp;
+	struct subdomain *node, *tmp;
 	int error = -ENOENT;
+	unsigned long flags;
 
 	if (!sd)
 		goto out;
 
-	write_lock(&subdomain_lock);
-	list_for_each_safe(lh, tmp, &subdomain_list) {
-		struct subdomain *node = list_entry(lh, struct subdomain, list);
+	write_lock_irqsave(&subdomain_lock, flags);
+	list_for_each_entry_safe(node, tmp, &subdomain_list, list) {
 		if (node == sd) {
 			list_del_init(&node->list);
 			error = 0;
 			break;
 		}
 	}
-	write_unlock(&subdomain_lock);
+	write_unlock_irqrestore(&subdomain_lock, flags);
 
 out:
 	return error;
@@ -204,17 +204,17 @@ out:
  */
 void sd_subdomainlist_iterate(sd_iter func, void *cookie)
 {
-	struct list_head *lh;
+	struct subdomain *node;
 	int ret = 0;
+	unsigned long flags;
 
-	read_lock(&subdomain_lock);
-	list_for_each(lh, &subdomain_list) {
-		struct subdomain *node = list_entry(lh, struct subdomain, list);
+	read_lock_irqsave(&subdomain_lock, flags);
+	list_for_each_entry(node, &subdomain_list, list) {
 		ret = (*func) (node, cookie);
 		if (ret != 0)
 			break;
 	}
-	read_unlock(&subdomain_lock);
+	read_unlock_irqrestore(&subdomain_lock, flags);
 }
 
 /**
@@ -227,17 +227,17 @@ void sd_subdomainlist_iterate(sd_iter func, void *cookie)
  */
 void sd_subdomainlist_iterateremove(sd_iter func, void *cookie)
 {
-	struct list_head *lh, *tmp;
+	struct subdomain *node, *tmp;
 	int ret = 0;
+	unsigned long flags;
 
-	write_lock(&subdomain_lock);
-	list_for_each_safe(lh, tmp, &subdomain_list) {
-		struct subdomain *node = list_entry(lh, struct subdomain, list);
+	write_lock_irqsave(&subdomain_lock, flags);
+	list_for_each_entry_safe(node, tmp, &subdomain_list, list) {
 		ret = (*func) (node, cookie);
 		if (ret != 0)
-			list_del_init(lh);
+			list_del_init(&node->list);
 	}
-	write_unlock(&subdomain_lock);
+	write_unlock_irqrestore(&subdomain_lock, flags);
 }
 
 /**
@@ -247,13 +247,14 @@ void sd_subdomainlist_iterateremove(sd_iter func, void *cookie)
  */
 void sd_subdomainlist_release()
 {
-	struct list_head *lh, *tmp;
+	struct subdomain *node, *tmp;
+	unsigned long flags;
 
-	write_lock(&subdomain_lock);
-	list_for_each_safe(lh, tmp, &subdomain_list) {
-		list_del_init(lh);
+	write_lock_irqsave(&subdomain_lock, flags);
+	list_for_each_entry_safe(node, tmp, &subdomain_list, list) {
+		list_del_init(&node->list);
 	}
-	write_unlock(&subdomain_lock);
+	write_unlock_irqrestore(&subdomain_lock, flags);
 }
 
 /* seq_file helper routines
@@ -261,13 +262,13 @@ void sd_subdomainlist_release()
  */
 static void *p_start(struct seq_file *f, loff_t *pos)
 {
-	struct list_head *lh;
+	struct sdprofile *node;
 	loff_t l = *pos;
 
 	read_lock(&profile_lock);
-	list_for_each(lh, &profile_list)
+	list_for_each_entry(node, &profile_list, list)
 		if (!l--)
-			return list_entry(lh, struct sdprofile, list);
+			return node;
 	return NULL;
 }
 
