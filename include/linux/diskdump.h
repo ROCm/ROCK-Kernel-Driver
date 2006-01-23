@@ -39,7 +39,11 @@
 #define pr_warn(fmt,arg...) \
 	printk(KERN_WARNING fmt,##arg)
 
+#if defined(CONFIG_LKCD_DUMP) || defined(CONFIG_LKCD_DUMP_MODULE)
 #define lkcd_dump_mode()       unlikely(dump_polling_oncpu)
+#else
+#define lkcd_dump_mode()	0
+#endif
 
 extern unsigned long dump_polling_oncpu;
 
