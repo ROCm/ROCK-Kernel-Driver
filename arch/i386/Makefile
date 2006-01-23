@@ -43,12 +43,6 @@ cflags-$(CONFIG_REGPARM) += -mregparm=3
 # a lot more stack due to the lack of sharing of stacklots:
 CFLAGS				+= $(shell if [ $(call cc-version) -lt 0400 ] ; then echo $(call cc-option,-fno-unit-at-a-time); fi ;)
 
-# m586 and genericarch is likely a distribution kernel. optimize for the
-# most common CPU (686)
-ifeq ($(CONFIG_X86_GENERICARCH),y)
-cflags-$(CONFIG_M586) += $(call cc-option,-mtune=i686)
-endif
-
 CFLAGS += $(cflags-y)
 
 # Default subarch .c files
