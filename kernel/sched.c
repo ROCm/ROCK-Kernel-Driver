@@ -53,11 +53,13 @@
 
 #include <asm/unistd.h>
 
+#ifdef CONFIG_LKCD_DUMP
 /* used to soft spin in sched while dump is in progress */
 unsigned long dump_oncpu;
 EXPORT_SYMBOL_GPL(dump_oncpu);
 unsigned long dump_polling_oncpu;
 EXPORT_SYMBOL_GPL(dump_polling_oncpu);
+#endif
 
 /*
  * Convert user-nice values [ -20 ... 0 ... 19 ]
@@ -2896,18 +2898,21 @@ asmlinkage void __sched schedule(void)
 	unsigned long run_time;
 	int cpu, idx, new_prio;
 
+#ifdef CONFIG_LKCD_DUMP
 	/*
 	 * If a crash dump is in progress, schedule()
 	 * is a no-op for the dumping cpu, and all
 	 * other cpus are forced to wait until the dump
 	 * completes.
 	 */
-	if (unlikely(dump_oncpu))
+	if (unlikely(dump_oncpu)) {
 		if (dump_oncpu == smp_processor_id()+1)
 			return;
 		else
 			while (dump_oncpu)
 				cpu_relax();
+	}
+#endif
 
 	/*
 	 * Test if we are atomic.  Since do_exit() needs to call into
