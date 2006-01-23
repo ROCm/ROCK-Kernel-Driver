@@ -29,6 +29,7 @@ CHECKFLAGS      += -D__x86_64__ -m64
 
 cflags-$(CONFIG_MK8) += $(call cc-option,-march=k8)
 cflags-$(CONFIG_MPSC) += $(call cc-option,-march=nocona)
+cflags-$(CONFIG_KDB) += $(call cc-option,-fno-optimize-sibling-calls,)
 CFLAGS += $(cflags-y)
 
 CFLAGS += -m64
@@ -66,13 +67,14 @@ endif
 
 head-y := arch/$(archdir)/kernel/head.o arch/$(archdir)/kernel/head64.o arch/$(archdir)/kernel/init_task.o
 
-libs-y 					+= arch/x86_64/lib/
+libs-y 					+= arch/$(archdir)/lib/
 core-y					+= arch/$(archdir)/kernel/ \
 					   arch/$(archdir)/mm/ \
-					   arch/x86_64/crypto/
+					   arch/$(archdir)/crypto/
 core-$(CONFIG_IA32_EMULATION)		+= arch/$(archdir)/ia32/
 drivers-$(CONFIG_PCI)			+= arch/$(archdir)/pci/
-drivers-$(CONFIG_OPROFILE)		+= arch/x86_64/oprofile/
+drivers-$(CONFIG_OPROFILE)		+= arch/$(archdir)/oprofile/
+drivers-$(CONFIG_KDB)			+= arch/$(archdir)/kdb/
 
 boot := arch/$(archdir)/boot
 

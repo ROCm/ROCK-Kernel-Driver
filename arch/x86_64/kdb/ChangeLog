@@ -1,0 +1,98 @@
+2005-09-30 Jack F. Vogel <jfv@bluesong.net>
+	* Port to 2.6.14-rc2
+	* sync with a couple changes from Keith
+	* Add backtrace code from Jim Houston
+	  (thanks Jim)
+
+2005-08-31 Jack F. Vogel <jfv@bluesong.net>
+	* Change to linker script for kexec
+	  thanks to Steven Dake <sdake@mvista.com>
+
+2005-08-30 Jack F. Vogel <jfv@bluesong.net>
+	* Notify struct should not be devinit
+	  thanks IWAMOTO Toshihiro <iwamoto@valinux.co.jp>
+
+2005-08-25 Jack F. Vogel <jfv@bluesong.net>
+	* Update to 2.6.11
+	* Fix to synchronize with the notify changes
+	  thanks to Jim Houston.
+
+2004-09-30 Keith Owens <kaos@sgi.com>
+	* Port to 2.6.9-rc2
+	* Fix line editting characters.  Jim Houston, Comcast.
+	* kdb v4.4-2.6.9-rc2-x86-64-1.
+
+2004-08-15 Jack F. Vogel <jfv@bluesong.net>
+	* Port to 2.6.8
+	* tighten up the code, using the built-in
+	  die_chain notify interface, thanks to
+	  Andi Kleen for pointing this out.
+
+2004-05-15 Jack F. Vogel <jfv@bluesong.net>
+	* port to 2.6.6 for x86_64
+
+2003-12-15 Cliff Neighbors <cliff@fabric7.com>
+	* initial port from i386 to x86_64
+
+2002-08-10 Keith Owens  <kaos@sgi.com>
+
+	* Replace kdb_port with kdb_serial to support memory mapped I/O.
+	  Note: This needs kdb v2.3-2.4.19-common-2 or later.
+	* kdb v2.3-2.4.19-i386-3.
+
+2002-08-09 Keith Owens  <kaos@sgi.com>
+
+	* Use -fno-optimize-sibling-calls for kdb if gcc supports it.
+	* .text.lock does not consume an activation frame.
+	* kdb v2.3-2.4.19-i386-2.
+
+2002-08-07 Keith Owens  <kaos@sgi.com>
+
+	* Upgrade to 2.4.19.
+	* Remove individual SGI copyrights, the general SGI copyright applies.
+	* New .text.lock name.  Hugh Dickins.
+	* Set KERNEL_CS in kdba_getcurrentframe.  Hugh Dickins.
+	* Clean up disassembly layout.  Hugh Dickins, Keith Owens.
+	* Replace hard coded stack size with THREAD_SIZE.  Hugh Dickins.
+	* Better stack layout on bt with no frame pointers.  Hugh Dickins.
+	* Make i386 IO breakpoints (bpha <address> IO) work again.
+	  Martin Wilck, Keith Owens.
+	* Remove fixed KDB_MAX_COMMANDS size.
+	* Add set_fs() around __copy_to_user on kernel addresses.
+	  Randolph Chung.
+	* Position i386 for CONFIG_NUMA_REPLICATE.
+	* kdb v2.3-2.4.19-i386-1.
+
+2002-07-09 Keith Owens  <kaos@sgi.com>
+
+	* Upgrade to 2.4.19-rc1.
+
+2002-06-14 Keith Owens  <kaos@sgi.com>
+
+	* Upgrade to 2.4.19-pre10.
+	* kdb v2.1-2.4.19-pre10-i386-1.
+
+2002-04-09 Keith Owens  <kaos@sgi.com>
+
+	* Upgrade to 2.4.19-pre6.
+	* kdb v2.1-2.4.19-pre6-i386-1.
+
+2002-02-26 Keith Owens  <kaos@sgi.com>
+
+	* Upgrade to 2.4.18.
+	* kdb v2.1-2.4.18-i386-1.
+
+2002-01-18 Keith Owens  <kaos@sgi.com>
+
+	* Use new kdb_get/put functions.
+	* Define kdba_{get,put}area_size functions for i386.
+	* Remove over-engineered dblist callback functions.
+	* Correctly handle failing call disp32 in backtrace.
+	* Remove bp_instvalid flag, redundant code.
+	* Remove dead code.
+	* kdb v2.1-2.4.17-i386-1.
+
+2002-01-04 Keith Owens  <kaos@sgi.com>
+
+	* Sync xfs <-> kdb i386 code.
+

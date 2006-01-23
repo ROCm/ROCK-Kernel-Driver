@@ -33,6 +33,8 @@ enum die_val {
 	DIE_CALL,
 	DIE_NMI_IPI,
 	DIE_PAGE_FAULT,
+	DIE_KDEBUG_ENTER,
+	DIE_KDEBUG_LEAVE,
 }; 
 	
 static inline int notify_die(enum die_val val, const char *str,
