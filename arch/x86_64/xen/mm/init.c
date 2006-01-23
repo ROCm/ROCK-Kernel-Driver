@@ -27,6 +27,8 @@
 #include <linux/proc_fs.h>
 #include <linux/pci.h>
 #include <linux/dma-mapping.h>
+#include <linux/module.h>
+#include <linux/memory_hotplug.h>
 
 #include <asm/processor.h>
 #include <asm/system.h>
@@ -376,9 +378,17 @@ unsigned long get_machine_pfn(unsigned long addr)
         return pte_mfn(*pte);
 } 
 
-static __init void *alloc_static_page(unsigned long *phys)
+static __meminit void *alloc_static_page(unsigned long *phys)
 {
 	unsigned long va = (start_pfn << PAGE_SHIFT) + __START_KERNEL_map;
+
+	if (after_bootmem) {
+		void *adr = (void *)get_zeroed_page(GFP_ATOMIC);
+
+		*phys = __pa(adr);
+		return adr;
+	}
+
 	*phys = start_pfn << PAGE_SHIFT;
 	start_pfn++;
 	memset((void *)va, 0, PAGE_SIZE);
@@ -411,60 +421,81 @@ static inline int make_readonly(unsigned long paddr)
 	return readonly;
 }
 
-static void __init phys_pud_init(pud_t *pud, unsigned long address, unsigned long end)
-{ 
-        long i, j, k; 
-        unsigned long paddr;
+static void __meminit
+phys_pmd_init(pmd_t *pmd, unsigned long address, unsigned long end)
+{
+	unsigned i, k;
 
-	i = pud_index(address);
+	for (i = 0; i < PTRS_PER_PMD; pmd++, i++) {
+		unsigned long pte_phys;
+		pte_t *pte, *pte_save;
+
+		if (address >= end) {
+			for (; i < PTRS_PER_PMD; i++, pmd++)
+				set_pmd(pmd,  __pmd(0));
+			break;
+		}
+		pte = alloc_static_page(&pte_phys);
+		pte_save = pte;
+		for (k = 0; k < PTRS_PER_PTE; pte++, k++, address += PTE_SIZE) {
+			if ((address >= end) ||
+			    ((address >> PAGE_SHIFT) >= xen_start_info->nr_pages)) {
+				__set_pte(pte, __pte(0));
+				continue;
+			}
+			if (make_readonly(address)) {
+				__set_pte(pte,
+				          __pte(address | (_KERNPG_TABLE & ~_PAGE_RW)));
+				continue;
+			}
+			__set_pte(pte, __pte(address | _KERNPG_TABLE));
+		}
+		pte = pte_save;
+		early_make_page_readonly(pte);
+		xen_pte_pin(pte_phys);
+		set_pmd(pmd, __pmd(pte_phys | _KERNPG_TABLE));
+	}
+}
+
+static void __meminit
+phys_pmd_update(pud_t *pud, unsigned long address, unsigned long end)
+{
+	pmd_t *pmd = pmd_offset(pud, (unsigned long)__va(address));
+
+	if (pmd_none(*pmd)) {
+		spin_lock(&init_mm.page_table_lock);
+		phys_pmd_init(pmd, address, end);
+		spin_unlock(&init_mm.page_table_lock);
+		__flush_tlb_all();
+	}
+}
+
+static void __meminit phys_pud_init(pud_t *pud, unsigned long address, unsigned long end)
+{ 
+	long i = pud_index(address);
+
 	pud = pud + i;
 
+	if (after_bootmem && pud_val(*pud)) {
+		phys_pmd_update(pud, address, end);
+		return;
+	}
+
 	for (; i < PTRS_PER_PUD; pud++, i++) {
-		unsigned long pmd_phys;
+		unsigned long paddr, pmd_phys;
 		pmd_t *pmd;
 
-		paddr = address + i*PUD_SIZE;
-		if (paddr >= end) { 
-			for (; i < PTRS_PER_PUD; i++, pud++) 
-				set_pud(pud, __pud(0)); 
+		paddr = (address & PGDIR_MASK) + i*PUD_SIZE;
+		if (paddr >= end)
 			break;
-		} 
 
 		pmd = alloc_static_page(&pmd_phys);
                 early_make_page_readonly(pmd);
                 xen_pmd_pin(pmd_phys);
+		spin_lock(&init_mm.page_table_lock);
 		set_pud(pud, __pud(pmd_phys | _KERNPG_TABLE));
-
-      		for (j = 0; j < PTRS_PER_PMD; pmd++, j++) {
-                        unsigned long pte_phys;
-                        pte_t *pte, *pte_save;
-
-			if (paddr >= end) { 
-				for (; j < PTRS_PER_PMD; j++, pmd++)
-					set_pmd(pmd,  __pmd(0)); 
-				break;
-			}
-                        pte = alloc_static_page(&pte_phys);
-                        pte_save = pte;
-                        for (k = 0; k < PTRS_PER_PTE; pte++, k++, paddr += PTE_SIZE) {
-                                if ((paddr >= end) ||
-                                    ((paddr >> PAGE_SHIFT) >=
-                                     xen_start_info->nr_pages)) { 
-                                        __set_pte(pte, __pte(0)); 
-                                        continue;
-                                }
-                                if (make_readonly(paddr)) {
-                                        __set_pte(pte, 
-                                                __pte(paddr | (_KERNPG_TABLE & ~_PAGE_RW)));
-                                        continue;
-                                }
-                                __set_pte(pte, __pte(paddr | _KERNPG_TABLE));
-                        }
-                        pte = pte_save;
-                        early_make_page_readonly(pte);  
-                        xen_pte_pin(pte_phys);
-			set_pmd(pmd, __pmd(pte_phys | _KERNPG_TABLE));
-		}
+		phys_pmd_init(pmd, paddr, end);
+		spin_unlock(&init_mm.page_table_lock);
 	}
 	__flush_tlb();
 } 
@@ -481,6 +512,9 @@ static void __init find_early_table_space(unsigned long end)
 		round_up(puds * 8, PAGE_SIZE) + 
 		round_up(pmds * 8, PAGE_SIZE) + 
 		round_up(ptes * 8, PAGE_SIZE); 
+
+	printk("kernel direct mapping tables upto %lx @ %lx-%lx\n",
+	       __pa(end), table_start<<PAGE_SHIFT, start_pfn<<PAGE_SHIFT);
 }
 
 void __init xen_init_pt(void)
@@ -582,36 +616,44 @@ void __init extend_init_mapping(void)
 /* Setup the direct mapping of the physical memory at PAGE_OFFSET.
    This runs before bootmem is initialized and gets pages directly from the 
    physical memory. To access them they are temporarily mapped. */
-void __init init_memory_mapping(unsigned long start, unsigned long end)
+void __meminit init_memory_mapping(unsigned long start, unsigned long end)
 { 
 	unsigned long next; 
 
 	Dprintk("init_memory_mapping\n");
 
-	find_early_table_space(end);
-	extend_init_mapping();
-
-	table_start = start_pfn;
+	if (!after_bootmem) {
+		find_early_table_space(end);
+		extend_init_mapping();
+		table_start = start_pfn;
+	}
 
 	start = (unsigned long)__va(start);
 	end = (unsigned long)__va(end);
 
 	for (; start < end; start = next) {
 		unsigned long pud_phys; 
-		pud_t *pud = alloc_static_page(&pud_phys);
-		early_make_page_readonly(pud);
+		pud_t *pud;
+
+		if (after_bootmem) {
+			pud = pud_offset_k(start & PGDIR_MASK);
+			make_page_readonly(pud);
+			pud_phys = __pa(pud);
+		}
+		else {
+			pud = alloc_static_page(&pud_phys);
+			early_make_page_readonly(pud);
+		}
 		xen_pud_pin(pud_phys);
 		next = start + PGDIR_SIZE;
 		if (next > end) 
 			next = end; 
 		phys_pud_init(pud, __pa(start), __pa(next));
-		set_pgd(pgd_offset_k(start), mk_kernel_pgd(pud_phys));
+		if (!after_bootmem)
+			set_pgd(pgd_offset_k(start), mk_kernel_pgd(pud_phys));
 	}
 
-	printk("kernel direct mapping tables upto %lx @ %lx-%lx\n",
-	       __pa(end), table_start<<PAGE_SHIFT, start_pfn<<PAGE_SHIFT);
-
-	BUG_ON(start_pfn != (table_start + (tables_space >> PAGE_SHIFT)));
+	BUG_ON(!after_bootmem && start_pfn != table_start + (tables_space >> PAGE_SHIFT));
 
 	__flush_tlb_all();
 }
@@ -687,6 +729,9 @@ size_zones(unsigned long *z, unsigned long *h,
 void __init paging_init(void)
 {
 	unsigned long zones[MAX_NR_ZONES], holes[MAX_NR_ZONES];
+
+	memory_present(0, 0, end_pfn);
+	sparse_init();
 	size_zones(zones, holes, 0, end_pfn);
 	free_area_init_node(0, NODE_DATA(0), zones,
 			    __pa(PAGE_OFFSET) >> PAGE_SHIFT, holes);
@@ -747,6 +792,50 @@ void __init clear_kernel_mapping(unsigned long address, unsigned long size)
 	}
 	__flush_tlb_all();
 } 
+
+/*
+ * Memory hotplug specific functions
+ * These are only for non-NUMA machines right now.
+ */
+#ifdef CONFIG_MEMORY_HOTPLUG
+
+void online_page(struct page *page)
+{
+	ClearPageReserved(page);
+	set_page_count(page, 1);
+	__free_page(page);
+	totalram_pages++;
+	num_physpages++;
+}
+
+int add_memory(u64 start, u64 size)
+{
+	struct pglist_data *pgdat = NODE_DATA(0);
+	struct zone *zone = pgdat->node_zones + MAX_NR_ZONES-2;
+	unsigned long start_pfn = start >> PAGE_SHIFT;
+	unsigned long nr_pages = size >> PAGE_SHIFT;
+	int ret;
+
+	ret = __add_pages(zone, start_pfn, nr_pages);
+	if (ret)
+		goto error;
+
+	init_memory_mapping(start, (start + size -1));
+
+	return ret;
+error:
+	printk("%s: Problem encountered in __add_pages!\n", __func__);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(add_memory);
+
+int remove_memory(u64 start, u64 size)
+{
+	return -EINVAL;
+}
+EXPORT_SYMBOL_GPL(remove_memory);
+
+#endif
 
 static struct kcore_list kcore_mem, kcore_vmalloc, kcore_kernel, kcore_modules,
 			 kcore_vsyscall;
@@ -872,7 +961,7 @@ void mark_rodata_ro(void)
 #ifdef CONFIG_BLK_DEV_INITRD
 void free_initrd_mem(unsigned long start, unsigned long end)
 {
-	if (start < (unsigned long)&_end)
+	if (start >= end)
 		return;
 	printk ("Freeing initrd memory: %ldk freed\n", (end - start) >> 10);
 	for (; start < end; start += PAGE_SIZE) {

@@ -6,7 +6,7 @@ CFLAGS	+= -Iarch/x86_64/kernel
 obj-$(CONFIG_IA32_EMULATION) := ia32entry.o syscall32.o syscall32_syscall.o
 
 c-obj-$(CONFIG_IA32_EMULATION) := sys_ia32.o ia32_signal.o tls32.o \
-	ia32_binfmt.o fpu32.o ptrace32.o 
+	ia32_binfmt.o fpu32.o ptrace32.o mmap32.o
 
 s-obj-y :=
 

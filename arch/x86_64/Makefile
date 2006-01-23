@@ -70,14 +70,14 @@ endif
 
 head-y := arch/$(archdir)/kernel/head.o arch/$(archdir)/kernel/head64.o arch/$(archdir)/kernel/init_task.o
 
-libs-y 					+= arch/$(archdir)/lib/
+libs-y 					+= arch/x86_64/lib/
 core-y					+= arch/$(archdir)/kernel/ \
 					   arch/$(archdir)/mm/ \
-					   arch/$(archdir)/crypto/
+					   arch/x86_64/crypto/
 core-$(CONFIG_IA32_EMULATION)		+= arch/$(archdir)/ia32/
 drivers-$(CONFIG_PCI)			+= arch/$(archdir)/pci/
-drivers-$(CONFIG_OPROFILE)		+= arch/$(archdir)/oprofile/
-drivers-$(CONFIG_KDB)			+= arch/$(archdir)/kdb/
+drivers-$(CONFIG_OPROFILE)		+= arch/x86_64/oprofile/
+drivers-$(CONFIG_KDB)			+= arch/x86_64/kdb/
 
 boot := arch/$(archdir)/boot
 

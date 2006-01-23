@@ -48,6 +48,7 @@
 #include <asm/unistd.h>
 #include <asm/thread_info.h>
 #include <asm/hw_irq.h>
+#include <asm/page.h>
 #include <asm/errno.h>
 #include <asm-xen/xen-public/arch-x86_64.h>
 
@@ -689,9 +690,6 @@ ENTRY(spurious_interrupt)
 #if 0
 	/* error code is on the stack already */
 	/* handle NMI like exceptions that can happen everywhere */
-#ifndef DEBUG_IST
-# define DEBUG_IST 0
-#endif
 	.macro paranoidentry sym, ist=0
         movq (%rsp),%rcx
         movq 8(%rsp),%r11
@@ -713,11 +711,11 @@ ENTRY(spurious_interrupt)
 	movq ORIG_RAX(%rsp),%rsi
 	movq $-1,ORIG_RAX(%rsp)
 	.if \ist
-	subq	$EXCEPTION_STACK_SIZE, per_cpu__init_tss + TSS_ist + (\ist - 1) * 8(%rbp)
+	subq	$EXCEPTION_STKSZ, per_cpu__init_tss + TSS_ist + (\ist - 1) * 8(%rbp)
 	.endif
 	call \sym
 	.if \ist
-	addq	$EXCEPTION_STACK_SIZE, per_cpu__init_tss + TSS_ist + (\ist - 1) * 8(%rbp)
+	addq	$EXCEPTION_STKSZ, per_cpu__init_tss + TSS_ist + (\ist - 1) * 8(%rbp)
 	.endif
 	cli
 	.endm

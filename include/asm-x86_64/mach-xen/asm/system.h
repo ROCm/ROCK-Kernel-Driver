@@ -392,9 +392,6 @@ do {									\
 		preempt_enable_no_resched();				\
 } while (0)
 
-#define safe_halt()		((void)0)
-#define halt()			((void)0)
-
 #define __save_and_cli(x)						\
 do {									\
 	vcpu_info_t *_vcpu;						\
@@ -405,6 +402,9 @@ do {									\
 	preempt_enable_no_resched();					\
 	barrier();							\
 } while (0)
+
+#define safe_halt()		((void)0)
+#define halt()			((void)0)
 
 void cpu_idle_wait(void);
 

@@ -5,7 +5,7 @@
 CFLAGS	+= -Iarch/x86_64/mm
 
 obj-y	:= init.o fault.o pageattr.o
-c-obj-y	:= extable.o
+c-obj-y	:= extable.o mmap.o
 
 i386-obj-y := hypervisor.o ioremap.o
 
@@ -22,7 +22,7 @@ $(patsubst %.o,$(obj)/%.c,$(c-obj-y) $(c-link)):
 	@ln -fsn $(srctree)/arch/x86_64/mm/$(notdir $@) $@
 
 $(patsubst %.o,$(obj)/%.c,$(i386-obj-y)):
-	ln -fsn $(srctree)/arch/i386/xen/mm/$(notdir $@) $@
+	@ln -fsn $(srctree)/arch/i386/xen/mm/$(notdir $@) $@
 
 obj-y	+= $(c-obj-y) $(i386-obj-y)
 

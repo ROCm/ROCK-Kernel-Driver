@@ -91,14 +91,19 @@ ENTRY(lgdt_finish)
 ENTRY(stext)
 ENTRY(_stext)
 
+	$page = 0
+#define NEXT_PAGE(name) \
+	$page = $page + 1; \
+	.org $page * 0x1000; \
+ENTRY(name)
+
 	/*
 	 * This default setting generates an ident mapping at address 0x100000
 	 * and a mapping for the kernel that precisely maps virtual address
 	 * 0xffffffff80000000 to physical address 0x000000. (always using
 	 * 2Mbyte large pages provided by PAE mode)
 	 */
-.org 0x1000
-ENTRY(init_level4_pgt)
+NEXT_PAGE(init_level4_pgt)
 	.fill	512,8,0
 
         /*
@@ -108,132 +113,29 @@ ENTRY(init_level4_pgt)
          * We also use this page to establish the initiali mapping for
          * vsyscall area.
          */
-.org 0x2000
-ENTRY(init_level4_user_pgt)
+NEXT_PAGE(init_level4_user_pgt)
 	.fill	512,8,0
 
 	/*
 	 * In Xen the following pre-initialized pgt entries are re-initialized.
 	 */
-.org 0x3000
-ENTRY(level3_kernel_pgt)
-	.fill	510,8,0
-	/* (2^48-(2*1024*1024*1024)-((2^39)*511))/(2^30) = 510 */
-	.quad	0x0000000000005007 + __PHYSICAL_START	/* -> level2_kernel_pgt */
-	.fill	1,8,0
+NEXT_PAGE(level3_kernel_pgt)
+	.fill	512,8,0
 
-.org 0x4000
-ENTRY(level2_ident_pgt)
-	/* 40MB for bootup. 	*/
-	.quad	0x0000000000000083
-	.quad	0x0000000000200083
-	.quad	0x0000000000400083
-	.quad	0x0000000000600083
-	.quad	0x0000000000800083
-	.quad	0x0000000000A00083
-	.quad	0x0000000000C00083
-	.quad	0x0000000000E00083
-	.quad	0x0000000001000083
-	.quad	0x0000000001200083
-	.quad	0x0000000001400083
-	.quad	0x0000000001600083
-	.quad	0x0000000001800083
-	.quad	0x0000000001A00083
-	.quad	0x0000000001C00083
-	.quad	0x0000000001E00083
-	.quad	0x0000000002000083
-	.quad	0x0000000002200083
-	.quad	0x0000000002400083
-	.quad	0x0000000002600083
-	/* Temporary mappings for the super early allocator in arch/x86_64/mm/init.c */
-	.globl temp_boot_pmds
-temp_boot_pmds:
-	.fill	492,8,0
-
-.org 0x5000
-ENTRY(level2_kernel_pgt)
-	/* 40MB kernel mapping. The kernel code cannot be bigger than that.
-	   When you change this change KERNEL_TEXT_SIZE in page.h too. */
-	/* (2^48-(2*1024*1024*1024)-((2^39)*511)-((2^30)*510)) = 0 */
-	.quad	0x0000000000000183
-	.quad	0x0000000000200183
-	.quad	0x0000000000400183
-	.quad	0x0000000000600183
-	.quad	0x0000000000800183
-	.quad	0x0000000000A00183
-	.quad	0x0000000000C00183
-	.quad	0x0000000000E00183
-	.quad	0x0000000001000183
-	.quad	0x0000000001200183
-	.quad	0x0000000001400183
-	.quad	0x0000000001600183
-	.quad	0x0000000001800183
-	.quad	0x0000000001A00183
-	.quad	0x0000000001C00183
-	.quad	0x0000000001E00183
-	.quad	0x0000000002000183
-	.quad	0x0000000002200183
-	.quad	0x0000000002400183
-	.quad	0x0000000002600183
-	/* Module mapping starts here */
-	.fill	492,8,0
-	
         /*
          * This is used for vsyscall area mapping as we have a different
          * level4 page table for user.
          */
-.org 0x6000
-ENTRY(level3_user_pgt)
-        .fill	512,8,0
+NEXT_PAGE(level3_user_pgt)
+	.fill	512,8,0
 
-.org 0x7000
-.org 0x8000
-ENTRY(empty_zero_page)
+NEXT_PAGE(level2_kernel_pgt)
+	.fill	512,8,0
 
-.org 0x9000
-ENTRY(empty_bad_page)
+NEXT_PAGE(empty_zero_page)
+	.fill	512,8,0
 
-.org 0xa000
-ENTRY(empty_bad_pte_table)
-
-.org 0xb000
-ENTRY(empty_bad_pmd_table)
-
-.org 0xc000
-ENTRY(level3_physmem_pgt)
-	.quad	0x0000000000005007 + __PHYSICAL_START	/* -> level2_kernel_pgt (so that __va works even before pagetable_init) */
-
-	
-	.org 0xd000
-#ifdef CONFIG_ACPI_SLEEP
-ENTRY(wakeup_level4_pgt)
-	.quad	0x0000000000002007 + __PHYSICAL_START	/* -> level3_ident_pgt */
-	.fill	255,8,0
-	.quad	0x000000000000a007 + __PHYSICAL_START
-	.fill	254,8,0
-	/* (2^48-(2*1024*1024*1024))/(2^39) = 511 */
-	.quad	0x0000000000003007 + __PHYSICAL_START	/* -> level3_kernel_pgt */
-#endif
-
-#ifndef CONFIG_XEN
-#ifndef CONFIG_HOTPLUG_CPU
-	__INITDATA
-#endif
-	/*
-	 * This default setting generates an ident mapping at address 0x100000
-	 * and a mapping for the kernel that precisely maps virtual address
-	 * 0xffffffff80000000 to physical address 0x000000. (always using
-	 * 2Mbyte large pages provided by PAE mode)
-	 */
-	.align PAGE_SIZE
-ENTRY(boot_level4_pgt)
-	.quad	0x0000000000002007 + __PHYSICAL_START	/* -> level3_ident_pgt */
-	.fill	255,8,0
-	.quad	0x000000000000a007 + __PHYSICAL_START
-	.fill	254,8,0
-	/* (2^48-(2*1024*1024*1024))/(2^39) = 511 */
-	.quad	0x0000000000003007 + __PHYSICAL_START	/* -> level3_kernel_pgt */
-#endif
+#undef NEXT_PAGE
 
 	.data
 
