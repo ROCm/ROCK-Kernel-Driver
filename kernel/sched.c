@@ -53,7 +53,7 @@
 
 #include <asm/unistd.h>
 
-#ifdef CONFIG_LKCD_DUMP
+#if defined(CONFIG_LKCD_DUMP) || defined(CONFIG_LKCD_DUMP_MODULE)
 /* used to soft spin in sched while dump is in progress */
 unsigned long dump_oncpu;
 EXPORT_SYMBOL_GPL(dump_oncpu);
@@ -2898,7 +2898,7 @@ asmlinkage void __sched schedule(void)
 	unsigned long run_time;
 	int cpu, idx, new_prio;
 
-#ifdef CONFIG_LKCD_DUMP
+#if defined(CONFIG_LKCD_DUMP) || defined(CONFIG_LKCD_DUMP_MODULE)
 	/*
 	 * If a crash dump is in progress, schedule()
 	 * is a no-op for the dumping cpu, and all
