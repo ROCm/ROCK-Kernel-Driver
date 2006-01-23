@@ -380,12 +380,14 @@ dump_net_open(struct dump_dev *net_dev, const char *arg)
 {
 	int retval = 0;
 	char *p, *larg;
+	char *larg_orig;
 	u64 tmp;
 
 	if (!(larg = kmalloc(strlen(arg), GFP_KERNEL)))
 		return -ENOMEM;
 
 	strcpy(larg, arg);
+	larg_orig = larg;
 
 	if ((p = strchr(larg, ',')) != NULL)
 		*p = '\0';
@@ -423,7 +425,7 @@ dump_net_open(struct dump_dev *net_dev, const char *arg)
 	printk("LKCD: Network device %s successfully configured for dumping\n",
 			net_dev->np.dev_name);
 
-       kfree(larg);
+	kfree(larg_orig);
 	return retval;
 }
 
