@@ -641,7 +641,7 @@ static inline u8 ata_busy_wait(struct ata_port *ap, unsigned int bits,
 
 static inline u8 ata_wait_idle(struct ata_port *ap)
 {
-	u8 status = ata_busy_wait(ap, ATA_BUSY | ATA_DRQ, 1000);
+	u8 status = ata_busy_wait(ap, ATA_BUSY | ATA_DRQ, 100000); /* 1000msec */
 
 	if (status & (ATA_BUSY | ATA_DRQ)) {
 		unsigned long l = ap->ioaddr.status_addr;
