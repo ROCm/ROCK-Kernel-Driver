@@ -294,7 +294,8 @@ YAMAHA_DEVICE(0x7010, "UB99"),
 	}
 },
 {
-	/* a later revision uses ID 0x0099 */
+	/* Has ID 0x0099 when not in "Advanced Driver" mode.
+	 * The UM-2EX has only one input, but we cannot detect this. */
 	USB_DEVICE(0x0582, 0x0005),
 	.driver_info = (unsigned long) & (const struct snd_usb_audio_quirk) {
 		.vendor_name = "EDIROL",
@@ -385,7 +386,7 @@ YAMAHA_DEVICE(0x7010, "UB99"),
 	}
 },
 {
-	/* a later revision uses ID 0x009d */
+	/* has ID 0x009d when not in "Advanced Driver" mode */
 	USB_DEVICE(0x0582, 0x0009),
 	.driver_info = (unsigned long) & (const struct snd_usb_audio_quirk) {
 		.vendor_name = "EDIROL",
@@ -1091,7 +1092,20 @@ YAMAHA_DEVICE(0x7010, "UB99"),
 	}
 },
 	/* TODO: add Edirol UA-101 support */
-	/* TODO: add Roland G-70 support */
+{
+	/* has ID 0x0081 when not in "Advanced Driver" mode */
+	USB_DEVICE(0x0582, 0x0080),
+	.driver_info = (unsigned long) & (const struct snd_usb_audio_quirk) {
+		.vendor_name = "Roland",
+		.product_name = "G-70",
+		.ifnum = 0,
+		.type = QUIRK_MIDI_FIXED_ENDPOINT,
+		.data = & (const struct snd_usb_midi_endpoint_info) {
+			.out_cables = 0x0001,
+			.in_cables  = 0x0001
+		}
+	}
+},
 	/* TODO: add Roland V-SYNTH XT support */
 	/* TODO: add BOSS GT-PRO support */
 {

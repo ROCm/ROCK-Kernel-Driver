@@ -75,8 +75,10 @@ MODULE_SUPPORTED_DEVICE("{{Crystal Semiconductors,CS4235},"
 
 #ifdef CS4232
 #define IDENT "CS4232"
+#define CS423X_DRIVER "snd_cs4232"
 #else
 #define IDENT "CS4236+"
+#define CS423X_DRIVER "snd_cs4236"
 #endif
 
 static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
@@ -160,7 +162,6 @@ MODULE_DEVICE_TABLE(pnp, snd_cs4232_pnpbiosids);
 #endif /* CS4232 */
 
 #ifdef CS4232
-#define CS423X_DRIVER		"snd_cs4232"
 #define CS423X_ISAPNP_DRIVER	"cs4232_isapnp"
 static struct pnp_card_device_id snd_cs423x_pnpids[] = {
 	/* Philips PCA70PS */
@@ -177,11 +178,12 @@ static struct pnp_card_device_id snd_cs423x_pnpids[] = {
 	{ .id = "CSC7632", .devs = { { "CSC0000" }, { "CSC0010" }, { "PNPb006" } } },
 	/* SIC CrystalWave 32 (CS4232) */
 	{ .id = "CSCf032", .devs = { { "CSC0000" }, { "CSC0010" }, { "CSC0003" } } },
+	/* Netfinity 3000 on-board soundcard */
+	{ .id = "CSCe825", .devs = { { "CSC0100" }, { "CSC0110" }, { "CSC010f" } } },
 	/* --- */
 	{ .id = "" }	/* end */
 };
 #else /* CS4236 */
-#define CS423X_DRIVER		"snd_cs4236"
 #define CS423X_ISAPNP_DRIVER	"cs4236_isapnp"
 static struct pnp_card_device_id snd_cs423x_pnpids[] = {
 	/* Intel Marlin Spike Motherboard - CS4235 */
