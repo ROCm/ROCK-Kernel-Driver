@@ -231,7 +231,7 @@ int ieee80211_xmit(struct sk_buff *skb, struct net_device *dev)
 	    rts_required;
 	unsigned long flags;
 	struct net_device_stats *stats = &ieee->stats;
-	int ether_type, encrypt, host_encrypt, host_encrypt_msdu;
+	int ether_type, encrypt, host_encrypt, host_encrypt_msdu, host_build_iv;
 	int bytes, fc, hdr_len;
 	struct sk_buff *skb_frag;
 	struct ieee80211_hdr_3addr header = {	/* Ensure zero initialized */
@@ -270,6 +270,7 @@ int ieee80211_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	host_encrypt = ieee->host_encrypt && encrypt && crypt;
 	host_encrypt_msdu = ieee->host_encrypt_msdu && encrypt && crypt;
+	host_build_iv = ieee->host_build_iv && encrypt && crypt;
 
 	if (!encrypt && ieee->ieee802_1x &&
 	    ieee->drop_unencrypted && ether_type != ETH_P_PAE) {
@@ -287,7 +288,7 @@ int ieee80211_xmit(struct sk_buff *skb, struct net_device *dev)
 	/* Determine total amount of storage required for TXB packets */
 	bytes = skb->len + SNAP_SIZE + sizeof(u16);
 
-	if (host_encrypt)
+	if (host_encrypt || host_build_iv)
 		fc = IEEE80211_FTYPE_DATA | IEEE80211_STYPE_DATA |
 		    IEEE80211_FCTL_PROTECTED;
 	else
@@ -427,7 +428,7 @@ int ieee80211_xmit(struct sk_buff *skb, struct net_device *dev)
 	for (; i < nr_frags; i++) {
 		skb_frag = txb->fragments[i];
 
-		if (host_encrypt)
+		if (host_encrypt || host_build_iv)
 			skb_reserve(skb_frag,
 				    crypt->ops->extra_mpdu_prefix_len);
 
@@ -462,6 +463,18 @@ int ieee80211_xmit(struct sk_buff *skb, struct net_device *dev)
 		 * to insert the IV between the header and the payload */
 		if (host_encrypt)
 			ieee80211_encrypt_fragment(ieee, skb_frag, hdr_len);
+		else if (host_build_iv) {
+			struct ieee80211_crypt_data *crypt;
+
+			crypt = ieee->crypt[ieee->tx_keyidx];
+			atomic_inc(&crypt->refcnt);
+			if (crypt->ops->build_iv)
+				crypt->ops->build_iv(skb_frag, hdr_len,
+				      ieee->sec.keys[ieee->sec.active_key],
+				      ieee->sec.key_sizes[ieee->sec.active_key],
+				      crypt->priv);
+			atomic_dec(&crypt->refcnt);
+		}
 
 		if (ieee->config &
 		    (CFG_IEEE80211_COMPUTE_FCS | CFG_IEEE80211_RESERVE_FCS))

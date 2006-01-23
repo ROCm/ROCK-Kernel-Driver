@@ -191,7 +191,7 @@ static void ccmp_init_blocks(struct crypto_tfm *tfm,
 }
 
 static int ieee80211_ccmp_hdr(struct sk_buff *skb, int hdr_len,
-			      u8 * aeskey, int keylen, void *priv)
+			      u8 *aeskey, int keylen, void *priv)
 {
 	struct ieee80211_ccmp_data *key = priv;
 	int i;

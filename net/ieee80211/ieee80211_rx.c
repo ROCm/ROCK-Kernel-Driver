@@ -419,7 +419,7 @@ int ieee80211_rx(struct ieee80211_device *ieee, struct sk_buff *skb,
 		int idx = 0;
 		if (skb->len >= hdrlen + 3) {
 			/* Top two-bits of byte 3 are the key index */
-  			idx = skb->data[hdrlen + 3] >> 6;
+			idx = skb->data[hdrlen + 3] >> 6;
 		}
 
 		/* ieee->crypt[] is WEP_KEY (4) in length.  Given that idx
@@ -1086,7 +1086,9 @@ static int ieee80211_parse_info_param(struct ieee80211_info_element
 			break;
 
 		case MFIE_TYPE_TIM:
-			IEEE80211_DEBUG_MGMT("MFIE_TYPE_TIM: ignored\n");
+			network->tim.tim_count = info_element->data[0];
+			network->tim.tim_period = info_element->data[1];
+			IEEE80211_DEBUG_MGMT("MFIE_TYPE_TIM: partially ignored\n");
 			break;
 
 		case MFIE_TYPE_ERP_INFO:
@@ -1359,6 +1361,7 @@ static void update_network(struct ieee80211_network *dst,
 	dst->listen_interval = src->listen_interval;
 	dst->atim_window = src->atim_window;
 	dst->erp_value = src->erp_value;
+	dst->tim = src->tim;
 
 	memcpy(dst->wpa_ie, src->wpa_ie, src->wpa_ie_len);
 	dst->wpa_ie_len = src->wpa_ie_len;

@@ -84,12 +84,10 @@ static int ieee80211_networks_allocate(struct ieee80211_device *ieee)
 
 void ieee80211_network_reset(struct ieee80211_network *network)
 {
-	if (!network) {
-		printk(KERN_ERR "aye! network is null???");
+	if (!network)
 		return;
-	}
+
 	if (network->ibss_dfs) {
-		printk(KERN_ERR "ibss_dfs = %p\n", network->ibss_dfs);
 		kfree(network->ibss_dfs);
 		network->ibss_dfs = NULL;
 	}
