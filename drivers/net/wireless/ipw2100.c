@@ -167,7 +167,7 @@ that only one external action is invoked at a time.
 
 #include "ipw2100.h"
 
-#define IPW2100_VERSION "1.1.3"
+#define IPW2100_VERSION "1.1.4"
 
 #define DRV_NAME	"ipw2100"
 #define DRV_VERSION	IPW2100_VERSION
@@ -411,7 +411,7 @@ static inline void write_nic_dword_auto_inc(struct net_device *dev, u32 val)
 	write_register(dev, IPW_REG_AUTOINCREMENT_DATA, val);
 }
 
-static void write_nic_memory(struct net_device *dev, u32 addr, u32 len,
+static inline void write_nic_memory(struct net_device *dev, u32 addr, u32 len,
 				    const u8 * buf)
 {
 	u32 aligned_addr;
@@ -449,7 +449,7 @@ static void write_nic_memory(struct net_device *dev, u32 addr, u32 len,
 				    *buf);
 }
 
-static void read_nic_memory(struct net_device *dev, u32 addr, u32 len,
+static inline void read_nic_memory(struct net_device *dev, u32 addr, u32 len,
 				   u8 * buf)
 {
 	u32 aligned_addr;
@@ -657,7 +657,7 @@ static void printk_buf(int level, const u8 * data, u32 len)
 
 #define MAX_RESET_BACKOFF 10
 
-static void schedule_reset(struct ipw2100_priv *priv)
+static inline void schedule_reset(struct ipw2100_priv *priv)
 {
 	unsigned long now = get_seconds();
 
@@ -797,7 +797,8 @@ static int ipw2100_hw_send_command(struct ipw2100_priv *priv,
 	 * doesn't seem to have as many firmware restart cycles...
 	 *
 	 * As a test, we're sticking in a 1/100s delay here */
-	schedule_timeout_uninterruptible(msecs_to_jiffies(10));
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout(msecs_to_jiffies(10));
 
 	return 0;
 
@@ -1130,7 +1131,7 @@ static inline void ipw2100_hw_set_gpio(struct ipw2100_priv *priv)
 	write_register(priv->net_dev, IPW_REG_GPIO, reg);
 }
 
-static int rf_kill_active(struct ipw2100_priv *priv)
+static inline int rf_kill_active(struct ipw2100_priv *priv)
 {
 #define MAX_RF_KILL_CHECKS 5
 #define RF_KILL_CHECK_DELAY 40
@@ -1244,7 +1245,8 @@ static int ipw2100_start_adapter(struct ipw2100_priv *priv)
 	IPW_DEBUG_FW("Waiting for f/w initialization to complete...\n");
 	i = 5000;
 	do {
-		schedule_timeout_uninterruptible(msecs_to_jiffies(40));
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout(msecs_to_jiffies(40));
 		/* Todo... wait for sync command ... */
 
 		read_register(priv->net_dev, IPW_REG_INTA, &inta);
@@ -1398,7 +1400,8 @@ static int ipw2100_hw_phy_off(struct ipw2100_priv *priv)
 		    (val2 & IPW2100_COMMAND_PHY_OFF))
 			return 0;
 
-		schedule_timeout_uninterruptible(HW_PHY_OFF_LOOP_DELAY);
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout(HW_PHY_OFF_LOOP_DELAY);
 	}
 
 	return -EIO;
@@ -1505,8 +1508,10 @@ static int ipw2100_hw_stop_adapter(struct ipw2100_priv *priv)
 			printk(KERN_WARNING DRV_NAME ": "
 			       "%s: Power down command failed: Error %d\n",
 			       priv->net_dev->name, err);
-		else
-			schedule_timeout_uninterruptible(HW_POWER_DOWN_DELAY);
+		else {
+			set_current_state(TASK_UNINTERRUPTIBLE);
+			schedule_timeout(HW_POWER_DOWN_DELAY);
+		}
 	}
 
 	priv->status &= ~STATUS_ENABLED;
@@ -1672,6 +1677,18 @@ static int ipw2100_start_scan(struct ipw2100_priv *priv)
 	return err;
 }
 
+static const struct ieee80211_geo ipw_geos[] = {
+	{			/* Restricted */
+	 "---",
+	 .bg_channels = 14,
+	 .bg = {{2412, 1}, {2417, 2}, {2422, 3},
+		{2427, 4}, {2432, 5}, {2437, 6},
+		{2442, 7}, {2447, 8}, {2452, 9},
+		{2457, 10}, {2462, 11}, {2467, 12},
+		{2472, 13}, {2484, 14}},
+	 },
+};
+
 static int ipw2100_up(struct ipw2100_priv *priv, int deferred)
 {
 	unsigned long flags;
@@ -1726,6 +1743,13 @@ static int ipw2100_up(struct ipw2100_priv *priv, int deferred)
 		rc = 1;
 		goto exit;
 	}
+
+	/* Initialize the geo */
+	if (ieee80211_set_geo(priv->ieee, &ipw_geos[0])) {
+		printk(KERN_WARNING DRV_NAME "Could not set geo\n");
+		return 0;
+	}
+	priv->ieee->freq_band = IEEE80211_24GHZ_BAND;
 
 	lock = LOCK_NONE;
 	if (ipw2100_set_ordinal(priv, IPW_ORD_PERS_DB_LOCK, &lock, &ord_len)) {
@@ -2177,7 +2201,7 @@ static const char *frame_types[] = {
 };
 #endif
 
-static int ipw2100_alloc_skb(struct ipw2100_priv *priv,
+static inline int ipw2100_alloc_skb(struct ipw2100_priv *priv,
 				    struct ipw2100_rx_packet *packet)
 {
 	packet->skb = dev_alloc_skb(sizeof(struct ipw2100_rx));
@@ -2201,7 +2225,7 @@ static int ipw2100_alloc_skb(struct ipw2100_priv *priv,
 #define SEARCH_SNAPSHOT 1
 
 #define SNAPSHOT_ADDR(ofs) (priv->snapshot[((ofs) >> 12) & 0xff] + ((ofs) & 0xfff))
-static int ipw2100_snapshot_alloc(struct ipw2100_priv *priv)
+static inline int ipw2100_snapshot_alloc(struct ipw2100_priv *priv)
 {
 	int i;
 	if (priv->snapshot[0])
@@ -2221,7 +2245,7 @@ static int ipw2100_snapshot_alloc(struct ipw2100_priv *priv)
 	return 1;
 }
 
-static void ipw2100_snapshot_free(struct ipw2100_priv *priv)
+static inline void ipw2100_snapshot_free(struct ipw2100_priv *priv)
 {
 	int i;
 	if (!priv->snapshot[0])
@@ -2231,7 +2255,7 @@ static void ipw2100_snapshot_free(struct ipw2100_priv *priv)
 	priv->snapshot[0] = NULL;
 }
 
-static u32 ipw2100_match_buf(struct ipw2100_priv *priv, u8 * in_buf,
+static inline u32 ipw2100_match_buf(struct ipw2100_priv *priv, u8 * in_buf,
 				    size_t len, int mode)
 {
 	u32 i, j;
@@ -2288,7 +2312,7 @@ static u32 ipw2100_match_buf(struct ipw2100_priv *priv, u8 * in_buf,
 static u8 packet_data[IPW_RX_NIC_BUFFER_LENGTH];
 #endif
 
-static void ipw2100_corruption_detected(struct ipw2100_priv *priv, int i)
+static inline void ipw2100_corruption_detected(struct ipw2100_priv *priv, int i)
 {
 #ifdef CONFIG_IPW2100_DEBUG_C3
 	struct ipw2100_status *status = &priv->status_queue.drv[i];
@@ -2346,7 +2370,7 @@ static void ipw2100_corruption_detected(struct ipw2100_priv *priv, int i)
 	schedule_reset(priv);
 }
 
-static void isr_rx(struct ipw2100_priv *priv, int i,
+static inline void isr_rx(struct ipw2100_priv *priv, int i,
 			  struct ieee80211_rx_stats *stats)
 {
 	struct ipw2100_status *status = &priv->status_queue.drv[i];
@@ -2425,7 +2449,7 @@ static void isr_rx(struct ipw2100_priv *priv, int i,
 	priv->rx_queue.drv[i].host_addr = packet->dma_addr;
 }
 
-static int ipw2100_corruption_check(struct ipw2100_priv *priv, int i)
+static inline int ipw2100_corruption_check(struct ipw2100_priv *priv, int i)
 {
 	struct ipw2100_status *status = &priv->status_queue.drv[i];
 	struct ipw2100_rx *u = priv->rx_buffers[i].rxp;
@@ -2481,7 +2505,7 @@ static int ipw2100_corruption_check(struct ipw2100_priv *priv, int i)
  * The WRITE index is cached in the variable 'priv->rx_queue.next'.
  *
  */
-static void __ipw2100_rx_process(struct ipw2100_priv *priv)
+static inline void __ipw2100_rx_process(struct ipw2100_priv *priv)
 {
 	struct ipw2100_bd_queue *rxq = &priv->rx_queue;
 	struct ipw2100_status_queue *sq = &priv->status_queue;
@@ -2634,7 +2658,7 @@ static void __ipw2100_rx_process(struct ipw2100_priv *priv)
  * for use by future command and data packets.
  *
  */
-static int __ipw2100_tx_process(struct ipw2100_priv *priv)
+static inline int __ipw2100_tx_process(struct ipw2100_priv *priv)
 {
 	struct ipw2100_bd_queue *txq = &priv->tx_queue;
 	struct ipw2100_bd *tbd;
@@ -3748,7 +3772,7 @@ static ssize_t store_memory(struct device *d, struct device_attribute *attr,
 	struct net_device *dev = priv->net_dev;
 	const char *p = buf;
 
-	(void) dev; /* kill unused-var warning for debug-only code */
+	(void)dev;		/* kill unused-var warning for debug-only code */
 
 	if (count < 1)
 		return count;
@@ -4013,8 +4037,8 @@ static DRIVER_ATTR(debug_level, S_IWUSR | S_IRUGO, show_debug_level,
 		   store_debug_level);
 #endif				/* CONFIG_IPW2100_DEBUG */
 
-static ssize_t show_fatal_error(struct device *d,
-				struct device_attribute *attr, char *buf)
+static ssize_t show_fatal_error(struct device *d, struct device_attribute *attr,
+				char *buf)
 {
 	struct ipw2100_priv *priv = dev_get_drvdata(d);
 	char *out = buf;
@@ -4038,9 +4062,8 @@ static ssize_t show_fatal_error(struct device *d,
 	return out - buf;
 }
 
-static ssize_t store_fatal_error(struct device *d,
-				 struct device_attribute *attr, const char *buf,
-				 size_t count)
+static ssize_t store_fatal_error(struct device *d, struct device_attribute *attr,
+				 const char *buf, size_t count)
 {
 	struct ipw2100_priv *priv = dev_get_drvdata(d);
 	schedule_reset(priv);
@@ -4068,7 +4091,7 @@ static ssize_t store_scan_age(struct device *d, struct device_attribute *attr,
 	unsigned long val;
 	char *p = buffer;
 
-	(void) dev; /* kill unused-var warning for debug-only code */
+	(void)dev;		/* kill unused-var warning for debug-only code */
 
 	IPW_DEBUG_INFO("enter\n");
 
@@ -5105,12 +5128,13 @@ static int ipw2100_set_tx_power(struct ipw2100_priv *priv, u32 tx_power)
 		.host_command_length = 4
 	};
 	int err = 0;
+	u32 tmp = tx_power;
 
 	if (tx_power != IPW_TX_POWER_DEFAULT)
-		tx_power = (tx_power - IPW_TX_POWER_MIN_DBM) * 16 /
+		tmp = (tx_power - IPW_TX_POWER_MIN_DBM) * 16 /
 		    (IPW_TX_POWER_MAX_DBM - IPW_TX_POWER_MIN_DBM);
 
-	cmd.host_command_parameters[0] = tx_power;
+	cmd.host_command_parameters[0] = tmp;
 
 	if (priv->ieee->iw_mode == IW_MODE_ADHOC)
 		err = ipw2100_hw_send_command(priv, &cmd);
@@ -5363,9 +5387,12 @@ static int ipw2100_configure_security(struct ipw2100_priv *priv, int batch_mode)
 						     SEC_LEVEL_0, 0, 1);
 	} else {
 		auth_mode = IPW_AUTH_OPEN;
-		if ((priv->ieee->sec.flags & SEC_AUTH_MODE) &&
-		    (priv->ieee->sec.auth_mode == WLAN_AUTH_SHARED_KEY))
-			auth_mode = IPW_AUTH_SHARED;
+		if (priv->ieee->sec.flags & SEC_AUTH_MODE) {
+			if (priv->ieee->sec.auth_mode == WLAN_AUTH_SHARED_KEY)
+				auth_mode = IPW_AUTH_SHARED;
+			else if (priv->ieee->sec.auth_mode == WLAN_AUTH_LEAP)
+				auth_mode = IPW_AUTH_LEAP_CISCO_ID;
+		}
 
 		sec_level = SEC_LEVEL_0;
 		if (priv->ieee->sec.flags & SEC_LEVEL)
@@ -5735,6 +5762,70 @@ static struct net_device_stats *ipw2100_stats(struct net_device *dev)
 	return &priv->ieee->stats;
 }
 
+#if WIRELESS_EXT < 18
+/* Support for wpa_supplicant before WE-18, deprecated. */
+
+/* following definitions must match definitions in driver_ipw.c */
+
+#define IPW2100_IOCTL_WPA_SUPPLICANT		SIOCIWFIRSTPRIV+30
+
+#define IPW2100_CMD_SET_WPA_PARAM		1
+#define	IPW2100_CMD_SET_WPA_IE			2
+#define IPW2100_CMD_SET_ENCRYPTION		3
+#define IPW2100_CMD_MLME			4
+
+#define IPW2100_PARAM_WPA_ENABLED		1
+#define IPW2100_PARAM_TKIP_COUNTERMEASURES	2
+#define IPW2100_PARAM_DROP_UNENCRYPTED		3
+#define IPW2100_PARAM_PRIVACY_INVOKED		4
+#define IPW2100_PARAM_AUTH_ALGS			5
+#define IPW2100_PARAM_IEEE_802_1X		6
+
+#define IPW2100_MLME_STA_DEAUTH			1
+#define IPW2100_MLME_STA_DISASSOC		2
+
+#define IPW2100_CRYPT_ERR_UNKNOWN_ALG		2
+#define IPW2100_CRYPT_ERR_UNKNOWN_ADDR		3
+#define IPW2100_CRYPT_ERR_CRYPT_INIT_FAILED	4
+#define IPW2100_CRYPT_ERR_KEY_SET_FAILED	5
+#define IPW2100_CRYPT_ERR_TX_KEY_SET_FAILED	6
+#define IPW2100_CRYPT_ERR_CARD_CONF_FAILED	7
+
+#define	IPW2100_CRYPT_ALG_NAME_LEN		16
+
+struct ipw2100_param {
+	u32 cmd;
+	u8 sta_addr[ETH_ALEN];
+	union {
+		struct {
+			u8 name;
+			u32 value;
+		} wpa_param;
+		struct {
+			u32 len;
+			u8 reserved[32];
+			u8 data[0];
+		} wpa_ie;
+		struct {
+			u32 command;
+			u32 reason_code;
+		} mlme;
+		struct {
+			u8 alg[IPW2100_CRYPT_ALG_NAME_LEN];
+			u8 set_tx;
+			u32 err;
+			u8 idx;
+			u8 seq[8];	/* sequence counter (set: RX, get: TX) */
+			u16 key_len;
+			u8 key[0];
+		} crypt;
+
+	} u;
+};
+
+/* end of driver_ipw.c code */
+#endif				/* WIRELESS_EXT < 18 */
+
 static int ipw2100_wpa_enable(struct ipw2100_priv *priv, int value)
 {
 	/* This is called when wpa_supplicant loads and closes the driver
@@ -5742,6 +5833,12 @@ static int ipw2100_wpa_enable(struct ipw2100_priv *priv, int value)
 	priv->ieee->wpa_enabled = value;
 	return 0;
 }
+
+#if WIRELESS_EXT < 18
+#define IW_AUTH_ALG_OPEN_SYSTEM			0x1
+#define IW_AUTH_ALG_SHARED_KEY			0x2
+#define IW_AUTH_ALG_LEAP			0x4
+#endif
 
 static int ipw2100_wpa_set_auth_algs(struct ipw2100_priv *priv, int value)
 {
@@ -5757,6 +5854,9 @@ static int ipw2100_wpa_set_auth_algs(struct ipw2100_priv *priv, int value)
 		ieee->open_wep = 0;
 	} else if (value & IW_AUTH_ALG_OPEN_SYSTEM) {
 		sec.auth_mode = WLAN_AUTH_OPEN;
+		ieee->open_wep = 1;
+	} else if (value & IW_AUTH_ALG_LEAP) {
+		sec.auth_mode = WLAN_AUTH_LEAP;
 		ieee->open_wep = 1;
 	} else
 		return -EINVAL;
@@ -5785,6 +5885,361 @@ void ipw2100_wpa_assoc_frame(struct ipw2100_priv *priv,
 	ipw2100_wpa_enable(priv, 1);
 	ipw2100_set_wpa_ie(priv, &frame, 0);
 }
+
+#if WIRELESS_EXT < 18
+static int ipw2100_wpa_set_param(struct net_device *dev, u8 name, u32 value)
+{
+	struct ipw2100_priv *priv = ieee80211_priv(dev);
+	struct ieee80211_crypt_data *crypt;
+	unsigned long flags;
+	int ret = 0;
+
+	switch (name) {
+	case IPW2100_PARAM_WPA_ENABLED:
+		ret = ipw2100_wpa_enable(priv, value);
+		break;
+
+	case IPW2100_PARAM_TKIP_COUNTERMEASURES:
+		crypt = priv->ieee->crypt[priv->ieee->tx_keyidx];
+		if (!crypt || !crypt->ops->set_flags || !crypt->ops->get_flags)
+			break;
+
+		flags = crypt->ops->get_flags(crypt->priv);
+
+		if (value)
+			flags |= IEEE80211_CRYPTO_TKIP_COUNTERMEASURES;
+		else
+			flags &= ~IEEE80211_CRYPTO_TKIP_COUNTERMEASURES;
+
+		crypt->ops->set_flags(flags, crypt->priv);
+
+		break;
+
+	case IPW2100_PARAM_DROP_UNENCRYPTED:{
+			/* See IW_AUTH_DROP_UNENCRYPTED handling for details */
+			struct ieee80211_security sec = {
+				.flags = SEC_ENABLED,
+				.enabled = value,
+			};
+			priv->ieee->drop_unencrypted = value;
+			/* We only change SEC_LEVEL for open mode. Others
+			 * are set by ipw_wpa_set_encryption.
+			 */
+			if (!value) {
+				sec.flags |= SEC_LEVEL;
+				sec.level = SEC_LEVEL_0;
+			} else {
+				sec.flags |= SEC_LEVEL;
+				sec.level = SEC_LEVEL_1;
+			}
+			if (priv->ieee->set_security)
+				priv->ieee->set_security(priv->ieee->dev, &sec);
+			break;
+		}
+
+	case IPW2100_PARAM_PRIVACY_INVOKED:
+		priv->ieee->privacy_invoked = value;
+		break;
+
+	case IPW2100_PARAM_AUTH_ALGS:
+		ret = ipw2100_wpa_set_auth_algs(priv, value);
+		break;
+
+	case IPW2100_PARAM_IEEE_802_1X:
+		priv->ieee->ieee802_1x = value;
+		break;
+
+	default:
+		printk(KERN_ERR DRV_NAME ": %s: Unknown WPA param: %d\n",
+		       dev->name, name);
+		ret = -EOPNOTSUPP;
+	}
+
+	return ret;
+}
+
+static int ipw2100_wpa_mlme(struct net_device *dev, int command, int reason)
+{
+
+	struct ipw2100_priv *priv = ieee80211_priv(dev);
+	int ret = 0;
+
+	switch (command) {
+	case IPW2100_MLME_STA_DEAUTH:
+		// silently ignore
+		break;
+
+	case IPW2100_MLME_STA_DISASSOC:
+		ipw2100_disassociate_bssid(priv);
+		break;
+
+	default:
+		printk(KERN_ERR DRV_NAME ": %s: Unknown MLME request: %d\n",
+		       dev->name, command);
+		ret = -EOPNOTSUPP;
+	}
+
+	return ret;
+}
+
+static int ipw2100_wpa_set_wpa_ie(struct net_device *dev,
+				  struct ipw2100_param *param, int plen)
+{
+
+	struct ipw2100_priv *priv = ieee80211_priv(dev);
+	struct ieee80211_device *ieee = priv->ieee;
+	u8 *buf;
+
+	if (!ieee->wpa_enabled)
+		return -EOPNOTSUPP;
+
+	if (param->u.wpa_ie.len > MAX_WPA_IE_LEN ||
+	    (param->u.wpa_ie.len && param->u.wpa_ie.data == NULL))
+		return -EINVAL;
+
+	if (param->u.wpa_ie.len) {
+		buf = kmalloc(param->u.wpa_ie.len, GFP_KERNEL);
+		if (buf == NULL)
+			return -ENOMEM;
+
+		memcpy(buf, param->u.wpa_ie.data, param->u.wpa_ie.len);
+
+		kfree(ieee->wpa_ie);
+		ieee->wpa_ie = buf;
+		ieee->wpa_ie_len = param->u.wpa_ie.len;
+
+	} else {
+		kfree(ieee->wpa_ie);
+		ieee->wpa_ie = NULL;
+		ieee->wpa_ie_len = 0;
+	}
+
+	ipw2100_wpa_assoc_frame(priv, ieee->wpa_ie, ieee->wpa_ie_len);
+
+	return 0;
+}
+
+/* implementation borrowed from hostap driver */
+
+static int ipw2100_wpa_set_encryption(struct net_device *dev,
+				      struct ipw2100_param *param,
+				      int param_len)
+{
+	int ret = 0;
+	struct ipw2100_priv *priv = ieee80211_priv(dev);
+	struct ieee80211_device *ieee = priv->ieee;
+	struct ieee80211_crypto_ops *ops;
+	struct ieee80211_crypt_data **crypt;
+
+	struct ieee80211_security sec = {
+		.flags = 0,
+	};
+
+	param->u.crypt.err = 0;
+	param->u.crypt.alg[IPW2100_CRYPT_ALG_NAME_LEN - 1] = '\0';
+
+	if (param_len !=
+	    (int)((char *)param->u.crypt.key - (char *)param) +
+	    param->u.crypt.key_len) {
+		IPW_DEBUG_INFO("Len mismatch %d, %d\n", param_len,
+			       param->u.crypt.key_len);
+		return -EINVAL;
+	}
+	if (param->sta_addr[0] == 0xff && param->sta_addr[1] == 0xff &&
+	    param->sta_addr[2] == 0xff && param->sta_addr[3] == 0xff &&
+	    param->sta_addr[4] == 0xff && param->sta_addr[5] == 0xff) {
+		if (param->u.crypt.idx >= WEP_KEYS)
+			return -EINVAL;
+		crypt = &ieee->crypt[param->u.crypt.idx];
+	} else {
+		return -EINVAL;
+	}
+
+	sec.flags |= SEC_ENABLED | SEC_ENCRYPT;
+	if (strcmp(param->u.crypt.alg, "none") == 0) {
+		if (crypt) {
+			sec.enabled = 0;
+			sec.encrypt = 0;
+			sec.level = SEC_LEVEL_0;
+			sec.flags |= SEC_LEVEL;
+			ieee80211_crypt_delayed_deinit(ieee, crypt);
+		}
+		goto done;
+	}
+	sec.enabled = 1;
+	sec.encrypt = 1;
+
+	ops = ieee80211_get_crypto_ops(param->u.crypt.alg);
+	if (ops == NULL && strcmp(param->u.crypt.alg, "WEP") == 0) {
+		request_module("ieee80211_crypt_wep");
+		ops = ieee80211_get_crypto_ops(param->u.crypt.alg);
+	} else if (ops == NULL && strcmp(param->u.crypt.alg, "TKIP") == 0) {
+		request_module("ieee80211_crypt_tkip");
+		ops = ieee80211_get_crypto_ops(param->u.crypt.alg);
+	} else if (ops == NULL && strcmp(param->u.crypt.alg, "CCMP") == 0) {
+		request_module("ieee80211_crypt_ccmp");
+		ops = ieee80211_get_crypto_ops(param->u.crypt.alg);
+	}
+	if (ops == NULL) {
+		IPW_DEBUG_INFO("%s: unknown crypto alg '%s'\n",
+			       dev->name, param->u.crypt.alg);
+		param->u.crypt.err = IPW2100_CRYPT_ERR_UNKNOWN_ALG;
+		ret = -EINVAL;
+		goto done;
+	}
+
+	if (*crypt == NULL || (*crypt)->ops != ops) {
+		struct ieee80211_crypt_data *new_crypt;
+
+		ieee80211_crypt_delayed_deinit(ieee, crypt);
+
+		new_crypt =
+		    kzalloc(sizeof(struct ieee80211_crypt_data), GFP_KERNEL);
+		if (new_crypt == NULL) {
+			ret = -ENOMEM;
+			goto done;
+		}
+		new_crypt->ops = ops;
+		if (new_crypt->ops && try_module_get(new_crypt->ops->owner))
+			new_crypt->priv =
+			    new_crypt->ops->init(param->u.crypt.idx);
+
+		if (new_crypt->priv == NULL) {
+			kfree(new_crypt);
+			param->u.crypt.err =
+			    IPW2100_CRYPT_ERR_CRYPT_INIT_FAILED;
+			ret = -EINVAL;
+			goto done;
+		}
+
+		*crypt = new_crypt;
+	}
+
+	if (param->u.crypt.key_len > 0 && (*crypt)->ops->set_key &&
+	    (*crypt)->ops->set_key(param->u.crypt.key,
+				   param->u.crypt.key_len, param->u.crypt.seq,
+				   (*crypt)->priv) < 0) {
+		IPW_DEBUG_INFO("%s: key setting failed\n", dev->name);
+		param->u.crypt.err = IPW2100_CRYPT_ERR_KEY_SET_FAILED;
+		ret = -EINVAL;
+		goto done;
+	}
+
+	if (param->u.crypt.set_tx) {
+		ieee->tx_keyidx = param->u.crypt.idx;
+		sec.active_key = param->u.crypt.idx;
+		sec.flags |= SEC_ACTIVE_KEY;
+	}
+
+	if (ops->name != NULL) {
+
+		if (strcmp(ops->name, "WEP") == 0) {
+			memcpy(sec.keys[param->u.crypt.idx],
+			       param->u.crypt.key, param->u.crypt.key_len);
+			sec.key_sizes[param->u.crypt.idx] =
+			    param->u.crypt.key_len;
+			sec.flags |= (1 << param->u.crypt.idx);
+			sec.flags |= SEC_LEVEL;
+			sec.level = SEC_LEVEL_1;
+		} else if (strcmp(ops->name, "TKIP") == 0) {
+			sec.flags |= SEC_LEVEL;
+			sec.level = SEC_LEVEL_2;
+		} else if (strcmp(ops->name, "CCMP") == 0) {
+			sec.flags |= SEC_LEVEL;
+			sec.level = SEC_LEVEL_3;
+		}
+	}
+      done:
+	if (ieee->set_security)
+		ieee->set_security(ieee->dev, &sec);
+
+	/* Do not reset port if card is in Managed mode since resetting will
+	 * generate new IEEE 802.11 authentication which may end up in looping
+	 * with IEEE 802.1X.  If your hardware requires a reset after WEP
+	 * configuration (for example... Prism2), implement the reset_port in
+	 * the callbacks structures used to initialize the 802.11 stack. */
+	if (ieee->reset_on_keychange &&
+	    ieee->iw_mode != IW_MODE_INFRA &&
+	    ieee->reset_port && ieee->reset_port(dev)) {
+		IPW_DEBUG_INFO("%s: reset_port failed\n", dev->name);
+		param->u.crypt.err = IPW2100_CRYPT_ERR_CARD_CONF_FAILED;
+		return -EINVAL;
+	}
+
+	return ret;
+}
+
+static int ipw2100_wpa_supplicant(struct net_device *dev, struct iw_point *p)
+{
+
+	struct ipw2100_param *param;
+	int ret = 0;
+
+	IPW_DEBUG_IOCTL("wpa_supplicant: len=%d\n", p->length);
+
+	if (p->length < sizeof(struct ipw2100_param) || !p->pointer)
+		return -EINVAL;
+
+	param = (struct ipw2100_param *)kmalloc(p->length, GFP_KERNEL);
+	if (param == NULL)
+		return -ENOMEM;
+
+	if (copy_from_user(param, p->pointer, p->length)) {
+		kfree(param);
+		return -EFAULT;
+	}
+
+	switch (param->cmd) {
+
+	case IPW2100_CMD_SET_WPA_PARAM:
+		ret = ipw2100_wpa_set_param(dev, param->u.wpa_param.name,
+					    param->u.wpa_param.value);
+		break;
+
+	case IPW2100_CMD_SET_WPA_IE:
+		ret = ipw2100_wpa_set_wpa_ie(dev, param, p->length);
+		break;
+
+	case IPW2100_CMD_SET_ENCRYPTION:
+		ret = ipw2100_wpa_set_encryption(dev, param, p->length);
+		break;
+
+	case IPW2100_CMD_MLME:
+		ret = ipw2100_wpa_mlme(dev, param->u.mlme.command,
+				       param->u.mlme.reason_code);
+		break;
+
+	default:
+		printk(KERN_ERR DRV_NAME
+		       ": %s: Unknown WPA supplicant request: %d\n", dev->name,
+		       param->cmd);
+		ret = -EOPNOTSUPP;
+
+	}
+
+	if (ret == 0 && copy_to_user(p->pointer, param, p->length))
+		ret = -EFAULT;
+
+	kfree(param);
+	return ret;
+}
+
+static int ipw2100_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
+{
+	struct iwreq *wrq = (struct iwreq *)rq;
+	int ret = -1;
+	switch (cmd) {
+	case IPW2100_IOCTL_WPA_SUPPLICANT:
+		ret = ipw2100_wpa_supplicant(dev, &wrq->u.data);
+		return ret;
+
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	return -EOPNOTSUPP;
+}
+#endif				/* WIRELESS_EXT < 18 */
 
 static void ipw_ethtool_get_drvinfo(struct net_device *dev,
 				    struct ethtool_drvinfo *info)
@@ -5914,6 +6369,9 @@ static struct net_device *ipw2100_alloc_device(struct pci_dev *pci_dev,
 	dev->open = ipw2100_open;
 	dev->stop = ipw2100_close;
 	dev->init = ipw2100_net_init;
+#if WIRELESS_EXT < 18
+	dev->do_ioctl = ipw2100_ioctl;
+#endif
 	dev->get_stats = ipw2100_stats;
 	dev->ethtool_ops = &ipw2100_ethtool_ops;
 	dev->tx_timeout = ipw2100_tx_timeout;
@@ -6727,7 +7185,7 @@ static int ipw2100_wx_get_range(struct net_device *dev,
 
 	/* Set the Wireless Extension versions */
 	range->we_version_compiled = WIRELESS_EXT;
-	range->we_version_source = 18;
+	range->we_version_source = 16;
 
 //      range->retry_capa;      /* What retry options are supported */
 //      range->retry_flags;     /* How to decode max/min retry limit */
@@ -6757,9 +7215,6 @@ static int ipw2100_wx_get_range(struct net_device *dev,
 	range->event_capa[0] = (IW_EVENT_CAPA_K_0 |
 				IW_EVENT_CAPA_MASK(SIOCGIWAP));
 	range->event_capa[1] = IW_EVENT_CAPA_K_1;
-
-	range->enc_capa = IW_ENC_CAPA_WPA | IW_ENC_CAPA_WPA2 |
-		IW_ENC_CAPA_CIPHER_TKIP | IW_ENC_CAPA_CIPHER_CCMP;
 
 	IPW_DEBUG_WX("GET Range\n");
 
@@ -7429,6 +7884,7 @@ static int ipw2100_wx_get_power(struct net_device *dev,
 	return 0;
 }
 
+#if WIRELESS_EXT > 17
 /*
  * WE-18 WPA support
  */
@@ -7690,6 +8146,7 @@ static int ipw2100_wx_set_mlme(struct net_device *dev,
 	}
 	return 0;
 }
+#endif				/* WIRELESS_EXT > 17 */
 
 /*
  *
@@ -7922,7 +8379,11 @@ static iw_handler ipw2100_wx_handlers[] = {
 	NULL,			/* SIOCWIWTHRSPY */
 	ipw2100_wx_set_wap,	/* SIOCSIWAP */
 	ipw2100_wx_get_wap,	/* SIOCGIWAP */
+#if WIRELESS_EXT > 17
 	ipw2100_wx_set_mlme,	/* SIOCSIWMLME */
+#else
+	NULL,			/* -- hole -- */
+#endif
 	NULL,			/* SIOCGIWAPLIST -- deprecated */
 	ipw2100_wx_set_scan,	/* SIOCSIWSCAN */
 	ipw2100_wx_get_scan,	/* SIOCGIWSCAN */
@@ -7946,6 +8407,7 @@ static iw_handler ipw2100_wx_handlers[] = {
 	ipw2100_wx_get_encode,	/* SIOCGIWENCODE */
 	ipw2100_wx_set_power,	/* SIOCSIWPOWER */
 	ipw2100_wx_get_power,	/* SIOCGIWPOWER */
+#if WIRELESS_EXT > 17
 	NULL,			/* -- hole -- */
 	NULL,			/* -- hole -- */
 	ipw2100_wx_set_genie,	/* SIOCSIWGENIE */
@@ -7955,6 +8417,7 @@ static iw_handler ipw2100_wx_handlers[] = {
 	ipw2100_wx_set_encodeext,	/* SIOCSIWENCODEEXT */
 	ipw2100_wx_get_encodeext,	/* SIOCGIWENCODEEXT */
 	NULL,			/* SIOCSIWPMKSA */
+#endif
 };
 
 #define IPW2100_PRIV_SET_MONITOR	SIOCIWFIRSTPRIV

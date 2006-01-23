@@ -31,9 +31,8 @@
 ******************************************************************************/
 
 #include "ipw2200.h"
-#include <linux/version.h>
 
-#define IPW2200_VERSION "git-1.0.8"
+#define IPW2200_VERSION "1.0.10"
 #define DRV_DESCRIPTION	"Intel(R) PRO/Wireless 2200/2915 Network Driver"
 #define DRV_COPYRIGHT	"Copyright(c) 2003-2005 Intel Corporation"
 #define DRV_VERSION     IPW2200_VERSION
@@ -55,7 +54,9 @@ static int associate = 1;
 static int auto_create = 1;
 static int led = 0;
 static int disable = 0;
+static int bt_coexist = 0;
 static int hwcrypto = 1;
+static int roaming = 1;
 static const char ipw_modes[] = {
 	'a', 'b', 'g', '?'
 };
@@ -227,12 +228,15 @@ static int snprintk_buf(u8 * output, size_t size, const u8 * data, size_t len)
 	return total;
 }
 
+/* alias for 32-bit indirect read (for SRAM/reg above 4K), with debug wrapper */
 static u32 _ipw_read_reg32(struct ipw_priv *priv, u32 reg);
 #define ipw_read_reg32(a, b) _ipw_read_reg32(a, b)
 
+/* alias for 8-bit indirect read (for SRAM/reg above 4K), with debug wrapper */
 static u8 _ipw_read_reg8(struct ipw_priv *ipw, u32 reg);
 #define ipw_read_reg8(a, b) _ipw_read_reg8(a, b)
 
+/* 8-bit indirect write (for SRAM/reg above 4K), with debug wrapper */
 static void _ipw_write_reg8(struct ipw_priv *priv, u32 reg, u8 value);
 static inline void ipw_write_reg8(struct ipw_priv *a, u32 b, u8 c)
 {
@@ -241,6 +245,7 @@ static inline void ipw_write_reg8(struct ipw_priv *a, u32 b, u8 c)
 	_ipw_write_reg8(a, b, c);
 }
 
+/* 16-bit indirect write (for SRAM/reg above 4K), with debug wrapper */
 static void _ipw_write_reg16(struct ipw_priv *priv, u32 reg, u16 value);
 static inline void ipw_write_reg16(struct ipw_priv *a, u32 b, u16 c)
 {
@@ -249,6 +254,7 @@ static inline void ipw_write_reg16(struct ipw_priv *a, u32 b, u16 c)
 	_ipw_write_reg16(a, b, c);
 }
 
+/* 32-bit indirect write (for SRAM/reg above 4K), with debug wrapper */
 static void _ipw_write_reg32(struct ipw_priv *priv, u32 reg, u32 value);
 static inline void ipw_write_reg32(struct ipw_priv *a, u32 b, u32 c)
 {
@@ -257,48 +263,70 @@ static inline void ipw_write_reg32(struct ipw_priv *a, u32 b, u32 c)
 	_ipw_write_reg32(a, b, c);
 }
 
+/* 8-bit direct write (low 4K) */
 #define _ipw_write8(ipw, ofs, val) writeb((val), (ipw)->hw_base + (ofs))
+
+/* 8-bit direct write (for low 4K of SRAM/regs), with debug wrapper */
 #define ipw_write8(ipw, ofs, val) \
  IPW_DEBUG_IO("%s %d: write_direct8(0x%08X, 0x%08X)\n", __FILE__, __LINE__, (u32)(ofs), (u32)(val)); \
  _ipw_write8(ipw, ofs, val)
 
+/* 16-bit direct write (low 4K) */
 #define _ipw_write16(ipw, ofs, val) writew((val), (ipw)->hw_base + (ofs))
+
+/* 16-bit direct write (for low 4K of SRAM/regs), with debug wrapper */
 #define ipw_write16(ipw, ofs, val) \
  IPW_DEBUG_IO("%s %d: write_direct16(0x%08X, 0x%08X)\n", __FILE__, __LINE__, (u32)(ofs), (u32)(val)); \
  _ipw_write16(ipw, ofs, val)
 
+/* 32-bit direct write (low 4K) */
 #define _ipw_write32(ipw, ofs, val) writel((val), (ipw)->hw_base + (ofs))
+
+/* 32-bit direct write (for low 4K of SRAM/regs), with debug wrapper */
 #define ipw_write32(ipw, ofs, val) \
  IPW_DEBUG_IO("%s %d: write_direct32(0x%08X, 0x%08X)\n", __FILE__, __LINE__, (u32)(ofs), (u32)(val)); \
  _ipw_write32(ipw, ofs, val)
 
+/* 8-bit direct read (low 4K) */
 #define _ipw_read8(ipw, ofs) readb((ipw)->hw_base + (ofs))
+
+/* 8-bit direct read (low 4K), with debug wrapper */
 static inline u8 __ipw_read8(char *f, u32 l, struct ipw_priv *ipw, u32 ofs)
 {
 	IPW_DEBUG_IO("%s %d: read_direct8(0x%08X)\n", f, l, (u32) (ofs));
 	return _ipw_read8(ipw, ofs);
 }
 
+/* alias to 8-bit direct read (low 4K of SRAM/regs), with debug wrapper */
 #define ipw_read8(ipw, ofs) __ipw_read8(__FILE__, __LINE__, ipw, ofs)
 
+/* 16-bit direct read (low 4K) */
 #define _ipw_read16(ipw, ofs) readw((ipw)->hw_base + (ofs))
+
+/* 16-bit direct read (low 4K), with debug wrapper */
 static inline u16 __ipw_read16(char *f, u32 l, struct ipw_priv *ipw, u32 ofs)
 {
 	IPW_DEBUG_IO("%s %d: read_direct16(0x%08X)\n", f, l, (u32) (ofs));
 	return _ipw_read16(ipw, ofs);
 }
 
+/* alias to 16-bit direct read (low 4K of SRAM/regs), with debug wrapper */
 #define ipw_read16(ipw, ofs) __ipw_read16(__FILE__, __LINE__, ipw, ofs)
 
+/* 32-bit direct read (low 4K) */
 #define _ipw_read32(ipw, ofs) readl((ipw)->hw_base + (ofs))
+
+/* 32-bit direct read (low 4K), with debug wrapper */
 static inline u32 __ipw_read32(char *f, u32 l, struct ipw_priv *ipw, u32 ofs)
 {
 	IPW_DEBUG_IO("%s %d: read_direct32(0x%08X)\n", f, l, (u32) (ofs));
 	return _ipw_read32(ipw, ofs);
 }
 
+/* alias to 32-bit direct read (low 4K of SRAM/regs), with debug wrapper */
 #define ipw_read32(ipw, ofs) __ipw_read32(__FILE__, __LINE__, ipw, ofs)
 
+/* multi-byte read (above 4K), with debug wrapper */
 static void _ipw_read_indirect(struct ipw_priv *, u32, u8 *, int);
 static inline void __ipw_read_indirect(const char *f, int l,
 				       struct ipw_priv *a, u32 b, u8 * c, int d)
@@ -308,15 +336,17 @@ static inline void __ipw_read_indirect(const char *f, int l,
 	_ipw_read_indirect(a, b, c, d);
 }
 
+/* alias to multi-byte read (SRAM/regs above 4K), with debug wrapper */
 #define ipw_read_indirect(a, b, c, d) __ipw_read_indirect(__FILE__, __LINE__, a, b, c, d)
 
+/* alias to multi-byte read (SRAM/regs above 4K), with debug wrapper */
 static void _ipw_write_indirect(struct ipw_priv *priv, u32 addr, u8 * data,
 				int num);
 #define ipw_write_indirect(a, b, c, d) \
 	IPW_DEBUG_IO("%s %d: write_indirect(0x%08X) %d bytes\n", __FILE__, __LINE__, (u32)(b), d); \
 	_ipw_write_indirect(a, b, c, d)
 
-/* indirect write s */
+/* 32-bit indirect write (above 4K) */
 static void _ipw_write_reg32(struct ipw_priv *priv, u32 reg, u32 value)
 {
 	IPW_DEBUG_IO(" %p : reg = 0x%8X : value = 0x%8X\n", priv, reg, value);
@@ -324,22 +354,29 @@ static void _ipw_write_reg32(struct ipw_priv *priv, u32 reg, u32 value)
 	_ipw_write32(priv, IPW_INDIRECT_DATA, value);
 }
 
+/* 8-bit indirect write (above 4K) */
 static void _ipw_write_reg8(struct ipw_priv *priv, u32 reg, u8 value)
 {
+	u32 aligned_addr = reg & IPW_INDIRECT_ADDR_MASK;	/* dword align */
+	u32 dif_len = reg - aligned_addr;
+
 	IPW_DEBUG_IO(" reg = 0x%8X : value = 0x%8X\n", reg, value);
-	_ipw_write32(priv, IPW_INDIRECT_ADDR, reg & IPW_INDIRECT_ADDR_MASK);
-	_ipw_write8(priv, IPW_INDIRECT_DATA, value);
+	_ipw_write32(priv, IPW_INDIRECT_ADDR, aligned_addr);
+	_ipw_write8(priv, IPW_INDIRECT_DATA + dif_len, value);
 }
 
+/* 16-bit indirect write (above 4K) */
 static void _ipw_write_reg16(struct ipw_priv *priv, u32 reg, u16 value)
 {
+	u32 aligned_addr = reg & IPW_INDIRECT_ADDR_MASK;	/* dword align */
+	u32 dif_len = (reg - aligned_addr) & (~0x1ul);
+
 	IPW_DEBUG_IO(" reg = 0x%8X : value = 0x%8X\n", reg, value);
-	_ipw_write32(priv, IPW_INDIRECT_ADDR, reg & IPW_INDIRECT_ADDR_MASK);
-	_ipw_write16(priv, IPW_INDIRECT_DATA, value);
+	_ipw_write32(priv, IPW_INDIRECT_ADDR, aligned_addr);
+	_ipw_write16(priv, IPW_INDIRECT_DATA + dif_len, value);
 }
 
-/* indirect read s */
-
+/* 8-bit indirect read (above 4K) */
 static u8 _ipw_read_reg8(struct ipw_priv *priv, u32 reg)
 {
 	u32 word;
@@ -349,6 +386,7 @@ static u8 _ipw_read_reg8(struct ipw_priv *priv, u32 reg)
 	return (word >> ((reg & 0x3) * 8)) & 0xff;
 }
 
+/* 32-bit indirect read (above 4K) */
 static u32 _ipw_read_reg32(struct ipw_priv *priv, u32 reg)
 {
 	u32 value;
@@ -361,11 +399,12 @@ static u32 _ipw_read_reg32(struct ipw_priv *priv, u32 reg)
 	return value;
 }
 
-/* iterative/auto-increment 32 bit reads and writes */
+/* General purpose, no alignment requirement, iterative (multi-byte) read, */
+/*    for area above 1st 4K of SRAM/reg space */
 static void _ipw_read_indirect(struct ipw_priv *priv, u32 addr, u8 * buf,
 			       int num)
 {
-	u32 aligned_addr = addr & IPW_INDIRECT_ADDR_MASK;
+	u32 aligned_addr = addr & IPW_INDIRECT_ADDR_MASK;	/* dword align */
 	u32 dif_len = addr - aligned_addr;
 	u32 i;
 
@@ -375,7 +414,7 @@ static void _ipw_read_indirect(struct ipw_priv *priv, u32 addr, u8 * buf,
 		return;
 	}
 
-	/* Read the first nibble byte by byte */
+	/* Read the first dword (or portion) byte by byte */
 	if (unlikely(dif_len)) {
 		_ipw_write32(priv, IPW_INDIRECT_ADDR, aligned_addr);
 		/* Start reading at aligned_addr + dif_len */
@@ -384,11 +423,12 @@ static void _ipw_read_indirect(struct ipw_priv *priv, u32 addr, u8 * buf,
 		aligned_addr += 4;
 	}
 
+	/* Read all of the middle dwords as dwords, with auto-increment */
 	_ipw_write32(priv, IPW_AUTOINC_ADDR, aligned_addr);
 	for (; num >= 4; buf += 4, aligned_addr += 4, num -= 4)
 		*(u32 *) buf = _ipw_read32(priv, IPW_AUTOINC_DATA);
 
-	/* Copy the last nibble */
+	/* Read the last dword (or portion) byte by byte */
 	if (unlikely(num)) {
 		_ipw_write32(priv, IPW_INDIRECT_ADDR, aligned_addr);
 		for (i = 0; num > 0; i++, num--)
@@ -396,10 +436,12 @@ static void _ipw_read_indirect(struct ipw_priv *priv, u32 addr, u8 * buf,
 	}
 }
 
+/* General purpose, no alignment requirement, iterative (multi-byte) write, */
+/*    for area above 1st 4K of SRAM/reg space */
 static void _ipw_write_indirect(struct ipw_priv *priv, u32 addr, u8 * buf,
 				int num)
 {
-	u32 aligned_addr = addr & IPW_INDIRECT_ADDR_MASK;
+	u32 aligned_addr = addr & IPW_INDIRECT_ADDR_MASK;	/* dword align */
 	u32 dif_len = addr - aligned_addr;
 	u32 i;
 
@@ -409,20 +451,21 @@ static void _ipw_write_indirect(struct ipw_priv *priv, u32 addr, u8 * buf,
 		return;
 	}
 
-	/* Write the first nibble byte by byte */
+	/* Write the first dword (or portion) byte by byte */
 	if (unlikely(dif_len)) {
 		_ipw_write32(priv, IPW_INDIRECT_ADDR, aligned_addr);
-		/* Start reading at aligned_addr + dif_len */
+		/* Start writing at aligned_addr + dif_len */
 		for (i = dif_len; ((i < 4) && (num > 0)); i++, num--, buf++)
 			_ipw_write8(priv, IPW_INDIRECT_DATA + i, *buf);
 		aligned_addr += 4;
 	}
 
+	/* Write all of the middle dwords as dwords, with auto-increment */
 	_ipw_write32(priv, IPW_AUTOINC_ADDR, aligned_addr);
 	for (; num >= 4; buf += 4, aligned_addr += 4, num -= 4)
 		_ipw_write32(priv, IPW_AUTOINC_DATA, *(u32 *) buf);
 
-	/* Copy the last nibble */
+	/* Write the last dword (or portion) byte by byte */
 	if (unlikely(num)) {
 		_ipw_write32(priv, IPW_INDIRECT_ADDR, aligned_addr);
 		for (i = 0; num > 0; i++, num--, buf++)
@@ -430,17 +473,21 @@ static void _ipw_write_indirect(struct ipw_priv *priv, u32 addr, u8 * buf,
 	}
 }
 
+/* General purpose, no alignment requirement, iterative (multi-byte) write, */
+/*    for 1st 4K of SRAM/regs space */
 static void ipw_write_direct(struct ipw_priv *priv, u32 addr, void *buf,
 			     int num)
 {
 	memcpy_toio((priv->hw_base + addr), buf, num);
 }
 
+/* Set bit(s) in low 4K of SRAM/regs */
 static inline void ipw_set_bit(struct ipw_priv *priv, u32 reg, u32 mask)
 {
 	ipw_write32(priv, reg, ipw_read32(priv, reg) | mask);
 }
 
+/* Clear bit(s) in low 4K of SRAM/regs */
 static inline void ipw_clear_bit(struct ipw_priv *priv, u32 reg, u32 mask)
 {
 	ipw_write32(priv, reg, ipw_read32(priv, reg) & ~mask);
@@ -462,7 +509,7 @@ static inline void ipw_disable_interrupts(struct ipw_priv *priv)
 	ipw_write32(priv, IPW_INTA_MASK_R, ~IPW_INTA_MASK_ALL);
 }
 
-#ifdef CONFIG_IPW2200_DEBUG
+#ifdef CONFIG_IPW2100_DEBUG
 static char *ipw_error_desc(u32 val)
 {
 	switch (val) {
@@ -722,9 +769,9 @@ u32 ipw_register_toggle(u32 reg)
  * - On radio OFF, turn off any LEDs started during radio on
  *
  */
-#define LD_TIME_LINK_ON 300
-#define LD_TIME_LINK_OFF 2700
-#define LD_TIME_ACT_ON 250
+#define LD_TIME_LINK_ON msecs_to_jiffies(300)
+#define LD_TIME_LINK_OFF msecs_to_jiffies(2700)
+#define LD_TIME_ACT_ON msecs_to_jiffies(250)
 
 void ipw_led_link_on(struct ipw_priv *priv)
 {
@@ -813,7 +860,7 @@ static void ipw_bg_led_link_off(void *data)
 	up(&priv->sem);
 }
 
-static void __ipw_led_activity_on(struct ipw_priv *priv)
+static inline void __ipw_led_activity_on(struct ipw_priv *priv)
 {
 	u32 led;
 
@@ -1074,6 +1121,7 @@ static DRIVER_ATTR(debug_level, S_IWUSR | S_IRUGO,
 
 static inline u32 ipw_get_event_log_len(struct ipw_priv *priv)
 {
+	/* length = 1st dword in log */
 	return ipw_read_reg32(priv, ipw_read32(priv, IPW_EVENT_LOG));
 }
 
@@ -1127,8 +1175,8 @@ static void ipw_free_error_log(struct ipw_fw_error *error)
 		kfree(error);
 }
 
-static ssize_t show_event_log(struct device *d,
-			      struct device_attribute *attr, char *buf)
+static ssize_t show_event_log(struct device *d, struct device_attribute *attr,
+			      char *buf)
 {
 	struct ipw_priv *priv = dev_get_drvdata(d);
 	u32 log_len = ipw_get_event_log_len(priv);
@@ -1148,8 +1196,8 @@ static ssize_t show_event_log(struct device *d,
 
 static DEVICE_ATTR(event_log, S_IRUGO, show_event_log, NULL);
 
-static ssize_t show_error(struct device *d,
-			  struct device_attribute *attr, char *buf)
+static ssize_t show_error(struct device *d, struct device_attribute *attr,
+			  char *buf)
 {
 	struct ipw_priv *priv = dev_get_drvdata(d);
 	u32 len = 0, i;
@@ -1183,8 +1231,7 @@ static ssize_t show_error(struct device *d,
 	return len;
 }
 
-static ssize_t clear_error(struct device *d,
-			   struct device_attribute *attr,
+static ssize_t clear_error(struct device *d, struct device_attribute *attr,
 			   const char *buf, size_t count)
 {
 	struct ipw_priv *priv = dev_get_drvdata(d);
@@ -1197,8 +1244,8 @@ static ssize_t clear_error(struct device *d,
 
 static DEVICE_ATTR(error, S_IRUGO | S_IWUSR, show_error, clear_error);
 
-static ssize_t show_cmd_log(struct device *d,
-			    struct device_attribute *attr, char *buf)
+static ssize_t show_cmd_log(struct device *d, struct device_attribute *attr,
+			    char *buf)
 {
 	struct ipw_priv *priv = dev_get_drvdata(d);
 	u32 len = 0, i;
@@ -1235,7 +1282,7 @@ static ssize_t store_scan_age(struct device *d, struct device_attribute *attr,
 			      const char *buf, size_t count)
 {
 	struct ipw_priv *priv = dev_get_drvdata(d);
-#ifdef CONFIG_IPW2200_DEBUG
+#ifdef CONFIG_IPW2100_DEBUG
 	struct net_device *dev = priv->net_dev;
 #endif
 	char buffer[] = "00000000";
@@ -1302,8 +1349,8 @@ static ssize_t store_led(struct device *d, struct device_attribute *attr,
 
 static DEVICE_ATTR(led, S_IWUSR | S_IRUGO, show_led, store_led);
 
-static ssize_t show_status(struct device *d,
-			   struct device_attribute *attr, char *buf)
+static ssize_t show_status(struct device *d, struct device_attribute *attr,
+			   char *buf)
 {
 	struct ipw_priv *p = d->driver_data;
 	return sprintf(buf, "0x%08x\n", (int)p->status);
@@ -1320,8 +1367,8 @@ static ssize_t show_cfg(struct device *d, struct device_attribute *attr,
 
 static DEVICE_ATTR(cfg, S_IRUGO, show_cfg, NULL);
 
-static ssize_t show_nic_type(struct device *d,
-			     struct device_attribute *attr, char *buf)
+static ssize_t show_nic_type(struct device *d, struct device_attribute *attr,
+			     char *buf)
 {
 	struct ipw_priv *priv = d->driver_data;
 	return sprintf(buf, "TYPE: %d\n", priv->nic_type);
@@ -1329,8 +1376,8 @@ static ssize_t show_nic_type(struct device *d,
 
 static DEVICE_ATTR(nic_type, S_IRUGO, show_nic_type, NULL);
 
-static ssize_t show_ucode_version(struct device *d,
-				  struct device_attribute *attr, char *buf)
+static ssize_t show_ucode_version(struct device *d, struct device_attribute *attr,
+				  char *buf)
 {
 	u32 len = sizeof(u32), tmp = 0;
 	struct ipw_priv *p = d->driver_data;
@@ -1361,14 +1408,13 @@ static DEVICE_ATTR(rtc, S_IWUSR | S_IRUGO, show_rtc, NULL);
  * Add a device attribute to view/control the delay between eeprom
  * operations.
  */
-static ssize_t show_eeprom_delay(struct device *d,
-				 struct device_attribute *attr, char *buf)
+static ssize_t show_eeprom_delay(struct device *d, struct device_attribute *attr,
+				 char *buf)
 {
 	int n = ((struct ipw_priv *)d->driver_data)->eeprom_delay;
 	return sprintf(buf, "%i\n", n);
 }
-static ssize_t store_eeprom_delay(struct device *d,
-				  struct device_attribute *attr,
+static ssize_t store_eeprom_delay(struct device *d, struct device_attribute *attr,
 				  const char *buf, size_t count)
 {
 	struct ipw_priv *p = d->driver_data;
@@ -1379,8 +1425,8 @@ static ssize_t store_eeprom_delay(struct device *d,
 static DEVICE_ATTR(eeprom_delay, S_IWUSR | S_IRUGO,
 		   show_eeprom_delay, store_eeprom_delay);
 
-static ssize_t show_command_event_reg(struct device *d,
-				      struct device_attribute *attr, char *buf)
+static ssize_t show_command_event_reg(struct device *d, struct device_attribute *attr,
+				      char *buf)
 {
 	u32 reg = 0;
 	struct ipw_priv *p = d->driver_data;
@@ -1388,8 +1434,7 @@ static ssize_t show_command_event_reg(struct device *d,
 	reg = ipw_read_reg32(p, IPW_INTERNAL_CMD_EVENT);
 	return sprintf(buf, "0x%08x\n", reg);
 }
-static ssize_t store_command_event_reg(struct device *d,
-				       struct device_attribute *attr,
+static ssize_t store_command_event_reg(struct device *d, struct device_attribute *attr,
 				       const char *buf, size_t count)
 {
 	u32 reg;
@@ -1403,8 +1448,8 @@ static ssize_t store_command_event_reg(struct device *d,
 static DEVICE_ATTR(command_event_reg, S_IWUSR | S_IRUGO,
 		   show_command_event_reg, store_command_event_reg);
 
-static ssize_t show_mem_gpio_reg(struct device *d,
-				 struct device_attribute *attr, char *buf)
+static ssize_t show_mem_gpio_reg(struct device *d, struct device_attribute *attr,
+				 char *buf)
 {
 	u32 reg = 0;
 	struct ipw_priv *p = d->driver_data;
@@ -1412,8 +1457,7 @@ static ssize_t show_mem_gpio_reg(struct device *d,
 	reg = ipw_read_reg32(p, 0x301100);
 	return sprintf(buf, "0x%08x\n", reg);
 }
-static ssize_t store_mem_gpio_reg(struct device *d,
-				  struct device_attribute *attr,
+static ssize_t store_mem_gpio_reg(struct device *d, struct device_attribute *attr,
 				  const char *buf, size_t count)
 {
 	u32 reg;
@@ -1427,8 +1471,8 @@ static ssize_t store_mem_gpio_reg(struct device *d,
 static DEVICE_ATTR(mem_gpio_reg, S_IWUSR | S_IRUGO,
 		   show_mem_gpio_reg, store_mem_gpio_reg);
 
-static ssize_t show_indirect_dword(struct device *d,
-				   struct device_attribute *attr, char *buf)
+static ssize_t show_indirect_dword(struct device *d, struct device_attribute *attr,
+				   char *buf)
 {
 	u32 reg = 0;
 	struct ipw_priv *priv = d->driver_data;
@@ -1440,8 +1484,7 @@ static ssize_t show_indirect_dword(struct device *d,
 
 	return sprintf(buf, "0x%08x\n", reg);
 }
-static ssize_t store_indirect_dword(struct device *d,
-				    struct device_attribute *attr,
+static ssize_t store_indirect_dword(struct device *d, struct device_attribute *attr,
 				    const char *buf, size_t count)
 {
 	struct ipw_priv *priv = d->driver_data;
@@ -1454,8 +1497,8 @@ static ssize_t store_indirect_dword(struct device *d,
 static DEVICE_ATTR(indirect_dword, S_IWUSR | S_IRUGO,
 		   show_indirect_dword, store_indirect_dword);
 
-static ssize_t show_indirect_byte(struct device *d,
-				  struct device_attribute *attr, char *buf)
+static ssize_t show_indirect_byte(struct device *d, struct device_attribute *attr,
+				  char *buf)
 {
 	u8 reg = 0;
 	struct ipw_priv *priv = d->driver_data;
@@ -1467,8 +1510,7 @@ static ssize_t show_indirect_byte(struct device *d,
 
 	return sprintf(buf, "0x%02x\n", reg);
 }
-static ssize_t store_indirect_byte(struct device *d,
-				   struct device_attribute *attr,
+static ssize_t store_indirect_byte(struct device *d, struct device_attribute *attr,
 				   const char *buf, size_t count)
 {
 	struct ipw_priv *priv = d->driver_data;
@@ -1481,8 +1523,8 @@ static ssize_t store_indirect_byte(struct device *d,
 static DEVICE_ATTR(indirect_byte, S_IWUSR | S_IRUGO,
 		   show_indirect_byte, store_indirect_byte);
 
-static ssize_t show_direct_dword(struct device *d,
-				 struct device_attribute *attr, char *buf)
+static ssize_t show_direct_dword(struct device *d, struct device_attribute *attr,
+				 char *buf)
 {
 	u32 reg = 0;
 	struct ipw_priv *priv = d->driver_data;
@@ -1494,8 +1536,7 @@ static ssize_t show_direct_dword(struct device *d,
 
 	return sprintf(buf, "0x%08x\n", reg);
 }
-static ssize_t store_direct_dword(struct device *d,
-				  struct device_attribute *attr,
+static ssize_t store_direct_dword(struct device *d, struct device_attribute *attr,
 				  const char *buf, size_t count)
 {
 	struct ipw_priv *priv = d->driver_data;
@@ -1508,7 +1549,7 @@ static ssize_t store_direct_dword(struct device *d,
 static DEVICE_ATTR(direct_dword, S_IWUSR | S_IRUGO,
 		   show_direct_dword, store_direct_dword);
 
-static int rf_kill_active(struct ipw_priv *priv)
+static inline int rf_kill_active(struct ipw_priv *priv)
 {
 	if (0 == (ipw_read32(priv, 0x30) & 0x10000))
 		priv->status |= STATUS_RF_KILL_HW;
@@ -1754,7 +1795,7 @@ static void ipw_irq_tasklet(struct ipw_priv *priv)
 		IPW_ERROR("Firmware error detected.  Restarting.\n");
 		if (priv->error) {
 			IPW_ERROR("Sysfs 'error' log already exists.\n");
-#ifdef CONFIG_IPW2200_DEBUG
+#ifdef CONFIG_IPW2100_DEBUG
 			if (ipw_debug_level & IPW_DL_FW_ERRORS) {
 				struct ipw_fw_error *error =
 				    ipw_alloc_error_log(priv);
@@ -1770,7 +1811,7 @@ static void ipw_irq_tasklet(struct ipw_priv *priv)
 			else
 				IPW_ERROR("Error allocating sysfs 'error' "
 					  "log.\n");
-#ifdef CONFIG_IPW2200_DEBUG
+#ifdef CONFIG_IPW2100_DEBUG
 			if (ipw_debug_level & IPW_DL_FW_ERRORS)
 				ipw_dump_error_log(priv, priv->error);
 #endif
@@ -1870,7 +1911,8 @@ static char *get_cmd_string(u8 cmd)
 }
 
 #define HOST_COMPLETE_TIMEOUT HZ
-static int ipw_send_cmd(struct ipw_priv *priv, struct host_cmd *cmd)
+
+static int __ipw_send_cmd(struct ipw_priv *priv, struct host_cmd *cmd)
 {
 	int rc = 0;
 	unsigned long flags;
@@ -1897,9 +1939,15 @@ static int ipw_send_cmd(struct ipw_priv *priv, struct host_cmd *cmd)
 	IPW_DEBUG_HC("%s command (#%d) %d bytes: 0x%08X\n",
 		     get_cmd_string(cmd->cmd), cmd->cmd, cmd->len,
 		     priv->status);
-	printk_buf(IPW_DL_HOST_COMMAND, (u8 *) cmd->param, cmd->len);
 
-	rc = ipw_queue_tx_hcmd(priv, cmd->cmd, &cmd->param, cmd->len, 0);
+#ifndef DEBUG_CMD_WEP_KEY
+	if (cmd->cmd == IPW_CMD_WEP_KEY)
+		IPW_DEBUG_HC("WEP_KEY command masked out for secure.\n");
+	else
+#endif
+		printk_buf(IPW_DL_HOST_COMMAND, (u8 *) cmd->param, cmd->len);
+
+	rc = ipw_queue_tx_hcmd(priv, cmd->cmd, cmd->param, cmd->len, 0);
 	if (rc) {
 		priv->status &= ~STATUS_HCMD_ACTIVE;
 		IPW_ERROR("Failed to send %s: Reason %d\n",
@@ -1942,61 +1990,62 @@ static int ipw_send_cmd(struct ipw_priv *priv, struct host_cmd *cmd)
 	return rc;
 }
 
-static int ipw_send_host_complete(struct ipw_priv *priv)
+static int ipw_send_cmd_simple(struct ipw_priv *priv, u8 command)
 {
 	struct host_cmd cmd = {
-		.cmd = IPW_CMD_HOST_COMPLETE,
-		.len = 0
+		.cmd = command,
 	};
 
+	return __ipw_send_cmd(priv, &cmd);
+}
+
+static int ipw_send_cmd_pdu(struct ipw_priv *priv, u8 command, u8 len,
+			    void *data)
+{
+	struct host_cmd cmd = {
+		.cmd = command,
+		.len = len,
+		.param = data,
+	};
+
+	return __ipw_send_cmd(priv, &cmd);
+}
+
+static int ipw_send_host_complete(struct ipw_priv *priv)
+{
 	if (!priv) {
 		IPW_ERROR("Invalid args\n");
 		return -1;
 	}
 
-	return ipw_send_cmd(priv, &cmd);
+	return ipw_send_cmd_simple(priv, IPW_CMD_HOST_COMPLETE);
 }
 
 static int ipw_send_system_config(struct ipw_priv *priv,
 				  struct ipw_sys_config *config)
 {
-	struct host_cmd cmd = {
-		.cmd = IPW_CMD_SYSTEM_CONFIG,
-		.len = sizeof(*config)
-	};
-
 	if (!priv || !config) {
 		IPW_ERROR("Invalid args\n");
 		return -1;
 	}
 
-	memcpy(cmd.param, config, sizeof(*config));
-	return ipw_send_cmd(priv, &cmd);
+	return ipw_send_cmd_pdu(priv, IPW_CMD_SYSTEM_CONFIG, sizeof(*config),
+				config);
 }
 
 static int ipw_send_ssid(struct ipw_priv *priv, u8 * ssid, int len)
 {
-	struct host_cmd cmd = {
-		.cmd = IPW_CMD_SSID,
-		.len = min(len, IW_ESSID_MAX_SIZE)
-	};
-
 	if (!priv || !ssid) {
 		IPW_ERROR("Invalid args\n");
 		return -1;
 	}
 
-	memcpy(cmd.param, ssid, cmd.len);
-	return ipw_send_cmd(priv, &cmd);
+	return ipw_send_cmd_pdu(priv, IPW_CMD_SSID, min(len, IW_ESSID_MAX_SIZE),
+				ssid);
 }
 
 static int ipw_send_adapter_address(struct ipw_priv *priv, u8 * mac)
 {
-	struct host_cmd cmd = {
-		.cmd = IPW_CMD_ADAPTER_ADDRESS,
-		.len = ETH_ALEN
-	};
-
 	if (!priv || !mac) {
 		IPW_ERROR("Invalid args\n");
 		return -1;
@@ -2005,8 +2054,7 @@ static int ipw_send_adapter_address(struct ipw_priv *priv, u8 * mac)
 	IPW_DEBUG_INFO("%s: Setting MAC to " MAC_FMT "\n",
 		       priv->net_dev->name, MAC_ARG(mac));
 
-	memcpy(cmd.param, mac, ETH_ALEN);
-	return ipw_send_cmd(priv, &cmd);
+	return ipw_send_cmd_pdu(priv, IPW_CMD_ADAPTER_ADDRESS, ETH_ALEN, mac);
 }
 
 /*
@@ -2048,8 +2096,8 @@ static void ipw_scan_check(void *data)
 	struct ipw_priv *priv = data;
 	if (priv->status & (STATUS_SCANNING | STATUS_SCAN_ABORTING)) {
 		IPW_DEBUG_SCAN("Scan completion watchdog resetting "
-			       "adapter (%dms).\n",
-			       IPW_SCAN_CHECK_WATCHDOG / 100);
+			       "adapter after (%dms).\n",
+			       jiffies_to_msecs(IPW_SCAN_CHECK_WATCHDOG));
 		queue_work(priv->workqueue, &priv->adapter_restart);
 	}
 }
@@ -2065,51 +2113,40 @@ static void ipw_bg_scan_check(void *data)
 static int ipw_send_scan_request_ext(struct ipw_priv *priv,
 				     struct ipw_scan_request_ext *request)
 {
-	struct host_cmd cmd = {
-		.cmd = IPW_CMD_SCAN_REQUEST_EXT,
-		.len = sizeof(*request)
-	};
-
-	memcpy(cmd.param, request, sizeof(*request));
-	return ipw_send_cmd(priv, &cmd);
+	return ipw_send_cmd_pdu(priv, IPW_CMD_SCAN_REQUEST_EXT,
+				sizeof(*request), request);
 }
 
 static int ipw_send_scan_abort(struct ipw_priv *priv)
 {
-	struct host_cmd cmd = {
-		.cmd = IPW_CMD_SCAN_ABORT,
-		.len = 0
-	};
-
 	if (!priv) {
 		IPW_ERROR("Invalid args\n");
 		return -1;
 	}
 
-	return ipw_send_cmd(priv, &cmd);
+	return ipw_send_cmd_simple(priv, IPW_CMD_SCAN_ABORT);
 }
 
 static int ipw_set_sensitivity(struct ipw_priv *priv, u16 sens)
 {
-	struct host_cmd cmd = {
-		.cmd = IPW_CMD_SENSITIVITY_CALIB,
-		.len = sizeof(struct ipw_sensitivity_calib)
+	struct ipw_sensitivity_calib calib = {
+		.beacon_rssi_raw = sens,
 	};
-	struct ipw_sensitivity_calib *calib = (struct ipw_sensitivity_calib *)
-	    &cmd.param;
-	calib->beacon_rssi_raw = sens;
-	return ipw_send_cmd(priv, &cmd);
+
+	return ipw_send_cmd_pdu(priv, IPW_CMD_SENSITIVITY_CALIB, sizeof(calib),
+				&calib);
 }
 
 static int ipw_send_associate(struct ipw_priv *priv,
 			      struct ipw_associate *associate)
 {
-	struct host_cmd cmd = {
-		.cmd = IPW_CMD_ASSOCIATE,
-		.len = sizeof(*associate)
-	};
-
 	struct ipw_associate tmp_associate;
+
+	if (!priv || !associate) {
+		IPW_ERROR("Invalid args\n");
+		return -1;
+	}
+
 	memcpy(&tmp_associate, associate, sizeof(*associate));
 	tmp_associate.policy_support =
 	    cpu_to_le16(tmp_associate.policy_support);
@@ -2122,80 +2159,55 @@ static int ipw_send_associate(struct ipw_priv *priv,
 	    cpu_to_le16(tmp_associate.beacon_interval);
 	tmp_associate.atim_window = cpu_to_le16(tmp_associate.atim_window);
 
-	if (!priv || !associate) {
-		IPW_ERROR("Invalid args\n");
-		return -1;
-	}
-
-	memcpy(cmd.param, &tmp_associate, sizeof(*associate));
-	return ipw_send_cmd(priv, &cmd);
+	return ipw_send_cmd_pdu(priv, IPW_CMD_ASSOCIATE, sizeof(tmp_associate),
+				&tmp_associate);
 }
 
 static int ipw_send_supported_rates(struct ipw_priv *priv,
 				    struct ipw_supported_rates *rates)
 {
-	struct host_cmd cmd = {
-		.cmd = IPW_CMD_SUPPORTED_RATES,
-		.len = sizeof(*rates)
-	};
-
 	if (!priv || !rates) {
 		IPW_ERROR("Invalid args\n");
 		return -1;
 	}
 
-	memcpy(cmd.param, rates, sizeof(*rates));
-	return ipw_send_cmd(priv, &cmd);
+	return ipw_send_cmd_pdu(priv, IPW_CMD_SUPPORTED_RATES, sizeof(*rates),
+				rates);
 }
 
 static int ipw_set_random_seed(struct ipw_priv *priv)
 {
-	struct host_cmd cmd = {
-		.cmd = IPW_CMD_SEED_NUMBER,
-		.len = sizeof(u32)
-	};
+	u32 val;
 
 	if (!priv) {
 		IPW_ERROR("Invalid args\n");
 		return -1;
 	}
 
-	get_random_bytes(&cmd.param, sizeof(u32));
+	get_random_bytes(&val, sizeof(val));
 
-	return ipw_send_cmd(priv, &cmd);
+	return ipw_send_cmd_pdu(priv, IPW_CMD_SEED_NUMBER, sizeof(val), &val);
 }
 
 static int ipw_send_card_disable(struct ipw_priv *priv, u32 phy_off)
 {
-	struct host_cmd cmd = {
-		.cmd = IPW_CMD_CARD_DISABLE,
-		.len = sizeof(u32)
-	};
-
 	if (!priv) {
 		IPW_ERROR("Invalid args\n");
 		return -1;
 	}
 
-	*((u32 *) & cmd.param) = phy_off;
-
-	return ipw_send_cmd(priv, &cmd);
+	return ipw_send_cmd_pdu(priv, IPW_CMD_CARD_DISABLE, sizeof(phy_off),
+				&phy_off);
 }
 
 static int ipw_send_tx_power(struct ipw_priv *priv, struct ipw_tx_power *power)
 {
-	struct host_cmd cmd = {
-		.cmd = IPW_CMD_TX_POWER,
-		.len = sizeof(*power)
-	};
-
 	if (!priv || !power) {
 		IPW_ERROR("Invalid args\n");
 		return -1;
 	}
 
-	memcpy(cmd.param, power, sizeof(*power));
-	return ipw_send_cmd(priv, &cmd);
+	return ipw_send_cmd_pdu(priv, IPW_CMD_TX_POWER, sizeof(*power), power);
 }
 
 static int ipw_set_tx_power(struct ipw_priv *priv)
@@ -2247,18 +2259,14 @@ static int ipw_send_rts_threshold(struct ipw_priv *priv, u16 rts)
 	struct ipw_rts_threshold rts_threshold = {
 		.rts_threshold = rts,
 	};
-	struct host_cmd cmd = {
-		.cmd = IPW_CMD_RTS_THRESHOLD,
-		.len = sizeof(rts_threshold)
-	};
 
 	if (!priv) {
 		IPW_ERROR("Invalid args\n");
 		return -1;
 	}
 
-	memcpy(cmd.param, &rts_threshold, sizeof(rts_threshold));
-	return ipw_send_cmd(priv, &cmd);
+	return ipw_send_cmd_pdu(priv, IPW_CMD_RTS_THRESHOLD,
+				sizeof(rts_threshold), &rts_threshold);
 }
 
 static int ipw_send_frag_threshold(struct ipw_priv *priv, u16 frag)
@@ -2266,27 +2274,19 @@ static int ipw_send_frag_threshold(struct ipw_priv *priv, u16 frag)
 	struct ipw_frag_threshold frag_threshold = {
 		.frag_threshold = frag,
 	};
-	struct host_cmd cmd = {
-		.cmd = IPW_CMD_FRAG_THRESHOLD,
-		.len = sizeof(frag_threshold)
-	};
 
 	if (!priv) {
 		IPW_ERROR("Invalid args\n");
 		return -1;
 	}
 
-	memcpy(cmd.param, &frag_threshold, sizeof(frag_threshold));
-	return ipw_send_cmd(priv, &cmd);
+	return ipw_send_cmd_pdu(priv, IPW_CMD_FRAG_THRESHOLD,
+				sizeof(frag_threshold), &frag_threshold);
 }
 
 static int ipw_send_power_mode(struct ipw_priv *priv, u32 mode)
 {
-	struct host_cmd cmd = {
-		.cmd = IPW_CMD_POWER_MODE,
-		.len = sizeof(u32)
-	};
-	u32 *param = (u32 *) (&cmd.param);
+	u32 param;
 
 	if (!priv) {
 		IPW_ERROR("Invalid args\n");
@@ -2297,17 +2297,18 @@ static int ipw_send_power_mode(struct ipw_priv *priv, u32 mode)
 	 * level */
 	switch (mode) {
 	case IPW_POWER_BATTERY:
-		*param = IPW_POWER_INDEX_3;
+		param = IPW_POWER_INDEX_3;
 		break;
 	case IPW_POWER_AC:
-		*param = IPW_POWER_MODE_CAM;
+		param = IPW_POWER_MODE_CAM;
 		break;
 	default:
-		*param = mode;
+		param = mode;
 		break;
 	}
 
-	return ipw_send_cmd(priv, &cmd);
+	return ipw_send_cmd_pdu(priv, IPW_CMD_POWER_MODE, sizeof(param),
+				&param);
 }
 
 static int ipw_send_retry_limit(struct ipw_priv *priv, u8 slimit, u8 llimit)
@@ -2316,18 +2317,14 @@ static int ipw_send_retry_limit(struct ipw_priv *priv, u8 slimit, u8 llimit)
 		.short_retry_limit = slimit,
 		.long_retry_limit = llimit
 	};
-	struct host_cmd cmd = {
-		.cmd = IPW_CMD_RETRY_LIMIT,
-		.len = sizeof(retry_limit)
-	};
 
 	if (!priv) {
 		IPW_ERROR("Invalid args\n");
 		return -1;
 	}
 
-	memcpy(cmd.param, &retry_limit, sizeof(retry_limit));
-	return ipw_send_cmd(priv, &cmd);
+	return ipw_send_cmd_pdu(priv, IPW_CMD_RETRY_LIMIT, sizeof(retry_limit),
+				&retry_limit);
 }
 
 /*
@@ -2359,7 +2356,7 @@ static inline void eeprom_write_reg(struct ipw_priv *p, u32 data)
 }
 
 /* perform a chip select operation */
-static void eeprom_cs(struct ipw_priv *priv)
+static inline void eeprom_cs(struct ipw_priv *priv)
 {
 	eeprom_write_reg(priv, 0);
 	eeprom_write_reg(priv, EEPROM_BIT_CS);
@@ -2368,7 +2365,7 @@ static void eeprom_cs(struct ipw_priv *priv)
 }
 
 /* perform a chip select operation */
-static void eeprom_disable_cs(struct ipw_priv *priv)
+static inline void eeprom_disable_cs(struct ipw_priv *priv)
 {
 	eeprom_write_reg(priv, EEPROM_BIT_CS);
 	eeprom_write_reg(priv, 0);
@@ -2454,7 +2451,7 @@ static void ipw_eeprom_init_sram(struct ipw_priv *priv)
 	/*
 	   If the data looks correct, then copy it to our private
 	   copy.  Otherwise let the firmware know to perform the operation
-	   on it's own
+	   on its own.
 	 */
 	if ((priv->eeprom + EEPROM_VERSION) != 0) {
 		IPW_DEBUG_INFO("Writing EEPROM data into SRAM\n");
@@ -2475,7 +2472,7 @@ static void ipw_eeprom_init_sram(struct ipw_priv *priv)
 	IPW_DEBUG_TRACE("<<\n");
 }
 
-static void ipw_zero_memory(struct ipw_priv *priv, u32 start, u32 count)
+static inline void ipw_zero_memory(struct ipw_priv *priv, u32 start, u32 count)
 {
 	count >>= 2;
 	if (!count)
@@ -2707,22 +2704,25 @@ static int ipw_fw_dma_add_buffer(struct ipw_priv *priv,
 
 static int ipw_fw_dma_wait(struct ipw_priv *priv)
 {
-	u32 current_index = 0;
+	u32 current_index = 0, previous_index;
 	u32 watchdog = 0;
 
 	IPW_DEBUG_FW(">> : \n");
 
 	current_index = ipw_fw_dma_command_block_index(priv);
-	IPW_DEBUG_FW_INFO("sram_desc.last_cb_index:0x%8X\n",
+	IPW_DEBUG_FW_INFO("sram_desc.last_cb_index:0x%08X\n",
 			  (int)priv->sram_desc.last_cb_index);
 
 	while (current_index < priv->sram_desc.last_cb_index) {
 		udelay(50);
+		previous_index = current_index;
 		current_index = ipw_fw_dma_command_block_index(priv);
 
-		watchdog++;
-
-		if (watchdog > 400) {
+		if (previous_index < current_index) {
+			watchdog = 0;
+			continue;
+		}
+		if (++watchdog > 400) {
 			IPW_DEBUG_FW_INFO("Timeout\n");
 			ipw_fw_dma_dump_command_block(priv);
 			ipw_fw_dma_abort(priv);
@@ -2772,7 +2772,8 @@ static inline int ipw_alive(struct ipw_priv *priv)
 	return ipw_read32(priv, 0x90) == 0xd55555d5;
 }
 
-static int ipw_poll_bit(struct ipw_priv *priv, u32 addr, u32 mask,
+/* timeout in msec, attempted in 10-msec quanta */
+static inline int ipw_poll_bit(struct ipw_priv *priv, u32 addr, u32 mask,
 			       int timeout)
 {
 	int i = 0;
@@ -2800,10 +2801,11 @@ static int ipw_stop_master(struct ipw_priv *priv)
 	/* stop master. typical delay - 0 */
 	ipw_set_bit(priv, IPW_RESET_REG, IPW_RESET_REG_STOP_MASTER);
 
+	/* timeout is in msec, polled in 10-msec quanta */
 	rc = ipw_poll_bit(priv, IPW_RESET_REG,
 			  IPW_RESET_REG_MASTER_DISABLED, 100);
 	if (rc < 0) {
-		IPW_ERROR("stop master failed in 10ms\n");
+		IPW_ERROR("wait for stop master failed after 100ms\n");
 		return -1;
 	}
 
@@ -2890,8 +2892,8 @@ static int ipw_load_ucode(struct ipw_priv *priv, u8 * data, size_t len)
 	mdelay(1);
 
 	/* enable ucode store */
-	ipw_write_reg8(priv, DINO_CONTROL_REG, 0x0);
-	ipw_write_reg8(priv, DINO_CONTROL_REG, DINO_ENABLE_CS);
+	ipw_write_reg8(priv, IPW_BASEBAND_CONTROL_STATUS, 0x0);
+	ipw_write_reg8(priv, IPW_BASEBAND_CONTROL_STATUS, DINO_ENABLE_CS);
 	mdelay(1);
 
 	/* write ucode */
@@ -3036,7 +3038,7 @@ static int ipw_stop_nic(struct ipw_priv *priv)
 	rc = ipw_poll_bit(priv, IPW_RESET_REG,
 			  IPW_RESET_REG_MASTER_DISABLED, 500);
 	if (rc < 0) {
-		IPW_ERROR("wait for reg master disabled failed\n");
+		IPW_ERROR("wait for reg master disabled failed after 500ms\n");
 		return rc;
 	}
 
@@ -3150,7 +3152,7 @@ static int ipw_get_fw(struct ipw_priv *priv,
 
 #define IPW_RX_BUF_SIZE (3000)
 
-static void ipw_rx_queue_reset(struct ipw_priv *priv,
+static inline void ipw_rx_queue_reset(struct ipw_priv *priv,
 				      struct ipw_rx_queue *rxq)
 {
 	unsigned long flags;
@@ -3209,55 +3211,31 @@ static int ipw_load(struct ipw_priv *priv)
 	const struct firmware *firmware = NULL;
 	const struct firmware *ucode = NULL;
 #endif
+	char *ucode_name;
+	char *fw_name;
 	int rc = 0, retries = 3;
 
-#ifdef CONFIG_PM
-	if (!fw_loaded) {
-#endif
-		rc = ipw_get_fw(priv, &bootfw, IPW_FW_NAME("boot"));
-		if (rc)
-			goto error;
-
-		switch (priv->ieee->iw_mode) {
-		case IW_MODE_ADHOC:
-			rc = ipw_get_fw(priv, &ucode,
-					IPW_FW_NAME("ibss_ucode"));
-			if (rc)
-				goto error;
-
-			rc = ipw_get_fw(priv, &firmware, IPW_FW_NAME("ibss"));
-			break;
-
+	switch (priv->ieee->iw_mode) {
+	case IW_MODE_ADHOC:
+		ucode_name = IPW_FW_NAME("ibss_ucode");
+		fw_name = IPW_FW_NAME("ibss");
+		break;
 #ifdef CONFIG_IPW2200_MONITOR
-		case IW_MODE_MONITOR:
-			rc = ipw_get_fw(priv, &ucode,
-					IPW_FW_NAME("sniffer_ucode"));
-			if (rc)
-				goto error;
-
-			rc = ipw_get_fw(priv, &firmware,
-					IPW_FW_NAME("sniffer"));
-			break;
+	case IW_MODE_MONITOR:
+		ucode_name = IPW_FW_NAME("sniffer_ucode");
+		fw_name = IPW_FW_NAME("sniffer");
+		break;
 #endif
-		case IW_MODE_INFRA:
-			rc = ipw_get_fw(priv, &ucode, IPW_FW_NAME("bss_ucode"));
-			if (rc)
-				goto error;
-
-			rc = ipw_get_fw(priv, &firmware, IPW_FW_NAME("bss"));
-			break;
-
-		default:
-			rc = -EINVAL;
-		}
-
-		if (rc)
-			goto error;
-
-#ifdef CONFIG_PM
-		fw_loaded = 1;
+	case IW_MODE_INFRA:
+		ucode_name = IPW_FW_NAME("bss_ucode");
+		fw_name = IPW_FW_NAME("bss");
+		break;
+	default:
+		rc = -EINVAL;
 	}
-#endif
+
+	if (rc < 0)
+		goto error;
 
 	if (!priv->rxq)
 		priv->rxq = ipw_rx_queue_alloc(priv);
@@ -3279,7 +3257,7 @@ static int ipw_load(struct ipw_priv *priv)
 	ipw_stop_nic(priv);
 
 	rc = ipw_reset_nic(priv);
-	if (rc) {
+	if (rc < 0) {
 		IPW_ERROR("Unable to reset NIC\n");
 		goto error;
 	}
@@ -3287,6 +3265,15 @@ static int ipw_load(struct ipw_priv *priv)
 	ipw_zero_memory(priv, IPW_NIC_SRAM_LOWER_BOUND,
 			IPW_NIC_SRAM_UPPER_BOUND - IPW_NIC_SRAM_LOWER_BOUND);
 
+#ifdef CONFIG_PM
+	if (!fw_loaded) {
+#endif
+		rc = ipw_get_fw(priv, &bootfw, IPW_FW_NAME("boot"));
+		if (rc < 0)
+			goto error;
+#ifdef CONFIG_PM
+	}
+#endif
 	/* DMA the initial boot firmware into the device */
 	rc = ipw_load_firmware(priv, bootfw->data + sizeof(struct fw_header),
 			       bootfw->size - sizeof(struct fw_header));
@@ -3298,7 +3285,7 @@ static int ipw_load(struct ipw_priv *priv)
 	/* kick start the device */
 	ipw_start_nic(priv);
 
-	/* wait for the device to finish it's initial startup sequence */
+	/* wait for the device to finish its initial startup sequence */
 	rc = ipw_poll_bit(priv, IPW_INTA_RW,
 			  IPW_INTA_BIT_FW_INITIALIZATION_DONE, 500);
 	if (rc < 0) {
@@ -3309,6 +3296,16 @@ static int ipw_load(struct ipw_priv *priv)
 
 	/* ack fw init done interrupt */
 	ipw_write32(priv, IPW_INTA_RW, IPW_INTA_BIT_FW_INITIALIZATION_DONE);
+
+#ifdef CONFIG_PM
+	if (!fw_loaded) {
+#endif
+		rc = ipw_get_fw(priv, &ucode, ucode_name);
+		if (rc < 0)
+			goto error;
+#ifdef CONFIG_PM
+	}
+#endif
 
 	/* DMA the ucode into the device */
 	rc = ipw_load_ucode(priv, ucode->data + sizeof(struct fw_header),
@@ -3321,6 +3318,16 @@ static int ipw_load(struct ipw_priv *priv)
 	/* stop nic */
 	ipw_stop_nic(priv);
 
+#ifdef CONFIG_PM
+	if (!fw_loaded) {
+#endif
+		rc = ipw_get_fw(priv, &firmware, fw_name);
+		if (rc < 0)
+			goto error;
+#ifdef CONFIG_PM
+	}
+#endif
+
 	/* DMA bss firmware into the device */
 	rc = ipw_load_firmware(priv, firmware->data +
 			       sizeof(struct fw_header),
@@ -3329,11 +3336,14 @@ static int ipw_load(struct ipw_priv *priv)
 		IPW_ERROR("Unable to load firmware: %d\n", rc);
 		goto error;
 	}
+#ifdef CONFIG_PM
+	fw_loaded = 1;
+#endif
 
 	ipw_write32(priv, IPW_EEPROM_LOAD_DISABLE, 0);
 
 	rc = ipw_queue_reset(priv);
-	if (rc) {
+	if (rc < 0) {
 		IPW_ERROR("Unable to initialize queues\n");
 		goto error;
 	}
@@ -3362,7 +3372,7 @@ static int ipw_load(struct ipw_priv *priv)
 	rc = ipw_poll_bit(priv, IPW_INTA_RW,
 			  IPW_INTA_BIT_FW_INITIALIZATION_DONE, 500);
 	if (rc < 0) {
-		IPW_ERROR("device failed to start after 500ms\n");
+		IPW_ERROR("device failed to start within 500ms\n");
 		goto error;
 	}
 	IPW_DEBUG_INFO("device response after %dms\n", rc);
@@ -3608,7 +3618,7 @@ static void ipw_tx_queue_free(struct ipw_priv *priv)
 	ipw_queue_tx_free(priv, &priv->txq[3]);
 }
 
-static void ipw_create_bssid(struct ipw_priv *priv, u8 * bssid)
+static inline void ipw_create_bssid(struct ipw_priv *priv, u8 * bssid)
 {
 	/* First 3 bytes are manufacturer */
 	bssid[0] = priv->mac_addr[0];
@@ -3622,7 +3632,7 @@ static void ipw_create_bssid(struct ipw_priv *priv, u8 * bssid)
 	bssid[0] |= 0x02;	/* set local assignment bit (IEEE802) */
 }
 
-static u8 ipw_add_station(struct ipw_priv *priv, u8 * bssid)
+static inline u8 ipw_add_station(struct ipw_priv *priv, u8 * bssid)
 {
 	struct ipw_station_entry entry;
 	int i;
@@ -3655,7 +3665,7 @@ static u8 ipw_add_station(struct ipw_priv *priv, u8 * bssid)
 	return i;
 }
 
-static u8 ipw_find_station(struct ipw_priv *priv, u8 * bssid)
+static inline u8 ipw_find_station(struct ipw_priv *priv, u8 * bssid)
 {
 	int i;
 
@@ -3778,7 +3788,7 @@ static const struct ipw_status_code ipw_status_codes[] = {
 	{0x2E, "Cipher suite is rejected per security policy"},
 };
 
-#ifdef CONFIG_IPW2200_DEBUG
+#ifdef CONFIG_IPW2100_DEBUG
 static const char *ipw_get_status_code(u16 status)
 {
 	int i;
@@ -3794,7 +3804,7 @@ static void inline average_init(struct average *avg)
 	memset(avg, 0, sizeof(*avg));
 }
 
-static void average_add(struct average *avg, s16 val)
+static void inline average_add(struct average *avg, s16 val)
 {
 	avg->sum -= avg->entries[avg->pos];
 	avg->sum += val;
@@ -3805,7 +3815,7 @@ static void average_add(struct average *avg, s16 val)
 	}
 }
 
-static s16 average_value(struct average *avg)
+static s16 inline average_value(struct average *avg)
 {
 	if (!unlikely(avg->init)) {
 		if (avg->pos)
@@ -3847,7 +3857,7 @@ static void ipw_reset_stats(struct ipw_priv *priv)
 
 }
 
-static u32 ipw_get_max_rate(struct ipw_priv *priv)
+static inline u32 ipw_get_max_rate(struct ipw_priv *priv)
 {
 	u32 i = 0x80000000;
 	u32 mask = priv->rates_mask;
@@ -4087,7 +4097,7 @@ static void ipw_bg_gather_stats(void *data)
  * roaming_threshold -> disassociate_threshold, scan and roam for better signal.
  * Above disassociate threshold, give up and stop scanning.
  * Roaming is disabled if disassociate_threshold <= roaming_threshold  */
-static void ipw_handle_missed_beacon(struct ipw_priv *priv,
+static inline void ipw_handle_missed_beacon(struct ipw_priv *priv,
 					    int missed_count)
 {
 	priv->notif_missed_beacons = missed_count;
@@ -4121,8 +4131,9 @@ static void ipw_handle_missed_beacon(struct ipw_priv *priv,
 		return;
 	}
 
-	if (missed_count > priv->roaming_threshold &&
-	    missed_count <= priv->disassociate_threshold) {
+	if (roaming &&
+	    (missed_count > priv->roaming_threshold &&
+	     missed_count <= priv->disassociate_threshold)) {
 		/* If we are not already roaming, set the ROAM
 		 * bit in the status and kick off a scan.
 		 * This can happen several times before we reach
@@ -4150,14 +4161,13 @@ static void ipw_handle_missed_beacon(struct ipw_priv *priv,
 	}
 
 	IPW_DEBUG_NOTIF("Missed beacon: %d\n", missed_count);
-
 }
 
 /**
  * Handle host notification packet.
  * Called from interrupt routine
  */
-static void ipw_rx_notification(struct ipw_priv *priv,
+static inline void ipw_rx_notification(struct ipw_priv *priv,
 				       struct ipw_rx_notification *notif)
 {
 	notif->size = le16_to_cpu(notif->size);
@@ -4250,7 +4260,7 @@ static void ipw_rx_notification(struct ipw_priv *priv,
 					if (priv->
 					    status & (STATUS_ASSOCIATED |
 						      STATUS_AUTH)) {
-#ifdef CONFIG_IPW2200_DEBUG
+#ifdef CONFIG_IPW2100_DEBUG
 						struct notif_authenticate *auth
 						    = &notif->u.auth;
 						IPW_DEBUG(IPW_DL_NOTIF |
@@ -4917,7 +4927,7 @@ static void ipw_bg_rx_queue_replenish(void *data)
 }
 
 /* Assumes that the skb field of the buffers in 'pool' is kept accurate.
- * If an SKB has been detached, the POOL needs to have it's SKB set to NULL
+ * If an SKB has been detached, the POOL needs to have its SKB set to NULL
  * This free routine walks the list of POOL entries and if SKB is set to
  * non NULL it is unmapped and freed
  */
@@ -4944,11 +4954,12 @@ static struct ipw_rx_queue *ipw_rx_queue_alloc(struct ipw_priv *priv)
 	struct ipw_rx_queue *rxq;
 	int i;
 
-	rxq = kzalloc(sizeof(*rxq), GFP_KERNEL);
+	rxq = (struct ipw_rx_queue *)kmalloc(sizeof(*rxq), GFP_KERNEL);
 	if (unlikely(!rxq)) {
 		IPW_ERROR("memory allocation failed\n");
 		return NULL;
 	}
+	memset(rxq, 0, sizeof(*rxq));
 	spin_lock_init(&rxq->lock);
 	INIT_LIST_HEAD(&rxq->rx_free);
 	INIT_LIST_HEAD(&rxq->rx_used);
@@ -5095,7 +5106,7 @@ static int ipw_compatible_rates(struct ipw_priv *priv,
 	return 1;
 }
 
-static void ipw_copy_rates(struct ipw_supported_rates *dest,
+static inline void ipw_copy_rates(struct ipw_supported_rates *dest,
 				  const struct ipw_supported_rates *src)
 {
 	u8 i;
@@ -5257,10 +5268,11 @@ static int ipw_find_adhoc_network(struct ipw_priv *priv,
 	if (priv->ieee->scan_age != 0 &&
 	    time_after(jiffies, network->last_scanned + priv->ieee->scan_age)) {
 		IPW_DEBUG_MERGE("Network '%s (" MAC_FMT ")' excluded "
-				"because of age: %lums.\n",
+				"because of age: %ums.\n",
 				escape_essid(network->ssid, network->ssid_len),
 				MAC_ARG(network->bssid),
-				1000 * (jiffies - network->last_scanned) / HZ);
+				jiffies_to_msecs(jiffies -
+						 network->last_scanned));
 		return 0;
 	}
 
@@ -5467,11 +5479,12 @@ static int ipw_best_network(struct ipw_priv *priv,
 	if (network->last_associate &&
 	    time_after(network->last_associate + (HZ * 3UL), jiffies)) {
 		IPW_DEBUG_ASSOC("Network '%s (" MAC_FMT ")' excluded "
-				"because of storming (%lus since last "
+				"because of storming (%ums since last "
 				"assoc attempt).\n",
 				escape_essid(network->ssid, network->ssid_len),
 				MAC_ARG(network->bssid),
-				(jiffies - network->last_associate) / HZ);
+				jiffies_to_msecs(jiffies -
+						 network->last_associate));
 		return 0;
 	}
 
@@ -5479,10 +5492,11 @@ static int ipw_best_network(struct ipw_priv *priv,
 	if (priv->ieee->scan_age != 0 &&
 	    time_after(jiffies, network->last_scanned + priv->ieee->scan_age)) {
 		IPW_DEBUG_ASSOC("Network '%s (" MAC_FMT ")' excluded "
-				"because of age: %lums.\n",
+				"because of age: %ums.\n",
 				escape_essid(network->ssid, network->ssid_len),
 				MAC_ARG(network->bssid),
-				1000 * (jiffies - network->last_scanned) / HZ);
+				jiffies_to_msecs(jiffies -
+						 network->last_scanned));
 		return 0;
 	}
 
@@ -5671,54 +5685,44 @@ static void ipw_adhoc_create(struct ipw_priv *priv,
 
 static void ipw_send_tgi_tx_key(struct ipw_priv *priv, int type, int index)
 {
-	struct ipw_tgi_tx_key *key;
-	struct host_cmd cmd = {
-		.cmd = IPW_CMD_TGI_TX_KEY,
-		.len = sizeof(*key)
-	};
+	struct ipw_tgi_tx_key key;
 
 	if (!(priv->ieee->sec.flags & (1 << index)))
 		return;
 
-	key = (struct ipw_tgi_tx_key *)&cmd.param;
-	key->key_id = index;
-	memcpy(key->key, priv->ieee->sec.keys[index], SCM_TEMPORAL_KEY_LENGTH);
-	key->security_type = type;
-	key->station_index = 0;	/* always 0 for BSS */
-	key->flags = 0;
+	key.key_id = index;
+	memcpy(key.key, priv->ieee->sec.keys[index], SCM_TEMPORAL_KEY_LENGTH);
+	key.security_type = type;
+	key.station_index = 0;	/* always 0 for BSS */
+	key.flags = 0;
 	/* 0 for new key; previous value of counter (after fatal error) */
-	key->tx_counter[0] = 0;
-	key->tx_counter[1] = 0;
+	key.tx_counter[0] = 0;
+	key.tx_counter[1] = 0;
 
-	ipw_send_cmd(priv, &cmd);
+	ipw_send_cmd_pdu(priv, IPW_CMD_TGI_TX_KEY, sizeof(key), &key);
 }
 
 static void ipw_send_wep_keys(struct ipw_priv *priv, int type)
 {
-	struct ipw_wep_key *key;
+	struct ipw_wep_key key;
 	int i;
-	struct host_cmd cmd = {
-		.cmd = IPW_CMD_WEP_KEY,
-		.len = sizeof(*key)
-	};
 
-	key = (struct ipw_wep_key *)&cmd.param;
-	key->cmd_id = DINO_CMD_WEP_KEY;
-	key->seq_num = 0;
+	key.cmd_id = DINO_CMD_WEP_KEY;
+	key.seq_num = 0;
 
 	/* Note: AES keys cannot be set for multiple times.
 	 * Only set it at the first time. */
 	for (i = 0; i < 4; i++) {
-		key->key_index = i | type;
+		key.key_index = i | type;
 		if (!(priv->ieee->sec.flags & (1 << i))) {
-			key->key_size = 0;
+			key.key_size = 0;
 			continue;
 		}
 
-		key->key_size = priv->ieee->sec.key_sizes[i];
-		memcpy(key->key, priv->ieee->sec.keys[i], key->key_size);
+		key.key_size = priv->ieee->sec.key_sizes[i];
+		memcpy(key.key, priv->ieee->sec.keys[i], key.key_size);
 
-		ipw_send_cmd(priv, &cmd);
+		ipw_send_cmd_pdu(priv, IPW_CMD_WEP_KEY, sizeof(key), &key);
 	}
 }
 
@@ -5827,7 +5831,7 @@ static void ipw_bg_adhoc_check(void *data)
 	up(&priv->sem);
 }
 
-#ifdef CONFIG_IPW2200_DEBUG
+#ifdef CONFIG_IPW2100_DEBUG
 static void ipw_debug_config(struct ipw_priv *priv)
 {
 	IPW_DEBUG_INFO("Scan completed, no valid APs matched "
@@ -5856,7 +5860,7 @@ static void ipw_debug_config(struct ipw_priv *priv)
 #define ipw_debug_config(x) do {} while (0)
 #endif
 
-static void ipw_set_fixed_rate(struct ipw_priv *priv, int mode)
+static inline void ipw_set_fixed_rate(struct ipw_priv *priv, int mode)
 {
 	/* TODO: Verify that this works... */
 	struct ipw_fixed_rate fr = {
@@ -6171,6 +6175,70 @@ static void ipw_bg_abort_scan(void *data)
 	up(&priv->sem);
 }
 
+#if WIRELESS_EXT < 18
+/* Support for wpa_supplicant before WE-18, deprecated. */
+
+/* following definitions must match definitions in driver_ipw.c */
+
+#define IPW_IOCTL_WPA_SUPPLICANT		SIOCIWFIRSTPRIV+30
+
+#define IPW_CMD_SET_WPA_PARAM			1
+#define	IPW_CMD_SET_WPA_IE			2
+#define IPW_CMD_SET_ENCRYPTION			3
+#define IPW_CMD_MLME				4
+
+#define IPW_PARAM_WPA_ENABLED			1
+#define IPW_PARAM_TKIP_COUNTERMEASURES		2
+#define IPW_PARAM_DROP_UNENCRYPTED		3
+#define IPW_PARAM_PRIVACY_INVOKED		4
+#define IPW_PARAM_AUTH_ALGS			5
+#define IPW_PARAM_IEEE_802_1X			6
+
+#define IPW_MLME_STA_DEAUTH			1
+#define IPW_MLME_STA_DISASSOC			2
+
+#define IPW_CRYPT_ERR_UNKNOWN_ALG		2
+#define IPW_CRYPT_ERR_UNKNOWN_ADDR		3
+#define IPW_CRYPT_ERR_CRYPT_INIT_FAILED		4
+#define IPW_CRYPT_ERR_KEY_SET_FAILED		5
+#define IPW_CRYPT_ERR_TX_KEY_SET_FAILED		6
+#define IPW_CRYPT_ERR_CARD_CONF_FAILED		7
+
+#define	IPW_CRYPT_ALG_NAME_LEN			16
+
+struct ipw_param {
+	u32 cmd;
+	u8 sta_addr[ETH_ALEN];
+	union {
+		struct {
+			u8 name;
+			u32 value;
+		} wpa_param;
+		struct {
+			u32 len;
+			u8 reserved[32];
+			u8 data[0];
+		} wpa_ie;
+		struct {
+			u32 command;
+			u32 reason_code;
+		} mlme;
+		struct {
+			u8 alg[IPW_CRYPT_ALG_NAME_LEN];
+			u8 set_tx;
+			u32 err;
+			u8 idx;
+			u8 seq[8];	/* sequence counter (set: RX, get: TX) */
+			u16 key_len;
+			u8 key[0];
+		} crypt;
+
+	} u;
+};
+
+/* end of driver_ipw.c code */
+#endif
+
 static int ipw_wpa_enable(struct ipw_priv *priv, int value)
 {
 	/* This is called when wpa_supplicant loads and closes the driver
@@ -6178,6 +6246,12 @@ static int ipw_wpa_enable(struct ipw_priv *priv, int value)
 	priv->ieee->wpa_enabled = value;
 	return 0;
 }
+
+#if WIRELESS_EXT < 18
+#define IW_AUTH_ALG_OPEN_SYSTEM			0x1
+#define IW_AUTH_ALG_SHARED_KEY			0x2
+#define IW_AUTH_ALG_LEAP			0x4
+#endif
 
 static int ipw_wpa_set_auth_algs(struct ipw_priv *priv, int value)
 {
@@ -6192,6 +6266,9 @@ static int ipw_wpa_set_auth_algs(struct ipw_priv *priv, int value)
 		ieee->open_wep = 0;
 	} else if (value & IW_AUTH_ALG_OPEN_SYSTEM) {
 		sec.auth_mode = WLAN_AUTH_OPEN;
+		ieee->open_wep = 1;
+	} else if (value & IW_AUTH_ALG_LEAP) {
+		sec.auth_mode = WLAN_AUTH_LEAP;
 		ieee->open_wep = 1;
 	} else
 		return -EINVAL;
@@ -6215,17 +6292,422 @@ void ipw_wpa_assoc_frame(struct ipw_priv *priv, char *wpa_ie, int wpa_ie_len)
 static int ipw_set_rsn_capa(struct ipw_priv *priv,
 			    char *capabilities, int length)
 {
-	struct host_cmd cmd = {
-		.cmd = IPW_CMD_RSN_CAPABILITIES,
-		.len = length,
-	};
-
 	IPW_DEBUG_HC("HOST_CMD_RSN_CAPABILITIES\n");
 
-	memcpy(cmd.param, capabilities, length);
-	return ipw_send_cmd(priv, &cmd);
+	return ipw_send_cmd_pdu(priv, IPW_CMD_RSN_CAPABILITIES, length,
+				capabilities);
 }
 
+#if WIRELESS_EXT < 18
+static int ipw_wpa_set_param(struct net_device *dev, u8 name, u32 value)
+{
+	struct ipw_priv *priv = ieee80211_priv(dev);
+	struct ieee80211_crypt_data *crypt;
+	unsigned long flags;
+	int ret = 0;
+
+	switch (name) {
+	case IPW_PARAM_WPA_ENABLED:
+		ret = ipw_wpa_enable(priv, value);
+		break;
+
+	case IPW_PARAM_TKIP_COUNTERMEASURES:
+		crypt = priv->ieee->crypt[priv->ieee->tx_keyidx];
+		if (!crypt || !crypt->ops->set_flags || !crypt->ops->get_flags) {
+			IPW_WARNING("Can't set TKIP countermeasures: "
+				    "crypt not set!\n");
+			break;
+		}
+
+		flags = crypt->ops->get_flags(crypt->priv);
+
+		if (value)
+			flags |= IEEE80211_CRYPTO_TKIP_COUNTERMEASURES;
+		else
+			flags &= ~IEEE80211_CRYPTO_TKIP_COUNTERMEASURES;
+
+		crypt->ops->set_flags(flags, crypt->priv);
+
+		break;
+
+	case IPW_PARAM_DROP_UNENCRYPTED:{
+			/* HACK:
+			 *
+			 * wpa_supplicant calls set_wpa_enabled when the driver
+			 * is loaded and unloaded, regardless of if WPA is being
+			 * used.  No other calls are made which can be used to
+			 * determine if encryption will be used or not prior to
+			 * association being expected.  If encryption is not being
+			 * used, drop_unencrypted is set to false, else true -- we
+			 * can use this to determine if the CAP_PRIVACY_ON bit should
+			 * be set.
+			 */
+			struct ieee80211_security sec = {
+				.flags = SEC_ENABLED,
+				.enabled = value,
+			};
+			priv->ieee->drop_unencrypted = value;
+			/* We only change SEC_LEVEL for open mode. Others
+			 * are set by ipw_wpa_set_encryption.
+			 */
+			if (!value) {
+				sec.flags |= SEC_LEVEL;
+				sec.level = SEC_LEVEL_0;
+			} else {
+				sec.flags |= SEC_LEVEL;
+				sec.level = SEC_LEVEL_1;
+			}
+			if (priv->ieee->set_security)
+				priv->ieee->set_security(priv->ieee->dev, &sec);
+			break;
+		}
+
+	case IPW_PARAM_PRIVACY_INVOKED:
+		priv->ieee->privacy_invoked = value;
+		break;
+
+	case IPW_PARAM_AUTH_ALGS:
+		ret = ipw_wpa_set_auth_algs(priv, value);
+		break;
+
+	case IPW_PARAM_IEEE_802_1X:
+		priv->ieee->ieee802_1x = value;
+		break;
+
+	default:
+		IPW_ERROR("%s: Unknown WPA param: %d\n", dev->name, name);
+		ret = -EOPNOTSUPP;
+	}
+
+	return ret;
+}
+
+static int ipw_wpa_mlme(struct net_device *dev, int command, int reason)
+{
+	struct ipw_priv *priv = ieee80211_priv(dev);
+	int ret = 0;
+
+	switch (command) {
+	case IPW_MLME_STA_DEAUTH:
+		// silently ignore
+		break;
+
+	case IPW_MLME_STA_DISASSOC:
+		ipw_disassociate(priv);
+		break;
+
+	default:
+		IPW_ERROR("%s: Unknown MLME request: %d\n", dev->name, command);
+		ret = -EOPNOTSUPP;
+	}
+
+	return ret;
+}
+
+static int ipw_wpa_ie_cipher2level(u8 cipher)
+{
+	switch (cipher) {
+	case 4:		/* CCMP */
+		return SEC_LEVEL_3;
+	case 2:		/* TKIP */
+		return SEC_LEVEL_2;
+	case 5:		/* WEP104 */
+	case 1:		/* WEP40 */
+		return SEC_LEVEL_1;
+	case 0:		/* NONE */
+		return SEC_LEVEL_0;
+	default:
+		return -1;
+	}
+}
+
+static int ipw_wpa_set_wpa_ie(struct net_device *dev,
+			      struct ipw_param *param, int plen)
+{
+	struct ipw_priv *priv = ieee80211_priv(dev);
+	struct ieee80211_device *ieee = priv->ieee;
+	u8 *buf;
+	u8 *ptk, *gtk;
+	int level;
+
+	if (param->u.wpa_ie.len > MAX_WPA_IE_LEN ||
+	    (param->u.wpa_ie.len && param->u.wpa_ie.data == NULL))
+		return -EINVAL;
+
+	if (param->u.wpa_ie.len) {
+		buf = kmalloc(param->u.wpa_ie.len, GFP_KERNEL);
+		if (buf == NULL)
+			return -ENOMEM;
+
+		memcpy(buf, param->u.wpa_ie.data, param->u.wpa_ie.len);
+		kfree(ieee->wpa_ie);
+		ieee->wpa_ie = buf;
+		ieee->wpa_ie_len = param->u.wpa_ie.len;
+	} else {
+		kfree(ieee->wpa_ie);
+		ieee->wpa_ie = NULL;
+		ieee->wpa_ie_len = 0;
+		goto done;
+	}
+
+	if (priv->ieee->host_encrypt)
+		goto done;
+
+	/* HACK: Parse wpa_ie here to get pairwise suite, otherwise
+	 * we need to change driver_ipw.c from wpa_supplicant. This
+	 * is OK since -Dipw is deprecated. The -Dwext driver has a
+	 * clean way to handle this. */
+	gtk = ptk = (u8 *) ieee->wpa_ie;
+	if (ieee->wpa_ie[0] == 0x30) {	/* RSN IE */
+		gtk += 4 + 3;
+		ptk += 4 + 4 + 2 + 3;
+	} else {		/* WPA IE */
+		gtk += 8 + 3;
+		ptk += 8 + 4 + 2 + 3;
+	}
+
+	if (ptk - (u8 *) ieee->wpa_ie > ieee->wpa_ie_len)
+		return -EINVAL;
+
+	level = ipw_wpa_ie_cipher2level(*gtk);
+	ipw_set_hw_decrypt_multicast(priv, level);
+
+	level = ipw_wpa_ie_cipher2level(*ptk);
+	ipw_set_hw_decrypt_unicast(priv, level);
+
+      done:
+	ipw_wpa_assoc_frame(priv, ieee->wpa_ie, ieee->wpa_ie_len);
+	return 0;
+}
+
+/* implementation borrowed from hostap driver */
+
+static int ipw_wpa_set_encryption(struct net_device *dev,
+				  struct ipw_param *param, int param_len)
+{
+	int ret = 0;
+	int group_key = 0;
+	struct ipw_priv *priv = ieee80211_priv(dev);
+	struct ieee80211_device *ieee = priv->ieee;
+	struct ieee80211_crypto_ops *ops;
+	struct ieee80211_crypt_data **crypt;
+
+	struct ieee80211_security sec = {
+		.flags = 0,
+	};
+
+	param->u.crypt.err = 0;
+	param->u.crypt.alg[IPW_CRYPT_ALG_NAME_LEN - 1] = '\0';
+
+	if (param_len !=
+	    (int)((char *)param->u.crypt.key - (char *)param) +
+	    param->u.crypt.key_len) {
+		IPW_DEBUG_INFO("Len mismatch %d, %d\n", param_len,
+			       param->u.crypt.key_len);
+		return -EINVAL;
+	}
+	if (param->sta_addr[0] == 0xff && param->sta_addr[1] == 0xff &&
+	    param->sta_addr[2] == 0xff && param->sta_addr[3] == 0xff &&
+	    param->sta_addr[4] == 0xff && param->sta_addr[5] == 0xff) {
+		if (param->u.crypt.idx >= WEP_KEYS)
+			return -EINVAL;
+		crypt = &ieee->crypt[param->u.crypt.idx];
+	} else {
+		return -EINVAL;
+	}
+
+	if (param->u.crypt.idx != 0)
+		group_key = 1;
+
+	sec.flags |= SEC_ENABLED | SEC_ENCRYPT;
+	if (strcmp(param->u.crypt.alg, "none") == 0) {
+		if (crypt) {
+			sec.enabled = 0;
+			sec.encrypt = 0;
+			sec.level = SEC_LEVEL_0;
+			sec.flags |= SEC_LEVEL;
+			ieee80211_crypt_delayed_deinit(ieee, crypt);
+		}
+		goto done;
+	}
+	sec.enabled = 1;
+	sec.encrypt = 1;
+
+	/* IPW HW cannot build TKIP MIC, host decryption still needed. */
+	if (strcmp(param->u.crypt.alg, "TKIP") == 0) {
+		if (group_key)
+			ieee->host_mc_decrypt = 1;
+		else
+			ieee->host_encrypt_msdu = 1;
+	}
+
+	/*if (!(ieee->host_encrypt || ieee->host_encrypt_msdu ||
+	   ieee->host_decrypt))
+	   goto skip_host_crypt; */
+	if (group_key ? !ieee->host_mc_decrypt :
+	    !(ieee->host_encrypt || ieee->host_decrypt ||
+	      ieee->host_encrypt_msdu))
+		goto skip_host_crypt;
+
+	ops = ieee80211_get_crypto_ops(param->u.crypt.alg);
+	if (ops == NULL && strcmp(param->u.crypt.alg, "WEP") == 0) {
+		request_module("ieee80211_crypt_wep");
+		ops = ieee80211_get_crypto_ops(param->u.crypt.alg);
+	} else if (ops == NULL && strcmp(param->u.crypt.alg, "TKIP") == 0) {
+		request_module("ieee80211_crypt_tkip");
+		ops = ieee80211_get_crypto_ops(param->u.crypt.alg);
+	} else if (ops == NULL && strcmp(param->u.crypt.alg, "CCMP") == 0) {
+		request_module("ieee80211_crypt_ccmp");
+		ops = ieee80211_get_crypto_ops(param->u.crypt.alg);
+	}
+	if (ops == NULL) {
+		IPW_DEBUG_INFO("%s: unknown crypto alg '%s'\n",
+			       dev->name, param->u.crypt.alg);
+		param->u.crypt.err = IPW_CRYPT_ERR_UNKNOWN_ALG;
+		ret = -EINVAL;
+		goto done;
+	}
+
+	if (*crypt == NULL || (*crypt)->ops != ops) {
+		struct ieee80211_crypt_data *new_crypt;
+
+		ieee80211_crypt_delayed_deinit(ieee, crypt);
+
+		new_crypt = (struct ieee80211_crypt_data *)
+		    kmalloc(sizeof(*new_crypt), GFP_KERNEL);
+		if (new_crypt == NULL) {
+			ret = -ENOMEM;
+			goto done;
+		}
+		memset(new_crypt, 0, sizeof(struct ieee80211_crypt_data));
+		new_crypt->ops = ops;
+		if (new_crypt->ops && try_module_get(new_crypt->ops->owner))
+			new_crypt->priv =
+			    new_crypt->ops->init(param->u.crypt.idx);
+
+		if (new_crypt->priv == NULL) {
+			kfree(new_crypt);
+			param->u.crypt.err = IPW_CRYPT_ERR_CRYPT_INIT_FAILED;
+			ret = -EINVAL;
+			goto done;
+		}
+
+		*crypt = new_crypt;
+	}
+
+	if (param->u.crypt.key_len > 0 && (*crypt)->ops->set_key &&
+	    (*crypt)->ops->set_key(param->u.crypt.key,
+				   param->u.crypt.key_len, param->u.crypt.seq,
+				   (*crypt)->priv) < 0) {
+		IPW_DEBUG_INFO("%s: key setting failed\n", dev->name);
+		param->u.crypt.err = IPW_CRYPT_ERR_KEY_SET_FAILED;
+		ret = -EINVAL;
+		goto done;
+	}
+
+      skip_host_crypt:
+	if (param->u.crypt.set_tx) {
+		ieee->tx_keyidx = param->u.crypt.idx;
+		sec.active_key = param->u.crypt.idx;
+		sec.flags |= SEC_ACTIVE_KEY;
+	} else
+		sec.flags &= ~SEC_ACTIVE_KEY;
+
+	if (param->u.crypt.alg != NULL) {
+		memcpy(sec.keys[param->u.crypt.idx],
+		       param->u.crypt.key, param->u.crypt.key_len);
+		sec.key_sizes[param->u.crypt.idx] = param->u.crypt.key_len;
+		sec.flags |= (1 << param->u.crypt.idx);
+
+		if (strcmp(param->u.crypt.alg, "WEP") == 0) {
+			sec.flags |= SEC_LEVEL;
+			sec.level = SEC_LEVEL_1;
+		} else if (strcmp(param->u.crypt.alg, "TKIP") == 0) {
+			sec.flags |= SEC_LEVEL;
+			sec.level = SEC_LEVEL_2;
+		} else if (strcmp(param->u.crypt.alg, "CCMP") == 0) {
+			sec.flags |= SEC_LEVEL;
+			sec.level = SEC_LEVEL_3;
+		}
+		/* Don't set sec level for group keys. */
+		if (group_key)
+			sec.flags &= ~SEC_LEVEL;
+	}
+      done:
+	if (ieee->set_security)
+		ieee->set_security(ieee->dev, &sec);
+
+	/* Do not reset port if card is in Managed mode since resetting will
+	 * generate new IEEE 802.11 authentication which may end up in looping
+	 * with IEEE 802.1X.  If your hardware requires a reset after WEP
+	 * configuration (for example... Prism2), implement the reset_port in
+	 * the callbacks structures used to initialize the 802.11 stack. */
+	if (ieee->reset_on_keychange &&
+	    ieee->iw_mode != IW_MODE_INFRA &&
+	    ieee->reset_port && ieee->reset_port(dev)) {
+		IPW_DEBUG_INFO("%s: reset_port failed\n", dev->name);
+		param->u.crypt.err = IPW_CRYPT_ERR_CARD_CONF_FAILED;
+		return -EINVAL;
+	}
+
+	return ret;
+}
+
+static int ipw_wpa_supplicant(struct net_device *dev, struct iw_point *p)
+{
+	struct ipw_param *param;
+	struct ipw_priv *priv = ieee80211_priv(dev);
+	int ret = 0;
+
+	IPW_DEBUG_INFO("wpa_supplicant: len=%d\n", p->length);
+
+	if (p->length < sizeof(struct ipw_param) || !p->pointer)
+		return -EINVAL;
+
+	param = (struct ipw_param *)kmalloc(p->length, GFP_KERNEL);
+	if (param == NULL)
+		return -ENOMEM;
+
+	if (copy_from_user(param, p->pointer, p->length)) {
+		kfree(param);
+		return -EFAULT;
+	}
+
+	down(&priv->sem);
+	switch (param->cmd) {
+
+	case IPW_CMD_SET_WPA_PARAM:
+		ret = ipw_wpa_set_param(dev, param->u.wpa_param.name,
+					param->u.wpa_param.value);
+		break;
+
+	case IPW_CMD_SET_WPA_IE:
+		ret = ipw_wpa_set_wpa_ie(dev, param, p->length);
+		break;
+
+	case IPW_CMD_SET_ENCRYPTION:
+		ret = ipw_wpa_set_encryption(dev, param, p->length);
+		break;
+
+	case IPW_CMD_MLME:
+		ret = ipw_wpa_mlme(dev, param->u.mlme.command,
+				   param->u.mlme.reason_code);
+		break;
+
+	default:
+		IPW_ERROR("%s: Unknown WPA supplicant request: %d\n",
+			  dev->name, param->cmd);
+		ret = -EOPNOTSUPP;
+	}
+
+	up(&priv->sem);
+	if (ret == 0 && copy_to_user(p->pointer, param, p->length))
+		ret = -EFAULT;
+
+	kfree(param);
+	return ret;
+}
+#else
 /*
  * WE-18 support
  */
@@ -6548,6 +7030,7 @@ static int ipw_wx_set_mlme(struct net_device *dev,
 	}
 	return 0;
 }
+#endif
 
 #ifdef CONFIG_IPW_QOS
 
@@ -7010,25 +7493,15 @@ static int ipw_handle_assoc_response(struct net_device *dev,
 static int ipw_send_qos_params_command(struct ipw_priv *priv, struct ieee80211_qos_parameters
 				       *qos_param)
 {
-	struct host_cmd cmd = {
-		.cmd = IPW_CMD_QOS_PARAMETERS,
-		.len = (sizeof(struct ieee80211_qos_parameters) * 3)
-	};
-
-	memcpy(cmd.param, qos_param, sizeof(*qos_param) * 3);
-	return ipw_send_cmd(priv, &cmd);
+	return ipw_send_cmd_pdu(priv, IPW_CMD_QOS_PARAMETERS,
+				sizeof(*qos_param) * 3, qos_param);
 }
 
 static int ipw_send_qos_info_command(struct ipw_priv *priv, struct ieee80211_qos_information_element
 				     *qos_param)
 {
-	struct host_cmd cmd = {
-		.cmd = IPW_CMD_WME_INFO,
-		.len = sizeof(*qos_param)
-	};
-
-	memcpy(cmd.param, qos_param, sizeof(*qos_param));
-	return ipw_send_cmd(priv, &cmd);
+	return ipw_send_cmd_pdu(priv, IPW_CMD_WME_INFO, sizeof(*qos_param),
+				qos_param);
 }
 
 #endif				/* CONFIG_IPW_QOS */
@@ -7052,19 +7525,22 @@ static int ipw_associate_network(struct ipw_priv *priv,
 
 	memset(&priv->assoc_request, 0, sizeof(priv->assoc_request));
 	priv->assoc_request.channel = network->channel;
+	priv->assoc_request.auth_key = 0;
+
 	if ((priv->capability & CAP_PRIVACY_ON) &&
-	    (priv->capability & CAP_SHARED_KEY)) {
+	    (priv->ieee->sec.auth_mode == WLAN_AUTH_SHARED_KEY)) {
 		priv->assoc_request.auth_type = AUTH_SHARED_KEY;
 		priv->assoc_request.auth_key = priv->ieee->sec.active_key;
 
-		if ((priv->capability & CAP_PRIVACY_ON) &&
-		    (priv->ieee->sec.level == SEC_LEVEL_1) &&
+		if ((priv->ieee->sec.level == SEC_LEVEL_1) &&
 		    !(priv->ieee->host_encrypt || priv->ieee->host_decrypt))
 			ipw_send_wep_keys(priv, DCW_WEP_KEY_SEC_TYPE_WEP);
-	} else {
+
+	} else if ((priv->capability & CAP_PRIVACY_ON) &&
+		   (priv->ieee->sec.auth_mode == WLAN_AUTH_LEAP))
+		priv->assoc_request.auth_type = AUTH_LEAP;
+	else
 		priv->assoc_request.auth_type = AUTH_OPEN;
-		priv->assoc_request.auth_key = 0;
-	}
 
 	if (priv->ieee->wpa_ie_len) {
 		priv->assoc_request.policy_support = 0x02;	/* RSN active */
@@ -7419,6 +7895,12 @@ static void ipw_rebuild_decrypted_skb(struct ipw_priv *priv,
 	}
 }
 
+static inline int ipw_is_broadcast_ether_addr(const u8 * addr)
+{
+	return (addr[0] & 0xff && addr[1] & 0xff && addr[2] & 0xff &&
+		addr[3] & 0xff && addr[4] & 0xff && addr[5] & 0xff);
+}
+
 static void ipw_handle_data_packet(struct ipw_priv *priv,
 				   struct ipw_rx_mem_buffer *rxb,
 				   struct ieee80211_rx_stats *stats)
@@ -7455,7 +7937,8 @@ static void ipw_handle_data_packet(struct ipw_priv *priv,
 	/* HW decrypt will not clear the WEP bit, MIC, PN, etc. */
 	hdr = (struct ieee80211_hdr_4addr *)rxb->skb->data;
 	if (priv->ieee->iw_mode != IW_MODE_MONITOR &&
-	    (is_multicast_ether_addr(hdr->addr1) ?
+	    ((is_multicast_ether_addr(hdr->addr1) ||
+	      ipw_is_broadcast_ether_addr(hdr->addr1)) ?
 	     !priv->ieee->host_mc_decrypt : !priv->ieee->host_decrypt))
 		ipw_rebuild_decrypted_skb(priv, rxb->skb);
 
@@ -7634,7 +8117,7 @@ static void ipw_handle_data_packet_monitor(struct ipw_priv *priv,
 }
 #endif
 
-static int is_network_packet(struct ipw_priv *priv,
+static inline int is_network_packet(struct ipw_priv *priv,
 				    struct ieee80211_hdr_4addr *header)
 {
 	/* Filter incoming packets to determine if they are targetted toward
@@ -7646,7 +8129,8 @@ static int is_network_packet(struct ipw_priv *priv,
 			return 0;
 
 		/* {broad,multi}cast packets to our BSSID go through */
-		if (is_multicast_ether_addr(header->addr1))
+		if (is_multicast_ether_addr(header->addr1) ||
+		    ipw_is_broadcast_ether_addr(header->addr1))
 			return !memcmp(header->addr3, priv->bssid, ETH_ALEN);
 
 		/* packets to our adapter go through */
@@ -7659,7 +8143,8 @@ static int is_network_packet(struct ipw_priv *priv,
 			return 0;
 
 		/* {broad,multi}cast packets to our BSS go through */
-		if (is_multicast_ether_addr(header->addr1))
+		if (is_multicast_ether_addr(header->addr1) ||
+		    ipw_is_broadcast_ether_addr(header->addr1))
 			return !memcmp(header->addr2, priv->bssid, ETH_ALEN);
 
 		/* packets to our adapter go through */
@@ -7672,7 +8157,7 @@ static int is_network_packet(struct ipw_priv *priv,
 
 #define IPW_PACKET_RETRY_TIME HZ
 
-static  int is_duplicate_packet(struct ipw_priv *priv,
+static inline int is_duplicate_packet(struct ipw_priv *priv,
 				      struct ieee80211_hdr_4addr *header)
 {
 	u16 sc = le16_to_cpu(header->seq_ctl);
@@ -7811,7 +8296,7 @@ static void ipw_rx(struct ipw_priv *priv)
 
 	while (i != r) {
 		rxb = priv->rxq->queue[i];
-#ifdef CONFIG_IPW2200_DEBUG
+#ifdef CONFIG_IPW2100_DEBUG
 		if (unlikely(rxb == NULL)) {
 			printk(KERN_CRIT "Queue not allocated!\n");
 			break;
@@ -8011,6 +8496,10 @@ static int ipw_sw_reset(struct ipw_priv *priv, int init)
 		priv->config |= CFG_ADHOC_CREATE;
 	else
 		IPW_DEBUG_INFO("Auto adhoc creation disabled.\n");
+
+	priv->config &= ~CFG_STATIC_ESSID;
+	priv->essid_len = 0;
+	memset(priv->essid, 0, IW_ESSID_MAX_SIZE);
 
 	if (disable) {
 		priv->status |= STATUS_RF_KILL_SW;
@@ -8409,11 +8898,13 @@ static int ipw_wx_get_range(struct net_device *dev,
 
 	up(&priv->sem);
 
+#if WIRELESS_EXT >= 17
 	/* Event capability (kernel + driver) */
 	range->event_capa[0] = (IW_EVENT_CAPA_K_0 |
 				IW_EVENT_CAPA_MASK(SIOCGIWTHRSPY) |
 				IW_EVENT_CAPA_MASK(SIOCGIWAP));
 	range->event_capa[1] = IW_EVENT_CAPA_K_1;
+#endif
 
 	IPW_DEBUG_WX("GET Range\n");
 	return 0;
@@ -8915,6 +9406,7 @@ static int ipw_wx_get_retry(struct net_device *dev,
 	return 0;
 }
 
+#if WIRELESS_EXT > 17
 static int ipw_request_direct_scan(struct ipw_priv *priv, char *essid,
 				   int essid_len)
 {
@@ -8936,12 +9428,14 @@ static int ipw_request_direct_scan(struct ipw_priv *priv, char *essid,
 	IPW_DEBUG_HC("starting request direct scan!\n");
 
 	if (priv->status & (STATUS_SCANNING | STATUS_SCAN_ABORTING)) {
-		/* We should not sleep here; otherwise we will block most
-		 * of the system (for instance, we hold rtnl_lock when we
-		 * get here).
-		 */
-		err = -EAGAIN;
-		goto done;
+		err = wait_event_interruptible(priv->wait_state,
+					       !(priv->
+						 status & (STATUS_SCANNING |
+							   STATUS_SCAN_ABORTING)));
+		if (err) {
+			IPW_DEBUG_HC("aborting direct scan");
+			goto done;
+		}
 	}
 	memset(&scan, 0, sizeof(scan));
 
@@ -8980,12 +9474,14 @@ static int ipw_request_direct_scan(struct ipw_priv *priv, char *essid,
 	up(&priv->sem);
 	return err;
 }
+#endif				/* WIRELESS_EXT > 17 */
 
 static int ipw_wx_set_scan(struct net_device *dev,
 			   struct iw_request_info *info,
 			   union iwreq_data *wrqu, char *extra)
 {
 	struct ipw_priv *priv = ieee80211_priv(dev);
+#if WIRELESS_EXT > 17
 	struct iw_scan_req *req = NULL;
 	if (wrqu->data.length
 	    && wrqu->data.length == sizeof(struct iw_scan_req)) {
@@ -8996,7 +9492,7 @@ static int ipw_wx_set_scan(struct net_device *dev,
 			return 0;
 		}
 	}
-
+#endif
 	IPW_DEBUG_WX("Start scan\n");
 
 	queue_work(priv->workqueue, &priv->request_scan);
@@ -9446,6 +9942,7 @@ static iw_handler ipw_wx_handlers[] = {
 	IW_IOCTL(SIOCGIWSPY) = iw_handler_get_spy,
 	IW_IOCTL(SIOCSIWTHRSPY) = iw_handler_set_thrspy,
 	IW_IOCTL(SIOCGIWTHRSPY) = iw_handler_get_thrspy,
+#if WIRELESS_EXT > 17
 	IW_IOCTL(SIOCSIWGENIE) = ipw_wx_set_genie,
 	IW_IOCTL(SIOCGIWGENIE) = ipw_wx_get_genie,
 	IW_IOCTL(SIOCSIWMLME) = ipw_wx_set_mlme,
@@ -9453,6 +9950,7 @@ static iw_handler ipw_wx_handlers[] = {
 	IW_IOCTL(SIOCGIWAUTH) = ipw_wx_get_auth,
 	IW_IOCTL(SIOCSIWENCODEEXT) = ipw_wx_set_encodeext,
 	IW_IOCTL(SIOCGIWENCODEEXT) = ipw_wx_get_encodeext,
+#endif
 };
 
 enum {
@@ -9528,7 +10026,9 @@ static struct iw_handler_def ipw_wx_handler_def = {
 	.num_private_args = ARRAY_SIZE(ipw_priv_args),
 	.private = ipw_priv_handler,
 	.private_args = ipw_priv_args,
+#if WIRELESS_EXT >= 17
 	.get_wireless_stats = ipw_get_wireless_stats,
+#endif
 };
 
 /*
@@ -9579,10 +10079,10 @@ static struct iw_statistics *ipw_get_wireless_stats(struct net_device *dev)
 
 /* net device stuff */
 
-static  void init_sys_config(struct ipw_sys_config *sys_config)
+static inline void init_sys_config(struct ipw_sys_config *sys_config)
 {
 	memset(sys_config, 0, sizeof(struct ipw_sys_config));
-	sys_config->bt_coexistence = 1;	/* We may need to look into prvStaBtConfig */
+	sys_config->bt_coexistence = 0;
 	sys_config->answer_broadcast_ssid_probe = 0;
 	sys_config->accept_all_data_frames = 0;
 	sys_config->accept_non_directed_frames = 1;
@@ -9625,7 +10125,7 @@ modify to send one tfd per fragment instead of using chunking.  otherwise
 we need to heavily modify the ieee80211_skb_to_txb.
 */
 
-static int ipw_tx_skb(struct ipw_priv *priv, struct ieee80211_txb *txb,
+static inline int ipw_tx_skb(struct ipw_priv *priv, struct ieee80211_txb *txb,
 			     int pri)
 {
 	struct ieee80211_hdr_3addr *hdr = (struct ieee80211_hdr_3addr *)
@@ -9643,15 +10143,11 @@ static int ipw_tx_skb(struct ipw_priv *priv, struct ieee80211_txb *txb,
 	u16 remaining_bytes;
 	int fc;
 
-	/* If there isn't room in the queue, we return busy and let the
-	 * network stack requeue the packet for us */
-	if (ipw_queue_space(q) < q->high_mark)
-		return NETDEV_TX_BUSY;
-
 	switch (priv->ieee->iw_mode) {
 	case IW_MODE_ADHOC:
 		hdr_len = IEEE80211_3ADDR_LEN;
-		unicast = !is_multicast_ether_addr(hdr->addr1);
+		unicast = !(is_multicast_ether_addr(hdr->addr1) ||
+			    ipw_is_broadcast_ether_addr(hdr->addr1));
 		id = ipw_find_station(priv, hdr->addr1);
 		if (id == IPW_INVALID_STATION) {
 			id = ipw_add_station(priv, hdr->addr1);
@@ -9666,7 +10162,8 @@ static int ipw_tx_skb(struct ipw_priv *priv, struct ieee80211_txb *txb,
 
 	case IW_MODE_INFRA:
 	default:
-		unicast = !is_multicast_ether_addr(hdr->addr3);
+		unicast = !(is_multicast_ether_addr(hdr->addr3) ||
+			    ipw_is_broadcast_ether_addr(hdr->addr3));
 		hdr_len = IEEE80211_3ADDR_LEN;
 		id = 0;
 		break;
@@ -9863,7 +10360,7 @@ static int ipw_net_hard_start_xmit(struct ieee80211_txb *txb,
 
       fail_unlock:
 	spin_unlock_irqrestore(&priv->lock, flags);
-	return 1;
+	return -1;
 }
 
 static struct net_device_stats *ipw_net_get_stats(struct net_device *dev)
@@ -10288,6 +10785,20 @@ static int ipw_config(struct ipw_priv *priv)
 
 	/* set basic system config settings */
 	init_sys_config(&priv->sys_config);
+
+	/* Support Bluetooth if we have BT h/w on board, and user wants to.
+	 * Does not support BT priority yet (don't abort or defer our Tx) */
+	if (bt_coexist) {
+		unsigned char bt_caps = priv->eeprom[EEPROM_SKU_CAPABILITY];
+
+		if (bt_caps & EEPROM_SKU_CAP_BT_CHANNEL_SIG)
+			priv->sys_config.bt_coexistence
+			    |= CFG_BT_COEXISTENCE_SIGNAL_CHNL;
+		if (bt_caps & EEPROM_SKU_CAP_BT_OOB)
+			priv->sys_config.bt_coexistence
+			    |= CFG_BT_COEXISTENCE_OOB;
+	}
+
 	if (priv->ieee->iw_mode == IW_MODE_ADHOC)
 		priv->sys_config.answer_broadcast_ssid_probe = 1;
 	else
@@ -10854,6 +11365,24 @@ static void ipw_bg_down(void *data)
 	up(&priv->sem);
 }
 
+#if WIRELESS_EXT < 18
+static int ipw_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
+{
+	struct iwreq *wrq = (struct iwreq *)rq;
+	int ret = -1;
+	switch (cmd) {
+	case IPW_IOCTL_WPA_SUPPLICANT:
+		ret = ipw_wpa_supplicant(dev, &wrq->u.data);
+		return ret;
+
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	return -EOPNOTSUPP;
+}
+#endif
+
 /* Called by register_netdev() */
 static int ipw_net_init(struct net_device *dev)
 {
@@ -10948,7 +11477,7 @@ static int ipw_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	priv->net_dev = net_dev;
 	priv->pci_dev = pdev;
-#ifdef CONFIG_IPW2200_DEBUG
+#ifdef CONFIG_IPW2100_DEBUG
 	ipw_debug_level = debug;
 #endif
 	spin_lock_init(&priv->lock);
@@ -11031,12 +11560,22 @@ static int ipw_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	net_dev->open = ipw_net_open;
 	net_dev->stop = ipw_net_stop;
 	net_dev->init = ipw_net_init;
+#if WIRELESS_EXT < 18
+	net_dev->do_ioctl = ipw_ioctl;
+#endif
 	net_dev->get_stats = ipw_net_get_stats;
 	net_dev->set_multicast_list = ipw_net_set_multicast_list;
 	net_dev->set_mac_address = ipw_net_set_mac_address;
+#if IW_HANDLER_VERSION >= 6
 	priv->wireless_data.spy_data = &priv->ieee->spy_data;
-	priv->wireless_data.ieee80211 = priv->ieee;
 	net_dev->wireless_data = &priv->wireless_data;
+#else
+	net_dev->get_wireless_stats = ipw_get_wireless_stats;
+#if WIRELESS_EXT == 16
+	ipw_wx_handler_def.spy_offset = offsetof(struct ieee80211_device,
+						 spy_data);
+#endif
+#endif
 	net_dev->wireless_handlers = &ipw_wx_handler_def;
 	net_dev->ethtool_ops = &ipw_ethtool_ops;
 	net_dev->irq = pdev->irq;
@@ -11121,8 +11660,8 @@ static void ipw_pci_remove(struct pci_dev *pdev)
 	/* Free MAC hash list for ADHOC */
 	for (i = 0; i < IPW_IBSS_MAC_HASH_SIZE; i++) {
 		list_for_each_safe(p, q, &priv->ibss_mac_hash[i]) {
-			kfree(list_entry(p, struct ipw_ibss_seq, list));
 			list_del(p);
+			kfree(list_entry(p, struct ipw_ibss_seq, list));
 		}
 	}
 
@@ -11156,6 +11695,7 @@ static int ipw_pci_suspend(struct pci_dev *pdev, pm_message_t state)
 
 	pci_save_state(pdev);
 	pci_disable_device(pdev);
+
 	pci_set_power_state(pdev, pci_choose_state(pdev, state));
 
 	return 0;
@@ -11278,12 +11818,18 @@ module_param(mode, int, 0444);
 MODULE_PARM_DESC(mode, "network mode (0=BSS,1=IBSS)");
 #endif
 
+module_param(bt_coexist, int, 0444);
+MODULE_PARM_DESC(bt_coexist, "enable bluetooth coexistence (default off)");
+
 module_param(hwcrypto, int, 0444);
 MODULE_PARM_DESC(hwcrypto, "enable hardware crypto (default on)");
 
 module_param(cmdlog, int, 0444);
 MODULE_PARM_DESC(cmdlog,
 		 "allocate a ring buffer for logging firmware commands");
+
+module_param(roaming, int, 0444);
+MODULE_PARM_DESC(roaming, "enable roaming support (default on)");
 
 module_exit(ipw_exit);
 module_init(ipw_init);
