@@ -32,7 +32,7 @@
 
 #define CN_PROC_MSG_SIZE (sizeof(struct cn_msg) + sizeof(struct proc_event))
 
-static atomic_t proc_event_num_listeners = ATOMIC_INIT(0);
+static atomic_t proc_event_num_listeners __read_mostly = ATOMIC_INIT(0);
 static struct cb_id cn_proc_event_id = { CN_IDX_PROC, CN_VAL_PROC };
 
 /* proc_event_counts is used as the sequence number of the netlink message */
