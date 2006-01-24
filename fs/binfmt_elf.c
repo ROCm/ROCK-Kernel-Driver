@@ -500,9 +500,7 @@ out:
 #define INTERPRETER_AOUT 1
 #define INTERPRETER_ELF 2
 
-#if BITS_PER_LONG == 64
-#define STACK_RND_MASK 0x3fffff		/* with 4K pages 1GB of VA */
-#else
+#ifndef STACK_RND_MASK
 #define STACK_RND_MASK 0x7ff		/* with 4K pages 8MB of VA */
 #endif
 
