@@ -1250,7 +1250,6 @@ static int choose_configuration(struct usb_device *udev)
 	return i;
 }
 
-#ifdef DEBUG
 static void show_string(struct usb_device *udev, char *id, char *string)
 {
 	if (!string)
@@ -1258,10 +1257,6 @@ static void show_string(struct usb_device *udev, char *id, char *string)
 	dev_printk(KERN_INFO, &udev->dev, "%s: %s\n", id, string);
 }
 
-#else
-static inline void show_string(struct usb_device *udev, char *id, char *string)
-{}
-#endif
 
 
 #ifdef	CONFIG_USB_OTG
@@ -1306,7 +1301,10 @@ int usb_new_device(struct usb_device *udev)
 	udev->serial = usb_cache_string(udev, udev->descriptor.iSerialNumber);
 
 	/* Tell the world! */
-	dev_dbg(&udev->dev, "new device strings: Mfr=%d, Product=%d, "
+	dev_info(&udev->dev, "new device found, idVendor=%04x, idProduct=%04x\n",
+		le16_to_cpu(udev->descriptor.idVendor),
+		le16_to_cpu(udev->descriptor.idProduct));
+	dev_info(&udev->dev, "new device strings: Mfr=%d, Product=%d, "
 			"SerialNumber=%d\n",
 			udev->descriptor.iManufacturer,
 			udev->descriptor.iProduct,
