@@ -1303,8 +1303,10 @@ static inline int e100_exec_cb_wait(struct nic *nic, struct sk_buff *skb,
 	int err = 0, counter = 50;
 	struct cb *cb = nic->cb_to_clean;
 
-	if ((err = e100_exec_cb(nic, NULL, e100_setup_ucode)))
+	if ((err = e100_exec_cb(nic, NULL, e100_setup_ucode))) {
 		DPRINTK(PROBE,ERR, "ucode cmd failed with error %d\n", err);
+		return err;
+	}
 
 	/* must restart cuc */
 	nic->cuc_cmd = cuc_start;
@@ -1726,9 +1728,11 @@ static int e100_alloc_cbs(struct nic *nic)
 	struct cb *cb;
 	unsigned int i, count = nic->params.cbs.count;
 
+	/* bail out if we've been here before */
+	if (nic->cbs_avail)
+		return 0;
+
 	nic->cuc_cmd = cuc_start;
-	nic->cb_to_use = nic->cb_to_send = nic->cb_to_clean = NULL;
-	nic->cbs_avail = 0;
 
 	nic->cbs = pci_alloc_consistent(nic->pdev,
 		sizeof(struct cb) * count, &nic->cbs_dma_addr);
@@ -2583,6 +2587,8 @@ static int __devinit e100_probe(struct pci_dev *pdev,
 	nic->pdev = pdev;
 	nic->msg_enable = (1 << debug) - 1;
 	pci_set_drvdata(pdev, netdev);
+	nic->cb_to_use = nic->cb_to_send = nic->cb_to_clean = NULL;
+	nic->cbs_avail = 0;
 
 	if((err = pci_enable_device(pdev))) {
 		DPRINTK(PROBE, ERR, "Cannot enable PCI device, aborting.\n");
@@ -2757,6 +2763,8 @@ static int e100_resume(struct pci_dev *pdev)
 	retval = pci_enable_wake(pdev, 0, 0);
 	if (retval)
 		DPRINTK(PROBE,ERR, "Error clearing wake events\n");
+	if ((retval = e100_alloc_cbs(nic)))
+		DPRINTK(PROBE,ERR, "No memory for cbs\n");
 	if(e100_hw_init(nic))
 		DPRINTK(HW, ERR, "e100_hw_init failed\n");
 
