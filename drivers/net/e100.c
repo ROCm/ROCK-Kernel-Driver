@@ -737,6 +737,10 @@ static u16 e100_eeprom_read(struct nic *nic, u16 *addr_len, u16 addr)
 	return le16_to_cpu(data);
 };
 
+static int badeeprom = 0;
+module_param(badeeprom, int, 0);
+MODULE_PARM_DESC(badeeprom, "Allow initialization with a corrupt EEPROM");
+
 /* Load entire EEPROM image into driver cache and validate checksum */
 static int e100_eeprom_load(struct nic *nic)
 {
@@ -757,7 +761,8 @@ static int e100_eeprom_load(struct nic *nic)
 	checksum = le16_to_cpu(0xBABA - checksum);
 	if(checksum != nic->eeprom[nic->eeprom_wc - 1]) {
 		DPRINTK(PROBE, ERR, "EEPROM corrupted\n");
-		return -EAGAIN;
+		if (!badeeprom)
+			return -EAGAIN;
 	}
 
 	return 0;
