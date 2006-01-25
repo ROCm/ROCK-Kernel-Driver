@@ -1,7 +1,7 @@
 /***************************************************************************
- * V4L2 driver for SN9C10x PC Camera Controllers                           *
+ * V4L2 driver for ET61X[12]51 PC Camera Controllers                       *
  *                                                                         *
- * Copyright (C) 2004-2006 by Luca Risolia <luca.risolia@studio.unibo.it>  *
+ * Copyright (C) 2006 by Luca Risolia <luca.risolia@studio.unibo.it>       *
  *                                                                         *
  * This program is free software; you can redistribute it and/or modify    *
  * it under the terms of the GNU General Public License as published by    *
@@ -41,42 +41,43 @@
 #include <asm/page.h>
 #include <asm/uaccess.h>
 
-#include "sn9c102.h"
+#include "et61x251.h"
 
 /*****************************************************************************/
 
-#define SN9C102_MODULE_NAME     "V4L2 driver for SN9C10x PC Camera Controllers"
-#define SN9C102_MODULE_AUTHOR   "(C) 2004-2006 Luca Risolia"
-#define SN9C102_AUTHOR_EMAIL    "<luca.risolia@studio.unibo.it>"
-#define SN9C102_MODULE_LICENSE  "GPL"
-#define SN9C102_MODULE_VERSION  "1:1.26"
-#define SN9C102_MODULE_VERSION_CODE  KERNEL_VERSION(1, 0, 26)
+#define ET61X251_MODULE_NAME    "V4L2 driver for ET61X[12]51 "                \
+                                "PC Camera Controllers"
+#define ET61X251_MODULE_AUTHOR  "(C) 2006 Luca Risolia"
+#define ET61X251_AUTHOR_EMAIL   "<luca.risolia@studio.unibo.it>"
+#define ET61X251_MODULE_LICENSE "GPL"
+#define ET61X251_MODULE_VERSION "1:1.01"
+#define ET61X251_MODULE_VERSION_CODE  KERNEL_VERSION(1, 0, 1)
 
 /*****************************************************************************/
 
-MODULE_DEVICE_TABLE(usb, sn9c102_id_table);
+MODULE_DEVICE_TABLE(usb, et61x251_id_table);
 
-MODULE_AUTHOR(SN9C102_MODULE_AUTHOR " " SN9C102_AUTHOR_EMAIL);
-MODULE_DESCRIPTION(SN9C102_MODULE_NAME);
-MODULE_VERSION(SN9C102_MODULE_VERSION);
-MODULE_LICENSE(SN9C102_MODULE_LICENSE);
+MODULE_AUTHOR(ET61X251_MODULE_AUTHOR " " ET61X251_AUTHOR_EMAIL);
+MODULE_DESCRIPTION(ET61X251_MODULE_NAME);
+MODULE_VERSION(ET61X251_MODULE_VERSION);
+MODULE_LICENSE(ET61X251_MODULE_LICENSE);
 
-static short video_nr[] = {[0 ... SN9C102_MAX_DEVICES-1] = -1};
+static short video_nr[] = {[0 ... ET61X251_MAX_DEVICES-1] = -1};
 module_param_array(video_nr, short, NULL, 0444);
 MODULE_PARM_DESC(video_nr,
                  "\n<-1|n[,...]> Specify V4L2 minor mode number."
                  "\n -1 = use next available (default)"
                  "\n  n = use minor number n (integer >= 0)"
-                 "\nYou can specify up to "__MODULE_STRING(SN9C102_MAX_DEVICES)
-                 " cameras this way."
+                 "\nYou can specify up to "
+                 __MODULE_STRING(ET61X251_MAX_DEVICES) " cameras this way."
                  "\nFor example:"
                  "\nvideo_nr=-1,2,-1 would assign minor number 2 to"
-                 "\nthe second camera and use auto for the first"
+                 "\nthe second registered camera and use auto for the first"
                  "\none and for every other camera."
                  "\n");
 
-static short force_munmap[] = {[0 ... SN9C102_MAX_DEVICES-1] = 
-                               SN9C102_FORCE_MUNMAP};
+static short force_munmap[] = {[0 ... ET61X251_MAX_DEVICES-1] =
+                               ET61X251_FORCE_MUNMAP};
 module_param_array(force_munmap, bool, NULL, 0444);
 MODULE_PARM_DESC(force_munmap,
                  "\n<0|1[,...]> Force the application to unmap previously"
@@ -89,8 +90,8 @@ MODULE_PARM_DESC(force_munmap,
                  "\nDefault value is "__MODULE_STRING(SN9C102_FORCE_MUNMAP)"."
                  "\n");
 
-#ifdef SN9C102_DEBUG
-static unsigned short debug = SN9C102_DEBUG_LEVEL;
+#ifdef ET61X251_DEBUG
+static unsigned short debug = ET61X251_DEBUG_LEVEL;
 module_param(debug, ushort, 0644);
 MODULE_PARM_DESC(debug,
                  "\n<n> Debugging information level, from 0 to 3:"
@@ -100,33 +101,15 @@ MODULE_PARM_DESC(debug,
                  "\n3 = more verbose messages"
                  "\nLevel 3 is useful for testing only, when only "
                  "one device is used."
-                 "\nDefault value is "__MODULE_STRING(SN9C102_DEBUG_LEVEL)"."
+                 "\nDefault value is "__MODULE_STRING(ET61X251_DEBUG_LEVEL)"."
                  "\n");
 #endif
 
 /*****************************************************************************/
 
-static sn9c102_sof_header_t sn9c102_sof_header[] = {
-	{0xff, 0xff, 0x00, 0xc4, 0xc4, 0x96, 0x00},
-	{0xff, 0xff, 0x00, 0xc4, 0xc4, 0x96, 0x01},
-};
-
-static sn9c103_sof_header_t sn9c103_sof_header[] = {
-	{0xff, 0xff, 0x00, 0xc4, 0xc4, 0x96, 0x20},
-};
-
-static sn9c102_eof_header_t sn9c102_eof_header[] = {
-	{0x00, 0x00, 0x00, 0x00},
-	{0x40, 0x00, 0x00, 0x00},
-	{0x80, 0x00, 0x00, 0x00},
-	{0xc0, 0x00, 0x00, 0x00},
-};
-
-/*****************************************************************************/
-
-static u32 
-sn9c102_request_buffers(struct sn9c102_device* cam, u32 count, 
-                        enum sn9c102_io_method io)
+static u32
+et61x251_request_buffers(struct et61x251_device* cam, u32 count,
+                         enum et61x251_io_method io)
 {
 	struct v4l2_pix_format* p = &(cam->sensor->pix_format);
 	struct v4l2_rect* r = &(cam->sensor->cropcap.bounds);
@@ -137,8 +120,8 @@ sn9c102_request_buffers(struct sn9c102_device* cam, u32 count,
 	void* buff = NULL;
 	u32 i;
 
-	if (count > SN9C102_MAX_FRAMES)
-		count = SN9C102_MAX_FRAMES;
+	if (count > ET61X251_MAX_FRAMES)
+		count = ET61X251_MAX_FRAMES;
 
 	cam->nbuffers = count;
 	while (cam->nbuffers > 0) {
@@ -163,7 +146,7 @@ sn9c102_request_buffers(struct sn9c102_device* cam, u32 count,
 }
 
 
-static void sn9c102_release_buffers(struct sn9c102_device* cam)
+static void et61x251_release_buffers(struct et61x251_device* cam)
 {
 	if (cam->nbuffers) {
 		vfree(cam->frame[0].bufmem);
@@ -173,23 +156,23 @@ static void sn9c102_release_buffers(struct sn9c102_device* cam)
 }
 
 
-static void sn9c102_empty_framequeues(struct sn9c102_device* cam)
+static void et61x251_empty_framequeues(struct et61x251_device* cam)
 {
 	u32 i;
 
 	INIT_LIST_HEAD(&cam->inqueue);
 	INIT_LIST_HEAD(&cam->outqueue);
 
-	for (i = 0; i < SN9C102_MAX_FRAMES; i++) {
+	for (i = 0; i < ET61X251_MAX_FRAMES; i++) {
 		cam->frame[i].state = F_UNUSED;
 		cam->frame[i].buf.bytesused = 0;
 	}
 }
 
 
-static void sn9c102_requeue_outqueue(struct sn9c102_device* cam)
+static void et61x251_requeue_outqueue(struct et61x251_device* cam)
 {
-	struct sn9c102_frame_t *i;
+	struct et61x251_frame_t *i;
 
 	list_for_each_entry(i, &cam->outqueue, frame) {
 		i->state = F_QUEUED;
@@ -200,7 +183,7 @@ static void sn9c102_requeue_outqueue(struct sn9c102_device* cam)
 }
 
 
-static void sn9c102_queue_unusedframes(struct sn9c102_device* cam)
+static void et61x251_queue_unusedframes(struct et61x251_device* cam)
 {
 	unsigned long lock_flags;
 	u32 i;
@@ -216,64 +199,34 @@ static void sn9c102_queue_unusedframes(struct sn9c102_device* cam)
 
 /*****************************************************************************/
 
-int sn9c102_write_regs(struct sn9c102_device* cam, u8* buff, u16 index)
-{
-	struct usb_device* udev = cam->usbdev;
-	int i, res;
-
-	if (index + sizeof(buff) >= ARRAY_SIZE(cam->reg))
-		return -1;
-
-	res = usb_control_msg(udev, usb_sndctrlpipe(udev, 0), 0x08, 0x41,
-	                      index, 0, buff, sizeof(buff),
-	                      SN9C102_CTRL_TIMEOUT*sizeof(buff));
-	if (res < 0) {
-		DBG(3, "Failed to write registers (index 0x%02X, error %d)",
-		    index, res);
-		return -1;
-	}
-
-	for (i = 0; i < sizeof(buff); i++)
-		cam->reg[index+i] = buff[i];
-
-	return 0;
-}
-
-
-int sn9c102_write_reg(struct sn9c102_device* cam, u8 value, u16 index)
+int et61x251_write_reg(struct et61x251_device* cam, u8 value, u16 index)
 {
 	struct usb_device* udev = cam->usbdev;
 	u8* buff = cam->control_buffer;
 	int res;
 
-	if (index >= ARRAY_SIZE(cam->reg))
-		return -1;
-
 	*buff = value;
 
-	res = usb_control_msg(udev, usb_sndctrlpipe(udev, 0), 0x08, 0x41,
-	                      index, 0, buff, 1, SN9C102_CTRL_TIMEOUT);
+	res = usb_control_msg(udev, usb_sndctrlpipe(udev, 0), 0x00, 0x41,
+	                      0, index, buff, 1, ET61X251_CTRL_TIMEOUT);
 	if (res < 0) {
 		DBG(3, "Failed to write a register (value 0x%02X, index "
 		       "0x%02X, error %d)", value, index, res);
 		return -1;
 	}
 
-	cam->reg[index] = value;
-
 	return 0;
 }
 
 
-/* NOTE: reading some registers always returns 0 */
-static int sn9c102_read_reg(struct sn9c102_device* cam, u16 index)
+int et61x251_read_reg(struct et61x251_device* cam, u16 index)
 {
 	struct usb_device* udev = cam->usbdev;
 	u8* buff = cam->control_buffer;
 	int res;
 
 	res = usb_control_msg(udev, usb_rcvctrlpipe(udev, 0), 0x00, 0xc1,
-	                      index, 0, buff, 1, SN9C102_CTRL_TIMEOUT);
+	                      0, index, buff, 1, ET61X251_CTRL_TIMEOUT);
 	if (res < 0)
 		DBG(3, "Failed to read a register (index 0x%02X, error %d)",
 		    index, res);
@@ -282,246 +235,175 @@ static int sn9c102_read_reg(struct sn9c102_device* cam, u16 index)
 }
 
 
-int sn9c102_pread_reg(struct sn9c102_device* cam, u16 index)
-{
-	if (index >= ARRAY_SIZE(cam->reg))
-		return -1;
-
-	return cam->reg[index];
-}
-
-
 static int
-sn9c102_i2c_wait(struct sn9c102_device* cam, struct sn9c102_sensor* sensor)
+et61x251_i2c_wait(struct et61x251_device* cam, struct et61x251_sensor* sensor)
 {
 	int i, r;
 
-	for (i = 1; i <= 5; i++) {
-		r = sn9c102_read_reg(cam, 0x08);
+	for (i = 1; i <= 8; i++) {
+		if (sensor->interface == ET61X251_I2C_3WIRES) {
+			r = et61x251_read_reg(cam, 0x8e);
+			if (!(r & 0x02) && (r >= 0))
+				return 0;
+		} else {
+			r = et61x251_read_reg(cam, 0x8b);
+			if (!(r & 0x01) && (r >= 0))
+				return 0;
+		}
 		if (r < 0)
 			return -EIO;
-		if (r & 0x04)
-			return 0;
-		if (sensor->frequency & SN9C102_I2C_400KHZ)
-			udelay(5*16);
-		else
-			udelay(16*16);
+		udelay(8*8); /* minimum for sensors at 400kHz */
 	}
+
 	return -EBUSY;
 }
 
 
-static int
-sn9c102_i2c_detect_read_error(struct sn9c102_device* cam, 
-                              struct sn9c102_sensor* sensor)
-{
-	int r;
-	r = sn9c102_read_reg(cam, 0x08);
-	return (r < 0 || (r >= 0 && !(r & 0x08))) ? -EIO : 0;
-}
-
-
-static int
-sn9c102_i2c_detect_write_error(struct sn9c102_device* cam, 
-                               struct sn9c102_sensor* sensor)
-{
-	int r;
-	r = sn9c102_read_reg(cam, 0x08);
-	return (r < 0 || (r >= 0 && (r & 0x08))) ? -EIO : 0;
-}
-
-
-int 
-sn9c102_i2c_try_raw_read(struct sn9c102_device* cam,
-                         struct sn9c102_sensor* sensor, u8 data0, u8 data1,
-                         u8 n, u8 buffer[])
+int
+et61x251_i2c_try_read(struct et61x251_device* cam,
+                      struct et61x251_sensor* sensor, u8 address)
 {
 	struct usb_device* udev = cam->usbdev;
 	u8* data = cam->control_buffer;
 	int err = 0, res;
 
-	/* Write cycle */
-	data[0] = ((sensor->interface == SN9C102_I2C_2WIRES) ? 0x80 : 0) |
-	          ((sensor->frequency & SN9C102_I2C_400KHZ) ? 0x01 : 0) | 0x10;
-	data[1] = data0; /* I2C slave id */
-	data[2] = data1; /* address */
-	data[7] = 0x10;
-	res = usb_control_msg(udev, usb_sndctrlpipe(udev, 0), 0x08, 0x41,
-	                      0x08, 0, data, 8, SN9C102_CTRL_TIMEOUT);
+	data[0] = address;
+	data[1] = cam->sensor->i2c_slave_id;
+	data[2] = cam->sensor->rsta | 0x10;
+	data[3] = !(et61x251_read_reg(cam, 0x8b) & 0x02);
+	res = usb_control_msg(udev, usb_sndctrlpipe(udev, 0), 0x00, 0x41,
+	                      0, 0x88, data, 4, ET61X251_CTRL_TIMEOUT);
 	if (res < 0)
 		err += res;
 
-	err += sn9c102_i2c_wait(cam, sensor);
+	err += et61x251_i2c_wait(cam, sensor);
 
-	/* Read cycle - n bytes */
-	data[0] = ((sensor->interface == SN9C102_I2C_2WIRES) ? 0x80 : 0) |
-	          ((sensor->frequency & SN9C102_I2C_400KHZ) ? 0x01 : 0) |
-	          (n << 4) | 0x02;
-	data[1] = data0;
-	data[7] = 0x10;
-	res = usb_control_msg(udev, usb_sndctrlpipe(udev, 0), 0x08, 0x41,
-	                      0x08, 0, data, 8, SN9C102_CTRL_TIMEOUT);
-	if (res < 0)
-		err += res;
-
-	err += sn9c102_i2c_wait(cam, sensor);
-
-	/* The first read byte will be placed in data[4] */
 	res = usb_control_msg(udev, usb_rcvctrlpipe(udev, 0), 0x00, 0xc1,
-	                      0x0a, 0, data, 5, SN9C102_CTRL_TIMEOUT);
+	                      0, 0x80, data, 8, ET61X251_CTRL_TIMEOUT);
 	if (res < 0)
 		err += res;
 
-	err += sn9c102_i2c_detect_read_error(cam, sensor);
-
-	PDBGG("I2C read: address 0x%02X, first read byte: 0x%02X", data1,
-	      data[4]);
-
-	if (err) {
+	if (err)
 		DBG(3, "I2C read failed for %s image sensor", sensor->name);
-		return -1;
-	}
 
-	if (buffer)
-		memcpy(buffer, data, sizeof(buffer));
+	PDBGG("I2C read: address 0x%02X, value: 0x%02X", address, data[0]);
 
-	return (int)data[4];
+	return err ? -1 : (int)data[0];
 }
 
 
-int 
-sn9c102_i2c_try_raw_write(struct sn9c102_device* cam,
-                          struct sn9c102_sensor* sensor, u8 n, u8 data0,
-                          u8 data1, u8 data2, u8 data3, u8 data4, u8 data5)
+int
+et61x251_i2c_try_write(struct et61x251_device* cam,
+                       struct et61x251_sensor* sensor, u8 address, u8 value)
 {
 	struct usb_device* udev = cam->usbdev;
 	u8* data = cam->control_buffer;
 	int err = 0, res;
 
-	/* Write cycle. It usually is address + value */
-	data[0] = ((sensor->interface == SN9C102_I2C_2WIRES) ? 0x80 : 0) |
-	          ((sensor->frequency & SN9C102_I2C_400KHZ) ? 0x01 : 0)
-	          | ((n - 1) << 4);
-	data[1] = data0;
-	data[2] = data1;
-	data[3] = data2;
-	data[4] = data3;
-	data[5] = data4;
-	data[6] = data5;
-	data[7] = 0x14;
-	res = usb_control_msg(udev, usb_sndctrlpipe(udev, 0), 0x08, 0x41,
-	                      0x08, 0, data, 8, SN9C102_CTRL_TIMEOUT);
+	data[0] = address;
+	data[1] = cam->sensor->i2c_slave_id;
+	data[2] = cam->sensor->rsta | 0x12;
+	res = usb_control_msg(udev, usb_sndctrlpipe(udev, 0), 0x00, 0x41,
+	                      0, 0x88, data, 3, ET61X251_CTRL_TIMEOUT);
 	if (res < 0)
 		err += res;
 
-	err += sn9c102_i2c_wait(cam, sensor);
-	err += sn9c102_i2c_detect_write_error(cam, sensor);
+	data[0] = value;
+	res = usb_control_msg(udev, usb_sndctrlpipe(udev, 0), 0x00, 0x41,
+	                      0, 0x80, data, 1, ET61X251_CTRL_TIMEOUT);
+	if (res < 0)
+		err += res;
+
+	err += et61x251_i2c_wait(cam, sensor);
 
 	if (err)
 		DBG(3, "I2C write failed for %s image sensor", sensor->name);
 
-	PDBGG("I2C raw write: %u bytes, data0 = 0x%02X, data1 = 0x%02X, "
-	      "data2 = 0x%02X, data3 = 0x%02X, data4 = 0x%02X, data5 = 0x%02X",
-	      n, data0, data1, data2, data3, data4, data5);
+	PDBGG("I2C write: address 0x%02X, value: 0x%02X", address, value);
 
 	return err ? -1 : 0;
 }
 
 
 int
-sn9c102_i2c_try_read(struct sn9c102_device* cam,
-                     struct sn9c102_sensor* sensor, u8 address)
+et61x251_i2c_raw_write(struct et61x251_device* cam, u8 n, u8 data1, u8 data2,
+                       u8 data3, u8 data4, u8 data5, u8 data6, u8 data7,
+                       u8 data8, u8 address)
 {
-	return sn9c102_i2c_try_raw_read(cam, sensor, sensor->i2c_slave_id,
-	                                address, 1, NULL);
+	struct usb_device* udev = cam->usbdev;
+	u8* data = cam->control_buffer;
+	int err = 0, res;
+
+	if (!cam->sensor)
+		return -1;
+
+	data[0] = data2;
+	data[1] = data3;
+	data[2] = data4;
+	data[3] = data5;
+	data[4] = data6;
+	data[5] = data7;
+	data[6] = data8;
+	res = usb_control_msg(udev, usb_sndctrlpipe(udev, 0), 0x00, 0x41,
+	                      0, 0x81, data, n-1, ET61X251_CTRL_TIMEOUT);
+	if (res < 0)
+		err += res;
+
+	data[0] = address;
+	data[1] = cam->sensor->i2c_slave_id;
+	data[2] = cam->sensor->rsta | 0x02 | (n << 4);
+	res = usb_control_msg(udev, usb_sndctrlpipe(udev, 0), 0x00, 0x41,
+	                      0, 0x88, data, 3, ET61X251_CTRL_TIMEOUT);
+	if (res < 0)
+		err += res;
+
+	/* Start writing through the serial interface */
+	data[0] = data1;
+	res = usb_control_msg(udev, usb_sndctrlpipe(udev, 0), 0x00, 0x41,
+	                      0, 0x80, data, 1, ET61X251_CTRL_TIMEOUT);
+	if (res < 0)
+		err += res;
+
+	err += et61x251_i2c_wait(cam, cam->sensor);
+
+	if (err)
+		DBG(3, "I2C raw write failed for %s image sensor",
+		    cam->sensor->name);
+
+	PDBGG("I2C raw write: %u bytes, address = 0x%02X, data1 = 0x%02X, "
+	      "data2 = 0x%02X, data3 = 0x%02X, data4 = 0x%02X, data5 = 0x%02X,"
+	      " data6 = 0x%02X, data7 = 0x%02X, data8 = 0x%02X", n, address,
+	      data1, data2, data3, data4, data5, data6, data7, data8);
+
+	return err ? -1 : 0;
+
 }
 
 
-int
-sn9c102_i2c_try_write(struct sn9c102_device* cam,
-                      struct sn9c102_sensor* sensor, u8 address, u8 value)
-{
-	return sn9c102_i2c_try_raw_write(cam, sensor, 3, 
-	                                 sensor->i2c_slave_id, address,
-	                                 value, 0, 0, 0);
-}
-
-
-int sn9c102_i2c_read(struct sn9c102_device* cam, u8 address)
+int et61x251_i2c_read(struct et61x251_device* cam, u8 address)
 {
 	if (!cam->sensor)
 		return -1;
 
-	return sn9c102_i2c_try_read(cam, cam->sensor, address);
+	return et61x251_i2c_try_read(cam, cam->sensor, address);
 }
 
 
-int sn9c102_i2c_write(struct sn9c102_device* cam, u8 address, u8 value)
+int et61x251_i2c_write(struct et61x251_device* cam, u8 address, u8 value)
 {
 	if (!cam->sensor)
 		return -1;
 
-	return sn9c102_i2c_try_write(cam, cam->sensor, address, value);
+	return et61x251_i2c_try_write(cam, cam->sensor, address, value);
 }
 
 /*****************************************************************************/
 
-static void*
-sn9c102_find_sof_header(struct sn9c102_device* cam, void* mem, size_t len)
+static void et61x251_urb_complete(struct urb *urb, struct pt_regs* regs)
 {
-	size_t soflen = 0, i;
-	u8 j, n = 0;
-
-	switch (cam->bridge) {
-	case BRIDGE_SN9C101:
-	case BRIDGE_SN9C102:
-		soflen = sizeof(sn9c102_sof_header_t);
-		n = sizeof(sn9c102_sof_header) / soflen;
-		break;
-	case BRIDGE_SN9C103:
-		soflen = sizeof(sn9c103_sof_header_t);
-		n = sizeof(sn9c103_sof_header) / soflen;
-	}
-
- 	for (i = 0; (len >= soflen) && (i <= len - soflen); i++)
-		for (j = 0; j < n; j++)
-			/* The invariable part of the header is 6 bytes long */
-			if ((cam->bridge != BRIDGE_SN9C103 &&
-			    !memcmp(mem + i, sn9c102_sof_header[j], 6)) ||
-			    (cam->bridge == BRIDGE_SN9C103 &&
-			    !memcmp(mem + i, sn9c103_sof_header[j], 6))) {
-				memcpy(cam->sof_header, mem + i, soflen);
-				/* Skip the header */
-				return mem + i + soflen;
-			}
-
-	return NULL;
-}
-
-
-static void*
-sn9c102_find_eof_header(struct sn9c102_device* cam, void* mem, size_t len)
-{
-	size_t eoflen = sizeof(sn9c102_eof_header_t), i;
-	unsigned j, n = sizeof(sn9c102_eof_header) / eoflen;
-
-	if (cam->sensor->pix_format.pixelformat == V4L2_PIX_FMT_SN9C10X)
-		return NULL; /* EOF header does not exist in compressed data */
-
-	for (i = 0; (len >= eoflen) && (i <= len - eoflen); i++)
-		for (j = 0; j < n; j++)
-			if (!memcmp(mem + i, sn9c102_eof_header[j], eoflen))
-				return mem + i;
-
-	return NULL;
-}
-
-
-static void sn9c102_urb_complete(struct urb *urb, struct pt_regs* regs)
-{
-	struct sn9c102_device* cam = urb->context;
-	struct sn9c102_frame_t** f;
-	size_t imagesize, soflen;
+	struct et61x251_device* cam = urb->context;
+	struct et61x251_frame_t** f;
+	size_t imagesize;
 	u8 i;
 	int err = 0;
 
@@ -550,20 +432,19 @@ static void sn9c102_urb_complete(struct urb *urb, struct pt_regs* regs)
 		goto resubmit_urb;
 
 	if (!(*f))
-		(*f) = list_entry(cam->inqueue.next, struct sn9c102_frame_t,
+		(*f) = list_entry(cam->inqueue.next, struct et61x251_frame_t,
 		                  frame);
 
 	imagesize = (cam->sensor->pix_format.width *
 	             cam->sensor->pix_format.height *
 	             cam->sensor->pix_format.priv) / 8;
 
-	soflen = (cam->bridge) == BRIDGE_SN9C103 ?
-	                          sizeof(sn9c103_sof_header_t) :
-	                          sizeof(sn9c102_sof_header_t);
-
 	for (i = 0; i < urb->number_of_packets; i++) {
-		unsigned int img, len, status;
-		void *pos, *sof, *eof;
+		unsigned int len, status;
+		void *pos;
+		u8* b1, * b2, sof;
+		const u8 VOID_BYTES = 6;
+		size_t imglen;
 
 		len = urb->iso_frame_desc[i].actual_length;
 		status = urb->iso_frame_desc[i].status;
@@ -575,109 +456,74 @@ static void sn9c102_urb_complete(struct urb *urb, struct pt_regs* regs)
 			continue;
 		}
 
-		PDBGG("Isochrnous frame: length %u, #%u i", len, i);
+		b1 = pos++;
+		b2 = pos++;
+		sof = ((*b1 & 0x3f) == 63);
+		imglen = ((*b1 & 0xc0) << 2) | *b2;
 
-redo:
-		sof = sn9c102_find_sof_header(cam, pos, len);
-		if (!sof) {
-			eof = sn9c102_find_eof_header(cam, pos, len);
-			if ((*f)->state == F_GRABBING) {
-end_of_frame:
-				img = len;
+		PDBGG("Isochrnous frame: length %u, #%u i, image length %zu",
+		      len, i, imglen);
 
-				if (eof)
-					img = (eof > pos) ? eof - pos - 1 : 0;
+		if ((*f)->state == F_QUEUED || (*f)->state == F_ERROR)
+start_of_frame:
+			if (sof) {
+				(*f)->state = F_GRABBING;
+				(*f)->buf.bytesused = 0;
+				do_gettimeofday(&(*f)->buf.timestamp);
+				pos += 22;
+				DBG(3, "SOF detected: new video frame");
+			}
 
-				if ((*f)->buf.bytesused+img > imagesize) {
-					u32 b = (*f)->buf.bytesused + img -
-					        imagesize;
-					img = imagesize - (*f)->buf.bytesused;
-					DBG(3, "Expected EOF not found: "
-					       "video frame cut");
-					if (eof)
-						DBG(3, "Exceeded limit: +%u "
-						       "bytes", (unsigned)(b));
-				}
-
-				memcpy((*f)->bufmem + (*f)->buf.bytesused, pos,
-				       img);
-
-				if ((*f)->buf.bytesused == 0)
-					do_gettimeofday(&(*f)->buf.timestamp);
-
-				(*f)->buf.bytesused += img;
-
-				if ((*f)->buf.bytesused == imagesize ||
-				    (cam->sensor->pix_format.pixelformat ==
-				                V4L2_PIX_FMT_SN9C10X && eof)) {
-					u32 b = (*f)->buf.bytesused;
-					(*f)->state = F_DONE;
-					(*f)->buf.sequence= ++cam->frame_count;
-					spin_lock(&cam->queue_lock);
-					list_move_tail(&(*f)->frame,
-					               &cam->outqueue);
-					if (!list_empty(&cam->inqueue))
-						(*f) = list_entry(
-						        cam->inqueue.next,
-						        struct sn9c102_frame_t,
-						        frame );
-					else
-						(*f) = NULL;
-					spin_unlock(&cam->queue_lock);
-					memcpy(cam->sysfs.frame_header,
-					       cam->sof_header, soflen);
-					DBG(3, "Video frame captured: %lu "
-					       "bytes", (unsigned long)(b));
-
-					if (!(*f))
-						goto resubmit_urb;
-
-				} else if (eof) {
+		if ((*f)->state == F_GRABBING) {
+			if (sof && (*f)->buf.bytesused) {
+				if (cam->sensor->pix_format.pixelformat ==
+				                         V4L2_PIX_FMT_ET61X251)
+					goto end_of_frame;
+				else {
+					DBG(3, "Not expected SOF detected "
+					       "after %lu bytes",
+					   (unsigned long)(*f)->buf.bytesused);
 					(*f)->state = F_ERROR;
-					DBG(3, "Not expected EOF after %lu "
-					       "bytes of image data", 
-					    (unsigned long)
-					    ((*f)->buf.bytesused));
+					continue;
 				}
+			}
 
-				if (sof) /* (1) */
-					goto start_of_frame;
-
-			} else if (eof) {
-				DBG(3, "EOF without SOF");
-				continue;
-
-			} else {
-				PDBGG("Ignoring pointless isochronous frame");
+			if ((*f)->buf.bytesused + imglen > imagesize) {
+				DBG(3, "Video frame size exceeded");
+				(*f)->state = F_ERROR;
 				continue;
 			}
 
-		} else if ((*f)->state == F_QUEUED || (*f)->state == F_ERROR) {
-start_of_frame:
-			(*f)->state = F_GRABBING;
-			(*f)->buf.bytesused = 0;
-			len -= (sof - pos);
-			pos = sof;
-			DBG(3, "SOF detected: new video frame");
-			if (len)
-				goto redo;
+			pos += VOID_BYTES;
 
-		} else if ((*f)->state == F_GRABBING) {
-			eof = sn9c102_find_eof_header(cam, pos, len);
-			if (eof && eof < sof)
-				goto end_of_frame; /* (1) */
-			else {
-				if (cam->sensor->pix_format.pixelformat ==
-				    V4L2_PIX_FMT_SN9C10X) {
-					eof = sof - soflen;
-					goto end_of_frame;
-				} else {
-					DBG(3, "SOF before expected EOF after "
-					       "%lu bytes of image data", 
-					    (unsigned long)
-					    ((*f)->buf.bytesused));
+			memcpy((*f)->bufmem+(*f)->buf.bytesused, pos, imglen);
+			(*f)->buf.bytesused += imglen;
+
+			if ((*f)->buf.bytesused == imagesize) {
+				u32 b;
+end_of_frame:
+				b = (*f)->buf.bytesused;
+				(*f)->state = F_DONE;
+				(*f)->buf.sequence= ++cam->frame_count;
+				spin_lock(&cam->queue_lock);
+				list_move_tail(&(*f)->frame, &cam->outqueue);
+				if (!list_empty(&cam->inqueue))
+					(*f) = list_entry(cam->inqueue.next,
+					               struct et61x251_frame_t,
+					                  frame);
+				else
+					(*f) = NULL;
+				spin_unlock(&cam->queue_lock);
+				DBG(3, "Video frame captured: : %lu bytes",
+				       (unsigned long)(b));
+
+				if (!(*f))
+					goto resubmit_urb;
+
+				if (sof &&
+				    cam->sensor->pix_format.pixelformat ==
+				                         V4L2_PIX_FMT_ET61X251)
 					goto start_of_frame;
-				}
 			}
 		}
 	}
@@ -694,22 +540,19 @@ resubmit_urb:
 }
 
 
-static int sn9c102_start_transfer(struct sn9c102_device* cam)
+static int et61x251_start_transfer(struct et61x251_device* cam)
 {
 	struct usb_device *udev = cam->usbdev;
 	struct urb* urb;
-	const unsigned int sn9c102_wMaxPacketSize[] = {0, 128, 256, 384, 512,
-	                                               680, 800, 900, 1023};
-	const unsigned int sn9c103_wMaxPacketSize[] = {0, 128, 256, 384, 512,
-	                                               680, 800, 900, 1003};
-	const unsigned int psz = (cam->bridge == BRIDGE_SN9C103) ?
-	                    sn9c103_wMaxPacketSize[SN9C102_ALTERNATE_SETTING] :
-	                    sn9c102_wMaxPacketSize[SN9C102_ALTERNATE_SETTING];
+	const unsigned int wMaxPacketSize[] = {0, 256, 384, 512, 640, 768, 832,
+	                                       864, 896, 920, 956, 980, 1000,
+	                                       1022};
+	const unsigned int psz = wMaxPacketSize[ET61X251_ALTERNATE_SETTING];
 	s8 i, j;
 	int err = 0;
 
-	for (i = 0; i < SN9C102_URBS; i++) {
-		cam->transfer_buffer[i] = kzalloc(SN9C102_ISO_PACKETS * psz,
+	for (i = 0; i < ET61X251_URBS; i++) {
+		cam->transfer_buffer[i] = kzalloc(ET61X251_ISO_PACKETS * psz,
 		                                  GFP_KERNEL);
 		if (!cam->transfer_buffer[i]) {
 			err = -ENOMEM;
@@ -718,8 +561,8 @@ static int sn9c102_start_transfer(struct sn9c102_device* cam)
 		}
 	}
 
-	for (i = 0; i < SN9C102_URBS; i++) {
-		urb = usb_alloc_urb(SN9C102_ISO_PACKETS, GFP_KERNEL);
+	for (i = 0; i < ET61X251_URBS; i++) {
+		urb = usb_alloc_urb(ET61X251_ISO_PACKETS, GFP_KERNEL);
 		cam->urb[i] = urb;
 		if (!urb) {
 			err = -ENOMEM;
@@ -730,28 +573,27 @@ static int sn9c102_start_transfer(struct sn9c102_device* cam)
 		urb->context = cam;
 		urb->pipe = usb_rcvisocpipe(udev, 1);
 		urb->transfer_flags = URB_ISO_ASAP;
-		urb->number_of_packets = SN9C102_ISO_PACKETS;
-		urb->complete = sn9c102_urb_complete;
+		urb->number_of_packets = ET61X251_ISO_PACKETS;
+		urb->complete = et61x251_urb_complete;
 		urb->transfer_buffer = cam->transfer_buffer[i];
-		urb->transfer_buffer_length = psz * SN9C102_ISO_PACKETS;
+		urb->transfer_buffer_length = psz * ET61X251_ISO_PACKETS;
 		urb->interval = 1;
-		for (j = 0; j < SN9C102_ISO_PACKETS; j++) {
+		for (j = 0; j < ET61X251_ISO_PACKETS; j++) {
 			urb->iso_frame_desc[j].offset = psz * j;
 			urb->iso_frame_desc[j].length = psz;
 		}
 	}
 
-	/* Enable video */
-	if (!(cam->reg[0x01] & 0x04)) {
-		err = sn9c102_write_reg(cam, cam->reg[0x01] | 0x04, 0x01);
-		if (err) {
-			err = -EIO;
-			DBG(1, "I/O hardware error");
-			goto free_urbs;
-		}
+	err = et61x251_write_reg(cam, 0x01, 0x03);
+	err = et61x251_write_reg(cam, 0x00, 0x03);
+	err = et61x251_write_reg(cam, 0x08, 0x03);
+	if (err) {
+		err = -EIO;
+		DBG(1, "I/O hardware error");
+		goto free_urbs;
 	}
 
-	err = usb_set_interface(udev, 0, SN9C102_ALTERNATE_SETTING);
+	err = usb_set_interface(udev, 0, ET61X251_ALTERNATE_SETTING);
 	if (err) {
 		DBG(1, "usb_set_interface() failed");
 		goto free_urbs;
@@ -759,7 +601,7 @@ static int sn9c102_start_transfer(struct sn9c102_device* cam)
 
 	cam->frame_current = NULL;
 
-	for (i = 0; i < SN9C102_URBS; i++) {
+	for (i = 0; i < ET61X251_URBS; i++) {
 		err = usb_submit_urb(cam->urb[i], GFP_KERNEL);
 		if (err) {
 			for (j = i-1; j >= 0; j--)
@@ -772,18 +614,18 @@ static int sn9c102_start_transfer(struct sn9c102_device* cam)
 	return 0;
 
 free_urbs:
-	for (i = 0; (i < SN9C102_URBS) &&  cam->urb[i]; i++)
+	for (i = 0; (i < ET61X251_URBS) &&  cam->urb[i]; i++)
 		usb_free_urb(cam->urb[i]);
 
 free_buffers:
-	for (i = 0; (i < SN9C102_URBS) && cam->transfer_buffer[i]; i++)
+	for (i = 0; (i < ET61X251_URBS) && cam->transfer_buffer[i]; i++)
 		kfree(cam->transfer_buffer[i]);
 
 	return err;
 }
 
 
-static int sn9c102_stop_transfer(struct sn9c102_device* cam)
+static int et61x251_stop_transfer(struct et61x251_device* cam)
 {
 	struct usb_device *udev = cam->usbdev;
 	s8 i;
@@ -792,7 +634,7 @@ static int sn9c102_stop_transfer(struct sn9c102_device* cam)
 	if (cam->state & DEV_DISCONNECTED)
 		return 0;
 
-	for (i = SN9C102_URBS-1; i >= 0; i--) {
+	for (i = ET61X251_URBS-1; i >= 0; i--) {
 		usb_kill_urb(cam->urb[i]);
 		usb_free_urb(cam->urb[i]);
 		kfree(cam->transfer_buffer[i]);
@@ -806,7 +648,7 @@ static int sn9c102_stop_transfer(struct sn9c102_device* cam)
 }
 
 
-static int sn9c102_stream_interrupt(struct sn9c102_device* cam)
+static int et61x251_stream_interrupt(struct et61x251_device* cam)
 {
 	int err = 0;
 
@@ -814,13 +656,14 @@ static int sn9c102_stream_interrupt(struct sn9c102_device* cam)
 	err = wait_event_timeout(cam->wait_stream,
 	                         (cam->stream == STREAM_OFF) ||
 	                         (cam->state & DEV_DISCONNECTED),
-	                         SN9C102_URB_TIMEOUT);
+	                         ET61X251_URB_TIMEOUT);
 	if (cam->state & DEV_DISCONNECTED)
 		return -ENODEV;
 	else if (err) {
 		cam->state |= DEV_MISCONFIGURED;
-		DBG(1, "The camera is misconfigured. To use it, close and "
-		       "open /dev/video%d again.", cam->v4ldev->minor);
+		DBG(1, "URB timeout reached. The camera is misconfigured. To "
+		       "use it, close and open /dev/video%d again.",
+		    cam->v4ldev->minor);
 		return err;
 	}
 
@@ -830,7 +673,7 @@ static int sn9c102_stream_interrupt(struct sn9c102_device* cam)
 /*****************************************************************************/
 
 #ifdef CONFIG_VIDEO_ADV_DEBUG
-static u8 sn9c102_strtou8(const char* buff, size_t len, ssize_t* count)
+static u8 et61x251_strtou8(const char* buff, size_t len, ssize_t* count)
 {
 	char str[5];
 	char* endp;
@@ -861,78 +704,78 @@ static u8 sn9c102_strtou8(const char* buff, size_t len, ssize_t* count)
    NOTE 2: buffers are PAGE_SIZE long
 */
 
-static ssize_t sn9c102_show_reg(struct class_device* cd, char* buf)
+static ssize_t et61x251_show_reg(struct class_device* cd, char* buf)
 {
-	struct sn9c102_device* cam;
+	struct et61x251_device* cam;
 	ssize_t count;
 
-	if (down_interruptible(&sn9c102_sysfs_lock))
+	if (down_interruptible(&et61x251_sysfs_lock))
 		return -ERESTARTSYS;
 
 	cam = video_get_drvdata(to_video_device(cd));
 	if (!cam) {
-		up(&sn9c102_sysfs_lock);
+		up(&et61x251_sysfs_lock);
 		return -ENODEV;
 	}
 
 	count = sprintf(buf, "%u\n", cam->sysfs.reg);
 
-	up(&sn9c102_sysfs_lock);
-
-	return count;
-} 
-
-
-static ssize_t 
-sn9c102_store_reg(struct class_device* cd, const char* buf, size_t len)
-{
-	struct sn9c102_device* cam;
-	u8 index;
-	ssize_t count;
-
-	if (down_interruptible(&sn9c102_sysfs_lock))
-		return -ERESTARTSYS;
-
-	cam = video_get_drvdata(to_video_device(cd));
-	if (!cam) {
-		up(&sn9c102_sysfs_lock);
-		return -ENODEV;
-	}
-
-	index = sn9c102_strtou8(buf, len, &count);
-	if (index > 0x1f || !count) {
-		up(&sn9c102_sysfs_lock);
-		return -EINVAL;
-	}
-
-	cam->sysfs.reg = index;
-
-	DBG(2, "Moved SN9C10X register index to 0x%02X", cam->sysfs.reg);
-	DBG(3, "Written bytes: %zd", count);
-
-	up(&sn9c102_sysfs_lock);
+	up(&et61x251_sysfs_lock);
 
 	return count;
 }
 
 
-static ssize_t sn9c102_show_val(struct class_device* cd, char* buf)
+static ssize_t
+et61x251_store_reg(struct class_device* cd, const char* buf, size_t len)
 {
-	struct sn9c102_device* cam;
+	struct et61x251_device* cam;
+	u8 index;
 	ssize_t count;
-	int val;
 
-	if (down_interruptible(&sn9c102_sysfs_lock))
+	if (down_interruptible(&et61x251_sysfs_lock))
 		return -ERESTARTSYS;
 
 	cam = video_get_drvdata(to_video_device(cd));
 	if (!cam) {
-		up(&sn9c102_sysfs_lock);
+		up(&et61x251_sysfs_lock);
 		return -ENODEV;
 	}
 
-	if ((val = sn9c102_read_reg(cam, cam->sysfs.reg)) < 0) {
-		up(&sn9c102_sysfs_lock);
+	index = et61x251_strtou8(buf, len, &count);
+	if (index > 0x8e || !count) {
+		up(&et61x251_sysfs_lock);
+		return -EINVAL;
+	}
+
+	cam->sysfs.reg = index;
+
+	DBG(2, "Moved ET61X[12]51 register index to 0x%02X", cam->sysfs.reg);
+	DBG(3, "Written bytes: %zd", count);
+
+	up(&et61x251_sysfs_lock);
+
+	return count;
+}
+
+
+static ssize_t et61x251_show_val(struct class_device* cd, char* buf)
+{
+	struct et61x251_device* cam;
+	ssize_t count;
+	int val;
+
+	if (down_interruptible(&et61x251_sysfs_lock))
+		return -ERESTARTSYS;
+
+	cam = video_get_drvdata(to_video_device(cd));
+	if (!cam) {
+		up(&et61x251_sysfs_lock);
+		return -ENODEV;
+	}
+
+	if ((val = et61x251_read_reg(cam, cam->sysfs.reg)) < 0) {
+		up(&et61x251_sysfs_lock);
 		return -EIO;
 	}
 
@@ -940,62 +783,62 @@ static ssize_t sn9c102_show_val(struct class_device* cd, char* buf)
 
 	DBG(3, "Read bytes: %zd", count);
 
-	up(&sn9c102_sysfs_lock);
-
-	return count;
-} 
-
-
-static ssize_t
-sn9c102_store_val(struct class_device* cd, const char* buf, size_t len)
-{
-	struct sn9c102_device* cam;
-	u8 value;
-	ssize_t count;
-	int err;
-
-	if (down_interruptible(&sn9c102_sysfs_lock))
-		return -ERESTARTSYS;
-
-	cam = video_get_drvdata(to_video_device(cd));
-	if (!cam) {
-		up(&sn9c102_sysfs_lock);
-		return -ENODEV;
-	}
-
-	value = sn9c102_strtou8(buf, len, &count);
-	if (!count) {
-		up(&sn9c102_sysfs_lock);
-		return -EINVAL;
-	}
-
-	err = sn9c102_write_reg(cam, value, cam->sysfs.reg);
-	if (err) {
-		up(&sn9c102_sysfs_lock);
-		return -EIO;
-	}
-
-	DBG(2, "Written SN9C10X reg. 0x%02X, val. 0x%02X",
-	    cam->sysfs.reg, value);
-	DBG(3, "Written bytes: %zd", count);
-
-	up(&sn9c102_sysfs_lock);
+	up(&et61x251_sysfs_lock);
 
 	return count;
 }
 
 
-static ssize_t sn9c102_show_i2c_reg(struct class_device* cd, char* buf)
+static ssize_t
+et61x251_store_val(struct class_device* cd, const char* buf, size_t len)
 {
-	struct sn9c102_device* cam;
+	struct et61x251_device* cam;
+	u8 value;
 	ssize_t count;
+	int err;
 
-	if (down_interruptible(&sn9c102_sysfs_lock))
+	if (down_interruptible(&et61x251_sysfs_lock))
 		return -ERESTARTSYS;
 
 	cam = video_get_drvdata(to_video_device(cd));
 	if (!cam) {
-		up(&sn9c102_sysfs_lock);
+		up(&et61x251_sysfs_lock);
+		return -ENODEV;
+	}
+
+	value = et61x251_strtou8(buf, len, &count);
+	if (!count) {
+		up(&et61x251_sysfs_lock);
+		return -EINVAL;
+	}
+
+	err = et61x251_write_reg(cam, value, cam->sysfs.reg);
+	if (err) {
+		up(&et61x251_sysfs_lock);
+		return -EIO;
+	}
+
+	DBG(2, "Written ET61X[12]51 reg. 0x%02X, val. 0x%02X",
+	    cam->sysfs.reg, value);
+	DBG(3, "Written bytes: %zd", count);
+
+	up(&et61x251_sysfs_lock);
+
+	return count;
+}
+
+
+static ssize_t et61x251_show_i2c_reg(struct class_device* cd, char* buf)
+{
+	struct et61x251_device* cam;
+	ssize_t count;
+
+	if (down_interruptible(&et61x251_sysfs_lock))
+		return -ERESTARTSYS;
+
+	cam = video_get_drvdata(to_video_device(cd));
+	if (!cam) {
+		up(&et61x251_sysfs_lock);
 		return -ENODEV;
 	}
 
@@ -1003,31 +846,31 @@ static ssize_t sn9c102_show_i2c_reg(struct class_device* cd, char* buf)
 
 	DBG(3, "Read bytes: %zd", count);
 
-	up(&sn9c102_sysfs_lock);
+	up(&et61x251_sysfs_lock);
 
 	return count;
 }
 
 
-static ssize_t 
-sn9c102_store_i2c_reg(struct class_device* cd, const char* buf, size_t len)
+static ssize_t
+et61x251_store_i2c_reg(struct class_device* cd, const char* buf, size_t len)
 {
-	struct sn9c102_device* cam;
+	struct et61x251_device* cam;
 	u8 index;
 	ssize_t count;
 
-	if (down_interruptible(&sn9c102_sysfs_lock))
+	if (down_interruptible(&et61x251_sysfs_lock))
 		return -ERESTARTSYS;
 
 	cam = video_get_drvdata(to_video_device(cd));
 	if (!cam) {
-		up(&sn9c102_sysfs_lock);
+		up(&et61x251_sysfs_lock);
 		return -ENODEV;
 	}
 
-	index = sn9c102_strtou8(buf, len, &count);
+	index = et61x251_strtou8(buf, len, &count);
 	if (!count) {
-		up(&sn9c102_sysfs_lock);
+		up(&et61x251_sysfs_lock);
 		return -EINVAL;
 	}
 
@@ -1036,34 +879,34 @@ sn9c102_store_i2c_reg(struct class_device* cd, const char* buf, size_t len)
 	DBG(2, "Moved sensor register index to 0x%02X", cam->sysfs.i2c_reg);
 	DBG(3, "Written bytes: %zd", count);
 
-	up(&sn9c102_sysfs_lock);
+	up(&et61x251_sysfs_lock);
 
 	return count;
 }
 
 
-static ssize_t sn9c102_show_i2c_val(struct class_device* cd, char* buf)
+static ssize_t et61x251_show_i2c_val(struct class_device* cd, char* buf)
 {
-	struct sn9c102_device* cam;
+	struct et61x251_device* cam;
 	ssize_t count;
 	int val;
 
-	if (down_interruptible(&sn9c102_sysfs_lock))
+	if (down_interruptible(&et61x251_sysfs_lock))
 		return -ERESTARTSYS;
 
 	cam = video_get_drvdata(to_video_device(cd));
 	if (!cam) {
-		up(&sn9c102_sysfs_lock);
+		up(&et61x251_sysfs_lock);
 		return -ENODEV;
 	}
 
-	if (!(cam->sensor->sysfs_ops & SN9C102_I2C_READ)) {
-		up(&sn9c102_sysfs_lock);
+	if (!(cam->sensor->sysfs_ops & ET61X251_I2C_READ)) {
+		up(&et61x251_sysfs_lock);
 		return -ENOSYS;
 	}
 
-	if ((val = sn9c102_i2c_read(cam, cam->sysfs.i2c_reg)) < 0) {
-		up(&sn9c102_sysfs_lock);
+	if ((val = et61x251_i2c_read(cam, cam->sysfs.i2c_reg)) < 0) {
+		up(&et61x251_sysfs_lock);
 		return -EIO;
 	}
 
@@ -1071,43 +914,43 @@ static ssize_t sn9c102_show_i2c_val(struct class_device* cd, char* buf)
 
 	DBG(3, "Read bytes: %zd", count);
 
-	up(&sn9c102_sysfs_lock);
+	up(&et61x251_sysfs_lock);
 
 	return count;
-} 
+}
 
 
 static ssize_t
-sn9c102_store_i2c_val(struct class_device* cd, const char* buf, size_t len)
+et61x251_store_i2c_val(struct class_device* cd, const char* buf, size_t len)
 {
-	struct sn9c102_device* cam;
+	struct et61x251_device* cam;
 	u8 value;
 	ssize_t count;
 	int err;
 
-	if (down_interruptible(&sn9c102_sysfs_lock))
+	if (down_interruptible(&et61x251_sysfs_lock))
 		return -ERESTARTSYS;
 
 	cam = video_get_drvdata(to_video_device(cd));
 	if (!cam) {
-		up(&sn9c102_sysfs_lock);
+		up(&et61x251_sysfs_lock);
 		return -ENODEV;
 	}
 
-	if (!(cam->sensor->sysfs_ops & SN9C102_I2C_WRITE)) {
-		up(&sn9c102_sysfs_lock);
+	if (!(cam->sensor->sysfs_ops & ET61X251_I2C_READ)) {
+		up(&et61x251_sysfs_lock);
 		return -ENOSYS;
 	}
 
-	value = sn9c102_strtou8(buf, len, &count);
+	value = et61x251_strtou8(buf, len, &count);
 	if (!count) {
-		up(&sn9c102_sysfs_lock);
+		up(&et61x251_sysfs_lock);
 		return -EINVAL;
 	}
 
-	err = sn9c102_i2c_write(cam, cam->sysfs.i2c_reg, value);
+	err = et61x251_i2c_write(cam, cam->sysfs.i2c_reg, value);
 	if (err) {
-		up(&sn9c102_sysfs_lock);
+		up(&et61x251_sysfs_lock);
 		return -EIO;
 	}
 
@@ -1115,140 +958,28 @@ sn9c102_store_i2c_val(struct class_device* cd, const char* buf, size_t len)
 	    cam->sysfs.i2c_reg, value);
 	DBG(3, "Written bytes: %zd", count);
 
-	up(&sn9c102_sysfs_lock);
+	up(&et61x251_sysfs_lock);
 
 	return count;
 }
-
-
-static ssize_t
-sn9c102_store_green(struct class_device* cd, const char* buf, size_t len)
-{
-	struct sn9c102_device* cam;
-	enum sn9c102_bridge bridge;
-	ssize_t res = 0;
-	u8 value;
-	ssize_t count;
-
-	if (down_interruptible(&sn9c102_sysfs_lock))
-		return -ERESTARTSYS;
-
-	cam = video_get_drvdata(to_video_device(cd));
-	if (!cam) {
-		up(&sn9c102_sysfs_lock);
-		return -ENODEV;
-	}
-
-	bridge = cam->bridge;
-
-	up(&sn9c102_sysfs_lock);
-
-	value = sn9c102_strtou8(buf, len, &count);
-	if (!count)
-		return -EINVAL;
-
-	switch (bridge) {
-	case BRIDGE_SN9C101:
-	case BRIDGE_SN9C102:
-		if (value > 0x0f)
-			return -EINVAL;
-		if ((res = sn9c102_store_reg(cd, "0x11", 4)) >= 0)
-			res = sn9c102_store_val(cd, buf, len);
-		break;
-	case BRIDGE_SN9C103:
-		if (value > 0x7f)
-			return -EINVAL;
-		if ((res = sn9c102_store_reg(cd, "0x04", 4)) >= 0)
-			res = sn9c102_store_val(cd, buf, len);
-		break;
-	}
-
-	return res;
-}
-
-
-static ssize_t
-sn9c102_store_blue(struct class_device* cd, const char* buf, size_t len)
-{
-	ssize_t res = 0;
-	u8 value;
-	ssize_t count;
-
-	value = sn9c102_strtou8(buf, len, &count);
-	if (!count || value > 0x7f)
-		return -EINVAL;
-
-	if ((res = sn9c102_store_reg(cd, "0x06", 4)) >= 0)
-		res = sn9c102_store_val(cd, buf, len);
-
-	return res;
-}
-
-
-static ssize_t
-sn9c102_store_red(struct class_device* cd, const char* buf, size_t len)
-{
-	ssize_t res = 0;
-	u8 value;
-	ssize_t count;
-
-	value = sn9c102_strtou8(buf, len, &count);
-	if (!count || value > 0x7f)
-		return -EINVAL;
-
-	if ((res = sn9c102_store_reg(cd, "0x05", 4)) >= 0)
-		res = sn9c102_store_val(cd, buf, len);
-
-	return res;
-}
-
-
-static ssize_t sn9c102_show_frame_header(struct class_device* cd, char* buf)
-{
-	struct sn9c102_device* cam;
-	ssize_t count;
-
-	cam = video_get_drvdata(to_video_device(cd));
-	if (!cam)
-		return -ENODEV;
-
-	count = sizeof(cam->sysfs.frame_header);
-	memcpy(buf, cam->sysfs.frame_header, count);
-
-	DBG(3, "Frame header, read bytes: %zd", count);
-
-	return count;
-} 
 
 
 static CLASS_DEVICE_ATTR(reg, S_IRUGO | S_IWUSR,
-                         sn9c102_show_reg, sn9c102_store_reg);
+                         et61x251_show_reg, et61x251_store_reg);
 static CLASS_DEVICE_ATTR(val, S_IRUGO | S_IWUSR,
-                         sn9c102_show_val, sn9c102_store_val);
+                         et61x251_show_val, et61x251_store_val);
 static CLASS_DEVICE_ATTR(i2c_reg, S_IRUGO | S_IWUSR,
-                         sn9c102_show_i2c_reg, sn9c102_store_i2c_reg);
+                         et61x251_show_i2c_reg, et61x251_store_i2c_reg);
 static CLASS_DEVICE_ATTR(i2c_val, S_IRUGO | S_IWUSR,
-                         sn9c102_show_i2c_val, sn9c102_store_i2c_val);
-static CLASS_DEVICE_ATTR(green, S_IWUGO, NULL, sn9c102_store_green);
-static CLASS_DEVICE_ATTR(blue, S_IWUGO, NULL, sn9c102_store_blue);
-static CLASS_DEVICE_ATTR(red, S_IWUGO, NULL, sn9c102_store_red);
-static CLASS_DEVICE_ATTR(frame_header, S_IRUGO,
-                         sn9c102_show_frame_header, NULL);
+                         et61x251_show_i2c_val, et61x251_store_i2c_val);
 
 
-static void sn9c102_create_sysfs(struct sn9c102_device* cam)
+static void et61x251_create_sysfs(struct et61x251_device* cam)
 {
 	struct video_device *v4ldev = cam->v4ldev;
 
 	video_device_create_file(v4ldev, &class_device_attr_reg);
 	video_device_create_file(v4ldev, &class_device_attr_val);
-	video_device_create_file(v4ldev, &class_device_attr_frame_header);
-	if (cam->bridge == BRIDGE_SN9C101 || cam->bridge == BRIDGE_SN9C102)
-		video_device_create_file(v4ldev, &class_device_attr_green);
-	else if (cam->bridge == BRIDGE_SN9C103) {
-		video_device_create_file(v4ldev, &class_device_attr_blue);
-		video_device_create_file(v4ldev, &class_device_attr_red);
-	}
 	if (cam->sensor && cam->sensor->sysfs_ops) {
 		video_device_create_file(v4ldev, &class_device_attr_i2c_reg);
 		video_device_create_file(v4ldev, &class_device_attr_i2c_val);
@@ -1259,48 +990,52 @@ static void sn9c102_create_sysfs(struct sn9c102_device* cam)
 /*****************************************************************************/
 
 static int
-sn9c102_set_pix_format(struct sn9c102_device* cam, struct v4l2_pix_format* pix)
+et61x251_set_pix_format(struct et61x251_device* cam,
+                        struct v4l2_pix_format* pix)
 {
-	int err = 0;
+	int r, err = 0;
 
-	if (pix->pixelformat == V4L2_PIX_FMT_SN9C10X)
-		err += sn9c102_write_reg(cam, cam->reg[0x18] | 0x80, 0x18);
+	if ((r = et61x251_read_reg(cam, 0x12)) < 0)
+		err += r;
+	if (pix->pixelformat == V4L2_PIX_FMT_ET61X251)
+		err += et61x251_write_reg(cam, r & 0xfd, 0x12);
 	else
-		err += sn9c102_write_reg(cam, cam->reg[0x18] & 0x7f, 0x18);
+		err += et61x251_write_reg(cam, r | 0x02, 0x12);
 
 	return err ? -EIO : 0;
 }
 
 
 static int
-sn9c102_set_compression(struct sn9c102_device* cam,
-                        struct v4l2_jpegcompression* compression)
+et61x251_set_compression(struct et61x251_device* cam,
+                         struct v4l2_jpegcompression* compression)
 {
-	int err = 0;
+	int r, err = 0;
 
+	if ((r = et61x251_read_reg(cam, 0x12)) < 0)
+		err += r;
 	if (compression->quality == 0)
-		err += sn9c102_write_reg(cam, cam->reg[0x17] | 0x01, 0x17);
-	else if (compression->quality == 1)
-		err += sn9c102_write_reg(cam, cam->reg[0x17] & 0xfe, 0x17);
+		err += et61x251_write_reg(cam, r & 0xfb, 0x12);
+	else
+		err += et61x251_write_reg(cam, r | 0x04, 0x12);
 
 	return err ? -EIO : 0;
 }
 
 
-static int sn9c102_set_scale(struct sn9c102_device* cam, u8 scale)
+static int et61x251_set_scale(struct et61x251_device* cam, u8 scale)
 {
-	u8 r = 0;
-	int err = 0;
+	int r = 0, err = 0;
+
+	r = et61x251_read_reg(cam, 0x12);
+	if (r < 0)
+		err += r;
 
 	if (scale == 1)
-		r = cam->reg[0x18] & 0xcf;
-	else if (scale == 2) {
-		r = cam->reg[0x18] & 0xcf;
-		r |= 0x10;
-	} else if (scale == 4)
-		r = cam->reg[0x18] | 0x20;
+		err += et61x251_write_reg(cam, r & ~0x01, 0x12);
+	else if (scale == 2)
+		err += et61x251_write_reg(cam, r | 0x01, 0x12);
 
-	err += sn9c102_write_reg(cam, r, 0x18);
 	if (err)
 		return -EIO;
 
@@ -1310,32 +1045,38 @@ static int sn9c102_set_scale(struct sn9c102_device* cam, u8 scale)
 }
 
 
-static int sn9c102_set_crop(struct sn9c102_device* cam, struct v4l2_rect* rect)
+static int
+et61x251_set_crop(struct et61x251_device* cam, struct v4l2_rect* rect)
 {
-	struct sn9c102_sensor* s = cam->sensor;
-	u8 h_start = (u8)(rect->left - s->cropcap.bounds.left),
-	   v_start = (u8)(rect->top - s->cropcap.bounds.top),
-	   h_size = (u8)(rect->width / 16),
-	   v_size = (u8)(rect->height / 16);
+	struct et61x251_sensor* s = cam->sensor;
+	u16 fmw_sx = (u16)(rect->left - s->cropcap.bounds.left +
+	                   s->active_pixel.left),
+	    fmw_sy = (u16)(rect->top - s->cropcap.bounds.top +
+	                   s->active_pixel.top),
+	    fmw_length = (u16)(rect->width),
+	    fmw_height = (u16)(rect->height);
 	int err = 0;
 
-	err += sn9c102_write_reg(cam, h_start, 0x12);
-	err += sn9c102_write_reg(cam, v_start, 0x13);
-	err += sn9c102_write_reg(cam, h_size, 0x15);
-	err += sn9c102_write_reg(cam, v_size, 0x16);
+	err += et61x251_write_reg(cam, fmw_sx & 0xff, 0x69);
+	err += et61x251_write_reg(cam, fmw_sy & 0xff, 0x6a);
+	err += et61x251_write_reg(cam, fmw_length & 0xff, 0x6b);
+	err += et61x251_write_reg(cam, fmw_height & 0xff, 0x6c);
+	err += et61x251_write_reg(cam, (fmw_sx >> 8) | ((fmw_sy & 0x300) >> 6)
+	                               | ((fmw_length & 0x300) >> 4)
+	                               | ((fmw_height & 0x300) >> 2), 0x6d);
 	if (err)
 		return -EIO;
 
-	PDBGG("h_start, v_start, h_size, v_size, ho_size, vo_size "
-	      "%u %u %u %u", h_start, v_start, h_size, v_size);
+	PDBGG("fmw_sx, fmw_sy, fmw_length, fmw_height: %u %u %u %u",
+	      fmw_sx, fmw_sy, fmw_length, fmw_height);
 
 	return 0;
 }
 
 
-static int sn9c102_init(struct sn9c102_device* cam)
+static int et61x251_init(struct et61x251_device* cam)
 {
-	struct sn9c102_sensor* s = cam->sensor;
+	struct et61x251_sensor* s = cam->sensor;
 	struct v4l2_control ctrl;
 	struct v4l2_queryctrl *qctrl;
 	struct v4l2_rect* rect;
@@ -1346,13 +1087,14 @@ static int sn9c102_init(struct sn9c102_device* cam)
 		init_waitqueue_head(&cam->open);
 		qctrl = s->qctrl;
 		rect = &(s->cropcap.defrect);
+		cam->compression.quality = ET61X251_COMPRESSION_QUALITY;
 	} else { /* use current values */
 		qctrl = s->_qctrl;
 		rect = &(s->_rect);
 	}
 
-	err += sn9c102_set_scale(cam, rect->width / s->pix_format.width);
-	err += sn9c102_set_crop(cam, rect);
+	err += et61x251_set_scale(cam, rect->width / s->pix_format.width);
+	err += et61x251_set_crop(cam, rect);
 	if (err)
 		return err;
 
@@ -1364,17 +1106,14 @@ static int sn9c102_init(struct sn9c102_device* cam)
 		}
 	}
 
-	if (!(cam->state & DEV_INITIALIZED))
-		cam->compression.quality =  cam->reg[0x17] & 0x01 ? 0 : 1;
-	else
-		err += sn9c102_set_compression(cam, &cam->compression);
-	err += sn9c102_set_pix_format(cam, &s->pix_format);
+	err += et61x251_set_compression(cam, &cam->compression);
+	err += et61x251_set_pix_format(cam, &s->pix_format);
 	if (s->set_pix_format)
 		err += s->set_pix_format(cam, &s->pix_format);
 	if (err)
 		return err;
 
-	if (s->pix_format.pixelformat == V4L2_PIX_FMT_SN9C10X)
+	if (s->pix_format.pixelformat == V4L2_PIX_FMT_ET61X251)
 		DBG(3, "Compressed video format is active, quality %d",
 		    cam->compression.quality);
 	else
@@ -1420,37 +1159,37 @@ static int sn9c102_init(struct sn9c102_device* cam)
 }
 
 
-static void sn9c102_release_resources(struct sn9c102_device* cam)
+static void et61x251_release_resources(struct et61x251_device* cam)
 {
-	down(&sn9c102_sysfs_lock);
+	down(&et61x251_sysfs_lock);
 
 	DBG(2, "V4L2 device /dev/video%d deregistered", cam->v4ldev->minor);
 	video_set_drvdata(cam->v4ldev, NULL);
 	video_unregister_device(cam->v4ldev);
 
-	up(&sn9c102_sysfs_lock);
+	up(&et61x251_sysfs_lock);
 
 	kfree(cam->control_buffer);
 }
 
 /*****************************************************************************/
 
-static int sn9c102_open(struct inode* inode, struct file* filp)
+static int et61x251_open(struct inode* inode, struct file* filp)
 {
-	struct sn9c102_device* cam;
+	struct et61x251_device* cam;
 	int err = 0;
 
 	/*
 	   This is the only safe way to prevent race conditions with
 	   disconnect
 	*/
-	if (!down_read_trylock(&sn9c102_disconnect))
+	if (!down_read_trylock(&et61x251_disconnect))
 		return -ERESTARTSYS;
 
 	cam = video_get_drvdata(video_devdata(filp));
 
 	if (down_interruptible(&cam->dev_sem)) {
-		up_read(&sn9c102_disconnect);
+		up_read(&et61x251_disconnect);
 		return -ERESTARTSYS;
 	}
 
@@ -1466,11 +1205,11 @@ static int sn9c102_open(struct inode* inode, struct file* filp)
 		                                  cam->state & DEV_DISCONNECTED
 		                                         || !cam->users);
 		if (err) {
-			up_read(&sn9c102_disconnect);
+			up_read(&et61x251_disconnect);
 			return err;
 		}
 		if (cam->state & DEV_DISCONNECTED) {
-			up_read(&sn9c102_disconnect);
+			up_read(&et61x251_disconnect);
 			return -ENODEV;
 		}
 		down(&cam->dev_sem);
@@ -1478,7 +1217,7 @@ static int sn9c102_open(struct inode* inode, struct file* filp)
 
 
 	if (cam->state & DEV_MISCONFIGURED) {
-		err = sn9c102_init(cam);
+		err = et61x251_init(cam);
 		if (err) {
 			DBG(1, "Initialization failed again. "
 			       "I will retry on next open().");
@@ -1487,7 +1226,7 @@ static int sn9c102_open(struct inode* inode, struct file* filp)
 		cam->state &= ~DEV_MISCONFIGURED;
 	}
 
-	if ((err = sn9c102_start_transfer(cam)))
+	if ((err = et61x251_start_transfer(cam)))
 		goto out;
 
 	filp->private_data = cam;
@@ -1496,29 +1235,29 @@ static int sn9c102_open(struct inode* inode, struct file* filp)
 	cam->stream = STREAM_OFF;
 	cam->nbuffers = 0;
 	cam->frame_count = 0;
-	sn9c102_empty_framequeues(cam);
+	et61x251_empty_framequeues(cam);
 
 	DBG(3, "Video device /dev/video%d is open", cam->v4ldev->minor);
 
 out:
 	up(&cam->dev_sem);
-	up_read(&sn9c102_disconnect);
+	up_read(&et61x251_disconnect);
 	return err;
 }
 
 
-static int sn9c102_release(struct inode* inode, struct file* filp)
+static int et61x251_release(struct inode* inode, struct file* filp)
 {
-	struct sn9c102_device* cam = video_get_drvdata(video_devdata(filp));
+	struct et61x251_device* cam = video_get_drvdata(video_devdata(filp));
 
 	down(&cam->dev_sem); /* prevent disconnect() to be called */
 
-	sn9c102_stop_transfer(cam);
+	et61x251_stop_transfer(cam);
 
-	sn9c102_release_buffers(cam);
+	et61x251_release_buffers(cam);
 
 	if (cam->state & DEV_DISCONNECTED) {
-		sn9c102_release_resources(cam);
+		et61x251_release_resources(cam);
 		up(&cam->dev_sem);
 		kfree(cam);
 		return 0;
@@ -1536,10 +1275,11 @@ static int sn9c102_release(struct inode* inode, struct file* filp)
 
 
 static ssize_t
-sn9c102_read(struct file* filp, char __user * buf, size_t count, loff_t* f_pos)
+et61x251_read(struct file* filp, char __user * buf,
+              size_t count, loff_t* f_pos)
 {
-	struct sn9c102_device* cam = video_get_drvdata(video_devdata(filp));
-	struct sn9c102_frame_t* f, * i;
+	struct et61x251_device* cam = video_get_drvdata(video_devdata(filp));
+	struct et61x251_frame_t* f, * i;
 	unsigned long lock_flags;
 	int err = 0;
 
@@ -1560,14 +1300,15 @@ sn9c102_read(struct file* filp, char __user * buf, size_t count, loff_t* f_pos)
 	}
 
 	if (cam->io == IO_MMAP) {
-		DBG(3, "Close and open the device again to choose "
-		       "the read method");
+		DBG(3, "Close and open the device again to choose the read "
+		       "method");
 		up(&cam->fileop_sem);
 		return -EINVAL;
 	}
 
 	if (cam->io == IO_NONE) {
-		if (!sn9c102_request_buffers(cam,cam->nreadbuffers, IO_READ)) {
+		if (!et61x251_request_buffers(cam, cam->nreadbuffers,
+		                              IO_READ)) {
 			DBG(1, "read() failed, not enough memory");
 			up(&cam->fileop_sem);
 			return -ENOMEM;
@@ -1578,8 +1319,8 @@ sn9c102_read(struct file* filp, char __user * buf, size_t count, loff_t* f_pos)
 
 	if (list_empty(&cam->inqueue)) {
 		if (!list_empty(&cam->outqueue))
-			sn9c102_empty_framequeues(cam);
-		sn9c102_queue_unusedframes(cam);
+			et61x251_empty_framequeues(cam);
+		et61x251_queue_unusedframes(cam);
 	}
 
 	if (!count) {
@@ -1593,7 +1334,7 @@ sn9c102_read(struct file* filp, char __user * buf, size_t count, loff_t* f_pos)
 			return -EAGAIN;
 		}
 		err = wait_event_interruptible
-		      ( cam->wait_frame, 
+		      ( cam->wait_frame,
 		        (!list_empty(&cam->outqueue)) ||
 		        (cam->state & DEV_DISCONNECTED) ||
 			(cam->state & DEV_MISCONFIGURED) );
@@ -1611,7 +1352,7 @@ sn9c102_read(struct file* filp, char __user * buf, size_t count, loff_t* f_pos)
 		}
 	}
 
-	f = list_entry(cam->outqueue.prev, struct sn9c102_frame_t, frame);
+	f = list_entry(cam->outqueue.prev, struct et61x251_frame_t, frame);
 
 	if (count > f->buf.bytesused)
 		count = f->buf.bytesused;
@@ -1629,21 +1370,21 @@ exit:
 	INIT_LIST_HEAD(&cam->outqueue);
 	spin_unlock_irqrestore(&cam->queue_lock, lock_flags);
 
-	sn9c102_queue_unusedframes(cam);
+	et61x251_queue_unusedframes(cam);
 
 	PDBGG("Frame #%lu, bytes read: %zu",
 	      (unsigned long)f->buf.index, count);
 
 	up(&cam->fileop_sem);
 
-	return count;
+	return err ? err : count;
 }
 
 
-static unsigned int sn9c102_poll(struct file *filp, poll_table *wait)
+static unsigned int et61x251_poll(struct file *filp, poll_table *wait)
 {
-	struct sn9c102_device* cam = video_get_drvdata(video_devdata(filp));
-	struct sn9c102_frame_t* f;
+	struct et61x251_device* cam = video_get_drvdata(video_devdata(filp));
+	struct et61x251_frame_t* f;
 	unsigned long lock_flags;
 	unsigned int mask = 0;
 
@@ -1662,8 +1403,8 @@ static unsigned int sn9c102_poll(struct file *filp, poll_table *wait)
 	}
 
 	if (cam->io == IO_NONE) {
-		if (!sn9c102_request_buffers(cam, cam->nreadbuffers,
-		                             IO_READ)) {
+		if (!et61x251_request_buffers(cam, cam->nreadbuffers,
+		                              IO_READ)) {
 			DBG(1, "poll() failed, not enough memory");
 			goto error;
 		}
@@ -1677,7 +1418,7 @@ static unsigned int sn9c102_poll(struct file *filp, poll_table *wait)
 			f->state = F_UNUSED;
 		INIT_LIST_HEAD(&cam->outqueue);
 		spin_unlock_irqrestore(&cam->queue_lock, lock_flags);
-		sn9c102_queue_unusedframes(cam);
+		et61x251_queue_unusedframes(cam);
 	}
 
 	poll_wait(filp, &cam->wait_frame, wait);
@@ -1695,30 +1436,30 @@ error:
 }
 
 
-static void sn9c102_vm_open(struct vm_area_struct* vma)
+static void et61x251_vm_open(struct vm_area_struct* vma)
 {
-	struct sn9c102_frame_t* f = vma->vm_private_data;
+	struct et61x251_frame_t* f = vma->vm_private_data;
 	f->vma_use_count++;
 }
 
 
-static void sn9c102_vm_close(struct vm_area_struct* vma)
+static void et61x251_vm_close(struct vm_area_struct* vma)
 {
 	/* NOTE: buffers are not freed here */
-	struct sn9c102_frame_t* f = vma->vm_private_data;
+	struct et61x251_frame_t* f = vma->vm_private_data;
 	f->vma_use_count--;
 }
 
 
-static struct vm_operations_struct sn9c102_vm_ops = {
-	.open = sn9c102_vm_open,
-	.close = sn9c102_vm_close,
+static struct vm_operations_struct et61x251_vm_ops = {
+	.open = et61x251_vm_open,
+	.close = et61x251_vm_close,
 };
 
 
-static int sn9c102_mmap(struct file* filp, struct vm_area_struct *vma)
+static int et61x251_mmap(struct file* filp, struct vm_area_struct *vma)
 {
-	struct sn9c102_device* cam = video_get_drvdata(video_devdata(filp));
+	struct et61x251_device* cam = video_get_drvdata(video_devdata(filp));
 	unsigned long size = vma->vm_end - vma->vm_start,
 	              start = vma->vm_start;
 	void *pos;
@@ -1769,10 +1510,10 @@ static int sn9c102_mmap(struct file* filp, struct vm_area_struct *vma)
 		size -= PAGE_SIZE;
 	}
 
-	vma->vm_ops = &sn9c102_vm_ops;
+	vma->vm_ops = &et61x251_vm_ops;
 	vma->vm_private_data = &cam->frame[i];
 
-	sn9c102_vm_open(vma);
+	et61x251_vm_open(vma);
 
 	up(&cam->fileop_sem);
 
@@ -1782,11 +1523,11 @@ static int sn9c102_mmap(struct file* filp, struct vm_area_struct *vma)
 /*****************************************************************************/
 
 static int
-sn9c102_vidioc_querycap(struct sn9c102_device* cam, void __user * arg)
+et61x251_vidioc_querycap(struct et61x251_device* cam, void __user * arg)
 {
 	struct v4l2_capability cap = {
-		.driver = "sn9c102",
-		.version = SN9C102_MODULE_VERSION_CODE,
+		.driver = "et61x251",
+		.version = ET61X251_MODULE_VERSION_CODE,
 		.capabilities = V4L2_CAP_VIDEO_CAPTURE | V4L2_CAP_READWRITE |
 		                V4L2_CAP_STREAMING,
 	};
@@ -1804,7 +1545,7 @@ sn9c102_vidioc_querycap(struct sn9c102_device* cam, void __user * arg)
 
 
 static int
-sn9c102_vidioc_enuminput(struct sn9c102_device* cam, void __user * arg)
+et61x251_vidioc_enuminput(struct et61x251_device* cam, void __user * arg)
 {
 	struct v4l2_input i;
 
@@ -1825,7 +1566,7 @@ sn9c102_vidioc_enuminput(struct sn9c102_device* cam, void __user * arg)
 
 
 static int
-sn9c102_vidioc_gs_input(struct sn9c102_device* cam, void __user * arg)
+et61x251_vidioc_gs_input(struct et61x251_device* cam, void __user * arg)
 {
 	int index;
 
@@ -1840,9 +1581,9 @@ sn9c102_vidioc_gs_input(struct sn9c102_device* cam, void __user * arg)
 
 
 static int
-sn9c102_vidioc_query_ctrl(struct sn9c102_device* cam, void __user * arg)
+et61x251_vidioc_query_ctrl(struct et61x251_device* cam, void __user * arg)
 {
-	struct sn9c102_sensor* s = cam->sensor;
+	struct et61x251_sensor* s = cam->sensor;
 	struct v4l2_queryctrl qc;
 	u8 i;
 
@@ -1862,9 +1603,9 @@ sn9c102_vidioc_query_ctrl(struct sn9c102_device* cam, void __user * arg)
 
 
 static int
-sn9c102_vidioc_g_ctrl(struct sn9c102_device* cam, void __user * arg)
+et61x251_vidioc_g_ctrl(struct et61x251_device* cam, void __user * arg)
 {
-	struct sn9c102_sensor* s = cam->sensor;
+	struct et61x251_sensor* s = cam->sensor;
 	struct v4l2_control ctrl;
 	int err = 0;
 	u8 i;
@@ -1877,7 +1618,7 @@ sn9c102_vidioc_g_ctrl(struct sn9c102_device* cam, void __user * arg)
 
 	if (!s->get_ctrl) {
 		for (i = 0; i < ARRAY_SIZE(s->qctrl); i++)
-			if (ctrl.id && ctrl.id == s->qctrl[i].id) {
+			if (ctrl.id == s->qctrl[i].id) {
 				ctrl.value = s->_qctrl[i].default_value;
 				goto exit;
 			}
@@ -1894,9 +1635,9 @@ exit:
 
 
 static int
-sn9c102_vidioc_s_ctrl(struct sn9c102_device* cam, void __user * arg)
+et61x251_vidioc_s_ctrl(struct et61x251_device* cam, void __user * arg)
 {
-	struct sn9c102_sensor* s = cam->sensor;
+	struct et61x251_sensor* s = cam->sensor;
 	struct v4l2_control ctrl;
 	u8 i;
 	int err = 0;
@@ -1921,15 +1662,12 @@ sn9c102_vidioc_s_ctrl(struct sn9c102_device* cam, void __user * arg)
 
 	s->_qctrl[i].default_value = ctrl.value;
 
-	PDBGG("VIDIOC_S_CTRL: id %lu, value %lu",
-	      (unsigned long)ctrl.id, (unsigned long)ctrl.value);
-
 	return 0;
 }
 
 
 static int
-sn9c102_vidioc_cropcap(struct sn9c102_device* cam, void __user * arg)
+et61x251_vidioc_cropcap(struct et61x251_device* cam, void __user * arg)
 {
 	struct v4l2_cropcap* cc = &(cam->sensor->cropcap);
 
@@ -1945,9 +1683,9 @@ sn9c102_vidioc_cropcap(struct sn9c102_device* cam, void __user * arg)
 
 
 static int
-sn9c102_vidioc_g_crop(struct sn9c102_device* cam, void __user * arg)
+et61x251_vidioc_g_crop(struct et61x251_device* cam, void __user * arg)
 {
-	struct sn9c102_sensor* s = cam->sensor;
+	struct et61x251_sensor* s = cam->sensor;
 	struct v4l2_crop crop = {
 		.type = V4L2_BUF_TYPE_VIDEO_CAPTURE,
 	};
@@ -1962,15 +1700,15 @@ sn9c102_vidioc_g_crop(struct sn9c102_device* cam, void __user * arg)
 
 
 static int
-sn9c102_vidioc_s_crop(struct sn9c102_device* cam, void __user * arg)
+et61x251_vidioc_s_crop(struct et61x251_device* cam, void __user * arg)
 {
-	struct sn9c102_sensor* s = cam->sensor;
+	struct et61x251_sensor* s = cam->sensor;
 	struct v4l2_crop crop;
 	struct v4l2_rect* rect;
 	struct v4l2_rect* bounds = &(s->cropcap.bounds);
 	struct v4l2_pix_format* pix_format = &(s->pix_format);
 	u8 scale;
-	const enum sn9c102_stream_state stream = cam->stream;
+	const enum et61x251_stream_state stream = cam->stream;
 	const u32 nbuffers = cam->nbuffers;
 	u32 i;
 	int err = 0;
@@ -1995,10 +1733,10 @@ sn9c102_vidioc_s_crop(struct sn9c102_device* cam, void __user * arg)
 	rect->left = (s->_rect.left & 1L) ? rect->left | 1L : rect->left & ~1L;
 	rect->top = (s->_rect.top & 1L) ? rect->top | 1L : rect->top & ~1L;
 
-	if (rect->width < 16)
-		rect->width = 16;
-	if (rect->height < 16)
-		rect->height = 16;
+	if (rect->width < 4)
+		rect->width = 4;
+	if (rect->height < 4)
+		rect->height = 4;
 	if (rect->width > bounds->width)
 		rect->width = bounds->width;
 	if (rect->height > bounds->height)
@@ -2012,20 +1750,20 @@ sn9c102_vidioc_s_crop(struct sn9c102_device* cam, void __user * arg)
 	if (rect->top + rect->height > bounds->top + bounds->height)
 		rect->top = bounds->top+bounds->height - rect->height;
 
-	rect->width &= ~15L;
-	rect->height &= ~15L;
+	rect->width &= ~3L;
+	rect->height &= ~3L;
 
-	if (SN9C102_PRESERVE_IMGSCALE) {
+	if (ET61X251_PRESERVE_IMGSCALE) {
 		/* Calculate the actual scaling factor */
 		u32 a, b;
 		a = rect->width * rect->height;
 		b = pix_format->width * pix_format->height;
-		scale = b ? (u8)((a / b) < 4 ? 1 : ((a / b) < 16 ? 2 : 4)) : 1;
+		scale = b ? (u8)((a / b) < 4 ? 1 : 2) : 1;
 	} else
 		scale = 1;
 
 	if (cam->stream == STREAM_ON)
-		if ((err = sn9c102_stream_interrupt(cam)))
+		if ((err = et61x251_stream_interrupt(cam)))
 			return err;
 
 	if (copy_to_user(arg, &crop, sizeof(crop))) {
@@ -2034,12 +1772,12 @@ sn9c102_vidioc_s_crop(struct sn9c102_device* cam, void __user * arg)
 	}
 
 	if (cam->module_param.force_munmap || cam->io == IO_READ)
-		sn9c102_release_buffers(cam);
+		et61x251_release_buffers(cam);
 
-	err = sn9c102_set_crop(cam, rect);
+	err = et61x251_set_crop(cam, rect);
 	if (s->set_crop)
 		err += s->set_crop(cam, rect);
-	err += sn9c102_set_scale(cam, scale);
+	err += et61x251_set_scale(cam, scale);
 
 	if (err) { /* atomic, no rollback in ioctl() */
 		cam->state |= DEV_MISCONFIGURED;
@@ -2053,8 +1791,8 @@ sn9c102_vidioc_s_crop(struct sn9c102_device* cam, void __user * arg)
 	s->pix_format.height = rect->height/scale;
 	memcpy(&(s->_rect), rect, sizeof(*rect));
 
-	if ((cam->module_param.force_munmap || cam->io == IO_READ) &&
-	    nbuffers != sn9c102_request_buffers(cam, nbuffers, cam->io)) {
+	if ((cam->module_param.force_munmap  || cam->io == IO_READ) &&
+	    nbuffers != et61x251_request_buffers(cam, nbuffers, cam->io)) {
 		cam->state |= DEV_MISCONFIGURED;
 		DBG(1, "VIDIOC_S_CROP failed because of not enough memory. To "
 		       "use the camera, close and open /dev/video%d again.",
@@ -2063,9 +1801,9 @@ sn9c102_vidioc_s_crop(struct sn9c102_device* cam, void __user * arg)
 	}
 
 	if (cam->io == IO_READ)
-		sn9c102_empty_framequeues(cam);
+		et61x251_empty_framequeues(cam);
 	else if (cam->module_param.force_munmap)
-		sn9c102_requeue_outqueue(cam);
+		et61x251_requeue_outqueue(cam);
 
 	cam->stream = stream;
 
@@ -2074,7 +1812,7 @@ sn9c102_vidioc_s_crop(struct sn9c102_device* cam, void __user * arg)
 
 
 static int
-sn9c102_vidioc_enum_fmt(struct sn9c102_device* cam, void __user * arg)
+et61x251_vidioc_enum_fmt(struct et61x251_device* cam, void __user * arg)
 {
 	struct v4l2_fmtdesc fmtd;
 
@@ -2086,7 +1824,7 @@ sn9c102_vidioc_enum_fmt(struct sn9c102_device* cam, void __user * arg)
 		fmtd.pixelformat = V4L2_PIX_FMT_SBGGR8;
 	} else if (fmtd.index == 1) {
 		strcpy(fmtd.description, "compressed");
-		fmtd.pixelformat = V4L2_PIX_FMT_SN9C10X;
+		fmtd.pixelformat = V4L2_PIX_FMT_ET61X251;
 		fmtd.flags = V4L2_FMT_FLAG_COMPRESSED;
 	} else
 		return -EINVAL;
@@ -2102,7 +1840,7 @@ sn9c102_vidioc_enum_fmt(struct sn9c102_device* cam, void __user * arg)
 
 
 static int
-sn9c102_vidioc_g_fmt(struct sn9c102_device* cam, void __user * arg)
+et61x251_vidioc_g_fmt(struct et61x251_device* cam, void __user * arg)
 {
 	struct v4l2_format format;
 	struct v4l2_pix_format* pfmt = &(cam->sensor->pix_format);
@@ -2113,7 +1851,7 @@ sn9c102_vidioc_g_fmt(struct sn9c102_device* cam, void __user * arg)
 	if (format.type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
 		return -EINVAL;
 
-	pfmt->bytesperline = (pfmt->pixelformat==V4L2_PIX_FMT_SN9C10X)
+	pfmt->bytesperline = (pfmt->pixelformat==V4L2_PIX_FMT_ET61X251)
 	                     ? 0 : (pfmt->width * pfmt->priv) / 8;
 	pfmt->sizeimage = pfmt->height * ((pfmt->width*pfmt->priv)/8);
 	pfmt->field = V4L2_FIELD_NONE;
@@ -2127,17 +1865,17 @@ sn9c102_vidioc_g_fmt(struct sn9c102_device* cam, void __user * arg)
 
 
 static int
-sn9c102_vidioc_try_s_fmt(struct sn9c102_device* cam, unsigned int cmd,
-                         void __user * arg)
+et61x251_vidioc_try_s_fmt(struct et61x251_device* cam, unsigned int cmd,
+                          void __user * arg)
 {
-	struct sn9c102_sensor* s = cam->sensor;
+	struct et61x251_sensor* s = cam->sensor;
 	struct v4l2_format format;
 	struct v4l2_pix_format* pix;
 	struct v4l2_pix_format* pfmt = &(s->pix_format);
 	struct v4l2_rect* bounds = &(s->cropcap.bounds);
 	struct v4l2_rect rect;
 	u8 scale;
-	const enum sn9c102_stream_state stream = cam->stream;
+	const enum et61x251_stream_state stream = cam->stream;
 	const u32 nbuffers = cam->nbuffers;
 	u32 i;
 	int err = 0;
@@ -2156,40 +1894,40 @@ sn9c102_vidioc_try_s_fmt(struct sn9c102_device* cam, unsigned int cmd,
 		u32 a, b;
 		a = rect.width * rect.height;
 		b = pix->width * pix->height;
-		scale = b ? (u8)((a / b) < 4 ? 1 : ((a / b) < 16 ? 2 : 4)) : 1;
+		scale = b ? (u8)((a / b) < 4 ? 1 : 2) : 1;
 	}
 
 	rect.width = scale * pix->width;
 	rect.height = scale * pix->height;
 
-	if (rect.width < 16)
-		rect.width = 16;
-	if (rect.height < 16)
-		rect.height = 16;
+	if (rect.width < 4)
+		rect.width = 4;
+	if (rect.height < 4)
+		rect.height = 4;
 	if (rect.width > bounds->left + bounds->width - rect.left)
 		rect.width = bounds->left + bounds->width - rect.left;
 	if (rect.height > bounds->top + bounds->height - rect.top)
 		rect.height = bounds->top + bounds->height - rect.top;
 
-	rect.width &= ~15L;
-	rect.height &= ~15L;
+	rect.width &= ~3L;
+	rect.height &= ~3L;
 
 	{ /* adjust the scaling factor */
 		u32 a, b;
 		a = rect.width * rect.height;
 		b = pix->width * pix->height;
-		scale = b ? (u8)((a / b) < 4 ? 1 : ((a / b) < 16 ? 2 : 4)) : 1;
+		scale = b ? (u8)((a / b) < 4 ? 1 : 2) : 1;
 	}
 
 	pix->width = rect.width / scale;
 	pix->height = rect.height / scale;
 
-	if (pix->pixelformat != V4L2_PIX_FMT_SN9C10X &&
+	if (pix->pixelformat != V4L2_PIX_FMT_ET61X251 &&
 	    pix->pixelformat != V4L2_PIX_FMT_SBGGR8)
 		pix->pixelformat = pfmt->pixelformat;
 	pix->priv = pfmt->priv; /* bpp */
 	pix->colorspace = pfmt->colorspace;
-	pix->bytesperline = (pix->pixelformat == V4L2_PIX_FMT_SN9C10X)
+	pix->bytesperline = (pix->pixelformat == V4L2_PIX_FMT_ET61X251)
 	                    ? 0 : (pix->width * pix->priv) / 8;
 	pix->sizeimage = pix->height * ((pix->width * pix->priv) / 8);
 	pix->field = V4L2_FIELD_NONE;
@@ -2203,13 +1941,13 @@ sn9c102_vidioc_try_s_fmt(struct sn9c102_device* cam, unsigned int cmd,
 	if (cam->module_param.force_munmap)
 		for (i = 0; i < cam->nbuffers; i++)
 			if (cam->frame[i].vma_use_count) {
-				DBG(3, "VIDIOC_S_FMT failed. Unmap the "
-				       "buffers first.");
+				DBG(3, "VIDIOC_S_FMT failed. "
+				       "Unmap the buffers first.");
 				return -EINVAL;
 			}
 
 	if (cam->stream == STREAM_ON)
-		if ((err = sn9c102_stream_interrupt(cam)))
+		if ((err = et61x251_stream_interrupt(cam)))
 			return err;
 
 	if (copy_to_user(arg, &format, sizeof(format))) {
@@ -2217,16 +1955,16 @@ sn9c102_vidioc_try_s_fmt(struct sn9c102_device* cam, unsigned int cmd,
 		return -EFAULT;
 	}
 
-	if (cam->module_param.force_munmap  || cam->io == IO_READ)
-		sn9c102_release_buffers(cam);
+	if (cam->module_param.force_munmap || cam->io == IO_READ)
+		et61x251_release_buffers(cam);
 
-	err += sn9c102_set_pix_format(cam, pix);
-	err += sn9c102_set_crop(cam, &rect);
+	err += et61x251_set_pix_format(cam, pix);
+	err += et61x251_set_crop(cam, &rect);
 	if (s->set_pix_format)
 		err += s->set_pix_format(cam, pix);
 	if (s->set_crop)
 		err += s->set_crop(cam, &rect);
-	err += sn9c102_set_scale(cam, scale);
+	err += et61x251_set_scale(cam, scale);
 
 	if (err) { /* atomic, no rollback in ioctl() */
 		cam->state |= DEV_MISCONFIGURED;
@@ -2240,7 +1978,7 @@ sn9c102_vidioc_try_s_fmt(struct sn9c102_device* cam, unsigned int cmd,
 	memcpy(&(s->_rect), &rect, sizeof(rect));
 
 	if ((cam->module_param.force_munmap  || cam->io == IO_READ) &&
-	    nbuffers != sn9c102_request_buffers(cam, nbuffers, cam->io)) {
+	    nbuffers != et61x251_request_buffers(cam, nbuffers, cam->io)) {
 		cam->state |= DEV_MISCONFIGURED;
 		DBG(1, "VIDIOC_S_FMT failed because of not enough memory. To "
 		       "use the camera, close and open /dev/video%d again.",
@@ -2249,9 +1987,9 @@ sn9c102_vidioc_try_s_fmt(struct sn9c102_device* cam, unsigned int cmd,
 	}
 
 	if (cam->io == IO_READ)
-		sn9c102_empty_framequeues(cam);
+		et61x251_empty_framequeues(cam);
 	else if (cam->module_param.force_munmap)
-		sn9c102_requeue_outqueue(cam);
+		et61x251_requeue_outqueue(cam);
 
 	cam->stream = stream;
 
@@ -2260,7 +1998,7 @@ sn9c102_vidioc_try_s_fmt(struct sn9c102_device* cam, unsigned int cmd,
 
 
 static int
-sn9c102_vidioc_g_jpegcomp(struct sn9c102_device* cam, void __user * arg)
+et61x251_vidioc_g_jpegcomp(struct et61x251_device* cam, void __user * arg)
 {
 	if (copy_to_user(arg, &cam->compression,
 	                 sizeof(cam->compression)))
@@ -2271,10 +2009,10 @@ sn9c102_vidioc_g_jpegcomp(struct sn9c102_device* cam, void __user * arg)
 
 
 static int
-sn9c102_vidioc_s_jpegcomp(struct sn9c102_device* cam, void __user * arg)
+et61x251_vidioc_s_jpegcomp(struct et61x251_device* cam, void __user * arg)
 {
 	struct v4l2_jpegcompression jc;
-	const enum sn9c102_stream_state stream = cam->stream;
+	const enum et61x251_stream_state stream = cam->stream;
 	int err = 0;
 
 	if (copy_from_user(&jc, arg, sizeof(jc)))
@@ -2284,10 +2022,10 @@ sn9c102_vidioc_s_jpegcomp(struct sn9c102_device* cam, void __user * arg)
 		return -EINVAL;
 
 	if (cam->stream == STREAM_ON)
-		if ((err = sn9c102_stream_interrupt(cam)))
+		if ((err = et61x251_stream_interrupt(cam)))
 			return err;
 
-	err += sn9c102_set_compression(cam, &jc);
+	err += et61x251_set_compression(cam, &jc);
 	if (err) { /* atomic, no rollback in ioctl() */
 		cam->state |= DEV_MISCONFIGURED;
 		DBG(1, "VIDIOC_S_JPEGCOMP failed because of hardware "
@@ -2305,7 +2043,7 @@ sn9c102_vidioc_s_jpegcomp(struct sn9c102_device* cam, void __user * arg)
 
 
 static int
-sn9c102_vidioc_reqbufs(struct sn9c102_device* cam, void __user * arg)
+et61x251_vidioc_reqbufs(struct et61x251_device* cam, void __user * arg)
 {
 	struct v4l2_requestbuffers rb;
 	u32 i;
@@ -2326,23 +2064,23 @@ sn9c102_vidioc_reqbufs(struct sn9c102_device* cam, void __user * arg)
 
 	for (i = 0; i < cam->nbuffers; i++)
 		if (cam->frame[i].vma_use_count) {
-			DBG(3, "VIDIOC_REQBUFS failed. Previous buffers are "
-			       "still mapped.");
+			DBG(3, "VIDIOC_REQBUFS failed. "
+			       "Previous buffers are still mapped.");
 			return -EINVAL;
 		}
 
 	if (cam->stream == STREAM_ON)
-		if ((err = sn9c102_stream_interrupt(cam)))
+		if ((err = et61x251_stream_interrupt(cam)))
 			return err;
 
-	sn9c102_empty_framequeues(cam);
+	et61x251_empty_framequeues(cam);
 
-	sn9c102_release_buffers(cam);
+	et61x251_release_buffers(cam);
 	if (rb.count)
-		rb.count = sn9c102_request_buffers(cam, rb.count, IO_MMAP);
+		rb.count = et61x251_request_buffers(cam, rb.count, IO_MMAP);
 
 	if (copy_to_user(arg, &rb, sizeof(rb))) {
-		sn9c102_release_buffers(cam);
+		et61x251_release_buffers(cam);
 		cam->io = IO_NONE;
 		return -EFAULT;
 	}
@@ -2354,7 +2092,7 @@ sn9c102_vidioc_reqbufs(struct sn9c102_device* cam, void __user * arg)
 
 
 static int
-sn9c102_vidioc_querybuf(struct sn9c102_device* cam, void __user * arg)
+et61x251_vidioc_querybuf(struct et61x251_device* cam, void __user * arg)
 {
 	struct v4l2_buffer b;
 
@@ -2383,7 +2121,7 @@ sn9c102_vidioc_querybuf(struct sn9c102_device* cam, void __user * arg)
 
 
 static int
-sn9c102_vidioc_qbuf(struct sn9c102_device* cam, void __user * arg)
+et61x251_vidioc_qbuf(struct et61x251_device* cam, void __user * arg)
 {
 	struct v4l2_buffer b;
 	unsigned long lock_flags;
@@ -2411,18 +2149,18 @@ sn9c102_vidioc_qbuf(struct sn9c102_device* cam, void __user * arg)
 
 
 static int
-sn9c102_vidioc_dqbuf(struct sn9c102_device* cam, struct file* filp,
-                     void __user * arg)
+et61x251_vidioc_dqbuf(struct et61x251_device* cam, struct file* filp,
+                      void __user * arg)
 {
 	struct v4l2_buffer b;
-	struct sn9c102_frame_t *f;
+	struct et61x251_frame_t *f;
 	unsigned long lock_flags;
 	int err = 0;
 
 	if (copy_from_user(&b, arg, sizeof(b)))
 		return -EFAULT;
 
-	if (b.type != V4L2_BUF_TYPE_VIDEO_CAPTURE || cam->io != IO_MMAP)
+	if (b.type != V4L2_BUF_TYPE_VIDEO_CAPTURE || cam->io!= IO_MMAP)
 		return -EINVAL;
 
 	if (list_empty(&cam->outqueue)) {
@@ -2444,7 +2182,7 @@ sn9c102_vidioc_dqbuf(struct sn9c102_device* cam, struct file* filp,
 	}
 
 	spin_lock_irqsave(&cam->queue_lock, lock_flags);
-	f = list_entry(cam->outqueue.next, struct sn9c102_frame_t, frame);
+	f = list_entry(cam->outqueue.next, struct et61x251_frame_t, frame);
 	list_del(cam->outqueue.next);
 	spin_unlock_irqrestore(&cam->queue_lock, lock_flags);
 
@@ -2464,7 +2202,7 @@ sn9c102_vidioc_dqbuf(struct sn9c102_device* cam, struct file* filp,
 
 
 static int
-sn9c102_vidioc_streamon(struct sn9c102_device* cam, void __user * arg)
+et61x251_vidioc_streamon(struct et61x251_device* cam, void __user * arg)
 {
 	int type;
 
@@ -2486,7 +2224,7 @@ sn9c102_vidioc_streamon(struct sn9c102_device* cam, void __user * arg)
 
 
 static int
-sn9c102_vidioc_streamoff(struct sn9c102_device* cam, void __user * arg)
+et61x251_vidioc_streamoff(struct et61x251_device* cam, void __user * arg)
 {
 	int type, err;
 
@@ -2497,10 +2235,10 @@ sn9c102_vidioc_streamoff(struct sn9c102_device* cam, void __user * arg)
 		return -EINVAL;
 
 	if (cam->stream == STREAM_ON)
-		if ((err = sn9c102_stream_interrupt(cam)))
+		if ((err = et61x251_stream_interrupt(cam)))
 			return err;
 
-	sn9c102_empty_framequeues(cam);
+	et61x251_empty_framequeues(cam);
 
 	DBG(3, "Stream off");
 
@@ -2509,7 +2247,7 @@ sn9c102_vidioc_streamoff(struct sn9c102_device* cam, void __user * arg)
 
 
 static int
-sn9c102_vidioc_g_parm(struct sn9c102_device* cam, void __user * arg)
+et61x251_vidioc_g_parm(struct et61x251_device* cam, void __user * arg)
 {
 	struct v4l2_streamparm sp;
 
@@ -2530,7 +2268,7 @@ sn9c102_vidioc_g_parm(struct sn9c102_device* cam, void __user * arg)
 
 
 static int
-sn9c102_vidioc_s_parm(struct sn9c102_device* cam, void __user * arg)
+et61x251_vidioc_s_parm(struct et61x251_device* cam, void __user * arg)
 {
 	struct v4l2_streamparm sp;
 
@@ -2545,8 +2283,8 @@ sn9c102_vidioc_s_parm(struct sn9c102_device* cam, void __user * arg)
 	if (sp.parm.capture.readbuffers == 0)
 		sp.parm.capture.readbuffers = cam->nreadbuffers;
 
-	if (sp.parm.capture.readbuffers > SN9C102_MAX_FRAMES)
-		sp.parm.capture.readbuffers = SN9C102_MAX_FRAMES;
+	if (sp.parm.capture.readbuffers > ET61X251_MAX_FRAMES)
+		sp.parm.capture.readbuffers = ET61X251_MAX_FRAMES;
 
 	if (copy_to_user(arg, &sp, sizeof(sp)))
 		return -EFAULT;
@@ -2557,83 +2295,83 @@ sn9c102_vidioc_s_parm(struct sn9c102_device* cam, void __user * arg)
 }
 
 
-static int sn9c102_ioctl_v4l2(struct inode* inode, struct file* filp,
-                              unsigned int cmd, void __user * arg)
+static int et61x251_ioctl_v4l2(struct inode* inode, struct file* filp,
+                               unsigned int cmd, void __user * arg)
 {
-	struct sn9c102_device* cam = video_get_drvdata(video_devdata(filp));
+	struct et61x251_device* cam = video_get_drvdata(video_devdata(filp));
 
 	switch (cmd) {
 
 	case VIDIOC_QUERYCAP:
-		return sn9c102_vidioc_querycap(cam, arg);
+		return et61x251_vidioc_querycap(cam, arg);
 
 	case VIDIOC_ENUMINPUT:
-		return sn9c102_vidioc_enuminput(cam, arg);
+		return et61x251_vidioc_enuminput(cam, arg);
 
 	case VIDIOC_G_INPUT:
 	case VIDIOC_S_INPUT:
-		return sn9c102_vidioc_gs_input(cam, arg);
+		return et61x251_vidioc_gs_input(cam, arg);
 
 	case VIDIOC_QUERYCTRL:
-		return sn9c102_vidioc_query_ctrl(cam, arg);
+		return et61x251_vidioc_query_ctrl(cam, arg);
 
 	case VIDIOC_G_CTRL:
-		return sn9c102_vidioc_g_ctrl(cam, arg);
+		return et61x251_vidioc_g_ctrl(cam, arg);
 
 	case VIDIOC_S_CTRL_OLD:
 	case VIDIOC_S_CTRL:
-		return sn9c102_vidioc_s_ctrl(cam, arg);
+		return et61x251_vidioc_s_ctrl(cam, arg);
 
 	case VIDIOC_CROPCAP_OLD:
 	case VIDIOC_CROPCAP:
-		return sn9c102_vidioc_cropcap(cam, arg);
+		return et61x251_vidioc_cropcap(cam, arg);
 
 	case VIDIOC_G_CROP:
-		return sn9c102_vidioc_g_crop(cam, arg);
+		return et61x251_vidioc_g_crop(cam, arg);
 
 	case VIDIOC_S_CROP:
-		return sn9c102_vidioc_s_crop(cam, arg);
+		return et61x251_vidioc_s_crop(cam, arg);
 
 	case VIDIOC_ENUM_FMT:
-		return sn9c102_vidioc_enum_fmt(cam, arg);
+		return et61x251_vidioc_enum_fmt(cam, arg);
 
 	case VIDIOC_G_FMT:
-		return sn9c102_vidioc_g_fmt(cam, arg);
+		return et61x251_vidioc_g_fmt(cam, arg);
 
 	case VIDIOC_TRY_FMT:
 	case VIDIOC_S_FMT:
-		return sn9c102_vidioc_try_s_fmt(cam, cmd, arg);
+		return et61x251_vidioc_try_s_fmt(cam, cmd, arg);
 
 	case VIDIOC_G_JPEGCOMP:
-		return sn9c102_vidioc_g_jpegcomp(cam, arg);
+		return et61x251_vidioc_g_jpegcomp(cam, arg);
 
 	case VIDIOC_S_JPEGCOMP:
-		return sn9c102_vidioc_s_jpegcomp(cam, arg);
+		return et61x251_vidioc_s_jpegcomp(cam, arg);
 
 	case VIDIOC_REQBUFS:
-		return sn9c102_vidioc_reqbufs(cam, arg);
+		return et61x251_vidioc_reqbufs(cam, arg);
 
 	case VIDIOC_QUERYBUF:
-		return sn9c102_vidioc_querybuf(cam, arg);
+		return et61x251_vidioc_querybuf(cam, arg);
 
 	case VIDIOC_QBUF:
-		return sn9c102_vidioc_qbuf(cam, arg);
+		return et61x251_vidioc_qbuf(cam, arg);
 
 	case VIDIOC_DQBUF:
-		return sn9c102_vidioc_dqbuf(cam, filp, arg);
+		return et61x251_vidioc_dqbuf(cam, filp, arg);
 
 	case VIDIOC_STREAMON:
-		return sn9c102_vidioc_streamon(cam, arg);
+		return et61x251_vidioc_streamon(cam, arg);
 
 	case VIDIOC_STREAMOFF:
-		return sn9c102_vidioc_streamoff(cam, arg);
+		return et61x251_vidioc_streamoff(cam, arg);
 
 	case VIDIOC_G_PARM:
-		return sn9c102_vidioc_g_parm(cam, arg);
+		return et61x251_vidioc_g_parm(cam, arg);
 
 	case VIDIOC_S_PARM_OLD:
 	case VIDIOC_S_PARM:
-		return sn9c102_vidioc_s_parm(cam, arg);
+		return et61x251_vidioc_s_parm(cam, arg);
 
 	case VIDIOC_G_STD:
 	case VIDIOC_S_STD:
@@ -2649,10 +2387,10 @@ static int sn9c102_ioctl_v4l2(struct inode* inode, struct file* filp,
 }
 
 
-static int sn9c102_ioctl(struct inode* inode, struct file* filp,
+static int et61x251_ioctl(struct inode* inode, struct file* filp,
                          unsigned int cmd, unsigned long arg)
 {
-	struct sn9c102_device* cam = video_get_drvdata(video_devdata(filp));
+	struct et61x251_device* cam = video_get_drvdata(video_devdata(filp));
 	int err = 0;
 
 	if (down_interruptible(&cam->fileop_sem))
@@ -2671,25 +2409,24 @@ static int sn9c102_ioctl(struct inode* inode, struct file* filp,
 		return -EIO;
 	}
 
-	V4LDBG(3, "sn9c102", cmd);
+	V4LDBG(3, "et61x251", cmd);
 
-	err = sn9c102_ioctl_v4l2(inode, filp, cmd, (void __user *)arg);
+	err = et61x251_ioctl_v4l2(inode, filp, cmd, (void __user *)arg);
 
 	up(&cam->fileop_sem);
 
 	return err;
 }
 
-/*****************************************************************************/
 
-static struct file_operations sn9c102_fops = {
+static struct file_operations et61x251_fops = {
 	.owner = THIS_MODULE,
-	.open =    sn9c102_open,
-	.release = sn9c102_release,
-	.ioctl =   sn9c102_ioctl,
-	.read =    sn9c102_read,
-	.poll =    sn9c102_poll,
-	.mmap =    sn9c102_mmap,
+	.open =    et61x251_open,
+	.release = et61x251_release,
+	.ioctl =   et61x251_ioctl,
+	.read =    et61x251_read,
+	.poll =    et61x251_poll,
+	.mmap =    et61x251_mmap,
 	.llseek =  no_llseek,
 };
 
@@ -2697,15 +2434,15 @@ static struct file_operations sn9c102_fops = {
 
 /* It exists a single interface only. We do not need to validate anything. */
 static int
-sn9c102_usb_probe(struct usb_interface* intf, const struct usb_device_id* id)
+et61x251_usb_probe(struct usb_interface* intf, const struct usb_device_id* id)
 {
 	struct usb_device *udev = interface_to_usbdev(intf);
-	struct sn9c102_device* cam;
+	struct et61x251_device* cam;
 	static unsigned int dev_nr = 0;
 	unsigned int i;
-	int err = 0, r;
+	int err = 0;
 
-	if (!(cam = kzalloc(sizeof(struct sn9c102_device), GFP_KERNEL)))
+	if (!(cam = kzalloc(sizeof(struct et61x251_device), GFP_KERNEL)))
 		return -ENOMEM;
 
 	cam->usbdev = udev;
@@ -2724,54 +2461,33 @@ sn9c102_usb_probe(struct usb_interface* intf, const struct usb_device_id* id)
 
 	init_MUTEX(&cam->dev_sem);
 
-	r = sn9c102_read_reg(cam, 0x00);
-	if (r < 0 || r != 0x10) {
-		DBG(1, "Sorry, this is not a SN9C10x based camera "
-		       "(vid/pid 0x%04X/0x%04X)", id->idVendor, id->idProduct);
-		err = -ENODEV;
-		goto fail;
-	}
+	DBG(2, "ET61X[12]51 PC Camera Controller detected "
+	       "(vid/pid 0x%04X/0x%04X)",id->idVendor, id->idProduct);
 
-	cam->bridge = (id->idProduct & 0xffc0) == 0x6080 ?
-	              BRIDGE_SN9C103 : BRIDGE_SN9C102;
-	switch (cam->bridge) {
-	case BRIDGE_SN9C101:
-	case BRIDGE_SN9C102:
-		DBG(2, "SN9C10[12] PC Camera Controller detected "
-		       "(vid/pid 0x%04X/0x%04X)", id->idVendor, id->idProduct);
-		break;
-	case BRIDGE_SN9C103:
-		DBG(2, "SN9C103 PC Camera Controller detected "
-		       "(vid/pid 0x%04X/0x%04X)", id->idVendor, id->idProduct);
-		break;
-	}
-
-	for  (i = 0; sn9c102_sensor_table[i]; i++) {
-		err = sn9c102_sensor_table[i](cam);
+	for  (i = 0; et61x251_sensor_table[i]; i++) {
+		err = et61x251_sensor_table[i](cam);
 		if (!err)
 			break;
 	}
 
-	if (!err && cam->sensor) {
+	if (!err && cam->sensor)
 		DBG(2, "%s image sensor detected", cam->sensor->name);
-		DBG(3, "Support for %s maintained by %s",
-		    cam->sensor->name, cam->sensor->maintainer);
-	} else {
+	else {
 		DBG(1, "No supported image sensor detected");
 		err = -ENODEV;
 		goto fail;
 	}
 
-	if (sn9c102_init(cam)) {
+	if (et61x251_init(cam)) {
 		DBG(1, "Initialization failed. I will retry on open().");
 		cam->state |= DEV_MISCONFIGURED;
 	}
 
-	strcpy(cam->v4ldev->name, "SN9C10x PC Camera");
+	strcpy(cam->v4ldev->name, "ET61X[12]51 PC Camera");
 	cam->v4ldev->owner = THIS_MODULE;
 	cam->v4ldev->type = VID_TYPE_CAPTURE | VID_TYPE_SCALES;
 	cam->v4ldev->hardware = 0;
-	cam->v4ldev->fops = &sn9c102_fops;
+	cam->v4ldev->fops = &et61x251_fops;
 	cam->v4ldev->minor = video_nr[dev_nr];
 	cam->v4ldev->release = video_device_release;
 	video_set_drvdata(cam->v4ldev, cam);
@@ -2785,7 +2501,7 @@ sn9c102_usb_probe(struct usb_interface* intf, const struct usb_device_id* id)
 		if (err == -ENFILE && video_nr[dev_nr] == -1)
 			DBG(1, "Free /dev/videoX node not found");
 		video_nr[dev_nr] = -1;
-		dev_nr = (dev_nr < SN9C102_MAX_DEVICES-1) ? dev_nr+1 : 0;
+		dev_nr = (dev_nr < ET61X251_MAX_DEVICES-1) ? dev_nr+1 : 0;
 		up(&cam->dev_sem);
 		goto fail;
 	}
@@ -2794,10 +2510,10 @@ sn9c102_usb_probe(struct usb_interface* intf, const struct usb_device_id* id)
 
 	cam->module_param.force_munmap = force_munmap[dev_nr];
 
-	dev_nr = (dev_nr < SN9C102_MAX_DEVICES-1) ? dev_nr+1 : 0;
+	dev_nr = (dev_nr < ET61X251_MAX_DEVICES-1) ? dev_nr+1 : 0;
 
 #ifdef CONFIG_VIDEO_ADV_DEBUG
-	sn9c102_create_sysfs(cam);
+	et61x251_create_sysfs(cam);
 	DBG(2, "Optional device control through 'sysfs' interface ready");
 #endif
 
@@ -2818,16 +2534,16 @@ fail:
 }
 
 
-static void sn9c102_usb_disconnect(struct usb_interface* intf)
+static void et61x251_usb_disconnect(struct usb_interface* intf)
 {
-	struct sn9c102_device* cam = usb_get_intfdata(intf);
+	struct et61x251_device* cam = usb_get_intfdata(intf);
 
 	if (!cam)
 		return;
 
-	down_write(&sn9c102_disconnect);
+	down_write(&et61x251_disconnect);
 
-	down(&cam->dev_sem); 
+	down(&cam->dev_sem);
 
 	DBG(2, "Disconnecting %s...", cam->v4ldev->name);
 
@@ -2838,13 +2554,13 @@ static void sn9c102_usb_disconnect(struct usb_interface* intf)
 		       "memory deallocation are deferred on close.",
 		    cam->v4ldev->minor);
 		cam->state |= DEV_MISCONFIGURED;
-		sn9c102_stop_transfer(cam);
+		et61x251_stop_transfer(cam);
 		cam->state |= DEV_DISCONNECTED;
 		wake_up_interruptible(&cam->wait_frame);
 		wake_up_interruptible(&cam->wait_stream);
 	} else {
 		cam->state |= DEV_DISCONNECTED;
-		sn9c102_release_resources(cam);
+		et61x251_release_resources(cam);
 	}
 
 	up(&cam->dev_sem);
@@ -2852,38 +2568,38 @@ static void sn9c102_usb_disconnect(struct usb_interface* intf)
 	if (!cam->users)
 		kfree(cam);
 
-	up_write(&sn9c102_disconnect);
+	up_write(&et61x251_disconnect);
 }
 
 
-static struct usb_driver sn9c102_usb_driver = {
-	.name =       "sn9c102",
-	.id_table =   sn9c102_id_table,
-	.probe =      sn9c102_usb_probe,
-	.disconnect = sn9c102_usb_disconnect,
+static struct usb_driver et61x251_usb_driver = {
+	.name =       "et61x251",
+	.id_table =   et61x251_id_table,
+	.probe =      et61x251_usb_probe,
+	.disconnect = et61x251_usb_disconnect,
 };
 
 /*****************************************************************************/
 
-static int __init sn9c102_module_init(void)
+static int __init et61x251_module_init(void)
 {
 	int err = 0;
 
-	KDBG(2, SN9C102_MODULE_NAME " v" SN9C102_MODULE_VERSION);
-	KDBG(3, SN9C102_MODULE_AUTHOR);
+	KDBG(2, ET61X251_MODULE_NAME " v" ET61X251_MODULE_VERSION);
+	KDBG(3, ET61X251_MODULE_AUTHOR);
 
-	if ((err = usb_register(&sn9c102_usb_driver)))
+	if ((err = usb_register(&et61x251_usb_driver)))
 		KDBG(1, "usb_register() failed");
 
 	return err;
 }
 
 
-static void __exit sn9c102_module_exit(void)
+static void __exit et61x251_module_exit(void)
 {
-	usb_deregister(&sn9c102_usb_driver);
+	usb_deregister(&et61x251_usb_driver);
 }
 
 
-module_init(sn9c102_module_init);
-module_exit(sn9c102_module_exit);
+module_init(et61x251_module_init);
+module_exit(et61x251_module_exit);
