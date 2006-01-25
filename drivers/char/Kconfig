@@ -1020,5 +1020,10 @@ config TELCLOCK
 	  sysfs directory, /sys/devices/platform/telco_clock, with a number of
 	  files for controlling the behavior of this hardware.
 
+config CRASHER
+	tristate "Crasher Module"
+	help
+	  Slab cache memory tester.  Only use this as a module
+
 endmenu
 
