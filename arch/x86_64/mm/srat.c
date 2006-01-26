@@ -135,7 +135,17 @@ void __init
 acpi_numa_processor_affinity_init(struct acpi_table_processor_affinity *pa)
 {
 	int pxm, node;
-	if (srat_disabled() || pa->flags.enabled == 0)
+	if (srat_disabled()) 
+		return;
+	if (pa->header.length < offsetof(typeof(*pa), flags)+sizeof(pa->flags)) {
+		printk(KERN_WARNING
+   "SRAT: Processor affinity for PXM %d APIC %u too short (%u). Ignored.\n",
+			pa->proximity_domain,
+			pa->apic_id,
+			pa->header.length);
+		return;
+	}
+	if (pa->flags.enabled == 0)
 		return;
 	pxm = pa->proximity_domain;
 	node = setup_node(pxm);
@@ -159,38 +169,32 @@ acpi_numa_memory_affinity_init(struct acpi_table_memory_affinity *ma)
 	int node, pxm;
 	int i;
 
-	if (srat_disabled() || ma->flags.enabled == 0)
+	if (srat_disabled())
 		return;
+	if (ma->header.length < offsetof(typeof(*ma), flags)+sizeof(ma->flags)) {
+		printk(KERN_WARNING
+	  "SRAT: Memory affinity for PXM %d too short (%u bytes). Ignored.\n",
+			ma->proximity_domain,
+			ma->header.length);
+		return;
+	}
+	if (ma->flags.enabled == 0)
+		return;
+	start = ma->base_addr_lo | ((u64)ma->base_addr_hi << 32);
+	end = start + (ma->length_lo | ((u64)ma->length_hi << 32));
 	pxm = ma->proximity_domain;
+	if (start == end) { 
+		printk(KERN_WARNING
+	"SRAT: Memory affinity for PXM %u empty (%lx-%lx). Ignored.\n",
+			pxm, 
+			start, end);
+		return;
+	}
 	node = setup_node(pxm);
 	if (node < 0) {
 		printk(KERN_ERR "SRAT: Too many proximity domains.\n");
 		bad_srat();
 		return;
-	}
-	start = ma->base_addr_lo | ((u64)ma->base_addr_hi << 32);
-	end = start + (ma->length_lo | ((u64)ma->length_hi << 32));
-
-	/* 
-	 * It is fine to add this area to the nodes data it will be used later
-	 * This code supports one contigious hot add area per node.
-	 */
-
-	if (ma->flags.hot_pluggable == 1 && !ignore_hotadd) {
-		found_add_area=1;
-		if (nodes_add[node].start == nodes_add[node].end ) {
-			nodes_add[node].start = start;
-			nodes_add[node].end = end;	
-		} else {
-			if (nodes_add[node].start + 1 == end)
-				nodes_add[node].start = start;
-			if (nodes_add[node].end + 1 == start)
-				nodes_add[node].end = end;
-		}
-		if ((nodes_add[node].end >> PAGE_SHIFT) > end_pfn)
-			end_pfn = nodes_add[node].end >> PAGE_SHIFT;
-		printk(KERN_INFO "SRAT: hot plug zone found %Lx - %Lx \n",
-				nodes_add[node].start, nodes_add[node].end);
 	}
 	i = conflicting_nodes(start, end);
 	if (i == node) {
@@ -215,6 +219,28 @@ acpi_numa_memory_affinity_init(struct acpi_table_memory_affinity *ma)
 		if (nd->end < end)
 			nd->end = end;
 	}
+ 
+ 	/* 
+ 	 * It is fine to add this area to the nodes data it will be used later
+ 	 * This code supports one contigious hot add area per node.
+ 	 */
+ 	if (ma->flags.hot_pluggable == 1 && !ignore_hotadd) {
+ 		found_add_area = 1;
+ 		if (nodes_add[node].start == nodes_add[node].end) {
+ 			nodes_add[node].start = start;
+ 			nodes_add[node].end = end;	
+ 		} else {
+ 			if (nodes_add[node].start == end)
+ 				nodes_add[node].start = start;
+ 			if (nodes_add[node].end == start)
+ 				nodes_add[node].end = end;
+ 		}
+ 		if ((nodes_add[node].end >> PAGE_SHIFT) > end_pfn)
+ 			end_pfn = nodes_add[node].end >> PAGE_SHIFT;
+ 		printk(KERN_INFO "SRAT: hot plug zone found %Lx - %Lx\n",
+ 				nodes_add[node].start, nodes_add[node].end);
+ 	}
+
 	printk(KERN_INFO "SRAT: Node %u PXM %u %Lx-%Lx\n", node, pxm,
 	       nd->start, nd->end);
 }
