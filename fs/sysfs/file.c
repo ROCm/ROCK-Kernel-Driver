@@ -6,6 +6,7 @@
 #include <linux/fsnotify.h>
 #include <linux/kobject.h>
 #include <linux/namei.h>
+#include <linux/limits.h>
 #include <asm/uaccess.h>
 #include <asm/semaphore.h>
 
@@ -13,6 +14,9 @@
 
 #define to_subsys(k) container_of(k,struct subsystem,kset.kobj)
 #define to_sattr(a) container_of(a,struct subsys_attribute,attr)
+
+/* used in crash dumps to help with debugging */
+static char last_sysfs_file[PATH_MAX];
 
 /*
  * Subsystem file operations.
@@ -326,7 +330,16 @@ static int check_perm(struct inode * inode, struct file * file)
 
 static int sysfs_open_file(struct inode * inode, struct file * filp)
 {
+	char *p = d_path(filp->f_dentry, sysfs_mount, last_sysfs_file,
+			sizeof(last_sysfs_file));
+	if (p)
+		memmove(last_sysfs_file, p, strlen(p) + 1);
 	return check_perm(inode,filp);
+}
+
+void sysfs_printk_last_file(void)
+{
+	printk(KERN_EMERG "last sysfs file: %s\n", last_sysfs_file);
 }
 
 static int sysfs_release(struct inode * inode, struct file * filp)

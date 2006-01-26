@@ -118,6 +118,8 @@ int sysfs_remove_bin_file(struct kobject * kobj, struct bin_attribute * attr);
 int sysfs_create_group(struct kobject *, const struct attribute_group *);
 void sysfs_remove_group(struct kobject *, const struct attribute_group *);
 
+void sysfs_printk_last_file(void);
+
 #else /* CONFIG_SYSFS */
 
 static inline int sysfs_create_dir(struct kobject * k)
@@ -181,6 +183,11 @@ static inline int sysfs_create_group(struct kobject * k, const struct attribute_
 }
 
 static inline void sysfs_remove_group(struct kobject * k, const struct attribute_group * g)
+{
+	;
+}
+
+static inline void sysfs_printk_last_file(void)
 {
 	;
 }
