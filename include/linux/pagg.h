@@ -133,6 +133,16 @@ extern void __pagg_detach(struct task_struct *task);
 extern int __pagg_exec(struct task_struct *task);
 
 /**
+ * pagg_list_empty - Check to see if the task's pagg_list is empty.
+ * @task: The task in question
+ *
+ */
+static inline int pagg_list_empty(const struct task_struct *task)
+{
+	return list_empty(&task->pagg_list);
+}
+
+/**
  * pagg_attach - child inherits attachment to pagg containers of its parent
  * @child: child task - to inherit
  * @parent: parenet task - child inherits pagg containers from this parent
@@ -145,7 +155,7 @@ static inline int pagg_attach(struct task_struct *child,
 			      struct task_struct *parent)
 {
 	INIT_PAGG_LIST(child);
-	if (!list_empty(&parent->pagg_list))
+	if (!pagg_list_empty(parent))
 		return __pagg_attach(child, parent);
 
 	return 0;
@@ -159,7 +169,7 @@ static inline int pagg_attach(struct task_struct *child,
  */
 static inline void pagg_detach(struct task_struct *task)
 {
-	if (!list_empty(&task->pagg_list))
+	if (!pagg_list_empty(task))
 		__pagg_detach(task);
 }
 
@@ -170,7 +180,7 @@ static inline void pagg_detach(struct task_struct *task)
  */
 static inline void pagg_exec(struct task_struct *task)
 {
-	if (!list_empty(&task->pagg_list))
+	if (!pagg_list_empty(task))
 		__pagg_exec(task);
 }
 
@@ -197,6 +207,7 @@ static inline void pagg_exec(struct task_struct *task)
 #define pagg_attach(ct, pt)  (0)
 #define pagg_detach(t)  do {  } while(0)
 #define pagg_exec(t)  do {  } while(0)
+#define pagg_list_empty(t) (1)
 
 #endif /* CONFIG_PAGG */
 

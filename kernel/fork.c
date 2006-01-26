@@ -1074,8 +1074,13 @@ static task_t *copy_process(unsigned long clone_flags,
 	 * copied first time - so re-copy it here, then check the child's CPU
 	 * to ensure it is on a valid CPU (and if not, just force it back to
 	 * parent's CPU). This avoids alot of nasty races.
+	 *
+	 * Some PAGG users set the cpus_allowed mask, so only reset it if the
+	 * pagg_list is empty or if the mask contains offline cpus.
 	 */
-	p->cpus_allowed = current->cpus_allowed;
+	if (pagg_list_empty(p) ||
+			unlikely(!cpus_subset(p->cpus_allowed,cpu_online_map)))
+		p->cpus_allowed = current->cpus_allowed;
 	if (unlikely(!cpu_isset(task_cpu(p), p->cpus_allowed) ||
 			!cpu_online(task_cpu(p))))
 		set_task_cpu(p, smp_processor_id());

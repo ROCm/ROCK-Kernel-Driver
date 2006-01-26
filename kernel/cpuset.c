@@ -2021,6 +2021,7 @@ cpumask_t cpuset_cpus_allowed(struct task_struct *tsk)
 
 	return mask;
 }
+EXPORT_SYMBOL_GPL(cpuset_cpus_allowed);
 
 void cpuset_init_current_mems_allowed(void)
 {

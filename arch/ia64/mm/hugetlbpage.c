@@ -12,6 +12,7 @@
 #include <linux/init.h>
 #include <linux/fs.h>
 #include <linux/mm.h>
+#include <linux/module.h>
 #include <linux/hugetlb.h>
 #include <linux/pagemap.h>
 #include <linux/smp_lock.h>
@@ -23,6 +24,7 @@
 #include <asm/tlbflush.h>
 
 unsigned int hpage_shift=HPAGE_SHIFT_DEFAULT;
+EXPORT_SYMBOL_GPL(hpage_shift);
 
 pte_t *
 huge_pte_alloc (struct mm_struct *mm, unsigned long addr)
