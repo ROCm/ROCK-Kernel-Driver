@@ -99,8 +99,15 @@ void __init setup_per_cpu_areas(void)
 		size = PERCPU_ENOUGH_ROOM;
 #endif
 
-	for_each_cpu_mask (i, cpu_possible_map) {
+	for (i = 0; i < NR_CPUS; i++) { 
 		char *ptr;
+		
+		/* Later set this to a unmapped area, but first 
+		   need to clean up NR_CPUS usage everywhere */
+		if (!cpu_possible(i)) {	
+			/* Point the the original reference data */
+			cpu_pda(i)->data_offset = 0;
+		}
 
 		if (!NODE_DATA(cpu_to_node(i))) {
 			printk("cpu with no node %d, num_online_nodes %d\n",
