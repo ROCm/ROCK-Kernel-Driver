@@ -738,6 +738,7 @@ static void __exit exit_o2nm(void)
 	/* XXX sync with hb callbacks and shut down hb? */
 	o2net_unregister_hb_callbacks();
 	o2hb_disk_heartbeat_exit();
+	o2cb_sys_shutdown();
 	configfs_unregister_subsystem(&o2nm_cluster_group.cs_subsys);
 	o2nm_remove_proc(o2nm_proc);
 	mlog_remove_proc(o2nm_proc);

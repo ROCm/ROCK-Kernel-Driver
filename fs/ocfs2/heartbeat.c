@@ -185,6 +185,9 @@ void ocfs2_clear_hb_callbacks(ocfs2_super *osb)
 {
 	int status;
 
+	if (osb->osb_hb_res == NULL)
+		return;
+
 	status = o2hb_unregister_callback(&osb->osb_hb_down);
 	if (status < 0)
 		mlog_errno(status);
