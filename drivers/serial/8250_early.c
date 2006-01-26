@@ -204,7 +204,7 @@ static int __init early_uart_setup(struct console *console, char *options)
 	 * Remember the line number of the first serial
 	 * console.  We'll make this the kdb serial console too.
 	 */
-	if (kdb_serial_line == -1) {
+	if (console && kdb_serial_line == -1) {
 		kdb_serial_line = console->index;
 		kdb_serial.io_type = device->port.iotype;
 		switch (device->port.iotype) {
