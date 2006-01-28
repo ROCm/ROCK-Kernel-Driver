@@ -1,3 +1,20 @@
+/*
+ *	Copyright (C) 2002-2005 Novell/SUSE
+ *
+ *	This program is free software; you can redistribute it and/or
+ *	modify it under the terms of the GNU General Public License as
+ *	published by the Free Software Foundation, version 2 of the
+ *	License.
+ *
+ *	http://forge.novell.com/modules/xfmod/project/?apparmor
+ *
+ *	AppArmor aamatch submodule (w/ pattern expansion).
+ *
+ *	This module makes use of a slightly modified version of the PCRE
+ *	library developed by Philip Hazel <ph10@cam.ac.uk>.  See the files
+ *	pcre_* in this directory.
+ */
+
 #include <linux/module.h>
 #include "match.h"
 #include "pcre_exec.h"
@@ -147,6 +164,6 @@ EXPORT_SYMBOL_GPL(sdmatch_features);
 EXPORT_SYMBOL_GPL(sdmatch_serialize);
 EXPORT_SYMBOL_GPL(sdmatch_match);
 
-MODULE_DESCRIPTION("SubDomain sd_match module [pcre]");
-MODULE_AUTHOR("SuSE/Novell <apparmor-general@forge.novell.com>");
+MODULE_DESCRIPTION("AppArmor aa_match module [pcre]");
+MODULE_AUTHOR("Tony Jones <tonyj@suse.de>");
 MODULE_LICENSE("GPL");

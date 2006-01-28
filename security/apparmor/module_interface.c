@@ -6,16 +6,15 @@
  *	published by the Free Software Foundation, version 2 of the
  *	License.
  *
- *	SubDomain userspace policy interface
+ *	AppArmor userspace policy interface
  */
 
 #include <asm/unaligned.h>
 
-#include "subdomain.h"
-#include "immunix.h"
+#include "apparmor.h"
 #include "inline.h"
 #include "module_interface.h"
-#include "sdmatch/match.h"
+#include "aamatch/match.h"
 
 /* sd_code defined in module_interface.h */
 
@@ -41,7 +40,7 @@ static inline void free_sd_entry(struct sd_entry *entry)
 /**
  * alloc_sd_entry - create new empty sd_entry
  *
- * This routine allocates, initializes, and returns a new SubDomain
+ * This routine allocates, initializes, and returns a new subdomain
  * file entry structure.  Structure is zeroed.  Returns new structure on
  * success, NULL on failure.
  */

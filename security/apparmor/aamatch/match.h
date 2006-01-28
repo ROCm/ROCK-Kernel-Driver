@@ -1,11 +1,23 @@
+/*
+ *	Copyright (C) 2002-2005 Novell/SUSE
+ *
+ *	This program is free software; you can redistribute it and/or
+ *	modify it under the terms of the GNU General Public License as
+ *	published by the Free Software Foundation, version 2 of the
+ *	License.
+ *
+ *	AppArmor submodule (match) prototypes
+ */
+
 #ifndef __MATCH_H
 #define __MATCH_H
 
 #include "../module_interface.h"
-#include "../subdomain.h"
+#include "../apparmor.h"
 
 /* The following functions implement an interface used by the primary
- * SubDomain module to perform name matching.
+ * AppArmor module to perform name matching (n.b. "AppArmor" was previously
+ * called "SubDomain").
 
  * sdmatch_alloc
  * sdmatch_free

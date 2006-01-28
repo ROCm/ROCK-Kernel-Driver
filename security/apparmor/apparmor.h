@@ -6,7 +6,7 @@
  *	published by the Free Software Foundation, version 2 of the
  *	License.
  *
- *	SubDomain internal prototypes
+ *	AppArmor internal prototypes
  */
 
 #ifndef __SUBDOMAIN_H
@@ -15,7 +15,7 @@
 /* defn of iattr */
 #include <linux/fs.h>
 
-#include "immunix.h"
+#include "shared.h"
 
 /* Control parameters (0 or 1), settable thru module/boot flags or
  * via /sys/kernel/security/subdomain/control */
@@ -48,13 +48,13 @@ extern int subdomain_logsyscall;
 #define SD_DEBUG(fmt, args...)						\
 	do {								\
 		if (subdomain_debug)					\
-			printk(KERN_DEBUG "SubDomain: " fmt, ##args);	\
+			printk(KERN_DEBUG "AppArmor: " fmt, ##args);	\
 	} while (0)
-#define SD_INFO(fmt, args...)	printk(KERN_INFO "SubDomain: " fmt, ##args)
-#define SD_WARN(fmt, args...)	printk(KERN_WARNING "SubDomain: " fmt, ##args)
-#define SD_ERROR(fmt, args...)	printk(KERN_ERR "SubDomain: " fmt, ##args)
+#define SD_INFO(fmt, args...)	printk(KERN_INFO "AppArmor: " fmt, ##args)
+#define SD_WARN(fmt, args...)	printk(KERN_WARNING "AppArmor: " fmt, ##args)
+#define SD_ERROR(fmt, args...)	printk(KERN_ERR "AppArmor: " fmt, ##args)
 
-/* basic SubDomain data structures */
+/* basic AppArmor data structures */
 
 struct flagval {
 	int debug;
@@ -62,9 +62,16 @@ struct flagval {
 	int audit;
 };
 
+enum entry_t {
+	sd_entry_literal,
+	sd_entry_tailglob,
+	sd_entry_pattern,
+	sd_entry_invalid
+};
+
 /**
  * sd_entry - file ACL *
- * Each SubDomain entry describes a file and an allowed access mode.
+ * Each entry describes a file and an allowed access mode.
  */
 struct sd_entry {
 	char *filename;
@@ -91,9 +98,8 @@ struct sd_entry {
 /**
  * sdprofile - basic confinement data
  *
- * The SubDomain profile contains the basic confinement data.  Each profile
- * has a name and potentially a list of SubDomain and NetDomain entries
- * (files and network access control information).  The profiles are
+ * The AppArmor profile contains the basic confinement data.  Each profile
+ * has a name and potentially a list of subdomain entries. The profiles are
  * connected in a list
  */
 struct sdprofile {
@@ -208,6 +214,8 @@ struct sd_audit {
 #define SD_XATTR_REMOVE 3
 
 /* main.c */
+extern int alloc_nullprofiles(void);
+extern void free_nullprofiles(void);
 extern int sd_audit_message(struct subdomain *, int, const char *, ...);
 extern int sd_audit_syscallreject(struct subdomain *, const char *);
 extern int sd_audit(struct subdomain *, const struct sd_audit *);
@@ -258,15 +266,15 @@ extern int sd_setprocattr_changehat(char *hatinfo, size_t infosize);
 extern int sd_setprocattr_setprofile(struct task_struct *p, char *profilename,
 				     size_t profilesize);
 
-/* subdomainfs.c */
+/* apparmorfs.c */
 extern int create_subdomainfs(void);
 extern int destroy_subdomainfs(void);
 
 /* capabilities.c */
 extern const char *capability_to_name(unsigned int cap);
 
-/* subdomain_version.c */
-extern const char *subdomain_version(void);
-extern const char *subdomain_version_nl(void);
+/* apparmor_version.c */
+extern const char *apparmor_version(void);
+extern const char *apparmor_version_nl(void);
 
 #endif				/* __SUBDOMAIN_H */

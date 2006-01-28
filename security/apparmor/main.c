@@ -6,16 +6,15 @@
  *	published by the Free Software Foundation, version 2 of the
  *	License.
  *
- *	SubDomain Core
+ *	AppArmor Core
  */
 
 #include <linux/security.h>
 #include <linux/namei.h>
 #include <linux/audit.h>
 
-#include "immunix.h"
-#include "subdomain.h"
-#include "sdmatch/match.h"
+#include "apparmor.h"
+#include "aamatch/match.h"
 
 #include "inline.h"
 
@@ -350,7 +349,7 @@ done:
 
 /**
  * sd_link_perm - test permission to link to a file
- * @sd: current SubDomain
+ * @sd: current subdomain
  * @link: name of link being created
  * @target: name of target to be linked to
  *
@@ -382,7 +381,7 @@ static int sd_link_perm(struct subdomain *sd,
 
 /**
  * _sd_perm_dentry
- * @sd: current SubDomain
+ * @sd: current subdomain
  * @dentry: requested dentry
  * @mask: mask of requested operations
  * @pname: pointer to hold matched pathname (if any)
@@ -457,8 +456,51 @@ static int _sd_perm_dentry(struct subdomain *sd, struct dentry *dentry,
  *************************/
 
 /**
+ * alloc_nullprofiles - Allocate null profiles
+ */
+int alloc_nullprofiles(void)
+{
+	null_profile = alloc_sdprofile();
+	null_complain_profile = alloc_sdprofile();
+
+	if (!null_profile || !null_complain_profile)
+		goto fail;
+
+	null_profile->name = kstrdup("null-profile", GFP_KERNEL);
+	null_complain_profile->name =
+		kstrdup("null-complain-profile", GFP_KERNEL);
+
+	if (!null_profile->name ||
+	    !null_complain_profile->name)
+		goto fail;
+
+	get_sdprofile(null_profile);
+	get_sdprofile(null_complain_profile);
+	null_complain_profile->flags.complain = 1;
+
+	return 1;
+
+fail:
+	/* free_sdprofile is safe for freeing partially constructed objects */
+	free_sdprofile(null_profile);
+	free_sdprofile(null_complain_profile);
+	null_profile = null_complain_profile = NULL;
+	return 0;
+}
+
+/**
+ * free_nullprofiles - Free null profiles
+ */
+void free_nullprofiles(void)
+{
+	put_sdprofile(null_complain_profile);
+	put_sdprofile(null_profile);
+	null_profile = null_complain_profile = NULL;
+}
+
+/**
  * sd_audit_message - Log a message to the audit subsystem
- * @sd: current SubDomain
+ * @sd: current subdomain
  * @flags: audit flags
  * @fmt: varargs fmt
  */
@@ -483,7 +525,7 @@ int sd_audit_message(struct subdomain *sd, int flags, const char *fmt, ...)
 
 /**
  * sd_audit_syscallreject - Log a syscall rejection to the audit subsystem
- * @sd: current SubDomain
+ * @sd: current subdomain
  * @msg: string describing syscall being rejected
  */
 int sd_audit_syscallreject(struct subdomain *sd, const char *msg)
@@ -501,7 +543,7 @@ int sd_audit_syscallreject(struct subdomain *sd, const char *msg)
 
 /**
  * sd_audit - Log an audit event to the audit subsystem
- * @sd: current SubDomain
+ * @sd: current subdomain
  * @sa: audit event
  */
 int sd_audit(struct subdomain *sd, const struct sd_audit *sa)
@@ -724,7 +766,7 @@ out:
 
 /**
  * sd_attr - check whether attribute change allowed
- * @sd: SubDomain to check against to check against
+ * @sd: subdomain to check against to check against
  * @dentry: file to check
  * @iattr: attribute changes requested
  */
@@ -783,8 +825,8 @@ out:
 }
 
 /**
- * sd_perm - basic SubDomain permissions check
- * @sd: SubDomain to check against
+ * sd_perm - basic subdomain permissions check
+ * @sd: subdomain to check against
  * @dentry: dentry
  * @mnt: mountpoint
  * @mask: access mode requested
@@ -823,7 +865,7 @@ out:
 
 /**
  * sd_perm_nameidata: interface to sd_perm accepting nameidata
- * @sd: SubDomain to check against
+ * @sd: subdomain to check against
  * @nd: namespace data (for vfsmnt and dentry)
  * @mask: access mode requested
  */
@@ -839,7 +881,7 @@ int sd_perm_nameidata(struct subdomain *sd, struct nameidata *nd, int mask)
 
 /**
  * sd_perm_dentry - file permissions interface when no vfsmnt available
- * @sd: current SubDomain
+ * @sd: current subdomain
  * @dentry: requested dentry
  * @mask: access mode requested
  *
@@ -874,7 +916,7 @@ out:
 
 /**
  * sd_perm_dir
- * @sd: current SubDomain
+ * @sd: current subdomain
  * @dentry: requested dentry
  * @mode: SD_DIR_MKDIR or SD_DIR_RMDIR
  *
@@ -913,7 +955,7 @@ out:
 
 /**
  * sd_capability - test permission to use capability
- * @sd: SubDomain to check against
+ * @sd: subdomain to check against
  * @cap: capability to be tested
  *
  * Look up capability in active profile capability set.
@@ -943,7 +985,7 @@ int sd_capability(struct subdomain *sd, int cap)
  * sd_link - hard link check
  * @link: dentry for link being created
  * @target: dentry for link target
- * @sd: SubDomain to check against
+ * @sd: subdomain to check against
  *
  * Checks link permissions for all possible name combinations.  This is
  * particularly ugly.  Returns 0 on sucess, error otherwise.
@@ -1123,7 +1165,7 @@ int sd_fork(struct task_struct *p)
  * @filp: file of program being registered
  *
  * Try to register a new program during execve().  This should give the
- * new program a valid SubDomain.
+ * new program a valid subdomain.
  *
  * This _used_ to be a really simple piece of code :-(
  *
@@ -1155,7 +1197,7 @@ int sd_register(struct file *filp)
 
 		sd = alloc_subdomain(current);
 		if (!sd) {
-			SD_WARN("%s: Failed to allocate SubDomain\n",
+			SD_WARN("%s: Failed to allocate subdomain\n",
 				__FUNCTION__);
 			goto out;
 		}
@@ -1314,10 +1356,10 @@ apply_profile:
 		 * Several things may have changed since the code above
 		 *
 		 * - If we are a confined process, sd is a refcounted copy of
-		 *   the SubDomain (get_sdcopy) and not the actual SubDomain.
+		 *   the subdomain (get_sdcopy) and not the actual subdomain.
 		 *   This allows us to not have to hold a read lock around
 		 *   all this code.  However, we need to change the actual
-		 *   SubDomain, not the copy.  Also, if profile replacement
+		 *   subdomain, not the copy.  Also, if profile replacement
 		 *   has taken place, our sd->profile may be inaccurate
 		 *   so we need to undo the copy and reverse the refcounting.
 		 *
@@ -1329,7 +1371,7 @@ apply_profile:
 
 		write_lock_irqsave(&sd_lock, flags);
 
-		/* task is guaranteed to have a SubDomain (->security)
+		/* task is guaranteed to have a subdomain (->security)
 		 * by this point
 		 */
 		latest_sd = SD_SUBDOMAIN(current->security);
@@ -1385,7 +1427,7 @@ out:
 }
 
 /**
- * sd_release - release the task's SubDomain
+ * sd_release - release the task's subdomain
  * @p: task being released
  *
  * This is called after a task has exited and the parent has reaped it.
@@ -1414,7 +1456,7 @@ void sd_release(struct task_struct *p)
 /**
  * do_change_hat - actually switch hats
  * @name: name of hat to swtich to
- * @sd: current SubDomain
+ * @sd: current subdomain
  *
  * Switch to a new hat.  Return 0 on success, error otherwise.
  */
@@ -1471,8 +1513,8 @@ static inline int do_change_hat(const char *hat_name, struct subdomain *sd)
  * @hat_magic: token to validate hat change
  *
  * Change to new @hat_name when current hat is top level profile, and store
- * the @hat_magic in the current SubDomain.  If the new @hat_name is
- * NULL, and the @hat_magic matches that stored in the current SubDomain
+ * the @hat_magic in the current subdomain.  If the new @hat_name is
+ * NULL, and the @hat_magic matches that stored in the current subdomain
  * return to original top level profile.  Returns 0 on success, error
  * otherwise.
  */
@@ -1494,8 +1536,8 @@ int sd_change_hat(const char *hat_name, __u32 hat_magic)
 			hat_magic, current->pid);
 	}
 
-	/* no SubDomains: changehat into the null_profile, since the process
-	   has no SubDomains do_change_hat won't find a match which will cause
+	/* no subdomain: changehat into the null_profile, since the process
+	   has no subdomain do_change_hat won't find a match which will cause
 	   a changehat to null_profile.  We could short circuit this but since
 	   the subdprofile (hat) list is empty we would save very little. */
 

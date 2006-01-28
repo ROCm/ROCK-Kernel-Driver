@@ -6,14 +6,13 @@
  *	published by the Free Software Foundation, version 2 of the
  *	License.
  *
- *	SubDomain /proc/pid/attr handling
+ *	AppArmor /proc/pid/attr handling
  */
 
 /* for isspace */
 #include <linux/ctype.h>
 
-#include "subdomain.h"
-#include "immunix.h"
+#include "apparmor.h"
 #include "inline.h"
 
 size_t sd_getprocattr(struct subdomain *sd, char *str, size_t size)

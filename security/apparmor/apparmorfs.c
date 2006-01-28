@@ -6,7 +6,7 @@
  *	published by the Free Software Foundation, version 2 of the
  *	License.
  *
- *	SubDomain filesystem (part of securityfs)
+ *	AppArmor filesystem (part of securityfs)
  */
 
 #include <linux/security.h>
@@ -15,10 +15,10 @@
 #include <linux/seq_file.h>
 #include <asm/uaccess.h>
 
-#include "subdomain.h"
+#include "apparmor.h"
 #include "inline.h"
 
-#define SECFS_SD "subdomain"
+#define SECFS_SD "apparmor"
 static struct dentry *sdfs_dentry = NULL;
 
 /* profile */
@@ -144,7 +144,7 @@ static int sd_prof_release(struct inode *inode, struct file *file)
 static ssize_t sd_version_read(struct file *file, char __user *buf,
 			       size_t size, loff_t *ppos)
 {
-	const char *version = subdomain_version_nl();
+	const char *version = apparmor_version_nl();
 
 	return simple_read_from_buffer(buf, size, ppos, version,
 				       strlen(version));

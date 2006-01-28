@@ -6,7 +6,7 @@
  *	published by the Free Software Foundation, version 2 of the
  *	License.
  *
- *	Immunix SubDomain LSM interface
+ *	Immunix AppArmor LSM interface (previously called "SubDomain")
  */
 
 #include <linux/security.h>
@@ -27,7 +27,7 @@
 
 #include <asm/mman.h>
 
-#include "subdomain.h"
+#include "apparmor.h"
 #include "inline.h"
 
 /* main SD lock [see get_sdcopy and put_sdcopy] */
@@ -41,22 +41,22 @@ rwlock_t sd_lock = RW_LOCK_UNLOCKED;
 /* Complain mode (used to be 'bitch' mode) */
 int subdomain_complain = 0;
 module_param_named(complain, subdomain_complain, int, S_IRUSR);
-MODULE_PARM_DESC(subdomain_complain, "Toggle SubDomain complain mode");
+MODULE_PARM_DESC(subdomain_complain, "Toggle AppArmor complain mode");
 
 /* Debug mode */
 int subdomain_debug = 0;
 module_param_named(debug, subdomain_debug, int, S_IRUSR);
-MODULE_PARM_DESC(subdomain_debug, "Toggle SubDomain debug mode");
+MODULE_PARM_DESC(subdomain_debug, "Toggle AppArmor debug mode");
 
 /* Audit mode */
 int subdomain_audit = 0;
 module_param_named(audit, subdomain_audit, int, S_IRUSR);
-MODULE_PARM_DESC(subdomain_audit, "Toggle SubDomain audit mode");
+MODULE_PARM_DESC(subdomain_audit, "Toggle AppArmor audit mode");
 
 /* Syscall logging mode */
 int subdomain_logsyscall = 0;
 module_param_named(logsyscall, subdomain_logsyscall, int, S_IRUSR);
-MODULE_PARM_DESC(subdomain_logsyscall, "Toggle SubDomain logsyscall mode");
+MODULE_PARM_DESC(subdomain_logsyscall, "Toggle AppArmor logsyscall mode");
 
 #ifndef MODULE
 static int __init sd_getopt_complain(char *str)
@@ -757,67 +757,35 @@ static int __init subdomain_init(void)
 	int error = 0;
 	const char *complainmsg = ": complainmode enabled";
 
-	/*
-	 * CREATE SUBDOMAINFS
-	 */
 	if (!create_subdomainfs()) {
-		SD_ERROR("Unable to activate SubDomain filesystem\n");
+		SD_ERROR("Unable to activate AppArmor filesystem\n");
 		error = -ENOENT;
 		goto createfs_out;
 	}
 
-	/*
-	 * CREATE NULL PROFILES
-	 */
-	null_profile = alloc_sdprofile();
-	null_complain_profile = alloc_sdprofile();
-	if (!null_profile || !null_complain_profile) {
+	if (!alloc_nullprofiles()){
 		SD_ERROR("Unable to allocate null profiles\n");
 		error = -ENOMEM;
-		goto dealloc_out;
+		goto createfs_out;
 	}
 
-	null_profile->name = kstrdup("null-profile", GFP_KERNEL);
-	null_complain_profile->name =
-		kstrdup("null-complain-profile", GFP_KERNEL);
-	if (!null_profile->name || !null_complain_profile->name) {
-		error = -ENOMEM;
-		goto dealloc_out;
-	}
-
-	get_sdprofile(null_profile);
-	get_sdprofile(null_complain_profile);
-	null_complain_profile->flags.complain = 1;
-
-	/*
-	 * REGISTER SubDomain WITH LSM
-	 */
 	if ((error = register_security(&subdomain_ops))) {
-		SD_WARN("Unable to load SubDomain\n");
+		SD_WARN("Unable to load AppArmor\n");
 		goto dealloc_out;
 	}
-	SD_INFO("SubDomain (version %s) initialized%s\n",
-		subdomain_version(),
-		subdomain_complain ? complainmsg : "");
 
+	SD_INFO("AppArmor (version %s) initialized%s\n",
+		apparmor_version(),
+		subdomain_complain ? complainmsg : "");
 	sd_audit_message(NULL, 0,
-		"SubDomain (version %s) initialized%s\n",
-		subdomain_version(),
+		"AppArmor (version %s) initialized%s\n",
+		apparmor_version(),
 		subdomain_complain ? complainmsg : "");
 
-	/* DONE */
 	return error;
 
 dealloc_out:
-	if (!null_complain_profile) {
-		free_sdprofile(null_complain_profile);
-		null_complain_profile = NULL;
-	}
-
-	if (!null_profile) {
-		free_sdprofile(null_profile);
-		null_profile = NULL;
-	}
+	free_nullprofiles();
 	(void)destroy_subdomainfs();
 
 createfs_out:
@@ -848,7 +816,7 @@ static void __exit subdomain_exit(void)
 
 	/* Remove profiles from the global profile list.
 	 * This is just for tidyness as there is no way to reference this
-	 * list once the SubDomain lsm hooks are detached (below)
+	 * list once the AppArmor lsm hooks are detached (below)
 	 */
 	sd_profilelist_release();
 
@@ -865,22 +833,22 @@ static void __exit subdomain_exit(void)
 	/* Free up list of active subdomain */
 	sd_subdomainlist_release();
 
-	put_sdprofile(null_complain_profile);
-	put_sdprofile(null_profile);
+	free_nullprofiles();
+
 	if (!destroy_subdomainfs())
-		SD_WARN("Unable to properly deactivate SubDomain fs\n");
+		SD_WARN("Unable to properly deactivate AppArmor fs\n");
 
 	if (unregister_security(&subdomain_ops))
-		SD_WARN("Unable to properly unregister SubDomain\n");
+		SD_WARN("Unable to properly unregister AppArmor\n");
 
-	SD_INFO("SubDomain protection removed\n");
+	SD_INFO("AppArmor protection removed\n");
 	sd_audit_message(NULL, 0,
-		"SubDomain protection removed\n");
+		"AppArmor protection removed\n");
 }
 
 security_initcall(subdomain_init);
 module_exit(subdomain_exit);
 
-MODULE_DESCRIPTION("SubDomain process confinement");
-MODULE_AUTHOR("SuSE/Novell <apparmor-general@forge.novell.com>");
+MODULE_DESCRIPTION("AppArmor process confinement");
+MODULE_AUTHOR("Tony Jones <tonyj@suse.de>");
 MODULE_LICENSE("GPL");

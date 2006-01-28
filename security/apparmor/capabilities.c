@@ -6,10 +6,10 @@
  *	published by the Free Software Foundation, version 2 of the
  *	License.
  *
- *	SubDomain capability definitions
+ *	AppArmor capability definitions
  */
 
-#include "subdomain.h"
+#include "apparmor.h"
 
 static const char *capnames[] = {
 	"chown",

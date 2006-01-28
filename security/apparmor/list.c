@@ -6,11 +6,11 @@
  *	published by the Free Software Foundation, version 2 of the
  *	License.
  *
- *	SubDomain Profile List Management
+ *	AppArmor Profile List Management
  */
 
 #include <linux/seq_file.h>
-#include "subdomain.h"
+#include "apparmor.h"
 #include "inline.h"
 
 /* list of all profiles and lock */
