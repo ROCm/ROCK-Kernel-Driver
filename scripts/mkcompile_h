@@ -70,9 +70,11 @@ LINUX_COMPILE_VERSION_ID="__linux_compile_version_id__`hostname | tr -c '[0-9A-Z
 # changed comment in the
 # first line.
 
+grep='grep -v UTS_VERSION\|LINUX_COMPILE_\(TIME\|VERSION_ID\)'
+
 if [ -r $TARGET ] && \
-      grep -v 'UTS_VERSION\|LINUX_COMPILE_TIME' $TARGET > .tmpver.1 && \
-      grep -v 'UTS_VERSION\|LINUX_COMPILE_TIME' .tmpcompile > .tmpver.2 && \
+      $grep $TARGET > .tmpver.1 && \
+      $grep .tmpcompile > .tmpver.2 && \
       cmp -s .tmpver.1 .tmpver.2; then
    rm -f .tmpcompile
 else

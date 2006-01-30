@@ -86,7 +86,7 @@
 
 #ifdef CONFIG_NR_CPUS
   #define CONFIG_NR__CPUS CONFIG_NR_CPUS
-#elif CONFIG_SMP
+#elif defined(CONFIG_SMP)
   #define CONFIG_NR__CPUS (32)
 #else
   #define CONFIG_NR__CPUS (1)
