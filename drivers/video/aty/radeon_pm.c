@@ -1321,7 +1321,6 @@ static void radeon_pm_full_reset_sdram(struct radeonfb_info *rinfo)
 	mdelay( 15);
 }
 
-#ifdef CONFIG_PPC_OF
 
 static void radeon_pm_reset_pad_ctlr_strength(struct radeonfb_info *rinfo)
 {
@@ -2401,7 +2400,6 @@ static void radeon_reinitialize_QW(struct radeonfb_info *rinfo)
 }
 #endif /* 0 */
 
-#endif /* CONFIG_PPC_OF */
 
 static void radeon_set_suspend(struct radeonfb_info *rinfo, int suspend)
 {
@@ -2700,7 +2698,6 @@ int radeonfb_pci_resume(struct pci_dev *pdev)
 	return rc;
 }
 
-#ifdef CONFIG_PPC_OF
 static void radeonfb_early_resume(void *data)
 {
         struct radeonfb_info *rinfo = data;
@@ -2709,7 +2706,6 @@ static void radeonfb_early_resume(void *data)
 	radeonfb_pci_resume(rinfo->pdev);
 	rinfo->no_schedule = 0;
 }
-#endif /* CONFIG_PPC_OF */
 
 #endif /* CONFIG_PM */
 
@@ -2728,13 +2724,21 @@ void radeonfb_pm_init(struct radeonfb_info *rinfo, int dynclk)
 		printk("radeonfb: Dynamic Clock Power Management disabled\n");
 	}
 
+#if defined(CONFIG_PM)
 	/* Check if we can power manage on suspend/resume. We can do
 	 * D2 on M6, M7 and M9, and we can resume from D3 cold a few other
 	 * "Mac" cards, but that's all. We need more infos about what the
 	 * BIOS does tho. Right now, all this PM stuff is pmac-only for that
 	 * reason. --BenH
 	 */
-#if defined(CONFIG_PM) && defined(CONFIG_PPC_PMAC)
+	/* Special case for Samsung P35 laptops
+	 */
+	if ((rinfo->pdev->vendor == 0x1002) && (rinfo->pdev->device == 0x4e50) &&
+		(rinfo->pdev->subsystem_vendor == 0x144d) && (rinfo->pdev->subsystem_device == 0xc00c)) {
+		rinfo->reinit_func = radeon_reinitialize_M10;
+		rinfo->pm_mode |= radeon_pm_off;
+	}
+#if defined(CONFIG_PPC_PMAC)
 	if (_machine == _MACH_Pmac && rinfo->of_node) {
 		if (rinfo->is_mobility && rinfo->pm_reg &&
 		    rinfo->family <= CHIP_FAMILY_RV250)
@@ -2778,7 +2782,8 @@ void radeonfb_pm_init(struct radeonfb_info *rinfo, int dynclk)
 		OUTREG(TV_DAC_CNTL, INREG(TV_DAC_CNTL) | 0x07000000);
 #endif
 	}
-#endif /* defined(CONFIG_PM) && defined(CONFIG_PPC_PMAC) */
+#endif /* defined(CONFIG_PPC_PMAC) */
+#endif /* defined(CONFIG_PM) */
 }
 
 void radeonfb_pm_exit(struct radeonfb_info *rinfo)
