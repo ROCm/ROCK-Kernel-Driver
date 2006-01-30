@@ -151,12 +151,12 @@ int do_setitimer(int which, struct itimerval *value, struct itimerval *ovalue)
 	switch (which) {
 	case ITIMER_REAL:
 		timer = &tsk->signal->real_timer;
-		hrtimer_cancel(timer);
 		if (ovalue) {
 			ovalue->it_value = itimer_get_remtime(timer);
 			ovalue->it_interval
 				= ktime_to_timeval(tsk->signal->it_real_incr);
 		}
+		hrtimer_cancel(timer);
 		tsk->signal->it_real_incr =
 			timeval_to_ktime(value->it_interval);
 		expires = timeval_to_ktime(value->it_value);

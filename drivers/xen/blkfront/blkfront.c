@@ -328,13 +328,12 @@ static void connect(struct blkfront_info *info)
 		return;
 	}
 	
-        xlvbd_add(sectors, info->vdevice, binfo, sector_size, info);
-
+	info->connected = BLKIF_STATE_CONNECTED;
 	(void)xenbus_switch_state(info->xbdev, NULL, XenbusStateConnected); 
+	xlvbd_add(sectors, info->vdevice, binfo, sector_size, info);
 	
 	/* Kick pending requests. */
 	spin_lock_irq(&blkif_io_lock);
-	info->connected = BLKIF_STATE_CONNECTED;
 	kick_pending_request_queues(info);
 	spin_unlock_irq(&blkif_io_lock);
 }
