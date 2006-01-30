@@ -2609,18 +2609,25 @@ int ip_route_output_flow(struct rtable **rp, struct flowi *flp, struct sock *sk,
 {
 	int err;
 
-	if ((err = __ip_route_output_key(rp, flp)) != 0)
-		return err;
+	if (flp->proto == 0) {
+		err = __ip_route_output_key(rp, flp);
+	} else {
+		u32 fl_src = flp->fl4_src, fl_dst = flp->fl4_dst;
+		int repeat = 1;
 
-	if (flp->proto) {
-		if (!flp->fl4_src)
-			flp->fl4_src = (*rp)->rt_src;
-		if (!flp->fl4_dst)
-			flp->fl4_dst = (*rp)->rt_dst;
-		return xfrm_lookup((struct dst_entry **)rp, flp, sk, flags);
+		do {
+			if ((err = __ip_route_output_key(rp, flp)) != 0)
+				break;
+
+			if (!fl_src)
+				flp->fl4_src = (*rp)->rt_src;
+			if (!fl_dst)
+				flp->fl4_dst = (*rp)->rt_dst;
+			err = xfrm_lookup((struct dst_entry **)rp, flp, sk, flags);
+		} while (err == -EAGAIN && repeat--);
 	}
 
-	return 0;
+	return err;
 }
 
 EXPORT_SYMBOL_GPL(ip_route_output_flow);
