@@ -89,20 +89,19 @@ efi_setup_pcdp_console(char *cmdline)
 	struct pcdp_uart *uart;
 	struct pcdp_device *dev, *end;
 	int i, serial = 0;
-	int rc = -ENODEV;
 
-	if (efi.hcdp == EFI_INVALID_TABLE_ADDR)
+	pcdp = efi.hcdp;
+	if (!pcdp)
 		return -ENODEV;
 
-	pcdp = ioremap(efi.hcdp, 4096);
-	printk(KERN_INFO "PCDP: v%d at 0x%lx\n", pcdp->rev, efi.hcdp);
+	printk(KERN_INFO "PCDP: v%d at 0x%lx\n", pcdp->rev, __pa(pcdp));
 
 	if (strstr(cmdline, "console=hcdp")) {
 		if (pcdp->rev < 3)
 			serial = 1;
 	} else if (strstr(cmdline, "console=")) {
 		printk(KERN_INFO "Explicit \"console=\"; ignoring PCDP\n");
-		goto out;
+		return -ENODEV;
 	}
 
 	if (pcdp->rev < 3 && efi_uart_console_only())
@@ -111,8 +110,7 @@ efi_setup_pcdp_console(char *cmdline)
 	for (i = 0, uart = pcdp->uart; i < pcdp->num_uarts; i++, uart++) {
 		if (uart->flags & PCDP_UART_PRIMARY_CONSOLE || serial) {
 			if (uart->type == PCDP_CONSOLE_UART) {
-				rc = setup_serial_console(uart);
-				goto out;
+				return setup_serial_console(uart);
 			}
 		}
 	}
@@ -123,13 +121,10 @@ efi_setup_pcdp_console(char *cmdline)
 	     dev = (struct pcdp_device *) ((u8 *) dev + dev->length)) {
 		if (dev->flags & PCDP_PRIMARY_CONSOLE) {
 			if (dev->type == PCDP_CONSOLE_VGA) {
-				rc = setup_vga_console(dev);
-				goto out;
+				return setup_vga_console(dev);
 			}
 		}
 	}
 
-out:
-	iounmap(pcdp);
-	return rc;
+	return -ENODEV;
 }
