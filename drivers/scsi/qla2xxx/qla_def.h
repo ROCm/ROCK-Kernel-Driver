@@ -2271,6 +2271,7 @@ typedef struct scsi_qla_host {
 #define LOOP_RESET_NEEDED	24
 #define BEACON_BLINK_NEEDED	25
 #define REGISTER_FDMI_NEEDED	26
+#define FCPORT_UPDATE_NEEDED	27
 
 	uint32_t	device_flags;
 #define DFLG_LOCAL_DEVICES		BIT_0

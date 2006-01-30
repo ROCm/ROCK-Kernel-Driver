@@ -758,7 +758,7 @@ qla2xxx_eh_device_reset(struct scsi_cmnd *cmd)
 		if (ret == SUCCESS) {
 			if (fcport->flags & FC_FABRIC_DEVICE) {
 				ha->isp_ops.fabric_logout(ha, fcport->loop_id);
-				qla2x00_mark_device_lost(ha, fcport);
+				qla2x00_mark_device_lost(ha, fcport, 0, 0);
 			}
 		}
 #endif
@@ -1645,17 +1645,28 @@ qla2x00_free_device(scsi_qla_host_t *ha)
 }
 
 static inline void
-qla2x00_schedule_rport_del(struct scsi_qla_host *ha, fc_port_t *fcport)
+qla2x00_schedule_rport_del(struct scsi_qla_host *ha, fc_port_t *fcport,
+    int defer)
 {
 	unsigned long flags;
+	struct fc_rport *rport;
 
-	spin_lock_irqsave(&fcport->rport_lock, flags);
-	if (fcport->rport) {
-		fcport->drport = fcport->rport;
+	if (!fcport->rport)
+		return;
+
+	rport = fcport->rport;
+	if (defer) {
+		spin_lock_irqsave(&fcport->rport_lock, flags);
+		fcport->drport = rport;
 		fcport->rport = NULL;
+		spin_unlock_irqrestore(&fcport->rport_lock, flags);
+		set_bit(FCPORT_UPDATE_NEEDED, &ha->dpc_flags);
+	} else {
+		spin_lock_irqsave(&fcport->rport_lock, flags);
+		fcport->rport = NULL;
+		spin_unlock_irqrestore(&fcport->rport_lock, flags);
+		fc_remote_port_delete(rport);
 	}
-	spin_unlock_irqrestore(&fcport->rport_lock, flags);
-	schedule_work(&fcport->rport_del_work);
 }
 
 /*
@@ -1668,10 +1679,10 @@ qla2x00_schedule_rport_del(struct scsi_qla_host *ha, fc_port_t *fcport)
  * Context:
  */
 void qla2x00_mark_device_lost(scsi_qla_host_t *ha, fc_port_t *fcport,
-    int do_login)
+    int do_login, int defer)
 {
 	if (atomic_read(&fcport->state) == FCS_ONLINE)
-		qla2x00_schedule_rport_del(ha, fcport);
+		qla2x00_schedule_rport_del(ha, fcport, defer);
 
 	/*
 	 * We may need to retry the login, so don't change the state of the
@@ -1718,7 +1729,7 @@ void qla2x00_mark_device_lost(scsi_qla_host_t *ha, fc_port_t *fcport,
  * Context:
  */
 void
-qla2x00_mark_all_devices_lost(scsi_qla_host_t *ha)
+qla2x00_mark_all_devices_lost(scsi_qla_host_t *ha, int defer)
 {
 	fc_port_t *fcport;
 
@@ -1733,9 +1744,12 @@ qla2x00_mark_all_devices_lost(scsi_qla_host_t *ha)
 		if (atomic_read(&fcport->state) == FCS_DEVICE_DEAD)
 			continue;
 		if (atomic_read(&fcport->state) == FCS_ONLINE)
-			qla2x00_schedule_rport_del(ha, fcport);
+			qla2x00_schedule_rport_del(ha, fcport, defer);
 		atomic_set(&fcport->state, FCS_DEVICE_LOST);
 	}
+
+	if (defer && ha->dpc_wait && !ha->dpc_active)
+		up(ha->dpc_wait);
 }
 
 /*
@@ -2192,6 +2206,9 @@ qla2x00_do_dpc(void *data)
 			    ha->host_no));
 		}
 
+		if (test_and_clear_bit(FCPORT_UPDATE_NEEDED, &ha->dpc_flags))
+			qla2x00_update_fcports(ha);
+
 		if (test_and_clear_bit(LOOP_RESET_NEEDED, &ha->dpc_flags)) {
 			DEBUG(printk("scsi(%ld): dpc: sched loop_reset()\n",
 			    ha->host_no));
@@ -2250,13 +2267,8 @@ qla2x00_do_dpc(void *data)
 						DEBUG(printk("scsi(%ld): port login OK: logged in ID 0x%x\n",
 						    ha->host_no, fcport->loop_id));
 
-						fcport->port_login_retry_count =
-						    ha->port_down_retry_count * PORT_RETRY_TIME;
-						atomic_set(&fcport->state, FCS_ONLINE);
-						atomic_set(&fcport->port_down_timer,
-						    ha->port_down_retry_count * PORT_RETRY_TIME);
-
-						fcport->login_retry = 0;
+						qla2x00_update_fcport(ha,
+						    fcport);
 					} else if (status == 1) {
 						set_bit(RELOGIN_NEEDED, &ha->dpc_flags);
 						/* retry the login again */
@@ -2500,6 +2512,7 @@ qla2x00_timer(scsi_qla_host_t *ha)
 	if ((test_bit(ISP_ABORT_NEEDED, &ha->dpc_flags) ||
 	    test_bit(LOOP_RESYNC_NEEDED, &ha->dpc_flags) ||
 	    test_bit(LOOP_RESET_NEEDED, &ha->dpc_flags) ||
+	    test_bit(FCPORT_UPDATE_NEEDED, &ha->dpc_flags) ||
 	    start_dpc ||
 	    test_bit(LOGIN_RETRY_NEEDED, &ha->dpc_flags) ||
 	    test_bit(RESET_MARKER_NEEDED, &ha->dpc_flags) ||

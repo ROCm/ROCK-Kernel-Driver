@@ -144,7 +144,6 @@ static int	mptscsih_tm_pending_wait(MPT_SCSI_HOST * hd);
 static int	mptscsih_tm_wait_for_completion(MPT_SCSI_HOST * hd, ulong timeout );
 static u32	SCPNT_TO_LOOKUP_IDX(struct scsi_cmnd *sc);
 
-static int	mptscsih_TMHandler(MPT_SCSI_HOST *hd, u8 type, u8 channel, u8 target, u8 lun, int ctx2abort, ulong timeout);
 static int	mptscsih_IssueTaskMgmt(MPT_SCSI_HOST *hd, u8 type, u8 channel, u8 target, u8 lun, int ctx2abort, ulong timeout);
 
 int		mptscsih_ioc_reset(MPT_ADAPTER *ioc, int post_reset);
@@ -161,8 +160,6 @@ static int	mptscsih_do_cmd(MPT_SCSI_HOST *hd, INTERNAL_CMD *iocmd);
 static void	mptscsih_synchronize_cache(MPT_SCSI_HOST *hd, VirtDevice *vdevice);
 static void	mptscsih_negotiate_to_asyn_narrow(MPT_SCSI_HOST *hd, VirtTarget *vtarget);
 static int	mptscsih_is_phys_disk(MPT_ADAPTER *ioc, int id);
-
-static struct work_struct   mptscsih_persistTask;
 
 #ifdef MPTSCSIH_ENABLE_DOMAIN_VALIDATION
 static int	mptscsih_do_raid(MPT_SCSI_HOST *hd, u8 action, INTERNAL_CMD *io);
@@ -1530,7 +1527,7 @@ mptscsih_freeChainBuffers(MPT_ADAPTER *ioc, int req_idx)
  *
  *	Returns 0 for SUCCESS or -1 if FAILED.
  */
-static int
+int
 mptscsih_TMHandler(MPT_SCSI_HOST *hd, u8 type, u8 channel, u8 target, u8 lun, int ctx2abort, ulong timeout)
 {
 	MPT_ADAPTER	*ioc;
@@ -2606,16 +2603,6 @@ mptscsih_ioc_reset(MPT_ADAPTER *ioc, int reset_phase)
 }
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
-/* work queue thread to clear the persitency table */
-static void
-mptscsih_sas_persist_clear_table(void * arg)
-{
-	MPT_ADAPTER *ioc = (MPT_ADAPTER *)arg;
-
-	mptbase_sas_persist_operation(ioc, MPI_SAS_OP_CLEAR_NOT_PRESENT);
-}
-
-/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 int
 mptscsih_event_process(MPT_ADAPTER *ioc, EventNotificationReply_t *pEvReply)
 {
@@ -2676,13 +2663,6 @@ mptscsih_event_process(MPT_ADAPTER *ioc, EventNotificationReply_t *pEvReply)
 #endif
 		break;
 	}
-
-	/* Persistent table is full. */
-	case MPI_EVENT_PERSISTENT_TABLE_FULL:
-		INIT_WORK(&mptscsih_persistTask,
-		    mptscsih_sas_persist_clear_table,(void *)ioc);
-		schedule_work(&mptscsih_persistTask);
-		break;
 
 	case MPI_EVENT_NONE:				/* 00 */
 	case MPI_EVENT_LOG_DATA:			/* 01 */
@@ -5644,6 +5624,7 @@ EXPORT_SYMBOL(mptscsih_event_process);
 EXPORT_SYMBOL(mptscsih_ioc_reset);
 EXPORT_SYMBOL(mptscsih_change_queue_depth);
 EXPORT_SYMBOL(mptscsih_timer_expired);
+EXPORT_SYMBOL(mptscsih_TMHandler);
 EXPORT_SYMBOL(mptscsih_poll);
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
