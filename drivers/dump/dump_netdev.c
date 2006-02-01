@@ -392,30 +392,35 @@ dump_net_open(struct dump_dev *net_dev, const char *arg)
 	if ((p = strchr(larg, ',')) != NULL)
 		*p = '\0';
 	strcpy(net_dev->np.dev_name, larg);
-	larg = p + 1;
+	if (p) {
+		larg = p + 1;
+		if ((p = strchr(larg, ',')) != NULL)
+			*p = '\0';
+		net_dev->np.remote_ip = simple_strtol(larg, &p, 16);
+	}
+	if (p) {
+		larg = p + 1;
+		if ((p = strchr(larg, ',')) != NULL)
+			*p = '\0';
+		net_dev->np.remote_port = simple_strtol(larg, &p, 16);
+	}
+	if (p) {
+		larg = p + 1;
+		if ((p = strchr(larg, ',')) != NULL)
+			*p = '\0';
+		net_dev->np.local_port = simple_strtol(larg, &p, 16);
+	}
+	if (p) {
+		larg = p + 1;
 
-	if ((p = strchr(larg, ',')) != NULL)
-		*p = '\0';
-	net_dev->np.remote_ip = simple_strtol(larg, &p, 16);
-
-	larg = p + 1;
-	if ((p = strchr(larg, ',')) != NULL)
-		*p = '\0';
-	net_dev->np.remote_port = simple_strtol(larg, &p, 16);
-
-	larg = p + 1;
-	if ((p = strchr(larg, ',')) != NULL)
-		*p = '\0';
-	net_dev->np.local_port = simple_strtol(larg, &p, 16);
-	larg = p + 1;
-
-	tmp = simple_strtoull(larg, NULL, 16);
-	net_dev->np.remote_mac[0] = (char) ((tmp & 0x0000ff0000000000LL) >> 40);
-	net_dev->np.remote_mac[1] = (char) ((tmp & 0x000000ff00000000LL) >> 32);
-	net_dev->np.remote_mac[2] = (char) ((tmp & 0x00000000ff000000LL) >> 24);
-	net_dev->np.remote_mac[3] = (char) ((tmp & 0x0000000000ff0000LL) >> 16);
-	net_dev->np.remote_mac[4] = (char) ((tmp & 0x000000000000ff00LL) >> 8);
-	net_dev->np.remote_mac[5] = (char) ((tmp & 0x00000000000000ffLL));
+		tmp = simple_strtoull(larg, NULL, 16);
+		net_dev->np.remote_mac[0] = (char) ((tmp & 0x0000ff0000000000LL) >> 40);
+		net_dev->np.remote_mac[1] = (char) ((tmp & 0x000000ff00000000LL) >> 32);
+		net_dev->np.remote_mac[2] = (char) ((tmp & 0x00000000ff000000LL) >> 24);
+		net_dev->np.remote_mac[3] = (char) ((tmp & 0x0000000000ff0000LL) >> 16);
+		net_dev->np.remote_mac[4] = (char) ((tmp & 0x000000000000ff00LL) >> 8);
+		net_dev->np.remote_mac[5] = (char) ((tmp & 0x00000000000000ffLL));
+	}
 
 	net_dev->np.rx_hook = rx_hook;	
 	retval = netpoll_setup(&net_dev->np);

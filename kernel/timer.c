@@ -473,7 +473,7 @@ static inline void __run_timers(tvec_base_t *base)
 					BUG();
 				}
 			}
-			spin_lock_irq(&base->t_base.lock);
+			spin_lock_irqsave(&base->t_base.lock, flags);
 		}
 	}
 	set_running_timer(base, NULL);

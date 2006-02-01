@@ -412,6 +412,33 @@ int ata_scsi_device_suspend(struct scsi_device *sdev)
 	return ata_device_suspend(ap, dev);
 }
 
+/* LKCD ops */
+int ata_scsi_dump_quiesce(struct scsi_device *device)
+{
+	struct ata_port *ap = (struct ata_port *) device->host->hostdata;
+	struct ata_host_set *host_set = ap->host_set;
+
+	/*
+	 * Give the device 1 second to finish whatever it might be doing,
+	 * then deal with any pending interrupts.
+	 */
+	mdelay(1000);
+	ap->ops->irq_handler(0, host_set, NULL);
+
+	ap->qactive = 0;
+	ap->active_tag = ATA_TAG_POISON;
+
+	return 0;
+}
+
+void ata_scsi_dump_poll(struct scsi_device *device)
+{
+	struct ata_port *ap = (struct ata_port *) device->host->hostdata;
+	struct ata_host_set *host_set = ap->host_set;
+
+	ap->ops->irq_handler(0, host_set, NULL);
+}
+
 /**
  *	ata_to_sense_error - convert ATA error to SCSI error
  *	@id: ATA device number

@@ -175,7 +175,7 @@ ssize_t store_polling(struct dump_dev_driver *ddev, const char *buf,
 	if ((sscanf(buf, "%lx", &tmp)) != 1)
 		return -EINVAL;
 
-	if ((tmp < 0) | (tmp > 1))
+	if ((tmp < 0) || (tmp > 1))
 		return -EINVAL;
 
 	dump_config.polling = tmp;
@@ -598,13 +598,11 @@ static int dumper_setup(const char *devid)
 
 	dump_config.dumper->dev = dump_dev;
 	
-	if (dump_config.dump_device)
+	if (dump_config.dump_device != devid) {
 		kfree(dump_config.dump_device);
-
-	if (!(dump_config.dump_device = kmalloc(strlen(devid), GFP_KERNEL)))
-		return -ENOMEM;
-
-	strcpy(dump_config.dump_device, devid);
+		if (!(dump_config.dump_device = kstrdup(devid, GFP_KERNEL)))
+			return -ENOMEM;
+	}
 
 	ret = dump_configure(devid);
 	if (!ret) {

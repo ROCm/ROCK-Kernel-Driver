@@ -499,6 +499,10 @@ extern int ata_std_bios_param(struct scsi_device *sdev,
 			      sector_t capacity, int geom[]);
 extern int ata_scsi_slave_config(struct scsi_device *sdev);
 
+/* LKCD dump ops */
+int ata_scsi_dump_quiesce(struct scsi_device *device);
+void ata_scsi_dump_poll(struct scsi_device *device);
+
 /*
  * Timing helpers
  */
