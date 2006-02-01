@@ -552,6 +552,9 @@ static int sn_pci_hotplug_init(void)
 	int rc;
 	int registered = 0;
 
+	if (!ia64_platform_is("sn2"))
+		return -ENODEV;
+
 	if (sn_sal_rev() < SGI_HOTPLUG_PROM_REV) {
 		printk(KERN_ERR "%s: PROM version must be greater than 4.30\n",
 		       __FUNCTION__);

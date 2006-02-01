@@ -973,6 +973,9 @@ static int __devinit sn_hwperf_misc_register_init(void)
 {
 	int e;
 
+	if (!ia64_platform_is("sn2"))
+		return -ENODEV;
+
 	sn_hwperf_init();
 
 	/*

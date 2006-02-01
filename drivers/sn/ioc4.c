@@ -406,6 +406,9 @@ MODULE_DEVICE_TABLE(pci, ioc4_id_table);
 static int __devinit
 ioc4_init(void)
 {
+	if (!ia64_platform_is("sn2"))
+		return -ENODEV;
+
 	return pci_register_driver(&ioc4_driver);
 }
 
