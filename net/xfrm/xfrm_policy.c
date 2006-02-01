@@ -786,23 +786,7 @@ int xfrm_lookup(struct dst_entry **dst_p, struct flowi *fl,
 	u16 family = dst_orig->ops->family;
 	u8 dir = policy_to_flow_dir(XFRM_POLICY_OUT);
 	u32 sk_sid = security_sk_sid(sk, fl, dir);
-	int loops = 0;
-
 restart:
-	if (dst_orig && !dst_check(dst_orig, 0)) {
-		printk(KERN_NOTICE "xfrm_lookup: IPv4 route is stale (obsolete=%u, loops=%d)\n",
-				dst_orig->obsolete, loops);
-		dump_stack();
-		err = -EAGAIN;
-		goto error_nopol;
-	}
-	if (unlikely(++loops > 10)) {
-		printk(KERN_NOTICE "xfrm_lookup bailing out after %d loops\n", loops);
-		dump_stack();
-		err = -EHOSTUNREACH;
-		goto error_nopol;
-	}
-
 	genid = atomic_read(&flow_cache_genid);
 	policy = NULL;
 	if (sk && sk->sk_policy[1])
@@ -870,7 +854,6 @@ restart:
 				}
 				if (nx == -EAGAIN ||
 				    genid != atomic_read(&flow_cache_genid)) {
-					printk(KERN_NOTICE "xfrm_tmpl_resolve says EAGAIN, try again\n");
 					xfrm_pol_put(policy);
 					goto restart;
 				}
@@ -904,8 +887,6 @@ restart:
 			 */
 			write_unlock_bh(&policy->lock);
 
-			printk(KERN_NOTICE "xfrm_lookup: newly created bundle is stale\n");
-
 			xfrm_pol_put(policy);
 			if (dst)
 				dst_free(dst);
@@ -922,9 +903,8 @@ restart:
 	return 0;
 
 error:
-	xfrm_pol_put(policy);
-error_nopol:
 	dst_release(dst_orig);
+	xfrm_pol_put(policy);
 	*dst_p = NULL;
 	return err;
 }
@@ -1216,24 +1196,18 @@ int xfrm_bundle_ok(struct xfrm_dst *first, struct flowi *fl, int family)
 	u32 mtu;
 
 	if (!dst_check(dst->path, ((struct xfrm_dst *)dst)->path_cookie) ||
-	    (dst->dev && !netif_running(dst->dev))) {
-		printk(KERN_DEBUG "xfrm_bundle_ok: %u\n", __LINE__);
+	    (dst->dev && !netif_running(dst->dev)))
 		return 0;
-	}
 
 	last = NULL;
 
 	do {
 		struct xfrm_dst *xdst = (struct xfrm_dst *)dst;
 
-		if (fl && !xfrm_selector_match(&dst->xfrm->sel, fl, family)) {
-			printk(KERN_DEBUG "xfrm_bundle_ok: %u\n", __LINE__);
+		if (fl && !xfrm_selector_match(&dst->xfrm->sel, fl, family))
 			return 0;
-		}
-		if (dst->xfrm->km.state != XFRM_STATE_VALID) {
-			printk(KERN_DEBUG "xfrm_bundle_ok: %u\n", __LINE__);
+		if (dst->xfrm->km.state != XFRM_STATE_VALID)
 			return 0;
-		}
 
 		mtu = dst_mtu(dst->child);
 		if (xdst->child_mtu_cached != mtu) {
@@ -1241,10 +1215,8 @@ int xfrm_bundle_ok(struct xfrm_dst *first, struct flowi *fl, int family)
 			xdst->child_mtu_cached = mtu;
 		}
 
-		if (!dst_check(xdst->route, xdst->route_cookie)) {
-			printk(KERN_DEBUG "xfrm_bundle_ok: %u\n", __LINE__);
+		if (!dst_check(xdst->route, xdst->route_cookie))
 			return 0;
-		}
 		mtu = dst_mtu(xdst->route);
 		if (xdst->route_mtu_cached != mtu) {
 			last = xdst;
