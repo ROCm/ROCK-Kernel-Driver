@@ -121,7 +121,7 @@ void __init net_random_init(void)
 {
 	int i;
 
-	for (i = 0; i < NR_CPUS; i++) {
+	for_each_cpu(i) {
 		struct nrnd_state *state = &per_cpu(net_rand_state,i);
 		__net_srandom(state, i+jiffies);
 	}

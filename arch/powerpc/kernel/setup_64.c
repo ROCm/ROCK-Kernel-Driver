@@ -33,6 +33,7 @@
 #include <linux/unistd.h>
 #include <linux/serial.h>
 #include <linux/serial_8250.h>
+#include <linux/bootmem.h>
 #include <asm/io.h>
 #include <asm/kdump.h>
 #include <asm/prom.h>
@@ -654,3 +655,36 @@ void cpu_die(void)
 	if (ppc_md.cpu_die)
 		ppc_md.cpu_die();
 }
+
+#ifdef CONFIG_SMP
+void __init setup_per_cpu_areas(void)
+{
+	int i;
+	unsigned long size;
+	char *ptr;
+
+	/* Copy section for each CPU (we discard the original) */
+	size = ALIGN(__per_cpu_end - __per_cpu_start, SMP_CACHE_BYTES);
+#ifdef CONFIG_MODULES
+	if (size < PERCPU_ENOUGH_ROOM)
+		size = PERCPU_ENOUGH_ROOM;
+#endif
+
+	/*
+	 * Poison invalid cpus, with lots of high bits set this should
+	 * always fault
+	 */
+	for (i = 0; i < NR_CPUS; i++) {
+		paca[i].data_offset = 0xeeeeeeeeeeeeeeeeULL;
+	}
+
+	for_each_cpu(i) {
+		ptr = alloc_bootmem_node(NODE_DATA(cpu_to_node(i)), size);
+		if (!ptr)
+			panic("Cannot allocate cpu data for CPU %d\n", i);
+
+		paca[i].data_offset = ptr - __per_cpu_start;
+		memcpy(ptr, __per_cpu_start, __per_cpu_end - __per_cpu_start);
+	}
+}
+#endif
