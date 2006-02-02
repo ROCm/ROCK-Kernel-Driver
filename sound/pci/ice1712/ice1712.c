@@ -55,6 +55,7 @@
 #include <linux/pci.h>
 #include <linux/slab.h>
 #include <linux/moduleparam.h>
+#include <linux/mutex.h>
 #include <sound/core.h>
 #include <sound/cs8427.h>
 #include <sound/info.h>
@@ -316,7 +317,6 @@ static void snd_ice1712_set_gpio_data(struct snd_ice1712 *ice, unsigned int val)
 	inb(ICEREG(ice, DATA)); /* dummy read for pci-posting */
 }
 
-
 /*
  *
  * CS8427 interface
@@ -396,6 +396,20 @@ int __devinit snd_ice1712_init_cs8427(struct snd_ice1712 *ice, int addr)
 	return 0;
 }
 
+static void snd_ice1712_set_input_clock_source(struct snd_ice1712 *ice, int spdif_is_master)
+{
+        /* change CS8427 clock source too */
+        if (ice->cs8427)
+                snd_ice1712_cs8427_set_input_clock(ice, spdif_is_master);
+	/* notify ak4524 chip as well */
+	if (spdif_is_master) {
+		unsigned int i;
+		for (i = 0; i < ice->akm_codecs; i++) {
+			if (ice->akm[i].ops.set_rate_val)
+				ice->akm[i].ops.set_rate_val(&ice->akm[i], 0);
+		}
+	}
+}
 
 /*
  *  Interrupt handler
@@ -1856,20 +1870,8 @@ static int snd_ice1712_pro_internal_clock_put(struct snd_kcontrol *kcontrol,
 	spin_unlock_irq(&ice->reg_lock);
 
 	if ((oval & ICE1712_SPDIF_MASTER) !=
-	    (inb(ICEMT(ice, RATE)) & ICE1712_SPDIF_MASTER)) {
-		/* change CS8427 clock source too */
-		if (ice->cs8427) {
-			snd_ice1712_cs8427_set_input_clock(ice, is_spdif_master(ice));
-		}
-		/* notify ak4524 chip as well */
-		if (is_spdif_master(ice)) {
-			unsigned int i;
-			for (i = 0; i < ice->akm_codecs; i++) {
-				if (ice->akm[i].ops.set_rate_val)
-					ice->akm[i].ops.set_rate_val(&ice->akm[i], 0);
-			}
-		}
-	}
+	    (inb(ICEMT(ice, RATE)) & ICE1712_SPDIF_MASTER))
+	        snd_ice1712_set_input_clock_source(ice, is_spdif_master(ice));
 
 	return change;
 }
@@ -2557,9 +2559,9 @@ static int __devinit snd_ice1712_create(struct snd_card *card,
 		cs8427_timeout = 1000;
 	ice->cs8427_timeout = cs8427_timeout;
 	spin_lock_init(&ice->reg_lock);
-	init_MUTEX(&ice->gpio_mutex);
-	init_MUTEX(&ice->i2c_mutex);
-	init_MUTEX(&ice->open_mutex);
+	mutex_init(&ice->gpio_mutex);
+	mutex_init(&ice->i2c_mutex);
+	mutex_init(&ice->open_mutex);
 	ice->gpio.set_mask = snd_ice1712_set_gpio_mask;
 	ice->gpio.set_dir = snd_ice1712_set_gpio_dir;
 	ice->gpio.set_data = snd_ice1712_set_gpio_data;
@@ -2734,6 +2736,8 @@ static int __devinit snd_ice1712_probe(struct pci_dev *pci,
 				return err;
 			}
 	}
+
+	snd_ice1712_set_input_clock_source(ice, 0);
 
 	sprintf(card->longname, "%s at 0x%lx, irq %i",
 		card->shortname, ice->port, ice->irq);
