@@ -47,7 +47,6 @@
 #include <linux/usb.h>
 #include <linux/vmalloc.h>
 #include <linux/moduleparam.h>
-#include <linux/mutex.h>
 #include <sound/core.h>
 #include <sound/info.h>
 #include <sound/pcm.h>
@@ -203,7 +202,7 @@ struct snd_usb_stream {
  * the all interfaces on the same card as one sound device.
  */
 
-static DEFINE_MUTEX(register_mutex);
+static DECLARE_MUTEX(register_mutex);
 static struct snd_usb_audio *usb_chip[SNDRV_CARDS];
 
 
@@ -476,18 +475,6 @@ static int retire_playback_sync_urb_hs(struct snd_usb_substream *subs,
 	return 0;
 }
 
-/* determine the number of frames in the next packet */
-static int snd_usb_audio_next_packet_size(struct snd_usb_substream *subs)
-{
-	if (subs->fill_max)
-		return subs->maxframesize;
-	else {
-		subs->phase = (subs->phase & 0xffff)
-			+ (subs->freqm << subs->datainterval);
-		return min(subs->phase >> 16, subs->maxframesize);
-	}
-}
-
 /*
  * Prepare urb for streaming before playback starts.
  *
@@ -505,7 +492,16 @@ static int prepare_startup_playback_urb(struct snd_usb_substream *subs,
 	urb->dev = ctx->subs->dev;
 	urb->number_of_packets = subs->packs_per_ms;
 	for (i = 0; i < subs->packs_per_ms; ++i) {
-		counts = snd_usb_audio_next_packet_size(subs);
+		/* calculate the size of a packet */
+		if (subs->fill_max)
+			counts = subs->maxframesize; /* fixed */
+		else {
+			subs->phase = (subs->phase & 0xffff)
+				+ (subs->freqm << subs->datainterval);
+			counts = subs->phase >> 16;
+			if (counts > subs->maxframesize)
+				counts = subs->maxframesize;
+		}
 		urb->iso_frame_desc[i].offset = offs * stride;
 		urb->iso_frame_desc[i].length = counts * stride;
 		offs += counts;
@@ -542,7 +538,16 @@ static int prepare_playback_urb(struct snd_usb_substream *subs,
 	urb->number_of_packets = 0;
 	spin_lock_irqsave(&subs->lock, flags);
 	for (i = 0; i < ctx->packets; i++) {
-		counts = snd_usb_audio_next_packet_size(subs);
+		/* calculate the size of a packet */
+		if (subs->fill_max)
+			counts = subs->maxframesize; /* fixed */
+		else {
+			subs->phase = (subs->phase & 0xffff)
+				+ (subs->freqm << subs->datainterval);
+			counts = subs->phase >> 16;
+			if (counts > subs->maxframesize)
+				counts = subs->maxframesize;
+		}
 		/* set up descriptor */
 		urb->iso_frame_desc[i].offset = offs * stride;
 		urb->iso_frame_desc[i].length = counts * stride;
@@ -1385,8 +1390,8 @@ static int snd_usb_hw_params(struct snd_pcm_substream *substream,
 	channels = params_channels(hw_params);
 	fmt = find_format(subs, format, rate, channels);
 	if (! fmt) {
-		snd_printd(KERN_DEBUG "cannot set format: format = 0x%x, rate = %d, channels = %d\n",
-			   format, rate, channels);
+		snd_printd(KERN_DEBUG "cannot set format: format = %s, rate = %d, channels = %d\n",
+			   snd_pcm_format_name(format), rate, channels);
 		return -EINVAL;
 	}
 
@@ -2012,8 +2017,6 @@ static struct usb_driver usb_audio_driver = {
 };
 
 
-#if defined(CONFIG_PROCFS) && defined(CONFIG_SND_VERBOSE_PROCFS)
-
 /*
  * proc interface for list the supported pcm formats
  */
@@ -2029,7 +2032,7 @@ static void proc_dump_substream_formats(struct snd_usb_substream *subs, struct s
 		fp = list_entry(p, struct audioformat, list);
 		snd_iprintf(buffer, "  Interface %d\n", fp->iface);
 		snd_iprintf(buffer, "    Altset %d\n", fp->altsetting);
-		snd_iprintf(buffer, "    Format: 0x%x\n", fp->format);
+		snd_iprintf(buffer, "    Format: %s\n", snd_pcm_format_name(fp->format));
 		snd_iprintf(buffer, "    Channels: %d\n", fp->channels);
 		snd_iprintf(buffer, "    Endpoint: %d %s (%s)\n",
 			    fp->endpoint & USB_ENDPOINT_NUMBER_MASK,
@@ -2104,13 +2107,6 @@ static void proc_pcm_format_add(struct snd_usb_stream *stream)
 		snd_info_set_text_ops(entry, stream, 1024, proc_pcm_format_read);
 }
 
-#else
-
-static inline void proc_pcm_format_add(struct snd_usb_stream *stream)
-{
-}
-
-#endif
 
 /*
  * initialize the substream instance.
@@ -3286,7 +3282,7 @@ static void *snd_usb_audio_probe(struct usb_device *dev,
 
 	/* check whether it's already registered */
 	chip = NULL;
-	mutex_lock(&register_mutex);
+	down(&register_mutex);
 	for (i = 0; i < SNDRV_CARDS; i++) {
 		if (usb_chip[i] && usb_chip[i]->dev == dev) {
 			if (usb_chip[i]->shutdown) {
@@ -3339,13 +3335,13 @@ static void *snd_usb_audio_probe(struct usb_device *dev,
 
 	usb_chip[chip->index] = chip;
 	chip->num_interfaces++;
-	mutex_unlock(&register_mutex);
+	up(&register_mutex);
 	return chip;
 
  __error:
 	if (chip && !chip->num_interfaces)
 		snd_card_free(chip->card);
-	mutex_unlock(&register_mutex);
+	up(&register_mutex);
  __err_val:
 	return NULL;
 }
@@ -3365,7 +3361,7 @@ static void snd_usb_audio_disconnect(struct usb_device *dev, void *ptr)
 
 	chip = ptr;
 	card = chip->card;
-	mutex_lock(&register_mutex);
+	down(&register_mutex);
 	chip->shutdown = 1;
 	chip->num_interfaces--;
 	if (chip->num_interfaces <= 0) {
@@ -3383,10 +3379,10 @@ static void snd_usb_audio_disconnect(struct usb_device *dev, void *ptr)
 			snd_usb_mixer_disconnect(p);
 		}
 		usb_chip[chip->index] = NULL;
-		mutex_unlock(&register_mutex);
+		up(&register_mutex);
 		snd_card_free(card);
 	} else {
-		mutex_unlock(&register_mutex);
+		up(&register_mutex);
 	}
 }
 

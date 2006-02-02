@@ -93,7 +93,7 @@ struct snd_sf_list {
 	int sample_locked;	/* locked time for sample */
 	struct snd_sf_callback callback;	/* callback functions */
 	int presets_locked;
-	struct mutex presets_mutex;
+	struct semaphore presets_mutex;
 	spinlock_t lock;
 	struct snd_util_memhdr *memhdr;
 };

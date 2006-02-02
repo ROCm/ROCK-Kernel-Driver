@@ -6,8 +6,8 @@
 #include <sound/pcm.h>
 
 typedef struct {
-	int (*startup)(struct snd_pcm_substream *, void *);
-	void (*shutdown)(struct snd_pcm_substream *, void *);
+	int (*startup)(snd_pcm_substream_t *, void *);
+	void (*shutdown)(snd_pcm_substream_t *, void *);
 	void (*suspend)(void *);
 	void (*resume)(void *);
 	void *priv;

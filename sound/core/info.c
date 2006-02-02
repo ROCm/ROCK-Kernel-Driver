@@ -31,7 +31,6 @@
 #include <sound/version.h>
 #include <linux/proc_fs.h>
 #include <linux/devfs_fs_kernel.h>
-#include <linux/mutex.h>
 #include <stdarg.h>
 
 /*
@@ -69,7 +68,7 @@ int snd_info_check_reserved_words(const char *str)
 	return 1;
 }
 
-static DEFINE_MUTEX(info_mutex);
+static DECLARE_MUTEX(info_mutex);
 
 struct snd_info_private_data {
 	struct snd_info_buffer *rbuffer;
@@ -266,11 +265,11 @@ static int snd_info_entry_open(struct inode *inode, struct file *file)
 	struct proc_dir_entry *p;
 	int mode, err;
 
-	mutex_lock(&info_mutex);
+	down(&info_mutex);
 	p = PDE(inode);
 	entry = p == NULL ? NULL : (struct snd_info_entry *)p->data;
 	if (entry == NULL || entry->disconnected) {
-		mutex_unlock(&info_mutex);
+		up(&info_mutex);
 		return -ENODEV;
 	}
 	if (!try_module_get(entry->module)) {
@@ -362,13 +361,13 @@ static int snd_info_entry_open(struct inode *inode, struct file *file)
 		break;
 	}
 	file->private_data = data;
-	mutex_unlock(&info_mutex);
+	up(&info_mutex);
 	if (entry->content == SNDRV_INFO_CONTENT_TEXT &&
 	    (mode == O_RDONLY || mode == O_RDWR)) {
 		if (entry->c.text.read) {
-			mutex_lock(&entry->access);
+			down(&entry->access);
 			entry->c.text.read(entry, data->rbuffer);
-			mutex_unlock(&entry->access);
+			up(&entry->access);
 		}
 	}
 	return 0;
@@ -376,7 +375,7 @@ static int snd_info_entry_open(struct inode *inode, struct file *file)
       __error:
 	module_put(entry->module);
       __error1:
-	mutex_unlock(&info_mutex);
+	up(&info_mutex);
 	return err;
 }
 
@@ -748,7 +747,7 @@ static struct snd_info_entry *snd_info_create_entry(const char *name)
 	}
 	entry->mode = S_IFREG | S_IRUGO;
 	entry->content = SNDRV_INFO_CONTENT_TEXT;
-	mutex_init(&entry->access);
+	init_MUTEX(&entry->access);
 	return entry;
 }
 
@@ -897,10 +896,10 @@ int snd_info_register(struct snd_info_entry * entry)
 
 	snd_assert(entry != NULL, return -ENXIO);
 	root = entry->parent == NULL ? snd_proc_root : entry->parent->p;
-	mutex_lock(&info_mutex);
+	down(&info_mutex);
 	p = snd_create_proc_entry(entry->name, entry->mode, root);
 	if (!p) {
-		mutex_unlock(&info_mutex);
+		up(&info_mutex);
 		return -ENOMEM;
 	}
 	p->owner = entry->module;
@@ -909,7 +908,7 @@ int snd_info_register(struct snd_info_entry * entry)
 	p->size = entry->size;
 	p->data = entry;
 	entry->p = p;
-	mutex_unlock(&info_mutex);
+	up(&info_mutex);
 	return 0;
 }
 
@@ -930,9 +929,9 @@ int snd_info_unregister(struct snd_info_entry * entry)
 	snd_assert(entry->p != NULL, return -ENXIO);
 	root = entry->parent == NULL ? snd_proc_root : entry->parent->p;
 	snd_assert(root, return -ENXIO);
-	mutex_lock(&info_mutex);
+	down(&info_mutex);
 	snd_remove_proc_entry(root, entry->p);
-	mutex_unlock(&info_mutex);
+	up(&info_mutex);
 	snd_info_free_entry(entry);
 	return 0;
 }

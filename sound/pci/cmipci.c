@@ -29,7 +29,6 @@
 #include <linux/slab.h>
 #include <linux/gameport.h>
 #include <linux/moduleparam.h>
-#include <linux/mutex.h>
 #include <sound/core.h>
 #include <sound/info.h>
 #include <sound/control.h>
@@ -440,7 +439,7 @@ struct cmipci {
 	struct snd_pcm_hardware *hw_info[3]; /* for playbacks */
 
 	int opened[2];	/* open mode */
-	struct mutex open_mutex;
+	struct semaphore open_mutex;
 
 	unsigned int mixer_insensitive: 1;
 	struct snd_kcontrol *mixer_res_ctl[CM_SAVED_MIXERS];
@@ -642,14 +641,14 @@ static int snd_cmipci_playback2_hw_params(struct snd_pcm_substream *substream,
 {
 	struct cmipci *cm = snd_pcm_substream_chip(substream);
 	if (params_channels(hw_params) > 2) {
-		mutex_lock(&cm->open_mutex);
+		down(&cm->open_mutex);
 		if (cm->opened[CM_CH_PLAY]) {
-			mutex_unlock(&cm->open_mutex);
+			up(&cm->open_mutex);
 			return -EBUSY;
 		}
 		/* reserve the channel A */
 		cm->opened[CM_CH_PLAY] = CM_OPEN_PLAYBACK_MULTI;
-		mutex_unlock(&cm->open_mutex);
+		up(&cm->open_mutex);
 	}
 	return snd_pcm_lib_malloc_pages(substream, params_buffer_bytes(hw_params));
 }
@@ -1462,9 +1461,9 @@ static int open_device_check(struct cmipci *cm, int mode, struct snd_pcm_substre
 	 * pcm framework doesn't pass file pointer before actually opened,
 	 * we can't know whether blocking mode or not in open callback..
 	 */
-	mutex_lock(&cm->open_mutex);
+	down(&cm->open_mutex);
 	if (cm->opened[ch]) {
-		mutex_unlock(&cm->open_mutex);
+		up(&cm->open_mutex);
 		return -EBUSY;
 	}
 	cm->opened[ch] = mode;
@@ -1476,7 +1475,7 @@ static int open_device_check(struct cmipci *cm, int mode, struct snd_pcm_substre
 		snd_cmipci_clear_bit(cm, CM_REG_MISC_CTRL, CM_ENDBDAC);
 		spin_unlock_irq(&cm->reg_lock);
 	}
-	mutex_unlock(&cm->open_mutex);
+	up(&cm->open_mutex);
 	return 0;
 }
 
@@ -1484,7 +1483,7 @@ static void close_device_check(struct cmipci *cm, int mode)
 {
 	int ch = mode & CM_OPEN_CH_MASK;
 
-	mutex_lock(&cm->open_mutex);
+	down(&cm->open_mutex);
 	if (cm->opened[ch] == mode) {
 		if (cm->channel[ch].substream) {
 			snd_cmipci_ch_reset(cm, ch);
@@ -1500,7 +1499,7 @@ static void close_device_check(struct cmipci *cm, int mode)
 			spin_unlock_irq(&cm->reg_lock);
 		}
 	}
-	mutex_unlock(&cm->open_mutex);
+	up(&cm->open_mutex);
 }
 
 /*
@@ -1547,7 +1546,7 @@ static int snd_cmipci_playback2_open(struct snd_pcm_substream *substream)
 	if ((err = open_device_check(cm, CM_OPEN_PLAYBACK2, substream)) < 0) /* use channel B */
 		return err;
 	runtime->hw = snd_cmipci_playback2;
-	mutex_lock(&cm->open_mutex);
+	down(&cm->open_mutex);
 	if (! cm->opened[CM_CH_PLAY]) {
 		if (cm->can_multi_ch) {
 			runtime->hw.channels_max = cm->max_channels;
@@ -1560,7 +1559,7 @@ static int snd_cmipci_playback2_open(struct snd_pcm_substream *substream)
 		}
 		snd_pcm_hw_constraint_minmax(runtime, SNDRV_PCM_HW_PARAM_BUFFER_SIZE, 0, 0x10000);
 	}
-	mutex_unlock(&cm->open_mutex);
+	up(&cm->open_mutex);
 	return 0;
 }
 
@@ -2845,7 +2844,7 @@ static int __devinit snd_cmipci_create(struct snd_card *card, struct pci_dev *pc
 	}
 
 	spin_lock_init(&cm->reg_lock);
-	mutex_init(&cm->open_mutex);
+	init_MUTEX(&cm->open_mutex);
 	cm->device = pci->device;
 	cm->card = card;
 	cm->pci = pci;

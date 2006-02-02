@@ -151,18 +151,14 @@ snd_vortex_create(struct snd_card *card, struct pci_dev *pci, vortex_t ** rchip)
 	// check PCI availability (DMA).
 	if ((err = pci_enable_device(pci)) < 0)
 		return err;
-	if (pci_set_dma_mask(pci, DMA_32BIT_MASK) < 0 ||
-	    pci_set_consistent_dma_mask(pci, DMA_32BIT_MASK) < 0) {
+	if (pci_set_dma_mask(pci, DMA_32BIT_MASK)) {
 		printk(KERN_ERR "error to set DMA mask\n");
-		pci_disable_device(pci);
 		return -ENXIO;
 	}
 
 	chip = kzalloc(sizeof(*chip), GFP_KERNEL);
-	if (chip == NULL) {
-		pci_disable_device(pci);
+	if (chip == NULL)
 		return -ENOMEM;
-	}
 
 	chip->card = card;
 
@@ -211,8 +207,6 @@ snd_vortex_create(struct snd_card *card, struct pci_dev *pci, vortex_t ** rchip)
 	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, chip, &ops)) < 0) {
 		goto alloc_out;
 	}
-
-	snd_card_set_dev(card, &pci->dev);
 
 	*rchip = chip;
 

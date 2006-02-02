@@ -11,8 +11,6 @@
  *			  Frank Pavlic (fpavlic@de.ibm.com) and
  *		 	  Martin Schwidefsky <schwidefsky@de.ibm.com>
  *
- *    $Revision: 1.102 $	 $Date: 2006/01/04 12:21:29 $
- *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -59,9 +57,8 @@
 /**
  * initialization string for output
  */
-#define VERSION_LCS_C  "$Revision: 1.102 $"
 
-static char version[] __initdata = "LCS driver ("VERSION_LCS_C "/" VERSION_LCS_H ")";
+static char version[] __initdata = "LCS driver";
 static char debug_buffer[255];
 
 /**

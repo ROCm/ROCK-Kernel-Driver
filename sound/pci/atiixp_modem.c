@@ -27,7 +27,6 @@
 #include <linux/pci.h>
 #include <linux/slab.h>
 #include <linux/moduleparam.h>
-#include <linux/mutex.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
@@ -256,7 +255,7 @@ struct atiixp_modem {
 	unsigned int codec_not_ready_bits;	/* for codec detection */
 
 	int spdif_over_aclink;		/* passed from the module option */
-	struct mutex open_mutex;	/* playback open mutex */
+	struct semaphore open_mutex;	/* playback open mutex */
 };
 
 
@@ -912,9 +911,9 @@ static int snd_atiixp_playback_open(struct snd_pcm_substream *substream)
 	struct atiixp_modem *chip = snd_pcm_substream_chip(substream);
 	int err;
 
-	mutex_lock(&chip->open_mutex);
+	down(&chip->open_mutex);
 	err = snd_atiixp_pcm_open(substream, &chip->dmas[ATI_DMA_PLAYBACK], 0);
-	mutex_unlock(&chip->open_mutex);
+	up(&chip->open_mutex);
 	if (err < 0)
 		return err;
 	return 0;
@@ -924,9 +923,9 @@ static int snd_atiixp_playback_close(struct snd_pcm_substream *substream)
 {
 	struct atiixp_modem *chip = snd_pcm_substream_chip(substream);
 	int err;
-	mutex_lock(&chip->open_mutex);
+	down(&chip->open_mutex);
 	err = snd_atiixp_pcm_close(substream, &chip->dmas[ATI_DMA_PLAYBACK]);
-	mutex_unlock(&chip->open_mutex);
+	up(&chip->open_mutex);
 	return err;
 }
 
@@ -1234,7 +1233,7 @@ static int __devinit snd_atiixp_create(struct snd_card *card,
 	}
 
 	spin_lock_init(&chip->reg_lock);
-	mutex_init(&chip->open_mutex);
+	init_MUTEX(&chip->open_mutex);
 	chip->card = card;
 	chip->pci = pci;
 	chip->irq = -1;

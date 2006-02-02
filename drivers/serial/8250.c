@@ -31,7 +31,6 @@
 #include <linux/init.h>
 #include <linux/console.h>
 #include <linux/sysrq.h>
-#include <linux/mca.h>
 #include <linux/delay.h>
 #include <linux/platform_device.h>
 #include <linux/tty.h>
@@ -1575,7 +1574,7 @@ static void serial8250_break_ctl(struct uart_port *port, int break_state)
 /*
  *	Wait for transmitter & holding register to empty
  */
-static void wait_for_xmitr(struct uart_8250_port *up)
+static void wait_for_xmitr(struct uart_8250_port *up, int bits)
 {
 	unsigned int status, tmout = 10000;
 
@@ -1589,7 +1588,7 @@ static void wait_for_xmitr(struct uart_8250_port *up)
 		if (--tmout == 0)
 			break;
 		udelay(1);
-	} while ((status & BOTH_EMPTY) != BOTH_EMPTY);
+	} while ((status & bits) != bits);
 
 	/* Wait up to 1s for flow control if necessary */
 	if (up->port.flags & UPF_CONS_FLOW) {
@@ -1736,7 +1735,7 @@ static int serial8250_startup(struct uart_port *port)
 		 * this interrupt whenever the transmitter is idle and
 		 * the interrupt is enabled.
 		 */
-		wait_for_xmitr(up);
+		wait_for_xmitr(up, UART_LSR_THRE);
 		serial_outp(up, UART_IER, UART_IER_THRI);
 		(void)serial_in(up, UART_IIR);
 		serial_outp(up, UART_IER, 0);
@@ -2162,12 +2161,6 @@ static void serial8250_config_port(struct uart_port *port, int flags)
 	int ret;
 
 	/*
-	 * Don't probe for MCA ports on non-MCA machines.
-	 */
-	if (up->port.flags & UPF_BOOT_ONLYMCA && !MCA_bus)
-		return;
-
-	/*
 	 * Find the region that we can probe for.  This in turn
 	 * tells us whether we can probe for the type of port.
 	 */
@@ -2328,10 +2321,10 @@ serial8250_console_write(struct console *co, const char *s, unsigned int count)
 		 *	If a LF, also do CR...
 		 */
 		if (*s == 10) {
-			wait_for_xmitr(up);
+			wait_for_xmitr(up, UART_LSR_THRE);
 			serial_out(up, UART_TX, 13);
 		}
-		wait_for_xmitr(up);
+		wait_for_xmitr(up, UART_LSR_THRE);
 		serial_out(up, UART_TX, *s);
 	}
 
@@ -2339,8 +2332,8 @@ serial8250_console_write(struct console *co, const char *s, unsigned int count)
 	 *	Finally, wait for transmitter to become empty
 	 *	and restore the IER
 	 */
-	wait_for_xmitr(up);
-	serial_out(up, UART_IER, ier);
+	wait_for_xmitr(up, BOTH_EMPTY);
+	serial_out(up, UART_IER, ier | UART_IER_THRI);
 }
 
 static int serial8250_console_setup(struct console *co, char *options)

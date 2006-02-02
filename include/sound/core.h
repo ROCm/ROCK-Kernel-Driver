@@ -23,7 +23,7 @@
  */
 
 #include <linux/sched.h>		/* wake_up() */
-#include <linux/mutex.h>		/* struct mutex */
+#include <asm/semaphore.h>		/* struct semaphore */
 #include <linux/rwsem.h>		/* struct rw_semaphore */
 #include <linux/workqueue.h>		/* struct workqueue_struct */
 #include <linux/pm.h>			/* pm_message_t */
@@ -137,7 +137,7 @@ struct snd_card {
 
 #ifdef CONFIG_PM
 	unsigned int power_state;	/* power state */
-	struct mutex power_lock;	/* power lock */
+	struct semaphore power_lock;	/* power lock */
 	wait_queue_head_t power_sleep;
 #endif
 
@@ -150,12 +150,12 @@ struct snd_card {
 #ifdef CONFIG_PM
 static inline void snd_power_lock(struct snd_card *card)
 {
-	mutex_lock(&card->power_lock);
+	down(&card->power_lock);
 }
 
 static inline void snd_power_unlock(struct snd_card *card)
 {
-	mutex_unlock(&card->power_lock);
+	up(&card->power_lock);
 }
 
 static inline unsigned int snd_power_get_state(struct snd_card *card)

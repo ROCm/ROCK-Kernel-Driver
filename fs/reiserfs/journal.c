@@ -152,18 +152,16 @@ static struct reiserfs_bitmap_node *allocate_bitmap_node(struct super_block
 	struct reiserfs_bitmap_node *bn;
 	static int id;
 
-	bn = reiserfs_kmalloc(sizeof(struct reiserfs_bitmap_node), GFP_NOFS,
-			      p_s_sb);
+	bn = kmalloc(sizeof(struct reiserfs_bitmap_node), GFP_NOFS);
 	if (!bn) {
 		return NULL;
 	}
-	bn->data = reiserfs_kmalloc(p_s_sb->s_blocksize, GFP_NOFS, p_s_sb);
+	bn->data = kzalloc(p_s_sb->s_blocksize, GFP_NOFS);
 	if (!bn->data) {
-		reiserfs_kfree(bn, sizeof(struct reiserfs_bitmap_node), p_s_sb);
+		kfree(bn);
 		return NULL;
 	}
 	bn->id = id++;
-	memset(bn->data, 0, p_s_sb->s_blocksize);
 	INIT_LIST_HEAD(&bn->list);
 	return bn;
 }
@@ -197,8 +195,8 @@ static inline void free_bitmap_node(struct super_block *p_s_sb,
 	struct reiserfs_journal *journal = SB_JOURNAL(p_s_sb);
 	journal->j_used_bitmap_nodes--;
 	if (journal->j_free_bitmap_nodes > REISERFS_MAX_BITMAP_NODES) {
-		reiserfs_kfree(bn->data, p_s_sb->s_blocksize, p_s_sb);
-		reiserfs_kfree(bn, sizeof(struct reiserfs_bitmap_node), p_s_sb);
+		kfree(bn->data);
+		kfree(bn);
 	} else {
 		list_add(&bn->list, &journal->j_bitmap_nodes);
 		journal->j_free_bitmap_nodes++;
@@ -276,8 +274,8 @@ static int free_bitmap_nodes(struct super_block *p_s_sb)
 	while (next != &journal->j_bitmap_nodes) {
 		bn = list_entry(next, struct reiserfs_bitmap_node, list);
 		list_del(next);
-		reiserfs_kfree(bn->data, p_s_sb->s_blocksize, p_s_sb);
-		reiserfs_kfree(bn, sizeof(struct reiserfs_bitmap_node), p_s_sb);
+		kfree(bn->data);
+		kfree(bn);
 		next = journal->j_bitmap_nodes.next;
 		journal->j_free_bitmap_nodes--;
 	}
@@ -581,7 +579,7 @@ static inline void put_journal_list(struct super_block *s,
 			       jl->j_trans_id, jl->j_refcount);
 	}
 	if (--jl->j_refcount == 0)
-		reiserfs_kfree(jl, sizeof(struct reiserfs_journal_list), s);
+		kfree(jl);
 }
 
 /*
@@ -849,7 +847,7 @@ static int write_ordered_buffers(spinlock_t * lock,
 			goto loop_next;
 		}
 		/* in theory, dirty non-uptodate buffers should never get here,
-		 * but the upper layer io error paths still have a few quirks.  
+		 * but the upper layer io error paths still have a few quirks.
 		 * Handle them here as gracefully as we can
 		 */
 		if (!buffer_uptodate(bh) && buffer_dirty(bh)) {
@@ -1067,7 +1065,7 @@ static int flush_commit_list(struct super_block *s,
 		if (tbh) {
 			if (buffer_dirty(tbh))
 			    ll_rw_block(WRITE, 1, &tbh) ;
-			put_bh(tbh) ; 
+			put_bh(tbh) ;
 		}
 	}
 	atomic_dec(&journal->j_async_throttle);
@@ -1851,8 +1849,7 @@ void remove_journal_hash(struct super_block *sb,
 static void free_journal_ram(struct super_block *p_s_sb)
 {
 	struct reiserfs_journal *journal = SB_JOURNAL(p_s_sb);
-	reiserfs_kfree(journal->j_current_jl,
-		       sizeof(struct reiserfs_journal_list), p_s_sb);
+	kfree(journal->j_current_jl);
 	journal->j_num_lists--;
 
 	vfree(journal->j_cnode_free_orig);
@@ -2126,21 +2123,15 @@ static int journal_read_transaction(struct super_block *p_s_sb,
 	}
 	trans_id = get_desc_trans_id(desc);
 	/* now we know we've got a good transaction, and it was inside the valid time ranges */
-	log_blocks =
-	    reiserfs_kmalloc(get_desc_trans_len(desc) *
-			     sizeof(struct buffer_head *), GFP_NOFS, p_s_sb);
-	real_blocks =
-	    reiserfs_kmalloc(get_desc_trans_len(desc) *
-			     sizeof(struct buffer_head *), GFP_NOFS, p_s_sb);
+	log_blocks = kmalloc(get_desc_trans_len(desc) *
+			     sizeof(struct buffer_head *), GFP_NOFS);
+	real_blocks = kmalloc(get_desc_trans_len(desc) *
+			      sizeof(struct buffer_head *), GFP_NOFS);
 	if (!log_blocks || !real_blocks) {
 		brelse(c_bh);
 		brelse(d_bh);
-		reiserfs_kfree(log_blocks,
-			       get_desc_trans_len(desc) *
-			       sizeof(struct buffer_head *), p_s_sb);
-		reiserfs_kfree(real_blocks,
-			       get_desc_trans_len(desc) *
-			       sizeof(struct buffer_head *), p_s_sb);
+		kfree(log_blocks);
+		kfree(real_blocks);
 		reiserfs_warning(p_s_sb,
 				 "journal-1169: kmalloc failed, unable to mount FS");
 		return -1;
@@ -2178,12 +2169,8 @@ static int journal_read_transaction(struct super_block *p_s_sb,
 			brelse_array(real_blocks, i);
 			brelse(c_bh);
 			brelse(d_bh);
-			reiserfs_kfree(log_blocks,
-				       get_desc_trans_len(desc) *
-				       sizeof(struct buffer_head *), p_s_sb);
-			reiserfs_kfree(real_blocks,
-				       get_desc_trans_len(desc) *
-				       sizeof(struct buffer_head *), p_s_sb);
+			kfree(log_blocks);
+			kfree(real_blocks);
 			return -1;
 		}
 	}
@@ -2199,12 +2186,8 @@ static int journal_read_transaction(struct super_block *p_s_sb,
 			brelse_array(real_blocks, get_desc_trans_len(desc));
 			brelse(c_bh);
 			brelse(d_bh);
-			reiserfs_kfree(log_blocks,
-				       get_desc_trans_len(desc) *
-				       sizeof(struct buffer_head *), p_s_sb);
-			reiserfs_kfree(real_blocks,
-				       get_desc_trans_len(desc) *
-				       sizeof(struct buffer_head *), p_s_sb);
+			kfree(log_blocks);
+			kfree(real_blocks);
 			return -1;
 		}
 		memcpy(real_blocks[i]->b_data, log_blocks[i]->b_data,
@@ -2226,12 +2209,8 @@ static int journal_read_transaction(struct super_block *p_s_sb,
 				     get_desc_trans_len(desc) - i);
 			brelse(c_bh);
 			brelse(d_bh);
-			reiserfs_kfree(log_blocks,
-				       get_desc_trans_len(desc) *
-				       sizeof(struct buffer_head *), p_s_sb);
-			reiserfs_kfree(real_blocks,
-				       get_desc_trans_len(desc) *
-				       sizeof(struct buffer_head *), p_s_sb);
+			kfree(log_blocks);
+			kfree(real_blocks);
 			return -1;
 		}
 		brelse(real_blocks[i]);
@@ -2250,12 +2229,8 @@ static int journal_read_transaction(struct super_block *p_s_sb,
 	journal->j_trans_id = trans_id + 1;
 	brelse(c_bh);
 	brelse(d_bh);
-	reiserfs_kfree(log_blocks,
-		       le32_to_cpu(desc->j_len) * sizeof(struct buffer_head *),
-		       p_s_sb);
-	reiserfs_kfree(real_blocks,
-		       le32_to_cpu(desc->j_len) * sizeof(struct buffer_head *),
-		       p_s_sb);
+	kfree(log_blocks);
+	kfree(real_blocks);
 	return 0;
 }
 
@@ -2504,14 +2479,8 @@ static int journal_read(struct super_block *p_s_sb)
 static struct reiserfs_journal_list *alloc_journal_list(struct super_block *s)
 {
 	struct reiserfs_journal_list *jl;
-      retry:
-	jl = reiserfs_kmalloc(sizeof(struct reiserfs_journal_list), GFP_NOFS,
-			      s);
-	if (!jl) {
-		yield();
-		goto retry;
-	}
-	memset(jl, 0, sizeof(*jl));
+	jl = kzalloc(sizeof(struct reiserfs_journal_list),
+		     GFP_NOFS | __GFP_NOFAIL);
 	INIT_LIST_HEAD(&jl->j_list);
 	INIT_LIST_HEAD(&jl->j_working_list);
 	INIT_LIST_HEAD(&jl->j_tail_bh_list);
@@ -3078,14 +3047,12 @@ struct reiserfs_transaction_handle *reiserfs_persistent_transaction(struct
 		}
 		return th;
 	}
-	th = reiserfs_kmalloc(sizeof(struct reiserfs_transaction_handle),
-			      GFP_NOFS, s);
+	th = kmalloc(sizeof(struct reiserfs_transaction_handle), GFP_NOFS);
 	if (!th)
 		return NULL;
 	ret = journal_begin(th, s, nblocks);
 	if (ret) {
-		reiserfs_kfree(th, sizeof(struct reiserfs_transaction_handle),
-			       s);
+		kfree(th);
 		return NULL;
 	}
 
@@ -3103,8 +3070,7 @@ int reiserfs_end_persistent_transaction(struct reiserfs_transaction_handle *th)
 		ret = -EIO;
 	if (th->t_refcount == 0) {
 		SB_JOURNAL(s)->j_persistent_trans--;
-		reiserfs_kfree(th, sizeof(struct reiserfs_transaction_handle),
-			       s);
+		kfree(th);
 	}
 	return ret;
 }

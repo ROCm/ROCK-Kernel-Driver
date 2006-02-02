@@ -28,8 +28,6 @@
 #include <linux/pm.h>
 #include <linux/init.h>
 #include <linux/slab.h>
-#include <linux/mutex.h>
-
 #include <sound/core.h>
 #include <sound/control.h>
 #include <sound/info.h>
@@ -79,7 +77,7 @@ static void cs46xx_dsp_proc_scb_info_read (struct snd_info_entry *entry,
 
 	ins = chip->dsp_spos_instance;
 
-	mutex_lock(&chip->spos_mutex);
+	down(&chip->spos_mutex);
 	snd_iprintf(buffer,"%04x %s:\n",scb->address,scb->scb_name);
 
 	for (col = 0,j = 0;j < 0x10; j++,col++) {
@@ -107,7 +105,7 @@ static void cs46xx_dsp_proc_scb_info_read (struct snd_info_entry *entry,
 		    scb->task_entry->address);
 
 	snd_iprintf(buffer,"index [%d] ref_count [%d]\n",scb->index,scb->ref_count);  
-	mutex_unlock(&chip->spos_mutex);
+	up(&chip->spos_mutex);
 }
 #endif
 

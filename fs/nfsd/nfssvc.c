@@ -163,7 +163,6 @@ nfsd_svc(unsigned short port, int nrservs)
 		 */
 		found_one = 0;
 
-#if defined(CONFIG_NFSD_V2_ACL) || defined(CONFIG_NFSD_V3_ACL)
 		for (i = NFSD_MINVERS; i < NFSD_NRVERS; i++) {
 			if (NFSCTL_VERISSET(nfsd_versbits, i)) {
 				nfsd_program.pg_vers[i] = nfsd_version[i];
@@ -177,6 +176,8 @@ nfsd_svc(unsigned short port, int nrservs)
 				nfsd_program.pg_vers[i] = nfsd_version[i];
 		}
 
+
+#if defined(CONFIG_NFSD_V2_ACL) || defined(CONFIG_NFSD_V3_ACL)
 		found_one = 0;
 
 		for (i = NFSD_ACL_MINVERS; i < NFSD_ACL_NRVERS; i++) {

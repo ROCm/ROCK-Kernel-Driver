@@ -24,7 +24,6 @@
 #define __SOUND_MIXART_H
 
 #include <linux/interrupt.h>
-#include <linux/mutex.h>
 #include <sound/pcm.h>
 
 #define MIXART_DRIVER_VERSION	0x000100	/* 0.1.0 */
@@ -93,9 +92,9 @@ struct mixart_mgr {
 
 	spinlock_t lock;              /* interrupt spinlock */
 	spinlock_t msg_lock;          /* mailbox spinlock */
-	struct mutex msg_mutex;   /* mutex for blocking_requests */
+	struct semaphore msg_mutex;   /* mutex for blocking_requests */
 
-	struct mutex setup_mutex; /* mutex used in hw_params, open and close */
+	struct semaphore setup_mutex; /* mutex used in hw_params, open and close */
 
 	/* hardware interface */
 	unsigned int dsp_loaded;      /* bit flags of loaded dsp indices */
@@ -108,7 +107,7 @@ struct mixart_mgr {
 	int sample_rate;
 	int ref_count_rate;
 
-	struct mutex mixer_mutex; /* mutex for mixer */
+	struct semaphore mixer_mutex; /* mutex for mixer */
 
 };
 

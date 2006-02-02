@@ -45,7 +45,6 @@
 #include <sound/initval.h>
 #include <linux/kmod.h>
 #include <linux/slab.h>
-#include <linux/mutex.h>
 
 MODULE_AUTHOR("Takashi Iwai <tiwai@suse.de>");
 MODULE_DESCRIPTION("ALSA sequencer device management");
@@ -70,7 +69,7 @@ struct ops_list {
 	struct list_head dev_list;	/* list of devices */
 	int num_devices;	/* number of associated devices */
 	int num_init_devices;	/* number of initialized devices */
-	struct mutex reg_mutex;
+	struct semaphore reg_mutex;
 
 	struct list_head list;	/* next driver */
 };
@@ -78,7 +77,7 @@ struct ops_list {
 
 static LIST_HEAD(opslist);
 static int num_ops;
-static DEFINE_MUTEX(ops_mutex);
+static DECLARE_MUTEX(ops_mutex);
 #ifdef CONFIG_PROC_FS
 static struct snd_info_entry *info_entry = NULL;
 #endif
@@ -109,7 +108,7 @@ static void snd_seq_device_info(struct snd_info_entry *entry,
 {
 	struct list_head *head;
 
-	mutex_lock(&ops_mutex);
+	down(&ops_mutex);
 	list_for_each(head, &opslist) {
 		struct ops_list *ops = list_entry(head, struct ops_list, list);
 		snd_iprintf(buffer, "snd-%s%s%s%s,%d\n",
@@ -119,7 +118,7 @@ static void snd_seq_device_info(struct snd_info_entry *entry,
 				ops->driver & DRIVER_LOCKED ? ",locked" : "",
 				ops->num_devices);
 	}
-	mutex_unlock(&ops_mutex);
+	up(&ops_mutex);	
 }
 #endif
  
@@ -155,20 +154,20 @@ void snd_seq_device_load_drivers(void)
 	if (! current->fs->root)
 		return;
 
-	mutex_lock(&ops_mutex);
+	down(&ops_mutex);
 	list_for_each(head, &opslist) {
 		struct ops_list *ops = list_entry(head, struct ops_list, list);
 		if (! (ops->driver & DRIVER_LOADED) &&
 		    ! (ops->driver & DRIVER_REQUESTED)) {
 			ops->used++;
-			mutex_unlock(&ops_mutex);
+			up(&ops_mutex);
 			ops->driver |= DRIVER_REQUESTED;
 			request_module("snd-%s", ops->id);
-			mutex_lock(&ops_mutex);
+			down(&ops_mutex);
 			ops->used--;
 		}
 	}
-	mutex_unlock(&ops_mutex);
+	up(&ops_mutex);
 #endif
 }
 
@@ -215,10 +214,10 @@ int snd_seq_device_new(struct snd_card *card, int device, char *id, int argsize,
 	dev->status = SNDRV_SEQ_DEVICE_FREE;
 
 	/* add this device to the list */
-	mutex_lock(&ops->reg_mutex);
+	down(&ops->reg_mutex);
 	list_add_tail(&dev->list, &ops->dev_list);
 	ops->num_devices++;
-	mutex_unlock(&ops->reg_mutex);
+	up(&ops->reg_mutex);
 
 	unlock_driver(ops);
 	
@@ -247,10 +246,10 @@ static int snd_seq_device_free(struct snd_seq_device *dev)
 		return -ENXIO;
 
 	/* remove the device from the list */
-	mutex_lock(&ops->reg_mutex);
+	down(&ops->reg_mutex);
 	list_del(&dev->list);
 	ops->num_devices--;
-	mutex_unlock(&ops->reg_mutex);
+	up(&ops->reg_mutex);
 
 	free_device(dev, ops);
 	if (dev->private_free)
@@ -345,7 +344,7 @@ int snd_seq_device_register_driver(char *id, struct snd_seq_dev_ops *entry,
 		return -EBUSY;
 	}
 
-	mutex_lock(&ops->reg_mutex);
+	down(&ops->reg_mutex);
 	/* copy driver operators */
 	ops->ops = *entry;
 	ops->driver |= DRIVER_LOADED;
@@ -356,7 +355,7 @@ int snd_seq_device_register_driver(char *id, struct snd_seq_dev_ops *entry,
 		struct snd_seq_device *dev = list_entry(head, struct snd_seq_device, list);
 		init_device(dev, ops);
 	}
-	mutex_unlock(&ops->reg_mutex);
+	up(&ops->reg_mutex);
 
 	unlock_driver(ops);
 	snd_seq_autoload_unlock();
@@ -379,17 +378,17 @@ static struct ops_list * create_driver(char *id)
 
 	/* set up driver entry */
 	strlcpy(ops->id, id, sizeof(ops->id));
-	mutex_init(&ops->reg_mutex);
+	init_MUTEX(&ops->reg_mutex);
 	ops->driver = DRIVER_EMPTY;
 	INIT_LIST_HEAD(&ops->dev_list);
 	/* lock this instance */
 	ops->used = 1;
 
 	/* register driver entry */
-	mutex_lock(&ops_mutex);
+	down(&ops_mutex);
 	list_add_tail(&ops->list, &opslist);
 	num_ops++;
-	mutex_unlock(&ops_mutex);
+	up(&ops_mutex);
 
 	return ops;
 }
@@ -415,7 +414,7 @@ int snd_seq_device_unregister_driver(char *id)
 	}
 
 	/* close and release all devices associated with this driver */
-	mutex_lock(&ops->reg_mutex);
+	down(&ops->reg_mutex);
 	ops->driver |= DRIVER_LOCKED; /* do not remove this driver recursively */
 	list_for_each(head, &ops->dev_list) {
 		struct snd_seq_device *dev = list_entry(head, struct snd_seq_device, list);
@@ -426,7 +425,7 @@ int snd_seq_device_unregister_driver(char *id)
 	if (ops->num_init_devices > 0)
 		snd_printk(KERN_ERR "free_driver: init_devices > 0!! (%d)\n",
 			   ops->num_init_devices);
-	mutex_unlock(&ops->reg_mutex);
+	up(&ops->reg_mutex);
 
 	unlock_driver(ops);
 
@@ -444,7 +443,7 @@ static void remove_drivers(void)
 {
 	struct list_head *head;
 
-	mutex_lock(&ops_mutex);
+	down(&ops_mutex);
 	head = opslist.next;
 	while (head != &opslist) {
 		struct ops_list *ops = list_entry(head, struct ops_list, list);
@@ -457,7 +456,7 @@ static void remove_drivers(void)
 		} else
 			head = head->next;
 	}
-	mutex_unlock(&ops_mutex);
+	up(&ops_mutex);
 }
 
 /*
@@ -520,16 +519,16 @@ static struct ops_list * find_driver(char *id, int create_if_empty)
 {
 	struct list_head *head;
 
-	mutex_lock(&ops_mutex);
+	down(&ops_mutex);
 	list_for_each(head, &opslist) {
 		struct ops_list *ops = list_entry(head, struct ops_list, list);
 		if (strcmp(ops->id, id) == 0) {
 			ops->used++;
-			mutex_unlock(&ops_mutex);
+			up(&ops_mutex);
 			return ops;
 		}
 	}
-	mutex_unlock(&ops_mutex);
+	up(&ops_mutex);
 	if (create_if_empty)
 		return create_driver(id);
 	return NULL;
@@ -537,9 +536,9 @@ static struct ops_list * find_driver(char *id, int create_if_empty)
 
 static void unlock_driver(struct ops_list *ops)
 {
-	mutex_lock(&ops_mutex);
+	down(&ops_mutex);
 	ops->used--;
-	mutex_unlock(&ops_mutex);
+	up(&ops_mutex);
 }
 
 

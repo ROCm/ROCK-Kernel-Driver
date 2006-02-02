@@ -30,7 +30,6 @@
 #include <linux/pci.h>
 #include <linux/slab.h>
 #include <linux/moduleparam.h>
-#include <linux/mutex.h>
 #include <sound/core.h>
 #include <sound/info.h>
 #include <sound/mpu401.h>
@@ -488,7 +487,7 @@ static int snd_vt1724_pcm_hw_params(struct snd_pcm_substream *substream,
 	int i, chs;
 
 	chs = params_channels(hw_params);
-	mutex_lock(&ice->open_mutex);
+	down(&ice->open_mutex);
 	/* mark surround channels */
 	if (substream == ice->playback_pro_substream) {
 		/* PDMA0 can be multi-channel up to 8 */
@@ -496,7 +495,7 @@ static int snd_vt1724_pcm_hw_params(struct snd_pcm_substream *substream,
 		for (i = 0; i < chs; i++) {
 			if (ice->pcm_reserved[i] &&
 			    ice->pcm_reserved[i] != substream) {
-				mutex_unlock(&ice->open_mutex);
+				up(&ice->open_mutex);
 				return -EBUSY;
 			}
 			ice->pcm_reserved[i] = substream;
@@ -511,7 +510,7 @@ static int snd_vt1724_pcm_hw_params(struct snd_pcm_substream *substream,
 			if (ice->playback_con_substream_ds[i] == substream) {
 				if (ice->pcm_reserved[i] &&
 				    ice->pcm_reserved[i] != substream) {
-					mutex_unlock(&ice->open_mutex);
+					up(&ice->open_mutex);
 					return -EBUSY;
 				}
 				ice->pcm_reserved[i] = substream;
@@ -519,7 +518,7 @@ static int snd_vt1724_pcm_hw_params(struct snd_pcm_substream *substream,
 			}
 		}
 	}
-	mutex_unlock(&ice->open_mutex);
+	up(&ice->open_mutex);
 	snd_vt1724_set_pro_rate(ice, params_rate(hw_params), 0);
 	return snd_pcm_lib_malloc_pages(substream, params_buffer_bytes(hw_params));
 }
@@ -529,12 +528,12 @@ static int snd_vt1724_pcm_hw_free(struct snd_pcm_substream *substream)
 	struct snd_ice1712 *ice = snd_pcm_substream_chip(substream);
 	int i;
 
-	mutex_lock(&ice->open_mutex);
+	down(&ice->open_mutex);
 	/* unmark surround channels */
 	for (i = 0; i < 3; i++)
 		if (ice->pcm_reserved[i] == substream)
 			ice->pcm_reserved[i] = NULL;
-	mutex_unlock(&ice->open_mutex);
+	up(&ice->open_mutex);
 	return snd_pcm_lib_free_pages(substream);
 }
 
@@ -779,7 +778,7 @@ static int snd_vt1724_playback_pro_open(struct snd_pcm_substream *substream)
 	snd_pcm_set_sync(substream);
 	snd_pcm_hw_constraint_msbits(runtime, 0, 32, 24);
 	set_rate_constraints(ice, substream);
-	mutex_lock(&ice->open_mutex);
+	down(&ice->open_mutex);
 	/* calculate the currently available channels */
 	for (chs = 0; chs < 3; chs++) {
 		if (ice->pcm_reserved[chs])
@@ -789,7 +788,7 @@ static int snd_vt1724_playback_pro_open(struct snd_pcm_substream *substream)
 	runtime->hw.channels_max = chs;
 	if (chs > 2) /* channels must be even */
 		snd_pcm_hw_constraint_step(runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS, 2);
-	mutex_unlock(&ice->open_mutex);
+	up(&ice->open_mutex);
 	snd_pcm_hw_constraint_step(runtime, 0, SNDRV_PCM_HW_PARAM_PERIOD_BYTES,
 				   VT1724_BUFFER_ALIGN);
 	snd_pcm_hw_constraint_step(runtime, 0, SNDRV_PCM_HW_PARAM_BUFFER_BYTES,
@@ -1129,13 +1128,13 @@ static int snd_vt1724_playback_indep_open(struct snd_pcm_substream *substream)
 	struct snd_ice1712 *ice = snd_pcm_substream_chip(substream);
 	struct snd_pcm_runtime *runtime = substream->runtime;
 
-	mutex_lock(&ice->open_mutex);
+	down(&ice->open_mutex);
 	/* already used by PDMA0? */
 	if (ice->pcm_reserved[substream->number]) {
-		mutex_unlock(&ice->open_mutex);
+		up(&ice->open_mutex);
 		return -EBUSY; /* FIXME: should handle blocking mode properly */
 	}
-	mutex_unlock(&ice->open_mutex);
+	up(&ice->open_mutex);
 	runtime->private_data = &vt1724_playback_dma_regs[substream->number];
 	ice->playback_con_substream_ds[substream->number] = substream;
 	runtime->hw = snd_vt1724_2ch_stereo;
@@ -1979,12 +1978,12 @@ unsigned char snd_vt1724_read_i2c(struct snd_ice1712 *ice,
 {
 	unsigned char val;
 
-	mutex_lock(&ice->i2c_mutex);
+	down(&ice->i2c_mutex);
 	outb(addr, ICEREG1724(ice, I2C_BYTE_ADDR));
 	outb(dev & ~VT1724_I2C_WRITE, ICEREG1724(ice, I2C_DEV_ADDR));
 	wait_i2c_busy(ice);
 	val = inb(ICEREG1724(ice, I2C_DATA));
-	mutex_unlock(&ice->i2c_mutex);
+	up(&ice->i2c_mutex);
 	//printk("i2c_read: [0x%x,0x%x] = 0x%x\n", dev, addr, val);
 	return val;
 }
@@ -1992,14 +1991,14 @@ unsigned char snd_vt1724_read_i2c(struct snd_ice1712 *ice,
 void snd_vt1724_write_i2c(struct snd_ice1712 *ice,
 			  unsigned char dev, unsigned char addr, unsigned char data)
 {
-	mutex_lock(&ice->i2c_mutex);
+	down(&ice->i2c_mutex);
 	wait_i2c_busy(ice);
 	//printk("i2c_write: [0x%x,0x%x] = 0x%x\n", dev, addr, data);
 	outb(addr, ICEREG1724(ice, I2C_BYTE_ADDR));
 	outb(data, ICEREG1724(ice, I2C_DATA));
 	outb(dev | VT1724_I2C_WRITE, ICEREG1724(ice, I2C_DEV_ADDR));
 	wait_i2c_busy(ice);
-	mutex_unlock(&ice->i2c_mutex);
+	up(&ice->i2c_mutex);
 }
 
 static int __devinit snd_vt1724_read_eeprom(struct snd_ice1712 *ice,
@@ -2230,9 +2229,9 @@ static int __devinit snd_vt1724_create(struct snd_card *card,
 	}
 	ice->vt1724 = 1;
 	spin_lock_init(&ice->reg_lock);
-	mutex_init(&ice->gpio_mutex);
-	mutex_init(&ice->open_mutex);
-	mutex_init(&ice->i2c_mutex);
+	init_MUTEX(&ice->gpio_mutex);
+	init_MUTEX(&ice->open_mutex);
+	init_MUTEX(&ice->i2c_mutex);
 	ice->gpio.set_mask = snd_vt1724_set_gpio_mask;
 	ice->gpio.set_dir = snd_vt1724_set_gpio_dir;
 	ice->gpio.set_data = snd_vt1724_set_gpio_data;

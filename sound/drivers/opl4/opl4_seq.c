@@ -62,10 +62,10 @@ static int snd_opl4_seq_use(void *private_data, struct snd_seq_port_subscribe *i
 	struct snd_opl4 *opl4 = private_data;
 	int err;
 
-	mutex_lock(&opl4->access_mutex);
+	down(&opl4->access_mutex);
 
 	if (opl4->used) {
-		mutex_unlock(&opl4->access_mutex);
+		up(&opl4->access_mutex);
 		return -EBUSY;
 	}
 	opl4->used++;
@@ -73,12 +73,12 @@ static int snd_opl4_seq_use(void *private_data, struct snd_seq_port_subscribe *i
 	if (info->sender.client != SNDRV_SEQ_CLIENT_SYSTEM) {
 		err = snd_opl4_seq_use_inc(opl4);
 		if (err < 0) {
-			mutex_unlock(&opl4->access_mutex);
+			up(&opl4->access_mutex);
 			return err;
 		}
 	}
 
-	mutex_unlock(&opl4->access_mutex);
+	up(&opl4->access_mutex);
 
 	snd_opl4_synth_reset(opl4);
 	return 0;
@@ -90,9 +90,9 @@ static int snd_opl4_seq_unuse(void *private_data, struct snd_seq_port_subscribe 
 
 	snd_opl4_synth_shutdown(opl4);
 
-	mutex_lock(&opl4->access_mutex);
+	down(&opl4->access_mutex);
 	opl4->used--;
-	mutex_unlock(&opl4->access_mutex);
+	up(&opl4->access_mutex);
 
 	if (info->sender.client != SNDRV_SEQ_CLIENT_SYSTEM)
 		snd_opl4_seq_use_dec(opl4);

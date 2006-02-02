@@ -5,7 +5,7 @@
  ******************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2005, R. Byron Moore
+ * Copyright (C) 2000 - 2006, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -272,20 +272,17 @@ void acpi_ns_delete_children(struct acpi_namespace_node *parent_node)
 		/* Grandchildren should have all been deleted already */
 
 		if (child_node->child) {
-			ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
-					  "Found a grandchild! P=%p C=%p\n",
-					  parent_node, child_node));
+			ACPI_ERROR((AE_INFO, "Found a grandchild! P=%p C=%p",
+				    parent_node, child_node));
 		}
 
 		/* Now we can free this child object */
 
 		ACPI_MEM_TRACKING(acpi_gbl_ns_node_list->total_freed++);
 
-#ifdef ACPI_DEBUG_OUTPUT
 		ACPI_DEBUG_PRINT((ACPI_DB_ALLOCATIONS,
 				  "Object %p, Remaining %X\n", child_node,
 				  acpi_gbl_current_node_count));
-#endif
 
 		/*
 		 * Detach an object if there is one, then free the child node
@@ -304,7 +301,9 @@ void acpi_ns_delete_children(struct acpi_namespace_node *parent_node)
 		/* There should be only one reference remaining on this node */
 
 		if (child_node->reference_count != 1) {
-			ACPI_REPORT_WARNING(("Existing references (%d) on node being deleted (%p)\n", child_node->reference_count, child_node));
+			ACPI_WARNING((AE_INFO,
+				      "Existing references (%d) on node being deleted (%p)",
+				      child_node->reference_count, child_node));
 		}
 
 		/* Now we can delete the node */

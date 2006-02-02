@@ -28,8 +28,6 @@
 #include <linux/pci.h>
 #include <linux/delay.h>
 #include <linux/moduleparam.h>
-#include <linux/mutex.h>
-
 #include <sound/core.h>
 #include <sound/initval.h>
 #include <sound/info.h>
@@ -520,7 +518,7 @@ static void pcxhr_trigger_tasklet(unsigned long arg)
 	struct timeval my_tv1, my_tv2;
 	do_gettimeofday(&my_tv1);
 #endif
-	mutex_lock(&mgr->setup_mutex);
+	down(&mgr->setup_mutex);
 
 	/* check the pipes concerned and build pipe_array */
 	for (i = 0; i < mgr->num_cards; i++) {
@@ -539,7 +537,7 @@ static void pcxhr_trigger_tasklet(unsigned long arg)
 		}
 	}
 	if (capture_mask == 0 && playback_mask == 0) {
-		mutex_unlock(&mgr->setup_mutex);
+		up(&mgr->setup_mutex);
 		snd_printk(KERN_ERR "pcxhr_trigger_tasklet : no pipes\n");
 		return;
 	}
@@ -550,7 +548,7 @@ static void pcxhr_trigger_tasklet(unsigned long arg)
 	/* synchronous stop of all the pipes concerned */
 	err = pcxhr_set_pipe_state(mgr,  playback_mask, capture_mask, 0);
 	if (err) {
-		mutex_unlock(&mgr->setup_mutex);
+		up(&mgr->setup_mutex);
 		snd_printk(KERN_ERR "pcxhr_trigger_tasklet : error stop pipes (P%x C%x)\n",
 			   playback_mask, capture_mask);
 		return;
@@ -594,7 +592,7 @@ static void pcxhr_trigger_tasklet(unsigned long arg)
 	/* synchronous start of all the pipes concerned */
 	err = pcxhr_set_pipe_state(mgr, playback_mask, capture_mask, 1);
 	if (err) {
-		mutex_unlock(&mgr->setup_mutex);
+		up(&mgr->setup_mutex);
 		snd_printk(KERN_ERR "pcxhr_trigger_tasklet : error start pipes (P%x C%x)\n",
 			   playback_mask, capture_mask);
 		return;
@@ -621,7 +619,7 @@ static void pcxhr_trigger_tasklet(unsigned long arg)
 	}
 	spin_unlock_irqrestore(&mgr->lock, flags);
 
-	mutex_unlock(&mgr->setup_mutex);
+	up(&mgr->setup_mutex);
 
 #ifdef CONFIG_SND_DEBUG_DETECT
 	do_gettimeofday(&my_tv2);
@@ -730,7 +728,7 @@ static int pcxhr_prepare(struct snd_pcm_substream *subs)
 	}
 	*/
 
-	mutex_lock(&mgr->setup_mutex);
+	down(&mgr->setup_mutex);
 
 	do {
 		/* if the stream was stopped before, format and buffer were reset */
@@ -757,7 +755,7 @@ static int pcxhr_prepare(struct snd_pcm_substream *subs)
 		}
 	} while(0);	/* do only once (so we can use break instead of goto) */
 
-	mutex_unlock(&mgr->setup_mutex);
+	up(&mgr->setup_mutex);
 
 	return err;
 }
@@ -782,7 +780,7 @@ static int pcxhr_hw_params(struct snd_pcm_substream *subs,
 	/*  set up format for the stream */
 	format = params_format(hw);
 
-	mutex_lock(&mgr->setup_mutex);
+	down(&mgr->setup_mutex);
 
 	stream->channels = channels;
 	stream->format = format;
@@ -791,7 +789,7 @@ static int pcxhr_hw_params(struct snd_pcm_substream *subs,
 	/*
 	err = pcxhr_set_format(stream);
 	if(err) {
-		mutex_unlock(&mgr->setup_mutex);
+		up(&mgr->setup_mutex);
 		return err;
 	}
 	*/
@@ -803,7 +801,7 @@ static int pcxhr_hw_params(struct snd_pcm_substream *subs,
 		err = pcxhr_update_r_buffer(stream);
 	}
 	*/
-	mutex_unlock(&mgr->setup_mutex);
+	up(&mgr->setup_mutex);
 
 	return err;
 }
@@ -849,7 +847,7 @@ static int pcxhr_open(struct snd_pcm_substream *subs)
 	struct pcxhr_stream    *stream;
 	int                 is_capture;
 
-	mutex_lock(&mgr->setup_mutex);
+	down(&mgr->setup_mutex);
 
 	/* copy the struct snd_pcm_hardware struct */
 	runtime->hw = pcxhr_caps;
@@ -873,7 +871,7 @@ static int pcxhr_open(struct snd_pcm_substream *subs)
 		/* streams in use */
 		snd_printk(KERN_ERR "pcxhr_open chip%d subs%d in use\n",
 			   chip->chip_idx, subs->number);
-		mutex_unlock(&mgr->setup_mutex);
+		up(&mgr->setup_mutex);
 		return -EBUSY;
 	}
 
@@ -889,7 +887,7 @@ static int pcxhr_open(struct snd_pcm_substream *subs)
 						     &external_rate) ||
 			    external_rate == 0) {
 				/* cannot detect the external clock rate */
-				mutex_unlock(&mgr->setup_mutex);
+				up(&mgr->setup_mutex);
 				return -EBUSY;
 			}
 			runtime->hw.rate_min = runtime->hw.rate_max = external_rate;
@@ -907,7 +905,7 @@ static int pcxhr_open(struct snd_pcm_substream *subs)
 
 	mgr->ref_count_rate++;
 
-	mutex_unlock(&mgr->setup_mutex);
+	up(&mgr->setup_mutex);
 	return 0;
 }
 
@@ -918,7 +916,7 @@ static int pcxhr_close(struct snd_pcm_substream *subs)
 	struct pcxhr_mgr *mgr = chip->mgr;
 	struct pcxhr_stream *stream = subs->runtime->private_data;
 
-	mutex_lock(&mgr->setup_mutex);
+	down(&mgr->setup_mutex);
 
 	snd_printdd("pcxhr_close chip%d subs%d\n", chip->chip_idx, subs->number);
 
@@ -931,7 +929,7 @@ static int pcxhr_close(struct snd_pcm_substream *subs)
 	stream->status    = PCXHR_STREAM_STATUS_FREE;
 	stream->substream = NULL;
 
-	mutex_unlock(&mgr->setup_mutex);
+	up(&mgr->setup_mutex);
 
 	return 0;
 }
@@ -1266,7 +1264,7 @@ static int __devinit pcxhr_probe(struct pci_dev *pci, const struct pci_device_id
 	spin_lock_init(&mgr->msg_lock);
 
 	/* init setup mutex*/
-	mutex_init(&mgr->setup_mutex);
+	init_MUTEX(&mgr->setup_mutex);
 
 	/* init taslket */
 	tasklet_init(&mgr->msg_taskq, pcxhr_msg_tasklet, (unsigned long) mgr);

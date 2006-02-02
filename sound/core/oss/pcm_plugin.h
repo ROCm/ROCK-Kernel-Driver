@@ -22,7 +22,12 @@
  *
  */
 
-#ifdef CONFIG_SND_PCM_OSS_PLUGINS
+#include <linux/bitmap.h>
+
+static inline unsigned long *bitmap_alloc(unsigned int nbits)
+{
+	return kmalloc(BITS_TO_LONGS(nbits), GFP_KERNEL);
+}
 
 #define snd_pcm_plug_stream(plug) ((plug)->stream)
 
@@ -64,6 +69,12 @@ struct snd_pcm_plugin {
 	snd_pcm_sframes_t (*client_channels)(struct snd_pcm_plugin *plugin,
 					     snd_pcm_uframes_t frames,
 					     struct snd_pcm_plugin_channel **channels);
+	int (*src_channels_mask)(struct snd_pcm_plugin *plugin,
+				 unsigned long *dst_vmask,
+				 unsigned long **src_vmask);
+	int (*dst_channels_mask)(struct snd_pcm_plugin *plugin,
+				 unsigned long *src_vmask,
+				 unsigned long **dst_vmask);
 	snd_pcm_sframes_t (*transfer)(struct snd_pcm_plugin *plugin,
 				      const struct snd_pcm_plugin_channel *src_channels,
 				      struct snd_pcm_plugin_channel *dst_channels,
@@ -79,6 +90,8 @@ struct snd_pcm_plugin {
 	char *buf;
 	snd_pcm_uframes_t buf_frames;
 	struct snd_pcm_plugin_channel *buf_channels;
+	unsigned long *src_vmask;
+	unsigned long *dst_vmask;
 	char extra_data[0];
 };
 
@@ -115,6 +128,7 @@ int snd_pcm_plugin_build_rate(struct snd_pcm_substream *handle,
 int snd_pcm_plugin_build_route(struct snd_pcm_substream *handle,
 			       struct snd_pcm_plugin_format *src_format,
 			       struct snd_pcm_plugin_format *dst_format,
+			       int *ttable,
 		               struct snd_pcm_plugin **r_plugin);
 int snd_pcm_plugin_build_copy(struct snd_pcm_substream *handle,
 			      struct snd_pcm_plugin_format *src_format,
@@ -167,13 +181,15 @@ snd_pcm_sframes_t snd_pcm_oss_readv3(struct snd_pcm_substream *substream,
 				     void **bufs, snd_pcm_uframes_t frames,
 				     int in_kernel);
 
-#else
+#define ROUTE_PLUGIN_RESOLUTION 16
 
-static inline snd_pcm_sframes_t snd_pcm_plug_client_size(struct snd_pcm_substream *handle, snd_pcm_uframes_t drv_size) { return drv_size; }
-static inline snd_pcm_sframes_t snd_pcm_plug_slave_size(struct snd_pcm_substream *handle, snd_pcm_uframes_t clt_size) { return clt_size; }
-static inline int snd_pcm_plug_slave_format(int format, struct snd_mask *format_mask) { return format; }
+int getput_index(int format);
+int copy_index(int format);
+int conv_index(int src_format, int dst_format);
 
-#endif
+void zero_channel(struct snd_pcm_plugin *plugin,
+		  const struct snd_pcm_plugin_channel *dst_channel,
+		  size_t samples);
 
 #ifdef PLUGIN_DEBUG
 #define pdprintf( fmt, args... ) printk( "plugin: " fmt, ##args)

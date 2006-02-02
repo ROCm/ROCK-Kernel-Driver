@@ -84,7 +84,7 @@ struct snd_info_entry {
 	void *private_data;
 	void (*private_free)(struct snd_info_entry *entry);
 	struct proc_dir_entry *p;
-	struct mutex access;
+	struct semaphore access;
 };
 
 #if defined(CONFIG_SND_OSSEMUL) && defined(CONFIG_PROC_FS)

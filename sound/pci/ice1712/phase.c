@@ -39,8 +39,6 @@
 #include <linux/interrupt.h>
 #include <linux/init.h>
 #include <linux/slab.h>
-#include <linux/mutex.h>
-
 #include <sound/core.h>
 
 #include "ice1712.h"
@@ -275,9 +273,9 @@ static int wm_pcm_mute_get(struct snd_kcontrol *kcontrol, struct snd_ctl_elem_va
 {
 	struct snd_ice1712 *ice = snd_kcontrol_chip(kcontrol);
 
-	mutex_lock(&ice->gpio_mutex);
+	down(&ice->gpio_mutex);
 	ucontrol->value.integer.value[0] = (wm_get(ice, WM_MUTE) & 0x10) ? 0 : 1;
-	mutex_unlock(&ice->gpio_mutex);
+	up(&ice->gpio_mutex);
 	return 0;
 }
 
@@ -586,11 +584,11 @@ static int wm_pcm_vol_get(struct snd_kcontrol *kcontrol, struct snd_ctl_elem_val
 	struct snd_ice1712 *ice = snd_kcontrol_chip(kcontrol);
 	unsigned short val;
 
-	mutex_lock(&ice->gpio_mutex);
+	down(&ice->gpio_mutex);
 	val = wm_get(ice, WM_DAC_DIG_MASTER_ATTEN) & 0xff;
 	val = val > PCM_MIN ? (val - PCM_MIN) : 0;
 	ucontrol->value.integer.value[0] = val;
-	mutex_unlock(&ice->gpio_mutex);
+	up(&ice->gpio_mutex);
 	return 0;
 }
 

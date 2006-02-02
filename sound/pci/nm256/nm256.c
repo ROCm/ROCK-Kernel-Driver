@@ -32,8 +32,6 @@
 #include <linux/pci.h>
 #include <linux/slab.h>
 #include <linux/moduleparam.h>
-#include <linux/mutex.h>
-
 #include <sound/core.h>
 #include <sound/info.h>
 #include <sound/control.h>
@@ -237,7 +235,7 @@ struct nm256 {
 	int irq_acks;
 	irqreturn_t (*interrupt)(int, void *, struct pt_regs *);
 	int badintrcount;		/* counter to check bogus interrupts */
-	struct mutex irq_mutex;
+	struct semaphore irq_mutex;
 
 	struct nm256_stream streams[2];
 
@@ -461,32 +459,32 @@ snd_nm256_set_format(struct nm256 *chip, struct nm256_stream *s,
 /* acquire interrupt */
 static int snd_nm256_acquire_irq(struct nm256 *chip)
 {
-	mutex_lock(&chip->irq_mutex);
+	down(&chip->irq_mutex);
 	if (chip->irq < 0) {
 		if (request_irq(chip->pci->irq, chip->interrupt, SA_INTERRUPT|SA_SHIRQ,
 				chip->card->driver, chip)) {
 			snd_printk(KERN_ERR "unable to grab IRQ %d\n", chip->pci->irq);
-			mutex_unlock(&chip->irq_mutex);
+			up(&chip->irq_mutex);
 			return -EBUSY;
 		}
 		chip->irq = chip->pci->irq;
 	}
 	chip->irq_acks++;
-	mutex_unlock(&chip->irq_mutex);
+	up(&chip->irq_mutex);
 	return 0;
 }
 
 /* release interrupt */
 static void snd_nm256_release_irq(struct nm256 *chip)
 {
-	mutex_lock(&chip->irq_mutex);
+	down(&chip->irq_mutex);
 	if (chip->irq_acks > 0)
 		chip->irq_acks--;
 	if (chip->irq_acks == 0 && chip->irq >= 0) {
 		free_irq(chip->irq, chip);
 		chip->irq = -1;
 	}
-	mutex_unlock(&chip->irq_mutex);
+	up(&chip->irq_mutex);
 }
 
 /*
@@ -1409,7 +1407,7 @@ snd_nm256_create(struct snd_card *card, struct pci_dev *pci,
 	chip->use_cache = use_cache;
 	spin_lock_init(&chip->reg_lock);
 	chip->irq = -1;
-	mutex_init(&chip->irq_mutex);
+	init_MUTEX(&chip->irq_mutex);
 
 	/* store buffer sizes in bytes */
 	chip->streams[SNDRV_PCM_STREAM_PLAYBACK].bufsize = playback_bufsize * 1024;

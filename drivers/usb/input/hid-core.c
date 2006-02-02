@@ -1311,7 +1311,7 @@ void hid_init_reports(struct hid_device *hid)
 	}
 
 	if (err)
-		warn("timeout initializing reports\n");
+		warn("timeout initializing reports");
 }
 
 #define USB_VENDOR_ID_WACOM		0x056a

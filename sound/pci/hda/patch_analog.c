@@ -23,8 +23,6 @@
 #include <linux/delay.h>
 #include <linux/slab.h>
 #include <linux/pci.h>
-#include <linux/mutex.h>
-
 #include <sound/core.h>
 #include "hda_codec.h"
 #include "hda_local.h"
@@ -62,7 +60,7 @@ struct ad198x_spec {
 	/* PCM information */
 	struct hda_pcm pcm_rec[2];	/* used in alc_build_pcms() */
 
-	struct mutex amp_mutex;	/* PCM volume/mute control mutex */
+	struct semaphore amp_mutex;	/* PCM volume/mute control mutex */
 	unsigned int spdif_route;
 
 	/* dynamic controls, init_verbs and input_mux */
@@ -373,9 +371,9 @@ static int ad1986a_pcm_amp_vol_get(struct snd_kcontrol *kcontrol, struct snd_ctl
 	struct hda_codec *codec = snd_kcontrol_chip(kcontrol);
 	struct ad198x_spec *ad = codec->spec;
 
-	mutex_lock(&ad->amp_mutex);
+	down(&ad->amp_mutex);
 	snd_hda_mixer_amp_volume_get(kcontrol, ucontrol);
-	mutex_unlock(&ad->amp_mutex);
+	up(&ad->amp_mutex);
 	return 0;
 }
 
@@ -385,13 +383,13 @@ static int ad1986a_pcm_amp_vol_put(struct snd_kcontrol *kcontrol, struct snd_ctl
 	struct ad198x_spec *ad = codec->spec;
 	int i, change = 0;
 
-	mutex_lock(&ad->amp_mutex);
+	down(&ad->amp_mutex);
 	for (i = 0; i < ARRAY_SIZE(ad1986a_dac_nids); i++) {
 		kcontrol->private_value = HDA_COMPOSE_AMP_VAL(ad1986a_dac_nids[i], 3, 0, HDA_OUTPUT);
 		change |= snd_hda_mixer_amp_volume_put(kcontrol, ucontrol);
 	}
 	kcontrol->private_value = HDA_COMPOSE_AMP_VAL(AD1986A_FRONT_DAC, 3, 0, HDA_OUTPUT);
-	mutex_unlock(&ad->amp_mutex);
+	up(&ad->amp_mutex);
 	return change;
 }
 
@@ -402,9 +400,9 @@ static int ad1986a_pcm_amp_sw_get(struct snd_kcontrol *kcontrol, struct snd_ctl_
 	struct hda_codec *codec = snd_kcontrol_chip(kcontrol);
 	struct ad198x_spec *ad = codec->spec;
 
-	mutex_lock(&ad->amp_mutex);
+	down(&ad->amp_mutex);
 	snd_hda_mixer_amp_switch_get(kcontrol, ucontrol);
-	mutex_unlock(&ad->amp_mutex);
+	up(&ad->amp_mutex);
 	return 0;
 }
 
@@ -414,13 +412,13 @@ static int ad1986a_pcm_amp_sw_put(struct snd_kcontrol *kcontrol, struct snd_ctl_
 	struct ad198x_spec *ad = codec->spec;
 	int i, change = 0;
 
-	mutex_lock(&ad->amp_mutex);
+	down(&ad->amp_mutex);
 	for (i = 0; i < ARRAY_SIZE(ad1986a_dac_nids); i++) {
 		kcontrol->private_value = HDA_COMPOSE_AMP_VAL(ad1986a_dac_nids[i], 3, 0, HDA_OUTPUT);
 		change |= snd_hda_mixer_amp_switch_put(kcontrol, ucontrol);
 	}
 	kcontrol->private_value = HDA_COMPOSE_AMP_VAL(AD1986A_FRONT_DAC, 3, 0, HDA_OUTPUT);
-	mutex_unlock(&ad->amp_mutex);
+	up(&ad->amp_mutex);
 	return change;
 }
 
@@ -546,7 +544,7 @@ static int patch_ad1986a(struct hda_codec *codec)
 	if (spec == NULL)
 		return -ENOMEM;
 
-	mutex_init(&spec->amp_mutex);
+	init_MUTEX(&spec->amp_mutex);
 	codec->spec = spec;
 
 	spec->multiout.max_channels = 6;
@@ -710,7 +708,7 @@ static int patch_ad1983(struct hda_codec *codec)
 	if (spec == NULL)
 		return -ENOMEM;
 
-	mutex_init(&spec->amp_mutex);
+	init_MUTEX(&spec->amp_mutex);
 	codec->spec = spec;
 
 	spec->multiout.max_channels = 2;
@@ -856,7 +854,7 @@ static int patch_ad1981(struct hda_codec *codec)
 	if (spec == NULL)
 		return -ENOMEM;
 
-	mutex_init(&spec->amp_mutex);
+	init_MUTEX(&spec->amp_mutex);
 	codec->spec = spec;
 
 	spec->multiout.max_channels = 2;
@@ -2034,7 +2032,7 @@ static int patch_ad1988(struct hda_codec *codec)
 	if (spec == NULL)
 		return -ENOMEM;
 
-	mutex_init(&spec->amp_mutex);
+	init_MUTEX(&spec->amp_mutex);
 	codec->spec = spec;
 
 	if (codec->revision_id == AD1988A_REV2)

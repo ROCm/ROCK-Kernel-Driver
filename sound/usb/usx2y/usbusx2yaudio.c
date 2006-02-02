@@ -811,7 +811,7 @@ static int snd_usX2Y_pcm_hw_free(struct snd_pcm_substream *substream)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct snd_usX2Y_substream *subs = runtime->private_data;
-	mutex_lock(&subs->usX2Y->prepare_mutex);
+	down(&subs->usX2Y->prepare_mutex);
 	snd_printdd("snd_usX2Y_hw_free(%p)\n", substream);
 
 	if (SNDRV_PCM_STREAM_PLAYBACK == substream->stream) {
@@ -832,7 +832,7 @@ static int snd_usX2Y_pcm_hw_free(struct snd_pcm_substream *substream)
 			usX2Y_urbs_release(subs);
 		}
 	}
-	mutex_unlock(&subs->usX2Y->prepare_mutex);
+	up(&subs->usX2Y->prepare_mutex);
 	return snd_pcm_lib_free_pages(substream);
 }
 /*
@@ -849,7 +849,7 @@ static int snd_usX2Y_pcm_prepare(struct snd_pcm_substream *substream)
 	int err = 0;
 	snd_printdd("snd_usX2Y_pcm_prepare(%p)\n", substream);
 
-	mutex_lock(&usX2Y->prepare_mutex);
+	down(&usX2Y->prepare_mutex);
 	usX2Y_subs_prepare(subs);
 // Start hardware streams
 // SyncStream first....
@@ -869,7 +869,7 @@ static int snd_usX2Y_pcm_prepare(struct snd_pcm_substream *substream)
 		err = usX2Y_urbs_start(subs);
 
  up_prepare_mutex:
-	mutex_unlock(&usX2Y->prepare_mutex);
+	up(&usX2Y->prepare_mutex);
 	return err;
 }
 

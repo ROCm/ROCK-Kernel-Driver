@@ -27,7 +27,6 @@
 #include <linux/slab.h>
 #include <linux/wait.h>
 #include <linux/moduleparam.h>
-#include <linux/mutex.h>
 
 #include <sound/core.h>
 #include <sound/info.h>
@@ -326,7 +325,7 @@ struct snd_korg1212 {
         int irq;
 
         spinlock_t    lock;
-	struct mutex open_mutex;
+	struct semaphore open_mutex;
 
 	struct timer_list timer;	/* timer callback for checking ack of stop request */
 	int stop_pending_cnt;		/* counter for stop pending check */
@@ -668,13 +667,13 @@ static int snd_korg1212_OpenCard(struct snd_korg1212 * korg1212)
 {
 	K1212_DEBUG_PRINTK("K1212_DEBUG: OpenCard [%s] %d\n",
 			   stateName[korg1212->cardState], korg1212->opencnt);
-	mutex_lock(&korg1212->open_mutex);
+	down(&korg1212->open_mutex);
         if (korg1212->opencnt++ == 0) {
 		snd_korg1212_TurnOffIdleMonitor(korg1212);
 		snd_korg1212_setCardState(korg1212, K1212_STATE_OPEN);
 	}
 
-	mutex_unlock(&korg1212->open_mutex);
+	up(&korg1212->open_mutex);
         return 1;
 }
 
@@ -683,9 +682,9 @@ static int snd_korg1212_CloseCard(struct snd_korg1212 * korg1212)
 	K1212_DEBUG_PRINTK("K1212_DEBUG: CloseCard [%s] %d\n",
 			   stateName[korg1212->cardState], korg1212->opencnt);
 
-	mutex_lock(&korg1212->open_mutex);
+	down(&korg1212->open_mutex);
 	if (--(korg1212->opencnt)) {
-		mutex_unlock(&korg1212->open_mutex);
+		up(&korg1212->open_mutex);
 		return 0;
 	}
 
@@ -696,7 +695,7 @@ static int snd_korg1212_CloseCard(struct snd_korg1212 * korg1212)
 			K1212_DEBUG_PRINTK("K1212_DEBUG: CloseCard - RC = %d [%s]\n",
 					   rc, stateName[korg1212->cardState]);
 		if (rc != K1212_CMDRET_Success) {
-			mutex_unlock(&korg1212->open_mutex);
+			up(&korg1212->open_mutex);
                         return 0;
 		}
         } else if (korg1212->cardState > K1212_STATE_SETUP) {
@@ -708,7 +707,7 @@ static int snd_korg1212_CloseCard(struct snd_korg1212 * korg1212)
                 snd_korg1212_setCardState(korg1212, K1212_STATE_READY);
 	}
 
-	mutex_unlock(&korg1212->open_mutex);
+	up(&korg1212->open_mutex);
         return 0;
 }
 
@@ -2180,7 +2179,7 @@ static int __devinit snd_korg1212_create(struct snd_card *card, struct pci_dev *
 
         init_waitqueue_head(&korg1212->wait);
         spin_lock_init(&korg1212->lock);
-	mutex_init(&korg1212->open_mutex);
+	init_MUTEX(&korg1212->open_mutex);
 	init_timer(&korg1212->timer);
 	korg1212->timer.function = snd_korg1212_timer_func;
 	korg1212->timer.data = (unsigned long)korg1212;

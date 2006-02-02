@@ -20,9 +20,10 @@ struct xt_get_revision
 #define XT_RETURN (-NF_REPEAT - 1)
 
 /* this is a dummy structure to find out the alignment requirement for a struct
- * containing all the fundamental data types that are used in ipt_entry, ip6t_entry
- * and arpt_entry.  This sucks, and it is a hack.  It will be my personal pleasure
- * to remove it -HW */
+ * containing all the fundamental data types that are used in ipt_entry,
+ * ip6t_entry and arpt_entry.  This sucks, and it is a hack.  It will be my
+ * personal pleasure to remove it -HW
+ */
 struct _xt_align
 {
 	u_int8_t u8;

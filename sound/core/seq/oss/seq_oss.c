@@ -24,7 +24,6 @@
 #include <linux/init.h>
 #include <linux/smp_lock.h>
 #include <linux/moduleparam.h>
-#include <linux/mutex.h>
 #include <sound/core.h>
 #include <sound/minors.h>
 #include <sound/initval.h>
@@ -125,7 +124,7 @@ module_exit(alsa_seq_oss_exit)
  * ALSA minor device interface
  */
 
-static DEFINE_MUTEX(register_mutex);
+static DECLARE_MUTEX(register_mutex);
 
 static int
 odev_open(struct inode *inode, struct file *file)
@@ -137,9 +136,9 @@ odev_open(struct inode *inode, struct file *file)
 	else
 		level = SNDRV_SEQ_OSS_MODE_SYNTH;
 
-	mutex_lock(&register_mutex);
+	down(&register_mutex);
 	rc = snd_seq_oss_open(file, level);
-	mutex_unlock(&register_mutex);
+	up(&register_mutex);
 
 	return rc;
 }
@@ -154,9 +153,9 @@ odev_release(struct inode *inode, struct file *file)
 
 	snd_seq_oss_drain_write(dp);
 
-	mutex_lock(&register_mutex);
+	down(&register_mutex);
 	snd_seq_oss_release(dp);
-	mutex_unlock(&register_mutex);
+	up(&register_mutex);
 
 	return 0;
 }
@@ -225,13 +224,13 @@ register_device(void)
 {
 	int rc;
 
-	mutex_lock(&register_mutex);
+	down(&register_mutex);
 	if ((rc = snd_register_oss_device(SNDRV_OSS_DEVICE_TYPE_SEQUENCER,
 					  NULL, 0,
 					  &seq_oss_f_ops, NULL,
 					  SNDRV_SEQ_OSS_DEVNAME)) < 0) {
 		snd_printk(KERN_ERR "can't register device seq\n");
-		mutex_unlock(&register_mutex);
+		up(&register_mutex);
 		return rc;
 	}
 	if ((rc = snd_register_oss_device(SNDRV_OSS_DEVICE_TYPE_MUSIC,
@@ -240,24 +239,24 @@ register_device(void)
 					  SNDRV_SEQ_OSS_DEVNAME)) < 0) {
 		snd_printk(KERN_ERR "can't register device music\n");
 		snd_unregister_oss_device(SNDRV_OSS_DEVICE_TYPE_SEQUENCER, NULL, 0);
-		mutex_unlock(&register_mutex);
+		up(&register_mutex);
 		return rc;
 	}
 	debug_printk(("device registered\n"));
-	mutex_unlock(&register_mutex);
+	up(&register_mutex);
 	return 0;
 }
 
 static void
 unregister_device(void)
 {
-	mutex_lock(&register_mutex);
+	down(&register_mutex);
 	debug_printk(("device unregistered\n"));
 	if (snd_unregister_oss_device(SNDRV_OSS_DEVICE_TYPE_MUSIC, NULL, 0) < 0)		
 		snd_printk(KERN_ERR "error unregister device music\n");
 	if (snd_unregister_oss_device(SNDRV_OSS_DEVICE_TYPE_SEQUENCER, NULL, 0) < 0)
 		snd_printk(KERN_ERR "error unregister device seq\n");
-	mutex_unlock(&register_mutex);
+	up(&register_mutex);
 }
 
 /*
@@ -271,12 +270,12 @@ static struct snd_info_entry *info_entry;
 static void
 info_read(struct snd_info_entry *entry, struct snd_info_buffer *buf)
 {
-	mutex_lock(&register_mutex);
+	down(&register_mutex);
 	snd_iprintf(buf, "OSS sequencer emulation version %s\n", SNDRV_SEQ_OSS_VERSION_STR);
 	snd_seq_oss_system_info_read(buf);
 	snd_seq_oss_synth_info_read(buf);
 	snd_seq_oss_midi_info_read(buf);
-	mutex_unlock(&register_mutex);
+	up(&register_mutex);
 }
 
 

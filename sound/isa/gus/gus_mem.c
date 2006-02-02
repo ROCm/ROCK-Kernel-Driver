@@ -34,9 +34,9 @@ static void snd_gf1_mem_info_read(struct snd_info_entry *entry,
 void snd_gf1_mem_lock(struct snd_gf1_mem * alloc, int xup)
 {
 	if (!xup) {
-		mutex_lock(&alloc->memory_mutex);
+		down(&alloc->memory_mutex);
 	} else {
-		mutex_unlock(&alloc->memory_mutex);
+		up(&alloc->memory_mutex);
 	}
 }
 
@@ -59,7 +59,7 @@ static struct snd_gf1_mem_block *snd_gf1_mem_xalloc(struct snd_gf1_mem * alloc,
 				alloc->first = nblock;
 			else
 				nblock->prev->next = nblock;
-			mutex_unlock(&alloc->memory_mutex);
+			up(&alloc->memory_mutex);
 			return NULL;
 		}
 		pblock = pblock->next;
@@ -80,7 +80,7 @@ int snd_gf1_mem_xfree(struct snd_gf1_mem * alloc, struct snd_gf1_mem_block * blo
 {
 	if (block->share) {	/* ok.. shared block */
 		block->share--;
-		mutex_unlock(&alloc->memory_mutex);
+		up(&alloc->memory_mutex);
 		return 0;
 	}
 	if (alloc->first == block) {
@@ -244,7 +244,7 @@ int snd_gf1_mem_init(struct snd_gus_card * gus)
 #endif
 
 	alloc = &gus->gf1.mem_alloc;
-	mutex_init(&alloc->memory_mutex);
+	init_MUTEX(&alloc->memory_mutex);
 	alloc->first = alloc->last = NULL;
 	if (!gus->gf1.memory)
 		return 0;
@@ -299,7 +299,7 @@ static void snd_gf1_mem_info_read(struct snd_info_entry *entry,
 
 	gus = entry->private_data;
 	alloc = &gus->gf1.mem_alloc;
-	mutex_lock(&alloc->memory_mutex);
+	down(&alloc->memory_mutex);
 	snd_iprintf(buffer, "8-bit banks       : \n    ");
 	for (i = 0; i < 4; i++)
 		snd_iprintf(buffer, "0x%06x (%04ik)%s", alloc->banks_8[i].address, alloc->banks_8[i].size >> 10, i + 1 < 4 ? "," : "");
@@ -343,7 +343,7 @@ static void snd_gf1_mem_info_read(struct snd_info_entry *entry,
 	}
 	snd_iprintf(buffer, "  Total: memory = %i, used = %i, free = %i\n",
 		    total, used, total - used);
-	mutex_unlock(&alloc->memory_mutex);
+	up(&alloc->memory_mutex);
 #if 0
 	ultra_iprintf(buffer, "  Verify: free = %i, max 8-bit block = %i, max 16-bit block = %i\n",
 		      ultra_memory_free_size(card, &card->gf1.mem_alloc),

@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2005, R. Byron Moore
+ * Copyright (C) 2000 - 2006, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -137,12 +137,18 @@
 
 /* Exception level -- used in the global "debug_level" */
 
-#define ACPI_DB_ERROR               ACPI_DEBUG_LEVEL (ACPI_LV_ERROR)
-#define ACPI_DB_WARN                ACPI_DEBUG_LEVEL (ACPI_LV_WARN)
 #define ACPI_DB_INIT                ACPI_DEBUG_LEVEL (ACPI_LV_INIT)
 #define ACPI_DB_DEBUG_OBJECT        ACPI_DEBUG_LEVEL (ACPI_LV_DEBUG_OBJECT)
 #define ACPI_DB_INFO                ACPI_DEBUG_LEVEL (ACPI_LV_INFO)
 #define ACPI_DB_ALL_EXCEPTIONS      ACPI_DEBUG_LEVEL (ACPI_LV_ALL_EXCEPTIONS)
+
+/*
+ * These two levels are essentially obsolete, all instances in the
+ * ACPICA core code have been replaced by REPORT_ERROR and REPORT_WARNING
+ * (Kept here because some drivers may still use them)
+ */
+#define ACPI_DB_ERROR               ACPI_DEBUG_LEVEL (ACPI_LV_ERROR)
+#define ACPI_DB_WARN                ACPI_DEBUG_LEVEL (ACPI_LV_WARN)
 
 /* Trace level -- also used in the global "debug_level" */
 
@@ -172,12 +178,7 @@
 
 /* Defaults for debug_level, debug and normal */
 
-#ifdef CONFIG_ACPI_DEBUG_LITE
-/* Don't print warnings and other noise by default. Can be still enabled on the command line. */
-#define ACPI_DEBUG_DEFAULT          (ACPI_LV_INIT | ACPI_LV_ERROR)
-#else
 #define ACPI_DEBUG_DEFAULT          (ACPI_LV_INIT | ACPI_LV_WARN | ACPI_LV_ERROR | ACPI_LV_DEBUG_OBJECT)
-#endif
 #define ACPI_NORMAL_DEFAULT         (ACPI_LV_INIT | ACPI_LV_WARN | ACPI_LV_ERROR | ACPI_LV_DEBUG_OBJECT)
 #define ACPI_DEBUG_ALL              (ACPI_LV_AML_DISASSEMBLE | ACPI_LV_ALL_EXCEPTIONS | ACPI_LV_ALL)
 
