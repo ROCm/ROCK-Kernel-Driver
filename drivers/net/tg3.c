@@ -3770,6 +3770,11 @@ static int tg3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		entry = start;
 	}
 
+	/* Some platforms like PPC64 need to sync system memory &
+	 * IO memory
+	 */
+	wmb();
+
 	/* Packets are ready, update Tx producer idx local and on card. */
 	tw32_tx_mbox((MAILBOX_SNDHOST_PROD_IDX_0 + TG3_64BIT_REG_LOW), entry);
 
