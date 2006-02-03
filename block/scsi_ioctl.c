@@ -309,6 +309,7 @@ static int sg_io(struct file *file, request_queue_t *q,
 		rq->timeout = q->sg_timeout;
 	if (!rq->timeout)
 		rq->timeout = BLK_DEFAULT_TIMEOUT;
+	rq->retries = 0;
 
 	start_time = jiffies;
 
@@ -427,6 +428,7 @@ static int sg_scsi_ioctl(struct file *file, request_queue_t *q,
 	rq->data = buffer;
 	rq->data_len = bytes;
 	rq->flags |= REQ_BLOCK_PC;
+	rq->retries = 0;
 
 	blk_execute_rq(q, bd_disk, rq, 0);
 	err = rq->errors & 0xff;	/* only 8 bit SCSI status */
