@@ -241,8 +241,14 @@ static void __devinit MP_processor_info (struct mpc_config_processor *m)
 	bios_cpu_apicid[num_processors - 1] = m->mpc_apicid;
 }
 #else
-void __init MP_processor_info (struct mpc_config_processor *m)
+static void __init MP_processor_info (struct mpc_config_processor *m)
 {
+	if (num_processors >= NR_CPUS) {
+		printk(KERN_WARNING "WARNING: NR_CPUS limit of %i reached."
+			" Processor ignored.\n", NR_CPUS);
+		return;
+	}
+	cpu_set(num_processors, cpu_possible_map);
 	num_processors++;
 }
 #endif /* CONFIG_XEN */
@@ -1097,7 +1103,7 @@ void __init mp_config_acpi_legacy_irqs (void)
 
 #define MAX_GSI_NUM	4096
 
-int mp_register_gsi (u32 gsi, int edge_level, int active_high_low)
+int mp_register_gsi (u32 gsi, int triggering, int polarity)
 {
 	int			ioapic = -1;
 	int			ioapic_pin = 0;
@@ -1146,7 +1152,7 @@ int mp_register_gsi (u32 gsi, int edge_level, int active_high_low)
 
 	mp_ioapic_routing[ioapic].pin_programmed[idx] |= (1<<bit);
 
-	if (edge_level) {
+	if (triggering == ACPI_LEVEL_SENSITIVE) {
 		/*
 		 * For PCI devices assign IRQs in order, avoiding gaps
 		 * due to unused I/O APIC pins.
@@ -1168,8 +1174,8 @@ int mp_register_gsi (u32 gsi, int edge_level, int active_high_low)
 	}
 
 	io_apic_set_pci_routing(ioapic, ioapic_pin, gsi,
-		    edge_level == ACPI_EDGE_SENSITIVE ? 0 : 1,
-		    active_high_low == ACPI_ACTIVE_HIGH ? 0 : 1);
+		    triggering == ACPI_EDGE_SENSITIVE ? 0 : 1,
+		    polarity == ACPI_ACTIVE_HIGH ? 0 : 1);
 	return gsi;
 }
 

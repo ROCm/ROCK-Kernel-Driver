@@ -118,6 +118,7 @@ void skb_under_panic(struct sk_buff *skb, int sz, void *here)
  *
  */
 
+#ifndef CONFIG_HAVE_ARCH_ALLOC_SKB
 /**
  *	__alloc_skb	-	allocate a network buffer
  *	@size: size to allocate
@@ -132,7 +133,6 @@ void skb_under_panic(struct sk_buff *skb, int sz, void *here)
  *	Buffers may only be allocated from interrupts using a @gfp_mask of
  *	%GFP_ATOMIC.
  */
-#ifndef CONFIG_HAVE_ARCH_ALLOC_SKB
 struct sk_buff *__alloc_skb(unsigned int size, gfp_t gfp_mask,
 			    int fclone)
 {
@@ -187,7 +187,7 @@ nodata:
 	skb = NULL;
 	goto out;
 }
-#endif /* !CONFIG_HAVE_ARCH_ALLOC_SKB */
+#endif
 
 /**
  *	alloc_skb_from_cache	-	allocate a network buffer

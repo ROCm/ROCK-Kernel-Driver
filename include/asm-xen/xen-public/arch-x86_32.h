@@ -49,10 +49,15 @@
  * machine->physical mapping table starts at this address, read-only.
  */
 #ifdef CONFIG_X86_PAE
-# define HYPERVISOR_VIRT_START (0xF5800000UL)
+#define __HYPERVISOR_VIRT_START 0xF5800000
 #else
-# define HYPERVISOR_VIRT_START (0xFC000000UL)
+#define __HYPERVISOR_VIRT_START 0xFC000000
 #endif
+
+#ifndef HYPERVISOR_VIRT_START
+#define HYPERVISOR_VIRT_START mk_unsigned_long(__HYPERVISOR_VIRT_START)
+#endif
+
 #ifndef machine_to_phys_mapping
 #define machine_to_phys_mapping ((unsigned long *)HYPERVISOR_VIRT_START)
 #endif
@@ -111,8 +116,6 @@ typedef struct vcpu_guest_context {
 #define VGCF_I387_VALID (1<<0)
 #define VGCF_VMX_GUEST  (1<<1)
 #define VGCF_IN_KERNEL  (1<<2)
-#define VGCF_SVM_GUEST  (1<<3)
-#define VGCF_HVM_GUEST  (VGCF_VMX_GUEST | VGCF_SVM_GUEST)
     unsigned long flags;                    /* VGCF_* flags                 */
     cpu_user_regs_t user_regs;              /* User-level CPU registers     */
     trap_info_t   trap_ctxt[256];           /* Virtual IDT                  */
@@ -132,6 +135,7 @@ typedef struct arch_shared_info {
     unsigned long max_pfn;                  /* max pfn that appears in table */
     /* Frame containing list of mfns containing list of mfns containing p2m. */
     unsigned long pfn_to_mfn_frame_list_list; 
+    unsigned long nmi_reason;
 } arch_shared_info_t;
 
 typedef struct {
@@ -139,7 +143,7 @@ typedef struct {
     unsigned long pad[5]; /* sizeof(vcpu_info_t) == 64 */
 } arch_vcpu_info_t;
 
-#endif
+#endif /* !__ASSEMBLY__ */
 
 #endif
 

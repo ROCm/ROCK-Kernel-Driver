@@ -3,7 +3,7 @@ c-obj-$(CONFIG_X86_IO_APIC)	        += earlyquirk.o
 c-obj-$(CONFIG_ACPI_SLEEP)	        += sleep.o wakeup.o
 
 ifneq ($(CONFIG_ACPI_PROCESSOR),)
-c-obj-y				+= cstate.o
+c-obj-y				+= cstate.o processor.o
 endif
 
 c-link                                  :=
