@@ -58,17 +58,17 @@ unsigned long badness(struct task_struct *p, unsigned long uptime)
 
 	/*
 	 * Processes which fork a lot of child processes are likely
-	 * a good choice. We add half the vmsize of the children if they
+	 * a good choice. We add a third of the vmsize of the children if they
 	 * have an own mm. This prevents forking servers to flood the
 	 * machine with an endless amount of children. In case a single
-	 * child is eating the vast majority of memory, adding only half
+	 * child is eating the vast majority of memory, adding only a third
 	 * to the parents will make the child our kill candidate of choice.
 	 */
 	list_for_each(tsk, &p->children) {
 		struct task_struct *chld;
 		chld = list_entry(tsk, struct task_struct, sibling);
 		if (chld->mm != p->mm && chld->mm)
-			points += chld->mm->total_vm/2 + 1;
+			points += chld->mm->total_vm/3 + 1;
 	}
 
 	/*
