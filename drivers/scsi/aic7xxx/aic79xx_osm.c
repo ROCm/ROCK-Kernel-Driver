@@ -453,18 +453,15 @@ ahd_linux_queue(struct scsi_cmnd * cmd, void (*scsi_done) (struct scsi_cmnd *))
 	struct	 ahd_softc *ahd;
 	struct	 ahd_linux_device *dev = scsi_transport_device_data(cmd->device);
 	int rtn = SCSI_MLQUEUE_HOST_BUSY;
-	unsigned long flags;
 
 	ahd = *(struct ahd_softc **)cmd->device->host->hostdata;
 
-	ahd_lock(ahd, &flags);
-	if (ahd->platform_data->qfrozen == 0) {
+	if (!atomic_read(&ahd->platform_data->qfrozen)) {
 		cmd->scsi_done = scsi_done;
 		cmd->result = CAM_REQ_INPROG << 16;
 		rtn = ahd_linux_run_command(ahd, dev, cmd);
 
 	}
-	ahd_unlock(ahd, &flags);
 	return rtn;
 }
 
@@ -691,10 +688,8 @@ ahd_linux_bus_reset(struct scsi_cmnd *cmd)
 		printf("%s: Bus reset called for cmd %p\n",
 		       ahd_name(ahd), cmd);
 #endif
-	ahd_lock(ahd, &s);
 	found = ahd_reset_channel(ahd, scmd_channel(cmd) + 'A',
 				  /*initiate reset*/TRUE);
-	ahd_unlock(ahd, &s);
 
 	if (bootverbose)
 		printf("%s: SCSI bus reset delivered. "
@@ -811,59 +806,6 @@ ahd_dmamap_unload(struct ahd_softc *ahd, bus_dma_tag_t dmat, bus_dmamap_t map)
 }
 
 /********************* Platform Dependent Functions ***************************/
-/*
- * Compare "left hand" softc with "right hand" softc, returning:
- * < 0 - lahd has a lower priority than rahd
- *   0 - Softcs are equal
- * > 0 - lahd has a higher priority than rahd
- */
-int
-ahd_softc_comp(struct ahd_softc *lahd, struct ahd_softc *rahd)
-{
-	int	value;
-
-	/*
-	 * Under Linux, cards are ordered as follows:
-	 *	1) PCI devices that are marked as the boot controller.
-	 *	2) PCI devices with BIOS enabled sorted by bus/slot/func.
-	 *	3) All remaining PCI devices sorted by bus/slot/func.
-	 */
-#if 0
-	value = (lahd->flags & AHD_BOOT_CHANNEL)
-	      - (rahd->flags & AHD_BOOT_CHANNEL);
-	if (value != 0)
-		/* Controllers set for boot have a *higher* priority */
-		return (value);
-#endif
-
-	value = (lahd->flags & AHD_BIOS_ENABLED)
-	      - (rahd->flags & AHD_BIOS_ENABLED);
-	if (value != 0)
-		/* Controllers with BIOS enabled have a *higher* priority */
-		return (value);
-
-	/* Still equal.  Sort by bus/slot/func. */
-	if (aic79xx_reverse_scan != 0)
-		value = ahd_get_pci_bus(lahd->dev_softc)
-		      - ahd_get_pci_bus(rahd->dev_softc);
-	else
-		value = ahd_get_pci_bus(rahd->dev_softc)
-		      - ahd_get_pci_bus(lahd->dev_softc);
-	if (value != 0)
-		return (value);
-	if (aic79xx_reverse_scan != 0)
-		value = ahd_get_pci_slot(lahd->dev_softc)
-		      - ahd_get_pci_slot(rahd->dev_softc);
-	else
-		value = ahd_get_pci_slot(rahd->dev_softc)
-		      - ahd_get_pci_slot(lahd->dev_softc);
-	if (value != 0)
-		return (value);
-
-	value = rahd->channel - lahd->channel;
-	return (value);
-}
-
 static void
 ahd_linux_setup_iocell_info(u_long index, int instance, int targ, int32_t value)
 {
@@ -1194,6 +1136,7 @@ ahd_platform_alloc(struct ahd_softc *ahd, void *platform_arg)
 	memset(ahd->platform_data, 0, sizeof(struct ahd_platform_data));
 	ahd->platform_data->irq = AHD_LINUX_NOIRQ;
 	ahd_lockinit(ahd);
+	atomic_set(&ahd->platform_data->qfrozen, 0);
 	init_MUTEX_LOCKED(&ahd->platform_data->eh_sem);
 	ahd->seltime = (aic79xx_seltime & 0x3) << 4;
 	return (0);
@@ -1354,7 +1297,13 @@ ahd_platform_set_tags(struct ahd_softc *ahd, struct ahd_devinfo *devinfo,
 		scsi_activate_tcq(sdev, dev->openings + dev->active);
 		break;
 	default:
-		scsi_deactivate_tcq(sdev, 1);
+		/*
+		 * We allow the OS to queue 2 untagged transactions to
+		 * us at any time even though we can only execute them
+		 * serially on the controller/device.  This should
+		 * remove some latency.
+		 */
+		scsi_deactivate_tcq(sdev, 2);
 		break;
 	}
 }
@@ -1433,6 +1382,9 @@ ahd_linux_run_command(struct ahd_softc *ahd, struct ahd_linux_device *dev,
 	struct	 ahd_tmode_tstate *tstate;
 	u_int	 col_idx;
 	uint16_t mask;
+	unsigned long flags;
+
+	ahd_lock(ahd, &flags);
 
 	/*
 	 * Get an scb to use.
@@ -1448,6 +1400,7 @@ ahd_linux_run_command(struct ahd_softc *ahd, struct ahd_linux_device *dev,
 	}
 	if ((scb = ahd_get_scb(ahd, col_idx)) == NULL) {
 		ahd->flags |= AHD_RESOURCE_SHORTAGE;
+		ahd_unlock(ahd, &flags);
 		return SCSI_MLQUEUE_HOST_BUSY;
 	}
 
@@ -1573,6 +1526,8 @@ ahd_linux_run_command(struct ahd_softc *ahd, struct ahd_linux_device *dev,
 	scb->flags |= SCB_ACTIVE;
 	ahd_queue_scb(ahd, scb);
 
+	ahd_unlock(ahd, &flags);
+
 	return 0;
 }
 
@@ -1591,12 +1546,6 @@ ahd_linux_isr(int irq, void *dev_id, struct pt_regs * regs)
 	ours = ahd_intr(ahd);
 	ahd_unlock(ahd, &flags);
 	return IRQ_RETVAL(ours);
-}
-
-void
-ahd_platform_flushwork(struct ahd_softc *ahd)
-{
-
 }
 
 void
@@ -2041,38 +1990,14 @@ ahd_freeze_simq(struct ahd_softc *ahd)
 {
 	unsigned long s;
 
-	ahd_lock(ahd, &s);
-	ahd->platform_data->qfrozen++;
-	if (ahd->platform_data->qfrozen == 1) {
+	if (!atomic_inc_and_test(&ahd->platform_data->qfrozen))
 		scsi_block_requests(ahd->platform_data->host);
-		ahd_platform_abort_scbs(ahd, CAM_TARGET_WILDCARD, ALL_CHANNELS,
-					CAM_LUN_WILDCARD, SCB_LIST_NULL,
-					ROLE_INITIATOR, CAM_REQUEUE_REQ);
-	}
-	ahd_unlock(ahd, &s);
 }
 
 void
 ahd_release_simq(struct ahd_softc *ahd)
 {
-	u_long s;
-	int    unblock_reqs;
-
-	unblock_reqs = 0;
-	ahd_lock(ahd, &s);
-	if (ahd->platform_data->qfrozen > 0)
-		ahd->platform_data->qfrozen--;
-	if (ahd->platform_data->qfrozen == 0) {
-		unblock_reqs = 1;
-	}
-	ahd_unlock(ahd, &s);
-	/*
-	 * There is still a race here.  The mid-layer
-	 * should keep its own freeze count and use
-	 * a bottom half handler to run the queues
-	 * so we can unblock with our own lock held.
-	 */
-	if (unblock_reqs)
+	if (atomic_dec_and_test(&ahd->platform_data->qfrozen))
 		scsi_unblock_requests(ahd->platform_data->host);
 }
 

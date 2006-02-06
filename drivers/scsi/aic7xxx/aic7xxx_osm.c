@@ -1336,7 +1336,13 @@ ahc_platform_set_tags(struct ahc_softc *ahc, struct ahc_devinfo *devinfo,
 		scsi_activate_tcq(sdev, dev->openings + dev->active);
 		break;
 	default:
-		scsi_deactivate_tcq(sdev, 1);
+		/*
+		 * We allow the OS to queue 2 untagged transactions to
+		 * us at any time even though we can only execute them
+		 * serially on the controller/device.  This should
+		 * remove some latency.
+		 */
+		scsi_deactivate_tcq(sdev, 2);
 		break;
 	}
 }

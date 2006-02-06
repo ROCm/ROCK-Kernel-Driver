@@ -7094,7 +7094,6 @@ ahd_pause_and_flushwork(struct ahd_softc *ahd)
 
 	ahd_flush_qoutfifo(ahd);
 
-	ahd_platform_flushwork(ahd);
 	ahd->flags &= ~AHD_ALL_INTERRUPTS;
 }
 

@@ -381,7 +381,7 @@ struct ahd_platform_data {
 	struct scsi_target *starget[AHD_NUM_TARGETS]; 
 
 	spinlock_t		 spin_lock;
-	u_int			 qfrozen;
+	atomic_t		 qfrozen;
 	struct semaphore	 eh_sem;
 	struct Scsi_Host        *host;		/* pointer to scsi host */
 #define AHD_LINUX_NOIRQ	((uint32_t)~0)
@@ -875,8 +875,6 @@ int	ahd_platform_abort_scbs(struct ahd_softc *ahd, int target,
 				role_t role, uint32_t status);
 irqreturn_t
 	ahd_linux_isr(int irq, void *dev_id, struct pt_regs * regs);
-void	ahd_platform_flushwork(struct ahd_softc *ahd);
-int	ahd_softc_comp(struct ahd_softc *, struct ahd_softc *);
 void	ahd_done(struct ahd_softc*, struct scb*);
 void	ahd_send_async(struct ahd_softc *, char channel,
 		       u_int target, u_int lun, ac_code, void *);
