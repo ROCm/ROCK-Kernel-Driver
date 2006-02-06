@@ -1303,6 +1303,7 @@ static int __init need_apic(struct dmi_system_id *d)
 KERN_INFO "%s detected. Enabling local APIC. Overwrite with \"nolapic\"\n",
 		       d->ident);
 #endif
+	}
 	return 0;
 } 
 
