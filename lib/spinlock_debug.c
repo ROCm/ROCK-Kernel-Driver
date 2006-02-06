@@ -68,13 +68,13 @@ static inline void debug_spin_unlock(spinlock_t *lock)
 static void __spin_lock_debug(spinlock_t *lock)
 {
 	int print_once = 1;
+	u64 i;
 
 	for (;;) {
-		unsigned long timeout = jiffies + HZ;
-		while (time_before(jiffies, timeout)) {
+		for (i = 0; i < loops_per_jiffy * HZ; i++) {
 			if (__raw_spin_trylock(&lock->raw_lock))
 				return;
-			cpu_relax();
+			__delay(1);
 		}
 		/* lockup suspected: */
 		if (print_once) {
@@ -144,9 +144,9 @@ static void __read_lock_debug(rwlock_t *lock)
 
 	for (;;) {
 		for (i = 0; i < loops_per_jiffy * HZ; i++) {
-			cpu_relax();
 			if (__raw_read_trylock(&lock->raw_lock))
 				return;
+			__delay(1);
 		}
 		/* lockup suspected: */
 		if (print_once) {
@@ -217,9 +217,9 @@ static void __write_lock_debug(rwlock_t *lock)
 
 	for (;;) {
 		for (i = 0; i < loops_per_jiffy * HZ; i++) {
-			cpu_relax();
 			if (__raw_write_trylock(&lock->raw_lock))
 				return;
+			__delay(1);
 		}
 		/* lockup suspected: */
 		if (print_once) {
