@@ -51,7 +51,7 @@ extern int using_apic_timer;
 DEFINE_SPINLOCK(rtc_lock);
 DEFINE_SPINLOCK(i8253_lock);
 
-static int nohpet __initdata = 0;
+int nohpet __initdata = 0;
 static int notsc __initdata = 0;
 
 #undef HPET_HACK_ENABLE_DANGEROUS

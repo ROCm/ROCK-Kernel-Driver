@@ -58,15 +58,15 @@ static void dlm_do_local_recovery_cleanup(struct dlm_ctxt *dlm, u8 dead_node);
 static int dlm_recovery_thread(void *data);
 void dlm_complete_recovery_thread(struct dlm_ctxt *dlm);
 int dlm_launch_recovery_thread(struct dlm_ctxt *dlm);
-void dlm_kick_recovery_thread(struct dlm_ctxt *dlm);
-int dlm_do_recovery(struct dlm_ctxt *dlm);
+static void dlm_kick_recovery_thread(struct dlm_ctxt *dlm);
+static int dlm_do_recovery(struct dlm_ctxt *dlm);
 
-int dlm_pick_recovery_master(struct dlm_ctxt *dlm);
+static int dlm_pick_recovery_master(struct dlm_ctxt *dlm);
 static int dlm_remaster_locks(struct dlm_ctxt *dlm, u8 dead_node);
-int dlm_init_recovery_area(struct dlm_ctxt *dlm, u8 dead_node);
-int dlm_request_all_locks(struct dlm_ctxt *dlm,
-			  u8 request_from, u8 dead_node);
-void dlm_destroy_recovery_area(struct dlm_ctxt *dlm, u8 dead_node);
+static int dlm_init_recovery_area(struct dlm_ctxt *dlm, u8 dead_node);
+static int dlm_request_all_locks(struct dlm_ctxt *dlm,
+				 u8 request_from, u8 dead_node);
+static void dlm_destroy_recovery_area(struct dlm_ctxt *dlm, u8 dead_node);
 
 static inline int dlm_num_locks_in_lockres(struct dlm_lock_resource *res);
 static void dlm_init_migratable_lockres(struct dlm_migratable_lockres *mres,
@@ -165,7 +165,7 @@ void dlm_dispatch_work(void *data)
  * RECOVERY THREAD
  */
 
-void dlm_kick_recovery_thread(struct dlm_ctxt *dlm)
+static void dlm_kick_recovery_thread(struct dlm_ctxt *dlm)
 {
 	/* wake the recovery thread
 	 * this will wake the reco thread in one of three places
@@ -316,7 +316,7 @@ static void dlm_end_recovery(struct dlm_ctxt *dlm)
 	wake_up(&dlm->reco.event);
 }
 
-int dlm_do_recovery(struct dlm_ctxt *dlm)
+static int dlm_do_recovery(struct dlm_ctxt *dlm)
 {
 	int status = 0;
 	int ret;
@@ -587,7 +587,7 @@ leave:
 	return status;
 }
 
-int dlm_init_recovery_area(struct dlm_ctxt *dlm, u8 dead_node)
+static int dlm_init_recovery_area(struct dlm_ctxt *dlm, u8 dead_node)
 {
 	int num=0;
 	struct dlm_reco_node_data *ndata;
@@ -621,7 +621,7 @@ int dlm_init_recovery_area(struct dlm_ctxt *dlm, u8 dead_node)
 	return 0;
 }
 
-void dlm_destroy_recovery_area(struct dlm_ctxt *dlm, u8 dead_node)
+static void dlm_destroy_recovery_area(struct dlm_ctxt *dlm, u8 dead_node)
 {
 	struct list_head *iter, *iter2;
 	struct dlm_reco_node_data *ndata;
@@ -638,7 +638,8 @@ void dlm_destroy_recovery_area(struct dlm_ctxt *dlm, u8 dead_node)
 	}
 }
 
-int dlm_request_all_locks(struct dlm_ctxt *dlm, u8 request_from, u8 dead_node)
+static int dlm_request_all_locks(struct dlm_ctxt *dlm, u8 request_from,
+				 u8 dead_node)
 {
 	struct dlm_lock_request lr;
 	enum dlm_status ret;
@@ -1861,8 +1862,8 @@ static void dlm_do_local_recovery_cleanup(struct dlm_ctxt *dlm, u8 dead_node)
 		bucket = &(dlm->resources[i]);
 		list_for_each(iter, bucket) {
 			res = list_entry (iter, struct dlm_lock_resource, list);
-			/* always prune any $RECOVERY entries for dead nodes,
-			 * otherwise hangs can occur during later recovery */
+ 			/* always prune any $RECOVERY entries for dead nodes,
+ 			 * otherwise hangs can occur during later recovery */
 			if (dlm_is_recovery_lock(res->lockname.name,
 						 res->lockname.len)) {
 				spin_lock(&res->spinlock);
@@ -1870,7 +1871,7 @@ static void dlm_do_local_recovery_cleanup(struct dlm_ctxt *dlm, u8 dead_node)
 					if (lock->ml.node == dead_node) {
 						mlog(0, "AHA! there was "
 						     "a $RECOVERY lock for dead "
-						     "node %u (%s)!\n", 
+						     "node %u (%s)!\n",
 						     dead_node, dlm->name);
 						list_del_init(&lock->list);
 						dlm_lock_put(lock);
@@ -1879,7 +1880,7 @@ static void dlm_do_local_recovery_cleanup(struct dlm_ctxt *dlm, u8 dead_node)
 				}
 				spin_unlock(&res->spinlock);
 				continue;
-			}
+			}			
 			spin_lock(&res->spinlock);
 			/* zero the lvb if necessary */
 			dlm_revalidate_lvb(dlm, res, dead_node);
@@ -1973,22 +1974,6 @@ void dlm_hb_node_up_cb(struct o2nm_node *node, int idx, void *data)
 	dlm_put(dlm);
 }
 
-int __dlm_hb_node_dead(struct dlm_ctxt *dlm, int node)
-{
-	if (test_bit(node, dlm->recovery_map))
-		return 1;
-	return 0;
-}
-
-int dlm_hb_node_dead(struct dlm_ctxt *dlm, int node)
-{
-	int ret;
-	spin_lock(&dlm->spinlock);
-	ret = __dlm_hb_node_dead(dlm, node);
-	spin_unlock(&dlm->spinlock);
-	return ret;
-}
-
 static void dlm_reco_ast(void *astdata)
 {
 	struct dlm_ctxt *dlm = astdata;
@@ -2018,7 +2003,7 @@ static void dlm_reco_unlock_ast(void *astdata, enum dlm_status st)
  * so each time a recovery master is needed, the entire cluster
  * will sync at this point.  if the new master dies, that will
  * be detected in dlm_do_recovery */
-int dlm_pick_recovery_master(struct dlm_ctxt *dlm)
+static int dlm_pick_recovery_master(struct dlm_ctxt *dlm)
 {
 	enum dlm_status ret;
 	struct dlm_lockstatus lksb;

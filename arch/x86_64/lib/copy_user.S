@@ -5,7 +5,7 @@
  */		 
 
 #define FIX_ALIGNMENT 1
-		
+
 	#include <asm/current.h>
 	#include <asm/asm-offsets.h>
 	#include <asm/thread_info.h>
@@ -21,7 +21,7 @@ copy_to_user:
 	jc  bad_to_user
 	cmpq threadinfo_addr_limit(%rax),%rcx
 	jae bad_to_user
-2:	
+2:
 	.byte 0xe9	/* 32bit jump */
 	.long .Lcug-1f
 1:
@@ -75,12 +75,12 @@ bad_to_user:
  * Output:		
  * eax uncopied bytes or 0 if successful.
  */
-	.globl copy_user_generic	
+	.globl copy_user_generic
 	.p2align 4
-copy_user_generic:	
-	.byte 0x66,0x66,0x90	/* 5 byte nop for replacement jump */	
+copy_user_generic:
+	.byte 0x66,0x66,0x90	/* 5 byte nop for replacement jump */
 	.byte 0x66,0x90
-1:		
+1:
 	.section .altinstr_replacement,"ax"
 2:	.byte 0xe9	             /* near jump with 32bit immediate */
 	.long copy_user_generic_c-1b /* offset */
@@ -93,7 +93,7 @@ copy_user_generic:
 	.byte  5
 	.byte  5
 	.previous
-.Lcug:	
+.Lcug:
 	pushq %rbx
 	xorl %eax,%eax		/*zero for the exception handler */
 
@@ -107,11 +107,11 @@ copy_user_generic:
 
 	movq %rdx,%rcx
 
-	movl $64,%ebx	
+	movl $64,%ebx
 	shrq $6,%rdx
 	decq %rdx
 	js   .Lhandle_tail
-	
+
 	.p2align 4
 .Lloop:
 .Ls1:	movq (%rsi),%r11
@@ -122,7 +122,7 @@ copy_user_generic:
 .Ld2:	movq %r8,1*8(%rdi)
 .Ld3:	movq %r9,2*8(%rdi)
 .Ld4:	movq %r10,3*8(%rdi)
-		
+
 .Ls5:	movq 4*8(%rsi),%r11
 .Ls6:	movq 5*8(%rsi),%r8
 .Ls7:	movq 6*8(%rsi),%r9
@@ -131,12 +131,12 @@ copy_user_generic:
 .Ld6:	movq %r8,5*8(%rdi)
 .Ld7:	movq %r9,6*8(%rdi)
 .Ld8:	movq %r10,7*8(%rdi)
-	
+
 	decq %rdx
 
 	leaq 64(%rsi),%rsi
 	leaq 64(%rdi),%rdi
-	
+
 	jns  .Lloop
 
 	.p2align 4
@@ -154,9 +154,9 @@ copy_user_generic:
 	leaq 8(%rdi),%rdi
 	leaq 8(%rsi),%rsi
 	jnz .Lloop_8
-	
-.Lhandle_7:		
-	movl %edx,%ecx	
+
+.Lhandle_7:
+	movl %edx,%ecx
 	andl $7,%ecx
 	jz   .Lende
 	.p2align 4
@@ -167,12 +167,12 @@ copy_user_generic:
 	incq %rsi
 	decl %ecx
 	jnz .Lloop_1
-			
+
 .Lende:
 	popq %rbx
-	ret	
+	ret
 
-#ifdef FIX_ALIGNMENT		  		
+#ifdef FIX_ALIGNMENT
 	/* align destination */
 	.p2align 4
 .Lbad_alignment:
@@ -182,7 +182,7 @@ copy_user_generic:
 	cmpq %r9,%rdx
 	jz   .Lhandle_7
 	js   .Lhandle_7
-.Lalign_1:		
+.Lalign_1:
 .Ls11:	movb (%rsi),%bl
 .Ld11:	movb %bl,(%rdi)
 	incq %rsi
@@ -192,14 +192,14 @@ copy_user_generic:
 	subq %r9,%rdx
 	jmp .Lafter_bad_alignment
 #endif
-	
-	/* table sorted by exception address */	
+
+	/* table sorted by exception address */
 	.section __ex_table,"a"
 	.align 8
 	.quad .Ls1,.Ls1e
 	.quad .Ls2,.Ls2e
 	.quad .Ls3,.Ls3e
-	.quad .Ls4,.Ls4e	
+	.quad .Ls4,.Ls4e
 	.quad .Ld1,.Ls1e
 	.quad .Ld2,.Ls2e
 	.quad .Ld3,.Ls3e
@@ -207,7 +207,7 @@ copy_user_generic:
 	.quad .Ls5,.Ls5e
 	.quad .Ls6,.Ls6e
 	.quad .Ls7,.Ls7e
-	.quad .Ls8,.Ls8e	
+	.quad .Ls8,.Ls8e
 	.quad .Ld5,.Ls5e
 	.quad .Ld6,.Ls6e
 	.quad .Ld7,.Ls7e
@@ -216,16 +216,16 @@ copy_user_generic:
 	.quad .Ld9,.Le_quad
 	.quad .Ls10,.Le_byte
 	.quad .Ld10,.Le_byte
-#ifdef FIX_ALIGNMENT	
+#ifdef FIX_ALIGNMENT
 	.quad .Ls11,.Lzero_rest
 	.quad .Ld11,.Lzero_rest
 #endif
 	.quad .Le5,.Le_zero
 	.previous
 
-	/* compute 64-offset for main loop. 8 bytes accuracy with error on the 
-	   pessimistic side. this is gross. it would be better to fix the 
-	   interface. */	
+	/* compute 64-offset for main loop. 8 bytes accuracy with error on the
+	   pessimistic side. this is gross. it would be better to fix the
+	   interface. */
 	/* eax: zero, ebx: 64 */
 .Ls1e: 	addl $8,%eax
 .Ls2e: 	addl $8,%eax
@@ -255,10 +255,10 @@ copy_user_generic:
 	movq %rdx,%rcx
 .Le_byte:
 	xorl %eax,%eax
-.Le5:	rep 
+.Le5:	rep
 	stosb
 	/* when there is another exception while zeroing the rest just return */
-.Le_zero:		
+.Le_zero:
 	movq %rdx,%rax
 	jmp .Lende
 
@@ -266,12 +266,12 @@ copy_user_generic:
 	   This is also a lot simpler. Use them when possible.
 	   Patch in jmps to this code instead of copying it fully
 	   to avoid unwanted aliasing in the exception tables. */
-		
+
  /* rdi	destination
   * rsi source
   * rdx count
   *
-  * Output:		
+  * Output:
   * eax uncopied bytes or 0 if successfull.
   *
   * Only 4GB of copy is supported. This shouldn't be a problem
@@ -280,7 +280,7 @@ copy_user_generic:
   * And more would be dangerous because both Intel and AMD have
   * errata with rep movsq > 4GB. If someone feels the need to fix
   * this please consider this.
-   */			
+   */
 copy_user_generic_c:
 	movl %edx,%ecx
 	shrl $3,%ecx
@@ -294,7 +294,7 @@ copy_user_generic_c:
 	ret
 3:	lea (%rdx,%rcx,8),%rax
 	ret
-	
+
 	.section __ex_table,"a"
 	.quad 1b,3b
 	.quad 2b,4b

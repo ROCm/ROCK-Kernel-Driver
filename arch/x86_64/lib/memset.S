@@ -22,32 +22,32 @@ __memset:
 	mul    %rcx		/* with rax, clobbers rdx */
 
 	/* align dst */
-	movl  %edi,%r9d		
-	andl  $7,%r9d	
+	movl  %edi,%r9d
+	andl  $7,%r9d
 	jnz  .Lbad_alignment
 .Lafter_bad_alignment:
-	
+
 	movl %r11d,%ecx
 	shrl $6,%ecx
 	jz	 .Lhandle_tail
 
 	.p2align 4
-.Lloop_64:	
+.Lloop_64:
 	decl   %ecx
-	movq  %rax,(%rdi) 
-	movq  %rax,8(%rdi) 
-	movq  %rax,16(%rdi) 
-	movq  %rax,24(%rdi) 
-	movq  %rax,32(%rdi) 
-	movq  %rax,40(%rdi) 
-	movq  %rax,48(%rdi) 
-	movq  %rax,56(%rdi) 
+	movq  %rax,(%rdi)
+	movq  %rax,8(%rdi)
+	movq  %rax,16(%rdi)
+	movq  %rax,24(%rdi)
+	movq  %rax,32(%rdi)
+	movq  %rax,40(%rdi)
+	movq  %rax,48(%rdi)
+	movq  %rax,56(%rdi)
 	leaq  64(%rdi),%rdi
 	jnz    .Lloop_64
 
 	/* Handle tail in loops. The loops should be faster than hard
-	   to predict jump tables. */ 
-	.p2align 4	   
+	   to predict jump tables. */
+	.p2align 4
 .Lhandle_tail:
 	movl	%r11d,%ecx
 	andl    $63&(~7),%ecx
@@ -70,8 +70,8 @@ __memset:
 	movb 	%al,(%rdi)
 	leaq	1(%rdi),%rdi
 	jnz     .Lloop_1
-	
-.Lende:	
+
+.Lende:
 	movq	%r10,%rax
 	ret
 
@@ -79,8 +79,8 @@ __memset:
 	cmpq $7,%r11
 	jbe	.Lhandle_7
 	movq %rax,(%rdi)	/* unaligned store */
-	movq $8,%r8			
-	subq %r9,%r8 
+	movq $8,%r8
+	subq %r9,%r8
 	addq %r8,%rdi
 	subq %r8,%r11
 	jmp .Lafter_bad_alignment
@@ -88,8 +88,8 @@ __memset:
 	/* Some CPUs run faster using the string instructions.
 	   It is also a lot simpler. Use this when possible */
 
-#include <asm/cpufeature.h>	
-		
+#include <asm/cpufeature.h>
+
 	.section .altinstructions,"a"
 	.align 8
 	.quad  memset
@@ -103,8 +103,8 @@ __memset:
  /* rdi	destination
   * rsi value
   * rdx count
-  */			
-memset_c:	
+  */
+memset_c:
 	movq %rdi,%r9
 	movl %edx,%r8d
 	andl $7,%r8d		

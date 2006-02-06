@@ -557,7 +557,8 @@ S:	Supported
 
 CONFIGFS
 P:	Joel Becker
-M:	Joel Becker <joel.becker@oracle.com>
+M:	joel.becker@oracle.com
+L:	linux-kernel@vger.kernel.org
 S:	Supported
 
 CIRRUS LOGIC GENERIC FBDEV DRIVER
@@ -1984,7 +1985,6 @@ M:	philb@gnu.org
 P:	Tim Waugh
 M:	tim@cyberelk.net
 P:	David Campbell
-M:	campbell@torque.net
 P:	Andrea Arcangeli
 M:	andrea@suse.de
 L:	linux-parport@lists.infradead.org
@@ -2298,7 +2298,7 @@ S:	Supported
 
 SELINUX SECURITY MODULE
 P:	Stephen Smalley
-M:	sds@epoch.ncsc.mil
+M:	sds@tycho.nsa.gov
 P:	James Morris
 M:	jmorris@namei.org
 L:	linux-kernel@vger.kernel.org (kernel issues)

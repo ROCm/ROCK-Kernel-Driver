@@ -64,6 +64,10 @@ void smp_local_timer_interrupt(struct pt_regs *regs)
 	 */
 }
 
+void ack_bad_irq(unsigned int irq)
+{
+	printk("unexpected IRQ trap at vector %02x\n", irq);
+}
 /*
  * Local APIC timer interrupt. This is the most natural way for doing
  * local interrupts, but local timer interrupts can be emulated by

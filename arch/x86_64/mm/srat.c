@@ -139,7 +139,7 @@ void __init
 acpi_numa_processor_affinity_init(struct acpi_table_processor_affinity *pa)
 {
 	int pxm, node;
-	if (srat_disabled()) 
+	if (srat_disabled())
 		return;
 	if (pa->header.length != sizeof(struct acpi_table_processor_affinity)) {		bad_srat();
 		return;
@@ -208,8 +208,8 @@ acpi_numa_memory_affinity_init(struct acpi_table_memory_affinity *ma)
 		if (nd->end < end)
 			nd->end = end;
 	}
- 
- 	/* 
+
+ 	/*
  	 * It is fine to add this area to the nodes data it will be used later
  	 * This code supports one contigious hot add area per node.
  	 */
@@ -217,7 +217,7 @@ acpi_numa_memory_affinity_init(struct acpi_table_memory_affinity *ma)
  		found_add_area = 1;
  		if (nodes_add[node].start == nodes_add[node].end) {
  			nodes_add[node].start = start;
- 			nodes_add[node].end = end;	
+ 			nodes_add[node].end = end;
  		} else {
  			if (nodes_add[node].start == end)
  				nodes_add[node].start = start;
@@ -278,10 +278,10 @@ int __init acpi_scan_nodes(unsigned long start, unsigned long end)
 	int i;
 
 	/* First clean up the node list */
-	for (i = 0; i < MAX_NUMNODES; i++) { 
+	for (i = 0; i < MAX_NUMNODES; i++) {
  		if (!found_add_area)
  			cutoff_node(i, start, end);
-		if ((nodes[i].end - nodes[i].start) < NODE_MIN_SIZE) 
+		if ((nodes[i].end - nodes[i].start) < NODE_MIN_SIZE)
 			unparse_node(i);
 	}
 
@@ -328,8 +328,8 @@ static int node_to_pxm(int n)
 void __init srat_reserve_add_area(int nodeid)
 {
 	if (found_add_area && nodes_add[nodeid].end) {
-		printk ("Reserving hot-add memory space node %d pages %08Lx to" 
-			" %08Lx\n", nodeid, nodes_add[nodeid].start, 
+		printk ("Reserving hot-add memory space node %d pages %08Lx to"
+			" %08Lx\n", nodeid, nodes_add[nodeid].start,
 			nodes_add[nodeid].end);
 
 		reserve_bootmem_node(NODE_DATA(nodeid), nodes_add[nodeid].start,

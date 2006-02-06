@@ -77,12 +77,12 @@ int ocfs2_write_blocks(ocfs2_super *osb, struct buffer_head *bhs[],
 	}
 
 	if (inode)
-		down(&OCFS2_I(inode)->ip_io_sem);
+		mutex_lock(&OCFS2_I(inode)->ip_io_mutex);
 	for (i = 0 ; i < nr ; i++) {
 		bh = bhs[i];
 		if (bh == NULL) {
 			if (inode)
-				up(&OCFS2_I(inode)->ip_io_sem);
+				mutex_unlock(&OCFS2_I(inode)->ip_io_mutex);
 			status = -EIO;
 			mlog_errno(status);
 			goto bail;
@@ -136,7 +136,7 @@ int ocfs2_write_blocks(ocfs2_super *osb, struct buffer_head *bhs[],
 			ocfs2_set_buffer_uptodate(inode, bh);
 	}
 	if (inode)
-		up(&OCFS2_I(inode)->ip_io_sem);
+		mutex_unlock(&OCFS2_I(inode)->ip_io_mutex);
 
 bail:
 
@@ -181,13 +181,13 @@ int ocfs2_read_blocks(ocfs2_super *osb, u64 block, int nr,
 		flags &= ~OCFS2_BH_CACHED;
 
 	if (inode)
-		down(&OCFS2_I(inode)->ip_io_sem);
+		mutex_lock(&OCFS2_I(inode)->ip_io_mutex);
 	for (i = 0 ; i < nr ; i++) {
 		if (bhs[i] == NULL) {
 			bhs[i] = sb_getblk(sb, block++);
 			if (bhs[i] == NULL) {
 				if (inode)
-					up(&OCFS2_I(inode)->ip_io_sem);
+					mutex_unlock(&OCFS2_I(inode)->ip_io_mutex);
 				status = -EIO;
 				mlog_errno(status);
 				goto bail;
@@ -275,7 +275,7 @@ int ocfs2_read_blocks(ocfs2_super *osb, u64 block, int nr,
 			ocfs2_set_buffer_uptodate(inode, bh);
 	}
 	if (inode)
-		up(&OCFS2_I(inode)->ip_io_sem);
+		mutex_unlock(&OCFS2_I(inode)->ip_io_mutex);
 
 	mlog(ML_BH_IO, "block=(%"MLFu64"), nr=(%d), cached=%s\n", block, nr,
 	     (!(flags & OCFS2_BH_CACHED) || ignore_cache) ? "no" : "yes");

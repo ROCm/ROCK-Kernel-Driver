@@ -43,9 +43,14 @@ APICs
    apicmaintimer Run time keeping from the local APIC timer instead
                  of using the PIT/HPET interrupt for this. This is useful
                  when the PIT/HPET interrupts are unreliable.
-		 
+
    noapicmaintimer  Don't do time keeping using the APIC timer.
 		 Useful when this option was auto selected, but doesn't work.
+
+   apicpmtimer
+		 Do APIC timer calibration using the pmtimer. Implies
+		 apicmaintimer. Useful when your PIT timer is totally
+		 broken.
 
 Early Console
 

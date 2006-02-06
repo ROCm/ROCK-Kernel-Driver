@@ -3316,12 +3316,6 @@ static int blk_cpu_notify(struct notifier_block *self, unsigned long action,
 				 &__get_cpu_var(blk_cpu_done));
 		raise_softirq_irqoff(BLOCK_SOFTIRQ);
 		local_irq_enable();
-	} else if (action == CPU_ONLINE) {
-		int cpu = (unsigned long) hcpu;
-
-		local_irq_disable();
-		INIT_LIST_HEAD(&per_cpu(blk_cpu_done, cpu));
-		local_irq_enable();
 	}
 
 	return NOTIFY_OK;
@@ -3457,7 +3451,7 @@ int __init blk_dev_init(void)
 	iocontext_cachep = kmem_cache_create("blkdev_ioc",
 			sizeof(struct io_context), 0, SLAB_PANIC, NULL, NULL);
 
-	for_each_online_cpu(i)
+	for_each_cpu(i)
 		INIT_LIST_HEAD(&per_cpu(blk_cpu_done, i));
 
 	open_softirq(BLOCK_SOFTIRQ, blk_done_softirq, NULL);

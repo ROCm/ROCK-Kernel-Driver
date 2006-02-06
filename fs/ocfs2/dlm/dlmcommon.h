@@ -663,6 +663,7 @@ int dlm_launch_recovery_thread(struct dlm_ctxt *dlm);
 void dlm_complete_recovery_thread(struct dlm_ctxt *dlm);
 void dlm_wait_for_recovery(struct dlm_ctxt *dlm);
 int dlm_is_node_dead(struct dlm_ctxt *dlm, u8 node);
+int dlm_is_node_dead(struct dlm_ctxt *dlm, u8 node);
 
 void dlm_get(struct dlm_ctxt *dlm);
 void dlm_put(struct dlm_ctxt *dlm);

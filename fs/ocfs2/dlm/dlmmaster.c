@@ -157,7 +157,7 @@ void dlm_print_one_mle(struct dlm_master_list_entry *mle)
 		  namelen, namelen, name);
 }
 
-			      
+
 static void dlm_dump_mles(struct dlm_ctxt *dlm);
 
 static void dlm_dump_mles(struct dlm_ctxt *dlm)

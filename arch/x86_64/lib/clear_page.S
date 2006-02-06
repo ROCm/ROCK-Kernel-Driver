@@ -10,7 +10,7 @@ clear_page:
 	.p2align 4
 .Lloop:
 	decl	%ecx
-#define PUT(x) movq %rax,x*8(%rdi) 
+#define PUT(x) movq %rax,x*8(%rdi)
 	movq %rax,(%rdi)
 	PUT(1)
 	PUT(2)
@@ -23,19 +23,19 @@ clear_page:
 	jnz	.Lloop
 	nop
 	ret
-clear_page_end:	
-	
+clear_page_end:
+
 	/* Some CPUs run faster using the string instructions.
 	   It is also a lot simpler. Use this when possible */
-	
+
 #include <asm/cpufeature.h>
-	    	
+
 	.section .altinstructions,"a"
 	.align 8
 	.quad  clear_page
 	.quad  clear_page_c
 	.byte  X86_FEATURE_REP_GOOD
-	.byte  clear_page_end-clear_page	
+	.byte  clear_page_end-clear_page
 	.byte  clear_page_c_end-clear_page_c
 	.previous
 

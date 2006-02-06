@@ -6,7 +6,6 @@
  *	extended error reporting for DASD ECKD devices
  *	Author(s): Stefan Weinhuber <wein@de.ibm.com>
  *
- *      $Revision: 1.4 $
  */
 
 #include <linux/init.h>
@@ -769,7 +768,7 @@ dasd_eer_sense_subsystem_status(void *data)
 	spin_unlock_irqrestore(&snsslock, irqflags);
 	dasd_eer_clean_SNSS_request(cqr);
 	cqr->device = device;
-	cqr->retries = 0;
+	cqr->retries = 255;
 	cqr->expires = 10 * HZ;
 
 	ccw = cqr->cpaddr;

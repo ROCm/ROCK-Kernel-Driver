@@ -2075,7 +2075,6 @@ pmac_suspend_devices(void)
 {
 	int ret;
 
-	pm_prepare_console();
 	
 	/* Notify old-style device drivers & userland */
 	ret = broadcast_sleep(PBOOK_SLEEP_REQUEST, PBOOK_SLEEP_REJECT);
