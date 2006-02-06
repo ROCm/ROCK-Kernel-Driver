@@ -786,7 +786,22 @@ int xfrm_lookup(struct dst_entry **dst_p, struct flowi *fl,
 	u16 family = dst_orig->ops->family;
 	u8 dir = policy_to_flow_dir(XFRM_POLICY_OUT);
 	u32 sk_sid = security_sk_sid(sk, fl, dir);
+	int loops = 0;
+
 restart:
+	if (loops && dst_orig && dst_orig->obsolete > 0) {
+		printk(KERN_NOTICE "xfrm_lookup: route is stale (obsolete=%d, loops=%d)\n",
+				dst_orig->obsolete, loops);
+		err = -EAGAIN;
+		goto error_nopol;
+	}
+	if (unlikely(++loops > 10)) {
+		printk(KERN_NOTICE "xfrm_lookup bailing out after %d loops\n", loops);
+		dump_stack();
+		err = -EHOSTUNREACH;
+		goto error_nopol;
+	}
+
 	genid = atomic_read(&flow_cache_genid);
 	policy = NULL;
 	if (sk && sk->sk_policy[1])
@@ -854,6 +869,7 @@ restart:
 				}
 				if (nx == -EAGAIN ||
 				    genid != atomic_read(&flow_cache_genid)) {
+					printk(KERN_NOTICE "xfrm_tmpl_resolve says EAGAIN, try again\n");
 					xfrm_pol_put(policy);
 					goto restart;
 				}
