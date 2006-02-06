@@ -106,6 +106,7 @@ extern struct cpuinfo_x86 cpu_data[];
 extern	int phys_proc_id[NR_CPUS];
 extern	int cpu_core_id[NR_CPUS];
 extern char ignore_fpu_irq;
+extern int cpu_llc_id[];
 
 extern void identify_cpu(struct cpuinfo_x86 *);
 extern void print_cpu_info(struct cpuinfo_x86 *);

@@ -30,6 +30,8 @@
 
 #define xxprint(msg) HYPERVISOR_console_io(CONSOLEIO_write, strlen(msg), msg)
 
+int cpu_llc_id[NR_CPUS] __cpuinitdata = {[0 ... NR_CPUS-1] = BAD_APICID};
+
 /*
  *	Some notes on x86 processor bugs affecting SMP operation:
  *

@@ -33,6 +33,11 @@
 
 #define xxprint(msg) HYPERVISOR_console_io(CONSOLEIO_write, strlen(msg), msg)
 
+/* Last level cache ID of each logical CPU */
+int cpu_llc_id[NR_CPUS] __cpuinitdata = {[0 ... NR_CPUS-1] = BAD_APICID};
+
+
+
 #else
 /*
  *	Smarter SMP flushing macros. 
