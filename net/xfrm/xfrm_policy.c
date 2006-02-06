@@ -919,8 +919,9 @@ restart:
 	return 0;
 
 error:
-	dst_release(dst_orig);
 	xfrm_pol_put(policy);
+error_nopol:
+	dst_release(dst_orig);
 	*dst_p = NULL;
 	return err;
 }
