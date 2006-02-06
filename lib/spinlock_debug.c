@@ -71,10 +71,11 @@ static void __spin_lock_debug(spinlock_t *lock)
 	u64 i;
 
 	for (;;) {
-		for (i = 0; i < loops_per_jiffy * HZ; i++) {
-			cpu_relax();
+		unsigned long timeout = jiffies + HZ;
+		while (time_before(jiffies, timeout)) {
 			if (__raw_spin_trylock(&lock->raw_lock))
 				return;
+			cpu_relax();
 		}
 		/* lockup suspected: */
 		if (print_once) {
