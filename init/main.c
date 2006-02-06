@@ -115,7 +115,7 @@ EXPORT_SYMBOL(system_state);
  * file -- if kernel_magic doesn't equal the namelist value of _end,
  * something's wrong.
  */
-unsigned long *kernel_magic = &_end;
+unsigned long *kernel_magic = (unsigned long *)&_end;
 
 /*
  * Boot command-line arguments
