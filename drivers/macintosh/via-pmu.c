@@ -2070,11 +2070,16 @@ restore_via_state(void)
 	out_8(&via[IER], IER_SET | SR_INT | CB1_INT);
 }
 
+/* to avoid include mess */
+extern int pm_prepare_console(void);
+extern void pm_restore_console(void);
+
 static int
 pmac_suspend_devices(void)
 {
 	int ret;
 
+	pm_prepare_console();
 	
 	/* Notify old-style device drivers & userland */
 	ret = broadcast_sleep(PBOOK_SLEEP_REQUEST, PBOOK_SLEEP_REJECT);
