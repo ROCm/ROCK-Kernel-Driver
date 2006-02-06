@@ -68,7 +68,6 @@ static inline void debug_spin_unlock(spinlock_t *lock)
 static void __spin_lock_debug(spinlock_t *lock)
 {
 	int print_once = 1;
-	u64 i;
 
 	for (;;) {
 		unsigned long timeout = jiffies + HZ;
