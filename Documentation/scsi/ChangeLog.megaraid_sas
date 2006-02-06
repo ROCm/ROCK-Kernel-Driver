@@ -1,3 +1,19 @@
+1 Release Date    : Tue Jan 31 11:54:40 PST 2006 - Sumant Patro 
+							<Sumant.Patro@lsil.com>
+2 Current Version : 00.00.02.02
+3 Older Version   : 00.00.02.01 
+i.	Support for 16 byte CDB added in Scsi_Host. 
+	Without 16 byte CDB support, calls like READ 16 does not reach driver, as the
+	SCSI mid layer assumes the maximum command length supported by driver to be 12. 
+
+		-Sumant Patro <Sumant.Patro@lsil.com>
+
+	"Ths patch properly registers the 16 byte command length capability of the 
+	megaraid_sas controlled hardware with the scsi midlayer. All megaraid_sas 
+	hardware supports 16 byte CDB's."
+
+		-Joshua Giles <joshua_giles@dell.com> 
+
 1 Release Date    : Mon Jan 23 14:09:01 PST 2006 - Sumant Patro <Sumant.Patro@lsil.com>
 2 Current Version : 00.00.02.02
 3 Older Version   : 00.00.02.01 
