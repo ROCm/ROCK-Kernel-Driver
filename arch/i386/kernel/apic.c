@@ -27,6 +27,7 @@
 #include <linux/sysdev.h>
 #include <linux/cpu.h>
 #include <linux/module.h>
+#include <linux/dmi.h>
 
 #include <asm/atomic.h>
 #include <asm/smp.h>
@@ -1292,12 +1293,43 @@ fastcall void smp_error_interrupt(struct pt_regs *regs)
 	irq_exit();
 }
 
+static int __init need_apic(struct dmi_system_id *d)
+{ 
+#ifdef CONFIG_X86_LOCAL_APIC
+	extern int enable_local_apic;
+	if (enable_local_apic == 0)  {
+		enable_local_apic = 1;
+		printk(
+KERN_INFO "%s detected. Enabling local APIC. Overwrite with \"nolapic\"\n",
+		       d->ident);
+#endif
+	return 0;
+} 
+
+static struct dmi_system_id __initdata apic_dmi_table[] = {
+	/* Systems that need APIC */
+	/* Multinode Summit systems need APIC to boot */
+	{ need_apic, "IBM x445", 
+	  { DMI_MATCH(DMI_SYS_VENDOR, "IBM"),
+	    DMI_MATCH(DMI_PRODUCT_NAME, "xSeries 440") }},
+	{ need_apic, "IBM x445", 
+	  { DMI_MATCH(DMI_SYS_VENDOR, "IBM"),
+	    DMI_MATCH(DMI_PRODUCT_NAME, "xSeries 445") }},
+	{ need_apic, "IBM x460",
+	  { DMI_MATCH(DMI_SYS_VENDOR, "IBM"),
+	    DMI_MATCH(DMI_PRODUCT_NAME, "eserver xSeries 460")}},
+	{}
+};
+
+
 /*
  * This initializes the IO-APIC and APIC hardware if this is
  * a UP kernel.
  */
 int __init APIC_init_uniprocessor (void)
 {
+	dmi_check_system(apic_dmi_table);
+
 #ifdef CONFIG_X86_APIC_OFF
 	if (enable_local_apic <= 0) { 
 		clear_bit(X86_FEATURE_APIC, boot_cpu_data.x86_capability);
@@ -1320,7 +1352,6 @@ int __init APIC_init_uniprocessor (void)
 	if (!cpu_has_apic && APIC_INTEGRATED(apic_version[boot_cpu_physical_apicid])) {
 		printk(KERN_ERR "BIOS bug, local APIC #%d not detected!...\n",
 			boot_cpu_physical_apicid);
-		nr_ioapics = 0;
 		clear_bit(X86_FEATURE_APIC, boot_cpu_data.x86_capability);
 		return -1;
 	}
