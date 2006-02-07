@@ -137,6 +137,22 @@ static int send_init_client(struct pmac_keywest *i2c, unsigned int *regs)
 	return 0;
 }
 
+static int tumbler_write_block(struct i2c_client *client, u8 reg, int len,
+			       u8 *values)
+{
+        union i2c_smbus_data data;
+        int err;
+
+        data.block[0] = len;
+	memcpy(&data.block[1], values, len);
+        err = i2c_smbus_xfer(client->adapter, client->addr, client->flags,
+                             I2C_SMBUS_WRITE, reg, I2C_SMBUS_I2C_BLOCK_DATA,
+                             &data);
+        return err;
+}
+
+
+
 
 static int tumbler_init_client(struct pmac_keywest *i2c)
 {
@@ -239,8 +255,7 @@ static int tumbler_set_master_volume(struct pmac_tumbler *mix)
 	block[4] = (right_vol >> 8)  & 0xff;
 	block[5] = (right_vol >> 0)  & 0xff;
   
-	if (i2c_smbus_write_block_data(mix->i2c.client, TAS_REG_VOL,
-				       6, block) < 0) {
+	if (tumbler_write_block(mix->i2c.client, TAS_REG_VOL, 6, block) < 0) {
 		snd_printk("failed to set volume \n");
 		return -EINVAL;
 	}
@@ -345,8 +360,7 @@ static int tumbler_set_drc(struct pmac_tumbler *mix)
 		val[1] = 0;
 	}
 
-	if (i2c_smbus_write_block_data(mix->i2c.client, TAS_REG_DRC,
-				       2, val) < 0) {
+	if (tumbler_write_block(mix->i2c.client, TAS_REG_DRC, 2, val) < 0) {
 		snd_printk("failed to set DRC\n");
 		return -EINVAL;
 	}
@@ -381,8 +395,7 @@ static int snapper_set_drc(struct pmac_tumbler *mix)
 	val[4] = 0x60;
 	val[5] = 0xa0;
 
-	if (i2c_smbus_write_block_data(mix->i2c.client, TAS_REG_DRC,
-				       6, val) < 0) {
+	if (tumbler_write_block(mix->i2c.client, TAS_REG_DRC, 6, val) < 0) {
 		snd_printk("failed to set DRC\n");
 		return -EINVAL;
 	}
@@ -492,8 +505,8 @@ static int tumbler_set_mono_volume(struct pmac_tumbler *mix,
 	vol = info->table[vol];
 	for (i = 0; i < info->bytes; i++)
 		block[i] = (vol >> ((info->bytes - i - 1) * 8)) & 0xff;
-	if (i2c_smbus_write_block_data(mix->i2c.client, info->reg,
-				       info->bytes, block) < 0) {
+	if (tumbler_write_block(mix->i2c.client, info->reg,
+				  info->bytes, block) < 0) {
 		snd_printk("failed to set mono volume %d\n", info->index);
 		return -EINVAL;
 	}
@@ -625,7 +638,7 @@ static int snapper_set_mix_vol1(struct pmac_tumbler *mix, int idx, int ch, int r
 		for (j = 0; j < 3; j++)
 			block[i * 3 + j] = (vol >> ((2 - j) * 8)) & 0xff;
 	}
-	if (i2c_smbus_write_block_data(mix->i2c.client, reg, 9, block) < 0) {
+	if (tumbler_write_block(mix->i2c.client, reg, 9, block) < 0) {
 		snd_printk("failed to set mono volume %d\n", reg);
 		return -EINVAL;
 	}

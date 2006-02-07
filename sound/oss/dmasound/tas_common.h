@@ -157,6 +157,21 @@ tas_mono_to_stereo(uint mono)
 	return mono | (mono<<8);
 }
 
+static int tas_write_block(struct i2c_client *client, u8 reg, int len, u8 *vals)
+{
+        union i2c_smbus_data data;
+        int err;
+
+        data.block[0] = len;
+	memcpy(&data.block[1], vals, len);
+        err = i2c_smbus_xfer(client->adapter, client->addr, client->flags,
+                             I2C_SMBUS_WRITE, reg, I2C_SMBUS_I2C_BLOCK_DATA,
+                             &data);
+        return err;
+}
+
+
+
 /*
  * Todo: make these functions a bit more efficient !
  */
@@ -178,10 +193,8 @@ tas_write_register(	struct tas_data_t *self,
 	if (write_mode & WRITE_SHADOW)
 		memcpy(self->shadow[reg_num],data,reg_width);
 	if (write_mode & WRITE_HW) {
-		rc=i2c_smbus_write_block_data(self->client,
-					      reg_num,
-					      reg_width,
-					      data);
+		rc = tas_write_block(self->client, reg_num,
+				     reg_width, data);
 		if (rc < 0) {
 			printk("tas: I2C block write failed \n");  
 			return rc; 
@@ -199,10 +212,8 @@ tas_sync_register(	struct tas_data_t *self,
 
 	if (reg_width==0 || self==NULL)
 		return -EINVAL;
-	rc=i2c_smbus_write_block_data(self->client,
-				      reg_num,
-				      reg_width,
-				      self->shadow[reg_num]);
+	rc = tas_write_block(self->client, reg_num,
+			     reg_width, self->shadow[reg_num]);
 	if (rc < 0) {
 		printk("tas: I2C block write failed \n");
 		return rc;
