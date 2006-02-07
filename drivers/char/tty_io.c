@@ -255,7 +255,6 @@ static void tty_buffer_free_all(struct tty_struct *tty)
 
 static void tty_buffer_init(struct tty_struct *tty)
 {
-	spin_lock_init(&tty->buf.lock);
 	tty->buf.head = NULL;
 	tty->buf.tail = NULL;
 	tty->buf.free = NULL;
@@ -269,7 +268,6 @@ static struct tty_buffer *tty_buffer_alloc(size_t size)
 	p->used = 0;
 	p->size = size;
 	p->next = NULL;
-	p->active = 0;
 	p->char_buf_ptr = (char *)(p->data);
 	p->flag_buf_ptr = (unsigned char *)p->char_buf_ptr + size;
 /* 	printk("Flip create %p\n", p); */
@@ -316,36 +314,25 @@ static struct tty_buffer *tty_buffer_find(struct tty_struct *tty, size_t size)
 
 int tty_buffer_request_room(struct tty_struct *tty, size_t size)
 {
-	struct tty_buffer *b, *n;
-	int left;
-	unsigned long flags;
-
-	spin_lock_irqsave(&tty->buf.lock, flags);
+	struct tty_buffer *b = tty->buf.tail, *n;
+	int left = 0;
 
 	/* OPTIMISATION: We could keep a per tty "zero" sized buffer to
 	   remove this conditional if its worth it. This would be invisible
 	   to the callers */
-	if ((b = tty->buf.tail) != NULL) {
+	if(b != NULL)
 		left = b->size - b->used;
-		b->active = 1;
-	} else
-		left = 0;
-
-	if (left < size) {
-		/* This is the slow path - looking for new buffers to use */
-		if ((n = tty_buffer_find(tty, size)) != NULL) {
-			if (b != NULL) {
-				b->next = n;
-				b->active = 0;
-			} else
-				tty->buf.head = n;
-			tty->buf.tail = n;
-			n->active = 1;
-		} else
-			size = left;
-	}
-
-	spin_unlock_irqrestore(&tty->buf.lock, flags);
+	if(left >= size)
+		return size;
+	/* This is the slow path - looking for new buffers to use */
+	n = tty_buffer_find(tty, size);
+	if(n == NULL)
+		return left;
+	if(b != NULL)
+		b->next = n;
+	else
+		tty->buf.head = n;
+	tty->buf.tail = n;
 	return size;
 }
 
@@ -411,12 +398,10 @@ EXPORT_SYMBOL_GPL(tty_insert_flip_string_flags);
 int tty_prepare_flip_string(struct tty_struct *tty, unsigned char **chars, size_t size)
 {
 	int space = tty_buffer_request_room(tty, size);
-	if (likely(space)) {
-		struct tty_buffer *tb = tty->buf.tail;
-		*chars = tb->char_buf_ptr + tb->used;
-		memset(tb->flag_buf_ptr + tb->used, TTY_NORMAL, space);
-		tb->used += space;
-	}
+	struct tty_buffer *tb = tty->buf.tail;
+	*chars = tb->char_buf_ptr + tb->used;
+	memset(tb->flag_buf_ptr + tb->used, TTY_NORMAL, space);
+	tb->used += space;
 	return space;
 }
 
@@ -433,12 +418,10 @@ EXPORT_SYMBOL_GPL(tty_prepare_flip_string);
 int tty_prepare_flip_string_flags(struct tty_struct *tty, unsigned char **chars, char **flags, size_t size)
 {
 	int space = tty_buffer_request_room(tty, size);
-	if (likely(space)) {
-		struct tty_buffer *tb = tty->buf.tail;
-		*chars = tb->char_buf_ptr + tb->used;
-		*flags = tb->flag_buf_ptr + tb->used;
-		tb->used += space;
-	}
+	struct tty_buffer *tb = tty->buf.tail;
+	*chars = tb->char_buf_ptr + tb->used;
+	*flags = tb->flag_buf_ptr + tb->used;
+	tb->used += space;
 	return space;
 }
 
@@ -2781,20 +2764,20 @@ static void flush_to_ldisc(void *private_)
 		schedule_delayed_work(&tty->buf.work, 1);
 		goto out;
 	}
-	spin_lock_irqsave(&tty->buf.lock, flags);
-	while((tbuf = tty->buf.head) != NULL && !tbuf->active) {
+	spin_lock_irqsave(&tty->read_lock, flags);
+	while((tbuf = tty->buf.head) != NULL) {
 		tty->buf.head = tbuf->next;
 		if (tty->buf.head == NULL)
 			tty->buf.tail = NULL;
-		spin_unlock_irqrestore(&tty->buf.lock, flags);
+		spin_unlock_irqrestore(&tty->read_lock, flags);
 		/* printk("Process buffer %p for %d\n", tbuf, tbuf->used); */
 		disc->receive_buf(tty, tbuf->char_buf_ptr,
 				       tbuf->flag_buf_ptr,
 				       tbuf->used);
-		spin_lock_irqsave(&tty->buf.lock, flags);
+		spin_lock_irqsave(&tty->read_lock, flags);
 		tty_buffer_free(tty, tbuf);
 	}
-	spin_unlock_irqrestore(&tty->buf.lock, flags);
+	spin_unlock_irqrestore(&tty->read_lock, flags);
 out:
 	tty_ldisc_deref(disc);
 }
@@ -2886,12 +2869,6 @@ EXPORT_SYMBOL(tty_get_baud_rate);
 
 void tty_flip_buffer_push(struct tty_struct *tty)
 {
-	unsigned long flags;
-	spin_lock_irqsave(&tty->buf.lock, flags);
-	if (tty->buf.tail != NULL)
-		tty->buf.tail->active = 0;
-	spin_unlock_irqrestore(&tty->buf.lock, flags);
-
 	if (tty->low_latency)
 		flush_to_ldisc((void *) tty);
 	else

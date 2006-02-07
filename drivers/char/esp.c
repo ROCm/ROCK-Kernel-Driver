@@ -359,7 +359,7 @@ static inline void receive_chars_pio(struct esp_struct *info, int num_bytes)
 		}
 	}
 
-	tty_schedule_flip(tty);
+	schedule_delayed_work(&tty->buf.work, 1);
 
 	info->stat_flags &= ~ESP_STAT_RX_TIMEOUT;
 	release_pio_buffer(pio_buf);
@@ -426,7 +426,7 @@ static inline void receive_chars_dma_done(struct esp_struct *info,
 			}
 			tty_insert_flip_char(tty, dma_buffer[num_bytes - 1], statflag);
 		}
-		tty_schedule_flip(tty);
+		schedule_delayed_work(&tty->buf.work, 1);
 	}
 
 	if (dma_bytes != num_bytes) {
