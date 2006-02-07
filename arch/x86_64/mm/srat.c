@@ -212,8 +212,10 @@ acpi_numa_memory_affinity_init(struct acpi_table_memory_affinity *ma)
  	/*
  	 * It is fine to add this area to the nodes data it will be used later
  	 * This code supports one contigious hot add area per node.
+ 	 * The signed cast is intentional to catch underflows.
  	 */
- 	if (ma->flags.hot_pluggable == 1 && !ignore_hotadd) {
+ 	if (ma->flags.hot_pluggable == 1 && !ignore_hotadd &&
+		(signed long)(end - start) > NODE_MIN_SIZE) {
  		found_add_area = 1;
  		if (nodes_add[node].start == nodes_add[node].end) {
  			nodes_add[node].start = start;
@@ -346,4 +348,5 @@ int __node_distance(int a, int b)
 	index = acpi_slit->localities * node_to_pxm(a);
 	return acpi_slit->entry[index + node_to_pxm(b)];
 }
+
 EXPORT_SYMBOL(__node_distance);

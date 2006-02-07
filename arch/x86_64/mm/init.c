@@ -479,7 +479,6 @@ void __init clear_kernel_mapping(unsigned long address, unsigned long size)
 
 /*
  * Memory hotplug specific functions
- * These are only for non-NUMA machines right now.
  */
 #ifdef CONFIG_ACPI_HOTPLUG_MEMORY
 
