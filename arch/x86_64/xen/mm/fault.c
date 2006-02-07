@@ -34,7 +34,6 @@
 #include <asm/proto.h>
 #include <asm/kdebug.h>
 #include <asm-generic/sections.h>
-#include <asm/kdebug.h>
 
 DEFINE_PER_CPU(pgd_t *, cur_pgd);
 
@@ -161,8 +160,8 @@ void dump_pagetable(unsigned long address)
 	preempt_enable();
 	pgd += pgd_index(address);
 
-	printk("PGD %lx ", pgd_val(*pgd));
 	if (bad_address(pgd)) goto bad;
+	printk("PGD %lx ", pgd_val(*pgd));
 	if (!pgd_present(*pgd)) goto ret; 
 
 	pud = __pud_offset_k((pud_t *)pgd_page(*pgd), address);

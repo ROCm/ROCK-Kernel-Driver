@@ -40,7 +40,7 @@ static void mm_walk(struct mm_struct *mm, pgprot_t flags)
 	int          g,u,m;
 
 	pgd = mm->pgd;
-	for (g = 0; g <= USER_PTRS_PER_PGD; g++, pgd++) {
+	for (g = 0; g <= (TASK_SIZE64 - 1) / PGDIR_SIZE; g++, pgd++) {
 		if (pgd_none(*pgd))
 			continue;
 		pud = pud_offset(pgd, 0);

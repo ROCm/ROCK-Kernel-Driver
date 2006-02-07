@@ -16,11 +16,18 @@
  */
 #define XENMEM_increase_reservation 0
 #define XENMEM_decrease_reservation 1
+#define XENMEM_populate_physmap     6
 typedef struct xen_memory_reservation {
 
     /*
-     * MFN bases of extents to free (XENMEM_decrease_reservation).
-     * MFN bases of extents that were allocated (XENMEM_increase_reservation).
+     * XENMEM_increase_reservation:
+     *   OUT: MFN bases of extents that were allocated
+     * XENMEM_decrease_reservation:
+     *   IN:  MFN bases of extents to free
+     * XENMEM_populate_physmap:
+     *   IN:  PFN bases of extents to populate with memory
+     *   OUT: MFN bases of extents that were allocated
+     *   (NB. This command also updates the mach_to_phys translation table)
      */
     unsigned long *extent_start;
 
@@ -29,11 +36,10 @@ typedef struct xen_memory_reservation {
     unsigned int   extent_order;
 
     /*
-     * XENMEM_increase_reservation: maximum # bits addressable by the user
-     * of the allocated region (e.g., I/O devices often have a 32-bit
-     * limitation even in 64-bit systems). If zero then the user has no
-     * addressing restriction.
-     * XENMEM_decrease_reservation: unused.
+     * Mmaximum # bits addressable by the user of the allocated region (e.g., 
+     * I/O devices often have a 32-bit limitation even in 64-bit systems). If 
+     * zero then the user has no addressing restriction.
+     * This field is not used by XENMEM_decrease_reservation.
      */
     unsigned int   address_bits;
 
@@ -87,6 +93,26 @@ typedef struct xen_machphys_mfn_list {
      */
     unsigned int nr_extents;
 } xen_machphys_mfn_list_t;
+
+/*
+ * Returns the base and size of the specified reserved 'RAM hole' in the
+ * specified guest's pseudophysical address space.
+ * arg == addr of xen_reserved_phys_area_t.
+ */
+#define XENMEM_reserved_phys_area   7
+typedef struct xen_reserved_phys_area {
+    /* Which request to report about? */
+    domid_t domid;
+
+    /*
+     * Which reserved area to report? Out-of-range request reports
+     * -ESRCH. Currently no architecture will have more than one reserved area.
+     */
+    unsigned int idx;
+
+    /* Base and size of the specified reserved area. */
+    unsigned long first_pfn, nr_pfns;
+} xen_reserved_phys_area_t;
 
 #endif /* __XEN_PUBLIC_MEMORY_H__ */
 

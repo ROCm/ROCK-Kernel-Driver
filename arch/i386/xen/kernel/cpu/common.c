@@ -49,6 +49,7 @@ static void default_init(struct cpuinfo_x86 * c)
 
 static struct cpu_dev default_cpu = {
 	.c_init	= default_init,
+	.c_vendor = "Unknown",
 };
 static struct cpu_dev * this_cpu = &default_cpu;
 
@@ -155,6 +156,7 @@ static void __devinit get_cpu_vendor(struct cpuinfo_x86 *c, int early)
 {
 	char *v = c->x86_vendor_id;
 	int i;
+	static int printed;
 
 	for (i = 0; i < X86_VENDOR_NUM; i++) {
 		if (cpu_devs[i]) {
@@ -164,10 +166,17 @@ static void __devinit get_cpu_vendor(struct cpuinfo_x86 *c, int early)
 				c->x86_vendor = i;
 				if (!early)
 					this_cpu = cpu_devs[i];
-				break;
+				return;
 			}
 		}
 	}
+	if (!printed) {
+		printed++;
+		printk(KERN_ERR "CPU: Vendor unknown, using generic init.\n");
+		printk(KERN_ERR "CPU: Your system may be unstable.\n");
+	}
+	c->x86_vendor = X86_VENDOR_UNKNOWN;
+	this_cpu = &default_cpu;
 }
 
 
@@ -249,7 +258,7 @@ static void __init early_cpu_detect(void)
 void __devinit generic_identify(struct cpuinfo_x86 * c)
 {
 	u32 tfms, xlvl;
-	int junk;
+	int ebx;
 
 	if (have_cpuid_p()) {
 		/* Get vendor name */
@@ -265,7 +274,7 @@ void __devinit generic_identify(struct cpuinfo_x86 * c)
 		/* Intel-defined flags: level 0x00000001 */
 		if ( c->cpuid_level >= 0x00000001 ) {
 			u32 capability, excap;
-			cpuid(0x00000001, &tfms, &junk, &excap, &capability);
+			cpuid(0x00000001, &tfms, &ebx, &excap, &capability);
 			c->x86_capability[0] = capability;
 			c->x86_capability[4] = excap;
 			c->x86 = (tfms >> 8) & 15;
@@ -275,6 +284,11 @@ void __devinit generic_identify(struct cpuinfo_x86 * c)
 				c->x86_model += ((tfms >> 16) & 0xF) << 4;
 			} 
 			c->x86_mask = tfms & 15;
+#ifdef CONFIG_SMP
+			c->apicid = phys_pkg_id((ebx >> 24) & 0xFF, 0);
+#else
+			c->apicid = (ebx >> 24) & 0xFF;
+#endif
 		} else {
 			/* Have CPUID level 0 only - unheard of */
 			c->x86 = 4;
@@ -454,8 +468,6 @@ void __devinit detect_ht(struct cpuinfo_x86 *c)
 	int 	cpu = smp_processor_id();
 
 	cpuid(1, &eax, &ebx, &ecx, &edx);
-
-	c->apicid = phys_pkg_id((ebx >> 24) & 0xFF, 0);
 
 	if (!cpu_has(c, X86_FEATURE_HT) || cpu_has(c, X86_FEATURE_CMP_LEGACY))
 		return;

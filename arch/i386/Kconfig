@@ -250,7 +250,7 @@ config SCHED_SMT
 
 config SCHED_MC
 	bool "Multi-core scheduler support"
-	depends on SMP
+	depends on SMP && !X86_XEN
 	help
 	  Multi-core scheduler support improves the CPU scheduler's decision 
 	  making when dealing with multi-core CPU chips at a cost of slightly 

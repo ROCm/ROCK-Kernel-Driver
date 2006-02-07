@@ -942,7 +942,7 @@ void __init setup_arch(char **cmdline_p)
 	e820_setup_gap();
 
 #ifdef CONFIG_GART_IOMMU
-       iommu_hole_init();
+	iommu_hole_init();
 #endif
 
 #ifdef CONFIG_XEN
@@ -1115,6 +1115,7 @@ static void __init amd_detect_cmp(struct cpuinfo_x86 *c)
 static int __init init_amd(struct cpuinfo_x86 *c)
 {
 	int r;
+	unsigned level;
 
 #ifdef CONFIG_SMP
 	unsigned long value;
@@ -1137,6 +1138,11 @@ static int __init init_amd(struct cpuinfo_x86 *c)
 	   3DNow is IDd by bit 31 in extended CPUID (1*32+31) anyway */
 	clear_bit(0*32+31, &c->x86_capability);
 	
+	/* On C+ stepping K8 rep microcode works well for copy/memset */
+	level = cpuid_eax(1);
+	if (c->x86 == 15 && ((level >= 0x0f48 && level < 0x0f50) || level >= 0x0f58))
+		set_bit(X86_FEATURE_REP_GOOD, &c->x86_capability);
+
 	r = get_model_name(c);
 	if (!r) { 
 		switch (c->x86) { 
@@ -1172,8 +1178,6 @@ static void __cpuinit detect_ht(struct cpuinfo_x86 *c)
 	int 	cpu = smp_processor_id();
 
 	cpuid(1, &eax, &ebx, &ecx, &edx);
-
-	c->apicid = phys_pkg_id(0);
 
 	if (!cpu_has(c, X86_FEATURE_HT) || cpu_has(c, X86_FEATURE_CMP_LEGACY))
 		return;
@@ -1381,6 +1385,8 @@ void __cpuinit identify_cpu(struct cpuinfo_x86 *c)
 		if (xlvl >= 0x80860001)
 			c->x86_capability[2] = cpuid_edx(0x80860001);
 	}
+
+	c->apicid = phys_pkg_id(0);
 
 	/*
 	 * Vendor-specific initialization.  In this section we
