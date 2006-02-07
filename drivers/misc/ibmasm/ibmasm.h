@@ -101,10 +101,11 @@ struct command {
 static inline void command_put(struct command *cmd)
 {
 	unsigned long flags;
+	spinlock_t *lock = cmd->lock;
 
-	spin_lock_irqsave(cmd->lock, flags);
+	spin_lock_irqsave(lock, flags);
         kobject_put(&cmd->kobj);
-	spin_unlock_irqrestore(cmd->lock, flags);
+	spin_unlock_irqrestore(lock, flags);
 }
 
 static inline void command_get(struct command *cmd)
