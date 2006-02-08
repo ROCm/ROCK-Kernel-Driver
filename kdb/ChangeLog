@@ -1,6 +1,31 @@
+2006-02-06 Keith Owens  <kaos@sgi.com>
+
+	* Change CONFIG_CRASH_DUMP to CONFIG_LKCD.
+	* Remove obsolete kdb_notifier_list.
+	* kdb v4.4-2.6.16-rc2-common-2.
+
+2006-02-06 Keith Owens  <kaos@sgi.com>
+
+	* Add xpcusers command.  Dean Nelson, SGI.
+	* kdb v4.4-2.6.16-rc2-common-1.
+
+2006-02-02 Keith Owens  <kaos@sgi.com>
+
+	* Check if we have a console before using it for KDB.
+	* kdb v4.4-2.6.16-rc1-common-3.
+
+2006-02-01 Keith Owens  <kaos@sgi.com>
+
+	* Add option 'R' to the pid command to reset to the original task.
+	* Include 'pid R' in archkdb* commands to reset up the original failing
+	  task.  Users may have switched to other cpus and/or tasks before
+	  issuing archkdb.
+	* Compile fix for kdbm_pg.c on i386.
+	* kdb v4.4-2.6.16-rc1-common-2.
+
 2006-01-18 Keith Owens  <kaos@sgi.com>
 
-	* kdb v4.4-2.6.16-common-1.
+	* kdb v4.4-2.6.16-rc1-common-1.
 
 2006-01-11 Keith Owens  <kaos@sgi.com>
 

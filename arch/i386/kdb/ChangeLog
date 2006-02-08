@@ -1,3 +1,12 @@
+2006-02-06 Keith Owens  <kaos@sgi.com>
+
+	* Change CONFIG_CRASH_DUMP to CONFIG_LKCD.
+	* kdb v4.4-2.6.16-rc2-i386-2.
+
+2006-02-06 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.16-rc2-i386-1.
+
 2006-01-18 Keith Owens  <kaos@sgi.com>
 
 	* kdb v4.4-2.6.16-rc1-i386-1.

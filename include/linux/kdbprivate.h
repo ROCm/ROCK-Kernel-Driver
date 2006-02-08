@@ -499,4 +499,8 @@ extern int kdba_putarea_size(unsigned long to_xxx, void *from, size_t size);
 extern int kdba_getarea_size(void *to, unsigned long from_xxx, size_t size);
 extern int kdba_verify_rw(unsigned long addr, size_t size);
 
+#ifndef KDB_RUNNING_PROCESS_ORIGINAL
+#define KDB_RUNNING_PROCESS_ORIGINAL kdb_running_process
+#endif
+
 #endif	/* !_KDBPRIVATE_H */

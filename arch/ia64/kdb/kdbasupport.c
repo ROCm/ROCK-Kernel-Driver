@@ -29,7 +29,7 @@
 #endif
 #include <asm/mca.h>
 
-static struct kdb_running_process kdb_running_process_save[NR_CPUS];
+struct kdb_running_process *kdb_running_process_save; /* [NR_CPUS] */
 static int kdba_show_handlers = 0;
 
 static int
@@ -1390,7 +1390,8 @@ kdba_handlers_modify(struct task_struct *p, int cpu)
 	work = kdb_running_process + cpu;
 	save = kdb_running_process_save + cpu;
 	*work = *save;
-	if (!kdba_show_handlers && (p->thread_info->flags & _TIF_MCA_INIT)) {
+	if (!kdba_show_handlers && REGION_NUMBER(p) >= RGN_GATE &&
+	    (p->thread_info->flags & _TIF_MCA_INIT)) {
 		struct ia64_sal_os_state *sos = (struct ia64_sal_os_state *)
 			((unsigned long)save->p + MCA_SOS_OFFSET);
 		char *p;
@@ -1471,6 +1472,9 @@ kdba_handlers(int argc, const char **argv, const char **envp, struct pt_regs *re
 void
 kdba_init(void)
 {
+	kdb_running_process_save = kzalloc(
+		sizeof(*kdb_running_process_save) * NR_CPUS, GFP_KERNEL);
+	BUG_ON(!kdb_running_process_save);
 	kdba_enable_lbr();
 	kdb_register("irr", kdba_sir, "", "Show interrupt registers", 0);
 	kdb_register("itm", kdba_itm, "", "Set new ITM value", 0);
@@ -1551,7 +1555,7 @@ void
 kdba_unsave_running(struct kdba_running_process *k, struct pt_regs *regs)
 {
 	memset(kdb_running_process_save + smp_processor_id(), 0,
-			sizeof(kdb_running_process_save[0]));
+			sizeof(*kdb_running_process_save));
 }
 
 void

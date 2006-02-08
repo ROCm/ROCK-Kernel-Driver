@@ -328,6 +328,11 @@ current process.
 The current process is used to display registers, both kernel and user
 space.
 It is also used when dumping user pages.
+.I pid R
+resets to the original process that was running when kdb was entered.
+This command is useful if you have been looking at other processes and/or
+cpus and you want to get back to the original process.
+It does not switch cpus, it only resets the context to the original process.
 .TP 8
 reboot
 Reboot the system, with no attempt to do a clean close down.

@@ -37,7 +37,7 @@
 #include <linux/nmi.h>
 #include <linux/ptrace.h>
 #include <linux/sysctl.h>
-#if defined(CONFIG_LKCD) || defined(CONFIG_LKCD_MODULE)
+#if defined(CONFIG_LKCD_DUMP) || defined(CONFIG_LKCD_DUMP_MODULE)
 #include <linux/dump.h>
 #endif
 
@@ -73,7 +73,6 @@ int kdb_on = 1;				/* Default is on */
 #endif	/* CONFIG_KDB_OFF */
 
 const char *kdb_diemsg;
-struct notifier_block *kdb_notifier_list;	/* racy for modules, see comments in kdb.h */
 static int kdb_go_count;
 #ifdef CONFIG_KDB_CONTINUE_CATASTROPHIC
 static unsigned int kdb_continue_catastrophic = CONFIG_KDB_CONTINUE_CATASTROPHIC;
@@ -1080,8 +1079,7 @@ handle_ctrl_cmd(char *cmd)
 static void
 kdb_do_dump(struct pt_regs *regs)
 {
-#if defined(CONFIG_LKCD) || defined(CONFIG_LKCD_MODULE)
-	notifier_call_chain(&kdb_notifier_list, KDB_EVENT_DUMPING, NULL);
+#if defined(CONFIG_LKCD_DUMP) || defined(CONFIG_LKCD_DUMP_MODULE)
 	kdb_printf("Forcing dump (if configured)\n");
 	console_loglevel = 8;	/* to see the dump messages */
 	dump("kdb_do_dump", regs);
@@ -1112,7 +1110,6 @@ kdb_do_dump(struct pt_regs *regs)
 static int
 kdb_reboot(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 {
-	notifier_call_chain(&kdb_notifier_list, KDB_EVENT_REBOOTING, NULL);
 	emergency_restart();
 	kdb_printf("Hmm, kdb_reboot did not reboot, spinning here\n");
 	while (1) {};
@@ -1936,7 +1933,6 @@ kdb(kdb_reason_t reason, int error, struct pt_regs *regs)
 		kdb_initial_cpu = smp_processor_id();
 		++kdb_seqno;
 		spin_unlock(&kdb_lock);
-		notifier_call_chain(&kdb_notifier_list, KDB_EVENT_ENTERED, NULL);	/* to be phased out */
 		notify_die(DIE_KDEBUG_ENTER, "KDEBUG ENTER", regs, error, 0, 0);
 	}
 
@@ -2015,7 +2011,6 @@ kdb(kdb_reason_t reason, int error, struct pt_regs *regs)
 			/* Wait until all the other processors leave kdb */
 			while (kdb_previous_event() != 1)
 				;
-			notifier_call_chain(&kdb_notifier_list, KDB_EVENT_EXITING, NULL);	/* to be phased out */
 			notify_die(DIE_KDEBUG_LEAVE, "KDEBUG LEAVE", regs, error, 0, 0);
 			kdb_initial_cpu = -1;	/* release kdb control */
 			KDB_DEBUG_STATE("kdb 13", reason);
@@ -3154,7 +3149,7 @@ kdb_ps(int argc, const char **argv, const char **envp, struct pt_regs *regs)
  *	This function implements the 'pid' command which switches
  *	the currently active process.
  *
- *	pid [<pid>]
+ *	pid [<pid> | R]
  *
  * Inputs:
  *	argc	argument count
@@ -3182,14 +3177,18 @@ kdb_pid(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 		return KDB_ARGCOUNT;
 
 	if (argc) {
-		diag = kdbgetularg(argv[1], &val);
-		if (diag)
-			return KDB_BADINT;
+		if (strcmp(argv[1], "R") == 0) {
+			p = KDB_RUNNING_PROCESS_ORIGINAL[kdb_initial_cpu].p;
+		} else {
+			diag = kdbgetularg(argv[1], &val);
+			if (diag)
+				return KDB_BADINT;
 
-		p = find_task_by_pid((pid_t)val);
-		if (!p) {
-			kdb_printf("No task with pid=%d\n", (pid_t)val);
-			return 0;
+			p = find_task_by_pid((pid_t)val);
+			if (!p) {
+				kdb_printf("No task with pid=%d\n", (pid_t)val);
+				return 0;
+			}
 		}
 
 		kdba_set_current_task(p);
@@ -4011,5 +4010,4 @@ EXPORT_SYMBOL(kdb_initial_cpu);
 EXPORT_SYMBOL(kdbnearsym);
 EXPORT_SYMBOL(kdb_printf);
 EXPORT_SYMBOL(kdb_symbol_print);
-EXPORT_SYMBOL(kdb_notifier_list);
 EXPORT_SYMBOL(kdb_running_process);

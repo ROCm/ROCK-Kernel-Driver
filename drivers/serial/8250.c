@@ -2360,7 +2360,7 @@ static int serial8250_console_setup(struct console *co, char *options)
 	 * Remember the line number of the first serial
 	 * console.  We'll make this the kdb serial console too.
 	 */
-	if (kdb_serial_line == -1) {
+	if (co && kdb_serial_line == -1) {
 		kdb_serial_line = co->index;
 		kdb_serial.io_type = port->iotype;
 		switch (port->iotype) {

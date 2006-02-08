@@ -10,6 +10,7 @@
 defcmd archkdb "" "First line arch debugging"
   set BTSYMARG 1
   set BTARGS 5
+  pid R
   -archkdbcommon
   -bta
 endefcmd
@@ -17,6 +18,7 @@ endefcmd
 defcmd archkdbcpu "" "archkdb with only tasks on cpus"
   set BTSYMARG 1
   set BTARGS 5
+  pid R
   -archkdbcommon
   -btc
 endefcmd
@@ -24,6 +26,7 @@ endefcmd
 defcmd archkdbshort "" "archkdb with less detailed backtrace"
   set BTSYMARG 0
   set BTARGS 0
+  pid R
   -archkdbcommon
   -bta
 endefcmd

@@ -1,3 +1,27 @@
+2006-02-07 Keith Owens  <kaos@sgi.com>
+
+	* Change kdb_running_process_save from a static array to a pointer.
+	  gcc 4.0 objects to forward declarations for arrays with an incomplete
+	  type.
+	* kdb v4.4-2.6.16-rc2-ia64-3.
+
+2006-02-06 Keith Owens  <kaos@sgi.com>
+
+	* Change CONFIG_CRASH_DUMP to CONFIG_LKCD.
+	* kdb v4.4-2.6.16-rc2-ia64-2.
+
+2006-02-06 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.16-rc2-ia64-1.
+
+2006-02-01 Keith Owens  <kaos@sgi.com>
+
+	* Handlers: check that the task is in kernel space before looking at
+	  the thread_info bits.
+	* Expose kdb_running_process_save[] so 'pid R' can get the original
+	  process, even when the MCA/INIT handlers are being used.
+	* kdb v4.4-2.6.16-rc1-ia64-3.
+
 2006-01-19 Keith Owens  <kaos@sgi.com>
 
 	* Add back some kdb changes to xpc_main that were lost due to a patch

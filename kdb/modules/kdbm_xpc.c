@@ -1005,6 +1005,66 @@ kdbm_xpc_notify_queue(int argc, const char **argv, const char **envp,
 }
 
 
+static void
+kdbm_xpc_print_users(struct xpc_registration *registration, int ch_number)
+{
+	kdb_printf("xpc_registrations[channel=%d] (0x%p):\n", ch_number,
+							(void *) registration);
+
+	kdb_printf("\t&mutex=0x%p\n", (void *) &registration->mutex);
+	kdb_printf("\tfunc=0x%p\n", (void *) registration->func);
+	kdb_printf("\tkey=0x%p\n", registration->key);
+	kdb_printf("\tnentries=%d\n", registration->nentries);
+	kdb_printf("\tmsg_size=%d\n", registration->msg_size);
+	kdb_printf("\tassigned_limit=%d\n", registration->assigned_limit);
+	kdb_printf("\tidle_limit=%d\n", registration->idle_limit);
+}
+
+
+/*
+ * Display current XPC users who have registered via xpc_connect().
+ *
+ *	xpcusers [ <channel> ]
+ */
+static int
+kdbm_xpc_users(int argc, const char **argv, const char **envp,
+			struct pt_regs *regs)
+{
+	int ret;
+	struct xpc_registration *registration;
+	int ch_number;
+
+
+	if (argc > 1) {
+		return KDB_ARGCOUNT;
+
+	} else if (argc == 1) {
+		ret = kdbgetularg(argv[1], (unsigned long *) &ch_number);
+		if (ret) {
+			return ret;
+		}
+		if (ch_number < 0 || ch_number >= XPC_NCHANNELS) {
+			kdb_printf("invalid channel #\n");
+			return KDB_BADINT;
+		}
+		registration = &xpc_registrations[ch_number];
+		kdbm_xpc_print_users(registration, ch_number);
+
+	} else {
+		for (ch_number = 0; ch_number < XPC_NCHANNELS; ch_number++) {
+			registration = &xpc_registrations[ch_number];
+
+			/* if !XPC_CHANNEL_REGISTERED(ch_number) */
+			if (registration->func == NULL) {
+				continue;
+			}
+			kdbm_xpc_print_users(registration, ch_number);
+		}
+	}
+	return 0;
+}
+
+
 static int __init
 kdbm_xpc_register(void)
 {
@@ -1026,6 +1086,8 @@ kdbm_xpc_register(void)
 			"Display struct xpc_msg", 0);
 	(void) kdb_register("xpcnque", kdbm_xpc_notify_queue, "<partid> "
 			"<channel>", "Display notify queue", 0);
+	(void) kdb_register("xpcusers", kdbm_xpc_users, "[ <channel> ]",
+			"Display struct xpc_registration entries", 0);
 	return 0;
 }
 
@@ -1042,6 +1104,7 @@ kdbm_xpc_unregister(void)
 	(void) kdb_unregister("xpcmque");
 	(void) kdb_unregister("xpcmsg");
 	(void) kdb_unregister("xpcnque");
+	(void) kdb_unregister("xpcusers");
 }
 
 
