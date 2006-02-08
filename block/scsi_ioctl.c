@@ -309,6 +309,7 @@ static int sg_io(struct file *file, request_queue_t *q,
 		rq->timeout = q->sg_timeout;
 	if (!rq->timeout)
 		rq->timeout = BLK_DEFAULT_TIMEOUT;
+
 	rq->retries = 0;
 
 	start_time = jiffies;

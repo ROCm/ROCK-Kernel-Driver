@@ -25,7 +25,7 @@ extern unsigned char apicid_to_node[256];
 #ifdef CONFIG_NUMA
 extern void __init init_cpu_to_node(void);
 
-static inline void clear_node_cpumask(int cpu) 
+static inline void clear_node_cpumask(int cpu)
 {
 	clear_bit(cpu, &node_to_cpumask[cpu_to_node(cpu)]);
 }
