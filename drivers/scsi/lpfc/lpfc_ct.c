@@ -1,7 +1,7 @@
 /*******************************************************************
  * This file is part of the Emulex Linux Device Driver for         *
  * Fibre Channel Host Bus Adapters.                                *
- * Copyright (C) 2004-2005 Emulex.  All rights reserved.           *
+ * Copyright (C) 2004-2006 Emulex.  All rights reserved.           *
  * EMULEX and SLI are trademarks of Emulex.                        *
  * www.emulex.com                                                  *
  *                                                                 *
@@ -260,8 +260,10 @@ lpfc_gen_req(struct lpfc_hba *phba, struct lpfc_dmabuf *bmp,
 	icmd->un.genreq64.w5.hcsw.Rctl = FC_UNSOL_CTL;
 	icmd->un.genreq64.w5.hcsw.Type = FC_COMMON_TRANSPORT_ULP;
 
-	if (!tmo)
-		tmo = (2 * phba->fc_ratov) + 1;
+	if (!tmo) {
+		 /* FC spec states we need 3 * ratov for CT requests */
+		tmo = (3 * phba->fc_ratov);
+	}
 	icmd->ulpTimeout = tmo;
 	icmd->ulpBdeCount = 1;
 	icmd->ulpLe = 1;
@@ -321,6 +323,7 @@ lpfc_ns_rsp(struct lpfc_hba * phba, struct lpfc_dmabuf * mp, uint32_t Size)
 	struct lpfc_sli_ct_request *Response =
 		(struct lpfc_sli_ct_request *) mp->virt;
 	struct lpfc_nodelist *ndlp = NULL;
+	struct lpfc_nodelist *next_ndlp;
 	struct lpfc_dmabuf *mlast, *next_mp;
 	uint32_t *ctptr = (uint32_t *) & Response->un.gid.PortType;
 	uint32_t Did;
@@ -389,8 +392,36 @@ lpfc_ns_rsp(struct lpfc_hba * phba, struct lpfc_dmabuf * mp, uint32_t Size)
 nsout1:
 	list_del(&head);
 
-	/* Here we are finished in the case RSCN */
+	/*
+ 	 * The driver has cycled through all Nports in the RSCN payload.
+ 	 * Complete the handling by cleaning up and marking the
+ 	 * current driver state.
+ 	 */
 	if (phba->hba_state == LPFC_HBA_READY) {
+
+		/*
+		 * Switch ports that connect a loop of multiple targets need
+		 * special consideration.  The driver wants to unregister the
+		 * rpi only on the target that was pulled from the loop.  On
+		 * RSCN, the driver wants to rediscover an NPort only if the
+		 * driver flagged it as NLP_NPR_2B_DISC.  Provided adisc is
+		 * not enabled and the NPort is not capable of retransmissions
+		 * (FC Tape) prevent timing races with the scsi error handler by
+		 * unregistering the Nport's RPI.  This action causes all
+		 * outstanding IO to flush back to the midlayer.
+		 */
+		list_for_each_entry_safe(ndlp, next_ndlp, &phba->fc_npr_list,
+					 nlp_listp) {
+			if (!(ndlp->nlp_flag & NLP_NPR_2B_DISC) &&
+			    (lpfc_rscn_payload_check(phba, ndlp->nlp_DID))) {
+				if ((phba->cfg_use_adisc == 0) &&
+				    !(ndlp->nlp_fcp_info &
+				      NLP_FCP_2_DEVICE)) {
+					lpfc_unreg_rpi(phba, ndlp);
+					ndlp->nlp_flag &= ~NLP_NPR_ADISC;
+				}
+			}
+		}
 		lpfc_els_flush_rscn(phba);
 		spin_lock_irq(phba->host->host_lock);
 		phba->fc_flag |= FC_RSCN_MODE; /* we are still in RSCN mode */
@@ -449,6 +480,11 @@ lpfc_cmpl_ct_cmd_gid_ft(struct lpfc_hba * phba, struct lpfc_iocbq * cmdiocb,
 		CTrsp = (struct lpfc_sli_ct_request *) outp->virt;
 		if (CTrsp->CommandResponse.bits.CmdRsp ==
 		    be16_to_cpu(SLI_CT_RESPONSE_FS_ACC)) {
+			lpfc_printf_log(phba, KERN_INFO, LOG_DISCOVERY,
+					"%d:0239 NameServer Rsp "
+					"Data: x%x\n",
+					phba->brd_no,
+					phba->fc_flag);
 			lpfc_ns_rsp(phba, outp,
 				    (uint32_t) (irsp->un.genreq64.bdl.bdeSize));
 		} else if (CTrsp->CommandResponse.bits.CmdRsp ==

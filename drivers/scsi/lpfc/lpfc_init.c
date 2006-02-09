@@ -1,7 +1,7 @@
 /*******************************************************************
  * This file is part of the Emulex Linux Device Driver for         *
  * Fibre Channel Host Bus Adapters.                                *
- * Copyright (C) 2004-2005 Emulex.  All rights reserved.           *
+ * Copyright (C) 2004-2006 Emulex.  All rights reserved.           *
  * EMULEX and SLI are trademarks of Emulex.                        *
  * www.emulex.com                                                  *
  * Portions Copyright (C) 2004-2005 Christoph Hellwig              *
@@ -459,7 +459,43 @@ lpfc_hba_down_prep(struct lpfc_hba * phba)
 	lpfc_els_flush_cmd(phba);
 	lpfc_disc_flush_list(phba);
 
+	/* Disable SLI2 since we disabled interrupts */
+	phba->sli.sli_flag &= ~LPFC_SLI2_ACTIVE;
 	return (0);
+}
+
+/************************************************************************/
+/*                                                                      */
+/*    lpfc_hba_down_post                                                */
+/*    This routine will do uninitialization after the HBA is reset      */
+/*    when bringing down the SLI Layer.                                 */
+/*    This routine returns 0 on success. Any other return value         */
+/*    indicates an error.                                               */
+/*                                                                      */
+/************************************************************************/
+int
+lpfc_hba_down_post(struct lpfc_hba * phba)
+{
+	struct lpfc_sli *psli = &phba->sli;
+	struct lpfc_sli_ring *pring;
+	struct lpfc_dmabuf *mp, *next_mp;
+	int i;
+
+	/* Cleanup preposted buffers on the ELS ring */
+	pring = &psli->ring[LPFC_ELS_RING];
+	list_for_each_entry_safe(mp, next_mp, &pring->postbufq, list) {
+		list_del(&mp->list);
+		pring->postbufq_cnt--;
+		lpfc_mbuf_free(phba, mp->virt, mp->phys);
+		kfree(mp);
+	}
+
+	for (i = 0; i < psli->num_rings; i++) {
+		pring = &psli->ring[i];
+		lpfc_sli_abort_iocb_ring(phba, pring);
+	}
+
+	return 0;
 }
 
 /************************************************************************/
@@ -475,20 +511,6 @@ lpfc_handle_eratt(struct lpfc_hba * phba)
 {
 	struct lpfc_sli *psli = &phba->sli;
 	struct lpfc_sli_ring  *pring;
-
-	/*
-	 * If a reset is sent to the HBA restore PCI configuration registers.
-	 */
-	if ( phba->hba_state == LPFC_INIT_START ) {
-		mdelay(1);
-		readl(phba->HCregaddr); /* flush */
-		writel(0, phba->HCregaddr);
-		readl(phba->HCregaddr); /* flush */
-
-		/* Restore PCI cmd register */
-		pci_write_config_word(phba->pcidev,
-				      PCI_COMMAND, phba->pci_cfg_value);
-	}
 
 	if (phba->work_hs & HS_FFER6) {
 		/* Re-establishing Link */
@@ -516,6 +538,7 @@ lpfc_handle_eratt(struct lpfc_hba * phba)
 		 * attempt to restart it.
 		 */
 		lpfc_offline(phba);
+		lpfc_sli_brdrestart(phba);
 		if (lpfc_online(phba) == 0) {	/* Initialize the HBA */
 			mod_timer(&phba->fc_estabtmo, jiffies + HZ * 60);
 			return;
@@ -532,7 +555,8 @@ lpfc_handle_eratt(struct lpfc_hba * phba)
 				phba->work_status[0], phba->work_status[1]);
 
 		lpfc_offline(phba);
-
+		phba->hba_state = LPFC_HBA_ERROR;
+		lpfc_hba_down_post(phba);
 	}
 }
 
@@ -1462,9 +1486,23 @@ lpfc_pci_probe_one(struct pci_dev *pdev, const struct pci_device_id *pid)
 	phba->pci_bar2_map = pci_resource_start(phba->pcidev, 2);
 	bar2map_len        = pci_resource_len(phba->pcidev, 2);
 
-	/* Map HBA SLIM and Control Registers to a kernel virtual address. */
+	/* Map HBA SLIM to a kernel virtual address. */
 	phba->slim_memmap_p      = ioremap(phba->pci_bar0_map, bar0map_len);
+	if (!phba->slim_memmap_p) {
+		error = -ENODEV;
+		dev_printk(KERN_ERR, &pdev->dev,
+			   "ioremap failed for SLIM memory.\n");
+		goto out_idr_remove;
+	}
+
+	/* Map HBA Control Registers to a kernel virtual address. */
 	phba->ctrl_regs_memmap_p = ioremap(phba->pci_bar2_map, bar2map_len);
+	if (!phba->ctrl_regs_memmap_p) {
+		error = -ENODEV;
+		dev_printk(KERN_ERR, &pdev->dev,
+			   "ioremap failed for HBA control registers.\n");
+		goto out_iounmap_slim;
+	}
 
 	/* Allocate memory for SLI-2 structures */
 	phba->slim2p = dma_alloc_coherent(&phba->pcidev->dev, SLI2_SLIM_SIZE,
@@ -1539,7 +1577,6 @@ lpfc_pci_probe_one(struct pci_dev *pdev, const struct pci_device_id *pid)
 	INIT_LIST_HEAD(&phba->lpfc_scsi_buf_list);
 
 	host->transportt = lpfc_transport_template;
-	host->hostdata[0] = (unsigned long)phba;
 	pci_set_drvdata(pdev, host);
 	error = scsi_add_host(host, &pdev->dev);
 	if (error)
@@ -1643,6 +1680,7 @@ out_free_slim:
 							phba->slim2p_mapping);
 out_iounmap:
 	iounmap(phba->ctrl_regs_memmap_p);
+out_iounmap_slim:
 	iounmap(phba->slim_memmap_p);
 out_idr_remove:
 	idr_remove(&lpfc_hba_index, phba->brd_no);
@@ -1660,7 +1698,7 @@ static void __devexit
 lpfc_pci_remove_one(struct pci_dev *pdev)
 {
 	struct Scsi_Host   *host = pci_get_drvdata(pdev);
-	struct lpfc_hba    *phba = (struct lpfc_hba *)host->hostdata[0];
+	struct lpfc_hba    *phba = (struct lpfc_hba *)host->hostdata;
 	unsigned long iflag;
 
 	lpfc_free_sysfs_attr(phba);
@@ -1681,6 +1719,7 @@ lpfc_pci_remove_one(struct pci_dev *pdev)
 	 * the HBA.
 	 */
 	lpfc_sli_hba_down(phba);
+	lpfc_sli_brdrestart(phba);
 
 	/* Release the irq reservation */
 	free_irq(phba->pcidev->irq, phba);
