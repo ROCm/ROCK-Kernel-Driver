@@ -241,14 +241,8 @@ static void __devinit MP_processor_info (struct mpc_config_processor *m)
 	bios_cpu_apicid[num_processors - 1] = m->mpc_apicid;
 }
 #else
-static void __init MP_processor_info (struct mpc_config_processor *m)
+void __init MP_processor_info (struct mpc_config_processor *m)
 {
-	if (num_processors >= NR_CPUS) {
-		printk(KERN_WARNING "WARNING: NR_CPUS limit of %i reached."
-			" Processor ignored.\n", NR_CPUS);
-		return;
-	}
-	cpu_set(num_processors, cpu_possible_map);
 	num_processors++;
 }
 #endif /* CONFIG_XEN */

@@ -1095,6 +1095,14 @@ void smp_trap_init(trap_info_t *trap_ctxt)
 	}
 }
 
+/* Actual parsing is done early in setup.c. */
+static int __init oops_dummy(char *s)
+{
+	panic_on_oops = 1;
+	return -1;
+}
+__setup("oops=", oops_dummy);
+
 static int __init kstack_setup(char *s)
 {
 	kstack_depth_to_print = simple_strtoul(s, NULL, 0);

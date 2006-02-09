@@ -120,6 +120,7 @@ int printk_address(unsigned long address)
 static unsigned long *in_exception_stack(unsigned cpu, unsigned long stack,
 					unsigned *usedp, const char **idp)
 {
+#ifndef CONFIG_XEN
 	static char ids[][8] = {
 		[DEBUG_STACK - 1] = "#DB",
 		[NMI_STACK - 1] = "NMI",
@@ -171,6 +172,7 @@ static unsigned long *in_exception_stack(unsigned cpu, unsigned long stack,
 		}
 #endif
 	}
+#endif
 	return NULL;
 }
 

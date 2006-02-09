@@ -23,6 +23,7 @@ extern asmlinkage void sysenter_entry(void);
 
 void enable_sep_cpu(void)
 {
+#ifndef CONFIG_XEN
 	int cpu = get_cpu();
 	struct tss_struct *tss = &per_cpu(init_tss, cpu);
 
@@ -37,6 +38,7 @@ void enable_sep_cpu(void)
 	wrmsr(MSR_IA32_SYSENTER_ESP, tss->esp1, 0);
 	wrmsr(MSR_IA32_SYSENTER_EIP, (unsigned long) sysenter_entry, 0);
 	put_cpu();	
+#endif
 }
 
 /*

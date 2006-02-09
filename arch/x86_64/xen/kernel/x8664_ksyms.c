@@ -39,11 +39,6 @@ extern void __write_lock_failed(rwlock_t *rw);
 extern void __read_lock_failed(rwlock_t *rw);
 #endif
 
-#if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_HD) || defined(CONFIG_BLK_DEV_IDE_MODULE) || defined(CONFIG_BLK_DEV_HD_MODULE)
-extern struct drive_info_struct drive_info;
-EXPORT_SYMBOL(drive_info);
-#endif
-
 /* platform dependent support */
 EXPORT_SYMBOL(boot_cpu_data);
 //EXPORT_SYMBOL(dump_fpu);
@@ -52,9 +47,6 @@ EXPORT_SYMBOL(ioremap_nocache);
 EXPORT_SYMBOL(iounmap);
 EXPORT_SYMBOL(kernel_thread);
 EXPORT_SYMBOL(pm_idle);
-#ifdef CONFIG_ACPI_BOOT
-EXPORT_SYMBOL(pm_power_off);
-#endif
 
 EXPORT_SYMBOL(__down_failed);
 EXPORT_SYMBOL(__down_failed_interruptible);

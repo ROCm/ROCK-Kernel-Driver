@@ -17,6 +17,14 @@
 #include <linux/kthread.h>
 #include <asm-xen/xencons.h>
 
+#if defined(__i386__) || defined(__x86_64__)
+/*
+ * Power off function, if any
+ */
+void (*pm_power_off)(void);
+EXPORT_SYMBOL(pm_power_off);
+#endif
+
 #define SHUTDOWN_INVALID  -1
 #define SHUTDOWN_POWEROFF  0
 #define SHUTDOWN_REBOOT    1

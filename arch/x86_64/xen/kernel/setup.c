@@ -130,7 +130,6 @@ EXPORT_SYMBOL(swiotlb);
 /*
  * Setup options
  */
-struct drive_info_struct { char dummy[32]; } drive_info;
 struct screen_info screen_info;
 struct sys_desc_table_struct {
 	unsigned short length;
@@ -635,7 +634,6 @@ void __init setup_arch(char **cmdline_p)
 
 #ifdef CONFIG_XEN
  	ROOT_DEV = MKDEV(RAMDISK_MAJOR,0); 
- 	drive_info = DRIVE_INFO;
 	kernel_end = 0;		/* dummy */
 #ifdef CONFIG_XEN_PHYSDEV_ACCESS
  	screen_info = SCREEN_INFO;
@@ -672,7 +670,6 @@ void __init setup_arch(char **cmdline_p)
         ARCH_SETUP
 #else
  	ROOT_DEV = old_decode_dev(ORIG_ROOT_DEV);
- 	drive_info = DRIVE_INFO;
  	screen_info = SCREEN_INFO;
 	edid_info = EDID_INFO;
 	saved_video_mode = SAVED_VIDEO_MODE;

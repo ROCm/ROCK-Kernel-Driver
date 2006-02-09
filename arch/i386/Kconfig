@@ -501,7 +501,7 @@ config HIGHMEM64G
 endchoice
 
 choice
-	depends on EXPERIMENTAL && !X86_PAE
+	depends on EXPERIMENTAL && !X86_PAE && !X86_XEN
 	prompt "Memory split"
 	default VMSPLIT_3G
 	help

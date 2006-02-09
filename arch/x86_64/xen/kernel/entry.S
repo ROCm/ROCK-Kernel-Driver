@@ -498,43 +498,9 @@ ENTRY(stub_rt_sigreturn)
 #define XCPT_FRAME _frame ORIG_RAX
 
 /* 
- * Interrupt entry/exit.
+ * Interrupt exit.
  *
- * Interrupt entry points save only callee clobbered registers in fast path.
- *	
- * Entry runs with interrupts off.	
  */ 
-
-/* 0(%rsp): interrupt number */ 
-	.macro interrupt func
-	cld
-#ifdef CONFIG_DEBUG_INFO
-	SAVE_ALL	
-	movq %rsp,%rdi
-	/*
-	 * Setup a stack frame pointer.  This allows gdb to trace
-	 * back to the original stack.
-	 */
-	movq %rsp,%rbp
-	CFI_DEF_CFA_REGISTER	rbp
-#else		
-	SAVE_ARGS
-	leaq -ARGOFFSET(%rsp),%rdi	# arg1 for handler
-#endif	
-#if 0 /* For Xen we don't need to do this */       
-	testl $3,CS(%rdi)
-	je 1f
-	swapgs	
-#endif        
-1:	incl    %gs:pda_irqcount	# RED-PEN should check preempt count
-	movq %gs:pda_irqstackptr,%rax
-	cmoveq %rax,%rsp /*todo This needs CFI annotation! */
-	pushq %rdi			# save old stack	
-#ifndef CONFIG_DEBUG_INFO
-	CFI_ADJUST_CFA_OFFSET	8
-#endif
-	call \func
-	.endm
 
 retint_check:
 	movl threadinfo_flags(%rcx),%edx
@@ -647,7 +613,6 @@ ENTRY(invalidate_interrupt\num)
 ENTRY(call_function_interrupt)
 	apicinterrupt CALL_FUNCTION_VECTOR,smp_call_function_interrupt
 #endif
-#endif /* !CONFIG_XEN */
 
 #ifdef CONFIG_X86_LOCAL_APIC	
 ENTRY(apic_timer_interrupt)
@@ -659,6 +624,7 @@ ENTRY(error_interrupt)
 ENTRY(spurious_interrupt)
 	apicinterrupt SPURIOUS_APIC_VECTOR,smp_spurious_interrupt
 #endif
+#endif /* !CONFIG_XEN */
 				
 /*
  * Exception entry points.
@@ -831,9 +797,15 @@ ENTRY(hypervisor_callback)
 ENTRY(do_hypervisor_callback)   # do_hyperviosr_callback(struct *pt_regs)
 # Since we don't modify %rdi, evtchn_do_upall(struct *pt_regs) will
 # see the correct pointer to the pt_regs
-        addq $8, %rsp            # we don't return, adjust the stack frame
-11:	movb $0, EVENT_MASK(%rsp)         
+	movq %rdi, %rsp            # we don't return, adjust the stack frame
+11:	movb $0, EVENT_MASK(%rdi)
+	movq %gs:pda_irqstackptr,%rax
+	incl %gs:pda_irqcount
+	cmovzq %rax,%rsp
+	pushq %rdi
 	call evtchn_do_upcall
+	popq %rsp
+	decl %gs:pda_irqcount
         jmp  error_exit
 
         ALIGN

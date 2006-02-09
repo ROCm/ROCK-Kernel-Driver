@@ -40,8 +40,6 @@
 #include <asm/fixmap.h>
 #endif
 
-void (*pm_power_off)(void) = NULL;
-
 #ifdef	CONFIG_X86_64
 
 extern void __init clustered_apic_check(void);

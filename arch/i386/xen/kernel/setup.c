@@ -73,11 +73,6 @@ void __init find_max_pfn(void);
 /* Allows setting of maximum possible memory size  */
 static unsigned long xen_override_max_pfn;
 
-static int xen_panic_event(struct notifier_block *, unsigned long, void *);
-static struct notifier_block xen_panic_block = {
-	xen_panic_event, NULL, 0 /* try to go last */
-};
-
 int disable_pse __devinitdata = 0;
 
 /*
@@ -836,6 +831,8 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 		else if (!memcmp(from, "noexec=", 7))
 			noexec_setup(from + 7);
 
+		else if (!memcmp(from,"oops=panic", 10))
+			panic_on_oops = 1;
 
 #ifdef  CONFIG_X86_MPPARSE
 		/*
@@ -1627,14 +1624,6 @@ void __init setup_arch(char **cmdline_p)
 	physdev_op_t op;
 	unsigned long max_low_pfn;
 
-	/* Force a quick death if the kernel panics. */
-	extern int panic_timeout;
-	if (panic_timeout == 0)
-		panic_timeout = 1;
-
-	/* Register a call for panic conditions. */
-	notifier_chain_register(&panic_notifier_list, &xen_panic_block);
-
 	HYPERVISOR_vm_assist(VMASST_CMD_enable, VMASST_TYPE_4gb_segments);
 	HYPERVISOR_vm_assist(VMASST_CMD_enable,
 			     VMASST_TYPE_writable_pagetables);
@@ -1869,14 +1858,6 @@ void __init setup_arch(char **cmdline_p)
 		console_use_vt = 0;
 #endif
 	}
-}
-
-static int
-xen_panic_event(struct notifier_block *this, unsigned long event, void *ptr)
-{
-	HYPERVISOR_sched_op(SCHEDOP_shutdown, SHUTDOWN_crash);
-	/* we're never actually going to get here... */
-	return NOTIFY_DONE;
 }
 
 #include "setup_arch_post.h"

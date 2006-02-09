@@ -221,6 +221,7 @@ need_resched:
 	jmp need_resched
 #endif
 
+#if 0 /* XEN */
 /* SYSENTER_RETURN points to after the "sysenter" instruction in
    the vsyscall page.  See vsyscall-sysentry.S, which defines the symbol.  */
 
@@ -268,6 +269,7 @@ sysenter_past_esp:
 	xorl %ebp,%ebp
 	sti
 	sysexit
+#endif /* XEN */
 
 
 	# system call handler stub
@@ -662,6 +664,7 @@ ENTRY(device_not_available)
 	call math_state_restore
 	jmp ret_from_exception
 
+#if 0 /* XEN */
 /*
  * Debug traps and NMI can happen at the one SYSENTER instruction
  * that sets up the real kernel stack. Check here, since we can't
@@ -683,12 +686,15 @@ label:						\
 	pushfl;					\
 	pushl $__KERNEL_CS;			\
 	pushl $sysenter_past_esp
+#endif /* XEN */
 
 KPROBE_ENTRY(debug)
+#if 0 /* XEN */
 	cmpl $sysenter_entry,(%esp)
 	jne debug_stack_correct
 	FIX_STACK(12, debug_stack_correct, debug_esp_fix_insn)
 debug_stack_correct:
+#endif /* XEN */
 	pushl $-1			# mark this as an int
 	SAVE_ALL
 	xorl %edx,%edx			# error code 0
