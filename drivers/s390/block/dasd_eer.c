@@ -102,11 +102,33 @@ struct eerbuffer {
 	int residual;
 };
 
-LIST_HEAD(bufferlist);
+static LIST_HEAD(bufferlist);
 
 static spinlock_t bufferlock = SPIN_LOCK_UNLOCKED;
 
-DECLARE_WAIT_QUEUE_HEAD(dasd_eer_read_wait_queue);
+static DECLARE_WAIT_QUEUE_HEAD(dasd_eer_read_wait_queue);
+
+/*
+ * Check if called ioctl is valid on this device type.
+ * Returns device if anything is fine, ERR_PTR otherwise.
+ */
+static inline struct dasd_device *
+dasd_eer_validate_ioctl(struct block_device *bdev, int no)
+{
+	struct dasd_device *device;
+
+	device = bdev->bd_disk->private_data;
+	if (device == NULL)
+		return ERR_PTR(-ENODEV);
+
+	if (strncmp((char *)&device->discipline->name, "ECKD", 4)) {
+		DEV_MESSAGE(KERN_WARNING, device,
+			    "ioctl (%x) not supported for %.4s device.",
+			    no, (char *)&device->discipline->name);
+		return ERR_PTR(-EOPNOTSUPP);
+	}
+	return device;
+}
 
 /*
  * How many free bytes are available on the buffer.
@@ -463,7 +485,7 @@ dasd_eer_probe(struct dasd_device *device)
  * dasd ccw queue so we can free the requests memory.
  */
 static void
-dasd_eer_dequeue_SNSS_request(struct dasd_device *device,
+dasd_eer_dequeue_snss_request(struct dasd_device *device,
 			      struct dasd_eer_private *eer)
 {
 	struct list_head *lst, *nxt;
@@ -511,7 +533,7 @@ static void
 dasd_eer_destroy(struct dasd_device *device, struct dasd_eer_private *eer)
 {
 	flush_workqueue(dasd_eer_workqueue);
-	dasd_eer_dequeue_SNSS_request(device, eer);
+	dasd_eer_dequeue_snss_request(device, eer);
 	dasd_kfree_request(eer->cqr, device);
 	kfree(eer);
 };
@@ -523,8 +545,7 @@ static int
 dasd_eer_enable_on_device(struct dasd_device *device)
 {
 	void *eer;
-	if (!device)
-		return -ENODEV;
+
 	if (device->eer)
 		return 0;
 	if (!try_module_get(THIS_MODULE)) {
@@ -575,9 +596,10 @@ dasd_ioctl_set_eer(struct block_device *bdev, int no, long args)
 		return -EINVAL;
 	if (get_user(intval, (int __user *) args))
 		return -EFAULT;
-	device =  bdev->bd_disk->private_data;
-	if (device == NULL)
-		return -ENODEV;
+
+	device = dasd_eer_validate_ioctl(bdev, no);
+	if (IS_ERR(device))
+		return PTR_ERR(device);
 
 	intval = (intval != 0);
 	DEV_MESSAGE (KERN_DEBUG, device,
@@ -597,9 +619,10 @@ dasd_ioctl_get_eer(struct block_device *bdev, int no, long args)
 {
 	struct dasd_device *device;
 
-	device =  bdev->bd_disk->private_data;
-	if (device == NULL)
-		return -ENODEV;
+	device = dasd_eer_validate_ioctl(bdev, no);
+	if (IS_ERR(device))
+		return PTR_ERR(device);
+
 	return put_user((device->eer != NULL), (int __user *) args);
 }
 
@@ -660,7 +683,7 @@ dasd_eer_write_standard_trigger(int trigger, struct dasd_device *device,
  * This function writes a DASD_EER_STATECHANGE trigger.
  */
 static void
-dasd_eer_write_SNSS_trigger(struct dasd_device *device,
+dasd_eer_write_snss_trigger(struct dasd_device *device,
 			    struct dasd_ccw_req *cqr)
 {
 	int data_size;
@@ -700,7 +723,7 @@ dasd_eer_write_SNSS_trigger(struct dasd_device *device,
  * callback function for use with SNSS request
  */
 static void
-dasd_eer_SNSS_cb(struct dasd_ccw_req *cqr, void *data)
+dasd_eer_snss_cb(struct dasd_ccw_req *cqr, void *data)
 {
         struct dasd_device *device;
 	struct dasd_eer_private *private;
@@ -708,7 +731,7 @@ dasd_eer_SNSS_cb(struct dasd_ccw_req *cqr, void *data)
 
         device = (struct dasd_device *)data;
 	private = (struct dasd_eer_private *)device->eer;
-	dasd_eer_write_SNSS_trigger(device, cqr);
+	dasd_eer_write_snss_trigger(device, cqr);
 	spin_lock_irqsave(&snsslock, irqflags);
 	if(!test_and_clear_bit(SNSS_REQUESTED, &private->flags)) {
 		clear_bit(CQR_IN_USE, &private->flags);
@@ -725,7 +748,7 @@ dasd_eer_SNSS_cb(struct dasd_ccw_req *cqr, void *data)
  * clean a used cqr before using it again
  */
 static void
-dasd_eer_clean_SNSS_request(struct dasd_ccw_req *cqr)
+dasd_eer_clean_snss_request(struct dasd_ccw_req *cqr)
 {
 	struct ccw1 *cpaddr = cqr->cpaddr;
 	void *data = cqr->data;
@@ -766,7 +789,7 @@ dasd_eer_sense_subsystem_status(void *data)
 		return;
 	};
 	spin_unlock_irqrestore(&snsslock, irqflags);
-	dasd_eer_clean_SNSS_request(cqr);
+	dasd_eer_clean_snss_request(cqr);
 	cqr->device = device;
 	cqr->retries = 255;
 	cqr->expires = 10 * HZ;
@@ -779,7 +802,7 @@ dasd_eer_sense_subsystem_status(void *data)
 
 	cqr->buildclk = get_clock();
 	cqr->status = DASD_CQR_FILLED;
-	cqr->callback = dasd_eer_SNSS_cb;
+	cqr->callback = dasd_eer_snss_cb;
 	cqr->callback_data = (void *)device;
         dasd_add_request_head(cqr);
 
@@ -854,7 +877,7 @@ static int dasd_eer_notify(struct notifier_block *self,
  * to transfer in a readbuffer, which is protected by the readbuffer_mutex.
  */
 static char readbuffer[PAGE_SIZE];
-DECLARE_MUTEX(readbuffer_mutex);
+static DECLARE_MUTEX(readbuffer_mutex);
 
 
 static int

@@ -224,6 +224,28 @@ check_XRC (struct ccw1         *de_ccw,
 
 } /* end check_XRC */
 
+/*
+ * Check if called ioctl is valid on this device type.
+ * Returns device if anything is fine, ERR_PTR otherwise.
+ */
+static inline struct dasd_device *
+dasd_eckd_validate_ioctl(struct block_device *bdev, int no)
+{
+	struct dasd_device *device;
+
+	device = bdev->bd_disk->private_data;
+	if (device == NULL)
+		return ERR_PTR(-ENODEV);
+
+	if (strncmp((char *)&device->discipline->name, "ECKD", 4)) {
+		DEV_MESSAGE(KERN_WARNING, device,
+			    "ioctl (%x) not supported for %.4s device.",
+			    no, (char *)&device->discipline->name);
+		return ERR_PTR(-EOPNOTSUPP);
+	}
+	return device;
+}
+
 static inline void
 define_extent(struct ccw1 * ccw, struct DE_eckd_data * data, int trk,
 	      int totrk, int cmd, struct dasd_device * device)
@@ -1236,9 +1258,9 @@ dasd_eckd_release(struct block_device *bdev, int no, long args)
 	if (!capable(CAP_SYS_ADMIN))
 		return -EACCES;
 
-	device = bdev->bd_disk->private_data;
-	if (device == NULL)
-		return -ENODEV;
+	device = dasd_eckd_validate_ioctl(bdev, no);
+	if (IS_ERR(device))
+		return PTR_ERR(device);
 
 	cqr = dasd_smalloc_request(dasd_eckd_discipline.name,
 				   1, 32, device);
@@ -1281,9 +1303,9 @@ dasd_eckd_reserve(struct block_device *bdev, int no, long args)
 	if (!capable(CAP_SYS_ADMIN))
 		return -EACCES;
 
-	device = bdev->bd_disk->private_data;
-	if (device == NULL)
-		return -ENODEV;
+	device = dasd_eckd_validate_ioctl(bdev, no);
+	if (IS_ERR(device))
+		return PTR_ERR(device);
 
 	cqr = dasd_smalloc_request(dasd_eckd_discipline.name,
 				   1, 32, device);
@@ -1325,9 +1347,9 @@ dasd_eckd_steal_lock(struct block_device *bdev, int no, long args)
 	if (!capable(CAP_SYS_ADMIN))
 		return -EACCES;
 
-	device = bdev->bd_disk->private_data;
-	if (device == NULL)
-		return -ENODEV;
+	device = dasd_eckd_validate_ioctl(bdev, no);
+	if (IS_ERR(device))
+		return PTR_ERR(device);
 
 	cqr = dasd_smalloc_request(dasd_eckd_discipline.name,
 				   1, 32, device);
@@ -1367,9 +1389,9 @@ dasd_eckd_performance(struct block_device *bdev, int no, long args)
 	struct ccw1 *ccw;
 	int rc;
 
-	device = bdev->bd_disk->private_data;
-	if (device == NULL)
-		return -ENODEV;
+	device = dasd_eckd_validate_ioctl(bdev, no);
+	if (IS_ERR(device))
+		return PTR_ERR(device);
 
 	cqr = dasd_smalloc_request(dasd_eckd_discipline.name,
 				   1 /* PSF */  + 1 /* RSSD */ ,
@@ -1438,9 +1460,9 @@ dasd_eckd_get_attrib (struct block_device *bdev, int no, long args)
         if (!args)
                 return -EINVAL;
 
-        device = bdev->bd_disk->private_data;
-        if (device == NULL)
-                return -ENODEV;
+	device = dasd_eckd_validate_ioctl(bdev, no);
+	if (IS_ERR(device))
+		return PTR_ERR(device);
 
         private = (struct dasd_eckd_private *) device->private;
         attrib = private->attrib;
@@ -1467,9 +1489,10 @@ dasd_eckd_set_attrib(struct block_device *bdev, int no, long args)
 	if (!args)
 		return -EINVAL;
 
-	device = bdev->bd_disk->private_data;
-	if (device == NULL)
-		return -ENODEV;
+
+	device = dasd_eckd_validate_ioctl(bdev, no);
+	if (IS_ERR(device))
+		return PTR_ERR(device);
 
 	if (copy_from_user(&attrib, (void __user *) args,
 			   sizeof (struct attrib_data_t))) {
