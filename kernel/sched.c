@@ -5879,7 +5879,7 @@ void build_sched_domains(const cpumask_t *cpu_map)
 		power = SCHED_LOAD_SCALE + (cpus_weight(sd->groups->cpumask)-1)
 					    * SCHED_LOAD_SCALE / 10;
 		sd->groups->cpu_power = power;
- 
+
 		sd = &per_cpu(phys_domains, i);
 
  		/*
