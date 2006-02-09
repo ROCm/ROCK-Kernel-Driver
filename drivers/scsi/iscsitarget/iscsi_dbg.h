@@ -6,7 +6,7 @@
 #define D_GENERIC	(1UL << 2)
 #define D_READ		(1UL << 3)
 #define D_WRITE 	(1UL << 4)
-#define D_IOD		(1UL << 5)
+#define D_IOV		(1UL << 5)
 #define D_THREAD	(1UL << 6)
 #define D_TASK_MGT	(1UL << 7)
 #define D_IOMODE	(1UL << 8)
@@ -36,7 +36,7 @@ do {								\
 	}							\
 } while (0)
 
-#ifdef D_IOV
+#ifdef D_DUMP_IOV
 static inline void iscsi_dump_iov(struct msghdr *msg)
 {
 	int i;
