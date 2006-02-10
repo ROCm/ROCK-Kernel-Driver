@@ -140,14 +140,29 @@ extern const struct kernel_symbol __start___ksymtab[];
 extern const struct kernel_symbol __stop___ksymtab[];
 extern const struct kernel_symbol __start___ksymtab_gpl[];
 extern const struct kernel_symbol __stop___ksymtab_gpl[];
+extern const struct kernel_symbol __start___ksymtab_gpl_future[];
+extern const struct kernel_symbol __stop___ksymtab_gpl_future[];
 extern const unsigned long __start___kcrctab[];
 extern const unsigned long __start___kcrctab_gpl[];
+extern const unsigned long __start___kcrctab_gpl_future[];
 
 #ifndef CONFIG_MODVERSIONS
 #define symversion(base, idx) NULL
 #else
 #define symversion(base, idx) ((base) ? ((base) + (idx)) : NULL)
 #endif
+
+/* lookup symbol in given range of kernel_symbols */
+static const struct kernel_symbol *lookup_symbol(const char *name,
+	const struct kernel_symbol *start,
+	const struct kernel_symbol *stop)
+{
+	const struct kernel_symbol *ks = start;
+	for (; ks < stop; ks++)
+		if (strcmp(ks->name, name) == 0)
+			return ks;
+	return NULL;
+}
 
 /* Find a symbol, return value, crc and module which owns it */
 static unsigned long __find_symbol(const char *name,
@@ -156,40 +171,75 @@ static unsigned long __find_symbol(const char *name,
 				   int gplok)
 {
 	struct module *mod;
-	unsigned int i;
+	const struct kernel_symbol *ks;
 
 	/* Core kernel first. */ 
 	*owner = NULL;
-	for (i = 0; __start___ksymtab+i < __stop___ksymtab; i++) {
-		if (strcmp(__start___ksymtab[i].name, name) == 0) {
-			*crc = symversion(__start___kcrctab, i);
-			return __start___ksymtab[i].value;
-		}
+	ks = lookup_symbol(name, __start___ksymtab, __stop___ksymtab);
+	if (ks) {
+		*crc = symversion(__start___kcrctab, (ks - __start___ksymtab));
+		return ks->value;
 	}
 	if (gplok) {
-		for (i = 0; __start___ksymtab_gpl+i<__stop___ksymtab_gpl; i++)
-			if (strcmp(__start___ksymtab_gpl[i].name, name) == 0) {
-				*crc = symversion(__start___kcrctab_gpl, i);
-				return __start___ksymtab_gpl[i].value;
-			}
+		ks = lookup_symbol(name, __start___ksymtab_gpl,
+					 __stop___ksymtab_gpl);
+		if (ks) {
+			*crc = symversion(__start___kcrctab_gpl,
+					  (ks - __start___ksymtab_gpl));
+			return ks->value;
+		}
+	}
+	ks = lookup_symbol(name, __start___ksymtab_gpl_future,
+				 __stop___ksymtab_gpl_future);
+	if (ks) {
+		if (!gplok) {
+			printk(KERN_WARNING "Symbol %s is being used "
+			       "by a non-GPL module, which will not "
+			       "be allowed in the future\n", name);
+			printk(KERN_WARNING "Please see the file "
+			       "Documentation/feature-removal-schedule.txt "
+			       "in the kernel source tree for more "
+			       "details.\n");
+		}
+		*crc = symversion(__start___kcrctab_gpl_future,
+				  (ks - __start___ksymtab_gpl_future));
+		return ks->value;
 	}
 
 	/* Now try modules. */ 
 	list_for_each_entry(mod, &modules, list) {
 		*owner = mod;
-		for (i = 0; i < mod->num_syms; i++)
-			if (strcmp(mod->syms[i].name, name) == 0) {
-				*crc = symversion(mod->crcs, i);
-				return mod->syms[i].value;
-			}
+		ks = lookup_symbol(name, mod->syms, mod->syms + mod->num_syms);
+		if (ks) {
+			*crc = symversion(mod->crcs, (ks - mod->syms));
+			return ks->value;
+		}
 
 		if (gplok) {
-			for (i = 0; i < mod->num_gpl_syms; i++) {
-				if (strcmp(mod->gpl_syms[i].name, name) == 0) {
-					*crc = symversion(mod->gpl_crcs, i);
-					return mod->gpl_syms[i].value;
-				}
+			ks = lookup_symbol(name, mod->gpl_syms,
+					   mod->gpl_syms + mod->num_gpl_syms);
+			if (ks) {
+				*crc = symversion(mod->gpl_crcs,
+						  (ks - mod->gpl_syms));
+				return ks->value;
 			}
+		}
+		ks = lookup_symbol(name, mod->gpl_future_syms,
+				   (mod->gpl_future_syms +
+				    mod->num_gpl_future_syms));
+		if (ks) {
+			if (!gplok) {
+				printk(KERN_WARNING "Symbol %s is being used "
+				       "by a non-GPL module, which will not "
+				       "be allowed in the future\n", name);
+				printk(KERN_WARNING "Please see the file "
+				       "Documentation/feature-removal-schedule.txt "
+				       "in the kernel source tree for more "
+				       "details.\n");
+			}
+			*crc = symversion(mod->gpl_future_crcs,
+					  (ks - mod->gpl_future_syms));
+			return ks->value;
 		}
 	}
 	DEBUGP("Failed to find symbol %s\n", name);
@@ -1458,18 +1508,13 @@ static void setup_modinfo(struct module *mod, Elf_Shdr *sechdrs,
 #ifdef CONFIG_KALLSYMS
 int is_exported(const char *name, const struct module *mod)
 {
-	unsigned int i;
-
-	if (!mod) {
-		for (i = 0; __start___ksymtab+i < __stop___ksymtab; i++)
-			if (strcmp(__start___ksymtab[i].name, name) == 0)
-				return 1;
-		return 0;
-	}
-	for (i = 0; i < mod->num_syms; i++)
-		if (strcmp(mod->syms[i].name, name) == 0)
+	if (!mod && lookup_symbol(name, __start___ksymtab, __stop___ksymtab))
+		return 1;
+	else
+		if (lookup_symbol(name, mod->syms, mod->syms + mod->num_syms))
 			return 1;
-	return 0;
+		else
+			return 0;
 }
 
 /* As per nm */
@@ -1551,7 +1596,8 @@ static struct module *load_module(void __user *umod,
 	char *secstrings, *args, *modmagic, *strtab = NULL, *supported;
 	unsigned int i, symindex = 0, strindex = 0, setupindex, exindex,
 		exportindex, modindex, obsparmindex, infoindex, gplindex,
-		crcindex, gplcrcindex, versindex, pcpuindex;
+		crcindex, gplcrcindex, versindex, pcpuindex, gplfutureindex,
+		gplfuturecrcindex;
 	long arglen;
 	struct module *mod;
 	long err = 0;
@@ -1632,8 +1678,10 @@ static struct module *load_module(void __user *umod,
 	/* Optional sections */
 	exportindex = find_sec(hdr, sechdrs, secstrings, "__ksymtab");
 	gplindex = find_sec(hdr, sechdrs, secstrings, "__ksymtab_gpl");
+	gplfutureindex = find_sec(hdr, sechdrs, secstrings, "__ksymtab_gpl_future");
 	crcindex = find_sec(hdr, sechdrs, secstrings, "__kcrctab");
 	gplcrcindex = find_sec(hdr, sechdrs, secstrings, "__kcrctab_gpl");
+	gplfuturecrcindex = find_sec(hdr, sechdrs, secstrings, "__kcrctab_gpl_future");
 	setupindex = find_sec(hdr, sechdrs, secstrings, "__param");
 	exindex = find_sec(hdr, sechdrs, secstrings, "__ex_table");
 	obsparmindex = find_sec(hdr, sechdrs, secstrings, "__obsparm");
@@ -1811,10 +1859,16 @@ static struct module *load_module(void __user *umod,
 	mod->gpl_syms = (void *)sechdrs[gplindex].sh_addr;
 	if (gplcrcindex)
 		mod->gpl_crcs = (void *)sechdrs[gplcrcindex].sh_addr;
+	mod->num_gpl_future_syms = sechdrs[gplfutureindex].sh_size /
+					sizeof(*mod->gpl_future_syms);
+	mod->gpl_future_syms = (void *)sechdrs[gplfutureindex].sh_addr;
+	if (gplfuturecrcindex)
+		mod->gpl_future_crcs = (void *)sechdrs[gplfuturecrcindex].sh_addr;
 
 #ifdef CONFIG_MODVERSIONS
 	if ((mod->num_syms && !crcindex) || 
-	    (mod->num_gpl_syms && !gplcrcindex)) {
+	    (mod->num_gpl_syms && !gplcrcindex) ||
+	    (mod->num_gpl_future_syms && !gplfuturecrcindex)) {
 		printk(KERN_WARNING "%s: No versions for exported symbols."
 		       " Tainting kernel.\n", mod->name);
 		add_taint(TAINT_FORCED_MODULE);
