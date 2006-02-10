@@ -54,10 +54,10 @@ static int dump_compress_init(int compression_type);
 static DECLARE_MUTEX(dump_sysfs_mutex);
 
 /* degree of system freeze when dumping */
-enum dump_silence_levels dump_silence_level = DUMP_HARD_SPIN_CPUS;	 
+enum dump_silence_levels dump_silence_level = DUMP_HARD_SPIN_CPUS;
 
 /* Other global fields */
-extern struct __dump_header dump_header; 
+extern struct __dump_header dump_header;
 struct dump_dev *dump_dev = NULL;  /* Active dump device */
 struct dump_dev_driver *dump_dev_driver = NULL;  /* acutall driver device */
 static int dump_compress = 0;
@@ -72,7 +72,7 @@ struct __dump_compress dump_none_compression = {
 };
 
 /* static variables */
-static int dump_okay = 0;	
+static int dump_okay = 0;
 static spinlock_t dump_lock = SPIN_LOCK_UNLOCKED;
 
 /* used for dump compressors */
@@ -85,7 +85,7 @@ static struct list_head dump_target_list = LIST_HEAD_INIT(dump_target_list);
 /* lkcd info structure -- this is used by lcrash for basic system data */
 	struct __lkcdinfo lkcdinfo = {
 		.ptrsz		= (sizeof(void *) * 8),
-#if defined(__LITTLE_ENDIAN) 
+#if defined(__LITTLE_ENDIAN)
 		.byte_order	= __LITTLE_ENDIAN,
 #else
 		.byte_order	= __BIG_ENDIAN,
@@ -181,9 +181,9 @@ ssize_t store_polling(struct dump_dev_driver *ddev, const char *buf,
 	dump_config.polling = tmp;
 
 	/* If dump_device has already been initalized and we
-	 * want to change the polling status we need to 
-	 * re-init dumpdev with the new polling value. 
-	 */ 
+	 * want to change the polling status we need to
+	 * re-init dumpdev with the new polling value.
+	 */
 	if (dump_config.dump_device)
 		dumper_setup(dump_config.dump_device);
 
@@ -204,15 +204,15 @@ ssize_t store_dumpdev(struct dump_dev_driver *ddev, const char *buf,
 	if (buf == NULL)
 		return -EINVAL;
 
-	if ((strncmp(buf, "eth", 3) == 0) | 
+	if ((strncmp(buf, "eth", 3) == 0) |
 			(strncmp(buf, "ath", 3) == 0) |
 			(strncmp(buf, "wlan", 4) == 0)){
 
 		type = DUMP_TYPE_NETDEV;
-	} else 
+	} else
 				type = DUMP_TYPE_BLOCKDEV;
 
-	if (dump_target_init(type) < 0) 	 
+	if (dump_target_init(type) < 0)
 		return -EINVAL;
 
 	__dump_open();
@@ -221,9 +221,9 @@ ssize_t store_dumpdev(struct dump_dev_driver *ddev, const char *buf,
 	if (err)
 		return -EINVAL;
 
-	/* do we have a compress value that was set 
-	 * before we had a dump dump_dev that needs 
-	 * to be initalized? 
+	/* do we have a compress value that was set
+	 * before we had a dump dump_dev that needs
+	 * to be initalized?
 	 */
 	if (dump_config.comp_flag) {
 		dump_compress_init((int)dump_config.comp_val);
@@ -257,7 +257,7 @@ ssize_t store_level(struct dump_dev_driver *ddev, const char *buf,
 	/* FIXME this is terrible and make it impossible for
 	 * the user to see what they set. I'm leaving it only for
 	 * the first rev and will fix this soon! -- troyh
-	 */ 
+	 */
 	switch ((int)tmp){
 		case DUMP_LEVEL_ALL:
 		case DUMP_LEVEL_ALL_RAM:
@@ -302,14 +302,14 @@ ssize_t store_compress(struct dump_dev_driver *ddev, const char *buf,
 	if ((tmp < 0) | (tmp > 2))
 		return -EINVAL;
 
-	/* dump_config.dump_device must valid first to establish 
+	/* dump_config.dump_device must valid first to establish
 	 * the compression type. Will take the parameter now and
-	 * delay the compress_init until we have a dump_device. 
+	 * delay the compress_init until we have a dump_device.
 	 */
 	if (dump_config.dump_device == 0){
 		dump_config.comp_flag = 1;
 		dump_config.comp_val = tmp;
-	} else { 
+	} else {
 		dump_compress_init((int)tmp);
 	}
 
@@ -473,15 +473,15 @@ void dump_execute(const char *panic_str, const struct pt_regs *regs)
 	}
 
 	/* What state are interrupts really in? */
-	if (in_interrupt()) { 
+	if (in_interrupt()) {
 		if(in_irq())
 			printk("LKCD: Dumping from interrupt handler!\n");
-		else 
+		else
 			printk("LKCD: Dumping from bottom half!\n");
 
-		/* 
+		/*
 		 * If we are not doing polling I/O then we should attempt
-		 * to clean up the irq state. 
+		 * to clean up the irq state.
 		 *
 		 * If polling I/O falls back to interrupt-driven mode then
 		 * it will need to clean the IRQ state
@@ -490,8 +490,8 @@ void dump_execute(const char *panic_str, const struct pt_regs *regs)
 			__dump_clean_irq_state();
 	}
 
-	/* Bring system into the strictest level of quiescing for min drift 
-	 * dump drivers can soften this as required in dev->ops->silence() 
+	/* Bring system into the strictest level of quiescing for min drift
+	 * dump drivers can soften this as required in dev->ops->silence()
 	 */
 	dump_oncpu = smp_processor_id() + 1;
 	dump_silence_level = DUMP_HARD_SPIN_CPUS;
@@ -510,7 +510,7 @@ void dump_execute(const char *panic_str, const struct pt_regs *regs)
 
 	console_loglevel = loglevel_save;
 
-	if (dump_config.reboot) 
+	if (dump_config.reboot)
 		emergency_restart();
 
 }
@@ -597,7 +597,7 @@ static int dumper_setup(const char *devid)
 	dump_config.dumper = &dumper_singlestage;
 
 	dump_config.dumper->dev = dump_dev;
-	
+
 	if (dump_config.dump_device != devid) {
 		kfree(dump_config.dump_device);
 		if (!(dump_config.dump_device = kstrdup(devid, GFP_KERNEL)))
@@ -608,11 +608,11 @@ static int dumper_setup(const char *devid)
 	if (!ret) {
 		dump_okay = 1;
 		printk("LKCD: %s dumper set up for dev %s\n",
-				dump_config.dumper->name, 
+				dump_config.dumper->name,
 				dump_config.dump_device);
 	} else {
 		printk("LKCD: %s dumper set up failed for dev %s\n",
-				dump_config.dumper->name, 
+				dump_config.dumper->name,
 				dump_config.dump_device);
 		dump_config.dumper = NULL;
 	}
@@ -650,7 +650,7 @@ static void dump_populate_dir(struct dump_dev_driver * ddev)
 
 	for (i = 0; (attr = dump_attrs[i]) && !err; i++) {
 		if (attr->show)
-			err = sysfs_create_file(&dump_subsys.kset.kobj, 
+			err = sysfs_create_file(&dump_subsys.kset.kobj,
 					&attr->attr);
 	}
 }
@@ -730,7 +730,7 @@ static struct sysrq_key_op sysrq_crashdump_op = {
 };
 #endif
 
-static inline void dump_sysrq_register(void) 
+static inline void dump_sysrq_register(void)
 {
 #ifdef CONFIG_MAGIC_SYSRQ
 	register_sysrq_key(DUMP_SYSRQ_KEY, &sysrq_crashdump_op);
@@ -747,7 +747,7 @@ static inline void dump_sysrq_unregister(void)
 /*
  * Name: dump_init()
  * Func: Initialize the dump process.  This will set up any architecture
- *       dependent code.  
+ *       dependent code.
  */
 static int __init dump_init(void)
 {
@@ -770,10 +770,10 @@ static int __init dump_init(void)
 	kobject_set_name(&dump_dev_driver->kobj, "dump_dev_driver");
 	kobj_set_kset_s(dump_dev_driver, dump_subsys);
 
-	/* initalize but do not register the kobject 
-	 * that represents the dump device, we only want 
-	 * if for refcount, the important attributes are 
-	 * assigned to the dump_subsys kobject anyway. 
+	/* initalize but do not register the kobject
+	 * that represents the dump device, we only want
+	 * if for refcount, the important attributes are
+	 * assigned to the dump_subsys kobject anyway.
 	 */
 	kobject_init(&dump_dev_driver->kobj);
 

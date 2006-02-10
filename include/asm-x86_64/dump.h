@@ -43,7 +43,7 @@ struct __dump_header_asm {
 
 	/* smp specific */
 	uint32_t	     dha_smp_num_cpus;
-	int		     dha_dumping_cpu;	
+	int		     dha_dumping_cpu;
 	struct pt_regs	     dha_smp_regs[NR_CPUS];
 	uint64_t	     dha_smp_current_task[NR_CPUS];
 	uint64_t	     dha_stack[NR_CPUS];
@@ -70,13 +70,13 @@ static inline void get_current_regs(struct pt_regs *regs)
 	__asm__ __volatile__("movq %%rbp,%0" : "=m"(regs->rbp));
 	__asm__ __volatile__("movq %%rax,%0" : "=m"(regs->rax));
 	__asm__ __volatile__("movq %%rsp,%0" : "=m"(regs->rsp));
-	__asm__ __volatile__("movl %%ss, %0" :"=r"(seg)); 
+	__asm__ __volatile__("movl %%ss, %0" :"=r"(seg));
 	regs->ss = (unsigned long)seg;
 	__asm__ __volatile__("movl %%cs, %0" :"=r"(seg));
 	regs->cs = (unsigned long)seg;
 	__asm__ __volatile__("pushfq; popq %0" :"=m"(regs->eflags));
 	regs->rip = (unsigned long)current_text_addr();
-	
+
 }
 
 extern volatile int dump_in_progress;

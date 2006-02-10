@@ -20,7 +20,7 @@ config LKCD_DUMP_BLOCKDEV
 	depends on LKCD_DUMP
 	help
 	  Say Y to allow saving crash dumps directly to a disk device.
-	
+
 config LKCD_DUMP_NETDEV
 	tristate "LKCD crash dump network device driver"
 	depends on LKCD_DUMP

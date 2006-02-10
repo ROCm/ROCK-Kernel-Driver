@@ -42,8 +42,8 @@ dump_compress_gzip(const u8 *old, u32 oldsize, u8 *new, u32 newsize,
 
 	dump_stream.workspace = deflate_workspace;
 	if ((paddr == workspace_paddr[0]) || (paddr == workspace_paddr[1])) {
-		/* 
-		 * This page belongs to deflate_workspace used as temporary 
+		/*
+		 * This page belongs to deflate_workspace used as temporary
 		 * buffer for compression. Hence, dump them without compression.
 		 */
 		return(0);
@@ -136,7 +136,7 @@ dump_compress_gzip_init(void)
 	 * failure.
 	 */
 
-	if (!(safety_buffer = (void *)__get_free_pages(GFP_KERNEL, 
+	if (!(safety_buffer = (void *)__get_free_pages(GFP_KERNEL,
 					get_order(DUMP_PAGE_SIZE))))
 		return -ENOMEM;
 
@@ -156,7 +156,7 @@ dump_compress_gzip_cleanup(void)
 {
 	vfree(deflate_workspace);
 	if (safety_buffer) {
-		free_pages((unsigned long)safety_buffer, 
+		free_pages((unsigned long)safety_buffer,
 				get_order(DUMP_PAGE_SIZE));
 		safety_buffer = NULL;
 	}

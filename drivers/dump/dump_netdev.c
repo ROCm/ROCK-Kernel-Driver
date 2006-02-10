@@ -1,6 +1,6 @@
 /*
  * Implements the dump driver interface for saving a dump via network
- * interface. 
+ * interface.
  *
  * Some of this code has been taken/adapted from Ingo Molnar's netconsole
  * code. LKCD team expresses its thanks to Ingo.
@@ -15,7 +15,7 @@
  *	Netdump code modified to use Netpoll API's.
  *
  * Copyright (C) 2001  Ingo Molnar <mingo@redhat.com>
- * Copyright (C) 2002 International Business Machines Corp. 
+ * Copyright (C) 2002 International Business Machines Corp.
  *
  *  This code is released under version 2 of the GNU GPL.
  */
@@ -57,7 +57,7 @@ static req_t req;
 static void rx_hook(struct netpoll *np, int port, char *msg, int size)
 {
 	req_t * __req = (req_t *) msg;
-	/* 
+	/*
 	 * First check if were are dumping or doing startup handshake, if
 	 * not quickly return.
 	 */
@@ -83,10 +83,10 @@ out:
 }
 static char netdump_membuf[1024 + HEADER_LEN + 1];
 /*
- * Fill the netdump_membuf with the header information from reply_t structure 
+ * Fill the netdump_membuf with the header information from reply_t structure
  * and send it down to netpoll_send_udp() routine.
  */
-static void 
+static void
 netdump_send_packet(struct netpoll *np, reply_t *reply, size_t data_len) {
 	char *b;
 
@@ -94,7 +94,7 @@ netdump_send_packet(struct netpoll *np, reply_t *reply, size_t data_len) {
 	netdump_membuf[0] = NETCONSOLE_VERSION;
 	put_unaligned(htonl(reply->nr), (u32 *) b);
 	put_unaligned(htonl(reply->code), (u32 *) (b + sizeof(reply->code)));
-	put_unaligned(htonl(reply->info), (u32 *) (b + sizeof(reply->code) + 
+	put_unaligned(htonl(reply->info), (u32 *) (b + sizeof(reply->code) +
 		sizeof(reply->info)));
 	netpoll_send_udp(np, netdump_membuf, data_len + HEADER_LEN);
 }
@@ -141,20 +141,20 @@ dump_handshake(struct dump_dev *net_dev)
 	size_t str_len;
 
 	if (startup_handshake) {
-		sprintf((netdump_membuf + HEADER_LEN), 
+		sprintf((netdump_membuf + HEADER_LEN),
 			"NETDUMP start, waiting for start-ACK.\n");
 		reply.code = REPLY_START_NETDUMP;
 		reply.nr = 0;
 		reply.info = 0;
 	} else {
-		sprintf((netdump_membuf + HEADER_LEN), 
+		sprintf((netdump_membuf + HEADER_LEN),
 			"NETDUMP start, waiting for start-ACK.\n");
 		reply.code = REPLY_START_WRITE_NETDUMP;
 		reply.nr = net_dev->curr_offset;
 		reply.info = net_dev->curr_offset;
 	}
 	str_len = strlen(netdump_membuf + HEADER_LEN);
-	
+
 	/* send 300 handshake packets before declaring failure */
 	for (i = 0; i < 300; i++) {
 		netdump_send_packet(&net_dev->np, &reply, str_len);
@@ -167,14 +167,14 @@ dump_handshake(struct dump_dev *net_dev)
 				break;
 		}
 
-		/* 
+		/*
 		 * if there is no new request, try sending the handshaking
 		 * packet again
 		 */
 		if (!new_req)
 			continue;
 
-		/* 
+		/*
 		 * check if the new request is of the expected type,
 		 * if so, return, else try sending the handshaking
 		 * packet again
@@ -206,7 +206,7 @@ do_netdump(struct dump_dev *net_dev, const char* buff, size_t len)
 	ssize_t  ret = 0;
 	int repeatCounter, counter, total_loop;
 	size_t str_len;
-	
+
 	netdump_in_progress = 1;
 
 	if (dump_handshake(net_dev) < 0) {
@@ -248,7 +248,7 @@ do_netdump(struct dump_dev *net_dev, const char* buff, size_t len)
 				}
 				mdelay(1);
 				repeatCounter = 0;
-			}	
+			}
 			continue;
 		}
 		repeatCounter = 0;
@@ -269,7 +269,7 @@ do_netdump(struct dump_dev *net_dev, const char* buff, size_t len)
 			goto out;
 
 		case COMM_HELLO:
-			sprintf((netdump_membuf + HEADER_LEN), 
+			sprintf((netdump_membuf + HEADER_LEN),
 				"Hello, this is netdump version " "0.%02d\n",
 				 NETCONSOLE_VERSION);
 			str_len = strlen(netdump_membuf + HEADER_LEN);
@@ -280,7 +280,7 @@ do_netdump(struct dump_dev *net_dev, const char* buff, size_t len)
 			break;
 
 		case COMM_GET_PAGE_SIZE:
-			sprintf((netdump_membuf + HEADER_LEN), 
+			sprintf((netdump_membuf + HEADER_LEN),
 				"PAGE_SIZE: %ld\n", PAGE_SIZE);
 			str_len = strlen(netdump_membuf + HEADER_LEN);
 			reply.code = REPLY_PAGE_SIZE;
@@ -294,7 +294,7 @@ do_netdump(struct dump_dev *net_dev, const char* buff, size_t len)
 			reply.nr = req.nr;
 			reply.info = num_physpages;
 			reply.info = page_counter;
-			sprintf((netdump_membuf + HEADER_LEN), 
+			sprintf((netdump_membuf + HEADER_LEN),
 				"Number of pages: %ld\n", num_physpages);
 			str_len = strlen(netdump_membuf + HEADER_LEN);
 			netdump_send_packet(&net_dev->np, &reply, str_len);
@@ -304,7 +304,7 @@ do_netdump(struct dump_dev *net_dev, const char* buff, size_t len)
 			reply.code = REPLY_MAGIC;
 			reply.nr = req.nr;
 			reply.info = NETCONSOLE_VERSION;
-			sprintf((netdump_membuf + HEADER_LEN), 
+			sprintf((netdump_membuf + HEADER_LEN),
 				(char *)&dump_magic, sizeof(dump_magic));
 			str_len = strlen(netdump_membuf + HEADER_LEN);
 			netdump_send_packet(&net_dev->np, &reply, str_len);
@@ -314,7 +314,7 @@ do_netdump(struct dump_dev *net_dev, const char* buff, size_t len)
 			reply.code = REPLY_ERROR;
 			reply.nr = req.nr;
 			reply.info = req.command;
-			sprintf((netdump_membuf + HEADER_LEN), 
+			sprintf((netdump_membuf + HEADER_LEN),
 				"Got unknown command code %d!\n", req.command);
 			str_len = strlen(netdump_membuf + HEADER_LEN);
 			netdump_send_packet(&net_dev->np, &reply, str_len);
@@ -359,10 +359,10 @@ dump_validate_config(struct netpoll *np)
 		return -1;
 	}
 	printk("LKCD: Target Ethernet Address %02x:%02x:%02x:%02x:%02x:%02x",
-		np->remote_mac[0], np->remote_mac[1], np->remote_mac[2], 
+		np->remote_mac[0], np->remote_mac[1], np->remote_mac[2],
 		np->remote_mac[3], np->remote_mac[4], np->remote_mac[5]);
 
-	if ((np->remote_mac[0] & np->remote_mac[1] & np->remote_mac[2] & 
+	if ((np->remote_mac[0] & np->remote_mac[1] & np->remote_mac[2] &
 		np->remote_mac[3] & np->remote_mac[4] & np->remote_mac[5]) == 255)
 		printk("LKCD: (Broadcast)");
 	printk("\n");
@@ -370,7 +370,7 @@ dump_validate_config(struct netpoll *np)
 }
 
 /*
- * Prepares the dump device so we can take a dump later. 
+ * Prepares the dump device so we can take a dump later.
  * Validates the netdump configuration parameters.
  *
  * TODO: Network connectivity check should be done here.
@@ -422,7 +422,7 @@ dump_net_open(struct dump_dev *net_dev, const char *arg)
 		net_dev->np.remote_mac[5] = (char) ((tmp & 0x00000000000000ffLL));
 	}
 
-	net_dev->np.rx_hook = rx_hook;	
+	net_dev->np.rx_hook = rx_hook;
 	retval = netpoll_setup(&net_dev->np);
 
 	dump_validate_config(&net_dev->np);
@@ -462,8 +462,8 @@ dump_net_silence(struct dump_dev *net_dev)
 }
 
 /*
- * Invoked when dumping is done. This is the time to put things back 
- * (i.e. undo the effects of dump_block_silence) so the device is 
+ * Invoked when dumping is done. This is the time to put things back
+ * (i.e. undo the effects of dump_block_silence) so the device is
  * available for normal use.
  */
 static int
@@ -542,7 +542,7 @@ struct dump_dev_ops dump_netdev_ops = {
 
 static struct dump_dev default_dump_netdev = {
 	.type = 2,
-	.ops = &dump_netdev_ops, 
+	.ops = &dump_netdev_ops,
 	.curr_offset = 0,
 	.np.name = "netdump",
 	.np.dev_name = "eth0",
@@ -562,7 +562,7 @@ dump_netdev_init(void)
 		return -1;
 	}
 	printk("LKCD: network device driver for LKCD registered\n");
- 
+
 	get_random_bytes(&dump_magic, sizeof(dump_magic));
 	return 0;
 }

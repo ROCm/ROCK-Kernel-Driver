@@ -145,6 +145,7 @@ NORET_TYPE void panic(const char * fmt, ...)
 	}
 #endif
 	for (i = 0;;) {
+		touch_softlockup_watchdog();
 		i += panic_blink(i);
 		mdelay(1);
 		i++;

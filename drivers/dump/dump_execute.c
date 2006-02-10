@@ -1,16 +1,16 @@
 /*
- * The file has the common/generic dump execution code 
+ * The file has the common/generic dump execution code
  *
  * Started: Oct 2002 -  Suparna Bhattacharya <suparna@in.ibm.com>
- * 	Split and rewrote high level dump execute code to make use 
+ * 	Split and rewrote high level dump execute code to make use
  * 	of dump method interfaces.
  *
- * Derived from original code in dump_base.c created by 
+ * Derived from original code in dump_base.c created by
  * 	Matt Robinson <yakker@sourceforge.net>)
- * 	
+ *
  * Copyright (C) 1999 - 2002 Silicon Graphics, Inc. All rights reserved.
  * Copyright (C) 2001 - 2002 Matt D. Robinson.  All rights reserved.
- * Copyright (C) 2002 International Business Machines Corp. 
+ * Copyright (C) 2002 International Business Machines Corp.
  *
  * Assumes dumper and dump config settings are in place
  * (invokes corresponding dumper specific routines as applicable)
@@ -29,7 +29,7 @@ struct notifier_block *dump_notifier_list; /* dump started/ended callback */
 extern int panic_timeout;
 
 /* Dump progress indicator */
-void 
+void
 dump_speedo(int i)
 {
 	static const char twiddle[4] =  { '|', '\\', '-', '/' };
@@ -62,8 +62,8 @@ int dump_begin(void)
 	return 0;
 }
 
-/* 
- * Write the dump terminator, a final header update and let go of 
+/*
+ * Write the dump terminator, a final header update and let go of
  * exclusive use of the device for dump.
  */
 int dump_complete(void)
@@ -92,7 +92,7 @@ int dump_execute_savedump(void)
 		return ret;
 	}
 
-	if (dump_config.level != DUMP_LEVEL_HEADER) { 
+	if (dump_config.level != DUMP_LEVEL_HEADER) {
 		ret = dump_sequencer();
 	}
 	if ((err = dump_complete())) {
@@ -117,22 +117,22 @@ int dump_generic_execute(const char *panic_str, const struct pt_regs *regs)
 
 	if ((ret = dump_configure_header(panic_str, regs))) {
 		printk("LKCD: dump config header failed ! error %d\n", ret);
-		return ret;	
+		return ret;
 	}
 
 	dump_calc_bootmap_pages();
 	/* tell interested parties that a dump is about to start */
-	notifier_call_chain(&dump_notifier_list, DUMP_BEGIN, 
+	notifier_call_chain(&dump_notifier_list, DUMP_BEGIN,
 		&dump_config.dump_device);
 
 	if (dump_config.level != DUMP_LEVEL_NONE)
 		ret = dump_execute_savedump();
 
-	printk("LKCD: dumped %ld blocks of %d bytes each\n", 
+	printk("LKCD: dumped %ld blocks of %d bytes each\n",
 		dump_config.dumper->count, DUMP_BUFFER_SIZE);
-	
+
 	/* tell interested parties that a dump has completed */
-	notifier_call_chain(&dump_notifier_list, DUMP_END, 
+	notifier_call_chain(&dump_notifier_list, DUMP_END,
 		&dump_config.dump_device);
 
 	return ret;

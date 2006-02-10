@@ -14,7 +14,7 @@ dump-$(CONFIG_X86_64)			+= dump_x8664.o
 dump-$(CONFIG_IA64)			+= dump_ia64.o
 dump-objs				+= $(dump-y)
 
-obj-$(CONFIG_LKCD_DUMP)		+= dump.o 
+obj-$(CONFIG_LKCD_DUMP)		+= dump.o
 obj-$(CONFIG_LKCD_DUMP_BLOCKDEV)	+= dump_blockdev.o
 obj-$(CONFIG_LKCD_DUMP_NETDEV)		+= dump_netdev.o
 obj-$(CONFIG_LKCD_DUMP_COMPRESS_RLE)	+= dump_rle.o

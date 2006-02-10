@@ -49,7 +49,7 @@ dump_compress_rle(const u8 *old, u32 oldsize, u8 *new, u32 newsize,
 				new[wi++] = value;
 				value = cur_byte = old[ri];
 				count = 0;
-			} else { 
+			} else {
 				if ((cur_byte = old[ri]) == value) {
 					count++;
 				} else {

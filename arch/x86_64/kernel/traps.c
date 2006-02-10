@@ -418,7 +418,7 @@ void __kprobes __die(const char * str, struct pt_regs * regs, long err)
 	sysfs_printk_last_file();
 	notify_die(DIE_OOPS, str, regs, err, current->thread.trap_no, SIGSEGV);
 	show_registers(regs);
-	dump((char *)str, regs); 
+	dump((char *)str, regs);
 	/* Executive summary in case the oops scrolled away */
 	printk(KERN_ALERT "RIP ");
 	printk_address(regs->rip); 

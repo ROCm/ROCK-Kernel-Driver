@@ -471,25 +471,27 @@ extern char __initramfs_start[], __initramfs_end[];
 static void __init free_initrd(void)
 {
 #ifdef CONFIG_KEXEC
+	unsigned long crashk_start = (unsigned long)__va(crashk_res.start);
+	unsigned long crashk_end   = (unsigned long)__va(crashk_res.end);
+
 	/*
 	 * If the initrd region is overlapped with crashkernel reserved region,
 	 * free only memory that is not part of crashkernel region.
 	 */
-	if (crashk_res.start && (__pa(initrd_start) < crashk_res.end) &&
-		(__pa(initrd_end) > crashk_res.start)) {
+	if (initrd_start < crashk_end && initrd_end > crashk_start) {
 		/*
-		 * Initialize initrd memory region since kexec boot does not do.
+		 * Initialize initrd memory region since the kexec boot does
+		 * not do.
 		 */
 		memset((void *)initrd_start, 0, initrd_end - initrd_start);
-		if (__pa(initrd_start) < crashk_res.start)
-			free_initrd_mem(initrd_start,
-					(unsigned long)__va(crashk_res.start));
-		if (__pa(initrd_end) > crashk_res.end)
-			free_initrd_mem((unsigned long)__va(crashk_res.end),
-					initrd_end);
+		if (initrd_start < crashk_start)
+			free_initrd_mem(initrd_start, crashk_start);
+		if (initrd_end > crashk_end)
+			free_initrd_mem(crashk_end, initrd_end);
 	} else
 #endif
 		free_initrd_mem(initrd_start, initrd_end);
+
 	initrd_start = 0;
 	initrd_end = 0;
 }

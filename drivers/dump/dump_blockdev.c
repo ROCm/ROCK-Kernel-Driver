@@ -1,5 +1,5 @@
 /*
- * Implements the dump driver interface for saving a dump to 
+ * Implements the dump driver interface for saving a dump to
  * a block device through the kernel's generic low level block I/O
  * routines, or through polling I/O.
  *
@@ -12,7 +12,7 @@
  *
  * Oct 2002  - Suparna Bhattacharya <suparna@in.ibm.com>
  * 	Rework to new dumpdev.h structures, implement open/close/
- * 	silence, misc fixes (blocknr removal, bio_add_page usage)  
+ * 	silence, misc fixes (blocknr removal, bio_add_page usage)
  * Oct 2004 - Mar 2005 - Mohamed Abbas <mohamed.abbas@intel.com>
  *                       Jason Uhlenkott <jasonuhl@sgi.com>
  *	Implement polling I/O (adapted from lkdump, with thanks
@@ -20,7 +20,7 @@
  *
  * Copyright (C) 1999 - 2005 Silicon Graphics, Inc. All rights reserved.
  * Copyright (C) 2001 - 2002 Matt D. Robinson.  All rights reserved.
- * Copyright (C) 2002 International Business Machines Corp. 
+ * Copyright (C) 2002 International Business Machines Corp.
  * Copyright (C) 2004 FUJITSU LIMITED
  *
  * This code is released under version 2 of the GNU GPL.
@@ -69,8 +69,8 @@ dump_bio_end_io(struct bio *bio, unsigned int bytes_done, int error)
 
 /* Check if the dump bio is already mapped to the specified buffer */
 static int
-dump_block_map_valid(struct dump_blockdev *dev, struct page *page, 
-	int len) 
+dump_block_map_valid(struct dump_blockdev *dev, struct page *page,
+	int len)
 {
 	struct bio *bio = dev->bio;
 	unsigned long bsize = 0;
@@ -93,8 +93,8 @@ dump_block_map_valid(struct dump_blockdev *dev, struct page *page,
 	return 1; /* already mapped */
 }
 
-/* 
- * Set up the dump bio for i/o from the specified buffer 
+/*
+ * Set up the dump bio for i/o from the specified buffer
  * Return value indicates whether the full buffer could be mapped or not
  */
 static int
@@ -132,7 +132,7 @@ dump_block_map(struct dump_blockdev *dev, void *buf, int len)
 		/* assume contig. page aligned low mem buffer( no vmalloc) */
 		if ((page_address(page) != buf) || (len & (PAGE_SIZE - 1))) {
 			printk("LKCD: map: invalid buffer alignment!\n");
-			return -EINVAL; 
+			return -EINVAL;
 		}
 		/* finally we can go ahead and map it */
 		while (bio->bi_size < len)
@@ -334,7 +334,7 @@ dump_block_intr_open(struct dump_dev *dev, unsigned long arg)
 
 	/* Convert it to the new dev_t format */
 	arg = MKDEV((arg >> OLDMINORBITS), (arg & OLDMINORMASK));
-	
+
 	/* get a corresponding block_dev struct for this */
 	bdev = bdget((dev_t)arg);
 	if (!bdev) {
@@ -347,7 +347,7 @@ dump_block_intr_open(struct dump_dev *dev, unsigned long arg)
 		goto err1;
 	}
 
-	if ((dump_bdev->bio = kmalloc(sizeof(struct bio), GFP_KERNEL)) 
+	if ((dump_bdev->bio = kmalloc(sizeof(struct bio), GFP_KERNEL))
 		== NULL) {
 		printk("LKCD: Cannot allocate bio\n");
 		retval = -ENOMEM;
@@ -356,7 +356,7 @@ dump_block_intr_open(struct dump_dev *dev, unsigned long arg)
 
 	bio_init(dump_bdev->bio);
 
-	if ((bvec = kmalloc(sizeof(struct bio_vec) * 
+	if ((bvec = kmalloc(sizeof(struct bio_vec) *
 		(DUMP_BUFFER_SIZE >> PAGE_SHIFT), GFP_KERNEL)) == NULL) {
 		retval = -ENOMEM;
 		goto err3;
@@ -368,14 +368,14 @@ dump_block_intr_open(struct dump_dev *dev, unsigned long arg)
 
 	/* make a note of the limit */
 	dump_bdev->limit = bdev->bd_inode->i_size;
-	
+
 	/* now make sure we can map the dump buffer */
 	dump_bdev->bio->bi_io_vec = bvec;
 	dump_bdev->bio->bi_max_vecs = DUMP_BUFFER_SIZE >> PAGE_SHIFT;
 
-	retval = dump_block_map(dump_bdev, dump_config.dumper->dump_buf, 
+	retval = dump_block_map(dump_bdev, dump_config.dumper->dump_buf,
 		DUMP_BUFFER_SIZE);
-		
+
 	if (retval) {
 		printk("LKCD: open: dump_block_map failed, ret %d\n", retval);
 		goto err3;
@@ -414,7 +414,7 @@ dump_block_poll_open(struct dump_dev *dev, unsigned long arg)
 
 	/* Convert it to the new dev_t format */
 	arg = MKDEV((arg >> OLDMINORBITS), (arg & OLDMINORMASK));
-	
+
 	/* get a corresponding block_dev struct for this */
 	bdev = bdget((dev_t)arg);
 	if (!bdev) {
@@ -458,21 +458,21 @@ err:	return retval;
 }
 
 /*
- * Prepares the dump device so we can take a dump later. 
- * The caller is expected to have filled up the dev_id field in the 
+ * Prepares the dump device so we can take a dump later.
+ * The caller is expected to have filled up the dev_id field in the
  * block dump dev structure.
  *
- * At dump time when dump_block_write() is invoked it will be too 
- * late to recover, so as far as possible make sure obvious errors 
+ * At dump time when dump_block_write() is invoked it will be too
+ * late to recover, so as far as possible make sure obvious errors
  * get caught right here and reported back to the caller.
  */
 static int
 dump_block_open(struct dump_dev *dev, const char *arg)
 {
-	unsigned long devid; 
+	unsigned long devid;
 
-	if ((sscanf(arg, "%lx", &devid)) != 1) 
-		return -EINVAL; 
+	if ((sscanf(arg, "%lx", &devid)) != 1)
+		return -EINVAL;
 
 	if (devid < 0)
 		return -EINVAL;
@@ -540,11 +540,11 @@ dump_block_intr_silence(struct dump_dev *dev)
 		printk("LKCD: I/O requests in flight at dump time\n");
 	}
 
-	/* 
-	 * Move to a softer level of silencing where no spin_lock_irqs 
+	/*
+	 * Move to a softer level of silencing where no spin_lock_irqs
 	 * are held on other cpus
 	 */
-	dump_silence_level = DUMP_SOFT_SPIN_CPUS;	
+	dump_silence_level = DUMP_SOFT_SPIN_CPUS;
 
 	ret = __dump_irq_enable();
 	if (ret) {
@@ -554,7 +554,7 @@ dump_block_intr_silence(struct dump_dev *dev)
 	printk("LKCD: Dumping to block device (%d,%d) on CPU %d ...\n",
 	       MAJOR(dump_bdev->dev_id), MINOR(dump_bdev->dev_id),
 	       smp_processor_id());
-	
+
 	return 0;
 }
 
@@ -570,7 +570,7 @@ dump_block_poll_silence(struct dump_dev *dev)
 	touch_nmi_watchdog();
 
 	if (down_trylock(&disk_dump_mutex))
-		return -EBUSY; 
+		return -EBUSY;
 
 	dump_polling_oncpu = smp_processor_id() + 1;
 
@@ -585,11 +585,11 @@ dump_block_poll_silence(struct dump_dev *dev)
 
 	BUG_ON(dump_part.bdev != dump_bdev->bdev);
 
-	/* 
-	 * Move to a softer level of silencing where no spin_lock_irqs 
+	/*
+	 * Move to a softer level of silencing where no spin_lock_irqs
 	 * are held on other cpus
 	 */
-	dump_silence_level = DUMP_SOFT_SPIN_CPUS;	
+	dump_silence_level = DUMP_SOFT_SPIN_CPUS;
 
 	touch_nmi_watchdog();
 
@@ -646,8 +646,8 @@ dump_block_poll_resume(struct dump_dev *dev)
 }
 
 /*
- * Invoked when dumping is done. This is the time to put things back 
- * (i.e. undo the effects of dump_block_silence) so the device is 
+ * Invoked when dumping is done. This is the time to put things back
+ * (i.e. undo the effects of dump_block_silence) so the device is
  * available for normal use.
  */
 static int
@@ -669,7 +669,7 @@ dump_block_seek(struct dump_dev *dev, loff_t off)
 {
 	struct dump_blockdev *dump_bdev = DUMP_BDEV(dev);
 	loff_t offset = off + dump_bdev->start_offset;
-	
+
 	if (offset & ( PAGE_SIZE - 1)) {
 		printk("LKCD: seek: non-page aligned\n");
 		return -EINVAL;
@@ -682,7 +682,7 @@ dump_block_seek(struct dump_dev *dev, loff_t off)
 
 	if (offset > dump_bdev->limit) {
 		printk("LKCD: seek: not enough space left on device!\n");
-		return -ENOSPC; 
+		return -ENOSPC;
 	}
 	dev->curr_offset = off;
 	return 0;
@@ -690,7 +690,7 @@ dump_block_seek(struct dump_dev *dev, loff_t off)
 
 
 static int
-dump_block_intr_write(struct dump_dev *dev, void *buf, 
+dump_block_intr_write(struct dump_dev *dev, void *buf,
 	unsigned long len)
 {
 	struct dump_blockdev *dump_bdev = DUMP_BDEV(dev);
@@ -703,7 +703,7 @@ dump_block_intr_write(struct dump_dev *dev, void *buf,
 	}
 
 	/* don't write more blocks than our max limit */
-	if (offset + len > dump_bdev->limit) 
+	if (offset + len > dump_bdev->limit)
 		len = dump_bdev->limit - offset;
 
 
@@ -717,7 +717,7 @@ dump_block_intr_write(struct dump_dev *dev, void *buf,
 	 * Write out the data to disk.
 	 * Assumes the entire buffer mapped to a single bio, which we can
 	 * submit and wait for io completion. In the future, may consider
-	 * increasing the dump buffer size and submitting multiple bio s 
+	 * increasing the dump buffer size and submitting multiple bio s
 	 * for better throughput.
 	 */
 	dump_bdev->err = -EAGAIN;
@@ -730,7 +730,7 @@ dump_block_intr_write(struct dump_dev *dev, void *buf,
 }
 
 static int
-dump_block_poll_write(struct dump_dev *dev, void *buf, 
+dump_block_poll_write(struct dump_dev *dev, void *buf,
 	unsigned long len)
 {
 	struct dump_blockdev *dump_bdev = DUMP_BDEV(dev);
@@ -744,7 +744,7 @@ dump_block_poll_write(struct dump_dev *dev, void *buf,
 	}
 
 	/* don't write more blocks than our max limit */
-	if (offset + len > dump_bdev->limit) 
+	if (offset + len > dump_bdev->limit)
 		len = dump_bdev->limit - offset;
 
 	if (dump_part.bdev != dump_bdev->bdev) {
@@ -767,14 +767,14 @@ out:
 }
 
 /*
- * Write out a buffer after checking the device limitations, 
- * sector sizes, etc. Assumes the buffer is in directly mapped 
+ * Write out a buffer after checking the device limitations,
+ * sector sizes, etc. Assumes the buffer is in directly mapped
  * kernel address space (not vmalloc'ed).
  *
- * Returns: number of bytes written or -ERRNO. 
+ * Returns: number of bytes written or -ERRNO.
  */
 static int
-dump_block_write(struct dump_dev *dev, void *buf, 
+dump_block_write(struct dump_dev *dev, void *buf,
 	unsigned long len)
 {
 	if (polling_mode)
@@ -827,18 +827,18 @@ struct dump_dev_ops dump_blockdev_ops = {
 };
 
 static struct dump_blockdev default_dump_blockdev = {
-	.ddev = {.type = 1, .ops = &dump_blockdev_ops, 
+	.ddev = {.type = 1, .ops = &dump_blockdev_ops,
 			.curr_offset = 0},
-	/* 
-	 * leave enough room for the longest swap header possibly written 
+	/*
+	 * leave enough room for the longest swap header possibly written
 	 * written by mkswap (likely the largest page size supported by
 	 * the arch
 	 */
 	.start_offset 	= DUMP_HEADER_OFFSET,
 	.err 		= 0
 	/* assume the rest of the fields are zeroed by default */
-};	
-	
+};
+
 struct dump_blockdev *dump_blockdev = &default_dump_blockdev;
 
 /*
@@ -860,7 +860,7 @@ dump_blockdev_init(void)
 		printk("LKCD: block device driver registration failed\n");
 		return -1;
 	}
-		
+
 	printk("LKCD: block device driver registered\n");
 	return 0;
 }

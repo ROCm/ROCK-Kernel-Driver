@@ -43,7 +43,7 @@ static int alloc_dha_stack(void)
 {
 	int i;
 	void *ptr;
-	
+
 	if (dump_header_asm.dha_stack[0])
 		return 0;
 
@@ -54,18 +54,18 @@ static int alloc_dha_stack(void)
 	}
 
 	for (i = 0; i < num_online_cpus(); i++) {
-		dump_header_asm.dha_stack[i] = 
+		dump_header_asm.dha_stack[i] =
 			(uint64_t)((unsigned long)ptr + (i * THREAD_SIZE));
 	}
 	return 0;
 }
 
-static int free_dha_stack(void) 
+static int free_dha_stack(void)
 {
 	if (dump_header_asm.dha_stack[0]) {
-		vfree((void *)dump_header_asm.dha_stack[0]);	
+		vfree((void *)dump_header_asm.dha_stack[0]);
 		dump_header_asm.dha_stack[0] = 0;
-	}	
+	}
 	return 0;
 }
 
@@ -77,7 +77,7 @@ __dump_save_regs(struct pt_regs* dest_regs, const struct pt_regs* regs)
 }
 
 void
-__dump_save_context(int cpu, const struct pt_regs *regs, 
+__dump_save_context(int cpu, const struct pt_regs *regs,
 	struct task_struct *tsk)
 {
 	dump_header_asm.dha_smp_current_task[cpu] = (unsigned long)tsk;
@@ -105,12 +105,12 @@ static cpumask_t saved_affinity[NR_IRQS];
 extern void stop_this_cpu(void *);
 
 static int
-dump_nmi_callback(struct pt_regs *regs, int cpu) 
+dump_nmi_callback(struct pt_regs *regs, int cpu)
 {
 	if (!dump_expect_ipi[cpu]) {
 		return 0;
 	}
-	
+
 	dump_expect_ipi[cpu] = 0;
 
 	dump_save_this_cpu(regs);
@@ -143,8 +143,8 @@ level_changed:
 }
 
 /* save registers on other processors */
-void 
-__dump_save_other_cpus(void) 
+void
+__dump_save_other_cpus(void)
 {
 	int i, cpu = smp_processor_id();
 	int other_cpus = num_online_cpus() - 1;
@@ -154,16 +154,16 @@ __dump_save_other_cpus(void)
 
 		for (i = 0; i < NR_CPUS; i++)
 			dump_expect_ipi[i] = (i != cpu && cpu_online(i));
-		
+
 		set_nmi_callback(dump_nmi_callback);
 		wmb();
 
 		dump_send_ipi();
 
-		/* may be we dont need to wait for NMI to be processed. 
+		/* may be we dont need to wait for NMI to be processed.
 		   just write out the header at the end of dumping, if
 		   this IPI is not processed untill then, there probably
-		   is a problem and we just fail to capture state of 
+		   is a problem and we just fail to capture state of
 		   other cpus. */
 		while(atomic_read(&waiting_for_dump_ipi) > 0)
 			cpu_relax();
@@ -183,7 +183,7 @@ set_irq_affinity(void)
 	int i;
 	cpumask_t cpu = CPU_MASK_NONE;
 
-	cpu_set(smp_processor_id(), cpu); 
+	cpu_set(smp_processor_id(), cpu);
 	memcpy(saved_affinity, irq_affinity, NR_IRQS * sizeof(unsigned long));
 	for (i = 0; i < NR_IRQS; i++) {
 		if (irq_desc[i].handler == NULL)
@@ -290,13 +290,13 @@ __dump_configure_header(const struct pt_regs *regs)
 static int notify(struct notifier_block *nb, unsigned long code, void *data)
 {
 	if (code == DIE_NMI_IPI && dump_oncpu)
-		return NOTIFY_BAD; 
-	return NOTIFY_DONE; 
-} 
+		return NOTIFY_BAD;
+	return NOTIFY_DONE;
+}
 
-static struct notifier_block dump_notifier = { 
-	.notifier_call = notify,	
-}; 
+static struct notifier_block dump_notifier = {
+	.notifier_call = notify,
+};
 
 /*
  * Name: __dump_init()
@@ -331,7 +331,7 @@ __dump_cleanup(void)
 {
 	free_dha_stack();
 	notifier_chain_unregister(&die_chain, &dump_notifier);
-	synchronize_kernel(); 
+	synchronize_kernel();
 	return;
 }
 
@@ -366,7 +366,7 @@ manual_handle_crashdump(void) {
 
 /*
  * Name: __dump_clean_irq_state()
- * Func: Clean up from the previous IRQ handling state. Such as oops from 
+ * Func: Clean up from the previous IRQ handling state. Such as oops from
  *       interrupt handler or bottom half.
  */
 void

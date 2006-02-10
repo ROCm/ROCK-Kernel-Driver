@@ -7,7 +7,7 @@
  *
  * 2.3 kernel modifications by: Matt D. Robinson (yakker@turbolinux.com)
  * Copyright 2000 TurboLinux, Inc.  All rights reserved.
- * 
+ *
  * This code is released under version 2 of the GNU GPL.
  */
 
@@ -39,7 +39,7 @@ alloc_dha_stack(void)
 {
 	int i;
 	void *ptr;
-	
+
 	if (dump_header_asm.dha_stack[0])
 		return 0;
 
@@ -57,17 +57,17 @@ alloc_dha_stack(void)
 }
 
 static int
-free_dha_stack(void) 
+free_dha_stack(void)
 {
 	if (dump_header_asm.dha_stack[0]) {
-		vfree((void *)dump_header_asm.dha_stack[0]);	
+		vfree((void *)dump_header_asm.dha_stack[0]);
 		dump_header_asm.dha_stack[0] = 0;
 	}
 	return 0;
 }
 
 
-void 
+void
 __dump_save_regs(struct pt_regs *dest_regs, const struct pt_regs *regs)
 {
 	*dest_regs = *regs;
@@ -81,7 +81,7 @@ __dump_save_regs(struct pt_regs *dest_regs, const struct pt_regs *regs)
 	 * that instead of this kludge.
 	 */
 	if (!user_mode(regs)) {
-		if ((0xffff & regs->xss) == __KERNEL_DS) 
+		if ((0xffff & regs->xss) == __KERNEL_DS)
 			/* already fixed up */
 			return;
 		dest_regs->esp = (unsigned long)&(regs->esp);
@@ -91,7 +91,7 @@ __dump_save_regs(struct pt_regs *dest_regs, const struct pt_regs *regs)
 }
 
 void
-__dump_save_context(int cpu, const struct pt_regs *regs, 
+__dump_save_context(int cpu, const struct pt_regs *regs,
 	struct task_struct *tsk)
 {
 	dump_header_asm.dha_smp_current_task[cpu] = (unsigned long)tsk;
@@ -120,13 +120,13 @@ static cpumask_t saved_affinity[NR_IRQS];
 extern void stop_this_cpu(void *); /* exported by i386 kernel */
 
 static int
-dump_nmi_callback(struct pt_regs *regs, int cpu) 
+dump_nmi_callback(struct pt_regs *regs, int cpu)
 {
 	if (!dump_expect_ipi[cpu])
 		return 0;
 
 	dump_expect_ipi[cpu] = 0;
-	
+
 	dump_save_this_cpu(regs);
 	atomic_dec(&waiting_for_dump_ipi);
 
@@ -145,7 +145,7 @@ dump_nmi_callback(struct pt_regs *regs, int cpu)
 	case DUMP_HALT_CPUS:		/* Execute halt */
 		stop_this_cpu(NULL);
 		break;
-		
+
 	case DUMP_SOFT_SPIN_CPUS:
 		/* Mark the task so it spins in schedule */
 		set_tsk_thread_flag(current, TIF_NEED_RESCHED);
@@ -156,12 +156,12 @@ dump_nmi_callback(struct pt_regs *regs, int cpu)
 }
 
 /* save registers on other processors */
-void 
+void
 __dump_save_other_cpus(void)
 {
 	int i, cpu = smp_processor_id();
 	int other_cpus = num_online_cpus()-1;
-	
+
 	if (other_cpus > 0) {
 		atomic_set(&waiting_for_dump_ipi, other_cpus);
 
@@ -174,10 +174,10 @@ __dump_save_other_cpus(void)
 		wmb();
 
 		dump_send_ipi();
-		/* may be we dont need to wait for NMI to be processed. 
+		/* may be we dont need to wait for NMI to be processed.
 		   just write out the header at the end of dumping, if
 		   this IPI is not processed until then, there probably
-		   is a problem and we just fail to capture state of 
+		   is a problem and we just fail to capture state of
 		   other cpus. */
 		while(atomic_read(&waiting_for_dump_ipi) > 0) {
 			cpu_relax();
@@ -191,7 +191,7 @@ __dump_save_other_cpus(void)
  * Routine to save the old irq affinities and change affinities of all irqs to
  * the dumping cpu.
  */
-static void 
+static void
 set_irq_affinity(void)
 {
 	int i;
@@ -211,7 +211,7 @@ set_irq_affinity(void)
 /*
  * Restore old irq affinities.
  */
-static void 
+static void
 reset_irq_affinity(void)
 {
 	int i;
@@ -231,18 +231,18 @@ reset_irq_affinity(void)
 #define save_other_cpu_states() do { } while (0)
 #endif /* !CONFIG_SMP */
 
-/* 
+/*
  * Kludge - dump from interrupt context is unreliable (Fixme)
  *
- * We do this so that softirqs initiated for dump i/o 
+ * We do this so that softirqs initiated for dump i/o
  * get processed and we don't hang while waiting for i/o
  * to complete or in any irq synchronization attempt.
  *
- * This is not quite legal of course, as it has the side 
- * effect of making all interrupts & softirqs triggered 
- * while dump is in progress complete before currently 
- * pending softirqs and the currently executing interrupt 
- * code. 
+ * This is not quite legal of course, as it has the side
+ * effect of making all interrupts & softirqs triggered
+ * while dump is in progress complete before currently
+ * pending softirqs and the currently executing interrupt
+ * code.
  */
 static inline void
 irq_bh_save(void)
@@ -281,7 +281,7 @@ __dump_irq_enable(void)
  * Func: Resume the system state in an architecture-specific way.
 
  */
-void 
+void
 __dump_irq_restore(void)
 {
 	local_irq_disable();
@@ -350,8 +350,8 @@ extern int page_is_ram(unsigned long);
 /*
  * Name: __dump_page_valid()
  * Func: Check if page is valid to dump.
- */ 
-int 
+ */
+int
 __dump_page_valid(unsigned long index)
 {
 	if (!pfn_valid(index))
@@ -360,7 +360,7 @@ __dump_page_valid(unsigned long index)
 	return page_is_ram(index);
 }
 
-/* 
+/*
  * Name: manual_handle_crashdump()
  * Func: Interface for the lkcd dump command. Calls dump_execute()
  */
@@ -368,7 +368,7 @@ int
 manual_handle_crashdump(void) {
 
 	struct pt_regs regs;
-	
+
 	get_current_regs(&regs);
 	dump_execute("manual", &regs);
 	return 0;
@@ -376,7 +376,7 @@ manual_handle_crashdump(void) {
 
 /*
  * Name: __dump_clean_irq_state()
- * Func: Clean up from the previous IRQ handling state. Such as oops from 
+ * Func: Clean up from the previous IRQ handling state. Such as oops from
  *       interrupt handler or bottom half.
  */
 void

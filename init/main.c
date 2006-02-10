@@ -715,7 +715,6 @@ static int init(void * unused)
 
 	acpi_early_init(); /* before LAPIC and SMP init */
 
-	/* Sets up cpus_possible() */
 	smp_prepare_cpus(max_cpus);
 
 	do_pre_smp_initcalls();

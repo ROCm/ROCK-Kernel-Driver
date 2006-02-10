@@ -1,11 +1,11 @@
-/* 
+/*
  * Default single stage dump scheme methods
  *
  * Previously a part of dump_base.c
  *
  * Started: Oct 2002 -  Suparna Bhattacharya <suparna@in.ibm.com>
- * 	Split and rewrote LKCD dump scheme to generic dump method 
- * 	interfaces 
+ * 	Split and rewrote LKCD dump scheme to generic dump method
+ * 	interfaces
  * Derived from original code created by
  * 	Matt Robinson <yakker@sourceforge.net>)
  *
@@ -13,21 +13,21 @@
  *
  * Copyright (C) 1999 - 2002 Silicon Graphics, Inc. All rights reserved.
  * Copyright (C) 2001 - 2002 Matt D. Robinson.  All rights reserved.
- * Copyright (C) 2002 International Business Machines Corp. 
+ * Copyright (C) 2002 International Business Machines Corp.
  *
  * This code is released under version 2 of the GNU GPL.
  */
 
 /*
- * Implements the default dump scheme, i.e. single-stage gathering and 
+ * Implements the default dump scheme, i.e. single-stage gathering and
  * saving of dump data directly to the target device, which operates in
  * a push mode, where the dumping system decides what data it saves
  * taking into account pre-specified dump config options.
  *
  * Aside: The 2-stage dump scheme, where there is a soft-reset between
  * the gathering and saving phases, also reuses some of these
- * default routines (see dump_overlay.c) 
- */ 
+ * default routines (see dump_overlay.c)
+ */
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
@@ -50,11 +50,11 @@ int dump_generic_sequencer(void)
 	int pass = 0, err = 0, save = 0;
 	int (*action)(unsigned long, unsigned long);
 
-	/* 
-	 * We want to save the more critical data areas first in 
+	/*
+	 * We want to save the more critical data areas first in
 	 * case we run out of space, encounter i/o failures, or get
 	 * interrupted otherwise and have to give up midway
-	 * So, run through the passes in increasing order 
+	 * So, run through the passes in increasing order
 	 */
 	for (;filter->selector; filter++, pass++)
 	{
@@ -68,7 +68,7 @@ int dump_generic_sequencer(void)
 		if ((err = dump_iterator(pass, action, filter)) < 0)
 			break;
 
-		printk("LKCD: \n %d dump pages %s of %d each in pass %d\n", 
+		printk("LKCD: \n %d dump pages %s of %d each in pass %d\n",
 		err, save ? "saved" : "skipped", (int)DUMP_PAGE_SIZE, pass);
 
 	}
@@ -86,14 +86,14 @@ static inline struct page *dump_get_page(loff_t loc)
 	/* need to use pfn/physaddr equiv of kern_addr_valid */
 
 	/* Important:
-	 *   On ARM/XScale system, the physical address starts from 
-	 *   PHYS_OFFSET, and it maybe the situation that PHYS_OFFSET != 0. 
-	 *   For example on Intel's PXA250, PHYS_OFFSET = 0xa0000000. And the 
+	 *   On ARM/XScale system, the physical address starts from
+	 *   PHYS_OFFSET, and it maybe the situation that PHYS_OFFSET != 0.
+	 *   For example on Intel's PXA250, PHYS_OFFSET = 0xa0000000. And the
 	 *   page index starts from PHYS_PFN_OFFSET. When configuring
  	 *   filter, filter->start is assigned to 0 in dump_generic_configure.
 	 *   Here we want to adjust it by adding PHYS_PFN_OFFSET to it!
 	 */
-	
+
 	if (__dump_page_valid(page_index))
 		return pfn_to_page(page_index);
 	else
@@ -103,7 +103,7 @@ static inline struct page *dump_get_page(loff_t loc)
 
 /* Default iterator: for singlestage and stage 1 of soft-boot dumping */
 /* Iterates over range of physical memory pages in DUMP_PAGE_SIZE increments */
-int dump_page_iterator(int pass, int (*action)(unsigned long, unsigned long), 
+int dump_page_iterator(int pass, int (*action)(unsigned long, unsigned long),
 	struct dump_data_filter *filter)
 {
 	/* Todo : fix unit, type */
@@ -112,7 +112,7 @@ int dump_page_iterator(int pass, int (*action)(unsigned long, unsigned long),
 	struct page *page;
 
 	/* Todo: Add membanks code */
-	/* TBD: Check if we need to address DUMP_PAGE_SIZE < PAGE_SIZE */	
+	/* TBD: Check if we need to address DUMP_PAGE_SIZE < PAGE_SIZE */
 
 	for (i = 0; i < filter->num_mbanks; i++) {
 		start = filter->start[i];
@@ -120,12 +120,12 @@ int dump_page_iterator(int pass, int (*action)(unsigned long, unsigned long),
 		for (loc = start; loc < end; loc += DUMP_PAGE_SIZE) {
 			dump_config.dumper->curr_loc = loc;
 			page = dump_get_page(loc);
-			if (page && filter->selector(pass, 
-				(unsigned long) page, DUMP_PAGE_SIZE)) { 
-				if ((err = action((unsigned long)page, 
+			if (page && filter->selector(pass,
+				(unsigned long) page, DUMP_PAGE_SIZE)) {
+				if ((err = action((unsigned long)page,
 					DUMP_PAGE_SIZE))) {
 					printk("LKCD: dump_page_iterator: err %d"
-						"for loc 0x%llx, in pass %d\n", 
+						"for loc 0x%llx, in pass %d\n",
 						err, loc, pass);
 					return err ? err : count;
 				} else
@@ -137,9 +137,9 @@ int dump_page_iterator(int pass, int (*action)(unsigned long, unsigned long),
 	return err ? err : count;
 }
 
-/* 
- * Base function that saves the selected block of data in the dump 
- * Action taken when iterator decides that data needs to be saved 
+/*
+ * Base function that saves the selected block of data in the dump
+ * Action taken when iterator decides that data needs to be saved
  */
 int dump_generic_save_data(unsigned long loc, unsigned long sz)
 {
@@ -161,7 +161,7 @@ int dump_generic_save_data(unsigned long loc, unsigned long sz)
 		}
 
 		left -= bytes;
-		
+
 		/* -- A few chores to do from time to time -- */
 		dump_config.dumper->count++;
 
@@ -177,17 +177,17 @@ int dump_generic_save_data(unsigned long loc, unsigned long sz)
 			touch_nmi_watchdog();
 		} else if (!(dump_config.dumper->count & 0x7)) {
 			/* Show progress so the user knows we aren't hung */
-			dump_speedo(dump_config.dumper->count >> 3); 
+			dump_speedo(dump_config.dumper->count >> 3);
 		}
 		/* Todo: Touch/Refresh watchdog */
 
 		/* --- Done with periodic chores -- */
 
-		/* 
-		 * extra bit of copying to simplify verification  
+		/*
+		 * extra bit of copying to simplify verification
 		 * in the second kernel boot based scheme
 		 */
-		memcpy(dump_buf - DUMP_PAGE_SIZE, dump_buf + 
+		memcpy(dump_buf - DUMP_PAGE_SIZE, dump_buf +
 			DUMP_BUFFER_SIZE - DUMP_PAGE_SIZE, DUMP_PAGE_SIZE);
 
 		/* now adjust the leftover bits back to the top of the page */
@@ -199,7 +199,7 @@ int dump_generic_save_data(unsigned long loc, unsigned long sz)
 		buf -= DUMP_BUFFER_SIZE;
 		dump_config.dumper->curr_buf = buf;
 	}
-				
+
 	return 0;
 }
 
@@ -209,10 +209,10 @@ int dump_generic_skip_data(unsigned long loc, unsigned long sz)
 	return 0;
 }
 
-/* 
- * Common low level routine to write a buffer to current dump device 
- * Expects checks for space etc to have been taken care of by the caller 
- * Operates serially at the moment for simplicity. 
+/*
+ * Common low level routine to write a buffer to current dump device
+ * Expects checks for space etc to have been taken care of by the caller
+ * Operates serially at the moment for simplicity.
  * TBD/Todo: Consider batching for improved throughput
  */
 int dump_ll_write(void *buf, unsigned long len)
@@ -230,7 +230,7 @@ int dump_ll_write(void *buf, unsigned long len)
 	while (len) {
 		if ((last_transfer = dump_dev_write(buf, len)) <= 0)  {
 			ret = last_transfer;
-			printk("LKCD: dump_dev_write failed !err %d\n", 
+			printk("LKCD: dump_dev_write failed !err %d\n",
 			ret);
 			break;
 		}
@@ -258,7 +258,7 @@ int dump_generic_write_buffer(void *buf, unsigned long len)
 	int err = 0;
 
 	/* check for space */
-	if ((err = dump_dev_seek(dump_config.dumper->curr_offset + len + 
+	if ((err = dump_dev_seek(dump_config.dumper->curr_offset + len +
 			2*DUMP_BUFFER_SIZE)) < 0) {
 		printk("LKCD: dump_write_buffer: insuff space after offset 0x%llx\n",
 			dump_config.dumper->curr_offset);
@@ -266,7 +266,7 @@ int dump_generic_write_buffer(void *buf, unsigned long len)
 	}
 	/* alignment check would happen as a side effect of this */
 	if ((err = dump_dev_seek(dump_config.dumper->curr_offset)) < 0)
-		return err; 
+		return err;
 
 	written = dump_ll_write(buf, len);
 
@@ -316,7 +316,7 @@ int dump_generic_configure(const char *devid)
 			pg_data_t *pgdat;
 			int i = 0;
 			for_each_pgdat(pgdat) {
-				filter->start[i] = 
+				filter->start[i] =
 					(loff_t)pgdat->node_start_pfn << PAGE_SHIFT;
 				filter->end[i] =
 					(loff_t)(pgdat->node_start_pfn + pgdat->node_spanned_pages) << PAGE_SHIFT;
@@ -341,7 +341,7 @@ int dump_generic_unconfigure(void)
 		return ret;
 
 	printk("LKCD: Closed dump device\n");
-	
+
 	if (buf)
 		dump_free_mem((buf - DUMP_PAGE_SIZE));
 
@@ -353,7 +353,7 @@ int dump_generic_unconfigure(void)
 
 #ifdef CONFIG_DISCONTIGMEM
 
-void dump_reconfigure_mbanks(void) 
+void dump_reconfigure_mbanks(void)
 {
         pg_data_t *pgdat;
         loff_t start, end, loc, loc_end;
@@ -374,7 +374,7 @@ void dump_reconfigure_mbanks(void)
 
                         /* Now loop here till you find the end */
                         for(loc_end = loc; loc_end < end; loc_end += (DUMP_PAGE_SIZE)) {
-                                
+
 				if(__dump_page_valid(loc_end >> PAGE_SHIFT)) {
                                 /* This page could very well be the last page */
                                         filter->end[i] = loc_end;
@@ -424,5 +424,5 @@ struct dumper dumper_singlestage = {
 	.compress 	= &dump_none_compression,
 	.filter		= dump_filter_table,
 	.dev		= NULL,
-};		
+};
 

@@ -44,7 +44,7 @@ struct __dump_header_asm {
 
 	/* smp specific */
 	uint32_t	     dha_smp_num_cpus;
-	int		     dha_dumping_cpu;	
+	int		     dha_dumping_cpu;
 	struct pt_regs	     dha_smp_regs[NR_CPUS];
 	uint64_t	     dha_smp_current_task[NR_CPUS];
 	uint64_t	     dha_stack[NR_CPUS];

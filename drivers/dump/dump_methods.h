@@ -1,9 +1,9 @@
 /*
- * Generic interfaces for flexible system dump 
+ * Generic interfaces for flexible system dump
  *
  * Started: Oct 2002 -  Suparna Bhattacharya (suparna@in.ibm.com)
  *
- * Copyright (C) 2002 International Business Machines Corp. 
+ * Copyright (C) 2002 International Business Machines Corp.
  *
  * This code is released under version 2 of the GNU GPL.
  */
@@ -12,24 +12,24 @@
 #define _LINUX_DUMP_METHODS_H
 
 /*
- * Inspired by Matt Robinson's suggestion of introducing dump 
- * methods as a way to enable different crash dump facilities to 
+ * Inspired by Matt Robinson's suggestion of introducing dump
+ * methods as a way to enable different crash dump facilities to
  * coexist where each employs its own scheme or dumping policy.
  *
- * The code here creates a framework for flexible dump by defining 
+ * The code here creates a framework for flexible dump by defining
  * a set of methods and providing associated helpers that differentiate
- * between the underlying mechanism (how to dump), overall scheme 
- * (sequencing of stages and data dumped and associated quiescing), 
- * output format (what the dump output looks like), target type 
- * (where to save the dump; see dumpdev.h), and selection policy 
+ * between the underlying mechanism (how to dump), overall scheme
+ * (sequencing of stages and data dumped and associated quiescing),
+ * output format (what the dump output looks like), target type
+ * (where to save the dump; see dumpdev.h), and selection policy
  * (state/data to dump).
- * 
- * These sets of interfaces can be mixed and matched to build a 
- * dumper suitable for a given situation, allowing for 
+ *
+ * These sets of interfaces can be mixed and matched to build a
+ * dumper suitable for a given situation, allowing for
  * flexibility as well appropriate degree of code reuse.
  * For example all features and options of lkcd (including
  * granular selective dumping in the near future) should be
- * available even when say, the 2 stage soft-boot based mechanism 
+ * available even when say, the 2 stage soft-boot based mechanism
  * is used for taking disruptive dumps.
  *
  * Todo: Additionally modules or drivers may supply their own
@@ -59,32 +59,32 @@ struct dump_data_filter{
 };
 
 
-/* 
- * Determined by the kind of dump mechanism and appropriate 
- * overall scheme 
- */ 
+/*
+ * Determined by the kind of dump mechanism and appropriate
+ * overall scheme
+ */
 struct dump_scheme_ops {
 	/* sets aside memory, inits data structures etc */
-	int (*configure)(const char *devid); 
+	int (*configure)(const char *devid);
 	/* releases  resources */
-	int (*unconfigure)(void); 
+	int (*unconfigure)(void);
 
 	/* ordering of passes, invoking iterator */
-	int (*sequencer)(void); 
+	int (*sequencer)(void);
         /* iterates over system data, selects and acts on data to dump */
-	int (*iterator)(int, int (*)(unsigned long, unsigned long), 
-		struct dump_data_filter *); 
+	int (*iterator)(int, int (*)(unsigned long, unsigned long),
+		struct dump_data_filter *);
         /* action when data is selected for dump */
-	int (*save_data)(unsigned long, unsigned long); 
+	int (*save_data)(unsigned long, unsigned long);
         /* action when data is to be excluded from dump */
-	int (*skip_data)(unsigned long, unsigned long); 
+	int (*skip_data)(unsigned long, unsigned long);
 	/* policies for space, multiple dump devices etc */
-	int (*write_buffer)(void *, unsigned long); 
+	int (*write_buffer)(void *, unsigned long);
 };
 
 struct dump_scheme {
 	/* the name serves as an anchor to locate the scheme after reboot */
-	char name[32]; 
+	char name[32];
 	struct dump_scheme_ops *ops;
 	struct list_head list;
 };
@@ -99,27 +99,27 @@ extern enum dump_silence_levels {
 /* determined by the dump (file) format */
 struct dump_fmt_ops {
 	/* build header */
-	int (*configure_header)(const char *, const struct pt_regs *); 
+	int (*configure_header)(const char *, const struct pt_regs *);
 	int (*update_header)(void); /* update header and write it out */
 	/* save curr context  */
-	void (*save_context)(int, const struct pt_regs *, 
-		struct task_struct *); 
+	void (*save_context)(int, const struct pt_regs *,
+		struct task_struct *);
 	/* typically called by the save_data action */
 	/* add formatted data to the dump buffer */
-	int (*add_data)(unsigned long, unsigned long); 
+	int (*add_data)(unsigned long, unsigned long);
 	int (*update_end_marker)(void);
 };
 
 struct dump_fmt {
-	unsigned long magic; 
+	unsigned long magic;
 	char name[32];  /* lcrash, crash, elf-core etc */
 	struct dump_fmt_ops *ops;
 	struct list_head list;
 };
 
-/* 
- * Modules will be able add their own data capture schemes by 
- * registering their own dumpers. Typically they would use the 
+/*
+ * Modules will be able add their own data capture schemes by
+ * registering their own dumpers. Typically they would use the
  * primary dumper as a template and tune it with their routines.
  * Still Todo.
  */
@@ -131,7 +131,7 @@ struct dumper {
 	struct dump_fmt *fmt;
 	struct __dump_compress *compress;
 	struct dump_data_filter *filter;
-	struct dump_dev *dev; 
+	struct dump_dev *dev;
 	/* state valid only for active dumper(s) - per instance */
 	/* run time state/context */
 	int curr_pass;
@@ -141,9 +141,9 @@ struct dumper {
 	void *curr_buf; /* current position in the dump buffer */
 	void *dump_buf; /* starting addr of dump buffer */
 	int header_dirty; /* whether the header needs to be written out */
-	int header_len; 
+	int header_len;
 	struct list_head dumper_list; /* links to other dumpers */
-};	
+};
 
 /* Starting point to get to the current configured state */
 struct dump_config {
@@ -156,7 +156,7 @@ struct dump_config {
 	char *dump_device;
 	unsigned long dump_addr; /* relevant only for in-memory dumps */
 	struct list_head dump_dev_list;
-};	
+};
 
 extern struct dump_config dump_config;
 
@@ -169,7 +169,7 @@ static inline int dump_sequencer(void)
 	return dump_config.dumper->scheme->ops->sequencer();
 }
 
-static inline int dump_iterator(int pass, int (*action)(unsigned long, 
+static inline int dump_iterator(int pass, int (*action)(unsigned long,
 	unsigned long), struct dump_data_filter *filter)
 {
 	return dump_config.dumper->scheme->ops->iterator(pass, action, filter);
@@ -195,13 +195,13 @@ static inline int dump_unconfigure(void)
 
 /* Format operations */
 
-static inline int dump_configure_header(const char *panic_str, 
+static inline int dump_configure_header(const char *panic_str,
 	const struct pt_regs *regs)
 {
 	return dump_config.dumper->fmt->ops->configure_header(panic_str, regs);
 }
 
-static inline void dump_save_context(int cpu, const struct pt_regs *regs, 
+static inline void dump_save_context(int cpu, const struct pt_regs *regs,
 		struct task_struct *tsk)
 {
 	dump_config.dumper->fmt->ops->save_context(cpu, regs, tsk);
@@ -234,7 +234,7 @@ static inline int dump_add_data(unsigned long loc, unsigned long sz)
 static inline int dump_compress_data(char *src, int slen, char *dst,
 		unsigned long loc)
 {
-	return dump_config.dumper->compress->compress_func(src, slen, 
+	return dump_config.dumper->compress->compress_func(src, slen,
 		dst, DUMP_DPC_PAGE_SIZE, loc);
 }
 
@@ -262,9 +262,9 @@ extern struct dump_scheme dump_scheme_singlestage;
 
 /* Default dump format methods */
 
-extern int dump_lcrash_configure_header(const char *panic_str, 
+extern int dump_lcrash_configure_header(const char *panic_str,
 	const struct pt_regs *regs);
-extern void dump_lcrash_save_context(int  cpu, const struct pt_regs *regs, 
+extern void dump_lcrash_save_context(int  cpu, const struct pt_regs *regs,
 	struct task_struct *tsk);
 extern int dump_generic_update_header(void);
 extern int dump_lcrash_add_data(unsigned long loc, unsigned long sz);
@@ -275,13 +275,13 @@ extern struct dump_fmt dump_fmt_lcrash;
 
 /* Default dump selection filter table */
 
-/* 
+/*
  * Entries listed in order of importance and correspond to passes
- * The last entry (with a level_mask of zero) typically reflects data that 
- * won't be dumped  -- this may for example be used to identify data 
- * that will be skipped for certain so the corresponding memory areas can be 
+ * The last entry (with a level_mask of zero) typically reflects data that
+ * won't be dumped  -- this may for example be used to identify data
+ * that will be skipped for certain so the corresponding memory areas can be
  * utilized as scratch space.
- */   
+ */
 extern struct dump_data_filter dump_filter_table[];
 
 /* Some pre-defined dumpers */
@@ -299,7 +299,7 @@ extern struct dumper dumper_stage2;
 /* Helpers - move these to dump.h later ? */
 
 int dump_generic_execute(const char *panic_str, const struct pt_regs *regs);
-extern int dump_ll_write(void *buf, unsigned long len); 
+extern int dump_ll_write(void *buf, unsigned long len);
 
 static inline void dumper_reset(void)
 {
@@ -310,9 +310,9 @@ static inline void dumper_reset(void)
 	dump_config.dumper->curr_pass = 0;
 }
 
-/* 
- * May later be moulded to perform boot-time allocations so we can dump 
- * earlier during bootup 
+/*
+ * May later be moulded to perform boot-time allocations so we can dump
+ * earlier during bootup
  */
 static inline void *dump_alloc_mem(unsigned long size)
 {
@@ -331,7 +331,7 @@ static inline void dump_free_mem(void *buf)
 	/*
 	 * Allocated using __get_free_pages().
 	 */
-	free_pages((unsigned long)buf, 
+	free_pages((unsigned long)buf,
 		get_order(DUMP_BUFFER_SIZE + 3 * DUMP_PAGE_SIZE));
 }
 

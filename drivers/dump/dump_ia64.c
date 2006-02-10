@@ -41,7 +41,7 @@ static int alloc_dha_stack(void)
 {
 	int i;
 	void *ptr;
-	
+
 	if (dump_header_asm.dha_stack[0])
 	{
 		return 0;
@@ -59,7 +59,7 @@ static int alloc_dha_stack(void)
 	return 0;
 }
 
-static int free_dha_stack(void) 
+static int free_dha_stack(void)
 {
 	if (dump_header_asm.dha_stack[0])
 	{
@@ -92,7 +92,7 @@ do_save_sw(struct unw_frame_info *info, void *arg)
 }
 
 void
-__dump_save_context(int cpu, const struct pt_regs *regs, 
+__dump_save_context(int cpu, const struct pt_regs *regs,
 	struct task_struct *tsk)
 {
 	struct unw_args uwargs;
@@ -229,7 +229,7 @@ __dump_save_other_cpus(void)
                 }
 
 		dump_ipi_function_ptr = IPI_handler;
-		
+
                 wmb();
 
                 dump_send_ipi();
@@ -314,7 +314,7 @@ __dump_irq_enable(void)
         set_irq_affinity();
         irq_bh_save();
 	ia64_srlz_d();
-	/* 
+	/*
 	 * reduce the task priority level
   	 * to get disk interrupts
 	 */
@@ -395,12 +395,12 @@ int __dump_memcpy_mc_expected = 0;		/* Doesn't help yet */
 /*
  * An ia64 version of memcpy() that trys to avoid machine checks.
  *
- * NB: 
+ * NB:
  * 	By itself __dump_memcpy_mc_expected() ins't providing any
  *	protection against Machine Checks. We are looking into the
  *	possability of adding code to the arch/ia64/kernel/mca.c fuction
  *	ia64_mca_ucmc_handler() to restore state so that a IA64_MCA_CORRECTED
- *	can be returned to the firmware. Curently it always returns 
+ *	can be returned to the firmware. Curently it always returns
  *	IA64_MCA_COLD_BOOT and reboots the machine.
  */
 /*
@@ -436,7 +436,7 @@ manual_handle_crashdump(void) {
 
 /*
  * Name: __dump_clean_irq_state()
- * Func: Clean up from the previous IRQ handling state. Such as oops from 
+ * Func: Clean up from the previous IRQ handling state. Such as oops from
  *       interrupt handler or bottom half.
  */
 void
@@ -444,19 +444,19 @@ __dump_clean_irq_state(void)
 {
     	unsigned long saved_tpr;
 	unsigned long TPR_MASK = 0xFFFFFFFFFFFEFF0F;
-	
-	
+
+
 	/* Get the processors task priority register */
 	saved_tpr = ia64_getreg(_IA64_REG_CR_TPR);
 	/* clear the mmi and mic bit's of the TPR to unmask interrupts */
-	saved_tpr = saved_tpr & TPR_MASK; 
+	saved_tpr = saved_tpr & TPR_MASK;
 	ia64_setreg(_IA64_REG_CR_TPR, saved_tpr);
 	ia64_srlz_d();
 
 	/* Tell the processor we're done with the interrupt
 	 * that got us here.
 	 */
-	
+
 	ia64_eoi();
 
 	/* local implementation of irq_exit(); */

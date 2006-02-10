@@ -40,8 +40,8 @@ struct hw_interrupt_type;
  */
 
 /* FIXME: LKCD We are out of free vectors 0xf0-0xf9, was using 0xf9
- * for now and because I don't know any better I'm going to 
- * hijack a ISA vector. 
+ * for now and because I don't know any better I'm going to
+ * hijack a ISA vector.
  */
 #define DUMP_VECTOR			0x20
 

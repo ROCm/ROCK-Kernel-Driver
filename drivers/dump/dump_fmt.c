@@ -2,8 +2,8 @@
  * Implements the routines which handle the format specific
  * aspects of dump for the default dump format.
  *
- * Used in single stage dumping and stage 1 of soft-boot based dumping 
- * Saves data in LKCD (lcrash) format 
+ * Used in single stage dumping and stage 1 of soft-boot based dumping
+ * Saves data in LKCD (lcrash) format
  *
  * Previously a part of dump_base.c
  *
@@ -11,7 +11,7 @@
  *	Split off and reshuffled LKCD dump format code around generic
  *	dump method interfaces.
  *
- * Derived from original code created by 
+ * Derived from original code created by
  * 	Matt Robinson <yakker@sourceforge.net>)
  *
  * Contributions from SGI, IBM, HP, MCL, and others.
@@ -19,7 +19,7 @@
  * Copyright (C) 1999 - 2002 Silicon Graphics, Inc. All rights reserved.
  * Copyright (C) 2000 - 2002 TurboLinux, Inc.  All rights reserved.
  * Copyright (C) 2001 - 2002 Matt D. Robinson.  All rights reserved.
- * Copyright (C) 2002 International Business Machines Corp. 
+ * Copyright (C) 2002 International Business Machines Corp.
  *
  * This code is released under version 2 of the GNU GPL.
  */
@@ -37,7 +37,7 @@
 #define DUMP_DEBUG 0
 /*
  * SYSTEM DUMP LAYOUT
- * 
+ *
  * System dumps are currently the combination of a dump header and a set
  * of data pages which contain the system memory.  The layout of the dump
  * (for full dumps) is as follows:
@@ -87,7 +87,7 @@ struct __dump_header dump_header;  /* the primary dump header              */
 struct __dump_header_asm dump_header_asm; /* the arch-specific dump header */
 
 /*
- *  Set up common header fields (mainly the arch indep section) 
+ *  Set up common header fields (mainly the arch indep section)
  *  Per-cpu state is handled by lcrash_save_context
  *  Returns the size of the header in bytes.
  */
@@ -127,7 +127,7 @@ static int lcrash_init_dump_header(const char *panic_str)
 	dump_header.dh_dump_compress = dump_config.dumper->compress->
 		compress_type;
 	dump_header.dh_dump_polling = dump_config.polling;
-	dump_header.dh_dump_device = dump_config.dumper->dev->device_id; 
+	dump_header.dh_dump_device = dump_config.dumper->dev->device_id;
 	dump_header.dh_dump_buffer_size = DUMP_BUFFER_SIZE;
 
 #if DUMP_DEBUG >= 6
@@ -138,17 +138,17 @@ static int lcrash_init_dump_header(const char *panic_str)
 	dump_header.dh_time.tv_sec = dh_time.tv_sec;
 	dump_header.dh_time.tv_usec = dh_time.tv_usec;
 
-	memcpy((void *)&(dump_header.dh_utsname_sysname), 
+	memcpy((void *)&(dump_header.dh_utsname_sysname),
 		(const void *)&(system_utsname.sysname), __NEW_UTS_LEN + 1);
-	memcpy((void *)&(dump_header.dh_utsname_nodename), 
+	memcpy((void *)&(dump_header.dh_utsname_nodename),
 		(const void *)&(system_utsname.nodename), __NEW_UTS_LEN + 1);
-	memcpy((void *)&(dump_header.dh_utsname_release), 
+	memcpy((void *)&(dump_header.dh_utsname_release),
 		(const void *)&(system_utsname.release), __NEW_UTS_LEN + 1);
-	memcpy((void *)&(dump_header.dh_utsname_version), 
+	memcpy((void *)&(dump_header.dh_utsname_version),
 		(const void *)&(system_utsname.version), __NEW_UTS_LEN + 1);
-	memcpy((void *)&(dump_header.dh_utsname_machine), 
+	memcpy((void *)&(dump_header.dh_utsname_machine),
 		(const void *)&(system_utsname.machine), __NEW_UTS_LEN + 1);
-	memcpy((void *)&(dump_header.dh_utsname_domainname), 
+	memcpy((void *)&(dump_header.dh_utsname_domainname),
 		(const void *)&(system_utsname.domainname), __NEW_UTS_LEN + 1);
 
 	if (panic_str) {
@@ -161,16 +161,16 @@ static int lcrash_init_dump_header(const char *panic_str)
         dump_header_asm.dha_header_size = sizeof(dump_header_asm);
 
 	dump_header_asm.dha_smp_num_cpus = num_online_cpus();
-	printk("LKCD: smp_num_cpus in header %d\n", 
+	printk("LKCD: smp_num_cpus in header %d\n",
 		dump_header_asm.dha_smp_num_cpus);
 
 	dump_header_asm.dha_dumping_cpu = smp_processor_id();
-	
+
 	return sizeof(dump_header) + sizeof(dump_header_asm);
 }
 
 
-int dump_lcrash_configure_header(const char *panic_str, 
+int dump_lcrash_configure_header(const char *panic_str,
 	const struct pt_regs *regs)
 {
 	int retval = 0;
@@ -182,14 +182,14 @@ int dump_lcrash_configure_header(const char *panic_str,
 	__dump_save_other_cpus(); /* side effect:silence cpus */
 
 	/* configure architecture-specific dump header values */
-	if ((retval = __dump_configure_header(regs))) 
+	if ((retval = __dump_configure_header(regs)))
 		return retval;
 
 	dump_config.dumper->header_dirty++;
 	return 0;
 }
 /* save register and task context */
-void dump_lcrash_save_context(int cpu, const struct pt_regs *regs, 
+void dump_lcrash_save_context(int cpu, const struct pt_regs *regs,
 	struct task_struct *tsk)
 {
 	/* This level of abstraction might be redundantly redundant */
@@ -204,7 +204,7 @@ int dump_write_header(void)
 
 	/* accounts for DUMP_HEADER_OFFSET if applicable */
 	if ((retval = dump_dev_seek(0))) {
-		printk("LKCD: Unable to seek to dump header offset: %d\n", 
+		printk("LKCD: Unable to seek to dump header offset: %d\n",
 			retval);
 		return retval;
 	}
@@ -216,7 +216,7 @@ int dump_write_header(void)
 	size = PAGE_ALIGN(size);
 	retval = dump_ll_write(buf , size);
 
-	if (retval < size) 
+	if (retval < size)
 		return (retval >= 0) ? ENOSPC : retval;
 	return 0;
 }
@@ -264,11 +264,11 @@ int dump_allow_compress(struct page *page, unsigned long size)
 	return !is_curr_stack_page(page, size) && !is_dump_page(page, size);
 }
 
-void lcrash_init_pageheader(struct __dump_page *dp, struct page *page, 
+void lcrash_init_pageheader(struct __dump_page *dp, struct page *page,
 	unsigned long sz)
 {
 	memset(dp, sizeof(struct __dump_page), 0);
-	dp->dp_flags = 0; 
+	dp->dp_flags = 0;
 	dp->dp_size = 0;
 	if (sz > 0)
 		dp->dp_address = (loff_t)page_to_pfn(page) << PAGE_SHIFT;
@@ -284,7 +284,7 @@ int dump_lcrash_add_data(unsigned long loc, unsigned long len)
 {
 	struct page *page = (struct page *)loc;
 	void *addr, *buf = dump_config.dumper->curr_buf;
-	struct __dump_page *dp = (struct __dump_page *)buf; 
+	struct __dump_page *dp = (struct __dump_page *)buf;
 	int bytes, size;
 
 	if (buf > dump_config.dumper->dump_buf + DUMP_BUFFER_SIZE)
@@ -295,10 +295,10 @@ int dump_lcrash_add_data(unsigned long loc, unsigned long len)
 
 	while (len) {
 		addr = kmap_atomic(page, KM_DUMP);
-		size = bytes = (len > PAGE_SIZE) ? PAGE_SIZE : len;	
+		size = bytes = (len > PAGE_SIZE) ? PAGE_SIZE : len;
 		/* check for compression */
 		if (dump_allow_compress(page, bytes)) {
-			size = dump_compress_data((char *)addr, bytes, 
+			size = dump_compress_data((char *)addr, bytes,
 				(char *)buf, loc);
 		}
 		/* set the compressed flag if the page did compress */
@@ -325,21 +325,21 @@ int dump_lcrash_add_data(unsigned long loc, unsigned long len)
 	dump_header.dh_num_dump_pages++;
 	dump_config.dumper->header_dirty++;
 
-	dump_config.dumper->curr_buf = buf;	
+	dump_config.dumper->curr_buf = buf;
 
 	return len;
 }
 
 int dump_lcrash_update_end_marker(void)
 {
-	struct __dump_page *dp = 
+	struct __dump_page *dp =
 		(struct __dump_page *)dump_config.dumper->curr_buf;
 	unsigned long left;
 	int ret = 0;
-		
+
 	lcrash_init_pageheader(dp, NULL, 0);
 	dp->dp_flags |= DUMP_DH_END; /* tbd: truncation test ? */
-	
+
 	/* now update the header */
 #if DUMP_DEBUG > 6
 	dump_header.dh_num_bytes += sizeof(*dp);
@@ -351,25 +351,25 @@ int dump_lcrash_update_end_marker(void)
 
 	while (left) {
 		if ((ret = dump_dev_seek(dump_config.dumper->curr_offset))) {
-			printk("LKCD: Seek failed at offset 0x%llx\n", 
+			printk("LKCD: Seek failed at offset 0x%llx\n",
 			dump_config.dumper->curr_offset);
 			return ret;
 		}
 
-		if (DUMP_BUFFER_SIZE > left) 
-			memset(dump_config.dumper->curr_buf, 'm', 
+		if (DUMP_BUFFER_SIZE > left)
+			memset(dump_config.dumper->curr_buf, 'm',
 				DUMP_BUFFER_SIZE - left);
 
-		if ((ret = dump_ll_write(dump_config.dumper->dump_buf, 
+		if ((ret = dump_ll_write(dump_config.dumper->dump_buf,
 			DUMP_BUFFER_SIZE)) < DUMP_BUFFER_SIZE) {
 			return (ret < 0) ? ret : -ENOSPC;
 		}
 
 		dump_config.dumper->curr_offset += DUMP_BUFFER_SIZE;
-	
+
 		if (left > DUMP_BUFFER_SIZE) {
 			left -= DUMP_BUFFER_SIZE;
-			memcpy(dump_config.dumper->dump_buf, 
+			memcpy(dump_config.dumper->dump_buf,
 			dump_config.dumper->dump_buf + DUMP_BUFFER_SIZE, left);
 			dump_config.dumper->curr_buf -= DUMP_BUFFER_SIZE;
 		} else {

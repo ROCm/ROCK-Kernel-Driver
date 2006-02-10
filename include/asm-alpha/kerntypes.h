@@ -1,7 +1,7 @@
 /*
  * asm-alpha/kerntypes.h
  *
- * Arch-dependent header file that includes headers for all arch-specific 
+ * Arch-dependent header file that includes headers for all arch-specific
  * types of interest.
  * The kernel type information is used by the lcrash utility when
  * analyzing system crash dumps or the live system. Using the type

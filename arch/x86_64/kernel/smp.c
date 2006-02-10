@@ -459,8 +459,8 @@ void stop_this_cpu(void* dummy)
 	cpu_clear(smp_processor_id(), cpu_online_map);
 	local_irq_disable();
 	disable_local_APIC();
-	for (;;) 
-		asm("hlt"); 
+	for (;;)
+		asm("hlt");
 }
 
 void smp_stop_cpu(void)

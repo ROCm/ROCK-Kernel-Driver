@@ -37,7 +37,7 @@ extern void dump_send_ipi(void);
 #include <linux/threads.h>
 #endif /* __KERNEL__ */
 
-/* 
+/*
  * mkswap.c calls getpagesize() to get the system page size,
  * which is not  necessarily the same as the hardware page size.
  *
@@ -108,12 +108,12 @@ typedef struct __dump_header_asm {
 
 	/* smp specific */
 	uint32_t	     dha_smp_num_cpus;
-	uint32_t	     dha_dumping_cpu;	
+	uint32_t	     dha_dumping_cpu;
 	struct pt_regs	     dha_smp_regs[NR_CPUS];
 	uint64_t	     dha_smp_current_task[NR_CPUS];
 	uint64_t	     dha_stack[NR_CPUS];
 	uint64_t	     dha_stack_ptr[NR_CPUS];
-        
+
 	/* load address of kernel */
         uint64_t             dha_kernel_addr;
 
@@ -125,7 +125,7 @@ extern struct __dump_header_asm dump_header_asm;
 #ifdef __KERNEL__
 static inline void get_current_regs(struct pt_regs *regs)
 {
-	/* 
+	/*
 	 * REMIND: Looking at functions/Macros like:
 	 *		 DO_SAVE_SWITCH_STACK
 	 *		 ia64_switch_to()
@@ -141,7 +141,7 @@ static inline void get_current_regs(struct pt_regs *regs)
 
 	__asm__ __volatile__("mov %0=b6;;":"=r"(regs->b6));
 	__asm__ __volatile__("mov %0=b7;;":"=r"(regs->b7));
-	
+
         __asm__ __volatile__("mov %0=ar.csd;;":"=r"(regs->ar_csd));
 	__asm__ __volatile__("mov %0=ar.ssd;;":"=r"(regs->ar_ssd));
 	__asm__ __volatile__("mov %0=psr;;":"=r"(ic_value));

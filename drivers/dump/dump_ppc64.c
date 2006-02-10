@@ -4,11 +4,11 @@
  * Created by: Matt Robinson (yakker@sgi.com)
  *
  * Copyright 1999 Silicon Graphics, Inc. All rights reserved.
- * 
+ *
  * 2.3 kernel modifications by: Matt D. Robinson (yakker@turbolinux.com)
  * Copyright 2000 TurboLinux, Inc.  All rights reserved.
  * Copyright 2003, 2004 IBM Corporation
- * 
+ *
  * This code is released under version 2 of the GNU GPL.
  */
 
@@ -23,7 +23,7 @@
 #include <linux/mm.h>
 #include <linux/vmalloc.h>
 #include <linux/delay.h>
-#include <linux/syscalls.h> 
+#include <linux/syscalls.h>
 #include <asm/hardirq.h>
 #include "dump_methods.h"
 #include <linux/irq.h>
@@ -55,7 +55,7 @@ static int alloc_dha_stack(void)
         }
 
         for (i = 0; i < num_possible_cpus(); i++) {
-                dump_header_asm.dha_stack[i] = 
+                dump_header_asm.dha_stack[i] =
 			(uint64_t)((unsigned long)ptr + (i * THREAD_SIZE));
 	}
 	return 0;
@@ -75,7 +75,7 @@ static atomic_t waiting_for_dump_ipi;
 
 extern void stop_this_cpu(void *);
 static int
-dump_ipi_handler(struct pt_regs *regs) 
+dump_ipi_handler(struct pt_regs *regs)
 {
 	int cpu = smp_processor_id();
 
@@ -98,7 +98,7 @@ dump_ipi_handler(struct pt_regs *regs)
 	case DUMP_HALT_CPUS:            /* Execute halt */
 		stop_this_cpu(NULL);
 		break;
-	
+
 	case DUMP_SOFT_SPIN_CPUS:
 		/* Mark the task so it spins in schedule */
 		set_tsk_thread_flag(current, TIF_NEED_RESCHED);
@@ -111,12 +111,12 @@ dump_ipi_handler(struct pt_regs *regs)
 /* save registers on other processors
  * If the other cpus don't respond we simply do not get their states.
  */
-void 
+void
 __dump_save_other_cpus(void)
 {
 	int i, cpu = smp_processor_id();
 	int other_cpus = num_online_cpus()-1;
-	
+
 	if (other_cpus > 0) {
 		atomic_set(&waiting_for_dump_ipi, other_cpus);
 		for (i = 0; i < NR_CPUS; i++)
@@ -130,15 +130,15 @@ __dump_save_other_cpus(void)
 		 * this IPI is not processed until then, there probably
 		 * is a problem and we just fail to capture state of
 		 * other cpus.
-		 * However, we will wait 10 secs for other CPUs to respond. 
+		 * However, we will wait 10 secs for other CPUs to respond.
 		 * If not, proceed the dump process even though we failed
-		 * to capture other CPU states. 
+		 * to capture other CPU states.
 		 */
 		i = 10000; /* wait max of 10 seconds */
 		while ((atomic_read(&waiting_for_dump_ipi) > 0) && (--i > 0)) {
 			barrier();
 			mdelay(1);
-		} 
+		}
 		printk("LKCD: done waiting: %d cpus not responding\n",
 		       atomic_read(&waiting_for_dump_ipi));
 		dump_send_ipi(NULL);	/* clear handler */
@@ -206,11 +206,11 @@ __dump_save_regs(struct pt_regs *dest_regs, const struct pt_regs *regs)
 {
 	if (regs) {
 		memcpy(dest_regs, regs, sizeof(struct pt_regs));
-	} 
+	}
 }
 
 void
-__dump_save_context(int cpu, const struct pt_regs *regs, 
+__dump_save_context(int cpu, const struct pt_regs *regs,
 	struct task_struct *tsk)
 {
 	dump_header_asm.dha_smp_current_task[cpu] = (unsigned long)tsk;
@@ -355,13 +355,13 @@ __dump_irq_restore(void)
 {
 	local_irq_disable();
 	__dump_reset_irq_affinity();
-	irq_bh_restore(); 
+	irq_bh_restore();
 }
 
 #if 0
 /* Cheap progress hack.  It estimates pages to write and
  * assumes all pages will go -- so it may get way off.
- * As the progress is not displayed for other architectures, not used at this 
+ * As the progress is not displayed for other architectures, not used at this
  * moment.
  */
 void
@@ -410,7 +410,7 @@ manual_handle_crashdump(void)
 
 /*
  * Name: __dump_clean_irq_state()
- * Func: Clean up from the previous IRQ handling state. Such as oops from 
+ * Func: Clean up from the previous IRQ handling state. Such as oops from
  *       interrupt handler or bottom half.
  */
 void

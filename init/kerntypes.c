@@ -4,9 +4,9 @@
  * Copyright (C) 2000 Tom Morano (tjm@sgi.com) and
  *                    Matt D. Robinson (yakker@alacritech.com)
  *
- * Dummy module that includes headers for all kernel types of interest. 
- * The kernel type information is used by the lcrash utility when 
- * analyzing system crash dumps or the live system. Using the type 
+ * Dummy module that includes headers for all kernel types of interest.
+ * The kernel type information is used by the lcrash utility when
+ * analyzing system crash dumps or the live system. Using the type
  * information for the running system, rather than kernel header files,
  * makes for a more flexible and robust analysis tool.
  *

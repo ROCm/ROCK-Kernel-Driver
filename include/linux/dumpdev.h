@@ -1,17 +1,17 @@
 /*
- * Generic dump device interfaces for flexible system dump 
+ * Generic dump device interfaces for flexible system dump
  * (Enables variation of dump target types e.g disk, network, memory)
  *
- * These interfaces have evolved based on discussions on lkcd-devel. 
- * Eventually the intent is to support primary and secondary or 
- * alternate targets registered at the same time, with scope for 
- * situation based failover or multiple dump devices used for parallel 
+ * These interfaces have evolved based on discussions on lkcd-devel.
+ * Eventually the intent is to support primary and secondary or
+ * alternate targets registered at the same time, with scope for
+ * situation based failover or multiple dump devices used for parallel
  * dump i/o.
  *
  * Started: Oct 2002 - Suparna Bhattacharya (suparna@in.ibm.com)
  *
  * Copyright (C) 2001 - 2002 Matt D. Robinson.  All rights reserved.
- * Copyright (C) 2002 International Business Machines Corp. 
+ * Copyright (C) 2002 International Business Machines Corp.
  *
  * This code is released under version 2 of the GNU GPL.
  */
@@ -43,7 +43,7 @@ struct dump_dev_ops {
 	/* not usually used during dump, but option available */
 	int (*read)(struct dump_dev *, void *, unsigned long);
 	/* use to poll for completion */
-	int (*ready)(struct dump_dev *, void *); 
+	int (*ready)(struct dump_dev *, void *);
 	int (*ioctl)(struct dump_dev *, unsigned int, unsigned long);
 };
 
@@ -57,7 +57,7 @@ struct dump_dev {
 };
 
 /*
- * dump_dev type variations: 
+ * dump_dev type variations:
  */
 
 /* block */
@@ -88,7 +88,7 @@ struct dump_memdev {
 	unsigned long last_offset;
 	unsigned long last_used_offset;
 	unsigned long last_bs_offset;
-};	
+};
 
 static inline struct dump_memdev *DUMP_MDEV(struct dump_dev *dev)
 {
@@ -99,7 +99,7 @@ static inline struct dump_memdev *DUMP_MDEV(struct dump_dev *dev)
 struct dump_rdev {
 	struct dump_dev ddev;
 	char name[32];
-	int (*reset)(struct dump_rdev *, unsigned int, 
+	int (*reset)(struct dump_rdev *, unsigned int,
 		unsigned long);
 	/* ... to do ... */
 };

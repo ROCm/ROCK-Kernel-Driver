@@ -28,7 +28,7 @@
 #include <asm/ioctl.h>
 #include <linux/autoconf.h>
 
-/* 
+/*
  * Predefine default DUMP_PAGE constants, asm header may override.
  *
  * On ia64 discontinuous memory systems it's possible for the memory
@@ -40,9 +40,9 @@
 #define DUMP_PAGE_ALIGN(addr)	PAGE_ALIGN(addr)
 
 /*
- * Dump offset changed from 4Kb to 64Kb to support multiple PAGE_SIZE 
- * (kernel page size). Assumption goes that 64K is the highest page size 
- * supported 
+ * Dump offset changed from 4Kb to 64Kb to support multiple PAGE_SIZE
+ * (kernel page size). Assumption goes that 64K is the highest page size
+ * supported
  */
 
 #define DUMP_HEADER_OFFSET	(1ULL << 16)
@@ -50,7 +50,7 @@
 #define OLDMINORBITS	8
 #define OLDMINORMASK	((1U << OLDMINORBITS) -1)
 
-/* Making DUMP_PAGE_SIZE = PAGE_SIZE, to support dumping on architectures 
+/* Making DUMP_PAGE_SIZE = PAGE_SIZE, to support dumping on architectures
  * which support page sizes (PAGE_SIZE) greater than 4KB.
  * Will it affect ia64 discontinuous memory systems ????
  */
@@ -58,7 +58,7 @@
 
 /* thread_info lies at the bottom of stack, (Except IA64). */
 #define STACK_START_POSITION(tsk)               (tsk->thread_info)
-/* 
+/*
  * Predefined default memcpy() to use when copying memory to the dump buffer.
  *
  * On ia64 there is a heads up function that can be called to let the prom
@@ -72,12 +72,12 @@
 /* necessary header files */
 #include <asm/dump.h>			/* for architecture-specific header */
 
-/* 
+/*
  * Size of the buffer that's used to hold:
  *
  *	1. the dump header (padded to fill the complete buffer)
  *	2. the possibly compressed page headers and data
- *   
+ *
  *  = 256k for page size >= 64k
  *  = 64k  for page size < 64k
  *  If DUMP_BUFFER_SIZE_MIN (defined in drivers/dump/Makefile) is larger than
@@ -100,7 +100,7 @@
 #elif CONFIG_IA64_PAGE_SIZE_64KB
   #define  CONFIG_PAGESIZE  (64 * 1024)
 #endif
-#else 
+#else
   #define  CONFIG_PAGESIZE  (4 * 1024)
 #endif
 
@@ -207,7 +207,7 @@ enum
 /*
  * Structure: __dump_header
  *  Function: This is the header dumped at the top of every valid crash
- *            dump.  
+ *            dump.
  */
 struct __dump_header {
 	/* the dump magic number -- unique to verify dump is valid */
@@ -222,9 +222,9 @@ struct __dump_header {
 	/* the level of this dump (just a header?) */
 	u32	dh_dump_level;
 
-	/* 
+	/*
 	 * We assume dump_page_size to be 4K in every case.
-	 * Store here the configurable system page size (4K, 8K, 16K, etc.) 
+	 * Store here the configurable system page size (4K, 8K, 16K, etc.)
 	 */
 	u32	dh_page_size;
 
@@ -381,7 +381,7 @@ extern void dump_execute(const char *, const struct pt_regs *);
 
 /*
  *	Notifier list for kernel code which wants to be called
- *	at kernel dump. 
+ *	at kernel dump.
  */
 extern struct notifier_block *dump_notifier_list;
 static inline int register_dump_notifier(struct notifier_block *nb)

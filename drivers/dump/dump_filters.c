@@ -2,14 +2,14 @@
  * Default filters to select data to dump for various passes.
  *
  * Started: Oct 2002 -  Suparna Bhattacharya <suparna@in.ibm.com>
- * 	Split and rewrote default dump selection logic to generic dump 
- * 	method interfaces 
- * Derived from a portion of dump_base.c created by 
+ * 	Split and rewrote default dump selection logic to generic dump
+ * 	method interfaces
+ * Derived from a portion of dump_base.c created by
  * 	Matt Robinson <yakker@sourceforge.net>)
  *
  * Copyright (C) 1999 - 2002 Silicon Graphics, Inc. All rights reserved.
  * Copyright (C) 2001 - 2002 Matt D. Robinson.  All rights reserved.
- * Copyright (C) 2002 International Business Machines Corp. 
+ * Copyright (C) 2002 International Business Machines Corp.
  *
  * Used during single-stage dumping and during stage 1 of the 2-stage scheme
  * (Stage 2 of the 2-stage scheme uses the fully transparent filters
@@ -78,13 +78,13 @@ static inline int unreferenced_page(struct page *p)
 int dump_filter_kernpages(int pass, unsigned long loc, unsigned long sz)
 {
 	struct page *page = (struct page *)loc;
-	/* if any of the pages is a kernel page, select this set */	
+	/* if any of the pages is a kernel page, select this set */
 	while (sz) {
 		if (dump_low_page(page) || kernel_page(page))
 			return 1;
 		sz -= PAGE_SIZE;
 		page++;
-	}	
+	}
 	return 0;
 }
 
@@ -94,7 +94,7 @@ int dump_filter_userpages(int pass, unsigned long loc, unsigned long sz)
 {
 	struct page *page = (struct page *)loc;
 	int ret = 0;
-	/* select if the set has any user page, and no kernel pages  */	
+	/* select if the set has any user page, and no kernel pages  */
 	while (sz) {
 		if (user_page(page) && !dump_low_page(page)) {
 			ret = 1;
@@ -103,7 +103,7 @@ int dump_filter_userpages(int pass, unsigned long loc, unsigned long sz)
 		}
 		page++;
 		sz -= PAGE_SIZE;
-	}	
+	}
 	return ret;
 }
 
@@ -114,14 +114,14 @@ int dump_filter_unusedpages(int pass, unsigned long loc, unsigned long sz)
 {
 	struct page *page = (struct page *)loc;
 
-	/* select if the set does not have any used pages  */	
+	/* select if the set does not have any used pages  */
 	while (sz) {
 		if (!unreferenced_page(page) || dump_low_page(page)) {
 			return 0;
 		}
 		page++;
 		sz -= PAGE_SIZE;
-	}	
+	}
 	return 1;
 }
 
@@ -133,13 +133,13 @@ int dump_filter_none(int pass, unsigned long loc, unsigned long sz)
 
 /* TBD: resolve level bitmask ? */
 struct dump_data_filter dump_filter_table[] = {
-	{ .name = "kern", .selector = dump_filter_kernpages, 
+	{ .name = "kern", .selector = dump_filter_kernpages,
 		.level_mask = DUMP_MASK_KERN},
-	{ .name = "user", .selector = dump_filter_userpages, 
+	{ .name = "user", .selector = dump_filter_userpages,
 		.level_mask = DUMP_MASK_USED},
-	{ .name = "unused", .selector = dump_filter_unusedpages, 
+	{ .name = "unused", .selector = dump_filter_unusedpages,
 		.level_mask = DUMP_MASK_UNUSED},
-	{ .name = "none", .selector = dump_filter_none, 
+	{ .name = "none", .selector = dump_filter_none,
 		.level_mask = DUMP_MASK_REST},
 	{ .name = "", .selector = NULL, .level_mask = 0}
 };
