@@ -138,7 +138,7 @@ objtree		:= $(CURDIR)
 src		:= $(srctree)
 obj		:= $(objtree)
 
-VPATH		:= $(srctree)
+VPATH		:= $(srctree):$(KBUILD_EXTMOD)
 
 export srctree objtree VPATH TOPDIR
 
@@ -152,7 +152,7 @@ export srctree objtree VPATH TOPDIR
 SUBARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ \
 				  -e s/arm.*/arm/ -e s/sa110/arm/ \
 				  -e s/s390x/s390/ -e s/parisc64/parisc/ \
-				  -e s/ppc.*/powerpc/ )
+				  -e s/ppc.*/powerpc/ -e s/mips.*/mips/ )
 
 # Cross compiling and selecting different set of gcc/bin-utils
 # ---------------------------------------------------------------------------
@@ -258,38 +258,6 @@ ifneq ($(findstring s,$(MAKEFLAGS)),)
 endif
 
 export quiet Q KBUILD_VERBOSE
-
-######
-# cc support functions to be used (only) in arch/$(ARCH)/Makefile
-# See documentation in Documentation/kbuild/makefiles.txt
-
-# as-option
-# Usage: cflags-y += $(call as-option, -Wa$(comma)-isa=foo,)
-
-as-option = $(shell if $(CC) $(CFLAGS) $(1) -Wa,-Z -c -o /dev/null \
-	     -xassembler /dev/null > /dev/null 2>&1; then echo "$(1)"; \
-	     else echo "$(2)"; fi ;)
-
-# cc-option
-# Usage: cflags-y += $(call cc-option, -march=winchip-c6, -march=i586)
-
-cc-option = $(shell if $(CC) $(CFLAGS) $(1) -S -o /dev/null -xc /dev/null \
-             > /dev/null 2>&1; then echo "$(1)"; else echo "$(2)"; fi ;)
-
-# cc-option-yn
-# Usage: flag := $(call cc-option-yn, -march=winchip-c6)
-cc-option-yn = $(shell if $(CC) $(CFLAGS) $(1) -S -o /dev/null -xc /dev/null \
-                > /dev/null 2>&1; then echo "y"; else echo "n"; fi;)
-
-# cc-option-align
-# Prefix align with either -falign or -malign
-cc-option-align = $(subst -functions=0,,\
-	$(call cc-option,-falign-functions=0,-malign-functions=0))
-
-# cc-version
-# Usage gcc-ver := $(call cc-version $(CC))
-cc-version = $(shell $(CONFIG_SHELL) $(srctree)/scripts/gcc-version.sh \
-              $(if $(1), $(1), $(CC)))
 
 
 # Look for make include files relative to root of kernel src
@@ -857,29 +825,6 @@ prepare prepare-all: prepare0
 
 export CPPFLAGS_vmlinux.lds += -P -C -U$(ARCH)
 
-# Single targets
-# ---------------------------------------------------------------------------
-
-%.s: %.c scripts FORCE
-	$(Q)$(MAKE) $(build)=$(@D) $@
-%.i: %.c scripts FORCE
-	$(Q)$(MAKE) $(build)=$(@D) $@
-%.symtypes: %.c scripts FORCE
-	$(Q)$(MAKE) $(build)=$(@D) $@
-%.o: %.c scripts FORCE
-	$(Q)$(MAKE) $(build)=$(@D) $@
-%.ko: scripts FORCE
-	$(Q)$(MAKE) KBUILD_MODULES=$(if $(CONFIG_MODULES),1) $(build)=$(@D) $(@:.ko=.o)
-	$(Q)$(MAKE) -rR -f $(srctree)/scripts/Makefile.modpost
-%/:      scripts prepare FORCE
-	$(Q)$(MAKE) KBUILD_MODULES=$(if $(CONFIG_MODULES),1) $(build)=$(@D)
-%.lst: %.c scripts FORCE
-	$(Q)$(MAKE) $(build)=$(@D) $@
-%.s: %.S scripts FORCE
-	$(Q)$(MAKE) $(build)=$(@D) $@
-%.o: %.S scripts FORCE
-	$(Q)$(MAKE) $(build)=$(@D) $@
-
 # 	FIXME: The asm symlink changes when $(ARCH) changes. That's
 #	hard to detect, but I suppose "make mrproper" is a good idea
 #	before switching between archs anyway.
@@ -1158,6 +1103,7 @@ else # KBUILD_EXTMOD
 KBUILD_MODULES := 1
 .PHONY: crmodverdir
 crmodverdir:
+	$(Q)rm -rf $(MODVERDIR)
 	$(Q)mkdir -p $(MODVERDIR)
 
 .PHONY: $(objtree)/Module.symvers
@@ -1181,8 +1127,27 @@ modules: $(module-dirs)
 modules_add: modules_install
 
 .PHONY: modules_install
-modules_install:
+modules_install: _emodinst_ _emodinst_post
+	
+install-dir := $(if $(INSTALL_MOD_DIR),$(INSTALL_MOD_DIR),extra)	
+.PHONY: _emodinst_
+_emodinst_:
+	$(Q)rm -rf $(MODLIB)/$(install-dir)
+	$(Q)mkdir -p $(MODLIB)/$(install-dir)
 	$(Q)$(MAKE) -rR -f $(srctree)/scripts/Makefile.modinst
+
+# Run depmod only is we have System.map and depmod is executable
+quiet_cmd_depmod = DEPMOD  $(KERNELRELEASE)
+      cmd_depmod = if [ -r System.map -a -x $(DEPMOD) ]; then \
+                      $(DEPMOD) -ae -F System.map             \
+                      $(if $(strip $(INSTALL_MOD_PATH)),      \
+		      -b $(INSTALL_MOD_PATH) -r)              \
+		      $(KERNELRELEASE);                       \
+                   fi
+
+.PHONY: _emodinst_post
+_emodinst_post: _emodinst_
+	$(call cmd,depmod)
 
 clean-dirs := $(addprefix _clean_,$(KBUILD_EXTMOD))
 
@@ -1206,6 +1171,11 @@ help:
 	@echo  '  modules_install - install the module'
 	@echo  '  clean           - remove generated files in module directory only'
 	@echo  ''
+
+# Dummies...
+.PHONY: prepare scripts
+prepare: ;
+scripts: ;
 endif # KBUILD_EXTMOD
 
 # Generate tags for editors
@@ -1326,6 +1296,46 @@ kernelrelease:
 	$(error kernelrelease not valid - run 'make *config' to update it))
 kernelversion:
 	@echo $(KERNELVERSION)
+
+# Single targets
+# ---------------------------------------------------------------------------
+# The directory part is taken from first prerequisite, so this
+# works even with external modules
+%.s: %.c scripts FORCE
+	$(Q)$(MAKE) $(build)=$(dir $<) $(dir $<)$(notdir $@)
+%.i: %.c scripts FORCE
+	$(Q)$(MAKE) $(build)=$(dir $<) $(dir $<)$(notdir $@)
+%.o: %.c scripts FORCE
+	$(Q)$(MAKE) $(build)=$(dir $<) $(dir $<)$(notdir $@)
+%.lst: %.c scripts FORCE
+	$(Q)$(MAKE) $(build)=$(dir $<) $(dir $<)$(notdir $@)
+%.s: %.S scripts FORCE
+	$(Q)$(MAKE) $(build)=$(dir $<) $(dir $<)$(notdir $@)
+%.o: %.S scripts FORCE
+	$(Q)$(MAKE) $(build)=$(dir $<) $(dir $<)$(notdir $@)
+%.symtypes: %.c scripts FORCE
+       $(Q)$(MAKE) $(build)=$(@D) $(dir $<)$(notdir $@)
+
+# For external modules we shall include any directory of the target,
+# but usual case there is no directory part.
+# make M=`pwd` module.o     => $(dir $@)=./
+# make M=`pwd` foo/module.o => $(dir $@)=foo/
+# make M=`pwd` /            => $(dir $@)=/
+ 
+ifeq ($(KBUILD_EXTMOD),)
+        target-dir = $(@D)
+else
+        zap-slash=$(filter-out .,$(patsubst %/,%,$(dir $@)))
+        target-dir = $(KBUILD_EXTMOD)$(if $(zap-slash),/$(zap-slash))
+endif
+
+/ %/:      scripts prepare FORCE
+	$(Q)$(MAKE) KBUILD_MODULES=$(if $(CONFIG_MODULES),1) \
+	$(build)=$(target-dir)
+%.ko: scripts FORCE
+	$(Q)$(MAKE) KBUILD_MODULES=$(if $(CONFIG_MODULES),1)   \
+	$(build)=$(target-dir) $(@:.ko=.o)
+	$(Q)$(MAKE) -rR -f $(srctree)/scripts/Makefile.modpost
 
 # FIXME Should go into a make.lib or something 
 # ===========================================================================
