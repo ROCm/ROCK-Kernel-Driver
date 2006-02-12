@@ -7,6 +7,7 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
+
 #include <linux/string.h>
 EXPORT_SYMBOL(memset);
 EXPORT_SYMBOL(memchr);
@@ -27,9 +28,6 @@ EXPORT_SYMBOL(strrchr);
 EXPORT_SYMBOL(strstr);
 EXPORT_SYMBOL(strpbrk);
 
-#include <linux/syscalls.h>
-EXPORT_SYMBOL_GPL(sys_ioctl);
-
 #include <asm/checksum.h>
 EXPORT_SYMBOL(ip_fast_csum);		/* hand-coded assembly */
 
@@ -44,7 +42,6 @@ EXPORT_SYMBOL(clear_page);
 
 #ifdef CONFIG_VIRTUAL_MEM_MAP
 #include <linux/bootmem.h>
-EXPORT_SYMBOL(min_low_pfn);	/* defined by bootmem.c, but not exported by generic code */
 EXPORT_SYMBOL(max_low_pfn);	/* defined by bootmem.c, but not exported by generic code */
 #endif
 
