@@ -1554,6 +1554,7 @@ int fb_get_options(char *name, char **option)
 	return retval;
 }
 
+#ifndef MODULE
 /**
  *	video_setup - process command line options
  *	@options: string of options
@@ -1597,6 +1598,7 @@ static int __init video_setup(char *options)
 	return 0;
 }
 __setup("video=", video_setup);
+#endif
 
     /*
      *  Visible symbols for modules
