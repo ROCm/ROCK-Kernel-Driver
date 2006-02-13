@@ -41,6 +41,7 @@ restrictions referred to are that the relevant option is valid if:
 	ISAPNP	ISA PnP code is enabled.
 	ISDN	Appropriate ISDN support is enabled.
 	JOY	Appropriate joystick support is enabled.
+	LIBATA	libata driver is enabled.
 	LP	Printer support is enabled.
 	LOOP	Loopback device support is enabled.
 	M68k	M68k architecture is enabled.
@@ -247,6 +248,9 @@ running once the system is up.
 			Format: <io>,<irq>,<nodeID>
 
 	ataflop=	[HW,M68k]
+
+	atapi_enabled=	[LIBATA] Enable discovery & support of ATAPI devices
+			Format: <value> (0=off, 1=on)
 
 	atarimouse=	[HW,MOUSE] Atari Mouse
 
@@ -987,6 +991,10 @@ running once the system is up.
 			emulation library even if a 387 maths coprocessor
 			is present.
 
+	noacpi=		[LIBATA] Disables use of ACPI in libata suspend/resume
+			when set.
+			Format: <int>
+
 	noalign		[KNL,ARM]
 
 	noapic		[SMP,APIC] Tells the kernel to not make use of any
@@ -1230,6 +1238,11 @@ running once the system is up.
 			[ISAPNP] Exclude memory regions for the
 			autoconfiguration.
 			Ranges are in pairs (memory base and size).
+
+	printk=		[LIBATA] Set libata printk level (mask).
+			The values are defined in include/linux/libata.h.
+			The default value is 1 (ATA_MSG_DRV).
+			Format: <int>
 
 	profile=	[KNL] Enable kernel profiling via /proc/profile
 			Format: [schedule,]<number>
