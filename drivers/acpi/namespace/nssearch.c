@@ -309,7 +309,7 @@ acpi_ns_search_and_enter(u32 target_name,
 	if (!acpi_ut_valid_acpi_name(target_name)) {
 		ACPI_ERROR((AE_INFO, "Bad character in ACPI Name: %X",
 			    target_name));
-		return_ACPI_STATUS(AE_BAD_CHARACTER);
+//		return_ACPI_STATUS(AE_BAD_CHARACTER);
 	}
 
 	/* Try to find the name in the namespace level specified by the caller */
