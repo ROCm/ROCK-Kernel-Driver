@@ -381,7 +381,7 @@ static int __dma_map_cont(struct scatterlist *sg, int start, int stopat,
 			SET_LEAK(iommu_page);
 			addr += PAGE_SIZE;
 			iommu_page++;
-		} 
+		}
 	} 
 	BUG_ON(iommu_page - iommu_start != pages);	
 	return 0;
