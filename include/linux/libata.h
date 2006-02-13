@@ -33,7 +33,9 @@
 #include <asm/io.h>
 #include <linux/ata.h>
 #include <linux/workqueue.h>
+#ifdef CONFIG_ACPI
 #include <acpi/acpi.h>
+#endif
 
 /*
  * compile-time options: to be removed as soon as all the drivers are
