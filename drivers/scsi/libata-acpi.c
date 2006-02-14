@@ -833,7 +833,7 @@ void ata_acpi_get_timing(struct ata_port *ap)
 		acpi_os_free(output.pointer);
 		if (ata_msg_drv(ap))
 			printk(KERN_ERR
-				"%s: unexpected _GTM length (0x%x)[should be 0x%x] or addr (0x%p)\n",
+				"%s: unexpected _GTM length (0x%x)[should be 0x%zx] or addr (0x%p)\n",
 				__FUNCTION__, out_obj->buffer.length,
 				sizeof(struct GTM_buffer), out_obj->buffer.pointer);
 		goto out;

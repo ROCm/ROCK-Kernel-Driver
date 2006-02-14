@@ -300,6 +300,7 @@ static int kauditd_thread(void *dummy)
 			remove_wait_queue(&kauditd_wait, &wait);
 		}
 	}
+	return 0;
 }
 
 void audit_send_reply(int pid, int seq, int type, int done, int multi,

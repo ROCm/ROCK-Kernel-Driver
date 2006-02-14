@@ -424,10 +424,10 @@ static int scsi_eh_completed_normally(struct scsi_cmnd *scmd)
  **/
 static void scsi_eh_done(struct scsi_cmnd *scmd)
 {
+	struct completion     *eh_action;
+
 	 if (lkcd_dump_mode())
                 return;
-
-	struct completion     *eh_action;
 
 	SCSI_LOG_ERROR_RECOVERY(3,
 		printk("%s scmd: %p result: %x\n",
