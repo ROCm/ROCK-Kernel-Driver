@@ -7455,6 +7455,7 @@ qeth_softsetup_card(struct qeth_card *card)
 		card->lan_online = 1;
 	if (card->info.type==QETH_CARD_TYPE_OSN)
 		goto out;
+	qeth_set_large_send(card, card->options.large_send);
 	if (card->options.layer2) {
 		card->dev->features |=
 			NETIF_F_HW_VLAN_FILTER |
@@ -7472,12 +7473,6 @@ qeth_softsetup_card(struct qeth_card *card)
 #endif
 		goto out;
 	}
-	if ((card->options.large_send == QETH_LARGE_SEND_EDDP) ||
-	    (card->options.large_send == QETH_LARGE_SEND_TSO))
-		card->dev->features |= NETIF_F_TSO | NETIF_F_SG;
-	else
-		card->dev->features &= ~(NETIF_F_TSO | NETIF_F_SG);
-
 	if ((rc = qeth_setadapter_parms(card)))
 		QETH_DBF_TEXT_(setup, 2, "2err%d", rc);
 	if ((rc = qeth_start_ipassists(card)))
