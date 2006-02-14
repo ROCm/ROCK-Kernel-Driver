@@ -49,7 +49,7 @@
 struct ocfs2_extent_map_entry {
 	struct rb_node e_node;
 	int e_tree_depth;
-	ocfs2_extent_rec e_rec;
+	struct ocfs2_extent_rec e_rec;
 };
 
 struct ocfs2_em_insert_context {
@@ -73,19 +73,19 @@ static int ocfs2_extent_map_insert_entry(struct ocfs2_extent_map *em,
 					 struct ocfs2_extent_map_entry *ent);
 static int ocfs2_extent_map_find_leaf(struct inode *inode,
 				      u32 cpos, u32 clusters,
-				      ocfs2_extent_list *el);
+				      struct ocfs2_extent_list *el);
 static int ocfs2_extent_map_lookup_read(struct inode *inode,
 					u32 cpos, u32 clusters,
 					struct ocfs2_extent_map_entry **ret_ent);
 static int ocfs2_extent_map_try_insert(struct inode *inode,
-				       ocfs2_extent_rec *rec,
+				       struct ocfs2_extent_rec *rec,
 				       int tree_depth,
 				       struct ocfs2_em_insert_context *ctxt);
 
 /* returns 1 only if the rec contains all the given clusters -- that is that
  * rec's cpos is <= the cluster cpos and that the rec endpoint (cpos +
  * clusters) is >= the argument's endpoint */
-static int ocfs2_extent_rec_contains_clusters(ocfs2_extent_rec *rec,
+static int ocfs2_extent_rec_contains_clusters(struct ocfs2_extent_rec *rec,
 					      u32 cpos, u32 clusters)
 {
 	if (le32_to_cpu(rec->e_cpos) > cpos)
@@ -153,14 +153,14 @@ ocfs2_extent_map_lookup(struct ocfs2_extent_map *em,
  */
 static int ocfs2_extent_map_find_leaf(struct inode *inode,
 				      u32 cpos, u32 clusters,
-				      ocfs2_extent_list *el)
+				      struct ocfs2_extent_list *el)
 {
 	int i, ret;
 	struct buffer_head *eb_bh = NULL;
 	u64 blkno;
 	u32 rec_end;
-	ocfs2_extent_block *eb;
-	ocfs2_extent_rec *rec;
+	struct ocfs2_extent_block *eb;
+	struct ocfs2_extent_rec *rec;
 
 	/*
 	 * The bh data containing the el cannot change here, because
@@ -236,7 +236,7 @@ static int ocfs2_extent_map_find_leaf(struct inode *inode,
 				       inode);
 		if (ret)
 			goto out_free;
-		eb = (ocfs2_extent_block *)eb_bh->b_data;
+		eb = (struct ocfs2_extent_block *)eb_bh->b_data;
 		if (!OCFS2_IS_VALID_EXTENT_BLOCK(eb)) {
 			OCFS2_RO_ON_INVALID_EXTENT_BLOCK(inode->i_sb, eb);
 			ret = -EIO;
@@ -245,7 +245,8 @@ static int ocfs2_extent_map_find_leaf(struct inode *inode,
 		el = &eb->h_list;
 	}
 
-	BUG_ON(el->l_tree_depth);
+	if (el->l_tree_depth)
+		BUG();
 
 	for (i = 0; i < le16_to_cpu(el->l_next_free_rec); i++) {
 		rec = &el->l_recs[i];
@@ -279,9 +280,9 @@ static int ocfs2_extent_map_lookup_read(struct inode *inode,
 	struct ocfs2_extent_map *em = &OCFS2_I(inode)->ip_map;
 	struct ocfs2_extent_map_entry *ent;
 	struct buffer_head *bh = NULL;
-	ocfs2_extent_block *eb;
-	ocfs2_dinode *di;
-	ocfs2_extent_list *el;
+	struct ocfs2_extent_block *eb;
+	struct ocfs2_dinode *di;
+	struct ocfs2_extent_list *el;
 
 	spin_lock(&OCFS2_I(inode)->ip_lock);
 	ent = ocfs2_extent_map_lookup(em, cpos, clusters, NULL, NULL);
@@ -301,7 +302,7 @@ static int ocfs2_extent_map_lookup_read(struct inode *inode,
 				brelse(bh);
 			return ret;
 		}
-		eb = (ocfs2_extent_block *)bh->b_data;
+		eb = (struct ocfs2_extent_block *)bh->b_data;
 		if (!OCFS2_IS_VALID_EXTENT_BLOCK(eb)) {
 			OCFS2_RO_ON_INVALID_EXTENT_BLOCK(inode->i_sb, eb);
 			brelse(bh);
@@ -319,7 +320,7 @@ static int ocfs2_extent_map_lookup_read(struct inode *inode,
 				brelse(bh);
 			return ret;
 		}
-		di = (ocfs2_dinode *)bh->b_data;
+		di = (struct ocfs2_dinode *)bh->b_data;
 		if (!OCFS2_IS_VALID_DINODE(di)) {
 			brelse(bh);
 			OCFS2_RO_ON_INVALID_DINODE(inode->i_sb, di);
@@ -337,8 +338,8 @@ static int ocfs2_extent_map_lookup_read(struct inode *inode,
 	if (!ent)
 		return -ESRCH;
 
-	/* FIXME: Make sure this isn't a corruption */
-	BUG_ON(ent->e_tree_depth);
+	if (ent->e_tree_depth)
+		BUG();  /* FIXME: Make sure this isn't a corruption */
 
 	*ret_ent = ent;
 
@@ -373,7 +374,7 @@ static int ocfs2_extent_map_insert_entry(struct ocfs2_extent_map *em,
  * in the insert_context will be freed.
  */
 static int ocfs2_extent_map_try_insert(struct inode *inode,
-				       ocfs2_extent_rec *rec,
+				       struct ocfs2_extent_rec *rec,
 				       int tree_depth,
 				       struct ocfs2_em_insert_context *ctxt)
 {
@@ -396,7 +397,8 @@ static int ocfs2_extent_map_try_insert(struct inode *inode,
 					  le32_to_cpu(rec->e_clusters), NULL,
 					  NULL);
 
-	BUG_ON(!old_ent);
+	if (!old_ent)
+		BUG();
 
 	ret = -EEXIST;
 	if (old_ent->e_tree_depth < tree_depth)
@@ -404,7 +406,7 @@ static int ocfs2_extent_map_try_insert(struct inode *inode,
 
 	if (old_ent->e_tree_depth == tree_depth) {
 		if (!memcmp(rec, &old_ent->e_rec,
-			    sizeof(ocfs2_extent_rec)))
+			    sizeof(struct ocfs2_extent_rec)))
 			ret = 0;
 
 		/* FIXME: Should this be ESRCH/EBADR??? */
@@ -480,7 +482,7 @@ out_unlock:
 }
 
 
-int ocfs2_extent_map_insert(struct inode *inode, ocfs2_extent_rec *rec,
+int ocfs2_extent_map_insert(struct inode *inode, struct ocfs2_extent_rec *rec,
 			    int tree_depth)
 {
 	int ret;
@@ -563,13 +565,14 @@ int ocfs2_extent_map_insert(struct inode *inode, ocfs2_extent_rec *rec,
  * rec->e_clusters.  If the append is an entirely new extent, then
  * rec->e_clusters is == new_clusters.
  */
-int ocfs2_extent_map_append(struct inode *inode, ocfs2_extent_rec *rec,
+int ocfs2_extent_map_append(struct inode *inode,
+			    struct ocfs2_extent_rec *rec,
 			    u32 new_clusters)
 {
 	int ret;
 	struct ocfs2_extent_map *em = &OCFS2_I(inode)->ip_map;
 	struct ocfs2_extent_map_entry *ent;
-	ocfs2_extent_rec *old;
+	struct ocfs2_extent_rec *old;
 
 	BUG_ON(!new_clusters);
 	BUG_ON(le32_to_cpu(rec->e_clusters) < new_clusters);
@@ -648,7 +651,7 @@ int ocfs2_extent_map_append(struct inode *inode, ocfs2_extent_rec *rec,
  * dropped.  After that, truncate and extend can happen.  Caveat Emptor.
  */
 int ocfs2_extent_map_get_rec(struct inode *inode, u32 cpos,
-			     ocfs2_extent_rec **rec,
+			     struct ocfs2_extent_rec **rec,
 			     int *tree_depth)
 {
 	int ret = -ENOENT;
@@ -744,7 +747,7 @@ int ocfs2_extent_map_get_blocks(struct inode *inode,
 	int bpc = ocfs2_clusters_to_blocks(inode->i_sb, 1);
 	struct ocfs2_extent_map_entry *ent = NULL;
 	struct ocfs2_extent_map *em = &OCFS2_I(inode)->ip_map;
-	ocfs2_extent_rec *rec;
+	struct ocfs2_extent_rec *rec;
 
 	*p_blkno = 0;
 
@@ -932,7 +935,7 @@ int __init init_ocfs2_extent_maps(void)
 	return 0;
 }
 
-void exit_ocfs2_extent_maps(void)
+void __exit exit_ocfs2_extent_maps(void)
 {
 	kmem_cache_destroy(ocfs2_em_ent_cachep);
 }

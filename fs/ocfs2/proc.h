@@ -26,9 +26,9 @@
 #ifndef OCFS2_PROC_H
 #define OCFS2_PROC_H
 
-void ocfs2_proc_add_volume(ocfs2_super *osb);
+void ocfs2_proc_add_volume(struct ocfs2_super *osb);
 void ocfs2_proc_deinit(void);
 int ocfs2_proc_init(void);
-void ocfs2_proc_remove_volume(ocfs2_super *osb);
+void ocfs2_proc_remove_volume(struct ocfs2_super *osb);
 
 #endif /* OCFS2_PROC_H */

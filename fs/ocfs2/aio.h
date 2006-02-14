@@ -32,6 +32,6 @@ ssize_t ocfs2_file_aio_read(struct kiocb *iocb, char __user *buf, size_t count,
 			    loff_t pos);
 
 void okp_teardown_from_list(void *data);
-void ocfs2_wait_for_okp_destruction(ocfs2_super *osb);
+void ocfs2_wait_for_okp_destruction(struct ocfs2_super *osb);
 
 #endif /* OCFS2_AIO_H */

@@ -132,7 +132,7 @@ static struct notifier_block *o2net_notifier_list;
 static DECLARE_MUTEX(o2net_notifier_mutex);
 
 static struct o2net_handshake *o2net_hand;
-static o2net_msg *o2net_keep_req, *o2net_keep_resp;
+static struct o2net_msg *o2net_keep_req, *o2net_keep_resp;
 
 static int o2net_sys_err_translations[O2NET_ERR_MAX] =
 		{[O2NET_ERR_NONE]	= 0,
@@ -184,8 +184,16 @@ static int o2net_prep_nsw(struct o2net_node *nn, struct o2net_status_wait *nsw)
 			break;
 		}
 		spin_lock(&nn->nn_lock);
-
+#ifndef IDR_GET_NEW_RETURNS_ID
 		ret = idr_get_new(&nn->nn_status_idr, nsw, &nsw->ns_id);
+#else
+		/* old semantics */
+		nsw->ns_id = idr_get_new(&nn->nn_status_idr, nsw);
+		if (nsw->ns_id < 0)
+			ret = -EAGAIN;
+		else
+			ret = 0;
+#endif
 		if (ret == 0)
 			list_add_tail(&nsw->ns_node_item,
 				      &nn->nn_status_list);
@@ -832,9 +840,9 @@ static void o2net_sendpage(struct o2net_sock_container *sc,
 	}
 }
 
-static void o2net_init_msg(o2net_msg *msg, u16 data_len, u16 msg_type, u32 key)
+static void o2net_init_msg(struct o2net_msg *msg, u16 data_len, u16 msg_type, u32 key)
 {
-	memset(msg, 0, sizeof(o2net_msg));
+	memset(msg, 0, sizeof(struct o2net_msg));
 	msg->magic = cpu_to_be16(O2NET_MSG_MAGIC);
 	msg->data_len = cpu_to_be16(data_len);
 	msg->msg_type = cpu_to_be16(msg_type);
@@ -870,7 +878,7 @@ int o2net_send_message_vec(u32 msg_type, u32 key, struct kvec *caller_vec,
 			   size_t caller_veclen, u8 target_node, int *status)
 {
 	int ret, error = 0;
-	o2net_msg *msg = NULL;
+	struct o2net_msg *msg = NULL;
 	size_t veclen, caller_bytes = 0;
 	struct kvec *vec = NULL;
 	struct o2net_sock_container *sc = NULL;
@@ -930,7 +938,7 @@ int o2net_send_message_vec(u32 msg_type, u32 key, struct kvec *caller_vec,
 		goto out;
 	}
 
-	msg = kmalloc(sizeof(o2net_msg), GFP_ATOMIC);
+	msg = kmalloc(sizeof(struct o2net_msg), GFP_ATOMIC);
 	if (!msg) {
 		mlog(0, "failed to allocate a o2net_msg!\n");
 		ret = -ENOMEM;
@@ -939,7 +947,7 @@ int o2net_send_message_vec(u32 msg_type, u32 key, struct kvec *caller_vec,
 
 	o2net_init_msg(msg, caller_bytes, msg_type, key);
 
-	vec[0].iov_len = sizeof(o2net_msg);
+	vec[0].iov_len = sizeof(struct o2net_msg);
 	vec[0].iov_base = msg;
 	memcpy(&vec[1], caller_vec, caller_veclen * sizeof(struct kvec));
 
@@ -953,7 +961,7 @@ int o2net_send_message_vec(u32 msg_type, u32 key, struct kvec *caller_vec,
 	/* finally, convert the message header to network byte-order
 	 * and send */
 	ret = o2net_send_tcp_msg(sc->sc_sock, vec, veclen,
-				 sizeof(o2net_msg) + caller_bytes);
+				 sizeof(struct o2net_msg) + caller_bytes);
 	msglog(msg, "sending returned %d\n", ret);
 	if (ret < 0) {
 		mlog(0, "error returned from o2net_send_tcp_msg=%d\n", ret);
@@ -998,12 +1006,12 @@ int o2net_send_message(u32 msg_type, u32 key, void *data, u32 len,
 }
 EXPORT_SYMBOL_GPL(o2net_send_message);
 
-static int o2net_send_status_magic(struct socket *sock, o2net_msg *hdr,
+static int o2net_send_status_magic(struct socket *sock, struct o2net_msg *hdr,
 				   enum o2net_system_error syserr, int err)
 {
 	struct kvec vec = {
 		.iov_base = hdr,
-		.iov_len = sizeof(o2net_msg),
+		.iov_len = sizeof(struct o2net_msg),
 	};
 
 	BUG_ON(syserr >= O2NET_ERR_MAX);
@@ -1017,13 +1025,13 @@ static int o2net_send_status_magic(struct socket *sock, o2net_msg *hdr,
 
 	msglog(hdr, "about to send status magic %d\n", err);
 	/* hdr has been in host byteorder this whole time */
-	return o2net_send_tcp_msg(sock, &vec, 1, sizeof(o2net_msg));
+	return o2net_send_tcp_msg(sock, &vec, 1, sizeof(struct o2net_msg));
 }
 
 /* this returns -errno if the header was unknown or too large, etc.
  * after this is called the buffer us reused for the next message */
 static int o2net_process_message(struct o2net_sock_container *sc,
-				 o2net_msg *hdr)
+				 struct o2net_msg *hdr)
 {
 	struct o2net_node *nn = o2net_nn_from_num(sc->sc_node->nd_num);
 	int ret = 0, handler_status;
@@ -1079,7 +1087,7 @@ static int o2net_process_message(struct o2net_sock_container *sc,
 	do_gettimeofday(&sc->sc_tv_func_start);
 	sc->sc_msg_key = be32_to_cpu(hdr->key);
 	sc->sc_msg_type = be16_to_cpu(hdr->msg_type);
-	handler_status = (nmh->nh_func)(hdr, sizeof(o2net_msg) +
+	handler_status = (nmh->nh_func)(hdr, sizeof(struct o2net_msg) +
 					     be16_to_cpu(hdr->data_len),
 					nmh->nh_func_data);
 	do_gettimeofday(&sc->sc_tv_func_stop);
@@ -1139,7 +1147,7 @@ static int o2net_check_handshake(struct o2net_sock_container *sc)
  * == 0 eof, or > 0 for progress made.*/
 static int o2net_advance_rx(struct o2net_sock_container *sc)
 {
-	o2net_msg *hdr;
+	struct o2net_msg *hdr;
 	int ret = 0;
 	void *data;
 	size_t datalen;
@@ -1148,9 +1156,9 @@ static int o2net_advance_rx(struct o2net_sock_container *sc)
 	do_gettimeofday(&sc->sc_tv_advance_start);
 
 	/* do we need more header? */
-	if (sc->sc_page_off < sizeof(o2net_msg)) {
+	if (sc->sc_page_off < sizeof(struct o2net_msg)) {
 		data = page_address(sc->sc_page) + sc->sc_page_off;
-		datalen = sizeof(o2net_msg) - sc->sc_page_off;
+		datalen = sizeof(struct o2net_msg) - sc->sc_page_off;
 		ret = o2net_recv_tcp_msg(sc->sc_sock, data, datalen);
 		if (ret > 0) {
 			sc->sc_page_off += ret;
@@ -1166,7 +1174,7 @@ static int o2net_advance_rx(struct o2net_sock_container *sc)
 			/* only swab incoming here.. we can
 			 * only get here once as we cross from
 			 * being under to over */
-			if (sc->sc_page_off == sizeof(o2net_msg)) {
+			if (sc->sc_page_off == sizeof(struct o2net_msg)) {
 				hdr = page_address(sc->sc_page);
 				if (be16_to_cpu(hdr->data_len) >
 				    O2NET_MAX_PAYLOAD_BYTES)
@@ -1177,7 +1185,7 @@ static int o2net_advance_rx(struct o2net_sock_container *sc)
 			goto out;
 	}
 
-	if (sc->sc_page_off < sizeof(o2net_msg)) {
+	if (sc->sc_page_off < sizeof(struct o2net_msg)) {
 		/* oof, still don't have a header */
 		goto out;
 	}
@@ -1188,10 +1196,10 @@ static int o2net_advance_rx(struct o2net_sock_container *sc)
 	msglog(hdr, "at page_off %zu\n", sc->sc_page_off);
 
 	/* do we need more payload? */
-	if (sc->sc_page_off - sizeof(o2net_msg) < be16_to_cpu(hdr->data_len)) {
+	if (sc->sc_page_off - sizeof(struct o2net_msg) < be16_to_cpu(hdr->data_len)) {
 		/* need more payload */
 		data = page_address(sc->sc_page) + sc->sc_page_off;
-		datalen = (sizeof(o2net_msg) + be16_to_cpu(hdr->data_len)) -
+		datalen = (sizeof(struct o2net_msg) + be16_to_cpu(hdr->data_len)) -
 			  sc->sc_page_off;
 		ret = o2net_recv_tcp_msg(sc->sc_sock, data, datalen);
 		if (ret > 0)
@@ -1200,7 +1208,7 @@ static int o2net_advance_rx(struct o2net_sock_container *sc)
 			goto out;
 	}
 
-	if (sc->sc_page_off - sizeof(o2net_msg) == be16_to_cpu(hdr->data_len)) {
+	if (sc->sc_page_off - sizeof(struct o2net_msg) == be16_to_cpu(hdr->data_len)) {
 		/* we can only get here once, the first time we read
 		 * the payload.. so set ret to progress if the handler
 		 * works out. after calling this the message is toast */
@@ -1303,16 +1311,14 @@ static void o2net_idle_timer(unsigned long data)
 	mlog(ML_NOTICE, "here are some times that might help debug the "
 	     "situation: (tmr %ld.%ld now %ld.%ld dr %ld.%ld adv "
 	     "%ld.%ld:%ld.%ld func (%08x:%u) %ld.%ld:%ld.%ld)\n",
-	     sc->sc_tv_timer.tv_sec, (long) sc->sc_tv_timer.tv_usec, 
-	     now.tv_sec, (long) now.tv_usec,
-	     sc->sc_tv_data_ready.tv_sec, (long) sc->sc_tv_data_ready.tv_usec,
-	     sc->sc_tv_advance_start.tv_sec,
-	     (long) sc->sc_tv_advance_start.tv_usec,
-	     sc->sc_tv_advance_stop.tv_sec,
-	     (long) sc->sc_tv_advance_stop.tv_usec,
+	     sc->sc_tv_timer.tv_sec, sc->sc_tv_timer.tv_usec, 
+	     now.tv_sec, now.tv_usec,
+	     sc->sc_tv_data_ready.tv_sec, sc->sc_tv_data_ready.tv_usec, 
+	     sc->sc_tv_advance_start.tv_sec, sc->sc_tv_advance_start.tv_usec, 
+	     sc->sc_tv_advance_stop.tv_sec, sc->sc_tv_advance_stop.tv_usec, 
 	     sc->sc_msg_key, sc->sc_msg_type,
-	     sc->sc_tv_func_start.tv_sec, (long) sc->sc_tv_func_start.tv_usec,
-	     sc->sc_tv_func_stop.tv_sec, (long) sc->sc_tv_func_stop.tv_usec);
+	     sc->sc_tv_func_start.tv_sec, sc->sc_tv_func_start.tv_usec,
+	     sc->sc_tv_func_stop.tv_sec, sc->sc_tv_func_stop.tv_usec);
 
 	o2net_sc_queue_work(sc, &sc->sc_shutdown_work);
 }
@@ -1534,6 +1540,22 @@ int o2net_register_hb_callbacks(void)
 }
 
 /* ------------------------------------------------------------ */
+
+#ifdef MISSING_SOCK_CREATE_LITE
+static inline int sock_create_lite(int family, int type, int protocol,
+				   struct socket **res)
+{
+	struct socket *sock = sock_alloc();
+	int ret = 0;
+
+	if (sock == NULL)
+		ret = -ENOMEM;
+
+	*res = sock;
+
+	return ret;
+}
+#endif /* MISSING_SOCK_CREATE_LITE */
 
 static int o2net_accept_one(struct socket *sock)
 {
@@ -1821,8 +1843,8 @@ int o2net_init(void)
 	unsigned long i;
 
 	o2net_hand = kcalloc(1, sizeof(struct o2net_handshake), GFP_KERNEL);
-	o2net_keep_req = kcalloc(1, sizeof(o2net_msg), GFP_KERNEL);
-	o2net_keep_resp = kcalloc(1, sizeof(o2net_msg), GFP_KERNEL);
+	o2net_keep_req = kcalloc(1, sizeof(struct o2net_msg), GFP_KERNEL);
+	o2net_keep_resp = kcalloc(1, sizeof(struct o2net_msg), GFP_KERNEL);
 	if (!o2net_hand || !o2net_keep_req || !o2net_keep_resp) {
 		kfree(o2net_hand);
 		kfree(o2net_keep_req);

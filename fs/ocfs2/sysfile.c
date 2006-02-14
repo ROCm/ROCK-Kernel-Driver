@@ -41,12 +41,12 @@
 
 #include "buffer_head_io.h"
 
-static struct inode * _ocfs2_get_system_file_inode(ocfs2_super *osb,
+static struct inode * _ocfs2_get_system_file_inode(struct ocfs2_super *osb,
 						   int type,
 						   u32 slot);
 
 static inline int is_global_system_inode(int type);
-static inline int is_in_system_inode_array(ocfs2_super *osb,
+static inline int is_in_system_inode_array(struct ocfs2_super *osb,
 					   int type,
 					   u32 slot);
 
@@ -56,14 +56,14 @@ static inline int is_global_system_inode(int type)
 		type <= OCFS2_LAST_GLOBAL_SYSTEM_INODE;
 }
 
-static inline int is_in_system_inode_array(ocfs2_super *osb,
+static inline int is_in_system_inode_array(struct ocfs2_super *osb,
 					   int type,
 					   u32 slot)
 {
 	return slot == osb->slot_num || is_global_system_inode(type);
 }
 
-struct inode *ocfs2_get_system_file_inode(ocfs2_super *osb,
+struct inode *ocfs2_get_system_file_inode(struct ocfs2_super *osb,
 					  int type,
 					  u32 slot)
 {
@@ -77,7 +77,8 @@ struct inode *ocfs2_get_system_file_inode(ocfs2_super *osb,
 	if (arr && ((inode = *arr) != NULL)) {
 		/* get a ref in addition to the array ref */
 		inode = igrab(inode);
-		BUG_ON(!inode);
+		if (!inode)
+			BUG();
 
 		return inode;
 	}
@@ -88,12 +89,13 @@ struct inode *ocfs2_get_system_file_inode(ocfs2_super *osb,
 	/* add one more if putting into array for first time */
 	if (arr && inode) {
 		*arr = igrab(inode);
-		BUG_ON(!*arr);
+		if (!*arr)
+			BUG();
 	}
 	return inode;
 }
 
-static struct inode * _ocfs2_get_system_file_inode(ocfs2_super *osb,
+static struct inode * _ocfs2_get_system_file_inode(struct ocfs2_super *osb,
 						   int type,
 						   u32 slot)
 {

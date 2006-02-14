@@ -100,18 +100,18 @@ static int ocfs2_remount(struct super_block *sb, int *flags, char *data);
 static void ocfs2_dismount_volume(struct super_block *sb, int mnt_err);
 static int ocfs2_initialize_mem_caches(void);
 static void ocfs2_free_mem_caches(void);
-static void ocfs2_delete_osb(ocfs2_super *osb);
+static void ocfs2_delete_osb(struct ocfs2_super *osb);
 
 static int ocfs2_statfs(struct super_block *sb, struct kstatfs *buf);
 
 static int ocfs2_sync_fs(struct super_block *sb, int wait);
 
-static int ocfs2_init_global_system_inodes(ocfs2_super *osb);
-static int ocfs2_init_local_system_inodes(ocfs2_super *osb);
-static int ocfs2_release_system_inodes(ocfs2_super *osb);
-static int ocfs2_fill_local_node_info(ocfs2_super *osb);
-static int ocfs2_check_volume(ocfs2_super *osb);
-static int ocfs2_verify_volume(ocfs2_dinode *di,
+static int ocfs2_init_global_system_inodes(struct ocfs2_super *osb);
+static int ocfs2_init_local_system_inodes(struct ocfs2_super *osb);
+static int ocfs2_release_system_inodes(struct ocfs2_super *osb);
+static int ocfs2_fill_local_node_info(struct ocfs2_super *osb);
+static int ocfs2_check_volume(struct ocfs2_super *osb);
+static int ocfs2_verify_volume(struct ocfs2_dinode *di,
 			       struct buffer_head *bh,
 			       u32 sectsize);
 static int ocfs2_initialize_super(struct super_block *sb,
@@ -140,13 +140,17 @@ static struct super_operations ocfs2_sops = {
 	.remount_fs	= ocfs2_remount,
 };
 
+#ifdef OCFS2_ORACORE_WORKAROUNDS
 #define OCFS_SUPER_MAGIC		0xa156f7eb
+#endif
 
 enum {
 	Opt_barrier,
 	Opt_err_panic,
 	Opt_err_ro,
+#ifdef OCFS2_ORACORE_WORKAROUNDS
 	Opt_datavolume,
+#endif
 	Opt_intr,
 	Opt_nointr,
 	Opt_hb_none,
@@ -158,7 +162,9 @@ static match_table_t tokens = {
 	{Opt_barrier, "barrier=%u"},
 	{Opt_err_panic, "errors=panic"},
 	{Opt_err_ro, "errors=remount-ro"},
+#ifdef OCFS2_ORACORE_WORKAROUNDS
 	{Opt_datavolume, "datavolume"},
+#endif
 	{Opt_intr, "intr"},
 	{Opt_nointr, "nointr"},
 	{Opt_hb_none, OCFS2_HB_NONE},
@@ -180,7 +186,7 @@ static int ocfs2_sync_fs(struct super_block *sb, int wait)
 {
 	int status = 0;
 	tid_t target;
-	ocfs2_super *osb = OCFS2_SB(sb);
+	struct ocfs2_super *osb = OCFS2_SB(sb);
 
 	sb->s_dirt = 0;
 
@@ -203,7 +209,7 @@ static int ocfs2_sync_fs(struct super_block *sb, int wait)
 	return 0;
 }
 
-static int ocfs2_init_global_system_inodes(ocfs2_super *osb)
+static int ocfs2_init_global_system_inodes(struct ocfs2_super *osb)
 {
 	struct inode *new = NULL;
 	int status = 0;
@@ -248,7 +254,7 @@ bail:
 	return status;
 }
 
-static int ocfs2_init_local_system_inodes(ocfs2_super *osb)
+static int ocfs2_init_local_system_inodes(struct ocfs2_super *osb)
 {
 	struct inode *new = NULL;
 	int status = 0;
@@ -276,7 +282,7 @@ bail:
 	return status;
 }
 
-static int ocfs2_release_system_inodes(ocfs2_super *osb)
+static int ocfs2_release_system_inodes(struct ocfs2_super *osb)
 {
 	int status = 0, i;
 	struct inode *inode;
@@ -364,7 +370,7 @@ static int ocfs2_remount(struct super_block *sb, int *flags, char *data)
 	int incompat_features;
 	int ret = 0;
 	unsigned long parsed_options;
-	ocfs2_super *osb = OCFS2_SB(sb);
+	struct ocfs2_super *osb = OCFS2_SB(sb);
 
 	if (!ocfs2_parse_options(sb, data, &parsed_options, 1)) {
 		ret = -EINVAL;
@@ -427,8 +433,8 @@ static int ocfs2_sb_probe(struct super_block *sb,
 			  int *sector_size)
 {
 	int status = 0, tmpstat;
-	ocfs1_vol_disk_hdr *hdr;
-	ocfs2_dinode *di;
+	struct ocfs1_vol_disk_hdr *hdr;
+	struct ocfs2_dinode *di;
 	int blksize;
 
 	*bh = NULL;
@@ -452,7 +458,7 @@ static int ocfs2_sb_probe(struct super_block *sb,
 		mlog_errno(status);
 		goto bail;
 	}
-	hdr = (ocfs1_vol_disk_hdr *) (*bh)->b_data;
+	hdr = (struct ocfs1_vol_disk_hdr *) (*bh)->b_data;
 	if (hdr->major_version == OCFS1_MAJOR_VERSION) {
 		mlog(ML_ERROR, "incompatible version: %u.%u\n",
 		     hdr->major_version, hdr->minor_version);
@@ -489,7 +495,7 @@ static int ocfs2_sb_probe(struct super_block *sb,
 			mlog_errno(status);
 			goto bail;
 		}
-		di = (ocfs2_dinode *) (*bh)->b_data;
+		di = (struct ocfs2_dinode *) (*bh)->b_data;
 		status = ocfs2_verify_volume(di, *bh, blksize);
 		if (status >= 0)
 			goto bail;
@@ -506,11 +512,11 @@ bail:
 void
 copy_uuid_from_super(char *buf, struct buffer_head *bh)
 {
-	ocfs2_dinode *di = NULL;
+	struct ocfs2_dinode *di = NULL;
 	int i;
 	char *ptr;
 	int ret;
-	di = (ocfs2_dinode *)bh->b_data;
+	di = (struct ocfs2_dinode *)bh->b_data;
 
 	for (i = 0, ptr = buf; i < OCFS2_VOL_UUID_LEN; i++) {
 		/* print with null */
@@ -530,7 +536,7 @@ static int ocfs2_fill_super(struct super_block *sb, void *data, int silent)
 	int status, sector_size;
 	unsigned long parsed_opt;
 	struct inode *inode = NULL;
-	ocfs2_super *osb = NULL;
+	struct ocfs2_super *osb = NULL;
 	struct buffer_head *bh = NULL;
 	char uuid[33];
 
@@ -569,9 +575,11 @@ static int ocfs2_fill_super(struct super_block *sb, void *data, int silent)
 	}
 	osb->s_mount_opt = parsed_opt;
 
+#ifdef OCFS2_ORACORE_WORKAROUNDS
 	if (osb->s_mount_opt & OCFS2_MOUNT_COMPAT_OCFS)
 		sb->s_magic = OCFS_SUPER_MAGIC;
 	else
+#endif
 		sb->s_magic = OCFS2_SUPER_MAGIC;
 
 	/* Hard readonly mode only if: bdev_read_only, MS_RDONLY,
@@ -761,6 +769,7 @@ static int ocfs2_parse_options(struct super_block *sb,
 		case Opt_err_ro:
 			*mount_opt &= ~OCFS2_MOUNT_ERRORS_PANIC;
 			break;
+#ifdef OCFS2_ORACORE_WORKAROUNDS
 		case Opt_datavolume:
 			if (is_remount) {
 				mlog(ML_ERROR, "Cannot specifiy datavolume "
@@ -770,6 +779,7 @@ static int ocfs2_parse_options(struct super_block *sb,
 			}
 			*mount_opt |= OCFS2_MOUNT_COMPAT_OCFS;
 			break;
+#endif
 		default:
 			mlog(ML_ERROR,
 			     "Unrecognized mount option \"%s\" "
@@ -880,10 +890,10 @@ static void ocfs2_put_super(struct super_block *sb)
 
 static int ocfs2_statfs(struct super_block *sb, struct kstatfs *buf)
 {
-	ocfs2_super *osb;
+	struct ocfs2_super *osb;
 	u32 numbits, freebits;
 	int status;
-	ocfs2_dinode *bm_lock;
+	struct ocfs2_dinode *bm_lock;
 	struct buffer_head *bh = NULL;
 	struct inode *inode = NULL;
 
@@ -906,14 +916,16 @@ static int ocfs2_statfs(struct super_block *sb, struct kstatfs *buf)
 		goto bail;
 	}
 
-	bm_lock = (ocfs2_dinode *) bh->b_data;
+	bm_lock = (struct ocfs2_dinode *) bh->b_data;
 
 	numbits = le32_to_cpu(bm_lock->id1.bitmap1.i_total);
 	freebits = numbits - le32_to_cpu(bm_lock->id1.bitmap1.i_used);
 
+#ifdef OCFS2_ORACORE_WORKAROUNDS
 	if (osb->s_mount_opt & OCFS2_MOUNT_COMPAT_OCFS)
 		buf->f_type = OCFS_SUPER_MAGIC;
 	else
+#endif
 		buf->f_type = OCFS2_SUPER_MAGIC;
 	buf->f_bsize = sb->s_blocksize;
 	buf->f_namelen = OCFS2_MAX_FILENAME_LEN;
@@ -958,7 +970,7 @@ static void ocfs2_inode_init_once(void *data,
 		oi->ip_dir_start_lookup = 0;
 
 		init_rwsem(&oi->ip_alloc_sem);
-		mutex_init(&oi->ip_io_mutex);
+		init_MUTEX(&(oi->ip_io_sem));
 
 		oi->ip_blkno = 0ULL;
 		oi->ip_clusters = 0;
@@ -983,7 +995,8 @@ static int ocfs2_initialize_mem_caches(void)
 		return -ENOMEM;
 
 	ocfs2_lock_cache = kmem_cache_create("ocfs2_lock",
-					     sizeof(ocfs2_journal_lock), 0,
+					     sizeof(struct ocfs2_journal_lock),
+					     0,
 					     SLAB_NO_REAP|SLAB_HWCACHE_ALIGN,
 					     NULL, NULL);
 	if (!ocfs2_lock_cache)
@@ -1028,7 +1041,7 @@ static int ocfs2_get_sector(struct super_block *sb,
 }
 
 /* ocfs2 1.0 only allows one cluster and node identity per kernel image. */
-static int ocfs2_fill_local_node_info(ocfs2_super *osb)
+static int ocfs2_fill_local_node_info(struct ocfs2_super *osb)
 {
 	int status;
 
@@ -1052,7 +1065,7 @@ static int ocfs2_mount_volume(struct super_block *sb)
 {
 	int status = 0;
 	int unlock_super = 0;
-	ocfs2_super *osb = OCFS2_SB(sb);
+	struct ocfs2_super *osb = OCFS2_SB(sb);
 
 	mlog_entry_void();
 
@@ -1143,7 +1156,7 @@ leave:
 /* we can't grab the goofy sem lock from inside wait_event, so we use
  * memory barriers to make sure that we'll see the null task before
  * being woken up */
-static int ocfs2_recovery_thread_running(ocfs2_super *osb)
+static int ocfs2_recovery_thread_running(struct ocfs2_super *osb)
 {
 	mb();
 	return osb->recovery_thread_task != NULL;
@@ -1152,7 +1165,7 @@ static int ocfs2_recovery_thread_running(ocfs2_super *osb)
 static void ocfs2_dismount_volume(struct super_block *sb, int mnt_err)
 {
 	int tmp;
-	ocfs2_super *osb = NULL;
+	struct ocfs2_super *osb = NULL;
 
 	mlog_entry("(0x%p)\n", sb);
 
@@ -1168,9 +1181,9 @@ static void ocfs2_dismount_volume(struct super_block *sb, int mnt_err)
 
 	/* disable any new recovery threads and wait for any currently
 	 * running ones to exit. Do this before setting the vol_state. */
-	mutex_lock(&osb->recovery_lock);
+	down(&osb->recovery_lock);
 	osb->disable_recovery = 1;
-	mutex_unlock(&osb->recovery_lock);
+	up(&osb->recovery_lock);
 	wait_event(osb->recovery_event, !ocfs2_recovery_thread_running(osb));
 
 	/* At this point, we know that no more recovery threads can be
@@ -1230,7 +1243,7 @@ static void ocfs2_dismount_volume(struct super_block *sb, int mnt_err)
 	sb->s_fs_info = NULL;
 }
 
-static int ocfs2_setup_osb_uuid(ocfs2_super *osb, const unsigned char *uuid,
+static int ocfs2_setup_osb_uuid(struct ocfs2_super *osb, const unsigned char *uuid,
 				unsigned uuid_bytes)
 {
 	int i, ret;
@@ -1262,16 +1275,16 @@ static int ocfs2_initialize_super(struct super_block *sb,
 {
 	int status = 0;
 	int i;
-	ocfs2_dinode *di = NULL;
+	struct ocfs2_dinode *di = NULL;
 	struct inode *inode = NULL;
 	struct buffer_head *bitmap_bh = NULL;
-	ocfs2_journal *journal;
+	struct ocfs2_journal *journal;
 	__le32 uuid_net_key;
-	ocfs2_super *osb;
+	struct ocfs2_super *osb;
 
 	mlog_entry_void();
 
-	osb = kcalloc(1, sizeof(ocfs2_super), GFP_KERNEL);
+	osb = kcalloc(1, sizeof(struct ocfs2_super), GFP_KERNEL);
 	if (!osb) {
 		status = -ENOMEM;
 		mlog_errno(status);
@@ -1288,7 +1301,8 @@ static int ocfs2_initialize_super(struct super_block *sb,
 	osb->sb = sb;
 	/* Save off for ocfs2_rw_direct */
 	osb->s_sectsize_bits = blksize_bits(sector_size);
-	BUG_ON(!osb->s_sectsize_bits);
+	if (!osb->s_sectsize_bits)
+		BUG();
 
 	osb->net_response_ids = 0;
 	spin_lock_init(&osb->net_response_lock);
@@ -1322,7 +1336,7 @@ static int ocfs2_initialize_super(struct super_block *sb,
 	snprintf(osb->dev_str, sizeof(osb->dev_str), "%u,%u",
 		 MAJOR(osb->sb->s_dev), MINOR(osb->sb->s_dev));
 
-	mutex_init(&osb->recovery_lock);
+	init_MUTEX(&osb->recovery_lock);
 
 	osb->disable_recovery = 0;
 	osb->recovery_thread_task = NULL;
@@ -1352,7 +1366,7 @@ static int ocfs2_initialize_super(struct super_block *sb,
 		goto bail;
 	}
 
-	di = (ocfs2_dinode *)bh->b_data;
+	di = (struct ocfs2_dinode *)bh->b_data;
 
 	if (ocfs2_setup_osb_uuid(osb, di->id2.i_super.s_uuid,
 				 sizeof(di->id2.i_super.s_uuid))) {
@@ -1410,7 +1424,7 @@ static int ocfs2_initialize_super(struct super_block *sb,
 	 */
 	/* initialize our journal structure */
 
-	journal = kcalloc(1, sizeof(ocfs2_journal), GFP_KERNEL);
+	journal = kcalloc(1, sizeof(struct ocfs2_journal), GFP_KERNEL);
 	if (!journal) {
 		mlog(ML_ERROR, "unable to alloc journal\n");
 		status = -ENOMEM;
@@ -1502,7 +1516,7 @@ static int ocfs2_initialize_super(struct super_block *sb,
 		goto bail;
 	}
 
-	di = (ocfs2_dinode *) bitmap_bh->b_data;
+	di = (struct ocfs2_dinode *) bitmap_bh->b_data;
 	osb->bitmap_cpg = le16_to_cpu(di->id2.i_chain.cl_cpg);
 	osb->num_clusters = le32_to_cpu(di->id1.bitmap1.i_total);
 	brelse(bitmap_bh);
@@ -1537,7 +1551,8 @@ bail:
  *              -EINVAL if there is a bad superblock
  *              0 on success
  */
-static int ocfs2_verify_volume(ocfs2_dinode *di, struct buffer_head *bh,
+static int ocfs2_verify_volume(struct ocfs2_dinode *di,
+			       struct buffer_head *bh,
 			       u32 blksz)
 {
 	int status = -EAGAIN;
@@ -1590,13 +1605,13 @@ static int ocfs2_verify_volume(ocfs2_dinode *di, struct buffer_head *bh,
 	return status;
 }
 
-static int ocfs2_check_volume(ocfs2_super *osb)
+static int ocfs2_check_volume(struct ocfs2_super *osb)
 {
 	int status = 0;
 	int dirty;
-	ocfs2_dinode *local_alloc = NULL; /* only used if we
-					   * recover
-					   * ourselves. */
+	struct ocfs2_dinode *local_alloc = NULL; /* only used if we
+						  * recover
+						  * ourselves. */
 
 	mlog_entry_void();
 
@@ -1674,7 +1689,7 @@ finally:
  * It will remove the osb from the global list and also free up all the
  * initialized resources and fileobject.
  */
-static void ocfs2_delete_osb(ocfs2_super *osb)
+static void ocfs2_delete_osb(struct ocfs2_super *osb)
 {
 	mlog_entry_void();
 
@@ -1693,7 +1708,7 @@ static void ocfs2_delete_osb(ocfs2_super *osb)
 		kfree(osb->local_alloc_copy);
 	kfree(osb->uuid_str);
 	ocfs2_put_dlm_debug(osb->osb_dlm_debug);
-	memset(osb, 0, sizeof(ocfs2_super));
+	memset(osb, 0, sizeof(struct ocfs2_super));
 
 	mlog_exit_void();
 }
@@ -1702,7 +1717,7 @@ static void ocfs2_delete_osb(ocfs2_super *osb)
  * panic(). We do not support continue-on-error operation. */
 static void ocfs2_handle_error(struct super_block *sb)
 {
-	ocfs2_super *osb = OCFS2_SB(sb);
+	struct ocfs2_super *osb = OCFS2_SB(sb);
 
 	if (osb->s_mount_opt & OCFS2_MOUNT_ERRORS_PANIC)
 		panic("OCFS2: (device %s): panic forced after error\n",

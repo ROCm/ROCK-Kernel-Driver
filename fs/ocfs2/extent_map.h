@@ -34,12 +34,12 @@ void exit_ocfs2_extent_maps(void);
  * in the process of being updated.
  */
 int ocfs2_extent_map_init(struct inode *inode);
-int ocfs2_extent_map_insert(struct inode *inode, ocfs2_extent_rec *rec,
+int ocfs2_extent_map_insert(struct inode *inode, struct ocfs2_extent_rec *rec,
 			    int tree_depth);
-int ocfs2_extent_map_append(struct inode *inode, ocfs2_extent_rec *rec,
+int ocfs2_extent_map_append(struct inode *inode, struct ocfs2_extent_rec *rec,
 			    u32 new_clusters);
 int ocfs2_extent_map_get_rec(struct inode *inode, u32 cpos,
-			     ocfs2_extent_rec **rec,
+			     struct ocfs2_extent_rec **rec,
 			     int *tree_depth);
 int ocfs2_extent_map_get_clusters(struct inode *inode,
 				  u32 v_cpos, int count,

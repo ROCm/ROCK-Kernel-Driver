@@ -28,9 +28,9 @@
 
 #include "ver.h"
 
-#define CLUSTER_BUILD_VERSION "1.1.7-SLES"
-#define CLUSTER_BUILD_DATE    "Mon Jan 16 11:58:10 PST 2006"
-#define CLUSTER_BUILD_MD5     "sles"
+#define CLUSTER_BUILD_VERSION	"1.2.0-SLES"
+#define CLUSTER_BUILD_DATE	"Tue Jan 24 14:31:42 PST 2006"
+#define CLUSTER_BUILD_MD5	"sles"
 
 #define VERSION_STR "OCFS2 Node Manager " \
 	CLUSTER_BUILD_VERSION " " CLUSTER_BUILD_DATE \

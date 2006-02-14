@@ -204,7 +204,7 @@ static int ocfs2_proc_alloc_stat(char *page, char **start, off_t off,
 {
 	int len, ret;
 	char *la_state;
-	ocfs2_super *osb = data;
+	struct ocfs2_super *osb = data;
 
 	mlog_entry_void();
 
@@ -258,7 +258,7 @@ static int ocfs2_proc_nodenum(char *page, char **start, off_t off,
 {
 	int len;
 	int ret;
-	ocfs2_super *osb = data;
+	struct ocfs2_super *osb = data;
 
 	mlog_entry_void();
 
@@ -274,7 +274,7 @@ static int ocfs2_proc_slotnum(char *page, char **start, off_t off,
 {
 	int len;
 	int ret;
-	ocfs2_super *osb = data;
+	struct ocfs2_super *osb = data;
 
 	mlog_entry_void();
 
@@ -308,7 +308,7 @@ static int ocfs2_proc_nodename(char *page, char **start, off_t off,
 	return ret;
 }
 
-void ocfs2_proc_add_volume(ocfs2_super * osb)
+void ocfs2_proc_add_volume(struct ocfs2_super * osb)
 {
 	char newdir[20];
 	struct proc_dir_entry *parent = NULL;
@@ -344,7 +344,7 @@ void ocfs2_proc_add_volume(ocfs2_super * osb)
 	mlog_exit_void();
 }
 
-void ocfs2_proc_remove_volume(ocfs2_super * osb)
+void ocfs2_proc_remove_volume(struct ocfs2_super * osb)
 {
 	ocfs2_proc_list *p;
 	char dir[20];
@@ -367,7 +367,7 @@ static int ocfs2_proc_uuid(char *page, char **start, off_t off,
 			   int count, int *eof, void *data)
 {
 	int len, ret;
-	ocfs2_super *osb = data;
+	struct ocfs2_super *osb = data;
 
 	mlog_entry_void();
 
@@ -383,7 +383,7 @@ static int ocfs2_proc_statistics(char *page, char **start, off_t off,
 {
 	int len;
 	int ret = 0;
-	ocfs2_super *osb = data;
+	struct ocfs2_super *osb = data;
 
 	mlog_entry_void();
 
@@ -408,7 +408,7 @@ static int ocfs2_proc_device(char *page, char **start, off_t off,
 {
 	int len;
 	int ret;
-	ocfs2_super *osb = data;
+	struct ocfs2_super *osb = data;
 
 	mlog_entry_void();
 
@@ -425,7 +425,7 @@ static int ocfs2_proc_nodes(char *page, char **start, off_t off,
 	int len = 0;
 	int i;
 	int ret;
-	ocfs2_super *osb = data;
+	struct ocfs2_super *osb = data;
 	char mount;
 
 	mlog_entry_void();
@@ -448,7 +448,7 @@ static int ocfs2_proc_label(char *page, char **start, off_t off,
 {
 	int len;
 	int ret;
-	ocfs2_super *osb = data;
+	struct ocfs2_super *osb = data;
 
 	mlog_entry_void();
 

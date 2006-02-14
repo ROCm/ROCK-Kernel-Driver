@@ -52,28 +52,28 @@
 spinlock_t trans_inc_lock = SPIN_LOCK_UNLOCKED;
 
 static int ocfs2_force_read_journal(struct inode *inode);
-static int ocfs2_recover_node(ocfs2_super *osb,
-			     int node_num);
+static int ocfs2_recover_node(struct ocfs2_super *osb,
+			      int node_num);
 static int __ocfs2_recovery_thread(void *arg);
-static int ocfs2_commit_cache(ocfs2_super *osb);
-static int ocfs2_wait_on_mount(ocfs2_super *osb);
-static void ocfs2_handle_cleanup_locks(ocfs2_journal *journal,
-				       ocfs2_journal_handle *handle);
-static void ocfs2_commit_unstarted_handle(ocfs2_journal_handle *handle);
-static int ocfs2_journal_toggle_dirty(ocfs2_super *osb,
-				     int dirty);
-static int ocfs2_trylock_journal(ocfs2_super *osb,
+static int ocfs2_commit_cache(struct ocfs2_super *osb);
+static int ocfs2_wait_on_mount(struct ocfs2_super *osb);
+static void ocfs2_handle_cleanup_locks(struct ocfs2_journal *journal,
+				       struct ocfs2_journal_handle *handle);
+static void ocfs2_commit_unstarted_handle(struct ocfs2_journal_handle *handle);
+static int ocfs2_journal_toggle_dirty(struct ocfs2_super *osb,
+				      int dirty);
+static int ocfs2_trylock_journal(struct ocfs2_super *osb,
 				 int slot_num);
-static int ocfs2_recover_orphans(ocfs2_super *osb,
-				int slot);
+static int ocfs2_recover_orphans(struct ocfs2_super *osb,
+				 int slot);
 static int ocfs2_commit_thread(void *arg);
 
-static int ocfs2_commit_cache(ocfs2_super *osb)
+static int ocfs2_commit_cache(struct ocfs2_super *osb)
 {
 	int status = 0;
 	unsigned int flushed;
 	unsigned long old_id;
-	ocfs2_journal *journal = NULL;
+	struct ocfs2_journal *journal = NULL;
 
 	mlog_entry_void();
 
@@ -113,9 +113,9 @@ finally:
 	return status;
 }
 
-ocfs2_journal_handle *ocfs2_alloc_handle(ocfs2_super *osb)
+struct ocfs2_journal_handle *ocfs2_alloc_handle(struct ocfs2_super *osb)
 {
-	ocfs2_journal_handle *retval = NULL;
+	struct ocfs2_journal_handle *retval = NULL;
 
 	retval = kcalloc(1, sizeof(*retval), GFP_KERNEL);
 	if (!retval) {
@@ -138,16 +138,17 @@ ocfs2_journal_handle *ocfs2_alloc_handle(ocfs2_super *osb)
 /* pass it NULL and it will allocate a new handle object for you.  If
  * you pass it a handle however, it may still return error, in which
  * case it has free'd the passed handle for you. */
-ocfs2_journal_handle *ocfs2_start_trans(ocfs2_super *osb,
-					ocfs2_journal_handle *handle,
-					int max_buffs)
+struct ocfs2_journal_handle *ocfs2_start_trans(struct ocfs2_super *osb,
+					       struct ocfs2_journal_handle *handle,
+					       int max_buffs)
 {
 	int ret;
 	journal_t *journal = osb->journal->j_journal;
 
 	mlog_entry("(max_buffs = %d)\n", max_buffs);
 
-	BUG_ON(!osb || !osb->journal->j_journal);
+	if (!osb || !osb->journal->j_journal)
+		BUG();
 
 	if (ocfs2_is_hard_readonly(osb)) {
 		ret = -EROFS;
@@ -206,7 +207,7 @@ done_free:
 	return ERR_PTR(ret);
 }
 
-void ocfs2_handle_add_inode(ocfs2_journal_handle *handle,
+void ocfs2_handle_add_inode(struct ocfs2_journal_handle *handle,
 			    struct inode *inode)
 {
 	BUG_ON(!handle);
@@ -226,7 +227,7 @@ void ocfs2_handle_add_inode(ocfs2_journal_handle *handle,
 	list_add_tail(&(OCFS2_I(inode)->ip_handle_list), &(handle->inode_list));
 }
 
-static void ocfs2_handle_unlock_inodes(ocfs2_journal_handle *handle)
+static void ocfs2_handle_unlock_inodes(struct ocfs2_journal_handle *handle)
 {
 	struct list_head *p, *n;
 	struct inode *inode;
@@ -247,7 +248,7 @@ static void ocfs2_handle_unlock_inodes(ocfs2_journal_handle *handle)
 
 /* This is trivial so we do it out of the main commit
  * paths. Beware, it can be called from start_trans too! */
-static void ocfs2_commit_unstarted_handle(ocfs2_journal_handle *handle)
+static void ocfs2_commit_unstarted_handle(struct ocfs2_journal_handle *handle)
 {
 	mlog_entry_void();
 
@@ -263,11 +264,11 @@ static void ocfs2_commit_unstarted_handle(ocfs2_journal_handle *handle)
 	mlog_exit_void();
 }
 
-void ocfs2_commit_trans(ocfs2_journal_handle *handle)
+void ocfs2_commit_trans(struct ocfs2_journal_handle *handle)
 {
 	handle_t *jbd_handle;
 	int retval;
-	ocfs2_journal *journal = handle->journal;
+	struct ocfs2_journal *journal = handle->journal;
 
 	mlog_entry_void();
 
@@ -327,7 +328,7 @@ void ocfs2_commit_trans(ocfs2_journal_handle *handle)
  * good because transaction ids haven't yet been recorded on the
  * cluster locks associated with this handle.
  */
-int ocfs2_extend_trans(ocfs2_journal_handle *handle,
+int ocfs2_extend_trans(struct ocfs2_journal_handle *handle,
 		       int nblocks)
 {
 	int status;
@@ -365,7 +366,7 @@ bail:
 	return status;
 }
 
-int ocfs2_journal_access(ocfs2_journal_handle *handle,
+int ocfs2_journal_access(struct ocfs2_journal_handle *handle,
 			 struct inode *inode,
 			 struct buffer_head *bh,
 			 int type)
@@ -400,7 +401,7 @@ int ocfs2_journal_access(ocfs2_journal_handle *handle,
 	 * j_trans_barrier for us. */
 	ocfs2_set_inode_lock_trans(OCFS2_SB(inode->i_sb)->journal, inode);
 
-	mutex_lock(&OCFS2_I(inode)->ip_io_mutex);
+	down(&OCFS2_I(inode)->ip_io_sem);
 	switch (type) {
 	case OCFS2_JOURNAL_ACCESS_CREATE:
 	case OCFS2_JOURNAL_ACCESS_WRITE:
@@ -415,7 +416,7 @@ int ocfs2_journal_access(ocfs2_journal_handle *handle,
 		status = -EINVAL;
 		mlog(ML_ERROR, "Uknown access type!\n");
 	}
-	mutex_unlock(&OCFS2_I(inode)->ip_io_mutex);
+	up(&OCFS2_I(inode)->ip_io_sem);
 
 	if (status < 0)
 		mlog(ML_ERROR, "Error %d getting %d access to buffer!\n",
@@ -425,7 +426,7 @@ int ocfs2_journal_access(ocfs2_journal_handle *handle,
 	return status;
 }
 
-int ocfs2_journal_dirty(ocfs2_journal_handle *handle,
+int ocfs2_journal_dirty(struct ocfs2_journal_handle *handle,
 			struct buffer_head *bh)
 {
 	int status;
@@ -446,11 +447,11 @@ int ocfs2_journal_dirty(ocfs2_journal_handle *handle,
 }
 
 /* We always assume you're adding a metadata lock at level 'ex' */
-int ocfs2_handle_add_lock(ocfs2_journal_handle *handle,
+int ocfs2_handle_add_lock(struct ocfs2_journal_handle *handle,
 			  struct inode *inode)
 {
 	int status;
-	ocfs2_journal_lock *lock;
+	struct ocfs2_journal_lock *lock;
 
 	BUG_ON(!inode);
 
@@ -474,15 +475,16 @@ bail:
 	return status;
 }
 
-static void ocfs2_handle_cleanup_locks(ocfs2_journal *journal,
-				       ocfs2_journal_handle *handle)
+static void ocfs2_handle_cleanup_locks(struct ocfs2_journal *journal,
+				       struct ocfs2_journal_handle *handle)
 {
 	struct list_head *p, *n;
-	ocfs2_journal_lock *lock;
+	struct ocfs2_journal_lock *lock;
 	struct inode *inode;
 
 	list_for_each_safe(p, n, &(handle->locks)) {
-		lock = list_entry(p, ocfs2_journal_lock, jl_lock_list);
+		lock = list_entry(p, struct ocfs2_journal_lock,
+				  jl_lock_list);
 		list_del(&lock->jl_lock_list);
 		handle->num_locks--;
 
@@ -499,7 +501,7 @@ static void ocfs2_handle_cleanup_locks(ocfs2_journal *journal,
 
 #define OCFS2_DEFAULT_COMMIT_INTERVAL 	(HZ * 5)
 
-void ocfs2_set_journal_params(ocfs2_super *osb)
+void ocfs2_set_journal_params(struct ocfs2_super *osb)
 {
 	journal_t *journal = osb->journal->j_journal;
 
@@ -512,14 +514,14 @@ void ocfs2_set_journal_params(ocfs2_super *osb)
 	spin_unlock(&journal->j_state_lock);
 }
 
-int ocfs2_journal_init(ocfs2_journal *journal, int *dirty)
+int ocfs2_journal_init(struct ocfs2_journal *journal, int *dirty)
 {
 	int status = -1;
 	struct inode *inode = NULL; /* the journal inode */
 	journal_t *j_journal = NULL;
-	ocfs2_dinode *di = NULL;
+	struct ocfs2_dinode *di = NULL;
 	struct buffer_head *bh = NULL;
-	ocfs2_super *osb;
+	struct ocfs2_super *osb;
 	int meta_lock = 0;
 
 	mlog_entry_void();
@@ -559,7 +561,7 @@ int ocfs2_journal_init(ocfs2_journal *journal, int *dirty)
 	}
 
 	meta_lock = 1;
-	di = (ocfs2_dinode *)bh->b_data;
+	di = (struct ocfs2_dinode *)bh->b_data;
 
 	if (inode->i_size <  OCFS2_MIN_JOURNAL_SIZE) {
 		mlog(ML_ERROR, "Journal file size (%lld) is too small!\n",
@@ -611,18 +613,18 @@ done:
 	return status;
 }
 
-static int ocfs2_journal_toggle_dirty(ocfs2_super *osb,
+static int ocfs2_journal_toggle_dirty(struct ocfs2_super *osb,
 				      int dirty)
 {
 	int status;
 	unsigned int flags;
-	ocfs2_journal *journal = osb->journal;
+	struct ocfs2_journal *journal = osb->journal;
 	struct buffer_head *bh = journal->j_bh;
-	ocfs2_dinode *fe;
+	struct ocfs2_dinode *fe;
 
 	mlog_entry_void();
 
-	fe = (ocfs2_dinode *)bh->b_data;
+	fe = (struct ocfs2_dinode *)bh->b_data;
 	if (!OCFS2_IS_VALID_DINODE(fe)) {
 		/* This is called from startup/shutdown which will
 		 * handle the errors in a specific manner, so no need
@@ -653,16 +655,17 @@ out:
  * If the journal has been kmalloc'd it needs to be freed after this
  * call.
  */
-void ocfs2_journal_shutdown(ocfs2_super *osb)
+void ocfs2_journal_shutdown(struct ocfs2_super *osb)
 {
-	ocfs2_journal *journal = NULL;
+	struct ocfs2_journal *journal = NULL;
 	int status = 0;
 	struct inode *inode = NULL;
 	int num_running_trans = 0;
 
 	mlog_entry_void();
 
-	BUG_ON(!osb);
+	if (!osb)
+		BUG();
 
 	journal = osb->journal;
 	if (!journal)
@@ -743,10 +746,10 @@ static void ocfs2_clear_journal_error(struct super_block *sb,
 	}
 }
 
-int ocfs2_journal_load(ocfs2_journal *journal)
+int ocfs2_journal_load(struct ocfs2_journal *journal)
 {
 	int status = 0;
-	ocfs2_super *osb;
+	struct ocfs2_super *osb;
 
 	mlog_entry_void();
 
@@ -788,13 +791,14 @@ done:
 
 /* 'full' flag tells us whether we clear out all blocks or if we just
  * mark the journal clean */
-int ocfs2_journal_wipe(ocfs2_journal *journal, int full)
+int ocfs2_journal_wipe(struct ocfs2_journal *journal, int full)
 {
 	int status;
 
 	mlog_entry_void();
 
-	BUG_ON(!journal);
+	if (!journal)
+		BUG();
 
 	status = journal_wipe(journal->j_journal, full);
 	if (status < 0) {
@@ -881,8 +885,8 @@ bail:
 struct ocfs2_la_recovery_item {
 	struct list_head	lri_list;
 	int			lri_slot;
-	ocfs2_dinode		*lri_la_dinode;
-	ocfs2_dinode		*lri_tl_dinode;
+	struct ocfs2_dinode	*lri_la_dinode;
+	struct ocfs2_dinode	*lri_tl_dinode;
 };
 
 /* Does the second half of the recovery process. By this point, the
@@ -898,9 +902,9 @@ struct ocfs2_la_recovery_item {
 void ocfs2_complete_recovery(void *data)
 {
 	int ret;
-	ocfs2_super *osb = data;
-	ocfs2_journal *journal = osb->journal;
-	ocfs2_dinode *la_dinode, *tl_dinode;
+	struct ocfs2_super *osb = data;
+	struct ocfs2_journal *journal = osb->journal;
+	struct ocfs2_dinode *la_dinode, *tl_dinode;
 	struct ocfs2_la_recovery_item *item;
 	struct list_head *p, *n;
 	LIST_HEAD(tmp_la_list);
@@ -959,10 +963,10 @@ void ocfs2_complete_recovery(void *data)
 /* NOTE: This function always eats your references to la_dinode and
  * tl_dinode, either manually on error, or by passing them to
  * ocfs2_complete_recovery */
-static void ocfs2_queue_recovery_completion(ocfs2_journal *journal,
+static void ocfs2_queue_recovery_completion(struct ocfs2_journal *journal,
 					    int slot_num,
-					    ocfs2_dinode *la_dinode,
-					    ocfs2_dinode *tl_dinode)
+					    struct ocfs2_dinode *la_dinode,
+					    struct ocfs2_dinode *tl_dinode)
 {
 	struct ocfs2_la_recovery_item *item;
 
@@ -994,9 +998,9 @@ static void ocfs2_queue_recovery_completion(ocfs2_journal *journal,
 
 /* Called by the mount code to queue recovery the last part of
  * recovery for it's own slot. */
-void ocfs2_complete_mount_recovery(ocfs2_super *osb)
+void ocfs2_complete_mount_recovery(struct ocfs2_super *osb)
 {
-	ocfs2_journal *journal = osb->journal;
+	struct ocfs2_journal *journal = osb->journal;
 
 	if (osb->dirty) {
 		/* No need to queue up our truncate_log as regular
@@ -1015,7 +1019,7 @@ void ocfs2_complete_mount_recovery(ocfs2_super *osb)
 static int __ocfs2_recovery_thread(void *arg)
 {
 	int status, node_num;
-	ocfs2_super *osb = arg;
+	struct ocfs2_super *osb = arg;
 
 	mlog_entry_void();
 
@@ -1060,10 +1064,10 @@ restart:
 					NULL);
 
 bail:
-	mutex_lock(&osb->recovery_lock);
+	down(&osb->recovery_lock);
 	if (!status &&
 	    !ocfs2_node_map_is_empty(osb, &osb->recovery_map)) {
-		mutex_unlock(&osb->recovery_lock);
+		up(&osb->recovery_lock);
 		goto restart;
 	}
 
@@ -1071,7 +1075,7 @@ bail:
 	mb(); /* sync with ocfs2_recovery_thread_running */
 	wake_up(&osb->recovery_event);
 
-	mutex_unlock(&osb->recovery_lock);
+	up(&osb->recovery_lock);
 
 	mlog_exit(status);
 	/* no one is callint kthread_stop() for us so the kthread() api
@@ -1081,12 +1085,12 @@ bail:
 	return status;
 }
 
-void ocfs2_recovery_thread(ocfs2_super *osb, int node_num)
+void ocfs2_recovery_thread(struct ocfs2_super *osb, int node_num)
 {
 	mlog_entry("(node_num=%d, osb->node_num = %d)\n",
 		   node_num, osb->node_num);
 
-	mutex_lock(&osb->recovery_lock);
+	down(&osb->recovery_lock);
 	if (osb->disable_recovery)
 		goto out;
 
@@ -1108,7 +1112,7 @@ void ocfs2_recovery_thread(ocfs2_super *osb, int node_num)
 	}
 
 out:
-	mutex_unlock(&osb->recovery_lock);
+	up(&osb->recovery_lock);
 	wake_up(&osb->recovery_event);
 
 	mlog_exit_void();
@@ -1116,7 +1120,7 @@ out:
 
 /* Does the actual journal replay and marks the journal inode as
  * clean. Will only replay if the journal inode is marked dirty. */
-static int ocfs2_replay_journal(ocfs2_super *osb,
+static int ocfs2_replay_journal(struct ocfs2_super *osb,
 				int node_num,
 				int slot_num)
 {
@@ -1124,7 +1128,7 @@ static int ocfs2_replay_journal(ocfs2_super *osb,
 	int got_lock = 0;
 	unsigned int flags;
 	struct inode *inode = NULL;
-	ocfs2_dinode *fe;
+	struct ocfs2_dinode *fe;
 	journal_t *journal = NULL;
 	struct buffer_head *bh = NULL;
 
@@ -1154,7 +1158,7 @@ static int ocfs2_replay_journal(ocfs2_super *osb,
 	}
 	got_lock = 1;
 
-	fe = (ocfs2_dinode *) bh->b_data;
+	fe = (struct ocfs2_dinode *) bh->b_data;
 
 	flags = le32_to_cpu(fe->id1.journal1.ij_flags);
 
@@ -1243,14 +1247,14 @@ done:
  * second part of a nodes recovery process (local alloc recovery) is
  * far less concerning.
  */
-static int ocfs2_recover_node(ocfs2_super *osb,
-			     int node_num)
+static int ocfs2_recover_node(struct ocfs2_super *osb,
+			      int node_num)
 {
 	int status = 0;
 	int slot_num;
 	struct ocfs2_slot_info *si = osb->slot_info;
-	ocfs2_dinode *la_copy = NULL;
-	ocfs2_dinode *tl_copy = NULL;
+	struct ocfs2_dinode *la_copy = NULL;
+	struct ocfs2_dinode *tl_copy = NULL;
 
 	mlog_entry("(node_num=%d, osb->node_num = %d)\n",
 		   node_num, osb->node_num);
@@ -1259,7 +1263,8 @@ static int ocfs2_recover_node(ocfs2_super *osb,
 
 	/* Should not ever be called to recover ourselves -- in that
 	 * case we should've called ocfs2_journal_load instead. */
-	BUG_ON(osb->node_num == node_num);
+	if (osb->node_num == node_num)
+		BUG();
 
 	slot_num = ocfs2_node_num_to_slot(si, node_num);
 	if (slot_num == OCFS2_INVALID_SLOT) {
@@ -1311,7 +1316,7 @@ done:
 /* Test node liveness by trylocking his journal. If we get the lock,
  * we drop it here. Return 0 if we got the lock, -EAGAIN if node is
  * still alive (we couldn't get the lock) and < 0 on error. */
-static int ocfs2_trylock_journal(ocfs2_super *osb,
+static int ocfs2_trylock_journal(struct ocfs2_super *osb,
 				 int slot_num)
 {
 	int status, flags;
@@ -1351,7 +1356,7 @@ bail:
 
 /* Call this underneath ocfs2_super_lock. It also assumes that the
  * slot info struct has been updated from disk. */
-int ocfs2_mark_dead_nodes(ocfs2_super *osb)
+int ocfs2_mark_dead_nodes(struct ocfs2_super *osb)
 {
 	int status, i, node_num;
 	struct ocfs2_slot_info *si = osb->slot_info;
@@ -1395,7 +1400,7 @@ bail:
 	return status;
 }
 
-static int ocfs2_recover_orphans(ocfs2_super *osb,
+static int ocfs2_recover_orphans(struct ocfs2_super *osb,
 				 int slot)
 {
 	int status = 0;
@@ -1538,7 +1543,7 @@ out:
 	return status;
 }
 
-static int ocfs2_wait_on_mount(ocfs2_super *osb)
+static int ocfs2_wait_on_mount(struct ocfs2_super *osb)
 {
 	/* This check is good because ocfs2 will wait on our recovery
 	 * thread before changing it to something other than MOUNTED
@@ -1561,8 +1566,8 @@ static int ocfs2_wait_on_mount(ocfs2_super *osb)
 static int ocfs2_commit_thread(void *arg)
 {
 	int status;
-	ocfs2_super *osb = arg;
-	ocfs2_journal *journal = osb->journal;
+	struct ocfs2_super *osb = arg;
+	struct ocfs2_journal *journal = osb->journal;
 
 	/* we can trust j_num_trans here because _should_stop() is only set in
 	 * shutdown and nobody other than ourselves should be able to start
@@ -1594,12 +1599,12 @@ static int ocfs2_commit_thread(void *arg)
 /* Look for a dirty journal without taking any cluster locks. Used for
  * hard readonly access to determine whether the file system journals
  * require recovery. */
-int ocfs2_check_journals_nolocks(ocfs2_super *osb)
+int ocfs2_check_journals_nolocks(struct ocfs2_super *osb)
 {
 	int ret = 0;
 	unsigned int slot;
 	struct buffer_head *di_bh;
-	ocfs2_dinode *di;
+	struct ocfs2_dinode *di;
 	struct inode *journal = NULL;
 
 	for(slot = 0; slot < osb->max_slots; slot++) {
@@ -1620,7 +1625,7 @@ int ocfs2_check_journals_nolocks(ocfs2_super *osb)
 			goto out;
 		}
 
-		di = (ocfs2_dinode *) di_bh->b_data;
+		di = (struct ocfs2_dinode *) di_bh->b_data;
 
 		if (le32_to_cpu(di->id1.journal1.ij_flags) &
 		    OCFS2_JOURNAL_DIRTY_FL)

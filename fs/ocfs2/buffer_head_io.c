@@ -52,7 +52,7 @@ void ocfs2_end_buffer_io_sync(struct buffer_head *bh,
 	unlock_buffer(bh);
 }
 
-int ocfs2_write_blocks(ocfs2_super *osb, struct buffer_head *bhs[],
+int ocfs2_write_blocks(struct ocfs2_super *osb, struct buffer_head *bhs[],
 		       int nr, struct inode *inode)
 {
 	int status = 0;
@@ -77,12 +77,12 @@ int ocfs2_write_blocks(ocfs2_super *osb, struct buffer_head *bhs[],
 	}
 
 	if (inode)
-		mutex_lock(&OCFS2_I(inode)->ip_io_mutex);
+		down(&OCFS2_I(inode)->ip_io_sem);
 	for (i = 0 ; i < nr ; i++) {
 		bh = bhs[i];
 		if (bh == NULL) {
 			if (inode)
-				mutex_unlock(&OCFS2_I(inode)->ip_io_mutex);
+				up(&OCFS2_I(inode)->ip_io_sem);
 			status = -EIO;
 			mlog_errno(status);
 			goto bail;
@@ -136,7 +136,7 @@ int ocfs2_write_blocks(ocfs2_super *osb, struct buffer_head *bhs[],
 			ocfs2_set_buffer_uptodate(inode, bh);
 	}
 	if (inode)
-		mutex_unlock(&OCFS2_I(inode)->ip_io_mutex);
+		up(&OCFS2_I(inode)->ip_io_sem);
 
 bail:
 
@@ -144,7 +144,7 @@ bail:
 	return status;
 }
 
-int ocfs2_read_blocks(ocfs2_super *osb, u64 block, int nr,
+int ocfs2_read_blocks(struct ocfs2_super *osb, u64 block, int nr,
 		      struct buffer_head *bhs[], int flags,
 		      struct inode *inode)
 {
@@ -181,13 +181,13 @@ int ocfs2_read_blocks(ocfs2_super *osb, u64 block, int nr,
 		flags &= ~OCFS2_BH_CACHED;
 
 	if (inode)
-		mutex_lock(&OCFS2_I(inode)->ip_io_mutex);
+		down(&OCFS2_I(inode)->ip_io_sem);
 	for (i = 0 ; i < nr ; i++) {
 		if (bhs[i] == NULL) {
 			bhs[i] = sb_getblk(sb, block++);
 			if (bhs[i] == NULL) {
 				if (inode)
-					mutex_unlock(&OCFS2_I(inode)->ip_io_mutex);
+					up(&OCFS2_I(inode)->ip_io_sem);
 				status = -EIO;
 				mlog_errno(status);
 				goto bail;
@@ -275,7 +275,7 @@ int ocfs2_read_blocks(ocfs2_super *osb, u64 block, int nr,
 			ocfs2_set_buffer_uptodate(inode, bh);
 	}
 	if (inode)
-		mutex_unlock(&OCFS2_I(inode)->ip_io_mutex);
+		up(&OCFS2_I(inode)->ip_io_sem);
 
 	mlog(ML_BH_IO, "block=(%"MLFu64"), nr=(%d), cached=%s\n", block, nr,
 	     (!(flags & OCFS2_BH_CACHED) || ignore_cache) ? "no" : "yes");

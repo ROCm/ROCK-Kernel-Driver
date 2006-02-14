@@ -45,10 +45,10 @@ static int ocfs2_symlink_get_block(struct inode *inode, sector_t iblock,
 {
 	int err = -EIO;
 	int status;
-	ocfs2_dinode *fe = NULL;
+	struct ocfs2_dinode *fe = NULL;
 	struct buffer_head *bh = NULL;
 	struct buffer_head *buffer_cache_bh = NULL;
-	ocfs2_super *osb = OCFS2_SB(inode->i_sb);
+	struct ocfs2_super *osb = OCFS2_SB(inode->i_sb);
 	void *kaddr;
 
 	mlog_entry("(0x%p, %llu, 0x%p, %d)\n", inode,
@@ -69,7 +69,7 @@ static int ocfs2_symlink_get_block(struct inode *inode, sector_t iblock,
 		mlog_errno(status);
 		goto bail;
 	}
-	fe = (ocfs2_dinode *) bh->b_data;
+	fe = (struct ocfs2_dinode *) bh->b_data;
 
 	if (!OCFS2_IS_VALID_DINODE(fe)) {
 		mlog(ML_ERROR, "Invalid dinode #%"MLFu64": signature = %.*s\n",

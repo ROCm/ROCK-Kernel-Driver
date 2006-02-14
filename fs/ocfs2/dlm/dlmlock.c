@@ -219,6 +219,17 @@ static enum dlm_status dlmlock_remote(struct dlm_ctxt *dlm,
 			dlm_error(status);
 		dlm_revert_pending_lock(res, lock);
 		dlm_lock_put(lock);
+	} else if (dlm_is_recovery_lock(res->lockname.name, 
+					res->lockname.len)) {
+		/* special case for the $RECOVERY lock.
+		 * there will never be an AST delivered to put
+		 * this lock on the proper secondary queue
+		 * (granted), so do it manually. */
+		mlog(0, "%s: $RECOVERY lock for this node (%u) is "
+		     "mastered by %u; got lock, manually granting (no ast)\n",
+		     dlm->name, dlm->node_num, res->owner);
+		list_del_init(&lock->list);
+		list_add_tail(&lock->list, &res->granted);
 	}
 	spin_unlock(&res->spinlock);
 
@@ -389,7 +400,7 @@ struct dlm_lock * dlm_new_lock(int type, u8 node, u64 cookie,
  *   held on exit:  none
  * returns: DLM_NORMAL, DLM_SYSERR, DLM_IVLOCKID, DLM_NOTQUEUED
  */
-int dlm_create_lock_handler(o2net_msg *msg, u32 len, void *data)
+int dlm_create_lock_handler(struct o2net_msg *msg, u32 len, void *data)
 {
 	struct dlm_ctxt *dlm = data;
 	struct dlm_create_lock *create = (struct dlm_create_lock *)msg->buf;
@@ -645,7 +656,19 @@ retry_lock:
 			mlog(0, "retrying lock with migration/"
 			     "recovery/in progress\n");
 			msleep(100);
-			dlm_wait_for_recovery(dlm);
+			/* no waiting for dlm_reco_thread */
+			if (recovery) {
+				if (status == DLM_RECOVERING) {
+					mlog(0, "%s: got RECOVERING "
+					     "for $REOCVERY lock, master "
+					     "was %u\n", dlm->name, 
+					     res->owner);
+					dlm_wait_for_node_death(dlm, res->owner, 
+							DLM_NODE_DEATH_WAIT_MAX);
+				}
+			} else {
+				dlm_wait_for_recovery(dlm);
+			}
 			goto retry_lock;
 		}
 

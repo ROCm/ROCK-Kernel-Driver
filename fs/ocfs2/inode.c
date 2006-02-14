@@ -66,11 +66,11 @@ static int ocfs2_read_locked_inode(struct inode *inode,
 				   struct ocfs2_find_inode_args *args);
 static int ocfs2_init_locked_inode(struct inode *inode, void *opaque);
 static int ocfs2_find_actor(struct inode *inode, void *opaque);
-static int ocfs2_truncate_for_delete(ocfs2_super *osb,
+static int ocfs2_truncate_for_delete(struct ocfs2_super *osb,
 				    struct inode *inode,
 				    struct buffer_head *fe_bh);
 
-struct inode *ocfs2_ilookup_for_vote(ocfs2_super *osb,
+struct inode *ocfs2_ilookup_for_vote(struct ocfs2_super *osb,
 				     u64 blkno,
 				     int delete_vote)
 {
@@ -88,7 +88,7 @@ struct inode *ocfs2_ilookup_for_vote(ocfs2_super *osb,
 	return ilookup5(osb->sb, args.fi_ino, ocfs2_find_actor, &args);
 }
 
-struct inode *ocfs2_iget(ocfs2_super *osb, u64 blkno)
+struct inode *ocfs2_iget(struct ocfs2_super *osb, u64 blkno)
 {
 	struct inode *inode = NULL;
 	struct super_block *sb = osb->sb;
@@ -211,11 +211,11 @@ static int ocfs2_init_locked_inode(struct inode *inode, void *opaque)
 	return 0;
 }
 
-int ocfs2_populate_inode(struct inode *inode, ocfs2_dinode *fe,
+int ocfs2_populate_inode(struct inode *inode, struct ocfs2_dinode *fe,
 		     	 int create_ino)
 {
 	struct super_block *sb;
-	ocfs2_super *osb;
+	struct ocfs2_super *osb;
 	int status = -EINVAL;
 
 	mlog_entry("(0x%p, size:%"MLFu64")\n", inode, fe->i_size);
@@ -335,8 +335,8 @@ static int ocfs2_read_locked_inode(struct inode *inode,
 				   struct ocfs2_find_inode_args *args)
 {
 	struct super_block *sb;
-	ocfs2_super *osb;
-	ocfs2_dinode *fe;
+	struct ocfs2_super *osb;
+	struct ocfs2_dinode *fe;
 	struct buffer_head *bh = NULL;
 	int status;
 	int sysfile = 0;
@@ -367,7 +367,7 @@ static int ocfs2_read_locked_inode(struct inode *inode,
 		goto bail;
 	}
 
-	fe = (ocfs2_dinode *) bh->b_data;
+	fe = (struct ocfs2_dinode *) bh->b_data;
 	if (!OCFS2_IS_VALID_DINODE(fe)) {
 		mlog(ML_ERROR, "Invalid dinode #%"MLFu64": signature = %.*s\n",
 		     fe->i_blkno, 7, fe->i_signature);
@@ -410,18 +410,18 @@ void ocfs2_sync_blockdev(struct super_block *sb)
 	sync_blockdev(sb->s_bdev);
 }
 
-static int ocfs2_truncate_for_delete(ocfs2_super *osb,
+static int ocfs2_truncate_for_delete(struct ocfs2_super *osb,
 				     struct inode *inode,
 				     struct buffer_head *fe_bh)
 {
 	int status = 0;
-	ocfs2_journal_handle *handle = NULL;
+	struct ocfs2_journal_handle *handle = NULL;
 	struct ocfs2_truncate_context *tc = NULL;
-	ocfs2_dinode *fe;
+	struct ocfs2_dinode *fe;
 
 	mlog_entry_void();
 
-	fe = (ocfs2_dinode *) fe_bh->b_data;
+	fe = (struct ocfs2_dinode *) fe_bh->b_data;
 
 	/* zero allocation, zero truncate :) */
 	if (!fe->i_clusters)
@@ -471,9 +471,9 @@ static int ocfs2_remove_inode(struct inode *inode,
 	int status;
 	struct inode *inode_alloc_inode = NULL;
 	struct buffer_head *inode_alloc_bh = NULL;
-	ocfs2_journal_handle *handle;
-	ocfs2_super *osb = OCFS2_SB(inode->i_sb);
-	ocfs2_dinode *di = (ocfs2_dinode *) di_bh->b_data;
+	struct ocfs2_journal_handle *handle;
+	struct ocfs2_super *osb = OCFS2_SB(inode->i_sb);
+	struct ocfs2_dinode *di = (struct ocfs2_dinode *) di_bh->b_data;
 
 	inode_alloc_inode =
 		ocfs2_get_system_file_inode(osb, INODE_ALLOC_SYSTEM_INODE,
@@ -549,7 +549,7 @@ static int ocfs2_wipe_inode(struct inode *inode,
 	int status, orphaned_slot;
 	struct inode *orphan_dir_inode = NULL;
 	struct buffer_head *orphan_dir_bh = NULL;
-	ocfs2_super *osb = OCFS2_SB(inode->i_sb);
+	struct ocfs2_super *osb = OCFS2_SB(inode->i_sb);
 
 	/* We've already voted on this so it should be readonly - no
 	 * spinlock needed. */
@@ -606,7 +606,7 @@ static int ocfs2_inode_is_valid_to_delete(struct inode *inode)
 {
 	int ret = 0;
 	struct ocfs2_inode_info *oi = OCFS2_I(inode);
-	ocfs2_super *osb = OCFS2_SB(inode->i_sb);
+	struct ocfs2_super *osb = OCFS2_SB(inode->i_sb);
 
 	/* We shouldn't be getting here for the root directory
 	 * inode.. */
@@ -663,7 +663,7 @@ static int ocfs2_query_inode_wipe(struct inode *inode,
 {
 	int status = 0;
 	struct ocfs2_inode_info *oi = OCFS2_I(inode);
-	ocfs2_dinode *di;
+	struct ocfs2_dinode *di;
 
 	*wipe = 0;
 
@@ -685,7 +685,7 @@ static int ocfs2_query_inode_wipe(struct inode *inode,
 	}
 
 	/* Do some basic inode verification... */
-	di = (ocfs2_dinode *) di_bh->b_data;
+	di = (struct ocfs2_dinode *) di_bh->b_data;
 	if (!(di->i_flags & cpu_to_le32(OCFS2_ORPHANED_FL))) {
 		/* for lack of a better error? */
 		status = -EEXIST;
@@ -746,9 +746,11 @@ static void ocfs2_cleanup_delete_inode(struct inode *inode,
 {
 	mlog(0, "Cleanup inode %"MLFu64", sync = %d\n",
 	     OCFS2_I(inode)->ip_blkno, sync_data);
+#ifndef OCFS2_DELETE_INODE_WORKAROUND
 	if (sync_data)
 		write_inode_now(inode, 1);
 	truncate_inode_pages(&inode->i_data, 0);
+#endif
 }
 
 void ocfs2_delete_inode(struct inode *inode)
@@ -895,10 +897,10 @@ void ocfs2_clear_inode(struct inode *inode)
 			"Clear inode of %"MLFu64", inode is locked\n",
 			oi->ip_blkno);
 
-	mlog_bug_on_msg(!mutex_trylock(&oi->ip_io_mutex),
-			"Clear inode of %"MLFu64", io_mutex is locked\n",
+	mlog_bug_on_msg(down_trylock(&oi->ip_io_sem),
+			"Clear inode of %"MLFu64", io_sem is locked\n",
 			oi->ip_blkno);
-	mutex_unlock(&oi->ip_io_mutex);
+	up(&oi->ip_io_sem);
 
 	/*
 	 * down_trylock() returns 0, down_write_trylock() returns 1
@@ -1055,12 +1057,12 @@ bail:
  * struct inode.
  * Only takes ip_lock.
  */
-int ocfs2_mark_inode_dirty(ocfs2_journal_handle *handle,
+int ocfs2_mark_inode_dirty(struct ocfs2_journal_handle *handle,
 			   struct inode *inode,
 			   struct buffer_head *bh)
 {
 	int status;
-	ocfs2_dinode *fe = (ocfs2_dinode *) bh->b_data;
+	struct ocfs2_dinode *fe = (struct ocfs2_dinode *) bh->b_data;
 
 	mlog_entry("(inode %"MLFu64")\n", OCFS2_I(inode)->ip_blkno);
 
@@ -1104,9 +1106,9 @@ leave:
  * does no i/o, only takes ip_lock.
  */
 void ocfs2_refresh_inode(struct inode *inode,
-			ocfs2_dinode *fe)
+			 struct ocfs2_dinode *fe)
 {
-	ocfs2_super *osb = OCFS2_SB(inode->i_sb);
+	struct ocfs2_super *osb = OCFS2_SB(inode->i_sb);
 
 	spin_lock(&OCFS2_I(inode)->ip_lock);
 

@@ -33,7 +33,6 @@
 #include <linux/rbtree.h>
 #include <linux/workqueue.h>
 #include <linux/kref.h>
-#include <linux/mutex.h>
 
 #include "cluster/nodemanager.h"
 #include "cluster/heartbeat.h"
@@ -184,17 +183,18 @@ enum ocfs2_mount_options
 	OCFS2_MOUNT_BARRIER = 1 << 1,	/* Use block barriers */
 	OCFS2_MOUNT_NOINTR  = 1 << 2,   /* Don't catch signals */
 	OCFS2_MOUNT_ERRORS_PANIC = 1 << 3, /* Panic on errors */
+#ifdef OCFS2_ORACORE_WORKAROUNDS
 	OCFS2_MOUNT_COMPAT_OCFS = 1 << 30, /* ocfs1 compatibility mode */
+#endif
 };
 
 #define OCFS2_OSB_SOFT_RO	0x0001
 #define OCFS2_OSB_HARD_RO	0x0002
 #define OCFS2_OSB_ERROR_FS	0x0004
 
-struct _ocfs2_journal;
-typedef struct _ocfs2_journal_handle ocfs2_journal_handle;
-
-typedef struct _ocfs2_super
+struct ocfs2_journal;
+struct ocfs2_journal_handle;
+struct ocfs2_super
 {
 	u32 osb_id;		/* id used by the proc interface */
 	struct task_struct *commit_task;
@@ -243,12 +243,12 @@ typedef struct _ocfs2_super
 	struct proc_dir_entry *proc_sub_dir; /* points to /proc/fs/ocfs2/<maj_min> */
 
 	atomic_t vol_state;
-	struct mutex recovery_lock;
+	struct semaphore recovery_lock;
 	struct task_struct *recovery_thread_task;
 	int disable_recovery;
 	wait_queue_head_t checkpoint_event;
 	atomic_t needs_checkpoint;
-	struct _ocfs2_journal *journal;
+	struct ocfs2_journal *journal;
 
 	enum ocfs2_local_alloc_state local_alloc_state;
 	struct buffer_head *local_alloc_bh;
@@ -256,7 +256,7 @@ typedef struct _ocfs2_super
 	/* Next two fields are for local node slot recovery during
 	 * mount. */
 	int dirty;
-	ocfs2_dinode *local_alloc_copy;
+	struct ocfs2_dinode *local_alloc_copy;
 
 	struct ocfs2_alloc_stats alloc_stats;
 	char dev_str[20];		/* "major,minor" of the device */
@@ -306,16 +306,16 @@ typedef struct _ocfs2_super
 	struct inode			*osb_tl_inode;
 	struct buffer_head		*osb_tl_bh;
 	struct work_struct		osb_truncate_log_wq;
-} ocfs2_super;
+};
 
-#define OCFS2_SB(sb)	    ((ocfs2_super *)(sb)->s_fs_info)
+#define OCFS2_SB(sb)	    ((struct ocfs2_super *)(sb)->s_fs_info)
 #define OCFS2_MAX_OSB_ID             65536
 
 /* set / clear functions because cluster events can make these happen
  * in parallel so we want the transitions to be atomic. this also
  * means that any future flags osb_flags must be protected by spinlock
  * too! */
-static inline void ocfs2_set_osb_flag(ocfs2_super *osb,
+static inline void ocfs2_set_osb_flag(struct ocfs2_super *osb,
 				      unsigned long flag)
 {
 	spin_lock(&osb->osb_lock);
@@ -323,7 +323,7 @@ static inline void ocfs2_set_osb_flag(ocfs2_super *osb,
 	spin_unlock(&osb->osb_lock);
 }
 
-static inline void ocfs2_set_ro_flag(ocfs2_super *osb,
+static inline void ocfs2_set_ro_flag(struct ocfs2_super *osb,
 				     int hard)
 {
 	spin_lock(&osb->osb_lock);
@@ -335,7 +335,7 @@ static inline void ocfs2_set_ro_flag(ocfs2_super *osb,
 	spin_unlock(&osb->osb_lock);
 }
 
-static inline int ocfs2_is_hard_readonly(ocfs2_super *osb)
+static inline int ocfs2_is_hard_readonly(struct ocfs2_super *osb)
 {
 	int ret;
 
@@ -346,7 +346,7 @@ static inline int ocfs2_is_hard_readonly(ocfs2_super *osb)
 	return ret;
 }
 
-static inline int ocfs2_is_soft_readonly(ocfs2_super *osb)
+static inline int ocfs2_is_soft_readonly(struct ocfs2_super *osb)
 {
 	int ret;
 

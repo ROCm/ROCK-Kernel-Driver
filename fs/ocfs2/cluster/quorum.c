@@ -245,7 +245,7 @@ static void o2quo_hb_down(struct o2nm_node *_node, int node, void *data)
 void o2quo_hb_still_up(void *arg)
 {
 	struct o2quo_state *qs = &o2quo_state;
-	u8 node = (u8)(long)arg;
+	u8 node = (long)arg;
 
 	spin_lock(&qs->qs_lock);
 
@@ -379,7 +379,7 @@ static int o2quo_register_hb_callbacks(void)
 int o2quo_init(void)
 {
 	struct o2quo_state *qs = &o2quo_state;
-	int i;
+	long i;
 
 	spin_lock_init(&qs->qs_lock);
 	INIT_WORK(&qs->qs_work, o2quo_make_decision, NULL);

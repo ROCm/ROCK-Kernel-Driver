@@ -262,7 +262,11 @@ static int sc_seq_show(struct seq_file *seq, void *v)
 
 	if (sc != NULL) {
 /* netdev 1, world 0 */
+#ifdef INET_SK_RETURNS_INET_OPT
+		struct inet_opt *inet = NULL;
+#else
 		struct inet_sock *inet = NULL;
+#endif
 		__be32 saddr = 0, daddr = 0;
 		__be16 sport = 0, dport = 0;
 

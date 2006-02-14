@@ -44,8 +44,8 @@ struct ocfs2_meta_lvb {
 	__be32       lvb_reserved[2];
 };
 
-int ocfs2_dlm_init(ocfs2_super *osb);
-void ocfs2_dlm_shutdown(ocfs2_super *osb);
+int ocfs2_dlm_init(struct ocfs2_super *osb);
+void ocfs2_dlm_shutdown(struct ocfs2_super *osb);
 void ocfs2_lock_res_init_once(struct ocfs2_lock_res *res);
 void ocfs2_inode_lock_res_init(struct ocfs2_lock_res *res,
 			       enum ocfs2_lock_type type,
@@ -62,7 +62,7 @@ void ocfs2_data_unlock(struct inode *inode,
 /* Instruct the dlm not to queue ourselves on the other node. */
 #define OCFS2_META_LOCK_NOQUEUE		(0x02)
 int ocfs2_meta_lock_full(struct inode *inode,
-			 ocfs2_journal_handle *handle,
+			 struct ocfs2_journal_handle *handle,
 			 struct buffer_head **ret_bh,
 			 int ex,
 			 int flags,
@@ -73,16 +73,16 @@ int ocfs2_meta_lock_full(struct inode *inode,
 #define ocfs2_meta_lock(i, h, b, e) ocfs2_meta_lock_full(i, h, b, e, 0, NULL, 0)
 void ocfs2_meta_unlock(struct inode *inode,
 		       int ex);
-int ocfs2_super_lock(ocfs2_super *osb,
+int ocfs2_super_lock(struct ocfs2_super *osb,
 		     int ex);
-void ocfs2_super_unlock(ocfs2_super *osb,
+void ocfs2_super_unlock(struct ocfs2_super *osb,
 			int ex);
-int ocfs2_rename_lock(ocfs2_super *osb);
-void ocfs2_rename_unlock(ocfs2_super *osb);
+int ocfs2_rename_lock(struct ocfs2_super *osb);
+void ocfs2_rename_unlock(struct ocfs2_super *osb);
 void ocfs2_mark_lockres_freeing(struct ocfs2_lock_res *lockres);
 
 /* for the vote thread */
-void ocfs2_process_blocked_lock(ocfs2_super *osb,
+void ocfs2_process_blocked_lock(struct ocfs2_super *osb,
 				struct ocfs2_lock_res *lockres);
 
 struct ocfs2_dlm_debug *ocfs2_new_dlm_debug(void);

@@ -441,9 +441,9 @@ static int ocfs2_write_remove_suid(struct inode *inode)
 	int ret;
 	struct buffer_head *bh = NULL;
 	struct ocfs2_inode_info *oi = OCFS2_I(inode);
-	ocfs2_journal_handle *handle;
-	ocfs2_super *osb = OCFS2_SB(inode->i_sb);
-	ocfs2_dinode *di;
+	struct ocfs2_journal_handle *handle;
+	struct ocfs2_super *osb = OCFS2_SB(inode->i_sb);
+	struct ocfs2_dinode *di;
 
 	mlog_entry("(Inode %"MLFu64", mode 0%o)\n", oi->ip_blkno,
 		   inode->i_mode);
@@ -474,7 +474,7 @@ static int ocfs2_write_remove_suid(struct inode *inode)
 	if ((inode->i_mode & S_ISGID) && (inode->i_mode & S_IXGRP))
 		inode->i_mode &= ~S_ISGID;
 
-	di = (ocfs2_dinode *) bh->b_data;
+	di = (struct ocfs2_dinode *) bh->b_data;
 	di->i_mode = cpu_to_le16(inode->i_mode);
 
 	ret = ocfs2_journal_dirty(handle, bh);
@@ -522,7 +522,7 @@ ssize_t ocfs2_write_lock_maybe_extend(struct file *filp,
 				      struct ocfs2_buffer_lock_ctxt *ctxt)
 {
 	int ret = 0;
-	ocfs2_super *osb = NULL;
+	struct ocfs2_super *osb = NULL;
 	struct dentry *dentry = filp->f_dentry;
 	struct inode *inode = dentry->d_inode;
 	int status;
@@ -620,15 +620,18 @@ lock:
 		saved_ppos = i_size_read(inode);
 		mlog(0, "O_APPEND: inode->i_size=%llu\n", saved_ppos);
 
+#ifdef OCFS2_ORACORE_WORKAROUNDS
 		if (osb->s_mount_opt & OCFS2_MOUNT_COMPAT_OCFS) {
 			/* ugh, work around some applications which open
 			 * everything O_DIRECT + O_APPEND and really don't
 			 * mean to use O_DIRECT. */
 			filp->f_flags &= ~O_DIRECT;
 		}
+#endif
 	}
 
 	if (filp->f_flags & O_DIRECT) {
+#ifdef OCFS2_ORACORE_WORKAROUNDS
 		if (osb->s_mount_opt & OCFS2_MOUNT_COMPAT_OCFS) {
 			int sector_size = 1 << osb->s_sectsize_bits;
 
@@ -641,6 +644,7 @@ lock:
 				info->wl_do_direct_io = 1;
 			}
 		} else
+#endif
 			info->wl_do_direct_io = 1;
 
 		mlog(0, "O_DIRECT\n");

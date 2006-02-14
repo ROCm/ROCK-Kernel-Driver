@@ -46,10 +46,9 @@
 #include "mmap.h"
 #include "suballoc.h"
 
-
 struct ocfs2_kiocb_private {
 	struct ocfs2_kiocb_private	*kp_teardown_next;
-	ocfs2_super			*kp_osb;
+	struct ocfs2_super			*kp_osb;
 	unsigned			kp_have_alloc_sem:1,
 					kp_have_write_locks:1;
 	struct inode			*kp_inode;
@@ -74,7 +73,7 @@ static void okp_teardown(struct ocfs2_kiocb_private *okp)
 
 void okp_teardown_from_list(void *data)
 {
-	ocfs2_super *osb = data;
+	struct ocfs2_super *osb = data;
 	struct ocfs2_kiocb_private *okp, *next;
 
 	for (okp = xchg(&osb->osb_okp_teardown_next, NULL); okp != NULL;
@@ -111,7 +110,7 @@ void okp_teardown_from_list(void *data)
 static void ocfs2_ki_dtor(struct kiocb *iocb)
 {
 	struct ocfs2_kiocb_private *next, *okp = iocb->private;
-	ocfs2_super *osb = okp->kp_osb;
+	struct ocfs2_super *osb = okp->kp_osb;
 
 	mlog(0, "iocb %p okp %p\n", iocb, okp);
 
@@ -137,7 +136,7 @@ static void ocfs2_ki_dtor(struct kiocb *iocb)
 }
 
 /* see ocfs2_ki_dtor() */
-void ocfs2_wait_for_okp_destruction(ocfs2_super *osb)
+void ocfs2_wait_for_okp_destruction(struct ocfs2_super *osb)
 {
 	/* first wait for okps to enter the work queue */
 	wait_event(osb->osb_okp_pending_wq,
@@ -166,7 +165,7 @@ static struct ocfs2_kiocb_private *okp_alloc(struct kiocb *iocb)
 {
 	struct inode *inode = iocb->ki_filp->f_dentry->d_inode;
 	struct ocfs2_kiocb_private *okp;
-	ocfs2_super *osb;
+	struct ocfs2_super *osb;
 
 	okp = kcalloc(1, sizeof(*okp), GFP_KERNEL);
 	if (okp == NULL) {

@@ -41,7 +41,7 @@
 /*
  * OCFS1 superblock.  Lives at sector 0.
  */
-typedef struct _ocfs1_vol_disk_hdr
+struct ocfs1_vol_disk_hdr
 {
 /*00*/	__u32 minor_version;
 	__u32 major_version;
@@ -70,10 +70,10 @@ typedef struct _ocfs1_vol_disk_hdr
 	__u32 prot_bits;
 	__s32 excl_mount;
 /*1B0*/
-} ocfs1_vol_disk_hdr;
+};
 
 
-typedef struct _ocfs1_disk_lock
+struct ocfs1_disk_lock
 {
 /*00*/	__u32 curr_master;
 	__u8 file_lock;
@@ -87,14 +87,14 @@ typedef struct _ocfs1_disk_lock
 /*20*/	__u64 oin_node_map;
 	__u64 dlock_seq_num;
 /*30*/
-} ocfs1_disk_lock;
+};
 
 /*
  * OCFS1 volume label.  Lives at sector 1.
  */
-typedef struct _ocfs1_vol_label
+struct ocfs1_vol_label
 {
-/*00*/	ocfs1_disk_lock disk_lock;
+/*00*/	struct ocfs1_disk_lock disk_lock;
 /*30*/	__u8 label[OCFS1_MAX_VOL_LABEL_LEN];
 /*70*/	__u16 label_len;
 /*72*/	__u8 vol_id[OCFS1_MAX_VOL_ID_LENGTH];
@@ -102,7 +102,7 @@ typedef struct _ocfs1_vol_label
 /*84*/	__u8 cluster_name[OCFS1_MAX_CLUSTER_NAME_LEN];
 /*A4*/	__u16 cluster_name_len;
 /*A6*/
-} ocfs1_vol_label;
+};
 
 
 #endif /* _OCFS1_FS_COMPAT_H */

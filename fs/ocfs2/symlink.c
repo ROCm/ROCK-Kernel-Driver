@@ -87,7 +87,7 @@ static char *ocfs2_fast_symlink_getlink(struct inode *inode,
 {
 	int status;
 	char *link = NULL;
-	ocfs2_dinode *fe;
+	struct ocfs2_dinode *fe;
 
 	mlog_entry_void();
 
@@ -102,7 +102,7 @@ static char *ocfs2_fast_symlink_getlink(struct inode *inode,
 		goto bail;
 	}
 
-	fe = (ocfs2_dinode *) (*bh)->b_data;
+	fe = (struct ocfs2_dinode *) (*bh)->b_data;
 	link = (char *) fe->id2.i_symlink;
 bail:
 	mlog_exit(status);
@@ -134,6 +134,8 @@ out:
 	mlog_exit(ret);
 	return ret;
 }
+
+#ifdef OCFS2_CDSL
 
 struct ocfs2_symlink_ops {
 	const char *name;
@@ -211,7 +213,7 @@ sym_nodenum(char *str, void *data)
 	unsigned int l;
 	char buf[10];
 	struct inode *inode = data;
-	ocfs2_super *osb = OCFS2_SB(inode->i_sb);
+	struct ocfs2_super *osb = OCFS2_SB(inode->i_sb);
 
 	l = sprintf(buf, "%lu", (unsigned long)osb->node_num);
 
@@ -373,6 +375,7 @@ static inline int ocfs2_cdsl_follow_link(struct nameidata *nd,
 bail:
 	return status;
 }
+#endif
 
 static void *ocfs2_follow_link(struct dentry *dentry,
 			       struct nameidata *nd)
@@ -393,7 +396,11 @@ static void *ocfs2_follow_link(struct dentry *dentry,
 		goto bail;
 	}
 
+#ifdef OCFS2_CDSL
 	status = ocfs2_cdsl_follow_link(nd, link, inode);
+#else
+	status = vfs_follow_link(nd, link);
+#endif
 	if (status)
 		mlog_errno(status);
 bail:
