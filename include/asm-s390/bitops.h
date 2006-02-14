@@ -52,16 +52,13 @@
  */
 
 /* set ALIGN_CS to 1 if the SMP safe bit operations should
- * align the address to 4 byte boundary. It seems to work
- * without the alignment. 
- */
-#ifdef __KERNEL__
-#define ALIGN_CS 0
-#else
+ * align the address to 4 byte boundary. */
+#ifdef CONFIG_SMP
 #define ALIGN_CS 1
-#ifndef CONFIG_SMP
-#error "bitops won't work without CONFIG_SMP"
 #endif
+
+#if !defined(__KERNEL__) && !defined(CONFIG_SMP)
+#error "bitops won't work without CONFIG_SMP"
 #endif
 
 /* bitmap tables from arch/S390/kernel/bitmap.S */
