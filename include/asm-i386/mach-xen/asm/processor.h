@@ -20,7 +20,7 @@
 #include <linux/config.h>
 #include <linux/threads.h>
 #include <asm/percpu.h>
-#include <asm-xen/xen-public/physdev.h>
+#include <xen/interface/physdev.h>
 
 /* flag for disabling the tsc */
 extern int tsc_disable;
@@ -91,7 +91,6 @@ struct cpuinfo_x86 {
 
 extern struct cpuinfo_x86 boot_cpu_data;
 extern struct cpuinfo_x86 new_cpu_data;
-DECLARE_PER_CPU(pgd_t *, cur_pgd);
 
 #ifdef CONFIG_SMP
 extern struct cpuinfo_x86 cpu_data[];

@@ -2,7 +2,6 @@
 #define _I386_PGTABLE_H
 
 #include <linux/config.h>
-#include <linux/sched.h>
 #include <asm/hypervisor.h>
 
 /*
@@ -449,21 +448,13 @@ do {				  					\
 	ptep_set_access_flags(__vma, __address, __ptep, __entry, 1);	\
 } while (0)
 
-#ifndef CONFIG_XEN_SHADOW_MODE
-void make_lowmem_page_readonly(void *va);
-void make_lowmem_page_writable(void *va);
-void make_page_readonly(void *va);
-void make_page_writable(void *va);
-void make_pages_readonly(void *va, unsigned int nr);
-void make_pages_writable(void *va, unsigned int nr);
-#else
-#define make_lowmem_page_readonly(_va) ((void)0)
-#define make_lowmem_page_writable(_va) ((void)0)
-#define make_page_readonly(_va)        ((void)0)
-#define make_page_writable(_va)        ((void)0)
-#define make_pages_readonly(_va, _nr)  ((void)0)
-#define make_pages_writable(_va, _nr)  ((void)0)
-#endif
+#include <xen/features.h>
+void make_lowmem_page_readonly(void *va, unsigned int feature);
+void make_lowmem_page_writable(void *va, unsigned int feature);
+void make_page_readonly(void *va, unsigned int feature);
+void make_page_writable(void *va, unsigned int feature);
+void make_pages_readonly(void *va, unsigned int nr, unsigned int feature);
+void make_pages_writable(void *va, unsigned int nr, unsigned int feature);
 
 #define virt_to_ptep(__va)						\
 ({									\

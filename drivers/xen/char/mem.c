@@ -91,11 +91,13 @@ out:
 
 static int mmap_mem(struct file * file, struct vm_area_struct * vma)
 {
+	size_t size = vma->vm_end - vma->vm_start;
+
 	if (uncached_access(file))
 		vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 
 	if (direct_remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
-				   vma->vm_end - vma->vm_start,
+				   size,
 				   vma->vm_page_prot, DOMID_IO))
 		return -EAGAIN;
 

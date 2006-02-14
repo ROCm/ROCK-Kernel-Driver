@@ -6,3 +6,4 @@ ifneq ($(CONFIG_ACPI_PROCESSOR),)
 obj-y			+= processor.o
 endif
 
+boot-$(CONFIG_XEN)		:= ../../../i386/kernel/acpi/boot-xen.o

@@ -15,66 +15,28 @@
  */
 #define set_pte(pteptr, pteval) (*(pteptr) = pteval)
 
-inline static void set_pte_at(struct mm_struct *mm, unsigned long addr, 
-		       pte_t *ptep, pte_t val )
-{
-    if ( ((mm != current->mm) && (mm != &init_mm)) ||
-	 HYPERVISOR_update_va_mapping( (addr), (val), 0 ) )
-    {
-        set_pte(ptep, val);
-    }
-}
+#define set_pte_at(_mm,addr,ptep,pteval) do {				\
+	if (((_mm) != current->mm && (_mm) != &init_mm) ||		\
+	    HYPERVISOR_update_va_mapping((addr), (pteval), 0))		\
+		set_pte((ptep), (pteval));				\
+} while (0)
 
-inline static void set_pte_at_sync(struct mm_struct *mm, unsigned long addr, 
-		       pte_t *ptep, pte_t val )
-{
-    if ( ((mm != current->mm) && (mm != &init_mm)) ||
-	 HYPERVISOR_update_va_mapping( (addr), (val), UVMF_INVLPG ) )
-    {
-        set_pte(ptep, val);
-	xen_invlpg(addr);
-    }
-}
+#define set_pte_at_sync(_mm,addr,ptep,pteval) do {			\
+	if (((_mm) != current->mm && (_mm) != &init_mm) ||		\
+	    HYPERVISOR_update_va_mapping((addr), (pteval), UVMF_INVLPG)) { \
+		set_pte((ptep), (pteval));				\
+		xen_invlpg((addr));					\
+	}								\
+} while (0)
 
 #define set_pte_atomic(pteptr, pteval) set_pte(pteptr,pteval)
 
-#ifndef CONFIG_XEN_SHADOW_MODE
 #define set_pmd(pmdptr, pmdval) xen_l2_entry_update((pmdptr), (pmdval))
-#else
-#define set_pmd(pmdptr, pmdval) (*(pmdptr) = (pmdval))
-#endif
 
 #define ptep_get_and_clear(mm,addr,xp)	__pte_ma(xchg(&(xp)->pte_low, 0))
 #define pte_same(a, b)		((a).pte_low == (b).pte_low)
-/*
- * We detect special mappings in one of two ways:
- *  1. If the MFN is an I/O page then Xen will set the m2p entry
- *     to be outside our maximum possible pseudophys range.
- *  2. If the MFN belongs to a different domain then we will certainly
- *     not have MFN in our p2m table. Conversely, if the page is ours,
- *     then we'll have p2m(m2p(MFN))==MFN.
- * If we detect a special mapping then it doesn't have a 'struct page'.
- * We force !pfn_valid() by returning an out-of-range pointer.
- *
- * NB. These checks require that, for any MFN that is not in our reservation,
- * there is no PFN such that p2m(PFN) == MFN. Otherwise we can get confused if
- * we are foreign-mapping the MFN, and the other domain as m2p(MFN) == PFN.
- * Yikes! Various places must poke in INVALID_P2M_ENTRY for safety.
- * 
- * NB2. When deliberately mapping foreign pages into the p2m table, you *must*
- *      use FOREIGN_FRAME(). This will cause pte_pfn() to choke on it, as we
- *      require. In all the cases we care about, the FOREIGN_FRAME bit is
- *      masked (e.g., pfn_to_mfn()) so behaviour there is correct.
- */
 #define pte_mfn(_pte) ((_pte).pte_low >> PAGE_SHIFT)
-#define pte_pfn(_pte)							\
-({									\
-	unsigned long mfn = pte_mfn(_pte);				\
-	unsigned long pfn = mfn_to_pfn(mfn);				\
-	if ((pfn >= max_mapnr) || (phys_to_machine_mapping[pfn] != mfn))\
-		pfn = max_mapnr; /* special: force !pfn_valid() */	\
-	pfn;								\
-})
+#define pte_pfn(_pte) mfn_to_local_pfn(pte_mfn(_pte))
 
 #define pte_page(_pte) pfn_to_page(pte_pfn(_pte))
 

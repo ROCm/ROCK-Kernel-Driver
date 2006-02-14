@@ -62,9 +62,10 @@ config X86_XEN
 	bool "Xen-compatible"
 	select X86_UP_APIC if !SMP && XEN_PRIVILEGED_GUEST
 	select X86_UP_IOAPIC if !SMP && XEN_PRIVILEGED_GUEST
+	select SWIOTLB
 	help
-	  Choose this option is you plan to run this kernel on top of Xen
-	  Hypervisor.
+	  Choose this option if you plan to run this kernel on top of the
+	  Xen Hypervisor.
 
 config X86_ELAN
 	bool "AMD Elan"
@@ -223,7 +224,7 @@ config SMP_ALTERNATIVES
 	  when running on an true SMP host.
 
           If unsure, say N.
-
+	  
 config NR_CPUS
 	int "Maximum number of CPUs (2-255)"
 	range 2 255
@@ -440,8 +441,7 @@ config X86_CPUID
 
 config SWIOTLB
 	bool
-	depends on X86_PRIVILEGED_GUEST
-	default y
+	default n
 
 source "drivers/firmware/Kconfig"
 
@@ -501,7 +501,7 @@ config HIGHMEM64G
 endchoice
 
 choice
-	depends on EXPERIMENTAL && !X86_PAE && !X86_XEN
+	depends on EXPERIMENTAL && !X86_PAE
 	prompt "Memory split"
 	default VMSPLIT_3G
 	help
@@ -646,7 +646,7 @@ config MATH_EMULATION
 
 config MTRR
 	bool "MTRR (Memory Type Range Register) support"
-	depends on (XEN_PRIVILEGED_GUEST || !X86_XEN)
+	depends on !XEN_UNPRIVILEGED_GUEST
 	default y if X86_XEN
 	---help---
 	  On Intel P6 family processors (Pentium Pro, Pentium II and later)
@@ -743,7 +743,7 @@ source kernel/Kconfig.hz
 
 config KEXEC
 	bool "kexec system call (EXPERIMENTAL)"
-	depends on EXPERIMENTAL
+	depends on EXPERIMENTAL && !X86_XEN
 	help
 	  kexec is a system call that implements the ability to shutdown your
 	  current kernel, and to start another kernel.  It is like a reboot
@@ -797,6 +797,7 @@ config HOTPLUG_CPU
 config DOUBLEFAULT
 	default y
 	bool "Enable doublefault exception handler" if EMBEDDED
+	depends on !XEN
 	help
           This option allows trapping of rare doublefault exceptions that
           would otherwise cause a system to silently reboot. Disabling this
@@ -820,7 +821,7 @@ depends on PM && !(X86_VISWS || X86_XEN)
 
 config APM
 	tristate "APM (Advanced Power Management) BIOS support"
-	depends on PM
+	depends on PM && PM_LEGACY
 	---help---
 	  APM is a BIOS specification for saving power using several different
 	  techniques. This is mostly useful for battery powered laptops with
@@ -968,7 +969,6 @@ source "arch/i386/kernel/cpu/cpufreq/Kconfig"
 endmenu
 
 menu "Bus options (PCI, PCMCIA, EISA, MCA, ISA)"
-	depends on !XEN_UNPRIVILEGED_GUEST
 
 config PCI
 	bool "PCI support" if !X86_VISWS
@@ -1072,7 +1072,7 @@ config EISA
 source "drivers/eisa/Kconfig"
 
 config MCA
-	bool "MCA support" if !(X86_VISWS || X86_VOYAGER)
+	bool "MCA support" if !(X86_VISWS || X86_VOYAGER || X86_XEN)
 	default y if X86_VOYAGER
 	help
 	  MicroChannel Architecture is found in some IBM PS/2 machines and

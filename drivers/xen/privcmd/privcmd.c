@@ -27,13 +27,16 @@
 #include <asm/uaccess.h>
 #include <asm/tlb.h>
 #include <asm/hypervisor.h>
-#include <asm-xen/linux-public/privcmd.h>
-#include <asm-xen/xen-public/xen.h>
-#include <asm-xen/xen-public/dom0_ops.h>
-#include <asm-xen/xen_proc.h>
+#include <xen/public/privcmd.h>
+#include <xen/interface/xen.h>
+#include <xen/interface/dom0_ops.h>
+#include <xen/xen_proc.h>
 
 static struct proc_dir_entry *privcmd_intf;
 static struct proc_dir_entry *capabilities_intf;
+
+#define NR_HYPERCALLS 32
+static DECLARE_BITMAP(hypercall_permission_map, NR_HYPERCALLS);
 
 static int privcmd_ioctl(struct inode *inode, struct file *file,
                          unsigned int cmd, unsigned long data)
@@ -48,6 +51,12 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 		if (copy_from_user(&hypercall, udata, sizeof(hypercall)))
 			return -EFAULT;
 
+		/* Check hypercall number for validity. */
+		if (hypercall.op >= NR_HYPERCALLS)
+			return -EINVAL;
+		if (!test_bit(hypercall.op, hypercall_permission_map))
+			return -EINVAL;
+
 #if defined(__i386__)
 		__asm__ __volatile__ (
 			"pushl %%ebx; pushl %%ecx; pushl %%edx; "
@@ -58,7 +67,9 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 			"movl 16(%%eax),%%esi ;"
 			"movl 20(%%eax),%%edi ;"
 			"movl   (%%eax),%%eax ;"
-			TRAP_INSTR "; "
+			"shll $5,%%eax ;"
+			"addl $hypercall_page,%%eax ;"
+			"call *%%eax ;"
 			"popl %%edi; popl %%esi; popl %%edx; "
 			"popl %%ecx; popl %%ebx"
 			: "=a" (ret) : "0" (&hypercall) : "memory" );
@@ -66,7 +77,10 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 		{
 			long ign1, ign2, ign3;
 			__asm__ __volatile__ (
-				"movq %8,%%r10; movq %9,%%r8;" TRAP_INSTR
+				"movq %8,%%r10; movq %9,%%r8;"
+				"shlq $5,%%rax ;"
+				"addq $hypercall_page,%%rax ;"
+				"call *%%rax"
 				: "=a" (ret), "=D" (ign1),
 				  "=S" (ign2), "=d" (ign3)
 				: "0" ((unsigned long)hypercall.op), 
@@ -75,7 +89,7 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 				"3" ((unsigned long)hypercall.arg[2]), 
 				"g" ((unsigned long)hypercall.arg[3]),
 				"g" ((unsigned long)hypercall.arg[4])
-				: "r11","rcx","r8","r10","memory");
+				: "r8", "r10", "memory" );
 		}
 #elif defined (__ia64__)
 		__asm__ __volatile__ (
@@ -158,7 +172,12 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 			goto batch_err;
 		}
 
-		vma = find_vma( current->mm, m.addr );
+		if (m.dom == DOMID_SELF) {
+			ret = -EINVAL;
+			goto batch_err;
+		}
+
+		vma = find_vma(current->mm, m.addr);
 		if (!vma) {
 			ret = -EINVAL;
 			goto batch_err;
@@ -250,6 +269,15 @@ static int capabilities_read(char *page, char **start, off_t off,
 
 static int __init privcmd_init(void)
 {
+	/* Set of hypercalls that privileged applications may execute. */
+	set_bit(__HYPERVISOR_acm_op,           hypercall_permission_map);
+	set_bit(__HYPERVISOR_dom0_op,          hypercall_permission_map);
+	set_bit(__HYPERVISOR_event_channel_op, hypercall_permission_map);
+	set_bit(__HYPERVISOR_memory_op,        hypercall_permission_map);
+	set_bit(__HYPERVISOR_mmu_update,       hypercall_permission_map);
+	set_bit(__HYPERVISOR_mmuext_op,        hypercall_permission_map);
+	set_bit(__HYPERVISOR_xen_version,      hypercall_permission_map);
+
 	privcmd_intf = create_xen_proc_entry("privcmd", 0400);
 	if (privcmd_intf != NULL)
 		privcmd_intf->proc_fops = &privcmd_file_ops;

@@ -9,13 +9,13 @@
 #include <linux/stringify.h>
 #include <asm/irq.h>
 #include <asm/mmu_context.h>
-#include <asm-xen/evtchn.h>
+#include <xen/evtchn.h>
 #include <asm/hypervisor.h>
-#include <asm-xen/xen-public/dom0_ops.h>
-#include <asm-xen/xenbus.h>
+#include <xen/interface/dom0_ops.h>
+#include <xen/xenbus.h>
 #include <linux/cpu.h>
 #include <linux/kthread.h>
-#include <asm-xen/xencons.h>
+#include <xen/xencons.h>
 
 #if defined(__i386__) || defined(__x86_64__)
 /*
@@ -101,6 +101,12 @@ static int __do_suspend(void *ignore)
 
 	BUG_ON(smp_processor_id() != 0);
 	BUG_ON(in_interrupt());
+
+	if (xen_feature(XENFEAT_auto_translated_physmap)) {
+		printk(KERN_WARNING "Cannot suspend in "
+		       "auto_translated_physmap mode.\n");
+		return -EOPNOTSUPP;
+	}
 
 #if defined(CONFIG_SMP) && !defined(CONFIG_HOTPLUG_CPU)
 	if (num_online_cpus() > 1) {
@@ -296,15 +302,15 @@ static void shutdown_handler(struct xenbus_watch *watch,
 			     const char **vec, unsigned int len)
 {
 	char *str;
-	struct xenbus_transaction *xbt;
+	xenbus_transaction_t xbt;
 	int err;
 
 	if (shutting_down != SHUTDOWN_INVALID)
 		return;
 
  again:
-	xbt = xenbus_transaction_start();
-	if (IS_ERR(xbt))
+	err = xenbus_transaction_start(&xbt);
+	if (err)
 		return;
 	str = (char *)xenbus_read(xbt, "control", "shutdown", NULL);
 	/* Ignore read errors and empty reads. */
@@ -345,12 +351,12 @@ static void sysrq_handler(struct xenbus_watch *watch, const char **vec,
 			  unsigned int len)
 {
 	char sysrq_key = '\0';
-	struct xenbus_transaction *xbt;
+	xenbus_transaction_t xbt;
 	int err;
 
  again:
-	xbt  = xenbus_transaction_start();
-	if (IS_ERR(xbt))
+	err = xenbus_transaction_start(&xbt);
+	if (err)
 		return;
 	if (!xenbus_scanf(xbt, "control", "sysrq", "%c", &sysrq_key)) {
 		printk(KERN_ERR "Unable to read sysrq code in "

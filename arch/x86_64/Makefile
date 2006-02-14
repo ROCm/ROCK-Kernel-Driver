@@ -59,39 +59,38 @@ CFLAGS += $(call cc-option,-mno-sse -mno-mmx -mno-sse2 -mno-3dnow,)
 
 AFLAGS += -m64
 
-ifndef CONFIG_XEN
-archdir := x86_64
-else
-archdir := x86_64/xen
-arch/x86_64/kernel/vmlinux.lds: arch/x86_64/kernel/vmlinux.lds.S
-CPPFLAGS := -D__KERNEL__ -Iinclude$(if $(KBUILD_SRC),2)/asm/mach-xen $(LINUXINCLUDE)
-LDFLAGS_vmlinux := -e _start
-endif
-
-head-y := arch/$(archdir)/kernel/head.o arch/$(archdir)/kernel/head64.o arch/$(archdir)/kernel/init_task.o
+head-y := arch/x86_64/kernel/head.o arch/x86_64/kernel/head64.o arch/x86_64/kernel/init_task.o
 
 libs-y 					+= arch/x86_64/lib/
-core-y					+= arch/$(archdir)/kernel/ \
-					   arch/$(archdir)/mm/ \
+core-y					+= arch/x86_64/kernel/ \
+					   arch/x86_64/mm/ \
 					   arch/x86_64/crypto/
-core-$(CONFIG_IA32_EMULATION)		+= arch/$(archdir)/ia32/
-drivers-$(CONFIG_PCI)			+= arch/$(archdir)/pci/
+core-$(CONFIG_IA32_EMULATION)		+= arch/x86_64/ia32/
+drivers-$(CONFIG_PCI)			+= arch/x86_64/pci/
 drivers-$(CONFIG_OPROFILE)		+= arch/x86_64/oprofile/
 drivers-$(CONFIG_KDB)			+= arch/x86_64/kdb/
 
-boot := arch/$(archdir)/boot
+boot := arch/x86_64/boot
 
 .PHONY: bzImage bzlilo install archmrproper \
 	fdimage fdimage144 fdimage288 archclean
 
-#Default target when executing "make"
 ifdef CONFIG_XEN
+CPPFLAGS := -D__KERNEL__ -Iinclude$(if $(KBUILD_SRC),2)/asm/mach-xen $(LINUXINCLUDE)
+head-y := arch/x86_64/kernel/head-xen.o arch/x86_64/kernel/head64-xen.o arch/x86_64/kernel/init_task.o
+LDFLAGS_vmlinux := -e _start
+boot := arch/i386/boot-xen
+.PHONY: vmlinuz
+#Default target when executing "make"
 all: vmlinuz
 
 vmlinuz: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $@
 
+install:
+	$(Q)$(MAKE) $(build)=$(boot) XENGUEST=$(XENGUEST) $@
 else
+#Default target when executing "make"
 all: bzImage
 
 BOOTIMAGE                     := arch/x86_64/boot/bzImage
@@ -108,10 +107,10 @@ bzdisk: vmlinux
 
 fdimage fdimage144 fdimage288: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(BOOTIMAGE) $@
-endif
 
 install:
 	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(BOOTIMAGE) $@ 
+endif
 
 archclean:
 	$(Q)$(MAKE) $(clean)=$(boot)

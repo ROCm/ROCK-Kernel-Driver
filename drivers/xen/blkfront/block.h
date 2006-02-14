@@ -46,11 +46,11 @@
 #include <linux/major.h>
 #include <linux/devfs_fs_kernel.h>
 #include <asm/hypervisor.h>
-#include <asm-xen/xenbus.h>
-#include <asm-xen/gnttab.h>
-#include <asm-xen/xen-public/xen.h>
-#include <asm-xen/xen-public/io/blkif.h>
-#include <asm-xen/xen-public/io/ring.h>
+#include <xen/xenbus.h>
+#include <xen/gnttab.h>
+#include <xen/interface/xen.h>
+#include <xen/interface/io/blkif.h>
+#include <xen/interface/io/ring.h>
 #include <asm/io.h>
 #include <asm/atomic.h>
 #include <asm/uaccess.h>
@@ -69,11 +69,7 @@
 #define WPRINTK(fmt, args...) ((void)0)
 #endif
  
-#if 0
-#define DPRINTK(_f, _a...) printk ( KERN_ALERT _f , ## _a )
-#else
-#define DPRINTK(_f, _a...) ((void)0)
-#endif
+#define DPRINTK(_f, _a...) pr_debug ( _f , ## _a )
 
 #if 0
 #define DPRINTK_IOCTL(_f, _a...) printk ( KERN_ALERT _f , ## _a )
@@ -146,6 +142,9 @@ extern int blkif_revalidate(dev_t dev);
 extern void do_blkif_request (request_queue_t *rq); 
 
 /* Virtual block-device subsystem. */
+/* Note that xlvbd_add doesn't call add_disk for you: you're expected
+   to call add_disk on info->gd once the disk is properly connected
+   up. */
 int xlvbd_add(blkif_sector_t capacity, int device,
 	      u16 vdisk_info, u16 sector_size, struct blkfront_info *info);
 void xlvbd_del(struct blkfront_info *info);

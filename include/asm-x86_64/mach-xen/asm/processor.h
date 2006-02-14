@@ -170,11 +170,6 @@ static inline void clear_in_cr4 (unsigned long mask)
 }
 
 
-#define load_cr3(pgdir) do {				\
-	xen_pt_switch(__pa(pgdir));			\
-	per_cpu(cur_pgd, smp_processor_id()) = pgdir;	\
-} while (/* CONSTCOND */0)
-
 /*
  * Bus types
  */
@@ -224,7 +219,6 @@ union i387_union {
 };
 
 extern struct cpuinfo_x86 boot_cpu_data;
-DECLARE_PER_CPU(pgd_t *, cur_pgd);
 
 #ifdef CONFIG_X86_VSMP
 #define ARCH_MIN_TASKALIGN	(1 << INTERNODE_CACHE_SHIFT)

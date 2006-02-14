@@ -27,19 +27,15 @@
  * IN THE SOFTWARE.
  */
 
+#include <xen/evtchn.h>
+#include <xen/gnttab.h>
+#include <xen/xenbus.h>
 
-#if 0
+/* xenbus_probe.c */
+extern char *kasprintf(const char *fmt, ...);
+
 #define DPRINTK(fmt, args...) \
-    printk("xenbus_client (%s:%d) " fmt ".\n", __FUNCTION__, __LINE__, ##args)
-#else
-#define DPRINTK(fmt, args...) ((void)0)
-#endif
-
-
-#include <asm-xen/evtchn.h>
-#include <asm-xen/gnttab.h>
-#include <asm-xen/xenbus.h>
-
+    pr_debug("xenbus_client (%s:%d) " fmt ".\n", __FUNCTION__, __LINE__, ##args)
 
 int xenbus_watch_path(struct xenbus_device *dev, const char *path,
 		      struct xenbus_watch *watch, 
@@ -70,16 +66,11 @@ int xenbus_watch_path2(struct xenbus_device *dev, const char *path,
 					const char **, unsigned int))
 {
 	int err;
-	char *state =
-		kmalloc(strlen(path) + 1 + strlen(path2) + 1, GFP_KERNEL);
+	char *state = kasprintf("%s/%s", path, path2);
 	if (!state) {
 		xenbus_dev_fatal(dev, -ENOMEM, "allocating path for watch");
 		return -ENOMEM;
 	}
-	strcpy(state, path);
-	strcat(state, "/");
-	strcat(state, path2);
-
 	err = xenbus_watch_path(dev, state, watch, callback);
 
 	if (err) {
@@ -91,7 +82,7 @@ EXPORT_SYMBOL(xenbus_watch_path2);
 
 
 int xenbus_switch_state(struct xenbus_device *dev,
-			struct xenbus_transaction *xbt,
+			xenbus_transaction_t xbt,
 			XenbusState state)
 {
 	/* We check whether the state is currently set to the given value, and
@@ -126,16 +117,7 @@ EXPORT_SYMBOL(xenbus_switch_state);
  */
 static char *error_path(struct xenbus_device *dev)
 {
-	char *path_buffer = kmalloc(strlen("error/") + strlen(dev->nodename) +
-				    1, GFP_KERNEL);
-	if (path_buffer == NULL) {
-		return NULL;
-	}
-
-	strcpy(path_buffer, "error/");
-	strcpy(path_buffer + strlen("error/"), dev->nodename);
-
-	return path_buffer;
+	return kasprintf("error/%s", dev->nodename);
 }
 
 
@@ -165,7 +147,7 @@ void _dev_error(struct xenbus_device *dev, int err, const char *fmt,
 		goto fail;
 	}
 
-	if (xenbus_write(NULL, path_buffer, "error", printf_buffer) != 0) {
+	if (xenbus_write(XBT_NULL, path_buffer, "error", printf_buffer) != 0) {
 		printk("xenbus: failed to write error node for %s (%s)\n",
 		       dev->nodename, printf_buffer);
 		goto fail;
@@ -200,7 +182,7 @@ void xenbus_dev_fatal(struct xenbus_device *dev, int err, const char *fmt,
 	_dev_error(dev, err, fmt, ap);
 	va_end(ap);
 	
-	xenbus_switch_state(dev, NULL, XenbusStateClosing);
+	xenbus_switch_state(dev, XBT_NULL, XenbusStateClosing);
 }
 EXPORT_SYMBOL(xenbus_dev_fatal);
 
@@ -236,7 +218,7 @@ XenbusState xenbus_read_driver_state(const char *path)
 {
 	XenbusState result;
 
-	int err = xenbus_gather(NULL, path, "state", "%d", &result, NULL);
+	int err = xenbus_gather(XBT_NULL, path, "state", "%d", &result, NULL);
 	if (err)
 		result = XenbusStateClosed;
 

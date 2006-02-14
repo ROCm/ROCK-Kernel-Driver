@@ -6,9 +6,15 @@
 #include <asm/segment.h>
 #include <asm/synch_bitops.h>
 #include <asm/hypervisor.h>
-#include <asm-xen/xen-public/arch-x86_64.h>
+#include <xen/interface/arch-x86_64.h>
 
 #ifdef __KERNEL__
+
+#ifdef CONFIG_SMP
+#define __vcpu_id smp_processor_id()
+#else
+#define __vcpu_id 0
+#endif
 
 #ifdef CONFIG_SMP
 #define LOCK_PREFIX "lock ; "
@@ -173,12 +179,11 @@ static inline void write_cr0(unsigned long val)
 	asm volatile("movq %0,%%cr0" :: "r" (val));
 } 
 
-static inline unsigned long read_cr3(void)
-{ 
-	unsigned long cr3;
-	asm("movq %%cr3,%0" : "=r" (cr3));
-	return cr3;
-} 
+#define read_cr3() ({ \
+	unsigned long __dummy; \
+	asm("movq %%cr3,%0" : "=r" (__dummy)); \
+	return machine_to_phys(__dummy); \
+})
 
 static inline unsigned long read_cr4(void)
 { 
@@ -349,7 +354,7 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
 do {									\
 	vcpu_info_t *_vcpu;						\
 	preempt_disable();						\
-	_vcpu = &HYPERVISOR_shared_info->vcpu_info[smp_processor_id()];	\
+	_vcpu = &HYPERVISOR_shared_info->vcpu_info[__vcpu_id];		\
 	_vcpu->evtchn_upcall_mask = 1;					\
 	preempt_enable_no_resched();					\
 	barrier();							\
@@ -360,7 +365,7 @@ do {									\
 	vcpu_info_t *_vcpu;						\
 	barrier();							\
 	preempt_disable();						\
-	_vcpu = &HYPERVISOR_shared_info->vcpu_info[smp_processor_id()];	\
+	_vcpu = &HYPERVISOR_shared_info->vcpu_info[__vcpu_id];		\
 	_vcpu->evtchn_upcall_mask = 0;					\
 	barrier(); /* unmask then check (avoid races) */		\
 	if ( unlikely(_vcpu->evtchn_upcall_pending) )			\
@@ -372,7 +377,7 @@ do {									\
 do {									\
 	vcpu_info_t *_vcpu;						\
 	preempt_disable();						\
-	_vcpu = &HYPERVISOR_shared_info->vcpu_info[smp_processor_id()];	\
+	_vcpu = &HYPERVISOR_shared_info->vcpu_info[__vcpu_id];		\
 	(x) = _vcpu->evtchn_upcall_mask;				\
 	preempt_enable();						\
 } while (0)
@@ -382,7 +387,7 @@ do {									\
 	vcpu_info_t *_vcpu;						\
 	barrier();							\
 	preempt_disable();						\
-	_vcpu = &HYPERVISOR_shared_info->vcpu_info[smp_processor_id()];	\
+	_vcpu = &HYPERVISOR_shared_info->vcpu_info[__vcpu_id];		\
 	if ((_vcpu->evtchn_upcall_mask = (x)) == 0) {			\
 		barrier(); /* unmask then check (avoid races) */	\
 		if ( unlikely(_vcpu->evtchn_upcall_pending) )		\
@@ -396,17 +401,12 @@ do {									\
 do {									\
 	vcpu_info_t *_vcpu;						\
 	preempt_disable();						\
-	_vcpu = &HYPERVISOR_shared_info->vcpu_info[smp_processor_id()];	\
+	_vcpu = &HYPERVISOR_shared_info->vcpu_info[__vcpu_id];		\
 	(x) = _vcpu->evtchn_upcall_mask;				\
 	_vcpu->evtchn_upcall_mask = 1;					\
 	preempt_enable_no_resched();					\
 	barrier();							\
 } while (0)
-
-#define safe_halt()		((void)0)
-#define halt()			((void)0)
-
-void cpu_idle_wait(void);
 
 #define local_irq_save(x)	__save_and_cli(x)
 #define local_irq_restore(x)	__restore_flags(x)
@@ -419,10 +419,15 @@ void cpu_idle_wait(void);
 ({	int ___x;							\
 	vcpu_info_t *_vcpu;						\
 	preempt_disable();						\
-	_vcpu = &HYPERVISOR_shared_info->vcpu_info[smp_processor_id()];	\
+	_vcpu = &HYPERVISOR_shared_info->vcpu_info[__vcpu_id];		\
 	___x = (_vcpu->evtchn_upcall_mask != 0);			\
 	preempt_enable_no_resched();					\
 	___x; })
+
+#define safe_halt()		((void)0)
+#define halt()			((void)0)
+
+void cpu_idle_wait(void);
 
 extern unsigned long arch_align_stack(unsigned long sp);
 

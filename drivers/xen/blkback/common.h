@@ -12,23 +12,15 @@
 #include <asm/io.h>
 #include <asm/setup.h>
 #include <asm/pgalloc.h>
-#include <asm-xen/evtchn.h>
+#include <xen/evtchn.h>
 #include <asm/hypervisor.h>
-#include <asm-xen/xen-public/io/blkif.h>
-#include <asm-xen/xen-public/io/ring.h>
-#include <asm-xen/gnttab.h>
-#include <asm-xen/driver_util.h>
+#include <xen/interface/io/blkif.h>
+#include <xen/interface/io/ring.h>
+#include <xen/gnttab.h>
+#include <xen/driver_util.h>
 
-#if 0
-#define ASSERT(_p) \
-    if ( !(_p) ) { printk("Assertion '%s' failed, line %d, file %s", #_p , \
-    __LINE__, __FILE__); *(int*)0=0; }
-#define DPRINTK(_f, _a...) printk(KERN_ALERT "(file=%s, line=%d) " _f, \
-                           __FILE__ , __LINE__ , ## _a )
-#else
-#define ASSERT(_p) ((void)0)
-#define DPRINTK(_f, _a...) ((void)0)
-#endif
+#define DPRINTK(_f, _a...) pr_debug("(file=%s, line=%d) " _f, \
+                                    __FILE__ , __LINE__ , ## _a )
 
 struct vbd {
 	blkif_vdev_t   handle;      /* what the domain refers to this vbd as */
@@ -60,9 +52,19 @@ typedef struct blkif_st {
 	/* Is this a blktap frontend */
 	unsigned int     is_blktap;
 #endif
-	struct list_head blkdev_list;
 	spinlock_t       blk_ring_lock;
 	atomic_t         refcnt;
+
+	wait_queue_head_t   wq;
+	struct task_struct  *xenblkd;
+	atomic_t            io_pending;
+	request_queue_t     *plug;
+
+	/* statistics */
+	unsigned long       st_print;
+	int                 st_rd_req;
+	int                 st_wr_req;
+	int                 st_oo_req;
 
 	struct work_struct free_work;
 
@@ -101,11 +103,10 @@ int vbd_translate(struct phys_req *req, blkif_t *blkif, int operation);
 
 void blkif_interface_init(void);
 
-void blkif_deschedule(blkif_t *blkif);
-
 void blkif_xenbus_init(void);
 
 irqreturn_t blkif_be_int(int irq, void *dev_id, struct pt_regs *regs);
+int blkif_schedule(void *arg);
 
 void update_blkif_status(blkif_t *blkif); 
 

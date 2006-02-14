@@ -30,7 +30,7 @@
 
 #include <linux/if_ether.h>
 #include <linux/err.h>
-#include <asm-xen/net_driver_util.h>
+#include <xen/net_driver_util.h>
 
 
 int xen_net_read_mac(struct xenbus_device *dev, u8 mac[])
@@ -38,7 +38,7 @@ int xen_net_read_mac(struct xenbus_device *dev, u8 mac[])
 	char *s;
 	int i;
 	char *e;
-	char *macstr = xenbus_read(NULL, dev->nodename, "mac", NULL);
+	char *macstr = xenbus_read(XBT_NULL, dev->nodename, "mac", NULL);
 	if (IS_ERR(macstr)) {
 		return PTR_ERR(macstr);
 	}

@@ -10,8 +10,11 @@
  * Copyright (c) 2005, Christopher Clark
  * Copyright (c) 2005, XenSource Ltd
  * 
- * This file may be distributed separately from the Linux kernel, or
- * incorporated into other software packages, subject to the following license:
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License version 2
+ * as published by the Free Software Foundation; or, when distributed
+ * separately from the Linux kernel or incorporated into other
+ * software packages, subject to the following license:
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this source file (the "Software"), to deal in the Software without
@@ -32,24 +35,16 @@
  * IN THE SOFTWARE.
  */
 
-#if 1
-#define ASSERT(p)							   \
-	if (!(p)) { printk("Assertion '%s' failed, line %d, file %s", #p , \
-	__LINE__, __FILE__); *(int*)0=0; }
-#else
-#define ASSERT(_p)
-#endif
-
 #include <linux/version.h>
 #include "block.h"
 #include <linux/cdrom.h>
 #include <linux/sched.h>
 #include <linux/interrupt.h>
 #include <scsi/scsi.h>
-#include <asm-xen/evtchn.h>
-#include <asm-xen/xenbus.h>
-#include <asm-xen/xen-public/grant_table.h>
-#include <asm-xen/gnttab.h>
+#include <xen/evtchn.h>
+#include <xen/xenbus.h>
+#include <xen/interface/grant_table.h>
+#include <xen/gnttab.h>
 #include <asm/hypervisor.h>
 
 #define BLKIF_STATE_DISCONNECTED 0
@@ -88,7 +83,7 @@ static int blkfront_probe(struct xenbus_device *dev,
 	struct blkfront_info *info;
 
 	/* FIXME: Use dynamic device id if this is not set. */
-	err = xenbus_scanf(NULL, dev->nodename,
+	err = xenbus_scanf(XBT_NULL, dev->nodename,
 			   "virtual-device", "%i", &vdevice);
 	if (err != 1) {
 		xenbus_dev_fatal(dev, err, "reading virtual-device");
@@ -158,7 +153,7 @@ static int talk_to_backend(struct xenbus_device *dev,
 			   struct blkfront_info *info)
 {
 	const char *message = NULL;
-	struct xenbus_transaction *xbt;
+	xenbus_transaction_t xbt;
 	int err;
 
 	/* Create shared ring, alloc event channel. */
@@ -167,8 +162,8 @@ static int talk_to_backend(struct xenbus_device *dev,
 		goto out;
 
 again:
-	xbt = xenbus_transaction_start();
-	if (IS_ERR(xbt)) {
+	err = xenbus_transaction_start(&xbt);
+	if (err) {
 		xenbus_dev_fatal(dev, err, "starting transaction");
 		goto destroy_blkring;
 	}
@@ -311,12 +306,12 @@ static void connect(struct blkfront_info *info)
 	int err;
 
         if( (info->connected == BLKIF_STATE_CONNECTED) || 
-	    (info->connected == BLKIF_STATE_SUSPENDED) ) 
+	    (info->connected == BLKIF_STATE_SUSPENDED) )
 		return;
 
 	DPRINTK("blkfront.c:connect:%s.\n", info->xbdev->otherend);
 
-	err = xenbus_gather(NULL, info->xbdev->otherend,
+	err = xenbus_gather(XBT_NULL, info->xbdev->otherend,
 			    "sectors", "%lu", &sectors,
 			    "info", "%u", &binfo,
 			    "sector-size", "%lu", &sector_size,
@@ -327,15 +322,22 @@ static void connect(struct blkfront_info *info)
 				 info->xbdev->otherend);
 		return;
 	}
-	
+
 	info->connected = BLKIF_STATE_CONNECTED;
-	(void)xenbus_switch_state(info->xbdev, NULL, XenbusStateConnected); 
-	xlvbd_add(sectors, info->vdevice, binfo, sector_size, info);
-	
+	(void)xenbus_switch_state(info->xbdev, XBT_NULL, XenbusStateConnected);
+	err = xlvbd_add(sectors, info->vdevice, binfo, sector_size, info);
+	if (err) {
+		xenbus_dev_fatal(info->xbdev, err, "xlvbd_add at %s",
+		                 info->xbdev->otherend);
+		return;
+	}
+
 	/* Kick pending requests. */
 	spin_lock_irq(&blkif_io_lock);
 	kick_pending_request_queues(info);
 	spin_unlock_irq(&blkif_io_lock);
+
+	add_disk(info->gd);
 }
 
 /**
@@ -356,7 +358,7 @@ static void blkfront_closing(struct xenbus_device *dev)
 		info->mi = NULL;
 	}
 
-	xenbus_switch_state(dev, NULL, XenbusStateClosed);
+	xenbus_switch_state(dev, XBT_NULL, XenbusStateClosed);
 }
 
 
@@ -540,7 +542,7 @@ static int blkif_queue_request(struct request *req)
 			lsect = fsect + (bvec->bv_len >> 9) - 1;
 			/* install a grant reference. */
 			ref = gnttab_claim_grant_reference(&gref_head);
-			ASSERT(ref != -ENOSPC);
+			BUG_ON(ref == -ENOSPC);
 
 			gnttab_grant_foreign_access_ref(
 				ref,
@@ -587,7 +589,6 @@ void do_blkif_request(request_queue_t *rq)
 
 	while ((req = elv_next_request(rq)) != NULL) {
 		info = req->rq_disk->private_data;
-
 		if (!blk_fs_request(req)) {
 			end_request(req, 0);
 			continue;
@@ -641,7 +642,7 @@ static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 
 	for (i = info->ring.rsp_cons; i != rp; i++) {
 		unsigned long id;
-		int ret, uptodate;
+		int ret;
 
 		bret = RING_GET_RESPONSE(&info->ring, i);
 		id   = bret->id;
@@ -658,12 +659,12 @@ static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 				DPRINTK("Bad return from blkdev data "
 					"request: %x\n", bret->status);
 
-			uptodate = (bret->status == BLKIF_RSP_OKAY);
 			ret = end_that_request_first(
-				req, uptodate,
+				req, (bret->status == BLKIF_RSP_OKAY),
 				req->hard_nr_sectors);
 			BUG_ON(ret);
-			end_that_request_last(req, uptodate);
+			end_that_request_last(
+				req, (bret->status == BLKIF_RSP_OKAY));
 			break;
 		default:
 			BUG();
@@ -766,7 +767,7 @@ static void blkif_recover(struct blkfront_info *info)
 
 	kfree(copy);
 
-	(void)xenbus_switch_state(info->xbdev, NULL, XenbusStateConnected); 
+	(void)xenbus_switch_state(info->xbdev, XBT_NULL, XenbusStateConnected); 
 	
 	/* Now safe for us to use the shared ring */
 	spin_lock_irq(&blkif_io_lock);
@@ -819,7 +820,7 @@ static void xlblk_exit(void)
 }
 module_exit(xlblk_exit);
 
-MODULE_LICENSE("BSD");
+MODULE_LICENSE("Dual BSD/GPL");
 
 
 /*

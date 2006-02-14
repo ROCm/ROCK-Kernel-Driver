@@ -11,9 +11,10 @@
  */
 
 #include "common.h"
-#include <asm-xen/balloon.h>
-#include <asm-xen/xen-public/memory.h>
+#include <xen/balloon.h>
+#include <xen/interface/memory.h>
 
+/*#define NETBE_DEBUG_INTERRUPT*/
 
 static void netif_idx_release(u16 pending_idx);
 static void netif_page_release(struct page *page);
@@ -38,10 +39,9 @@ static struct timer_list net_timer;
 #define MAX_PENDING_REQS 256
 
 static struct sk_buff_head rx_queue;
-static multicall_entry_t rx_mcl[NET_RX_RING_SIZE*2+1];
+static multicall_entry_t rx_mcl[NET_RX_RING_SIZE+1];
 static mmu_update_t rx_mmu[NET_RX_RING_SIZE];
-
-static gnttab_transfer_t grant_rx_op[MAX_PENDING_REQS];
+static gnttab_transfer_t grant_rx_op[NET_RX_RING_SIZE];
 static unsigned char rx_notify[NR_IRQS];
 
 static unsigned long mmap_vstart;
@@ -119,7 +119,7 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	netif_t *netif = netdev_priv(dev);
 
-	ASSERT(skb->dev == dev);
+	BUG_ON(skb->dev != dev);
 
 	/* Drop the packet if the target domain has no receive buffers. */
 	if (!netif->active || 
@@ -236,29 +236,34 @@ static void net_rx_action(unsigned long unused)
 		netif->rx.req_cons++;
 		gop++;
 
-		mmu->ptr = ((maddr_t)new_mfn << PAGE_SHIFT) |
-			MMU_MACHPHYS_UPDATE;
-		mmu->val = __pa(vdata) >> PAGE_SHIFT;  
-		mmu++;
+		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
+			mmu->ptr = ((maddr_t)new_mfn << PAGE_SHIFT) |
+				MMU_MACHPHYS_UPDATE;
+			mmu->val = __pa(vdata) >> PAGE_SHIFT;
+			mmu++;
+		}
 
 		__skb_queue_tail(&rxq, skb);
 
 		/* Filled the batch queue? */
-		if ((mcl - rx_mcl) == ARRAY_SIZE(rx_mcl))
+		if ((gop - grant_rx_op) == ARRAY_SIZE(grant_rx_op))
 			break;
 	}
 
 	if (mcl == rx_mcl)
 		return;
 
-	mcl->op = __HYPERVISOR_mmu_update;
-	mcl->args[0] = (unsigned long)rx_mmu;
-	mcl->args[1] = mmu - rx_mmu;
-	mcl->args[2] = 0;
-	mcl->args[3] = DOMID_SELF;
-	mcl++;
+	mcl[-1].args[MULTI_UVMFLAGS_INDEX] = UVMF_TLB_FLUSH|UVMF_ALL;
 
-	mcl[-2].args[MULTI_UVMFLAGS_INDEX] = UVMF_TLB_FLUSH|UVMF_ALL;
+	if (mmu - rx_mmu) {
+		mcl->op = __HYPERVISOR_mmu_update;
+		mcl->args[0] = (unsigned long)rx_mmu;
+		mcl->args[1] = mmu - rx_mmu;
+		mcl->args[2] = 0;
+		mcl->args[3] = DOMID_SELF;
+		mcl++;
+	}
+
 	ret = HYPERVISOR_multicall(rx_mcl, mcl - rx_mcl);
 	BUG_ON(ret != 0);
 
@@ -727,6 +732,7 @@ static int make_rx_response(netif_t *netif,
 	return notify;
 }
 
+#ifdef NETBE_DEBUG_INTERRUPT
 static irqreturn_t netif_be_dbg(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct list_head *ent;
@@ -758,6 +764,7 @@ static irqreturn_t netif_be_dbg(int irq, void *dev_id, struct pt_regs *regs)
 
 	return IRQ_HANDLED;
 }
+#endif
 
 static int __init netback_init(void)
 {
@@ -794,6 +801,7 @@ static int __init netback_init(void)
 
 	netif_xenbus_init();
 
+#ifdef NETBE_DEBUG_INTERRUPT
 	(void)bind_virq_to_irqhandler(
 		VIRQ_DEBUG,
 		0,
@@ -801,6 +809,7 @@ static int __init netback_init(void)
 		SA_SHIRQ, 
 		"net-be-dbg",
 		&netif_be_dbg);
+#endif
 
 	return 0;
 }

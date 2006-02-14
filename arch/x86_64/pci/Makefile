@@ -22,3 +22,11 @@ irq-y    += ../../i386/pci/irq.o
 common-y += ../../i386/pci/common.o
 fixup-y  += ../../i386/pci/fixup.o
 i386-y  += ../../i386/pci/i386.o
+
+ifdef CONFIG_XEN
+irq-y		:= ../../i386/pci/irq-xen.o
+i386-y		:= ../../i386/pci/i386.o
+include $(srctree)/scripts/Makefile.xen
+
+obj-y := $(call cherrypickxen, $(obj-y))
+endif

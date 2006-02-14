@@ -21,9 +21,9 @@
 #include <asm/desc.h>
 #include <asm/arch_hooks.h>
 #include <asm/pgalloc.h>
-#include <asm-xen/evtchn.h>
-#include <asm-xen/xen-public/vcpu.h>
-#include <asm-xen/xenbus.h>
+#include <xen/evtchn.h>
+#include <xen/interface/vcpu.h>
+#include <xen/xenbus.h>
 
 #ifdef CONFIG_SMP_ALTERNATIVES
 #include <asm/smp_alt.h>
@@ -39,8 +39,6 @@ extern void hypervisor_callback(void);
 extern void failsafe_callback(void);
 extern void system_call(void);
 extern void smp_trap_init(trap_info_t *);
-
-extern cpumask_t cpu_initialized;
 
 /* Number of siblings per CPU package */
 int smp_num_siblings = 1;
@@ -83,13 +81,14 @@ unsigned int maxcpus = NR_CPUS;
 
 void __init prefill_possible_map(void)
 {
-	unsigned i;
+	int i, rc;
 
 	if (!cpus_empty(cpu_possible_map))
 		return;
 
 	for (i = 0; i < NR_CPUS; i++) {
-		if (HYPERVISOR_vcpu_op(VCPUOP_is_up, i, NULL) == -ENOENT)
+		rc = HYPERVISOR_vcpu_op(VCPUOP_is_up, i, NULL);
+		if (rc == -ENOENT)
 			break;
 		cpu_set(i, cpu_possible_map);
 	}
@@ -140,10 +139,9 @@ static void xen_smp_intr_exit(unsigned int cpu)
 
 static void cpu_bringup(void)
 {
-	if (!cpu_isset(smp_processor_id(), cpu_initialized)) {
-		cpu_init();
-		preempt_disable();
-	}
+	cpu_init();
+	touch_softlockup_watchdog();
+	preempt_disable();
 	local_irq_enable();
 	cpu_idle();
 }
@@ -202,7 +200,7 @@ void vcpu_prepare(int vcpu)
 
 	ctxt.ctrlreg[3] = virt_to_mfn(init_level4_pgt) << PAGE_SHIFT;
 
-	ctxt.gs_base_kernel = (unsigned long)cpu_pda(vcpu);
+	ctxt.gs_base_kernel = (unsigned long)(cpu_pda(vcpu));
 #endif
 
 	BUG_ON(HYPERVISOR_vcpu_op(VCPUOP_initialise, vcpu, &ctxt));
@@ -210,7 +208,7 @@ void vcpu_prepare(int vcpu)
 
 void __init smp_prepare_cpus(unsigned int max_cpus)
 {
-	unsigned cpu;
+	int cpu;
 	struct task_struct *idle;
 
 	cpu_data[0] = boot_cpu_data;
@@ -222,8 +220,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 	cpu_sibling_map[0] = cpumask_of_cpu(0);
 	cpu_core_map[0]    = cpumask_of_cpu(0);
 
-	if (max_cpus != 0)
-		xen_smp_intr_init(0);
+	xen_smp_intr_init(0);
 
 	for_each_cpu_mask (cpu, cpu_possible_map) {
 		if (cpu == 0)
@@ -252,7 +249,9 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 		memcpy((void *)cpu_gdt_descr[cpu].address,
 		       (void *)cpu_gdt_descr[0].address,
 		       cpu_gdt_descr[0].size);
-		make_page_readonly((void *)cpu_gdt_descr[cpu].address);
+		make_page_readonly(
+			(void *)cpu_gdt_descr[cpu].address,
+			XENFEAT_writable_descriptor_tables);
 
 #ifdef CONFIG_HOTPLUG_CPU
 		if (xen_start_info->flags & SIF_INITDOMAIN)
@@ -283,9 +282,8 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 void __devinit smp_prepare_boot_cpu(void)
 {
 	prefill_possible_map();
-	cpu_set(0, cpu_possible_map);
-	cpu_set(0, cpu_present_map);
-	cpu_set(0, cpu_online_map);
+	cpu_present_map  = cpumask_of_cpu(0);
+	cpu_online_map   = cpumask_of_cpu(0);
 }
 
 #ifdef CONFIG_HOTPLUG_CPU
@@ -311,7 +309,7 @@ static void vcpu_hotplug(unsigned int cpu)
 		return;
 
 	sprintf(dir, "cpu/%d", cpu);
-	err = xenbus_scanf(NULL, dir, "availability", "%s", state);
+	err = xenbus_scanf(XBT_NULL, dir, "availability", "%s", state);
 	if (err != 1) {
 		printk(KERN_ERR "XENBUS: Unable to read cpu state\n");
 		return;

@@ -250,6 +250,9 @@ struct page {
 #if NR_CPUS >= CONFIG_SPLIT_PTLOCK_CPUS
 	    spinlock_t ptl;
 #endif
+#ifdef CONFIG_XEN
+	    struct list_head ballooned;
+#endif
 	};
 	pgoff_t index;			/* Our offset within mapping. */
 	struct list_head lru;		/* Pageout list, eg. active_list
@@ -1019,9 +1022,9 @@ struct page *follow_page(struct vm_area_struct *, unsigned long address,
 #define FOLL_ANON	0x08	/* give ZERO_PAGE if no pgtable */
 
 #ifdef CONFIG_XEN
-typedef int (*pte_fn_t)(pte_t *pte, struct page *pte_page, unsigned long addr,
+typedef int (*pte_fn_t)(pte_t *pte, struct page *pte_page, unsigned long addr, 
                         void *data);
-extern int generic_page_range(struct mm_struct *mm, unsigned long address,
+extern int generic_page_range(struct mm_struct *mm, unsigned long address, 
                               unsigned long size, pte_fn_t fn, void *data);
 #endif
 

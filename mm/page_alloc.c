@@ -460,8 +460,7 @@ void fastcall __init __free_pages_bootmem(struct page *page, unsigned int order)
 			set_page_count(p, 0);
 		}
 
-		if (arch_free_page(page, order))
-			return;
+		arch_free_page(page, order);
 
 		mod_page_state(pgfree, 1 << order);
 

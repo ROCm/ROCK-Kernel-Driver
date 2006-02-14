@@ -14,24 +14,16 @@
 #include <linux/in.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
-#include <asm-xen/evtchn.h>
-#include <asm-xen/xen-public/io/netif.h>
+#include <xen/evtchn.h>
+#include <xen/interface/io/netif.h>
 #include <asm/io.h>
 #include <asm/pgalloc.h>
-#include <asm-xen/xen-public/grant_table.h>
-#include <asm-xen/gnttab.h>
-#include <asm-xen/driver_util.h>
+#include <xen/interface/grant_table.h>
+#include <xen/gnttab.h>
+#include <xen/driver_util.h>
 
-#if 0
-#define ASSERT(_p) \
-    if ( !(_p) ) { printk("Assertion '%s' failed, line %d, file %s", #_p , \
-    __LINE__, __FILE__); *(int*)0=0; }
-#define DPRINTK(_f, _a...) printk(KERN_ALERT "(file=%s, line=%d) " _f, \
-                           __FILE__ , __LINE__ , ## _a )
-#else
-#define ASSERT(_p) ((void)0)
-#define DPRINTK(_f, _a...) ((void)0)
-#endif
+#define DPRINTK(_f, _a...) pr_debug("(file=%s, line=%d) " _f, \
+                                    __FILE__ , __LINE__ , ## _a )
 #define IPRINTK(fmt, args...) \
     printk(KERN_INFO "xen_net: " fmt, ##args)
 #define WPRINTK(fmt, args...) \
@@ -55,7 +47,8 @@ typedef struct netif_st {
 	/* The shared rings and indexes. */
 	netif_tx_back_ring_t tx;
 	netif_rx_back_ring_t rx;
-	struct vm_struct *comms_area;
+	struct vm_struct *tx_comms_area;
+	struct vm_struct *rx_comms_area;
 
 	/* Allow netif_be_start_xmit() to peek ahead in the rx request ring. */
 	RING_IDX rx_req_cons_peek;
@@ -81,7 +74,7 @@ typedef struct netif_st {
 #define NET_RX_RING_SIZE __RING_SIZE((netif_rx_sring_t *)0, PAGE_SIZE)
 
 void netif_creditlimit(netif_t *netif);
-int  netif_disconnect(netif_t *netif);
+void netif_disconnect(netif_t *netif);
 
 netif_t *alloc_netif(domid_t domid, unsigned int handle, u8 be_mac[ETH_ALEN]);
 void free_netif(netif_t *netif);

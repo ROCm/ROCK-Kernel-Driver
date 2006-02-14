@@ -4,8 +4,11 @@
  * Copyright (c) 2002-2005, K A Fraser
  * Copyright (c) 2005, XenSource Ltd
  * 
- * This file may be distributed separately from the Linux kernel, or
- * incorporated into other software packages, subject to the following license:
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License version 2
+ * as published by the Free Software Foundation; or, when distributed
+ * separately from the Linux kernel or incorporated into other
+ * software packages, subject to the following license:
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this source file (the "Software"), to deal in the Software without
@@ -34,7 +37,6 @@
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/errno.h>
-#include <linux/in.h>
 #include <linux/netdevice.h>
 #include <linux/inetdevice.h>
 #include <linux/etherdevice.h>
@@ -43,22 +45,23 @@
 #include <linux/bitops.h>
 #include <linux/proc_fs.h>
 #include <linux/ethtool.h>
+#include <linux/in.h>
 #include <net/sock.h>
 #include <net/pkt_sched.h>
 #include <net/arp.h>
 #include <net/route.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
-#include <asm-xen/evtchn.h>
-#include <asm-xen/xenbus.h>
-#include <asm-xen/xen-public/io/netif.h>
-#include <asm-xen/xen-public/memory.h>
-#include <asm-xen/balloon.h>
+#include <xen/evtchn.h>
+#include <xen/xenbus.h>
+#include <xen/interface/io/netif.h>
+#include <xen/interface/memory.h>
+#include <xen/balloon.h>
 #include <asm/page.h>
 #include <asm/uaccess.h>
-#include <asm-xen/xen-public/grant_table.h>
-#include <asm-xen/gnttab.h>
-#include <asm-xen/net_driver_util.h>
+#include <xen/interface/grant_table.h>
+#include <xen/gnttab.h>
+#include <xen/net_driver_util.h>
 
 #define GRANT_INVALID_REF	0
 
@@ -76,9 +79,6 @@
         skb_shinfo(_skb)->nr_frags = 0;               \
         skb_shinfo(_skb)->frag_list = NULL;           \
     } while (0)
-
-/* Allow headroom on each rx pkt for Ethernet header, alignment padding, ... */
-#define RX_HEADROOM 512
 
 static unsigned long rx_pfn_array[NET_RX_RING_SIZE];
 static multicall_entry_t rx_mcl[NET_RX_RING_SIZE+1];
@@ -118,6 +118,8 @@ struct netfront_info
 	int rx_min_target, rx_max_target, rx_target;
 	struct sk_buff_head rx_batch;
 
+	struct timer_list rx_refill_timer;
+
 	/*
 	 * {tx,rx}_skbs store outstanding skbuffs. The first entry in each
 	 * array is an index into a chain of free entries.
@@ -153,15 +155,11 @@ static char *be_state_name[] = {
 };
 #endif
 
-#ifdef DEBUG
-#define DPRINTK(fmt, args...) \
-	printk(KERN_ALERT "netfront (%s:%d) " fmt, __FUNCTION__, __LINE__, ##args)
-#else
-#define DPRINTK(fmt, args...) ((void)0)
-#endif
-#define IPRINTK(fmt, args...) \
+#define DPRINTK(fmt, args...) pr_debug("netfront (%s:%d) " fmt, \
+                                       __FUNCTION__, __LINE__, ##args)
+#define IPRINTK(fmt, args...)				\
 	printk(KERN_INFO "netfront: " fmt, ##args)
-#define WPRINTK(fmt, args...) \
+#define WPRINTK(fmt, args...)				\
 	printk(KERN_WARNING "netfront: " fmt, ##args)
 
 
@@ -210,7 +208,7 @@ static int netfront_probe(struct xenbus_device *dev,
 	struct netfront_info *info;
 	unsigned int handle;
 
-	err = xenbus_scanf(NULL, dev->nodename, "handle", "%u", &handle);
+	err = xenbus_scanf(XBT_NULL, dev->nodename, "handle", "%u", &handle);
 	if (err != 1) {
 		xenbus_dev_fatal(dev, err, "reading handle");
 		return err;
@@ -258,7 +256,7 @@ static int talk_to_backend(struct xenbus_device *dev,
 			   struct netfront_info *info)
 {
 	const char *message;
-	struct xenbus_transaction *xbt;
+	xenbus_transaction_t xbt;
 	int err;
 
 	err = xen_net_read_mac(dev, info->mac);
@@ -273,8 +271,8 @@ static int talk_to_backend(struct xenbus_device *dev,
 		goto out;
 
 again:
-	xbt = xenbus_transaction_start();
-	if (IS_ERR(xbt)) {
+	err = xenbus_transaction_start(&xbt);
+	if (err) {
 		xenbus_dev_fatal(dev, err, "starting transaction");
 		goto destroy_ring;
 	}
@@ -517,6 +515,13 @@ static void network_tx_buf_gc(struct net_device *dev)
 }
 
 
+static void rx_refill_timeout(unsigned long data)
+{
+	struct net_device *dev = (struct net_device *)data;
+	netif_rx_schedule(dev);
+}
+
+
 static void network_alloc_rx_buffers(struct net_device *dev)
 {
 	unsigned short id;
@@ -534,13 +539,26 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 	 * Allocate skbuffs greedily, even though we batch updates to the
 	 * receive ring. This creates a less bursty demand on the memory
 	 * allocator, so should reduce the chance of failed allocation requests
-	 *  both for ourself and for other kernel subsystems.
+	 * both for ourself and for other kernel subsystems.
 	 */
 	batch_target = np->rx_target - (req_prod - np->rx.rsp_cons);
 	for (i = skb_queue_len(&np->rx_batch); i < batch_target; i++) {
-		skb = alloc_xen_skb(dev->mtu + RX_HEADROOM);
-		if (skb == NULL)
-			break;
+		/*
+		 * Subtract dev_alloc_skb headroom (16 bytes) and shared info
+		 * tailroom then round down to SKB_DATA_ALIGN boundary.
+		 */
+		skb = alloc_xen_skb(
+			((PAGE_SIZE - sizeof(struct skb_shared_info)) &
+			 (-SKB_DATA_ALIGN(1))) - 16);
+		if (skb == NULL) {
+			/* Any skbuffs queued for refill? Force them out. */
+			if (i != 0)
+				goto refill;
+			/* Could not allocate any skbuffs. Try again later. */
+			mod_timer(&np->rx_refill_timer,
+				  jiffies + (HZ/10));
+			return;
+		}
 		__skb_queue_tail(&np->rx_batch, skb);
 	}
 
@@ -548,6 +566,12 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 	if (i < (np->rx_target/2))
 		return;
 
+	/* Adjust our fill target if we risked running out of buffers. */
+	if (((req_prod - np->rx.sring->rsp_prod) < (np->rx_target / 4)) &&
+	    ((np->rx_target *= 2) > np->rx_max_target))
+		np->rx_target = np->rx_max_target;
+
+ refill:
 	for (i = 0; ; i++) {
 		if ((skb = __skb_dequeue(&np->rx_batch)) == NULL)
 			break;
@@ -568,7 +592,8 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 		rx_pfn_array[i] = virt_to_mfn(skb->head);
 
 		/* Remove this page from map before passing back to Xen. */
-		set_phys_to_machine(__pa(skb->head) >> PAGE_SHIFT, INVALID_P2M_ENTRY);
+		set_phys_to_machine(__pa(skb->head) >> PAGE_SHIFT,
+				    INVALID_P2M_ENTRY);
 
 		MULTI_update_va_mapping(rx_mcl+i, (unsigned long)skb->head,
 					__pte(0), 0);
@@ -601,11 +626,6 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 	/* Above is a suitable barrier to ensure backend will see requests. */
 	np->rx.req_prod_pvt = req_prod + i;
 	RING_PUSH_REQUESTS(&np->rx);
-
-	/* Adjust our fill target if we risked running out of buffers. */
-	if (((req_prod - np->rx.sring->rsp_prod) < (np->rx_target / 4)) &&
-	    ((np->rx_target *= 2) > np->rx_max_target))
-		np->rx_target = np->rx_max_target;
 }
 
 
@@ -783,14 +803,17 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 		np->stats.rx_bytes += rx->status;
 
 		/* Remap the page. */
-		mmu->ptr = ((maddr_t)mfn << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE;
-		mmu->val  = __pa(skb->head) >> PAGE_SHIFT;
-		mmu++;
 		MULTI_update_va_mapping(mcl, (unsigned long)skb->head,
 					pfn_pte_ma(mfn, PAGE_KERNEL), 0);
 		mcl++;
+		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
+			mmu->ptr = ((maddr_t)mfn << PAGE_SHIFT)
+				| MMU_MACHPHYS_UPDATE;
+			mmu->val = __pa(skb->head) >> PAGE_SHIFT;
+			mmu++;
 
-		set_phys_to_machine(__pa(skb->head) >> PAGE_SHIFT, mfn);
+			set_phys_to_machine(__pa(skb->head) >> PAGE_SHIFT, mfn);
+		}
 
 		__skb_queue_tail(&rxq, skb);
 	}
@@ -810,36 +833,43 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 	}
 
 	while ((skb = __skb_dequeue(&rxq)) != NULL) {
+		if (skb->len > (dev->mtu + ETH_HLEN)) {
+			if (net_ratelimit())
+				printk(KERN_INFO "Received packet too big for "
+				       "MTU (%d > %d)\n",
+				       skb->len - ETH_HLEN, dev->mtu);
+			skb->len  = 0;
+			skb->tail = skb->data;
+			init_skb_shinfo(skb);
+			dev_kfree_skb(skb);
+			continue;
+		}
+
 		/*
 		 * Enough room in skbuff for the data we were passed? Also,
 		 * Linux expects at least 16 bytes headroom in each rx buffer.
 		 */
 		if (unlikely(skb->tail > skb->end) || 
 		    unlikely((skb->data - skb->head) < 16)) {
-			nskb = NULL;
-
-			/* Only copy the packet if it fits in the MTU. */
-			if (skb->len <= (dev->mtu + ETH_HLEN)) {
-				if ((skb->tail > skb->end) && net_ratelimit())
+			if (net_ratelimit()) {
+				if (skb->tail > skb->end)
 					printk(KERN_INFO "Received packet "
-					       "needs %zd bytes more "
-					       "headroom.\n",
+					       "is %zd bytes beyond tail.\n",
 					       skb->tail - skb->end);
-
-				nskb = alloc_xen_skb(skb->len + 2);
-				if (nskb != NULL) {
-					skb_reserve(nskb, 2);
-					skb_put(nskb, skb->len);
-					memcpy(nskb->data,
-					       skb->data,
-					       skb->len);
-					nskb->dev = skb->dev;
-				}
+				else
+					printk(KERN_INFO "Received packet "
+					       "is %zd bytes before head.\n",
+					       16 - (skb->data - skb->head));
 			}
-			else if (net_ratelimit())
-				printk(KERN_INFO "Received packet too big for "
-				       "MTU (%d > %d)\n",
-				       skb->len - ETH_HLEN, dev->mtu);
+
+			nskb = alloc_xen_skb(skb->len + 2);
+			if (nskb != NULL) {
+				skb_reserve(nskb, 2);
+				skb_put(nskb, skb->len);
+				memcpy(nskb->data, skb->data, skb->len);
+				nskb->dev = skb->dev;
+				nskb->ip_summed = skb->ip_summed;
+			}
 
 			/* Reinitialise and then destroy the old skbuff. */
 			skb->len  = 0;
@@ -1063,6 +1093,10 @@ static int create_netdev(int handle, struct xenbus_device *dev,
 	np->rx_min_target = RX_MIN_TARGET;
 	np->rx_max_target = RX_MAX_TARGET;
 
+	init_timer(&np->rx_refill_timer);
+	np->rx_refill_timer.data = (unsigned long)netdev;
+	np->rx_refill_timer.function = rx_refill_timeout;
+
 	/* Initialise {tx,rx}_skbs as a free chain containing every entry. */
 	for (i = 0; i <= NET_TX_RING_SIZE; i++) {
 		np->tx_skbs[i] = (void *)((unsigned long) i+1);
@@ -1164,7 +1198,7 @@ static void netfront_closing(struct xenbus_device *dev)
 
 	close_netdev(info);
 
-	xenbus_switch_state(dev, NULL, XenbusStateClosed);
+	xenbus_switch_state(dev, XBT_NULL, XenbusStateClosed);
 }
 
 
@@ -1174,29 +1208,26 @@ static int netfront_remove(struct xenbus_device *dev)
 
 	DPRINTK("%s\n", dev->nodename);
 
-	netif_free(info);
-	kfree(info);
+	netif_disconnect_backend(info);
+	free_netdev(info->netdev);
 
 	return 0;
 }
 
 
-static void netif_free(struct netfront_info *info)
-{
-	netif_disconnect_backend(info);
-	close_netdev(info);
-}
-
-
 static void close_netdev(struct netfront_info *info)
 {
-	if (info->netdev) {
+	spin_lock_irq(&info->netdev->xmit_lock);
+	netif_stop_queue(info->netdev);
+	spin_unlock_irq(&info->netdev->xmit_lock);
+
 #ifdef CONFIG_PROC_FS
-		xennet_proc_delif(info->netdev);
+	xennet_proc_delif(info->netdev);
 #endif
-		unregister_netdev(info->netdev);
-		info->netdev = NULL;
-	}
+
+	del_timer_sync(&info->rx_refill_timer);
+
+	unregister_netdev(info->netdev);
 }
 
 
@@ -1205,21 +1236,28 @@ static void netif_disconnect_backend(struct netfront_info *info)
 	/* Stop old i/f to prevent errors whilst we rebuild the state. */
 	spin_lock_irq(&info->tx_lock);
 	spin_lock(&info->rx_lock);
-	netif_stop_queue(info->netdev);
-	/* info->backend_state = BEST_DISCONNECTED; */
+	info->backend_state = BEST_DISCONNECTED;
 	spin_unlock(&info->rx_lock);
 	spin_unlock_irq(&info->tx_lock);
-    
+
+	if (info->irq)
+		unbind_from_irqhandler(info->irq, info->netdev);
+	info->evtchn = info->irq = 0;
+
 	end_access(info->tx_ring_ref, info->tx.sring);
 	end_access(info->rx_ring_ref, info->rx.sring);
 	info->tx_ring_ref = GRANT_INVALID_REF;
 	info->rx_ring_ref = GRANT_INVALID_REF;
 	info->tx.sring = NULL;
 	info->rx.sring = NULL;
+}
 
-	if (info->irq)
-		unbind_from_irqhandler(info->irq, info->netdev);
-	info->evtchn = info->irq = 0;
+
+static void netif_free(struct netfront_info *info)
+{
+	close_netdev(info);
+	netif_disconnect_backend(info);
+	free_netdev(info->netdev);
 }
 
 
@@ -1283,7 +1321,7 @@ static void netif_exit(void)
 }
 module_exit(netif_exit);
 
-MODULE_LICENSE("BSD");
+MODULE_LICENSE("Dual BSD/GPL");
  
  
 /* ** /proc **/

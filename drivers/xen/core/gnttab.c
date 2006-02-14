@@ -5,18 +5,38 @@
  * 
  * Copyright (c) 2005, Christopher Clark
  * Copyright (c) 2004-2005, K A Fraser
+ * 
+ * This file may be distributed separately from the Linux kernel, or
+ * incorporated into other software packages, subject to the following license:
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this source file (the "Software"), to deal in the Software without
+ * restriction, including without limitation the rights to use, copy, modify,
+ * merge, publish, distribute, sublicense, and/or sell copies of the Software,
+ * and to permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
 
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/sched.h>
 #include <asm/pgtable.h>
-#include <asm-xen/xen-public/xen.h>
+#include <xen/interface/xen.h>
 #include <asm/fixmap.h>
 #include <asm/uaccess.h>
-#include <asm-xen/xen_proc.h>
-#include <asm-xen/linux-public/privcmd.h>
-#include <asm-xen/gnttab.h>
+#include <xen/public/privcmd.h>
+#include <xen/gnttab.h>
 #include <asm/synch_bitops.h>
 
 #if 1
@@ -340,57 +360,6 @@ gnttab_request_free_callback(struct gnttab_free_callback *callback,
 	spin_unlock_irqrestore(&gnttab_list_lock, flags);
 }
 
-/*
- * ProcFS operations
- */
-
-#ifdef CONFIG_PROC_FS
-
-static struct proc_dir_entry *grant_pde;
-static struct file_operations grant_file_ops;
-
-static int
-grant_read(char *page, char **start, off_t off, int count, int *eof,
-	   void *data)
-{
-	int             len;
-	unsigned int    i;
-	grant_entry_t  *gt;
-
-	gt = (grant_entry_t *)shared;
-	len = 0;
-
-	for (i = 0; i < NR_GRANT_ENTRIES; i++) {
-		if (len > (PAGE_SIZE - 200)) {
-			len += sprintf( page + len, "Truncated.\n");
-			break;
-		}
-	}
-
-	if (gt[i].flags) {
-		len += sprintf(page + len,
-			       "Grant: ref (0x%x) flags (0x%hx) "
-			       "dom (0x%hx) frame (0x%x)\n", 
-			       i,
-			       gt[i].flags,
-			       gt[i].domid,
-			       gt[i].frame );
-	}
-
-	*eof = 1;
-	return len;
-}
-
-static int
-grant_write(struct file *file, const char __user *buffer, unsigned long count,
-	    void *data)
-{
-	/* TODO: implement this */
-	return -ENOSYS;
-}
-
-#endif /* CONFIG_PROC_FS */
-
 int
 gnttab_resume(void)
 {
@@ -405,8 +374,13 @@ gnttab_resume(void)
 	BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_setup_table, &setup, 1));
 	BUG_ON(setup.status != 0);
 
+#ifdef __ia64__
+	shared = __va(frames[0] << PAGE_SHIFT);
+	printk("grant table at %p\n", shared);
+#else
 	for (i = 0; i < NR_GRANT_FRAMES; i++)
 		set_fixmap(FIX_GNTTAB_END - i, frames[i] << PAGE_SHIFT);
+#endif
 
 	return 0;
 }
@@ -432,36 +406,20 @@ gnttab_init(void)
 
 	BUG_ON(gnttab_resume());
 
+#ifndef __ia64__
 	shared = (grant_entry_t *)fix_to_virt(FIX_GNTTAB_END);
+#endif
 
 	for (i = NR_RESERVED_ENTRIES; i < NR_GRANT_ENTRIES; i++)
 		gnttab_list[i] = i + 1;
 	gnttab_free_count = NR_GRANT_ENTRIES - NR_RESERVED_ENTRIES;
 	gnttab_free_head  = NR_RESERVED_ENTRIES;
 
-#ifdef CONFIG_PROC_FS
-	/*
-	 *  /proc/xen/grant : used by libxc to access grant tables
-	 */
-	if ((grant_pde = create_xen_proc_entry("grant", 0600)) == NULL) {
-		WPRINTK("Unable to create grant xen proc entry\n");
-		return -1;
-	}
-
-	grant_file_ops.read   = grant_pde->proc_fops->read;
-	grant_file_ops.write  = grant_pde->proc_fops->write;
-
-	grant_pde->proc_fops  = &grant_file_ops;
-
-	grant_pde->read_proc  = &grant_read;
-	grant_pde->write_proc = &grant_write;
-#endif
-
 	printk("Grant table initialized\n");
 	return 0;
 }
 
-__initcall(gnttab_init);
+core_initcall(gnttab_init);
 
 /*
  * Local variables:

@@ -7,7 +7,7 @@
  */
 
 #include "common.h"
-#include <asm-xen/evtchn.h>
+#include <xen/evtchn.h>
 
 static kmem_cache_t *blkif_cachep;
 
@@ -24,6 +24,8 @@ blkif_t *alloc_blkif(domid_t domid)
 	blkif->status = DISCONNECTED;
 	spin_lock_init(&blkif->blk_ring_lock);
 	atomic_set(&blkif->refcnt, 1);
+	init_waitqueue_head(&blkif->wq);
+	blkif->st_print = jiffies;
 
 	return blkif;
 }
@@ -123,11 +125,10 @@ static void free_blkif(void *arg)
 	blkif_t *blkif = (blkif_t *)arg;
 
 	/* Already disconnected? */
-	if (!blkif->irq)
-		return;
-
-	unbind_from_irqhandler(blkif->irq, blkif);
-	blkif->irq = 0;
+	if (blkif->irq) {
+		unbind_from_irqhandler(blkif->irq, blkif);
+		blkif->irq = 0;
+	}
 
 	vbd_free(&blkif->vbd);
 

@@ -1,11 +1,6 @@
 #ifndef TPM_FRONT_H
 #define TPM_FRONT_H
 
-#ifndef TRUE
-#define TRUE 1
-#define FALSE 0
-#endif
-
 struct tpm_private {
 	tpmif_tx_interface_t *tx;
 	unsigned int evtchn;
@@ -22,9 +17,6 @@ struct tpm_private {
 	domid_t backend_id;
 	wait_queue_head_t wait_q;
 
-};
-
-struct tpmfront_info {
 	struct xenbus_device *dev;
 	int ring_ref;
 };

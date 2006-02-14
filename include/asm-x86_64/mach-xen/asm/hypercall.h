@@ -34,19 +34,20 @@
 #ifndef __HYPERCALL_H__
 #define __HYPERCALL_H__
 
-#include <asm-xen/xen-public/xen.h>
-#include <asm-xen/xen-public/sched.h>
+#include <xen/interface/xen.h>
+#include <xen/interface/sched.h>
 
-#define __syscall_clobber "r11","rcx","memory"
+#define __STR(x) #x
+#define STR(x) __STR(x)
 
 #define _hypercall0(type, name)			\
 ({						\
 	long __res;				\
 	asm volatile (				\
-		TRAP_INSTR			\
+		"call hypercall_page + ("STR(__HYPERVISOR_##name)" * 32)"\
 		: "=a" (__res)			\
-		: "0" (__HYPERVISOR_##name)	\
-		: __syscall_clobber );		\
+		:				\
+		: "memory" );			\
 	(type)__res;				\
 })
 
@@ -54,10 +55,10 @@
 ({								\
 	long __res, __ign1;					\
 	asm volatile (						\
-		TRAP_INSTR					\
+		"call hypercall_page + ("STR(__HYPERVISOR_##name)" * 32)"\
 		: "=a" (__res), "=D" (__ign1)			\
-		: "0" (__HYPERVISOR_##name), "1" ((long)(a1))	\
-		: __syscall_clobber );				\
+		: "1" ((long)(a1))				\
+		: "memory" );					\
 	(type)__res;						\
 })
 
@@ -65,11 +66,10 @@
 ({								\
 	long __res, __ign1, __ign2;				\
 	asm volatile (						\
-		TRAP_INSTR					\
+		"call hypercall_page + ("STR(__HYPERVISOR_##name)" * 32)"\
 		: "=a" (__res), "=D" (__ign1), "=S" (__ign2)	\
-		: "0" (__HYPERVISOR_##name), "1" ((long)(a1)),	\
-		"2" ((long)(a2))				\
-		: __syscall_clobber );				\
+		: "1" ((long)(a1)), "2" ((long)(a2))		\
+		: "memory" );					\
 	(type)__res;						\
 })
 
@@ -77,12 +77,12 @@
 ({								\
 	long __res, __ign1, __ign2, __ign3;			\
 	asm volatile (						\
-		TRAP_INSTR					\
+		"call hypercall_page + ("STR(__HYPERVISOR_##name)" * 32)"\
 		: "=a" (__res), "=D" (__ign1), "=S" (__ign2), 	\
 		"=d" (__ign3)					\
-		: "0" (__HYPERVISOR_##name), "1" ((long)(a1)),	\
-		"2" ((long)(a2)), "3" ((long)(a3))		\
-		: __syscall_clobber );				\
+		: "1" ((long)(a1)), "2" ((long)(a2)),		\
+		"3" ((long)(a3))				\
+		: "memory" );					\
 	(type)__res;						\
 })
 
@@ -90,13 +90,13 @@
 ({								\
 	long __res, __ign1, __ign2, __ign3;			\
 	asm volatile (						\
-		"movq %8,%%r10; " TRAP_INSTR			\
+		"movq %7,%%r10; "				\
+		"call hypercall_page + ("STR(__HYPERVISOR_##name)" * 32)"\
 		: "=a" (__res), "=D" (__ign1), "=S" (__ign2),	\
 		"=d" (__ign3)					\
-		: "0" (__HYPERVISOR_##name), "1" ((long)(a1)),	\
-		"2" ((long)(a2)), "3" ((long)(a3)),		\
-		"g" ((long)(a4))				\
-		: __syscall_clobber, "r10" );			\
+		: "1" ((long)(a1)), "2" ((long)(a2)),		\
+		"3" ((long)(a3)), "g" ((long)(a4))		\
+		: "memory", "r10" );				\
 	(type)__res;						\
 })
 
@@ -104,13 +104,14 @@
 ({								\
 	long __res, __ign1, __ign2, __ign3;			\
 	asm volatile (						\
-		"movq %8,%%r10; movq %9,%%r8; " TRAP_INSTR	\
+		"movq %7,%%r10; movq %8,%%r8; "			\
+		"call hypercall_page + ("STR(__HYPERVISOR_##name)" * 32)"\
 		: "=a" (__res), "=D" (__ign1), "=S" (__ign2),	\
 		"=d" (__ign3)					\
-		: "0" (__HYPERVISOR_##name), "1" ((long)(a1)),	\
-		"2" ((long)(a2)), "3" ((long)(a3)),		\
-		"g" ((long)(a4)), "g" ((long)(a5))		\
-		: __syscall_clobber, "r10", "r8" );		\
+		: "1" ((long)(a1)), "2" ((long)(a2)),		\
+		"3" ((long)(a3)), "g" ((long)(a4)),		\
+		"g" ((long)(a5))				\
+		: "memory", "r10", "r8" );			\
 	(type)__res;						\
 })
 
@@ -287,12 +288,6 @@ HYPERVISOR_vcpu_op(
 }
 
 static inline int
-HYPERVISOR_switch_to_user(void)
-{
-	return _hypercall0(int, switch_to_user);
-}
-
-static inline int
 HYPERVISOR_set_segment_base(
 	int reg, unsigned long value)
 {
@@ -305,6 +300,14 @@ HYPERVISOR_suspend(
 {
 	return _hypercall3(int, sched_op, SCHEDOP_shutdown,
 			   SHUTDOWN_suspend, srec);
+}
+
+static inline int
+HYPERVISOR_nmi_op(
+	unsigned long op,
+	unsigned long arg)
+{
+	return _hypercall2(int, nmi_op, op, arg);
 }
 
 #endif /* __HYPERCALL_H__ */

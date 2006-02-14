@@ -38,10 +38,10 @@
 #include <asm/system.h>
 #include <asm/ptrace.h>
 #include <asm/synch_bitops.h>
-#include <asm-xen/xen-public/event_channel.h>
-#include <asm-xen/xen-public/physdev.h>
+#include <xen/interface/event_channel.h>
+#include <xen/interface/physdev.h>
 #include <asm/hypervisor.h>
-#include <asm-xen/evtchn.h>
+#include <xen/evtchn.h>
 #include <linux/mc146818rtc.h> /* RTC_IRQ */
 
 /*
@@ -165,11 +165,10 @@ asmlinkage void evtchn_do_upcall(struct pt_regs *regs)
 	while (l1 != 0) {
 		l1i = __ffs(l1);
 		l1 &= ~(1UL << l1i);
-        
+
 		while ((l2 = active_evtchns(cpu, s, l1i)) != 0) {
 			l2i = __ffs(l2);
-			l2 &= ~(1UL << l2i);
-            
+
 			port = (l1i * BITS_PER_LONG) + l2i;
 			if ((irq = evtchn_to_irq[port]) != -1)
 				do_IRQ(irq, regs);
@@ -641,6 +640,44 @@ void notify_remote_via_irq(int irq)
 		notify_remote_via_evtchn(evtchn);
 }
 EXPORT_SYMBOL(notify_remote_via_irq);
+
+void mask_evtchn(int port)
+{
+	shared_info_t *s = HYPERVISOR_shared_info;
+	synch_set_bit(port, &s->evtchn_mask[0]);
+}
+EXPORT_SYMBOL(mask_evtchn);
+
+void unmask_evtchn(int port)
+{
+	shared_info_t *s = HYPERVISOR_shared_info;
+	unsigned int cpu = smp_processor_id();
+	vcpu_info_t *vcpu_info = &s->vcpu_info[cpu];
+
+	/* Slow path (hypercall) if this is a non-local port. */
+	if (unlikely(cpu != cpu_from_evtchn(port))) {
+		evtchn_op_t op = { .cmd = EVTCHNOP_unmask,
+				   .u.unmask.port = port };
+		(void)HYPERVISOR_event_channel_op(&op);
+		return;
+	}
+
+	synch_clear_bit(port, &s->evtchn_mask[0]);
+
+	/*
+	 * The following is basically the equivalent of 'hw_resend_irq'. Just
+	 * like a real IO-APIC we 'lose the interrupt edge' if the channel is
+	 * masked.
+	 */
+	if (synch_test_bit(port, &s->evtchn_pending[0]) && 
+	    !synch_test_and_set_bit(port / BITS_PER_LONG,
+				    &vcpu_info->evtchn_pending_sel)) {
+		vcpu_info->evtchn_upcall_pending = 1;
+		if (!vcpu_info->evtchn_upcall_mask)
+			force_evtchn_callback();
+	}
+}
+EXPORT_SYMBOL(unmask_evtchn);
 
 void irq_resume(void)
 {

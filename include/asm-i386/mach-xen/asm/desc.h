@@ -91,14 +91,7 @@ static inline void set_ldt_desc(unsigned int cpu, void *addr, unsigned int size)
 	(info)->seg_not_present	== 1	&& \
 	(info)->useable		== 0	)
 
-#include <asm/pgtable.h>
-static inline int write_ldt_entry(void *ldt, int entry, __u32 entry_a, __u32 entry_b)
-{
-	__u32 *lp = (__u32 *)((char *)ldt + entry*8);
-	maddr_t mach_lp = arbitrary_virt_to_machine(lp);
-	return HYPERVISOR_update_descriptor(
-		mach_lp, (u64)entry_a | ((u64)entry_b<<32));
-}
+extern int write_ldt_entry(void *ldt, int entry, __u32 entry_a, __u32 entry_b);
 
 #if TLS_SIZE != 24
 # error update this code.

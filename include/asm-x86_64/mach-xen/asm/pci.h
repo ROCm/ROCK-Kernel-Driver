@@ -80,9 +80,6 @@ extern int iommu_sac_force;
 
 #elif defined(CONFIG_SWIOTLB)
 
-#undef PCI_DMA_BUS_IS_PHYS
-#define PCI_DMA_BUS_IS_PHYS	0
-
 #define pci_dac_dma_supported(pci_dev, mask)    1
 
 #define DECLARE_PCI_UNMAP_ADDR(ADDR_NAME)	\
@@ -100,9 +97,6 @@ extern int iommu_sac_force;
 
 #else
 /* No IOMMU */
-
-#undef PCI_DMA_BUS_IS_PHYS
-#define PCI_DMA_BUS_IS_PHYS 1
 
 #define pci_dac_dma_supported(pci_dev, mask)    1
 

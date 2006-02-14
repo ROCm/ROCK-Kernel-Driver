@@ -154,14 +154,13 @@ static inline void set_tssldt_descriptor(void *ptr, unsigned long tss, unsigned 
 
 static inline void set_ldt_desc(unsigned cpu, void *addr, int size)
 { 
-	set_tssldt_descriptor((struct ldttss_desc *)&cpu_gdt(cpu)[GDT_ENTRY_LDT],
-                              (unsigned long)addr, 
+	set_tssldt_descriptor(&cpu_gdt(cpu)[GDT_ENTRY_LDT], (unsigned long)addr,
 			      DESC_LDT, size * 8 - 1);
 }
 
 static inline void set_seg_base(unsigned cpu, int entry, void *base)
 { 
-	struct desc_struct *d = (struct desc_struct *)&cpu_gdt(cpu)[entry];
+	struct desc_struct *d = &cpu_gdt(cpu)[entry];
 	u32 addr = (u32)(u64)base;
 	BUG_ON((u64)base >> 32); 
 	d->base0 = addr & 0xffff;

@@ -118,7 +118,6 @@ void skb_under_panic(struct sk_buff *skb, int sz, void *here)
  *
  */
 
-#ifndef CONFIG_HAVE_ARCH_ALLOC_SKB
 /**
  *	__alloc_skb	-	allocate a network buffer
  *	@size: size to allocate
@@ -133,6 +132,7 @@ void skb_under_panic(struct sk_buff *skb, int sz, void *here)
  *	Buffers may only be allocated from interrupts using a @gfp_mask of
  *	%GFP_ATOMIC.
  */
+#ifndef CONFIG_HAVE_ARCH_ALLOC_SKB
 struct sk_buff *__alloc_skb(unsigned int size, gfp_t gfp_mask,
 			    int fclone)
 {
@@ -187,7 +187,7 @@ nodata:
 	skb = NULL;
 	goto out;
 }
-#endif
+#endif /* !CONFIG_HAVE_ARCH_ALLOC_SKB */
 
 /**
  *	alloc_skb_from_cache	-	allocate a network buffer
@@ -208,17 +208,15 @@ struct sk_buff *alloc_skb_from_cache(kmem_cache_t *cp,
 				     gfp_t gfp_mask,
 				     int fclone)
 {
+	kmem_cache_t *cache;
+	struct skb_shared_info *shinfo;
 	struct sk_buff *skb;
 	u8 *data;
 
-	/* Get the HEAD */
-	if (fclone)
-		skb = kmem_cache_alloc(skbuff_fclone_cache,
-				       gfp_mask & ~__GFP_DMA);
-	else
-		skb = kmem_cache_alloc(skbuff_head_cache,
-				       gfp_mask & ~__GFP_DMA);
+	cache = fclone ? skbuff_fclone_cache : skbuff_head_cache;
 
+	/* Get the HEAD */
+	skb = kmem_cache_alloc(cache, gfp_mask & ~__GFP_DMA);
 	if (!skb)
 		goto out;
 
@@ -235,6 +233,16 @@ struct sk_buff *alloc_skb_from_cache(kmem_cache_t *cp,
 	skb->data = data;
 	skb->tail = data;
 	skb->end  = data + size;
+	/* make sure we initialize shinfo sequentially */
+	shinfo = skb_shinfo(skb);
+	atomic_set(&shinfo->dataref, 1);
+	shinfo->nr_frags  = 0;
+	shinfo->tso_size = 0;
+	shinfo->tso_segs = 0;
+	shinfo->ufo_size = 0;
+	shinfo->ip6_frag_id = 0;
+	shinfo->frag_list = NULL;
+
 	if (fclone) {
 		struct sk_buff *child = skb + 1;
 		atomic_t *fclone_ref = (atomic_t *) (child + 1);
@@ -244,18 +252,10 @@ struct sk_buff *alloc_skb_from_cache(kmem_cache_t *cp,
 
 		child->fclone = SKB_FCLONE_UNAVAILABLE;
 	}
-	atomic_set(&(skb_shinfo(skb)->dataref), 1);
-	skb_shinfo(skb)->nr_frags  = 0;
-	skb_shinfo(skb)->tso_size = 0;
-	skb_shinfo(skb)->tso_segs = 0;
-	skb_shinfo(skb)->frag_list = NULL;
 out:
 	return skb;
 nodata:
-	if (fclone)
-		kmem_cache_free(skbuff_fclone_cache, skb);
-	else
-		kmem_cache_free(skbuff_head_cache, skb);
+	kmem_cache_free(cache, skb);
 	skb = NULL;
 	goto out;
 }

@@ -20,15 +20,13 @@
 
 #include <stdarg.h>
 #include <linux/module.h>
-#include <asm-xen/xenbus.h>
+#include <linux/kthread.h>
+#include <xen/xenbus.h>
 #include "common.h"
 
-
-#if 0
 #undef DPRINTK
 #define DPRINTK(fmt, args...) \
-    printk("blkback/xenbus (%s:%d) " fmt ".\n", __FUNCTION__, __LINE__, ##args)
-#endif
+    pr_debug("blkback/xenbus (%s:%d) " fmt ".\n", __FUNCTION__, __LINE__, ##args)
 
 
 struct backend_info
@@ -61,7 +59,7 @@ void update_blkif_status(blkif_t *blkif)
 
 
 static ssize_t show_physical_device(struct device *_dev,
-                                    struct device_attribute *attr, char *buf)
+				    struct device_attribute *attr, char *buf)
 {
 	struct xenbus_device *dev = to_xenbus_device(_dev);
 	struct backend_info *be = dev->data;
@@ -71,8 +69,8 @@ DEVICE_ATTR(physical_device, S_IRUSR | S_IRGRP | S_IROTH,
 	    show_physical_device, NULL);
 
 
-static ssize_t show_mode(struct device *_dev,
-                        struct device_attribute *attr, char *buf)
+static ssize_t show_mode(struct device *_dev, struct device_attribute *attr,
+			 char *buf)
 {
 	struct xenbus_device *dev = to_xenbus_device(_dev);
 	struct backend_info *be = dev->data;
@@ -94,6 +92,8 @@ static int blkback_remove(struct xenbus_device *dev)
 	}
 	if (be->blkif) {
 		be->blkif->status = DISCONNECTED; 
+		if (be->blkif->xenblkd)
+			kthread_stop(be->blkif->xenblkd);
 		blkif_put(be->blkif);
 		be->blkif = NULL;
 	}
@@ -144,7 +144,7 @@ static int blkback_probe(struct xenbus_device *dev,
 	if (err)
 		goto fail;
 
-	err = xenbus_switch_state(dev, NULL, XenbusStateInitWait);
+	err = xenbus_switch_state(dev, XBT_NULL, XenbusStateInitWait);
 	if (err)
 		goto fail;
 
@@ -174,7 +174,7 @@ static void backend_changed(struct xenbus_watch *watch,
 
 	DPRINTK("");
 
-	err = xenbus_scanf(NULL, dev->nodename, "physical-device", "%x:%x",
+	err = xenbus_scanf(XBT_NULL, dev->nodename, "physical-device", "%x:%x",
 			   &major, &minor);
 	if (XENBUS_EXIST_ERR(err)) {
 		/* Since this watch will fire once immediately after it is
@@ -196,7 +196,7 @@ static void backend_changed(struct xenbus_watch *watch,
 		return;
 	}
 
-	be->mode = xenbus_read(NULL, dev->nodename, "mode", NULL);
+	be->mode = xenbus_read(XBT_NULL, dev->nodename, "mode", NULL);
 	if (IS_ERR(be->mode)) {
 		err = PTR_ERR(be->mode);
 		be->mode = NULL;
@@ -219,6 +219,17 @@ static void backend_changed(struct xenbus_watch *watch,
 			be->major = 0;
 			be->minor = 0;
 			xenbus_dev_fatal(dev, err, "creating vbd structure");
+			return;
+		}
+
+		be->blkif->xenblkd = kthread_run(blkif_schedule, be->blkif,
+						 "xvd %d %02x:%02x",
+						 be->blkif->domid,
+						 be->major, be->minor);
+		if (IS_ERR(be->blkif->xenblkd)) {
+			err = PTR_ERR(be->blkif->xenblkd);
+			be->blkif->xenblkd = NULL;
+			xenbus_dev_error(dev, err, "start xenblkd");
 			return;
 		}
 
@@ -256,7 +267,7 @@ static void frontend_changed(struct xenbus_device *dev,
 		break;
 
 	case XenbusStateClosing:
-		xenbus_switch_state(dev, NULL, XenbusStateClosing);
+		xenbus_switch_state(dev, XBT_NULL, XenbusStateClosing);
 		break;
 
 	case XenbusStateClosed:
@@ -290,7 +301,7 @@ static void maybe_connect(struct backend_info *be)
  */
 static void connect(struct backend_info *be)
 {
-	struct xenbus_transaction *xbt;
+	xenbus_transaction_t xbt;
 	int err;
 	struct xenbus_device *dev = be->dev;
 
@@ -298,10 +309,9 @@ static void connect(struct backend_info *be)
 
 	/* Supply the information about the device the frontend needs */
 again:
-	xbt = xenbus_transaction_start();
+	err = xenbus_transaction_start(&xbt);
 
-	if (IS_ERR(xbt)) {
-		err = PTR_ERR(xbt);
+	if (err) {
 		xenbus_dev_fatal(dev, err, "starting transaction");
 		return;
 	}
@@ -354,7 +364,7 @@ static int connect_ring(struct backend_info *be)
 
 	DPRINTK("%s", dev->otherend);
 
-	err = xenbus_gather(NULL, dev->otherend, "ring-ref", "%lu", &ring_ref,
+	err = xenbus_gather(XBT_NULL, dev->otherend, "ring-ref", "%lu", &ring_ref,
 			    "event-channel", "%u", &evtchn, NULL);
 	if (err) {
 		xenbus_dev_fatal(dev, err,

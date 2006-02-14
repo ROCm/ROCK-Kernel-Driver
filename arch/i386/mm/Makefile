@@ -8,3 +8,11 @@ obj-$(CONFIG_NUMA) += discontig.o
 obj-$(CONFIG_HUGETLB_PAGE) += hugetlbpage.o
 obj-$(CONFIG_HIGHMEM) += highmem.o
 obj-$(CONFIG_BOOT_IOREMAP) += boot_ioremap.o
+
+ifdef CONFIG_XEN
+include $(srctree)/scripts/Makefile.xen
+
+obj-y		+= hypervisor.o
+
+obj-y := $(call cherrypickxen, $(obj-y))
+endif

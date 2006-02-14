@@ -49,13 +49,12 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/uaccess.h>
-#include <asm-xen/xen-public/xen.h>
-#include <asm-xen/xen-public/event_channel.h>
+#include <xen/interface/xen.h>
+#include <xen/interface/event_channel.h>
 #include <asm/hypervisor.h>
-#include <asm-xen/evtchn.h>
-#include <asm-xen/xencons.h>
+#include <xen/evtchn.h>
+#include <xen/xencons.h>
 
-#include "xencons_ring.h"
 /*
  * Modes:
  *  'xencons=off'  [XC_OFF]:     Console is disabled.
@@ -135,19 +134,21 @@ static struct tty_driver *xencons_driver;
 static void kcons_write(
 	struct console *c, const char *s, unsigned int count)
 {
-	int           i;
+	int           i = 0;
 	unsigned long flags;
 
 	spin_lock_irqsave(&xencons_lock, flags);
-    
-	for (i = 0; i < count; i++) {
-		if ((wp - wc) >= (wbuf_size - 1))
-			break;
-		if ((wbuf[WBUF_MASK(wp++)] = s[i]) == '\n')
-			wbuf[WBUF_MASK(wp++)] = '\r';
-	}
 
-	__xencons_tx_flush();
+	while (i < count) {
+		for (; i < count; i++) {
+			if ((wp - wc) >= (wbuf_size - 1))
+				break;
+			if ((wbuf[WBUF_MASK(wp++)] = s[i]) == '\n')
+				wbuf[WBUF_MASK(wp++)] = '\r';
+		}
+
+		__xencons_tx_flush();
+	}
 
 	spin_unlock_irqrestore(&xencons_lock, flags);
 }
@@ -167,7 +168,7 @@ static void kcons_write_dom0(
 
 static struct tty_driver *kcons_device(struct console *c, int *index)
 {
-	*index = c->index;
+	*index = 0;
 	return xencons_driver;
 }
 
@@ -247,7 +248,6 @@ void xencons_force_flush(void)
 	if (xen_start_info->flags & SIF_INITDOMAIN)
 		return;
 
-
 	/* Spin until console data is flushed through to the daemon. */
 	while (wc != wp) {
 		int sent = 0;
@@ -271,8 +271,7 @@ static struct tty_struct *xencons_tty;
 static int xencons_priv_irq;
 static char x_char;
 
-/* Non-privileged receive callback. */
-static void xencons_rx(char *buf, unsigned len, struct pt_regs *regs)
+void xencons_rx(char *buf, unsigned len, struct pt_regs *regs)
 {
 	int           i;
 	unsigned long flags;
@@ -311,49 +310,38 @@ static void xencons_rx(char *buf, unsigned len, struct pt_regs *regs)
 	spin_unlock_irqrestore(&xencons_lock, flags);
 }
 
-/* Privileged and non-privileged transmit worker. */
 static void __xencons_tx_flush(void)
 {
-	int sz, work_done = 0;
+	int sent, sz, work_done = 0;
 
-	if (xen_start_info->flags & SIF_INITDOMAIN) {
-		if (x_char) {
+	if (x_char) {
+		if (xen_start_info->flags & SIF_INITDOMAIN)
 			kcons_write_dom0(NULL, &x_char, 1);
-			x_char = 0;
-			work_done = 1;
-		}
-
-		while (wc != wp) {
-			sz = wp - wc;
-			if (sz > (wbuf_size - WBUF_MASK(wc)))
-				sz = wbuf_size - WBUF_MASK(wc);
-			kcons_write_dom0(NULL, &wbuf[WBUF_MASK(wc)], sz);
-			wc += sz;
-			work_done = 1;
-		}
-	} else {
-		while (x_char) {
-			if (xencons_ring_send(&x_char, 1) == 1) {
-				x_char = 0;
-				work_done = 1;
-			}
-		}
-
-		while (wc != wp) {
-			int sent;
-			sz = wp - wc;
-			if (sz > (wbuf_size - WBUF_MASK(wc)))
-				sz = wbuf_size - WBUF_MASK(wc);
-			sent = xencons_ring_send(&wbuf[WBUF_MASK(wc)], sz);
-			if (sent > 0) {
-				wc += sent;
-				work_done = 1;
-			}
-		}
+		else
+			while (x_char)
+				if (xencons_ring_send(&x_char, 1) == 1)
+					break;
+		x_char = 0;
+		work_done = 1;
 	}
 
-	if (work_done && (xencons_tty != NULL))
-	{
+	while (wc != wp) {
+		sz = wp - wc;
+		if (sz > (wbuf_size - WBUF_MASK(wc)))
+			sz = wbuf_size - WBUF_MASK(wc);
+		if (xen_start_info->flags & SIF_INITDOMAIN) {
+			kcons_write_dom0(NULL, &wbuf[WBUF_MASK(wc)], sz);
+			wc += sz;
+		} else {
+			sent = xencons_ring_send(&wbuf[WBUF_MASK(wc)], sz);
+			if (sent == 0)
+				break;
+			wc += sent;
+		}
+		work_done = 1;
+	}
+
+	if (work_done && (xencons_tty != NULL)) {
 		wake_up_interruptible(&xencons_tty->write_wait);
 		if ((xencons_tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
 		    (xencons_tty->ldisc.write_wakeup != NULL))
@@ -361,31 +349,26 @@ static void __xencons_tx_flush(void)
 	}
 }
 
+void xencons_tx(void)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&xencons_lock, flags);
+	__xencons_tx_flush();
+	spin_unlock_irqrestore(&xencons_lock, flags);
+}
+
 /* Privileged receive callback and transmit kicker. */
 static irqreturn_t xencons_priv_interrupt(int irq, void *dev_id,
                                           struct pt_regs *regs)
 {
-	static char   rbuf[16];
-	int           i, l;
-	unsigned long flags;
+	static char rbuf[16];
+	int         l;
 
-	spin_lock_irqsave(&xencons_lock, flags);
+	while ((l = HYPERVISOR_console_io(CONSOLEIO_read, 16, rbuf)) > 0)
+		xencons_rx(rbuf, l, regs);
 
-	if (xencons_tty != NULL)
-	{
-		/* Receive work. */
-		while ((l = HYPERVISOR_console_io(
-			CONSOLEIO_read, 16, rbuf)) > 0)
-			for (i = 0; i < l; i++)
-				tty_insert_flip_char(xencons_tty, rbuf[i], 0);
-		if (xencons_tty->buf.tail && xencons_tty->buf.tail->used != 0)
-			tty_flip_buffer_push(xencons_tty);
-	}
-
-	/* Transmit work. */
-	__xencons_tx_flush();
-
-	spin_unlock_irqrestore(&xencons_lock, flags);
+	xencons_tx();
 
 	return IRQ_HANDLED;
 }
@@ -579,47 +562,6 @@ static struct tty_operations xencons_ops = {
 	.wait_until_sent = xencons_wait_until_sent,
 };
 
-#ifdef CONFIG_XEN_PHYSDEV_ACCESS
-static const char *xennullcon_startup(void)
-{
-	return NULL;
-}
-
-static int xennullcon_dummy(void)
-{
-	return 0;
-}
-
-#define DUMMY (void *)xennullcon_dummy
-
-/*
- *  The console `switch' structure for the dummy console
- *
- *  Most of the operations are dummies.
- */
-
-const struct consw xennull_con = {
-	.owner =		THIS_MODULE,
-	.con_startup =	xennullcon_startup,
-	.con_init =		DUMMY,
-	.con_deinit =	DUMMY,
-	.con_clear =	DUMMY,
-	.con_putc =		DUMMY,
-	.con_putcs =	DUMMY,
-	.con_cursor =	DUMMY,
-	.con_scroll =	DUMMY,
-	.con_bmove =	DUMMY,
-	.con_switch =	DUMMY,
-	.con_blank =	DUMMY,
-	.con_font_set =	DUMMY,
-	.con_font_get =	DUMMY,
-	.con_font_default =	DUMMY,
-	.con_font_copy =	DUMMY,
-	.con_set_palette =	DUMMY,
-	.con_scrolldelta =	DUMMY,
-};
-#endif
-
 static int __init xencons_init(void)
 {
 	int rc;
@@ -637,6 +579,7 @@ static int __init xencons_init(void)
 	if (xencons_driver == NULL)
 		return -ENOMEM;
 
+	DRV(xencons_driver)->name            = "xencons";
 	DRV(xencons_driver)->major           = TTY_MAJOR;
 	DRV(xencons_driver)->type            = TTY_DRIVER_TYPE_SERIAL;
 	DRV(xencons_driver)->subtype         = SERIAL_TYPE_NORMAL;
@@ -664,7 +607,8 @@ static int __init xencons_init(void)
 	if ((rc = tty_register_driver(DRV(xencons_driver))) != 0) {
 		printk("WARNING: Failed to register Xen virtual "
 		       "console driver as '%s%d'\n",
-		       DRV(xencons_driver)->name, DRV(xencons_driver)->name_base);
+		       DRV(xencons_driver)->name,
+		       DRV(xencons_driver)->name_base);
 		put_tty_driver(xencons_driver);
 		xencons_driver = NULL;
 		return rc;
@@ -681,8 +625,6 @@ static int __init xencons_init(void)
 			"console",
 			NULL);
 		BUG_ON(xencons_priv_irq < 0);
-	} else {
-		xencons_ring_register_receiver(xencons_rx);
 	}
 
 	printk("Xen virtual console successfully installed as %s%d\n",

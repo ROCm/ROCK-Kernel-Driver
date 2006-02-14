@@ -249,9 +249,9 @@ int setup_irq(unsigned int irq, struct irqaction * new)
  *	@old: Pointer to the irqaction that is to be unregistered
  *
  *	This function is called by free_irq and does the actual
- *	business of unregistering the handler. It exists as a
- *	seperate function to enable handlers to be unregistered
- *	for irqactions that have been allocated statically at
+ *	business of unregistering the handler. It exists as a 
+ *	seperate function to enable handlers to be unregistered 
+ *	for irqactions that have been allocated statically at 
  *	boot time.
  *
  *	This function must not be called from interrupt context.

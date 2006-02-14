@@ -27,12 +27,8 @@
  * IN THE SOFTWARE.
  */
 
-#if 0
 #define DPRINTK(fmt, args...) \
-    printk("xenbus_probe (%s:%d) " fmt ".\n", __FUNCTION__, __LINE__, ##args)
-#else
-#define DPRINTK(fmt, args...) ((void)0)
-#endif
+    pr_debug("xenbus_probe (%s:%d) " fmt ".\n", __FUNCTION__, __LINE__, ##args)
 
 #include <linux/kernel.h>
 #include <linux/err.h>
@@ -47,11 +43,11 @@
 #include <asm/page.h>
 #include <asm/pgtable.h>
 #include <asm/hypervisor.h>
-#include <asm-xen/xenbus.h>
-#include <asm-xen/xen_proc.h>
-#include <asm-xen/balloon.h>
-#include <asm-xen/evtchn.h>
-#include <asm-xen/linux-public/evtchn.h>
+#include <xen/xenbus.h>
+#include <xen/xen_proc.h>
+#include <xen/balloon.h>
+#include <xen/evtchn.h>
+#include <xen/public/evtchn.h>
 
 #include "xenbus_comms.h"
 
@@ -115,7 +111,7 @@ static int frontend_bus_id(char bus_id[BUS_ID_SIZE], const char *nodename)
 static int read_otherend_details(struct xenbus_device *xendev,
 				 char *id_node, char *path_node)
 {
-	int err = xenbus_gather(NULL, xendev->nodename,
+	int err = xenbus_gather(XBT_NULL, xendev->nodename,
 				id_node, "%i", &xendev->otherend_id,
 				path_node, NULL, &xendev->otherend,
 				NULL);
@@ -126,7 +122,7 @@ static int read_otherend_details(struct xenbus_device *xendev,
 		return err;
 	}
 	if (strlen(xendev->otherend) == 0 ||
-	    !xenbus_exists(NULL, xendev->otherend, "")) {
+	    !xenbus_exists(XBT_NULL, xendev->otherend, "")) {
 		xenbus_dev_fatal(xendev, -ENOENT, "missing other end from %s",
 				 xendev->nodename);
 		kfree(xendev->otherend);
@@ -200,21 +196,20 @@ static int backend_bus_id(char bus_id[BUS_ID_SIZE], const char *nodename)
 
 	devid = strrchr(nodename, '/') + 1;
 
-	err = xenbus_gather(NULL, nodename, "frontend-id", "%i", &domid,
+	err = xenbus_gather(XBT_NULL, nodename, "frontend-id", "%i", &domid,
 			    "frontend", NULL, &frontend,
 			    NULL);
 	if (err)
 		return err;
 	if (strlen(frontend) == 0)
 		err = -ERANGE;
-
-	if (!err && !xenbus_exists(NULL, frontend, ""))
+	if (!err && !xenbus_exists(XBT_NULL, frontend, ""))
 		err = -ENOENT;
 
-	if (err) {
-		kfree(frontend);
+	kfree(frontend);
+
+	if (err)
 		return err;
-	}
 
 	if (snprintf(bus_id, BUS_ID_SIZE,
 		     "%.*s-%i-%s", typelen, type, domid, devid) >= BUS_ID_SIZE)
@@ -222,10 +217,29 @@ static int backend_bus_id(char bus_id[BUS_ID_SIZE], const char *nodename)
 	return 0;
 }
 
-static int xenbus_hotplug_backend(struct device *dev, char **envp,
-				  int num_envp, char *buffer, int buffer_size)
+static int xenbus_uevent_backend(struct device *dev, char **envp,
+				 int num_envp, char *buffer, int buffer_size);
+static int xenbus_probe_backend(const char *type, const char *domid);
+static struct xen_bus_type xenbus_backend = {
+	.root = "backend",
+	.levels = 3, 		/* backend/type/<frontend>/<id> */
+	.get_bus_id = backend_bus_id,
+	.probe = xenbus_probe_backend,
+	.bus = {
+		.name  = "xen-backend",
+		.match = xenbus_match,
+		.uevent = xenbus_uevent_backend,
+	},
+	.dev = {
+		.bus_id = "xen-backend",
+	},
+};
+
+static int xenbus_uevent_backend(struct device *dev, char **envp,
+				 int num_envp, char *buffer, int buffer_size)
 {
 	struct xenbus_device *xdev;
+	struct xenbus_driver *drv;
 	int i = 0;
 	int length = 0;
 
@@ -239,13 +253,14 @@ static int xenbus_hotplug_backend(struct device *dev, char **envp,
 		return -ENODEV;
 
 	/* stuff we want to pass to /sbin/hotplug */
-	add_uevent_var(envp, num_envp, &i,
-		       buffer, buffer_size, &length,
+	add_uevent_var(envp, num_envp, &i, buffer, buffer_size, &length,
 		       "XENBUS_TYPE=%s", xdev->devicetype);
 
-	add_uevent_var(envp, num_envp, &i,
-		       buffer, buffer_size, &length,
+	add_uevent_var(envp, num_envp, &i, buffer, buffer_size, &length,
 		       "XENBUS_PATH=%s", xdev->nodename);
+
+	add_uevent_var(envp, num_envp, &i, buffer, buffer_size, &length,
+		       "XENBUS_BASE_PATH=%s", xenbus_backend.root);
 
 	/* terminate, set to next free slot, shrink available space */
 	envp[i] = NULL;
@@ -254,29 +269,15 @@ static int xenbus_hotplug_backend(struct device *dev, char **envp,
 	buffer = &buffer[length];
 	buffer_size -= length;
 
-	if (dev->driver && to_xenbus_driver(dev->driver)->hotplug)
-		return to_xenbus_driver(dev->driver)->hotplug
-			(xdev, envp, num_envp, buffer, buffer_size);
+	if (dev->driver) {
+		drv = to_xenbus_driver(dev->driver);
+		if (drv && drv->uevent)
+			return drv->uevent(xdev, envp, num_envp, buffer,
+					   buffer_size);
+	}
 
 	return 0;
 }
-
-static int xenbus_probe_backend(const char *type, const char *domid);
-static struct xen_bus_type xenbus_backend = {
-	.root = "backend",
-	.levels = 3, 		/* backend/type/<frontend>/<id> */
-	.get_bus_id = backend_bus_id,
-	.probe = xenbus_probe_backend,
-	.bus = {
-		.name  = "xen-backend",
-		.match = xenbus_match,
-		.uevent = xenbus_hotplug_backend,
-	},
-	.dev = {
-		.bus_id = "xen-backend",
-	},
-};
-
 
 static void otherend_changed(struct xenbus_watch *watch,
 			     const char **vec, unsigned int len)
@@ -307,15 +308,16 @@ static void otherend_changed(struct xenbus_watch *watch,
 static int talk_to_otherend(struct xenbus_device *dev)
 {
 	struct xenbus_driver *drv = to_xenbus_driver(dev->dev.driver);
-	int err;
 
 	free_otherend_watch(dev);
 	free_otherend_details(dev);
 
-	err = drv->read_otherend_details(dev);
-	if (err)
-		return err;
+	return drv->read_otherend_details(dev);
+}
 
+
+static int watch_otherend(struct xenbus_device *dev)
+{
 	return xenbus_watch_path2(dev, dev->otherend, "state",
 				  &dev->otherend_watch, otherend_changed);
 }
@@ -330,14 +332,6 @@ static int xenbus_dev_probe(struct device *_dev)
 
 	DPRINTK("");
 
-	err = talk_to_otherend(dev);
-	if (err) {
-		printk(KERN_WARNING
-		       "xenbus_probe: talk_to_otherend on %s failed.\n",
-		       dev->nodename);
-		return err;
-	}
-
 	if (!drv->probe) {
 		err = -ENODEV;
 		goto fail;
@@ -349,14 +343,30 @@ static int xenbus_dev_probe(struct device *_dev)
 		goto fail;
 	}
 
+	err = talk_to_otherend(dev);
+	if (err) {
+		printk(KERN_WARNING
+		       "xenbus_probe: talk_to_otherend on %s failed.\n",
+		       dev->nodename);
+		return err;
+	}
+
 	err = drv->probe(dev, id);
 	if (err)
 		goto fail;
 
+	err = watch_otherend(dev);
+	if (err) {
+		printk(KERN_WARNING
+		       "xenbus_probe: watch_otherend on %s failed.\n",
+		       dev->nodename);
+		return err;
+	}
+
 	return 0;
 fail:
 	xenbus_dev_error(dev, err, "xenbus_dev_probe on %s", dev->nodename);
-	xenbus_switch_state(dev, NULL, XenbusStateClosed);
+	xenbus_switch_state(dev, XBT_NULL, XenbusStateClosed);
 	return -ENODEV;
 	
 }
@@ -374,7 +384,7 @@ static int xenbus_dev_remove(struct device *_dev)
 	if (drv->remove)
 		drv->remove(dev);
 
-	xenbus_switch_state(dev, NULL, XenbusStateClosed);
+	xenbus_switch_state(dev, XBT_NULL, XenbusStateClosed);
 	return 0;
 }
 
@@ -453,12 +463,17 @@ static int cleanup_dev(struct device *dev, void *data)
 
 	DPRINTK("%s", info->nodename);
 
-	if (!strncmp(xendev->nodename, info->nodename, len)) {
-		info->dev = xendev;
-		get_device(dev);
-		return 1;
-	}
-	return 0;
+	/* Match the info->nodename path, or any subdirectory of that path. */
+	if (strncmp(xendev->nodename, info->nodename, len))
+		return 0;
+
+	/* If the node name is longer, ensure it really is a subdirectory. */
+	if ((strlen(xendev->nodename) > len) && (xendev->nodename[len] != '/'))
+		return 0;
+
+	info->dev = xendev;
+	get_device(dev);
+	return 1;
 }
 
 static void xenbus_cleanup_devices(const char *path, struct bus_type *bus)
@@ -488,7 +503,7 @@ static void xenbus_dev_release(struct device *dev)
 }
 
 /* Simplified asprintf. */
-static char *kasprintf(const char *fmt, ...)
+char *kasprintf(const char *fmt, ...)
 {
 	va_list ap;
 	unsigned int len;
@@ -527,14 +542,6 @@ static int xenbus_probe_node(struct xen_bus_type *bus,
 			     const char *type,
 			     const char *nodename)
 {
-#define CHECK_FAIL				\
-	do {					\
-		if (err)			\
-			goto fail;		\
-	}					\
-	while (0)				\
-
-
 	int err;
 	struct xenbus_device *xendev;
 	size_t stringlen;
@@ -569,19 +576,18 @@ static int xenbus_probe_node(struct xen_bus_type *bus,
 	xendev->dev.release = xenbus_dev_release;
 
 	err = bus->get_bus_id(xendev->dev.bus_id, xendev->nodename);
-	CHECK_FAIL;
+	if (err)
+		goto fail;
 
 	/* Register with generic device framework. */
 	err = device_register(&xendev->dev);
-	CHECK_FAIL;
+	if (err)
+		goto fail;
 
 	device_create_file(&xendev->dev, &dev_attr_nodename);
 	device_create_file(&xendev->dev, &dev_attr_devtype);
 
 	return 0;
-
-#undef CHECK_FAIL
-
 fail:
 	xenbus_dev_free(xendev);
 	return err;
@@ -637,7 +643,7 @@ static int xenbus_probe_backend(const char *type, const char *domid)
 	if (!nodename)
 		return -ENOMEM;
 
-	dir = xenbus_directory(NULL, nodename, "", &dir_n);
+	dir = xenbus_directory(XBT_NULL, nodename, "", &dir_n);
 	if (IS_ERR(dir)) {
 		kfree(nodename);
 		return PTR_ERR(dir);
@@ -660,7 +666,7 @@ static int xenbus_probe_device_type(struct xen_bus_type *bus, const char *type)
 	unsigned int dir_n = 0;
 	int i;
 
-	dir = xenbus_directory(NULL, bus->root, type, &dir_n);
+	dir = xenbus_directory(XBT_NULL, bus->root, type, &dir_n);
 	if (IS_ERR(dir))
 		return PTR_ERR(dir);
 
@@ -679,7 +685,7 @@ static int xenbus_probe_devices(struct xen_bus_type *bus)
 	char **dir;
 	unsigned int i, dir_n;
 
-	dir = xenbus_directory(NULL, bus->root, "", &dir_n);
+	dir = xenbus_directory(XBT_NULL, bus->root, "", &dir_n);
 	if (IS_ERR(dir))
 		return PTR_ERR(dir);
 
@@ -725,7 +731,7 @@ static void dev_changed(const char *node, struct xen_bus_type *bus)
 	if (char_count(node, '/') < 2)
  		return;
 
-	exists = xenbus_exists(NULL, node, "");
+	exists = xenbus_exists(XBT_NULL, node, "");
 	if (!exists) {
 		xenbus_cleanup_devices(node, &bus->bus);
 		return;
@@ -820,6 +826,14 @@ static int resume_dev(struct device *dev, void *data)
 		return err;
 	}
 
+	err = watch_otherend(xdev);
+	if (err) {
+		printk(KERN_WARNING
+		       "xenbus_probe: resume (watch_otherend) %s failed: "
+		       "%d.\n", dev->bus_id, err);
+		return err;
+	}
+
 	if (drv->resume)
 		err = drv->resume(xdev);
 	if (err)
@@ -849,16 +863,16 @@ EXPORT_SYMBOL(xenbus_resume);
 
 
 /* A flag to determine if xenstored is 'ready' (i.e. has started) */
-int xenstored_ready = 0; 
+int xenstored_ready = 0;
 
 
 int register_xenstore_notifier(struct notifier_block *nb)
 {
 	int ret = 0;
 
-	if (xenstored_ready > 0) 
+	if (xenstored_ready > 0)
 		ret = nb->notifier_call(nb, 0, NULL);
-	else 
+	else
 		notifier_chain_register(&xenstore_chain, nb);
 
 	return ret;
@@ -875,7 +889,7 @@ EXPORT_SYMBOL(unregister_xenstore_notifier);
 
 void xenbus_probe(void *unused)
 {
-	BUG_ON((xenstored_ready <= 0)); 
+	BUG_ON((xenstored_ready <= 0));
 
 	/* Enumerate devices in xenstore. */
 	xenbus_probe_devices(&xenbus_frontend);
@@ -890,27 +904,27 @@ void xenbus_probe(void *unused)
 }
 
 
-static struct proc_dir_entry *xsd_mfn_intf;
+static struct proc_dir_entry *xsd_kva_intf;
 static struct proc_dir_entry *xsd_port_intf;
 
 
-static int xsd_mfn_read(char *page, char **start, off_t off,
+static int xsd_kva_read(char *page, char **start, off_t off,
                         int count, int *eof, void *data)
 {
-	int len; 
-	len  = sprintf(page, "%ld", xen_start_info->store_mfn); 
-	*eof = 1; 
-	return len; 
+	int len;
+	len  = sprintf(page, "0x%p", mfn_to_virt(xen_start_info->store_mfn));
+	*eof = 1;
+	return len;
 }
 
 static int xsd_port_read(char *page, char **start, off_t off,
 			 int count, int *eof, void *data)
 {
-	int len; 
+	int len;
 
-	len  = sprintf(page, "%d", xen_start_info->store_evtchn); 
-	*eof = 1; 
-	return len; 
+	len  = sprintf(page, "%d", xen_start_info->store_evtchn);
+	*eof = 1;
+	return len;
 }
 
 
@@ -945,8 +959,8 @@ static int __init xenbus_probe_init(void)
 
 		/* Allocate page. */
 		page = get_zeroed_page(GFP_KERNEL);
-		if (!page) 
-			return -ENOMEM; 
+		if (!page)
+			return -ENOMEM;
 
 		/* We don't refcnt properly, so set reserved on page.
 		 * (this allocation is permanent) */
@@ -959,25 +973,25 @@ static int __init xenbus_probe_init(void)
 		/* Next allocate a local port which xenstored can bind to */
 		op.cmd = EVTCHNOP_alloc_unbound;
 		op.u.alloc_unbound.dom        = DOMID_SELF;
-		op.u.alloc_unbound.remote_dom = 0; 
+		op.u.alloc_unbound.remote_dom = 0;
 
 		ret = HYPERVISOR_event_channel_op(&op);
-		BUG_ON(ret); 
+		BUG_ON(ret);
 		xen_start_info->store_evtchn = op.u.alloc_unbound.port;
 
 		/* And finally publish the above info in /proc/xen */
-		if((xsd_mfn_intf = create_xen_proc_entry("xsd_mfn", 0400)))
-			xsd_mfn_intf->read_proc = xsd_mfn_read; 
+		if((xsd_kva_intf = create_xen_proc_entry("xsd_kva", 0400)))
+			xsd_kva_intf->read_proc = xsd_kva_read;
 		if((xsd_port_intf = create_xen_proc_entry("xsd_port", 0400)))
 			xsd_port_intf->read_proc = xsd_port_read;
 	}
 
 	/* Initialize the interface to xenstore. */
-	err = xs_init(); 
+	err = xs_init();
 	if (err) {
 		printk(KERN_WARNING
 		       "XENBUS: Error initializing xenstore comms: %i\n", err);
-		return err; 
+		return err;
 	}
 
 	if (!dom0) {

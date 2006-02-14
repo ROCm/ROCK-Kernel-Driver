@@ -20,8 +20,8 @@
 
 #include <stdarg.h>
 #include <linux/module.h>
-#include <asm-xen/xenbus.h>
-#include <asm-xen/net_driver_util.h>
+#include <xen/xenbus.h>
+#include <xen/net_driver_util.h>
 #include "common.h"
 
 
@@ -93,7 +93,7 @@ static int netback_probe(struct xenbus_device *dev,
 	if (err)
 		goto fail;
 
-	err = xenbus_switch_state(dev, NULL, XenbusStateInitWait);
+	err = xenbus_switch_state(dev, XBT_NULL, XenbusStateInitWait);
 	if (err) {
 		goto fail;
 	}
@@ -112,31 +112,29 @@ fail:
  * and vif variables to the environment, for the benefit of the vif-* hotplug
  * scripts.
  */
-static int netback_hotplug(struct xenbus_device *xdev, char **envp,
-			   int num_envp, char *buffer, int buffer_size)
+static int netback_uevent(struct xenbus_device *xdev, char **envp,
+			  int num_envp, char *buffer, int buffer_size)
 {
 	struct backend_info *be = xdev->data;
 	netif_t *netif = be->netif;
 	int i = 0, length = 0;
 	char *val;
 
-	DPRINTK("netback_hotplug");
+	DPRINTK("netback_uevent");
 
-	val = xenbus_read(NULL, xdev->nodename, "script", NULL);
+	val = xenbus_read(XBT_NULL, xdev->nodename, "script", NULL);
 	if (IS_ERR(val)) {
 		int err = PTR_ERR(val);
 		xenbus_dev_fatal(xdev, err, "reading script");
 		return err;
 	}
 	else {
-		add_uevent_var(envp, num_envp, &i,
-			       buffer, buffer_size, &length,
-			       "script=%s", val);
+		add_uevent_var(envp, num_envp, &i, buffer, buffer_size,
+			       &length, "script=%s", val);
 		kfree(val);
 	}
 
-	add_uevent_var(envp, num_envp, &i,
-		       buffer, buffer_size, &length,
+	add_uevent_var(envp, num_envp, &i, buffer, buffer_size, &length,
 		       "vif=%s", netif->dev->name);
 
 	envp[i] = NULL;
@@ -160,7 +158,7 @@ static void backend_changed(struct xenbus_watch *watch,
 
 	DPRINTK("");
 
-	err = xenbus_scanf(NULL, dev->nodename, "handle", "%li", &handle);
+	err = xenbus_scanf(XBT_NULL, dev->nodename, "handle", "%li", &handle);
 	if (XENBUS_EXIST_ERR(err)) {
 		/* Since this watch will fire once immediately after it is
 		   registered, we expect this.  Ignore it, and wait for the
@@ -212,7 +210,7 @@ static void frontend_changed(struct xenbus_device *dev,
 		break;
 
 	case XenbusStateClosing:
-		xenbus_switch_state(dev, NULL, XenbusStateClosing);
+		xenbus_switch_state(dev, XBT_NULL, XenbusStateClosing);
 		break;
 
 	case XenbusStateClosed:
@@ -256,7 +254,7 @@ static void connect(struct backend_info *be)
 		return;
 	}
 
-	xenbus_switch_state(dev, NULL, XenbusStateConnected);
+	xenbus_switch_state(dev, XBT_NULL, XenbusStateConnected);
 }
 
 
@@ -269,7 +267,7 @@ static int connect_rings(struct backend_info *be)
 
 	DPRINTK("");
 
-	err = xenbus_gather(NULL, dev->otherend,
+	err = xenbus_gather(XBT_NULL, dev->otherend,
 			    "tx-ring-ref", "%lu", &tx_ring_ref,
 			    "rx-ring-ref", "%lu", &rx_ring_ref,
 			    "event-channel", "%u", &evtchn, NULL);
@@ -307,7 +305,7 @@ static struct xenbus_driver netback = {
 	.ids = netback_ids,
 	.probe = netback_probe,
 	.remove = netback_remove,
-	.hotplug = netback_hotplug,
+	.uevent = netback_uevent,
 	.otherend_changed = frontend_changed,
 };
 

@@ -69,38 +69,24 @@ static inline void set_pte(pte_t *ptep, pte_t pte)
 # define set_pte_atomic(pteptr,pteval) set_pte(pteptr,pteval)
 #endif
 
-inline static void set_pte_at(struct mm_struct *mm, unsigned long addr, 
-		       pte_t *ptep, pte_t val )
-{
-    if ( ((mm != current->mm) && (mm != &init_mm)) ||
-	 HYPERVISOR_update_va_mapping( (addr), (val), 0 ) )
-    {
-        set_pte(ptep, val);
-    }
-}
+#define set_pte_at(_mm,addr,ptep,pteval) do {				\
+	if (((_mm) != current->mm && (_mm) != &init_mm) ||		\
+	    HYPERVISOR_update_va_mapping((addr), (pteval), 0))		\
+		set_pte((ptep), (pteval));				\
+} while (0)
 
-inline static void set_pte_at_sync(struct mm_struct *mm, unsigned long addr, 
-		       pte_t *ptep, pte_t val )
-{
-    if ( ((mm != current->mm) && (mm != &init_mm)) ||
-	 HYPERVISOR_update_va_mapping( (addr), (val), UVMF_INVLPG ) )
-    {
-        set_pte(ptep, val);
-	xen_invlpg(addr);
-    }
-}
+#define set_pte_at_sync(_mm,addr,ptep,pteval) do {			\
+	if (((_mm) != current->mm && (_mm) != &init_mm) ||		\
+	    HYPERVISOR_update_va_mapping((addr), (pteval), UVMF_INVLPG)) { \
+		set_pte((ptep), (pteval));				\
+		xen_invlpg((addr));					\
+	}								\
+} while (0)
 
-#ifdef CONFIG_XEN_SHADOW_MODE
-# define set_pmd(pmdptr,pmdval) \
-		set_64bit((unsigned long long *)(pmdptr),pmd_val(pmdval))
-# define set_pud(pudptr,pudval) \
-		(*(pudptr) = (pudval))
-#else
-# define set_pmd(pmdptr,pmdval)				\
+#define set_pmd(pmdptr,pmdval)				\
 		xen_l2_entry_update((pmdptr), (pmdval))
-# define set_pud(pudptr,pudval) \
+#define set_pud(pudptr,pudval) \
 		xen_l3_entry_update((pudptr), (pudval))
-#endif
 
 /*
  * Pentium-II erratum A13: in PAE mode we explicitly have to flush
@@ -147,14 +133,7 @@ static inline int pte_none(pte_t pte)
 
 #define pte_mfn(_pte) ( ((_pte).pte_low >> PAGE_SHIFT) |\
 		        (((_pte).pte_high & 0xfff) << (32-PAGE_SHIFT)) )
-#define pte_pfn(_pte)                                                  \
-({                                                                     \
-       unsigned long mfn = pte_mfn(_pte);                              \
-       unsigned long pfn = mfn_to_pfn(mfn);                            \
-       if ((pfn >= max_mapnr) || (phys_to_machine_mapping[pfn] != mfn))\
-               pfn = max_mapnr; /* special: force !pfn_valid() */      \
-       pfn;                                                            \
-})
+#define pte_pfn(_pte) mfn_to_local_pfn(pte_mfn(_pte))
 
 extern unsigned long long __supported_pte_mask;
 
