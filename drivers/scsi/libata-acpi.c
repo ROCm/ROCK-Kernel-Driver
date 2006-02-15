@@ -435,7 +435,7 @@ int do_drive_get_GTF(struct ata_port *ap, struct ata_device *atadev,
 
 	/* Don't continue if device has no _ADR method.
 	 * _GTF is intended for known motherboard devices. */
-	if (ata_id_is_ata(atadev->id)) {
+	if (!ata_id_is_sata(atadev->id)) {
 		err = pata_get_dev_handle(dev, &handle, &pcidevfn);
 		if (err < 0) {
 			if (ata_msg_probe(ap))
@@ -460,7 +460,7 @@ int do_drive_get_GTF(struct ata_port *ap, struct ata_device *atadev,
 		dev_adr = SATA_ADR_RSVD;
 		err = get_sata_adr(dev, handle, pcidevfn, 0, ap, atadev,
 				&dev_adr);
-		if (ata_id_is_ata(atadev->id)) {
+		if (!ata_id_is_sata(atadev->id)) {
 			printk(KERN_DEBUG "%s: early exit\n", __FUNCTION__);
 			err = -1;
 			goto out;
