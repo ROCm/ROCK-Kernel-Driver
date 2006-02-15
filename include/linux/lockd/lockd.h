@@ -154,7 +154,7 @@ struct nlm_rqst * nlmclnt_alloc_call(void);
 int		  nlmclnt_prepare_block(struct nlm_rqst *req, struct nlm_host *host, struct file_lock *fl);
 void		  nlmclnt_finish_block(struct nlm_rqst *req);
 long		  nlmclnt_block(struct nlm_rqst *req, long timeout);
-u32		  nlmclnt_grant(struct nlm_lock *);
+u32		  nlmclnt_grant(const struct sockaddr_in *addr, const struct nlm_lock *);
 void		  nlmclnt_recovery(struct nlm_host *);
 int		  nlmclnt_reclaim(struct nlm_host *, struct file_lock *);
 int		  nlmclnt_setgrantargs(struct nlm_rqst *, struct nlm_lock *);
@@ -228,7 +228,7 @@ nlm_cmp_addr(const struct sockaddr_in *sin1, const struct sockaddr_in *sin2)
  * When the second lock is of type F_UNLCK, this acts like a wildcard.
  */
 static __inline__ int
-nlm_compare_locks(struct file_lock *fl1, struct file_lock *fl2)
+nlm_compare_locks(const struct file_lock *fl1, const struct file_lock *fl2)
 {
 	return	fl1->fl_pid   == fl2->fl_pid
 	     && fl1->fl_start == fl2->fl_start
