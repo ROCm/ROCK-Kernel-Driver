@@ -153,6 +153,8 @@ static int statistic_interface_def_close(struct inode *, struct file *);
 
 static int statistic_interface_data_open(struct inode *, struct file *);
 
+static int statistic_interface_disclaimer_open(struct inode *, struct file *);
+
 struct file_operations statistic_def_file_ops = {
 	.owner		= THIS_MODULE,
 	.read		= statistic_interface_generic_read,
@@ -165,6 +167,13 @@ struct file_operations statistic_data_file_ops = {
 	.owner		= THIS_MODULE,
 	.read		= statistic_interface_generic_read,
 	.open		= statistic_interface_data_open,
+	.release	= statistic_interface_generic_close,
+};
+
+struct file_operations statistic_disclaimer_file_ops = {
+	.owner		= THIS_MODULE,
+	.read		= statistic_interface_generic_read,
+	.open		= statistic_interface_disclaimer_open,
 	.release	= statistic_interface_generic_close,
 };
 
@@ -238,6 +247,12 @@ int __init statistic_init(void)
 	sema_init(&statistic_globals.sem, 1);
 	INIT_LIST_HEAD(&statistic_globals.interface_lh);
 	statistic_globals.root_dir = debugfs_create_dir(STATISTIC_ROOT_DIR, NULL);
+	statistic_globals.disclaimer = debugfs_create_file(
+					STATISTIC_FILENAME_DISCLAIMER,
+					S_IFREG | S_IRUSR,
+					statistic_globals.root_dir,
+					NULL,
+					&statistic_disclaimer_file_ops);
 	return 0;
 }
 
@@ -247,6 +262,7 @@ void __exit statistic_exit(void)
 	 * FIXME: any need to cleanup any statistic possibly still allocated?
 	 * (would only concern leftovers of exploiters - someone elses problem?)
 	 */
+	debugfs_remove(statistic_globals.disclaimer);
 	debugfs_remove(statistic_globals.root_dir);
 }
 
@@ -1719,7 +1735,6 @@ static int statistic_interface_generic_open(struct inode *inode,
 		struct statistic_file_private **private)
 {
 	*interface = (struct statistic_interface *) inode->u.generic_ip;
-	BUG_ON(!interface);
 
 	*private = kmalloc(sizeof(struct statistic_file_private), GFP_KERNEL);
 	if (!(*private))
@@ -2162,6 +2177,27 @@ static int statistic_interface_data_open(struct inode *inode, struct file *file)
 	statistic_unlock(interface, flags);
 
 	return retval;
+}
+
+static int statistic_interface_disclaimer_open(struct inode *inode, struct file *file)
+{
+	struct statistic_interface *interface;
+	struct statistic_file_private *private;
+	int retval;
+	struct sgrb_seg *seg;
+
+	retval = statistic_interface_generic_open(
+			inode, file, &interface, &private);
+	if (retval)
+		return retval;
+	seg = sgrb_seg_find(&private->read_seg_lh, 256, GFP_KERNEL);
+	if (!seg)
+		return -ENOMEM;
+	seg->offset += sprintf(seg->address + seg->offset,
+		"Usage and content of this interface are preliminary. "
+		"It is subject to further development. "
+		"Future changes are likely.\n");
+	return 0;
 }
 
 postcore_initcall(statistic_init);

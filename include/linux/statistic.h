@@ -36,6 +36,7 @@
 
 #define STATISTIC_FILENAME_DATA	"data"
 #define STATISTIC_FILENAME_DEF	"definition"
+#define STATISTIC_FILENAME_DISCLAIMER "DISCLAIMER"
 
 #define STATISTIC_NAME_SIZE	64
 
@@ -194,6 +195,7 @@ struct statistic_global_data {
 	struct dentry		*root_dir;
 	struct list_head	interface_lh;
 	struct semaphore	sem;
+	struct dentry		*disclaimer;
 };
 
 #ifdef CONFIG_STATISTICS
