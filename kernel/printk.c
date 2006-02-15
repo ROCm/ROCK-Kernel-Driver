@@ -561,7 +561,7 @@ asmlinkage int vprintk(const char *fmt, va_list args)
 	int printed_len;
 	char *p;
 	static char printk_buf[1024];
-	static int log_level_unknown = 1;
+	static int new_line = 1;
 
 	preempt_disable();
 	if (unlikely(oops_in_progress) && printk_cpu == smp_processor_id())
@@ -576,62 +576,48 @@ asmlinkage int vprintk(const char *fmt, va_list args)
 	/* Emit the output into the temporary buffer */
 	printed_len = vscnprintf(printk_buf, sizeof(printk_buf), fmt, args);
 
-	/*
-	 * Copy the output into log_buf.  If the caller didn't provide
-	 * appropriate log level tags, we insert them here
-	 */
-	for (p = printk_buf; *p; p++) {
-		if (log_level_unknown) {
-                        /* log_level_unknown signals the start of a new line */
-			if (printk_time) {
-				int loglev_char;
-				char tbuf[50], *tp;
-				unsigned tlen;
-				unsigned long long t;
-				unsigned long nanosec_rem;
-
-				/*
-				 * force the log level token to be
-				 * before the time output.
-				 */
-				if (p[0] == '<' && p[1] >='0' &&
-				   p[1] <= '7' && p[2] == '>') {
-					loglev_char = p[1];
-					p += 3;
-					printed_len -= 3;
-				} else {
-					loglev_char = default_message_loglevel
-						+ '0';
-				}
-				t = printk_clock();
-				nanosec_rem = do_div(t, 1000000000);
-				tlen = sprintf(tbuf,
-						"<%c>[%5lu.%06lu] ",
-						loglev_char,
-						(unsigned long)t,
-						nanosec_rem/1000);
-
-				for (tp = tbuf; tp < tbuf + tlen; tp++)
-					emit_log_char(*tp);
-				printed_len += tlen;
-			} else {
-				if (p[0] != '<' || p[1] < '0' ||
-				   p[1] > '7' || p[2] != '>') {
-					emit_log_char('<');
-					emit_log_char(default_message_loglevel
-						+ '0');
-					emit_log_char('>');
-					printed_len += 3;
-				}
+ 	/*
+ 	 * Copy the output into log_buf.  If the caller didn't provide
+	 * appropriate log level tags, we insert them here.
+ 	 */
+ 	for (p = printk_buf; *p; p++) {
+		if (new_line) {
+			/* The log level token is first. */
+			int loglev_char;
+			if (p[0] == '<' && p[1] >='0' &&
+			    p[1] <= '7' && p[2] == '>') {
+				loglev_char = p[1];
+				p += 3;
+			} else	{
+				loglev_char = default_message_loglevel + '0';
+				printed_len += 3;
 			}
-			log_level_unknown = 0;
-			if (!*p)
-				break;
-		}
-		emit_log_char(*p);
-		if (*p == '\n')
-			log_level_unknown = 1;
-	}
+			emit_log_char('<');
+			emit_log_char(loglev_char);
+			emit_log_char('>');
+			/* A timestamp, if requested, goes next. */
+ 			if (printk_time) {
+				char tbuf[TIMESTAMP_SIZE], *tp;
+				printed_len += nsec_to_timestamp(tbuf,
+							printk_clock());
+				for (tp = tbuf; *tp; tp++)
+ 					emit_log_char(*tp);
+				emit_log_char(' ');
+				printed_len++;
+ 			}
+			new_line = 0;
+ 			if (!*p)
+ 				break;
+ 		}
+		/*
+		 * Once we are done with special strings at the head of
+		 * each line, we just keep copying characters until
+		 * we come across another line and need to start over.
+		 */
+ 		emit_log_char(*p);
+ 		if (*p == '\n')
+			new_line = 1;
+ 	}
 
 	if (!cpu_online(smp_processor_id())) {
 		/*

@@ -86,4 +86,10 @@ config TEXTSEARCH_BM
 config TEXTSEARCH_FSM
 	tristate
 
+#
+# Scatter-gather ring-buffer is select'ed if needed
+#
+config SGRB
+	boolean
+
 endmenu

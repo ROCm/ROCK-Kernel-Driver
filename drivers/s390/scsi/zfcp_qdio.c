@@ -416,6 +416,7 @@ zfcp_qdio_response_handler(struct ccw_device *ccw_device,
 	} else {
 		queue->free_index += count;
 		queue->free_index %= QDIO_MAX_BUFFERS_PER_Q;
+		statistic_inc(adapter->stat_qdio_inb, count);
 		atomic_set(&queue->free_count, 0);
 		ZFCP_LOG_TRACE("%i buffers enqueued to response "
 			       "queue at position %i\n", count, start);
@@ -660,6 +661,10 @@ zfcp_qdio_sbals_from_segment(struct zfcp_fsf_req *fsf_req, unsigned long sbtype,
 		/* get next free SBALE for new piece */
 		if (NULL == zfcp_qdio_sbale_next(fsf_req, sbtype)) {
 			/* no SBALE left, clean up and leave */
+			statistic_inc(
+				fsf_req->adapter->stat_qdio_outb_full,
+				atomic_read(
+				 &fsf_req->adapter->request_queue.free_count));
 			zfcp_qdio_sbals_wipe(fsf_req);
 			return -EINVAL;
 		}

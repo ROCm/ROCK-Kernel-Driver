@@ -2523,6 +2523,13 @@ STARMODE RADIO IP (STRIP) PROTOCOL DRIVER
 W:	http://mosquitonet.Stanford.EDU/strip.html
 S:	Unsupported ?
 
+STATISTICS INFRASTRUCTURE
+P:	Martin Peschke
+M:	mpeschke@de.ibm.com
+M:	linux390@de.ibm.com
+W:	http://oss.software.ibm.com/developerworks/opensource/linux390
+S:	Supported
+
 STRADIS MPEG-2 DECODER DRIVER
 P:	Nathan Laredo
 M:	laredo@gnu.org
