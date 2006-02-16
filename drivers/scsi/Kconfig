@@ -629,19 +629,6 @@ config SCSI_SATA_INTEL_COMBINED
 	depends on IDE=y && !BLK_DEV_IDE_SATA && (SCSI_SATA_AHCI || SCSI_ATA_PIIX)
 	default y
 
-config SCSI_SATA_ACPI
-	bool
-	depends on SCSI_SATA && ACPI && PCI
-	default y
-	help
-	  This option adds support for SATA-related ACPI objects.
-	  These ACPI objects add the ability to retrieve taskfiles
-	  from the ACPI BIOS and write them to the disk controller.
-	  These objects may be related to performance, security,
-	  power management, or other areas.
-	  You can disable this at kernel boot time by using the
-	  option 'libata.noacpi'.
-
 config SCSI_BUSLOGIC
 	tristate "BusLogic SCSI support"
 	depends on (PCI || ISA || MCA) && SCSI && ISA_DMA_API

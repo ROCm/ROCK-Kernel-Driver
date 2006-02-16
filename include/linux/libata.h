@@ -33,13 +33,9 @@
 #include <asm/io.h>
 #include <linux/ata.h>
 #include <linux/workqueue.h>
-#ifdef CONFIG_ACPI
-#include <acpi/acpi.h>
-#endif
 
 /*
- * compile-time options: to be removed as soon as all the drivers are
- * converted to the new debugging mechanism
+ * compile-time options
  */
 #undef ATA_DEBUG		/* debugging output */
 #undef ATA_VERBOSE_DEBUG	/* yet more debugging output */
@@ -74,38 +70,6 @@
         #expr,__FILE__,__FUNCTION__,__LINE__);          \
         }
 #endif
-
-/* NEW: debug levels */
-#define HAVE_LIBATA_MSG 1
-
-enum {
-	ATA_MSG_DRV	= 0x0001,
-	ATA_MSG_INFO	= 0x0002,
-	ATA_MSG_PROBE	= 0x0004,
-	ATA_MSG_WARN	= 0x0008,
-	ATA_MSG_MALLOC	= 0x0010,
-	ATA_MSG_CTL	= 0x0020,
-	ATA_MSG_INTR	= 0x0040,
-	ATA_MSG_ERR	= 0x0080,
-};
-
-#define ata_msg_drv(p)    ((p)->msg_enable & ATA_MSG_DRV)
-#define ata_msg_info(p)   ((p)->msg_enable & ATA_MSG_INFO)
-#define ata_msg_probe(p)  ((p)->msg_enable & ATA_MSG_PROBE)
-#define ata_msg_warn(p)   ((p)->msg_enable & ATA_MSG_WARN)
-#define ata_msg_malloc(p) ((p)->msg_enable & ATA_MSG_MALLOC)
-#define ata_msg_ctl(p)    ((p)->msg_enable & ATA_MSG_CTL)
-#define ata_msg_intr(p)   ((p)->msg_enable & ATA_MSG_INTR)
-#define ata_msg_err(p)    ((p)->msg_enable & ATA_MSG_ERR)
-
-static inline u32 ata_msg_init(int dval, int default_msg_enable_bits)
-{
-	if (dval < 0 || dval >= (sizeof(u32) * 8))
-		return default_msg_enable_bits; /* should be 0x1 - only driver info msgs */
-	if (!dval)
-		return 0;
-	return (1 << dval) - 1;
-}
 
 /* defines only for the constants which don't work well as enums */
 #define ATA_TAG_POISON		0xfafbfcfdU
@@ -159,10 +123,11 @@ enum {
 					     * proper HSM is in place. */
 	ATA_FLAG_DEBUGMSG	= (1 << 10),
 	ATA_FLAG_NO_ATAPI	= (1 << 11), /* No ATAPI support */
+
 	ATA_FLAG_SUSPENDED	= (1 << 12), /* port is suspended */
+
 	ATA_FLAG_PIO_LBA48	= (1 << 13), /* Host DMA engine is LBA28 only */
 	ATA_FLAG_IRQ_MASK	= (1 << 14), /* Mask IRQ in PIO xfers */
-	ATA_FLAG_PATA_MODE	= (1 << 15), /* port in PATA mode */
 
 	ATA_QCFLAG_ACTIVE	= (1 << 1), /* cmd not yet ack'd to scsi lyer */
 	ATA_QCFLAG_SG		= (1 << 3), /* have s/g table? */
@@ -235,7 +200,6 @@ struct scsi_device;
 struct ata_port_operations;
 struct ata_port;
 struct ata_queued_cmd;
-struct GTM_buffer;
 
 /* typedefs */
 typedef int (*ata_qc_cb_t) (struct ata_queued_cmd *qc);
@@ -354,11 +318,6 @@ struct ata_device {
 	u16			cylinders;	/* Number of cylinders */
 	u16			heads;		/* Number of heads */
 	u16			sectors;	/* Number of sectors per track */
-
-#ifdef CONFIG_SCSI_SATA_ACPI
-	/* ACPI objects info */
-	acpi_handle		obj_handle;
-#endif
 };
 
 struct ata_port {
@@ -379,7 +338,6 @@ struct ata_port {
 
 	u8			ctl;	/* cache of ATA control register */
 	u8			last_ctl;	/* Cache last written value */
-	u8			legacy_mode;
 	unsigned int		pio_mask;
 	unsigned int		mwdma_mask;
 	unsigned int		udma_mask;
@@ -400,13 +358,6 @@ struct ata_port {
 	struct work_struct	pio_task;
 	unsigned int		hsm_task_state;
 	unsigned long		pio_task_timeout;
-	struct device		*dev;
-
-	u32			msg_enable;
-#ifdef CONFIG_SCSI_SATA_ACPI
-	struct GTM_buffer	*gtm;
-	void			*gtm_object_area;
-#endif
 
 	void			*private_data;
 };
@@ -698,9 +649,9 @@ static inline u8 ata_wait_idle(struct ata_port *ap)
 
 	if (status & (ATA_BUSY | ATA_DRQ)) {
 		unsigned long l = ap->ioaddr.status_addr;
-		if (ata_msg_warn(ap))
-			printk(KERN_WARNING "ATA: abnormal status 0x%X on port 0x%lX\n",
-				status, l);
+		printk(KERN_WARNING
+		       "ATA: abnormal status 0x%X on port 0x%lX\n",
+		       status, l);
 	}
 
 	return status;
@@ -792,8 +743,7 @@ static inline u8 ata_irq_ack(struct ata_port *ap, unsigned int chk_drq)
 
 	status = ata_busy_wait(ap, bits, 1000);
 	if (status & bits)
-		if (ata_msg_err(ap))
-			printk(KERN_ERR "abnormal status 0x%X\n", status);
+		DPRINTK("abnormal status 0x%X\n", status);
 
 	/* get controller status; clear intr, err bits */
 	if (ap->flags & ATA_FLAG_MMIO) {
@@ -811,10 +761,8 @@ static inline u8 ata_irq_ack(struct ata_port *ap, unsigned int chk_drq)
 		post_stat = inb(ap->ioaddr.bmdma_addr + ATA_DMA_STATUS);
 	}
 
-	if (ata_msg_intr(ap))
-		printk(KERN_INFO "%s: irq ack: host_stat 0x%X, new host_stat 0x%X, drv_stat 0x%X\n",
-			__FUNCTION__,
-			host_stat, post_stat, status);
+	VPRINTK("irq ack: host_stat 0x%X, new host_stat 0x%X, drv_stat 0x%X\n",
+		host_stat, post_stat, status);
 
 	return status;
 }
