@@ -250,7 +250,6 @@ struct azx_dev {
 	unsigned int fragsize;		/* size of each period in bytes */
 	unsigned int frags;		/* number for period in the play buffer */
 	unsigned int fifo_size;		/* FIFO size */
-	unsigned int last_pos;		/* last updated period position */
 
 	void __iomem *sd_addr;		/* stream descriptor pointer */
 
@@ -261,10 +260,11 @@ struct azx_dev {
 	unsigned int format_val;	/* format value to be set in the controller and the codec */
 	unsigned char stream_tag;	/* assigned stream */
 	unsigned char index;		/* stream index */
+	/* for sanity check of position buffer */
+	unsigned int period_intr;
 
 	unsigned int opened: 1;
 	unsigned int running: 1;
-	unsigned int period_updating: 1;
 };
 
 /* CORB/RIRB */
@@ -446,8 +446,8 @@ static void azx_free_cmd_io(struct azx *chip)
 }
 
 /* send a command */
-static int azx_send_cmd(struct hda_codec *codec, hda_nid_t nid, int direct,
-			unsigned int verb, unsigned int para)
+static int azx_corb_send_cmd(struct hda_codec *codec, hda_nid_t nid, int direct,
+			     unsigned int verb, unsigned int para)
 {
 	struct azx *chip = codec->bus->private_data;
 	unsigned int wp;
@@ -503,18 +503,21 @@ static void azx_update_rirb(struct azx *chip)
 }
 
 /* receive a response */
-static unsigned int azx_get_response(struct hda_codec *codec)
+static unsigned int azx_rirb_get_response(struct hda_codec *codec)
 {
 	struct azx *chip = codec->bus->private_data;
 	int timeout = 50;
 
 	while (chip->rirb.cmds) {
 		if (! --timeout) {
-			if (printk_ratelimit())
-				snd_printk(KERN_ERR
-					"azx_get_response timeout\n");
+			snd_printk(KERN_ERR
+				   "hda_intel: azx_get_response timeout, "
+				   "switching to single_cmd mode...\n");
 			chip->rirb.rp = azx_readb(chip, RIRBWP);
 			chip->rirb.cmds = 0;
+			/* switch to single_cmd mode */
+			chip->single_cmd = 1;
+			azx_free_cmd_io(chip);
 			return -1;
 		}
 		msleep(1);
@@ -577,6 +580,36 @@ static unsigned int azx_single_get_response(struct hda_codec *codec)
 	snd_printd(SFX "get_response timeout: IRS=0x%x\n", azx_readw(chip, IRS));
 	return (unsigned int)-1;
 }
+
+/*
+ * The below are the main callbacks from hda_codec.
+ *
+ * They are just the skeleton to call sub-callbacks according to the
+ * current setting of chip->single_cmd.
+ */
+
+/* send a command */
+static int azx_send_cmd(struct hda_codec *codec, hda_nid_t nid,
+			int direct, unsigned int verb,
+			unsigned int para)
+{
+	struct azx *chip = codec->bus->private_data;
+	if (chip->single_cmd)
+		return azx_single_send_cmd(codec, nid, direct, verb, para);
+	else
+		return azx_corb_send_cmd(codec, nid, direct, verb, para);
+}
+
+/* get a response */
+static unsigned int azx_get_response(struct hda_codec *codec)
+{
+	struct azx *chip = codec->bus->private_data;
+	if (chip->single_cmd)
+		return azx_single_get_response(codec);
+	else
+		return azx_rirb_get_response(codec);
+}
+
 
 /* reset codec link */
 static int azx_reset(struct azx *chip)
@@ -771,11 +804,10 @@ static irqreturn_t azx_interrupt(int irq, void* dev_id, struct pt_regs *regs)
 		if (status & azx_dev->sd_int_sta_mask) {
 			azx_sd_writeb(azx_dev, SD_STS, SD_INT_MASK);
 			if (azx_dev->substream && azx_dev->running) {
-				azx_dev->period_updating = 1;
+				azx_dev->period_intr++;
 				spin_unlock(&chip->reg_lock);
 				snd_pcm_period_elapsed(azx_dev->substream);
 				spin_lock(&chip->reg_lock);
-				azx_dev->period_updating = 0;
 			}
 		}
 	}
@@ -900,13 +932,8 @@ static int __devinit azx_codec_create(struct azx *chip, const char *model)
 	bus_temp.private_data = chip;
 	bus_temp.modelname = model;
 	bus_temp.pci = chip->pci;
-	if (chip->single_cmd) {
-		bus_temp.ops.command = azx_single_send_cmd;
-		bus_temp.ops.get_response = azx_single_get_response;
-	} else {
-		bus_temp.ops.command = azx_send_cmd;
-		bus_temp.ops.get_response = azx_get_response;
-	}
+	bus_temp.ops.command = azx_send_cmd;
+	bus_temp.ops.get_response = azx_get_response;
 
 	if ((err = snd_hda_bus_new(chip->card, &bus_temp, &chip->bus)) < 0)
 		return err;
@@ -1091,7 +1118,6 @@ static int azx_pcm_prepare(struct snd_pcm_substream *substream)
 		azx_dev->fifo_size = azx_sd_readw(azx_dev, SD_FIFOSIZE) + 1;
 	else
 		azx_dev->fifo_size = 0;
-	azx_dev->last_pos = 0;
 
 	return hinfo->ops.prepare(hinfo, apcm->codec, azx_dev->stream_tag,
 				  azx_dev->format_val, substream);
@@ -1139,10 +1165,20 @@ static snd_pcm_uframes_t azx_pcm_pointer(struct snd_pcm_substream *substream)
 	struct azx_dev *azx_dev = get_azx_dev(substream);
 	unsigned int pos;
 
-	if (chip->position_fix == POS_FIX_POSBUF) {
+	if (chip->position_fix == POS_FIX_POSBUF ||
+	    chip->position_fix == POS_FIX_AUTO) {
 		/* use the position buffer */
 		pos = *azx_dev->posbuf;
+		if (chip->position_fix == POS_FIX_AUTO &&
+		    azx_dev->period_intr == 1 && ! pos) {
+			printk(KERN_WARNING
+			       "hda-intel: Invalid position buffer, "
+			       "using LPIB read method instead.\n");
+			chip->position_fix = POS_FIX_NONE;
+			goto read_lpib;
+		}
 	} else {
+	read_lpib:
 		/* read LPIB */
 		pos = azx_sd_readl(azx_dev, SD_LPIB);
 		if (chip->position_fix == POS_FIX_FIFO)
@@ -1308,8 +1344,7 @@ static int azx_suspend(struct pci_dev *pci, pm_message_t state)
 	for (i = 0; i < chip->pcm_devs; i++)
 		snd_pcm_suspend_all(chip->pcm[i]);
 	snd_hda_suspend(chip->bus, state);
-	if (! chip->single_cmd)
-		azx_free_cmd_io(chip);
+	azx_free_cmd_io(chip);
 	pci_disable_device(pci);
 	pci_save_state(pci);
 	return 0;
@@ -1347,8 +1382,7 @@ static int azx_free(struct azx *chip)
 		azx_int_clear(chip);
 
 		/* disable CORB/RIRB */
-		if (! chip->single_cmd)
-			azx_free_cmd_io(chip);
+		azx_free_cmd_io(chip);
 
 		/* disable position buffer */
 		azx_writel(chip, DPLBASE, 0);
@@ -1415,7 +1449,7 @@ static int __devinit azx_create(struct snd_card *card, struct pci_dev *pci,
 	chip->irq = -1;
 	chip->driver_type = driver_type;
 
-	chip->position_fix = position_fix ? position_fix : POS_FIX_POSBUF;
+	chip->position_fix = position_fix;
 	chip->single_cmd = single_cmd;
 
 #if BITS_PER_LONG != 64
