@@ -451,16 +451,8 @@ ahd_linux_queue(struct scsi_cmnd * cmd, void (*scsi_done) (struct scsi_cmnd *))
 {
 	struct	 ahd_softc *ahd;
 	struct	 ahd_linux_device *dev = scsi_transport_device_data(cmd->device);
-#if 0
-	struct	 scsi_target *starget = cmd->device->sdev_target;
-	struct	 ahd_linux_target *targ = scsi_transport_target_data(starget);
-#endif
 	int rtn = SCSI_MLQUEUE_HOST_BUSY;
 
-#if 0
-	if (atomic_read(&targ->qfrozen))
-		return SCSI_MLQUEUE_DEVICE_BUSY;
-#endif
 	ahd = *(struct ahd_softc **)cmd->device->host->hostdata;
 
 	cmd->scsi_done = scsi_done;
@@ -672,7 +664,7 @@ ahd_linux_dev_reset(struct scsi_cmnd *cmd)
 	struct ahd_linux_device *dev;
 	struct scb *reset_scb;
 	u_int  cdb_byte;
-	int    retval;
+	int    retval = SUCCESS;
 	int    paused;
 	int    wait;
 	struct	ahd_initiator_tinfo *tinfo;
@@ -729,6 +721,7 @@ ahd_linux_dev_reset(struct scsi_cmnd *cmd)
 	reset_scb->hscb->lun = cmd->device->lun;
 	reset_scb->hscb->cdb_len = 0;
 	reset_scb->hscb->task_management = SIU_TASKMGMT_LUN_RESET;
+	reset_scb->flags |= SCB_DEVICE_RESET|SCB_RECOVERY_SCB|SCB_ACTIVE;
 	if ((tinfo->curr.ppr_options & MSG_EXT_PPR_IU_REQ) != 0) {
 		reset_scb->flags |= SCB_PACKETIZED;
 	} else {
@@ -746,17 +739,15 @@ ahd_linux_dev_reset(struct scsi_cmnd *cmd)
 	ahd->platform_data->eh_done = &done;
 	ahd_unlock(ahd, &flags);
 
-	printf("%s: Recovery code sleeping\n", ahd_name(ahd));
+	printf("%s: Device reset code sleeping\n", ahd_name(ahd));
 	if (!wait_for_completion_timeout(&done, 5 * HZ)) {
 		ahd_lock(ahd, &flags);
 		ahd->platform_data->eh_done = NULL;
 		ahd_unlock(ahd, &flags);
-		printf("%s: Timer Expired (active %d)\n",
+		printf("%s: Device reset timer expired (active %d)\n",
 		       ahd_name(ahd), dev->active);
 		retval = FAILED;
 	}
-	printf("Recovery code awake\n");
-
 	printf("%s: Device reset returning 0x%x\n", ahd_name(ahd), retval);
 
 	return (retval);
