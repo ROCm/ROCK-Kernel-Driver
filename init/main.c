@@ -47,6 +47,7 @@
 #include <linux/rmap.h>
 #include <linux/mempolicy.h>
 #include <linux/key.h>
+#include <linux/delayacct.h>
 
 #include <asm/io.h>
 #include <asm/bugs.h>
@@ -578,6 +579,7 @@ asmlinkage void __init start_kernel(void)
 	proc_root_init();
 #endif
 	cpuset_init();
+	delayacct_init();
 
 	check_bugs();
 

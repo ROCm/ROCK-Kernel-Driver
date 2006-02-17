@@ -35,6 +35,7 @@
 #include <linux/cn_proc.h>
 #include <linux/mutex.h>
 #include <linux/pagg.h>
+#include <linux/delayacct.h>
 
 #include <asm/uaccess.h>
 #include <asm/unistd.h>
@@ -843,6 +844,8 @@ fastcall NORET_TYPE void do_exit(long code)
 				preempt_count());
 
 	acct_update_integrals(tsk);
+	delayacct_tsk_exit(tsk);
+
 	if (tsk->mm) {
 		update_hiwater_rss(tsk->mm);
 		update_hiwater_vm(tsk->mm);
