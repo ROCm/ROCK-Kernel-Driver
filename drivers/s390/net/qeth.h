@@ -1094,19 +1094,19 @@ qeth_ipaddr4_to_string(const __u8 *addr, char *buf)
 static inline int
 qeth_string_to_ipaddr4(const char *buf, __u8 *addr)
 {
-        int count = 0, rc = 0;
-        int in[4];
+	int count = 0, rc = 0;
+	int in[4];
 
-        rc = sscanf(buf, "%d.%d.%d.%d%n",
-                    &in[0], &in[1], &in[2], &in[3], &count);
-        if (rc != 4  || count)
-                return -EINVAL;
-        for (count = 0; count < 4; count++) {
-                if (in[count] > 255)
-                        return -EINVAL;
-                addr[count] = in[count];
-        }
-        return 0;
+	rc = sscanf(buf, "%d.%d.%d.%d%n", 
+		    &in[0], &in[1], &in[2], &in[3], &count);
+	if (rc != 4  || count) 
+		return -EINVAL;
+	for (count = 0; count < 4; count++) {
+		if (in[count] > 255)
+			return -EINVAL;
+		addr[count] = in[count];
+	}
+	return 0;
 }
 
 static inline void

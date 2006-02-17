@@ -1459,7 +1459,7 @@ lcs_txbuffer_cb(struct lcs_channel *channel, struct lcs_buffer *buffer)
 	card = (struct lcs_card *)
 		((char *) channel - offsetof(struct lcs_card, write));
 	if (netif_queue_stopped(card->dev))
-		netif_wake_queue(card->dev);	/* stack continue */
+		netif_wake_queue(card->dev);
 	spin_lock(&card->lock);
 	card->tx_emitted--;
 	if (card->tx_emitted <= 0 && card->tx_buffer != NULL)
@@ -1494,7 +1494,7 @@ __lcs_start_xmit(struct lcs_card *card, struct sk_buff *skb,
 		card->stats.tx_carrier_errors++;
 		return 0;
 	}
-	netif_stop_queue(card->dev);			/* stack slowdown */
+	netif_stop_queue(card->dev);
 	spin_lock(&card->lock);
 	if (card->tx_buffer != NULL &&
 	    card->tx_buffer->count + sizeof(struct lcs_header) +
@@ -1523,7 +1523,7 @@ __lcs_start_xmit(struct lcs_card *card, struct sk_buff *skb,
 	card->stats.tx_bytes += skb->len;
 	card->stats.tx_packets++;
 	dev_kfree_skb(skb);
-	netif_wake_queue(card->dev);			/* stack cont. */
+	netif_wake_queue(card->dev);
 	spin_lock(&card->lock);
 	if (card->tx_emitted <= 0 && card->tx_buffer != NULL)
 		/* If this is the first tx buffer emit it immediately. */
@@ -1541,7 +1541,6 @@ lcs_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	LCS_DBF_TEXT(5, trace, "pktxmit");
 	card = (struct lcs_card *) dev->priv;
-	/*spin_lock(&card->lock); */
 	rc = __lcs_start_xmit(card, skb, dev);
 	return rc;
 }
