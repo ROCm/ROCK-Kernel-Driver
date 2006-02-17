@@ -490,7 +490,6 @@ kdbm_xpc_print_channel_flags(u32 flags)
 	kdb_printf("\tflags=0x%x", flags);
 
 	if (flags & XPC_C_WDISCONNECT)		kdb_printf(" WDISCONNECT");
-	if (flags & XPC_C_DISCONNECTCALLOUT)	kdb_printf(" DISCONNECTCALLOUT");
 	if (flags & XPC_C_DISCONNECTING)	kdb_printf(" DISCONNECTING");
 	if (flags & XPC_C_DISCONNECTED)		kdb_printf(" DISCONNECTED");
 
@@ -501,7 +500,6 @@ kdbm_xpc_print_channel_flags(u32 flags)
 
 	if (flags & XPC_C_CONNECTING)		kdb_printf(" CONNECTING");
 	if (flags & XPC_C_CONNECTED)		kdb_printf(" CONNECTED");
-	if (flags & XPC_C_CONNECTCALLOUT)	kdb_printf(" CONNECTCALLOUT");
 	if (flags & XPC_C_SETUP)		kdb_printf(" SETUP");
 
 	if (flags & XPC_C_OPENREQUEST)		kdb_printf(" OPENREQUEST");
