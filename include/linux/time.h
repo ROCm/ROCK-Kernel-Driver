@@ -147,21 +147,6 @@ extern struct timespec ns_to_timespec(const nsec_t nsec);
  */
 extern struct timeval ns_to_timeval(const nsec_t nsec);
 
-/*
- * timespec_diff_ns - Return difference of two timestamps in nanoseconds
- * In the rare case of @end being earlier than @start, return zero
- */
-static inline unsigned long long
-timespec_diff_ns(struct timespec *start, struct timespec *end)
-{
-	long long ret;
-
-	ret = end->tv_sec*(1000000000) + end->tv_nsec;
-	ret -= start->tv_sec*(1000000000) + start->tv_nsec;
-	if (ret < 0)
-		return 0;
-	return ret;
-}
 #endif /* __KERNEL__ */
 
 #define NFDBITS			__NFDBITS

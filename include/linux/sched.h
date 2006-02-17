@@ -15,7 +15,6 @@
 #include <linux/cpumask.h>
 #include <linux/errno.h>
 #include <linux/nodemask.h>
-#include <linux/sysctl.h>
 
 #include <asm/system.h>
 #include <asm/semaphore.h>
@@ -527,9 +526,6 @@ struct backing_dev_info;
 struct reclaim_state;
 
 #ifdef CONFIG_SCHEDSTATS
-extern int schedstats_sysctl;
-extern int schedstats_sysctl_handler(ctl_table *, int, struct file *,
-			void __user *, size_t *, loff_t *);
 struct sched_info {
 	/* cumulative counters */
 	unsigned long	cpu_time,	/* time spent on the cpu */
@@ -542,21 +538,6 @@ struct sched_info {
 };
 
 extern struct file_operations proc_schedstat_operations;
-#endif
-
-#ifdef CONFIG_TASK_DELAY_ACCT
-struct task_delay_info {
-	spinlock_t	lock;
-
-	/* timestamp recording variables (to reduce stack usage) */
-	struct timespec start, end;
-
-	/* Add stats in pairs: u64 delay, u32 count, aligned properly */
-	u64 blkio_delay;	/* wait for sync block io completion */
-	u64 swapin_delay;	/* wait for pages to be swapped in */
-	u32 blkio_count;
-	u32 swapin_count;
-};
 #endif
 
 enum idle_type
@@ -894,9 +875,6 @@ struct task_struct {
 /* List of pagg (process aggregate) attachments */
 	struct list_head pagg_list;
 	struct rw_semaphore pagg_sem;
-#endif
-#ifdef	CONFIG_TASK_DELAY_ACCT
-	struct task_delay_info *delays;
 #endif
 };
 

@@ -67,7 +67,7 @@ config DETECT_SOFTLOCKUP
 
 config SCHEDSTATS
 	bool "Collect scheduler statistics"
-	depends on PROC_FS
+	depends on DEBUG_KERNEL && PROC_FS
 	help
 	  If you say Y here, additional code will be inserted into the
 	  scheduler and related routines to collect statistics about

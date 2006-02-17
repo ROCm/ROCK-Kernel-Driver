@@ -48,8 +48,6 @@
 #include <linux/rmap.h>
 #include <linux/module.h>
 #include <linux/init.h>
-#include <linux/time.h>
-#include <linux/delayacct.h>
 
 #include <asm/pgalloc.h>
 #include <asm/uaccess.h>
@@ -2327,27 +2325,18 @@ static inline int handle_pte_fault(struct mm_struct *mm,
 
 	old_entry = entry = *pte;
 	if (!pte_present(entry)) {
-		int ret;
-
-		delayacct_timestamp_start();
 		if (pte_none(entry)) {
 			if (!vma->vm_ops || !vma->vm_ops->nopage)
 				return do_anonymous_page(mm, vma, address,
 					pte, pmd, write_access);
-
-			ret = do_no_page(mm, vma, address,
+			return do_no_page(mm, vma, address,
 					pte, pmd, write_access);
-			if (vma->vm_file)
-				delayacct_blkio();
-			return ret;
 		}
 		if (pte_file(entry))
 			return do_file_page(mm, vma, address,
 					pte, pmd, write_access, entry);
-		ret = do_swap_page(mm, vma, address,
+		return do_swap_page(mm, vma, address,
 					pte, pmd, write_access, entry);
- 		delayacct_swapin();
-		return ret;
 	}
 
 	ptl = pte_lockptr(mm, pmd);

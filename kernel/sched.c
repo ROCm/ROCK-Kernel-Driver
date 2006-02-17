@@ -308,57 +308,11 @@ static inline void task_rq_unlock(runqueue_t *rq, unsigned long *flags)
 }
 
 #ifdef CONFIG_SCHEDSTATS
-int schedstats_sysctl = 0;
-static DEFINE_PER_CPU(int, schedstats) = 0;
-			/* schedstats turned off by default */
-static void
-schedstats_set(int val)
-{
-	int i;
-	static spinlock_t schedstats_lock = SPIN_LOCK_UNLOCKED;
-
-	spin_lock(&schedstats_lock);
-	schedstats_sysctl = val;
-	for (i = 0; i < NR_CPUS; i++)
-		per_cpu(schedstats, i) = val;
-	spin_unlock(&schedstats_lock);
-}
-
-static int __init schedstats_setup_enable(char *str)
-{
-	schedstats_sysctl = 1;
-	schedstats_set(schedstats_sysctl);
-	return 1;
-}
-
-__setup("schedstats", schedstats_setup_enable);
-
-int
-schedstats_sysctl_handler(ctl_table *table, int write, struct file *filp,
-		void __user *buffer, size_t *lenp, loff_t *ppos)
-{
-	int ret, prev = schedstats_sysctl;
-	struct task_struct *g, *t;
-
-	ret = proc_dointvec(table, write, filp, buffer, lenp, ppos);
-	if ((ret != 0) || (prev == schedstats_sysctl))
-		return ret;
-	if (schedstats_sysctl) {
-		read_lock(&tasklist_lock);
-		do_each_thread(g, t) {
-			memset(&t->sched_info, 0, sizeof(t->sched_info));
-		} while_each_thread(g, t);
-		read_unlock(&tasklist_lock);
-	}
-	schedstats_set(schedstats_sysctl);
-	return ret;
-}
-
 /*
  * bump this up when changing the output format or the meaning of an existing
  * format, so that tools can adapt (or abort)
  */
-#define SCHEDSTAT_VERSION 13
+#define SCHEDSTAT_VERSION 12
 
 static int show_schedstat(struct seq_file *seq, void *v)
 {
@@ -366,10 +320,6 @@ static int show_schedstat(struct seq_file *seq, void *v)
 
 	seq_printf(seq, "version %d\n", SCHEDSTAT_VERSION);
 	seq_printf(seq, "timestamp %lu\n", jiffies);
-	if (!schedstats_sysctl) {
-		seq_printf(seq, "State Off\n");
-		return 0;
-	}
 	for_each_online_cpu(cpu) {
 		runqueue_t *rq = cpu_rq(cpu);
 #ifdef CONFIG_SMP
@@ -448,17 +398,8 @@ struct file_operations proc_schedstat_operations = {
 	.release = single_release,
 };
 
-#define schedstats_on	(per_cpu(schedstats, smp_processor_id()) != 0)
-# define schedstat_inc(rq, field)	\
-do {					\
-	if (unlikely(schedstats_on))	\
-		(rq)->field++;		\
-} while (0)
-# define schedstat_add(rq, field, amt)	\
-do {					\
-	if (unlikely(schedstats_on))	\
-		(rq)->field += (amt);	\
-} while (0)
+# define schedstat_inc(rq, field)	do { (rq)->field++; } while (0)
+# define schedstat_add(rq, field, amt)	do { (rq)->field += (amt); } while (0)
 #else /* !CONFIG_SCHEDSTATS */
 # define schedstat_inc(rq, field)	do { } while (0)
 # define schedstat_add(rq, field, amt)	do { } while (0)
@@ -541,7 +482,7 @@ static void sched_info_arrive(task_t *t)
  */
 static inline void sched_info_queued(task_t *t)
 {
-	if (unlikely(schedstats_on && !t->sched_info.last_queued))
+	if (!t->sched_info.last_queued)
 		t->sched_info.last_queued = jiffies;
 }
 
@@ -565,7 +506,7 @@ static inline void sched_info_depart(task_t *t)
  * their time slice.  (This may also be called when switching to or from
  * the idle task.)  We are only called when prev != next.
  */
-static inline void __sched_info_switch(task_t *prev, task_t *next)
+static inline void sched_info_switch(task_t *prev, task_t *next)
 {
 	struct runqueue *rq = task_rq(prev);
 
@@ -580,13 +521,6 @@ static inline void __sched_info_switch(task_t *prev, task_t *next)
 	if (next != rq->idle)
 		sched_info_arrive(next);
 }
-
-static inline void sched_info_switch(task_t *prev, task_t *next)
-{
-	if (unlikely(schedstats_on))
-		__sched_info_switch(prev, next);
-}
-
 #else
 #define sched_info_queued(t)		do { } while (0)
 #define sched_info_switch(t, next)	do { } while (0)
