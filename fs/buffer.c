@@ -42,6 +42,8 @@
 #include <linux/bitops.h>
 #include <linux/mpage.h>
 #include <linux/bit_spinlock.h>
+#include <linux/time.h>
+#include <linux/delayacct.h>
 
 static int fsync_buffers_list(spinlock_t *lock, struct list_head *list);
 static void invalidate_bh_lrus(void);
@@ -345,6 +347,7 @@ static long do_fsync(unsigned int fd, int datasync)
 		goto out_putf;
 	}
 
+	delayacct_timestamp_start();
 	mapping = file->f_mapping;
 
 	current->flags |= PF_SYNCWRITE;
@@ -367,6 +370,7 @@ static long do_fsync(unsigned int fd, int datasync)
 out_putf:
 	fput(file);
 out:
+	delayacct_blkio();
 	return ret;
 }
 

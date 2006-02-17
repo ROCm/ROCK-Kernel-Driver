@@ -15,6 +15,8 @@
 #include <linux/module.h>
 #include <linux/syscalls.h>
 #include <linux/pagemap.h>
+#include <linux/time.h>
+#include <linux/delayacct.h>
 
 #include <asm/uaccess.h>
 #include <asm/unistd.h>
@@ -236,8 +238,11 @@ ssize_t do_sync_read(struct file *filp, char __user *buf, size_t len, loff_t *pp
 		(ret = filp->f_op->aio_read(&kiocb, buf, len, kiocb.ki_pos)))
 		wait_on_retry_sync_kiocb(&kiocb);
 
-	if (-EIOCBQUEUED == ret)
+	if (-EIOCBQUEUED == ret) {
+		delayacct_timestamp_start();
 		ret = wait_on_sync_kiocb(&kiocb);
+		delayacct_blkio();
+	}
 	*ppos = kiocb.ki_pos;
 	return ret;
 }

@@ -416,6 +416,8 @@ running once the system is up.
 			Format: <area>[,<node>]
 			See also Documentation/networking/decnet.txt.
 
+	delayacct	[KNL] Enable per-task delay accounting
+
 	devfs=		[DEVFS]
 			See Documentation/filesystems/devfs/boot-options.
 
@@ -1338,6 +1340,8 @@ running once the system is up.
 
 	sc1200wdt=	[HW,WDT] SC1200 WDT (watchdog) driver
 			Format: <io>[,<timeout>[,<isapnp>]]
+
+	schedstats	[KNL] Collect CPU scheduler statistics
 
 	scsi_debug_*=	[SCSI]
 			See drivers/scsi/scsi_debug.c.
