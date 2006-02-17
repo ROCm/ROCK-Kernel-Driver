@@ -637,7 +637,6 @@ struct dlm_lock * dlm_new_lock(int type, u8 node, u64 cookie,
 void dlm_lock_get(struct dlm_lock *lock);
 void dlm_lock_put(struct dlm_lock *lock);
 
-void dlm_lock_detach_lockres(struct dlm_lock *lock);
 void dlm_lock_attach_lockres(struct dlm_lock *lock,
 			     struct dlm_lock_resource *res);
 

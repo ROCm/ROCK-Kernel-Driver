@@ -431,7 +431,7 @@ static void scsi_target_reap_usercontext(void *data)
  */
 void scsi_target_reap(struct scsi_target *starget)
 {
-	execute_in_process_context(scsi_target_reap_usercontext, starget);
+	scsi_execute_in_process_context(scsi_target_reap_usercontext, starget);
 }
 
 /**

@@ -19,6 +19,7 @@
 #endif	/* CONFIG_KDB */
 #include <linux/hardirq.h>
 #include <linux/kprobes.h>
+#include <linux/delay.h>		/* for ssleep() */
 #include <linux/dump.h>
 
 #include <asm/fpswa.h>
@@ -124,6 +125,13 @@ die (const char *str, struct pt_regs *regs, long err)
 	bust_spinlocks(0);
 	die.lock_owner = -1;
 	spin_unlock_irq(&die.lock);
+
+	if (panic_on_oops) {
+		printk(KERN_EMERG "Fatal exception: panic in 5 seconds\n");
+		ssleep(5);
+		panic("Fatal exception");
+	}
+
   	do_exit(SIGSEGV);
 }
 

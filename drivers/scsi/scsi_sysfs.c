@@ -256,7 +256,7 @@ static void scsi_device_dev_release_usercontext(void *data)
 
 static void scsi_device_dev_release(struct device *dev)
 {
-	execute_in_process_context(scsi_device_dev_release_usercontext,	dev);
+	scsi_execute_in_process_context(scsi_device_dev_release_usercontext,	dev);
 }
 
 static struct class sdev_class = {
