@@ -964,7 +964,9 @@ config APM_REAL_MODE_POWER_OFF
 
 endmenu
 
+if !X86_XEN
 source "arch/i386/kernel/cpu/cpufreq/Kconfig"
+endif
 
 endmenu
 
@@ -1040,7 +1042,6 @@ source "drivers/pci/Kconfig"
 
 config ISA_DMA_API
 	bool
-	depends on !X86_XEN
 	default y
 
 config ISA
