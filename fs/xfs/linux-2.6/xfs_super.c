@@ -952,14 +952,14 @@ STATIC struct quotactl_ops linvfs_qops = {
 	.set_xquota		= linvfs_setxquota,
 };
 
-STATIC struct file_system_type xfs_fs_type = {
+struct file_system_type xfs_fs_type = {
 	.owner			= THIS_MODULE,
 	.name			= "xfs",
 	.get_sb			= linvfs_get_sb,
 	.kill_sb		= kill_block_super,
 	.fs_flags		= FS_REQUIRES_DEV,
 };
-
+EXPORT_SYMBOL(xfs_fs_type);
 
 STATIC int __init
 init_xfs_fs( void )
@@ -991,7 +991,6 @@ init_xfs_fs( void )
 	error = register_filesystem(&xfs_fs_type);
 	if (error)
 		goto undo_register;
-	XFS_DM_INIT(&xfs_fs_type);
 	return 0;
 
 undo_register:
@@ -1007,7 +1006,6 @@ undo_zones:
 STATIC void __exit
 exit_xfs_fs( void )
 {
-	XFS_DM_EXIT(&xfs_fs_type);
 	unregister_filesystem(&xfs_fs_type);
 	xfs_cleanup();
 	xfs_buf_terminate();

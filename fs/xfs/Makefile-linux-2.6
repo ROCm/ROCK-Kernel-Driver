@@ -53,12 +53,10 @@ ifeq ($(CONFIG_XFS_TRACE),y)
 	EXTRA_CFLAGS += -DXFS_BUF_TRACE
 	EXTRA_CFLAGS += -DXFS_VNODE_TRACE
 endif
-ifeq ($(CONFIG_XFS_DMAPI),y)
-	EXTRA_CFLAGS += -I $(TOPDIR)/fs/dmapi
-endif
 
 obj-$(CONFIG_XFS_FS)		+= xfs.o
 obj-$(CONFIG_XFS_QUOTA)		+= quota/
+obj-$(CONFIG_XFS_DMAPI)		+= dmapi/
 
 xfs-$(CONFIG_XFS_RT)		+= xfs_rtalloc.o
 xfs-$(CONFIG_XFS_POSIX_ACL)	+= xfs_acl.o
@@ -142,7 +140,6 @@ xfs-y				+= $(addprefix support/, \
 				   uuid.o)
 
 xfs-$(CONFIG_XFS_TRACE)		+= support/ktrace.o
-xfs-$(CONFIG_XFS_DMAPI)		+= xfs_dmapi.o
 
 # If both xfs and kdb modules are built in then xfsidbg is built in.  If xfs is
 # a module and kdb modules are being compiled then xfsidbg must be a module, to

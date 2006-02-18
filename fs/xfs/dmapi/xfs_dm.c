@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2005 Silicon Graphics, Inc.
+ * Copyright (c) 2000-2006 Silicon Graphics, Inc.
  * All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or
@@ -15,15 +15,6 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc.,  51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
-
-#include <linux/version.h>
-#include <linux/init.h>
-#include <linux/spinlock.h>
-#include <linux/seq_file.h>
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-#include <linux/iobuf.h>
-#endif
-
 #include "xfs.h"
 #include "xfs_fs.h"
 #include "xfs_types.h"
@@ -57,15 +48,9 @@
 #include "xfs_inode_item.h"
 #include <dmapi.h>
 #include <dmapi_kern.h>
+#include "xfs_dm.h"
 
 #define MAXNAMLEN MAXNAMELEN
-
-int
-xfs_setattr(
-	bhv_desc_t	*bdp,
-	vattr_t		*vap,
-	int		flags,
-	cred_t		*credp);
 
 #define XFS_BHV_LOOKUP(vp, xbdp)  \
 	xbdp = vn_bhv_lookup(VN_BHV_HEAD(vp), &xfs_vnodeops); \
@@ -95,7 +80,7 @@ static void up_rw_sems(struct inode *ip, int flags)
 #endif
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)) && \
     (LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,22))
-	if (flags & DM_FLAGS_ISEM)
+	if (flags & DM_FLAGS_IMUX)
 		up(&ip->i_sem);
 	if (flags & DM_FLAGS_IALLOCSEM_RD)
 		up_read(&ip->i_alloc_sem);
@@ -103,7 +88,7 @@ static void up_rw_sems(struct inode *ip, int flags)
 		up_write(&ip->i_alloc_sem);
 #endif
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(2,4,21)
-	if (flags & DM_FLAGS_ISEM)
+	if (flags & DM_FLAGS_IMUX)
 		up(&ip->i_sem);
 #endif
 }
@@ -122,11 +107,11 @@ static void down_rw_sems(struct inode *ip, int flags)
 		down_read(&ip->i_alloc_sem);
 	else if (flags & DM_FLAGS_IALLOCSEM_WR)
 		down_write(&ip->i_alloc_sem);
-	if (flags & DM_FLAGS_ISEM)
+	if (flags & DM_FLAGS_IMUX)
 		down(&ip->i_sem);
 #endif
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(2,4,21)
-	if (flags & DM_FLAGS_ISEM)
+	if (flags & DM_FLAGS_IMUX)
 		down(&ip->i_sem);
 #endif
 }
@@ -1392,12 +1377,12 @@ xfs_dm_get_bulkall_rvp(
 	statstruct_sz = DM_STAT_SIZE(dm_xstat_t, 0);
 	statstruct_sz = (statstruct_sz+(DM_STAT_ALIGN-1)) & ~(DM_STAT_ALIGN-1);
 
-	nelems = buflen / statstruct_sz;
+	nelems = buflen / statstruct_sz; 
 	if (nelems < 1) {
 		if (put_user( statstruct_sz, rlenp ))
 			return(-EFAULT);
 		return(-E2BIG);
-	}
+	} 
 
 	mp_bdp = bhv_lookup(VFS_BHVHEAD(vfsp), &xfs_vfsops);
 	ASSERT(mp_bdp);
@@ -1411,17 +1396,17 @@ xfs_dm_get_bulkall_rvp(
 	dmb.attrname.dan_chars[sizeof(dmb.attrname.dan_chars) - 1] = '\0';
 
 	/*
-	 * fill the buffer with dm_xstat_t's
+	 * fill the buffer with dm_xstat_t's 
 	 */
 
 	dmb.laststruct = NULL;
 	dmb.bulkall = 1;
 	error = xfs_bulkstat(mp, (xfs_ino_t *)&loc,
-			     &nelems,
+			     &nelems, 
 			     xfs_dm_bulkstat_one,
 			     (void*)&dmb,
 			     statstruct_sz,
-			     bufp,
+			     bufp, 
 			     BULKSTAT_FG_IGET,
 			     &done);
 
@@ -3048,7 +3033,7 @@ xfs_dm_get_fsys_vector(
  *	is still mapped.
  */
 
-int
+STATIC int
 xfs_dm_send_mmap_event(
 	struct vm_area_struct *vma,
 	unsigned int	wantflag)
@@ -3149,7 +3134,7 @@ out_unlock:
 }
 
 
-static int
+STATIC int
 xfs_dm_send_destroy_event(
 	vnode_t		*vp,
 	dm_right_t	vp_right)	/* always DM_RIGHT_NULL */
@@ -3165,7 +3150,7 @@ xfs_dm_send_destroy_event(
 }
 
 
-static int
+STATIC int
 xfs_dm_send_namesp_event(
 	dm_eventtype_t	event,
 	vfs_t		*vfsp,		/* used by PREUNMOUNT */
@@ -3194,7 +3179,7 @@ xfs_dm_send_namesp_event(
 }
 
 
-static void
+STATIC void
 xfs_dm_send_unmount_event(
 	vfs_t		*vfsp,
 	vnode_t		*vp,		/* NULL if unmount successful */
@@ -3208,98 +3193,6 @@ xfs_dm_send_unmount_event(
 }
 
 
-
-static struct file_operations *
-xfs_dm_get_invis_ops(
-	struct inode *ip)
-{
-	return &linvfs_invis_file_operations;
-}
-
-static int
-xfs_dm_fh_to_inode(
-	struct super_block	*sb,
-	struct inode		**ip,
-	dm_fid_t		*dmfid)
-{
-	vnode_t	*vp = NULL;
-	vfs_t	*vfsp = LINVFS_GET_VFS(sb);
-	int	error;
-	fid_t	fid;
-
-	/* Returns negative errors to DMAPI */
-
-	*ip = NULL;
-	memcpy(&fid, dmfid, sizeof(*dmfid));
-	if (fid.fid_len) {	/* file object handle */
-		VFS_VGET(vfsp, &vp, &fid, error);
-	}
-	else {			/* filesystem handle */
-		VFS_ROOT(vfsp, &vp, error);
-	}
-	if(vp && (error == 0))
-		*ip = LINVFS_GET_IP(vp);
-	return -error; /* Return negative error to DMAPI */
-}
-
-static int
-xfs_dm_inode_to_fh(
-	struct inode		*ip,
-	dm_fid_t		*dmfid,
-	dm_fsid_t		*dmfsid)
-{
-	vnode_t	*vp = LINVFS_GET_VP(ip);
-	int	error;
-	fid_t	fid;
-
-	/* Returns negative errors to DMAPI */
-
-	if (vp->v_vfsp->vfs_altfsid == NULL)
-		return -EINVAL;
-	VOP_FID2(vp, &fid, error);
-	if (error)
-		return -error; /* Return negative error to DMAPI */
-
-	memcpy(dmfid, &fid, sizeof(*dmfid));
-	memcpy(dmfsid, vp->v_vfsp->vfs_altfsid, sizeof(*dmfsid));
-	return 0;
-}
-
-static int
-xfs_dm_get_dmapiops(
-	struct super_block	*sb,
-	void			*addr)
-{
-	vfs_t	*vfsp = LINVFS_GET_VFS(sb);
-	int error;
-
-	/* Returns negative errors to DMAPI */
-
-	VFS_DMAPIOPS(vfsp, (caddr_t)addr, error);
-	return -error; /* Return negative error to DMAPI */
-}
-
-static void
-xfs_dm_get_fsid(
-	struct super_block	*sb,
-	dm_fsid_t		*fsid)
-{
-	vfs_t	*vfsp = LINVFS_GET_VFS(sb);
-	memcpy(fsid, vfsp->vfs_altfsid, sizeof(*fsid));
-}
-
-
-/*
- * Filesystem operations accessed by the DMAPI core.
- */
-struct filesystem_dmapi_operations xfs_dmapiops = {
-	.get_fsys_vector	= xfs_dm_get_dmapiops,
-	.fh_to_inode		= xfs_dm_fh_to_inode,
-	.get_invis_ops		= xfs_dm_get_invis_ops,
-	.inode_to_fh		= xfs_dm_inode_to_fh,
-	.get_fsid		= xfs_dm_get_fsid,
-};
-
 /*
  * Data migration operations accessed by the rest of XFS.
  * When DMAPI support is configured in, this vector is used.
@@ -3312,138 +3205,3 @@ xfs_dmops_t	xfs_dmcore_xfs = {
 	.xfs_send_namesp	= xfs_dm_send_namesp_event,
 	.xfs_send_unmount	= xfs_dm_send_unmount_event,
 };
-
-
-/*
- * DMAPI behavior module routines
- */
-
-STATIC int
-xfs_dm_mount(
-	struct bhv_desc		*bhv,
-	struct xfs_mount_args	*args,
-	struct cred		*cr)
-{
-	struct xfs_inode	*rootip;
-	struct vnode		*rootvp;
-	struct vfs		*vfsp = bhvtovfs(bhv);
-	int			error = 0;
-
-	/* Returns positive errors to XFS */
-
-	PVFS_MOUNT(BHV_NEXT(bhv), args, cr, error);
-	if (error)
-		return error;
-
-	if (args->flags & XFSMNT_DMAPI) {
-		VFS_ROOT(vfsp, &rootvp, error);
-		if (!error) {
-			rootip = xfs_vtoi(rootvp);
-			VN_RELE(rootvp);
-			if (rootip != NULL) {
-			    vfsp->vfs_flag |= VFS_DMI;
-			    error = dm_send_mount_event(vfsp->vfs_super,
-					DM_RIGHT_NULL, NULL,
-					DM_RIGHT_NULL, LINVFS_GET_IP(rootvp),
-					DM_RIGHT_NULL,
-					args->mtpt, args->fsname);
-			    error = -error; /* DMAPI returns negative errs */
-			}
-		}
-	}
-
-	return error;
-}
-
-#define MNTOPT_DMAPI	"dmapi"		/* DMI enabled (DMAPI / XDSM) */
-#define MNTOPT_XDSM	"xdsm"		/* DMI enabled (DMAPI / XDSM) */
-#define MNTOPT_DMI	"dmi"		/* DMI enabled (DMAPI / XDSM) */
-
-STATIC int
-xfs_dm_parseargs(
-	struct bhv_desc		*bhv,
-	char			*options,
-	struct xfs_mount_args	*args,
-	int			update)
-{
-	size_t			length;
-	char			*local_options = options;
-	char			*this_char;
-	int			error;
-
-	/* Returns positive errors to XFS */
-
-	while ((this_char = strsep(&local_options, ",")) != NULL) {
-		length = strlen(this_char);
-		if (local_options)
-			length++;
-
-		if (!strcmp(this_char, MNTOPT_DMAPI)) {
-			args->flags |= XFSMNT_DMAPI;
-		} else if (!strcmp(this_char, MNTOPT_XDSM)) {
-			args->flags |= XFSMNT_DMAPI;
-		} else if (!strcmp(this_char, MNTOPT_DMI)) {
-			args->flags |= XFSMNT_DMAPI;
-		} else {
-			if (local_options)
-				*(local_options-1) = ',';
-			continue;
-		}
-
-		while (length--)
-			*this_char++ = ',';
-	}
-
-	PVFS_PARSEARGS(BHV_NEXT(bhv), options, args, update, error);
-	if (!error && (args->flags & XFSMNT_DMAPI) && (*args->mtpt == '\0')) {
-		printk("XFS: %s option needs the mount point option as well\n",
-			MNTOPT_DMAPI);
-		error = EINVAL;
-	}
-	if (!error && !update && !(args->flags & XFSMNT_DMAPI))
-		bhv_remove_vfsops(bhvtovfs(bhv), VFS_POSITION_DM);
-	return error;
-}
-
-STATIC int
-xfs_dm_showargs(
-	struct bhv_desc		*bhv,
-	struct seq_file		*m)
-{
-	struct vfs		*vfsp = bhvtovfs(bhv);
-	int			error;
-
-	/* Returns positive errors to XFS */
-
-	if (vfsp->vfs_flag & VFS_DMI)
-		seq_puts(m, "," MNTOPT_DMAPI);
-
-	PVFS_SHOWARGS(BHV_NEXT(bhv), m, error);
-	return error;
-}
-
-struct bhv_vfsops xfs_dmops = { {
-	BHV_IDENTITY_INIT(VFS_BHV_DM, VFS_POSITION_DM),
-	.vfs_mount		= xfs_dm_mount,
-	.vfs_parseargs		= xfs_dm_parseargs,
-	.vfs_showargs		= xfs_dm_showargs,
-	.vfs_dmapiops		= xfs_dm_get_fsys_vector, },
-};
-
-void
-xfs_dm_init(
-	struct file_system_type *fstype)
-{
-	vfs_bhv_set_custom(&xfs_dmops, &xfs_dmcore_xfs);
-	bhv_module_init(XFS_DMOPS, THIS_MODULE, &xfs_dmops);
-	dmapi_register(fstype, &xfs_dmapiops);
-}
-
-void
-xfs_dm_exit(
-	struct file_system_type *fstype)
-{
-	dmapi_unregister(fstype);
-	bhv_module_exit(XFS_DMOPS);
-	vfs_bhv_clr_custom(&xfs_dmops);
-}
