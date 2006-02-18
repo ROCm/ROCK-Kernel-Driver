@@ -2090,7 +2090,7 @@ again:
 			     "begin_reco now\n", dlm->name, 
 			     dlm->reco.dead_node, dlm->node_num);
 			status = dlm_send_begin_reco_message(dlm,
-				      dlm->reco.dead_node);
+			      dlm->reco.dead_node);
 			/* this always succeeds */
 			BUG_ON(status);
 
