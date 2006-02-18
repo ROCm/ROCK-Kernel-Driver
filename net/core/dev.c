@@ -742,7 +742,11 @@ int dev_change_name(struct net_device *dev, char *newname)
 	else if (__dev_get_by_name(newname))
 		return -EEXIST;
 	else
+	{
+		if (strncmp(newname, dev->name, IFNAMSIZ))
+			printk(KERN_INFO "%s renamed to %s\n", dev->name, newname);
 		strlcpy(dev->name, newname, IFNAMSIZ);
+	}
 
 	err = class_device_rename(&dev->class_dev, dev->name);
 	if (!err) {
