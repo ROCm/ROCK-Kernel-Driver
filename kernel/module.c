@@ -878,36 +878,33 @@ static int obsolete_params(const char *name,
 			   const char *strtab)
 {
 	struct kernel_param *kp;
-	unsigned int i;
+	unsigned int i, j;
 	int ret;
 
 	kp = kmalloc(sizeof(kp[0]) * num, GFP_KERNEL);
 	if (!kp)
 		return -ENOMEM;
 
-	for (i = 0; i < num; i++) {
+	for (i = 0, j = 0; i < num; i++) {
 		char sym_name[128 + sizeof(MODULE_SYMBOL_PREFIX)];
 
 		snprintf(sym_name, sizeof(sym_name), "%s%s",
 			 MODULE_SYMBOL_PREFIX, obsparm[i].name);
 
-		kp[i].name = obsparm[i].name;
-		kp[i].perm = 000;
-		kp[i].set = set_obsolete;
-		kp[i].get = NULL;
+		kp[j].name = obsparm[i].name;
+		kp[j].perm = 000;
+		kp[j].set = set_obsolete;
+		kp[j].get = NULL;
 		obsparm[i].addr
 			= (void *)find_local_symbol(sechdrs, symindex, strtab,
 						    sym_name);
-		if (!obsparm[i].addr) {
-			printk("%s: falsely claims to have parameter %s\n",
-			       name, obsparm[i].name);
-			ret = -EINVAL;
-			goto out;
+		if (obsparm[i].addr) {
+			kp[j].arg = &obsparm[i];
+			j++;
 		}
-		kp[i].arg = &obsparm[i];
 	}
 
-	ret = parse_args(name, args, kp, num, NULL);
+	ret = parse_args(name, args, kp, j, NULL);
  out:
 	kfree(kp);
 	return ret;
