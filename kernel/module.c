@@ -827,6 +827,10 @@ static int set_obsolete(const char *val, struct kernel_param *kp)
 		max = simple_strtol(p, &endp, 10);
 	} else
 		max = min;
+	if (!obsparm->addr) {
+		/* Assume the compiler optimized out an unused parameter. */
+		return 0;
+	}
 	switch (*endp) {
 	case 'b':
 		return param_array(kp->name, val, min, max, obsparm->addr,
@@ -878,33 +882,30 @@ static int obsolete_params(const char *name,
 			   const char *strtab)
 {
 	struct kernel_param *kp;
-	unsigned int i, j;
+	unsigned int i;
 	int ret;
 
 	kp = kmalloc(sizeof(kp[0]) * num, GFP_KERNEL);
 	if (!kp)
 		return -ENOMEM;
 
-	for (i = 0, j = 0; i < num; i++) {
+	for (i = 0; i < num; i++) {
 		char sym_name[128 + sizeof(MODULE_SYMBOL_PREFIX)];
 
 		snprintf(sym_name, sizeof(sym_name), "%s%s",
 			 MODULE_SYMBOL_PREFIX, obsparm[i].name);
 
-		kp[j].name = obsparm[i].name;
-		kp[j].perm = 000;
-		kp[j].set = set_obsolete;
-		kp[j].get = NULL;
+		kp[i].name = obsparm[i].name;
+		kp[i].perm = 000;
+		kp[i].set = set_obsolete;
+		kp[i].get = NULL;
 		obsparm[i].addr
 			= (void *)find_local_symbol(sechdrs, symindex, strtab,
 						    sym_name);
-		if (obsparm[i].addr) {
-			kp[j].arg = &obsparm[i];
-			j++;
-		}
+		kp[i].arg = &obsparm[i];
 	}
 
-	ret = parse_args(name, args, kp, j, NULL);
+	ret = parse_args(name, args, kp, num, NULL);
  out:
 	kfree(kp);
 	return ret;
