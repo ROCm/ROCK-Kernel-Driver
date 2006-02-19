@@ -97,9 +97,9 @@ static void __init early_uart_write(struct console *console, const char *s, unsi
 	serial_out(port, UART_IER, 0);
 
 	while (*s && count-- > 0) {
-		putc(port, *s);
 		if (*s == '\n')
 			putc(port, '\r');
+		putc(port, *s);
 		s++;
 	}
 
