@@ -6,6 +6,8 @@
 #include <linux/bootmem.h>
 #include <linux/slab.h>
 
+int dmi_num_cpus;
+
 static char * __init dmi_string(struct dmi_header *dm, u8 s)
 {
 	u8 *bp = ((u8 *) dm) + dm->length;
@@ -176,6 +178,9 @@ static void __init dmi_decode(struct dmi_header *dm)
 		dmi_save_ident(dm, DMI_BOARD_NAME, 5);
 		dmi_save_ident(dm, DMI_BOARD_VERSION, 6);
 		break;
+	case 4: 	/* Central Processor */
+		dmi_num_cpus++;
+		break;
 	case 10:	/* Onboard Devices Information */
 		dmi_save_devices(dm);
 		break;
@@ -299,3 +304,31 @@ struct dmi_device * dmi_find_device(int type, const char *name,
 	return NULL;
 }
 EXPORT_SYMBOL(dmi_find_device);
+
+/**
+ *	dmi_get_year - Return year of a DMI date
+ *	@field:	data index (like dmi_get_system_info)
+ *
+ *	Handles y2k issues.
+ */
+int dmi_get_year(int field)
+{
+	int year;
+	char *s = dmi_get_system_info(field);
+
+	if (!s || !*s)
+		return 0;
+	s = strrchr(s, '/');
+	if (!s)
+		return 0;
+
+	s += 1;
+	year = simple_strtoul(s, NULL, 0);
+	if (year < 100) {	/* 2-digit year */
+		year += 1900;
+		if (year < 1996)	/* no dates < spec 1.0 */
+			year += 100;
+	}
+
+	return year;
+}

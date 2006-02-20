@@ -1595,6 +1595,9 @@ void __init setup_arch(char **cmdline_p)
 
 
 	dmi_scan_machine();
+#ifdef CONFIG_X86_APIC_OFF
+	dmi_check_apic();
+#endif
 
 #ifdef CONFIG_X86_GENERICARCH
 	generic_apic_probe(*cmdline_p);

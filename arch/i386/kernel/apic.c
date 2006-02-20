@@ -1307,6 +1307,7 @@ KERN_INFO "%s detected. Enabling local APIC. Overwrite with \"nolapic\"\n",
 	return 0;
 } 
 
+/* The table is mostly covered by the generic checks below anyways, but keep it for now */ 
 static struct dmi_system_id __initdata apic_dmi_table[] = {
 	/* Systems that need APIC */
 	/* Multinode Summit systems need APIC to boot */
@@ -1322,6 +1323,46 @@ static struct dmi_system_id __initdata apic_dmi_table[] = {
 	{}
 };
 
+#ifdef CONFIG_X86_APIC_OFF
+static __init int dmi_enable_apic(void)
+{
+	int year;
+	char *vendor; 
+
+	/* If the machine has more than one CPU try to use APIC because it'll 
+	   be running the SMP kernel with APIC soon anyways. 
+	   This won't cover dual core, but they are handled by the date check 
+	   below. */
+	if (dmi_num_cpus > 1)
+		return 1;
+
+	year = dmi_get_year(DMI_BIOS_DATE);
+	vendor = dmi_get_system_info(DMI_BIOS_VENDOR);
+
+	/* All Intel BIOS since 1998 assumed APIC on. Don't include 1998 itself
+	   because we're not sure for that. */
+	if (vendor && !strncmp(vendor, "Intel", 5))
+		return year > 1998;
+
+	/* Use APIC for anything since 2001 */
+	return year >= 2001;
+}
+
+void __init dmi_check_apic(void)
+{
+	if (enable_local_apic != 0)
+		return;
+	enable_local_apic = dmi_enable_apic();
+	if (enable_local_apic == 0) {
+		printk(
+	KERN_INFO "APIC disabled because your old system seems to be old\n"); 
+		printk(KERN_INFO "overwrite with \"apic\"\n");
+	} else {
+		printk(
+	KERN_INFO "APIC enabled because system is MP or new enough\n");
+	}
+}
+#endif
 
 /*
  * This initializes the IO-APIC and APIC hardware if this is
