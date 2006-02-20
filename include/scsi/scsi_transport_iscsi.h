@@ -53,18 +53,20 @@ struct iscsi_transport {
 	struct module *owner;
 	char *name;
 	unsigned int caps;
+	/* LLD sets this to indicate what values it can export to sysfs */
+	unsigned int param_mask;
 	struct scsi_host_template *host_template;
 	/* LLD session/scsi_host data size */
 	int hostdata_size;
-	/* LLD iscsi_host data size */
-	int ihostdata_size;
 	/* LLD connection data size */
 	int conndata_size;
+	/* LLD session data size */
+	int sessiondata_size;
 	int max_lun;
 	unsigned int max_conn;
 	unsigned int max_cmd_len;
 	struct iscsi_cls_session *(*create_session)
-		(struct scsi_transport_template *t, uint32_t sn, uint32_t *sid);
+		(struct scsi_transport_template *t, uint32_t sn, uint32_t *hn);
 	void (*destroy_session) (struct iscsi_cls_session *session);
 	struct iscsi_cls_conn *(*create_conn) (struct iscsi_cls_session *sess,
 				uint32_t cid);
@@ -77,10 +79,11 @@ struct iscsi_transport {
 	int (*set_param) (struct iscsi_cls_conn *conn, enum iscsi_param param,
 			  uint32_t value);
 	int (*get_conn_param) (struct iscsi_cls_conn *conn,
-			       enum iscsi_param param,
-			       uint32_t *value);
+			       enum iscsi_param param, uint32_t *value);
 	int (*get_session_param) (struct iscsi_cls_session *session,
 				  enum iscsi_param param, uint32_t *value);
+	int (*get_session_str_param) (struct iscsi_cls_session *session,
+				      enum iscsi_param param, char **value);
 	int (*send_pdu) (struct iscsi_cls_conn *conn, struct iscsi_hdr *hdr,
 			 char *data, uint32_t data_size);
 	void (*get_stats) (struct iscsi_cls_conn *conn,
@@ -104,6 +107,7 @@ struct iscsi_cls_conn {
 	struct list_head conn_list;	/* item in connlist */
 	void *dd_data;			/* LLD private data */
 	struct iscsi_transport *transport;
+	uint32_t cid;			/* connection id */
 	int active;			/* must be accessed with the connlock */
 	struct device dev;		/* sysfs transport/container device */
 	struct mempool_zone *z_error;
@@ -117,6 +121,16 @@ struct iscsi_cls_conn {
 struct iscsi_cls_session {
 	struct list_head sess_list;		/* item in session_list */
 	struct iscsi_transport *transport;
+
+	/* iSCSI values used as unique id by userspace. */
+	char *targetname;
+	/* portal/group values we got during discovery */
+	char *address;
+	int port;
+	int tpgt;
+
+	int sid;				/* session id */
+	void *dd_data;				/* LLD private data */
 	struct device dev;	/* sysfs transport/container device */
 };
 

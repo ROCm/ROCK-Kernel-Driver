@@ -3254,7 +3254,7 @@ static struct iscsi_transport iscsi_tcp_transport;
 
 static struct iscsi_cls_session *
 iscsi_session_create(struct scsi_transport_template *scsit,
-		     uint32_t initial_cmdsn, uint32_t *sid)
+		     uint32_t initial_cmdsn, uint32_t *hostno)
 {
 	struct Scsi_Host *shost;
 	struct iscsi_session *session;
@@ -3274,7 +3274,8 @@ iscsi_session_create(struct scsi_transport_template *scsit,
 	session->exp_cmdsn = initial_cmdsn + 1;
 	session->max_cmdsn = initial_cmdsn + 1;
 	session->max_r2t = 1;
-	*sid = shost->host_no;
+
+	*hostno = shost->host_no;
 
 	/* initialize SCSI PDU commands pool */
 	if (iscsi_pool_init(&session->cmdpool, session->cmds_max,
@@ -3609,6 +3610,18 @@ static struct iscsi_transport iscsi_tcp_transport = {
 	.name			= "tcp",
 	.caps			= CAP_RECOVERY_L0 | CAP_MULTI_R2T | CAP_HDRDGST
 				  | CAP_DATADGST,
+	.param_mask		= ISCSI_MAX_RECV_DLENGTH |
+				  ISCSI_MAX_XMIT_DLENGTH |
+				  ISCSI_HDRDGST_EN |
+				  ISCSI_DATADGST_EN |
+				  ISCSI_INITIAL_R2T_EN |
+				  ISCSI_MAX_R2T |
+				  ISCSI_IMM_DATA_EN |
+				  ISCSI_FIRST_BURST |
+				  ISCSI_MAX_BURST |
+				  ISCSI_PDU_INORDER_EN |
+				  ISCSI_DATASEQ_INORDER_EN |
+				  ISCSI_ERL,
 	.host_template		= &iscsi_sht,
 	.hostdata_size		= sizeof(struct iscsi_session),
 	.conndata_size		= sizeof(struct iscsi_conn),
