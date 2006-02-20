@@ -148,12 +148,9 @@ enum
 	KERN_SPIN_RETRY=70,	/* int: number of spinlock retries */
 	KERN_UNSUPPORTED=71,	/* int: allow loading of unsupported modules */
 	KERN_KDB=72,		/* int: kdb on/off */
-	KERN_DEFTIMESLICE=73,	/* int: nice   0 def timeslice */
-	KERN_MINTIMESLICE=74,	/* int: nice +19 min timeslice */
-	KERN_HZ=75,		/* unsigned long: internal kernel HZ */
-	KERN_DUMP=76,		/* directory: dump parameters */
-	KERN_DELAYACCT=77,	/* int: Per-task delay accounting on/off */
-	KERN_SCHEDSTATS=78,	/* int: Schedstats on/off */
+	KERN_DUMP=73,		/* directory: dump parameters */
+	KERN_DELAYACCT=74,	/* int: Per-task delay accounting on/off */
+	KERN_SCHEDSTATS=75,	/* int: Schedstats on/off */
 };
 
 

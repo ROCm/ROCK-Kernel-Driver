@@ -92,11 +92,8 @@ EXPORT_SYMBOL_GPL(dump_polling_oncpu);
  * default timeslice is 100 msecs, maximum timeslice is 800 msecs.
  * Timeslices get refilled after they expire.
  */
-#define __MIN_TIMESLICE		  4000 /* usec userspace */
-#define __DEF_TIMESLICE		104000 /* usec userspace */
-int def_timeslice = __DEF_TIMESLICE, min_timeslice = __MIN_TIMESLICE;
-#define MIN_TIMESLICE ((min_timeslice * HZ + 999999) / 1000000)
-#define DEF_TIMESLICE ((def_timeslice * HZ + 999999) / 1000000)
+#define MIN_TIMESLICE		max(5 * HZ / 1000, 1)
+#define DEF_TIMESLICE		(100 * HZ / 1000)
 #define ON_RUNQUEUE_WEIGHT	 30
 #define CHILD_PENALTY		 95
 #define PARENT_PENALTY		100
