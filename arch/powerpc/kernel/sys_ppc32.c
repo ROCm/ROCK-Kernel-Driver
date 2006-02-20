@@ -425,7 +425,7 @@ long compat_sys_ipc(u32 call, u32 first, u32 second, u32 third, compat_uptr_t pt
 		return sys_shmdt(compat_ptr(ptr));
 	case SHMGET:
 		/* sign extend key_t */
-		return sys_shmget((int)first, second, third);
+		return sys_shmget((int)first, (int)second, third);
 	case SHMCTL:
 		/* sign extend shmid */
 		return compat_sys_shmctl((int)first, second, compat_ptr(ptr));
