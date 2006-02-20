@@ -89,15 +89,11 @@ EXPORT_SYMBOL_GPL(dump_polling_oncpu);
  * These are the 'tuning knobs' of the scheduler:
  *
  * Minimum timeslice is 5 msecs (or 1 jiffy, whichever is larger),
- * default timeslice is 105 msecs, maximum timeslice is 805 msecs.
+ * default timeslice is 100 msecs, maximum timeslice is 800 msecs.
  * Timeslices get refilled after they expire.
- * Those values are choosen accurately to make sure each nice level
- * step does make a difference with HZ = 250.
  */
-#define __MIN_TIMESLICE		  8000 /* usec userspace */
-#define __DEF_TIMESLICE		168000 /* usec userspace */
-#define __MIN_TIMESLICE_DESKTOP	  4000 /* usec userspace */
-#define __DEF_TIMESLICE_DESKTOP	 84000 /* usec userspace */
+#define __MIN_TIMESLICE		  4000 /* usec userspace */
+#define __DEF_TIMESLICE		104000 /* usec userspace */
 int def_timeslice = __DEF_TIMESLICE, min_timeslice = __MIN_TIMESLICE;
 #define MIN_TIMESLICE ((min_timeslice * HZ + 999999) / 1000000)
 #define DEF_TIMESLICE ((def_timeslice * HZ + 999999) / 1000000)
@@ -3392,13 +3388,6 @@ out:
 }
 EXPORT_SYMBOL(wait_for_completion_interruptible_timeout);
 
-static int __init init_desktop(char *str)
-{
-	min_timeslice = __MIN_TIMESLICE_DESKTOP;
-	def_timeslice = __DEF_TIMESLICE_DESKTOP;
-	return 1;
-}
-__setup("desktop", init_desktop);
 
 #define	SLEEP_ON_VAR					\
 	unsigned long flags;				\
