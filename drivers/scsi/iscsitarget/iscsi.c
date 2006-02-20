@@ -1169,7 +1169,7 @@ static void execute_task_management(struct iscsi_cmnd *req)
 	rsp = iscsi_cmnd_create_rsp_cmnd(req, 1);
 	rsp_hdr = (struct iscsi_tm_rsp *)&rsp->pdu.bhs;
 
-	rsp_hdr->opcode = ISCSI_OP_SCSI_TMFUNC;
+	rsp_hdr->opcode = ISCSI_OP_SCSI_TMFUNC_RSP;
 	rsp_hdr->flags = ISCSI_FLAG_CMD_FINAL;
 	rsp_hdr->itt = req_hdr->itt;
 	rsp_hdr->response = ISCSI_TMF_RSP_COMPLETE;
