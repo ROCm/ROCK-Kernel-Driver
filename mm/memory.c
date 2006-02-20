@@ -762,11 +762,11 @@ static unsigned long unmap_page_range(struct mmu_gather *tlb,
 	return addr;
 }
 
-#ifdef CONFIG_PREEMPT
-# define ZAP_BLOCK_SIZE	(8 * PAGE_SIZE)
+#ifdef CONFIG_SMP
+/* zap one pte page at a time */
+#define ZAP_BLOCK_SIZE		(FREE_PTE_NR * PAGE_SIZE)
 #else
-/* No preempt: go for improved straight-line efficiency */
-# define ZAP_BLOCK_SIZE	(1024 * PAGE_SIZE)
+#define ZAP_BLOCK_SIZE		(253 * PAGE_SIZE)
 #endif
 
 /**
