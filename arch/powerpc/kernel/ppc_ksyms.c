@@ -178,9 +178,6 @@ EXPORT_SYMBOL(adb_try_handler_change);
 EXPORT_SYMBOL(cuda_request);
 EXPORT_SYMBOL(cuda_poll);
 #endif /* CONFIG_ADB_CUDA */
-#ifdef CONFIG_PPC_PMAC
-EXPORT_SYMBOL(sys_ctrler);
-#endif
 #ifdef CONFIG_VT
 EXPORT_SYMBOL(kd_mksound);
 #endif
@@ -206,17 +203,12 @@ EXPORT_SYMBOL(screen_info);
 #endif
 
 #ifdef CONFIG_PPC32
-EXPORT_SYMBOL(__delay);
 EXPORT_SYMBOL(timer_interrupt);
 EXPORT_SYMBOL(irq_desc);
 EXPORT_SYMBOL(tb_ticks_per_jiffy);
 EXPORT_SYMBOL(console_drivers);
 EXPORT_SYMBOL(cacheable_memcpy);
 #endif
-
-EXPORT_SYMBOL(__up);
-EXPORT_SYMBOL(__down);
-EXPORT_SYMBOL(__down_interruptible);
 
 #ifdef  CONFIG_8xx
 EXPORT_SYMBOL(cpm_install_handler);

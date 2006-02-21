@@ -1321,7 +1321,6 @@ static void radeon_pm_full_reset_sdram(struct radeonfb_info *rinfo)
 	mdelay( 15);
 }
 
-
 static void radeon_pm_reset_pad_ctlr_strength(struct radeonfb_info *rinfo)
 {
 	u32 tmp, tmp2;
@@ -1834,6 +1833,8 @@ static void radeon_reinitialize_M10(struct radeonfb_info *rinfo)
 	 */
 	radeon_pm_m10_enable_lvds_spread_spectrum(rinfo);
 }
+
+#ifdef CONFIG_PPC_OF
 
 static void radeon_pm_m9p_reconfigure_mc(struct radeonfb_info *rinfo)
 {
@@ -2400,6 +2401,7 @@ static void radeon_reinitialize_QW(struct radeonfb_info *rinfo)
 }
 #endif /* 0 */
 
+#endif /* CONFIG_PPC_OF */
 
 static void radeon_set_suspend(struct radeonfb_info *rinfo, int suspend)
 {
@@ -2698,6 +2700,7 @@ int radeonfb_pci_resume(struct pci_dev *pdev)
 	return rc;
 }
 
+#ifdef CONFIG_PPC_OF
 static void radeonfb_early_resume(void *data)
 {
         struct radeonfb_info *rinfo = data;
@@ -2706,6 +2709,7 @@ static void radeonfb_early_resume(void *data)
 	radeonfb_pci_resume(rinfo->pdev);
 	rinfo->no_schedule = 0;
 }
+#endif /* CONFIG_PPC_OF */
 
 #endif /* CONFIG_PM */
 
@@ -2733,8 +2737,10 @@ void radeonfb_pm_init(struct radeonfb_info *rinfo, int dynclk)
 	 */
 	/* Special case for Samsung P35 laptops
 	 */
-	if ((rinfo->pdev->vendor == 0x1002) && (rinfo->pdev->device == 0x4e50) &&
-		(rinfo->pdev->subsystem_vendor == 0x144d) && (rinfo->pdev->subsystem_device == 0xc00c)) {
+	if ((rinfo->pdev->vendor == PCI_VENDOR_ID_ATI) &&
+	    (rinfo->pdev->device == PCI_CHIP_RV350_NP) &&
+	    (rinfo->pdev->subsystem_vendor == PCI_VENDOR_ID_SAMSUNG) &&
+	    (rinfo->pdev->subsystem_device == 0xc00c)) {
 		rinfo->reinit_func = radeon_reinitialize_M10;
 		rinfo->pm_mode |= radeon_pm_off;
 	}
