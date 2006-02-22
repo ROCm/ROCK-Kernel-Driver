@@ -249,6 +249,9 @@ static int nodes_cover_memory(void)
 		unsigned long e = nodes[i].end >> PAGE_SHIFT;
 		pxmram += e - s;
 		pxmram -= e820_hole_size(s, e);
+		pxmram -= nodes_add[i].end - nodes_add[i].start;
+		if ((long)pxmram < 0)
+			pxmram = 0;
 	}
 
 	e820ram = end_pfn - e820_hole_size(0, end_pfn);
@@ -307,6 +310,12 @@ int __init acpi_scan_nodes(unsigned long start, unsigned long end)
 	/* Finally register nodes */
 	for_each_node_mask(i, nodes_parsed)
 		setup_node_bootmem(i, nodes[i].start, nodes[i].end);
+	/* Try again in case setup_node_bootmem missed one due
+	   to missing bootmem */
+	for_each_node_mask(i, nodes_parsed)
+		if (!node_online(i))
+			setup_node_bootmem(i, nodes[i].start, nodes[i].end);
+
 	for (i = 0; i < NR_CPUS; i++) { 
 		if (cpu_to_node[i] == NUMA_NO_NODE)
 			continue;
