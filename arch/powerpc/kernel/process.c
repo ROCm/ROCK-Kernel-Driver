@@ -330,11 +330,6 @@ struct task_struct *__switch_to(struct task_struct *prev,
 #endif
 
 	local_irq_save(flags);
-
-	account_system_vtime(current);
-	account_process_vtime(current);
-	calculate_steal_time();
-
 	last = _switch(old_thread, new_thread);
 
 	local_irq_restore(flags);
