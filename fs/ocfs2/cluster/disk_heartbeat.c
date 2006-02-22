@@ -77,6 +77,12 @@ struct o2hb_disk_slot {
 	struct list_head	ds_live_item;
 };
 
+struct o2hb_track_blocker {
+	const char	*tb_why;
+	struct timeval	tb_start;
+	struct timeval	tb_end;
+};
+
 /* each thread owns a region.. when we're asked to tear down the region
  * we ask the thread to stop, who cleans up the region */
 struct o2hb_region {
@@ -121,12 +127,110 @@ struct o2hb_region {
 	 * being checked because we temporarily have to zero out the
 	 * crc field. */
 	struct o2hb_disk_heartbeat_block *hr_tmp_block;
+
+	unsigned int hr_curr_blocker;
+#define O2HB_NUM_BLOCKER_TRACKS 24
+	struct o2hb_track_blocker hr_blocker[O2HB_NUM_BLOCKER_TRACKS];
 };
+
+static spinlock_t o2hb_blocker_lock = SPIN_LOCK_UNLOCKED;
 
 struct o2hb_bio_wait_ctxt {
 	atomic_t          wc_num_reqs;
 	struct completion wc_io_complete;
 };
+
+static unsigned int o2hb_elapsed_msecs(struct timeval *start,
+				       struct timeval *end);
+
+static void o2hb_print_one_blocker(unsigned int index,
+				   struct o2hb_track_blocker *blocker)
+{
+	unsigned int elapsed_ms;
+
+	/* this will not have been initialized if we never used that
+	 * blocker */
+	if (!blocker->tb_why)
+		return;
+
+	elapsed_ms = o2hb_elapsed_msecs(&blocker->tb_start, &blocker->tb_end);
+
+	printk(KERN_EMERG "Index %u: took %u ms to do %s\n",
+	       index, elapsed_ms, blocker->tb_why);
+}
+
+static void o2hb_print_blockers(struct o2hb_region *reg)
+{
+	unsigned int i;
+	unsigned int cur;
+	struct o2hb_track_blocker *blocker;
+
+	spin_lock(&o2hb_blocker_lock);
+
+	cur = reg->hr_curr_blocker;
+	printk(KERN_EMERG "Heartbeat thread (%d) printing last %u blocking "
+	       "operations (cur = %u):\n", current->pid,
+	       O2HB_NUM_BLOCKER_TRACKS, cur);
+
+	blocker = &reg->hr_blocker[cur];
+	if (blocker->tb_end.tv_sec == 0) {
+		printk(KERN_EMERG "Heartbeat thread stuck at %s, stuffing "
+		       "current time into that blocker (index %u)\n",
+		       blocker->tb_why, cur);
+		do_gettimeofday(&blocker->tb_end);
+	}
+
+	for(i = (cur + 1); i < O2HB_NUM_BLOCKER_TRACKS; i++)
+		o2hb_print_one_blocker(i, &reg->hr_blocker[i]);
+
+	for(i = 0; i <= cur; i++)
+		o2hb_print_one_blocker(i, &reg->hr_blocker[i]);
+
+	spin_unlock(&o2hb_blocker_lock);
+}
+
+static void o2hb_mlog_blocking(struct o2hb_region *reg,
+			       struct timeval *start,
+			       const char *msg)
+{
+	struct o2hb_track_blocker *blocker = &reg->hr_blocker[reg->hr_curr_blocker];
+
+	spin_lock(&o2hb_blocker_lock);
+
+	mlog(ML_HEARTBEAT, "reg %.*s|%llu: thread %s cur %u\n",
+	     BDEVNAME_SIZE, reg->hr_dev_name, reg->hr_start_block, msg,
+	     reg->hr_curr_blocker);
+	do_gettimeofday(start);
+
+	blocker->tb_why = msg;
+	blocker->tb_start = *start;
+	/* helps us track the completion of this thread */
+	memset(&blocker->tb_end, 0, sizeof(blocker->tb_end));
+	spin_unlock(&o2hb_blocker_lock);
+}
+
+static void o2hb_mlog_blocking_done(struct o2hb_region *reg,
+				    struct timeval *start)
+{
+	struct timeval end;
+	unsigned int elapsed_ms;
+	struct o2hb_track_blocker *blocker = &reg->hr_blocker[reg->hr_curr_blocker];
+
+	spin_lock(&o2hb_blocker_lock);
+
+	do_gettimeofday(&end);
+	elapsed_ms = o2hb_elapsed_msecs(start, &end);
+
+	mlog(ML_HEARTBEAT, "reg %.*s|%llu done after %d ms cur %u\n",
+	     BDEVNAME_SIZE, reg->hr_dev_name, reg->hr_start_block, elapsed_ms,
+	     reg->hr_curr_blocker);
+
+	blocker->tb_end = end;
+	reg->hr_curr_blocker++;
+	if (reg->hr_curr_blocker >= O2HB_NUM_BLOCKER_TRACKS)
+		reg->hr_curr_blocker = 0;
+	spin_unlock(&o2hb_blocker_lock);
+}
 
 static void o2hb_write_timeout(void *arg)
 {
@@ -135,6 +239,8 @@ static void o2hb_write_timeout(void *arg)
 	mlog(ML_ERROR, "Heartbeat write timeout to device %s after %u "
 	     "milliseconds\n", reg->hr_dev_name,
 	     jiffies_to_msecs(jiffies - reg->hr_last_timeout_start)); 
+
+	o2hb_print_blockers(reg);
 
 	o2quo_disk_timeout();
 }
@@ -207,7 +313,8 @@ static int o2hb_bio_end_io(struct bio *bio,
 static struct bio *o2hb_setup_one_bio(struct o2hb_region *reg,
 				      struct o2hb_bio_wait_ctxt *wc,
 				      unsigned int start_slot,
-				      unsigned int num_slots)
+				      unsigned int num_slots,
+				      int write)
 {
 	int i, nr_vecs, len, first_page, last_page;
 	unsigned int vec_len, vec_start;
@@ -215,14 +322,20 @@ static struct bio *o2hb_setup_one_bio(struct o2hb_region *reg,
 	unsigned int spp = reg->hr_slots_per_page;
 	struct bio *bio;
 	struct page *page;
+	struct timeval start;
 
 	nr_vecs = (num_slots + spp - 1) / spp;
 
+	if (write)
+		o2hb_mlog_blocking(reg, &start, "bio alloc write");
+	else
+		o2hb_mlog_blocking(reg, &start, "bio alloc read");
 	/* Testing has shown this allocation to take long enough under
 	 * GFP_KERNEL that the local node can get fenced. It would be
 	 * nicest if we could pre-allocate these bios and avoid this
 	 * all together. */
 	bio = bio_alloc(GFP_ATOMIC, nr_vecs);
+	o2hb_mlog_blocking_done(reg, &start);
 	if (!bio) {
 		mlog(ML_ERROR, "Could not alloc slots BIO!\n");
 		bio = ERR_PTR(-ENOMEM);
@@ -250,7 +363,12 @@ static struct bio *o2hb_setup_one_bio(struct o2hb_region *reg,
 		mlog(ML_HB_BIO, "page %d, vec_len = %u, vec_start = %u\n",
 		     i, vec_len, vec_start);
 
+		if (write)
+			o2hb_mlog_blocking(reg, &start, "bio add page write");
+		else
+			o2hb_mlog_blocking(reg, &start, "bio add page read");
 		len = bio_add_page(bio, page, vec_len, vec_start);
+		o2hb_mlog_blocking_done(reg, &start);
 		if (len != vec_len) {
 			bio_put(bio);
 			bio = ERR_PTR(-EIO);
@@ -327,10 +445,13 @@ static int o2hb_read_slots(struct o2hb_region *reg,
 	struct o2hb_bio_wait_ctxt wc;
 	struct bio **bios;
 	struct bio *bio;
+	struct timeval start;
 
 	o2hb_compute_request_limits(reg, max_slots, &num_bios, &slots_per_bio);
 
+	o2hb_mlog_blocking(reg, &start, "allocating bios for read");
 	bios = kcalloc(num_bios, sizeof(struct bio *), GFP_KERNEL);
+	o2hb_mlog_blocking_done(reg, &start);
 	if (!bios) {
 		status = -ENOMEM;
 		mlog_errno(status);
@@ -347,7 +468,7 @@ static int o2hb_read_slots(struct o2hb_region *reg,
 		if (max_slots < (start_slot + num_slots))
 			num_slots = max_slots - start_slot;
 
-		bio = o2hb_setup_one_bio(reg, &wc, start_slot, num_slots);
+		bio = o2hb_setup_one_bio(reg, &wc, start_slot, num_slots, 0);
 		if (IS_ERR(bio)) {
 			o2hb_bio_wait_dec(&wc, num_bios - i);
 
@@ -357,13 +478,17 @@ static int o2hb_read_slots(struct o2hb_region *reg,
 		}
 		bios[i] = bio;
 
+		o2hb_mlog_blocking(reg, &start, "submit_bio for read");
 		submit_bio(READ, bio);
+		o2hb_mlog_blocking_done(reg, &start);
 	}
 
 	status = 0;
 
 bail_and_wait:
+	o2hb_mlog_blocking(reg, &start, "waiting for read completion");
 	o2hb_wait_on_io(reg, &wc);
+	o2hb_mlog_blocking_done(reg, &start);
 
 	if (bios) {
 		for(i = 0; i < num_bios; i++)
@@ -382,19 +507,22 @@ static int o2hb_issue_node_write(struct o2hb_region *reg,
 	int status;
 	unsigned int slot;
 	struct bio *bio;
+	struct timeval start;
 
 	o2hb_bio_wait_init(write_wc, 1);
 
 	slot = o2nm_this_node();
 
-	bio = o2hb_setup_one_bio(reg, write_wc, slot, 1);
+	bio = o2hb_setup_one_bio(reg, write_wc, slot, 1, 1);
 	if (IS_ERR(bio)) {
 		status = PTR_ERR(bio);
 		mlog_errno(status);
 		goto bail;
 	}
 
+	o2hb_mlog_blocking(reg, &start, "submit_bio for write");
 	submit_bio(WRITE, bio);
+	o2hb_mlog_blocking_done(reg, &start);
 
 	*write_bio = bio;
 	status = 0;
@@ -690,6 +818,7 @@ static void o2hb_do_disk_heartbeat(struct o2hb_region *reg)
 	unsigned long configured_nodes[BITS_TO_LONGS(O2NM_MAX_NODES)];
 	struct bio *write_bio;
 	struct o2hb_bio_wait_ctxt write_wc;
+	struct timeval start;
 
 	if (o2nm_configured_node_map(configured_nodes, sizeof(configured_nodes)))
 		return;
@@ -728,18 +857,22 @@ static void o2hb_do_disk_heartbeat(struct o2hb_region *reg)
 		return;
 	}
 
+	o2hb_mlog_blocking(reg, &start, "checking slots");
 	i = -1;
 	while((i = find_next_bit(configured_nodes, O2NM_MAX_NODES, i + 1)) < O2NM_MAX_NODES) {
 
 		change |= o2hb_check_slot(reg, &reg->hr_slots[i]);
 	}
+	o2hb_mlog_blocking_done(reg, &start);
 
 	/*
 	 * We have to be sure we've advertised ourselves on disk
 	 * before we can go to steady state.  This ensures that
 	 * people we find in our steady state have seen us.
 	 */
+	o2hb_mlog_blocking(reg, &start, "waiting for write completion");
 	o2hb_wait_on_io(reg, &write_wc);
+	o2hb_mlog_blocking_done(reg, &start);
 	bio_put(write_bio);
 	o2hb_arm_write_timeout(reg);
 
@@ -817,9 +950,12 @@ static int o2hb_thread(void *data)
 		     after_hb.tv_sec, after_hb.tv_usec, elapsed_msec);
 
 		if (elapsed_msec < reg->hr_timeout_ms) {
+			struct timeval start;
 			/* the kthread api has blocked signals for us so no
 			 * need to record the return value. */
+			o2hb_mlog_blocking(reg, &start, "msleep");
 			msleep_interruptible(reg->hr_timeout_ms - elapsed_msec);
+			o2hb_mlog_blocking_done(reg, &start);
 		}
 	}
 

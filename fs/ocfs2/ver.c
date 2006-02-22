@@ -30,7 +30,7 @@
 #include "ver.h"
 
 #define OCFS2_BUILD_VERSION	"1.2.0-SLES"
-#define OCFS2_BUILD_DATE	"Tue Jan 24 14:31:42 PST 2006"
+#define OCFS2_BUILD_DATE	"Tue Feb 21 14:36:13 PST 2006"
 #define OCFS2_BUILD_MD5	"sles"
 
 #define VERSION_STR "OCFS2 " \
