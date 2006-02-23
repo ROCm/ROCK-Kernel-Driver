@@ -117,6 +117,7 @@ extern void do_cpu_ftr_fixups(unsigned long offset);
 #define CPU_FTR_MMCRA_SIHV		ASM_CONST(0x0000080000000000)
 #define CPU_FTR_CI_LARGE_PAGE		ASM_CONST(0x0000100000000000)
 #define CPU_FTR_PAUSE_ZERO		ASM_CONST(0x0000200000000000)
+#define CPU_FTR_PURR			ASM_CONST(0x0000400000000000)
 #else
 /* ensure on 32b processors the flags are available for compiling but
  * don't do anything */
@@ -132,6 +133,7 @@ extern void do_cpu_ftr_fixups(unsigned long offset);
 #define CPU_FTR_LOCKLESS_TLBIE		ASM_CONST(0x0)
 #define CPU_FTR_MMCRA_SIHV		ASM_CONST(0x0)
 #define CPU_FTR_CI_LARGE_PAGE		ASM_CONST(0x0)
+#define CPU_FTR_PURR			ASM_CONST(0x0)
 #endif
 
 #ifndef __ASSEMBLY__
@@ -313,7 +315,7 @@ enum {
 	    CPU_FTR_HPTE_TABLE | CPU_FTR_PPCAS_ARCH_V2 |
 	    CPU_FTR_MMCRA | CPU_FTR_SMT |
 	    CPU_FTR_COHERENT_ICACHE | CPU_FTR_LOCKLESS_TLBIE |
-	    CPU_FTR_MMCRA_SIHV,
+	    CPU_FTR_MMCRA_SIHV | CPU_FTR_PURR,
 	CPU_FTRS_CELL = CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB |
 	    CPU_FTR_HPTE_TABLE | CPU_FTR_PPCAS_ARCH_V2 |
 	    CPU_FTR_ALTIVEC_COMP | CPU_FTR_MMCRA | CPU_FTR_SMT |
@@ -326,7 +328,7 @@ enum {
 #ifdef __powerpc64__
 	    CPU_FTRS_POWER3 | CPU_FTRS_RS64 | CPU_FTRS_POWER4 |
 	    CPU_FTRS_PPC970 | CPU_FTRS_POWER5 | CPU_FTRS_CELL |
-            CPU_FTR_CI_LARGE_PAGE |
+            CPU_FTR_CI_LARGE_PAGE | CPU_FTR_PURR |
 #else
 #if CLASSIC_PPC
 	    CPU_FTRS_PPC601 | CPU_FTRS_603 | CPU_FTRS_604 | CPU_FTRS_740_NOTAU |
