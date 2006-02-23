@@ -659,7 +659,7 @@ void __meminit init_memory_mapping(unsigned long start, unsigned long end)
 		pud_t *pud;
 
 		if (after_bootmem) {
-			pud = pud_offset_k(pgd, __PAGE_OFFSET);
+			pud = pud_offset_k(pgd, start & PGDIR_MASK);
 			make_page_readonly(pud, XENFEAT_writable_page_tables);
 			pud_phys = __pa(pud);
 		} else {
@@ -814,9 +814,8 @@ void __init clear_kernel_mapping(unsigned long address, unsigned long size)
 
 /*
  * Memory hotplug specific functions
- * These are only for non-NUMA machines right now.
  */
-#ifdef CONFIG_MEMORY_HOTPLUG
+#ifdef CONFIG_ACPI_HOTPLUG_MEMORY
 
 void online_page(struct page *page)
 {
@@ -827,25 +826,24 @@ void online_page(struct page *page)
 	num_physpages++;
 }
 
+/* You can only add memory you reserved during boot */
 int add_memory(u64 start, u64 size)
 {
-	struct pglist_data *pgdat = NODE_DATA(0);
-	struct zone *zone = pgdat->node_zones + MAX_NR_ZONES-2;
-	unsigned long start_pfn = start >> PAGE_SHIFT;
-	unsigned long nr_pages = size >> PAGE_SHIFT;
-	int ret;
-
-	ret = __add_pages(zone, start_pfn, nr_pages);
-	if (ret)
-		goto error;
+	u64 i;
+	int ret = 0;
 
 	init_memory_mapping(start, (start + size -1));
-
-	return ret;
-error:
-	printk("%s: Problem encountered in __add_pages!\n", __func__);
+	for (i = start;  i < start+size; i+= PAGE_SIZE) {
+		if (pfn_valid(i>>PAGE_SHIFT))
+			online_page(pfn_to_page(i >> PAGE_SHIFT));
+ 		else {
+			printk (KERN_ERR "%Lx is not a valid pfn\n",i);
+			ret = -EINVAL;
+		}
+	}
 	return ret;
 }
+
 EXPORT_SYMBOL_GPL(add_memory);
 
 int remove_memory(u64 start, u64 size)

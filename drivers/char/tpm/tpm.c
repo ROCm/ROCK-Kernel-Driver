@@ -30,7 +30,8 @@
 
 enum tpm_const {
 	TPM_MINOR = 224,	/* officially assigned */
-	TPM_BUFSIZE = 2048,
+	TPM_MIN_BUFSIZE = 2048,
+	TPM_MAX_BUFSIZE = 64 * 1024,
 	TPM_NUM_DEVICES = 256,
 	TPM_NUM_MASK_ENTRIES = TPM_NUM_DEVICES / (8 * sizeof(int))
 };
@@ -52,14 +53,14 @@ static void timeout_work(void * ptr)
 
 	down(&chip->buffer_mutex);
 	atomic_set(&chip->data_pending, 0);
-	memset(chip->data_buffer, 0, TPM_BUFSIZE);
+	memset(chip->data_buffer, 0, get_chip_buffersize(chip));
 	up(&chip->buffer_mutex);
 }
 
 /*
  * Internal kernel interface to transmit TPM commands
  */
-static ssize_t tpm_transmit(struct tpm_chip *chip, const char *buf,
+static ssize_t tpm_transmit(struct tpm_chip * chip, const char *buf,
 			    size_t bufsiz)
 {
 	ssize_t rc;
@@ -351,7 +352,7 @@ int tpm_open(struct inode *inode, struct file *file)
 
 	spin_unlock(&driver_lock);
 
-	chip->data_buffer = kmalloc(TPM_BUFSIZE * sizeof(u8), GFP_KERNEL);
+	chip->data_buffer = kmalloc(get_chip_buffersize(chip) * sizeof(u8), GFP_KERNEL);
 	if (chip->data_buffer == NULL) {
 		chip->num_opens--;
 		put_device(chip->dev);
@@ -399,8 +400,8 @@ ssize_t tpm_write(struct file *file, const char __user *buf,
 
 	down(&chip->buffer_mutex);
 
-	if (in_size > TPM_BUFSIZE)
-		in_size = TPM_BUFSIZE;
+	if (in_size > get_chip_buffersize(chip))
+		in_size = get_chip_buffersize(chip);
 
 	if (copy_from_user
 	    (chip->data_buffer, (void __user *) buf, in_size)) {
@@ -409,9 +410,13 @@ ssize_t tpm_write(struct file *file, const char __user *buf,
 	}
 
 	/* atomic tpm command send and result receive */
-	out_size = tpm_transmit(chip, chip->data_buffer, TPM_BUFSIZE);
+	out_size = tpm_transmit(chip, chip->data_buffer, 
+	                        get_chip_buffersize(chip));
 
 	atomic_set(&chip->data_pending, out_size);
+#ifdef CONFIG_XEN
+	atomic_set(&chip->data_position, 0);
+#endif
 	up(&chip->buffer_mutex);
 
 	/* Set a timeout by which the reader must come claim the result */
@@ -427,20 +432,52 @@ ssize_t tpm_read(struct file * file, char __user *buf,
 {
 	struct tpm_chip *chip = file->private_data;
 	int ret_size;
+#ifdef CONFIG_XEN
+	int pending = 0;
+#endif
 
+#ifndef CONFIG_XEN
 	del_singleshot_timer_sync(&chip->user_read_timer);
 	flush_scheduled_work();
+#endif
 	ret_size = atomic_read(&chip->data_pending);
+#ifndef CONFIG_XEN
 	atomic_set(&chip->data_pending, 0);
+#endif
 	if (ret_size > 0) {	/* relay data */
+		int pos;
+
 		if (size < ret_size)
 			ret_size = size;
 
+#ifndef CONFIG_XEN
+		pos = 0;
+#else
+		pos = atomic_read(&chip->data_position);
+#endif
+
 		down(&chip->buffer_mutex);
-		if (copy_to_user(buf, chip->data_buffer, ret_size))
+		if (copy_to_user(buf, &chip->data_buffer[pos], ret_size))
 			ret_size = -EFAULT;
+#ifdef CONFIG_XEN
+		else {
+			pending = atomic_read(&chip->data_pending) - ret_size;
+			if ( pending ) {
+				atomic_set( &chip->data_pending, pending );
+				atomic_set( &chip->data_position, pos+ret_size );
+			}
+		}
+#endif
 		up(&chip->buffer_mutex);
 	}
+	
+#ifdef CONFIG_XEN
+	if ( ret_size <= 0 || pending == 0 ) {
+		atomic_set( &chip->data_pending, 0 );
+		del_singleshot_timer_sync(&chip->user_read_timer);
+		flush_scheduled_work();
+	}
+#endif
 
 	return ret_size;
 }
@@ -544,6 +581,12 @@ int tpm_register_hardware(struct device *dev, struct tpm_vendor_specific *entry)
 	chip->user_read_timer.data = (unsigned long) chip;
 
 	chip->vendor = entry;
+	
+	if (entry->buffersize < TPM_MIN_BUFSIZE) {
+		entry->buffersize = TPM_MIN_BUFSIZE;
+	} else if (entry->buffersize > TPM_MAX_BUFSIZE) {
+		entry->buffersize = TPM_MAX_BUFSIZE;
+	}
 
 	chip->dev_num = -1;
 

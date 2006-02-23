@@ -1,26 +1,13 @@
-
 #include <linux/config.h>
-
-.section __xen_guest
-	.ascii	"GUEST_OS=linux,GUEST_VER=2.6"
-	.ascii	",XEN_VER=xen-3.0"
-	.ascii	",VIRT_BASE=0xC0000000"
-	.ascii	",HYPERCALL_PAGE=0x104" /* __pa(hypercall_page) >> 12 */
-#ifdef CONFIG_X86_PAE
-	.ascii	",PAE=yes"
-#else
-	.ascii	",PAE=no"
-#endif
-	.ascii	",LOADER=generic"
-	.byte	0
-
-.text
 #include <linux/threads.h>
 #include <linux/linkage.h>
 #include <asm/segment.h>
+#include <asm/page.h>
 #include <asm/thread_info.h>
 #include <asm/asm-offsets.h>
 #include <xen/interface/arch-x86_32.h>
+
+.text
 
 /*
  * References to members of the new_cpu_data structure.
@@ -45,7 +32,7 @@ ENTRY(startup_32_smp)
 	cld
 
 	/* Set up the stack pointer */
-	lss stack_start,%esp
+	movl $(init_thread_union+THREAD_SIZE),%esp
 
 checkCPUtype:
 
@@ -102,23 +89,23 @@ ENTRY(lgdt_finish)
 	pushl %eax
 	lret
 
-ENTRY(stack_start)
-	.long init_thread_union+THREAD_SIZE
-	.long __BOOT_DS
-
+#ifndef CONFIG_XEN
 ready:	.byte 0
-
-.globl idt_descr
-.globl cpu_gdt_descr
+#endif
 
 	ALIGN
+
+#ifndef CONFIG_XEN
 	.word 0				# 32-bit align idt_desc.address
+.globl idt_descr
 idt_descr:
 	.word IDT_ENTRIES*8-1		# idt contains 256 entries
 	.long idt_table
+#endif
 
 # boot GDT descriptor (later on used by CPU#0):
 	.word 0				# 32 bit align gdt_desc.address
+.globl cpu_gdt_descr
 cpu_gdt_descr:
 	.word GDT_SIZE
 	.long cpu_gdt_table
@@ -190,12 +177,43 @@ ENTRY(cpu_gdt_table)
 .org 0x3000
 ENTRY(default_ldt)
 
-.org 0x4000
+#define HYPERCALL_PAGE_OFFSET 0x4000
+.org HYPERCALL_PAGE_OFFSET
 ENTRY(hypercall_page)
+.skip 0x1000
 
-.org 0x5000
 /*
  * Real beginning of normal "text" segment
  */
 ENTRY(stext)
 ENTRY(_stext)
+
+
+/*
+ * __xen_guest information
+ */
+.macro utoh value
+ .if (\value) < 0
+	utoh (((\value)>>4)&0x0fffffff)
+ .elseif (\value) >= 0x10
+	utoh ((\value)>>4)
+ .endif
+ .if ((\value) & 0xf) < 10
+  .byte '0' + ((\value) & 0xf)
+ .else
+  .byte 'A' + ((\value) & 0xf) - 10
+ .endif
+.endm
+
+.section __xen_guest
+	.ascii	"GUEST_OS=linux,GUEST_VER=2.6"
+	.ascii	",XEN_VER=xen-3.0"
+	.ascii	",VIRT_BASE=0x"; utoh __PAGE_OFFSET
+	.ascii	",HYPERCALL_PAGE=0x"; utoh ((__PHYSICAL_START+HYPERCALL_PAGE_OFFSET)>>PAGE_SHIFT)
+#ifdef CONFIG_X86_PAE
+	.ascii	",PAE=yes"
+#else
+	.ascii	",PAE=no"
+#endif
+	.ascii	",LOADER=generic"
+	.byte	0

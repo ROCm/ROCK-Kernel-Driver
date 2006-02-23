@@ -47,8 +47,6 @@
 #include <asm/proto.h>
 #include <asm/nmi.h>
 
-extern struct gate_struct idt_table[256]; 
-
 asmlinkage void divide_error(void);
 asmlinkage void debug(void);
 asmlinkage void nmi(void);
@@ -430,6 +428,7 @@ void __kprobes __die(const char * str, struct pt_regs * regs, long err)
 	printk("DEBUG_PAGEALLOC");
 #endif
 	printk("\n");
+	sysfs_printk_last_file();
 	notify_die(DIE_OOPS, str, regs, err, current->thread.trap_no, SIGSEGV);
 	show_registers(regs);
 	/* Executive summary in case the oops scrolled away */
@@ -986,10 +985,6 @@ void __init trap_init(void)
                 printk("HYPERVISOR_set_trap_table faild: error %d\n",
                        ret);
 
-#ifdef CONFIG_IA32_EMULATION
-	set_system_gate(IA32_SYSCALL_VECTOR, ia32_syscall);
-#endif
-       
 	/*
 	 * Should be a barrier for any external CPU state.
 	 */

@@ -90,7 +90,6 @@ static inline void clear_LDT(void)
  * something other than this.
  */
 extern struct desc_struct default_ldt[];
-extern struct gate_struct idt_table[]; 
 extern struct desc_ptr cpu_gdt_descr[];
 
 /* the cpu gdt accessor */
@@ -112,29 +111,6 @@ static inline void _set_gate(void *adr, unsigned type, unsigned long func, unsig
 	/* does not need to be atomic because it is only done once at setup time */ 
 	memcpy(adr, &s, 16); 
 } 
-
-static inline void set_intr_gate(int nr, void *func) 
-{ 
-	BUG_ON((unsigned)nr > 0xFF);
-	_set_gate(&idt_table[nr], GATE_INTERRUPT, (unsigned long) func, 0, 0); 
-} 
-
-static inline void set_intr_gate_ist(int nr, void *func, unsigned ist) 
-{ 
-	BUG_ON((unsigned)nr > 0xFF);
-	_set_gate(&idt_table[nr], GATE_INTERRUPT, (unsigned long) func, 0, ist); 
-} 
-
-static inline void set_system_gate(int nr, void *func) 
-{ 
-	BUG_ON((unsigned)nr > 0xFF);
-	_set_gate(&idt_table[nr], GATE_INTERRUPT, (unsigned long) func, 3, 0); 
-} 
-
-static inline void set_system_gate_ist(int nr, void *func, unsigned ist)
-{
-	_set_gate(&idt_table[nr], GATE_INTERRUPT, (unsigned long) func, 3, ist);
-}
 
 static inline void set_tssldt_descriptor(void *ptr, unsigned long tss, unsigned type, 
 					 unsigned size) 

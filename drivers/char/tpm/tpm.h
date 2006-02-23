@@ -50,6 +50,7 @@ struct tpm_vendor_specific {
 	u8 req_complete_mask;
 	u8 req_complete_val;
 	u8 req_canceled;
+	u32 buffersize;
 	void __iomem *iobase;		/* ioremapped address */
 	unsigned long base;		/* TPM base address */
 
@@ -74,6 +75,9 @@ struct tpm_chip {
 	/* Data passed to and from the tpm via the read/write calls */
 	u8 *data_buffer;
 	atomic_t data_pending;
+#ifdef CONFIG_XEN
+	atomic_t data_position;
+#endif
 	struct semaphore buffer_mutex;
 
 	struct timer_list user_read_timer;	/* user needs to claim result */
@@ -97,6 +101,11 @@ static inline void tpm_write_index(int base, int index, int value)
 {
 	outb(index, base);
 	outb(value & 0xFF, base+1);
+}
+
+static inline u32 get_chip_buffersize(struct tpm_chip *chip)
+{
+	return chip->vendor->buffersize;
 }
 
 extern int tpm_register_hardware(struct device *,

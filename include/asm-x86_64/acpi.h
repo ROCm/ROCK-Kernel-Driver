@@ -166,6 +166,7 @@ extern int acpi_skip_timer_override;
 
 extern int unsync_tsc_on_multicluster;
 
+#ifndef CONFIG_XEN
 static inline int acpi_madt_oem_check(char *oem, char *productid) 
 { 
 	/* Copied from i386. Probably has too many entries. */
@@ -177,6 +178,7 @@ static inline int acpi_madt_oem_check(char *oem, char *productid)
         }
         return 0;
 }
+#endif
 
 #endif /*__KERNEL__*/
 
