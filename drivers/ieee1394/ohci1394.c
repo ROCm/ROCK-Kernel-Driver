@@ -572,6 +572,7 @@ static void ohci_initialize(struct ti_ohci *ohci)
 		  OHCI1394_reqTxComplete |
 		  OHCI1394_isochRx |
 		  OHCI1394_isochTx |
+		  OHCI1394_postedWriteErr |
 		  OHCI1394_cycleInconsistent);
 
 	/* Enable link */
@@ -2374,7 +2375,10 @@ static irqreturn_t ohci_irq_handler(int irq, void *dev_id,
 
 		event &= ~OHCI1394_unrecoverableError;
 	}
-
+	if (event & OHCI1394_postedWriteErr) {
+		PRINT(KERN_ERR, "physical posted write error");
+		/* no recovery strategy yet, had to involve protocol drivers */
+	}
 	if (event & OHCI1394_cycleInconsistent) {
 		/* We subscribe to the cycleInconsistent event only to
 		 * clear the corresponding event bit... otherwise,
@@ -3259,8 +3263,8 @@ static int __devinit ohci1394_pci_probe(struct pci_dev *dev,
 	 * fail to report the right length.  Anyway, the ohci spec
 	 * clearly says it's 2kb, so this shouldn't be a problem. */
 	ohci_base = pci_resource_start(dev, 0);
-	if (pci_resource_len(dev, 0) != OHCI1394_REGISTER_SIZE)
-		PRINT(KERN_WARNING, "Unexpected PCI resource length of %lx!",
+	if (pci_resource_len(dev, 0) < OHCI1394_REGISTER_SIZE)
+		PRINT(KERN_WARNING, "PCI resource length of 0x%lx too small!",
 		      pci_resource_len(dev, 0));
 
 	/* Seems PCMCIA handles this internally. Not sure why. Seems
