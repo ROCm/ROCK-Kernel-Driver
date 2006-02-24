@@ -455,7 +455,6 @@ acpi_memory_register_notify_handler(acpi_handle handle,
 
 	status = is_memory_device(handle);
 	if (ACPI_FAILURE(status)){
-		ACPI_EXCEPTION((AE_INFO, status, "handle is no memory device"));
 		return_ACPI_STATUS(AE_OK);	/* continue */
 	}
 
@@ -475,7 +474,6 @@ acpi_memory_deregister_notify_handler(acpi_handle handle,
 
 	status = is_memory_device(handle);
 	if (ACPI_FAILURE(status)){
-		ACPI_EXCEPTION((AE_INFO, status, "handle is no memory device"));
 		return_ACPI_STATUS(AE_OK);	/* continue */
 	}
 
