@@ -178,6 +178,23 @@ extern void zfcp_erp_unit_access_denied(struct zfcp_unit *);
 extern void zfcp_erp_adapter_access_changed(struct zfcp_adapter *);
 extern void zfcp_erp_port_access_changed(struct zfcp_port *);
 extern void zfcp_erp_unit_access_changed(struct zfcp_unit *);
+extern int zfcp_sg_list_alloc(struct zfcp_sg_list *, size_t);
+extern void zfcp_sg_list_free(struct zfcp_sg_list *);
+extern int zfcp_sg_list_copy_from_user(struct zfcp_sg_list *, void __user *,
+                                      size_t);
+extern int zfcp_sg_list_copy_to_user(void __user *, struct zfcp_sg_list *,
+                                    size_t);
+extern size_t zfcp_sg_size(struct scatterlist *, unsigned int);
+
+void zfcp_register_callbacks(struct zfcp_callbacks *);
+void zfcp_unregister_callbacks(void);
+
+extern void zfcp_cb_incoming_els(struct zfcp_adapter *, void *);
+extern void zfcp_cb_link_down(struct zfcp_adapter *);
+extern void zfcp_cb_link_up(struct zfcp_adapter *);
+extern void zfcp_cb_adapter_add(struct zfcp_adapter *);
+extern void zfcp_cb_port_add(struct zfcp_port *);
+extern void zfcp_cb_unit_add(struct zfcp_unit *);
 
 /******************************** AUX ****************************************/
 extern void zfcp_hba_dbf_event_fsf_response(struct zfcp_fsf_req *);

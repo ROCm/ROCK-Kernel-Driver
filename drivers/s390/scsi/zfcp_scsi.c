@@ -930,3 +930,6 @@ static struct device_attribute *zfcp_sysfs_sdev_attrs[] = {
 };
 
 #undef ZFCP_LOG_AREA
+
+EXPORT_SYMBOL(zfcp_data);
+EXPORT_SYMBOL(zfcp_scsi_command_sync);

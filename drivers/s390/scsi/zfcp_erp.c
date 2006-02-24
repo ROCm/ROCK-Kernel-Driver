@@ -3395,10 +3395,12 @@ zfcp_erp_action_cleanup(int action, struct zfcp_adapter *adapter,
 		    && (!atomic_test_mask(ZFCP_STATUS_UNIT_TEMPORARY,
 					  &unit->status))
 		    && !unit->device
-		    && port->rport)
+		    && port->rport) {
  			scsi_add_device(port->adapter->scsi_host, 0,
  					port->rport->scsi_target_id,
 					unit->scsi_lun);
+			zfcp_cb_unit_add(unit);
+		}
 		zfcp_unit_put(unit);
 		break;
 	case ZFCP_ERP_ACTION_REOPEN_PORT_FORCED:
@@ -3704,3 +3706,9 @@ zfcp_erp_unit_access_changed(struct zfcp_unit *unit)
 }
 
 #undef ZFCP_LOG_AREA
+
+EXPORT_SYMBOL(zfcp_erp_wait);
+EXPORT_SYMBOL(zfcp_erp_port_reopen);
+EXPORT_SYMBOL(zfcp_erp_unit_reopen);
+EXPORT_SYMBOL(zfcp_erp_unit_shutdown);
+EXPORT_SYMBOL(zfcp_fsf_request_timeout_handler);

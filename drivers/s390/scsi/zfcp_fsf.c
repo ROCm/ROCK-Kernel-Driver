@@ -645,6 +645,7 @@ zfcp_fsf_link_down_info_eval(struct zfcp_adapter *adapter,
 				link_down->vendor_specific_code);
 
  out:
+	zfcp_cb_link_down(adapter);
 	zfcp_erp_adapter_failed(adapter);
 }
 
@@ -953,6 +954,9 @@ zfcp_fsf_status_read_handler(struct zfcp_fsf_req *fsf_req)
 		zfcp_erp_adapter_reopen(adapter,
 					ZFCP_STATUS_ADAPTER_LINK_UNPLUGGED
 					| ZFCP_STATUS_COMMON_ERP_FAILED);
+
+		zfcp_cb_link_up(adapter);
+
 		break;
 
 	case FSF_STATUS_READ_NOTIFICATION_LOST:
@@ -2185,6 +2189,8 @@ zfcp_fsf_exchange_config_data_handler(struct zfcp_fsf_req *fsf_req)
 		}
 		atomic_set_mask(ZFCP_STATUS_ADAPTER_XCONFIG_OK,
 				&adapter->status);
+		zfcp_cb_adapter_add(adapter);
+
 		break;
 	case FSF_EXCHANGE_CONFIG_DATA_INCOMPLETE:
 		debug_text_event(adapter->erp_dbf, 0, "xchg-inco");
@@ -4924,3 +4930,7 @@ zfcp_fsf_req_send(struct zfcp_fsf_req *fsf_req, struct timer_list *timer)
 }
 
 #undef ZFCP_LOG_AREA
+
+EXPORT_SYMBOL(zfcp_fsf_exchange_port_data);
+EXPORT_SYMBOL(zfcp_fsf_send_ct);
+EXPORT_SYMBOL(zfcp_fsf_send_els);

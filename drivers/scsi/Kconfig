@@ -1868,6 +1868,23 @@ config ZFCP
           called zfcp. If you want to compile it as a module, say M here
           and read <file:Documentation/modules.txt>.
 
+config ZFCP_HBAAPI
+	tristate "FC-HBA Support"
+	depends on ZFCP
+	default n
+	help
+	  Say Y here to include HBA API (FC-HBA) support for z990 (GA2)
+	  and above.
+	  For details please refer to the documentation provided by IBM at
+	  <http://oss.software.ibm.com/developerworks/opensource/linux390>
+
+	  This support is also available as a separate module.
+	  If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>.  The module will be called
+	  zfcp_hbaapi.o.
+
+	  If unsure, say N.
+
 endmenu
 
 source "drivers/scsi/pcmcia/Kconfig"
