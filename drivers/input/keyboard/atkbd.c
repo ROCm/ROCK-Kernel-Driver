@@ -362,6 +362,7 @@ static irqreturn_t atkbd_interrupt(struct serio *serio, unsigned char data,
 				       "like XFree86, might be trying access hardware directly.\n",
 				       data == ATKBD_RET_ACK ? "ACK" : "NAK", serio->phys);
 			} else {
+#if 0
 				printk(KERN_WARNING "atkbd.c: Unknown key %s "
 				       "(%s set %d, code %#x on %s).\n",
 				       atkbd->release ? "released" : "pressed",
@@ -370,6 +371,7 @@ static irqreturn_t atkbd_interrupt(struct serio *serio, unsigned char data,
 				printk(KERN_WARNING "atkbd.c: Use 'setkeycodes %s%02x <keycode>' "
 				       "to make it known.\n",
 				       code & 0x80 ? "e0" : "", code & 0x7f);
+#endif
 			}
 			input_sync(atkbd->dev);
 			break;
