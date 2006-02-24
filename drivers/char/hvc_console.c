@@ -657,7 +657,7 @@ static int hvc_poll(struct hvc_struct *hp)
 
 	if (read_total)
 		tty_flip_buffer_push(tty);
-
+	
 	return poll_mask;
 }
 

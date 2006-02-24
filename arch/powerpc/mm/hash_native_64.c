@@ -403,8 +403,9 @@ static void native_hpte_clear(void)
 		 */
 		hpte_v = hptep->v;
 
-		/* tlbie() takes the native_tlbie_lock. hence change the
-		 * tlbie() call here to __tlbie()
+		/*
+		 * Call __tlbie() here rather than tlbie() since we
+		 * already hold the native_tlbie_lock.
 		 */
 		if (hpte_v & HPTE_V_VALID) {
 			hptep->v = 0;
