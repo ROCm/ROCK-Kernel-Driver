@@ -586,7 +586,6 @@ void __cpuinit cpu_gdt_init(struct Xgt_desc_struct *gdt_descr)
 	}
 	if (HYPERVISOR_set_gdt(frames, gdt_descr->size / 8))
 		BUG();
-	lgdt_finish();
 }
 
 /*

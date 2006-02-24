@@ -510,13 +510,7 @@ retint_restore_args:
 	jnz restore_all_enable_events	# != 0 => reenable event delivery      
         XEN_PUT_VCPU_INFO(%rsi)
 		
-	RESTORE_ARGS 0,8,0						
-	testb $3,8(%rsp)                # check CS
-	jnz  user_mode
-kernel_mode:
-        orb   $3,1*8(%rsp)
-	iretq
-user_mode:
+	RESTORE_ARGS 0,8,0
 	HYPERVISOR_IRET 0
 	
 	/* edi: workmask, edx: work */
@@ -826,11 +820,6 @@ scrit:	/**** START OF CRITICAL REGION ****/
 	jnz  14f			# process more events if necessary...
 	XEN_PUT_VCPU_INFO(%rsi)
         RESTORE_ARGS 0,8,0
-        testb $3,8(%rsp)                # check CS
-        jnz  crit_user_mode
-        orb   $3,1*8(%rsp)
-        iretq
-crit_user_mode:
         HYPERVISOR_IRET 0
         
 14:	XEN_LOCKED_BLOCK_EVENTS(%rsi)

@@ -76,19 +76,6 @@ L6:
 	jmp L6			# main should never return here, but
 				# just in case, we know what happens.
 
-ENTRY(lgdt_finish)
-	movl $(__KERNEL_DS),%eax	# reload all the segment registers
-	movw %ax,%ss			# after changing gdt.
-
-	movl $(__USER_DS),%eax		# DS/ES contains default USER segment
-	movw %ax,%ds
-	movw %ax,%es
-
-	popl %eax			# reload CS by intersegment return
-	pushl $(__KERNEL_CS)
-	pushl %eax
-	lret
-
 #ifndef CONFIG_XEN
 ready:	.byte 0
 #endif
@@ -130,17 +117,10 @@ ENTRY(cpu_gdt_table)
 	.quad 0x0000000000000000	/* 0x53 reserved */
 	.quad 0x0000000000000000	/* 0x5b reserved */
 
-#ifdef CONFIG_X86_PAE
-	.quad 0x00cfbb00000067ff	/* 0x60 kernel 4GB code at 0x00000000 */
-	.quad 0x00cfb300000067ff	/* 0x68 kernel 4GB data at 0x00000000 */
-	.quad 0x00cffb00000067ff	/* 0x73 user 4GB code at 0x00000000 */
-	.quad 0x00cff300000067ff	/* 0x7b user 4GB data at 0x00000000 */
-#else
-	.quad 0x00cfbb000000c3ff	/* 0x60 kernel 4GB code at 0x00000000 */
-	.quad 0x00cfb3000000c3ff	/* 0x68 kernel 4GB data at 0x00000000 */
-	.quad 0x00cffb000000c3ff	/* 0x73 user 4GB code at 0x00000000 */
-	.quad 0x00cff3000000c3ff	/* 0x7b user 4GB data at 0x00000000 */
-#endif
+	.quad 0x00cfbb000000ffff	/* 0x60 kernel 4GB code at 0x00000000 */
+	.quad 0x00cfb3000000ffff	/* 0x68 kernel 4GB data at 0x00000000 */
+	.quad 0x00cffb000000ffff	/* 0x73 user 4GB code at 0x00000000 */
+	.quad 0x00cff3000000ffff	/* 0x7b user 4GB data at 0x00000000 */
 
 	.quad 0x0000000000000000	/* 0x80 TSS descriptor */
 	.quad 0x0000000000000000	/* 0x88 LDT descriptor */
@@ -210,6 +190,9 @@ ENTRY(_stext)
 	.ascii	",XEN_VER=xen-3.0"
 	.ascii	",VIRT_BASE=0x"; utoh __PAGE_OFFSET
 	.ascii	",HYPERCALL_PAGE=0x"; utoh ((__PHYSICAL_START+HYPERCALL_PAGE_OFFSET)>>PAGE_SHIFT)
+	.ascii  ",FEATURES=writable_page_tables"
+	.ascii	         "|writable_descriptor_tables"
+	.ascii	         "|auto_translated_physmap"
 #ifdef CONFIG_X86_PAE
 	.ascii	",PAE=yes"
 #else

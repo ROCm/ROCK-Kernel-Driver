@@ -13,6 +13,7 @@
 #include <asm/fixmap.h>
 #include <asm/processor.h>
 #include <asm/thread_info.h>
+#include <asm/elf.h>
 
 #define DEFINE(sym, val) \
         asm volatile("\n->" #sym " %0 " #val : : "i" (val))
@@ -70,5 +71,9 @@ void foo(void)
 #endif
 
 	DEFINE(PAGE_SIZE_asm, PAGE_SIZE);
+#ifndef CONFIG_XEN
 	DEFINE(VSYSCALL_BASE, __fix_to_virt(FIX_VSYSCALL));
+#else
+	DEFINE(VSYSCALL_BASE, VSYSCALL_BASE);
+#endif
 }
