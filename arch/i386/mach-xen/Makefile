@@ -4,4 +4,4 @@
 
 obj-y				:= setup.o topology.o
   
-topology-y			:= ../mach-default/topology.o
+topology-y			:= ../kernel/topology.o
