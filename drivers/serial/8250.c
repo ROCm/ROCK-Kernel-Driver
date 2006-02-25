@@ -2456,6 +2456,12 @@ static struct uart_driver serial8250_reg = {
 	.cons			= SERIAL8250_CONSOLE,
 };
 
+/*
+ * early_serial_setup - early registration for 8250 ports
+ *
+ * Setup an 8250 port structure prior to console initialisation.  Use
+ * after console initialisation will cause undefined behaviour.
+ */
 int __init early_serial_setup(struct uart_port *port)
 {
 	if (port->line >= ARRAY_SIZE(serial8250_ports))
