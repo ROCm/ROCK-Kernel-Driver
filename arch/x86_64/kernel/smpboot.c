@@ -1176,8 +1176,6 @@ void __init smp_cpus_done(unsigned int max_cpus)
 	setup_ioapic_dest();
 #endif
 
-	time_init_gtod();
-
 	check_nmi_watchdog();
 }
 
@@ -1268,7 +1266,7 @@ void __cpu_die(unsigned int cpu)
  	printk(KERN_ERR "CPU %u didn't die...\n", cpu);
 }
 
-static __init int setup_additional_cpus(char *s)
+__init int setup_additional_cpus(char *s)
 {
 	return get_option(&s, &additional_cpus);
 }

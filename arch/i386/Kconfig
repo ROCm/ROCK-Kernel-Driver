@@ -224,7 +224,7 @@ config SMP_ALTERNATIVES
 	  when running on an true SMP host.
 
           If unsure, say N.
-	  
+
 config NR_CPUS
 	int "Maximum number of CPUs (2-255)"
 	range 2 255

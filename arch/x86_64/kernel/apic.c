@@ -980,7 +980,6 @@ __cpuinit int oem_force_hpet_timer(void)
 {
 	int i, clusters, zeros;
 	unsigned id;
-	char *vendor;
 	DECLARE_BITMAP(clustermap, NUM_APIC_CLUSTERS);
 
 	/* Only do this check on IBM machines - big Unisys systems
