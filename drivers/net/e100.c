@@ -2498,8 +2498,11 @@ static struct ethtool_ops e100_ethtool_ops = {
 	.set_eeprom		= e100_set_eeprom,
 	.get_ringparam		= e100_get_ringparam,
 	.set_ringparam		= e100_set_ringparam,
+#if 0
+	/* https://bugzilla.novell.com/show_bug.cgi?id=153095 */
 	.self_test_count	= e100_diag_test_count,
 	.self_test		= e100_diag_test,
+#endif
 	.get_strings		= e100_get_strings,
 	.phys_id		= e100_phys_id,
 	.get_stats_count	= e100_get_stats_count,
