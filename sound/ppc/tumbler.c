@@ -191,7 +191,8 @@ static int check_audio_gpio(struct pmac_gpio *gp)
 
 	ret = do_gpio_read(gp);
 
-	return (ret & 0xd) == (gp->active_val & 0xd);
+	printk("%s addr %x ret %x av %x\n",__FUNCTION__,gp->addr,ret,gp->active_val);
+	return (ret & 0x1) == (gp->active_val & 0x1);
 }
 
 static int read_audio_gpio(struct pmac_gpio *gp)
@@ -199,7 +200,9 @@ static int read_audio_gpio(struct pmac_gpio *gp)
 	int ret;
 	if (! gp->addr)
 		return 0;
-	ret = ((do_gpio_read(gp) & 0x02) !=0);
+	ret = do_gpio_read(gp);
+	printk("%s addr %x ret %x av %x\n",__FUNCTION__,gp->addr,ret,gp->active_val);
+	ret = (ret & 0x02) !=0;
 	return ret == gp->active_state;
 }
 
@@ -958,7 +961,7 @@ static void device_change_handler(void *self)
 	headphone = tumbler_detect_headphone(chip);
 	lineout = tumbler_detect_lineout(chip);
 
-	DBG("headphone: %d, lineout: %d\n", headphone, lineout);
+	printk("headphone: %d, lineout: %d\n", headphone, lineout);
 
 	if (headphone || lineout) {
 		/* unmute headphone/lineout & mute speaker */
