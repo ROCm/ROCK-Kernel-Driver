@@ -186,15 +186,21 @@ static void ahci_scr_write (struct ata_port *ap, unsigned int sc_reg, u32 val);
 static int ahci_init_one (struct pci_dev *pdev, const struct pci_device_id *ent);
 static int ahci_qc_issue(struct ata_queued_cmd *qc);
 static irqreturn_t ahci_interrupt (int irq, void *dev_instance, struct pt_regs *regs);
+static void ahci_start_engine(struct ata_port *ap);
+static int ahci_stop_engine(struct ata_port *ap);
 static void ahci_phy_reset(struct ata_port *ap);
 static void ahci_irq_clear(struct ata_port *ap);
 static void ahci_eng_timeout(struct ata_port *ap);
 static int ahci_port_start(struct ata_port *ap);
+static void ahci_port_suspend(struct ata_port *ap);
+static void ahci_port_resume(struct ata_port *ap);
 static void ahci_port_stop(struct ata_port *ap);
 static void ahci_tf_read(struct ata_port *ap, struct ata_taskfile *tf);
 static void ahci_qc_prep(struct ata_queued_cmd *qc);
 static u8 ahci_check_status(struct ata_port *ap);
 static inline int ahci_host_intr(struct ata_port *ap, struct ata_queued_cmd *qc);
+static int ahci_scsi_device_suspend(struct scsi_device *sdev);
+static int ahci_scsi_device_resume(struct scsi_device *sdev);
 static void ahci_remove_one (struct pci_dev *pdev);
 
 static struct scsi_host_template ahci_sht = {
@@ -214,8 +220,8 @@ static struct scsi_host_template ahci_sht = {
 	.dma_boundary		= AHCI_DMA_BOUNDARY,
 	.slave_configure	= ata_scsi_slave_config,
 	.bios_param		= ata_std_bios_param,
-	.resume			= ata_scsi_device_resume,
-	.suspend		= ata_scsi_device_suspend,
+	.resume			= ahci_scsi_device_resume,
+	.suspend		= ahci_scsi_device_suspend,
 };
 
 static const struct ata_port_operations ahci_ops = {
@@ -376,6 +382,22 @@ static int ahci_port_start(struct ata_port *ap)
 
 	ap->private_data = pp;
 
+	/*
+	 * Internal structures are initialized,
+	 * we can now do a simple resume()
+	 */
+	ahci_port_resume(ap);
+
+	return 0;
+}
+
+static void ahci_port_resume(struct ata_port *ap)
+{
+	void *mmio = ap->host_set->mmio_base;
+	void *port_mmio = ahci_port_base(mmio, ap->port_no);
+	struct ahci_host_priv *hpriv = ap->host_set->private_data;
+	struct ahci_port_priv *pp = ap->private_data;
+
 	if (hpriv->cap & HOST_CAP_64)
 		writel((pp->cmd_slot_dma >> 16) >> 16, port_mmio + PORT_LST_ADDR_HI);
 	writel(pp->cmd_slot_dma & 0xffffffff, port_mmio + PORT_LST_ADDR);
@@ -387,13 +409,42 @@ static int ahci_port_start(struct ata_port *ap)
 	readl(port_mmio + PORT_FIS_ADDR); /* flush */
 
 	writel(PORT_CMD_ICC_ACTIVE | PORT_CMD_FIS_RX |
-	       PORT_CMD_POWER_ON | PORT_CMD_SPIN_UP |
-	       PORT_CMD_START, port_mmio + PORT_CMD);
+	       PORT_CMD_POWER_ON | PORT_CMD_SPIN_UP,
+	       port_mmio + PORT_CMD);
 	readl(port_mmio + PORT_CMD); /* flush */
 
-	return 0;
+	ahci_start_engine(ap);
 }
 
+static void ahci_port_suspend(struct ata_port *ap)
+{
+	void *mmio = ap->host_set->mmio_base;
+	void *port_mmio = ahci_port_base(mmio, ap->port_no);
+	u32 tmp;
+	int work;
+
+	ahci_stop_engine(ap);
+
+	/*
+	 * Disable FIS reception
+	 */
+	tmp = readl(port_mmio + PORT_CMD);
+	tmp &= ~(PORT_CMD_FIS_RX);
+	writel(tmp, port_mmio + PORT_CMD);
+	readl(port_mmio + PORT_CMD); /* flush */
+
+	/*
+	 * Wait for HBA to acknowledge.
+	 * This could be as long as 500 msec
+	 */
+	work = 1000;
+	while (work-- > 0) {
+		tmp = readl(port_mmio + PORT_CMD);
+		if ((tmp & PORT_CMD_FIS_ON) == 0)
+			break;
+		udelay(10);
+	}
+}
 
 static void ahci_port_stop(struct ata_port *ap)
 {
@@ -403,15 +454,7 @@ static void ahci_port_stop(struct ata_port *ap)
 	void __iomem *port_mmio = ahci_port_base(mmio, ap->port_no);
 	u32 tmp;
 
-	tmp = readl(port_mmio + PORT_CMD);
-	tmp &= ~(PORT_CMD_START | PORT_CMD_FIS_RX);
-	writel(tmp, port_mmio + PORT_CMD);
-	readl(port_mmio + PORT_CMD); /* flush */
-
-	/* spec says 500 msecs for each PORT_CMD_{START,FIS_RX} bit, so
-	 * this is slightly incorrect.
-	 */
-	msleep(500);
+	ahci_port_suspend(ap);
 
 	ap->private_data = NULL;
 	dma_free_coherent(dev, AHCI_PORT_PRIV_DMA_SZ,
@@ -461,10 +504,18 @@ static void ahci_phy_reset(struct ata_port *ap)
 	struct ata_device *dev = &ap->device[0];
 	u32 new_tmp, tmp;
 
+	ahci_stop_engine(ap);
+
 	__sata_phy_reset(ap);
+
+	/* clear SATA phy error, if any */
+	tmp = readl(port_mmio + PORT_SCR_ERR);
+	writel(tmp, port_mmio + PORT_SCR_ERR);
 
 	if (ap->flags & ATA_FLAG_PORT_DISABLED)
 		return;
+
+	ahci_start_engine(ap);
 
 	tmp = readl(port_mmio + PORT_SIG);
 	tf.lbah		= (tmp >> 24)	& 0xff;
@@ -575,6 +626,65 @@ static void ahci_qc_prep(struct ata_queued_cmd *qc)
 	pp->cmd_slot[0].opts |= cpu_to_le32(n_elem << 16);
 }
 
+static void ahci_start_engine(struct ata_port *ap)
+{
+	void __iomem *mmio = ap->host_set->mmio_base;
+	void __iomem *port_mmio = ahci_port_base(mmio, ap->port_no);
+	u32 tmp;
+	int work;
+
+	tmp = readl(port_mmio + PORT_CMD);
+	/*
+	 * AHCI rev 1.1 section 10.3.1:
+	 * Software shall not set PxCMD.ST to ‘1’ until it verifies
+	 * that PxCMD.CR is ‘0’ and has set PxCMD.FRE to ‘1’.
+	 */
+	if ((tmp & PORT_CMD_FIS_RX) == 0)
+		printk(KERN_WARNING "ata%d: dma not running\n",ap->id);
+	/* 
+	 * wait for engine to become idle.
+	 */
+	work = 1000;
+	while (work-- > 0) {
+		tmp = readl(port_mmio + PORT_CMD);
+		if ((tmp & PORT_CMD_LIST_ON) == 0)
+			break;
+		udelay(10);
+	}
+	
+	/*
+	 * Start DMA
+	 */
+	tmp |= PORT_CMD_START;
+	writel(tmp, port_mmio + PORT_CMD);
+	readl(port_mmio + PORT_CMD); /* flush */
+}
+
+static int ahci_stop_engine(struct ata_port *ap)
+{
+	void __iomem *mmio = ap->host_set->mmio_base;
+	void __iomem *port_mmio = ahci_port_base(mmio, ap->port_no);
+	int work;
+	u32 tmp;
+
+	tmp = readl(port_mmio + PORT_CMD);
+	tmp &= ~PORT_CMD_START;
+	writel(tmp, port_mmio + PORT_CMD);
+
+	/* 
+	 * wait for engine to become idle
+	 */
+	work = 1000;
+	while (work-- > 0) {
+		tmp = readl(port_mmio + PORT_CMD);
+		if ((tmp & PORT_CMD_LIST_ON) == 0)
+			return 0;
+		udelay(10);
+	}
+
+	return -EIO;
+}
+
 static void ahci_restart_port(struct ata_port *ap, u32 irq_stat)
 {
 	void __iomem *mmio = ap->host_set->mmio_base;
@@ -596,20 +706,7 @@ static void ahci_restart_port(struct ata_port *ap, u32 irq_stat)
 			readl(port_mmio + PORT_SCR_ERR));
 
 	/* stop DMA */
-	tmp = readl(port_mmio + PORT_CMD);
-	tmp &= ~PORT_CMD_START;
-	writel(tmp, port_mmio + PORT_CMD);
-
-	/* wait for engine to stop.  TODO: this could be
-	 * as long as 500 msec
-	 */
-	work = 1000;
-	while (work-- > 0) {
-		tmp = readl(port_mmio + PORT_CMD);
-		if ((tmp & PORT_CMD_LIST_ON) == 0)
-			break;
-		udelay(10);
-	}
+	ahci_stop_engine(ap);
 
 	/* clear SATA phy error, if any */
 	tmp = readl(port_mmio + PORT_SCR_ERR);
@@ -628,10 +725,7 @@ static void ahci_restart_port(struct ata_port *ap, u32 irq_stat)
 	}
 
 	/* re-start DMA */
-	tmp = readl(port_mmio + PORT_CMD);
-	tmp |= PORT_CMD_START;
-	writel(tmp, port_mmio + PORT_CMD);
-	readl(port_mmio + PORT_CMD); /* flush */
+	ahci_start_engine(ap);
 }
 
 static void ahci_eng_timeout(struct ata_port *ap)
@@ -789,6 +883,30 @@ static int ahci_qc_issue(struct ata_queued_cmd *qc)
 	readl(port_mmio + PORT_CMD_ISSUE);	/* flush */
 
 	return 0;
+}
+
+int ahci_scsi_device_suspend(struct scsi_device *sdev)
+{
+	struct ata_port *ap = (struct ata_port *) &sdev->host->hostdata[0];
+	struct ata_device *dev = &ap->device[sdev->id];
+	int rc;
+
+	rc = ata_device_suspend(ap, dev);
+
+	if (!rc)
+		ahci_port_suspend(ap);
+
+	return rc;
+}
+
+int ahci_scsi_device_resume(struct scsi_device *sdev)
+{
+	struct ata_port *ap = (struct ata_port *) &sdev->host->hostdata[0];
+	struct ata_device *dev = &ap->device[sdev->id];
+
+	ahci_port_resume(ap);
+
+	return ata_device_resume(ap, dev);
 }
 
 static void ahci_setup_port(struct ata_ioports *port, unsigned long base,
