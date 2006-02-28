@@ -372,12 +372,10 @@ acpi_ut_update_ref_count(union acpi_operand_object *object, u32 action)
 	 * (A deleted object will have a huge reference count)
 	 */
 	if (count > ACPI_MAX_REFERENCE_COUNT) {
-
-		ACPI_WARNING((AE_INFO,
-			      "Large Reference Count (%X) in object %p",
-			      count, object));
+		ACPI_DEBUG_PRINT((ACPI_DB_WARN,
+				  "Large Reference Count (%X) in object %p",
+				  count, object));
 	}
-
 	return;
 }
 
