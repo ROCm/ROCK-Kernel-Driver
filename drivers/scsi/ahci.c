@@ -44,6 +44,7 @@
 #include <linux/device.h>
 #include <scsi/scsi_host.h>
 #include <scsi/scsi_cmnd.h>
+#include <scsi/scsi_device.h>
 #include <linux/libata.h>
 #include <asm/io.h>
 
@@ -325,10 +326,7 @@ static inline void __iomem *ahci_port_base (void __iomem *base, unsigned int por
 static int ahci_port_start(struct ata_port *ap)
 {
 	struct device *dev = ap->host_set->dev;
-	struct ahci_host_priv *hpriv = ap->host_set->private_data;
 	struct ahci_port_priv *pp;
-	void __iomem *mmio = ap->host_set->mmio_base;
-	void __iomem *port_mmio = ahci_port_base(mmio, ap->port_no);
 	void *mem;
 	dma_addr_t mem_dma;
 	int rc;
@@ -450,9 +448,6 @@ static void ahci_port_stop(struct ata_port *ap)
 {
 	struct device *dev = ap->host_set->dev;
 	struct ahci_port_priv *pp = ap->private_data;
-	void __iomem *mmio = ap->host_set->mmio_base;
-	void __iomem *port_mmio = ahci_port_base(mmio, ap->port_no);
-	u32 tmp;
 
 	ahci_port_suspend(ap);
 
