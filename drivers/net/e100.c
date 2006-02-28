@@ -2159,6 +2159,9 @@ static int e100_loopback_test(struct nic *nic, enum loopback loopback_mode)
 
 	msleep(10);
 
+	pci_dma_sync_single_for_cpu(nic->pdev, nic->rx_to_clean->dma_addr,
+			RFD_BUF_LEN, PCI_DMA_FROMDEVICE);
+
 	if(memcmp(nic->rx_to_clean->skb->data + sizeof(struct rfd),
 	   skb->data, ETH_DATA_LEN))
 		err = -EAGAIN;
@@ -2166,8 +2169,9 @@ static int e100_loopback_test(struct nic *nic, enum loopback loopback_mode)
 err_loopback_none:
 	mdio_write(nic->netdev, nic->mii.phy_id, MII_BMCR, 0);
 	nic->loopback = lb_none;
-	e100_hw_init(nic);
 	e100_clean_cbs(nic);
+	e100_alloc_cbs(nic);
+	e100_hw_init(nic);
 err_clean_rx:
 	e100_rx_clean_list(nic);
 	return err;
@@ -2498,11 +2502,8 @@ static struct ethtool_ops e100_ethtool_ops = {
 	.set_eeprom		= e100_set_eeprom,
 	.get_ringparam		= e100_get_ringparam,
 	.set_ringparam		= e100_set_ringparam,
-#if 0
-	/* https://bugzilla.novell.com/show_bug.cgi?id=153095 */
 	.self_test_count	= e100_diag_test_count,
 	.self_test		= e100_diag_test,
-#endif
 	.get_strings		= e100_get_strings,
 	.phys_id		= e100_phys_id,
 	.get_stats_count	= e100_get_stats_count,
