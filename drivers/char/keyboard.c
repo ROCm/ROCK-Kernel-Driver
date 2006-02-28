@@ -34,6 +34,7 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 
+#include <linux/consolemap.h>
 #include <linux/kbd_kern.h>
 #include <linux/kbd_diacr.h>
 #include <linux/vt_kern.h>
@@ -332,10 +333,9 @@ static void applkey(struct vc_data *vc, int key, char mode)
  * Many other routines do put_queue, but I think either
  * they produce ASCII, or they produce some user-assigned
  * string, and in both cases we might assume that it is
- * in utf-8 already. UTF-8 is defined for words of up to 31 bits,
- * but we need only 16 bits here
+ * in utf-8 already.
  */
-static void to_utf8(struct vc_data *vc, ushort c)
+static void to_utf8(struct vc_data *vc, uint c)
 {
 	if (c < 0x80)
 		/*  0******* */
@@ -344,12 +344,31 @@ static void to_utf8(struct vc_data *vc, ushort c)
 		/* 110***** 10****** */
 		put_queue(vc, 0xc0 | (c >> 6));
 		put_queue(vc, 0x80 | (c & 0x3f));
-	} else {
+    	} else if (c < 0x10000) {
+	       	if (c >= 0xD800 && c < 0xE000)
+			return;
+		if (c == 0xFFFF)
+			return;
 		/* 1110**** 10****** 10****** */
 		put_queue(vc, 0xe0 | (c >> 12));
 		put_queue(vc, 0x80 | ((c >> 6) & 0x3f));
 		put_queue(vc, 0x80 | (c & 0x3f));
+    	} else if (c < 0x110000) {
+		/* 11110*** 10****** 10****** 10****** */
+		put_queue(vc, 0xf0 | (c >> 18));
+		put_queue(vc, 0x80 | ((c >> 12) & 0x3f));
+		put_queue(vc, 0x80 | ((c >> 6) & 0x3f));
+		put_queue(vc, 0x80 | (c & 0x3f));
 	}
+}
+
+static void put_8bit(struct vc_data *vc, u8 c)
+{
+	if (kbd->kbdmode != VC_UNICODE || c < 32 || c == 127) 
+		/* Don't translate control chars */
+		put_queue(vc, c);
+	else
+		to_utf8(vc, conv_8bit_to_uni(c));
 }
 
 /*
@@ -412,7 +431,7 @@ static unsigned char handle_diacr(struct vc_data *vc, unsigned char ch)
 	if (ch == ' ' || ch == d)
 		return d;
 
-	put_queue(vc, d);
+	put_8bit(vc, d);
 	return ch;
 }
 
@@ -422,7 +441,7 @@ static unsigned char handle_diacr(struct vc_data *vc, unsigned char ch)
 static void fn_enter(struct vc_data *vc, struct pt_regs *regs)
 {
 	if (diacr) {
-		put_queue(vc, diacr);
+		put_8bit(vc, diacr);
 		diacr = 0;
 	}
 	put_queue(vc, 13);
@@ -631,7 +650,7 @@ static void k_self(struct vc_data *vc, unsigned char value, char up_flag, struct
 		diacr = value;
 		return;
 	}
-	put_queue(vc, value);
+	put_8bit(vc, value);
 }
 
 /*
@@ -777,7 +796,7 @@ static void k_shift(struct vc_data *vc, unsigned char value, char up_flag, struc
 	/* kludge */
 	if (up_flag && shift_state != old_state && npadch != -1) {
 		if (kbd->kbdmode == VC_UNICODE)
-			to_utf8(vc, npadch & 0xffff);
+			to_utf8(vc, npadch);
 		else
 			put_queue(vc, npadch & 0xff);
 		npadch = -1;
