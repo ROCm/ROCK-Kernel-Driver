@@ -147,11 +147,12 @@ enum
 	KERN_SETUID_DUMPABLE=69, /* int: behaviour of dumps for setuid core */
 	KERN_SPIN_RETRY=70,	/* int: number of spinlock retries */
 	KERN_ACPI_VIDEO_FLAGS=71, /* int: flags for setting up video after ACPI sleep */
-	KERN_UNSUPPORTED=72,	/* int: allow loading of unsupported modules */
-	KERN_KDB=73,		/* int: kdb on/off */
-	KERN_DUMP=74,		/* directory: dump parameters */
-	KERN_DELAYACCT=75,	/* int: Per-task delay accounting on/off */
-	KERN_SCHEDSTATS=76,	/* int: Schedstats on/off */
+	KERN_IA64_UNALIGNED=72, /* int: ia64 unaligned userland trap enable */
+	KERN_UNSUPPORTED=73,	/* int: allow loading of unsupported modules */
+	KERN_KDB=74,		/* int: kdb on/off */
+	KERN_DUMP=75,		/* directory: dump parameters */
+	KERN_DELAYACCT=76,	/* int: Per-task delay accounting on/off */
+	KERN_SCHEDSTATS=77,	/* int: Schedstats on/off */
 };
 
 
