@@ -911,7 +911,7 @@ typedef int (proc_writefunc) (struct file * file, const char __user * buffer,
 			      unsigned long count, void *data);
 
 static int
-__init asus_proc_add(char *name, proc_writefunc * writefunc,
+asus_proc_add(char *name, proc_writefunc * writefunc,
 		     proc_readfunc * readfunc, mode_t mode,
 		     struct acpi_device *device)
 {
@@ -930,7 +930,7 @@ __init asus_proc_add(char *name, proc_writefunc * writefunc,
 	return 0;
 }
 
-static int __init asus_hotk_add_fs(struct acpi_device *device)
+static int asus_hotk_add_fs(struct acpi_device *device)
 {
 	struct proc_dir_entry *proc;
 	mode_t mode;
@@ -1123,7 +1123,7 @@ static int __init asus_model_match(char *model)
  * This function is used to initialize the hotk with right values. In this
  * method, we can make all the detection we want, and modify the hotk struct
  */
-static int __init asus_hotk_get_info(void)
+static int asus_hotk_get_info(void)
 {
 	struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
 	struct acpi_buffer dsdt = { ACPI_ALLOCATE_BUFFER, NULL };
@@ -1230,7 +1230,7 @@ static int __init asus_hotk_get_info(void)
 	return AE_OK;
 }
 
-static int __init asus_hotk_check(void)
+static int asus_hotk_check(void)
 {
 	int result = 0;
 
@@ -1248,7 +1248,7 @@ static int __init asus_hotk_check(void)
 	return result;
 }
 
-static int __init asus_hotk_add(struct acpi_device *device)
+static int asus_hotk_add(struct acpi_device *device)
 {
 	acpi_status status = AE_OK;
 	int result;

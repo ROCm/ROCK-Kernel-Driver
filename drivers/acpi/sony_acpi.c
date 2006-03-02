@@ -258,7 +258,7 @@ static acpi_status sony_walk_callback(acpi_handle handle, u32 level,
 	return AE_OK;
 }
 
-static int __init sony_acpi_add(struct acpi_device *device)
+static int sony_acpi_add(struct acpi_device *device)
 {
 	acpi_status status;
 	int result;
@@ -340,7 +340,7 @@ outwalk:
 }
 
 
-static int __exit sony_acpi_remove(struct acpi_device *device, int type)
+static int sony_acpi_remove(struct acpi_device *device, int type)
 {
 	acpi_status status;
 	struct sony_acpi_value *item;

@@ -104,7 +104,7 @@
 
 /* Max reference count (for debug only) */
 
-#define ACPI_MAX_REFERENCE_COUNT        0x400
+#define ACPI_MAX_REFERENCE_COUNT        0x800
 
 /* Size of cached memory mapping for system memory operation region */
 
