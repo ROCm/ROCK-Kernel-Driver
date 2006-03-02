@@ -139,6 +139,8 @@ void switch_ipi_to_APIC_timer(void *cpumask);
 #define ARCH_APICTIMER_STOPS_ON_C3	1
 #endif
 
+extern int timer_over_8254;
+
 extern void dmi_check_apic(void);
 
 #else /* !CONFIG_X86_LOCAL_APIC */
