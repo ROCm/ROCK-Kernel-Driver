@@ -318,7 +318,8 @@ static int nfs_commit_write(struct file *file, struct page *page, unsigned offse
 
 static int nfs_invalidate_page(struct page *page, unsigned long offset)
 {
-	BUG_ON(PagePrivate(page));
+	if (offset==0)
+		BUG_ON(PagePrivate(page));
 	return 1;
 }
 
