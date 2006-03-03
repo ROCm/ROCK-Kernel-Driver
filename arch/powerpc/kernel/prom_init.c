@@ -422,7 +422,8 @@ static int __init prom_next_node(phandle *nodep)
 	}
 }
 
-static int inline prom_getprop(phandle node, const char *pname,
+/* do not mark as inline to work around gcc bug #26549 */
+static int __init prom_getprop(phandle node, const char *pname,
 			       void *value, size_t valuelen)
 {
 	return call_prom("getprop", 4, 1, node, ADDR(pname),
@@ -434,7 +435,7 @@ static int inline prom_getproplen(phandle node, const char *pname)
 	return call_prom("getproplen", 2, 1, node, ADDR(pname));
 }
 
-static void add_string(char **str, const char *q)
+static void __init add_string(char **str, const char *q)
 {
 	char *p = *str;
 
@@ -444,7 +445,7 @@ static void add_string(char **str, const char *q)
 	*str = p;
 }
 
-static char *tohex(unsigned int x)
+static char __init *tohex(unsigned int x)
 {
 	static char digits[] = "0123456789abcdef";
 	static char result[9];
@@ -491,7 +492,7 @@ static int __init prom_setprop(phandle node, const char *nodename,
 #define islower(c)	('a' <= (c) && (c) <= 'z')
 #define toupper(c)	(islower(c) ? ((c) - 'a' + 'A') : (c))
 
-unsigned long prom_strtoul(const char *cp, const char **endp)
+static unsigned long __init prom_strtoul(const char *cp, const char **endp)
 {
 	unsigned long result = 0, base = 10, value;
 
@@ -516,7 +517,7 @@ unsigned long prom_strtoul(const char *cp, const char **endp)
 	return result;
 }
 
-unsigned long prom_memparse(const char *ptr, const char **retptr)
+static unsigned long __init prom_memparse(const char *ptr, const char **retptr)
 {
 	unsigned long ret = prom_strtoul(ptr, retptr);
 	int shift = 0;
@@ -658,7 +659,7 @@ static struct fake_elf {
 			u32	ignore_me;
 		} rpadesc;
 	} rpanote;
-} fake_elf = {
+} fake_elf __initdata = {
 	.elfhdr = {
 		.e_ident = { 0x7f, 'E', 'L', 'F',
 			     ELFCLASS32, ELFDATA2MSB, EV_CURRENT },
@@ -890,7 +891,7 @@ static unsigned long __init prom_next_cell(int s, cell_t **cellp)
  * If problems seem to show up, it would be a good start to track
  * them down.
  */
-static void reserve_mem(u64 base, u64 size)
+static void __init reserve_mem(u64 base, u64 size)
 {
 	u64 top = base + size;
 	unsigned long cnt = RELOC(mem_reserve_cnt);
