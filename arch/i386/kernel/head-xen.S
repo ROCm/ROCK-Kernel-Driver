@@ -76,33 +76,50 @@ L6:
 	jmp L6			# main should never return here, but
 				# just in case, we know what happens.
 
+#define HYPERCALL_PAGE_OFFSET 0x1000
+.org HYPERCALL_PAGE_OFFSET
+ENTRY(hypercall_page)
+.skip 0x1000
+
+/*
+ * Real beginning of normal "text" segment
+ */
+ENTRY(stext)
+ENTRY(_stext)
+
+/*
+ * BSS section
+ */
+.section ".bss.page_aligned","w"
+ENTRY(empty_zero_page)
+	.fill 4096,1,0
+
+/*
+ * This starts the data section.
+ */
+.data
+
 #ifndef CONFIG_XEN
 ready:	.byte 0
-#endif
+
+.globl idt_descr
+.globl cpu_gdt_descr
 
 	ALIGN
-
-#ifndef CONFIG_XEN
 	.word 0				# 32-bit align idt_desc.address
-.globl idt_descr
 idt_descr:
 	.word IDT_ENTRIES*8-1		# idt contains 256 entries
 	.long idt_table
-#endif
 
 # boot GDT descriptor (later on used by CPU#0):
 	.word 0				# 32 bit align gdt_desc.address
-.globl cpu_gdt_descr
 cpu_gdt_descr:
 	.word GDT_SIZE
 	.long cpu_gdt_table
 
 	.fill NR_CPUS-1,8,0		# space for the other GDT descriptors
+#endif
 
-.org 0x1000
-ENTRY(empty_zero_page)
-
-.org 0x2000
 ENTRY(cpu_gdt_table)
 	.quad 0x0000000000000000	/* NULL descriptor */
 	.quad 0x0000000000000000	/* 0x0b reserved */
@@ -117,10 +134,10 @@ ENTRY(cpu_gdt_table)
 	.quad 0x0000000000000000	/* 0x53 reserved */
 	.quad 0x0000000000000000	/* 0x5b reserved */
 
-	.quad 0x00cfbb000000ffff	/* 0x60 kernel 4GB code at 0x00000000 */
-	.quad 0x00cfb3000000ffff	/* 0x68 kernel 4GB data at 0x00000000 */
-	.quad 0x00cffb000000ffff	/* 0x73 user 4GB code at 0x00000000 */
-	.quad 0x00cff3000000ffff	/* 0x7b user 4GB data at 0x00000000 */
+	.quad 0x00cf9a000000ffff	/* 0x60 kernel 4GB code at 0x00000000 */
+	.quad 0x00cf92000000ffff	/* 0x68 kernel 4GB data at 0x00000000 */
+	.quad 0x00cffa000000ffff	/* 0x73 user 4GB code at 0x00000000 */
+	.quad 0x00cff2000000ffff	/* 0x7b user 4GB data at 0x00000000 */
 
 	.quad 0x0000000000000000	/* 0x80 TSS descriptor */
 	.quad 0x0000000000000000	/* 0x88 LDT descriptor */
@@ -144,30 +161,7 @@ ENTRY(cpu_gdt_table)
 	.quad 0x0000000000000000	/* 0xc0 APM CS 16 code (16 bit) */
 	.quad 0x0000000000000000	/* 0xc8 APM DS    data */
 
-	.quad 0x0000000000000000	/* 0xd0 - ESPFIX 16-bit SS */
-	.quad 0x0000000000000000	/* 0xd8 - unused */
-	.quad 0x0000000000000000	/* 0xe0 - unused */
-	.quad 0x0000000000000000	/* 0xe8 - unused */
-	.quad 0x0000000000000000	/* 0xf0 - unused */
-	.quad 0x0000000000000000	/* 0xf8 - GDT entry 31: double-fault TSS */
-
-	/* Be sure this is zeroed to avoid false validations in Xen */
-	.fill PAGE_SIZE_asm / 8 - GDT_ENTRIES,8,0
-
-.org 0x3000
-ENTRY(default_ldt)
-
-#define HYPERCALL_PAGE_OFFSET 0x4000
-.org HYPERCALL_PAGE_OFFSET
-ENTRY(hypercall_page)
-.skip 0x1000
-
-/*
- * Real beginning of normal "text" segment
- */
-ENTRY(stext)
-ENTRY(_stext)
-
+	.fill GDT_ENTRIES - (.-cpu_gdt_table) / 8,8,0
 
 /*
  * __xen_guest information
@@ -193,6 +187,7 @@ ENTRY(_stext)
 	.ascii  ",FEATURES=writable_page_tables"
 	.ascii	         "|writable_descriptor_tables"
 	.ascii	         "|auto_translated_physmap"
+	.ascii	         "|supervisor_mode_kernel"
 #ifdef CONFIG_X86_PAE
 	.ascii	",PAE=yes"
 #else
