@@ -16,6 +16,7 @@
 #include <linux/module.h>
 #include <linux/topology.h>
 #include <linux/bootmem.h>
+#include <linux/mm.h>
 #include <asm/proto.h>
 #include <asm/numa.h>
 #include <asm/e820.h>
@@ -214,8 +215,20 @@ acpi_numa_memory_affinity_init(struct acpi_table_memory_affinity *ma)
  	 * This code supports one contigious hot add area per node.
  	 * The signed cast is intentional to catch underflows.
  	 */
- 	if (ma->flags.hot_pluggable == 1 && !ignore_hotadd &&
-		(signed long)(end - start) > NODE_MIN_SIZE) {
+ 	if (ma->flags.hot_pluggable == 1 && !ignore_hotadd) {
+		unsigned long s_pfn = start >> PAGE_SHIFT;
+		unsigned long e_pfn = end >> PAGE_SHIFT;
+
+		/* Sorry guys - if you want working memory hotplug write correct SRATs */
+		if ((signed long)(end - start) < NODE_MIN_SIZE ||
+		    e820_hole_size(s_pfn, e_pfn) != e_pfn - s_pfn) { 
+			printk(KERN_ERR 
+	"SRAT: Hotplug area %lx-%lx too small or overlaps with real memory\n",
+				start, end);
+			bad_srat();
+			return;
+		}
+
  		found_add_area = 1;
  		if (nodes_add[node].start == nodes_add[node].end) {
  			nodes_add[node].start = start;
@@ -340,9 +353,13 @@ static int node_to_pxm(int n)
 void __init srat_reserve_add_area(int nodeid)
 {
 	if (found_add_area && nodes_add[nodeid].end) {
-		printk ("Reserving hot-add memory space node %d pages %08Lx to"
-			" %08Lx\n", nodeid, nodes_add[nodeid].start,
-			nodes_add[nodeid].end);
+		printk(KERN_INFO 
+	"SRAT: Reserving hot-add memory space for node %d at %Lx-%Lx\n", 
+			nodeid, nodes_add[nodeid].start, nodes_add[nodeid].end);
+		printk(KERN_INFO 
+	"SRAT: This will cost you %Lu MB of pre-allocated memory.\n", 
+		(((nodes_add[nodeid].end - 
+			nodes_add[nodeid].start)/PAGE_SIZE)*sizeof(struct page)) >> 20);
 
 		reserve_bootmem_node(NODE_DATA(nodeid), nodes_add[nodeid].start,
 			       nodes_add[nodeid].end - nodes_add[nodeid].start);
