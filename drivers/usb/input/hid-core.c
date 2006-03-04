@@ -931,8 +931,8 @@ static void hid_irq_in(struct urb *urb, struct pt_regs *regs)
 		case -ENOENT:
 		case -EPERM:
 		case -ESHUTDOWN:	/* unplug */
-		case -EILSEQ:		/* unplug timeout on uhci */
 			return;
+		case -EILSEQ:		/* CRC error or failed urbs before unplug */
 		case -ETIMEDOUT:	/* NAK */
 			break;
 		default:		/* error */
