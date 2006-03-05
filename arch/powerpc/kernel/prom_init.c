@@ -398,7 +398,9 @@ static void __init __attribute__((noreturn)) prom_panic(const char *reason)
 #endif
 	prom_print(reason);
 	/* ToDo: should put up an SRC here on p/iSeries */
-	call_prom("exit", 0, 0);
+	/* Do not call exit because it clears the screen on pmac
+	 * it also causes some sort of double-fault on early pmacs */
+	asm("trap\n");
 
 	for (;;)			/* should never get here */
 		;
