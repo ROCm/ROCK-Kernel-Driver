@@ -744,10 +744,6 @@ static int __init detect_init_APIC (void)
 	u32 h, l, features;
 #ifdef CONFIG_X86_APIC_OFF
 	/* Disabled by kernel option? */
-	if (enable_local_apic < 1)
-		return -1;
-#else
-	/* Disabled by kernel option? */
 	if (enable_local_apic < 0)
 		return -1;
 #endif
@@ -1352,8 +1348,8 @@ void __init dmi_check_apic(void)
 {
 	if (enable_local_apic != 0)
 		return;
-	enable_local_apic = dmi_enable_apic();
-	if (enable_local_apic == 0) {
+	if (!dmi_enable_apic()) {
+		enable_local_apic = -1;
 		printk(
 	KERN_INFO "APIC disabled because your old system seems to be old\n"); 
 		printk(KERN_INFO "overwrite with \"apic\"\n");
