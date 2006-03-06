@@ -103,6 +103,7 @@ struct rcu_data {
 	struct rcu_head **curtail;
 	struct rcu_head *donelist;
 	struct rcu_head **donetail;
+	int doneself;
 	int cpu;
 	struct rcu_head barrier;
 };
@@ -265,6 +266,8 @@ extern __deprecated_for_modules void synchronize_kernel(void);
 extern void synchronize_rcu(void);
 void synchronize_idle(void);
 extern void rcu_barrier(void);
+int rcu_set_remote_rcu(int cpu);
+void rcu_clear_remote_rcu(int cpu);
 
 #endif /* __KERNEL__ */
 #endif /* __LINUX_RCUPDATE_H */
