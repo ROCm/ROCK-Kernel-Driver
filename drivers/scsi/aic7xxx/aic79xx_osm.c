@@ -481,15 +481,12 @@ ahd_linux_target_alloc(struct scsi_target *starget)
 {
 	struct	ahd_softc *ahd =
 		*((struct ahd_softc **)dev_to_shost(&starget->dev)->hostdata);
-	unsigned long flags;
 	struct scsi_target **ahd_targp = ahd_linux_target_in_softc(starget);
 	struct ahd_linux_target *targ = scsi_transport_target_data(starget);
 	struct ahd_devinfo devinfo;
 	struct ahd_initiator_tinfo *tinfo;
 	struct ahd_tmode_tstate *tstate;
 	char channel = starget->channel + 'A';
-
-	ahd_lock(ahd, &flags);
 
 	BUG_ON(*ahd_targp != NULL);
 
@@ -512,7 +509,6 @@ ahd_linux_target_alloc(struct scsi_target *starget)
 			 AHD_TRANS_GOAL, /*paused*/FALSE);
 	ahd_set_width(ahd, &devinfo, MSG_EXT_WDTR_BUS_8_BIT,
 		      AHD_TRANS_GOAL, /*paused*/FALSE);
-	ahd_unlock(ahd, &flags);
 
 	return 0;
 }
@@ -1460,9 +1456,6 @@ ahd_linux_run_command(struct ahd_softc *ahd, struct ahd_linux_device *dev,
 	struct	 ahd_tmode_tstate *tstate;
 	u_int	 col_idx;
 	uint16_t mask;
-	unsigned long flags;
-
-	ahd_lock(ahd, &flags);
 
 	/*
 	 * Get an scb to use.
@@ -1478,7 +1471,6 @@ ahd_linux_run_command(struct ahd_softc *ahd, struct ahd_linux_device *dev,
 	}
 	if ((scb = ahd_get_scb(ahd, col_idx)) == NULL) {
 		ahd->flags |= AHD_RESOURCE_SHORTAGE;
-		ahd_unlock(ahd, &flags);
 		return SCSI_MLQUEUE_HOST_BUSY;
 	}
 
@@ -1603,8 +1595,6 @@ ahd_linux_run_command(struct ahd_softc *ahd, struct ahd_linux_device *dev,
 		dev->commands_since_idle_or_otag++;
 	scb->flags |= SCB_ACTIVE;
 	ahd_queue_scb(ahd, scb);
-
-	ahd_unlock(ahd, &flags);
 
 	return 0;
 }
