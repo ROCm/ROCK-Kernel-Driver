@@ -16,7 +16,6 @@
 #include <linux/fs.h>
 #include <linux/blkpg.h>
 
-#include <asm/delay.h>
 #include <asm/uaccess.h>
 
 /* This is ugly... */
@@ -100,21 +99,10 @@ int
 dasd_scan_partitions(struct dasd_device * device)
 {
 	struct block_device *bdev;
-	int i;
 
-	/* Make the disk known. */
-	set_capacity(device->gdp, device->blocks << device->s2b_shift);
-
-	for (i=0; i < 512; i++) {
-		bdev = bdget_disk(device->gdp, 0);
-		if (!bdev || blkdev_get(bdev, FMODE_READ, 1) < 0)
-			return -ENODEV;
-		if(bdev->bd_inode->i_size)
-			break;
-		blkdev_put(bdev);
-		udelay(1000);
-	}
-	
+	bdev = bdget_disk(device->gdp, 0);
+	if (!bdev || blkdev_get(bdev, FMODE_READ, 1) < 0)
+		return -ENODEV;
 	/*
 	 * See fs/partition/check.c:register_disk,rescan_partitions
 	 * Can't call rescan_partitions directly. Use ioctl.
