@@ -4038,6 +4038,8 @@ static inline void __cond_resched(void)
 	 */
 	if (unlikely(preempt_count()))
 		return;
+	if (unlikely(system_state != SYSTEM_RUNNING))
+		return;
 	do {
 		add_preempt_count(PREEMPT_ACTIVE);
 		schedule();
