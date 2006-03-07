@@ -379,8 +379,8 @@ acpi_pci_irq_derive(struct pci_dev *dev,
 	}
 
 	if (irq < 0) {
-		ACPI_WARNING((AE_INFO, "Unable to derive IRQ for device %s",
-			      pci_name(dev)));
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO,, "Unable to derive IRQ for device %s",
+				  pci_name(dev)));
 		return_VALUE(-1);
 	}
 
