@@ -95,6 +95,8 @@ static __init void bad_srat(void)
 	acpi_numa = -1;
 	for (i = 0; i < MAX_LOCAL_APIC; i++)
 		apicid_to_node[i] = NUMA_NO_NODE;
+	for (i = 0; i < MAX_NUMNODES; i++)
+		nodes_add[i].start = nodes[i].end = 0;
 }
 
 static __init inline int srat_disabled(void)
