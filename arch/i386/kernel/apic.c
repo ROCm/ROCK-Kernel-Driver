@@ -1355,7 +1355,7 @@ void __init dmi_check_apic(void)
 		printk(KERN_INFO "overwrite with \"apic\"\n");
 	} else {
 		printk(
-	KERN_INFO "APIC enabled because system is MP or new enough\n");
+	KERN_INFO "APIC allowed because system is MP or new enough\n");
 	}
 }
 #endif

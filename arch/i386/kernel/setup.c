@@ -866,7 +866,8 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 		else if (!memcmp(from, "noapic", 6))
 			disable_ioapic_setup();
  		/* SUSE specific option */
- 		else if (!memcmp(from, "apic", 4))
+ 		else if (!memcmp(from, "apic", 4) && 
+				(from[4] == ' ' || from[4] == '\0'))
  		        lapic_enable();
 #endif /* CONFIG_X86_IO_APIC */
 #endif /* CONFIG_ACPI */
