@@ -177,7 +177,7 @@ endif
 archprepare: maketools
 
 .PHONY: maketools FORCE
-maketools: include/linux/version.h include/asm-arm/.arch FORCE
+maketools: $(objtree)/include/linux/version.h include/asm-arm/.arch FORCE
 	$(Q)$(MAKE) $(build)=arch/arm/tools include/asm-arm/mach-types.h
 
 # Convert bzImage to zImage

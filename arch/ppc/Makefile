@@ -117,7 +117,7 @@ archclean:
 archprepare: checkbin
 
 # Temporary hack until we have migrated to asm-powerpc
-include/asm: arch/$(ARCH)/include/asm
+$(objtree)/include/asm: arch/$(ARCH)/include/asm
 arch/$(ARCH)/include/asm:
 	$(Q)if [ ! -d arch/$(ARCH)/include ]; then mkdir -p arch/$(ARCH)/include; fi
 	$(Q)ln -fsn $(srctree)/include/asm-powerpc arch/$(ARCH)/include/asm
