@@ -364,17 +364,22 @@ restart:
  */
 static inline void prune_one_dentry(struct dentry * dentry)
 {
+	struct super_block *sb = dentry->d_sb;
 	struct dentry * parent;
 
 	__d_drop(dentry);
 	list_del(&dentry->d_u.d_child);
 	dentry_stat.nr_dentry--;	/* For d_free, below */
+	sb->s_prunes++;
 	dentry_iput(dentry);
 	parent = dentry->d_parent;
 	d_free(dentry);
 	if (parent != dentry)
 		dput(parent);
 	spin_lock(&dcache_lock);
+	sb->s_prunes--;
+	if (likely(!sb->s_prunes))
+		wake_up(&sb->s_wait_prunes);
 }
 
 /**
@@ -623,19 +628,60 @@ out:
 	return found;
 }
 
+/*
+ * A special version of wait_event(!sb->s_prunes) which takes the dcache_lock
+ * when checking the condition and gives feedback if we slept.
+ */
+static int wait_on_prunes(struct super_block *sb)
+{
+	DEFINE_WAIT(wait);
+	int slept = 0;
+
+#ifdef DCACHE_DEBUG
+	printk(KERN_DEBUG "%s: waiting for %d prunes\n", __FUNCTION__,
+	       sb->s_prunes);
+#endif
+
+	spin_lock(&dcache_lock);
+	for (;;) {
+		prepare_to_wait(&sb->s_wait_prunes, &wait,
+				TASK_UNINTERRUPTIBLE);
+		if (!sb->s_prunes)
+			break;
+		spin_unlock(&dcache_lock);
+		schedule();
+		slept = 1;
+		spin_lock(&dcache_lock);
+	}
+	spin_unlock(&dcache_lock);
+	finish_wait(&sb->s_wait_prunes, &wait);
+	return slept;
+}
+
 /**
  * shrink_dcache_parent - prune dcache
  * @parent: parent of entries to prune
  *
  * Prune the dcache to remove unused children of the parent dentry.
  */
- 
+/*
+ * If we slept on waiting for other prunes to finish, there maybe are
+ * some dentries the d_lru list that we have "overlooked" the last
+ * time we called select_parent(). Therefor lets restart in this case.
+ */
 void shrink_dcache_parent(struct dentry * parent)
 {
 	int found;
+	struct super_block *sb = parent->d_sb;
 
+ again:
 	while ((found = select_parent(parent)) != 0)
 		prune_dcache(found);
+
+	/* If we are called from generic_shutdown_super() during
+	 * umount of a filesystem, we want to check for other prunes */
+	if (!sb->s_root && wait_on_prunes(sb))
+		goto again;
 }
 
 /**
