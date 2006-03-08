@@ -481,6 +481,8 @@ ahd_linux_target_alloc(struct scsi_target *starget)
 {
 	struct	ahd_softc *ahd =
 		*((struct ahd_softc **)dev_to_shost(&starget->dev)->hostdata);
+	struct seeprom_config *sc = ahd->seep_config;
+	unsigned long flags;
 	struct scsi_target **ahd_targp = ahd_linux_target_in_softc(starget);
 	struct ahd_linux_target *targ = scsi_transport_target_data(starget);
 	struct ahd_devinfo devinfo;
@@ -488,27 +490,50 @@ ahd_linux_target_alloc(struct scsi_target *starget)
 	struct ahd_tmode_tstate *tstate;
 	char channel = starget->channel + 'A';
 
+	ahd_lock(ahd, &flags);
+
 	BUG_ON(*ahd_targp != NULL);
 
 	*ahd_targp = starget;
 	memset(targ, 0, sizeof(*targ));
+
+	if (sc) {
+		int flags = sc->device_flags[starget->id];
+
+		tinfo = ahd_fetch_transinfo(ahd, 'A', ahd->our_id,
+					    starget->id, &tstate);
+
+		if ((flags  & CFPACKETIZED) == 0) {
+			/* Do not negotiate packetized transfers */
+			spi_rd_strm(starget) = 0;
+			spi_pcomp_en(starget) = 0;
+			spi_rti(starget) = 0;
+			spi_wr_flow(starget) = 0;
+			spi_hold_mcs(starget) = 0;
+		} else {
+			if ((ahd->features & AHD_RTI) == 0)
+				spi_rti(starget) = 0;
+		}
+
+		if ((flags & CFQAS) == 0)
+			spi_qas(starget) = 0;
+
+		/* Transinfo values have been set to BIOS settings */
+		spi_max_width(starget) = (flags & CFWIDEB) ? 1 : 0;
+		spi_min_period(starget) = tinfo->user.period;
+		spi_max_offset(starget) = tinfo->user.offset;
+	}
 
 	tinfo = ahd_fetch_transinfo(ahd, channel, ahd->our_id,
 				    starget->id, &tstate);
 	ahd_compile_devinfo(&devinfo, ahd->our_id, starget->id,
 			    CAM_LUN_WILDCARD, channel,
 			    ROLE_INITIATOR);
-	spi_min_period(starget) = AHD_SYNCRATE_MAX; /* We can do U320 */
-	if ((ahd->bugs & AHD_PACED_NEGTABLE_BUG) != 0)
-		spi_max_offset(starget) = MAX_OFFSET_PACED_BUG;
-	else
-		spi_max_offset(starget) = MAX_OFFSET_PACED;
-	spi_max_width(starget) = ahd->features & AHD_WIDE;
-
 	ahd_set_syncrate(ahd, &devinfo, 0, 0, 0,
 			 AHD_TRANS_GOAL, /*paused*/FALSE);
 	ahd_set_width(ahd, &devinfo, MSG_EXT_WDTR_BUS_8_BIT,
 		      AHD_TRANS_GOAL, /*paused*/FALSE);
+	ahd_unlock(ahd, &flags);
 
 	return 0;
 }
@@ -1456,6 +1481,9 @@ ahd_linux_run_command(struct ahd_softc *ahd, struct ahd_linux_device *dev,
 	struct	 ahd_tmode_tstate *tstate;
 	u_int	 col_idx;
 	uint16_t mask;
+	unsigned long flags;
+
+	ahd_lock(ahd, &flags);
 
 	/*
 	 * Get an scb to use.
@@ -1471,6 +1499,7 @@ ahd_linux_run_command(struct ahd_softc *ahd, struct ahd_linux_device *dev,
 	}
 	if ((scb = ahd_get_scb(ahd, col_idx)) == NULL) {
 		ahd->flags |= AHD_RESOURCE_SHORTAGE;
+		ahd_unlock(ahd, &flags);
 		return SCSI_MLQUEUE_HOST_BUSY;
 	}
 
@@ -1497,30 +1526,6 @@ ahd_linux_run_command(struct ahd_softc *ahd, struct ahd_linux_device *dev,
 	if ((tstate->auto_negotiate & mask) != 0) {
 		scb->flags |= SCB_AUTO_NEGOTIATE;
 		scb->hscb->control |= MK_MESSAGE;
-		} else if (cmd->cmnd[0] == INQUIRY
-			&& (tinfo->curr.offset != 0
-			 || tinfo->curr.width != MSG_EXT_WDTR_BUS_8_BIT
-			 || tinfo->curr.ppr_options != 0)
-			&& (tinfo->curr.ppr_options & MSG_EXT_PPR_IU_REQ)==0) {
-			/*
-			 * The SCSI spec requires inquiry
-			 * commands to complete without
-			 * reporting unit attention conditions.
-			 * Because of this, an inquiry command
-			 * that occurs just after a device is
-			 * reset will result in a data phase
-			 * with mismatched negotiated rates.
-			 * The core already forces a renegotiation
-			 * for reset events that are visible to
-			 * our controller or that we initiate,
-			 * but a third party device reset or a
-			 * hot-plug insertion can still cause this
-			 * issue.  Therefore, we force a re-negotiation
-			 * for every inquiry command unless we
-			 * are async.
-			 */
-			scb->flags |= SCB_NEGOTIATE;
-			scb->hscb->control |= MK_MESSAGE;
 	}
 
 	if ((dev->flags & (AHD_DEV_Q_TAGGED|AHD_DEV_Q_BASIC)) != 0) {
@@ -1595,6 +1600,8 @@ ahd_linux_run_command(struct ahd_softc *ahd, struct ahd_linux_device *dev,
 		dev->commands_since_idle_or_otag++;
 	scb->flags |= SCB_ACTIVE;
 	ahd_queue_scb(ahd, scb);
+
+	ahd_unlock(ahd, &flags);
 
 	return 0;
 }

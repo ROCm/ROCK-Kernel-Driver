@@ -1438,7 +1438,8 @@ mptscsih_qcmd(struct scsi_cmnd *SCpnt, void (*done)(struct scsi_cmnd *))
 			/* Trying to do DV to this target, extend timeout.
 			 * Wait to issue until flag is clear
 			 */
-			if (dvStatus & MPT_SCSICFG_DV_PENDING) {
+			if (SCpnt->eh_timeout.function && 
+			    (dvStatus & MPT_SCSICFG_DV_PENDING)) {
 				mod_timer(&SCpnt->eh_timeout, jiffies + 40 * HZ);
 				issueCmd = 0;
 			}

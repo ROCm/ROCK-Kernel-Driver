@@ -380,6 +380,7 @@ struct ahd_platform_data {
 	 */
 	struct scsi_target *starget[AHD_NUM_TARGETS]; 
 
+	spinlock_t		 spin_lock;
 	struct completion	*eh_done;
 	struct Scsi_Host        *host;		/* pointer to scsi host */
 #define AHD_LINUX_NOIRQ	((uint32_t)~0)
@@ -521,18 +522,19 @@ void	ahd_format_transinfo(struct info_str *info,
 static __inline void
 ahd_lockinit(struct ahd_softc *ahd)
 {
+	spin_lock_init(&ahd->platform_data->spin_lock);
 }
 
 static __inline void
 ahd_lock(struct ahd_softc *ahd, unsigned long *flags)
 {
-	spin_lock_irqsave(ahd->platform_data->host->host_lock, *flags);
+	spin_lock_irqsave(&ahd->platform_data->spin_lock, *flags);
 }
 
 static __inline void
 ahd_unlock(struct ahd_softc *ahd, unsigned long *flags)
 {
-	spin_unlock_irqrestore(ahd->platform_data->host->host_lock, *flags);
+	spin_unlock_irqrestore(&ahd->platform_data->spin_lock, *flags);
 }
 
 /******************************* PCI Definitions ******************************/
