@@ -880,7 +880,7 @@ acpi_status acpi_os_wait_semaphore(acpi_handle handle, u32 units, u16 timeout)
 	ACPI_DEBUG_PRINT((ACPI_DB_MUTEX, "Waiting for semaphore[%p|%d|%d]\n",
 			  handle, units, timeout));
 
-	if (in_atomic())
+	if (in_atomic() || acpi_in_resume)
 		timeout = 0;
 
 	switch (timeout) {
@@ -1009,7 +1009,7 @@ u8 acpi_os_writable(void *ptr, acpi_size len)
 
 u32 acpi_os_get_thread_id(void)
 {
-	if (!in_atomic())
+	if (!in_atomic() && !acpi_in_resume)
 		return current->pid;
 
 	return 0;
@@ -1252,7 +1252,11 @@ acpi_status acpi_os_release_object(acpi_cache_t * cache, void *object)
 
 void *acpi_os_acquire_object(acpi_cache_t * cache)
 {
-	void *object = kmem_cache_alloc(cache, GFP_KERNEL);
+	void *object;
+	if (acpi_in_resume)
+		object = kmem_cache_alloc(cache, GFP_ATOMIC);
+	else
+		object = kmem_cache_alloc(cache, GFP_KERNEL);
 	WARN_ON(!object);
 	return object;
 }

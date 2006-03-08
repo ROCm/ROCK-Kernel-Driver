@@ -250,6 +250,7 @@ acpi_extract_package(union acpi_object *package,
 
 EXPORT_SYMBOL(acpi_extract_package);
 
+extern int acpi_in_resume;
 acpi_status
 acpi_evaluate_integer(acpi_handle handle,
 		      acpi_string pathname,
@@ -264,7 +265,10 @@ acpi_evaluate_integer(acpi_handle handle,
 	if (!data)
 		return_ACPI_STATUS(AE_BAD_PARAMETER);
 
-	element = kmalloc(sizeof(union acpi_object), GFP_KERNEL);
+	if (acpi_in_resume)
+		element = kmalloc(sizeof(union acpi_object), GFP_ATOMIC);
+	else
+		element = kmalloc(sizeof(union acpi_object), GFP_KERNEL);
 	if (!element)
 		return_ACPI_STATUS(AE_NO_MEMORY);
 
