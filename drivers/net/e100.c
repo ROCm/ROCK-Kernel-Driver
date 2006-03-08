@@ -2170,8 +2170,7 @@ err_loopback_none:
 	mdio_write(nic->netdev, nic->mii.phy_id, MII_BMCR, 0);
 	nic->loopback = lb_none;
 	e100_clean_cbs(nic);
-	e100_alloc_cbs(nic);
-	e100_hw_init(nic);
+	e100_hw_reset(nic);
 err_clean_rx:
 	e100_rx_clean_list(nic);
 	return err;
