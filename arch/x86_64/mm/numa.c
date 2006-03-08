@@ -192,8 +192,8 @@ void __init setup_node_zones(int nodeid)
 	NODE_DATA(nodeid)->node_mem_map = 
 		__alloc_bootmem_core(NODE_DATA(nodeid)->bdata, 
 				memmapsize, SMP_CACHE_BYTES, 
-				limit, 
-				round_down(limit - memmapsize, PAGE_SIZE));
+				round_down(limit - memmapsize, PAGE_SIZE), 
+				limit);
 
 	size_zones(zones, holes, start_pfn, end_pfn);
 	free_area_init_node(nodeid, NODE_DATA(nodeid), zones,
