@@ -85,8 +85,8 @@ static int watchdog(void * __bind_cpu)
 	 * in softlockup_tick():
 	 */
 	while (!kthread_should_stop()) {
-		msleep_interruptible(1000);
 		touch_softlockup_watchdog();
+		msleep_interruptible(1000);
 	}
 	__set_current_state(TASK_RUNNING);
 
