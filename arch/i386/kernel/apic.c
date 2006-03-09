@@ -1351,11 +1351,11 @@ void __init dmi_check_apic(void)
 	if (!dmi_enable_apic()) {
 		enable_local_apic = -1;
 		printk(
-	KERN_INFO "APIC disabled because your old system seems to be old\n"); 
+	KERN_INFO "IO/L-APIC disabled because your old system seems to be old\n"); 
 		printk(KERN_INFO "overwrite with \"apic\"\n");
 	} else {
 		printk(
-	KERN_INFO "APIC allowed because system is MP or new enough\n");
+	KERN_INFO "IO/L-APIC allowed because system is MP or new enough\n");
 	}
 }
 #endif
