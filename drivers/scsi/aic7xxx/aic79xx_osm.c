@@ -490,9 +490,11 @@ ahd_linux_target_alloc(struct scsi_target *starget)
 	struct ahd_tmode_tstate *tstate;
 	char channel = starget->channel + 'A';
 
-	ahd_lock(ahd, &flags);
+	/* target might already be allocated when doing a rescan */
+	if (*ahd_targp)
+		return 0;
 
-	BUG_ON(*ahd_targp != NULL);
+	ahd_lock(ahd, &flags);
 
 	*ahd_targp = starget;
 	memset(targ, 0, sizeof(*targ));
