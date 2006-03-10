@@ -98,14 +98,17 @@ struct rcu_data {
 	long  	       	batch;           /* Batch # for current RCU batch */
 	struct rcu_head *nxtlist;
 	struct rcu_head **nxttail;
-	long            count; /* # of queued items */
+	long            qlen; 	 	 /* # of queued callbacks */
 	struct rcu_head *curlist;
 	struct rcu_head **curtail;
 	struct rcu_head *donelist;
 	struct rcu_head **donetail;
-	int doneself;
+	long		blimit;		 /* Upper limit on a processed batch */
 	int cpu;
 	struct rcu_head barrier;
+#ifdef CONFIG_SMP
+	long		last_rs_qlen;	 /* qlen during the last resched */
+#endif
 };
 
 DECLARE_PER_CPU(struct rcu_data, rcu_data);
@@ -266,8 +269,6 @@ extern __deprecated_for_modules void synchronize_kernel(void);
 extern void synchronize_rcu(void);
 void synchronize_idle(void);
 extern void rcu_barrier(void);
-int rcu_set_remote_rcu(int cpu);
-void rcu_clear_remote_rcu(int cpu);
 
 #endif /* __KERNEL__ */
 #endif /* __LINUX_RCUPDATE_H */

@@ -1607,7 +1607,7 @@ void __init setup_arch(char **cmdline_p)
 		efi_map_memmap();
 
 #ifdef CONFIG_X86_IO_APIC
-	check_acpi_pci();	/* Checks more than just ACPI actually */	
+	check_acpi_pci();	/* Checks more than just ACPI actually */
 #endif
 
 #ifdef CONFIG_ACPI

@@ -18,9 +18,15 @@
 
 /* Debug */
 #define LOG_PARSE(fmt...)
-#define LOG_ERROR(fmt...)	/* printk(fmt) */
+#define LOG_ERROR(fmt...)	printk(fmt)
 #define LOG_BLOB(t,b,c)
-#define DBG(fmt...)		/* printk(fmt) */
+
+#undef DEBUG
+#ifdef DEBUG
+#define DBG(fmt...)		printk(fmt)
+#else
+#define DBG(fmt...)
+#endif
 
 /* Command numbers */
 #define PMF_CMD_LIST			0

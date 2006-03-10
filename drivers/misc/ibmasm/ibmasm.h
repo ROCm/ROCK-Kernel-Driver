@@ -104,13 +104,13 @@ static inline void command_put(struct command *cmd)
 	spinlock_t *lock = cmd->lock;
 
 	spin_lock_irqsave(lock, flags);
-        kobject_put(&cmd->kobj);
+	kobject_put(&cmd->kobj);
 	spin_unlock_irqrestore(lock, flags);
 }
 
 static inline void command_get(struct command *cmd)
 {
-        kobject_get(&cmd->kobj);
+	kobject_get(&cmd->kobj);
 }
 
 

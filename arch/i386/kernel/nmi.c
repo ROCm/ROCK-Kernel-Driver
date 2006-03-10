@@ -357,7 +357,7 @@ static void clear_msr_range(unsigned int base, unsigned int n)
 		wrmsr(base+i, 0, 0);
 }
 
-static inline void write_watchdog_counter(const char *descr)
+static void write_watchdog_counter(const char *descr)
 {
 	u64 count = (u64)cpu_khz * 1000;
 

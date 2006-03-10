@@ -67,7 +67,43 @@ DEFINE_PER_CPU(struct rcu_data, rcu_bh_data) = { 0L };
 
 /* Fake initialization required by compiler */
 static DEFINE_PER_CPU(struct tasklet_struct, rcu_tasklet) = {NULL};
-static int maxbatch = 10000;
+static int blimit = 10;
+static int qhimark = 10000;
+static int qlowmark = 100;
+#ifdef CONFIG_SMP
+static int rsinterval = 1000;
+#endif
+
+static atomic_t rcu_barrier_cpu_count;
+static struct semaphore rcu_barrier_sema;
+static struct completion rcu_barrier_completion;
+
+#ifdef CONFIG_SMP
+static void force_quiescent_state(struct rcu_data *rdp,
+			struct rcu_ctrlblk *rcp)
+{
+	int cpu;
+	cpumask_t cpumask;
+	set_need_resched();
+	if (unlikely(rdp->qlen - rdp->last_rs_qlen > rsinterval)) {
+		rdp->last_rs_qlen = rdp->qlen;
+		/*
+		 * Don't send IPI to itself. With irqs disabled,
+		 * rdp->cpu is the current cpu.
+		 */
+		cpumask = rcp->cpumask;
+		cpu_clear(rdp->cpu, cpumask);
+		for_each_cpu_mask(cpu, cpumask)
+			smp_send_reschedule(cpu);
+	}
+}
+#else
+static inline void force_quiescent_state(struct rcu_data *rdp,
+			struct rcu_ctrlblk *rcp)
+{
+	set_need_resched();
+}
+#endif
 
 /**
  * call_rcu - Queue an RCU callback for invocation after a grace period.
@@ -92,102 +128,13 @@ void fastcall call_rcu(struct rcu_head *head,
 	rdp = &__get_cpu_var(rcu_data);
 	*rdp->nxttail = head;
 	rdp->nxttail = &head->next;
-
-	if (unlikely(++rdp->count > 10000))
-		set_need_resched();
-
+	if (unlikely(++rdp->qlen > qhimark)) {
+		rdp->blimit = INT_MAX;
+		force_quiescent_state(rdp, &rcu_ctrlblk);
+	}
 	local_irq_restore(flags);
 }
 
-static atomic_t rcu_barrier_cpu_count;
-static struct semaphore rcu_barrier_sema;
-static struct completion rcu_barrier_completion;
-
-/*
- * Routines for setting up cpus for remote callback processing.
- * This is done to improve determinism on specified cpus.
- */
-#define rcu_remote_online_cpus(_m_) \
-	cpus_and((_m_), cpu_remotercu_map, cpu_online_map)
-
-static int cpu_remotercu_next = -1;
-static cpumask_t cpu_remotercu_map = CPU_MASK_NONE;
-static spinlock_t cpu_remotercu_lock = SPIN_LOCK_UNLOCKED;
-
-static inline int is_remote_rcu(void) {
-	cpumask_t mask;
-
-	rcu_remote_online_cpus(mask);
-	return cpu_isset(smp_processor_id(), mask);
-}
-
-static inline int rcu_remote_rcus(void)
-{
-	cpumask_t mask;
-
-	rcu_remote_online_cpus(mask);
-	return !cpus_empty(mask);
-}
-
-/* Get the next cpu to do remote callback processing on */
-static inline int rcu_next_remotercu(void)
-{
-	cpumask_t mask;
-	unsigned long flags;
-	int cpu;
-
-	rcu_remote_online_cpus(mask);
-	if (cpus_empty(mask))
-		return -1;
-	spin_lock_irqsave(&cpu_remotercu_lock, flags);
-	cpu_remotercu_next=next_cpu(cpu_remotercu_next, mask);
-	if (cpu_remotercu_next >= NR_CPUS) {
-		cpu_remotercu_next = first_cpu(mask);
-	}
-	cpu = cpu_remotercu_next;
-	spin_unlock_irqrestore(&cpu_remotercu_lock, flags);
-
-	return cpu;
-}
-
-int rcu_set_remote_rcu(int cpu) {
-	unsigned long flags;
-
-	if (cpu < NR_CPUS) {
-		spin_lock_irqsave(&cpu_remotercu_lock, flags);
-		cpu_set(cpu, cpu_remotercu_map);
-		spin_unlock_irqrestore(&cpu_remotercu_lock, flags);
-		return 0;
-	} else
-		return 1;
-}
-EXPORT_SYMBOL(rcu_set_remote_rcu);
-
-void rcu_clear_remote_rcu(int cpu) {
-	unsigned long flags;
-
-	if (cpu < NR_CPUS) {
-		spin_lock_irqsave(&cpu_remotercu_lock, flags);
-		cpu_clear(cpu, cpu_remotercu_map);
-		spin_unlock_irqrestore(&cpu_remotercu_lock, flags);
-	}
-}
-EXPORT_SYMBOL(rcu_clear_remote_rcu);
-
-/* Setup the mask of cpus configured for remote callback processing */
-static int __init rcu_remotercu_cpu_setup(char *str)
-{
-	int cpus[NR_CPUS], i;
-
-	str = get_options(str, ARRAY_SIZE(cpus), cpus);
-	cpus_clear(cpu_remotercu_map);
-	for (i = 1; i <= cpus[0]; i++)
-		rcu_set_remote_rcu(cpus[i]);
-	cpu_remotercu_next = first_cpu(cpu_remotercu_map);
-	return 1;
-}
-
-__setup ("remotercu=", rcu_remotercu_cpu_setup);
 /**
  * call_rcu_bh - Queue an RCU for invocation after a quicker grace period.
  * @head: structure to be used for queueing the RCU updates.
@@ -216,12 +163,12 @@ void fastcall call_rcu_bh(struct rcu_head *head,
 	rdp = &__get_cpu_var(rcu_bh_data);
 	*rdp->nxttail = head;
 	rdp->nxttail = &head->next;
-	rdp->count++;
-/*
- *  Should we directly call rcu_do_batch() here ?
- *  if (unlikely(rdp->count > 10000))
- *      rcu_do_batch(rdp);
- */
+
+	if (unlikely(++rdp->qlen > qhimark)) {
+		rdp->blimit = INT_MAX;
+		force_quiescent_state(rdp, &rcu_bh_ctrlblk);
+	}
+
 	local_irq_restore(flags);
 }
 
@@ -284,10 +231,12 @@ static void rcu_do_batch(struct rcu_data *rdp)
 		next = rdp->donelist = list->next;
 		list->func(list);
 		list = next;
-		rdp->count--;
-		if (++count >= maxbatch)
+		rdp->qlen--;
+		if (++count >= rdp->blimit)
 			break;
 	}
+	if (rdp->blimit == INT_MAX && rdp->qlen <= qlowmark)
+		rdp->blimit = blimit;
 	if (!rdp->donelist)
 		rdp->donetail = &rdp->donelist;
 	else
@@ -436,8 +385,6 @@ static void rcu_offline_cpu(int cpu)
 	struct rcu_data *this_rdp = &get_cpu_var(rcu_data);
 	struct rcu_data *this_bh_rdp = &get_cpu_var(rcu_bh_data);
 
-	rcu_clear_remote_rcu(cpu);
-
 	__rcu_offline_cpu(this_rdp, &rcu_ctrlblk,
 					&per_cpu(rcu_data, cpu));
 	__rcu_offline_cpu(this_bh_rdp, &rcu_bh_ctrlblk,
@@ -461,13 +408,9 @@ static void rcu_offline_cpu(int cpu)
 static void __rcu_process_callbacks(struct rcu_ctrlblk *rcp,
 					struct rcu_data *rdp)
 {
-	int is_remote;
-
 	if (rdp->curlist && !rcu_batch_before(rcp->completed, rdp->batch)) {
-		struct rcu_head ** r = rdp->donetail;
 		*rdp->donetail = rdp->curlist;
-		/* Only change donetail if __rcu_process_remote.. hasn't */
-		cmpxchg(&rdp->donetail, r, rdp->curtail);
+		rdp->donetail = rdp->curtail;
 		rdp->curlist = NULL;
 		rdp->curtail = &rdp->curlist;
 	}
@@ -502,62 +445,14 @@ static void __rcu_process_callbacks(struct rcu_ctrlblk *rcp,
 		local_irq_enable();
 	}
 	rcu_check_quiescent_state(rcp, rdp);
-	/* Prevent remote cpu's from accessing donelist */
-	if (likely(!(is_remote = is_remote_rcu())))
-		rdp->doneself = 0;
-	if (rdp->donelist && !is_remote) {
+	if (rdp->donelist)
 		rcu_do_batch(rdp);
-	}
-	if (unlikely(is_remote_rcu()))
-		rdp->doneself = 1;
-}
-
-static inline void __rcu_process_remote_callbacks(void)
-{
-	struct rcu_data *rdp;
-	struct rcu_head * list = NULL;
-	struct rcu_head * list_bh = NULL;
-	int cpu;
-
-
-	if (likely(!rcu_remote_rcus() || is_remote_rcu())) {
-		return;
-	}
-	cpu = rcu_next_remotercu();
-	/* Just in case.. */
-	if (unlikely(cpu == -1)) {
-		return;
-	}
-	rdp = &per_cpu(rcu_data, cpu);
-	/*
-	 * The xchg prevents multiple cpus from processing the same
-	 * list simulataneously.
-	 */
-	if (rdp->doneself && (list = xchg(&rdp->donelist, NULL))!=NULL) {
-		rdp->count = 0;
-		rdp->donetail = &rdp->donelist;
-	}
-	rdp = &per_cpu(rcu_bh_data, cpu);
-	if (rdp->doneself && (list_bh = xchg(&rdp->donelist, NULL))!=NULL) {
-		rdp->count = 0;
-		rdp->donetail = &rdp->donelist;
-	}
-
-	while (list) {
-		list->func(list);
-		list = list->next;
-	}
-	while (list_bh) {
-		list_bh->func(list_bh);
-		list_bh = list_bh->next;
-	}
 }
 
 static void rcu_process_callbacks(unsigned long unused)
 {
 	__rcu_process_callbacks(&rcu_ctrlblk, &__get_cpu_var(rcu_data));
 	__rcu_process_callbacks(&rcu_bh_ctrlblk, &__get_cpu_var(rcu_bh_data));
-	__rcu_process_remote_callbacks();
 }
 
 static int __rcu_pending(struct rcu_ctrlblk *rcp, struct rcu_data *rdp)
@@ -586,9 +481,6 @@ static int __rcu_pending(struct rcu_ctrlblk *rcp, struct rcu_data *rdp)
 
 int rcu_pending(int cpu)
 {
-	/* If any cpus setup for remote callbacks, schedule tasklet anyway. */
-	if (unlikely(rcu_remote_rcus()) && !is_remote_rcu())
-		tasklet_schedule(&per_cpu(rcu_tasklet, cpu));
 	return __rcu_pending(&rcu_ctrlblk, &per_cpu(rcu_data, cpu)) ||
 		__rcu_pending(&rcu_bh_ctrlblk, &per_cpu(rcu_bh_data, cpu));
 }
@@ -615,6 +507,7 @@ static void rcu_init_percpu_data(int cpu, struct rcu_ctrlblk *rcp,
 	rdp->quiescbatch = rcp->completed;
 	rdp->qs_pending = 0;
 	rdp->cpu = cpu;
+	rdp->blimit = blimit;
 }
 
 static void __devinit rcu_online_cpu(int cpu)
@@ -709,7 +602,12 @@ void synchronize_kernel(void)
 	synchronize_rcu();
 }
 
-module_param(maxbatch, int, 0);
+module_param(blimit, int, 0);
+module_param(qhimark, int, 0);
+module_param(qlowmark, int, 0);
+#ifdef CONFIG_SMP
+module_param(rsinterval, int, 0);
+#endif
 EXPORT_SYMBOL_GPL(rcu_batches_completed);
 EXPORT_SYMBOL_GPL_FUTURE(call_rcu);	/* WARNING: GPL-only in April 2006. */
 EXPORT_SYMBOL_GPL_FUTURE(call_rcu_bh);	/* WARNING: GPL-only in April 2006. */

@@ -2276,7 +2276,7 @@ static inline void check_timer(void)
 	apic_write_around(APIC_LVT0, APIC_LVT_MASKED | APIC_DM_EXTINT);
 	init_8259A(1);
 	timer_ack = 1;
-	if (timer_over_8254 > 0)	
+	if (timer_over_8254 > 0)
 		enable_8259A_irq(0);
 
 	pin1  = find_isa_irq_pin(0, mp_INT);
