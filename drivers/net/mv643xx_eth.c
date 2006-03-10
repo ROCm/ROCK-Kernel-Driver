@@ -39,6 +39,9 @@
 #include <linux/etherdevice.h>
 #include <linux/in.h>
 #include <linux/ip.h>
+#ifdef CONFIG_PPC_CHRP
+#include <linux/pci.h>
+#endif
 
 #include <linux/bitops.h>
 #include <linux/delay.h>
@@ -1449,6 +1452,7 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
 	if (err)
 		goto out;
 
+	SET_NETDEV_DEV(dev, &pdev->dev);
 	p = dev->dev_addr;
 	printk(KERN_NOTICE
 		"%s: port %d with MAC address %02x:%02x:%02x:%02x:%02x:%02x\n",
@@ -1585,6 +1589,13 @@ MODULE_AUTHOR(	"Rabeeh Khoury, Assaf Hoffman, Matthew Dharm, Manish Lachwani"
 		" and Dale Farnsworth");
 MODULE_DESCRIPTION("Ethernet driver for Marvell MV643XX");
 
+#ifdef CONFIG_PPC_CHRP
+static struct pci_device_id pci_marvell_mv64360[] = {
+	{ PCI_DEVICE(PCI_VENDOR_ID_MARVELL, PCI_DEVICE_ID_MARVELL_MV64360) },
+	{}
+};
+MODULE_DEVICE_TABLE(pci, pci_marvell_mv64360);
+#endif
 /*
  * The second part is the low level driver of the gigE ethernet ports.
  */
