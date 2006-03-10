@@ -177,6 +177,7 @@ static void register_proc_table(ctl_table *, struct proc_dir_entry *, void *);
 static void unregister_proc_table(ctl_table *, struct proc_dir_entry *);
 #endif
 
+static unsigned int __HZ = HZ;
 /* The default sysctl tables: */
 
 static ctl_table root_table[] = {
@@ -662,6 +663,14 @@ static ctl_table kern_table[] = {
 		.proc_handler	= &proc_dointvec,
 	},
 #endif
+	{
+		.ctl_name	= KERN_SETUID_DUMPABLE,
+		.procname	= "suid_dumpable",
+		.data		= &suid_dumpable,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
 #if defined(CONFIG_S390) && defined(CONFIG_SMP)
 	{
 		.ctl_name	= KERN_SPIN_RETRY,
@@ -692,6 +701,34 @@ static ctl_table kern_table[] = {
 		.proc_handler	= &proc_dointvec,
 	},
 #endif
+#if defined(CONFIG_TASK_DELAY_ACCT)
+	{
+		.ctl_name	= KERN_DELAYACCT,
+		.procname	= "delayacct",
+		.data		= &delayacct_on,
+		.maxlen		= sizeof (int),
+		.mode		= 0644,
+		.proc_handler	= &delayacct_sysctl_handler,
+	},
+#endif
+#if defined(CONFIG_SCHEDSTATS)
+	{
+		.ctl_name	= KERN_SCHEDSTATS,
+		.procname	= "schedstats",
+		.data		= &schedstats_sysctl,
+		.maxlen		= sizeof (int),
+		.mode		= 0644,
+		.proc_handler	= &schedstats_sysctl_handler,
+	},
+#endif
+	{
+		.ctl_name	= KERN_HZ,
+		.procname	= "HZ",
+		.data		= &__HZ,
+		.maxlen		= sizeof(int),
+		.mode		= 0444,
+		.proc_handler	= &proc_dointvec,
+	},
 	{ .ctl_name = 0 }
 };
 
@@ -925,26 +962,6 @@ static ctl_table vm_table[] = {
 		.strategy	= &sysctl_jiffies,
 	},
 #endif
-#if defined(CONFIG_TASK_DELAY_ACCT)
-	{
-		.ctl_name	= KERN_DELAYACCT,
-		.procname	= "delayacct",
-		.data		= &delayacct_on,
-		.maxlen		= sizeof (int),
-		.mode		= 0644,
-		.proc_handler	= &delayacct_sysctl_handler,
-	},
-#endif
-#if defined(CONFIG_SCHEDSTATS)
-	{
-		.ctl_name	= KERN_SCHEDSTATS,
-		.procname	= "schedstats",
-		.data		= &schedstats_sysctl,
-		.maxlen		= sizeof (int),
-		.mode		= 0644,
-		.proc_handler	= &schedstats_sysctl_handler,
-	},
-#endif
 	{ .ctl_name = 0 }
 };
 
@@ -1067,14 +1084,6 @@ static ctl_table fs_table[] = {
 	},
 #endif	
 #endif
-	{
-		.ctl_name	= KERN_SETUID_DUMPABLE,
-		.procname	= "suid_dumpable",
-		.data		= &suid_dumpable,
-		.maxlen		= sizeof(int),
-		.mode		= 0644,
-		.proc_handler	= &proc_dointvec,
-	},
 	{ .ctl_name = 0 }
 };
 

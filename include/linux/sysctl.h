@@ -153,6 +153,7 @@ enum
 	KERN_DUMP=75,		/* directory: dump parameters */
 	KERN_DELAYACCT=76,	/* int: Per-task delay accounting on/off */
 	KERN_SCHEDSTATS=77,	/* int: Schedstats on/off */
+	KERN_HZ=78,		/* unsigned long: internal kernel HZ */
 };
 
 
