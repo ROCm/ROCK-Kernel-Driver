@@ -766,7 +766,9 @@ lpfc_sli_process_unsol_iocb(struct lpfc_hba *phba, struct lpfc_sli_ring *pring,
 	}
 	/* unSolicited Responses */
 	if (pring->prt[0].profile) {
-		(pring->prt[0].lpfc_sli_rcv_unsol_event) (phba, pring, saveq);
+		if (pring->prt[0].lpfc_sli_rcv_unsol_event)
+			(pring->prt[0].lpfc_sli_rcv_unsol_event) (phba, pring,
+									saveq);
 		match = 1;
 	} else {
 		/* We must search, based on rctl / type
@@ -777,8 +779,9 @@ lpfc_sli_process_unsol_iocb(struct lpfc_hba *phba, struct lpfc_sli_ring *pring,
 			     Rctl)
 			    && (pring->prt[i].
 				type == Type)) {
-				(pring->prt[i].lpfc_sli_rcv_unsol_event)
-					(phba, pring, saveq);
+				if (pring->prt[i].lpfc_sli_rcv_unsol_event)
+					(pring->prt[i].lpfc_sli_rcv_unsol_event)
+							(phba, pring, saveq);
 				match = 1;
 				break;
 			}
@@ -1151,12 +1154,17 @@ lpfc_sli_handle_fast_ring_event(struct lpfc_hba * phba,
 			cmdiocbq = lpfc_sli_iocbq_lookup(phba, pring,
 							 &rspiocbq);
 			if ((cmdiocbq) && (cmdiocbq->iocb_cmpl)) {
-				spin_unlock_irqrestore(
-				       phba->host->host_lock, iflag);
-				(cmdiocbq->iocb_cmpl)(phba, cmdiocbq,
-						      &rspiocbq);
-				spin_lock_irqsave(phba->host->host_lock,
-						  iflag);
+				if (phba->cfg_poll & ENABLE_FCP_RING_POLLING) {
+					(cmdiocbq->iocb_cmpl)(phba, cmdiocbq,
+							      &rspiocbq);
+				} else {
+					spin_unlock_irqrestore(
+						phba->host->host_lock, iflag);
+					(cmdiocbq->iocb_cmpl)(phba, cmdiocbq,
+							      &rspiocbq);
+					spin_lock_irqsave(phba->host->host_lock,
+							  iflag);
+				}
 			}
 			break;
 		default:
@@ -1558,6 +1566,79 @@ lpfc_sli_brdready(struct lpfc_hba * phba, uint32_t mask)
 	return retval;
 }
 
+#define BARRIER_TEST_PATTERN (0xdeadbeef)
+
+void lpfc_reset_barrier(struct lpfc_hba * phba)
+{
+	uint32_t * resp_buf;
+	uint32_t * mbox_buf;
+	volatile uint32_t mbox;
+	uint32_t hc_copy;
+	int  i;
+	uint8_t hdrtype;
+
+	pci_read_config_byte(phba->pcidev, PCI_HEADER_TYPE, &hdrtype);
+	if (hdrtype != 0x80 ||
+	    (FC_JEDEC_ID(phba->vpd.rev.biuRev) != HELIOS_JEDEC_ID &&
+	     FC_JEDEC_ID(phba->vpd.rev.biuRev) != THOR_JEDEC_ID))
+		return;
+
+	/*
+	 * Tell the other part of the chip to suspend temporarily all
+	 * its DMA activity.
+	 */
+	resp_buf =  (uint32_t *)phba->MBslimaddr;
+
+	/* Disable the error attention */
+	hc_copy = readl(phba->HCregaddr);
+	writel((hc_copy & ~HC_ERINT_ENA), phba->HCregaddr);
+	readl(phba->HCregaddr); /* flush */
+
+	if (readl(phba->HAregaddr) & HA_ERATT) {
+		/* Clear Chip error bit */
+		writel(HA_ERATT, phba->HAregaddr);
+		phba->stopped = 1;
+	}
+
+	mbox = 0;
+	((MAILBOX_t *)&mbox)->mbxCommand = MBX_KILL_BOARD;
+	((MAILBOX_t *)&mbox)->mbxOwner = OWN_CHIP;
+
+	writel(BARRIER_TEST_PATTERN, (resp_buf + 1));
+	mbox_buf = (uint32_t *)phba->MBslimaddr;
+	writel(mbox, mbox_buf);
+
+	for (i = 0;
+	     readl(resp_buf + 1) != ~(BARRIER_TEST_PATTERN) && i < 50; i++)
+		mdelay(1);
+
+	if (readl(resp_buf + 1) != ~(BARRIER_TEST_PATTERN)) {
+		if (phba->sli.sli_flag & LPFC_SLI2_ACTIVE ||
+		    phba->stopped)
+			goto restore_hc;
+		else
+			goto clear_errat;
+	}
+
+	((MAILBOX_t *)&mbox)->mbxOwner = OWN_HOST;
+	for (i = 0; readl(resp_buf) != mbox &&  i < 500; i++)
+		mdelay(1);
+
+clear_errat:
+
+	while (!(readl(phba->HAregaddr) & HA_ERATT) && ++i < 500)
+		mdelay(1);
+
+	if (readl(phba->HAregaddr) & HA_ERATT) {
+		writel(HA_ERATT, phba->HAregaddr);
+		phba->stopped = 1;
+	}
+
+restore_hc:
+	writel(hc_copy, phba->HCregaddr);
+	readl(phba->HCregaddr); /* flush */
+}
+
 int
 lpfc_sli_brdkill(struct lpfc_hba * phba)
 {
@@ -1580,9 +1661,8 @@ lpfc_sli_brdkill(struct lpfc_hba * phba)
 		psli->sli_flag);
 
 	if ((pmb = (LPFC_MBOXQ_t *) mempool_alloc(phba->mbox_mem_pool,
-						  GFP_ATOMIC)) == 0) {
+						  GFP_KERNEL)) == 0)
 		return 1;
-	}
 
 	/* Disable the error attention */
 	spin_lock_irq(phba->host->host_lock);
@@ -1602,6 +1682,8 @@ lpfc_sli_brdkill(struct lpfc_hba * phba)
 		return 1;
 	}
 
+	psli->sli_flag &= ~LPFC_SLI2_ACTIVE;
+
 	mempool_free(pmb, phba->mbox_mem_pool);
 
 	/* There is no completion for a KILL_BOARD mbox cmd. Check for an error
@@ -1617,7 +1699,10 @@ lpfc_sli_brdkill(struct lpfc_hba * phba)
 	}
 
 	del_timer_sync(&psli->mbox_tmo);
-
+	if (ha_copy & HA_ERATT) {
+		writel(HA_ERATT, phba->HAregaddr);
+		phba->stopped = 1;
+	}
 	spin_lock_irq(phba->host->host_lock);
 	psli->sli_flag &= ~LPFC_SLI_MBOX_ACTIVE;
 	spin_unlock_irq(phba->host->host_lock);
@@ -1657,6 +1742,7 @@ lpfc_sli_brdreset(struct lpfc_hba * phba)
 			      (cfg_value &
 			       ~(PCI_COMMAND_PARITY | PCI_COMMAND_SERR)));
 
+	psli->sli_flag &= ~LPFC_SLI2_ACTIVE;
 	/* Now toggle INITFF bit in the Host Control Register */
 	writel(HC_INITFF, phba->HCregaddr);
 	mdelay(1);
@@ -1705,6 +1791,8 @@ lpfc_sli_brdrestart(struct lpfc_hba * phba)
 	mb->mbxCommand = MBX_RESTART;
 	mb->mbxHc = 1;
 
+	lpfc_reset_barrier(phba);
+
 	to_slim = phba->MBslimaddr;
 	writel(*(uint32_t *) mb, to_slim);
 	readl(to_slim); /* flush */
@@ -1722,7 +1810,7 @@ lpfc_sli_brdrestart(struct lpfc_hba * phba)
 	readl(to_slim); /* flush */
 
 	lpfc_sli_brdreset(phba);
-
+	phba->stopped = 0;
 	phba->hba_state = LPFC_INIT_START;
 
 	spin_unlock_irq(phba->host->host_lock);
@@ -2030,6 +2118,13 @@ lpfc_sli_issue_mbox(struct lpfc_hba * phba, LPFC_MBOXQ_t * pmbox, uint32_t flag)
 		return (MBX_NOT_FINISHED);
 	}
 
+	if (mb->mbxCommand != MBX_KILL_BOARD && flag & MBX_NOWAIT &&
+	    !(readl(phba->HCregaddr) & HC_MBINT_ENA)) {
+		spin_unlock_irqrestore(phba->host->host_lock, drvr_flag);
+		LOG_MBOX_CANNOT_ISSUE_DATA( phba, mb, psli, flag)
+		return (MBX_NOT_FINISHED);
+	}
+
 	if (psli->sli_flag & LPFC_SLI_MBOX_ACTIVE) {
 		/* Polling for a mbox command when another one is already active
 		 * is not allowed in SLI. Also, the driver must have established
@@ -2146,8 +2241,7 @@ lpfc_sli_issue_mbox(struct lpfc_hba * phba, LPFC_MBOXQ_t * pmbox, uint32_t flag)
 		/* First copy command data to host SLIM area */
 		lpfc_sli_pcimem_bcopy(mb, &phba->slim2p->mbx, MAILBOX_CMD_SIZE);
 	} else {
-		if (mb->mbxCommand == MBX_CONFIG_PORT ||
-		    mb->mbxCommand == MBX_KILL_BOARD) {
+		if (mb->mbxCommand == MBX_CONFIG_PORT) {
 			/* copy command data into host mbox for cmpl */
 			lpfc_sli_pcimem_bcopy(mb, &phba->slim2p->mbx,
 					MAILBOX_CMD_SIZE);
@@ -2377,6 +2471,37 @@ lpfc_sli_issue_iocb(struct lpfc_hba *phba, struct lpfc_sli_ring *pring,
 	return IOCB_BUSY;
 }
 
+static int
+lpfc_extra_ring_setup( struct lpfc_hba *phba)
+{
+	struct lpfc_sli *psli;
+	struct lpfc_sli_ring *pring;
+
+	psli = &phba->sli;
+
+	/* Adjust cmd/rsp ring iocb entries more evenly */
+	pring = &psli->ring[psli->fcp_ring];
+	pring->numCiocb -= SLI2_IOCB_CMD_R1XTRA_ENTRIES;
+	pring->numRiocb -= SLI2_IOCB_RSP_R1XTRA_ENTRIES;
+	pring->numCiocb -= SLI2_IOCB_CMD_R3XTRA_ENTRIES;
+	pring->numRiocb -= SLI2_IOCB_RSP_R3XTRA_ENTRIES;
+
+	pring = &psli->ring[1];
+	pring->numCiocb += SLI2_IOCB_CMD_R1XTRA_ENTRIES;
+	pring->numRiocb += SLI2_IOCB_RSP_R1XTRA_ENTRIES;
+	pring->numCiocb += SLI2_IOCB_CMD_R3XTRA_ENTRIES;
+	pring->numRiocb += SLI2_IOCB_RSP_R3XTRA_ENTRIES;
+
+	/* Setup default profile for this ring */
+	pring->iotag_max = 4096;
+	pring->num_mask = 1;
+	pring->prt[0].profile = 0;      /* Mask 0 */
+	pring->prt[0].rctl = FC_UNSOL_DATA;
+	pring->prt[0].type = 5;
+	pring->prt[0].lpfc_sli_rcv_unsol_event = NULL;
+	return 0;
+}
+
 int
 lpfc_sli_setup(struct lpfc_hba *phba)
 {
@@ -2460,6 +2585,8 @@ lpfc_sli_setup(struct lpfc_hba *phba)
 				"SLI2 SLIM Data: x%x x%x\n",
 				phba->brd_no, totiocb, MAX_SLI2_IOCB);
 	}
+	if (phba->cfg_multi_ring_support == 2)
+		lpfc_extra_ring_setup(phba);
 
 	return 0;
 }
@@ -3080,6 +3207,7 @@ lpfc_intr_handler(int irq, void *dev_id, struct pt_regs * regs)
 			/* Clear Chip error bit */
 			writel(HA_ERATT, phba->HAregaddr);
 			readl(phba->HAregaddr); /* flush */
+			phba->stopped = 1;
 		}
 
 		spin_lock(phba->host->host_lock);
