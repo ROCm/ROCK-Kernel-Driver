@@ -29,6 +29,7 @@
 #include <linux/efi.h>
 #include <linux/memory_hotplug.h>
 #include <linux/initrd.h>
+#include <linux/dma-mapping.h>
 
 #include <asm/processor.h>
 #include <asm/system.h>
@@ -44,10 +45,6 @@
 #include <asm/hypervisor.h>
 
 extern unsigned long *contiguous_bitmap;
-
-#if defined(CONFIG_SWIOTLB)
-extern void swiotlb_init(void);
-#endif
 
 unsigned int __VMALLOC_RESERVE = 128 << 20;
 
@@ -764,7 +761,7 @@ void __init pgtable_cache_init(void)
 #endif
 				0,
 				pgd_ctor,
-				PTRS_PER_PMD == 1 ? pgd_dtor : NULL);
+				pgd_dtor);
 	if (!pgd_cache)
 		panic("pgtable_cache_init(): Cannot create pgd cache");
 }

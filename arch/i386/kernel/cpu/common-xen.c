@@ -601,7 +601,7 @@ void __cpuinit cpu_gdt_init(struct Xgt_desc_struct *gdt_descr)
 void __cpuinit cpu_init(void)
 {
 	int cpu = smp_processor_id();
-#ifndef CONFIG_XEN
+#ifndef CONFIG_X86_NO_TSS
 	struct tss_struct * t = &per_cpu(init_tss, cpu);
 #endif
 	struct thread_struct *thread = &current->thread;
@@ -664,7 +664,7 @@ void __cpuinit cpu_init(void)
 		memset(gdt, 0, PAGE_SIZE);
 
 		memcpy(gdt, cpu_gdt_table, GDT_SIZE);
-
+		
 		cpu_gdt_descr->size = GDT_SIZE;
 		cpu_gdt_descr->address = (unsigned long)gdt;
 	}

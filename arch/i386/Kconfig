@@ -224,7 +224,7 @@ config SMP_ALTERNATIVES
 	  when running on an true SMP host.
 
           If unsure, say N.
-
+	  
 config NR_CPUS
 	int "Maximum number of CPUs (2-255)"
 	range 2 255
@@ -797,7 +797,7 @@ config HOTPLUG_CPU
 config DOUBLEFAULT
 	default y
 	bool "Enable doublefault exception handler" if EMBEDDED
-	depends on !XEN
+	depends on !X86_NO_TSS
 	help
           This option allows trapping of rare doublefault exceptions that
           would otherwise cause a system to silently reboot. Disabling this
@@ -1016,6 +1016,13 @@ config PCI_GOMMCONFIG
 config PCI_GODIRECT
 	bool "Direct"
 
+config PCI_GOXEN_FE
+	bool "Xen PCI Frontend"
+	depends on X86_XEN
+	help
+	  The PCI device frontend driver allows the kernel to import arbitrary
+	  PCI devices from a PCI backend to support PCI driver domains.
+
 config PCI_GOANY
 	bool "Any"
 
@@ -1035,6 +1042,18 @@ config PCI_MMCONFIG
 	bool
 	depends on PCI && ACPI && (PCI_GOMMCONFIG || PCI_GOANY)
 	default y
+
+config XEN_PCIDEV_FRONTEND
+	bool
+	depends on PCI && X86_XEN && (PCI_GOXEN_FE || PCI_GOANY)
+	default y
+
+config XEN_PCIDEV_FE_DEBUG
+	bool "Xen PCI Frontend Debugging"
+	depends on XEN_PCIDEV_FRONTEND
+	default n
+	help
+	  Enables some debug statements within the PCI Frontend.
 
 source "drivers/pci/pcie/Kconfig"
 
@@ -1175,6 +1194,21 @@ config X86_BIOS_REBOOT
 config X86_TRAMPOLINE
 	bool
 	depends on X86_SMP || (X86_VOYAGER && SMP)
+	default y
+
+config X86_NO_TSS
+	bool
+	depends on X86_XEN
+	default y
+
+config X86_SYSENTER
+	bool
+	depends on !X86_NO_TSS
+	default y
+
+config X86_NO_IDT
+	bool
+	depends on X86_XEN
 	default y
 
 config KTIME_SCALAR

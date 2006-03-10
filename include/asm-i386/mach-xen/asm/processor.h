@@ -91,6 +91,10 @@ struct cpuinfo_x86 {
 
 extern struct cpuinfo_x86 boot_cpu_data;
 extern struct cpuinfo_x86 new_cpu_data;
+#ifndef CONFIG_X86_NO_TSS
+extern struct tss_struct doublefault_tss;
+DECLARE_PER_CPU(struct tss_struct, init_tss);
+#endif
 
 #ifdef CONFIG_SMP
 extern struct cpuinfo_x86 cpu_data[];
@@ -341,6 +345,9 @@ extern int bootloader_type;
 #define IO_BITMAP_BITS  65536
 #define IO_BITMAP_BYTES (IO_BITMAP_BITS/8)
 #define IO_BITMAP_LONGS (IO_BITMAP_BYTES/sizeof(long))
+#ifndef CONFIG_X86_NO_TSS
+#define IO_BITMAP_OFFSET offsetof(struct tss_struct,io_bitmap)
+#endif
 #define INVALID_IO_BITMAP_OFFSET 0x8000
 #define INVALID_IO_BITMAP_OFFSET_LAZY 0x9000
 
@@ -398,6 +405,54 @@ typedef struct {
 
 struct thread_struct;
 
+#ifndef CONFIG_X86_NO_TSS
+struct tss_struct {
+	unsigned short	back_link,__blh;
+	unsigned long	esp0;
+	unsigned short	ss0,__ss0h;
+	unsigned long	esp1;
+	unsigned short	ss1,__ss1h;	/* ss1 is used to cache MSR_IA32_SYSENTER_CS */
+	unsigned long	esp2;
+	unsigned short	ss2,__ss2h;
+	unsigned long	__cr3;
+	unsigned long	eip;
+	unsigned long	eflags;
+	unsigned long	eax,ecx,edx,ebx;
+	unsigned long	esp;
+	unsigned long	ebp;
+	unsigned long	esi;
+	unsigned long	edi;
+	unsigned short	es, __esh;
+	unsigned short	cs, __csh;
+	unsigned short	ss, __ssh;
+	unsigned short	ds, __dsh;
+	unsigned short	fs, __fsh;
+	unsigned short	gs, __gsh;
+	unsigned short	ldt, __ldth;
+	unsigned short	trace, io_bitmap_base;
+	/*
+	 * The extra 1 is there because the CPU will access an
+	 * additional byte beyond the end of the IO permission
+	 * bitmap. The extra byte must be all 1 bits, and must
+	 * be within the limit.
+	 */
+	unsigned long	io_bitmap[IO_BITMAP_LONGS + 1];
+	/*
+	 * Cache the current maximum and the last task that used the bitmap:
+	 */
+	unsigned long io_bitmap_max;
+	struct thread_struct *io_bitmap_owner;
+	/*
+	 * pads the TSS to be cacheline-aligned (size is 0x100)
+	 */
+	unsigned long __cacheline_filler[35];
+	/*
+	 * .. and then another 0x100 bytes for emergency kernel stack
+	 */
+	unsigned long stack[64];
+} __attribute__((packed));
+#endif
+
 #define ARCH_MIN_TASKALIGN	16
 
 struct thread_struct {
@@ -433,8 +488,38 @@ struct thread_struct {
 	.io_bitmap_ptr = NULL,						\
 }
 
+#ifndef CONFIG_X86_NO_TSS
+/*
+ * Note that the .io_bitmap member must be extra-big. This is because
+ * the CPU will access an additional byte beyond the end of the IO
+ * permission bitmap. The extra byte must be all 1 bits, and must
+ * be within the limit.
+ */
+#define INIT_TSS  {							\
+	.esp0		= sizeof(init_stack) + (long)&init_stack,	\
+	.ss0		= __KERNEL_DS,					\
+	.ss1		= __KERNEL_CS,					\
+	.io_bitmap_base	= INVALID_IO_BITMAP_OFFSET,			\
+	.io_bitmap	= { [ 0 ... IO_BITMAP_LONGS] = ~0 },		\
+}
+
+static inline void __load_esp0(struct tss_struct *tss, struct thread_struct *thread)
+{
+	tss->esp0 = thread->esp0;
+#ifdef CONFIG_X86_SYSENTER
+	/* This can only happen when SEP is enabled, no need to test "SEP"arately */
+	if (unlikely(tss->ss1 != thread->sysenter_cs)) {
+		tss->ss1 = thread->sysenter_cs;
+		wrmsr(MSR_IA32_SYSENTER_CS, thread->sysenter_cs, 0);
+	}
+#endif
+}
+#define load_esp0(tss, thread) \
+	__load_esp0(tss, thread)
+#else
 #define load_esp0(tss, thread) \
 	HYPERVISOR_stack_switch(__KERNEL_DS, (thread)->esp0)
+#endif
 
 #define start_thread(regs, new_eip, new_esp) do {		\
 	__asm__("movl %0,%%fs ; movl %0,%%gs": :"r" (0));	\

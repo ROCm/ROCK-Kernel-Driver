@@ -64,16 +64,12 @@ void foo(void)
 	OFFSET(pbe_orig_address, pbe, orig_address);
 	OFFSET(pbe_next, pbe, next);
 
-#ifndef CONFIG_XEN
+#ifdef CONFIG_X86_SYSENTER
 	/* Offset from the sysenter stack to tss.esp0 */
 	DEFINE(TSS_sysenter_esp0, offsetof(struct tss_struct, esp0) -
 		 sizeof(struct tss_struct));
 #endif
 
 	DEFINE(PAGE_SIZE_asm, PAGE_SIZE);
-#ifndef CONFIG_XEN
-	DEFINE(VSYSCALL_BASE, __fix_to_virt(FIX_VSYSCALL));
-#else
 	DEFINE(VSYSCALL_BASE, VSYSCALL_BASE);
-#endif
 }

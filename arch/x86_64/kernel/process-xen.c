@@ -289,9 +289,10 @@ void exit_thread(void)
 	kprobe_flush_task(me);
 
 	if (me->thread.io_bitmap_ptr) { 
-#ifndef CONFIG_XEN
+#ifndef CONFIG_X86_NO_TSS
 		struct tss_struct *tss = &per_cpu(init_tss, get_cpu());
-#else
+#endif
+#ifdef CONFIG_XEN
 		static physdev_op_t iobmp_op = {
 			.cmd = PHYSDEVOP_SET_IOBITMAP
 		};
@@ -299,13 +300,14 @@ void exit_thread(void)
 
 		kfree(t->io_bitmap_ptr);
 		t->io_bitmap_ptr = NULL;
-#ifndef CONFIG_XEN
 		/*
 		 * Careful, clear this in the TSS too:
 		 */
+#ifndef CONFIG_X86_NO_TSS
 		memset(tss->io_bitmap, 0xff, t->io_bitmap_max);
 		put_cpu();
-#else
+#endif
+#ifdef CONFIG_XEN
 		HYPERVISOR_physdev_op(&iobmp_op);
 #endif
 		t->io_bitmap_max = 0;
@@ -465,6 +467,9 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 	struct thread_struct *prev = &prev_p->thread,
 				 *next = &next_p->thread;
 	int cpu = smp_processor_id();  
+#ifndef CONFIG_X86_NO_TSS
+	struct tss_struct *tss = &per_cpu(init_tss, cpu);
+#endif
 	physdev_op_t iopl_op, iobmp_op;
 	multicall_entry_t _mcl[8], *mcl = _mcl;
 

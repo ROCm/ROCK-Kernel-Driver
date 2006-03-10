@@ -60,8 +60,18 @@ asmlinkage int system_call(void);
 
 struct desc_struct default_ldt[] = { { 0, 0 }, { 0, 0 }, { 0, 0 },
 		{ 0, 0 }, { 0, 0 } };
+
 /* Do we ignore FPU interrupts ? */
 char ignore_fpu_irq = 0;
+
+#ifndef CONFIG_X86_NO_IDT
+/*
+ * The IDT has to be page-aligned to simplify the Pentium
+ * F0 0F bug workaround.. We have a special link segment
+ * for this.
+ */
+struct desc_struct idt_table[256] __attribute__((__section__(".data.idt"))) = { {0, 0}, };
+#endif
 
 asmlinkage void divide_error(void);
 asmlinkage void debug(void);
@@ -80,7 +90,11 @@ asmlinkage void page_fault(void);
 asmlinkage void coprocessor_error(void);
 asmlinkage void simd_coprocessor_error(void);
 asmlinkage void alignment_check(void);
+#ifndef CONFIG_XEN
+asmlinkage void spurious_interrupt_bug(void);
+#else
 asmlinkage void fixup_4gb_segment(void);
+#endif
 asmlinkage void machine_check(void);
 
 static int kstack_depth_to_print = 24;
@@ -383,7 +397,7 @@ void die(const char * str, struct pt_regs * regs, long err)
 
 static inline void die_if_kernel(const char * str, struct pt_regs * regs, long err)
 {
-  if (!user_mode_vm(regs))
+	if (!user_mode_vm(regs))
 		die(str, regs, err);
 }
 
@@ -483,9 +497,6 @@ DO_ERROR(10, SIGSEGV, "invalid TSS", invalid_TSS)
 DO_ERROR(11, SIGBUS,  "segment not present", segment_not_present)
 DO_ERROR(12, SIGBUS,  "stack segment", stack_segment)
 DO_ERROR_INFO(17, SIGBUS, "alignment check", alignment_check, BUS_ADRALN, 0)
-#ifdef CONFIG_X86_MCE
-DO_ERROR(18, SIGBUS, "machine check", machine_check)
-#endif
 DO_ERROR_INFO(32, SIGSEGV, "iret exception", iret_error, ILL_BADSTK, 0)
 
 fastcall void __kprobes do_general_protection(struct pt_regs * regs,
@@ -733,7 +744,7 @@ fastcall void __kprobes do_debug(struct pt_regs * regs, long error_code)
 		 * check for kernel mode by just checking the CPL
 		 * of CS.
 		 */
-	  if (!user_mode(regs))
+		if (!user_mode(regs))
 			goto clear_TF_reenable;
 	}
 
@@ -900,6 +911,15 @@ fastcall void do_simd_coprocessor_error(struct pt_regs * regs,
 }
 
 #ifndef CONFIG_XEN
+fastcall void do_spurious_interrupt_bug(struct pt_regs * regs,
+					  long error_code)
+{
+#if 0
+	/* No need to warn about this any longer. */
+	printk("Ignoring P6 Local APIC Spurious Interrupt Bug...\n");
+#endif
+}
+
 fastcall void setup_x86_bogus_stack(unsigned char * stk)
 {
 	unsigned long *switch16_ptr, *switch32_ptr;
@@ -983,6 +1003,14 @@ asmlinkage void math_emulate(long arg)
 #ifdef CONFIG_X86_F00F_BUG
 void __init trap_init_f00f_bug(void)
 {
+	__set_fixmap(FIX_F00F_IDT, __pa(&idt_table), PAGE_KERNEL_RO);
+
+	/*
+	 * Update the IDT descriptor and reload the IDT so that
+	 * it uses the read-only mapped virtual address.
+	 */
+	idt_descr.address = fix_to_virt(FIX_F00F_IDT);
+	load_idt(&idt_descr);
 }
 #endif
 

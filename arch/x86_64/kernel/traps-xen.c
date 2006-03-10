@@ -47,6 +47,10 @@
 #include <asm/proto.h>
 #include <asm/nmi.h>
 
+#ifndef CONFIG_X86_NO_IDT
+extern struct gate_struct idt_table[256]; 
+#endif
+
 asmlinkage void divide_error(void);
 asmlinkage void debug(void);
 asmlinkage void nmi(void);
@@ -132,7 +136,7 @@ int printk_address(unsigned long address)
 static unsigned long *in_exception_stack(unsigned cpu, unsigned long stack,
 					unsigned *usedp, const char **idp)
 {
-#ifndef CONFIG_XEN
+#ifndef CONFIG_X86_NO_TSS
 	static char ids[][8] = {
 		[DEBUG_STACK - 1] = "#DB",
 		[NMI_STACK - 1] = "NMI",

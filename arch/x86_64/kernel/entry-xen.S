@@ -51,6 +51,7 @@
 #include <asm/page.h>
 #include <asm/errno.h>
 #include <xen/interface/arch-x86_64.h>
+#include <xen/interface/features.h>
 
 #include "irq_vectors.h"
 
@@ -61,6 +62,8 @@
 #ifndef CONFIG_PREEMPT
 #define retint_kernel retint_restore_args
 #endif	
+
+NMI_MASK = 0x80000000
 	
 /*
  * C code is not supposed to know about undefined top of stack. Every time 
@@ -143,6 +146,21 @@
          * #define VGCF_IN_SYSCALL (1<<8) 
          */
 	.macro HYPERVISOR_IRET flag
+	testb $3,1*8(%rsp)
+	jnz   2f
+	testl $NMI_MASK,2*8(%rsp)
+	jnz   2f
+
+	testb $1,(xen_features+XENFEAT_supervisor_mode_kernel)
+	jnz   1f
+
+	/* Direct iret to kernel space. Correct CS and SS. */
+	orb   $3,1*8(%rsp)
+	orb   $3,4*8(%rsp)
+1:	iretq
+
+2:	/* Slow iret via hypervisor. */
+	andl  $~NMI_MASK, 16(%rsp)
 	pushq $\flag
 	jmp  hypercall_page + (__HYPERVISOR_iret * 32)
 	.endm
@@ -800,15 +818,17 @@ ENTRY(do_hypervisor_callback)   # do_hyperviosr_callback(struct *pt_regs)
 	jmp  error_exit
 
 #ifdef CONFIG_X86_LOCAL_APIC
-ENTRY(nmi)
+KPROBE_ENTRY(nmi)
 	zeroentry do_nmi_callback
 ENTRY(do_nmi_callback)
         addq $8, %rsp
         call do_nmi
+        orl  $NMI_MASK,EFLAGS(%rsp)
         RESTORE_REST
         XEN_BLOCK_EVENTS(%rsi)
         GET_THREAD_INFO(%rcx)
         jmp  retint_restore_args
+	.previous .text
 #endif
 
         ALIGN

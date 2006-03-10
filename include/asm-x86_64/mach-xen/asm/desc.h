@@ -90,6 +90,9 @@ static inline void clear_LDT(void)
  * something other than this.
  */
 extern struct desc_struct default_ldt[];
+#ifndef CONFIG_X86_NO_IDT
+extern struct gate_struct idt_table[]; 
+#endif
 extern struct desc_ptr cpu_gdt_descr[];
 
 /* the cpu gdt accessor */
@@ -112,6 +115,31 @@ static inline void _set_gate(void *adr, unsigned type, unsigned long func, unsig
 	memcpy(adr, &s, 16); 
 } 
 
+#ifndef CONFIG_X86_NO_IDT
+static inline void set_intr_gate(int nr, void *func) 
+{ 
+	BUG_ON((unsigned)nr > 0xFF);
+	_set_gate(&idt_table[nr], GATE_INTERRUPT, (unsigned long) func, 0, 0); 
+} 
+
+static inline void set_intr_gate_ist(int nr, void *func, unsigned ist) 
+{ 
+	BUG_ON((unsigned)nr > 0xFF);
+	_set_gate(&idt_table[nr], GATE_INTERRUPT, (unsigned long) func, 0, ist); 
+} 
+
+static inline void set_system_gate(int nr, void *func) 
+{ 
+	BUG_ON((unsigned)nr > 0xFF);
+	_set_gate(&idt_table[nr], GATE_INTERRUPT, (unsigned long) func, 3, 0); 
+} 
+
+static inline void set_system_gate_ist(int nr, void *func, unsigned ist)
+{
+	_set_gate(&idt_table[nr], GATE_INTERRUPT, (unsigned long) func, 3, ist);
+}
+#endif
+
 static inline void set_tssldt_descriptor(void *ptr, unsigned long tss, unsigned type, 
 					 unsigned size) 
 { 
@@ -127,6 +155,22 @@ static inline void set_tssldt_descriptor(void *ptr, unsigned long tss, unsigned 
 	d.base3 = PTR_HIGH(tss); 
 	memcpy(ptr, &d, 16); 
 }
+
+#ifndef CONFIG_X86_NO_TSS
+static inline void set_tss_desc(unsigned cpu, void *addr)
+{ 
+	/*
+	 * sizeof(unsigned long) coming from an extra "long" at the end
+	 * of the iobitmap. See tss_struct definition in processor.h
+	 *
+	 * -1? seg base+limit should be pointing to the address of the
+	 * last valid byte
+	 */
+	set_tssldt_descriptor(&cpu_gdt(cpu)[GDT_ENTRY_TSS], 
+		(unsigned long)addr, DESC_TSS,
+		IO_BITMAP_OFFSET + IO_BITMAP_BYTES + sizeof(unsigned long) - 1);
+} 
+#endif
 
 static inline void set_ldt_desc(unsigned cpu, void *addr, int size)
 { 
@@ -196,13 +240,13 @@ static inline void load_TLS(struct thread_struct *t, unsigned int cpu)
  */
 static inline void load_LDT_nolock (mm_context_t *pc, int cpu)
 {
-        void *segments = pc->ldt;
-        int count = pc->size;
+	void *segments = pc->ldt;
+	int count = pc->size;
 
-        if (likely(!count))
-                segments = NULL;
+	if (likely(!count))
+		segments = NULL;
 
-        xen_set_ldt((unsigned long)segments, count);
+	xen_set_ldt((unsigned long)segments, count);
 }
 
 static inline void load_LDT(mm_context_t *pc)

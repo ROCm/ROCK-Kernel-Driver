@@ -45,9 +45,9 @@ static void __init clear_bss(void)
 
 extern char saved_command_line[];
 
-#ifndef CONFIG_XEN
 static void __init copy_bootdata(char *real_mode_data)
 {
+#ifndef CONFIG_XEN
 	int new_data;
 	char * command_line;
 
@@ -63,20 +63,16 @@ static void __init copy_bootdata(char *real_mode_data)
 	}
 	command_line = (char *) ((u64)(new_data));
 	memcpy(saved_command_line, command_line, COMMAND_LINE_SIZE);
-	printk("Bootdata ok (command line is %s)\n", saved_command_line);
-}
 #else
-static void __init copy_bootdata(struct start_info *start_info)
-{
 	int max_cmdline;
 	
 	if ((max_cmdline = MAX_GUEST_CMDLINE) > COMMAND_LINE_SIZE)
 		max_cmdline = COMMAND_LINE_SIZE;
-	memcpy(saved_command_line, start_info->cmd_line, max_cmdline);
+	memcpy(saved_command_line, xen_start_info->cmd_line, max_cmdline);
 	saved_command_line[max_cmdline-1] = '\0';
+#endif
 	printk("Bootdata ok (command line is %s)\n", saved_command_line);
 }
-#endif
 
 static void __init setup_boot_cpu_data(void)
 {
@@ -96,15 +92,15 @@ static void __init setup_boot_cpu_data(void)
 	boot_cpu_data.x86_mask = eax & 0xf;
 }
 
-void __init x86_64_start_kernel(struct start_info *start_info)
+void __init x86_64_start_kernel(char * real_mode_data)
 {
 	char *s;
 	int i;
 
-	xen_start_info = start_info;
+	xen_start_info = (struct start_info *)real_mode_data;
 	if (!xen_feature(XENFEAT_auto_translated_physmap)) {
 		phys_to_machine_mapping =
-			(unsigned long *)start_info->mfn_list;
+			(unsigned long *)xen_start_info->mfn_list;
 		start_pfn = (__pa(xen_start_info->pt_base) >> PAGE_SHIFT) +
 			xen_start_info->nr_pt_frames;
 	}
@@ -119,7 +115,7 @@ void __init x86_64_start_kernel(struct start_info *start_info)
  		cpu_pda(i) = &boot_cpu_pda[i];
 
 	pda_init(0);
-	copy_bootdata(start_info);
+	copy_bootdata(real_mode_data);
 #ifdef CONFIG_SMP
 	cpu_set(0, cpu_online_map);
 #endif

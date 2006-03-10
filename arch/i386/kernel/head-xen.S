@@ -1,3 +1,6 @@
+
+
+.text
 #include <linux/config.h>
 #include <linux/threads.h>
 #include <linux/linkage.h>
@@ -6,8 +9,6 @@
 #include <asm/thread_info.h>
 #include <asm/asm-offsets.h>
 #include <xen/interface/arch-x86_32.h>
-
-.text
 
 /*
  * References to members of the new_cpu_data structure.
@@ -24,11 +25,6 @@
 
 ENTRY(startup_32)
 	movl %esi,xen_start_info
-
-#if 0
-ENTRY(startup_32_smp)
-#endif /* CONFIG_SMP */
-
 	cld
 
 	/* Set up the stack pointer */
@@ -56,21 +52,13 @@ checkCPUtype:
 	movb %cl,X86_MASK
 	movl %edx,X86_CAPABILITY
 
+	movb $1,X86_HARD_MATH
+
 	xorl %eax,%eax			# Clear FS/GS and LDT
 	movl %eax,%fs
 	movl %eax,%gs
 	cld			# gcc2 wants the direction flag cleared at all times
 
-#if 0
-	movb ready, %cl
-	movb $1, ready
-	cmpb $0,%cl
-	je 1f			# the first CPU calls start_kernel
-				# all other CPUs call initialize_secondary
-	call initialize_secondary
-	jmp L6
-1:
-#endif /* CONFIG_SMP */
 	call start_kernel
 L6:
 	jmp L6			# main should never return here, but
@@ -99,27 +87,9 @@ ENTRY(empty_zero_page)
  */
 .data
 
-#ifndef CONFIG_XEN
-ready:	.byte 0
-
-.globl idt_descr
-.globl cpu_gdt_descr
-
-	ALIGN
-	.word 0				# 32-bit align idt_desc.address
-idt_descr:
-	.word IDT_ENTRIES*8-1		# idt contains 256 entries
-	.long idt_table
-
-# boot GDT descriptor (later on used by CPU#0):
-	.word 0				# 32 bit align gdt_desc.address
-cpu_gdt_descr:
-	.word GDT_SIZE
-	.long cpu_gdt_table
-
-	.fill NR_CPUS-1,8,0		# space for the other GDT descriptors
-#endif
-
+/*
+ * The Global Descriptor Table contains 28 quadwords, per-CPU.
+ */
 ENTRY(cpu_gdt_table)
 	.quad 0x0000000000000000	/* NULL descriptor */
 	.quad 0x0000000000000000	/* 0x0b reserved */
@@ -161,16 +131,19 @@ ENTRY(cpu_gdt_table)
 	.quad 0x0000000000000000	/* 0xc0 APM CS 16 code (16 bit) */
 	.quad 0x0000000000000000	/* 0xc8 APM DS    data */
 
-	.fill GDT_ENTRIES - (.-cpu_gdt_table) / 8,8,0
+	.quad 0x0000000000000000	/* 0xd0 - ESPFIX 16-bit SS */
+	.quad 0x0000000000000000	/* 0xd8 - unused */
+	.quad 0x0000000000000000	/* 0xe0 - unused */
+	.quad 0x0000000000000000	/* 0xe8 - unused */
+	.quad 0x0000000000000000	/* 0xf0 - unused */
+	.quad 0x0000000000000000	/* 0xf8 - GDT entry 31: double-fault TSS */
 
 /*
  * __xen_guest information
  */
-.macro utoh value
- .if (\value) < 0
-	utoh (((\value)>>4)&0x0fffffff)
- .elseif (\value) >= 0x10
-	utoh ((\value)>>4)
+.macro utoa value
+ .if (\value) < 0 || (\value) >= 0x10
+	utoa (((\value)>>4)&0x0fffffff)
  .endif
  .if ((\value) & 0xf) < 10
   .byte '0' + ((\value) & 0xf)
@@ -182,11 +155,14 @@ ENTRY(cpu_gdt_table)
 .section __xen_guest
 	.ascii	"GUEST_OS=linux,GUEST_VER=2.6"
 	.ascii	",XEN_VER=xen-3.0"
-	.ascii	",VIRT_BASE=0x"; utoh __PAGE_OFFSET
-	.ascii	",HYPERCALL_PAGE=0x"; utoh ((__PHYSICAL_START+HYPERCALL_PAGE_OFFSET)>>PAGE_SHIFT)
+	.ascii	",VIRT_BASE=0x"
+		utoa __PAGE_OFFSET
+	.ascii	",HYPERCALL_PAGE=0x"
+		utoa ((__PHYSICAL_START+HYPERCALL_PAGE_OFFSET)>>PAGE_SHIFT)
 	.ascii  ",FEATURES=writable_page_tables"
 	.ascii	         "|writable_descriptor_tables"
 	.ascii	         "|auto_translated_physmap"
+	.ascii	         "|pae_pgdir_above_4gb"
 	.ascii	         "|supervisor_mode_kernel"
 #ifdef CONFIG_X86_PAE
 	.ascii	",PAE=yes"

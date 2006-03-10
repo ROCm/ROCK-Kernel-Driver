@@ -108,8 +108,8 @@ static inline unsigned int xen_io_apic_read(unsigned int apic, unsigned int reg)
 	int ret;
 
 	op.cmd = PHYSDEVOP_APIC_READ;
-	op.u.apic_op.apic = mp_ioapics[apic].mpc_apicid;
-	op.u.apic_op.offset = reg;
+	op.u.apic_op.apic_physbase = mp_ioapics[apic].mpc_apicaddr;
+	op.u.apic_op.reg = reg;
 	ret = HYPERVISOR_physdev_op(&op);
 	if (ret)
 		return ret;
@@ -121,8 +121,8 @@ static inline void xen_io_apic_write(unsigned int apic, unsigned int reg, unsign
 	physdev_op_t op;
 
 	op.cmd = PHYSDEVOP_APIC_WRITE;
-	op.u.apic_op.apic = mp_ioapics[apic].mpc_apicid;
-	op.u.apic_op.offset = reg;
+	op.u.apic_op.apic_physbase = mp_ioapics[apic].mpc_apicaddr;
+	op.u.apic_op.reg = reg;
 	op.u.apic_op.value = value;
 	HYPERVISOR_physdev_op(&op);
 }
@@ -317,7 +317,7 @@ static int __init setup_enable_8254_timer(char *s)
 
 __setup("disable_8254_timer", setup_disable_8254_timer);
 __setup("enable_8254_timer", setup_enable_8254_timer);
-#endif
+#endif /* !CONFIG_XEN */
 
 #include <asm/pci-direct.h>
 #include <linux/pci_ids.h>
@@ -377,20 +377,21 @@ void __init check_ioapic(void)
 #endif
 					/* RED-PEN skip them on mptables too? */
 					return;
+				case PCI_VENDOR_ID_ATI:
 
 				/* This should be actually default, but
 				   for 2.6.16 let's do it for ATI only where
 				   it's really needed. */
-				case PCI_VENDOR_ID_ATI:
 #ifndef CONFIG_XEN
-					if (timer_over_8254 == 1) {
-						timer_over_8254 = 0;
+					if (timer_over_8254 == 1) {	
+						timer_over_8254 = 0;	
 					printk(KERN_INFO
 		"ATI board detected. Disabling timer routing over 8254.\n");
-					}
+					}	
 #endif
 					return;
 				} 
+
 
 				/* No multi-function device? */
 				type = read_pci_config_byte(num,slot,func,
@@ -2144,7 +2145,7 @@ int __init io_apic_get_redir_entries (int ioapic)
 }
 
 
-int io_apic_set_pci_routing (int ioapic, int pin, int irq, int triggering, int polarity)
+int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level, int active_high_low)
 {
 	struct IO_APIC_route_entry entry;
 	unsigned long flags;
@@ -2166,8 +2167,8 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq, int triggering, int p
 	entry.delivery_mode = INT_DELIVERY_MODE;
 	entry.dest_mode = INT_DEST_MODE;
 	entry.dest.logical.logical_dest = cpu_mask_to_apicid(TARGET_CPUS);
-	entry.trigger = triggering;
-	entry.polarity = polarity;
+	entry.trigger = edge_level;
+	entry.polarity = active_high_low;
 	entry.mask = 1;					 /* Disabled (masked) */
 
 	irq = gsi_irq_sharing(irq);
@@ -2182,9 +2183,9 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq, int triggering, int p
 	apic_printk(APIC_VERBOSE,KERN_DEBUG "IOAPIC[%d]: Set PCI routing entry (%d-%d -> 0x%x -> "
 		"IRQ %d Mode:%i Active:%i)\n", ioapic, 
 	       mp_ioapics[ioapic].mpc_apicid, pin, entry.vector, irq,
-	       triggering, polarity);
+	       edge_level, active_high_low);
 
-	ioapic_register_intr(irq, entry.vector, triggering);
+	ioapic_register_intr(irq, entry.vector, edge_level);
 
 	if (!ioapic && (irq < 16))
 		disable_8259A_irq(irq);

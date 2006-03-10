@@ -125,6 +125,16 @@ config X86_64_XEN
 	help
 	  This option will compile a kernel compatible with Xen hypervisor
 
+config X86_NO_TSS
+	bool
+	depends on X86_64_XEN
+	default y
+
+config X86_NO_IDT
+	bool
+	depends on X86_64_XEN
+	default y
+
 #
 # Define implied options from the CPU selection here
 #
@@ -212,7 +222,7 @@ config X86_LOCAL_APIC
 
 config MTRR
 	bool "MTRR (Memory Type Range Register) support"
-	depends on !X86_64_XEN
+	depends on !XEN_UNPRIVILEGED_GUEST
 	---help---
 	  On Intel P6 family processors (Pentium Pro, Pentium II and later)
 	  the Memory Type Range Registers (MTRRs) may be used to control
@@ -522,9 +532,7 @@ endif
 
 source "drivers/acpi/Kconfig"
 
-if !X86_64_XEN
 source "arch/x86_64/kernel/cpufreq/Kconfig"
-endif
 
 endmenu
 
@@ -542,6 +550,21 @@ config PCI_DIRECT
 config PCI_MMCONFIG
 	bool "Support mmconfig PCI config space access"
 	depends on PCI && ACPI
+
+config XEN_PCIDEV_FRONTEND
+	bool "Xen PCI Frontend"
+	depends on PCI && X86_64_XEN
+	default y
+	help
+	  The PCI device frontend driver allows the kernel to import arbitrary
+	  PCI devices from a PCI backend to support PCI driver domains.
+
+config XEN_PCIDEV_FE_DEBUG
+	bool "Xen PCI Frontend Debugging"
+	depends on XEN_PCIDEV_FRONTEND
+	default n
+	help
+	  Enables some debug statements within the PCI Frontend.
 
 config UNORDERED_IO
        bool "Unordered IO mapping access"

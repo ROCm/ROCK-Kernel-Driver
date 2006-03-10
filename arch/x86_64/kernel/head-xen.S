@@ -31,6 +31,7 @@ ENTRY(_start)
 	/* zero EFLAGS after setting rsp */
 	pushq $0
 	popfq
+
 	/* rsi is pointer to startup info structure.
 	   pass it to C */
 	movq %rsi,%rdi
@@ -77,42 +78,9 @@ NEXT_PAGE(empty_zero_page)
 	.skip PAGE_SIZE
 
 NEXT_PAGE(hypercall_page)
-	.skip PAGE_SIZE
+	.fill	512,8,0
 
 #undef NEXT_PAGE
-
-	.data
-
-#ifndef CONFIG_XEN
-#ifdef CONFIG_ACPI_SLEEP
-	.align PAGE_SIZE
-ENTRY(wakeup_level4_pgt)
-	.quad	phys_level3_ident_pgt | 0x007
-	.fill	255,8,0
-	.quad	phys_level3_physmem_pgt | 0x007
-	.fill	254,8,0
-	/* (2^48-(2*1024*1024*1024))/(2^39) = 511 */
-	.quad	phys_level3_kernel_pgt | 0x007
-#endif
-
-#ifndef CONFIG_HOTPLUG_CPU
-	__INITDATA
-#endif
-	/*
-	 * This default setting generates an ident mapping at address 0x100000
-	 * and a mapping for the kernel that precisely maps virtual address
-	 * 0xffffffff80000000 to physical address 0x000000. (always using
-	 * 2Mbyte large pages provided by PAE mode)
-	 */
-	.align PAGE_SIZE
-ENTRY(boot_level4_pgt)
-	.quad	phys_level3_ident_pgt | 0x007
-	.fill	255,8,0
-	.quad	phys_level3_physmem_pgt | 0x007
-	.fill	254,8,0
-	/* (2^48-(2*1024*1024*1024))/(2^39) = 511 */
-	.quad	phys_level3_kernel_pgt | 0x007
-#endif
 
 	.data
 
@@ -165,10 +133,8 @@ gdt_end:
  * __xen_guest information
  */
 .macro utoh value
- .if (\value) < 0
+ .if (\value) < 0 || (\value) >= 0x10
 	utoh (((\value)>>4)&0x0fffffffffffffff)
- .elseif (\value) >= 0x10
-	utoh ((\value)>>4)
  .endif
  .if ((\value) & 0xf) < 10
   .byte '0' + ((\value) & 0xf)

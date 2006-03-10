@@ -60,11 +60,6 @@ int enable_local_apic __initdata = 0; /* -1=force-disable, +1=force-enable */
  */
 int apic_verbosity;
 
-int get_physical_broadcast(void)
-{
-        return 0xff;
-}
-
 /*
  * 'what should we do if we get a hw irq event on an illegal vector'.
  * each architecture has to answer this themselves.
@@ -83,6 +78,11 @@ void ack_bad_irq(unsigned int irq)
 	 */
 	if (cpu_has_apic)
 		ack_APIC_irq();
+}
+
+int get_physical_broadcast(void)
+{
+        return 0xff;
 }
 
 #ifndef CONFIG_XEN

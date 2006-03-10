@@ -40,7 +40,7 @@ cpumask_t cpu_initialized __cpuinitdata = CPU_MASK_NONE;
 struct x8664_pda *_cpu_pda[NR_CPUS] __read_mostly;
 struct x8664_pda boot_cpu_pda[NR_CPUS] __cacheline_aligned;
 
-#ifndef CONFIG_XEN
+#ifndef CONFIG_X86_NO_IDT
 struct desc_ptr idt_descr = { 256 * 16, (unsigned long) idt_table }; 
 #endif
 
@@ -199,7 +199,7 @@ void pda_init(int cpu)
 	pda->irqstackptr += IRQSTACKSIZE-64;
 } 
 
-#ifndef CONFIG_XEN
+#ifndef CONFIG_X86_NO_TSS
 char boot_exception_stacks[(N_EXCEPTION_STACKS - 1) * EXCEPTION_STKSZ + DEBUG_STKSZ]
 __attribute__((section(".bss.page_aligned")));
 #endif
@@ -244,7 +244,7 @@ void __cpuinit check_efer(void)
 void __cpuinit cpu_init (void)
 {
 	int cpu = stack_smp_processor_id();
-#ifndef CONFIG_XEN
+#ifndef CONFIG_X86_NO_TSS
 	struct tss_struct *t = &per_cpu(init_tss, cpu);
 	unsigned long v; 
 	char *estacks = NULL; 
@@ -257,7 +257,7 @@ void __cpuinit cpu_init (void)
 		pda_init(cpu);
 		zap_low_mappings(cpu);
 	}
-#ifndef CONFIG_XEN
+#ifndef CONFIG_X86_NO_TSS
 	else
 		estacks = boot_exception_stacks; 
 #endif
@@ -292,7 +292,7 @@ void __cpuinit cpu_init (void)
 
 	check_efer();
 
-#ifndef CONFIG_XEN
+#ifndef CONFIG_X86_NO_TSS
 	/*
 	 * set up and load the per-CPU TSS
 	 */
@@ -337,8 +337,10 @@ void __cpuinit cpu_init (void)
 		BUG();
 	enter_lazy_tlb(&init_mm, me);
 
-#ifndef CONFIG_XEN
+#ifndef CONFIG_X86_NO_TSS
 	set_tss_desc(cpu, t);
+#endif
+#ifndef CONFIG_XEN
 	load_TR_desc();
 #endif
 	load_LDT(&init_mm.context);

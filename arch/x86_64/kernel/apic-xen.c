@@ -37,7 +37,6 @@
 #include <asm/idle.h>
 
 int apic_verbosity;
-int disable_apic;
 
 /*
  * 'what should we do if we get a hw irq event on an illegal vector'.
@@ -115,6 +114,8 @@ void smp_apic_timer_interrupt(struct pt_regs *regs)
 	irq_exit();
 }
 
+int __initdata unsync_tsc_on_multicluster;
+
 /*
  * This interrupt should _never_ happen with our APIC/SMP architecture
  */
@@ -181,6 +182,7 @@ asmlinkage void smp_error_interrupt(void)
 	irq_exit();
 }
 
+int disable_apic;
 
 /*
  * This initializes the IO-APIC and APIC hardware if this is

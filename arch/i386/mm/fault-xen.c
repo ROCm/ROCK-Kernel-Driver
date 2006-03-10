@@ -469,7 +469,7 @@ bad_area_nosemaphore:
 		return;
 	}
 
-#if 0
+#ifdef CONFIG_X86_F00F_BUG
 	/*
 	 * Pentium F0 0F C7 C8 bug workaround.
 	 */

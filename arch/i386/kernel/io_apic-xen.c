@@ -61,8 +61,8 @@ static inline unsigned int xen_io_apic_read(unsigned int apic, unsigned int reg)
 	int ret;
 
 	op.cmd = PHYSDEVOP_APIC_READ;
-	op.u.apic_op.apic = mp_ioapics[apic].mpc_apicid;
-	op.u.apic_op.offset = reg;
+	op.u.apic_op.apic_physbase = mp_ioapics[apic].mpc_apicaddr;
+	op.u.apic_op.reg = reg;
 	ret = HYPERVISOR_physdev_op(&op);
 	if (ret)
 		return ret;
@@ -74,8 +74,8 @@ static inline void xen_io_apic_write(unsigned int apic, unsigned int reg, unsign
 	physdev_op_t op;
 
 	op.cmd = PHYSDEVOP_APIC_WRITE;
-	op.u.apic_op.apic = mp_ioapics[apic].mpc_apicid;
-	op.u.apic_op.offset = reg;
+	op.u.apic_op.apic_physbase = mp_ioapics[apic].mpc_apicaddr;
+	op.u.apic_op.reg = reg;
 	op.u.apic_op.value = value;
 	HYPERVISOR_physdev_op(&op);
 }
@@ -786,8 +786,6 @@ static int find_irq_entry(int apic, int pin, int type)
 	return -1;
 }
 
-#ifndef CONFIG_XEN
-#endif
 /*
  * Find the pin to which IRQ[irq] (ISA) is connected
  */
@@ -1530,6 +1528,8 @@ void __init print_IO_APIC(void)
 	return;
 }
 
+#if 0
+
 static void print_APIC_bitfield (int base)
 {
 	unsigned int v;
@@ -1670,6 +1670,9 @@ void /*__init*/ print_PIC(void)
 	v = inb(0x4d1) << 8 | inb(0x4d0);
 	printk(KERN_DEBUG "... PIC ELCR: %04x\n", v);
 }
+
+#endif  /*  0  */
+
 #else
 void __init print_IO_APIC(void) { }
 #endif /* !CONFIG_XEN */

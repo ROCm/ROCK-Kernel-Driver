@@ -465,7 +465,7 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 			elfcorehdr_addr = memparse(from+11, &from);
 #endif
 
-#ifdef CONFIG_HOTPLUG_CPU
+#if defined(CONFIG_HOTPLUG_CPU) && !defined(CONFIG_XEN)
 		else if (!memcmp(from, "additional_cpus=", 16))
 			setup_additional_cpus(from+16);
 #endif

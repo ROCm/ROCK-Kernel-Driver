@@ -156,7 +156,6 @@ static inline void set_in_cr4 (unsigned long mask)
 	}
 }
 
-
 static inline void clear_in_cr4 (unsigned long mask)
 {
 #ifndef CONFIG_XEN
@@ -175,7 +174,6 @@ static inline void clear_in_cr4 (unsigned long mask)
  */
 #define MCA_bus 0
 #define MCA_bus__is_a_macro
-
 
 /*
  * User space process size. 47bits minus one guard page.
@@ -198,6 +196,9 @@ static inline void clear_in_cr4 (unsigned long mask)
 #define IO_BITMAP_BITS  65536
 #define IO_BITMAP_BYTES (IO_BITMAP_BITS/8)
 #define IO_BITMAP_LONGS (IO_BITMAP_BYTES/sizeof(long))
+#ifndef CONFIG_X86_NO_TSS
+#define IO_BITMAP_OFFSET offsetof(struct tss_struct,io_bitmap)
+#endif
 #define INVALID_IO_BITMAP_OFFSET 0x8000
 
 struct i387_fxsave_struct {
@@ -217,6 +218,33 @@ struct i387_fxsave_struct {
 union i387_union {
 	struct i387_fxsave_struct	fxsave;
 };
+
+#ifndef CONFIG_X86_NO_TSS
+struct tss_struct {
+	u32 reserved1;
+	u64 rsp0;	
+	u64 rsp1;
+	u64 rsp2;
+	u64 reserved2;
+	u64 ist[7];
+	u32 reserved3;
+	u32 reserved4;
+	u16 reserved5;
+	u16 io_bitmap_base;
+	/*
+	 * The extra 1 is there because the CPU will access an
+	 * additional byte beyond the end of the IO permission
+	 * bitmap. The extra byte must be all 1 bits, and must
+	 * be within the limit. Thus we have:
+	 *
+	 * 128 bytes, the bitmap itself, for ports 0..0x3ff
+	 * 8 bytes, for an extra "long" of ~0UL
+	 */
+	unsigned long io_bitmap[IO_BITMAP_LONGS + 1];
+} __attribute__((packed)) ____cacheline_aligned;
+
+DECLARE_PER_CPU(struct tss_struct,init_tss);
+#endif
 
 extern struct cpuinfo_x86 boot_cpu_data;
 
@@ -253,12 +281,18 @@ struct thread_struct {
 	unsigned io_bitmap_max;
 /* cached TLS descriptors. */
 	u64 tls_array[GDT_ENTRY_TLS_ENTRIES];
-       	unsigned int	iopl;
+	unsigned int	iopl;
 } __attribute__((aligned(16)));
 
 #define INIT_THREAD  { \
 	.rsp0 = (unsigned long)&init_stack + sizeof(init_stack) \
 }
+
+#ifndef CONFIG_X86_NO_TSS
+#define INIT_TSS  { \
+	.rsp0 = (unsigned long)&init_stack + sizeof(init_stack) \
+}
+#endif
 
 #define INIT_MMAP \
 { &init_mm, 0, 0, NULL, PAGE_SHARED, VM_READ | VM_WRITE | VM_EXEC, 1, NULL, NULL }

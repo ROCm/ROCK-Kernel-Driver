@@ -366,7 +366,7 @@ asmlinkage void __kprobes do_page_fault(struct pt_regs *regs,
 		 * entries.
 		 */
 		if (!(error_code & (PF_RSVD|PF_USER|PF_PROT)) &&
-		    address >= HYPERVISOR_VIRT_END) {
+		    address >= PAGE_OFFSET) {
 			if (vmalloc_fault(address) < 0)
 				goto bad_area_nosemaphore;
 			return;

@@ -215,10 +215,9 @@ void pgd_ctor(void *pgd, kmem_cache_t *cache, unsigned long unused)
 		spin_lock_irqsave(&pgd_lock, flags);
 	}
 
-	if (PTRS_PER_PMD == 1 || HAVE_SHARED_KERNEL_PMD)
-		clone_pgd_range((pgd_t *)pgd + USER_PTRS_PER_PGD,
-				swapper_pg_dir + USER_PTRS_PER_PGD,
-				KERNEL_PGD_PTRS);
+	clone_pgd_range((pgd_t *)pgd + USER_PTRS_PER_PGD,
+			swapper_pg_dir + USER_PTRS_PER_PGD,
+			KERNEL_PGD_PTRS);
 	if (PTRS_PER_PMD > 1)
 		return;
 
@@ -250,30 +249,6 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
 			goto out_oom;
 		set_pgd(&pgd[i], __pgd(1 + __pa(pmd)));
 	}
-
-	if (!HAVE_SHARED_KERNEL_PMD) {
-		unsigned long flags;
-
-		for (i = USER_PTRS_PER_PGD; i < PTRS_PER_PGD; i++) {
-			pmd_t *pmd = kmem_cache_alloc(pmd_cache, GFP_KERNEL);
-			if (!pmd)
-				goto out_oom;
-			set_pgd(&pgd[USER_PTRS_PER_PGD], __pgd(1 + __pa(pmd)));
-		}
-
-		spin_lock_irqsave(&pgd_lock, flags);
-		for (i = USER_PTRS_PER_PGD; i < PTRS_PER_PGD; i++) {
-			unsigned long v = (unsigned long)i << PGDIR_SHIFT;
-			pgd_t *kpgd = pgd_offset_k(v);
-			pud_t *kpud = pud_offset(kpgd, v);
-			pmd_t *kpmd = pmd_offset(kpud, v);
-			pmd_t *pmd = (void *)__va(pgd_val(pgd[i])-1);
-			memcpy(pmd, kpmd, PAGE_SIZE);
-		}
-		pgd_list_add(pgd);
-		spin_unlock_irqrestore(&pgd_lock, flags);
-	}
-
 	return pgd;
 
 out_oom:
@@ -288,23 +263,9 @@ void pgd_free(pgd_t *pgd)
 	int i;
 
 	/* in the PAE case user pgd entries are overwritten before usage */
-	if (PTRS_PER_PMD > 1) {
-		for (i = 0; i < USER_PTRS_PER_PGD; ++i) {
-			pmd_t *pmd = (void *)__va(pgd_val(pgd[i])-1);
-			kmem_cache_free(pmd_cache, pmd);
-		}
-		if (!HAVE_SHARED_KERNEL_PMD) {
-			unsigned long flags;
-			spin_lock_irqsave(&pgd_lock, flags);
-			pgd_list_del(pgd);
-			spin_unlock_irqrestore(&pgd_lock, flags);
-			for (i = USER_PTRS_PER_PGD; i < PTRS_PER_PGD; i++) {
-				pmd_t *pmd = (void *)__va(pgd_val(pgd[i])-1);
-				memset(pmd, 0, PTRS_PER_PMD*sizeof(pmd_t));
-				kmem_cache_free(pmd_cache, pmd);
-			}
-		}
-	}
+	if (PTRS_PER_PMD > 1)
+		for (i = 0; i < USER_PTRS_PER_PGD; ++i)
+			kmem_cache_free(pmd_cache, (void *)__va(pgd_val(pgd[i])-1));
 	/* in the non-PAE case, free_pgtables() clears user pgd entries */
 	kmem_cache_free(pgd_cache, pgd);
 }

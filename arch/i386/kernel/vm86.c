@@ -97,7 +97,7 @@
 struct pt_regs * FASTCALL(save_v86_state(struct kernel_vm86_regs * regs));
 struct pt_regs * fastcall save_v86_state(struct kernel_vm86_regs * regs)
 {
-#ifndef CONFIG_XEN
+#ifndef CONFIG_X86_NO_TSS
 	struct tss_struct *tss;
 #endif
 	struct pt_regs *ret;
@@ -124,7 +124,7 @@ struct pt_regs * fastcall save_v86_state(struct kernel_vm86_regs * regs)
 		do_exit(SIGSEGV);
 	}
 
-#ifndef CONFIG_XEN
+#ifndef CONFIG_X86_NO_TSS
 	tss = &per_cpu(init_tss, get_cpu());
 #endif
 	current->thread.esp0 = current->thread.saved_esp0;
@@ -255,10 +255,9 @@ out:
 
 static void do_sys_vm86(struct kernel_vm86_struct *info, struct task_struct *tsk)
 {
-#ifndef CONFIG_XEN
+#ifndef CONFIG_X86_NO_TSS
 	struct tss_struct *tss;
 #endif
-
 /*
  * make sure the vm86() system call doesn't try to do anything silly
  */
@@ -302,7 +301,7 @@ static void do_sys_vm86(struct kernel_vm86_struct *info, struct task_struct *tsk
 	savesegment(fs, tsk->thread.saved_fs);
 	savesegment(gs, tsk->thread.saved_gs);
 
-#ifndef CONFIG_XEN
+#ifndef CONFIG_X86_NO_TSS
 	tss = &per_cpu(init_tss, get_cpu());
 #endif
 	tsk->thread.esp0 = (unsigned long) &info->VM86_TSS_ESP0;
