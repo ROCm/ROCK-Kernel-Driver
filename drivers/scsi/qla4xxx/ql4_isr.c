@@ -1,63 +1,8 @@
 /*
- * Copyright (c)  2003-2005 QLogic Corporation
- * QLogic Linux iSCSI Driver
+ * QLogic iSCSI HBA Driver
+ * Copyright (c)  2003-2006 QLogic Corporation
  *
- * This program includes a device driver for Linux 2.6 that may be
- * distributed with QLogic hardware specific firmware binary file.
- * You may modify and redistribute the device driver code under the
- * GNU General Public License as published by the Free Software
- * Foundation (version 2 or a later version) and/or under the
- * following terms, as applicable:
- *
- * 	1. Redistribution of source code must retain the above
- * 	   copyright notice, this list of conditions and the
- * 	   following disclaimer.
- *
- * 	2. Redistribution in binary form must reproduce the above
- * 	   copyright notice, this list of conditions and the
- * 	   following disclaimer in the documentation and/or other
- * 	   materials provided with the distribution.
- *
- * 	3. The name of QLogic Corporation may not be used to
- * 	   endorse or promote products derived from this software
- * 	   without specific prior written permission.
- *
- * You may redistribute the hardware specific firmware binary file
- * under the following terms:
- *
- * 	1. Redistribution of source code (only if applicable),
- * 	   must retain the above copyright notice, this list of
- * 	   conditions and the following disclaimer.
- *
- * 	2. Redistribution in binary form must reproduce the above
- * 	   copyright notice, this list of conditions and the
- * 	   following disclaimer in the documentation and/or other
- * 	   materials provided with the distribution.
- *
- * 	3. The name of QLogic Corporation may not be used to
- * 	   endorse or promote products derived from this software
- * 	   without specific prior written permission
- *
- * REGARDLESS OF WHAT LICENSING MECHANISM IS USED OR APPLICABLE,
- * THIS PROGRAM IS PROVIDED BY QLOGIC CORPORATION "AS IS'' AND ANY
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
- * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR
- * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
- * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
- * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- *
- * USER ACKNOWLEDGES AND AGREES THAT USE OF THIS PROGRAM WILL NOT
- * CREATE OR GIVE GROUNDS FOR A LICENSE BY IMPLICATION, ESTOPPEL, OR
- * OTHERWISE IN ANY INTELLECTUAL PROPERTY RIGHTS (PATENT, COPYRIGHT,
- * TRADE SECRET, MASK WORK, OR OTHER PROPRIETARY RIGHT) EMBODIED IN
- * ANY OTHER QLOGIC HARDWARE OR SOFTWARE EITHER SOLELY OR IN
- * COMBINATION WITH THIS PROGRAM.
+ * See LICENSE.qla4xxx for copyright and licensing details.
  */
 
 #include "ql4_def.h"
@@ -230,6 +175,9 @@ qla4xxx_status_entry(scsi_qla_host_t *ha, STATUS_ENTRY *sts_entry)
 		}
 
 		if ((sts_entry->iscsiFlags & ISCSI_FLAG_RESIDUAL_UNDER) == 0) {
+			/*
+			 * Firmware detected a SCSI transport underrun condition
+			 */
 			cmd->resid = residual;
 			DEBUG2(printk("scsi%ld:%d:%d:%d: %s: UNDERRUN status "
 			    "detected, xferlen = 0x%x, residual = 0x%x\n",
@@ -400,12 +348,6 @@ qla4xxx_process_response_queue(scsi_qla_host_t * ha)
 			qla4xxx_status_entry(ha, sts_entry);
 			break;
 
-		case ET_PASSTHRU_STATUS:
-			qla4xxx_isns_process_response(ha,
-			    (PASSTHRU_STATUS_ENTRY *)sts_entry);
-			break;
-
-/* FIXMEdg: Cut and paste from fibre code */
 		case ET_STATUS_CONTINUATION:
 			/* Just throw away the status continuation entries */
 			DEBUG2(printk("scsi%ld: %s: Status Continuation entry "
@@ -488,9 +430,7 @@ exit_prq_error:
 static void
 qla4xxx_isr_decode_mailbox(scsi_qla_host_t * ha, uint32_t mbox_status)
 {
-	/* used for MBOX_ASTS_ISNS_UNSOLICITED_PDU_RECEIVED */
 	int i;
-	static uint32_t mbox_sts[MBOX_REG_COUNT];
 
 	if ((mbox_status == MBOX_STS_BUSY) ||
 	    (mbox_status == MBOX_STS_INTERMEDIATE_COMPLETION) ||
@@ -632,27 +572,6 @@ qla4xxx_isr_decode_mailbox(scsi_qla_host_t * ha, uint32_t mbox_status)
 					    ha->aen_q[i].mbox_sts[2],
 					    ha->aen_q[i].mbox_sts[3]));
 				}
-			}
-			break;
-
-		case MBOX_ASTS_ISNS_UNSOLICITED_PDU_RECEIVED:
-			memset(&mbox_sts, 0, sizeof(mbox_sts));
-			mbox_sts[0] = mbox_status;
-			mbox_sts[1] = RD_REG_DWORD(&ha->reg->mailbox[1]);
-			mbox_sts[2] = RD_REG_DWORD(&ha->reg->mailbox[2]);
-			mbox_sts[3] = RD_REG_DWORD(&ha->reg->mailbox[3]);
-			mbox_sts[4] = RD_REG_DWORD(&ha->reg->mailbox[4]);
-			mbox_sts[5] = RD_REG_DWORD(&ha->reg->mailbox[5]);
-
-			if (mbox_sts[1] == ISNS_EVENT_DATA_RECEIVED) {
-				if (qla4xxx_isns_get_server_request(ha,
-				    mbox_sts[3], mbox_sts[2]) != QLA_SUCCESS) {
-					/* Nothing? */
-				}
-			} else if (mbox_sts[1] ==
-			    ISNS_EVENT_CONNECTION_OPENED) {
-				qla4xxx_isns_enable_callback(ha, mbox_sts[2],
-				    mbox_sts[3], mbox_sts[4], mbox_sts[5]);
 			}
 			break;
 
@@ -864,7 +783,7 @@ qla4xxx_process_aen(scsi_qla_host_t * ha, uint8_t process_aen)
 		case MBOX_ASTS_DATABASE_CHANGED:
 			if (process_aen == FLUSH_DDB_CHANGED_AENS) {
 				DEBUG2(printk("scsi%ld: AEN[%d] %04x, index "
-				    "[%d] state=%04x IGNORED!\n", ha->host_no,
+				    "[%d] state=%04x FLUSHED!\n", ha->host_no,
 				    ha->aen_out, mbox_sts[0], mbox_sts[2],
 				    mbox_sts[3]));
 				break;

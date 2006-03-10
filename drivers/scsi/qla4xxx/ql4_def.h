@@ -1,63 +1,8 @@
 /*
- * Copyright (c)  2003-2005 QLogic Corporation
- * QLogic Linux iSCSI Driver
+ * QLogic iSCSI HBA Driver
+ * Copyright (c)  2003-2006 QLogic Corporation
  *
- * This program includes a device driver for Linux 2.6 that may be
- * distributed with QLogic hardware specific firmware binary file.
- * You may modify and redistribute the device driver code under the
- * GNU General Public License as published by the Free Software
- * Foundation (version 2 or a later version) and/or under the
- * following terms, as applicable:
- *
- * 	1. Redistribution of source code must retain the above
- * 	   copyright notice, this list of conditions and the
- * 	   following disclaimer.
- *
- * 	2. Redistribution in binary form must reproduce the above
- * 	   copyright notice, this list of conditions and the
- * 	   following disclaimer in the documentation and/or other
- * 	   materials provided with the distribution.
- *
- * 	3. The name of QLogic Corporation may not be used to
- * 	   endorse or promote products derived from this software
- * 	   without specific prior written permission.
- *
- * You may redistribute the hardware specific firmware binary file
- * under the following terms:
- *
- * 	1. Redistribution of source code (only if applicable),
- * 	   must retain the above copyright notice, this list of
- * 	   conditions and the following disclaimer.
- *
- * 	2. Redistribution in binary form must reproduce the above
- * 	   copyright notice, this list of conditions and the
- * 	   following disclaimer in the documentation and/or other
- * 	   materials provided with the distribution.
- *
- * 	3. The name of QLogic Corporation may not be used to
- * 	   endorse or promote products derived from this software
- * 	   without specific prior written permission
- *
- * REGARDLESS OF WHAT LICENSING MECHANISM IS USED OR APPLICABLE,
- * THIS PROGRAM IS PROVIDED BY QLOGIC CORPORATION "AS IS'' AND ANY
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
- * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR
- * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
- * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
- * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- *
- * USER ACKNOWLEDGES AND AGREES THAT USE OF THIS PROGRAM WILL NOT
- * CREATE OR GIVE GROUNDS FOR A LICENSE BY IMPLICATION, ESTOPPEL, OR
- * OTHERWISE IN ANY INTELLECTUAL PROPERTY RIGHTS (PATENT, COPYRIGHT,
- * TRADE SECRET, MASK WORK, OR OTHER PROPRIETARY RIGHT) EMBODIED IN
- * ANY OTHER QLOGIC HARDWARE OR SOFTWARE EITHER SOLELY OR IN
- * COMBINATION WITH THIS PROGRAM.
+ * See LICENSE.qla4xxx for copyright and licensing details.
  */
 
 #ifndef __QL4_DEF_H
@@ -75,14 +20,14 @@
 #include <linux/dmapool.h>
 #include <linux/mempool.h>
 #include <linux/spinlock.h>
-#include <linux/completion.h>
+#include <linux/kthread.h>
 #include <asm/semaphore.h>
 
 #include <scsi/scsi.h>
 #include <scsi/scsi_host.h>
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_cmnd.h>
-#include <scsi/scsi_transport_fc.h>
+#include <scsi/scsi_transport_iscsi.h>
 
 /* XXX(dg): move to pci_ids.h */
 #ifndef PCI_DEVICE_ID_QLOGIC_ISP4010
@@ -187,9 +132,6 @@
 #define MAX_LINKED_CMDS_PER_LUN		3
 #define MAX_REQS_SERVICED_PER_INTR	16
 
-/* Number of seconds to subtract for internal command timer */
-#define QLA_CMD_TIMER_DELTA             2
-
 #define	ISCSI_IPADDR_SIZE		4	/* IP address size */
 #define	ISCSI_ALIAS_SIZE		32	/* ISCSI Alais name size */
 #define	ISCSI_NAME_SIZE			255	/* ISCSI Name size  - usually a string */
@@ -282,7 +224,7 @@ typedef struct _srb_t {
 #define SRB_ERR_DEVICE     3	/* Request failed because "device error" */
 #define SRB_ERR_OTHER      4
 
-	uint16_t active_array_index;
+	uint16_t reserved;
 	uint16_t iocb_tov;
 	uint16_t iocb_cnt;	/* Number of used iocbs */
 	uint16_t cc_stat;
@@ -300,6 +242,7 @@ typedef struct _srb_t {
 typedef struct ddb_entry {
 	struct list_head list;	/* ddb list */
 	struct scsi_qla_host *ha;
+	struct iscsi_cls_session	*session;
 	atomic_t state;		/* DDB State */
 
 	unsigned long flags;	/* DDB Flags */
@@ -383,55 +326,6 @@ typedef struct {
 	uint32_t mbox_sts[MBOX_AEN_REG_COUNT];
 } aen_t;
 
-/*
- * NOTE: This structure definition really belongs in the ql4isns.h file,
- *       but it's easier to compile when the structure is defined here.
- */
-typedef struct _ATTRIBUTE_LIST {
-	uint32_t isns_tag;
-
-#define ISNS_ATTR_TYPE_EMPTY      1	// Used for delimiter attr. & operating attr. for query.
-#define ISNS_ATTR_TYPE_STRING     2	// UTF-8 encoded string
-#define ISNS_ATTR_TYPE_ULONG      3
-#define ISNS_ATTR_TYPE_ADDRESS    4	// 128-bit IPv6
-	uint32_t type;
-	unsigned long data;
-} ATTRIBUTE_LIST;
-
-/* iSNS information */
-typedef struct _isns_info {
-	unsigned long isns_flags;
-#define ISNS_FLAG_ISNS_ENABLED_IN_ISP   0	/* 0x00000001 */
-#define ISNS_FLAG_ISNS_SRV_ENABLED   	1	/* 0x00000002 */
-#define ISNS_FLAG_ISNS_SRV_REGISTERED   2	/* 0x00000004 */
-#define ISNS_FLAG_ISNS_SCN_REGISTERED   4	/* 0x00000010 */
-#define ISNS_FLAG_QUERY_SINGLE_OBJECT   5	/* 0x00000020 */
-#define ISNS_FLAG_SCN_IN_PROGRESS       6	/* 0x00000040 */
-#define ISNS_FLAG_SCN_RESTART           7	/* 0x00000080 */
-#define ISNS_FLAG_REREGISTER            28	/* 0x10000000 */
-#define ISNS_FLAG_RESTART_SERVICE       31	/* 0x80000000 */
-
-	uint16_t isns_connection_id;
-	uint16_t isns_scn_conn_id;
-	uint16_t isns_esi_conn_id;
-	uint16_t isns_nsh_conn_id;
-	uint16_t isns_remote_port_num;
-	uint16_t isns_scn_port_num;
-	uint16_t isns_esi_port_num;
-	uint16_t isns_nsh_port_num;
-	uint8_t isns_entity_id[256];
-
-	atomic_t isns_restart_timer;
-	uint16_t isns_transaction_id;
-	uint16_t isns_num_discovered_targets;
-
-	ATTRIBUTE_LIST isns_reg_attr_list[13];
-	ATTRIBUTE_LIST isns_dereg_attr_list[7];
-	ATTRIBUTE_LIST isns_scn_reg_attr_list[5];
-	ATTRIBUTE_LIST isns_scn_dereg_attr_list[3];
-	ATTRIBUTE_LIST isns_dev_get_next_attr_list[5];
-	ATTRIBUTE_LIST isns_dev_attr_qry_attr_list[13];
-} isns_info_t;
 
 /*
  * ISP Initialization Control Block.
@@ -453,8 +347,6 @@ typedef struct {
  * Linux Host Adapter structure
  */
 typedef struct scsi_qla_host {
-	struct list_head list;
-
 	/* Linux adapter configuration data */
 	struct Scsi_Host *host;	/* pointer to host data */
 	uint32_t tot_ddbs;
@@ -471,7 +363,6 @@ typedef struct scsi_qla_host {
 #define AF_TOPCAT_CHIP_PRESENT	      9	/* 0x00000200 */
 #define AF_IRQ_ATTACHED	      	     10	/* 0x00000400 */
 #define AF_64BIT_PCI_ADDR	     11	/* 0x00000800 */
-#define AF_HA_GOING_AWAY	     12	/* 0x00001000 */
 	unsigned long dpc_flags;
 
 #define DPC_RESET_HA		      1	/* 0x00000002 */
@@ -495,17 +386,12 @@ typedef struct scsi_qla_host {
 
 	/* pci information */
 	struct pci_dev *pdev;
-	uint32_t function_number;
-	struct qla_board_info *brd_info;
 
 	/* isp_reg_t *reg; */
 	isp_reg_t __iomem *reg;	/* Base I/O address */
 	unsigned long pio_address;
 	unsigned long pio_length;
 #define MIN_IOBASE_LEN		0x100
-
-	int mem_err;
-	unsigned long irq;	/* IRQ for adapter            */
 
 	uint16_t req_q_count;
 	uint8_t marker_needed;
@@ -516,16 +402,15 @@ typedef struct scsi_qla_host {
 
 	/* NVRAM registers */
 	eeprom_data_t *nvram;
-	/* spinlock_t hardware_lock ____cacheline_aligned; */
-	spinlock_t hardware_lock;
+	spinlock_t hardware_lock ____cacheline_aligned;
 	spinlock_t list_lock;
+	uint32_t   eeprom_cmd_data;
 
 	/* Counters for general statistics */
 	uint64_t adapter_error_count;
 	uint64_t device_error_count;
 	uint64_t total_io_count;
 	uint64_t total_mbytes_xferred;
-	uint64_t isr_count;	/* Interrupt count */
 	uint64_t link_failure_count;
 	uint64_t invalid_crc_count;
 	uint32_t spurious_int_count;
@@ -548,6 +433,7 @@ typedef struct scsi_qla_host {
 	uint16_t tcp_options;
 	uint8_t ip_address[IP_ADDR_LEN];
 	uint8_t subnet_mask[IP_ADDR_LEN];
+	uint8_t gateway[IP_ADDR_LEN];
 	uint8_t isns_ip_address[IP_ADDR_LEN];
 	uint16_t isns_server_port_number;
 	uint8_t alias[32];
@@ -564,45 +450,8 @@ typedef struct scsi_qla_host {
 	uint32_t board_id;
 	uint32_t addl_fw_state;
 
-
-	/* iSNS information */
-	unsigned long isns_flags;
-
-#define ISNS_FLAG_ISNS_ENABLED_IN_ISP   0	/* 0x00000001 */
-#define ISNS_FLAG_ISNS_SRV_ENABLED   	1	/* 0x00000002 */
-#define ISNS_FLAG_ISNS_SRV_REGISTERED   2	/* 0x00000004 */
-#define ISNS_FLAG_ISNS_SCN_REGISTERED   4	/* 0x00000010 */
-#define ISNS_FLAG_QUERY_SINGLE_OBJECT   5	/* 0x00000020 */
-#define ISNS_FLAG_SCN_IN_PROGRESS       6	/* 0x00000040 */
-#define ISNS_FLAG_SCN_RESTART           7	/* 0x00000080 */
-#define ISNS_FLAG_DEV_SCAN_DONE         27	/* 0x08000000 */
-#define ISNS_FLAG_REREGISTER            28	/* 0x10000000 */
-#define ISNS_FLAG_RESTART_SERVICE       31	/* 0x80000000 */
-	uint16_t isns_connection_id;
-	uint16_t isns_scn_conn_id;
-	uint16_t isns_esi_conn_id;
-	uint16_t isns_nsh_conn_id;
-	uint16_t isns_remote_port_num;
-	uint16_t isns_scn_port_num;
-	uint16_t isns_esi_port_num;
-	uint16_t isns_nsh_port_num;
-	uint8_t isns_entity_id[256];
-	atomic_t isns_restart_timer;
-	uint16_t isns_transaction_id;
-	uint16_t isns_num_discovered_targets;
-	ATTRIBUTE_LIST isns_reg_attr_list[13];
-	ATTRIBUTE_LIST isns_dereg_attr_list[7];
-	ATTRIBUTE_LIST isns_scn_reg_attr_list[5];
-	ATTRIBUTE_LIST isns_scn_dereg_attr_list[3];
-	ATTRIBUTE_LIST isns_dev_get_next_attr_list[5];
-	ATTRIBUTE_LIST isns_dev_attr_qry_attr_list[13];
-
 	/* Linux kernel thread */
-	pid_t dpc_pid;
-	int dpc_should_die;
-	struct completion dpc_inited;
-	struct completion dpc_exited;
-	struct semaphore *dpc_wait;
+	struct task_struct *dpc_thread;
 	uint8_t dpc_active;	/* DPC routine is active */
 
 	/* Linux timer thread */
@@ -623,7 +472,6 @@ typedef struct scsi_qla_host {
 
 	/* Active array */
 	srb_t *active_srb_array[MAX_SRBS];
-	uint16_t active_srb_count;
 	uint16_t current_active_index;
 
 	/* DMA Memory Block */
@@ -658,9 +506,9 @@ typedef struct scsi_qla_host {
 	uint16_t pdu_count;	/* Number of available aen_q entries */
 	uint16_t pdu_in;	/* Current indexes */
 	uint16_t pdu_out;
+	uint16_t pdu_active;
 	PDU_ENTRY *free_pdu_top;
 	PDU_ENTRY *free_pdu_bottom;
-	uint16_t pdu_active;
 	PDU_ENTRY pdu_queue[MAX_PDU_ENTRIES];
 
 	/* This semaphore protects several threads to do mailbox commands
@@ -672,22 +520,12 @@ typedef struct scsi_qla_host {
 	/* temporary mailbox status registers */
 	volatile uint8_t mbox_status_count;
 	volatile uint32_t mbox_status[MBOX_REG_COUNT];
-	ISNS_DISCOVERED_TARGET *isns_disc_tgt_databasev;
-	dma_addr_t isns_disc_tgt_databasep;
-	uint32_t isns_disc_tgt_database_size;
 
 	/* local device database list (contains internal ddb entries) */
 	struct list_head ddb_list;
 
 	/* Map ddb_list entry by FW ddb index */
 	ddb_entry_t *fw_ddb_index_map[MAX_DDB_ENTRIES];
-
-	/* Adapter I/O statistics for failover */
-	uint64_t IosRequested;
-	uint64_t BytesRequested;
-	uint64_t IosExecuted;
-	uint64_t BytesExecuted;
-	spinlock_t host_lock ____cacheline_aligned;
 } scsi_qla_host_t;
 
 #define ADAPTER_UP(ha) ((test_bit(AF_ONLINE, &ha->flags) != 0) && (test_bit(AF_LINK_UP, &ha->flags) != 0))
@@ -723,6 +561,5 @@ typedef struct {
 #include "ql4_glbl.h"
 #include "ql4_dbg.h"
 #include "ql4_inline.h"
-#include "ql4_isns.h"
 
 #endif	/*_QLA4XXX_H */

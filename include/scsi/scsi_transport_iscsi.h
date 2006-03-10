@@ -82,12 +82,15 @@ struct iscsi_transport {
 			       enum iscsi_param param, uint32_t *value);
 	int (*get_session_param) (struct iscsi_cls_session *session,
 				  enum iscsi_param param, uint32_t *value);
+	int (*get_conn_str_param) (struct iscsi_cls_conn *conn,
+				   enum iscsi_param param, char *buf);
 	int (*get_session_str_param) (struct iscsi_cls_session *session,
-				      enum iscsi_param param, char **value);
+				      enum iscsi_param param, char *buf);
 	int (*send_pdu) (struct iscsi_cls_conn *conn, struct iscsi_hdr *hdr,
 			 char *data, uint32_t data_size);
 	void (*get_stats) (struct iscsi_cls_conn *conn,
 			   struct iscsi_stats *stats);
+	void (*session_recovery_timedout) (struct iscsi_cls_session *session);
 };
 
 /*
@@ -108,6 +111,14 @@ struct iscsi_cls_conn {
 	void *dd_data;			/* LLD private data */
 	struct iscsi_transport *transport;
 	uint32_t cid;			/* connection id */
+
+	/* portal/group values we got during discovery */
+	char *persistent_address;
+	int persistent_port;
+	/* portal/group values we are currently using */
+	char *address;
+	int port;
+
 	int active;			/* must be accessed with the connlock */
 	struct device dev;		/* sysfs transport/container device */
 	struct mempool_zone *z_error;
@@ -120,14 +131,19 @@ struct iscsi_cls_conn {
 
 struct iscsi_cls_session {
 	struct list_head sess_list;		/* item in session_list */
+	struct list_head host_list;
 	struct iscsi_transport *transport;
 
 	/* iSCSI values used as unique id by userspace. */
 	char *targetname;
-	/* portal/group values we got during discovery */
-	char *address;
-	int port;
 	int tpgt;
+
+	/* recovery fields */
+	int recovery_tmo;
+	struct work_struct recovery_work;
+
+	int target_id;
+	int channel;
 
 	int sid;				/* session id */
 	void *dd_data;				/* LLD private data */
@@ -140,15 +156,23 @@ struct iscsi_cls_session {
 #define iscsi_session_to_shost(_session) \
 	dev_to_shost(_session->dev.parent)
 
+struct iscsi_host {
+	int next_target_id;
+	struct list_head sessions;
+	struct mutex mutex;
+};
+
 /*
  * session and connection functions that can be used by HW iSCSI LLDs
  */
 extern struct iscsi_cls_session *iscsi_create_session(struct Scsi_Host *shost,
-				struct iscsi_transport *t);
+				struct iscsi_transport *t, int channel);
 extern int iscsi_destroy_session(struct iscsi_cls_session *session);
 extern struct iscsi_cls_conn *iscsi_create_conn(struct iscsi_cls_session *sess,
 					    uint32_t cid);
 extern int iscsi_destroy_conn(struct iscsi_cls_conn *conn);
+extern void iscsi_unblock_session(struct iscsi_cls_session *session);
+extern void iscsi_block_session(struct iscsi_cls_session *session);
 
 /*
  * session functions used by software iscsi

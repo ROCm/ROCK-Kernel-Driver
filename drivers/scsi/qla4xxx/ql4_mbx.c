@@ -1,63 +1,8 @@
 /*
- * Copyright (c)  2003-2005 QLogic Corporation
- * QLogic Linux iSCSI Driver
+ * QLogic iSCSI HBA Driver
+ * Copyright (c)  2003-2006 QLogic Corporation
  *
- * This program includes a device driver for Linux 2.6 that may be
- * distributed with QLogic hardware specific firmware binary file.
- * You may modify and redistribute the device driver code under the
- * GNU General Public License as published by the Free Software
- * Foundation (version 2 or a later version) and/or under the
- * following terms, as applicable:
- *
- * 	1. Redistribution of source code must retain the above
- * 	   copyright notice, this list of conditions and the
- * 	   following disclaimer.
- *
- * 	2. Redistribution in binary form must reproduce the above
- * 	   copyright notice, this list of conditions and the
- * 	   following disclaimer in the documentation and/or other
- * 	   materials provided with the distribution.
- *
- * 	3. The name of QLogic Corporation may not be used to
- * 	   endorse or promote products derived from this software
- * 	   without specific prior written permission.
- *
- * You may redistribute the hardware specific firmware binary file
- * under the following terms:
- *
- * 	1. Redistribution of source code (only if applicable),
- * 	   must retain the above copyright notice, this list of
- * 	   conditions and the following disclaimer.
- *
- * 	2. Redistribution in binary form must reproduce the above
- * 	   copyright notice, this list of conditions and the
- * 	   following disclaimer in the documentation and/or other
- * 	   materials provided with the distribution.
- *
- * 	3. The name of QLogic Corporation may not be used to
- * 	   endorse or promote products derived from this software
- * 	   without specific prior written permission
- *
- * REGARDLESS OF WHAT LICENSING MECHANISM IS USED OR APPLICABLE,
- * THIS PROGRAM IS PROVIDED BY QLOGIC CORPORATION "AS IS'' AND ANY
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
- * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR
- * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
- * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
- * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- *
- * USER ACKNOWLEDGES AND AGREES THAT USE OF THIS PROGRAM WILL NOT
- * CREATE OR GIVE GROUNDS FOR A LICENSE BY IMPLICATION, ESTOPPEL, OR
- * OTHERWISE IN ANY INTELLECTUAL PROPERTY RIGHTS (PATENT, COPYRIGHT,
- * TRADE SECRET, MASK WORK, OR OTHER PROPRIETARY RIGHT) EMBODIED IN
- * ANY OTHER QLOGIC HARDWARE OR SOFTWARE EITHER SOLELY OR IN
- * COMBINATION WITH THIS PROGRAM.
+ * See LICENSE.qla4xxx for copyright and licensing details.
  */
 
 #include "ql4_def.h"
@@ -69,7 +14,6 @@
  */
 extern int ql4xportdownretrycount;
 extern int ql4xdiscoverywait;
-extern void qla4xxx_isns_build_entity_id(scsi_qla_host_t *);
 extern int qla4xxx_eh_wait_for_active_target_commands(scsi_qla_host_t *, int,
     int lun);
 
@@ -169,7 +113,7 @@ qla4xxx_mailbox_command(scsi_qla_host_t * ha, uint8_t inCount,
 	/* Wait for command to complete */
 	wait_count = jiffies + MBOX_TOV * HZ;
 	while (test_bit(AF_MBOX_COMMAND_DONE, &ha->flags) == 0) {
-		if (wait_count <= jiffies)
+		if (time_after_eq(jiffies, wait_count))
 			break;
 
 		spin_lock_irqsave(&ha->hardware_lock, flags);
@@ -460,6 +404,8 @@ qla4xxx_initialize_fw_cb(scsi_qla_host_t * ha)
 	    min(sizeof(ha->ip_address), sizeof(init_fw_cb->IPAddr)));
 	memcpy(ha->subnet_mask, init_fw_cb->SubnetMask,
 	    min(sizeof(ha->subnet_mask), sizeof(init_fw_cb->SubnetMask)));
+	memcpy(ha->gateway, init_fw_cb->GatewayIPAddr,
+	    min(sizeof(ha->gateway), sizeof(init_fw_cb->GatewayIPAddr)));
 	memcpy(ha->isns_ip_address, init_fw_cb->iSNSIPAddr,
 	    min(sizeof(ha->isns_ip_address), sizeof(init_fw_cb->iSNSIPAddr)));
 	memcpy(ha->name_string, init_fw_cb->iSCSINameString,
@@ -543,6 +489,8 @@ qla4xxx_get_dhcp_ip_address(scsi_qla_host_t * ha)
 	    min(sizeof(ha->ip_address), sizeof(init_fw_cb->IPAddr)));
 	memcpy(ha->subnet_mask, init_fw_cb->SubnetMask,
 	    min(sizeof(ha->subnet_mask), sizeof(init_fw_cb->SubnetMask)));
+	memcpy(ha->gateway, init_fw_cb->GatewayIPAddr,
+	    min(sizeof(ha->gateway), sizeof(init_fw_cb->GatewayIPAddr)));
 
 	dma_free_coherent(&ha->pdev->dev, sizeof(INIT_FW_CTRL_BLK), init_fw_cb,
 	    init_fw_cb_dma);
@@ -583,8 +531,8 @@ qla4xxx_get_firmware_state(scsi_qla_host_t * ha)
 	ha->firmware_state = mbox_sts[1];
 	ha->board_id = mbox_sts[2];
 	ha->addl_fw_state = mbox_sts[3];
-	DEBUG2(printk("%s firmware_state=0x%x\n", __func__,
-	    ha->firmware_state));
+	DEBUG2(printk("scsi%ld: %s firmware_state=0x%x\n",
+		      ha->host_no, __func__, ha->firmware_state);)
 
 	return QLA_SUCCESS;
 }
@@ -884,7 +832,10 @@ qla4xxx_get_conn_event_log(scsi_qla_host_t * ha)
 	dma_addr_t event_log_dma = 0;
 	uint32_t event_log_size = 0;
 	uint32_t num_valid_entries;
-	/*uint32_t      oldest_entry = 0; */
+	uint32_t      oldest_entry = 0;
+	uint32_t	max_event_log_entries;
+	uint8_t         i;
+
 
 	memset(&mbox_cmd, 0, sizeof(mbox_cmd));
 	memset(&mbox_sts, 0, sizeof(mbox_cmd));
@@ -919,9 +870,38 @@ qla4xxx_get_conn_event_log(scsi_qla_host_t * ha)
 	/* Dump Event Log. */
 	num_valid_entries = mbox_sts[1];
 
-	//FIXME:  Code wraparound entries later ...
-	//if (num_valid_entries > MAX_CONN_EVENT_LOG_ENTRIES)
-	//      oldest_entry = num_valid_entries % MAX_CONN_EVENT_LOG_ENTRIES;
+	max_event_log_entries = event_log_size / sizeof(CONN_EVENT_LOG_ENTRY);
+
+	if (num_valid_entries > max_event_log_entries)
+		oldest_entry = num_valid_entries % max_event_log_entries;
+
+	DEBUG3(printk("scsi%ld: Connection Event Log Dump (%d entries):\n",
+ 			      ha->host_no, num_valid_entries));
+
+ 	if (extended_error_logging == 3) {
+		if (oldest_entry == 0) {
+			/* Circular Buffer has not wrapped around */
+ 		for (i=0; i < num_valid_entries; i++) {
+				qla4xxx_dump_buffer((uint8_t *)event_log+
+						    (i*sizeof(*event_log)),
+						    sizeof(*event_log));
+			}
+		}
+		else {
+			/* Circular Buffer has wrapped around - display accordingly*/
+			for (i=oldest_entry; i < max_event_log_entries; i++) {
+				qla4xxx_dump_buffer((uint8_t *)event_log+
+						    (i*sizeof(*event_log)),
+						    sizeof(*event_log));
+			}
+			for (i=0; i < oldest_entry; i++) {
+				qla4xxx_dump_buffer((uint8_t *)event_log+
+						    (i*sizeof(*event_log)),
+						    sizeof(*event_log));
+			}
+ 		}
+ 	}
+
 exit_get_event_log:
 	if (event_log)
 		dma_free_coherent(&ha->pdev->dev, event_log_size, event_log,
@@ -972,93 +952,10 @@ qla4xxx_reset_lun(scsi_qla_host_t * ha, ddb_entry_t * ddb_entry, int lun)
 	if (mbox_sts[0] != MBOX_STS_COMMAND_COMPLETE &&
 	    mbox_sts[0] != MBOX_STS_COMMAND_ERROR)
 		status = QLA_ERROR;
-/*FIXME*/
-	/*spin_lock_irq(ha->host->host_lock);*/
+
 	return status;
 }
 
-int
-qla4xxx_isns_enable(scsi_qla_host_t * ha, uint32_t isns_ip_addr,
-    uint16_t isns_server_port_num)
-{
-	uint32_t mbox_cmd[MBOX_REG_COUNT];
-	uint32_t mbox_sts[MBOX_REG_COUNT];
-
-	qla4xxx_isns_build_entity_id(ha);
-	memset(&mbox_cmd, 0, sizeof(mbox_cmd));
-	memset(&mbox_sts, 0, sizeof(mbox_sts));
-	mbox_cmd[0] = MBOX_CMD_SET_ISNS_SERVICE;
-	mbox_cmd[1] = ISNS_ENABLE;
-	mbox_cmd[2] = isns_ip_addr;
-	mbox_cmd[3] = isns_server_port_num;
-	if (qla4xxx_mailbox_command(ha, 4, 6, &mbox_cmd[0], &mbox_sts[0]) !=
-	    QLA_SUCCESS)
-		return (QLA_ERROR);
-
-	DEBUG2(printk("scsi%ld: Start iSNS Service %d.%d.%d.%d Port %04d...\n",
-	    ha->host_no, (isns_ip_addr & 0x000000FF),
-	    (isns_ip_addr & 0x0000FF00) >> 8,
-	    (isns_ip_addr & 0x00FF0000) >> 16,
-	    (isns_ip_addr & 0xFF000000) >> 24, isns_server_port_num));
-
-	return QLA_SUCCESS;
-}
-
-int
-qla4xxx_isns_disable(scsi_qla_host_t * ha)
-{
-	uint32_t mbox_cmd[MBOX_REG_COUNT];
-	uint32_t mbox_sts[MBOX_REG_COUNT];
-
-	if (test_bit(ISNS_FLAG_ISNS_SRV_ENABLED, &ha->isns_flags)) {
-		memset(&mbox_cmd, 0, sizeof(mbox_cmd));
-		memset(&mbox_sts, 0, sizeof(mbox_sts));
-		mbox_cmd[0] = MBOX_CMD_SET_ISNS_SERVICE;
-		mbox_cmd[1] = ISNS_DISABLE;
-		if (qla4xxx_mailbox_command(ha, 2, 2, &mbox_cmd[0],
-		    &mbox_sts[0]) != QLA_SUCCESS) {
-			DEBUG2(printk("scsi%ld: %s: MBOX_CMD_SET_ISNS_SERVICE "
-			    "failed w/ status %04X %04X\n", ha->host_no,
-			    __func__, mbox_sts[0], mbox_sts[1]));
-			return QLA_ERROR;
-		}
-	}
-	clear_bit(ISNS_FLAG_ISNS_SRV_ENABLED, &ha->isns_flags);
-	ISNS_CLEAR_FLAGS(ha);
-	ha->isns_connection_id = 0;
-
-	//ha->isns_scn_conn_id     = 0;
-	//ha->isns_esi_conn_id     = 0;
-	//ha->isns_nsh_conn_id     = 0;
-	ha->isns_remote_port_num = 0;
-	ha->isns_scn_port_num = 0;
-	ha->isns_esi_port_num = 0;
-	ha->isns_nsh_port_num = 0;
-	ha->isns_num_discovered_targets = 0;
-	memset(ha->isns_entity_id, 0, sizeof(ha->isns_entity_id));
-
-	return QLA_SUCCESS;
-}
-
-int
-qla4xxx_isns_status(scsi_qla_host_t * ha)
-{
-	uint32_t mbox_cmd[MBOX_REG_COUNT];
-	uint32_t mbox_sts[MBOX_REG_COUNT];
-
-	memset(&mbox_cmd, 0, sizeof(mbox_cmd));
-	memset(&mbox_sts, 0, sizeof(mbox_sts));
-	mbox_cmd[0] = MBOX_CMD_SET_ISNS_SERVICE;
-	mbox_cmd[1] = ISNS_STATUS;
-	if (qla4xxx_mailbox_command(ha, 2, 2, &mbox_cmd[0], &mbox_sts[0]) !=
-	    QLA_SUCCESS) {
-		DEBUG2(printk("scsi%ld: %s: MBOX_CMD_SET_ISNS_SERVICE failed "
-		    "w/ status %04X %04X\n", ha->host_no, __func__,
-		    mbox_sts[0], mbox_sts[1]));
-		return QLA_ERROR;
-	}
-	return QLA_SUCCESS;
-}
 
 int
 qla4xxx_get_flash(scsi_qla_host_t * ha, dma_addr_t dma_addr, uint32_t offset,

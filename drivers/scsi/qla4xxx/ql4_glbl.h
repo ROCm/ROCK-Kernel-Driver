@@ -1,64 +1,10 @@
 /*
- * Copyright (c)  2003-2005 QLogic Corporation
- * QLogic Linux iSCSI Driver
+ * QLogic iSCSI HBA Driver
+ * Copyright (c)  2003-2006 QLogic Corporation
  *
- * This program includes a device driver for Linux 2.6 that may be
- * distributed with QLogic hardware specific firmware binary file.
- * You may modify and redistribute the device driver code under the
- * GNU General Public License as published by the Free Software
- * Foundation (version 2 or a later version) and/or under the
- * following terms, as applicable:
- *
- * 	1. Redistribution of source code must retain the above
- * 	   copyright notice, this list of conditions and the
- * 	   following disclaimer.
- *
- * 	2. Redistribution in binary form must reproduce the above
- * 	   copyright notice, this list of conditions and the
- * 	   following disclaimer in the documentation and/or other
- * 	   materials provided with the distribution.
- *
- * 	3. The name of QLogic Corporation may not be used to
- * 	   endorse or promote products derived from this software
- * 	   without specific prior written permission.
- *
- * You may redistribute the hardware specific firmware binary file
- * under the following terms:
- *
- * 	1. Redistribution of source code (only if applicable),
- * 	   must retain the above copyright notice, this list of
- * 	   conditions and the following disclaimer.
- *
- * 	2. Redistribution in binary form must reproduce the above
- * 	   copyright notice, this list of conditions and the
- * 	   following disclaimer in the documentation and/or other
- * 	   materials provided with the distribution.
- *
- * 	3. The name of QLogic Corporation may not be used to
- * 	   endorse or promote products derived from this software
- * 	   without specific prior written permission
- *
- * REGARDLESS OF WHAT LICENSING MECHANISM IS USED OR APPLICABLE,
- * THIS PROGRAM IS PROVIDED BY QLOGIC CORPORATION "AS IS'' AND ANY
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
- * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR
- * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
- * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
- * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- *
- * USER ACKNOWLEDGES AND AGREES THAT USE OF THIS PROGRAM WILL NOT
- * CREATE OR GIVE GROUNDS FOR A LICENSE BY IMPLICATION, ESTOPPEL, OR
- * OTHERWISE IN ANY INTELLECTUAL PROPERTY RIGHTS (PATENT, COPYRIGHT,
- * TRADE SECRET, MASK WORK, OR OTHER PROPRIETARY RIGHT) EMBODIED IN
- * ANY OTHER QLOGIC HARDWARE OR SOFTWARE EITHER SOLELY OR IN
- * COMBINATION WITH THIS PROGRAM.
+ * See LICENSE.qla4xxx for copyright and licensing details.
  */
+
 #ifndef __QLA4x_GBL_H
 #define	__QLA4x_GBL_H
 
@@ -76,7 +22,6 @@ extern int qla4xxx_soft_reset(scsi_qla_host_t *);
 extern const char *host_sts_msg[];
 extern void qla4xxx_delete_timer_from_cmd(srb_t * srb);
 extern scsi_qla_host_t *qla4xxx_get_adapter_handle(uint16_t instance);
-extern uint32_t qla4xxx_get_hba_count(void);
 extern void qla4xxx_free_ddb_list(scsi_qla_host_t * ha);
 extern void qla4xxx_mark_device_missing(scsi_qla_host_t *, ddb_entry_t *);
 extern int extended_error_logging;
@@ -102,9 +47,6 @@ extern int qla4xxx_send_passthru0_iocb(scsi_qla_host_t *, uint16_t,
 extern irqreturn_t qla4xxx_intr_handler(int, void *, struct pt_regs *);
 extern void qla4xxx_interrupt_service_routine(scsi_qla_host_t * ha,
 					      uint32_t intr_status);
-extern void __qla4xxx_suspend_lun(scsi_qla_host_t * ha, srb_t * srb,
-				  int lun, uint16_t time,
-				  uint16_t retries, int delay);
 
 /*
  * Defined in  ql4_init.c
@@ -145,8 +87,6 @@ extern int qla4xxx_process_ddb_changed(scsi_qla_host_t * ha,
 					   uint32_t state);
 extern int qla4xxx_init_rings(scsi_qla_host_t * ha);
 extern int qla4xxx_reinitialize_ddb_list(scsi_qla_host_t * ha);
-extern void qla4xxx_flush_all_srbs(scsi_qla_host_t * ha,
-				   ddb_entry_t * ddb_entry, int lun);
 
 /*
  * Defined in  ql4_mbx.c
@@ -158,8 +98,6 @@ extern int qla4xxx_mailbox_command(scsi_qla_host_t * ha, uint8_t inCount,
 				       uint32_t * mbx_sts);
 extern int qla4xxx_issue_iocb(scsi_qla_host_t * ha, void *buffer,
 				  dma_addr_t phys_addr, size_t size);
-extern int qla4xxx_isns_enable(scsi_qla_host_t *, uint32_t, uint16_t);
-extern int qla4xxx_isns_disable(scsi_qla_host_t *);
 extern int qla4xxx_get_flash(scsi_qla_host_t *, dma_addr_t, uint32_t,
 				 uint32_t);
 extern int qla4xxx_initialize_fw_cb(scsi_qla_host_t *);
@@ -187,28 +125,10 @@ extern void qla4xxx_scsi_pass_done(struct scsi_cmnd *cmd);
 extern void qla4xxx_ioctl_sem_init(scsi_qla_host_t * ha);
 
 /*
- * Defined in  ql4_isns.c
+ * Defined in  ql4_nvram.c
  */
-extern int qla4xxx_isns_process_response(scsi_qla_host_t * ha,
-					     PASSTHRU_STATUS_ENTRY * sts_entry);
-extern int qla4xxx_isns_restart_service_completion(scsi_qla_host_t * ha,
-						       uint32_t
-						       isns_ip_addr,
-						       uint16_t
-						       isns_server_port_num);
-extern int qla4xxx_isns_restart_service(scsi_qla_host_t *);
-extern int qla4xxx_isns_init_attributes(scsi_qla_host_t *);
-extern int qla4xxx_isns_reenable(scsi_qla_host_t *, uint32_t, uint16_t);
-extern void qla4xxx_isns_enable_callback(scsi_qla_host_t *, uint32_t,
-					 uint32_t, uint32_t, uint32_t);
-extern int qla4xxx_isns_get_server_request(scsi_qla_host_t *, uint32_t,
-					       uint16_t);
-
-    /*
-     * Defined in  ql4_nvram.c
-     */
 extern u16 RD_NVRAM_WORD(scsi_qla_host_t *, int);
-extern int qla4xxx_is_NVRAM_configuration_valid(scsi_qla_host_t * ha);
+extern int qla4xxx_is_nvram_configuration_valid(scsi_qla_host_t * ha);
 extern int ql4xxx_sem_lock(scsi_qla_host_t * ha, u32 sem_mask, u32 sem_bits);
 extern void ql4xxx_sem_unlock(scsi_qla_host_t * ha, u32 sem_mask);
 extern int ql4xxx_sem_spinlock(scsi_qla_host_t * ha, u32 sem_mask,

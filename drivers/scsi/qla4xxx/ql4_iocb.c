@@ -1,63 +1,8 @@
 /*
- * Copyright (c)  2003-2005 QLogic Corporation
- * QLogic Linux iSCSI Driver
+ * QLogic iSCSI HBA Driver
+ * Copyright (c)  2003-2006 QLogic Corporation
  *
- * This program includes a device driver for Linux 2.6 that may be
- * distributed with QLogic hardware specific firmware binary file.
- * You may modify and redistribute the device driver code under the
- * GNU General Public License as published by the Free Software
- * Foundation (version 2 or a later version) and/or under the
- * following terms, as applicable:
- *
- * 	1. Redistribution of source code must retain the above
- * 	   copyright notice, this list of conditions and the
- * 	   following disclaimer.
- *
- * 	2. Redistribution in binary form must reproduce the above
- * 	   copyright notice, this list of conditions and the
- * 	   following disclaimer in the documentation and/or other
- * 	   materials provided with the distribution.
- *
- * 	3. The name of QLogic Corporation may not be used to
- * 	   endorse or promote products derived from this software
- * 	   without specific prior written permission.
- *
- * You may redistribute the hardware specific firmware binary file
- * under the following terms:
- *
- * 	1. Redistribution of source code (only if applicable),
- * 	   must retain the above copyright notice, this list of
- * 	   conditions and the following disclaimer.
- *
- * 	2. Redistribution in binary form must reproduce the above
- * 	   copyright notice, this list of conditions and the
- * 	   following disclaimer in the documentation and/or other
- * 	   materials provided with the distribution.
- *
- * 	3. The name of QLogic Corporation may not be used to
- * 	   endorse or promote products derived from this software
- * 	   without specific prior written permission
- *
- * REGARDLESS OF WHAT LICENSING MECHANISM IS USED OR APPLICABLE,
- * THIS PROGRAM IS PROVIDED BY QLOGIC CORPORATION "AS IS'' AND ANY
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
- * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR
- * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
- * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
- * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- *
- * USER ACKNOWLEDGES AND AGREES THAT USE OF THIS PROGRAM WILL NOT
- * CREATE OR GIVE GROUNDS FOR A LICENSE BY IMPLICATION, ESTOPPEL, OR
- * OTHERWISE IN ANY INTELLECTUAL PROPERTY RIGHTS (PATENT, COPYRIGHT,
- * TRADE SECRET, MASK WORK, OR OTHER PROPRIETARY RIGHT) EMBODIED IN
- * ANY OTHER QLOGIC HARDWARE OR SOFTWARE EITHER SOLELY OR IN
- * COMBINATION WITH THIS PROGRAM.
+ * See LICENSE.qla4xxx for copyright and licensing details.
  */
 
 #include "ql4_def.h"
@@ -158,8 +103,7 @@ qla4xxx_send_marker_iocb(scsi_qla_host_t *ha, ddb_entry_t *ddb_entry, int lun)
 	marker_entry->hdr.entryCount = 1;
 	marker_entry->target = cpu_to_le16(ddb_entry->fw_ddb_index);
 	marker_entry->modifier = cpu_to_le16(MM_LUN_RESET);
-	marker_entry->lun[1] = LSB(lun);	/*SAMII compliant lun */
-	marker_entry->lun[2] = MSB(lun);
+	int_to_scsilun(lun, &marker_entry->lun);
 	wmb();
 
 	/* Tell ISP it's got a new I/O request */
@@ -425,7 +369,7 @@ qla4xxx_send_command_to_isp(scsi_qla_host_t *ha, srb_t * srb)
 	struct scsi_cmnd *cmd = srb->cmd;
 	ddb_entry_t *ddb_entry;
 	COMMAND_ENTRY *cmd_entry;
-	struct scatterlist *sg;
+	struct scatterlist *sg = NULL;
 
 	uint16_t tot_dsds;
 	uint16_t req_cnt;
@@ -508,17 +452,16 @@ qla4xxx_send_command_to_isp(scsi_qla_host_t *ha, srb_t * srb)
 
 	/* Build command packet */
 	cmd_entry = (COMMAND_ENTRY *) ha->request_ptr;
+	memset(cmd_entry, 0, sizeof(COMMAND_ENTRY));
 	cmd_entry->hdr.entryType = ET_COMMAND;
 	cmd_entry->handle = cpu_to_le32(index);
 	cmd_entry->target = cpu_to_le16(ddb_entry->fw_ddb_index);
 	cmd_entry->connection_id = cpu_to_le16(ddb_entry->connection_id);
 
-	cmd_entry->lun[1] = LSB(cmd->device->lun);	/* SAMII compliant. */
-	cmd_entry->lun[2] = MSB(cmd->device->lun);
+	int_to_scsilun(cmd->device->lun, &cmd_entry->lun);
 	cmd_entry->cmdSeqNum = cpu_to_le32(ddb_entry->CmdSn);
 	cmd_entry->ttlByteCnt = cpu_to_le32(cmd->request_bufflen);
-	memcpy(cmd_entry->cdb, cmd->cmnd, min((unsigned char)MAX_COMMAND_SIZE,
-	    cmd->cmd_len));
+	memcpy(cmd_entry->cdb, cmd->cmnd, cmd->cmd_len);
 	cmd_entry->dataSegCnt = cpu_to_le16(tot_dsds);
 	cmd_entry->hdr.entryCount = req_cnt;
 
@@ -559,13 +502,24 @@ qla4xxx_send_command_to_isp(scsi_qla_host_t *ha, srb_t * srb)
 	qla4xxx_build_scsi_iocbs(srb, cmd_entry, tot_dsds);
 	wmb();
 
+	/*
+	 * Check to see if adapter is online before placing request on
+	 * request queue.  If a reset occurs and a request is in the queue,
+	 * the firmware will still attempt to process the request, retrieving
+	 * garbage for pointers.
+	 */
+	if (!test_bit(AF_ONLINE, &ha->flags)) {
+		DEBUG2(printk("scsi%ld: %s: Adapter OFFLINE! "
+				      "Do not issue command.\n",
+                                      ha->host_no, __func__));
+		goto queuing_error;
+	}
+
 	/* put command in active array */
 	ha->active_srb_array[index] = srb;
 	srb->cmd->host_scribble = (unsigned char *)(unsigned long)index;
-	//srb->active_array_index = index;
 
 	/* update counters */
-	ha->active_srb_count++;
 	srb->state = SRB_ACTIVE_STATE;
 	srb->flags |= SRB_DMA_VALID;
 

@@ -1,4 +1,4 @@
-config SCSI_QLA4XXX
+config SCSI_QLA_ISCSI
 	tristate "QLogic ISP4XXX host adapter family support"
 	depends on PCI && SCSI
 	---help---

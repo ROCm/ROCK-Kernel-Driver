@@ -1,63 +1,8 @@
 /*
- * Copyright (c)  2003-2005 QLogic Corporation
- * QLogic Linux iSCSI Driver
+ * QLogic iSCSI HBA Driver
+ * Copyright (c)  2003-2006 QLogic Corporation
  *
- * This program includes a device driver for Linux 2.6 that may be
- * distributed with QLogic hardware specific firmware binary file.
- * You may modify and redistribute the device driver code under the
- * GNU General Public License as published by the Free Software
- * Foundation (version 2 or a later version) and/or under the
- * following terms, as applicable:
- *
- * 	1. Redistribution of source code must retain the above
- * 	   copyright notice, this list of conditions and the
- * 	   following disclaimer.
- *
- * 	2. Redistribution in binary form must reproduce the above
- * 	   copyright notice, this list of conditions and the
- * 	   following disclaimer in the documentation and/or other
- * 	   materials provided with the distribution.
- *
- * 	3. The name of QLogic Corporation may not be used to
- * 	   endorse or promote products derived from this software
- * 	   without specific prior written permission.
- *
- * You may redistribute the hardware specific firmware binary file
- * under the following terms:
- *
- * 	1. Redistribution of source code (only if applicable),
- * 	   must retain the above copyright notice, this list of
- * 	   conditions and the following disclaimer.
- *
- * 	2. Redistribution in binary form must reproduce the above
- * 	   copyright notice, this list of conditions and the
- * 	   following disclaimer in the documentation and/or other
- * 	   materials provided with the distribution.
- *
- * 	3. The name of QLogic Corporation may not be used to
- * 	   endorse or promote products derived from this software
- * 	   without specific prior written permission
- *
- * REGARDLESS OF WHAT LICENSING MECHANISM IS USED OR APPLICABLE,
- * THIS PROGRAM IS PROVIDED BY QLOGIC CORPORATION "AS IS'' AND ANY
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
- * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR
- * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
- * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
- * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- *
- * USER ACKNOWLEDGES AND AGREES THAT USE OF THIS PROGRAM WILL NOT
- * CREATE OR GIVE GROUNDS FOR A LICENSE BY IMPLICATION, ESTOPPEL, OR
- * OTHERWISE IN ANY INTELLECTUAL PROPERTY RIGHTS (PATENT, COPYRIGHT,
- * TRADE SECRET, MASK WORK, OR OTHER PROPRIETARY RIGHT) EMBODIED IN
- * ANY OTHER QLOGIC HARDWARE OR SOFTWARE EITHER SOLELY OR IN
- * COMBINATION WITH THIS PROGRAM.
+ * See LICENSE.qla4xxx for copyright and licensing details.
  */
 
 #include "ql4_def.h"
@@ -68,12 +13,6 @@
 *  QLogic ISP4xxx Hardware Support Function Prototypes.
  */
 extern int ql4xdiscoverywait;
-
-/*
- * Local routines
- */
-static int qla4xxx_start_firmware(scsi_qla_host_t * ha);
-static int qla4xxx_config_nvram(scsi_qla_host_t * ha);
 
 static void
 ql4xxx_set_mac_number(scsi_qla_host_t * ha)
@@ -216,7 +155,6 @@ qla4xxx_init_rings(scsi_qla_host_t * ha)
 	/* Initialize active array */
 	for (i = 0; i < MAX_SRBS; i++)
 		ha->active_srb_array[i] = 0;
-	ha->active_srb_count = 0;
 
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
@@ -311,18 +249,6 @@ qla4xxx_init_local_data(scsi_qla_host_t *ha)
 	/* Initilize aen queue */
 	ha->aen_q_count = MAX_AEN_ENTRIES;
 
-	/* Initialize local iSNS data */
-	qla4xxx_isns_init_attributes(ha);
-	ha->isns_flags = 0;
-	atomic_set(&ha->isns_restart_timer, 0);
-	ha->isns_connection_id = 0;
-	ha->isns_remote_port_num = 0;
-	ha->isns_scn_port_num = 0;
-	ha->isns_esi_port_num = 0;
-	ha->isns_nsh_port_num = 0;
-	memset(ha->isns_entity_id, 0, sizeof(ha->isns_entity_id));
-	ha->isns_num_discovered_targets = 0;
-
 	return qla4xxx_get_firmware_status(ha);
 }
 
@@ -337,6 +263,7 @@ qla4xxx_fw_ready(scsi_qla_host_t * ha)
 	     timeout_count--) {
 		if (test_and_clear_bit(DPC_GET_DHCP_IP_ADDR, &ha->dpc_flags))
 			qla4xxx_get_dhcp_ip_address(ha);
+
 		/* Get firmware state. */
 		if (qla4xxx_get_firmware_state(ha) != QLA_SUCCESS) {
 			DEBUG2(printk("scsi%ld: %s: unable to get firmware "
@@ -385,17 +312,6 @@ qla4xxx_fw_ready(scsi_qla_host_t * ha)
 			    FW_ADDSTATE_ISNS_SVC_ENABLED) != 0 ? "YES" : "NO"));
 
 			ready = 1;
-			/* If iSNS is enabled, start the iSNS service now. */
-			if ((ha->tcp_options & TOPT_ISNS_ENABLE) &&
-			    !IPAddrIsZero(ha->isns_ip_address)) {
-				uint32_t ip_addr = 0;
-
-				IPAddr2Uint32(ha->isns_ip_address, &ip_addr);
-				ql4_printk(KERN_INFO, ha,
-				    "Initializing ISNS..\n");
-				qla4xxx_isns_reenable(ha, ip_addr,
-				    ha->isns_server_port_number);
-			}
 			break;
 		}
 		DEBUG2(printk("scsi%ld: %s: waiting on fw, state=%x:%x - "
@@ -408,8 +324,13 @@ qla4xxx_fw_ready(scsi_qla_host_t * ha)
 	if (timeout_count <= 0)
 		DEBUG2(printk("scsi%ld: %s: FW Initialization timed out!\n",
 		    ha->host_no, __func__));
-	if (ha->firmware_state & FW_STATE_DHCP_IN_PROGRESS)
+
+	if (ha->firmware_state & FW_STATE_DHCP_IN_PROGRESS)  {
+		DEBUG2(printk("scsi%ld: %s: FW is reporting its waiting to"
+					" grab an IP address from DHCP server\n",
+					      ha->host_no, __func__));
 		ready = 1;
+	}
 
 	return ready;
 }
@@ -444,50 +365,6 @@ qla4xxx_init_firmware(scsi_qla_host_t * ha)
 
 	set_bit(AF_ONLINE, &ha->flags);
 	return qla4xxx_get_firmware_status(ha);
-}
-
-/**************************************************************************
- * qla4xxx_find_isns_targets
- *	This routine locates a device handle for ther given iSNS information.
- *	If device doesn't exist, returns NULL.
- *
- * Input:
- * 	ha - Pointer to host adapter structure.
- *      ip_addr - Pointer to IP address
- *      alias - Pointer to iSCSI alias
- *
- * Returns:
- *	Pointer to the corresponding internal device database structure
- *
- * Context:
- *	Kernel context.
- **************************************************************************/
-static inline int
-qla4xxx_is_discovered_target(scsi_qla_host_t * ha, uint8_t * ip_addr,
-    uint8_t * alias, uint8_t * name_str)
-{
-	ISNS_DISCOVERED_TARGET *discovered_target = NULL;
-	int i, j;
-
-	for (i = 0; i < ha->isns_num_discovered_targets; i++) {
-		discovered_target = &ha->isns_disc_tgt_databasev[i];
-
-		for (j = 0; j < discovered_target->NumPortals; j++) {
-			if (memcmp(discovered_target->Portal[j].IPAddr, ip_addr,
-			    min(sizeof(discovered_target->Portal[j].IPAddr),
-				    sizeof(*ip_addr)) == 0)
-			    && memcmp(discovered_target->Alias, alias,
-				    min(sizeof(discovered_target->Alias),
-					    sizeof(*alias)) == 0)
-			    && memcmp(discovered_target->NameString, name_str,
-				    min(sizeof(discovered_target->Alias),
-					    sizeof(*name_str)) == 0)) {
-
-				return QLA_SUCCESS;
-			}
-		}
-	}
-	return QLA_ERROR;
 }
 
 static struct ddb_entry *
@@ -617,10 +494,6 @@ qla4xxx_update_ddb_entry(scsi_qla_host_t * ha, struct ddb_entry *ddb_entry,
 		    sizeof(fw_ddb_entry->iscsiName)));
 	memcpy(&ddb_entry->ip_addr[0], &fw_ddb_entry->ipAddr[0],
 	    min(sizeof(ddb_entry->ip_addr), sizeof(fw_ddb_entry->ipAddr)));
-
-	if (qla4xxx_is_discovered_target(ha, fw_ddb_entry->ipAddr,
-	    fw_ddb_entry->iSCSIAlias, fw_ddb_entry->iscsiName) == QLA_SUCCESS)
-		set_bit(DF_ISNS_DISCOVERED, &ddb_entry->flags);
 
 	DEBUG2(printk("scsi%ld: %s: ddb[%d] - State= %x status= %d.\n",
 	    ha->host_no, __func__, fw_ddb_index,
@@ -762,8 +635,9 @@ qla4xxx_build_ddb_list(scsi_qla_host_t *ha)
 			    ha->host_no, __func__, fw_ddb_index));
 			err_code = ((conn_err & 0x00ff0000) >> 16);
 			if (err_code == 0x1c || err_code == 0x06) {
-				DEBUG2(printk("%s send target completed or "
-				    "access denied failure\n", __func__));
+				DEBUG2(printk("scsi%ld: %s send target completed "
+				    "or access denied failure\n",
+				    ha->host_no, __func__));
 			} else {
 				qla4xxx_set_ddb_entry(ha, fw_ddb_index, NULL,
 				    0);
@@ -845,9 +719,9 @@ qla4xxx_devices_ready(scsi_qla_host_t * ha)
 				err_code = ((conn_err & 0x00ff0000) >> 16);
 				if (err_code == 0x1c || err_code == 0x06) {
 					DEBUG2(printk(
-					    "%s send target completed or "
+					    "scsi%ld: %s send target completed or "
 					    "access denied failure\n",
-					    __func__);)
+					    ha->host_no, __func__);)
 				} else {
 					/* We either have a device that is in
 					 * the process of relogging in or a
@@ -1077,7 +951,7 @@ qla4xxx_config_nvram(scsi_qla_host_t * ha)
 	QL4XXX_LOCK_NVRAM(ha);
 	/* Get EEPRom Parameters from NVRAM and validate */
 	ql4_printk(KERN_INFO, ha, "Configuring NVRAM ...\n");
-	if (qla4xxx_is_NVRAM_configuration_valid(ha) == QLA_SUCCESS) {
+	if (qla4xxx_is_nvram_configuration_valid(ha) == QLA_SUCCESS) {
 		spin_lock_irqsave(&ha->hardware_lock, flags);
 		extHwConfig.Asuint32_t = RD_NVRAM_WORD(ha,
 		    EEPROM_EXT_HW_CONF_OFFSET());
@@ -1308,6 +1182,7 @@ qla4xxx_start_firmware(scsi_qla_host_t * ha)
 			return QLA_ERROR;
 		}
 		config_chip = 1;
+
 		/* Reset clears the semaphore, so aquire again */
 		QL4XXX_LOCK_DRVR_WAIT(ha);
 	}
@@ -1315,16 +1190,16 @@ qla4xxx_start_firmware(scsi_qla_host_t * ha)
 	if (config_chip) {
 		if (qla4xxx_config_nvram(ha))
 			status = qla4xxx_start_firmware_from_flash(ha);
+	}
 
-		QL4XXX_UNLOCK_DRVR(ha);
-		if (status == QLA_SUCCESS) {
-			qla4xxx_get_fw_version(ha);
-			if (test_and_clear_bit(AF_GET_CRASH_RECORD, &ha->flags))
-				qla4xxx_get_crash_record(ha);
-		} else {
-			DEBUG(printk("scsi%ld: %s: Firmware has NOT started\n",
-			    ha->host_no, __func__));
-		}
+	QL4XXX_UNLOCK_DRVR(ha);
+	if (status == QLA_SUCCESS) {
+		qla4xxx_get_fw_version(ha);
+		if (test_and_clear_bit(AF_GET_CRASH_RECORD, &ha->flags))
+			qla4xxx_get_crash_record(ha);
+	} else {
+		DEBUG(printk("scsi%ld: %s: Firmware has NOT started\n",
+		    ha->host_no, __func__));
 	}
 	return status;
 }
@@ -1352,6 +1227,8 @@ int
 qla4xxx_initialize_adapter(scsi_qla_host_t * ha, uint8_t renew_ddb_list)
 {
 	int status = QLA_ERROR;
+
+	ha->eeprom_cmd_data = 0;
 
 	qla4x00_pci_config(ha);
 
@@ -1382,32 +1259,6 @@ qla4xxx_initialize_adapter(scsi_qla_host_t * ha, uint8_t renew_ddb_list)
 	/* Skip device discovery if ip and subnet is zero */
 	if (IPAddrIsZero(ha->ip_address) || IPAddrIsZero(ha->subnet_mask))
 		return status;
-
-	/* If iSNS Enabled, wait for iSNS targets */
-	if (test_bit (ISNS_FLAG_ISNS_ENABLED_IN_ISP, &ha->isns_flags)) {
-		unsigned long wait_cnt = jiffies + ql4xdiscoverywait * HZ;
-
-		DEBUG(printk("scsi%ld: Delay up to %d seconds while iSNS "
-		    "targets are being discovered.\n", ha->host_no,
-		    ql4xdiscoverywait));
-		while (!time_after_eq(jiffies, wait_cnt)) {
-			if (test_bit(ISNS_FLAG_DEV_SCAN_DONE, &ha->isns_flags))
-				break;
-			qla4xxx_get_firmware_state(ha);
-			set_current_state(TASK_INTERRUPTIBLE);
-			schedule_timeout(1 * HZ);
-		}
-
-		if (!test_bit(ISNS_FLAG_ISNS_SRV_ENABLED, &ha->isns_flags)) {
-			DEBUG2(printk("scsi%ld: iSNS service failed to start\n",
-			    ha->host_no));
-		} else {
-			if (!ha->isns_num_discovered_targets) {
-				DEBUG2(printk("scsi%ld: Failed to discover "
-				    "iSNS targets\n", ha->host_no));
-			}
-		}
-	}
 
 	if (renew_ddb_list == PRESERVE_DDB_LIST) {
 		/*
