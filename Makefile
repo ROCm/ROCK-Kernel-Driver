@@ -1,7 +1,7 @@
 VERSION = 2
 PATCHLEVEL = 6
 SUBLEVEL = 16
-EXTRAVERSION = -rc5-git14
+EXTRAVERSION =-rc6
 NAME=Sliding Snow Leopard
 
 # *DOCUMENTATION*
@@ -859,7 +859,7 @@ define filechk_version.h
 	)
 endef
 
-$(objtree)/include/linux/version.h: $(srctree)/Makefile .config FORCE
+$(objtree)/include/linux/version.h: $(srctree)/Makefile .config .kernelrelease FORCE
 	$(call filechk,version.h)
 
 # ---------------------------------------------------------------------------
