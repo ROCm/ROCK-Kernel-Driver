@@ -444,7 +444,7 @@ qla4xxx_probe_adapter(struct pci_dev *pdev, const struct pci_device_id *ent)
 	list_for_each_entry_safe(ddb_entry, ddbtemp, &ha->ddb_list, list) {
 		if (ddb_entry->fw_ddb_device_state == DDB_DS_SESSION_ACTIVE) {
 			if( (ddb_entry->session = iscsi_create_session(host,
-				&qla4xxx_iscsi_transport_functions)) != NULL ) {
+				&qla4xxx_iscsi_transport_functions),0) != NULL ) {
 				ddb_entry->session->dd_data = ddb_entry;
 				iscsi_create_conn(ddb_entry->session, 0);
 			}
