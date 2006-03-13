@@ -150,82 +150,83 @@ static ssize_t sd_version_read(struct file *file, char __user *buf,
 				       strlen(version));
 }
 
-static ssize_t sd_profile_load(struct file *f, const char __user *buf,
-			       size_t size, loff_t *pos)
+static char *sd_simple_write_to_buffer(const char __user *userbuf,
+				       size_t alloc_size, size_t copy_size,
+				       loff_t *pos, const char *msg)
 {
-	void *data;
-	ssize_t error = -EFAULT;
+	char *data;
 
-	if (*pos != 0)
+	if (*pos != 0) {
 		/* only writes from pos 0, that is complete writes */
-		return -ESPIPE;
+		data = ERR_PTR(-ESPIPE);
+		goto out;
+	}
 
-	/* Don't allow confined processes to load profiles.
+	/* Don't allow confined processes to load/replace/remove profiles.
 	 * No sane person would add rules allowing this to a profile
 	 * but we enforce the restriction anyways.
 	 */
 	if (sd_is_confined()) {
 		struct subdomain *sd = SD_SUBDOMAIN(current->security);
 
-		SD_WARN("REJECTING access to profile addition (%s(%d) "
+		SD_WARN("REJECTING access to profile %s (%s(%d) "
 			"profile %s active %s)\n",
-			current->comm, current->pid,
+			msg, current->comm, current->pid,
 			sd->profile->name, sd->active->name);
 
-		return -EPERM;
-	}
-
-	data = vmalloc(size);
-	if (data == NULL)
-		return -ENOMEM;
-
-	if (copy_from_user(data, buf, size)) {
-		error = -EFAULT;
+		data = ERR_PTR(-EPERM);
 		goto out;
 	}
 
-	error = sd_file_prof_add(data, size);
+	data = vmalloc(alloc_size);
+	if (data == NULL) {
+		data = ERR_PTR(-ENOMEM);
+		goto out;
+	}
+
+	if (copy_from_user(data, userbuf, copy_size)) {
+		vfree(data);
+		data = ERR_PTR(-EFAULT);
+		goto out;
+	}
 
 out:
-	vfree(data);
+	return data;
+}
+
+static ssize_t sd_profile_load(struct file *f, const char __user *buf,
+			       size_t size, loff_t *pos)
+{
+	char *data;
+	ssize_t error;
+
+	data = sd_simple_write_to_buffer(buf, size, size, pos, "load");
+
+	if (!IS_ERR(data)) {
+		error = sd_file_prof_add(data, size);
+		vfree(data);
+	} else {
+		error = PTR_ERR(data);
+	}
+
 	return error;
 }
 
 static ssize_t sd_profile_replace(struct file *f, const char __user *buf,
 				  size_t size, loff_t *pos)
 {
-	void *data;
-	ssize_t error = -EFAULT;
+	char *data;
+	ssize_t error;
 
-	if (*pos != 0)
-		/* only writes from pos 0, that is complete writes */
-		return -ESPIPE;
+	data = sd_simple_write_to_buffer(buf, size, size, pos, "replacement");
 
-	/* Don't allow confined processes to replace profiles */
-	if (sd_is_confined()) {
-		struct subdomain *sd = SD_SUBDOMAIN(current->security);
-
-		SD_WARN("REJECTING access to profile replacement (%s(%d) "
-			"profile %s active %s)\n",
-			current->comm, current->pid,
-			sd->profile->name, sd->active->name);
-
-		return -EPERM;
+	if (!IS_ERR(data)) {
+		error = sd_file_prof_repl(data, size);
+		vfree(data);
+	} else {
+		error = PTR_ERR(data);
 	}
 
-	data = vmalloc(size);
-	if (data == NULL)
-		return -ENOMEM;
-
-	if (copy_from_user(data, buf, size)) {
-		error = -EFAULT;
-		goto out;
-	}
-
-	error = sd_file_prof_repl(data, size);
-
-out:
-	vfree(data);
 	return error;
 }
 
@@ -233,38 +234,21 @@ static ssize_t sd_profile_remove(struct file *f, const char __user *buf,
 				  size_t size, loff_t *pos)
 {
 	char *data;
-	ssize_t error = -EFAULT;
+	ssize_t error;
 
-	if (*pos != 0)
-		/* only writes from pos 0, that is complete writes */
-		return -ESPIPE;
+	/* sd_file_prof_remove needs a null terminated string so 1 extra
+	 * byte is allocated and null the copied data is then null terminated
+	 */
+	data = sd_simple_write_to_buffer(buf, size+1, size, pos, "removal");
 
-	/* Don't allow confined processes to remove profiles */
-	if (sd_is_confined()) {
-		struct subdomain *sd = SD_SUBDOMAIN(current->security);
-
-		SD_WARN("REJECTING access to profile removal (%s(%d) "
-			"profile %s active %s)\n",
-			current->comm, current->pid,
-			sd->profile->name, sd->active->name);
-
-		return -EPERM;
+	if (!IS_ERR(data)) {
+		data[size] = 0;
+		error = sd_file_prof_remove(data, size);
+		vfree(data);
+	} else {
+		error = PTR_ERR(data);
 	}
 
-	data = (char *)vmalloc(size + 1);
-	if (data == NULL)
-		return -ENOMEM;
-
-	data[size] = 0;
-	if (copy_from_user(data, buf, size)) {
-		error = -EFAULT;
-		goto out;
-	}
-
-	error = sd_file_prof_remove((char *)data, size);
-
-out:
-	vfree(data);
 	return error;
 }
 

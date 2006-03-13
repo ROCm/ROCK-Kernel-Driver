@@ -166,6 +166,7 @@ extern struct sdprofile *null_complain_profile;
 struct sd_audit {
 	unsigned short type, flags;
 	unsigned int result;
+	unsigned int gfp_mask;
 	int errorcode;
 
 	const char *name;
@@ -197,9 +198,9 @@ struct sd_audit {
 #define HINT_MANDPROF "missing_mandatory_profile"
 #define HINT_CHGPROF "changing_profile"
 
-#define LOG_HINT(sd, hint, fmt, args...) \
+#define LOG_HINT(sd, gfp, hint, fmt, args...) \
 	do {\
-		sd_audit_message(sd, 0, \
+		sd_audit_message(sd, gfp, 0, \
 			"LOGPROF-HINT " hint " " fmt, ##args);\
 	} while(0)
 
@@ -216,8 +217,10 @@ struct sd_audit {
 /* main.c */
 extern int alloc_nullprofiles(void);
 extern void free_nullprofiles(void);
-extern int sd_audit_message(struct subdomain *, int, const char *, ...);
-extern int sd_audit_syscallreject(struct subdomain *, const char *);
+extern int sd_audit_message(struct subdomain *, unsigned int gfp, int,
+			    const char *, ...);
+extern int sd_audit_syscallreject(struct subdomain *, unsigned int gfp,
+				  const char *);
 extern int sd_audit(struct subdomain *, const struct sd_audit *);
 extern char *sd_get_name(struct dentry *dentry, struct vfsmount *mnt);
 
@@ -251,7 +254,7 @@ extern struct sdprofile *sd_profilelist_replace(struct sdprofile *profile);
 extern void sd_profile_dump(struct sdprofile *);
 extern void sd_profilelist_dump(void);
 extern void sd_subdomainlist_add(struct subdomain *);
-extern int sd_subdomainlist_remove(struct subdomain *);
+extern void sd_subdomainlist_remove(struct subdomain *);
 extern void sd_subdomainlist_iterate(sd_iter, void *);
 extern void sd_subdomainlist_iterateremove(sd_iter, void *);
 extern void sd_subdomainlist_release(void);

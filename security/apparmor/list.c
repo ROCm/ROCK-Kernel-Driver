@@ -172,27 +172,15 @@ void sd_subdomainlist_add(struct subdomain *sd)
  *
  * Remove subdomain from subdomain_list
  */
-int sd_subdomainlist_remove(struct subdomain *sd)
+void sd_subdomainlist_remove(struct subdomain *sd)
 {
-	struct subdomain *node, *tmp;
-	int error = -ENOENT;
 	unsigned long flags;
 
-	if (!sd)
-		goto out;
-
-	write_lock_irqsave(&subdomain_lock, flags);
-	list_for_each_entry_safe(node, tmp, &subdomain_list, list) {
-		if (node == sd) {
-			list_del_init(&node->list);
-			error = 0;
-			break;
-		}
+	if (sd) {
+		write_lock_irqsave(&subdomain_lock, flags);
+		list_del_init(&sd->list);
+		write_unlock_irqrestore(&subdomain_lock, flags);
 	}
-	write_unlock_irqrestore(&subdomain_lock, flags);
-
-out:
-	return error;
 }
 
 /**

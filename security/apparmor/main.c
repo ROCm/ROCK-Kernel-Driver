@@ -501,10 +501,12 @@ void free_nullprofiles(void)
 /**
  * sd_audit_message - Log a message to the audit subsystem
  * @sd: current subdomain
+ * @gfp: allocation flags
  * @flags: audit flags
  * @fmt: varargs fmt
  */
-int sd_audit_message(struct subdomain *sd, int flags, const char *fmt, ...)
+int sd_audit_message(struct subdomain *sd, unsigned int gfp, int flags,
+		     const char *fmt, ...)
 {
 	int ret;
 	struct sd_audit sa;
@@ -513,6 +515,7 @@ int sd_audit_message(struct subdomain *sd, int flags, const char *fmt, ...)
 	sa.name = fmt;
 	va_start(sa.vaval, fmt);
 	sa.flags = flags;
+	sa.gfp_mask = gfp;
 	sa.errorcode = 0;
 	sa.result = 0;	/* fake failure: force message to be logged */
 
@@ -527,14 +530,17 @@ int sd_audit_message(struct subdomain *sd, int flags, const char *fmt, ...)
  * sd_audit_syscallreject - Log a syscall rejection to the audit subsystem
  * @sd: current subdomain
  * @msg: string describing syscall being rejected
+ * @gfp: memory allocation flags
  */
-int sd_audit_syscallreject(struct subdomain *sd, const char *msg)
+int sd_audit_syscallreject(struct subdomain *sd, unsigned int gfp,
+			   const char *msg)
 {
 	struct sd_audit sa;
 
 	sa.type = SD_AUDITTYPE_SYSCALL;
 	sa.name = msg;
 	sa.flags = 0;
+	sa.gfp_mask = gfp;
 	sa.errorcode = 0;
 	sa.result = 0; /* failure */
 
@@ -558,10 +564,7 @@ int sd_audit(struct subdomain *sd, const struct sd_audit *sa)
 	    error = -EINVAL,
 	    opspec_error = -EACCES;
 
-	/* XXX, investigate when it's safe to use GFP_KERNEL. For sure not
-	 * safe from sd_capability as scheduler spinlock can be held
-	 */
-	const int gfp_mask = GFP_ATOMIC;
+	const unsigned int gfp_mask = sa->gfp_mask;
 
 	WARN_ON(sa->type >= SD_AUDITTYPE__END);
 
@@ -622,6 +625,8 @@ int sd_audit(struct subdomain *sd, const struct sd_audit *sa)
 	if (!ab) {
 		SD_ERROR("Unable to log event (%d) to audit subsys\n",
 			sa->type);
+		if (sdcomplain)
+			error = 0;
 		goto out;
 	}
 
@@ -781,6 +786,7 @@ int sd_attr(struct subdomain *sd, struct dentry *dentry, struct iattr *iattr)
 	sa.type = SD_AUDITTYPE_ATTR;
 	sa.pval = iattr;
 	sa.flags = 0;
+	sa.gfp_mask = GFP_KERNEL;
 
 	permerror = _sd_perm_dentry(sd, dentry, MAY_WRITE, &sa.name);
 	sd_permerror2result(permerror, &sa);
@@ -812,6 +818,7 @@ int sd_xattr(struct subdomain *sd, struct dentry *dentry, const char *xattr,
 	sa.ival = xattroptype;
 	sa.pval = xattr;
 	sa.flags = 0;
+	sa.gfp_mask = GFP_KERNEL;
 
 	permerror = _sd_perm_dentry(sd, dentry, mask, &sa.name);
 	sd_permerror2result(permerror, &sa);
@@ -850,6 +857,7 @@ int sd_perm(struct subdomain *sd, struct dentry *dentry, struct vfsmount *mnt,
 	sa.name = sd_get_name(dentry, mnt);
 	sa.ival = mask;
 	sa.flags = 0;
+	sa.gfp_mask = GFP_KERNEL;
 
 	permerror = (sa.name ? sd_file_perm(sd, sa.name, mask) : -ENOMEM);
 
@@ -902,6 +910,7 @@ int sd_perm_dentry(struct subdomain *sd, struct dentry *dentry, int mask)
 	sa.type = SD_AUDITTYPE_FILE;
 	sa.ival = mask;
 	sa.flags = 0;
+	sa.gfp_mask = GFP_KERNEL;
 
 	permerror = _sd_perm_dentry(sd, dentry, mask, &sa.name);
 	sd_permerror2result(permerror, &sa);
@@ -935,12 +944,11 @@ int sd_perm_dir(struct subdomain *sd, struct dentry *dentry, int diroptype)
 		goto out;
 
 	mask = MAY_WRITE;
-	if (diroptype == SD_DIR_RMDIR)
-		mask |= SD_MAY_LINK;
 
 	sa.type = SD_AUDITTYPE_DIR;
 	sa.ival = diroptype;
 	sa.flags = 0;
+	sa.gfp_mask = GFP_KERNEL;
 
 	permerror = _sd_perm_dentry(sd, dentry, mask, &sa.name);
 	sd_permerror2result(permerror, &sa);
@@ -974,6 +982,7 @@ int sd_capability(struct subdomain *sd, int cap)
 		sa.flags = 0;
 		sa.errorcode = 0;
 		sa.result = cap_raised(sd->active->capabilities, cap);
+		sa.gfp_mask = GFP_ATOMIC;
 
 		error = sd_audit(sd, &sa);
 	}
@@ -1100,6 +1109,7 @@ int sd_link(struct subdomain *sd, struct dentry *link, struct dentry *target)
 	sa.flags = 0;
 	sa.errorcode = errorcode;
 	sa.result = result;
+	sa.gfp_mask = GFP_KERNEL;
 
 	error = sd_audit(sd, &sa);
 
@@ -1152,7 +1162,7 @@ int sd_fork(struct task_struct *p)
 
 		if (SUBDOMAIN_COMPLAIN(sd) &&
 		    sd->active == null_complain_profile)
-			LOG_HINT(sd, HINT_FORK,
+			LOG_HINT(sd, GFP_KERNEL, HINT_FORK,
 				"pid=%d child=%d\n",
 				current->pid, p->pid);
 	}
@@ -1310,7 +1320,7 @@ find_profile:
 		/* Profile (mandatory) could not be found */
 
 		if (complain) {
-			LOG_HINT(sd, HINT_MANDPROF,
+			LOG_HINT(sd, GFP_KERNEL, HINT_MANDPROF,
 				"image=%s pid=%d profile=%s active=%s\n",
 				filename,
 				current->pid,
@@ -1410,7 +1420,7 @@ apply_profile:
 		put_sdprofile(newprofile);
 
 		if (complain && newprofile == null_complain_profile)
-			LOG_HINT(latest_sd, HINT_CHGPROF,
+			LOG_HINT(latest_sd, GFP_ATOMIC, HINT_CHGPROF,
 				"pid=%d\n",
 				current->pid);
 
@@ -1481,7 +1491,7 @@ static inline int do_change_hat(const char *hat_name, struct subdomain *sd)
 		 * out to the parent profile (assuming magic != NULL)
 		 */
 		if (SUBDOMAIN_COMPLAIN(sd)) {
-			LOG_HINT(sd, HINT_UNKNOWN_HAT,
+			LOG_HINT(sd, GFP_ATOMIC, HINT_UNKNOWN_HAT,
  				"%s pid=%d "
 				"profile=%s active=%s\n",
 				hat_name,

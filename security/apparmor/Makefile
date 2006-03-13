@@ -1,6 +1,6 @@
 # Makefile for AppArmor Linux Security Module (previously called "SubDomain")
 #
-APPARMOR_VER=2.0-19.43r6152
+APPARMOR_VER=2.0-19.43r6320
 
 EXTRA_CFLAGS += -DAPPARMOR_VERSION=\"${APPARMOR_VER}\"
 

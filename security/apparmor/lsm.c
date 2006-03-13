@@ -6,6 +6,8 @@
  *	published by the Free Software Foundation, version 2 of the
  *	License.
  *
+ *	http://forge.novell.com/modules/xfmod/project/?apparmor
+ *
  *	Immunix AppArmor LSM interface (previously called "SubDomain")
  */
 
@@ -102,7 +104,7 @@ static int subdomain_ptrace(struct task_struct *parent,
 	sd = SD_SUBDOMAIN(current->security);
 
 	if (!error && __sd_is_confined(sd)) {
-		error = sd_audit_syscallreject(sd, "ptrace");
+		error = sd_audit_syscallreject(sd, GFP_ATOMIC, "ptrace");
 		WARN_ON(error != -EPERM);
 	}
 
@@ -170,7 +172,8 @@ static int subdomain_sysctl(struct ctl_table *table, int op)
 	sd = SD_SUBDOMAIN(current->security);
 
 	if ((op & 002) && __sd_is_confined(sd) && !capable(CAP_SYS_ADMIN)) {
-		error = sd_audit_syscallreject(sd, "sysctl (write)");
+		error = sd_audit_syscallreject(sd, GFP_ATOMIC,
+					       "sysctl (write)");
 		WARN_ON(error != -EPERM);
 	}
 
@@ -222,7 +225,7 @@ static int subdomain_sb_mount(char *dev_name, struct nameidata *nd, char *type,
 	sd = SD_SUBDOMAIN(current->security);
 
 	if (__sd_is_confined(sd)) {
-		error = sd_audit_syscallreject(sd, "mount");
+		error = sd_audit_syscallreject(sd, GFP_ATOMIC, "mount");
 		WARN_ON(error != -EPERM);
 	}
 
@@ -242,7 +245,7 @@ static int subdomain_umount(struct vfsmount *mnt, int flags)
 	sd = SD_SUBDOMAIN(current->security);
 
 	if (__sd_is_confined(sd)) {
-		error = sd_audit_syscallreject(sd, "umount");
+		error = sd_audit_syscallreject(sd, GFP_KERNEL, "umount");
 		WARN_ON(error != -EPERM);
 	}
 
@@ -273,7 +276,7 @@ static int subdomain_inode_rmdir(struct inode *inode, struct dentry *dentry)
 
 	sd = get_sdcopy(&sdcopy);
 
-	error = sd_perm_dentry(sd, dentry, MAY_WRITE | SD_MAY_LINK);
+	error = sd_perm_dir(sd, dentry, SD_DIR_RMDIR);
 
 	put_sdcopy(sd);
 
@@ -316,7 +319,7 @@ static int subdomain_inode_unlink(struct inode *inode, struct dentry *dentry)
 
 	sd = get_sdcopy(&sdcopy);
 
-	error = sd_perm_dentry(sd, dentry, MAY_WRITE | SD_MAY_LINK);
+	error = sd_perm_dentry(sd, dentry, MAY_WRITE);
 
 	put_sdcopy(sd);
 
@@ -349,7 +352,7 @@ static int subdomain_inode_rename(struct inode *old_inode,
 	sd = get_sdcopy(&sdcopy);
 
 	error = sd_perm_dentry(sd, old_dentry,
-			       MAY_READ | MAY_WRITE | SD_MAY_LINK);
+			       MAY_READ | MAY_WRITE);
 
 	if (!error)
 		error = sd_perm_dentry(sd, new_dentry, MAY_WRITE);
@@ -465,17 +468,18 @@ static int subdomain_file_permission(struct file *file, int mask)
 	struct sdprofile *f_profile;
 	int error = 0;
 
-	sd = get_sdcopy(&sdcopy);
-
 	f_profile = SD_PROFILE(file->f_security);
+	/* bail out early if this isn't a mediated file */
+	if (!(f_profile && VALID_FSTYPE(file->f_dentry->d_inode)))
+		goto out;
 
-	if (__sd_is_confined(sd) && f_profile && f_profile != sd->active &&
-	    VALID_FSTYPE(file->f_dentry->d_inode))
+	sd = get_sdcopy(&sdcopy);
+	if (__sd_is_confined(sd) && f_profile != sd->active)
 		error = sd_perm(sd, file->f_dentry, file->f_vfsmnt,
 				mask & (MAY_EXEC | MAY_WRITE | MAY_READ));
-
 	put_sdcopy(sd);
 
+out:
 	return error;
 }
 
@@ -777,7 +781,7 @@ static int __init subdomain_init(void)
 	SD_INFO("AppArmor (version %s) initialized%s\n",
 		apparmor_version(),
 		subdomain_complain ? complainmsg : "");
-	sd_audit_message(NULL, 0,
+	sd_audit_message(NULL, GFP_KERNEL, 0,
 		"AppArmor (version %s) initialized%s\n",
 		apparmor_version(),
 		subdomain_complain ? complainmsg : "");
@@ -842,7 +846,7 @@ static void __exit subdomain_exit(void)
 		SD_WARN("Unable to properly unregister AppArmor\n");
 
 	SD_INFO("AppArmor protection removed\n");
-	sd_audit_message(NULL, 0,
+	sd_audit_message(NULL, GFP_KERNEL, 0,
 		"AppArmor protection removed\n");
 }
 
