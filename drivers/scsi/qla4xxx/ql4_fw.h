@@ -4,37 +4,12 @@
  *
  * See LICENSE.qla4xxx for copyright and licensing details.
  */
-
 #ifndef _QLA4X_FW_H
 #define _QLA4X_FW_H
-
-#ifndef uint64_t
-#define uint64_t __u64
-#endif
-
-#define QLA4XXX_VENDOR_ID   	0x1077
-#define QLA4000_DEVICE_ID  	0x4000
-#define QLA4010_DEVICE_ID  	0x4010
-
-#define QLA4040_SSDID_NIC  	0x011D	/* Uses QLA4010 PCI Device ID */
-#define QLA4040_SSDID_ISCSI  	0x011E
-#define QLA4040C_SSDID_NIC  	0x011F
-#define QLA4040C_SSDID_ISCSI  	0x0120
 
 #define MAX_PRST_DEV_DB_ENTRIES         64
 #define MIN_DISC_DEV_DB_ENTRY           MAX_PRST_DEV_DB_ENTRIES
 #define MAX_DEV_DB_ENTRIES              512
-
-// ISP Maximum number of DSD per command
-#define DSD_MAX                                 1024
-
-// FW check
-#define FW_UP(reg,stat)                         (((stat = RD_REG_DWORD(reg->mailbox[0])) != 0) && (stat != 0x0007))
-
-#define INVALID_REGISTER 			((uint32_t)-1)
-
-#define ISP4010_NET_FUNCTION                            0
-#define ISP4010_ISCSI_FUNCTION                          1
 
 /*************************************************************************
  *
@@ -380,8 +355,7 @@ typedef struct isp_reg_t {
 	int i = 0; \
 	while (1) { \
 		if (QL4XXX_LOCK_DRVR(a) == 0) { \
-			set_current_state(TASK_UNINTERRUPTIBLE); \
-			schedule_timeout(10); \
+			msleep(10); \
 			if (!i) { \
 				DEBUG2(printk("scsi%ld: %s: Waiting for " \
 				    "Global Init Semaphore...n", a->host_no, \

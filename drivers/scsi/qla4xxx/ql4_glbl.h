@@ -8,8 +8,6 @@
 #ifndef __QLA4x_GBL_H
 #define	__QLA4x_GBL_H
 
-#include <linux/interrupt.h>
-
 /*
  * Defined in ql4_os.c
  */

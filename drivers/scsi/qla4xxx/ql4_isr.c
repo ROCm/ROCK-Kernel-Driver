@@ -745,9 +745,6 @@ qla4xxx_intr_handler(int irq, void *dev_id, struct pt_regs *regs)
  *
  * Returns:
  *	None
- *
- * Context:
- *	Kernel context.
  **************************************************************************/
 void
 qla4xxx_process_aen(scsi_qla_host_t * ha, uint8_t process_aen)

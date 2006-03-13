@@ -9,4 +9,3 @@
  * Compile time Options:
  *     0 - Disable and 1 - Enable
  */
-#define	DISABLE_HBA_RESETS	0

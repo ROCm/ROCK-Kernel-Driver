@@ -181,8 +181,7 @@ ql4xxx_sem_spinlock(scsi_qla_host_t * ha, u32 sem_mask, u32 sem_bits)
 			    "code = 0x%x\n", ha->host_no, sem_mask, sem_bits));
 			break;
 		}
-		set_current_state(TASK_UNINTERRUPTIBLE); 
-		schedule_timeout(10); 
+		msleep(100);
 	}
 	return 1;
 }

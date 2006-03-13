@@ -7,8 +7,6 @@
 
 #include "ql4_def.h"
 
-#include <linux/delay.h>
-
 /*
 *  QLogic ISP4xxx Hardware Support Function Prototypes.
  */
@@ -54,9 +52,6 @@ ql4xxx_set_mac_number(scsi_qla_host_t * ha)
  *
  * Returns:
  *	None
- *
- * Context:
- *	Kernel context.
  **************************************************************************/
 void
 qla4xxx_free_ddb(scsi_qla_host_t * ha, struct ddb_entry *ddb_entry)
@@ -83,9 +78,6 @@ qla4xxx_free_ddb(scsi_qla_host_t * ha, struct ddb_entry *ddb_entry)
  *
  * Returns:
  *	None
- *
- * Context:
- *	Kernel context.
  **************************************************************************/
 void
 qla4xxx_free_ddb_list(scsi_qla_host_t * ha)
@@ -116,9 +108,6 @@ qla4xxx_free_ddb_list(scsi_qla_host_t * ha)
  *	The QLA4000 doesn't care, so just default to QLA4010's requirement.
  * Returns:
  *	QLA_SUCCESS - Always return success.
- *
- * Context:
- *	Kernel context.
  */
 int
 qla4xxx_init_rings(scsi_qla_host_t * ha)
@@ -173,9 +162,6 @@ qla4xxx_init_rings(scsi_qla_host_t * ha)
  * Returns:
  *	QLA_SUCCESS - Successfully validated M.A.C. address
  *	QLA_ERROR   - Failed to validate M.A.C. address
- *
- * Context:
- *	Kernel context.
  **************************************************************************/
 static int
 qla4xxx_validate_mac_address(scsi_qla_host_t *ha)
@@ -229,9 +215,6 @@ exit_validate_mac_no_free:
  * Returns:
  *	QLA_SUCCESS - Successfully initialized local data
  *	QLA_ERROR   - Failed to initialize local data
- *
- * Context:
- *	Kernel context.
  */
 static int
 qla4xxx_init_local_data(scsi_qla_host_t *ha)
@@ -317,8 +300,7 @@ qla4xxx_fw_ready(scsi_qla_host_t * ha)
 		DEBUG2(printk("scsi%ld: %s: waiting on fw, state=%x:%x - "
 		    "seconds expired= %d\n", ha->host_no, __func__,
 		    ha->firmware_state, ha->addl_fw_state, timeout_count));
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(1 * HZ);
+		msleep(1000);
 	}			/* end of for */
 
 	if (timeout_count <= 0)
@@ -345,9 +327,6 @@ qla4xxx_fw_ready(scsi_qla_host_t * ha)
  * Returns:
  *	QLA_SUCCESS - Successfully initialized firmware
  *	QLA_ERROR   - Failed to initialize firmware
- *
- * Context:
- *	Kernel context.
  */
 static int
 qla4xxx_init_firmware(scsi_qla_host_t * ha)
@@ -437,9 +416,6 @@ qla4xxx_get_ddb_entry(scsi_qla_host_t *ha, uint32_t fw_ddb_index)
  * Returns:
  *	QLA_SUCCESS - Successfully update ddb_entry
  *	QLA_ERROR   - Failed to update ddb_entry
- *
- * Context:
- *	Kernel context.
  **************************************************************************/
 int
 qla4xxx_update_ddb_entry(scsi_qla_host_t * ha, struct ddb_entry *ddb_entry,
@@ -518,9 +494,6 @@ exit_update_ddb:
  *
  * Returns:
  *	Pointer to internal device database structure
- *
- * Context:
- *	Kernel context.
  **************************************************************************/
 struct ddb_entry *
 qla4xxx_alloc_ddb(scsi_qla_host_t * ha, uint32_t fw_ddb_index)
@@ -530,7 +503,7 @@ qla4xxx_alloc_ddb(scsi_qla_host_t * ha, uint32_t fw_ddb_index)
 	DEBUG2(printk("scsi%ld: %s: fw_ddb_index [%d]\n", ha->host_no,
 	    __func__, fw_ddb_index));
 
-	ddb_entry = (struct ddb_entry *)kmalloc(sizeof(*ddb_entry), GFP_ATOMIC);
+	ddb_entry = (struct ddb_entry *)kmalloc(sizeof(*ddb_entry), GFP_KERNEL);
 	if (ddb_entry == NULL) {
 		DEBUG2(printk("scsi%ld: %s: Unable to allocate memory "
 		    "to add fw_ddb_index [%d]\n", ha->host_no, __func__,
@@ -567,9 +540,6 @@ qla4xxx_alloc_ddb(scsi_qla_host_t * ha, uint32_t fw_ddb_index)
  * Returns:
  *	QLA_SUCCESS - Successfully built internal ddb list, if targets available
  *	QLA_ERROR   - Error on a mailbox command
- *
- * Context:
- *	Kernel context.
  **************************************************************************/
 static int
 qla4xxx_build_ddb_list(scsi_qla_host_t *ha)
@@ -666,9 +636,6 @@ qla4xxx_build_ddb_list(scsi_qla_host_t *ha)
  * Returns:
  *	QLA_SUCCESS - Successfully (re)built internal ddb list
  *	QLA_ERROR   - Failed to (re)build internal ddb list
- *
- * Context:
- *	Kernel context.
  **************************************************************************/
 static int
 qla4xxx_devices_ready(scsi_qla_host_t * ha)
@@ -760,9 +727,7 @@ qla4xxx_devices_ready(scsi_qla_host_t * ha)
 			return QLA_SUCCESS;
 		}
 
-		/* delay */
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(HZ * 2);
+		msleep(2000);
 	} while (!time_after_eq(jiffies, discovery_wtime));
 
 	DEBUG3(qla4xxx_get_conn_event_log(ha));
@@ -791,10 +756,7 @@ qla4xxx_flush_AENS(scsi_qla_host_t *ha)
 		if (test_and_clear_bit(DPC_AEN, &ha->dpc_flags))
 			qla4xxx_process_aen(ha, FLUSH_DDB_CHANGED_AENS);
 
-		/* delay */
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(HZ * 1);
-
+		msleep(1000);
 	} while (!time_after_eq(jiffies, wtime));
 
 }
@@ -849,9 +811,6 @@ qla4xxx_initialize_ddb_list(scsi_qla_host_t *ha)
  * Returns:
  *	QLA_SUCCESS - Successfully updated internal ddb list
  *	QLA_ERROR   - Failed to update internal ddb list
- *
- * Context:
- *	Kernel context.
  */
 int
 qla4xxx_reinitialize_ddb_list(scsi_qla_host_t * ha)
@@ -886,9 +845,6 @@ qla4xxx_reinitialize_ddb_list(scsi_qla_host_t * ha)
  * Returns:
  *    QLA_SUCCESS = Successfully relogged in device
  *    QLA_ERROR   = Failed to relogin device
- *
- * Context:
- *	Kernel context.
  **************************************************************************/
 int
 qla4xxx_relogin_device(scsi_qla_host_t * ha, struct ddb_entry * ddb_entry)
@@ -916,9 +872,6 @@ qla4xxx_relogin_device(scsi_qla_host_t * ha, struct ddb_entry * ddb_entry)
  *
  * Returns:
  *	None.
- *
- * Context:
- *	Kernel context.
  **************************************************************************/
 static void
 qla4010_get_topcat_presence(scsi_qla_host_t * ha)
@@ -1057,8 +1010,7 @@ qla4xxx_start_firmware_from_flash(scsi_qla_host_t * ha)
 		    "complete... ctrl_sts=0x%x, remaining=%d\n", ha->host_no,
 		    __func__, ctrl_status, max_wait_time));
 
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(HZ / 4);
+		msleep(250);
 	} while ((max_wait_time--));
 
 	if (mbox_status == MBOX_STS_COMMAND_COMPLETE) {
@@ -1092,9 +1044,6 @@ qla4xxx_start_firmware_from_flash(scsi_qla_host_t * ha)
  * Returns:
  *	QLA_SUCCESS - Successfully started QLA4xxx firmware
  *	QLA_ERROR   - Failed to start QLA4xxx firmware
- *
- * Context:
- *	Kernel context.
  **************************************************************************/
 static int
 qla4xxx_start_firmware(scsi_qla_host_t * ha)
@@ -1219,14 +1168,12 @@ qla4xxx_start_firmware(scsi_qla_host_t * ha)
  * Returns:
  *	QLA_SUCCESS - Successfully initialized adapter
  *	QLA_ERROR   - Failed to initialize adapter
- *
- * Context:
- *	Kernel context.
  **************************************************************************/
 int
 qla4xxx_initialize_adapter(scsi_qla_host_t * ha, uint8_t renew_ddb_list)
 {
 	int status = QLA_ERROR;
+	int8_t ip_address[IP_ADDR_LEN] = {0} ;
 
 	ha->eeprom_cmd_data = 0;
 
@@ -1257,7 +1204,8 @@ qla4xxx_initialize_adapter(scsi_qla_host_t * ha, uint8_t renew_ddb_list)
 		return status;
 
 	/* Skip device discovery if ip and subnet is zero */
-	if (IPAddrIsZero(ha->ip_address) || IPAddrIsZero(ha->subnet_mask))
+        if (memcmp(ha->ip_address, ip_address, IP_ADDR_LEN) == 0 ||
+            memcmp(ha->subnet_mask, ip_address, IP_ADDR_LEN) == 0)
 		return status;
 
 	if (renew_ddb_list == PRESERVE_DDB_LIST) {
@@ -1301,9 +1249,6 @@ exit_init_hba:
  *
  * Returns:
  *	None
- *
- * Context:
- *	Kernel context.
  **************************************************************************/
 static void
 qla4xxx_add_device_dynamically(scsi_qla_host_t *ha, uint32_t fw_ddb_index)
@@ -1345,9 +1290,6 @@ qla4xxx_add_device_dynamically(scsi_qla_host_t *ha, uint32_t fw_ddb_index)
  * Returns:
  *	QLA_SUCCESS - Successfully processed ddb_changed aen
  *	QLA_ERROR   - Failed to process ddb_changed aen
- *
- * Context:
- *	Kernel context.
  **************************************************************************/
 int
 qla4xxx_process_ddb_changed(scsi_qla_host_t * ha, uint32_t fw_ddb_index,
@@ -1443,9 +1385,6 @@ qla4xxx_process_ddb_changed(scsi_qla_host_t * ha, uint32_t fw_ddb_index,
  * Returns:
  *	QLA_SUCCESS - Successfully logged in device
  *	QLA_ERROR   - Failed to login device
- *
- * Context:
- *	Kernel context.
  **************************************************************************/
 int
 qla4xxx_login_device(scsi_qla_host_t * ha, uint16_t fw_ddb_index,
@@ -1490,9 +1429,6 @@ exit_login_device:
  * Returns:
  *	QLA_SUCCESS - Successfully logged out device
  *	QLA_ERROR   - Failed to logout device
- *
- * Context:
- *	Kernel context.
  **************************************************************************/
 int
 qla4xxx_logout_device(scsi_qla_host_t * ha, uint16_t fw_ddb_index,

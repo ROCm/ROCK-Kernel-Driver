@@ -17,9 +17,6 @@
  *
  * Returns:
  *      Pointer to the corresponding internal device database structure
- *
- * Context:
- *      Kernel context.
  */
 static inline ddb_entry_t *
 qla4xxx_lookup_ddb_by_fw_index(scsi_qla_host_t *ha, uint32_t fw_ddb_index)

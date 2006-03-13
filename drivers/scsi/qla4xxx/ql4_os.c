@@ -7,14 +7,10 @@
 
 #include "ql4_def.h"
 
-#include <linux/delay.h>
-#include <linux/vmalloc.h>
 #include <linux/moduleparam.h>
 
 #include <scsi/scsi_tcq.h>
 #include <scsi/scsicam.h>
-#include <scsi/scsi_transport.h>
-#include <scsi/scsi_transport_iscsi.h>
 
 /*
  * Driver version
@@ -168,8 +164,6 @@ qla4xxx_stop_timer(scsi_qla_host_t * ha)
  * Returns:
  *	None
  *
- * Context:
- *	Kernel context.
  **************************************************************************/
 void
 qla4xxx_mark_device_missing(scsi_qla_host_t * ha, ddb_entry_t * ddb_entry)
@@ -249,9 +243,6 @@ qla4xxx_srb_compl(scsi_qla_host_t *ha, srb_t *srb)
  *
  * Returns:
  *      None
- *
- * Context:
- *      Kernel context.
  **************************************************************************/
 static int
 qla4xxx_queuecommand(struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *))
@@ -314,9 +305,6 @@ qc_fail_command:
  * Input:
  *
  * Returns:
- *
- * Context:
- *	Kernel context.
  **************************************************************************/
 static int __devinit
 qla4xxx_probe_adapter(struct pci_dev *pdev, const struct pci_device_id *ent)
@@ -362,7 +350,7 @@ qla4xxx_probe_adapter(struct pci_dev *pdev, const struct pci_device_id *ent)
 	INIT_LIST_HEAD(&ha->ddb_list);
 	INIT_LIST_HEAD(&ha->free_srb_q);
 
-	init_MUTEX(&ha->mbox_sem);
+	mutex_init(&ha->mbox_sem);
 	init_waitqueue_head(&ha->mailbox_wait_queue);
 
 	spin_lock_init(&ha->hardware_lock);
@@ -483,9 +471,6 @@ probe_disable_device:
  *	pci_dev - PCI device pointer
  *
  * Returns:
- *
- * Context:
- *	Kernel context.
  **************************************************************************/
 static void __devexit
 qla4xxx_remove_adapter(struct pci_dev *pdev)
@@ -510,9 +495,6 @@ qla4xxx_remove_adapter(struct pci_dev *pdev)
  *	pci_dev - PCI device pointer
  *
  * Returns:
- *
- * Context:
- *	Kernel context.
  **************************************************************************/
 static void
 qla4xxx_free_adapter(scsi_qla_host_t * ha)
@@ -560,9 +542,6 @@ qla4xxx_free_adapter(scsi_qla_host_t * ha)
  * Input:
  *
  * Returns:
- *
- * Context:
- *	Kernel context.
  **************************************************************************/
 static int
 qla4xxx_iospace_config(scsi_qla_host_t * ha)
@@ -664,8 +643,6 @@ qla4xxx_config_dma_addressing(scsi_qla_host_t * ha)
  *      QLA_SUCCESS - Successfully allocated adapter memory
  *      QLA_ERROR   - Failed to allocate adapter memory
  *
- * Context:
- *      Kernel context.
  **************************************************************************/
 static int
 qla4xxx_mem_alloc(scsi_qla_host_t * ha)
@@ -735,9 +712,6 @@ mem_alloc_error_exit:
  *
  * Returns:
  *      None
- *
- * Context:
- *      Kernel context.
  **************************************************************************/
 static void
 qla4xxx_mem_free(scsi_qla_host_t * ha)
@@ -815,9 +789,6 @@ qla4xxx_slave_configure(struct scsi_device *sdev)
  *
  * Returns:
  *      Pointer to corresponding SCSI Request Block
- *
- * Context:
- *      Kernel/Interrupt context.
  **************************************************************************/
 srb_t *
 del_from_active_array(scsi_qla_host_t * ha, uint32_t index)
@@ -853,9 +824,6 @@ del_from_active_array(scsi_qla_host_t * ha, uint32_t index)
  *
  * Returns:
  *      None
- *
- * Context:
- *      Interrupt context.
  **************************************************************************/
 void
 qla4xxx_timer(scsi_qla_host_t *ha)
@@ -977,18 +945,6 @@ qla4xxx_timer(scsi_qla_host_t *ha)
 	DEBUG2(ha->seconds_since_last_intr++;)
 }
 
-int
-qla4xxx_check_for_disable_hba_reset(scsi_qla_host_t * ha)
-{
-#if DISABLE_HBA_RESETS
-	clear_bit(DPC_RESET_HA, &ha->dpc_flags);
-	clear_bit(DPC_RESET_HA_INTR, &ha->dpc_flags);
-	clear_bit(DPC_RESET_HA_DESTROY_DDB_LIST, &ha->dpc_flags);
-	return 0;
-#else
-	return 1;
-#endif
-}
 
 /**************************************************************************
  * qla4xxx_do_dpc
@@ -1005,9 +961,6 @@ qla4xxx_check_for_disable_hba_reset(scsi_qla_host_t * ha)
  *
  * Returns:
  *      None
- *
- * Context:
- *      Kernel context.
  **************************************************************************/
 static int qla4xxx_do_dpc(void *data)
 {
@@ -1043,57 +996,53 @@ static int qla4xxx_do_dpc(void *data)
 		    test_bit(DPC_RESET_HA, &ha->dpc_flags) ||
 		    test_bit(DPC_RESET_HA_INTR, &ha->dpc_flags) ||
 		    test_bit(DPC_RESET_HA_DESTROY_DDB_LIST, &ha->dpc_flags)) {
-			if (qla4xxx_check_for_disable_hba_reset(ha)) {
-				if (test_bit(DPC_RESET_HA_DESTROY_DDB_LIST,
-				    &ha->dpc_flags))
-					/*
-					 * dg 09/23 Never initialize ddb list
-					 * once we up and running
-					 * qla4xxx_recover_adapter(ha,
-					 *    REBUILD_DDB_LIST);
-					 */
-					qla4xxx_recover_adapter(ha,
-					    PRESERVE_DDB_LIST);
+			if (test_bit(DPC_RESET_HA_DESTROY_DDB_LIST,
+			    &ha->dpc_flags))
+				/*
+				 * dg 09/23 Never initialize ddb list
+				 * once we up and running
+				 * qla4xxx_recover_adapter(ha,
+				 *    REBUILD_DDB_LIST);
+				 */
+				qla4xxx_recover_adapter(ha,
+				    PRESERVE_DDB_LIST);
 
-				if (test_bit(DPC_RESET_HA, &ha->dpc_flags))
-					qla4xxx_recover_adapter(ha,
-					    PRESERVE_DDB_LIST);
+			if (test_bit(DPC_RESET_HA, &ha->dpc_flags))
+				qla4xxx_recover_adapter(ha,
+				    PRESERVE_DDB_LIST);
 
-				if (test_and_clear_bit(DPC_RESET_HA_INTR,
-				    &ha->dpc_flags)) {
-					uint8_t wait_time = RESET_INTR_TOV;
-					unsigned long flags = 0;
+			if (test_and_clear_bit(DPC_RESET_HA_INTR,
+			    &ha->dpc_flags)) {
+				uint8_t wait_time = RESET_INTR_TOV;
+				unsigned long flags = 0;
 
-					qla4xxx_flush_active_srbs(ha);
+				qla4xxx_flush_active_srbs(ha);
 
-					spin_lock_irqsave(&ha->hardware_lock,
-					    flags);
-					while ((RD_REG_DWORD(
-						&ha->reg->ctrl_status) &
-                                                (CSR_SOFT_RESET|
-						 CSR_FORCE_SOFT_RESET)) != 0) {
-						if (--wait_time == 0)
-							break;
+				spin_lock_irqsave(&ha->hardware_lock,
+				    flags);
+				while ((RD_REG_DWORD(
+					&ha->reg->ctrl_status) &
+					(CSR_SOFT_RESET|
+					 CSR_FORCE_SOFT_RESET)) != 0) {
+					if (--wait_time == 0)
+						break;
 
-						spin_unlock_irqrestore(
-						    &ha->hardware_lock, flags);
-
-						set_current_state(
-						    TASK_UNINTERRUPTIBLE);
-						schedule_timeout(1 * HZ);
-
-						spin_lock_irqsave(
-						    &ha->hardware_lock, flags);
-					}
 					spin_unlock_irqrestore(
 					    &ha->hardware_lock, flags);
 
-					if (wait_time == 0)
-						DEBUG2(printk(
-						    "scsi%ld: %s: SR|FSR bit "
-						    "not cleared-- resetting\n",
-						    ha->host_no, __func__));
+					msleep(1000);
+
+					spin_lock_irqsave(
+					    &ha->hardware_lock, flags);
 				}
+				spin_unlock_irqrestore(
+				    &ha->hardware_lock, flags);
+
+				if (wait_time == 0)
+					DEBUG2(printk(
+					    "scsi%ld: %s: SR|FSR bit "
+					    "not cleared-- resetting\n",
+					    ha->host_no, __func__));
 			}
 		}
 
@@ -1149,9 +1098,6 @@ static int qla4xxx_do_dpc(void *data)
  * Returns:
  *      QLA_SUCCESS - Successfully reset the firmware
  *      QLA_ERROR   - Failed to reset the firmware
- *
- * Context:
- *      Kernel context.
  **************************************************************************/
 int
 qla4010_soft_reset(scsi_qla_host_t * ha)
@@ -1188,8 +1134,7 @@ qla4010_soft_reset(scsi_qla_host_t * ha)
 		if ((ctrl_status & CSR_NET_RESET_INTR) == 0)
 			break;
 
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(1 * HZ);
+		msleep(1000);
 	} while ((--max_wait_time));
 
 	if ((ctrl_status & CSR_NET_RESET_INTR) != 0) {
@@ -1215,8 +1160,7 @@ qla4010_soft_reset(scsi_qla_host_t * ha)
 			break;
 		}
 
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(1 * HZ);
+		msleep(1000);
 	} while ((--max_wait_time));
 
 	/*
@@ -1257,8 +1201,7 @@ qla4010_soft_reset(scsi_qla_host_t * ha)
 				break;
 			}
 
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout(1 * HZ);
+			msleep(1000);
 		} while ((--max_wait_time));
 	}
 
@@ -1275,9 +1218,6 @@ qla4010_soft_reset(scsi_qla_host_t * ha)
  * Returns:
  *      QLA_SUCCESS - Successfully reset the firmware
  *      QLA_ERROR   - Failed to reset the firmware
- *
- * Context:
- *      Kernel context.
  **************************************************************************/
 int
 qla4xxx_topcat_reset(scsi_qla_host_t * ha)
@@ -1311,9 +1251,6 @@ qla4xxx_topcat_reset(scsi_qla_host_t * ha)
  * Returns:
  *      QLA_SUCCESS - Successfully reset the firmware
  *      QLA_ERROR   - Failed to reset the firmware
- *
- * Context:
- *      Kernel context.
  **************************************************************************/
 int
 qla4xxx_soft_reset(scsi_qla_host_t * ha)
@@ -1346,9 +1283,6 @@ qla4xxx_soft_reset(scsi_qla_host_t * ha)
  * Returns:
  *      QLA_SUCCESS - Successfully reset the firmware
  *      QLA_ERROR   - Failed to reset the firmware
- *
- * Context:
- *      Kernel context.
  **************************************************************************/
 int
 qla4xxx_hard_reset(scsi_qla_host_t * ha)
@@ -1384,9 +1318,6 @@ qla4xxx_hard_reset(scsi_qla_host_t * ha)
  * Returns:
  *      QLA_SUCCESS - All outstanding commands completed
  *      QLA_ERROR   - All outstanding commands did not complete
- *
- * Context:
- *      Kernel context.
  **************************************************************************/
 static int
 qla4xxx_cmd_wait(scsi_qla_host_t * ha)
@@ -1421,9 +1352,7 @@ qla4xxx_cmd_wait(scsi_qla_host_t * ha)
 		if (wait_cnt == 0)
 			stat = QLA_ERROR;
 		else {
-			/* sleep a second */
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout(1 * HZ);
+			msleep(1000);
 		}
 	}			/* End of While (wait_cnt) */
 
@@ -1443,9 +1372,6 @@ qla4xxx_cmd_wait(scsi_qla_host_t * ha)
  * Returns:
  *      QLA_SUCCESS - Successfully recovered adapter
  *      QLA_ERROR   - Failed to recover adapter
- *
- * Context:
- *      Kernel context.
  **************************************************************************/
 int
 qla4xxx_recover_adapter(scsi_qla_host_t * ha, uint8_t renew_ddb_list)
@@ -1566,9 +1492,6 @@ qla4xxx_recover_adapter(scsi_qla_host_t * ha, uint8_t renew_ddb_list)
  * Returns:
  *    Not Found : 0
  *    Found : 1
- *
- * Context:
- *      Kernel context.
  **************************************************************************/
 static int
 qla4xxx_eh_wait_on_command(scsi_qla_host_t * ha, struct scsi_cmnd *cmd)
@@ -1585,8 +1508,7 @@ qla4xxx_eh_wait_on_command(scsi_qla_host_t * ha, struct scsi_cmnd *cmd)
 			break;
 		}
 
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(2 * HZ);
+		msleep(2000);
 	} while (max_wait_time--);
 
 	return done;
@@ -1604,9 +1526,6 @@ qla4xxx_eh_wait_on_command(scsi_qla_host_t * ha, struct scsi_cmnd *cmd)
  * Returns:
  *      SUCCESS - Adapter is ONLINE
  *      FAILED  - Adapter is DEAD
- *
- * Context:
- *      Kernel context.  Assume io_request_lock LOCKED upon entry
  **************************************************************************/
 int qla4xxx_wait_for_hba_online(scsi_qla_host_t * ha)
 {
@@ -1620,8 +1539,7 @@ int qla4xxx_wait_for_hba_online(scsi_qla_host_t * ha)
 		if (!ADAPTER_UP(ha) && (ha->retry_reset_ha_cnt == 0)) {
 			return QLA_ERROR;
 		}
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(2 * HZ);
+		msleep(2000);
 	}
 
 	return QLA_ERROR;
@@ -1644,9 +1562,6 @@ int qla4xxx_wait_for_hba_online(scsi_qla_host_t * ha)
  * Returns:
  *      SUCCESS - Successfully aborted non-active command
  *      FAILED  - Command not found, or command currently active
- *
- * Context:
- *      Kernel context.  io_request_lock LOCKED
  **************************************************************************/
 static int
 qla4xxx_eh_abort(struct scsi_cmnd *cmd)
@@ -1674,9 +1589,6 @@ qla4xxx_eh_abort(struct scsi_cmnd *cmd)
  * Returns:
  *      0 - All pending commands returned
  *      non-zero - All pending commands did not return
- *
- * Context:
- *      Kernel context.
  **************************************************************************/
 int
 qla4xxx_eh_wait_for_active_target_commands(scsi_qla_host_t * ha, int t, int l)
@@ -1727,9 +1639,6 @@ qla4xxx_eh_wait_for_active_target_commands(scsi_qla_host_t * ha, int t, int l)
  * Returns:
  *      SUCCESS - Successfully reset target/lun
  *      FAILED  - Failed to reset target/lun
- *
- * Context:
- *      Kernel context.  io_request_lock LOCKED
  **************************************************************************/
 static int
 qla4xxx_eh_device_reset(struct scsi_cmnd *cmd)
@@ -1800,8 +1709,6 @@ eh_dev_reset_done:
  *      SUCCESS - Successfully reset adapter/bus
  *      FAILED  - Failed to reset adapter/bus
  *
- * Context:
- *      Kernel context.  io_request_lock LOCKED
  **************************************************************************/
 static int
 qla4xxx_eh_bus_reset(struct scsi_cmnd *cmd)
@@ -1860,9 +1767,6 @@ qla4xxx_eh_bus_reset(struct scsi_cmnd *cmd)
  * Returns:
  *      QLA_SUCCESS - Successfully reset target
  *      QLA_ERROR   - Failed to reset target
- *
- * Context:
- *      Kernel context.
  **************************************************************************/
 int
 qla4xxx_reset_target(scsi_qla_host_t * ha, ddb_entry_t * ddb_entry)
@@ -1922,9 +1826,6 @@ qla4xxx_reset_target(scsi_qla_host_t * ha, ddb_entry_t * ddb_entry)
  *
  * Returns:
  *      None
- *
- * Context:
- *      Kernel context.
  **************************************************************************/
 static void
 qla4xxx_flush_active_srbs(scsi_qla_host_t * ha)
@@ -1956,9 +1857,6 @@ qla4xxx_flush_active_srbs(scsi_qla_host_t * ha)
  * Returns:
  *      SUCCESS - Successfully recovered host adapter
  *      FAILED  - Failed to recover host adapter
- *
- * Context:
- *      Kernel context.  io_request_lock LOCKED
  **************************************************************************/
 static int
 qla4xxx_eh_host_reset(struct scsi_cmnd *cmd)

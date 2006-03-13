@@ -7,8 +7,6 @@
 
 #include "ql4_def.h"
 
-#include <linux/delay.h>
-
 /*
  * externals
  */
@@ -38,9 +36,6 @@ extern int qla4xxx_eh_wait_for_active_target_commands(scsi_qla_host_t *, int,
  * Returns:
  *	QLA_SUCCESS - Mailbox command completed successfully
  *	QLA_ERROR   - Mailbox command competed in error.
- *
- * Context:
- *	Kernel context.
  **************************************************************************/
 int
 qla4xxx_mailbox_command(scsi_qla_host_t * ha, uint8_t inCount,
@@ -53,7 +48,7 @@ qla4xxx_mailbox_command(scsi_qla_host_t * ha, uint8_t inCount,
 	unsigned long flags = 0;
 	DECLARE_WAITQUEUE(wait, current);
 
-	down(&ha->mbox_sem);
+	mutex_lock(&ha->mbox_sem);
 
 	/* Mailbox code active */
 	set_bit(AF_MBOX_COMMAND, &ha->flags);
@@ -95,7 +90,6 @@ qla4xxx_mailbox_command(scsi_qla_host_t * ha, uint8_t inCount,
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
 	/* Wait for completion */
-	set_current_state(TASK_UNINTERRUPTIBLE);
 	add_wait_queue(&ha->mailbox_wait_queue, &wait);
 
 	/*
@@ -105,7 +99,6 @@ qla4xxx_mailbox_command(scsi_qla_host_t * ha, uint8_t inCount,
 	 */
 	if (outCount == 0) {
 		status = QLA_SUCCESS;
-		set_current_state(TASK_RUNNING);
 		remove_wait_queue(&ha->mailbox_wait_queue, &wait);
 		goto mbox_exit;
 	}
@@ -130,20 +123,8 @@ qla4xxx_mailbox_command(scsi_qla_host_t * ha, uint8_t inCount,
 		}
 		spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
-		/*
-		 * Delay for 10 microseconds
-		 * NOTE: Interrupt_handler may be called here,
-		 *       if interrupts are enabled
-		 */
-#if 0
-		udelay(10);
-
-#else				/*  */
-		schedule_timeout(10);
-
-#endif				/*  */
-	}			/* wait loop */
-	set_current_state(TASK_RUNNING);
+		mdelay(10);
+	}
 	remove_wait_queue(&ha->mailbox_wait_queue, &wait);
 
 	/* Check for mailbox timeout. */
@@ -191,64 +172,11 @@ qla4xxx_mailbox_command(scsi_qla_host_t * ha, uint8_t inCount,
 mbox_exit:
 	clear_bit(AF_MBOX_COMMAND, &ha->flags);
 	clear_bit(AF_MBOX_COMMAND_DONE, &ha->flags);
-	up(&ha->mbox_sem);
+	mutex_unlock(&ha->mbox_sem);
 
 	return status;
 }
 
-#if 0
-int qla4xxx_send_noop(scsi_qla_host_t * ha)
-{
-	uint32_t mbox_cmd[MBOX_REG_COUNT];
-	uint32_t mbox_sts[MBOX_REG_COUNT];
-	memset(&mbox_cmd, 0, sizeof(mbox_cmd));
-	memset(&mbox_sts, 0, sizeof(mbox_sts));
-	mbox_cmd[0] = MBOX_CMD_NOP;
-	if (qla4xxx_mailbox_command(ha, 1, 1, &mbox_cmd[0], &mbox_sts[0])
-	    != QLA_SUCCESS) {
-		DEBUG2( printk(KERN_INFO "scsi%d: NOP failed\n", ha->host_no));
-		return (QLA_ERROR);
-	}
-
-	else {
-		return (QLA_SUCCESS);
-	}
-}
-
-int qla4xxx_mbx_test(scsi_qla_host_t * ha)
-{
-	uint32_t mbox_cmd[MBOX_REG_COUNT];
-	uint32_t mbox_sts[MBOX_REG_COUNT];
-	int i;
-	int status;
-	memset(&mbox_cmd, 0, sizeof(mbox_cmd));
-	memset(&mbox_sts, 0, sizeof(mbox_sts));
-	mbox_cmd[0] = MBOX_CMD_REGISTER_TEST;
-	mbox_cmd[1] = 0x11111111;
-	mbox_cmd[2] = 0x22222222;
-	mbox_cmd[3] = 0x33333333;
-	mbox_cmd[4] = 0x44444444;
-	mbox_cmd[5] = 0x55555555;
-	mbox_cmd[6] = 0x66666666;
-	mbox_cmd[7] = 0x77777777;
-	if (qla4xxx_mailbox_command(ha, 8, 8, &mbox_cmd[0], &mbox_sts[0])
-	    != QLA_SUCCESS) {
-		return (QLA_ERROR);
-	}
-	if (mbox_sts[1] != 0x11111111 || mbox_sts[2] != 0x22222222
-	    || mbox_sts[3] != 0x33333333 || mbox_sts[4] != 0x44444444
-	    || mbox_sts[5] != 0x55555555 || mbox_sts[6] != 0x66666666
-	    || mbox_sts[7] != 0x77777777) {
-		status = QLA_ERROR;
-	}
-
-	else {
-		status = QLA_SUCCESS;
-	}
-	return (status);
-}
-
-#endif				/*  */
 
 /*
  * qla4xxx_issue_iocb
@@ -264,9 +192,6 @@ int qla4xxx_mbx_test(scsi_qla_host_t * ha)
  *
  * Returns:
  *	qla2x00 local function return status code.
- *
- * Context:
- *	Kernel context.
  */
 int
 qla4xxx_issue_iocb(scsi_qla_host_t * ha, void *buffer, dma_addr_t phys_addr,
@@ -339,9 +264,6 @@ qla4xxx_clear_database_entry(scsi_qla_host_t * ha, uint16_t fw_ddb_index)
  * Returns:
  *	QLA_SUCCESS - Successfully initialized firmware ctrl block
  *	QLA_ERROR   - Failed to initialize firmware ctrl block
- *
- * Context:
- *	Kernel context.
  **************************************************************************/
 int
 qla4xxx_initialize_fw_cb(scsi_qla_host_t * ha)
@@ -447,9 +369,6 @@ qla4xxx_initialize_fw_cb(scsi_qla_host_t * ha)
  * Returns:
  *	QLA_SUCCESS - Successfully obtained DHCP IP Address
  *	QLA_ERROR   - Failed to obtained
- *
- * Context:
- *	Kernel context.
  **************************************************************************/
 int
 qla4xxx_get_dhcp_ip_address(scsi_qla_host_t * ha)
@@ -508,9 +427,6 @@ qla4xxx_get_dhcp_ip_address(scsi_qla_host_t * ha)
  * Returns:
  *	QLA_SUCCESS - Successfully retrieved firmware state
  *	QLA_ERROR   - Failed to retrieve firmware state
- *
- * Context:
- *	Kernel context.
  **************************************************************************/
 int
 qla4xxx_get_firmware_state(scsi_qla_host_t * ha)
@@ -547,9 +463,6 @@ qla4xxx_get_firmware_state(scsi_qla_host_t * ha)
  * Returns:
  *	QLA_SUCCESS - Successfully retrieved firmware status
  *	QLA_ERROR   - Failed to retrieve firmware status
- *
- * Context:
- *	Kernel context.
  **************************************************************************/
 int
 qla4xxx_get_firmware_status(scsi_qla_host_t * ha)
@@ -601,9 +514,6 @@ qla4xxx_get_firmware_status(scsi_qla_host_t * ha)
  * Returns:
  *	QLA_SUCCESS - Successfully retrieved ddb info from firmware
  *	QLA_ERROR   - Failed to retrieve ddb info from firmware
- *
- * Context:
- *	Kernel context.
  **************************************************************************/
 int
 qla4xxx_get_fwddb_entry(scsi_qla_host_t *ha, uint16_t fw_ddb_index,
@@ -698,9 +608,6 @@ exit_get_fwddb:
  * Returns:
  *	QLA_SUCCESS - Successfully set ddb_entry in firmware
  *	QLA_ERROR   - Failed to set ddb_entry in firmware
- *
- * Context:
- *	Kernel context.
  **************************************************************************/
 int
 qla4xxx_set_ddb_entry(scsi_qla_host_t * ha, uint16_t fw_ddb_index,
@@ -757,9 +664,6 @@ qla4xxx_conn_open_session_login(scsi_qla_host_t * ha, uint16_t fw_ddb_index)
  *
  * Returns:
  *	None
- *
- * Context:
- *	Kernel context.
  **************************************************************************/
 void
 qla4xxx_get_crash_record(scsi_qla_host_t * ha)
@@ -819,9 +723,6 @@ exit_get_crash_record:
  *
  * Returns:
  *	None
- *
- * Context:
- *	Kernel context.
  **************************************************************************/
 void
 qla4xxx_get_conn_event_log(scsi_qla_host_t * ha)
@@ -924,9 +825,6 @@ exit_get_event_log:
  * Returns:
  *	QLA_SUCCESS - lun reset completed successfully
  *	QLA_ERROR   - lun reset failed
- *
- * Context:
- *	Kernel context.
  **************************************************************************/
 int
 qla4xxx_reset_lun(scsi_qla_host_t * ha, ddb_entry_t * ddb_entry, int lun)
@@ -998,9 +896,6 @@ qla4xxx_get_flash(scsi_qla_host_t * ha, dma_addr_t dma_addr, uint32_t offset,
  * Returns:
  *	QLA_SUCCESS - Successfully retrieved firmware version
  *	QLA_ERROR   - Failed to retrieve firmware version
- *
- * Context:
- *	Kernel context.
  **************************************************************************/
 int
 qla4xxx_get_fw_version(scsi_qla_host_t * ha)

@@ -26,9 +26,6 @@
  * Returns:
  *	QLA_SUCCESS - Successfully retrieved request packet
  *	QLA_ERROR   - Failed to retrieve request packet
- *
- * Context:
- *	Kernel context.
  **************************************************************************/
 int
 qla4xxx_get_req_pkt(scsi_qla_host_t *ha, QUEUE_ENTRY **queue_entry)
@@ -77,9 +74,6 @@ qla4xxx_get_req_pkt(scsi_qla_host_t *ha, QUEUE_ENTRY **queue_entry)
  * Returns:
  *	QLA_SUCCESS - Successfully sent marker IOCB
  *	QLA_ERROR   - Failed to send marker IOCB
- *
- * Context:
- *	Kernel context.
  **************************************************************************/
 int
 qla4xxx_send_marker_iocb(scsi_qla_host_t *ha, ddb_entry_t *ddb_entry, int lun)
@@ -194,9 +188,6 @@ qla4xxx_free_pdu(scsi_qla_host_t * ha, PDU_ENTRY * pdu)
  * Returns:
  *	QLA_SUCCESS - Successfully sent marker IOCB
  *	QLA_ERROR   - Failed to send marker IOCB
- *
- * Context:
- *	Kernel context.
  **************************************************************************/
 int
 qla4xxx_send_passthru0_iocb(scsi_qla_host_t * ha, uint16_t fw_ddb_index,
@@ -359,9 +350,6 @@ qla4xxx_build_scsi_iocbs(srb_t *srb, COMMAND_ENTRY *cmd_entry,
  * Returns:
  *      QLA_SUCCESS - Successfully sent command to ISP
  *      QLA_ERROR   - Failed to send command to ISP
- *
- * Context:
- *      Kernel context.
  **************************************************************************/
 int
 qla4xxx_send_command_to_isp(scsi_qla_host_t *ha, srb_t * srb)

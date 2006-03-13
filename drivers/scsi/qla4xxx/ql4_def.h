@@ -21,12 +21,15 @@
 #include <linux/mempool.h>
 #include <linux/spinlock.h>
 #include <linux/kthread.h>
-#include <asm/semaphore.h>
+#include <linux/delay.h>
+#include <linux/interrupt.h>
+#include <linux/mutex.h>
 
 #include <scsi/scsi.h>
 #include <scsi/scsi_host.h>
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_cmnd.h>
+#include <scsi/scsi_transport.h>
 #include <scsi/scsi_transport_iscsi.h>
 
 /* XXX(dg): move to pci_ids.h */
@@ -41,9 +44,6 @@
 #define IS_QLA4010(ha)	((ha)->pdev->device == PCI_DEVICE_ID_QLOGIC_ISP4010)
 #define IS_QLA4022(ha)	((ha)->pdev->device == PCI_DEVICE_ID_QLOGIC_ISP4022)
 
-#define QLA4010
-#define QLA4XXX_BOARD_PORTS		1
-#define QLA4XXX_PROC_NAME		"qla4010"
 #define QLA_SUCCESS			0
 #define QLA_ERROR			1
 
@@ -83,20 +83,6 @@
 #define BIT_30	0x40000000
 #define BIT_31	0x80000000
 
-#define IPAddrIsZero( _X1_ )   ((_X1_)[0] == 0 && \
-                                (_X1_)[1] == 0 && \
-                                (_X1_)[2] == 0 && \
-                                (_X1_)[3] == 0)
-#define IPAddrIsEqual(_X1_, _X2_) ((_X1_)[0] == (_X2_)[0] && \
-                                   (_X1_)[1] == (_X2_)[1] && \
-                                   (_X1_)[2] == (_X2_)[2] && \
-                                   (_X1_)[3] == (_X2_)[3])
-#define IPAddr2Uint32(_X1_,_X2_) { \
-                                  *_X2_ = 0; \
-				  *_X2_ |= _X1_[3] << 24; \
-				  *_X2_ |= _X1_[2] << 16; \
-				  *_X2_ |= _X1_[1] << 8;  \
-				  *_X2_ |= _X1_[0];}
 /*
  * Host adapter default definitions
  ***********************************/
@@ -511,10 +497,10 @@ typedef struct scsi_qla_host {
 	PDU_ENTRY *free_pdu_bottom;
 	PDU_ENTRY pdu_queue[MAX_PDU_ENTRIES];
 
-	/* This semaphore protects several threads to do mailbox commands
+	/* This mutex protects several threads to do mailbox commands
 	 * concurrently.
 	 */
-	struct semaphore mbox_sem;
+	struct mutex  mbox_sem;
 	wait_queue_head_t mailbox_wait_queue;
 
 	/* temporary mailbox status registers */
