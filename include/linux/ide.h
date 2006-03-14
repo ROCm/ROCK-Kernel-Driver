@@ -19,6 +19,7 @@
 #include <linux/device.h>
 #include <linux/pci.h>
 #include <linux/completion.h>
+#include <acpi/acpi.h>
 #include <asm/byteorder.h>
 #include <asm/system.h>
 #include <asm/io.h>
@@ -541,6 +542,11 @@ typedef enum {
 struct ide_driver_s;
 struct ide_settings_s;
 
+#ifdef CONFIG_BLK_DEV_IDEACPI
+struct ide_acpi_drive_link;
+struct ide_acpi_hwif_link;
+#endif
+
 typedef struct ide_drive_s {
 	char		name[4];	/* drive name, such as "hda" */
         char            driver_req[10];	/* requests specific driver */
@@ -637,6 +643,9 @@ typedef struct ide_drive_s {
 
 	int		lun;		/* logical unit */
 	int		crc_count;	/* crc counter to reduce drive speed */
+#ifdef CONFIG_BLK_DEV_IDEACPI
+	struct ide_acpi_drive_link *acpidata;
+#endif
 	struct list_head list;
 	struct device	gendev;
 	struct completion gendev_rel_comp;	/* to deal with device release() */
@@ -802,6 +811,10 @@ typedef struct hwif_s {
 	unsigned dma;
 
 	void (*led_act)(void *data, int rw);
+
+#ifdef CONFIG_BLK_DEV_IDEACPI
+	struct ide_acpi_hwif_link *acpidata;
+#endif
 } ____cacheline_internodealigned_in_smp ide_hwif_t;
 
 /*
@@ -1291,6 +1304,18 @@ static inline void ide_dma_verbose(ide_drive_t *drive) { ; }
 
 #ifndef CONFIG_BLK_DEV_IDEDMA_PCI
 static inline void ide_release_dma(ide_hwif_t *drive) {;}
+#endif
+
+#ifdef CONFIG_BLK_DEV_IDEACPI
+extern int ide_acpi_exec_tfs(ide_drive_t *drive);
+extern void ide_acpi_get_timing(ide_hwif_t *hwif);
+extern void ide_acpi_push_timing(ide_hwif_t *hwif);
+extern void ide_acpi_init(ide_hwif_t *hwif);
+#else
+static inline int ide_acpi_exec_tfs(ide_drive_t *drive) { return 0; }
+static inline void ide_acpi_get_timing(ide_hwif_t *hwif) { ; }
+static inline void ide_acpi_push_timing(ide_hwif_t *hwif) { ; }
+static inline void ide_acpi_init(ide_hwif_t *hwif) { ; }
 #endif
 
 extern int ide_hwif_request_regions(ide_hwif_t *hwif);

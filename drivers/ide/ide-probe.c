@@ -1387,6 +1387,9 @@ static int hwif_init(ide_hwif_t *hwif)
 
 done:
 	init_gendisk(hwif);
+
+	ide_acpi_init(hwif);
+
 	hwif->present = 1;	/* success */
 	return 1;
 
