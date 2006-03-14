@@ -19,7 +19,9 @@
 #include <linux/device.h>
 #include <linux/pci.h>
 #include <linux/completion.h>
+#ifdef CONFIG_BLK_DEV_IDEACPI
 #include <acpi/acpi.h>
+#endif
 #include <asm/byteorder.h>
 #include <asm/system.h>
 #include <asm/io.h>
