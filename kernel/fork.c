@@ -127,6 +127,7 @@ void __put_task_struct_cb(struct rcu_head *rhp)
 	if (!profile_handoff_task(tsk))
 		free_task(tsk);
 }
+EXPORT_SYMBOL(__put_task_struct_cb);
 
 void __init fork_init(unsigned long mempages)
 {
