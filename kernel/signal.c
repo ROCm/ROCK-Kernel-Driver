@@ -379,7 +379,7 @@ void __exit_signal(struct task_struct *tsk)
 			sig->group_exit_task = NULL;
 		}
 		if (tsk == sig->curr_target)
-			sig->curr_target = next_thread(tsk);
+			sig->curr_target = NULL; // was: next_thread(tsk);
 		tsk->signal = NULL;
 		/*
 		 * Accumulate here the counters for all threads but the
