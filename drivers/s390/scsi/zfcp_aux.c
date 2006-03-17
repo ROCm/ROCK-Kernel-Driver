@@ -1842,7 +1842,7 @@ zfcp_unregister_callbacks(void)
 }
 
 /**
- * zfcp_cb_incoming_els - make callback for incoming els 
+ * zfcp_cb_incoming_els - make callback for incoming els
  * @adpater: adapter where ELS was received
  * @payload: received ELS payload
  */

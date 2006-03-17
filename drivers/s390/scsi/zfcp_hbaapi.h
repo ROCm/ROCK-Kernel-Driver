@@ -1,4 +1,4 @@
-/* 
+/*
  * $Id: linux-2.6.12-zfcp_hbaapi.patch,v 1.4 2005/08/23 20:04:56 aherrman Exp $
  *
  * FCP adapter driver for IBM eServer zSeries
@@ -157,7 +157,7 @@ struct scsi_report_luns_cmd {
 	u8 control;
 } __attribute__((packed));
 
-/* minimum size of the response data for REPORT LUNS */ 
+/* minimum size of the response data for REPORT LUNS */
 #define SCSI_REPORT_LUNS_SIZE_MIN 8
 
 #ifndef REPORT_LUNS
@@ -231,7 +231,7 @@ struct zh_get_portstatistics {
  * struct zh_event_polled_link
  * @event: subtype of link event, see @zh_event_polled_link_e
  * @port_fc_id: port FC id, where this event occurred
- * 
+ *
  * The standard defines an array of 3 u32 as reserved
  * in its structure. We do not need this here since no data
  * is passed with this member from kernel, to user-space
@@ -244,7 +244,7 @@ struct zh_event_polled_link {
  * struct zh_event_polled_rscn
  * @port_fc_id: port FC id, where this event occurred
  * @port_page: affected port_id pages
- * 
+ *
  * The standard defines an array of 2 u32 as reserved
  * in its structure. We do not need this here since no data
  * is passed with this member from kernel, to user-space
@@ -567,7 +567,7 @@ struct zh_send_rps {
 };
 
 /**
- * struct zh_send_ct - send out a Generic Service command 
+ * struct zh_send_ct - send out a Generic Service command
  * @devid: unique id for adapter device
  * @req_length: size the request buffer
  * @req: request buffer

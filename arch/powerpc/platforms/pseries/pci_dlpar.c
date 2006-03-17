@@ -191,6 +191,7 @@ struct pci_controller * __devinit init_phb_dynamic(struct device_node *dn)
 	if (!phb)
 		return NULL;
 	setup_phb(dn, phb);
+	pci_process_bridge_OF_ranges(phb, dn, 0);
 
 	pci_setup_phb_io_dynamic(phb, primary);
 

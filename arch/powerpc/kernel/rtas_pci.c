@@ -291,8 +291,6 @@ int __devinit setup_phb(struct device_node *dev, struct pci_controller *phb)
 	phb->ops = &rtas_pci_ops;
 	phb->buid = get_phb_buid(dev);
 
-	pci_process_bridge_OF_ranges(phb, dev, 0);
-
 	return 0;
 }
 
@@ -324,6 +322,7 @@ unsigned long __init find_and_init_phbs(void)
 		if (!phb)
 			continue;
 		setup_phb(node, phb);
+		pci_process_bridge_OF_ranges(phb, node, 0);
 		pci_setup_phb_io(phb, index == 0);
 #ifdef CONFIG_PPC_PSERIES
 		/* XXX This code need serious fixing ... --BenH */

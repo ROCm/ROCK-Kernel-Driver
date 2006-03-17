@@ -1,4 +1,4 @@
-/* 
+/*
  * zfcp_hbaapi.c,v 1.4.2.98 2005/02/16 08:51:03 aherrman Exp
  *
  * FCP adapter driver for IBM eServer zSeries
@@ -87,7 +87,7 @@ struct zh_event_item {
 
 /**
  * struct zh_client - per client data
- * @sem: 
+ * @sem:
  * @registered: 1 if the fd is registered for events, else 0
  * @lost: 1 if the fd has lost an event, else 0
  * @next: index for next event in array to be delivered for this client
@@ -95,7 +95,7 @@ struct zh_event_item {
  * @clients: list handling for list of clients
  *
  * This structure is attached to filp->private_data and used throughout the
- * module to save per client data. 
+ * module to save per client data.
  */
 struct zh_client {
 	struct semaphore sem;
@@ -330,7 +330,7 @@ get_config_units(struct file *filp, struct zfcp_port *port)
 {
 	struct zfcp_unit *unit;
 	int ret = 0;
-	
+
 	list_for_each_entry(unit, &port->unit_list_head, list)
 		if (unit->device) {
 			zfcp_hbaapi_get_unit_config(filp, unit);
@@ -420,7 +420,7 @@ zfcp_hbaapi_get_adapter_config(struct file *filp, struct zfcp_adapter *adapter)
 	BUG_ON(filp == NULL);
 
 	client = (void*) filp->private_data;
-	
+
 	item = new_event_item(GFP_ATOMIC, ZH_EVENT_ADAPTER_ADD);
 	if (item == NULL)
 		return;
@@ -513,7 +513,7 @@ zh_busid_to_u32(char *str, u32 *id)
 
 /**
  * zfcp_hbaapi_get_adapter_attributes - provide data for the API call
- * @devno: of the adapter 
+ * @devno: of the adapter
  * @attr: pointer to struct zfcp_adapter_attributes to return attributes
  * Return: 0 on success, -E* else
  * Locks: lock/unlock zfcp_data.config_lock
@@ -526,7 +526,7 @@ zfcp_hbaapi_get_adapter_attributes(char *bus_id,
 	struct Scsi_Host *shost;
 	int ret = 0;
 	u32 id;
-	
+
 	memset(attr, 0, sizeof(*attr));
 
 	ret = zfcp_search_adapter_port_unit(bus_id, 0, 0, &adapter, NULL, NULL);
@@ -583,7 +583,7 @@ zfcp_hbaapi_get_port_statistics(char *bus_id,
 	int ret = 0;
 
 	memset(stat, 0, sizeof(*stat));
-	
+
 	ret = zfcp_search_adapter_port_unit(bus_id, 0, 0, &adapter, NULL, NULL);
 	if (ret)
 		return ret;
@@ -645,7 +645,7 @@ zfcp_hbaapi_get_port_attributes(char *bus_id,
 	int ret = 0;
 
 	memset(attr, 0, sizeof(*attr));
-	
+
 	ret = zfcp_search_adapter_port_unit(bus_id, 0, 0, &adapter, NULL, NULL);
 	if (ret)
 		return ret;
@@ -751,7 +751,7 @@ zfcp_hbaapi_server_enqueue(struct zfcp_adapter *adapter, u8 gs_type)
 			      zfcp_get_busid_by_adapter(adapter), d_id);
 		return NULL;
 	}
-	
+
 
 	status = atomic_read(&port->status);
 	if (!((status & ZFCP_STATUS_PORT_PHYS_OPEN) &&
@@ -1061,7 +1061,7 @@ zfcp_hbaapi_get_did(char *bus_id, wwn_t wwpn, u8 domain, u32 *d_id)
 		if (domain) {
 			*d_id = 0xfffc00 | domain;
 			return 0;
-		} else 
+		} else
 			return -ENOPOR;
 	}
 
@@ -1240,7 +1240,7 @@ zh_map_port_speed(u32 *speed, int flag_operating_speed)
 		case 4:
 			*speed = 8;
 			break;
-		case 8:	
+		case 8:
 			*speed = 4;
 			break;
 		case (1<<14):
@@ -1279,7 +1279,7 @@ zfcp_hbaapi_ioc_get_portattributes(void __user *u_ptr)
 	ioc_data = kmalloc(sizeof(*ioc_data), GFP_KERNEL);
 	if (!ioc_data)
 		return -ENOMEM;
-	
+
 	if (copy_from_user(ioc_data, u_ptr, sizeof(*ioc_data))) {
 		ret = -EFAULT;
 		goto out;
@@ -1317,7 +1317,7 @@ zfcp_hbaapi_ioc_get_portstatistics(void __user *u_ptr)
 	ioc_data = kmalloc(sizeof(*ioc_data), GFP_KERNEL);
 	if (!ioc_data)
 		return -ENOMEM;
-	
+
 	if (copy_from_user(ioc_data, u_ptr, sizeof(*ioc_data))) {
 		ret = -EFAULT;
 		goto out;
@@ -1346,7 +1346,7 @@ zfcp_hbaapi_ioc_get_dportattributes(void __user *u_ptr)
 	struct zh_get_portattributes *ioc_data;
 	int ret;
 	char bus_id[BUS_ID_SIZE] = { 0 };
-	
+
 	ioc_data = kmalloc(sizeof(*ioc_data), GFP_KERNEL);
 	if (!ioc_data)
 		return -ENOMEM;
@@ -1373,7 +1373,7 @@ zfcp_hbaapi_ioc_get_dportattributes(void __user *u_ptr)
  * zfcp_hbaapi_ioc_get_event_buffer - get events from the polled event queue
  * @u_ptr: user-space pointer to copy data from and to
  * Return: number of return events on success, else -E* code
- * 
+ *
  * Copy events belonging to an adapter to user-space and delete them.
  */
 static int noinline
@@ -1388,7 +1388,7 @@ zfcp_hbaapi_ioc_get_event_buffer(void __user *u_ptr)
 	ioc_data = kmalloc(sizeof(*ioc_data), GFP_KERNEL);
 	if (!ioc_data)
 		return -ENOMEM;
-	
+
 	if (copy_from_user(ioc_data, u_ptr, sizeof(*ioc_data))) {
 		ret = -EFAULT;
 		goto out;
@@ -1575,14 +1575,14 @@ zfcp_hbaapi_ioc_event(void __user *u_ptr, struct file *filp)
  * Debug: DEBUG ONLY
  *
  * Insert a dummy event into the list of events, used to determine if
- * the event handling code is working. Insert a dummy event into the 
+ * the event handling code is working. Insert a dummy event into the
  * polled event buffer, used to test the polled event buffer code.
  */
 static int noinline
 zfcp_hbaapi_ioc_event_insert(void)
 {
 	struct zh_event_item *item;
-	
+
 	item = kmalloc(sizeof(*item), GFP_KERNEL);
 	if (!item)
 		return -ENOMEM;
@@ -1629,7 +1629,7 @@ zfcp_hbaapi_alloc_scsi_cmnd(void *cmd, size_t cmd_size, struct scatterlist *sg,
 	return sc;
 }
 
-/** 
+/**
  * zfcp_hbaapi_send_scsi - send SCSI command to a unit
  * @devno: devno of the adapter
  * @wwpn: WWPN of the discovered port the unit is attached to
@@ -1646,7 +1646,7 @@ zfcp_hbaapi_send_scsi(char *bus_id, wwn_t wwpn, fcp_lun_t lun,
 	struct zfcp_port *port;
 	struct zfcp_unit *unit;
 	struct timer_list *timer;
-	
+
 	ret = zfcp_search_adapter_port_unit(bus_id, wwpn, lun,
 					    &adapter, &port, &unit);
 	if (ret)
@@ -1843,7 +1843,7 @@ zfcp_hbaapi_report_luns_helper(struct zh_scsi_report_luns *ioc_data)
 	ret = zfcp_sg_list_alloc(&sg_list, ioc_data->rsp_buffer_size);
 	if (ret < 0)
 		return ret;
-	
+
 	cmd.op = REPORT_LUNS;
 	cmd.alloc_length = ioc_data->rsp_buffer_size;
 
@@ -1957,7 +1957,7 @@ zfcp_hbaapi_ioc_scsi_inquiry(void __user *u_ptr)
 	ioc_data = kmalloc(sizeof(*ioc_data), GFP_KERNEL);
 	if (!ioc_data)
 		return -ENOMEM;
-	
+
 	if (copy_from_user(ioc_data, u_ptr, sizeof(*ioc_data))) {
 		ret = -EFAULT;
 		goto out;
@@ -2037,11 +2037,11 @@ zfcp_hbaapi_ioc_get_config(void __user *u_ptr, struct file *filp)
 
 	if (!list_empty(&head->config))
 		zfcp_hbaapi_ioc_clear_config(filp);
-	
+
 	ioc_data = kmalloc(sizeof(*ioc_data), GFP_KERNEL);
 	if (!ioc_data)
 		return -ENOMEM;
-	
+
 	if (copy_from_user(ioc_data, u_ptr, sizeof(*ioc_data))) {
 		ret = -EFAULT;
 		goto out;
@@ -2073,7 +2073,7 @@ zfcp_hbaapi_ioc_get_rnid(void __user *u_ptr)
 	ioc_data = kmalloc(sizeof(*ioc_data), GFP_KERNEL);
 	if (!ioc_data)
 		return -ENOMEM;
-	
+
 	/* XXX just copy devid from user space */
 	if (copy_from_user(ioc_data, u_ptr, sizeof(*ioc_data))) {
 		ret = -EFAULT;
@@ -2204,7 +2204,7 @@ zfcp_hbaapi_ioc_send_rnid(void __user *u_ptr)
 	ioc_data = kmalloc(sizeof(*ioc_data), GFP_KERNEL);
 	if (!ioc_data)
 		return -ENOMEM;
-	
+
 	if (copy_from_user(ioc_data, u_ptr, sizeof(*ioc_data))) {
 		ret = -EFAULT;
 		goto out;
@@ -2233,7 +2233,7 @@ zfcp_hbaapi_ioc_send_rnid(void __user *u_ptr)
 		ioc_data->size = resp.sg->length;
 		memcpy(&ioc_data->payload, zfcp_sg_to_address(resp.sg),
 		       ioc_data->size);
-		
+
 		if (copy_to_user(u_ptr, ioc_data, sizeof(*ioc_data)))
 			ret = -EFAULT;
 	}
@@ -2266,7 +2266,7 @@ zfcp_hbaapi_ioc_send_rls(void __user *u_ptr)
 	ioc_data = kmalloc(sizeof(*ioc_data), GFP_KERNEL);
 	if (!ioc_data)
 		return -ENOMEM;
-	
+
 	if (copy_from_user(ioc_data, u_ptr, sizeof(*ioc_data))) {
 		ret = -EFAULT;
 		goto out;
@@ -2288,7 +2288,7 @@ zfcp_hbaapi_ioc_send_rls(void __user *u_ptr)
 	ret = zfcp_hbaapi_get_did(bus_id, ioc_data->wwpn, 0, &d_id);
 	if (ret)
 		goto free_resp;
-		
+
 	rls->n_port_id = d_id;
 
 	ret = zfcp_hbaapi_send_els(bus_id, d_id, req.sg, req.count,
@@ -2297,7 +2297,7 @@ zfcp_hbaapi_ioc_send_rls(void __user *u_ptr)
 		ioc_data->size = resp.sg[0].length;
 		memcpy(&ioc_data->payload, zfcp_sg_to_address(&resp.sg[0]),
 		       ioc_data->size);
-		
+
 		if (copy_to_user(u_ptr, ioc_data, sizeof(*ioc_data)))
 			ret = -EFAULT;
 	}
@@ -2330,7 +2330,7 @@ zfcp_hbaapi_ioc_send_rps(void __user *u_ptr)
 	ioc_data = kmalloc(sizeof(*ioc_data), GFP_KERNEL);
 	if (!ioc_data)
 		return -ENOMEM;
-	
+
 	if (copy_from_user(ioc_data, u_ptr, sizeof(*ioc_data))) {
 		ret = -EFAULT;
 		goto out;
@@ -2353,7 +2353,7 @@ zfcp_hbaapi_ioc_send_rps(void __user *u_ptr)
 				  ioc_data->domain, &d_id);
 	if (ret)
 		goto free_resp;
-		
+
 	if (ioc_data->object_wwpn) {
 		rps->flag = 0x02;
 		rps->port_selection = ioc_data->object_wwpn;
@@ -2369,7 +2369,7 @@ zfcp_hbaapi_ioc_send_rps(void __user *u_ptr)
 		ioc_data->size = resp.sg[0].length;
 		memcpy(&ioc_data->payload, zfcp_sg_to_address(&resp.sg[0]),
 		       ioc_data->size);
-		
+
 		if (copy_to_user(u_ptr, ioc_data, sizeof(*ioc_data)))
 			ret = -EFAULT;
 	}
@@ -2428,7 +2428,7 @@ zfcp_hbaapi_send_ct_helper(struct zh_send_ct *send_ct)
 	zfcp_sg_list_free(&resp);
  free_req:
 	zfcp_sg_list_free(&req);
-	
+
 	return ret;
 }
 
@@ -2448,7 +2448,7 @@ zfcp_hbaapi_ioc_send_ct(void __user *u_ptr)
 	ioc_data = kmalloc(sizeof(*ioc_data), GFP_KERNEL);
 	if (!ioc_data)
 		return -ENOMEM;
-	
+
 	if (copy_from_user(ioc_data, u_ptr, sizeof(*ioc_data))) {
 		ret = -EFAULT;
 		goto out;
@@ -2503,7 +2503,7 @@ zfcp_hbaapi_send_ct32(unsigned int cmd, unsigned long arg)
 	loc = kmalloc(sizeof(*loc), GFP_KERNEL);
 	if (!loc)
 		return -ENOMEM;
-	
+
 	if (copy_from_user(&loc->ioc_data32, u_ptr, sizeof(loc->ioc_data32))) {
 		ret = -EFAULT;
 		goto out;
@@ -2564,7 +2564,7 @@ zfcp_hbaapi_scsi_report_luns32(unsigned int cmd, unsigned long arg)
 	loc = kmalloc(sizeof(*loc), GFP_KERNEL);
 	if (!loc)
 		return -ENOMEM;
-	
+
 	if (copy_from_user(&loc->ioc_data32, u_ptr, sizeof(loc->ioc_data32))) {
 		ret = -EFAULT;
 		goto out;
@@ -2598,7 +2598,7 @@ zfcp_hbaapi_scsi_report_luns32(unsigned int cmd, unsigned long arg)
  * @cmd: ioctl request
  * @arg: parameter(s) for the command
  * Return:  0 on success, else -E* code
- * 
+ *
  * This is the main interaction method between the ZFCP HBA API
  * library and the kernel. Here we only determine what we should do,
  * and then call the corresponding worker method.
@@ -2655,7 +2655,7 @@ zfcp_hbaapi_compat_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
  * @inode: struct inode
  * @filp: struct file
  * Return: 0 on success, else -ENOMEM or -ENODEV
- * 
+ *
  * Called when the zfcp_hbaapi device file is opened. Initializes
  * filp->private_data.
  *
@@ -2743,12 +2743,12 @@ zfcp_hbaapi_read(struct file *filp, char __user * buf, size_t count,
 	list_for_each_safe(entry, safe, &client->config)
 	{
 		item = list_entry(entry, struct zh_event_item, list);
-		
+
 		if (copy_to_user(buf, &item->event, sizeof(item->event))) {
 			ret = -EFAULT;
 			goto up;
 		}
-		
+
 		list_del(entry);
 		kfree(item);
 
@@ -2772,7 +2772,7 @@ zfcp_hbaapi_read(struct file *filp, char __user * buf, size_t count,
  * @cmd: ioctl request
  * @arg: parameter(s) for the command
  * Return:  0 on success, else -E* code
- * 
+ *
  * This is the main interaction method between the ZFCP HBA API
  * library and the kernel. Here we only determine what we should do,
  * and then call the corresponding worker method.
@@ -2868,7 +2868,7 @@ zfcp_hbaapi_cb_adapter_add(struct zfcp_adapter *adapter)
 {
 	struct zh_event_item *item;
 	struct Scsi_Host *shost;
-	
+
 	item = new_event_item(GFP_ATOMIC, ZH_EVENT_ADAPTER_ADD);
 	if (item == NULL)
 		return;
@@ -2876,7 +2876,7 @@ zfcp_hbaapi_cb_adapter_add(struct zfcp_adapter *adapter)
 	BUSID_TO_DEVID(zfcp_get_busid_by_adapter(adapter),
 		       &item->event.data.adapter_add.devid);
 
-	
+
 	read_lock(&zfcp_data.config_lock);
 	shost = adapter->scsi_host;
 	if (shost) {
@@ -2964,7 +2964,7 @@ zfcp_hbaapi_incoming_rscn(char *bus_id, u32 s_id,
 	rscn_element = (struct fcp_rscn_element *) (payload + 1);
 
 	for (i = 0; i < nr_entries; i++, rscn_element++) {
-		
+
 		item = new_event_item(GFP_ATOMIC, ZH_EVENT_POLLED);
 		if (item == NULL)
 			return;
@@ -2974,7 +2974,7 @@ zfcp_hbaapi_incoming_rscn(char *bus_id, u32 s_id,
 		item->event.data.polled.data.rscn.port_fc_id = s_id;
 		memcpy(&item->event.data.polled.data.rscn.port_page,
 		       rscn_element, sizeof(*rscn_element));
-		
+
 		add_event_to_polled(item);
 	}
 }
@@ -3089,7 +3089,7 @@ static struct zfcp_callbacks zfcp_hbaapi_cb = {
 /**
  * zfcp_hbaapi_init - module initialization
  * Return: 0 on success, else < 0
- * 
+ *
  * Sets owner, registers with zfcp, registers misc device, initializes
  * global events structure.
  */
@@ -3097,7 +3097,7 @@ static int
 zfcp_hbaapi_init(void)
 {
 	int ret = 0;
-	
+
 	if (maxshared <= 0) {
 		ZFCP_LOG_NORMAL("illegal value for maxshared: %d, "
 				"minimum is 1\n", maxshared);
