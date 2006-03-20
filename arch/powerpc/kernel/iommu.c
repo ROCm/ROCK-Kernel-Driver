@@ -427,8 +427,10 @@ struct iommu_table *iommu_init_table(struct iommu_table *tbl)
 	tbl->it_largehint = tbl->it_halfpoint;
 	spin_lock_init(&tbl->it_lock);
 
+#ifndef CONFIG_CRASH_DUMP
 	/* Clear the hardware table in case firmware left allocations in it */
 	ppc_md.tce_free(tbl, tbl->it_offset, tbl->it_size);
+#endif
 
 	if (!welcomed) {
 		printk(KERN_INFO "IOMMU table initialized, virtual merging %s\n",

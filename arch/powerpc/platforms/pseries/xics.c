@@ -651,6 +651,7 @@ void xics_teardown_cpu(int secondary)
 	ops->cppr_info(cpu, 0x00);
 	iosync();
 
+	ops->qirr_info(cpu, 0xff);
 	/*
 	 * Some machines need to have at least one cpu in the GIQ,
 	 * so leave the master cpu in the group.
