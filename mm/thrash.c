@@ -54,6 +54,9 @@ void grab_swap_token(void)
 	struct mm_struct *mm;
 	int reason;
 
+	if (current->mm == NULL)
+		return;
+
 	/* We have the token. Let others know we still need it. */
 	if (has_swap_token(current->mm)) {
 		current->mm->recent_pagein = 1;
