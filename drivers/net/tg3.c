@@ -6496,6 +6496,8 @@ static int tg3_open(struct net_device *dev)
 	struct tg3 *tp = netdev_priv(dev);
 	int err;
 
+	netif_carrier_off(tp->dev);
+
 	tg3_full_lock(tp, 0);
 
 	tg3_disable_ints(tp);
@@ -10525,7 +10527,6 @@ static void __devinit tg3_init_link_config(struct tg3 *tp)
 	tp->link_config.speed = SPEED_INVALID;
 	tp->link_config.duplex = DUPLEX_INVALID;
 	tp->link_config.autoneg = AUTONEG_ENABLE;
-	netif_carrier_off(tp->dev);
 	tp->link_config.active_speed = SPEED_INVALID;
 	tp->link_config.active_duplex = DUPLEX_INVALID;
 	tp->link_config.phy_is_low_power = 0;
