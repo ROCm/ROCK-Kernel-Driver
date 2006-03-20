@@ -69,7 +69,8 @@ static void cell_show_cpuinfo(struct seq_file *m)
 	of_node_put(root);
 }
 
-#ifdef CONFIG_SPARSEMEM
+#if defined(CONFIG_SPARSEMEM) && defined(CONFIG_BROKEN)
+#error CONFIG_NUMA
 static int __init find_spu_node_id(struct device_node *spe)
 {
 	unsigned int *id;
