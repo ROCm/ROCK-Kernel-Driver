@@ -86,6 +86,14 @@ int libata_fua = 0;
 module_param_named(fua, libata_fua, int, 0444);
 MODULE_PARM_DESC(fua, "FUA support (0=off, 1=on)");
 
+int noacpi = 0;
+module_param(noacpi, int, 0444);
+MODULE_PARM_DESC(noacpi, "Disables use of ACPI in suspend/resume when set");
+
+int libata_printk = ATA_MSG_DRV;
+module_param_named(printk, libata_printk, int, 0644);
+MODULE_PARM_DESC(printk, "Set libata printk flags"); /* in linux/libata.h */
+
 MODULE_AUTHOR("Jeff Garzik");
 MODULE_DESCRIPTION("Library module for ATA devices");
 MODULE_LICENSE("GPL");
@@ -1116,7 +1124,7 @@ int ata_qc_complete_internal(struct ata_queued_cmd *qc)
  *	None.  Should be called with kernel context, might sleep.
  */
 
-static unsigned
+unsigned int
 ata_exec_internal(struct ata_port *ap, struct ata_device *dev,
 		  struct ata_taskfile *tf,
 		  int dma_dir, void *buf, unsigned int buflen)
@@ -1305,11 +1313,11 @@ retry:
 
 	/* print device capabilities */
 	printk(KERN_DEBUG "ata%u: dev %u cfg "
-	       "49:%04x 82:%04x 83:%04x 84:%04x 85:%04x 86:%04x 87:%04x 88:%04x\n",
-	       ap->id, device, dev->id[49],
+	       "00:%04x 49:%04x 82:%04x 83:%04x 84:%04x 85:%04x 86:%04x 87:%04x 88:%04x 93:%04x\n",
+	       ap->id, device, dev->id[0], dev->id[49],
 	       dev->id[82], dev->id[83], dev->id[84],
 	       dev->id[85], dev->id[86], dev->id[87],
-	       dev->id[88]);
+	       dev->id[88], dev->id[93]);
 
 	/*
 	 * common ATA, ATAPI feature tests
@@ -1465,6 +1473,8 @@ void ata_dev_config(struct ata_port *ap, unsigned int i)
 
 	if (ap->ops->dev_config)
 		ap->ops->dev_config(ap, &ap->device[i]);
+
+	ata_acpi_push_id(ap, i);
 }
 
 /**
@@ -1504,6 +1514,8 @@ static int ata_bus_probe(struct ata_port *ap)
 	ata_set_mode(ap);
 	if (ap->flags & ATA_FLAG_PORT_DISABLED)
 		goto err_out_disable;
+
+	ata_acpi_exec_tfs(ap);
 
 	return 0;
 
@@ -4292,12 +4304,17 @@ static int ata_start_drive(struct ata_port *ap, struct ata_device *dev)
  */
 int ata_device_resume(struct ata_port *ap, struct ata_device *dev)
 {
+	printk(KERN_DEBUG "ata%d: resume device\n", ap->id);
+
+	WARN_ON (irqs_disabled());
+
+	if (!ata_dev_present(dev))
+		return 0;
+	ata_acpi_exec_tfs(ap);
 	if (ap->flags & ATA_FLAG_SUSPENDED) {
 		ap->flags &= ~ATA_FLAG_SUSPENDED;
 		ata_set_mode(ap);
 	}
-	if (!ata_dev_present(dev))
-		return 0;
 	if (dev->class == ATA_DEV_ATA)
 		ata_start_drive(ap, dev);
 
@@ -4313,6 +4330,7 @@ int ata_device_resume(struct ata_port *ap, struct ata_device *dev)
  */
 int ata_device_suspend(struct ata_port *ap, struct ata_device *dev)
 {
+	printk(KERN_DEBUG "ata%d: suspend device\n", ap->id);
 	if (!ata_dev_present(dev))
 		return 0;
 	if (dev->class == ATA_DEV_ATA)
@@ -4320,6 +4338,27 @@ int ata_device_suspend(struct ata_port *ap, struct ata_device *dev)
 
 	ata_standby_drive(ap, dev);
 	ap->flags |= ATA_FLAG_SUSPENDED;
+	return 0;
+}
+
+/**
+ *	ata_device_shutdown - send Standby Immediate command to drive
+ *	@ap: target ata_port
+ *	@dev: target device on the ata_port
+ *
+ *	This command makes it safe to power-off a drive.
+ *	Otherwise the heads may be flying at the wrong place
+ *	when the power is removed.
+ */
+int ata_device_shutdown(struct ata_port *ap, struct ata_device *dev)
+{
+
+	if (!ata_dev_present(dev))
+		return 0;
+
+	ata_standby_drive(ap, dev);
+	ap->flags |= ATA_FLAG_SUSPENDED;
+
 	return 0;
 }
 
@@ -4427,6 +4466,7 @@ static void ata_host_init(struct ata_port *ap, struct Scsi_Host *host,
 	ap->port_no = port_no;
 	ap->hard_port_no =
 		ent->legacy_mode ? ent->hard_port_no : port_no;
+	ap->legacy_mode = ent->legacy_mode;
 	ap->pio_mask = ent->pio_mask;
 	ap->mwdma_mask = ent->mwdma_mask;
 	ap->udma_mask = ent->udma_mask;
@@ -4435,6 +4475,7 @@ static void ata_host_init(struct ata_port *ap, struct Scsi_Host *host,
 	ap->cbl = ATA_CBL_NONE;
 	ap->active_tag = ATA_TAG_POISON;
 	ap->last_ctl = 0xFF;
+	ap->dev = ent->dev;
 
 	INIT_WORK(&ap->packet_task, atapi_packet_task, ap);
 	INIT_WORK(&ap->pio_task, ata_pio_task, ap);
@@ -4547,10 +4588,13 @@ int ata_device_add(const struct ata_probe_ent *ent)
 				(ap->mwdma_mask << ATA_SHIFT_MWDMA) |
 				(ap->pio_mask << ATA_SHIFT_PIO);
 
+		ap->msg_enable = libata_printk;
+
 		/* print per-port info to dmesg */
 		printk(KERN_INFO "ata%u: %cATA max %s cmd 0x%lX ctl 0x%lX "
 				 "bmdma 0x%lX irq %lu\n",
 			ap->id,
+			ap->flags & ATA_FLAG_PATA_MODE ? 'P' :
 			ap->flags & ATA_FLAG_SATA ? 'S' : 'P',
 			ata_mode_string(xfer_mode_mask),
 	       		ap->ioaddr.cmd_addr,
@@ -4610,6 +4654,12 @@ int ata_device_add(const struct ata_probe_ent *ent)
 		struct ata_port *ap = host_set->ports[i];
 
 		ata_scsi_scan_host(ap);
+	}
+
+	for (i = 0; i < ent->n_ports; i++) {
+		struct ata_port *ap = host_set->ports[i];
+
+		ata_acpi_get_timing(ap);
 	}
 
 	dev_set_drvdata(dev, host_set);
@@ -4831,6 +4881,7 @@ static struct ata_probe_ent *ata_pci_init_legacy_port(struct pci_dev *pdev, stru
 	probe_ent->n_ports = 1;
 	probe_ent->hard_port_no = port_num;
 	probe_ent->private_data = port->private_data;
+	probe_ent->host_flags = port->host_flags;
 
 	switch(port_num)
 	{
@@ -4891,14 +4942,21 @@ int ata_pci_init_one (struct pci_dev *pdev, struct ata_port_info **port_info,
 	else
 		port[1] = port[0];
 
+	printk(KERN_DEBUG "%s: pci_dev class+intf: 0x%x\n",
+		__FUNCTION__, pdev->class);
 	if ((port[0]->host_flags & ATA_FLAG_NO_LEGACY) == 0
 	    && (pdev->class >> 8) == PCI_CLASS_STORAGE_IDE) {
+		printk(KERN_DEBUG "%s: NO_LEGACY == 0\n", __FUNCTION__);
+		port[0]->host_flags |= ATA_FLAG_PATA_MODE;
+		port[0]->host_flags &= ~ATA_FLAG_SATA;
 		/* TODO: What if one channel is in native mode ... */
 		pci_read_config_byte(pdev, PCI_CLASS_PROG, &tmp8);
 		mask = (1 << 2) | (1 << 0);
 		if ((tmp8 & mask) != mask)
 			legacy_mode = (1 << 3);
 	}
+	else
+		printk(KERN_DEBUG "%s: NO_LEGACY == 1\n", __FUNCTION__);
 
 	/* FIXME... */
 	if ((!legacy_mode) && (n_ports > 2)) {
@@ -5074,6 +5132,7 @@ int pci_test_config_bits(struct pci_dev *pdev, const struct pci_bits *bits)
 
 int ata_pci_device_suspend(struct pci_dev *pdev, pm_message_t state)
 {
+	dev_printk(KERN_DEBUG, &pdev->dev, "suspend PCI device\n");
 	pci_save_state(pdev);
 	pci_disable_device(pdev);
 	pci_set_power_state(pdev, PCI_D3hot);
@@ -5082,6 +5141,7 @@ int ata_pci_device_suspend(struct pci_dev *pdev, pm_message_t state)
 
 int ata_pci_device_resume(struct pci_dev *pdev)
 {
+	dev_printk(KERN_DEBUG, &pdev->dev, "resume PCI device\n");
 	pci_set_power_state(pdev, PCI_D0);
 	pci_restore_state(pdev);
 	pci_enable_device(pdev);
@@ -5200,5 +5260,7 @@ EXPORT_SYMBOL_GPL(ata_pci_device_resume);
 
 EXPORT_SYMBOL_GPL(ata_device_suspend);
 EXPORT_SYMBOL_GPL(ata_device_resume);
+EXPORT_SYMBOL_GPL(ata_device_shutdown);
 EXPORT_SYMBOL_GPL(ata_scsi_device_suspend);
 EXPORT_SYMBOL_GPL(ata_scsi_device_resume);
+EXPORT_SYMBOL_GPL(ata_scsi_device_shutdown);

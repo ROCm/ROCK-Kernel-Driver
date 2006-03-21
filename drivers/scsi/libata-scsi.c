@@ -439,6 +439,14 @@ void ata_scsi_dump_poll(struct scsi_device *device)
 	ap->ops->irq_handler(0, host_set, NULL);
 }
 
+int ata_scsi_device_shutdown(struct scsi_device *sdev)
+{
+	struct ata_port *ap = (struct ata_port *) &sdev->host->hostdata[0];
+	struct ata_device *dev = &ap->device[sdev->id];
+
+	return ata_device_shutdown(ap, dev);
+}
+
 /**
  *	ata_to_sense_error - convert ATA error to SCSI error
  *	@id: ATA device number

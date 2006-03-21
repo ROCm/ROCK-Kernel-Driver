@@ -192,6 +192,7 @@ static struct scsi_host_template piix_sht = {
 	.bios_param		= ata_std_bios_param,
 	.resume			= ata_scsi_device_resume,
 	.suspend		= ata_scsi_device_suspend,
+	.shutdown		= ata_scsi_device_shutdown,
 	.dump_quiesce		= ata_scsi_dump_quiesce,
 	.dump_poll		= ata_scsi_dump_poll,
 };

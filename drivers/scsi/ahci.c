@@ -223,6 +223,7 @@ static struct scsi_host_template ahci_sht = {
 	.bios_param		= ata_std_bios_param,
 	.resume			= ahci_scsi_device_resume,
 	.suspend		= ahci_scsi_device_suspend,
+	.shutdown		= ata_scsi_device_shutdown,
 };
 
 static const struct ata_port_operations ahci_ops = {
@@ -685,7 +686,6 @@ static void ahci_restart_port(struct ata_port *ap, u32 irq_stat)
 	void __iomem *mmio = ap->host_set->mmio_base;
 	void __iomem *port_mmio = ahci_port_base(mmio, ap->port_no);
 	u32 tmp;
-	int work;
 
 	if ((ap->device[0].class != ATA_DEV_ATAPI) ||
 	    ((irq_stat & PORT_IRQ_TF_ERR) == 0))
