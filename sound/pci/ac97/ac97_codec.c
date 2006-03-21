@@ -192,9 +192,6 @@ static const struct ac97_codec_id snd_ac97_codec_ids[] = {
 
 static int snd_ac97_valid_reg(struct snd_ac97 *ac97, unsigned short reg)
 {
-	if (ac97->limited_regs && ! test_bit(reg, ac97->reg_accessed))
-  		return 0;
-
 	/* filter some registers for buggy codecs */
 	switch (ac97->id) {
 	case AC97_ID_AK4540:
@@ -1008,9 +1005,6 @@ static int snd_ac97_try_volume_mix(struct snd_ac97 * ac97, int reg)
 		break;
 	}
 
-	if (ac97->limited_regs && test_bit(reg, ac97->reg_accessed))
-		return 1; /* allow without check */
-
 	val = snd_ac97_read(ac97, reg);
 	if (!(val & mask)) {
 		/* nothing seems to be here - mute flag is not set */
@@ -1029,6 +1023,18 @@ static void check_volume_resolution(struct snd_ac97 *ac97, int reg, unsigned cha
 	unsigned short cbit[3] = { 0x20, 0x10, 0x01 };
 	unsigned char max[3] = { 63, 31, 15 };
 	int i;
+
+	/* first look up the static resolution table */
+	if (ac97->res_table) {
+		const struct snd_ac97_res_table *tbl;
+		for (tbl = ac97->res_table; tbl->reg; tbl++) {
+			if (tbl->reg == reg) {
+				*lo_max = tbl->bits & 0xff;
+				*hi_max = (tbl->bits >> 8) & 0xff;
+				return;
+			}
+		}
+	}
 
 	*lo_max = *hi_max = 0;
 	for (i = 0 ; i < ARRAY_SIZE(cbit); i++) {
@@ -1854,8 +1860,7 @@ int snd_ac97_mixer(struct snd_ac97_bus *bus, struct snd_ac97_template *template,
 	ac97->num = template->num;
 	ac97->addr = template->addr;
 	ac97->scaps = template->scaps;
-	ac97->limited_regs = template->limited_regs;
-	memcpy(ac97->reg_accessed, template->reg_accessed, sizeof(ac97->reg_accessed));
+	ac97->res_table = template->res_table;
 	bus->codec[ac97->num] = ac97;
 	mutex_init(&ac97->reg_mutex);
 	mutex_init(&ac97->page_mutex);

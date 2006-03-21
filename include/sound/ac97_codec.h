@@ -433,6 +433,12 @@ struct snd_ac97_bus {
 	struct snd_info_entry *proc;
 };
 
+/* static resolution table */
+struct snd_ac97_res_table {
+	unsigned short reg;	/* register */
+	unsigned short bits;	/* resolution bitmask */
+};
+
 struct snd_ac97_template {
 	void *private_data;
 	void (*private_free) (struct snd_ac97 *ac97);
@@ -440,8 +446,7 @@ struct snd_ac97_template {
 	unsigned short num;	/* number of codec: 0 = primary, 1 = secondary */
 	unsigned short addr;	/* physical address of codec [0-3] */
 	unsigned int scaps;	/* driver capabilities */
-	unsigned int limited_regs; /* allow limited registers only */
-	DECLARE_BITMAP(reg_accessed, 0x80); /* bit flags */
+	const struct snd_ac97_res_table *res_table;	/* static resolution */
 };
 
 struct snd_ac97 {
@@ -464,12 +469,12 @@ struct snd_ac97 {
 	unsigned short caps;	/* capabilities (register 0) */
 	unsigned short ext_id;	/* extended feature identification (register 28) */
 	unsigned short ext_mid;	/* extended modem ID (register 3C) */
+	const struct snd_ac97_res_table *res_table;	/* static resolution */
 	unsigned int scaps;	/* driver capabilities */
 	unsigned int flags;	/* specific code */
 	unsigned int rates[6];	/* see AC97_RATES_* defines */
 	unsigned int spdif_status;
 	unsigned short regs[0x80]; /* register cache */
-	unsigned int limited_regs; /* allow limited registers only */
 	DECLARE_BITMAP(reg_accessed, 0x80); /* bit flags */
 	union {			/* vendor specific code */
 		struct {
