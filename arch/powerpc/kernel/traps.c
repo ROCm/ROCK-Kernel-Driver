@@ -165,16 +165,30 @@ int die(const char *str, struct pt_regs *regs, long err)
 		crash_dump_start = 1;
 		spin_unlock_irq(&die_lock);
 		crash_kexec(regs);
-		/* NOTREACHED */
-	}
-	spin_unlock_irq(&die_lock);
-	if (crash_dump_start)
 		/*
-		 * Only for soft-reset: Other CPUs will be responded to an IPI
-		 * sent by first kexec CPU.
+		 * If the kdump image is not loaded.
 		 */
-		for(;;)
-			;
+		crash_dump_start = 0;
+	} else
+		spin_unlock_irq(&die_lock);
+	if (crash_dump_start) {
+		/*
+	 	 * For soft-reset, some CPUs would have responded
+		 * to kdump IPI before receives FWNMI. So, call kdump IPI
+		 * callback directly. Otherwise, these CPUs will be
+	 	 * spinning forever since no more IPIs coming from
+		 * panic CPU.
+	 	 */
+		if (crash_ipi_function_ptr) {
+			crash_ipi_function_ptr(regs);
+			return 1;
+		}
+		while (crash_dump_start) {
+			mdelay(1);
+			barrier();
+		}
+		/* kdump image is not loaded */
+	}
 
 	if (in_interrupt())
 		panic("Fatal exception in interrupt");

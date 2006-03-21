@@ -40,6 +40,7 @@
 
 /* This keeps a track of which one is crashing cpu. */
 int crashing_cpu = -1;
+void (*crash_ipi_function_ptr)(struct pt_regs *) = NULL;
 
 static u32 *append_elf_note(u32 *buf, char *name, unsigned type, void *data,
 							       size_t data_len)
@@ -97,7 +98,16 @@ static void crash_save_this_cpu(struct pt_regs *regs, int cpu)
 }
 
 #ifdef CONFIG_SMP
-static atomic_t waiting_for_crash_ipi;
+static cpumask_t cpus_in_crash = CPU_MASK_NONE;
+
+static void crash_send_ipi(void (*crash_ipi_callback)(struct pt_regs *))
+{
+	crash_ipi_function_ptr = crash_ipi_callback;
+	if (crash_ipi_callback) {
+		mb();
+		smp_ops->message_pass(MSG_ALL_BUT_SELF, PPC_MSG_DEBUGGER_BREAK);
+	}
+}
 
 void crash_ipi_callback(struct pt_regs *regs)
 {
@@ -109,13 +119,16 @@ void crash_ipi_callback(struct pt_regs *regs)
 	if (!cpu_online(cpu))
 		return;
 
+	if (cpu_isset(cpu, cpus_in_crash))
+		return;
+
 	if (ppc_md.kexec_cpu_down)
 		ppc_md.kexec_cpu_down(1, 1);
 
 	local_irq_disable();
 
 	crash_save_this_cpu(regs, cpu);
-	atomic_dec(&waiting_for_crash_ipi);
+	cpu_set(cpu, cpus_in_crash);
 	kexec_smp_wait();
 	/* NOTREACHED */
 }
@@ -123,8 +136,7 @@ void crash_ipi_callback(struct pt_regs *regs)
 static void crash_kexec_prepare_cpus(void)
 {
 	unsigned int msecs;
-
-	atomic_set(&waiting_for_crash_ipi, num_online_cpus() - 1);
+	unsigned int ncpus = num_online_cpus() - 1;/* Excluding the panic cpu */
 
 	crash_send_ipi(crash_ipi_callback);
 	smp_wmb();
@@ -138,7 +150,7 @@ static void crash_kexec_prepare_cpus(void)
 	 */
 	printk(KERN_ALERT "Sending IPI to other cpus...\n");
 	msecs = 10000;
-	while ((atomic_read(&waiting_for_crash_ipi) > 0) && (--msecs > 0)) {
+	while ((cpus_weight(cpus_in_crash) < ncpus) && (--msecs > 0)) {
 		barrier();
 		mdelay(1);
 	}
@@ -153,9 +165,10 @@ static void crash_kexec_prepare_cpus(void)
 	 * will call machine_kexec() directly from this handler to do
 	 * kexec boot.
 	 */
-	if (atomic_read(&waiting_for_crash_ipi))
-		printk(KERN_ALERT "done waiting: %d cpus not responding\n",
-			atomic_read(&waiting_for_crash_ipi));
+	if (cpus_weight(cpus_in_crash) < ncpus)
+		printk(KERN_ALERT "done waiting: %d cpu(s) not responding\n",
+			ncpus - cpus_weight(cpus_in_crash));
+
 	/* Leave the IPI callback set */
 }
 #else

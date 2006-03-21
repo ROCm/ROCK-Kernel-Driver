@@ -50,6 +50,7 @@
 #ifdef CONFIG_PPC64
 #include <asm/paca.h>
 #endif
+#include <asm/kexec.h> /* extern crash_ipi_function_ptr */
 
 #ifdef DEBUG
 #include <asm/udbg.h>
@@ -77,8 +78,6 @@ static int (*dump_ipi_function_ptr)(struct pt_regs *) = NULL;
 void smp_call_function_interrupt(void);
 
 int smt_enabled_at_boot = 1;
-
-static void (*crash_ipi_function_ptr)(struct pt_regs *) = NULL;
 
 #ifdef CONFIG_MPIC
 int __init smp_mpic_probe(void)
@@ -160,17 +159,6 @@ void smp_send_reschedule(int cpu)
 void smp_send_debugger_break(int cpu)
 {
 	smp_ops->message_pass(cpu, PPC_MSG_DEBUGGER_BREAK);
-}
-#endif
-
-#ifdef CONFIG_KEXEC
-void crash_send_ipi(void (*crash_ipi_callback)(struct pt_regs *))
-{
-	crash_ipi_function_ptr = crash_ipi_callback;
-	if (crash_ipi_callback) {
-		mb();
-		smp_ops->message_pass(MSG_ALL_BUT_SELF, PPC_MSG_DEBUGGER_BREAK);
-	}
 }
 #endif
 
