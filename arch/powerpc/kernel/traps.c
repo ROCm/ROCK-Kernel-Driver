@@ -98,7 +98,10 @@ static DEFINE_SPINLOCK(die_lock);
 
 int die(const char *str, struct pt_regs *regs, long err)
 {
-	static int die_counter, crash_dump_start = 0;
+	static int die_counter;
+#ifdef CONFIG_KEXEC
+	static int crash_dump_start = 0;
+#endif
 	int nl = 0;
 
 	if (debugger(regs))
@@ -161,6 +164,7 @@ int die(const char *str, struct pt_regs *regs, long err)
 	dump((char *)str, regs);
 	bust_spinlocks(0);
 
+#ifdef CONFIG_KEXEC
 	if (!crash_dump_start && kexec_should_crash(current)) {
 		crash_dump_start = 1;
 		spin_unlock_irq(&die_lock);
@@ -189,6 +193,7 @@ int die(const char *str, struct pt_regs *regs, long err)
 		}
 		/* kdump image is not loaded */
 	}
+#endif
 
 	if (in_interrupt())
 		panic("Fatal exception in interrupt");
