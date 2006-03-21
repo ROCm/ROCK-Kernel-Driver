@@ -30,8 +30,6 @@
 #include <linux/security.h>
 #include <linux/syscalls.h>
 #include <linux/cpuset.h>
-#include <linux/time.h>
-#include <linux/delayacct.h>
 #include "filemap.h"
 /*
  * FIXME: remove all knowledge of the buffer layer from the core VM
@@ -1109,11 +1107,8 @@ generic_file_read(struct file *filp, char __user *buf, size_t count, loff_t *ppo
 
 	init_sync_kiocb(&kiocb, filp);
 	ret = __generic_file_aio_read(&kiocb, &local_iov, 1, ppos);
-	if (-EIOCBQUEUED == ret) {
-		delayacct_timestamp_start();
+	if (-EIOCBQUEUED == ret)
 		ret = wait_on_sync_kiocb(&kiocb);
-		delayacct_blkio();
-	}
 	return ret;
 }
 

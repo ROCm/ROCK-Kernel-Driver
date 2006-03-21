@@ -49,6 +49,7 @@
 #include <linux/syscalls.h>
 #include <linux/times.h>
 #include <linux/acct.h>
+#include <linux/delayacct.h>
 #include <asm/tlb.h>
 
 #include <asm/unistd.h>
@@ -301,57 +302,11 @@ static inline void task_rq_unlock(runqueue_t *rq, unsigned long *flags)
 }
 
 #ifdef CONFIG_SCHEDSTATS
-int schedstats_sysctl = 0;
-static DEFINE_PER_CPU(int, schedstats) = 0;
-			/* schedstats turned off by default */
-static void
-schedstats_set(int val)
-{
-	int i;
-	static spinlock_t schedstats_lock = SPIN_LOCK_UNLOCKED;
-
-	spin_lock(&schedstats_lock);
-	schedstats_sysctl = val;
-	for (i = 0; i < NR_CPUS; i++)
-		per_cpu(schedstats, i) = val;
-	spin_unlock(&schedstats_lock);
-}
-
-static int __init schedstats_setup_enable(char *str)
-{
-	schedstats_sysctl = 1;
-	schedstats_set(schedstats_sysctl);
-	return 1;
-}
-
-__setup("schedstats", schedstats_setup_enable);
-
-int
-schedstats_sysctl_handler(ctl_table *table, int write, struct file *filp,
-		void __user *buffer, size_t *lenp, loff_t *ppos)
-{
-	int ret, prev = schedstats_sysctl;
-	struct task_struct *g, *t;
-
-	ret = proc_dointvec(table, write, filp, buffer, lenp, ppos);
-	if ((ret != 0) || (prev == schedstats_sysctl))
-		return ret;
-	if (schedstats_sysctl) {
-		read_lock(&tasklist_lock);
-		do_each_thread(g, t) {
-			memset(&t->sched_info, 0, sizeof(t->sched_info));
-		} while_each_thread(g, t);
-		read_unlock(&tasklist_lock);
-	}
-	schedstats_set(schedstats_sysctl);
-	return ret;
-}
-
 /*
  * bump this up when changing the output format or the meaning of an existing
  * format, so that tools can adapt (or abort)
  */
-#define SCHEDSTAT_VERSION 13
+#define SCHEDSTAT_VERSION 12
 
 static int show_schedstat(struct seq_file *seq, void *v)
 {
@@ -359,10 +314,6 @@ static int show_schedstat(struct seq_file *seq, void *v)
 
 	seq_printf(seq, "version %d\n", SCHEDSTAT_VERSION);
 	seq_printf(seq, "timestamp %lu\n", jiffies);
-	if (!schedstats_sysctl) {
-		seq_printf(seq, "State Off\n");
-		return 0;
-	}
 	for_each_online_cpu(cpu) {
 		runqueue_t *rq = cpu_rq(cpu);
 #ifdef CONFIG_SMP
@@ -441,18 +392,26 @@ struct file_operations proc_schedstat_operations = {
 	.release = single_release,
 };
 
-#define schedstats_on	(per_cpu(schedstats, smp_processor_id()) != 0)
-# define schedstat_inc(rq, field)	\
-do {					\
-	if (unlikely(schedstats_on))	\
-		(rq)->field++;		\
-} while (0)
-# define schedstat_add(rq, field, amt)	\
-do {					\
-	if (unlikely(schedstats_on))	\
-		(rq)->field += (amt);	\
-} while (0)
+static inline void rq_sched_info_arrive(struct runqueue *rq,
+						unsigned long diff)
+{
+	if (rq) {
+		rq->rq_sched_info.run_delay += diff;
+		rq->rq_sched_info.pcnt++;
+	}
+}
+
+static inline void rq_sched_info_depart(struct runqueue *rq,
+						unsigned long diff)
+{
+	if (rq)
+		rq->rq_sched_info.cpu_time += diff;
+}
+# define schedstat_inc(rq, field)	do { (rq)->field++; } while (0)
+# define schedstat_add(rq, field, amt)	do { (rq)->field += (amt); } while (0)
 #else /* !CONFIG_SCHEDSTATS */
+static inline void rq_sched_info_arrive(struct runqueue *rq, unsigned long diff) {}
+static inline void rq_sched_info_depart(struct runqueue *rq, unsigned long diff) {}
 # define schedstat_inc(rq, field)	do { } while (0)
 # define schedstat_add(rq, field, amt)	do { } while (0)
 #endif
@@ -472,7 +431,18 @@ static inline runqueue_t *this_rq_lock(void)
 	return rq;
 }
 
+#if defined(CONFIG_SCHEDSTATS) || defined(CONFIG_TASK_DELAY_ACCT)
+
+static inline int sched_info_on(void)
+{
 #ifdef CONFIG_SCHEDSTATS
+	return 1;
+#endif
+#ifdef CONFIG_TASK_DELAY_ACCT
+	return delayacct_on;
+#endif
+}
+
 /*
  * Called when a process is dequeued from the active array and given
  * the cpu.  We should note that with the exception of interactive
@@ -501,7 +471,6 @@ static inline void sched_info_dequeued(task_t *t)
 static void sched_info_arrive(task_t *t)
 {
 	unsigned long now = jiffies, diff = 0;
-	struct runqueue *rq = task_rq(t);
 
 	if (t->sched_info.last_queued)
 		diff = now - t->sched_info.last_queued;
@@ -510,11 +479,7 @@ static void sched_info_arrive(task_t *t)
 	t->sched_info.last_arrival = now;
 	t->sched_info.pcnt++;
 
-	if (!rq)
-		return;
-
-	rq->rq_sched_info.run_delay += diff;
-	rq->rq_sched_info.pcnt++;
+	rq_sched_info_arrive(task_rq(t), diff);
 }
 
 /*
@@ -534,8 +499,9 @@ static void sched_info_arrive(task_t *t)
  */
 static inline void sched_info_queued(task_t *t)
 {
-	if (unlikely(schedstats_on && !t->sched_info.last_queued))
-		t->sched_info.last_queued = jiffies;
+	if (unlikely(sched_info_on()))
+		if (!t->sched_info.last_queued)
+			t->sched_info.last_queued = jiffies;
 }
 
 /*
@@ -544,13 +510,10 @@ static inline void sched_info_queued(task_t *t)
  */
 static inline void sched_info_depart(task_t *t)
 {
-	struct runqueue *rq = task_rq(t);
 	unsigned long diff = jiffies - t->sched_info.last_arrival;
 
 	t->sched_info.cpu_time += diff;
-
-	if (rq)
-		rq->rq_sched_info.cpu_time += diff;
+	rq_sched_info_depart(task_rq(t), diff);
 }
 
 /*
@@ -573,13 +536,11 @@ static inline void __sched_info_switch(task_t *prev, task_t *next)
 	if (next != rq->idle)
 		sched_info_arrive(next);
 }
-
 static inline void sched_info_switch(task_t *prev, task_t *next)
 {
-	if (unlikely(schedstats_on))
+	if (unlikely(sched_info_on()))
 		__sched_info_switch(prev, next);
 }
-
 #else
 #define sched_info_queued(t)		do { } while (0)
 #define sched_info_switch(t, next)	do { } while (0)
@@ -1337,7 +1298,7 @@ void fastcall sched_fork(task_t *p, int clone_flags)
 	p->state = TASK_RUNNING;
 	INIT_LIST_HEAD(&p->run_list);
 	p->array = NULL;
-#ifdef CONFIG_SCHEDSTATS
+#if defined(CONFIG_SCHEDSTATS) || defined(CONFIG_TASK_DELAY_ACCT)
 	memset(&p->sched_info, 0, sizeof(p->sched_info));
 #endif
 #if defined(CONFIG_SMP) && defined(__ARCH_WANT_UNLOCKED_CTXSW)
@@ -4122,9 +4083,11 @@ void __sched io_schedule(void)
 {
 	struct runqueue *rq = &per_cpu(runqueues, raw_smp_processor_id());
 
+	delayacct_blkio_start();
 	atomic_inc(&rq->nr_iowait);
 	schedule();
 	atomic_dec(&rq->nr_iowait);
+	delayacct_blkio_end();
 }
 
 EXPORT_SYMBOL(io_schedule);
@@ -4134,9 +4097,11 @@ long __sched io_schedule_timeout(long timeout)
 	struct runqueue *rq = &per_cpu(runqueues, raw_smp_processor_id());
 	long ret;
 
+	delayacct_blkio_start();
 	atomic_inc(&rq->nr_iowait);
 	ret = schedule_timeout(timeout);
 	atomic_dec(&rq->nr_iowait);
+	delayacct_blkio_end();
 	return ret;
 }
 

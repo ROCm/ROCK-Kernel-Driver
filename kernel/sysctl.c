@@ -46,7 +46,6 @@
 #include <linux/syscalls.h>
 #include <linux/nfs_fs.h>
 #include <linux/acpi.h>
-#include <linux/delayacct.h>
 
 #include <asm/uaccess.h>
 #include <asm/processor.h>
@@ -702,26 +701,6 @@ static ctl_table kern_table[] = {
 		.maxlen		= sizeof (int),
 	 	.mode		= 0644,
 		.proc_handler	= &proc_dointvec,
-	},
-#endif
-#if defined(CONFIG_TASK_DELAY_ACCT)
-	{
-		.ctl_name	= KERN_DELAYACCT,
-		.procname	= "delayacct",
-		.data		= &delayacct_on,
-		.maxlen		= sizeof (int),
-		.mode		= 0644,
-		.proc_handler	= &delayacct_sysctl_handler,
-	},
-#endif
-#if defined(CONFIG_SCHEDSTATS)
-	{
-		.ctl_name	= KERN_SCHEDSTATS,
-		.procname	= "schedstats",
-		.data		= &schedstats_sysctl,
-		.maxlen		= sizeof (int),
-		.mode		= 0644,
-		.proc_handler	= &schedstats_sysctl_handler,
 	},
 #endif
 	{

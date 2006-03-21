@@ -151,9 +151,7 @@ enum
 	KERN_UNSUPPORTED=73,	/* int: allow loading of unsupported modules */
 	KERN_KDB=74,		/* int: kdb on/off */
 	KERN_DUMP=75,		/* directory: dump parameters */
-	KERN_DELAYACCT=76,	/* int: Per-task delay accounting on/off */
-	KERN_SCHEDSTATS=77,	/* int: Schedstats on/off */
-	KERN_HZ=78,		/* unsigned long: internal kernel HZ */
+	KERN_HZ=76,		/* unsigned long: internal kernel HZ */
 };
 
 

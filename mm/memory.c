@@ -48,8 +48,6 @@
 #include <linux/rmap.h>
 #include <linux/module.h>
 #include <linux/init.h>
-#include <linux/time.h>
-#include <linux/delayacct.h>
 
 #include <asm/pgalloc.h>
 #include <asm/uaccess.h>
@@ -1996,6 +1994,7 @@ static int do_swap_page(struct mm_struct *mm, struct vm_area_struct *vma,
 
 	entry = pte_to_swp_entry(orig_pte);
 again:
+	current->flags |= PF_SWAPIN;
 	page = lookup_swap_cache(entry);
 	if (!page) {
  		swapin_readahead(entry, address, vma);
@@ -2008,6 +2007,7 @@ again:
 			page_table = pte_offset_map_lock(mm, pmd, address, &ptl);
 			if (likely(pte_same(*page_table, orig_pte)))
 				ret = VM_FAULT_OOM;
+			current->flags &= ~PF_SWAPIN;
 			goto unlock;
 		}
 
@@ -2019,6 +2019,8 @@ again:
 
 	mark_page_accessed(page);
 	lock_page(page);
+	current->flags &= ~PF_SWAPIN;
+
 	if (!PageSwapCache(page)) {
 		/* Page migration has occured */
 		unlock_page(page);
@@ -2322,27 +2324,18 @@ static inline int handle_pte_fault(struct mm_struct *mm,
 
 	old_entry = entry = *pte;
 	if (!pte_present(entry)) {
-		int ret;
-
-		delayacct_timestamp_start();
 		if (pte_none(entry)) {
 			if (!vma->vm_ops || !vma->vm_ops->nopage)
 				return do_anonymous_page(mm, vma, address,
 					pte, pmd, write_access);
-
-			ret = do_no_page(mm, vma, address,
+			return do_no_page(mm, vma, address,
 					pte, pmd, write_access);
-			if (vma->vm_file)
-				delayacct_blkio();
-			return ret;
 		}
 		if (pte_file(entry))
 			return do_file_page(mm, vma, address,
 					pte, pmd, write_access, entry);
-		ret = do_swap_page(mm, vma, address,
+		return do_swap_page(mm, vma, address,
 					pte, pmd, write_access, entry);
- 		delayacct_swapin();
-		return ret;
 	}
 
 	ptl = pte_lockptr(mm, pmd);

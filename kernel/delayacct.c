@@ -1,14 +1,16 @@
 /* delayacct.c - per-task delay accounting
  *
- * Copyright (C) Shailabh Nagar, IBM Corp. 2005
+ * Copyright (C) Shailabh Nagar, IBM Corp. 2006
  *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of version 2.1 of the GNU Lesser General Public License
- * as published by the Free Software Foundation.
+ * This program is free software;  you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it would be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
+ * the GNU General Public License for more details.
  */
 
 #include <linux/sched.h>
@@ -27,17 +29,14 @@ static int __init delayacct_setup_enable(char *str)
 }
 __setup("delayacct", delayacct_setup_enable);
 
-int delayacct_init(void)
+void delayacct_init(void)
 {
 	delayacct_cache = kmem_cache_create("delayacct_cache",
 					    sizeof(struct task_delay_info),
 					    0,
 					    SLAB_PANIC,
 					    NULL, NULL);
-	if (!delayacct_cache)
-		return -ENOMEM;
 	delayacct_tsk_init(&init_task);
-	return 0;
 }
 
 void __delayacct_tsk_init(struct task_struct *tsk)
@@ -51,119 +50,61 @@ void __delayacct_tsk_init(struct task_struct *tsk)
 
 void __delayacct_tsk_exit(struct task_struct *tsk)
 {
-	kmem_cache_free(delayacct_cache, tsk->delays);
-	tsk->delays = NULL;
-}
-
-static inline unsigned long long delayacct_measure(void)
-{
-	do_posix_clock_monotonic_gettime(&current->delays->end);
-	return timespec_diff_ns(&current->delays->start, &current->delays->end);
-}
-
-void __delayacct_blkio(void)
-{
-	unsigned long long delay;
-
-	delay = delayacct_measure();
-
-	spin_lock(&current->delays->lock);
-	current->delays->blkio_delay += delay;
-	current->delays->blkio_count++;
-	spin_unlock(&current->delays->lock);
-}
-
-void __delayacct_swapin(void)
-{
-	unsigned long long delay;
-
-	delay = delayacct_measure();
-
-	spin_lock(&current->delays->lock);
-	current->delays->swapin_delay += delay;
-	current->delays->swapin_count++;
-	spin_unlock(&current->delays->lock);
-}
-
-/* Allocate task_delay_info for all tasks without one */
-static int alloc_delays(void)
-{
-	int cnt=0, i;
-	struct task_struct *g, *t;
-	struct task_delay_info **delayp;
-
-	read_lock(&tasklist_lock);
-	do_each_thread(g, t) {
-		if (!t->delays)
-			cnt++;
-	} while_each_thread(g, t);
-	read_unlock(&tasklist_lock);
-
-	if (!cnt)
-		return 0;
-
-	delayp = kmalloc(cnt *sizeof(struct task_delay_info *), GFP_KERNEL);
-	if (!delayp)
-		return -ENOMEM;
-	for (i = 0; i < cnt; i++) {
-		delayp[i] = kmem_cache_alloc(delayacct_cache, SLAB_KERNEL);
-		if (!delayp[i])
-			goto out;
-		memset(delayp[i], 0, sizeof(*delayp[i]));
-		spin_lock_init(&delayp[i]->lock);
+	if (tsk->delays) {
+		kmem_cache_free(delayacct_cache, tsk->delays);
+		tsk->delays = NULL;
 	}
-
-	read_lock(&tasklist_lock);
-	do_each_thread(g, t) {
-		if (t->delays)
-			continue;
-		t->delays = delayp[--i];
-		if (i<0)
-			break;
-	} while_each_thread(g, t);
-	read_unlock(&tasklist_lock);
-
-	if (i)
-		BUG();
-	return 0;
-out:
-	--i;
-	while (i >= 0)
-		kmem_cache_free(delayacct_cache, delayp[--i]);
-	return -ENOMEM;
 }
 
-/* Reset task_delay_info structs for all tasks */
-static void reset_delays(void)
+/*
+ * Start accounting for a delay statistic using
+ * its starting timestamp (@start)
+ */
+
+static inline void delayacct_start(struct timespec *start)
 {
-	struct task_struct *g, *t;
-
-	read_lock(&tasklist_lock);
-	do_each_thread(g, t) {
-		if (!t->delays)
-			BUG();
-		memset(t->delays, 0, sizeof(struct task_delay_info));
-		spin_lock_init(&t->delays->lock);
-	} while_each_thread(g, t);
-	read_unlock(&tasklist_lock);
+	do_posix_clock_monotonic_gettime(start);
 }
 
-int delayacct_sysctl_handler(ctl_table *table, int write, struct file *filp,
-			      void __user *buffer, size_t *lenp, loff_t *ppos)
+/*
+ * Finish delay accounting for a statistic using
+ * its timestamps (@start, @end), accumalator (@total) and @count
+ */
+
+static inline void delayacct_end(struct timespec *start, struct timespec *end,
+				u64 *total, u32 *count)
 {
-	int ret, prev;
+	struct timespec ts;
+	nsec_t ns;
 
-	prev = delayacct_on;
-	ret = proc_dointvec(table, write, filp, buffer, lenp, ppos);
-	if (ret || (prev == delayacct_on))
-		return ret;
+	do_posix_clock_monotonic_gettime(end);
+	ts.tv_sec = end->tv_sec - start->tv_sec;
+	ts.tv_nsec = end->tv_nsec - start->tv_nsec;
+	ns = timespec_to_ns(&ts);
+	if (ns < 0)
+		return;
 
-	if (delayacct_on)
-		ret = alloc_delays();
-	else
-		reset_delays();
-	if (ret)
-		delayacct_on = prev;
-	return ret;
+	spin_lock(&current->delays->lock);
+	*total += ns;
+	(*count)++;
+	spin_unlock(&current->delays->lock);
 }
 
+void __delayacct_blkio_start(void)
+{
+	delayacct_start(&current->delays->blkio_start);
+}
+
+void __delayacct_blkio_end(void)
+{
+	if (current->flags & PF_SWAPIN)	/* Swapping a page in */
+		delayacct_end(&current->delays->blkio_start,
+				&current->delays->blkio_end,
+				&current->delays->swapin_delay,
+				&current->delays->swapin_count);
+	else	/* Other block I/O */
+		delayacct_end(&current->delays->blkio_start,
+				&current->delays->blkio_end,
+				&current->delays->blkio_delay,
+				&current->delays->blkio_count);
+}

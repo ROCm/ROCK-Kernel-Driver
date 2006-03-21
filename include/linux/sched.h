@@ -15,7 +15,6 @@
 #include <linux/cpumask.h>
 #include <linux/errno.h>
 #include <linux/nodemask.h>
-#include <linux/sysctl.h>
 
 #include <asm/system.h>
 #include <asm/semaphore.h>
@@ -527,10 +526,7 @@ typedef struct prio_array prio_array_t;
 struct backing_dev_info;
 struct reclaim_state;
 
-#ifdef CONFIG_SCHEDSTATS
-extern int schedstats_sysctl;
-extern int schedstats_sysctl_handler(ctl_table *, int, struct file *,
-			void __user *, size_t *, loff_t *);
+#if defined(CONFIG_SCHEDSTATS) || defined(CONFIG_TASK_DELAY_ACCT)
 struct sched_info {
 	/* cumulative counters */
 	unsigned long	cpu_time,	/* time spent on the cpu */
@@ -542,23 +538,32 @@ struct sched_info {
 			last_queued;	/* when we were last queued to run */
 };
 
+#ifdef CONFIG_SCHEDSTATS
 extern struct file_operations proc_schedstat_operations;
-#endif
+#endif /* CONFIG_SCHEDSTATS */
+#endif /* defined(CONFIG_SCHEDSTATS) || defined(CONFIG_TASK_DELAY_ACCT) */
 
 #ifdef CONFIG_TASK_DELAY_ACCT
+extern int delayacct_on;
+
 struct task_delay_info {
 	spinlock_t	lock;
 
-	/* timestamp recording variables (to reduce stack usage) */
-	struct timespec start, end;
+	/* For each stat XXX, add following, aligned appropriately
+	 *
+	 * struct timespec XXX_start, XXX_end;
+	 * u64 XXX_delay;
+	 * u32 XXX_count;
+	 */
 
-	/* Add stats in pairs: u64 delay, u32 count, aligned properly */
+	struct timespec blkio_start, blkio_end;	/* Shared by blkio, swapin */
 	u64 blkio_delay;	/* wait for sync block io completion */
-	u64 swapin_delay;	/* wait for pages to be swapped in */
+	u64 swapin_delay;	/* wait for sync block io completion */
 	u32 blkio_count;
 	u32 swapin_count;
 };
 #endif
+
 
 enum idle_type
 {
@@ -736,7 +741,7 @@ struct task_struct {
 	cpumask_t cpus_allowed;
 	unsigned int time_slice, first_time_slice;
 
-#ifdef CONFIG_SCHEDSTATS
+#if defined(CONFIG_SCHEDSTATS) || defined(CONFIG_TASK_DELAY_ACCT)
 	struct sched_info sched_info;
 #endif
 
@@ -957,6 +962,7 @@ static inline void put_task_struct(struct task_struct *t)
 #define PF_BORROWED_MM	0x00400000	/* I am a kthread doing use_mm */
 #define PF_RANDOMIZE	0x00800000	/* randomize virtual address space */
 #define PF_SWAPWRITE	0x01000000	/* Allowed to write to swap */
+#define PF_SWAPIN	0x02000000	/* I am doing a swap in */
 #define PF_SPREAD_PAGE	0x04000000	/* Spread page cache over cpuset */
 #define PF_SPREAD_SLAB	0x08000000	/* Spread some slab caches over cpuset */
 #define PF_MEMPOLICY	0x10000000	/* Non-default NUMA mempolicy */

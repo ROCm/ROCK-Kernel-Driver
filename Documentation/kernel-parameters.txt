@@ -1375,8 +1375,6 @@ running once the system is up.
 	sc1200wdt=	[HW,WDT] SC1200 WDT (watchdog) driver
 			Format: <io>[,<timeout>[,<isapnp>]]
 
-	schedstats	[KNL] Collect CPU scheduler statistics
-
 	scsi_debug_*=	[SCSI]
 			See drivers/scsi/scsi_debug.c.
 

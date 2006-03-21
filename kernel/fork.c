@@ -44,8 +44,8 @@
 #include <linux/rmap.h>
 #include <linux/acct.h>
 #include <linux/cn_proc.h>
-#include <linux/pagg.h>
 #include <linux/delayacct.h>
+#include <linux/pagg.h>
 
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
@@ -977,8 +977,8 @@ static task_t *copy_process(unsigned long clone_flags,
 	if (p->binfmt && !try_module_get(p->binfmt->module))
 		goto bad_fork_cleanup_put_domain;
 
-	delayacct_tsk_init(p);	/* Must remain after dup_task_struct() */
 	p->did_exec = 0;
+	delayacct_tsk_init(p);	/* Must remain after dup_task_struct() */
 	copy_flags(clone_flags, p);
 	p->pid = pid;
 	retval = -EFAULT;
