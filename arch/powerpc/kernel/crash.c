@@ -40,7 +40,6 @@
 
 /* This keeps a track of which one is crashing cpu. */
 int crashing_cpu = -1;
-void (*crash_ipi_function_ptr)(struct pt_regs *) = NULL;
 
 static u32 *append_elf_note(u32 *buf, char *name, unsigned type, void *data,
 							       size_t data_len)

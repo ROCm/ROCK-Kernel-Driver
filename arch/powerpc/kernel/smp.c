@@ -50,7 +50,6 @@
 #ifdef CONFIG_PPC64
 #include <asm/paca.h>
 #endif
-#include <asm/kexec.h> /* extern crash_ipi_function_ptr */
 
 #ifdef DEBUG
 #include <asm/udbg.h>
@@ -78,6 +77,8 @@ static int (*dump_ipi_function_ptr)(struct pt_regs *) = NULL;
 void smp_call_function_interrupt(void);
 
 int smt_enabled_at_boot = 1;
+
+void (*crash_ipi_function_ptr)(struct pt_regs *) = NULL;
 
 #ifdef CONFIG_MPIC
 int __init smp_mpic_probe(void)
