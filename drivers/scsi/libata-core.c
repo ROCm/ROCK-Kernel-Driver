@@ -67,7 +67,6 @@ static unsigned int ata_busy_sleep (struct ata_port *ap,
 static void ata_dev_reread_id(struct ata_port *ap, struct ata_device *dev);
 static void ata_dev_init_params(struct ata_port *ap, struct ata_device *dev);
 static void ata_set_mode(struct ata_port *ap);
-static void ata_set_drives_mode(struct ata_port *ap);
 static void ata_dev_set_xfermode(struct ata_port *ap, struct ata_device *dev);
 static unsigned int ata_get_mode_mask(const struct ata_port *ap, int shift);
 static int fgb(u32 bitmap);
@@ -1513,8 +1512,6 @@ static int ata_bus_probe(struct ata_port *ap)
 		goto err_out_disable;
 
 	ata_set_mode(ap);
-	ata_set_drives_mode(ap);
-
 	if (ap->flags & ATA_FLAG_PORT_DISABLED)
 		goto err_out_disable;
 
@@ -1893,12 +1890,6 @@ static void ata_host_set_dma(struct ata_port *ap, u8 xfer_mode,
 	}
 }
 
-static void ata_set_drives_mode(struct ata_port *ap)
-{
-	ata_dev_set_mode(ap, &ap->device[0]);
-	ata_dev_set_mode(ap, &ap->device[1]);
-}
-
 /**
  *	ata_set_mode - Program timings and issue SET FEATURES - XFER
  *	@ap: port on which timings will be programmed
@@ -1929,6 +1920,10 @@ static void ata_set_mode(struct ata_port *ap)
 	/* step 3: if that xfer mode isn't PIO, set host DMA timings */
 	if (xfer_shift != ATA_SHIFT_PIO)
 		ata_host_set_dma(ap, xfer_mode, xfer_shift);
+
+	/* step 4: update devices' xfer mode */
+	ata_dev_set_mode(ap, &ap->device[0]);
+	ata_dev_set_mode(ap, &ap->device[1]);
 
 	if (ap->flags & ATA_FLAG_PORT_DISABLED)
 		return;
@@ -4316,12 +4311,12 @@ int ata_device_resume(struct ata_port *ap, struct ata_device *dev)
 	if (!ata_dev_present(dev))
 		return 0;
 
-	ata_set_mode(ap);
+	ata_bus_reset(ap);
 	ata_acpi_exec_tfs(ap);
 
 	if (ap->flags & ATA_FLAG_SUSPENDED) {
 		ap->flags &= ~ATA_FLAG_SUSPENDED;
-		ata_set_drives_mode(ap);
+		ata_set_mode(ap);
 	}
 	if (dev->class == ATA_DEV_ATA)
 		ata_start_drive(ap, dev);
