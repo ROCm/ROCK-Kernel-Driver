@@ -28,6 +28,7 @@ enum dm_evt_attr {
 	DM_E_ATTR_TSUSEC	= 3,
 	DM_E_ATTR_DMNAME	= 4,
 	DM_E_ATTR_BLKERR	= 5,
+	DM_E_ATTR_VLDPTHS	= 6,
 	DM_E_ATTR_MAX,
 };
 

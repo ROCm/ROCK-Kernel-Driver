@@ -836,7 +836,7 @@ static int __fail_path(struct pgpath *pgpath, struct bio *bio)
 		m->current_pgpath = NULL;
 
 	/* Get error data from bio when available */
-	evt = dm_path_fail_evt(pgpath->path.dev->name, 0);
+	evt = dm_path_fail_evt(pgpath->path.dev->name, m->nr_valid_paths);
 	if (evt)
 		list_add(&evt->elist, &m->evt_list);
 	queue_work(kmultipathd, &m->trigger_event);
@@ -884,7 +884,7 @@ static int reinstate_path(struct pgpath *pgpath)
 	if (!m->nr_valid_paths++ && m->queue_size)
 		queue_work(kmultipathd, &m->process_queued_ios);
 
-	evt = dm_path_reinstate_evt(pgpath->path.dev->name);
+	evt = dm_path_reinstate_evt(pgpath->path.dev->name, m->nr_valid_paths);
 	if (evt)
 		list_add(&evt->elist, &m->evt_list);
 

@@ -77,24 +77,39 @@ static void mp_zone_free_dm_evt(void *element, void *pool_data)
 }
 
 static void
-mp_zone_complete(struct mp_zone *zone, int release_all)
+mp_zone_complete(struct mp_zone *zone, int release_pid)
 {
 	unsigned long flags;
 	struct dm_evt *evt, *n;
+	struct sk_buff *skb;
+	struct nlmsghdr *nlh;
 
 	spin_lock_irqsave(&zone->freelock, flags);
 	if (zone->allocated) {
 		list_for_each_entry_safe(evt, n, &zone->freequeue, zlist) {
-			if (skb_shared(evt->skb)) {
-				if (release_all)
-					kfree_skb(evt->skb);
-				else
-					continue;
+			skb = evt->skb;
+
+			if (release_pid) {
+				nlh = (struct nlmsghdr *)skb->data;
+				if (nlh->nlmsg_pid == release_pid) {
+					if (skb->next && skb->sk)
+						skb_unlink(skb,
+						  &skb->sk->sk_receive_queue);
+					atomic_set(&skb->users, 1);
+				}
 			}
 
-			list_del(&evt->zlist);
-			mempool_free(evt, zone->pool);
-			--zone->allocated;
+			if (!skb_shared(skb)) {
+				list_del(&evt->zlist);
+				--zone->allocated;
+				skb_orphan(skb);
+
+				/* Init in case sent to pool */
+				skb->len = 0;
+				skb->tail = skb->head;
+
+				mempool_free(evt, zone->pool);
+			}
 		}
 	}
 	spin_unlock_irqrestore(&zone->freelock, flags);
@@ -144,7 +159,7 @@ static u64 dm_evt_seqnum;
 static DEFINE_SPINLOCK(sequence_lock);
 
 static struct dm_evt *dm_nl_build_path_msg(char* dm_name, int type,
-					     int blk_err)
+					     int nr_valid_paths)
 {
 	struct dm_evt *evt;
 	struct nlmsghdr	*nlh;
@@ -179,9 +194,7 @@ static struct dm_evt *dm_nl_build_path_msg(char* dm_name, int type,
 	NLA_PUT_U64(evt->skb, DM_E_ATTR_TSSEC, tv.tv_sec);
 	NLA_PUT_U64(evt->skb, DM_E_ATTR_TSUSEC, tv.tv_usec);
 	NLA_PUT_STRING(evt->skb, DM_E_ATTR_DMNAME, dm_name);
-
-	if (blk_err)
-		NLA_PUT_U32(evt->skb, DM_E_ATTR_BLKERR, blk_err);
+	NLA_PUT_U32(evt->skb, DM_E_ATTR_VLDPTHS, nr_valid_paths);
 
 	nlmsg_end(evt->skb, nlh);
 
@@ -190,8 +203,8 @@ static struct dm_evt *dm_nl_build_path_msg(char* dm_name, int type,
 nla_put_failure:
 	printk(KERN_ERR "%s: nla_put_failure\n",
 	       __FUNCTION__);
-	/* reduce skb users so zone_complete can free */
-	kfree_skb(evt->skb);
+	/* Set skb users so zone_complete can free */
+	atomic_set(&evt->skb->users, 1);
 	mp_zone_complete(&z_dm_evt, 0);
 out:
 	return ERR_PTR(err);
@@ -212,20 +225,21 @@ void dm_send_evt(struct dm_evt *evt)
 }
 EXPORT_SYMBOL(dm_send_evt);
 
-struct dm_evt *dm_path_fail_evt(char* dm_name, int blk_err)
+struct dm_evt *dm_path_fail_evt(char* dm_name, int nr_valid_paths)
 {
 	struct dm_evt *evt;
-	evt = dm_nl_build_path_msg(dm_name, DM_EVT_FAIL_PATH, blk_err);
+	evt = dm_nl_build_path_msg(dm_name, DM_EVT_FAIL_PATH, nr_valid_paths);
 
 	return evt;
 }
 
 EXPORT_SYMBOL(dm_path_fail_evt);
 
-struct dm_evt *dm_path_reinstate_evt(char* dm_name)
+struct dm_evt *dm_path_reinstate_evt(char* dm_name, int nr_valid_paths)
 {
 	struct dm_evt *evt;
-	evt = dm_nl_build_path_msg(dm_name, DM_EVT_REINSTATE_PATH, 0);
+	evt = dm_nl_build_path_msg(dm_name, DM_EVT_REINSTATE_PATH,
+				   nr_valid_paths);
 
 	return evt;
 }
@@ -283,9 +297,9 @@ static int dm_nl_rcv_nl_event(struct notifier_block *this, unsigned long event, 
 	if (event == NETLINK_URELEASE &&
 	    n->protocol == NETLINK_DM && n->pid) {
 		if ( n->pid == dm_nl_daemon_pid  ) {
+			mp_zone_complete(&z_dm_evt, dm_nl_daemon_pid);
 			dm_nl_daemon_pid = 0;
 		}
-		mp_zone_complete(&z_dm_evt, 1);
 	}
 
 	return NOTIFY_DONE;
