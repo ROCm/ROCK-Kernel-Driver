@@ -4328,7 +4328,8 @@ int ata_device_resume(struct ata_port *ap, struct ata_device *dev)
  *	standbynow command.
  *
  */
-int ata_device_suspend(struct ata_port *ap, struct ata_device *dev)
+int ata_device_suspend(struct ata_port *ap, struct ata_device *dev,
+		       pm_message_t state)
 {
 	printk(KERN_DEBUG "ata%d: suspend device\n", ap->id);
 	if (!ata_dev_present(dev))
@@ -4336,7 +4337,8 @@ int ata_device_suspend(struct ata_port *ap, struct ata_device *dev)
 	if (dev->class == ATA_DEV_ATA)
 		ata_flush_cache(ap, dev);
 
-	ata_standby_drive(ap, dev);
+	if (state.event != PM_EVENT_FREEZE)
+		ata_standby_drive(ap, dev);
 	ap->flags |= ATA_FLAG_SUSPENDED;
 	return 0;
 }

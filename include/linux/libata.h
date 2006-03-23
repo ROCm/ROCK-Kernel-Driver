@@ -502,10 +502,10 @@ extern int ata_scsi_error(struct Scsi_Host *host);
 extern int ata_scsi_release(struct Scsi_Host *host);
 extern unsigned int ata_host_intr(struct ata_port *ap, struct ata_queued_cmd *qc);
 extern int ata_scsi_device_resume(struct scsi_device *);
-extern int ata_scsi_device_suspend(struct scsi_device *);
+extern int ata_scsi_device_suspend(struct scsi_device *, pm_message_t);
 extern int ata_scsi_device_shutdown(struct scsi_device *);
 extern int ata_device_resume(struct ata_port *, struct ata_device *);
-extern int ata_device_suspend(struct ata_port *, struct ata_device *);
+extern int ata_device_suspend(struct ata_port *, struct ata_device *, pm_message_t);
 extern int ata_device_shutdown(struct ata_port *, struct ata_device *);
 extern int ata_ratelimit(void);
 
