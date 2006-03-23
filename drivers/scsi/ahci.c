@@ -200,7 +200,7 @@ static void ahci_tf_read(struct ata_port *ap, struct ata_taskfile *tf);
 static void ahci_qc_prep(struct ata_queued_cmd *qc);
 static u8 ahci_check_status(struct ata_port *ap);
 static inline int ahci_host_intr(struct ata_port *ap, struct ata_queued_cmd *qc);
-static int ahci_scsi_device_suspend(struct scsi_device *sdev);
+static int ahci_scsi_device_suspend(struct scsi_device *sdev, pm_message_t state);
 static int ahci_scsi_device_resume(struct scsi_device *sdev);
 static void ahci_remove_one (struct pci_dev *pdev);
 
@@ -874,13 +874,13 @@ static int ahci_qc_issue(struct ata_queued_cmd *qc)
 	return 0;
 }
 
-int ahci_scsi_device_suspend(struct scsi_device *sdev)
+int ahci_scsi_device_suspend(struct scsi_device *sdev, pm_message_t state)
 {
 	struct ata_port *ap = (struct ata_port *) &sdev->host->hostdata[0];
 	struct ata_device *dev = &ap->device[sdev->id];
 	int rc;
 
-	rc = ata_device_suspend(ap, dev);
+	rc = ata_device_suspend(ap, dev, state);
 
 	if (!rc)
 		ahci_port_suspend(ap);
