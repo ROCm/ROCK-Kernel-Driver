@@ -286,8 +286,8 @@ struct scsi_host_template {
 	 * suspend support
 	 */
 	int (*resume)(struct scsi_device *);
-	int (*suspend)(struct scsi_device *);
-	int (*shutdown)(struct scsi_device *, pm_message_t);
+	int (*suspend)(struct scsi_device *, pm_message_t);
+	int (*shutdown)(struct scsi_device *);
 
 	/*
 	 * Name of proc directory
