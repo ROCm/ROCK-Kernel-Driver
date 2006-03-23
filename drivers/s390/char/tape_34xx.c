@@ -28,11 +28,6 @@
 debug_info_t *TAPE_DBF_AREA = NULL;
 EXPORT_SYMBOL(TAPE_DBF_AREA);
 
-enum tape_34xx_type {
-	tape_3480,
-	tape_3490,
-};
-
 #define TAPE34XX_FMT_3480	0
 #define TAPE34XX_FMT_3480_2_XF	1
 #define TAPE34XX_FMT_3480_XF	2
