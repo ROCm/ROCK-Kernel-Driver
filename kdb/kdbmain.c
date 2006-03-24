@@ -1458,17 +1458,15 @@ static void
 kdb_wait_for_cpus(void)
 {
 #ifdef	CONFIG_SMP
-	int online = 0, kdb_data = 0, prev_kdb_data = 0, i, time;
+	int online = 0, kdb_data = 0, prev_kdb_data = 0, c, time;
 	mdelay(100);
 	for (time = 0; time < kdb_wait_for_cpus_secs; ++time) {
 		online = 0;
 		kdb_data = 0;
-		for (i = 0; i < NR_CPUS; ++i) {
-			if (cpu_online(i)) {
-				++online;
-				if (kdb_running_process[i].seqno >= kdb_seqno - 1)
-					++kdb_data;
-			}
+		for_each_online_cpu(c) {
+			++online;
+			if (kdb_running_process[c].seqno >= kdb_seqno - 1)
+				++kdb_data;
 		}
 		if (online == kdb_data)
 			break;
@@ -1480,6 +1478,9 @@ kdb_wait_for_cpus(void)
 		}
 		touch_nmi_watchdog();
 		mdelay(1000);
+		/* Architectures may want to send a more forceful interrupt */
+		if (time == min(kdb_wait_for_cpus_secs / 2, 5))
+			kdba_wait_for_cpus();
 		if (time % 4 == 0)
 			kdb_printf(".");
 	}
@@ -1802,7 +1803,8 @@ kdb(kdb_reason_t reason, int error, struct pt_regs *regs)
 	 * in kdb.  Not guaranteed to work but it makes an attempt at
 	 * debugging the debugger.
 	 */
-	if (reason != KDB_REASON_SWITCH) {
+	if (reason != KDB_REASON_SWITCH &&
+	    reason != KDB_REASON_ENTER_SLAVE) {
 		if (KDB_IS_RUNNING() && !KDB_STATE(REENTRY)) {
 			int recover = 1;
 			unsigned long recurse = 0;

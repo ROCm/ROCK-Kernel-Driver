@@ -1,3 +1,24 @@
+2006-03-24 Keith Owens  <kaos@sgi.com>
+
+	* Define a dummy kdba_wait_for_cpus().
+	* kdb v4.4-2.6.16-i386-2.
+
+2006-03-21 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.16-i386-1.
+
+2006-03-14 Nathan Scott  <nathans@sgi.com>
+
+	* kdb v4.4-2.6.16-rc6-i386-1.
+
+2006-02-28 Nathan Scott  <nathans@sgi.com>
+
+	* kdb v4.4-2.6.16-rc5-i386-1.
+
+2006-02-20 Nathan Scott  <nathans@sgi.com>
+
+	* kdb v4.4-2.6.16-rc4-i386-1.
+
 2006-02-06 Keith Owens  <kaos@sgi.com>
 
 	* Change CONFIG_CRASH_DUMP to CONFIG_LKCD.
@@ -213,7 +234,7 @@
 
 	* Add stackdepth command.
 	* Handle backtrace with separate soft and hard irq stacks
-          (CONFIG_4KSTACKS).
+	  (CONFIG_4KSTACKS).
 	* Work around RESTORE_ALL macro, which can only be used once.
 	* Export kdba_dumpregs.  Bryan Cardillo, UPenn.
 	* kdb v4.4-2.6.9-rc2-i386-2.

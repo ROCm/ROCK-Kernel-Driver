@@ -95,37 +95,6 @@
 # define IA64_MCA_DEBUG(fmt...)
 #endif
 
-#ifdef	CONFIG_KDB
-/* Warning: usage of kdba_mca_trace assumes that ia64 atomic inc/dec are lock
- * free.  If atomic operations ever use spinlocks on ia64 then, sooner or later,
- * this will deadlock on an MCA or INIT event (not irq safe).
- *
- * If you want kdb procedure traces at all times, not just during MCA/INIT
- * handling, then use kdb to set kdba_mca_trace to 1, 'mm4 kdba_mca_trace 1' or
- * patch this code to set kdba_mca_trace = ATOMIC_INIT(1).
- * To disable kdb MCA tracing, 'mm4 no_kdba_mca_trace 1' or patch this code
- * to set no_kdba_mca_trace = 1.
- */
-static atomic_t kdba_mca_trace;
-static int no_kdba_mca_trace;
-#define INC_KDBA_MCA_TRACE() (void)(atomic_inc(&kdba_mca_trace))
-#define DEC_KDBA_MCA_TRACE() (void)(atomic_dec(&kdba_mca_trace))
-#define KDBA_MCA_TRACE_TEST()						\
-	(!no_kdba_mca_trace && atomic_read(&kdba_mca_trace))
-#define KDBA_MCA_TRACE()						\
-	if (KDBA_MCA_TRACE_TEST())					\
-		kdb_printf("KDBA_MCA_TRACE: %s: cpu %d itc %ld\n",	\
-			__FUNCTION__,					\
-			smp_processor_id(),				\
-			ia64_get_itc())
-extern int kdb_wait_for_cpus_secs;
-#else/* !CONFIG_KDB */
-#define INC_KDBA_MCA_TRACE() do {} while(0)
-#define DEC_KDBA_MCA_TRACE() do {} while(0)
-#define KDBA_MCA_TRACE_TEST() 0
-#define KDBA_MCA_TRACE() do {} while(0)
-#endif/* CONFIG_KDB */
-
 /* Used by mca_asm.S */
 u32				ia64_mca_serialize;
 DEFINE_PER_CPU(u64, ia64_mca_data); /* == __per_cpu_mca[smp_processor_id()] */
@@ -299,7 +268,6 @@ ia64_mca_log_sal_error_record(int sal_info_type)
 	static const char * const rec_name[] = { "MCA", "INIT", "CMC", "CPE" };
 #endif
 
-	KDBA_MCA_TRACE();
 	size = ia64_log_get(sal_info_type, &buffer, irq_safe);
 	if (!size)
 		return;
@@ -333,7 +301,6 @@ ia64_mca_cpe_int_handler (int cpe_irq, void *arg, struct pt_regs *ptregs)
 	static int		index;
 	static DEFINE_SPINLOCK(cpe_history_lock);
 
-	KDBA_MCA_TRACE();
 	IA64_MCA_DEBUG("%s: received interrupt vector = %#x on CPU %d\n",
 		       __FUNCTION__, cpe_irq, smp_processor_id());
 
@@ -554,7 +521,6 @@ static void
 ia64_mca_wakeup_all(void)
 {
 	int cpu;
-	KDBA_MCA_TRACE();
 
 	/* Clear the Rendez checkin flag for all cpus */
 	for_each_online_cpu(cpu) {
@@ -580,8 +546,6 @@ ia64_mca_rendez_int_handler(int rendez_irq, void *arg, struct pt_regs *regs)
 	unsigned long flags;
 	int cpu = smp_processor_id();
 
-	INC_KDBA_MCA_TRACE();
-	KDBA_MCA_TRACE();
 	/* Mask all interrupts */
 	local_irq_save(flags);
 	if (notify_die(DIE_MCA_RENDZVOUS_ENTER, "MCA", regs, 0, 0, 0)
@@ -615,7 +579,6 @@ ia64_mca_rendez_int_handler(int rendez_irq, void *arg, struct pt_regs *regs)
 
 	/* Enable all interrupts */
 	local_irq_restore(flags);
-	DEC_KDBA_MCA_TRACE();
 	return IRQ_HANDLED;
 }
 
@@ -637,7 +600,6 @@ ia64_mca_rendez_int_handler(int rendez_irq, void *arg, struct pt_regs *regs)
 static irqreturn_t
 ia64_mca_wakeup_int_handler(int wakeup_irq, void *arg, struct pt_regs *ptregs)
 {
-	KDBA_MCA_TRACE();
 	return IRQ_HANDLED;
 }
 
@@ -1000,8 +962,6 @@ ia64_mca_handler(struct pt_regs *regs, struct switch_stack *sw,
 		&sos->proc_state_param;
 	int recover, cpu = smp_processor_id();
 	task_t *previous_current;
-	INC_KDBA_MCA_TRACE();
-	KDBA_MCA_TRACE();
 
 	oops_in_progress = 1;	/* FIXME: make printk NMI/MCA/INIT safe */
 	previous_current = ia64_mca_modify_original_stack(regs, sw, sos, "MCA");
@@ -1058,7 +1018,6 @@ ia64_mca_handler(struct pt_regs *regs, struct switch_stack *sw,
 
 	set_curr_task(cpu, previous_current);
 	monarch_cpu = -1;
-	DEC_KDBA_MCA_TRACE();
 }
 
 static DECLARE_WORK(cmc_disable_work, ia64_mca_cmc_vector_disable_keventd, NULL);
@@ -1346,8 +1305,20 @@ ia64_init_handler(struct pt_regs *regs, struct switch_stack *sw,
 	static atomic_t monarchs;
 	task_t *previous_current;
 	int cpu = smp_processor_id();
-	INC_KDBA_MCA_TRACE();
-	KDBA_MCA_TRACE();
+#ifdef	CONFIG_KDB
+	int kdba_recalcitrant = 0;
+	/* kdba_wait_for_cpus() sends INIT to recalcitrant cpus which ends up
+	 * calling this routine.  If KDB is waiting for the IPI to be processed
+	 * then treat all INIT events as slaves, kdb_initial_cpu is the
+	 * monarch.
+	 */
+	if (KDB_STATE(WAIT_IPI)) {
+		monarch_cpu = kdb_initial_cpu;
+		sos->monarch = 0;
+		KDB_STATE_CLEAR(WAIT_IPI);
+		kdba_recalcitrant = 1;
+	}
+#endif	/* CONFIG_KDB */
 
 	oops_in_progress = 1;	/* FIXME: make printk NMI/MCA/INIT safe */
 	console_loglevel = 15;	/* make sure printks make it to console */
@@ -1389,6 +1360,8 @@ ia64_init_handler(struct pt_regs *regs, struct switch_stack *sw,
 		       cpu_relax();	/* spin until monarch enters */
 #ifdef	CONFIG_KDB
 		KDB_ENTER_SLAVE();
+		if (kdba_recalcitrant)
+			monarch_cpu = -1;
 #endif	/* CONFIG_KDB */
 		if (notify_die(DIE_INIT_SLAVE_ENTER, "INIT", regs, 0, 0, 0)
 				== NOTIFY_STOP)
@@ -1436,7 +1409,6 @@ ia64_init_handler(struct pt_regs *regs, struct switch_stack *sw,
 	atomic_dec(&monarchs);
 	set_curr_task(cpu, previous_current);
 	monarch_cpu = -1;
-	DEC_KDBA_MCA_TRACE();
 	return;
 }
 

@@ -560,7 +560,7 @@ kdbm_filp(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 					f.f_dentry, f.f_vfsmnt, f.f_op);
 
 	kdb_printf(" f_count = %d f_flags = 0x%x f_mode = 0x%x\n",
-					f.f_count.counter, f.f_flags, f.f_mode);
+					atomic_read(&f.f_count), f.f_flags, f.f_mode);
 
 	kdb_printf(" f_pos = %Ld security = 0x%p\n",
 					f.f_pos, f.f_security);

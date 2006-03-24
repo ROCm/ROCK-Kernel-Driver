@@ -1,3 +1,25 @@
+2006-03-24 Keith Owens  <kaos@sgi.com>
+
+	* Use INIT to interrupt cpus that do not respond to a normal kdb IPI.
+	* Remove KDBA_MCA_TRACE from arch/ia64/kernel/mca.c.
+	* kdb v4.4-2.6.16-ia64-2.
+
+2006-03-21 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.16-ia64-1.
+
+2006-03-14 Nathan Scott  <nathans@sgi.com>
+
+	* kdb v4.4-2.6.16-rc6-ia64-1.
+
+2006-02-28 Nathan Scott  <nathans@sgi.com>
+
+	* kdb v4.4-2.6.16-rc5-ia64-1.
+
+2006-02-20 Nathan Scott  <nathans@sgi.com>
+
+	* kdb v4.4-2.6.16-rc4-ia64-1.
+
 2006-02-07 Keith Owens  <kaos@sgi.com>
 
 	* Change kdb_running_process_save from a static array to a pointer.

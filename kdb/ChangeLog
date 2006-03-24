@@ -1,3 +1,31 @@
+2006-03-22 Keith Owens  <kaos@sgi.com>
+
+	* Add some more xpc flags.  Dean Nelson, SGI.
+	* Replace open coded counter references with atomic_read().
+	* Pass early_uart_console to early_uart_setup().  Francois
+	  Wellenreiter, Bull.
+	* Replace open code with for_each_online_cpu().
+	* If cpus do not come into kdb after a few seconds then let
+	  architectures send a more forceful interrupt.
+	* Close a timing race with KDB_ENTER_SLAVE.
+	* kdb v4.4-2.6.16-common-2.
+
+2006-03-21 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.16-common-1.
+
+2006-03-14 Nathan Scott  <nathans@sgi.com>
+
+	* kdb v4.4-2.6.16-rc6-common-1.
+
+2006-02-28 Nathan Scott  <nathans@sgi.com>
+
+	* kdb v4.4-2.6.16-rc5-common-1.
+
+2006-02-20 Nathan Scott  <nathans@sgi.com>
+
+	* kdb v4.4-2.6.16-rc4-common-1.
+
 2006-02-06 Keith Owens  <kaos@sgi.com>
 
 	* Change CONFIG_CRASH_DUMP to CONFIG_LKCD.

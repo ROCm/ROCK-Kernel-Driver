@@ -158,4 +158,6 @@ extern enum kdba_serial_console kdba_serial_console;
 #define KDB_RUNNING_PROCESS_ORIGINAL kdb_running_process_save
 extern struct kdb_running_process *kdb_running_process_save; /* [NR_CPUS] */
 
+extern void kdba_wait_for_cpus(void);
+
 #endif	/* !_ASM_KDBPRIVATE_H */

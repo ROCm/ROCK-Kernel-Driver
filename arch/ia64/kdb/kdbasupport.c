@@ -1377,6 +1377,23 @@ kdba_sendinit(int argc, const char **argv, const char **envp, struct pt_regs *re
 	platform_send_ipi(cpunum, 0, IA64_IPI_DM_INIT, 0);
 	return 0;
 }
+
+/* Invoked once from kdb_wait_for_cpus when waiting for cpus.  For those cpus
+ * that have not responded to the normal KDB interrupt yet, hit them with an
+ * INIT event.
+ */
+void
+kdba_wait_for_cpus(void)
+{
+	int c;
+	if (KDB_FLAG(CATASTROPHIC))
+		return;
+	kdb_printf("  Sending INIT to cpus that have not responded yet\n");
+	for_each_online_cpu(c)
+		if (kdb_running_process[c].seqno < kdb_seqno - 1)
+			platform_send_ipi(c, 0, IA64_IPI_DM_INIT, 0);
+}
+
 #endif /* CONFIG_SMP */
 
 /* This code is sensitive to the layout of the MCA/INIT stack (see mca_asm.h)

@@ -255,7 +255,7 @@ int __init early_serial_console_init(char *cmdline)
 		return -ENODEV;
 
 	options = strchr(cmdline, ',') + 1;
-	if ((err = early_uart_setup(NULL, options)) < 0)
+	if ((err = early_uart_setup(&early_uart_console, options)) < 0)
 		return err;
 	return early_uart_console_init();
 }

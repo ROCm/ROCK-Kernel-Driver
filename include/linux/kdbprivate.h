@@ -503,4 +503,6 @@ extern int kdba_verify_rw(unsigned long addr, size_t size);
 #define KDB_RUNNING_PROCESS_ORIGINAL kdb_running_process
 #endif
 
+extern int kdb_wait_for_cpus_secs;
+
 #endif	/* !_KDBPRIVATE_H */

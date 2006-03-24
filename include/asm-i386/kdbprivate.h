@@ -179,4 +179,6 @@ void kdba_unsave_running(struct kdba_running_process *k, struct pt_regs *regs)
 
 extern const char *kdba_irq_ctx_type(int cpu, struct thread_info *tinfo);
 
+#define kdba_wait_for_cpus()
+
 #endif	/* !_ASM_KDBPRIVATE_H */
