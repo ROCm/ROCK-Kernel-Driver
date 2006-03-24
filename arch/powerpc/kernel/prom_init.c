@@ -1505,7 +1505,8 @@ static int __init prom_find_machine_type(void)
 #ifdef CONFIG_PPC64
 			if (strstr(p, RELOC("Momentum,Maple")))
 				return PLATFORM_MAPLE;
-			if (strstr(p, RELOC("IBM,CPB")))
+			if (strstr(p, RELOC("IBM,CPB"))||
+			    strstr(p, RELOC("CBEA")))
 				return PLATFORM_CELL;
 #endif
 			i += sl + 1;
