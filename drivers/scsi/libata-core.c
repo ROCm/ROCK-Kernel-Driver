@@ -4311,7 +4311,7 @@ int ata_device_resume(struct ata_port *ap, struct ata_device *dev)
 	if (!ata_dev_present(dev))
 		return 0;
 
-	ata_bus_reset(ap);
+	ap->ops->phy_reset(ap);
 	ata_acpi_exec_tfs(ap);
 
 	if (ap->flags & ATA_FLAG_SUSPENDED) {
