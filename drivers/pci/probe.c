@@ -347,6 +347,7 @@ pci_alloc_child_bus(struct pci_bus *parent, struct pci_dev *bridge, int busnr)
 	child->parent = parent;
 	child->ops = parent->ops;
 	child->sysdata = parent->sysdata;
+	child->bus_flags = parent->bus_flags;
 	child->bridge = get_device(&bridge->dev);
 
 	child->class_dev.class = &pcibus_class;
@@ -585,13 +586,15 @@ int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev * dev, int max
 		    (child->number > bus->subordinate) ||
 		    (child->number < bus->number) ||
 		    (child->subordinate < bus->number)) {
-			printk(KERN_WARNING "PCI: Bus #%02x (-#%02x) may be "
+			printk(KERN_WARNING "PCI: Bus #%02x (-#%02x) is "
 			       "hidden behind%s bridge #%02x (-#%02x)%s\n",
 			       child->number, child->subordinate,
 			       bus->self->transparent ? " transparent" : " ",
 			       bus->number, bus->subordinate,
 			       pcibios_assign_all_busses() ? " " :
 			       " (try 'pci=assign-busses')");
+			printk(KERN_WARNING "Please report the result to "
+			       "linux-kernel to fix this permanently\n");
 		}
 		bus = bus->parent;
 	}
