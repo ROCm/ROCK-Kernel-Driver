@@ -310,7 +310,9 @@ void delete_partition(struct gendisk *disk, int part)
 	p->ios[0] = p->ios[1] = 0;
 	p->sectors[0] = p->sectors[1] = 0;
 	devfs_remove("%s/part%d", disk->devfs_name, part);
-	kobject_unregister(&p->kobj);
+	kobject_uevent(&p->kobj, KOBJ_REMOVE);
+	kobject_del(&p->kobj);
+	kobject_put(&p->kobj);
 }
 
 void add_partition(struct gendisk *disk, int part, sector_t start, sector_t len)
@@ -336,7 +338,10 @@ void add_partition(struct gendisk *disk, int part, sector_t start, sector_t len)
 		snprintf(p->kobj.name,KOBJ_NAME_LEN,"%s%d",disk->kobj.name,part);
 	p->kobj.parent = &disk->kobj;
 	p->kobj.ktype = &ktype_part;
-	kobject_register(&p->kobj);
+	kobject_init(&p->kobj);
+	kobject_add(&p->kobj);
+	if (!disk->part_uevent_supress)
+		kobject_uevent(&p->kobj, KOBJ_ADD);
 	disk->part[part-1] = p;
 }
 
@@ -373,6 +378,8 @@ void register_disk(struct gendisk *disk)
 {
 	struct block_device *bdev;
 	char *s;
+	int i;
+	struct hd_struct *p;
 	int err;
 
 	strlcpy(disk->kobj.name,disk->disk_name,KOBJ_NAME_LEN);
@@ -382,14 +389,13 @@ void register_disk(struct gendisk *disk)
 		*s = '!';
 	if ((err = kobject_add(&disk->kobj)))
 		return;
-	disk_sysfs_symlinks(disk);
-	kobject_uevent(&disk->kobj, KOBJ_ADD);
 
+	disk_sysfs_symlinks(disk);
 	/* No minors to use for partitions */
 	if (disk->minors == 1) {
 		if (disk->devfs_name[0] != '\0')
 			devfs_add_disk(disk);
-		return;
+		goto exit;
 	}
 
 	/* always add handle for the whole disk */
@@ -397,16 +403,32 @@ void register_disk(struct gendisk *disk)
 
 	/* No such device (e.g., media were just removed) */
 	if (!get_capacity(disk))
-		return;
+		goto exit;
 
 	bdev = bdget_disk(disk, 0);
 	if (!bdev)
-		return;
+		goto exit;
 
+	/* scan partition table, but supress uevents */
 	bdev->bd_invalidated = 1;
-	if (blkdev_get(bdev, FMODE_READ, 0) < 0)
-		return;
+	disk->part_uevent_supress = 1;
+	err = blkdev_get(bdev, FMODE_READ, 0);
+	disk->part_uevent_supress = 0;
+	if (err < 0)
+		goto exit;
 	blkdev_put(bdev);
+
+exit:
+	/* announce disk after possible partitions are already created */
+	kobject_uevent(&disk->kobj, KOBJ_ADD);
+
+	/* announce possible partitions */
+	for (i = 1; i < disk->minors; i++) {
+		p = disk->part[i-1];
+		if (!p || !p->nr_sects)
+			continue;
+		kobject_uevent(&p->kobj, KOBJ_ADD);
+	}
 }
 
 int rescan_partitions(struct gendisk *disk, struct block_device *bdev)
