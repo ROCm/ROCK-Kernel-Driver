@@ -5,8 +5,11 @@
  * 
  * Copyright (c) 2002-2004, K A Fraser
  * 
- * This file may be distributed separately from the Linux kernel, or
- * incorporated into other software packages, subject to the following license:
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License version 2
+ * as published by the Free Software Foundation; or, when distributed
+ * separately from the Linux kernel or incorporated into other
+ * software packages, subject to the following license:
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this source file (the "Software"), to deal in the Software without
@@ -33,6 +36,7 @@
 #include <xen/interface/xen.h>
 #include <xen/interface/sched.h>
 #include <xen/interface/nmi.h>
+#include <linux/errno.h>
 
 #define __STR(x) #x
 #define STR(x) __STR(x)
@@ -167,6 +171,31 @@ HYPERVISOR_sched_op(
 	int cmd, unsigned long arg)
 {
 	return _hypercall2(int, sched_op, cmd, arg);
+}
+
+static inline int
+HYPERVISOR_sched_op_new(
+	int cmd, void *arg)
+{
+	return _hypercall2(int, sched_op_new, cmd, arg);
+}
+
+static inline int
+HYPERVISOR_poll(
+	evtchn_port_t *ports, unsigned int nr_ports, u64 timeout)
+{
+	struct sched_poll sched_poll = {
+		.ports = ports,
+		.nr_ports = nr_ports,
+		.timeout = jiffies_to_st(timeout)
+	};
+
+	int rc = HYPERVISOR_sched_op_new(SCHEDOP_poll, &sched_poll);
+
+	if (rc == -ENOSYS)
+		rc = HYPERVISOR_sched_op(SCHEDOP_yield, 0);
+
+	return rc;
 }
 
 static inline long
@@ -304,8 +333,7 @@ HYPERVISOR_suspend(
 
 static inline int
 HYPERVISOR_nmi_op(
-	unsigned long op,
-	unsigned long arg)
+	unsigned long op, void *arg)
 {
 	return _hypercall2(int, nmi_op, op, arg);
 }

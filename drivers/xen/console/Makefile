@@ -1,2 +1,3 @@
+obj-$(CONFIG_XEN_CONSOLE) := xencons.o
 
-obj-y	:= console.o xencons_ring.o
+xencons-y := console.o xencons_ring.o

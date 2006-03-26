@@ -277,6 +277,7 @@ static inline pte_t ptep_get_and_clear_full(struct mm_struct *mm, unsigned long 
 		   issue the two stores in either order, but the hypervisor
 		   must not see the high part before the low one. */
 		ptep->pte_low = 0;
+		barrier();
 		ptep->pte_high = 0;
 #else
 		*ptep = __pte(0);

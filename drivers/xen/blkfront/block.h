@@ -7,8 +7,11 @@
  * Modifications by Mark A. Williamson are (c) Intel Research Cambridge
  * Copyright (c) 2004-2005, Christian Limpach
  * 
- * This file may be distributed separately from the Linux kernel, or
- * incorporated into other software packages, subject to the following license:
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License version 2
+ * as published by the Free Software Foundation; or, when distributed
+ * separately from the Linux kernel or incorporated into other
+ * software packages, subject to the following license:
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this source file (the "Software"), to deal in the Software without
@@ -55,24 +58,24 @@
 #include <asm/atomic.h>
 #include <asm/uaccess.h>
 
-#if 1 
+#if 1
 #define IPRINTK(fmt, args...) \
     printk(KERN_INFO "xen_blk: " fmt, ##args)
 #else
 #define IPRINTK(fmt, args...) ((void)0)
 #endif
 
-#if 1 
+#if 1
 #define WPRINTK(fmt, args...) \
     printk(KERN_WARNING "xen_blk: " fmt, ##args)
 #else
 #define WPRINTK(fmt, args...) ((void)0)
 #endif
- 
-#define DPRINTK(_f, _a...) pr_debug ( _f , ## _a )
+
+#define DPRINTK(_f, _a...) pr_debug(_f, ## _a)
 
 #if 0
-#define DPRINTK_IOCTL(_f, _a...) printk ( KERN_ALERT _f , ## _a )
+#define DPRINTK_IOCTL(_f, _a...) printk(KERN_ALERT _f, ## _a)
 #else
 #define DPRINTK_IOCTL(_f, _a...) ((void)0)
 #endif
@@ -139,7 +142,7 @@ extern int blkif_ioctl(struct inode *inode, struct file *filep,
                        unsigned command, unsigned long argument);
 extern int blkif_check(dev_t dev);
 extern int blkif_revalidate(dev_t dev);
-extern void do_blkif_request (request_queue_t *rq); 
+extern void do_blkif_request (request_queue_t *rq);
 
 /* Virtual block-device subsystem. */
 /* Note that xlvbd_add doesn't call add_disk for you: you're expected

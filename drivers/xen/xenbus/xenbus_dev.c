@@ -7,8 +7,11 @@
  * Copyright (c) 2005, Christian Limpach
  * Copyright (c) 2005, Rusty Russell, IBM Corporation
  * 
- * This file may be distributed separately from the Linux kernel, or
- * incorporated into other software packages, subject to the following license:
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License version 2
+ * as published by the Free Software Foundation; or, when distributed
+ * separately from the Linux kernel or incorporated into other
+ * software packages, subject to the following license:
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this source file (the "Software"), to deal in the Software without
@@ -36,6 +39,7 @@
 #include <linux/notifier.h>
 #include <linux/wait.h>
 #include <linux/fs.h>
+#include <linux/poll.h>
 
 #include "xenbus_comms.h"
 
@@ -179,11 +183,10 @@ static int xenbus_dev_open(struct inode *inode, struct file *filp)
 
 	nonseekable_open(inode, filp);
 
-	u = kmalloc(sizeof(*u), GFP_KERNEL);
+	u = kzalloc(sizeof(*u), GFP_KERNEL);
 	if (u == NULL)
 		return -ENOMEM;
 
-	memset(u, 0, sizeof(*u));
 	INIT_LIST_HEAD(&u->transactions);
 	init_waitqueue_head(&u->read_waitq);
 
@@ -208,11 +211,22 @@ static int xenbus_dev_release(struct inode *inode, struct file *filp)
 	return 0;
 }
 
+static unsigned int xenbus_dev_poll(struct file *file, poll_table *wait)
+{
+	struct xenbus_dev_data *u = file->private_data;
+
+	poll_wait(file, &u->read_waitq, wait);
+	if (u->read_cons != u->read_prod)
+		return POLLIN | POLLRDNORM;
+	return 0;
+}
+
 static struct file_operations xenbus_dev_file_ops = {
 	.read = xenbus_dev_read,
 	.write = xenbus_dev_write,
 	.open = xenbus_dev_open,
 	.release = xenbus_dev_release,
+	.poll = xenbus_dev_poll,
 };
 
 static int __init

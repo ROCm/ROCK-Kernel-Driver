@@ -30,6 +30,7 @@
 #include <linux/memory_hotplug.h>
 #include <linux/initrd.h>
 #include <linux/dma-mapping.h>
+#include <linux/scatterlist.h>
 
 #include <asm/processor.h>
 #include <asm/system.h>
@@ -43,6 +44,7 @@
 #include <asm/tlbflush.h>
 #include <asm/sections.h>
 #include <asm/hypervisor.h>
+#include <asm/swiotlb.h>
 
 extern unsigned long *contiguous_bitmap;
 
@@ -557,10 +559,15 @@ void __init paging_init(void)
 
 	kmap_init();
 
-	/* Switch to the real shared_info page, and clear the dummy page. */
-	set_fixmap(FIX_SHARED_INFO, xen_start_info->shared_info);
-	HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
-	memset(empty_zero_page, 0, sizeof(empty_zero_page));
+	if (!xen_feature(XENFEAT_auto_translated_physmap) ||
+	    xen_start_info->shared_info >= xen_start_info->nr_pages) {
+		/* Switch to the real shared_info page, and clear the
+		 * dummy page. */
+		set_fixmap(FIX_SHARED_INFO, xen_start_info->shared_info);
+		HYPERVISOR_shared_info =
+			(shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
+		memset(empty_zero_page, 0, sizeof(empty_zero_page));
+	}
 
 	/* Setup mapping of lower 1st MB */
 	for (i = 0; i < NR_FIX_ISAMAPS; i++)

@@ -5,8 +5,11 @@
  * 
  * Copyright (c) 2002-2004, K A Fraser
  * 
- * This file may be distributed separately from the Linux kernel, or
- * incorporated into other software packages, subject to the following license:
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License version 2
+ * as published by the Free Software Foundation; or, when distributed
+ * separately from the Linux kernel or incorporated into other
+ * software packages, subject to the following license:
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this source file (the "Software"), to deal in the Software without
@@ -79,12 +82,6 @@ void xen_l3_entry_update(pud_t *ptr, pud_t val); /* x86_64/PAE */
 void xen_l4_entry_update(pgd_t *ptr, pgd_t val); /* x86_64 only */
 void xen_pgd_pin(unsigned long ptr);
 void xen_pgd_unpin(unsigned long ptr);
-void xen_pud_pin(unsigned long ptr); /* x86_64 only */
-void xen_pud_unpin(unsigned long ptr); /* x86_64 only */
-void xen_pmd_pin(unsigned long ptr); /* x86_64 only */
-void xen_pmd_unpin(unsigned long ptr); /* x86_64 only */
-void xen_pte_pin(unsigned long ptr);
-void xen_pte_unpin(unsigned long ptr);
 
 void xen_set_ldt(unsigned long ptr, unsigned long bytes);
 void xen_machphys_update(unsigned long mfn, unsigned long pfn);
@@ -102,6 +99,9 @@ int xen_create_contiguous_region(
     unsigned long vstart, unsigned int order, unsigned int address_bits);
 void xen_destroy_contiguous_region(
     unsigned long vstart, unsigned int order);
+
+/* Turn jiffies into Xen system time. */
+u64 jiffies_to_st(unsigned long jiffies);
 
 #include <asm/hypercall.h>
 

@@ -5,8 +5,11 @@
  * Copyright (C) 2005 Mike Wray, Hewlett-Packard
  * Copyright (C) 2005 XenSource Ltd
  * 
- * This file may be distributed separately from the Linux kernel, or
- * incorporated into other software packages, subject to the following license:
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License version 2
+ * as published by the Free Software Foundation; or, when distributed
+ * separately from the Linux kernel or incorporated into other
+ * software packages, subject to the following license:
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this source file (the "Software"), to deal in the Software without
@@ -49,9 +52,7 @@
 
 #include "xenbus_comms.h"
 
-extern struct semaphore xenwatch_mutex;
-
-#define streq(a, b) (strcmp((a), (b)) == 0)
+extern struct mutex xenwatch_mutex;
 
 static struct notifier_block *xenstore_chain;
 
@@ -59,8 +60,8 @@ static struct notifier_block *xenstore_chain;
 static const struct xenbus_device_id *
 match_device(const struct xenbus_device_id *arr, struct xenbus_device *dev)
 {
-	for (; !streq(arr->devicetype, ""); arr++) {
-		if (streq(arr->devicetype, dev->devicetype))
+	for (; *arr->devicetype != '\0'; arr++) {
+		if (!strcmp(arr->devicetype, dev->devicetype))
 			return arr;
 	}
 	return NULL;
@@ -106,6 +107,23 @@ static int frontend_bus_id(char bus_id[BUS_ID_SIZE], const char *nodename)
 }
 
 
+static void free_otherend_details(struct xenbus_device *dev)
+{
+	kfree(dev->otherend);
+	dev->otherend = NULL;
+}
+
+
+static void free_otherend_watch(struct xenbus_device *dev)
+{
+	if (dev->otherend_watch.node) {
+		unregister_xenbus_watch(&dev->otherend_watch);
+		kfree(dev->otherend_watch.node);
+		dev->otherend_watch.node = NULL;
+	}
+}
+
+
 static int read_otherend_details(struct xenbus_device *xendev,
 				 char *id_node, char *path_node)
 {
@@ -123,8 +141,7 @@ static int read_otherend_details(struct xenbus_device *xendev,
 	    !xenbus_exists(XBT_NULL, xendev->otherend, "")) {
 		xenbus_dev_fatal(xendev, -ENOENT, "missing other end from %s",
 				 xendev->nodename);
-		kfree(xendev->otherend);
-		xendev->otherend = NULL;
+		free_otherend_details(xendev);
 		return -ENOENT;
 	}
 
@@ -141,23 +158,6 @@ static int read_backend_details(struct xenbus_device *xendev)
 static int read_frontend_details(struct xenbus_device *xendev)
 {
 	return read_otherend_details(xendev, "frontend-id", "frontend");
-}
-
-
-static void free_otherend_details(struct xenbus_device *dev)
-{
-	kfree(dev->otherend);
-	dev->otherend = NULL;
-}
-
-
-static void free_otherend_watch(struct xenbus_device *dev)
-{
-	if (dev->otherend_watch.node) {
-		unregister_xenbus_watch(&dev->otherend_watch);
-		kfree(dev->otherend_watch.node);
-		dev->otherend_watch.node = NULL;
-	}
 }
 
 
@@ -366,7 +366,6 @@ fail:
 	xenbus_dev_error(dev, err, "xenbus_dev_probe on %s", dev->nodename);
 	xenbus_switch_state(dev, XBT_NULL, XenbusStateClosed);
 	return -ENODEV;
-	
 }
 
 static int xenbus_dev_remove(struct device *_dev)
@@ -397,9 +396,9 @@ static int xenbus_register_driver_common(struct xenbus_driver *drv,
 	drv->driver.probe = xenbus_dev_probe;
 	drv->driver.remove = xenbus_dev_remove;
 
-	down(&xenwatch_mutex);
+	mutex_lock(&xenwatch_mutex);
 	ret = driver_register(&drv->driver);
-	up(&xenwatch_mutex);
+	mutex_unlock(&xenwatch_mutex);
 	return ret;
 }
 
@@ -409,7 +408,7 @@ int xenbus_register_frontend(struct xenbus_driver *drv)
 
 	return xenbus_register_driver_common(drv, &xenbus_frontend);
 }
-EXPORT_SYMBOL(xenbus_register_frontend);
+EXPORT_SYMBOL_GPL(xenbus_register_frontend);
 
 int xenbus_register_backend(struct xenbus_driver *drv)
 {
@@ -417,13 +416,13 @@ int xenbus_register_backend(struct xenbus_driver *drv)
 
 	return xenbus_register_driver_common(drv, &xenbus_backend);
 }
-EXPORT_SYMBOL(xenbus_register_backend);
+EXPORT_SYMBOL_GPL(xenbus_register_backend);
 
 void xenbus_unregister_driver(struct xenbus_driver *drv)
 {
 	driver_unregister(&drv->driver);
 }
-EXPORT_SYMBOL(xenbus_unregister_driver);
+EXPORT_SYMBOL_GPL(xenbus_unregister_driver);
 
 struct xb_find_info
 {
@@ -436,7 +435,7 @@ static int cmp_dev(struct device *dev, void *data)
 	struct xenbus_device *xendev = to_xenbus_device(dev);
 	struct xb_find_info *info = data;
 
-	if (streq(xendev->nodename, info->nodename)) {
+	if (!strcmp(xendev->nodename, info->nodename)) {
 		info->dev = xendev;
 		get_device(dev);
 		return 1;
@@ -488,16 +487,10 @@ static void xenbus_cleanup_devices(const char *path, struct bus_type *bus)
 	} while (info.dev);
 }
 
-static void xenbus_dev_free(struct xenbus_device *xendev)
-{
-	kfree(xendev);
-}
-
 static void xenbus_dev_release(struct device *dev)
 {
-	if (dev) {
-		xenbus_dev_free(to_xenbus_device(dev));
-	}
+	if (dev)
+		kfree(to_xenbus_device(dev));
 }
 
 /* Simplified asprintf. */
@@ -554,10 +547,9 @@ static int xenbus_probe_node(struct xen_bus_type *bus,
 	}
 
 	stringlen = strlen(nodename) + 1 + strlen(type) + 1;
-	xendev = kmalloc(sizeof(*xendev) + stringlen, GFP_KERNEL);
+	xendev = kzalloc(sizeof(*xendev) + stringlen, GFP_KERNEL);
 	if (!xendev)
 		return -ENOMEM;
-	memset(xendev, 0, sizeof(*xendev));
 
 	/* Copy the strings into the extra space. */
 
@@ -587,7 +579,7 @@ static int xenbus_probe_node(struct xen_bus_type *bus,
 
 	return 0;
 fail:
-	xenbus_dev_free(xendev);
+	kfree(xendev);
 	return err;
 }
 
@@ -600,7 +592,7 @@ static int xenbus_probe_frontend(const char *type, const char *name)
 	nodename = kasprintf("%s/%s/%s", xenbus_frontend.root, type, name);
 	if (!nodename)
 		return -ENOMEM;
-	
+
 	DPRINTK("%s", nodename);
 
 	err = xenbus_probe_node(&xenbus_frontend, type, nodename);
@@ -848,7 +840,7 @@ void xenbus_suspend(void)
 	bus_for_each_dev(&xenbus_backend.bus, NULL, NULL, suspend_dev);
 	xs_suspend();
 }
-EXPORT_SYMBOL(xenbus_suspend);
+EXPORT_SYMBOL_GPL(xenbus_suspend);
 
 void xenbus_resume(void)
 {
@@ -857,7 +849,7 @@ void xenbus_resume(void)
 	bus_for_each_dev(&xenbus_frontend.bus, NULL, NULL, resume_dev);
 	bus_for_each_dev(&xenbus_backend.bus, NULL, NULL, resume_dev);
 }
-EXPORT_SYMBOL(xenbus_resume);
+EXPORT_SYMBOL_GPL(xenbus_resume);
 
 
 /* A flag to determine if xenstored is 'ready' (i.e. has started) */
@@ -875,13 +867,13 @@ int register_xenstore_notifier(struct notifier_block *nb)
 
 	return ret;
 }
-EXPORT_SYMBOL(register_xenstore_notifier);
+EXPORT_SYMBOL_GPL(register_xenstore_notifier);
 
 void unregister_xenstore_notifier(struct notifier_block *nb)
 {
 	notifier_chain_unregister(&xenstore_chain, nb);
 }
-EXPORT_SYMBOL(unregister_xenstore_notifier);
+EXPORT_SYMBOL_GPL(unregister_xenstore_notifier);
 
 
 static int all_devices_ready_(struct device *dev, void *data)
@@ -959,9 +951,8 @@ static int xsd_kva_mmap(struct file *file, struct vm_area_struct *vma)
 	if ((size > PAGE_SIZE) || (vma->vm_pgoff != 0))
 		return -EINVAL;
 
-	vma->vm_pgoff = mfn_to_pfn(xen_start_info->store_mfn);
-
-	if (remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
+	if (remap_pfn_range(vma, vma->vm_start,
+			    mfn_to_pfn(xen_start_info->store_mfn),
 			    size, vma->vm_page_prot))
 		return -EAGAIN;
 
@@ -972,6 +963,7 @@ static int xsd_kva_read(char *page, char **start, off_t off,
                         int count, int *eof, void *data)
 {
 	int len;
+
 	len  = sprintf(page, "0x%p", mfn_to_virt(xen_start_info->store_mfn));
 	*eof = 1;
 	return len;
@@ -1006,8 +998,8 @@ static int __init xenbus_probe_init(void)
 	device_register(&xenbus_backend.dev);
 
 	/*
-	** Domain0 doesn't have a store_evtchn or store_mfn yet.
-	*/
+	 * Domain0 doesn't have a store_evtchn or store_mfn yet.
+	 */
 	dom0 = (xen_start_info->store_evtchn == 0);
 
 	if (dom0) {
@@ -1022,14 +1014,10 @@ static int __init xenbus_probe_init(void)
 		if (!page)
 			return -ENOMEM;
 
-		/* We don't refcnt properly, so set reserved on page.
-		 * (this allocation is permanent) */
-		SetPageReserved(virt_to_page(page));
-
 		xen_start_info->store_mfn =
 			pfn_to_mfn(virt_to_phys((void *)page) >>
 				   PAGE_SHIFT);
-		
+
 		/* Next allocate a local port which xenstored can bind to */
 		op.cmd = EVTCHNOP_alloc_unbound;
 		op.u.alloc_unbound.dom        = DOMID_SELF;
@@ -1040,16 +1028,20 @@ static int __init xenbus_probe_init(void)
 		xen_start_info->store_evtchn = op.u.alloc_unbound.port;
 
 		/* And finally publish the above info in /proc/xen */
-		if ((xsd_kva_intf = create_xen_proc_entry("xsd_kva", 0400))) {
+		xsd_kva_intf = create_xen_proc_entry("xsd_kva", 0600);
+		if (xsd_kva_intf) {
 			memcpy(&xsd_kva_fops, xsd_kva_intf->proc_fops,
 			       sizeof(xsd_kva_fops));
 			xsd_kva_fops.mmap = xsd_kva_mmap;
 			xsd_kva_intf->proc_fops = &xsd_kva_fops;
 			xsd_kva_intf->read_proc = xsd_kva_read;
 		}
-		if ((xsd_port_intf = create_xen_proc_entry("xsd_port", 0400)))
+		xsd_port_intf = create_xen_proc_entry("xsd_port", 0400);
+		if (xsd_port_intf)
 			xsd_port_intf->read_proc = xsd_port_read;
 	}
+	else
+		xenstored_ready = 1;
 
 	/* Initialize the interface to xenstore. */
 	err = xs_init();
@@ -1059,10 +1051,8 @@ static int __init xenbus_probe_init(void)
 		return err;
 	}
 
-	if (!dom0) {
-		xenstored_ready = 1;
+	if (!dom0)
 		xenbus_probe(NULL);
-	}
 
 	return 0;
 }

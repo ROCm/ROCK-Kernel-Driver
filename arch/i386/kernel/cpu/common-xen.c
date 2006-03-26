@@ -34,8 +34,6 @@ static int disable_x86_serial_nr __devinitdata = 1;
 
 struct cpu_dev * cpu_devs[X86_VENDOR_NUM] = {};
 
-extern void machine_specific_modify_cpu_capabilities(struct cpuinfo_x86 *c);
-
 extern int disable_pse;
 
 static void default_init(struct cpuinfo_x86 * c)
@@ -283,10 +281,10 @@ void __devinit generic_identify(struct cpuinfo_x86 * c)
 			c->x86_capability[4] = excap;
 			c->x86 = (tfms >> 8) & 15;
 			c->x86_model = (tfms >> 4) & 15;
-			if (c->x86 == 0xf) {
+			if (c->x86 == 0xf)
 				c->x86 += (tfms >> 20) & 0xff;
+			if (c->x86 >= 0x6)
 				c->x86_model += ((tfms >> 16) & 0xF) << 4;
-			} 
 			c->x86_mask = tfms & 15;
 #ifdef CONFIG_SMP
 			c->apicid = phys_pkg_id((ebx >> 24) & 0xFF, 0);
@@ -429,8 +427,6 @@ void __devinit identify_cpu(struct cpuinfo_x86 *c)
 			sprintf(c->x86_model_id, "%02x/%02x",
 				c->x86_vendor, c->x86_model);
 	}
-
-	machine_specific_modify_cpu_capabilities(c);
 
 	/* Now the feature flags better reflect actual CPU features! */
 

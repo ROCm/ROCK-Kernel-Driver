@@ -102,6 +102,7 @@ typedef struct trap_info {
     uint16_t      cs;      /* code selector                                 */
     unsigned long address; /* code offset                                   */
 } trap_info_t;
+DEFINE_GUEST_HANDLE(trap_info_t);
 
 typedef struct cpu_user_regs {
     uint32_t ebx;
@@ -125,6 +126,7 @@ typedef struct cpu_user_regs {
     uint16_t fs, _pad4;
     uint16_t gs, _pad5;
 } cpu_user_regs_t;
+DEFINE_GUEST_HANDLE(cpu_user_regs_t);
 
 typedef uint64_t tsc_timestamp_t; /* RDTSC timestamp */
 
@@ -157,7 +159,7 @@ DEFINE_GUEST_HANDLE(vcpu_guest_context_t);
 typedef struct arch_shared_info {
     unsigned long max_pfn;                  /* max pfn that appears in table */
     /* Frame containing list of mfns containing list of mfns containing p2m. */
-    unsigned long pfn_to_mfn_frame_list_list; 
+    unsigned long pfn_to_mfn_frame_list_list;
     unsigned long nmi_reason;
 } arch_shared_info_t;
 
@@ -167,6 +169,18 @@ typedef struct {
 } arch_vcpu_info_t;
 
 #endif /* !__ASSEMBLY__ */
+
+/*
+ * Prefix forces emulation of some non-trapping instructions.
+ * Currently only CPUID.
+ */
+#ifdef __ASSEMBLY__
+#define XEN_EMULATE_PREFIX .byte 0x0f,0x0b,0x78,0x65,0x6e ;
+#define XEN_CPUID          XEN_EMULATE_PREFIX cpuid
+#else
+#define XEN_EMULATE_PREFIX ".byte 0x0f,0x0b,0x78,0x65,0x6e ; "
+#define XEN_CPUID          XEN_EMULATE_PREFIX "cpuid"
+#endif
 
 #endif
 

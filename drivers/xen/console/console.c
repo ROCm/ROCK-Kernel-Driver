@@ -5,8 +5,11 @@
  * 
  * Copyright (c) 2002-2004, K A Fraser.
  * 
- * This file may be distributed separately from the Linux kernel, or
- * incorporated into other software packages, subject to the following license:
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License version 2
+ * as published by the Free Software Foundation; or, when distributed
+ * separately from the Linux kernel or incorporated into other
+ * software packages, subject to the following license:
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this source file (the "Software"), to deal in the Software without
@@ -44,8 +47,10 @@
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/console.h>
+#ifndef MODULE
 #include <linux/bootmem.h>
 #include <linux/sysrq.h>
+#endif
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/uaccess.h>
@@ -68,7 +73,7 @@
 static enum { XC_OFF, XC_DEFAULT, XC_TTY, XC_SERIAL } xc_mode = XC_DEFAULT;
 static int xc_num = -1;
 
-#ifdef CONFIG_MAGIC_SYSRQ
+#if defined(CONFIG_MAGIC_SYSRQ) && !defined(MODULE)
 static unsigned long sysrq_requested;
 extern int sysrq_enabled;
 #endif
@@ -85,8 +90,7 @@ static int __init xencons_setup(char *str)
 	else if (!strncmp(str, "off", 3))
 		xc_mode = XC_OFF;
 
-	switch ( xc_mode )
-	{
+	switch (xc_mode) {
 	case XC_SERIAL:
 		n = simple_strtol(str+4, &q, 10);
 		if (q > (str + 4))
@@ -103,7 +107,12 @@ static int __init xencons_setup(char *str)
 
 	return 1;
 }
+#ifndef MODULE
 __setup("xencons=", xencons_setup);
+#else
+static char __initdata mode_str[128];
+module_param_string(mode, mode_str, sizeof(mode_str), 0);
+#endif
 
 /* The kernel and user-land drivers share a common transmit buffer. */
 static unsigned int wbuf_size = 4096;
@@ -119,7 +128,12 @@ static int __init xencons_bufsz_setup(char *str)
 		wbuf_size <<= 1;
 	return 1;
 }
+#ifndef MODULE
 __setup("xencons_bufsz=", xencons_bufsz_setup);
+#else
+static char __initdata bufsz_str[32];
+module_param_string(bufsz, bufsz_str, sizeof(bufsz_str), 0);
+#endif
 
 /* This lock protects accesses to the common transmit buffer. */
 static spinlock_t xencons_lock = SPIN_LOCK_UNLOCKED;
@@ -213,12 +227,27 @@ static int __init xen_console_init(void)
 		return __RETCODE;
 	}
 
+#ifndef MODULE
 	wbuf = alloc_bootmem(wbuf_size);
+#else
+	wbuf = kmalloc(wbuf_size, GFP_KERNEL);
+#endif
+	if (!wbuf)
+		return -ENOMEM;
 
 	register_console(&kcons_info);
 
 	return __RETCODE;
 }
+
+static void xen_console_exit(void)
+{
+#ifdef MODULE
+	unregister_console(&kcons_info);
+#endif
+}
+
+#ifndef MODULE
 console_initcall(xen_console_init);
 
 /*** Useful function for console debugging -- goes straight to Xen. ***/
@@ -227,7 +256,7 @@ asmlinkage int xprintk(const char *fmt, ...)
 	va_list args;
 	int printk_len;
 	static char printk_buf[1024];
-    
+
 	/* Emit the output into the temporary buffer */
 	va_start(args, fmt);
 	printk_len = vsnprintf(printk_buf, sizeof(printk_buf), fmt, args);
@@ -238,9 +267,14 @@ asmlinkage int xprintk(const char *fmt, ...)
 
 	return 0;
 }
+#endif
 
 /*** Forcibly flush console data before dying. ***/
+#ifndef MODULE
 void xencons_force_flush(void)
+#else
+static void _xencons_force_flush(void)
+#endif
 {
 	int sz;
 
@@ -257,6 +291,15 @@ void xencons_force_flush(void)
 		if (sent > 0)
 			wc += sent;
 	}
+}
+
+#ifndef MODULE
+void xencons_resume(void)
+#else
+static void _xencons_resume(void)
+#endif
+{
+	(void)xencons_ring_init();
 }
 
 
@@ -281,7 +324,7 @@ void xencons_rx(char *buf, unsigned len, struct pt_regs *regs)
 		goto out;
 
 	for (i = 0; i < len; i++) {
-#ifdef CONFIG_MAGIC_SYSRQ
+#if defined(CONFIG_MAGIC_SYSRQ) && !defined(MODULE)
 		if (sysrq_enabled) {
 			if (buf[i] == '\x0f') { /* ^O */
 				sysrq_requested = jiffies;
@@ -485,7 +528,7 @@ static void xencons_flush_chars(struct tty_struct *tty)
 
 	spin_lock_irqsave(&xencons_lock, flags);
 	__xencons_tx_flush();
-	spin_unlock_irqrestore(&xencons_lock, flags);    
+	spin_unlock_irqrestore(&xencons_lock, flags);
 }
 
 static void xencons_wait_until_sent(struct tty_struct *tty, int timeout)
@@ -495,17 +538,15 @@ static void xencons_wait_until_sent(struct tty_struct *tty, int timeout)
 	if (TTY_INDEX(tty) != 0)
 		return;
 
-	while (DRV(tty->driver)->chars_in_buffer(tty))
-	{
+	while (DRV(tty->driver)->chars_in_buffer(tty)) {
 		set_current_state(TASK_INTERRUPTIBLE);
 		schedule_timeout(1);
 		if (signal_pending(current))
 			break;
-		if ( (timeout != 0) &&
-		     time_after(jiffies, orig_jiffies + timeout) )
+		if (timeout && time_after(jiffies, orig_jiffies + timeout))
 			break;
 	}
-    
+
 	set_current_state(TASK_RUNNING);
 }
 
@@ -521,7 +562,7 @@ static int xencons_open(struct tty_struct *tty, struct file *filp)
 	if (xencons_tty == NULL)
 		xencons_tty = tty;
 	__xencons_tx_flush();
-	spin_unlock_irqrestore(&xencons_lock, flags);    
+	spin_unlock_irqrestore(&xencons_lock, flags);
 
 	return 0;
 }
@@ -543,7 +584,7 @@ static void xencons_close(struct tty_struct *tty, struct file *filp)
 		tty->closing = 0;
 		spin_lock_irqsave(&xencons_lock, flags);
 		xencons_tty = NULL;
-		spin_unlock_irqrestore(&xencons_lock, flags);    
+		spin_unlock_irqrestore(&xencons_lock, flags);
 	}
 }
 
@@ -569,30 +610,39 @@ static int __init xencons_init(void)
 	if (xen_init() < 0)
 		return -ENODEV;
 
+#ifdef MODULE
+	xencons_setup(mode_str);
+	xencons_bufsz_setup(bufsz_str);
+	rc = xen_console_init();
+	if (rc)
+		return rc;
+#endif
+
 	if (xc_mode == XC_OFF)
 		return 0;
 
 	xencons_ring_init();
 
-	xencons_driver = alloc_tty_driver((xc_mode == XC_SERIAL) ? 
+	xencons_driver = alloc_tty_driver((xc_mode == XC_SERIAL) ?
 					  1 : MAX_NR_CONSOLES);
-	if (xencons_driver == NULL)
+	if (xencons_driver == NULL) {
+		xen_console_exit();
 		return -ENOMEM;
+	}
 
 	DRV(xencons_driver)->name            = "xencons";
 	DRV(xencons_driver)->major           = TTY_MAJOR;
 	DRV(xencons_driver)->type            = TTY_DRIVER_TYPE_SERIAL;
 	DRV(xencons_driver)->subtype         = SERIAL_TYPE_NORMAL;
 	DRV(xencons_driver)->init_termios    = tty_std_termios;
-	DRV(xencons_driver)->flags           = 
+	DRV(xencons_driver)->flags           =
 		TTY_DRIVER_REAL_RAW |
 		TTY_DRIVER_RESET_TERMIOS |
 		TTY_DRIVER_NO_DEVFS;
 	DRV(xencons_driver)->termios         = xencons_termios;
 	DRV(xencons_driver)->termios_locked  = xencons_termios_locked;
 
-	if (xc_mode == XC_SERIAL)
-	{
+	if (xc_mode == XC_SERIAL) {
 		DRV(xencons_driver)->name        = "ttyS";
 		DRV(xencons_driver)->minor_start = 64 + xc_num;
 		DRV(xencons_driver)->name_base   = 0 + xc_num;
@@ -611,6 +661,7 @@ static int __init xencons_init(void)
 		       DRV(xencons_driver)->name_base);
 		put_tty_driver(xencons_driver);
 		xencons_driver = NULL;
+		xen_console_exit();
 		return rc;
 	}
 
@@ -630,11 +681,28 @@ static int __init xencons_init(void)
 	printk("Xen virtual console successfully installed as %s%d\n",
 	       DRV(xencons_driver)->name,
 	       DRV(xencons_driver)->name_base );
-    
+
+#ifdef MODULE
+	__xencons_resume = _xencons_resume;
+	__xencons_force_flush = _xencons_force_flush;
+	__unsafe(THIS_MODULE);
+#endif
+
 	return 0;
 }
 
 module_init(xencons_init);
+
+MODULE_LICENSE("Dual BSD/GPL");
+
+static void __exit xencons_exit(void)
+{
+	BUG();
+}
+
+module_exit(xencons_exit);
+
+MODULE_LICENSE("Dual BSD/GPL");
 
 /*
  * Local variables:

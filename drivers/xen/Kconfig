@@ -171,6 +171,12 @@ config XEN_TPMDEV_FRONTEND
 	help
 	  The TPM-device frontend driver.
 
+config XEN_CONSOLE
+	tristate "Xen virtual console"
+	default y
+	help
+	  The Xen virtual console is ...
+
 config XEN_SCRUB_PAGES
 	bool "Scrub memory before freeing it to Xen"
 	default y
@@ -188,6 +194,14 @@ config XEN_DISABLE_SERIAL
 	help
 	  Disable serial port drivers, allowing the Xen console driver
 	  to provide a serial console at ttyS0.
+
+config XEN_SYSFS
+	tristate "Export Xen attributes in sysfs"
+	depends on XEN
+	depends on SYSFS
+	default y
+	help
+		Xen hypervisor attributes will show up under /sys/hypervisor/.
 
 endmenu
 

@@ -7,8 +7,11 @@
  * Copyright (c) 2003-2004, M Williamson, K Fraser
  * Copyright (c) 2005 Dan M. Smith, IBM Corporation
  * 
- * This file may be distributed separately from the Linux kernel, or
- * incorporated into other software packages, subject to the following license:
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License version 2
+ * as published by the Free Software Foundation; or, when distributed
+ * separately from the Linux kernel or incorporated into other
+ * software packages, subject to the following license:
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this source file (the "Software"), to deal in the Software without
@@ -468,6 +471,7 @@ static int __init balloon_init(void)
 		return -1;
 
 	current_pages = min(xen_start_info->nr_pages, max_pfn);
+	totalram_pages = current_pages;
 	target_pages  = current_pages;
 	balloon_low   = 0;
 	balloon_high  = 0;
@@ -513,7 +517,7 @@ void balloon_update_driver_allowance(long delta)
 }
 
 static int dealloc_pte_fn(
-	pte_t *pte, struct page *pte_page, unsigned long addr, void *data)
+	pte_t *pte, struct page *pmd_page, unsigned long addr, void *data)
 {
 	unsigned long mfn = pte_mfn(*pte);
 	int ret;
@@ -543,10 +547,11 @@ struct page *balloon_alloc_empty_page_range(unsigned long nr_pages)
 	scrub_pages(vstart, 1 << order);
 
 	balloon_lock(flags);
-	ret = generic_page_range(
-		&init_mm, vstart, PAGE_SIZE << order, dealloc_pte_fn, NULL);
+	ret = apply_to_page_range(&init_mm, vstart,
+				  PAGE_SIZE << order, dealloc_pte_fn, NULL);
 	BUG_ON(ret);
 	current_pages -= 1UL << order;
+	totalram_pages = current_pages;
 	balloon_unlock(flags);
 
 	schedule_work(&balloon_worker);
@@ -570,9 +575,11 @@ void balloon_dealloc_empty_page_range(
 	schedule_work(&balloon_worker);
 }
 
-EXPORT_SYMBOL(balloon_update_driver_allowance);
-EXPORT_SYMBOL(balloon_alloc_empty_page_range);
-EXPORT_SYMBOL(balloon_dealloc_empty_page_range);
+EXPORT_SYMBOL_GPL(balloon_update_driver_allowance);
+EXPORT_SYMBOL_GPL(balloon_alloc_empty_page_range);
+EXPORT_SYMBOL_GPL(balloon_dealloc_empty_page_range);
+
+MODULE_LICENSE("Dual BSD/GPL");
 
 /*
  * Local variables:

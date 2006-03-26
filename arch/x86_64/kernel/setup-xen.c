@@ -82,8 +82,6 @@
 extern unsigned long start_pfn;
 extern struct edid_info edid_info;
 
-extern void machine_specific_modify_cpu_capabilities(struct cpuinfo_x86 *c);
-
 shared_info_t *HYPERVISOR_shared_info = (shared_info_t *)empty_zero_page;
 EXPORT_SYMBOL(HYPERVISOR_shared_info);
 
@@ -664,6 +662,13 @@ void __init setup_arch(char **cmdline_p)
 
 	setup_xen_features();
 
+	if (xen_feature(XENFEAT_auto_translated_physmap) &&
+	    xen_start_info->shared_info < xen_start_info->nr_pages) {
+		HYPERVISOR_shared_info =
+			(shared_info_t *)__va(xen_start_info->shared_info);
+		memset(empty_zero_page, 0, sizeof(empty_zero_page));
+	}
+
 	HYPERVISOR_vm_assist(VMASST_CMD_enable,
 			     VMASST_TYPE_writable_pagetables);
 
@@ -978,6 +983,7 @@ void __init setup_arch(char **cmdline_p)
 
 #endif /* !CONFIG_XEN */
 }
+
 
 static int __cpuinit get_model_name(struct cpuinfo_x86 *c)
 {
@@ -1403,8 +1409,6 @@ void __cpuinit identify_cpu(struct cpuinfo_x86 *c)
 
 	select_idle_routine(c);
 	detect_ht(c); 
-
-	machine_specific_modify_cpu_capabilities(c);
 
 	/*
 	 * On SMP, boot_cpu_data holds the common feature set between

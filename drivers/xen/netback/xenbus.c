@@ -76,14 +76,13 @@ static int netback_probe(struct xenbus_device *dev,
 			 const struct xenbus_device_id *id)
 {
 	int err;
-	struct backend_info *be = kmalloc(sizeof(struct backend_info),
+	struct backend_info *be = kzalloc(sizeof(struct backend_info),
 					  GFP_KERNEL);
 	if (!be) {
 		xenbus_dev_fatal(dev, -ENOMEM,
 				 "allocating backend structure");
 		return -ENOMEM;
 	}
-	memset(be, 0, sizeof(*be));
 
 	be->dev = dev;
 	dev->data = be;
@@ -214,7 +213,8 @@ static void frontend_changed(struct xenbus_device *dev,
 		break;
 
 	case XenbusStateClosed:
-		kobject_uevent(&dev->dev.kobj, KOBJ_OFFLINE);
+		if (be->netif != NULL)
+			kobject_uevent(&dev->dev.kobj, KOBJ_OFFLINE);
 		device_unregister(&dev->dev);
 		break;
 

@@ -5,8 +5,11 @@
  * 
  * Copyright (c) 2002-2005, K A Fraser
  * 
- * This file may be distributed separately from the Linux kernel, or
- * incorporated into other software packages, subject to the following license:
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License version 2
+ * as published by the Free Software Foundation; or, when distributed
+ * separately from the Linux kernel or incorporated into other
+ * software packages, subject to the following license:
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this source file (the "Software"), to deal in the Software without
@@ -55,24 +58,44 @@ static int evtchn_to_irq[NR_EVENT_CHANNELS];
 
 /* Packed IRQ information: binding type, sub-type index, and event channel. */
 static u32 irq_info[NR_IRQS];
+
 /* Binding types. */
 enum { IRQT_UNBOUND, IRQT_PIRQ, IRQT_VIRQ, IRQT_IPI, IRQT_EVTCHN };
+
 /* Constructor for packed IRQ information. */
-#define mk_irq_info(type, index, evtchn)				\
-	(((u32)(type) << 24) | ((u32)(index) << 16) | (u32)(evtchn))
+static inline u32 mk_irq_info(u32 type, u32 index, u32 evtchn)
+{
+	return ((type << 24) | (index << 16) | evtchn);
+}
+
 /* Convenient shorthand for packed representation of an unbound IRQ. */
 #define IRQ_UNBOUND	mk_irq_info(IRQT_UNBOUND, 0, 0)
-/* Accessor macros for packed IRQ information. */
-#define evtchn_from_irq(irq) ((u16)(irq_info[irq]))
-#define index_from_irq(irq)  ((u8)(irq_info[irq] >> 16))
-#define type_from_irq(irq)   ((u8)(irq_info[irq] >> 24))
+
+/*
+ * Accessors for packed IRQ information.
+ */
+
+static inline unsigned int evtchn_from_irq(int irq)
+{
+	return (u16)(irq_info[irq]);
+}
+
+static inline unsigned int index_from_irq(int irq)
+{
+	return (u8)(irq_info[irq] >> 16);
+}
+
+static inline unsigned int type_from_irq(int irq)
+{
+	return (u8)(irq_info[irq] >> 24);
+}
 
 /* IRQ <-> VIRQ mapping. */
 DEFINE_PER_CPU(int, virq_to_irq[NR_VIRQS]);
 
 /* IRQ <-> IPI mapping. */
 #ifndef NR_IPIS
-#define NR_IPIS 1 
+#define NR_IPIS 1
 #endif
 DEFINE_PER_CPU(int, ipi_to_irq[NR_IPIS]);
 
@@ -87,10 +110,13 @@ static unsigned long pirq_needs_unmask_notify[NR_PIRQS/sizeof(unsigned long)];
 static u8 cpu_evtchn[NR_EVENT_CHANNELS];
 static unsigned long cpu_evtchn_mask[NR_CPUS][NR_EVENT_CHANNELS/BITS_PER_LONG];
 
-#define active_evtchns(cpu,sh,idx)		\
-	((sh)->evtchn_pending[idx] &		\
-	 cpu_evtchn_mask[cpu][idx] &		\
-	 ~(sh)->evtchn_mask[idx])
+static inline unsigned long active_evtchns(unsigned int cpu, shared_info_t *sh,
+					   unsigned int idx)
+{
+	return (sh->evtchn_pending[idx] &
+		cpu_evtchn_mask[cpu][idx] &
+		~sh->evtchn_mask[idx]);
+}
 
 static void bind_evtchn_to_cpu(unsigned int chn, unsigned int cpu)
 {
@@ -106,16 +132,31 @@ static void init_evtchn_cpu_bindings(void)
 	memset(cpu_evtchn_mask[0], ~0, sizeof(cpu_evtchn_mask[0]));
 }
 
-#define cpu_from_evtchn(evtchn)		(cpu_evtchn[evtchn])
+static inline unsigned int cpu_from_evtchn(unsigned int evtchn)
+{
+	return cpu_evtchn[evtchn];
+}
 
 #else
 
-#define active_evtchns(cpu,sh,idx)		\
-	((sh)->evtchn_pending[idx] &		\
-	 ~(sh)->evtchn_mask[idx])
-#define bind_evtchn_to_cpu(chn,cpu)	((void)0)
-#define init_evtchn_cpu_bindings()	((void)0)
-#define cpu_from_evtchn(evtchn)		(0)
+static inline unsigned long active_evtchns(unsigned int cpu, shared_info_t *sh,
+					   unsigned int idx)
+{
+	return (sh->evtchn_pending[idx] & ~sh->evtchn_mask[idx]);
+}
+
+static void bind_evtchn_to_cpu(unsigned int chn, unsigned int cpu)
+{
+}
+
+static void init_evtchn_cpu_bindings(void)
+{
+}
+
+static inline unsigned int cpu_from_evtchn(unsigned int evtchn)
+{
+	return 0;
+}
 
 #endif
 
@@ -147,7 +188,7 @@ void force_evtchn_callback(void)
 {
 	(void)HYPERVISOR_xen_version(0, NULL);
 }
-EXPORT_SYMBOL(force_evtchn_callback);
+EXPORT_SYMBOL_GPL(force_evtchn_callback);
 
 /* NB. Interrupts are disabled on entry. */
 asmlinkage void evtchn_do_upcall(struct pt_regs *regs)
@@ -209,7 +250,7 @@ static int bind_evtchn_to_irq(unsigned int evtchn)
 	irq_bindcount[irq]++;
 
 	spin_unlock(&irq_mapping_update_lock);
-    
+
 	return irq;
 }
 
@@ -238,7 +279,7 @@ static int bind_virq_to_irq(unsigned int virq, unsigned int cpu)
 	irq_bindcount[irq]++;
 
 	spin_unlock(&irq_mapping_update_lock);
-    
+
 	return irq;
 }
 
@@ -323,7 +364,7 @@ int bind_evtchn_to_irqhandler(
 
 	return irq;
 }
-EXPORT_SYMBOL(bind_evtchn_to_irqhandler);
+EXPORT_SYMBOL_GPL(bind_evtchn_to_irqhandler);
 
 int bind_virq_to_irqhandler(
 	unsigned int virq,
@@ -345,7 +386,7 @@ int bind_virq_to_irqhandler(
 
 	return irq;
 }
-EXPORT_SYMBOL(bind_virq_to_irqhandler);
+EXPORT_SYMBOL_GPL(bind_virq_to_irqhandler);
 
 int bind_ipi_to_irqhandler(
 	unsigned int ipi,
@@ -367,14 +408,14 @@ int bind_ipi_to_irqhandler(
 
 	return irq;
 }
-EXPORT_SYMBOL(bind_ipi_to_irqhandler);
+EXPORT_SYMBOL_GPL(bind_ipi_to_irqhandler);
 
 void unbind_from_irqhandler(unsigned int irq, void *dev_id)
 {
 	free_irq(irq, dev_id);
 	unbind_from_irq(irq);
 }
-EXPORT_SYMBOL(unbind_from_irqhandler);
+EXPORT_SYMBOL_GPL(unbind_from_irqhandler);
 
 #ifdef CONFIG_SMP
 static void do_nothing_function(void *ign)
@@ -535,9 +576,9 @@ static unsigned int startup_pirq(unsigned int irq)
 	/* NB. We are happy to share unless we are probing. */
 	op.u.bind_pirq.flags = probing_irq(irq) ? 0 : BIND_PIRQ__WILL_SHARE;
 	if (HYPERVISOR_event_channel_op(&op) != 0) {
-		if ( !probing_irq(irq) )
-			printk(KERN_INFO "Failed to obtain physical "
-			       "IRQ %d\n", irq);
+		if (!probing_irq(irq))
+			printk(KERN_INFO "Failed to obtain physical IRQ %d\n",
+			       irq);
 		return 0;
 	}
 	evtchn = op.u.bind_pirq.port;
@@ -639,14 +680,14 @@ void notify_remote_via_irq(int irq)
 	if (VALID_EVTCHN(evtchn))
 		notify_remote_via_evtchn(evtchn);
 }
-EXPORT_SYMBOL(notify_remote_via_irq);
+EXPORT_SYMBOL_GPL(notify_remote_via_irq);
 
 void mask_evtchn(int port)
 {
 	shared_info_t *s = HYPERVISOR_shared_info;
 	synch_set_bit(port, &s->evtchn_mask[0]);
 }
-EXPORT_SYMBOL(mask_evtchn);
+EXPORT_SYMBOL_GPL(mask_evtchn);
 
 void unmask_evtchn(int port)
 {
@@ -669,7 +710,7 @@ void unmask_evtchn(int port)
 	 * like a real IO-APIC we 'lose the interrupt edge' if the channel is
 	 * masked.
 	 */
-	if (synch_test_bit(port, &s->evtchn_pending[0]) && 
+	if (synch_test_bit(port, &s->evtchn_pending[0]) &&
 	    !synch_test_and_set_bit(port / BITS_PER_LONG,
 				    &vcpu_info->evtchn_pending_sel)) {
 		vcpu_info->evtchn_upcall_pending = 1;
@@ -677,7 +718,7 @@ void unmask_evtchn(int port)
 			force_evtchn_callback();
 	}
 }
-EXPORT_SYMBOL(unmask_evtchn);
+EXPORT_SYMBOL_GPL(unmask_evtchn);
 
 void irq_resume(void)
 {
@@ -722,7 +763,7 @@ void irq_resume(void)
 		op.u.bind_virq.vcpu = 0;
 		BUG_ON(HYPERVISOR_event_channel_op(&op) != 0);
 		evtchn = op.u.bind_virq.port;
-        
+
 		/* Record the new mapping. */
 		evtchn_to_irq[evtchn] = irq;
 		irq_info[irq] = mk_irq_info(IRQT_VIRQ, virq, evtchn);
@@ -744,7 +785,7 @@ void irq_resume(void)
 		op.u.bind_ipi.vcpu = 0;
 		BUG_ON(HYPERVISOR_event_channel_op(&op) != 0);
 		evtchn = op.u.bind_ipi.port;
-        
+
 		/* Record the new mapping. */
 		evtchn_to_irq[evtchn] = irq;
 		irq_info[irq] = mk_irq_info(IRQT_IPI, ipi, evtchn);
@@ -794,8 +835,7 @@ void __init init_IRQ(void)
 	}
 
 	/* Phys IRQ space is statically bound (1:1 mapping). Nail refcnts. */
-	for (i = 0; i < NR_PIRQS; i++)
-	{
+	for (i = 0; i < NR_PIRQS; i++) {
 		irq_bindcount[pirq_to_irq(i)] = 1;
 
 #ifdef RTC_IRQ

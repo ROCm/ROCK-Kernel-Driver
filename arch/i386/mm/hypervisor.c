@@ -5,8 +5,11 @@
  * 
  * Copyright (c) 2002-2004, K A Fraser
  * 
- * This file may be distributed separately from the Linux kernel, or
- * incorporated into other software packages, subject to the following license:
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License version 2
+ * as published by the Free Software Foundation; or, when distributed
+ * separately from the Linux kernel or incorporated into other
+ * software packages, subject to the following license:
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this source file (the "Software"), to deal in the Software without
@@ -200,56 +203,6 @@ void xen_pgd_unpin(unsigned long ptr)
 	op.arg1.mfn = pfn_to_mfn(ptr >> PAGE_SHIFT);
 	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
-
-void xen_pte_pin(unsigned long ptr)
-{
-	struct mmuext_op op;
-	op.cmd = MMUEXT_PIN_L1_TABLE;
-	op.arg1.mfn = pfn_to_mfn(ptr >> PAGE_SHIFT);
-	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
-}
-
-void xen_pte_unpin(unsigned long ptr)
-{
-	struct mmuext_op op;
-	op.cmd = MMUEXT_UNPIN_TABLE;
-	op.arg1.mfn = pfn_to_mfn(ptr >> PAGE_SHIFT);
-	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
-}
-
-#ifdef CONFIG_X86_64
-void xen_pud_pin(unsigned long ptr)
-{
-	struct mmuext_op op;
-	op.cmd = MMUEXT_PIN_L3_TABLE;
-	op.arg1.mfn = pfn_to_mfn(ptr >> PAGE_SHIFT);
-	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
-}
-
-void xen_pud_unpin(unsigned long ptr)
-{
-	struct mmuext_op op;
-	op.cmd = MMUEXT_UNPIN_TABLE;
-	op.arg1.mfn = pfn_to_mfn(ptr >> PAGE_SHIFT);
-	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
-}
-
-void xen_pmd_pin(unsigned long ptr)
-{
-	struct mmuext_op op;
-	op.cmd = MMUEXT_PIN_L2_TABLE;
-	op.arg1.mfn = pfn_to_mfn(ptr >> PAGE_SHIFT);
-	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
-}
-
-void xen_pmd_unpin(unsigned long ptr)
-{
-	struct mmuext_op op;
-	op.cmd = MMUEXT_UNPIN_TABLE;
-	op.arg1.mfn = pfn_to_mfn(ptr >> PAGE_SHIFT);
-	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
-}
-#endif /* CONFIG_X86_64 */
 
 void xen_set_ldt(unsigned long ptr, unsigned long len)
 {

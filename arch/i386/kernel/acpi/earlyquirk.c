@@ -18,13 +18,11 @@ static int __init check_bridge(int vendor, int device)
 		acpi_skip_timer_override = 1;
 	}
 #endif
-#ifndef CONFIG_XEN
 	if (vendor == PCI_VENDOR_ID_ATI && timer_over_8254 == 1) {
 		timer_over_8254 = 0;
 		printk(KERN_INFO "ATI board detected. Disabling timer routing "
 				"over 8254.\n");
 	}
-#endif
 	return 0;
 }
 

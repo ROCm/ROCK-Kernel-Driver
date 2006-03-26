@@ -7,8 +7,11 @@
  * Modifications by Mark A. Williamson are (c) Intel Research Cambridge
  * Copyright (c) 2004-2005, Christian Limpach
  * 
- * This file may be distributed separately from the Linux kernel, or
- * incorporated into other software packages, subject to the following license:
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License version 2
+ * as published by the Free Software Foundation; or, when distributed
+ * separately from the Linux kernel or incorporated into other
+ * software packages, subject to the following license:
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this source file (the "Software"), to deal in the Software without
@@ -97,11 +100,9 @@ xlbd_alloc_major_info(int major, int minor, int index)
 {
 	struct xlbd_major_info *ptr;
 
-	ptr = kmalloc(sizeof(struct xlbd_major_info), GFP_KERNEL);
+	ptr = kzalloc(sizeof(struct xlbd_major_info), GFP_KERNEL);
 	if (ptr == NULL)
 		return NULL;
-
-	memset(ptr, 0, sizeof(struct xlbd_major_info));
 
 	ptr->major = major;
 
@@ -216,6 +217,10 @@ xlvbd_alloc_gendisk(int minor, blkif_sector_t capacity, int vdevice,
 	int nr_minors = 1;
 	int err = -ENODEV;
 
+	BUG_ON(info->gd != NULL);
+	BUG_ON(info->mi != NULL);
+	BUG_ON(info->rq != NULL);
+
 	mi = xlbd_get_major_info(vdevice);
 	if (mi == NULL)
 		goto out;
@@ -268,6 +273,7 @@ xlvbd_alloc_gendisk(int minor, blkif_sector_t capacity, int vdevice,
  out:
 	if (mi)
 		xlbd_put_major_info(mi);
+	info->mi = NULL;
 	return err;
 }
 
@@ -294,22 +300,20 @@ xlvbd_add(blkif_sector_t capacity, int vdevice, u16 vdisk_info,
 void
 xlvbd_del(struct blkfront_info *info)
 {
-	struct block_device *bd;
-
-	bd = bdget(info->dev);
-	if (bd == NULL)
+	if (info->mi == NULL)
 		return;
 
-	if (info->gd == NULL)
-		return;
-
+	BUG_ON(info->gd == NULL);
 	del_gendisk(info->gd);
 	put_disk(info->gd);
+	info->gd = NULL;
+
 	xlbd_put_major_info(info->mi);
 	info->mi = NULL;
-	blk_cleanup_queue(info->rq);
 
-	bdput(bd);
+	BUG_ON(info->rq == NULL);
+	blk_cleanup_queue(info->rq);
+	info->rq = NULL;
 }
 
 /*

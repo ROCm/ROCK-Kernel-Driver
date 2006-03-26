@@ -5,15 +5,15 @@
  */
 #include <linux/module.h>
 #include <asm/bitops.h>
+#include <xen/evtchn.h>
 #include "pciback.h"
 
 int verbose_request = 0;
 module_param(verbose_request, int, 0644);
 
 /* Ensure a device is "turned off" and ready to be exported.
- * This also sets up the device's private data to keep track of what should
- * be in the base address registers (BARs) so that we can keep the
- * client from manipulating them directly.
+ * (Also see pciback_config_reset to ensure virtual configuration space is
+ * ready to be re-exported)
  */
 void pciback_reset_device(struct pci_dev *dev)
 {
@@ -67,6 +67,7 @@ irqreturn_t pciback_handle_event(int irq, void *dev_id, struct pt_regs *regs)
 
 	wmb();
 	clear_bit(_XEN_PCIF_active, (unsigned long *)&pdev->sh_info->flags);
+	notify_remote_via_irq(pdev->evtchn_irq);
 
       out:
 	return IRQ_HANDLED;

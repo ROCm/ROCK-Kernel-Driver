@@ -25,14 +25,23 @@ void (*pm_power_off)(void);
 EXPORT_SYMBOL(pm_power_off);
 #endif
 
+#ifdef CONFIG_XEN_CONSOLE_MODULE
+void (*__xencons_force_flush)(void) = NULL;
+EXPORT_SYMBOL(__xencons_force_flush);
+void (*__xencons_resume)(void) = NULL;
+EXPORT_SYMBOL(__xencons_resume);
+#endif
+
+extern void ctrl_alt_del(void);
+
 #define SHUTDOWN_INVALID  -1
 #define SHUTDOWN_POWEROFF  0
-#define SHUTDOWN_REBOOT    1
 #define SHUTDOWN_SUSPEND   2
-// Code 3 is SHUTDOWN_CRASH, which we don't use because the domain can only
-// report a crash, not be instructed to crash!
-// HALT is the same as POWEROFF, as far as we're concerned.  The tools use
-// the distinction when we return the reason code to them.
+/* Code 3 is SHUTDOWN_CRASH, which we don't use because the domain can only
+ * report a crash, not be instructed to crash!
+ * HALT is the same as POWEROFF, as far as we're concerned.  The tools use
+ * the distinction when we return the reason code to them.
+ */
 #define SHUTDOWN_HALT      4
 
 void machine_emergency_restart(void)
@@ -84,13 +93,13 @@ static int __do_suspend(void *ignore)
 {
 	int i, j, k, fpp;
 
-	extern int gnttab_suspend(void);
-	extern int gnttab_resume(void);
-
-	extern void time_resume(void);
 	extern unsigned long max_pfn;
 	extern unsigned long *pfn_to_mfn_frame_list_list;
 	extern unsigned long *pfn_to_mfn_frame_list[];
+
+	extern int gnttab_suspend(void);
+	extern int gnttab_resume(void);
+	extern void time_resume(void);
 
 #ifdef CONFIG_SMP
 	cpumask_t prev_online_cpus;
@@ -121,7 +130,7 @@ static int __do_suspend(void *ignore)
 	lock_cpu_hotplug();
 #ifdef CONFIG_SMP
 	/*
-	 * Take all other CPUs offline. We hold the hotplug semaphore to
+	 * Take all other CPUs offline. We hold the hotplug mutex to
 	 * avoid other processes bringing up CPUs under our feet.
 	 */
 	cpus_clear(prev_online_cpus);
@@ -167,26 +176,26 @@ static int __do_suspend(void *ignore)
 	 */
 	HYPERVISOR_suspend(virt_to_mfn(xen_start_info));
 
-	shutting_down = SHUTDOWN_INVALID; 
+	shutting_down = SHUTDOWN_INVALID;
 
 	set_fixmap(FIX_SHARED_INFO, xen_start_info->shared_info);
 
 	HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
 
 	memset(empty_zero_page, 0, PAGE_SIZE);
-	     
+
 	HYPERVISOR_shared_info->arch.pfn_to_mfn_frame_list_list =
 		virt_to_mfn(pfn_to_mfn_frame_list_list);
-  
+
 	fpp = PAGE_SIZE/sizeof(unsigned long);
 	for (i = 0, j = 0, k = -1; i < max_pfn; i += fpp, j++) {
 		if ((j % fpp) == 0) {
 			k++;
-			pfn_to_mfn_frame_list_list[k] = 
+			pfn_to_mfn_frame_list_list[k] =
 				virt_to_mfn(pfn_to_mfn_frame_list[k]);
 			j = 0;
 		}
-		pfn_to_mfn_frame_list[k][j] = 
+		pfn_to_mfn_frame_list[k][j] =
 			virt_to_mfn(&phys_to_machine_mapping[i]);
 	}
 	HYPERVISOR_shared_info->arch.max_pfn = max_pfn;
@@ -207,7 +216,7 @@ static int __do_suspend(void *ignore)
 
 #endif
 
-	/* 
+	/*
 	 * Only resume xenbus /after/ we've prepared our VCPUs; otherwise
 	 * the VCPU hotplug callback can race with our vcpu_prepare
 	 */
@@ -231,35 +240,21 @@ static int __do_suspend(void *ignore)
 
 static int shutdown_process(void *__unused)
 {
-	static char *envp[] = { "HOME=/", "TERM=linux", 
+	static char *envp[] = { "HOME=/", "TERM=linux",
 				"PATH=/sbin:/usr/sbin:/bin:/usr/bin", NULL };
-	static char *restart_argv[]  = { "/sbin/reboot", NULL };
 	static char *poweroff_argv[] = { "/sbin/poweroff", NULL };
 
 	extern asmlinkage long sys_reboot(int magic1, int magic2,
 					  unsigned int cmd, void *arg);
 
-	daemonize("shutdown");
-
-	switch (shutting_down) {
-	case SHUTDOWN_POWEROFF:
-	case SHUTDOWN_HALT:
+	if ((shutting_down == SHUTDOWN_POWEROFF) ||
+	    (shutting_down == SHUTDOWN_HALT)) {
 		if (execve("/sbin/poweroff", poweroff_argv, envp) < 0) {
 			sys_reboot(LINUX_REBOOT_MAGIC1,
 				   LINUX_REBOOT_MAGIC2,
 				   LINUX_REBOOT_CMD_POWER_OFF,
 				   NULL);
 		}
-		break;
-
-	case SHUTDOWN_REBOOT:
-		if (execve("/sbin/reboot", restart_argv, envp) < 0) {
-			sys_reboot(LINUX_REBOOT_MAGIC1,
-				   LINUX_REBOOT_MAGIC2,
-				   LINUX_REBOOT_CMD_RESTART,
-				   NULL);
-		}
-		break;
 	}
 
 	shutting_down = SHUTDOWN_INVALID; /* could try again */
@@ -291,7 +286,7 @@ static void __shutdown_handler(void *unused)
 	else
 		err = kthread_create_on_cpu(__do_suspend, NULL, "suspend", 0);
 
-	if ( err < 0 ) {
+	if (err < 0) {
 		printk(KERN_WARNING "Error creating shutdown process (%d): "
 		       "retrying...\n", -err);
 		schedule_delayed_work(&shutdown_work, HZ/2);
@@ -330,7 +325,7 @@ static void shutdown_handler(struct xenbus_watch *watch,
 	if (strcmp(str, "poweroff") == 0)
 		shutting_down = SHUTDOWN_POWEROFF;
 	else if (strcmp(str, "reboot") == 0)
-		shutting_down = SHUTDOWN_REBOOT;
+		ctrl_alt_del();
 	else if (strcmp(str, "suspend") == 0)
 		shutting_down = SHUTDOWN_SUSPEND;
 	else if (strcmp(str, "halt") == 0)
@@ -390,8 +385,6 @@ static struct xenbus_watch sysrq_watch = {
 };
 #endif
 
-static struct notifier_block xenstore_notifier;
-
 static int setup_shutdown_watcher(struct notifier_block *notifier,
                                   unsigned long event,
                                   void *data)
@@ -406,14 +399,12 @@ static int setup_shutdown_watcher(struct notifier_block *notifier,
 	err2 = register_xenbus_watch(&sysrq_watch);
 #endif
 
-	if (err1) {
+	if (err1)
 		printk(KERN_ERR "Failed to set shutdown watcher\n");
-	}
-    
+
 #ifdef CONFIG_MAGIC_SYSRQ
-	if (err2) {
+	if (err2)
 		printk(KERN_ERR "Failed to set sysrq watcher\n");
-	}
 #endif
 
 	return NOTIFY_DONE;
@@ -421,11 +412,10 @@ static int setup_shutdown_watcher(struct notifier_block *notifier,
 
 static int __init setup_shutdown_event(void)
 {
-    
-	xenstore_notifier.notifier_call = setup_shutdown_watcher;
-
+	static struct notifier_block xenstore_notifier = {
+		.notifier_call = setup_shutdown_watcher
+	};
 	register_xenstore_notifier(&xenstore_notifier);
-    
 	return 0;
 }
 
