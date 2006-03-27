@@ -339,8 +339,10 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 			disable_timer_pin_1 = -1;
 
 		if (!memcmp(from, "nolapic", 7) ||
-		    !memcmp(from, "disableapic", 11))
+		    !memcmp(from, "disableapic", 11)) {
+			clear_bit(X86_FEATURE_APIC, boot_cpu_data.x86_capability);	
 			disable_apic = 1;
+		}
 
 		/* Don't confuse with noapictimer */
 		if (!memcmp(from, "noapic", 6) &&
