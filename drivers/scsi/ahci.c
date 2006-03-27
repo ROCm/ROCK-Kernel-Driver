@@ -187,8 +187,12 @@ static void ahci_scr_write (struct ata_port *ap, unsigned int sc_reg, u32 val);
 static int ahci_init_one (struct pci_dev *pdev, const struct pci_device_id *ent);
 static int ahci_qc_issue(struct ata_queued_cmd *qc);
 static irqreturn_t ahci_interrupt (int irq, void *dev_instance, struct pt_regs *regs);
-static void ahci_start_engine(struct ata_port *ap);
-static int ahci_stop_engine(struct ata_port *ap);
+static int ahci_start_engine(void __iomem *port_mmio);
+static int ahci_stop_engine(void __iomem *port_mmio);
+static int ahci_stop_fis_rx(void __iomem *port_mmio);
+static void ahci_start_fis_rx(void __iomem *port_mmio, 
+			      struct ahci_port_priv *pp,
+			      struct ahci_host_priv *hpriv);
 static void ahci_phy_reset(struct ata_port *ap);
 static void ahci_irq_clear(struct ata_port *ap);
 static void ahci_eng_timeout(struct ata_port *ap);
@@ -327,7 +331,10 @@ static inline void __iomem *ahci_port_base (void __iomem *base, unsigned int por
 static int ahci_port_start(struct ata_port *ap)
 {
 	struct device *dev = ap->host_set->dev;
+	struct ahci_host_priv *hpriv = ap->host_set->private_data;
 	struct ahci_port_priv *pp;
+	void __iomem *mmio = ap->host_set->mmio_base;
+	void __iomem *port_mmio = ahci_port_base(mmio, ap->port_no);
 	void *mem;
 	dma_addr_t mem_dma;
 	int rc;
@@ -382,67 +389,19 @@ static int ahci_port_start(struct ata_port *ap)
 	ap->private_data = pp;
 
 	/*
-	 * Internal structures are initialized,
-	 * we can now do a simple resume()
+	 * Driver is setup; initialize the HBA
 	 */
-	ahci_port_resume(ap);
+	ahci_start_fis_rx(port_mmio, pp, hpriv);
 
+	/*
+	 * Do not enable DMA here; according to the spec
+	 * (section 10.1.1) we should first enable FIS reception,
+	 * then check if the port is enabled before we try to 
+	 * switch on DMA.
+	 * And as the port check is done during probe
+	 * we really shouldn't be doing it here.
+	 */
 	return 0;
-}
-
-static void ahci_port_resume(struct ata_port *ap)
-{
-	void *mmio = ap->host_set->mmio_base;
-	void *port_mmio = ahci_port_base(mmio, ap->port_no);
-	struct ahci_host_priv *hpriv = ap->host_set->private_data;
-	struct ahci_port_priv *pp = ap->private_data;
-
-	if (hpriv->cap & HOST_CAP_64)
-		writel((pp->cmd_slot_dma >> 16) >> 16, port_mmio + PORT_LST_ADDR_HI);
-	writel(pp->cmd_slot_dma & 0xffffffff, port_mmio + PORT_LST_ADDR);
-	readl(port_mmio + PORT_LST_ADDR); /* flush */
-
-	if (hpriv->cap & HOST_CAP_64)
-		writel((pp->rx_fis_dma >> 16) >> 16, port_mmio + PORT_FIS_ADDR_HI);
-	writel(pp->rx_fis_dma & 0xffffffff, port_mmio + PORT_FIS_ADDR);
-	readl(port_mmio + PORT_FIS_ADDR); /* flush */
-
-	writel(PORT_CMD_ICC_ACTIVE | PORT_CMD_FIS_RX |
-	       PORT_CMD_POWER_ON | PORT_CMD_SPIN_UP,
-	       port_mmio + PORT_CMD);
-	readl(port_mmio + PORT_CMD); /* flush */
-
-	ahci_start_engine(ap);
-}
-
-static void ahci_port_suspend(struct ata_port *ap)
-{
-	void *mmio = ap->host_set->mmio_base;
-	void *port_mmio = ahci_port_base(mmio, ap->port_no);
-	u32 tmp;
-	int work;
-
-	ahci_stop_engine(ap);
-
-	/*
-	 * Disable FIS reception
-	 */
-	tmp = readl(port_mmio + PORT_CMD);
-	tmp &= ~(PORT_CMD_FIS_RX);
-	writel(tmp, port_mmio + PORT_CMD);
-	readl(port_mmio + PORT_CMD); /* flush */
-
-	/*
-	 * Wait for HBA to acknowledge.
-	 * This could be as long as 500 msec
-	 */
-	work = 1000;
-	while (work-- > 0) {
-		tmp = readl(port_mmio + PORT_CMD);
-		if ((tmp & PORT_CMD_FIS_ON) == 0)
-			break;
-		udelay(10);
-	}
 }
 
 static void ahci_port_stop(struct ata_port *ap)
@@ -457,6 +416,56 @@ static void ahci_port_stop(struct ata_port *ap)
 			  pp->cmd_slot, pp->cmd_slot_dma);
 	ata_pad_free(ap, dev);
 	kfree(pp);
+}
+
+static int ahci_port_resume(struct ata_port *ap)
+{
+	void __iomem *mmio = ap->host_set->mmio_base;
+	void __iomem *port_mmio = ahci_port_base(mmio, ap->port_no);
+	struct ahci_host_priv *hpriv = ap->host_set->private_data;
+	struct ahci_port_priv *pp = ap->private_data;
+	int rc;
+
+	/*
+	 * Enable FIS reception
+	 */
+	ahci_start_fis_rx(port_mmio, pp, hpriv);
+
+	/*
+	 * Enable DMA
+	 */
+	rc = ahci_start_engine(port_mmio);
+	if (rc)
+		printk(KERN_WARNING "ata%d: cannot start DMA engine (rc %d)\n",
+		       ap->id, rc);
+
+	return rc;
+}
+
+static int ahci_port_suspend(struct ata_port *ap)
+{
+	void __iomem *mmio = ap->host_set->mmio_base;
+	void __iomem *port_mmio = ahci_port_base(mmio, ap->port_no);
+	int rc;
+
+	/*
+	 * Disable DMA
+	 */
+	rc = ahci_stop_engine(port_mmio);
+	if (rc) {
+		printk(KERN_WARNING "ata%u: DMA engine busy\n", ap->id);
+		return rc;
+	}
+
+	/*
+	 * Disable FIS reception
+	 */
+	rc = ahci_stop_fis_rx(port_mmio);
+	if (rc)
+		printk(KERN_WARNING "ata%d: FIS RX still running (rc %d)\n",
+		       ap->id, rc);
+
+	return rc;
 }
 
 static u32 ahci_scr_read (struct ata_port *ap, unsigned int sc_reg_in)
@@ -493,6 +502,159 @@ static void ahci_scr_write (struct ata_port *ap, unsigned int sc_reg_in,
 	writel(val, (void __iomem *) ap->ioaddr.scr_addr + (sc_reg * 4));
 }
 
+static int ahci_stop_engine(void __iomem *port_mmio)
+{
+	int work;
+	u32 tmp;
+
+	tmp = readl(port_mmio + PORT_CMD);
+	/* Check if the HBA is idle */
+	if ((tmp & (PORT_CMD_START | PORT_CMD_LIST_ON)) == 0)
+		return 0;
+
+	/* Setting HBA to idle */
+	tmp &= ~PORT_CMD_START;
+	writel(tmp, port_mmio + PORT_CMD);
+
+	/* 
+	 * wait for engine to become idle
+	 */
+	work = 1000;
+	while (work-- > 0) {
+		tmp = readl(port_mmio + PORT_CMD);
+		if ((tmp & PORT_CMD_LIST_ON) == 0)
+			return 0;
+		udelay(10);
+	}
+
+	return -EIO;
+}
+
+static int ahci_start_engine(void __iomem *port_mmio)
+{
+	u32 tmp;
+	int work = 1000;
+
+	/*
+	 * Get current status
+	 */
+	tmp = readl(port_mmio + PORT_CMD);
+
+	/*
+	 * AHCI rev 1.1 section 10.3.1:
+	 * Software shall not set PxCMD.ST to ‘1’ until it verifies
+	 * that PxCMD.CR is ‘0’ and has set PxCMD.FRE to ‘1’.
+	 */
+	if ((tmp & PORT_CMD_FIS_RX) == 0)
+		return -EPERM;
+
+	/* 
+	 * wait for engine to become idle.
+	 */
+	while (work-- > 0) {
+		tmp = readl(port_mmio + PORT_CMD);
+		if ((tmp & PORT_CMD_LIST_ON) == 0)
+			break;
+		udelay(10);
+	}
+	
+	if (!work) {
+		/*
+		 * We need to do a port reset / HBA reset here
+		 */
+		return -EBUSY;
+	}
+
+	/*
+	 * Start DMA
+	 */
+	tmp |= PORT_CMD_START;
+	writel(tmp, port_mmio + PORT_CMD);
+	readl(port_mmio + PORT_CMD); /* flush */
+
+	return 0;
+}
+
+static int ahci_stop_fis_rx(void __iomem *port_mmio)
+{
+	u32 tmp;
+	int work = 1000;
+
+	/*
+	 * Get current status
+	 */
+	tmp = readl(port_mmio + PORT_CMD);
+
+	/* Check if FIS RX is already disabled */
+	if ((tmp & PORT_CMD_FIS_RX) == 0)
+		return 0;
+
+	/*
+	 * AHCI Rev 1.1 section 10.3.2
+	 * Software shall not clear PxCMD.FRE while
+	 * PxCMD.ST or PxCMD.CR is set to ‘1’. 
+	 */
+	if (tmp & (PORT_CMD_LIST_ON | PORT_CMD_START)) {
+		return -EPERM;
+	}
+
+	/*
+	 * Disable FIS reception
+	 *
+	 * AHCI Rev 1.1 Section 10.1.2:
+	 * If PxCMD.FRE is set to '1', software should clear it
+	 * to '0' and wait at least 500 milliseconds for PxCMD.FR
+	 * to return '0' when read. If PxCMD.FR does not clear
+	 * '0' correctly, then software may attempt a port reset
+	 * of a full HBA reset to recover.
+	 */
+	tmp &= ~(PORT_CMD_FIS_RX);
+	writel(tmp, port_mmio + PORT_CMD);
+
+	mdelay(500);
+	work = 1000;
+	while (work-- > 0) {
+	    tmp = readl(port_mmio + PORT_CMD);
+	    if ((tmp & PORT_CMD_FIS_ON) == 0)
+		return 0;
+	    udelay(10);
+	}
+
+	return -EBUSY;
+}
+
+static void ahci_start_fis_rx(void __iomem *port_mmio, 
+			      struct ahci_port_priv *pp,
+			      struct ahci_host_priv *hpriv)
+{
+	/*
+	 * Enable FIS reception
+	 */
+	if (hpriv->cap & HOST_CAP_64)
+		writel((pp->cmd_slot_dma >> 16) >> 16, port_mmio + PORT_LST_ADDR_HI);
+	writel(pp->cmd_slot_dma & 0xffffffff, port_mmio + PORT_LST_ADDR);
+	readl(port_mmio + PORT_LST_ADDR); /* flush */
+
+	if (hpriv->cap & HOST_CAP_64)
+		writel((pp->rx_fis_dma >> 16) >> 16, port_mmio + PORT_FIS_ADDR_HI);
+	writel(pp->rx_fis_dma & 0xffffffff, port_mmio + PORT_FIS_ADDR);
+	readl(port_mmio + PORT_FIS_ADDR); /* flush */
+
+	/*
+	 * This is wrong. We should only activate
+	 * FIS_RX here; everything else should be handled
+	 * separately.
+	 * Some bits might not even be settable here
+	 * as they depend on the respective feature to be
+	 * implemented (Staggered Spin-up, 
+	 * Cold-presence detection etc.)
+	 */
+	writel(PORT_CMD_ICC_ACTIVE | PORT_CMD_FIS_RX |
+	       PORT_CMD_POWER_ON | PORT_CMD_SPIN_UP,
+	       port_mmio + PORT_CMD);
+	readl(port_mmio + PORT_CMD); /* flush */
+}
+
 static void ahci_phy_reset(struct ata_port *ap)
 {
 	void __iomem *port_mmio = (void __iomem *) ap->ioaddr.cmd_addr;
@@ -500,7 +662,7 @@ static void ahci_phy_reset(struct ata_port *ap)
 	struct ata_device *dev = &ap->device[0];
 	u32 new_tmp, tmp;
 
-	ahci_stop_engine(ap);
+	ahci_stop_engine(port_mmio);
 
 	__sata_phy_reset(ap);
 
@@ -511,7 +673,7 @@ static void ahci_phy_reset(struct ata_port *ap)
 	if (ap->flags & ATA_FLAG_PORT_DISABLED)
 		return;
 
-	ahci_start_engine(ap);
+	ahci_start_engine(port_mmio);
 
 	tmp = readl(port_mmio + PORT_SIG);
 	tf.lbah		= (tmp >> 24)	& 0xff;
@@ -622,70 +784,12 @@ static void ahci_qc_prep(struct ata_queued_cmd *qc)
 	pp->cmd_slot[0].opts |= cpu_to_le32(n_elem << 16);
 }
 
-static void ahci_start_engine(struct ata_port *ap)
-{
-	void __iomem *mmio = ap->host_set->mmio_base;
-	void __iomem *port_mmio = ahci_port_base(mmio, ap->port_no);
-	u32 tmp;
-	int work;
-
-	tmp = readl(port_mmio + PORT_CMD);
-	/*
-	 * AHCI rev 1.1 section 10.3.1:
-	 * Software shall not set PxCMD.ST to ‘1’ until it verifies
-	 * that PxCMD.CR is ‘0’ and has set PxCMD.FRE to ‘1’.
-	 */
-	if ((tmp & PORT_CMD_FIS_RX) == 0)
-		printk(KERN_WARNING "ata%d: dma not running\n",ap->id);
-	/* 
-	 * wait for engine to become idle.
-	 */
-	work = 1000;
-	while (work-- > 0) {
-		tmp = readl(port_mmio + PORT_CMD);
-		if ((tmp & PORT_CMD_LIST_ON) == 0)
-			break;
-		udelay(10);
-	}
-	
-	/*
-	 * Start DMA
-	 */
-	tmp |= PORT_CMD_START;
-	writel(tmp, port_mmio + PORT_CMD);
-	readl(port_mmio + PORT_CMD); /* flush */
-}
-
-static int ahci_stop_engine(struct ata_port *ap)
-{
-	void __iomem *mmio = ap->host_set->mmio_base;
-	void __iomem *port_mmio = ahci_port_base(mmio, ap->port_no);
-	int work;
-	u32 tmp;
-
-	tmp = readl(port_mmio + PORT_CMD);
-	tmp &= ~PORT_CMD_START;
-	writel(tmp, port_mmio + PORT_CMD);
-
-	/* 
-	 * wait for engine to become idle
-	 */
-	work = 1000;
-	while (work-- > 0) {
-		tmp = readl(port_mmio + PORT_CMD);
-		if ((tmp & PORT_CMD_LIST_ON) == 0)
-			return 0;
-		udelay(10);
-	}
-
-	return -EIO;
-}
-
 static void ahci_restart_port(struct ata_port *ap, u32 irq_stat)
 {
 	void __iomem *mmio = ap->host_set->mmio_base;
 	void __iomem *port_mmio = ahci_port_base(mmio, ap->port_no);
 	u32 tmp;
+	int rc;
 
 	if ((ap->device[0].class != ATA_DEV_ATAPI) ||
 	    ((irq_stat & PORT_IRQ_TF_ERR) == 0))
@@ -701,7 +805,7 @@ static void ahci_restart_port(struct ata_port *ap, u32 irq_stat)
 			readl(port_mmio + PORT_SCR_ERR));
 
 	/* stop DMA */
-	ahci_stop_engine(ap);
+	rc = ahci_stop_engine(port_mmio);
 
 	/* clear SATA phy error, if any */
 	tmp = readl(port_mmio + PORT_SCR_ERR);
@@ -711,7 +815,7 @@ static void ahci_restart_port(struct ata_port *ap, u32 irq_stat)
 	 * if so, issue COMRESET
 	 */
 	tmp = readl(port_mmio + PORT_TFDATA);
-	if (tmp & (ATA_BUSY | ATA_DRQ)) {
+	if (rc || (tmp & (ATA_BUSY | ATA_DRQ))) {
 		writel(0x301, port_mmio + PORT_SCR_CTL);
 		readl(port_mmio + PORT_SCR_CTL); /* flush */
 		udelay(10);
@@ -720,7 +824,10 @@ static void ahci_restart_port(struct ata_port *ap, u32 irq_stat)
 	}
 
 	/* re-start DMA */
-	ahci_start_engine(ap);
+	rc = ahci_start_engine(port_mmio);
+	if (rc)
+		printk(KERN_WARNING "ata%u: cannot start DMA (rc %d)\n",
+		       ap->id, rc);
 }
 
 static void ahci_eng_timeout(struct ata_port *ap)
@@ -883,7 +990,7 @@ int ahci_scsi_device_suspend(struct scsi_device *sdev, pm_message_t state)
 	rc = ata_device_suspend(ap, dev, state);
 
 	if (!rc)
-		ahci_port_suspend(ap);
+		rc = ahci_port_suspend(ap);
 
 	return rc;
 }
@@ -1005,23 +1112,24 @@ static int ahci_host_init(struct ata_probe_ent *probe_ent)
 				(unsigned long) mmio, i);
 
 		/* make sure port is not active */
-		tmp = readl(port_mmio + PORT_CMD);
-		VPRINTK("PORT_CMD 0x%x\n", tmp);
-		if (tmp & (PORT_CMD_LIST_ON | PORT_CMD_FIS_ON |
-			   PORT_CMD_FIS_RX | PORT_CMD_START)) {
-			tmp &= ~(PORT_CMD_LIST_ON | PORT_CMD_FIS_ON |
-				 PORT_CMD_FIS_RX | PORT_CMD_START);
-			writel(tmp, port_mmio + PORT_CMD);
-			readl(port_mmio + PORT_CMD); /* flush */
+		rc = ahci_stop_engine(port_mmio);
+		if (rc)
+			printk(KERN_WARNING "ata%u: DMA engine busy (rc %d)\n",
+			       i, rc);
 
-			/* spec says 500 msecs for each bit, so
-			 * this is slightly incorrect.
-			 */
-			msleep(500);
-		}
+		rc = ahci_stop_fis_rx(port_mmio);
+		if (rc)
+			printk(KERN_WARNING "ata%u: FIS RX not stopped (rc %d)\n",
+			       i, rc);
 
+		/*
+		 * TODO: port / HBA reset if the above fails
+		 */
 		writel(PORT_CMD_SPIN_UP, port_mmio + PORT_CMD);
 
+		/*
+		 * Wait for the communications link to establish
+		 */
 		j = 0;
 		while (j < 100) {
 			msleep(10);
