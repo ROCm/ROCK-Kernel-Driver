@@ -1,6 +1,7 @@
 /* delayacct.c - per-task delay accounting
  *
  * Copyright (C) Shailabh Nagar, IBM Corp. 2006
+ * Copyright (C) Balbir Singh, IBM Corp. 2006
  *
  * This program is free software;  you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,9 +19,12 @@
 #include <linux/time.h>
 #include <linux/sysctl.h>
 #include <linux/delayacct.h>
+#include <linux/taskstats.h>
+#include <linux/mutex.h>
 
 int delayacct_on = 0;		/* Delay accounting turned on/off */
 kmem_cache_t *delayacct_cache;
+static DEFINE_MUTEX(delayacct_exit_mutex);
 
 static int __init delayacct_setup_enable(char *str)
 {
@@ -50,10 +54,16 @@ void __delayacct_tsk_init(struct task_struct *tsk)
 
 void __delayacct_tsk_exit(struct task_struct *tsk)
 {
+	/*
+	 * Protect against racing thread group exits
+	 */
+	mutex_lock(&delayacct_exit_mutex);
+	taskstats_exit_pid(tsk);
 	if (tsk->delays) {
 		kmem_cache_free(delayacct_cache, tsk->delays);
 		tsk->delays = NULL;
 	}
+	mutex_unlock(&delayacct_exit_mutex);
 }
 
 /*
@@ -108,3 +118,43 @@ void __delayacct_blkio_end(void)
 				&current->delays->blkio_delay,
 				&current->delays->blkio_count);
 }
+#ifdef CONFIG_TASKSTATS
+int __delayacct_add_tsk(struct taskstats *d, struct task_struct *tsk)
+{
+	nsec_t tmp;
+	struct timespec ts;
+	unsigned long t1,t2,t3;
+
+	/* zero XXX_total,non-zero XXX_count implies XXX stat overflowed */
+
+	tmp = (nsec_t)d->cpu_run_real_total ;
+	tmp += (u64)(tsk->utime+tsk->stime)*TICK_NSEC;
+	d->cpu_run_real_total = (tmp < (nsec_t)d->cpu_run_real_total)? 0: tmp;
+
+	/* No locking available for sched_info. Take snapshot first. */
+	t1 = tsk->sched_info.pcnt;
+	t2 = tsk->sched_info.run_delay;
+	t3 = tsk->sched_info.cpu_time;
+
+	d->cpu_count += t1;
+
+	jiffies_to_timespec(t2, &ts);
+	tmp = (nsec_t)d->cpu_delay_total + timespec_to_ns(&ts);
+	d->cpu_delay_total = (tmp < (nsec_t)d->cpu_delay_total)? 0: tmp;
+
+	tmp = (nsec_t)d->cpu_run_virtual_total
+		+ (nsec_t)jiffies_to_usecs(t3) * 1000;
+	d->cpu_run_virtual_total = (tmp < (nsec_t)d->cpu_run_virtual_total) ?
+					0 : tmp;
+
+	spin_lock(&tsk->delays->lock);
+	tmp = d->blkio_delay_total + tsk->delays->blkio_delay;
+	d->blkio_delay_total = (tmp < d->blkio_delay_total)? 0: tmp;
+	tmp = d->swapin_delay_total + tsk->delays->swapin_delay;
+	d->swapin_delay_total = (tmp < d->swapin_delay_total)? 0: tmp;
+	d->blkio_count += tsk->delays->blkio_count;
+	d->swapin_count += tsk->delays->swapin_count;
+	spin_unlock(&tsk->delays->lock);
+	return 0;
+}
+#endif /* CONFIG_TASKSTATS */

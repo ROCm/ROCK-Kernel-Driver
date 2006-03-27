@@ -18,6 +18,7 @@
 #define _LINUX_TASKDELAYS_H
 
 #include <linux/sched.h>
+#include <linux/taskstats.h>
 
 #ifdef CONFIG_TASK_DELAY_ACCT
 extern int delayacct_on;	/* Delay accounting turned on/off */
@@ -27,6 +28,7 @@ extern void __delayacct_tsk_init(struct task_struct *);
 extern void __delayacct_tsk_exit(struct task_struct *);
 extern void __delayacct_blkio_start(void);
 extern void __delayacct_blkio_end(void);
+extern int __delayacct_add_tsk(struct taskstats *, struct task_struct *);
 
 static inline void delayacct_tsk_init(struct task_struct *tsk)
 {
@@ -64,4 +66,13 @@ static inline void delayacct_blkio_start(void)
 static inline void delayacct_blkio_end(void)
 {}
 #endif /* CONFIG_TASK_DELAY_ACCT */
+#ifdef CONFIG_TASKSTATS
+static inline int delayacct_add_tsk(struct taskstats *d,
+				    struct task_struct *tsk)
+{
+	if (!tsk->delays)
+		return -EINVAL;
+	return __delayacct_add_tsk(d, tsk);
+}
+#endif
 #endif /* _LINUX_TASKDELAYS_H */
