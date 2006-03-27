@@ -139,8 +139,11 @@ extern struct task_struct *last_task_used_spe;
 
 /* This decides where the kernel will search for a free chunk of vm
  * space during mmap's.
+ *
+ * /proc/pid/unmap_base is only supported for 32bit processes for now.
  */
-#define TASK_UNMAPPED_BASE_USER32 (PAGE_ALIGN(TASK_SIZE_USER32 / 4))
+#define __TASK_UNMAPPED_BASE (PAGE_ALIGN(STACK_TOP_USER32 / 4))
+#define TASK_UNMAPPED_BASE_USER32 (PAGE_ALIGN(current->map_base))
 #define TASK_UNMAPPED_BASE_USER64 (PAGE_ALIGN(TASK_SIZE_USER64 / 4))
 
 #define TASK_UNMAPPED_BASE ((test_thread_flag(TIF_32BIT)) ? \

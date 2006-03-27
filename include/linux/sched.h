@@ -682,6 +682,12 @@ struct group_info {
 	gid_t *blocks[0];
 };
 
+#ifndef __TASK_UNMAPPED_BASE
+#define __TASK_UNMAPPED_BASE 0UL
+#else
+#define __HAS_ARCH_PROC_MAPPED_BASE
+#endif
+
 /*
  * get_group_info() must be called with the owning task locked (via task_lock())
  * when task != current.  The reason being that the vast majority of callers are
@@ -905,6 +911,9 @@ struct task_struct {
 #ifdef	CONFIG_TASK_DELAY_ACCT
 	struct task_delay_info *delays;
 #endif
+
+/* TASK_UNMAPPED_BASE */
+	unsigned long map_base;
 };
 
 static inline pid_t process_group(struct task_struct *tsk)

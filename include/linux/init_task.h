@@ -120,6 +120,7 @@ extern struct group_info init_groups;
 	.alloc_lock	= SPIN_LOCK_UNLOCKED,				\
 	.proc_lock	= SPIN_LOCK_UNLOCKED,				\
 	.journal_info	= NULL,						\
+	.map_base	= __TASK_UNMAPPED_BASE,				\
 	.cpu_timers	= INIT_CPU_TIMERS(tsk.cpu_timers),		\
 	.fs_excl	= ATOMIC_INIT(0),				\
 	INIT_TASK_PAGG(tsk)						\

@@ -114,7 +114,8 @@ extern unsigned long task_size;
 /* This decides where the kernel will search for a free chunk of vm
  * space during mmap's.
  */
-#define TASK_UNMAPPED_BASE	(0x40000000)
+#define __TASK_UNMAPPED_BASE	(0x40000000)
+#define TASK_UNMAPPED_BASE	(current->map_base)
 
 extern void start_thread(struct pt_regs *regs, unsigned long entry, 
 			 unsigned long stack);
