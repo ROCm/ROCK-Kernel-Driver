@@ -2200,7 +2200,7 @@ lcs_new_device(struct ccwgroup_device *ccwgdev)
 #ifdef CONFIG_IP_MULTICAST
 	if (!lcs_check_multicast_support(card)) {
 		card->dev->set_multicast_list = lcs_set_multicast_list;
-		card->dev->features |= NETIF_F_MC_ALL; 
+		card->dev->features |= NETIF_F_MC_ALL;
 	}
 #endif
 netdev_out:

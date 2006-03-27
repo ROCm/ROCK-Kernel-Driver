@@ -403,7 +403,7 @@ dasd_ioctl_information(struct block_device *bdev, int no, long args)
 	if (!device->discipline->fill_info)
 		return -EINVAL;
 
-	dasd_info = kmalloc(sizeof(struct dasd_information2_t), GFP_KERNEL);
+	dasd_info = kzalloc(sizeof(struct dasd_information2_t), GFP_KERNEL);
 	if (dasd_info == NULL)
 		return -ENOMEM;
 
@@ -446,8 +446,7 @@ dasd_ioctl_information(struct block_device *bdev, int no, long args)
 		memcpy(dasd_info->type, device->discipline->name, 4);
 	else
 		memcpy(dasd_info->type, "none", 4);
-	dasd_info->req_queue_len = 0;
-	dasd_info->chanq_len = 0;
+
 	if (device->request_queue->request_fn) {
 		struct list_head *l;
 #ifdef DASD_EXTENDED_PROFILING

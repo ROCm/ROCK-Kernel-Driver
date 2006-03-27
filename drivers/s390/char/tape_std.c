@@ -49,7 +49,7 @@ tape_std_assign_timeout(unsigned long data)
 	if(rc)
 		PRINT_ERR("(%s): Assign timeout: Cancel failed with rc = %i\n",
 			device->cdev->dev.bus_id, rc);
-		
+
 }
 
 int

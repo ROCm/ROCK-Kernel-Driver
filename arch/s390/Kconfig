@@ -454,13 +454,13 @@ endmenu
 
 source "net/Kconfig"
 
-source "drivers/connector/Kconfig"
-
 config PCMCIA
 	bool
 	default n
 
 source "drivers/base/Kconfig"
+
+source "drivers/connector/Kconfig"
 
 source "drivers/scsi/Kconfig"
 

@@ -691,10 +691,8 @@ dasd_term_IO(struct dasd_ccw_req * cqr)
 
 	/* Check the cqr */
 	rc = dasd_check_cqr(cqr);
-	if (rc) {
-		cqr->status = DASD_CQR_FAILED;
+	if (rc)
 		return rc;
-	}
 	retries = 0;
 	device = (struct dasd_device *) cqr->device;
 	while ((retries < 5) && (cqr->status == DASD_CQR_IN_IO)) {
@@ -747,10 +745,8 @@ dasd_start_IO(struct dasd_ccw_req * cqr)
 
 	/* Check the cqr */
 	rc = dasd_check_cqr(cqr);
-	if (rc) {
-		cqr->status = DASD_CQR_FAILED;
+	if (rc)
 		return rc;
-	}
 	device = (struct dasd_device *) cqr->device;
 	if (cqr->retries < 0) {
 		DEV_MESSAGE(KERN_DEBUG, device,

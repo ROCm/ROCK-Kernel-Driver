@@ -576,11 +576,11 @@ asmlinkage int vprintk(const char *fmt, va_list args)
 	/* Emit the output into the temporary buffer */
 	printed_len = vscnprintf(printk_buf, sizeof(printk_buf), fmt, args);
 
- 	/*
- 	 * Copy the output into log_buf.  If the caller didn't provide
+	/*
+	 * Copy the output into log_buf.  If the caller didn't provide
 	 * appropriate log level tags, we insert them here.
- 	 */
- 	for (p = printk_buf; *p; p++) {
+	 */
+	for (p = printk_buf; *p; p++) {
 		if (new_line) {
 			/* The log level token is first. */
 			int loglev_char;
@@ -588,36 +588,36 @@ asmlinkage int vprintk(const char *fmt, va_list args)
 			    p[1] <= '7' && p[2] == '>') {
 				loglev_char = p[1];
 				p += 3;
+				printed_len -= 3;
 			} else	{
 				loglev_char = default_message_loglevel + '0';
-				printed_len += 3;
 			}
 			emit_log_char('<');
 			emit_log_char(loglev_char);
 			emit_log_char('>');
 			/* A timestamp, if requested, goes next. */
- 			if (printk_time) {
+			if (printk_time) {
 				char tbuf[TIMESTAMP_SIZE], *tp;
 				printed_len += nsec_to_timestamp(tbuf,
 							printk_clock());
 				for (tp = tbuf; *tp; tp++)
- 					emit_log_char(*tp);
+					emit_log_char(*tp);
 				emit_log_char(' ');
 				printed_len++;
- 			}
+			}
 			new_line = 0;
- 			if (!*p)
- 				break;
- 		}
+			if (!*p)
+				break;
+		}
 		/*
 		 * Once we are done with special strings at the head of
 		 * each line, we just keep copying characters until
 		 * we come across another line and need to start over.
 		 */
- 		emit_log_char(*p);
- 		if (*p == '\n')
+		emit_log_char(*p);
+		if (*p == '\n')
 			new_line = 1;
- 	}
+	}
 
 	if (!cpu_online(smp_processor_id())) {
 		/*

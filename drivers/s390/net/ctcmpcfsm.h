@@ -1,9 +1,3 @@
-/*
- * $Id: ctcmpcfsm.h,v 1.4 2005/03/24 12:25:38 mschwide Exp $
- * RELEASE-TAG: CTCMPC/ESCON network driver $Revision: 1.4 $
- *
- */
-
 #include "fsm.h"
 
 /**

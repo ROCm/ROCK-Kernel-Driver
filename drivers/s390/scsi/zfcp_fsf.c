@@ -4871,7 +4871,7 @@ zfcp_fsf_req_send(struct zfcp_fsf_req *fsf_req, struct timer_list *timer)
 	 */
 	atomic_sub(fsf_req->sbal_number, &req_queue->free_count);
 	statistic_inc(adapter->stat_qdio_outb,
-			QDIO_MAX_BUFFERS_PER_Q - 
+			QDIO_MAX_BUFFERS_PER_Q -
 			atomic_read(&req_queue->free_count));
 	ZFCP_LOG_TRACE("free_count=%d\n", atomic_read(&req_queue->free_count));
 	req_queue->free_index += fsf_req->sbal_number;	  /* increase */

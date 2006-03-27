@@ -969,7 +969,7 @@ struct zfcp_adapter {
 	struct device           generic_services;  /* directory for WKA ports */
 	struct fc_host_statistics *fc_stats;
 	struct fsf_qtcb_bottom_port *stats_reset_data;
-	unsigned long		stats_reset;
+	unsigned long stats_reset;
 	struct statistic_interface	*stat_if;
 	struct statistic		*stat_qdio_outb_full;
 	struct statistic		*stat_qdio_outb;

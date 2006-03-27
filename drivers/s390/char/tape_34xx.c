@@ -2,8 +2,7 @@
  *  drivers/s390/char/tape_34xx.c
  *    tape device discipline for 3480/3490 tapes.
  *
- *  S390 and zSeries version
- *    Copyright (C) 2001,2002 IBM Deutschland Entwicklung GmbH, IBM Corporation
+ *    Copyright (C) IBM Corp. 2001,2006
  *    Author(s): Carsten Otte <cotte@de.ibm.com>
  *		 Tuan Ngo-Anh <ngoanh@de.ibm.com>
  *		 Martin Schwidefsky <schwidefsky@de.ibm.com>

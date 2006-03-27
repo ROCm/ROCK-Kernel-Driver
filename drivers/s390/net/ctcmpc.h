@@ -1,6 +1,4 @@
 /*
- * $Id: ctcmpc.h,v 1.3 2005/03/24 12:25:38 mschwide Exp $
- *
  * CTC / ESCON network driver, mpc interface.
  *
  * Copyright (C) 2003 IBM United States, IBM Corporation
@@ -21,7 +19,6 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: CTCMPC/ESCON network driver $Revision: 1.3 $
  */
 
 #ifndef _CTCMPC_H_

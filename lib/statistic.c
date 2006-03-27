@@ -119,7 +119,7 @@
  *	  statistic_format_data_history().
  */
 
-#define STATISTIC_C_REVISION "$Revision: 1.5 $"
+#define STATISTIC_C_REVISION "$Revision: 1.6 $"
 
 #include <linux/fs.h>
 #include <linux/debugfs.h>

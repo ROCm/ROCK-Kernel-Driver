@@ -23,8 +23,6 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#define ZFCP_STAT_REVISION "$Revision: 1.9.2.1 $"
-
 #include <linux/statistic.h>
 #include <linux/ctype.h>
 #include "zfcp_ext.h"
