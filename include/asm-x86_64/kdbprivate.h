@@ -178,4 +178,6 @@ void kdba_unsave_running(struct kdba_running_process *k, struct pt_regs *regs)
 {
 }
 
+#define kdba_wait_for_cpus()
+
 #endif	/* !_ASM_KDBPRIVATE_H */
