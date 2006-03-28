@@ -9,6 +9,8 @@ source "drivers/md/Kconfig"
 
 menu "Character device drivers"
 
+source "drivers/char/Kconfig.raw"
+
 config UNIX98_PTYS
 	bool "Unix98 PTY support"
 	---help---
