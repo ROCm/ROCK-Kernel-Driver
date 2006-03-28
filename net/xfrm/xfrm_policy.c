@@ -785,11 +785,12 @@ int xfrm_lookup(struct dst_entry **dst_p, struct flowi *fl,
 	u16 family;
 	u8 dir = policy_to_flow_dir(XFRM_POLICY_OUT);
 	u32 sk_sid = security_sk_sid(sk, fl, dir);
+	unsigned long timeout = jiffies + 60 * HZ;
 	int loops = 0;
 
 restart:
-	if (unlikely(++loops > 10)) {
-		printk(KERN_NOTICE "xfrm_lookup bailing out after %d loops\n", loops);
+	if (unlikely(time_after(jiffies, timeout))) {
+		printk(KERN_NOTICE "xfrm_lookup bailing out after 60 seconds and %d loops\n", loops++);
 		dump_stack();
 		err = -EHOSTUNREACH;
 		goto error_nopol;
