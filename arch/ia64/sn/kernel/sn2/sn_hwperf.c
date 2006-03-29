@@ -110,7 +110,7 @@ static int sn_hwperf_geoid_to_cnode(char *location)
 	if (sn_hwperf_location_to_bpos(location, &rack, &bay, &slot, &slab))
 		return -1;
 
-	for_each_node(cnode) {
+	for (cnode = 0; cnode < num_cnodes; cnode++) {
 		geoid = cnodeid_get_geoid(cnode);
 		module_id = geo_module(geoid);
 		this_rack = MODULE_GET_RACK(module_id);
