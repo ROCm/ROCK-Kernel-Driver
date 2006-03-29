@@ -22,7 +22,7 @@
 #include <linux/taskstats.h>
 #include <linux/mutex.h>
 
-int delayacct_on = 0;		/* Delay accounting turned on/off */
+int delayacct_on __read_mostly = 0;	/* Delay accounting turned on/off */
 kmem_cache_t *delayacct_cache;
 static DEFINE_MUTEX(delayacct_exit_mutex);
 

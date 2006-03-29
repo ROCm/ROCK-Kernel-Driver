@@ -1299,7 +1299,8 @@ void fastcall sched_fork(task_t *p, int clone_flags)
 	INIT_LIST_HEAD(&p->run_list);
 	p->array = NULL;
 #if defined(CONFIG_SCHEDSTATS) || defined(CONFIG_TASK_DELAY_ACCT)
-	memset(&p->sched_info, 0, sizeof(p->sched_info));
+	if (unlikely(sched_info_on()))
+		memset(&p->sched_info, 0, sizeof(p->sched_info));
 #endif
 #if defined(CONFIG_SMP) && defined(__ARCH_WANT_UNLOCKED_CTXSW)
 	p->oncpu = 0;
