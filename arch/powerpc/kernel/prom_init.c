@@ -397,10 +397,13 @@ static void __init __attribute__((noreturn)) prom_panic(const char *reason)
 	reason = PTRRELOC(reason);
 #endif
 	prom_print(reason);
-	/* ToDo: should put up an SRC here on p/iSeries */
 	/* Do not call exit because it clears the screen on pmac
 	 * it also causes some sort of double-fault on early pmacs */
-	asm("trap\n");
+	if (RELOC(of_platform) == PLATFORM_POWERMAC)
+		asm("trap\n");
+
+	/* ToDo: should put up an SRC here on p/iSeries */
+	call_prom("exit", 0, 0);
 
 	for (;;)			/* should never get here */
 		;
@@ -2063,15 +2066,6 @@ unsigned long __init prom_init(unsigned long r3, unsigned long r4,
 	 */
 	prom_init_stdout();
 
-	/* Bail if this is a kdump kernel. */
-	if (PHYSICAL_START > 0)
-		prom_panic("Error: You can't boot a kdump kernel from OF!\n");
-
-	/*
-	 * Check for an initrd
-	 */
-	prom_check_initrd(r3, r4);
-
 	/*
 	 * Get default machine type. At this point, we do not differentiate
 	 * between pSeries SMP and pSeries LPAR
@@ -2080,6 +2074,15 @@ unsigned long __init prom_init(unsigned long r3, unsigned long r4,
 	getprop_rval = RELOC(of_platform);
 	prom_setprop(_prom->chosen, "/chosen", "linux,platform",
 		     &getprop_rval, sizeof(getprop_rval));
+
+	/* Bail if this is a kdump kernel. */
+	if (PHYSICAL_START > 0)
+		prom_panic("Error: You can't boot a kdump kernel from OF!\n");
+
+	/*
+	 * Check for an initrd
+	 */
+	prom_check_initrd(r3, r4);
 
 #ifdef CONFIG_PPC_PSERIES
 	/*
