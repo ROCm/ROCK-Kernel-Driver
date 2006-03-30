@@ -35,6 +35,7 @@
 #include <asm/proto.h>
 #include <asm/kdebug.h>
 #include <asm/local.h>
+#include <asm/mce.h>
 
 /*
  * lapic_nmi_owner tracks the ownership of the lapic NMI hardware:
@@ -483,6 +484,10 @@ void __kprobes nmi_watchdog_tick(struct pt_regs * regs, unsigned reason)
 		__get_cpu_var(nmi_touch) = 0;
 		touched = 1;
 	}
+	/* Could check oops_in_progress here too, but it's safer
+	   not too */
+	if (atomic_read(&mce_entry) > 0) 
+		touched = 1;
 	if (!touched && __get_cpu_var(last_irq_sum) == sum) {
 		/*
 		 * Ayiee, looks like this CPU is stuck ...
