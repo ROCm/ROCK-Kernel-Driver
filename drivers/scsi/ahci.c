@@ -40,6 +40,7 @@
 #include <linux/delay.h>
 #include <linux/interrupt.h>
 #include <linux/sched.h>
+#include <linux/suspend.h>
 #include <linux/dma-mapping.h>
 #include <linux/device.h>
 #include <scsi/scsi_host.h>
@@ -86,6 +87,11 @@ enum {
 
 	/* HOST_CAP bits */
 	HOST_CAP_64		= (1 << 31), /* PCI DAC (64-bit DMA) support */
+	HOST_CAP_SIS		= (1 << 28), /* Interlock switch */
+	HOST_CAP_SSS		= (1 << 27), /* Staggered Spin-up */
+	HOST_CAP_SPM		= (1 << 17), /* Port multiplier */
+	HOST_CAP_SSC		= (1 << 14), /* Slumber capable */
+	HOST_CAP_PSC		= (1 << 13), /* Partial capable */
 
 	/* registers for each SATA port */
 	PORT_LST_ADDR		= 0x00, /* command list DMA addr */
@@ -136,13 +142,16 @@ enum {
 
 	/* PORT_CMD bits */
 	PORT_CMD_ATAPI		= (1 << 24), /* Device is ATAPI */
+	PORT_CMD_CPD		= (1 << 20), /* Cold presence detection */
 	PORT_CMD_LIST_ON	= (1 << 15), /* cmd list DMA engine running */
 	PORT_CMD_FIS_ON		= (1 << 14), /* FIS DMA engine running */
 	PORT_CMD_FIS_RX		= (1 << 4), /* Enable FIS receive DMA engine */
+	PORT_CMD_CLO		= (1 << 3), /* Command list override */
 	PORT_CMD_POWER_ON	= (1 << 2), /* Power up device */
 	PORT_CMD_SPIN_UP	= (1 << 1), /* Spin up device */
 	PORT_CMD_START		= (1 << 0), /* Enable port DMA engine */
 
+	PORT_CMD_ICC_MASK	= (0xf << 28), /* i/f ICC state mask */
 	PORT_CMD_ICC_ACTIVE	= (0x1 << 28), /* Put i/f in active state */
 	PORT_CMD_ICC_PARTIAL	= (0x2 << 28), /* Put i/f in partial state */
 	PORT_CMD_ICC_SLUMBER	= (0x6 << 28), /* Put i/f in slumber state */
@@ -197,15 +206,19 @@ static void ahci_phy_reset(struct ata_port *ap);
 static void ahci_irq_clear(struct ata_port *ap);
 static void ahci_eng_timeout(struct ata_port *ap);
 static int ahci_port_start(struct ata_port *ap);
-static int ahci_port_suspend(struct ata_port *ap);
+static int ahci_port_suspend(struct ata_port *ap, pm_message_t state);
 static int ahci_port_resume(struct ata_port *ap);
 static void ahci_port_stop(struct ata_port *ap);
+static int ahci_port_standby(void __iomem *port_mmio, u32 cap);
+static int ahci_port_spinup(void __iomem *port_mmio, u32 cap);
 static void ahci_tf_read(struct ata_port *ap, struct ata_taskfile *tf);
 static void ahci_qc_prep(struct ata_queued_cmd *qc);
 static u8 ahci_check_status(struct ata_port *ap);
 static inline int ahci_host_intr(struct ata_port *ap, struct ata_queued_cmd *qc);
 static int ahci_scsi_device_suspend(struct scsi_device *sdev, pm_message_t state);
 static int ahci_scsi_device_resume(struct scsi_device *sdev);
+static int ahci_pci_device_suspend(struct pci_dev *pdev, pm_message_t state);
+static int ahci_pci_device_resume(struct pci_dev *pdev);
 static void ahci_remove_one (struct pci_dev *pdev);
 
 static struct scsi_host_template ahci_sht = {
@@ -313,8 +326,8 @@ static struct pci_driver ahci_pci_driver = {
 	.id_table		= ahci_pci_tbl,
 	.probe			= ahci_init_one,
 	.remove			= ahci_remove_one,
-	.suspend		= ata_pci_device_suspend,
-	.resume			= ata_pci_device_resume,
+	.suspend		= ahci_pci_device_suspend,
+	.resume			= ahci_pci_device_resume,
 };
 
 
@@ -392,6 +405,10 @@ static int ahci_port_start(struct ata_port *ap)
 	 * Driver is setup; initialize the HBA
 	 */
 	ahci_start_fis_rx(port_mmio, pp, hpriv);
+	rc = ahci_port_spinup(port_mmio, hpriv->cap);
+	if (rc)
+		printk(KERN_WARNING "ata%d: could not spinup device (%d)\n",
+		       ap->id, rc);
 
 	/*
 	 * Do not enable DMA here; according to the spec
@@ -409,7 +426,7 @@ static void ahci_port_stop(struct ata_port *ap)
 	struct device *dev = ap->host_set->dev;
 	struct ahci_port_priv *pp = ap->private_data;
 
-	ahci_port_suspend(ap);
+	ahci_port_suspend(ap, PMSG_SUSPEND);
 
 	ap->private_data = NULL;
 	dma_free_coherent(dev, AHCI_PORT_PRIV_DMA_SZ,
@@ -425,11 +442,52 @@ static int ahci_port_resume(struct ata_port *ap)
 	struct ahci_host_priv *hpriv = ap->host_set->private_data;
 	struct ahci_port_priv *pp = ap->private_data;
 	int rc;
+	u32 tmp;
 
 	/*
 	 * Enable FIS reception
 	 */
 	ahci_start_fis_rx(port_mmio, pp, hpriv);
+
+	rc = ahci_port_spinup(port_mmio, hpriv->cap);
+	if (rc)
+		printk(KERN_WARNING "ata%d: could not spinup device (%d)\n",
+		       ap->id, rc);
+
+	/*
+	 * Clear error status
+	 */
+	tmp = readl(port_mmio + PORT_SCR_ERR);
+	writel(tmp, port_mmio + PORT_SCR_ERR);
+	/*
+	 * Clear interrupt status
+	 */
+	tmp = readl(mmio + HOST_CTL);
+	if (!(tmp & HOST_IRQ_EN)) {
+		u32 irq_stat;
+
+		printk(KERN_WARNING "ata%d: enabling interrupts\n", ap->id);
+
+		/* ack any pending irq events for this port */
+		irq_stat = readl(port_mmio + PORT_IRQ_STAT);
+		if (irq_stat)
+			writel(irq_stat, port_mmio + PORT_IRQ_STAT);
+
+		/* set irq mask (enables interrupts) */
+		writel(DEF_PORT_IRQ, port_mmio + PORT_IRQ_MASK);
+
+		/*
+		 * This should only be executed once per host,
+		 * ie only for the last port.
+		 */
+		irq_stat = readl(mmio + HOST_IRQ_STAT);
+		if (irq_stat)
+			writel(irq_stat, mmio + HOST_IRQ_STAT);
+
+		tmp |= HOST_IRQ_EN;
+		writel(tmp, mmio + HOST_CTL);
+		(void) readl(mmio + HOST_CTL);
+	}
 
 	/*
 	 * Enable DMA
@@ -442,10 +500,11 @@ static int ahci_port_resume(struct ata_port *ap)
 	return rc;
 }
 
-static int ahci_port_suspend(struct ata_port *ap)
+static int ahci_port_suspend(struct ata_port *ap, pm_message_t state)
 {
 	void __iomem *mmio = ap->host_set->mmio_base;
 	void __iomem *port_mmio = ahci_port_base(mmio, ap->port_no);
+	struct ahci_host_priv *hpriv = ap->host_set->private_data;
 	int rc;
 
 	/*
@@ -464,6 +523,12 @@ static int ahci_port_suspend(struct ata_port *ap)
 	if (rc)
 		printk(KERN_WARNING "ata%d: FIS RX still running (rc %d)\n",
 		       ap->id, rc);
+
+	/*
+	 * Put device into slumber mode
+	 */
+	if (!rc && state.event != PM_EVENT_FREEZE)
+		ahci_port_standby(port_mmio, hpriv->cap);
 
 	return rc;
 }
@@ -627,8 +692,10 @@ static void ahci_start_fis_rx(void __iomem *port_mmio,
 			      struct ahci_port_priv *pp,
 			      struct ahci_host_priv *hpriv)
 {
+	u32 tmp;
+
 	/*
-	 * Enable FIS reception
+	 * Set FIS registers
 	 */
 	if (hpriv->cap & HOST_CAP_64)
 		writel((pp->cmd_slot_dma >> 16) >> 16, port_mmio + PORT_LST_ADDR_HI);
@@ -641,18 +708,111 @@ static void ahci_start_fis_rx(void __iomem *port_mmio,
 	readl(port_mmio + PORT_FIS_ADDR); /* flush */
 
 	/*
-	 * This is wrong. We should only activate
-	 * FIS_RX here; everything else should be handled
-	 * separately.
-	 * Some bits might not even be settable here
-	 * as they depend on the respective feature to be
-	 * implemented (Staggered Spin-up, 
-	 * Cold-presence detection etc.)
+	 * Enable FIS reception
 	 */
-	writel(PORT_CMD_ICC_ACTIVE | PORT_CMD_FIS_RX |
-	       PORT_CMD_POWER_ON | PORT_CMD_SPIN_UP,
-	       port_mmio + PORT_CMD);
+	tmp = readl(port_mmio + PORT_CMD);
+	tmp |= PORT_CMD_FIS_RX;
+	writel(tmp, port_mmio + PORT_CMD);
 	readl(port_mmio + PORT_CMD); /* flush */
+}
+
+static int ahci_port_spinup(void __iomem *port_mmio, u32 cap)
+{
+	u32 tmp;
+
+	tmp = readl(port_mmio + PORT_CMD);
+	/*
+	 * AHCI Rev1.1 Section 5.3.2.3:
+	 * Software is only allowed to program the PxCMD.FRE,
+	 * PxCMD.POD, PxSCTL.DET, and PxCMD.SUD register bits
+	 * when PxCMD.ST is set to ‘0’.
+	 */
+	if (tmp & PORT_CMD_START)
+		return -EBUSY;
+
+	/*
+	 * Power on device if supported
+	 */
+	if (tmp & PORT_CMD_CPD) {
+		tmp |= PORT_CMD_POWER_ON;
+		writel(tmp, port_mmio + PORT_CMD);
+		tmp = readl(port_mmio + PORT_CMD);
+	}
+
+	/*
+	 * Spin up device
+	 */
+	if (cap & HOST_CAP_SSS) {
+		tmp |= PORT_CMD_SPIN_UP;
+		writel(tmp, port_mmio + PORT_CMD);
+		tmp = readl(port_mmio + PORT_CMD);
+	}
+
+	if ((tmp & PORT_CMD_ICC_MASK) != PORT_CMD_ICC_ACTIVE) {
+		tmp |= PORT_CMD_ICC_ACTIVE;
+		writel(tmp, port_mmio + PORT_CMD);
+		tmp = readl(port_mmio + PORT_CMD);
+	}
+
+	return 0;
+}
+
+static int ahci_port_standby(void __iomem *port_mmio, u32 cap)
+{
+	u32 tmp, scontrol, sstatus;
+
+	tmp = readl(port_mmio + PORT_CMD);
+	/*
+	 * AHCI Rev1.1 Section 5.3.2.3:
+	 * Software is only allowed to program the PxCMD.FRE,
+	 * PxCMD.POD, PxSCTL.DET, and PxCMD.SUD register bits
+	 * when PxCMD.ST is set to ‘0’.
+	 */
+	if (tmp & PORT_CMD_START)
+		return -EBUSY;
+
+	if (cap & HOST_CAP_SSC) {
+		/*
+		 * Enable transitions to slumber mode
+		 */
+		scontrol = readl(port_mmio + PORT_SCR_CTL);
+		if ((scontrol & 0x0f00) > 0x100) {
+			scontrol &= ~0xf00;
+			writel(scontrol, port_mmio + PORT_SCR_CTL);
+		}
+		/*
+		 * Put device into slumber mode
+		 */
+		tmp |= PORT_CMD_ICC_SLUMBER;
+		writel(tmp, port_mmio + PORT_CMD);
+		tmp = readl(port_mmio + PORT_CMD);
+
+		/*
+		 * Actually, we should wait for the device to
+		 * enter slumber mode by checking
+		 * sstatus & 0xf00 == 6
+		 */
+		sstatus = readl(port_mmio + PORT_SCR_STAT);
+	}
+
+	/*
+	 * Put device into listen mode
+	 */
+	scontrol = readl(port_mmio + PORT_SCR_CTL);
+	scontrol &= ~0xf;
+	writel(scontrol, port_mmio + PORT_SCR_CTL);
+
+	tmp = readl(port_mmio + PORT_CMD);
+	if (cap & HOST_CAP_SSS) {
+		/*
+		 * Spin down the device for staggered spin-up support
+		 */
+		tmp &= ~PORT_CMD_SPIN_UP;
+		writel(tmp, port_mmio + PORT_CMD);
+		readl(port_mmio + PORT_CMD); /* flush */
+	}
+
+	return 0;
 }
 
 static void ahci_phy_reset(struct ata_port *ap)
@@ -672,8 +832,6 @@ static void ahci_phy_reset(struct ata_port *ap)
 
 	if (ap->flags & ATA_FLAG_PORT_DISABLED)
 		return;
-
-	ahci_start_engine(port_mmio);
 
 	tmp = readl(port_mmio + PORT_SIG);
 	tf.lbah		= (tmp >> 24)	& 0xff;
@@ -697,6 +855,9 @@ static void ahci_phy_reset(struct ata_port *ap)
 		writel(new_tmp, port_mmio + PORT_CMD);
 		readl(port_mmio + PORT_CMD); /* flush */
 	}
+
+	ahci_start_engine(port_mmio);
+
 }
 
 static u8 ahci_check_status(struct ata_port *ap)
@@ -990,7 +1151,7 @@ int ahci_scsi_device_suspend(struct scsi_device *sdev, pm_message_t state)
 	rc = ata_device_suspend(ap, dev, state);
 
 	if (!rc)
-		rc = ahci_port_suspend(ap);
+		rc = ahci_port_suspend(ap, state);
 
 	return rc;
 }
@@ -1003,6 +1164,47 @@ int ahci_scsi_device_resume(struct scsi_device *sdev)
 	ahci_port_resume(ap);
 
 	return ata_device_resume(ap, dev);
+}
+
+int ahci_pci_device_suspend(struct pci_dev *pdev, pm_message_t state)
+{
+	struct device *dev = pci_dev_to_dev(pdev);
+	struct ata_host_set *host_set = dev_get_drvdata(dev);
+	void __iomem *mmio = host_set->mmio_base;
+	u32 tmp;
+
+	/*
+	 * AHCI spec rev1.1 section 8.3.3:
+	 * Software must disable interrupts prior to
+	 * requesting a transition of the HBA to
+	 * D3 state.
+	 */
+	tmp = readl(mmio + HOST_CTL);
+	tmp &= ~HOST_IRQ_EN;
+	writel(tmp, mmio + HOST_CTL);
+	tmp = readl(mmio + HOST_CTL); /* flush */
+
+	return ata_pci_device_suspend(pdev, state);
+}
+
+int ahci_pci_device_resume(struct pci_dev *pdev)
+{
+	struct device *dev = pci_dev_to_dev(pdev);
+	struct ata_host_set *host_set = dev_get_drvdata(dev);
+	void __iomem *mmio = host_set->mmio_base;
+	u32 tmp;
+
+	/*
+	 * Enabling AHCI mode
+	 */
+	tmp = readl(mmio + HOST_CTL);
+	if (!(tmp & HOST_AHCI_EN)) {
+		tmp |= HOST_AHCI_EN;
+		writel(tmp, mmio + HOST_CTL);
+		tmp = readl(mmio + HOST_CTL);
+	}
+
+	return ata_pci_device_resume(pdev);
 }
 
 static void ahci_setup_port(struct ata_ioports *port, unsigned long base,
@@ -1029,8 +1231,15 @@ static int ahci_host_init(struct ata_probe_ent *probe_ent)
 	void __iomem *port_mmio;
 
 	cap_save = readl(mmio + HOST_CAP);
-	cap_save &= ( (1<<28) | (1<<17) );
-	cap_save |= (1 << 27);
+
+	if (pdev->vendor == PCI_VENDOR_ID_INTEL) {
+		/*
+		 * Intel ICHx specific 
+		 * AHCI spec defines HOST_CAP as R/O
+		 */
+		cap_save &= ( HOST_CAP_SIS | HOST_CAP_SPM );
+		cap_save |= HOST_CAP_SSS;
+	}
 
 	/* global controller reset */
 	tmp = readl(mmio + HOST_CTL);
@@ -1123,7 +1332,10 @@ static int ahci_host_init(struct ata_probe_ent *probe_ent)
 			       i, rc);
 
 		/*
-		 * TODO: port / HBA reset if the above fails
+		 * Actually, this is wrong again.
+		 * AHCI spec says that we first should
+		 * enable FIS reception before sending
+		 * SPIN_UP to the device ...
 		 */
 		writel(PORT_CMD_SPIN_UP, port_mmio + PORT_CMD);
 
@@ -1217,7 +1429,7 @@ static void ahci_print_info(struct ata_probe_ent *probe_ent)
 	dev_printk(KERN_INFO, &pdev->dev,
 		"flags: "
 	       	"%s%s%s%s%s%s"
-	       	"%s%s%s%s%s%s%s\n"
+	       	"%s%s%s%s%s%s%s%s%s%s\n"
 	       	,
 
 		cap & (1 << 31) ? "64bit " : "",
@@ -1233,7 +1445,10 @@ static void ahci_print_info(struct ata_probe_ent *probe_ent)
 		cap & (1 << 17) ? "pmp " : "",
 		cap & (1 << 15) ? "pio " : "",
 		cap & (1 << 14) ? "slum " : "",
-		cap & (1 << 13) ? "part " : ""
+		cap & (1 << 13) ? "part " : "",
+		cap & (1 <<  7) ? "coal " : "",
+		cap & (1 <<  6) ? "enc " : "",
+		cap & (1 <<  5) ? "ext " : ""
 		);
 }
 
