@@ -1594,14 +1594,14 @@ void __sata_phy_reset(struct ata_port *ap)
 	} else {
 		printk(KERN_INFO "ata%u: SATA link down (SStatus %X)\n",
 		       ap->id, sstatus);
-		ata_port_disable(ap);
+		ap->ops->port_disable(ap);
 	}
 
 	if (ap->flags & ATA_FLAG_PORT_DISABLED)
 		return;
 
 	if (ata_busy_sleep(ap, ATA_TMOUT_BOOT_QUICK, ATA_TMOUT_BOOT)) {
-		ata_port_disable(ap);
+		ap->ops->port_disable(ap);
 		return;
 	}
 
@@ -1934,7 +1934,7 @@ static void ata_set_mode(struct ata_port *ap)
 	return;
 
 err_out:
-	ata_port_disable(ap);
+	ap->ops->port_disable(ap);
 }
 
 /**
@@ -2425,7 +2425,7 @@ static void ata_dev_set_xfermode(struct ata_port *ap, struct ata_device *dev)
 	if (ata_exec_internal(ap, dev, &tf, DMA_NONE, NULL, 0)) {
 		printk(KERN_ERR "ata%u: failed to set xfermode, disabled\n",
 		       ap->id);
-		ata_port_disable(ap);
+		ap->ops->port_disable(ap);
 	}
 
 	DPRINTK("EXIT\n");
@@ -2469,7 +2469,7 @@ static void ata_dev_reread_id(struct ata_port *ap, struct ata_device *dev)
 	return;
 err_out:
 	printk(KERN_ERR "ata%u: failed to reread ID, disabled\n", ap->id);
-	ata_port_disable(ap);
+	ap->ops->port_disable(ap);
 }
 
 /**
@@ -2503,7 +2503,7 @@ static void ata_dev_init_params(struct ata_port *ap, struct ata_device *dev)
 	if (ata_exec_internal(ap, dev, &tf, DMA_NONE, NULL, 0)) {
 		printk(KERN_ERR "ata%u: failed to init parameters, disabled\n",
 		       ap->id);
-		ata_port_disable(ap);
+		ap->ops->port_disable(ap);
 	}
 
 	DPRINTK("EXIT\n");

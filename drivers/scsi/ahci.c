@@ -179,6 +179,7 @@ struct ahci_host_priv {
 	unsigned long		flags;
 	u32			cap;	/* cache of HOST_CAP register */
 	u32			port_map; /* cache of HOST_PORTS_IMPL reg */
+	u32			dev_map;  /* connected devices */
 };
 
 struct ahci_port_priv {
@@ -211,6 +212,7 @@ static int ahci_port_resume(struct ata_port *ap);
 static void ahci_port_stop(struct ata_port *ap);
 static int ahci_port_standby(void __iomem *port_mmio, u32 cap);
 static int ahci_port_spinup(void __iomem *port_mmio, u32 cap);
+static void ahci_port_disable(struct ata_port *ap);
 static void ahci_tf_read(struct ata_port *ap, struct ata_taskfile *tf);
 static void ahci_qc_prep(struct ata_queued_cmd *qc);
 static u8 ahci_check_status(struct ata_port *ap);
@@ -244,7 +246,7 @@ static struct scsi_host_template ahci_sht = {
 };
 
 static const struct ata_port_operations ahci_ops = {
-	.port_disable		= ata_port_disable,
+	.port_disable		= ahci_port_disable,
 
 	.check_status		= ahci_check_status,
 	.check_altstatus	= ahci_check_status,
@@ -466,8 +468,6 @@ static int ahci_port_resume(struct ata_port *ap)
 	if (!(tmp & HOST_IRQ_EN)) {
 		u32 irq_stat;
 
-		printk(KERN_WARNING "ata%d: enabling interrupts\n", ap->id);
-
 		/* ack any pending irq events for this port */
 		irq_stat = readl(port_mmio + PORT_IRQ_STAT);
 		if (irq_stat)
@@ -476,17 +476,21 @@ static int ahci_port_resume(struct ata_port *ap)
 		/* set irq mask (enables interrupts) */
 		writel(DEF_PORT_IRQ, port_mmio + PORT_IRQ_MASK);
 
-		/*
-		 * This should only be executed once per host,
-		 * ie only for the last port.
-		 */
-		irq_stat = readl(mmio + HOST_IRQ_STAT);
-		if (irq_stat)
-			writel(irq_stat, mmio + HOST_IRQ_STAT);
+		if ((hpriv->dev_map >> (ap->port_no + 1)) == 0) {
+			/*
+			 * Enable interrupts if this was the last port
+			 */
+			printk(KERN_WARNING "ata%d: enabling interrupts\n",
+			       ap->id);
 
-		tmp |= HOST_IRQ_EN;
-		writel(tmp, mmio + HOST_CTL);
-		(void) readl(mmio + HOST_CTL);
+			irq_stat = readl(mmio + HOST_IRQ_STAT);
+			if (irq_stat)
+				writel(irq_stat, mmio + HOST_IRQ_STAT);
+
+			tmp |= HOST_IRQ_EN;
+			writel(tmp, mmio + HOST_CTL);
+			(void) readl(mmio + HOST_CTL);
+		}
 	}
 
 	/*
@@ -532,6 +536,16 @@ static int ahci_port_suspend(struct ata_port *ap, pm_message_t state)
 
 	return rc;
 }
+
+static void ahci_port_disable(struct ata_port *ap) 
+{	
+	struct ahci_host_priv *hpriv = ap->host_set->private_data;
+
+	ata_port_disable(ap);
+
+	hpriv->dev_map &= ~(1 << ap->port_no);
+}
+
 
 static u32 ahci_scr_read (struct ata_port *ap, unsigned int sc_reg_in)
 {
@@ -679,10 +693,10 @@ static int ahci_stop_fis_rx(void __iomem *port_mmio)
 	mdelay(500);
 	work = 1000;
 	while (work-- > 0) {
-	    tmp = readl(port_mmio + PORT_CMD);
-	    if ((tmp & PORT_CMD_FIS_ON) == 0)
-		return 0;
-	    udelay(10);
+		tmp = readl(port_mmio + PORT_CMD);
+		if ((tmp & PORT_CMD_FIS_ON) == 0)
+			return 0;
+		udelay(10);
 	}
 
 	return -EBUSY;
@@ -818,6 +832,7 @@ static int ahci_port_standby(void __iomem *port_mmio, u32 cap)
 static void ahci_phy_reset(struct ata_port *ap)
 {
 	void __iomem *port_mmio = (void __iomem *) ap->ioaddr.cmd_addr;
+	struct ahci_host_priv *hpriv = ap->host_set->private_data;
 	struct ata_taskfile tf;
 	struct ata_device *dev = &ap->device[0];
 	u32 new_tmp, tmp;
@@ -841,7 +856,7 @@ static void ahci_phy_reset(struct ata_port *ap)
 
 	dev->class = ata_dev_classify(&tf);
 	if (!ata_dev_present(dev)) {
-		ata_port_disable(ap);
+		ap->ops->port_disable(ap);
 		return;
 	}
 
@@ -857,7 +872,8 @@ static void ahci_phy_reset(struct ata_port *ap)
 	}
 
 	ahci_start_engine(port_mmio);
-
+	
+	hpriv->dev_map |= (1 << ap->port_no);
 }
 
 static u8 ahci_check_status(struct ata_port *ap)
@@ -1276,6 +1292,7 @@ static int ahci_host_init(struct ata_probe_ent *probe_ent)
 
 	hpriv->cap = readl(mmio + HOST_CAP);
 	hpriv->port_map = readl(mmio + HOST_PORTS_IMPL);
+	hpriv->dev_map = 0;
 	probe_ent->n_ports = (hpriv->cap & 0x1f) + 1;
 
 	VPRINTK("cap 0x%x  port_map 0x%x  n_ports %d\n",
