@@ -389,8 +389,7 @@ static int check_device_area(struct dm_dev *dd, sector_t start, sector_t len)
 {
 	sector_t dev_size;
 	dev_size = dd->bdev->bd_inode->i_size >> SECTOR_SHIFT;
-	return dev_size ?
-		((start < dev_size) && (len <= (dev_size - start))) : 1;
+	return ((start < dev_size) && (len <= (dev_size - start)));
 }
 
 /*
