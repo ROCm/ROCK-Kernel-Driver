@@ -1101,6 +1101,7 @@ struct runqueue {
 
 	task_t *migration_thread;
 	struct list_head migration_queue;
+	int cpu;
 #endif
 
 #ifdef CONFIG_SCHEDSTATS
