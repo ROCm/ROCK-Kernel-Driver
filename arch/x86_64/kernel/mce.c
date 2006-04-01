@@ -29,7 +29,7 @@
 #define MISC_MCELOG_MINOR 227
 #define NR_BANKS 6
 
-atomic_t mce_entry; 
+atomic_t mce_entry;
 
 static int mce_dont_init;
 
@@ -175,7 +175,7 @@ void do_machine_check(struct pt_regs * regs, long error_code)
 	int i;
 	int panicm_found = 0;
 
-	atomic_inc(&mce_entry); 
+	atomic_inc(&mce_entry);
 
 	if (regs)
 		notify_die(DIE_NMI, "machine check", regs, error_code, 18, SIGKILL);
