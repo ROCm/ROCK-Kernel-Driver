@@ -21,10 +21,10 @@
 #include <linux/skbuff.h>
 #include <linux/inetdevice.h>
 
-#include "hysdn_defs.h"
-
 unsigned int hynet_enable = 0xffffffff; 
 module_param(hynet_enable, uint, 0);
+
+#include "hysdn_defs.h"
 
 /* store the actual version for log reporting */
 char *hysdn_net_revision = "$Revision: 1.8.6.4 $";
