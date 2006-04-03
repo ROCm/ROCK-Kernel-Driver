@@ -90,6 +90,9 @@ MODULE_DESCRIPTION("Intel CPU (IA-32) Microcode Update Driver");
 MODULE_AUTHOR("Tigran Aivazian <tigran@veritas.com>");
 MODULE_LICENSE("GPL");
 
+static int verbose;
+module_param(verbose, int, 0644);
+
 #define MICROCODE_VERSION 	"1.14"
 
 #define DEFAULT_UCODE_DATASIZE 	(2000) 	  /* 2000 bytes */
@@ -196,12 +199,16 @@ static inline void mark_microcode_update (int cpu_num, microcode_header_t *mc_he
 	pr_debug("   Checksum 0x%x\n", cksum);
 
 	if (mc_header->rev < uci->rev) {
-		printk(KERN_ERR "microcode: CPU%d not 'upgrading' to earlier revision"
-		       " 0x%x (current=0x%x)\n", cpu_num, mc_header->rev, uci->rev);
+		if (verbose)
+			printk(KERN_WARNING "microcode: CPU%d not 'upgrading' to earlier revision"
+			       " 0x%x (current=0x%x)\n", cpu_num, mc_header->rev, uci->rev);
 		goto out;
 	} else if (mc_header->rev == uci->rev) {
 		/* notify the caller of success on this cpu */
 		uci->err = MC_SUCCESS;
+		if (verbose)
+			printk(KERN_INFO "microcode: CPU%d already at revision 0x%x\n",
+				cpu_num, uci->rev);
 		goto out;
 	}
 
@@ -367,6 +374,8 @@ static void do_update_one (void * unused)
 	struct ucode_cpu_info *uci = ucode_cpu_info + cpu_num;
 
 	if (uci->mc == NULL) {
+		if (verbose)
+			printk(KERN_INFO "microcode: No new microcode data for CPU%d\n", cpu_num);
 		return;
 	}
 
