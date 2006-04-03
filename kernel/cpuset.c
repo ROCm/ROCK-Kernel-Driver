@@ -839,6 +839,55 @@ static int update_cpumask(struct cpuset *cs, char *buf)
 }
 
 /*
+ * cpuset_migrate_mm
+ *
+ *    Migrate memory region from one set of nodes to another.
+ *
+ *    Temporarilly set tasks mems_allowed to target nodes of migration,
+ *    so that the migration code can allocate pages on these nodes.
+ *
+ *    Call holding manage_sem, so our current->cpuset won't change
+ *    during this call, as manage_sem holds off any attach_task()
+ *    calls.  Therefore we don't need to take task_lock around the
+ *    call to guarantee_online_mems(), as we know no one is changing
+ *    our tasks cpuset.
+ *
+ *    Hold callback_sem around the two modifications of our tasks
+ *    mems_allowed to synchronize with cpuset_mems_allowed().
+ *
+ *    While the mm_struct we are migrating is typically from some
+ *    other task, the task_struct mems_allowed that we are hacking
+ *    is for our current task, which must allocate new pages for that
+ *    migrating memory region.
+ *
+ *    We call cpuset_update_task_memory_state() before hacking
+ *    our tasks mems_allowed, so that we are assured of being in
+ *    sync with our tasks cpuset, and in particular, callbacks to
+ *    cpuset_update_task_memory_state() from nested page allocations
+ *    won't see any mismatch of our cpuset and task mems_generation
+ *    values, so won't overwrite our hacked tasks mems_allowed
+ *    nodemask.
+ */
+
+static void cpuset_migrate_mm(struct mm_struct *mm, const nodemask_t *from,
+							const nodemask_t *to)
+{
+	struct task_struct *tsk = current;
+
+	cpuset_update_task_memory_state();
+
+	down(&callback_sem);
+	tsk->mems_allowed = *to;
+	up(&callback_sem);
+
+	do_migrate_pages(mm, from, to, MPOL_MF_MOVE_ALL);
+
+	down(&callback_sem);
+	guarantee_online_mems(tsk->cpuset, &tsk->mems_allowed);
+	up(&callback_sem);
+}
+
+/*
  * Handle user request to change the 'mems' memory placement
  * of a cpuset.  Needs to validate the request, update the
  * cpusets mems_allowed and mems_generation, and for each
@@ -951,10 +1000,8 @@ static int update_nodemask(struct cpuset *cs, char *buf)
 		struct mm_struct *mm = mmarray[i];
 
 		mpol_rebind_mm(mm, &cs->mems_allowed);
-		if (migrate) {
-			do_migrate_pages(mm, &oldmem, &cs->mems_allowed,
-							MPOL_MF_MOVE_ALL);
-		}
+		if (migrate)
+			cpuset_migrate_mm(mm, &oldmem, &cs->mems_allowed);
 		mmput(mm);
 	}
 
@@ -1189,11 +1236,11 @@ static int attach_task(struct cpuset *cs, char *pidbuf, char **ppathbuf)
 	mm = get_task_mm(tsk);
 	if (mm) {
 		mpol_rebind_mm(mm, &to);
+		if (is_memory_migrate(cs))
+			cpuset_migrate_mm(mm, &from, &to);
 		mmput(mm);
 	}
 
-	if (is_memory_migrate(cs))
-		do_migrate_pages(tsk->mm, &from, &to, MPOL_MF_MOVE_ALL);
 	put_task_struct(tsk);
 	synchronize_rcu();
 	if (atomic_dec_and_test(&oldcs->count))
