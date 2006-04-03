@@ -1029,6 +1029,7 @@ kdba_clearsinglestep(struct pt_regs *regs)
 		regs->eflags &= ~EF_IE;
 }
 
+#if 0
 #ifdef KDB_HAVE_LONGJMP
 int asmlinkage
 kdba_setjmp(kdb_jmp_buf *jb)
@@ -1094,6 +1095,7 @@ kdba_longjmp(kdb_jmp_buf *jb, int reason)
 #endif	 /* CONFIG_FRAME_POINTER */
 }
 #endif	/* KDB_HAVE_LONGJMP */
+#endif
 
 /*
  * kdba_enable_lbr
