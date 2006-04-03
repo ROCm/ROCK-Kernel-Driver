@@ -586,8 +586,13 @@ int hrtimer_get_res(const clockid_t which_clock, struct timespec *tp)
  */
 static inline void run_hrtimer_queue(struct hrtimer_base *base)
 {
-	ktime_t now = base->get_time();
+	ktime_t now;
 	struct rb_node *node;
+
+	if (!base->first)
+		return;
+
+	now = base->get_time();
 
 	spin_lock_irq(&base->lock);
 

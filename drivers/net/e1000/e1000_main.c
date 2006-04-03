@@ -735,7 +735,7 @@ e1000_probe(struct pci_dev *pdev,
 	}
 	
 
-#ifdef NETIF_F_TSO_default_to_off_for_now
+#ifdef NETIF_F_TSO
 	if ((adapter->hw.mac_type >= e1000_82544) &&
 	   (adapter->hw.mac_type != e1000_82547))
 		netdev->features |= NETIF_F_TSO;
