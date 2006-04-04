@@ -3157,39 +3157,37 @@ probe_device_type(struct device *devPtr)
 		length = sizeof(static_testmsg) - 24;
 		/* the -24 allows for the header */
 		dv = send_to_AP(index, z90crypt.cdx, length, loc_testmsg);
-		if (dv) {
-			PDEBUG("dv returned by send during probe: %d\n", dv);
-			if (dv == DEV_SEN_EXCEPTION) {
-				rv = SEN_FATAL_ERROR;
-				PRINTKC("exception in send to AP %d\n", index);
-				break;
-			}
-			PDEBUG("return value from send_to_AP: %d\n", rv);
-			switch (dv) {
-			case DEV_GONE:
-				PDEBUG("dev %d not available\n", index);
-				rv = SEN_NOT_AVAIL;
-				break;
-			case DEV_ONLINE:
-				rv = 0;
-				break;
-			case DEV_EMPTY:
-				rv = SEN_NOT_AVAIL;
-				break;
-			case DEV_NO_WORK:
-				rv = SEN_FATAL_ERROR;
-				break;
-			case DEV_BAD_MESSAGE:
-				rv = SEN_USER_ERROR;
-				break;
-			case DEV_QUEUE_FULL:
-				rv = SEN_QUEUE_FULL;
-				break;
-			default:
-				PRINTK("unknown dv=%d for dev %d\n", dv, index);
-				rv = SEN_NOT_AVAIL;
-				break;
-			}
+		PDEBUG("dv returned by send during probe: %d\n", dv);
+		if (dv == DEV_SEN_EXCEPTION) {
+			rv = SEN_FATAL_ERROR;
+			PRINTKC("exception in send to AP %d\n", index);
+			break;
+		}
+		PDEBUG("return value from send_to_AP: %d\n", rv);
+		switch (dv) {
+		case DEV_GONE:
+			PDEBUG("dev %d not available\n", index);
+			rv = SEN_NOT_AVAIL;
+			break;
+		case DEV_ONLINE:
+			rv = 0;
+			break;
+		case DEV_EMPTY:
+			rv = SEN_NOT_AVAIL;
+			break;
+		case DEV_NO_WORK:
+			rv = SEN_FATAL_ERROR;
+			break;
+		case DEV_BAD_MESSAGE:
+			rv = SEN_USER_ERROR;
+			break;
+		case DEV_QUEUE_FULL:
+			rv = SEN_QUEUE_FULL;
+			break;
+		default:
+			PRINTK("unknown dv=%d for dev %d\n", dv, index);
+			rv = SEN_NOT_AVAIL;
+			break;
 		}
 
 		if (rv)
@@ -3285,7 +3283,7 @@ probe_PCIXCC_type(struct device *devPtr)
 {
 	int rv, dv, i, index, length;
 	unsigned char psmid[8];
-	static unsigned char loc_testmsg[548];
+	static unsigned char loc_testmsg[sizeof(MCL3_testmsg)];
 	struct CPRBX *cprbx_p;
 
 	index = devPtr->dev_self_x;
@@ -3294,39 +3292,37 @@ probe_PCIXCC_type(struct device *devPtr)
 		memcpy(loc_testmsg, MCL3_testmsg, sizeof(MCL3_testmsg));
 		length = sizeof(MCL3_testmsg) - 0x0C;
 		dv = send_to_AP(index, z90crypt.cdx, length, loc_testmsg);
-		if (dv) {
-			PDEBUG("dv returned = %d\n", dv);
-			if (dv == DEV_SEN_EXCEPTION) {
-				rv = SEN_FATAL_ERROR;
-				PRINTKC("exception in send to AP %d\n", index);
-				break;
-			}
-			PDEBUG("return value from send_to_AP: %d\n", rv);
-			switch (dv) {
-			case DEV_GONE:
-				PDEBUG("dev %d not available\n", index);
-				rv = SEN_NOT_AVAIL;
-				break;
-			case DEV_ONLINE:
-				rv = 0;
-				break;
-			case DEV_EMPTY:
-				rv = SEN_NOT_AVAIL;
-				break;
-			case DEV_NO_WORK:
-				rv = SEN_FATAL_ERROR;
-				break;
-			case DEV_BAD_MESSAGE:
-				rv = SEN_USER_ERROR;
-				break;
-			case DEV_QUEUE_FULL:
-				rv = SEN_QUEUE_FULL;
-				break;
-			default:
-				PRINTK("unknown dv=%d for dev %d\n", dv, index);
-				rv = SEN_NOT_AVAIL;
-				break;
-			}
+		PDEBUG("dv returned = %d\n", dv);
+		if (dv == DEV_SEN_EXCEPTION) {
+			rv = SEN_FATAL_ERROR;
+			PRINTKC("exception in send to AP %d\n", index);
+			break;
+		}
+		PDEBUG("return value from send_to_AP: %d\n", rv);
+		switch (dv) {
+		case DEV_GONE:
+			PDEBUG("dev %d not available\n", index);
+			rv = SEN_NOT_AVAIL;
+			break;
+		case DEV_ONLINE:
+			rv = 0;
+			break;
+		case DEV_EMPTY:
+			rv = SEN_NOT_AVAIL;
+			break;
+		case DEV_NO_WORK:
+			rv = SEN_FATAL_ERROR;
+			break;
+		case DEV_BAD_MESSAGE:
+			rv = SEN_USER_ERROR;
+			break;
+		case DEV_QUEUE_FULL:
+			rv = SEN_QUEUE_FULL;
+			break;
+		default:
+			PRINTK("unknown dv=%d for dev %d\n", dv, index);
+			rv = SEN_NOT_AVAIL;
+			break;
 		}
 
 		if (rv)
