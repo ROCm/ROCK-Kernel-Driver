@@ -807,6 +807,29 @@ static inline void scsi_destroy_sdev(struct scsi_device *sdev)
 	put_device(&sdev->sdev_gendev);
 }
 
+/** 
+ * scsi_inq_str - print INQUIRY data from min to max index,
+ * strip trailing whitespace
+ * @buf:   Output buffer with at least end-first+1 bytes of space
+ * @inq:   Inquiry buffer (input)
+ * @first: Offset of string into inq
+ * @end:   Index after last character in inq
+ */
+static unsigned char* scsi_inq_str(unsigned char* buf, unsigned char *inq,
+				   unsigned first, unsigned end)
+{
+	unsigned term = 0, idx;
+	for (idx = 0; idx+first < end && idx+first < inq[4]+5; ++idx) {
+		if (inq[idx+first] > 0x20) {
+			buf[idx] = inq[idx+first];
+			term = idx+1;
+		} else {
+			buf[idx] = ' ';
+		}
+	}
+	buf[term] = 0;
+	return buf;
+}
 
 /**
  * scsi_probe_and_add_lun - probe a LUN, if a LUN is found add it
@@ -871,10 +894,12 @@ static int scsi_probe_and_add_lun(struct scsi_target *starget,
 	if (scsi_probe_lun(sdev, result, result_len, &bflags))
 		goto out_free_result;
 
+	if (bflagsp)
+		*bflagsp = bflags;
 	/*
 	 * result contains valid SCSI INQUIRY data.
 	 */
-	if ((result[0] >> 5) == 3) {
+	if (((result[0] >> 5) == 3) && !(bflags & BLIST_ATTACH_PQ3)) {
 		/*
 		 * For a Peripheral qualifier 3 (011b), the SCSI
 		 * spec says: The device server is not capable of
@@ -885,9 +910,18 @@ static int scsi_probe_and_add_lun(struct scsi_target *starget,
 		 * logical disk configured at sdev->lun, but there
 		 * is a target id responding.
 		 */
-		SCSI_LOG_SCAN_BUS(3, printk(KERN_INFO
-					"scsi scan: peripheral qualifier of 3,"
-					" no device added\n"));
+		SCSI_LOG_SCAN_BUS(2, sdev_printk(KERN_INFO, sdev, "scsi scan:"
+				   " peripheral qualifier of 3, device not"
+				   " added\n"))
+		if (lun == 0) {
+			unsigned char vend[9], mod[17];
+			SCSI_LOG_SCAN_BUS(1, sdev_printk(KERN_INFO, sdev,
+					"scsi scan: consider passing scsi_mod."
+					"dev_flags=%s:%s:0x240 or 0x800240\n",
+					scsi_inq_str(vend, result, 8, 16),
+					scsi_inq_str(mod, result, 16, 32)));
+		}
+		
 		res = SCSI_SCAN_TARGET_PRESENT;
 		goto out_free_result;
 	}
@@ -898,8 +932,6 @@ static int scsi_probe_and_add_lun(struct scsi_target *starget,
 			sdev->lockable = 0;
 			scsi_unlock_floptical(sdev, result);
 		}
-		if (bflagsp)
-			*bflagsp = bflags;
 	}
 
  out_free_result:
@@ -924,7 +956,6 @@ static int scsi_probe_and_add_lun(struct scsi_target *starget,
  * scsi_sequential_lun_scan - sequentially scan a SCSI target
  * @starget:	pointer to target structure to scan
  * @bflags:	black/white list flag for LUN 0
- * @lun0_res:	result of scanning LUN 0
  *
  * Description:
  *     Generally, scan from LUN 1 (LUN 0 is assumed to already have been
@@ -934,8 +965,7 @@ static int scsi_probe_and_add_lun(struct scsi_target *starget,
  *     Modifies sdevscan->lun.
  **/
 static void scsi_sequential_lun_scan(struct scsi_target *starget,
-				     int bflags, int lun0_res, int scsi_level,
-				     int rescan)
+				     int bflags, int scsi_level, int rescan)
 {
 	unsigned int sparse_lun, lun, max_dev_lun;
 	struct Scsi_Host *shost = dev_to_shost(starget->dev.parent);
@@ -954,13 +984,6 @@ static void scsi_sequential_lun_scan(struct scsi_target *starget,
 		sparse_lun = 1;
 	} else
 		sparse_lun = 0;
-
-	/*
-	 * If not sparse lun and no device attached at LUN 0 do not scan
-	 * any further.
-	 */
-	if (!sparse_lun && (lun0_res != SCSI_SCAN_LUN_PRESENT))
-		return;
 
 	/*
 	 * If less than SCSI_1_CSS, and no special lun scaning, stop
@@ -1375,7 +1398,7 @@ static void __scsi_scan_target(struct device *parent, unsigned int channel,
 			 * do a sequential scan.
 			 */
 			scsi_sequential_lun_scan(starget, bflags,
-				       	res, starget->scsi_level, rescan);
+						 starget->scsi_level, rescan);
 	}
 
  out_reap:
