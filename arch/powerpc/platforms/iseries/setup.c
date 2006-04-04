@@ -54,6 +54,7 @@
 #include <asm/iseries/hv_lp_event.h>
 #include <asm/iseries/lpar_map.h>
 #include <asm/udbg.h>
+#include <asm/irq.h>
 
 #include "naca.h"
 #include "setup.h"
@@ -712,6 +713,12 @@ void __init iSeries_init_IRQ(void) { }
 
 static int __init iseries_probe(int platform)
 {
+	/*
+	 * The Hypervisor only allows us up to 256 interrupt
+	 * sources (the irq number is passed in a u8).
+	 */
+	virt_irq_max = 255;
+
 	return PLATFORM_ISERIES_LPAR == platform;
 }
 
