@@ -1712,6 +1712,7 @@ static int serial8250_startup(struct uart_port *port)
 	 * Do a quick test to see if we receive an
 	 * interrupt when we enable the TX irq.
 	 */
+	serial_outp(up, UART_IER, 0);
 	serial_outp(up, UART_IER, UART_IER_THRI);
 	lsr = serial_in(up, UART_LSR);
 	iir = serial_in(up, UART_IIR);
