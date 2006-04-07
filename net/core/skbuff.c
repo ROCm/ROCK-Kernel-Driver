@@ -461,7 +461,7 @@ struct sk_buff *skb_clone(struct sk_buff *skb, gfp_t gfp_mask)
 
 #endif
 #ifdef CONFIG_XEN
-	C(proto_csum_valid);
+	C(proto_data_valid);
 	C(proto_csum_blank);
 #endif
 	C(truesize);

@@ -1155,8 +1155,6 @@ static int __init init_amd(struct cpuinfo_x86 *c)
 
 	if (c->extended_cpuid_level >= 0x80000008) {
 		c->x86_max_cores = (cpuid_ecx(0x80000008) & 0xff) + 1;
-		if (c->x86_max_cores & (c->x86_max_cores - 1))
-			c->x86_max_cores = 1;
 
 		amd_detect_cmp(c);
 	}
@@ -1489,7 +1487,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 
 		/* Intel-defined (#2) */
-		"pni", NULL, NULL, "monitor", "ds_cpl", "vmx", NULL, "est",
+		"pni", NULL, NULL, "monitor", "ds_cpl", "vmx", "smx", "est",
 		"tm2", NULL, "cid", NULL, NULL, "cx16", "xtpr", NULL,
 		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,

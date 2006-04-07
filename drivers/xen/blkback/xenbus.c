@@ -47,6 +47,10 @@ static int connect_ring(struct backend_info *);
 static void backend_changed(struct xenbus_watch *, const char **,
 			    unsigned int);
 
+int blkif_connected(blkif_t *blkif)
+{
+	return (blkif->be->dev->state == XenbusStateConnected);
+}
 
 void update_blkif_status(blkif_t *blkif)
 { 
@@ -142,7 +146,7 @@ static int blkback_probe(struct xenbus_device *dev,
 	if (err)
 		goto fail;
 
-	err = xenbus_switch_state(dev, XBT_NULL, XenbusStateInitWait);
+	err = xenbus_switch_state(dev, XenbusStateInitWait);
 	if (err)
 		goto fail;
 
@@ -253,19 +257,24 @@ static void frontend_changed(struct xenbus_device *dev,
 
 	switch (frontend_state) {
 	case XenbusStateInitialising:
-	case XenbusStateConnected:
 		break;
 
 	case XenbusStateInitialised:
+	case XenbusStateConnected:
+		/* Ensure we connect even when two watches fire in 
+		   close successsion and we miss the intermediate value 
+		   of frontend_state. */
+		if (dev->state == XenbusStateConnected)
+			break;
+
 		err = connect_ring(be);
-		if (err) {
-			return;
-		}
-		update_blkif_status(be->blkif); 
+		if (err)
+			break;
+		update_blkif_status(be->blkif);
 		break;
 
 	case XenbusStateClosing:
-		xenbus_switch_state(dev, XBT_NULL, XenbusStateClosing);
+		xenbus_switch_state(dev, XenbusStateClosing);
 		break;
 
 	case XenbusStateClosed:
@@ -338,15 +347,17 @@ again:
 		goto abort;
 	}
 
-	err = xenbus_switch_state(dev, xbt, XenbusStateConnected);
-	if (err)
-		goto abort;
-
 	err = xenbus_transaction_end(xbt, 0);
 	if (err == -EAGAIN)
 		goto again;
 	if (err)
 		xenbus_dev_fatal(dev, err, "ending transaction");
+
+	err = xenbus_switch_state(dev, XenbusStateConnected);
+	if (err)
+		xenbus_dev_fatal(dev, err, "switching to Connected state",
+				 dev->nodename);
+
 	return;
  abort:
 	xenbus_transaction_end(xbt, 1);

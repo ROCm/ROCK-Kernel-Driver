@@ -145,7 +145,7 @@ config DEBUG_BUGVERBOSE
 
 config DEBUG_INFO
 	bool "Compile the kernel with debug info"
-	depends on DEBUG_KERNEL && !X86_64_XEN
+	depends on DEBUG_KERNEL
 	help
           If you say Y here the resulting kernel image will include
 	  debugging info resulting in a larger kernel image.

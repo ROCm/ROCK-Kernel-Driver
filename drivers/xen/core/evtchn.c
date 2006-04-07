@@ -170,9 +170,9 @@ static inline void exit_idle(void) {}
 #include <asm/idle.h>
 #define IRQ_REG orig_rax
 #endif
-#define do_IRQ(irq, regs) do {			\
-	(regs)->IRQ_REG = (irq);		\
-	do_IRQ((regs));				\
+#define do_IRQ(irq, regs) do {		\
+	(regs)->IRQ_REG = ~(irq);	\
+	do_IRQ((regs));			\
 } while (0)
 #endif
 

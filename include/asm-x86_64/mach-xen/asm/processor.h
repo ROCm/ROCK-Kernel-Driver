@@ -141,31 +141,21 @@ extern unsigned long mmu_cr4_features;
 static inline void set_in_cr4 (unsigned long mask)
 {
 	mmu_cr4_features |= mask;
-	switch (mask) {
-	case X86_CR4_OSFXSR:
-	case X86_CR4_OSXMMEXCPT:
-		break;
-	default:
-		do {
-			const char *msg = "Xen unsupported cr4 update\n";
-			(void)HYPERVISOR_console_io(
-				CONSOLEIO_write, __builtin_strlen(msg),
-				(char *)msg);
-			BUG();
-		} while (0);
-	}
+	__asm__("movq %%cr4,%%rax\n\t"
+		"orq %0,%%rax\n\t"
+		"movq %%rax,%%cr4\n"
+		: : "irg" (mask)
+		:"ax");
 }
 
 static inline void clear_in_cr4 (unsigned long mask)
 {
-#ifndef CONFIG_XEN
 	mmu_cr4_features &= ~mask;
 	__asm__("movq %%cr4,%%rax\n\t"
 		"andq %0,%%rax\n\t"
 		"movq %%rax,%%cr4\n"
 		: : "irg" (~mask)
 		:"ax");
-#endif
 }
 
 
@@ -182,13 +172,22 @@ static inline void clear_in_cr4 (unsigned long mask)
 
 /* This decides where the kernel will search for a free chunk of vm
  * space during mmap's.
+ *
+ * /proc/pid/unmap_base is only supported for 32bit processes without
+ * 3GB personality for now.
  */
 #define IA32_PAGE_OFFSET ((current->personality & ADDR_LIMIT_3GB) ? 0xc0000000 : 0xFFFFe000)
 
 #define TASK_SIZE 		(test_thread_flag(TIF_IA32) ? IA32_PAGE_OFFSET : TASK_SIZE64)
 #define TASK_SIZE_OF(child) 	((test_tsk_thread_flag(child, TIF_IA32)) ? IA32_PAGE_OFFSET : TASK_SIZE64)
 
-#define TASK_UNMAPPED_BASE	PAGE_ALIGN(TASK_SIZE/3)
+/* FIXME: Used in initializer, do we need to check for 64bit here? */
+#define __TASK_UNMAPPED_BASE (PAGE_ALIGN(0xffffe000 / 3))
+#define TASK_UNMAPPED_32 ((current->personality & ADDR_LIMIT_3GB) ? \
+ 	PAGE_ALIGN(0xc0000000 / 3) : PAGE_ALIGN(current->map_base))
+#define TASK_UNMAPPED_64 PAGE_ALIGN(TASK_SIZE64/3)
+#define TASK_UNMAPPED_BASE	\
+	(test_thread_flag(TIF_IA32) ? TASK_UNMAPPED_32 : TASK_UNMAPPED_64)
 
 /*
  * Size of io_bitmap.

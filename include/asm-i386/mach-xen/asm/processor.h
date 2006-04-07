@@ -237,20 +237,11 @@ extern unsigned long mmu_cr4_features;
 
 static inline void set_in_cr4 (unsigned long mask)
 {
+	unsigned cr4;
 	mmu_cr4_features |= mask;
-	switch (mask) {
-	case X86_CR4_OSFXSR:
-	case X86_CR4_OSXMMEXCPT:
-		break;
-	default:
-		do {
-			const char *msg = "Xen unsupported cr4 update\n";
-			(void)HYPERVISOR_console_io(
-				CONSOLEIO_write, __builtin_strlen(msg),
-				(char *)msg);
-			BUG();
-		} while (0);
-	}
+	cr4 = read_cr4();
+	cr4 |= mask;
+	write_cr4(cr4);
 }
 
 static inline void clear_in_cr4 (unsigned long mask)
@@ -335,7 +326,8 @@ extern int bootloader_type;
 /* This decides where the kernel will search for a free chunk of vm
  * space during mmap's.
  */
-#define TASK_UNMAPPED_BASE	(PAGE_ALIGN(TASK_SIZE / 3))
+#define TASK_UNMAPPED_BASE	(current->map_base)
+#define __TASK_UNMAPPED_BASE PAGE_ALIGN(TASK_SIZE/3)
 
 #define HAVE_ARCH_PICK_MMAP_LAYOUT
 
