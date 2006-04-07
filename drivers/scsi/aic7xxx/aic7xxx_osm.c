@@ -522,10 +522,6 @@ ahc_linux_target_alloc(struct scsi_target *starget)
 	unsigned int our_id = ahc->our_id;
 	unsigned int target_offset;
 
-	/* target might already be allocated when doing a rescan */
-	if (*ahc_targp)
-		return 0;
-
 	target_offset = starget->id;
 	if (starget->channel != 0)
 		target_offset += 8;
@@ -534,6 +530,8 @@ ahc_linux_target_alloc(struct scsi_target *starget)
 		our_id = ahc->our_id_b;
 
 	ahc_lock(ahc, &flags);
+
+	BUG_ON(*ahc_targp != NULL);
 
 	*ahc_targp = starget;
 	memset(targ, 0, sizeof(*targ));
