@@ -413,23 +413,20 @@ static ssize_t store_scaling_governor (struct cpufreq_policy * policy,
 	char	str_governor[16];
 	struct cpufreq_policy new_policy;
 
-	mutex_lock(&policy->lock);
 	ret = cpufreq_get_policy(&new_policy, policy->cpu);
 	if (ret)
-		goto error;
+		return ret;
 
 	ret = sscanf (buf, "%15s", str_governor);
-	if (ret != 1){
-		ret =  -EINVAL;
-		goto error;
-	}
+	if (ret != 1)
+		return -EINVAL;
 
-	if (cpufreq_parse_governor(str_governor, &new_policy.policy, &new_policy.governor)){
-		ret =  -EINVAL;
-		goto error;
-	}
+	if (cpufreq_parse_governor(str_governor, &new_policy.policy, &new_policy.governor))
+		return -EINVAL;
+
 	/* Do not use cpufreq_set_policy here or the user_policy.max
 	   will be wrongly overridden */
+	mutex_lock(&policy->lock);
 	ret = __cpufreq_set_policy(policy, &new_policy);
 
 	policy->user_policy.policy = policy->policy;
@@ -438,9 +435,6 @@ static ssize_t store_scaling_governor (struct cpufreq_policy * policy,
 	cpufreq_cpu_put(policy);
 
 	return ret ? ret : count;
- error:
-	mutex_unlock(&policy->lock);
-	return ret;
 }
 
 /**
