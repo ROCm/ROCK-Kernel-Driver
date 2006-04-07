@@ -332,7 +332,7 @@ fh_compose(struct svc_fh *fhp, struct svc_export *exp, struct dentry *dentry, st
 		parent->d_name.name, dentry->d_name.name,
 		(inode ? inode->i_ino : 0));
 
-	if (ref_fh && ref_fh->fs_export == exp) {
+	if (ref_fh && ref_fh->fh_export == exp) {
 		ref_fh_version = ref_fh->fh_handle.fh_version;
 		if (ref_fh_version == 0xca)
 			ref_fh_fsid_type = 0;
