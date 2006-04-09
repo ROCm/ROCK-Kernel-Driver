@@ -1374,6 +1374,7 @@ void __init dmi_check_apic(void)
 		return;
 	if (!dmi_enable_apic()) {
 		enable_local_apic = -1;
+		clear_bit(X86_FEATURE_APIC, boot_cpu_data.x86_capability);
 		printk(
 	KERN_INFO "IO/L-APIC disabled because your old system seems to be old\n"); 
 		printk(KERN_INFO "overwrite with \"apic\"\n");
