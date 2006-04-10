@@ -31,7 +31,7 @@ static inline cpumask_t target_cpus(void)
 #define APIC_DFR_VALUE		(APIC_DFR_FLAT)
 #define INT_DELIVERY_MODE	(dest_Fixed)
 #define INT_DEST_MODE		(0)    /* phys delivery to target proc */
-#define NO_BALANCE_IRQ		(1)
+#define NO_BALANCE_IRQ		(0)
 #define WAKE_SECONDARY_VIA_INIT
 
 
