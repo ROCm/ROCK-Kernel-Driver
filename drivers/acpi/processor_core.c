@@ -483,7 +483,7 @@ static int acpi_processor_get_info(struct acpi_processor *pr)
 	if (cpu_index >= NR_CPUS) {
 		if (ACPI_FAILURE
 		    (acpi_processor_hotadd_init(pr->handle, &pr->id))) {
-			ACPI_ERROR((AE_INFO,
+			ACPI_DEBUG_PRINT((ACPI_DB_INFO,
 				    "Getting cpuindex for acpiid 0x%x",
 				    pr->acpi_id));
 			return_VALUE(-ENODEV);
