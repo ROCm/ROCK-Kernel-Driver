@@ -1565,17 +1565,17 @@ static int __init ide_setup(char *s)
 
 #ifdef CONFIG_BLK_DEV_IDEACPI
 	if (!strcmp(s, "ide=noacpi")) {
-		printk(" : Disable IDE ACPI support.\n");
+		//printk(" : Disable IDE ACPI support.\n");
 		ide_noacpi = 1;
 		return 1;
 	}
 	if (!strcmp(s, "ide=acpigtf")) {
-		printk(" : Enable IDE ACPI _GTF support.\n");
+		//printk(" : Enable IDE ACPI _GTF support.\n");
 		ide_noacpitfs = 0;
 		return 1;
 	}
 	if (!strcmp(s, "ide=acpionboot")) {
-		printk(" : Call IDE ACPI methods on boot.\n");
+		//printk(" : Call IDE ACPI methods on boot.\n");
 		ide_noacpionboot = 0;
 		return 1;
 	}

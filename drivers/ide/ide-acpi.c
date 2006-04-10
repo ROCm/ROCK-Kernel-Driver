@@ -52,7 +52,7 @@ struct ide_acpi_hwif_link {
 	struct ide_acpi_drive_link	 slave;
 };
 	
-#define DEBUGGING	1
+#undef DEBUGGING
 /* note: adds function name and KERN_DEBUG */
 #ifdef DEBUGGING
 #define DEBPRINT(fmt, args...)	\
