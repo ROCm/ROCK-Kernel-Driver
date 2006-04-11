@@ -267,9 +267,14 @@ EXPORT_SYMBOL(invalidate_inode_pages);
  * @end: the page offset 'to' which to invalidate (inclusive)
  *
  * Any pages which are found to be mapped into pagetables are unmapped prior to
- * invalidation.
+ * invalidation. invalidate_inode_pages2_range is non destructive and it can't
+ * lose dirty data (if dirty data exists -EIO will be returned). It's up to
+ * the caller to call unmap_mapping_range and filemap_write_and_wait before
+ * invalidate_inode_pages2 if needed.
  *
- * Returns -EIO if any pages could not be invalidated.
+ * Returns -EIO if any pages could not be invalidated. Before returning -EIO
+ * it tries invalidating all pages in the range, it doesn't stop at the first
+ * page invalidation failure.
  */
 int invalidate_inode_pages2_range(struct address_space *mapping,
 				  pgoff_t start, pgoff_t end)
@@ -283,13 +288,12 @@ int invalidate_inode_pages2_range(struct address_space *mapping,
 
 	pagevec_init(&pvec, 0);
 	next = start;
-	while (next <= end && !ret && !wrapped &&
+	while (next <= end && !wrapped &&
 		pagevec_lookup(&pvec, mapping, next,
 			min(end - next, (pgoff_t)PAGEVEC_SIZE - 1) + 1)) {
-		for (i = 0; !ret && i < pagevec_count(&pvec); i++) {
+		for (i = 0; i < pagevec_count(&pvec); i++) {
 			struct page *page = pvec.pages[i];
 			pgoff_t page_index;
-			int was_dirty;
 
 			lock_page(page);
 			if (page->mapping != mapping) {
@@ -325,12 +329,9 @@ int invalidate_inode_pages2_range(struct address_space *mapping,
 					  PAGE_CACHE_SIZE, 0);
 				}
 			}
-			was_dirty = test_clear_page_dirty(page);
-			if (!invalidate_complete_page(mapping, page)) {
-				if (was_dirty)
-					set_page_dirty(page);
+
+			if (!invalidate_complete_page(mapping, page))
 				ret = -EIO;
-			}
 			unlock_page(page);
 		}
 		pagevec_release(&pvec);
