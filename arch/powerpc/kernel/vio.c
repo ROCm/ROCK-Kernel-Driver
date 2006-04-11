@@ -267,21 +267,22 @@ static int vio_hotplug(struct device *dev, char **envp, int num_envp,
 			char *buffer, int buffer_size)
 {
 	const struct vio_dev *vio_dev = to_vio_dev(dev);
-	char *cp;
+	char *cp = NULL;
 	int length;
 
 	if (!num_envp)
 		return -ENOMEM;
 
-	if (!vio_dev->dev.platform_data)
-		return -ENODEV;
-	cp = (char *)get_property(vio_dev->dev.platform_data, "compatible", &length);
-	if (!cp)
-		return -ENODEV;
+	if (vio_dev->dev.platform_data) {
+		cp = (char *)get_property(vio_dev->dev.platform_data,
+				"compatible", &length);
+		if (!cp)
+			return -ENODEV;
+	}
 
 	envp[0] = buffer;
 	length = scnprintf(buffer, buffer_size, "MODALIAS=vio:T%sS%s",
-				vio_dev->type, cp);
+				vio_dev->type, cp ? cp : "");
 	if (buffer_size - length <= 0)
 		return -ENOMEM;
 	envp[1] = NULL;
