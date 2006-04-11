@@ -1,3 +1,8 @@
+2006-03-30 Keith Owens  <kaos@sgi.com>
+
+	* Change CONFIG_LKCD to CONFIG_LKCD_DUMP.
+	* kdb v4.4-2.6.16-i386-3.
+
 2006-03-24 Keith Owens  <kaos@sgi.com>
 
 	* Define a dummy kdba_wait_for_cpus().

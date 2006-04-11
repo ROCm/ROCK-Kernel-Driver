@@ -1854,7 +1854,7 @@ kdb(kdb_reason_t reason, int error, struct pt_regs *regs)
 				goto out;
 			}
 		}
-	} else if (!KDB_IS_RUNNING()) {
+	} else if (reason == KDB_REASON_SWITCH && !KDB_IS_RUNNING()) {
 		kdb_printf("kdb: CPU switch without kdb running, I'm confused\n");
 		goto out;
 	}

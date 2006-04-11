@@ -1,3 +1,19 @@
+2006-04-05 Keith Owens  <kaos@sgi.com>
+
+	* More fixes for the timing race with KDB_ENTER_SLAVE.
+	* kdb v4.4-2.6.16-common-5.
+
+2006-03-30 Keith Owens  <kaos@sgi.com>
+
+	* Some code was testing KDB_IS_RUNNING() twice, which left it open to
+	  races.  Cache the result instead.
+	* kdb v4.4-2.6.16-common-4.
+
+2006-03-30 Keith Owens  <kaos@sgi.com>
+
+	* Change CONFIG_LKCD to CONFIG_LKCD_DUMP.
+	* kdb v4.4-2.6.16-common-3.
+
 2006-03-22 Keith Owens  <kaos@sgi.com>
 
 	* Add some more xpc flags.  Dean Nelson, SGI.
