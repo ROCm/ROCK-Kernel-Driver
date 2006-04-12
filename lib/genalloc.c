@@ -107,9 +107,10 @@ unsigned long gen_pool_alloc(struct gen_pool *poolp, int size)
 			spin_unlock_irqrestore(&poolp->lock, flags);
 			ptr = (struct gen_pool_link *)poolp->get_new_chunk(poolp);
 			spin_lock_irqsave(&poolp->lock, flags);
-			h[j].next = ptr;
-			if (h[j].next)
-				h[j].next->next = NULL;
+			if (ptr != NULL) {
+				ptr->next = h[j].next;
+				h[j].next = ptr;
+			}
 			break;
 		}
 		j++;
@@ -129,6 +130,9 @@ unsigned long gen_pool_alloc(struct gen_pool *poolp, int size)
 			h[j].next = (struct gen_pool_link *) (a + s);
 			h[j].next->next = NULL;
 		}
+		((struct gen_pool_link *)a)->next = NULL;
+		while (((volatile struct gen_pool_link *)a)->next != NULL)
+			;  /* spin until uncached write gets to FSB */
 	}
 	spin_unlock_irqrestore(&poolp->lock, flags);
 	return a;
@@ -161,8 +165,6 @@ void gen_pool_free(struct gen_pool *poolp, unsigned long ptr, int size)
 	spin_lock_irqsave(&poolp->lock, flags);
 	while (1) {
 		if (s == max_chunk_size) {
-			((struct gen_pool_link *)a)->next = h[i].next;
-			h[i].next = (struct gen_pool_link *)a;
 			break;
 		}
 		b = a ^ s;
@@ -172,15 +174,19 @@ void gen_pool_free(struct gen_pool *poolp, unsigned long ptr, int size)
 			q = q->next;
 
 		if (!q->next) {
-			((struct gen_pool_link *)a)->next = h[i].next;
-			h[i].next = (struct gen_pool_link *)a;
 			break;
 		}
 		q->next = q->next->next;
 		a = a & b;
+		b = a + s;
+		((struct gen_pool_link *)b)->next = NULL;
 		s <<= 1;
 		i++;
 	}
+	((struct gen_pool_link *)a)->next = h[i].next;
+	while (((volatile struct gen_pool_link *)a)->next != h[i].next)
+		;  /* spin until uncached write gets to FSB */
+	h[i].next = (struct gen_pool_link *)a;
 	spin_unlock_irqrestore(&poolp->lock, flags);
 }
 EXPORT_SYMBOL(gen_pool_free);
