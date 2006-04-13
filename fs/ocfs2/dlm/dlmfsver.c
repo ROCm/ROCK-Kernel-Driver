@@ -28,8 +28,8 @@
 
 #include "dlmfsver.h"
 
-#define DLM_BUILD_VERSION	"1.2.0-SLES"
-#define DLM_BUILD_DATE	"Tue Feb 21 14:36:13 PST 2006"
+#define DLM_BUILD_VERSION	"1.2.1-SLES"
+#define DLM_BUILD_DATE	"Tue Apr 11 14:45:04 PDT 2006"
 #define DLM_BUILD_MD5	"sles"
 
 #define VERSION_STR "OCFS2 DLMFS " \

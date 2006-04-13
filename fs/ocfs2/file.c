@@ -510,6 +510,17 @@ static int ocfs2_truncate_file(struct ocfs2_super *osb,
 	if (new_i_size == le64_to_cpu(fe->i_size))
 		goto bail;
 
+	/* This forces other nodes to sync and drop their pages. Do
+	 * this even if we have a truncate without allocation change -
+	 * ocfs2 cluster sizes can be much greater than page size, so
+	 * we have to truncate them anyway.  */
+	status = ocfs2_data_lock(inode, 1);
+	if (status < 0) {
+		mlog_errno(status);
+		goto bail;
+	}
+	ocfs2_data_unlock(inode, 1);
+
 	if (le32_to_cpu(fe->i_clusters) ==
 	    ocfs2_clusters_for_bytes(osb->sb, new_i_size)) {
 		mlog(0, "fe->i_clusters = %u, so we do a simple truncate\n",
@@ -531,14 +542,6 @@ static int ocfs2_truncate_file(struct ocfs2_super *osb,
 			mlog_errno(status);
 		goto bail;
 	}
-
-	/* This forces other nodes to sync and drop their pages */
-	status = ocfs2_data_lock(inode, 1);
-	if (status < 0) {
-		mlog_errno(status);
-		goto bail;
-	}
-	ocfs2_data_unlock(inode, 1);
 
 	/* alright, we're going to need to do a full blown alloc size
 	 * change. Orphan the inode so that recovery can complete the

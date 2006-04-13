@@ -37,9 +37,7 @@
 #define DLM_THREAD_SHUFFLE_INTERVAL    5     // flush everything every 5 passes
 #define DLM_THREAD_MS                  200   // flush at least every 200 ms
 
-#define DLM_HASH_BITS     7
-#define DLM_HASH_SIZE     (1 << DLM_HASH_BITS)
-#define DLM_HASH_MASK     (DLM_HASH_SIZE - 1)
+#define DLM_HASH_BUCKETS     (PAGE_SIZE / sizeof(struct hlist_head))
 
 enum dlm_ast_type {
 	DLM_AST = 0,
@@ -87,7 +85,7 @@ enum dlm_ctxt_state {
 struct dlm_ctxt
 {
 	struct list_head list;
-	struct list_head *resources;
+	struct hlist_head *lockres_hash;
 	struct list_head dirty_list;
 	struct list_head purge_list;
 	struct list_head pending_asts;
@@ -217,7 +215,7 @@ struct dlm_lock_resource
 {
 	/* WARNING: Please see the comment in dlm_init_lockres before
 	 * adding fields here. */
-	struct list_head list;
+	struct hlist_node hash_node;
 	struct kref      refs;
 
 	/* please keep these next 3 in this order
@@ -630,6 +628,21 @@ __dlm_lockres_state_to_status(struct dlm_lock_resource *res)
 		status = DLM_FORWARD;
 
 	return status;
+}
+
+static inline u8 dlm_get_lock_cookie_node(u64 cookie)
+{
+	u8 ret;
+	cookie >>= 56;
+	ret = (u8)(cookie & 0xffULL);
+	return ret;
+}
+
+static inline unsigned long long dlm_get_lock_cookie_seq(u64 cookie)
+{
+	unsigned long long ret;
+	ret = ((unsigned long long)cookie) & 0x00ffffffffffffffULL;
+	return ret;
 }
 
 struct dlm_lock * dlm_new_lock(int type, u8 node, u64 cookie,

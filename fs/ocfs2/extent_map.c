@@ -176,21 +176,33 @@ static int ocfs2_extent_map_find_leaf(struct inode *inode,
 				   le32_to_cpu(rec->e_clusters));
 
 			ret = -EBADR;
-			if (rec_end > OCFS2_I(inode)->ip_clusters)
+			if (rec_end > OCFS2_I(inode)->ip_clusters) {
+				mlog_errno(ret);
+				ocfs2_error(inode->i_sb,
+					    "Extent %d at e_blkno %"MLFu64" of inode %"MLFu64" goes past ip_clusters of %u\n",
+					    i,
+					    le64_to_cpu(rec->e_blkno),
+					    OCFS2_I(inode)->ip_blkno,
+					    OCFS2_I(inode)->ip_clusters);
 				goto out_free;
+			}
 
 			if (rec_end <= cpos) {
 				ret = ocfs2_extent_map_insert(inode, rec,
 						le16_to_cpu(el->l_tree_depth));
-				if (ret && (ret != -EEXIST))
+				if (ret && (ret != -EEXIST)) {
+					mlog_errno(ret);
 					goto out_free;
+				}
 				continue;
 			}
 			if ((cpos + clusters) <= le32_to_cpu(rec->e_cpos)) {
 				ret = ocfs2_extent_map_insert(inode, rec,
 						le16_to_cpu(el->l_tree_depth));
-				if (ret && (ret != -EEXIST))
+				if (ret && (ret != -EEXIST)) {
+					mlog_errno(ret);
 					goto out_free;
+				}
 				continue;
 			}
 
@@ -204,8 +216,10 @@ static int ocfs2_extent_map_find_leaf(struct inode *inode,
 			ret = -ESRCH;
 			if (!ocfs2_extent_rec_contains_clusters(rec,
 							        cpos,
-								clusters))
+								clusters)) {
+				mlog_errno(ret);
 				goto out_free;
+			}
 
 			/*
 			 * If we've already found a record, the el has
@@ -213,8 +227,16 @@ static int ocfs2_extent_map_find_leaf(struct inode *inode,
 			 * EEEK!
 			 */
 			ret = -EBADR;
-			if (blkno)
+			if (blkno) {
+				mlog_errno(ret);
+				ocfs2_error(inode->i_sb,
+					    "Multiple extents for (cpos = %u, clusters = %u) on inode %"MLFu64"; e_blkno %"MLFu64" and rec %d at e_blkno %"MLFu64"\n",
+					    cpos, clusters,
+					    OCFS2_I(inode)->ip_blkno,
+					    blkno, i,
+					    le64_to_cpu(rec->e_blkno));
 				goto out_free;
+			}
 
 			blkno = le64_to_cpu(rec->e_blkno);
 		}
@@ -224,8 +246,14 @@ static int ocfs2_extent_map_find_leaf(struct inode *inode,
 		 * in the branches, so we'd better have found someone
 		 */
 		ret = -EBADR;
-		if (!blkno)
+		if (!blkno) {
+			ocfs2_error(inode->i_sb,
+				    "No record found for (cpos = %u, clusters = %u) on inode %"MLFu64"\n",
+				    cpos, clusters,
+				    OCFS2_I(inode)->ip_blkno);
+			mlog_errno(ret);
 			goto out_free;
+		}
 
 		if (eb_bh) {
 			brelse(eb_bh);
@@ -234,8 +262,10 @@ static int ocfs2_extent_map_find_leaf(struct inode *inode,
 		ret = ocfs2_read_block(OCFS2_SB(inode->i_sb),
 				       blkno, &eb_bh, OCFS2_BH_CACHED,
 				       inode);
-		if (ret)
+		if (ret) {
+			mlog_errno(ret);
 			goto out_free;
+		}
 		eb = (struct ocfs2_extent_block *)eb_bh->b_data;
 		if (!OCFS2_IS_VALID_EXTENT_BLOCK(eb)) {
 			OCFS2_RO_ON_INVALID_EXTENT_BLOCK(inode->i_sb, eb);
@@ -250,10 +280,26 @@ static int ocfs2_extent_map_find_leaf(struct inode *inode,
 
 	for (i = 0; i < le16_to_cpu(el->l_next_free_rec); i++) {
 		rec = &el->l_recs[i];
+
+		if ((le32_to_cpu(rec->e_cpos) + le32_to_cpu(rec->e_clusters)) >
+		    OCFS2_I(inode)->ip_clusters) {
+			ret = -EBADR;
+			mlog_errno(ret);
+			ocfs2_error(inode->i_sb,
+				    "Extent %d at e_blkno %"MLFu64" of inode %"MLFu64" goes past ip_clusters of %u\n",
+				    i,
+				    le64_to_cpu(rec->e_blkno),
+				    OCFS2_I(inode)->ip_blkno,
+				    OCFS2_I(inode)->ip_clusters);
+			return ret;
+		}
+
 		ret = ocfs2_extent_map_insert(inode, rec,
 					      le16_to_cpu(el->l_tree_depth));
-		if (ret)
+		if (ret) {
+			mlog_errno(ret);
 			goto out_free;
+		}
 	}
 
 	ret = 0;
@@ -298,6 +344,7 @@ static int ocfs2_extent_map_lookup_read(struct inode *inode,
 		ret = ocfs2_read_block(OCFS2_SB(inode->i_sb), blkno, &bh,
 				       OCFS2_BH_CACHED, inode);
 		if (ret) {
+			mlog_errno(ret);
 			if (bh)
 				brelse(bh);
 			return ret;
@@ -316,6 +363,7 @@ static int ocfs2_extent_map_lookup_read(struct inode *inode,
 				       OCFS2_I(inode)->ip_blkno, &bh,
 				       OCFS2_BH_CACHED, inode);
 		if (ret) {
+			mlog_errno(ret);
 			if (bh)
 				brelse(bh);
 			return ret;
@@ -331,12 +379,17 @@ static int ocfs2_extent_map_lookup_read(struct inode *inode,
 
 	ret = ocfs2_extent_map_find_leaf(inode, cpos, clusters, el);
 	brelse(bh);
-	if (ret)
+	if (ret) {
+		mlog_errno(ret);
 		return ret;
+	}
 
 	ent = ocfs2_extent_map_lookup(em, cpos, clusters, NULL, NULL);
-	if (!ent)
-		return -ESRCH;
+	if (!ent) {
+		ret = -ESRCH;
+		mlog_errno(ret);
+		return ret;
+	}
 
 	if (ent->e_tree_depth)
 		BUG();  /* FIXME: Make sure this isn't a corruption */
@@ -489,14 +542,24 @@ int ocfs2_extent_map_insert(struct inode *inode, struct ocfs2_extent_rec *rec,
 	struct ocfs2_em_insert_context ctxt = {0, };
 
 	if ((le32_to_cpu(rec->e_cpos) + le32_to_cpu(rec->e_clusters)) >
-	    OCFS2_I(inode)->ip_map.em_clusters)
-		return -EBADR;
+	    OCFS2_I(inode)->ip_map.em_clusters) {
+		ret = -EBADR;
+		mlog_errno(ret);
+		return ret;
+	}
 
 	/* Zero e_clusters means a truncated tail record.  It better be EOF */
 	if (!rec->e_clusters) {
 		if ((le32_to_cpu(rec->e_cpos) + le32_to_cpu(rec->e_clusters)) !=
-		    OCFS2_I(inode)->ip_map.em_clusters)
-			return -EBADR;
+		    OCFS2_I(inode)->ip_map.em_clusters) {
+			ret = -EBADR;
+			mlog_errno(ret);
+			ocfs2_error(inode->i_sb,
+				    "Zero e_clusters on non-tail extent record at e_blkno %"MLFu64" on inode %"MLFu64"\n",
+				    le64_to_cpu(rec->e_blkno),
+				    OCFS2_I(inode)->ip_blkno);
+			return ret;
+		}
 
 		/* Ignore the truncated tail */
 		return 0;
@@ -505,8 +568,10 @@ int ocfs2_extent_map_insert(struct inode *inode, struct ocfs2_extent_rec *rec,
 	ret = -ENOMEM;
 	ctxt.new_ent = kmem_cache_alloc(ocfs2_em_ent_cachep,
 					GFP_KERNEL);
-	if (!ctxt.new_ent)
+	if (!ctxt.new_ent) {
+		mlog_errno(ret);
 		return ret;
+	}
 
 	ctxt.new_ent->e_rec = *rec;
 	ctxt.new_ent->e_tree_depth = tree_depth;
@@ -532,6 +597,9 @@ int ocfs2_extent_map_insert(struct inode *inode, struct ocfs2_extent_rec *rec,
 						  tree_depth, &ctxt);
 	} while (ret == -EAGAIN);
 
+	if (ret < 0)
+		mlog_errno(ret);
+
 	if (ctxt.left_ent)
 		kmem_cache_free(ocfs2_em_ent_cachep, ctxt.left_ent);
 	if (ctxt.right_ent)
@@ -552,12 +620,12 @@ int ocfs2_extent_map_insert(struct inode *inode, struct ocfs2_extent_rec *rec,
  * Existing record in the extent map:
  *
  *	cpos = 10, len = 10
- * 	|---------|
+ *	|---------|
  *
  * New Record:
  *
  *	cpos = 10, len = 20
- * 	|------------------|
+ *	|------------------|
  *
  * The passed record is the new on-disk record.  The new_clusters value
  * is how many clusters were added to the file.  If the append is a
@@ -630,7 +698,8 @@ int ocfs2_extent_map_append(struct inode *inode,
 
 	if (ret == -ENOENT)
 		ret = ocfs2_extent_map_insert(inode, rec, 0);
-
+	if (ret < 0)
+		mlog_errno(ret);
 	return ret;
 }
 
@@ -754,8 +823,11 @@ int ocfs2_extent_map_get_blocks(struct inode *inode,
 	cpos = ocfs2_blocks_to_clusters(inode->i_sb, v_blkno);
 	clusters = ocfs2_blocks_to_clusters(inode->i_sb,
 					    (u64)count + bpc - 1);
-	if ((cpos + clusters) > OCFS2_I(inode)->ip_clusters)
-		return -EINVAL;
+	if ((cpos + clusters) > OCFS2_I(inode)->ip_clusters) {
+		ret = -EINVAL;
+		mlog_errno(ret);
+		return ret;
+	}
 
 	if ((cpos + clusters) > em->em_clusters) {
 		/*
@@ -768,16 +840,21 @@ int ocfs2_extent_map_get_blocks(struct inode *inode,
 	}
 
 	ret = ocfs2_extent_map_lookup_read(inode, cpos, clusters, &ent);
-	if (ret)
+	if (ret) {
+		mlog_errno(ret);
 		return ret;
+	}
 
 	if (ent)
 	{
 		rec = &ent->e_rec;
 
 		/* We should never find ourselves straddling an interval */
-		if (!ocfs2_extent_rec_contains_clusters(rec, cpos, clusters))
-			return -ESRCH;
+		if (!ocfs2_extent_rec_contains_clusters(rec, cpos, clusters)) {
+			ret = -ESRCH;
+			mlog_errno(ret);
+			return ret;
+		}
 
 		boff = ocfs2_clusters_to_blocks(inode->i_sb, cpos -
 						le32_to_cpu(rec->e_cpos));
