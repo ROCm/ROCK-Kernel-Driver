@@ -390,6 +390,43 @@ void *idr_find(struct idr *idp, int id)
 }
 EXPORT_SYMBOL(idr_find);
 
+/**
+ * idr_update - update pointer for given id
+ * @idp: idr handle
+ * @ptr: pointer you want associated with the ide
+ * @id: lookup key
+ *
+ * Update the pointer registered with the id.  A -ENOENT
+ * return indicates that @id is not valid.
+ *
+ * The caller must serialize vs idr_find(), idr_get_new(), and idr_remove().
+ */
+int idr_replace(struct idr *idp, void *ptr, int id)
+{
+	int n;
+	struct idr_layer *p;
+	int shift = (idp->layers - 1) * IDR_BITS;
+
+	n = idp->layers * IDR_BITS;
+	p = idp->top;
+
+	id &= MAX_ID_MASK;
+
+	while ((shift > 0) && p) {
+		n = (id >> shift) & IDR_MASK;
+		p = p->ary[n];
+		shift -= IDR_BITS;
+	}
+
+	n = id & IDR_MASK;
+	if (unlikely(p == NULL || !test_bit(n, &p->bitmap)))
+		return -ENOENT;
+
+	p->ary[n] = ptr;
+	return 0;
+}
+EXPORT_SYMBOL(idr_replace);
+
 static void idr_cache_ctor(void * idr_layer, kmem_cache_t *idr_layer_cache,
 		unsigned long flags)
 {

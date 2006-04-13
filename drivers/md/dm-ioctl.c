@@ -600,12 +600,16 @@ static int dev_create(struct dm_ioctl *param, size_t param_size)
  */
 static struct hash_cell *__find_device_hash_cell(struct dm_ioctl *param)
 {
+	struct hash_cell *hc;
 	if (*param->uuid)
-		return __get_uuid_cell(param->uuid);
+		hc = __get_uuid_cell(param->uuid);
 	else if (*param->name)
-		return __get_name_cell(param->name);
+		hc = __get_name_cell(param->name);
 	else
 		return dm_get_mdptr(huge_decode_dev(param->dev));
+	if (hc)
+		dm_get(hc->md);
+	return hc;
 }
 
 static struct mapped_device *find_device(struct dm_ioctl *param)
@@ -617,7 +621,6 @@ static struct mapped_device *find_device(struct dm_ioctl *param)
 	hc = __find_device_hash_cell(param);
 	if (hc) {
 		md = hc->md;
-		dm_get(md);
 
 		/*
 		 * Sneakily write in both the name and the uuid
@@ -642,6 +645,7 @@ static struct mapped_device *find_device(struct dm_ioctl *param)
 static int dev_remove(struct dm_ioctl *param, size_t param_size)
 {
 	struct hash_cell *hc;
+	struct mapped_device *md;
 
 	down_write(&_hash_lock);
 	hc = __find_device_hash_cell(param);
@@ -652,8 +656,11 @@ static int dev_remove(struct dm_ioctl *param, size_t param_size)
 		return -ENXIO;
 	}
 
+	md = hc->md;
+
 	__hash_remove(hc);
 	up_write(&_hash_lock);
+	dm_put(md);
 	param->data_size = 0;
 	return 0;
 }
@@ -731,7 +738,6 @@ static int do_resume(struct dm_ioctl *param)
 	}
 
 	md = hc->md;
-	dm_get(md);
 
 	new_map = hc->new_map;
 	hc->new_map = NULL;
@@ -975,6 +981,7 @@ static int table_load(struct dm_ioctl *param, size_t param_size)
 	int r;
 	struct hash_cell *hc;
 	struct dm_table *t;
+	struct mapped_device *md;
 
 	r = dm_table_create(&t, get_mode(param), param->target_count);
 	if (r)
@@ -1001,7 +1008,9 @@ static int table_load(struct dm_ioctl *param, size_t param_size)
 	param->flags |= DM_INACTIVE_PRESENT_FLAG;
 
 	r = __dev_status(hc->md, param);
+	md = hc->md;
 	up_write(&_hash_lock);
+	dm_put(md);
 	return r;
 }
 
@@ -1009,6 +1018,7 @@ static int table_clear(struct dm_ioctl *param, size_t param_size)
 {
 	int r;
 	struct hash_cell *hc;
+	struct mapped_device *md;
 
 	down_write(&_hash_lock);
 
@@ -1027,7 +1037,9 @@ static int table_clear(struct dm_ioctl *param, size_t param_size)
 	param->flags &= ~DM_INACTIVE_PRESENT_FLAG;
 
 	r = __dev_status(hc->md, param);
+	md = hc->md;
 	up_write(&_hash_lock);
+	dm_put(md);
 	return r;
 }
 

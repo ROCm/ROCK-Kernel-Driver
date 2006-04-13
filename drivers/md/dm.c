@@ -23,6 +23,7 @@ static const char *_name = DM_NAME;
 static unsigned int major = 0;
 static unsigned int _major = 0;
 
+static DEFINE_SPINLOCK(_minor_lock);
 /*
  * One of these is allocated per bio.
  */
@@ -51,12 +52,15 @@ union map_info *dm_get_mapinfo(struct bio *bio)
         return NULL;
 }
 
+#define MINOR_ALLOCED ((void *)-1)
+
 /*
  * Bits for the md->flags field.
  */
 #define DMF_BLOCK_IO 0
 #define DMF_SUSPENDED 1
 #define DMF_FROZEN 2
+#define DMF_FREEING 3
 
 struct mapped_device {
 	struct rw_semaphore io_lock;
@@ -213,9 +217,16 @@ static int dm_blk_open(struct inode *inode, struct file *file)
 {
 	struct mapped_device *md;
 
+	spin_lock(&_minor_lock);
 	md = inode->i_bdev->bd_disk->private_data;
-	dm_get(md);
-	return 0;
+	if (md) {
+		if (test_bit(DMF_FREEING, &md->flags) == 0)
+			dm_get(md);
+		else
+			md = NULL;
+	}
+	spin_unlock(&_minor_lock);
+	return md ? 0 : -ENXIO;
 }
 
 static int dm_blk_close(struct inode *inode, struct file *file)
@@ -695,14 +706,13 @@ static int dm_any_congested(void *congested_data, int bdi_bits)
 /*-----------------------------------------------------------------
  * An IDR is used to keep track of allocated minor numbers.
  *---------------------------------------------------------------*/
-static DECLARE_MUTEX(_minor_lock);
 static DEFINE_IDR(_minor_idr);
 
 static void free_minor(unsigned int minor)
 {
-	down(&_minor_lock);
+	spin_lock(&_minor_lock);
 	idr_remove(&_minor_idr, minor);
-	up(&_minor_lock);
+	spin_unlock(&_minor_lock);
 }
 
 /*
@@ -715,20 +725,18 @@ static int specific_minor(struct mapped_device *md, unsigned int minor)
 	if (minor >= (1 << MINORBITS))
 		return -EINVAL;
 
-	down(&_minor_lock);
+	r = idr_pre_get(&_minor_idr, GFP_KERNEL);
+	if (!r)
+		return -ENOMEM;
+
+	spin_lock(&_minor_lock);
 
 	if (idr_find(&_minor_idr, minor)) {
 		r = -EBUSY;
 		goto out;
 	}
 
-	r = idr_pre_get(&_minor_idr, GFP_KERNEL);
-	if (!r) {
-		r = -ENOMEM;
-		goto out;
-	}
-
-	r = idr_get_new_above(&_minor_idr, md, minor, &m);
+	r = idr_get_new_above(&_minor_idr, MINOR_ALLOCED, minor, &m);
 	if (r) {
 		goto out;
 	}
@@ -740,7 +748,7 @@ static int specific_minor(struct mapped_device *md, unsigned int minor)
 	}
 
 out:
-	up(&_minor_lock);
+	spin_unlock(&_minor_lock);
 	return r;
 }
 
@@ -749,15 +757,13 @@ static int next_free_minor(struct mapped_device *md, unsigned int *minor)
 	int r;
 	unsigned int m;
 
-	down(&_minor_lock);
-
 	r = idr_pre_get(&_minor_idr, GFP_KERNEL);
-	if (!r) {
-		r = -ENOMEM;
-		goto out;
-	}
+	if (!r)
+		return -ENOMEM;
 
-	r = idr_get_new(&_minor_idr, md, &m);
+	spin_lock(&_minor_lock);
+
+	r = idr_get_new(&_minor_idr, MINOR_ALLOCED, &m);
 	if (r) {
 		goto out;
 	}
@@ -771,7 +777,7 @@ static int next_free_minor(struct mapped_device *md, unsigned int *minor)
 	*minor = m;
 
 out:
-	up(&_minor_lock);
+	spin_unlock(&_minor_lock);
 	return r;
 }
 
@@ -789,6 +795,9 @@ static struct mapped_device *alloc_dev(unsigned int minor, int persistent)
 		DMWARN("unable to allocate device, out of memory.");
 		return NULL;
 	}
+
+	if (!try_module_get(THIS_MODULE))
+		goto bad0;
 
 	/* get a minor number for the dev */
 	r = persistent ? specific_minor(md, minor) : next_free_minor(md, &minor);
@@ -828,6 +837,10 @@ static struct mapped_device *alloc_dev(unsigned int minor, int persistent)
 	if (!md->disk)
 		goto bad4;
 
+	atomic_set(&md->pending, 0);
+	init_waitqueue_head(&md->wait);
+	init_waitqueue_head(&md->eventq);
+
 	md->disk->major = _major;
 	md->disk->first_minor = minor;
 	md->disk->fops = &dm_blk_dops;
@@ -836,9 +849,11 @@ static struct mapped_device *alloc_dev(unsigned int minor, int persistent)
 	sprintf(md->disk->disk_name, "dm-%d", minor);
 	add_disk(md->disk);
 
-	atomic_set(&md->pending, 0);
-	init_waitqueue_head(&md->wait);
-	init_waitqueue_head(&md->eventq);
+	/* Populate the mapping, nobody knows we exist yet */
+	spin_lock(&_minor_lock);
+	r = idr_replace(&_minor_idr, md, minor);
+	spin_unlock(&_minor_lock);
+	BUG_ON(r < 0);
 
 	return md;
 
@@ -850,6 +865,8 @@ static struct mapped_device *alloc_dev(unsigned int minor, int persistent)
 	blk_put_queue(md->queue);
 	free_minor(minor);
  bad1:
+	module_put(THIS_MODULE);
+ bad0:
 	kfree(md);
 	return NULL;
 }
@@ -866,8 +883,14 @@ static void free_dev(struct mapped_device *md)
 	mempool_destroy(md->io_pool);
 	del_gendisk(md->disk);
 	free_minor(minor);
+
+	spin_lock(&_minor_lock);
+	md->disk->private_data = NULL;
+	spin_unlock(&_minor_lock);
+
 	put_disk(md->disk);
 	blk_put_queue(md->queue);
+	module_put(THIS_MODULE);
 	kfree(md);
 }
 
@@ -952,7 +975,7 @@ int dm_create_with_minor(unsigned int minor, struct mapped_device **result)
 	return create_aux(minor, 1, result);
 }
 
-static struct mapped_device *dm_find_md(dev_t dev)
+struct mapped_device *dm_get_md(dev_t dev)
 {
 	struct mapped_device *md;
 	unsigned minor = MINOR(dev);
@@ -960,23 +983,20 @@ static struct mapped_device *dm_find_md(dev_t dev)
 	if (MAJOR(dev) != _major || minor >= (1 << MINORBITS))
 		return NULL;
 
-	down(&_minor_lock);
+	spin_lock(&_minor_lock);
 
 	md = idr_find(&_minor_idr, minor);
-	if (!md || (dm_disk(md)->first_minor != minor))
+	if (md && (md == MINOR_ALLOCED || (dm_disk(md)->first_minor != minor)))
 		md = NULL;
 
-	up(&_minor_lock);
+	if (md) {
+		if (test_bit(DMF_FREEING, &md->flags))
+			md = NULL;
+		else
+			dm_get(md);
+	}
 
-	return md;
-}
-
-struct mapped_device *dm_get_md(dev_t dev)
-{
-	struct mapped_device *md = dm_find_md(dev);
-
-	if (md)
-		dm_get(md);
+	spin_unlock(&_minor_lock);
 
 	return md;
 }
@@ -986,7 +1006,7 @@ void *dm_get_mdptr(dev_t dev)
 	struct mapped_device *md;
 	void *mdptr = NULL;
 
-	md = dm_find_md(dev);
+	md = dm_get_md(dev);
 	if (md)
 		mdptr = md->interface_ptr;
 	return mdptr;
@@ -1006,7 +1026,12 @@ void dm_put(struct mapped_device *md)
 {
 	struct dm_table *map = dm_get_table(md);
 
-	if (atomic_dec_and_test(&md->holders)) {
+	BUG_ON(test_bit(DMF_FREEING, &md->flags));
+
+	if (atomic_dec_and_lock(&md->holders, &_minor_lock)) {
+		idr_replace(&_minor_idr, MINOR_ALLOCED, md->disk->first_minor);
+		set_bit(DMF_FREEING, &md->flags);
+		spin_unlock(&_minor_lock);
 		if (!dm_suspended(md)) {
 			dm_table_presuspend_targets(map);
 			dm_table_postsuspend_targets(map);
