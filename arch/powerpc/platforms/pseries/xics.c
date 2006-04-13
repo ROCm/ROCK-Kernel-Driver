@@ -208,6 +208,20 @@ xics_ops pSeriesLP_ops = {
 	pSeriesLP_qirr_info
 };
 
+static unsigned int xics_startup(unsigned int virq)
+{
+	unsigned int irq;
+
+	irq = irq_offset_down(virq);
+	if (radix_tree_insert(&irq_map, virt_irq_to_real(irq),
+			      &virt_irq_to_real_map[irq]) == -ENOMEM)
+		printk(KERN_CRIT "Out of memory creating real -> virtual"
+		       " IRQ mapping for irq %u (real 0x%x)\n",
+		       virq, virt_irq_to_real(irq));
+	xics_enable_irq(virq);
+	return 0;	/* return value is ignored */
+}
+
 static unsigned int real_irq_to_virt(unsigned int real_irq)
 {
 	unsigned int *ptr;
@@ -216,31 +230,6 @@ static unsigned int real_irq_to_virt(unsigned int real_irq)
 	if (ptr == NULL)
 		return NO_IRQ;
 	return ptr - virt_irq_to_real_map;
-}
-
-static unsigned int xics_startup(unsigned int virq)
-{
-	unsigned int irq;
-
-	irq = irq_offset_down(virq);
-
-#ifdef CONFIG_CRASH_DUMP
-	/* We may have kdumped from an interrupt handler in which case we
-	 * won't have EOI'ed that irq, so do it now. We only want to do
-	 * this the first time we're called for each irq, so exploit the
-	 * radix tree as a way to check if we've already enabled this irq.
-	 */
-	if (real_irq_to_virt(virt_irq_to_real(irq)) == NO_IRQ)
-		xics_end_irq(virq);
-#endif
-
-	if (radix_tree_insert(&irq_map, virt_irq_to_real(irq),
-			      &virt_irq_to_real_map[irq]) == -ENOMEM)
-		printk(KERN_CRIT "Out of memory creating real -> virtual"
-		       " IRQ mapping for irq %u (real 0x%x)\n",
-		       virq, virt_irq_to_real(irq));
-	xics_enable_irq(virq);
-	return 0;	/* return value is ignored */
 }
 
 #ifdef CONFIG_SMP
@@ -651,24 +640,27 @@ void xics_teardown_cpu(int secondary)
 	ops->cppr_info(cpu, 0x00);
 	iosync();
 
+	/*
+	 * Clear IPI
+	 */
 	ops->qirr_info(cpu, 0xff);
+
+	/*
+	 * we need to EOI the IPI if we got here from kexec down IPI
+	 *
+	 * probably need to check all the other interrupts too
+	 * should we be flagging idle loop instead?
+	 * or creating some task to be scheduled?
+	 */
+	ops->xirr_info_set(cpu, XICS_IPI);
 	/*
 	 * Some machines need to have at least one cpu in the GIQ,
 	 * so leave the master cpu in the group.
 	 */
-	if (secondary) {
-		/*
-		 * we need to EOI the IPI if we got here from kexec down IPI
-		 *
-		 * probably need to check all the other interrupts too
-		 * should we be flagging idle loop instead?
-		 * or creating some task to be scheduled?
-		 */
-		ops->xirr_info_set(cpu, XICS_IPI);
+	if (secondary)
 		rtas_set_indicator(GLOBAL_INTERRUPT_QUEUE,
 			(1UL << interrupt_server_size) - 1 -
 			default_distrib_server, 0);
-	}
 }
 
 #ifdef CONFIG_HOTPLUG_CPU

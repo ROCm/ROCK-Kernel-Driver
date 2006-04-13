@@ -71,7 +71,6 @@
 #define DBG(fmt...)
 #endif
 
-extern unsigned long setup_boot_paca(void);
 int have_of = 1;
 int boot_cpuid = 0;
 dev_t boot_dev;

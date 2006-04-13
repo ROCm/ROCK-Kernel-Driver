@@ -52,9 +52,13 @@
 #include <asm/firmware.h>
 #include <asm/processor.h>
 #endif
+#include <asm/kexec.h>
 
 #ifdef CONFIG_PPC64	/* XXX */
 #define _IO_BASE	pci_io_base
+#ifdef CONFIG_KEXEC
+cpumask_t cpus_in_sr = CPU_MASK_NONE;
+#endif
 #endif
 
 #ifdef CONFIG_DEBUGGER
@@ -99,9 +103,6 @@ static DEFINE_SPINLOCK(die_lock);
 int die(const char *str, struct pt_regs *regs, long err)
 {
 	static int die_counter;
-#ifdef CONFIG_KEXEC
-	static int crash_dump_start = 0;
-#endif
 	int nl = 0;
 
 	if (debugger(regs))
@@ -163,37 +164,11 @@ int die(const char *str, struct pt_regs *regs, long err)
 	show_regs(regs);
 	dump((char *)str, regs);
 	bust_spinlocks(0);
+	spin_unlock_irq(&die_lock);
 
-#ifdef CONFIG_KEXEC
-	if (!crash_dump_start && kexec_should_crash(current)) {
-		crash_dump_start = 1;
-		spin_unlock_irq(&die_lock);
+	if (kexec_should_crash(current))
 		crash_kexec(regs);
-		/*
-		 * If the kdump image is not loaded.
-		 */
-		crash_dump_start = 0;
-	} else
-		spin_unlock_irq(&die_lock);
-	if (crash_dump_start) {
-		/*
-	 	 * For soft-reset, some CPUs would have responded
-		 * to kdump IPI before receives FWNMI. So, call kdump IPI
-		 * callback directly. Otherwise, these CPUs will be
-	 	 * spinning forever since no more IPIs coming from
-		 * panic CPU.
-	 	 */
-		if (crash_ipi_function_ptr) {
-			crash_ipi_function_ptr(regs);
-			return 1;
-		}
-		while (crash_dump_start) {
-			mdelay(1);
-			barrier();
-		}
-		/* kdump image is not loaded */
-	}
-#endif
+	crash_kexec_secondary(regs);
 
 	if (in_interrupt())
 		panic("Fatal exception in interrupt");
@@ -257,7 +232,21 @@ void system_reset_exception(struct pt_regs *regs)
 			return;
 	}
 
+#ifdef CONFIG_KEXEC
+	cpu_set(smp_processor_id(), cpus_in_sr);
+#endif
+
 	die("System Reset", regs, SIGABRT);
+
+	/*
+	 * Some CPUs which got released from debugger will execute this path.
+	 * These CPUs entered debugger first time via soft-reset - Means,
+	 * could be possible that these CPUs may not repond to an IPI later.
+	 * Therefore, has to call kdump func directly.
+	 * Not a problem if we exited from debugger to recover. In this case
+	 * there will not be any primary kexec CPU. Hence, will be returned.
+	 */
+	crash_kexec_secondary(regs);
 
 	/* Must die if the interrupt is not recoverable */
 	if (!(regs->msr & MSR_RI))
