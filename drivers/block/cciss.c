@@ -1184,16 +1184,16 @@ static int revalidate_allvol(ctlr_info_t *host)
 static inline void complete_buffers(struct bio *bio, int status)
 {
 	while (bio) {
-		struct bio *xbh = bio->bi_next; 
+		struct bio *xbh = bio->bi_next;
 		int nr_sectors = bio_sectors(bio);
 
-		bio->bi_next = NULL; 
+		bio->bi_next = NULL;
 		blk_finished_io(len);
 		bio_endio(bio, nr_sectors << 9, status ? 0 : -EIO);
 		bio = xbh;
 	}
 
-} 
+}
 
 static void cciss_softirq_done(struct request *rq)
 {
@@ -1220,7 +1220,7 @@ static void cciss_softirq_done(struct request *rq)
 
 #ifdef CCISS_DEBUG
 	printk("Done with %p\n", rq);
-#endif /* CCISS_DEBUG */ 
+#endif /* CCISS_DEBUG */
 
 	spin_lock_irqsave(&h->lock, flags);
 	end_that_request_last(rq, rq->errors);
