@@ -28,6 +28,7 @@
 
 #include <asm/processor.h>
 #include <asm/machdep.h>
+#include <asm/kexec.h>
 #include <asm/kdump.h>
 #include <asm/lmb.h>
 #include <asm/firmware.h>
@@ -43,8 +44,6 @@
 /* This keeps a track of which one is crashing cpu. */
 int crashing_cpu = -1;
 static cpumask_t cpus_in_crash = CPU_MASK_NONE;
-extern struct kimage *kexec_crash_image;
-extern cpumask_t cpus_in_sr;
 
 static u32 *append_elf_note(u32 *buf, char *name, unsigned type, void *data,
 							       size_t data_len)
@@ -136,7 +135,7 @@ void crash_ipi_callback(struct pt_regs *regs)
 	 * If not, soft-reset will be invoked to bring other CPUs.
 	 */
 	while (!cpu_isset(crashing_cpu, cpus_in_crash))
-		barrier();
+		cpu_relax();
 
 	if (ppc_md.kexec_cpu_down)
 		ppc_md.kexec_cpu_down(1, 1);
@@ -153,7 +152,7 @@ static void crash_soft_reset_check(int cpu)
 
 	cpu_clear(cpu, cpus_in_sr);
 	while (atomic_read(&enter_on_soft_reset) != ncpus)
-		barrier();
+		cpu_relax();
 }
 
 static void crash_kexec_prepare_cpus(int cpu)
@@ -174,7 +173,7 @@ static void crash_kexec_prepare_cpus(int cpu)
 	printk(KERN_EMERG "Sending IPI to other cpus...\n");
 	msecs = 10000;
 	while ((cpus_weight(cpus_in_crash) < ncpus) && (--msecs > 0)) {
-		barrier();
+		cpu_relax();
 		mdelay(1);
 	}
 
@@ -192,7 +191,7 @@ static void crash_kexec_prepare_cpus(int cpu)
 		cpus_in_sr = CPU_MASK_NONE;
 		atomic_set(&enter_on_soft_reset, 0);
 		while (cpus_weight(cpus_in_crash) < ncpus)
-			barrier();
+			cpu_relax();
 	}
 	/*
 	 * Make sure all CPUs are entered via soft-reset if the kdump is
@@ -228,9 +227,9 @@ void crash_kexec_secondary(struct pt_regs *regs)
 			return;
 		}
 		mdelay(1);
-		barrier();
+		cpu_relax();
 	}
-        if (cpu == crashing_cpu) {
+	if (cpu == crashing_cpu) {
 		/*
 		 * Panic CPU will enter this func only via soft-reset.
 		 * Wait until all secondary CPUs entered and

@@ -113,6 +113,7 @@ extern void kexec_smp_wait(void);	/* get and clear naca physid, wait for
 extern void __init kexec_setup(void);
 extern int crashing_cpu;
 extern void crash_send_ipi(void (*crash_ipi_callback)(struct pt_regs *));
+extern cpumask_t cpus_in_sr;
 #endif /* __powerpc64 __ */
 
 struct kimage;
