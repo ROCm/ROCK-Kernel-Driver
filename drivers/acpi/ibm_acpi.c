@@ -1716,12 +1716,12 @@ static int __init setup_notify(struct ibm_struct *ibm)
 	int ret;
 
 	if (!*ibm->handle)
-		return 0;
+		return 1;
 
 	ret = acpi_bus_get_device(*ibm->handle, &ibm->device);
 	if (ret < 0) {
 		printk(IBM_ERR "%s device not present\n", ibm->name);
-		return 0;
+		return 1;
 	}
 
 	acpi_driver_data(ibm->device) = ibm;
@@ -1811,6 +1811,8 @@ static int __init ibm_init(struct ibm_struct *ibm)
 		ret = setup_notify(ibm);
 		if (ret < 0)
 			return ret;
+		if (ret > 0)
+			return 0;
 		ibm->notify_installed = 1;
 	}
 
