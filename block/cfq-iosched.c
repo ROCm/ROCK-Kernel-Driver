@@ -43,9 +43,9 @@ static int cfq_slice_idle = HZ / 100;
 #define CFQ_KEY_ANY		(0xffff)
 
 /*
- * disable queueing at the driver/hardware level
+ * amount of queueing at the driver/hardware level
  */
-static const int cfq_max_depth = 2;
+static const int cfq_max_depth = 64;
 
 /*
  * for the hash of cfqq inside the cfqd
