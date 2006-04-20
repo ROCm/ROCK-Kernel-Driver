@@ -279,7 +279,7 @@ int acpi_ec_enter_burst_mode(union acpi_ec *ec)
 	atomic_set(&ec->intr.leaving_burst, 0);
 	return_VALUE(0);
       end:
-	ACPI_EXCEPTION ((AE_INFO, status, "EC wait, burst mode");
+	ACPI_EXCEPTION ((AE_INFO, status, "EC wait, burst mode"));
 	return_VALUE(-1);
 }
 
@@ -300,7 +300,7 @@ int acpi_ec_leave_burst_mode(union acpi_ec *ec)
 	atomic_set(&ec->intr.leaving_burst, 1);
 	return_VALUE(0);
 end:
-	ACPI_EXCEPTION((AE_INFO, status, "EC leave burst mode");
+	ACPI_EXCEPTION((AE_INFO, status, "EC leave burst mode"));
 	return_VALUE(-1);
 }
 #endif /* ACPI_FUTURE_USAGE */
