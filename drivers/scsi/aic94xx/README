@@ -1,0 +1,82 @@
+$Id: //depot/aic94xx/README#2 $
+
+Copyright (C) 2005 Adaptec, Inc.  All rights reserved.
+Copyright (C) 2005 Luben Tuikov <luben_tuikov@adaptec.com>
+
+LICENSE AGREEMENT
+-----------------
+
+This file is licensed under GPLv2.
+
+This file is part of the aic94xx driver.
+
+The aic94xx driver is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public
+License as published by the Free Software Foundation;
+version 2 of the License.
+
+The aic94xx driver is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with Aic94xx Driver; if not, write to the Free Software
+Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+
+Introduction
+------------
+
+The aic94xx driver supports Adaptec SAS/SATA Host Adapters
+with AIC-94xx chips.  Features include 32/64 bit PCI/PCI-X
+interface supporting up to 66 MHz PCI 2.3 and up to 133 MHz
+PCI-X 2.0 operation.  It supports MSI or PCI interrupt pin.
+      * AIC-9405W is a  4 phy host adapter, 4 port maximum.
+      * AIC-9410W is an 8 phy host adapter, 8 port maximum.
+
+The driver supports Revision B0 or later of the controller.
+
+
+Hot plugging
+------------
+
+Hot plugging is supported, it works and has been tested.
+
+
+Dynamic PCI IDs
+---------------
+
+To make the driver probe and attach to a new device it
+doesn't quite recognize, you can dynamically add to the PCI
+ID table of the driver as follows:
+
+echo "vendor device" > /sys/bus/pci/drivers/aic94xx/new_id
+
+For the complete details see Documentation/pci.txt file.
+
+
+Not a HostRAID driver
+---------------------
+
+This driver is _not_ a HostRAID driver, it does _not_
+provide RAID capabilities.  Although RAID could be built on
+top of the devices exported by this driver.
+
+If you would like this driver to attach to a HostRAID
+enabled controller*, set the "attach_HostRAID" module
+parameter to "1" either at module load time or through sysfs.
+
+Kernel command line; append this:
+
+       aic94xx.attach_HostRAID=1
+
+Module loading, append this to your modprobe/insmod:
+
+       attach_HostRAID=1
+
+Or through sysfs, if the driver has already been loaded:
+
+echo "1" > /sys/module/aic94xx/parameters/attach_HostRAID
+
+* This of course could COMPLETELY destroy your HostRAID
+  array, and is NOT recommended.
