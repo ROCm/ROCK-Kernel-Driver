@@ -1448,11 +1448,11 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
 		return err;
 	}
 
+	SET_NETDEV_DEV(dev, &pdev->dev);
 	err = register_netdev(dev);
 	if (err)
 		goto out;
 
-	SET_NETDEV_DEV(dev, &pdev->dev);
 	p = dev->dev_addr;
 	printk(KERN_NOTICE
 		"%s: port %d with MAC address %02x:%02x:%02x:%02x:%02x:%02x\n",
