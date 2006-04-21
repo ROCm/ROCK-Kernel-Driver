@@ -933,6 +933,7 @@ static void hid_irq_in(struct urb *urb, struct pt_regs *regs)
 		case -ESHUTDOWN:	/* unplug */
 			return;
 		case -EILSEQ:		/* CRC error or failed urbs before unplug */
+		case -EPROTO:		/* failed urbs unplug 1.1 dev from 2.0 hub */
 		case -ETIMEDOUT:	/* NAK */
 			break;
 		default:		/* error */
