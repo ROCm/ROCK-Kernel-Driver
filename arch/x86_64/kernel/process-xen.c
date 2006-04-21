@@ -474,18 +474,6 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 	multicall_entry_t _mcl[8], *mcl = _mcl;
 
 	/*
-	 * This is basically '__unlazy_fpu', except that we queue a
-	 * multicall to indicate FPU task switch, rather than
-	 * synchronously trapping to Xen.
-	 */
-	if (prev_p->thread_info->status & TS_USEDFPU) {
-		__save_init_fpu(prev_p); /* _not_ save_init_fpu() */
-		mcl->op      = __HYPERVISOR_fpu_taskswitch;
-		mcl->args[0] = 1;
-		mcl++;
-	}
-
-	/*
 	 * Reload esp0, LDT and the page table pointer:
 	 */
 	mcl->op      = __HYPERVISOR_stack_switch;
@@ -561,6 +549,20 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 	prev->userrsp = read_pda(oldrsp); 
 	write_pda(oldrsp, next->userrsp); 
 	write_pda(pcurrent, next_p); 
+
+	/*
+	 * This is basically 'unlazy_fpu', except that we do a
+	 * hypercall to indicate FPU task switch, rather than
+	 * synchronously trapping to Xen.
+	 */
+ 	/* This must be here to ensure both math_state_restore() and
+	   kernel_fpu_begin() work consistently.
+	   And the AMD workaround requires it to be after DS reload. */
+	if (prev_p->thread_info->status & TS_USEDFPU) {
+		__save_init_fpu(prev_p); /* _not_ save_init_fpu() */
+		HYPERVISOR_fpu_taskswitch(1);
+	}
+
 	write_pda(kernelstack,
 		  task_stack_page(next_p) + THREAD_SIZE - PDA_STACKOFFSET);
 

@@ -754,7 +754,7 @@ static int __init acpi_parse_madt_ioapic_entries(void)
 		return -ENODEV;
 	}
 
-	if (!cpu_has_apic) 
+	if (!cpu_has_apic)
 		return -ENODEV;
 
 	/*

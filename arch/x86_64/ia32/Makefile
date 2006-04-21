@@ -23,6 +23,7 @@ quiet_cmd_syscall = SYSCALL $@
 			   -Wl,-soname=linux-gate.so.1 -o $@ \
 			   -Wl,-T,$(filter-out FORCE,$^)
 
+$(obj)/vsyscall-int80.so \
 $(obj)/vsyscall-sysenter.so $(obj)/vsyscall-syscall.so: \
 $(obj)/vsyscall-%.so: $(src)/vsyscall.lds $(obj)/vsyscall-%.o FORCE
 	$(call if_changed,syscall)
