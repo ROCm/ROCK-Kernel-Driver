@@ -450,9 +450,6 @@ mptsas_slave_alloc(struct scsi_device *sdev)
 		for (i = 0; i < p->num_phys; i++) {
 			if (p->phy_info[i].attached.sas_address ==
 					rphy->identify.sas_address) {
-				if (!mptsas_is_end_device(
-					&p->phy_info[i].attached))
-					goto out_no_dev;
 				target_id = p->phy_info[i].attached.id;
 				vtarget->bus_id = p->phy_info[i].attached.channel;
 				vdev->lun = sdev->lun;
@@ -472,7 +469,6 @@ mptsas_slave_alloc(struct scsi_device *sdev)
 			}
 		}
 	}
- out_no_dev:
 	mutex_unlock(&hd->ioc->sas_topology_mutex);
 
 	kfree(vdev);
