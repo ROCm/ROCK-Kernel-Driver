@@ -1238,6 +1238,7 @@ lpfc_nlp_list(struct lpfc_hba * phba, struct lpfc_nodelist * nlp, int list)
 						evt_listp);
 
 		}
+		nlp->nlp_flag &= ~NLP_NODEV_REMOVE;
 		nlp->nlp_type |= NLP_FC_NODE;
 		break;
 	case NLP_MAPPED_LIST:
@@ -1258,6 +1259,7 @@ lpfc_nlp_list(struct lpfc_hba * phba, struct lpfc_nodelist * nlp, int list)
 						evt_listp);
 
 		}
+		nlp->nlp_flag &= ~NLP_NODEV_REMOVE;
 		break;
 	case NLP_NPR_LIST:
 		nlp->nlp_flag |= list;
@@ -1402,6 +1404,8 @@ lpfc_check_sli_ndlp(struct lpfc_hba * phba,
 			if (icmd->ulpContext == (volatile ushort)ndlp->nlp_rpi)
 				return 1;
 		case CMD_ELS_REQUEST64_CR:
+			if (icmd->un.elsreq64.remoteID == ndlp->nlp_DID)
+				return 1;
 		case CMD_XMIT_ELS_RSP64_CX:
 			if (iocb->context1 == (uint8_t *) ndlp)
 				return 1;
