@@ -465,14 +465,18 @@ lpfc_rcv_padisc(struct lpfc_hba * phba,
 static int
 lpfc_rcv_logo(struct lpfc_hba * phba,
 		      struct lpfc_nodelist * ndlp,
-		      struct lpfc_iocbq *cmdiocb)
+		      struct lpfc_iocbq *cmdiocb,
+		      uint32_t els_cmd)
 {
 	/* Put ndlp on NPR list with 1 sec timeout for plogi, ACC logo */
 	/* Only call LOGO ACC for first LOGO, this avoids sending unnecessary
 	 * PLOGIs during LOGO storms from a device.
 	 */
 	ndlp->nlp_flag |= NLP_LOGO_ACC;
-	lpfc_els_rsp_acc(phba, ELS_CMD_ACC, cmdiocb, ndlp, NULL, 0);
+	if (els_cmd == ELS_CMD_PRLO)
+		lpfc_els_rsp_acc(phba, ELS_CMD_PRLO, cmdiocb, ndlp, NULL, 0);
+	else
+		lpfc_els_rsp_acc(phba, ELS_CMD_ACC, cmdiocb, ndlp, NULL, 0);
 
 	if (!(ndlp->nlp_type & NLP_FABRIC) ||
 		(ndlp->nlp_state == NLP_STE_ADISC_ISSUE)) {
@@ -681,7 +685,7 @@ lpfc_rcv_logo_plogi_issue(struct lpfc_hba * phba,
 	/* software abort outstanding PLOGI */
 	lpfc_els_abort(phba, ndlp, 1);
 
-	lpfc_rcv_logo(phba, ndlp, cmdiocb);
+	lpfc_rcv_logo(phba, ndlp, cmdiocb, ELS_CMD_LOGO);
 	return ndlp->nlp_state;
 }
 
@@ -905,7 +909,7 @@ lpfc_rcv_logo_adisc_issue(struct lpfc_hba * phba,
 	/* software abort outstanding ADISC */
 	lpfc_els_abort(phba, ndlp, 0);
 
-	lpfc_rcv_logo(phba, ndlp, cmdiocb);
+	lpfc_rcv_logo(phba, ndlp, cmdiocb, ELS_CMD_LOGO);
 	return ndlp->nlp_state;
 }
 
@@ -932,7 +936,7 @@ lpfc_rcv_prlo_adisc_issue(struct lpfc_hba * phba,
 	cmdiocb = (struct lpfc_iocbq *) arg;
 
 	/* Treat like rcv logo */
-	lpfc_rcv_logo(phba, ndlp, cmdiocb);
+	lpfc_rcv_logo(phba, ndlp, cmdiocb, ELS_CMD_PRLO);
 	return ndlp->nlp_state;
 }
 
@@ -1048,7 +1052,7 @@ lpfc_rcv_logo_reglogin_issue(struct lpfc_hba * phba,
 
 	cmdiocb = (struct lpfc_iocbq *) arg;
 
-	lpfc_rcv_logo(phba, ndlp, cmdiocb);
+	lpfc_rcv_logo(phba, ndlp, cmdiocb, ELS_CMD_LOGO);
 	return ndlp->nlp_state;
 }
 
@@ -1073,7 +1077,7 @@ lpfc_rcv_prlo_reglogin_issue(struct lpfc_hba * phba,
 	struct lpfc_iocbq *cmdiocb;
 
 	cmdiocb = (struct lpfc_iocbq *) arg;
-	lpfc_els_rsp_acc(phba, ELS_CMD_ACC, cmdiocb, ndlp, NULL, 0);
+	lpfc_els_rsp_acc(phba, ELS_CMD_PRLO, cmdiocb, ndlp, NULL, 0);
 	return ndlp->nlp_state;
 }
 
@@ -1186,7 +1190,7 @@ lpfc_rcv_logo_prli_issue(struct lpfc_hba * phba,
 	/* Software abort outstanding PRLI before sending acc */
 	lpfc_els_abort(phba, ndlp, 1);
 
-	lpfc_rcv_logo(phba, ndlp, cmdiocb);
+	lpfc_rcv_logo(phba, ndlp, cmdiocb, ELS_CMD_LOGO);
 	return ndlp->nlp_state;
 }
 
@@ -1214,7 +1218,7 @@ lpfc_rcv_prlo_prli_issue(struct lpfc_hba * phba,
 	struct lpfc_iocbq *cmdiocb;
 
 	cmdiocb = (struct lpfc_iocbq *) arg;
-	lpfc_els_rsp_acc(phba, ELS_CMD_ACC, cmdiocb, ndlp, NULL, 0);
+	lpfc_els_rsp_acc(phba, ELS_CMD_PRLO, cmdiocb, ndlp, NULL, 0);
 	return ndlp->nlp_state;
 }
 
@@ -1351,7 +1355,7 @@ lpfc_rcv_logo_unmap_node(struct lpfc_hba * phba,
 
 	cmdiocb = (struct lpfc_iocbq *) arg;
 
-	lpfc_rcv_logo(phba, ndlp, cmdiocb);
+	lpfc_rcv_logo(phba, ndlp, cmdiocb, ELS_CMD_LOGO);
 	return ndlp->nlp_state;
 }
 
@@ -1375,7 +1379,7 @@ lpfc_rcv_prlo_unmap_node(struct lpfc_hba * phba,
 
 	cmdiocb = (struct lpfc_iocbq *) arg;
 
-	lpfc_els_rsp_acc(phba, ELS_CMD_ACC, cmdiocb, ndlp, NULL, 0);
+	lpfc_els_rsp_acc(phba, ELS_CMD_PRLO, cmdiocb, ndlp, NULL, 0);
 	return ndlp->nlp_state;
 }
 
@@ -1424,7 +1428,7 @@ lpfc_rcv_logo_mapped_node(struct lpfc_hba * phba,
 
 	cmdiocb = (struct lpfc_iocbq *) arg;
 
-	lpfc_rcv_logo(phba, ndlp, cmdiocb);
+	lpfc_rcv_logo(phba, ndlp, cmdiocb, ELS_CMD_LOGO);
 	return ndlp->nlp_state;
 }
 
@@ -1456,7 +1460,7 @@ lpfc_rcv_prlo_mapped_node(struct lpfc_hba * phba,
 	spin_unlock_irq(phba->host->host_lock);
 
 	/* Treat like rcv logo */
-	lpfc_rcv_logo(phba, ndlp, cmdiocb);
+	lpfc_rcv_logo(phba, ndlp, cmdiocb, ELS_CMD_PRLO);
 	return ndlp->nlp_state;
 }
 
@@ -1551,7 +1555,7 @@ lpfc_rcv_logo_npr_node(struct lpfc_hba * phba,
 
 	cmdiocb = (struct lpfc_iocbq *) arg;
 
-	lpfc_rcv_logo(phba, ndlp, cmdiocb);
+	lpfc_rcv_logo(phba, ndlp, cmdiocb, ELS_CMD_LOGO);
 	return ndlp->nlp_state;
 }
 
