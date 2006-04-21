@@ -9,11 +9,16 @@
 #include <linux/init.h>
 #include <linux/acpi.h>
 #include <linux/bitmap.h>
+#include <asm/e820.h>
+
 #include "pci.h"
 
 #define MMCONFIG_APER_SIZE (256*1024*1024)
+/* Verify the first 16 busses. We assume that systems with more busses
+   get MCFG right. */
+#define MAX_CHECK_BUS 16
 
-static DECLARE_BITMAP(fallback_slots, 32);
+static DECLARE_BITMAP(fallback_slots, 32*MAX_CHECK_BUS);
 
 /* Static virtual mapping of the MMCONFIG aperture */
 struct mmcfg_virt {
@@ -55,7 +60,8 @@ static char __iomem *get_virt(unsigned int seg, unsigned bus)
 static char __iomem *pci_dev_base(unsigned int seg, unsigned int bus, unsigned int devfn)
 {
 	char __iomem *addr;
-	if (seg == 0 && bus == 0 && test_bit(PCI_SLOT(devfn), &fallback_slots))
+	if (seg == 0 && bus < MAX_CHECK_BUS &&
+		test_bit(32*bus + PCI_SLOT(devfn), fallback_slots))
 		return NULL;
 	addr = get_virt(seg, bus);
 	if (!addr)
@@ -129,21 +135,26 @@ static struct pci_raw_ops pci_mmcfg = {
    Normally this can be expressed in the MCFG by not listing them
    and assigning suitable _SEGs, but this isn't implemented in some BIOS.
    Instead try to discover all devices on bus 0 that are unreachable using MM
-   and fallback for them.
-   We only do this for bus 0/seg 0 */
+   and fallback for them. */
 static __init void unreachable_devices(void)
 {
-	int i;
-	for (i = 0; i < 32; i++) {
-		u32 val1;
-		char __iomem *addr;
+	int i, k;
+	/* Use the max bus number from ACPI here? */
+	for (k = 0; k < MAX_CHECK_BUS; k++) {
+		for (i = 0; i < 32; i++) {
+			u32 val1;
+			char __iomem *addr;
 
-		pci_conf1_read(0, 0, PCI_DEVFN(i,0), 0, 4, &val1);
-		if (val1 == 0xffffffff)
-			continue;
-		addr = pci_dev_base(0, 0, PCI_DEVFN(i, 0));
-		if (addr == NULL|| readl(addr) != val1) {
-			set_bit(i, &fallback_slots);
+			pci_conf1_read(0, k, PCI_DEVFN(i,0), 0, 4, &val1);
+			if (val1 == 0xffffffff)
+				continue;
+			addr = pci_dev_base(0, k, PCI_DEVFN(i, 0));
+			if (addr == NULL|| readl(addr) != val1) {
+				set_bit(i + 32*k, fallback_slots);
+				printk(KERN_NOTICE
+				"PCI: No mmconfig possible on device %x:%x\n",
+					k, i);
+			}
 		}
 	}
 }
@@ -160,6 +171,14 @@ static int __init pci_mmcfg_init(void)
 	    (pci_mmcfg_config == NULL) ||
 	    (pci_mmcfg_config[0].base_address == 0))
 		return 0;
+
+	if (!e820_all_mapped(pci_mmcfg_config[0].base_address,
+			pci_mmcfg_config[0].base_address + MMCONFIG_APER_SIZE,
+			E820_RESERVED)) {
+		printk(KERN_ERR "PCI: BIOS Bug: MCFG area is not E820-reserved\n");
+		printk(KERN_ERR "PCI: Not using MMCONFIG.\n");
+		return;
+	}
 
 	/* RED-PEN i386 doesn't do _nocache right now */
 	pci_mmcfg_virt = kmalloc(sizeof(*pci_mmcfg_virt) * pci_mmcfg_config_num, GFP_KERNEL);
