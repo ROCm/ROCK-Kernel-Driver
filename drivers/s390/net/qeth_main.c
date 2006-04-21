@@ -3803,11 +3803,11 @@ qeth_open(struct net_device *dev)
 		QETH_DBF_TEXT(trace,4,"nomacadr");
 		return -EPERM;
 	}
-	card->dev->flags |= IFF_UP;
-	netif_start_queue(dev);
 	card->data.state = CH_STATE_UP;
 	card->state = CARD_STATE_UP;
-
+	card->dev->flags |= IFF_UP;
+	netif_start_queue(dev);
+	
 	if (!card->lan_online && netif_carrier_ok(dev))
 		netif_carrier_off(dev);
 	return 0;
@@ -3822,7 +3822,7 @@ qeth_stop(struct net_device *dev)
 
 	card = (struct qeth_card *) dev->priv;
 
-	netif_stop_queue(dev);
+	netif_tx_disable(dev);
 	card->dev->flags &= ~IFF_UP;
 	if (card->state == CARD_STATE_UP)
 		card->state = CARD_STATE_SOFTSETUP;
@@ -3963,7 +3963,7 @@ qeth_prepare_skb(struct qeth_card *card, struct sk_buff **skb,
 #endif
 	*hdr = (struct qeth_hdr *)
 		qeth_push_skb(card, skb, sizeof(struct qeth_hdr));
-	if (hdr == NULL)
+	if (*hdr == NULL)
 		return -EINVAL;
 	return 0;
 }
@@ -6367,12 +6367,9 @@ qeth_netdev_init(struct net_device *dev)
 	dev->vlan_rx_kill_vid = qeth_vlan_rx_kill_vid;
 	dev->vlan_rx_add_vid = qeth_vlan_rx_add_vid;
 #endif
-	dev->hard_header = card->orig_hard_header;
 	if (qeth_get_netdev_flags(card) & IFF_NOARP) {
 		dev->rebuild_header = NULL;
 		dev->hard_header = NULL;
-		if (card->options.fake_ll)
-			dev->hard_header = qeth_fake_header;
 		dev->header_cache_update = NULL;
 		dev->hard_header_cache = NULL;
 	}
@@ -6485,6 +6482,9 @@ retry:
 	/*network device will be recovered*/
 	if (card->dev) {
 		card->dev->hard_header = card->orig_hard_header;
+		if (card->options.fake_ll && 
+		    (qeth_get_netdev_flags(card) & IFF_NOARP))
+			card->dev->hard_header = qeth_fake_header;
 		return 0;
 	}
 	/* at first set_online allocate netdev */
@@ -7040,14 +7040,12 @@ qeth_softsetup_ipv6(struct qeth_card *card)
 
 	QETH_DBF_TEXT(trace,3,"softipv6");
 
-	netif_stop_queue(card->dev);
 	rc = qeth_send_startlan(card, QETH_PROT_IPV6);
 	if (rc) {
 		PRINT_ERR("IPv6 startlan failed on %s\n",
 			  QETH_CARD_IFNAME(card));
 		return rc;
 	}
-	netif_wake_queue(card->dev);
 	rc = qeth_query_ipassists(card,QETH_PROT_IPV6);
 	if (rc) {
 		PRINT_ERR("IPv6 query ipassist failed on %s\n",
@@ -7361,7 +7359,8 @@ qeth_set_large_send(struct qeth_card *card, enum qeth_large_send_types type)
 		card->options.large_send = type;
 		return 0;
 	}
-	netif_stop_queue(card->dev);
+	if (card->state == CARD_STATE_UP)
+		netif_tx_disable(card->dev);
 	card->options.large_send = type;
 	switch (card->options.large_send) {
 	case QETH_LARGE_SEND_EDDP:
@@ -7383,7 +7382,8 @@ qeth_set_large_send(struct qeth_card *card, enum qeth_large_send_types type)
 		card->dev->features &= ~(NETIF_F_TSO | NETIF_F_SG);
 		break;
 	}
-	netif_wake_queue(card->dev);
+	if (card->state == CARD_STATE_UP)
+		netif_wake_queue(card->dev);
 	return rc;
 }
 
@@ -7437,7 +7437,7 @@ qeth_softsetup_card(struct qeth_card *card)
 	if ((rc = qeth_setrouting_v6(card)))
 		QETH_DBF_TEXT_(setup, 2, "5err%d", rc);
 out:
-	netif_stop_queue(card->dev);
+	netif_tx_disable(card->dev);
 	return 0;
 }
 
@@ -7746,10 +7746,8 @@ static int
 qeth_register_netdev(struct qeth_card *card)
 {
 	QETH_DBF_TEXT(setup, 3, "regnetd");
-	if (card->dev->reg_state != NETREG_UNINITIALIZED) {
-		qeth_netdev_init(card->dev);
+	if (card->dev->reg_state != NETREG_UNINITIALIZED) 
 		return 0;
-	}
 	/* sysfs magic */
 	SET_NETDEV_DEV(card->dev, &card->gdev->dev);
 	return register_netdev(card->dev);

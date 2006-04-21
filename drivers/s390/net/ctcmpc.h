@@ -41,5 +41,8 @@ extern  int ctc_mpc_alloc_channel(int,callbacktypei2);
 extern void ctc_mpc_establish_connectivity(int,callbacktypei3);
 extern void ctc_mpc_dealloc_ch(int);
 extern void ctc_mpc_flow_control(int,int);
-
+EXPORT_SYMBOL(ctc_mpc_alloc_channel);
+EXPORT_SYMBOL(ctc_mpc_establish_connectivity);
+EXPORT_SYMBOL(ctc_mpc_dealloc_ch);
+EXPORT_SYMBOL(ctc_mpc_flow_control);
 #endif
