@@ -103,7 +103,6 @@ static struct iscsi_transport qla4xxx_iscsi_transport_functions = {
         .name                   = "qla4xxx",
         .caps                   = 0,
         .host_template          = &qla4xxx_driver_template,
-        .hostdata_size          = 0,
         .conndata_size          = 0,
         .max_conn               = 1,
         .max_cmd_len            = IOCB_MAX_CDB_LEN,

@@ -472,106 +472,6 @@ int iscsi_destroy_conn(struct iscsi_cls_conn *conn)
 EXPORT_SYMBOL_GPL(iscsi_destroy_conn);
 
 /*
- * These functions are used only by software iscsi_transports
- * which do not allocate and more their scsi_hosts since this
- * is initiated from userspace.
- */
-
-/*
- * iSCSI Session's hostdata organization:
- *
- *    *------------------* <== hostdata_session(host->hostdata)
- *    | ptr to class sess|
- *    |------------------| <== iscsi_hostdata(host->hostdata)
- *    | transport's data |
- *    *------------------*
- */
-
-#define hostdata_privsize(_t)	(sizeof(unsigned long) + _t->hostdata_size + \
-				 _t->hostdata_size % sizeof(unsigned long))
-
-#define hostdata_session(_hostdata) (iscsi_ptr(*(unsigned long *)_hostdata))
-
-/**
- * iscsi_transport_create_session - create iscsi cls session and host
- * scsit: scsi transport template
- * transport: iscsi transport template
- *
- * This can be used by software iscsi_transports that allocate
- * a session per scsi host.
- **/
-struct Scsi_Host *
-iscsi_transport_create_session(struct scsi_transport_template *scsit,
-			       struct iscsi_transport *transport)
-{
-	struct iscsi_cls_session *session;
-	struct Scsi_Host *shost;
-	unsigned long flags;
-
-	shost = scsi_host_alloc(transport->host_template,
-				hostdata_privsize(transport));
-	if (!shost) {
-		printk(KERN_ERR "iscsi: can not allocate SCSI host for "
-			"session\n");
-		return NULL;
-	}
-
-	shost->max_id = 1;
-	shost->max_channel = 0;
-	shost->max_lun = transport->max_lun;
-	shost->max_cmd_len = transport->max_cmd_len;
-	shost->transportt = scsit;
-	shost->transportt->create_work_queue = 1;
-
-	if (scsi_add_host(shost, NULL))
-		goto free_host;
-
-	session = iscsi_create_session(shost, transport, 0);
-	if (!session)
-		goto remove_host;
-
-	*(unsigned long*)shost->hostdata = (unsigned long)session;
-	spin_lock_irqsave(&sesslock, flags);
-	list_add(&session->sess_list, &sesslist);
-	spin_unlock_irqrestore(&sesslock, flags);
-	return shost;
-
-remove_host:
-	scsi_remove_host(shost);
-free_host:
-	scsi_host_put(shost);
-	return NULL;
-}
-
-EXPORT_SYMBOL_GPL(iscsi_transport_create_session);
-
-/**
- * iscsi_transport_destroy_session - destroy session and scsi host
- * shost: scsi host
- *
- * This can be used by software iscsi_transports that allocate
- * a session per scsi host.
- **/
-int iscsi_transport_destroy_session(struct Scsi_Host *shost)
-{
-	struct iscsi_cls_session *session;
-	unsigned long flags;
-
-	session = hostdata_session(shost->hostdata);
-	spin_lock_irqsave(&sesslock, flags);
-	list_del(&session->sess_list);
-	spin_unlock_irqrestore(&sesslock, flags);
-	iscsi_destroy_session(session);
-
-	scsi_remove_host(shost);
-	/* ref from host alloc */
-	scsi_host_put(shost);
-	return 0;
-}
-
-EXPORT_SYMBOL_GPL(iscsi_transport_destroy_session);
-
-/*
  * iscsi interface functions
  */
 static struct iscsi_internal *
@@ -857,13 +757,18 @@ iscsi_if_create_session(struct iscsi_internal *priv, struct iscsi_uevent *ev)
 {
 	struct iscsi_transport *transport = priv->iscsi_transport;
 	struct iscsi_cls_session *session;
+	unsigned long flags;
 	uint32_t hostno;
 
-	session = transport->create_session(&priv->t,
+	session = transport->create_session(transport, &priv->t,
 					    ev->u.c_session.initial_cmdsn,
 					    &hostno);
 	if (!session)
 		return -ENOMEM;
+
+	spin_lock_irqsave(&sesslock, flags);
+	list_add(&session->sess_list, &sesslist);
+	spin_unlock_irqrestore(&sesslock, flags);
 
 	ev->r.c_session_ret.host_no = hostno;
 	ev->r.c_session_ret.sid = session->sid;
@@ -1024,6 +929,40 @@ iscsi_set_param(struct iscsi_transport *transport, struct iscsi_uevent *ev)
 }
 
 static int
+iscsi_if_transport_ep(struct iscsi_transport *transport,
+		      struct iscsi_uevent *ev, int msg_type)
+{
+	struct sockaddr *dst_addr;
+	int rc = 0;
+
+	switch (msg_type) {
+	case ISCSI_UEVENT_TRANSPORT_EP_CONNECT:
+		if (!transport->ep_connect)
+			return -EINVAL;
+
+		dst_addr = (struct sockaddr *)((char*)ev + sizeof(*ev));
+		rc = transport->ep_connect(dst_addr,
+					   ev->u.ep_connect.non_blocking,
+					   &ev->r.ep_connect_ret.handle);
+		break;
+	case ISCSI_UEVENT_TRANSPORT_EP_POLL:
+		if (!transport->ep_poll)
+			return -EINVAL;
+
+		ev->r.retcode = transport->ep_poll(ev->u.ep_poll.ep_handle,
+						   ev->u.ep_poll.timeout_ms);
+		break;
+	case ISCSI_UEVENT_TRANSPORT_EP_DISCONNECT:
+		if (!transport->ep_disconnect)
+			return -EINVAL;
+
+		transport->ep_disconnect(ev->u.ep_disconnect.ep_handle);
+		break;
+	}
+	return rc;
+}
+
+static int
 iscsi_if_recv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 {
 	int err = 0;
@@ -1032,6 +971,7 @@ iscsi_if_recv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 	struct iscsi_internal *priv;
 	struct iscsi_cls_session *session;
 	struct iscsi_cls_conn *conn;
+	unsigned long flags;
 
 	priv = iscsi_if_transport_lookup(iscsi_ptr(ev->transport_handle));
 	if (!priv)
@@ -1047,9 +987,13 @@ iscsi_if_recv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 		break;
 	case ISCSI_UEVENT_DESTROY_SESSION:
 		session = iscsi_session_lookup(ev->u.d_session.sid);
-		if (session)
+		if (session) {
+			spin_lock_irqsave(&sesslock, flags);
+			list_del(&session->sess_list);
+			spin_unlock_irqrestore(&sesslock, flags);
+
 			transport->destroy_session(session);
-		else
+		} else
 			err = -EINVAL;
 		break;
 	case ISCSI_UEVENT_CREATE_CONN:
@@ -1064,7 +1008,7 @@ iscsi_if_recv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 
 		if (session && conn)
 			ev->r.retcode =	transport->bind_conn(session, conn,
-					ev->u.b_conn.transport_fd,
+					ev->u.b_conn.transport_eph,
 					ev->u.b_conn.is_leading);
 		else
 			err = -EINVAL;
@@ -1098,6 +1042,11 @@ iscsi_if_recv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 		break;
 	case ISCSI_UEVENT_GET_STATS:
 		err = iscsi_if_get_stats(transport, nlh);
+		break;
+	case ISCSI_UEVENT_TRANSPORT_EP_CONNECT:
+	case ISCSI_UEVENT_TRANSPORT_EP_POLL:
+	case ISCSI_UEVENT_TRANSPORT_EP_DISCONNECT:
+		err = iscsi_if_transport_ep(transport, ev, nlh->nlmsg_type);
 		break;
 	default:
 		err = -EINVAL;
@@ -1418,10 +1367,9 @@ iscsi_register_transport(struct iscsi_transport *tt)
 	if (priv)
 		return NULL;
 
-	priv = kmalloc(sizeof(*priv), GFP_KERNEL);
+	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
 	if (!priv)
 		return NULL;
-	memset(priv, 0, sizeof(*priv));
 	INIT_LIST_HEAD(&priv->list);
 	priv->iscsi_transport = tt;
 	priv->t.user_scan = iscsi_user_scan;
