@@ -906,6 +906,8 @@ void acpi_processor_uninstall_hotplug_notify(void)
  * ACPI, but needs symbols from this driver
  */
 
+static int processor_driver_registered = 0;
+
 static int __init acpi_processor_init(void)
 {
 	int result = 0;
@@ -926,6 +928,8 @@ static int __init acpi_processor_init(void)
 		return_VALUE(0);
 	}
 
+	processor_driver_registered = 1;
+
 	acpi_processor_install_hotplug_notify();
 
 	acpi_thermal_cpufreq_init();
@@ -943,12 +947,13 @@ static void __exit acpi_processor_exit(void)
 
 	acpi_thermal_cpufreq_exit();
 
+	if (processor_driver_registered){
 	acpi_processor_uninstall_hotplug_notify();
 
 	acpi_bus_unregister_driver(&acpi_processor_driver);
 
 	remove_proc_entry(ACPI_PROCESSOR_CLASS, acpi_root_dir);
-
+	}
 	return_VOID;
 }
 
