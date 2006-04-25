@@ -48,7 +48,7 @@
 
 #define PFX "IPMI message handler: "
 
-#define IPMI_DRIVER_VERSION "38.0"
+#define IPMI_DRIVER_VERSION "38.1"
 
 static struct ipmi_recv_msg *ipmi_alloc_recv_msg(void);
 static int ipmi_init_msghandler(void);
@@ -1804,8 +1804,7 @@ int ipmi_register_smi(struct ipmi_smi_handlers *handlers,
 		      void		       *send_info,
 		      unsigned char            version_major,
 		      unsigned char            version_minor,
-		      unsigned char            slave_addr,
-		      ipmi_smi_t               *new_intf)
+		      unsigned char            slave_addr)
 {
 	int              i, j;
 	int              rv;
@@ -1878,9 +1877,9 @@ int ipmi_register_smi(struct ipmi_smi_handlers *handlers,
 	if (rv)
 		goto out;
 
-	/* FIXME - this is an ugly kludge, this sets the intf for the
-	   caller before sending any messages with it. */
-	*new_intf = intf;
+	rv = handlers->start_processing(send_info, intf);
+	if (rv)
+		goto out;
 
 	if ((version_major > 1)
 	    || ((version_major == 1) && (version_minor >= 5)))
