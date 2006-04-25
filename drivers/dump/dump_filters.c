@@ -57,7 +57,8 @@ int dump_low_page(struct page *p)
 static inline int kernel_page(struct page *p)
 {
 	return (PageReserved(p) && !PageInuse(p)) ||
-		(!PageLRU(p) && !PageCompound(p) && PageInuse(p));
+		(!PageLRU(p) && PageInuse(p))     ||
+		(PageCompound(p) && (long)p->lru.prev < 4);
 }
 
 static inline int user_page(struct page *p)
