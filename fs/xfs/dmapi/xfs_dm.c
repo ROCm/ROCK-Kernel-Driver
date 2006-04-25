@@ -2793,7 +2793,7 @@ xfs_dm_set_region(
 		 * bit, then that's always okay.  Otherwise, it's busy.
 		 */
 		dm_eventset_t m1;
-		m1 = ip->i_iocore.io_dmevmask & ~(1 << DM_EVENT_READ);
+		m1 = ip->i_iocore.io_dmevmask & ((1 << DM_EVENT_WRITE) | (1 << DM_EVENT_TRUNCATE));
 		if (m1 != new_mask) {
 			return -EBUSY;
 		}
