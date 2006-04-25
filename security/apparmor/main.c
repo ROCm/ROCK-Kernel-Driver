@@ -678,12 +678,21 @@ int sd_audit(struct subdomain *sd, const struct sd_audit *sa)
 	} else if (sa->type == SD_AUDITTYPE_XATTR) {
 		const char *fmt;
 		switch (sa->ival) {
-			case SD_XATTR_GET: fmt = "xattr get";
-			case SD_XATTR_SET: fmt = "xattr set";
-			case SD_XATTR_LIST: fmt = "xattr list";
-			case SD_XATTR_REMOVE: fmt = "xattr remove";
+			case SD_XATTR_GET:
+				fmt = "xattr get";
+				break;
+			case SD_XATTR_SET:
+				fmt = "xattr set";
+				break;
+			case SD_XATTR_LIST:
+				fmt = "xattr list";
+				break;
+			case SD_XATTR_REMOVE:
+				fmt = "xattr remove";
+				break;
 			default:
 				fmt = "xattr <unknown>";
+				break;
 		}
 
 		audit_log_format(ab, "%s on %s ", fmt, sa->name);
