@@ -296,7 +296,7 @@ static int ocfs2_extent_map_find_leaf(struct inode *inode,
 
 		ret = ocfs2_extent_map_insert(inode, rec,
 					      le16_to_cpu(el->l_tree_depth));
-		if (ret) {
+		if (ret && (ret != -EEXIST)) {
 			mlog_errno(ret);
 			goto out_free;
 		}
@@ -425,6 +425,11 @@ static int ocfs2_extent_map_insert_entry(struct ocfs2_extent_map *em,
 /*
  * Simple rule: on any return code other than -EAGAIN, anything left
  * in the insert_context will be freed.
+ *
+ * Simple rule #2: A return code of -EEXIST from this function or
+ * its calls to ocfs2_extent_map_insert_entry() signifies that another
+ * thread beat us to the insert.  It is not an actual error, but it
+ * tells the caller we have no more work to do.
  */
 static int ocfs2_extent_map_try_insert(struct inode *inode,
 				       struct ocfs2_extent_rec *rec,
@@ -446,23 +451,32 @@ static int ocfs2_extent_map_try_insert(struct inode *inode,
 		goto out_unlock;
 	}
 
+	/* Since insert_entry failed, the map MUST have old_ent */
 	old_ent = ocfs2_extent_map_lookup(em, le32_to_cpu(rec->e_cpos),
-					  le32_to_cpu(rec->e_clusters), NULL,
-					  NULL);
-
+					  le32_to_cpu(rec->e_clusters),
+					  NULL, NULL);
 	if (!old_ent)
 		BUG();
 
-	ret = -EEXIST;
-	if (old_ent->e_tree_depth < tree_depth)
+	if (old_ent->e_tree_depth < tree_depth) {
+		/* Another thread beat us to the lower tree_depth */
+		ret = -EEXIST;
 		goto out_unlock;
+	}
 
 	if (old_ent->e_tree_depth == tree_depth) {
+		/*
+		 * Another thread beat us to this tree_depth.
+		 * Let's make sure we agree with that thread (the
+		 * extent_rec should be identical).
+		 */
 		if (!memcmp(rec, &old_ent->e_rec,
 			    sizeof(struct ocfs2_extent_rec)))
 			ret = 0;
+		else
+			/* FIXME: Should this be ESRCH/EBADR??? */
+			ret = -EEXIST;
 
-		/* FIXME: Should this be ESRCH/EBADR??? */
 		goto out_unlock;
 	}
 
@@ -567,7 +581,7 @@ int ocfs2_extent_map_insert(struct inode *inode, struct ocfs2_extent_rec *rec,
 
 	ret = -ENOMEM;
 	ctxt.new_ent = kmem_cache_alloc(ocfs2_em_ent_cachep,
-					GFP_KERNEL);
+					GFP_NOFS);
 	if (!ctxt.new_ent) {
 		mlog_errno(ret);
 		return ret;
@@ -581,14 +595,14 @@ int ocfs2_extent_map_insert(struct inode *inode, struct ocfs2_extent_rec *rec,
 		if (ctxt.need_left && !ctxt.left_ent) {
 			ctxt.left_ent =
 				kmem_cache_alloc(ocfs2_em_ent_cachep,
-						 GFP_KERNEL);
+						 GFP_NOFS);
 			if (!ctxt.left_ent)
 				break;
 		}
 		if (ctxt.need_right && !ctxt.right_ent) {
 			ctxt.right_ent =
 				kmem_cache_alloc(ocfs2_em_ent_cachep,
-						 GFP_KERNEL);
+						 GFP_NOFS);
 			if (!ctxt.right_ent)
 				break;
 		}
@@ -597,7 +611,7 @@ int ocfs2_extent_map_insert(struct inode *inode, struct ocfs2_extent_rec *rec,
 						  tree_depth, &ctxt);
 	} while (ret == -EAGAIN);
 
-	if (ret < 0)
+	if ((ret < 0) && (ret != -EEXIST))
 		mlog_errno(ret);
 
 	if (ctxt.left_ent)

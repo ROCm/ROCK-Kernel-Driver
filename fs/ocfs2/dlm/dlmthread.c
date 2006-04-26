@@ -39,6 +39,7 @@
 #include <linux/inet.h>
 #include <linux/timer.h>
 #include <linux/kthread.h>
+#include <linux/delay.h>
 
 
 #include "cluster/heartbeat.h"
@@ -56,6 +57,8 @@ extern spinlock_t dlm_domain_lock;
 extern struct list_head dlm_domains;
 
 static int dlm_thread(void *data);
+static void dlm_purge_lockres_now(struct dlm_ctxt *dlm,
+				  struct dlm_lock_resource *lockres);
 
 #define dlm_lock_is_remote(dlm, lock)     ((lock)->ml.node != (dlm)->node_num)
 
@@ -81,7 +84,7 @@ repeat:
 }
 
 
-static int __dlm_lockres_unused(struct dlm_lock_resource *res)
+int __dlm_lockres_unused(struct dlm_lock_resource *res)
 {
 	if (list_empty(&res->granted) &&
 	    list_empty(&res->converting) &&
@@ -104,6 +107,20 @@ void __dlm_lockres_calc_usage(struct dlm_ctxt *dlm,
 	assert_spin_locked(&res->spinlock);
 
 	if (__dlm_lockres_unused(res)){
+		/* For now, just keep any resource we master */
+		if (res->owner == dlm->node_num)
+		{
+			if (!list_empty(&res->purge)) {
+				mlog(0, "we master %s:%.*s, but it is on "
+				     "the purge list.  Removing\n",
+				     dlm->name, res->lockname.len,
+				     res->lockname.name);
+				list_del_init(&res->purge);
+				dlm->purge_count--;
+			}
+			return;
+		}
+
 		if (list_empty(&res->purge)) {
 			mlog(0, "putting lockres %.*s from purge list\n",
 			     res->lockname.len, res->lockname.name);
@@ -111,10 +128,23 @@ void __dlm_lockres_calc_usage(struct dlm_ctxt *dlm,
 			res->last_used = jiffies;
 			list_add_tail(&res->purge, &dlm->purge_list);
 			dlm->purge_count++;
+
+			/* if this node is not the owner, there is
+			 * no way to keep track of who the owner could be.
+			 * unhash it to avoid serious problems. */
+			if (res->owner != dlm->node_num) {
+				mlog(0, "%s:%.*s: doing immediate "
+				     "purge of lockres owned by %u\n",
+				     dlm->name, res->lockname.len,
+				     res->lockname.name, res->owner);
+
+				dlm_purge_lockres_now(dlm, res);
+			}
 		}
 	} else if (!list_empty(&res->purge)) {
-		mlog(0, "removing lockres %.*s from purge list\n",
-		     res->lockname.len, res->lockname.name);
+		mlog(0, "removing lockres %.*s from purge list, "
+		     "owner=%u\n", res->lockname.len, res->lockname.name,
+		     res->owner);
 
 		list_del_init(&res->purge);
 		dlm->purge_count--;
@@ -166,12 +196,31 @@ again:
 	} else if (ret < 0) {
 		mlog(ML_NOTICE, "lockres %.*s: migrate failed, retrying\n",
 		     lockres->lockname.len, lockres->lockname.name);
+		msleep(100);
 		goto again;
 	}
 
 	spin_lock(&dlm->spinlock);
 
 finish:
+	if (!list_empty(&lockres->purge)) {
+		list_del_init(&lockres->purge);
+		dlm->purge_count--;
+	}
+	__dlm_unhash_lockres(lockres);
+}
+
+/* make an unused lockres go away immediately.
+ * as soon as the dlm spinlock is dropped, this lockres
+ * will not be found. kfree still happens on last put. */
+static void dlm_purge_lockres_now(struct dlm_ctxt *dlm,
+				  struct dlm_lock_resource *lockres)
+{
+	assert_spin_locked(&dlm->spinlock);
+	assert_spin_locked(&lockres->spinlock);
+
+	BUG_ON(!__dlm_lockres_unused(lockres));
+
 	if (!list_empty(&lockres->purge)) {
 		list_del_init(&lockres->purge);
 		dlm->purge_count--;
@@ -431,6 +480,8 @@ void __dlm_dirty_lockres(struct dlm_ctxt *dlm, struct dlm_lock_resource *res)
 	/* don't shuffle secondary queues */
 	if ((res->owner == dlm->node_num) &&
 	    !(res->state & DLM_LOCK_RES_DIRTY)) {
+		/* ref for dirty_list */
+		dlm_lockres_get(res);
 		list_add_tail(&res->dirty, &dlm->dirty_list);
 		res->state |= DLM_LOCK_RES_DIRTY;
 	}
@@ -622,6 +673,8 @@ static int dlm_thread(void *data)
 			list_del_init(&res->dirty);
 			spin_unlock(&res->spinlock);
 			spin_unlock(&dlm->spinlock);
+			/* Drop dirty_list ref */
+			dlm_lockres_put(res);
 
 		 	/* lockres can be re-dirtied/re-added to the
 			 * dirty_list in this gap, but that is ok */
@@ -658,8 +711,9 @@ static int dlm_thread(void *data)
 			 * spinlock and do NOT have the dlm lock.
 			 * safe to reserve/queue asts and run the lists. */
 
-			mlog(0, "calling dlm_shuffle_lists with dlm=%p, "
-			     "res=%p\n", dlm, res);
+			mlog(0, "calling dlm_shuffle_lists with dlm=%s, "
+			     "res=%.*s\n", dlm->name,
+			     res->lockname.len, res->lockname.name);
 
 			/* called while holding lockres lock */
 			dlm_shuffle_lists(dlm, res);
@@ -673,6 +727,8 @@ in_progress:
 			/* if the lock was in-progress, stick
 			 * it on the back of the list */
 			if (delay) {
+				/* ref for dirty_list */
+				dlm_lockres_get(res);
 				spin_lock(&res->spinlock);
 				list_add_tail(&res->dirty, &dlm->dirty_list);
 				res->state |= DLM_LOCK_RES_DIRTY;
@@ -693,7 +749,7 @@ in_progress:
 
 		/* yield and continue right away if there is more work to do */
 		if (!n) {
-			yield();
+			cond_resched();
 			continue;
 		}
 

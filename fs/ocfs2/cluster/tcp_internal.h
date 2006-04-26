@@ -57,7 +57,7 @@ struct o2net_node {
 	 * or fails or when an accepted socket is attached. */
 	wait_queue_head_t		nn_sc_wq;
 
-	struct idr			nn_status_idr;
+	u32				nn_status_next_id;
 	struct list_head		nn_status_list;
 
 	/* connects are attempted from when heartbeat comes up until either hb
@@ -150,7 +150,7 @@ enum o2net_system_error {
 struct o2net_status_wait {
 	enum o2net_system_error	ns_sys_status;
 	s32			ns_status;
-	int			ns_id;
+	u32			ns_id;
 	wait_queue_head_t	ns_wq;
 	struct list_head	ns_node_item;
 };
@@ -160,6 +160,7 @@ struct o2net_send_tracking {
 	struct list_head		st_net_proc_item;
 	struct task_struct		*st_task;
 	struct o2net_sock_container	*st_sc;
+	u32				st_id;
 	u32				st_msg_type;
 	u32				st_msg_key;
 	u8				st_node;

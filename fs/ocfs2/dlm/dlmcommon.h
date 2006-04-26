@@ -61,7 +61,8 @@ static inline int dlm_is_recovery_lock(const char *lock_name, int name_len)
 	return 0;
 }
 
-#define DLM_RECO_STATE_ACTIVE  0x0001
+#define DLM_RECO_STATE_ACTIVE    0x0001
+#define DLM_RECO_STATE_FINALIZE  0x0002
 
 struct dlm_recovery_ctxt
 {
@@ -106,6 +107,8 @@ struct dlm_ctxt
 	struct list_head master_list;
 	struct list_head mle_hb_events;
 
+	struct proc_dir_entry *dlm_proc;
+
 	/* these give a really vague idea of the system load */
 	atomic_t local_resources;
 	atomic_t remote_resources;
@@ -120,6 +123,7 @@ struct dlm_ctxt
 	struct o2hb_callback_func dlm_hb_down;
 	struct task_struct *dlm_thread_task;
 	struct task_struct *dlm_reco_thread_task;
+	struct workqueue_struct *dlm_worker;
 	wait_queue_head_t dlm_thread_wq;
 	wait_queue_head_t dlm_reco_thread_wq;
 	wait_queue_head_t ast_wq;
@@ -218,18 +222,26 @@ struct dlm_lock_resource
 	struct hlist_node hash_node;
 	struct kref      refs;
 
-	/* please keep these next 3 in this order
-	 * some funcs want to iterate over all lists */
+	/*
+	 * Please keep granted, converting, and blocked in this order,
+	 * as some funcs want to iterate over all lists.
+	 *
+	 * All four lists are protected by the hash's reference.
+	 */
 	struct list_head granted;
 	struct list_head converting;
 	struct list_head blocked;
+	struct list_head purge;
 
+	/*
+	 * These two lists require you to hold an additional reference
+	 * while they are on the list.
+	 */
 	struct list_head dirty;
 	struct list_head recovering; // dlm_recovery_ctxt.resources list
 
 	/* unused lock resources have their last_used stamped and are
 	 * put on a list for the dlm thread to run. */
-	struct list_head purge;
 	unsigned long    last_used;
 
 	unsigned migration_pending:1;
@@ -299,6 +311,15 @@ enum dlm_lockres_list {
 	DLM_CONVERTING_LIST,
 	DLM_BLOCKED_LIST
 };
+
+static inline int dlm_lvb_is_empty(char *lvb)
+{
+	int i;
+	for (i=0; i<DLM_LVB_LEN; i++)
+		if (lvb[i])
+			return 0;
+	return 1;
+}
 
 static inline struct list_head *
 dlm_list_idx_to_ptr(struct dlm_lock_resource *res, enum dlm_lockres_list idx)
@@ -609,7 +630,8 @@ struct dlm_finalize_reco
 {
 	u8 node_idx;
 	u8 dead_node;
-	__be16 pad1;
+	u8 flags;
+	u8 pad1;
 	__be32 pad2;
 };
 
@@ -681,6 +703,7 @@ void dlm_wait_for_recovery(struct dlm_ctxt *dlm);
 void dlm_kick_recovery_thread(struct dlm_ctxt *dlm);
 int dlm_is_node_dead(struct dlm_ctxt *dlm, u8 node);
 int dlm_wait_for_node_death(struct dlm_ctxt *dlm, u8 node, int timeout);
+int dlm_wait_for_node_recovery(struct dlm_ctxt *dlm, u8 node, int timeout);
 
 void dlm_get(struct dlm_ctxt *dlm);
 void dlm_put(struct dlm_ctxt *dlm);
@@ -849,6 +872,7 @@ int dlm_lock_basts_flushed(struct dlm_ctxt *dlm, struct dlm_lock *lock);
 
 
 int dlm_dump_all_mles(const char __user *data, unsigned int len);
+int __dlm_lockres_unused(struct dlm_lock_resource *res);
 
 
 static inline const char * dlm_lock_mode_name(int mode)

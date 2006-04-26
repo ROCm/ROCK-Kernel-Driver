@@ -28,5 +28,7 @@
 void dlm_remove_proc(void);
 void dlm_init_proc(void);
 void dlm_dump_lock_resources(struct dlm_ctxt *dlm);
+void dlm_proc_add_domain(struct dlm_ctxt *dlm);
+void dlm_proc_del_domain(struct dlm_ctxt *dlm);
 
 #endif

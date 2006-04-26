@@ -193,6 +193,8 @@ static int dlm_wait_on_domain_helper(const char *domain)
 
 static void dlm_free_ctxt_mem(struct dlm_ctxt *dlm)
 {
+	dlm_proc_del_domain(dlm);
+
 	if (dlm->lockres_hash)
 		free_page((unsigned long) dlm->lockres_hash);
 
@@ -285,11 +287,21 @@ int dlm_domain_fully_joined(struct dlm_ctxt *dlm)
 	return ret;
 }
 
+static void dlm_destroy_dlm_worker(struct dlm_ctxt *dlm)
+{
+	if (dlm->dlm_worker) {
+		flush_workqueue(dlm->dlm_worker);
+		destroy_workqueue(dlm->dlm_worker);
+		dlm->dlm_worker = NULL;
+	}
+}
+
 static void dlm_complete_dlm_shutdown(struct dlm_ctxt *dlm)
 {
 	dlm_unregister_domain_handlers(dlm);
 	dlm_complete_thread(dlm);
 	dlm_complete_recovery_thread(dlm);
+	dlm_destroy_dlm_worker(dlm);
 
 	/* We've left the domain. Now we can take ourselves out of the
 	 * list and allow the kref stuff to help us free the
@@ -381,12 +393,13 @@ static void __dlm_print_nodes(struct dlm_ctxt *dlm)
 
 	assert_spin_locked(&dlm->spinlock);
 
-	mlog(ML_NOTICE, "Nodes in my domain (\"%s\"):\n", dlm->name);
+	printk(KERN_INFO "ocfs2_dlm: Nodes in domain (\"%s\"): ", dlm->name);
 
 	while ((node = find_next_bit(dlm->domain_map, O2NM_MAX_NODES,
 				     node + 1)) < O2NM_MAX_NODES) {
-		mlog(ML_NOTICE, " node %d\n", node);
+		printk("%d ", node);
 	}
+	printk("\n");
 }
 
 static int dlm_exit_domain_handler(struct o2net_msg *msg, u32 len, void *data)
@@ -402,7 +415,7 @@ static int dlm_exit_domain_handler(struct o2net_msg *msg, u32 len, void *data)
 
 	node = exit_msg->node_idx;
 
-	mlog(0, "Node %u leaves domain %s\n", node, dlm->name);
+	printk(KERN_INFO "ocfs2_dlm: Node %u leaves domain %s\n", node, dlm->name);
 
 	spin_lock(&dlm->spinlock);
 	clear_bit(node, dlm->domain_map);
@@ -651,6 +664,8 @@ static int dlm_assert_joined_handler(struct o2net_msg *msg, u32 len, void *data)
 		set_bit(assert->node_idx, dlm->domain_map);
 		__dlm_set_joining_node(dlm, DLM_LOCK_RES_OWNER_UNKNOWN);
 
+		printk(KERN_INFO "ocfs2_dlm: Node %u joins domain %s\n",
+		       assert->node_idx, dlm->name);
 		__dlm_print_nodes(dlm);
 
 		/* notify anything attached to the heartbeat events */
@@ -889,7 +904,7 @@ static int dlm_try_to_join_domain(struct dlm_ctxt *dlm)
 
 	mlog_entry("%p", dlm);
 
-	ctxt = kcalloc(1, sizeof(*ctxt), GFP_KERNEL);
+	ctxt = kcalloc(1, sizeof(*ctxt), GFP_NOFS);
 	if (!ctxt) {
 		status = -ENOMEM;
 		mlog_errno(status);
@@ -1135,6 +1150,13 @@ static int dlm_join_domain(struct dlm_ctxt *dlm)
 		goto bail;
 	}
 
+	dlm->dlm_worker = create_singlethread_workqueue("dlm_wq");
+	if (!dlm->dlm_worker) {
+		status = -ENOMEM;
+		mlog_errno(status);
+		goto bail;
+	}
+
 	do {
 		unsigned int backoff;
 		status = dlm_try_to_join_domain(dlm);
@@ -1175,6 +1197,7 @@ bail:
 		dlm_unregister_domain_handlers(dlm);
 		dlm_complete_thread(dlm);
 		dlm_complete_recovery_thread(dlm);
+		dlm_destroy_dlm_worker(dlm);
 	}
 
 	return status;
@@ -1186,13 +1209,13 @@ static struct dlm_ctxt *dlm_alloc_ctxt(const char *domain,
 	int i;
 	struct dlm_ctxt *dlm = NULL;
 
-	dlm = kcalloc(1, sizeof(*dlm), GFP_KERNEL);
+	dlm = kcalloc(1, sizeof(*dlm), GFP_NOFS);
 	if (!dlm) {
 		mlog_errno(-ENOMEM);
 		goto leave;
 	}
 
-	dlm->name = kmalloc(strlen(domain) + 1, GFP_KERNEL);
+	dlm->name = kmalloc(strlen(domain) + 1, GFP_NOFS);
 	if (dlm->name == NULL) {
 		mlog_errno(-ENOMEM);
 		kfree(dlm);
@@ -1200,7 +1223,7 @@ static struct dlm_ctxt *dlm_alloc_ctxt(const char *domain,
 		goto leave;
 	}
 
-	dlm->lockres_hash = (struct hlist_head *) __get_free_page(GFP_KERNEL);
+	dlm->lockres_hash = (struct hlist_head *) __get_free_page(GFP_NOFS);
 	if (!dlm->lockres_hash) {
 		mlog_errno(-ENOMEM);
 		kfree(dlm->name);
@@ -1240,6 +1263,7 @@ static struct dlm_ctxt *dlm_alloc_ctxt(const char *domain,
 
 	dlm->dlm_thread_task = NULL;
 	dlm->dlm_reco_thread_task = NULL;
+	dlm->dlm_worker = NULL;
 	init_waitqueue_head(&dlm->dlm_thread_wq);
 	init_waitqueue_head(&dlm->dlm_reco_thread_wq);
 	init_waitqueue_head(&dlm->reco.event);
@@ -1265,6 +1289,8 @@ static struct dlm_ctxt *dlm_alloc_ctxt(const char *domain,
 	dlm->dlm_state = DLM_CTXT_NEW;
 
 	INIT_LIST_HEAD(&dlm->dlm_eviction_callbacks);
+
+	dlm_proc_add_domain(dlm);
 
 	mlog(0, "context init: refcount %u\n",
 		  atomic_read(&dlm->dlm_refs.refcount));

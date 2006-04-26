@@ -117,6 +117,7 @@ static int nst_seq_show(struct seq_file *seq, void *v)
 			   "  process name: %s\n"
 			   "  node:         %u\n"
 			   "  sc:           %p\n"
+			   "  message id:   %d\n"
 			   "  message type: %u\n"
 			   "  message key:  0x%08x\n"
 			   "  sock acquiry: %lu.%lu\n"
@@ -125,7 +126,8 @@ static int nst_seq_show(struct seq_file *seq, void *v)
 			   nst, (unsigned long)nst->st_task->pid,
 			   (unsigned long)nst->st_task->tgid,
 			   nst->st_task->comm, nst->st_node,
-			   nst->st_sc, nst->st_msg_type, nst->st_msg_key,
+			   nst->st_sc, nst->st_id, nst->st_msg_type,
+			   nst->st_msg_key,
 			   nst->st_sock_time.tv_sec, nst->st_sock_time.tv_usec,
 			   nst->st_send_time.tv_sec, nst->st_send_time.tv_usec,
 			   nst->st_status_time.tv_sec,
@@ -253,6 +255,8 @@ static void *sc_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 	return sc; /* unused, just needs to be null when done */
 }
 
+#define TV_SEC_USEC(TV) TV.tv_sec, TV.tv_usec
+
 static int sc_seq_show(struct seq_file *seq, void *v)
 {
 	struct o2net_sock_container *sc, *dummy_sc = seq->private;
@@ -285,11 +289,31 @@ static int sc_seq_show(struct seq_file *seq, void *v)
 			   "  krefs:           %d\n"
 			   "  sock:            %u.%u.%u.%u:%u -> %u.%u.%u.%u:%u\n"
 			   "  remote node:     %s\n"
-			   "  page off:        %zu\n",
-			   sc, atomic_read(&sc->sc_kref.refcount),
+			   "  page off:        %zu\n"
+			   "  handshake ok:    %u\n"
+			   "  timer:           %lu.%lu\n"
+			   "  data ready:      %lu.%lu\n"
+			   "  advance start:   %lu.%lu\n"
+			   "  advance stop:    %lu.%lu\n"
+			   "  func start:      %lu.%lu\n"
+			   "  func stop:       %lu.%lu\n"
+			   "  func key:        %u\n"
+			   "  func type:       %u\n",
+			   sc,
+			   atomic_read(&sc->sc_kref.refcount),
 			   NIPQUAD(saddr), inet ? ntohs(sport) : 0,
-			   NIPQUAD(daddr), inet ? ntohs(dport) : 0,
-			   sc->sc_node->nd_name, sc->sc_page_off);
+			   	NIPQUAD(daddr), inet ? ntohs(dport) : 0,
+			   sc->sc_node->nd_name,
+			   sc->sc_page_off,
+			   sc->sc_handshake_ok,
+			   TV_SEC_USEC(sc->sc_tv_timer),
+			   TV_SEC_USEC(sc->sc_tv_data_ready),
+			   TV_SEC_USEC(sc->sc_tv_advance_start),
+			   TV_SEC_USEC(sc->sc_tv_advance_stop),
+			   TV_SEC_USEC(sc->sc_tv_func_start),
+			   TV_SEC_USEC(sc->sc_tv_func_stop),
+			   sc->sc_msg_key,
+			   sc->sc_msg_type);
 	}
 
 

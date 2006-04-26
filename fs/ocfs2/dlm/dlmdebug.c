@@ -58,6 +58,9 @@ static int dlm_parse_domain_and_lockres(char *buf, unsigned int len,
 					struct dlm_ctxt **dlm,
 					struct dlm_lock_resource **res);
 
+static int dlm_proc_stats(char *page, char **start, off_t off,
+			  int count, int *eof, void *data);
+
 typedef int (dlm_debug_func_t)(const char __user *data, unsigned int len);
 
 struct dlm_debug_funcs
@@ -114,6 +117,8 @@ static struct file_operations dlm_debug_operations = {
 
 #define OCFS2_DLM_PROC_PATH "fs/ocfs2_dlm"
 #define DLM_DEBUG_PROC_NAME "debug"
+#define DLM_STAT_PROC_NAME  "stat"
+
 static struct proc_dir_entry *ocfs2_dlm_proc;
 
 void dlm_remove_proc(void)
@@ -138,6 +143,52 @@ void dlm_init_proc(void)
 				  ocfs2_dlm_proc);
 	if (entry)
 		entry->proc_fops = &dlm_debug_operations;
+}
+
+static int dlm_proc_stats(char *page, char **start, off_t off,
+			  int count, int *eof, void *data)
+{
+	int len;
+	struct dlm_ctxt *dlm = data;
+
+	len = sprintf(page, "local=%d, remote=%d, unknown=%d\n",
+		      atomic_read(&dlm->local_resources),
+		      atomic_read(&dlm->remote_resources),
+		      atomic_read(&dlm->unknown_resources));
+
+	if (len <= off + count)
+		*eof = 1;
+
+	*start = page + off;
+	len -= off;
+	if (len > count)
+		len = count;
+	if (len < 0)
+		len = 0;
+
+	return len;
+}
+
+void dlm_proc_add_domain(struct dlm_ctxt *dlm)
+{
+	struct proc_dir_entry *entry;
+
+	dlm->dlm_proc = proc_mkdir(dlm->name, ocfs2_dlm_proc);
+	if (dlm->dlm_proc) {
+		entry = create_proc_read_entry(DLM_STAT_PROC_NAME,
+					       S_IFREG | S_IRUGO, dlm->dlm_proc,
+					       dlm_proc_stats, (char *)dlm);
+		if (entry)
+			entry->owner = THIS_MODULE;
+	}
+}
+
+void dlm_proc_del_domain(struct dlm_ctxt *dlm)
+{
+	if (dlm->dlm_proc) {
+		remove_proc_entry(DLM_STAT_PROC_NAME, dlm->dlm_proc);
+		remove_proc_entry(dlm->name, ocfs2_dlm_proc);
+	}
 }
 
 /* lock resource printing is usually very important (printed
@@ -177,7 +228,7 @@ static int dlm_dump_one_lock_resource(const char __user *data,
 		mlog(ML_ERROR, "user passed too little data: %d bytes\n", len);
 		goto leave;
 	}
-	buf = kmalloc(len+1, GFP_KERNEL);
+	buf = kmalloc(len+1, GFP_NOFS);
 	if (!buf) {
 		mlog(ML_ERROR, "could not alloc %d bytes\n", len+1);
 		ret = -ENOMEM;
@@ -436,7 +487,7 @@ static int dlm_trigger_migration(const char __user *data, unsigned int len)
 		mlog(ML_ERROR, "user passed too little data: %d bytes\n", len);
 		goto leave;
 	}
-	buf = kmalloc(len+1, GFP_KERNEL);
+	buf = kmalloc(len+1, GFP_NOFS);
 	if (!buf) {
 		mlog(ML_ERROR, "could not alloc %d bytes\n", len+1);
 		ret = -ENOMEM;

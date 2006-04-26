@@ -335,7 +335,7 @@ static void __ocfs2_set_buffer_uptodate(struct ocfs2_inode_info *oi,
 	mlog(0, "Inode %"MLFu64", block %llu, expand = %d\n",
 	     oi->ip_blkno, (unsigned long long) block, expand_tree);
 
-	new = kmem_cache_alloc(ocfs2_uptodate_cachep, GFP_KERNEL);
+	new = kmem_cache_alloc(ocfs2_uptodate_cachep, GFP_NOFS);
 	if (!new) {
 		mlog_errno(-ENOMEM);
 		return;
@@ -347,7 +347,7 @@ static void __ocfs2_set_buffer_uptodate(struct ocfs2_inode_info *oi,
 		 * has no way of tracking that. */
 		for(i = 0; i < OCFS2_INODE_MAX_CACHE_ARRAY; i++) {
 			tree[i] = kmem_cache_alloc(ocfs2_uptodate_cachep,
-						   GFP_KERNEL);
+						   GFP_NOFS);
 			if (!tree[i]) {
 				mlog_errno(-ENOMEM);
 				goto out_free;
