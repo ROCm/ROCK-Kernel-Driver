@@ -985,7 +985,7 @@ iscsi_tcp_data_ready(struct sock *sk, int flag)
 
 	/* use rd_desc to pass 'conn' to iscsi_tcp_data_recv */
 	rd_desc.arg.data = conn;
-	rd_desc.count = 0;
+	rd_desc.count = 65536;
 	tcp_read_sock(sk, &rd_desc, iscsi_tcp_data_recv);
 
 	read_unlock(&sk->sk_callback_lock);
