@@ -80,8 +80,14 @@ NORET_TYPE void panic(const char * fmt, ...)
 	printk(KERN_EMERG "Kernel panic - not syncing: %s\n",buf);
 	bust_spinlocks(0);
 
+#ifdef CONFIG_LKCD_DUMP
+	/* FIXME: lkcd wants it in that order for whatever reason */
 	notifier_call_chain(&panic_notifier_list, 0, buf);
-
+	crash_kexec(NULL);
+#ifdef CONFIG_SMP
+	smp_send_stop();
+#endif
+#else
 	/*
 	 * If we have crashed and we have a crash kernel loaded let it handle
 	 * everything else.
@@ -98,6 +104,8 @@ NORET_TYPE void panic(const char * fmt, ...)
 	smp_send_stop();
 #endif
 
+	notifier_call_chain(&panic_notifier_list, 0, buf);
+#endif
 
 	if (!panic_blink)
 		panic_blink = no_blink;
