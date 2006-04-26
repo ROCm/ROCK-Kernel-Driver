@@ -427,7 +427,6 @@ struct sk_buff *skb_clone(struct sk_buff *skb, gfp_t gfp_mask)
 	C(local_df);
 	n->cloned = 1;
 	n->nohdr = 0;
-	C(copied_early);
 	C(pkt_type);
 	C(ip_summed);
 	C(priority);

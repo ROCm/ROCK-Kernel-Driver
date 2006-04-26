@@ -401,7 +401,7 @@ enum
 	NET_TCP_CONG_CONTROL=110,
 	NET_TCP_ABC=111,
 	NET_IPV4_IPFRAG_MAX_DIST=112,
-	NET_TCP_DMA_COPYBREAK=0xf00baa, /* not in mainline yet; picking random value */
+	NET_TCP_DMA_COPYBREAK=113,
 };
 
 enum {

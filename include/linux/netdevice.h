@@ -37,6 +37,7 @@
 #include <linux/config.h>
 #include <linux/device.h>
 #include <linux/percpu.h>
+#include <linux/dmaengine.h>
 
 struct divert_blk;
 struct vlan_group;
@@ -597,19 +598,6 @@ struct softnet_data
 };
 
 DECLARE_PER_CPU(struct softnet_data,softnet_data);
-
-#ifdef CONFIG_NET_DMA
-static inline struct dma_chan *get_softnet_dma(void)
-{
-	struct dma_chan *chan;
-	rcu_read_lock();
-	chan = __get_cpu_var(softnet_data.net_dma);
-	if (chan)
-		dma_chan_get(chan);
-	rcu_read_unlock();
-	return chan;
-}
-#endif
 
 #define HAVE_NETIF_QUEUE
 

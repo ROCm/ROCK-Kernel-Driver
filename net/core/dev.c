@@ -114,8 +114,8 @@
 #include <linux/wireless.h>		/* Note : will define WIRELESS_EXT */
 #include <net/iw_handler.h>
 #endif	/* CONFIG_NET_RADIO */
-#include <linux/dmaengine.h>
 #include <asm/current.h>
+#include <linux/dmaengine.h>
 
 #ifdef CONFIG_XEN
 #include <net/ip.h>
@@ -158,6 +158,7 @@ static struct list_head ptype_all;		/* Taps */
 #ifdef CONFIG_NET_DMA
 static struct dma_client *net_dma_client;
 static unsigned int net_dma_count;
+static spinlock_t net_dma_event_lock;
 #endif
 
 /*
@@ -1780,9 +1781,6 @@ static void net_rx_action(struct softirq_action *h)
 	unsigned long start_time = jiffies;
 	int budget = netdev_budget;
 	void *have;
-#ifdef CONFIG_NET_DMA
-	struct dma_chan *chan;
-#endif
 
 	local_irq_disable();
 
@@ -1816,13 +1814,16 @@ static void net_rx_action(struct softirq_action *h)
 out:
 #ifdef CONFIG_NET_DMA
 	/*
-	 * There may not be any more sk_buffs comming right now, so push
+	 * There may not be any more sk_buffs coming right now, so push
 	 * any pending DMA copies to hardware
 	 */
-	spin_lock(&net_dma_client->lock);
-	list_for_each_entry(chan, &net_dma_client->channels, client_node)
-		dma_async_memcpy_issue_pending(chan);
-	spin_unlock(&net_dma_client->lock);
+	if (net_dma_client) {
+		struct dma_chan *chan;
+		rcu_read_lock();
+		list_for_each_entry_rcu(chan, &net_dma_client->channels, client_node)
+			dma_async_memcpy_issue_pending(chan);
+		rcu_read_unlock();
+	}
 #endif
 	local_irq_enable();
 	return;
@@ -3273,7 +3274,7 @@ static int dev_cpu_callback(struct notifier_block *nfb,
 
 #ifdef CONFIG_NET_DMA
 /**
- * net_dma_reblance -
+ * net_dma_rebalance -
  * This is called when the number of channels allocated to the net_dma_client
  * changes.  The net_dma_client tries to have one DMA channel per CPU.
  */
@@ -3281,13 +3282,12 @@ static void net_dma_rebalance(void)
 {
 	unsigned int cpu, i, n;
 	struct dma_chan *chan;
-	unsigned long flags;
 
 	lock_cpu_hotplug();
 
 	if (net_dma_count == 0) {
 		for_each_online_cpu(cpu)
-			per_cpu(softnet_data.net_dma, cpu) = NULL;
+			rcu_assign_pointer(per_cpu(softnet_data.net_dma, cpu), NULL);
 		unlock_cpu_hotplug();
 		return;
 	}
@@ -3295,20 +3295,19 @@ static void net_dma_rebalance(void)
 	i = 0;
 	cpu = first_cpu(cpu_online_map);
 
-	spin_lock_irqsave(&net_dma_client->lock, flags);
+	rcu_read_lock();
 	list_for_each_entry(chan, &net_dma_client->channels, client_node) {
-		/* cpus_clear(chan->cpumask); */
-		n = ((num_online_cpus() / net_dma_count) + (i < (num_online_cpus() % net_dma_count) ? 1 : 0));
+		n = ((num_online_cpus() / net_dma_count)
+		   + (i < (num_online_cpus() % net_dma_count) ? 1 : 0));
 
 		while(n) {
 			per_cpu(softnet_data.net_dma, cpu) = chan;
-			/* cpu_set(cpu, chan->cpumask); */
 			cpu = next_cpu(cpu, cpu_online_map);
 			n--;
 		}
 		i++;
 	}
-	spin_unlock_irqrestore(&net_dma_client->lock, flags);
+	rcu_read_unlock();
 
 	unlock_cpu_hotplug();
 }
@@ -3319,8 +3318,10 @@ static void net_dma_rebalance(void)
  * @chan:
  * @event:
  */
-static void netdev_dma_event(struct dma_client *client, struct dma_chan *chan, enum dma_event event)
+static void netdev_dma_event(struct dma_client *client, struct dma_chan *chan,
+	enum dma_event event)
 {
+	spin_lock(&net_dma_event_lock);
 	switch (event) {
 	case DMA_RESOURCE_ADDED:
 		net_dma_count++;
@@ -3333,6 +3334,7 @@ static void netdev_dma_event(struct dma_client *client, struct dma_chan *chan, e
 	default:
 		break;
 	}
+	spin_unlock(&net_dma_event_lock);
 }
 
 /**
@@ -3340,6 +3342,7 @@ static void netdev_dma_event(struct dma_client *client, struct dma_chan *chan, e
  */
 static int __init netdev_dma_register(void)
 {
+	spin_lock_init(&net_dma_event_lock);
 	net_dma_client = dma_async_client_register(netdev_dma_event);
 	if (net_dma_client == NULL)
 		return -ENOMEM;

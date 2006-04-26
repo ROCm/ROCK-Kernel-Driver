@@ -1,24 +1,24 @@
-/*****************************************************************************
-Copyright(c) 2004 - 2006 Intel Corporation. All rights reserved.
-Portions based on net/core/datagram.c and copyrighted by their authors.
-
-This program is free software; you can redistribute it and/or modify it
-under the terms of the GNU General Public License as published by the Free
-Software Foundation; either version 2 of the License, or (at your option)
-any later version.
-
-This program is distributed in the hope that it will be useful, but WITHOUT
-ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-more details.
-
-You should have received a copy of the GNU General Public License along with
-this program; if not, write to the Free Software Foundation, Inc., 59
-Temple Place - Suite 330, Boston, MA  02111-1307, USA.
-
-The full GNU General Public License is included in this distribution in the
-file called LICENSE.
-*****************************************************************************/
+/*
+ * Copyright(c) 2004 - 2006 Intel Corporation. All rights reserved.
+ * Portions based on net/core/datagram.c and copyrighted by their authors.
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the Free
+ * Software Foundation; either version 2 of the License, or (at your option)
+ * any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc., 59
+ * Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+ *
+ * The full GNU General Public License is included in this distribution in the
+ * file called COPYING.
+ */
 
 /*
  * This code allows the net stack to make use of a DMA engine for
@@ -30,10 +30,7 @@ file called LICENSE.
 #include <linux/rtnetlink.h> /* for BUG_TRAP */
 #include <net/tcp.h>
 
-
-#ifdef CONFIG_NET_DMA
-
-#define NET_DMA_DEFAULT_COPYBREAK 1024
+#define NET_DMA_DEFAULT_COPYBREAK 4096
 
 int sysctl_tcp_dma_copybreak = NET_DMA_DEFAULT_COPYBREAK;
 
@@ -43,13 +40,13 @@ int sysctl_tcp_dma_copybreak = NET_DMA_DEFAULT_COPYBREAK;
  *	@offset - offset in the buffer to start copying from
  *	@iovec - io vector to copy to
  *	@len - amount of data to copy from buffer to iovec
- *	@locked_list - locked iovec buffer data
+ *	@pinned_list - locked iovec buffer data
  *
  *	Note: the iovec is modified during the copy.
  */
 int dma_skb_copy_datagram_iovec(struct dma_chan *chan,
 			struct sk_buff *skb, int offset, struct iovec *to,
-			size_t len, struct dma_locked_list *locked_list)
+			size_t len, struct dma_pinned_list *pinned_list)
 {
 	int start = skb_headlen(skb);
 	int i, copy = start - offset;
@@ -59,10 +56,12 @@ int dma_skb_copy_datagram_iovec(struct dma_chan *chan,
 	if (copy > 0) {
 		if (copy > len)
 			copy = len;
-		if ((cookie = dma_memcpy_toiovec(chan, to, locked_list,
-		     skb->data + offset, copy)) < 0)
+		cookie = dma_memcpy_to_iovec(chan, to, pinned_list,
+		                            skb->data + offset, copy);
+		if (cookie < 0)
 			goto fault;
-		if ((len -= copy) == 0)
+		len -= copy;
+		if (len == 0)
 			goto end;
 		offset += copy;
 	}
@@ -74,6 +73,7 @@ int dma_skb_copy_datagram_iovec(struct dma_chan *chan,
 		BUG_TRAP(start <= offset + len);
 
 		end = start + skb_shinfo(skb)->frags[i].size;
+		copy = end - offset;
 		if ((copy = end - offset) > 0) {
 			skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
 			struct page *page = frag->page;
@@ -81,11 +81,12 @@ int dma_skb_copy_datagram_iovec(struct dma_chan *chan,
 			if (copy > len)
 				copy = len;
 
-			cookie = dma_memcpy_pg_toiovec(chan, to, locked_list, page,
+			cookie = dma_memcpy_pg_to_iovec(chan, to, pinned_list, page,
 					frag->page_offset + offset - start, copy);
 			if (cookie < 0)
 				goto fault;
-			if (!(len -= copy))
+			len -= copy;
+			if (len == 0)
 				goto end;
 			offset += copy;
 		}
@@ -101,13 +102,17 @@ int dma_skb_copy_datagram_iovec(struct dma_chan *chan,
 			BUG_TRAP(start <= offset + len);
 
 			end = start + list->len;
-			if ((copy = end - offset) > 0) {
+			copy = end - offset;
+			if (copy > 0) {
 				if (copy > len)
 					copy = len;
-				if ((cookie = dma_skb_copy_datagram_iovec(chan, list,
-					        offset - start, to, copy, locked_list)) < 0)
+				cookie = dma_skb_copy_datagram_iovec(chan, list,
+				                offset - start, to, copy,
+				                pinned_list);
+				if (cookie < 0)
 					goto fault;
-				if ((len -= copy) == 0)
+				len -= copy;
+				if (len == 0)
 					goto end;
 				offset += copy;
 			}
@@ -124,14 +129,3 @@ end:
 fault:
  	return -EFAULT;
 }
-
-#else
-
-int dma_skb_copy_datagram_iovec(struct dma_chan *chan,
-			const struct sk_buff *skb, int offset, struct iovec *to,
-			size_t len, struct dma_locked_list *locked_list)
-{
-	return skb_copy_datagram_iovec(skb, offset, to, len);
-}
-
-#endif

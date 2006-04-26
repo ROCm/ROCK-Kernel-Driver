@@ -674,7 +674,6 @@ ctl_table ipv4_table[] = {
 		.proc_handler	= &proc_dointvec
 	},
 #endif
-
 	{ .ctl_name = 0 }
 };
 

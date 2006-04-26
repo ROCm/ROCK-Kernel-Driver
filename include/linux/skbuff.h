@@ -268,8 +268,7 @@ struct sk_buff {
 				nfctinfo:3;
 	__u8			pkt_type:3,
 				fclone:2,
-				ipvs_property:1,
-				copied_early:1;
+				ipvs_property:1;
 	__be16			protocol;
 
 	void			(*destructor)(struct sk_buff *skb);

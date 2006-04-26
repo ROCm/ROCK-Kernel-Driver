@@ -1,41 +1,41 @@
-/*****************************************************************************
-Copyright(c) 2004 - 2006 Intel Corporation. All rights reserved.
-
-This program is free software; you can redistribute it and/or modify it
-under the terms of the GNU General Public License as published by the Free
-Software Foundation; either version 2 of the License, or (at your option)
-any later version.
-
-This program is distributed in the hope that it will be useful, but WITHOUT
-ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-more details.
-
-You should have received a copy of the GNU General Public License along with
-this program; if not, write to the Free Software Foundation, Inc., 59
-Temple Place - Suite 330, Boston, MA  02111-1307, USA.
-
-The full GNU General Public License is included in this distribution in the
-file called LICENSE.
-*****************************************************************************/
+/*
+ * Copyright(c) 2004 - 2006 Intel Corporation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the Free
+ * Software Foundation; either version 2 of the License, or (at your option)
+ * any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc., 59
+ * Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+ *
+ * The full GNU General Public License is included in this distribution in the
+ * file called COPYING.
+ */
 #ifndef IOATDMA_H
 #define IOATDMA_H
 
 #include <linux/dmaengine.h>
-#include "cb_hw.h"
+#include "ioatdma_hw.h"
 #include <linux/init.h>
 #include <linux/dmapool.h>
 #include <linux/cache.h>
 
-#define PCI_DEVICE_ID_INTEL_CB		0x1a38
+#define PCI_DEVICE_ID_INTEL_IOAT	0x1a38
 
-#define CB_LOW_COMPLETION_MASK		0xffffffc0
+#define IOAT_LOW_COMPLETION_MASK	0xffffffc0
 
 extern struct list_head dma_device_list;
 extern struct list_head dma_client_list;
 
 /**
- * struct cb_device - internal representation of a CB device
+ * struct ioat_device - internal representation of a IOAT device
  * @pdev: PCI-Express device
  * @reg_base: MMIO register space base address
  * @dma_pool: for allocating DMA descriptors
@@ -43,19 +43,18 @@ extern struct list_head dma_client_list;
  * @msi: Message Signaled Interrupt number
  */
 
-struct cb_device {
+struct ioat_device {
 	struct pci_dev *pdev;
 	void *reg_base;
-	struct dma_pool *dma_pool;
+	struct pci_pool *dma_pool;
+	struct pci_pool *completion_pool;
 
 	struct dma_device common;
 	u8 msi;
-
-	struct cb_dma_chan *idx[4];
 };
 
 /**
- * struct cb_dma_chan - internal representation of a DMA channel
+ * struct ioat_dma_chan - internal representation of a DMA channel
  * @device:
  * @reg_base:
  * @sw_in_use:
@@ -73,14 +72,13 @@ struct cb_device {
  * @device_node:
  */
 
-struct cb_dma_chan {
+struct ioat_dma_chan {
 
 	void *reg_base;
 
 	dma_cookie_t completed_cookie;
 	unsigned long last_completion;
 
-	u32 running;
 	u32 xfercap;	/* XFERCAP register value expanded out */
 
 	spinlock_t cleanup_lock;
@@ -90,35 +88,34 @@ struct cb_dma_chan {
 
 	int pending;
 
-	struct cb_device *device;
+	struct ioat_device *device;
 	struct dma_chan common;
 
+	dma_addr_t completion_addr;
 	union {
-		u64 completion; /* HW completion writeback */
+		u64 full; /* HW completion writeback */
 		struct {
-			u32 completion_low;
-			u32 completion_high;
+			u32 low;
+			u32 high;
 		};
-	} ____cacheline_aligned;
-	char padding ____cacheline_aligned;
+	} *completion_virt;
 };
 
 /* wrapper around hardware descriptor format + additional software fields */
 
 /**
- * struct cb_desc_sw - wrapper around hardware descriptor
+ * struct ioat_desc_sw - wrapper around hardware descriptor
  * @hw: hardware DMA descriptor
  * @node:
  * @cookie:
  * @phys:
  */
 
-struct cb_desc_sw {
-	struct cb_dma_descriptor *hw;
+struct ioat_desc_sw {
+	struct ioat_dma_descriptor *hw;
 	struct list_head node;
 	dma_cookie_t cookie;
 	dma_addr_t phys;
-	/* these should do nothing on the arch we expect to find this device on */
 	DECLARE_PCI_UNMAP_ADDR(src)
 	DECLARE_PCI_UNMAP_LEN(src_len)
 	DECLARE_PCI_UNMAP_ADDR(dst)

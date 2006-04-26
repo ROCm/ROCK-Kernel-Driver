@@ -18,27 +18,35 @@
  * The full GNU General Public License is included in this distribution in the
  * file called COPYING.
  */
-#ifndef NETDMA_H
-#define NETDMA_H
-#include <linux/config.h>
-#ifdef CONFIG_NET_DMA
-#include <linux/dmaengine.h>
-#include <linux/skbuff.h>
+#ifndef _IOAT_HW_H_
+#define _IOAT_HW_H_
 
-static inline struct dma_chan *get_softnet_dma(void)
-{
-	struct dma_chan *chan;
-	rcu_read_lock();
-	chan = rcu_dereference(__get_cpu_var(softnet_data.net_dma));
-	if (chan)
-		dma_chan_get(chan);
-	rcu_read_unlock();
-	return chan;
-}
+/* PCI Configuration Space Values */
+#define IOAT_PCI_VID			0x8086
+#define IOAT_PCI_DID			0x1A38
+#define IOAT_PCI_RID			0x00
+#define IOAT_PCI_SVID			0x8086
+#define IOAT_PCI_SID			0x8086
+#define IOAT_VER			0x12	/* Version 1.2 */
 
-int dma_skb_copy_datagram_iovec(struct dma_chan* chan,
-		const struct sk_buff *skb, int offset, struct iovec *to,
-		size_t len, struct dma_pinned_list *pinned_list);
+struct ioat_dma_descriptor {
+	uint32_t	size;
+	uint32_t	ctl;
+	uint64_t	src_addr;
+	uint64_t	dst_addr;
+	uint64_t	next;
+	uint64_t	rsv1;
+	uint64_t	rsv2;
+	uint64_t	user1;
+	uint64_t	user2;
+};
 
-#endif /* CONFIG_NET_DMA */
-#endif /* NETDMA_H */
+#define IOAT_DMA_DESCRIPTOR_CTL_INT_GN	0x00000001
+#define IOAT_DMA_DESCRIPTOR_CTL_SRC_SN	0x00000002
+#define IOAT_DMA_DESCRIPTOR_CTL_DST_SN	0x00000004
+#define IOAT_DMA_DESCRIPTOR_CTL_CP_STS	0x00000008
+#define IOAT_DMA_DESCRIPTOR_CTL_FRAME	0x00000010
+#define IOAT_DMA_DESCRIPTOR_NUL		0x00000020
+#define IOAT_DMA_DESCRIPTOR_OPCODE	0xFF000000
+
+#endif

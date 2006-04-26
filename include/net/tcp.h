@@ -28,6 +28,7 @@
 #include <linux/cache.h>
 #include <linux/percpu.h>
 #include <linux/skbuff.h>
+#include <linux/dmaengine.h>
 
 #include <net/inet_connection_sock.h>
 #include <net/inet_timewait_sock.h>
@@ -287,8 +288,8 @@ extern int			tcp_rcv_established(struct sock *sk,
 						    unsigned len);
 
 extern void			tcp_rcv_space_adjust(struct sock *sk);
-extern void			tcp_cleanup_rbuf(struct sock *sk,
-						 int copied);
+
+extern void			tcp_cleanup_rbuf(struct sock *sk, int copied);
 
 extern int			tcp_twsk_unique(struct sock *sk,
 						struct sock *sktw, void *twp);
@@ -505,9 +506,6 @@ extern u32	__tcp_select_window(struct sock *sk);
  * 40 bytes on 64-bit machines, if this grows please adjust
  * skbuff.h:skbuff->cb[xxx] size appropriately.
  */
-
-#include <linux/dmaengine.h>
-
 struct tcp_skb_cb {
 	union {
 		struct inet_skb_parm	h4;
@@ -810,11 +808,12 @@ static inline void tcp_prequeue_init(struct tcp_sock *tp)
 	tp->ucopy.len = 0;
 	tp->ucopy.memory = 0;
 	skb_queue_head_init(&tp->ucopy.prequeue);
-
+#ifdef CONFIG_NET_DMA
 	tp->ucopy.dma_chan = NULL;
 	tp->ucopy.wakeup = 0;
-	tp->ucopy.locked_list = NULL;
+	tp->ucopy.pinned_list = NULL;
 	tp->ucopy.dma_cookie = 0;
+#endif
 }
 
 /* Packet is added to VJ-style prequeue for processing in process

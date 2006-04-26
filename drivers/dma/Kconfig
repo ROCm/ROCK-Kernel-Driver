@@ -14,7 +14,7 @@ comment "DMA Clients"
 
 config NET_DMA
 	bool "Network: TCP receive copy offload"
-	depends on DMA_ENGINE
+	depends on DMA_ENGINE && NET
 	default y
 	---help---
 	  This enables the use of DMA engines in the network stack to
@@ -22,13 +22,21 @@ config NET_DMA
 	  Since this is the main user of the DMA engine, it should be enabled;
 	  say Y here.
 
+config DMA_TESTCLIENT
+	tristate "Test DMA client"
+	depends on DMA_ENGINE
+	---help---
+	  The test client driver performs a DMA-assisted memcpy on module
+	  load, and prints the result when unloaded. It is pretty simple, but
+	  perhaps is useful as a demonstration of the DMA subsystem API.
+
 comment "DMA Devices"
 
 config INTEL_IOATDMA
 	tristate "Intel I/OAT DMA support"
-	depends on DMA_ENGINE
+	depends on DMA_ENGINE && PCI
 	default m
 	---help---
-	  Enable support for the Intel I/OAT DMA engine.
+	  Enable support for the Intel(R) I/OAT DMA engine.
 
 endmenu

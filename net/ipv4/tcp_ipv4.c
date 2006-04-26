@@ -982,11 +982,6 @@ int tcp_v4_do_rcv(struct sock *sk, struct sk_buff *skb)
 {
 	if (sk->sk_state == TCP_ESTABLISHED) { /* Fast path */
 		TCP_CHECK_TIMER(sk);
-
-#ifdef CONFIG_NET_DMA
-		dma_async_try_early_copy(sk, skb);
-#endif
-
 		if (tcp_rcv_established(sk, skb, skb->h.th, skb->len))
 			goto reset;
 		TCP_CHECK_TIMER(sk);
@@ -1098,6 +1093,8 @@ process:
 	if (!sock_owned_by_user(sk)) {
 #ifdef CONFIG_NET_DMA
 		struct tcp_sock *tp = tcp_sk(sk);
+		if (!tp->ucopy.dma_chan && tp->ucopy.pinned_list)
+			tp->ucopy.dma_chan = get_softnet_dma();
 		if (tp->ucopy.dma_chan)
 			ret = tcp_v4_do_rcv(sk, skb);
 		else
@@ -1108,7 +1105,6 @@ process:
 		}
 	} else
 		sk_add_backlog(sk, skb);
-
 	bh_unlock_sock(sk);
 
 	sock_put(sk);
@@ -1253,7 +1249,6 @@ static int tcp_v4_init_sock(struct sock *sk)
 	struct tcp_sock *tp = tcp_sk(sk);
 
 	skb_queue_head_init(&tp->out_of_order_queue);
-	skb_queue_head_init(&tp->async_wait_queue);
 	tcp_init_xmit_timers(sk);
 	tcp_prequeue_init(tp);
 
@@ -1307,8 +1302,10 @@ int tcp_v4_destroy_sock(struct sock *sk)
 	/* Cleans up our, hopefully empty, out_of_order_queue. */
   	__skb_queue_purge(&tp->out_of_order_queue);
 
-	/* Cleans up our async_wait_queue */
-  	__skb_queue_purge(&tp->async_wait_queue);
+#ifdef CONFIG_NET_DMA
+	/* Cleans up our sk_async_wait_queue */
+  	__skb_queue_purge(&sk->sk_async_wait_queue);
+#endif
 
 	/* Clean prequeue, it must be empty really */
 	__skb_queue_purge(&tp->ucopy.prequeue);

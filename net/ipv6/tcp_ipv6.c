@@ -1217,8 +1217,16 @@ process:
 	bh_lock_sock(sk);
 	ret = 0;
 	if (!sock_owned_by_user(sk)) {
-		if (!tcp_prequeue(sk, skb))
-			ret = tcp_v6_do_rcv(sk, skb);
+#ifdef CONFIG_NET_DMA
+                struct tcp_sock *tp = tcp_sk(sk);
+                if (tp->ucopy.dma_chan)
+                        ret = tcp_v6_do_rcv(sk, skb);
+                else
+#endif
+		{
+			if (!tcp_prequeue(sk, skb))
+				ret = tcp_v6_do_rcv(sk, skb);
+		}
 	} else
 		sk_add_backlog(sk, skb);
 	bh_unlock_sock(sk);
@@ -1341,7 +1349,6 @@ static int tcp_v6_init_sock(struct sock *sk)
 	struct tcp_sock *tp = tcp_sk(sk);
 
 	skb_queue_head_init(&tp->out_of_order_queue);
-	skb_queue_head_init(&tp->async_wait_queue);
 	tcp_init_xmit_timers(sk);
 	tcp_prequeue_init(tp);
 

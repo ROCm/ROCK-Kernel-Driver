@@ -1,25 +1,27 @@
-/*****************************************************************************
-Copyright(c) 2004 - 2006 Intel Corporation. All rights reserved.
-
-This program is free software; you can redistribute it and/or modify it
-under the terms of the GNU General Public License as published by the Free
-Software Foundation; either version 2 of the License, or (at your option)
-any later version.
-
-This program is distributed in the hope that it will be useful, but WITHOUT
-ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-more details.
-
-You should have received a copy of the GNU General Public License along with
-this program; if not, write to the Free Software Foundation, Inc., 59
-Temple Place - Suite 330, Boston, MA  02111-1307, USA.
-
-The full GNU General Public License is included in this distribution in the
-file called LICENSE.
-*****************************************************************************/
+/*
+ * Copyright(c) 2004 - 2006 Intel Corporation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the Free
+ * Software Foundation; either version 2 of the License, or (at your option)
+ * any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc., 59
+ * Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+ *
+ * The full GNU General Public License is included in this distribution in the
+ * file called COPYING.
+ */
 #ifndef DMAENGINE_H
 #define DMAENGINE_H
+#include <linux/config.h>
+#ifdef CONFIG_DMA_ENGINE
 
 #include <linux/device.h>
 #include <linux/uio.h>
@@ -63,19 +65,34 @@ enum dma_status {
 };
 
 /**
+ * struct dma_chan_percpu - the per-CPU part of struct dma_chan
+ * @refcount: local_t used for open-coded "bigref" counting
+ * @memcpy_count: transaction counter
+ * @bytes_transferred: byte counter
+ */
+
+struct dma_chan_percpu {
+	local_t refcount;
+	/* stats */
+	unsigned long memcpy_count;
+	unsigned long bytes_transferred;
+};
+
+/**
  * struct dma_chan - devices supply DMA channels, clients use them
  * @client: ptr to the client user of this chan, will be NULL when unused
  * @device: ptr to the dma device who supplies this channel, always !NULL
  * @cookie: last cookie value returned to client
  * @chan_id:
  * @class_dev:
- * @memcpy_count: transaction count
- * @bytes_transferred: octet count
+ * @refcount: kref, used in "bigref" slow-mode
+ * @slow_ref:
+ * @rcu:
  * @client_node: used to add this to the client chan list
  * @device_node: used to add this to the device chan list
+ * @local: per-cpu pointer to a struct dma_chan_percpu
  */
-struct dma_chan
-{
+struct dma_chan {
 	struct dma_client *client;
 	struct dma_device *device;
 	dma_cookie_t cookie;
@@ -85,26 +102,34 @@ struct dma_chan
 	struct class_device class_dev;
 
 	struct kref refcount;
+	int slow_ref;
 	struct rcu_head rcu;
-
-	/* stats */
-	unsigned long memcpy_count;
-	unsigned long bytes_transferred;
 
 	struct list_head client_node;
 	struct list_head device_node;
+	struct dma_chan_percpu *local;
 };
 
 void dma_chan_cleanup(struct kref *kref);
 
 static inline void dma_chan_get(struct dma_chan *chan)
 {
-	kref_get(&chan->refcount);
+	if (unlikely(chan->slow_ref))
+		kref_get(&chan->refcount);
+	else {
+		local_inc(&(per_cpu_ptr(chan->local, get_cpu())->refcount));
+		put_cpu();
+	}
 }
 
 static inline void dma_chan_put(struct dma_chan *chan)
 {
-	kref_put(&chan->refcount, dma_chan_cleanup);
+	if (unlikely(chan->slow_ref))
+		kref_put(&chan->refcount, dma_chan_cleanup);
+	else {
+		local_dec(&(per_cpu_ptr(chan->local, get_cpu())->refcount));
+		put_cpu();
+	}
 }
 
 /*
@@ -137,6 +162,8 @@ struct dma_client {
  * @chancnt: how many DMA channels are supported
  * @channels: the list of struct dma_chan
  * @global_node: list_head for global dma_device_list
+ * @refcount:
+ * @done:
  * @dev_id:
  * Other func ptrs: used to make use of this device's capabilities
  */
@@ -189,8 +216,10 @@ void dma_async_client_chan_request(struct dma_client *client,
 static inline dma_cookie_t dma_async_memcpy_buf_to_buf(struct dma_chan *chan,
 	void *dest, void *src, size_t len)
 {
-	chan->bytes_transferred += len;
-	chan->memcpy_count++;
+	int cpu = get_cpu();
+	per_cpu_ptr(chan->local, cpu)->bytes_transferred += len;
+	per_cpu_ptr(chan->local, cpu)->memcpy_count++;
+	put_cpu();
 
 	return chan->device->device_memcpy_buf_to_buf(chan, dest, src, len);
 }
@@ -211,8 +240,10 @@ static inline dma_cookie_t dma_async_memcpy_buf_to_buf(struct dma_chan *chan,
 static inline dma_cookie_t dma_async_memcpy_buf_to_pg(struct dma_chan *chan,
 	struct page *page, unsigned int offset, void *kdata, size_t len)
 {
-	chan->bytes_transferred += len;
-	chan->memcpy_count++;
+	int cpu = get_cpu();
+	per_cpu_ptr(chan->local, cpu)->bytes_transferred += len;
+	per_cpu_ptr(chan->local, cpu)->memcpy_count++;
+	put_cpu();
 
 	return chan->device->device_memcpy_buf_to_pg(chan, page, offset,
 	                                             kdata, len);
@@ -236,8 +267,10 @@ static inline dma_cookie_t dma_async_memcpy_pg_to_pg(struct dma_chan *chan,
 	struct page *dest_pg, unsigned int dest_off, struct page *src_pg,
 	unsigned int src_off, size_t len)
 {
-	chan->bytes_transferred += len;
-	chan->memcpy_count++;
+	int cpu = get_cpu();
+	per_cpu_ptr(chan->local, cpu)->bytes_transferred += len;
+	per_cpu_ptr(chan->local, cpu)->memcpy_count++;
+	put_cpu();
 
 	return chan->device->device_memcpy_pg_to_pg(chan, dest_pg, dest_off,
 	                                            src_pg, src_off, len);
@@ -282,7 +315,8 @@ static inline enum dma_status dma_async_memcpy_complete(struct dma_chan *chan,
  * the test logic is seperated for lightweight testing of multiple cookies
  */
 static inline enum dma_status dma_async_is_complete(dma_cookie_t cookie,
-			dma_cookie_t last_complete, dma_cookie_t last_used) {
+			dma_cookie_t last_complete, dma_cookie_t last_used)
+{
 	if (last_complete <= last_used) {
 		if ((cookie <= last_complete) || (cookie > last_used))
 			return DMA_SUCCESS;
@@ -301,26 +335,25 @@ void dma_async_device_unregister(struct dma_device *device);
 
 /* --- Helper iov-locking functions --- */
 
-struct dma_page_list
-{
+struct dma_page_list {
 	char *base_address;
 	int nr_pages;
 	struct page **pages;
 };
 
-struct dma_locked_list
-{
+struct dma_pinned_list {
 	int nr_iovecs;
 	struct dma_page_list page_list[0];
 };
 
-int dma_lock_iovec_pages(struct iovec *iov, size_t len,
-	struct dma_locked_list	**locked_list);
-void dma_unlock_iovec_pages(struct dma_locked_list* locked_list);
-dma_cookie_t dma_memcpy_toiovec(struct dma_chan *chan, struct iovec *iov,
-	struct dma_locked_list *locked_list, unsigned char *kdata, size_t len);
-dma_cookie_t dma_memcpy_pg_toiovec(struct dma_chan *chan, struct iovec *iov,
-	struct dma_locked_list *locked_list, struct page *page,
+struct dma_pinned_list *dma_pin_iovec_pages(struct iovec *iov, size_t len);
+void dma_unpin_iovec_pages(struct dma_pinned_list* pinned_list);
+
+dma_cookie_t dma_memcpy_to_iovec(struct dma_chan *chan, struct iovec *iov,
+	struct dma_pinned_list *pinned_list, unsigned char *kdata, size_t len);
+dma_cookie_t dma_memcpy_pg_to_iovec(struct dma_chan *chan, struct iovec *iov,
+	struct dma_pinned_list *pinned_list, struct page *page,
 	unsigned int offset, size_t len);
 
+#endif /* CONFIG_DMA_ENGINE */
 #endif /* DMAENGINE_H */

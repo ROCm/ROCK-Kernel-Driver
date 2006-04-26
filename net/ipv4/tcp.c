@@ -941,7 +941,7 @@ void tcp_cleanup_rbuf(struct sock *sk, int copied)
 	struct tcp_sock *tp = tcp_sk(sk);
 	int time_to_ack = 0;
 
-#if TCP_DEBUG && !defined(CONFIG_NET_DMA)
+#if TCP_DEBUG
 	struct sk_buff *skb = skb_peek(&sk->sk_receive_queue);
 
 	BUG_TRAP(!skb || before(tp->copied_seq, TCP_SKB_CB(skb)->end_seq));
@@ -1071,11 +1071,11 @@ int tcp_read_sock(struct sock *sk, read_descriptor_t *desc,
 				break;
 		}
 		if (skb->h.th->fin) {
-			sk_eat_skb(sk, skb);
+			sk_eat_skb(sk, skb, 0);
 			++seq;
 			break;
 		}
-		sk_eat_skb(sk, skb);
+		sk_eat_skb(sk, skb, 0);
 		if (!desc->count)
 			break;
 	}
@@ -1109,6 +1109,7 @@ int tcp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 	int target;		/* Read at least this many bytes */
 	long timeo;
 	struct task_struct *user_recv = NULL;
+	int copied_early = 0;
 
 	lock_sock(sk);
 
@@ -1134,17 +1135,13 @@ int tcp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 
 #ifdef CONFIG_NET_DMA
 	tp->ucopy.dma_chan = NULL;
-	if ((len > sysctl_tcp_dma_copybreak) && !(flags & MSG_PEEK) && !sysctl_tcp_low_latency) {
-		tp->ucopy.dma_chan = get_softnet_dma();
-		if (tp->ucopy.dma_chan) {
-			if (dma_lock_iovec_pages(msg->msg_iov, len,
-			    &tp->ucopy.locked_list)) {
-				/* fallback to no-dma */
-				tp->ucopy.dma_chan = NULL;
-				dma_chan_put(tp->ucopy.dma_chan);
-			}
-		}
-	}
+	preempt_disable();
+	if ((len > sysctl_tcp_dma_copybreak) && !(flags & MSG_PEEK) &&
+	    !sysctl_tcp_low_latency && __get_cpu_var(softnet_data.net_dma)) {
+		preempt_enable_no_resched();
+		tp->ucopy.pinned_list = dma_pin_iovec_pages(msg->msg_iov, len);
+	} else
+		preempt_enable_no_resched();
 #endif
 
 	do {
@@ -1176,12 +1173,7 @@ int tcp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 				       "seq %X\n", *seq, TCP_SKB_CB(skb)->seq);
 				break;
 			}
-
-			if (!skb->copied_early)
-				offset = *seq - TCP_SKB_CB(skb)->seq;
-			else
-				offset = 0;
-
+			offset = *seq - TCP_SKB_CB(skb)->seq;
 			if (skb->h.th->syn)
 				offset--;
 			if (offset < skb->len)
@@ -1293,7 +1285,9 @@ int tcp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 		} else
 			sk_wait_data(sk, &timeo);
 
+#ifdef CONFIG_NET_DMA
 		tp->ucopy.wakeup = 0;
+#endif
 
 		if (user_recv) {
 			int chunk;
@@ -1326,12 +1320,8 @@ do_prequeue:
 		}
 		continue;
 
-found_ok_skb:
+	found_ok_skb:
 		/* Ok so how much can we use? */
-		if (skb->copied_early) {
-			used = skb->len;
-			goto skip_copy;
-		}
 		used = skb->len - offset;
 		if (len < used)
 			used = len;
@@ -1354,11 +1344,15 @@ found_ok_skb:
 		}
 
 		if (!(flags & MSG_TRUNC)) {
+#ifdef CONFIG_NET_DMA
+			if (!tp->ucopy.dma_chan && tp->ucopy.pinned_list)
+				tp->ucopy.dma_chan = get_softnet_dma();
+
 			if (tp->ucopy.dma_chan) {
 				tp->ucopy.dma_cookie = dma_skb_copy_datagram_iovec(
 					tp->ucopy.dma_chan, skb, offset,
 					msg->msg_iov, used,
-					tp->ucopy.locked_list);
+					tp->ucopy.pinned_list);
 
 				if (tp->ucopy.dma_cookie < 0) {
 
@@ -1370,9 +1364,11 @@ found_ok_skb:
 					break;
 				}
 				if ((offset + used) == skb->len)
-					skb->copied_early = 1;
+					copied_early = 1;
 
-			} else {
+			} else
+#endif
+			{
 				err = skb_copy_datagram_iovec(skb, offset,
 						msg->msg_iov, used);
 				if (err) {
@@ -1401,12 +1397,8 @@ skip_copy:
 		if (skb->h.th->fin)
 			goto found_fin_ok;
 		if (!(flags & MSG_PEEK)) {
-			if (!skb->copied_early)
-				sk_eat_skb(sk, skb);
-			else {
-				__skb_unlink(skb, &sk->sk_receive_queue);
-				__skb_queue_tail(&tp->async_wait_queue, skb);
-			}
+			sk_eat_skb(sk, skb, copied_early);
+			copied_early = 0;
 		}
 		continue;
 
@@ -1414,12 +1406,8 @@ skip_copy:
 		/* Process the FIN. */
 		++*seq;
 		if (!(flags & MSG_PEEK)) {
-			if (!skb->copied_early)
-				sk_eat_skb(sk, skb);
-			else {
-				__skb_unlink(skb, &sk->sk_receive_queue);
-				__skb_queue_tail(&tp->async_wait_queue, skb);
-			}
+			sk_eat_skb(sk, skb, copied_early);
+			copied_early = 0;
 		}
 		break;
 	} while (len > 0);
@@ -1443,7 +1431,6 @@ skip_copy:
 		tp->ucopy.len = 0;
 	}
 
-
 #ifdef CONFIG_NET_DMA
 	if (tp->ucopy.dma_chan) {
 		struct sk_buff *skb;
@@ -1454,21 +1441,23 @@ skip_copy:
 		while (dma_async_memcpy_complete(tp->ucopy.dma_chan,
 		                                 tp->ucopy.dma_cookie, &done,
 		                                 &used) == DMA_IN_PROGRESS) {
-			/* do partial cleanup of async_wait_queue */
-			while ((skb = skb_peek(&tp->async_wait_queue)) &&
+			/* do partial cleanup of sk_async_wait_queue */
+			while ((skb = skb_peek(&sk->sk_async_wait_queue)) &&
 			       (dma_async_is_complete(skb->dma_cookie, done,
 			                              used) == DMA_SUCCESS)) {
-				__skb_dequeue(&tp->async_wait_queue);
+				__skb_dequeue(&sk->sk_async_wait_queue);
 				kfree_skb(skb);
 			}
 		}
 
 		/* Safe to free early-copied skbs now */
-		__skb_queue_purge(&tp->async_wait_queue);
-		dma_unlock_iovec_pages(tp->ucopy.locked_list);
+		__skb_queue_purge(&sk->sk_async_wait_queue);
 		dma_chan_put(tp->ucopy.dma_chan);
 		tp->ucopy.dma_chan = NULL;
-		tp->ucopy.locked_list = NULL;
+	}
+	if (tp->ucopy.pinned_list) {
+		dma_unpin_iovec_pages(tp->ucopy.pinned_list);
+		tp->ucopy.pinned_list = NULL;
 	}
 #endif
 
@@ -1739,7 +1728,9 @@ int tcp_disconnect(struct sock *sk, int flags)
 	__skb_queue_purge(&sk->sk_receive_queue);
 	sk_stream_writequeue_purge(sk);
 	__skb_queue_purge(&tp->out_of_order_queue);
-	__skb_queue_purge(&tp->async_wait_queue);
+#ifdef CONFIG_NET_DMA
+	__skb_queue_purge(&sk->sk_async_wait_queue);
+#endif
 
 	inet->dport = 0;
 
