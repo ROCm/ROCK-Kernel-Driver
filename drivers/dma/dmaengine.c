@@ -65,6 +65,7 @@
 #include <linux/spinlock.h>
 #include <linux/percpu.h>
 #include <linux/rcupdate.h>
+#include <linux/mutex.h>
 
 static DEFINE_MUTEX(dma_list_mutex);
 static LIST_HEAD(dma_device_list);
