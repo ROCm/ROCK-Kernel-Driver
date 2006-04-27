@@ -853,6 +853,7 @@ dasd_get_uid(struct ccw_device *cdev, struct dasd_uid *uid)
 	spin_unlock(&dasd_devmap_lock);
 	return 0;
 }
+EXPORT_SYMBOL(dasd_get_uid);
 
 /*
  * Register the given device unique identifier into devmap struct.
@@ -870,6 +871,7 @@ dasd_set_uid(struct ccw_device *cdev, struct dasd_uid *uid)
 	spin_unlock(&dasd_devmap_lock);
 	return 0;
 }
+EXPORT_SYMBOL(dasd_set_uid);
 
 /*
  * Return value of the specified feature.
