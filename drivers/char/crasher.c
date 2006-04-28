@@ -16,12 +16,27 @@ static struct completion startup = COMPLETION_INITIALIZER(startup);
 static unsigned long rand_seed = 152L;
 static unsigned long seed = 152L;
 static int threads = 1;
+static int call_panic;
+static int call_bug;
+static int call_trap;
 
 module_param(seed, ulong, 0);
+module_param(call_panic, int, 0);
+module_param(call_bug, int, 0);
+module_param(call_trap, int, 0);
 module_param(threads, int, 0);
 MODULE_PARM_DESC(seed, "random seed for memory tests");
+MODULE_PARM_DESC(call_panic, "test option. call panic() and render the system unusable.");
+MODULE_PARM_DESC(call_bug, "test option. call BUG() and render the system unusable.");
+MODULE_PARM_DESC(call_trap, "test option. dereference an invalid pointer to simulate a crash and render the system unusable.");
 MODULE_PARM_DESC(threads, "number of threads to run");
 MODULE_LICENSE("GPL");
+
+#if BITS_PER_LONG == 64
+#define UNMAPPED_MEM_AREA 0xeeeeeeeeeeeeeeeeUL
+#else
+#define UNMAPPED_MEM_AREA 0xeeeeeeeeUL
+#endif
 
 #define NUM_ALLOC 24
 #define NUM_SIZES 8
@@ -56,13 +71,13 @@ static char *mem_alloc(int size) {
 
 static void mem_check(char *p, int size) {
 	int i;
-	if (!p) 
+	if (!p)
 		return;
 	for (i = 0 ; i < size; i++) {
         	if (p[i] != ((i % 119) + 8)) {
-			printk(KERN_CRIT "verify error at %lX offset %d " 
-			       " wanted %d found %d size %d\n", 
-			       (unsigned long)(p + i), i, (i % 119) + 8, 
+			printk(KERN_CRIT "verify error at %lX offset %d "
+			       " wanted %d found %d size %d\n",
+			       (unsigned long)(p + i), i, (i % 119) + 8,
 			       p[i], size);
 		}
 	}
@@ -106,7 +121,7 @@ static void mem_verify(void) {
 	}
 }
 
-static int crasher_thread(void *unused) 
+static int crasher_thread(void *unused)
 {
 	daemonize("crasher");
 	complete(&startup);
@@ -121,15 +136,31 @@ static int __init crasher_init(void)
 	init_completion(&startup);
 	crasher_srandom(seed);
 
+	if (call_panic) {
+		panic("test panic from crasher module. Good Luck.\n");
+		return -EFAULT;
+	}
+	if (call_bug) {
+		printk("triggering BUG\n");
+		BUG_ON(1);
+		return -EFAULT;
+	}
+	if (call_trap) {
+		char *p = (char *)UNMAPPED_MEM_AREA;
+		printk("dereferencing invalid pointer %p.\n", p);
+		p[0] = '\n';
+		return -EFAULT;
+	}
+
 	printk("crasher module (%d threads).  Testing sizes: ", threads);
 	for (i = 0 ; i < NUM_SIZES ; i++)
 		printk("%d ", sizes[i]);
 	printk("\n");
 
-	for (i = 0 ; i < threads ; i++) 
-		kernel_thread(crasher_thread, crasher_thread, 
+	for (i = 0 ; i < threads ; i++)
+		kernel_thread(crasher_thread, crasher_thread,
 			      CLONE_FS | CLONE_FILES);
-	for (i = 0 ; i < threads ; i++) 
+	for (i = 0 ; i < threads ; i++)
 		wait_for_completion(&startup);
 	return 0;
 }
@@ -138,7 +169,7 @@ static void __exit crasher_exit(void)
 {
 	int i;
 	module_exiting = 1;
-	for (i = 0 ; i < threads ; i++) 
+	for (i = 0 ; i < threads ; i++)
 		wait_for_completion(&startup);
 	printk("all crasher threads done\n");
 	return;
