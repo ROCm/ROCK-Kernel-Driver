@@ -264,6 +264,7 @@ nfsd4_decode_fattr(struct nfsd4_compoundargs *argp, u32 *bmval, struct iattr *ia
 		READ64(iattr->ia_size);
 		iattr->ia_valid |= ATTR_SIZE;
 	}
+#if 0
 	if (bmval[0] & FATTR4_WORD0_ACL) {
 		int nace, i;
 		struct nfs4_ace ace;
@@ -307,6 +308,13 @@ nfsd4_decode_fattr(struct nfsd4_compoundargs *argp, u32 *bmval, struct iattr *ia
 		}
 	} else
 		*acl = NULL;
+#else
+	*acl = NULL;
+	if (bmval[0] & FATTR4_WORD0_ACL) {
+		status = -EOPNOTSUPP;
+		goto out_nfserr;
+	}
+#endif
 	if (bmval[1] & FATTR4_WORD1_MODE) {
 		READ_BUF(4);
 		len += 4;
@@ -1322,6 +1330,7 @@ nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
 			goto out;
 		fhp = &tempfh;
 	}
+#if 0
 	if (bmval0 & (FATTR4_WORD0_ACL | FATTR4_WORD0_ACLSUPPORT
 			| FATTR4_WORD0_SUPPORTED_ATTRS)) {
 		status = nfsd4_get_nfs4_acl(rqstp, dentry, &acl);
@@ -1336,6 +1345,10 @@ nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
 				goto out_nfserr;
 		}
 	}
+#else
+	if (bmval0 & FATTR4_WORD0_ACL)
+	  bmval0 &= ~FATTR4_WORD0_ACL;
+#endif
 	if ((buflen -= 16) < 0)
 		goto out_resource;
 
