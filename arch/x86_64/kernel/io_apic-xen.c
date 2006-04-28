@@ -881,14 +881,17 @@ int assign_irq_vector(int irq)
 		return -ENOSPC;
 
 	vector_irq[op.u.irq_op.vector] = irq;
-	if (irq != AUTO_ASSIGN)
-		IO_APIC_VECTOR(irq) = op.u.irq_op.vector;
+	if (irq != AUTO_ASSIGN) {
+		u8 vector = cmpxchg(&IO_APIC_VECTOR(irq), 0, op.u.irq_op.vector);
+
+		BUG_ON(vector && vector != op.u.irq_op.vector);
+	}
 
 	return op.u.irq_op.vector;
 }
 
-extern void (*interrupt[NR_IRQS])(void);
 #ifndef CONFIG_XEN
+extern void (*interrupt[NR_IRQS])(void);
 static struct hw_interrupt_type ioapic_level_type;
 static struct hw_interrupt_type ioapic_edge_type;
 

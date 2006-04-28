@@ -188,7 +188,8 @@ void force_evtchn_callback(void)
 {
 	(void)HYPERVISOR_xen_version(0, NULL);
 }
-EXPORT_SYMBOL_GPL(force_evtchn_callback);
+/* Not a GPL symbol: used in ubiquitous macros, so too restrictive. */
+EXPORT_SYMBOL(force_evtchn_callback);
 
 /* NB. Interrupts are disabled on entry. */
 asmlinkage void evtchn_do_upcall(struct pt_regs *regs)
@@ -225,7 +226,8 @@ static int find_unbound_irq(void)
 {
 	int irq;
 
-	for (irq = 0; irq < NR_IRQS; irq++)
+	/* Only allocate from dynirq range */
+	for (irq = DYNIRQ_BASE; irq < NR_IRQS; irq++)
 		if (irq_bindcount[irq] == 0)
 			break;
 

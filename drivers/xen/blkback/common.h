@@ -135,8 +135,6 @@ int blkif_schedule(void *arg);
 
 void update_blkif_status(blkif_t *blkif); 
 
-int blkif_connected(blkif_t *blkif);
-
 #endif /* __BLKIF__BACKEND__COMMON_H__ */
 
 /*

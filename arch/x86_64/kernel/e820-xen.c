@@ -312,7 +312,43 @@ void __init e820_reserve_resources(void)
 #else
 int __init e820_all_mapped(unsigned long start, unsigned long end, unsigned type)
 {
-	return 1;
+	dom0_op_t op;
+	dom0_memory_map_entry_t *map;
+	unsigned i;
+
+	for (i = 1; ; ++i) {
+		map = vmalloc(i * PAGE_SIZE);
+		if(!map)
+			return 0;
+		memset(map, 0, i * PAGE_SIZE);
+		op.cmd = DOM0_PHYSICAL_MEMORY_MAP;
+		op.u.physical_memory_map.max_map_entries = (i * PAGE_SIZE) / sizeof(*map);
+		op.u.physical_memory_map.memory_map = map;
+		if (HYPERVISOR_dom0_op(&op) < 0) {
+			vfree(map);
+			return 0;
+		}
+		if (op.u.physical_memory_map.nr_map_entries < op.u.physical_memory_map.max_map_entries)
+			break;
+	}
+
+	for (i = 0; i < op.u.physical_memory_map.nr_map_entries && start < end; i++) {
+		const dom0_memory_map_entry_t *ei = map + i;
+
+		if (type && !ei->is_ram == (type == E820_RAM))
+			continue;
+		/* is the region (part) in overlap with the current region ?*/
+		if (ei->start >= end || ei->end <= start)
+			continue;
+		/* if the region is at the beginning of <start,end> we move
+		 * start to the end of the region since it's ok until there
+		 */
+		if (ei->start <= start)
+			start = ei->end;
+	}
+
+	vfree(map);
+	return start >= end;
 }
 #endif /* CONFIG_XEN */
 

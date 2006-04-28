@@ -222,14 +222,6 @@ int blkif_schedule(void *arg)
 	if (debug_lvl)
 		printk(KERN_DEBUG "%s: started\n", current->comm);
 
-	/*
-	 * This thread may start before we are connected to the frontend
-	 * driver. In that case we must wait to be fully connected.
-	 */
-	wait_event_interruptible(
-		blkif->wq,
-		blkif_connected(blkif) || kthread_should_stop());
-
 	while (!kthread_should_stop()) {
 		wait_event_interruptible(
 			blkif->wq,

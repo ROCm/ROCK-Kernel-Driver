@@ -404,8 +404,9 @@ typedef struct dom0_getdomaininfolist {
 DEFINE_GUEST_HANDLE(dom0_getdomaininfolist_t);
 
 #define DOM0_PLATFORM_QUIRK      39
-#define QUIRK_NOIRQBALANCING  1
-#define QUIRK_IOAPICMODIFY  2
+#define QUIRK_NOIRQBALANCING      1 /* Do not restrict IO-APIC RTE targets */
+#define QUIRK_IOAPIC_BAD_REGSEL   2 /* IO-APIC REGSEL forgets its value    */
+#define QUIRK_IOAPIC_GOOD_REGSEL  3 /* IO-APIC REGSEL behaves properly     */
 typedef struct dom0_platform_quirk {
     /* IN variables. */
     uint32_t quirk_id;
@@ -473,12 +474,6 @@ typedef struct dom0_hypercall_init {
 } dom0_hypercall_init_t;
 DEFINE_GUEST_HANDLE(dom0_hypercall_init_t);
 
-#define DOM0_SETTIMEOFFSET    49
-typedef struct dom0_settimeoffset {
-    domid_t  domain;
-    int32_t  time_offset_seconds; /* applied to domain wallclock time */
-} dom0_settimeoffset_t;
-
 typedef struct dom0_op {
     uint32_t cmd;
     uint32_t interface_version; /* DOM0_INTERFACE_VERSION */
@@ -520,7 +515,6 @@ typedef struct dom0_op {
         struct dom0_irq_permission    irq_permission;
         struct dom0_iomem_permission  iomem_permission;
         struct dom0_hypercall_init    hypercall_init;
-        struct dom0_settimeoffset     settimeoffset;
         uint8_t                       pad[128];
     } u;
 } dom0_op_t;

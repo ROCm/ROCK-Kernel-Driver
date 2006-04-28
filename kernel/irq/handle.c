@@ -12,6 +12,10 @@
 #include <linux/interrupt.h>
 #include <linux/kernel_stat.h>
 
+#ifdef CONFIG_XEN
+#include <asm/hypervisor.h>
+#endif
+
 #include "internals.h"
 
 /*
@@ -76,10 +80,19 @@ irqreturn_t no_action(int cpl, void *dev_id, struct pt_regs *regs)
 /*
  * Have got an event to handle:
  */
-fastcall int handle_IRQ_event(unsigned int irq, struct pt_regs *regs,
+fastcall /*irqreturn_t*/int handle_IRQ_event(unsigned int irq, struct pt_regs *regs,
 				struct irqaction *action)
 {
-	int ret, retval = 0, status = 0;
+	irqreturn_t ret, retval = IRQ_NONE;
+	unsigned int status = 0;
+
+#ifdef CONFIG_XEN
+	unsigned int pirq = irq_to_pirq(irq);
+
+	BUILD_BUG_ON(BITS_TO_LONGS(NR_PIRQS) > sizeof(((shared_info_t *)0)->pirq_shared));
+	if (pirq < NR_PIRQS && test_bit(pirq, HYPERVISOR_shared_info->pirq_shared))
+		retval = IRQ_HANDLED;
+#endif
 
 	if (!(action->flags & SA_INTERRUPT))
 		local_irq_enable();

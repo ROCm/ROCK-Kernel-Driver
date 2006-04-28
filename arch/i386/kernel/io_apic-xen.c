@@ -1207,7 +1207,7 @@ int assign_irq_vector(int irq)
 {
 	physdev_op_t op;
 
-	BUG_ON(irq >= NR_IRQ_VECTORS);
+	BUG_ON(irq != AUTO_ASSIGN && (unsigned)irq >= NR_IRQ_VECTORS);
 	if (irq != AUTO_ASSIGN && IO_APIC_VECTOR(irq) > 0)
 		return IO_APIC_VECTOR(irq);
 
@@ -1217,8 +1217,11 @@ int assign_irq_vector(int irq)
 		return -ENOSPC;
 
 	vector_irq[op.u.irq_op.vector] = irq;
-	if (irq != AUTO_ASSIGN)
-		IO_APIC_VECTOR(irq) = op.u.irq_op.vector;
+	if (irq != AUTO_ASSIGN) {
+		u8 vector = cmpxchg(&IO_APIC_VECTOR(irq), 0, op.u.irq_op.vector);
+
+		BUG_ON(vector && vector != op.u.irq_op.vector);
+	}
 
 	return op.u.irq_op.vector;
 }
@@ -2481,16 +2484,13 @@ __setup("enable_8254_timer", setup_enable_8254_timer);
  
 static int __init io_apic_bug_finalize(void)
 {
-	if(sis_apic_bug == -1) {
-		if (xen_start_info->flags & SIF_INITDOMAIN) {
-			dom0_op_t op = {
-				.cmd = DOM0_PLATFORM_QUIRK,
-				.u.platform_quirk.quirk_id = QUIRK_IOAPICMODIFY
-			};
-
-			HYPERVISOR_dom0_op(&op);
-		}
+	if(sis_apic_bug == -1)
 		sis_apic_bug = 0;
+	if (xen_start_info->flags & SIF_INITDOMAIN) {
+		dom0_op_t op = { .cmd = DOM0_PLATFORM_QUIRK };
+		op.u.platform_quirk.quirk_id = sis_apic_bug ?
+			QUIRK_IOAPIC_BAD_REGSEL : QUIRK_IOAPIC_GOOD_REGSEL;
+		HYPERVISOR_dom0_op(&op);
 	}
 	return 0;
 }

@@ -41,24 +41,38 @@ struct backend_info
 };
 
 
-static void maybe_connect(struct backend_info *);
 static void connect(struct backend_info *);
 static int connect_ring(struct backend_info *);
 static void backend_changed(struct xenbus_watch *, const char **,
 			    unsigned int);
 
-int blkif_connected(blkif_t *blkif)
-{
-	return (blkif->be->dev->state == XenbusStateConnected);
-}
 
 void update_blkif_status(blkif_t *blkif)
 { 
-	if(blkif->irq && blkif->vbd.bdev) {
-		blkif->status = CONNECTED; 
-		(void)blkif_be_int(0, blkif, NULL); 
+	int err;
+
+	/* Not ready to connect? */
+	if (!blkif->irq || !blkif->vbd.bdev)
+		return;
+
+	/* Already connected? */
+	if (blkif->be->dev->state == XenbusStateConnected)
+		return;
+
+	/* Attempt to connect: exit if we fail to. */
+	connect(blkif->be);
+	if (blkif->be->dev->state != XenbusStateConnected)
+		return;
+
+	blkif->xenblkd = kthread_run(blkif_schedule, blkif,
+				     "xvd %d %02x:%02x",
+				     blkif->domid,
+				     blkif->be->major, blkif->be->minor);
+	if (IS_ERR(blkif->xenblkd)) {
+		err = PTR_ERR(blkif->xenblkd);
+		blkif->xenblkd = NULL;
+		xenbus_dev_error(blkif->be->dev, err, "start xenblkd");
 	}
-	maybe_connect(blkif->be); 
 }
 
 
@@ -224,17 +238,6 @@ static void backend_changed(struct xenbus_watch *watch,
 			return;
 		}
 
-		be->blkif->xenblkd = kthread_run(blkif_schedule, be->blkif,
-						 "xvd %d %02x:%02x",
-						 be->blkif->domid,
-						 be->major, be->minor);
-		if (IS_ERR(be->blkif->xenblkd)) {
-			err = PTR_ERR(be->blkif->xenblkd);
-			be->blkif->xenblkd = NULL;
-			xenbus_dev_error(dev, err, "start xenblkd");
-			return;
-		}
-
 		device_create_file(&dev->dev, &dev_attr_physical_device);
 		device_create_file(&dev->dev, &dev_attr_mode);
 
@@ -292,14 +295,6 @@ static void frontend_changed(struct xenbus_device *dev,
 
 
 /* ** Connection ** */
-
-
-static void maybe_connect(struct backend_info *be)
-{
-	if ((be->major != 0 || be->minor != 0) &&
-	    be->blkif->status == CONNECTED)
-		connect(be);
-}
 
 
 /**
