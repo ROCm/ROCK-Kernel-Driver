@@ -2552,9 +2552,13 @@ int nfs4_proc_renew(struct nfs4_client *clp, struct rpc_cred *cred)
 
 static inline int nfs4_server_supports_acls(struct nfs_server *server)
 {
+#if 0
 	return (server->caps & NFS_CAP_ACLS)
 		&& (server->acl_bitmask & ACL4_SUPPORT_ALLOW_ACL)
 		&& (server->acl_bitmask & ACL4_SUPPORT_DENY_ACL);
+#else
+	return 0;
+#endif
 }
 
 /* Assuming that XATTR_SIZE_MAX is a multiple of PAGE_CACHE_SIZE, and that
