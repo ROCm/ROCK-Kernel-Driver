@@ -601,12 +601,14 @@ static int dev_create(struct dm_ioctl *param, size_t param_size)
 static struct hash_cell *__find_device_hash_cell(struct dm_ioctl *param)
 {
 	struct hash_cell *hc;
+
 	if (*param->uuid)
 		hc = __get_uuid_cell(param->uuid);
 	else if (*param->name)
 		hc = __get_name_cell(param->name);
 	else
 		return dm_get_mdptr(huge_decode_dev(param->dev));
+
 	if (hc)
 		dm_get(hc->md);
 	return hc;
