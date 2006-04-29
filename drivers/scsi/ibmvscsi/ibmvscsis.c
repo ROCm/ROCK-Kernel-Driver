@@ -3725,7 +3725,7 @@ static struct vio_driver ibmvscsis_driver = {
 	.probe = ibmvscsis_probe,
 	.remove = ibmvscsis_remove,
         .driver = {
-		.name = "ibmvscsi",
+		.name = "ibmvscsis",
 		.owner = THIS_MODULE,
         },
 };
