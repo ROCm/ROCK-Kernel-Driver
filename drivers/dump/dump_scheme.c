@@ -369,6 +369,11 @@ void dump_reconfigure_mbanks(void)
                         if(!(__dump_page_valid(loc >> PAGE_SHIFT)))
                                 continue;
 
+                        if (i == MAX_MBANKS) {
+				printk("Too many mbanks.  Dump will be incomplete.\n");
+				break;
+			}
+
                         /* We found a valid page. This is the start */
                         filter->start[i] = loc;
 
@@ -393,8 +398,8 @@ void dump_reconfigure_mbanks(void)
                 for(i = 0; i < dump_config.dumper->filter->num_mbanks; i++) {
                         filter->start[i] = dump_config.dumper->filter->start[i];
                         filter->end[i] = dump_config.dumper->filter->end[i];
-                        filter->num_mbanks = dump_config.dumper->filter->num_mbanks;
                 }
+                filter->num_mbanks = dump_config.dumper->filter->num_mbanks;
         }
 }
 #endif

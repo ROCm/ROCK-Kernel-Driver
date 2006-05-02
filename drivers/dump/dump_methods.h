@@ -47,6 +47,8 @@
 
 #define MAX_PASSES 	6
 #define MAX_DEVS	4
+#define MAX_MBANKS_PER_NODE	8
+#define MAX_MBANKS	(MAX_NUMNODES * MAX_MBANKS_PER_NODE)
 
 
 /* To customise selection of pages to be dumped in a given pass/group */
@@ -54,7 +56,7 @@ struct dump_data_filter{
 	char name[32];
 	int (*selector)(int, unsigned long, unsigned long);
 	ulong level_mask; /* dump level(s) for which this filter applies */
-	loff_t start[MAX_NUMNODES], end[MAX_NUMNODES]; /* location range applicable */
+	loff_t start[MAX_MBANKS], end[MAX_MBANKS]; /* location range applicable */
 	ulong num_mbanks;  /* Number of memory banks. Greater than one for discontig memory (NUMA) */
 };
 
