@@ -1332,7 +1332,7 @@ e1000_copper_link_ggp_setup(struct e1000_hw *hw)
     DEBUGFUNC("e1000_copper_link_ggp_setup");
 
     if(!hw->phy_reset_disable) {
-        
+
         /* Enable CRS on TX for half-duplex operation. */
         ret_val = e1000_read_phy_reg(hw, GG82563_PHY_MAC_SPEC_CTRL,
                                      &phy_data);
@@ -2846,7 +2846,7 @@ e1000_get_speed_and_duplex(struct e1000_hw *hw,
         }
     }
 
-    if ((hw->mac_type == e1000_80003es2lan) && 
+    if ((hw->mac_type == e1000_80003es2lan) &&
         (hw->media_type == e1000_media_type_copper)) {
         if (*speed == SPEED_1000)
             ret_val = e1000_configure_kmrn_for_1000(hw);

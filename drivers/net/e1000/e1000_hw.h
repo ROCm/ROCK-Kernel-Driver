@@ -395,7 +395,7 @@ boolean_t e1000_enable_tx_pkt_filtering(struct e1000_hw *hw);
 int32_t e1000_mng_enable_host_if(struct e1000_hw *hw);
 int32_t e1000_mng_host_if_write(struct e1000_hw *hw, uint8_t *buffer,
                             uint16_t length, uint16_t offset, uint8_t *sum);
-int32_t e1000_mng_write_cmd_header(struct e1000_hw* hw, 
+int32_t e1000_mng_write_cmd_header(struct e1000_hw* hw,
                                    struct e1000_host_mng_command_header* hdr);
 
 int32_t e1000_mng_write_commit(struct e1000_hw *hw);

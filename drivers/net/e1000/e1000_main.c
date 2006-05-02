@@ -354,7 +354,7 @@ e1000_update_mng_vlan(struct e1000_adapter *adapter)
 					(vid != old_vid) &&
 					!adapter->vlgrp->vlan_devices[old_vid])
 				e1000_vlan_rx_kill_vid(netdev, old_vid);
-		} else 
+		} else
 			adapter->mng_vlan_id = vid;
 	}
 }
@@ -729,8 +729,8 @@ e1000_probe(struct pci_dev *pdev,
 		DPRINTK(PROBE, INFO, "PHY reset is blocked due to SOL/IDER session.\n");
 
 	/* if ksp3, indicate if it's port a being setup */
-	if (pdev->device == E1000_DEV_ID_82546GB_QUAD_COPPER_KSP3 && 
-			e1000_ksp3_port_a == 0) 
+	if (pdev->device == E1000_DEV_ID_82546GB_QUAD_COPPER_KSP3 &&
+			e1000_ksp3_port_a == 0)
 		adapter->ksp3_port_a = 1;
 	e1000_ksp3_port_a++;
 	/* Reset for multiple KP3 adapters */
@@ -744,7 +744,7 @@ e1000_probe(struct pci_dev *pdev,
 				   NETIF_F_HW_VLAN_RX |
 				   NETIF_F_HW_VLAN_FILTER;
 	}
-	
+
 
 #ifdef NETIF_F_TSO
 	if ((adapter->hw.mac_type >= e1000_82544) &&
@@ -2278,7 +2278,7 @@ e1000_watchdog(unsigned long data)
 				break;
 			}
 
-			if ((adapter->hw.mac_type == e1000_82571 || 
+			if ((adapter->hw.mac_type == e1000_82571 ||
 			     adapter->hw.mac_type == e1000_82572) &&
 			    adapter->txb2b == 0) {
 #define SPEED_MODE_BIT (1 << 21)
@@ -2287,7 +2287,7 @@ e1000_watchdog(unsigned long data)
 				tarc0 &= ~SPEED_MODE_BIT;
 				E1000_WRITE_REG(&adapter->hw, TARC0, tarc0);
 			}
-				
+
 #ifdef NETIF_F_TSO
 			/* disable TSO for pcie and 10/100 speeds, to avoid
 			 * some hardware issues */
@@ -3793,7 +3793,7 @@ e1000_clean_rx_irq_ps(struct e1000_adapter *adapter,
 		 * throughput, so unsplit small packets and save the alloc/put*/
 		if (l1 && ((length + l1) < E1000_CB_LENGTH)) {
 			u8 *vaddr;
-			/* there is no documentation about how to call 
+			/* there is no documentation about how to call
 			 * kmap_atomic, but we can't sleep once kmap_atomic,
 			 * so be quick about it */
 			pci_dma_sync_single_for_cpu(pdev,
@@ -3812,10 +3812,11 @@ e1000_clean_rx_irq_ps(struct e1000_adapter *adapter,
 			goto copydone;
 		} /* if */
 		}
-		
+
 		for (j = 0; j < adapter->rx_ps_pages; j++) {
-			if (!(length= le16_to_cpu(rx_desc->wb.upper.length[j])))
+			if (!(length = le16_to_cpu(rx_desc->wb.upper.length[j])))
 				break;
+
 			pci_unmap_page(pdev, ps_page_dma->ps_page_dma[j],
 					PAGE_SIZE, PCI_DMA_FROMDEVICE);
 			ps_page_dma->ps_page_dma[j] = 0;
@@ -3824,6 +3825,7 @@ e1000_clean_rx_irq_ps(struct e1000_adapter *adapter,
 			ps_page->ps_page[j] = NULL;
 			skb->len += length;
 			skb->data_len += length;
+			skb->truesize += length;
 		}
 
 copydone:
