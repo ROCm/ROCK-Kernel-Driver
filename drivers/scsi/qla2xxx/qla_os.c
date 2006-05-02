@@ -601,6 +601,7 @@ qla2x00_wait_for_loop_ready(scsi_qla_host_t *ha)
 *    Either SUCCESS or FAILED.
 *
 * Note:
+*    Only return FAILED if command not returned by firmware.
 **************************************************************************/
 int
 qla2xxx_eh_abort(struct scsi_cmnd *cmd)
@@ -611,11 +612,12 @@ qla2xxx_eh_abort(struct scsi_cmnd *cmd)
 	unsigned int id, lun;
 	unsigned long serial;
 	unsigned long flags;
+	int wait = 0;
 
 	if (!CMD_SP(cmd))
-		return FAILED;
+		return SUCCESS;
 
-	ret = FAILED;
+	ret = SUCCESS;
 
 	id = cmd->device->id;
 	lun = cmd->device->lun;
@@ -644,7 +646,7 @@ qla2xxx_eh_abort(struct scsi_cmnd *cmd)
 		} else {
 			DEBUG3(printk("%s(%ld): abort_command "
 			    "mbx success.\n", __func__, ha->host_no));
-			ret = SUCCESS;
+			wait = 1;
 		}
 		spin_lock_irqsave(&ha->hardware_lock, flags);
 
@@ -653,17 +655,18 @@ qla2xxx_eh_abort(struct scsi_cmnd *cmd)
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
 	/* Wait for the command to be returned. */
-	if (ret == SUCCESS) {
+	if (wait) {
 		if (qla2x00_eh_wait_on_command(ha, cmd) != QLA_SUCCESS) {
 			qla_printk(KERN_ERR, ha,
 			    "scsi(%ld:%d:%d): Abort handler timed out -- %lx "
 			    "%x.\n", ha->host_no, id, lun, serial, ret);
+			ret = FAILED;
 		}
 	}
 
 	qla_printk(KERN_INFO, ha,
-	    "scsi(%ld:%d:%d): Abort command issued -- %lx %x.\n", ha->host_no,
-	    id, lun, serial, ret);
+	    "scsi(%ld:%d:%d): Abort command issued -- %d %lx %x.\n",
+	    ha->host_no, id, lun, wait, serial, ret);
 
 	return ret;
 }
