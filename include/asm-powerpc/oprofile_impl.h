@@ -38,9 +38,6 @@ struct op_system_config {
 #endif
 	unsigned long enable_kernel;
 	unsigned long enable_user;
-#ifdef CONFIG_PPC64
-	unsigned long backtrace_spinlocks;
-#endif
 };
 
 /* Per-arch configuration */
@@ -133,6 +130,8 @@ static inline void ctr_write(unsigned int i, unsigned int val)
 	}
 }
 #endif /* !CONFIG_FSL_BOOKE */
+
+extern void op_powerpc_backtrace(struct pt_regs * const regs, unsigned int depth);
 
 #endif /* __KERNEL__ */
 #endif /* _ASM_POWERPC_OPROFILE_IMPL_H */

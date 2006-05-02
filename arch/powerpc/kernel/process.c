@@ -769,7 +769,7 @@ out:
 	return error;
 }
 
-static int validate_sp(unsigned long sp, struct task_struct *p,
+int validate_sp(unsigned long sp, struct task_struct *p,
 		       unsigned long nbytes)
 {
 	unsigned long stack_page = (unsigned long)task_stack_page(p);
@@ -806,6 +806,8 @@ static int validate_sp(unsigned long sp, struct task_struct *p,
 #define REGS_MARKER	0x72656773ul
 #define FRAME_MARKER	2
 #endif
+
+EXPORT_SYMBOL(validate_sp);
 
 unsigned long get_wchan(struct task_struct *p)
 {
