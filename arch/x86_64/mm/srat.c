@@ -21,14 +21,20 @@
 #include <asm/numa.h>
 #include <asm/e820.h>
 
+#if (defined(CONFIG_ACPI_HOTPLUG_MEMORY) || \
+	defined(CONFIG_ACPI_HOTPLUG_MEMORY_MODULE)) \
+		&& !defined(CONFIG_MEMORY_HOTPLUG)
+#define RESERVE_HOTADD 1
+#endif
+
 static struct acpi_table_slit *acpi_slit;
 
 static nodemask_t nodes_parsed __initdata;
 static nodemask_t nodes_found __initdata;
-static struct node nodes[MAX_NUMNODES] __initdata;
-struct node nodes_add[MAX_NUMNODES] __initdata;
+static struct bootnode nodes[MAX_NUMNODES] __initdata;
+static struct bootnode nodes_add[MAX_NUMNODES] __initdata;
 static int found_add_area __initdata;
-int ignore_hotadd __initdata;
+int hotadd_percent __initdata = 10;
 static u8 pxm2node[256] = { [0 ... 255] = 0xff };
 
 /* Too small nodes confuse the VM badly. Usually they result
@@ -62,7 +68,7 @@ static __init int conflicting_nodes(unsigned long start, unsigned long end)
 {
 	int i;
 	for_each_node_mask(i, nodes_parsed) {
-		struct node *nd = &nodes[i];
+		struct bootnode *nd = &nodes[i];
 		if (nd->start == nd->end)
 			continue;
 		if (nd->end > start && nd->start < end)
@@ -75,7 +81,11 @@ static __init int conflicting_nodes(unsigned long start, unsigned long end)
 
 static __init void cutoff_node(int i, unsigned long start, unsigned long end)
 {
-	struct node *nd = &nodes[i];
+	struct bootnode *nd = &nodes[i];
+
+	if (found_add_area)
+		return;
+
 	if (nd->start < start) {
 		nd->start = start;
 		if (nd->end < nd->start)
@@ -162,11 +172,114 @@ acpi_numa_processor_affinity_init(struct acpi_table_processor_affinity *pa)
 	       pxm, pa->apic_id, node);
 }
 
+#ifdef RESERVE_HOTADD
+/*
+ * Protect against too large hotadd areas that would fill up memory.
+ */
+static int hotadd_enough_memory(struct bootnode *nd)
+{
+	static unsigned long allocated;
+	static unsigned long last_area_end;
+	unsigned long pages = (nd->end - nd->start) >> PAGE_SHIFT;
+	long mem = pages * sizeof(struct page);
+	unsigned long addr;
+	unsigned long allowed;
+	unsigned long oldpages = pages;
+
+	if (mem < 0)
+		return 0;
+	allowed = (end_pfn - e820_hole_size(0, end_pfn)) * PAGE_SIZE;
+	allowed = (allowed / 100) * hotadd_percent;
+	if (allocated + mem > allowed) {
+		/* Give them at least part of their hotadd memory upto hotadd_percent
+		   It would be better to spread the limit out
+		   over multiple hotplug areas, but that is too complicated
+		   right now */
+		if (allocated >= allowed)
+			return 0;
+		pages = (allowed - allocated + mem) / sizeof(struct page);
+		mem = pages * sizeof(struct page);
+		nd->end = nd->start + pages*PAGE_SIZE;
+	}
+	/* Not completely fool proof, but a good sanity check */
+	addr = find_e820_area(last_area_end, end_pfn<<PAGE_SHIFT, mem);
+	if (addr == -1UL)
+		return 0;
+	if (pages != oldpages)
+		printk(KERN_NOTICE "SRAT: Hotadd area limited to %lu bytes\n",
+			pages << PAGE_SHIFT);
+	last_area_end = addr + mem;
+	allocated += mem;
+	return 1;
+}
+
+/*
+ * It is fine to add this area to the nodes data it will be used later
+ * This code supports one contigious hot add area per node.
+ */
+static int reserve_hotadd(int node, unsigned long start, unsigned long end)
+{
+	unsigned long s_pfn = start >> PAGE_SHIFT;
+	unsigned long e_pfn = end >> PAGE_SHIFT;
+	int changed = 0;
+	struct bootnode *nd = &nodes_add[node];
+
+	/* I had some trouble with strange memory hotadd regions breaking
+	   the boot. Be very strict here and reject anything unexpected.
+	   If you want working memory hotadd write correct SRATs.
+
+	   The node size check is a basic sanity check to guard against
+	   mistakes */
+	if ((signed long)(end - start) < NODE_MIN_SIZE) {
+		printk(KERN_ERR "SRAT: Hotplug area too small\n");
+		return -1;
+	}
+
+	/* This check might be a bit too strict, but I'm keeping it for now. */
+	if (e820_hole_size(s_pfn, e_pfn) != e_pfn - s_pfn) {
+		printk(KERN_ERR "SRAT: Hotplug area has existing memory\n");
+		return -1;
+	}
+
+	if (!hotadd_enough_memory(&nodes_add[node]))  {
+		printk(KERN_ERR "SRAT: Hotplug area too large\n");
+		return -1;
+	}
+
+	/* Looks good */
+
+ 	found_add_area = 1;
+	if (nd->start == nd->end) {
+ 		nd->start = start;
+ 		nd->end = end;
+		changed = 1;
+ 	} else {
+ 		if (nd->start == end) {
+ 			nd->start = start;
+			changed = 1;
+		}
+ 		if (nd->end == start) {
+ 			nd->end = end;
+			changed = 1;
+		}
+		if (!changed)
+			printk(KERN_ERR "SRAT: Hotplug zone not continuous. Partly ignored\n");
+ 	}
+
+ 	if ((nd->end >> PAGE_SHIFT) > end_pfn)
+ 		end_pfn = nd->end >> PAGE_SHIFT;
+
+	if (changed)
+	 	printk(KERN_INFO "SRAT: hot plug zone found %Lx - %Lx\n", nd->start, nd->end);
+	return 0;
+}
+#endif
+
 /* Callback for parsing of the Proximity Domain <-> Memory Area mappings */
 void __init
 acpi_numa_memory_affinity_init(struct acpi_table_memory_affinity *ma)
 {
-	struct node *nd;
+	struct bootnode *nd, oldnode;
 	unsigned long start, end;
 	int node, pxm;
 	int i;
@@ -178,6 +291,8 @@ acpi_numa_memory_affinity_init(struct acpi_table_memory_affinity *ma)
 		return;
 	}
 	if (ma->flags.enabled == 0)
+		return;
+ 	if (ma->flags.hot_pluggable && hotadd_percent == 0)
 		return;
 	start = ma->base_addr_lo | ((u64)ma->base_addr_hi << 32);
 	end = start + (ma->length_lo | ((u64)ma->length_hi << 32));
@@ -202,6 +317,7 @@ acpi_numa_memory_affinity_init(struct acpi_table_memory_affinity *ma)
 		return;
 	}
 	nd = &nodes[node];
+	oldnode = *nd;
 	if (!node_test_and_set(node, nodes_parsed)) {
 		nd->start = start;
 		nd->end = end;
@@ -212,43 +328,18 @@ acpi_numa_memory_affinity_init(struct acpi_table_memory_affinity *ma)
 			nd->end = end;
 	}
 
- 	/*
- 	 * It is fine to add this area to the nodes data it will be used later
- 	 * This code supports one contigious hot add area per node.
- 	 * The signed cast is intentional to catch underflows.
- 	 */
- 	if (ma->flags.hot_pluggable == 1 && !ignore_hotadd) {
-		unsigned long s_pfn = start >> PAGE_SHIFT;
-		unsigned long e_pfn = end >> PAGE_SHIFT;
-
-		/* Sorry guys - if you want working memory hotplug write correct SRATs */
-		if ((signed long)(end - start) < NODE_MIN_SIZE ||
-		    e820_hole_size(s_pfn, e_pfn) != e_pfn - s_pfn) { 
-			printk(KERN_ERR 
-	"SRAT: Hotplug area %lx-%lx too small or overlaps with real memory\n",
-				start, end);
-			bad_srat();
-			return;
-		}
-
- 		found_add_area = 1;
- 		if (nodes_add[node].start == nodes_add[node].end) {
- 			nodes_add[node].start = start;
- 			nodes_add[node].end = end;
- 		} else {
- 			if (nodes_add[node].start == end)
- 				nodes_add[node].start = start;
- 			if (nodes_add[node].end == start)
- 				nodes_add[node].end = end;
- 		}
- 		if ((nodes_add[node].end >> PAGE_SHIFT) > end_pfn)
- 			end_pfn = nodes_add[node].end >> PAGE_SHIFT;
- 		printk(KERN_INFO "SRAT: hot plug zone found %Lx - %Lx\n",
- 				nodes_add[node].start, nodes_add[node].end);
- 	}
-
 	printk(KERN_INFO "SRAT: Node %u PXM %u %Lx-%Lx\n", node, pxm,
 	       nd->start, nd->end);
+
+#ifdef RESERVE_HOTADD
+ 	if (ma->flags.hot_pluggable && reserve_hotadd(node, start, end) < 0) {
+		/* Ignore hotadd region. Undo damage */
+		printk(KERN_NOTICE "SRAT: Hotplug region ignored\n");
+		*nd = oldnode;
+		if ((nd->start | nd->end) == 0)
+			node_clear(node, nodes_parsed);
+	}
+#endif
 }
 
 /* Sanity check to catch more bad SRATs (they are amazingly common).
@@ -300,8 +391,7 @@ int __init acpi_scan_nodes(unsigned long start, unsigned long end)
 
 	/* First clean up the node list */
 	for (i = 0; i < MAX_NUMNODES; i++) {
- 		if (!found_add_area)
- 			cutoff_node(i, start, end);
+ 		cutoff_node(i, start, end);
 		if ((nodes[i].end - nodes[i].start) < NODE_MIN_SIZE)
 			unparse_node(i);
 	}
@@ -355,14 +445,17 @@ static int node_to_pxm(int n)
 void __init srat_reserve_add_area(int nodeid)
 {
 	if (found_add_area && nodes_add[nodeid].end) {
-		printk(KERN_INFO 
-	"SRAT: Reserving hot-add memory space for node %d at %Lx-%Lx\n", 
-			nodeid, nodes_add[nodeid].start, nodes_add[nodeid].end);
-		printk(KERN_INFO 
-	"SRAT: This will cost you %Lu MB of pre-allocated memory.\n", 
-		(((nodes_add[nodeid].end - 
-			nodes_add[nodeid].start)/PAGE_SIZE)*sizeof(struct page)) >> 20);
+		u64 total_mb;
 
+		printk(KERN_INFO "SRAT: Reserving hot-add memory space "
+				"for node %d at %Lx-%Lx\n",
+			nodeid, nodes_add[nodeid].start, nodes_add[nodeid].end);
+		total_mb = (nodes_add[nodeid].end - nodes_add[nodeid].start)
+					>> PAGE_SHIFT;
+		total_mb *= sizeof(struct page);
+		total_mb >>= 20;
+		printk(KERN_INFO "SRAT: This will cost you %Lu MB of "
+				"pre-allocated memory.\n", (unsigned long long)total_mb);
 		reserve_bootmem_node(NODE_DATA(nodeid), nodes_add[nodeid].start,
 			       nodes_add[nodeid].end - nodes_add[nodeid].start);
 	}

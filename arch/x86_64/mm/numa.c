@@ -47,7 +47,7 @@ int numa_off __initdata;
  * -1 if node overlap or lost ram (shift too big)
  */
 static int __init
-populate_memnodemap(const struct node *nodes, int numnodes, int shift)
+populate_memnodemap(const struct bootnode *nodes, int numnodes, int shift)
 {
 	int i; 
 	int res = -1;
@@ -74,7 +74,7 @@ populate_memnodemap(const struct node *nodes, int numnodes, int shift)
 	return res;
 }
 
-int __init compute_hash_shift(struct node *nodes, int numnodes)
+int __init compute_hash_shift(struct bootnode *nodes, int numnodes)
 {
 	int shift = 20;
 
@@ -101,7 +101,7 @@ int early_pfn_to_nid(unsigned long pfn)
 }
 #endif
 
-static void * __init 
+static void * __init
 early_node_mem(int nodeid, unsigned long start, unsigned long end,
 	      unsigned long size)
 {
@@ -109,7 +109,7 @@ early_node_mem(int nodeid, unsigned long start, unsigned long end,
 	void *ptr;
 	if (mem != -1L)
 		return __va(mem);
-	ptr = __alloc_bootmem_nopanic(size, 
+	ptr = __alloc_bootmem_nopanic(size,
 				SMP_CACHE_BYTES, __pa(MAX_DMA_ADDRESS));
 	if (ptr == 0) {
 		printk(KERN_ERR "Cannot find %lu bytes in node %d\n",
@@ -147,7 +147,7 @@ void __init setup_node_bootmem(int nodeid, unsigned long start, unsigned long en
 	/* Find a place for the bootmem map */
 	bootmap_pages = bootmem_bootmap_pages(end_pfn - start_pfn); 
 	bootmap_start = round_up(nodedata_phys + pgdat_size, PAGE_SIZE);
-	bootmap = early_node_mem(nodeid, bootmap_start, end, 
+	bootmap = early_node_mem(nodeid, bootmap_start, end,
 					bootmap_pages<<PAGE_SHIFT);
 	if (bootmap == NULL)  {
 		if (nodedata_phys < start || nodedata_phys >= end)
@@ -227,7 +227,7 @@ int numa_fake __initdata = 0;
 static int numa_emulation(unsigned long start_pfn, unsigned long end_pfn)
 {
  	int i;
- 	struct node nodes[MAX_NUMNODES];
+ 	struct bootnode nodes[MAX_NUMNODES];
  	unsigned long sz = ((end_pfn - start_pfn)<<PAGE_SHIFT) / numa_fake;
 
  	/* Kludge needed for the hash function */
@@ -362,8 +362,8 @@ __init int numa_setup(char *opt)
 #ifdef CONFIG_ACPI_NUMA
  	if (!strncmp(opt,"noacpi",6))
  		acpi_numa = -1;
-	if (!strncmp(opt,"ignorehotadd",13))
-		ignore_hotadd = 1;
+	if (!strncmp(opt,"hotadd=", 7))
+		hotadd_percent = simple_strtoul(opt+7, NULL, 10);
 #endif
 	return 1;
 } 

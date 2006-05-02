@@ -57,6 +57,7 @@ extern int zone_grow_waitqueues(struct zone *zone, unsigned long nr_pages);
 extern int add_one_highpage(struct page *page, int pfn, int bad_ppro);
 /* need some defines for these for archs that don't support it */
 extern void online_page(struct page *page);
+/* VM interface that may be used by firmware interface */
 extern int online_pages(unsigned long, unsigned long);
 
 /* reasonably generic interface to expand the physical pages in a zone  */
@@ -89,11 +90,6 @@ static inline int mhp_notimplemented(const char *func)
 	return -ENOSYS;
 }
 
-static inline int __add_pages(struct zone *zone, unsigned long start_pfn,
-	unsigned long nr_pages)
-{
-	return mhp_notimplemented(__FUNCTION__);
-}
 #endif /* ! CONFIG_MEMORY_HOTPLUG */
 static inline int __remove_pages(struct zone *zone, unsigned long start_pfn,
 	unsigned long nr_pages)
@@ -103,13 +99,10 @@ static inline int __remove_pages(struct zone *zone, unsigned long start_pfn,
 	return -ENOSYS;
 }
 
-/* VM interface that may be used by firmware interface */
+#if defined(CONFIG_MEMORY_HOTPLUG) || defined(CONFIG_ACPI_HOTPLUG_MEMORY) \
+	|| defined(CONFIG_ACPI_HOTPLUG_MEMORY_MODULE)
 extern int add_memory(u64 start, u64 size);
 extern int remove_memory(u64 start, u64 size);
-
-#ifdef CONFIG_ACPI_HOTPLUG_MEMORY
-extern int add_memory(u64 start, u64 size);
-extern int remove_memory(u64 start, u64 size);
-#endif 
+#endif
 
 #endif /* __LINUX_MEMORY_HOTPLUG_H */

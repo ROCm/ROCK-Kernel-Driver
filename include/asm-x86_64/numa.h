@@ -4,11 +4,11 @@
 #include <linux/nodemask.h>
 #include <asm/numnodes.h>
 
-struct node { 
+struct bootnode {
 	u64 start,end; 
 };
 
-extern int compute_hash_shift(struct node *nodes, int numnodes);
+extern int compute_hash_shift(struct bootnode *nodes, int numnodes);
 extern int pxm_to_node(int nid);
 
 #define ZONE_ALIGN (1UL << (MAX_ORDER+PAGE_SHIFT))
@@ -19,7 +19,7 @@ extern int numa_off;
 
 extern void numa_set_node(int cpu, int node);
 extern void srat_reserve_add_area(int nodeid);
-extern int ignore_hotadd;
+extern int hotadd_percent;
 
 extern unsigned char apicid_to_node[256];
 #ifdef CONFIG_NUMA

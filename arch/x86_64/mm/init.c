@@ -480,7 +480,7 @@ void __init clear_kernel_mapping(unsigned long address, unsigned long size)
 /*
  * Memory hotplug specific functions
  */
-#ifdef CONFIG_ACPI_HOTPLUG_MEMORY
+#if defined(CONFIG_ACPI_HOTPLUG_MEMORY) || defined(CONFIG_ACPI_HOTPLUG_MEMORY_MODULE)
 
 void online_page(struct page *page)
 {
@@ -491,24 +491,57 @@ void online_page(struct page *page)
 	num_physpages++;
 }
 
-/* You can only add memory you reserved during boot */
+#ifndef CONFIG_MEMORY_HOTPLUG
+/*
+ * Memory Hotadd without sparsemem. The mem_maps have been allocated in advance,
+ * just online the pages.
+ */
+int __add_pages(struct zone *z, unsigned long start_pfn, unsigned long nr_pages)
+{
+	int err = -EIO;
+	unsigned long pfn;
+	unsigned long total = 0, mem = 0;
+	for (pfn = start_pfn; pfn < start_pfn + nr_pages; pfn++) {
+		if (pfn_valid(pfn)) {
+			online_page(pfn_to_page(pfn));
+			err = 0;
+			mem++;
+		}
+		total++;
+	}
+	if (!err) {
+		z->spanned_pages += total;
+		z->present_pages += mem;
+		z->zone_pgdat->node_spanned_pages += total;
+		z->zone_pgdat->node_present_pages += mem;
+	}
+	return err;
+}
+#endif
+
+/*
+ * Memory is added always to NORMAL zone. This means you will never get
+ * additional DMA/DMA32 memory.
+ */
 int add_memory(u64 start, u64 size)
 {
-	u64 i;
-	int ret = 0;
+	struct pglist_data *pgdat = NODE_DATA(0);
+	struct zone *zone = pgdat->node_zones + MAX_NR_ZONES-2;
+	unsigned long start_pfn = start >> PAGE_SHIFT;
+	unsigned long nr_pages = size >> PAGE_SHIFT;
+	int ret;
+
+	ret = __add_pages(zone, start_pfn, nr_pages);
+	if (ret)
+		goto error;
 
 	init_memory_mapping(start, (start + size -1));
-	for (i = start;  i < start+size; i+= PAGE_SIZE) {
-		if (pfn_valid(i>>PAGE_SHIFT))
-			online_page(pfn_to_page(i >> PAGE_SHIFT));
- 		else {
-			printk (KERN_ERR "%Lx is not a valid pfn\n",i);
-			ret = -EINVAL; 
-		}
-	}
+
+	return ret;
+error:
+	printk("%s: Problem encountered in __add_pages!\n", __func__);
 	return ret;
 }
-
 EXPORT_SYMBOL_GPL(add_memory);
 
 int remove_memory(u64 start, u64 size)
