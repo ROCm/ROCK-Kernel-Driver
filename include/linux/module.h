@@ -449,6 +449,7 @@ void module_remove_driver(struct device_driver *);
 #else /* !CONFIG_MODULES... */
 #define EXPORT_SYMBOL(sym)
 #define EXPORT_SYMBOL_GPL(sym)
+#define EXPORT_SYMBOL_GPL_FUTURE(sym)
 
 /* Given an address, look for it in the exception tables. */
 static inline const struct exception_table_entry *
