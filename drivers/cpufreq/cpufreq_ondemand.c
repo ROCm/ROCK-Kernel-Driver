@@ -370,7 +370,7 @@ static void do_dbs_timer(void *data)
 static inline void dbs_timer_init(void)
 {
 	INIT_WORK(&dbs_work, do_dbs_timer, NULL);
-	dbs_workq = create_singlethread_workqueue("ondemand");
+	if (!dbs_workq) dbs_workq = create_singlethread_workqueue("ondemand");
 	if (!dbs_workq) {
 		printk(KERN_ERR "ondemand: Cannot initialize kernel thread\n"); 
 		return;
