@@ -2155,6 +2155,7 @@ static struct hda_board_config alc880_cfg_tbl[] = {
 
 	{ .modelname = "lg", .config = ALC880_LG },
 	{ .pci_subvendor = 0x1854, .pci_subdevice = 0x003b, .config = ALC880_LG },
+	{ .pci_subvendor = 0x1854, .pci_subdevice = 0x0068, .config = ALC880_LG },
 
 	{ .modelname = "lg-lw", .config = ALC880_LG_LW },
 	{ .pci_subvendor = 0x1854, .pci_subdevice = 0x0018, .config = ALC880_LG_LW },
@@ -3732,6 +3733,8 @@ static void alc260_auto_init(struct hda_codec *codec)
 static struct hda_board_config alc260_cfg_tbl[] = {
 	{ .modelname = "basic", .config = ALC260_BASIC },
 	{ .pci_subvendor = 0x104d, .pci_subdevice = 0x81bb,
+	  .config = ALC260_BASIC }, /* Sony VAIO */
+	{ .pci_subvendor = 0x104d, .pci_subdevice = 0x81cd,
 	  .config = ALC260_BASIC }, /* Sony VAIO */
 	{ .pci_subvendor = 0x152d, .pci_subdevice = 0x0729,
 	  .config = ALC260_BASIC }, /* CTL Travel Master U553W */

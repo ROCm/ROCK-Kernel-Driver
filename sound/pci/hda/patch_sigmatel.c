@@ -1212,8 +1212,8 @@ static hda_nid_t vaio_mux_nids[] = { 0x15 };
 static struct hda_input_mux vaio_mux = {
 	.num_items = 2,
 	.items = {
-		/* { "HP", 0x0 },
-		   { "Unknown", 0x1 }, */
+		/* { "HP", 0x0 }, */
+		{ "Line", 0x1 },
 		{ "Mic", 0x2 },
 		{ "PCM", 0x3 },
 	}
@@ -1262,13 +1262,13 @@ static int vaio_master_sw_put(struct snd_kcontrol *kcontrol,
 	int change;
 
 	change = snd_hda_codec_amp_update(codec, 0x02, 0, HDA_OUTPUT, 0,
-					  0x80, valp[0] & 0x80);
+					  0x80, (valp[0] ? 0 : 0x80));
 	change |= snd_hda_codec_amp_update(codec, 0x02, 1, HDA_OUTPUT, 0,
-					   0x80, valp[1] & 0x80);
+					   0x80, (valp[1] ? 0 : 0x80));
 	snd_hda_codec_amp_update(codec, 0x05, 0, HDA_OUTPUT, 0,
-				 0x80, valp[0] & 0x80);
+				 0x80, (valp[0] ? 0 : 0x80));
 	snd_hda_codec_amp_update(codec, 0x05, 1, HDA_OUTPUT, 0,
-				 0x80, valp[1] & 0x80);
+				 0x80, (valp[1] ? 0 : 0x80));
 	return change;
 }
 
@@ -1370,6 +1370,12 @@ struct hda_codec_preset snd_hda_preset_sigmatel[] = {
  	{ .id = 0x83847681, .name = "STAC9220D/9223D A2", .patch = patch_stac922x },
  	{ .id = 0x83847682, .name = "STAC9221 A2", .patch = patch_stac922x },
  	{ .id = 0x83847683, .name = "STAC9221D A2", .patch = patch_stac922x },
+ 	{ .id = 0x83847618, .name = "STAC9227", .patch = patch_stac922x },
+ 	{ .id = 0x83847619, .name = "STAC9227", .patch = patch_stac922x },
+ 	{ .id = 0x83847616, .name = "STAC9228", .patch = patch_stac922x },
+ 	{ .id = 0x83847617, .name = "STAC9228", .patch = patch_stac922x },
+ 	{ .id = 0x83847614, .name = "STAC9229", .patch = patch_stac922x },
+ 	{ .id = 0x83847615, .name = "STAC9229", .patch = patch_stac922x },
  	{ .id = 0x83847620, .name = "STAC9274", .patch = patch_stac927x },
  	{ .id = 0x83847621, .name = "STAC9274D", .patch = patch_stac927x },
  	{ .id = 0x83847622, .name = "STAC9273X", .patch = patch_stac927x },
