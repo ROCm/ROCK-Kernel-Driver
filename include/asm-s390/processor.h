@@ -75,7 +75,7 @@ extern struct task_struct *last_task_used_math;
 					TASK31_SIZE : TASK64_SIZE)
 # define TASK_UNMAPPED_BASE	(test_thread_flag(TIF_31BIT) ? \
 					(current->map_base) : (TASK64_SIZE / 2))
-# define __TASK_UNMAPPED_BASE	(TASK64_SIZE / 2)
+# define __TASK_UNMAPPED_BASE	(TASK31_SIZE / 2)
 # define DEFAULT_TASK_SIZE	TASK64_SIZE
 
 #endif /* __s390x__ */
