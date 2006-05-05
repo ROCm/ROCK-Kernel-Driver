@@ -579,7 +579,10 @@ static void discover_ebda(void)
 	/* Round EBDA up to pages */
 	if (ebda_size == 0)
 		ebda_size = 1;
+	ebda_size <<= 10;
 	ebda_size = round_up(ebda_size + (ebda_addr & ~PAGE_MASK), PAGE_SIZE);
+	if (ebda_size > 64*1024)
+		ebda_size = 64*1024;
 }
 
 void __init setup_arch(char **cmdline_p)
