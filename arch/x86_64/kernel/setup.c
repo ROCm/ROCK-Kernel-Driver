@@ -574,10 +574,12 @@ static void discover_ebda(void)
 	ebda_addr = *(unsigned short *)EBDA_ADDR_POINTER;
 	ebda_addr <<= 4;
 
+	ebda_size = *(unsigned short *)(unsigned long)ebda_addr;
+
 	/* Round EBDA up to pages */
 	if (ebda_size == 0)
-		ebda_size = PAGE_SIZE;
-	ebda_size = round_up(ebda_size, PAGE_SIZE);
+		ebda_size = 1;
+	ebda_size = round_up(ebda_size + (ebda_addr & ~PAGE_MASK), PAGE_SIZE);
 }
 
 void __init setup_arch(char **cmdline_p)
