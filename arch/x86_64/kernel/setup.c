@@ -561,17 +561,23 @@ static inline void copy_edd(void)
 #endif
 
 #define EBDA_ADDR_POINTER 0x40E
-static void __init reserve_ebda_region(void)
+
+unsigned __initdata ebda_addr;
+unsigned __initdata ebda_size;
+
+static void discover_ebda(void)
 {
-	unsigned int addr;
-	/** 
+	/*
 	 * there is a real-mode segmented pointer pointing to the 
 	 * 4K EBDA area at 0x40E
 	 */
-	addr = *(unsigned short *)phys_to_virt(EBDA_ADDR_POINTER);
-	addr <<= 4;
-	if (addr)
-		reserve_bootmem_generic(addr, PAGE_SIZE);
+	ebda_addr = *(unsigned short *)EBDA_ADDR_POINTER;
+	ebda_addr <<= 4;
+
+	/* Round EBDA up to pages */
+	if (ebda_size == 0)
+		ebda_size = PAGE_SIZE;
+	ebda_size = round_up(ebda_size, PAGE_SIZE);
 }
 
 void __init setup_arch(char **cmdline_p)
@@ -616,6 +622,8 @@ void __init setup_arch(char **cmdline_p)
 
 	check_efer();
 
+	discover_ebda();
+
 	init_memory_mapping(0, (end_pfn_map << PAGE_SHIFT));
 
 	zap_low_mappings(0);
@@ -656,7 +664,8 @@ void __init setup_arch(char **cmdline_p)
 	reserve_bootmem_generic(0, PAGE_SIZE);
 
 	/* reserve ebda region */
-	reserve_ebda_region();
+	if (ebda_addr)
+		reserve_bootmem_generic(ebda_addr, ebda_size);
 
 #ifdef CONFIG_SMP
 	/*
