@@ -4421,6 +4421,8 @@ qeth_send_packet(struct qeth_card *card, struct sk_buff *skb)
 	enum qeth_large_send_types large_send = QETH_LARGE_SEND_NO;
 	struct qeth_eddp_context *ctx = NULL;
 	int tx_bytes = skb->len;
+	unsigned short nr_frags = skb_shinfo(skb)->nr_frags;
+	unsigned short tso_size = skb_shinfo(skb)->tso_size;
 	int rc;
 
 	QETH_DBF_TEXT(trace, 6, "sendpkt");
@@ -4503,16 +4505,16 @@ qeth_send_packet(struct qeth_card *card, struct sk_buff *skb)
 		card->stats.tx_packets++;
 		card->stats.tx_bytes += tx_bytes;
 #ifdef CONFIG_QETH_PERF_STATS
-		if (skb_shinfo(skb)->tso_size &&
+		if (tso_size &&
 		   !(large_send == QETH_LARGE_SEND_NO)) {
-			card->perf_stats.large_send_bytes += skb->len;
+			card->perf_stats.large_send_bytes += tx_bytes;
 			card->perf_stats.large_send_cnt++;
 		}
- 		if (skb_shinfo(skb)->nr_frags > 0){
+ 		if (nr_frags > 0){
 			card->perf_stats.sg_skbs_sent++;
 			/* nr_frags + skb->data */
 			card->perf_stats.sg_frags_sent +=
-				skb_shinfo(skb)->nr_frags + 1;
+				nr_frags + 1;
 		}
 #endif /* CONFIG_QETH_PERF_STATS */
 	}

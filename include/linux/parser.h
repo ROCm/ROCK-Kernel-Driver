@@ -31,5 +31,3 @@ int match_octal(substring_t *, int *result);
 int match_hex(substring_t *, int *result);
 void match_strcpy(char *, substring_t *);
 char *match_strdup(substring_t *);
-int match_u64(substring_t *, u64 *result, int);
-int match_s64(substring_t *, s64 *result, int);

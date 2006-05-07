@@ -161,10 +161,6 @@ zfcp_ccw_set_online(struct ccw_device *ccw_device)
 	retval = zfcp_adapter_debug_register(adapter);
 	if (retval)
 		goto out;
-	retval = zfcp_adapter_statistic_register(adapter);
-	if (retval)
-		goto out_stat_create;
-
 	retval = zfcp_erp_thread_setup(adapter);
 	if (retval) {
 		ZFCP_LOG_INFO("error: start of error recovery thread for "
@@ -185,8 +181,6 @@ zfcp_ccw_set_online(struct ccw_device *ccw_device)
  out_scsi_register:
 	zfcp_erp_thread_kill(adapter);
  out_erp_thread:
-	zfcp_adapter_statistic_unregister(adapter);
- out_stat_create:
 	zfcp_adapter_debug_unregister(adapter);
  out:
 	up(&zfcp_data.config_sema);
@@ -213,7 +207,6 @@ zfcp_ccw_set_offline(struct ccw_device *ccw_device)
 	zfcp_erp_wait(adapter);
 	zfcp_adapter_scsi_unregister(adapter);
 	zfcp_erp_thread_kill(adapter);
-	zfcp_adapter_statistic_unregister(adapter);
 	zfcp_adapter_debug_unregister(adapter);
 	up(&zfcp_data.config_sema);
 	return 0;

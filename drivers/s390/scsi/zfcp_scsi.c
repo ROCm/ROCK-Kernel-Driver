@@ -435,16 +435,6 @@ zfcp_scsi_eh_abort_handler(struct scsi_cmnd *scpnt)
 	ZFCP_LOG_INFO("aborting scsi_cmnd=%p on adapter %s\n",
 		      scpnt, zfcp_get_busid_by_adapter(adapter));
 
-	if (scpnt->sc_data_direction == DMA_TO_DEVICE)
-		statistic_inc(unit->stat_sizes_timedout_write,
-			      scpnt->request_bufflen);
-	else if (scpnt->sc_data_direction == DMA_FROM_DEVICE)
-		statistic_inc(unit->stat_sizes_timedout_read,
-			      scpnt->request_bufflen);
-	else
-		statistic_inc(unit->stat_sizes_timedout_nodata,
-			       scpnt->request_bufflen);
-
 	/* avoid race condition between late normal completion and abort */
 	write_lock_irqsave(&adapter->abort_lock, flags);
 
@@ -539,14 +529,12 @@ zfcp_scsi_eh_device_reset_handler(struct scsi_cmnd *scpnt)
 				atomic_set_mask
 				    (ZFCP_STATUS_UNIT_NOTSUPPUNITRESET,
 				     &unit->status);
-			statistic_inc(unit->stat_eh_reset, -1);
 			/* fall through and try 'target reset' next */
 		} else {
 			ZFCP_LOG_DEBUG("unit reset succeeded (unit=%p)\n",
 				       unit);
 			/* avoid 'target reset' */
 			retval = SUCCESS;
-			statistic_inc(unit->stat_eh_reset, 1);
 			goto out;
 		}
 	}
@@ -554,11 +542,9 @@ zfcp_scsi_eh_device_reset_handler(struct scsi_cmnd *scpnt)
 	if (retval) {
 		ZFCP_LOG_DEBUG("target reset failed (unit=%p)\n", unit);
 		retval = FAILED;
-		statistic_inc(unit->stat_eh_reset, -2);
 	} else {
 		ZFCP_LOG_DEBUG("target reset succeeded (unit=%p)\n", unit);
 		retval = SUCCESS;
-		statistic_inc(unit->stat_eh_reset, 2);
 	}
  out:
 	return retval;

@@ -150,8 +150,6 @@ dasd_state_new_to_known(struct dasd_device *device)
 static inline void
 dasd_state_known_to_new(struct dasd_device * device)
 {
-	/* Disable extended error reporting for this device. */
-	dasd_eer_disable(device);
 	/* Forget the discipline information. */
 	if (device->discipline)
 		module_put(device->discipline->owner);
@@ -898,9 +896,6 @@ dasd_handle_state_change_pending(struct dasd_device *device)
 	struct dasd_ccw_req *cqr;
 	struct list_head *l, *n;
 
-	/* First of all start sense subsystem status request. */
-	dasd_eer_snss(device);
-
 	device->stopped &= ~DASD_STOPPED_PENDING;
 
         /* restart all 'running' IO on queue */
@@ -1120,19 +1115,6 @@ restart:
 			}
 			goto restart;
 		}
-
-		/* First of all call extended error reporting. */
-		if (dasd_eer_enabled(device) &&
-		    cqr->status == DASD_CQR_FAILED) {
-			dasd_eer_write(device, cqr, DASD_EER_FATALERROR);
-
-			/* restart request  */
-			cqr->status = DASD_CQR_QUEUED;
-			cqr->retries = 255;
-			device->stopped |= DASD_STOPPED_QUIESCE;
-			goto restart;
-		}
-
 		/* Process finished ERP request. */
 		if (cqr->refers) {
 			__dasd_process_erp(device, cqr);
@@ -1272,8 +1254,7 @@ __dasd_start_head(struct dasd_device * device)
 		return;
 	/* Non-temporary stop condition will trigger fail fast */
 	if (device->stopped & ~DASD_STOPPED_PENDING &&
-	    test_bit(DASD_CQR_FLAGS_FAILFAST, &cqr->flags) &&
-	    (!dasd_eer_enabled(device))) {
+	    test_bit(DASD_CQR_FLAGS_FAILFAST, &cqr->flags)) {
 		cqr->status = DASD_CQR_FAILED;
 		dasd_schedule_bh(device);
 		return;
@@ -1833,7 +1814,6 @@ dasd_exit(void)
 #ifdef CONFIG_PROC_FS
 	dasd_proc_exit();
 #endif
-	dasd_eer_exit();
 	dasd_ioctl_exit();
         if (dasd_page_cache != NULL) {
 		kmem_cache_destroy(dasd_page_cache);
@@ -2037,9 +2017,6 @@ dasd_generic_notify(struct ccw_device *cdev, int event)
 	switch (event) {
 	case CIO_GONE:
 	case CIO_NO_PATH:
-		/* First of all call extended error reporting. */
-		dasd_eer_write(device, NULL, DASD_EER_NOPATH);
-
 		if (device->state < DASD_STATE_BASIC)
 			break;
 		/* Device is active. We want to keep it. */
@@ -2097,7 +2074,6 @@ dasd_generic_auto_online (struct ccw_driver *dasd_discipline_driver)
 	put_driver(drv);
 }
 
-
 static int __init
 dasd_init(void)
 {
@@ -2131,9 +2107,6 @@ dasd_init(void)
 	if (rc)
 		goto failed;
 	rc = dasd_ioctl_init();
-	if (rc)
-		goto failed;
-	rc = dasd_eer_init();
 	if (rc)
 		goto failed;
 #ifdef CONFIG_PROC_FS

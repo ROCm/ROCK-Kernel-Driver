@@ -125,6 +125,13 @@ static int
 dasd_fba_check_characteristics(struct dasd_device *device)
 {
 	struct dasd_fba_private *private;
+	struct dasd_uid uid = {
+		.alias = 0,
+		.vendor = "",
+		.serial = "",
+		.ssid = 0,
+		.unit_addr = 0,
+	};
 	struct ccw_device *cdev = device->cdev;	
 	void *rdc_data;
 	int rc;
@@ -159,6 +166,9 @@ dasd_fba_check_characteristics(struct dasd_device *device)
 		    ((private->rdc_data.blk_bdsa *
 		      (private->rdc_data.blk_size >> 9)) >> 11),
 		    private->rdc_data.blk_size);
+
+	rc = dasd_set_uid(device->cdev, &uid);
+
 	return 0;
 }
 

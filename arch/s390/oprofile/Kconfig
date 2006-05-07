@@ -1,3 +1,6 @@
+
+menu "Profiling support"
+
 config PROFILING
 	bool "Profiling support"
 	help
@@ -14,4 +17,6 @@ config OPROFILE
 	  and applications.
 
 	  If unsure, say N.
+
+endmenu
 

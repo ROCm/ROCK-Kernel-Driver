@@ -56,8 +56,6 @@
 #include <asm/qdio.h>
 #include <asm/debug.h>
 #include <asm/ebcdic.h>
-#include <asm/timex.h>
-#include <linux/statistic.h>
 #include <linux/mempool.h>
 #include <linux/syscalls.h>
 #include <linux/ioctl.h>
@@ -66,7 +64,7 @@
 /********************* GENERAL DEFINES *********************************/
 
 /* zfcp version number, it consists of major, minor, and patch-level number */
-#define ZFCP_VERSION		"4.6.0"
+#define ZFCP_VERSION		"4.5.0"
 
 /**
  * zfcp_sg_to_address - determine kernel address from struct scatterlist
@@ -969,13 +967,7 @@ struct zfcp_adapter {
 	struct device           generic_services;  /* directory for WKA ports */
 	struct fc_host_statistics *fc_stats;
 	struct fsf_qtcb_bottom_port *stats_reset_data;
-	unsigned long stats_reset;
-	struct statistic_interface	*stat_if;
-	struct statistic		*stat_qdio_outb_full;
-	struct statistic		*stat_qdio_outb;
-	struct statistic		*stat_qdio_inb;
-	struct statistic		*stat_low_mem_scsi;
-	struct statistic		*stat_erp;
+	unsigned long		stats_reset;
 };
 
 /*
@@ -1022,24 +1014,6 @@ struct zfcp_unit {
         struct scsi_device     *device;        /* scsi device struct pointer */
 	struct zfcp_erp_action erp_action;     /* pending error recovery */
         atomic_t               erp_counter;
-	atomic_t		read_num;
-	atomic_t		write_num;
-	struct statistic_interface	*stat_if;
-	struct statistic		*stat_sizes_scsi_write;
-	struct statistic		*stat_sizes_scsi_read;
-	struct statistic		*stat_sizes_scsi_nodata;
-	struct statistic		*stat_sizes_scsi_nofit;
-	struct statistic		*stat_sizes_scsi_nomem;
-	struct statistic		*stat_sizes_timedout_write;
-	struct statistic		*stat_sizes_timedout_read;
-	struct statistic		*stat_sizes_timedout_nodata;
-	struct statistic		*stat_latencies_scsi_write;
-	struct statistic		*stat_latencies_scsi_read;
-	struct statistic		*stat_latencies_scsi_nodata;
-	struct statistic		*stat_pending_scsi_write;
-	struct statistic		*stat_pending_scsi_read;
-	struct statistic		*stat_erp;
-	struct statistic		*stat_eh_reset;
 };
 
 /* FSF request */
@@ -1060,14 +1034,13 @@ struct zfcp_fsf_req {
 	u32		       fsf_command;    /* FSF Command copy */
 	struct fsf_qtcb	       *qtcb;	       /* address of associated QTCB */
 	u32		       seq_no;         /* Sequence number of request */
-	unsigned long	       data;           /* private data of request */
+        unsigned long          data;           /* private data of request */ 
 	struct zfcp_erp_action *erp_action;    /* used if this request is
 						  issued on behalf of erp */
 	mempool_t	       *pool;	       /* used if request was alloacted
 						  from emergency pool */
 	unsigned long long     issued;         /* request sent time (STCK) */
-	unsigned long long	received;
-	struct zfcp_unit	*unit;
+	struct zfcp_unit       *unit;
 };
 
 typedef void zfcp_fsf_req_handler_t(struct zfcp_fsf_req*);

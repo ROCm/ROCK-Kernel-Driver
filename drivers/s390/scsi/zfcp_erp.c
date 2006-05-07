@@ -1622,12 +1622,10 @@ zfcp_erp_strategy_check_unit(struct zfcp_unit *unit, int result)
 	switch (result) {
 	case ZFCP_ERP_SUCCEEDED :
 		atomic_set(&unit->erp_counter, 0);
-		statistic_inc(unit->stat_erp, 1);
 		zfcp_erp_unit_unblock(unit);
 		break;
 	case ZFCP_ERP_FAILED :
 		atomic_inc(&unit->erp_counter);
-		statistic_inc(unit->stat_erp, -1);
 		if (atomic_read(&unit->erp_counter) > ZFCP_MAX_ERPS)
 			zfcp_erp_unit_failed(unit);
 		break;
@@ -1695,12 +1693,10 @@ zfcp_erp_strategy_check_adapter(struct zfcp_adapter *adapter, int result)
 	switch (result) {
 	case ZFCP_ERP_SUCCEEDED :
 		atomic_set(&adapter->erp_counter, 0);
-		statistic_inc(adapter->stat_erp, 1);
 		zfcp_erp_adapter_unblock(adapter);
 		break;
 	case ZFCP_ERP_FAILED :
 		atomic_inc(&adapter->erp_counter);
-		statistic_inc(adapter->stat_erp, -1);
 		if (atomic_read(&adapter->erp_counter) > ZFCP_MAX_ERPS)
 			zfcp_erp_adapter_failed(adapter);
 		break;
