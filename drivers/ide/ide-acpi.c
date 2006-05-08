@@ -81,7 +81,7 @@ static int ide_get_dev_handle(struct device *dev, acpi_handle *handle,
 	struct pci_dev *pdev = to_pci_dev(dev);
 	unsigned int bus, devnum, func;
 	acpi_integer addr;
-	acpi_handle dev_handle, parent_handle;
+	acpi_handle dev_handle;
 	struct acpi_buffer buffer = {.length = ACPI_ALLOCATE_BUFFER,
 					.pointer = NULL};
 	acpi_status status;
@@ -91,37 +91,37 @@ static int ide_get_dev_handle(struct device *dev, acpi_handle *handle,
 	bus = pdev->bus->number;
 	devnum = PCI_SLOT(pdev->devfn);
 	func = PCI_FUNC(pdev->devfn);
+	/* ACPI _ADR encoding for PCI bus: */
+	addr = (acpi_integer)(devnum << 16 | func);
 
 	DEBPRINT("ENTER: pci %02x:%02x.%01x\n", bus, devnum, func);
 
 	dev_handle = DEVICE_ACPI_HANDLE(dev);
-	parent_handle = DEVICE_ACPI_HANDLE(dev->parent);
+	if (!dev_handle) {
+		DEBPRINT("no acpi handle for device\n");
+		goto err;
+	}
 
-	status = acpi_get_object_info(parent_handle, &buffer);
+	status = acpi_get_object_info(dev_handle, &buffer);
 	if (ACPI_FAILURE(status)) {
-		DEBPRINT("get_object_info for parent failed\n");
+		DEBPRINT("get_object_info for device failed\n");
 		goto err;
 	}
 	dinfo = buffer.pointer;
 	if (dinfo && (dinfo->valid & ACPI_VALID_ADR) &&
-	    dinfo->address == bus) {
-		/* ACPI spec for _ADR for PCI bus: */
-		addr = (acpi_integer)(devnum << 16 | func);
+	    dinfo->address == addr) {
 		*pcidevfn = addr;
 		*handle = dev_handle;
 	} else {
-		DEBPRINT("get_object_info for parent has wrong "
-			" bus: %llu, should be %d\n",
+		DEBPRINT("get_object_info for device has wrong "
+			" address: %llu, should be %u\n",
 			dinfo ? (unsigned long long)dinfo->address : -1ULL,
-			bus);
+			(unsigned int)addr);
 		goto err;
 	}
 
-	DEBPRINT("for dev=0x%x.%x, addr=0x%llx, parent=0x%p, *handle=0x%p\n",
-		 devnum, func, (unsigned long long)addr,
-		 dev->parent, *handle);
-	if (!*handle)
-		goto err;
+	DEBPRINT("for dev=0x%x.%x, addr=0x%llx, *handle=0x%p\n",
+		 devnum, func, (unsigned long long)addr, *handle);
 	ret = 0;
 err:
 	acpi_os_free(dinfo);
