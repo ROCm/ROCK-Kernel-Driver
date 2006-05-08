@@ -136,7 +136,7 @@ err:
  *
  * Returns handle on success, 0 on error.
  */
-acpi_handle ide_acpi_hwif_get_handle(ide_hwif_t *hwif)
+static acpi_handle ide_acpi_hwif_get_handle(ide_hwif_t *hwif)
 {
 	struct device		*dev = hwif->gendev.parent;
 	acpi_handle		dev_handle;
@@ -176,7 +176,7 @@ acpi_handle ide_acpi_hwif_get_handle(ide_hwif_t *hwif)
  *
  * Returns handle on success, 0 on error.
  */
-acpi_handle ide_acpi_drive_get_handle(ide_drive_t *drive)
+static acpi_handle ide_acpi_drive_get_handle(ide_drive_t *drive)
 {
 	ide_hwif_t	*hwif = HWIF(drive);
 	int		 port;
@@ -216,7 +216,7 @@ acpi_handle ide_acpi_drive_get_handle(ide_drive_t *drive)
  * The returned @gtf_length and @gtf_address are only valid if the
  * function return value is 0.
  */
-int do_drive_get_GTF(ide_drive_t *drive,
+static int do_drive_get_GTF(ide_drive_t *drive,
 		     unsigned int *gtf_length, unsigned long *gtf_address,
 		     unsigned long *obj_loc)
 {
