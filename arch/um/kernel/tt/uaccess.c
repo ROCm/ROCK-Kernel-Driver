@@ -60,6 +60,7 @@ int strnlen_user_tt(const void __user *str, int len)
 				 &current->thread.fault_addr,
 				 &current->thread.fault_catcher));
 }
+EXPORT_SYMBOL(strnlen_user_tt);
 
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.
