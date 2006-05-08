@@ -13,6 +13,7 @@
 #include <linux/pagemap.h>
 #include <linux/mempolicy.h>
 #include <linux/cpuset.h>
+#include <linux/mutex.h>
 
 #include <asm/page.h>
 #include <asm/pgtable.h>
@@ -20,7 +21,7 @@
 #include <linux/hugetlb.h>
 
 const unsigned long hugetlb_zero = 0, hugetlb_infinity = ~0UL;
-static unsigned long nr_huge_pages, free_huge_pages;
+static unsigned long nr_huge_pages, free_huge_pages, resv_huge_pages;
 unsigned long max_huge_pages;
 static struct list_head hugepage_freelists[MAX_NUMNODES];
 static unsigned int nr_huge_pages_node[MAX_NUMNODES];
@@ -98,17 +99,26 @@ struct page *alloc_huge_page(struct vm_area_struct *vma, unsigned long addr)
 	int i;
 
 	spin_lock(&hugetlb_lock);
+
+	if (vma->vm_flags & VM_MAYSHARE)
+		resv_huge_pages--;
+	else if (free_huge_pages <= resv_huge_pages)
+		goto fail;
+
 	page = dequeue_huge_page(vma, addr);
-	if (!page) {
-		spin_unlock(&hugetlb_lock);
-		return NULL;
-	}
+	if (!page)
+		goto fail;
+
 	spin_unlock(&hugetlb_lock);
 	set_page_count(page, 1);
 	page[1].lru.next = (void *)free_huge_page;	/* set dtor */
 	for (i = 0; i < (HPAGE_SIZE/PAGE_SIZE); ++i)
 		clear_user_highpage(&page[i], addr);
 	return page;
+
+fail:
+	spin_unlock(&hugetlb_lock);
+	return NULL;
 }
 
 static int __init hugetlb_init(void)
@@ -199,6 +209,7 @@ static unsigned long set_max_huge_pages(unsigned long count)
 		return nr_huge_pages;
 
 	spin_lock(&hugetlb_lock);
+	count = max(count, resv_huge_pages);
 	try_to_free_low(count);
 	while (count < nr_huge_pages) {
 		struct page *page = dequeue_huge_page(NULL, 0);
@@ -225,9 +236,11 @@ int hugetlb_report_meminfo(char *buf)
 	return sprintf(buf,
 			"HugePages_Total: %5lu\n"
 			"HugePages_Free:  %5lu\n"
+			"HugePages_Rsvd:  %5lu\n"
 			"Hugepagesize:    %5lu kB\n",
 			nr_huge_pages,
 			free_huge_pages,
+			resv_huge_pages,
 			HPAGE_SIZE/1024);
 }
 
@@ -256,11 +269,6 @@ kdb_hugetlb_report_meminfo(void)
 		HPAGE_SIZE/1024);
 }
 #endif	/* CONFIG_KDB */
-
-int is_hugepage_mem_enough(size_t size)
-{
-	return (size + ~HPAGE_MASK)/HPAGE_SIZE <= free_huge_pages;
-}
 
 /* Return the number pages of memory we physically have, in PAGE_SIZE units. */
 unsigned long hugetlb_total_pages(void)
@@ -385,6 +393,160 @@ void unmap_hugepage_range(struct vm_area_struct *vma, unsigned long start,
 
 	spin_unlock(&mm->page_table_lock);
 	flush_tlb_range(vma, start, end);
+}
+
+struct file_region {
+	struct list_head link;
+	long from;
+	long to;
+};
+
+static long region_add(struct list_head *head, long f, long t)
+{
+	struct file_region *rg, *nrg, *trg;
+
+	/* Locate the region we are either in or before. */
+	list_for_each_entry(rg, head, link)
+		if (f <= rg->to)
+			break;
+
+	/* Round our left edge to the current segment if it encloses us. */
+	if (f > rg->from)
+		f = rg->from;
+
+	/* Check for and consume any regions we now overlap with. */
+	nrg = rg;
+	list_for_each_entry_safe(rg, trg, rg->link.prev, link) {
+		if (&rg->link == head)
+			break;
+		if (rg->from > t)
+			break;
+
+		/* If this area reaches higher then extend our area to
+		 * include it completely.  If this is not the first area
+		 * which we intend to reuse, free it. */
+		if (rg->to > t)
+			t = rg->to;
+		if (rg != nrg) {
+			list_del(&rg->link);
+			kfree(rg);
+		}
+	}
+	nrg->from = f;
+	nrg->to = t;
+	return 0;
+}
+
+static long region_chg(struct list_head *head, long f, long t)
+{
+	struct file_region *rg, *nrg;
+	long chg = 0;
+
+	/* Locate the region we are before or in. */
+	list_for_each_entry(rg, head, link)
+		if (f <= rg->to)
+			break;
+
+	/* If we are below the current region then a new region is required.
+	 * Subtle, allocate a new region at the position but make it zero
+	 * size such that we can guarentee to record the reservation. */
+	if (&rg->link == head || t < rg->from) {
+		nrg = kmalloc(sizeof(*nrg), GFP_KERNEL);
+		if (nrg == 0)
+			return -ENOMEM;
+		nrg->from = f;
+		nrg->to   = f;
+		INIT_LIST_HEAD(&nrg->link);
+		list_add(&nrg->link, rg->link.prev);
+
+		return t - f;
+	}
+
+	/* Round our left edge to the current segment if it encloses us. */
+	if (f > rg->from)
+		f = rg->from;
+	chg = t - f;
+
+	/* Check for and consume any regions we now overlap with. */
+	list_for_each_entry(rg, rg->link.prev, link) {
+		if (&rg->link == head)
+			break;
+		if (rg->from > t)
+			return chg;
+
+		/* We overlap with this area, if it extends futher than
+		 * us then we must extend ourselves.  Account for its
+		 * existing reservation. */
+		if (rg->to > t) {
+			chg += rg->to - t;
+			t = rg->to;
+		}
+		chg -= rg->to - rg->from;
+	}
+	return chg;
+}
+
+static long region_truncate(struct list_head *head, long end)
+{
+	struct file_region *rg, *trg;
+	long chg = 0;
+
+	/* Locate the region we are either in or before. */
+	list_for_each_entry(rg, head, link)
+		if (end <= rg->to)
+			break;
+	if (&rg->link == head)
+		return 0;
+
+	/* If we are in the middle of a region then adjust it. */
+	if (end > rg->from) {
+		chg = rg->to - end;
+		rg->to = end;
+		rg = list_entry(rg->link.next, typeof(*rg), link);
+	}
+
+	/* Drop any remaining regions. */
+	list_for_each_entry_safe(rg, trg, rg->link.prev, link) {
+		if (&rg->link == head)
+			break;
+		chg += rg->to - rg->from;
+		list_del(&rg->link);
+		kfree(rg);
+	}
+	return chg;
+}
+
+static int hugetlb_acct_memory(long delta)
+{
+	int ret = -ENOMEM;
+
+	spin_lock(&hugetlb_lock);
+	if ((delta + resv_huge_pages) <= free_huge_pages) {
+		resv_huge_pages += delta;
+		ret = 0;
+	}
+	spin_unlock(&hugetlb_lock);
+	return ret;
+}
+
+int hugetlb_reserve_pages(struct inode *inode, long from, long to)
+{
+	long ret, chg;
+
+	chg = region_chg(&inode->i_mapping->private_list, from, to);
+	if (chg < 0)
+		return chg;
+	ret = hugetlb_acct_memory(chg);
+	if (ret < 0)
+		return ret;
+	region_add(&inode->i_mapping->private_list, from, to);
+	return 0;
+}
+
+void hugetlb_unreserve_pages(struct inode *inode, long offset, long freed)
+{
+	long chg = region_truncate(&inode->i_mapping->private_list, offset);
+	hugetlb_acct_memory(freed - chg);
 }
 
 static int hugetlb_cow(struct mm_struct *mm, struct vm_area_struct *vma,
@@ -513,14 +675,24 @@ int hugetlb_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 	pte_t *ptep;
 	pte_t entry;
 	int ret;
+	static DEFINE_MUTEX(hugetlb_instantiation_mutex);
 
 	ptep = huge_pte_alloc(mm, address);
 	if (!ptep)
 		return VM_FAULT_OOM;
 
+	/*
+	 * Serialize hugepage allocation and instantiation, so that we don't
+	 * get spurious allocation failures if two CPUs race to instantiate
+	 * the same page in the page cache.
+	 */
+	mutex_lock(&hugetlb_instantiation_mutex);
 	entry = *ptep;
-	if (pte_none(entry))
-		return hugetlb_no_page(mm, vma, address, ptep, write_access);
+	if (pte_none(entry)) {
+		ret = hugetlb_no_page(mm, vma, address, ptep, write_access);
+		mutex_unlock(&hugetlb_instantiation_mutex);
+		return ret;
+	}
 
 	ret = VM_FAULT_MINOR;
 
@@ -530,6 +702,7 @@ int hugetlb_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 		if (write_access && !pte_write(entry))
 			ret = hugetlb_cow(mm, vma, address, ptep, entry);
 	spin_unlock(&mm->page_table_lock);
+	mutex_unlock(&hugetlb_instantiation_mutex);
 
 	return ret;
 }

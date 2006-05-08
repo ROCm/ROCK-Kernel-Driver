@@ -1171,6 +1171,11 @@ done:
 	pagevec_release(&pvec);
 }
 
+static inline int zone_is_near_oom(struct zone *zone)
+{
+	return zone->pages_scanned >= (zone->nr_active + zone->nr_inactive)*4;
+}
+
 /*
  * This moves pages from the active list to the inactive list.
  *
@@ -1202,10 +1207,13 @@ refill_inactive_zone(struct zone *zone, struct scan_control *sc)
 	struct pagevec pvec;
 	int reclaim_mapped = 0;
 
-	if (unlikely(sc->may_swap)) {
+	if (likely(sc->may_swap)) {
 		long mapped_ratio;
 		long distress;
 		long swap_tendency;
+
+		if (zone_is_near_oom(zone))
+			goto force_reclaim_mapped;
 
 		/*
 		 * `distress' is a measure of how much trouble we're having
@@ -1240,6 +1248,7 @@ refill_inactive_zone(struct zone *zone, struct scan_control *sc)
 		 * memory onto the inactive list.
 		 */
 		if (swap_tendency >= 100)
+force_reclaim_mapped:
 			reclaim_mapped = 1;
 	}
 
@@ -1390,9 +1399,10 @@ shrink_zone(struct zone *zone, struct scan_control *sc)
  * If a zone is deemed to be full of pinned pages then just give it a light
  * scan then give up on it.
  */
-static void
+static int
 shrink_caches(struct zone **zones, struct scan_control *sc)
 {
+	int all_unreclaimable = 1;
 	int i;
 
 	for (i = 0; zones[i] != NULL; i++) {
@@ -1411,8 +1421,12 @@ shrink_caches(struct zone **zones, struct scan_control *sc)
 		if (zone->all_unreclaimable && sc->priority != DEF_PRIORITY)
 			continue;	/* Let kswapd poll it */
 
+		all_unreclaimable = 0;
+
 		shrink_zone(zone, sc);
 	}
+
+	return all_unreclaimable;
 }
  
 /*
@@ -1430,6 +1444,7 @@ shrink_caches(struct zone **zones, struct scan_control *sc)
  */
 int try_to_free_pages(struct zone **zones, gfp_t gfp_mask)
 {
+	int all_unreclaimable;
 	int priority;
 	int ret = 0;
 	int total_scanned = 0, total_reclaimed = 0;
@@ -1462,7 +1477,7 @@ int try_to_free_pages(struct zone **zones, gfp_t gfp_mask)
 		sc.swap_cluster_max = SWAP_CLUSTER_MAX;
 		if (!priority)
 			disable_swap_token();
-		shrink_caches(zones, &sc);
+		all_unreclaimable = shrink_caches(zones, &sc);
 		shrink_slab(sc.nr_scanned, gfp_mask, lru_pages);
 		if (reclaim_state) {
 			sc.nr_reclaimed += reclaim_state->reclaimed_slab;
@@ -1491,6 +1506,9 @@ int try_to_free_pages(struct zone **zones, gfp_t gfp_mask)
 		if (sc.nr_scanned && priority < DEF_PRIORITY - 2)
 			blk_congestion_wait(WRITE, HZ/10);
 	}
+	/* still more we can do? */
+	if (!all_unreclaimable)
+		ret = 1;
 out:
 	for (i = 0; zones[i] != 0; i++) {
 		struct zone *zone = zones[i];
@@ -1637,7 +1655,7 @@ scan:
 			if (zone->all_unreclaimable)
 				continue;
 			if (nr_slab == 0 && zone->pages_scanned >=
-				    (zone->nr_active + zone->nr_inactive) * 4)
+				    (zone->nr_active + zone->nr_inactive) * 6)
 				zone->all_unreclaimable = 1;
 			/*
 			 * If we've done a decent amount of scanning and
