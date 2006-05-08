@@ -732,7 +732,7 @@ dasd_alias_show(struct device *dev, struct device_attribute *attr, char *buf)
 	else
 		alias = 0;
 	spin_unlock(&dasd_devmap_lock);
-
+	
 	return sprintf(buf, alias ? "1\n" : "0\n");
 }
 
@@ -772,7 +772,7 @@ dasd_uid_show(struct device *dev, struct device_attribute *attr, char *buf)
 		snprintf(uid, sizeof(uid), "%s.%s.%04x.%02x",
 			 devmap->uid.vendor, devmap->uid.serial,
 			 devmap->uid.ssid, devmap->uid.unit_addr);
-	else
+	else 
 		uid[0] = 0;
 	spin_unlock(&dasd_devmap_lock);
 
@@ -781,6 +781,46 @@ dasd_uid_show(struct device *dev, struct device_attribute *attr, char *buf)
 
 static DEVICE_ATTR(uid, 0444, dasd_uid_show, NULL);
 
+/*
+ * extended error-reporting
+ */
+static ssize_t
+dasd_eer_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct dasd_devmap *devmap;
+	int eer_flag;
+
+	devmap = dasd_find_busid(dev->bus_id);
+	if (!IS_ERR(devmap) && devmap->device)
+		eer_flag = dasd_eer_enabled(devmap->device);
+	else
+		eer_flag = 0;
+	return snprintf(buf, PAGE_SIZE, eer_flag ? "1\n" : "0\n");
+}
+
+static ssize_t
+dasd_eer_store(struct device *dev, struct device_attribute *attr,
+	       const char *buf, size_t count)
+{
+	struct dasd_devmap *devmap;
+	int rc;
+
+	devmap = dasd_devmap_from_cdev(to_ccwdev(dev));
+	if (IS_ERR(devmap))
+		return PTR_ERR(devmap);
+	if (!devmap->device)
+		return count;
+	if (buf[0] == '1') {
+		rc = dasd_eer_enable(devmap->device);
+		if (rc)
+			return rc;
+	} else
+		dasd_eer_disable(devmap->device);
+	return count;
+}
+
+static DEVICE_ATTR(eer_enabled, 0644, dasd_eer_show, dasd_eer_store);
+
 static struct attribute * dasd_attrs[] = {
 	&dev_attr_readonly.attr,
 	&dev_attr_discipline.attr,
@@ -788,12 +828,14 @@ static struct attribute * dasd_attrs[] = {
 	&dev_attr_vendor.attr,
 	&dev_attr_uid.attr,
 	&dev_attr_use_diag.attr,
+	&dev_attr_eer_enabled.attr,
 	NULL,
 };
 
 static struct attribute_group dasd_attr_group = {
 	.attrs = dasd_attrs,
 };
+
 
 /*
  * Return copy of the device unique identifier.
