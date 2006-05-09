@@ -1010,7 +1010,7 @@ void *dm_get_mdptr(dev_t dev)
 	if (md)
 		mdptr = md->interface_ptr;
 
-	if (mdptr == NULL)
+	if (md != NULL && mdptr == NULL)
 		dm_put(md);
 
 	return mdptr;
