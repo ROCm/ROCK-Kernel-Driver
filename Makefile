@@ -1312,7 +1312,7 @@ kernelversion:
 %.o: %.S scripts FORCE
 	$(Q)$(MAKE) $(build)=$(dir $<) $(dir $<)$(notdir $@)
 %.symtypes: %.c scripts FORCE
-       $(Q)$(MAKE) $(build)=$(@D) $(dir $<)$(notdir $@)
+	$(Q)$(MAKE) $(build)=$(@D) $(dir $<)$(notdir $@)
 
 # For external modules we shall include any directory of the target,
 # but usual case there is no directory part.
