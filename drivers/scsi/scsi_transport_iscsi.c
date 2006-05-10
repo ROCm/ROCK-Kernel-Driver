@@ -862,13 +862,18 @@ iscsi_if_destroy_conn(struct iscsi_transport *transport, struct iscsi_uevent *ev
 	return 0;
 }
 
-static void
+static int
 iscsi_copy_param(struct iscsi_uevent *ev, uint32_t *value, char *data)
 {
-	if (ev->u.set_param.len != sizeof(uint32_t))
-		BUG();
+	if (ev->u.set_param.len != sizeof(uint32_t)) {
+		printk (KERN_NOTICE "%s: invalid parameter size %u, "
+		        "should be %lu\n", __FUNCTION__, ev->u.set_param.len,
+		        sizeof(uint32_t));
+		return -EINVAL;
+	}
 	memcpy(value, data, min_t(uint32_t, sizeof(uint32_t),
 		ev->u.set_param.len));
+	return 0;
 }
 
 static int
@@ -887,7 +892,8 @@ iscsi_set_param(struct iscsi_transport *transport, struct iscsi_uevent *ev)
 
 	switch (ev->u.set_param.param) {
 	case ISCSI_PARAM_SESS_RECOVERY_TMO:
-		iscsi_copy_param(ev, &value, data);
+		if ((err = iscsi_copy_param(ev, &value, data))
+			return err;
 		if (value != 0)
 			session->recovery_tmo = value;
 		break;
@@ -901,11 +907,13 @@ iscsi_set_param(struct iscsi_transport *transport, struct iscsi_uevent *ev)
 			return -ENOMEM;
 		break;
 	case ISCSI_PARAM_TPGT:
-		iscsi_copy_param(ev, &value, data);
+		if ((err = iscsi_copy_param(ev, &value, data)))
+			return err;
 		session->tpgt = value;
 		break;
 	case ISCSI_PARAM_PERSISTENT_PORT:
-		iscsi_copy_param(ev, &value, data);
+		if ((err = iscsi_copy_param(ev, &value, data)))
+			return err;
 		conn->persistent_port = value;
 		break;
 	case ISCSI_PARAM_PERSISTENT_ADDRESS:
@@ -921,7 +929,8 @@ iscsi_set_param(struct iscsi_transport *transport, struct iscsi_uevent *ev)
 			return -ENOMEM;
 		break;
 	default:
-		iscsi_copy_param(ev, &value, data);
+		if ((err = iscsi_copy_param(ev, &value, data)))
+			return err;
 		err = transport->set_param(conn, ev->u.set_param.param, value);
 	}
 
