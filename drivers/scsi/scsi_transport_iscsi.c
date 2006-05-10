@@ -892,7 +892,7 @@ iscsi_set_param(struct iscsi_transport *transport, struct iscsi_uevent *ev)
 
 	switch (ev->u.set_param.param) {
 	case ISCSI_PARAM_SESS_RECOVERY_TMO:
-		if ((err = iscsi_copy_param(ev, &value, data))
+		if ((err = iscsi_copy_param(ev, &value, data)))
 			return err;
 		if (value != 0)
 			session->recovery_tmo = value;
