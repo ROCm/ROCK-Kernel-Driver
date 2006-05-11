@@ -88,7 +88,6 @@ static __inline int logical_smp_processor_id(void)
 	return GET_APIC_LOGICAL_ID(*(unsigned long *)(APIC_BASE+APIC_LDR));
 }
 
-extern u8 bios_cpu_apicid[];
 
 #endif
 
@@ -103,4 +102,11 @@ extern void __cpu_die(unsigned int cpu);
 #define NO_PROC_ID		0xFF		/* No processor magic marker */
 
 #endif
+
+#ifndef __ASSEMBLY__
+
+extern u8 bios_cpu_apicid[];
+
+#endif
+
 #endif
