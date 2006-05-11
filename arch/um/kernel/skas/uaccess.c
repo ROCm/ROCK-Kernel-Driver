@@ -249,7 +249,6 @@ int strnlen_user_skas(const void __user *str, int len)
 		return(count + 1);
 	return(-EFAULT);
 }
-EXPORT_SYMBOL(strnlen_user_skas);
 
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.
