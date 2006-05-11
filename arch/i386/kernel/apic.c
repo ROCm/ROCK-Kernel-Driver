@@ -1267,6 +1267,55 @@ int setup_profiling_timer(unsigned int multiplier)
 }
 
 /*
+ * oem_force_hpet_timer -- force HPET mode for some boxes.
+ *
+ * Thus far, the major user of this is IBM's Summit2 series:
+ *
+ * Clustered boxes may have unsynced TSC problems if they are
+ * multi-chassis. Use available data to take a good guess.
+ * If in doubt, go HPET.
+ */
+
+__cpuinit int oem_force_hpet_timer(void)
+{
+	int i, clusters, zeros;
+	unsigned id;
+	DECLARE_BITMAP(clustermap, NUM_APIC_CLUSTERS);
+
+	bitmap_zero(clustermap, NUM_APIC_CLUSTERS);
+
+	for (i = 0; i < NR_CPUS; i++) {
+		id = bios_cpu_apicid[i];
+		if (id != BAD_APICID)
+			__set_bit(APIC_CLUSTERID(id), clustermap);
+	}
+
+	/* Problem:  Partially populated chassis may not have CPUs in some of
+	 * the APIC clusters they have been allocated.  Only present CPUs have
+	 * bios_cpu_apicid entries, thus causing zeroes in the bitmap.  Since
+	 * clusters are allocated sequentially, count zeros only if they are
+	 * bounded by ones.
+	 */
+	clusters = 0;
+	zeros = 0;
+	for (i = 0; i < NUM_APIC_CLUSTERS; i++) {
+		if (test_bit(i, clustermap)) {
+			clusters += 1 + zeros;
+			zeros = 0;
+		} else
+			++zeros;
+	}
+
+	/*
+	 * If clusters > 2, then should be multi-chassis.  Return 1 for HPET.
+	 * Else return 0 to use TSC.
+	 * May have to revisit this when multi-core + hyperthreaded CPUs come
+	 * out, but AFAIK this will work even for them.
+	 */
+	return (clusters > 2);
+}
+
+/*
  * This interrupt should _never_ happen with our APIC/SMP architecture
  */
 fastcall void smp_spurious_interrupt(struct pt_regs *regs)

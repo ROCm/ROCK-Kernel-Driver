@@ -2,6 +2,7 @@
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <asm/timer.h>
+#include <asm/hpet.h>
 
 #ifdef CONFIG_HPET_TIMER
 /*
@@ -46,6 +47,24 @@ void clock_fallback(void)
 	cur_timer = &timer_pit;
 }
 
+/*
+ * Make an educated guess if the TSC is trustworthy and synchronized
+ * over all CPUs.
+ */
+__cpuinit int unsynchronized_tsc(void)
+{
+#ifdef CONFIG_SMP
+	if (oem_force_hpet_timer())
+		return 1;
+ 	/* Intel systems are normally all synchronized. Exceptions
+ 	   are handled in the OEM check above. */
+ 	if (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL)
+ 		return 0;
+#endif
+ 	/* Assume multi socket systems are not synchronized */
+ 	return num_present_cpus() > 1;
+}
+
 /* iterates through the list of timers, returning the first 
  * one that initializes successfully.
  */
@@ -53,6 +72,12 @@ struct timer_opts* __init select_timer(void)
 {
 	int i = 0;
 	
+	/* Prefer TSC if possible because it's fastest */
+	if (clock_override[0] == 0 && !unsynchronized_tsc()) { 
+		if (timer_tsc_init.init(clock_override) == 0)
+			return timer_tsc_init.opts;
+	}
+
 	/* find most preferred working timer */
 	while (timers[i]) {
 		if (timers[i]->init)

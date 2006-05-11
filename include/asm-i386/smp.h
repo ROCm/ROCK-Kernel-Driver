@@ -88,6 +88,8 @@ static __inline int logical_smp_processor_id(void)
 	return GET_APIC_LOGICAL_ID(*(unsigned long *)(APIC_BASE+APIC_LDR));
 }
 
+extern u8 bios_cpu_apicid[];
+
 #endif
 
 extern int __cpu_disable(void);
