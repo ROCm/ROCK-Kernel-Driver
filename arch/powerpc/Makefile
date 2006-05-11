@@ -114,7 +114,7 @@ cpu-as-$(CONFIG_E200)		+= -Wa,-me200
 
 AFLAGS += $(cpu-as-y)
 CFLAGS += $(cpu-as-y)
-CFLAGS += -fno-ivopts
+CFLAGS += $(call cc-option,-fno-ivopts)
 
 head-y				:= arch/powerpc/kernel/head_32.o
 head-$(CONFIG_PPC64)		:= arch/powerpc/kernel/head_64.o
