@@ -1216,7 +1216,8 @@ static int b44_alloc_consistent(struct b44 *bp)
 		                             DMA_TABLE_BYTES,
 		                             DMA_BIDIRECTIONAL);
 
-		if (rx_ring_dma + size > B44_DMA_MASK) {
+		if (dma_mapping_error(rx_ring_dma) || 
+			rx_ring_dma + size > B44_DMA_MASK) {
 			kfree(rx_ring);
 			goto out_err;
 		}
@@ -1242,7 +1243,8 @@ static int b44_alloc_consistent(struct b44 *bp)
 		                             DMA_TABLE_BYTES,
 		                             DMA_TO_DEVICE);
 
-		if (tx_ring_dma + size > B44_DMA_MASK) {
+		if (dma_mapping_error(tx_ring_dma) || 
+			tx_ring_dma + size > B44_DMA_MASK) {
 			kfree(tx_ring);
 			goto out_err;
 		}
