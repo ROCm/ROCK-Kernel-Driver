@@ -390,8 +390,8 @@ static int data_out_desc_size(struct srp_cmd *cmd)
 	case SRP_DIRECT_BUFFER:
 		return sizeof(struct memory_descriptor);
 	case SRP_INDIRECT_BUFFER:
-		return sizeof(struct indirect_descriptor) + 
-		    ((cmd->data_out_count - 
+		return sizeof(struct indirect_descriptor) +
+		    ((cmd->data_out_count -
 			1) * sizeof(struct memory_descriptor));
 	default:
 		err("client error. Invalid data_out_format %d\n",
@@ -511,7 +511,7 @@ static long h_copy_rdma(u64 length, unsigned long siobn, dma_addr_t saddr,
 	while (bytes_copied < length) {
 		u64 bytes_to_copy = (length - bytes_copied) > MAX_H_COPY_RDMA ?
 		    MAX_H_COPY_RDMA : (length - bytes_copied);
-		rc = plpar_hcall_norets(H_COPY_RDMA, bytes_to_copy, siobn, 
+		rc = plpar_hcall_norets(H_COPY_RDMA, bytes_to_copy, siobn,
 					saddr, diobn, daddr);
 		if (rc != H_Success)
 			return rc;
@@ -671,14 +671,14 @@ static int split_iu(struct iu_entry* iue)
 	}
 
 	child1 = kmalloc(sizeof(struct iu_entry) + sizeof(union viosrp_iu),
-			 GFP_KERNEL);
+			 GFP_ATOMIC);
 	if (child1 == NULL)
 		return -ENOMEM;
 
 	child2 = kmalloc(sizeof(struct iu_entry) + sizeof(union viosrp_iu),
-			 GFP_KERNEL);
+			 GFP_ATOMIC);
 	if (child2 == NULL) {
-		free_iu(child1);
+		kfree(child1);
 		return -ENOMEM;
 	}
 
@@ -786,7 +786,7 @@ static void init_data_buffer(struct server_adapter *adapter)
 	for (i = 0; i < DMA_BUFFER_INIT_COUNT; i++) {
 		if (adapter->dma_buffer[i].addr == NULL) {
 			adapter->dma_buffer[i].addr =
-			    dma_alloc_coherent(adapter->dev, 
+			    dma_alloc_coherent(adapter->dev,
 					       DMA_BUFFER_INIT_LEN,
 					       &adapter->dma_buffer[i].
 					       token,
@@ -863,7 +863,7 @@ static void free_data_buffer(char *buffer, dma_addr_t data_token, size_t len,
 						  adapter->dma_buffer[i].len,
 						  adapter->dma_buffer[i].addr,
 						  adapter->dma_buffer[i].token);
-				
+
 				atomic_dec(&adapter->buffers_allocated);
 
 				adapter->dma_buffer[i].addr = buffer;
@@ -1081,7 +1081,7 @@ static long send_cmd_data(dma_addr_t stoken, int len, struct iu_entry *iue)
 		md = &id->list[0];
 
 	else {
-		ext_list = dma_alloc_coherent(iue->adapter->dev, 
+		ext_list = dma_alloc_coherent(iue->adapter->dev,
 					      id->head.length,
 					      &data_token,
 					      GFP_KERNEL);
@@ -1166,7 +1166,7 @@ static int get_md_list(int num_entries, int togetlen,
 		else
 			thislen = togetlen;
 
-		bytes = get_md_data(stoken + gotlen, thislen, md + i, 
+		bytes = get_md_data(stoken + gotlen, thislen, md + i,
 				    iue->adapter);
 		if (bytes < 0)
 			return bytes;
@@ -1231,7 +1231,7 @@ static long get_cmd_data(dma_addr_t stoken, int len, struct iu_entry *iue)
 
 	/* get indirect table */
 
-	ext_list = dma_alloc_coherent(iue->adapter->dev, 
+	ext_list = dma_alloc_coherent(iue->adapter->dev,
 				      id->head.length,
 				      &data_token,
 				      GFP_KERNEL);
@@ -1259,7 +1259,7 @@ static long get_cmd_data(dma_addr_t stoken, int len, struct iu_entry *iue)
 	dma_free_coherent(iue->adapter->dev,
 			  id->head.length,
 			  ext_list, data_token);
-	
+
 	return gotlen;
 }
 
@@ -1294,7 +1294,7 @@ static long send_rsp(struct iu_entry *iue,
 		/* all children are done, send response */
 		if (!parent->req.child[0] && !parent->req.child[1]) {
 			if (!test_bit(V_ABORTED, &parent->req.flags))
-				send_rsp(parent, parent->req.child_status, 
+				send_rsp(parent, parent->req.child_status,
 					 0x00);
 			else
 				iue->adapter->next_rsp_delta++;
@@ -1501,7 +1501,7 @@ static int process_inquiry(struct iu_entry *iue)
 	unsigned long flags;
 	int genhd_flags;
 
-	id = dma_alloc_coherent(iue->adapter->dev, sizeof(*id), &data_token, 
+	id = dma_alloc_coherent(iue->adapter->dev, sizeof(*id), &data_token,
 				GFP_KERNEL);
 
 	if (id == NULL) {
@@ -1717,7 +1717,7 @@ static int process_rw(char *cmd, int rw, struct iu_entry *iue, long lba,
 	bio->bi_rw |= 1 << BIO_RW_SYNC;
 	bio->bi_phys_segments = 1;
 	bio->bi_hw_segments = 1;
-	if (bdev_get_queue(bio->bi_bdev)->ordered != QUEUE_ORDERED_NONE 
+	if (bdev_get_queue(bio->bi_bdev)->ordered != QUEUE_ORDERED_NONE
 	    && test_bit(V_BARRIER, &iue->req.flags))
 		bio->bi_rw |= 1 << BIO_RW_BARRIER;
 
@@ -1827,7 +1827,7 @@ static int process_read_capacity(struct iu_entry *iue)
 	int bytes;
 	unsigned long flags;
 
-	cap = dma_alloc_coherent(iue->adapter->dev, sizeof(*cap), &data_token, 
+	cap = dma_alloc_coherent(iue->adapter->dev, sizeof(*cap), &data_token,
 				 GFP_KERNEL);
 
 	if (cap == NULL) {
@@ -1837,7 +1837,7 @@ static int process_read_capacity(struct iu_entry *iue)
 
 	/* return block size and last valid block */
 	cap->blocksize = iue->req.vd->b.sectsize;
-	cap->blocks = 
+	cap->blocks =
 	    iue->req.vd->b.bdev->bd_inode->i_size / cap->blocksize - 1;
 
 	dbg("capacity %ld bytes, %d blocks, %d blocksize\n",
@@ -2025,7 +2025,7 @@ static int process_reportLUNs(struct iu_entry *iue)
 				dbg("  lun %16.16lx\n",
 				    iue->adapter->vbus[bus]->vdev[target]->lun);
 			}
-			
+
 		}
 	}
 
@@ -2107,7 +2107,7 @@ static int try_passthru(struct iu_entry *iue)
 	rq->timeout = iue->req.timeout;
 
 	memcpy(rq->cmd, iue->iu->srp.cmd.cdb, BLK_MAX_CDB);
-	err = blk_execute_rq(q, iue->req.vd->b.bdev->bd_disk, rq, 
+	err = blk_execute_rq(q, iue->req.vd->b.bdev->bd_disk, rq,
 			     ELEVATOR_INSERT_BACK);
 	blk_put_request(rq);
 	if ((err == 0) && (rw == READ) && (len)) {
@@ -2398,7 +2398,7 @@ nobuf:	req->sr_use_sg = 0;
 	req->sr_bufflen = len;
 	req->sr_buffer = buffer;
 	req->sr_sense_buffer[0] = 0;
-	req->sr_request->flags = 
+	req->sr_request->flags =
 	    test_bit(V_BARRIER, &iue->req.flags) ? REQ_HARDBARRIER : 0;
 	req->upper_private_data = (void*)iue;
 	iue->req.sreq = req;
@@ -2435,8 +2435,8 @@ static void process_login(struct iu_entry *iue)
 	iu->srp.login_rsp.max_initiator_to_target_iulen = sizeof(union srp_iu);
 	iu->srp.login_rsp.max_target_to_initiator_iulen = sizeof(union srp_iu);
 	/* direct and indirect */
-	iu->srp.login_rsp.supported_buffer_formats = 0x0006; 
-	iu->srp.login_rsp.multi_channel_result = 0x00; 
+	iu->srp.login_rsp.supported_buffer_formats = 0x0006;
+	iu->srp.login_rsp.multi_channel_result = 0x00;
 
 	send_iu(iue, sizeof(iu->srp.login_rsp), VIOSRP_SRP_FORMAT);
 }
@@ -2559,8 +2559,8 @@ u16 send_adapter_info(struct iu_entry *iue,
 		      dma_addr_t remote_buffer, u16 length)
 {
 	dma_addr_t data_token;
-	struct mad_adapter_info_data *info = 
-	    dma_alloc_coherent(iue->adapter->dev, sizeof(*info), &data_token, 
+	struct mad_adapter_info_data *info =
+	    dma_alloc_coherent(iue->adapter->dev, sizeof(*info), &data_token,
 			       GFP_KERNEL);
 
 	dbg("in send_adapter_info\n ");
@@ -2937,7 +2937,7 @@ static int initialize_crq_queue(struct crq_queue *queue,
 		       PAGE_SIZE);
 
 	/* If the adapter was left active for some reason (like kexec)
-	 * try freeing and re-registering 
+	 * try freeing and re-registering
 	 */
 	if (rc == H_Resource) {
 	    do {
@@ -3098,7 +3098,7 @@ static void deactivate_device(struct vdev *vdev)
 /*
  * Callback when a scsi_device gets added to the system
  */
-static int add_scsi_device(struct class_device *cdev, 
+static int add_scsi_device(struct class_device *cdev,
 			   struct class_interface *cl_intf)
 {
 	struct scsi_device *sdev = to_scsi_device(cdev->dev);
@@ -3121,7 +3121,7 @@ static int add_scsi_device(struct class_device *cdev,
 /*
  * Callback when a scsi_device gets removed from the system
  */
-static void rem_scsi_device(struct class_device *cdev, 
+static void rem_scsi_device(struct class_device *cdev,
 			    struct class_interface *cl_intf)
 {
 	struct scsi_dev_node *tmp_sdn;
@@ -3686,8 +3686,13 @@ static int ibmvscsis_remove(struct vio_dev *dev)
 				/* If the target exists */
 				struct vdev *vdev =
 					       adapter->vbus[bus]->vdev[target];
-				if (vdev && !vdev ->disabled)
+				if (vdev && !vdev ->disabled) {
+					spin_unlock_irqrestore(&adapter->lock,
+							       flags);
 					deactivate_device(vdev);
+					spin_lock_irqsave(&adapter->lock,
+							  flags);
+				}
 			}
 			spin_unlock_irqrestore(&adapter->lock, flags);
 			set_num_targets(adapter->vbus[bus], 0);
