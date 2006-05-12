@@ -344,14 +344,14 @@ dump_block_intr_open(struct dump_dev *dev, unsigned long arg)
 
 	/* get the block device opened */
 	if ((retval = blkdev_get(bdev, O_RDWR | O_LARGEFILE, 0))) {
-		goto err1;
+		goto err;
 	}
 
 	if ((dump_bdev->bio = kmalloc(sizeof(struct bio), GFP_KERNEL))
 		== NULL) {
 		printk("LKCD: Cannot allocate bio\n");
 		retval = -ENOMEM;
-		goto err2;
+		goto err1;
 	}
 
 	bio_init(dump_bdev->bio);
@@ -359,7 +359,7 @@ dump_block_intr_open(struct dump_dev *dev, unsigned long arg)
 	if ((bvec = kmalloc(sizeof(struct bio_vec) *
 		(DUMP_BUFFER_SIZE >> PAGE_SHIFT), GFP_KERNEL)) == NULL) {
 		retval = -ENOMEM;
-		goto err3;
+		goto err2;
 	}
 
 	/* assign the new dump dev structure */
@@ -378,7 +378,7 @@ dump_block_intr_open(struct dump_dev *dev, unsigned long arg)
 
 	if (retval) {
 		printk("LKCD: open: dump_block_map failed, ret %d\n", retval);
-		goto err3;
+		goto err2;
 	}
 
 	printk("LKCD: Block device (%d,%d) successfully configured for dumping\n",
@@ -389,11 +389,10 @@ dump_block_intr_open(struct dump_dev *dev, unsigned long arg)
 	/* after opening the block device, return */
 	return retval;
 
-err3:	dump_free_bio(dump_bdev->bio);
+err2:	dump_free_bio(dump_bdev->bio);
 	dump_bdev->bio = NULL;
-err2:	if (bdev) blkdev_put(bdev);
-		goto err;
-err1:	if (bdev) bdput(bdev);
+err1:	if (bdev)
+		blkdev_put(bdev);
 	dump_bdev->bdev = NULL;
 err:	return retval;
 }
@@ -424,7 +423,7 @@ dump_block_poll_open(struct dump_dev *dev, unsigned long arg)
 
 	/* get the block device opened */
 	if ((retval = blkdev_get(bdev, O_RDWR | O_LARGEFILE, 0))) {
-		goto err1;
+		goto err;
 	}
 
 	dump_bdev->bio = 0;
@@ -437,13 +436,13 @@ dump_block_poll_open(struct dump_dev *dev, unsigned long arg)
 	target = get_device(bdev->bd_disk->driverfs_dev);
 	if (!target) {
 		retval = -EINVAL;
-		goto err2;
+		goto err1;
 	}
 	retval = register_disk_dump_device(target,bdev);
 	if (retval == -EEXIST)
 		retval = 0;
 	else if (retval < 0)
-		goto err2;
+		goto err1;
 
         printk("LKCD: Block device (%d,%d) successfully configured for dumping using polling I/O\n",
 		MAJOR((dev_t)arg), MINOR((dev_t)arg));
@@ -451,9 +450,8 @@ dump_block_poll_open(struct dump_dev *dev, unsigned long arg)
 	/* after opening the block device, return */
 	return retval;
 
-err2:	if (bdev) blkdev_put(bdev);
-		goto err;
-err1:	if (bdev) bdput(bdev);
+err1:	if (bdev)
+		blkdev_put(bdev);
 err:	return retval;
 }
 

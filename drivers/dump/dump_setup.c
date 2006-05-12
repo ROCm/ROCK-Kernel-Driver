@@ -615,6 +615,7 @@ static int dumper_setup(const char *devid)
 				dump_config.dumper->name,
 				dump_config.dump_device);
 		dump_config.dumper = NULL;
+	        dump_config.dump_device = NULL;
 	}
 	return ret;
 }
@@ -666,7 +667,7 @@ int dump_register_device(struct dump_dev *ddev)
 
 	list_for_each(tmp, &dump_target_list) {
 		dev = list_entry(tmp, struct dump_dev, list);
-		if (dev->type == dev->type) {
+		if (ddev->type == dev->type) {
 			printk("LKCD: Target type %d already registered\n",
 					dev->type);
 			return -1; /* return proper error */
