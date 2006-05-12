@@ -252,6 +252,7 @@ struct iu_pool {
 struct vdev {
 	struct list_head list;
 	char direct_scsi;
+	char type;
 	atomic_t refcount;
 	int disabled;
 	u64 lun;
@@ -3017,6 +3018,9 @@ static int activate_device(struct vdev *vdev)
 	if (IS_ERR(bdev))
 		return PTR_ERR(bdev);;
 
+	if (vdev->type == 'B')
+		goto block;
+
 	spin_lock_irqsave(&sdev_list_lock, flags);
 	list_for_each_entry(tmp_sdn, &scsi_dev_list, node) {
 		struct scsi_device *sdev = tmp_sdn->sdev;
@@ -3037,7 +3041,7 @@ static int activate_device(struct vdev *vdev)
 		}
 	}
 	spin_unlock_irqrestore(&sdev_list_lock, flags);
-
+block:
 	vdev->direct_scsi = 0;
 	vdev->b.bdev = bdev;
 	vdev->disabled = 0;
@@ -3195,6 +3199,7 @@ static void set_num_targets(struct vbus* vbus, long value)
 			tmpdev->lun = make_lun(vbus->bus_num, i, 0);
 			tmpdev->b.blocksize = PAGE_CACHE_SIZE;
 			tmpdev->b.sectsize = 512;
+			tmpdev->type = 'B';
 			tmpdev->disabled = 1;
 
 			tmpdev->kobj.parent = &vbus->kobj;
@@ -3313,6 +3318,7 @@ static void set_num_buses(struct device *dev, long value)
 }
 
 /* Target sysfs stuff */
+static ATTR(target, type, 0644);
 static ATTR(target, device, 0644);
 static ATTR(target, active, 0644);
 static ATTR(target, ro, 0644);
@@ -3336,6 +3342,8 @@ static ssize_t vscsi_target_show(struct kobject * kobj,
 		returned = sprintf(buf, "%d\n", !vdev->disabled);
 	else if (attr == &vscsi_target_ro_attr)
 		returned = sprintf(buf, "%d\n", vdev->b.ro);
+        else if (attr == &vscsi_target_type_attr)
+                returned = sprintf(buf, "%c\n", vdev->type);
 	else {
 		returned = -EFAULT;
 		BUG();
@@ -3389,6 +3397,14 @@ static ssize_t vscsi_target_store(struct kobject * kobj,
 		}
 	} else if (attr == &vscsi_target_ro_attr)
 		vdev->b.ro = value > 0 ? 1 : 0;
+        else if (attr == &vscsi_target_type_attr) {
+                if (buf[0] == 'B' ||  buf[0] == 'b')
+                        vdev->type = 'B';
+                else if (buf[0] == 'S' || buf[0] == 's')
+                        vdev->type = 'S';
+                else
+                        return -EINVAL;
+	}
 	else
 		BUG();
 
@@ -3396,6 +3412,7 @@ static ssize_t vscsi_target_store(struct kobject * kobj,
 }
 
 static struct attribute * vscsi_target_attrs[] = {
+	&vscsi_target_type_attr,
 	&vscsi_target_device_attr,
 	&vscsi_target_active_attr,
 	&vscsi_target_ro_attr,
