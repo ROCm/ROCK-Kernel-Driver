@@ -9,8 +9,6 @@ source "drivers/md/Kconfig"
 
 menu "Character device drivers"
 
-source "drivers/char/Kconfig.raw"
-
 config UNIX98_PTYS
 	bool "Unix98 PTY support"
 	---help---
@@ -52,6 +50,26 @@ config UNIX98_PTY_COUNT
 
 	  When not in use, each additional set of 256 PTYs occupy
 	  approximately 8 KB of kernel memory on 32-bit architectures.
+
+config RAW_DRIVER
+	tristate "RAW driver (/dev/raw/rawN) (OBSOLETE)"
+	help
+	  The raw driver permits block devices to be bound to /dev/raw/rawN.
+	  Once bound, I/O against /dev/raw/rawN uses efficient zero-copy I/O.
+	  See the raw(8) manpage for more details.
+
+          The raw driver is deprecated and may be removed from 2.7
+          kernels.  Applications should simply open the device (eg /dev/hda1)
+          with the O_DIRECT flag.
+
+config MAX_RAW_DEVS
+	int "Maximum number of RAW devices to support (1-8192)"
+	depends on RAW_DRIVER
+	default "256"
+	help
+	  The maximum number of RAW devices that are supported.
+	  Default is 256. Increase this number in case you need lots of
+	  raw devices.
 
 config HANGCHECK_TIMER
 	tristate "Hangcheck timer"
