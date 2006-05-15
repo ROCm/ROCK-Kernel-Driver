@@ -646,7 +646,16 @@ char *ia64_pci_get_legacy_mem(struct pci_bus *bus)
 int
 pci_mmap_legacy_page_range(struct pci_bus *bus, struct vm_area_struct *vma)
 {
+	unsigned long size;
 	char *addr;
+
+	/*
+	 * If we allow WB access to the region, we can't map it
+	 * UC at the same time.
+	 */
+	size = vma->vm_end - vma->vm_start;
+	if (valid_phys_addr_range(vma->vm_pgoff << PAGE_SHIFT, &size))
+		return -EINVAL;
 
 	addr = pci_get_legacy_mem(bus);
 	if (IS_ERR(addr))
@@ -657,7 +666,7 @@ pci_mmap_legacy_page_range(struct pci_bus *bus, struct vm_area_struct *vma)
 	vma->vm_flags |= (VM_SHM | VM_RESERVED | VM_IO);
 
 	if (remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
-			    vma->vm_end - vma->vm_start, vma->vm_page_prot))
+			    size, vma->vm_page_prot))
 		return -EAGAIN;
 
 	return 0;
