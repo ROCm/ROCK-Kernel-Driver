@@ -166,11 +166,7 @@ int die(const char *str, struct pt_regs *regs, long err)
 	bust_spinlocks(0);
 	spin_unlock_irq(&die_lock);
 
-	if (kexec_should_crash(current)
-#ifdef CONFIG_KEXEC
-		|| cpu_isset(smp_processor_id(),cpus_in_sr)
-#endif
-		)
+	if (kexec_should_crash(current) || kexec_sr_activated(smp_processor_id()))
 		crash_kexec(regs);
 	crash_kexec_secondary(regs);
 
