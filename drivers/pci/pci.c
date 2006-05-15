@@ -365,13 +365,6 @@ pci_set_power_state(struct pci_dev *dev, pci_power_t state)
 	else if (state == PCI_D2 || dev->current_state == PCI_D2)
 		udelay(200);
 
-	/*
-	 * Give firmware a chance to be called, such as ACPI _PRx, _PSx
-	 * Firmware method after natice method ?
-	 */
-	if (platform_pci_set_power_state)
-		platform_pci_set_power_state(dev, state);
-
 	dev->current_state = state;
 
 	/* According to section 5.4.1 of the "PCI BUS POWER MANAGEMENT
