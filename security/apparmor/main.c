@@ -47,6 +47,34 @@ struct sdprofile *null_complain_profile;
  **************************/
 
 /**
+ * dentry_xlate_error
+ * @dentry: pointer to dentry
+ * @error: error number
+ * @dtype: type of dentry
+ *
+ * Display error message when a dentry translation error occured
+ */
+static void dentry_xlate_error(struct dentry *dentry, int error, char *dtype)
+{
+	const unsigned int len = 16;
+	char buf[len];
+
+	if (dentry->d_inode) {
+		snprintf(buf, len, "%lu", dentry->d_inode->i_ino);
+	} else {
+		strncpy(buf, "<negative>", len);
+		buf[len-1]=0;
+	}
+
+	SD_ERROR("An error occured while translating %s %p "
+		 "inode# %s to a pathname. Error %d\n",
+		 dtype,
+		 dentry,
+		 buf,
+		 error);
+}
+
+/**
  * sd_taskattr_access:
  * @name: name of file to check permission
  * @mask: permission mask requested for file
@@ -428,12 +456,7 @@ static int _sd_perm_dentry(struct subdomain *sd, struct dentry *dentry,
 	} while (name);
 
 	if ((sdpath_error = sd_path_end(&data)) != 0) {
-		SD_ERROR("%s: An error occured while translating dentry %p "
-			 "inode# %lu to a pathname. Error %d\n",
-			 __FUNCTION__,
-			 dentry,
-			 dentry->d_inode->i_ino,
-			 sdpath_error);
+		dentry_xlate_error(dentry, sdpath_error, "dentry");
 
 		WARN_ON(name);	/* name should not be set if error */
 		error = sdpath_error;
@@ -586,7 +609,7 @@ int sd_audit(struct subdomain *sd, const struct sd_audit *sa)
 		}
 	} else if (sa->errorcode < 0) {
 		audit_log(current->audit_context, gfp_mask, AUDIT_SD,
-			"Internal error auditing event type %d (error %d)\n",
+			"Internal error auditing event type %d (error %d)",
 			sa->type, sa->errorcode);
 		SD_ERROR("Internal error auditing event type %d (error %d)\n",
 			sa->type, sa->errorcode);
@@ -718,13 +741,9 @@ int sd_audit(struct subdomain *sd, const struct sd_audit *sa)
 		goto out;
 	}
 
-	audit_log_format(ab, "(%s(%d) ", current->comm, current->pid);
-
-	if (0)
-		audit_log_format(ab, "[global deny])\n");
-	else
-		audit_log_format(ab, "profile %s active %s)\n",
-			sd->profile->name, sd->active->name);
+	audit_log_format(ab, "(%s(%d) profile %s active %s)",
+		current->comm, current->pid,
+		sd->profile->name, sd->active->name);
 
 	audit_log_end(ab);
 
@@ -747,11 +766,13 @@ out:
  */
 char *sd_get_name(struct dentry *dentry, struct vfsmount *mnt)
 {
-	char *page, *name = NULL;
+	char *page, *name;
 
 	page = (char *)__get_free_page(GFP_KERNEL);
-	if (!page)
+	if (!page) {
+		name = ERR_PTR(-ENOMEM);
 		goto out;
+	}
 
 	name = d_path(dentry, mnt, page, PAGE_SIZE);
 
@@ -759,7 +780,9 @@ char *sd_get_name(struct dentry *dentry, struct vfsmount *mnt)
 	 * has been removed from the cache.
 	 * The size > deleted_size and strcmp checks are redundant safe guards.
 	 */
-	if (name) {
+	if (IS_ERR(name)) {
+		free_page((unsigned long)page);
+	} else {
 		const char deleted_str[] = " (deleted)";
 		const size_t deleted_size = sizeof(deleted_str) - 1;
 		size_t size;
@@ -768,8 +791,10 @@ char *sd_get_name(struct dentry *dentry, struct vfsmount *mnt)
 		    size > deleted_size &&
 		    strcmp(name + size - deleted_size, deleted_str) == 0)
 			name[size - deleted_size] = '\0';
+
+		SD_DEBUG("%s: full_path=%s\n", __FUNCTION__, name);
 	}
-	SD_DEBUG("%s: full_path=%s\n", __FUNCTION__, name);
+
 out:
 	return name;
 }
@@ -868,7 +893,12 @@ int sd_perm(struct subdomain *sd, struct dentry *dentry, struct vfsmount *mnt,
 	sa.flags = 0;
 	sa.gfp_mask = GFP_KERNEL;
 
-	permerror = (sa.name ? sd_file_perm(sd, sa.name, mask) : -ENOMEM);
+	if (IS_ERR(sa.name)) {
+		permerror = PTR_ERR(sa.name);
+		sa.name = NULL;
+	} else {
+		permerror = sd_file_perm(sd, sa.name, mask);
+	}
 
 	sd_permerror2result(permerror, &sa);
 
@@ -1063,13 +1093,8 @@ int sd_link(struct subdomain *sd, struct dentry *link, struct dentry *target)
 
 			/* should not be possible if we matched */
 			if ((sdpath_error = sd_path_end(&idata)) != 0) {
-				SD_ERROR("%s: An error occured while "
-					 "translating inner dentry %p "
-					 "inode %lu to a pathname. Error %d\n",
-					 __FUNCTION__,
-					 target,
-					 target->d_inode->i_ino,
-					 sdpath_error);
+				dentry_xlate_error(target, sdpath_error,
+						   "inner dentry [link]");
 
 				/* name should not be set if error */
 				WARN_ON(iname);
@@ -1087,12 +1112,7 @@ int sd_link(struct subdomain *sd, struct dentry *link, struct dentry *target)
 		/* inner error */
 		(void)sd_path_end(&odata);
 	} else if ((sdpath_error = sd_path_end(&odata)) != 0) {
-		SD_ERROR("%s: An error occured while translating outer "
-			 "dentry %p inode %lu to a pathname. Error %d\n",
-			 __FUNCTION__,
-			 link,
-			 link->d_inode->i_ino,
-			 sdpath_error);
+		dentry_xlate_error(link, sdpath_error, "outer dentry [link]");
 
 		errorcode = sdpath_error;
 	}
@@ -1225,7 +1245,7 @@ int sd_register(struct file *filp)
 	}
 
 	filename = sd_get_name(filp->f_dentry, filp->f_vfsmnt);
-	if (!filename) {
+	if (IS_ERR(filename)) {
 		SD_WARN("%s: Failed to get filename\n", __FUNCTION__);
 		goto out;
 	}

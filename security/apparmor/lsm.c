@@ -101,7 +101,7 @@ static int subdomain_ptrace(struct task_struct *parent,
 
 	read_lock_irqsave(&sd_lock, flags);
 
-	sd = SD_SUBDOMAIN(current->security);
+	sd = SD_SUBDOMAIN(parent->security);
 
 	if (!error && __sd_is_confined(sd)) {
 		error = sd_audit_syscallreject(sd, GFP_ATOMIC, "ptrace");
