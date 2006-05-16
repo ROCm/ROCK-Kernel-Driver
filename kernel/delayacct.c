@@ -128,7 +128,8 @@ int __delayacct_add_tsk(struct taskstats *d, struct task_struct *tsk)
 	/* zero XXX_total,non-zero XXX_count implies XXX stat overflowed */
 
 	tmp = (nsec_t)d->cpu_run_real_total ;
-	tmp += (u64)(tsk->utime+tsk->stime)*TICK_NSEC;
+	cputime_to_timespec(tsk->utime + tsk->stime, &ts);
+	tmp += timespec_to_ns(&ts);
 	d->cpu_run_real_total = (tmp < (nsec_t)d->cpu_run_real_total)? 0: tmp;
 
 	/* No locking available for sched_info. Take snapshot first. */
