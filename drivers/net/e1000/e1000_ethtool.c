@@ -60,7 +60,6 @@ static const struct e1000_stats e1000_gstrings_stats[] = {
 	{ "tx_bytes", E1000_STAT(net_stats.tx_bytes) },
 	{ "rx_errors", E1000_STAT(net_stats.rx_errors) },
 	{ "tx_errors", E1000_STAT(net_stats.tx_errors) },
-	{ "rx_dropped", E1000_STAT(net_stats.rx_dropped) },
 	{ "tx_dropped", E1000_STAT(net_stats.tx_dropped) },
 	{ "multicast", E1000_STAT(net_stats.multicast) },
 	{ "collisions", E1000_STAT(net_stats.collisions) },
@@ -1870,7 +1869,7 @@ e1000_get_strings(struct net_device *netdev, uint32_t stringset, uint8_t *data)
 	}
 }
 
-struct ethtool_ops e1000_ethtool_ops = {
+static struct ethtool_ops e1000_ethtool_ops = {
 	.get_settings           = e1000_get_settings,
 	.set_settings           = e1000_set_settings,
 	.get_drvinfo            = e1000_get_drvinfo,

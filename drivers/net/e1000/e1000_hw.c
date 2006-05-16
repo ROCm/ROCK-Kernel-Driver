@@ -68,8 +68,8 @@ static int32_t e1000_polarity_reversal_workaround(struct e1000_hw *hw);
 static int32_t e1000_set_phy_mode(struct e1000_hw *hw);
 static int32_t e1000_host_if_read_cookie(struct e1000_hw *hw, uint8_t *buffer);
 static uint8_t e1000_calculate_mng_checksum(char *buffer, uint32_t length);
-static int32_t e1000_configure_kmrn_for_10_100(struct e1000_hw *hw);
-static int32_t e1000_configure_kmrn_for_1000(struct e1000_hw *hw);
+static int32_t e1000_configure_kmrn_for_10_100(struct e1000_hw *hw, uint16_t duplex);
+static int32_t e1000_configure_kmrn_for_1000(struct e1000_hw *hw, uint16_t duplex);
 
 /* IGP cable length table */
 static const
@@ -1332,7 +1332,7 @@ e1000_copper_link_ggp_setup(struct e1000_hw *hw)
     DEBUGFUNC("e1000_copper_link_ggp_setup");
 
     if(!hw->phy_reset_disable) {
-
+        
         /* Enable CRS on TX for half-duplex operation. */
         ret_val = e1000_read_phy_reg(hw, GG82563_PHY_MAC_SPEC_CTRL,
                                      &phy_data);
@@ -1440,8 +1440,8 @@ e1000_copper_link_ggp_setup(struct e1000_hw *hw)
             if (ret_val)
                 return ret_val;
 
-            /* Enable Pass False Carrier on the PHY */
-            phy_data |= GG82563_KMCR_PASS_FALSE_CARRIER;
+            /* Disable Pass False Carrier on the PHY */
+            phy_data &= ~GG82563_KMCR_PASS_FALSE_CARRIER;
 
             ret_val = e1000_write_phy_reg(hw, GG82563_PHY_KMRN_MODE_CTRL,
                                           phy_data);
@@ -1679,6 +1679,25 @@ e1000_setup_copper_link(struct e1000_hw *hw)
 
     DEBUGFUNC("e1000_setup_copper_link");
 
+    switch (hw->mac_type) {
+    case e1000_80003es2lan:
+        /* Set the mac to wait the maximum time between each
+         * iteration and increase the max iterations when
+         * polling the phy; this fixes erroneous timeouts at 10Mbps. */
+        ret_val = e1000_write_kmrn_reg(hw, GG82563_REG(0x34, 4), 0xFFFF);
+        if (ret_val)
+            return ret_val;
+        ret_val = e1000_read_kmrn_reg(hw, GG82563_REG(0x34, 9), &reg_data);
+        if (ret_val)
+            return ret_val;
+        reg_data |= 0x3F;
+        ret_val = e1000_write_kmrn_reg(hw, GG82563_REG(0x34, 9), reg_data);
+        if (ret_val)
+            return ret_val;
+    default:
+        break;
+    }
+
     /* Check if it is a valid PHY and set PHY mode if necessary. */
     ret_val = e1000_copper_link_preconfig(hw);
     if(ret_val)
@@ -1765,7 +1784,7 @@ e1000_setup_copper_link(struct e1000_hw *hw)
 * hw - Struct containing variables accessed by shared code
 ******************************************************************************/
 static int32_t
-e1000_configure_kmrn_for_10_100(struct e1000_hw *hw)
+e1000_configure_kmrn_for_10_100(struct e1000_hw *hw, uint16_t duplex)
 {
     int32_t ret_val = E1000_SUCCESS;
     uint32_t tipg;
@@ -1785,11 +1804,26 @@ e1000_configure_kmrn_for_10_100(struct e1000_hw *hw)
     tipg |= DEFAULT_80003ES2LAN_TIPG_IPGT_10_100;
     E1000_WRITE_REG(hw, TIPG, tipg);
 
+    ret_val = e1000_read_phy_reg(hw, GG82563_PHY_KMRN_MODE_CTRL,
+                                 &reg_data);
+    if (ret_val)
+        return ret_val;
+
+    /* Enable pass false carrier when in half duplex mode. */
+    if (duplex == HALF_DUPLEX)
+        reg_data |= GG82563_KMCR_PASS_FALSE_CARRIER;
+    else
+        reg_data &= ~GG82563_KMCR_PASS_FALSE_CARRIER;
+
+
+    ret_val = e1000_write_phy_reg(hw, GG82563_PHY_KMRN_MODE_CTRL,
+                                  reg_data);
+    
     return ret_val;
 }
 
 static int32_t
-e1000_configure_kmrn_for_1000(struct e1000_hw *hw)
+e1000_configure_kmrn_for_1000(struct e1000_hw *hw, uint16_t duplex)
 {
     int32_t ret_val = E1000_SUCCESS;
     uint16_t reg_data;
@@ -1809,6 +1843,18 @@ e1000_configure_kmrn_for_1000(struct e1000_hw *hw)
     tipg |= DEFAULT_80003ES2LAN_TIPG_IPGT_1000;
     E1000_WRITE_REG(hw, TIPG, tipg);
 
+
+    ret_val = e1000_read_phy_reg(hw, GG82563_PHY_KMRN_MODE_CTRL,
+                                 &reg_data);
+    if (ret_val)
+        return ret_val;
+
+    /* Disable Pass False Carrier on the PHY */
+    reg_data &= ~GG82563_KMCR_PASS_FALSE_CARRIER;
+
+    ret_val = e1000_write_phy_reg(hw, GG82563_PHY_KMRN_MODE_CTRL,
+                                  reg_data);
+    
     return ret_val;
 }
 
@@ -2846,12 +2892,12 @@ e1000_get_speed_and_duplex(struct e1000_hw *hw,
         }
     }
 
-    if ((hw->mac_type == e1000_80003es2lan) &&
+    if ((hw->mac_type == e1000_80003es2lan) && 
         (hw->media_type == e1000_media_type_copper)) {
         if (*speed == SPEED_1000)
-            ret_val = e1000_configure_kmrn_for_1000(hw);
+            ret_val = e1000_configure_kmrn_for_1000(hw, *duplex);
         else
-            ret_val = e1000_configure_kmrn_for_10_100(hw);
+            ret_val = e1000_configure_kmrn_for_10_100(hw, *duplex);
         if (ret_val)
             return ret_val;
     }
@@ -3329,7 +3375,7 @@ e1000_write_phy_reg_ex(struct e1000_hw *hw,
         E1000_WRITE_REG(hw, MDIC, mdic);
 
         /* Poll the ready bit to see if the MDI read completed */
-        for(i = 0; i < 640; i++) {
+        for(i = 0; i < 641; i++) {
             usec_delay(5);
             mdic = E1000_READ_REG(hw, MDIC);
             if(mdic & E1000_MDIC_READY) break;
