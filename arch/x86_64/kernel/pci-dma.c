@@ -52,6 +52,10 @@ dma_alloc_pages(struct device *dev, gfp_t gfp, unsigned order)
 		node = pcibus_to_node(to_pci_dev(dev)->bus);
 	else
 		node = numa_node_id();
+
+	if (node < first_node(node_online_map))
+		node = first_node(node_online_map);
+
 	page = alloc_pages_node(node, gfp, order);
 	return page ? page_address(page) : NULL;
 }
