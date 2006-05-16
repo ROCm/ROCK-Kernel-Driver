@@ -1,20 +1,8 @@
 /**
- * machine_specific_memory_setup - Hook for machine specific memory setup.
- *
  * Description:
  *	This is included late in kernel/setup.c so that it can make
  *	use of all of the static functions.
  **/
-
-static char * __init machine_specific_memory_setup(void)
-{
-	unsigned long max_pfn = xen_start_info->nr_pages;
-
-	e820.nr_map = 0;
-	add_memory_region(0, PFN_PHYS(max_pfn), E820_RAM);
-
-	return "Xen";
-}
 
 extern void hypervisor_callback(void);
 extern void failsafe_callback(void);

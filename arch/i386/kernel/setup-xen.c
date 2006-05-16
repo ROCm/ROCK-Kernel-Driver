@@ -152,7 +152,9 @@ struct ist_info ist_info;
 	defined(CONFIG_X86_SPEEDSTEP_SMI_MODULE)
 EXPORT_SYMBOL(ist_info);
 #endif
+#ifndef CONFIG_XEN
 struct e820map e820;
+#endif
 
 extern void early_cpu_init(void);
 extern void generic_apic_probe(char *);
@@ -394,6 +396,7 @@ EXPORT_SYMBOL(phys_to_machine_mapping);
 start_info_t *xen_start_info;
 EXPORT_SYMBOL(xen_start_info);
 
+#ifndef CONFIG_XEN
 static void __init limit_regions(unsigned long long size)
 {
 	unsigned long long current_addr = 0;
@@ -487,7 +490,6 @@ static void __init print_memory_map(char *who)
 	}
 }
 
-#if 0
 /*
  * Sanitize the BIOS e820 map.
  *
@@ -742,7 +744,9 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 {
 	char c = ' ', *to = command_line, *from = saved_command_line;
 	int len = 0, max_cmdline;
+#ifndef CONFIG_XEN
 	int userdef = 0;
+#endif
 
 	if ((max_cmdline = MAX_GUEST_CMDLINE) > COMMAND_LINE_SIZE)
 		max_cmdline = COMMAND_LINE_SIZE;
@@ -790,6 +794,7 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 			}
 		}
 
+#ifndef CONFIG_XEN
 		else if (!memcmp(from, "memmap=", 7)) {
 			if (to != command_line)
 				to--;
@@ -831,6 +836,7 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 				}
 			}
 		}
+#endif
 
 		else if (!memcmp(from, "noexec=", 7))
 			noexec_setup(from + 7);
@@ -975,10 +981,12 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 	}
 	*to = '\0';
 	*cmdline_p = command_line;
+#ifndef CONFIG_XEN
 	if (userdef) {
 		printk(KERN_INFO "user-defined physical RAM map:\n");
 		print_memory_map("user");
 	}
+#endif
 }
 
 #if 0 /* !XEN */
@@ -1181,6 +1189,7 @@ unsigned long __init find_max_low_pfn(void)
 	return max_low_pfn;
 }
 
+#ifndef CONFIG_XEN
 /*
  * Free all available memory for boot time allocation.  Used
  * as a callback function by efi_memory_walk()
@@ -1199,11 +1208,14 @@ free_available_memory(unsigned long start, unsigned long end, void *arg)
 
 	return 0;
 }
+#endif
+
 /*
  * Register fully available low RAM pages with the bootmem allocator.
  */
 static void __init register_bootmem_low_pages(unsigned long max_low_pfn)
 {
+#ifndef CONFIG_XEN
 	int i;
 
 	if (efi_enabled) {
@@ -1241,6 +1253,13 @@ static void __init register_bootmem_low_pages(unsigned long max_low_pfn)
 		size = last_pfn - curr_pfn;
 		free_bootmem(PFN_PHYS(curr_pfn), PFN_PHYS(size));
 	}
+#else
+	unsigned long size = xen_start_info->nr_pages;
+
+	if (size > max_low_pfn)
+		size = max_low_pfn;
+	free_bootmem(0, PFN_PHYS(size));
+#endif
 }
 
 #ifndef CONFIG_XEN
@@ -1774,12 +1793,14 @@ void __init setup_arch(char **cmdline_p)
 	setup_xen_features();
 
 	ARCH_SETUP
+#ifndef CONFIG_XEN
 	if (efi_enabled)
 		efi_init();
 	else {
 		printk(KERN_INFO "BIOS-provided physical RAM map:\n");
 		print_memory_map(machine_specific_memory_setup());
 	}
+#endif
 
 	copy_edd();
 

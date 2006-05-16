@@ -170,7 +170,9 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		ret = skb_copy_bits(skb, -hlen, nskb->data - hlen,
 				     skb->len + hlen);
 		BUG_ON(ret);
+		/* Copy only the header fields we use in this driver. */
 		nskb->dev = skb->dev;
+		nskb->ip_summed = skb->ip_summed;
 		nskb->proto_data_valid = skb->proto_data_valid;
 		dev_kfree_skb(skb);
 		skb = nskb;
@@ -842,18 +844,10 @@ static int __init netback_init(void)
 		&netif_be_dbg);
 #endif
 
-	__unsafe(THIS_MODULE);
-
 	return 0;
 }
 
-static void netback_cleanup(void)
-{
-	BUG();
-}
-
 module_init(netback_init);
-module_exit(netback_cleanup);
 
 MODULE_LICENSE("Dual BSD/GPL");
 

@@ -685,22 +685,12 @@ static int __init xencons_init(void)
 #ifdef MODULE
 	__xencons_resume = _xencons_resume;
 	__xencons_force_flush = _xencons_force_flush;
-	__unsafe(THIS_MODULE);
 #endif
 
 	return 0;
 }
 
 module_init(xencons_init);
-
-MODULE_LICENSE("Dual BSD/GPL");
-
-static void __exit xencons_exit(void)
-{
-	BUG();
-}
-
-module_exit(xencons_exit);
 
 MODULE_LICENSE("Dual BSD/GPL");
 

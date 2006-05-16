@@ -88,9 +88,6 @@ EXPORT_SYMBOL(HYPERVISOR_shared_info);
 extern char hypercall_page[PAGE_SIZE];
 EXPORT_SYMBOL(hypercall_page);
 
-/* Allows setting of maximum possible memory size  */
-unsigned long xen_override_max_pfn;
-
 unsigned long *phys_to_machine_mapping;
 unsigned long *pfn_to_mfn_frame_list_list, *pfn_to_mfn_frame_list[512];
 
@@ -137,7 +134,9 @@ struct sys_desc_table_struct {
 };
 
 struct edid_info edid_info;
+#ifndef CONFIG_XEN
 struct e820map e820;
+#endif
 
 extern int root_mountflags;
 
@@ -316,7 +315,9 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 {
 	char c = ' ', *to = command_line, *from = COMMAND_LINE;
 	int len = 0;
+#ifndef CONFIG_XEN
 	int userdef = 0;
+#endif
 
 	for (;;) {
 		if (c != ' ') 
@@ -396,6 +397,7 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 		if (!memcmp(from, "mem=", 4))
 			parse_memopt(from+4, &from); 
 
+#ifndef CONFIG_XEN
 		if (!memcmp(from, "memmap=", 7)) {
 			/* exactmap option is for used defined memory */
 			if (!memcmp(from+7, "exactmap", 8)) {
@@ -417,6 +419,7 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 				userdef = 1;
 			}
 		}
+#endif
 
 #ifdef CONFIG_NUMA
 		if (!memcmp(from, "numa=", 5))
@@ -476,10 +479,12 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 			break;
 		*(to++) = c;
 	}
+#ifndef CONFIG_XEN
 	if (userdef) {
 		printk(KERN_INFO "user-defined physical RAM map:\n");
 		e820_print_map("user");
 	}
+#endif
 	*to = '\0';
 	*cmdline_p = command_line;
 }
@@ -611,10 +616,10 @@ static inline void copy_edd(void)
 }
 #endif
 
-#ifndef CONFIG_XEN
 #define EBDA_ADDR_POINTER 0x40E
 static void __init reserve_ebda_region(void)
 {
+#ifndef CONFIG_XEN
 	unsigned int addr;
 	/** 
 	 * there is a real-mode segmented pointer pointing to the 
@@ -624,8 +629,8 @@ static void __init reserve_ebda_region(void)
 	addr <<= 4;
 	if (addr)
 		reserve_bootmem_generic(addr, PAGE_SIZE);
-}
 #endif
+}
 
 void __init setup_arch(char **cmdline_p)
 {
@@ -732,7 +737,6 @@ void __init setup_arch(char **cmdline_p)
 	contig_initmem_init(start_pfn, end_pfn);
 #endif
 
-#ifndef CONFIG_XEN
 	/* Reserve direct mapping */
 	reserve_bootmem_generic(table_start << PAGE_SHIFT, 
 				(table_end - table_start) << PAGE_SHIFT);
@@ -749,7 +753,6 @@ void __init setup_arch(char **cmdline_p)
 
 	/* reserve ebda region */
 	reserve_ebda_region();
-#endif
 
 #ifdef CONFIG_SMP
 	/*
@@ -769,31 +772,20 @@ void __init setup_arch(char **cmdline_p)
         */
        acpi_reserve_bootmem();
 #endif
-#ifdef CONFIG_XEN
 #ifdef CONFIG_BLK_DEV_INITRD
-	if (xen_start_info->mod_start) {
-		if (INITRD_START + INITRD_SIZE <= (end_pfn << PAGE_SHIFT)) {
-			/*reserve_bootmem_generic(INITRD_START, INITRD_SIZE);*/
-			initrd_start = INITRD_START + PAGE_OFFSET;
-			initrd_end = initrd_start+INITRD_SIZE;
-			initrd_below_start_ok = 1;
-		} else {
-			printk(KERN_ERR "initrd extends beyond end of memory "
-				"(0x%08lx > 0x%08lx)\ndisabling initrd\n",
-				(unsigned long)(INITRD_START + INITRD_SIZE),
-				(unsigned long)(end_pfn << PAGE_SHIFT));
-			initrd_start = 0;
-		}
-	}
-#endif
-#else	/* CONFIG_XEN */
-#ifdef CONFIG_BLK_DEV_INITRD
+#ifndef CONFIG_XEN
 	if (LOADER_TYPE && INITRD_START) {
+#else
+	if (xen_start_info->mod_start) {
+#endif
 		if (INITRD_START + INITRD_SIZE <= (end_pfn << PAGE_SHIFT)) {
 			reserve_bootmem_generic(INITRD_START, INITRD_SIZE);
 			initrd_start =
 				INITRD_START ? INITRD_START + PAGE_OFFSET : 0;
 			initrd_end = initrd_start+INITRD_SIZE;
+#ifdef CONFIG_XEN
+			initrd_below_start_ok = 1;
+#endif
 		}
 		else {
 			printk(KERN_ERR "initrd extends beyond end of memory "
@@ -804,7 +796,6 @@ void __init setup_arch(char **cmdline_p)
 		}
 	}
 #endif
-#endif	/* !CONFIG_XEN */
 #ifdef CONFIG_KEXEC
 	if (crashk_res.start != crashk_res.end) {
 		reserve_bootmem(crashk_res.start,

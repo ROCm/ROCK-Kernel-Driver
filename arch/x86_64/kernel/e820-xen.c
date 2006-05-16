@@ -36,6 +36,7 @@ EXPORT_SYMBOL(end_pfn);
 unsigned long end_user_pfn = MAXMEM>>PAGE_SHIFT;  
 unsigned long end_pfn_map; 
 
+#ifndef CONFIG_XEN
 /* 
  * Add a memory region to the kernel e820 map.
  */ 
@@ -53,8 +54,6 @@ void __init add_memory_region(unsigned long start, unsigned long size, int type)
 	e820.map[x].type = type;
 	e820.nr_map++;
 }
-
-#ifndef CONFIG_XEN
 
 /* 
  * end_pfn only includes RAM, while end_pfn_map includes all e820 entries.
@@ -352,6 +351,7 @@ int __init e820_all_mapped(unsigned long start, unsigned long end, unsigned type
 }
 #endif /* CONFIG_XEN */
 
+#ifndef CONFIG_XEN
 void __init e820_print_map(char *who)
 {
 	int i;
@@ -378,7 +378,6 @@ void __init e820_print_map(char *who)
 	}
 }
 
-#ifndef CONFIG_XEN
 /*
  * Sanitize the BIOS e820 map.
  *
@@ -636,7 +635,8 @@ void __init setup_memory_region(void)
 
 #else  /* CONFIG_XEN */
 
-extern unsigned long xen_override_max_pfn;
+/* Allows setting of maximum possible memory size  */
+static unsigned long xen_override_max_pfn;
 extern union xen_start_info_union xen_start_info_union;
 
 unsigned long __init e820_end_of_ram(void)
@@ -736,6 +736,7 @@ void __init parse_memopt(char *p, char **from)
 	xen_override_max_pfn = (unsigned long) end_user_pfn;
 } 
 
+#ifndef CONFIG_XEN
 void __init parse_memmapopt(char *p, char **from)
 {
 	unsigned long long start_at, mem_size;
@@ -756,6 +757,7 @@ void __init parse_memmapopt(char *p, char **from)
 	}
 	p = *from;
 }
+#endif
 
 /*
  * Search for the biggest gap in the low 32 bits of the e820

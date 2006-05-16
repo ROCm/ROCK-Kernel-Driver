@@ -66,9 +66,11 @@ int vbd_create(blkif_t *blkif, blkif_vdev_t handle, unsigned major,
 	vbd->bdev = open_by_devnum(
 		vbd->pdevice,
 		vbd->readonly ? FMODE_READ : FMODE_WRITE);
+
 	if (IS_ERR(vbd->bdev)) {
-		DPRINTK("vbd_creat: device %08x doesn't exist.\n",
+		DPRINTK("vbd_creat: device %08x could not be opened.\n",
 			vbd->pdevice);
+		vbd->bdev = NULL;
 		return -ENOENT;
 	}
 

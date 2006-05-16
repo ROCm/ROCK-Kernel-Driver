@@ -58,7 +58,9 @@ EXPORT_SYMBOL(dma_ops);
 
 extern unsigned long *contiguous_bitmap;
 
+#ifndef CONFIG_XEN
 static unsigned long dma_reserve __initdata;
+#endif
 
 DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
 extern unsigned long start_pfn;
@@ -1016,6 +1018,7 @@ void free_initrd_mem(unsigned long start, unsigned long end)
 }
 #endif
 
+#ifndef CONFIG_XEN
 void __init reserve_bootmem_generic(unsigned long phys, unsigned len) 
 { 
 	/* Should check here against the e820 map to avoid double free */ 
@@ -1028,6 +1031,7 @@ void __init reserve_bootmem_generic(unsigned long phys, unsigned len)
 	if (phys+len <= MAX_DMA_PFN*PAGE_SIZE)
 		dma_reserve += len / PAGE_SIZE;
 }
+#endif
 
 int kern_addr_valid(unsigned long addr) 
 { 
