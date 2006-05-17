@@ -863,11 +863,17 @@ zfcp_reset_fc_host_stats(struct Scsi_Host *shost)
 	}
 }
 
+static void zfcp_set_rport_dev_loss_tmo(struct fc_rport *rport, u32 timeout)
+{
+	rport->dev_loss_tmo = timeout;
+}
+
 struct fc_function_template zfcp_transport_functions = {
 	.show_starget_port_id = 1,
 	.show_starget_port_name = 1,
 	.show_starget_node_name = 1,
 	.show_rport_supported_classes = 1,
+	.show_rport_dev_loss_tmo = 1,
 	.show_host_node_name = 1,
 	.show_host_port_name = 1,
 	.show_host_permanent_port_name = 1,
@@ -875,6 +881,7 @@ struct fc_function_template zfcp_transport_functions = {
 	.show_host_supported_speeds = 1,
 	.show_host_maxframe_size = 1,
 	.show_host_serial_number = 1,
+	.set_rport_dev_loss_tmo = zfcp_set_rport_dev_loss_tmo,
 	.get_fc_host_stats = zfcp_get_fc_host_stats,
 	.reset_fc_host_stats = zfcp_reset_fc_host_stats,
 	/* no functions registered for following dynamic attributes but
