@@ -99,16 +99,19 @@ static int subdomain_ptrace(struct task_struct *parent,
 
 	error = cap_ptrace(parent, child);
 
-	read_lock_irqsave(&sd_lock, flags);
+	if (error == 0 && parent->security) {
+		read_lock_irqsave(&sd_lock, flags);
 
-	sd = SD_SUBDOMAIN(parent->security);
+		sd = SD_SUBDOMAIN(parent->security);
 
-	if (!error && __sd_is_confined(sd)) {
-		error = sd_audit_syscallreject(sd, GFP_ATOMIC, "ptrace");
-		WARN_ON(error != -EPERM);
+		if (__sd_is_confined(sd)) {
+			error = sd_audit_syscallreject(sd, GFP_ATOMIC,
+						       "ptrace");
+			WARN_ON(error != -EPERM);
+		}
+
+		read_unlock_irqrestore(&sd_lock, flags);
 	}
-
-	read_unlock_irqrestore(&sd_lock, flags);
 
 	return error;
 }
@@ -145,7 +148,7 @@ static int subdomain_capable(struct task_struct *tsk, int cap)
 	/* cap_capable returns 0 on success, else -EPERM */
 	error = cap_capable(tsk, cap);
 
-	if (error == 0) {
+	if (error == 0 && current->security) {
 		struct subdomain *sd, sdcopy;
 		unsigned long flags;
 
@@ -166,6 +169,9 @@ static int subdomain_sysctl(struct ctl_table *table, int op)
 	int error = 0;
 	struct subdomain *sd;
 	unsigned long flags;
+
+	if (!current->security)
+		return 0;
 
 	read_lock_irqsave(&sd_lock, flags);
 
@@ -220,6 +226,9 @@ static int subdomain_sb_mount(char *dev_name, struct nameidata *nd, char *type,
 	struct subdomain *sd;
 	unsigned long lockflags;
 
+	if (!current->security)
+		return 0;
+
 	read_lock_irqsave(&sd_lock, lockflags);
 
 	sd = SD_SUBDOMAIN(current->security);
@@ -239,6 +248,9 @@ static int subdomain_umount(struct vfsmount *mnt, int flags)
 	int error = 0;
 	struct subdomain *sd;
 	unsigned long lockflags;
+
+	if (!current->security)
+		return 0;
 
 	read_lock_irqsave(&sd_lock, lockflags);
 
@@ -260,6 +272,9 @@ static int subdomain_inode_mkdir(struct inode *inode, struct dentry *dentry,
 	struct subdomain sdcopy, *sd;
 	int error;
 
+	if (!current->security)
+		return 0;
+
 	sd = get_sdcopy(&sdcopy);
 
 	error = sd_perm_dir(sd, dentry, SD_DIR_MKDIR);
@@ -273,6 +288,9 @@ static int subdomain_inode_rmdir(struct inode *inode, struct dentry *dentry)
 {
 	struct subdomain sdcopy, *sd;
 	int error;
+
+	if (!current->security)
+		return 0;
 
 	sd = get_sdcopy(&sdcopy);
 
@@ -288,6 +306,9 @@ static int subdomain_inode_create(struct inode *inode, struct dentry *dentry,
 {
 	struct subdomain sdcopy, *sd;
 	int error;
+
+	if (!current->security)
+		return 0;
 
 	sd = get_sdcopy(&sdcopy);
 
@@ -305,6 +326,9 @@ static int subdomain_inode_link(struct dentry *old_dentry, struct inode *inode,
 	int error = 0;
 	struct subdomain sdcopy, *sd;
 
+	if (!current->security)
+		return 0;
+
 	sd = get_sdcopy(&sdcopy);
 	error = sd_link(sd, new_dentry, old_dentry);
 	put_sdcopy(sd);
@@ -316,6 +340,9 @@ static int subdomain_inode_unlink(struct inode *inode, struct dentry *dentry)
 {
 	struct subdomain sdcopy, *sd;
 	int error;
+
+	if (!current->security)
+		return 0;
 
 	sd = get_sdcopy(&sdcopy);
 
@@ -331,6 +358,9 @@ static int subdomain_inode_mknod(struct inode *inode, struct dentry *dentry,
 {
 	struct subdomain sdcopy, *sd;
 	int error = 0;
+
+	if (!current->security)
+		return 0;
 
 	sd = get_sdcopy(&sdcopy);
 
@@ -348,6 +378,9 @@ static int subdomain_inode_rename(struct inode *old_inode,
 {
 	struct subdomain sdcopy, *sd;
 	int error = 0;
+
+	if (!current->security)
+		return 0;
 
 	sd = get_sdcopy(&sdcopy);
 
@@ -370,7 +403,7 @@ static int subdomain_inode_permission(struct inode *inode, int mask,
 	/* Do not perform check on pipes or sockets
 	 * Same as subdomain_file_permission
 	 */
-	if (VALID_FSTYPE(inode)) {
+	if (current->security && VALID_FSTYPE(inode)) {
 		struct subdomain sdcopy, *sd;
 
 		sd = get_sdcopy(&sdcopy);
@@ -386,7 +419,7 @@ static int subdomain_inode_setattr(struct dentry *dentry, struct iattr *iattr)
 	struct subdomain sdcopy, *sd;
 	int error = 0;
 
-	if (VALID_FSTYPE(dentry->d_inode)) {
+	if (current->security && VALID_FSTYPE(dentry->d_inode)) {
 
 		sd = get_sdcopy(&sdcopy);
 
@@ -407,7 +440,7 @@ static int subdomain_inode_setxattr(struct dentry *dentry, char *name,
 {
 	int error = 0;
 
-	if (VALID_FSTYPE(dentry->d_inode)) {
+	if (current->security && VALID_FSTYPE(dentry->d_inode)) {
 		struct subdomain sdcopy, *sd;
 
 		sd = get_sdcopy(&sdcopy);
@@ -422,7 +455,7 @@ static int subdomain_inode_getxattr(struct dentry *dentry, char *name)
 {
 	int error = 0;
 
-	if (VALID_FSTYPE(dentry->d_inode)) {
+	if (current->security && VALID_FSTYPE(dentry->d_inode)) {
 		struct subdomain sdcopy, *sd;
 
 		sd = get_sdcopy(&sdcopy);
@@ -436,7 +469,7 @@ static int subdomain_inode_listxattr(struct dentry *dentry)
 {
 	int error = 0;
 
-	if (VALID_FSTYPE(dentry->d_inode)) {
+	if (current->security && VALID_FSTYPE(dentry->d_inode)) {
 		struct subdomain sdcopy, *sd;
 
 		sd = get_sdcopy(&sdcopy);
@@ -451,7 +484,7 @@ static int subdomain_inode_removexattr(struct dentry *dentry, char *name)
 {
 	int error = 0;
 
-	if (VALID_FSTYPE(dentry->d_inode)) {
+	if (current->security && VALID_FSTYPE(dentry->d_inode)) {
 		struct subdomain sdcopy, *sd;
 
 		sd = get_sdcopy(&sdcopy);
@@ -467,6 +500,9 @@ static int subdomain_file_permission(struct file *file, int mask)
 	struct subdomain sdcopy, *sd;
 	struct sdprofile *f_profile;
 	int error = 0;
+
+	if (!current->security)
+		goto out;
 
 	f_profile = SD_PROFILE(file->f_security);
 	/* bail out early if this isn't a mediated file */
@@ -486,6 +522,9 @@ out:
 static int subdomain_file_alloc_security(struct file *file)
 {
 	struct subdomain sdcopy, *sd;
+
+	if (!current->security)
+		return 0;
 
 	sd = get_sdcopy(&sdcopy);
 
@@ -509,6 +548,9 @@ static int subdomain_file_mmap (struct file *file, unsigned long reqprot,
 	int error = 0, mask = 0;
 	struct subdomain sdcopy, *sd;
 	struct sdprofile *f_profile;
+
+	if (!current->security)
+		return 0;
 
 	sd = get_sdcopy(&sdcopy);
 
@@ -543,7 +585,8 @@ static int subdomain_task_alloc_security(struct task_struct *p)
 
 static void subdomain_task_free_security(struct task_struct *p)
 {
-	sd_release(p);
+	if (p->security)
+		sd_release(p);
 }
 
 static int subdomain_task_post_setuid(uid_t id0, uid_t id1, uid_t id2,

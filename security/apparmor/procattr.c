@@ -265,7 +265,7 @@ int sd_setprocattr_setprofile(struct task_struct *p, char *profilename,
 			}
 
 			write_lock_irqsave(&sd_lock, flags);
-			if (!SD_SUBDOMAIN(p->security)) {
+			if (!p->security) {
 				p->security = sd;
 			} else { /* race */
 				free_subdomain(sd);

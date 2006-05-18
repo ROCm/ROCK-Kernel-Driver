@@ -1161,23 +1161,26 @@ int sd_link(struct subdomain *sd, struct dentry *link, struct dentry *target)
  * sd_fork - create a new subdomain
  * @p: new process
  *
- * Create a new subdomain struct for the newly created process @p.
- * Copy parent info to child.  If parent has no subdomain, child
- * will get one with NULL values.  Return 0 on sucess.
+ * Create a new subdomain for newly created process @p if it's parent
+ * is already confined.  Otherwise a subdomain will be lazily allocated
+ * for the child if it subsequently execs (in sd_register).
+ * Return 0 on sucess.
  */
 
 int sd_fork(struct task_struct *p)
 {
 	struct subdomain *sd = SD_SUBDOMAIN(current->security);
-	struct subdomain *newsd = alloc_subdomain(p);
+	struct subdomain *newsd = NULL;
 
 	SD_DEBUG("%s\n", __FUNCTION__);
 
-	if (!newsd)
-		return -ENOMEM;
-
-	if (sd) {
+	if (__sd_is_confined(sd)) {
 		unsigned long flags;
+
+		newsd = alloc_subdomain(p);
+
+		if (!newsd)
+			return -ENOMEM;
 
 		/* Can get away with a read rather than write lock here
 		 * as we just allocated newsd above, so we can guarantee
@@ -1218,31 +1221,11 @@ int sd_register(struct file *filp)
 		exec_mode = 0,
 		findprofile = 0,
 		findprofile_mandatory = 0,
-		issdcopy = 1,
 		complain = 0;
 
 	SD_DEBUG("%s\n", __FUNCTION__);
 
 	sd = get_sdcopy(&sdcopy);
-
-	if (sd) {
-		complain = SUBDOMAIN_COMPLAIN(sd);
-	} else {
-		/* task has no subdomain.  This can happen when a task is
-		 * created when subdomain is not loaded.  Allocate and
-		 * attach a subdomain to the task
-		 */
-		issdcopy = 0;
-
-		sd = alloc_subdomain(current);
-		if (!sd) {
-			SD_WARN("%s: Failed to allocate subdomain\n",
-				__FUNCTION__);
-			goto out;
-		}
-
-		current->security = sd;
-	}
 
 	filename = sd_get_name(filp->f_dentry, filp->f_vfsmnt);
 	if (IS_ERR(filename)) {
@@ -1257,6 +1240,8 @@ int sd_register(struct file *filp)
 		findprofile = 1;
 		goto find_profile;
 	}
+
+	complain = SUBDOMAIN_COMPLAIN(sd);
 
 	/* Confined task, determine what mode inherit, unconstrained or
 	 * mandatory to load new profile
@@ -1384,7 +1369,7 @@ find_profile:
 apply_profile:
 	/* Apply profile if necessary */
 	if (newprofile) {
-		struct subdomain *latest_sd;
+		struct subdomain *latest_sd, *lazy_sd = NULL;
 		unsigned long flags;
 
 		if (newprofile == &unconstrained_flag)
@@ -1392,15 +1377,14 @@ apply_profile:
 
 		/* grab a write lock
 		 *
-		 * Several things may have changed since the code above
+		 * - Task may be presently unconfined (have no sd). In which
+		 *   case we have to lazily allocate one.  Note we may be raced
+		 *   to this allocation by a setprofile.
 		 *
-		 * - If we are a confined process, sd is a refcounted copy of
-		 *   the subdomain (get_sdcopy) and not the actual subdomain.
-		 *   This allows us to not have to hold a read lock around
-		 *   all this code.  However, we need to change the actual
-		 *   subdomain, not the copy.  Also, if profile replacement
-		 *   has taken place, our sd->profile may be inaccurate
-		 *   so we need to undo the copy and reverse the refcounting.
+		 * - sd is a refcounted copy of the subdomain (get_sdcopy) and
+		 *   not the actual subdomain. This allows us to not have to
+		 *   hold a read lock around all this code. However, we need to
+		 *   change the actual subdomain, not the copy.
 		 *
 		 * - If newprofile points to an actual profile (result of
 		 *   sd_profilelist_find above), this profile may have been
@@ -1408,12 +1392,33 @@ apply_profile:
 		 *   having to hold a write lock around all this code.
 		 */
 
+		if (!sd) {
+			lazy_sd = alloc_subdomain(current);
+		}
+
 		write_lock_irqsave(&sd_lock, flags);
 
-		/* task is guaranteed to have a subdomain (->security)
-		 * by this point
-		 */
 		latest_sd = SD_SUBDOMAIN(current->security);
+
+		if (latest_sd) {
+			if (lazy_sd) {
+				/* raced by setprofile (created latest_sd) */
+				free_subdomain(lazy_sd);
+				lazy_sd = NULL;
+			}
+		} else {
+			if (lazy_sd) {
+				latest_sd = lazy_sd;
+				current->security = lazy_sd;
+			} else {
+				SD_ERROR("%s: Failed to allocate subdomain\n",
+					__FUNCTION__);
+
+				error = -ENOMEM;
+				write_unlock_irqrestore(&sd_lock, flags);
+				goto done;
+			}
+		}
 
 		/* Determine if profile we found earlier is stale.
 		 * If so, reobtain it.  N.B stale flag should never be
@@ -1436,15 +1441,6 @@ apply_profile:
 			}
 		}
 
-		/* need to drop reference counts we obtained in get_sdcopy
-		 * above.  Need to do it before overwriting latest_sd, in
-		 * case latest_sd == sd (no async replacement has taken place).
-		 */
-		if (issdcopy) {
-			put_sdcopy(sd);
-			issdcopy = 0;
-		}
-
 		sd_switch(latest_sd, newprofile, newprofile);
 		put_sdprofile(newprofile);
 
@@ -1456,9 +1452,10 @@ apply_profile:
 		write_unlock_irqrestore(&sd_lock, flags);
 	}
 
+done:
 	sd_put_name(filename);
 
-	if (issdcopy)
+	if (sd)
 		put_sdcopy(sd);
 
 out:
@@ -1470,22 +1467,20 @@ out:
  * @p: task being released
  *
  * This is called after a task has exited and the parent has reaped it.
- * @p->security blob is freed.
+ * p->security must be !NULL. The @p->security blob is freed.
  */
 void sd_release(struct task_struct *p)
 {
 	struct subdomain *sd = SD_SUBDOMAIN(p->security);
-	if (sd) {
-		p->security = NULL;
+	p->security = NULL;
 
-		sd_subdomainlist_remove(sd);
+	sd_subdomainlist_remove(sd);
 
-		/* release profiles */
-		put_sdprofile(sd->profile);
-		put_sdprofile(sd->active);
+	/* release profiles */
+	put_sdprofile(sd->profile);
+	put_sdprofile(sd->active);
 
-		kfree(sd);
-	}
+	kfree(sd);
 }
 
 /*****************************
