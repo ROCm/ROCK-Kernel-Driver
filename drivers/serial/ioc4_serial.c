@@ -2633,6 +2633,12 @@ ioc4_serial_attach_one(struct ioc4_driver_data *idd)
 
 	DPRINT_CONFIG(("%s (0x%p, 0x%p)\n", __FUNCTION__, idd->idd_pdev, idd->idd_pci_id));
 
+	/* PCI-RT does not bring out serial connctions.
+	 * Do not attach to this particular IOC4.
+	 */
+	if (idd->idd_variant == IOC4_VARIANT_PCI_RT)
+		return 0;
+
 	/* request serial registers */
 	tmp_addr1 = idd->idd_bar0 + IOC4_SERIAL_OFFSET;
 
@@ -2749,7 +2755,10 @@ int ioc4_serial_remove_one(struct ioc4_driver_data *idd)
 	struct ioc4_port *port;
 	struct ioc4_soft *soft;
 
+	/* If serial driver did not attach, don't try to detach */
 	control = idd->idd_serial_data;
+	if (!control)
+		return 0;
 
 	for (ii = 0; ii < IOC4_NUM_SERIAL_PORTS; ii++) {
 		the_port = &control->ic_port[ii].icp_uart_port;
