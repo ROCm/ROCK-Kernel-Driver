@@ -73,14 +73,14 @@ void nf_bridge_maybe_copy_header(struct sk_buff *skb)
 			memcpy(skb->data - 18, skb->nf_bridge->data, 18);
 			skb_push(skb, 4);
 		} else
-			memcpy(skb->data - 16, skb->nf_bridge->data, 16);
+			memcpy(skb->data - 14, skb->nf_bridge->data, 14);
 	}
 }
 
 static inline
 void nf_bridge_save_header(struct sk_buff *skb)
 {
-        int header_size = 16;
+        int header_size = 14;
 
 	if (skb->protocol == __constant_htons(ETH_P_8021Q))
 		header_size = 18;
