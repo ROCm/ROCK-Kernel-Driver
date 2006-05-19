@@ -117,7 +117,7 @@ struct iscsi_transport {
 	void (*cleanup_cmd_task) (struct iscsi_conn *conn,
 				  struct iscsi_cmd_task *ctask);
 	int (*xmit_mgmt_task) (struct iscsi_conn *conn,
-			       struct iscsi_mgmt_task *mtask); 
+			       struct iscsi_mgmt_task *mtask);
 	void (*session_recovery_timedout) (struct iscsi_cls_session *session);
 	int (*ep_connect) (struct sockaddr *dst_addr, int non_blocking,
 			   uint64_t *ep_handle);
@@ -173,6 +173,8 @@ struct iscsi_cls_conn {
 #define ISCSI_STATE_LOGGED_IN		2
 #define ISCSI_STATE_FAILED		3
 #define ISCSI_STATE_TERMINATE		4
+#define ISCSI_STATE_IN_RECOVERY		5
+#define ISCSI_STATE_RECOVERY_FAILED	6
 
 struct iscsi_cls_session {
 	struct list_head sess_list;		/* item in session_list */
