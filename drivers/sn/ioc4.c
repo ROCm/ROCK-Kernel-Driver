@@ -245,33 +245,36 @@ ioc4_clock_calibrate(struct ioc4_driver_data *idd)
 #ifndef PCI_DEVICE_ID_VITESSE_VSC7174
 #define PCI_DEVICE_ID_VITESSE_VSC7174 0x7174
 #endif
+
 static unsigned int
 ioc4_variant(struct ioc4_driver_data *idd)
 {
 	struct pci_dev *pdev = NULL;
 	int found = 0;
 
-	/* IO9: Look for a QLogic ISP 12160 at the same bus and slot 3. */
+	/* IO9: Look for a QLogic ISP 12160 at the same bus in slot 3. */
 	do {
 		pdev = pci_get_device(PCI_VENDOR_ID_QLOGIC,
 				      PCI_DEVICE_ID_QLOGIC_ISP12160, pdev);
-		if (pdev &&
+		if (pdev && (3 == PCI_SLOT(pdev->devfn)) &&
 		    idd->idd_pdev->bus->number == pdev->bus->number &&
-		    3 == PCI_SLOT(pdev->devfn))
+		    pci_domain_nr(idd->idd_pdev->bus) ==
+						pci_domain_nr(pdev->bus))
 			found = 1;
 		pci_dev_put(pdev);
 	} while (pdev && !found);
 	if (NULL != pdev)
 		return IOC4_VARIANT_IO9;
 
-	/* IO10: Look for a Vitesse VSC 7174 at the same bus and slot 3. */
+	/* IO10: Look for a Vitesse VSC 7174 at the same bus in slot 3. */
 	pdev = NULL;
 	do {
 		pdev = pci_get_device(PCI_VENDOR_ID_VITESSE,
 				      PCI_DEVICE_ID_VITESSE_VSC7174, pdev);
-		if (pdev &&
+		if (pdev && (3 == PCI_SLOT(pdev->devfn)) &&
 		    idd->idd_pdev->bus->number == pdev->bus->number &&
-		    3 == PCI_SLOT(pdev->devfn))
+		    pci_domain_nr(idd->idd_pdev->bus) ==
+						pci_domain_nr(pdev->bus))
 			found = 1;
 		pci_dev_put(pdev);
 	} while (pdev && !found);
