@@ -1545,18 +1545,35 @@ static struct tcp_seq_afinfo tcp6_seq_afinfo = {
 	.owner		= THIS_MODULE,
 	.name		= "tcp6",
 	.family		= AF_INET6,
+	.seq_start	= tcp_seq_start,
+	.seq_next	= tcp_seq_next,
 	.seq_show	= tcp6_seq_show,
 	.seq_fops	= &tcp6_seq_fops,
 };
 
+static struct file_operations tcp6_listen_seq_fops;
+static struct tcp_seq_afinfo tcp6_listen_seq_afinfo = {
+	.owner		= THIS_MODULE,
+	.name		= "tcp6_listen",
+	.family		= AF_INET6,
+	.seq_start	= tcp_listen_seq_start,
+	.seq_next	= tcp_listen_seq_next,
+	.seq_show	= tcp6_seq_show,
+	.seq_fops	= &tcp6_listen_seq_fops,
+};
+
 int __init tcp6_proc_init(void)
 {
-	return tcp_proc_register(&tcp6_seq_afinfo);
+	int err = tcp_proc_register(&tcp6_seq_afinfo);
+	if (err)
+		return err;
+	return tcp_proc_register(&tcp6_listen_seq_afinfo);
 }
 
 void tcp6_proc_exit(void)
 {
 	tcp_proc_unregister(&tcp6_seq_afinfo);
+	tcp_proc_unregister(&tcp6_listen_seq_afinfo);
 }
 #endif
 

@@ -1054,7 +1054,10 @@ struct tcp_seq_afinfo {
 	struct module		*owner;
 	char			*name;
 	sa_family_t		family;
+	void *			(*seq_start)(struct seq_file *seq, loff_t *pos);
 	int			(*seq_show) (struct seq_file *m, void *v);
+	void *			(*seq_next)(struct seq_file *seq, void *v, loff_t *pos);
+
 	struct file_operations	*seq_fops;
 };
 
@@ -1068,6 +1071,11 @@ struct tcp_iter_state {
 
 extern int tcp_proc_register(struct tcp_seq_afinfo *afinfo);
 extern void tcp_proc_unregister(struct tcp_seq_afinfo *afinfo);
+
+extern void *tcp_seq_start(struct seq_file *seq, loff_t *pos);
+extern void *tcp_listen_seq_start(struct seq_file *seq, loff_t *pos);
+extern void *tcp_seq_next(struct seq_file *seq, void *v, loff_t *pos);
+extern void *tcp_listen_seq_next(struct seq_file *seq, void *v, loff_t *pos);
 
 extern struct request_sock_ops tcp_request_sock_ops;
 
