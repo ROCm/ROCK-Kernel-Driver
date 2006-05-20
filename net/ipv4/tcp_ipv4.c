@@ -1539,13 +1539,10 @@ static void *tcp_get_idx(struct seq_file *seq, loff_t pos, int listenonly)
 	st->state = TCP_SEQ_STATE_LISTENING;
 	rc	  = listening_get_idx(seq, &pos, listenonly);
 
-	if (!rc)
-		inet_listen_unlock(&tcp_hashinfo);
-
-	if (listenonly)
-		return rc;
-
 	if (!rc) {
+		if (listenonly)
+			return rc;
+		inet_listen_unlock(&tcp_hashinfo);
 		local_bh_disable();
 		st->state = TCP_SEQ_STATE_ESTABLISHED;
 		rc	  = established_get_idx(seq, pos);
