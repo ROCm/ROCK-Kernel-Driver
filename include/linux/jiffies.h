@@ -447,4 +447,11 @@ static inline u64 nsec_to_clock_t(u64 x)
 	return x;
 }
 
+static inline int nsec_to_timestamp(char *s, unsigned long long t)
+{
+	unsigned long nsec_rem = do_div(t, 1000000000);
+	return sprintf(s, "[%5lu.%06lu]", (unsigned long)t, nsec_rem/1000);
+}
+#define TIMESTAMP_SIZE	30
+
 #endif

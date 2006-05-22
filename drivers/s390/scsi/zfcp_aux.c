@@ -771,15 +771,20 @@ zfcp_unit_enqueue(struct zfcp_port *port, fcp_lun_t fcp_lun)
 	unit->sysfs_device.release = zfcp_sysfs_unit_release;
 	dev_set_drvdata(&unit->sysfs_device, unit);
 
+	if (zfcp_unit_statistic_register(unit))
+		return NULL;
+
 	/* mark unit unusable as long as sysfs registration is not complete */
 	atomic_set_mask(ZFCP_STATUS_COMMON_REMOVE, &unit->status);
 
 	if (device_register(&unit->sysfs_device)) {
+		zfcp_unit_statistic_unregister(unit);
 		kfree(unit);
 		return NULL;
 	}
 
 	if (zfcp_sysfs_unit_create_files(&unit->sysfs_device)) {
+		zfcp_unit_statistic_unregister(unit);
 		device_unregister(&unit->sysfs_device);
 		return NULL;
 	}
@@ -819,6 +824,7 @@ zfcp_unit_dequeue(struct zfcp_unit *unit)
 	list_del(&unit->list);
 	write_unlock_irq(&zfcp_data.config_lock);
 	unit->port->units--;
+	zfcp_unit_statistic_unregister(unit);
 	zfcp_port_put(unit->port);
 	zfcp_sysfs_unit_remove_files(&unit->sysfs_device);
 	device_unregister(&unit->sysfs_device);
@@ -828,6 +834,16 @@ static void *
 zfcp_mempool_alloc(gfp_t gfp_mask, void *size)
 {
 	return kmalloc((size_t) size, gfp_mask);
+}
+
+static void *
+zfcp_mempool_alloc_fsf_req_scsi(unsigned int __nocast gfp_mask, void *data)
+{
+	struct zfcp_adapter *adapter = (struct zfcp_adapter *)data;
+	void *ptr = kmalloc(sizeof(struct zfcp_fsf_req_pool_element), gfp_mask);
+	if (!ptr)
+		statistic_inc(adapter->stat_low_mem_scsi, 0);
+	return ptr;
 }
 
 static void
@@ -857,8 +873,8 @@ zfcp_allocate_low_mem_buffers(struct zfcp_adapter *adapter)
 
 	adapter->pool.fsf_req_scsi =
 		mempool_create(ZFCP_POOL_FSF_REQ_SCSI_NR,
-			       zfcp_mempool_alloc, zfcp_mempool_free, (void *)
-			       sizeof(struct zfcp_fsf_req_pool_element));
+			       zfcp_mempool_alloc_fsf_req_scsi,
+			       zfcp_mempool_free, (void *)adapter);
 
 	if (NULL == adapter->pool.fsf_req_scsi)
 		return -ENOMEM;

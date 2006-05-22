@@ -219,4 +219,10 @@ extern void zfcp_scsi_dbf_event_abort(const char *, struct zfcp_adapter *,
 extern void zfcp_scsi_dbf_event_devreset(const char *, u8, struct zfcp_unit *,
 					 struct scsi_cmnd *);
 
+/*************************** stat ********************************************/
+extern int zfcp_adapter_statistic_register(struct zfcp_adapter *);
+extern int zfcp_adapter_statistic_unregister(struct zfcp_adapter *);
+extern int zfcp_unit_statistic_register(struct zfcp_unit *);
+extern int zfcp_unit_statistic_unregister(struct zfcp_unit *);
+
 #endif	/* ZFCP_EXT_H */

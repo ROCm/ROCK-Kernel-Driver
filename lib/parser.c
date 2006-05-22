@@ -140,6 +140,64 @@ static int match_number(substring_t *s, int *result, int base)
 }
 
 /**
+ * match_u64: scan a number in the given base from a substring_t
+ * @s: substring to be scanned
+ * @result: resulting integer on success
+ * @base: base to use when converting string
+ *
+ * Description: Given a &substring_t and a base, attempts to parse the substring
+ * as a number in that base. On success, sets @result to the u64 represented
+ * by the string and returns 0. Returns either -ENOMEM or -EINVAL on failure.
+ */
+int match_u64(substring_t *s, u64 *result, int base)
+{
+        char *endp;
+        char *buf;
+        int ret;
+
+        buf = kmalloc(s->to - s->from + 1, GFP_KERNEL);
+        if (!buf)
+                return -ENOMEM;
+        memcpy(buf, s->from, s->to - s->from);
+        buf[s->to - s->from] = '\0';
+        *result = simple_strtoull(buf, &endp, base);
+        ret = 0;
+        if (endp == buf)
+                ret = -EINVAL;
+        kfree(buf);
+        return ret;
+}
+
+/**
+ * match_s64: scan a number in the given base from a substring_t
+ * @s: substring to be scanned
+ * @result: resulting integer on success
+ * @base: base to use when converting string
+ *
+ * Description: Given a &substring_t and a base, attempts to parse the substring
+ * as a number in that base. On success, sets @result to the s64 represented
+ * by the string and returns 0. Returns either -ENOMEM or -EINVAL on failure.
+ */
+int match_s64(substring_t *s, s64 *result, int base)
+{
+        char *endp;
+        char *buf;
+        int ret;
+
+        buf = kmalloc(s->to - s->from + 1, GFP_KERNEL);
+        if (!buf)
+                return -ENOMEM;
+        memcpy(buf, s->from, s->to - s->from);
+        buf[s->to - s->from] = '\0';
+        *result = simple_strtoll(buf, &endp, base);
+        ret = 0;
+        if (endp == buf)
+                ret = -EINVAL;
+        kfree(buf);
+        return ret;
+}
+
+/**
  * match_int: - scan a decimal representation of an integer from a substring_t
  * @s: substring_t to be scanned
  * @result: resulting integer on success
@@ -218,3 +276,5 @@ EXPORT_SYMBOL(match_octal);
 EXPORT_SYMBOL(match_hex);
 EXPORT_SYMBOL(match_strcpy);
 EXPORT_SYMBOL(match_strdup);
+EXPORT_SYMBOL(match_u64);
+EXPORT_SYMBOL(match_s64);

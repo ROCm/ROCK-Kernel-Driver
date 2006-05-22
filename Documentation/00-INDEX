@@ -264,6 +264,8 @@ stable_kernel_rules.txt
 	- rules and procedures for the -stable kernel releases.
 stallion.txt
 	- info on using the Stallion multiport serial driver.
+statistics.txt
+	- info on statistics infrastructure available for drivers and others
 svga.txt
 	- short guide on selecting video modes at boot via VGA BIOS.
 sx.txt

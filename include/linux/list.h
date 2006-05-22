@@ -411,6 +411,18 @@ static inline void list_splice_init(struct list_head *list,
 	     pos = list_entry(pos->member.next, typeof(*pos), member))
 
 /**
+ * list_for_each_entry_continue_reverse -       iterate backwards over list
+ *                      of given type continuing before existing point
+ * @pos:        the type * to use as a loop counter.
+ * @head:       the head for your list.
+ * @member:     the name of the list_struct within the struct.
+ */
+#define list_for_each_entry_continue_reverse(pos, head, member)                 \
+        for (pos = list_entry(pos->member.prev, typeof(*pos), member);  \
+             prefetch(pos->member.prev), &pos->member != (head);        \
+             pos = list_entry(pos->member.prev, typeof(*pos), member))
+
+/**
  * list_for_each_entry_safe - iterate over list of given type safe against removal of list entry
  * @pos:	the type * to use as a loop counter.
  * @n:		another type * to use as temporary storage

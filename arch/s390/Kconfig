@@ -470,7 +470,13 @@ source "drivers/net/Kconfig"
 
 source "fs/Kconfig"
 
+menu "Instrumentation Support"
+
 source "arch/s390/oprofile/Kconfig"
+
+source "lib/Kconfig.statistic"
+
+endmenu
 
 source "arch/s390/Kconfig.debug"
 
