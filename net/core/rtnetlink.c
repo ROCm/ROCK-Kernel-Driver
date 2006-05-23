@@ -451,7 +451,7 @@ void rtmsg_ifinfo(int type, struct net_device *dev, unsigned change)
 			       sizeof(struct rtnl_link_ifmap) +
 			       sizeof(struct rtnl_link_stats) + 128);
 
-	skb = alloc_skb(size, GFP_KERNEL);
+	skb = alloc_skb(size, in_atomic() ? GFP_ATOMIC : GFP_KERNEL);
 	if (!skb)
 		return;
 
@@ -460,7 +460,7 @@ void rtmsg_ifinfo(int type, struct net_device *dev, unsigned change)
 		return;
 	}
 	NETLINK_CB(skb).dst_group = RTNLGRP_LINK;
-	netlink_broadcast(rtnl, skb, 0, RTNLGRP_LINK, GFP_KERNEL);
+	netlink_broadcast(rtnl, skb, 0, RTNLGRP_LINK, in_atomic() ? GFP_ATOMIC : GFP_KERNEL);
 }
 
 /* Protected by RTNL sempahore.  */
