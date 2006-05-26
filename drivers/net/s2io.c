@@ -459,7 +459,7 @@ static int init_shared_mem(struct s2io_nic *nic)
 		}
 	}
 
-	nic->ufo_in_band_v = kmalloc((sizeof(u64) * size), GFP_KERNEL);
+	nic->ufo_in_band_v = kzalloc((sizeof(u64) * size), GFP_KERNEL);
 	if (!nic->ufo_in_band_v)
 		return -ENOMEM;
 
@@ -2049,7 +2049,7 @@ static struct sk_buff *s2io_txdl_getskb(fifo_info_t *fifo_data, TxD_t *txdlp, in
 				       frag->size, PCI_DMA_TODEVICE);
 		}
 	}
-	txdlp->Host_Control = 0;
+	memset(txdlp, 0, (sizeof(TxD_t) * fifo_data->max_txds));
 	return(skb);
 }
 
@@ -3563,8 +3563,6 @@ static int s2io_xmit(struct sk_buff *skb, struct net_device *dev)
 					sp->ufo_in_band_v,
 					sizeof(u64), PCI_DMA_TODEVICE);
 		txdp++;
-		txdp->Control_1 = 0;
-		txdp->Control_2 = 0;
 	}
 
 	txdp->Buffer_Pointer = pci_map_single
