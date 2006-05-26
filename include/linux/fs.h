@@ -265,6 +265,7 @@ typedef void (dio_iodone_t)(struct kiocb *iocb, loff_t offset,
 #define ATTR_KILL_SUID	2048
 #define ATTR_KILL_SGID	4096
 #define ATTR_FILE	8192
+#define ATTR_NO_BLOCK	32768	/* Return EAGAIN and don't block on long truncates */
 
 /*
  * This is the Inode Attributes structure, used for notify_change().  It
