@@ -393,7 +393,7 @@ static void netdev_release(struct class_device *cd)
 	kfree((char *)dev - dev->padded);
 }
 
-struct class net_class = {
+static struct class net_class = {
 	.name = "net",
 	.release = netdev_release,
 	.class_dev_attrs = net_class_attributes,
@@ -462,5 +462,3 @@ int netdev_sysfs_init(void)
 {
 	return class_register(&net_class);
 }
-
-EXPORT_SYMBOL(net_class);
