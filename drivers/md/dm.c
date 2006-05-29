@@ -1201,6 +1201,7 @@ int dm_suspend(struct mapped_device *md, int do_lockfs)
 	dm_table_postsuspend_targets(map);
 
 	set_bit(DMF_SUSPENDED, &md->flags);
+	kobject_uevent(&md->disk->kobj, KOBJ_OFFLINE);
 
 	r = 0;
 
@@ -1247,6 +1248,7 @@ int dm_resume(struct mapped_device *md)
 
 	dm_table_unplug_all(map);
 
+	kobject_uevent(&md->disk->kobj, KOBJ_ONLINE);
 	r = 0;
 
 out:
