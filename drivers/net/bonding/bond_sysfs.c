@@ -54,7 +54,6 @@ extern struct bond_parm_tbl bond_lacp_tbl[];
 extern struct bond_parm_tbl xmit_hashtype_tbl[];
 
 static int expected_refcount = -1;
-static struct class *netdev_class;
 /*--------------------------- Data Structures -----------------------------*/
 
 /* Bonding sysfs lock.  Why can't we just use the subsytem lock?
@@ -1298,24 +1297,9 @@ static struct attribute_group bonding_group = {
  */
 int bond_create_sysfs(void)
 {
-	int ret = 0;
-	struct bonding *firstbond;
-
 	init_rwsem(&bonding_rwsem);
 
-	/* get the netdev class pointer */
-	firstbond = container_of(bond_dev_list.next, struct bonding, bond_list);
-	if (!firstbond)
-		return -ENODEV;
-
-	netdev_class = firstbond->dev->class_dev.class;
-	if (!netdev_class)
-		return -ENODEV;
-
-	ret = class_create_file(netdev_class, &class_attr_bonding_masters);
-
-	return ret;
-
+	return class_create_file(&net_class, &class_attr_bonding_masters);
 }
 
 /*
@@ -1323,8 +1307,7 @@ int bond_create_sysfs(void)
  */
 void bond_destroy_sysfs(void)
 {
-	if (netdev_class)
-		class_remove_file(netdev_class, &class_attr_bonding_masters);
+        class_remove_file(&net_class, &class_attr_bonding_masters);
 }
 
 /*

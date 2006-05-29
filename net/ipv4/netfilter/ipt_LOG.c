@@ -395,12 +395,12 @@ ipt_log_packet(unsigned int pf,
 		printk("MAC=");
 		if (skb->dev && skb->dev->hard_header_len
 		    && skb->mac.raw != (void*)skb->nh.iph) {
-			int i;
+			int i, len;
 			unsigned char *p = skb->mac.raw;
-			for (i = 0; i < skb->dev->hard_header_len; i++,p++)
-				printk("%02x%c", *p,
-				       i==skb->dev->hard_header_len - 1
-				       ? ' ':':');
+			len = (int)((unsigned char *)skb->nh.iph - p);
+			len = min((int)skb->dev->hard_header_len, len);
+			for (i = 0; i < len; i++,p++)
+				printk("%02x%c", *p, i==len - 1 ? ' ':':');
 		} else
 			printk(" ");
 	}

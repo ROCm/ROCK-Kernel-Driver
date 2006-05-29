@@ -958,6 +958,11 @@ extern void dev_seq_stop(struct seq_file *seq, void *v);
 
 extern void linkwatch_run_queue(void);
 
+#ifdef CONFIG_SYSFS
+/* for bonding module and other dynamic interfaces */
+extern struct class net_class;
+#endif
+
 #endif /* __KERNEL__ */
 
 #endif	/* _LINUX_DEV_H */
