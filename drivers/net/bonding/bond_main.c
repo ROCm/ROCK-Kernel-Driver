@@ -50,7 +50,7 @@
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/init.h>
-#include <linux/timer.h>
+#include <linux/workqueue.h>
 #include <linux/socket.h>
 #include <linux/ctype.h>
 #include <linux/inet.h>
@@ -1971,6 +1971,7 @@ void bond_mii_monitor(struct net_device *bond_dev)
 	int delta_in_ticks;
 	int i;
 
+	rtnl_lock();
 	read_lock(&bond->lock);
 
 	delta_in_ticks = (bond->params.miimon * HZ) / 1000;
@@ -2201,10 +2202,11 @@ void bond_mii_monitor(struct net_device *bond_dev)
 
 re_arm:
 	if (bond->params.miimon) {
-		mod_timer(&bond->mii_timer, jiffies + delta_in_ticks);
+		schedule_delayed_work(&bond->mii_work, delta_in_ticks);
 	}
 out:
 	read_unlock(&bond->lock);
+	rtnl_unlock();
 }
 
 
@@ -2404,6 +2406,7 @@ void bond_loadbalance_arp_mon(struct net_device *bond_dev)
 	int delta_in_ticks;
 	int i;
 
+	rtnl_lock();
 	read_lock(&bond->lock);
 
 	delta_in_ticks = (bond->params.arp_interval * HZ) / 1000;
@@ -2513,10 +2516,11 @@ void bond_loadbalance_arp_mon(struct net_device *bond_dev)
 
 re_arm:
 	if (bond->params.arp_interval) {
-		mod_timer(&bond->arp_timer, jiffies + delta_in_ticks);
+		schedule_delayed_work(&bond->arp_work, delta_in_ticks);
 	}
 out:
 	read_unlock(&bond->lock);
+	rtnl_unlock();
 }
 
 /*
@@ -2541,6 +2545,7 @@ void bond_activebackup_arp_mon(struct net_device *bond_dev)
 	int delta_in_ticks;
 	int i;
 
+	rtnl_lock();
 	read_lock(&bond->lock);
 
 	delta_in_ticks = (bond->params.arp_interval * HZ) / 1000;
@@ -2757,10 +2762,11 @@ void bond_activebackup_arp_mon(struct net_device *bond_dev)
 
 re_arm:
 	if (bond->params.arp_interval) {
-		mod_timer(&bond->arp_timer, jiffies + delta_in_ticks);
+		schedule_delayed_work(&bond->arp_work, delta_in_ticks);
 	}
 out:
 	read_unlock(&bond->lock);
+	rtnl_unlock();
 }
 
 /*------------------------------ proc/seq_file-------------------------------*/
@@ -3313,14 +3319,12 @@ static int bond_xmit_hash_policy_l2(struct sk_buff *skb,
 static int bond_open(struct net_device *bond_dev)
 {
 	struct bonding *bond = bond_dev->priv;
-	struct timer_list *mii_timer = &bond->mii_timer;
-	struct timer_list *arp_timer = &bond->arp_timer;
 
 	bond->kill_timers = 0;
 
 	if ((bond->params.mode == BOND_MODE_TLB) ||
 	    (bond->params.mode == BOND_MODE_ALB)) {
-		struct timer_list *alb_timer = &(BOND_ALB_INFO(bond).alb_timer);
+		struct work_struct *alb_work = &(BOND_ALB_INFO(bond).alb_work);
 
 		/* bond_alb_initialize must be called before the timer
 		 * is started.
@@ -3330,40 +3334,22 @@ static int bond_open(struct net_device *bond_dev)
 			return -1;
 		}
 
-		init_timer(alb_timer);
-		alb_timer->expires  = jiffies + 1;
-		alb_timer->data     = (unsigned long)bond;
-		alb_timer->function = (void *)&bond_alb_monitor;
-		add_timer(alb_timer);
+		INIT_WORK(alb_work, (void *)&bond_alb_monitor, bond);
+		schedule_delayed_work(alb_work, 1);
 	}
 
 	if (bond->params.miimon) {  /* link check interval, in milliseconds. */
-		init_timer(mii_timer);
-		mii_timer->expires  = jiffies + 1;
-		mii_timer->data     = (unsigned long)bond_dev;
-		mii_timer->function = (void *)&bond_mii_monitor;
-		add_timer(mii_timer);
+                schedule_delayed_work(&bond->mii_work, 1);
 	}
 
 	if (bond->params.arp_interval) {  /* arp interval, in milliseconds. */
-		init_timer(arp_timer);
-		arp_timer->expires  = jiffies + 1;
-		arp_timer->data     = (unsigned long)bond_dev;
-		if (bond->params.mode == BOND_MODE_ACTIVEBACKUP) {
-			arp_timer->function = (void *)&bond_activebackup_arp_mon;
-		} else {
-			arp_timer->function = (void *)&bond_loadbalance_arp_mon;
-		}
-		add_timer(arp_timer);
+                schedule_delayed_work(&bond->arp_work, 1);
 	}
 
 	if (bond->params.mode == BOND_MODE_8023AD) {
-		struct timer_list *ad_timer = &(BOND_AD_INFO(bond).ad_timer);
-		init_timer(ad_timer);
-		ad_timer->expires  = jiffies + 1;
-		ad_timer->data     = (unsigned long)bond;
-		ad_timer->function = (void *)&bond_3ad_state_machine_handler;
-		add_timer(ad_timer);
+		struct work_struct *ad_work = &(BOND_AD_INFO(bond).ad_work);
+		INIT_WORK(ad_work, (void *)&bond_3ad_state_machine_handler, bond);
+		schedule_delayed_work(ad_work, 1);
 
 		/* register to receive LACPDUs */
 		bond_register_lacpdu(bond);
@@ -3395,20 +3381,20 @@ static int bond_close(struct net_device *bond_dev)
 	 */
 
 	if (bond->params.miimon) {  /* link check interval, in milliseconds. */
-		del_timer_sync(&bond->mii_timer);
+		cancel_rearming_delayed_work(&bond->mii_work);
 	}
 
 	if (bond->params.arp_interval) {  /* arp interval, in milliseconds. */
-		del_timer_sync(&bond->arp_timer);
+		cancel_rearming_delayed_work(&bond->arp_work);
 	}
 
 	switch (bond->params.mode) {
 	case BOND_MODE_8023AD:
-		del_timer_sync(&(BOND_AD_INFO(bond).ad_timer));
+		cancel_rearming_delayed_work(&(BOND_AD_INFO(bond).ad_work));
 		break;
 	case BOND_MODE_TLB:
 	case BOND_MODE_ALB:
-		del_timer_sync(&(BOND_ALB_INFO(bond).alb_timer));
+		cancel_rearming_delayed_work(&(BOND_ALB_INFO(bond).alb_work));
 		break;
 	default:
 		break;
@@ -4111,6 +4097,14 @@ static int bond_init(struct net_device *bond_dev, struct bond_params *params)
 	/* initialize rwlocks */
 	rwlock_init(&bond->lock);
 	rwlock_init(&bond->curr_slave_lock);
+
+	/* initialize work */
+	INIT_WORK(&bond->mii_work, (void *)&bond_mii_monitor, bond_dev);
+	if (params->mode == BOND_MODE_ACTIVEBACKUP) {
+	        INIT_WORK(&bond->arp_work, (void *)&bond_activebackup_arp_mon, bond_dev);
+	} else {
+		INIT_WORK(&bond->arp_work, (void *)&bond_loadbalance_arp_mon, bond_dev);
+	}
 
 	bond->params = *params; /* copy params struct */
 

@@ -15,7 +15,7 @@
 #ifndef _LINUX_BONDING_H
 #define _LINUX_BONDING_H
 
-#include <linux/timer.h>
+#include <linux/workqueue.h>
 #include <linux/proc_fs.h>
 #include <linux/if_bonding.h>
 #include <linux/kobject.h>
@@ -180,8 +180,8 @@ struct bonding {
 	s32      slave_cnt; /* never change this value outside the attach/detach wrappers */
 	rwlock_t lock;
 	rwlock_t curr_slave_lock;
-	struct   timer_list mii_timer;
-	struct   timer_list arp_timer;
+	struct   work_struct mii_work;
+	struct   work_struct arp_work;
 	s8       kill_timers;
 	struct   net_device_stats stats;
 #ifdef CONFIG_PROC_FS

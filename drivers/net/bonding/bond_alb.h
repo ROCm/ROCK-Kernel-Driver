@@ -84,7 +84,7 @@ struct tlb_slave_info {
 };
 
 struct alb_bond_info {
-	struct timer_list	alb_timer;
+	struct work_struct	alb_work;
 	struct tlb_client_info	*tx_hashtbl; /* Dynamically allocated */
 	spinlock_t		tx_hashtbl_lock;
 	u32			unbalanced_load;

@@ -1,4 +1,3 @@
-
 /*
  * Copyright(c) 2004-2005 Intel Corporation. All rights reserved.
  *
@@ -424,6 +423,11 @@ static ssize_t bonding_store_mode(struct class_device *cd, const char *buf, size
 		ret = -EINVAL;
 		goto out;
 	} else {
+	        if (new_value == BOND_MODE_ACTIVEBACKUP) {
+	               INIT_WORK(&bond->arp_work, (void *)&bond_activebackup_arp_mon, bond->dev);
+                } else {
+                       INIT_WORK(&bond->arp_work, (void *)&bond_loadbalance_arp_mon, bond->dev);
+	        }
 		bond->params.mode = new_value;
 		bond_set_mode_ops(bond, bond->params.mode);
 		printk(KERN_INFO DRV_NAME ": %s: setting mode to %s (%d).\n",
@@ -540,13 +544,7 @@ static ssize_t bonding_store_arp_interval(struct class_device *cd, const char *b
 		       "%s Disabling MII monitoring.\n",
 		       bond->dev->name, bond->dev->name);
 		bond->params.miimon = 0;
-		/* Kill MII timer, else it brings bond's link down */
-		if (bond->arp_timer.function) {
-			printk(KERN_INFO DRV_NAME
-			": %s: Kill MII timer, else it brings bond's link down...\n",
-		       bond->dev->name);
-			del_timer_sync(&bond->mii_timer);
-		}
+		cancel_rearming_delayed_work(&bond->mii_work);
 	}
 	if (!bond->params.arp_targets[0]) {
 		printk(KERN_INFO DRV_NAME
@@ -560,26 +558,8 @@ static ssize_t bonding_store_arp_interval(struct class_device *cd, const char *b
 		 * timer will get fired off when the open function
 		 * is called.
 		 */
-		if (bond->arp_timer.function) {
-			/* The timer's already set up, so fire it off */
-			mod_timer(&bond->arp_timer, jiffies + 1);
-		} else {
-			/* Set up the timer. */
-			init_timer(&bond->arp_timer);
-			bond->arp_timer.expires = jiffies + 1;
-			bond->arp_timer.data =
-				(unsigned long) bond->dev;
-			if (bond->params.mode == BOND_MODE_ACTIVEBACKUP) {
-				bond->arp_timer.function =
-					(void *)
-					&bond_activebackup_arp_mon;
-			} else {
-				bond->arp_timer.function =
-					(void *)
-					&bond_loadbalance_arp_mon;
-			}
-			add_timer(&bond->arp_timer);
-		}
+		cancel_rearming_delayed_work(&bond->arp_work);
+		schedule_delayed_work(&bond->arp_work, 1);
 	}
 
 out:
@@ -909,13 +889,7 @@ static ssize_t bonding_store_miimon(struct class_device *cd, const char *buf, si
 			       "ARP monitoring. Disabling ARP monitoring...\n",
 			       bond->dev->name);
 			bond->params.arp_interval = 0;
-			/* Kill ARP timer, else it brings bond's link down */
-			if (bond->mii_timer.function) {
-				printk(KERN_INFO DRV_NAME
-				": %s: Kill ARP timer, else it brings bond's link down...\n",
-			       bond->dev->name);
-				del_timer_sync(&bond->arp_timer);
-			}
+			cancel_rearming_delayed_work(&bond->arp_work);
 		}
 
 		if (bond->dev->flags & IFF_UP) {
@@ -924,19 +898,8 @@ static ssize_t bonding_store_miimon(struct class_device *cd, const char *buf, si
 			 * timer will get fired off when the open function
 			 * is called.
 			 */
-			if (bond->mii_timer.function) {
-				/* The timer's already set up, so fire it off */
-				mod_timer(&bond->mii_timer, jiffies + 1);
-			} else {
-				/* Set up the timer. */
-				init_timer(&bond->mii_timer);
-				bond->mii_timer.expires = jiffies + 1;
-				bond->mii_timer.data =
-					(unsigned long) bond->dev;
-				bond->mii_timer.function =
-					(void *) &bond_mii_monitor;
-				add_timer(&bond->mii_timer);
-			}
+			cancel_rearming_delayed_work(&bond->mii_work);
+			schedule_delayed_work(&bond->mii_work, 1);
 		}
 	}
 out:
