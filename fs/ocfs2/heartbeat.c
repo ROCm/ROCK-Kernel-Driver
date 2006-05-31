@@ -70,19 +70,22 @@ void ocfs2_init_node_maps(struct ocfs2_super *osb)
 	ocfs2_node_map_init(&osb->osb_recovering_orphan_dirs);
 }
 
+static void ocfs2_handle_fencing(int node_num, struct ocfs2_super *osb)
+{
+	/* I would much rather handle this by setting the file system
+	 * read only, but that's for a later date. -jdm */
+	panic("ocfs2 is very sorry to be fencing this system by panicing\n");
+}
+
 static void ocfs2_do_node_down(int node_num,
 			       struct ocfs2_super *osb)
 {
-	BUG_ON(osb->node_num == node_num);
-
 	mlog(0, "ocfs2: node down event for %d\n", node_num);
 
-#if 0
 	if (osb->node_num == node_num) {
 		ocfs2_handle_fencing(node_num, osb);
 		return;
 	}
-#endif
 
 	if (!osb->dlm) {
 		/*
