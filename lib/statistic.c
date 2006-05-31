@@ -433,17 +433,20 @@ int statistic_create(struct statistic **stat_ptr,
 int statistic_remove(struct statistic **stat_ptr)
 {
 	unsigned long flags;
+	struct statistic_interface *interface;
 
 	if (!*stat_ptr)
 		return -EINVAL;
 
-	statistic_lock((*stat_ptr)->interface, flags);
+	interface = (*stat_ptr)->interface;
+
+	statistic_lock(interface, flags);
 	if ((*stat_ptr)->release)
 		(*stat_ptr)->release(*stat_ptr);
 	list_del(&(*stat_ptr)->list);
 	kfree(*stat_ptr);
 	*stat_ptr = NULL;
-	statistic_unlock((*stat_ptr)->interface, flags);
+	statistic_unlock(interface, flags);
 
 	return 0;
 }
