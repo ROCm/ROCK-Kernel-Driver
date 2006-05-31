@@ -310,4 +310,5 @@ done:
 struct file_operations ctr_fops = {
 	.owner		= THIS_MODULE,
 	.unlocked_ioctl	= ioctl,
+	.compat_ioctl	= ioctl,
 };

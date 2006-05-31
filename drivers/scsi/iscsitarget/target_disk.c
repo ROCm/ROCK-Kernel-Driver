@@ -23,7 +23,7 @@ static int insert_disconnect_pg(u8 *ptr)
 
 static int insert_caching_pg(u8 *ptr)
 {
-	unsigned char caching_pg[] = {0x08, 0x12, 0x14, 0x00, 0xff, 0xff, 0x00, 0x00,
+	unsigned char caching_pg[] = {0x08, 0x12, 0x10, 0x00, 0xff, 0xff, 0x00, 0x00,
 				      0xff, 0xff, 0xff, 0xff, 0x80, 0x14, 0x00, 0x00,
 				      0x00, 0x00, 0x00, 0x00};
 
@@ -329,13 +329,13 @@ static int build_read_response(struct iscsi_cmnd *cmnd)
 
 	assert(tio);
 	assert(cmnd->lun);
-	tio_read(cmnd->lun, tio);
 
-	return 0;
+	return tio_read(cmnd->lun, tio);
 }
 
 static int build_write_response(struct iscsi_cmnd *cmnd)
 {
+	int err;
 	struct tio *tio = cmnd->tio;
 
 	assert(cmnd);
@@ -343,10 +343,11 @@ static int build_write_response(struct iscsi_cmnd *cmnd)
 	assert(cmnd->lun);
 
 	list_del_init(&cmnd->list);
-	tio_write(cmnd->lun, tio);
-	tio_sync(cmnd->lun, tio);
+	err = tio_write(cmnd->lun, tio);
+	if (!err)
+		err = tio_sync(cmnd->lun, tio);
 
-	return 0;
+	return err;
 }
 
 static int build_generic_response(struct iscsi_cmnd *cmnd)

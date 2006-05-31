@@ -231,7 +231,6 @@ typedef void (iet_show_info_t)(struct seq_file *seq, struct iscsi_target *target
 struct iscsi_cmnd {
 	struct list_head list;
 	struct list_head conn_list;
-	unsigned long state;
 	unsigned long flags;
 	struct iscsi_conn *conn;
 	struct iet_volume *lun;

@@ -223,10 +223,10 @@ static void iscsi_cmnd_init_write(struct iscsi_cmnd *cmnd)
 	LIST_HEAD(head);
 
 	if (!list_empty(&cmnd->list)) {
-		eprintk("%x %x %x %x %lx %lx %u %u %u %u %u %u %u %d %d\n",
+		eprintk("%x %x %x %x %lx %u %u %u %u %u %u %u %d %d\n",
 			cmnd_itt(cmnd), cmnd_ttt(cmnd), cmnd_opcode(cmnd),
-			cmnd_scsicode(cmnd), cmnd->state, cmnd->flags,
-			cmnd->r2t_sn, cmnd->r2t_length, cmnd->is_unsolicited_data,
+			cmnd_scsicode(cmnd), cmnd->flags, cmnd->r2t_sn,
+			cmnd->r2t_length, cmnd->is_unsolicited_data,
 			cmnd->target_task_tag, cmnd->outstanding_r2t,
 			cmnd->hdigest, cmnd->ddigest,
 			list_empty(&cmnd->pdu_list), list_empty(&cmnd->hash_list));
@@ -315,25 +315,6 @@ static struct iscsi_cmnd *create_scsi_rsp(struct iscsi_cmnd *req)
 	return rsp;
 }
 
-void send_scsi_rsp(struct iscsi_cmnd *req, int (*func)(struct iscsi_cmnd *))
-{
-	struct iscsi_cmnd *rsp;
-	struct iscsi_cmd_rsp *rsp_hdr;
-	u32 size;
-
-	rsp = create_scsi_rsp(req);
-	rsp_hdr = (struct iscsi_cmd_rsp *) &rsp->pdu.bhs;
-	if ((size = cmnd_read_size(req)) != 0) {
-		rsp_hdr->flags |= ISCSI_FLAG_CMD_UNDERFLOW;
-		rsp_hdr->residual_count = cpu_to_be32(size);
-	}
-
-	if (func(req) < 0)
-		eprintk("%x\n", cmnd_opcode(req));
-
-	iscsi_cmnd_init_write(rsp);
-}
-
 static struct iscsi_cmnd *create_sense_rsp(struct iscsi_cmnd *req,
 					   u8 sense_key, u8 asc, u8 ascq)
 {
@@ -369,15 +350,47 @@ static struct iscsi_cmnd *create_sense_rsp(struct iscsi_cmnd *req,
 	return rsp;
 }
 
+void send_scsi_rsp(struct iscsi_cmnd *req, int (*func)(struct iscsi_cmnd *))
+{
+	struct iscsi_cmnd *rsp;
+	struct iscsi_cmd_rsp *rsp_hdr;
+	u32 size;
+
+	switch (func(req)) {
+	case 0:
+		rsp = create_scsi_rsp(req);
+		rsp_hdr = (struct iscsi_cmd_rsp *) &rsp->pdu.bhs;
+		if ((size = cmnd_read_size(req)) != 0) {
+			rsp_hdr->flags |= ISCSI_FLAG_CMD_UNDERFLOW;
+			rsp_hdr->residual_count = cpu_to_be32(size);
+		}
+		break;
+	case -EIO:
+		/* Medium Error/Write Fault */
+		rsp = create_sense_rsp(req, MEDIUM_ERROR, 0x03, 0x0);
+		break;
+	default:
+		rsp = create_sense_rsp(req, ILLEGAL_REQUEST, 0x24, 0x0);
+	}
+	iscsi_cmnd_init_write(rsp);
+}
+
 void send_data_rsp(struct iscsi_cmnd *req, int (*func)(struct iscsi_cmnd *))
 {
 	struct iscsi_cmnd *rsp;
 
-	if (func(req) < 0) {
-		rsp = create_sense_rsp(req, ILLEGAL_REQUEST, 0x24, 0x0);
-		iscsi_cmnd_init_write(rsp);
-	} else
+	switch (func(req)) {
+	case 0:
 		do_send_data_rsp(req);
+		return;
+	case -EIO:
+		/* Medium Error/Unrecovered Read Error */
+		rsp = create_sense_rsp(req, MEDIUM_ERROR, 0x11, 0x0);
+		break;
+	default:
+		rsp = create_sense_rsp(req, ILLEGAL_REQUEST, 0x24, 0x0);
+	}
+	iscsi_cmnd_init_write(rsp);
 }
 
 /**
@@ -401,10 +414,11 @@ void iscsi_cmnd_remove(struct iscsi_cmnd *cmnd)
 	if (!list_empty(&cmnd->list)) {
 		struct iscsi_cmd *req = cmnd_hdr(cmnd);
 
-		eprintk("cmnd %p still on some list?, %x, %x, %x, %x, %x, %x, %x %lx %lx\n",
+		eprintk("cmnd %p still on some list?, %x, %x, %x, %x, %x, %x, %x %lx\n",
 			cmnd, req->opcode, req->cdb[0], req->flags, req->itt,
 			ntoh24(req->dlength),
-			req->cmdsn, be32_to_cpu(cmnd->pdu.datasize), cmnd->state, conn->state);
+			req->cmdsn, be32_to_cpu(cmnd->pdu.datasize),
+			conn->state);
 
 		if (cmnd->req) {
 			struct iscsi_cmd *req = cmnd_hdr(cmnd->req);
@@ -941,6 +955,7 @@ static void scsi_cmnd_start(struct iscsi_conn *conn, struct iscsi_cmnd *req)
 			eprintk("%x %x\n", cmnd_itt(req), req_hdr->cdb[0]);
 			create_sense_rsp(req, ABORTED_COMMAND, 0xc, 0xc);
 			cmnd_skip_data(req);
+			break;
 		}
 
 		set_offset_and_length(req->lun, req_hdr->cdb, &offset, &length);
@@ -1548,7 +1563,7 @@ static int check_segment_length(struct iscsi_cmnd *cmnd)
 	struct iscsi_sess_param *param = &conn->session->param;
 
 	if (cmnd->pdu.datasize > param->max_recv_data_length) {
-		eprintk("too lond data %x %u %u\n", cmnd_itt(cmnd),
+		eprintk("data too long %x %u %u\n", cmnd_itt(cmnd),
 			cmnd->pdu.datasize, param->max_recv_data_length);
 
 		if (get_pgcnt(cmnd->pdu.datasize, 0) > ISCSI_CONN_IOV_MAX) {

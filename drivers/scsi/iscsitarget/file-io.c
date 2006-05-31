@@ -26,7 +26,7 @@ static int fileio_make_request(struct iet_volume *lu, struct tio *tio, int rw)
 	u32 offset, size;
 	loff_t ppos, count;
 	char *buf;
-	int i;
+	int i, err = 0;
 	ssize_t ret;
 
 	assert(p);
@@ -58,15 +58,17 @@ static int fileio_make_request(struct iet_volume *lu, struct tio *tio, int rw)
 
 		set_fs(oldfs);
 
-		if (ret != count)
+		if (ret != count) {
 			eprintk("I/O error %lld, %ld\n", count, (long) ret);
+			err = -EIO;
+		}
 
 		size -= count;
 		offset = 0;
 	}
 	assert(!size);
 
-	return 0;
+	return err;
 }
 
 static int fileio_sync(struct iet_volume *lu, struct tio *tio)
