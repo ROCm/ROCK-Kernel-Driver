@@ -54,29 +54,28 @@ struct as_io_context {
 
 struct cfq_queue;
 struct cfq_io_context {
-	struct rb_node rb_node;
+	/*
+	 * circular list of cfq_io_contexts belonging to a process io context
+	 */
+	struct list_head list;
+	struct cfq_queue *cfqq;
 	void *key;
-
-	struct cfq_queue *cfqq[2];
 
 	struct io_context *ioc;
 
 	unsigned long last_end_request;
-	sector_t last_request_pos;
- 	unsigned long last_queue;
-
 	unsigned long ttime_total;
 	unsigned long ttime_samples;
 	unsigned long ttime_mean;
+	sector_t last_request_pos;
+ 	unsigned long last_queue;
 
 	unsigned int seek_samples;
 	u64 seek_total;
 	sector_t seek_mean;
 
-	struct list_head queue_list;
-
-	void (*dtor)(struct io_context *); /* destructor */
-	void (*exit)(struct io_context *); /* called on task exit */
+	void (*dtor)(struct cfq_io_context *);
+	void (*exit)(struct cfq_io_context *);
 };
 
 /*
@@ -97,7 +96,7 @@ struct io_context {
 	int nr_batch_requests;     /* Number of requests left in the batch */
 
 	struct as_io_context *aic;
-	struct rb_root cic_root;
+	struct cfq_io_context *cic;
 };
 
 void put_io_context(struct io_context *ioc);
@@ -410,6 +409,8 @@ struct request_queue
 
 	struct blk_queue_tag	*queue_tags;
 
+	atomic_t		refcnt;
+
 	unsigned int		nr_sorted;
 	unsigned int		in_flight;
 
@@ -428,8 +429,6 @@ struct request_queue
 	struct request		pre_flush_rq, bar_rq, post_flush_rq;
 	struct request		*orig_bar_rq;
 	unsigned int		bi_size;
-
-	struct semaphore	sysfs_lock;
 };
 
 #define RQ_INACTIVE		(-1)
@@ -731,7 +730,7 @@ extern long nr_blockdev_pages(void);
 int blk_get_queue(request_queue_t *);
 request_queue_t *blk_alloc_queue(gfp_t);
 request_queue_t *blk_alloc_queue_node(gfp_t, int);
-extern void blk_put_queue(request_queue_t *);
+#define blk_put_queue(q) blk_cleanup_queue((q))
 
 /*
  * tag stuff

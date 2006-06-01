@@ -1756,10 +1756,15 @@ EXPORT_SYMBOL(blk_run_queue);
  *     Hopefully the low level driver will have finished any
  *     outstanding requests first...
  **/
-static void blk_release_queue(struct kobject *kobj)
+void blk_cleanup_queue(request_queue_t * q)
 {
-	request_queue_t *q = container_of(kobj, struct request_queue, kobj);
 	struct request_list *rl = &q->rq;
+
+	if (!atomic_dec_and_test(&q->refcnt))
+		return;
+
+	if (q->elevator)
+		elevator_exit(q->elevator);
 
 	blk_sync_queue(q);
 
@@ -1770,24 +1775,6 @@ static void blk_release_queue(struct kobject *kobj)
 		__blk_queue_free_tags(q);
 
 	kmem_cache_free(requestq_cachep, q);
-}
-
-void blk_put_queue(request_queue_t *q)
-{
-	kobject_put(&q->kobj);
-}
-EXPORT_SYMBOL(blk_put_queue);
-
-void blk_cleanup_queue(request_queue_t * q)
-{
-	down(&q->sysfs_lock);
-	set_bit(QUEUE_FLAG_DEAD, &q->queue_flags);
-	up(&q->sysfs_lock);
-
-	if (q->elevator)
-		elevator_exit(q->elevator);
-
-	blk_put_queue(q);
 }
 
 EXPORT_SYMBOL(blk_cleanup_queue);
@@ -1817,8 +1804,6 @@ request_queue_t *blk_alloc_queue(gfp_t gfp_mask)
 }
 EXPORT_SYMBOL(blk_alloc_queue);
 
-static struct kobj_type queue_ktype;
-
 request_queue_t *blk_alloc_queue_node(gfp_t gfp_mask, int node_id)
 {
 	request_queue_t *q;
@@ -1829,15 +1814,10 @@ request_queue_t *blk_alloc_queue_node(gfp_t gfp_mask, int node_id)
 
 	memset(q, 0, sizeof(*q));
 	init_timer(&q->unplug_timer);
-
-	snprintf(q->kobj.name, KOBJ_NAME_LEN, "%s", "queue");
-	q->kobj.ktype = &queue_ktype;
-	kobject_init(&q->kobj);
+	atomic_set(&q->refcnt, 1);
 
 	q->backing_dev_info.unplug_io_fn = blk_backing_dev_unplug;
 	q->backing_dev_info.unplug_io_data = q;
-
-	sema_init(&q->sysfs_lock, 1);
 
 	return q;
 }
@@ -1890,10 +1870,8 @@ blk_init_queue_node(request_fn_proc *rfn, spinlock_t *lock, int node_id)
 		return NULL;
 
 	q->node = node_id;
-	if (blk_init_free_list(q)) {
-		kmem_cache_free(requestq_cachep, q);
-		return NULL;
-	}
+	if (blk_init_free_list(q))
+		goto out_init;
 
 	/*
 	 * if caller didn't supply a lock, they get per-queue locking with
@@ -1929,7 +1907,9 @@ blk_init_queue_node(request_fn_proc *rfn, spinlock_t *lock, int node_id)
 		return q;
 	}
 
-	blk_put_queue(q);
+	blk_cleanup_queue(q);
+out_init:
+	kmem_cache_free(requestq_cachep, q);
 	return NULL;
 }
 EXPORT_SYMBOL(blk_init_queue_node);
@@ -1937,7 +1917,7 @@ EXPORT_SYMBOL(blk_init_queue_node);
 int blk_get_queue(request_queue_t *q)
 {
 	if (likely(!test_bit(QUEUE_FLAG_DEAD, &q->queue_flags))) {
-		kobject_get(&q->kobj);
+		atomic_inc(&q->refcnt);
 		return 0;
 	}
 
@@ -3416,12 +3396,7 @@ void end_that_request_last(struct request *req, int uptodate)
 	if (unlikely(laptop_mode) && blk_fs_request(req))
 		laptop_io_completion();
 
-	/*
-	 * Account IO completion.  bar_rq isn't accounted as a normal
-	 * IO on queueing nor completion.  Accounting the containing
-	 * request is enough.
-	 */
-	if (disk && blk_fs_request(req) && req != &req->q->bar_rq) {
+	if (disk && blk_fs_request(req)) {
 		unsigned long duration = jiffies - req->start_time;
 		const int rw = rq_data_dir(req);
 
@@ -3521,18 +3496,10 @@ void put_io_context(struct io_context *ioc)
 	BUG_ON(atomic_read(&ioc->refcount) == 0);
 
 	if (atomic_dec_and_test(&ioc->refcount)) {
-		struct cfq_io_context *cic;
-
-		rcu_read_lock();
 		if (ioc->aic && ioc->aic->dtor)
 			ioc->aic->dtor(ioc->aic);
-		if (ioc->cic_root.rb_node != NULL) {
-			struct rb_node *n = rb_first(&ioc->cic_root);
-
-			cic = rb_entry(n, struct cfq_io_context, rb_node);
-			cic->dtor(ioc);
-		}
-		rcu_read_unlock();
+		if (ioc->cic && ioc->cic->dtor)
+			ioc->cic->dtor(ioc->cic);
 
 		kmem_cache_free(iocontext_cachep, ioc);
 	}
@@ -3544,7 +3511,6 @@ void exit_io_context(void)
 {
 	unsigned long flags;
 	struct io_context *ioc;
-	struct cfq_io_context *cic;
 
 	local_irq_save(flags);
 	task_lock(current);
@@ -3556,11 +3522,9 @@ void exit_io_context(void)
 
 	if (ioc->aic && ioc->aic->exit)
 		ioc->aic->exit(ioc->aic);
-	if (ioc->cic_root.rb_node != NULL) {
-		cic = rb_entry(rb_first(&ioc->cic_root), struct cfq_io_context, rb_node);
-		cic->exit(ioc);
-	}
- 
+	if (ioc->cic && ioc->cic->exit)
+		ioc->cic->exit(ioc->cic);
+
 	put_io_context(ioc);
 }
 
@@ -3589,7 +3553,7 @@ struct io_context *current_io_context(gfp_t gfp_flags)
 		ret->last_waited = jiffies; /* doesn't matter... */
 		ret->nr_batch_requests = 0; /* because this is 0 */
 		ret->aic = NULL;
-		ret->cic_root.rb_node = NULL;
+		ret->cic = NULL;
 		tsk->io_context = ret;
 	}
 
@@ -3669,13 +3633,10 @@ static ssize_t
 queue_requests_store(struct request_queue *q, const char *page, size_t count)
 {
 	struct request_list *rl = &q->rq;
-	unsigned long nr;
-	int ret = queue_var_store(&nr, page, count);
-	if (nr < BLKDEV_MIN_RQ)
-		nr = BLKDEV_MIN_RQ;
 
-	spin_lock_irq(q->queue_lock);
-	q->nr_requests = nr;
+	int ret = queue_var_store(&q->nr_requests, page, count);
+	if (q->nr_requests < BLKDEV_MIN_RQ)
+		q->nr_requests = BLKDEV_MIN_RQ;
 	blk_queue_congestion_threshold(q);
 
 	if (rl->count[READ] >= queue_congestion_on_threshold(q))
@@ -3701,7 +3662,6 @@ queue_requests_store(struct request_queue *q, const char *page, size_t count)
 		blk_clear_queue_full(q, WRITE);
 		wake_up(&rl->wait[WRITE]);
 	}
-	spin_unlock_irq(q->queue_lock);
 	return ret;
 }
 
@@ -3818,19 +3778,13 @@ static ssize_t
 queue_attr_show(struct kobject *kobj, struct attribute *attr, char *page)
 {
 	struct queue_sysfs_entry *entry = to_queue(attr);
-	request_queue_t *q = container_of(kobj, struct request_queue, kobj);
-	ssize_t res;
+	struct request_queue *q;
 
+	q = container_of(kobj, struct request_queue, kobj);
 	if (!entry->show)
 		return -EIO;
-	down(&q->sysfs_lock);
-	if (test_bit(QUEUE_FLAG_DEAD, &q->queue_flags)) {
-		up(&q->sysfs_lock);
-		return -ENOENT;
-	}
-	res = entry->show(q, page);
-	up(&q->sysfs_lock);
-	return res;
+
+	return entry->show(q, page);
 }
 
 static ssize_t
@@ -3838,20 +3792,13 @@ queue_attr_store(struct kobject *kobj, struct attribute *attr,
 		    const char *page, size_t length)
 {
 	struct queue_sysfs_entry *entry = to_queue(attr);
-	request_queue_t *q = container_of(kobj, struct request_queue, kobj);
+	struct request_queue *q;
 
-	ssize_t res;
-
+	q = container_of(kobj, struct request_queue, kobj);
 	if (!entry->store)
 		return -EIO;
-	down(&q->sysfs_lock);
-	if (test_bit(QUEUE_FLAG_DEAD, &q->queue_flags)) {
-		up(&q->sysfs_lock);
-		return -ENOENT;
-	}
-	res = entry->store(q, page, length);
-	up(&q->sysfs_lock);
-	return res;
+
+	return entry->store(q, page, length);
 }
 
 static struct sysfs_ops queue_sysfs_ops = {
@@ -3862,7 +3809,6 @@ static struct sysfs_ops queue_sysfs_ops = {
 static struct kobj_type queue_ktype = {
 	.sysfs_ops	= &queue_sysfs_ops,
 	.default_attrs	= default_attrs,
-	.release	= blk_release_queue,
 };
 
 int blk_register_queue(struct gendisk *disk)
@@ -3875,17 +3821,19 @@ int blk_register_queue(struct gendisk *disk)
 		return -ENXIO;
 
 	q->kobj.parent = kobject_get(&disk->kobj);
+	if (!q->kobj.parent)
+		return -EBUSY;
 
-	ret = kobject_add(&q->kobj);
+	snprintf(q->kobj.name, KOBJ_NAME_LEN, "%s", "queue");
+	q->kobj.ktype = &queue_ktype;
+
+	ret = kobject_register(&q->kobj);
 	if (ret < 0)
 		return ret;
 
-	kobject_uevent(&q->kobj, KOBJ_ADD);
-
 	ret = elv_register_queue(q);
 	if (ret) {
-		kobject_uevent(&q->kobj, KOBJ_REMOVE);
-		kobject_del(&q->kobj);
+		kobject_unregister(&q->kobj);
 		return ret;
 	}
 
@@ -3899,8 +3847,7 @@ void blk_unregister_queue(struct gendisk *disk)
 	if (q && q->request_fn) {
 		elv_unregister_queue(q);
 
-		kobject_uevent(&q->kobj, KOBJ_REMOVE);
-		kobject_del(&q->kobj);
+		kobject_unregister(&q->kobj);
 		kobject_put(&disk->kobj);
 	}
 }
