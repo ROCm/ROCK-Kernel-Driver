@@ -284,6 +284,8 @@ static struct cfq_queue *cfq_find_cfq_hash(struct cfq_data *, unsigned int, unsi
 static void cfq_dispatch_insert(request_queue_t *, struct cfq_rq *);
 static struct cfq_queue *cfq_get_queue(struct cfq_data *cfqd, unsigned int key, struct task_struct *tsk, gfp_t gfp_mask);
 
+#define process_sync(tsk)	((tsk)->flags & PF_SYNCWRITE)
+
 /*
  * lots of deadline iosched dupes, can be abstracted later...
  */
@@ -337,9 +339,9 @@ static int cfq_queue_empty(request_queue_t *q)
 	return !cfqd->busy_queues;
 }
 
-static inline pid_t cfq_queue_pid(struct task_struct *task, int rw, int sync)
+static inline pid_t cfq_queue_pid(struct task_struct *task, int rw)
 {
-	if (rw == READ || sync)
+	if (rw == READ || process_sync(task))
 		return task->pid;
 
 	return CFQ_KEY_ASYNC;
@@ -628,19 +630,11 @@ cfq_reposition_crq_rb(struct cfq_queue *cfqq, struct cfq_rq *crq)
 	cfq_add_crq_rb(crq);
 }
 
-static inline int cfq_bio_sync(struct bio *bio)
-{
-	if (bio && bio_sync(bio))
-		return 1;
-
-	return 0;
-}
-
 static struct request *
 cfq_find_rq_fmerge(struct cfq_data *cfqd, struct bio *bio)
 {
 	struct task_struct *tsk = current;
-	pid_t key = cfq_queue_pid(tsk, bio_data_dir(bio), cfq_bio_sync(bio));
+	pid_t key = cfq_queue_pid(tsk, bio_data_dir(bio));
 	struct cfq_queue *cfqq;
 	struct rb_node *n;
 	sector_t sector;
@@ -1975,7 +1969,6 @@ static int cfq_may_queue(request_queue_t *q, int rw, struct bio *bio)
 {
 	struct cfq_data *cfqd = q->elevator->elevator_data;
 	struct task_struct *tsk = current;
-	const int sync = cfq_bio_sync(bio);
 	struct cfq_queue *cfqq;
 
 	/*
@@ -1984,7 +1977,7 @@ static int cfq_may_queue(request_queue_t *q, int rw, struct bio *bio)
 	 * so just lookup a possibly existing queue, or return 'may queue'
 	 * if that fails
 	 */
-	cfqq = cfq_find_cfq_hash(cfqd, cfq_queue_pid(tsk,rw,sync), tsk->ioprio);
+	cfqq = cfq_find_cfq_hash(cfqd, cfq_queue_pid(tsk, rw), tsk->ioprio);
 	if (cfqq) {
 		cfq_init_prio_data(cfqq);
 		cfq_prio_boost(cfqq);
@@ -2049,7 +2042,7 @@ cfq_set_request(request_queue_t *q, struct request *rq, struct bio *bio,
 	struct task_struct *tsk = current;
 	struct cfq_io_context *cic;
 	const int rw = rq_data_dir(rq);
-	pid_t key = cfq_queue_pid(tsk, rw, cfq_bio_sync(bio));
+	pid_t key = cfq_queue_pid(tsk, rw);
 	struct cfq_queue *cfqq;
 	struct cfq_rq *crq;
 	unsigned long flags;

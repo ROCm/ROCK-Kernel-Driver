@@ -354,7 +354,6 @@ static void dio_bio_submit(struct dio *dio)
 	spin_unlock_irqrestore(&dio->bio_lock, flags);
 	if (dio->is_async && dio->rw == READ)
 		bio_set_pages_dirty(bio);
-	bio->bi_rw |= (1 << BIO_RW_SYNC);
 	submit_bio(dio->rw, bio);
 
 	dio->bio = NULL;
@@ -1187,6 +1186,9 @@ __blockdev_direct_IO(int rw, struct kiocb *iocb, struct inode *inode,
 	int release_i_mutex = 0;
 	int acquire_i_mutex = 0;
 
+	if (rw & WRITE)
+		current->flags |= PF_SYNCWRITE;
+
 	if (bdev)
 		bdev_blkbits = blksize_bits(bdev_hardsect_size(bdev));
 
@@ -1275,6 +1277,8 @@ out:
 		mutex_unlock(&inode->i_mutex);
 	else if (acquire_i_mutex)
 		mutex_lock(&inode->i_mutex);
+	if (rw & WRITE)
+		current->flags &= ~PF_SYNCWRITE;
 	return retval;
 }
 EXPORT_SYMBOL(__blockdev_direct_IO);
