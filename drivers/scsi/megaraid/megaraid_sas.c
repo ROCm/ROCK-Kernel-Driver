@@ -10,7 +10,7 @@
  *	   2 of the License, or (at your option) any later version.
  *
  * FILE		: megaraid_sas.c
- * Version	: v00.00.02.04
+ * Version	: v03.01
  *
  * Authors:
  * 	Sreenivas Bagalkote	<Sreenivas.Bagalkote@lsil.com>
@@ -65,6 +65,12 @@ static struct pci_device_id megasas_pci_table[] = {
 	 PCI_ANY_ID,
 	 PCI_ANY_ID,
 	},
+	{
+	 PCI_VENDOR_ID_LSI_LOGIC,
+	 PCI_DEVICE_ID_LSI_VERDE_ZCR,	// vega
+	 PCI_ANY_ID,
+	 PCI_ANY_ID,
+	 },
 	{
 	 PCI_VENDOR_ID_DELL,
 	 PCI_DEVICE_ID_DELL_PERC5, // xscale IOP
@@ -289,9 +295,14 @@ static struct megasas_instance_template megasas_instance_template_ppc = {
  * @regs:			MFI register set
  */
 static inline void
-megasas_disable_intr(struct megasas_register_set __iomem * regs)
+megasas_disable_intr(struct megasas_instance *instance)
 {
 	u32 mask = 0x1f; 
+	struct megasas_register_set __iomem *regs = instance->reg_set;
+
+	if(instance->pdev->device == PCI_DEVICE_ID_LSI_SAS1078R)	
+		mask = 0xffffffff; 
+
 	writel(mask, &regs->outbound_intr_mask);
 
 	/* Dummy readl to force pci flush */
@@ -741,7 +752,6 @@ static int
 megasas_queue_command(struct scsi_cmnd *scmd, void (*done) (struct scsi_cmnd *))
 {
 	u32 frame_count;
-	unsigned long flags;
 	struct megasas_cmd *cmd;
 	struct megasas_instance *instance;
 
@@ -776,9 +786,7 @@ megasas_queue_command(struct scsi_cmnd *scmd, void (*done) (struct scsi_cmnd *))
 	/*
 	 * Issue the command to the FW
 	 */
-	spin_lock_irqsave(&instance->instance_lock, flags);
-	instance->fw_outstanding++;
-	spin_unlock_irqrestore(&instance->instance_lock, flags);
+	atomic_inc(&instance->fw_outstanding);
 
 	instance->instancet->fire_cmd(cmd->frame_phys_addr ,cmd->frame_count-1,instance->reg_set);
 
@@ -826,19 +834,20 @@ static int megasas_wait_for_outstanding(struct megasas_instance *instance)
 
 	for (i = 0; i < wait_time; i++) {
 
-		if (!instance->fw_outstanding)
+		int outstanding = atomic_read(&instance->fw_outstanding);
+
+		if (!outstanding)
 			break;
 
 		if (!(i % MEGASAS_RESET_NOTICE_INTERVAL)) {
 			printk(KERN_NOTICE "megasas: [%2d]waiting for %d "
-			       "commands to complete\n", i,
-			       instance->fw_outstanding);
+			       "commands to complete\n",i,outstanding);
 		}
 
 		msleep(1000);
 	}
 
-	if (instance->fw_outstanding) {
+	if (atomic_read(&instance->fw_outstanding)) {
 		instance->hw_crit_error = 1;
 		return FAILED;
 	}
@@ -1056,6 +1065,7 @@ megasas_complete_cmd(struct megasas_instance *instance, struct megasas_cmd *cmd,
 		cmd->scmd->SCp.ptr = (char *)0;
 	}
 
+
 	switch (hdr->cmd) {
 
 	case MFI_CMD_PD_SCSI_IO:
@@ -1082,9 +1092,7 @@ megasas_complete_cmd(struct megasas_instance *instance, struct megasas_cmd *cmd,
 
 		if (exception) {
 
-			spin_lock_irqsave(&instance->instance_lock, flags);
-			instance->fw_outstanding--;
-			spin_unlock_irqrestore(&instance->instance_lock, flags);
+			atomic_dec(&instance->fw_outstanding);
 
 			megasas_unmap_sgbuf(instance, cmd);
 			cmd->scmd->scsi_done(cmd->scmd);
@@ -1132,9 +1140,7 @@ megasas_complete_cmd(struct megasas_instance *instance, struct megasas_cmd *cmd,
 			break;
 		}
 
-		spin_lock_irqsave(&instance->instance_lock, flags);
-		instance->fw_outstanding--;
-		spin_unlock_irqrestore(&instance->instance_lock, flags);
+		atomic_dec(&instance->fw_outstanding);
 
 		megasas_unmap_sgbuf(instance, cmd);
 		cmd->scmd->scsi_done(cmd->scmd);
@@ -1267,7 +1273,7 @@ megasas_transition_to_ready(struct megasas_instance* instance)
 			/*
 			 * Bring it to READY state; assuming max wait 2 secs
 			 */
-			megasas_disable_intr(instance->reg_set);
+			megasas_disable_intr(instance);
 			writel(MFI_INIT_READY, &instance->reg_set->inbound_doorbell);
 
 			max_wait = 10;
@@ -1764,6 +1770,11 @@ static int megasas_init_mfi(struct megasas_instance *instance)
 	init_frame->data_xfer_len = sizeof(struct megasas_init_queue_info);
 
 	/*
+	 * disable the intr before fire the init frame to FW 
+	 */	
+	megasas_disable_intr(instance);
+	
+	/*
 	 * Issue the init frame in polled mode
 	 */
 	if (megasas_issue_polled(instance, cmd)) {
@@ -2170,12 +2181,13 @@ megasas_probe_one(struct pci_dev *pdev, const struct pci_device_id *id)
 	 * Initialize locks and queues
 	 */
 	INIT_LIST_HEAD(&instance->cmd_pool);
+		
+	atomic_set(&instance->fw_outstanding,0);
 
 	init_waitqueue_head(&instance->int_cmd_wait_q);
 	init_waitqueue_head(&instance->abort_cmd_wait_q);
 
 	spin_lock_init(&instance->cmd_pool_lock);
-	spin_lock_init(&instance->instance_lock);
 
 	sema_init(&instance->aen_mutex, 1);
 	sema_init(&instance->ioctl_sem, MEGASAS_INT_CMDS);
@@ -2240,7 +2252,7 @@ megasas_probe_one(struct pci_dev *pdev, const struct pci_device_id *id)
 	megasas_mgmt_info.max_index--;
 
 	pci_set_drvdata(pdev, NULL);
-	megasas_disable_intr(instance->reg_set);
+	megasas_disable_intr(instance);
 	free_irq(instance->pdev->irq, instance);
 
 	megasas_release_mfi(instance);
@@ -2370,7 +2382,7 @@ static void megasas_detach_one(struct pci_dev *pdev)
 
 	pci_set_drvdata(instance->pdev, NULL);
 
-	megasas_disable_intr(instance->reg_set);
+	megasas_disable_intr(instance);
 
 	free_irq(instance->pdev->irq, instance);
 
@@ -2704,7 +2716,6 @@ megasas_mgmt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	switch (cmd) {
 	case MEGASAS_IOC_FIRMWARE:
 		return megasas_mgmt_ioctl_fw(file, arg);
-
 	case MEGASAS_IOC_GET_AEN:
 		return megasas_mgmt_ioctl_aen(file, arg);
 	}
