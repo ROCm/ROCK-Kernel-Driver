@@ -158,9 +158,6 @@ asmlinkage long sys_msync(unsigned long start, size_t len, int flags)
 	struct vm_area_struct *vma;
 	int unmapped_error, error = -EINVAL;
 
-	if (flags & MS_SYNC)
-		current->flags |= PF_SYNCWRITE;
-
 	down_read(&current->mm->mmap_sem);
 	if (flags & ~(MS_ASYNC | MS_INVALIDATE | MS_SYNC))
 		goto out;
@@ -211,6 +208,5 @@ asmlinkage long sys_msync(unsigned long start, size_t len, int flags)
 	}
 out:
 	up_read(&current->mm->mmap_sem);
-	current->flags &= ~PF_SYNCWRITE;
 	return error;
 }

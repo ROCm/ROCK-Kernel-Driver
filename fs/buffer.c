@@ -347,7 +347,6 @@ static long do_fsync(unsigned int fd, int datasync)
 
 	mapping = file->f_mapping;
 
-	current->flags |= PF_SYNCWRITE;
 	ret = filemap_fdatawrite(mapping);
 
 	/*
@@ -362,7 +361,6 @@ static long do_fsync(unsigned int fd, int datasync)
 	err = filemap_fdatawait(mapping);
 	if (!ret)
 		ret = err;
-	current->flags &= ~PF_SYNCWRITE;
 
 out_putf:
 	fput(file);
