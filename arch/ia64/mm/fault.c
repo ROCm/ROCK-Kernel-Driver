@@ -19,6 +19,53 @@
 
 extern void die (char *, struct pt_regs *, long);
 
+#ifdef CONFIG_KPROBES
+struct notifier_block *notify_page_fault_chain;
+static DEFINE_SPINLOCK(page_fault_notifier_lock);
+
+/* Hook to register for page fault notifications */
+int register_page_fault_notifier(struct notifier_block *nb)
+{
+	unsigned long flags;
+	int err = 0;
+
+	spin_lock_irqsave(&page_fault_notifier_lock, flags);
+	err = notifier_chain_register(&notify_page_fault_chain, nb);
+	spin_unlock_irqrestore(&page_fault_notifier_lock, flags);
+	return err;
+}
+
+int unregister_page_fault_notifier(struct notifier_block *nb)
+{
+	unsigned long flags;
+	int err = 0;
+
+	spin_lock_irqsave(&page_fault_notifier_lock, flags);
+	err = notifier_chain_unregister(&notify_page_fault_chain, nb);
+	spin_unlock_irqrestore(&page_fault_notifier_lock, flags);
+	return err;
+}
+
+static inline int notify_page_fault(enum die_val val, const char *str,
+			struct pt_regs *regs, long err, int trap, int sig)
+{
+	struct die_args args = {
+		.regs = regs,
+		.str = str,
+		.err = err,
+		.trapnr = trap,
+		.signr = sig
+	};
+	return notifier_call_chain(&notify_page_fault_chain, val, &args);
+}
+#else
+static inline int notify_page_fault(enum die_val val, const char *str,
+			struct pt_regs *regs, long err, int trap, int sig)
+{
+	return NOTIFY_DONE;
+}
+#endif
+
 /*
  * Return TRUE if ADDRESS points at a page in the kernel's mapped segment
  * (inside region 5, on ia64) and that page is present.
@@ -81,7 +128,7 @@ ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_regs *re
 	/*
 	 * This is to handle the kprobes on user space access instructions
 	 */
-	if (notify_die(DIE_PAGE_FAULT, "page fault", regs, code, TRAP_BRKPT,
+	if (notify_page_fault(DIE_PAGE_FAULT, "page fault", regs, code, TRAP_BRKPT,
 					SIGSEGV) == NOTIFY_STOP)
 		return;
 

@@ -52,6 +52,14 @@ DECLARE_MUTEX(kprobe_mutex);		/* Protects kprobe_table */
 DEFINE_SPINLOCK(kretprobe_lock);	/* Protects kretprobe_inst_table */
 static DEFINE_PER_CPU(struct kprobe *, kprobe_instance) = NULL;
 
+#ifdef ARCH_HAVE_PAGE_FAULT_NOTIFIER
+static atomic_t kprobe_count = ATOMIC_INIT(0);
+static struct notifier_block kprobe_page_fault_nb = {
+	.notifier_call = kprobe_exceptions_notify,
+	.priority = 0x7fffffff /* we need to notified first */
+};
+#endif
+
 #ifdef __ARCH_WANT_KPROBES_INSN_SLOT
 /*
  * kprobe->ainsn.insn points to the copy of the instruction to be
@@ -464,6 +472,10 @@ static int __kprobes __register_kprobe(struct kprobe *p,
 	old_p = get_kprobe(p->addr);
 	if (old_p) {
 		ret = register_aggr_kprobe(old_p, p);
+#ifdef ARCH_HAVE_PAGE_FAULT_NOTIFIER
+		if (!ret)
+			atomic_inc(&kprobe_count);
+#endif
 		goto out;
 	}
 
@@ -473,6 +485,12 @@ static int __kprobes __register_kprobe(struct kprobe *p,
 	INIT_HLIST_NODE(&p->hlist);
 	hlist_add_head_rcu(&p->hlist,
 		       &kprobe_table[hash_ptr(p->addr, KPROBE_HASH_BITS)]);
+
+#ifdef ARCH_HAVE_PAGE_FAULT_NOTIFIER
+	if (atomic_add_return(1, &kprobe_count) == \
+				(ARCH_INACTIVE_KPROBE_COUNT + 1))
+		register_page_fault_notifier(&kprobe_page_fault_nb);
+#endif
 
   	arch_arm_kprobe(p);
 
@@ -537,6 +555,18 @@ valid_p:
 		}
 		arch_remove_kprobe(p);
 	}
+
+#ifdef ARCH_HAVE_PAGE_FAULT_NOTIFIER
+	/* Call unregister_page_fault_notifier()
+	 * if no probes are active
+	 */
+	down(&kprobe_mutex);
+	if (atomic_add_return(-1, &kprobe_count) == \
+				ARCH_INACTIVE_KPROBE_COUNT)
+		unregister_page_fault_notifier(&kprobe_page_fault_nb);
+	up(&kprobe_mutex);
+#endif
+	return;
 }
 
 static struct notifier_block kprobe_exceptions_nb = {

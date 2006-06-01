@@ -38,8 +38,11 @@ struct die_args {
 	int signr;
 };
 
+#define ARCH_HAVE_PAGE_FAULT_NOTIFIER
 extern int register_die_notifier(struct notifier_block *);
 extern int unregister_die_notifier(struct notifier_block *);
+extern int register_page_fault_notifier(struct notifier_block *);
+extern int unregister_page_fault_notifier(struct notifier_block *);
 extern struct notifier_block *ia64die_chain;
 
 enum die_val {
