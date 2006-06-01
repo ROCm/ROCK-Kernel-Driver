@@ -33,7 +33,7 @@ unsigned long pci_mem_start = 0xaeedbabe;
  */
 unsigned long end_pfn; 
 EXPORT_SYMBOL(end_pfn);
-unsigned long end_user_pfn = MAXMEM>>PAGE_SHIFT;  
+static unsigned long __initdata end_user_pfn;
 unsigned long end_pfn_map; 
 
 #ifndef CONFIG_XEN
@@ -635,20 +635,18 @@ void __init setup_memory_region(void)
 
 #else  /* CONFIG_XEN */
 
-/* Allows setting of maximum possible memory size  */
-static unsigned long xen_override_max_pfn;
 extern union xen_start_info_union xen_start_info_union;
 
 unsigned long __init e820_end_of_ram(void)
 {
 	unsigned long max_end_pfn;
 
-	if (xen_override_max_pfn == 0) {
+	if (end_user_pfn == 0) {
 		max_end_pfn = xen_start_info->nr_pages;
 		/* Default 8MB slack (to balance backend allocations). */
 		max_end_pfn += 8 << (20 - PAGE_SHIFT);
-	} else if (xen_override_max_pfn > xen_start_info->nr_pages) {
-		max_end_pfn = xen_override_max_pfn;
+	} else if (end_user_pfn > xen_start_info->nr_pages) {
+		max_end_pfn = end_user_pfn;
 	} else {
 		max_end_pfn = xen_start_info->nr_pages;
 	}
@@ -733,7 +731,6 @@ void __init parse_memopt(char *p, char **from)
 { 
 	end_user_pfn = memparse(p, from);
 	end_user_pfn >>= PAGE_SHIFT;	
-	xen_override_max_pfn = (unsigned long) end_user_pfn;
 } 
 
 #ifndef CONFIG_XEN

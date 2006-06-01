@@ -92,6 +92,7 @@ static void __init check_fpu(void)
 
 static void __init check_hlt(void)
 {
+#ifndef CONFIG_XEN
 	printk(KERN_INFO "Checking 'hlt' instruction... ");
 	if (!boot_cpu_data.hlt_works_ok) {
 		printk("disabled\n");
@@ -102,6 +103,7 @@ static void __init check_hlt(void)
 	halt();
 	halt();
 	printk("OK.\n");
+#endif
 }
 
 /*

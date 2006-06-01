@@ -625,8 +625,11 @@ do {									\
 		preempt_enable_no_resched();				\
 } while (0)
 
-#define safe_halt()		((void)0)
-#define halt()			((void)0)
+#define safe_halt()		((void)HYPERVISOR_block())
+#define halt()			((void)					\
+	(HYPERVISOR_shared_info->vcpu_info[__vcpu_id].evtchn_upcall_mask \
+	 ? HYPERVISOR_vcpu_op(VCPUOP_down, __vcpu_id, NULL)		\
+	 : HYPERVISOR_block()))
 
 #define __save_and_cli(x)						\
 do {									\

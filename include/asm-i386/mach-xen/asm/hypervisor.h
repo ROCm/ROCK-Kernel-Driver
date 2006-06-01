@@ -41,6 +41,7 @@
 #include <xen/interface/xen.h>
 #include <xen/interface/dom0_ops.h>
 #include <xen/interface/sched.h>
+#include <xen/interface/vcpu.h>
 #include <xen/interface/nmi.h>
 #include <asm/ptrace.h>
 #include <asm/page.h>

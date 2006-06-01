@@ -857,13 +857,3 @@ void __init init_IRQ(void)
 		irq_desc[pirq_to_irq(i)].handler = &pirq_type;
 	}
 }
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

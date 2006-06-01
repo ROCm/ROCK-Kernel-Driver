@@ -370,11 +370,28 @@ static struct xenbus_watch target_watch =
 	.node = "memory/target"
 };
 
+/*
+ * Compute the minimum value this domain can be ballooned down to
+ * (in kilo bytes). This is little over 2% of the maximum pages the domain
+ * will ever handle (with a floor).
+ */
+static unsigned long long  min_target(void)
+{
+	unsigned long long	min_mem;
+
+
+	min_mem = (192000 +  (((max_pfn << (PAGE_SHIFT -10))) >> 6) +
+		(((max_pfn << (PAGE_SHIFT -10))) >> 7));
+
+	return (min_mem);
+}
+
 /* React to a change in the target key */
 static void watch_target(struct xenbus_watch *watch,
 			 const char **vec, unsigned int len)
 {
 	unsigned long long new_target;
+	unsigned long long min_value = min_target();
 	int err;
 
 	err = xenbus_scanf(XBT_NULL, "memory", "target", "%llu", &new_target);
@@ -382,12 +399,17 @@ static void watch_target(struct xenbus_watch *watch,
 		/* This is ok (for domain0 at least) - so just return */
 		return;
 	} 
-        
+
 	/* The given memory/target value is in KiB, so it needs converting to
 	   pages.  PAGE_SHIFT converts bytes to pages, hence PAGE_SHIFT - 10.
+	   But first make sure that we are not lowering the value below the
+	   "minimum".
 	*/
-	set_new_target(new_target >> (PAGE_SHIFT - 10));
-    
+	if (new_target > min_value) {
+		set_new_target(new_target >> (PAGE_SHIFT - 10));
+	} else {
+		set_new_target(min_value >> (PAGE_SHIFT - 10));
+	}
 }
 
 static int balloon_init_watcher(struct notifier_block *notifier,
@@ -580,13 +602,3 @@ EXPORT_SYMBOL_GPL(balloon_alloc_empty_page_range);
 EXPORT_SYMBOL_GPL(balloon_dealloc_empty_page_range);
 
 MODULE_LICENSE("Dual BSD/GPL");
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

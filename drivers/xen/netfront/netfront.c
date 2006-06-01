@@ -1512,14 +1512,3 @@ static void xennet_proc_delif(struct net_device *dev)
 }
 
 #endif
-
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

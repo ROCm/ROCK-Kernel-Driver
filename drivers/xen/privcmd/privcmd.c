@@ -159,12 +159,10 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 	break;
 
 	case IOCTL_PRIVCMD_MMAPBATCH: {
-		mmu_update_t u;
 		privcmd_mmapbatch_t m;
 		struct vm_area_struct *vma = NULL;
 		unsigned long __user *p;
 		unsigned long addr, mfn; 
-		uint64_t ptep;
 		int i;
 
 		if (copy_from_user(&m, udata, sizeof(m))) {
@@ -207,15 +205,10 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 			if (ret < 0)
 			    goto batch_err;
 #else
-
-			ret = create_lookup_pte_addr(vma->vm_mm, addr, &ptep);
-			if (ret)
-				goto batch_err;
-
-			u.val = pte_val_ma(pfn_pte_ma(mfn, vma->vm_page_prot));
-			u.ptr = ptep;
-
-			if (HYPERVISOR_mmu_update(&u, 1, NULL, m.dom) < 0)
+			ret = direct_remap_pfn_range(vma, addr & PAGE_MASK,
+						     mfn, PAGE_SIZE,
+						     vma->vm_page_prot, m.dom);
+			if (ret < 0)
 				put_user(0xF0000000 | mfn, p);
 #endif
 		}
@@ -290,13 +283,3 @@ static int __init privcmd_init(void)
 }
 
 __initcall(privcmd_init);
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */
