@@ -13,6 +13,7 @@
 
 #include <linux/security.h>
 #include <linux/module.h>
+#include <linux/mm.h>
 
 /* superblock types */
 
@@ -216,7 +217,20 @@ static int subdomain_bprm_set_security(struct linux_binprm *bprm)
 	/* already set based on script name */
 	if (bprm->sh_bang)
 		return 0;
-	return sd_register(bprm->file);
+	return sd_register(bprm);
+}
+
+static int subdomain_bprm_secureexec(struct linux_binprm *bprm)
+{
+	int ret = cap_bprm_secureexec(bprm);
+
+	if (ret == 0 && (unsigned long)bprm->security & SD_SECURE_EXEC_NEEDED) {
+		SD_DEBUG("%s: secureexec required for %s\n",
+			__FUNCTION__, bprm->filename);
+		ret = 1;
+	}
+
+	return ret;
 }
 
 static int subdomain_sb_mount(char *dev_name, struct nameidata *nd, char *type,
@@ -257,7 +271,7 @@ static int subdomain_umount(struct vfsmount *mnt, int flags)
 	sd = SD_SUBDOMAIN(current->security);
 
 	if (__sd_is_confined(sd)) {
-		error = sd_audit_syscallreject(sd, GFP_KERNEL, "umount");
+		error = sd_audit_syscallreject(sd, GFP_ATOMIC, "umount");
 		WARN_ON(error != -EPERM);
 	}
 
@@ -498,84 +512,111 @@ static int subdomain_inode_removexattr(struct dentry *dentry, char *name)
 static int subdomain_file_permission(struct file *file, int mask)
 {
 	struct subdomain sdcopy, *sd;
-	struct sdprofile *f_profile;
+	struct sdfile *sdf;
 	int error = 0;
 
-	if (!current->security)
-		goto out;
-
-	f_profile = SD_PROFILE(file->f_security);
-	/* bail out early if this isn't a mediated file */
-	if (!(f_profile && VALID_FSTYPE(file->f_dentry->d_inode)))
-		goto out;
+	if (!current->security ||
+	    !(sdf = (struct sdfile *)file->f_security) ||
+	    !VALID_FSTYPE(file->f_dentry->d_inode))
+		return 0;
 
 	sd = get_sdcopy(&sdcopy);
-	if (__sd_is_confined(sd) && f_profile != sd->active)
+
+	if (__sd_is_confined(sd) && sdf->profile != sd->active)
 		error = sd_perm(sd, file->f_dentry, file->f_vfsmnt,
 				mask & (MAY_EXEC | MAY_WRITE | MAY_READ));
+
 	put_sdcopy(sd);
 
-out:
 	return error;
 }
 
 static int subdomain_file_alloc_security(struct file *file)
 {
 	struct subdomain sdcopy, *sd;
+	int error = 0;
 
 	if (!current->security)
 		return 0;
 
 	sd = get_sdcopy(&sdcopy);
 
-	if (__sd_is_confined(sd))
-		file->f_security = get_sdprofile(sd->active);
+	if (__sd_is_confined(sd)) {
+		struct sdfile *sdf;
+
+		sdf = kmalloc(sizeof(struct sdfile), GFP_KERNEL);
+
+		if (sdf) {
+			sdf->type = sd_file_default;
+			sdf->profile = get_sdprofile(sd->active);
+		} else {
+			error = -ENOMEM;
+		}
+
+		file->f_security = sdf;
+	}
 
 	put_sdcopy(sd);
 
-	return 0;
+	return error;
 }
 
 static void subdomain_file_free_security(struct file *file)
 {
-	struct sdprofile *p = SD_PROFILE(file->f_security);
-	put_sdprofile(p);
+	struct sdfile *sdf = (struct sdfile *)file->f_security;
+
+	if (sdf) {
+		put_sdprofile(sdf->profile);
+		kfree(sdf);
+	}
 }
 
-static int subdomain_file_mmap (struct file *file, unsigned long reqprot,
- 				unsigned long prot, unsigned long flags)
+static inline int sd_mmap(struct file *file, unsigned long prot,
+				 unsigned long flags)
 {
 	int error = 0, mask = 0;
 	struct subdomain sdcopy, *sd;
-	struct sdprofile *f_profile;
+	struct sdfile *sdf;
 
-	if (!current->security)
+	if (!current->security || !file ||
+	    !(sdf = (struct sdfile *)file->f_security) ||
+	    sdf->type == sd_file_shmem)
 		return 0;
 
 	sd = get_sdcopy(&sdcopy);
 
-	f_profile = file ? SD_PROFILE(file->f_security) : NULL;
-
 	if (prot & PROT_READ)
 		mask |= MAY_READ;
-	if (prot & PROT_WRITE)
+
+	/* Private mappings don't require write perms since they don't
+	 * write back to the files */
+	if (prot & PROT_WRITE && !(flags & MAP_PRIVATE))
 		mask |= MAY_WRITE;
+
 	if (prot & PROT_EXEC)
-		mask |= MAY_EXEC;
+		mask |= SD_EXEC_MMAP;
 
 	SD_DEBUG("%s: 0x%x\n", __FUNCTION__, mask);
 
-	/* Don't check if no subdomain's, profiles haven't changed, or
-	 * mapping in the executable
-	 */
-	if (file && __sd_sub_defined(sd) &&
-	    f_profile != sd->active &&
-	    !(flags & MAP_EXECUTABLE))
+	if (mask)
 		error = sd_perm(sd, file->f_dentry, file->f_vfsmnt, mask);
 
 	put_sdcopy(sd);
 
 	return error;
+}
+
+static int subdomain_file_mmap(struct file *file, unsigned long reqprot,
+			       unsigned long prot, unsigned long flags)
+{
+	return sd_mmap(file, prot, flags);
+}
+
+static int subdomain_file_mprotect(struct vm_area_struct* vma,
+				   unsigned long reqprot, unsigned long prot)
+{
+	return sd_mmap(vma->vm_file, prot,
+		!(vma->vm_flags & VM_SHARED) ? MAP_PRIVATE : 0);
 }
 
 static int subdomain_task_alloc_security(struct task_struct *p)
@@ -599,6 +640,17 @@ static void subdomain_task_reparent_to_init(struct task_struct *p)
 {
 	cap_task_reparent_to_init(p);
 	return;
+}
+
+static int subdomain_shm_shmat(struct shmid_kernel* shp, char __user *shmaddr,
+			       int shmflg)
+{
+	struct sdfile *sdf = (struct sdfile *)shp->shm_file->f_security;
+
+	if (sdf)
+		sdf->type = sd_file_shmem;
+
+	return 0;
 }
 
 static int subdomain_getprocattr(struct task_struct *p, char *name, void *value,
@@ -768,6 +820,7 @@ struct security_operations subdomain_ops = {
 
 	.bprm_apply_creds =		subdomain_bprm_apply_creds,
 	.bprm_set_security =		subdomain_bprm_set_security,
+	.bprm_secureexec =		subdomain_bprm_secureexec,
 
 	.sb_mount =			subdomain_sb_mount,
 	.sb_umount =			subdomain_umount,
@@ -789,11 +842,14 @@ struct security_operations subdomain_ops = {
 	.file_alloc_security =		subdomain_file_alloc_security,
 	.file_free_security =		subdomain_file_free_security,
 	.file_mmap =			subdomain_file_mmap,
+	.file_mprotect =		subdomain_file_mprotect,
 
 	.task_alloc_security =		subdomain_task_alloc_security,
 	.task_free_security =		subdomain_task_free_security,
 	.task_post_setuid =		subdomain_task_post_setuid,
 	.task_reparent_to_init =	subdomain_task_reparent_to_init,
+
+	.shm_shmat =			subdomain_shm_shmat,
 
 	.getprocattr =			subdomain_getprocattr,
 	.setprocattr =			subdomain_setprocattr,

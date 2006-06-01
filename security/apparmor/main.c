@@ -134,22 +134,26 @@ out:
  *         SD_MAY_EXEC is returned indicating a naked x
  *         if the has an exec qualifier then only the qualifier bit {pui}
  *         is returned (SD_MAY_EXEC) is not set.
+ * @unsafe: true if secure_exec should be overridden
  *
  * Returns 0 (false):
  *    if unable to find profile or there are conflicting pattern matches.
  *       *xmod - is not modified
+ *       *unsafe - is not modified
  *
  * Returns 1 (true):
  *    if not confined
  *       *xmod = SD_MAY_EXEC
+ *       *unsafe = 0
  *    if exec rule matched
  *       if the rule has an execution mode qualifier {pui} then
  *          *xmod = the execution qualifier of the rule {pui}
  *       else
  *          *xmod = SD_MAY_EXEC
+ *       unsafe = presence of unsafe flag
  */
 static inline int sd_get_execmode(struct subdomain *sd, const char *name,
-				  int *xmod)
+				  int *xmod, int *unsafe)
 {
 	struct sdprofile *profile;
 	struct sd_entry *entry;
@@ -182,8 +186,8 @@ static inline int sd_get_execmode(struct subdomain *sd, const char *name,
 		    sdmatch_match(name, entry->filename,
 				  entry->entry_type, entry->extradata)) {
 			if (match &&
-			    SD_EXEC_MASK(entry->mode) !=
-			    SD_EXEC_MASK(match->mode))
+			    SD_EXEC_UNSAFE_MASK(entry->mode) !=
+			    SD_EXEC_UNSAFE_MASK(match->mode))
 				pattern_match_invalid = 1;
 			else
 				/* keep searching for an exact match */
@@ -203,8 +207,8 @@ static inline int sd_get_execmode(struct subdomain *sd, const char *name,
 				break;
 			} else {
 				if (match &&
-				    SD_EXEC_MASK(entry->mode) !=
-				    SD_EXEC_MASK(match->mode))
+				    SD_EXEC_UNSAFE_MASK(entry->mode) !=
+				    SD_EXEC_UNSAFE_MASK(match->mode))
 					pattern_match_invalid = 1;
 				else
 					/* got a tailglob match, keep searching
@@ -228,6 +232,7 @@ static inline int sd_get_execmode(struct subdomain *sd, const char *name,
 			mode = mode & ~SD_MAY_EXEC;
 
 		*xmod = mode;
+		*unsafe = (match->mode & SD_EXEC_UNSAFE);
 	} else if (!match) {
 		SD_DEBUG("%s: Unable to find execute entry in profile "
 			 "for image '%s'\n",
@@ -246,6 +251,7 @@ static inline int sd_get_execmode(struct subdomain *sd, const char *name,
 
 not_confined:
 	*xmod = SD_MAY_EXEC;
+	*unsafe = 0;
 	return 1;
 }
 
@@ -314,9 +320,10 @@ static unsigned int sd_file_perm(struct subdomain *sd, const char *name,
 
 	SD_DEBUG("%s: %s 0x%x\n", __FUNCTION__, name, mask);
 
-	/* should not enter with other than R/W/X/L */
+	/* should not enter with other than R/W/M/X/L */
 	BUG_ON(mask &
-	       ~(SD_MAY_READ | SD_MAY_WRITE | SD_MAY_EXEC | SD_MAY_LINK));
+	       ~(SD_MAY_READ | SD_MAY_WRITE | SD_MAY_EXEC |
+		 SD_EXEC_MMAP | SD_MAY_LINK));
 
 	/* not confined */
 	if (!__sd_is_confined(sd)) {
@@ -668,7 +675,8 @@ int sd_audit(struct subdomain *sd, const struct sd_audit *sa)
 	if (sa->type == SD_AUDITTYPE_FILE) {
 		int perm = sdaudit ? sa->ival : sa->errorcode;
 
-		audit_log_format(ab, "%s%s%s%s access to %s ",
+		audit_log_format(ab, "%s%s%s%s%s access to %s ",
+			perm & SD_EXEC_MMAP ? "m" : "",
 			perm & SD_MAY_READ  ? "r" : "",
 			perm & SD_MAY_WRITE ? "w" : "",
 			perm & SD_MAY_EXEC  ? "x" : "",
@@ -1212,15 +1220,17 @@ int sd_fork(struct task_struct *p)
  * This _used_ to be a really simple piece of code :-(
  *
  */
-int sd_register(struct file *filp)
+int sd_register(struct linux_binprm *bprm)
 {
 	char *filename;
+	struct file *filp = bprm->file;
 	struct subdomain *sd, sdcopy;
 	struct sdprofile *newprofile = NULL, unconstrained_flag;
 	int 	error = -ENOMEM,
 		exec_mode = 0,
 		findprofile = 0,
 		findprofile_mandatory = 0,
+		unsafe_exec = 0,
 		complain = 0;
 
 	SD_DEBUG("%s\n", __FUNCTION__);
@@ -1246,7 +1256,7 @@ int sd_register(struct file *filp)
 	/* Confined task, determine what mode inherit, unconstrained or
 	 * mandatory to load new profile
 	 */
-	if (sd_get_execmode(sd, filename, &exec_mode)) {
+	if (sd_get_execmode(sd, filename, &exec_mode, &unsafe_exec)) {
 		switch (exec_mode) {
 		case SD_EXEC_INHERIT:
 			/* do nothing - setting of profile
@@ -1306,9 +1316,10 @@ int sd_register(struct file *filp)
 	} else if (complain) {
 		/* There was no entry in calling profile
 		 * describing mode to execute image in.
-		 * Drop into null-profile
+		 * Drop into null-profile (disabling secure exec).
 		 */
 		newprofile = get_sdprofile(null_complain_profile);
+		unsafe_exec = 1;
 	} else {
 		SD_WARN("%s: Rejecting exec(2) of image '%s'. "
 			"Unable to determine exec qualifier "
@@ -1439,6 +1450,23 @@ apply_profile:
 				write_unlock_irqrestore(&sd_lock, flags);
 				goto find_profile;
 			}
+		}
+
+		/* Handle confined exec.
+		 * Can be at this point for the following reasons:
+		 * 1. unconfined switching to confined
+		 * 2. confined switching to different confinement
+		 * 3. confined switching to unconfined
+		 *
+		 * Cases 2 and 3 are marked as requiring secure exec
+		 * (unless policy specified "unsafe exec")
+		 */
+		if (__sd_is_confined(latest_sd) && !unsafe_exec) {
+			unsigned long bprm_flags;
+
+			bprm_flags = SD_SECURE_EXEC_NEEDED;
+			bprm->security = (void*)
+				((unsigned long)bprm->security | bprm_flags);
 		}
 
 		sd_switch(latest_sd, newprofile, newprofile);

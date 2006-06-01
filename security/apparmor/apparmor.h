@@ -15,6 +15,9 @@
 /* defn of iattr */
 #include <linux/fs.h>
 
+/* defn of linux_binprm */
+#include <linux/binfmts.h>
+
 #include "shared.h"
 
 /* Control parameters (0 or 1), settable thru module/boot flags or
@@ -86,14 +89,15 @@ struct sd_entry {
 	struct list_head listp[POS_SD_FILE_MAX + 1];
 };
 
-#define SD_EXEC_MODIFIER_MASK(mask) ((mask) & (SD_EXEC_UNCONSTRAINED |\
-		      		    SD_EXEC_INHERIT |\
-		      		    SD_EXEC_PROFILE))
+#define SD_SECURE_EXEC_NEEDED 0x00000001
 
-#define SD_EXEC_MASK(mask) ((mask) & (SD_MAY_EXEC |\
-		      		    SD_EXEC_UNCONSTRAINED |\
-		      		    SD_EXEC_INHERIT |\
-		      		    SD_EXEC_PROFILE))
+#define SD_EXEC_MODIFIER_MASK(mask) ((mask) & SD_EXEC_MODIFIERS)
+
+#define SD_EXEC_MASK(mask) ((mask) & (SD_MAY_EXEC | SD_EXEC_MODIFIERS))
+
+#define SD_EXEC_UNSAFE_MASK(mask) ((mask) & (SD_MAY_EXEC |\
+					     SD_EXEC_MODIFIERS |\
+					     SD_EXEC_UNSAFE))
 
 /**
  * sdprofile - basic confinement data
@@ -119,6 +123,21 @@ struct sdprofile {
 	kernel_cap_t capabilities;
 
 	atomic_t count;			/* reference count */
+};
+
+enum sdfile_type {
+	sd_file_default,
+	sd_file_shmem
+};
+
+/**
+ * sdfile - file pointer confinement data
+ *
+ * Data structure assigned to each open file (by subdomain_file_alloc_security)
+ */
+struct sdfile {
+	enum sdfile_type type;
+	struct sdprofile *profile;
 };
 
 /**
@@ -240,7 +259,7 @@ extern int sd_perm_dir(struct subdomain *sd, struct dentry *dentry,
 extern int sd_link(struct subdomain *sd,
 		   struct dentry *link, struct dentry *target);
 extern int sd_fork(struct task_struct *p);
-extern int sd_register(struct file *file);
+extern int sd_register(struct linux_binprm *bprm);
 extern void sd_release(struct task_struct *p);
 extern int sd_change_hat(const char *id, __u32 hat_magic);
 extern int sd_associate_filp(struct file *filp);
