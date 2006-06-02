@@ -690,7 +690,7 @@ static int is_processor_present(acpi_handle handle)
 
 	status = acpi_evaluate_integer(handle, "_STA", NULL, &sta);
 	if (ACPI_FAILURE(status) || !(sta & ACPI_STA_PRESENT)) {
-		ACPI_EXCEPTION((AE_INFO, status, "Processor Device is not present"));
+		printk(KERN_DEBUG "Hotpluggable processor device is not present\n");
 		return_VALUE(0);
 	}
 	return_VALUE(1);
