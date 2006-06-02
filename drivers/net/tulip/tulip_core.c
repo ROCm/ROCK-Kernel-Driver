@@ -18,11 +18,11 @@
 
 #define DRV_NAME	"tulip"
 #ifdef CONFIG_TULIP_NAPI
-#define DRV_VERSION    "1.1.13-NAPI" /* Keep at least for test */
+#define DRV_VERSION    "1.1.14-NAPI" /* Keep at least for test */
 #else
-#define DRV_VERSION	"1.1.13"
+#define DRV_VERSION	"1.1.14"
 #endif
-#define DRV_RELDATE	"May 11, 2002"
+#define DRV_RELDATE	"May 31, 2006"
 
 
 #include <linux/module.h>
@@ -774,14 +774,13 @@ static int tulip_close (struct net_device *dev)
 	int i;
 
 	netif_stop_queue (dev);
-
+	free_irq (dev->irq, dev);    /* don't let IRQs race w/tulip_down() */
 	tulip_down (dev);
 
 	if (tulip_debug > 1)
 		printk (KERN_DEBUG "%s: Shutting down ethercard, status was %2.2x.\n",
 			dev->name, ioread32 (ioaddr + CSR5));
 
-	free_irq (dev->irq, dev);
 
 	/* Free all the skbuffs in the Rx queue. */
 	for (i = 0; i < RX_RING_SIZE; i++) {
