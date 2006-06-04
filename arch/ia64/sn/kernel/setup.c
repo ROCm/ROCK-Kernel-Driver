@@ -678,6 +678,18 @@ void __init sn_cpu_init(void)
 		    (volatile unsigned long *)GLOBAL_MMR_ADDR(nasid,
 							      SH1_PI_CAM_CONTROL);
 	}
+
+/*
+ * This is a hack to fix a RCU scaling problems on insanely large systems. This fix
+ * is specific to 2.6.16-based kernel.
+ */
+        {
+                extern int rcu_mask;
+                if (cpuid == 512)
+                        rcu_mask = 1;
+                else if (cpuid == 768)
+                        rcu_mask = 3;
+        }
 }
 
 /*

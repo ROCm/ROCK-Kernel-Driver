@@ -152,6 +152,7 @@ enum
 	KERN_KDB=74,		/* int: kdb on/off */
 	KERN_DUMP=75,		/* directory: dump parameters */
 	KERN_HZ=76,		/* unsigned long: internal kernel HZ */
+	KERN_RCU_MASK=77,       /* int: mask for slow rcu callback processing */
 };
 
 

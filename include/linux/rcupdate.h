@@ -104,7 +104,6 @@ struct rcu_data {
 	struct rcu_head *donelist;
 	struct rcu_head **donetail;
 	long		blimit;		 /* Upper limit on a processed batch */
-	int doneself;
 	int cpu;
 	struct rcu_head barrier;
 #ifdef CONFIG_SMP
@@ -271,8 +270,6 @@ extern __deprecated_for_modules void synchronize_kernel(void);
 extern void synchronize_rcu(void);
 void synchronize_idle(void);
 extern void rcu_barrier(void);
-int rcu_set_remote_rcu(int cpu);
-void rcu_clear_remote_rcu(int cpu);
 
 #endif /* __KERNEL__ */
 #endif /* __LINUX_RCUPDATE_H */

@@ -47,6 +47,7 @@
 #include <linux/notifier.h>
 #include <linux/rcupdate.h>
 #include <linux/cpu.h>
+#include <linux/jiffies.h>
 
 /* Definition for rcupdate control block. */
 struct rcu_ctrlblk rcu_ctrlblk = {
@@ -64,6 +65,19 @@ struct rcu_ctrlblk rcu_bh_ctrlblk = {
 
 DEFINE_PER_CPU(struct rcu_data, rcu_data) = { 0L };
 DEFINE_PER_CPU(struct rcu_data, rcu_bh_data) = { 0L };
+
+/*
+ * Set the following to 1, 3, 7, 15, ... to slow down the rate at which RCU
+ * callbacks are processed. WARNING - make sure the value is 2**n-1
+ */
+int rcu_mask = 0;
+
+/* Is it time to process a batch on this cpu */
+static inline int rcu_time(int cpu)
+{
+	return (((jiffies - cpu) & rcu_mask) == 0);
+}
+
 
 /* Fake initialization required by compiler */
 static DEFINE_PER_CPU(struct tasklet_struct, rcu_tasklet) = {NULL};
@@ -105,91 +119,6 @@ static inline void force_quiescent_state(struct rcu_data *rdp,
 }
 #endif
 
-/*
- * Routines for setting up cpus for remote callback processing.
- * This is done to improve determinism on specified cpus.
- */
-#define rcu_remote_online_cpus(_m_) \
-	cpus_and((_m_), cpu_remotercu_map, cpu_online_map)
-
-static int cpu_remotercu_next = -1;
-static cpumask_t cpu_remotercu_map = CPU_MASK_NONE;
-static spinlock_t cpu_remotercu_lock = SPIN_LOCK_UNLOCKED;
-
-static inline int is_remote_rcu(void) {
-	cpumask_t mask;
-
-	rcu_remote_online_cpus(mask);
-	return cpu_isset(smp_processor_id(), mask);
-}
-
-static inline int rcu_remote_rcus(void)
-{
-	cpumask_t mask;
-
-	rcu_remote_online_cpus(mask);
-	return !cpus_empty(mask);
-}
-
-/* Get the next cpu to do remote callback processing on */
-static inline int rcu_next_remotercu(void)
-{
-	cpumask_t mask;
-	unsigned long flags;
-	int cpu;
-
-	rcu_remote_online_cpus(mask);
-	if (cpus_empty(mask))
-		return -1;
-	spin_lock_irqsave(&cpu_remotercu_lock, flags);
-	cpu_remotercu_next=next_cpu(cpu_remotercu_next, mask);
-	if (cpu_remotercu_next >= NR_CPUS) {
-		cpu_remotercu_next = first_cpu(mask);
-	}
-	cpu = cpu_remotercu_next;
-	spin_unlock_irqrestore(&cpu_remotercu_lock, flags);
-
-	return cpu;
-}
-
-int rcu_set_remote_rcu(int cpu) {
-	unsigned long flags;
-
-	if (cpu < NR_CPUS) {
-		spin_lock_irqsave(&cpu_remotercu_lock, flags);
-		cpu_set(cpu, cpu_remotercu_map);
-		spin_unlock_irqrestore(&cpu_remotercu_lock, flags);
-		return 0;
-	} else
-		return 1;
-}
-EXPORT_SYMBOL(rcu_set_remote_rcu);
-
-void rcu_clear_remote_rcu(int cpu) {
-	unsigned long flags;
-
-	if (cpu < NR_CPUS) {
-		spin_lock_irqsave(&cpu_remotercu_lock, flags);
-		cpu_clear(cpu, cpu_remotercu_map);
-		spin_unlock_irqrestore(&cpu_remotercu_lock, flags);
-	}
-}
-EXPORT_SYMBOL(rcu_clear_remote_rcu);
-
-/* Setup the mask of cpus configured for remote callback processing */
-static int __init rcu_remotercu_cpu_setup(char *str)
-{
-	int cpus[NR_CPUS], i;
-
-	str = get_options(str, ARRAY_SIZE(cpus), cpus);
-	cpus_clear(cpu_remotercu_map);
-	for (i = 1; i <= cpus[0]; i++)
-		rcu_set_remote_rcu(cpus[i]);
-	cpu_remotercu_next = first_cpu(cpu_remotercu_map);
-	return 1;
-}
-
-__setup ("remotercu=", rcu_remotercu_cpu_setup);
 /**
  * call_rcu - Queue an RCU callback for invocation after a grace period.
  * @head: structure to be used for queueing the RCU updates.
@@ -470,8 +399,6 @@ static void rcu_offline_cpu(int cpu)
 	struct rcu_data *this_rdp = &get_cpu_var(rcu_data);
 	struct rcu_data *this_bh_rdp = &get_cpu_var(rcu_bh_data);
 
-	rcu_clear_remote_rcu(cpu);
-
 	__rcu_offline_cpu(this_rdp, &rcu_ctrlblk,
 					&per_cpu(rcu_data, cpu));
 	__rcu_offline_cpu(this_bh_rdp, &rcu_bh_ctrlblk,
@@ -495,13 +422,9 @@ static void rcu_offline_cpu(int cpu)
 static void __rcu_process_callbacks(struct rcu_ctrlblk *rcp,
 					struct rcu_data *rdp)
 {
-	int is_remote;
-
 	if (rdp->curlist && !rcu_batch_before(rcp->completed, rdp->batch)) {
-		struct rcu_head ** r = rdp->donetail;
 		*rdp->donetail = rdp->curlist;
-		/* Only change donetail if __rcu_process_remote.. hasn't */
-		cmpxchg(&rdp->donetail, r, rdp->curtail);
+		rdp->donetail = rdp->curtail;
 		rdp->curlist = NULL;
 		rdp->curtail = &rdp->curlist;
 	}
@@ -536,62 +459,14 @@ static void __rcu_process_callbacks(struct rcu_ctrlblk *rcp,
 		local_irq_enable();
 	}
 	rcu_check_quiescent_state(rcp, rdp);
-	/* Prevent remote cpu's from accessing donelist */
-	if (likely(!(is_remote = is_remote_rcu())))
-		rdp->doneself = 0;
-	if (rdp->donelist && !is_remote) {
+	if (rdp->donelist)
 		rcu_do_batch(rdp);
-	}
-	if (unlikely(is_remote_rcu()))
-		rdp->doneself = 1;
-}
-
-static inline void __rcu_process_remote_callbacks(void)
-{
-	struct rcu_data *rdp;
-	struct rcu_head * list = NULL;
-	struct rcu_head * list_bh = NULL;
-	int cpu;
-
-
-	if (likely(!rcu_remote_rcus() || is_remote_rcu())) {
-		return;
-	}
-	cpu = rcu_next_remotercu();
-	/* Just in case.. */
-	if (unlikely(cpu == -1)) {
-		return;
-	}
-	rdp = &per_cpu(rcu_data, cpu);
-	/*
-	 * The xchg prevents multiple cpus from processing the same
-	 * list simulataneously.
-	 */
-	if (rdp->doneself && (list = xchg(&rdp->donelist, NULL))!=NULL) {
-		rdp->qlen = 0;
-		rdp->donetail = &rdp->donelist;
-	}
-	rdp = &per_cpu(rcu_bh_data, cpu);
-	if (rdp->doneself && (list_bh = xchg(&rdp->donelist, NULL))!=NULL) {
-		rdp->qlen = 0;
-		rdp->donetail = &rdp->donelist;
-	}
-
-	while (list) {
-		list->func(list);
-		list = list->next;
-	}
-	while (list_bh) {
-		list_bh->func(list_bh);
-		list_bh = list_bh->next;
-	}
 }
 
 static void rcu_process_callbacks(unsigned long unused)
 {
 	__rcu_process_callbacks(&rcu_ctrlblk, &__get_cpu_var(rcu_data));
 	__rcu_process_callbacks(&rcu_bh_ctrlblk, &__get_cpu_var(rcu_bh_data));
-	__rcu_process_remote_callbacks();
 }
 
 static int __rcu_pending(struct rcu_ctrlblk *rcp, struct rcu_data *rdp)
@@ -625,9 +500,6 @@ static int __rcu_pending(struct rcu_ctrlblk *rcp, struct rcu_data *rdp)
  */
 int rcu_pending(int cpu)
 {
-	/* If any cpus setup for remote callbacks, schedule tasklet anyway. */
-	if (unlikely(rcu_remote_rcus()) && !is_remote_rcu())
-		tasklet_schedule(&per_cpu(rcu_tasklet, cpu));
 	return __rcu_pending(&rcu_ctrlblk, &per_cpu(rcu_data, cpu)) ||
 		__rcu_pending(&rcu_bh_ctrlblk, &per_cpu(rcu_bh_data, cpu));
 }
@@ -648,6 +520,9 @@ int rcu_needs_cpu(int cpu)
 
 void rcu_check_callbacks(int cpu, int user)
 {
+	if (!rcu_time(cpu))
+		return;
+
 	if (user || 
 	    (idle_cpu(cpu) && !in_softirq() && 
 				hardirq_count() <= (1 << HARDIRQ_SHIFT))) {
