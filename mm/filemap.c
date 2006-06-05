@@ -536,6 +536,23 @@ void fastcall __lock_page(struct page *page)
 }
 EXPORT_SYMBOL(__lock_page);
 
+static int __sleep_on_page_lock(void *word)
+{
+	io_schedule();
+	return 0;
+}
+
+/*
+ * Variant of lock_page that does not require the caller to hold a reference
+ * on the page's mapping.
+ */
+void fastcall __lock_page_nosync(struct page *page)
+{
+	DEFINE_WAIT_BIT(wait, &page->flags, PG_locked);
+	__wait_on_bit_lock(page_waitqueue(page), &wait, __sleep_on_page_lock,
+							TASK_UNINTERRUPTIBLE);
+}
+
 /*
  * a rather lightweight function, finding and getting a reference to a
  * hashed page atomically.

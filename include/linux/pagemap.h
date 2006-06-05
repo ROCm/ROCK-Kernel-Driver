@@ -166,6 +166,7 @@ static inline pgoff_t linear_page_index(struct vm_area_struct *vma,
 }
 
 extern void FASTCALL(__lock_page(struct page *page));
+extern void FASTCALL(__lock_page_nosync(struct page *page));
 extern void FASTCALL(unlock_page(struct page *page));
 
 static inline void lock_page(struct page *page)
@@ -173,6 +174,13 @@ static inline void lock_page(struct page *page)
 	might_sleep();
 	if (TestSetPageLocked(page))
 		__lock_page(page);
+}
+
+static inline void lock_page_nosync(struct page *page)
+{
+	might_sleep();
+	if (TestSetPageLocked(page))
+		__lock_page_nosync(page);
 }
 	
 /*
