@@ -81,6 +81,8 @@ static inline int rcu_time(int cpu)
 
 /* Fake initialization required by compiler */
 static DEFINE_PER_CPU(struct tasklet_struct, rcu_tasklet) = {NULL};
+/* Tasklet for processing rcu callbacks remotely */
+static DEFINE_PER_CPU(struct tasklet_struct, rcu_remote_tasklet) = {NULL};
 static int blimit = 10;
 static int qhimark = 10000;
 static int qlowmark = 100;
@@ -119,6 +121,185 @@ static inline void force_quiescent_state(struct rcu_data *rdp,
 }
 #endif
 
+/*
+ * Variables and routines for remote rcu callback processing
+ *
+ * Remote callback processing allows specified (configured) cpus to have
+ * their list of rcu callbacks processed by other (non-configured) cpus,
+ * thus reducing the amount of overhead and latency seen by configured
+ * cpus.
+ *
+ * This is accomplished by having non-configured cpus process the donelist
+ * of the configured cpus from tasklet context.  The remote cpu donelists
+ * are processed in a round-robin fashion, one list per cpu.  Since only
+ * donelist processing is affected, other rcu list and quiescent state
+ * processing is unaffected.
+ *
+ * Configuration of a cpu for remote callback processing is done via the
+ * rcu_set_remote_rcu() and rcu_clear_remote_rcu() routines.
+ */
+#define RCU_BATCH_IDLE 0
+#define RCU_BATCH_LOCAL 1
+#define RCU_BATCH_REMOTE 2
+
+#if defined(CONFIG_NUMA) && defined(CONFIG_IA64)
+#define remote_rcu_callbacks 1
+
+/* cpus configured for remote callback processing, this rarely changes */
+static cpumask_t __read_mostly cpu_remotercu_map = CPU_MASK_NONE;
+
+/* next cpu for which we need to do remote callback processing */
+static int cpu_remotercu_next = -1;
+
+/* lock cpu_remotercu_next and changes to cpu_remotercu_map */
+static DEFINE_SPINLOCK(cpu_remotercu_lock);
+
+/*
+ * Return a mask of online cpus configured for remote rcu processing.
+ */
+static void rcu_remote_cpus(cpumask_t * mask)
+{
+	cpus_and(*mask, cpu_remotercu_map, cpu_online_map);
+}
+
+/*
+ * Is this cpu configured for remote rcu callback processing?
+ */
+static int rcu_callbacks_processed_remotely(int cpu)
+{
+	cpumask_t mask;
+
+	rcu_remote_cpus(&mask);
+	return(cpu_isset(cpu, mask));
+}
+
+/*
+ * Should this cpu be processing rcu callbacks for cpus configured as such?
+ */
+static int rcu_process_remote(int cpu)
+{
+	cpumask_t mask;
+
+	rcu_remote_cpus(&mask);
+	/*
+	 * If the system has some cpus configured for remote callbacks and
+	 * this cpu is not one of those, then this cpu processes remote rcu
+	 * callbacks.
+	 */
+	return (!cpus_empty(mask) && !cpu_isset(cpu, mask));
+}
+
+/*
+ * Get the next cpu on which to do remote rcu callback processing
+ * We simply round-robin across all cpus configured for remote callbacks.
+ */
+static int rcu_next_remotercu(void)
+{
+	cpumask_t mask;
+	unsigned long flags;
+	int cpu;
+
+	rcu_remote_cpus(&mask);
+	if (unlikely(cpus_empty(mask)))
+		return -1;
+	spin_lock_irqsave(&cpu_remotercu_lock, flags);
+	cpu_remotercu_next = next_cpu(cpu_remotercu_next, mask);
+	if (cpu_remotercu_next >= NR_CPUS)
+		cpu_remotercu_next = first_cpu(mask);
+	cpu = cpu_remotercu_next;
+	spin_unlock_irqrestore(&cpu_remotercu_lock, flags);
+
+	return cpu;
+}
+
+static void rcu_rm_lock(struct rcu_data *rdp)
+{
+	spin_lock_irq(&rdp->rmlock);
+}
+
+static void rcu_rm_unlock(struct rcu_data *rdp)
+{
+	spin_unlock_irq(&rdp->rmlock);
+}
+
+static void rcu_set_batch_stat(struct rcu_data *rdp, short stat)
+{
+	rdp->batch_stat = stat;
+}
+
+/*
+ * Update the batch processing status only if no current callback processing.
+ */
+static short rcu_setcmp_batch_stat(struct rcu_data *rdp, short stat)
+{
+	return cmpxchg(&rdp->batch_stat, RCU_BATCH_IDLE, stat) == RCU_BATCH_IDLE;
+}
+
+/*
+ * Update qlen and return the new value.
+ */
+static long rcu_updated_qlen(struct rcu_data *rdp)
+{
+	long old, new;
+
+	/* Update qlen safely if configured for remote callbacks */
+	if (unlikely(rcu_callbacks_processed_remotely(smp_processor_id()))) {
+		do {
+			old = rdp->qlen;
+			new = old + 1;
+		} while (cmpxchg(&rdp->qlen, old, new) != old);
+		return new;
+	} else
+		return ++rdp->qlen;
+}
+
+/*
+ * Configure a cpu for remote rcu callback processing.
+ */
+int rcu_set_remote_rcu(int cpu)
+{
+	unsigned long flags;
+
+	if (cpu_online(cpu)) {
+		spin_lock_irqsave(&cpu_remotercu_lock, flags);
+		cpu_set(cpu, cpu_remotercu_map);
+		spin_unlock_irqrestore(&cpu_remotercu_lock, flags);
+		return 0;
+	} else
+		return -1;
+}
+EXPORT_SYMBOL_GPL(rcu_set_remote_rcu);
+
+/*
+ * Configure a cpu for standard rcu callback processing.
+ */
+int rcu_clear_remote_rcu(int cpu)
+{
+	unsigned long flags;
+
+	if (cpu_online(cpu)) {
+		spin_lock_irqsave(&cpu_remotercu_lock, flags);
+		cpu_clear(cpu, cpu_remotercu_map);
+		spin_unlock_irqrestore(&cpu_remotercu_lock, flags);
+		return 0;
+	} else
+		return -1;
+}
+EXPORT_SYMBOL_GPL(rcu_clear_remote_rcu);
+#else
+#define remote_rcu_callbacks 0
+static int rcu_callbacks_processed_remotely(int cpu) { return 0; }
+static int rcu_process_remote(int cpu) { return 0; }
+static void rcu_rm_lock(struct rcu_data *rdp) {}
+static void rcu_rm_unlock(struct rcu_data *rdp) {}
+static void rcu_set_batch_stat(struct rcu_data *rdp, short stat) {}
+static int rcu_setcmp_batch_stat(struct rcu_data *rdp, short stat) { return 1; }
+static long rcu_updated_qlen(struct rcu_data *rdp)
+{
+	return ++rdp->qlen;
+}
+static void rcu_clear_remote_rcu(int cpu) {}
+#endif
 /**
  * call_rcu - Queue an RCU callback for invocation after a grace period.
  * @head: structure to be used for queueing the RCU updates.
@@ -142,7 +323,7 @@ void fastcall call_rcu(struct rcu_head *head,
 	rdp = &__get_cpu_var(rcu_data);
 	*rdp->nxttail = head;
 	rdp->nxttail = &head->next;
-	if (unlikely(++rdp->qlen > qhimark)) {
+	if (unlikely(rcu_updated_qlen(rdp) > qhimark)) {
 		rdp->blimit = INT_MAX;
 		force_quiescent_state(rdp, &rcu_ctrlblk);
 	}
@@ -178,7 +359,7 @@ void fastcall call_rcu_bh(struct rcu_head *head,
 	*rdp->nxttail = head;
 	rdp->nxttail = &head->next;
 
-	if (unlikely(++rdp->qlen > qhimark)) {
+	if (unlikely(rcu_updated_qlen(rdp) > qhimark)) {
 		rdp->blimit = INT_MAX;
 		force_quiescent_state(rdp, &rcu_bh_ctrlblk);
 	}
@@ -399,6 +580,8 @@ static void rcu_offline_cpu(int cpu)
 	struct rcu_data *this_rdp = &get_cpu_var(rcu_data);
 	struct rcu_data *this_bh_rdp = &get_cpu_var(rcu_bh_data);
 
+	rcu_clear_remote_rcu(cpu);
+
 	__rcu_offline_cpu(this_rdp, &rcu_ctrlblk,
 					&per_cpu(rcu_data, cpu));
 	__rcu_offline_cpu(this_bh_rdp, &rcu_bh_ctrlblk,
@@ -406,6 +589,7 @@ static void rcu_offline_cpu(int cpu)
 	put_cpu_var(rcu_data);
 	put_cpu_var(rcu_bh_data);
 	tasklet_kill_immediate(&per_cpu(rcu_tasklet, cpu), cpu);
+	tasklet_kill_immediate(&per_cpu(rcu_remote_tasklet, cpu), cpu);
 }
 
 #else
@@ -422,9 +606,26 @@ static void rcu_offline_cpu(int cpu)
 static void __rcu_process_callbacks(struct rcu_ctrlblk *rcp,
 					struct rcu_data *rdp)
 {
+	int cpu = smp_processor_id();
+
 	if (rdp->curlist && !rcu_batch_before(rcp->completed, rdp->batch)) {
-		*rdp->donetail = rdp->curlist;
-		rdp->donetail = rdp->curtail;
+		/*
+		 * If this cpu is configured for remote rcu callback
+		 * processing, grab the lock to protect donelist from
+		 * changes done by remote callback processing.
+		 *
+		 * Remote callback processing should only try this lock,
+		 * then move on, so contention should be minimal.
+		 */
+		if (unlikely(rcu_callbacks_processed_remotely(cpu))) {
+			rcu_rm_lock(rdp);
+			*rdp->donetail = rdp->curlist;
+			rdp->donetail = rdp->curtail;
+			rcu_rm_unlock(rdp);
+		} else {
+			*rdp->donetail = rdp->curlist;
+			rdp->donetail = rdp->curtail;
+		}
 		rdp->curlist = NULL;
 		rdp->curtail = &rdp->curlist;
 	}
@@ -459,8 +660,15 @@ static void __rcu_process_callbacks(struct rcu_ctrlblk *rcp,
 		local_irq_enable();
 	}
 	rcu_check_quiescent_state(rcp, rdp);
-	if (rdp->donelist)
+	if (remote_rcu_callbacks) {
+		if (rdp->donelist && !rcu_callbacks_processed_remotely(cpu) &&
+				rcu_setcmp_batch_stat(rdp, RCU_BATCH_LOCAL)) {
+			rcu_do_batch(rdp);
+			rcu_set_batch_stat(rdp, RCU_BATCH_IDLE);
+		}
+	} else if (rdp->donelist) {
 		rcu_do_batch(rdp);
+	}
 }
 
 static void rcu_process_callbacks(unsigned long unused)
@@ -468,6 +676,97 @@ static void rcu_process_callbacks(unsigned long unused)
 	__rcu_process_callbacks(&rcu_ctrlblk, &__get_cpu_var(rcu_data));
 	__rcu_process_callbacks(&rcu_bh_ctrlblk, &__get_cpu_var(rcu_bh_data));
 }
+
+#if defined(CONFIG_NUMA) && defined(CONFIG_IA64)
+/*
+ * Do callback processing for cpus marked as such.
+ *
+ * This will only be run on systems with cpus configured for remote
+ * callback processing, but only on cpus not configured as such.
+ *
+ * We process both regular and bh donelists for only one cpu at a
+ * time.
+ */
+static void rcu_process_remote_callbacks(unsigned long unused)
+{
+	struct rcu_data *rdp, *rdp_bh;
+	struct rcu_head * list = NULL;
+	struct rcu_head * list_bh = NULL;
+	int cpu;
+	long old, new, cnt;
+
+	/* Get the cpu for which we will process the donelists */
+	cpu = rcu_next_remotercu();
+	if (unlikely(cpu == -1))
+		return;
+
+	/*
+	 * We process whatever remote callbacks we can at this moment for
+	 * this cpu.  If the list protection locks are held, we move on,
+	 * as we don't want contention.
+	 */
+	rdp = &per_cpu(rcu_data, cpu);
+	if (spin_trylock_irq(&rdp->rmlock)) {
+		/*
+		 * batch_stat ensures cpu isn't still running rcu_do_batch.
+		 * This can happen if we've just configured on the fly.
+		 */
+		if (rcu_setcmp_batch_stat(rdp, RCU_BATCH_REMOTE)) {
+			list = xchg(&rdp->donelist, NULL);
+			if (list != NULL)
+				rdp->donetail = &rdp->donelist;
+		}
+		spin_unlock_irq(&rdp->rmlock);
+	}
+
+	rdp_bh = &per_cpu(rcu_bh_data, cpu);
+	if (spin_trylock_irq(&rdp_bh->rmlock)) {
+		if (rcu_setcmp_batch_stat(rdp_bh, RCU_BATCH_REMOTE)) {
+			list_bh = xchg(&rdp_bh->donelist, NULL);
+			if (list_bh != NULL)
+				rdp_bh->donetail = &rdp_bh->donelist;
+		}
+		spin_unlock_irq(&rdp_bh->rmlock);
+	}
+
+	/* Process the donelists */
+	cnt = 0;
+	while (list) {
+		list->func(list);
+		list = list->next;
+		cnt++;
+	}
+
+	/* Safely update qlen without lock contention */
+	if (cnt) {
+		do {
+			old = rdp->qlen;
+			new = old - cnt;
+		} while (cmpxchg(&rdp->qlen, old, new) != old);
+	}
+
+	if (rdp->batch_stat == RCU_BATCH_REMOTE)
+		rcu_set_batch_stat(rdp, RCU_BATCH_IDLE);
+
+	cnt = 0;
+	while (list_bh) {
+		list_bh->func(list_bh);
+		list_bh = list_bh->next;
+		cnt++;
+	}
+
+	if (cnt) {
+		do {
+			old = rdp_bh->qlen;
+			new = old - cnt;
+		} while (cmpxchg(&rdp_bh->qlen, old, new)!=old);
+	}
+	if (rdp_bh->batch_stat == RCU_BATCH_REMOTE)
+		rcu_set_batch_stat(rdp_bh, RCU_BATCH_IDLE);
+}
+#else
+static void rcu_process_remote_callbacks(unsigned long unused) {}
+#endif
 
 static int __rcu_pending(struct rcu_ctrlblk *rcp, struct rcu_data *rdp)
 {
@@ -500,6 +799,13 @@ static int __rcu_pending(struct rcu_ctrlblk *rcp, struct rcu_data *rdp)
  */
 int rcu_pending(int cpu)
 {
+	/*
+	 * Schedule remote callback processing on this cpu only if
+	 * there are cpus set up for remote callback processing, and
+	 * this one is not.
+	 */
+	if (unlikely(rcu_process_remote(cpu)))
+		tasklet_schedule(&per_cpu(rcu_remote_tasklet, cpu));
 	return __rcu_pending(&rcu_ctrlblk, &per_cpu(rcu_data, cpu)) ||
 		__rcu_pending(&rcu_bh_ctrlblk, &per_cpu(rcu_bh_data, cpu));
 }
@@ -544,6 +850,9 @@ static void rcu_init_percpu_data(int cpu, struct rcu_ctrlblk *rcp,
 	rdp->qs_pending = 0;
 	rdp->cpu = cpu;
 	rdp->blimit = blimit;
+#if defined(CONFIG_SMP) && defined(CONFIG_IA64)
+	spin_lock_init(&rdp->rmlock);
+#endif
 }
 
 static void __devinit rcu_online_cpu(int cpu)
@@ -554,6 +863,8 @@ static void __devinit rcu_online_cpu(int cpu)
 	rcu_init_percpu_data(cpu, &rcu_ctrlblk, rdp);
 	rcu_init_percpu_data(cpu, &rcu_bh_ctrlblk, bh_rdp);
 	tasklet_init(&per_cpu(rcu_tasklet, cpu), rcu_process_callbacks, 0UL);
+	tasklet_init(&per_cpu(rcu_remote_tasklet, cpu),
+			rcu_process_remote_callbacks, 0UL);
 }
 
 static int __devinit rcu_cpu_notify(struct notifier_block *self, 

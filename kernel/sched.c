@@ -636,7 +636,7 @@ static int effective_prio(task_t *p)
 static inline void __activate_task(task_t *p, runqueue_t *rq)
 {
 	prio_array_t *array = rq->active;
-	if (unlikely(EXPIRED_STARVING(rq)))
+	if (!rt_task(p) && unlikely(EXPIRED_STARVING(rq)))
 		array = rq->expired;
 	enqueue_task(p, array);
 	rq->nr_running++;
