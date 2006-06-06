@@ -802,8 +802,6 @@ static int elevator_switch(request_queue_t *q, struct elevator_type *new_e)
 		elv_drain_elevator(q);
 	}
 
-	spin_unlock_irq(q->queue_lock);
-
 	/*
 	 * unregister old elevator data
 	 */
@@ -819,6 +817,8 @@ static int elevator_switch(request_queue_t *q, struct elevator_type *new_e)
 	if (elv_register_queue(q))
 		goto fail_register;
 
+	spin_unlock_irq(q->queue_lock);
+
 	/*
 	 * finally exit old elevator and turn off BYPASS.
 	 */
@@ -827,16 +827,19 @@ static int elevator_switch(request_queue_t *q, struct elevator_type *new_e)
 	return 1;
 
 fail_register:
+	spin_unlock_irq(q->queue_lock);
 	/*
 	 * switch failed, exit the new io scheduler and reattach the old
 	 * one again (along with re-adding the sysfs dir)
 	 */
 	elevator_exit(e);
 	e = NULL;
+	spin_lock_irq(q->queue_lock);
 fail:
 	q->elevator = old_elevator;
 	elv_register_queue(q);
 	clear_bit(QUEUE_FLAG_ELVSWITCH, &q->queue_flags);
+	spin_unlock_irq(q->queue_lock);
 	if (e)
 		kobject_put(&e->kobj);
 	return 0;
