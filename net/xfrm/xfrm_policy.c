@@ -790,11 +790,12 @@ int xfrm_lookup(struct dst_entry **dst_p, struct flowi *fl,
 
 restart:
 	if (unlikely(time_after(jiffies, timeout))) {
-		printk(KERN_NOTICE "xfrm_lookup bailing out after 60 seconds and %d loops\n", loops++);
+		printk(KERN_NOTICE "xfrm_lookup bailing out after 60 seconds and %d loops\n", loops);
 		dump_stack();
 		err = -EHOSTUNREACH;
 		goto error_nopol;
 	}
+	++loops;
 
 	genid = atomic_read(&flow_cache_genid);
 	policy = NULL;
