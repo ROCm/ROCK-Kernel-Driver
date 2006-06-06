@@ -814,10 +814,10 @@ static int elevator_switch(request_queue_t *q, struct elevator_type *new_e)
 	if (elevator_attach(q, e))
 		goto fail;
 
+	spin_unlock_irq(q->queue_lock);
+
 	if (elv_register_queue(q))
 		goto fail_register;
-
-	spin_unlock_irq(q->queue_lock);
 
 	/*
 	 * finally exit old elevator and turn off BYPASS.
@@ -827,7 +827,6 @@ static int elevator_switch(request_queue_t *q, struct elevator_type *new_e)
 	return 1;
 
 fail_register:
-	spin_unlock_irq(q->queue_lock);
 	/*
 	 * switch failed, exit the new io scheduler and reattach the old
 	 * one again (along with re-adding the sysfs dir)
@@ -837,9 +836,9 @@ fail_register:
 	spin_lock_irq(q->queue_lock);
 fail:
 	q->elevator = old_elevator;
+	spin_unlock_irq(q->queue_lock);
 	elv_register_queue(q);
 	clear_bit(QUEUE_FLAG_ELVSWITCH, &q->queue_flags);
-	spin_unlock_irq(q->queue_lock);
 	if (e)
 		kobject_put(&e->kobj);
 	return 0;
