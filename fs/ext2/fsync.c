@@ -25,6 +25,7 @@
 #include "ext2.h"
 #include <linux/smp_lock.h>
 #include <linux/buffer_head.h>		/* for fsync_inode_buffers() */
+#include <linux/pagemap.h>
 
 
 /*
@@ -35,10 +36,26 @@
 int ext2_sync_file(struct file *file, struct dentry *dentry, int datasync)
 {
 	struct inode *inode = dentry->d_inode;
+	struct super_block *sb = inode->i_sb;
 	int err;
 	int ret;
 
 	ret = sync_mapping_buffers(inode->i_mapping);
+
+	/* it might make more sense to ext2_error on -EIO from
+	 * sync_mapping_buffers as well, but those errors are isolated to just
+	 * this file. We can safely return -EIO to fsync and let the app know
+	 * they have a problem.  
+	 *
+	 * AS_EIO indicates a failure to write a metadata page, but we have no 
+	 * way of knowing which one.  It's best to force readonly and let fsck 
+	 * figure it all out.
+	 */
+	if (test_and_clear_bit(AS_EIO, &sb->s_bdev->bd_inode->i_mapping->flags)) {
+		ext2_error(sb, "ext2_sync_file", "metadata io error");
+		if (!ret)
+			ret = -EIO;
+	}
 	if (!(inode->i_state & I_DIRTY))
 		return ret;
 	if (datasync && !(inode->i_state & I_DIRTY_DATASYNC))
