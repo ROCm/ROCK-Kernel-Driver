@@ -802,6 +802,8 @@ static int elevator_switch(request_queue_t *q, struct elevator_type *new_e)
 		elv_drain_elevator(q);
 	}
 
+	spin_unlock_irq(q->queue_lock);
+
 	/*
 	 * unregister old elevator data
 	 */
@@ -813,8 +815,6 @@ static int elevator_switch(request_queue_t *q, struct elevator_type *new_e)
 	 */
 	if (elevator_attach(q, e))
 		goto fail;
-
-	spin_unlock_irq(q->queue_lock);
 
 	if (elv_register_queue(q))
 		goto fail_register;
@@ -833,10 +833,8 @@ fail_register:
 	 */
 	elevator_exit(e);
 	e = NULL;
-	spin_lock_irq(q->queue_lock);
 fail:
 	q->elevator = old_elevator;
-	spin_unlock_irq(q->queue_lock);
 	elv_register_queue(q);
 	clear_bit(QUEUE_FLAG_ELVSWITCH, &q->queue_flags);
 	if (e)
