@@ -760,12 +760,17 @@ static struct scsi_id_instance_data *sbp2_alloc_device(struct unit_directory *ud
 
 	/* Register the status FIFO address range. We could use the same FIFO
 	 * for targets at different nodes. However we need different FIFOs per
-	 * target in order to support multi-unit devices. */
+	 * target in order to support multi-unit devices.
+	 * The FIFO is located out of the local host controller's physical range
+	 * but, if possible, within the posted write area. Status writes will
+	 * then be performed as unified transactions. This slightly reduces
+	 * bandwidth usage, and some Prolific based devices seem to require it.
+	 */
 	scsi_id->status_fifo_addr = hpsb_allocate_and_register_addrspace(
 			&sbp2_highlevel, ud->ne->host, &sbp2_ops,
 			sizeof(struct sbp2_status_block), sizeof(quadlet_t),
-			~0ULL, ~0ULL);
-	if (!scsi_id->status_fifo_addr) {
+			0x010000000000ULL, CSR1212_ALL_SPACE_END);
+	if (scsi_id->status_fifo_addr == ~0ULL) {
 		SBP2_ERR("failed to allocate status FIFO address range");
 		goto failed_alloc;
 	}
@@ -2495,9 +2500,20 @@ static int sbp2scsi_slave_alloc(struct scsi_device *sdev)
 
 static int sbp2scsi_slave_configure(struct scsi_device *sdev)
 {
+	struct scsi_id_instance_data *scsi_id =
+		(struct scsi_id_instance_data *)sdev->host->hostdata[0];
+
 	blk_queue_dma_alignment(sdev->request_queue, (512 - 1));
 	sdev->use_10_for_rw = 1;
 	sdev->use_10_for_ms = 1;
+
+	if ((scsi_id->sbp2_firmware_revision & 0xffff00) == 0x0a2700 &&
+	    (scsi_id->ud->model_id == 0x000021 /* gen.4 iPod */ ||
+	     scsi_id->ud->model_id == 0x000023 /* iPod mini  */ ||
+	     scsi_id->ud->model_id == 0x00007e /* iPod Photo */ )) {
+		SBP2_INFO("enabling iPod workaround: decrement disk capacity");
+		sdev->fix_capacity = 1;
+	}
 	return 0;
 }
 
