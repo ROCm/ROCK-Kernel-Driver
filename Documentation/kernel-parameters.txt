@@ -1693,6 +1693,10 @@ running once the system is up.
 	norandmaps	Don't use address space randomization
 			Equivalent to echo 0 > /proc/sys/kernel/randomize_va_space
 
+	disable_buffer_lru
+			Disable per CPU LRU in the buffer cache.
+			This might avoid some real time hickups on large systems.
+
 
 ______________________________________________________________________
 Changelog:
