@@ -19,7 +19,7 @@
  * This makes sure that old versions of dom0 tools will stop working in a
  * well-defined way (rather than crashing the machine, for instance).
  */
-#define DOM0_INTERFACE_VERSION   0x03000000
+#define DOM0_INTERFACE_VERSION   0x03000001
 
 /************************************************************************/
 
@@ -27,10 +27,10 @@
 typedef struct dom0_getmemlist {
     /* IN variables. */
     domid_t       domain;
-    unsigned long max_pfns;
+    uint64_t max_pfns;
     GUEST_HANDLE(ulong) buffer;
     /* OUT variables. */
-    unsigned long num_pfns;
+    uint64_t num_pfns;
 } dom0_getmemlist_t;
 DEFINE_GUEST_HANDLE(dom0_getmemlist_t);
 
@@ -91,8 +91,8 @@ typedef struct dom0_getdomaininfo {
 #define DOMFLAGS_SHUTDOWNMASK 255 /* DOMFLAGS_SHUTDOWN guest-supplied code.  */
 #define DOMFLAGS_SHUTDOWNSHIFT 16
     uint32_t flags;
-    unsigned long tot_pages;
-    unsigned long max_pages;
+    uint64_t tot_pages;
+    uint64_t max_pages;
     unsigned long shared_info_frame;       /* MFN of shared_info struct */
     uint64_t cpu_time;
     uint32_t nr_online_vcpus;     /* Number of VCPUs currently online. */
@@ -216,8 +216,8 @@ typedef struct dom0_physinfo {
     uint32_t sockets_per_node;
     uint32_t nr_nodes;
     uint32_t cpu_khz;
-    unsigned long total_pages;
-    unsigned long free_pages;
+    uint64_t total_pages;
+    uint64_t free_pages;
     uint32_t hw_cap[8];
 } dom0_physinfo_t;
 DEFINE_GUEST_HANDLE(dom0_physinfo_t);
@@ -260,7 +260,7 @@ typedef struct dom0_shadow_control {
     uint32_t       op;
     GUEST_HANDLE(ulong) dirty_bitmap;
     /* IN/OUT variables. */
-    unsigned long  pages;        /* size of buffer, updated with actual size */
+    uint64_t       pages;        /* size of buffer, updated with actual size */
     /* OUT variables. */
     dom0_shadow_control_stats_t stats;
 } dom0_shadow_control_t;
@@ -269,16 +269,16 @@ DEFINE_GUEST_HANDLE(dom0_shadow_control_t);
 #define DOM0_SETDOMAINMAXMEM   28
 typedef struct dom0_setdomainmaxmem {
     /* IN variables. */
-    domid_t       domain;
-    unsigned long max_memkb;
+    domid_t  domain;
+    uint64_t max_memkb;
 } dom0_setdomainmaxmem_t;
 DEFINE_GUEST_HANDLE(dom0_setdomainmaxmem_t);
 
 #define DOM0_GETPAGEFRAMEINFO2 29   /* batched interface */
 typedef struct dom0_getpageframeinfo2 {
     /* IN variables. */
-    domid_t        domain;
-    unsigned long  num;
+    domid_t  domain;
+    uint64_t num;
     /* IN/OUT variables. */
     GUEST_HANDLE(ulong) array;
 } dom0_getpageframeinfo2_t;
@@ -295,11 +295,11 @@ DEFINE_GUEST_HANDLE(dom0_getpageframeinfo2_t);
 typedef struct dom0_add_memtype {
     /* IN variables. */
     unsigned long mfn;
-    unsigned long nr_mfns;
-    uint32_t      type;
+    uint64_t nr_mfns;
+    uint32_t type;
     /* OUT variables. */
-    uint32_t      handle;
-    uint32_t      reg;
+    uint32_t handle;
+    uint32_t reg;
 } dom0_add_memtype_t;
 DEFINE_GUEST_HANDLE(dom0_add_memtype_t);
 
@@ -325,7 +325,7 @@ typedef struct dom0_read_memtype {
     uint32_t reg;
     /* OUT variables. */
     unsigned long mfn;
-    unsigned long nr_mfns;
+    uint64_t nr_mfns;
     uint32_t type;
 } dom0_read_memtype_t;
 DEFINE_GUEST_HANDLE(dom0_read_memtype_t);
@@ -462,7 +462,7 @@ DEFINE_GUEST_HANDLE(dom0_irq_permission_t);
 typedef struct dom0_iomem_permission {
     domid_t  domain;          /* domain to be affected */
     unsigned long first_mfn;  /* first page (physical page number) in range */
-    unsigned long nr_mfns;    /* number of pages in range (>0) */
+    uint64_t nr_mfns;         /* number of pages in range (>0) */
     uint8_t allow_access;     /* allow (!0) or deny (0) access to range? */
 } dom0_iomem_permission_t;
 DEFINE_GUEST_HANDLE(dom0_iomem_permission_t);

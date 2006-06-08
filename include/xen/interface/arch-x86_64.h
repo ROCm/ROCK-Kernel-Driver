@@ -232,6 +232,9 @@ typedef struct vcpu_guest_context {
 } vcpu_guest_context_t;
 DEFINE_GUEST_HANDLE(vcpu_guest_context_t);
 
+#define xen_pfn_to_cr3(pfn) ((unsigned long)(pfn) << 12)
+#define xen_cr3_to_pfn(cr3) ((unsigned long)(cr3) >> 12)
+
 typedef struct arch_shared_info {
     unsigned long max_pfn;                  /* max pfn that appears in table */
     /* Frame containing list of mfns containing list of mfns containing p2m. */

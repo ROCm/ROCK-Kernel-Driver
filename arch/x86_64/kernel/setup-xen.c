@@ -667,13 +667,6 @@ void __init setup_arch(char **cmdline_p)
 
 	setup_xen_features();
 
-	if (xen_feature(XENFEAT_auto_translated_physmap) &&
-	    xen_start_info->shared_info < xen_start_info->nr_pages) {
-		HYPERVISOR_shared_info =
-			(shared_info_t *)__va(xen_start_info->shared_info);
-		memset(empty_zero_page, 0, sizeof(empty_zero_page));
-	}
-
 	HYPERVISOR_vm_assist(VMASST_CMD_enable,
 			     VMASST_TYPE_writable_pagetables);
 
@@ -813,14 +806,6 @@ void __init setup_arch(char **cmdline_p)
 #ifdef CONFIG_XEN
 	{
 		int i, j, k, fpp;
-		unsigned long va;
-
-		/* 'Initial mapping' of initrd must be destroyed. */
-		for (va = xen_start_info->mod_start;
-		     va < (xen_start_info->mod_start+xen_start_info->mod_len);
-		     va += PAGE_SIZE) {
-			HYPERVISOR_update_va_mapping(va, __pte_ma(0), 0);
-		}
 
 		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
 			/* Make sure we have a large enough P->M table. */
@@ -835,14 +820,6 @@ void __init setup_arch(char **cmdline_p)
 				__pa(xen_start_info->mfn_list),
 				PFN_PHYS(PFN_UP(xen_start_info->nr_pages *
 						sizeof(unsigned long))));
-
-			/* Destroyed 'initial mapping' of old p2m table. */
-			for (va = xen_start_info->mfn_list;
-			     va < (xen_start_info->mfn_list +
-				   (xen_start_info->nr_pages*sizeof(unsigned long)));
-			     va += PAGE_SIZE) {
-				HYPERVISOR_update_va_mapping(va, __pte_ma(0), 0);
-			}
 
 			/*
 			 * Initialise the list of the frames that specify the

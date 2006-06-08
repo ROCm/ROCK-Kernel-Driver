@@ -670,9 +670,21 @@ void __meminit init_memory_mapping(unsigned long start, unsigned long end)
 	if (!after_bootmem) {
 		BUG_ON(start_pfn != table_start + (tables_space >> PAGE_SHIFT));
 
-		/* Destroy the temporary mappings created above. */
-		start = __START_KERNEL_map + (table_start << PAGE_SHIFT);
-		end = start + tables_space;
+		/* Re-vector virtual addresses pointing into the initial
+		   mapping to the just established permanent ones. */
+		xen_start_info = __va(__pa(xen_start_info));
+		xen_start_info->pt_base = (unsigned long)__va(__pa(xen_start_info->pt_base));
+		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
+			phys_to_machine_mapping = __va(__pa(xen_start_info->mfn_list));
+			xen_start_info->mfn_list = (unsigned long)phys_to_machine_mapping;
+		}
+		if (xen_start_info->mod_start)
+			xen_start_info->mod_start = (unsigned long)__va(__pa(xen_start_info->mod_start));
+
+		/* Destroy the Xen-created mappings beyond the kernel image as well
+		   as the temporary mappings created in init_memory_mapping(). */
+		start = PAGE_ALIGN((unsigned long)_end);
+		end = __START_KERNEL_map + (start_pfn << PAGE_SHIFT);
 		for (; start < end; start += PAGE_SIZE) {
 			/* Should also clear out and reclaim any page table
 			   pages no longer needed... */
@@ -764,15 +776,11 @@ void __init paging_init(void)
 	free_area_init_node(0, NODE_DATA(0), zones,
 			    __pa(PAGE_OFFSET) >> PAGE_SHIFT, holes);
 
-	if (!xen_feature(XENFEAT_auto_translated_physmap) ||
-	    xen_start_info->shared_info >= xen_start_info->nr_pages) {
-		/* Switch to the real shared_info page, and clear the
-		 * dummy page. */
-		set_fixmap(FIX_SHARED_INFO, xen_start_info->shared_info);
-		HYPERVISOR_shared_info =
-			(shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
-		memset(empty_zero_page, 0, sizeof(empty_zero_page));
-	}
+	/* Switch to the real shared_info page, and clear the
+	 * dummy page. */
+	set_fixmap(FIX_SHARED_INFO, xen_start_info->shared_info);
+	HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
+	memset(empty_zero_page, 0, sizeof(empty_zero_page));
 
 	init_mm.context.pinned = 1;
 

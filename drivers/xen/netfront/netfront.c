@@ -478,7 +478,7 @@ static void network_tx_buf_gc(struct net_device *dev)
 				printk(KERN_ALERT "network_tx_buf_gc: warning "
 				       "-- grant still in use by backend "
 				       "domain.\n");
-				goto out;
+				BUG();
 			}
 			gnttab_end_foreign_access_ref(
 				np->grant_tx_ref[id], GNTMAP_readonly);
@@ -504,7 +504,6 @@ static void network_tx_buf_gc(struct net_device *dev)
 		mb();
 	} while (prod != np->tx.sring->rsp_prod);
 
- out:
 	if (np->tx_full &&
 	    ((np->tx.sring->req_prod - prod) < NET_TX_RING_SIZE)) {
 		np->tx_full = 0;
