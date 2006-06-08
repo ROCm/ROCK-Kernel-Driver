@@ -9,6 +9,7 @@
 
 #include <asm/pci-direct.h>
 #include <asm/acpi.h>
+#include <asm/apic.h>
 
 #ifdef CONFIG_ACPI
 
