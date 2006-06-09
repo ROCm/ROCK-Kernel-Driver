@@ -120,16 +120,9 @@ static struct elevator_type *elevator_get(const char *name)
 	return e;
 }
 
-static int elevator_init_queue(request_queue_t *q, struct elevator_queue *eq,
-			       void **data)
+static void *elevator_init_queue(request_queue_t *q, struct elevator_queue *eq)
 {
-	if (eq->ops->elevator_init_fn) {
-		*data = eq->ops->elevator_init_fn(q, eq);
-		if (*data == NULL)
-			return 1;
-	}
-
-	return 0;
+	return eq->ops->elevator_init_fn(q, eq);
 }
 
 static void elevator_attach(request_queue_t *q, struct elevator_queue *eq,
@@ -209,7 +202,8 @@ int elevator_init(request_queue_t *q, char *name)
 	if (!eq)
 		return -ENOMEM;
 
-	if (elevator_init_queue(q, eq, &data)) {
+	data = elevator_init_queue(q, eq);
+	if (!data) {
 		kobject_put(&eq->kobj);
 		return -ENOMEM;
 	}
@@ -798,7 +792,8 @@ static int elevator_switch(request_queue_t *q, struct elevator_type *new_e)
 	if (!e)
 		return 0;
 
-	if (elevator_init_queue(q, e, &data)) {
+	data = elevator_init_queue(q, e);
+	if (!data) {
 		kobject_put(&e->kobj);
 		return 0;
 	}
