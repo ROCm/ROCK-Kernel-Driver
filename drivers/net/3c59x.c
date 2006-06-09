@@ -2118,7 +2118,8 @@ vortex_error(struct net_device *dev, int status)
 				do_tx_reset = 1;
 				reset_mask = 0x0108;		/* Reset interface logic, but not download logic */
 			}
-		} else {						/* Merely re-enable the transmitter. */
+		}
+		if (!do_tx_reset) {						/* Merely re-enable the transmitter. */
 			iowrite16(TxEnable, ioaddr + EL3_CMD);
 		}
 	}
