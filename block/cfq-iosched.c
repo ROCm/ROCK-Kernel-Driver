@@ -1332,6 +1332,10 @@ cfq_alloc_io_context(struct cfq_data *cfqd, gfp_t gfp_mask)
 		cic->ttime_total = 0;
 		cic->ttime_samples = 0;
 		cic->ttime_mean = 0;
+		cic->seek_samples = 0;
+		cic->last_request_pos = 0;
+		cic->seek_total = 0;
+		cic->seek_mean = 0;
 		cic->dtor = cfq_free_io_context;
 		cic->exit = cfq_exit_io_context;
 		INIT_LIST_HEAD(&cic->queue_list);
