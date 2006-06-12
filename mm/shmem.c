@@ -2154,6 +2154,7 @@ static int shmem_fill_super(struct super_block *sb,
 	sb->s_blocksize_bits = PAGE_CACHE_SHIFT;
 	sb->s_magic = TMPFS_MAGIC;
 	sb->s_op = &shmem_ops;
+	sb->s_time_gran = 1;
 #ifdef CONFIG_TMPFS_POSIX_ACL
 	sb->s_xattr = shmem_xattr_handlers;
 	sb->s_flags |= MS_POSIXACL;
