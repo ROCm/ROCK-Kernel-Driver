@@ -56,8 +56,6 @@
 struct dma_mapping_ops* dma_ops;
 EXPORT_SYMBOL(dma_ops);
 
-int after_bootmem;
-
 extern unsigned long *contiguous_bitmap;
 
 #ifndef CONFIG_XEN
@@ -78,7 +76,7 @@ extern unsigned long start_pfn;
 	(((mfn_to_pfn((addr) >> PAGE_SHIFT)) << PAGE_SHIFT) +	\
 	__START_KERNEL_map)))
 
-static void __meminit early_make_page_readonly(void *va, unsigned int feature)
+static void early_make_page_readonly(void *va, unsigned int feature)
 {
 	unsigned long addr, _va = (unsigned long)va;
 	pte_t pte, *ptep;
@@ -86,11 +84,6 @@ static void __meminit early_make_page_readonly(void *va, unsigned int feature)
 
 	if (xen_feature(feature))
 		return;
-
-	if (after_bootmem) {
-		make_page_readonly(va, feature);
-		return;
-	}
 
 	addr = (unsigned long) page[pgd_index(_va)];
 	addr_to_page(addr, page);
@@ -206,6 +199,10 @@ void show_mem(void)
 	printk(KERN_INFO "%lu pages shared\n",shared);
 	printk(KERN_INFO "%lu pages swap cached\n",cached);
 }
+
+/* References to section boundaries */
+
+int after_bootmem;
 
 static void *spp_getpage(void)
 { 
@@ -375,8 +372,7 @@ void __set_fixmap_user (enum fixed_addresses idx, unsigned long phys, pgprot_t p
 	set_pte_phys(address, phys, prot, SET_FIXMAP_USER); 
 }
 
-unsigned long __initdata table_start;
-static unsigned long __initdata tables_space;
+unsigned long __initdata table_start, tables_space; 
 
 unsigned long get_machine_pfn(unsigned long addr)
 {
@@ -448,9 +444,9 @@ phys_pmd_init(pmd_t *pmd, unsigned long address, unsigned long end)
 		pte = alloc_static_page(&pte_phys);
 		pte_save = pte;
 		for (k = 0; k < PTRS_PER_PTE; pte++, k++, address += PTE_SIZE) {
-			if (address >= (after_bootmem
-			                ? end
-			                : xen_start_info->nr_pages << PAGE_SHIFT)) {
+			if ((address >= end) ||
+			    ((address >> PAGE_SHIFT) >=
+			     xen_start_info->nr_pages)) { 
 				__set_pte(pte, __pte(0)); 
 				continue;
 			}
@@ -550,7 +546,7 @@ void __init xen_init_pt(void)
 		mk_kernel_pgd(__pa_symbol(level3_user_pgt)));
 }
 
-static void __init extend_init_mapping(void)
+void __init extend_init_mapping(void) 
 {
 	unsigned long va = __START_KERNEL_map;
 	unsigned long phys, addr, *pte_page;
@@ -621,8 +617,7 @@ static void __init find_early_table_space(unsigned long end)
 	table_start = start_pfn;
 
 	early_printk("kernel direct mapping tables up to %lx @ %lx-%lx\n",
-		end, table_start << PAGE_SHIFT,
-		(table_start << PAGE_SHIFT) + tables_space);
+		end, table_start << PAGE_SHIFT, start_pfn << PAGE_SHIFT);
 }
 
 /* Setup the direct mapping of the physical memory at PAGE_OFFSET.
@@ -668,28 +663,32 @@ void __meminit init_memory_mapping(unsigned long start, unsigned long end)
 	}
 
 	if (!after_bootmem) {
-		BUG_ON(start_pfn != table_start + (tables_space >> PAGE_SHIFT));
+		BUG_ON(start_pfn != table_start + (tables_space>>PAGE_SHIFT));
 
 		/* Re-vector virtual addresses pointing into the initial
-		   mapping to the just established permanent ones. */
+		   mapping to the just-established permanent ones. */
 		xen_start_info = __va(__pa(xen_start_info));
-		xen_start_info->pt_base = (unsigned long)__va(__pa(xen_start_info->pt_base));
+		xen_start_info->pt_base = (unsigned long)
+			__va(__pa(xen_start_info->pt_base));
 		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
-			phys_to_machine_mapping = __va(__pa(xen_start_info->mfn_list));
-			xen_start_info->mfn_list = (unsigned long)phys_to_machine_mapping;
+			phys_to_machine_mapping =
+				__va(__pa(xen_start_info->mfn_list));
+			xen_start_info->mfn_list = (unsigned long)
+				phys_to_machine_mapping;
 		}
 		if (xen_start_info->mod_start)
-			xen_start_info->mod_start = (unsigned long)__va(__pa(xen_start_info->mod_start));
+			xen_start_info->mod_start = (unsigned long)
+				__va(__pa(xen_start_info->mod_start));
 
-		/* Destroy the Xen-created mappings beyond the kernel image as well
-		   as the temporary mappings created in init_memory_mapping(). */
+		/* Destroy the Xen-created mappings beyond the kernel image as
+		 * well as the temporary mappings created above. Prevents
+		 * overlap with modules area (if init mapping is very big).
+		 */
 		start = PAGE_ALIGN((unsigned long)_end);
-		end = __START_KERNEL_map + (start_pfn << PAGE_SHIFT);
-		for (; start < end; start += PAGE_SIZE) {
-			/* Should also clear out and reclaim any page table
-			   pages no longer needed... */
-			WARN_ON(HYPERVISOR_update_va_mapping(start, __pte_ma(0), 0));
-		}
+		end   = __START_KERNEL_map + (start_pfn << PAGE_SHIFT);
+		for (; start < end; start += PAGE_SIZE)
+			WARN_ON(HYPERVISOR_update_va_mapping(
+				start, __pte_ma(0), 0));
 	}
 
 	__flush_tlb_all();
@@ -910,6 +909,7 @@ static struct kcore_list kcore_mem, kcore_vmalloc, kcore_kernel, kcore_modules,
 void __init mem_init(void)
 {
 	long codesize, reservedpages, datasize, initsize;
+	unsigned long pfn;
 
 	contiguous_bitmap = alloc_bootmem_low_pages(
 		(end_pfn + 2*BITS_PER_LONG) >> 3);
@@ -938,6 +938,11 @@ void __init mem_init(void)
 #else
 	totalram_pages = free_all_bootmem();
 #endif
+	/* XEN: init and count pages outside initial allocation. */
+	for (pfn = xen_start_info->nr_pages; pfn < max_pfn; pfn++) {
+		ClearPageReserved(&mem_map[pfn]);
+		set_page_count(&mem_map[pfn], 1);
+	}
 	reservedpages = end_pfn - totalram_pages - e820_hole_size(0, end_pfn);
 
 	after_bootmem = 1;

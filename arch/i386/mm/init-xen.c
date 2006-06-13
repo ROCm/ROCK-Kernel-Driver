@@ -666,7 +666,6 @@ void __init mem_init(void)
 	for (pfn = xen_start_info->nr_pages; pfn < max_low_pfn; pfn++) {
 		ClearPageReserved(&mem_map[pfn]);
 		set_page_count(&mem_map[pfn], 1);
-		totalram_pages++;
 	}
 
 	reservedpages = 0;
