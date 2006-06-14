@@ -374,7 +374,7 @@ module_param_named(dev_loss_tmo, fc_dev_loss_tmo, int, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(dev_loss_tmo,
 		 "Maximum number of seconds that the FC transport should"
 		 " insulate the loss of a remote port. Once this value is"
-		 " exceeded, the scsi target may be removed. Reference the
+		 " exceeded, the scsi target may be removed. Reference the"
 		 " remove_on_dev_loss module parameter.  Value should be"
 		 " between 1 and SCSI_DEVICE_BLOCK_MAX_TIMEOUT.");
 
