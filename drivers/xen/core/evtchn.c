@@ -120,6 +120,11 @@ static inline unsigned long active_evtchns(unsigned int cpu, shared_info_t *sh,
 
 static void bind_evtchn_to_cpu(unsigned int chn, unsigned int cpu)
 {
+	int irq = evtchn_to_irq[chn];
+
+	BUG_ON(irq == -1);
+	set_native_irq_info(irq, cpumask_of_cpu(cpu));
+
 	clear_bit(chn, (unsigned long *)cpu_evtchn_mask[cpu_evtchn[chn]]);
 	set_bit(chn, (unsigned long *)cpu_evtchn_mask[cpu]);
 	cpu_evtchn[chn] = cpu;
@@ -127,7 +132,12 @@ static void bind_evtchn_to_cpu(unsigned int chn, unsigned int cpu)
 
 static void init_evtchn_cpu_bindings(void)
 {
+	int i;
+
 	/* By default all event channels notify CPU#0. */
+	for (i = 0; i < NR_IRQS; i++)
+		set_native_irq_info(i, cpumask_of_cpu(0));
+
 	memset(cpu_evtchn, 0, sizeof(cpu_evtchn));
 	memset(cpu_evtchn_mask[0], ~0, sizeof(cpu_evtchn_mask[0]));
 }
@@ -419,25 +429,14 @@ void unbind_from_irqhandler(unsigned int irq, void *dev_id)
 }
 EXPORT_SYMBOL_GPL(unbind_from_irqhandler);
 
-#ifdef CONFIG_SMP
-static void do_nothing_function(void *ign)
-{
-}
-#endif
-
 /* Rebind an evtchn so that it gets delivered to a specific cpu */
 static void rebind_irq_to_cpu(unsigned irq, unsigned tcpu)
 {
 	evtchn_op_t op = { .cmd = EVTCHNOP_bind_vcpu };
-	int evtchn;
+	int evtchn = evtchn_from_irq(irq);
 
-	spin_lock(&irq_mapping_update_lock);
-
-	evtchn = evtchn_from_irq(irq);
-	if (!VALID_EVTCHN(evtchn)) {
-		spin_unlock(&irq_mapping_update_lock);
+	if (!VALID_EVTCHN(evtchn))
 		return;
-	}
 
 	/* Send future instances of this interrupt to other vcpu. */
 	op.u.bind_vcpu.port = evtchn;
@@ -450,21 +449,6 @@ static void rebind_irq_to_cpu(unsigned irq, unsigned tcpu)
 	 */
 	if (HYPERVISOR_event_channel_op(&op) >= 0)
 		bind_evtchn_to_cpu(evtchn, tcpu);
-
-	spin_unlock(&irq_mapping_update_lock);
-
-	/*
-	 * Now send the new target processor a NOP IPI. When this returns, it
-	 * will check for any pending interrupts, and so service any that got 
-	 * delivered to the wrong processor by mistake.
-	 * 
-	 * XXX: The only time this is called with interrupts disabled is from
-	 * the hotplug/hotunplug path. In that case, all cpus are stopped with 
-	 * interrupts disabled, and the missed interrupts will be picked up
-	 * when they start again. This is kind of a hack.
-	 */
-	if (!irqs_disabled())
-		smp_call_function(do_nothing_function, NULL, 0, 0);
 }
 
 
@@ -589,8 +573,8 @@ static unsigned int startup_pirq(unsigned int irq)
 
 	pirq_query_unmask(irq_to_pirq(irq));
 
-	bind_evtchn_to_cpu(evtchn, 0);
 	evtchn_to_irq[evtchn] = irq;
+	bind_evtchn_to_cpu(evtchn, 0);
 	irq_info[irq] = mk_irq_info(IRQT_PIRQ, irq, evtchn);
 
  out:
@@ -668,6 +652,15 @@ static struct hw_interrupt_type pirq_type = {
 	end_pirq,
 	set_affinity_irq
 };
+
+int irq_ignore_unhandled(unsigned int irq)
+{
+	physdev_op_t op;
+	op.cmd = PHYSDEVOP_IRQ_STATUS_QUERY;
+	op.u.irq_status_query.irq = irq;
+	(void)HYPERVISOR_physdev_op(&op);
+	return !!(op.u.irq_status_query.flags & PHYSDEVOP_IRQ_SHARED);
+}
 
 void hw_resend_irq(struct hw_interrupt_type *h, unsigned int i)
 {
