@@ -723,14 +723,16 @@ static ctl_table kern_table[] = {
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec,
 	},
+#ifdef CONFIG_SMP
 	{
-		.ctl_name	= 9999,
+		.ctl_name	= -2,
 		.procname	= "affinity_load_balancing",
 		.data		= &affinity_load_balancing,
 		.maxlen		= sizeof(affinity_load_balancing),
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec,
 	},
+#endif
 	{ .ctl_name = 0 }
 };
 
