@@ -233,6 +233,8 @@ static ctl_table root_table[] = {
 	{ .ctl_name = 0 }
 };
 
+extern int affinity_load_balancing;
+
 static ctl_table kern_table[] = {
 	{
 		.ctl_name	= KERN_OSTYPE,
@@ -718,6 +720,14 @@ static ctl_table kern_table[] = {
 		.procname	= "rcu_mask",
 		.data		= &rcu_mask,
 		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{
+		.ctl_name	= 9999,
+		.procname	= "affinity_load_balancing",
+		.data		= &affinity_load_balancing,
+		.maxlen		= sizeof(affinity_load_balancing),
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec,
 	},

@@ -1020,6 +1020,28 @@ find_idlest_cpu(struct sched_group *group, struct task_struct *p, int this_cpu)
 	return idlest;
 }
 
+static int
+find_idlest_cpu_nodomain(struct task_struct *p, int this_cpu)
+{
+	cpumask_t tmp;
+	unsigned long load, min_load = ULONG_MAX;
+	int idlest = -1;
+	int i;
+
+	/* Traverse only the allowed CPUs */
+	cpus_and(tmp, cpu_online_map, p->cpus_allowed);
+
+	for_each_cpu_mask(i, tmp) {
+		load = target_load(i, 1);
+
+		if (load < min_load) {
+			min_load = load;
+			idlest = i;
+		}
+	}
+	return idlest;
+}
+
 /*
  * sched_balance_self: balance the current task (running on cpu) in domains
  * that have the 'flag' flag set. In practice, this is SD_BALANCE_FORK and
@@ -1031,10 +1053,16 @@ find_idlest_cpu(struct sched_group *group, struct task_struct *p, int this_cpu)
  *
  * preempt must be disabled.
  */
+
+int affinity_load_balancing = 0;
+
 static int sched_balance_self(int cpu, int flag)
 {
 	struct task_struct *t = current;
 	struct sched_domain *tmp, *sd = NULL;
+
+	if (affinity_load_balancing && !cpus_full(t->cpus_allowed))
+		return find_idlest_cpu_nodomain(t, cpu);
 
 	for_each_domain(cpu, tmp)
 		if (tmp->flags & flag)
