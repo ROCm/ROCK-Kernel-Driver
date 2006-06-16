@@ -66,7 +66,7 @@
 #include "s2io.h"
 #include "s2io-regs.h"
 
-#define DRV_VERSION "Version 2.0.9.4"
+#define DRV_VERSION "Version 2.0.9.5"
 
 /* S2io Driver name & version. */
 static char s2io_driver_name[] = "Neterion";
@@ -6137,6 +6137,9 @@ Defaulting to INTA\n");
 	/*  Set the factory defined MAC address initially   */
 	dev->addr_len = ETH_ALEN;
 	memcpy(dev->dev_addr, sp->def_mac_addr, ETH_ALEN);
+
+	/* reset Nic and bring it to known state */
+	s2io_reset(sp);
 
 	/*
 	 * Initialize the tasklet status and link state flags
