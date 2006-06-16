@@ -68,6 +68,7 @@ EXPORT_SYMBOL_GPL(gnttab_free_grant_reference);
 EXPORT_SYMBOL_GPL(gnttab_claim_grant_reference);
 EXPORT_SYMBOL_GPL(gnttab_release_grant_reference);
 EXPORT_SYMBOL_GPL(gnttab_request_free_callback);
+EXPORT_SYMBOL_GPL(gnttab_cancel_free_callback);
 EXPORT_SYMBOL_GPL(gnttab_grant_foreign_access_ref);
 EXPORT_SYMBOL_GPL(gnttab_grant_foreign_transfer_ref);
 
@@ -356,6 +357,21 @@ gnttab_request_free_callback(struct gnttab_free_callback *callback,
 	gnttab_free_callback_list = callback;
 	check_free_callbacks();
  out:
+	spin_unlock_irqrestore(&gnttab_list_lock, flags);
+}
+
+void gnttab_cancel_free_callback(struct gnttab_free_callback *callback)
+{
+	struct gnttab_free_callback **pcb;
+	unsigned long flags;
+
+	spin_lock_irqsave(&gnttab_list_lock, flags);
+	for (pcb = &gnttab_free_callback_list; *pcb; pcb = &(*pcb)->next) {
+		if (*pcb == callback) {
+			*pcb = callback->next;
+			break;
+		}
+	}
 	spin_unlock_irqrestore(&gnttab_list_lock, flags);
 }
 
