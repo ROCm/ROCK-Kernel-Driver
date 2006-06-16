@@ -522,17 +522,9 @@ static void mark_files_ro(struct super_block *sb)
 	file_list_unlock();
 }
 
-/**
- *	do_remount_sb - asks filesystem to change mount options.
- *	@sb:	superblock in question
- *	@flags:	numeric part of options
- *	@data:	the rest of options
- *      @force: whether or not to force the change
- *
- *	Alters the mount options of a mounted file system.
- */
 #define REMOUNT_FORCE		1
 #define REMOUNT_SHRINK_DCACHE	2
+
 static int __do_remount_sb(struct super_block *sb, int flags, void *data, int rflags)
 {
 	int retval;
@@ -565,6 +557,15 @@ static int __do_remount_sb(struct super_block *sb, int flags, void *data, int rf
 	return 0;
 }
 
+/**
+ *	do_remount_sb - asks filesystem to change mount options.
+ *	@sb:	superblock in question
+ *	@flags:	numeric part of options
+ *	@data:	the rest of options
+ *      @force: whether or not to force the change
+ *
+ *	Alters the mount options of a mounted file system.
+ */
 int do_remount_sb(struct super_block *sb, int flags, void *data, int force)
 {
 	return __do_remount_sb(sb, flags, data,
