@@ -549,6 +549,8 @@ ipv6_add_addr(struct inet6_dev *idev, const struct in6_addr *addr, int pfxlen,
 	ifa->flags = flags | IFA_F_TENTATIVE;
 	ifa->cstamp = ifa->tstamp = jiffies;
 
+	ifa->rt = rt;
+
 	ifa->idev = idev;
 	in6_dev_hold(idev);
 	/* For caller */
@@ -574,8 +576,6 @@ ipv6_add_addr(struct inet6_dev *idev, const struct in6_addr *addr, int pfxlen,
 		in6_ifa_hold(ifa);
 	}
 #endif
-
-	ifa->rt = rt;
 
 	in6_ifa_hold(ifa);
 	write_unlock(&idev->lock);
