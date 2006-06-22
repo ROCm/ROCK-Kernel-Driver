@@ -189,3 +189,7 @@ xfs_dm_exit(void)
 
 module_init(xfs_dm_init);
 module_exit(xfs_dm_exit);
+
+MODULE_AUTHOR("Silicon Graphics, Inc.");
+MODULE_DESCRIPTION("SGI XFS Data Management API subsystem");
+MODULE_LICENSE("GPL");

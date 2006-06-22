@@ -132,3 +132,4 @@ testclient_exit_module(void)
 
 module_exit(testclient_exit_module);
 
+MODULE_LICENSE("GPL");

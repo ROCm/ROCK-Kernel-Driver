@@ -133,13 +133,15 @@ nlmsvc_find_block(struct nlm_cookie *cookie)
 {
 	struct nlm_block *block;
 
-	list_for_each_entry(block, &nlm_blocked, b_list) {
-		if (nlm_cookie_match(&block->b_call.a_args.cookie, cookie))
-			break;
-	}
+	list_for_each_entry(block, &nlm_blocked, b_list)
+		if (nlm_cookie_match(&block->b_call.a_args.cookie, cookie)) {
+			dprintk("nlmsvc_find_block(%s): block=%p\n",
+				nlmdbg_cookie2a(cookie), block);
+			return block;
+		}
 
-	dprintk("nlmsvc_find_block(%s): block=%p\n", nlmdbg_cookie2a(cookie), block);
-	return block;
+	dprintk("nlmsvc_find_block(%s): block=NULL\n", nlmdbg_cookie2a(cookie));
+	return NULL;
 }
 
 /*
