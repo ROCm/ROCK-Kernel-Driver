@@ -307,6 +307,7 @@ static int raid1_end_write_request(struct bio *bio, unsigned int bytes_done, int
 	int mirror, behind = test_bit(R1BIO_BehindIO, &r1_bio->state);
 	conf_t *conf = mddev_to_conf(r1_bio->mddev);
 	struct bio *to_put = NULL;
+	int dec_pending = 1; /* decrement pending I/O count or not? */
 
 	if (bio->bi_size)
 		return 1;
@@ -315,7 +316,8 @@ static int raid1_end_write_request(struct bio *bio, unsigned int bytes_done, int
 		if (r1_bio->bios[mirror] == bio)
 			break;
 
-	if (error == -ENOTSUPP && test_bit(R1BIO_Barrier, &r1_bio->state)) {
+	if (error == -EOPNOTSUPP && test_bit(R1BIO_Barrier, &r1_bio->state)) {
+		dec_pending = 0;
 		set_bit(BarriersNotsupp, &conf->mirrors[mirror].rdev->flags);
 		set_bit(R1BIO_BarrierRetry, &r1_bio->state);
 		r1_bio->mddev->barriers_work = 0;
@@ -394,8 +396,9 @@ static int raid1_end_write_request(struct bio *bio, unsigned int bytes_done, int
 		raid_end_bio_io(r1_bio);
 	}
 
-	rdev_dec_pending(conf->mirrors[mirror].rdev, conf->mddev);
  out:
+	if (dec_pending)
+		rdev_dec_pending(conf->mirrors[mirror].rdev, conf->mddev);
 	if (to_put)
 		bio_put(to_put);
 
@@ -1139,8 +1142,19 @@ static int end_sync_write(struct bio *bio, unsigned int bytes_done, int error)
 			mirror = i;
 			break;
 		}
-	if (!uptodate)
+	if (!uptodate) {
+		int sync_blocks = 0;
+		sector_t s = r1_bio->sector;
+		long sectors_to_go = r1_bio->sectors;
+		/* make sure these bits doesn't get cleared. */
+		do {
+			bitmap_end_sync(mddev->bitmap, s,
+					&sync_blocks, 1);
+			s += sync_blocks;
+			sectors_to_go -= sync_blocks;
+		} while (sectors_to_go > 0);
 		md_error(mddev, conf->mirrors[mirror].rdev);
+	}
 
 	update_head_pos(mirror, r1_bio);
 
