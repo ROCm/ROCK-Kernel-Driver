@@ -77,7 +77,14 @@
 
 #include <asm/uaccess.h>
 
+#define SYNC_MODE_NONE 0
+#define SYNC_MODE_BARRIER 1
+#define SYNC_MODE_DATA 2
+#define SYNC_MODE_FULL 3
+
 static int max_loop = 8;
+static int loop_sync_mode;
+static char *sync_mode = "";
 static struct loop_device *loop_dev;
 static struct gendisk **disks;
 
@@ -467,16 +474,59 @@ lo_receive(struct loop_device *lo, struct bio *bio, int bsize, loff_t pos)
 	return ret;
 }
 
+/*
+ * This is best effort. We really wouldn't know what to do with a returned
+ * error. This code is taken from the implementation of fsync.
+ */
+static int sync_file(struct file * file)
+{
+	struct address_space *mapping;
+	int ret;
+
+	if (!file->f_op || !file->f_op->fsync)
+		return -EOPNOTSUPP;
+
+	mapping = file->f_mapping;
+
+	ret = filemap_fdatawrite(mapping);
+	if (!ret) {
+		/*
+		 * We need to protect against concurrent writers,
+		 * which could cause livelocks in fsync_buffers_list
+		 */
+		if (loop_sync_mode == SYNC_MODE_FULL) {
+			mutex_lock(&mapping->host->i_mutex);
+			ret = file->f_op->fsync(file, file->f_dentry, 1);
+			mutex_unlock(&mapping->host->i_mutex);
+		}
+
+		filemap_fdatawait(mapping);
+	}
+
+	return ret;
+}
+
 static int do_bio_filebacked(struct loop_device *lo, struct bio *bio)
 {
 	loff_t pos;
 	int ret;
+	int sync = loop_sync_mode >= SYNC_MODE_DATA;
+	int barrier = bio_barrier(bio) && loop_sync_mode == SYNC_MODE_BARRIER;
+
+	if (barrier) {
+		ret = sync_file(lo->lo_backing_file);
+		if (unlikely(ret))
+			return ret;
+	}
 
 	pos = ((loff_t) bio->bi_sector << 9) + lo->lo_offset;
 	if (bio_rw(bio) == WRITE)
 		ret = lo_send(lo, bio, lo->lo_blocksize, pos);
 	else
 		ret = lo_receive(lo, bio, lo->lo_blocksize, pos);
+
+	if ((barrier || sync) && !ret)
+		ret = sync_file(lo->lo_backing_file);
 	return ret;
 }
 
@@ -1207,6 +1257,7 @@ static struct block_device_operations lo_fops = {
  * And now the modules code and kernel interface.
  */
 module_param(max_loop, int, 0);
+module_param(sync_mode, charp, 0);
 MODULE_PARM_DESC(max_loop, "Maximum number of loop devices (1-256)");
 MODULE_LICENSE("GPL");
 MODULE_ALIAS_BLOCKDEV_MAJOR(LOOP_MAJOR);
@@ -1256,6 +1307,16 @@ static int __init loop_init(void)
 				    " 1 and 256), using default (8)\n");
 		max_loop = 8;
 	}
+
+	if (strcmp(sync_mode, "barrier") == 0)
+		loop_sync_mode = SYNC_MODE_BARRIER;
+	else if (strcmp(sync_mode, "full") == 0)
+		loop_sync_mode = SYNC_MODE_FULL;
+	else if (strcmp(sync_mode, "data") == 0)
+		loop_sync_mode = SYNC_MODE_DATA;
+
+	if (loop_sync_mode)
+		printk("loop: sync_mode (%s: %d)\n", sync_mode, loop_sync_mode);
 
 	if (register_blkdev(LOOP_MAJOR, "loop"))
 		return -EIO;

@@ -607,10 +607,25 @@ static int asd_init_ctxmem(struct asd_ha_struct *asd_ha)
 int asd_init_hw(struct asd_ha_struct *asd_ha)
 {
 	int err;
+	u32 v;
 
 	err = asd_init_sw(asd_ha);
 	if (err)
 		return err;
+
+	err = pci_read_config_dword(asd_ha->pcidev, PCIC_HSTPCIX_CNTRL, &v);
+	if (err) {
+		asd_printk("couldn't read PCIC_HSTPCIX_CNTRL of %s\n",
+			   pci_name(asd_ha->pcidev));
+		return err;
+	}
+	pci_write_config_dword(asd_ha->pcidev, PCIC_HSTPCIX_CNTRL, 
+					v | SC_TMR_DIS);
+	if (err) {
+		asd_printk("couldn't disable split completion timer of %s\n",
+			   pci_name(asd_ha->pcidev));
+		return err;
+	}
 
 	err = asd_read_ocm(asd_ha);
 	if (err) {
