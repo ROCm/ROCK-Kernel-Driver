@@ -171,11 +171,6 @@ static void klist_devices_put(struct klist_node *n)
  */
 int driver_register(struct device_driver * drv)
 {
-	if ((drv->bus->probe && drv->probe) ||
-	    (drv->bus->remove && drv->remove) ||
-	    (drv->bus->shutdown && drv->shutdown)) {
-		printk(KERN_WARNING "Driver '%s' needs updating - please use bus_type methods\n", drv->name);
-	}
 	klist_init(&drv->klist_devices, klist_devices_get, klist_devices_put);
 	init_completion(&drv->unloaded);
 	return bus_add_driver(drv);

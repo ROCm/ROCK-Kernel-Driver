@@ -367,6 +367,38 @@ static int do_lo_send_write(struct loop_device *lo, struct bio_vec *bvec,
 	return ret;
 }
 
+/*
+ * This is best effort. We really wouldn't know what to do with a returned
+ * error. This code is taken from the implementation of fsync.
+ */
+static int sync_file(struct file * file)
+{
+	struct address_space *mapping;
+	int ret;
+
+	if (!file->f_op || !file->f_op->fsync)
+		return -EOPNOTSUPP;
+
+	mapping = file->f_mapping;
+
+	ret = filemap_fdatawrite(mapping);
+	if (!ret) {
+		/*
+		 * We need to protect against concurrent writers,
+		 * which could cause livelocks in fsync_buffers_list
+		 */
+		if (loop_sync_mode == SYNC_MODE_FULL) {
+			mutex_lock(&mapping->host->i_mutex);
+			ret = file->f_op->fsync(file, file->f_dentry, 1);
+			mutex_unlock(&mapping->host->i_mutex);
+		}
+
+		filemap_fdatawait(mapping);
+	}
+
+	return ret;
+}
+
 static int lo_send(struct loop_device *lo, struct bio *bio, int bsize,
 		loff_t pos)
 {
@@ -375,6 +407,14 @@ static int lo_send(struct loop_device *lo, struct bio *bio, int bsize,
 	struct bio_vec *bvec;
 	struct page *page = NULL;
 	int i, ret = 0;
+	int sync = loop_sync_mode >= SYNC_MODE_DATA;
+	int barrier = bio_barrier(bio) && loop_sync_mode == SYNC_MODE_BARRIER;
+
+	if (barrier) {
+		ret = sync_file(lo->lo_backing_file);
+		if (unlikely(ret))
+			return ret;
+	}
 
 	do_lo_send = do_lo_send_aops;
 	if (!(lo->lo_flags & LO_FLAGS_USE_AOPS)) {
@@ -397,6 +437,11 @@ static int lo_send(struct loop_device *lo, struct bio *bio, int bsize,
 		kunmap(page);
 		__free_page(page);
 	}
+
+	if ((barrier || sync) && !ret) {
+		ret = sync_file(lo->lo_backing_file);
+	}
+
 out:
 	return ret;
 fail:
@@ -474,59 +519,16 @@ lo_receive(struct loop_device *lo, struct bio *bio, int bsize, loff_t pos)
 	return ret;
 }
 
-/*
- * This is best effort. We really wouldn't know what to do with a returned
- * error. This code is taken from the implementation of fsync.
- */
-static int sync_file(struct file * file)
-{
-	struct address_space *mapping;
-	int ret;
-
-	if (!file->f_op || !file->f_op->fsync)
-		return -EOPNOTSUPP;
-
-	mapping = file->f_mapping;
-
-	ret = filemap_fdatawrite(mapping);
-	if (!ret) {
-		/*
-		 * We need to protect against concurrent writers,
-		 * which could cause livelocks in fsync_buffers_list
-		 */
-		if (loop_sync_mode == SYNC_MODE_FULL) {
-			mutex_lock(&mapping->host->i_mutex);
-			ret = file->f_op->fsync(file, file->f_dentry, 1);
-			mutex_unlock(&mapping->host->i_mutex);
-		}
-
-		filemap_fdatawait(mapping);
-	}
-
-	return ret;
-}
-
 static int do_bio_filebacked(struct loop_device *lo, struct bio *bio)
 {
 	loff_t pos;
 	int ret;
-	int sync = loop_sync_mode >= SYNC_MODE_DATA;
-	int barrier = bio_barrier(bio) && loop_sync_mode == SYNC_MODE_BARRIER;
-
-	if (barrier) {
-		ret = sync_file(lo->lo_backing_file);
-		if (unlikely(ret))
-			return ret;
-	}
 
 	pos = ((loff_t) bio->bi_sector << 9) + lo->lo_offset;
 	if (bio_rw(bio) == WRITE)
 		ret = lo_send(lo, bio, lo->lo_blocksize, pos);
 	else
 		ret = lo_receive(lo, bio, lo->lo_blocksize, pos);
-
-	if ((barrier || sync) && !ret)
-		ret = sync_file(lo->lo_backing_file);
 	return ret;
 }
 
@@ -1314,6 +1316,8 @@ static int __init loop_init(void)
 		loop_sync_mode = SYNC_MODE_FULL;
 	else if (strcmp(sync_mode, "data") == 0)
 		loop_sync_mode = SYNC_MODE_DATA;
+	else if (strcmp(sync_mode, "none") == 0)
+		loop_sync_mode = SYNC_MODE_NONE;
 
 	if (loop_sync_mode)
 		printk("loop: sync_mode (%s: %d)\n", sync_mode, loop_sync_mode);
