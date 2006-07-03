@@ -215,6 +215,7 @@ static int sync_file(struct file * file, int full_sync)
 
 	ret = filemap_fdatawrite(mapping);
 	if (!ret) {
+		int ret2;
 		/*
 		 * We need to protect against concurrent writers,
 		 * which could cause livelocks in fsync_buffers_list
@@ -222,7 +223,9 @@ static int sync_file(struct file * file, int full_sync)
 		if (full_sync)
 			ret = file->f_op->fsync(file, file->f_dentry, 1);
 
-		filemap_fdatawait(mapping);
+		ret2 = filemap_fdatawait(mapping);
+		if (!ret)
+			ret = ret2;
 	}
 
 	return ret;
