@@ -77,14 +77,7 @@
 
 #include <asm/uaccess.h>
 
-#define SYNC_MODE_NONE 0
-#define SYNC_MODE_BARRIER 1
-#define SYNC_MODE_DATA 2
-#define SYNC_MODE_FULL 3
-
 static int max_loop = 8;
-static int loop_sync_mode;
-static char *sync_mode = "";
 static struct loop_device *loop_dev;
 static struct gendisk **disks;
 
@@ -206,6 +199,35 @@ lo_do_transfer(struct loop_device *lo, int cmd,
 	return lo->transfer(lo, cmd, rpage, roffs, lpage, loffs, size, rblock);
 }
 
+/*
+ * This is best effort. We really wouldn't know what to do with a returned
+ * error. This code is taken from the implementation of fsync.
+ */
+static int sync_file(struct file * file, int full_sync)
+{
+	struct address_space *mapping;
+	int ret;
+
+	if (!file->f_op || !file->f_op->fsync)
+		return -EOPNOTSUPP;
+
+	mapping = file->f_mapping;
+
+	ret = filemap_fdatawrite(mapping);
+	if (!ret) {
+		/*
+		 * We need to protect against concurrent writers,
+		 * which could cause livelocks in fsync_buffers_list
+		 */
+		if (full_sync)
+			ret = file->f_op->fsync(file, file->f_dentry, 1);
+
+		filemap_fdatawait(mapping);
+	}
+
+	return ret;
+}
+
 /**
  * do_lo_send_aops - helper for writing data to a loop device
  *
@@ -218,11 +240,18 @@ static int do_lo_send_aops(struct loop_device *lo, struct bio_vec *bvec,
 	struct file *file = lo->lo_backing_file; /* kudos to NFsckingS */
 	struct address_space *mapping = file->f_mapping;
 	struct address_space_operations *aops = mapping->a_ops;
+	struct inode *inode = file->f_dentry->d_inode;
 	pgoff_t index;
 	unsigned offset, bv_offs;
 	int len, ret;
+	unsigned long old_blocks;
 
 	mutex_lock(&mapping->host->i_mutex);
+
+	spin_lock(&inode->i_lock);
+	old_blocks = inode->i_blocks;
+	spin_unlock(&inode->i_lock);
+
 	index = pos >> PAGE_CACHE_SHIFT;
 	offset = pos & ((pgoff_t)PAGE_CACHE_SIZE - 1);
 	bv_offs = bvec->bv_offset;
@@ -284,6 +313,15 @@ static int do_lo_send_aops(struct loop_device *lo, struct bio_vec *bvec,
 		page_cache_release(page);
 	}
 	ret = 0;
+
+	if (file->f_flags & O_SYNC) {
+		int full_sync = 0;
+		spin_lock(&inode->i_lock);
+		if (inode->i_blocks > old_blocks)
+			full_sync = 1;
+		spin_unlock(&inode->i_lock);
+		ret = sync_file(file, full_sync);
+	}
 out:
 	mutex_unlock(&mapping->host->i_mutex);
 	return ret;
@@ -367,38 +405,6 @@ static int do_lo_send_write(struct loop_device *lo, struct bio_vec *bvec,
 	return ret;
 }
 
-/*
- * This is best effort. We really wouldn't know what to do with a returned
- * error. This code is taken from the implementation of fsync.
- */
-static int sync_file(struct file * file)
-{
-	struct address_space *mapping;
-	int ret;
-
-	if (!file->f_op || !file->f_op->fsync)
-		return -EOPNOTSUPP;
-
-	mapping = file->f_mapping;
-
-	ret = filemap_fdatawrite(mapping);
-	if (!ret) {
-		/*
-		 * We need to protect against concurrent writers,
-		 * which could cause livelocks in fsync_buffers_list
-		 */
-		if (loop_sync_mode == SYNC_MODE_FULL) {
-			mutex_lock(&mapping->host->i_mutex);
-			ret = file->f_op->fsync(file, file->f_dentry, 1);
-			mutex_unlock(&mapping->host->i_mutex);
-		}
-
-		filemap_fdatawait(mapping);
-	}
-
-	return ret;
-}
-
 static int lo_send(struct loop_device *lo, struct bio *bio, int bsize,
 		loff_t pos)
 {
@@ -407,14 +413,6 @@ static int lo_send(struct loop_device *lo, struct bio *bio, int bsize,
 	struct bio_vec *bvec;
 	struct page *page = NULL;
 	int i, ret = 0;
-	int sync = loop_sync_mode >= SYNC_MODE_DATA;
-	int barrier = bio_barrier(bio) && loop_sync_mode == SYNC_MODE_BARRIER;
-
-	if (barrier) {
-		ret = sync_file(lo->lo_backing_file);
-		if (unlikely(ret))
-			return ret;
-	}
 
 	do_lo_send = do_lo_send_aops;
 	if (!(lo->lo_flags & LO_FLAGS_USE_AOPS)) {
@@ -437,11 +435,6 @@ static int lo_send(struct loop_device *lo, struct bio *bio, int bsize,
 		kunmap(page);
 		__free_page(page);
 	}
-
-	if ((barrier || sync) && !ret) {
-		ret = sync_file(lo->lo_backing_file);
-	}
-
 out:
 	return ret;
 fail:
@@ -833,6 +826,9 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 
 	if (!(file->f_mode & FMODE_WRITE))
 		lo_flags |= LO_FLAGS_READ_ONLY;
+
+	if ((file->f_flags & O_SYNC) && (!file->f_op || !file->f_op->fsync))
+		return -EINVAL;
 
 	error = -EINVAL;
 	if (S_ISREG(inode->i_mode) || S_ISBLK(inode->i_mode)) {
@@ -1259,7 +1255,6 @@ static struct block_device_operations lo_fops = {
  * And now the modules code and kernel interface.
  */
 module_param(max_loop, int, 0);
-module_param(sync_mode, charp, 0);
 MODULE_PARM_DESC(max_loop, "Maximum number of loop devices (1-256)");
 MODULE_LICENSE("GPL");
 MODULE_ALIAS_BLOCKDEV_MAJOR(LOOP_MAJOR);
@@ -1309,18 +1304,6 @@ static int __init loop_init(void)
 				    " 1 and 256), using default (8)\n");
 		max_loop = 8;
 	}
-
-	if (strcmp(sync_mode, "barrier") == 0)
-		loop_sync_mode = SYNC_MODE_BARRIER;
-	else if (strcmp(sync_mode, "full") == 0)
-		loop_sync_mode = SYNC_MODE_FULL;
-	else if (strcmp(sync_mode, "data") == 0)
-		loop_sync_mode = SYNC_MODE_DATA;
-	else if (strcmp(sync_mode, "none") == 0)
-		loop_sync_mode = SYNC_MODE_NONE;
-
-	if (loop_sync_mode)
-		printk("loop: sync_mode (%s: %d)\n", sync_mode, loop_sync_mode);
 
 	if (register_blkdev(LOOP_MAJOR, "loop"))
 		return -EIO;
