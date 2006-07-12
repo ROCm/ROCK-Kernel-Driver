@@ -5606,10 +5606,10 @@ static int rx_osm_handler(ring_info_t *ring_data, RxD_t * rxdp)
 		((unsigned long) rxdp->Host_Control);
 	int ring_no = ring_data->ring_no;
 	u16 l3_csum, l4_csum;
+	unsigned long long err = rxdp->Control_1 & RXD_T_CODE;
 
 	skb->dev = dev;
-	if (rxdp->Control_1 & RXD_T_CODE) {
-		unsigned long long err = rxdp->Control_1 & RXD_T_CODE;
+	if (err && ((err >> 48) != 0x5)) {
 		DBG_PRINT(ERR_DBG, "%s: Rx error Value: 0x%llx\n",
 			  dev->name, err);
 		dev_kfree_skb(skb);
