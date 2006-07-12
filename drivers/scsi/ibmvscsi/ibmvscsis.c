@@ -518,6 +518,8 @@ static long h_copy_rdma(u64 length, unsigned long siobn, dma_addr_t saddr,
 			return rc;
 
 		bytes_copied += bytes_to_copy;
+		saddr += bytes_to_copy;
+		daddr += bytes_to_copy;
 	}
 	return H_Success;
 }
