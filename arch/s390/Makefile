@@ -70,7 +70,6 @@ CFLAGS		+= -mbackchain -msoft-float $(cflags-y)
 CFLAGS		+= $(call cc-option,-finline-limit=10000)
 CFLAGS 		+= -pipe -fno-strength-reduce -Wno-sign-compare 
 AFLAGS		+= $(aflags-y)
-CFLAGS += $(call cc-option,-fno-ivopts)
 
 OBJCOPYFLAGS	:= -O binary
 LDFLAGS_vmlinux := -e start
