@@ -8,6 +8,8 @@
 #define KDUMP_TRAMPOLINE_START	0x0100
 #define KDUMP_TRAMPOLINE_END	0x3000
 
+#define KDUMP_MIN_TCE_ENTRIES 2048
+
 extern void kdump_setup(void);
 
 #endif /* __PPC64_KDUMP_H */
