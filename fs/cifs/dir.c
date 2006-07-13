@@ -138,9 +138,7 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode,
 	cifs_sb = CIFS_SB(inode->i_sb);
 	pTcon = cifs_sb->tcon;
 
-	down(&direntry->d_sb->s_vfs_rename_sem);
 	full_path = build_path_from_dentry(direntry);
-	up(&direntry->d_sb->s_vfs_rename_sem);
 	if(full_path == NULL) {
 		FreeXid(xid);
 		return -ENOMEM;
@@ -317,9 +315,7 @@ int cifs_mknod(struct inode *inode, struct dentry *direntry, int mode,
 	cifs_sb = CIFS_SB(inode->i_sb);
 	pTcon = cifs_sb->tcon;
 
-	down(&direntry->d_sb->s_vfs_rename_sem);
 	full_path = build_path_from_dentry(direntry);
-	up(&direntry->d_sb->s_vfs_rename_sem);
 	if(full_path == NULL)
 		rc = -ENOMEM;
 	else if (pTcon->ses->capabilities & CAP_UNIX) {

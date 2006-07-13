@@ -203,9 +203,7 @@ int cifs_open(struct inode *inode, struct file *file)
 		}
 	}
 
-	down(&inode->i_sb->s_vfs_rename_sem);
 	full_path = build_path_from_dentry(file->f_dentry);
-	up(&inode->i_sb->s_vfs_rename_sem);
 	if (full_path == NULL) {
 		FreeXid(xid);
 		return -ENOMEM;
@@ -929,6 +927,12 @@ struct cifsFileInfo *find_writable_file(struct cifsInodeInfo *cifs_inode)
 {
 	struct cifsFileInfo *open_file;
 	int rc;
+
+	if(cifs_inode == NULL) {
+		cERROR(1,("Null inode passed to cifs_writeable_file"));
+		dump_stack();
+		return NULL;
+	}
 
 	read_lock(&GlobalSMBSeslock);
 	list_for_each_entry(open_file, &cifs_inode->openFileList, flist) {
