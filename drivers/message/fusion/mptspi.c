@@ -87,6 +87,10 @@ static int mpt_pq_filter = 0;
 module_param(mpt_pq_filter, int, 0);
 MODULE_PARM_DESC(mpt_pq_filter, " Enable peripheral qualifier filter: enable=1  (default=0)");
 
+static int mpt_qas = MPTSCSIH_QAS;
+module_param(mpt_qas, int, 1);
+MODULE_PARM_DESC(mpt_qas, " Quick Arbitration and Selection (QAS) enabled=1, disabled=0 (default=MPTSCSIH_QAS=1)");
+
 static void mptspi_write_offset(struct scsi_target *, int);
 static void mptspi_write_width(struct scsi_target *, int);
 static int mptspi_write_spi_device_pg1(struct scsi_target *,
@@ -608,7 +612,8 @@ static void mptspi_write_qas(struct scsi_target *starget, int qas)
 	VirtTarget *vtarget = starget->hostdata;
 	u32 nego;
 
-	if ((vtarget->negoFlags & MPT_TARGET_NO_NEGO_QAS) ||
+	if (!mpt_qas ||
+	    (vtarget->negoFlags & MPT_TARGET_NO_NEGO_QAS) ||
 	    hd->ioc->spi_data.noQas)
 		spi_qas(starget) = 0;
 	else
@@ -1053,7 +1058,7 @@ mptspi_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		ioc->name,
 		mpt_saf_te,
 		mpt_pq_filter));
-	ioc->spi_data.noQas = 0;
+	ioc->spi_data.noQas = mpt_qas ? 0 : MPT_TARGET_NO_NEGO_QAS;
 
 	init_waitqueue_head(&hd->scandv_waitq);
 	hd->scandv_wait_done = 0;
