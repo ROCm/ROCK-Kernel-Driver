@@ -6,7 +6,7 @@
  *	
  *	m4 initialization (m4 is used as an assembly preprocessor)
  *   
- *   Copyright (C) 2001, 2002 Samuel Rydh (samuel@ibrium.se)
+ *   Copyright (C) 2001, 2002, 2004 Samuel Rydh (samuel@ibrium.se)
  *   
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -16,6 +16,7 @@
 
 /* This end-of-quote matches the start-of-quote in mol_config.h */
 ]]]]]
+divert(-1)
 changequote([,])
 	
 dnl m4 macros to avoid in header files (we can not rename these)
@@ -33,7 +34,7 @@ undefine([changecom])
 undefine([changequote])
 dnl undefine([decr])
 undefine([defn])
-undefine([divert])
+dnl undefine([divert])
 undefine([divnum])
 undefine([errprint])
 dnl undefine([eval])
@@ -74,9 +75,10 @@ dnl	dumpdef m4exit
 /*	M4 Macros	 						*/
 /************************************************************************/
 
-/* WARNING - M4 BUG IN MacOS X (10.1.2):
- * eval() in MacOS X (10.1.2) handles '&' as '&&' and '|' as '||'.
- */
+dnl
+dnl WARNING - M4 BUG IN MacOS X (10.1.2):
+dnl eval() in MacOS X (10.1.2) handles '&' as '&&' and '|' as '||'.
+dnl
 
 /* FORLOOP(var, from, to, [body var...]) */
 define([mFORLOOP], [pushdef([$1], [$2])_mFORLOOP([$1], [$2], [$3], [$4])popdef([$1])])
@@ -136,3 +138,4 @@ ifdef([$1]_curnum,,[$1[]f:])dnl
 $1[]_[]$1_curnum[]dnl
 ])
 
+divert(0)dnl

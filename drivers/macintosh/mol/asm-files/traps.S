@@ -1,12 +1,12 @@
 /* 
  *   Creation Date: <2001/01/27 16:25:14 samuel>
- *   Time-stamp: <2003/08/26 21:37:56 samuel>
+ *   Time-stamp: <2004/03/07 21:58:48 samuel>
  *   
  *	<traps.S>
  *	
  *	Exception Vectors
  *   
- *   Copyright (C) 2000, 2001, 2002, 2003 Samuel Rydh (samuel@ibrium.se)
+ *   Copyright (C) 2000, 2001, 2002, 2003, 2004 Samuel Rydh (samuel@ibrium.se)
  *   
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -21,8 +21,9 @@
 #include "asm_offsets.h"
 #include "asmdefs.h"
 #include "molasm.h"
+#include "asmdbg.h"
+#include "actions.h"
 #include "vector.h"
-#include "reloc.h"
 #include "rvec.h"
 #include "constants.h"
 #include "mac_registers.h"
@@ -30,14 +31,19 @@
 #include "osi.h"
 #include "kernel_vars.h"
 
-
+		
 /************************************************************************/
 /*	Exception Vector Definitions					*/
 /************************************************************************/
 
+	ACTIONS_SECTION
+GLOBAL_SYMBOL(r__actions_section):	
+	ACTIONS_OFFS_SECTION
+GLOBAL_SYMBOL(r__actions_offs_section):
+
 	.text
 GLOBAL_SYMBOL(r__reloctable_start):
-	
+
 MACRO_0(EXCEPTION_PREAMBLE, [
 	// SPRG1 = r1, SPRG0 = r3, r3=CR, r1=MOL_STACK
 	__ZERO_TICK_CNT(entry)
@@ -137,18 +143,18 @@ MACRO_0(RESTORE_MIDDLE_REGS, [		// reverse save_middle_regs, restores registers
 MACRO(GET_INSTR_OPCODE, [dummy], [
 	mfmsr	r3			// r3 = exception MSR
 	ori	r2,r3,MSR_DR
-	bl	9f
+	bl	8f
 
 	// secondary interrupt entry (we _know_ this must be a DSI)
 #ifdef CONFIG_SMP
 	LOADI	r5,EXTERN(compat_hash_table_lock)
 	li	r4,1
 	tophys	r5,r5
-8:	lwarx	r0,0,r5			// lock
+7:	lwarx	r0,0,r5			// lock
 	cmpwi	r0,0
-	bne-	8b
+	bne-	7b
 	stwcx.	r4,0,r5
-	bne-	8b
+	bne-	7b
 	isync
 	tlbie	r6
 	eieio
@@ -159,7 +165,7 @@ MACRO(GET_INSTR_OPCODE, [dummy], [
 	tlbie	r6			// flush PTE from ITLB
 #endif
 	b	exception_return
-9:	
+8:	
 	mtmsr	r2
 	isync
 
@@ -340,7 +346,7 @@ VECTOR( 0xc00, "System Call", secint_bad )
 	LOADI	r2,OSI_SC_MAGIC_R4
 	cmpw	cr1,r3,r5
 	cmpw	cr0,r4,r2
-	crand	eq,eq,cr1*4+eq
+	crand	eq,eq,cr1_eq
 	beq+	2f
 
 	MAC_TRAP(0xc00)			// r7 reason bits used (zero)
@@ -455,6 +461,9 @@ secint_lr_call:
 // method is using only a single file. This will also effectively
 // reduce the size of the relocation table.
 
+#ifdef __darwin__
+#include "darwin.S"
+#endif
 #include "entry.S"
 #include "dec.S"
 #include "emulation.S"
@@ -472,21 +481,21 @@ secint_lr_call:
 #endif
 #endif
 	
-#ifdef ACTION_SYM_GREPPING
-#include "actions.S"
-#endif
-
+#ifdef __linux__
 	.text	50
+#endif
 GLOBAL_SYMBOL(r__reloctable_end):
 
-	
+	ACTIONS_OFFS_SECTION
+GLOBAL_SYMBOL(r__actions_offs_section_end):
+		
 // The BUMP("counter") macro adds entries to text subsection 90.
 // This adds labels before the counter entries.
 
+#ifdef __linux__
 	.text	89
 GLOBAL_SYMBOL(__start_bumptable):
 	.text	91
 GLOBAL_SYMBOL(__end_bumptable):
 	.text
-
-
+#endif

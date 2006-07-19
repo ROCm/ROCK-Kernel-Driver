@@ -1,12 +1,12 @@
 /* 
  *   Creation Date: <97/05/26 02:10:43 samuel>
- *   Time-stamp: <2003/08/30 16:36:16 samuel>
+ *   Time-stamp: <2004/03/13 14:14:20 samuel>
  *   
  *	<misc.c>
  *	
  *	Kernel interface
  *   
- *   Copyright (C) 1997-2003 Samuel Rydh (samuel@ibrium.se)
+ *   Copyright (C) 1997-2004 Samuel Rydh (samuel@ibrium.se)
  *   
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -15,14 +15,16 @@
  */
 
 #include "archinclude.h"
-
 #include <linux/vmalloc.h>
+#include <linux/sched.h>
 #include <asm/uaccess.h>
 #include <asm/prom.h>
-
 #include "kernel_vars.h"
 #include "misc.h"
 #include "performance.h"
+#include "map.h"
+
+#define MMU	kv->mmu
 
 kernel_vars_t *
 alloc_kvar_pages( void )
@@ -58,6 +60,23 @@ free_kvar_pages( kernel_vars_t *kv )
 	for( i=1, order=0; i<NUM_KVARS_PAGES; i=i<<1, order++ )
 		;
 	free_pages( (ulong)kv, order );
+}
+
+
+/************************************************************************/
+/*	hash access							*/
+/************************************************************************/
+
+ulong *
+map_emulated_hash( kernel_vars_t *kv, ulong mbase, ulong size )
+{
+	return (ulong*)(MMU.userspace_ram_base + mbase);
+}
+
+void
+unmap_emulated_hash( kernel_vars_t *kv )
+{
+	/* nothing */
 }
 
 /************************************************************************/

@@ -1,6 +1,6 @@
 /* 
  *   Creation Date: <2002/06/08 20:53:20 samuel>
- *   Time-stamp: <2004/02/22 12:42:21 samuel>
+ *   Time-stamp: <2004/02/22 13:07:50 samuel>
  *   
  *	<fault.c>
  *	
@@ -28,6 +28,7 @@
 #include "mtable.h"
 #include "performance.h"
 #include "processor.h"
+#include "hash.h"
 
 /* exception bits (srr1/dsisr and a couple of mol defined bits) */
 #define		EBIT_PAGE_FAULT		BIT(1)		/* I/D, PTE missing */
@@ -153,6 +154,10 @@ lookup_mac_pte( kernel_vars_t *kv, ulong vsid, ulong ea )
 	ulong mask;
 	int i;
 
+	/* make sure the hash is mapped... */
+	if( !MMU.hash_base )
+		return NULL;
+
 	/* we are only interested in the page index */
 	ea &= 0x0ffff000;
 	mask = MMU.hash_mask>>6;
@@ -269,6 +274,7 @@ find_pte_slot( ulong ea, ulong *pte0, int pte_present, int *pte_replaced )
 {
 	static int grab_add=0;
 	ulong phash, pteg, *p, cmp = *pte0;
+	ulong *primary, *secondary;
 	int i;
 
 	/* we are only interested in the page index */
@@ -276,19 +282,24 @@ find_pte_slot( ulong ea, ulong *pte0, int pte_present, int *pte_replaced )
 
 	/* primary hash function */
 	phash = (ea >> 12) ^ (PTE0_VSID(cmp) & 0x7ffff);
-	pteg = (ulong)hw_hash_base | ((phash & hw_hash_mask) << 6);
+
+	pteg = (phash << 6) & ptehash.pteg_mask;
+	primary = (ulong*)((ulong)ptehash.base + pteg);
+
+	pteg = pteg ^ ptehash.pteg_mask;
+	secondary = (ulong*)((ulong)ptehash.base + pteg);	
 
 	if( pte_present ) {
 		*pte_replaced = 1;
 
 		/* look in primary PTEG */
-		p=(ulong*)pteg;
+		p = primary;
 		for( i=0; i<8; i++, p+=2 )
 			if( cmp == *p )
 				return p;
      
 		/* look in secondary PTEG */
-		p = (ulong*)(pteg ^ (hw_hash_mask << 6));
+		p = secondary;
 		cmp |= BIT(25);
 		for( i=0; i<8; i++, p+=2 )
 			if( cmp == *p ) {
@@ -302,15 +313,12 @@ find_pte_slot( ulong ea, ulong *pte0, int pte_present, int *pte_replaced )
 	*pte_replaced = 0;
 	
 	/* free slot in primary PTEG? */
-	p=(ulong*)pteg;
-	for( i=0; i<8; i++, p+=2 )
+	for( p=primary, i=0; i<8; i++, p+=2 )
 		if( !(*p & BIT(0)) )
 			return p;
 
 	/* free slot in secondary PTEG? */
-	p = (ulong*)(pteg ^ (hw_hash_mask << 6));
-
-	for( i=0; i<8; i++,p+=2 )
+	for( p=secondary, i=0; i<8; i++, p+=2 )
 		if( !(*p & BIT(0)) ) {
 			*pte0 |= PTE0_H;
 			return p;
@@ -320,7 +328,7 @@ find_pte_slot( ulong ea, ulong *pte0, int pte_present, int *pte_replaced )
 	grab_add = (grab_add+1) & 0x7;
 
 	/* printk("Grabbing slot %d, EA %08X\n",grab_add, ea ); */
-	return (ulong*)(pteg + grab_add * sizeof(ulong[2]));
+	return (ulong*)((ulong)primary + grab_add * sizeof(ulong[2]));
 }
 
 static inline int 
@@ -331,7 +339,7 @@ insert_pte( kernel_vars_t *kv, fault_param_t *pb, const int ebits )
 	int status, pte_replaced;
 	pte_lvrange_t *lvrange;
 	ulong pte0, pte1, *slot;
-	char *lvptr;
+	ulong lvptr;
 
 	pte1 = PTE1_M | PTE1_R | (pb->pte1 & (PTE1_R | PTE1_C | PTE1_WIMG))
 		| (is_write(ebits) ? 2:3);
@@ -365,7 +373,7 @@ insert_pte( kernel_vars_t *kv, fault_param_t *pb, const int ebits )
 	pte0 = PTE0_V | (sr << 7) | ((ea>>22) & PTE0_API);
 	slot = find_pte_slot( ea, &pte0, !is_page_fault(ebits), &pte_replaced );
 
-	lvptr = (status & MAPPING_PHYSICAL) ? NULL : (char*)(pte1 & PTE1_RPN);
+	lvptr = (status & MAPPING_PHYSICAL) ? 0 : (pte1 & PTE1_RPN);
 
 	/* the RC bits should correspond to the is_write flag; this prevents the
 	 * CPU from stamping RC bits unnecessary (besides, the kernel seems to
@@ -385,7 +393,7 @@ insert_pte( kernel_vars_t *kv, fault_param_t *pb, const int ebits )
 #endif
 		pte1 &= ~PTE1_RPN;
 
-		/* we should not have problems with zero pages... */
+		/* zero pages should work just fine now... */
 		pte1 |= get_phys_page( kv, lvptr, is_write(ebits) );
 		/* pte1 |= get_phys_page( kv, lvptr, !(status & MAPPING_RO) ); */
 	}
@@ -398,7 +406,7 @@ insert_pte( kernel_vars_t *kv, fault_param_t *pb, const int ebits )
 
 	__store_PTE( ea, slot, pte0, pte1 );
 
-	pte_inserted( kv, ea, lvptr, lvrange, slot, pb->vsid_eptr[ea>>28], sr );
+	pte_inserted( kv, ea, (char*)lvptr, lvrange, slot, pb->vsid_eptr[ea>>28], sr );
 
 	/* debugger support */
 	if( (kv->break_flags & BREAK_EA_PAGE) && (ea & ~0xfff) == MREGS.mdbg_ea_break )
@@ -510,7 +518,7 @@ dsi_exception( kernel_vars_t *kv, ulong dar, ulong dsisr )
 		| ((MREGS.msr & MSR_DR) ? EBIT_USE_MMU : 0);
 
 	pb.vsid_eptr = (MREGS.msr & MSR_DR) ? MMU.vsid : MMU.unmapped_vsid;
-	pb.sr_base = phys_to_virt(MMU.sr_data);
+	pb.sr_base = (ulong*)((ulong)MMU.sr_data - kv->kvars_tophys_offs);
 
 	/* segment register switch-in required? */
 	if( !pb.vsid_eptr[topind] ) {
@@ -521,7 +529,7 @@ dsi_exception( kernel_vars_t *kv, ulong dar, ulong dsisr )
 	return page_fault( kv, &pb, ebits );
 }
 
-int 
+int
 isi_exception( kernel_vars_t *kv, ulong nip, ulong srr1 )
 {
 	fault_param_t pb;
@@ -532,7 +540,7 @@ isi_exception( kernel_vars_t *kv, ulong nip, ulong srr1 )
 	if( srr1 & EBIT_PAGE_FAULT ) {
 		int ebits = EBIT_PAGE_FAULT | ((MREGS.msr & MSR_IR) ? EBIT_USE_MMU : 0);
 		pb.ea = nip;
-		pb.sr_base = phys_to_virt(MMU.sr_inst);
+		pb.sr_base = (ulong*)((ulong)MMU.sr_inst - kv->kvars_tophys_offs);
 		BUMP(isi_page_fault);
 		return page_fault( kv, &pb, ebits );
 	}

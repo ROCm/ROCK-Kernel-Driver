@@ -6,7 +6,7 @@
  *	
  *	Handles splitmode (MSR_IR != MSR_DR)
  *   
- *   Copyright (C) 2000, 2001, 2002, 2003 Samuel Rydh (samuel@ibrium.se)
+ *   Copyright (C) 2000, 2001, 2002, 2003, 2004 Samuel Rydh (samuel@ibrium.se)
  *   
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -43,7 +43,7 @@ MACRO(SPLITMODE_SMP_UNLOCK, [scr1,scr2], [
 	stw	_scr2,0(_scr1)
 #endif
 ])
-	
+
 	/////////////////////////////////////////////////////////////
 	// prepare_splitmode
 	//
@@ -166,9 +166,9 @@ splitmode_dsi:
 	beq	splitm_load
 
 	rlwinm	r5,r3,6+5+3,(0x1f<<3)		// r5 = rS << 3
-	EMU_LOAD_GPR R5, /**/ R6		// r0 = value
+	EMU_LOAD_GPR r5, /**/ R6		// r0 = value
 	mtlr	r4				// secint handler	
-	SM_SET_MSR_DR /**/ R5
+	SM_SET_MSR_DR /**/ r5
 
 	rlwinm	r6,r3,6,0x3e			// primary opcode & ~1
 	mtcrf	0x40,r3				// cr[5] = update bit (if opcode != 31)
@@ -203,7 +203,7 @@ splitm_store_op31:
 
 splitm_load:
 	mtlr	r4				// secint handler
-	SM_SET_MSR_DR /**/ R5
+	SM_SET_MSR_DR /**/ r5
 	rlwinm	r6,r3,6,0x3e			// primary opcode & ~1
 	mtcrf	0x40,r3				// cr[5] = update bit (if opcode != 31)
 	cmpwi	r6,30				// 31 & ~1
@@ -242,7 +242,7 @@ splitm_load_op31:
 	// r0=value, r2=ea, r3=opcode
 splitm_stwcx:
 	stwcx.	r0,0,r2
-	SM_CLEAR_MSR_DR /**/ R0
+	SM_CLEAR_MSR_DR /**/ r0
 	lwz	r6,xCR(r1)
 	mfcr	r0
 	rlwimi	r6,r0,0,0,3
@@ -284,42 +284,43 @@ splitm_dcbf:
 splitm_stwbrx:	
 	stwbrx	r0,0,r2
 	b	splitm_done
-		
+
 splitm_load_continue:
-	SM_CLEAR_MSR_DR /**/ R4
+	SM_CLEAR_MSR_DR /**/ r4
 	BUMP("splitm_load")
 	rlwinm	r4,r3,6+5+3,(0x1f<<3)		// r5 = rS << 3
-	EMU_STORE_GPR R4, /**/ R6		// r0 = value
+	EMU_STORE_GPR r4, /**/ R6		// r0 = value
 	bf+	5,splitm_done2			// update form?
 	b	1f
+
 splitm_store_continue:	
-	SM_CLEAR_MSR_DR /**/ R0
+	SM_CLEAR_MSR_DR /**/ r0
 	BUMP("splitm_store")
 	bf+	5,splitm_done2			// update form?
 1:	rlwinm	r3,r3,6+5+5+3,(31<<3)
 	mr	r0,r2
-	EMU_STORE_GPR R3, /**/ R6		// r0 = value
+	EMU_STORE_GPR r3, /**/ R6		// r0 = value
 	b	splitm_done2
 splitm_done:
-	SM_CLEAR_MSR_DR /**/ R0
+	SM_CLEAR_MSR_DR /**/ r0
 splitm_done2:	
 	lwz	r3,K_TMP_SCRATCH0(r1)
 	lwz	r6,xNIP(r1)			// restore NIP
 	mtsrin	r3,r2
 	b	emulation_done
-	
+
 
 	// fallback, store and execute the instruction, r3=opcode
 splitm_fallback:
-	SM_CLEAR_MSR_DR /**/ R0
+	SM_CLEAR_MSR_DR /**/ r0
 #if 0
 	stw	r3,xDEBUG1(r1)
 	stw	r6,xDEBUG0(r1)
 	lwz	r6,xNIP(r1)
 	DEBUGGER_SAVE(0x1111)	
 #endif
-	SPLITMODE_SMP_LOCK /**/ R0,R2
-	
+	SPLITMODE_SMP_LOCK /**/ r0,r2
+
 	BUMP("splitm_fallback")
 	bl	secint_splitm_fallback		// set secondary exception handler
 
@@ -351,7 +352,7 @@ split_store_patch:
 	mfsprg_a3 r1				// and stack pointer
 
 	xGPR_SAVE_RANGE R2,R7,r1
-	SPLITMODE_SMP_UNLOCK /**/ R3,R4
+	SPLITMODE_SMP_UNLOCK /**/ r3,r4
 
 	mfsprg_a0 r2				// r1 - to be saved
 	lwz	r6,xNIP(r1)			// restore r6,r7 and segment register

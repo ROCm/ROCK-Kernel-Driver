@@ -1,12 +1,12 @@
 /* 
  *   Creation Date: <1998-11-21 16:07:47 samuel>
- *   Time-stamp: <2003/01/31 14:08:38 samuel>
+ *   Time-stamp: <2004/03/13 14:08:18 samuel>
  *   
  *	<emu.c>
  *	
  *	Emulation of some assembly instructions
  *   
- *   Copyright (C) 1998-2003 Samuel Rydh (samuel@ibrium.se)
+ *   Copyright (C) 1998-2004 Samuel Rydh (samuel@ibrium.se)
  *   
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -25,6 +25,8 @@
 #include "mtable.h"
 #include "performance.h"
 #include "emuaccel_sh.h"
+#include "misc.h"
+#include "map.h"
 
 #define BAT_PERFORMANCE_HACK
 // #define DEBUG
@@ -51,32 +53,32 @@ int
 do_mtsdr1( kernel_vars_t *kv, ulong value )
 {
 	ulong mbase, mask;
-	char *base;
 	int s;
 	
 	MREGS.spr[S_SDR1] = value;
 
-	/* the mask must be a valid one; we hade better make sure are
+	/* the mask must be a valid one; we hade better make sure we are
 	 * not tricked by a bogus sdr1 value
 	 */
-	for( mask=BIT(23); mask && !(mask & value)  ; mask=mask>>1 )
+	for( mask=BIT(23); mask && !(mask & value) ; mask=mask>>1 )
 		;
 	mask = mask? ((mask | (mask-1)) << 16) | 0xffff : 0xffff;
-
 	mbase = value & ~mask;
-	base = mbase - MMU.mac_ram_base + MMU.linux_ram_base;
 
-	if( base < MMU.linux_ram_base || base + mask >= MMU.linux_ram_base + MMU.ram_size ) {
+	if( mbase + mask >= MMU.ram_size ) {
 		/* S_SDR1 out of range, fallback to a safe setting */
 		printk("WARNING, S_SDR1, %08lX is out of range\n", value);
-		base = MMU.linux_ram_base;
 		mbase = 0;
 		mask = 0xffff;
 	}
-	MMU.hash_base = (ulong*)base;
+
 	MMU.hash_mbase = mbase;
 	MMU.hash_mask = mask;
 	MMU.pthash_sr = -1;		/* clear old tlbhash matching */
+
+	if( MMU.hash_base )
+		unmap_emulated_hash( kv );
+	MMU.hash_base = map_emulated_hash( kv, MMU.hash_mbase, mask+1 );
 
 	/* try to allocate the PTE bitfield table (16K/128 MB ram). The worst
 	 * case is 512K which will fail since the kmalloc limit is 128K.
@@ -84,8 +86,8 @@ do_mtsdr1( kernel_vars_t *kv, ulong value )
 	 */
 	s = (mask+1)/8/8;		
 	if( MMU.pthash_inuse_bits )
-		kfree_mol( MMU.pthash_inuse_bits );
-	if( !(MMU.pthash_inuse_bits=kmalloc_mol( s )) )
+		kfree_cont_mol( MMU.pthash_inuse_bits );
+	if( !(MMU.pthash_inuse_bits=kmalloc_cont_mol(s)) )
 		MMU.pthash_inuse_bits_ph = 0;
 	else {
 		memset( MMU.pthash_inuse_bits, 0, s );
@@ -93,7 +95,7 @@ do_mtsdr1( kernel_vars_t *kv, ulong value )
 	}
 
 	/* make sure the unmapped ram range is flushed... */
-	flush_lv_range( kv, (ulong)base, mask+1 );
+	flush_lv_range( kv, MMU.userspace_ram_base + mbase, mask+1 );
 
 	/* ...as well as any MMU mappings */
 	clear_pte_hash_table( kv );

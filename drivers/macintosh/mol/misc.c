@@ -1,12 +1,12 @@
 /* 
  *   Creation Date: <2003/06/06 20:00:52 samuel>
- *   Time-stamp: <2003/08/27 19:49:00 samuel>
+ *   Time-stamp: <2004/03/06 13:54:26 samuel>
  *   
  *	<misc.c>
  *	
  *	Miscellaneous
  *   
- *   Copyright (C) 2003 Samuel Rydh (samuel@ibrium.se)
+ *   Copyright (C) 2003, 2004 Samuel Rydh (samuel@ibrium.se)
  *   
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -24,6 +24,7 @@
 #include "misc.h"
 #include "emu.h"
 #include "alloc.h"
+#include "uaccess.h"
 
 
 /************************************************************************/
@@ -32,7 +33,7 @@
 
 #ifdef PERFORMANCE_INFO
 
-void
+static void
 clear_performance_info( kernel_vars_t *kv )
 {
 	perf_info_t *p = g_perf_info_table;
@@ -45,24 +46,21 @@ clear_performance_info( kernel_vars_t *kv )
 	kv->num_acntrs = 0;
 }
 
-int
-get_performance_info( kernel_vars_t *kv, int ind, perf_ctr_t *r )
+static int
+get_performance_info( kernel_vars_t *kv, uint ind, perf_ctr_t *r )
 {
-	perf_info_t *p = g_perf_info_table;
-	int i, j, len;
+	perf_info_t *p;
+	int len;
 	char *name;
 
-	for( i=0; p->name && i!=ind; i++, p++ )
+	for( p=g_perf_info_table; p->name && ind; p++, ind-- )
 		;
 	if( !p->name ) {
-		extern char *__start_bumptable[], *__end_bumptable[];
-		char **s;
-		for( j=0, s=__start_bumptable ; s < __end_bumptable && i!=ind ; s++, i++, j++ )
-			;
-		if( s >= __end_bumptable )
-			return -1;
-		name = *s;
-		r->ctr = kv->asm_bump_cntr[j];
+		extern int __start_bumptable[], __end_bumptable[];
+		if( ind >= __end_bumptable - __start_bumptable )
+			return 1;
+		name = (char*)__start_bumptable + __start_bumptable[ind];
+		r->ctr = kv->asm_bump_cntr[ind];
 	} else {
 		name = p->name;
 		r->ctr = *p->ctrptr;
@@ -76,15 +74,15 @@ get_performance_info( kernel_vars_t *kv, int ind, perf_ctr_t *r )
 
 #else /* PERFORMANCE_INFO */
 
-void
+static void
 clear_performance_info( kernel_vars_t *kv ) 
 {
 }
 
-int
-get_performance_info( kernel_vars_t *kv, int ind, perf_ctr_t *r )
+static int
+get_performance_info( kernel_vars_t *kv, uint ind, perf_ctr_t *r )
 { 
-	return -1;
+	return 1;
 }
 
 #endif /* PERFORMANCE_INFO */
@@ -172,9 +170,12 @@ tune_spr( kernel_vars_t *kv, uint spr, int action )
 	kv->_bp.spr_hooks[spr] = hook;
 }
 
+/* return value: <0: system error, >=0: ret value */
 int
 handle_ioctl( kernel_vars_t *kv, int cmd, int arg1, int arg2, int arg3 ) 
 {
+	struct mmu_mapping map;
+	perf_ctr_t pctr;
 	int ret = 0;
 	
 	switch( cmd ) {
@@ -198,7 +199,7 @@ handle_ioctl( kernel_vars_t *kv, int cmd, int arg1, int arg2, int arg3 )
 		remove_io_trans( kv, arg1, arg2 );
 		break;
 
-	case MOL_IOCTL_ALLOC_EMUACCEL_SLOT: /* EMULATE_xxx, param, ret_addr -- ind */
+	case MOL_IOCTL_ALLOC_EMUACCEL_SLOT: /* EMULATE_xxx, param, ret_addr -- mphys */
 		ret = alloc_emuaccel_slot( kv, arg1, arg2, arg3 );
 		break;
 	case MOL_IOCTL_MAPIN_EMUACCEL_PAGE: /* arg1 = mphys */
@@ -211,6 +212,24 @@ handle_ioctl( kernel_vars_t *kv, int cmd, int arg1, int arg2, int arg3 )
 	case MOL_IOCTL_TUNE_SPR: /* spr#, action */
 		tune_spr( kv, arg1, arg2 );
 		break;
+
+	case MOL_IOCTL_MMU_MAP: /* arg1=struct mmu_mapping *m, arg2=map/unmap */
+		if( copy_from_user_mol(&map, (struct mmu_mapping*)arg1, sizeof(map)) )
+			break;
+		if( arg2 )
+			mmu_add_map( kv, &map );
+		else 
+			mmu_remove_map( kv, &map );
+		if( copy_to_user_mol((struct mmu_mapping*)arg1, &map, sizeof(map)) )
+			ret = -EFAULT_MOL;
+		break;
+
+	case MOL_IOCTL_GET_PERF_INFO:
+		ret = get_performance_info( kv, arg1, &pctr );
+		if( copy_to_user_mol((perf_ctr_t*)arg2, &pctr, sizeof(pctr)) )
+			ret = -EFAULT_MOL;
+		break;
+
 #if 0
 	case MOL_IOCTL_TRACK_DIRTY_RAM:
 		ret = track_lvrange( kv );

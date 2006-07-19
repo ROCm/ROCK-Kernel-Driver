@@ -1,13 +1,13 @@
 /*   -*- asm -*- 
  *
  *   Creation Date: <2001/02/03 19:38:07 samuel>
- *   Time-stamp: <2003/07/08 18:55:50 samuel>
+ *   Time-stamp: <2004/02/22 15:36:20 samuel>
  *   
  *	<asmdefs.h>
  *	
  *	Common assembly definitions
  *   
- *   Copyright (C) 2001, 2002, 2003 Samuel Rydh (samuel@ibrium.se)
+ *   Copyright (C) 2001, 2002, 2003, 2004 Samuel Rydh (samuel@ibrium.se)
  *   
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -38,6 +38,17 @@
 #define		HI(v)		hi16(v)
 #define		LO(v)		lo16(v)
 
+/************************************************************************/
+/*	Stack Frame							*/
+/************************************************************************/
+
+#ifdef __linux__
+#define STACK_LR_OFFSET		4
+#endif
+
+#ifdef __darwin__
+#define STACK_LR_OFFSET		8		/* 4 is the CR offset */
+#endif
 	
 /************************************************************************/
 /*	Register name prefix						*/
@@ -243,17 +254,32 @@ MACRO(mfsprg3, [reg], [mfspr _reg,SPRG3] )
 /*	Register names							*/
 /************************************************************************/
 
+#define		cr0_lt	0
+#define		cr0_gt	1
+#define		cr0_eq	2
+#define		cr0_so	3
+
+#define		cr1_lt	4
+#define		cr1_gt	5
+#define		cr1_eq	6
+#define		cr1_so	7
+
+#define		cr2_lt	8
+#define		cr2_gt	9
+#define		cr2_eq	10
+#define		cr2_so	11
+
+#define		cr3_lt	12
+#define		cr3_gt	13
+#define		cr3_eq	14
+#define		cr3_so	15
+
 #ifdef __darwin__
-/* These symbols are not defined under Darwin */
-#define		cr0	0
-#define		cr1	1
-#define		cr2	2
-#define		cr3	3
-#define		cr4	4
-#define		cr5	5
-#define		cr6	6
-#define		cr7	7	
-#define		cr8	8
+/* IMPORTANT: we may *not* define crN on darwin; If we do, the
+ * assembler will generate bogus code. For instance,
+ * bne cr1,1f is not equivalent to bne 1,1f but to
+ * bne 4,1f...
+ */
 #define		lt	0	/* Less than */
 #define		gt	1	/* Greater than */
 #define		eq	2	/* Equal */
@@ -332,9 +358,9 @@ MACRO(mfsprg3, [reg], [mfspr _reg,SPRG3] )
 #ifndef __darwin__
 
 /* GPR register names, rN -> N, frN -> N, vN -> N */
-mFORLOOP([i],0,31,[define(r[]i,[]i)])	
-mFORLOOP([i],0,31,[define(fr[]i,[]i)])	
-mFORLOOP([i],0,31,[define(v[]i,[]i)])	
+mFORLOOP([i],0,31,[define(r[]i,[]i)])
+mFORLOOP([i],0,31,[define(fr[]i,[]i)])
+mFORLOOP([i],0,31,[define(v[]i,[]i)])
 
 #endif /* __darwin__ */
 

@@ -6,7 +6,7 @@
  *	
  *	Exports from <base.S>
  *   
- *   Copyright (C) 1999, 2000, 2001, 2002, 2003 Samuel Rydh (samuel@ibrium.se)
+ *   Copyright (C) 1999, 2000, 2001, 2002, 2003, 2004 Samuel Rydh (samuel@ibrium.se)
  *   
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -17,9 +17,14 @@
 #ifndef _H_ASMFUNCS
 #define _H_ASMFUNCS
 
-#include "reloc.h"
 #include "kernel_vars.h" 
 #include "tlbie.h"
+
+
+/* globl variable defined in actions.c */
+extern int reloc_virt_offs;
+#define reloc_ptr( v )  ((ulong)(v) + (ulong)reloc_virt_offs)
+
 
 /* The code in base.o (all low-level assembly) are copied to a physically 
  * continuous memory area. The following inline functions maps function calls

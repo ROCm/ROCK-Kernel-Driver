@@ -22,6 +22,7 @@
 #include "performance.h"
 
 extern int do_intercept_tlbie( kernel_vars_t *kv, ulong pte0, ulong pte1, ulong pteoffs );
+extern int do_intercept_tlbie_block( kernel_vars_t *kv, ulong pteoffs, ulong length );
 
 #define	MMU	(kv->mmu)
 #define	MREGS	(kv->mregs)
@@ -45,6 +46,37 @@ do_intercept_tlbie( kernel_vars_t *kv, ulong pte0, ulong pte1, ulong pteoffs )
 
 	//printk("do_intercept_tlbie: vsid %08lX, ea %08lX\n", vsid, (v<<12) );
 	flush_vsid_ea( kv, vsid, (v<<12) );
+
+	return RVEC_NOP;
+}
+
+int
+do_intercept_tlbie_block( kernel_vars_t *kv, ulong pteoffs, ulong length )
+{
+	unsigned int finish;
+
+	//printk("do_intercept_tlbie_block: pteoffs %08lX length %08lX\n", pteoffs, length);
+
+	if (pteoffs + length > MMU.hash_mask) {
+		printk("do_intercept_tlbie_block: length exceeding hash!\n");
+		finish = MMU.hash_mask + 1;
+	} else
+		finish = pteoffs + length;
+
+	if (MMU.pthash_inuse_bits == NULL)
+		return RVEC_NOP;
+
+	while (pteoffs < finish) {
+		if (check_bit_mol(pteoffs >> 3, MMU.pthash_inuse_bits)) {
+			ulong pte0, pte1;
+
+			pte0 = *((unsigned int *) (MMU.hash_base + pteoffs));
+			pte1 = *((unsigned int *) (MMU.hash_base + pteoffs + 4));
+			do_intercept_tlbie(kv, pte0, pte1, pteoffs);
+		} 
+
+		pteoffs += 8;
+	}
 
 	return RVEC_NOP;
 }

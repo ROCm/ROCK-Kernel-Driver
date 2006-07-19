@@ -1,12 +1,12 @@
 /* 
  *   Creation Date: <2001/01/26 21:33:45 samuel>
- *   Time-stamp: <2003/08/12 00:26:22 samuel>
+ *   Time-stamp: <2004/02/08 20:08:20 samuel>
  *   
  *	<return_vectors.h>
  *	
  *	Possible mac-return vectors (see mainloop.S)
  *   
- *   Copyright (C) 2000, 2001, 2002, 2003 Samuel Rydh (samuel@ibrium.se)
+ *   Copyright (C) 2000, 2001, 2002, 2003, 2004 Samuel Rydh (samuel@ibrium.se)
  *   
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -27,6 +27,9 @@
 /* ---------------------------------------------------------------------------- */
 
 #define	RVEC_NOP			0		/* Must be zero */
+#ifdef __darwin__
+#define RVEC_CALL_KERNEL		1		/* call kernel */
+#endif
 #define RVEC_ENABLE_FPU			3		/* Load up FPU */
 
 #define RVEC_TRACE_TRAP			6
@@ -68,6 +71,8 @@
 #define RVEC_BREAK			32		/* r4 = break_flag */
 #define RVEC_BAD_NIP			33		/* r4 = phys_nip */
 #define RVEC_OUT_OF_MEMORY		34		/* fatal out of memory... */
+
+#define RVEC_CHECK_IRQS			35		/* check interrupts */
 
 
 /************************************************************************/

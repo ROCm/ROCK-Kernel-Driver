@@ -1,12 +1,12 @@
 /* 
  *   Creation Date: <1999-12-28 14:03:18 samuel>
- *   Time-stamp: <2003/08/15 20:35:28 samuel>
+ *   Time-stamp: <2004/02/14 14:52:52 samuel>
  *   
  *	<mmu_fb.c>
  *	
  *	Offscreen framebuffer acceleration
  *   
- *   Copyright (C) 2002, 2003 Samuel Rydh (samuel@ibrium.se)
+ *   Copyright (C) 2002, 2003, 2004 Samuel Rydh (samuel@ibrium.se)
  *   
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -16,6 +16,7 @@
 
 #include "archinclude.h"
 #include "alloc.h"
+#include "uaccess.h"
 #include "mmu.h"
 #include "asmfuncs.h"
 #include "performance.h"
@@ -39,9 +40,14 @@ typedef struct fb_data {
 #define MMU		(kv->mmu)
 #define DECLARE_FB	fb_data_t *fb = MMU.fb_data
 
-/**************************************************************
-*  		Implementation
-**************************************************************/
+#ifdef __darwin__
+static inline void
+__put_user( short val, short *destptr )
+{
+	copy_to_user_mol( destptr, &val, sizeof(short) );
+}
+#endif
+
 
 int
 init_mmu_fb( kernel_vars_t *kv )
@@ -64,7 +70,7 @@ cleanup_mmu_fb( kernel_vars_t *kv )
 }
 
 void
-video_pte_inserted( kernel_vars_t *kv, char *lvptr, ulong *slot, ulong pte0, ulong pte1, ulong ea )
+video_pte_inserted( kernel_vars_t *kv, ulong lvptr, ulong *slot, ulong pte0, ulong pte1, ulong ea )
 {
 	DECLARE_FB;
 	int i;
@@ -72,7 +78,7 @@ video_pte_inserted( kernel_vars_t *kv, char *lvptr, ulong *slot, ulong pte0, ulo
 	if( !fb )
 		return;
 
-	i = ((ulong)lvptr - (ulong)fb->lv_base) >> 12;
+	i = (lvptr - (ulong)fb->lv_base) >> 12;
 	if( i >= 0 && i < fb->nrec ) {
 		line_entry_t *p = &fb->line_table[i];
 
@@ -90,7 +96,7 @@ video_pte_inserted( kernel_vars_t *kv, char *lvptr, ulong *slot, ulong pte0, ulo
 		p->pte1 = pte1 & ~PTE1_C;
 		p->ea = ea;
 	} else {
-		printk("Warning: video_page outside range, %p %p\n", lvptr, fb->lv_base );
+		printk("Warning: video_page outside range, %lx %p\n", lvptr, fb->lv_base );
 	}
 }
 
@@ -116,6 +122,7 @@ setup_fb_acceleration( kernel_vars_t *kv, char *lvbase, int bytes_per_row, int h
 		cleanup_mmu_fb( kv );
 		return;
 	}
+	memset( p, 0, sizeof(line_entry_t) * fb->nrec );
 	fb->line_table = p;
 
 	fb->lv_base = (char*)((ulong)lvbase & ~0xfff);

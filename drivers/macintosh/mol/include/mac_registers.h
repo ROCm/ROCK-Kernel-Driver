@@ -1,12 +1,12 @@
 /* 
  *   Creation Date: <97/06/24 22:25:04 samuel>
- *   Time-stamp: <2003/08/18 23:20:07 samuel>
+ *   Time-stamp: <2004/02/08 20:32:59 samuel>
  *   
  *	<mac_registers.h>
  *	
  *	
  *   
- *   Copyright (C) 1997-2003 Samuel Rydh (samuel@ibrium.se)
+ *   Copyright (C) 1997-2004 Samuel Rydh (samuel@ibrium.se)
  *   
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -31,6 +31,12 @@ typedef struct {
 typedef struct {
 	unsigned long	words[4];
 } altivec_reg_t;
+
+#define NR_HOST_IRQS		64
+
+typedef struct irq_bitfield {
+	unsigned long irqs[(NR_HOST_IRQS - 1) / sizeof(unsigned long) + 1];
+} irq_bitfield_t;
 
 typedef struct mac_regs {			/* this struct is page aligned */
 	/* the sprs should be page aligned (occupies one page) */
@@ -64,6 +70,9 @@ typedef struct mac_regs {			/* this struct is page aligned */
 	int		obsolete_irq;		/* unused */
 
 	/* RVEC parameters */
+#ifdef __darwin__
+	ulong		rvec_vector;		/* Used in kernel C-mode */
+#endif
 	ulong		rvec_param[3];		/* Used in kernel C-mode */
 
 	/* misc */
@@ -90,8 +99,17 @@ typedef struct mac_regs {			/* this struct is page aligned */
 	unsigned long	dbg_last_osi;
 
 	unsigned long	kernel_dbg_stop;	/* stop emulation flag */
+
+	/* host irq mapping data */
+	irq_bitfield_t		mapped_irqs;	/* keeps track of used host irqs */
+	irq_bitfield_t		active_irqs;	/* irqs that are up are marked here */
+	int			hostirq_update; /* whether userspace should update the pic */
+	/* should be mol_atomic_t but causes trouble... */
+	int			hostirq_active_cnt;	/* number of active host irq lines */
+
 } mac_regs_t;
 
+#define NUM_MREGS_PAGES		((sizeof(mac_regs_t)+0xfff)/0x1000)
 
 #define	BIT(n)			(1U<<(31-(n)))	/* bit 0 is MSB */
 

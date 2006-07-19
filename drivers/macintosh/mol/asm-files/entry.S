@@ -1,12 +1,12 @@
 /* 
  *   Creation Date: <2001/01/30 00:22:35 samuel>
- *   Time-stamp: <2003/09/04 11:24:31 samuel>
+ *   Time-stamp: <2004/03/07 13:33:39 samuel>
  *   
  *	<entry.S>
  *	
  *	Emulator/mac switching
  *   
- *   Copyright (C) 2001, 2002, 2003 Samuel Rydh (samuel@ibrium.se)
+ *   Copyright (C) 2001, 2002, 2003, 2004 Samuel Rydh (samuel@ibrium.se)
  *   
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -55,7 +55,7 @@ mac_entry_initialize:
 	mtcr	r3
 
 	// msr to be used in mac-mode
-	LOADI	r3,(MSR_ME | MSR_IR | MSR_DR | MSR_PR | MSR_EE )
+	LOADI	r3,(MSR_ME | MSR_IR | MSR_DR | MSR_PR | MSR_EE)
 	stw	r3,K_MSR(r1)
 
 	PERF_MONITOR_SETUP /**/ r4
@@ -91,15 +91,13 @@ mac_entry_initialize:
 1:	li	r4,1
 	stw	r4,ST_MAGIC(r1)
 2:	mtcr	r3				// restore registers
-	mfsprg_a1 r1
-	mfsprg_a0 r3
 	CONTINUE_TRAP( 0x700 )			// not MOL, take the trap
 
 	balign_32
 mac_entry:
-	lis	r1,HA(EXTERN(Symbol_SESSION_TABLE))
+	lis_svh R1,SPECVAR_SESSION_TABLE
 	cmpwi	r4,MOL_ENTRY_R4_MAGIC		// MOL switch magic.
-	addi	r1,r1,LO(EXTERN(Symbol_SESSION_TABLE))
+	ori_svl R1,R1,SPECVAR_SESSION_TABLE
 	bne-	2b
 	lwz	r4,ST_MAGIC(r1)			// check that the magic match
 	cmplwi	r5,1				// and is greater than 1
@@ -344,6 +342,10 @@ set_mac_context:
 	mtspr	DBAT1U,r4
 	mtspr	DBAT2U,r4
 	mtspr	DBAT3U,r4
+#ifdef __darwin__
+	lwz	r4,K_MOL_SDR1(r1)
+	mtsdr1	r4
+#endif	
 	blr
 
 		
@@ -359,7 +361,7 @@ set_emulator_context:
 	lwz	r2,K_EMULATOR_SPRG3(r1)	
 	mtsprg_a2 r0
 	mtsprg_a3 r2
-		
+
 	// Restore segment registers
 	addi	r8,r1,K_EMULATOR_SR
 	LOAD_SEGMENT_REGS r8, /**/ r2,r10
@@ -385,6 +387,11 @@ set_emulator_context:
 	mtspr	DBAT2U,r7
 	lwz	r2,K_DBAT3U_SAVE(r1)
 	mtspr	DBAT3U,r2
+#ifdef __darwin__
+	lwz	r2,K_OS_SDR1(r1)
+	mtsdr1	r2
+	fix_sprg2 /**/ R2			// must not modify sprg2 (i.e. sprg_a0) under OSX 10.3
+#endif	
 	blr
 
 

@@ -1,12 +1,12 @@
 /* 
  *   Creation Date: <2000/09/07 20:36:54 samuel>
- *   Time-stamp: <2003/06/08 17:53:51 samuel>
+ *   Time-stamp: <2004/02/14 14:45:33 samuel>
  *   
  *	<mmu_tracker.c>
  *	
  *	Keeps track of dirty RAM pages
  *   
- *   Copyright (C) 2000, 2001, 2002, 2003 Samuel Rydh (samuel@ibrium.se)
+ *   Copyright (C) 2000, 2001, 2002, 2003, 2004 Samuel Rydh (samuel@ibrium.se)
  *   
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -16,7 +16,7 @@
 
 #include "archinclude.h"
 #include "alloc.h"
-
+#include "uaccess.h"
 #include "mmu.h"
 
 
@@ -25,15 +25,13 @@ typedef struct tracker_data {
 	size_t	table_size;
 	
 	int	npages;
-	char	*lvbase;
+	ulong	lvbase;
 } tracker_data_t;
 
 #define MMU		(kv->mmu)
 #define DECLARE_TS	tracker_data_t *ts = MMU.tracker_data
 
-/************************************************************************/
-/*	F U N C T I O N S						*/
-/************************************************************************/
+
 
 int
 init_mmu_tracker( kernel_vars_t *kv )
@@ -41,7 +39,6 @@ init_mmu_tracker( kernel_vars_t *kv )
 	/* track_lvrange does the initialization */
 	return 0;
 }
-
 
 void
 cleanup_mmu_tracker( kernel_vars_t *kv )
@@ -60,7 +57,7 @@ cleanup_mmu_tracker( kernel_vars_t *kv )
 int
 track_lvrange( kernel_vars_t *kv )
 {
-	char *lvbase = MMU.linux_ram_base;
+	ulong lvbase = MMU.userspace_ram_base;
 	int size = MMU.ram_size;
 	
 	DECLARE_TS;
@@ -69,7 +66,7 @@ track_lvrange( kernel_vars_t *kv )
 	if( !size )
 		return 0;
 
-	if( !(ts=kmalloc_mol( sizeof(tracker_data_t) )) )
+	if( !(ts=kmalloc_mol(sizeof(tracker_data_t))) )
 		return 1;
 	memset( ts, 0, sizeof(tracker_data_t) );
 	MMU.tracker_data = ts;
@@ -77,7 +74,7 @@ track_lvrange( kernel_vars_t *kv )
 	ts->npages = size >> 12;
 	ts->table_size = (ts->npages+7)/8;
 	ts->lvbase = lvbase;
-	if( !(ts->table=vmalloc_mol( ts->table_size )) ) {
+	if( !(ts->table=vmalloc_mol(ts->table_size)) ) {
 		cleanup_mmu_tracker( kv );
 		return 1;
 	}
@@ -86,7 +83,7 @@ track_lvrange( kernel_vars_t *kv )
 }
 
 void
-lvpage_dirty( kernel_vars_t *kv, char *lvbase )
+lvpage_dirty( kernel_vars_t *kv, ulong lvbase )
 {
 	DECLARE_TS;
 	int pgindex;
@@ -94,7 +91,7 @@ lvpage_dirty( kernel_vars_t *kv, char *lvbase )
 	if( !ts )
 		return;
 
-	pgindex = (ulong)(lvbase - ts->lvbase) >> 12;
+	pgindex = (lvbase - ts->lvbase) >> 12;
 
 	if( pgindex >=0 && pgindex < ts->npages )
 		ts->table[pgindex >> 3] |= (1 << (pgindex & 7));
@@ -129,4 +126,3 @@ set_track_buffer( kernel_vars_t *kv, char *buf )
 		printk("set_track_buffer: Bad access\n");
 	}
 }
-

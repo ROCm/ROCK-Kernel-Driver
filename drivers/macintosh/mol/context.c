@@ -1,6 +1,6 @@
 /* 
  *   Creation Date: <1998-11-20 16:18:20 samuel>
- *   Time-stamp: <2004/02/28 19:27:16 samuel>
+ *   Time-stamp: <2004/02/28 19:16:44 samuel>
  *   
  *	<context.c>
  *	
@@ -23,23 +23,19 @@
 #include "emu.h"
 #include "mtable.h"
 #include "performance.h"
-
+#include "context.h"
+#include "hash.h"
 
 #define MMU	(kv->mmu)
+
 
 static int
 flush_all_PTEs( kernel_vars_t *kv )
 {
-	ulong ea, v, sdr1 = _get_sdr1();
-	ulong *pte = phys_to_virt( sdr1 & ~0xffff );
-	int npte = ((((sdr1 & 0x1ff) << 16) | 0xffff) + 1) / 8;
-	int i, count=0;
+	int i, count=0, npte=(ptehash.pte_mask + 8)/8;
+	ulong *pte, ea, v;
 
-	/* SDR1 might not be initialized (yet) on the 603 */
-	if( !sdr1 )
-		return 0;
-
-	for( i=0; i<npte; i++, pte+=2 ) {
+	for( pte=ptehash.base, i=0; i<npte; i++, pte+=2 ) {
 		v = *pte;
 		if( !(v & BIT(0)) )	/* test V-bit */
 			continue;
@@ -96,7 +92,7 @@ int
 alloc_context( kernel_vars_t *kv )
 {
 	int mol_context = MMU.next_mol_context++;
-	int vsid = MUNGE_CONTEXT((mol_context >> 4)) << 4;
+	int vsid = MUNGE_CONTEXT(mol_context >> 4);
 
 	vsid += MUNGE_ESID_ADD * (mol_context & 0xf);
 	return (vsid & VSID_MASK);

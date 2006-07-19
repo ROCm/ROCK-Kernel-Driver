@@ -1,6 +1,6 @@
 /* 
  *   Creation Date: <1999/05/30 15:30:25 samuel>
- *   Time-stamp: <2004/01/14 21:14:28 samuel>
+ *   Time-stamp: <2004/06/05 19:47:33 samuel>
  *   
  *	<mol_config.h>
  *	
@@ -50,19 +50,10 @@ typedef unsigned long	ulong;
 
 #include "config.h"
 #include "autoconf.h"
+#include "unconfig.h"
 
 #ifdef CONFIG_OLDWORLD
 #define OLDWORLD_SUPPORT
-#endif
-#ifndef HAVE_ALSA
-#undef CONFIG_ALSA
-#endif
-#ifndef HAVE_X11
-#undef CONFIG_X11
-#undef CONFIG_XDGA
-#endif
-#ifndef HAVE_XDGA
-#undef CONFIG_XDGA
 #endif
 
 #include "platform.h"

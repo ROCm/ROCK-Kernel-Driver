@@ -1,6 +1,6 @@
 /* 
  *   Creation Date: <2003/03/03 23:19:47 samuel>
- *   Time-stamp: <2004/02/14 19:41:09 samuel>
+ *   Time-stamp: <2004/02/21 16:24:56 samuel>
  *   
  *	<skiplist.c>
  *	
@@ -16,6 +16,7 @@
 
 #include "archinclude.h"
 #include "skiplist.h"
+#include "alloc.h"
 
 #define SKIPLIST_END 		INT_MAX		/* this key is reserved */
 
@@ -58,6 +59,15 @@ mol_random_entropy( void )
         mol_rand_seed ^= entropy;
 }
 
+static inline void
+set_level_next( skiplist_level_t *level, skiplist_el_t *el )
+{
+	level->next = el;
+#ifdef __darwin__
+	level->next_phys = el ? tophys_mol(el) : NULL;
+#endif	
+}
+
 
 /************************************************************************/
 /*	skiplist operations						*/
@@ -70,28 +80,27 @@ skiplist_prealloc( skiplist_t *sl, char *buf, unsigned int size,
 	skiplist_el_t *p, *head;
 	unsigned int s;
 	int n, count;
-	
+
 	head = NULL;
 	for( count=0 ;; size -= s, buf += s, count++ ) {
 		for( n=0; n<SKIPLIST_MAX_HEIGHT-1 && (mol_random() & 0x40) ; n++ )
 			;
-		s = sl->datasize + sizeof(skiplist_t) + n*sizeof(skiplist_t*);
+		s = sl->datasize + sizeof(skiplist_t) + n*sizeof(skiplist_level_t);
 		if( s > size )
 			break;
 		p = (skiplist_el_t*)(buf + sl->datasize);
-
 		p->key = n;
-		p->next[0] = head;
+		set_level_next( &p->level[0], head );
 		head = p;
 	}
 
-	/* note: the callback call is allowed to manipulate the skiplist */
-	for( n=0, p=head; p; p=p->next[0], n++ ) {
+	/* note: the callback is allowed to manipulate the skiplist */
+	for( n=0, p=head; p; p=p->level[0].next, n++ ) {
 		if( callback )
 			(*callback)( (char*)p - sl->datasize, n, count, usr1, usr2 );
-		if( !p->next[0] ) {
-			p->next[0] = sl->freelist;
-			sl->freelist = head;
+		if( !p->level[0].next ) {
+			p->level[0] = sl->freelist;
+			set_level_next( &sl->freelist, head );
 			break;
 		}
 	}
@@ -101,15 +110,15 @@ skiplist_prealloc( skiplist_t *sl, char *buf, unsigned int size,
 char *
 skiplist_insert( skiplist_t *sl, int key )
 {
-	skiplist_el_t *pleft = (skiplist_el_t*)((char*)&sl->root[0] - offsetof(skiplist_el_t, next));
-	skiplist_el_t *p = sl->freelist;
+	skiplist_el_t *pleft = (skiplist_el_t*)((char*)&sl->root[0] - offsetof(skiplist_el_t, level));
+	skiplist_level_t el = sl->freelist;
+	skiplist_el_t *p = el.next;
 	int n, slev;
 
 	if( !p )
 		return NULL;
-	sl->freelist = p->next[0];
+	sl->freelist = p->level[0];
 	n = p->key;
-
 	p->key = key;
 
 	/* pick a good search level (the -3 is benchmarked) */
@@ -125,64 +134,66 @@ skiplist_insert( skiplist_t *sl, int key )
 	if( slev < n )
 		slev = n;
 	for( ; slev >= 0; slev-- ) {
-		for( ; pleft->next[slev]->key < key ; pleft=pleft->next[slev] )
+		for( ; pleft->level[slev].next->key < key ; pleft=pleft->level[slev].next )
 			;
 		if( slev <= n ) {
-			p->next[slev] = pleft->next[slev];
-			pleft->next[slev] = p;
+			p->level[slev] = pleft->level[slev];
+			pleft->level[slev] = el;
 		}
 	}
+
 	return (char*)p - sl->datasize;
 }
 
 char *
 skiplist_delete( skiplist_t *sl, int key )
 {
-	skiplist_el_t *p = (skiplist_el_t*)((char*)&sl->root[0] - offsetof(skiplist_el_t, next));
-	skiplist_el_t *delnode = NULL;
-	int n, level=0;
+	skiplist_el_t *p = (skiplist_el_t*)((char*)&sl->root[0] - offsetof(skiplist_el_t, level));
+	skiplist_level_t delptr;
+	int n, level = -1;
 
 	for( n=SKIPLIST_MAX_HEIGHT-1; n>=0; n-- ) {
-		for( ; p->next[n]->key < key ; p=p->next[n] )
+		for( ; p->level[n].next->key < key ; p=p->level[n].next )
 			;
-		if( p->next[n]->key != key )
+		if( p->level[n].next->key != key )
 			continue;
 
-		if( !delnode ) {
-			delnode = p->next[n];
+		if( level < 0 ) {
+			delptr = p->level[n];
 			level = n;
 		}
-		p->next[n] = delnode->next[n];
+		p->level[n] = delptr.next->level[n];
 	}
-	if( !delnode )
+	if( level < 0 )
 		return NULL;
 	
 	/* put on freelist */
-	delnode->key = level;
-	delnode->next[0] = sl->freelist;
-	sl->freelist = delnode;
+	p = delptr.next;
+	p->key = level;
+	p->level[0] = sl->freelist;
+	sl->freelist = delptr;
 	sl->nel--;
 
-	return (char*)delnode - sl->datasize;
+	return (char*)p - sl->datasize;
 }
 
 char *
 skiplist_lookup( skiplist_t *sl, int key )
 {
-	skiplist_el_t *p = (skiplist_el_t*)((char*)&sl->root[0] - offsetof(skiplist_el_t, next));
+	skiplist_el_t *p = (skiplist_el_t*)((char*)&sl->root[0] - offsetof(skiplist_el_t, level));
 	int n = sl->slevel;
 
 	for( ;; ) {
-		if( p->next[n]->key < key ) {
-			p = p->next[n];
+		if( p->level[n].next->key < key ) {
+			p = p->level[n].next;
 			continue;
 		}
-		if( p->next[n]->key > key ) {
+		if( p->level[n].next->key > key ) {
 			if( --n < 0 )
 				break;
 			continue;
 		}
-		return (char*)p->next[n] - sl->datasize;
+		return (char*)p->level[n].next - sl->datasize;
 	}
 	return NULL;
 }
@@ -190,16 +201,20 @@ skiplist_lookup( skiplist_t *sl, int key )
 void
 skiplist_init( skiplist_t *sl, int datasize )
 {
+	skiplist_level_t nilptr;
 	int i;
+
 	mol_random_entropy();
 
 	memset( sl, 0, sizeof(*sl) );
 	
 	sl->nil_el.key = SKIPLIST_END;
 	sl->datasize = datasize;
-	for( i=0; i < SKIPLIST_MAX_HEIGHT ; i++ )
-		sl->root[i] = &sl->nil_el;
 
 	/* remember: the nil element is of level 0 */
-	sl->nil_el.next[0] = &sl->nil_el;
+	set_level_next( &nilptr, &sl->nil_el );
+	sl->nil_el.level[0] = nilptr;
+
+	for( i=0; i < SKIPLIST_MAX_HEIGHT ; i++ )
+		sl->root[i] = nilptr;
 }

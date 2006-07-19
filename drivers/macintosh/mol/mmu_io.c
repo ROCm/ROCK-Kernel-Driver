@@ -1,13 +1,13 @@
 /* 
  *   Creation Date: <1998-12-02 03:23:31 samuel>
- *   Time-stamp: <2003/06/08 14:55:55 samuel>
+ *   Time-stamp: <2004/03/13 16:57:31 samuel>
  *   
  *	<mmu_io.c>
  *	
  *	Translate mac_phys to whatever has been mapped in at
  *	a particular address (linux ram, framebuffer, ROM, etc.)
  *   
- *   Copyright (C) 1998-2003 Samuel Rydh (samuel@ibrium.se)
+ *   Copyright (C) 1998-2004 Samuel Rydh (samuel@ibrium.se)
  *   
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -65,7 +65,7 @@ static char		*scratch_page;
 int
 init_mmu_io( kernel_vars_t *kv )
 {
-	if( !(MMU.io_data = kmalloc_mol( sizeof(io_data_t) ) ))
+	if( !(MMU.io_data=kmalloc_mol(sizeof(io_data_t))) )
 		return 1;
 	memset( MMU.io_data, 0, sizeof(io_data_t) );
 	return 0;
@@ -149,7 +149,11 @@ add_block_trans( kernel_vars_t *kv, ulong mbase, char *lvbase, ulong size, int f
 	block_trans_t *bt;
 	pte_lvrange_t *lvrange = NULL;
 	int ind, i;
-	
+
+	/* warn if things are not aligned properly */
+	if( (size & 0xfff) || ((int)lvbase & 0xfff) || (mbase & 0xfff) )
+		printk("Bad block translation alignement\n");
+
 	/* we keep an unsorted list - RAM should be added first, then ROM, then VRAM etc */
 	if( iod->num_btrans >= MAX_BLOCK_TRANS ) {
 		printk("Maximal number of block translations exceeded!\n");
@@ -171,7 +175,7 @@ add_block_trans( kernel_vars_t *kv, ulong mbase, char *lvbase, ulong size, int f
 	/* IMPORTANT: DBATs can _only_ be used when we KNOW that ea == mphys. */
 	if( (flags & MAPPING_DBAT) ) {
 		ulong bat[2];
-		if( !bat_align( flags, mbase, (ulong)lvbase, size, bat ) ) {
+		if( !bat_align(flags, mbase, (ulong)lvbase, size, bat) ) {
 			/* printk("BATS: %08lX %08lX\n", bat[0], bat[1] ); */
 			MMU.transl_dbat0.word[0] = bat[0];
 			MMU.transl_dbat0.word[1] = bat[1];
@@ -179,7 +183,7 @@ add_block_trans( kernel_vars_t *kv, ulong mbase, char *lvbase, ulong size, int f
 	}
 
 	if( !(flags & MAPPING_PHYSICAL) )
-		if( !(lvrange=register_lvrange( kv, lvbase, size )) )
+		if( !(lvrange=register_lvrange(kv, lvbase, size)) )
 			return -1;
 
 	/* Determine where to insert the translation in the table.
@@ -224,7 +228,7 @@ remove_block_trans( kernel_vars_t *kv, int id )
 	BUMP(remove_block_trans);
 	clear_pte_hash_table( kv );
 
-	for(p=iod->btable, i=0; i<iod->num_btrans; i++,p++ ) {
+	for( p=iod->btable, i=0; i<iod->num_btrans; i++, p++ ) {
 		if( id == p->id ) {
 			if( p->flags & MAPPING_DBAT ) {
 				MMU.transl_dbat0.word[0] = 0;
@@ -257,7 +261,7 @@ add_io_trans( kernel_vars_t *kv, ulong mbase, int size, void *usr_data )
 	mbase -= mbase & 7;
 	size = (size+7) & ~7;
 
-	while( size>0 ) {
+	while( size > 0 ) {
 		mb = mbase & 0xfffff000;
 
 		pre_next = &iod->io_page_head;
@@ -321,7 +325,7 @@ remove_io_trans( kernel_vars_t *kv, ulong mbase, int size )
 	mbase -= mbase & 7;
 	size = (size+7) & ~7;
 
-	while( size>0 ) {
+	while( size > 0 ) {
 		mb = mbase & 0xfffff000;
 
 		pre_next = &iod->io_page_head;
@@ -397,7 +401,7 @@ mphys_to_pte( kernel_vars_t *kv, ulong mphys, ulong *the_pte1, int is_write, pte
 	for( p=iod->btable, i=0; i<num_btrans; i++,p++ ) {
 		if( mphys - p->mbase < (ulong)p->size ) {
 			if( (p->flags & MAPPING_SCRATCH) ) {
-				/* if we run out of memory here it, returning silently is OK */
+				/* it is OK to return silently if we run out of memory */
 				if( !scratch_page && !(scratch_page=(char*)alloc_page_mol()) )
 					return 0;
 				pte1 |= tophys_mol(scratch_page);
@@ -410,6 +414,12 @@ mphys_to_pte( kernel_vars_t *kv, ulong mphys, ulong *the_pte1, int is_write, pte
 				pte1 &= ~PTE1_I;
 			} else if( !(p->flags & MAPPING_MACOS_CONTROLS_CACHE) )
 				pte1 &= ~(PTE1_W | PTE1_I);
+
+			/* well, just a try...  */
+			if ( p->flags & MAPPING_FORCE_WRITABLE ) {
+				/* printk("forcing mphys page %lx writable\n", mphys); */
+				pte1 = (pte1 & ~3) | 2;
+			}
 
 			*lvrange = p->lvrange;
 			*the_pte1 = pte1;
@@ -434,6 +444,18 @@ mphys_to_pte( kernel_vars_t *kv, ulong mphys, ulong *the_pte1, int is_write, pte
 void 
 mmu_add_map( kernel_vars_t *kv, struct mmu_mapping *m )
 {
+	if( m->flags & MAPPING_MREGS ) {
+		char *start = (char*)tophys_mol(&kv->mregs);
+		uint offs = (uint)m->lvbase;
+		m->flags &= ~MAPPING_MREGS;
+		m->flags |= MAPPING_PHYSICAL;
+		m->lvbase = start + offs;
+		m->id = -1;
+		if( offs + (uint)m->size > NUM_MREGS_PAGES * 0x1000 ) {
+			printk("Invalid mregs mapping\n");
+			return;
+		}
+	}
 	m->id = add_block_trans( kv, m->mbase, m->lvbase, m->size, m->flags );	
 }
 

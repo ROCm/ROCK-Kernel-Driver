@@ -1,12 +1,12 @@
 /* 
  *   Creation Date: <2001/06/21 17:10:35 samuel>
- *   Time-stamp: <2003/08/12 11:53:18 samuel>
+ *   Time-stamp: <2004/03/07 13:16:58 samuel>
  *   
  *	<dec.S>
  *	
  *	DEC / TimeBase stuff
  *   
- *   Copyright (C) 2001, 2002, 2003 Samuel Rydh (samuel@ibrium.se)
+ *   Copyright (C) 2001, 2002, 2003, 2004 Samuel Rydh (samuel@ibrium.se)
  *   
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -175,13 +175,9 @@ __dec_VECTOR:
 	cmpwi	r1,0
 	blt+	1f
 	mtcr	r3					// Restore and exit
-	mfsprg_a1 r1
-	mfsprg_a0 r3
-	rfi
+	ABORT_TRAP( 0x900 )
 1:
 	mtcr	r3					// Restore and continue trap
-	mfsprg_a1 r1
-	mfsprg_a0 r3
 	CONTINUE_TRAP( 0x900 )
 	
 VECTOR_( 0x900, "Decrementer", secint_bad, __dec_VECTOR )

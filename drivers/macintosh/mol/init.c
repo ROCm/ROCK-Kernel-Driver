@@ -1,6 +1,6 @@
 /* 
  *   Creation Date: <2002/01/13 20:45:37 samuel>
- *   Time-stamp: <2004/01/14 21:43:52 samuel>
+ *   Time-stamp: <2004/02/14 14:01:09 samuel>
  *   
  *	<init.c>
  *	
@@ -23,6 +23,7 @@
 #include "performance.h"
 #include "mol-ioctl.h"
 #include "version.h"
+#include "hash.h"
 
 /* globals */
 session_table_t		*g_sesstab;
@@ -36,18 +37,21 @@ int 			g_num_sessions;
 int
 common_init( void )
 {
-	if( !(g_sesstab=kmalloc_cont_mol(sizeof(*g_sesstab))) )
+	if( init_hash() )
 		return 1;
-	memset( g_sesstab, 0, sizeof(*g_sesstab) );
-	init_MUTEX( &g_sesstab->mutex );
-	
-	if( arch_common_init() ) {
-		kfree_cont_mol( g_sesstab );
+
+	if( !(g_sesstab=kmalloc_cont_mol(sizeof(*g_sesstab))) ) {
+		cleanup_hash();
 		return 1;
 	}
-	if( relocate_code() ) {
-		arch_common_cleanup();
+	
+	memset( g_sesstab, 0, sizeof(*g_sesstab) );
+	init_MUTEX_mol( &g_sesstab->lock );
+	
+	if( arch_common_init() ) {
+		free_MUTEX_mol( &g_sesstab->lock );
 		kfree_cont_mol( g_sesstab );
+		cleanup_hash();
 		return 1;
 	}
 	return 0;
@@ -56,9 +60,13 @@ common_init( void )
 void
 common_cleanup( void )
 {
-	relocation_cleanup();
 	arch_common_cleanup();
+
+	free_MUTEX_mol( &g_sesstab->lock );
 	kfree_cont_mol( g_sesstab );
+	g_sesstab = NULL;
+
+	cleanup_hash();
 }
 
 
@@ -70,7 +78,8 @@ static int
 initialize_session_( uint index )
 {
 	kernel_vars_t *kv;
-
+	ulong kv_phys;
+	
 	if( g_sesstab->magic == 1 )
 		return -EMOLSECURITY;
 
@@ -78,33 +87,38 @@ initialize_session_( uint index )
 	if( g_sesstab->kvars[index] )
 		return -EMOLINUSE;
 
-	if( !g_num_sessions && write_hooks() )
+	if( !g_num_sessions && perform_actions() )
 		return -EMOLGENERAL;
 	
-	if( !(kv=alloc_kvar_pages()) ) {
-		remove_hooks();
-		return -EMOLGENERAL;
-	}
+	if( !(kv=alloc_kvar_pages()) )
+		goto error;
 
 	memset( kv, 0, NUM_KVARS_PAGES * 0x1000 );
 	kv->session_index = index;
 	kv->kvars_virt = kv;
+	kv_phys = tophys_mol(kv);
+	kv->kvars_tophys_offs = kv_phys - (ulong)kv;
 
-	if( init_mmu(kv) ) {
-		remove_hooks();
-		free_kvar_pages( kv );
-		return -EMOLGENERAL;
-	}
+	if( init_mmu(kv) )
+		goto error;
+
+	init_host_irqs(kv);
 	initialize_spr_table( kv );
 
 	msr_altered( kv );
 
 	g_num_sessions++;
 
-	g_sesstab->kvars_ph[index] = tophys_mol(kv);
+	g_sesstab->kvars_ph[index] = kv_phys;
 	g_sesstab->kvars[index] = kv;
 
 	return 0;
+ error:
+	if( !g_num_sessions )
+		cleanup_actions();
+	if( kv )
+		free_kvar_pages( kv );
+	return -EMOLGENERAL;
 }
 
 int
@@ -145,6 +159,7 @@ destroy_session( uint index )
 
 		/* decrease before freeing anything (simplifies deallocation of shared resources) */
 		g_num_sessions--;
+		cleanup_host_irqs(kv);
 		cleanup_mmu( kv );
 
 		if( kv->emuaccel_page )
@@ -154,7 +169,7 @@ destroy_session( uint index )
 		free_kvar_pages( kv );
 
 		if( !g_num_sessions )
-			remove_hooks();
+			cleanup_actions();
 	}
 	SESSION_UNLOCK;
 }

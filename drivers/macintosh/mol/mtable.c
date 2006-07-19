@@ -1,6 +1,6 @@
 /* 
  *   Creation Date: <2002/05/26 14:46:42 samuel>
- *   Time-stamp: <2004/02/28 19:28:54 samuel>
+ *   Time-stamp: <2004/02/28 19:33:21 samuel>
  *   
  *	<mtable.c>
  *	
@@ -25,6 +25,7 @@
 #include "performance.h"
 #endif
 #include "mtable.h"
+#include "hash.h"
 
 /* #define DEBUG */
 
@@ -65,6 +66,7 @@ typedef struct {
 } pent_table_t;
 
 struct vsid_ent {				/* record which describes a mac vsid */
+	vsid_ent_t	*myself_virt;		/* virtual address of this struct */
 	int		linux_vsid;		/* munged mac context | VSID(Kp) */
 	int		linux_vsid_sv;		/* munged privileged mac context | VSID(Kp) */
 	pent_table_t	*lev2[64];		/* bit 9-14 of ea */
@@ -75,9 +77,9 @@ struct vsid_ent {				/* record which describes a mac vsid */
 #define LEV2_IND(ea)	(((ea) >> (12+5)) & 0x3f)	/* lev2 index is bit 9-14 */
 #define PELIST_IND(ea)	(((ea) >> 12) & 0x1f)		/* pelist index is 15-19 */
 
-#define PTE_TO_IND(pte)	((((int)pte - (int)hw_hash_base) & hw_pte_offs_mask) >> 3)
+#define PTE_TO_IND(pte)	((((int)pte - (int)ptehash.base) & ptehash.pte_mask) >> 3)
 
-#define ZERO_PTE(pent)	*((ulong*)hw_hash_base + ((pent & PENT_INDEX_MASK) << 1)) = 0
+#define ZERO_PTE(pent)	*((ulong*)ptehash.base + ((pent & PENT_INDEX_MASK) << 1)) = 0
 
 
 struct pte_lvrange {
@@ -396,7 +398,7 @@ flush_vsid( vsid_info_t *vi, vsid_ent_t *r )
 /*	Allocations							*/
 /************************************************************************/
 
-/* this function allocates 0x1000 - sizeof(alloc_ent_t) bytes */
+/* this function allocates 0x1000 - sizeof(alloc_ent_t) zeroed bytes */
 static void *
 do_chunk_kmalloc( vsid_info_t *vi, int what )
 {
@@ -405,14 +407,14 @@ do_chunk_kmalloc( vsid_info_t *vi, int what )
 
 	if( vi->alloc_size > vi->alloc_limit )
 		return NULL;
-	if( !(ptr=kmalloc_mol(0x1000)) )
+	if( !(ptr=(char*)alloc_page_mol()) )
 		return NULL;
 	mp = (alloc_ent_t*)((char*)ptr + 0x1000 - sizeof(alloc_ent_t));
 
 	mp->next = vi->allocations;
-	vi->allocations = mp;
 	mp->ptr = ptr;
 	mp->what = what;
+	vi->allocations = mp;
 
 	vi->alloc_size += 0x1000;
 	BUMP_N( alloced, 0x1000 );
@@ -428,7 +430,7 @@ do_kfree( vsid_info_t *vi, int what )
 		p = *mp;
 		if( p->what == what || what == ALLOC_CONT_ANY ) {
 			*mp = p->next;
-			kfree_mol( p->ptr );
+			free_page_mol( (ulong)p->ptr );
 
 			vi->alloc_size -= 0x1000;
 			BUMP_N( released, 0x1000 );
@@ -495,7 +497,7 @@ lev2_alloc( vsid_info_t *vi )
 	
 	//BUMP( lev2_alloc );
 
-	if( !(t=do_chunk_kmalloc( vi, ALLOC_CONT_LEV2 )) )
+	if( !(t=do_chunk_kmalloc(vi, ALLOC_CONT_LEV2)) )
 		return 1;
 
 	/* the alignment must be correct (the ea calculation will fail otherwise) */
@@ -694,7 +696,7 @@ pte_inserted( kernel_vars_t *kv, ulong ea, char *lvptr, pte_lvrange_t *lvrange,
 /*	VSID allocation							*/
 /************************************************************************/
 
-/* initialize vsid element callback */
+/* initialize vsid element callback (ind loops from 0 to n-1) */
 static void
 _vsid_el_callback( char *data, int ind, int n, void *usr1_kv, void *dummy )
 {
@@ -703,6 +705,7 @@ _vsid_el_callback( char *data, int ind, int n, void *usr1_kv, void *dummy )
 
 	r->linux_vsid = alloc_context(kv) | VSID_Kp;
 	r->linux_vsid_sv = alloc_context(kv) | VSID_Kp;
+	r->myself_virt = r;
 }
 
 /* mac_vsid might be negative (used as vsid for unmapped access).
@@ -843,11 +846,11 @@ register_lvrange( kernel_vars_t *kv, char *lvbase, int size )
 	vsid_info_t *vi = MMU.vsid_info;
 	pte_lvrange_t *lvr;
 	int i, nel = (size >> 12);
-	int s = (sizeof(pterec_t) * nel );
+	int s = sizeof(pterec_t) * nel;
 
 	/* printk("register_lvrange\n"); */
 
-	if( !(lvr=kmalloc_mol( sizeof(pte_lvrange_t) )) )
+	if( !(lvr=kmalloc_mol(sizeof(pte_lvrange_t))) )
 		return NULL;
 	memset( lvr, 0, sizeof(pte_lvrange_t) );
 	
@@ -859,7 +862,7 @@ register_lvrange( kernel_vars_t *kv, char *lvbase, int size )
 	for( i=0; i<nel; i++ ) {
 		lvr->pents[i].pent = PENT_LV_HEAD | PENT_UNUSED;
 		lvr->pents[i].lv_next = &lvr->pents[i];
-		//lvr->pents[i].ea_next = NULL;
+		lvr->pents[i].ea_next = NULL;
 	}
 	lvr->base = (ulong)lvbase;
 	lvr->size = size;

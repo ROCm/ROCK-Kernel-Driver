@@ -1,6 +1,6 @@
 /* 
  *   Creation Date: <2001/08/15 01:11:01 samuel>
- *   Time-stamp: <2003/08/27 22:47:56 samuel>
+ *   Time-stamp: <2003/10/24 10:22:00 samuel>
  *   
  *	<kuname.c>
  *	
@@ -17,13 +17,13 @@
 #include <linux/config.h>
 #include <linux/version.h>
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+
 #ifdef CONFIG_SMP
 #define SMP_STRING	"-smp"
 #else
 #define SMP_STRING	""
 #endif
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
 
 #ifndef CONFIG_ALTIVEC
 #define ALTIVEC_STRING	"-noav"
@@ -31,7 +31,8 @@
 #define ALTIVEC_STRING	""
 #endif
 
-#else 
+#else
+#define SMP_STRING	""
 #define ALTIVEC_STRING	""
 #endif
 

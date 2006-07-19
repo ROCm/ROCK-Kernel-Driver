@@ -1,12 +1,12 @@
 /* 
  *   Creation Date: <97/07/14 15:53:06 samuel>
- *   Time-stamp: <2003/08/27 12:46:50 samuel>
+ *   Time-stamp: <2004/02/21 21:37:37 samuel>
  *   
  *	<kernel_vars.h>
  *	
  *	Variables used by the kernel
  *   
- *   Copyright (C) 1997-2003 Samuel Rydh (samuel@ibrium.se)
+ *   Copyright (C) 1997-2004 Samuel Rydh (samuel@ibrium.se)
  *   
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -32,10 +32,11 @@
 
 #ifndef DUMPVARS
 #include "alloc.h"
+#include "locks.h"
+#include "atomic.h"
 #else
-typedef int mol_spinlock_t;
-typedef int atomic_t;
-struct semaphore { int s; };
+typedef int		mol_mutex_t;
+typedef int		mol_atomic_t;
 #endif
 
 typedef struct {
@@ -80,33 +81,32 @@ typedef struct {
 
 	ulong		emulator_context;	/* context of emulator (equals VSID >> 4) in Linux */
 
-	ulong		mac_ram_base;		/* macram, mac-virtual base */
-	char		*linux_ram_base;	/* linux-virtual base */
+	ulong		userspace_ram_base;	/* userspace RAM base */
 	size_t		ram_size;
 
-	mac_bat_t	bats[8];		/* 4 IBAT + 4 DBAT */
 	ulong		bat_hack_count;		/* HACK to speed up MacOS 9.1 */
+	mac_bat_t	bats[8];		/* 4 IBAT + 4 DBAT */
+
 #ifdef EMULATE_603
 	ulong		ptes_d_ea_603[64];	/* EA4-EA19 of dPTE */
 	mPTE_t		ptes_d_603[64];		/* Data on-chip PTEs (603-emulation) */
 	ulong		ptes_i_ea_603[64];	/* EA4-EA19 of iPTE */
 	mPTE_t		ptes_i_603[64];		/* Instruction on-chip PTEs (603-emulation) */
 #endif
-	/* Emulated PTE hash */
-	ulong		hash_mbase;		/* mac physical base address of hash */
-	ulong		*hash_base;		/* linux virtual base address of hash */
+	/* emulated PTE hash */
+	ulong		hash_mbase;		/* mac physical hash base */
+	ulong		*hash_base;		/* kernel pointer to mac hash */
 	ulong		hash_mask;		/* hash mask (0x000fffff etc) */
-	ulong		hw_sdr1;		/* Hardware SDR1 */
-
-	ulong		pthash_sr;		/* segment register corresponding to */ 
-	ulong		pthash_ea_base;		/* pthash_ea_base */
-	void		*pthash_inuse_bits;	/* bitvector (one bit per PTE) */
-	ulong		pthash_inuse_bits_ph;	/* physical base address */
 
 	/* context number allocation */
 	int		next_mol_context;	/* in the range FIRST .. LAST_MOL_CONTEXT(n) */
 	int		first_mol_context;	/* first context number this session may use */
 	int		last_mol_context;	/* last context number this session may use */
+
+	ulong		pthash_sr;		/* segment register corresponding to */ 
+	ulong		pthash_ea_base;		/* pthash_ea_base */
+	void		*pthash_inuse_bits;	/* bitvector (one bit per PTE) */
+	ulong		pthash_inuse_bits_ph;	/* physical base address */
 
 	/* various tables */
 	struct io_data 		*io_data;	/* translation info */
@@ -119,6 +119,11 @@ typedef struct {
 
 	char   		*lvptr_reservation;	/* lvptr associated with PTE to be inserted */
 	int		lvptr_reservation_lost;	/* set if reservation is lost (page out) */
+
+#ifdef __darwin__
+	ulong		os_sdr1;		/* SDR1 used by the host OS */
+	ulong		mol_sdr1;		/* SDR1 used by MOL */
+#endif
 } mmu_vars_t;
 
 
@@ -177,10 +182,17 @@ typedef struct kernel_vars {
 	ulong			emuaccel_page;		/* page used for instruction acceleration */
 
 	int			break_flags;
+	ulong			kvars_tophys_offs;	/* physical - virtual address of kvars */
 	struct kernel_vars	*kvars_virt;		/* me */
 	int			session_index;
 
-	struct semaphore	ioctl_sem;		/* ioctl lock */
+	mol_mutex_t		ioctl_sem;		/* ioctl lock */
+#ifdef __darwin__
+	void			*kcall_routine;
+	int			kcall_args[3];
+	char			*mregs_virtual;		/* mregs address used by client */
+	
+#endif
 
 #ifdef PERFORMANCE_INFO
 	ulong			asm_bump_cntr[NUM_ASM_BUMP_CNTRS];
@@ -188,21 +200,23 @@ typedef struct kernel_vars {
 	int			num_acntrs;
 	acc_counter_t		acntrs[MAX_ACC_CNTR_DEPTH];
 #endif
+
+	void			*main_thread;	/* pointer to the main thread task_struct */
+
 } kernel_vars_t;
 
-#define NUM_KVARS_PAGES		((sizeof( kernel_vars_t )+0xfff)/0x1000)
-
+#define NUM_KVARS_PAGES		((sizeof(kernel_vars_t)+0xfff)/0x1000)
 
 typedef struct {
 	kernel_vars_t		*kvars[MAX_NUM_SESSIONS];
 	int			magic;
 	ulong	 		kvars_ph[MAX_NUM_SESSIONS];
-	struct semaphore	mutex;
-	atomic_t		external_thread_cnt;
+	mol_mutex_t		lock;
+	mol_atomic_t		external_thread_cnt;
 } session_table_t;
 
-#define SESSION_LOCK		down( &g_sesstab->mutex )
-#define SESSION_UNLOCK		up( &g_sesstab->mutex )
+#define SESSION_LOCK		down_mol( &g_sesstab->lock )
+#define SESSION_UNLOCK		up_mol( &g_sesstab->lock )
 
 extern session_table_t		*g_sesstab;
 

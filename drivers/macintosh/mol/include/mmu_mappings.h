@@ -1,12 +1,12 @@
 /* 
  *   Creation Date: <1998-10-31 03:11:06 samuel>
- *   Time-stamp: <2003/06/05 09:00:54 samuel>
+ *   Time-stamp: <2004/03/13 16:44:58 samuel>
  *   
  *	<mmu_mappings.h>
  *	
  *	Mappings mac physical <-> linux virtual
  *   
- *   Copyright (C) 1998-2003 Samuel Rydh (samuel@ibrium.se)
+ *   Copyright (C) 1998-2004 Samuel Rydh (samuel@ibrium.se)
  *   
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -37,6 +37,8 @@ typedef struct mmu_mapping {
 #define MAPPING_DBAT			64	/* allow use of a DBAT register */
 #define MAPPING_MACOS_CONTROLS_CACHE	128	/* do not force WIM bits to 001 */
 #define MAPPING_PUT_FIRST		256	/* take precedence over other translations */
+#define MAPPING_MREGS			512	/* map mregs into emulated process */
+#define MAPPING_FORCE_WRITABLE		4096	/* guess what... */
 
 #ifdef __KERNEL__
 #define MAPPING_IO			1024	/* I/O translation */

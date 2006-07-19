@@ -25,10 +25,18 @@
 #include <linux/in.h>
 #include <linux/wait.h>
 
+MODULE_AUTHOR("Marc Hellwig and Christian Bauer");
+MODULE_DESCRIPTION("SheepShaver/Basilisk II networking");
 MODULE_LICENSE("GPL");
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 #define LINUX_26
+#endif
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,9)
+#define ETH_HDR(skb) eth_hdr((skb))
+#else
+#define ETH_HDR(skb) (skb)->mac.ethernet
 #endif
 
 #define DEBUG 0
@@ -71,14 +79,14 @@ struct SheepVars {
  * MOL:			fake_addr,	MOL_IP
  */
 
-static struct proto sheep_proto = {
-	.name = "SHEEP",
-	.owner = THIS_MODULE,
-	.obj_size = sizeof(struct sock),
-};
-
 #ifdef LINUX_26
-#define compat_sk_alloc(a,b,c)	sk_alloc( (a), (b), &sheep_proto, (c))
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,12))
+#define compat_sk_alloc(a,b,c)  sk_alloc( (a), (b), &mol_proto, 1 )
+#else
+#define compat_sk_alloc(a,b,c)	sk_alloc( (a), (b), (c), NULL )
+#endif
+
 #define skt_set_dead(skt)	do {} while(0)
 #define wmem_alloc		sk_wmem_alloc
 #else
@@ -154,10 +162,16 @@ demasquerade( struct sk_buff *skb, struct SheepVars *v )
  * the IP address is wrong.)
  */
 
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,14))
+static int
+sheep_net_receiver( struct sk_buff *skb, struct net_device *dev, struct packet_type *pt, struct net_device *orig_dev )
+#else
 static int 
 sheep_net_receiver( struct sk_buff *skb, struct net_device *dev, struct packet_type *pt )
+#endif
 {
-	int multicast = (eth_hdr(skb)->h_dest[0] & ETH_ADDR_MULTICAST);
+	int multicast = (ETH_HDR(skb)->h_dest[0] & ETH_ADDR_MULTICAST);
 	const char *laddr = dev->dev_addr;
 	struct sk_buff *skb2;
 	struct SheepVars *v = (struct SheepVars*)pt;
@@ -171,7 +185,7 @@ sheep_net_receiver( struct sk_buff *skb, struct net_device *dev, struct packet_t
 
 		if( !multicast ) {
 			// Drop, unless this is a localhost -> MOL transmission */
-			if( addrcmp((char*)&eth_hdr(skb)->h_dest, v->fake_addr) )
+			if( addrcmp((char*)&ETH_HDR(skb)->h_dest, v->fake_addr) )
 				goto drop;
 
 			/* XXX: If it were possible, we would prevent the packet from beeing sent out
@@ -182,16 +196,16 @@ sheep_net_receiver( struct sk_buff *skb, struct net_device *dev, struct packet_t
 			 * the controller. This way, the packet ought to be discarded by
 			 * switches.
 			 */
-			cpyaddr( &eth_hdr(skb)->h_dest[0], laddr );
+			cpyaddr( &ETH_HDR(skb)->h_dest[0], laddr );
 		}
 	} else {
 		// is this a packet to the local host from MOL?
-		if( !addrcmp((char*)&eth_hdr(skb)->h_source, v->fake_addr) )
+		if( !addrcmp((char*)&ETH_HDR(skb)->h_source, v->fake_addr) )
 			goto drop;
 		
 		if( !multicast ) {
 			// if the packet is not meant for this host, discard it
-			if( addrcmp((char*)&eth_hdr(skb)->h_dest, laddr) )
+			if( addrcmp((char*)&ETH_HDR(skb)->h_dest, laddr) )
 				goto drop;
 
 			// filter IP-traffic
@@ -219,7 +233,7 @@ sheep_net_receiver( struct sk_buff *skb, struct net_device *dev, struct packet_t
 	skb = skb2;
 
 	if( !multicast )
-		cpyaddr( &eth_hdr(skb)->h_dest[0], v->fake_addr );
+		cpyaddr( &ETH_HDR(skb)->h_dest[0], v->fake_addr );
 
 	// We also want the Ethernet header
 	skb_push( skb, skb->data - skb->mac.raw );
@@ -240,28 +254,42 @@ drop:
 /************************************************************************/
 /*	misc device ops							*/
 /************************************************************************/
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,12))
+static struct proto mol_proto =
+{
+	.name     = "MOL",
+	.owner     = THIS_MODULE,
+	.obj_size    = sizeof(struct sock)
+};
+#endif
+
 
 static int 
 sheep_net_open( struct inode *inode, struct file *f )
 {
 	static char fake_addr_[6] = { 0xFE, 0xFD, 0xDE, 0xAD, 0xBE, 0xEF };
 	struct SheepVars *v;
-	int rc;
 	D(bug("sheep_net: open\n"));
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,12))
+	if (proto_register(&mol_proto,0) < 0)
+	{
+		printk(KERN_INFO "Unable to register protocol type\n");
+		return -1;
+	}
+#endif
 
 	// Must be opened with read permissions
 	if( (f->f_flags & O_ACCMODE) == O_WRONLY )
 		return -EPERM;
 
-	rc = proto_register(&sheep_proto, 0);
-	if (rc) {
-		printk(KERN_INFO "Unable to register mol sheep protocol type: %d\n", rc);
-		return rc;
-	}
-
 	// Allocate private variables
-	if( !(v=f->private_data=kmalloc(sizeof(*v), GFP_USER)) )
+	f->private_data = kmalloc(sizeof(struct SheepVars), GFP_USER);
+	if( f->private_data == NULL)
 		return -ENOMEM;
+
+	v = (struct SheepVars *) f->private_data;
+	
 	memset( v, 0, sizeof(*v) );
 	memcpy( v->fake_addr, fake_addr_, 6 );
 
@@ -291,7 +319,9 @@ sheep_net_release( struct inode *inode, struct file *f )
 	while( (skb=skb_dequeue(&v->queue)) )
 		kfree_skb(skb);
 
-	proto_unregister(&sheep_proto);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,12))
+	proto_unregister(&mol_proto);
+#endif
 
 	// Free private variables
 	kfree(v);
@@ -409,7 +439,7 @@ sheep_net_writev( struct file *f, const struct iovec *iv, unsigned long count, l
 	skb->mac.raw = skb->data;
 
 	// Base the IP-filter on the IP address of outgoing ARPs
-	if( eth_hdr(skb)->h_proto == htons(ETH_P_ARP) ) {
+	if( ETH_HDR(skb)->h_proto == htons(ETH_P_ARP) ) {
 		char *s = &skb->data[14+14];	/* source IP-address */
 		int n[4];
 		if( *(long*)s != v->ipfilter ) {

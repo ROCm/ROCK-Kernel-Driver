@@ -1,6 +1,6 @@
 /* 
  *   Creation Date: <2003/08/20 17:31:44 samuel>
- *   Time-stamp: <2004/01/14 21:44:17 samuel>
+ *   Time-stamp: <2004/02/14 14:43:13 samuel>
  *   
  *	<dev.c>
  *	
@@ -20,14 +20,19 @@
 #include <linux/miscdevice.h>
 #include <linux/spinlock.h>
 #include <linux/init.h>
-#include <asm/atomic.h>
+#include <linux/interrupt.h>
+#include <linux/irq.h>
+#include <linux/bitops.h>
 #include <asm/prom.h>
+#include <asm/machdep.h>
+#include <asm/atomic.h>
 #include "kernel_vars.h"
 #include "mol-ioctl.h"
 #include "version.h"
 #include "mmu.h"
 #include "misc.h"
 #include "mtable.h"
+#include "atomic.h"
 
 MODULE_AUTHOR("Samuel Rydh <samuel@ibrium.se>");
 MODULE_DESCRIPTION("Mac-on-Linux kernel module");
@@ -115,6 +120,34 @@ prevent_mod_unload( void )
 #endif
 }
 
+int
+get_irqs( kernel_vars_t *kv, irq_bitfield_t *irq_info_p )
+{
+	irq_bitfield_t irq_mask;
+	int i;
+
+	/* copy the interrupt mask from userspace */
+	if (copy_from_user(&irq_mask, irq_info_p, sizeof(irq_mask)))
+		return -EFAULT;
+
+	/* see which of the mapped interrupts need to be enabled */
+	for (i = 0; i < NR_HOST_IRQS; i++) {
+		if (check_bit_mol(i, (char *) kv->mregs.mapped_irqs.irqs)
+				&& check_bit_mol(i, (char *) irq_mask.irqs)
+				&& check_bit_mol(i, (char *) kv->mregs.active_irqs.irqs)) {
+			if (test_and_clear_bit(i, kv->mregs.active_irqs.irqs))
+				atomic_dec_mol((mol_atomic_t *) &(kv->mregs.hostirq_active_cnt));
+			enable_irq(i);
+		}
+	}
+
+	/* if one of the enabled interrupts was pending, it should have fired
+	 * now, updating active_irqs */
+	if (copy_to_user(irq_info_p, &(kv->mregs.active_irqs), sizeof(kv->mregs.active_irqs)))
+		return -EFAULT;
+
+	return 0;
+}
 
 /************************************************************************/
 /*	ioctl 								*/
@@ -146,14 +179,15 @@ debugger_op( kernel_vars_t *kv, dbg_op_params_t *upb )
 static int
 arch_handle_ioctl( kernel_vars_t *kv, int cmd, int p1, int p2, int p3 )
 {
-	struct mmu_mapping map;	
-	perf_ctr_t pctr;
 	char *rompage;
 	int ret = -EFAULT;
 
 	switch( cmd ) {
+	case MOL_IOCTL_GET_IRQS:
+		return get_irqs( kv, (irq_bitfield_t *) p1 );
+
 	case MOL_IOCTL_GET_DIRTY_FBLINES:  /* short *retbuf, int size -- npairs */
-		if( !access_ok(VERIFY_WRITE, (short*)p1, p2) )
+		if( compat_verify_area(VERIFY_WRITE, (short*)p1, p2) )
 			break;
 		ret = get_dirty_fb_lines( kv, (short*)p1, p2 );
 		break;
@@ -162,21 +196,12 @@ arch_handle_ioctl( kernel_vars_t *kv, int cmd, int p1, int p2, int p3 )
 		ret = debugger_op( kv, (dbg_op_params_t*)p1 );
 		break;
 		
-	case MOL_IOCTL_GET_PERF_INFO:
-		ret = get_performance_info( kv, p1, &pctr );
-		if( copy_to_user((perf_ctr_t*)p2, &pctr, sizeof(pctr)) )
-			ret = -EFAULT;
+	case MOL_IOCTL_GRAB_IRQ:
+		ret = grab_host_irq(kv, p1);
 		break;
 
-	case MOL_IOCTL_MMU_MAP: /* p1 = struct mmu_mapping *m, p2 = map/unmap */
-		if( copy_from_user(&map, (struct mmu_mapping*)p1, sizeof(map)) )
-			break;
-		if( p2 )
-			mmu_add_map( kv, &map );
-		else 
-			mmu_remove_map( kv, &map );
-		if( copy_to_user((struct mmu_mapping*)p1, &map, sizeof(map)) )
-			ret = -EFAULT;
+	case MOL_IOCTL_RELEASE_IRQ:
+		ret = release_host_irq(kv, p1);
 		break;
 
 	case MOL_IOCTL_COPY_LAST_ROMPAGE: /* p1 = dest */
@@ -188,11 +213,11 @@ arch_handle_ioctl( kernel_vars_t *kv, int cmd, int p1, int p2, int p3 )
 		break;
 
 	case MOL_IOCTL_SET_RAM: /* void ( char *lvbase, size_t size ) */
-		if( !access_ok(VERIFY_WRITE, (char*)p1, p2) )
+		if( compat_verify_area(VERIFY_WRITE, (char*)p1, p2) )
 			break;
-		kv->mmu.linux_ram_base = (char*)p1;
+		ret = 0;
+		kv->mmu.userspace_ram_base = p1;
 		kv->mmu.ram_size = p2;
-		kv->mmu.mac_ram_base = 0;
 		mtable_tune_alloc_limit( kv, p2/(1024 * 1024) );
 		break;
 
@@ -222,8 +247,10 @@ mol_open( struct inode *inode, struct file *file )
 	
 	down( &initmutex );
 	if( !opencnt++ ) {
-		if( common_init() )
+		if( common_init() ) {
 			ret = -ENOMEM;
+			opencnt = 0;
+		}
 	}
 	up( &initmutex );
 
@@ -236,10 +263,10 @@ mol_release( struct inode *inode, struct file *file )
 {
 	kernel_vars_t *kv = (kernel_vars_t*)file->private_data;
 	
+	down( &initmutex );
 	if( kv )
 		destroy_session( kv->session_index );
 
-	down( &initmutex );
 	if( !--opencnt )
 		common_cleanup();
 	up( &initmutex );
@@ -252,7 +279,8 @@ mol_ioctl( struct inode *inode, struct file *file, unsigned int cmd, unsigned lo
 	mol_ioctl_pb_t pb;
 	kernel_vars_t *kv;
 	int ret;
-
+	uint session;
+	
 	/* fast path */
 	if( cmd == MOL_IOCTL_SMP_SEND_IPI ) {
 		send_ipi();
@@ -281,9 +309,13 @@ mol_ioctl( struct inode *inode, struct file *file, unsigned int cmd, unsigned lo
 		up( &initmutex );
 		return ret;
 
-	case MOL_IOCTL_DBG_GET_KVARS_PHYS:
-		ret = ((uint)pb.arg1 < MAX_NUM_SESSIONS) ? 
-			virt_to_phys(g_sesstab->kvars[pb.arg1]) : 0;
+	case MOL_IOCTL_DBG_COPY_KVARS:
+		session = pb.arg1;
+		ret = -EINVAL;
+		down( &initmutex );
+		if( session < MAX_NUM_SESSIONS && (kv=g_sesstab->kvars[session]) )
+			ret = copy_to_user( (char*)pb.arg2, kv, sizeof(*kv) );
+		up( &initmutex );
 		return ret;
 	}
 

@@ -1,12 +1,12 @@
 /* 
  *   Creation Date: <2003/03/06 22:03:59 samuel>
- *   Time-stamp: <2003/03/08 18:54:55 samuel>
+ *   Time-stamp: <2004/02/21 16:30:45 samuel>
  *   
  *	<vsid.S>
  *	
  *	VSID lookup (skiplist search)
  *   
- *   Copyright (C) 2003 Samuel Rydh (samuel@ibrium.se)
+ *   Copyright (C) 2003, 2004 Samuel Rydh (samuel@ibrium.se)
  *   
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -16,6 +16,12 @@
 
 #include "mtable.h"
 
+#if (SKIPLIST_LEVELSIZE == 4)
+#define SLEVEL_SHIFT	2
+#endif
+#if (SKIPLIST_LEVELSIZE == 8)
+#define SLEVEL_SHIFT	3
+#endif
 
 emulate_mtsrin:
 	rlwinm	r2,r4,32-8,24,28		// r2 = #B << 8
@@ -38,26 +44,29 @@ emulate_mtsr:
 	/******* vsid lookup (skiplist search)  *******/
 	
 	lwz	r2,K_VSID_SL_SLEVEL(r1)		// n = search level (0..15)
-	rlwinm	r2,r2,2,0,29			// n *= 4
+	rlwinm	r2,r2,SLEVEL_SHIFT,0,29		// n *= 4 (or n *= 8 on darwin)
+
 	addi	r3,r1,K_VSID_SL_ROOT_ELEM	// p = root element
 1:	add	r5,r2,r3			//
 2:	lwz	r3,SKIPLIST_NEXT(r5)		// r3 = p->next[n]
-	tophys	r3,r3
+#ifdef __linux__
+	tophys	R3,R3
+#endif
 	lwz	r4,SKIPLIST_KEY(r3)		// r0 = p->next[n].key
 	cmpw	cr1,r4,r0
 	bge-	cr1,3f
 	b	1b
 3:	
-	addi	r2,r2,-4			// r2 -= 4
+	addi	r2,r2,-SKIPLIST_LEVELSIZE	// r2 -= 4|8
 	beq-	cr1,vsid_found			// jump if key matches
 	cmpwi	r2,0
-	addi	r5,r5,-4			// r3 = r3 - 4
+	addi	r5,r5,-SKIPLIST_LEVELSIZE	// r5 -= 4|8
 	bge+	2b
 
 	/******* vsid missing *******/
 	BUMP("vsid_missing")
 	// r8 used
-11:	lwz	r2,K_ILLEGAL_SR(r1)		// vsid unallocated...
+	lwz	r2,K_ILLEGAL_SR(r1)		// vsid unallocated...
 	li	r4,0				// no entry...
 	stw	r2,K_SV_SR_BASE(r8)
 	stw	r2,K_USER_SR_BASE(r8)
@@ -69,13 +78,17 @@ emulate_mtsr:
 	
 	/******* vsid found *******/
 vsid_found:
+	
 	BUMP("vsid_found")
 	// match, r3 points to the skiplist element
 	addi	r4,r3,-SIZEOF_VSID_ENT		// sizeof(vsid_ent_t)
 	lwz	r2,VSID_USER_OFFS(r4)		// vsid_user
 	lwz	r3,VSID_SV_OFFS(r4)		// vsid_sv
-	tovirt	r4,r4				// r4 = vsid_element
-
+#ifdef __linux__
+	tovirt	R4,R4				// r4 = vsid_element
+#else
+	lwz	r4,VSID_MYSELF_VIRT(r4)
+#endif
 	rlwinm	r6,r9,2,31,31			// r6 = Ks ? 1:0
 	stw	r4,K_VSID_ENT_BASE(r8)		// store vsid entry (possibly NULL)
 	rlwinm	r4,r9,3,31,31			// r4 = Kp ? 1:0
@@ -107,4 +120,4 @@ vsid_found:
 	GET_TICK_CNT(entry, "mtsr")
 	BUMP("mtsr_")
 	b	emulation_done
-	
+

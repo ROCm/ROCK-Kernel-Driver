@@ -1,12 +1,12 @@
 /* 
  *   Creation Date: <1998-11-11 11:56:45 samuel>
- *   Time-stamp: <2003/08/26 21:05:25 samuel>
+ *   Time-stamp: <2004/03/13 14:25:26 samuel>
  *   
  *	<mmu.c>
  *	
  *	Handles page mappings and the mac MMU
  *   
- *   Copyright (C) 1998-2003 Samuel Rydh (samuel@ibrium.se)
+ *   Copyright (C) 1998-2004 Samuel Rydh (samuel@ibrium.se)
  *   
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -24,75 +24,12 @@
 #include "misc.h"
 #include "mtable.h"
 #include "performance.h"
-
-static char	*hash_allocation;
-static int	sdr1_owned;		/* clear sdr1 at exit */
-
-static ulong	hw_sdr1;
-mPTE_t		*hw_hash_base;
-ulong		hw_hash_mask;		/* _SDR1 = Hash_mask >> 10 */
-ulong		hw_pte_offs_mask;	/* gives offset into hash table */
+#include "context.h"
+#include "hash.h"
+#include "map.h"
 
 #define MREGS	(kv->mregs)
 #define MMU	(kv->mmu)
-
-
-/************************************************************************/
-/*	arch_mmu_init() calls one of these functions			*/
-/************************************************************************/
-
-static void
-init_hash_globals( kernel_vars_t *kv, ulong sdr1, mPTE_t *base )
-{
-	/* initialize only once... */ 
-	if( !hw_sdr1 ) {
-		hw_sdr1 = sdr1;
-		hw_hash_base = base;
-		hw_hash_mask = ((sdr1 & 0x1ff) << 10) | 0x3ff;
-		hw_pte_offs_mask = (hw_hash_mask << 6) | 0x38;
-	}
-	MMU.hw_sdr1 = hw_sdr1;
-}
-
-void
-share_pte_hash( kernel_vars_t *kv, ulong sdr1, mPTE_t *base )
-{
-	init_hash_globals( kv, sdr1, base );
-}
-
-int
-create_pte_hash( kernel_vars_t *kv, int set_sdr1 )
-{
-	ulong size = 1024*128;		/* 128K is the kmalloc limit */ 
-	ulong sdr1, mask, base;
-
-	if( hw_sdr1 ) {
-		init_hash_globals( kv, hw_sdr1, hw_hash_base );
-		return 0;
-	}
-
-	if( !(hash_allocation=kmalloc_mol(size)) )
-		return 1;
-	memset( hash_allocation, 0, size );
-	
-	base = (ulong)hash_allocation;
-	if( (base & (size-1)) ) {
-		printk("Badly aligned SDR1 allocation - 64K wasted\n");
-		size /= 2;
-		base = (((ulong)hash_allocation + size) & ~(size-1));
-	}
-	mask = (size-1) >> 6;
-	sdr1 = mask >> 10;
-	sdr1 |= tophys_mol( (char*)base );
-
-	init_hash_globals( kv, sdr1, (mPTE_t*)base );
-	if( set_sdr1 ) {
-		_set_sdr1( sdr1 );
-		sdr1_owned = 1;
-	}
-	printk("SDR1 = %08lX\n", sdr1 );
-	return 0;
-}
 
 
 /************************************************************************/
@@ -103,7 +40,7 @@ int
 init_mmu( kernel_vars_t *kv )
 {
 	int success;
-	
+
 	success =
 		!arch_mmu_init( kv ) &&
 		!init_contexts( kv ) &&
@@ -130,7 +67,7 @@ cleanup_mmu( kernel_vars_t *kv )
 	 * facilities. The kvars entry has been clear so we just have
 	 * to wait around until no threads are using it.
 	 */
-	while( atomic_read(&g_sesstab->external_thread_cnt) )
+	while( atomic_read_mol(&g_sesstab->external_thread_cnt) )
 		;
 
 	cleanup_mmu_tracker( kv );
@@ -140,22 +77,11 @@ cleanup_mmu( kernel_vars_t *kv )
 	cleanup_contexts( kv );
 
 	if( MMU.pthash_inuse_bits )
-		kfree_mol( MMU.pthash_inuse_bits );
+		kfree_cont_mol( MMU.pthash_inuse_bits );
+	if( MMU.hash_base )
+		unmap_emulated_hash( kv );
 
 	memset( &MMU, 0, sizeof(mmu_vars_t) );
-
-	if( g_num_sessions )
-		return;
-
-	if( hash_allocation ) {
-		if( sdr1_owned )
-			_set_sdr1(0);
-		kfree_mol( hash_allocation );
-		hash_allocation = NULL;
-	}
-	hw_hash_base = NULL;
-	sdr1_owned = hw_sdr1 = hw_hash_mask = 0;
-	
 }
 
 
@@ -198,7 +124,7 @@ mmu_altered( kernel_vars_t *kv )
 
 	do_mtsdr1( kv, MREGS.spr[S_SDR1] );
 
-	for(i=0; i<16; i++ )
+	for( i=0; i<16; i++ )
 		do_mtbat( kv, S_IBAT0U+i, MREGS.spr[ S_IBAT0U+i ], 1 );
 }
 
@@ -216,7 +142,7 @@ do_flush( ulong context, ulong va, ulong *dummy, int n )
 	kernel_vars_t *kv;
 	BUMP( do_flush );
 
-	atomic_inc( &g_sesstab->external_thread_cnt );
+	atomic_inc_mol( &g_sesstab->external_thread_cnt );
 
 	for( i=0; i<MAX_NUM_SESSIONS; i++ ) {
 		if( !(kv=g_sesstab->kvars[i]) || context != kv->mmu.emulator_context )
@@ -228,7 +154,7 @@ do_flush( ulong context, ulong va, ulong *dummy, int n )
 		break;
 	}
 
-	atomic_dec( &g_sesstab->external_thread_cnt );
+	atomic_dec_mol( &g_sesstab->external_thread_cnt );
 }
 
 
@@ -271,8 +197,8 @@ dbg_get_PTE( kernel_vars_t *kv, int context, ulong va, mPTE_t *retptr )
 	va &= 0x0ffff000;
 
 	/* get hash base and hash mask */
-	base = (ulong)hw_hash_base;
-	mask = hw_hash_mask | 0x3ff;
+	base = (ulong)ptehash.base;
+	mask = ptehash.pteg_mask >> 6;
 
 	/* hash function */
 	ptmp = (vsid ^ (va>>12)) & mask;

@@ -6,7 +6,7 @@
  *	
  *	Emulation acceleration
  *   
- *   Copyright (C) 2003 Samuel Rydh (samuel@ibrium.se)
+ *   Copyright (C) 2003, 2004 Samuel Rydh (samuel@ibrium.se)
  *   
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -166,7 +166,9 @@ emulate_mtmsr_accel:
 	
 #define EMUACCEL_REL(s)			s - emuaccel_table
 
+#ifdef __linux__
 	.text	70			/* this table does not need to be relocated */
+#endif
 	// format: emuaccel_inst, offset, table_index_mask
 GLOBAL_SYMBOL(emuaccel_table):
 	.long	EMUACCEL_MTMSR,		EMUACCEL_REL( emuaccel_mtmsr_rNN ),	0x1f

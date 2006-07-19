@@ -1,12 +1,12 @@
 /* 
  *   Creation Date: <2002/01/12 22:11:51 samuel>
- *   Time-stamp: <2003/08/14 23:18:22 samuel>
+ *   Time-stamp: <2004/04/10 22:27:41 samuel>
  *   
  *	<archinclude.h>
  *	
  *	
  *   
- *   Copyright (C) 2002, 2003 Samuel Rydh (samuel@ibrium.se)
+ *   Copyright (C) 2002, 2003, 2004 Samuel Rydh (samuel@ibrium.se)
  *   
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -22,6 +22,7 @@
 //#define PERFORMANCE_INFO_LIGHT	/* sample only the most important counters */
 
 #include "mol_config.h"
+#include "kconfig.h"
 
 #include <linux/config.h>
 #include <linux/version.h>
@@ -37,26 +38,27 @@
 #include <asm/mmu_context.h>
 #include <asm/time.h>
 
-#endif	 /* __ASSEMBLY__ */
+#include "dbg.h"
 
-#ifndef __ASSEMBLY__
 /* these are declared, but we just want to be sure the definition does not change */
 extern int flush_hash_pages( unsigned context, unsigned long va, unsigned long pmdval, int count ); /* 2.6 */
 extern int flush_hash_page( unsigned context, unsigned long va, pte_t *ptep ); /* 2.5 */
-#endif
+#endif /* __ASSEMBLY__ */
 
 #ifdef LINUX_26
-#define compat_flush_hash_pages	flush_hash_pages
-#define compat_hash_table_lock	mmu_hash_lock
+#define compat_flush_hash_pages		flush_hash_pages
+#define compat_hash_table_lock		mmu_hash_lock
 #else
-#define compat_flush_hash_pages	flush_hash_page
-#define compat_hash_table_lock	hash_table_lock
+#define compat_flush_hash_pages		flush_hash_page
+#define compat_hash_table_lock		hash_table_lock
 #endif
 
 
-#define	ENOSYS_MOL		ENOSYS
-#define EFAULT_MOL		EFAULT
+#define	ENOSYS_MOL			ENOSYS
+#define EFAULT_MOL			EFAULT
 
+#define IS_LINUX			1
+#define IS_DARWIN			0
 
 
 #endif   /* _H_ARCHINCLUDE */

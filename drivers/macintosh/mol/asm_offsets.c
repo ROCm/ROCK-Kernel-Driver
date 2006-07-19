@@ -154,6 +154,8 @@ int main( void )
 
 	M_DEF( xKERNEL_DBG_STOP, kernel_dbg_stop );
 
+	M_DEF( xHOSTIRQ_ACTIVE_CNT, hostirq_active_cnt );
+
 	return 0;
 }
 

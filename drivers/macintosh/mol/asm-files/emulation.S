@@ -1,12 +1,12 @@
 /* 
  *   Creation Date: <97/07/26 18:23:02 samuel>
- *   Time-stamp: <2003/08/20 15:46:43 samuel>
+ *   Time-stamp: <2004/02/22 13:12:14 samuel>
  *   
  *	<emulation.S>
  *	
  *	Low-level emulation of some privileged instructions
  *   
- *   Copyright (C) 1997-2003 Samuel Rydh (samuel@ibrium.se)
+ *   Copyright (C) 1997-2004 Samuel Rydh (samuel@ibrium.se)
  *   
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -14,7 +14,7 @@
  *   
  */
 	
-MACRO(INC_NIP, [
+MACRO_0(INC_NIP, [
 	addi	r6,r6,4
 ])
 
@@ -322,7 +322,7 @@ emulate_mtspr:					// r3 = xMSR
 	balign_32
 emulate_mtmsr:
 	lwz	r3,xMSR(r1)			// r3 = old MSR
-	LI_PHYS( r2, load_gpr_table )
+	LI_PHYS( R2, load_gpr_table )
 	add	r2,r5,r2
 	mtlr	r2
 	blrl					// r0 = new MSR
@@ -606,7 +606,15 @@ dec_test_ret:
 
 test_for_irq:
 	BUMP("test-for-irq")
-	andi.	r2,r0,MSR_EE
+	and	r2,r3,r0		// check whether we are turning external interrupts on
+	andi.	r2,r2,MSR_EE		// we need to recheck IRQs in userspace then 
+	beq+	1f
+	lwz	r4,xHOSTIRQ_ACTIVE_CNT(r1)
+	cmpwi	r4,0			// only return if some host irq is up
+	beq+	1f
+	MAC_EXIT_SAVE(RVEC_CHECK_IRQS)
+
+1:	andi.	r2,r0,MSR_EE
 	beq	irq_test_ret
 	b	mac_irq_trap
 	

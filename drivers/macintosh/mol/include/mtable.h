@@ -1,12 +1,12 @@
 /* 
  *   Creation Date: <2002/05/26 15:52:50 samuel>
- *   Time-stamp: <2003/08/16 05:25:16 samuel>
+ *   Time-stamp: <2004/02/21 16:18:11 samuel>
  *   
  *	<mtable.h>
  *	
  *	Keeps track of the PTEs
  *   
- *   Copyright (C) 2002, 2003 Samuel Rydh (samuel@ibrium.se)
+ *   Copyright (C) 2002, 2003, 2004 Samuel Rydh (samuel@ibrium.se)
  *   
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -55,12 +55,11 @@ make_lvptr_reservation( kernel_vars_t *kv, char *lvptr ) {
 
 #endif /* __ASSEMBLY__ */
 
-/* negativ offsets to linux_vsid and linux_vsid_sv from 
- * the end of the vsid_ent_t struct.
- */
-#define	VSID_USER_OFFS		0
-#define	VSID_SV_OFFS		4
-#define SIZEOF_VSID_ENT		(64*4 + 8)
+/* offsets to linux_vsid and linux_vsid_sv (used from assembly) */
+#define VSID_MYSELF_VIRT	0
+#define	VSID_USER_OFFS		4
+#define	VSID_SV_OFFS		8
+#define SIZEOF_VSID_ENT		(64*4 + 12)
 
 #define VSID_OFFSETS_OK	\
 	((offsetof(vsid_ent_t, linux_vsid) == VSID_USER_OFFS ) || \

@@ -4,7 +4,9 @@ MOL_OBJS =	\
 		_dev.o \
 		_misc.o \
 		_mmu.o \
+		_hostirq.o \
 		init.o \
+		hash.o \
 		emu.o \
 		mmu.o \
 		mmu_fb.o \
@@ -17,14 +19,12 @@ MOL_OBJS =	\
 		ptaccess.o \
 		misc.o \
 		_traps.o \
-		hook.o \
-		_actions.o
+		actions.o
 
 
 mol-objs	:= $(MOL_OBJS)
 obj-m		:= mol.o sheep.o
 
-RELBUILD	= $(obj)/relbuild.tmp.pl
 MOL_INCLUDE_DIR = $(srctree)/$(src)/include
 MOL_ASMFLAGS    = $(ASMFLAGS) $(INCLUDES) -D__ASSEMBLY__ -D__KERNEL__
 EXTRA_CFLAGS	= -I$(MOL_INCLUDE_DIR) -I$(obj)/include
@@ -33,23 +33,9 @@ $(obj)/asm_offsets.c:	$(srctree)/$(src)/asm_offsets.c $(MOL_INCLUDE_DIR)/asm_off
 	rm -f $@
 	cat $(srctree)/$(src)/asm_offsets.c $(MOL_INCLUDE_DIR)/asm_offsets.h > $@
 
-$(obj)/hook.o:		$(obj)/include/reloc_table.h
-$(obj)/_traps.o:	$(obj)/asm_offsets.h $(srctree)/$(src)/asm-files/traps.S $(srctree)/$(src)/asm-files/*.S
+$(obj)/_traps.o:	$(obj)/asm_offsets.h $(srctree)/$(src)/asm-files/*.S
 $(obj)/include: FORCE
 	mkdir -vp $@
-
-$(obj)/include/reloc_table.h: $(obj)/_traps.o $(obj)/include
-	$(RM) -fv $@ $@.tmp ; echo "/* WARNING! DO NOT EDIT! AUTOMATICALLY GENERATED! */" > $@.tmp
-	$(RM) -fv $(RELBUILD)
-	echo "#!/usr/bin/perl -w" > $(RELBUILD)
-	echo '$$'"NM = '$(NM)';" >> $(RELBUILD)
-	echo '$$'"OBJDUMP = '$(OBJDUMP)';" >> $(RELBUILD)
-	echo '$$'"GCC = '$(CC)  -D__KERNEL__ $(CFLAGS) $(LINUXINCLUDE) -I$(MOL_INCLUDE_DIR) -I$(src)';" >> $(RELBUILD)
-	echo '$$'"ARCH = 'ppc';" >> $(RELBUILD)
-	cat $(srctree)/$(src)/relbuild.pl >> $(RELBUILD)
-	perl $(RELBUILD) $< $(srctree)/$(src)/asm-files/traps.S >> $@.tmp
-	$(STRIP) -S -x $<
-	mv -v $@.tmp $@
 
 $(obj)/_%.o: $(src)/asm-files/%.S
 	echo "  AS [x]   $@"
@@ -59,11 +45,14 @@ $(obj)/_%.o: $(src)/asm-files/%.S
 	$(AS) $@.s $(AS_FLAGS) -o $@
 	$(RM) $@.s $@.m4
 
-$(obj)/asm_offsets.h:   $(MOL_INCLUDE_DIR)/archinclude.h $(MOL_INCLUDE_DIR)/kernel_vars.h $(MOL_INCLUDE_DIR)/mac_registers.h
+$(addprefix $(obj)/,$(MOL_OBJS)): $(obj)/%.o: $(obj)/include/kconfig.h
+$(obj)/include/kconfig.h:
+	$(RM) -fv $(obj)/include/kconfig.h
+	echo "/* nothing */" > $(obj)/include/kconfig.h
+
+$(obj)/asm_offsets.h:   $(MOL_INCLUDE_DIR)/archinclude.h $(MOL_INCLUDE_DIR)/kernel_vars.h $(MOL_INCLUDE_DIR)/mac_registers.h $(obj)/include/kconfig.h
 $(obj)/asm_offsets.h:   $(srctree)/$(src)/asm_offsets.c $(MOL_INCLUDE_DIR)/asm_offsets.inc
 	$(RM) -fv $(obj)/tmp-offsets.c $@ ; cat $^ > $(obj)/tmp-offsets.c
-	$(RM) -fv $(src)/autoconf.h
-	echo "/* nothing */" > $(src)/autoconf.h
 	$(CC) -D__KERNEL__ $(CFLAGS) $(LINUXINCLUDE) -I$(MOL_INCLUDE_DIR) -I$(src) -Wall -S $(obj)/tmp-offsets.c
 	echo "/* WARNING! Automatically generated from 'shared/asm_offsets.c' - DO NOT EDIT! */" > $@
 	grep '^#' tmp-offsets.s >> $@

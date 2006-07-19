@@ -1,12 +1,12 @@
 /* -*-c-*-
  *   Creation Date: <2001/10/20 17:51:10 samuel>
- *   Time-stamp: <2003/08/20 14:00:27 samuel>
+ *   Time-stamp: <2004/02/21 21:38:27 samuel>
  *   
  *	<asm_offsets.inc>
  *	
  *	Extra offsets (included from asm_offsets.c)
  *   
- *   Copyright (C) 2001, 2002, 2003 Samuel Rydh (samuel@ibrium.se)
+ *   Copyright (C) 2001, 2002, 2003, 2004 Samuel Rydh (samuel@ibrium.se)
  *   
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -47,10 +47,18 @@ extra( void )
 	K_DEF( K_SPLIT_SR_BASE, mmu.split_sr[0] );
 	K_DEF( K_VSID_ENT_BASE, mmu.vsid[0] );
 
-	DEFINE( SKIPLIST_NEXT, offsetof(skiplist_el_t, next) );
+#ifdef __darwin__
+	K_DEF( K_OS_SDR1, mmu.os_sdr1 );
+	K_DEF( K_MOL_SDR1, mmu.mol_sdr1 );
+	DEFINE( SKIPLIST_NEXT, offsetof(skiplist_el_t, level[0].next_phys) );
+#endif
+#ifdef __linux__
+	DEFINE( SKIPLIST_NEXT, offsetof(skiplist_el_t, level[0].next) );
+#endif
+	DEFINE( SKIPLIST_LEVELSIZE, sizeof(skiplist_level_t) );
 	DEFINE( SKIPLIST_KEY, offsetof(skiplist_el_t, key) );
 	DEFINE( K_VSID_SL_ROOT_ELEM, offsetof(kernel_vars_t, mmu.vsid_sl.root) 
-				     - offsetof(skiplist_el_t, next));
+				     - offsetof(skiplist_el_t, level));
 	K_DEF( K_VSID_SL_SLEVEL, mmu.vsid_sl.slevel );
 
 	K_DEF( K_IBAT0U_SAVE, _bp.ibat_save[0].word[0] );
@@ -118,4 +126,11 @@ extra( void )
 	K_DEF( K_EMULATOR_KCALL_NIP, _bp.emulator_kcall_nip );
 
 	K_DEF( K_EMULATOR_SR, mmu.emulator_sr );
+
+#ifdef __darwin__
+	K_DEF( K_KCALL_ROUTINE, kcall_routine );
+	K_DEF( K_KCALL_ARG0, kcall_args[0] );
+	K_DEF( K_KCALL_ARG1, kcall_args[1] );
+	K_DEF( K_KCALL_ARG2, kcall_args[2] );
+#endif
 }

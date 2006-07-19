@@ -1,12 +1,12 @@
 /* 
  *   Creation Date: <2002/06/08 21:01:54 samuel>
- *   Time-stamp: <2003/08/27 13:18:33 samuel>
+ *   Time-stamp: <2004/02/19 11:54:33 samuel>
  *   
  *	<fault.c>
  *	
  *	Linux part
  *   
- *   Copyright (C) 2002, 2003 Samuel Rydh (samuel@ibrium.se)
+ *   Copyright (C) 2002, 2003, 2004 Samuel Rydh (samuel@ibrium.se)
  *   
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -60,9 +60,9 @@ fix_pte( ulong *p, ulong set, ulong flags )
 #define PAGE_BITS_READ		(_PAGE_ACCESSED | _PAGE_HASHPTE )
 
 ulong 
-get_phys_page( kernel_vars_t *kv, char *lvptr, int request_rw )
+get_phys_page( kernel_vars_t *kv, ulong va, int request_rw )
 {
-	ulong va = (ulong)lvptr;
+	char *lvptr = (char*)va;
 	ulong lpte, uptr, *ptr;
 	ulong flags;
 	struct mm_struct *mm;
@@ -114,7 +114,7 @@ no_page:
 	handle_mm_fault( mm, vma, va, request_rw );
 
 	up_read( &mm->mmap_sem );
-	return get_phys_page(kv, lvptr, request_rw);
+	return get_phys_page(kv, va, request_rw);
 
 bad_area:
 	up_read( &mm->mmap_sem );

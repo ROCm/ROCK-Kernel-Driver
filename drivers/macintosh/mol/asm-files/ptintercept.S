@@ -6,7 +6,7 @@
  *	
  *	Handles writes to the (mac) hash table
  *   
- *   Copyright (C) 2001, 2002, 2003 Samuel Rydh (samuel@ibrium.se)
+ *   Copyright (C) 2001, 2002, 2003, 2004 Samuel Rydh (samuel@ibrium.se)
  *   
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -157,7 +157,6 @@ do_stfs:
 do_stfiw:
 do_stswi:
 do_stswx:
-do_stmw:
 	lwz	r6,xNIP(r1)
 	DEBUGGER_SAVE(0x1882)			// unimplemented store instruction
 
@@ -165,49 +164,49 @@ do_stmw:
 do_dcbi:
 do_dcbz:
 	mtlr	r4
-	SET_MSR_DR /**/ R6
+	SET_MSR_DR /**/ r6
 	rlwinm	r6,r2,0,~0x7
 	lwz	r4,0(r6)
 	lwz	r5,4(r6)
 	dcbz	0,r2
-	CLEAR_MSR_DR /**/ R0
+	CLEAR_MSR_DR /**/ r0
 	b	st_continue_2
 do_stwcx:
-	EMU_LOAD_GPR R5, /**/ R6		// r0 = value
+	EMU_LOAD_GPR r5, /**/ R6		// r0 = value
 	mtlr	r4
-	SET_MSR_DR /**/ R6
+	SET_MSR_DR /**/ r6
 	rlwinm	r6,r2,0,~0x7
 	lwz	r4,0(r6)
 	lwz	r5,4(r6)
 	stwcx.	r0,0,r2
-	CLEAR_MSR_DR /**/ R0
+	CLEAR_MSR_DR /**/ r0
 	lwz	r6,xCR(r1)
 	mfcr	r0
 	rlwimi	r6,r0,0,0,3
 	stw	r6,xCR(r1)
 	b	st_continue_2
 do_sth:	
-	EMU_LOAD_GPR R5, /**/ R6		// r0 = value
+	EMU_LOAD_GPR r5, /**/ R6		// r0 = value
 	mtlr	r4
-	SET_MSR_DR /**/ R6
+	SET_MSR_DR /**/ r6
 	rlwinm	r6,r2,0,~0x7
 	lwz	r4,0(r6)
 	lwz	r5,4(r6)
 	sth	r0,0(r2)
 	b	st_continue
 do_stb:
-	EMU_LOAD_GPR R5, /**/ R6		// r0 = value
+	EMU_LOAD_GPR r5, /**/ R6		// r0 = value
 	mtlr	r4
-	SET_MSR_DR /**/ R6
+	SET_MSR_DR /**/ r6
 	rlwinm	r6,r2,0,~0x7
 	lwz	r4,0(r6)
 	lwz	r5,4(r6)
 	stb	r0,0(r2)
 	b	st_continue
 do_stw:
-	EMU_LOAD_GPR R5, /**/ R6		// r0 = value
+	EMU_LOAD_GPR r5, /**/ R6		// r0 = value
 	mtlr	r4
-	SET_MSR_DR /**/ R6
+	SET_MSR_DR /**/ r6
 	rlwinm	r6,r2,0,~0x7
 	lwz	r4,0(r6)
 	lwz	r5,4(r6)
@@ -216,11 +215,11 @@ do_stw:
 
 	// r4=PTE0, r5=PTE1, r3=opcode, r2=dar, scratch: r0
 st_continue:
-	CLEAR_MSR_DR /**/ R0
+	CLEAR_MSR_DR /**/ r0
 	bf+	5,st_continue_2			// update form?
 	rlwinm	r3,r3,6+5+5+3,(31<<3)
 	mr	r0,r2
-	EMU_STORE_GPR R3, /**/ R6		// r0 = value
+	EMU_STORE_GPR r3, /**/ R6		// r0 = value
 st_continue_2:
 	// check if the old PTE has been used (r2=dar,r4/r5=PTE)
 	lwz	r3,K_TLBHASH_BASE_EA(r1)	// Calculate tlb offset
@@ -257,4 +256,48 @@ pt_intercept:
 
 	// r4=PTE0, r5=PTE1
 	LOADI	r3,EXTERN(do_intercept_tlbie)
+	b	call_kernel
+
+	// stmw uses another emulator entry point because it might overwrite a bunch of PTEs
+do_stmw:
+	mtlr	r4
+
+	// save some debugging info
+//	stw	r2,xDBG_TRACE_SPACE(r1)
+
+	SET_MSR_DR /**/ r6
+
+	// now do the stmw. we do that manually since we have to access emulator regs.
+	mr	r4,r2				// r4: memory pointer
+	srwi	r6,r5,3				// r6: rS
+1:	cmpwi	r5,32 << 3			// loop condition
+	bge	2f
+	EMU_LOAD_GPR r5, /**/ R3		// r0 = value
+	stw	r0,0(r4)			// store the value
+	addi	r5,r5,1 << 3			// update register counter
+	addi	r4,r4,4				// and memory pointer
+	b	1b
+
+2:	CLEAR_MSR_DR /**/ r0
+
+	// load up r4 and r5 for do_intercept_tlbie_block (see below)
+	subfic	r5,r6,32			// number of registers (=words) stored
+	slwi	r5,r5,2				// number of bytes stored
+	add	r4,r2,r5			// last byte stored
+	addi	r4,r4,7				// alignment to
+	rlwinm  r5,r4,0,~0x7			// PTE size
+	rlwinm	r4,r2,0,~0x7			// pte block pointer
+	sub	r5,r5,r4			// substract block pointer -> length (in bytes)
+	lwz	r3,K_TLBHASH_BASE_EA(r1)	// calculate tlb offset
+	sub	r4,r4,r3			// tlb offset
+	b	st_block_continue
+
+	// transfer to C-function [r2=dar, r4=pte block offset, r5=pte block length]
+st_block_continue:
+	BUMP("pt_intercept_taken")
+	lwz	r6,xNIP(r1)
+	addi	r6,r6,4				// inc NIP
+	bl	save_middle_regs
+
+	LOADI 	r3,EXTERN(do_intercept_tlbie_block)
 	b	call_kernel
