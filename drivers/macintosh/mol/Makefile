@@ -38,23 +38,23 @@ $(obj)/_traps.o:	$(MOL_OBJ_INCLUDE_DIR)/asm_offsets.h $(srctree)/$(src)/asm-file
 
 $(obj)/_%.o: $(src)/asm-files/%.S
 	echo "  AS [x]   $@"
-	$(RM) $@ $@.s
+	rm -f $@ $@.s
 	$(CPP) $(LINUXINCLUDE) -I$(MOL_SRC_INCLUDE_DIR) -I$(MOL_OBJ_INCLUDE_DIR) $(MOL_ASMFLAGS) $< | m4 > $@.m4
 	cat $@.m4 > $@.s
 	$(AS) $@.s $(AS_FLAGS) -o $@
-	$(RM) $@.s $@.m4
+	rm -f $@.s $@.m4
 
 $(addprefix $(obj)/,$(MOL_OBJS)): $(obj)/%.o: $(MOL_OBJ_INCLUDE_DIR)/kconfig.h
 $(MOL_OBJ_INCLUDE_DIR)/kconfig.h:
 	mkdir -vp $(MOL_OBJ_INCLUDE_DIR)
-	$(RM) -fv $@
+	rm -fv $@
 	echo "/* nothing */" > $@
 
 $(MOL_OBJ_INCLUDE_DIR)/asm_offsets.h:   $(MOL_SRC_INCLUDE_DIR)/archinclude.h $(MOL_SRC_INCLUDE_DIR)/kernel_vars.h $(MOL_SRC_INCLUDE_DIR)/mac_registers.h $(MOL_OBJ_INCLUDE_DIR)/kconfig.h
 $(MOL_OBJ_INCLUDE_DIR)/asm_offsets.h:   $(srctree)/$(src)/asm_offsets.c $(MOL_SRC_INCLUDE_DIR)/asm_offsets.inc
-	$(RM) -fv $(obj)/tmp-offsets.c $@ ; cat $^ > $(obj)/tmp-offsets.c
+	rm -fv $(obj)/tmp-offsets.c $@ ; cat $^ > $(obj)/tmp-offsets.c
 	$(CC) -D__KERNEL__ $(CFLAGS) $(LINUXINCLUDE) -I$(MOL_SRC_INCLUDE_DIR) -I$(MOL_OBJ_INCLUDE_DIR) -Wall -S $(obj)/tmp-offsets.c
 	echo "/* WARNING! Automatically generated from 'shared/asm_offsets.c' - DO NOT EDIT! */" > $@
 	grep '^#' tmp-offsets.s >> $@
-	$(RM) -fv $(obj)/tmp-offsets.*
+	rm -fv $(obj)/tmp-offsets.*
 
