@@ -59,7 +59,7 @@ msdos_magic_present(unsigned char *p)
 	return (p[0] == MSDOS_LABEL_MAGIC1 && p[1] == MSDOS_LABEL_MAGIC2);
 }
 
-/* Value is EBCIDIC 'IBMA' */
+/* Value is EBCDIC 'IBMA' */
 #define AIX_LABEL_MAGIC1	0xC9
 #define AIX_LABEL_MAGIC2	0xC2
 #define AIX_LABEL_MAGIC3	0xD4
