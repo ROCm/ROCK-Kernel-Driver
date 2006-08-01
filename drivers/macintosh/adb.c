@@ -297,7 +297,7 @@ int __init adb_init(void)
 		return 0;
 #endif
 #ifdef CONFIG_PPC64
-	if (_machine != _MACH_Pmac)
+	if (!machine_is(powermac))
 		return 0;
 #endif
 #ifdef CONFIG_MAC
