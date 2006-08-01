@@ -783,22 +783,18 @@ kdbm_sc(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 		   sc->device, sc->list.next, sc->done);
 	kdb_printf("serial_number = %ld  retries = %d\n",
 		   sc->serial_number, sc->retries);
-	kdb_printf("cmd_len = %d  old_cmd_len = %d\n",
-		   sc->cmd_len, sc->old_cmd_len);
+	kdb_printf("cmd_len = %d\n",
+		   sc->cmd_len);
 	kdb_printf("cmnd = [%2.2x/%2.2x/%2.2x/%2.2x/%2.2x/%2.2x/%2.2x/%2.2x/%2.2x/%2.2x/%2.2x/%2.2x]\n",
 		   sc->cmnd[0], sc->cmnd[1], sc->cmnd[2], sc->cmnd[3], sc->cmnd[4],
 		   sc->cmnd[5], sc->cmnd[6], sc->cmnd[7], sc->cmnd[8], sc->cmnd[9],
 		   sc->cmnd[10], sc->cmnd[11]);
-	kdb_printf("data_cmnd = [%2.2x/%2.2x/%2.2x/%2.2x/%2.2x/%2.2x/%2.2x/%2.2x/%2.2x/%2.2x/%2.2x/%2.2x]\n",
-		   sc->data_cmnd[0], sc->data_cmnd[1], sc->data_cmnd[2], sc->data_cmnd[3], sc->data_cmnd[4],
-		   sc->data_cmnd[5], sc->data_cmnd[6], sc->data_cmnd[7], sc->data_cmnd[8], sc->data_cmnd[9],
-		   sc->data_cmnd[10], sc->data_cmnd[11]);
 	kdb_printf("request_buffer = 0x%p  request_bufflen = %d\n",
 		   sc->request_buffer, sc->request_bufflen);
-	kdb_printf("use_sg = %d  old_use_sg = %d sglist_len = %d\n",
-		   sc->use_sg, sc->old_use_sg, sc->sglist_len);
-	kdb_printf("bufflen = %d  buffer = 0x%p  underflow = %d transfersize = %d\n",
-		   sc->bufflen, sc->buffer, sc->underflow, sc->transfersize);
+	kdb_printf("use_sg = %d sglist_len = %d\n",
+		   sc->use_sg, sc->sglist_len);
+	kdb_printf("underflow = %d transfersize = %d\n",
+		   sc->underflow, sc->transfersize);
 	kdb_printf("tag = %d pid = %ld\n",
 		   sc->tag, sc->pid);
 
