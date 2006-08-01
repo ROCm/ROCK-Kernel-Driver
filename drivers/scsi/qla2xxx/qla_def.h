@@ -119,7 +119,7 @@
  */
 #define WWN_SIZE		8	/* Size of WWPN, WWN & WWNN */
 #define MAX_FIBRE_DEVICES	512
-#define MAX_FIBRE_LUNS  	0x3FFF
+#define MAX_FIBRE_LUNS  	0xFFFF
 #define	MAX_RSCN_COUNT		32
 #define	MAX_HOST_COUNT		16
 

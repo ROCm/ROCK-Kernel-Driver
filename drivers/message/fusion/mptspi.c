@@ -83,14 +83,6 @@ static int mpt_saf_te = MPTSCSIH_SAF_TE;
 module_param(mpt_saf_te, int, 0);
 MODULE_PARM_DESC(mpt_saf_te, " Force enabling SEP Processor: enable=1  (default=MPTSCSIH_SAF_TE=0)");
 
-static int mpt_pq_filter = 0;
-module_param(mpt_pq_filter, int, 0);
-MODULE_PARM_DESC(mpt_pq_filter, " Enable peripheral qualifier filter: enable=1  (default=0)");
-
-static int mpt_qas = MPTSCSIH_QAS;
-module_param(mpt_qas, int, 1);
-MODULE_PARM_DESC(mpt_qas, " Quick Arbitration and Selection (QAS) enabled=1, disabled=0 (default=MPTSCSIH_QAS=1)");
-
 static void mptspi_write_offset(struct scsi_target *, int);
 static void mptspi_write_width(struct scsi_target *, int);
 static int mptspi_write_spi_device_pg1(struct scsi_target *,
@@ -611,8 +603,7 @@ static void mptspi_write_qas(struct scsi_target *starget, int qas)
 	VirtTarget *vtarget = starget->hostdata;
 	u32 nego;
 
-	if (!mpt_qas ||
-	    (vtarget->negoFlags & MPT_TARGET_NO_NEGO_QAS) ||
+	if ((vtarget->negoFlags & MPT_TARGET_NO_NEGO_QAS) ||
 	    hd->ioc->spi_data.noQas)
 		spi_qas(starget) = 0;
 	else
@@ -1052,15 +1043,13 @@ mptspi_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	hd->timer.function = mptscsih_timer_expired;
 
 	ioc->spi_data.Saf_Te = mpt_saf_te;
-	hd->mpt_pq_filter = mpt_pq_filter;
 
 	hd->negoNvram = MPT_SCSICFG_USE_NVRAM;
 	ddvprintk((MYIOC_s_INFO_FMT
-		"saf_te %x mpt_pq_filter %x\n",
+		"saf_te %x\n",
 		ioc->name,
-		mpt_saf_te,
-		mpt_pq_filter));
-	ioc->spi_data.noQas = mpt_qas ? 0 : MPT_TARGET_NO_NEGO_QAS;
+		mpt_saf_te));
+	ioc->spi_data.noQas = 0;
 
 	init_waitqueue_head(&hd->scandv_waitq);
 	hd->scandv_wait_done = 0;

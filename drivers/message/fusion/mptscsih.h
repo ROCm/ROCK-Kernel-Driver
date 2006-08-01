@@ -66,7 +66,6 @@
 #define MPTSCSIH_DOMAIN_VALIDATION      1
 #define MPTSCSIH_MAX_WIDTH              1
 #define MPTSCSIH_MIN_SYNC               0x08
-#define MPTSCSIH_QAS                    1
 #define MPTSCSIH_SAF_TE                 0
 #define MPTSCSIH_PT_CLEAR               0
 
