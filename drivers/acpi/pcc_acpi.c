@@ -185,7 +185,7 @@ static int acpi_pcc_retrieve_biosdata(struct acpi_hotkey *hotkey, u32* sinf)
 	sinf[hkey->package.count] = -1;
 
 end:
-	acpi_os_free(buffer.pointer);
+	kfree(buffer.pointer);
 
 	if (status != AE_OK) {
 		return 0;

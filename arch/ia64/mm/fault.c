@@ -20,30 +20,17 @@
 extern void die (char *, struct pt_regs *, long);
 
 #ifdef CONFIG_KPROBES
-struct notifier_block *notify_page_fault_chain;
-static DEFINE_SPINLOCK(page_fault_notifier_lock);
+ATOMIC_NOTIFIER_HEAD(notify_page_fault_chain);
 
 /* Hook to register for page fault notifications */
 int register_page_fault_notifier(struct notifier_block *nb)
 {
-	unsigned long flags;
-	int err = 0;
-
-	spin_lock_irqsave(&page_fault_notifier_lock, flags);
-	err = notifier_chain_register(&notify_page_fault_chain, nb);
-	spin_unlock_irqrestore(&page_fault_notifier_lock, flags);
-	return err;
+	return atomic_notifier_chain_register(&notify_page_fault_chain, nb);
 }
 
 int unregister_page_fault_notifier(struct notifier_block *nb)
 {
-	unsigned long flags;
-	int err = 0;
-
-	spin_lock_irqsave(&page_fault_notifier_lock, flags);
-	err = notifier_chain_unregister(&notify_page_fault_chain, nb);
-	spin_unlock_irqrestore(&page_fault_notifier_lock, flags);
-	return err;
+	return atomic_notifier_chain_unregister(&notify_page_fault_chain, nb);
 }
 
 static inline int notify_page_fault(enum die_val val, const char *str,
@@ -56,7 +43,7 @@ static inline int notify_page_fault(enum die_val val, const char *str,
 		.trapnr = trap,
 		.signr = sig
 	};
-	return notifier_call_chain(&notify_page_fault_chain, val, &args);
+	return atomic_notifier_call_chain(&notify_page_fault_chain, val, &args);
 }
 #else
 static inline int notify_page_fault(enum die_val val, const char *str,

@@ -501,6 +501,7 @@ void apply_alternatives(struct alt_instr *start, struct alt_instr *end)
 {
 }
 
+#ifdef CONFIG_SMP
 void alternatives_smp_module_add(struct module *mod, char *name,
 				 void *locks, void *locks_end,
 				 void *text,  void *text_end)
@@ -510,3 +511,4 @@ void alternatives_smp_module_add(struct module *mod, char *name,
 void alternatives_smp_module_del(struct module *mod)
 {
 }
+#endif

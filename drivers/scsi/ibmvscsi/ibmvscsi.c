@@ -121,10 +121,9 @@ static int initialize_event_pool(struct event_pool *pool,
 
 	pool->size = size;
 	pool->next = 0;
-	pool->events = kmalloc(pool->size * sizeof(*pool->events), GFP_KERNEL);
+	pool->events = kcalloc(pool->size, sizeof(*pool->events), GFP_KERNEL);
 	if (!pool->events)
 		return -ENOMEM;
-	memset(pool->events, 0x00, pool->size * sizeof(*pool->events));
 
 	pool->iu_storage =
 	    dma_alloc_coherent(hostdata->dev,
@@ -545,7 +544,7 @@ static int ibmvscsi_send_srp_event(struct srp_event_struct *evt_struct,
 	 * can handle more requests (can_queue) when we actually can't
 	 */
 	if (evt_struct->crq.format == VIOSRP_SRP_FORMAT) {
-		request_status = 
+		request_status =
 			atomic_dec_if_positive(&hostdata->request_limit);
 		/* If request limit was -1 when we started, it is now even
 		 * less than that
@@ -592,7 +591,7 @@ static int ibmvscsi_send_srp_event(struct srp_event_struct *evt_struct,
 		evt_struct->cmnd_done(evt_struct->cmnd);
 	} else if (evt_struct->done)
 		evt_struct->done(evt_struct);
-	
+
 	free_event_struct(&hostdata->pool, evt_struct);
 	return 0;
 }
@@ -1217,7 +1216,7 @@ void ibmvscsi_handle_crq(struct viosrp_crq *crq,
 							hostdata) == 0) ||
 			    (ibmvscsi_send_crq(hostdata,
 					       0xC001000000000000LL, 0))) {
-					atomic_set(&hostdata->request_limit, 
+					atomic_set(&hostdata->request_limit,
 						   -1);
 					printk(KERN_ERR
 					       "ibmvscsi: error after"
@@ -1519,7 +1518,7 @@ static int ibmvscsi_probe(struct vio_dev *vdev, const struct vio_device_id *id)
 	hostdata->host->max_sectors = 32 * 8; /* default max I/O 32 pages */
 
 	rc = ibmvscsi_init_crq_queue(&hostdata->queue, hostdata, max_requests);
-	if (rc != 0 && rc != H_Resource) {
+	if (rc != 0 && rc != H_RESOURCE) {
 		printk(KERN_ERR "ibmvscsi: couldn't initialize crq\n");
 		goto init_crq_failed;
 	}
@@ -1539,8 +1538,8 @@ static int ibmvscsi_probe(struct vio_dev *vdev, const struct vio_device_id *id)
 	 * to fail if the other end is not acive.  In that case we don't
 	 * want to scan
 	 */
-	if (ibmvscsi_send_crq(hostdata, 0xC001000000000000LL, 0) == 0 
-	    || rc == H_Resource) {
+	if (ibmvscsi_send_crq(hostdata, 0xC001000000000000LL, 0) == 0
+	    || rc == H_RESOURCE) {
 		/*
 		 * Wait around max init_timeout secs for the adapter to finish
 		 * initializing. When we are done initializing, we will have a

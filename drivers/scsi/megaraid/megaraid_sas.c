@@ -10,7 +10,7 @@
  *	   2 of the License, or (at your option) any later version.
  *
  * FILE		: megaraid_sas.c
- * Version	: v03.01
+ * Version	: v00.00.03.01
  *
  * Authors:
  * 	Sreenivas Bagalkote	<Sreenivas.Bagalkote@lsil.com>
@@ -55,25 +55,25 @@ static struct pci_device_id megasas_pci_table[] = {
 
 	{
 	 PCI_VENDOR_ID_LSI_LOGIC,
-	 PCI_DEVICE_ID_LSI_SAS1064R, // xscale IOP
+	 PCI_DEVICE_ID_LSI_SAS1064R, /* xscale IOP */
 	 PCI_ANY_ID,
 	 PCI_ANY_ID,
 	 },
 	{
 	 PCI_VENDOR_ID_LSI_LOGIC,
-	 PCI_DEVICE_ID_LSI_SAS1078R, // ppc IOP
+	 PCI_DEVICE_ID_LSI_SAS1078R, /* ppc IOP */
 	 PCI_ANY_ID,
 	 PCI_ANY_ID,
 	},
 	{
 	 PCI_VENDOR_ID_LSI_LOGIC,
-	 PCI_DEVICE_ID_LSI_VERDE_ZCR,	// vega
+	 PCI_DEVICE_ID_LSI_VERDE_ZCR,	/* xscale IOP, vega */
 	 PCI_ANY_ID,
 	 PCI_ANY_ID,
 	 },
 	{
 	 PCI_VENDOR_ID_DELL,
-	 PCI_DEVICE_ID_DELL_PERC5, // xscale IOP
+	 PCI_DEVICE_ID_DELL_PERC5, /* xscale IOP */
 	 PCI_ANY_ID,
 	 PCI_ANY_ID,
 	 },
@@ -300,8 +300,8 @@ megasas_disable_intr(struct megasas_instance *instance)
 	u32 mask = 0x1f; 
 	struct megasas_register_set __iomem *regs = instance->reg_set;
 
-	if(instance->pdev->device == PCI_DEVICE_ID_LSI_SAS1078R)	
-		mask = 0xffffffff; 
+	if(instance->pdev->device == PCI_DEVICE_ID_LSI_SAS1078R)
+		mask = 0xffffffff;
 
 	writel(mask, &regs->outbound_intr_mask);
 
@@ -1059,12 +1059,10 @@ megasas_complete_cmd(struct megasas_instance *instance, struct megasas_cmd *cmd,
 {
 	int exception = 0;
 	struct megasas_header *hdr = &cmd->frame->hdr;
-	unsigned long flags;
 
 	if (cmd->scmd) {
 		cmd->scmd->SCp.ptr = (char *)0;
 	}
-
 
 	switch (hdr->cmd) {
 
@@ -1770,10 +1768,10 @@ static int megasas_init_mfi(struct megasas_instance *instance)
 	init_frame->data_xfer_len = sizeof(struct megasas_init_queue_info);
 
 	/*
-	 * disable the intr before fire the init frame to FW 
-	 */	
+	 * disable the intr before firing the init frame to FW
+	 */
 	megasas_disable_intr(instance);
-	
+
 	/*
 	 * Issue the init frame in polled mode
 	 */
@@ -2181,7 +2179,7 @@ megasas_probe_one(struct pci_dev *pdev, const struct pci_device_id *id)
 	 * Initialize locks and queues
 	 */
 	INIT_LIST_HEAD(&instance->cmd_pool);
-		
+
 	atomic_set(&instance->fw_outstanding,0);
 
 	init_waitqueue_head(&instance->int_cmd_wait_q);
@@ -2209,7 +2207,7 @@ megasas_probe_one(struct pci_dev *pdev, const struct pci_device_id *id)
 	/*
 	 * Register IRQ
 	 */
-	if (request_irq(pdev->irq, megasas_isr, SA_SHIRQ, "megasas", instance)) {
+	if (request_irq(pdev->irq, megasas_isr, IRQF_SHARED, "megasas", instance)) {
 		printk(KERN_DEBUG "megasas: Failed to register IRQ\n");
 		goto fail_irq;
 	}
@@ -2716,6 +2714,7 @@ megasas_mgmt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	switch (cmd) {
 	case MEGASAS_IOC_FIRMWARE:
 		return megasas_mgmt_ioctl_fw(file, arg);
+
 	case MEGASAS_IOC_GET_AEN:
 		return megasas_mgmt_ioctl_aen(file, arg);
 	}

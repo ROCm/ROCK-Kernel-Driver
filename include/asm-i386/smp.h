@@ -5,7 +5,6 @@
  * We need the APIC definitions automatically as part of 'smp.h'
  */
 #ifndef __ASSEMBLY__
-#include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/threads.h>
 #include <linux/cpumask.h>
@@ -88,7 +87,6 @@ static __inline int logical_smp_processor_id(void)
 	return GET_APIC_LOGICAL_ID(*(unsigned long *)(APIC_BASE+APIC_LDR));
 }
 
-
 #endif
 
 extern int __cpu_disable(void);
@@ -102,11 +100,4 @@ extern void __cpu_die(unsigned int cpu);
 #define NO_PROC_ID		0xFF		/* No processor magic marker */
 
 #endif
-
-#ifndef __ASSEMBLY__
-
-extern u8 bios_cpu_apicid[];
-
-#endif
-
 #endif

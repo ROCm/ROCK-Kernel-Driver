@@ -39,7 +39,7 @@
 #include <acpi/acpi_bus.h>
 #include <asm/uaccess.h>
 
-#define ASUS_ACPI_VERSION "0.30-SUSE"
+#define ASUS_ACPI_VERSION "0.30"
 
 #define PROC_ASUS       "asus"	//the directory
 #define PROC_MLED       "mled"
@@ -140,7 +140,6 @@ struct asus_hotk {
 		P30,		//Samsung P30
 		S1x,		//S1300A, but also L1400B and M2400A (L84F)
 		S2x,		//S200 (J1 reported), Victor MP-XP7210
-		V6V,		//V6V
 		W1N,		//W1000N
 		W5A,		//W5A
 		xxN,		//M2400N, M3700N, M5200N, M6800N, S1300N, S5200N
@@ -315,7 +314,8 @@ static struct model_data model_conf[END_MODEL] = {
 	 .brightness_set = "SPLV",
 	 .brightness_get = "GPLV",
 	 .display_set = "SDSP",
-	 .display_get = "\\_SB.PCI0.P0P1.VGA.GETD"},
+	 .display_get = "\\SSTE"},
+
 	{
 	 .name = "M6R",
 	 .mt_mled = "MLED",
@@ -325,7 +325,7 @@ static struct model_data model_conf[END_MODEL] = {
 	 .brightness_set = "SPLV",
 	 .brightness_get = "GPLV",
 	 .display_set = "SDSP",
-	 .display_get = "\\SSTE"},
+	 .display_get = "\\_SB.PCI0.P0P1.VGA.GETD"},
 
 	{
 	 .name = "P30",
@@ -356,20 +356,6 @@ static struct model_data model_conf[END_MODEL] = {
 	 .lcd_status = "\\BKLI",
 	 .brightness_up = S2x_PREFIX "_Q0B",
 	 .brightness_down = S2x_PREFIX "_Q0A"},
-
-	{
-	 .name = "V6V",
-	 .mt_bt_switch = "BLED",
-	 .mt_wled = "WLED",
-	 .mt_tled = "TLED",
-	 .mt_lcd_switch = xxN_PREFIX "_Q10",
-	 .bt_status = "\\_SB.PCI0.SBRG.BLTS",
-	 .display_get = "\\_SB.PCI0.POP1.VGA.GETD",
-	 .display_set = "SDSP",
-	 .brightness_set = "SPLV",
-	 .brightness_get = "GPLV",
-	 .lcd_status = "\\BKLT"
-	},
 
 	{
 	 .name = "W1N",
@@ -673,7 +659,7 @@ static int
 proc_write_bluetooth(struct file *file, const char __user * buffer,
 		     unsigned long count, void *data)
 {
-	/* Note: mt_bt_switch controls both internal Bluetooth adapter's
+	/* Note: mt_bt_switch controls both internal Bluetooth adapter's 
 	   presence and its LED */
 	return write_led(buffer, count, hotk->methods->mt_bt_switch, BT_ON, 0);
 }
@@ -1066,7 +1052,7 @@ static void asus_hotk_notify(acpi_handle handle, u32 event, void *data)
  * Match the model string to the list of supported models. Return END_MODEL if
  * no match or model is NULL.
  */
-static int __init asus_model_match(char *model)
+static int asus_model_match(char *model)
 {
 	if (model == NULL)
 		return END_MODEL;
@@ -1113,8 +1099,6 @@ static int __init asus_model_match(char *model)
 		return L5x;
 	else if (strncmp(model, "A4G", 3) == 0)
 		return A4G;
-	else if (strncmp(model, "V6V", 3) == 0)
-		return V6V;
 	else if (strncmp(model, "W1N", 3) == 0)
 		return W1N;
 	else if (strncmp(model, "W5A", 3) == 0)
@@ -1144,7 +1128,7 @@ static int asus_hotk_get_info(void)
 	 * HID), this bit will be moved. A global variable asus_info contains
 	 * the DSDT header.
 	 */
-	status = acpi_get_table(ACPI_TABLE_DSDT, 1, &dsdt);
+	status = acpi_get_table(ACPI_TABLE_ID_DSDT, 1, &dsdt);
 	if (ACPI_FAILURE(status))
 		printk(KERN_WARNING "  Couldn't get the DSDT table header\n");
 	else
@@ -1165,8 +1149,8 @@ static int asus_hotk_get_info(void)
 
 	/*
 	 * Try to match the object returned by INIT to the specific model.
-	 * Handle every possible object (or the lack of thereof) the DSDT
-	 * writers might throw at us. When in trouble, we pass NULL to
+	 * Handle every possible object (or the lack of thereof) the DSDT 
+	 * writers might throw at us. When in trouble, we pass NULL to 
 	 * asus_model_match() and try something completely different.
 	 */
 	if (buffer.pointer) {
@@ -1179,7 +1163,7 @@ static int asus_hotk_get_info(void)
 			string = model->buffer.pointer;
 			break;
 		default:
-			acpi_os_free(model);
+			kfree(model);
 			break;
 		}
 	}
@@ -1240,7 +1224,7 @@ static int asus_hotk_get_info(void)
 		/* S1300A reports L84F, but L1400B too, account for that */
 	}
 
-	acpi_os_free(model);
+	kfree(model);
 
 	return AE_OK;
 }
@@ -1262,6 +1246,8 @@ static int asus_hotk_check(void)
 
 	return result;
 }
+
+static int asus_hotk_found;
 
 static int asus_hotk_add(struct acpi_device *device)
 {
@@ -1323,6 +1309,8 @@ static int asus_hotk_add(struct acpi_device *device)
 		}
 	}
 
+	asus_hotk_found = 1;
+
 	/* LED display is off by default */
 	hotk->ledd_status = 0xFFF;
 
@@ -1372,10 +1360,22 @@ static int __init asus_acpi_init(void)
 	asus_proc_dir->owner = THIS_MODULE;
 
 	result = acpi_bus_register_driver(&asus_hotk_driver);
-	if (result < 1) {
+	if (result < 0) {
+		remove_proc_entry(PROC_ASUS, acpi_root_dir);
+		return result;
+	}
+
+	/*
+	 * This is a bit of a kludge.  We only want this module loaded
+	 * for ASUS systems, but there's currently no way to probe the
+	 * ACPI namespace for ASUS HIDs.  So we just return failure if
+	 * we didn't find one, which will cause the module to be
+	 * unloaded.
+	 */
+	if (!asus_hotk_found) {
 		acpi_bus_unregister_driver(&asus_hotk_driver);
 		remove_proc_entry(PROC_ASUS, acpi_root_dir);
-		return -ENODEV;
+		return result;
 	}
 
 	return 0;
@@ -1386,7 +1386,7 @@ static void __exit asus_acpi_exit(void)
 	acpi_bus_unregister_driver(&asus_hotk_driver);
 	remove_proc_entry(PROC_ASUS, acpi_root_dir);
 
-	acpi_os_free(asus_info);
+	kfree(asus_info);
 
 	return;
 }

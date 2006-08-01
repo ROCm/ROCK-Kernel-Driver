@@ -14,7 +14,6 @@
  * This file handles the architecture-dependent parts of hardware exceptions
  */
 
-#include <linux/config.h>
 #include <linux/errno.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
@@ -32,6 +31,7 @@
 #include <linux/delay.h>
 #include <linux/kprobes.h>
 #include <linux/kexec.h>
+#include <linux/backlight.h>
 
 #include <asm/kdebug.h>
 #include <asm/pgtable.h>
@@ -109,10 +109,18 @@ int die(const char *str, struct pt_regs *regs, long err)
 	spin_lock_irq(&die_lock);
 	bust_spinlocks(1);
 #ifdef CONFIG_PMAC_BACKLIGHT
-	if (machine_is(powermac)) {
-		set_backlight_enable(1);
-		set_backlight_level(BACKLIGHT_MAX);
+	mutex_lock(&pmac_backlight_mutex);
+	if (machine_is(powermac) && pmac_backlight) {
+		struct backlight_properties *props;
+
+		down(&pmac_backlight->sem);
+		props = pmac_backlight->props;
+		props->brightness = props->max_brightness;
+		props->power = FB_BLANK_UNBLANK;
+		props->update_status(pmac_backlight);
+		up(&pmac_backlight->sem);
 	}
+	mutex_unlock(&pmac_backlight_mutex);
 #endif
 	printk("Oops: %s, sig: %ld [#%d]\n", str, err, ++die_counter);
 #ifdef CONFIG_PREEMPT
@@ -134,7 +142,8 @@ int die(const char *str, struct pt_regs *regs, long err)
 	bust_spinlocks(0);
 	spin_unlock_irq(&die_lock);
 
-	if (kexec_should_crash(current) || kexec_sr_activated(smp_processor_id()))
+	if (kexec_should_crash(current) ||
+		kexec_sr_activated(smp_processor_id()))
 		crash_kexec(regs);
 	crash_kexec_secondary(regs);
 
@@ -666,7 +675,7 @@ static int emulate_instruction(struct pt_regs *regs)
 	u32 instword;
 	u32 rd;
 
-	if (!user_mode(regs))
+	if (!user_mode(regs) || (regs->msr & MSR_LE))
 		return -EINVAL;
 	CHECK_FULL_REGS(regs);
 
@@ -813,9 +822,11 @@ void __kprobes program_check_exception(struct pt_regs *regs)
 
 void alignment_exception(struct pt_regs *regs)
 {
-	int fixed;
+	int fixed = 0;
 
-	fixed = fix_alignment(regs);
+	/* we don't implement logging of alignment exceptions */
+	if (!(current->thread.align_ctl & PR_UNALIGN_SIGBUS))
+		fixed = fix_alignment(regs);
 
 	if (fixed == 1) {
 		regs->nip += 4;	/* skip over emulated instruction */

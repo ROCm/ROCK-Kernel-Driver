@@ -155,6 +155,7 @@ static void crash_soft_reset_check(int cpu)
 		cpu_relax();
 }
 
+
 static void crash_kexec_prepare_cpus(int cpu)
 {
 	unsigned int msecs;
@@ -248,6 +249,8 @@ void crash_kexec_secondary(struct pt_regs *regs)
 #else
 static void crash_kexec_prepare_cpus(int cpu)
 {
+	unsigned int irq;
+
 	/*
 	 * move the secondarys to us so that we can copy
 	 * the new kernel 0-0x100 safely
@@ -269,7 +272,7 @@ void default_machine_crash_shutdown(struct pt_regs *regs)
 
 	/*
 	 * This function is only called after the system
-	 * has paniced or is otherwise in a critical state.
+	 * has panicked or is otherwise in a critical state.
 	 * The minimum amount of code to allow a kexec'd kernel
 	 * to run successfully needs to happen here.
 	 *
@@ -280,14 +283,15 @@ void default_machine_crash_shutdown(struct pt_regs *regs)
 	local_irq_disable();
 
 	for_each_irq(irq) {
-		struct irq_desc *desc = &irq_desc[irq];
+		struct irq_desc *desc = irq_desc + irq;
 
 		if (desc->status & IRQ_INPROGRESS)
-			desc->handler->end(irq);
+			desc->chip->end(irq);
 
 		if (!(desc->status & IRQ_DISABLED))
-			desc->handler->disable(irq);
+			desc->chip->disable(irq);
 	}
+
 	/*
 	 * Make a note of crashing cpu. Will be used in machine_kexec
 	 * such that another IPI will not be sent.

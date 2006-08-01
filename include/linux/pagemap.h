@@ -99,57 +99,19 @@ extern struct page * read_cache_page(struct address_space *mapping,
 extern int read_cache_pages(struct address_space *mapping,
 		struct list_head *pages, filler_t *filler, void *data);
 
+static inline struct page *read_mapping_page(struct address_space *mapping,
+					     unsigned long index, void *data)
+{
+	filler_t *filler = (filler_t *)mapping->a_ops->readpage;
+	return read_cache_page(mapping, index, filler, data);
+}
+
 int add_to_page_cache(struct page *page, struct address_space *mapping,
 				unsigned long index, gfp_t gfp_mask);
 int add_to_page_cache_lru(struct page *page, struct address_space *mapping,
 				unsigned long index, gfp_t gfp_mask);
 extern void remove_from_page_cache(struct page *page);
 extern void __remove_from_page_cache(struct page *page);
-
-extern atomic_t nr_pagecache;
-
-#ifdef CONFIG_SMP
-
-#define PAGECACHE_ACCT_THRESHOLD        max(16, NR_CPUS * 2)
-DECLARE_PER_CPU(long, nr_pagecache_local);
-
-/*
- * pagecache_acct implements approximate accounting for pagecache.
- * vm_enough_memory() do not need high accuracy. Writers will keep
- * an offset in their per-cpu arena and will spill that into the
- * global count whenever the absolute value of the local count
- * exceeds the counter's threshold.
- *
- * MUST be protected from preemption.
- * current protection is mapping->page_lock.
- */
-static inline void pagecache_acct(int count)
-{
-	long *local;
-
-	local = &__get_cpu_var(nr_pagecache_local);
-	*local += count;
-	if (*local > PAGECACHE_ACCT_THRESHOLD || *local < -PAGECACHE_ACCT_THRESHOLD) {
-		atomic_add(*local, &nr_pagecache);
-		*local = 0;
-	}
-}
-
-#else
-
-static inline void pagecache_acct(int count)
-{
-	atomic_add(count, &nr_pagecache);
-}
-#endif
-
-static inline unsigned long get_page_cache_size(void)
-{
-	int ret = atomic_read(&nr_pagecache);
-	if (unlikely(ret < 0))
-		ret = 0;
-	return ret;
-}
 
 /*
  * Return byte-offset into filesystem object for page.
@@ -168,7 +130,6 @@ static inline pgoff_t linear_page_index(struct vm_area_struct *vma,
 }
 
 extern void FASTCALL(__lock_page(struct page *page));
-extern void FASTCALL(__lock_page_nosync(struct page *page));
 extern void FASTCALL(unlock_page(struct page *page));
 
 static inline void lock_page(struct page *page)
@@ -176,13 +137,6 @@ static inline void lock_page(struct page *page)
 	might_sleep();
 	if (TestSetPageLocked(page))
 		__lock_page(page);
-}
-
-static inline void lock_page_nosync(struct page *page)
-{
-	might_sleep();
-	if (TestSetPageLocked(page))
-		__lock_page_nosync(page);
 }
 	
 /*

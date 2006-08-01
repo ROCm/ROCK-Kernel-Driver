@@ -199,9 +199,9 @@ static int subdomain_netlink_send(struct sock *sk, struct sk_buff *skb)
 	return cap_netlink_send(sk, skb);
 }
 
-static int subdomain_netlink_recv(struct sk_buff *skb)
+static int subdomain_netlink_recv(struct sk_buff *skb, int capability)
 {
-	return cap_netlink_recv(skb);
+	return cap_netlink_recv(skb, capability);
 }
 
 static void subdomain_bprm_apply_creds(struct linux_binprm *bprm, int unsafe)

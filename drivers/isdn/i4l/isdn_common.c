@@ -11,7 +11,6 @@
  *
  */
 
-#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/poll.h>
@@ -943,7 +942,7 @@ isdn_readbchan_tty(int di, int channel, struct tty_struct *tty, int cisco_hack)
 			count_put = count_pull;
 			if(count_put > 1)
 				tty_insert_flip_string(tty, skb->data, count_put - 1);
-			last = skb->data[count_put] - 1;
+			last = skb->data[count_put - 1];
 			len -= count_put;
 #ifdef CONFIG_ISDN_AUDIO
 		}
@@ -1187,9 +1186,8 @@ isdn_write(struct file *file, const char __user *buf, size_t count, loff_t * off
 			goto out;
 		}
 		chidx = isdn_minor2chan(minor);
-		while (isdn_writebuf_stub(drvidx, chidx, buf, count) != count)
+		while ((retval = isdn_writebuf_stub(drvidx, chidx, buf, count)) == 0)
 			interruptible_sleep_on(&dev->drv[drvidx]->snd_waitq[chidx]);
-		retval = count;
 		goto out;
 	}
 	if (minor <= ISDN_MINOR_CTRLMAX) {
@@ -1967,9 +1965,10 @@ isdn_writebuf_stub(int drvidx, int chan, const u_char __user * buf, int len)
 	struct sk_buff *skb = alloc_skb(hl + len, GFP_ATOMIC);
 
 	if (!skb)
-		return 0;
+		return -ENOMEM;
 	skb_reserve(skb, hl);
-	copy_from_user(skb_put(skb, len), buf, len);
+	if (copy_from_user(skb_put(skb, len), buf, len))
+		return -EFAULT;
 	ret = dev->drv[drvidx]->interface->writebuf_skb(drvidx, chan, 1, skb);
 	if (ret <= 0)
 		dev_kfree_skb(skb);

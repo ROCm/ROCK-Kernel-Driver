@@ -51,7 +51,7 @@ struct ide_acpi_hwif_link {
 	struct ide_acpi_drive_link	 master;
 	struct ide_acpi_drive_link	 slave;
 };
-	
+
 #undef DEBUGGING
 /* note: adds function name and KERN_DEBUG */
 #ifdef DEBUGGING
@@ -124,7 +124,7 @@ static int ide_get_dev_handle(struct device *dev, acpi_handle *handle,
 		 devnum, func, (unsigned long long)addr, *handle);
 	ret = 0;
 err:
-	acpi_os_free(dinfo);
+	kfree(dinfo);
 	return ret;
 }
 
@@ -305,7 +305,7 @@ static int do_drive_get_GTF(ide_drive_t *drive,
 		       "expected object type of ACPI_TYPE_BUFFER, "
 		       "got 0x%x\n", out_obj->type);
 		err = -ENOENT;
-		acpi_os_free(output.pointer);
+		kfree(output.pointer);
 		goto out;
 	}
 
@@ -316,7 +316,7 @@ static int do_drive_get_GTF(ide_drive_t *drive,
 		       __FUNCTION__, out_obj->buffer.length,
 		       out_obj->buffer.pointer);
 		err = -ENOENT;
-		acpi_os_free(output.pointer);
+		kfree(output.pointer);
 		goto out;
 	}
 
@@ -460,7 +460,7 @@ int ide_acpi_exec_tfs(ide_drive_t *drive)
 	DEBPRINT("call set_taskfiles, drive=%s\n", drive->name);
 
 	ret = do_drive_set_taskfiles(drive, gtf_length, gtf_address);
-	acpi_os_free((void *)obj_loc);
+	kfree((void *)obj_loc);
 	if (ret < 0) {
 		DEBPRINT("set_taskfiles error (%d)\n", ret);
 	}
@@ -515,13 +515,13 @@ void ide_acpi_get_timing(ide_hwif_t *hwif)
 		DEBPRINT("Run _GTM: length or ptr is NULL (0x%llx, 0x%p)\n",
 		       (unsigned long long)output.length,
 		       output.pointer);
-		acpi_os_free(output.pointer);
+		kfree(output.pointer);
 		return;
 	}
 
 	out_obj = output.pointer;
 	if (out_obj->type != ACPI_TYPE_BUFFER) {
-		acpi_os_free(output.pointer);
+		kfree(output.pointer);
 		DEBPRINT("Run _GTM: error: "
 		       "expected object type of ACPI_TYPE_BUFFER, "
 		       "got 0x%x\n", out_obj->type);
@@ -530,7 +530,7 @@ void ide_acpi_get_timing(ide_hwif_t *hwif)
 
 	if (!out_obj->buffer.length || !out_obj->buffer.pointer ||
 	    out_obj->buffer.length != sizeof(struct GTM_buffer)) {
-		acpi_os_free(output.pointer);
+		kfree(output.pointer);
 		printk(KERN_ERR
 		       "%s: unexpected _GTM length (0x%x)[should be 0x%x] or addr (0x%p)\n",
 		       __FUNCTION__, out_obj->buffer.length,
@@ -542,7 +542,7 @@ void ide_acpi_get_timing(ide_hwif_t *hwif)
 	       sizeof(struct GTM_buffer));
 
 	DEBPRINT("_GTM info: ptr: 0x%p, len: 0x%x, exp.len: 0x%Zx\n",
-		 out_obj->buffer.pointer, out_obj->buffer.length, 
+		 out_obj->buffer.pointer, out_obj->buffer.length,
 		 sizeof(struct GTM_buffer));
 
 	DEBPRINT("_GTM fields: 0x%x, 0x%x, 0x%x, 0x%x, 0x%x\n",
@@ -552,7 +552,7 @@ void ide_acpi_get_timing(ide_hwif_t *hwif)
 		 hwif->acpidata->gtm.DMA_speed1,
 		 hwif->acpidata->gtm.GTM_flags);
 
-	acpi_os_free(output.pointer);
+	kfree(output.pointer);
 }
 EXPORT_SYMBOL_GPL(ide_acpi_get_timing);
 
@@ -664,7 +664,7 @@ void ide_acpi_init(ide_hwif_t *hwif)
 				 master->drive->name, err);
 		}
 	}
-		
+
 	if (slave->drive->present) {
 		err = taskfile_lib_get_identify(slave->drive, slave->idbuff);
 		if (err) {

@@ -14,7 +14,6 @@
  *	Mikael Pettersson	:	PM converted to driver model.
  */
 
-#include <linux/config.h>
 #include <linux/init.h>
 
 #include <linux/mm.h>
@@ -36,6 +35,7 @@
 #include <asm/arch_hooks.h>
 #include <asm/hpet.h>
 #include <asm/i8253.h>
+#include <asm/nmi.h>
 
 #include <mach_apic.h>
 #include <mach_apicdef.h>
@@ -62,7 +62,7 @@ int apic_verbosity;
 
 static void apic_pm_activate(void);
 
-int modern_apic(void)
+static int modern_apic(void)
 {
 	unsigned int lvr, version;
 	/* AMD systems use old APIC versions, so check the CPU */
@@ -113,7 +113,7 @@ void __init apic_intr_init(void)
 }
 
 /* Using APIC to generate smp_local_timer_interrupt? */
-int using_apic_timer = 0;
+int using_apic_timer __read_mostly = 0;
 
 static int enabled_via_apicbase;
 
@@ -156,7 +156,7 @@ void clear_local_APIC(void)
 	maxlvt = get_maxlvt();
 
 	/*
-	 * Masking an LVT entry on a P6 can trigger a local APIC error
+	 * Masking an LVT entry can trigger a local APIC error
 	 * if the vector is zero. Mask LVTERR first to prevent this.
 	 */
 	if (maxlvt >= 3) {
@@ -1117,7 +1117,18 @@ void disable_APIC_timer(void)
 		unsigned long v;
 
 		v = apic_read(APIC_LVTT);
-		apic_write_around(APIC_LVTT, v | APIC_LVT_MASKED);
+		/*
+		 * When an illegal vector value (0-15) is written to an LVT
+		 * entry and delivery mode is Fixed, the APIC may signal an
+		 * illegal vector error, with out regard to whether the mask
+		 * bit is set or whether an interrupt is actually seen on input.
+		 *
+		 * Boot sequence might call this function when the LVTT has
+		 * '0' vector value. So make sure vector field is set to
+		 * valid value.
+		 */
+		v |= (APIC_LVT_MASKED | LOCAL_TIMER_VECTOR);
+		apic_write_around(APIC_LVTT, v);
 	}
 }
 
@@ -1259,55 +1270,6 @@ void smp_send_timer_broadcast_ipi(struct pt_regs *regs)
 int setup_profiling_timer(unsigned int multiplier)
 {
 	return -EINVAL;
-}
-
-/*
- * oem_force_hpet_timer -- force HPET mode for some boxes.
- *
- * Thus far, the major user of this is IBM's Summit2 series:
- *
- * Clustered boxes may have unsynced TSC problems if they are
- * multi-chassis. Use available data to take a good guess.
- * If in doubt, go HPET.
- */
-
-__cpuinit int oem_force_hpet_timer(void)
-{
-	int i, clusters, zeros;
-	unsigned id;
-	DECLARE_BITMAP(clustermap, NUM_APIC_CLUSTERS);
-
-	bitmap_zero(clustermap, NUM_APIC_CLUSTERS);
-
-	for (i = 0; i < NR_CPUS; i++) {
-		id = bios_cpu_apicid[i];
-		if (id != BAD_APICID)
-			__set_bit(APIC_CLUSTERID(id), clustermap);
-	}
-
-	/* Problem:  Partially populated chassis may not have CPUs in some of
-	 * the APIC clusters they have been allocated.  Only present CPUs have
-	 * bios_cpu_apicid entries, thus causing zeroes in the bitmap.  Since
-	 * clusters are allocated sequentially, count zeros only if they are
-	 * bounded by ones.
-	 */
-	clusters = 0;
-	zeros = 0;
-	for (i = 0; i < NUM_APIC_CLUSTERS; i++) {
-		if (test_bit(i, clustermap)) {
-			clusters += 1 + zeros;
-			zeros = 0;
-		} else
-			++zeros;
-	}
-
-	/*
-	 * If clusters > 2, then should be multi-chassis.  Return 1 for HPET.
-	 * Else return 0 to use TSC.
-	 * May have to revisit this when multi-core + hyperthreaded CPUs come
-	 * out, but AFAIK this will work even for them.
-	 */
-	return (clusters > 2);
 }
 
 /*
