@@ -32,6 +32,6 @@ void		(*xx_store_pte_lowmem)( ulong *slot, int pte0, int pte1 );
 int
 arch_mmu_init( kernel_vars_t *kv )
 {
-	MMU.emulator_context = current->mm->context;
+	MMU.emulator_context = current->mm->context.id;
 	return 0;
 }
