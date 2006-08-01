@@ -492,17 +492,17 @@ static void add_file(struct super_block *sb, char *name,
 
 int reiserfs_proc_info_init(struct super_block *sb)
 {
-	char bdev[BDEVNAME_SIZE];
+	char b[BDEVNAME_SIZE];
 	char *s;
 
 	/* Some block devices use /'s */
-	strlcpy(bdev, reiserfs_bdevname(sb), BDEVNAME_SIZE);
-	s = strchr(bdev, '/');
+	strlcpy(b, reiserfs_bdevname(sb), BDEVNAME_SIZE);
+	s = strchr(b, '/');
 	if (s)
 		*s = '!';
 
 	spin_lock_init(&__PINFO(sb).lock);
-	REISERFS_SB(sb)->procdir = proc_mkdir(bdev, proc_info_root);
+	REISERFS_SB(sb)->procdir = proc_mkdir(b, proc_info_root);
 	if (REISERFS_SB(sb)->procdir) {
 		REISERFS_SB(sb)->procdir->owner = THIS_MODULE;
 		REISERFS_SB(sb)->procdir->data = sb;
@@ -516,19 +516,19 @@ int reiserfs_proc_info_init(struct super_block *sb)
 		return 0;
 	}
 	reiserfs_warning(sb, "reiserfs: cannot create /proc/%s/%s",
-			 proc_info_root_name, bdev);
+			 proc_info_root_name, b);
 	return 1;
 }
 
 int reiserfs_proc_info_done(struct super_block *sb)
 {
 	struct proc_dir_entry *de = REISERFS_SB(sb)->procdir;
-	char bdev[BDEVNAME_SIZE];
+	char b[BDEVNAME_SIZE];
 	char *s;
 
 	/* Some block devices use /'s */
-	strlcpy(bdev, reiserfs_bdevname(sb), BDEVNAME_SIZE);
-	s = strchr(bdev, '/');
+	strlcpy(b, reiserfs_bdevname(sb), BDEVNAME_SIZE);
+	s = strchr(b, '/');
 	if (s)
 		*s = '!';
 
@@ -545,7 +545,7 @@ int reiserfs_proc_info_done(struct super_block *sb)
 	__PINFO(sb).exiting = 1;
 	spin_unlock(&__PINFO(sb).lock);
 	if (proc_info_root) {
-		remove_proc_entry(bdev, proc_info_root);
+		remove_proc_entry(b, proc_info_root);
 		REISERFS_SB(sb)->procdir = NULL;
 	}
 	return 0;

@@ -1184,7 +1184,7 @@ ixgb_tso(struct ixgb_adapter *adapter, struct sk_buff *skb)
 	uint16_t ipcse, tucse, mss;
 	int err;
 
-	if(likely(skb_shinfo(skb)->gso_size)) {
+	if (likely(skb_is_gso(skb))) {
 		if (skb_header_cloned(skb)) {
 			err = pskb_expand_head(skb, 0, 0, GFP_ATOMIC);
 			if (err)
@@ -1292,7 +1292,7 @@ ixgb_tx_map(struct ixgb_adapter *adapter, struct sk_buff *skb,
 
 	while(len) {
 		buffer_info = &tx_ring->buffer_info[i];
-		size = min(len, IXGB_MAX_JUMBO_FRAME_SIZE);
+		size = min(len, IXGB_MAX_DATA_PER_TXD);
 		buffer_info->length = size;
 		buffer_info->dma =
 			pci_map_single(adapter->pdev,
@@ -1317,7 +1317,7 @@ ixgb_tx_map(struct ixgb_adapter *adapter, struct sk_buff *skb,
 
 		while(len) {
 			buffer_info = &tx_ring->buffer_info[i];
-			size = min(len, IXGB_MAX_JUMBO_FRAME_SIZE);
+			size = min(len, IXGB_MAX_DATA_PER_TXD);
 			buffer_info->length = size;
 			buffer_info->dma =
 				pci_map_page(adapter->pdev,
