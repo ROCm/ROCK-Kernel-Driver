@@ -2362,9 +2362,6 @@ static int sbp2scsi_queuecommand(struct scsi_cmnd *SCpnt,
 		sbp2scsi_complete_command(scsi_id, SBP2_SCSI_STATUS_SELECTION_TIMEOUT,
 					  SCpnt, done);
 	}
-	if (scsi_id->ne->guid_vendor_id == 0x0010b9 && /* Maxtor's OUI */
-		(sdev->type == TYPE_DISK || sdev->type == TYPE_RBC))
-			sdev->allow_restart = 1;
 	return 0;
 
 done:
