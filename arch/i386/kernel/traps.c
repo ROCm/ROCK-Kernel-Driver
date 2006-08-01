@@ -38,6 +38,10 @@
 #include <linux/mca.h>
 #endif
 
+#ifdef	CONFIG_KDB
+#include <linux/kdb.h>
+#endif	/* CONFIG_KDB */
+
 #include <asm/processor.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
@@ -433,6 +437,10 @@ void die(const char * str, struct pt_regs * regs, long err)
 	bust_spinlocks(0);
 	die.lock_owner = -1;
 	spin_unlock_irqrestore(&die.lock, flags);
+#ifdef	CONFIG_KDB
+	kdb_diemsg = str;
+	kdb(KDB_REASON_OOPS, err, regs);
+#endif	/* CONFIG_KDB */
 
 	if (!regs)
 		return;
@@ -543,7 +551,7 @@ fastcall void do_##name(struct pt_regs * regs, long error_code) \
 }
 
 DO_VM86_ERROR_INFO( 0, SIGFPE,  "divide error", divide_error, FPE_INTDIV, regs->eip)
-#ifndef CONFIG_KPROBES
+#if	!defined(CONFIG_KPROBES) && !defined(CONFIG_KDB)
 DO_VM86_ERROR( 3, SIGTRAP, "int3", int3)
 #endif
 DO_VM86_ERROR( 4, SIGSEGV, "overflow", overflow)
@@ -647,6 +655,9 @@ static void io_check_error(unsigned char reason, struct pt_regs * regs)
 
 static void unknown_nmi_error(unsigned char reason, struct pt_regs * regs)
 {
+#ifdef	CONFIG_KDB
+	(void)kdb(KDB_REASON_NMI, reason, regs);
+#endif	/* CONFIG_KDB */
 #ifdef CONFIG_MCA
 	/* Might actually be able to figure out what the guilty party
 	* is. */
@@ -679,6 +690,9 @@ void die_nmi (struct pt_regs *regs, const char *msg)
 	printk(" on CPU%d, eip %08lx, registers:\n",
 		smp_processor_id(), regs->eip);
 	show_registers(regs);
+#ifdef	CONFIG_KDB
+	kdb(KDB_REASON_NMI, 0, regs);
+#endif	/* CONFIG_KDB */
 	printk(KERN_EMERG "console shuts up ...\n");
 	console_silent();
 	spin_unlock(&nmi_print_lock);
@@ -702,7 +716,17 @@ static void default_do_nmi(struct pt_regs * regs)
 	/* Only the BSP gets external NMIs from the system.  */
 	if (!smp_processor_id())
 		reason = get_nmi_reason();
- 
+
+#if defined(CONFIG_SMP) && defined(CONFIG_KDB)
+	/*
+	 * Call the kernel debugger to see if this NMI is due
+	 * to an KDB requested IPI.  If so, kdb will handle it.
+	 */
+	if (kdb_ipi(regs, NULL)) {
+		return;
+	}
+#endif	/* defined(CONFIG_SMP) && defined(CONFIG_KDB) */
+
 	if (!(reason & 0xc0)) {
 		if (notify_die(DIE_NMI_IPI, "nmi_ipi", regs, reason, 2, SIGINT)
 							== NOTIFY_STOP)
@@ -772,6 +796,10 @@ EXPORT_SYMBOL_GPL(unset_nmi_callback);
 #ifdef CONFIG_KPROBES
 fastcall void __kprobes do_int3(struct pt_regs *regs, long error_code)
 {
+#ifdef	CONFIG_KDB
+	if (kdb(KDB_REASON_BREAK, error_code, regs))
+		return;
+#endif
 	if (notify_die(DIE_INT3, "int3", regs, error_code, 3, SIGTRAP)
 			== NOTIFY_STOP)
 		return;
@@ -810,6 +838,11 @@ fastcall void __kprobes do_debug(struct pt_regs * regs, long error_code)
 	struct task_struct *tsk = current;
 
 	get_debugreg(condition, 6);
+
+#ifdef	CONFIG_KDB
+	if (kdb(KDB_REASON_DEBUG, error_code, regs))
+		return;
+#endif	/* CONFIG_KDB */
 
 	if (notify_die(DIE_DEBUG, "debug", regs, condition, error_code,
 					SIGTRAP) == NOTIFY_STOP)
@@ -863,6 +896,16 @@ clear_TF_reenable:
 	regs->eflags &= ~TF_MASK;
 	return;
 }
+
+#if	defined(CONFIG_KDB) && !defined(CONFIG_KPROBES)
+fastcall void do_int3(struct pt_regs * regs, long error_code)
+{
+	if (kdb(KDB_REASON_BREAK, error_code, regs))
+		return;
+	do_trap(3, SIGTRAP, "int3", 1, regs, error_code, NULL);
+}
+#endif	/* CONFIG_KDB && !CONFIG_KPROBES */
+
 
 /*
  * Note that we play around with the 'TS' bit in an attempt to get

@@ -18,6 +18,10 @@
 #error "This file is PCI bus glue.  CONFIG_PCI must be defined."
 #endif
 
+#ifdef	CONFIG_KDB_USB
+#include <linux/kdb.h>
+#endif
+
 /*-------------------------------------------------------------------------*/
 
 static int
@@ -109,6 +113,11 @@ ohci_pci_start (struct usb_hcd *hcd)
 		ohci_stop (hcd);
 		return ret;
 	}
+
+#ifdef	CONFIG_KDB_USB
+	kdb_usb_infos.poll_func = ohci_kdb_poll;
+	kdb_usb_infos.uhci = NULL; /* not used */
+#endif
 	return 0;
 }
 

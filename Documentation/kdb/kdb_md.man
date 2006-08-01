@@ -1,0 +1,136 @@
+.TH MD 1 "August 4, 2004"
+.SH NAME
+md, mdWcN, mdr, mds, mm, mmW\- Memory manipulation commands
+.SH SYNOPSIS
+md [ \fIaddress-expression\fP [ \fIline-count\fP [\fIoutput-radix\fP ] ] ]
+.LP
+md\fIW\fRc\fIn\fR [ \fIaddress-expression\fP [ \fIline-count\fP [\fIoutput-radix\fP ] ] ]
+.LP
+mdp \fIphysical-address-expression\fP,\fIbytes\fP
+.LP
+mdr \fIaddress-expression\fP,\fIbytes\fP
+.LP
+mds [ \fIaddress-expression\fP [ \fIline-count\fP [\fIoutput-radix\fP ] ] ]
+.LP
+mm \fIaddress-expression\fP \fInew-contents\fP
+.LP
+mm\fIW\fR \fIaddress-expression\fP \fInew-contents\fP
+.SH DESCRIPTION
+The
+.B md
+command is used to display the contents of memory.
+The \fIaddress-expression\fP may be a numeric value (decimal or
+hexidecimal), a symbol name, a register name preceeded by one or more
+percent symbols '%', an environment variable name preceeded by
+a currency symbol '$',  or a simple expression consisting of a
+symbol name, an addition or subtraction character and a numeric
+value (decimal or hexidecimal).
+.P
+If an address is specified and the \fIline-count\fP or \fIradix\fP arguments
+are omitted, they default to the values of the \fBMDCOUNT\fP and \fBRADIX\fP
+environment variables respectively.  If the \fBMDCOUNT\fP or \fBRADIX\fP
+environment variables are unset, the appropriate defaults will be used [see
+\fBENVIRONMENT\fP below].  If no address is specified then md resumes
+after the last address printed, using the previous values of count and
+radix.  The start address is rounded down to a multiple of the
+BYTESPERWORD (md) or width (md\fIW\fR).
+.P
+md uses the current value of environment variable \fBBYTESPERWORD\fP to
+read the data.  When reading hardware registers that require special
+widths, it is more convenient to use md\fIW\fRc\fIn\fR where \fIW\fR is
+the width for this command and \fRc\fIn\fR is the number of entries to
+read.  For example, md1c20 reads 20 bytes, 1 at a time.  To continue
+printing just type md, the width and count apply to following md
+commands with no parameters.  \fBNote:\fR The count is the number of
+repeats of the width, unlike MDCOUNT which gives the number of md lines
+to print.
+.P
+The
+.B mdp
+command displays the contents of physical memory, starting at the
+specified physical address for the specified number of bytes.
+The address is preceded by 'phys'.
+.P
+The
+.B mdr
+command displays the raw contents of memory, starting at the specified
+address for the specified number of bytes.
+The data is printed in one line without a leading address and no
+trailing character conversion.
+.B mdr
+is intended for interfacing with external debuggers, it is of little
+use to humans.
+.P
+The
+.B mds
+command displays the contents of memory one word per line and
+attempts to correlate the contents of each word with a symbol
+in the symbol table.   If no symbol is found, the ascii representation
+of the word is printed, otherwise the symbol name and offset from
+symbol value are printed.
+By default the section data is printed for kernel symbols.
+.P
+The
+.B mm
+and
+\fBmm\fIW\fR
+commands allow modification of memory.   The bytes at the address
+represented by \fIaddress-expression\fP are changed to
+\fInew-contents\fP.  \fInew-contents\fP is allowed to be an
+\fIaddress-expression\fP.
+.B mm
+changes a machine word, \fBmm\fIW\fR changes \fIW\fR bytes at that
+address.
+.SH LIMITATIONS
+None.
+.SH ENVIRONMENT
+.TP 8
+MDCOUNT
+This environment variable (default=8) defines the number of lines
+that will be displayed by each invocation of the \fBmd\fP command.
+
+.TP 8
+RADIX
+This environment variable (default=16) defines the radix used to
+print the memory contents.
+
+.TP 8
+BYTESPERWORD
+This environment variable (default=4) selects the width of output
+data when printing memory contents.  Select the value two to get
+16-bit word output, select the value one to get byte output.
+
+.TP 8
+LINES
+This environment variable governs the number of lines of output
+that will be presented before the kernel debugger built-in pager
+pauses the output.   This variable only affects the functioning
+of the \fBmd\fP and \fBmds\fP if the \fBMDCOUNT\fP variable
+is set to a value greater than the \fBLINES\fP variable.
+
+.TP 8
+NOSECT
+If the \fBNOSECT\fP environment variable is non-zero then the
+section information is suppressed.
+The default is NOSECT=1 so section data is suppressed; use set\ NOSECT=0
+to see section information.
+.SH SMP CONSIDERATIONS
+None.
+.SH EXAMPLES
+.TP 8
+md %edx
+Display memory starting at the address contained in register \fB%edx\fP.
+
+.TP 8
+mds %esp
+Display stack contents symbolically.   This command is quite useful
+in manual stack traceback.
+
+.TP 8
+mm 0xc0252110 0x25
+Change the memory location at 0xc0252110 to the value 0x25.
+
+.TP 8
+md chrdev_table 15
+Display 15 lines (at 16 bytes per line) starting at address
+represented by the symbol \fIchrdev_table\fP.

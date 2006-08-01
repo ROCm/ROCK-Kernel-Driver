@@ -587,6 +587,24 @@ ENTRY(name)				\
 /* The include is where all of the SMP etc. interrupts come from */
 #include "entry_arch.h"
 
+#ifdef	CONFIG_KDB
+
+ENTRY(kdb_call)
+	pushl %eax              # save orig EAX
+	SAVE_ALL
+	pushl %esp              # struct pt_regs
+	pushl $0                # error_code
+	pushl $1                # KDB_REASON_ENTER
+	call  kdb
+	addl  $12,%esp          # remove args
+	jmp restore_all
+
+#ifdef	CONFIG_SMP
+BUILD_INTERRUPT(kdb_interrupt,KDB_VECTOR)
+#endif	/* CONFIG_SMP */
+
+#endif	/* CONFIG_KDB */
+
 ENTRY(divide_error)
 	RING0_INT_FRAME
 	pushl $0			# no error code

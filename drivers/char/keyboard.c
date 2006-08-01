@@ -39,6 +39,9 @@
 #include <linux/sysrq.h>
 #include <linux/input.h>
 #include <linux/reboot.h>
+#ifdef	CONFIG_KDB
+#include <linux/kdb.h>
+#endif	/* CONFIG_KDB */
 
 static void kbd_disconnect(struct input_handle *handle);
 extern void ctrl_alt_del(void);
@@ -1162,6 +1165,13 @@ static void kbd_keycode(unsigned int keycode, int down,
 		if (emulate_raw(vc, keycode, !down << 7))
 			if (keycode < BTN_MISC)
 				printk(KERN_WARNING "keyboard.c: can't emulate rawmode for keycode %d\n", keycode);
+
+#ifdef	CONFIG_KDB
+	if (down && !rep && keycode == KEY_PAUSE && kdb_on == 1) {
+		kdb(KDB_REASON_KEYBOARD, 0, regs);
+		return;
+	}
+#endif	/* CONFIG_KDB */
 
 #ifdef CONFIG_BOOTSPLASH
 	/* This code has to be redone for some non-x86 platforms */

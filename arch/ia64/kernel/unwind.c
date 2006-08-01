@@ -57,13 +57,27 @@
 
 #ifdef UNW_DEBUG
   static unsigned int unw_debug_level = UNW_DEBUG;
-#  define UNW_DEBUG_ON(n)	unw_debug_level >= n
-   /* Do not code a printk level, not all debug lines end in newline */
-#  define UNW_DPRINT(n, ...)  if (UNW_DEBUG_ON(n)) printk(__VA_ARGS__)
+#  ifdef CONFIG_KDB
+#    include <linux/kdb.h>
+#    include <linux/kdbprivate.h>
+#    define UNW_KMALLOC(s, f)	debug_kmalloc(s, f)
+#    define UNW_KFREE(p)	debug_kfree(p)
+#    define UNW_DEBUG_ON(n)	(unw_debug_level >= n && !KDB_IS_RUNNING())
+#    define UNW_DPRINT(n, ...)	if (UNW_DEBUG_ON(n)) kdb_printf(__VA_ARGS__)
+#  else	/* !CONFIG_KDB */
+#    define UNW_DEBUG_ON(n)	unw_debug_level >= n
+     /* Do not code a printk level, not all debug lines end in newline */
+#    define UNW_DPRINT(n, ...)  if (UNW_DEBUG_ON(n)) printk(__VA_ARGS__)
+#    define UNW_KMALLOC(s, f)	kmalloc(s, f)
+#    define UNW_KFREE(p)	kfree(p)
+#  endif /* CONFIG_KDB */
+#  undef inline
 #  define inline
 #else /* !UNW_DEBUG */
 #  define UNW_DEBUG_ON(n)  0
 #  define UNW_DPRINT(n, ...)
+#  define UNW_KMALLOC(s, f)	kmalloc(s, f)
+#  define UNW_KFREE(p)		kfree(p)
 #endif /* UNW_DEBUG */
 
 #if UNW_STATS
@@ -72,10 +86,10 @@
 # define STAT(x...)
 #endif
 
-#define alloc_reg_state()	kmalloc(sizeof(struct unw_reg_state), GFP_ATOMIC)
-#define free_reg_state(usr)	kfree(usr)
-#define alloc_labeled_state()	kmalloc(sizeof(struct unw_labeled_state), GFP_ATOMIC)
-#define free_labeled_state(usr)	kfree(usr)
+#define alloc_reg_state()	UNW_KMALLOC(sizeof(struct unw_reg_state), GFP_ATOMIC)
+#define free_reg_state(usr)	UNW_KFREE(usr)
+#define alloc_labeled_state()	UNW_KMALLOC(sizeof(struct unw_labeled_state), GFP_ATOMIC)
+#define free_labeled_state(usr)	UNW_KFREE(usr)
 
 typedef unsigned long unw_word;
 typedef unsigned char unw_hash_index_t;
@@ -2078,7 +2092,7 @@ unw_add_unwind_table (const char *name, unsigned long segment_base, unsigned lon
 		return NULL;
 	}
 
-	table = kmalloc(sizeof(*table), GFP_USER);
+	table = UNW_KMALLOC(sizeof(*table), GFP_USER);
 	if (!table)
 		return NULL;
 
@@ -2151,7 +2165,7 @@ unw_remove_unwind_table (void *handle)
 		write_unlock(&tmp->lock);
 	}
 
-	kfree(table);
+	UNW_KFREE(table);
 }
 
 static int __init
@@ -2185,7 +2199,7 @@ create_gate_table (void)
 		size += 3*8 + 8 + 8*UNW_LENGTH(*(u64 *) (segbase + entry->info_offset));
 	size += 8;	/* reserve space for "end of table" marker */
 
-	unw.gate_table = kmalloc(size, GFP_KERNEL);
+	unw.gate_table = UNW_KMALLOC(size, GFP_KERNEL);
 	if (!unw.gate_table) {
 		unw.gate_table_size = 0;
 		printk(KERN_ERR "%s: unable to create unwind data for gate page!\n", __FUNCTION__);

@@ -210,6 +210,118 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 #undef K
 }
 
+#ifdef	CONFIG_KDB
+#include <linux/kdb.h>
+#include <linux/kdbprivate.h>
+/* Like meminfo_read_proc() but without the locks and using kdb_printf() */
+void
+kdb_meminfo_read_proc(void)
+{
+	struct sysinfo i;
+	unsigned long inactive;
+	unsigned long active;
+	unsigned long free;
+	unsigned long committed;
+	unsigned long allowed;
+	struct vmalloc_info vmi;
+	long cached;
+
+	get_zone_counts(&active, &inactive, &free);
+
+/*
+ * display in kilobytes.
+ */
+#define K(x) ((x) << (PAGE_SHIFT - 10))
+	si_meminfo(&i);
+	kdb_si_swapinfo(&i);
+	committed = atomic_read(&vm_committed_space);
+	allowed = ((totalram_pages - hugetlb_total_pages())
+		* sysctl_overcommit_ratio / 100) + total_swap_pages;
+
+	cached = global_page_state(NR_FILE_PAGES) -
+			total_swapcache_pages - i.bufferram;
+	if (cached < 0)
+		cached = 0;
+
+	get_vmalloc_info(&vmi);
+
+	kdb_printf(
+		"MemTotal:     %8lu kB\n"
+		"MemFree:      %8lu kB\n"
+		"Buffers:      %8lu kB\n",
+		K(i.totalram),
+		K(i.freeram),
+		K(i.bufferram)
+		);
+	kdb_printf(
+		"Cached:       %8lu kB\n"
+		"SwapCached:   %8lu kB\n"
+		"Active:       %8lu kB\n",
+		K(cached),
+		K(total_swapcache_pages),
+		K(active)
+		);
+	kdb_printf(
+		"Inactive:     %8lu kB\n"
+		"HighTotal:    %8lu kB\n"
+		"HighFree:     %8lu kB\n",
+		K(inactive),
+		K(i.totalhigh),
+		K(i.freehigh)
+		);
+	kdb_printf(
+		"LowTotal:     %8lu kB\n"
+		"LowFree:      %8lu kB\n"
+		"SwapTotal:    %8lu kB\n",
+		K(i.totalram-i.totalhigh),
+		K(i.freeram-i.freehigh),
+		K(i.totalswap)
+		);
+	kdb_printf(
+		"SwapFree:     %8lu kB\n"
+		"Dirty:        %8lu kB\n"
+		"Writeback:    %8lu kB\n",
+		K(i.freeswap),
+		K(global_page_state(NR_FILE_DIRTY)),
+		K(global_page_state(NR_WRITEBACK))
+		);
+	kdb_printf(
+		"AnonPages:    %8lu kB\n"
+		"Mapped:       %8lu kB\n"
+		"Slab:         %8lu kB\n",
+		K(global_page_state(NR_ANON_PAGES)),
+		K(global_page_state(NR_FILE_MAPPED)),
+		K(global_page_state(NR_SLAB))
+		);
+	kdb_printf(
+		"PageTables:   %8lu kB\n"
+		"NFS Unstable: %8lu kB\n"
+		"Bounce:       %8lu kB\n",
+		K(global_page_state(NR_PAGETABLE)),
+		K(global_page_state(NR_UNSTABLE_NFS)),
+		K(global_page_state(NR_BOUNCE))
+		);
+	kdb_printf(
+		"CommitLimit:  %8lu kB\n"
+		"Committed_AS: %8lu kB\n"
+		"VmallocTotal: %8lu kB\n",
+		K(allowed),
+		K(committed),
+		(unsigned long)VMALLOC_TOTAL >> 10
+		);
+	kdb_printf(
+		"VmallocUsed:  %8lu kB\n"
+		"VmallocChunk: %8lu kB\n",
+		vmi.used >> 10,
+		vmi.largest_chunk >> 10
+		);
+
+#ifdef	CONFIG_HUGETLBFS
+	kdb_hugetlb_report_meminfo();
+#endif
+}
+#endif	/* CONFIG_KDB */
+
 extern struct seq_operations fragmentation_op;
 static int fragmentation_open(struct inode *inode, struct file *file)
 {

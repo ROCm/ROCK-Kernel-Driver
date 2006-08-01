@@ -96,6 +96,7 @@ drivers-$(CONFIG_PCI)			+= arch/i386/pci/
 # must be linked after kernel/
 drivers-$(CONFIG_OPROFILE)		+= arch/i386/oprofile/
 drivers-$(CONFIG_PM)			+= arch/i386/power/
+drivers-$(CONFIG_KDB)			+= arch/i386/kdb/
 
 CFLAGS += $(mflags-y)
 AFLAGS += $(mflags-y)

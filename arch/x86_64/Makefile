@@ -30,6 +30,7 @@ cflags-y	:=
 cflags-kernel-y	:=
 cflags-$(CONFIG_MK8) += $(call cc-option,-march=k8)
 cflags-$(CONFIG_MPSC) += $(call cc-option,-march=nocona)
+cflags-$(CONFIG_KDB) += $(call cc-option,-fno-optimize-sibling-calls,)
 cflags-$(CONFIG_GENERIC_CPU) += $(call cc-option,-mtune=generic)
 
 cflags-y += -m64
@@ -68,6 +69,7 @@ core-y					+= arch/x86_64/kernel/ \
 core-$(CONFIG_IA32_EMULATION)		+= arch/x86_64/ia32/
 drivers-$(CONFIG_PCI)			+= arch/x86_64/pci/
 drivers-$(CONFIG_OPROFILE)		+= arch/x86_64/oprofile/
+drivers-$(CONFIG_KDB)			+= arch/x86_64/kdb/
 
 boot := arch/x86_64/boot
 

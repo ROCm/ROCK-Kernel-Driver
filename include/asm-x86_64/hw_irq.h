@@ -33,6 +33,8 @@ struct hw_interrupt_type;
 #define IA32_SYSCALL_VECTOR	0x80
 
 
+#define KDBENTER_VECTOR         0x81
+
 /*
  * Vectors 0x20-0x2f are used for ISA interrupts.
  */

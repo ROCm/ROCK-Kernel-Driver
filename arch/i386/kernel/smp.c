@@ -25,6 +25,8 @@
 #include <asm/tlbflush.h>
 #include <mach_apic.h>
 
+#include <linux/config.h>
+
 /*
  *	Some notes on x86 processor bugs affecting SMP operation:
  *
@@ -230,6 +232,7 @@ void send_IPI_mask_sequence(cpumask_t mask, int vector)
 			 * program the ICR 
 			 */
 			cfg = __prepare_ICR(0, vector);
+
 			
 			/*
 			 * Send the IPI. The write to APIC_ICR fires this off.

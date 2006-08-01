@@ -44,6 +44,10 @@
 #define DRIVER_DESC "USB HID core driver"
 #define DRIVER_LICENSE "GPL"
 
+#ifdef	CONFIG_KDB_USB
+#include <linux/kdb.h>
+#endif
+
 static char *hid_types[] = {"Device", "Pointer", "Mouse", "Device", "Joystick",
 				"Gamepad", "Keyboard", "Keypad", "Multi-Axis Controller"};
 /*
@@ -1974,6 +1978,12 @@ static void hid_disconnect(struct usb_interface *intf)
 	if (!hid)
 		return;
 
+#ifdef CONFIG_KDB_USB
+	/* Unlink the KDB USB struct */
+	if (hid->urbin == kdb_usb_infos.urb)
+		memset(&kdb_usb_infos, 0, sizeof(kdb_usb_infos));
+#endif
+
 	spin_lock_irq(&hid->inlock);	/* Sync with error handler */
 	usb_set_intfdata(intf, NULL);
 	spin_unlock_irq(&hid->inlock);
@@ -2050,6 +2060,15 @@ static int hid_probe(struct usb_interface *intf, const struct usb_device_id *id)
 
 	printk(": USB HID v%x.%02x %s [%s] on %s\n",
 		hid->version >> 8, hid->version & 0xff, c, hid->name, path);
+
+#ifdef	CONFIG_KDB_USB
+	/* Initialization of the KDB structure */
+	if (!strcmp(c, "Keyboard")) {
+		kdb_usb_infos.urb = hid->urbin;
+		kdb_usb_infos.buffer = hid->inbuf;
+		kdb_usb_infos.reset_timer = NULL;
+	}
+#endif
 
 	return 0;
 }

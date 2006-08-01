@@ -151,7 +151,8 @@ enum
 	KERN_COMPAT_LOG=73,	/* int: print compat layer  messages */
 	KERN_MAX_LOCK_DEPTH=74,
 	KERN_UNSUPPORTED=75,	/* int: allow loading of unsupported modules */
-	KERN_RCU_MASK=76,       /* int: mask for slow rcu callback processing */
+	KERN_KDB=76,		/* int: kdb on/off */
+	KERN_RCU_MASK=77,       /* int: mask for slow rcu callback processing */
 };
 
 

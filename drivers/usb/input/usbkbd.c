@@ -80,6 +80,10 @@ struct usb_kbd {
 	dma_addr_t leds_dma;
 };
 
+#ifdef	CONFIG_KDB_USB
+#include <linux/kdb.h>
+#endif
+
 static void usb_kbd_irq(struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_kbd *kbd = urb->context;
@@ -295,6 +299,13 @@ static int usb_kbd_probe(struct usb_interface *iface,
 	usb_fill_int_urb(kbd->irq, dev, pipe,
 			 kbd->new, (maxp > 8 ? 8 : maxp),
 			 usb_kbd_irq, kbd, endpoint->bInterval);
+
+#ifdef	CONFIG_KDB_USB
+	/* Init the KDB structure */
+	kdb_usb_infos.urb = kbd->irq;
+	kdb_usb_infos.buffer = kbd->new;
+	kdb_usb_infos.reset_timer = NULL;
+#endif
 	kbd->irq->transfer_dma = kbd->new_dma;
 	kbd->irq->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
 
@@ -327,6 +338,11 @@ static void usb_kbd_disconnect(struct usb_interface *intf)
 	struct usb_kbd *kbd = usb_get_intfdata (intf);
 
 	usb_set_intfdata(intf, NULL);
+#ifdef CONFIG_KDB_USB
+       /* Unlink the KDB USB struct */
+       if (kbd && kbd->irq == kdb_usb_infos.urb)
+               memset(&kdb_usb_infos, 0, sizeof(kdb_usb_infos));
+#endif /* CONFIG_KDB_USB */
 	if (kbd) {
 		usb_kill_urb(kbd->irq);
 		input_unregister_device(kbd->dev);

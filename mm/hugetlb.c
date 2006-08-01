@@ -245,6 +245,25 @@ int hugetlb_sysctl_handler(struct ctl_table *table, int write,
 }
 #endif /* CONFIG_SYSCTL */
 
+#ifdef	CONFIG_KDB
+#include <linux/kdb.h>
+#include <linux/kdbprivate.h>
+/* Like hugetlb_report_meminfo() but using kdb_printf() */
+void
+kdb_hugetlb_report_meminfo(void)
+{
+	kdb_printf(
+		"HugePages_Total: %5lu\n"
+		"HugePages_Free:  %5lu\n"
+		"HugePages_Rsvd:  %5lu\n"
+		"Hugepagesize:    %5lu kB\n",
+		nr_huge_pages,
+		free_huge_pages,
+		resv_huge_pages,
+		HPAGE_SIZE/1024);
+}
+#endif	/* CONFIG_KDB */
+
 int hugetlb_report_meminfo(char *buf)
 {
 	return sprintf(buf,
