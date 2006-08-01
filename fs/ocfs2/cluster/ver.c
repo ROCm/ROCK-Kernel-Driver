@@ -28,13 +28,9 @@
 
 #include "ver.h"
 
-#define CLUSTER_BUILD_VERSION	"1.2.1-SLES"
-#define CLUSTER_BUILD_DATE	"Tue Apr 25 14:46:36 PDT 2006"
-#define CLUSTER_BUILD_MD5	"sles"
+#define CLUSTER_BUILD_VERSION "1.3.3"
 
-#define VERSION_STR "OCFS2 Node Manager " \
-	CLUSTER_BUILD_VERSION " " CLUSTER_BUILD_DATE \
-	" (build " CLUSTER_BUILD_MD5 ")"
+#define VERSION_STR "OCFS2 Node Manager " CLUSTER_BUILD_VERSION
 
 void cluster_print_version(void)
 {
@@ -43,6 +39,4 @@ void cluster_print_version(void)
 
 MODULE_DESCRIPTION(VERSION_STR);
 
-#ifdef MODULE_VERSION
 MODULE_VERSION(CLUSTER_BUILD_VERSION);
-#endif

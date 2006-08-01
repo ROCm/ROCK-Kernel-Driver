@@ -227,7 +227,7 @@ struct rme32 {
 	struct snd_kcontrol *spdif_ctl;
 };
 
-static struct pci_device_id snd_rme32_ids[] = {
+static struct pci_device_id snd_rme32_ids[] __devinitdata = {
 	{PCI_VENDOR_ID_XILINX_RME, PCI_DEVICE_ID_RME_DIGI32,
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0,},
 	{PCI_VENDOR_ID_XILINX_RME, PCI_DEVICE_ID_RME_DIGI32_8,
@@ -313,7 +313,7 @@ static int snd_rme32_capture_copy(struct snd_pcm_substream *substream, int chann
 }
 
 /*
- * SPDIF I/O capabilites (half-duplex mode)
+ * SPDIF I/O capabilities (half-duplex mode)
  */
 static struct snd_pcm_hardware snd_rme32_spdif_info = {
 	.info =		(SNDRV_PCM_INFO_MMAP_IOMEM |
@@ -339,7 +339,7 @@ static struct snd_pcm_hardware snd_rme32_spdif_info = {
 };
 
 /*
- * ADAT I/O capabilites (half-duplex mode)
+ * ADAT I/O capabilities (half-duplex mode)
  */
 static struct snd_pcm_hardware snd_rme32_adat_info =
 {
@@ -364,7 +364,7 @@ static struct snd_pcm_hardware snd_rme32_adat_info =
 };
 
 /*
- * SPDIF I/O capabilites (full-duplex mode)
+ * SPDIF I/O capabilities (full-duplex mode)
  */
 static struct snd_pcm_hardware snd_rme32_spdif_fd_info = {
 	.info =		(SNDRV_PCM_INFO_MMAP |
@@ -390,7 +390,7 @@ static struct snd_pcm_hardware snd_rme32_spdif_fd_info = {
 };
 
 /*
- * ADAT I/O capabilites (full-duplex mode)
+ * ADAT I/O capabilities (full-duplex mode)
  */
 static struct snd_pcm_hardware snd_rme32_adat_fd_info =
 {

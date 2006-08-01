@@ -51,20 +51,7 @@ struct o2nm_node {
 	int			nd_local;
 
 	unsigned long		nd_set_attributes;
-	atomic_t		nd_count;
 };
-
-struct o2nm_cluster {
-	struct config_group	cl_group;
-	unsigned		cl_has_local:1;
-	u8			cl_local_node;
-	rwlock_t		cl_nodes_lock;
-	struct o2nm_node  	*cl_nodes[O2NM_MAX_NODES];
-	struct rb_root		cl_node_ip_tree;
-	/* this bitmap is part of a hack for disk bitmap.. will go eventually. - zab */
-	unsigned long	cl_nodes_bitmap[BITS_TO_LONGS(O2NM_MAX_NODES)];
-};
-extern struct o2nm_cluster *o2nm_single_cluster;
 
 u8 o2nm_this_node(void);
 
@@ -73,10 +60,5 @@ struct o2nm_node *o2nm_get_node_by_num(u8 node_num);
 struct o2nm_node *o2nm_get_node_by_ip(__be32 addr);
 void o2nm_node_get(struct o2nm_node *node);
 void o2nm_node_put(struct o2nm_node *node);
-
-static inline struct o2nm_node *to_o2nm_node(struct config_item *item)
-{
-	return container_of(item, struct o2nm_node, nd_item);
-}
 
 #endif /* O2CLUSTER_NODEMANAGER_H */

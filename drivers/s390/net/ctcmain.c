@@ -6,7 +6,7 @@
  * Fixes by : Jochen Röhrig (roehrig@de.ibm.com)
  *            Arnaldo Carvalho de Melo <acme@conectiva.com.br>
 	      Peter Tiedemann (ptiedem@de.ibm.com)
- * Driver Model stuff by : Cornelia Huck <cornelia.huck@de.ibm.com>
+ * Driver Model stuff by : Cornelia Huck <huckc@de.ibm.com>
  *
  * Documentation used:
  *  - Principles of Operation (IBM doc#: SA22-7201-06)
@@ -65,6 +65,7 @@
 
 #include <asm/idals.h>
 
+#include "ctctty.h"
 #include "fsm.h"
 #include "cu3088.h"
 
@@ -478,7 +479,10 @@ ctc_unpack_skb(struct channel *ch, struct sk_buff *pskb)
 		skb->dev = pskb->dev;
 		skb->protocol = pskb->protocol;
 		pskb->ip_summed = CHECKSUM_UNNECESSARY;
-		netif_rx_ni(skb);
+		if (ch->protocol == CTC_PROTO_LINUX_TTY)
+			ctc_tty_netif_rx(skb);
+		else
+			netif_rx_ni(skb);
 		/**
 		 * Successful rx; reset logflags
 		 */
@@ -553,7 +557,8 @@ ccw_unit_check(struct channel *ch, unsigned char sense)
 	DBF_TEXT(trace, 5, __FUNCTION__);
 	if (sense & SNS0_INTERVENTION_REQ) {
 		if (sense & 0x01) {
-			ctc_pr_debug("%s: Interface disc. or Sel. reset "
+			if (ch->protocol != CTC_PROTO_LINUX_TTY)
+				ctc_pr_debug("%s: Interface disc. or Sel. reset "
 					"(remote)\n", ch->id);
 			fsm_event(ch->fsm, CH_EVENT_UC_RCRESET, ch);
 		} else {
@@ -1481,13 +1486,13 @@ ch_action_iofatal(fsm_instance * fi, int event, void *arg)
 	}
 }
 
-static void 
+static void
 ch_action_reinit(fsm_instance *fi, int event, void *arg)
 {
  	struct channel *ch = (struct channel *)arg;
  	struct net_device *dev = ch->netdev;
  	struct ctc_priv *privptr = dev->priv;
- 
+
 	DBF_TEXT(trace, 4, __FUNCTION__);
  	ch_action_iofatal(fi, event, arg);
  	fsm_addtimer(&privptr->restart_timer, 1000, DEV_EVENT_RESTART, dev);
@@ -1619,7 +1624,7 @@ less_than(char *id1, char *id2)
 	}
 	dev1 = simple_strtoul(id1, &id1, 16);
 	dev2 = simple_strtoul(id2, &id2, 16);
-	
+
 	return (dev1 < dev2);
 }
 
@@ -1890,7 +1895,7 @@ ctc_irq_handler(struct ccw_device *cdev, unsigned long intparm, struct irb *irb)
 			    irb->scsw.dstat);
 		return;
 	}
-	
+
 	priv = ((struct ccwgroup_device *)cdev->dev.driver_data)
 		->dev.driver_data;
 
@@ -1904,7 +1909,7 @@ ctc_irq_handler(struct ccw_device *cdev, unsigned long intparm, struct irb *irb)
 			   "device %s\n", cdev->dev.bus_id);
 		return;
 	}
-	
+
 	dev = (struct net_device *) (ch->netdev);
 	if (dev == NULL) {
 		ctc_pr_crit("ctc: ctc_irq_handler dev=NULL bus_id=%s, ch=0x%p\n",
@@ -2003,12 +2008,12 @@ dev_action_stop(fsm_instance * fi, int event, void *arg)
 		fsm_event(ch->fsm, CH_EVENT_STOP, ch);
 	}
 }
-static void 
+static void
 dev_action_restart(fsm_instance *fi, int event, void *arg)
 {
 	struct net_device *dev = (struct net_device *)arg;
 	struct ctc_priv *privptr = dev->priv;
-	
+
 	DBF_TEXT(trace, 3, __FUNCTION__);
 	ctc_pr_debug("%s: Restarting\n", dev->name);
 	dev_action_stop(fi, event, arg);
@@ -2029,6 +2034,7 @@ static void
 dev_action_chup(fsm_instance * fi, int event, void *arg)
 {
 	struct net_device *dev = (struct net_device *) arg;
+	struct ctc_priv *privptr = dev->priv;
 
 	DBF_TEXT(trace, 3, __FUNCTION__);
 	switch (fsm_getstate(fi)) {
@@ -2043,6 +2049,8 @@ dev_action_chup(fsm_instance * fi, int event, void *arg)
 				fsm_newstate(fi, DEV_STATE_RUNNING);
 				ctc_pr_info("%s: connected with remote side\n",
 					    dev->name);
+				if (privptr->protocol == CTC_PROTO_LINUX_TTY)
+					ctc_tty_setcarrier(dev, 1);
 				ctc_clear_busy(dev);
 			}
 			break;
@@ -2051,6 +2059,8 @@ dev_action_chup(fsm_instance * fi, int event, void *arg)
 				fsm_newstate(fi, DEV_STATE_RUNNING);
 				ctc_pr_info("%s: connected with remote side\n",
 					    dev->name);
+				if (privptr->protocol == CTC_PROTO_LINUX_TTY)
+					ctc_tty_setcarrier(dev, 1);
 				ctc_clear_busy(dev);
 			}
 			break;
@@ -2076,10 +2086,14 @@ dev_action_chup(fsm_instance * fi, int event, void *arg)
 static void
 dev_action_chdown(fsm_instance * fi, int event, void *arg)
 {
+	struct net_device *dev = (struct net_device *) arg;
+	struct ctc_priv *privptr = dev->priv;
 
 	DBF_TEXT(trace, 3, __FUNCTION__);
 	switch (fsm_getstate(fi)) {
 		case DEV_STATE_RUNNING:
+			if (privptr->protocol == CTC_PROTO_LINUX_TTY)
+				ctc_tty_setcarrier(dev, 0);
 			if (event == DEV_EVENT_TXDOWN)
 				fsm_newstate(fi, DEV_STATE_STARTWAIT_TX);
 			else
@@ -2179,7 +2193,7 @@ transmit_skb(struct channel *ch, struct sk_buff *skb)
 
 	DBF_TEXT(trace, 5, __FUNCTION__);
 	/* we need to acquire the lock for testing the state
-	 * otherwise we can have an IRQ changing the state to 
+	 * otherwise we can have an IRQ changing the state to
 	 * TXIDLE after the test but before acquiring the lock.
 	 */
 	spin_lock_irqsave(&ch->collect_lock, saveflags);
@@ -2379,10 +2393,12 @@ ctc_tx(struct sk_buff *skb, struct net_device * dev)
 
 	/**
 	 * If channels are not running, try to restart them
-	 * and throw away packet. 
+	 * and throw away packet.
 	 */
 	if (fsm_getstate(privptr->fsm) != DEV_STATE_RUNNING) {
 		fsm_event(privptr->fsm, DEV_EVENT_START, dev);
+		if (privptr->protocol == CTC_PROTO_LINUX_TTY)
+			return -EBUSY;
 		dev_kfree_skb(skb);
 		privptr->stats.tx_dropped++;
 		privptr->stats.tx_errors++;
@@ -2592,13 +2608,20 @@ ctc_netdev_unregister(struct net_device * dev)
 	if (!dev)
 		return;
 	privptr = (struct ctc_priv *) dev->priv;
-	unregister_netdev(dev);
+	if (privptr->protocol != CTC_PROTO_LINUX_TTY)
+		unregister_netdev(dev);
+	else
+		ctc_tty_unregister_netdev(dev);
 }
 
 static int
 ctc_netdev_register(struct net_device * dev)
 {
-	return register_netdev(dev);
+	struct ctc_priv *privptr = (struct ctc_priv *) dev->priv;
+	if (privptr->protocol != CTC_PROTO_LINUX_TTY)
+		return register_netdev(dev);
+	else
+		return ctc_tty_register_netdev(dev);
 }
 
 static void
@@ -2644,9 +2667,7 @@ ctc_proto_store(struct device *dev, struct device_attribute *attr, const char *b
 	if (!priv)
 		return -ENODEV;
 	sscanf(buf, "%u", &value);
-	if (!((value == CTC_PROTO_S390)  ||
-	      (value == CTC_PROTO_LINUX) ||
-	      (value == CTC_PROTO_OS390)))
+	if ((value < 0) || (value > CTC_PROTO_MAX))
 		return -EINVAL;
 	priv->protocol = value;
 
@@ -2717,7 +2738,7 @@ ctc_remove_files(struct device *dev)
 /**
  * Add ctc specific attributes.
  * Add ctc private data.
- * 
+ *
  * @param cgdev pointer to ccwgroup_device just added
  *
  * @returns 0 on success, !0 on failure.
@@ -2848,7 +2869,7 @@ ctc_new_device(struct ccwgroup_device *cgdev)
 	DBF_TEXT(setup, 3, buffer);
 
 	type = get_channel_type(&cgdev->cdev[0]->id);
-	
+
 	snprintf(read_id, CTC_ID_SIZE, "ch-%s", cgdev->cdev[0]->dev.bus_id);
 	snprintf(write_id, CTC_ID_SIZE, "ch-%s", cgdev->cdev[1]->dev.bus_id);
 
@@ -2876,14 +2897,17 @@ ctc_new_device(struct ccwgroup_device *cgdev)
 		goto out;
 	}
 
-	strlcpy(dev->name, "ctc%d", IFNAMSIZ);
+	if (privptr->protocol == CTC_PROTO_LINUX_TTY)
+		strlcpy(dev->name, "ctctty%d", IFNAMSIZ);
+	else
+		strlcpy(dev->name, "ctc%d", IFNAMSIZ);
 
 	for (direction = READ; direction <= WRITE; direction++) {
 		privptr->channel[direction] =
 		    channel_get(type, direction == READ ? read_id : write_id,
 				direction);
 		if (privptr->channel[direction] == NULL) {
-			if (direction == WRITE) 
+			if (direction == WRITE)
 				channel_free(privptr->channel[READ]);
 
 			ctc_free_netdevice(dev, 1);
@@ -2931,7 +2955,7 @@ ctc_shutdown_device(struct ccwgroup_device *cgdev)
 {
 	struct ctc_priv *priv;
 	struct net_device *ndev;
-		
+
 	DBF_TEXT(setup, 3, __FUNCTION__);
 	pr_debug("%s() called\n", __FUNCTION__);
 
@@ -3022,6 +3046,7 @@ ctc_exit(void)
 {
 	DBF_TEXT(setup, 3, __FUNCTION__);
 	unregister_cu3088_discipline(&ctc_group_driver);
+	ctc_tty_cleanup();
 	ctc_unregister_dbf_views();
 	ctc_pr_info("CTC driver unloaded\n");
 }
@@ -3048,8 +3073,10 @@ ctc_init(void)
 		ctc_pr_crit("ctc_init failed with ctc_register_dbf_views rc = %d\n", ret);
 		return ret;
 	}
+	ctc_tty_init();
 	ret = register_cu3088_discipline(&ctc_group_driver);
 	if (ret) {
+		ctc_tty_cleanup();
 		ctc_unregister_dbf_views();
 	}
 	return ret;

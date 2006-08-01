@@ -1123,8 +1123,8 @@
           if ((err = pci_enable_device(pci)) < 0)
                   return err;
           /* check PCI availability (28bit DMA) */
-          if (pci_set_dma_mask(pci, 0x0fffffff) < 0 ||
-              pci_set_consistent_dma_mask(pci, 0x0fffffff) < 0) {
+          if (pci_set_dma_mask(pci, DMA_28BIT_MASK) < 0 ||
+              pci_set_consistent_dma_mask(pci, DMA_28BIT_MASK) < 0) {
                   printk(KERN_ERR "error to set 28bit mask DMA\n");
                   pci_disable_device(pci);
                   return -ENXIO;
@@ -1172,7 +1172,7 @@
   }        
 
   /* PCI IDs */
-  static struct pci_device_id snd_mychip_ids[] = {
+  static struct pci_device_id snd_mychip_ids[] __devinitdata = {
           { PCI_VENDOR_ID_FOO, PCI_DEVICE_ID_BAR,
             PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },
           ....
@@ -1216,7 +1216,7 @@
         The allocation of PCI resources is done in the
       <function>probe()</function> function, and usually an extra
       <function>xxx_create()</function> function is written for this
-      purpose. 
+      purpose.
       </para>
 
       <para>
@@ -1225,7 +1225,7 @@
       allocating resources. Also, you need to set the proper PCI DMA
       mask to limit the accessed i/o range. In some cases, you might
       need to call <function>pci_set_master()</function> function,
-      too. 
+      too.
       </para>
 
       <para>
@@ -1236,8 +1236,8 @@
 <![CDATA[
   if ((err = pci_enable_device(pci)) < 0)
           return err;
-  if (pci_set_dma_mask(pci, 0x0fffffff) < 0 ||
-      pci_set_consistent_dma_mask(pci, 0x0fffffff) < 0) {
+  if (pci_set_dma_mask(pci, DMA_28BIT_MASK) < 0 ||
+      pci_set_consistent_dma_mask(pci, DMA_28BIT_MASK) < 0) {
           printk(KERN_ERR "error to set 28bit mask DMA\n");
           pci_disable_device(pci);
           return -ENXIO;
@@ -1256,13 +1256,13 @@
       functions. Unlike ALSA ver.0.5.x., there are no helpers for
       that. And these resources must be released in the destructor
       function (see below). Also, on ALSA 0.9.x, you don't need to
-      allocate (pseudo-)DMA for PCI like ALSA 0.5.x. 
+      allocate (pseudo-)DMA for PCI like ALSA 0.5.x.
       </para>
 
       <para>
         Now assume that this PCI device has an I/O port with 8 bytes
         and an interrupt. Then struct <structname>mychip</structname> will have the
-        following fields: 
+        following fields:
 
         <informalexample>
           <programlisting>
@@ -1565,7 +1565,7 @@
         <informalexample>
           <programlisting>
 <![CDATA[
-  static struct pci_device_id snd_mychip_ids[] = {
+  static struct pci_device_id snd_mychip_ids[] __devinitdata = {
           { PCI_VENDOR_ID_FOO, PCI_DEVICE_ID_BAR,
             PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },
           ....
@@ -1834,7 +1834,7 @@
           mychip_set_sample_format(chip, runtime->format);
           mychip_set_sample_rate(chip, runtime->rate);
           mychip_set_channels(chip, runtime->channels);
-          mychip_set_dma_setup(chip, runtime->dma_area,
+          mychip_set_dma_setup(chip, runtime->dma_addr,
                                chip->buffer_size,
                                chip->period_size);
           return 0;
@@ -2836,7 +2836,7 @@ struct _snd_pcm_runtime {
 
         <para>
 	Note that this callback became non-atomic since the recent version.
-	You can use schedule-related fucntions safely in this callback now.
+	You can use schedule-related functions safely in this callback now.
         </para>
 
         <para>
@@ -3388,7 +3388,7 @@ struct _snd_pcm_runtime {
           .name = "PCM Playback Switch",
           .index = 0,
           .access = SNDRV_CTL_ELEM_ACCESS_READWRITE,
-          .private_values = 0xffff,
+          .private_value = 0xffff,
           .info = my_control_info,
           .get = my_control_get,
           .put = my_control_put
@@ -3449,7 +3449,7 @@ struct _snd_pcm_runtime {
       </para>
 
       <para>
-        The <structfield>private_values</structfield> field contains
+        The <structfield>private_value</structfield> field contains
       an arbitrary long integer value for this record. When using
       generic <structfield>info</structfield>,
       <structfield>get</structfield> and

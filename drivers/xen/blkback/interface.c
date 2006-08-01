@@ -35,7 +35,7 @@
 
 static kmem_cache_t *blkif_cachep;
 
-blkif_t *blkif_alloc(domid_t domid)
+blkif_t *alloc_blkif(domid_t domid)
 {
 	blkif_t *blkif;
 
@@ -50,7 +50,6 @@ blkif_t *blkif_alloc(domid_t domid)
 	atomic_set(&blkif->refcnt, 1);
 	init_waitqueue_head(&blkif->wq);
 	blkif->st_print = jiffies;
-	init_waitqueue_head(&blkif->waiting_to_free);
 
 	return blkif;
 }
@@ -145,23 +144,31 @@ int blkif_map(blkif_t *blkif, unsigned long shared_page, unsigned int evtchn)
 	return 0;
 }
 
-void blkif_free(blkif_t *blkif)
+static void free_blkif(void *arg)
 {
-	atomic_dec(&blkif->refcnt);
-	wait_event(blkif->waiting_to_free, atomic_read(&blkif->refcnt) == 0);
+	blkif_t *blkif = (blkif_t *)arg;
 
 	/* Already disconnected? */
-	if (blkif->irq)
+	if (blkif->irq) {
 		unbind_from_irqhandler(blkif->irq, blkif);
+		blkif->irq = 0;
+	}
 
 	vbd_free(&blkif->vbd);
 
 	if (blkif->blk_ring.sring) {
 		unmap_frontend_page(blkif);
 		free_vm_area(blkif->blk_ring_area);
+		blkif->blk_ring.sring = NULL;
 	}
 
 	kmem_cache_free(blkif_cachep, blkif);
+}
+
+void free_blkif_callback(blkif_t *blkif)
+{
+	INIT_WORK(&blkif->free_work, free_blkif, (void *)blkif);
+	schedule_work(&blkif->free_work);
 }
 
 void __init blkif_interface_init(void)
@@ -169,3 +176,13 @@ void __init blkif_interface_init(void)
 	blkif_cachep = kmem_cache_create("blkif_cache", sizeof(blkif_t), 
 					 0, 0, NULL, NULL);
 }
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

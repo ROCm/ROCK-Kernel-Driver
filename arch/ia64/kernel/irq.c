@@ -101,7 +101,6 @@ void set_irq_affinity_info (unsigned int irq, int hwid, int redir)
 
 	if (irq < NR_IRQS) {
 		irq_affinity[irq] = mask;
-		set_irq_info(irq, mask);
 		irq_redir[irq] = (char) (redir & 0xff);
 	}
 }
@@ -163,8 +162,19 @@ void fixup_irqs(void)
 {
 	unsigned int irq;
 	extern void ia64_process_pending_intr(void);
+	extern void ia64_disable_timer(void);
+	extern volatile int time_keeper_id;
 
-	ia64_set_itv(1<<16);
+	ia64_disable_timer();
+
+	/*
+	 * Find a new timesync master
+	 */
+	if (smp_processor_id() == time_keeper_id) {
+		time_keeper_id = first_cpu(cpu_online_map);
+		printk ("CPU %d is now promoted to time-keeper master\n", time_keeper_id);
+	}
+
 	/*
 	 * Phase 1: Locate irq's bound to this cpu and
 	 * relocate them for cpu removal.

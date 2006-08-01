@@ -570,10 +570,27 @@ static int __init blkif_init(void)
 		list_add_tail(&pending_reqs[i].free_list, &pending_free);
     
 	blkif_xenbus_init();
-
+	__unsafe(THIS_MODULE);
 	return 0;
 }
 
 module_init(blkif_init);
 
+static void blkif_exit(void)
+{
+	BUG();
+}
+
+module_exit(blkif_exit);
+
 MODULE_LICENSE("Dual BSD/GPL");
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

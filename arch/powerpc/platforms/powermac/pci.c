@@ -1115,7 +1115,7 @@ pmac_pci_enable_device_hook(struct pci_dev *dev, int initial)
 	 * (iBook second controller)
 	 */
 	if (dev->vendor == PCI_VENDOR_ID_APPLE
-	    && (dev->class == ((PCI_CLASS_SERIAL_USB << 8) | 0x10))
+	    && dev->class == PCI_CLASS_SERIAL_USB_OHCI
 	    && !node) {
 		printk(KERN_INFO "Apple USB OHCI %s disabled by firmware\n",
 		       pci_name(dev));
@@ -1219,7 +1219,7 @@ void __init pmac_pcibios_after_init(void)
 #ifdef CONFIG_PPC32
 void pmac_pci_fixup_cardbus(struct pci_dev* dev)
 {
-	if (_machine != _MACH_Pmac)
+	if (!machine_is(powermac))
 		return;
 	/*
 	 * Fix the interrupt routing on the various cardbus bridges
@@ -1262,8 +1262,9 @@ void pmac_pci_fixup_pciata(struct pci_dev* dev)
         * On PowerMacs, we try to switch any PCI ATA controller to
 	* fully native mode
         */
-	if (_machine != _MACH_Pmac)
+	if (!machine_is(powermac))
 		return;
+
 	/* Some controllers don't have the class IDE */
 	if (dev->vendor == PCI_VENDOR_ID_PROMISE)
 		switch(dev->device) {

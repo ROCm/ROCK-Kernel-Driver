@@ -38,8 +38,6 @@
 #include <int.h>
 #include <uart.h>
 
-extern asmlinkage void cp0_irqdispatch(void);
-
 static DEFINE_SPINLOCK(irq_lock);
 
 /* default prio for interrupts */
@@ -55,7 +53,7 @@ static char gic_prio[PNX8550_INT_GIC_TOTINT] = {
 	1			//  70
 };
 
-void hw0_irqdispatch(int irq, struct pt_regs *regs)
+static void hw0_irqdispatch(int irq, struct pt_regs *regs)
 {
 	/* find out which interrupt */
 	irq = PNX8550_GIC_VECTOR_0 >> 3;
@@ -68,7 +66,7 @@ void hw0_irqdispatch(int irq, struct pt_regs *regs)
 }
 
 
-void timer_irqdispatch(int irq, struct pt_regs *regs)
+static void timer_irqdispatch(int irq, struct pt_regs *regs)
 {
 	irq = (0x01c0 & read_c0_config7()) >> 6;
 
@@ -86,6 +84,20 @@ void timer_irqdispatch(int irq, struct pt_regs *regs)
 	if (irq & 0x4) {
 		do_IRQ(PNX8550_INT_TIMER3, regs);
 	}
+}
+
+asmlinkage void plat_irq_dispatch(struct pt_regs *regs)
+{
+	unsigned int pending = read_c0_status() & read_c0_cause();
+
+	if (pending & STATUSF_IP2)
+		do_IRQ(2, regs);
+	else if (pending & STATUSF_IP7) {
+		if (read_c0_config7() & 0x01c0)
+			timer_irqdispatch(7, regs);
+	}
+
+	spurious_interrupt(regs);
 }
 
 static inline void modify_cp0_intmask(unsigned clr_mask, unsigned set_mask)
@@ -223,9 +235,6 @@ void __init arch_init_irq(void)
 	int i;
 	int configPR;
 
-	/* init of cp0 interrupts */
-	set_except_vector(0, cp0_irqdispatch);
-
 	for (i = 0; i < PNX8550_INT_CP0_TOTINT; i++) {
 		irq_desc[i].handler = &level_irq_type;
 		pnx8550_ack(i);	/* mask the irq just in case  */
@@ -251,7 +260,7 @@ void __init arch_init_irq(void)
 		if (gic_int_line == (PNX8550_INT_GPIO0 - PNX8550_INT_GIC_MIN)) {
 			/* PCI INT through gpio 8, which is setup in
 			 * pnx8550_setup.c and routed to GPIO
- 			 * Interrupt Level 0 (GPIO Connection 58).
+			 * Interrupt Level 0 (GPIO Connection 58).
 			 * Set it active low. */
 
 			PNX8550_GIC_REQ(gic_int_line) = 0x1E020000;

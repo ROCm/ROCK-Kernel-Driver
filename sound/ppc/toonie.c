@@ -22,7 +22,6 @@
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/i2c.h>
-#include <linux/i2c-dev.h>
 #include <linux/kmod.h>
 #include <linux/slab.h>
 #include <linux/interrupt.h>
@@ -118,7 +117,7 @@ static int toonie_get_mute_switch(struct snd_kcontrol *kcontrol,
 		gp = &mix->amp_mute_gpio;
 		break;
 	default:
-		return -EINVAL;;
+		return -EINVAL;
 	}
 	ucontrol->value.integer.value[0] = !check_audio_gpio(gp);
 	return 0;
@@ -146,7 +145,7 @@ static int toonie_put_mute_switch(struct snd_kcontrol *kcontrol,
 		gp = &mix->amp_mute_gpio;
 		break;
 	default:
-		return -EINVAL;;
+		return -EINVAL;
 	}
 	val = ! check_audio_gpio(gp);
 	if (val != ucontrol->value.integer.value[0]) {
@@ -336,7 +335,7 @@ static void toonie_cleanup(struct snd_pmac *chip)
 	chip->mixer_data = NULL;
 }
 
-int snd_pmac_toonie_init(struct snd_pmac *chip)
+int __init snd_pmac_toonie_init(struct snd_pmac *chip)
 {
 	struct pmac_toonie *mix;
 

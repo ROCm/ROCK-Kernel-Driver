@@ -68,8 +68,6 @@ extern char * dmi_get_system_info(int field);
 extern struct dmi_device * dmi_find_device(int type, const char *name,
 	struct dmi_device *from);
 extern void dmi_scan_machine(void);
-
-extern int dmi_num_cpus;
 extern int dmi_get_year(int field);
 
 #else

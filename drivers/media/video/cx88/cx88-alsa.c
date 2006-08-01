@@ -303,7 +303,7 @@ static int dsp_buffer_free(snd_cx88_card_t *chip)
 	BUG_ON(!chip->dma_size);
 
 	dprintk(2,"Freeing buffer\n");
-	videobuf_dma_pci_unmap(chip->pci, &chip->dma_risc);
+	videobuf_pci_dma_unmap(chip->pci, &chip->dma_risc);
 	videobuf_dma_free(&chip->dma_risc);
 	btcx_riscmem_free(chip->pci,&chip->buf->risc);
 	kfree(chip->buf);
@@ -429,7 +429,7 @@ static int snd_cx88_hw_params(struct snd_pcm_substream * substream,
 	videobuf_dma_init_kernel(&buf->vb.dma,PCI_DMA_FROMDEVICE,
 			(PAGE_ALIGN(buf->vb.size) >> PAGE_SHIFT));
 
-	videobuf_dma_pci_map(chip->pci,&buf->vb.dma);
+	videobuf_pci_dma_map(chip->pci,&buf->vb.dma);
 
 
 	cx88_risc_databuffer(chip->pci, &buf->risc,
@@ -616,7 +616,7 @@ static struct snd_kcontrol_new snd_cx88_capture_volume = {
  * Only boards with eeprom and byte 1 at eeprom=1 have it
  */
 
-static struct pci_device_id cx88_audio_pci_tbl[] = {
+static struct pci_device_id cx88_audio_pci_tbl[] __devinitdata = {
 	{0x14f1,0x8801,PCI_ANY_ID,PCI_ANY_ID,0,0,0},
 	{0x14f1,0x8811,PCI_ANY_ID,PCI_ANY_ID,0,0,0},
 	{0, }
@@ -676,6 +676,11 @@ static int __devinit snd_cx88_create(struct snd_card *card,
 	chip = (snd_cx88_card_t *) card->private_data;
 
 	core = cx88_core_get(pci);
+	if (NULL == core) {
+		err = -EINVAL;
+		kfree (chip);
+		return err;
+	}
 
 	if (!pci_dma_supported(pci,0xffffffff)) {
 		dprintk(0, "%s/1: Oops: no 32bit PCI DMA ???\n",core->name);
@@ -692,11 +697,6 @@ static int __devinit snd_cx88_create(struct snd_card *card,
 	spin_lock_init(&chip->reg_lock);
 
 	cx88_reset(core);
-	if (NULL == core) {
-		err = -EINVAL;
-		kfree (chip);
-		return err;
-	}
 	chip->core = core;
 
 	/* get irq */

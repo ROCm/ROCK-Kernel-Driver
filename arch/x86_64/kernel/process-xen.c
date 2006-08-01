@@ -359,6 +359,7 @@ static inline void set_32bit_tls(struct task_struct *t, int tls, u32 addr)
 	struct user_desc ud = { 
 		.base_addr = addr,
 		.limit = 0xfffff,
+		.contents = (3 << 3), /* user */
 		.seg_32bit = 1,
 		.limit_in_pages = 1,
 		.useable = 1,
@@ -452,6 +453,13 @@ out:
 	return err;
 }
 
+static inline void __save_init_fpu( struct task_struct *tsk )
+{
+	asm volatile( "rex64 ; fxsave %0 ; fnclex"
+		      : "=m" (tsk->thread.i387.fxsave));
+	tsk->thread_info->status &= ~TS_USEDFPU;
+}
+
 /*
  *	switch_to(x,y) should switch tasks from x to y.
  *
@@ -472,6 +480,18 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 #endif
 	physdev_op_t iopl_op, iobmp_op;
 	multicall_entry_t _mcl[8], *mcl = _mcl;
+
+	/*
+	 * This is basically '__unlazy_fpu', except that we queue a
+	 * multicall to indicate FPU task switch, rather than
+	 * synchronously trapping to Xen.
+	 */
+	if (prev_p->thread_info->status & TS_USEDFPU) {
+		__save_init_fpu(prev_p); /* _not_ save_init_fpu() */
+		mcl->op      = __HYPERVISOR_fpu_taskswitch;
+		mcl->args[0] = 1;
+		mcl++;
+	}
 
 	/*
 	 * Reload esp0, LDT and the page table pointer:
@@ -549,20 +569,6 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 	prev->userrsp = read_pda(oldrsp); 
 	write_pda(oldrsp, next->userrsp); 
 	write_pda(pcurrent, next_p); 
-
-	/*
-	 * This is basically 'unlazy_fpu', except that we do a
-	 * hypercall to indicate FPU task switch, rather than
-	 * synchronously trapping to Xen.
-	 */
- 	/* This must be here to ensure both math_state_restore() and
-	   kernel_fpu_begin() work consistently.
-	   And the AMD workaround requires it to be after DS reload. */
-	if (prev_p->thread_info->status & TS_USEDFPU) {
-		__save_init_fpu(prev_p); /* _not_ save_init_fpu() */
-		HYPERVISOR_fpu_taskswitch(1);
-	}
-
 	write_pda(kernelstack,
 		  task_stack_page(next_p) + THREAD_SIZE - PDA_STACKOFFSET);
 

@@ -721,6 +721,8 @@ gss_destroy(struct rpc_auth *auth)
 
 	gss_auth = container_of(auth, struct gss_auth, rpc_auth);
 	rpc_unlink(gss_auth->path);
+	dput(gss_auth->dentry);
+	gss_auth->dentry = NULL;
 	gss_mech_put(gss_auth->mech);
 
 	rpcauth_free_credcache(auth);
@@ -792,7 +794,6 @@ gss_create_cred(struct rpc_auth *auth, struct auth_cred *acred, int flags)
 
 out_err:
 	dprintk("RPC:      gss_create_cred failed with error %d\n", err);
-	if (cred) gss_destroy_cred(&cred->gc_base);
 	return ERR_PTR(err);
 }
 

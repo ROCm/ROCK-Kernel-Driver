@@ -1689,16 +1689,14 @@ qdio_alloc_qs(struct qdio_irq *irq_ptr,
 	int result=-ENOMEM;
 
 	for (i=0;i<no_input_qs;i++) {
-		q=kmalloc(sizeof(struct qdio_q),GFP_KERNEL);
+		q = kzalloc(sizeof(struct qdio_q), GFP_KERNEL);
 
 		if (!q) {
 			QDIO_PRINT_ERR("kmalloc of q failed!\n");
 			goto out;
 		}
 
-		memset(q,0,sizeof(struct qdio_q));
-
-		q->slib=kmalloc(PAGE_SIZE,GFP_KERNEL);
+		q->slib = kmalloc(PAGE_SIZE, GFP_KERNEL);
 		if (!q->slib) {
 			QDIO_PRINT_ERR("kmalloc of slib failed!\n");
 			goto out;
@@ -1708,13 +1706,11 @@ qdio_alloc_qs(struct qdio_irq *irq_ptr,
 	}
 
 	for (i=0;i<no_output_qs;i++) {
-		q=kmalloc(sizeof(struct qdio_q),GFP_KERNEL);
+		q = kzalloc(sizeof(struct qdio_q), GFP_KERNEL);
 
 		if (!q) {
 			goto out;
 		}
-
-		memset(q,0,sizeof(struct qdio_q));
 
 		q->slib=kmalloc(PAGE_SIZE,GFP_KERNEL);
 		if (!q->slib) {
@@ -2987,7 +2983,7 @@ qdio_allocate(struct qdio_initialize *init_data)
 	qdio_allocate_do_dbf(init_data);
 
 	/* create irq */
-	irq_ptr=(void *) get_zeroed_page(GFP_KERNEL | GFP_DMA);
+	irq_ptr = (void *) get_zeroed_page(GFP_KERNEL | GFP_DMA);
 
 	QDIO_DBF_TEXT0(0,setup,"irq_ptr:");
 	QDIO_DBF_HEX0(0,setup,&irq_ptr,sizeof(void*));
@@ -2996,7 +2992,6 @@ qdio_allocate(struct qdio_initialize *init_data)
 		QDIO_PRINT_ERR("kmalloc of irq_ptr failed!\n");
 		return -ENOMEM;
 	}
-
 
 	init_MUTEX(&irq_ptr->setting_up_sema);
 
@@ -3688,10 +3683,10 @@ qdio_get_qdio_memory(void)
 
 	for (i=1;i<INDICATORS_PER_CACHELINE;i++)
 		indicator_used[i]=0;
-	indicators=(__u32*)kmalloc(sizeof(__u32)*(INDICATORS_PER_CACHELINE),
+	indicators = kzalloc(sizeof(__u32)*(INDICATORS_PER_CACHELINE),
 				   GFP_KERNEL);
-       	if (!indicators) return -ENOMEM;
-	memset(indicators,0,sizeof(__u32)*(INDICATORS_PER_CACHELINE));
+       	if (!indicators)
+		return -ENOMEM;
 	return 0;
 }
 

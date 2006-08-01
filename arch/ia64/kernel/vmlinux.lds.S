@@ -29,7 +29,6 @@ SECTIONS
 	*(.exit.text)
 	*(.exit.data)
 	*(.exitcall.exit)
-	*(.kdb_exitcall.exit)
 	*(.IA_64.unwind.exit.text)
 	*(.IA_64.unwind_info.exit.text)
 	}
@@ -71,33 +70,17 @@ SECTIONS
 	  __stop___ex_table = .;
 	}
 
-  .data.patch.vtop : AT(ADDR(.data.patch.vtop) - LOAD_OFFSET)
+  /* MCA table */
+  . = ALIGN(16);
+  __mca_table : AT(ADDR(__mca_table) - LOAD_OFFSET)
 	{
-	  __start___vtop_patchlist = .;
-	  *(.data.patch.vtop)
-	  __end___vtop_patchlist = .;
-	}
-
-  .data.patch.mckinley_e9 : AT(ADDR(.data.patch.mckinley_e9) - LOAD_OFFSET)
-	{
-	  __start___mckinley_e9_bundles = .;
-	  *(.data.patch.mckinley_e9)
-	  __end___mckinley_e9_bundles = .;
+	  __start___mca_table = .;
+	  *(__mca_table)
+	  __stop___mca_table = .;
 	}
 
   /* Global data */
   _data = .;
-
-#if defined(CONFIG_IA64_GENERIC)
-  /* Machine Vector */
-  . = ALIGN(16);
-  .machvec : AT(ADDR(.machvec) - LOAD_OFFSET)
-	{
-	  machvec_start = .;
-	  *(.machvec)
-	  machvec_end = .;
-	}
-#endif
 
   /* Unwind info & table: */
   . = ALIGN(8);
@@ -155,12 +138,32 @@ SECTIONS
 	  *(.initcall7.init)
 	  __initcall_end = .;
 	}
-  .kdb_initcall.init : AT(ADDR(.kdb_initcall.init) - LOAD_OFFSET)
+
+  .data.patch.vtop : AT(ADDR(.data.patch.vtop) - LOAD_OFFSET)
 	{
-	  __kdb_initcall_start = .;
-	  *(.kdb_initcall.init)
-	  __kdb_initcall_end = .;
+	  __start___vtop_patchlist = .;
+	  *(.data.patch.vtop)
+	  __end___vtop_patchlist = .;
 	}
+
+  .data.patch.mckinley_e9 : AT(ADDR(.data.patch.mckinley_e9) - LOAD_OFFSET)
+	{
+	  __start___mckinley_e9_bundles = .;
+	  *(.data.patch.mckinley_e9)
+	  __end___mckinley_e9_bundles = .;
+	}
+
+#if defined(CONFIG_IA64_GENERIC)
+  /* Machine Vector */
+  . = ALIGN(16);
+  .machvec : AT(ADDR(.machvec) - LOAD_OFFSET)
+	{
+	  machvec_start = .;
+	  *(.machvec)
+	  machvec_end = .;
+	}
+#endif
+
    __con_initcall_start = .;
   .con_initcall.init : AT(ADDR(.con_initcall.init) - LOAD_OFFSET)
 	{ *(.con_initcall.init) }

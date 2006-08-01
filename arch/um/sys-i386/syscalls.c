@@ -61,21 +61,27 @@ long old_select(struct sel_arg_struct __user *arg)
 	return sys_select(a.n, a.inp, a.outp, a.exp, a.tvp);
 }
 
-/* The i386 version skips reading from %esi, the fourth argument. So we must do
- * this, too.
+/*
+ * The prototype on i386 is:
+ *
+ *     int clone(int flags, void * child_stack, int * parent_tidptr, struct user_desc * newtls, int * child_tidptr)
+ *
+ * and the "newtls" arg. on i386 is read by copy_thread directly from the
+ * register saved on the stack.
  */
 long sys_clone(unsigned long clone_flags, unsigned long newsp,
-	       int __user *parent_tid, int unused, int __user *child_tid)
+	       int __user *parent_tid, void *newtls, int __user *child_tid)
 {
 	long ret;
 
 	if (!newsp)
 		newsp = UPT_SP(&current->thread.regs.regs);
+
 	current->thread.forking = 1;
 	ret = do_fork(clone_flags, newsp, &current->thread.regs, 0, parent_tid,
 		      child_tid);
 	current->thread.forking = 0;
-	return(ret);
+	return ret;
 }
 
 /*
@@ -93,18 +99,19 @@ long sys_ipc (uint call, int first, int second,
 
 	switch (call) {
 	case SEMOP:
-		return sys_semtimedop(first, (struct sembuf *) ptr, second,
-				      NULL);
+		return sys_semtimedop(first, (struct sembuf __user *) ptr,
+				      second, NULL);
 	case SEMTIMEDOP:
-		return sys_semtimedop(first, (struct sembuf *) ptr, second,
-				      (const struct timespec *) fifth);
+		return sys_semtimedop(first, (struct sembuf __user *) ptr,
+				      second,
+				      (const struct timespec __user *) fifth);
 	case SEMGET:
 		return sys_semget (first, second, third);
 	case SEMCTL: {
 		union semun fourth;
 		if (!ptr)
 			return -EINVAL;
-		if (get_user(fourth.__pad, (void **) ptr))
+		if (get_user(fourth.__pad, (void __user * __user *) ptr))
 			return -EFAULT;
 		return sys_semctl (first, second, third, fourth);
 	}

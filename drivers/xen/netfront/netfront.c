@@ -478,7 +478,7 @@ static void network_tx_buf_gc(struct net_device *dev)
 				printk(KERN_ALERT "network_tx_buf_gc: warning "
 				       "-- grant still in use by backend "
 				       "domain.\n");
-				BUG();
+				goto out;
 			}
 			gnttab_end_foreign_access_ref(
 				np->grant_tx_ref[id], GNTMAP_readonly);
@@ -504,6 +504,7 @@ static void network_tx_buf_gc(struct net_device *dev)
 		mb();
 	} while (prod != np->tx.sring->rsp_prod);
 
+ out:
 	if (np->tx_full &&
 	    ((np->tx.sring->req_prod - prod) < NET_TX_RING_SIZE)) {
 		np->tx_full = 0;
@@ -662,10 +663,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 			goto drop;
 		skb_put(nskb, skb->len);
 		memcpy(nskb->data, skb->data, skb->len);
-		/* Copy only the header fields we use in this driver. */
 		nskb->dev = skb->dev;
-		nskb->ip_summed = skb->ip_summed;
-		nskb->proto_data_valid = skb->proto_data_valid;
 		dev_kfree_skb(skb);
 		skb = nskb;
 	}
@@ -897,11 +895,8 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 				skb_reserve(nskb, 2);
 				skb_put(nskb, skb->len);
 				memcpy(nskb->data, skb->data, skb->len);
-				/* Copy any other fields we already set up. */
 				nskb->dev = skb->dev;
 				nskb->ip_summed = skb->ip_summed;
-				nskb->proto_data_valid = skb->proto_data_valid;
-				nskb->proto_csum_blank = skb->proto_csum_blank;
 			}
 
 			/* Reinitialise and then destroy the old skbuff. */
@@ -1511,3 +1506,14 @@ static void xennet_proc_delif(struct net_device *dev)
 }
 
 #endif
+
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

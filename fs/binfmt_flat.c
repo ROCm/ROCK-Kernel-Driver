@@ -36,6 +36,7 @@
 #include <linux/personality.h>
 #include <linux/init.h>
 #include <linux/flat.h>
+#include <linux/syscalls.h>
 
 #include <asm/byteorder.h>
 #include <asm/system.h>
@@ -426,6 +427,7 @@ static int load_flat_file(struct linux_binprm * bprm,
 	int i, rev, relocs = 0;
 	loff_t fpos;
 	unsigned long start_code, end_code;
+	int ret;
 
 	hdr = ((struct flat_hdr *) bprm->buf);		/* exec-header */
 	inode = bprm->file->f_dentry->d_inode;
@@ -450,7 +452,8 @@ static int load_flat_file(struct linux_binprm * bprm,
 		 */
 		if (strncmp(hdr->magic, "#!", 2))
 			printk("BINFMT_FLAT: bad header magic\n");
-		return -ENOEXEC;
+		ret = -ENOEXEC;
+		goto err;
 	}
 
 	if (flags & FLAT_FLAG_KTRACE)
@@ -458,14 +461,16 @@ static int load_flat_file(struct linux_binprm * bprm,
 
 	if (rev != FLAT_VERSION && rev != OLD_FLAT_VERSION) {
 		printk("BINFMT_FLAT: bad flat file version 0x%x (supported 0x%x and 0x%x)\n", rev, FLAT_VERSION, OLD_FLAT_VERSION);
-		return -ENOEXEC;
+		ret = -ENOEXEC;
+		goto err;
 	}
 	
 	/* Don't allow old format executables to use shared libraries */
 	if (rev == OLD_FLAT_VERSION && id != 0) {
 		printk("BINFMT_FLAT: shared libraries are not available before rev 0x%x\n",
 				(int) FLAT_VERSION);
-		return -ENOEXEC;
+		ret = -ENOEXEC;
+		goto err;
 	}
 
 	/*
@@ -478,7 +483,8 @@ static int load_flat_file(struct linux_binprm * bprm,
 #ifndef CONFIG_BINFMT_ZFLAT
 	if (flags & (FLAT_FLAG_GZIP|FLAT_FLAG_GZDATA)) {
 		printk("Support for ZFLAT executables is not enabled.\n");
-		return -ENOEXEC;
+		ret = -ENOEXEC;
+		goto err;
 	}
 #endif
 
@@ -490,14 +496,18 @@ static int load_flat_file(struct linux_binprm * bprm,
 	rlim = current->signal->rlim[RLIMIT_DATA].rlim_cur;
 	if (rlim >= RLIM_INFINITY)
 		rlim = ~0;
-	if (data_len + bss_len > rlim)
-		return -ENOMEM;
+	if (data_len + bss_len > rlim) {
+		ret = -ENOMEM;
+		goto err;
+	}
 
 	/* Flush all traces of the currently running executable */
 	if (id == 0) {
 		result = flush_old_exec(bprm);
-		if (result)
-			return result;
+		if (result) {
+			ret = result;
+			goto err;
+		}
 
 		/* OK, This is the point of no return */
 		set_personality(PER_LINUX);
@@ -527,7 +537,8 @@ static int load_flat_file(struct linux_binprm * bprm,
 			if (!textpos)
 				textpos = (unsigned long) -ENOMEM;
 			printk("Unable to mmap process text, errno %d\n", (int)-textpos);
-			return(textpos);
+			ret = textpos;
+			goto err;
 		}
 
 		down_write(&current->mm->mmap_sem);
@@ -542,7 +553,8 @@ static int load_flat_file(struct linux_binprm * bprm,
 			printk("Unable to allocate RAM for process data, errno %d\n",
 					(int)-datapos);
 			do_munmap(current->mm, textpos, text_len);
-			return realdatastart;
+			ret = realdatastart;
+			goto err;
 		}
 		datapos = realdatastart + MAX_SHARED_LIBS * sizeof(unsigned long);
 
@@ -564,7 +576,8 @@ static int load_flat_file(struct linux_binprm * bprm,
 			printk("Unable to read data+bss, errno %d\n", (int)-result);
 			do_munmap(current->mm, textpos, text_len);
 			do_munmap(current->mm, realdatastart, data_len + extra);
-			return result;
+			ret = result;
+			goto err;
 		}
 
 		reloc = (unsigned long *) (datapos+(ntohl(hdr->reloc_start)-text_len));
@@ -582,7 +595,8 @@ static int load_flat_file(struct linux_binprm * bprm,
 				textpos = (unsigned long) -ENOMEM;
 			printk("Unable to allocate RAM for process text/data, errno %d\n",
 					(int)-textpos);
-			return(textpos);
+			ret = textpos;
+			goto err;
 		}
 
 		realdatastart = textpos + ntohl(hdr->data_start);
@@ -627,7 +641,8 @@ static int load_flat_file(struct linux_binprm * bprm,
 			printk("Unable to read code+data+bss, errno %d\n",(int)-result);
 			do_munmap(current->mm, textpos, text_len + data_len + extra +
 				MAX_SHARED_LIBS * sizeof(unsigned long));
-			return result;
+			ret = result;
+			goto err;
 		}
 	}
 
@@ -690,8 +705,10 @@ static int load_flat_file(struct linux_binprm * bprm,
 			unsigned long addr;
 			if (*rp) {
 				addr = calc_reloc(*rp, libinfo, id, 0);
-				if (addr == RELOC_FAILED)
-					return -ENOEXEC;
+				if (addr == RELOC_FAILED) {
+					ret = -ENOEXEC;
+					goto err;
+				}
 				*rp = addr;
 			}
 		}
@@ -718,8 +735,10 @@ static int load_flat_file(struct linux_binprm * bprm,
 			relval = ntohl(reloc[i]);
 			addr = flat_get_relocate_addr(relval);
 			rp = (unsigned long *) calc_reloc(addr, libinfo, id, 1);
-			if (rp == (unsigned long *)RELOC_FAILED)
-				return -ENOEXEC;
+			if (rp == (unsigned long *)RELOC_FAILED) {
+				ret = -ENOEXEC;
+				goto err;
+			}
 
 			/* Get the pointer's value.  */
 			addr = flat_get_addr_from_rp(rp, relval, flags);
@@ -731,8 +750,10 @@ static int load_flat_file(struct linux_binprm * bprm,
 				if ((flags & FLAT_FLAG_GOTPIC) == 0)
 					addr = ntohl(addr);
 				addr = calc_reloc(addr, libinfo, id, 0);
-				if (addr == RELOC_FAILED)
-					return -ENOEXEC;
+				if (addr == RELOC_FAILED) {
+					ret = -ENOEXEC;
+					goto err;
+				}
 
 				/* Write back the relocated pointer.  */
 				flat_put_addr_at_rp(rp, addr, relval);
@@ -752,6 +773,8 @@ static int load_flat_file(struct linux_binprm * bprm,
 			stack_len);
 
 	return 0;
+err:
+	return ret;
 }
 
 

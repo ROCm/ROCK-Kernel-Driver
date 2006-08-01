@@ -17,11 +17,12 @@
 #include <linux/time.h> /* need struct timeval */
 #include <linux/poll.h>
 #include <linux/device.h>
+#include <linux/mutex.h>
 #endif
 #include <linux/compiler.h> /* need __user */
 
 
-#define OBSOLETE_OWNER 1 /* It will be removed for 2.6.15 */
+#define OBSOLETE_OWNER 1 /* It will be removed for 2.6.17 */
 #define HAVE_V4L2 1
 
 /*
@@ -48,6 +49,16 @@
 
 #ifdef __KERNEL__
 
+/* Minor device allocation */
+#define MINOR_VFL_TYPE_GRABBER_MIN   0
+#define MINOR_VFL_TYPE_GRABBER_MAX  63
+#define MINOR_VFL_TYPE_RADIO_MIN    64
+#define MINOR_VFL_TYPE_RADIO_MAX   127
+#define MINOR_VFL_TYPE_VTX_MIN     192
+#define MINOR_VFL_TYPE_VTX_MAX     223
+#define MINOR_VFL_TYPE_VBI_MIN     224
+#define MINOR_VFL_TYPE_VBI_MAX     255
+
 #define VFL_TYPE_GRABBER	0
 #define VFL_TYPE_VBI		1
 #define VFL_TYPE_RADIO		2
@@ -64,7 +75,7 @@ struct video_device
 	int minor;
 
 	/* device ops + callbacks */
-	struct file_operations *fops;
+	const struct file_operations *fops;
 	void (*release)(struct video_device *vfd);
 
 
@@ -80,7 +91,7 @@ struct video_device
 
 	/* for videodev.c intenal usage -- please don't touch */
 	int users;                     /* video_exclusive_{open|close} ... */
-	struct semaphore lock;         /* ... helper function uses these   */
+	struct mutex lock;             /* ... helper function uses these   */
 	char devfs_name[64];           /* devfs */
 	struct class_device class_dev; /* sysfs */
 };
@@ -872,6 +883,7 @@ struct v4l2_modulator
 #define V4L2_TUNER_MODE_LANG2		0x0002
 #define V4L2_TUNER_MODE_SAP		0x0002
 #define V4L2_TUNER_MODE_LANG1		0x0003
+#define V4L2_TUNER_MODE_LANG1_LANG2	0x0004
 
 struct v4l2_frequency
 {
@@ -952,13 +964,19 @@ struct v4l2_sliced_vbi_format
 	__u32   reserved[2];            /* must be zero */
 };
 
+/* Teletext World System Teletext
+   (WST), defined on ITU-R BT.653-2 */
 #define V4L2_SLICED_TELETEXT_B          (0x0001)
+/* Video Program System, defined on ETS 300 231*/
 #define V4L2_SLICED_VPS                 (0x0400)
+/* Closed Caption, defined on EIA-608 */
 #define V4L2_SLICED_CAPTION_525         (0x1000)
+/* Wide Screen System, defined on ITU-R BT1119.1 */
 #define V4L2_SLICED_WSS_625             (0x4000)
 
 #define V4L2_SLICED_VBI_525             (V4L2_SLICED_CAPTION_525)
 #define V4L2_SLICED_VBI_625             (V4L2_SLICED_TELETEXT_B | V4L2_SLICED_VPS | V4L2_SLICED_WSS_625)
+
 
 struct v4l2_sliced_vbi_cap
 {
@@ -1123,8 +1141,13 @@ extern char *v4l2_type_names[];
 /*  Compatibility layer interface  --  v4l1-compat module */
 typedef int (*v4l2_kioctl)(struct inode *inode, struct file *file,
 			   unsigned int cmd, void *arg);
+
+#ifdef CONFIG_VIDEO_V4L1_COMPAT
 int v4l_compat_translate_ioctl(struct inode *inode, struct file *file,
 			       int cmd, void *arg, v4l2_kioctl driver_ioctl);
+#else
+#define v4l_compat_translate_ioctl(inode,file,cmd,arg,ioctl) -EINVAL
+#endif
 
 /* 32 Bits compatibility layer for 64 bits processors */
 extern long v4l_compat_ioctl32(struct file *file, unsigned int cmd,

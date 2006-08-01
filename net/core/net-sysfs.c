@@ -29,7 +29,7 @@ static const char fmt_ulong[] = "%lu\n";
 
 static inline int dev_isalive(const struct net_device *dev) 
 {
-	return dev->reg_state == NETREG_REGISTERED;
+	return dev->reg_state <= NETREG_REGISTERED;
 }
 
 /* use same locking rules as GIF* ioctl's */
@@ -91,6 +91,7 @@ NETDEVICE_SHOW(iflink, fmt_dec);
 NETDEVICE_SHOW(ifindex, fmt_dec);
 NETDEVICE_SHOW(features, fmt_long_hex);
 NETDEVICE_SHOW(type, fmt_dec);
+NETDEVICE_SHOW(link_mode, fmt_dec);
 
 /* use same locking rules as GIFHWADDR ioctl's */
 static ssize_t format_addr(char *buf, const unsigned char *addr, int len)
@@ -131,6 +132,43 @@ static ssize_t show_carrier(struct class_device *dev, char *buf)
 		return sprintf(buf, fmt_dec, !!netif_carrier_ok(netdev));
 	}
 	return -EINVAL;
+}
+
+static ssize_t show_dormant(struct class_device *dev, char *buf)
+{
+	struct net_device *netdev = to_net_dev(dev);
+
+	if (netif_running(netdev))
+		return sprintf(buf, fmt_dec, !!netif_dormant(netdev));
+
+	return -EINVAL;
+}
+
+static const char *operstates[] = {
+	"unknown",
+	"notpresent", /* currently unused */
+	"down",
+	"lowerlayerdown",
+	"testing", /* currently unused */
+	"dormant",
+	"up"
+};
+
+static ssize_t show_operstate(struct class_device *dev, char *buf)
+{
+	const struct net_device *netdev = to_net_dev(dev);
+	unsigned char operstate;
+
+	read_lock(&dev_base_lock);
+	operstate = netdev->operstate;
+	if (!netif_running(netdev))
+		operstate = IF_OPER_DOWN;
+	read_unlock(&dev_base_lock);
+
+	if (operstate >= ARRAY_SIZE(operstates))
+		return -EINVAL; /* should not happen */
+
+	return sprintf(buf, "%s\n", operstates[operstate]);
 }
 
 /* read-write attributes */
@@ -190,9 +228,12 @@ static struct class_device_attribute net_class_attributes[] = {
 	__ATTR(ifindex, S_IRUGO, show_ifindex, NULL),
 	__ATTR(features, S_IRUGO, show_features, NULL),
 	__ATTR(type, S_IRUGO, show_type, NULL),
+	__ATTR(link_mode, S_IRUGO, show_link_mode, NULL),
 	__ATTR(address, S_IRUGO, show_address, NULL),
 	__ATTR(broadcast, S_IRUGO, show_broadcast, NULL),
 	__ATTR(carrier, S_IRUGO, show_carrier, NULL),
+	__ATTR(dormant, S_IRUGO, show_dormant, NULL),
+	__ATTR(operstate, S_IRUGO, show_operstate, NULL),
 	__ATTR(mtu, S_IRUGO | S_IWUSR, show_mtu, store_mtu),
 	__ATTR(flags, S_IRUGO | S_IWUSR, show_flags, store_flags),
 	__ATTR(tx_queue_len, S_IRUGO | S_IWUSR, show_tx_queue_len,
@@ -404,58 +445,33 @@ static struct class net_class = {
 
 void netdev_unregister_sysfs(struct net_device * net)
 {
-	struct class_device * class_dev = &(net->class_dev);
-
-	if (net->get_stats)
-		sysfs_remove_group(&class_dev->kobj, &netstat_group);
-
-#ifdef WIRELESS_EXT
-	if (net->get_wireless_stats || (net->wireless_handlers &&
-			net->wireless_handlers->get_wireless_stats))
-		sysfs_remove_group(&class_dev->kobj, &wireless_group);
-#endif
-	class_device_del(class_dev);
-
+	class_device_del(&(net->class_dev));
 }
 
 /* Create sysfs entries for network device. */
 int netdev_register_sysfs(struct net_device *net)
 {
 	struct class_device *class_dev = &(net->class_dev);
-	int ret;
+	struct attribute_group **groups = net->sysfs_groups;
 
+	class_device_initialize(class_dev);
 	class_dev->class = &net_class;
 	class_dev->class_data = net;
+	class_dev->groups = groups;
 
+	BUILD_BUG_ON(BUS_ID_SIZE < IFNAMSIZ);
 	strlcpy(class_dev->class_id, net->name, BUS_ID_SIZE);
-	if ((ret = class_device_register(class_dev)))
-		goto out;
 
-	if (net->get_stats &&
-	    (ret = sysfs_create_group(&class_dev->kobj, &netstat_group)))
-		goto out_unreg; 
+	if (net->get_stats)
+		*groups++ = &netstat_group;
 
 #ifdef WIRELESS_EXT
-	if (net->get_wireless_stats || (net->wireless_handlers &&
-			net->wireless_handlers->get_wireless_stats)) {
-		ret = sysfs_create_group(&class_dev->kobj, &wireless_group);
-		if (ret)
-			goto out_cleanup;
-	}
-	return 0;
-out_cleanup:
-	if (net->get_stats)
-		sysfs_remove_group(&class_dev->kobj, &netstat_group);
-#else
-	return 0;
+	if (net->get_wireless_stats
+	    || (net->wireless_handlers && net->wireless_handlers->get_wireless_stats))
+		*groups++ = &wireless_group;
 #endif
 
-out_unreg:
-	printk(KERN_WARNING "%s: sysfs attribute registration failed %d\n",
-	       net->name, ret);
-	class_device_unregister(class_dev);
-out:
-	return ret;
+	return class_device_add(class_dev);
 }
 
 int netdev_sysfs_init(void)

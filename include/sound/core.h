@@ -170,13 +170,13 @@ static inline void snd_power_change_state(struct snd_card *card, unsigned int st
 }
 
 /* init.c */
-int snd_power_wait(struct snd_card *card, unsigned int power_state, struct file *file);
+int snd_power_wait(struct snd_card *card, unsigned int power_state);
 
 #else /* ! CONFIG_PM */
 
 #define snd_power_lock(card)		do { (void)(card); } while (0)
 #define snd_power_unlock(card)		do { (void)(card); } while (0)
-static inline int snd_power_wait(struct snd_card *card, unsigned int state, struct file *file) { return 0; }
+static inline int snd_power_wait(struct snd_card *card, unsigned int state) { return 0; }
 #define snd_power_get_state(card)	SNDRV_CTL_POWER_D0
 #define snd_power_change_state(card, state)	do { (void)(card); } while (0)
 
@@ -186,7 +186,7 @@ struct snd_minor {
 	int type;			/* SNDRV_DEVICE_TYPE_XXX */
 	int card;			/* card number */
 	int device;			/* device number */
-	struct file_operations *f_ops;	/* file operations */
+	const struct file_operations *f_ops;	/* file operations */
 	void *private_data;		/* private data for f_ops->open */
 	char name[0];			/* device name (keep at the end of
 								structure) */
@@ -200,14 +200,14 @@ extern int snd_ecards_limit;
 void snd_request_card(int card);
 
 int snd_register_device(int type, struct snd_card *card, int dev,
-			struct file_operations *f_ops, void *private_data,
+			const struct file_operations *f_ops, void *private_data,
 			const char *name);
 int snd_unregister_device(int type, struct snd_card *card, int dev);
 void *snd_lookup_minor_data(unsigned int minor, int type);
 
 #ifdef CONFIG_SND_OSSEMUL
 int snd_register_oss_device(int type, struct snd_card *card, int dev,
-			    struct file_operations *f_ops, void *private_data,
+			    const struct file_operations *f_ops, void *private_data,
 			    const char *name);
 int snd_unregister_oss_device(int type, struct snd_card *card, int dev);
 void *snd_lookup_oss_minor_data(unsigned int minor, int type);

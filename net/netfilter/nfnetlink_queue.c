@@ -354,16 +354,17 @@ nfqnl_build_packet_message(struct nfqnl_instance *queue,
 	QDEBUG("entered\n");
 
 	/* all macros expand to constant values at compile time */
-	size =    NLMSG_SPACE(sizeof(struct nfqnl_msg_packet_hdr))
-		+ NLMSG_SPACE(sizeof(u_int32_t))	/* ifindex */
-		+ NLMSG_SPACE(sizeof(u_int32_t))	/* ifindex */
+	size =    NLMSG_SPACE(sizeof(struct nfgenmsg)) +
+		+ NFA_SPACE(sizeof(struct nfqnl_msg_packet_hdr))
+		+ NFA_SPACE(sizeof(u_int32_t))	/* ifindex */
+		+ NFA_SPACE(sizeof(u_int32_t))	/* ifindex */
 #ifdef CONFIG_BRIDGE_NETFILTER
-		+ NLMSG_SPACE(sizeof(u_int32_t))	/* ifindex */
-		+ NLMSG_SPACE(sizeof(u_int32_t))	/* ifindex */
+		+ NFA_SPACE(sizeof(u_int32_t))	/* ifindex */
+		+ NFA_SPACE(sizeof(u_int32_t))	/* ifindex */
 #endif
-		+ NLMSG_SPACE(sizeof(u_int32_t))	/* mark */
-		+ NLMSG_SPACE(sizeof(struct nfqnl_msg_packet_hw))
-		+ NLMSG_SPACE(sizeof(struct nfqnl_msg_packet_timestamp));
+		+ NFA_SPACE(sizeof(u_int32_t))	/* mark */
+		+ NFA_SPACE(sizeof(struct nfqnl_msg_packet_hw))
+		+ NFA_SPACE(sizeof(struct nfqnl_msg_packet_timestamp));
 
 	outdev = entinf->outdev;
 
@@ -388,7 +389,7 @@ nfqnl_build_packet_message(struct nfqnl_instance *queue,
 		else
 			data_len = queue->copy_range;
 		
-		size += NLMSG_SPACE(data_len);
+		size += NFA_SPACE(data_len);
 		break;
 	
 	default:
@@ -1070,17 +1071,13 @@ static struct file_operations nfqnl_file_ops = {
 
 #endif /* PROC_FS */
 
-static int
-init_or_cleanup(int init)
+static int __init nfnetlink_queue_init(void)
 {
 	int i, status = -ENOMEM;
 #ifdef CONFIG_PROC_FS
 	struct proc_dir_entry *proc_nfqueue;
 #endif
 	
-	if (!init)
-		goto cleanup;
-
 	for (i = 0; i < INSTANCE_BUCKETS; i++)
 		INIT_HLIST_HEAD(&instance_table[i]);
 
@@ -1100,31 +1097,26 @@ init_or_cleanup(int init)
 #endif
 
 	register_netdevice_notifier(&nfqnl_dev_notifier);
-
 	return status;
 
-cleanup:
-	nf_unregister_queue_handlers(&nfqh);
-	unregister_netdevice_notifier(&nfqnl_dev_notifier);
 #ifdef CONFIG_PROC_FS
-	remove_proc_entry("nfnetlink_queue", proc_net_netfilter);
 cleanup_subsys:
-#endif	
 	nfnetlink_subsys_unregister(&nfqnl_subsys);
+#endif
 cleanup_netlink_notifier:
 	netlink_unregister_notifier(&nfqnl_rtnl_notifier);
 	return status;
 }
 
-static int __init init(void)
+static void __exit nfnetlink_queue_fini(void)
 {
-	
-	return init_or_cleanup(1);
-}
-
-static void __exit fini(void)
-{
-	init_or_cleanup(0);
+	nf_unregister_queue_handlers(&nfqh);
+	unregister_netdevice_notifier(&nfqnl_dev_notifier);
+#ifdef CONFIG_PROC_FS
+	remove_proc_entry("nfnetlink_queue", proc_net_netfilter);
+#endif
+	nfnetlink_subsys_unregister(&nfqnl_subsys);
+	netlink_unregister_notifier(&nfqnl_rtnl_notifier);
 }
 
 MODULE_DESCRIPTION("netfilter packet queue handler");
@@ -1132,5 +1124,5 @@ MODULE_AUTHOR("Harald Welte <laforge@netfilter.org>");
 MODULE_LICENSE("GPL");
 MODULE_ALIAS_NFNL_SUBSYS(NFNL_SUBSYS_QUEUE);
 
-module_init(init);
-module_exit(fini);
+module_init(nfnetlink_queue_init);
+module_exit(nfnetlink_queue_fini);

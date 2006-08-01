@@ -33,7 +33,6 @@
 #include <linux/list.h>
 #include <linux/completion.h>
 #include <linux/interrupt.h>
-#include <scsi/scsi_cmnd.h>
 #include "viosrp.h"
 
 struct scsi_cmnd;
@@ -69,7 +68,7 @@ struct srp_event_struct {
 	void (*cmnd_done) (struct scsi_cmnd *);
 	struct completion comp;
 	union viosrp_iu *sync_srp;
-	struct memory_descriptor *ext_list;
+	struct srp_direct_buf *ext_list;
 	dma_addr_t ext_list_token;
 };
 

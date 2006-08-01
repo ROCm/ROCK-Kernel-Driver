@@ -69,6 +69,7 @@ config IP_NF_CONNTRACK_NETLINK
 	tristate 'Connection tracking netlink interface (EXPERIMENTAL)'
 	depends on EXPERIMENTAL && IP_NF_CONNTRACK && NETFILTER_NETLINK
 	depends on IP_NF_CONNTRACK!=y || NETFILTER_NETLINK!=m
+	depends on IP_NF_NAT=n || IP_NF_NAT
 	help
 	  This option enables support for a netlink-based userspace interface
 
@@ -168,6 +169,26 @@ config IP_NF_PPTP
 	  If you want to compile it as a module, say M here and read
 	  Documentation/modules.txt.  If unsure, say `N'.
 
+config IP_NF_H323
+	tristate  'H.323 protocol support (EXPERIMENTAL)'
+	depends on IP_NF_CONNTRACK && EXPERIMENTAL
+	help
+	  H.323 is a VoIP signalling protocol from ITU-T. As one of the most
+	  important VoIP protocols, it is widely used by voice hardware and
+	  software including voice gateways, IP phones, Netmeeting, OpenPhone,
+	  Gnomemeeting, etc.
+
+	  With this module you can support H.323 on a connection tracking/NAT
+	  firewall.
+
+	  This module supports RAS, Fast-start, H.245 tunnelling, RTP/RTCP
+	  and T.120 based data and applications including audio, video, FAX,
+	  chat, whiteboard, file transfer, etc. For more information, please
+	  see http://nath323.sourceforge.net/.
+
+	  If you want to compile it as a module, say 'M' here and read
+	  Documentation/modules.txt.  If unsure, say 'N'.
+
 config IP_NF_QUEUE
 	tristate "IP Userspace queueing via NETLINK (OBSOLETE)"
 	help
@@ -198,16 +219,6 @@ config IP_NF_MATCH_IPRANGE
 	help
 	  This option makes possible to match IP addresses against IP address
 	  ranges.
-
-	  To compile it as a module, choose M here.  If unsure, say N.
-
-config IP_NF_MATCH_MULTIPORT
-	tristate "Multiple port match support"
-	depends on IP_NF_IPTABLES
-	help
-	  Multiport matching allows you to match TCP or UDP packets based on
-	  a series of source or destination ports: normally a rule can only
-	  match a single range of ports.
 
 	  To compile it as a module, choose M here.  If unsure, say N.
 
@@ -252,12 +263,12 @@ config IP_NF_MATCH_DSCP
 
 	  To compile it as a module, choose M here.  If unsure, say N.
 
-config IP_NF_MATCH_AH_ESP
-	tristate "AH/ESP match support"
+config IP_NF_MATCH_AH
+	tristate "AH match support"
 	depends on IP_NF_IPTABLES
 	help
-	  These two match extensions (`ah' and `esp') allow you to match a
-	  range of SPIs inside AH or ESP headers of IPSec packets.
+	  This match extension allows you to match a range of SPIs
+	  inside AH header of IPSec packets.
 
 	  To compile it as a module, choose M here.  If unsure, say N.
 
@@ -303,29 +314,6 @@ config IP_NF_MATCH_HASHLIMIT
 	  destination IP' or `500pps from any given source IP'  with a single
 	  IPtables rule.
 
-config IP_NF_MATCH_POLICY
-       tristate "IPsec policy match support"
-       depends on IP_NF_IPTABLES && XFRM
-       help
-         Policy matching allows you to match packets based on the
-         IPsec policy that was used during decapsulation/will
-         be used during encapsulation.
-
-         To compile it as a module, choose M here.  If unsure, say N.
-
-config IP_NF_MATCH_IPV4OPTIONS
-	tristate  'IPV4OPTIONS match support'
-	depends on IP_NF_IPTABLES
-	help
-	  This option adds a IPV4OPTIONS match.
-	  It allows you to filter options like source routing,
-	  record route, timestamp and router-altert.
-	
-	  If you say Y here, try iptables -m ipv4options --help for more information.
-	 
-	  If you want to compile it as a module, say M here and read
-	  Documentation/modules.txt.  If unsure, say '.
-
 # `filter', generic and specific targets
 config IP_NF_FILTER
 	tristate "Packet filtering"
@@ -357,7 +345,7 @@ config IP_NF_TARGET_LOG
 	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP_NF_TARGET_ULOG
-	tristate "ULOG target support (OBSOLETE)"
+	tristate "ULOG target support"
 	depends on IP_NF_IPTABLES
 	---help---
 
@@ -506,6 +494,12 @@ config IP_NF_NAT_PPTP
 	depends on IP_NF_NAT!=n && IP_NF_PPTP!=n
 	default IP_NF_NAT if IP_NF_PPTP=y
 	default m if IP_NF_PPTP=m
+
+config IP_NF_NAT_H323
+	tristate
+	depends on IP_NF_IPTABLES!=n && IP_NF_CONNTRACK!=n && IP_NF_NAT!=n
+	default IP_NF_NAT if IP_NF_H323=y
+	default m if IP_NF_H323=m
 
 # mangle + specific targets
 config IP_NF_MANGLE

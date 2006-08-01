@@ -28,7 +28,6 @@
 #include <linux/spinlock.h>
 #include <linux/cache.h>
 #include <linux/err.h>
-#include <linux/dump.h>
 #include <linux/sysdev.h>
 #include <linux/cpu.h>
 #include <linux/notifier.h>
@@ -72,7 +71,6 @@ EXPORT_SYMBOL(cpu_possible_map);
 struct smp_ops_t *smp_ops;
 
 static volatile unsigned int cpu_callin_map[NR_CPUS];
-static int (*dump_ipi_function_ptr)(struct pt_regs *) = NULL;
 
 void smp_call_function_interrupt(void);
 
@@ -128,22 +126,16 @@ void smp_message_recv(int msg, struct pt_regs *regs)
 		/* XXX Do we have to do this? */
 		set_need_resched();
 		break;
-#if defined(CONFIG_DEBUGGER) || defined(CONFIG_LKCD_DUMP) \
-		|| defined(CONFIG_LKCD_DUMP_MODULE)
 	case PPC_MSG_DEBUGGER_BREAK:
 		if (crash_ipi_function_ptr) {
 			crash_ipi_function_ptr(regs);
 			break;
 		}
-		if (dump_ipi_function_ptr) {
-			dump_ipi_function_ptr(regs);
-		}
 #ifdef CONFIG_DEBUGGER
-		else
-			debugger_ipi(regs);
-#endif /* CONFIG_DEBUGGER */
+		debugger_ipi(regs);
 		break;
-#endif
+#endif /* CONFIG_DEBUGGER */
+		/* FALLTHROUGH */
 	default:
 		printk("SMP %d: smp_message_recv(): unknown msg %d\n",
 		       smp_processor_id(), msg);
@@ -174,16 +166,7 @@ void crash_send_ipi(void (*crash_ipi_callback)(struct pt_regs *))
 }
 #endif
 
-void dump_send_ipi(int (*dump_ipi_callback)(struct pt_regs *))
-{
-	dump_ipi_function_ptr = dump_ipi_callback;
-	if (dump_ipi_callback) {
-		mb();
-		smp_ops->message_pass(MSG_ALL_BUT_SELF, PPC_MSG_DEBUGGER_BREAK);
-	}
-}
-
-void stop_this_cpu(void *dummy)
+static void stop_this_cpu(void *dummy)
 {
 	local_irq_disable();
 	while (1)
@@ -379,7 +362,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
  
 	smp_space_timers(max_cpus);
 
-	for_each_cpu(cpu)
+	for_each_possible_cpu(cpu)
 		if (cpu != boot_cpuid)
 			smp_create_idle(cpu);
 }

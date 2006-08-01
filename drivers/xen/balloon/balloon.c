@@ -170,7 +170,7 @@ static unsigned long current_target(void)
 
 static int increase_reservation(unsigned long nr_pages)
 {
-	unsigned long *frame_list, frame, pfn, i, flags;
+	unsigned long *frame_list, pfn, i, flags;
 	struct page   *page;
 	long           rc;
 	struct xen_memory_reservation reservation = {
@@ -183,11 +183,8 @@ static int increase_reservation(unsigned long nr_pages)
 		nr_pages = PAGE_SIZE / sizeof(unsigned long);
 
 	frame_list = (unsigned long *)__get_free_page(GFP_KERNEL);
-	if (frame_list == NULL) {
-		frame_list = &frame;
-		if (nr_pages > 1)
-			nr_pages = 1;
-	}
+	if (frame_list == NULL)
+		return -ENOMEM;
 
 	balloon_lock(flags);
 
@@ -203,17 +200,14 @@ static int increase_reservation(unsigned long nr_pages)
 	rc = HYPERVISOR_memory_op(
 		XENMEM_populate_physmap, &reservation);
 	if (rc < nr_pages) {
-		if (rc > 0) {
-			int ret;
-
-			/* We hit the Xen hard limit: reprobe. */
-			reservation.nr_extents = rc;
-			ret = HYPERVISOR_memory_op(XENMEM_decrease_reservation,
-					&reservation);
-			BUG_ON(ret != rc);
-		}
-		if (rc >= 0)
-			hard_limit = current_pages + rc - driver_pages;
+		int ret;
+		/* We hit the Xen hard limit: reprobe. */
+		reservation.extent_start = frame_list;
+		reservation.nr_extents   = rc;
+		ret = HYPERVISOR_memory_op(XENMEM_decrease_reservation,
+				&reservation);
+		BUG_ON(ret != rc);
+		hard_limit = current_pages + rc - driver_pages;
 		goto out;
 	}
 
@@ -250,15 +244,14 @@ static int increase_reservation(unsigned long nr_pages)
  out:
 	balloon_unlock(flags);
 
-	if (frame_list != &frame)
-		free_page((unsigned long)frame_list);
+	free_page((unsigned long)frame_list);
 
 	return 0;
 }
 
 static int decrease_reservation(unsigned long nr_pages)
 {
-	unsigned long *frame_list, frame, pfn, i, flags;
+	unsigned long *frame_list, pfn, i, flags;
 	struct page   *page;
 	void          *v;
 	int            need_sleep = 0;
@@ -273,11 +266,8 @@ static int decrease_reservation(unsigned long nr_pages)
 		nr_pages = PAGE_SIZE / sizeof(unsigned long);
 
 	frame_list = (unsigned long *)__get_free_page(GFP_KERNEL);
-	if (frame_list == NULL) {
-		frame_list = &frame;
-		if (nr_pages > 1)
-			nr_pages = 1;
-	}
+	if (frame_list == NULL)
+		return -ENOMEM;
 
 	for (i = 0; i < nr_pages; i++) {
 		if ((page = alloc_page(GFP_HIGHUSER)) == NULL) {
@@ -328,8 +318,7 @@ static int decrease_reservation(unsigned long nr_pages)
 
 	balloon_unlock(flags);
 
-	if (frame_list != &frame)
-		free_page((unsigned long)frame_list);
+	free_page((unsigned long)frame_list);
 
 	return need_sleep;
 }
@@ -381,49 +370,11 @@ static struct xenbus_watch target_watch =
 	.node = "memory/target"
 };
 
-/*
- * Compute the minimum value this domain can be ballooned down to
- * (in kilo bytes).
- */
-static unsigned long  min_target(void)
-{
-	unsigned long	min_kib;
-	unsigned long	curr_kib = current_target() << (PAGE_SHIFT - 10);
-	const unsigned long	max_kib = max_pfn << (PAGE_SHIFT - 10);
-
-	/* Simple continuous piecewiese linear function:
-	 *  max	MB -> min MB	gradient
-	 *       0	   0
-	 *      16	  16
-	 *      32	  24
-	 *     128	  72	(1/2)
-	 *     512 	 168	(1/4)
-	 *    2048	 360	(1/8)
-	 *    8192	 552	(1/32)
-	 *   32768	1320
-	 *   65536	2344
-	 */
-	if (max_kib < 131072UL)
-		min_kib = 8192UL + (max_kib >> 1);
-	else if (max_kib < 524288UL)
-		min_kib = 40960UL + (max_kib >> 2);
-	else if (max_kib < 2097152UL)
-		min_kib = 106496UL + (max_kib >> 3);
-	else
-		min_kib = 303104UL + (max_kib >> 5);
-
-	if (min_kib > curr_kib)
-		min_kib = curr_kib;	/* Don't enforce growth */
-
-	return min_kib;
-}
-
 /* React to a change in the target key */
 static void watch_target(struct xenbus_watch *watch,
 			 const char **vec, unsigned int len)
 {
 	unsigned long long new_target;
-	unsigned long min_value = min_target();
 	int err;
 
 	err = xenbus_scanf(XBT_NULL, "memory", "target", "%llu", &new_target);
@@ -434,13 +385,7 @@ static void watch_target(struct xenbus_watch *watch,
         
 	/* The given memory/target value is in KiB, so it needs converting to
 	   pages.  PAGE_SHIFT converts bytes to pages, hence PAGE_SHIFT - 10.
-	   But first make sure that we are not lowering the value below the
-	   "minimum".
 	*/
-	if (new_target < min_value)
-		new_target = min_value;
-
-	printk(KERN_INFO "Setting mem allocation to %llu kiB\n", new_target);
 	set_new_target(new_target >> (PAGE_SHIFT - 10));
     
 }
@@ -635,3 +580,13 @@ EXPORT_SYMBOL_GPL(balloon_alloc_empty_page_range);
 EXPORT_SYMBOL_GPL(balloon_dealloc_empty_page_range);
 
 MODULE_LICENSE("Dual BSD/GPL");
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

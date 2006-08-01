@@ -14,50 +14,46 @@
 
 int nfsd_setuser(struct svc_rqst *rqstp, struct svc_export *exp)
 {
-	struct svc_cred	*cred = &rqstp->rq_cred;
+	struct svc_cred	cred = rqstp->rq_cred;
 	int i;
 	int ret;
-	uid_t luid = cred->cr_uid;
-	gid_t lgid = cred->cr_gid;
-	struct group_info *gi = NULL;
 
 	if (exp->ex_flags & NFSEXP_ALLSQUASH) {
-		luid = exp->ex_anon_uid;
-		lgid = exp->ex_anon_gid;
-		gi = groups_alloc(0);
-		if (!gi)
-			return -ENOMEM;
+		cred.cr_uid = exp->ex_anon_uid;
+		cred.cr_gid = exp->ex_anon_gid;
+		cred.cr_group_info = groups_alloc(0);
 	} else if (exp->ex_flags & NFSEXP_ROOTSQUASH) {
-		if (!cred->cr_uid)
-			luid = exp->ex_anon_uid;
-		if (!cred->cr_gid)
-			lgid = exp->ex_anon_gid;
-		gi = groups_alloc(cred->cr_group_info->ngroups);
-		if (!gi)
-			return -ENOMEM;
-		for (i = 0; i < cred->cr_group_info->ngroups; i++) {
-			if (!GROUP_AT(cred->cr_group_info, i))
-				GROUP_AT(gi, i) = exp->ex_anon_gid;
-			else
-				GROUP_AT(gi, i) = GROUP_AT(cred->cr_group_info, i);
-		}
-	}
+		struct group_info *gi;
+		if (!cred.cr_uid)
+			cred.cr_uid = exp->ex_anon_uid;
+		if (!cred.cr_gid)
+			cred.cr_gid = exp->ex_anon_gid;
+		gi = groups_alloc(cred.cr_group_info->ngroups);
+		if (gi)
+			for (i = 0; i < cred.cr_group_info->ngroups; i++) {
+				if (!GROUP_AT(cred.cr_group_info, i))
+					GROUP_AT(gi, i) = exp->ex_anon_gid;
+				else
+					GROUP_AT(gi, i) = GROUP_AT(cred.cr_group_info, i);
+			}
+		cred.cr_group_info = gi;
+	} else
+		get_group_info(cred.cr_group_info);
 
-	if (luid != (uid_t) -1)
-		current->fsuid = luid;
+	if (cred.cr_uid != (uid_t) -1)
+		current->fsuid = cred.cr_uid;
 	else
 		current->fsuid = exp->ex_anon_uid;
-	if (lgid != (gid_t) -1)
-		current->fsgid = lgid;
+	if (cred.cr_gid != (gid_t) -1)
+		current->fsgid = cred.cr_gid;
 	else
 		current->fsgid = exp->ex_anon_gid;
 
-	if (gi) {
-		ret = set_current_groups(gi);
-		put_group_info(gi);
-	} else
-		ret = set_current_groups(cred->cr_group_info);
-	if ((luid)) {
+	if (!cred.cr_group_info)
+		return -ENOMEM;
+	ret = set_current_groups(cred.cr_group_info);
+	put_group_info(cred.cr_group_info);
+	if ((cred.cr_uid)) {
 		cap_t(current->cap_effective) &= ~CAP_NFSD_MASK;
 	} else {
 		cap_t(current->cap_effective) |= (CAP_NFSD_MASK &

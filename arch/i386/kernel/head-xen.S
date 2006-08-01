@@ -163,7 +163,7 @@ ENTRY(cpu_gdt_table)
 	.ascii	         "|pae_pgdir_above_4gb"
 	.ascii	         "|supervisor_mode_kernel"
 #ifdef CONFIG_X86_PAE
-	.ascii	",PAE=yes[extended-cr3]"
+	.ascii	",PAE=yes"
 #else
 	.ascii	",PAE=no"
 #endif

@@ -296,7 +296,6 @@ typedef enum {
 /* Initialization */
 int32_t e1000_reset_hw(struct e1000_hw *hw);
 int32_t e1000_init_hw(struct e1000_hw *hw);
-int32_t e1000_id_led_init(struct e1000_hw * hw);
 int32_t e1000_set_mac_type(struct e1000_hw *hw);
 void e1000_set_media_type(struct e1000_hw *hw);
 
@@ -304,10 +303,8 @@ void e1000_set_media_type(struct e1000_hw *hw);
 int32_t e1000_setup_link(struct e1000_hw *hw);
 int32_t e1000_phy_setup_autoneg(struct e1000_hw *hw);
 void e1000_config_collision_dist(struct e1000_hw *hw);
-int32_t e1000_config_fc_after_link_up(struct e1000_hw *hw);
 int32_t e1000_check_for_link(struct e1000_hw *hw);
 int32_t e1000_get_speed_and_duplex(struct e1000_hw *hw, uint16_t * speed, uint16_t * duplex);
-int32_t e1000_wait_autoneg(struct e1000_hw *hw);
 int32_t e1000_force_mac_fc(struct e1000_hw *hw);
 
 /* PHY */
@@ -315,24 +312,13 @@ int32_t e1000_read_phy_reg(struct e1000_hw *hw, uint32_t reg_addr, uint16_t *phy
 int32_t e1000_write_phy_reg(struct e1000_hw *hw, uint32_t reg_addr, uint16_t data);
 int32_t e1000_phy_hw_reset(struct e1000_hw *hw);
 int32_t e1000_phy_reset(struct e1000_hw *hw);
-int32_t e1000_detect_gig_phy(struct e1000_hw *hw);
 int32_t e1000_phy_get_info(struct e1000_hw *hw, struct e1000_phy_info *phy_info);
-int32_t e1000_phy_m88_get_info(struct e1000_hw *hw, struct e1000_phy_info *phy_info);
-int32_t e1000_phy_igp_get_info(struct e1000_hw *hw, struct e1000_phy_info *phy_info);
-int32_t e1000_get_cable_length(struct e1000_hw *hw, uint16_t *min_length, uint16_t *max_length);
-int32_t e1000_check_polarity(struct e1000_hw *hw, uint16_t *polarity);
-int32_t e1000_check_downshift(struct e1000_hw *hw);
 int32_t e1000_validate_mdi_setting(struct e1000_hw *hw);
 int32_t e1000_read_kmrn_reg(struct e1000_hw *hw, uint32_t reg_addr, uint16_t *data);
 int32_t e1000_write_kmrn_reg(struct e1000_hw *hw, uint32_t reg_addr, uint16_t data);
-int32_t e1000_duplex_reversal(struct e1000_hw *hw);
 
 /* EEPROM Functions */
 int32_t e1000_init_eeprom_params(struct e1000_hw *hw);
-boolean_t e1000_is_onboard_nvm_eeprom(struct e1000_hw *hw);
-int32_t e1000_read_eeprom_eerd(struct e1000_hw *hw, uint16_t offset, uint16_t words, uint16_t *data);
-int32_t e1000_write_eeprom_eewr(struct e1000_hw *hw, uint16_t offset, uint16_t words, uint16_t *data);
-int32_t e1000_poll_eerd_eewr_done(struct e1000_hw *hw, int eerd);
 
 /* MNG HOST IF functions */
 uint32_t e1000_enable_mng_pass_thru(struct e1000_hw *hw);
@@ -364,7 +350,7 @@ struct e1000_host_mng_command_info {
     struct e1000_host_mng_command_header command_header;  /* Command Head/Command Result Head has 4 bytes */
     uint8_t command_data[E1000_HI_MAX_MNG_DATA_LENGTH];   /* Command data can length 0..0x658*/
 };
-#ifdef E1000_BIG_ENDIAN
+#ifdef __BIG_ENDIAN
 struct e1000_host_mng_dhcp_cookie{
     uint32_t signature;
     uint16_t vlan_id;
@@ -392,13 +378,6 @@ int32_t e1000_mng_write_dhcp_info(struct e1000_hw *hw, uint8_t *buffer,
 							uint16_t length);
 boolean_t e1000_check_mng_mode(struct e1000_hw *hw);
 boolean_t e1000_enable_tx_pkt_filtering(struct e1000_hw *hw);
-int32_t e1000_mng_enable_host_if(struct e1000_hw *hw);
-int32_t e1000_mng_host_if_write(struct e1000_hw *hw, uint8_t *buffer,
-                            uint16_t length, uint16_t offset, uint8_t *sum);
-int32_t e1000_mng_write_cmd_header(struct e1000_hw* hw, 
-                                   struct e1000_host_mng_command_header* hdr);
-
-int32_t e1000_mng_write_commit(struct e1000_hw *hw);
 
 int32_t e1000_read_eeprom(struct e1000_hw *hw, uint16_t reg, uint16_t words, uint16_t *data);
 int32_t e1000_validate_eeprom_checksum(struct e1000_hw *hw);
@@ -410,13 +389,11 @@ int32_t e1000_swfw_sync_acquire(struct e1000_hw *hw, uint16_t mask);
 void e1000_swfw_sync_release(struct e1000_hw *hw, uint16_t mask);
 
 /* Filters (multicast, vlan, receive) */
-void e1000_init_rx_addrs(struct e1000_hw *hw);
 void e1000_mc_addr_list_update(struct e1000_hw *hw, uint8_t * mc_addr_list, uint32_t mc_addr_count, uint32_t pad, uint32_t rar_used_count);
 uint32_t e1000_hash_mc_addr(struct e1000_hw *hw, uint8_t * mc_addr);
 void e1000_mta_set(struct e1000_hw *hw, uint32_t hash_value);
 void e1000_rar_set(struct e1000_hw *hw, uint8_t * mc_addr, uint32_t rar_index);
 void e1000_write_vfta(struct e1000_hw *hw, uint32_t offset, uint32_t value);
-void e1000_clear_vfta(struct e1000_hw *hw);
 
 /* LED functions */
 int32_t e1000_setup_led(struct e1000_hw *hw);
@@ -427,7 +404,6 @@ int32_t e1000_led_off(struct e1000_hw *hw);
 /* Adaptive IFS Functions */
 
 /* Everything else */
-void e1000_clear_hw_cntrs(struct e1000_hw *hw);
 void e1000_reset_adaptive(struct e1000_hw *hw);
 void e1000_update_adaptive(struct e1000_hw *hw);
 void e1000_tbi_adjust_stats(struct e1000_hw *hw, struct e1000_hw_stats *stats, uint32_t frame_len, uint8_t * mac_addr);
@@ -440,28 +416,11 @@ void e1000_write_pci_cfg(struct e1000_hw *hw, uint32_t reg, uint16_t * value);
 uint32_t e1000_io_read(struct e1000_hw *hw, unsigned long port);
 uint32_t e1000_read_reg_io(struct e1000_hw *hw, uint32_t offset);
 void e1000_io_write(struct e1000_hw *hw, unsigned long port, uint32_t value);
-void e1000_write_reg_io(struct e1000_hw *hw, uint32_t offset, uint32_t value);
-int32_t e1000_config_dsp_after_link_change(struct e1000_hw *hw, boolean_t link_up);
-int32_t e1000_set_d3_lplu_state(struct e1000_hw *hw, boolean_t active);
-int32_t e1000_set_d0_lplu_state(struct e1000_hw *hw, boolean_t active);
-void e1000_set_pci_express_master_disable(struct e1000_hw *hw);
 void e1000_enable_pciex_master(struct e1000_hw *hw);
 int32_t e1000_disable_pciex_master(struct e1000_hw *hw);
-int32_t e1000_get_auto_rd_done(struct e1000_hw *hw);
-int32_t e1000_get_phy_cfg_done(struct e1000_hw *hw);
 int32_t e1000_get_software_semaphore(struct e1000_hw *hw);
 void e1000_release_software_semaphore(struct e1000_hw *hw);
 int32_t e1000_check_phy_reset_block(struct e1000_hw *hw);
-int32_t e1000_get_hw_eeprom_semaphore(struct e1000_hw *hw);
-void e1000_put_hw_eeprom_semaphore(struct e1000_hw *hw);
-int32_t e1000_commit_shadow_ram(struct e1000_hw *hw);
-uint8_t e1000_arc_subsystem_valid(struct e1000_hw *hw);
-int32_t e1000_set_pci_ex_no_snoop(struct e1000_hw *hw, uint32_t no_snoop);
-
-#define E1000_READ_REG_IO(a, reg) \
-    e1000_read_reg_io((a), E1000_##reg)
-#define E1000_WRITE_REG_IO(a, reg, val) \
-    e1000_write_reg_io((a), E1000_##reg, val)
 
 /* PCI Device IDs */
 #define E1000_DEV_ID_82542               0x1000
@@ -503,7 +462,6 @@ int32_t e1000_set_pci_ex_no_snoop(struct e1000_hw *hw, uint32_t no_snoop);
 #define E1000_DEV_ID_82572EI_COPPER      0x107D
 #define E1000_DEV_ID_82572EI_FIBER       0x107E
 #define E1000_DEV_ID_82572EI_SERDES      0x107F
-#define E1000_DEV_ID_82572EI             0x10B9
 #define E1000_DEV_ID_82573E              0x108B
 #define E1000_DEV_ID_82573E_IAMT         0x108C
 #define E1000_DEV_ID_82573L              0x109A
@@ -1351,7 +1309,7 @@ struct e1000_hw_stats {
 
 /* Structure containing variables used by the shared code (e1000_hw.c) */
 struct e1000_hw {
-    uint8_t *hw_addr;
+    uint8_t __iomem *hw_addr;
     uint8_t *flash_address;
     e1000_mac_type mac_type;
     e1000_phy_type phy_type;
@@ -2106,7 +2064,7 @@ struct e1000_host_command_info {
 
 #define E1000_MDALIGN          4096
 
-/* PCI-Ex registers*/
+/* PCI-Ex registers */
 
 /* PCI-Ex Control Register */
 #define E1000_GCR_RXD_NO_SNOOP          0x00000001

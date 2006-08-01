@@ -85,6 +85,8 @@
 #include <linux/pnp.h>
 #include <linux/isapnp.h>
 #include <linux/moduleparam.h>
+#include <linux/delay.h>
+
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <sound/core.h>
@@ -2204,7 +2206,7 @@ static int __devinit snd_audiodrive_probe(struct snd_card *card, int dev)
 	return snd_card_register(card);
 }
 
-static int __init snd_es18xx_nonpnp_probe1(int dev, struct platform_device *devptr)
+static int __devinit snd_es18xx_nonpnp_probe1(int dev, struct platform_device *devptr)
 {
 	struct snd_card *card;
 	int err;
@@ -2221,7 +2223,7 @@ static int __init snd_es18xx_nonpnp_probe1(int dev, struct platform_device *devp
 	return 0;
 }
 
-static int __init snd_es18xx_nonpnp_probe(struct platform_device *pdev)
+static int __devinit snd_es18xx_nonpnp_probe(struct platform_device *pdev)
 {
 	int dev = pdev->id;
 	int err;
@@ -2297,6 +2299,8 @@ static struct platform_driver snd_es18xx_nonpnp_driver = {
 
 
 #ifdef CONFIG_PNP
+static unsigned int __devinitdata es18xx_pnp_devices;
+
 static int __devinit snd_audiodrive_pnp_detect(struct pnp_card_link *pcard,
 					       const struct pnp_card_device_id *pid)
 {
@@ -2327,6 +2331,7 @@ static int __devinit snd_audiodrive_pnp_detect(struct pnp_card_link *pcard,
 
 	pnp_set_card_drvdata(pcard, card);
 	dev++;
+	es18xx_pnp_devices++;
 	return 0;
 }
 
@@ -2388,19 +2393,21 @@ static int __init alsa_card_es18xx_init(void)
 			continue;
 		device = platform_device_register_simple(ES18XX_DRIVER,
 							 i, NULL, 0);
-		if (IS_ERR(device)) {
-			err = PTR_ERR(device);
-			goto errout;
+		if (IS_ERR(device))
+	       		continue;
+		if (!platform_get_drvdata(device)) {
+			platform_device_unregister(device);
+			continue;
 		}
 		platform_devices[i] = device;
 		cards++;
 	}
 
 #ifdef CONFIG_PNP
-	i = pnp_register_card_driver(&es18xx_pnpc_driver);
-	if (i >= 0) {
+	err = pnp_register_card_driver(&es18xx_pnpc_driver);
+	if (!err) {
 		pnp_registered = 1;
-		cards += i;
+		cards += es18xx_pnp_devices;
 	}
 #endif
 
@@ -2408,14 +2415,10 @@ static int __init alsa_card_es18xx_init(void)
 #ifdef MODULE
 		snd_printk(KERN_ERR "ESS AudioDrive ES18xx soundcard not found or device busy\n");
 #endif
-		err = -ENODEV;
-		goto errout;
+		snd_es18xx_unregister_all();
+		return -ENODEV;
 	}
 	return 0;
-
- errout:
-	snd_es18xx_unregister_all();
-	return err;
 }
 
 static void __exit alsa_card_es18xx_exit(void)

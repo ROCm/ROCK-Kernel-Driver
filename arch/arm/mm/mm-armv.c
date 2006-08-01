@@ -376,7 +376,7 @@ void __init build_mem_type_table(void)
 		ecc_mask = 0;
 	}
 
-	if (cpu_arch <= CPU_ARCH_ARMv5TEJ) {
+	if (cpu_arch <= CPU_ARCH_ARMv5TEJ && !cpu_is_xscale()) {
 		for (i = 0; i < ARRAY_SIZE(mem_types); i++) {
 			if (mem_types[i].prot_l1)
 				mem_types[i].prot_l1 |= PMD_BIT4;
@@ -387,6 +387,17 @@ void __init build_mem_type_table(void)
 
 	cp = &cache_policies[cachepolicy];
 	kern_pgprot = user_pgprot = cp->pte;
+
+	/*
+	 * Enable CPU-specific coherency if supported.
+	 * (Only available on XSC3 at the moment.)
+	 */
+	if (arch_is_coherent()) {
+		if (cpu_is_xsc3()) {
+			mem_types[MT_MEMORY].prot_sect |= PMD_SECT_S;
+			mem_types[MT_MEMORY].prot_pte |= L_PTE_COHERENT;
+		}
+	}
 
 	/*
 	 * ARMv6 and above have extended page tables.
@@ -557,7 +568,8 @@ void __init create_mapping(struct map_desc *md)
 	 *	supersections are only allocated for domain 0 regardless
 	 *	of the actual domain assignments in use.
 	 */
-	if (cpu_architecture() >= CPU_ARCH_ARMv6 && domain == 0) {
+	if ((cpu_architecture() >= CPU_ARCH_ARMv6 || cpu_is_xsc3())
+		&& domain == 0) {
 		/*
 		 * Align to supersection boundary if !high pages.
 		 * High pages have already been checked for proper
@@ -619,7 +631,7 @@ void setup_mm_for_reboot(char mode)
 		pgd = init_mm.pgd;
 
 	base_pmdval = PMD_SECT_AP_WRITE | PMD_SECT_AP_READ | PMD_TYPE_SECT;
-	if (cpu_architecture() <= CPU_ARCH_ARMv5TEJ)
+	if (cpu_architecture() <= CPU_ARCH_ARMv5TEJ && !cpu_is_xscale())
 		base_pmdval |= PMD_BIT4;
 
 	for (i = 0; i < FIRST_USER_PGD_NR + USER_PTRS_PER_PGD; i++, pgd++) {

@@ -326,6 +326,8 @@ out:
         .p_encode = (kxdrproc_t) nfs4_xdr_##argtype,                    \
         .p_decode = (kxdrproc_t) nfs4_xdr_##restype,                    \
         .p_bufsiz = MAX(NFS4_##argtype##_sz,NFS4_##restype##_sz) << 2,  \
+        .p_statidx = NFSPROC4_CB_##call,				\
+	.p_name   = #proc,                                              \
 }
 
 static struct rpc_procinfo     nfs4_cb_procedures[] = {
@@ -335,7 +337,7 @@ static struct rpc_procinfo     nfs4_cb_procedures[] = {
 
 static struct rpc_version       nfs_cb_version4 = {
         .number                 = 1,
-        .nrprocs                = sizeof(nfs4_cb_procedures)/sizeof(nfs4_cb_procedures[0]),
+        .nrprocs                = ARRAY_SIZE(nfs4_cb_procedures),
         .procs                  = nfs4_cb_procedures
 };
 
@@ -411,7 +413,7 @@ nfsd4_probe_callback(struct nfs4_client *clp)
 	/* Initialize rpc_program */
 	program->name = "nfs4_cb";
 	program->number = cb->cb_prog;
-	program->nrvers = sizeof(nfs_cb_version)/sizeof(nfs_cb_version[0]);
+	program->nrvers = ARRAY_SIZE(nfs_cb_version);
 	program->version = nfs_cb_version;
 	program->stats = stat;
 
@@ -439,8 +441,9 @@ nfsd4_probe_callback(struct nfs4_client *clp)
 		goto out_clnt;
 	}
 
-	/* the task holds a reference to the nfs4_client struct */
 	cb->cb_client = clnt;
+
+	/* the task holds a reference to the nfs4_client struct */
 	atomic_inc(&clp->cl_count);
 
 	msg.rpc_cred = nfsd4_lookupcred(clp,0);
@@ -458,13 +461,12 @@ nfsd4_probe_callback(struct nfs4_client *clp)
 out_rpciod:
 	atomic_dec(&clp->cl_count);
 	rpciod_down();
+	cb->cb_client = NULL;
 out_clnt:
 	rpc_shutdown_client(clnt);
-	goto out_err;
 out_err:
 	dprintk("NFSD: warning: no callback path to client %.*s\n",
 		(int)clp->cl_name.len, clp->cl_name.data);
-	cb->cb_client = NULL;
 }
 
 static void

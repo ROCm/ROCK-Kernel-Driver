@@ -138,7 +138,7 @@ boot := arch/sh/boot
 CPPFLAGS_vmlinux.lds := -traditional
 
 ifneq ($(KBUILD_SRC),)
-	incdir-prefix	:= $(srctree)/include/asm-sh/
+incdir-prefix	:= $(srctree)/include/asm-sh/
 else
 incdir-prefix	:=
 endif
@@ -172,8 +172,8 @@ include/asm-sh/.mach: $(wildcard include/config/sh/*.h) include/config/MARKER
 
 archprepare: maketools include/asm-sh/.cpu include/asm-sh/.mach
 
-.PHONY: maketools FORCE
-maketools:  $(objtree)/include/linux/version.h FORCE
+PHONY += maketools FORCE
+maketools:  include/linux/version.h FORCE
 	$(Q)$(MAKE) $(build)=arch/sh/tools include/asm-sh/machtypes.h
 
 all: zImage

@@ -4,7 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1999 Helge Deller (07-13-1999)
+ * Copyright (C) 1999-2006 Helge Deller <deller@gmx.de> (07-13-1999)
  * Copyright (C) 1999 SuSE GmbH Nuernberg
  * Copyright (C) 2000 Philipp Rumpf (prumpf@tux.org)
  *
@@ -89,7 +89,7 @@ update_mmu_cache(struct vm_area_struct *vma, unsigned long address, pte_t pte)
 	if (pfn_valid(page_to_pfn(page)) && page_mapping(page) &&
 	    test_bit(PG_dcache_dirty, &page->flags)) {
 
-		flush_kernel_dcache_page(page_address(page));
+		flush_kernel_dcache_page(page);
 		clear_bit(PG_dcache_dirty, &page->flags);
 	}
 }
@@ -278,7 +278,7 @@ void flush_dcache_page(struct page *page)
 		return;
 	}
 
-	flush_kernel_dcache_page(page_address(page));
+	flush_kernel_dcache_page(page);
 
 	if (!mapping)
 		return;
@@ -317,7 +317,7 @@ EXPORT_SYMBOL(flush_dcache_page);
 
 /* Defined in arch/parisc/kernel/pacache.S */
 EXPORT_SYMBOL(flush_kernel_dcache_range_asm);
-EXPORT_SYMBOL(flush_kernel_dcache_page);
+EXPORT_SYMBOL(flush_kernel_dcache_page_asm);
 EXPORT_SYMBOL(flush_data_cache_local);
 EXPORT_SYMBOL(flush_kernel_icache_range_asm);
 
@@ -358,5 +358,5 @@ void parisc_setup_cache_timing(void)
 	if (!parisc_cache_flush_threshold)
 		parisc_cache_flush_threshold = FLUSH_THRESHOLD;
 
-	printk("Setting cache flush threshold to %x (%d CPUs online)\n", parisc_cache_flush_threshold, num_online_cpus());
+	printk(KERN_INFO "Setting cache flush threshold to %x (%d CPUs online)\n", parisc_cache_flush_threshold, num_online_cpus());
 }

@@ -190,18 +190,18 @@ xfs_cleanup(void)
 	ktrace_free(xfs_alloc_trace_buf);
 #endif
 
-	kmem_cache_destroy(xfs_bmap_free_item_zone);
-	kmem_cache_destroy(xfs_btree_cur_zone);
-	kmem_cache_destroy(xfs_inode_zone);
-	kmem_cache_destroy(xfs_trans_zone);
-	kmem_cache_destroy(xfs_da_state_zone);
-	kmem_cache_destroy(xfs_dabuf_zone);
-	kmem_cache_destroy(xfs_buf_item_zone);
-	kmem_cache_destroy(xfs_efd_zone);
-	kmem_cache_destroy(xfs_efi_zone);
-	kmem_cache_destroy(xfs_ifork_zone);
-	kmem_cache_destroy(xfs_ili_zone);
-	kmem_cache_destroy(xfs_chashlist_zone);
+	kmem_zone_destroy(xfs_bmap_free_item_zone);
+	kmem_zone_destroy(xfs_btree_cur_zone);
+	kmem_zone_destroy(xfs_inode_zone);
+	kmem_zone_destroy(xfs_trans_zone);
+	kmem_zone_destroy(xfs_da_state_zone);
+	kmem_zone_destroy(xfs_dabuf_zone);
+	kmem_zone_destroy(xfs_buf_item_zone);
+	kmem_zone_destroy(xfs_efd_zone);
+	kmem_zone_destroy(xfs_efi_zone);
+	kmem_zone_destroy(xfs_ifork_zone);
+	kmem_zone_destroy(xfs_ili_zone);
+	kmem_zone_destroy(xfs_chashlist_zone);
 }
 
 /*
@@ -272,8 +272,6 @@ xfs_start_flags(
 		mp->m_inoadd = XFS_INO64_OFFSET;
 	}
 #endif
-	if (ap->flags & XFSMNT_NOATIME)
-		mp->m_flags |= XFS_MOUNT_NOATIME;
 	if (ap->flags & XFSMNT_RETERR)
 		mp->m_flags |= XFS_MOUNT_RETERR;
 	if (ap->flags & XFSMNT_NOALIGN)
@@ -444,6 +442,9 @@ xfs_mount(
 	p = vfs_bhv_lookup(vfsp, VFS_POSITION_IO);
 	mp->m_io_ops = p ? *(xfs_ioops_t *) vfs_bhv_custom(p) : xfs_iocore_xfs;
 
+	if (args->flags & XFSMNT_QUIET)
+		flags |= XFS_MFSI_QUIET;
+
 	/*
 	 * Open real time and log devices - order is important.
 	 */
@@ -494,7 +495,7 @@ xfs_mount(
 	error = xfs_start_flags(vfsp, args, mp);
 	if (error)
 		goto error1;
-	error = xfs_readsb(mp);
+	error = xfs_readsb(mp, flags);
 	if (error)
 		goto error1;
 	error = xfs_finish_flags(vfsp, args, mp);
@@ -634,7 +635,7 @@ xfs_quiesce_fs(
 	xfs_mount_t		*mp)
 {
 	int			count = 0, pincount;
-		
+
 	xfs_refcache_purge_mp(mp);
 	xfs_flush_buftarg(mp->m_ddev_targp, 0);
 	xfs_finish_reclaim_all(mp, 0);
@@ -645,7 +646,7 @@ xfs_quiesce_fs(
 	 * meta data (typically directory updates).
 	 * Which then must be flushed and logged before
 	 * we can write the unmount record.
-	 */ 
+	 */
 	do {
 		xfs_syncsub(mp, SYNC_REMOUNT|SYNC_ATTR|SYNC_WAIT, 0, NULL);
 		pincount = xfs_flush_buftarg(mp->m_ddev_targp, 1);
@@ -671,10 +672,6 @@ xfs_mntupdate(
 	if (!(*flags & MS_RDONLY)) {			/* rw/ro -> rw */
 		if (vfsp->vfs_flag & VFS_RDONLY)
 			vfsp->vfs_flag &= ~VFS_RDONLY;
-		if (args->flags & XFSMNT_NOATIME)
-			mp->m_flags |= XFS_MOUNT_NOATIME;
-		else
-			mp->m_flags &= ~XFS_MOUNT_NOATIME;
 		if (args->flags & XFSMNT_BARRIER) {
 			mp->m_flags |= XFS_MOUNT_BARRIER;
 			xfs_mountfs_check_barriers(mp);
@@ -877,10 +874,10 @@ xfs_statvfs(
  *		       determine if they should be flushed sync, async, or
  *		       delwri.
  *      SYNC_CLOSE   - This flag is passed when the system is being
- *		       unmounted.  We should sync and invalidate everthing.
+ *		       unmounted.  We should sync and invalidate everything.
  *      SYNC_FSDATA  - This indicates that the caller would like to make
  *		       sure the superblock is safe on disk.  We can ensure
- *		       this by simply makeing sure the log gets flushed
+ *		       this by simply making sure the log gets flushed
  *		       if SYNC_BDFLUSH is set, and by actually writing it
  *		       out otherwise.
  *
@@ -905,7 +902,7 @@ xfs_sync(
  *
  * This routine supports all of the flags defined for the generic VFS_SYNC
  * interface as explained above under xfs_sync.  In the interests of not
- * changing interfaces within the 6.5 family, additional internallly-
+ * changing interfaces within the 6.5 family, additional internally-
  * required functions are specified within a separate xflags parameter,
  * only available by calling this routine.
  *
@@ -1087,7 +1084,7 @@ xfs_sync_inodes(
 		 * If this is just vfs_sync() or pflushd() calling
 		 * then we can skip inodes for which it looks like
 		 * there is nothing to do.  Since we don't have the
-		 * inode locked this is racey, but these are periodic
+		 * inode locked this is racy, but these are periodic
 		 * calls so it doesn't matter.  For the others we want
 		 * to know for sure, so we at least try to lock them.
 		 */
@@ -1226,7 +1223,7 @@ xfs_sync_inodes(
 					xfs_iunlock(ip, XFS_ILOCK_SHARED);
 
 					error = xfs_itobp(mp, NULL, ip,
-							  &dip, &bp, 0);
+							  &dip, &bp, 0, 0);
 					if (!error) {
 						xfs_buf_relse(bp);
 					} else {
@@ -1426,7 +1423,7 @@ xfs_sync_inodes(
  *
  * This routine supports all of the flags defined for the generic VFS_SYNC
  * interface as explained above under xfs_sync.  In the interests of not
- * changing interfaces within the 6.5 family, additional internallly-
+ * changing interfaces within the 6.5 family, additional internally-
  * required functions are specified within a separate xflags parameter,
  * only available by calling this routine.
  *
@@ -1694,12 +1691,9 @@ xfs_parseargs(
 	int			dsunit, dswidth, vol_dsunit, vol_dswidth;
 	int			iosize;
 
+	args->flags |= XFSMNT_IDELETE;
 	args->flags |= XFSMNT_BARRIER;
 	args->flags2 |= XFSMNT2_COMPAT_IOSIZE;
-
-#if 0	/* XXX: off by default, until some remaining issues ironed out */
-	args->flags |= XFSMNT_IDELETE; /* default to on */
-#endif
 
 	if (!options)
 		goto done;
@@ -1909,7 +1903,6 @@ xfs_showargs(
 		{ XFS_MOUNT_NOUUID,		"," MNTOPT_NOUUID },
 		{ XFS_MOUNT_NORECOVERY,		"," MNTOPT_NORECOVERY },
 		{ XFS_MOUNT_OSYNCISOSYNC,	"," MNTOPT_OSYNCISOSYNC },
-		{ XFS_MOUNT_IDELETE,		"," MNTOPT_NOIKEEP },
 		{ 0, NULL }
 	};
 	struct proc_xfs_info	*xfs_infop;
@@ -1945,6 +1938,8 @@ xfs_showargs(
 		seq_printf(m, "," MNTOPT_SWIDTH "=%d",
 				(int)XFS_FSB_TO_BB(mp, mp->m_swidth));
 
+	if (!(mp->m_flags & XFS_MOUNT_IDELETE))
+		seq_printf(m, "," MNTOPT_IKEEP);
 	if (!(mp->m_flags & XFS_MOUNT_COMPAT_IOSIZE))
 		seq_printf(m, "," MNTOPT_LARGEIO);
 
@@ -1985,7 +1980,6 @@ vfsops_t xfs_vfsops = {
 	.vfs_vget		= xfs_vget,
 	.vfs_dmapiops		= (vfs_dmapiops_t)fs_nosys,
 	.vfs_quotactl		= (vfs_quotactl_t)fs_nosys,
-	.vfs_get_inode		= xfs_get_inode,
 	.vfs_init_vnode		= xfs_initialize_vnode,
 	.vfs_force_shutdown	= xfs_do_force_shutdown,
 	.vfs_freeze		= xfs_freeze,

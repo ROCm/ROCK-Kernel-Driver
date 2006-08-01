@@ -28,6 +28,7 @@
 #include <linux/major.h>
 #include <linux/kdev_t.h>
 #include <linux/device.h>
+#include <linux/mutex.h>
 
 struct class *class3270;
 
@@ -49,9 +50,6 @@ struct raw3270 {
 	unsigned char *ascebc;		/* ascii -> ebcdic table */
 	struct class_device *clttydev;	/* 3270-class tty device ptr */
 	struct class_device *cltubdev;	/* 3270-class tub device ptr */
-
-	struct raw3270_request init_request;
-	unsigned char init_data[256];
 };
 
 /* raw3270->flags */
@@ -62,7 +60,7 @@ struct raw3270 {
 #define RAW3270_FLAGS_CONSOLE	8	/* Device is the console. */
 
 /* Semaphore to protect global data of raw3270 (devices, views, etc). */
-static DECLARE_MUTEX(raw3270_sem);
+static DEFINE_MUTEX(raw3270_mutex);
 
 /* List of 3270 devices. */
 static struct list_head raw3270_devices = LIST_HEAD_INIT(raw3270_devices);
@@ -118,10 +116,9 @@ raw3270_request_alloc(size_t size)
 	struct raw3270_request *rq;
 
 	/* Allocate request structure */
-	rq = kmalloc(sizeof(struct raw3270_request), GFP_KERNEL | GFP_DMA);
+	rq = kzalloc(sizeof(struct raw3270_request), GFP_KERNEL | GFP_DMA);
 	if (!rq)
 		return ERR_PTR(-ENOMEM);
-	memset(rq, 0, sizeof(struct raw3270_request));
 
 	/* alloc output buffer. */
 	if (size > 0) {
@@ -487,6 +484,8 @@ struct raw3270_ua {	/* Query Reply structure for Usable Area */
 	} __attribute__ ((packed)) aua;
 } __attribute__ ((packed));
 
+static unsigned char raw3270_init_data[256];
+static struct raw3270_request raw3270_init_request;
 static struct diag210 raw3270_init_diag210;
 static DECLARE_MUTEX(raw3270_init_sem);
 
@@ -645,17 +644,17 @@ __raw3270_size_device(struct raw3270 *rp)
 	 * required (3270 device switched to 'stand-by') and command
 	 * rejects (old devices that can't do 'read partition').
 	 */
-	memset(&rp->init_request, 0, sizeof(rp->init_request));
-	memset(&rp->init_data, 0, 256);
-	/* Store 'read partition' data stream to init_data */
-	memcpy(&rp->init_data, wbuf, sizeof(wbuf));
-	INIT_LIST_HEAD(&rp->init_request.list);
-	rp->init_request.ccw.cmd_code = TC_WRITESF;
-	rp->init_request.ccw.flags = CCW_FLAG_SLI;
-	rp->init_request.ccw.count = sizeof(wbuf);
-	rp->init_request.ccw.cda = (__u32) __pa(&rp->init_data);
+	memset(&raw3270_init_request, 0, sizeof(raw3270_init_request));
+	memset(raw3270_init_data, 0, sizeof(raw3270_init_data));
+	/* Store 'read partition' data stream to raw3270_init_data */
+	memcpy(raw3270_init_data, wbuf, sizeof(wbuf));
+	INIT_LIST_HEAD(&raw3270_init_request.list);
+	raw3270_init_request.ccw.cmd_code = TC_WRITESF;
+	raw3270_init_request.ccw.flags = CCW_FLAG_SLI;
+	raw3270_init_request.ccw.count = sizeof(wbuf);
+	raw3270_init_request.ccw.cda = (__u32) __pa(raw3270_init_data);
 
-	rc = raw3270_start_init(rp, &raw3270_init_view, &rp->init_request);
+	rc = raw3270_start_init(rp, &raw3270_init_view, &raw3270_init_request);
 	if (rc)
 		/* Check error cases: -ERESTARTSYS, -EIO and -EOPNOTSUPP */
 		return rc;
@@ -680,18 +679,18 @@ __raw3270_size_device(struct raw3270 *rp)
 	 * The device accepted the 'read partition' command. Now
 	 * set up a read ccw and issue it.
 	 */
-	rp->init_request.ccw.cmd_code = TC_READMOD;
-	rp->init_request.ccw.flags = CCW_FLAG_SLI;
-	rp->init_request.ccw.count = sizeof(rp->init_data);
-	rp->init_request.ccw.cda = (__u32) __pa(rp->init_data);
-	rc = raw3270_start_init(rp, &raw3270_init_view, &rp->init_request);
+	raw3270_init_request.ccw.cmd_code = TC_READMOD;
+	raw3270_init_request.ccw.flags = CCW_FLAG_SLI;
+	raw3270_init_request.ccw.count = sizeof(raw3270_init_data);
+	raw3270_init_request.ccw.cda = (__u32) __pa(raw3270_init_data);
+	rc = raw3270_start_init(rp, &raw3270_init_view, &raw3270_init_request);
 	if (rc)
 		return rc;
 	/* Got a Query Reply */
-	count = sizeof(rp->init_data) - rp->init_request.rescnt;
-	uap = (struct raw3270_ua *) (rp->init_data + 1);
+	count = sizeof(raw3270_init_data) - raw3270_init_request.rescnt;
+	uap = (struct raw3270_ua *) (raw3270_init_data + 1);
 	/* Paranoia check. */
-	if (rp->init_data[0] != 0x88 || uap->uab.qcode != 0x81)
+	if (raw3270_init_data[0] != 0x88 || uap->uab.qcode != 0x81)
 		return -EOPNOTSUPP;
 	/* Copy rows/columns of default Usable Area */
 	rp->rows = uap->uab.h;
@@ -750,18 +749,18 @@ raw3270_reset_device(struct raw3270 *rp)
 	int rc;
 
 	down(&raw3270_init_sem);
-	memset(&rp->init_request, 0, sizeof(rp->init_request));
-	memset(&rp->init_data, 0, sizeof(rp->init_data));
-	/* Store reset data stream to init_data/init_request */
-	rp->init_data[0] = TW_KR;
-	INIT_LIST_HEAD(&rp->init_request.list);
-	rp->init_request.ccw.cmd_code = TC_EWRITEA;
-	rp->init_request.ccw.flags = CCW_FLAG_SLI;
-	rp->init_request.ccw.count = 1;
-	rp->init_request.ccw.cda = (__u32) __pa(rp->init_data);
+	memset(&raw3270_init_request, 0, sizeof(raw3270_init_request));
+	memset(raw3270_init_data, 0, sizeof(raw3270_init_data));
+	/* Store reset data stream to raw3270_init_data/raw3270_init_request */
+	raw3270_init_data[0] = TW_KR;
+	INIT_LIST_HEAD(&raw3270_init_request.list);
+	raw3270_init_request.ccw.cmd_code = TC_EWRITEA;
+	raw3270_init_request.ccw.flags = CCW_FLAG_SLI;
+	raw3270_init_request.ccw.count = 1;
+	raw3270_init_request.ccw.cda = (__u32) __pa(raw3270_init_data);
 	rp->view = &raw3270_init_view;
 	raw3270_init_view.dev = rp;
-	rc = raw3270_start_init(rp, &raw3270_init_view, &rp->init_request);
+	rc = raw3270_start_init(rp, &raw3270_init_view, &raw3270_init_request);
 	raw3270_init_view.dev = 0;
 	rp->view = 0;
 	up(&raw3270_init_sem);
@@ -817,7 +816,7 @@ raw3270_setup_device(struct ccw_device *cdev, struct raw3270 *rp, char *ascebc)
 	 * number for it. Note: there is no device with minor 0,
 	 * see special case for fs3270.c:fs3270_open().
 	 */
-	down(&raw3270_sem);
+	mutex_lock(&raw3270_mutex);
 	/* Keep the list sorted. */
 	minor = RAW3270_FIRSTMINOR;
 	rp->minor = -1;
@@ -834,7 +833,7 @@ raw3270_setup_device(struct ccw_device *cdev, struct raw3270 *rp, char *ascebc)
 		rp->minor = minor;
 		list_add_tail(&rp->list, &raw3270_devices);
 	}
-	up(&raw3270_sem);
+	mutex_unlock(&raw3270_mutex);
 	/* No free minor number? Then give up. */
 	if (rp->minor == -1)
 		return -EUSERS;
@@ -855,7 +854,7 @@ raw3270_setup_console(struct ccw_device *cdev)
 	char *ascebc;
 	int rc;
 
-	rp = (struct raw3270 *) alloc_bootmem_low(sizeof(struct raw3270));
+	rp = (struct raw3270 *) alloc_bootmem(sizeof(struct raw3270));
 	ascebc = (char *) alloc_bootmem(256);
 	rc = raw3270_setup_device(cdev, rp, ascebc);
 	if (rc)
@@ -896,7 +895,7 @@ raw3270_create_device(struct ccw_device *cdev)
 	char *ascebc;
 	int rc;
 
-	rp = kmalloc(sizeof(struct raw3270), GFP_KERNEL | GFP_DMA);
+	rp = kmalloc(sizeof(struct raw3270), GFP_KERNEL);
 	if (!rp)
 		return ERR_PTR(-ENOMEM);
 	ascebc = kmalloc(256, GFP_KERNEL);
@@ -1005,7 +1004,7 @@ raw3270_add_view(struct raw3270_view *view, struct raw3270_fn *fn, int minor)
 
 	if (minor <= 0)
 		return -ENODEV;
-	down(&raw3270_sem);
+	mutex_lock(&raw3270_mutex);
 	rc = -ENODEV;
 	list_for_each_entry(rp, &raw3270_devices, list) {
 		if (rp->minor != minor)
@@ -1026,7 +1025,7 @@ raw3270_add_view(struct raw3270_view *view, struct raw3270_fn *fn, int minor)
 		spin_unlock_irqrestore(get_ccwdev_lock(rp->cdev), flags);
 		break;
 	}
-	up(&raw3270_sem);
+	mutex_unlock(&raw3270_mutex);
 	return rc;
 }
 
@@ -1040,7 +1039,7 @@ raw3270_find_view(struct raw3270_fn *fn, int minor)
 	struct raw3270_view *view, *tmp;
 	unsigned long flags;
 
-	down(&raw3270_sem);
+	mutex_lock(&raw3270_mutex);
 	view = ERR_PTR(-ENODEV);
 	list_for_each_entry(rp, &raw3270_devices, list) {
 		if (rp->minor != minor)
@@ -1059,7 +1058,7 @@ raw3270_find_view(struct raw3270_fn *fn, int minor)
 		spin_unlock_irqrestore(get_ccwdev_lock(rp->cdev), flags);
 		break;
 	}
-	up(&raw3270_sem);
+	mutex_unlock(&raw3270_mutex);
 	return view;
 }
 
@@ -1106,7 +1105,7 @@ raw3270_delete_device(struct raw3270 *rp)
 	struct ccw_device *cdev;
 
 	/* Remove from device chain. */
-	down(&raw3270_sem);
+	mutex_lock(&raw3270_mutex);
 	if (rp->clttydev)
 		class_device_destroy(class3270,
 				     MKDEV(IBM_TTY3270_MAJOR, rp->minor));
@@ -1114,7 +1113,7 @@ raw3270_delete_device(struct raw3270 *rp)
 		class_device_destroy(class3270,
 				     MKDEV(IBM_FS3270_MAJOR, rp->minor));
 	list_del_init(&rp->list);
-	up(&raw3270_sem);
+	mutex_unlock(&raw3270_mutex);
 
 	/* Disconnect from ccw_device. */
 	cdev = rp->cdev;
@@ -1210,13 +1209,13 @@ int raw3270_register_notifier(void (*notifier)(int, int))
 	if (!np)
 		return -ENOMEM;
 	np->notifier = notifier;
-	down(&raw3270_sem);
+	mutex_lock(&raw3270_mutex);
 	list_add_tail(&np->list, &raw3270_notifier);
 	list_for_each_entry(rp, &raw3270_devices, list) {
 		get_device(&rp->cdev->dev);
 		notifier(rp->minor, 1);
 	}
-	up(&raw3270_sem);
+	mutex_unlock(&raw3270_mutex);
 	return 0;
 }
 
@@ -1224,14 +1223,14 @@ void raw3270_unregister_notifier(void (*notifier)(int, int))
 {
 	struct raw3270_notifier *np;
 
-	down(&raw3270_sem);
+	mutex_lock(&raw3270_mutex);
 	list_for_each_entry(np, &raw3270_notifier, list)
 		if (np->notifier == notifier) {
 			list_del(&np->list);
 			kfree(np);
 			break;
 		}
-	up(&raw3270_sem);
+	mutex_unlock(&raw3270_mutex);
 }
 
 /*
@@ -1258,10 +1257,10 @@ raw3270_set_online (struct ccw_device *cdev)
 		goto failure;
 	raw3270_create_attributes(rp);
 	set_bit(RAW3270_FLAGS_READY, &rp->flags);
-	down(&raw3270_sem);
+	mutex_lock(&raw3270_mutex);
 	list_for_each_entry(np, &raw3270_notifier, list)
 		np->notifier(rp->minor, 1);
-	up(&raw3270_sem);
+	mutex_unlock(&raw3270_mutex);
 	return 0;
 
 failure:
@@ -1309,10 +1308,10 @@ raw3270_remove (struct ccw_device *cdev)
 	}
 	spin_unlock_irqrestore(get_ccwdev_lock(cdev), flags);
 
-	down(&raw3270_sem);
+	mutex_lock(&raw3270_mutex);
 	list_for_each_entry(np, &raw3270_notifier, list)
 		np->notifier(rp->minor, 0);
-	up(&raw3270_sem);
+	mutex_unlock(&raw3270_mutex);
 
 	/* Reset 3270 device. */
 	raw3270_reset_device(rp);
@@ -1372,13 +1371,13 @@ raw3270_init(void)
 	rc = ccw_driver_register(&raw3270_ccw_driver);
 	if (rc == 0) {
 		/* Create attributes for early (= console) device. */
-		down(&raw3270_sem);
+		mutex_lock(&raw3270_mutex);
 		class3270 = class_create(THIS_MODULE, "3270");
 		list_for_each_entry(rp, &raw3270_devices, list) {
 			get_device(&rp->cdev->dev);
 			raw3270_create_attributes(rp);
 		}
-		up(&raw3270_sem);
+		mutex_unlock(&raw3270_mutex);
 	}
 	return rc;
 }

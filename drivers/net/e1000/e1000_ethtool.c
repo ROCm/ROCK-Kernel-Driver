@@ -32,19 +32,6 @@
 
 #include <asm/uaccess.h>
 
-extern char e1000_driver_name[];
-extern char e1000_driver_version[];
-
-extern int e1000_up(struct e1000_adapter *adapter);
-extern void e1000_down(struct e1000_adapter *adapter);
-extern void e1000_reset(struct e1000_adapter *adapter);
-extern int e1000_set_spd_dplx(struct e1000_adapter *adapter, uint16_t spddplx);
-extern int e1000_setup_all_rx_resources(struct e1000_adapter *adapter);
-extern int e1000_setup_all_tx_resources(struct e1000_adapter *adapter);
-extern void e1000_free_all_rx_resources(struct e1000_adapter *adapter);
-extern void e1000_free_all_tx_resources(struct e1000_adapter *adapter);
-extern void e1000_update_stats(struct e1000_adapter *adapter);
-
 struct e1000_stats {
 	char stat_string[ETH_GSTRING_LEN];
 	int sizeof_stat;
@@ -177,7 +164,6 @@ e1000_get_settings(struct net_device *netdev, struct ethtool_cmd *ecmd)
 
 	ecmd->autoneg = ((hw->media_type == e1000_media_type_fiber) ||
 			 hw->autoneg) ? AUTONEG_ENABLE : AUTONEG_DISABLE;
-
 	return 0;
 }
 
@@ -1208,7 +1194,7 @@ e1000_nonintegrated_phy_loopback(struct e1000_adapter *adapter)
 	e1000_write_phy_reg(&adapter->hw, PHY_CTRL, 0x8100);
 
 	/* Wait for reset to complete. */
-	usec_delay(500);
+	udelay(500);
 
 	/* Have to setup TX_CLK and TX_CRS after software reset */
 	e1000_phy_reset_clk_and_crs(adapter);
@@ -1291,7 +1277,7 @@ e1000_integrated_phy_loopback(struct e1000_adapter *adapter)
 	if (adapter->hw.phy_type == e1000_phy_m88)
 		e1000_phy_disable_receiver(adapter);
 
-	usec_delay(500);
+	udelay(500);
 
 	return 0;
 }
@@ -1749,7 +1735,6 @@ e1000_set_wol(struct net_device *netdev, struct ethtool_wolinfo *wol)
 			adapter->wol |= E1000_WUFC_BC;
 		if (wol->wolopts & WAKE_MAGIC)
 			adapter->wol |= E1000_WUFC_MAG;
-
 	}
 
 	return 0;
@@ -1893,7 +1878,7 @@ static struct ethtool_ops e1000_ethtool_ops = {
 	.set_pauseparam		= e1000_set_pauseparam,
 	.get_rx_csum		= e1000_get_rx_csum,
 	.set_rx_csum		= e1000_set_rx_csum,
-	.get_tx_csum            = e1000_get_tx_csum,
+	.get_tx_csum		= e1000_get_tx_csum,
 	.set_tx_csum		= e1000_set_tx_csum,
 	.get_sg			= ethtool_op_get_sg,
 	.set_sg			= ethtool_op_set_sg,
@@ -1907,12 +1892,10 @@ static struct ethtool_ops e1000_ethtool_ops = {
 	.phys_id                = e1000_phys_id,
 	.get_stats_count        = e1000_get_stats_count,
 	.get_ethtool_stats      = e1000_get_ethtool_stats,
-#ifdef ETHTOOL_GPERMADDR
-	.get_perm_addr  		= ethtool_op_get_perm_addr,
-#endif
+	.get_perm_addr		= ethtool_op_get_perm_addr,
 };
 
-void set_ethtool_ops(struct net_device *netdev)
+void e1000_set_ethtool_ops(struct net_device *netdev)
 {
 	SET_ETHTOOL_OPS(netdev, &e1000_ethtool_ops);
 }

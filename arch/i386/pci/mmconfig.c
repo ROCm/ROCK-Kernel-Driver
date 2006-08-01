@@ -80,8 +80,10 @@ static int pci_mmcfg_read(unsigned int seg, unsigned int bus,
 	unsigned long flags;
 	u32 base;
 
-	if (!value || (bus > 255) || (devfn > 255) || (reg > 4095))
+	if ((bus > 255) || (devfn > 255) || (reg > 4095)) {
+		*value = -1;
 		return -EINVAL;
+	}
 
 	base = get_base_addr(seg, bus, devfn);
 	if (!base)
@@ -183,16 +185,16 @@ static __init void unreachable_devices(void)
 	}
 }
 
-static int __init pci_mmcfg_init(void)
+void __init pci_mmcfg_init(void)
 {
 	if ((pci_probe & PCI_PROBE_MMCONF) == 0)
-		goto out;
+		return;
 
 	acpi_table_parse(ACPI_MCFG, acpi_parse_mcfg);
 	if ((pci_mmcfg_config_num == 0) ||
 	    (pci_mmcfg_config == NULL) ||
 	    (pci_mmcfg_config[0].base_address == 0))
-		goto out;
+		return;
 
 	if (!e820_all_mapped(pci_mmcfg_config[0].base_address,
 			pci_mmcfg_config[0].base_address + MMCONFIG_APER_SIZE,
@@ -207,9 +209,4 @@ static int __init pci_mmcfg_init(void)
 	pci_probe = (pci_probe & ~PCI_PROBE_MASK) | PCI_PROBE_MMCONF;
 
 	unreachable_devices();
-
- out:
-	return 0;
 }
-
-arch_initcall(pci_mmcfg_init);

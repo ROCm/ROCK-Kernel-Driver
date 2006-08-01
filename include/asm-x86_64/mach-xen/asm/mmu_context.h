@@ -73,7 +73,8 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 	struct mmuext_op _op[3], *op = _op;
 
 	if (likely(prev != next)) {
-		BUG_ON(!next->context.pinned);
+		if (!next->context.pinned)
+			mm_pin(next);
 
 		/* stop flush ipis for the previous mm */
 		clear_bit(cpu, &prev->cpu_vm_mask);
@@ -126,11 +127,8 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 	asm volatile("movl %0,%%fs"::"r"(0));  \
 } while(0)
 
-static inline void activate_mm(struct mm_struct *prev, struct mm_struct *next)
-{
-	if (!next->context.pinned)
-		mm_pin(next);
-	switch_mm(prev, next, NULL);
-}
+#define activate_mm(prev, next) do {		\
+	switch_mm((prev),(next),NULL);		\
+} while (0)
 
 #endif

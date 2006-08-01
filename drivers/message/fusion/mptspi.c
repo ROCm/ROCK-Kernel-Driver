@@ -417,7 +417,6 @@ static struct scsi_host_template mptspi_driver_template = {
 	.max_sectors			= 8192,
 	.cmd_per_lun			= 7,
 	.use_clustering			= ENABLE_CLUSTERING,
-	.dump_poll			= mptscsih_poll,
 };
 
 static int mptspi_write_spi_device_pg1(struct scsi_target *starget,
@@ -789,6 +788,7 @@ static struct pci_device_id mptspi_pci_table[] = {
 };
 MODULE_DEVICE_TABLE(pci, mptspi_pci_table);
 
+
 /*
  * renegotiate for a given target
  */
@@ -836,6 +836,7 @@ mptspi_ioc_reset(MPT_ADAPTER *ioc, int reset_phase)
 	return rc;
 }
 
+#ifdef CONFIG_PM
 /*
  * spi module resume handler
  */
@@ -851,6 +852,7 @@ mptspi_resume(struct pci_dev *pdev)
 
 	return rc;
 }
+#endif
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/

@@ -41,7 +41,7 @@
 #include "dlmglue.h"
 #include "extent_map.h"
 #include "file.h"
-#include  "heartbeat.h"
+#include "heartbeat.h"
 #include "inode.h"
 #include "journal.h"
 #include "namei.h"
@@ -95,7 +95,7 @@ struct inode *ocfs2_iget(struct ocfs2_super *osb, u64 blkno)
 	struct super_block *sb = osb->sb;
 	struct ocfs2_find_inode_args args;
 
-	mlog_entry("(blkno = %"MLFu64")\n", blkno);
+	mlog_entry("(blkno = %llu)\n", (unsigned long long)blkno);
 
 	/* Ok. By now we've either got the offsets passed to us by the
 	 * caller, or we just pulled them off the bh. Lets do some
@@ -134,8 +134,8 @@ struct inode *ocfs2_iget(struct ocfs2_super *osb, u64 blkno)
 
 bail:
 	if (!IS_ERR(inode)) {
-		mlog(0, "returning inode with number %"MLFu64"\n",
-		     OCFS2_I(inode)->ip_blkno);
+		mlog(0, "returning inode with number %llu\n",
+		     (unsigned long long)OCFS2_I(inode)->ip_blkno);
 		mlog_exit_ptr(inode);
 	} else
 		mlog_errno(PTR_ERR(inode));
@@ -219,7 +219,8 @@ int ocfs2_populate_inode(struct inode *inode, struct ocfs2_dinode *fe,
 	struct ocfs2_super *osb;
 	int status = -EINVAL;
 
-	mlog_entry("(0x%p, size:%"MLFu64")\n", inode, fe->i_size);
+	mlog_entry("(0x%p, size:%llu)\n", inode,
+		   (unsigned long long)fe->i_size);
 
 	sb = inode->i_sb;
 	osb = OCFS2_SB(sb);
@@ -228,9 +229,10 @@ int ocfs2_populate_inode(struct inode *inode, struct ocfs2_dinode *fe,
 	 * today.  change if needed. */
 	if (!OCFS2_IS_VALID_DINODE(fe) ||
 	    !(fe->i_flags & cpu_to_le32(OCFS2_VALID_FL))) {
-		mlog(ML_ERROR, "Invalid dinode: i_ino=%lu, i_blkno=%"MLFu64", "
+		mlog(ML_ERROR, "Invalid dinode: i_ino=%lu, i_blkno=%llu, "
 		     "signature = %.*s, flags = 0x%x\n",
-		     inode->i_ino, le64_to_cpu(fe->i_blkno), 7,
+		     inode->i_ino,
+		     (unsigned long long)le64_to_cpu(fe->i_blkno), 7,
 		     fe->i_signature, le32_to_cpu(fe->i_flags));
 		goto bail;
 	}
@@ -268,8 +270,9 @@ int ocfs2_populate_inode(struct inode *inode, struct ocfs2_dinode *fe,
 
 	if (OCFS2_I(inode)->ip_blkno != le64_to_cpu(fe->i_blkno))
 		mlog(ML_ERROR,
-		     "ip_blkno %"MLFu64" != i_blkno %"MLFu64"!\n",
-		     OCFS2_I(inode)->ip_blkno, fe->i_blkno);
+		     "ip_blkno %llu != i_blkno %llu!\n",
+		     (unsigned long long)OCFS2_I(inode)->ip_blkno,
+		     (unsigned long long)fe->i_blkno);
 
 	OCFS2_I(inode)->ip_clusters = le32_to_cpu(fe->i_clusters);
 	OCFS2_I(inode)->ip_orphaned_slot = OCFS2_INVALID_SLOT;
@@ -278,8 +281,8 @@ int ocfs2_populate_inode(struct inode *inode, struct ocfs2_dinode *fe,
 		inode->i_ino = ino_from_blkno(inode->i_sb,
 			       le64_to_cpu(fe->i_blkno));
 
-	mlog(0, "blkno = %"MLFu64", ino = %lu, create_ino = %s\n",
-	     fe->i_blkno, inode->i_ino, create_ino ? "true" : "false");
+	mlog(0, "blkno = %llu, ino = %lu, create_ino = %s\n",
+	     (unsigned long long)fe->i_blkno, inode->i_ino, create_ino ? "true" : "false");
 
 	inode->i_nlink = le16_to_cpu(fe->i_links_count);
 
@@ -300,7 +303,6 @@ int ocfs2_populate_inode(struct inode *inode, struct ocfs2_dinode *fe,
 		    inode->i_fop = &ocfs2_fops;
 		    inode->i_op = &ocfs2_file_iops;
 		    i_size_write(inode, le64_to_cpu(fe->i_size));
-		    OCFS2_I(inode)->ip_mmu_private = inode->i_size;
 		    break;
 	    case S_IFDIR:
 		    inode->i_op = &ocfs2_dir_iops;
@@ -321,6 +323,8 @@ int ocfs2_populate_inode(struct inode *inode, struct ocfs2_dinode *fe,
 		    break;
 	}
 
+	ocfs2_inode_lock_res_init(&OCFS2_I(inode)->ip_rw_lockres,
+				  OCFS2_LOCK_TYPE_RW, inode);
 	ocfs2_inode_lock_res_init(&OCFS2_I(inode)->ip_meta_lockres,
 				  OCFS2_LOCK_TYPE_META, inode);
 	ocfs2_inode_lock_res_init(&OCFS2_I(inode)->ip_data_lockres,
@@ -370,8 +374,8 @@ static int ocfs2_read_locked_inode(struct inode *inode,
 
 	fe = (struct ocfs2_dinode *) bh->b_data;
 	if (!OCFS2_IS_VALID_DINODE(fe)) {
-		mlog(ML_ERROR, "Invalid dinode #%"MLFu64": signature = %.*s\n",
-		     fe->i_blkno, 7, fe->i_signature);
+		mlog(ML_ERROR, "Invalid dinode #%llu: signature = %.*s\n",
+		     (unsigned long long)fe->i_blkno, 7, fe->i_signature);
 		make_bad_inode(inode);
 		goto bail;
 	}
@@ -385,8 +389,8 @@ static int ocfs2_read_locked_inode(struct inode *inode,
 
 	status = -EINVAL;
 	if (ocfs2_populate_inode(inode, fe, 0) < 0) {
-		mlog(ML_ERROR, "populate inode failed! i_blkno=%"MLFu64", "
-		     "i_ino=%lu\n", fe->i_blkno, inode->i_ino);
+		mlog(ML_ERROR, "populate failed! i_blkno=%llu, i_ino=%lu\n",
+		     (unsigned long long)fe->i_blkno, inode->i_ino);
 		make_bad_inode(inode);
 		goto bail;
 	}
@@ -562,7 +566,7 @@ static int ocfs2_check_orphan_recovery_state(struct ocfs2_super *osb,
 		ret = -EDEADLK;
 		goto out;
 	}
-	/* This signals to the orphan recovery process that is should
+	/* This signals to the orphan recovery process that it should
 	 * wait for us to handle the wipe. */
 	osb->osb_orphan_wipes[slot]++;
 out:
@@ -674,8 +678,8 @@ static int ocfs2_inode_is_valid_to_delete(struct inode *inode)
 	 * never get here as system file inodes should always have a
 	 * positive link count. */
 	if (oi->ip_flags & OCFS2_INODE_SYSTEM_FILE) {
-		mlog(ML_ERROR, "Skipping delete of system file %"MLFu64".\n",
-		     oi->ip_blkno);
+		mlog(ML_ERROR, "Skipping delete of system file %llu\n",
+		     (unsigned long long)oi->ip_blkno);
 		goto bail_unlock;
 	}
 
@@ -714,16 +718,16 @@ static int ocfs2_query_inode_wipe(struct inode *inode,
 	 * ocfs2_delete_inode, another node might have asked to delete
 	 * the inode. Recheck our flags to catch this. */
 	if (!ocfs2_inode_is_valid_to_delete(inode)) {
-		mlog(0, "Skipping delete of %"MLFu64" because flags changed\n",
-		     oi->ip_blkno);
+		mlog(0, "Skipping delete of %llu because flags changed\n",
+		     (unsigned long long)oi->ip_blkno);
 		goto bail;
 	}
 
 	/* Now that we have an up to date inode, we can double check
 	 * the link count. */
 	if (inode->i_nlink) {
-		mlog(0, "Skipping delete of %"MLFu64" because nlink = %u\n",
-		     oi->ip_blkno, inode->i_nlink);
+		mlog(0, "Skipping delete of %llu because nlink = %u\n",
+		     (unsigned long long)oi->ip_blkno, inode->i_nlink);
 		goto bail;
 	}
 
@@ -733,9 +737,11 @@ static int ocfs2_query_inode_wipe(struct inode *inode,
 		/* for lack of a better error? */
 		status = -EEXIST;
 		mlog(ML_ERROR,
-		     "Inode %"MLFu64" (on-disk %"MLFu64") not orphaned! "
+		     "Inode %llu (on-disk %llu) not orphaned! "
 		     "Disk flags  0x%x, inode flags 0x%x\n",
-		     oi->ip_blkno, di->i_blkno, di->i_flags, oi->ip_flags);
+		     (unsigned long long)oi->ip_blkno,
+		     (unsigned long long)di->i_blkno, di->i_flags,
+		     oi->ip_flags);
 		goto bail;
 	}
 
@@ -752,8 +758,8 @@ static int ocfs2_query_inode_wipe(struct inode *inode,
 	 * disk and let them worry about deleting it. */
 	if (status == -EBUSY) {
 		status = 0;
-		mlog(0, "Skipping delete of %"MLFu64" because it is in use on"
-		     "other nodes\n", oi->ip_blkno);
+		mlog(0, "Skipping delete of %llu because it is in use on"
+		     "other nodes\n", (unsigned long long)oi->ip_blkno);
 		goto bail;
 	}
 	if (status < 0) {
@@ -767,13 +773,13 @@ static int ocfs2_query_inode_wipe(struct inode *inode,
 		 * into. This may happen during node death and
 		 * recovery knows how to clean it up so we can safely
 		 * ignore this inode for now on. */
-		mlog(0, "Nobody knew where inode %"MLFu64" was orphaned!\n",
-		     oi->ip_blkno);
+		mlog(0, "Nobody knew where inode %llu was orphaned!\n",
+		     (unsigned long long)oi->ip_blkno);
 	} else {
 		*wipe = 1;
 
-		mlog(0, "Inode %"MLFu64" is ok to wipe from orphan dir %d\n",
-		     oi->ip_blkno, oi->ip_orphaned_slot);
+		mlog(0, "Inode %llu is ok to wipe from orphan dir %d\n",
+		     (unsigned long long)oi->ip_blkno, oi->ip_orphaned_slot);
 	}
 	spin_unlock(&oi->ip_lock);
 
@@ -787,13 +793,11 @@ bail:
 static void ocfs2_cleanup_delete_inode(struct inode *inode,
 				       int sync_data)
 {
-	mlog(0, "Cleanup inode %"MLFu64", sync = %d\n",
-	     OCFS2_I(inode)->ip_blkno, sync_data);
-#ifndef OCFS2_DELETE_INODE_WORKAROUND
+	mlog(0, "Cleanup inode %llu, sync = %d\n",
+	     (unsigned long long)OCFS2_I(inode)->ip_blkno, sync_data);
 	if (sync_data)
 		write_inode_now(inode, 1);
 	truncate_inode_pages(&inode->i_data, 0);
-#endif
 }
 
 void ocfs2_delete_inode(struct inode *inode)
@@ -831,7 +835,12 @@ void ocfs2_delete_inode(struct inode *inode)
 
 	/* Lock down the inode. This gives us an up to date view of
 	 * it's metadata (for verification), and allows us to
-	 * serialize delete_inode votes. */
+	 * serialize delete_inode votes. 
+	 *
+	 * Even though we might be doing a truncate, we don't take the
+	 * allocation lock here as it won't be needed - nobody will
+	 * have the file open.
+	 */
 	status = ocfs2_meta_lock(inode, NULL, &di_bh, 1);
 	if (status < 0) {
 		if (status != -ENOENT)
@@ -893,14 +902,15 @@ void ocfs2_clear_inode(struct inode *inode)
 	if (!inode)
 		goto bail;
 
-	mlog(0, "Clearing inode: %"MLFu64", nlink = %u\n",
-	     OCFS2_I(inode)->ip_blkno, inode->i_nlink);
+	mlog(0, "Clearing inode: %llu, nlink = %u\n",
+	     (unsigned long long)OCFS2_I(inode)->ip_blkno, inode->i_nlink);
 
 	mlog_bug_on_msg(OCFS2_SB(inode->i_sb) == NULL,
 			"Inode=%lu\n", inode->i_ino);
 
 	/* Do these before all the other work so that we don't bounce
 	 * the vote thread while waiting to destroy the locks. */
+	ocfs2_mark_lockres_freeing(&oi->ip_rw_lockres);
 	ocfs2_mark_lockres_freeing(&oi->ip_meta_lockres);
 	ocfs2_mark_lockres_freeing(&oi->ip_data_lockres);
 
@@ -914,8 +924,8 @@ void ocfs2_clear_inode(struct inode *inode)
 		ocfs2_checkpoint_inode(inode);
 
 	mlog_bug_on_msg(!list_empty(&oi->ip_io_markers),
-			"Clear inode of %"MLFu64", inode has io markers\n",
-			oi->ip_blkno);
+			"Clear inode of %llu, inode has io markers\n",
+			(unsigned long long)oi->ip_blkno);
 
 	ocfs2_extent_map_drop(inode, 0);
 	ocfs2_extent_map_init(inode);
@@ -924,46 +934,47 @@ void ocfs2_clear_inode(struct inode *inode)
 	if (status < 0)
 		mlog_errno(status);
 
+	ocfs2_lock_res_free(&oi->ip_rw_lockres);
 	ocfs2_lock_res_free(&oi->ip_meta_lockres);
 	ocfs2_lock_res_free(&oi->ip_data_lockres);
 
 	ocfs2_metadata_cache_purge(inode);
 
 	mlog_bug_on_msg(oi->ip_metadata_cache.ci_num_cached,
-			"Clear inode of %"MLFu64", inode has %u cache items\n",
-			oi->ip_blkno, oi->ip_metadata_cache.ci_num_cached);
+			"Clear inode of %llu, inode has %u cache items\n",
+			(unsigned long long)oi->ip_blkno, oi->ip_metadata_cache.ci_num_cached);
 
 	mlog_bug_on_msg(!(oi->ip_flags & OCFS2_INODE_CACHE_INLINE),
-			"Clear inode of %"MLFu64", inode has a bad flag\n",
-			oi->ip_blkno);
+			"Clear inode of %llu, inode has a bad flag\n",
+			(unsigned long long)oi->ip_blkno);
 
 	mlog_bug_on_msg(spin_is_locked(&oi->ip_lock),
-			"Clear inode of %"MLFu64", inode is locked\n",
-			oi->ip_blkno);
+			"Clear inode of %llu, inode is locked\n",
+			(unsigned long long)oi->ip_blkno);
 
-	mlog_bug_on_msg(down_trylock(&oi->ip_io_sem),
-			"Clear inode of %"MLFu64", io_sem is locked\n",
-			oi->ip_blkno);
-	up(&oi->ip_io_sem);
+	mlog_bug_on_msg(!mutex_trylock(&oi->ip_io_mutex),
+			"Clear inode of %llu, io_mutex is locked\n",
+			(unsigned long long)oi->ip_blkno);
+	mutex_unlock(&oi->ip_io_mutex);
 
 	/*
 	 * down_trylock() returns 0, down_write_trylock() returns 1
 	 * kernel 1, world 0
 	 */
 	mlog_bug_on_msg(!down_write_trylock(&oi->ip_alloc_sem),
-			"Clear inode of %"MLFu64", alloc_sem is locked\n",
-			oi->ip_blkno);
+			"Clear inode of %llu, alloc_sem is locked\n",
+			(unsigned long long)oi->ip_blkno);
 	up_write(&oi->ip_alloc_sem);
 
 	mlog_bug_on_msg(oi->ip_open_count,
-			"Clear inode of %"MLFu64" has open count %d\n",
-			oi->ip_blkno, oi->ip_open_count);
+			"Clear inode of %llu has open count %d\n",
+			(unsigned long long)oi->ip_blkno, oi->ip_open_count);
 	mlog_bug_on_msg(!list_empty(&oi->ip_handle_list),
-			"Clear inode of %"MLFu64" has non empty handle list\n",
-			oi->ip_blkno);
+			"Clear inode of %llu has non empty handle list\n",
+			(unsigned long long)oi->ip_blkno);
 	mlog_bug_on_msg(oi->ip_handle,
-			"Clear inode of %"MLFu64" has non empty handle pointer\n",
-			oi->ip_blkno);
+			"Clear inode of %llu has non empty handle pointer\n",
+			(unsigned long long)oi->ip_blkno);
 
 	/* Clear all other flags. */
 	oi->ip_flags = OCFS2_INODE_CACHE_INLINE;
@@ -985,8 +996,8 @@ void ocfs2_drop_inode(struct inode *inode)
 
 	mlog_entry_void();
 
-	mlog(0, "Drop inode %"MLFu64", nlink = %u, ip_flags = 0x%x\n",
-	     oi->ip_blkno, inode->i_nlink, oi->ip_flags);
+	mlog(0, "Drop inode %llu, nlink = %u, ip_flags = 0x%x\n",
+	     (unsigned long long)oi->ip_blkno, inode->i_nlink, oi->ip_flags);
 
 	/* Testing ip_orphaned_slot here wouldn't work because we may
 	 * not have gotten a delete_inode vote from any other nodes
@@ -1063,8 +1074,8 @@ int ocfs2_inode_revalidate(struct dentry *dentry)
 	struct inode *inode = dentry->d_inode;
 	int status = 0;
 
-	mlog_entry("(inode = 0x%p, ino = %"MLFu64")\n", inode,
-		   inode ? OCFS2_I(inode)->ip_blkno : 0ULL);
+	mlog_entry("(inode = 0x%p, ino = %llu)\n", inode,
+		   inode ? (unsigned long long)OCFS2_I(inode)->ip_blkno : 0ULL);
 
 	if (!inode) {
 		mlog(0, "eep, no inode!\n");
@@ -1108,7 +1119,8 @@ int ocfs2_mark_inode_dirty(struct ocfs2_journal_handle *handle,
 	int status;
 	struct ocfs2_dinode *fe = (struct ocfs2_dinode *) bh->b_data;
 
-	mlog_entry("(inode %"MLFu64")\n", OCFS2_I(inode)->ip_blkno);
+	mlog_entry("(inode %llu)\n",
+		   (unsigned long long)OCFS2_I(inode)->ip_blkno);
 
 	status = ocfs2_journal_access(handle, inode, bh,
 				      OCFS2_JOURNAL_ACCESS_WRITE);
@@ -1158,9 +1170,6 @@ void ocfs2_refresh_inode(struct inode *inode,
 
 	OCFS2_I(inode)->ip_clusters = le32_to_cpu(fe->i_clusters);
 	i_size_write(inode, le64_to_cpu(fe->i_size));
-	if (S_ISREG(inode->i_mode)) {
-		OCFS2_I(inode)->ip_mmu_private = i_size_read(inode);
-	}
 	inode->i_nlink = le16_to_cpu(fe->i_links_count);
 	inode->i_uid = le32_to_cpu(fe->i_uid);
 	inode->i_gid = le32_to_cpu(fe->i_gid);

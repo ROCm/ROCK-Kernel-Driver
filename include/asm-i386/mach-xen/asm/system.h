@@ -116,12 +116,10 @@ __asm__ __volatile__ ("movw %%dx,%1\n\t" \
 	__asm__ ( \
 		"movl %%cr3,%0\n\t" \
 		:"=r" (__dummy)); \
-	__dummy = xen_cr3_to_pfn(__dummy); \
-	mfn_to_pfn(__dummy) << PAGE_SHIFT; \
+	machine_to_phys(__dummy); \
 })
 #define write_cr3(x) ({						\
-	unsigned int __dummy = pfn_to_mfn((x) >> PAGE_SHIFT);	\
-	__dummy = xen_pfn_to_cr3(__dummy);			\
+	maddr_t __dummy = phys_to_machine(x);			\
 	__asm__ __volatile__("movl %0,%%cr3": :"r" (__dummy));	\
 })
 
@@ -627,11 +625,8 @@ do {									\
 		preempt_enable_no_resched();				\
 } while (0)
 
-#define safe_halt()		((void)HYPERVISOR_block())
-#define halt()			((void)					\
-	(HYPERVISOR_shared_info->vcpu_info[__vcpu_id].evtchn_upcall_mask \
-	 ? HYPERVISOR_vcpu_op(VCPUOP_down, __vcpu_id, NULL)		\
-	 : HYPERVISOR_block()))
+#define safe_halt()		((void)0)
+#define halt()			((void)0)
 
 #define __save_and_cli(x)						\
 do {									\

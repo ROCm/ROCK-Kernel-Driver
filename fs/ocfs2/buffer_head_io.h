@@ -31,20 +31,15 @@
 void ocfs2_end_buffer_io_sync(struct buffer_head *bh,
 			     int uptodate);
 
-/* Yosh made me do it. */
-static inline int ocfs2_write_block(struct ocfs2_super         *osb,
-				    struct buffer_head  *bh,
-				    struct inode        *inode);
 static inline int ocfs2_read_block(struct ocfs2_super          *osb,
 				   u64                  off,
 				   struct buffer_head **bh,
 				   int                  flags,
 				   struct inode        *inode);
 
-int ocfs2_write_blocks(struct ocfs2_super          *osb,
-		       struct buffer_head  *bh[],
-		       int                  nr,
-		       struct inode        *inode);
+int ocfs2_write_block(struct ocfs2_super          *osb,
+		      struct buffer_head  *bh,
+		      struct inode        *inode);
 int ocfs2_read_blocks(struct ocfs2_super          *osb,
 		      u64                  block,
 		      int                  nr,
@@ -55,16 +50,6 @@ int ocfs2_read_blocks(struct ocfs2_super          *osb,
 
 #define OCFS2_BH_CACHED            1
 #define OCFS2_BH_READAHEAD         8	/* use this to pass READA down to submit_bh */
-
-static inline int ocfs2_write_block(struct ocfs2_super * osb, struct buffer_head *bh,
-				    struct inode *inode)
-{
-	int status;
-
-	status = ocfs2_write_blocks(osb, &bh, 1, inode);
-
-	return status;
-}
 
 static inline int ocfs2_read_block(struct ocfs2_super * osb, u64 off,
 				   struct buffer_head **bh, int flags,

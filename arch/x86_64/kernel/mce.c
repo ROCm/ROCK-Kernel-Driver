@@ -141,8 +141,7 @@ static void mce_panic(char *msg, struct mce *backup, unsigned long start)
 
 static int mce_available(struct cpuinfo_x86 *c)
 {
-	return test_bit(X86_FEATURE_MCE, &c->x86_capability) &&
-	       test_bit(X86_FEATURE_MCA, &c->x86_capability);
+	return cpu_has(c, X86_FEATURE_MCE) && cpu_has(c, X86_FEATURE_MCA);
 }
 
 static inline void mce_get_rip(struct mce *m, struct pt_regs *regs)
@@ -508,7 +507,7 @@ static struct miscdevice mce_log_device = {
 static int __init mcheck_disable(char *str)
 {
 	mce_dont_init = 1;
-	return 0;
+	return 1;
 }
 
 /* mce=off disables machine check. Note you can reenable it later
@@ -528,7 +527,7 @@ static int __init mcheck_enable(char *str)
 		get_option(&str, &tolerant);
 	else
 		printk("mce= argument %s ignored. Please use /sys", str); 
-	return 0;
+	return 1;
 }
 
 __setup("nomce", mcheck_disable);
@@ -630,7 +629,7 @@ static __cpuinit void mce_remove_device(unsigned int cpu)
 #endif
 
 /* Get notified when a cpu comes on/off. Be hotplug friendly. */
-static __cpuinit int
+static int
 mce_cpu_callback(struct notifier_block *nfb, unsigned long action, void *hcpu)
 {
 	unsigned int cpu = (unsigned long)hcpu;

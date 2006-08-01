@@ -140,7 +140,6 @@ extern int blkif_open(struct inode *inode, struct file *filep);
 extern int blkif_release(struct inode *inode, struct file *filep);
 extern int blkif_ioctl(struct inode *inode, struct file *filep,
                        unsigned command, unsigned long argument);
-extern int blkif_getgeo(struct block_device *, struct hd_geometry *);
 extern int blkif_check(dev_t dev);
 extern int blkif_revalidate(dev_t dev);
 extern void do_blkif_request (request_queue_t *rq);
@@ -154,3 +153,13 @@ int xlvbd_add(blkif_sector_t capacity, int device,
 void xlvbd_del(struct blkfront_info *info);
 
 #endif /* __XEN_DRIVERS_BLOCK_H__ */
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

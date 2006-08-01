@@ -67,12 +67,13 @@ static struct inode *debugfs_get_inode(struct super_block *sb, int mode, dev_t d
 static int debugfs_mknod(struct inode *dir, struct dentry *dentry,
 			 int mode, dev_t dev)
 {
-	struct inode *inode = debugfs_get_inode(dir->i_sb, mode, dev);
+	struct inode *inode;
 	int error = -EPERM;
 
 	if (dentry->d_inode)
 		return -EEXIST;
 
+	inode = debugfs_get_inode(dir->i_sb, mode, dev);
 	if (inode) {
 		d_instantiate(dentry, inode);
 		dget(dentry);
@@ -191,7 +192,7 @@ static int debugfs_create_by_name(const char *name, mode_t mode,
  */
 struct dentry *debugfs_create_file(const char *name, mode_t mode,
 				   struct dentry *parent, void *data,
-				   struct file_operations *fops)
+				   const struct file_operations *fops)
 {
 	struct dentry *dentry = NULL;
 	int error;

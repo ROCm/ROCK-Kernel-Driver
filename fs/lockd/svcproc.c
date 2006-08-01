@@ -22,10 +22,6 @@
 
 #define NLMDBG_FACILITY		NLMDBG_CLIENT
 
-static u32	nlmsvc_callback(struct svc_rqst *, u32, struct nlm_res *);
-
-static const struct rpc_call_ops nlmsvc_callback_ops;
-
 #ifdef CONFIG_LOCKD_V4
 static u32
 cast_to_nlm(u32 status, u32 vers)
@@ -71,8 +67,8 @@ nlmsvc_retrieve_args(struct svc_rqst *rqstp, struct nlm_args *argp,
 		return nlm_lck_denied_nolocks;
 
 	/* Obtain host handle */
-	if (!(host = nlmsvc_lookup_host(rqstp, lock->caller, lock->len))
-	 || (argp->monitor && nsm_monitor(host) < 0))
+	if (!(host = nlmsvc_lookup_host(rqstp))
+	 || (argp->monitor && !host->h_monitored && nsm_monitor(host) < 0))
 		goto no_locks;
 	*hostp = host;
 
@@ -262,83 +258,91 @@ nlmsvc_proc_granted(struct svc_rqst *rqstp, struct nlm_args *argp,
 }
 
 /*
+ * This is the generic lockd callback for async RPC calls
+ */
+static void nlmsvc_callback_exit(struct rpc_task *task, void *data)
+{
+	dprintk("lockd: %4d callback returned %d\n", task->tk_pid,
+			-task->tk_status);
+}
+
+static void nlmsvc_callback_release(void *data)
+{
+	nlm_release_call(data);
+}
+
+static const struct rpc_call_ops nlmsvc_callback_ops = {
+	.rpc_call_done = nlmsvc_callback_exit,
+	.rpc_release = nlmsvc_callback_release,
+};
+
+/*
  * `Async' versions of the above service routines. They aren't really,
  * because we send the callback before the reply proper. I hope this
  * doesn't break any clients.
  */
-static int
-nlmsvc_proc_test_msg(struct svc_rqst *rqstp, struct nlm_args *argp,
+static int nlmsvc_callback(struct svc_rqst *rqstp, u32 proc, struct nlm_args *argp,
+		int (*func)(struct svc_rqst *, struct nlm_args *, struct nlm_res  *))
+{
+	struct nlm_host	*host;
+	struct nlm_rqst	*call;
+	int stat;
+
+	host = nlmsvc_lookup_host(rqstp);
+	if (host == NULL)
+		return rpc_system_err;
+
+	call = nlm_alloc_call(host);
+	if (call == NULL)
+		return rpc_system_err;
+
+	stat = func(rqstp, argp, &call->a_res);
+	if (stat != 0) {
+		nlm_release_call(call);
+		return stat;
+	}
+
+	call->a_flags = RPC_TASK_ASYNC;
+	if (nlm_async_reply(call, proc, &nlmsvc_callback_ops) < 0)
+		return rpc_system_err;
+	return rpc_success;
+}
+
+static int nlmsvc_proc_test_msg(struct svc_rqst *rqstp, struct nlm_args *argp,
 					     void	     *resp)
 {
-	struct nlm_res	res;
-	u32		stat;
-
 	dprintk("lockd: TEST_MSG      called\n");
-	memset(&res, 0, sizeof(res));
-
-	if ((stat = nlmsvc_proc_test(rqstp, argp, &res)) == 0)
-		stat = nlmsvc_callback(rqstp, NLMPROC_TEST_RES, &res);
-	return stat;
+	return nlmsvc_callback(rqstp, NLMPROC_TEST_RES, argp, nlmsvc_proc_test);
 }
 
-static int
-nlmsvc_proc_lock_msg(struct svc_rqst *rqstp, struct nlm_args *argp,
+static int nlmsvc_proc_lock_msg(struct svc_rqst *rqstp, struct nlm_args *argp,
 					     void	     *resp)
 {
-	struct nlm_res	res;
-	u32		stat;
-
 	dprintk("lockd: LOCK_MSG      called\n");
-	memset(&res, 0, sizeof(res));
-
-	if ((stat = nlmsvc_proc_lock(rqstp, argp, &res)) == 0)
-		stat = nlmsvc_callback(rqstp, NLMPROC_LOCK_RES, &res);
-	return stat;
+	return nlmsvc_callback(rqstp, NLMPROC_LOCK_RES, argp, nlmsvc_proc_lock);
 }
 
-static int
-nlmsvc_proc_cancel_msg(struct svc_rqst *rqstp, struct nlm_args *argp,
+static int nlmsvc_proc_cancel_msg(struct svc_rqst *rqstp, struct nlm_args *argp,
 					       void	       *resp)
 {
-	struct nlm_res	res;
-	u32		stat;
-
 	dprintk("lockd: CANCEL_MSG    called\n");
-	memset(&res, 0, sizeof(res));
-
-	if ((stat = nlmsvc_proc_cancel(rqstp, argp, &res)) == 0)
-		stat = nlmsvc_callback(rqstp, NLMPROC_CANCEL_RES, &res);
-	return stat;
+	return nlmsvc_callback(rqstp, NLMPROC_CANCEL_RES, argp, nlmsvc_proc_cancel);
 }
 
 static int
 nlmsvc_proc_unlock_msg(struct svc_rqst *rqstp, struct nlm_args *argp,
                                                void            *resp)
 {
-	struct nlm_res	res;
-	u32		stat;
-
 	dprintk("lockd: UNLOCK_MSG    called\n");
-	memset(&res, 0, sizeof(res));
-
-	if ((stat = nlmsvc_proc_unlock(rqstp, argp, &res)) == 0)
-		stat = nlmsvc_callback(rqstp, NLMPROC_UNLOCK_RES, &res);
-	return stat;
+	return nlmsvc_callback(rqstp, NLMPROC_UNLOCK_RES, argp, nlmsvc_proc_unlock);
 }
 
 static int
 nlmsvc_proc_granted_msg(struct svc_rqst *rqstp, struct nlm_args *argp,
                                                 void            *resp)
 {
-	struct nlm_res	res;
-	u32		stat;
-
 	dprintk("lockd: GRANTED_MSG   called\n");
-	memset(&res, 0, sizeof(res));
-
-	if ((stat = nlmsvc_proc_granted(rqstp, argp, &res)) == 0)
-		stat = nlmsvc_callback(rqstp, NLMPROC_GRANTED_RES, &res);
-	return stat;
+	return nlmsvc_callback(rqstp, NLMPROC_GRANTED_RES, argp, nlmsvc_proc_granted);
 }
 
 /*
@@ -446,6 +450,9 @@ nlmsvc_proc_sm_notify(struct svc_rqst *rqstp, struct nlm_reboot *argp,
 					      void	        *resp)
 {
 	struct sockaddr_in	saddr = rqstp->rq_addr;
+	int			vers = argp->vers;
+	int			prot = argp->proto >> 1;
+	struct nlm_host		*host;
 
 	dprintk("lockd: SM_NOTIFY     called\n");
 	if (saddr.sin_addr.s_addr != htonl(INADDR_LOOPBACK)
@@ -460,9 +467,19 @@ nlmsvc_proc_sm_notify(struct svc_rqst *rqstp, struct nlm_reboot *argp,
 	/* Obtain the host pointer for this NFS server and try to
 	 * reclaim all locks we hold on this server.
 	 */
-	memset(&saddr, 0, sizeof(saddr));
 	saddr.sin_addr.s_addr = argp->addr;
-	nlm_host_rebooted(&saddr, argp->mon, argp->len, argp->state);
+	if ((argp->proto & 1)==0) {
+		if ((host = nlmclnt_lookup_host(&saddr, prot, vers)) != NULL) {
+			nlmclnt_recovery(host, argp->state);
+			nlm_release_host(host);
+		}
+	} else {
+		/* If we run on an NFS server, delete all locks held by the client */
+		if ((host = nlm_lookup_host(1, &saddr, prot, vers)) != NULL) {
+			nlmsvc_free_host_resources(host);
+			nlm_release_host(host);
+		}
+	}
 
 	return rpc_success;
 }
@@ -482,56 +499,6 @@ nlmsvc_proc_granted_res(struct svc_rqst *rqstp, struct nlm_res  *argp,
 	nlmsvc_grant_reply(rqstp, &argp->cookie, argp->status);
 	return rpc_success;
 }
-
-/*
- * This is the generic lockd callback for async RPC calls
- */
-static u32
-nlmsvc_callback(struct svc_rqst *rqstp, u32 proc, struct nlm_res *resp)
-{
-	struct nlm_host	*host;
-	struct nlm_rqst	*call;
-
-	if (!(call = nlmclnt_alloc_call()))
-		return rpc_system_err;
-
-	host = nlmclnt_lookup_host(&rqstp->rq_addr,
-				rqstp->rq_prot, rqstp->rq_vers,
-				NULL, 0);
-	if (!host) {
-		kfree(call);
-		return rpc_system_err;
-	}
-
-	call->a_flags = RPC_TASK_ASYNC;
-	call->a_host  = host;
-	memcpy(&call->a_args, resp, sizeof(*resp));
-
-	if (nlmsvc_async_call(call, proc, &nlmsvc_callback_ops) < 0)
-		goto error;
-
-	return rpc_success;
- error:
-	nlm_release_host(host);
-	kfree(call);
-	return rpc_system_err;
-}
-
-static void nlmsvc_callback_exit(struct rpc_task *task, void *data)
-{
-	struct nlm_rqst	*call = data;
-
-	if (task->tk_status < 0) {
-		dprintk("lockd: %4d callback failed (errno = %d)\n",
-					task->tk_pid, -task->tk_status);
-	}
-	nlm_release_host(call->a_host);
-	kfree(call);
-}
-
-static const struct rpc_call_ops nlmsvc_callback_ops = {
-	.rpc_call_done = nlmsvc_callback_exit,
-};
 
 /*
  * NLM Server procedures.

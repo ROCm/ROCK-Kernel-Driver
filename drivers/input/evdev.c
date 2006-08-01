@@ -130,9 +130,8 @@ static int evdev_open(struct inode * inode, struct file * file)
 	if ((accept_err = input_accept_process(&(evdev_table[i]->handle), file)))
 		return accept_err;
 
-	if (!(list = kmalloc(sizeof(struct evdev_list), GFP_KERNEL)))
+	if (!(list = kzalloc(sizeof(struct evdev_list), GFP_KERNEL)))
 		return -ENOMEM;
-	memset(list, 0, sizeof(struct evdev_list));
 
 	list->evdev = evdev_table[i];
 	list_add_tail(&list->node, &evdev_table[i]->list);
@@ -404,6 +403,27 @@ static long evdev_ioctl_handler(struct file *file, unsigned int cmd,
 		case EVIOCGID:
 			if (copy_to_user(p, &dev->id, sizeof(struct input_id)))
 				return -EFAULT;
+			return 0;
+
+		case EVIOCGREP:
+			if (!test_bit(EV_REP, dev->evbit))
+				return -ENOSYS;
+			if (put_user(dev->rep[REP_DELAY], ip))
+				return -EFAULT;
+			if (put_user(dev->rep[REP_PERIOD], ip + 1))
+				return -EFAULT;
+			return 0;
+
+		case EVIOCSREP:
+			if (!test_bit(EV_REP, dev->evbit))
+				return -ENOSYS;
+			if (get_user(u, ip))
+				return -EFAULT;
+			if (get_user(v, ip + 1))
+				return -EFAULT;
+
+			input_event(dev, EV_REP, REP_DELAY, u);
+			input_event(dev, EV_REP, REP_PERIOD, v);
 
 			return 0;
 
@@ -609,9 +629,8 @@ static struct input_handle *evdev_connect(struct input_handler *handler, struct 
 		return NULL;
 	}
 
-	if (!(evdev = kmalloc(sizeof(struct evdev), GFP_KERNEL)))
+	if (!(evdev = kzalloc(sizeof(struct evdev), GFP_KERNEL)))
 		return NULL;
-	memset(evdev, 0, sizeof(struct evdev));
 
 	INIT_LIST_HEAD(&evdev->list);
 	init_waitqueue_head(&evdev->wait);

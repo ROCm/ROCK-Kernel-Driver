@@ -286,13 +286,12 @@ int scsi_execute_req(struct scsi_device *sdev, const unsigned char *cmd,
 	int result;
 	
 	if (sshdr) {
-		sense = kmalloc(SCSI_SENSE_BUFFERSIZE, GFP_NOIO);
+		sense = kzalloc(SCSI_SENSE_BUFFERSIZE, GFP_NOIO);
 		if (!sense)
 			return DRIVER_ERROR << 24;
-		memset(sense, 0, SCSI_SENSE_BUFFERSIZE);
 	}
 	result = scsi_execute(sdev, cmd, data_direction, buffer, bufflen,
-				  sense, timeout, retries, 0);
+			      sense, timeout, retries, 0);
 	if (sshdr)
 		scsi_normalize_sense(sense, SCSI_SENSE_BUFFERSIZE, sshdr);
 
@@ -368,7 +367,7 @@ static int scsi_req_map_sg(struct request *rq, struct scatterlist *sgl,
 			   int nsegs, unsigned bufflen, gfp_t gfp)
 {
 	struct request_queue *q = rq->q;
-	int nr_pages = (bufflen + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	int nr_pages = (bufflen + sgl[0].offset + PAGE_SIZE - 1) >> PAGE_SHIFT;
 	unsigned int data_len = 0, len, bytes, off;
 	struct page *page;
 	struct bio *bio = NULL;
@@ -1068,16 +1067,29 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes,
 			break;
 		case NOT_READY:
 			/*
-			 * If the device is in the process of becoming ready,
-			 * retry.
+			 * If the device is in the process of becoming
+			 * ready, or has a temporary blockage, retry.
 			 */
-			if (sshdr.asc == 0x04 && sshdr.ascq == 0x01) {
-				scsi_requeue_command(q, cmd);
-				return;
+			if (sshdr.asc == 0x04) {
+				switch (sshdr.ascq) {
+				case 0x01: /* becoming ready */
+				case 0x04: /* format in progress */
+				case 0x05: /* rebuild in progress */
+				case 0x06: /* recalculation in progress */
+				case 0x07: /* operation in progress */
+				case 0x08: /* Long write in progress */
+				case 0x09: /* self test in progress */
+					scsi_requeue_command(q, cmd);
+					return;
+				default:
+					break;
+				}
 			}
-			if (!(req->flags & REQ_QUIET))
+			if (!(req->flags & REQ_QUIET)) {
 				scmd_printk(KERN_INFO, cmd,
-					   "Device not ready.\n");
+					   "Device not ready: ");
+				scsi_print_sense_hdr("", &sshdr);
+			}
 			scsi_end_request(cmd, 0, this_count, 1);
 			return;
 		case VOLUME_OVERFLOW:
@@ -1480,6 +1492,8 @@ static inline int scsi_host_queue_ready(struct request_queue *q,
 static void scsi_kill_request(struct request *req, request_queue_t *q)
 {
 	struct scsi_cmnd *cmd = req->special;
+	struct scsi_device *sdev = cmd->device;
+	struct Scsi_Host *shost = sdev->host;
 
 	blkdev_dequeue_request(req);
 
@@ -1492,6 +1506,19 @@ static void scsi_kill_request(struct request *req, request_queue_t *q)
 	scsi_init_cmd_errh(cmd);
 	cmd->result = DID_NO_CONNECT << 16;
 	atomic_inc(&cmd->device->iorequest_cnt);
+
+	/*
+	 * SCSI request completion path will do scsi_device_unbusy(),
+	 * bump busy counts.  To bump the counters, we need to dance
+	 * with the locks as normal issue path does.
+	 */
+	sdev->device_busy++;
+	spin_unlock(sdev->request_queue->queue_lock);
+	spin_lock(shost->host_lock);
+	shost->host_busy++;
+	spin_unlock(shost->host_lock);
+	spin_lock(sdev->request_queue->queue_lock);
+
 	__scsi_done(cmd);
 }
 
@@ -1788,9 +1815,8 @@ int __init scsi_init_queue(void)
 					sgp->name);
 		}
 
-		sgp->pool = mempool_create(SG_MEMPOOL_SIZE,
-				mempool_alloc_slab, mempool_free_slab,
-				sgp->slab);
+		sgp->pool = mempool_create_slab_pool(SG_MEMPOOL_SIZE,
+						     sgp->slab);
 		if (!sgp->pool) {
 			printk(KERN_ERR "SCSI: can't init sg mempool %s\n",
 					sgp->name);
@@ -1812,6 +1838,84 @@ void scsi_exit_queue(void)
 		kmem_cache_destroy(sgp->slab);
 	}
 }
+
+/**
+ *	scsi_mode_select - issue a mode select
+ *	@sdev:	SCSI device to be queried
+ *	@pf:	Page format bit (1 == standard, 0 == vendor specific)
+ *	@sp:	Save page bit (0 == don't save, 1 == save)
+ *	@modepage: mode page being requested
+ *	@buffer: request buffer (may not be smaller than eight bytes)
+ *	@len:	length of request buffer.
+ *	@timeout: command timeout
+ *	@retries: number of retries before failing
+ *	@data: returns a structure abstracting the mode header data
+ *	@sense: place to put sense data (or NULL if no sense to be collected).
+ *		must be SCSI_SENSE_BUFFERSIZE big.
+ *
+ *	Returns zero if successful; negative error number or scsi
+ *	status on error
+ *
+ */
+int
+scsi_mode_select(struct scsi_device *sdev, int pf, int sp, int modepage,
+		 unsigned char *buffer, int len, int timeout, int retries,
+		 struct scsi_mode_data *data, struct scsi_sense_hdr *sshdr)
+{
+	unsigned char cmd[10];
+	unsigned char *real_buffer;
+	int ret;
+
+	memset(cmd, 0, sizeof(cmd));
+	cmd[1] = (pf ? 0x10 : 0) | (sp ? 0x01 : 0);
+
+	if (sdev->use_10_for_ms) {
+		if (len > 65535)
+			return -EINVAL;
+		real_buffer = kmalloc(8 + len, GFP_KERNEL);
+		if (!real_buffer)
+			return -ENOMEM;
+		memcpy(real_buffer + 8, buffer, len);
+		len += 8;
+		real_buffer[0] = 0;
+		real_buffer[1] = 0;
+		real_buffer[2] = data->medium_type;
+		real_buffer[3] = data->device_specific;
+		real_buffer[4] = data->longlba ? 0x01 : 0;
+		real_buffer[5] = 0;
+		real_buffer[6] = data->block_descriptor_length >> 8;
+		real_buffer[7] = data->block_descriptor_length;
+
+		cmd[0] = MODE_SELECT_10;
+		cmd[7] = len >> 8;
+		cmd[8] = len;
+	} else {
+		if (len > 255 || data->block_descriptor_length > 255 ||
+		    data->longlba)
+			return -EINVAL;
+
+		real_buffer = kmalloc(4 + len, GFP_KERNEL);
+		if (!real_buffer)
+			return -ENOMEM;
+		memcpy(real_buffer + 4, buffer, len);
+		len += 4;
+		real_buffer[0] = 0;
+		real_buffer[1] = data->medium_type;
+		real_buffer[2] = data->device_specific;
+		real_buffer[3] = data->block_descriptor_length;
+		
+
+		cmd[0] = MODE_SELECT;
+		cmd[4] = len;
+	}
+
+	ret = scsi_execute_req(sdev, cmd, DMA_TO_DEVICE, real_buffer, len,
+			       sshdr, timeout, retries);
+	kfree(real_buffer);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(scsi_mode_select);
+
 /**
  *	scsi_mode_sense - issue a mode sense, falling back from 10 to 
  *		six bytes if necessary.
@@ -1833,7 +1937,8 @@ void scsi_exit_queue(void)
 int
 scsi_mode_sense(struct scsi_device *sdev, int dbd, int modepage,
 		  unsigned char *buffer, int len, int timeout, int retries,
-		  struct scsi_mode_data *data, struct scsi_sense_hdr *sshdr) {
+		  struct scsi_mode_data *data, struct scsi_sense_hdr *sshdr)
+{
 	unsigned char cmd[12];
 	int use_10_for_ms;
 	int header_length;
@@ -1893,8 +1998,16 @@ scsi_mode_sense(struct scsi_device *sdev, int dbd, int modepage,
 	}
 
 	if(scsi_status_is_good(result)) {
-		data->header_length = header_length;
-		if(use_10_for_ms) {
+		if (unlikely(buffer[0] == 0x86 && buffer[1] == 0x0b &&
+			     (modepage == 6 || modepage == 8))) {
+			/* Initio breakage? */
+			header_length = 0;
+			data->length = 13;
+			data->medium_type = 0;
+			data->device_specific = 0;
+			data->longlba = 0;
+			data->block_descriptor_length = 0;
+		} else if(use_10_for_ms) {
 			data->length = buffer[0]*256 + buffer[1] + 2;
 			data->medium_type = buffer[2];
 			data->device_specific = buffer[3];
@@ -1907,6 +2020,7 @@ scsi_mode_sense(struct scsi_device *sdev, int dbd, int modepage,
 			data->device_specific = buffer[2];
 			data->block_descriptor_length = buffer[3];
 		}
+		data->header_length = header_length;
 	}
 
 	return result;

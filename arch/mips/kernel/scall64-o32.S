@@ -209,7 +209,7 @@ sys_call_table:
 	PTR	sys_fork
 	PTR	sys_read
 	PTR	sys_write
-	PTR	sys_open			/* 4005 */
+	PTR	compat_sys_open			/* 4005 */
 	PTR	sys_close
 	PTR	sys_waitpid
 	PTR	sys_creat
@@ -328,7 +328,7 @@ sys_call_table:
 	PTR	sys_setdomainname
 	PTR	sys32_newuname
 	PTR	sys_ni_syscall			/* sys_modify_ldt */
-	PTR	sys32_adjtimex
+	PTR	compat_sys_adjtimex
 	PTR	sys_mprotect			/* 4125 */
 	PTR	compat_sys_sigprocmask
 	PTR	sys_ni_syscall			/* was creat_module */
@@ -508,4 +508,6 @@ sys_call_table:
 	PTR	sys_pselect6
 	PTR	sys_ppoll
 	PTR	sys_unshare
+	PTR	sys_splice
+	PTR	sys32_sync_file_range		/* 4305 */
 	.size	sys_call_table,.-sys_call_table

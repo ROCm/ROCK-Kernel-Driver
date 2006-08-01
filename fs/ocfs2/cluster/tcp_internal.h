@@ -22,20 +22,33 @@
 #ifndef O2CLUSTER_TCP_INTERNAL_H
 #define O2CLUSTER_TCP_INTERNAL_H
 
-#define O2NET_MAX_CONNECT_ATTEMPTS	5
-
 #define O2NET_MSG_MAGIC           ((u16)0xfa55)
 #define O2NET_MSG_STATUS_MAGIC    ((u16)0xfa56)
 #define O2NET_MSG_KEEP_REQ_MAGIC  ((u16)0xfa57)
 #define O2NET_MSG_KEEP_RESP_MAGIC ((u16)0xfa58)
 
 /* same as hb delay, we're waiting for another node to recognize our hb */
-#define O2NET_RECONNECT_DELAY_MS	2000	
+#define O2NET_RECONNECT_DELAY_MS	O2HB_REGION_TIMEOUT_MS
+
+/* we're delaying our quorum decision so that heartbeat will have timed
+ * out truly dead nodes by the time we come around to making decisions
+ * on their number */
+#define O2NET_QUORUM_DELAY_MS	((o2hb_dead_threshold + 2) * O2HB_REGION_TIMEOUT_MS)
 
 #define O2NET_KEEPALIVE_DELAY_SECS	5
 #define O2NET_IDLE_TIMEOUT_SECS		10
 
-#define O2NET_PROTOCOL_VERSION 1ULL
+/* 
+ * This version number represents quite a lot, unfortunately.  It not
+ * only represents the raw network message protocol on the wire but also
+ * locking semantics of the file system using the protocol.  It should 
+ * be somewhere else, I'm sure, but right now it isn't.
+ *
+ * New in version 2:
+ * 	- full 64 bit i_size in the metadata lock lvbs
+ * 	- introduction of "rw" lock and pushing meta/data locking down
+ */
+#define O2NET_PROTOCOL_VERSION 2ULL
 struct o2net_handshake {
 	__be64	protocol_version;
 	__be64	connector_id;
@@ -57,7 +70,7 @@ struct o2net_node {
 	 * or fails or when an accepted socket is attached. */
 	wait_queue_head_t		nn_sc_wq;
 
-	u32				nn_status_next_id;
+	struct idr			nn_status_idr;
 	struct list_head		nn_status_list;
 
 	/* connects are attempted from when heartbeat comes up until either hb
@@ -74,6 +87,11 @@ struct o2net_node {
 	 * established.  this expiring gives up on the node and errors out
 	 * transmits */
 	struct work_struct		nn_connect_expired;
+
+	/* after we give up on a socket we wait a while before deciding
+	 * that it is still heartbeating and that we should do some
+	 * quorum work */
+	struct work_struct		nn_still_up;
 };
 
 struct o2net_sock_container {
@@ -116,8 +134,6 @@ struct o2net_sock_container {
 	void			(*sc_state_change)(struct sock *sk);
 	void			(*sc_data_ready)(struct sock *sk, int bytes);
 
-	struct list_head	sc_net_proc_item;
-
 	struct timeval 		sc_tv_timer;
 	struct timeval 		sc_tv_data_ready;
 	struct timeval 		sc_tv_advance_start;
@@ -150,26 +166,9 @@ enum o2net_system_error {
 struct o2net_status_wait {
 	enum o2net_system_error	ns_sys_status;
 	s32			ns_status;
-	u32			ns_id;
+	int			ns_id;
 	wait_queue_head_t	ns_wq;
 	struct list_head	ns_node_item;
 };
-
-/* just for state dumps */
-struct o2net_send_tracking {
-	struct list_head		st_net_proc_item;
-	struct task_struct		*st_task;
-	struct o2net_sock_container	*st_sc;
-	u32				st_id;
-	u32				st_msg_type;
-	u32				st_msg_key;
-	u8				st_node;
-	struct timeval			st_sock_time;
-	struct timeval			st_send_time;
-	struct timeval			st_status_time;
-};
-
-void o2net_proc_add_sc(struct o2net_sock_container *sc);
-void o2net_proc_del_sc(struct o2net_sock_container *sc);
 
 #endif /* O2CLUSTER_TCP_INTERNAL_H */

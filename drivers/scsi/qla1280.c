@@ -350,6 +350,7 @@
 #include <linux/pci_ids.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
+#include <linux/dma-mapping.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -4258,32 +4259,6 @@ qla1280_get_token(char *str)
 }
 
 
-/**************************************************************************
- *   qla1280_dump_poll
- *     Handle pending interrupts and complete commands, if any.  LKCD uses
- *     this to perform crash dump I/O while interrupts are disabled.
- **************************************************************************/
-static void
-qla1280_dump_poll(struct scsi_device *device)
-{
-	struct scsi_qla_host *ha;
-	struct device_reg *reg;
-	u16 data;
-
-	ha = (struct scsi_qla_host *)device->host->hostdata;
-	reg = ha->iobase;
-
-	/* Check for pending interrupts. */
-	data = qla1280_debounce_register(&reg->istatus);
-	if (data & RISC_INT) {
-		qla1280_isr(ha, &ha->done_q);
-	}
-	if (!list_empty(&ha->done_q))
-		qla1280_done(ha);
-}
-
-
-
 static struct scsi_host_template qla1280_driver_template = {
 	.module			= THIS_MODULE,
 	.proc_name		= "qla1280",
@@ -4301,7 +4276,6 @@ static struct scsi_host_template qla1280_driver_template = {
 	.sg_tablesize		= SG_ALL,
 	.cmd_per_lun		= 1,
 	.use_clustering		= ENABLE_CLUSTERING,
-	.dump_poll		= qla1280_dump_poll,
 };
 
 
@@ -4348,7 +4322,7 @@ qla1280_probe_one(struct pci_dev *pdev, const struct pci_device_id *id)
 
 #ifdef QLA_64BIT_PTR
 	if (pci_set_dma_mask(ha->pdev, (dma_addr_t) ~ 0ULL)) {
-		if (pci_set_dma_mask(ha->pdev, 0xffffffff)) {
+		if (pci_set_dma_mask(ha->pdev, DMA_32BIT_MASK)) {
 			printk(KERN_WARNING "scsi(%li): Unable to set a "
 			       "suitable DMA mask - aborting\n", ha->host_no);
 			error = -ENODEV;
@@ -4358,7 +4332,7 @@ qla1280_probe_one(struct pci_dev *pdev, const struct pci_device_id *id)
 		dprintk(2, "scsi(%li): 64 Bit PCI Addressing Enabled\n",
 			ha->host_no);
 #else
-	if (pci_set_dma_mask(ha->pdev, 0xffffffff)) {
+	if (pci_set_dma_mask(ha->pdev, DMA_32BIT_MASK)) {
 		printk(KERN_WARNING "scsi(%li): Unable to set a "
 		       "suitable DMA mask - aborting\n", ha->host_no);
 		error = -ENODEV;

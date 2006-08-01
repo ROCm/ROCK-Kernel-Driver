@@ -81,7 +81,7 @@ struct elevator_queue
 	void *elevator_data;
 	struct kobject kobj;
 	struct elevator_type *elevator_type;
-	struct semaphore sysfs_lock;
+	struct mutex sysfs_lock;
 };
 
 /*

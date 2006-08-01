@@ -488,7 +488,7 @@ static void smp_really_stop_cpu(void *dummy)
 {
 	smp_stop_cpu(); 
 	for (;;) 
-		halt();
+		asm("hlt"); 
 } 
 
 void smp_send_stop(void)

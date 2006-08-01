@@ -116,6 +116,7 @@ void mips_timer_interrupt(struct pt_regs *regs)
 
 null:
 	ack_r4ktimer(0);
+	irq_exit();
 }
 
 #ifdef CONFIG_PM
@@ -359,7 +360,7 @@ static unsigned long do_fast_cp0_gettimeoffset(void)
 		: "hi", "lo", GCC_REG_ACCUM);
 
 	/*
- 	 * Due to possible jiffies inconsistencies, we need to check
+	 * Due to possible jiffies inconsistencies, we need to check
 	 * the result so that we'll get a timer that is monotonic.
 	 */
 	if (res >= USECS_PER_JIFFY)

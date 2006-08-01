@@ -53,8 +53,6 @@ extern int sysctl_vsyscall;
 extern int nohpet;
 extern unsigned long vxtime_hz;
 
-extern void do_softirq_thunk(void);
-
 extern int numa_setup(char *opt);
 
 extern int setup_early_printk(char *); 
@@ -67,12 +65,8 @@ extern int k8_scan_nodes(unsigned long start, unsigned long end);
 extern void numa_initmem_init(unsigned long start_pfn, unsigned long end_pfn);
 extern unsigned long numa_free_all_bootmem(void);
 
-#ifndef CONFIG_XEN
 extern void reserve_bootmem_generic(unsigned long phys, unsigned len);
 extern void free_bootmem_generic(unsigned long phys, unsigned len);
-#else
-static inline void reserve_bootmem_generic(unsigned long phys, unsigned len) {}
-#endif
 
 extern void load_gs_index(unsigned gs);
 
@@ -133,7 +127,6 @@ extern int fix_aperture;
 #define iommu_aperture 0
 #define iommu_aperture_allowed 0
 #endif
-extern int force_iommu;
 
 extern int reboot_force;
 extern int notsc_setup(char *);

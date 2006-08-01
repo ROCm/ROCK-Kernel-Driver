@@ -42,6 +42,9 @@
 #include "stv0299.h"
 #include "stv0297.h"
 #include "tda1004x.h"
+#include "lnbp21.h"
+#include "bsbe1.h"
+#include "bsru6.h"
 
 #define DEBIADDR_IR		0x1234
 #define DEBIADDR_CICONTROL	0x0000
@@ -68,6 +71,7 @@ struct budget_ci {
 	struct tasklet_struct msp430_irq_tasklet;
 	struct tasklet_struct ciintf_irq_tasklet;
 	int slot_status;
+	int ci_irq;
 	struct dvb_ca_en50221 ca;
 	char ir_dev_name[50];
 	u8 tuner_pll_address; /* used for philips_tdm1316l configs */
@@ -273,8 +277,10 @@ static int ciintf_slot_reset(struct dvb_ca_en50221 *ca, int slot)
 	if (slot != 0)
 		return -EINVAL;
 
-	// trigger on RISING edge during reset so we know when READY is re-asserted
-	saa7146_setgpio(saa, 0, SAA7146_GPIO_IRQHI);
+	if (budget_ci->ci_irq) {
+		// trigger on RISING edge during reset so we know when READY is re-asserted
+		saa7146_setgpio(saa, 0, SAA7146_GPIO_IRQHI);
+	}
 	budget_ci->slot_status = SLOTSTATUS_RESET;
 	ttpci_budget_debiwrite(&budget_ci->budget, DEBICICTL, DEBIADDR_CICONTROL, 1, 0, 1, 0);
 	msleep(1);
@@ -367,11 +373,50 @@ static void ciintf_interrupt(unsigned long data)
 	}
 }
 
+static int ciintf_poll_slot_status(struct dvb_ca_en50221 *ca, int slot, int open)
+{
+	struct budget_ci *budget_ci = (struct budget_ci *) ca->data;
+	unsigned int flags;
+
+	// ensure we don't get spurious IRQs during initialisation
+	if (!budget_ci->budget.ci_present)
+		return -EINVAL;
+
+	// read the CAM status
+	flags = ttpci_budget_debiread(&budget_ci->budget, DEBICICTL, DEBIADDR_CICONTROL, 1, 1, 0);
+	if (flags & CICONTROL_CAMDETECT) {
+		// mark it as present if it wasn't before
+		if (budget_ci->slot_status & SLOTSTATUS_NONE) {
+			budget_ci->slot_status = SLOTSTATUS_PRESENT;
+		}
+
+		// during a RESET, we check if we can read from IO memory to see when CAM is ready
+		if (budget_ci->slot_status & SLOTSTATUS_RESET) {
+			if (ciintf_read_attribute_mem(ca, slot, 0) == 0x1d) {
+				budget_ci->slot_status = SLOTSTATUS_READY;
+			}
+		}
+	} else {
+		budget_ci->slot_status = SLOTSTATUS_NONE;
+	}
+
+	if (budget_ci->slot_status != SLOTSTATUS_NONE) {
+		if (budget_ci->slot_status & SLOTSTATUS_READY) {
+			return DVB_CA_EN50221_POLL_CAM_PRESENT | DVB_CA_EN50221_POLL_CAM_READY;
+		}
+		return DVB_CA_EN50221_POLL_CAM_PRESENT;
+	}
+
+	return 0;
+}
+
 static int ciintf_init(struct budget_ci *budget_ci)
 {
 	struct saa7146_dev *saa = budget_ci->budget.dev;
 	int flags;
 	int result;
+	int ci_version;
+	int ca_flags;
 
 	memset(&budget_ci->ca, 0, sizeof(struct dvb_ca_en50221));
 
@@ -379,15 +424,28 @@ static int ciintf_init(struct budget_ci *budget_ci)
 	saa7146_write(saa, MC1, saa7146_read(saa, MC1) | (0x800 << 16) | 0x800);
 
 	// test if it is there
-	if ((ttpci_budget_debiread(&budget_ci->budget, DEBICICTL, DEBIADDR_CIVERSION, 1, 1, 0) & 0xa0) != 0xa0) {
+	ci_version = ttpci_budget_debiread(&budget_ci->budget, DEBICICTL, DEBIADDR_CIVERSION, 1, 1, 0);
+	if ((ci_version & 0xa0) != 0xa0) {
 		result = -ENODEV;
 		goto error;
 	}
+
 	// determine whether a CAM is present or not
 	flags = ttpci_budget_debiread(&budget_ci->budget, DEBICICTL, DEBIADDR_CICONTROL, 1, 1, 0);
 	budget_ci->slot_status = SLOTSTATUS_NONE;
 	if (flags & CICONTROL_CAMDETECT)
 		budget_ci->slot_status = SLOTSTATUS_PRESENT;
+
+	// version 0xa2 of the CI firmware doesn't generate interrupts
+	if (ci_version == 0xa2) {
+		ca_flags = 0;
+		budget_ci->ci_irq = 0;
+	} else {
+		ca_flags = DVB_CA_EN50221_FLAG_IRQ_CAMCHANGE |
+				DVB_CA_EN50221_FLAG_IRQ_FR |
+				DVB_CA_EN50221_FLAG_IRQ_DA;
+		budget_ci->ci_irq = 1;
+	}
 
 	// register CI interface
 	budget_ci->ca.owner = THIS_MODULE;
@@ -398,23 +456,27 @@ static int ciintf_init(struct budget_ci *budget_ci)
 	budget_ci->ca.slot_reset = ciintf_slot_reset;
 	budget_ci->ca.slot_shutdown = ciintf_slot_shutdown;
 	budget_ci->ca.slot_ts_enable = ciintf_slot_ts_enable;
+	budget_ci->ca.poll_slot_status = ciintf_poll_slot_status;
 	budget_ci->ca.data = budget_ci;
 	if ((result = dvb_ca_en50221_init(&budget_ci->budget.dvb_adapter,
 					  &budget_ci->ca,
-					  DVB_CA_EN50221_FLAG_IRQ_CAMCHANGE |
-					  DVB_CA_EN50221_FLAG_IRQ_FR |
-					  DVB_CA_EN50221_FLAG_IRQ_DA, 1)) != 0) {
+					  ca_flags, 1)) != 0) {
 		printk("budget_ci: CI interface detected, but initialisation failed.\n");
 		goto error;
 	}
+
 	// Setup CI slot IRQ
-	tasklet_init(&budget_ci->ciintf_irq_tasklet, ciintf_interrupt, (unsigned long) budget_ci);
-	if (budget_ci->slot_status != SLOTSTATUS_NONE) {
-		saa7146_setgpio(saa, 0, SAA7146_GPIO_IRQLO);
-	} else {
-		saa7146_setgpio(saa, 0, SAA7146_GPIO_IRQHI);
+	if (budget_ci->ci_irq) {
+		tasklet_init(&budget_ci->ciintf_irq_tasklet, ciintf_interrupt, (unsigned long) budget_ci);
+		if (budget_ci->slot_status != SLOTSTATUS_NONE) {
+			saa7146_setgpio(saa, 0, SAA7146_GPIO_IRQLO);
+		} else {
+			saa7146_setgpio(saa, 0, SAA7146_GPIO_IRQHI);
+		}
+		saa7146_write(saa, IER, saa7146_read(saa, IER) | MASK_03);
 	}
-	saa7146_write(saa, IER, saa7146_read(saa, IER) | MASK_03);
+
+	// enable interface
 	ttpci_budget_debiwrite(&budget_ci->budget, DEBICICTL, DEBIADDR_CICONTROL, 1,
 			       CICONTROL_RESET, 1, 0);
 
@@ -423,10 +485,12 @@ static int ciintf_init(struct budget_ci *budget_ci)
 	budget_ci->budget.ci_present = 1;
 
 	// forge a fake CI IRQ so the CAM state is setup correctly
-	flags = DVB_CA_EN50221_CAMCHANGE_REMOVED;
-	if (budget_ci->slot_status != SLOTSTATUS_NONE)
-		flags = DVB_CA_EN50221_CAMCHANGE_INSERTED;
-	dvb_ca_en50221_camchange_irq(&budget_ci->ca, 0, flags);
+	if (budget_ci->ci_irq) {
+		flags = DVB_CA_EN50221_CAMCHANGE_REMOVED;
+		if (budget_ci->slot_status != SLOTSTATUS_NONE)
+			flags = DVB_CA_EN50221_CAMCHANGE_INSERTED;
+		dvb_ca_en50221_camchange_irq(&budget_ci->ca, 0, flags);
+	}
 
 	return 0;
 
@@ -440,9 +504,13 @@ static void ciintf_deinit(struct budget_ci *budget_ci)
 	struct saa7146_dev *saa = budget_ci->budget.dev;
 
 	// disable CI interrupts
-	saa7146_write(saa, IER, saa7146_read(saa, IER) & ~MASK_03);
-	saa7146_setgpio(saa, 0, SAA7146_GPIO_INPUT);
-	tasklet_kill(&budget_ci->ciintf_irq_tasklet);
+	if (budget_ci->ci_irq) {
+		saa7146_write(saa, IER, saa7146_read(saa, IER) & ~MASK_03);
+		saa7146_setgpio(saa, 0, SAA7146_GPIO_INPUT);
+		tasklet_kill(&budget_ci->ciintf_irq_tasklet);
+	}
+
+	// reset interface
 	ttpci_budget_debiwrite(&budget_ci->budget, DEBICICTL, DEBIADDR_CICONTROL, 1, 0, 1, 0);
 	msleep(1);
 	ttpci_budget_debiwrite(&budget_ci->budget, DEBICICTL, DEBIADDR_CICONTROL, 1,
@@ -470,126 +538,9 @@ static void budget_ci_irq(struct saa7146_dev *dev, u32 * isr)
 	if (*isr & MASK_10)
 		ttpci_budget_irq10_handler(dev, isr);
 
-	if ((*isr & MASK_03) && (budget_ci->budget.ci_present))
+	if ((*isr & MASK_03) && (budget_ci->budget.ci_present) && (budget_ci->ci_irq))
 		tasklet_schedule(&budget_ci->ciintf_irq_tasklet);
 }
-
-
-static u8 alps_bsru6_inittab[] = {
-	0x01, 0x15,
-	0x02, 0x00,
-	0x03, 0x00,
-	0x04, 0x7d,		/* F22FR = 0x7d, F22 = f_VCO / 128 / 0x7d = 22 kHz */
-	0x05, 0x35,		/* I2CT = 0, SCLT = 1, SDAT = 1 */
-	0x06, 0x40,		/* DAC not used, set to high impendance mode */
-	0x07, 0x00,		/* DAC LSB */
-	0x08, 0x40,		/* DiSEqC off, LNB power on OP2/LOCK pin on */
-	0x09, 0x00,		/* FIFO */
-	0x0c, 0x51,		/* OP1 ctl = Normal, OP1 val = 1 (LNB Power ON) */
-	0x0d, 0x82,		/* DC offset compensation = ON, beta_agc1 = 2 */
-	0x0e, 0x23,		/* alpha_tmg = 2, beta_tmg = 3 */
-	0x10, 0x3f,		// AGC2  0x3d
-	0x11, 0x84,
-	0x12, 0xb9,
-	0x15, 0xc9,		// lock detector threshold
-	0x16, 0x00,
-	0x17, 0x00,
-	0x18, 0x00,
-	0x19, 0x00,
-	0x1a, 0x00,
-	0x1f, 0x50,
-	0x20, 0x00,
-	0x21, 0x00,
-	0x22, 0x00,
-	0x23, 0x00,
-	0x28, 0x00,		// out imp: normal  out type: parallel FEC mode:0
-	0x29, 0x1e,		// 1/2 threshold
-	0x2a, 0x14,		// 2/3 threshold
-	0x2b, 0x0f,		// 3/4 threshold
-	0x2c, 0x09,		// 5/6 threshold
-	0x2d, 0x05,		// 7/8 threshold
-	0x2e, 0x01,
-	0x31, 0x1f,		// test all FECs
-	0x32, 0x19,		// viterbi and synchro search
-	0x33, 0xfc,		// rs control
-	0x34, 0x93,		// error control
-	0x0f, 0x52,
-	0xff, 0xff
-};
-
-static int alps_bsru6_set_symbol_rate(struct dvb_frontend *fe, u32 srate, u32 ratio)
-{
-	u8 aclk = 0;
-	u8 bclk = 0;
-
-	if (srate < 1500000) {
-		aclk = 0xb7;
-		bclk = 0x47;
-	} else if (srate < 3000000) {
-		aclk = 0xb7;
-		bclk = 0x4b;
-	} else if (srate < 7000000) {
-		aclk = 0xb7;
-		bclk = 0x4f;
-	} else if (srate < 14000000) {
-		aclk = 0xb7;
-		bclk = 0x53;
-	} else if (srate < 30000000) {
-		aclk = 0xb6;
-		bclk = 0x53;
-	} else if (srate < 45000000) {
-		aclk = 0xb4;
-		bclk = 0x51;
-	}
-
-	stv0299_writereg(fe, 0x13, aclk);
-	stv0299_writereg(fe, 0x14, bclk);
-	stv0299_writereg(fe, 0x1f, (ratio >> 16) & 0xff);
-	stv0299_writereg(fe, 0x20, (ratio >> 8) & 0xff);
-	stv0299_writereg(fe, 0x21, (ratio) & 0xf0);
-
-	return 0;
-}
-
-static int alps_bsru6_pll_set(struct dvb_frontend *fe, struct i2c_adapter *i2c, struct dvb_frontend_parameters *params)
-{
-	u8 buf[4];
-	u32 div;
-	struct i2c_msg msg = {.addr = 0x61,.flags = 0,.buf = buf,.len = sizeof(buf) };
-
-	if ((params->frequency < 950000) || (params->frequency > 2150000))
-		return -EINVAL;
-
-	div = (params->frequency + (125 - 1)) / 125;	// round correctly
-	buf[0] = (div >> 8) & 0x7f;
-	buf[1] = div & 0xff;
-	buf[2] = 0x80 | ((div & 0x18000) >> 10) | 4;
-	buf[3] = 0xC4;
-
-	if (params->frequency > 1530000)
-		buf[3] = 0xc0;
-
-	if (i2c_transfer(i2c, &msg, 1) != 1)
-		return -EIO;
-	return 0;
-}
-
-static struct stv0299_config alps_bsru6_config = {
-
-	.demod_address = 0x68,
-	.inittab = alps_bsru6_inittab,
-	.mclk = 88000000UL,
-	.invert = 1,
-	.skip_reinit = 0,
-	.lock_output = STV0229_LOCKOUTPUT_1,
-	.volt13_op0_op1 = STV0299_VOLT13_OP1,
-	.min_delay_ms = 100,
-	.set_symbol_rate = alps_bsru6_set_symbol_rate,
-	.pll_set = alps_bsru6_pll_set,
-};
-
-
-
 
 static u8 philips_su1278_tt_inittab[] = {
 	0x01, 0x0f,
@@ -1069,6 +1020,20 @@ static void frontend_init(struct budget_ci *budget_ci)
 			break;
 		}
 		break;
+
+	case 0x1017:		// TT S-1500 PCI
+		budget_ci->budget.dvb_frontend = stv0299_attach(&alps_bsbe1_config, &budget_ci->budget.i2c_adap);
+		if (budget_ci->budget.dvb_frontend) {
+			budget_ci->budget.dvb_frontend->ops->dishnetwork_send_legacy_command = NULL;
+			if (lnbp21_init(budget_ci->budget.dvb_frontend, &budget_ci->budget.i2c_adap, LNBP21_LLC, 0)) {
+				printk("%s: No LNBP21 found!\n", __FUNCTION__);
+				if (budget_ci->budget.dvb_frontend->ops->release)
+					budget_ci->budget.dvb_frontend->ops->release(budget_ci->budget.dvb_frontend);
+				budget_ci->budget.dvb_frontend = NULL;
+			}
+		}
+
+		break;
 	}
 
 	if (budget_ci->budget.dvb_frontend == NULL) {
@@ -1146,6 +1111,7 @@ static int budget_ci_detach(struct saa7146_dev *dev)
 
 static struct saa7146_extension budget_extension;
 
+MAKE_BUDGET_INFO(ttbs2, "TT-Budget/S-1500 PCI", BUDGET_TT);
 MAKE_BUDGET_INFO(ttbci, "TT-Budget/WinTV-NOVA-CI PCI", BUDGET_TT_HW_DISEQC);
 MAKE_BUDGET_INFO(ttbt2, "TT-Budget/WinTV-NOVA-T	 PCI", BUDGET_TT);
 MAKE_BUDGET_INFO(ttbtci, "TT-Budget-T-CI PCI", BUDGET_TT);
@@ -1157,6 +1123,7 @@ static struct pci_device_id pci_tbl[] = {
 	MAKE_EXTENSION_PCI(ttbcci, 0x13c2, 0x1010),
 	MAKE_EXTENSION_PCI(ttbt2, 0x13c2, 0x1011),
 	MAKE_EXTENSION_PCI(ttbtci, 0x13c2, 0x1012),
+	MAKE_EXTENSION_PCI(ttbs2, 0x13c2, 0x1017),
 	{
 	 .vendor = 0,
 	 }

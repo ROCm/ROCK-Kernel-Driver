@@ -1860,7 +1860,7 @@ static char * __prism2_translate_scan(local_info_t *local,
 	memset(&iwe, 0, sizeof(iwe));
 	iwe.cmd = SIOCGIWFREQ;
 	if (scan) {
-		chan = scan->chid;
+		chan = le16_to_cpu(scan->chid);
 	} else if (bss) {
 		chan = bss->chan;
 	} else {
@@ -1868,7 +1868,7 @@ static char * __prism2_translate_scan(local_info_t *local,
 	}
 
 	if (chan > 0) {
-		iwe.u.freq.m = freq_list[le16_to_cpu(chan - 1)] * 100000;
+		iwe.u.freq.m = freq_list[chan - 1] * 100000;
 		iwe.u.freq.e = 1;
 		current_ev = iwe_stream_add_event(current_ev, end_buf, &iwe,
 						  IW_EV_FREQ_LEN);
@@ -3358,10 +3358,6 @@ static int prism2_ioctl_siwencodeext(struct net_device *dev,
 	if (ext->ext_flags & IW_ENCODE_EXT_SET_TX_KEY) {
 		if (!sta_ptr)
 			local->tx_keyidx = i;
-		else if (i) {
-			ret = -EINVAL;
-			goto done;
-		}
 	}
 
 

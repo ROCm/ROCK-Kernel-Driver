@@ -134,3 +134,18 @@ int xencons_ring_init(void)
 
 	return 0;
 }
+
+void xencons_resume(void)
+{
+	(void)xencons_ring_init();
+}
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

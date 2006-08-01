@@ -38,6 +38,7 @@
 #include <linux/hdreg.h>
 #include <linux/spinlock.h>
 #include <linux/compat.h>
+#include <linux/blktrace_api.h>
 #include <asm/uaccess.h>
 #include <asm/io.h>
 
@@ -995,13 +996,11 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 			status = -EINVAL;
 			goto cleanup1;
 		}
-		buff = (unsigned char **) kmalloc(MAXSGENTRIES * 
-				sizeof(char *), GFP_KERNEL);
+		buff = kzalloc(MAXSGENTRIES * sizeof(char *), GFP_KERNEL);
 		if (!buff) {
 			status = -ENOMEM;
 			goto cleanup1;
 		}
-		memset(buff, 0, MAXSGENTRIES);
 		buff_size = (int *) kmalloc(MAXSGENTRIES * sizeof(int), 
 					GFP_KERNEL);
 		if (!buff_size) {
@@ -2186,7 +2185,7 @@ static void start_io( ctlr_info_t *h)
 			break;
 		}
 
-		/* Get the frist entry from the Request Q */ 
+		/* Get the first entry from the Request Q */ 
 		removeQ(&(h->reqQ), c);
 		h->Qdepth--;
 	
@@ -2333,6 +2332,7 @@ static inline void complete_command( ctlr_info_t *h, CommandList_struct *cmd,
 
 	cmd->rq->completion_data = cmd;
 	cmd->rq->errors = status;
+	blk_add_trace_rq(cmd->rq->q, cmd->rq, BLK_TA_COMPLETE);
 	blk_complete_request(cmd->rq);
 }
 
@@ -2361,8 +2361,7 @@ queue:
 	if (!creq)
 		goto startio;
 
-	if (creq->nr_phys_segments > MAXSGENTRIES)
-                BUG();
+	BUG_ON(creq->nr_phys_segments > MAXSGENTRIES);
 
 	if (( c = cmd_alloc(h, 1)) == NULL)
 		goto full;
@@ -2730,9 +2729,9 @@ static void __devinit cciss_interrupt_mode(ctlr_info_t *c, struct pci_dev *pdev,
                         return;
                 }
         }
+default_int_mode:
 #endif /* CONFIG_PCI_MSI */
 	/* if we get here we're going to use the default interrupt mode */
-default_int_mode:
         c->intr[SIMPLE_MODE_INT] = pdev->irq;
 	return;
 }
@@ -2941,13 +2940,12 @@ static void cciss_getgeometry(int cntl_num)
 	int block_size;
 	int total_size; 
 
-	ld_buff = kmalloc(sizeof(ReportLunData_struct), GFP_KERNEL);
+	ld_buff = kzalloc(sizeof(ReportLunData_struct), GFP_KERNEL);
 	if (ld_buff == NULL)
 	{
 		printk(KERN_ERR "cciss: out of memory\n");
 		return;
 	}
-	memset(ld_buff, 0, sizeof(ReportLunData_struct));
 	size_buff = kmalloc(sizeof( ReadCapdata_struct), GFP_KERNEL);
         if (size_buff == NULL)
         {
@@ -3061,10 +3059,9 @@ static int alloc_cciss_hba(void)
 	for(i=0; i< MAX_CTLR; i++) {
 		if (!hba[i]) {
 			ctlr_info_t *p;
-			p = kmalloc(sizeof(ctlr_info_t), GFP_KERNEL);
+			p = kzalloc(sizeof(ctlr_info_t), GFP_KERNEL);
 			if (!p)
 				goto Enomem;
-			memset(p, 0, sizeof(ctlr_info_t));
 			for (n = 0; n < NWD; n++)
 				p->gendisk[n] = disk[n];
 			hba[i] = p;
@@ -3253,8 +3250,7 @@ static int __devinit cciss_init_one(struct pci_dev *pdev,
 
 clean4:
 #ifdef CONFIG_CISS_SCSI_TAPE
-	if(hba[i]->scsi_rejects.complete)
-		kfree(hba[i]->scsi_rejects.complete);
+	kfree(hba[i]->scsi_rejects.complete);
 #endif
 	kfree(hba[i]->cmd_pool_bits);
 	if(hba[i]->cmd_pool)

@@ -114,15 +114,14 @@ udp_manip_pkt(struct sk_buff **pskb,
 		portptr = &hdr->dest;
 	}
 	if (hdr->check) { /* 0 is a special case meaning no checksum */
-#ifdef CONFIG_XEN
-		if ((*pskb)->proto_csum_blank)
+		if ((*pskb)->proto_csum_blank) {
 			hdr->check = ip_nat_cheat_check(oldip, ~newip, hdr->check);
-		else
-#endif
+		} else {
 			hdr->check = ip_nat_cheat_check(~oldip, newip,
 					ip_nat_cheat_check(*portptr ^ 0xFFFF,
 							   newport,
 							   hdr->check));
+		}
 	}
 	*portptr = newport;
 	return 1;

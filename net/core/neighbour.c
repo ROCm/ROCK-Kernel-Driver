@@ -284,14 +284,11 @@ static struct neighbour **neigh_hash_alloc(unsigned int entries)
 	struct neighbour **ret;
 
 	if (size <= PAGE_SIZE) {
-		ret = kmalloc(size, GFP_ATOMIC);
+		ret = kzalloc(size, GFP_ATOMIC);
 	} else {
 		ret = (struct neighbour **)
-			__get_free_pages(GFP_ATOMIC, get_order(size));
+		      __get_free_pages(GFP_ATOMIC|__GFP_ZERO, get_order(size));
 	}
-	if (ret)
-		memset(ret, 0, size);
-
 	return ret;
 }
 
@@ -586,8 +583,8 @@ void neigh_destroy(struct neighbour *neigh)
 			kfree(hh);
 	}
 
-	if (neigh->ops && neigh->ops->destructor)
-		(neigh->ops->destructor)(neigh);
+	if (neigh->parms->neigh_destructor)
+		(neigh->parms->neigh_destructor)(neigh);
 
 	skb_queue_purge(&neigh->arp_queue);
 
@@ -750,11 +747,13 @@ static void neigh_timer_handler(unsigned long arg)
 					  neigh->used + neigh->parms->delay_probe_time)) {
 			NEIGH_PRINTK2("neigh %p is delayed.\n", neigh);
 			neigh->nud_state = NUD_DELAY;
+			neigh->updated = jiffies;
 			neigh_suspect(neigh);
 			next = now + neigh->parms->delay_probe_time;
 		} else {
 			NEIGH_PRINTK2("neigh %p is suspected.\n", neigh);
 			neigh->nud_state = NUD_STALE;
+			neigh->updated = jiffies;
 			neigh_suspect(neigh);
 		}
 	} else if (state & NUD_DELAY) {
@@ -762,11 +761,13 @@ static void neigh_timer_handler(unsigned long arg)
 				   neigh->confirmed + neigh->parms->delay_probe_time)) {
 			NEIGH_PRINTK2("neigh %p is now reachable.\n", neigh);
 			neigh->nud_state = NUD_REACHABLE;
+			neigh->updated = jiffies;
 			neigh_connect(neigh);
 			next = neigh->confirmed + neigh->parms->reachable_time;
 		} else {
 			NEIGH_PRINTK2("neigh %p is probed.\n", neigh);
 			neigh->nud_state = NUD_PROBE;
+			neigh->updated = jiffies;
 			atomic_set(&neigh->probes, 0);
 			next = now + neigh->parms->retrans_time;
 		}
@@ -780,6 +781,7 @@ static void neigh_timer_handler(unsigned long arg)
 		struct sk_buff *skb;
 
 		neigh->nud_state = NUD_FAILED;
+		neigh->updated = jiffies;
 		notify = 1;
 		NEIGH_CACHE_STAT_INC(neigh->tbl, res_failed);
 		NEIGH_PRINTK2("neigh %p is failed.\n", neigh);
@@ -843,10 +845,12 @@ int __neigh_event_send(struct neighbour *neigh, struct sk_buff *skb)
 		if (neigh->parms->mcast_probes + neigh->parms->app_probes) {
 			atomic_set(&neigh->probes, neigh->parms->ucast_probes);
 			neigh->nud_state     = NUD_INCOMPLETE;
+			neigh->updated = jiffies;
 			neigh_hold(neigh);
 			neigh_add_timer(neigh, now + 1);
 		} else {
 			neigh->nud_state = NUD_FAILED;
+			neigh->updated = jiffies;
 			write_unlock_bh(&neigh->lock);
 
 			if (skb)
@@ -857,6 +861,7 @@ int __neigh_event_send(struct neighbour *neigh, struct sk_buff *skb)
 		NEIGH_PRINTK2("neigh %p is delayed.\n", neigh);
 		neigh_hold(neigh);
 		neigh->nud_state = NUD_DELAY;
+		neigh->updated = jiffies;
 		neigh_add_timer(neigh,
 				jiffies + neigh->parms->delay_probe_time);
 	}
@@ -1081,8 +1086,7 @@ static void neigh_hh_init(struct neighbour *n, struct dst_entry *dst,
 		if (hh->hh_type == protocol)
 			break;
 
-	if (!hh && (hh = kmalloc(sizeof(*hh), GFP_ATOMIC)) != NULL) {
-		memset(hh, 0, sizeof(struct hh_cache));
+	if (!hh && (hh = kzalloc(sizeof(*hh), GFP_ATOMIC)) != NULL) {
 		rwlock_init(&hh->hh_lock);
 		hh->hh_type = protocol;
 		atomic_set(&hh->hh_refcnt, 0);
@@ -1322,8 +1326,7 @@ void neigh_parms_destroy(struct neigh_parms *parms)
 	kfree(parms);
 }
 
-
-void neigh_table_init(struct neigh_table *tbl)
+void neigh_table_init_no_netlink(struct neigh_table *tbl)
 {
 	unsigned long now = jiffies;
 	unsigned long phsize;
@@ -1358,12 +1361,10 @@ void neigh_table_init(struct neigh_table *tbl)
 	tbl->hash_buckets = neigh_hash_alloc(tbl->hash_mask + 1);
 
 	phsize = (PNEIGH_HASHMASK + 1) * sizeof(struct pneigh_entry *);
-	tbl->phash_buckets = kmalloc(phsize, GFP_KERNEL);
+	tbl->phash_buckets = kzalloc(phsize, GFP_KERNEL);
 
 	if (!tbl->hash_buckets || !tbl->phash_buckets)
 		panic("cannot allocate neighbour cache hashes");
-
-	memset(tbl->phash_buckets, 0, phsize);
 
 	get_random_bytes(&tbl->hash_rnd, sizeof(tbl->hash_rnd));
 
@@ -1381,10 +1382,27 @@ void neigh_table_init(struct neigh_table *tbl)
 
 	tbl->last_flush = now;
 	tbl->last_rand	= now + tbl->parms.reachable_time * 20;
+}
+
+void neigh_table_init(struct neigh_table *tbl)
+{
+	struct neigh_table *tmp;
+
+	neigh_table_init_no_netlink(tbl);
 	write_lock(&neigh_tbl_lock);
+	for (tmp = neigh_tables; tmp; tmp = tmp->next) {
+		if (tmp->family == tbl->family)
+			break;
+	}
 	tbl->next	= neigh_tables;
 	neigh_tables	= tbl;
 	write_unlock(&neigh_tbl_lock);
+
+	if (unlikely(tmp)) {
+		printk(KERN_ERR "NEIGH: Registering multiple tables for "
+		       "family %d\n", tbl->family);
+		dump_stack();
+	}
 }
 
 int neigh_table_clear(struct neigh_table *tbl)
@@ -1625,7 +1643,7 @@ static int neightbl_fill_info(struct neigh_table *tbl, struct sk_buff *skb,
 
 		memset(&ndst, 0, sizeof(ndst));
 
-		for_each_cpu(cpu) {
+		for_each_possible_cpu(cpu) {
 			struct neigh_statistics	*st;
 
 			st = per_cpu_ptr(tbl->stats, cpu);
@@ -2655,6 +2673,7 @@ EXPORT_SYMBOL(neigh_rand_reach_time);
 EXPORT_SYMBOL(neigh_resolve_output);
 EXPORT_SYMBOL(neigh_table_clear);
 EXPORT_SYMBOL(neigh_table_init);
+EXPORT_SYMBOL(neigh_table_init_no_netlink);
 EXPORT_SYMBOL(neigh_update);
 EXPORT_SYMBOL(neigh_update_hhs);
 EXPORT_SYMBOL(pneigh_enqueue);

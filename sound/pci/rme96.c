@@ -232,7 +232,7 @@ struct rme96 {
 	struct snd_kcontrol   *spdif_ctl;
 };
 
-static struct pci_device_id snd_rme96_ids[] = {
+static struct pci_device_id snd_rme96_ids[] __devinitdata = {
 	{ PCI_VENDOR_ID_XILINX, PCI_DEVICE_ID_RME_DIGI96,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },
 	{ PCI_VENDOR_ID_XILINX, PCI_DEVICE_ID_RME_DIGI96_8,
@@ -359,7 +359,7 @@ snd_rme96_capture_copy(struct snd_pcm_substream *substream,
 }
 
 /*
- * Digital output capabilites (S/PDIF)
+ * Digital output capabilities (S/PDIF)
  */
 static struct snd_pcm_hardware snd_rme96_playback_spdif_info =
 {
@@ -388,7 +388,7 @@ static struct snd_pcm_hardware snd_rme96_playback_spdif_info =
 };
 
 /*
- * Digital input capabilites (S/PDIF)
+ * Digital input capabilities (S/PDIF)
  */
 static struct snd_pcm_hardware snd_rme96_capture_spdif_info =
 {
@@ -417,7 +417,7 @@ static struct snd_pcm_hardware snd_rme96_capture_spdif_info =
 };
 
 /*
- * Digital output capabilites (ADAT)
+ * Digital output capabilities (ADAT)
  */
 static struct snd_pcm_hardware snd_rme96_playback_adat_info =
 {
@@ -442,7 +442,7 @@ static struct snd_pcm_hardware snd_rme96_playback_adat_info =
 };
 
 /*
- * Digital input capabilites (ADAT)
+ * Digital input capabilities (ADAT)
  */
 static struct snd_pcm_hardware snd_rme96_capture_adat_info =
 {

@@ -202,7 +202,7 @@ static dma_addr_t vio_map_single(struct device *dev, void *vaddr,
 			  size_t size, enum dma_data_direction direction)
 {
 	return iommu_map_single(to_vio_dev(dev)->iommu_table, vaddr, size,
-			direction);
+			~0ul, direction);
 }
 
 static void vio_unmap_single(struct device *dev, dma_addr_t dma_handle,
@@ -216,7 +216,7 @@ static int vio_map_sg(struct device *dev, struct scatterlist *sglist,
 		int nelems, enum dma_data_direction direction)
 {
 	return iommu_map_sg(dev, to_vio_dev(dev)->iommu_table, sglist,
-			nelems, direction);
+			nelems, ~0ul, direction);
 }
 
 static void vio_unmap_sg(struct device *dev, struct scatterlist *sglist,
@@ -229,7 +229,7 @@ static void *vio_alloc_coherent(struct device *dev, size_t size,
 			   dma_addr_t *dma_handle, gfp_t flag)
 {
 	return iommu_alloc_coherent(to_vio_dev(dev)->iommu_table, size,
-			dma_handle, flag);
+			dma_handle, ~0ul, flag);
 }
 
 static void vio_free_coherent(struct device *dev, size_t size,
@@ -267,22 +267,21 @@ static int vio_hotplug(struct device *dev, char **envp, int num_envp,
 			char *buffer, int buffer_size)
 {
 	const struct vio_dev *vio_dev = to_vio_dev(dev);
-	char *cp = NULL;
+	char *cp;
 	int length;
 
 	if (!num_envp)
 		return -ENOMEM;
 
-	if (vio_dev->dev.platform_data) {
-		cp = (char *)get_property(vio_dev->dev.platform_data,
-				"compatible", &length);
-		if (!cp)
-			return -ENODEV;
-	}
+	if (!vio_dev->dev.platform_data)
+		return -ENODEV;
+	cp = (char *)get_property(vio_dev->dev.platform_data, "compatible", &length);
+	if (!cp)
+		return -ENODEV;
 
 	envp[0] = buffer;
 	length = scnprintf(buffer, buffer_size, "MODALIAS=vio:T%sS%s",
-				vio_dev->type, cp ? cp : "");
+				vio_dev->type, cp);
 	if (buffer_size - length <= 0)
 		return -ENOMEM;
 	envp[1] = NULL;

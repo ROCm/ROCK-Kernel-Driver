@@ -20,6 +20,7 @@
 #include <linux/gfp.h>
 #include <linux/radix-tree.h>
 #include <linux/cpu.h>
+#include <asm/firmware.h>
 #include <asm/prom.h>
 #include <asm/io.h>
 #include <asm/pgtable.h>
@@ -167,7 +168,7 @@ static int pSeriesLP_xirr_info_get(int n_cpu)
 	unsigned long return_value;
 
 	lpar_rc = plpar_xirr(&return_value);
-	if (lpar_rc != H_Success)
+	if (lpar_rc != H_SUCCESS)
 		panic(" bad return code xirr - rc = %lx \n", lpar_rc);
 	return (int)return_value;
 }
@@ -178,7 +179,7 @@ static void pSeriesLP_xirr_info_set(int n_cpu, int value)
 	unsigned long val64 = value & 0xffffffff;
 
 	lpar_rc = plpar_eoi(val64);
-	if (lpar_rc != H_Success)
+	if (lpar_rc != H_SUCCESS)
 		panic("bad return code EOI - rc = %ld, value=%lx\n", lpar_rc,
 		      val64);
 }
@@ -188,7 +189,7 @@ void pSeriesLP_cppr_info(int n_cpu, u8 value)
 	unsigned long lpar_rc;
 
 	lpar_rc = plpar_cppr(value);
-	if (lpar_rc != H_Success)
+	if (lpar_rc != H_SUCCESS)
 		panic("bad return code cppr - rc = %lx\n", lpar_rc);
 }
 
@@ -197,7 +198,7 @@ static void pSeriesLP_qirr_info(int n_cpu , u8 value)
 	unsigned long lpar_rc;
 
 	lpar_rc = plpar_ipi(get_hard_smp_processor_id(n_cpu), value);
-	if (lpar_rc != H_Success)
+	if (lpar_rc != H_SUCCESS)
 		panic("bad return code qirr - rc = %lx\n", lpar_rc);
 }
 
@@ -407,7 +408,7 @@ static irqreturn_t xics_ipi_action(int irq, void *dev_id, struct pt_regs *regs)
 			smp_message_recv(PPC_MSG_MIGRATE_TASK, regs);
 		}
 #endif
-#if defined(CONFIG_DEBUGGER) || defined(CONFIG_KEXEC) || defined(CONFIG_LKCD_DUMP) || defined(CONFIG_LKCD_DUMP_MODULE)
+#if defined(CONFIG_DEBUGGER) || defined(CONFIG_KEXEC)
 		if (test_and_clear_bit(PPC_MSG_DEBUGGER_BREAK,
 				       &xics_ipi_message[cpu].value)) {
 			mb();
@@ -536,11 +537,11 @@ nextnode:
 		of_node_put(np);
 	}
 
-	if (platform_is_lpar())
+	if (firmware_has_feature(FW_FEATURE_LPAR))
 		ops = &pSeriesLP_ops;
 	else {
 #ifdef CONFIG_SMP
-		for_each_cpu(i) {
+		for_each_possible_cpu(i) {
 			int hard_id;
 
 			/* FIXME: Do this dynamically! --RR */

@@ -60,9 +60,6 @@
 #include <asm/div64.h>
 #include <linux/blkdev.h> /* sector_div */
 
-void (*do_eop_acct) (int, struct task_struct *) = NULL;
-EXPORT_SYMBOL_GPL(do_eop_acct);
-
 /*
  * These constants control the amount of freespace that suspend and
  * resume the process accounting system, and the time delay between
@@ -452,8 +449,8 @@ static void do_acct_process(long exitcode, struct file *file)
 	/* calculate run_time in nsec*/
 	do_posix_clock_monotonic_gettime(&uptime);
 	run_time = (u64)uptime.tv_sec*NSEC_PER_SEC + uptime.tv_nsec;
-	run_time -= (u64)current->start_time.tv_sec*NSEC_PER_SEC
-					+ current->start_time.tv_nsec;
+	run_time -= (u64)current->group_leader->start_time.tv_sec * NSEC_PER_SEC
+		       + current->group_leader->start_time.tv_nsec;
 	/* convert nsec -> AHZ */
 	elapsed = nsec_to_AHZ(run_time);
 #if ACCT_VERSION==3
@@ -472,10 +469,10 @@ static void do_acct_process(long exitcode, struct file *file)
 #endif
 	do_div(elapsed, AHZ);
 	ac.ac_btime = xtime.tv_sec - elapsed;
-	jiffies = cputime_to_jiffies(cputime_add(current->group_leader->utime,
+	jiffies = cputime_to_jiffies(cputime_add(current->utime,
 						 current->signal->utime));
 	ac.ac_utime = encode_comp_t(jiffies_to_AHZ(jiffies));
-	jiffies = cputime_to_jiffies(cputime_add(current->group_leader->stime,
+	jiffies = cputime_to_jiffies(cputime_add(current->stime,
 						 current->signal->stime));
 	ac.ac_stime = encode_comp_t(jiffies_to_AHZ(jiffies));
 	/* we really need to bite the bullet and change layout */
@@ -525,9 +522,9 @@ static void do_acct_process(long exitcode, struct file *file)
 	ac.ac_io = encode_comp_t(0 /* current->io_usage */);	/* %% */
 	ac.ac_rw = encode_comp_t(ac.ac_io / 1024);
 	ac.ac_minflt = encode_comp_t(current->signal->min_flt +
-				     current->group_leader->min_flt);
+				     current->min_flt);
 	ac.ac_majflt = encode_comp_t(current->signal->maj_flt +
-				     current->group_leader->maj_flt);
+				     current->maj_flt);
 	ac.ac_swaps = encode_comp_t(0);
 	ac.ac_exitcode = exitcode;
 
@@ -554,15 +551,9 @@ static void do_acct_process(long exitcode, struct file *file)
  *
  * handles process accounting for an exiting task
  */
-void acct_process(struct task_struct *tsk, long exitcode, int last_thread)
+void acct_process(long exitcode)
 {
 	struct file *file = NULL;
-
-	if (do_eop_acct)
-		do_eop_acct(exitcode, tsk);
-
-	if (!last_thread)
-		return;
 
 	/*
 	 * accelerate the common fastpath:

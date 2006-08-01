@@ -559,11 +559,15 @@ void __init paging_init(void)
 
 	kmap_init();
 
-	/* Switch to the real shared_info page, and clear the
-	 * dummy page. */
-	set_fixmap(FIX_SHARED_INFO, xen_start_info->shared_info);
-	HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
-	memset(empty_zero_page, 0, sizeof(empty_zero_page));
+	if (!xen_feature(XENFEAT_auto_translated_physmap) ||
+	    xen_start_info->shared_info >= xen_start_info->nr_pages) {
+		/* Switch to the real shared_info page, and clear the
+		 * dummy page. */
+		set_fixmap(FIX_SHARED_INFO, xen_start_info->shared_info);
+		HYPERVISOR_shared_info =
+			(shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
+		memset(empty_zero_page, 0, sizeof(empty_zero_page));
+	}
 
 	/* Setup mapping of lower 1st MB */
 	for (i = 0; i < NR_FIX_ISAMAPS; i++)
@@ -666,6 +670,7 @@ void __init mem_init(void)
 	for (pfn = xen_start_info->nr_pages; pfn < max_low_pfn; pfn++) {
 		ClearPageReserved(&mem_map[pfn]);
 		set_page_count(&mem_map[pfn], 1);
+		totalram_pages++;
 	}
 
 	reservedpages = 0;
@@ -721,7 +726,6 @@ void __init mem_init(void)
  * Specifically, in the case of x86, we will always add
  * memory to the highmem for now.
  */
-#ifdef CONFIG_HOTPLUG_MEMORY
 #ifndef CONFIG_NEED_MULTIPLE_NODES
 int add_memory(u64 start, u64 size)
 {
@@ -737,7 +741,6 @@ int remove_memory(u64 start, u64 size)
 {
 	return -EINVAL;
 }
-#endif
 #endif
 
 kmem_cache_t *pgd_cache;
@@ -765,7 +768,7 @@ void __init pgtable_cache_init(void)
 #endif
 				0,
 				pgd_ctor,
-				PTRS_PER_PMD == 1 ? pgd_dtor : NULL);
+				pgd_dtor);
 	if (!pgd_cache)
 		panic("pgtable_cache_init(): Cannot create pgd cache");
 }

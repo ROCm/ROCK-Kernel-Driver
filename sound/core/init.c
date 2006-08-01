@@ -223,7 +223,8 @@ int snd_card_disconnect(struct snd_card *card)
 	struct snd_monitor_file *mfile;
 	struct file *file;
 	struct snd_shutdown_f_ops *s_f_ops;
-	struct file_operations *f_ops, *old_f_ops;
+	struct file_operations *f_ops;
+	const struct file_operations *old_f_ops;
 	int err;
 
 	spin_lock(&card->files_lock);
@@ -721,13 +722,12 @@ int snd_card_file_remove(struct snd_card *card, struct file *file)
  *  snd_power_wait - wait until the power-state is changed.
  *  @card: soundcard structure
  *  @power_state: expected power state
- *  @file: file structure for the O_NONBLOCK check (optional)
  *
  *  Waits until the power-state is changed.
  *
  *  Note: the power lock must be active before call.
  */
-int snd_power_wait(struct snd_card *card, unsigned int power_state, struct file *file)
+int snd_power_wait(struct snd_card *card, unsigned int power_state)
 {
 	wait_queue_t wait;
 	int result = 0;
@@ -744,12 +744,6 @@ int snd_power_wait(struct snd_card *card, unsigned int power_state, struct file 
 		}
 		if (snd_power_get_state(card) == power_state)
 			break;
-#if 0 /* block all devices */
-		if (file && (file->f_flags & O_NONBLOCK)) {
-			result = -EAGAIN;
-			break;
-		}
-#endif
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		snd_power_unlock(card);
 		schedule_timeout(30 * HZ);

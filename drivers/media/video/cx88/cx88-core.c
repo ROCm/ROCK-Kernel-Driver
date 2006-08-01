@@ -146,9 +146,11 @@ int cx88_risc_buffer(struct pci_dev *pci, struct btcx_riscmem *risc,
 		fields++;
 
 	/* estimate risc mem: worst case is one write per page border +
-	   one write per scan line + syncs + jump (all 2 dwords) */
-	instructions  = (bpl * lines * fields) / PAGE_SIZE + lines * fields;
-	instructions += 3 + 4;
+	   one write per scan line + syncs + jump (all 2 dwords).  Padding
+	   can cause next bpl to start close to a page border.  First DMA
+	   region may be smaller than PAGE_SIZE */
+	instructions  = fields * (1 + ((bpl + padding) * lines) / PAGE_SIZE + lines);
+	instructions += 2;
 	if ((rc = btcx_riscmem_alloc(pci,risc,instructions*8)) < 0)
 		return rc;
 
@@ -163,7 +165,7 @@ int cx88_risc_buffer(struct pci_dev *pci, struct btcx_riscmem *risc,
 
 	/* save pointer to jmp instruction address */
 	risc->jmp = rp;
-	BUG_ON((risc->jmp - risc->cpu + 2) / 4 > risc->size);
+	BUG_ON((risc->jmp - risc->cpu + 2) * sizeof (*risc->cpu) > risc->size);
 	return 0;
 }
 
@@ -176,9 +178,11 @@ int cx88_risc_databuffer(struct pci_dev *pci, struct btcx_riscmem *risc,
 	int rc;
 
 	/* estimate risc mem: worst case is one write per page border +
-	   one write per scan line + syncs + jump (all 2 dwords) */
-	instructions  = (bpl * lines) / PAGE_SIZE + lines;
-	instructions += 3 + 4;
+	   one write per scan line + syncs + jump (all 2 dwords).  Here
+	   there is no padding and no sync.  First DMA region may be smaller
+	   than PAGE_SIZE */
+	instructions  = 1 + (bpl * lines) / PAGE_SIZE + lines;
+	instructions += 1;
 	if ((rc = btcx_riscmem_alloc(pci,risc,instructions*8)) < 0)
 		return rc;
 
@@ -188,7 +192,7 @@ int cx88_risc_databuffer(struct pci_dev *pci, struct btcx_riscmem *risc,
 
 	/* save pointer to jmp instruction address */
 	risc->jmp = rp;
-	BUG_ON((risc->jmp - risc->cpu + 2) / 4 > risc->size);
+	BUG_ON((risc->jmp - risc->cpu + 2) * sizeof (*risc->cpu) > risc->size);
 	return 0;
 }
 
@@ -213,14 +217,13 @@ int cx88_risc_stopper(struct pci_dev *pci, struct btcx_riscmem *risc,
 }
 
 void
-cx88_free_buffer(struct pci_dev *pci, struct cx88_buffer *buf)
+cx88_free_buffer(struct videobuf_queue *q, struct cx88_buffer *buf)
 {
-	if (in_interrupt())
-		BUG();
+	BUG_ON(in_interrupt());
 	videobuf_waiton(&buf->vb,0,0);
-	videobuf_dma_pci_unmap(pci, &buf->vb.dma);
+	videobuf_dma_unmap(q, &buf->vb.dma);
 	videobuf_dma_free(&buf->vb.dma);
-	btcx_riscmem_free(pci, &buf->risc);
+	btcx_riscmem_free((struct pci_dev *)q->dev, &buf->risc);
 	buf->vb.state = STATE_NEEDS_INIT;
 }
 
@@ -1061,7 +1064,7 @@ struct cx88_core* cx88_core_get(struct pci_dev *pci)
 	core->pci_bus  = pci->bus->number;
 	core->pci_slot = PCI_SLOT(pci->devfn);
 	core->pci_irqmask = 0x00fc00;
-	init_MUTEX(&core->lock);
+	mutex_init(&core->lock);
 
 	core->nr = cx88_devcount++;
 	sprintf(core->name,"cx88[%d]",core->nr);

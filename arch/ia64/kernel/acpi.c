@@ -284,19 +284,24 @@ acpi_parse_plat_int_src(acpi_table_entry_header * header,
 	return 0;
 }
 
+#ifdef CONFIG_HOTPLUG_CPU
 unsigned int can_cpei_retarget(void)
 {
 	extern int cpe_vector;
+	extern unsigned int force_cpei_retarget;
 
 	/*
 	 * Only if CPEI is supported and the override flag
 	 * is present, otherwise return that its re-targettable
 	 * if we are in polling mode.
 	 */
-	if (cpe_vector > 0 && !acpi_cpei_override)
-		return 0;
-	else
-		return 1;
+	if (cpe_vector > 0) {
+		if (acpi_cpei_override || force_cpei_retarget)
+			return 1;
+		else
+			return 0;
+	}
+	return 1;
 }
 
 unsigned int is_cpu_cpei_target(unsigned int cpu)
@@ -315,6 +320,7 @@ void set_cpei_target_cpu(unsigned int cpu)
 {
 	acpi_cpei_phys_cpuid = cpu_physical_id(cpu);
 }
+#endif
 
 unsigned int get_cpei_target_cpu(void)
 {
@@ -458,6 +464,9 @@ void __init
 acpi_numa_processor_affinity_init(struct acpi_table_processor_affinity *pa)
 {
 	int pxm;
+
+	if (!pa->flags.enabled)
+		return;
 
 	pxm = get_processor_proximity_domain(pa);
 
@@ -642,9 +651,9 @@ unsigned long __init acpi_find_rsdp(void)
 {
 	unsigned long rsdp_phys = 0;
 
-	if (efi.acpi20)
-		rsdp_phys = __pa(efi.acpi20);
-	else if (efi.acpi)
+	if (efi.acpi20 != EFI_INVALID_TABLE_ADDR)
+		rsdp_phys = efi.acpi20;
+	else if (efi.acpi != EFI_INVALID_TABLE_ADDR)
 		printk(KERN_WARNING PREFIX
 		       "v1.0/r0.71 tables no longer supported\n");
 	return rsdp_phys;

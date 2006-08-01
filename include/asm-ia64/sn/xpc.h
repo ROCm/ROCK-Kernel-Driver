@@ -676,7 +676,6 @@ extern void xpc_activate_partition(struct xpc_partition *);
 extern void xpc_activate_kthreads(struct xpc_channel *, int);
 extern void xpc_create_kthreads(struct xpc_channel *, int);
 extern void xpc_disconnect_wait(int);
-extern int xpc_kdebug_force_disengage(void);
 
 
 /* found in xpc_partition.c */
@@ -1226,28 +1225,6 @@ xpc_map_bte_errors(bte_result_t error)
 	}
 }
 
-
-
-static inline void *
-xpc_kmalloc_cacheline_aligned(size_t size, gfp_t flags, void **base)
-{
-	/* see if kmalloc will give us cachline aligned memory by default */
-	*base = kmalloc(size, flags);
-	if (*base == NULL) {
-		return NULL;
-	}
-	if ((u64) *base == L1_CACHE_ALIGN((u64) *base)) {
-		return *base;
-	}
-	kfree(*base);
-
-	/* nope, we'll have to do it ourselves */
-	*base = kmalloc(size + L1_CACHE_BYTES, flags);
-	if (*base == NULL) {
-		return NULL;
-	}
-	return (void *) L1_CACHE_ALIGN((u64) *base);
-}
 
 
 /*

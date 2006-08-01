@@ -7,6 +7,8 @@ lib-y := errno.o ctype.o string.o vsprintf.o cmdline.o \
 	 idr.o div64.o int_sqrt.o bitmap.o extable.o prio_tree.o \
 	 sha1.o
 
+lib-$(CONFIG_SMP) += cpumask.o
+
 lib-y	+= kobject.o kref.o kobject_uevent.o klist.o
 
 obj-y += sort.o parser.o halfmd4.o iomap_copy.o
@@ -21,6 +23,7 @@ lib-$(CONFIG_RWSEM_GENERIC_SPINLOCK) += rwsem-spinlock.o
 lib-$(CONFIG_RWSEM_XCHGADD_ALGORITHM) += rwsem.o
 lib-$(CONFIG_SEMAPHORE_SLEEPERS) += semaphore-sleepers.o
 lib-$(CONFIG_GENERIC_FIND_NEXT_BIT) += find_next_bit.o
+lib-$(CONFIG_GENERIC_HWEIGHT) += hweight.o
 obj-$(CONFIG_LOCK_KERNEL) += kernel_lock.o
 obj-$(CONFIG_DEBUG_PREEMPT) += smp_processor_id.o
 
@@ -44,13 +47,7 @@ obj-$(CONFIG_TEXTSEARCH_KMP) += ts_kmp.o
 obj-$(CONFIG_TEXTSEARCH_BM) += ts_bm.o
 obj-$(CONFIG_TEXTSEARCH_FSM) += ts_fsm.o
 
-obj-$(CONFIG_SGRB)	 += sgrb.o
-obj-$(CONFIG_STATISTICS) += statistic.o
-
 obj-$(CONFIG_SWIOTLB) += swiotlb.o
-ifneq ($(CONFIG_IA64),y)
-swiotlb-$(CONFIG_XEN) := ../arch/i386/kernel/swiotlb.o
-endif
 
 hostprogs-y	:= gen_crc32table
 clean-files	:= crc32table.h

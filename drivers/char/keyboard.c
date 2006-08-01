@@ -34,15 +34,11 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 
-#include <linux/consolemap.h>
 #include <linux/kbd_kern.h>
 #include <linux/kbd_diacr.h>
 #include <linux/vt_kern.h>
 #include <linux/sysrq.h>
 #include <linux/input.h>
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#endif	/* CONFIG_KDB */
 
 static void kbd_disconnect(struct input_handle *handle);
 extern void ctrl_alt_del(void);
@@ -78,7 +74,7 @@ void compute_shiftstate(void);
 	k_self,		k_fn,		k_spec,		k_pad,\
 	k_dead,		k_cons,		k_cur,		k_shift,\
 	k_meta,		k_ascii,	k_lock,		k_lowercase,\
-	k_slock,	k_dead2,	k_ignore,	k_ignore
+	k_slock,	k_dead2,	k_brl,		k_ignore
 
 typedef void (k_handler_fn)(struct vc_data *vc, unsigned char value,
 			    char up_flag, struct pt_regs *regs);
@@ -104,7 +100,7 @@ static fn_handler_fn *fn_handler[] = { FN_HANDLERS };
 const int max_vals[] = {
 	255, ARRAY_SIZE(func_table) - 1, ARRAY_SIZE(fn_handler) - 1, NR_PAD - 1,
 	NR_DEAD - 1, 255, 3, NR_SHIFT - 1, 255, NR_ASCII - 1, NR_LOCK - 1,
-	255, NR_LOCK - 1, 255
+	255, NR_LOCK - 1, 255, NR_BRL - 1
 };
 
 const int NR_TYPES = ARRAY_SIZE(max_vals);
@@ -130,7 +126,7 @@ static unsigned long key_down[NBITS(KEY_MAX)];		/* keyboard key bitmap */
 static unsigned char shift_down[NR_SHIFT];		/* shift state counters.. */
 static int dead_key_next;
 static int npadch = -1;					/* -1 or number assembled on pad */
-static unsigned char diacr;
+static unsigned int diacr;
 static char rep;					/* flag telling character repeat */
 
 static unsigned char ledstate = 0xff;			/* undefined */
@@ -333,9 +329,10 @@ static void applkey(struct vc_data *vc, int key, char mode)
  * Many other routines do put_queue, but I think either
  * they produce ASCII, or they produce some user-assigned
  * string, and in both cases we might assume that it is
- * in utf-8 already.
+ * in utf-8 already. UTF-8 is defined for words of up to 31 bits,
+ * but we need only 16 bits here
  */
-static void to_utf8(struct vc_data *vc, uint c)
+static void to_utf8(struct vc_data *vc, ushort c)
 {
 	if (c < 0x80)
 		/*  0******* */
@@ -344,31 +341,12 @@ static void to_utf8(struct vc_data *vc, uint c)
 		/* 110***** 10****** */
 		put_queue(vc, 0xc0 | (c >> 6));
 		put_queue(vc, 0x80 | (c & 0x3f));
-    	} else if (c < 0x10000) {
-	       	if (c >= 0xD800 && c < 0xE000)
-			return;
-		if (c == 0xFFFF)
-			return;
+	} else {
 		/* 1110**** 10****** 10****** */
 		put_queue(vc, 0xe0 | (c >> 12));
 		put_queue(vc, 0x80 | ((c >> 6) & 0x3f));
 		put_queue(vc, 0x80 | (c & 0x3f));
-    	} else if (c < 0x110000) {
-		/* 11110*** 10****** 10****** 10****** */
-		put_queue(vc, 0xf0 | (c >> 18));
-		put_queue(vc, 0x80 | ((c >> 12) & 0x3f));
-		put_queue(vc, 0x80 | ((c >> 6) & 0x3f));
-		put_queue(vc, 0x80 | (c & 0x3f));
 	}
-}
-
-static void put_8bit(struct vc_data *vc, u8 c)
-{
-	if (kbd->kbdmode != VC_UNICODE || c < 32 || c == 127) 
-		/* Don't translate control chars */
-		put_queue(vc, c);
-	else
-		to_utf8(vc, conv_8bit_to_uni(c));
 }
 
 /*
@@ -416,22 +394,30 @@ void compute_shiftstate(void)
  * Otherwise, conclude that DIACR was not combining after all,
  * queue it and return CH.
  */
-static unsigned char handle_diacr(struct vc_data *vc, unsigned char ch)
+static unsigned int handle_diacr(struct vc_data *vc, unsigned int ch)
 {
-	int d = diacr;
+	unsigned int d = diacr;
 	unsigned int i;
 
 	diacr = 0;
 
-	for (i = 0; i < accent_table_size; i++) {
-		if (accent_table[i].diacr == d && accent_table[i].base == ch)
-			return accent_table[i].result;
+	if ((d & ~0xff) == BRL_UC_ROW) {
+		if ((ch & ~0xff) == BRL_UC_ROW)
+			return d | ch;
+	} else {
+		for (i = 0; i < accent_table_size; i++)
+			if (accent_table[i].diacr == d && accent_table[i].base == ch)
+				return accent_table[i].result;
 	}
 
-	if (ch == ' ' || ch == d)
+	if (ch == ' ' || ch == (BRL_UC_ROW|0) || ch == d)
 		return d;
 
-	put_8bit(vc, d);
+	if (kbd->kbdmode == VC_UNICODE)
+		to_utf8(vc, d);
+	else if (d < 0x100)
+		put_queue(vc, d);
+
 	return ch;
 }
 
@@ -441,7 +427,10 @@ static unsigned char handle_diacr(struct vc_data *vc, unsigned char ch)
 static void fn_enter(struct vc_data *vc, struct pt_regs *regs)
 {
 	if (diacr) {
-		put_8bit(vc, diacr);
+		if (kbd->kbdmode == VC_UNICODE)
+			to_utf8(vc, diacr);
+		else if (diacr < 0x100)
+			put_queue(vc, diacr);
 		diacr = 0;
 	}
 	put_queue(vc, 13);
@@ -637,7 +626,7 @@ static void k_lowercase(struct vc_data *vc, unsigned char value, char up_flag, s
 	printk(KERN_ERR "keyboard.c: k_lowercase was called - impossible\n");
 }
 
-static void k_self(struct vc_data *vc, unsigned char value, char up_flag, struct pt_regs *regs)
+static void k_unicode(struct vc_data *vc, unsigned int value, char up_flag, struct pt_regs *regs)
 {
 	if (up_flag)
 		return;		/* no action, if this is a key release */
@@ -650,7 +639,10 @@ static void k_self(struct vc_data *vc, unsigned char value, char up_flag, struct
 		diacr = value;
 		return;
 	}
-	put_8bit(vc, value);
+	if (kbd->kbdmode == VC_UNICODE)
+		to_utf8(vc, value);
+	else if (value < 0x100)
+		put_queue(vc, value);
 }
 
 /*
@@ -658,11 +650,21 @@ static void k_self(struct vc_data *vc, unsigned char value, char up_flag, struct
  * dead keys modifying the same character. Very useful
  * for Vietnamese.
  */
-static void k_dead2(struct vc_data *vc, unsigned char value, char up_flag, struct pt_regs *regs)
+static void k_deadunicode(struct vc_data *vc, unsigned int value, char up_flag, struct pt_regs *regs)
 {
 	if (up_flag)
 		return;
 	diacr = (diacr ? handle_diacr(vc, value) : value);
+}
+
+static void k_self(struct vc_data *vc, unsigned char value, char up_flag, struct pt_regs *regs)
+{
+	k_unicode(vc, value, up_flag, regs);
+}
+
+static void k_dead2(struct vc_data *vc, unsigned char value, char up_flag, struct pt_regs *regs)
+{
+	k_deadunicode(vc, value, up_flag, regs);
 }
 
 /*
@@ -672,7 +674,7 @@ static void k_dead(struct vc_data *vc, unsigned char value, char up_flag, struct
 {
 	static unsigned char ret_diacr[NR_DEAD] = {'`', '\'', '^', '~', '"', ',' };
 	value = ret_diacr[value];
-	k_dead2(vc, value, up_flag, regs);
+	k_deadunicode(vc, value, up_flag, regs);
 }
 
 static void k_cons(struct vc_data *vc, unsigned char value, char up_flag, struct pt_regs *regs)
@@ -796,7 +798,7 @@ static void k_shift(struct vc_data *vc, unsigned char value, char up_flag, struc
 	/* kludge */
 	if (up_flag && shift_state != old_state && npadch != -1) {
 		if (kbd->kbdmode == VC_UNICODE)
-			to_utf8(vc, npadch);
+			to_utf8(vc, npadch & 0xffff);
 		else
 			put_queue(vc, npadch & 0xff);
 		npadch = -1;
@@ -854,6 +856,80 @@ static void k_slock(struct vc_data *vc, unsigned char value, char up_flag, struc
 	if (!key_maps[kbd->lockstate ^ kbd->slockstate]) {
 		kbd->slockstate = 0;
 		chg_vc_kbd_slock(kbd, value);
+	}
+}
+
+/* by default, 300ms interval for combination release */
+static unsigned brl_timeout = 300;
+MODULE_PARM_DESC(brl_timeout, "Braille keys release delay in ms (0 for commit on first key release)");
+module_param(brl_timeout, uint, 0644);
+
+static unsigned brl_nbchords = 1;
+MODULE_PARM_DESC(brl_nbchords, "Number of chords that produce a braille pattern (0 for dead chords)");
+module_param(brl_nbchords, uint, 0644);
+
+static void k_brlcommit(struct vc_data *vc, unsigned int pattern, char up_flag, struct pt_regs *regs)
+{
+	static unsigned long chords;
+	static unsigned committed;
+
+	if (!brl_nbchords)
+		k_deadunicode(vc, BRL_UC_ROW | pattern, up_flag, regs);
+	else {
+		committed |= pattern;
+		chords++;
+		if (chords == brl_nbchords) {
+			k_unicode(vc, BRL_UC_ROW | committed, up_flag, regs);
+			chords = 0;
+			committed = 0;
+		}
+	}
+}
+
+static void k_brl(struct vc_data *vc, unsigned char value, char up_flag, struct pt_regs *regs)
+{
+	static unsigned pressed,committing;
+	static unsigned long releasestart;
+
+	if (kbd->kbdmode != VC_UNICODE) {
+		if (!up_flag)
+			printk("keyboard mode must be unicode for braille patterns\n");
+		return;
+	}
+
+	if (!value) {
+		k_unicode(vc, BRL_UC_ROW, up_flag, regs);
+		return;
+	}
+
+	if (value > 8)
+		return;
+
+	if (up_flag) {
+		if (brl_timeout) {
+			if (!committing ||
+			    jiffies - releasestart > (brl_timeout * HZ) / 1000) {
+				committing = pressed;
+				releasestart = jiffies;
+			}
+			pressed &= ~(1 << (value - 1));
+			if (!pressed) {
+				if (committing) {
+					k_brlcommit(vc, committing, 0, regs);
+					committing = 0;
+				}
+			}
+		} else {
+			if (committing) {
+				k_brlcommit(vc, committing, 0, regs);
+				committing = 0;
+			}
+			pressed &= ~(1 << (value - 1));
+		}
+	} else {
+		pressed |= 1 << (value - 1);
+		if (!brl_timeout)
+			committing = pressed;
 	}
 }
 
@@ -1084,13 +1160,6 @@ static void kbd_keycode(unsigned int keycode, int down,
 			if (keycode < BTN_MISC)
 				printk(KERN_WARNING "keyboard.c: can't emulate rawmode for keycode %d\n", keycode);
 
-#ifdef	CONFIG_KDB
-	if (down && !rep && keycode == KEY_PAUSE && kdb_on == 1) {
-		kdb(KDB_REASON_KEYBOARD, 0, regs);
-		return;
-	}
-#endif	/* CONFIG_KDB */
-
 #ifdef CONFIG_BOOTSPLASH
 	/* This code has to be redone for some non-x86 platforms */
 	if (down == 1 && (keycode == 0x3c || keycode == 0x01)) {        /* F2 and ESC on PC keyboard */
@@ -1163,9 +1232,13 @@ static void kbd_keycode(unsigned int keycode, int down,
 	}
 
 	if (keycode > NR_KEYS)
-		return;
+		if (keycode >= KEY_BRL_DOT1 && keycode <= KEY_BRL_DOT8)
+			keysym = K(KT_BRL, keycode - KEY_BRL_DOT1 + 1);
+		else
+			return;
+	else
+		keysym = key_map[keycode];
 
-	keysym = key_map[keycode];
 	type = KTYP(keysym);
 
 	if (type < 0xf0) {

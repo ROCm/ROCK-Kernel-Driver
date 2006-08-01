@@ -1186,14 +1186,12 @@ static int fc_user_scan(struct Scsi_Host *shost, uint channel,
 struct scsi_transport_template *
 fc_attach_transport(struct fc_function_template *ft)
 {
-	struct fc_internal *i = kmalloc(sizeof(struct fc_internal),
-					GFP_KERNEL);
 	int count;
+	struct fc_internal *i = kzalloc(sizeof(struct fc_internal),
+					GFP_KERNEL);
 
 	if (unlikely(!i))
 		return NULL;
-
-	memset(i, 0, sizeof(struct fc_internal));
 
 	i->t.target_attrs.ac.attrs = &i->starget_attrs[0];
 	i->t.target_attrs.ac.class = &fc_transport_class.class;
@@ -1306,9 +1304,7 @@ EXPORT_SYMBOL(fc_release_transport);
  * @work:	Work to queue for execution.
  *
  * Return value:
- * 	1 - work queued for execution
- *	0 - work is already queued
- *	-EINVAL - work queue doesn't exist
+ * 	0 on success / != 0 for error
  **/
 static int
 fc_queue_work(struct Scsi_Host *shost, struct work_struct *work)
@@ -1458,6 +1454,8 @@ fc_starget_delete(void *data)
 	struct Scsi_Host *shost = rport_to_shost(rport);
 	unsigned long flags;
 
+	scsi_target_unblock(&rport->dev);
+
 	spin_lock_irqsave(shost->host_lock, flags);
 	if (rport->flags & FC_RPORT_DEVLOSS_PENDING) {
 		spin_unlock_irqrestore(shost->host_lock, flags);
@@ -1529,12 +1527,11 @@ fc_rport_create(struct Scsi_Host *shost, int channel,
 	size_t size;
 
 	size = (sizeof(struct fc_rport) + fci->f->dd_fcrport_size);
-	rport = kmalloc(size, GFP_KERNEL);
+	rport = kzalloc(size, GFP_KERNEL);
 	if (unlikely(!rport)) {
 		printk(KERN_ERR "%s: allocation failure\n", __FUNCTION__);
 		return NULL;
 	}
-	memset(rport, 0, size);
 
 	rport->maxframe_size = -1;
 	rport->supported_classes = FC_COS_UNSPECIFIED;
@@ -1731,8 +1728,6 @@ fc_remote_port_add(struct Scsi_Host *shost, int channel,
 
 				spin_unlock_irqrestore(shost->host_lock, flags);
 
-				scsi_target_unblock(&rport->dev);
-
 				return rport;
 			}
 		}
@@ -1788,10 +1783,9 @@ fc_remote_port_add(struct Scsi_Host *shost, int channel,
 				/* initiate a scan of the target */
 				rport->flags |= FC_RPORT_SCAN_PENDING;
 				scsi_queue_work(shost, &rport->scan_work);
-				spin_unlock_irqrestore(shost->host_lock, flags);
-				scsi_target_unblock(&rport->dev);
-			} else
-				spin_unlock_irqrestore(shost->host_lock, flags);
+			}
+
+			spin_unlock_irqrestore(shost->host_lock, flags);
 
 			return rport;
 		}
@@ -1965,7 +1959,6 @@ fc_remote_port_rolechg(struct fc_rport  *rport, u32 roles)
 		rport->flags |= FC_RPORT_SCAN_PENDING;
 		scsi_queue_work(shost, &rport->scan_work);
 		spin_unlock_irqrestore(shost->host_lock, flags);
-		scsi_target_unblock(&rport->dev);
 	}
 }
 EXPORT_SYMBOL(fc_remote_port_rolechg);
@@ -1998,9 +1991,8 @@ fc_timeout_deleted_rport(void  *data)
 		dev_printk(KERN_ERR, &rport->dev,
 			"blocked FC remote port time out: no longer"
 			" a FCP target, removing starget\n");
-		spin_unlock_irqrestore(shost->host_lock, flags);
-		scsi_target_unblock(&rport->dev);
 		fc_queue_work(shost, &rport->stgt_delete_work);
+		spin_unlock_irqrestore(shost->host_lock, flags);
 		return;
 	}
 
@@ -2068,14 +2060,16 @@ fc_timeout_deleted_rport(void  *data)
 	 * went away and didn't come back - we'll remove
 	 * all attached scsi devices.
 	 */
-	spin_unlock_irqrestore(shost->host_lock, flags);
-
-	scsi_target_unblock(&rport->dev);
 	fc_queue_work(shost, &rport->stgt_delete_work);
+
+	spin_unlock_irqrestore(shost->host_lock, flags);
 }
 
 /**
  * fc_scsi_scan_rport - called to perform a scsi scan on a remote port.
+ *
+ * Will unblock the target (in case it went away and has now come back),
+ * then invoke a scan.
  *
  * @data:	remote port to be scanned.
  **/
@@ -2088,6 +2082,7 @@ fc_scsi_scan_rport(void *data)
 
 	if ((rport->port_state == FC_PORTSTATE_ONLINE) &&
 	    (rport->roles & FC_RPORT_ROLE_FCP_TARGET)) {
+		scsi_target_unblock(&rport->dev);
 		scsi_scan_target(&rport->dev, rport->channel,
 			rport->scsi_target_id, SCAN_WILD_CARD, 1);
 	}

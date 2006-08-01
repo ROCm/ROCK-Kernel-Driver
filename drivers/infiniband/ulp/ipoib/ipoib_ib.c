@@ -161,7 +161,7 @@ static int ipoib_ib_post_receives(struct net_device *dev)
 	struct ipoib_dev_priv *priv = netdev_priv(dev);
 	int i;
 
-	for (i = 0; i < IPOIB_RX_RING_SIZE; ++i) {
+	for (i = 0; i < ipoib_recvq_size; ++i) {
 		if (ipoib_alloc_rx_skb(dev, i)) {
 			ipoib_warn(priv, "failed to allocate receive buffer %d\n", i);
 			return -ENOMEM;
@@ -187,7 +187,7 @@ static void ipoib_ib_handle_wc(struct net_device *dev,
 	if (wr_id & IPOIB_OP_RECV) {
 		wr_id &= ~IPOIB_OP_RECV;
 
-		if (wr_id < IPOIB_RX_RING_SIZE) {
+		if (wr_id < ipoib_recvq_size) {
 			struct sk_buff *skb  = priv->rx_ring[wr_id].skb;
 			dma_addr_t      addr = priv->rx_ring[wr_id].mapping;
 
@@ -252,9 +252,9 @@ static void ipoib_ib_handle_wc(struct net_device *dev,
 		struct ipoib_tx_buf *tx_req;
 		unsigned long flags;
 
-		if (wr_id >= IPOIB_TX_RING_SIZE) {
+		if (wr_id >= ipoib_sendq_size) {
 			ipoib_warn(priv, "completion event with wrid %d (> %d)\n",
-				   wr_id, IPOIB_TX_RING_SIZE);
+				   wr_id, ipoib_sendq_size);
 			return;
 		}
 
@@ -275,7 +275,8 @@ static void ipoib_ib_handle_wc(struct net_device *dev,
 		spin_lock_irqsave(&priv->tx_lock, flags);
 		++priv->tx_tail;
 		if (netif_queue_stopped(dev) &&
-		    priv->tx_head - priv->tx_tail <= IPOIB_TX_RING_SIZE / 2)
+		    test_bit(IPOIB_FLAG_ADMIN_UP, &priv->flags) &&
+		    priv->tx_head - priv->tx_tail <= ipoib_sendq_size >> 1)
 			netif_wake_queue(dev);
 		spin_unlock_irqrestore(&priv->tx_lock, flags);
 
@@ -344,13 +345,13 @@ void ipoib_send(struct net_device *dev, struct sk_buff *skb,
 	 * means we have to make sure everything is properly recorded and
 	 * our state is consistent before we call post_send().
 	 */
-	tx_req = &priv->tx_ring[priv->tx_head & (IPOIB_TX_RING_SIZE - 1)];
+	tx_req = &priv->tx_ring[priv->tx_head & (ipoib_sendq_size - 1)];
 	tx_req->skb = skb;
 	addr = dma_map_single(priv->ca->dma_device, skb->data, skb->len,
 			      DMA_TO_DEVICE);
 	pci_unmap_addr_set(tx_req, mapping, addr);
 
-	if (unlikely(post_send(priv, priv->tx_head & (IPOIB_TX_RING_SIZE - 1),
+	if (unlikely(post_send(priv, priv->tx_head & (ipoib_sendq_size - 1),
 			       address->ah, qpn, addr, skb->len))) {
 		ipoib_warn(priv, "post_send failed\n");
 		++priv->stats.tx_errors;
@@ -363,7 +364,7 @@ void ipoib_send(struct net_device *dev, struct sk_buff *skb,
 		address->last_send = priv->tx_head;
 		++priv->tx_head;
 
-		if (priv->tx_head - priv->tx_tail == IPOIB_TX_RING_SIZE) {
+		if (priv->tx_head - priv->tx_tail == ipoib_sendq_size) {
 			ipoib_dbg(priv, "TX ring full, stopping kernel net queue\n");
 			netif_stop_queue(dev);
 		}
@@ -416,25 +417,46 @@ int ipoib_ib_dev_open(struct net_device *dev)
 	ret = ipoib_ib_post_receives(dev);
 	if (ret) {
 		ipoib_warn(priv, "ipoib_ib_post_receives returned %d\n", ret);
+		ipoib_ib_dev_stop(dev);
 		return -1;
 	}
 
 	clear_bit(IPOIB_STOP_REAPER, &priv->flags);
 	queue_delayed_work(ipoib_workqueue, &priv->ah_reap_task, HZ);
 
+	set_bit(IPOIB_FLAG_INITIALIZED, &priv->flags);
+
 	return 0;
+}
+
+static void ipoib_pkey_dev_check_presence(struct net_device *dev)
+{
+	struct ipoib_dev_priv *priv = netdev_priv(dev);
+	u16 pkey_index = 0;
+
+	if (ib_find_cached_pkey(priv->ca, priv->port, priv->pkey, &pkey_index))
+		clear_bit(IPOIB_PKEY_ASSIGNED, &priv->flags);
+	else
+		set_bit(IPOIB_PKEY_ASSIGNED, &priv->flags);
 }
 
 int ipoib_ib_dev_up(struct net_device *dev)
 {
 	struct ipoib_dev_priv *priv = netdev_priv(dev);
 
+	ipoib_pkey_dev_check_presence(dev);
+
+	if (!test_bit(IPOIB_PKEY_ASSIGNED, &priv->flags)) {
+		ipoib_dbg(priv, "PKEY is not assigned.\n");
+		return 0;
+	}
+
 	set_bit(IPOIB_FLAG_OPER_UP, &priv->flags);
 
 	return ipoib_mcast_start_thread(dev);
 }
 
-int ipoib_ib_dev_down(struct net_device *dev)
+int ipoib_ib_dev_down(struct net_device *dev, int flush)
 {
 	struct ipoib_dev_priv *priv = netdev_priv(dev);
 
@@ -449,10 +471,11 @@ int ipoib_ib_dev_down(struct net_device *dev)
 		set_bit(IPOIB_PKEY_STOP, &priv->flags);
 		cancel_delayed_work(&priv->pkey_task);
 		mutex_unlock(&pkey_mutex);
-		flush_workqueue(ipoib_workqueue);
+		if (flush)
+			flush_workqueue(ipoib_workqueue);
 	}
 
-	ipoib_mcast_stop_thread(dev, 1);
+	ipoib_mcast_stop_thread(dev, flush);
 	ipoib_mcast_dev_flush(dev);
 
 	ipoib_flush_paths(dev);
@@ -466,7 +489,7 @@ static int recvs_pending(struct net_device *dev)
 	int pending = 0;
 	int i;
 
-	for (i = 0; i < IPOIB_RX_RING_SIZE; ++i)
+	for (i = 0; i < ipoib_recvq_size; ++i)
 		if (priv->rx_ring[i].skb)
 			++pending;
 
@@ -480,6 +503,8 @@ int ipoib_ib_dev_stop(struct net_device *dev)
 	unsigned long begin;
 	struct ipoib_tx_buf *tx_req;
 	int i;
+
+	clear_bit(IPOIB_FLAG_INITIALIZED, &priv->flags);
 
 	/*
 	 * Move our QP to the error state and then reinitialize in
@@ -503,7 +528,7 @@ int ipoib_ib_dev_stop(struct net_device *dev)
 			 */
 			while ((int) priv->tx_tail - (int) priv->tx_head < 0) {
 				tx_req = &priv->tx_ring[priv->tx_tail &
-							(IPOIB_TX_RING_SIZE - 1)];
+							(ipoib_sendq_size - 1)];
 				dma_unmap_single(priv->ca->dma_device,
 						 pci_unmap_addr(tx_req, mapping),
 						 tx_req->skb->len,
@@ -512,7 +537,7 @@ int ipoib_ib_dev_stop(struct net_device *dev)
 				++priv->tx_tail;
 			}
 
-			for (i = 0; i < IPOIB_RX_RING_SIZE; ++i)
+			for (i = 0; i < ipoib_recvq_size; ++i)
 				if (priv->rx_ring[i].skb) {
 					dma_unmap_single(priv->ca->dma_device,
 							 pci_unmap_addr(&priv->rx_ring[i],
@@ -585,12 +610,19 @@ void ipoib_ib_dev_flush(void *_dev)
 	struct net_device *dev = (struct net_device *)_dev;
 	struct ipoib_dev_priv *priv = netdev_priv(dev), *cpriv;
 
-	if (!test_bit(IPOIB_FLAG_ADMIN_UP, &priv->flags))
+	if (!test_bit(IPOIB_FLAG_INITIALIZED, &priv->flags) ) {
+		ipoib_dbg(priv, "Not flushing - IPOIB_FLAG_INITIALIZED not set.\n");
 		return;
+	}
+
+	if (!test_bit(IPOIB_FLAG_ADMIN_UP, &priv->flags)) {
+		ipoib_dbg(priv, "Not flushing - IPOIB_FLAG_ADMIN_UP not set.\n");
+		return;
+	}
 
 	ipoib_dbg(priv, "flushing\n");
 
-	ipoib_ib_dev_down(dev);
+	ipoib_ib_dev_down(dev, 0);
 
 	/*
 	 * The device could have been brought down between the start and when
@@ -603,7 +635,7 @@ void ipoib_ib_dev_flush(void *_dev)
 
 	/* Flush any child interfaces too */
 	list_for_each_entry(cpriv, &priv->child_intfs, list)
-		ipoib_ib_dev_flush(&cpriv->dev);
+		ipoib_ib_dev_flush(cpriv->dev);
 
 	mutex_unlock(&priv->vlan_mutex);
 }
@@ -629,17 +661,6 @@ void ipoib_ib_dev_cleanup(struct net_device *dev)
  * Bug #2507. This implementation will probably be removed when the P_Key
  * change async notification is available.
  */
-
-static void ipoib_pkey_dev_check_presence(struct net_device *dev)
-{
-	struct ipoib_dev_priv *priv = netdev_priv(dev);
-	u16 pkey_index = 0;
-
-	if (ib_find_cached_pkey(priv->ca, priv->port, priv->pkey, &pkey_index))
-		clear_bit(IPOIB_PKEY_ASSIGNED, &priv->flags);
-	else
-		set_bit(IPOIB_PKEY_ASSIGNED, &priv->flags);
-}
 
 void ipoib_pkey_poll(void *dev_ptr)
 {

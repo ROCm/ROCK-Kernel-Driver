@@ -27,6 +27,7 @@ EXPORT_SYMBOL(clear_page);
 
 #ifdef CONFIG_VIRTUAL_MEM_MAP
 #include <linux/bootmem.h>
+EXPORT_SYMBOL(min_low_pfn);	/* defined by bootmem.c, but not exported by generic code */
 EXPORT_SYMBOL(max_low_pfn);	/* defined by bootmem.c, but not exported by generic code */
 #endif
 
@@ -107,19 +108,3 @@ EXPORT_SYMBOL(ia64_spinlock_contention);
 
 extern char ia64_ivt[];
 EXPORT_SYMBOL(ia64_ivt);
-
-#include <asm/hw_irq.h>
-
-#ifdef CONFIG_LKCD_DUMP_MODULE
-#ifdef CONFIG_SMP
-extern cpumask_t irq_affinity[NR_IRQS];
-extern void stop_this_cpu(void *);
-extern int (*dump_ipi_function_ptr)(struct pt_regs *);
-extern void dump_send_ipi(void);
-EXPORT_SYMBOL_GPL(irq_desc);
-EXPORT_SYMBOL_GPL(irq_affinity);
-EXPORT_SYMBOL_GPL(stop_this_cpu);
-EXPORT_SYMBOL_GPL(dump_send_ipi);
-EXPORT_SYMBOL_GPL(dump_ipi_function_ptr);
-#endif
-#endif

@@ -49,18 +49,10 @@
 #include <linux/syscalls.h>
 #include <linux/times.h>
 #include <linux/acct.h>
-#include <linux/delayacct.h>
+#include <linux/kprobes.h>
 #include <asm/tlb.h>
 
 #include <asm/unistd.h>
-
-#if defined(CONFIG_LKCD_DUMP) || defined(CONFIG_LKCD_DUMP_MODULE)
-/* used to soft spin in sched while dump is in progress */
-unsigned long dump_oncpu;
-EXPORT_SYMBOL_GPL(dump_oncpu);
-unsigned long dump_polling_oncpu;
-EXPORT_SYMBOL_GPL(dump_polling_oncpu);
-#endif
 
 /*
  * Convert user-nice values [ -20 ... 0 ... 19 ]
@@ -153,7 +145,8 @@ EXPORT_SYMBOL_GPL(dump_polling_oncpu);
 	(v1) * (v2_max) / (v1_max)
 
 #define DELTA(p) \
-	(SCALE(TASK_NICE(p), 40, MAX_BONUS) + INTERACTIVE_DELTA)
+	(SCALE(TASK_NICE(p) + 20, 40, MAX_BONUS) - 20 * MAX_BONUS / 40 + \
+		INTERACTIVE_DELTA)
 
 #define TASK_INTERACTIVE(p) \
 	((p)->prio <= (p)->static_prio - DELTA(p))
@@ -187,7 +180,90 @@ static unsigned int task_timeslice(task_t *p)
 #define task_hot(p, now, sd) ((long long) ((now) - (p)->last_ran)	\
 				< (long long) (sd)->cache_hot_time)
 
-DEFINE_PER_CPU(struct runqueue, runqueues);
+/*
+ * These are the runqueue data structures:
+ */
+
+#define BITMAP_SIZE ((((MAX_PRIO+1+7)/8)+sizeof(long)-1)/sizeof(long))
+
+typedef struct runqueue runqueue_t;
+
+struct prio_array {
+	unsigned int nr_active;
+	unsigned long bitmap[BITMAP_SIZE];
+	struct list_head queue[MAX_PRIO];
+};
+
+/*
+ * This is the main, per-CPU runqueue data structure.
+ *
+ * Locking rule: those places that want to lock multiple runqueues
+ * (such as the load balancing or the thread migration code), lock
+ * acquire operations must be ordered by ascending &runqueue.
+ */
+struct runqueue {
+	spinlock_t lock;
+
+	/*
+	 * nr_running and cpu_load should be in the same cacheline because
+	 * remote CPUs use both these fields when doing load calculation.
+	 */
+	unsigned long nr_running;
+#ifdef CONFIG_SMP
+	unsigned long cpu_load[3];
+#endif
+	unsigned long long nr_switches;
+
+	/*
+	 * This is part of a global counter where only the total sum
+	 * over all CPUs matters. A task can increase this counter on
+	 * one CPU and if it got migrated afterwards it may decrease
+	 * it on another CPU. Always updated under the runqueue lock:
+	 */
+	unsigned long nr_uninterruptible;
+
+	unsigned long expired_timestamp;
+	unsigned long long timestamp_last_tick;
+	task_t *curr, *idle;
+	struct mm_struct *prev_mm;
+	prio_array_t *active, *expired, arrays[2];
+	int best_expired_prio;
+	atomic_t nr_iowait;
+
+#ifdef CONFIG_SMP
+	struct sched_domain *sd;
+
+	/* For active balancing */
+	int active_balance;
+	int push_cpu;
+
+	task_t *migration_thread;
+	struct list_head migration_queue;
+	int cpu;
+#endif
+
+#ifdef CONFIG_SCHEDSTATS
+	/* latency stats */
+	struct sched_info rq_sched_info;
+
+	/* sys_sched_yield() stats */
+	unsigned long yld_exp_empty;
+	unsigned long yld_act_empty;
+	unsigned long yld_both_empty;
+	unsigned long yld_cnt;
+
+	/* schedule() stats */
+	unsigned long sched_switch;
+	unsigned long sched_cnt;
+	unsigned long sched_goidle;
+
+	/* try_to_wake_up() stats */
+	unsigned long ttwu_cnt;
+	unsigned long ttwu_local;
+#endif
+};
+
+static DEFINE_PER_CPU(struct runqueue, runqueues);
 
 /*
  * The domain tree (rq->sd) is protected by RCU's quiescent state transition.
@@ -392,26 +468,9 @@ struct file_operations proc_schedstat_operations = {
 	.release = single_release,
 };
 
-static inline void rq_sched_info_arrive(struct runqueue *rq,
-						unsigned long diff)
-{
-	if (rq) {
-		rq->rq_sched_info.run_delay += diff;
-		rq->rq_sched_info.pcnt++;
-	}
-}
-
-static inline void rq_sched_info_depart(struct runqueue *rq,
-						unsigned long diff)
-{
-	if (rq)
-		rq->rq_sched_info.cpu_time += diff;
-}
 # define schedstat_inc(rq, field)	do { (rq)->field++; } while (0)
 # define schedstat_add(rq, field, amt)	do { (rq)->field += (amt); } while (0)
 #else /* !CONFIG_SCHEDSTATS */
-static inline void rq_sched_info_arrive(struct runqueue *rq, unsigned long diff) {}
-static inline void rq_sched_info_depart(struct runqueue *rq, unsigned long diff) {}
 # define schedstat_inc(rq, field)	do { } while (0)
 # define schedstat_add(rq, field, amt)	do { } while (0)
 #endif
@@ -431,18 +490,7 @@ static inline runqueue_t *this_rq_lock(void)
 	return rq;
 }
 
-#if defined(CONFIG_SCHEDSTATS) || defined(CONFIG_TASK_DELAY_ACCT)
-
-static inline int sched_info_on(void)
-{
 #ifdef CONFIG_SCHEDSTATS
-	return 1;
-#endif
-#ifdef CONFIG_TASK_DELAY_ACCT
-	return delayacct_on;
-#endif
-}
-
 /*
  * Called when a process is dequeued from the active array and given
  * the cpu.  We should note that with the exception of interactive
@@ -471,6 +519,7 @@ static inline void sched_info_dequeued(task_t *t)
 static void sched_info_arrive(task_t *t)
 {
 	unsigned long now = jiffies, diff = 0;
+	struct runqueue *rq = task_rq(t);
 
 	if (t->sched_info.last_queued)
 		diff = now - t->sched_info.last_queued;
@@ -479,7 +528,11 @@ static void sched_info_arrive(task_t *t)
 	t->sched_info.last_arrival = now;
 	t->sched_info.pcnt++;
 
-	rq_sched_info_arrive(task_rq(t), diff);
+	if (!rq)
+		return;
+
+	rq->rq_sched_info.run_delay += diff;
+	rq->rq_sched_info.pcnt++;
 }
 
 /*
@@ -499,9 +552,8 @@ static void sched_info_arrive(task_t *t)
  */
 static inline void sched_info_queued(task_t *t)
 {
-	if (unlikely(sched_info_on()))
-		if (!t->sched_info.last_queued)
-			t->sched_info.last_queued = jiffies;
+	if (!t->sched_info.last_queued)
+		t->sched_info.last_queued = jiffies;
 }
 
 /*
@@ -510,10 +562,13 @@ static inline void sched_info_queued(task_t *t)
  */
 static inline void sched_info_depart(task_t *t)
 {
+	struct runqueue *rq = task_rq(t);
 	unsigned long diff = jiffies - t->sched_info.last_arrival;
 
 	t->sched_info.cpu_time += diff;
-	rq_sched_info_depart(task_rq(t), diff);
+
+	if (rq)
+		rq->rq_sched_info.cpu_time += diff;
 }
 
 /*
@@ -521,7 +576,7 @@ static inline void sched_info_depart(task_t *t)
  * their time slice.  (This may also be called when switching to or from
  * the idle task.)  We are only called when prev != next.
  */
-static inline void __sched_info_switch(task_t *prev, task_t *next)
+static inline void sched_info_switch(task_t *prev, task_t *next)
 {
 	struct runqueue *rq = task_rq(prev);
 
@@ -535,11 +590,6 @@ static inline void __sched_info_switch(task_t *prev, task_t *next)
 
 	if (next != rq->idle)
 		sched_info_arrive(next);
-}
-static inline void sched_info_switch(task_t *prev, task_t *next)
-{
-	if (unlikely(sched_info_on()))
-		__sched_info_switch(prev, next);
 }
 #else
 #define sched_info_queued(t)		do { } while (0)
@@ -615,30 +665,15 @@ static int effective_prio(task_t *p)
 }
 
 /*
- * We place interactive tasks back into the active array, if possible.
- *
- * To guarantee that this does not starve expired tasks we ignore the
- * interactivity of a task if the first expired task had to wait more
- * than a 'reasonable' amount of time. This deadline timeout is
- * load-dependent, as the frequency of array switched decreases with
- * increasing number of running tasks. We also ignore the interactivity
- * if a better static_prio task has expired:
- */
-#define EXPIRED_STARVING(rq) \
-	((STARVATION_LIMIT && ((rq)->expired_timestamp && \
-		(jiffies - (rq)->expired_timestamp >= \
-			STARVATION_LIMIT * ((rq)->nr_running) + 1))) || \
-			((rq)->curr->static_prio > (rq)->best_expired_prio))
-
-/*
  * __activate_task - move a task to the runqueue.
  */
-static inline void __activate_task(task_t *p, runqueue_t *rq)
+static void __activate_task(task_t *p, runqueue_t *rq)
 {
-	prio_array_t *array = rq->active;
-	if (!rt_task(p) && unlikely(EXPIRED_STARVING(rq)))
-		array = rq->expired;
-	enqueue_task(p, array);
+	prio_array_t *target = rq->active;
+
+	if (batch_task(p))
+		target = rq->expired;
+	enqueue_task(p, target);
 	rq->nr_running++;
 }
 
@@ -657,7 +692,7 @@ static int recalc_task_prio(task_t *p, unsigned long long now)
 	unsigned long long __sleep_time = now - p->timestamp;
 	unsigned long sleep_time;
 
-	if (unlikely(p->policy == SCHED_BATCH))
+	if (batch_task(p))
 		sleep_time = 0;
 	else {
 		if (__sleep_time > NS_MAX_SLEEP_AVG)
@@ -669,27 +704,25 @@ static int recalc_task_prio(task_t *p, unsigned long long now)
 	if (likely(sleep_time > 0)) {
 		/*
 		 * User tasks that sleep a long time are categorised as
-		 * idle and will get just interactive status to stay active &
-		 * prevent them suddenly becoming cpu hogs and starving
-		 * other processes.
+		 * idle. They will only have their sleep_avg increased to a
+		 * level that makes them just interactive priority to stay
+		 * active yet prevent them suddenly becoming cpu hogs and
+		 * starving other processes.
 		 */
-		if (p->mm && p->activated != -1 &&
-			sleep_time > INTERACTIVE_SLEEP(p)) {
-				p->sleep_avg = JIFFIES_TO_NS(MAX_SLEEP_AVG -
-						DEF_TIMESLICE);
-		} else {
-			/*
-			 * The lower the sleep avg a task has the more
-			 * rapidly it will rise with sleep time.
-			 */
-			sleep_time *= (MAX_BONUS - CURRENT_BONUS(p)) ? : 1;
+		if (p->mm && sleep_time > INTERACTIVE_SLEEP(p)) {
+				unsigned long ceiling;
 
+				ceiling = JIFFIES_TO_NS(MAX_SLEEP_AVG -
+					DEF_TIMESLICE);
+				if (p->sleep_avg < ceiling)
+					p->sleep_avg = ceiling;
+		} else {
 			/*
 			 * Tasks waking from uninterruptible sleep are
 			 * limited in their sleep_avg rise as they
 			 * are likely to be waiting on I/O
 			 */
-			if (p->activated == -1 && p->mm) {
+			if (p->sleep_type == SLEEP_NONINTERACTIVE && p->mm) {
 				if (p->sleep_avg >= INTERACTIVE_SLEEP(p))
 					sleep_time = 0;
 				else if (p->sleep_avg + sleep_time >=
@@ -744,7 +777,7 @@ static void activate_task(task_t *p, runqueue_t *rq, int local)
 	 * This checks to make sure it's not an uninterruptible task
 	 * that is now waking up.
 	 */
-	if (!p->activated) {
+	if (p->sleep_type == SLEEP_NORMAL) {
 		/*
 		 * Tasks which were woken up by interrupts (ie. hw events)
 		 * are most likely of interactive nature. So we give them
@@ -753,13 +786,13 @@ static void activate_task(task_t *p, runqueue_t *rq, int local)
 		 * on a CPU, first time around:
 		 */
 		if (in_interrupt())
-			p->activated = 2;
+			p->sleep_type = SLEEP_INTERRUPTED;
 		else {
 			/*
 			 * Normal first-time wakeups get a credit too for
 			 * on-runqueue time, but it will be weighted down:
 			 */
-			p->activated = 1;
+			p->sleep_type = SLEEP_INTERACTIVE;
 		}
 	}
 	p->timestamp = now;
@@ -1275,19 +1308,19 @@ out_activate:
 		 * Tasks on involuntary sleep don't earn
 		 * sleep_avg beyond just interactive state.
 		 */
-		p->activated = -1;
-	}
+		p->sleep_type = SLEEP_NONINTERACTIVE;
+	} else
 
 	/*
 	 * Tasks that have marked their sleep as noninteractive get
-	 * woken up without updating their sleep average. (i.e. their
-	 * sleep is handled in a priority-neutral manner, no priority
-	 * boost and no penalty.)
+	 * woken up with their sleep average not weighted in an
+	 * interactive way.
 	 */
-	if (old_state & TASK_NONINTERACTIVE)
-		__activate_task(p, rq);
-	else
-		activate_task(p, rq, cpu == this_cpu);
+		if (old_state & TASK_NONINTERACTIVE)
+			p->sleep_type = SLEEP_NONINTERACTIVE;
+
+
+	activate_task(p, rq, cpu == this_cpu);
 	/*
 	 * Sync wakeups (i.e. those types of wakeups where the waker
 	 * has indicated that it will leave the CPU in short order)
@@ -1345,9 +1378,8 @@ void fastcall sched_fork(task_t *p, int clone_flags)
 	p->state = TASK_RUNNING;
 	INIT_LIST_HEAD(&p->run_list);
 	p->array = NULL;
-#if defined(CONFIG_SCHEDSTATS) || defined(CONFIG_TASK_DELAY_ACCT)
-	if (unlikely(sched_info_on()))
-		memset(&p->sched_info, 0, sizeof(p->sched_info));
+#ifdef CONFIG_SCHEDSTATS
+	memset(&p->sched_info, 0, sizeof(p->sched_info));
 #endif
 #if defined(CONFIG_SMP) && defined(__ARCH_WANT_UNLOCKED_CTXSW)
 	p->oncpu = 0;
@@ -1552,8 +1584,14 @@ static inline void finish_task_switch(runqueue_t *rq, task_t *prev)
 	finish_lock_switch(rq, prev);
 	if (mm)
 		mmdrop(mm);
-	if (unlikely(prev_task_flags & PF_DEAD))
+	if (unlikely(prev_task_flags & PF_DEAD)) {
+		/*
+		 * Remove function-return probe instances associated with this
+		 * task and put them back on the free list.
+	 	 */
+		kprobe_flush_task(prev);
 		put_task_struct(prev);
+	}
 }
 
 /**
@@ -1623,7 +1661,7 @@ unsigned long nr_uninterruptible(void)
 {
 	unsigned long i, sum = 0;
 
-	for_each_cpu(i)
+	for_each_possible_cpu(i)
 		sum += cpu_rq(i)->nr_uninterruptible;
 
 	/*
@@ -1640,7 +1678,7 @@ unsigned long long nr_context_switches(void)
 {
 	unsigned long long i, sum = 0;
 
-	for_each_cpu(i)
+	for_each_possible_cpu(i)
 		sum += cpu_rq(i)->nr_switches;
 
 	return sum;
@@ -1650,7 +1688,7 @@ unsigned long nr_iowait(void)
 {
 	unsigned long i, sum = 0;
 
-	for_each_cpu(i)
+	for_each_possible_cpu(i)
 		sum += atomic_read(&cpu_rq(i)->nr_iowait);
 
 	return sum;
@@ -1670,7 +1708,6 @@ unsigned long nr_active(void)
 
 	return running + uninterruptible;
 }
-
 
 #ifdef CONFIG_SMP
 
@@ -2481,6 +2518,22 @@ unsigned long long current_sched_time(const task_t *tsk)
 }
 
 /*
+ * We place interactive tasks back into the active array, if possible.
+ *
+ * To guarantee that this does not starve expired tasks we ignore the
+ * interactivity of a task if the first expired task had to wait more
+ * than a 'reasonable' amount of time. This deadline timeout is
+ * load-dependent, as the frequency of array switched decreases with
+ * increasing number of running tasks. We also ignore the interactivity
+ * if a better static_prio task has expired:
+ */
+#define EXPIRED_STARVING(rq) \
+	((STARVATION_LIMIT && ((rq)->expired_timestamp && \
+		(jiffies - (rq)->expired_timestamp >= \
+			STARVATION_LIMIT * ((rq)->nr_running) + 1))) || \
+			((rq)->curr->static_prio > (rq)->best_expired_prio))
+
+/*
  * Account user cpu time to a process.
  * @p: the process that the cpu time gets accounted to
  * @hardirq_offset: the offset to subtract from hardirq_count()
@@ -2858,6 +2911,12 @@ EXPORT_SYMBOL(sub_preempt_count);
 
 #endif
 
+static inline int interactive_sleep(enum sleep_type sleep_type)
+{
+	return (sleep_type == SLEEP_INTERACTIVE ||
+		sleep_type == SLEEP_INTERRUPTED);
+}
+
 /*
  * schedule() is the main scheduler function.
  */
@@ -2872,34 +2931,16 @@ asmlinkage void __sched schedule(void)
 	unsigned long run_time;
 	int cpu, idx, new_prio;
 
-#if defined(CONFIG_LKCD_DUMP) || defined(CONFIG_LKCD_DUMP_MODULE)
-	/*
-	 * If a crash dump is in progress, schedule()
-	 * is a no-op for the dumping cpu, and all
-	 * other cpus are forced to wait until the dump
-	 * completes.
-	 */
-	if (unlikely(dump_oncpu)) {
-		if (dump_oncpu == smp_processor_id()+1)
-			return;
-		else
-			while (dump_oncpu)
-				cpu_relax();
-	}
-#endif
-
 	/*
 	 * Test if we are atomic.  Since do_exit() needs to call into
 	 * schedule() atomically, we ignore that path for now.
 	 * Otherwise, whine if we are scheduling when we should not be.
 	 */
-	if (likely(!current->exit_state)) {
-		if (unlikely(in_atomic())) {
-			printk(KERN_ERR "scheduling while atomic: "
-				"%s/0x%08x/%d\n",
-				current->comm, preempt_count(), current->pid);
-			dump_stack();
-		}
+	if (unlikely(in_atomic() && !current->exit_state)) {
+		printk(KERN_ERR "BUG: scheduling while atomic: "
+			"%s/0x%08x/%d\n",
+			current->comm, preempt_count(), current->pid);
+		dump_stack();
 	}
 	profile_hit(SCHED_PROFILING, __builtin_return_address(0));
 
@@ -2999,12 +3040,12 @@ go_idle:
 	queue = array->queue + idx;
 	next = list_entry(queue->next, task_t, run_list);
 
-	if (!rt_task(next) && next->activated > 0) {
+	if (!rt_task(next) && interactive_sleep(next->sleep_type)) {
 		unsigned long long delta = now - next->timestamp;
 		if (unlikely((long long)(now - next->timestamp) < 0))
 			delta = 0;
 
-		if (next->activated == 1)
+		if (next->sleep_type == SLEEP_INTERACTIVE)
 			delta = delta * (ON_RUNQUEUE_WEIGHT * 128 / 100) / 128;
 
 		array = next->array;
@@ -3014,10 +3055,9 @@ go_idle:
 			dequeue_task(next, array);
 			next->prio = new_prio;
 			enqueue_task(next, array);
-		} else
-			requeue_task(next, array);
+		}
 	}
-	next->activated = 0;
+	next->sleep_type = SLEEP_NORMAL;
 switch_tasks:
 	if (next == rq->idle)
 		schedstat_inc(rq, sched_goidle);
@@ -3058,8 +3098,6 @@ switch_tasks:
 	preempt_enable_no_resched();
 	if (unlikely(test_thread_flag(TIF_NEED_RESCHED)))
 		goto need_resched;
-
-	return;
 }
 
 EXPORT_SYMBOL(schedule);
@@ -4134,11 +4172,9 @@ void __sched io_schedule(void)
 {
 	struct runqueue *rq = &per_cpu(runqueues, raw_smp_processor_id());
 
-	delayacct_blkio_start();
 	atomic_inc(&rq->nr_iowait);
 	schedule();
 	atomic_dec(&rq->nr_iowait);
-	delayacct_blkio_end();
 }
 
 EXPORT_SYMBOL(io_schedule);
@@ -4148,11 +4184,9 @@ long __sched io_schedule_timeout(long timeout)
 	struct runqueue *rq = &per_cpu(runqueues, raw_smp_processor_id());
 	long ret;
 
-	delayacct_blkio_start();
 	atomic_inc(&rq->nr_iowait);
 	ret = schedule_timeout(timeout);
 	atomic_dec(&rq->nr_iowait);
-	delayacct_blkio_end();
 	return ret;
 }
 
@@ -4782,7 +4816,7 @@ static int migration_call(struct notifier_block *nfb, unsigned long action,
 /* Register at highest priority so that task migration (migrate_all_tasks)
  * happens before everything else.
  */
-static struct notifier_block __devinitdata migration_notifier = {
+static struct notifier_block migration_notifier = {
 	.notifier_call = migration_call,
 	.priority = 10
 };
@@ -5643,6 +5677,32 @@ static int cpu_to_allnodes_group(int cpu)
 {
 	return cpu_to_node(cpu);
 }
+static void init_numa_sched_groups_power(struct sched_group *group_head)
+{
+	struct sched_group *sg = group_head;
+	int j;
+
+	if (!sg)
+		return;
+next_sg:
+	for_each_cpu_mask(j, sg->cpumask) {
+		struct sched_domain *sd;
+
+		sd = &per_cpu(phys_domains, j);
+		if (j != first_cpu(sd->groups->cpumask)) {
+			/*
+			 * Only add "power" once for each
+			 * physical package.
+			 */
+			continue;
+		}
+
+		sg->cpu_power += sd->groups->cpu_power;
+	}
+	sg = sg->next;
+	if (sg != group_head)
+		goto next_sg;
+}
 #endif
 
 /*
@@ -5888,43 +5948,13 @@ void build_sched_domains(const cpumask_t *cpu_map)
 				(cpus_weight(sd->groups->cpumask)-1) / 10;
 		sd->groups->cpu_power = power;
 #endif
-
-#ifdef CONFIG_NUMA
-		sd = &per_cpu(allnodes_domains, i);
-		if (sd->groups) {
-			power = SCHED_LOAD_SCALE + SCHED_LOAD_SCALE *
-				(cpus_weight(sd->groups->cpumask)-1) / 10;
-			sd->groups->cpu_power = power;
-		}
-#endif
 	}
 
 #ifdef CONFIG_NUMA
-	for (i = 0; i < MAX_NUMNODES; i++) {
-		struct sched_group *sg = sched_group_nodes[i];
-		int j;
+	for (i = 0; i < MAX_NUMNODES; i++)
+		init_numa_sched_groups_power(sched_group_nodes[i]);
 
-		if (sg == NULL)
-			continue;
-next_sg:
-		for_each_cpu_mask(j, sg->cpumask) {
-			struct sched_domain *sd;
-
-			sd = &per_cpu(phys_domains, j);
-			if (j != first_cpu(sd->groups->cpumask)) {
-				/*
-				 * Only add "power" once for each
-				 * physical package.
-				 */
-				continue;
-			}
-
-			sg->cpu_power += sd->groups->cpu_power;
-		}
-		sg = sg->next;
-		if (sg != sched_group_nodes[i])
-			goto next_sg;
-	}
+	init_numa_sched_groups_power(sched_group_allnodes);
 #endif
 
 	/* Attach the domains */
@@ -6106,7 +6136,7 @@ void __init sched_init(void)
 	runqueue_t *rq;
 	int i, j, k;
 
-	for_each_cpu(i) {
+	for_each_possible_cpu(i) {
 		prio_array_t *array;
 
 		rq = cpu_rq(i);
@@ -6165,7 +6195,7 @@ void __might_sleep(char *file, int line)
 		if (time_before(jiffies, prev_jiffy + HZ) && prev_jiffy)
 			return;
 		prev_jiffy = jiffies;
-		printk(KERN_ERR "Debug: sleeping function called from invalid"
+		printk(KERN_ERR "BUG: sleeping function called from invalid"
 				" context at %s:%d\n", file, line);
 		printk("in_atomic():%d, irqs_disabled():%d\n",
 			in_atomic(), irqs_disabled());
@@ -6207,7 +6237,7 @@ void normalize_rt_tasks(void)
 
 #endif /* CONFIG_MAGIC_SYSRQ */
 
-#if	defined(CONFIG_IA64) || defined(CONFIG_KDB)
+#ifdef CONFIG_IA64
 /*
  * These functions are only useful for the IA64 MCA handling.
  *
@@ -6250,80 +6280,3 @@ void set_curr_task(int cpu, task_t *p)
 }
 
 #endif
-
-#ifdef	CONFIG_KDB
-
-#include <linux/kdb.h>
-
-static void
-kdb_prio(char *name, prio_array_t *array, kdb_printf_t xxx_printf)
-{
-	int pri;
-
-	xxx_printf("  %s nr_active:%d  bitmap: 0x%lx 0x%lx 0x%lx\n",
-		name, array->nr_active,
-		array->bitmap[0], array->bitmap[1], array->bitmap[2]);
-
-	pri = sched_find_first_bit(array->bitmap);
-	if (pri != MAX_PRIO) {
-		xxx_printf("   bitmap priorities:");
-		while (pri != MAX_PRIO) {
-			xxx_printf(" %d", pri);
-			pri++;
-			pri = find_next_bit(array->bitmap, MAX_PRIO, pri);
-		}
-		xxx_printf("\n");
-	}
-
-	for (pri = 0; pri < MAX_PRIO; pri++) {
-		int printed_hdr = 0;
-		struct list_head *head, *curr;
-
-		head = array->queue + pri;
-		curr = head->next;
-		while(curr != head) {
-			task_t *task;
-			if (!printed_hdr) {
-				xxx_printf("   queue at priority=%d\n", pri);
-				printed_hdr = 1;
-			}
-			task = list_entry(curr, task_t, run_list);
-			xxx_printf("    0x%p %d %s  time_slice:%d\n",
-				   task, task->pid, task->comm,
-				   task->time_slice);
-			curr = curr->next;
-		}
-	}
-}
-
-/* This code must be in sched.c because struct runqueue is only defined in this
- * source.  To allow most of kdb to be modular, this code cannot call any kdb
- * functions directly, any external functions that it needs must be passed in
- * as parameters.
- */
-
-void
-kdb_runqueue(unsigned long cpu, kdb_printf_t xxx_printf)
-{
-	struct runqueue *rq;
-
-	rq = cpu_rq(cpu);
-
-	xxx_printf("CPU%ld lock:%s curr:0x%p(%d)(%s)",
-		   cpu, (spin_is_locked(&rq->lock))?"LOCKED":"free",
-		   rq->curr, rq->curr->pid, rq->curr->comm);
-	if (rq->curr == rq->idle)
-		xxx_printf(" is idle");
-	xxx_printf("\n ");
-#ifdef CONFIG_SMP
-	xxx_printf(" cpu_load:%lu %lu %lu",
-			rq->cpu_load[0], rq->cpu_load[1], rq->cpu_load[2]);
-#endif
-	xxx_printf(" nr_running:%lu nr_switches:%llu\n",
-		   rq->nr_running, rq->nr_switches);
-	kdb_prio("active", rq->active, xxx_printf);
-	kdb_prio("expired", rq->expired, xxx_printf);
-}
-EXPORT_SYMBOL(kdb_runqueue);
-
-#endif	/* CONFIG_KDB */

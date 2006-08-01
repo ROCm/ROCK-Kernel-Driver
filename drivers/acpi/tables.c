@@ -572,11 +572,6 @@ static int __init acpi_table_get_sdt(struct acpi_table_rsdp *rsdp)
  * 
  * result: sdt_entry[] is initialized
  */
-#if defined(CONFIG_X86_XEN) || defined(CONFIG_X86_64_XEN)
-#define acpi_rsdp_phys_to_va(rsdp_phys) isa_bus_to_virt(rsdp_phys)
-#else
-#define acpi_rsdp_phys_to_va(rsdp_phys) __va(rsdp_phys)
-#endif
 
 int __init acpi_table_init(void)
 {
@@ -592,7 +587,8 @@ int __init acpi_table_init(void)
 		return -ENODEV;
 	}
 
-	rsdp = (struct acpi_table_rsdp *)acpi_rsdp_phys_to_va(rsdp_phys);
+	rsdp = (struct acpi_table_rsdp *)__acpi_map_table(rsdp_phys,
+		sizeof(struct acpi_table_rsdp));
 	if (!rsdp) {
 		printk(KERN_WARNING PREFIX "Unable to map RSDP\n");
 		return -ENODEV;

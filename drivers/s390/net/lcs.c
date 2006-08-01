@@ -55,7 +55,7 @@
 #endif
 
 /**
- * initialization string  for  output
+ * initialization string for output
  */
 
 static char version[] __initdata = "LCS driver";
@@ -116,11 +116,10 @@ lcs_alloc_channel(struct lcs_channel *channel)
 	LCS_DBF_TEXT(2, setup, "ichalloc");
 	for (cnt = 0; cnt < LCS_NUM_BUFFS; cnt++) {
 		/* alloc memory fo iobuffer */
-		channel->iob[cnt].data = (void *)
-			kmalloc(LCS_IOBUFFERSIZE, GFP_DMA | GFP_KERNEL);
+		channel->iob[cnt].data =
+			kzalloc(LCS_IOBUFFERSIZE, GFP_DMA | GFP_KERNEL);
 		if (channel->iob[cnt].data == NULL)
 			break;
-		memset(channel->iob[cnt].data, 0, LCS_IOBUFFERSIZE);
 		channel->iob[cnt].state = BUF_STATE_EMPTY;
 	}
 	if (cnt < LCS_NUM_BUFFS) {
@@ -183,10 +182,9 @@ lcs_alloc_card(void)
 
 	LCS_DBF_TEXT(2, setup, "alloclcs");
 
-	card = kmalloc(sizeof(struct lcs_card), GFP_KERNEL | GFP_DMA);
+	card = kzalloc(sizeof(struct lcs_card), GFP_KERNEL | GFP_DMA);
 	if (card == NULL)
 		return NULL;
-	memset(card, 0, sizeof(struct lcs_card));
 	card->lan_type = LCS_FRAME_TYPE_AUTO;
 	card->pkt_seq = 0;
 	card->lancmd_timeout = LCS_LANCMD_TIMEOUT_DEFAULT;
@@ -788,10 +786,9 @@ lcs_alloc_reply(struct lcs_cmd *cmd)
 
 	LCS_DBF_TEXT(4, trace, "getreply");
 
-	reply = kmalloc(sizeof(struct lcs_reply), GFP_ATOMIC);
+	reply = kzalloc(sizeof(struct lcs_reply), GFP_ATOMIC);
 	if (!reply)
 		return NULL;
-	memset(reply,0,sizeof(struct lcs_reply));
 	atomic_set(&reply->refcnt,1);
 	reply->sequence_no = cmd->sequence_no;
 	reply->received = 0;
@@ -1293,7 +1290,7 @@ lcs_set_multicast_list(struct net_device *dev)
         LCS_DBF_TEXT(4, trace, "setmulti");
         card = (struct lcs_card *) dev->priv;
 
-        if (!lcs_set_thread_start_bit(card, LCS_SET_MC_THREAD)) 
+        if (!lcs_set_thread_start_bit(card, LCS_SET_MC_THREAD))
 		schedule_work(&card->kernel_thread_starter);
 }
 
@@ -1402,7 +1399,7 @@ lcs_irq(struct ccw_device *cdev, unsigned long intparm, struct irb *irb)
 	/* Check for channel and device errors presented */
 	rc = lcs_get_problem(cdev, irb);
 	if (rc || (dstat & DEV_STAT_UNIT_EXCEP)) {
-		PRINT_WARN("check on device %s, dstat=0x%X, cstat=0x%X \n", 
+		PRINT_WARN("check on device %s, dstat=0x%X, cstat=0x%X \n",
 			    cdev->dev.bus_id, dstat, cstat);
 		if (rc) {
 			lcs_schedule_recovery(card);
@@ -1413,7 +1410,7 @@ lcs_irq(struct ccw_device *cdev, unsigned long intparm, struct irb *irb)
 	/* How far in the ccw chain have we processed? */
 	if ((channel->state != CH_STATE_INIT) &&
 	    (irb->scsw.fctl & SCSW_FCTL_START_FUNC)) {
-		index = (struct ccw1 *) __va((addr_t) irb->scsw.cpa) 
+		index = (struct ccw1 *) __va((addr_t) irb->scsw.cpa)
 			- channel->ccws;
 		if ((irb->scsw.actl & SCSW_ACTL_SUSPENDED) ||
 		    (irb->scsw.cstat & SCHN_STAT_PCI))
@@ -1736,7 +1733,7 @@ lcs_start_kernel_thread(struct lcs_card *card)
 		kernel_thread(lcs_recovery, (void *) card, SIGCHLD);
 #ifdef CONFIG_IP_MULTICAST
 	if (lcs_do_start_thread(card, LCS_SET_MC_THREAD))
-		kernel_thread(lcs_register_mc_addresses, 
+		kernel_thread(lcs_register_mc_addresses,
 				(void *) card, SIGCHLD);
 #endif
 }
@@ -1997,7 +1994,7 @@ lcs_timeout_store (struct device *dev, struct device_attribute *attr, const char
 DEVICE_ATTR(lancmd_timeout, 0644, lcs_timeout_show, lcs_timeout_store);
 
 static ssize_t
-lcs_dev_recover_store(struct device *dev, struct device_attribute *attr, 
+lcs_dev_recover_store(struct device *dev, struct device_attribute *attr,
 		      const char *buf, size_t count)
 {
 	struct lcs_card *card = dev->driver_data;
@@ -2156,10 +2153,8 @@ lcs_new_device(struct ccwgroup_device *ccwgdev)
 	SET_MODULE_OWNER(dev);
 	memcpy(card->dev->dev_addr, card->mac, LCS_MAC_LENGTH);
 #ifdef CONFIG_IP_MULTICAST
-	if (!lcs_check_multicast_support(card)) {
+	if (!lcs_check_multicast_support(card))
 		card->dev->set_multicast_list = lcs_set_multicast_list;
-		card->dev->features |= NETIF_F_MC_ALL;
-	}
 #endif
 netdev_out:
 	lcs_set_allowed_threads(card,0xffffffff);

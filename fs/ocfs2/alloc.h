@@ -70,8 +70,6 @@ struct ocfs2_truncate_context {
 	struct buffer_head *tc_last_eb_bh;
 };
 
-void ocfs2_free_truncate_context(struct ocfs2_truncate_context *tc);
-
 int ocfs2_prepare_truncate(struct ocfs2_super *osb,
 			   struct inode *inode,
 			   struct buffer_head *fe_bh,

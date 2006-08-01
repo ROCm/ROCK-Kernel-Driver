@@ -34,19 +34,16 @@
 #include <asm/bootinfo.h>
 #include <linux/string.h>
 #include <linux/kernel.h>
+#include <asm/sections.h>
 #include <asm/it8172/it8172.h>
 #include <asm/it8172/it8172_dbg.h>
 
 int prom_argc;
 char **prom_argv, **prom_envp;
 
-extern char _end;
 extern void  __init prom_init_cmdline(void);
 extern unsigned long __init prom_get_memsize(void);
 extern void __init it8172_init_ram_resource(unsigned long memsize);
-
-#define PFN_UP(x)	(((x) + PAGE_SIZE-1) >> PAGE_SHIFT)
-#define PFN_ALIGN(x)	(((unsigned long)(x) + (PAGE_SIZE - 1)) & PAGE_MASK)
 
 const char *get_system_type(void)
 {

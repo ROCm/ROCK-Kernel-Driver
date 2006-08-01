@@ -221,10 +221,6 @@ rff_trace:
  *
  * XXX	if we had a free scratch register we could save the RSP into the stack frame
  *      and report it properly in ps. Unfortunately we haven't.
- *
- * When user can change the frames always force IRET. That is because
- * it deals with uncanonical addresses better. SYSRET has trouble
- * with them due to bugs in both AMD and Intel CPUs.
  */ 			 		
 
 ENTRY(system_call)
@@ -293,10 +289,7 @@ sysret_signal:
 	xorl %esi,%esi # oldset -> arg2
 	call ptregscall_common
 1:	movl $_TIF_NEED_RESCHED,%edi
-	/* Use IRET because user could have changed frame. This
-	   works because ptregscall_common has called FIXUP_TOP_OF_STACK. */
-	cli
-	jmp int_with_check
+	jmp sysret_check
 	
 badsys:
 	movq $-ENOSYS,RAX-ARGOFFSET(%rsp)
@@ -316,9 +309,13 @@ tracesys:
 	ja  1f
 	movq %r10,%rcx	/* fixup for C */
 	call *sys_call_table(,%rax,8)
-1:	movq %rax,RAX-ARGOFFSET(%rsp)
-	/* Use IRET because user could have changed frame */
-	jmp int_ret_from_sys_call
+	movq %rax,RAX-ARGOFFSET(%rsp)
+1:	SAVE_REST
+	movq %rsp,%rdi
+	call syscall_trace_leave
+	RESTORE_TOP_OF_STACK %rbx
+	RESTORE_REST
+	jmp ret_from_sys_call
 	CFI_ENDPROC
 		
 /* 
@@ -452,9 +449,25 @@ ENTRY(stub_execve)
 	CFI_ADJUST_CFA_OFFSET -8
 	CFI_REGISTER rip, r11
 	SAVE_REST
+	movq %r11, %r15
+	CFI_REGISTER rip, r15
 	FIXUP_TOP_OF_STACK %r11
 	call sys_execve
+	GET_THREAD_INFO(%rcx)
+	bt $TIF_IA32,threadinfo_flags(%rcx)
+	CFI_REMEMBER_STATE
+	jc exec_32bit
 	RESTORE_TOP_OF_STACK %r11
+	movq %r15, %r11
+	CFI_REGISTER rip, r11
+	RESTORE_REST
+	pushq %r11
+	CFI_ADJUST_CFA_OFFSET 8
+	CFI_REL_OFFSET rip, 0
+	ret
+
+exec_32bit:
+	CFI_RESTORE_STATE
 	movq %rax,RAX(%rsp)
 	RESTORE_REST
 	jmp int_ret_from_sys_call

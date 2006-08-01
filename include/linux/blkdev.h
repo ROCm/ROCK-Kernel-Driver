@@ -17,11 +17,14 @@
 
 #include <asm/scatterlist.h>
 
+struct scsi_ioctl_command;
+
 struct request_queue;
 typedef struct request_queue request_queue_t;
 struct elevator_queue;
 typedef struct elevator_queue elevator_t;
 struct request_pm_state;
+struct blk_trace;
 
 #define BLKDEV_MIN_RQ	4
 #define BLKDEV_MAX_RQ	128	/* Default maximum */
@@ -420,6 +423,8 @@ struct request_queue
 	unsigned int		sg_reserved_size;
 	int			node;
 
+	struct blk_trace	*blk_trace;
+
 	/*
 	 * reserved for flush operations
 	 */
@@ -429,7 +434,7 @@ struct request_queue
 	struct request		*orig_bar_rq;
 	unsigned int		bi_size;
 
-	struct semaphore	sysfs_lock;
+	struct mutex		sysfs_lock;
 };
 
 #define RQ_INACTIVE		(-1)
@@ -608,6 +613,8 @@ extern void blk_plug_device(request_queue_t *);
 extern int blk_remove_plug(request_queue_t *);
 extern void blk_recount_segments(request_queue_t *, struct bio *);
 extern int scsi_cmd_ioctl(struct file *, struct gendisk *, unsigned int, void __user *);
+extern int sg_scsi_ioctl(struct file *, struct request_queue *,
+		struct gendisk *, struct scsi_ioctl_command __user *);
 extern void blk_start_queue(request_queue_t *q);
 extern void blk_stop_queue(request_queue_t *q);
 extern void blk_sync_queue(struct request_queue *q);

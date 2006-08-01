@@ -1,5 +1,4 @@
 /*
- * arch/ppc64/kernel/iommu.c
  * Copyright (C) 2001 Mike Corrigan & Dave Engebretsen, IBM Corporation
  * 
  * Rewrite, cleanup, new allocation schemes, virtual merging: 
@@ -63,6 +62,7 @@ __setup("iommu=", setup_iommu);
 static unsigned long iommu_range_alloc(struct iommu_table *tbl,
                                        unsigned long npages,
                                        unsigned long *handle,
+                                       unsigned long mask,
                                        unsigned int align_order)
 { 
 	unsigned long n, end, i, start;
@@ -99,8 +99,20 @@ static unsigned long iommu_range_alloc(struct iommu_table *tbl,
 	 */
 	if (start >= limit)
 		start = largealloc ? tbl->it_largehint : tbl->it_hint;
-	
+
  again:
+
+	if (limit + tbl->it_offset > mask) {
+		limit = mask - tbl->it_offset + 1;
+		/* If we're constrained on address range, first try
+		 * at the masked hint to avoid O(n) search complexity,
+		 * but on second pass, start at 0.
+		 */
+		if ((start & mask) >= limit || pass > 0)
+			start = 0;
+		else
+			start &= mask;
+	}
 
 	n = find_next_zero_bit(tbl->it_map, limit, start);
 
@@ -152,14 +164,14 @@ static unsigned long iommu_range_alloc(struct iommu_table *tbl,
 
 static dma_addr_t iommu_alloc(struct iommu_table *tbl, void *page,
 		       unsigned int npages, enum dma_data_direction direction,
-		       unsigned int align_order)
+		       unsigned long mask, unsigned int align_order)
 {
 	unsigned long entry, flags;
 	dma_addr_t ret = DMA_ERROR_CODE;
-	
+
 	spin_lock_irqsave(&(tbl->it_lock), flags);
 
-	entry = iommu_range_alloc(tbl, npages, NULL, align_order);
+	entry = iommu_range_alloc(tbl, npages, NULL, mask, align_order);
 
 	if (unlikely(entry == DMA_ERROR_CODE)) {
 		spin_unlock_irqrestore(&(tbl->it_lock), flags);
@@ -238,7 +250,7 @@ static void iommu_free(struct iommu_table *tbl, dma_addr_t dma_addr,
 
 int iommu_map_sg(struct device *dev, struct iommu_table *tbl,
 		struct scatterlist *sglist, int nelems,
-		enum dma_data_direction direction)
+		unsigned long mask, enum dma_data_direction direction)
 {
 	dma_addr_t dma_next = 0, dma_addr;
 	unsigned long flags;
@@ -276,7 +288,7 @@ int iommu_map_sg(struct device *dev, struct iommu_table *tbl,
 		vaddr = (unsigned long)page_address(s->page) + s->offset;
 		npages = PAGE_ALIGN(vaddr + slen) - (vaddr & PAGE_MASK);
 		npages >>= PAGE_SHIFT;
-		entry = iommu_range_alloc(tbl, npages, &handle, 0);
+		entry = iommu_range_alloc(tbl, npages, &handle, mask >> PAGE_SHIFT, 0);
 
 		DBG("  - vaddr: %lx, size: %lx\n", vaddr, slen);
 
@@ -510,7 +522,8 @@ void iommu_free_table(struct device_node *dn)
  * byte within the page as vaddr.
  */
 dma_addr_t iommu_map_single(struct iommu_table *tbl, void *vaddr,
-		size_t size, enum dma_data_direction direction)
+		size_t size, unsigned long mask,
+		enum dma_data_direction direction)
 {
 	dma_addr_t dma_handle = DMA_ERROR_CODE;
 	unsigned long uaddr;
@@ -523,7 +536,8 @@ dma_addr_t iommu_map_single(struct iommu_table *tbl, void *vaddr,
 	npages >>= PAGE_SHIFT;
 
 	if (tbl) {
-		dma_handle = iommu_alloc(tbl, vaddr, npages, direction, 0);
+		dma_handle = iommu_alloc(tbl, vaddr, npages, direction,
+					 mask >> PAGE_SHIFT, 0);
 		if (dma_handle == DMA_ERROR_CODE) {
 			if (printk_ratelimit())  {
 				printk(KERN_INFO "iommu_alloc failed, "
@@ -552,7 +566,7 @@ void iommu_unmap_single(struct iommu_table *tbl, dma_addr_t dma_handle,
  * to the dma address (mapping) of the first page.
  */
 void *iommu_alloc_coherent(struct iommu_table *tbl, size_t size,
-		dma_addr_t *dma_handle, gfp_t flag)
+		dma_addr_t *dma_handle, unsigned long mask, gfp_t flag)
 {
 	void *ret = NULL;
 	dma_addr_t mapping;
@@ -582,7 +596,8 @@ void *iommu_alloc_coherent(struct iommu_table *tbl, size_t size,
 	memset(ret, 0, size);
 
 	/* Set up tces to cover the allocated range */
-	mapping = iommu_alloc(tbl, ret, npages, DMA_BIDIRECTIONAL, order);
+	mapping = iommu_alloc(tbl, ret, npages, DMA_BIDIRECTIONAL,
+			      mask >> PAGE_SHIFT, order);
 	if (mapping == DMA_ERROR_CODE) {
 		free_pages((unsigned long)ret, order);
 		ret = NULL;

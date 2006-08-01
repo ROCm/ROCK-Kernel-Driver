@@ -553,6 +553,8 @@ pmac_ide_init_hwif_ports(hw_regs_t *hw,
 
 	if (irq != NULL)
 		*irq = pmac_ide[ix].irq;
+
+	hw->dev = &pmac_ide[ix].mdev->ofdev.dev;
 }
 
 #define PMAC_IDE_REG(x) ((void __iomem *)(IDE_DATA_REG+(x)))
@@ -1677,7 +1679,7 @@ MODULE_DEVICE_TABLE(pci, pmac_ide_pci_match);
 void __init
 pmac_ide_probe(void)
 {
-	if (_machine != _MACH_Pmac)
+	if (!machine_is(powermac))
 		return;
 
 #ifdef CONFIG_BLK_DEV_IDE_PMAC_ATA100FIRST

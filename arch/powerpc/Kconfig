@@ -37,6 +37,10 @@ config RWSEM_XCHGADD_ALGORITHM
 	bool
 	default y
 
+config GENERIC_HWEIGHT
+	bool
+	default y
+
 config GENERIC_CALIBRATE_DELAY
 	bool
 	default y
@@ -127,6 +131,12 @@ config PPC_83xx
 	select 83xx
 	select PPC_FPU
 
+config PPC_85xx
+	bool "Freescale 85xx"
+	select E500
+	select FSL_SOC
+	select 85xx
+
 config 40x
 	bool "AMCC 40x"
 
@@ -139,8 +149,6 @@ config 8xx
 config E200
 	bool "Freescale e200"
 
-config E500
-	bool "Freescale e500"
 endchoice
 
 config POWER4_ONLY
@@ -166,6 +174,13 @@ config 6xx
 
 # this is temp to handle compat with arch=ppc
 config 83xx
+	bool
+
+# this is temp to handle compat with arch=ppc
+config 85xx
+	bool
+
+config E500
 	bool
 
 config PPC_FPU
@@ -217,6 +232,7 @@ config ALTIVEC
 config SPE
 	bool "SPE Support"
 	depends on E200 || E500
+	default y
 	---help---
 	  This option enables kernel support for the Signal Processing
 	  Extensions (SPE) to the PowerPC processor. The kernel currently
@@ -350,6 +366,7 @@ config PPC_PMAC64
 	select U3_DART
 	select MPIC_BROKEN_U3
 	select GENERIC_TBSYNC
+	select PPC_970_NAP
 	default y
 
 config PPC_PREP
@@ -367,6 +384,7 @@ config PPC_MAPLE
 	select MPIC_BROKEN_U3
 	select GENERIC_TBSYNC
 	select PPC_UDBG_16550
+	select PPC_970_NAP
 	default n
 	help
           This option enables support for the Maple 970FX Evaluation Board.
@@ -441,6 +459,10 @@ config PPC_MPC106
 	bool
 	default n
 
+config PPC_970_NAP
+	bool
+	default n
+
 source "drivers/cpufreq/Kconfig"
 
 config CPU_FREQ_PMAC
@@ -475,7 +497,7 @@ config PPC601_SYNC_FIX
 	  If in doubt, say Y here.
 
 config TAU
-	bool "Thermal Management Support"
+	bool "On-chip CPU temperature sensor support"
 	depends on 6xx
 	help
 	  G3 and G4 processors have an on-chip temperature sensor called the
@@ -484,7 +506,7 @@ config TAU
 	  on-die temperature in /proc/cpuinfo if the cpu supports it.
 
 	  Unfortunately, on some chip revisions, this sensor is very inaccurate
-	  and in some cases, does not work at all, so don't assume the cpu
+	  and in many cases, does not work at all, so don't assume the cpu
 	  temp is actually what /proc/cpuinfo says it is.
 
 config TAU_INT
@@ -633,6 +655,11 @@ config NUMA
 	depends on PPC64 && !CRASH_DUMP
 	default y if SMP && PPC_PSERIES
 
+config NODES_SHIFT
+	int
+	default "4"
+	depends on NEED_MULTIPLE_NODES
+
 config ARCH_SELECT_MEMORY_MODEL
 	def_bool y
 	depends on PPC64
@@ -749,13 +776,12 @@ config GENERIC_ISA_DMA
 
 config PPC_I8259
 	bool
-	default y if 85xx
 	default n
 
 config PPC_INDIRECT_PCI
 	bool
 	depends on PCI
-	default y if 40x || 44x || 85xx
+	default y if 40x || 44x
 	default n
 
 config EISA
@@ -772,8 +798,8 @@ config MCA
 	bool
 
 config PCI
-	bool "PCI support" if 40x || CPM2 || PPC_83xx || 85xx || PPC_MPC52xx || (EMBEDDED && PPC_ISERIES)
-	default y if !40x && !CPM2 && !8xx && !APUS && !PPC_83xx && !85xx
+	bool "PCI support" if 40x || CPM2 || PPC_83xx || PPC_85xx || PPC_MPC52xx || (EMBEDDED && PPC_ISERIES)
+	default y if !40x && !CPM2 && !8xx && !APUS && !PPC_83xx && !PPC_85xx
 	default PCI_PERMEDIA if !4xx && !CPM2 && !8xx && APUS
 	default PCI_QSPAN if !4xx && !CPM2 && 8xx
 	help

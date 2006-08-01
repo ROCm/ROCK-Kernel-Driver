@@ -38,8 +38,7 @@ xfs_stats_clear_proc_handler(
 
 	if (!ret && write && *valp) {
 		printk("XFS Clearing xfsstats\n");
-		for (c = 0; c < NR_CPUS; c++) {
-			if (!cpu_possible(c)) continue;
+		for_each_cpu(c) {
 			preempt_disable();
 			/* save vn_active, it's a universal truth! */
 			vn_active = per_cpu(xfsstats, c).vn_active;
@@ -85,21 +84,6 @@ STATIC ctl_table xfs_table[] = {
 	sizeof(int), 0644, NULL, &proc_dointvec_minmax,
 	&sysctl_intvec, NULL,
 	&xfs_params.syncd_timer.min, &xfs_params.syncd_timer.max},
-
-	{XFS_PROBE_DMAPI, "probe_dmapi", &xfs_params.probe_dmapi.val,
-	sizeof(int), 0644, NULL, &proc_dointvec_minmax,
-	&sysctl_intvec, NULL,
-	&xfs_params.probe_dmapi.min, &xfs_params.probe_dmapi.max},
-
-	{XFS_PROBE_IOOPS, "probe_ioops", &xfs_params.probe_ioops.val,
-	sizeof(int), 0644, NULL, &proc_dointvec_minmax,
-	&sysctl_intvec, NULL,
-	&xfs_params.probe_ioops.min, &xfs_params.probe_ioops.max},
-
-	{XFS_PROBE_QUOTA, "probe_quota", &xfs_params.probe_quota.val,
-	sizeof(int), 0644, NULL, &proc_dointvec_minmax,
-	&sysctl_intvec, NULL,
-	&xfs_params.probe_quota.min, &xfs_params.probe_quota.max},
 
 	{XFS_INHERIT_SYNC, "inherit_sync", &xfs_params.inherit_sync.val,
 	sizeof(int), 0644, NULL, &proc_dointvec_minmax,

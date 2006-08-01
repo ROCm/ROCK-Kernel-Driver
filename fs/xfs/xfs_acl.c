@@ -36,6 +36,7 @@
 #include "xfs_mac.h"
 #include "xfs_attr.h"
 
+#include <linux/capability.h>
 #include <linux/posix_acl_xattr.h>
 
 STATIC int	xfs_acl_setmode(vnode_t *, xfs_acl_t *, int *);
@@ -394,7 +395,7 @@ xfs_acl_allow_set(
  * The access control process to determine the access permission:
  *	if uid == file owner id, use the file owner bits.
  *	if gid == file owner group id, use the file group bits.
- *	scan ACL for a maching user or group, and use matched entry
+ *	scan ACL for a matching user or group, and use matched entry
  *	permission. Use total permissions of all matching group entries,
  *	until all acl entries are exhausted. The final permission produced
  *	by matching acl entry or entries needs to be & with group permission.
@@ -521,7 +522,6 @@ xfs_acl_access(
 
 	return xfs_acl_capability_check(md, cr);
 }
-EXPORT_SYMBOL(xfs_acl_access);
 
 /*
  * ACL validity checker.

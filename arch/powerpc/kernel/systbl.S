@@ -322,6 +322,9 @@ SYSCALL(spu_create)
 COMPAT_SYS(pselect6)
 COMPAT_SYS(ppoll)
 SYSCALL(unshare)
+SYSCALL(splice)
+SYSCALL(tee)
+SYSCALL(vmsplice)
 COMPAT_SYS(openat)
 SYSCALL(mkdirat)
 SYSCALL(mknodat)
@@ -335,3 +338,10 @@ SYSCALL(symlinkat)
 SYSCALL(readlinkat)
 SYSCALL(fchmodat)
 SYSCALL(faccessat)
+COMPAT_SYS(get_robust_list)
+COMPAT_SYS(set_robust_list)
+
+/*
+ * please add new calls to arch/powerpc/platforms/cell/spu_callbacks.c
+ * as well when appropriate.
+ */

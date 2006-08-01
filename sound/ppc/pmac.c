@@ -869,7 +869,7 @@ static int __init snd_pmac_detect(struct snd_pmac *chip)
 
 	u32 layout_id = 0;
 
-	if (_machine != _MACH_Pmac)
+	if (!machine_is(powermac))
 		return -ENODEV;
 
 	chip->subframe = 0;
@@ -934,7 +934,7 @@ static int __init snd_pmac_detect(struct snd_pmac *chip)
 	/* This should be verified on older screamers */
 	if (device_is_compatible(sound, "screamer")) {
 		chip->model = PMAC_SCREAMER;
-		chip->can_byte_swap = 0; /* FIXME: check this */
+		// chip->can_byte_swap = 0; /* FIXME: check this */
 	}
 	if (device_is_compatible(sound, "burgundy")) {
 		chip->model = PMAC_BURGUNDY;

@@ -217,8 +217,6 @@ zfcp_fsf_req_complete(struct zfcp_fsf_req *fsf_req)
 	int retval = 0;
 	int cleanup;
 
-	fsf_req->received = get_clock();
-
 	if (unlikely(fsf_req->fsf_command == FSF_QTCB_UNSOLICITED_STATUS)) {
 		ZFCP_LOG_DEBUG("Status read response received\n");
 		/*
@@ -645,7 +643,6 @@ zfcp_fsf_link_down_info_eval(struct zfcp_adapter *adapter,
 				link_down->vendor_specific_code);
 
  out:
-	zfcp_cb_link_down(adapter);
 	zfcp_erp_adapter_failed(adapter);
 }
 
@@ -954,9 +951,6 @@ zfcp_fsf_status_read_handler(struct zfcp_fsf_req *fsf_req)
 		zfcp_erp_adapter_reopen(adapter,
 					ZFCP_STATUS_ADAPTER_LINK_UNPLUGGED
 					| ZFCP_STATUS_COMMON_ERP_FAILED);
-
-		zfcp_cb_link_up(adapter);
-
 		break;
 
 	case FSF_STATUS_READ_NOTIFICATION_LOST:
@@ -2189,8 +2183,6 @@ zfcp_fsf_exchange_config_data_handler(struct zfcp_fsf_req *fsf_req)
 		}
 		atomic_set_mask(ZFCP_STATUS_ADAPTER_XCONFIG_OK,
 				&adapter->status);
-		zfcp_cb_adapter_add(adapter);
-
 		break;
 	case FSF_EXCHANGE_CONFIG_DATA_INCOMPLETE:
 		debug_text_event(adapter->erp_dbf, 0, "xchg-inco");
@@ -3521,12 +3513,6 @@ zfcp_fsf_send_fcp_command_task(struct zfcp_adapter *adapter,
 			       unit->fcp_lun,
 			       unit->port->wwpn,
 			       zfcp_get_busid_by_adapter(adapter));
-		if (retval == -ENOMEM)
-			statistic_inc(unit->stat_sizes_scsi_nomem,
-				       scsi_cmnd->request_bufflen);
-		if (retval == -EIO)
-			statistic_inc(unit->stat_sizes_scsi_nofit,
-				       scsi_cmnd->request_bufflen);
 		goto failed_req_create;
 	}
 
@@ -3637,8 +3623,6 @@ zfcp_fsf_send_fcp_command_task(struct zfcp_adapter *adapter,
 		zfcp_erp_unit_shutdown(unit, 0);
 		retval = -EINVAL;
 		}
-		statistic_inc(unit->stat_sizes_scsi_nofit,
-			       scsi_cmnd->request_bufflen);
 		goto no_fit;
 	}
 
@@ -3661,17 +3645,6 @@ zfcp_fsf_send_fcp_command_task(struct zfcp_adapter *adapter,
 			      unit->port->wwpn,
 			      unit->fcp_lun);
 		goto send_failed;
-	}
-
-	switch (sbtype) {
-	case SBAL_FLAGS0_TYPE_READ :
-		statistic_inc(unit->stat_pending_scsi_read,
-				atomic_inc_return(&unit->read_num));
-		break;
-	case SBAL_FLAGS0_TYPE_WRITE :
-		statistic_inc(unit->stat_pending_scsi_write,
-				atomic_inc_return(&unit->write_num));
-		break;
 	}
 
 	ZFCP_LOG_TRACE("Send FCP Command initiated (adapter %s, "
@@ -4053,32 +4026,9 @@ zfcp_fsf_send_fcp_command_task_handler(struct zfcp_fsf_req *fsf_req)
 	u32 sns_len;
 	char *fcp_rsp_info = zfcp_get_fcp_rsp_info_ptr(fcp_rsp_iu);
 	unsigned long flags;
-	struct zfcp_adapter *adapter = fsf_req->adapter;
 	struct zfcp_unit *unit = fsf_req->unit;
-	long long unsigned latency;
 
-	statistic_lock(unit->stat_if, flags);
-	latency = fsf_req->received - fsf_req->issued;
-	do_div(latency, 1000000);
-	latency++;
-	if (fcp_cmnd_iu->wddata == 1) {
-		statistic_inc_nolock(unit->stat_sizes_scsi_write,
-				      zfcp_get_fcp_dl(fcp_cmnd_iu));
-		statistic_inc_nolock(unit->stat_latencies_scsi_write, latency);
-		atomic_dec(&unit->write_num);
-	} else if (fcp_cmnd_iu->rddata == 1) {
-		statistic_inc_nolock(unit->stat_sizes_scsi_read,
-				      zfcp_get_fcp_dl(fcp_cmnd_iu));
-		statistic_inc_nolock(unit->stat_latencies_scsi_read, latency);
-		atomic_dec(&unit->read_num);
-	} else {
-		statistic_inc_nolock(unit->stat_sizes_scsi_nodata,
-				      zfcp_get_fcp_dl(fcp_cmnd_iu));
-		statistic_inc_nolock(unit->stat_latencies_scsi_nodata, latency);
-	}
-	statistic_unlock(unit->stat_if, flags);
-
-	read_lock_irqsave(&adapter->abort_lock, flags);
+	read_lock_irqsave(&fsf_req->adapter->abort_lock, flags);
 	scpnt = (struct scsi_cmnd *) fsf_req->data;
 	if (unlikely(!scpnt)) {
 		ZFCP_LOG_DEBUG
@@ -4697,14 +4647,10 @@ zfcp_fsf_req_sbal_get(struct zfcp_adapter *adapter, int req_flags,
 						       ZFCP_SBAL_TIMEOUT);
 		if (ret < 0)
 			return ret;
-		if (!ret) {
-			statistic_inc(adapter->stat_qdio_outb_full, 1);
+		if (!ret)
 			return -EIO;
-		}
-        } else if (!zfcp_fsf_req_sbal_check(lock_flags, req_queue, 1)) {
-		statistic_inc(adapter->stat_qdio_outb_full, 1);
+        } else if (!zfcp_fsf_req_sbal_check(lock_flags, req_queue, 1))
                 return -EIO;
-	}
 
         return 0;
 }
@@ -4870,9 +4816,6 @@ zfcp_fsf_req_send(struct zfcp_fsf_req *fsf_req, struct timer_list *timer)
 	 * position of first one
 	 */
 	atomic_sub(fsf_req->sbal_number, &req_queue->free_count);
-	statistic_inc(adapter->stat_qdio_outb,
-			QDIO_MAX_BUFFERS_PER_Q - 
-			atomic_read(&req_queue->free_count));
 	ZFCP_LOG_TRACE("free_count=%d\n", atomic_read(&req_queue->free_count));
 	req_queue->free_index += fsf_req->sbal_number;	  /* increase */
 	req_queue->free_index %= QDIO_MAX_BUFFERS_PER_Q;  /* wrap if needed */
@@ -4930,7 +4873,3 @@ zfcp_fsf_req_send(struct zfcp_fsf_req *fsf_req, struct timer_list *timer)
 }
 
 #undef ZFCP_LOG_AREA
-
-EXPORT_SYMBOL(zfcp_fsf_exchange_port_data);
-EXPORT_SYMBOL(zfcp_fsf_send_ct);
-EXPORT_SYMBOL(zfcp_fsf_send_els);

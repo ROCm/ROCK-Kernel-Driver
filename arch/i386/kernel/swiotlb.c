@@ -47,9 +47,6 @@ EXPORT_SYMBOL(swiotlb);
  */
 #define IO_TLB_SHIFT 11
 
-/* Width of DMA addresses in the IO TLB. 31 bits is an aacraid limitation. */
-#define IO_TLB_DMA_BITS 31
-
 static int swiotlb_force;
 static char *iotlb_virt_start;
 static unsigned long iotlb_nslabs;
@@ -59,16 +56,10 @@ static unsigned long iotlb_nslabs;
  * swiotlb_sync_single_*, to see if the memory was in fact allocated by this
  * API.
  */
-static unsigned long iotlb_pfn_start, iotlb_pfn_end;
+static dma_addr_t iotlb_bus_start, iotlb_bus_end, iotlb_bus_mask;
 
 /* Does the given dma address reside within the swiotlb aperture? */
-static inline int in_swiotlb_aperture(dma_addr_t dev_addr)
-{
-	unsigned long pfn = mfn_to_local_pfn(dev_addr >> PAGE_SHIFT);
-	return (pfn_valid(pfn)
-		&& (pfn >= iotlb_pfn_start)
-		&& (pfn < iotlb_pfn_end));
-}
+#define in_swiotlb_aperture(a) (!(((a) ^ iotlb_bus_start) & iotlb_bus_mask))
 
 /*
  * When the IOMMU overflows we return a fallback buffer. This sets the size.
@@ -134,6 +125,7 @@ void
 swiotlb_init_with_default_size (size_t default_size)
 {
 	unsigned long i, bytes;
+	int rc;
 
 	if (!iotlb_nslabs) {
 		iotlb_nslabs = (default_size >> IO_TLB_SHIFT);
@@ -154,13 +146,10 @@ swiotlb_init_with_default_size (size_t default_size)
 		      "Use dom0_mem Xen boot parameter to reserve\n"
 		      "some DMA memory (e.g., dom0_mem=-128M).\n");
 
-	for (i = 0; i < iotlb_nslabs; i += IO_TLB_SEGSIZE) {
-		int rc = xen_create_contiguous_region(
-			(unsigned long)iotlb_virt_start + (i << IO_TLB_SHIFT),
-			get_order(IO_TLB_SEGSIZE << IO_TLB_SHIFT),
-			IO_TLB_DMA_BITS);
-		BUG_ON(rc);
-	}
+	/* Hardcode 31 address bits for now: aacraid limitation. */
+	rc = xen_create_contiguous_region(
+		(unsigned long)iotlb_virt_start, get_order(bytes), 31);
+	BUG_ON(rc);
 
 	/*
 	 * Allocate and initialize the free list array.  This array is used
@@ -178,13 +167,17 @@ swiotlb_init_with_default_size (size_t default_size)
 	 */
 	io_tlb_overflow_buffer = alloc_bootmem_low(io_tlb_overflow);
 
-	iotlb_pfn_start = __pa(iotlb_virt_start) >> PAGE_SHIFT;
-	iotlb_pfn_end   = iotlb_pfn_start + (bytes >> PAGE_SHIFT);
+	iotlb_bus_start = virt_to_bus(iotlb_virt_start);
+	iotlb_bus_end   = iotlb_bus_start + bytes;
+	iotlb_bus_mask  = ~(dma_addr_t)(bytes - 1);
 
 	printk(KERN_INFO "Software IO TLB enabled: \n"
 	       " Aperture:     %lu megabytes\n"
+	       " Bus range:    0x%016lx - 0x%016lx\n"
 	       " Kernel range: 0x%016lx - 0x%016lx\n",
 	       bytes >> 20,
+	       (unsigned long)iotlb_bus_start,
+	       (unsigned long)iotlb_bus_end,
 	       (unsigned long)iotlb_virt_start,
 	       (unsigned long)iotlb_virt_start + bytes);
 }
@@ -653,7 +646,7 @@ swiotlb_dma_mapping_error(dma_addr_t dma_addr)
 int
 swiotlb_dma_supported (struct device *hwdev, u64 mask)
 {
-	return (mask >= ((1UL << IO_TLB_DMA_BITS) - 1));
+	return (mask >= (iotlb_bus_end - 1));
 }
 
 EXPORT_SYMBOL(swiotlb_init);
@@ -669,3 +662,13 @@ EXPORT_SYMBOL(swiotlb_map_page);
 EXPORT_SYMBOL(swiotlb_unmap_page);
 EXPORT_SYMBOL(swiotlb_dma_mapping_error);
 EXPORT_SYMBOL(swiotlb_dma_supported);
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

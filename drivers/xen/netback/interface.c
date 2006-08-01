@@ -78,7 +78,7 @@ static struct ethtool_ops network_ethtool_ops =
 	.set_tx_csum = ethtool_op_set_tx_csum,
 };
 
-netif_t *netif_alloc(domid_t domid, unsigned int handle, u8 be_mac[ETH_ALEN])
+netif_t *alloc_netif(domid_t domid, unsigned int handle, u8 be_mac[ETH_ALEN])
 {
 	int err = 0, i;
 	struct net_device *dev;
@@ -97,8 +97,7 @@ netif_t *netif_alloc(domid_t domid, unsigned int handle, u8 be_mac[ETH_ALEN])
 	netif->domid  = domid;
 	netif->handle = handle;
 	netif->status = DISCONNECTED;
-	atomic_set(&netif->refcnt, 1);
-	init_waitqueue_head(&netif->waiting_to_free);
+	atomic_set(&netif->refcnt, 0);
 	netif->dev = dev;
 
 	netif->credit_bytes = netif->remaining_credit = ~0UL;
@@ -279,10 +278,9 @@ err_rx:
 	return err;
 }
 
-static void netif_free(netif_t *netif)
+static void free_netif_callback(void *arg)
 {
-	atomic_dec(&netif->refcnt);
-	wait_event(netif->waiting_to_free, atomic_read(&netif->refcnt) == 0);
+	netif_t *netif = (netif_t *)arg;
 
 	if (netif->irq)
 		unbind_from_irqhandler(netif->irq, netif);
@@ -298,6 +296,12 @@ static void netif_free(netif_t *netif)
 	free_netdev(netif->dev);
 }
 
+void free_netif(netif_t *netif)
+{
+	INIT_WORK(&netif->free_work, free_netif_callback, (void *)netif);
+	schedule_work(&netif->free_work);
+}
+
 void netif_disconnect(netif_t *netif)
 {
 	switch (netif->status) {
@@ -309,11 +313,22 @@ void netif_disconnect(netif_t *netif)
 			__netif_down(netif);
 		rtnl_unlock();
 		netif_put(netif);
-		/* fall through */
+		break;
 	case DISCONNECTED:
-		netif_free(netif);
+		BUG_ON(atomic_read(&netif->refcnt) != 0);
+		free_netif(netif);
 		break;
 	default:
 		BUG();
 	}
 }
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

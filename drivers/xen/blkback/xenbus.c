@@ -112,7 +112,7 @@ static int blkback_remove(struct xenbus_device *dev)
 		be->blkif->status = DISCONNECTED; 
 		if (be->blkif->xenblkd)
 			kthread_stop(be->blkif->xenblkd);
-		blkif_free(be->blkif);
+		blkif_put(be->blkif);
 		be->blkif = NULL;
 	}
 
@@ -144,7 +144,7 @@ static int blkback_probe(struct xenbus_device *dev,
 	be->dev = dev;
 	dev->data = be;
 
-	be->blkif = blkif_alloc(dev->otherend_id);
+	be->blkif = alloc_blkif(dev->otherend_id);
 	if (IS_ERR(be->blkif)) {
 		err = PTR_ERR(be->blkif);
 		be->blkif = NULL;
@@ -412,3 +412,14 @@ void blkif_xenbus_init(void)
 {
 	xenbus_register_backend(&blkback);
 }
+
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

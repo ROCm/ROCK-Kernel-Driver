@@ -47,16 +47,17 @@
 #include <linux/notifier.h>
 #include <linux/rcupdate.h>
 #include <linux/cpu.h>
+#include <linux/mutex.h>
 #include <linux/jiffies.h>
 
 /* Definition for rcupdate control block. */
-struct rcu_ctrlblk rcu_ctrlblk = {
+static struct rcu_ctrlblk rcu_ctrlblk = {
 	.cur = -300,
 	.completed = -300,
 	.lock = SPIN_LOCK_UNLOCKED,
 	.cpumask = CPU_MASK_NONE,
 };
-struct rcu_ctrlblk rcu_bh_ctrlblk = {
+static struct rcu_ctrlblk rcu_bh_ctrlblk = {
 	.cur = -300,
 	.completed = -300,
 	.lock = SPIN_LOCK_UNLOCKED,
@@ -91,7 +92,7 @@ static int rsinterval = 1000;
 #endif
 
 static atomic_t rcu_barrier_cpu_count;
-static struct semaphore rcu_barrier_sema;
+static DEFINE_MUTEX(rcu_barrier_mutex);
 static struct completion rcu_barrier_completion;
 
 #ifdef CONFIG_SMP
@@ -402,13 +403,13 @@ static void rcu_barrier_func(void *notused)
 void rcu_barrier(void)
 {
 	BUG_ON(in_interrupt());
-	/* Take cpucontrol semaphore to protect against CPU hotplug */
-	down(&rcu_barrier_sema);
+	/* Take cpucontrol mutex to protect against CPU hotplug */
+	mutex_lock(&rcu_barrier_mutex);
 	init_completion(&rcu_barrier_completion);
 	atomic_set(&rcu_barrier_cpu_count, 0);
 	on_each_cpu(rcu_barrier_func, NULL, 0, 1);
 	wait_for_completion(&rcu_barrier_completion);
-	up(&rcu_barrier_sema);
+	mutex_unlock(&rcu_barrier_mutex);
 }
 EXPORT_SYMBOL_GPL(rcu_barrier);
 
@@ -630,8 +631,8 @@ static void __rcu_process_callbacks(struct rcu_ctrlblk *rcp,
 		rdp->curtail = &rdp->curlist;
 	}
 
-	local_irq_disable();
 	if (rdp->nxtlist && !rdp->curlist) {
+		local_irq_disable();
 		rdp->curlist = rdp->nxtlist;
 		rdp->curtail = rdp->nxttail;
 		rdp->nxtlist = NULL;
@@ -656,9 +657,8 @@ static void __rcu_process_callbacks(struct rcu_ctrlblk *rcp,
 			rcu_start_batch(rcp);
 			spin_unlock(&rcp->lock);
 		}
-	} else {
-		local_irq_enable();
 	}
+
 	rcu_check_quiescent_state(rcp, rdp);
 	if (remote_rcu_callbacks) {
 		if (rdp->donelist && !rcu_callbacks_processed_remotely(cpu) &&
@@ -867,7 +867,7 @@ static void __devinit rcu_online_cpu(int cpu)
 			rcu_process_remote_callbacks, 0UL);
 }
 
-static int __devinit rcu_cpu_notify(struct notifier_block *self, 
+static int rcu_cpu_notify(struct notifier_block *self,
 				unsigned long action, void *hcpu)
 {
 	long cpu = (long)hcpu;
@@ -884,7 +884,7 @@ static int __devinit rcu_cpu_notify(struct notifier_block *self,
 	return NOTIFY_OK;
 }
 
-static struct notifier_block __devinitdata rcu_nb = {
+static struct notifier_block rcu_nb = {
 	.notifier_call	= rcu_cpu_notify,
 };
 
@@ -896,7 +896,6 @@ static struct notifier_block __devinitdata rcu_nb = {
  */
 void __init rcu_init(void)
 {
-	sema_init(&rcu_barrier_sema, 1);
 	rcu_cpu_notify(&rcu_nb, CPU_UP_PREPARE,
 			(void *)(long)smp_processor_id());
 	/* Register notifier for non-boot CPUs */

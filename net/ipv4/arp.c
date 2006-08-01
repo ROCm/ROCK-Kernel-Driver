@@ -879,16 +879,16 @@ static int arp_process(struct sk_buff *skb)
 
 	n = __neigh_lookup(&arp_tbl, &sip, dev, 0);
 
-#ifdef CONFIG_IP_ACCEPT_UNSOLICITED_ARP
-	/* Unsolicited ARP is not accepted by default.
-	   It is possible, that this option should be enabled for some
-	   devices (strip is candidate)
-	 */
-	if (n == NULL &&
-	    arp->ar_op == htons(ARPOP_REPLY) &&
-	    inet_addr_type(sip) == RTN_UNICAST)
-		n = __neigh_lookup(&arp_tbl, &sip, dev, -1);
-#endif
+	if (ipv4_devconf.arp_accept) {
+		/* Unsolicited ARP is not accepted by default.
+		   It is possible, that this option should be enabled for some
+		   devices (strip is candidate)
+		 */
+		if (n == NULL &&
+		    arp->ar_op == htons(ARPOP_REPLY) &&
+		    inet_addr_type(sip) == RTN_UNICAST)
+			n = __neigh_lookup(&arp_tbl, &sip, dev, -1);
+	}
 
 	if (n) {
 		int state = NUD_REACHABLE;
@@ -928,7 +928,8 @@ static void parp_redo(struct sk_buff *skb)
  *	Receive an arp request from the device layer.
  */
 
-int arp_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt, struct net_device *orig_dev)
+static int arp_rcv(struct sk_buff *skb, struct net_device *dev,
+		   struct packet_type *pt, struct net_device *orig_dev)
 {
 	struct arphdr *arp;
 
@@ -1417,7 +1418,6 @@ static int __init arp_proc_init(void)
 
 EXPORT_SYMBOL(arp_broken_ops);
 EXPORT_SYMBOL(arp_find);
-EXPORT_SYMBOL(arp_rcv);
 EXPORT_SYMBOL(arp_create);
 EXPORT_SYMBOL(arp_xmit);
 EXPORT_SYMBOL(arp_send);

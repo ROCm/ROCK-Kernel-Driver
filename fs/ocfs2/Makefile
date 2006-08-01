@@ -1,11 +1,10 @@
 EXTRA_CFLAGS += -Ifs/ocfs2
 
-EXTRA_CFLAGS += -DCATCH_BH_JBD_RACES -DOCFS2_ORACORE_WORKAROUNDS -DOCFS2_CDSL
+EXTRA_CFLAGS += -DCATCH_BH_JBD_RACES
 
 obj-$(CONFIG_OCFS2_FS) += ocfs2.o
 
 ocfs2-objs := \
-	aio.o			\
 	alloc.o 		\
 	aops.o 			\
 	buffer_head_io.o	\
@@ -21,7 +20,6 @@ ocfs2-objs := \
 	localalloc.o 		\
 	mmap.o 			\
 	namei.o 		\
-	proc.o			\
 	slot_map.o 		\
 	suballoc.o 		\
 	super.o 		\

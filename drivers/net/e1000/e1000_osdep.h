@@ -41,7 +41,6 @@
 #include <linux/interrupt.h>
 #include <linux/sched.h>
 
-#define usec_delay(x) udelay(x)
 #ifndef msec_delay
 #define msec_delay(x)	do { if(in_interrupt()) { \
 				/* Don't mdelay in interrupt context! */ \
@@ -83,9 +82,6 @@ typedef enum {
 #define DEBUGOUT3 DEBUGOUT2
 #define DEBUGOUT7 DEBUGOUT3
 
-#ifdef __BIG_ENDIAN
-#define E1000_BIG_ENDIAN __BIG_ENDIAN
-#endif
 
 #define E1000_WRITE_REG(a, reg, value) ( \
     writel((value), ((a)->hw_addr + \
@@ -129,6 +125,5 @@ typedef enum {
         (offset)))
 
 #define E1000_WRITE_FLUSH(a) E1000_READ_REG(a, STATUS)
-
 
 #endif /* _E1000_OSDEP_H_ */

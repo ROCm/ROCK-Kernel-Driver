@@ -850,7 +850,7 @@ static void init_rxtx_rings(struct net_device *dev)
 			break;
 		skb->dev = dev;			/* Mark as being used by this device. */
 		np->rx_addr[i] = pci_map_single(np->pci_dev,skb->data,
-					skb->len,PCI_DMA_FROMDEVICE);
+					np->rx_buf_sz,PCI_DMA_FROMDEVICE);
 
 		np->rx_ring[i].buffer1 = np->rx_addr[i];
 		np->rx_ring[i].status = DescOwn;
@@ -1316,7 +1316,7 @@ static int netdev_rx(struct net_device *dev)
 			skb->dev = dev;			/* Mark as being used by this device. */
 			np->rx_addr[entry] = pci_map_single(np->pci_dev,
 							skb->data,
-							skb->len, PCI_DMA_FROMDEVICE);
+							np->rx_buf_sz, PCI_DMA_FROMDEVICE);
 			np->rx_ring[entry].buffer1 = np->rx_addr[entry];
 		}
 		wmb();
@@ -1645,7 +1645,7 @@ static int w840_suspend (struct pci_dev *pdev, pm_message_t state)
 
 		/* no more hardware accesses behind this line. */
 
-		if (np->csr6) BUG();
+		BUG_ON(np->csr6);
 		if (ioread32(ioaddr + IntrEnable)) BUG();
 
 		/* pci_power_off(pdev, -1); */

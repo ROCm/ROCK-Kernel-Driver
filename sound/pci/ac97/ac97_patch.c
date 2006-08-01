@@ -1627,7 +1627,6 @@ static const struct snd_kcontrol_new snd_ac97_ad1981x_jack_sense[] = {
  * (SS vendor << 16 | device)
  */
 static unsigned int ad1981_jacks_blacklist[] = {
-	0x10140537, /* Thinkpad T41p */
 	0x10140554, /* Thinkpad T42p/R50p */
 	0 /* end */
 };
@@ -2049,10 +2048,7 @@ int patch_alc650(struct snd_ac97 * ac97)
 	/* Enable SPDIF-IN only on Rev.E and above */
 	val = snd_ac97_read(ac97, AC97_ALC650_CLOCK);
 	/* SPDIF IN with pin 47 */
-	if (ac97->spec.dev_flags &&
-	    /* ASUS A6KM requires EAPD */
-	    ! (ac97->subsystem_vendor == 0x1043 &&
-	       ac97->subsystem_device == 0x1103))
+	if (ac97->spec.dev_flags)
 		val |= 0x03; /* enable */
 	else
 		val &= ~0x03; /* disable */
@@ -2827,5 +2823,35 @@ int mpatch_si3036(struct snd_ac97 * ac97)
 	ac97->build_ops = &patch_si3036_ops;
 	snd_ac97_write_cache(ac97, 0x5c, 0xf210 );
 	snd_ac97_write_cache(ac97, 0x68, 0);
+	return 0;
+}
+
+/*
+ * LM 4550 Codec
+ *
+ * We use a static resolution table since LM4550 codec cannot be
+ * properly autoprobed to determine the resolution via
+ * check_volume_resolution().
+ */
+
+static struct snd_ac97_res_table lm4550_restbl[] = {
+	{ AC97_MASTER, 0x1f1f },
+	{ AC97_HEADPHONE, 0x1f1f },
+	{ AC97_MASTER_MONO, 0x001f },
+	{ AC97_PC_BEEP, 0x001f },	/* LSB is ignored */
+	{ AC97_PHONE, 0x001f },
+	{ AC97_MIC, 0x001f },
+	{ AC97_LINE, 0x1f1f },
+	{ AC97_CD, 0x1f1f },
+	{ AC97_VIDEO, 0x1f1f },
+	{ AC97_AUX, 0x1f1f },
+	{ AC97_PCM, 0x1f1f },
+	{ AC97_REC_GAIN, 0x0f0f },
+	{ } /* terminator */
+};
+
+int patch_lm4550(struct snd_ac97 *ac97)
+{
+	ac97->res_table = lm4550_restbl;
 	return 0;
 }

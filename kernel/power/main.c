@@ -103,7 +103,7 @@ static int suspend_prepare(suspend_state_t state)
 }
 
 
-static int suspend_enter(suspend_state_t state)
+int suspend_enter(suspend_state_t state)
 {
 	int error = 0;
 	unsigned long flags;
@@ -272,7 +272,7 @@ static ssize_t state_store(struct subsystem * subsys, const char * buf, size_t n
 		if (*s && !strncmp(buf, *s, len))
 			break;
 	}
-	if (*s)
+	if (state < PM_SUSPEND_MAX && *s)
 		error = enter_state(state);
 	else
 		error = -EINVAL;

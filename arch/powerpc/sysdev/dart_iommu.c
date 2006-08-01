@@ -49,6 +49,7 @@
 
 #include "dart.h"
 
+extern int iommu_is_off;
 extern int iommu_force_on;
 
 /* Physical base address and size of the DART table */
@@ -194,8 +195,6 @@ static int dart_init(struct device_node *dart_node)
 	 * prefetching into invalid pages and corrupting data
 	 */
 	tmp = lmb_alloc(DART_PAGE_SIZE, DART_PAGE_SIZE);
-	if (!tmp)
-		panic("DART: Cannot allocate spare page!");
 	dart_emptyval = DARTMAP_VALID | ((tmp >> DART_PAGE_SHIFT) &
 					 DARTMAP_RPNMASK);
 
@@ -331,10 +330,17 @@ void iommu_init_early_dart(void)
 
 void __init alloc_dart_table(void)
 {
-	/* Only reserve DART space if machine has more than 2GB of RAM
+	/* Only reserve DART space if machine has more than 1GB of RAM
 	 * or if requested with iommu=on on cmdline.
+	 *
+	 * 1GB of RAM is picked as limit because some default devices
+	 * (i.e. Airport Extreme) have 30 bit address range limits.
 	 */
-	if (lmb_end_of_DRAM() <= 0x80000000ull && !iommu_force_on)
+
+	if (iommu_is_off)
+		return;
+
+	if (!iommu_force_on && lmb_end_of_DRAM() <= 0x40000000ull)
 		return;
 
 	/* 512 pages (2MB) is max DART tablesize. */

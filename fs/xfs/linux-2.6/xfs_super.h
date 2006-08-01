@@ -18,6 +18,28 @@
 #ifndef __XFS_SUPER_H__
 #define __XFS_SUPER_H__
 
+#ifdef CONFIG_XFS_DMAPI
+# define vfs_insertdmapi(vfs)	vfs_insertops(vfsp, &xfs_dmops)
+# define vfs_initdmapi()	dmapi_init()
+# define vfs_exitdmapi()	dmapi_uninit()
+#else
+# define vfs_insertdmapi(vfs)	do { } while (0)
+# define vfs_initdmapi()	do { } while (0)
+# define vfs_exitdmapi()	do { } while (0)
+#endif
+
+#ifdef CONFIG_XFS_QUOTA
+# define vfs_insertquota(vfs)	vfs_insertops(vfsp, &xfs_qmops)
+extern void xfs_qm_init(void);
+extern void xfs_qm_exit(void);
+# define vfs_initquota()	xfs_qm_init()
+# define vfs_exitquota()	xfs_qm_exit()
+#else
+# define vfs_insertquota(vfs)	do { } while (0)
+# define vfs_initquota()	do { } while (0)
+# define vfs_exitquota()	do { } while (0)
+#endif
+
 #ifdef CONFIG_XFS_POSIX_ACL
 # define XFS_ACL_STRING		"ACLs, "
 # define set_posix_acl_flag(sb)	((sb)->s_flags |= MS_POSIXACL)
@@ -56,6 +78,12 @@
 # define XFS_TRACE_STRING
 #endif
 
+#ifdef CONFIG_XFS_DMAPI
+# define XFS_DMAPI_STRING	"dmapi support, "
+#else
+# define XFS_DMAPI_STRING
+#endif
+
 #ifdef DEBUG
 # define XFS_DBG_STRING		"debug"
 #else
@@ -67,12 +95,8 @@
 				XFS_REALTIME_STRING \
 				XFS_BIGFS_STRING \
 				XFS_TRACE_STRING \
+				XFS_DMAPI_STRING \
 				XFS_DBG_STRING /* DBG must be last */
-
-#define LINVFS_GET_VFS(s) \
-	(vfs_t *)((s)->s_fs_info)
-#define LINVFS_SET_VFS(s, vfsp) \
-	((s)->s_fs_info = vfsp)
 
 struct xfs_inode;
 struct xfs_mount;
@@ -81,7 +105,6 @@ struct block_device;
 
 extern __uint64_t xfs_max_file_offset(unsigned int);
 
-extern struct inode *xfs_get_inode(bhv_desc_t *, xfs_ino_t, int);
 extern void xfs_initialize_vnode(bhv_desc_t *, vnode_t *, bhv_desc_t *, int);
 
 extern void xfs_flush_inode(struct xfs_inode *);
@@ -92,6 +115,6 @@ extern int  xfs_blkdev_get(struct xfs_mount *, const char *,
 extern void xfs_blkdev_put(struct block_device *);
 extern void xfs_blkdev_issue_flush(struct xfs_buftarg *);
 
-extern struct export_operations linvfs_export_ops;
+extern struct export_operations xfs_export_operations;
 
 #endif	/* __XFS_SUPER_H__ */

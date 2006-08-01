@@ -214,6 +214,14 @@ config RWSEM_XCHGADD_ALGORITHM
 	bool
 	default n
 
+config GENERIC_FIND_NEXT_BIT
+	bool
+	default y
+
+config GENERIC_HWEIGHT
+	bool
+	default y
+
 config GENERIC_CALIBRATE_DELAY
 	bool
 	default y
@@ -276,6 +284,11 @@ config NUMA
 	bool "Numa Memory Allocation Support"
 	depends on SMP && BROKEN
 	default n
+
+config NODES_SHIFT
+	int
+	default "1"
+	depends on NEED_MULTIPLE_NODES
 
 # turning this on wastes a bunch of space.
 # Summit needs it only when NUMA is on

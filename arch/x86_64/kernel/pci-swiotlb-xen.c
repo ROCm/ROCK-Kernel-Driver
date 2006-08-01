@@ -13,8 +13,6 @@ int swiotlb __read_mostly;
 EXPORT_SYMBOL(swiotlb);
 #endif
 
-void swiotlb_init(void);
-
 struct dma_mapping_ops swiotlb_dma_ops = {
 #if 0
 	.mapping_error = swiotlb_dma_mapping_error,

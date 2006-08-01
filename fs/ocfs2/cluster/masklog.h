@@ -198,8 +198,10 @@ extern struct mlog_bits mlog_and_bits, mlog_not_bits;
 } while (0)
 
 #define mlog_errno(st) do {						\
-	if ((st) != -ERESTARTSYS && (st) != -EINTR)			\
-		mlog(ML_ERROR, "status = %lld\n", (long long)(st));	\
+	int _st = (st);							\
+	if (_st != -ERESTARTSYS && _st != -EINTR &&			\
+	    _st != AOP_TRUNCATED_PAGE)					\
+		mlog(ML_ERROR, "status = %lld\n", (long long)_st);	\
 } while (0)
 
 #define mlog_entry(fmt, args...) do {					\
@@ -210,11 +212,10 @@ extern struct mlog_bits mlog_and_bits, mlog_not_bits;
 	mlog(ML_ENTRY, "ENTRY:\n");					\
 } while (0)
 
-/* We disable this for old compilers since they don't have support for
- * __builtin_types_compatible_p.
+/*
+ * We disable this for sparse.
  */
-#if (__GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 1)) && \
-    !defined(__CHECKER__)
+#if !defined(__CHECKER__)
 #define mlog_exit(st) do {						     \
 	if (__builtin_types_compatible_p(typeof(st), unsigned long))	     \
 		mlog(ML_EXIT, "EXIT: %lu\n", (unsigned long) (st));	     \
@@ -255,18 +256,9 @@ extern struct mlog_bits mlog_and_bits, mlog_not_bits;
 	}								\
 } while (0)
 
-#if (BITS_PER_LONG == 32) || defined(CONFIG_X86_64) || (defined(CONFIG_UML_X86) && defined(CONFIG_64BIT))
-#define MLFi64 "lld"
-#define MLFu64 "llu"
-#define MLFx64 "llx"
-#else
-#define MLFi64 "ld"
-#define MLFu64 "lu"
-#define MLFx64 "lx"
-#endif
-
-#include <linux/proc_fs.h>
-int mlog_init_proc(struct proc_dir_entry *parent);
-void mlog_remove_proc(struct proc_dir_entry *parent);
+#include <linux/kobject.h>
+#include <linux/sysfs.h>
+int mlog_sys_init(struct subsystem *o2cb_subsys);
+void mlog_sys_shutdown(void);
 
 #endif /* O2CLUSTER_MASKLOG_H */

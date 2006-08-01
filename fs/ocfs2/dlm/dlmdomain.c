@@ -163,7 +163,7 @@ static struct dlm_ctxt * __dlm_lookup_domain_full(const char *domain, int len)
 }
 
 /* For null terminated domain strings ONLY */
-struct dlm_ctxt * __dlm_lookup_domain(const char *domain)
+static struct dlm_ctxt * __dlm_lookup_domain(const char *domain)
 {
 	assert_spin_locked(&dlm_domain_lock);
 
@@ -193,8 +193,6 @@ static int dlm_wait_on_domain_helper(const char *domain)
 
 static void dlm_free_ctxt_mem(struct dlm_ctxt *dlm)
 {
-	dlm_proc_del_domain(dlm);
-
 	if (dlm->lockres_hash)
 		free_page((unsigned long) dlm->lockres_hash);
 
@@ -268,13 +266,6 @@ struct dlm_ctxt *dlm_grab(struct dlm_ctxt *dlm)
 	return target;
 }
 
-void dlm_get(struct dlm_ctxt *dlm)
-{
-	spin_lock(&dlm_domain_lock);
-	__dlm_get(dlm);
-	spin_unlock(&dlm_domain_lock);
-}
-
 int dlm_domain_fully_joined(struct dlm_ctxt *dlm)
 {
 	int ret;
@@ -287,21 +278,11 @@ int dlm_domain_fully_joined(struct dlm_ctxt *dlm)
 	return ret;
 }
 
-static void dlm_destroy_dlm_worker(struct dlm_ctxt *dlm)
-{
-	if (dlm->dlm_worker) {
-		flush_workqueue(dlm->dlm_worker);
-		destroy_workqueue(dlm->dlm_worker);
-		dlm->dlm_worker = NULL;
-	}
-}
-
 static void dlm_complete_dlm_shutdown(struct dlm_ctxt *dlm)
 {
 	dlm_unregister_domain_handlers(dlm);
 	dlm_complete_thread(dlm);
 	dlm_complete_recovery_thread(dlm);
-	dlm_destroy_dlm_worker(dlm);
 
 	/* We've left the domain. Now we can take ourselves out of the
 	 * list and allow the kref stuff to help us free the
@@ -393,13 +374,12 @@ static void __dlm_print_nodes(struct dlm_ctxt *dlm)
 
 	assert_spin_locked(&dlm->spinlock);
 
-	printk(KERN_INFO "ocfs2_dlm: Nodes in domain (\"%s\"): ", dlm->name);
+	mlog(ML_NOTICE, "Nodes in my domain (\"%s\"):\n", dlm->name);
 
 	while ((node = find_next_bit(dlm->domain_map, O2NM_MAX_NODES,
 				     node + 1)) < O2NM_MAX_NODES) {
-		printk("%d ", node);
+		mlog(ML_NOTICE, " node %d\n", node);
 	}
-	printk("\n");
 }
 
 static int dlm_exit_domain_handler(struct o2net_msg *msg, u32 len, void *data)
@@ -415,7 +395,7 @@ static int dlm_exit_domain_handler(struct o2net_msg *msg, u32 len, void *data)
 
 	node = exit_msg->node_idx;
 
-	printk(KERN_INFO "ocfs2_dlm: Node %u leaves domain %s\n", node, dlm->name);
+	mlog(0, "Node %u leaves domain %s\n", node, dlm->name);
 
 	spin_lock(&dlm->spinlock);
 	clear_bit(node, dlm->domain_map);
@@ -580,7 +560,7 @@ static int dlm_query_join_handler(struct o2net_msg *msg, u32 len, void *data)
 	 * to back off and try again.  This gives heartbeat a chance
 	 * to catch up.
 	 */
-	if (!o2hb_check_node_heartbeating(query->domain, query->node_idx)) {
+	if (!o2hb_check_node_heartbeating(query->node_idx)) {
 		mlog(0, "node %u is not in our live map yet\n",
 		     query->node_idx);
 
@@ -664,8 +644,6 @@ static int dlm_assert_joined_handler(struct o2net_msg *msg, u32 len, void *data)
 		set_bit(assert->node_idx, dlm->domain_map);
 		__dlm_set_joining_node(dlm, DLM_LOCK_RES_OWNER_UNKNOWN);
 
-		printk(KERN_INFO "ocfs2_dlm: Node %u joins domain %s\n",
-		       assert->node_idx, dlm->name);
 		__dlm_print_nodes(dlm);
 
 		/* notify anything attached to the heartbeat events */
@@ -904,7 +882,7 @@ static int dlm_try_to_join_domain(struct dlm_ctxt *dlm)
 
 	mlog_entry("%p", dlm);
 
-	ctxt = kcalloc(1, sizeof(*ctxt), GFP_NOFS);
+	ctxt = kcalloc(1, sizeof(*ctxt), GFP_KERNEL);
 	if (!ctxt) {
 		status = -ENOMEM;
 		mlog_errno(status);
@@ -914,8 +892,7 @@ static int dlm_try_to_join_domain(struct dlm_ctxt *dlm)
 	/* group sem locking should work for us here -- we're already
 	 * registered for heartbeat events so filling this should be
 	 * atomic wrt getting those handlers called. */
-	o2hb_fill_node_map(dlm->name, dlm->live_nodes_map,
-	                   sizeof(dlm->live_nodes_map));
+	o2hb_fill_node_map(dlm->live_nodes_map, sizeof(dlm->live_nodes_map));
 
 	spin_lock(&dlm->spinlock);
 	memcpy(ctxt->live_map, dlm->live_nodes_map, sizeof(ctxt->live_map));
@@ -1007,14 +984,13 @@ static int dlm_register_domain_handlers(struct dlm_ctxt *dlm)
 	mlog(0, "registering handlers.\n");
 
 	o2hb_setup_callback(&dlm->dlm_hb_down, O2HB_NODE_DOWN_CB,
-			    dlm_hb_node_down_cb, dlm,
-			    DLM_HB_NODE_DOWN_PRI, NULL);
+			    dlm_hb_node_down_cb, dlm, DLM_HB_NODE_DOWN_PRI);
 	status = o2hb_register_callback(&dlm->dlm_hb_down);
 	if (status)
 		goto bail;
 
 	o2hb_setup_callback(&dlm->dlm_hb_up, O2HB_NODE_UP_CB,
-			    dlm_hb_node_up_cb, dlm, DLM_HB_NODE_UP_PRI, NULL);
+			    dlm_hb_node_up_cb, dlm, DLM_HB_NODE_UP_PRI);
 	status = o2hb_register_callback(&dlm->dlm_hb_up);
 	if (status)
 		goto bail;
@@ -1150,13 +1126,6 @@ static int dlm_join_domain(struct dlm_ctxt *dlm)
 		goto bail;
 	}
 
-	dlm->dlm_worker = create_singlethread_workqueue("dlm_wq");
-	if (!dlm->dlm_worker) {
-		status = -ENOMEM;
-		mlog_errno(status);
-		goto bail;
-	}
-
 	do {
 		unsigned int backoff;
 		status = dlm_try_to_join_domain(dlm);
@@ -1197,7 +1166,6 @@ bail:
 		dlm_unregister_domain_handlers(dlm);
 		dlm_complete_thread(dlm);
 		dlm_complete_recovery_thread(dlm);
-		dlm_destroy_dlm_worker(dlm);
 	}
 
 	return status;
@@ -1209,13 +1177,13 @@ static struct dlm_ctxt *dlm_alloc_ctxt(const char *domain,
 	int i;
 	struct dlm_ctxt *dlm = NULL;
 
-	dlm = kcalloc(1, sizeof(*dlm), GFP_NOFS);
+	dlm = kcalloc(1, sizeof(*dlm), GFP_KERNEL);
 	if (!dlm) {
 		mlog_errno(-ENOMEM);
 		goto leave;
 	}
 
-	dlm->name = kmalloc(strlen(domain) + 1, GFP_NOFS);
+	dlm->name = kmalloc(strlen(domain) + 1, GFP_KERNEL);
 	if (dlm->name == NULL) {
 		mlog_errno(-ENOMEM);
 		kfree(dlm);
@@ -1223,7 +1191,7 @@ static struct dlm_ctxt *dlm_alloc_ctxt(const char *domain,
 		goto leave;
 	}
 
-	dlm->lockres_hash = (struct hlist_head *) __get_free_page(GFP_NOFS);
+	dlm->lockres_hash = (struct hlist_head *) __get_free_page(GFP_KERNEL);
 	if (!dlm->lockres_hash) {
 		mlog_errno(-ENOMEM);
 		kfree(dlm->name);
@@ -1263,7 +1231,6 @@ static struct dlm_ctxt *dlm_alloc_ctxt(const char *domain,
 
 	dlm->dlm_thread_task = NULL;
 	dlm->dlm_reco_thread_task = NULL;
-	dlm->dlm_worker = NULL;
 	init_waitqueue_head(&dlm->dlm_thread_wq);
 	init_waitqueue_head(&dlm->dlm_reco_thread_wq);
 	init_waitqueue_head(&dlm->reco.event);
@@ -1290,8 +1257,6 @@ static struct dlm_ctxt *dlm_alloc_ctxt(const char *domain,
 
 	INIT_LIST_HEAD(&dlm->dlm_eviction_callbacks);
 
-	dlm_proc_add_domain(dlm);
-
 	mlog(0, "context init: refcount %u\n",
 		  atomic_read(&dlm->dlm_refs.refcount));
 
@@ -1315,7 +1280,7 @@ struct dlm_ctxt * dlm_register_domain(const char *domain,
 		goto leave;
 	}
 
-	if (!o2hb_check_local_node_heartbeating(domain)) {
+	if (!o2hb_check_local_node_heartbeating()) {
 		mlog(ML_ERROR, "the local node has not been configured, or is "
 		     "not heartbeating\n");
 		ret = -EPROTO;
@@ -1503,14 +1468,11 @@ static int __init dlm_init(void)
 		return -1;
 	}
 
-	dlm_init_proc();
-
 	return 0;
 }
 
 static void __exit dlm_exit (void)
 {
-	dlm_remove_proc();
 	dlm_unregister_net_handlers();
 	dlm_destroy_mle_cache();
 }

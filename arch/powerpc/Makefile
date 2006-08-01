@@ -104,10 +104,13 @@ ifndef CONFIG_FSL_BOOKE
 CFLAGS		+= -mstring
 endif
 
+ifeq ($(CONFIG_6xx),y)
+CFLAGS		+= -mcpu=powerpc
+endif
+
 cpu-as-$(CONFIG_PPC64BRIDGE)	+= -Wa,-mppc64bridge
 cpu-as-$(CONFIG_4xx)		+= -Wa,-m405
 cpu-as-$(CONFIG_6xx)		+= -Wa,-maltivec
-cpu-as-$(CONFIG_6xx)		+= -mcpu=powerpc
 cpu-as-$(CONFIG_POWER4)		+= -Wa,-maltivec
 cpu-as-$(CONFIG_E500)		+= -Wa,-me500
 cpu-as-$(CONFIG_E200)		+= -Wa,-me200
@@ -130,13 +133,8 @@ core-y				+= arch/powerpc/kernel/ \
 				   arch/powerpc/lib/ \
 				   arch/powerpc/sysdev/ \
 				   arch/powerpc/platforms/
-core-$(CONFIG_PPC32)		+= arch/ppc/kernel/
-core-$(CONFIG_MATH_EMULATION)	+= arch/ppc/math-emu/
+core-$(CONFIG_MATH_EMULATION)	+= arch/powerpc/math-emu/
 core-$(CONFIG_XMON)		+= arch/powerpc/xmon/
-core-$(CONFIG_APUS)		+= arch/ppc/amiga/
-drivers-$(CONFIG_8xx)		+= arch/ppc/8xx_io/
-drivers-$(CONFIG_4xx)		+= arch/ppc/4xx_io/
-drivers-$(CONFIG_CPM2)		+= arch/ppc/8260_io/
 
 drivers-$(CONFIG_OPROFILE)	+= arch/powerpc/oprofile/
 
@@ -149,9 +147,9 @@ all: $(KBUILD_IMAGE)
 
 CPPFLAGS_vmlinux.lds	:= -Upowerpc
 
-BOOT_TARGETS = zImage zImage.initrd znetboot znetboot.initrd vmlinux.sm uImage
+BOOT_TARGETS = zImage zImage.initrd znetboot znetboot.initrd vmlinux.sm uImage vmlinux.bin
 
-.PHONY: $(BOOT_TARGETS)
+PHONY += $(BOOT_TARGETS)
 
 boot := arch/$(ARCH)/boot
 
@@ -177,7 +175,7 @@ archprepare: checkbin
 
 ifeq ($(CONFIG_PPC32),y)
 # Temporary hack until we have migrated to asm-powerpc
-$(objtree)/include/asm: arch/$(ARCH)/include/asm
+include/asm: arch/$(ARCH)/include/asm
 arch/$(ARCH)/include/asm: FORCE
 	$(Q)if [ ! -d arch/$(ARCH)/include ]; then mkdir -p arch/$(ARCH)/include; fi
 	$(Q)ln -fsn $(srctree)/include/asm-$(OLDARCH) arch/$(ARCH)/include/asm

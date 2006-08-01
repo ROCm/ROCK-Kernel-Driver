@@ -61,18 +61,6 @@ config BLK_DEV_SD
 	  In this case, do not compile the driver for your SCSI host adapter
 	  (below) as a module either.
 
-config SCSI_DUMP
-	tristate "SCSI dump support"
-	depends on LKCD_DUMP_BLOCKDEV && SCSI
-	help
-	   If you want to be able to use LKCD to write crash dumps to
-	   SCSI disks using polling I/O (i.e. with interrupts disabled),
-	   say Y here.
-
-	   This option is only useful if your low-level disk driver supports
-	   polling I/O.  If it doesn't, LKCD will fall back to ordinary
-	   interrupt-driven I/O.
-
 config CHR_DEV_ST
 	tristate "SCSI tape support"
 	depends on SCSI
@@ -221,7 +209,7 @@ config SCSI_LOGGING
 	  there should be no noticeable performance impact as long as you have
 	  logging turned off.
 
-menu "SCSI Transports"
+menu "SCSI Transport Attributes"
 	depends on SCSI
 
 config SCSI_SPI_ATTRS
@@ -253,26 +241,6 @@ config SCSI_SAS_ATTRS
 	help
 	  If you wish to export transport-specific information about
 	  each attached SAS device to sysfs, say Y.
-
-config ISCSI_TARGET
-	tristate "iSCSI Target over TCP/IP"
-	depends on SCSI && INET
-	help
-	 The iSCSI Enterprise Target is an open source iSCSI target
-	 with professional features. It is aimed at working well in
-	 enterprise environment under real workload, and is scalable
-	 and versatile enough to meet the challenge of future storage
-	 needs and developements.
-
-	 To compile this driver as a module, choose M here: the
-	 module will be called iscsi_trgt.
-
-	 The userspace component needed to initialize the driver, documentation,
-	 and sample configuration files can be found here:
-
-	 http://iscsitarget.sf.net
-
-source "drivers/scsi/sas/Kconfig"
 
 endmenu
 
@@ -411,6 +379,14 @@ config SCSI_AHA1740
 config SCSI_AACRAID
 	tristate "Adaptec AACRAID support"
 	depends on SCSI && PCI
+	help
+	  This driver supports a variety of Dell, HP, Adaptec, IBM and
+	  ICP storage products. For a list of supported products, refer
+	  to <file:Documentation/scsi/aacraid.txt>.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called aacraid.
+
 
 source "drivers/scsi/aic7xxx/Kconfig.aic7xxx"
 
@@ -455,7 +431,6 @@ config SCSI_AIC7XXX_OLD
 	  module will be called aic7xxx_old.
 
 source "drivers/scsi/aic7xxx/Kconfig.aic79xx"
-source "drivers/scsi/aic94xx/Kconfig"
 
 # All the I2O code and drivers do not seem to be 64bit safe.
 config SCSI_DPT_I2O
@@ -471,7 +446,9 @@ config SCSI_DPT_I2O
 
 config SCSI_ADVANSYS
 	tristate "AdvanSys SCSI support"
-	depends on (ISA || EISA || PCI) && SCSI && BROKEN
+	depends on SCSI
+	depends on ISA || EISA || PCI
+	depends on BROKEN || X86_32
 	help
 	  This is a driver for all SCSI host adapters manufactured by
 	  AdvanSys. It is documented in the kernel source in
@@ -620,10 +597,10 @@ config SCSI_SATA_VIA
 	  If unsure, say N.
 
 config SCSI_SATA_VITESSE
-	tristate "VITESSE VSC-7174 SATA support"
+	tristate "VITESSE VSC-7174 / INTEL 31244 SATA support"
 	depends on SCSI_SATA && PCI
 	help
-	  This option enables support for Vitesse VSC7174 Serial ATA.
+	  This option enables support for Vitesse VSC7174 and Intel 31244 Serial ATA.
 
 	  If unsure, say N.
 
@@ -631,19 +608,6 @@ config SCSI_SATA_INTEL_COMBINED
 	bool
 	depends on IDE=y && !BLK_DEV_IDE_SATA && (SCSI_SATA_AHCI || SCSI_ATA_PIIX)
 	default y
-
-config SCSI_SATA_ACPI
-	bool
-	depends on SCSI_SATA && ACPI && PCI
-	default y
-	help
-	  This option adds support for SATA-related ACPI objects.
-	  These ACPI objects add the ability to retrieve taskfiles
-	  from the ACPI BIOS and write them to the disk controller.
-	  These objects may be related to performance, security,
-	  power management, or other areas.
-	  You can disable this at kernel boot time by using the
-	  option 'libata.noacpi'.
 
 config SCSI_BUSLOGIC
 	tristate "BusLogic SCSI support"
@@ -936,16 +900,6 @@ config SCSI_IBMVSCSI
 	  To compile this driver as a module, choose M here: the
 	  module will be called ibmvscsic.
 
-config SCSI_IBMVSCSIS
-	tristate "IBM Virtual SCSI Server support"
-	depends on PPC_PSERIES
-	help
-	  This is the IBM Virtual SCSI Server which can be configured using
-	  the ppc64-utils package available at
-	  http://techsupport.services.ibm.com/server/lopdiags
-	  To compile this driver as a module, choose M here: the
-	  module will be called ibmvscsis.
-
 config SCSI_INITIO
 	tristate "Initio 9100U(W) support"
 	depends on PCI && SCSI
@@ -1127,7 +1081,7 @@ config SCSI_SYM53C8XX_DMA_ADDRESSING_MODE
 	  memory using PCI DAC cycles.
 
 config SCSI_SYM53C8XX_DEFAULT_TAGS
-	int "default tagged command queue depth"
+	int "Default tagged command queue depth"
 	depends on SCSI_SYM53C8XX_2
 	default "16"
 	help
@@ -1138,7 +1092,7 @@ config SCSI_SYM53C8XX_DEFAULT_TAGS
 	  exceed CONFIG_SCSI_SYM53C8XX_MAX_TAGS.
 
 config SCSI_SYM53C8XX_MAX_TAGS
-	int "maximum number of queued commands"
+	int "Maximum number of queued commands"
 	depends on SCSI_SYM53C8XX_2
 	default "64"
 	help
@@ -1147,13 +1101,14 @@ config SCSI_SYM53C8XX_MAX_TAGS
 	  possible. The driver supports up to 256 queued commands per device.
 	  This value is used as a compiled-in hard limit.
 
-config SCSI_SYM53C8XX_IOMAPPED
-	bool "use port IO"
+config SCSI_SYM53C8XX_MMIO
+	bool "Use memory mapped IO"
 	depends on SCSI_SYM53C8XX_2
+	default y
 	help
-	  If you say Y here, the driver will use port IO to access
-	  the card.  This is significantly slower then using memory
-	  mapped IO.  Most people should answer N.
+	  Memory mapped IO is faster than Port IO.  Most people should
+	  answer Y here, but some machines may have problems.  If you have
+	  to answer N here, please report the problem to the maintainer.
 
 config SCSI_IPR
 	tristate "IBM Power Linux RAID adapter support"
@@ -1356,15 +1311,6 @@ config SCSI_QLOGIC_FAS
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called qlogicfas.
-
-config SCSI_QLOGIC_FC
-	tristate "Qlogic ISP FC SCSI support"
-	depends on PCI && SCSI
-	help
-	  This is a driver for the QLogic ISP2100 SCSI-FCP host adapter.
-
-	  To compile this driver as a module, choose M here: the
-	  module will be called qlogicfc.
 
 config SCSI_QLOGIC_FC_FIRMWARE
 	bool "Include loadable firmware in driver"
@@ -1883,23 +1829,6 @@ config ZFCP
           This driver is also available as a module. This module will be
           called zfcp. If you want to compile it as a module, say M here
           and read <file:Documentation/modules.txt>.
-
-config ZFCP_HBAAPI
-	tristate "FC-HBA Support"
-	depends on ZFCP
-	default n
-	help
-	  Say Y here to include HBA API (FC-HBA) support for z990 (GA2)
-	  and above.
-	  For details please refer to the documentation provided by IBM at
-	  <http://oss.software.ibm.com/developerworks/opensource/linux390>
-
-	  This support is also available as a separate module.
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  The module will be called
-	  zfcp_hbaapi.o.
-
-	  If unsure, say N.
 
 endmenu
 

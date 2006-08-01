@@ -139,10 +139,10 @@ typedef struct { unsigned long pgprot; } pgprot_t;
 
 #define pfn_to_kaddr(pfn)	__va((pfn) << PAGE_SHIFT)
 
+#ifndef CONFIG_SPARSEMEM
 #ifndef CONFIG_NEED_MULTIPLE_NODES
-#define pfn_to_page(pfn)	(mem_map + (pfn))
-#define page_to_pfn(page)	((unsigned long)((page) - mem_map))
 #define pfn_valid(pfn)		((pfn) < max_mapnr)
+#endif
 #endif
 
 #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
@@ -160,6 +160,7 @@ typedef struct { unsigned long pgprot; } pgprot_t;
 #define WANT_PAGE_VIRTUAL
 #endif
 
+#include <asm-generic/memory_model.h>
 #include <asm-generic/page.h>
 
 #endif /* _ASM_PAGE_H */

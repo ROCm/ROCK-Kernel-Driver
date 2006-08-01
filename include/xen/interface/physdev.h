@@ -17,8 +17,6 @@ typedef struct physdevop_irq_status_query {
     /* OUT */
 /* Need to call PHYSDEVOP_IRQ_UNMASK_NOTIFY when the IRQ has been serviced? */
 #define PHYSDEVOP_IRQ_NEEDS_UNMASK_NOTIFY (1<<0)
-/* IRQ shared by multiple guests? */
-#define PHYSDEVOP_IRQ_SHARED              (1<<1)
     uint32_t flags;
 } physdevop_irq_status_query_t;
 

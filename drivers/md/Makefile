@@ -46,10 +46,6 @@ ifeq ($(CONFIG_ALTIVEC),y)
 altivec_flags := -maltivec -mabi=altivec
 endif
 
-ifeq ($(CONFIG_DM_NL_EVT),y)
-dm-mod-objs			+= dm-netlink.o
-endif
-
 targets += raid6int1.c
 $(obj)/raid6int1.c:   UNROLL := 1
 $(obj)/raid6int1.c:   $(src)/raid6int.uc $(src)/unroll.pl FORCE

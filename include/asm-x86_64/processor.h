@@ -170,22 +170,13 @@ static inline void clear_in_cr4 (unsigned long mask)
 
 /* This decides where the kernel will search for a free chunk of vm
  * space during mmap's.
- *
- * /proc/pid/unmap_base is only supported for 32bit processes without
- * 3GB personality for now.
  */
 #define IA32_PAGE_OFFSET ((current->personality & ADDR_LIMIT_3GB) ? 0xc0000000 : 0xFFFFe000)
 
 #define TASK_SIZE 		(test_thread_flag(TIF_IA32) ? IA32_PAGE_OFFSET : TASK_SIZE64)
 #define TASK_SIZE_OF(child) 	((test_tsk_thread_flag(child, TIF_IA32)) ? IA32_PAGE_OFFSET : TASK_SIZE64)
 
-/* FIXME: Used in initializer, do we need to check for 64bit here? */
-#define __TASK_UNMAPPED_BASE (PAGE_ALIGN(0xffffe000 / 3))
-#define TASK_UNMAPPED_32 ((current->personality & ADDR_LIMIT_3GB) ? \
- 	PAGE_ALIGN(0xc0000000 / 3) : PAGE_ALIGN(current->map_base))
-#define TASK_UNMAPPED_64 PAGE_ALIGN(TASK_SIZE64/3)
-#define TASK_UNMAPPED_BASE	\
-	(test_thread_flag(TIF_IA32) ? TASK_UNMAPPED_32 : TASK_UNMAPPED_64)
+#define TASK_UNMAPPED_BASE	PAGE_ALIGN(TASK_SIZE/3)
 
 /*
  * Size of io_bitmap.
@@ -366,9 +357,6 @@ struct extended_sigtable {
 	unsigned int reserved[3];
 	struct extended_signature sigs[0];
 };
-
-/* '6' because it used to be for P6 only (but now covers Pentium 4 as well) */
-#define MICROCODE_IOCFREE	_IO('6',0)
 
 
 #define ASM_NOP1 K8_NOP1

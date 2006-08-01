@@ -224,28 +224,6 @@ check_XRC (struct ccw1         *de_ccw,
 
 } /* end check_XRC */
 
-/*
- * Check if called ioctl is valid on this device type.
- * Returns device if anything is fine, ERR_PTR otherwise.
- */
-static inline struct dasd_device *
-dasd_eckd_validate_ioctl(struct block_device *bdev, int no)
-{
-	struct dasd_device *device;
-
-	device = bdev->bd_disk->private_data;
-	if (device == NULL)
-		return ERR_PTR(-ENODEV);
-
-	if (strncmp((char *)&device->discipline->name, "ECKD", 4)) {
-		DEV_MESSAGE(KERN_WARNING, device,
-			    "ioctl (%x) not supported for %.4s device.",
-			    no, (char *)&device->discipline->name);
-		return ERR_PTR(-EOPNOTSUPP);
-	}
-	return device;
-}
-
 static inline void
 define_extent(struct ccw1 * ccw, struct DE_eckd_data * data, int trk,
 	      int totrk, int cmd, struct dasd_device * device)
@@ -1296,18 +1274,13 @@ dasd_eckd_fill_info(struct dasd_device * device,
  * (see dasd_eckd_reserve) device.
  */
 static int
-dasd_eckd_release(struct block_device *bdev, int no, long args)
+dasd_eckd_release(struct dasd_device *device)
 {
-	struct dasd_device *device;
 	struct dasd_ccw_req *cqr;
 	int rc;
 
 	if (!capable(CAP_SYS_ADMIN))
 		return -EACCES;
-
-	device = dasd_eckd_validate_ioctl(bdev, no);
-	if (IS_ERR(device))
-		return PTR_ERR(device);
 
 	cqr = dasd_smalloc_request(dasd_eckd_discipline.name,
 				   1, 32, device);
@@ -1341,18 +1314,13 @@ dasd_eckd_release(struct block_device *bdev, int no, long args)
  * the interrupt is outstanding for a certain time. 
  */
 static int
-dasd_eckd_reserve(struct block_device *bdev, int no, long args)
+dasd_eckd_reserve(struct dasd_device *device)
 {
-	struct dasd_device *device;
 	struct dasd_ccw_req *cqr;
 	int rc;
 
 	if (!capable(CAP_SYS_ADMIN))
 		return -EACCES;
-
-	device = dasd_eckd_validate_ioctl(bdev, no);
-	if (IS_ERR(device))
-		return PTR_ERR(device);
 
 	cqr = dasd_smalloc_request(dasd_eckd_discipline.name,
 				   1, 32, device);
@@ -1385,18 +1353,13 @@ dasd_eckd_reserve(struct block_device *bdev, int no, long args)
  * (unconditional reserve)
  */
 static int
-dasd_eckd_steal_lock(struct block_device *bdev, int no, long args)
+dasd_eckd_steal_lock(struct dasd_device *device)
 {
-	struct dasd_device *device;
 	struct dasd_ccw_req *cqr;
 	int rc;
 
 	if (!capable(CAP_SYS_ADMIN))
 		return -EACCES;
-
-	device = dasd_eckd_validate_ioctl(bdev, no);
-	if (IS_ERR(device))
-		return PTR_ERR(device);
 
 	cqr = dasd_smalloc_request(dasd_eckd_discipline.name,
 				   1, 32, device);
@@ -1427,18 +1390,13 @@ dasd_eckd_steal_lock(struct block_device *bdev, int no, long args)
  * Read performance statistics
  */
 static int
-dasd_eckd_performance(struct block_device *bdev, int no, long args)
+dasd_eckd_performance(struct dasd_device *device, void __user *argp)
 {
-	struct dasd_device *device;
 	struct dasd_psf_prssd_data *prssdp;
 	struct dasd_rssd_perf_stats_t *stats;
 	struct dasd_ccw_req *cqr;
 	struct ccw1 *ccw;
 	int rc;
-
-	device = dasd_eckd_validate_ioctl(bdev, no);
-	if (IS_ERR(device))
-		return PTR_ERR(device);
 
 	cqr = dasd_smalloc_request(dasd_eckd_discipline.name,
 				   1 /* PSF */  + 1 /* RSSD */ ,
@@ -1483,8 +1441,9 @@ dasd_eckd_performance(struct block_device *bdev, int no, long args)
 		/* Prepare for Read Subsystem Data */
 		prssdp = (struct dasd_psf_prssd_data *) cqr->data;
 		stats = (struct dasd_rssd_perf_stats_t *) (prssdp + 1);
-		rc = copy_to_user((long __user *) args, (long *) stats,
-				  sizeof(struct dasd_rssd_perf_stats_t));
+		if (copy_to_user(argp, stats,
+				 sizeof(struct dasd_rssd_perf_stats_t)))
+			rc = -EFAULT;
 	}
 	dasd_sfree_request(cqr, cqr->device);
 	return rc;
@@ -1495,27 +1454,22 @@ dasd_eckd_performance(struct block_device *bdev, int no, long args)
  * Returnes the cache attributes used in Define Extend (DE).
  */
 static int
-dasd_eckd_get_attrib (struct block_device *bdev, int no, long args)
+dasd_eckd_get_attrib(struct dasd_device *device, void __user *argp)
 {
-	struct dasd_device *device;
-        struct dasd_eckd_private *private;
-        struct attrib_data_t attrib;
+	struct dasd_eckd_private *private =
+		(struct dasd_eckd_private *)device->private;
+	struct attrib_data_t attrib = private->attrib;
 	int rc;
 
         if (!capable(CAP_SYS_ADMIN))
                 return -EACCES;
-        if (!args)
+	if (!argp)
                 return -EINVAL;
 
-	device = dasd_eckd_validate_ioctl(bdev, no);
-	if (IS_ERR(device))
-		return PTR_ERR(device);
-
-        private = (struct dasd_eckd_private *) device->private;
-        attrib = private->attrib;
-
-        rc = copy_to_user((long __user *) args, (long *) &attrib,
-			  sizeof (struct attrib_data_t));
+	rc = 0;
+	if (copy_to_user(argp, (long *) &attrib,
+			 sizeof (struct attrib_data_t)))
+		rc = -EFAULT;
 
 	return rc;
 }
@@ -1525,33 +1479,46 @@ dasd_eckd_get_attrib (struct block_device *bdev, int no, long args)
  * Stores the attributes for cache operation to be used in Define Extend (DE).
  */
 static int
-dasd_eckd_set_attrib(struct block_device *bdev, int no, long args)
+dasd_eckd_set_attrib(struct dasd_device *device, void __user *argp)
 {
-	struct dasd_device *device;
-	struct dasd_eckd_private *private;
+	struct dasd_eckd_private *private =
+		(struct dasd_eckd_private *)device->private;
 	struct attrib_data_t attrib;
 
 	if (!capable(CAP_SYS_ADMIN))
 		return -EACCES;
-	if (!args)
+	if (!argp)
 		return -EINVAL;
 
-
-	device = dasd_eckd_validate_ioctl(bdev, no);
-	if (IS_ERR(device))
-		return PTR_ERR(device);
-
-	if (copy_from_user(&attrib, (void __user *) args,
-			   sizeof (struct attrib_data_t))) {
+	if (copy_from_user(&attrib, argp, sizeof(struct attrib_data_t)))
 		return -EFAULT;
-	}
-	private = (struct dasd_eckd_private *) device->private;
 	private->attrib = attrib;
 
 	DEV_MESSAGE(KERN_INFO, device,
 		    "cache operation mode set to %x (%i cylinder prestage)",
 		    private->attrib.operation, private->attrib.nr_cyl);
 	return 0;
+}
+
+static int
+dasd_eckd_ioctl(struct dasd_device *device, unsigned int cmd, void __user *argp)
+{
+	switch (cmd) {
+	case BIODASDGATTR:
+		return dasd_eckd_get_attrib(device, argp);
+	case BIODASDSATTR:
+		return dasd_eckd_set_attrib(device, argp);
+	case BIODASDPSRD:
+		return dasd_eckd_performance(device, argp);
+	case BIODASDRLSE:
+		return dasd_eckd_release(device);
+	case BIODASDRSRV:
+		return dasd_eckd_reserve(device);
+	case BIODASDSLCK:
+		return dasd_eckd_steal_lock(device);
+	default:
+		return -ENOIOCTLCMD;
+	}
 }
 
 /*
@@ -1712,6 +1679,7 @@ static struct dasd_discipline dasd_eckd_discipline = {
 	.free_cp = dasd_eckd_free_cp,
 	.dump_sense = dasd_eckd_dump_sense,
 	.fill_info = dasd_eckd_fill_info,
+	.ioctl = dasd_eckd_ioctl,
 };
 
 static int __init
@@ -1719,59 +1687,18 @@ dasd_eckd_init(void)
 {
 	int ret;
 
-	dasd_ioctl_no_register(THIS_MODULE, BIODASDGATTR,
-			       dasd_eckd_get_attrib);
-	dasd_ioctl_no_register(THIS_MODULE, BIODASDSATTR,
-			       dasd_eckd_set_attrib);
-	dasd_ioctl_no_register(THIS_MODULE, BIODASDPSRD,
-			       dasd_eckd_performance);
-	dasd_ioctl_no_register(THIS_MODULE, BIODASDRLSE,
-			       dasd_eckd_release);
-	dasd_ioctl_no_register(THIS_MODULE, BIODASDRSRV,
-			       dasd_eckd_reserve);
-	dasd_ioctl_no_register(THIS_MODULE, BIODASDSLCK,
-			       dasd_eckd_steal_lock);
-
 	ASCEBC(dasd_eckd_discipline.ebcname, 4);
 
 	ret = ccw_driver_register(&dasd_eckd_driver);
-	if (ret) {
-		dasd_ioctl_no_unregister(THIS_MODULE, BIODASDGATTR,
-					 dasd_eckd_get_attrib);
-		dasd_ioctl_no_unregister(THIS_MODULE, BIODASDSATTR,
-					 dasd_eckd_set_attrib);
-		dasd_ioctl_no_unregister(THIS_MODULE, BIODASDPSRD,
-					 dasd_eckd_performance);
-		dasd_ioctl_no_unregister(THIS_MODULE, BIODASDRLSE,
-					 dasd_eckd_release);
-		dasd_ioctl_no_unregister(THIS_MODULE, BIODASDRSRV,
-					 dasd_eckd_reserve);
-		dasd_ioctl_no_unregister(THIS_MODULE, BIODASDSLCK,
-					 dasd_eckd_steal_lock);
-		return ret;
-	}
-
-	dasd_generic_auto_online(&dasd_eckd_driver);
-	return 0;
+	if (!ret)
+		dasd_generic_auto_online(&dasd_eckd_driver);
+	return ret;
 }
 
 static void __exit
 dasd_eckd_cleanup(void)
 {
 	ccw_driver_unregister(&dasd_eckd_driver);
-
-	dasd_ioctl_no_unregister(THIS_MODULE, BIODASDGATTR,
-				 dasd_eckd_get_attrib);
-	dasd_ioctl_no_unregister(THIS_MODULE, BIODASDSATTR,
-				 dasd_eckd_set_attrib);
-	dasd_ioctl_no_unregister(THIS_MODULE, BIODASDPSRD,
-				 dasd_eckd_performance);
-	dasd_ioctl_no_unregister(THIS_MODULE, BIODASDRLSE,
-				 dasd_eckd_release);
-	dasd_ioctl_no_unregister(THIS_MODULE, BIODASDRSRV,
-				 dasd_eckd_reserve);
-	dasd_ioctl_no_unregister(THIS_MODULE, BIODASDSLCK,
-				 dasd_eckd_steal_lock);
 }
 
 module_init(dasd_eckd_init);

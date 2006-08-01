@@ -58,12 +58,6 @@ extern void disable_irq(unsigned int irq);
 extern void enable_irq(unsigned int irq);
 #endif
 
-#ifdef CONFIG_HAVE_IRQ_IGNORE_UNHANDLED
-int irq_ignore_unhandled(unsigned int irq);
-#else
-#define irq_ignore_unhandled(irq) 0
-#endif
-
 #ifndef __ARCH_SET_SOFTIRQ_PENDING
 #define set_softirq_pending(x) (local_softirq_pending() = (x))
 #define or_softirq_pending(x)  (local_softirq_pending() |= (x))
@@ -297,8 +291,5 @@ extern unsigned long probe_irq_on(void);	/* returns 0 on failure */
 extern int probe_irq_off(unsigned long);	/* returns 0 or negative on failure */
 extern unsigned int probe_irq_mask(unsigned long);	/* returns mask of ISA interrupts */
 #endif
-
-extern void dump_clear_tasklet(void);
-extern void dump_run_tasklet(void);
 
 #endif

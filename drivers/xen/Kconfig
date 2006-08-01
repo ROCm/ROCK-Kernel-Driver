@@ -181,12 +181,6 @@ config XEN_TPMDEV_FRONTEND
 	help
 	  The TPM-device frontend driver.
 
-config XEN_CONSOLE
-	tristate "Xen virtual console"
-	default y
-	help
-	  The Xen virtual console is ...
-
 config XEN_SCRUB_PAGES
 	bool "Scrub memory before freeing it to Xen"
 	default y
@@ -219,10 +213,6 @@ config HAVE_ARCH_ALLOC_SKB
 	default y
 
 config HAVE_ARCH_DEV_ALLOC_SKB
-	bool
-	default y
-
-config HAVE_IRQ_IGNORE_UNHANDLED
 	bool
 	default y
 

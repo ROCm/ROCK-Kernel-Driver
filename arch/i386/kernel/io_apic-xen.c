@@ -1205,9 +1205,10 @@ u8 irq_vector[NR_IRQ_VECTORS] __read_mostly; /* = { FIRST_DEVICE_VECTOR , 0 }; *
 
 int assign_irq_vector(int irq)
 {
+	static int current_vector = FIRST_DEVICE_VECTOR;
 	physdev_op_t op;
 
-	BUG_ON(irq != AUTO_ASSIGN && (unsigned)irq >= NR_IRQ_VECTORS);
+	BUG_ON(irq >= NR_IRQ_VECTORS);
 	if (irq != AUTO_ASSIGN && IO_APIC_VECTOR(irq) > 0)
 		return IO_APIC_VECTOR(irq);
 
@@ -1215,15 +1216,13 @@ int assign_irq_vector(int irq)
 	op.u.irq_op.irq = irq;
 	if (HYPERVISOR_physdev_op(&op))
 		return -ENOSPC;
+	current_vector = op.u.irq_op.vector;
 
-	vector_irq[op.u.irq_op.vector] = irq;
-	if (irq != AUTO_ASSIGN) {
-		u8 vector = cmpxchg(&IO_APIC_VECTOR(irq), 0, op.u.irq_op.vector);
+	vector_irq[current_vector] = irq;
+	if (irq != AUTO_ASSIGN)
+		IO_APIC_VECTOR(irq) = current_vector;
 
-		BUG_ON(vector && vector != op.u.irq_op.vector);
-	}
-
-	return op.u.irq_op.vector;
+	return current_vector;
 }
 
 #ifndef CONFIG_XEN

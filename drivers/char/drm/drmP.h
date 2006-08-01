@@ -357,6 +357,12 @@ typedef struct drm_freelist {
 	spinlock_t lock;
 } drm_freelist_t;
 
+typedef struct drm_dma_handle {
+	dma_addr_t busaddr;
+	void *vaddr;
+	size_t size;
+} drm_dma_handle_t;
+
 /**
  * Buffer entry.  There is one of this for each buffer size order.
  */
@@ -366,7 +372,7 @@ typedef struct drm_buf_entry {
 	drm_buf_t *buflist;		/**< buffer list */
 	int seg_count;
 	int page_order;
-	unsigned long *seglist;
+	drm_dma_handle_t **seglist;
 
 	drm_freelist_t freelist;
 } drm_buf_entry_t;
@@ -482,12 +488,6 @@ typedef struct drm_sigdata {
 	int context;
 	drm_hw_lock_t *lock;
 } drm_sigdata_t;
-
-typedef struct drm_dma_handle {
-	dma_addr_t busaddr;
-	void *vaddr;
-	size_t size;
-} drm_dma_handle_t;
 
 /**
  * Mappings list
@@ -813,12 +813,8 @@ extern void drm_mem_init(void);
 extern int drm_mem_info(char *buf, char **start, off_t offset,
 			int request, int *eof, void *data);
 extern void *drm_realloc(void *oldpt, size_t oldsize, size_t size, int area);
-extern unsigned long drm_alloc_pages(int order, int area);
-extern void drm_free_pages(unsigned long address, int order, int area);
 extern void *drm_ioremap(unsigned long offset, unsigned long size,
 			 drm_device_t * dev);
-extern void *drm_ioremap_nocache(unsigned long offset, unsigned long size,
-				 drm_device_t * dev);
 extern void drm_ioremapfree(void *pt, unsigned long size, drm_device_t * dev);
 
 extern DRM_AGP_MEM *drm_alloc_agp(drm_device_t * dev, int pages, u32 type);
@@ -893,7 +889,6 @@ extern int drm_lock_free(drm_device_t * dev,
 				/* Buffer management support (drm_bufs.h) */
 extern int drm_addbufs_agp(drm_device_t * dev, drm_buf_desc_t * request);
 extern int drm_addbufs_pci(drm_device_t * dev, drm_buf_desc_t * request);
-extern int drm_addbufs_fb(drm_device_t *dev, drm_buf_desc_t *request);
 extern int drm_addmap(drm_device_t * dev, unsigned int offset,
 		      unsigned int size, drm_map_type_t type,
 		      drm_map_flags_t flags, drm_local_map_t ** map_ptr);
@@ -1024,11 +1019,13 @@ static __inline__ void drm_core_ioremap(struct drm_map *map,
 	map->handle = drm_ioremap(map->offset, map->size, dev);
 }
 
+#if 0
 static __inline__ void drm_core_ioremap_nocache(struct drm_map *map,
 						struct drm_device *dev)
 {
 	map->handle = drm_ioremap_nocache(map->offset, map->size, dev);
 }
+#endif  /*  0  */
 
 static __inline__ void drm_core_ioremapfree(struct drm_map *map,
 					    struct drm_device *dev)

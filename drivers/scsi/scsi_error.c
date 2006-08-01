@@ -24,7 +24,6 @@
 #include <linux/interrupt.h>
 #include <linux/blkdev.h>
 #include <linux/delay.h>
-#include <linux/diskdump.h>
 
 #include <scsi/scsi.h>
 #include <scsi/scsi_dbg.h>
@@ -423,9 +422,6 @@ static void scsi_eh_done(struct scsi_cmnd *scmd)
 {
 	struct completion     *eh_action;
 
-	 if (lkcd_dump_mode())
-                return;
-
 	SCSI_LOG_ERROR_RECOVERY(3,
 		printk("%s scmd: %p result: %x\n",
 			__FUNCTION__, scmd, scmd->result));
@@ -586,8 +582,7 @@ static int scsi_request_sense(struct scsi_cmnd *scmd)
  *    keep a list of pending commands for final completion, and once we
  *    are ready to leave error handling we handle completion for real.
  **/
-static void scsi_eh_finish_cmd(struct scsi_cmnd *scmd,
-			       struct list_head *done_q)
+void scsi_eh_finish_cmd(struct scsi_cmnd *scmd, struct list_head *done_q)
 {
 	scmd->device->host->host_failed--;
 	scmd->eh_eflags = 0;
@@ -599,6 +594,7 @@ static void scsi_eh_finish_cmd(struct scsi_cmnd *scmd,
 	scsi_setup_cmd_retry(scmd);
 	list_move_tail(&scmd->eh_entry, done_q);
 }
+EXPORT_SYMBOL(scsi_eh_finish_cmd);
 
 /**
  * scsi_eh_get_sense - Get device sense data.
@@ -1321,8 +1317,6 @@ int scsi_decide_disposition(struct scsi_cmnd *scmd)
 	}
 }
 
-EXPORT_SYMBOL_GPL(scsi_decide_disposition);
-
 /**
  * scsi_eh_lock_door - Prevent medium removal for the specified device
  * @sdev:	SCSI device to prevent medium removal
@@ -1429,7 +1423,7 @@ static void scsi_eh_ready_devs(struct Scsi_Host *shost,
  * @done_q:	list_head of processed commands.
  *
  **/
-static void scsi_eh_flush_done_q(struct list_head *done_q)
+void scsi_eh_flush_done_q(struct list_head *done_q)
 {
 	struct scsi_cmnd *scmd, *next;
 
@@ -1458,6 +1452,7 @@ static void scsi_eh_flush_done_q(struct list_head *done_q)
 		}
 	}
 }
+EXPORT_SYMBOL(scsi_eh_flush_done_q);
 
 /**
  * scsi_unjam_host - Attempt to fix a host which has a cmd that failed.
@@ -1543,8 +1538,8 @@ int scsi_error_handler(void *data)
 		 * what we need to do to get it up and online again (if we can).
 		 * If we fail, we end up taking the thing offline.
 		 */
-		if (shost->hostt->eh_strategy_handler) 
-			shost->hostt->eh_strategy_handler(shost);
+		if (shost->transportt->eh_strategy_handler)
+			shost->transportt->eh_strategy_handler(shost);
 		else
 			scsi_unjam_host(shost);
 

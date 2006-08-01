@@ -130,9 +130,7 @@ LIST_HEAD(tty_drivers);			/* linked list of tty drivers */
 
 /* Semaphore to protect creating and releasing a tty. This is shared with
    vt.c for deeply disgusting hack reasons */
-DECLARE_MUTEX(tty_sem);
-
-int console_use_vt = 1;
+DEFINE_MUTEX(tty_mutex);
 
 #ifdef CONFIG_UNIX98_PTYS
 extern struct tty_driver *ptm_driver;	/* Unix98 pty masters; for /dev/ptmx */
@@ -353,10 +351,10 @@ int tty_buffer_request_room(struct tty_struct *tty, size_t size)
 	spin_unlock_irqrestore(&tty->buf.lock, flags);
 	return size;
 }
-
 EXPORT_SYMBOL_GPL(tty_buffer_request_room);
 
-int tty_insert_flip_string(struct tty_struct *tty, unsigned char *chars, size_t size)
+int tty_insert_flip_string(struct tty_struct *tty, const unsigned char *chars,
+				size_t size)
 {
 	int copied = 0;
 	do {
@@ -370,17 +368,16 @@ int tty_insert_flip_string(struct tty_struct *tty, unsigned char *chars, size_t 
 		tb->used += space;
 		copied += space;
 		chars += space;
-/* 		printk("Flip insert %d.\n", space); */
 	}
 	/* There is a small chance that we need to split the data over
 	   several buffers. If this is the case we must loop */
 	while (unlikely(size > copied));
 	return copied;
 }
+EXPORT_SYMBOL(tty_insert_flip_string);
 
-EXPORT_SYMBOL_GPL(tty_insert_flip_string);
-
-int tty_insert_flip_string_flags(struct tty_struct *tty, unsigned char *chars, char *flags, size_t size)
+int tty_insert_flip_string_flags(struct tty_struct *tty,
+		const unsigned char *chars, const char *flags, size_t size)
 {
 	int copied = 0;
 	do {
@@ -401,9 +398,20 @@ int tty_insert_flip_string_flags(struct tty_struct *tty, unsigned char *chars, c
 	while (unlikely(size > copied));
 	return copied;
 }
+EXPORT_SYMBOL(tty_insert_flip_string_flags);
 
-EXPORT_SYMBOL_GPL(tty_insert_flip_string_flags);
-
+void tty_schedule_flip(struct tty_struct *tty)
+{
+	unsigned long flags;
+	spin_lock_irqsave(&tty->buf.lock, flags);
+	if (tty->buf.tail != NULL) {
+		tty->buf.tail->active = 0;
+		tty->buf.tail->commit = tty->buf.tail->used;
+	}
+	spin_unlock_irqrestore(&tty->buf.lock, flags);
+	schedule_delayed_work(&tty->buf.work, 1);
+}
+EXPORT_SYMBOL(tty_schedule_flip);
 
 /*
  *	Prepare a block of space in the buffer for data. Returns the length
@@ -545,14 +553,12 @@ void tty_ldisc_put(int disc)
 	struct tty_ldisc *ld;
 	unsigned long flags;
 	
-	if (disc < N_TTY || disc >= NR_LDISCS)
-		BUG();
+	BUG_ON(disc < N_TTY || disc >= NR_LDISCS);
 		
 	spin_lock_irqsave(&tty_ldisc_lock, flags);
 	ld = &tty_ldiscs[disc];
-	if(ld->refcount == 0)
-		BUG();
-	ld->refcount --;
+	BUG_ON(ld->refcount == 0);
+	ld->refcount--;
 	module_put(ld->owner);
 	spin_unlock_irqrestore(&tty_ldisc_lock, flags);
 }
@@ -647,8 +653,7 @@ void tty_ldisc_deref(struct tty_ldisc *ld)
 {
 	unsigned long flags;
 
-	if(ld == NULL)
-		BUG();
+	BUG_ON(ld == NULL);
 		
 	spin_lock_irqsave(&tty_ldisc_lock, flags);
 	if(ld->refcount == 0)
@@ -1099,8 +1104,8 @@ static void do_tty_hangup(void *data)
 				p->signal->tty = NULL;
 			if (!p->signal->leader)
 				continue;
-			send_group_sig_info(SIGHUP, SEND_SIG_PRIV, p);
-			send_group_sig_info(SIGCONT, SEND_SIG_PRIV, p);
+			group_send_sig_info(SIGHUP, SEND_SIG_PRIV, p);
+			group_send_sig_info(SIGCONT, SEND_SIG_PRIV, p);
 			if (tty->pgrp > 0)
 				p->signal->tty_old_pgrp = tty->pgrp;
 		} while_each_task_pid(tty->session, PIDTYPE_SID, p);
@@ -1190,11 +1195,11 @@ void disassociate_ctty(int on_exit)
 
 	lock_kernel();
 
-	down(&tty_sem);
+	mutex_lock(&tty_mutex);
 	tty = current->signal->tty;
 	if (tty) {
 		tty_pgrp = tty->pgrp;
-		up(&tty_sem);
+		mutex_unlock(&tty_mutex);
 		if (on_exit && tty->driver->type != TTY_DRIVER_TYPE_PTY)
 			tty_vhangup(tty);
 	} else {
@@ -1202,7 +1207,7 @@ void disassociate_ctty(int on_exit)
 			kill_pg(current->signal->tty_old_pgrp, SIGHUP, on_exit);
 			kill_pg(current->signal->tty_old_pgrp, SIGCONT, on_exit);
 		}
-		up(&tty_sem);
+		mutex_unlock(&tty_mutex);
 		unlock_kernel();	
 		return;
 	}
@@ -1213,7 +1218,7 @@ void disassociate_ctty(int on_exit)
 	}
 
 	/* Must lock changes to tty_old_pgrp */
-	down(&tty_sem);
+	mutex_lock(&tty_mutex);
 	current->signal->tty_old_pgrp = 0;
 	tty->session = 0;
 	tty->pgrp = -1;
@@ -1224,7 +1229,7 @@ void disassociate_ctty(int on_exit)
 		p->signal->tty = NULL;
 	} while_each_task_pid(current->signal->session, PIDTYPE_SID, p);
 	read_unlock(&tasklist_lock);
-	up(&tty_sem);
+	mutex_unlock(&tty_mutex);
 	unlock_kernel();
 }
 
@@ -1308,7 +1313,7 @@ static inline ssize_t do_tty_write(
 	ssize_t ret = 0, written = 0;
 	unsigned int chunk;
 	
-	if (down_interruptible(&tty->atomic_write)) {
+	if (mutex_lock_interruptible(&tty->atomic_write_lock)) {
 		return -ERESTARTSYS;
 	}
 
@@ -1331,7 +1336,7 @@ static inline ssize_t do_tty_write(
 	if (count < chunk)
 		chunk = count;
 
-	/* write_buf/write_cnt is protected by the atomic_write semaphore */
+	/* write_buf/write_cnt is protected by the atomic_write_lock mutex */
 	if (tty->write_cnt < chunk) {
 		unsigned char *buf;
 
@@ -1340,7 +1345,7 @@ static inline ssize_t do_tty_write(
 
 		buf = kmalloc(chunk, GFP_KERNEL);
 		if (!buf) {
-			up(&tty->atomic_write);
+			mutex_unlock(&tty->atomic_write_lock);
 			return -ENOMEM;
 		}
 		kfree(tty->write_buf);
@@ -1376,7 +1381,7 @@ static inline ssize_t do_tty_write(
 		inode->i_mtime = current_fs_time(inode->i_sb);
 		ret = written;
 	}
-	up(&tty->atomic_write);
+	mutex_unlock(&tty->atomic_write_lock);
 	return ret;
 }
 
@@ -1444,8 +1449,8 @@ static inline void tty_line_name(struct tty_driver *driver, int index, char *p)
 
 /*
  * WSH 06/09/97: Rewritten to remove races and properly clean up after a
- * failed open.  The new code protects the open with a semaphore, so it's
- * really quite straightforward.  The semaphore locking can probably be
+ * failed open.  The new code protects the open with a mutex, so it's
+ * really quite straightforward.  The mutex locking can probably be
  * relaxed for the (most common) case of reopening a tty.
  */
 static int init_dev(struct tty_driver *driver, int idx,
@@ -1642,7 +1647,7 @@ fast_track:
 success:
 	*ret_tty = tty;
 	
-	/* All paths come through here to release the semaphore */
+	/* All paths come through here to release the mutex */
 end_init:
 	return retval;
 
@@ -1735,7 +1740,7 @@ static void release_dev(struct file * filp)
 {
 	struct tty_struct *tty, *o_tty;
 	int	pty_master, tty_closing, o_tty_closing, do_sleep;
-	int	devpts_master, devpts;
+	int	devpts;
 	int	idx;
 	char	buf[64];
 	unsigned long flags;
@@ -1752,7 +1757,6 @@ static void release_dev(struct file * filp)
 	pty_master = (tty->driver->type == TTY_DRIVER_TYPE_PTY &&
 		      tty->driver->subtype == PTY_TYPE_MASTER);
 	devpts = (tty->driver->flags & TTY_DRIVER_DEVPTS_MEM) != 0;
-	devpts_master = pty_master && devpts;
 	o_tty = tty->link;
 
 #ifdef TTY_PARANOIA_CHECK
@@ -1839,7 +1843,7 @@ static void release_dev(struct file * filp)
 		/* Guard against races with tty->count changes elsewhere and
 		   opens on /dev/tty */
 		   
-		down(&tty_sem);
+		mutex_lock(&tty_mutex);
 		tty_closing = tty->count <= 1;
 		o_tty_closing = o_tty &&
 			(o_tty->count <= (pty_master ? 1 : 0));
@@ -1870,7 +1874,7 @@ static void release_dev(struct file * filp)
 
 		printk(KERN_WARNING "release_dev: %s: read/write wait queue "
 				    "active!\n", tty_name(tty, buf));
-		up(&tty_sem);
+		mutex_unlock(&tty_mutex);
 		schedule();
 	}	
 
@@ -1936,7 +1940,7 @@ static void release_dev(struct file * filp)
 		read_unlock(&tasklist_lock);
 	}
 
-	up(&tty_sem);
+	mutex_unlock(&tty_mutex);
 
 	/* check whether both sides are closing ... */
 	if (!tty_closing || (o_tty && !o_tty_closing))
@@ -2042,11 +2046,11 @@ retry_open:
 	index  = -1;
 	retval = 0;
 	
-	down(&tty_sem);
+	mutex_lock(&tty_mutex);
 
 	if (device == MKDEV(TTYAUX_MAJOR,0)) {
 		if (!current->signal->tty) {
-			up(&tty_sem);
+			mutex_unlock(&tty_mutex);
 			return -ENXIO;
 		}
 		driver = current->signal->tty->driver;
@@ -2056,7 +2060,7 @@ retry_open:
 		goto got_driver;
 	}
 #ifdef CONFIG_VT
-	if (console_use_vt && (device == MKDEV(TTY_MAJOR,0))) {
+	if (device == MKDEV(TTY_MAJOR,0)) {
 		extern struct tty_driver *console_driver;
 		driver = console_driver;
 		index = fg_console;
@@ -2072,18 +2076,18 @@ retry_open:
 			noctty = 1;
 			goto got_driver;
 		}
-		up(&tty_sem);
+		mutex_unlock(&tty_mutex);
 		return -ENODEV;
 	}
 
 	driver = get_tty_driver(device, &index);
 	if (!driver) {
-		up(&tty_sem);
+		mutex_unlock(&tty_mutex);
 		return -ENODEV;
 	}
 got_driver:
 	retval = init_dev(driver, index, &tty);
-	up(&tty_sem);
+	mutex_unlock(&tty_mutex);
 	if (retval)
 		return retval;
 
@@ -2169,9 +2173,9 @@ static int ptmx_open(struct inode * inode, struct file * filp)
 	}
 	up(&allocated_ptys_lock);
 
-	down(&tty_sem);
+	mutex_lock(&tty_mutex);
 	retval = init_dev(ptm_driver, index, &tty);
-	up(&tty_sem);
+	mutex_unlock(&tty_mutex);
 	
 	if (retval)
 		goto out;
@@ -2190,6 +2194,7 @@ static int ptmx_open(struct inode * inode, struct file * filp)
 		return 0;
 out1:
 	release_dev(filp);
+	return retval;
 out:
 	down(&allocated_ptys_lock);
 	idr_remove(&allocated_ptys, index);
@@ -2692,7 +2697,7 @@ static void __do_SAK(void *arg)
 	tty_hangup(tty);
 #else
 	struct tty_struct *tty = arg;
-	struct task_struct *p;
+	struct task_struct *g, *p;
 	int session;
 	int		i;
 	struct file	*filp;
@@ -2713,8 +2718,18 @@ static void __do_SAK(void *arg)
 		tty->driver->flush_buffer(tty);
 	
 	read_lock(&tasklist_lock);
+	/* Kill the entire session */
 	do_each_task_pid(session, PIDTYPE_SID, p) {
-		if (p->signal->tty == tty || session > 0) {
+		printk(KERN_NOTICE "SAK: killed process %d"
+			" (%s): p->signal->session==tty->session\n",
+			p->pid, p->comm);
+		send_sig(SIGKILL, p, 1);
+	} while_each_task_pid(session, PIDTYPE_SID, p);
+	/* Now kill any processes that happen to have the
+	 * tty open.
+	 */
+	do_each_thread(g, p) {
+		if (p->signal->tty == tty) {
 			printk(KERN_NOTICE "SAK: killed process %d"
 			    " (%s): p->signal->session==tty->session\n",
 			    p->pid, p->comm);
@@ -2738,14 +2753,14 @@ static void __do_SAK(void *arg)
 					printk(KERN_NOTICE "SAK: killed process %d"
 					    " (%s): fd#%d opened to the tty\n",
 					    p->pid, p->comm, i);
-					send_sig(SIGKILL, p, 1);
+					force_sig(SIGKILL, p);
 					break;
 				}
 			}
 			spin_unlock(&p->files->file_lock);
 		}
 		task_unlock(p);
-	} while_each_task_pid(session, PIDTYPE_SID, p);
+	} while_each_thread(g, p);
 	read_unlock(&tasklist_lock);
 #endif
 }
@@ -2936,8 +2951,8 @@ static void initialize_tty_struct(struct tty_struct *tty)
 	init_waitqueue_head(&tty->write_wait);
 	init_waitqueue_head(&tty->read_wait);
 	INIT_WORK(&tty->hangup_work, do_tty_hangup, tty);
-	sema_init(&tty->atomic_read, 1);
-	sema_init(&tty->atomic_write, 1);
+	mutex_init(&tty->atomic_read_lock);
+	mutex_init(&tty->atomic_write_lock);
 	spin_lock_init(&tty->read_lock);
 	INIT_LIST_HEAD(&tty->tty_files);
 	INIT_WORK(&tty->SAK_work, NULL, NULL);
@@ -3258,8 +3273,6 @@ static int __init tty_init(void)
 #endif
 
 #ifdef CONFIG_VT
-	if (!console_use_vt)
-		goto out_vt;
 	cdev_init(&vc0_cdev, &console_fops);
 	if (cdev_add(&vc0_cdev, MKDEV(TTY_MAJOR, 0), 1) ||
 	    register_chrdev_region(MKDEV(TTY_MAJOR, 0), 1, "/dev/vc/0") < 0)
@@ -3268,7 +3281,6 @@ static int __init tty_init(void)
 	class_device_create(tty_class, NULL, MKDEV(TTY_MAJOR, 0), NULL, "tty0");
 
 	vty_init();
- out_vt:
 #endif
 	return 0;
 }

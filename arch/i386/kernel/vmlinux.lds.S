@@ -35,13 +35,6 @@ SECTIONS
   __ex_table : AT(ADDR(__ex_table) - LOAD_OFFSET) { *(__ex_table) }
   __stop___ex_table = .;
 
-  . = ALIGN(16);
-  __start_smp_alternatives_table = .;
-  __smp_alternatives : AT(ADDR(__smp_alternatives) - LOAD_OFFSET) { *(__smp_alternatives) }
-  __stop_smp_alternatives_table = .;
-
-  __smp_replacements : AT(ADDR(__smp_replacements) - LOAD_OFFSET) { *(__smp_replacements) }
-
   RODATA
 
   /* writeable */
@@ -76,6 +69,26 @@ SECTIONS
 	*(.data.init_task)
   }
 
+  /* might get freed after init */
+  . = ALIGN(4096);
+  __smp_alt_begin = .;
+  __smp_alt_instructions = .;
+  .smp_altinstructions : AT(ADDR(.smp_altinstructions) - LOAD_OFFSET) {
+	*(.smp_altinstructions)
+  }
+  __smp_alt_instructions_end = .;
+  . = ALIGN(4);
+  __smp_locks = .;
+  .smp_locks : AT(ADDR(.smp_locks) - LOAD_OFFSET) {
+	*(.smp_locks)
+  }
+  __smp_locks_end = .;
+  .smp_altinstr_replacement : AT(ADDR(.smp_altinstr_replacement) - LOAD_OFFSET) {
+	*(.smp_altinstr_replacement)
+  }
+  . = ALIGN(4096);
+  __smp_alt_end = .;
+
   /* will be freed after init */
   . = ALIGN(4096);		/* Init code and data */
   __init_begin = .;
@@ -105,11 +118,6 @@ SECTIONS
 	*(.con_initcall.init)
   }
   __con_initcall_end = .;
-  __kdb_initcall_start = .;
-  .kdb_initcall.init : AT(ADDR(.kdb_initcall.init) - LOAD_OFFSET) {
-	*(.kdb_initcall.init)
-  }
-  __kdb_initcall_end = .;
   SECURITY_INIT
   . = ALIGN(4);
   __alt_instructions = .;

@@ -26,13 +26,6 @@ void (*pm_power_off)(void);
 EXPORT_SYMBOL(pm_power_off);
 #endif
 
-#ifdef CONFIG_XEN_CONSOLE_MODULE
-void (*__xencons_force_flush)(void) = NULL;
-EXPORT_SYMBOL(__xencons_force_flush);
-void (*__xencons_resume)(void) = NULL;
-EXPORT_SYMBOL(__xencons_resume);
-#endif
-
 extern void ctrl_alt_del(void);
 
 #define SHUTDOWN_INVALID  -1
@@ -376,3 +369,13 @@ static int __init setup_shutdown_event(void)
 }
 
 subsys_initcall(setup_shutdown_event);
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

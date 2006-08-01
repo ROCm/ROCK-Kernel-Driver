@@ -42,6 +42,7 @@ EXPORT_SYMBOL(boot_cpu_data);
 //EXPORT_SYMBOL(dump_fpu);
 EXPORT_SYMBOL(kernel_thread);
 EXPORT_SYMBOL(pm_idle);
+EXPORT_SYMBOL(pm_power_off);
 
 EXPORT_SYMBOL(__down_failed);
 EXPORT_SYMBOL(__down_failed_interruptible);

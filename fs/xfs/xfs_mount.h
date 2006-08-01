@@ -280,8 +280,10 @@ typedef struct xfs_icsb_cnts {
 	uint64_t	icsb_fdblocks;
 	uint64_t	icsb_ifree;
 	uint64_t	icsb_icount;
-	spinlock_t	icsb_lock;
+	unsigned long	icsb_flags;
 } xfs_icsb_cnts_t;
+
+#define XFS_ICSB_FLAG_LOCK	(1 << 0)	/* counter lock bit */
 
 #define XFS_ICSB_SB_LOCKED	(1 << 0)	/* sb already locked */
 #define XFS_ICSB_LAZY_COUNT	(1 << 1)	/* accuracy not needed */
@@ -377,7 +379,7 @@ typedef struct xfs_mount {
 #endif
 	int			m_dalign;	/* stripe unit */
 	int			m_swidth;	/* stripe width */
-	int			m_sinoalign;	/* stripe unit inode alignmnt */
+	int			m_sinoalign;	/* stripe unit inode alignment */
 	int			m_attr_magicpct;/* 37% of the blocksize */
 	int			m_dir_magicpct;	/* 37% of the dir blocksize */
 	__uint8_t		m_mk_sharedro;	/* mark shared ro on unmount */
@@ -401,6 +403,7 @@ typedef struct xfs_mount {
 #ifdef HAVE_PERCPU_SB
 	xfs_icsb_cnts_t		*m_sb_cnts;	/* per-cpu superblock counters */
 	unsigned long		m_icsb_counters; /* disabled per-cpu counters */
+	struct notifier_block	m_icsb_notifier; /* hotplug cpu notifier */
 #endif
 } xfs_mount_t;
 
@@ -416,8 +419,6 @@ typedef struct xfs_mount {
 #define XFS_MOUNT_FS_SHUTDOWN	(1ULL << 4)	/* atomic stop of all filesystem
 						   operations, typically for
 						   disk errors in metadata */
-#define XFS_MOUNT_NOATIME	(1ULL << 5)	/* don't modify inode access
-						   times on reads */
 #define XFS_MOUNT_RETERR	(1ULL << 6)     /* return alignment errors to
 						   user */
 #define XFS_MOUNT_NOALIGN	(1ULL << 7)	/* turn off stripe alignment
@@ -505,18 +506,16 @@ xfs_preferred_iosize(xfs_mount_t *mp)
 #define XFS_SHUTDOWN_REMOTE_REQ 0x10	/* Shutdown came from remote cell */
 
 /*
- * xflags for xfs_syncsub
- */
-#define XFS_XSYNC_RELOC		0x01
-
-/*
  * Flags for xfs_mountfs
  */
 #define XFS_MFSI_SECOND		0x01	/* Secondary mount -- skip stuff */
 #define XFS_MFSI_CLIENT		0x02	/* Is a client -- skip lots of stuff */
+/*	XFS_MFSI_RRINODES	*/
 #define XFS_MFSI_NOUNLINK	0x08	/* Skip unlinked inode processing in */
 					/* log recovery */
 #define XFS_MFSI_NO_QUOTACHECK	0x10	/* Skip quotacheck processing */
+/*	XFS_MFSI_CONVERT_SUNIT	*/
+#define XFS_MFSI_QUIET		0x40	/* Be silent if mount errors found */
 
 /*
  * Macros for getting from mount to vfs and back.
@@ -585,7 +584,7 @@ extern int	xfs_mod_incore_sb_unlocked(xfs_mount_t *, xfs_sb_field_t,
 extern int	xfs_mod_incore_sb_batch(xfs_mount_t *, xfs_mod_sb_t *,
 			uint, int);
 extern struct xfs_buf *xfs_getsb(xfs_mount_t *, int);
-extern int	xfs_readsb(xfs_mount_t *mp);
+extern int	xfs_readsb(xfs_mount_t *, int);
 extern void	xfs_freesb(xfs_mount_t *);
 extern void	xfs_do_force_shutdown(bhv_desc_t *, int, char *, int);
 extern int	xfs_syncsub(xfs_mount_t *, int, int, int *);

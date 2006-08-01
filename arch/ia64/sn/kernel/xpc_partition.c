@@ -49,11 +49,9 @@ u64 xpc_prot_vec[MAX_NUMNODES];
 
 /* this partition's reserved page pointers */
 struct xpc_rsvd_page *xpc_rsvd_page;
-EXPORT_SYMBOL_GPL(xpc_rsvd_page);
 static u64 *xpc_part_nasids;
 static u64 *xpc_mach_nasids;
 struct xpc_vars *xpc_vars;
-EXPORT_SYMBOL_GPL(xpc_vars);
 struct xpc_vars_part *xpc_vars_part;
 
 static int xp_nasid_mask_bytes;	/* actual size in bytes of nasid mask */
@@ -67,7 +65,6 @@ static int xp_nasid_mask_words;	/* actual size in words of nasid mask */
  * another variable.
  */
 struct xpc_partition xpc_partitions[XP_MAX_PARTITIONS + 1];
-EXPORT_SYMBOL_GPL(xpc_partitions);
 
 
 /*
@@ -81,6 +78,31 @@ EXPORT_SYMBOL_GPL(xpc_partitions);
  */
 char ____cacheline_aligned xpc_remote_copy_buffer[XPC_RP_HEADER_SIZE +
 							XP_NASID_MASK_BYTES];
+
+
+/*
+ * Guarantee that the kmalloc'd memory is cacheline aligned.
+ */
+static void *
+xpc_kmalloc_cacheline_aligned(size_t size, gfp_t flags, void **base)
+{
+	/* see if kmalloc will give us cachline aligned memory by default */
+	*base = kmalloc(size, flags);
+	if (*base == NULL) {
+		return NULL;
+	}
+	if ((u64) *base == L1_CACHE_ALIGN((u64) *base)) {
+		return *base;
+	}
+	kfree(*base);
+
+	/* nope, we'll have to do it ourselves */
+	*base = kmalloc(size + L1_CACHE_BYTES, flags);
+	if (*base == NULL) {
+		return NULL;
+	}
+	return (void *) L1_CACHE_ALIGN((u64) *base);
+}
 
 
 /*
@@ -114,9 +136,7 @@ xpc_get_rsvd_page_pa(int nasid)
 		}
 
 		if (L1_CACHE_ALIGN(len) > buf_len) {
-			if (buf_base != NULL) {
-				kfree(buf_base);
-			}
+			kfree(buf_base);
 			buf_len = L1_CACHE_ALIGN(len);
 			buf = (u64) xpc_kmalloc_cacheline_aligned(buf_len,
 							GFP_KERNEL, &buf_base);
@@ -137,9 +157,7 @@ xpc_get_rsvd_page_pa(int nasid)
 		}
 	}
 
-	if (buf_base != NULL) {
-		kfree(buf_base);
-	}
+	kfree(buf_base);
 
 	if (status != SALRET_OK) {
 		rp_pa = 0;
@@ -1041,13 +1059,12 @@ xpc_discovery(void)
 	remote_vars = (struct xpc_vars *) remote_rp;
 
 
-	discovered_nasids = kmalloc(sizeof(u64) * xp_nasid_mask_words,
+	discovered_nasids = kzalloc(sizeof(u64) * xp_nasid_mask_words,
 							GFP_KERNEL);
 	if (discovered_nasids == NULL) {
 		kfree(remote_rp_base);
 		return;
 	}
-	memset(discovered_nasids, 0, sizeof(u64) * xp_nasid_mask_words);
 
 	rp = (struct xpc_rsvd_page *) xpc_rsvd_page;
 

@@ -29,7 +29,6 @@
 #include <linux/kobject.h>
 #include <linux/sysfs.h>
 
-#include "heartbeat.h"
 #include "ocfs2_nodemanager.h"
 #include "masklog.h"
 #include "sys.h"
@@ -46,21 +45,15 @@ struct o2cb_attribute o2cb_attr_##_name = __ATTR(_name, _mode, _show, _store)
 #define to_o2cb_subsys(k) container_of(to_kset(k), struct subsystem, kset)
 #define to_o2cb_attr(_attr) container_of(_attr, struct o2cb_attribute, attr)
 
-static ssize_t o2cb_heartbeat_mode_show(char *buf)
+static ssize_t o2cb_interface_revision_show(char *buf)
 {
-	return snprintf(buf, PAGE_SIZE, "%s\n", o2hb_heartbeat_mode());
+	return snprintf(buf, PAGE_SIZE, "%u\n", O2NM_API_VERSION);
 }
 
-static ssize_t o2cb_heartbeat_mode_store(const char * buffer, size_t count)
-{
-	return o2hb_set_heartbeat_mode(buffer, count);
-}
-
-static O2CB_ATTR(heartbeat_mode, S_IFREG | S_IRUGO | S_IWUSR,
-                 o2cb_heartbeat_mode_show, o2cb_heartbeat_mode_store);
+static O2CB_ATTR(interface_revision, S_IFREG | S_IRUGO, o2cb_interface_revision_show, NULL);
 
 static struct attribute *o2cb_attrs[] = {
-	&o2cb_attr_heartbeat_mode.attr,
+	&o2cb_attr_interface_revision.attr,
 	NULL,
 };
 
@@ -111,11 +104,21 @@ o2cb_store(struct kobject * kobj, struct attribute * attr,
 
 void o2cb_sys_shutdown(void)
 {
+	mlog_sys_shutdown();
 	subsystem_unregister(&o2cb_subsys);
 }
 
 int o2cb_sys_init(void)
 {
+	int ret;
+
 	o2cb_subsys.kset.kobj.ktype = &o2cb_subsys_type;
-	return subsystem_register(&o2cb_subsys);
+	ret = subsystem_register(&o2cb_subsys);
+	if (ret)
+		return ret;
+
+	ret = mlog_sys_init(&o2cb_subsys);
+	if (ret)
+		subsystem_unregister(&o2cb_subsys);
+	return ret;
 }

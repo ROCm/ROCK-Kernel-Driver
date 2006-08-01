@@ -57,7 +57,6 @@ extern void machine_check_exception(struct pt_regs *regs);
 extern void alignment_exception(struct pt_regs *regs);
 extern void program_check_exception(struct pt_regs *regs);
 extern void single_step_exception(struct pt_regs *regs);
-extern int pmac_newworld;
 extern int sys_sigreturn(struct pt_regs *regs);
 
 EXPORT_SYMBOL(clear_pages);
@@ -82,6 +81,7 @@ EXPORT_SYMBOL(strcat);
 EXPORT_SYMBOL(strlen);
 EXPORT_SYMBOL(strcmp);
 EXPORT_SYMBOL(strcasecmp);
+EXPORT_SYMBOL(strncasecmp);
 
 EXPORT_SYMBOL(csum_partial);
 EXPORT_SYMBOL(csum_partial_copy_generic);
@@ -227,16 +227,4 @@ EXPORT_SYMBOL(intercept_table);
 #if defined(CONFIG_40x) || defined(CONFIG_BOOKE)
 EXPORT_SYMBOL(__mtdcr);
 EXPORT_SYMBOL(__mfdcr);
-#endif
-
-#ifdef CONFIG_LKCD_DUMP_MODULE
-extern int dump_page_is_ram(unsigned long);
-EXPORT_SYMBOL_GPL(dump_page_is_ram);
-#ifdef CONFIG_SMP
-EXPORT_SYMBOL_GPL(irq_affinity);
-extern void stop_this_cpu(void *);
-extern void dump_send_ipi(int (*dump_ipi_callback)(struct pt_regs *));
-EXPORT_SYMBOL_GPL(stop_this_cpu);
-EXPORT_SYMBOL_GPL(dump_send_ipi);
-#endif
 #endif

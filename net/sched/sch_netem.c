@@ -167,7 +167,7 @@ static int netem_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 	if (count == 0) {
 		sch->qstats.drops++;
 		kfree_skb(skb);
-		return NET_XMIT_DROP;
+		return NET_XMIT_BYPASS;
 	}
 
 	/*
@@ -252,9 +252,9 @@ static int netem_requeue(struct sk_buff *skb, struct Qdisc *sch)
 static unsigned int netem_drop(struct Qdisc* sch)
 {
 	struct netem_sched_data *q = qdisc_priv(sch);
-	unsigned int len;
+	unsigned int len = 0;
 
-	if ((len = q->qdisc->ops->drop(q->qdisc)) != 0) {
+	if (q->qdisc->ops->drop && (len = q->qdisc->ops->drop(q->qdisc)) != 0) {
 		sch->q.qlen--;
 		sch->qstats.drops++;
 	}

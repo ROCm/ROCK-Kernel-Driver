@@ -120,18 +120,17 @@ dma_set_mask(struct device *dev, u64 mask)
 	return 0;
 }
 
+#ifdef __i386__
 static inline int
 dma_get_cache_alignment(void)
 {
-#ifdef __i386__
 	/* no easy way to get cache size on all x86, so return the
 	 * maximum possible, to be safe */
 	return (1 << INTERNODE_CACHE_SHIFT);
-#else
-	/* same for gart, swiotlb, and nommu */
-	return boot_cpu_data.x86_clflush_size;
-#endif
 }
+#else
+extern int dma_get_cache_alignment(void);
+#endif
 
 #define dma_is_consistent(d)	(1)
 

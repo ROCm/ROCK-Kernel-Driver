@@ -61,6 +61,7 @@ static struct usb_device_id id_table [] = {
 	{ USB_DEVICE(ELCOM_VENDOR_ID, ELCOM_PRODUCT_ID) },
 	{ USB_DEVICE(ELCOM_VENDOR_ID, ELCOM_PRODUCT_ID_UCSGT) },
 	{ USB_DEVICE(ITEGNO_VENDOR_ID, ITEGNO_PRODUCT_ID) },
+	{ USB_DEVICE(ITEGNO_VENDOR_ID, ITEGNO_PRODUCT_ID_2080) },
 	{ USB_DEVICE(MA620_VENDOR_ID, MA620_PRODUCT_ID) },
 	{ USB_DEVICE(RATOC_VENDOR_ID, RATOC_PRODUCT_ID) },
 	{ USB_DEVICE(TRIPP_VENDOR_ID, TRIPP_PRODUCT_ID) },
@@ -78,6 +79,7 @@ static struct usb_device_id id_table [] = {
 	{ USB_DEVICE(SAGEM_VENDOR_ID, SAGEM_PRODUCT_ID) },
 	{ USB_DEVICE(LEADTEK_VENDOR_ID, LEADTEK_9531_PRODUCT_ID) },
 	{ USB_DEVICE(SPEEDDRAGON_VENDOR_ID, SPEEDDRAGON_PRODUCT_ID) },
+	{ USB_DEVICE(OTI_VENDOR_ID, OTI_PRODUCT_ID) },
 	{ }					/* Terminating entry */
 };
 
@@ -219,10 +221,9 @@ static int pl2303_startup (struct usb_serial *serial)
 	dbg("device type: %d", type);
 
 	for (i = 0; i < serial->num_ports; ++i) {
-		priv = kmalloc (sizeof (struct pl2303_private), GFP_KERNEL);
+		priv = kzalloc(sizeof(struct pl2303_private), GFP_KERNEL);
 		if (!priv)
 			goto cleanup;
-		memset (priv, 0x00, sizeof (struct pl2303_private));
 		spin_lock_init(&priv->lock);
 		priv->buf = pl2303_buf_alloc(PL2303_BUF_SIZE);
 		if (priv->buf == NULL) {
@@ -384,12 +385,11 @@ static void pl2303_set_termios (struct usb_serial_port *port, struct termios *ol
 		}
 	}
 
-	buf = kmalloc (7, GFP_KERNEL);
+	buf = kzalloc (7, GFP_KERNEL);
 	if (!buf) {
 		dev_err(&port->dev, "%s - out of memory.\n", __FUNCTION__);
 		return;
 	}
-	memset (buf, 0x00, 0x07);
 	
 	i = usb_control_msg (serial->dev, usb_rcvctrlpipe (serial->dev, 0),
 			     GET_LINE_REQUEST, GET_LINE_REQUEST_TYPE,

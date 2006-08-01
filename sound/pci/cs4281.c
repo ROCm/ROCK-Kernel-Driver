@@ -494,7 +494,7 @@ struct cs4281 {
 
 static irqreturn_t snd_cs4281_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 
-static struct pci_device_id snd_cs4281_ids[] = {
+static struct pci_device_id snd_cs4281_ids[] __devinitdata = {
 	{ 0x1013, 0x6005, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },	/* CS4281 */
 	{ 0, }
 };
@@ -1046,7 +1046,7 @@ static int snd_cs4281_put_volume(struct snd_kcontrol *kcontrol,
 		snd_cs4281_pokeBA0(chip, regL, volL);
 		change = 1;
 	}
-	if (ucontrol->value.integer.value[0] != volL) {
+	if (ucontrol->value.integer.value[1] != volR) {
 		volR = CS_VOL_MASK - (ucontrol->value.integer.value[1] & CS_VOL_MASK);
 		snd_cs4281_pokeBA0(chip, regR, volR);
 		change = 1;

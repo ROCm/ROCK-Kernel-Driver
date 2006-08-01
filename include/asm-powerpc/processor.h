@@ -22,22 +22,6 @@
  * -- BenH.
  */
 
-/* Platforms codes (to be obsoleted) */
-#define PLATFORM_PSERIES	0x0100
-#define PLATFORM_PSERIES_LPAR	0x0101
-#define PLATFORM_ISERIES_LPAR	0x0201
-#define PLATFORM_LPAR		0x0001
-#define PLATFORM_POWERMAC	0x0400
-#define PLATFORM_MAPLE		0x0500
-#define PLATFORM_PREP		0x0600
-#define PLATFORM_CHRP		0x0700
-#define PLATFORM_CELL		0x1000
-
-/* Compat platform codes for 32 bits */
-#define _MACH_prep	PLATFORM_PREP
-#define _MACH_Pmac	PLATFORM_POWERMAC
-#define _MACH_chrp	PLATFORM_CHRP
-
 /* PREP sub-platform types see residual.h for these */
 #define _PREP_Motorola	0x01	/* motorola prep */
 #define _PREP_Firm	0x02	/* firmworks prep */
@@ -49,19 +33,14 @@
 #define _CHRP_IBM	0x05	/* IBM chrp, the longtrail and longtrail 2 */
 #define _CHRP_Pegasos	0x06	/* Genesi/bplan's Pegasos and Pegasos2 */
 
-#ifdef __KERNEL__
-#define platform_is_pseries()	(_machine == PLATFORM_PSERIES || \
-				 _machine == PLATFORM_PSERIES_LPAR)
-#define platform_is_lpar()	(!!(_machine & PLATFORM_LPAR))
+#if defined(__KERNEL__) && defined(CONFIG_PPC32)
 
-#if defined(CONFIG_PPC_MULTIPLATFORM)
-extern int _machine;
+extern int _chrp_type;
 
-#ifdef CONFIG_PPC32
+#ifdef CONFIG_PPC_PREP
 
 /* what kind of prep workstation we are */
 extern int _prep_type;
-extern int _chrp_type;
 
 /*
  * This is used to identify the board type from a given PReP board
@@ -71,17 +50,14 @@ extern int _chrp_type;
 extern unsigned char ucBoardRev;
 extern unsigned char ucBoardRevMaj, ucBoardRevMin;
 
-#endif /* CONFIG_PPC32 */
+#endif /* CONFIG_PPC_PREP */
 
-#elif defined(CONFIG_PPC_ISERIES)
-/*
- * iSeries is soon to become MULTIPLATFORM hopefully ...
- */
-#define _machine PLATFORM_ISERIES_LPAR
-#else
+#ifndef CONFIG_PPC_MULTIPLATFORM
 #define _machine 0
 #endif /* CONFIG_PPC_MULTIPLATFORM */
-#endif /* __KERNEL__ */
+
+#endif /* defined(__KERNEL__) && defined(CONFIG_PPC32) */
+
 /*
  * Default implementation of macro that returns current
  * instruction pointer ("program counter").
@@ -139,11 +115,8 @@ extern struct task_struct *last_task_used_spe;
 
 /* This decides where the kernel will search for a free chunk of vm
  * space during mmap's.
- *
- * /proc/pid/unmap_base is only supported for 32bit processes for now.
  */
-#define __TASK_UNMAPPED_BASE (PAGE_ALIGN(TASK_SIZE_USER32 / 4))
-#define TASK_UNMAPPED_BASE_USER32 (PAGE_ALIGN(current->map_base))
+#define TASK_UNMAPPED_BASE_USER32 (PAGE_ALIGN(TASK_SIZE_USER32 / 4))
 #define TASK_UNMAPPED_BASE_USER64 (PAGE_ALIGN(TASK_SIZE_USER64 / 4))
 
 #define TASK_UNMAPPED_BASE ((test_thread_flag(TIF_32BIT)) ? \

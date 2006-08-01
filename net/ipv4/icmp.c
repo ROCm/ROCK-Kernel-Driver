@@ -753,7 +753,7 @@ static void icmp_redirect(struct sk_buff *skb)
 	case ICMP_REDIR_HOST:
 	case ICMP_REDIR_HOSTTOS:
 		ip_rt_redirect(skb->nh.iph->saddr, ip, skb->h.icmph->un.gateway,
-			       iph->saddr, iph->tos, skb->dev);
+			       iph->saddr, skb->dev);
 		break;
   	}
 out:
@@ -1107,7 +1107,7 @@ void __init icmp_init(struct net_proto_family *ops)
 	struct inet_sock *inet;
 	int i;
 
-	for_each_cpu(i) {
+	for_each_possible_cpu(i) {
 		int err;
 
 		err = sock_create_kern(PF_INET, SOCK_RAW, IPPROTO_ICMP,

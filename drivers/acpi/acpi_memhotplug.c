@@ -110,32 +110,6 @@ acpi_memory_get_device_resources(struct acpi_memory_device *mem_device)
 	return_VALUE(0);
 }
 
-static int 
-acpi_memory_get_current_resource(acpi_handle handle, struct acpi_memory_device **return_device) {
-	
-	int result;
-	struct acpi_memory_device *mem_device;
-
-	ACPI_FUNCTION_TRACE("acpi_memory_get_current_resource");
-	
-	mem_device = kmalloc(sizeof(struct acpi_memory_device), GFP_KERNEL);
-	if (!mem_device)
-		return_VALUE(-ENOMEM);
-	memset(mem_device,0, sizeof(struct acpi_memory_device));
-
-	mem_device->handle = handle;
-	result = acpi_memory_get_device_resources(mem_device);
-	if (result) {
-		kfree(mem_device);
-		return_VALUE(result);
-	}
-	mem_device->state = MEMORY_POWER_ON_STATE;
-	*return_device = mem_device;
-	
-	return_VALUE(result);
-}
-
-
 static int
 acpi_memory_get_device(acpi_handle handle,
 		       struct acpi_memory_device **mem_device)
@@ -144,7 +118,6 @@ acpi_memory_get_device(acpi_handle handle,
 	acpi_handle phandle;
 	struct acpi_device *device = NULL;
 	struct acpi_device *pdevice = NULL;
-	int result;
 
 	ACPI_FUNCTION_TRACE("acpi_memory_get_device");
 
@@ -173,17 +146,14 @@ acpi_memory_get_device(acpi_handle handle,
 		ACPI_EXCEPTION((AE_INFO, status, "Cannot add acpi bus"));
 		return_VALUE(-EINVAL);
 	}
+
       end:
 	*mem_device = acpi_driver_data(device);
-
 	if (!(*mem_device)) {
-		/* Try and get the memory_device from the current handle */
-		result = acpi_memory_get_current_resource(handle,mem_device);
-		if (result) {
-			printk(KERN_ERR "\nThere is no data for this memory device\n");
-			return_VALUE(-EINVAL);
-		}
+		printk(KERN_ERR "\n driver data not found");
+		return_VALUE(-ENODEV);
 	}
+
 	return_VALUE(0);
 }
 
@@ -455,6 +425,7 @@ acpi_memory_register_notify_handler(acpi_handle handle,
 
 	status = is_memory_device(handle);
 	if (ACPI_FAILURE(status)){
+		ACPI_EXCEPTION((AE_INFO, status, "handle is no memory device"));
 		return_ACPI_STATUS(AE_OK);	/* continue */
 	}
 
@@ -474,6 +445,7 @@ acpi_memory_deregister_notify_handler(acpi_handle handle,
 
 	status = is_memory_device(handle);
 	if (ACPI_FAILURE(status)){
+		ACPI_EXCEPTION((AE_INFO, status, "handle is no memory device"));
 		return_ACPI_STATUS(AE_OK);	/* continue */
 	}
 

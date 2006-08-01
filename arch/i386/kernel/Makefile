@@ -6,8 +6,8 @@ extra-y := head.o init_task.o vmlinux.lds
 
 obj-y	:= process.o semaphore.o signal.o entry.o traps.o irq.o \
 		ptrace.o time.o ioport.o ldt.o setup.o i8259.o sys_i386.o \
-		pci-dma.o i386_ksyms.o i387.o dmi_scan.o bootflag.o \
-		quirks.o i8237.o topology.o
+		pci-dma.o i386_ksyms.o i387.o bootflag.o \
+		quirks.o i8237.o topology.o alternative.o
 
 obj-y				+= cpu/
 obj-y				+= timers/
@@ -37,26 +37,17 @@ obj-$(CONFIG_EFI) 		+= efi.o efi_stub.o
 obj-$(CONFIG_DOUBLEFAULT) 	+= doublefault.o
 obj-$(CONFIG_VM86)		+= vm86.o
 obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
-obj-$(CONFIG_SMP_ALTERNATIVES)	+= smpalts.o
 
 EXTRA_AFLAGS   := -traditional
 
 obj-$(CONFIG_SCx200)		+= scx200.o
 
-ifdef CONFIG_XEN
-vsyscall_note := vsyscall-note-xen.o
-else
-vsyscall_note := vsyscall-note.o
-endif
-
-VSYSCALL_TYPES-y			:= int80
-VSYSCALL_TYPES-$(CONFIG_X86_SYSENTER)	+= sysenter
 # vsyscall.o contains the vsyscall DSO images as __initdata.
 # We must build both images before we can assemble it.
 # Note: kbuild does not track this dependency due to usage of .incbin
-$(obj)/vsyscall.o: $(foreach F,$(VSYSCALL_TYPES-y),$(obj)/vsyscall-$F.so)
-targets += $(foreach F,$(VSYSCALL_TYPES-y),vsyscall-$F.o vsyscall-$F.so)
-targets += $(vsyscall_note) vsyscall.lds
+$(obj)/vsyscall.o: $(obj)/vsyscall-int80.so $(obj)/vsyscall-sysenter.so
+targets += $(foreach F,int80 sysenter,vsyscall-$F.o vsyscall-$F.so)
+targets += vsyscall-note.o vsyscall.lds
 
 # The DSO images are built using a special linker script.
 quiet_cmd_syscall = SYSCALL $@
@@ -71,7 +62,7 @@ SYSCFLAGS_vsyscall-int80.so	= $(vsyscall-flags)
 
 $(obj)/vsyscall-int80.so $(obj)/vsyscall-sysenter.so: \
 $(obj)/vsyscall-%.so: $(src)/vsyscall.lds \
-		      $(obj)/vsyscall-%.o $(obj)/$(vsyscall_note) FORCE
+		      $(obj)/vsyscall-%.o $(obj)/vsyscall-note.o FORCE
 	$(call if_changed,syscall)
 
 # We also create a special relocatable object that should mirror the symbol
@@ -83,18 +74,5 @@ $(obj)/built-in.o: ld_flags += -R $(obj)/vsyscall-syms.o
 
 SYSCFLAGS_vsyscall-syms.o = -r
 $(obj)/vsyscall-syms.o: $(src)/vsyscall.lds \
-			$(obj)/vsyscall-$(if $(CONFIG_X86_SYSENTER),sysenter,int80).o \
-			$(obj)/$(vsyscall_note) FORCE
+			$(obj)/vsyscall-sysenter.o $(obj)/vsyscall-note.o FORCE
 	$(call if_changed,syscall)
-
-ifdef CONFIG_XEN
-include $(srctree)/scripts/Makefile.xen
-
-obj-y += fixup.o
-microcode-$(subst m,y,$(CONFIG_MICROCODE)) := microcode-xen.o
-n-obj-xen := i8259.o timers/ reboot.o smpboot.o trampoline.o
-
-obj-y := $(call filterxen, $(obj-y), $(n-obj-xen))
-obj-y := $(call cherrypickxen, $(obj-y))
-extra-y := $(call cherrypickxen, $(extra-y))
-endif

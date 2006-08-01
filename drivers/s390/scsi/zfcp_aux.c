@@ -43,6 +43,13 @@ static int __init  zfcp_module_init(void);
 static void zfcp_ns_gid_pn_handler(unsigned long);
 
 /* miscellaneous */
+static inline int zfcp_sg_list_alloc(struct zfcp_sg_list *, size_t);
+static inline void zfcp_sg_list_free(struct zfcp_sg_list *);
+static inline int zfcp_sg_list_copy_from_user(struct zfcp_sg_list *,
+					      void __user *, size_t);
+static inline int zfcp_sg_list_copy_to_user(void __user *,
+					    struct zfcp_sg_list *, size_t);
+
 static long zfcp_cfdc_dev_ioctl(struct file *, unsigned int, unsigned long);
 
 #define ZFCP_CFDC_IOC_MAGIC                     0xDD
@@ -222,8 +229,6 @@ zfcp_module_init(void)
 
 	ZFCP_LOG_TRACE("major/minor for zfcp_cfdc: %d/%d\n",
 		       ZFCP_CFDC_DEV_MAJOR, zfcp_cfdc_misc.minor);
-
-	init_waitqueue_head(&zfcp_callbacks.wq);
 
 	/* Initialise proc semaphores */
 	sema_init(&zfcp_data.config_sema, 1);
@@ -460,7 +465,7 @@ zfcp_cfdc_dev_ioctl(struct file *file, unsigned int command,
  * elements of the scatter-gather list. The maximum size of a single element
  * in the scatter-gather list is PAGE_SIZE.
  */
-int
+static inline int
 zfcp_sg_list_alloc(struct zfcp_sg_list *sg_list, size_t size)
 {
 	struct scatterlist *sg;
@@ -508,7 +513,7 @@ zfcp_sg_list_alloc(struct zfcp_sg_list *sg_list, size_t size)
  * Memory for each element in the scatter-gather list is freed.
  * Finally sg_list->sg is freed itself and sg_list->count is reset.
  */
-void
+static inline void
 zfcp_sg_list_free(struct zfcp_sg_list *sg_list)
 {
 	struct scatterlist *sg;
@@ -553,7 +558,7 @@ zfcp_sg_size(struct scatterlist *sg, unsigned int sg_count)
  * @size: number of bytes to be copied
  * Return: 0 on success, -EFAULT if copy_from_user fails.
  */
-int
+static inline int
 zfcp_sg_list_copy_from_user(struct zfcp_sg_list *sg_list,
 			    void __user *user_buffer,
                             size_t size)
@@ -591,7 +596,7 @@ zfcp_sg_list_copy_from_user(struct zfcp_sg_list *sg_list,
  * @size: number of bytes to be copied
  * Return: 0 on success, -EFAULT if copy_to_user fails
  */
-int
+static inline int
 zfcp_sg_list_copy_to_user(void __user  *user_buffer,
 			  struct zfcp_sg_list *sg_list,
                           size_t size)
@@ -771,20 +776,15 @@ zfcp_unit_enqueue(struct zfcp_port *port, fcp_lun_t fcp_lun)
 	unit->sysfs_device.release = zfcp_sysfs_unit_release;
 	dev_set_drvdata(&unit->sysfs_device, unit);
 
-	if (zfcp_unit_statistic_register(unit))
-		return NULL;
-
 	/* mark unit unusable as long as sysfs registration is not complete */
 	atomic_set_mask(ZFCP_STATUS_COMMON_REMOVE, &unit->status);
 
 	if (device_register(&unit->sysfs_device)) {
-		zfcp_unit_statistic_unregister(unit);
 		kfree(unit);
 		return NULL;
 	}
 
 	if (zfcp_sysfs_unit_create_files(&unit->sysfs_device)) {
-		zfcp_unit_statistic_unregister(unit);
 		device_unregister(&unit->sysfs_device);
 		return NULL;
 	}
@@ -824,32 +824,9 @@ zfcp_unit_dequeue(struct zfcp_unit *unit)
 	list_del(&unit->list);
 	write_unlock_irq(&zfcp_data.config_lock);
 	unit->port->units--;
-	zfcp_unit_statistic_unregister(unit);
 	zfcp_port_put(unit->port);
 	zfcp_sysfs_unit_remove_files(&unit->sysfs_device);
 	device_unregister(&unit->sysfs_device);
-}
-
-static void *
-zfcp_mempool_alloc(gfp_t gfp_mask, void *size)
-{
-	return kmalloc((size_t) size, gfp_mask);
-}
-
-static void *
-zfcp_mempool_alloc_fsf_req_scsi(unsigned int __nocast gfp_mask, void *data)
-{
-	struct zfcp_adapter *adapter = (struct zfcp_adapter *)data;
-	void *ptr = kmalloc(sizeof(struct zfcp_fsf_req_pool_element), gfp_mask);
-	if (!ptr)
-		statistic_inc(adapter->stat_low_mem_scsi, 0);
-	return ptr;
-}
-
-static void
-zfcp_mempool_free(void *element, void *size)
-{
-	kfree(element);
 }
 
 /*
@@ -864,51 +841,39 @@ static int
 zfcp_allocate_low_mem_buffers(struct zfcp_adapter *adapter)
 {
 	adapter->pool.fsf_req_erp =
-		mempool_create(ZFCP_POOL_FSF_REQ_ERP_NR,
-			       zfcp_mempool_alloc, zfcp_mempool_free, (void *)
-			       sizeof(struct zfcp_fsf_req_pool_element));
-
-	if (NULL == adapter->pool.fsf_req_erp)
+		mempool_create_kmalloc_pool(ZFCP_POOL_FSF_REQ_ERP_NR,
+				sizeof(struct zfcp_fsf_req_pool_element));
+	if (!adapter->pool.fsf_req_erp)
 		return -ENOMEM;
 
 	adapter->pool.fsf_req_scsi =
-		mempool_create(ZFCP_POOL_FSF_REQ_SCSI_NR,
-			       zfcp_mempool_alloc_fsf_req_scsi,
-			       zfcp_mempool_free, (void *)adapter);
-
-	if (NULL == adapter->pool.fsf_req_scsi)
+		mempool_create_kmalloc_pool(ZFCP_POOL_FSF_REQ_SCSI_NR,
+				sizeof(struct zfcp_fsf_req_pool_element));
+	if (!adapter->pool.fsf_req_scsi)
 		return -ENOMEM;
 
 	adapter->pool.fsf_req_abort =
-		mempool_create(ZFCP_POOL_FSF_REQ_ABORT_NR,
-			       zfcp_mempool_alloc, zfcp_mempool_free, (void *)
-			       sizeof(struct zfcp_fsf_req_pool_element));
-
-	if (NULL == adapter->pool.fsf_req_abort)
+		mempool_create_kmalloc_pool(ZFCP_POOL_FSF_REQ_ABORT_NR,
+				sizeof(struct zfcp_fsf_req_pool_element));
+	if (!adapter->pool.fsf_req_abort)
 		return -ENOMEM;
 
 	adapter->pool.fsf_req_status_read =
-		mempool_create(ZFCP_POOL_STATUS_READ_NR,
-			       zfcp_mempool_alloc, zfcp_mempool_free,
-			       (void *) sizeof(struct zfcp_fsf_req));
-
-	if (NULL == adapter->pool.fsf_req_status_read)
+		mempool_create_kmalloc_pool(ZFCP_POOL_STATUS_READ_NR,
+					    sizeof(struct zfcp_fsf_req));
+	if (!adapter->pool.fsf_req_status_read)
 		return -ENOMEM;
 
 	adapter->pool.data_status_read =
-		mempool_create(ZFCP_POOL_STATUS_READ_NR,
-			       zfcp_mempool_alloc, zfcp_mempool_free,
-			       (void *) sizeof(struct fsf_status_read_buffer));
-
-	if (NULL == adapter->pool.data_status_read)
+		mempool_create_kmalloc_pool(ZFCP_POOL_STATUS_READ_NR,
+					sizeof(struct fsf_status_read_buffer));
+	if (!adapter->pool.data_status_read)
 		return -ENOMEM;
 
 	adapter->pool.data_gid_pn =
-		mempool_create(ZFCP_POOL_DATA_GID_PN_NR,
-			       zfcp_mempool_alloc, zfcp_mempool_free, (void *)
-			       sizeof(struct zfcp_gid_pn_data));
-
-	if (NULL == adapter->pool.data_gid_pn)
+		mempool_create_kmalloc_pool(ZFCP_POOL_DATA_GID_PN_NR,
+					    sizeof(struct zfcp_gid_pn_data));
+	if (!adapter->pool.data_gid_pn)
 		return -ENOMEM;
 
 	return 0;
@@ -1257,8 +1222,6 @@ zfcp_port_enqueue(struct zfcp_adapter *adapter, wwn_t wwpn, u32 status,
 
 	zfcp_adapter_get(adapter);
 
-	zfcp_cb_port_add(port);
-
 	return port;
 }
 
@@ -1468,8 +1431,6 @@ zfcp_fsf_incoming_els(struct zfcp_fsf_req *fsf_req)
 		zfcp_fsf_incoming_els_rscn(adapter, status_buffer);
 	else
 		zfcp_fsf_incoming_els_unknown(adapter, status_buffer);
-
-	zfcp_cb_incoming_els(adapter, status_buffer->payload);
 }
 
 
@@ -1800,159 +1761,3 @@ zfcp_handle_els_rjt(u32 sq, struct zfcp_ls_rjt_par *rjt_par)
 }
 
 #undef ZFCP_LOG_AREA
-
-/****************************************************************/
-/******* HBA API Support related Functions  *********************/
-/****************************************************************/
-#define ZFCP_LOG_AREA                   ZFCP_LOG_AREA_FC
-
-struct zfcp_callbacks zfcp_callbacks = { };
-
-/**
- * zfcp_register_callbacks - register callbacks for event handling in HBA API
- * @callbacks: set of callback functions to be registered
- */
-void
-zfcp_register_callbacks(struct zfcp_callbacks *callbacks)
-{
-	zfcp_callbacks.incoming_els = callbacks->incoming_els;
-	zfcp_callbacks.link_down = callbacks->link_down;
-	zfcp_callbacks.link_up = callbacks->link_up;
-	zfcp_callbacks.adapter_add = callbacks->adapter_add;
-	zfcp_callbacks.port_add = callbacks->port_add;
-	zfcp_callbacks.unit_add = callbacks->unit_add;
-}
-
-/**
- * zfcp_unregister_callbacks - deregister callbacks for event handling
- */
-void
-zfcp_unregister_callbacks(void)
-{
-	zfcp_callbacks.incoming_els = NULL;
-	zfcp_callbacks.link_down = NULL;
-	zfcp_callbacks.link_up = NULL;
-	zfcp_callbacks.adapter_add = NULL;
-	zfcp_callbacks.port_add = NULL;
-	zfcp_callbacks.unit_add = NULL;
-
-	/* wait until all callbacks returned */
-	wait_event(zfcp_callbacks.wq,
-		   atomic_read(&zfcp_callbacks.refcount) == 0);
-}
-
-/**
- * zfcp_cb_incoming_els - make callback for incoming els
- * @adpater: adapter where ELS was received
- * @payload: received ELS payload
- */
-void
-zfcp_cb_incoming_els(struct zfcp_adapter *adapter, void *payload)
-{
-	zfcp_cb_incoming_els_t cb;
-
-	atomic_inc(&zfcp_callbacks.refcount);
-	cb = zfcp_callbacks.incoming_els;
-	if (cb)
-		cb(adapter, payload);
-	if (atomic_dec_return(&zfcp_callbacks.refcount) == 0)
-		wake_up(&zfcp_callbacks.wq);
-}
-
-/**
- * zfcp_cb_link_down - make callback for link down event
- * @adapter: adapter where link down occurred
- */
-void
-zfcp_cb_link_down(struct zfcp_adapter *adapter)
-{
-	zfcp_cb_link_down_t cb;
-	atomic_inc(&zfcp_callbacks.refcount);
-	cb = zfcp_callbacks.link_down;
-	if (cb)
-		cb(adapter);
-	if (atomic_dec_return(&zfcp_callbacks.refcount) == 0)
-		wake_up(&zfcp_callbacks.wq);
-}
-
-/**
- * zfcp_cb_link_up - make callback for link up event
- * @adapter: adapter where link up occurred
- */
-void
-zfcp_cb_link_up(struct zfcp_adapter *adapter)
-{
-	zfcp_cb_link_up_t cb;
-	atomic_inc(&zfcp_callbacks.refcount);
-	cb = zfcp_callbacks.link_up;
-	if (cb)
-		cb(adapter);
-	if (atomic_dec_return(&zfcp_callbacks.refcount) == 0)
-		wake_up(&zfcp_callbacks.wq);
-}
-
-/**
- * zfcp_cb_adapter_add - make callback for adapter add event
- * @adapter: adapter which was added/activated
- */
-void
-zfcp_cb_adapter_add(struct zfcp_adapter *adapter)
-{
-	zfcp_cb_adapter_add_t cb;
-	atomic_inc(&zfcp_callbacks.refcount);
-	cb = zfcp_callbacks.adapter_add;
-	if (cb)
-		cb(adapter);
-	if (atomic_dec_return(&zfcp_callbacks.refcount) == 0)
-		wake_up(&zfcp_callbacks.wq);
-}
-
-/**
- * zfcp_cb_port_add - make callback for port add event
- * @port: port which was added
- */
-void
-zfcp_cb_port_add(struct zfcp_port *port)
-{
-	zfcp_cb_port_add_t cb;
-	atomic_inc(&zfcp_callbacks.refcount);
-	cb = zfcp_callbacks.port_add;
-	if (cb)
-		cb(port);
-	if (atomic_dec_return(&zfcp_callbacks.refcount) == 0)
-		wake_up(&zfcp_callbacks.wq);
-}
-
-/**
- * zfcp_cb_unit_add - make callback for unit add event
- * @unit: unit which was added
- */
-void
-zfcp_cb_unit_add(struct zfcp_unit *unit)
-{
-	zfcp_cb_unit_add_t cb;
-	atomic_inc(&zfcp_callbacks.refcount);
-	cb = zfcp_callbacks.unit_add;
-	if (cb)
-		cb(unit);
-	if (atomic_dec_return(&zfcp_callbacks.refcount) == 0)
-		wake_up(&zfcp_callbacks.wq);
-}
-
-#undef ZFCP_LOG_AREA
-
-EXPORT_SYMBOL(zfcp_sg_list_alloc);
-EXPORT_SYMBOL(zfcp_sg_list_free);
-EXPORT_SYMBOL(zfcp_sg_size);
-EXPORT_SYMBOL(zfcp_sg_list_copy_from_user);
-EXPORT_SYMBOL(zfcp_sg_list_copy_to_user);
-EXPORT_SYMBOL(zfcp_get_unit_by_lun);
-EXPORT_SYMBOL(zfcp_get_port_by_wwpn);
-EXPORT_SYMBOL(zfcp_get_port_by_did);
-EXPORT_SYMBOL(zfcp_get_adapter_by_busid);
-EXPORT_SYMBOL(zfcp_register_callbacks);
-EXPORT_SYMBOL(zfcp_unregister_callbacks);
-EXPORT_SYMBOL(zfcp_port_enqueue);
-EXPORT_SYMBOL(zfcp_unit_enqueue);
-EXPORT_SYMBOL(zfcp_unit_dequeue);
-EXPORT_SYMBOL(zfcp_check_ct_response);

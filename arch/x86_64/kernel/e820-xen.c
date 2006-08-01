@@ -33,10 +33,9 @@ unsigned long pci_mem_start = 0xaeedbabe;
  */
 unsigned long end_pfn; 
 EXPORT_SYMBOL(end_pfn);
-static unsigned long __initdata end_user_pfn;
+unsigned long end_user_pfn = MAXMEM>>PAGE_SHIFT;  
 unsigned long end_pfn_map; 
 
-#ifndef CONFIG_XEN
 /* 
  * Add a memory region to the kernel e820 map.
  */ 
@@ -54,6 +53,8 @@ void __init add_memory_region(unsigned long start, unsigned long size, int type)
 	e820.map[x].type = type;
 	e820.nr_map++;
 }
+
+#ifndef CONFIG_XEN
 
 /* 
  * end_pfn only includes RAM, while end_pfn_map includes all e820 entries.
@@ -102,11 +103,7 @@ static inline int bad_addr(unsigned long *addrp, unsigned long size)
 	return 0;
 } 
 
-/*
- * This function checks if any part of the range <start,end> is mapped
- * with type.
- */
-int __meminit e820_any_mapped(unsigned long start, unsigned long end, unsigned type)
+int __init e820_mapped(unsigned long start, unsigned long end, unsigned type) 
 { 
 	int i;
 	for (i = 0; i < e820.nr_map; i++) { 
@@ -117,35 +114,6 @@ int __meminit e820_any_mapped(unsigned long start, unsigned long end, unsigned t
 			continue; 
 		return 1; 
 	} 
-	return 0;
-}
-
-/*
- * This function checks if the entire range <start,end> is mapped with type.
- *
- * Note: this function only works correct if the e820 table is sorted and
- * not-overlapping, which is the case
- */
-int __init e820_all_mapped(unsigned long start, unsigned long end, unsigned type)
-{
-	int i;
-	for (i = 0; i < e820.nr_map; i++) {
-		struct e820entry *ei = &e820.map[i];
-		if (type && ei->type != type)
-			continue;
-		/* is the region (part) in overlap with the current region ?*/
-		if (ei->addr >= end || ei->addr + ei->size <= start)
-			continue;
-
-		/* if the region is at the beginning of <start,end> we move
-		 * start to the end of the region since it's ok until there
-		 */
-		if (ei->addr <= start)
-			start = ei->addr + ei->size;
-		/* if start is now at or beyond end, we're done, full coverage */
-		if (start >= end)
-			return 1; /* we're done */
-	}
 	return 0;
 }
 
@@ -308,50 +276,8 @@ void __init e820_reserve_resources(void)
 		}
 	}
 }
-#else
-int __init e820_all_mapped(unsigned long start, unsigned long end, unsigned type)
-{
-	dom0_op_t op;
-	dom0_memory_map_entry_t *map;
-	unsigned i;
-
-	for (i = 1; ; ++i) {
-		map = vmalloc(i * PAGE_SIZE);
-		if(!map)
-			return 0;
-		memset(map, 0, i * PAGE_SIZE);
-		op.cmd = DOM0_PHYSICAL_MEMORY_MAP;
-		op.u.physical_memory_map.max_map_entries = (i * PAGE_SIZE) / sizeof(*map);
-		op.u.physical_memory_map.memory_map = map;
-		if (HYPERVISOR_dom0_op(&op) < 0) {
-			vfree(map);
-			return 0;
-		}
-		if (op.u.physical_memory_map.nr_map_entries < op.u.physical_memory_map.max_map_entries)
-			break;
-	}
-
-	for (i = 0; i < op.u.physical_memory_map.nr_map_entries && start < end; i++) {
-		const dom0_memory_map_entry_t *ei = map + i;
-
-		if (type && !ei->is_ram == (type == E820_RAM))
-			continue;
-		/* is the region (part) in overlap with the current region ?*/
-		if (ei->start >= end || ei->end <= start)
-			continue;
-		/* if the region is at the beginning of <start,end> we move
-		 * start to the end of the region since it's ok until there
-		 */
-		if (ei->start <= start)
-			start = ei->end;
-	}
-
-	vfree(map);
-	return start >= end;
-}
 #endif /* CONFIG_XEN */
 
-#ifndef CONFIG_XEN
 void __init e820_print_map(char *who)
 {
 	int i;
@@ -378,6 +304,7 @@ void __init e820_print_map(char *who)
 	}
 }
 
+#ifndef CONFIG_XEN
 /*
  * Sanitize the BIOS e820 map.
  *
@@ -635,18 +562,19 @@ void __init setup_memory_region(void)
 
 #else  /* CONFIG_XEN */
 
+extern unsigned long xen_override_max_pfn;
 extern union xen_start_info_union xen_start_info_union;
 
 unsigned long __init e820_end_of_ram(void)
 {
 	unsigned long max_end_pfn;
 
-	if (end_user_pfn == 0) {
+	if (xen_override_max_pfn == 0) {
 		max_end_pfn = xen_start_info->nr_pages;
 		/* Default 8MB slack (to balance backend allocations). */
 		max_end_pfn += 8 << (20 - PAGE_SHIFT);
-	} else if (end_user_pfn > xen_start_info->nr_pages) {
-		max_end_pfn = end_user_pfn;
+	} else if (xen_override_max_pfn > xen_start_info->nr_pages) {
+		max_end_pfn = xen_override_max_pfn;
 	} else {
 		max_end_pfn = xen_start_info->nr_pages;
 	}
@@ -731,9 +659,9 @@ void __init parse_memopt(char *p, char **from)
 { 
 	end_user_pfn = memparse(p, from);
 	end_user_pfn >>= PAGE_SHIFT;	
+	xen_override_max_pfn = (unsigned long) end_user_pfn;
 } 
 
-#ifndef CONFIG_XEN
 void __init parse_memmapopt(char *p, char **from)
 {
 	unsigned long long start_at, mem_size;
@@ -754,7 +682,6 @@ void __init parse_memmapopt(char *p, char **from)
 	}
 	p = *from;
 }
-#endif
 
 /*
  * Search for the biggest gap in the low 32 bits of the e820

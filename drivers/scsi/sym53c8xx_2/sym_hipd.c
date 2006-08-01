@@ -40,7 +40,6 @@
 
 #include <linux/slab.h>
 #include <asm/param.h>		/* for timeouts in units of HZ */
-#include <scsi/scsi_dbg.h>
 
 #include "sym_glue.h"
 #include "sym_nvram.h"
@@ -73,7 +72,10 @@ static void sym_printl_hex(u_char *p, int n)
 
 static void sym_print_msg(struct sym_ccb *cp, char *label, u_char *msg)
 {
-	sym_print_addr(cp->cmd, "%s: ", label);
+	if (label)
+		sym_print_addr(cp->cmd, "%s: ", label);
+	else
+		sym_print_addr(cp->cmd, "");
 
 	spi_print_msg(msg);
 	printf("\n");
@@ -473,7 +475,7 @@ static int sym_getpciclock (struct sym_hcb *np)
  *  calculations more simple.
  */
 #define _5M 5000000
-static u32 div_10M[] = {2*_5M, 3*_5M, 4*_5M, 6*_5M, 8*_5M, 12*_5M, 16*_5M};
+static const u32 div_10M[] = {2*_5M, 3*_5M, 4*_5M, 6*_5M, 8*_5M, 12*_5M, 16*_5M};
 
 /*
  *  Get clock factor and sync divisor for a given 
@@ -646,6 +648,37 @@ static void sym_save_initial_setting (struct sym_hcb *np)
 }
 
 /*
+ *  Set SCSI BUS mode.
+ *  - LVD capable chips (895/895A/896/1010) report the current BUS mode
+ *    through the STEST4 IO register.
+ *  - For previous generation chips (825/825A/875), the user has to tell us
+ *    how to check against HVD, since a 100% safe algorithm is not possible.
+ */
+static void sym_set_bus_mode(struct sym_hcb *np, struct sym_nvram *nvram)
+{
+	if (np->scsi_mode)
+		return;
+
+	np->scsi_mode = SMODE_SE;
+	if (np->features & (FE_ULTRA2|FE_ULTRA3))
+		np->scsi_mode = (np->sv_stest4 & SMODE);
+	else if	(np->features & FE_DIFF) {
+		if (SYM_SETUP_SCSI_DIFF == 1) {
+			if (np->sv_scntl3) {
+				if (np->sv_stest2 & 0x20)
+					np->scsi_mode = SMODE_HVD;
+			} else if (nvram->type == SYM_SYMBIOS_NVRAM) {
+				if (!(INB(np, nc_gpreg) & 0x08))
+					np->scsi_mode = SMODE_HVD;
+			}
+		} else if (SYM_SETUP_SCSI_DIFF == 2)
+			np->scsi_mode = SMODE_HVD;
+	}
+	if (np->scsi_mode == SMODE_HVD)
+		np->rv_stest2 |= 0x20;
+}
+
+/*
  *  Prepare io register values used by sym_start_up() 
  *  according to selected and supported features.
  */
@@ -655,10 +688,7 @@ static int sym_prepare_setting(struct Scsi_Host *shost, struct sym_hcb *np, stru
 	u32	period;
 	int i;
 
-	/*
-	 *  Wide ?
-	 */
-	np->maxwide	= (np->features & FE_WIDE)? 1 : 0;
+	np->maxwide = (np->features & FE_WIDE) ? 1 : 0;
 
 	/*
 	 *  Guess the frequency of the chip's clock.
@@ -839,6 +869,7 @@ static int sym_prepare_setting(struct Scsi_Host *shost, struct sym_hcb *np, stru
 	 *  Get parity checking, host ID and verbose mode from NVRAM
 	 */
 	np->myaddr = 255;
+	np->scsi_mode = 0;
 	sym_nvram_setup_host(shost, np, nvram);
 
 	/*
@@ -855,33 +886,7 @@ static int sym_prepare_setting(struct Scsi_Host *shost, struct sym_hcb *np, stru
 	 */
 	sym_init_burst(np, burst_max);
 
-	/*
-	 *  Set SCSI BUS mode.
-	 *  - LVD capable chips (895/895A/896/1010) report the 
-	 *    current BUS mode through the STEST4 IO register.
-	 *  - For previous generation chips (825/825A/875), 
-	 *    user has to tell us how to check against HVD, 
-	 *    since a 100% safe algorithm is not possible.
-	 */
-	np->scsi_mode = SMODE_SE;
-	if (np->features & (FE_ULTRA2|FE_ULTRA3))
-		np->scsi_mode = (np->sv_stest4 & SMODE);
-	else if	(np->features & FE_DIFF) {
-		if (SYM_SETUP_SCSI_DIFF == 1) {
-			if (np->sv_scntl3) {
-				if (np->sv_stest2 & 0x20)
-					np->scsi_mode = SMODE_HVD;
-			}
-			else if (nvram->type == SYM_SYMBIOS_NVRAM) {
-				if (!(INB(np, nc_gpreg) & 0x08))
-					np->scsi_mode = SMODE_HVD;
-			}
-		}
-		else if	(SYM_SETUP_SCSI_DIFF == 2)
-			np->scsi_mode = SMODE_HVD;
-	}
-	if (np->scsi_mode == SMODE_HVD)
-		np->rv_stest2 |= 0x20;
+	sym_set_bus_mode(np, nvram);
 
 	/*
 	 *  Set LED support from SCRIPTS.
@@ -974,8 +979,8 @@ static int sym_prepare_setting(struct Scsi_Host *shost, struct sym_hcb *np, stru
  *
  *  Has to be called with interrupts disabled.
  */
-#ifndef CONFIG_SCSI_SYM53C8XX_IOMAPPED
-static int sym_regtest (struct sym_hcb *np)
+#ifdef CONFIG_SCSI_SYM53C8XX_MMIO
+static int sym_regtest(struct sym_hcb *np)
 {
 	register volatile u32 data;
 	/*
@@ -993,20 +998,25 @@ static int sym_regtest (struct sym_hcb *np)
 #endif
 		printf ("CACHE TEST FAILED: reg dstat-sstat2 readback %x.\n",
 			(unsigned) data);
-		return (0x10);
+		return 0x10;
 	}
-	return (0);
+	return 0;
+}
+#else
+static inline int sym_regtest(struct sym_hcb *np)
+{
+	return 0;
 }
 #endif
 
-static int sym_snooptest (struct sym_hcb *np)
+static int sym_snooptest(struct sym_hcb *np)
 {
-	u32	sym_rd, sym_wr, sym_bk, host_rd, host_wr, pc, dstat;
-	int	i, err=0;
-#ifndef CONFIG_SCSI_SYM53C8XX_IOMAPPED
-	err |= sym_regtest (np);
-	if (err) return (err);
-#endif
+	u32 sym_rd, sym_wr, sym_bk, host_rd, host_wr, pc, dstat;
+	int i, err;
+
+	err = sym_regtest(np);
+	if (err)
+		return err;
 restart_test:
 	/*
 	 *  Enable Master Parity Checking as we intend 
@@ -1095,7 +1105,7 @@ restart_test:
 		err |= 4;
 	}
 
-	return (err);
+	return err;
 }
 
 /*
@@ -1432,29 +1442,18 @@ static int sym_prepare_nego(struct sym_hcb *np, struct sym_ccb *cp, u_char *msgp
 
 	switch (nego) {
 	case NS_SYNC:
-		msgptr[msglen++] = M_EXTENDED;
-		msgptr[msglen++] = 3;
-		msgptr[msglen++] = M_X_SYNC_REQ;
-		msgptr[msglen++] = goal->period;
-		msgptr[msglen++] = goal->offset;
+		msglen += spi_populate_sync_msg(msgptr + msglen, goal->period,
+				goal->offset);
 		break;
 	case NS_WIDE:
-		msgptr[msglen++] = M_EXTENDED;
-		msgptr[msglen++] = 2;
-		msgptr[msglen++] = M_X_WIDE_REQ;
-		msgptr[msglen++] = goal->width;
+		msglen += spi_populate_width_msg(msgptr + msglen, goal->width);
 		break;
 	case NS_PPR:
-		msgptr[msglen++] = M_EXTENDED;
-		msgptr[msglen++] = 6;
-		msgptr[msglen++] = M_X_PPR_REQ;
-		msgptr[msglen++] = goal->period;
-		msgptr[msglen++] = 0;
-		msgptr[msglen++] = goal->offset;
-		msgptr[msglen++] = goal->width;
-		msgptr[msglen++] = (goal->iu ? PPR_OPT_IU : 0) |
+		msglen += spi_populate_ppr_msg(msgptr + msglen, goal->period,
+				goal->offset, goal->width,
+				(goal->iu ? PPR_OPT_IU : 0) |
 					(goal->dt ? PPR_OPT_DT : 0) |
-					(goal->qas ? PPR_OPT_QAS : 0);
+					(goal->qas ? PPR_OPT_QAS : 0));
 		break;
 	}
 
@@ -1476,7 +1475,7 @@ static int sym_prepare_nego(struct sym_hcb *np, struct sym_ccb *cp, u_char *msgp
 /*
  *  Insert a job into the start queue.
  */
-static void sym_put_start_queue(struct sym_hcb *np, struct sym_ccb *cp)
+void sym_put_start_queue(struct sym_hcb *np, struct sym_ccb *cp)
 {
 	u_short	qidx;
 
@@ -3950,11 +3949,7 @@ sym_sync_nego_check(struct sym_hcb *np, int req, struct sym_ccb *cp)
 	/*
 	 *  It was a request. Prepare an answer message.
 	 */
-	np->msgout[0] = M_EXTENDED;
-	np->msgout[1] = 3;
-	np->msgout[2] = M_X_SYNC_REQ;
-	np->msgout[3] = per;
-	np->msgout[4] = ofs;
+	spi_populate_sync_msg(np->msgout, per, ofs);
 
 	if (DEBUG_FLAGS & DEBUG_NEGO) {
 		sym_print_nego_msg(np, target, "sync msgout", np->msgout);
@@ -4080,14 +4075,7 @@ sym_ppr_nego_check(struct sym_hcb *np, int req, int target)
 	/*
 	 *  It was a request. Prepare an answer message.
 	 */
-	np->msgout[0] = M_EXTENDED;
-	np->msgout[1] = 6;
-	np->msgout[2] = M_X_PPR_REQ;
-	np->msgout[3] = per;
-	np->msgout[4] = 0;
-	np->msgout[5] = ofs;
-	np->msgout[6] = wide;
-	np->msgout[7] = opts;
+	spi_populate_ppr_msg(np->msgout, per, ofs, wide, opts);
 
 	if (DEBUG_FLAGS & DEBUG_NEGO) {
 		sym_print_nego_msg(np, target, "ppr msgout", np->msgout);
@@ -4199,10 +4187,7 @@ sym_wide_nego_check(struct sym_hcb *np, int req, struct sym_ccb *cp)
 	/*
 	 *  It was a request. Prepare an answer message.
 	 */
-	np->msgout[0] = M_EXTENDED;
-	np->msgout[1] = 2;
-	np->msgout[2] = M_X_WIDE_REQ;
-	np->msgout[3] = wide;
+	spi_populate_width_msg(np->msgout, wide);
 
 	np->msgin [0] = M_NOOP;
 
@@ -4247,11 +4232,8 @@ static void sym_wide_nego(struct sym_hcb *np, struct sym_tcb *tp, struct sym_ccb
 		 * a single SCSI command (Suggested by Justin Gibbs).
 		 */
 		if (tp->tgoal.offset) {
-			np->msgout[0] = M_EXTENDED;
-			np->msgout[1] = 3;
-			np->msgout[2] = M_X_SYNC_REQ;
-			np->msgout[3] = tp->tgoal.period;
-			np->msgout[4] = tp->tgoal.offset;
+			spi_populate_sync_msg(np->msgout, tp->tgoal.period,
+					tp->tgoal.offset);
 
 			if (DEBUG_FLAGS & DEBUG_NEGO) {
 				sym_print_nego_msg(np, cp->target,
@@ -4510,7 +4492,7 @@ static void sym_int_sir (struct sym_hcb *np)
 			switch (np->msgin [2]) {
 			case M_X_MODIFY_DP:
 				if (DEBUG_FLAGS & DEBUG_POINTER)
-					sym_print_msg(cp,"modify DP",np->msgin);
+					sym_print_msg(cp, NULL, np->msgin);
 				tmp = (np->msgin[3]<<24) + (np->msgin[4]<<16) + 
 				      (np->msgin[5]<<8)  + (np->msgin[6]);
 				sym_modify_dp(np, tp, cp, tmp);
@@ -4537,7 +4519,7 @@ static void sym_int_sir (struct sym_hcb *np)
 		 */
 		case M_IGN_RESIDUE:
 			if (DEBUG_FLAGS & DEBUG_POINTER)
-				sym_print_msg(cp,"ign wide residue", np->msgin);
+				sym_print_msg(cp, NULL, np->msgin);
 			if (cp->host_flags & HF_SENSE)
 				OUTL_DSP(np, SCRIPTA_BA(np, clrack));
 			else
@@ -4626,7 +4608,8 @@ struct sym_ccb *sym_get_ccb (struct sym_hcb *np, struct scsi_cmnd *cmd, u_char t
 			 *  Debugging purpose.
 			 */
 #ifndef SYM_OPT_HANDLE_DEVICE_QUEUEING
-			assert(lp->busy_itl == 0);
+			if (lp->busy_itl != 0)
+				goto out_free;
 #endif
 			/*
 			 *  Allocate resources for tags if not yet.
@@ -4671,7 +4654,8 @@ struct sym_ccb *sym_get_ccb (struct sym_hcb *np, struct scsi_cmnd *cmd, u_char t
 			 *  Debugging purpose.
 			 */
 #ifndef SYM_OPT_HANDLE_DEVICE_QUEUEING
-			assert(lp->busy_itl == 0 && lp->busy_itlq == 0);
+			if (lp->busy_itl != 0 || lp->busy_itlq != 0)
+				goto out_free;
 #endif
 			/*
 			 *  Count this nexus for this LUN.

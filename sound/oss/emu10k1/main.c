@@ -94,6 +94,7 @@
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/proc_fs.h>
+#include <linux/dma-mapping.h>
 
 #include "hwaccess.h"
 #include "8010.h"
@@ -119,7 +120,7 @@
  
 
 /* the emu10k1 _seems_ to only supports 29 bit (512MiB) bit bus master */
-#define EMU10K1_DMA_MASK                0x1fffffff	/* DMA buffer mask for pci_alloc_consist */
+#define EMU10K1_DMA_MASK DMA_29BIT_MASK	/* DMA buffer mask for pci_alloc_consist */
 
 #ifndef PCI_VENDOR_ID_CREATIVE
 #define PCI_VENDOR_ID_CREATIVE 0x1102
@@ -1320,7 +1321,7 @@ static int __devinit emu10k1_probe(struct pci_dev *pci_dev, const struct pci_dev
 	card->is_aps = (subsysvid == EMU_APS_SUBID);
 
 	spin_lock_init(&card->lock);
-	init_MUTEX(&card->open_sem);
+	mutex_init(&card->open_sem);
 	card->open_mode = 0;
 	init_waitqueue_head(&card->open_wait);
 

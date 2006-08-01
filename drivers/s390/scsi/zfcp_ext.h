@@ -148,7 +148,6 @@ extern struct fc_function_template zfcp_transport_functions;
 
 /******************************** ERP ****************************************/
 extern void zfcp_erp_modify_adapter_status(struct zfcp_adapter *, u32, int);
-extern void zfcp_adapter_erp_reset(struct zfcp_adapter *);
 extern int  zfcp_erp_adapter_reopen(struct zfcp_adapter *, int);
 extern int  zfcp_erp_adapter_shutdown(struct zfcp_adapter *, int);
 extern void zfcp_erp_adapter_failed(struct zfcp_adapter *);
@@ -168,7 +167,7 @@ extern void zfcp_erp_unit_failed(struct zfcp_unit *);
 extern int  zfcp_erp_thread_setup(struct zfcp_adapter *);
 extern int  zfcp_erp_thread_kill(struct zfcp_adapter *);
 extern int  zfcp_erp_wait(struct zfcp_adapter *);
-extern void zfcp_erp_async_handler(struct zfcp_erp_action *, unsigned long);
+extern int  zfcp_erp_async_handler(struct zfcp_erp_action *, unsigned long);
 
 extern int  zfcp_test_link(struct zfcp_port *);
 
@@ -179,23 +178,6 @@ extern void zfcp_erp_unit_access_denied(struct zfcp_unit *);
 extern void zfcp_erp_adapter_access_changed(struct zfcp_adapter *);
 extern void zfcp_erp_port_access_changed(struct zfcp_port *);
 extern void zfcp_erp_unit_access_changed(struct zfcp_unit *);
-extern int zfcp_sg_list_alloc(struct zfcp_sg_list *, size_t);
-extern void zfcp_sg_list_free(struct zfcp_sg_list *);
-extern int zfcp_sg_list_copy_from_user(struct zfcp_sg_list *, void __user *,
-                                      size_t);
-extern int zfcp_sg_list_copy_to_user(void __user *, struct zfcp_sg_list *,
-                                    size_t);
-extern size_t zfcp_sg_size(struct scatterlist *, unsigned int);
-
-void zfcp_register_callbacks(struct zfcp_callbacks *);
-void zfcp_unregister_callbacks(void);
-
-extern void zfcp_cb_incoming_els(struct zfcp_adapter *, void *);
-extern void zfcp_cb_link_down(struct zfcp_adapter *);
-extern void zfcp_cb_link_up(struct zfcp_adapter *);
-extern void zfcp_cb_adapter_add(struct zfcp_adapter *);
-extern void zfcp_cb_port_add(struct zfcp_port *);
-extern void zfcp_cb_unit_add(struct zfcp_unit *);
 
 /******************************** AUX ****************************************/
 extern void zfcp_hba_dbf_event_fsf_response(struct zfcp_fsf_req *);
@@ -219,11 +201,5 @@ extern void zfcp_scsi_dbf_event_abort(const char *, struct zfcp_adapter *,
 				      struct zfcp_fsf_req *);
 extern void zfcp_scsi_dbf_event_devreset(const char *, u8, struct zfcp_unit *,
 					 struct scsi_cmnd *);
-
-/*************************** stat ********************************************/
-extern int zfcp_adapter_statistic_register(struct zfcp_adapter *);
-extern int zfcp_adapter_statistic_unregister(struct zfcp_adapter *);
-extern int zfcp_unit_statistic_register(struct zfcp_unit *);
-extern int zfcp_unit_statistic_unregister(struct zfcp_unit *);
 
 #endif	/* ZFCP_EXT_H */

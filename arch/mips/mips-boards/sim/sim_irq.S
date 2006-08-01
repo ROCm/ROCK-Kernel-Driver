@@ -42,7 +42,7 @@
 	and	s0, s1
 
 #if defined(CONFIG_CPU_MIPS32) || defined(CONFIG_CPU_MIPS64)
- 	.set	mips32
+	.set	mips32
 	clz	a0, s0
 	.set	mips0
 	negu	a0
@@ -94,6 +94,8 @@
 
 
 spurious:
-	j	spurious_interrupt
+	jal	spurious_interrupt
+	 nop
+	j	ret_from_irq
 	 nop
 	END(simIRQ)

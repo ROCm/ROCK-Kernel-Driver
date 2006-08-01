@@ -2,46 +2,6 @@ menu "Kernel hacking"
 
 source "lib/Kconfig.debug"
 
-config LKCD_DUMP
-	tristate "LKCD crash dump support (EXPERIMENTAL)"
-	depends on EXPERIMENTAL
-	default n
-	---help---
-	  Say Y here to enable saving an image of system memory when a panic
-	  or other error occurs. Dumps can also be forced with the SysRq+d
-	  key if MAGIC_SYSRQ is enabled.
-
-config KERNTYPES
-	bool
-	depends on LKCD_DUMP
-	default y
-
-config LKCD_DUMP_BLOCKDEV
-	tristate "LKCD crash dump block device driver"
-	depends on LKCD_DUMP
-	help
-	  Say Y to allow saving crash dumps directly to a disk device.
-
-config LKCD_DUMP_NETDEV
-	tristate "LKCD crash dump network device driver"
-	depends on LKCD_DUMP
-	help
-	  Say Y to allow saving crash dumps over a network device.
-
-config LKCD_DUMP_COMPRESS_RLE
-	tristate "LKCD crash dump RLE compression"
-	depends on LKCD_DUMP
-	help
-	  Say Y to allow saving dumps with Run Length Encoding compression.
-
-config LKCD_DUMP_COMPRESS_GZIP
-	tristate "LKCD crash dump GZIP compression"
-	select ZLIB_INFLATE
-	select ZLIB_DEFLATE
-	depends on LKCD_DUMP
-	help
-	  Say Y to allow saving dumps with Gnu Zip compression.
-
 config EARLY_PRINTK
 	bool "Early printk" if EMBEDDED && DEBUG_KERNEL
 	default y
@@ -71,12 +31,21 @@ config DEBUG_STACK_USAGE
 
 	  This option will slow down process creation somewhat.
 
+config STACK_BACKTRACE_COLS
+	int "Stack backtraces per line" if DEBUG_KERNEL
+	range 1 3
+	default 2
+	help
+	  Selects how many stack backtrace entries per line to display.
+
+	  This can save screen space when displaying traces.
+
 comment "Page alloc debug is incompatible with Software Suspend on i386"
 	depends on DEBUG_KERNEL && SOFTWARE_SUSPEND
 
 config DEBUG_PAGEALLOC
-	bool "Page alloc debugging"
-	depends on DEBUG_KERNEL && !SOFTWARE_SUSPEND
+	bool "Debug page memory allocations"
+	depends on DEBUG_KERNEL && !SOFTWARE_SUSPEND && !HUGETLBFS
 	help
 	  Unmap pages from the kernel linear mapping after free_pages().
 	  This results in a large slowdown, but helps to find certain types
@@ -112,82 +81,13 @@ config X86_MPPARSE
 	depends on X86_LOCAL_APIC && !X86_VISWS
 	default y
 
-config KDB
-	bool "Built-in Kernel Debugger support"
-	depends on DEBUG_KERNEL
-	select KALLSYMS
-	select KALLSYMS_ALL
+config DOUBLEFAULT
+	default y
+	bool "Enable doublefault exception handler" if EMBEDDED
 	help
-	  This option provides a built-in kernel debugger.  The built-in
-	  kernel debugger contains commands which allow memory to be examined,
-	  instructions to be disassembled and breakpoints to be set.  For details,
-	  see Documentation/kdb/kdb.mm and the manual pages kdb_bt, kdb_ss, etc.
-	  Kdb can also be used via the serial port.  Set up the system to
-	  have a serial console (see Documentation/serial-console.txt).
-	  The key sequence <escape>KDB on the serial port will cause the
-	  kernel debugger to be entered with input from the serial port and
-	  output to the serial console.  If unsure, say N.
-
-config KDB_MODULES
-	tristate "KDB modules"
-	depends on KDB
-	help
-	  KDB can be extended by adding your own modules, in directory
-	  kdb/modules.  This option selects the way that these modules should
-	  be compiled, as free standing modules (select M) or built into the
-	  kernel (select Y).  If unsure say M.
-
-config KDB_OFF
-	bool "KDB off by default"
-	depends on KDB
-	help
-	  Normally kdb is activated by default, as long as CONFIG_KDB is set.
-	  If you want to ship a kernel with kdb support but only have kdb
-	  turned on when the user requests it then select this option.  When
-	  compiled with CONFIG_KDB_OFF, kdb ignores all events unless you boot
-	  with kdb=on or you echo "1" > /proc/sys/kernel/kdb.  This option also
-	  works in reverse, if kdb is normally activated, you can boot with
-	  kdb=off or echo "0" > /proc/sys/kernel/kdb to deactivate kdb. If
-	  unsure, say N.
-
-config KDB_CONTINUE_CATASTROPHIC
-	int "KDB continues after catastrophic errors"
-	depends on KDB
-	default "0"
-	help
-	  This integer controls the behaviour of kdb when the kernel gets a
-	  catastrophic error, i.e. for a panic, oops, NMI or other watchdog
-	  tripping.  CONFIG_KDB_CONTINUE_CATASTROPHIC interacts with
-	  /proc/sys/kernel/kdb and CONFIG_LKCD_DUMP (if your kernel has the
-	  LKCD patch).
-	  When KDB is active (/proc/sys/kernel/kdb == 1) and a catastrophic
-	  error occurs, nothing extra happens until you type 'go'.
-	  CONFIG_KDB_CONTINUE_CATASTROPHIC == 0 (default).  The first time
-	  you type 'go', kdb warns you.  The second time you type 'go', KDB
-	  tries to continue - no guarantees that the kernel is still usable.
-	  CONFIG_KDB_CONTINUE_CATASTROPHIC == 1.  KDB tries to continue - no
-	  guarantees that the kernel is still usable.
-	  CONFIG_KDB_CONTINUE_CATASTROPHIC == 2.  If your kernel has the LKCD
-	  patch and LKCD is configured to take a dump then KDB forces a dump.
-	  Whether or not a dump is taken, KDB forces a reboot.
-	  When KDB is not active (/proc/sys/kernel/kdb == 0) and a catastrophic
-	  error occurs, the following steps are automatic, no human
-	  intervention is required.
-	  CONFIG_KDB_CONTINUE_CATASTROPHIC == 0 (default) or 1.  KDB attempts
-	  to continue - no guarantees that the kernel is still usable.
-	  CONFIG_KDB_CONTINUE_CATASTROPHIC == 2.  If your kernel has the LKCD
-	  patch and LKCD is configured to take a dump then KDB automatically
-	  forces a dump.  Whether or not a dump is taken, KDB forces a
-	  reboot.
-	  If you are not sure, say 0.  Read Documentation/kdb/dump.txt before
-	  setting to 2.
-
-config KDB_USB
-	bool "Support for USB Keyboard in KDB (OHCI only)"
-	depends on KDB && USB_OHCI_HCD
-	help
-	  If you want to use kdb from a OHCI USB keyboard then say Y here.  If you
-	  say N then kdb can only be used from a PC (AT) keyboard or a serial
-	  console.
+          This option allows trapping of rare doublefault exceptions that
+          would otherwise cause a system to silently reboot. Disabling this
+          option saves about 4k and might cause you much additional grey
+          hair.
 
 endmenu

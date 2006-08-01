@@ -97,25 +97,14 @@ void __init prefill_possible_map(void)
 
 	for (i = 0; i < NR_CPUS; i++) {
 		rc = HYPERVISOR_vcpu_op(VCPUOP_is_up, i, NULL);
-		if (rc >= 0)
-			cpu_set(i, cpu_possible_map);
+		if (rc == -ENOENT)
+			break;
+		cpu_set(i, cpu_possible_map);
 	}
 }
 
 void __init smp_alloc_memory(void)
 {
-}
-
-static inline void
-set_cpu_sibling_map(int cpu)
-{
-	phys_proc_id[cpu] = cpu;
-	cpu_core_id[cpu]  = 0;
-
-	cpu_sibling_map[cpu] = cpumask_of_cpu(cpu);
-	cpu_core_map[cpu]    = cpumask_of_cpu(cpu);
-
-	cpu_data[cpu].booted_cores = 1;
 }
 
 static void xen_smp_intr_init(unsigned int cpu)
@@ -211,7 +200,7 @@ static void vcpu_prepare(int vcpu)
 	ctxt.failsafe_callback_cs  = __KERNEL_CS;
 	ctxt.failsafe_callback_eip = (unsigned long)failsafe_callback;
 
-	ctxt.ctrlreg[3] = xen_pfn_to_cr3(virt_to_mfn(swapper_pg_dir));
+	ctxt.ctrlreg[3] = virt_to_mfn(swapper_pg_dir) << PAGE_SHIFT;
 #else /* __x86_64__ */
 	ctxt.user_regs.cs = __KERNEL_CS;
 	ctxt.user_regs.esp = idle->thread.rsp0 - sizeof(struct pt_regs);
@@ -223,7 +212,7 @@ static void vcpu_prepare(int vcpu)
 	ctxt.failsafe_callback_eip = (unsigned long)failsafe_callback;
 	ctxt.syscall_callback_eip  = (unsigned long)system_call;
 
-	ctxt.ctrlreg[3] = xen_pfn_to_cr3(virt_to_mfn(init_level4_pgt));
+	ctxt.ctrlreg[3] = virt_to_mfn(init_level4_pgt) << PAGE_SHIFT;
 
 	ctxt.gs_base_kernel = (unsigned long)(cpu_pda(vcpu));
 #endif
@@ -241,20 +230,14 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 	struct Xgt_desc_struct *gdt_descr;
 #endif
 
-	boot_cpu_data.apicid = 0;
 	cpu_data[0] = boot_cpu_data;
 
 	cpu_2_logical_apicid[0] = 0;
 	x86_cpu_to_apicid[0] = 0;
 
 	current_thread_info()->cpu = 0;
-
-	for (cpu = 0; cpu < NR_CPUS; cpu++) {
-		cpus_clear(cpu_sibling_map[cpu]);
-		cpus_clear(cpu_core_map[cpu]);
-	}
-
-	set_cpu_sibling_map(0);
+	cpu_sibling_map[0] = cpumask_of_cpu(0);
+	cpu_core_map[0]    = cpumask_of_cpu(0);
 
 	xen_smp_intr_init(0);
 
@@ -279,8 +262,6 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 			XENFEAT_writable_descriptor_tables);
 
 		cpu_data[cpu] = boot_cpu_data;
-		cpu_data[cpu].apicid = cpu;
-
 		cpu_2_logical_apicid[cpu] = cpu;
 		x86_cpu_to_apicid[cpu] = cpu;
 
@@ -489,18 +470,6 @@ void smp_resume(void)
 		vcpu_hotplug(i);
 }
 
-static void
-remove_siblinginfo(int cpu)
-{
-	phys_proc_id[cpu] = BAD_APICID;
-	cpu_core_id[cpu]  = BAD_APICID;
-
-	cpus_clear(cpu_sibling_map[cpu]);
-	cpus_clear(cpu_core_map[cpu]);
-
-	cpu_data[cpu].booted_cores = 0;
-}
-
 int __cpu_disable(void)
 {
 	cpumask_t map = cpu_online_map;
@@ -508,8 +477,6 @@ int __cpu_disable(void)
 
 	if (cpu == 0)
 		return -EBUSY;
-
-	remove_siblinginfo(cpu);
 
 	cpu_clear(cpu, map);
 	fixup_irqs(map);
@@ -582,10 +549,6 @@ int __devinit __cpu_up(unsigned int cpu)
 		prepare_for_smp();
 #endif
 
-	/* This must be done before setting cpu_online_map */
-	set_cpu_sibling_map(cpu);
-	wmb();
-
 	xen_smp_intr_init(cpu);
 	cpu_set(cpu, cpu_online_map);
 
@@ -606,3 +569,13 @@ int setup_profiling_timer(unsigned int multiplier)
 	return -EINVAL;
 }
 #endif
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

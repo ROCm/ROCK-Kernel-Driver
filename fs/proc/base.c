@@ -104,8 +104,8 @@ enum pid_directory_inos {
 	PROC_TGID_MAPS,
 	PROC_TGID_NUMA_MAPS,
 	PROC_TGID_MOUNTS,
+	PROC_TGID_MOUNTSTATS,
 	PROC_TGID_WCHAN,
-	PROC_TGID_MAPBASE,
 #ifdef CONFIG_MMU
 	PROC_TGID_SMAPS,
 #endif
@@ -145,6 +145,7 @@ enum pid_directory_inos {
 	PROC_TID_MAPS,
 	PROC_TID_NUMA_MAPS,
 	PROC_TID_MOUNTS,
+	PROC_TID_MOUNTSTATS,
 	PROC_TID_WCHAN,
 #ifdef CONFIG_MMU
 	PROC_TID_SMAPS,
@@ -202,9 +203,7 @@ static struct pid_entry tgid_base_stuff[] = {
 	E(PROC_TGID_ROOT,      "root",    S_IFLNK|S_IRWXUGO),
 	E(PROC_TGID_EXE,       "exe",     S_IFLNK|S_IRWXUGO),
 	E(PROC_TGID_MOUNTS,    "mounts",  S_IFREG|S_IRUGO),
-#ifdef __HAS_ARCH_PROC_MAPPED_BASE
-   	E(PROC_TGID_MAPBASE,	"mapped_base",	S_IFREG|S_IRUSR|S_IWUSR),
-#endif
+	E(PROC_TGID_MOUNTSTATS, "mountstats", S_IFREG|S_IRUSR),
 #ifdef CONFIG_MMU
 	E(PROC_TGID_SMAPS,     "smaps",   S_IFREG|S_IRUGO),
 #endif
@@ -539,12 +538,15 @@ static int proc_oom_score(struct task_struct *task, char *buffer)
 
 /* If the process being read is separated by chroot from the reading process,
  * don't let the reader access the threads.
+ *
+ * note: this does dput(root) and mntput(vfsmnt) on exit.
  */
 static int proc_check_chroot(struct dentry *root, struct vfsmount *vfsmnt)
 {
 	struct dentry *de, *base;
 	struct vfsmount *our_vfsmnt, *mnt;
 	int res = 0;
+
 	read_lock(&current->fs->lock);
 	our_vfsmnt = mntget(current->fs->rootmnt);
 	base = dget(current->fs->root);
@@ -554,11 +556,11 @@ static int proc_check_chroot(struct dentry *root, struct vfsmount *vfsmnt)
 	de = root;
 	mnt = vfsmnt;
 
-	while (vfsmnt != our_vfsmnt) {
-		if (vfsmnt == vfsmnt->mnt_parent)
+	while (mnt != our_vfsmnt) {
+		if (mnt == mnt->mnt_parent)
 			goto out;
-		de = vfsmnt->mnt_mountpoint;
-		vfsmnt = vfsmnt->mnt_parent;
+		de = mnt->mnt_mountpoint;
+		mnt = mnt->mnt_parent;
 	}
 
 	if (!is_subdir(de, base))
@@ -569,7 +571,7 @@ exit:
 	dput(base);
 	mntput(our_vfsmnt);
 	dput(root);
-	mntput(mnt);
+	mntput(vfsmnt);
 	return res;
 out:
 	spin_unlock(&vfsmount_lock);
@@ -738,6 +740,38 @@ static struct file_operations proc_mounts_operations = {
 	.llseek		= seq_lseek,
 	.release	= mounts_release,
 	.poll		= mounts_poll,
+};
+
+extern struct seq_operations mountstats_op;
+static int mountstats_open(struct inode *inode, struct file *file)
+{
+	struct task_struct *task = proc_task(inode);
+	int ret = seq_open(file, &mountstats_op);
+
+	if (!ret) {
+		struct seq_file *m = file->private_data;
+		struct namespace *namespace;
+		task_lock(task);
+		namespace = task->namespace;
+		if (namespace)
+			get_namespace(namespace);
+		task_unlock(task);
+
+		if (namespace)
+			m->private = namespace;
+		else {
+			seq_release(inode, file);
+			ret = -EINVAL;
+		}
+	}
+	return ret;
+}
+
+static struct file_operations proc_mountstats_operations = {
+	.open		= mountstats_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= mounts_release,
 };
 
 #define PROC_BLOCK_SIZE	(3*1024)		/* 4K page size but our output routines use some slack for overruns */
@@ -950,56 +984,6 @@ static struct file_operations proc_oom_adjust_operations = {
 	.read		= oom_adjust_read,
 	.write		= oom_adjust_write,
 };
-
-#ifdef __HAS_ARCH_PROC_MAPPED_BASE
-static ssize_t mapbase_read(struct file * file, char * buf,
-			size_t count, loff_t *ppos)
-{
-	struct task_struct *task = proc_task(file->f_dentry->d_inode);
-	char buffer[64];
-	size_t len;
-	loff_t __ppos = *ppos;
-
-	len = sprintf(buffer, "%li\n", task->map_base);
-	if (__ppos >= len)
-		return 0;
-	if (count > len-__ppos)
-		count = len-__ppos;
-	if (copy_to_user(buf, buffer + __ppos, count)) 
-		return -EFAULT;
-	*ppos = __ppos + count;
-	return count;
-}
-
-static ssize_t mapbase_write(struct file * file, const char * buf,
-			 size_t count, loff_t *ppos)
-{
-	struct task_struct *task = proc_task(file->f_dentry->d_inode);
-	char buffer[64], *end;
-	unsigned long newbase;
-
-	if (!capable(CAP_SYS_ADMIN))
-		return -EPERM;
-	memset(buffer, 0, 64);	
-	if (count > 62)
-		count = 62;
-	if (copy_from_user(buffer, buf, count)) 
-		return -EFAULT;
-	newbase = simple_strtoul(buffer, &end, 0);
-	if (*end == '\n')
-		end++;
-	if (newbase > 0)
-		task->map_base = newbase;
-	if (end - buffer == 0) 
-		return -EIO;
-	return end - buffer;
-}
-
-static struct file_operations proc_mapbase_operations = {
-	read:		mapbase_read,
-	write:		mapbase_write,
-};
-#endif /* __HAS_ARCH_PROC_MAPPED_BASE */
 
 static struct inode_operations proc_mem_inode_operations = {
 	.permission	= proc_permission,
@@ -1766,11 +1750,6 @@ static struct dentry *proc_pident_lookup(struct inode *dir,
 		case PROC_TGID_MAPS:
 			inode->i_fop = &proc_maps_operations;
 			break;
-#ifdef __HAS_ARCH_PROC_MAPPED_BASE
- 		case PROC_TGID_MAPBASE:
- 			inode->i_fop = &proc_mapbase_operations;
- 			break;
-#endif
 #ifdef CONFIG_NUMA
 		case PROC_TID_NUMA_MAPS:
 		case PROC_TGID_NUMA_MAPS:
@@ -1798,6 +1777,10 @@ static struct dentry *proc_pident_lookup(struct inode *dir,
 			inode->i_fop = &proc_smaps_operations;
 			break;
 #endif
+		case PROC_TID_MOUNTSTATS:
+		case PROC_TGID_MOUNTSTATS:
+			inode->i_fop = &proc_mountstats_operations;
+			break;
 #ifdef CONFIG_SECURITY
 		case PROC_TID_ATTR:
 			inode->i_nlink = 2;

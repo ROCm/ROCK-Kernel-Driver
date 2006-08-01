@@ -102,8 +102,6 @@ EXPORT_SYMBOL(cpu_callout_map);
 EXPORT_SYMBOL(screen_info);
 #endif
 
-EXPORT_SYMBOL(get_wchan);
-
 EXPORT_SYMBOL(rtc_lock);
 
 EXPORT_SYMBOL_GPL(set_nmi_callback);
@@ -114,7 +112,6 @@ EXPORT_SYMBOL_GPL(unset_nmi_callback);
 #undef memcpy
 #undef memset
 #undef memmove
-#undef strlen
 
 extern void * memset(void *,int,__kernel_size_t);
 extern size_t strlen(const char *);
@@ -123,7 +120,6 @@ extern void * memcpy(void *,const void *,__kernel_size_t);
 extern void * __memcpy(void *,const void *,__kernel_size_t);
 
 EXPORT_SYMBOL(memset);
-EXPORT_SYMBOL(strlen);
 EXPORT_SYMBOL(memmove);
 EXPORT_SYMBOL(memcpy);
 EXPORT_SYMBOL(__memcpy);
@@ -143,15 +139,11 @@ EXPORT_SYMBOL(rwsem_down_write_failed_thunk);
 EXPORT_SYMBOL(empty_zero_page);
 
 EXPORT_SYMBOL(die_chain);
-EXPORT_SYMBOL(register_die_notifier);
 
 #ifdef CONFIG_SMP
 EXPORT_SYMBOL(cpu_sibling_map);
 EXPORT_SYMBOL(smp_num_siblings);
 #endif
-
-extern void do_softirq_thunk(void);
-EXPORT_SYMBOL(do_softirq_thunk);
 
 #ifdef CONFIG_BUG
 EXPORT_SYMBOL(out_of_line_bug);
@@ -161,21 +153,6 @@ EXPORT_SYMBOL(init_level4_pgt);
 
 extern unsigned long __supported_pte_mask;
 EXPORT_SYMBOL(__supported_pte_mask);
-
-#ifdef CONFIG_LKCD_DUMP_MODULE
-#ifdef CONFIG_SMP
-extern irq_desc_t irq_desc[NR_IRQS];
-extern cpumask_t irq_affinity[NR_IRQS];
-extern void stop_this_cpu(void *);
-extern void dump_send_ipi(void);
-EXPORT_SYMBOL_GPL(irq_desc);
-EXPORT_SYMBOL_GPL(irq_affinity);
-EXPORT_SYMBOL_GPL(dump_send_ipi);
-EXPORT_SYMBOL_GPL(stop_this_cpu);
-#endif
-extern int page_is_ram(unsigned long);
-EXPORT_SYMBOL_GPL(page_is_ram);
-#endif
 
 #ifdef CONFIG_SMP
 EXPORT_SYMBOL(flush_tlb_page);

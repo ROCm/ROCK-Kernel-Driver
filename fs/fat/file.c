@@ -116,7 +116,6 @@ int fat_generic_ioctl(struct inode *inode, struct file *filp,
 static int
 fat_file_release(struct inode *inode, struct file *filp)
 {
-
 	if ((filp->f_mode & FMODE_WRITE) &&
 	     MSDOS_SB(inode->i_sb)->options.flush) {
 		writeback_inode(inode);
@@ -126,7 +125,7 @@ fat_file_release(struct inode *inode, struct file *filp)
 	return 0;
 }
 
-struct file_operations fat_file_operations = {
+const struct file_operations fat_file_operations = {
 	.llseek		= generic_file_llseek,
 	.read		= do_sync_read,
 	.write		= do_sync_write,

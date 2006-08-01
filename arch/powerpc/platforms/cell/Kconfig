@@ -10,4 +10,10 @@ config SPU_FS
 	  Units on machines implementing the Broadband Processor
 	  Architecture.
 
+config SPUFS_MMAP
+	bool
+	depends on SPU_FS && SPARSEMEM
+	select MEMORY_HOTPLUG
+	default y
+
 endmenu

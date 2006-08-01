@@ -74,7 +74,7 @@ late_initcall(start_lost_tick_compensation);
  *
  *			-johnstul@us.ibm.com "math is hard, lets go shopping!"
  */
-static unsigned long cyc2ns_scale; 
+static unsigned long cyc2ns_scale __read_mostly;
 #define CYC2NS_SCALE_FACTOR 10 /* 2^10, carefully chosen */
 
 static inline void set_cyc2ns_scale(unsigned long cpu_khz)
@@ -279,7 +279,7 @@ time_cpufreq_notifier(struct notifier_block *nb, unsigned long val,
 {
 	struct cpufreq_freqs *freq = data;
 
-	if (val != CPUFREQ_RESUMECHANGE)
+	if (val != CPUFREQ_RESUMECHANGE && val != CPUFREQ_SUSPENDCHANGE)
 		write_seqlock_irq(&xtime_lock);
 	if (!ref_freq) {
 		if (!freq->old){
@@ -312,7 +312,7 @@ time_cpufreq_notifier(struct notifier_block *nb, unsigned long val,
 	}
 
 end:
-	if (val != CPUFREQ_RESUMECHANGE)
+	if (val != CPUFREQ_RESUMECHANGE && val != CPUFREQ_SUSPENDCHANGE)
 		write_sequnlock_irq(&xtime_lock);
 
 	return 0;

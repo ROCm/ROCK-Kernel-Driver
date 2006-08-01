@@ -31,21 +31,11 @@
 #include <asm/div64.h>
 #include "internal.h"
 
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#endif
-
 void get_vmalloc_info(struct vmalloc_info *vmi)
 {
 	struct vm_struct *vma;
 	unsigned long free_area_size;
 	unsigned long prev_end;
-#ifdef	CONFIG_KDB
-	int get_lock = !KDB_IS_RUNNING();
-#else
-#define	get_lock 1
-#endif
-
 
 	vmi->used = 0;
 
@@ -57,8 +47,7 @@ void get_vmalloc_info(struct vmalloc_info *vmi)
 
 		prev_end = VMALLOC_START;
 
-		if (get_lock)
-			read_lock(&vmlist_lock);
+		read_lock(&vmlist_lock);
 
 		for (vma = vmlist; vma; vma = vma->next) {
 			unsigned long addr = (unsigned long) vma->addr;
@@ -83,7 +72,6 @@ void get_vmalloc_info(struct vmalloc_info *vmi)
 		if (VMALLOC_END - prev_end > vmi->largest_chunk)
 			vmi->largest_chunk = VMALLOC_END - prev_end;
 
-		if (get_lock)
-			read_unlock(&vmlist_lock);
+		read_unlock(&vmlist_lock);
 	}
 }

@@ -33,6 +33,7 @@
 #include <linux/rbtree.h>
 #include <linux/workqueue.h>
 #include <linux/kref.h>
+#include <linux/mutex.h>
 
 #include "cluster/nodemanager.h"
 #include "cluster/heartbeat.h"
@@ -109,24 +110,13 @@ struct ocfs2_lock_res_ops;
 
 typedef void (*ocfs2_lock_callback)(int status, unsigned long data);
 
-struct ocfs2_lockres_flag_callback {
-	struct list_head	fc_lockres_item;
-	unsigned		fc_free_once_called:1;
-
-	unsigned long		fc_flag_mask;
-	unsigned long		fc_flag_goal;
-
-	ocfs2_lock_callback	fc_cb;
-	unsigned long		fc_data;
-};
-
 struct ocfs2_lock_res {
 	void                    *l_priv;
 	struct ocfs2_lock_res_ops *l_ops;
 	spinlock_t               l_lock;
 
 	struct list_head         l_blocked_list;
-	struct list_head         l_flag_cb_list;
+	struct list_head         l_mask_waiters;
 
 	enum ocfs2_lock_type     l_type;
 	unsigned long		 l_flags;
@@ -183,9 +173,7 @@ enum ocfs2_mount_options
 	OCFS2_MOUNT_BARRIER = 1 << 1,	/* Use block barriers */
 	OCFS2_MOUNT_NOINTR  = 1 << 2,   /* Don't catch signals */
 	OCFS2_MOUNT_ERRORS_PANIC = 1 << 3, /* Panic on errors */
-#ifdef OCFS2_ORACORE_WORKAROUNDS
-	OCFS2_MOUNT_COMPAT_OCFS = 1 << 30, /* ocfs1 compatibility mode */
-#endif
+	OCFS2_MOUNT_DATA_WRITEBACK = 1 << 4, /* No data ordering */
 };
 
 #define OCFS2_OSB_SOFT_RO	0x0001
@@ -243,7 +231,7 @@ struct ocfs2_super
 	struct proc_dir_entry *proc_sub_dir; /* points to /proc/fs/ocfs2/<maj_min> */
 
 	atomic_t vol_state;
-	struct semaphore recovery_lock;
+	struct mutex recovery_lock;
 	struct task_struct *recovery_thread_task;
 	int disable_recovery;
 	wait_queue_head_t checkpoint_event;
@@ -288,17 +276,10 @@ struct ocfs2_super
 	unsigned int net_response_ids;
 	struct list_head net_response_list;
 
-	struct o2hb_heartbeat_resource *osb_hb_res;
 	struct o2hb_callback_func osb_hb_up;
 	struct o2hb_callback_func osb_hb_down;
 
 	struct list_head	osb_net_handlers;
-
-	/* see ocfs2_ki_dtor() */
-	struct work_struct		osb_okp_teardown_work;
-	struct ocfs2_kiocb_private	*osb_okp_teardown_next;
-	atomic_t			osb_okp_pending;
-	wait_queue_head_t		osb_okp_pending_wq;
 
 	wait_queue_head_t		osb_mount_event;
 
@@ -314,6 +295,15 @@ struct ocfs2_super
 
 #define OCFS2_SB(sb)	    ((struct ocfs2_super *)(sb)->s_fs_info)
 #define OCFS2_MAX_OSB_ID             65536
+
+static inline int ocfs2_should_order_data(struct inode *inode)
+{
+	if (!S_ISREG(inode->i_mode))
+		return 0;
+	if (OCFS2_SB(inode->i_sb)->s_mount_opt & OCFS2_MOUNT_DATA_WRITEBACK)
+		return 0;
+	return 1;
+}
 
 /* set / clear functions because cluster events can make these happen
  * in parallel so we want the transitions to be atomic. this also
@@ -367,8 +357,8 @@ static inline int ocfs2_is_soft_readonly(struct ocfs2_super *osb)
 #define OCFS2_RO_ON_INVALID_DINODE(__sb, __di)	do {			\
 	typeof(__di) ____di = (__di);					\
 	ocfs2_error((__sb), 						\
-		"Dinode # %"MLFu64" has bad signature %.*s",		\
-		(____di)->i_blkno, 7,					\
+		"Dinode # %llu has bad signature %.*s",			\
+		(unsigned long long)(____di)->i_blkno, 7,		\
 		(____di)->i_signature);					\
 } while (0);
 
@@ -378,8 +368,8 @@ static inline int ocfs2_is_soft_readonly(struct ocfs2_super *osb)
 #define OCFS2_RO_ON_INVALID_EXTENT_BLOCK(__sb, __eb)	do {		\
 	typeof(__eb) ____eb = (__eb);					\
 	ocfs2_error((__sb), 						\
-		"Extent Block # %"MLFu64" has bad signature %.*s",	\
-		(____eb)->h_blkno, 7,					\
+		"Extent Block # %llu has bad signature %.*s",		\
+		(unsigned long long)(____eb)->h_blkno, 7,		\
 		(____eb)->h_signature);					\
 } while (0);
 
@@ -389,8 +379,8 @@ static inline int ocfs2_is_soft_readonly(struct ocfs2_super *osb)
 #define OCFS2_RO_ON_INVALID_GROUP_DESC(__sb, __gd)	do {		\
 	typeof(__gd) ____gd = (__gd);					\
 		ocfs2_error((__sb),					\
-		"Group Descriptor # %"MLFu64" has bad signature %.*s",	\
-		(____gd)->bg_blkno, 7,					\
+		"Group Descriptor # %llu has bad signature %.*s",	\
+		(unsigned long long)(____gd)->bg_blkno, 7,		\
 		(____gd)->bg_signature);				\
 } while (0);
 
@@ -431,6 +421,13 @@ static inline unsigned int ocfs2_clusters_for_bytes(struct super_block *sb,
 	return clusters;
 }
 
+static inline u64 ocfs2_blocks_for_bytes(struct super_block *sb,
+					 u64 bytes)
+{
+	bytes += sb->s_blocksize - 1;
+	return bytes >> sb->s_blocksize_bits;
+}
+
 static inline u64 ocfs2_clusters_to_bytes(struct super_block *sb,
 					  u32 clusters)
 {
@@ -445,6 +442,15 @@ static inline u64 ocfs2_align_bytes_to_clusters(struct super_block *sb,
 
 	clusters = ocfs2_clusters_for_bytes(sb, bytes);
 	return (u64)clusters << cl_bits;
+}
+
+static inline u64 ocfs2_align_bytes_to_blocks(struct super_block *sb,
+					      u64 bytes)
+{
+	u64 blocks;
+
+        blocks = ocfs2_blocks_for_bytes(sb, bytes);
+	return blocks << sb->s_blocksize_bits;
 }
 
 static inline unsigned long ocfs2_align_bytes_to_sectors(u64 bytes)

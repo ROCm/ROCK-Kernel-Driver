@@ -33,12 +33,8 @@
 
 #define DRIVER_NAME "mmci-pl18x"
 
-#ifdef CONFIG_MMC_DEBUG
 #define DBG(host,fmt,args...)	\
 	pr_debug("%s: %s: " fmt, mmc_hostname(host->mmc), __func__ , args)
-#else
-#define DBG(host,fmt,args...)	do { } while (0)
-#endif
 
 static unsigned int fmax = 515633;
 
@@ -405,9 +401,6 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 {
 	struct mmci_host *host = mmc_priv(mmc);
 	u32 clk = 0, pwr = 0;
-
-	DBG(host, "clock %uHz busmode %u powermode %u Vdd %u\n",
-	    ios->clock, ios->bus_mode, ios->power_mode, ios->vdd);
 
 	if (ios->clock) {
 		if (ios->clock >= host->mclk) {

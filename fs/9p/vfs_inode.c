@@ -7,9 +7,8 @@
  *  Copyright (C) 2002 by Ron Minnich <rminnich@lanl.gov>
  *
  *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
+ *  it under the terms of the GNU General Public License version 2
+ *  as published by the Free Software Foundation.
  *
  *  This program is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -255,8 +254,8 @@ struct inode *v9fs_get_inode(struct super_block *sb, int mode)
 }
 
 static int
-v9fs_create(struct v9fs_session_info *v9ses, u32 pfid, char *name,
-	u32 perm, u8 mode, u32 *fidp, struct v9fs_qid *qid, u32 *iounit)
+v9fs_create(struct v9fs_session_info *v9ses, u32 pfid, char *name, u32 perm,
+	u8 mode, char *extension, u32 *fidp, struct v9fs_qid *qid, u32 *iounit)
 {
 	u32 fid;
 	int err;
@@ -271,14 +270,17 @@ v9fs_create(struct v9fs_session_info *v9ses, u32 pfid, char *name,
 	err = v9fs_t_walk(v9ses, pfid, fid, NULL, &fcall);
 	if (err < 0) {
 		PRINT_FCALL_ERROR("clone error", fcall);
-		goto error;
+		if (fcall && fcall->id == RWALK)
+			goto clunk_fid;
+		else
+			goto put_fid;
 	}
 	kfree(fcall);
 
-	err = v9fs_t_create(v9ses, fid, name, perm, mode, &fcall);
+	err = v9fs_t_create(v9ses, fid, name, perm, mode, extension, &fcall);
 	if (err < 0) {
 		PRINT_FCALL_ERROR("create fails", fcall);
-		goto error;
+		goto clunk_fid;
 	}
 
 	if (iounit)
@@ -293,7 +295,11 @@ v9fs_create(struct v9fs_session_info *v9ses, u32 pfid, char *name,
 	kfree(fcall);
 	return 0;
 
-error:
+clunk_fid:
+	v9fs_t_clunk(v9ses, fid);
+	fid = V9FS_NOFID;
+
+put_fid:
 	if (fid >= 0)
 		v9fs_put_idpool(fid, &v9ses->fidpool);
 
@@ -319,6 +325,9 @@ v9fs_clone_walk(struct v9fs_session_info *v9ses, u32 fid, struct dentry *dentry)
 		&fcall);
 
 	if (err < 0) {
+		if (fcall && fcall->id == RWALK)
+			goto clunk_fid;
+
 		PRINT_FCALL_ERROR("walk error", fcall);
 		v9fs_put_idpool(nfid, &v9ses->fidpool);
 		goto error;
@@ -348,7 +357,7 @@ error:
 	return ERR_PTR(err);
 }
 
-struct inode *
+static struct inode *
 v9fs_inode_from_fid(struct v9fs_session_info *v9ses, u32 fid,
 	struct super_block *sb)
 {
@@ -474,7 +483,7 @@ v9fs_vfs_create(struct inode *dir, struct dentry *dentry, int mode,
 		flags = O_RDWR;
 
 	err = v9fs_create(v9ses, dfid->fid, (char *) dentry->d_name.name,
-		perm, v9fs_uflags2omode(flags), &fid, &qid, &iounit);
+		perm, v9fs_uflags2omode(flags), NULL, &fid, &qid, &iounit);
 
 	if (err)
 		goto error;
@@ -550,7 +559,7 @@ static int v9fs_vfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 	perm = unixmode2p9mode(v9ses, mode | S_IFDIR);
 
 	err = v9fs_create(v9ses, dfid->fid, (char *) dentry->d_name.name,
-		perm, V9FS_OREAD, &fid, NULL, NULL);
+		perm, V9FS_OREAD, NULL, &fid, NULL, NULL);
 
 	if (err) {
 		dprintk(DEBUG_ERROR, "create error %d\n", err);
@@ -637,19 +646,26 @@ static struct dentry *v9fs_vfs_lookup(struct inode *dir, struct dentry *dentry,
 	}
 
 	result = v9fs_t_walk(v9ses, dirfidnum, newfid,
-		(char *)dentry->d_name.name, NULL);
+		(char *)dentry->d_name.name, &fcall);
+
 	if (result < 0) {
-		v9fs_put_idpool(newfid, &v9ses->fidpool);
+		if (fcall && fcall->id == RWALK)
+			v9fs_t_clunk(v9ses, newfid);
+		else
+			v9fs_put_idpool(newfid, &v9ses->fidpool);
+
 		if (result == -ENOENT) {
 			d_add(dentry, NULL);
 			dprintk(DEBUG_VFS,
 				"Return negative dentry %p count %d\n",
 				dentry, atomic_read(&dentry->d_count));
+			kfree(fcall);
 			return NULL;
 		}
 		dprintk(DEBUG_ERROR, "walk error:%d\n", result);
 		goto FreeFcall;
 	}
+	kfree(fcall);
 
 	result = v9fs_t_stat(v9ses, newfid, &fcall);
 	if (result < 0) {
@@ -1008,11 +1024,13 @@ static int v9fs_readlink(struct dentry *dentry, char *buffer, int buflen)
 
 	/* copy extension buffer into buffer */
 	if (fcall->params.rstat.stat.extension.len < buflen)
-		buflen = fcall->params.rstat.stat.extension.len;
+		buflen = fcall->params.rstat.stat.extension.len + 1;
 
-	memcpy(buffer, fcall->params.rstat.stat.extension.str, buflen - 1);
+	memmove(buffer, fcall->params.rstat.stat.extension.str, buflen - 1);
 	buffer[buflen-1] = 0;
 
+	dprintk(DEBUG_ERROR, "%s -> %.*s (%s)\n", dentry->d_name.name, fcall->params.rstat.stat.extension.len,
+		fcall->params.rstat.stat.extension.str, buffer);
 	retval = buflen;
 
       FreeFcall:
@@ -1072,7 +1090,7 @@ static void *v9fs_vfs_follow_link(struct dentry *dentry, struct nameidata *nd)
 	if (!link)
 		link = ERR_PTR(-ENOMEM);
 	else {
-		len = v9fs_readlink(dentry, link, strlen(link));
+		len = v9fs_readlink(dentry, link, PATH_MAX);
 
 		if (len < 0) {
 			__putname(link);
@@ -1109,10 +1127,7 @@ static int v9fs_vfs_mkspecial(struct inode *dir, struct dentry *dentry,
 	struct v9fs_session_info *v9ses;
 	struct v9fs_fid *dfid, *vfid;
 	struct inode *inode;
-	struct v9fs_fcall *fcall;
-	struct v9fs_wstat wstat;
 
-	fcall = NULL;
 	inode = NULL;
 	vfid = NULL;
 	v9ses = v9fs_inode2v9ses(dir);
@@ -1125,7 +1140,7 @@ static int v9fs_vfs_mkspecial(struct inode *dir, struct dentry *dentry,
 	}
 
 	err = v9fs_create(v9ses, dfid->fid, (char *) dentry->d_name.name,
-		perm, V9FS_OREAD, &fid, NULL, NULL);
+		perm, V9FS_OREAD, (char *) extension, &fid, NULL, NULL);
 
 	if (err)
 		goto error;
@@ -1148,23 +1163,11 @@ static int v9fs_vfs_mkspecial(struct inode *dir, struct dentry *dentry,
 		goto error;
 	}
 
-	/* issue a Twstat */
-	v9fs_blank_wstat(&wstat);
-	wstat.muid = v9ses->name;
-	wstat.extension = (char *) extension;
-	err = v9fs_t_wstat(v9ses, vfid->fid, &wstat, &fcall);
-	if (err < 0) {
-		PRINT_FCALL_ERROR("wstat error", fcall);
-		goto error;
-	}
-
-	kfree(fcall);
 	dentry->d_op = &v9fs_dentry_operations;
 	d_instantiate(dentry, inode);
 	return 0;
 
 error:
-	kfree(fcall);
 	if (vfid)
 		v9fs_fid_destroy(vfid);
 
@@ -1224,7 +1227,7 @@ v9fs_vfs_link(struct dentry *old_dentry, struct inode *dir,
 	}
 
 	name = __getname();
-	sprintf(name, "hardlink(%d)\n", oldfid->fid);
+	sprintf(name, "%d\n", oldfid->fid);
 	retval = v9fs_vfs_mkspecial(dir, dentry, V9FS_DMLINK, name);
 	__putname(name);
 
@@ -1253,6 +1256,8 @@ v9fs_vfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t rdev)
 		return -EINVAL;
 
 	name = __getname();
+	if (!name)
+		return -ENOMEM;
 	/* build extension */
 	if (S_ISBLK(mode))
 		sprintf(name, "b %u %u", MAJOR(rdev), MINOR(rdev));

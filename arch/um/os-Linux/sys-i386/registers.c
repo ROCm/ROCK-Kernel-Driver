@@ -104,7 +104,7 @@ void init_registers(int pid)
 	err = ptrace(PTRACE_GETREGS, pid, 0, exec_regs);
 	if(err)
 		panic("check_ptrace : PTRACE_GETREGS failed, errno = %d",
-		      err);
+		      errno);
 
 	errno = 0;
 	err = ptrace(PTRACE_GETFPXREGS, pid, 0, exec_fpx_regs);
@@ -119,7 +119,7 @@ void init_registers(int pid)
 	err = ptrace(PTRACE_GETFPREGS, pid, 0, exec_fp_regs);
 	if(err)
 		panic("check_ptrace : PTRACE_GETFPREGS failed, errno = %d",
-		      err);
+		      errno);
 }
 
 void get_safe_registers(unsigned long *regs, unsigned long *fp_regs)
@@ -129,10 +129,7 @@ void get_safe_registers(unsigned long *regs, unsigned long *fp_regs)
 		memcpy(fp_regs, exec_fp_regs,
 		       HOST_FP_SIZE * sizeof(unsigned long));
 }
-/* from glibc 2.3 as found in sles9-i386 */
-#define JB_PC 5
-#define JB_SP 4
-#define JB_BP 3
+
 void get_thread_regs(union uml_pt_regs *uml_regs, void *buffer)
 {
 	struct __jmp_buf_tag *jmpbuf = buffer;

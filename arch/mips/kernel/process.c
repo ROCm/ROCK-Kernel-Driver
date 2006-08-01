@@ -41,6 +41,10 @@
 #include <asm/elf.h>
 #include <asm/isadep.h>
 #include <asm/inst.h>
+#ifdef CONFIG_MIPS_MT_SMTC
+#include <asm/mipsmtregs.h>
+extern void smtc_idle_loop_hook(void);
+#endif /* CONFIG_MIPS_MT_SMTC */
 
 /*
  * The idle thread. There's no useful work to be done, so just try to conserve
@@ -51,26 +55,22 @@ ATTRIB_NORET void cpu_idle(void)
 {
 	/* endless idle loop with no priority at all */
 	while (1) {
-		while (!need_resched())
+		while (!need_resched()) {
+#ifdef CONFIG_MIPS_MT_SMTC
+			smtc_idle_loop_hook();
+#endif /* CONFIG_MIPS_MT_SMTC */
 			if (cpu_wait)
 				(*cpu_wait)();
+		}
 		preempt_enable_no_resched();
 		schedule();
 		preempt_disable();
 	}
 }
 
-extern void do_signal(struct pt_regs *regs);
-extern void do_signal32(struct pt_regs *regs);
-
 /*
  * Native o32 and N64 ABI without DSP ASE
  */
-extern int setup_frame(struct k_sigaction * ka, struct pt_regs *regs,
-        int signr, sigset_t *set);
-extern int setup_rt_frame(struct k_sigaction * ka, struct pt_regs *regs,
-        int signr, sigset_t *set, siginfo_t *info);
-
 struct mips_abi mips_abi = {
 	.do_signal	= do_signal,
 #ifdef CONFIG_TRAD_SIGNALS
@@ -83,11 +83,6 @@ struct mips_abi mips_abi = {
 /*
  * o32 compatibility on 64-bit kernels, without DSP ASE
  */
-extern int setup_frame_32(struct k_sigaction * ka, struct pt_regs *regs,
-        int signr, sigset_t *set);
-extern int setup_rt_frame_32(struct k_sigaction * ka, struct pt_regs *regs,
-        int signr, sigset_t *set, siginfo_t *info);
-
 struct mips_abi mips_abi_32 = {
 	.do_signal	= do_signal32,
 	.setup_frame	= setup_frame_32,
@@ -99,9 +94,6 @@ struct mips_abi mips_abi_32 = {
 /*
  * N32 on 64-bit kernels, without DSP ASE
  */
-extern int setup_rt_frame_n32(struct k_sigaction * ka, struct pt_regs *regs,
-        int signr, sigset_t *set, siginfo_t *info);
-
 struct mips_abi mips_abi_n32 = {
 	.do_signal	= do_signal,
 	.setup_rt_frame	= setup_rt_frame_n32
@@ -192,6 +184,17 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	p->thread.cp0_status = read_c0_status() & ~(ST0_CU2|ST0_CU1);
 	childregs->cp0_status &= ~(ST0_CU2|ST0_CU1);
 	clear_tsk_thread_flag(p, TIF_USEDFPU);
+
+#ifdef CONFIG_MIPS_MT_FPAFF
+	/*
+	 * FPU affinity support is cleaner if we track the
+	 * user-visible CPU affinity from the very beginning.
+	 * The generic cpus_allowed mask will already have
+	 * been copied from the parent before copy_thread
+	 * is invoked.
+	 */
+	p->thread.user_cpus_allowed = p->cpus_allowed;
+#endif /* CONFIG_MIPS_MT_FPAFF */
 
 	if (clone_flags & CLONE_SETTLS)
 		ti->tp_value = regs->regs[7];
@@ -435,4 +438,3 @@ unsigned long get_wchan(struct task_struct *p)
 	return pc;
 }
 
-EXPORT_SYMBOL(get_wchan);

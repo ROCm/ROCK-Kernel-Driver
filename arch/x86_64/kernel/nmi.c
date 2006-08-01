@@ -25,7 +25,6 @@
 #include <linux/nmi.h>
 #include <linux/sysctl.h>
 #include <linux/kprobes.h>
-#include <linux/dump.h>
 
 #include <asm/smp.h>
 #include <asm/mtrr.h>
@@ -164,9 +163,7 @@ int __init check_nmi_watchdog (void)
 	local_irq_enable();
 	mdelay((10*1000)/nmi_hz); // wait 10 ticks
 
-	for (cpu = 0; cpu < NR_CPUS; cpu++) {
-		if (!cpu_online(cpu))
-			continue;
+	for_each_online_cpu(cpu) {
 		if (cpu_pda(cpu)->__nmi_count - counts[cpu] <= 5) {
 			endflag = 1;
 			printk("CPU#%d: NMI appears to be stuck (%d->%d)!\n",
@@ -544,6 +541,7 @@ asmlinkage __kprobes void do_nmi(struct pt_regs * regs, long error_code)
 
 void set_nmi_callback(nmi_callback_t callback)
 {
+	vmalloc_sync_all();
 	rcu_assign_pointer(nmi_callback, callback);
 }
 

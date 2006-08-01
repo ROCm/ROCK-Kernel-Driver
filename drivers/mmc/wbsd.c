@@ -44,15 +44,10 @@
 #define DRIVER_NAME "wbsd"
 #define DRIVER_VERSION "1.5"
 
-#ifdef CONFIG_MMC_DEBUG
 #define DBG(x...) \
-	printk(KERN_DEBUG DRIVER_NAME ": " x)
+	pr_debug(DRIVER_NAME ": " x)
 #define DBGF(f, x...) \
-	printk(KERN_DEBUG DRIVER_NAME " [%s()]: " f, __func__ , ##x)
-#else
-#define DBG(x...)	do { } while (0)
-#define DBGF(x...)	do { } while (0)
-#endif
+	pr_debug(DRIVER_NAME " [%s()]: " f, __func__ , ##x)
 
 /*
  * Device resources
@@ -667,14 +662,14 @@ static void wbsd_prepare_data(struct wbsd_host *host, struct mmc_data *data)
 	unsigned long dmaflags;
 
 	DBGF("blksz %04x blks %04x flags %08x\n",
-		1 << data->blksz_bits, data->blocks, data->flags);
+		data->blksz, data->blocks, data->flags);
 	DBGF("tsac %d ms nsac %d clk\n",
 		data->timeout_ns / 1000000, data->timeout_clks);
 
 	/*
 	 * Calculate size.
 	 */
-	host->size = data->blocks << data->blksz_bits;
+	host->size = data->blocks * data->blksz;
 
 	/*
 	 * Check timeout values for overflow.
@@ -701,12 +696,12 @@ static void wbsd_prepare_data(struct wbsd_host *host, struct mmc_data *data)
 	 * Two bytes are needed for each data line.
 	 */
 	if (host->bus_width == MMC_BUS_WIDTH_1) {
-		blksize = (1 << data->blksz_bits) + 2;
+		blksize = data->blksz + 2;
 
 		wbsd_write_index(host, WBSD_IDX_PBSMSB, (blksize >> 4) & 0xF0);
 		wbsd_write_index(host, WBSD_IDX_PBSLSB, blksize & 0xFF);
 	} else if (host->bus_width == MMC_BUS_WIDTH_4) {
-		blksize = (1 << data->blksz_bits) + 2 * 4;
+		blksize = data->blksz + 2 * 4;
 
 		wbsd_write_index(host, WBSD_IDX_PBSMSB,
 			((blksize >> 4) & 0xF0) | WBSD_DATA_WIDTH);
@@ -935,10 +930,6 @@ static void wbsd_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 {
 	struct wbsd_host *host = mmc_priv(mmc);
 	u8 clk, setup, pwr;
-
-	DBGF("clock %uHz busmode %u powermode %u cs %u Vdd %u width %u\n",
-		ios->clock, ios->bus_mode, ios->power_mode, ios->chip_select,
-		ios->vdd, ios->bus_width);
 
 	spin_lock_bh(&host->lock);
 

@@ -473,7 +473,7 @@ static int __init fb_console_setup(char *this_opt)
 	int i, j;
 
 	if (!this_opt || !*this_opt)
-		return 0;
+		return 1;
 
 	while ((options = strsep(&this_opt, ",")) != NULL) {
 		if (!strncmp(options, "font:", 5))
@@ -488,10 +488,10 @@ static int __init fb_console_setup(char *this_opt)
 					options++;
 				}
 				if (*options != ',')
-					return 0;
+					return 1;
 				options++;
 			} else
-				return 0;
+				return 1;
 		}
 		
 		if (!strncmp(options, "map:", 4)) {
@@ -503,7 +503,7 @@ static int __init fb_console_setup(char *this_opt)
 					con2fb_map_boot[i] =
 						(options[j++]-'0') % FB_MAX;
 				}
-			return 0;
+			return 1;
 		}
 
 		if (!strncmp(options, "vc:", 3)) {
@@ -525,7 +525,7 @@ static int __init fb_console_setup(char *this_opt)
 				rotate = 0;
 		}
 	}
-	return 0;
+	return 1;
 }
 
 __setup("fbcon=", fb_console_setup);
@@ -1163,6 +1163,7 @@ static void fbcon_init(struct vc_data *vc, int init)
 		set_blitting_type(vc, info);
 	}
 
+	ops->p = &fb_display[fg_console];
 }
 
 static void fbcon_deinit(struct vc_data *vc)
@@ -1769,7 +1770,7 @@ static int fbcon_scroll(struct vc_data *vc, int t, int b, int dir,
 					fbcon_redraw_move(vc, p, 0, t, count);
 				ypan_up_redraw(vc, t, count);
 				if (vc->vc_rows - b > 0)
-					fbcon_redraw_move(vc, p, b - count,
+					fbcon_redraw_move(vc, p, b,
 							  vc->vc_rows - b, b);
 			} else
 				fbcon_redraw_move(vc, p, t + count, b - t - count, t);

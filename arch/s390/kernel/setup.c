@@ -297,34 +297,19 @@ void (*_machine_power_off)(void) = do_machine_power_off_nonsmp;
 
 void machine_restart(char *command)
 {
-	if (!in_interrupt() || oops_in_progress)
-		/*
-		 * Only unblank the console if we are called in enabled
-		 * context or a bust_spinlocks cleared the way for us.
-		 */
-		console_unblank();
+	console_unblank();
 	_machine_restart(command);
 }
 
 void machine_halt(void)
 {
-	if (!in_interrupt() || oops_in_progress)
-		/*
-		 * Only unblank the console if we are called in enabled
-		 * context or a bust_spinlocks cleared the way for us.
-		 */
-		console_unblank();
+	console_unblank();
 	_machine_halt();
 }
 
 void machine_power_off(void)
 {
-	if (!in_interrupt() || oops_in_progress)
-		/*
-		 * Only unblank the console if we are called in enabled
-		 * context or a bust_spinlocks cleared the way for us.
-		 */
-		console_unblank();
+	console_unblank();
 	_machine_power_off();
 }
 

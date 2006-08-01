@@ -50,7 +50,7 @@ qla2x00_sysfs_write_fw_dump(struct kobject *kobj, char *buf, loff_t off,
 			    ha->host_no);
 
 			vfree(ha->fw_dump_buffer);
-			if (!IS_QLA24XX(ha) && !IS_QLA25XX(ha))
+			if (!IS_QLA24XX(ha) && !IS_QLA54XX(ha))
 				free_pages((unsigned long)ha->fw_dump,
 				    ha->fw_dump_order);
 
@@ -64,7 +64,7 @@ qla2x00_sysfs_write_fw_dump(struct kobject *kobj, char *buf, loff_t off,
 		if ((ha->fw_dump || ha->fw_dumped) && !ha->fw_dump_reading) {
 			ha->fw_dump_reading = 1;
 
-			if (IS_QLA24XX(ha) || IS_QLA25XX(ha))
+			if (IS_QLA24XX(ha) || IS_QLA54XX(ha))
 				dump_size = FW_DUMP_SIZE_24XX;
 			else {
 				dump_size = FW_DUMP_SIZE_1M;
@@ -138,7 +138,7 @@ qla2x00_sysfs_write_nvram(struct kobject *kobj, char *buf, loff_t off,
 		return 0;
 
 	/* Checksum NVRAM. */
-	if (IS_QLA24XX(ha) || IS_QLA25XX(ha)) {
+	if (IS_QLA24XX(ha) || IS_QLA54XX(ha)) {
 		uint32_t *iter;
 		uint32_t chksum;
 
@@ -319,7 +319,7 @@ qla2x00_sysfs_read_vpd(struct kobject *kobj, char *buf, loff_t off,
 	if (!capable(CAP_SYS_ADMIN) || off != 0)
 		return 0;
 
-	if (!IS_QLA24XX(ha) && !IS_QLA25XX(ha))
+	if (!IS_QLA24XX(ha) && !IS_QLA54XX(ha))
 		return -ENOTSUPP;
 
 	/* Read NVRAM. */
@@ -341,7 +341,7 @@ qla2x00_sysfs_write_vpd(struct kobject *kobj, char *buf, loff_t off,
 	if (!capable(CAP_SYS_ADMIN) || off != 0 || count != ha->vpd_size)
 		return 0;
 
-	if (!IS_QLA24XX(ha) && !IS_QLA25XX(ha))
+	if (!IS_QLA24XX(ha) && !IS_QLA54XX(ha))
 		return -ENOTSUPP;
 
 	/* Write NVRAM. */
@@ -358,7 +358,7 @@ static struct bin_attribute sysfs_vpd_attr = {
 		.mode = S_IRUSR | S_IWUSR,
 		.owner = THIS_MODULE,
 	},
-	.size = FA_NVRAM_VPD_SIZE,
+	.size = 0,
 	.read = qla2x00_sysfs_read_vpd,
 	.write = qla2x00_sysfs_write_vpd,
 };
@@ -507,9 +507,6 @@ qla2x00_zio_show(struct class_device *cdev, char *buf)
 	int len = 0;
 
 	switch (ha->zio_mode) {
-	case QLA_ZIO_MODE_5:
-		len += snprintf(buf + len, PAGE_SIZE-len, "Mode 5\n");
-		break;
 	case QLA_ZIO_MODE_6:
 		len += snprintf(buf + len, PAGE_SIZE-len, "Mode 6\n");
 		break;
@@ -527,20 +524,16 @@ qla2x00_zio_store(struct class_device *cdev, const char *buf, size_t count)
 	int val = 0;
 	uint16_t zio_mode;
 
+	if (!IS_ZIO_SUPPORTED(ha))
+		return -ENOTSUPP;
+
 	if (sscanf(buf, "%d", &val) != 1)
 		return -EINVAL;
 
-	switch (val) {
-	case 1:
-		zio_mode = QLA_ZIO_MODE_5;
-		break;
-	case 2:
+	if (val)
 		zio_mode = QLA_ZIO_MODE_6;
-		break;
-	default:
+	else
 		zio_mode = QLA_ZIO_DISABLED;
-		break;
-	}
 
 	/* Update per-hba values and queue a reset. */
 	if (zio_mode != QLA_ZIO_DISABLED || ha->zio_mode != QLA_ZIO_DISABLED) {
@@ -807,7 +800,7 @@ qla2x00_get_fc_host_stats(struct Scsi_Host *shost)
 	pfc_host_stat = &ha->fc_host_stat;
 	memset(pfc_host_stat, -1, sizeof(struct fc_host_statistics));
 
-	if (IS_QLA24XX(ha) || IS_QLA25XX(ha)) {
+	if (IS_QLA24XX(ha) || IS_QLA54XX(ha)) {
 		rval = qla24xx_get_isp_stats(ha, (uint32_t *)&stat_buf,
 		    sizeof(stat_buf) / 4, mb_stat);
 	} else {

@@ -52,6 +52,14 @@ MODULE_DESCRIPTION("Mellanox InfiniBand HCA low-level driver");
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_VERSION(DRV_VERSION);
 
+#ifdef CONFIG_INFINIBAND_MTHCA_DEBUG
+
+int mthca_debug_level = 0;
+module_param_named(debug_level, mthca_debug_level, int, 0644);
+MODULE_PARM_DESC(debug_level, "Enable debug tracing if > 0");
+
+#endif /* CONFIG_INFINIBAND_MTHCA_DEBUG */
+
 #ifdef CONFIG_PCI_MSI
 
 static int msi_x = 0;
@@ -68,6 +76,10 @@ MODULE_PARM_DESC(msi, "attempt to use MSI if nonzero");
 #define msi   (0)
 
 #endif /* CONFIG_PCI_MSI */
+
+static int tune_pci = 0;
+module_param(tune_pci, int, 0444);
+MODULE_PARM_DESC(tune_pci, "increase PCI burst from the default set by BIOS if nonzero");
 
 static const char mthca_version[] __devinitdata =
 	DRV_NAME ": Mellanox InfiniBand HCA driver v"
@@ -89,6 +101,9 @@ static int __devinit mthca_tune_pci(struct mthca_dev *mdev)
 {
 	int cap;
 	u16 val;
+
+	if (!tune_pci)
+		return 0;
 
 	/* First try to max out Read Byte Count */
 	cap = pci_find_capability(mdev->pdev, PCI_CAP_ID_PCIX);
@@ -176,6 +191,7 @@ static int __devinit mthca_dev_lim(struct mthca_dev *mdev, struct mthca_dev_lim 
 	mdev->limits.reserved_srqs      = dev_lim->reserved_srqs;
 	mdev->limits.reserved_eecs      = dev_lim->reserved_eecs;
 	mdev->limits.max_desc_sz        = dev_lim->max_desc_sz;
+	mdev->limits.max_srq_sge	= mthca_max_srq_sge(mdev);
 	/*
 	 * Subtract 1 from the limit because we need to allocate a
 	 * spare CQE so the HCA HW can tell the difference between an
@@ -191,6 +207,18 @@ static int __devinit mthca_dev_lim(struct mthca_dev *mdev, struct mthca_dev_lim 
 	mdev->limits.port_width_cap     = dev_lim->max_port_width;
 	mdev->limits.page_size_cap      = ~(u32) (dev_lim->min_page_sz - 1);
 	mdev->limits.flags              = dev_lim->flags;
+	/*
+	 * For old FW that doesn't return static rate support, use a
+	 * value of 0x3 (only static rate values of 0 or 1 are handled),
+	 * except on Sinai, where even old FW can handle static rate
+	 * values of 2 and 3.
+	 */
+	if (dev_lim->stat_rate_support)
+		mdev->limits.stat_rate_support = dev_lim->stat_rate_support;
+	else if (mdev->mthca_flags & MTHCA_FLAG_SINAI_OPT)
+		mdev->limits.stat_rate_support = 0xf;
+	else
+		mdev->limits.stat_rate_support = 0x3;
 
 	/* IB_DEVICE_RESIZE_MAX_WR not supported by driver.
 	   May be doable since hardware supports it for SRQ.
@@ -935,13 +963,19 @@ enum {
 
 static struct {
 	u64 latest_fw;
-	int is_memfree;
-	int is_pcie;
+	u32 flags;
 } mthca_hca_table[] = {
-	[TAVOR]        = { .latest_fw = MTHCA_FW_VER(3, 3, 3), .is_memfree = 0, .is_pcie = 0 },
-	[ARBEL_COMPAT] = { .latest_fw = MTHCA_FW_VER(4, 7, 0), .is_memfree = 0, .is_pcie = 1 },
-	[ARBEL_NATIVE] = { .latest_fw = MTHCA_FW_VER(5, 1, 0), .is_memfree = 1, .is_pcie = 1 },
-	[SINAI]        = { .latest_fw = MTHCA_FW_VER(1, 0, 1), .is_memfree = 1, .is_pcie = 1 }
+	[TAVOR]        = { .latest_fw = MTHCA_FW_VER(3, 4, 0),
+			   .flags     = 0 },
+	[ARBEL_COMPAT] = { .latest_fw = MTHCA_FW_VER(4, 7, 400),
+			   .flags     = MTHCA_FLAG_PCIE },
+	[ARBEL_NATIVE] = { .latest_fw = MTHCA_FW_VER(5, 1, 0),
+			   .flags     = MTHCA_FLAG_MEMFREE |
+					MTHCA_FLAG_PCIE },
+	[SINAI]        = { .latest_fw = MTHCA_FW_VER(1, 0, 800),
+			   .flags     = MTHCA_FLAG_MEMFREE |
+					MTHCA_FLAG_PCIE    |
+					MTHCA_FLAG_SINAI_OPT }
 };
 
 static int __devinit mthca_init_one(struct pci_dev *pdev,
@@ -1031,12 +1065,9 @@ static int __devinit mthca_init_one(struct pci_dev *pdev,
 
 	mdev->pdev = pdev;
 
+	mdev->mthca_flags = mthca_hca_table[id->driver_data].flags;
 	if (ddr_hidden)
 		mdev->mthca_flags |= MTHCA_FLAG_DDR_HIDDEN;
-	if (mthca_hca_table[id->driver_data].is_memfree)
-		mdev->mthca_flags |= MTHCA_FLAG_MEMFREE;
-	if (mthca_hca_table[id->driver_data].is_pcie)
-		mdev->mthca_flags |= MTHCA_FLAG_PCIE;
 
 	/*
 	 * Now reset the HCA before we touch the PCI capabilities or

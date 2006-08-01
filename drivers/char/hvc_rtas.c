@@ -36,7 +36,7 @@
 
 #include <asm/irq.h>
 #include <asm/rtas.h>
-#include <asm/hvconsole.h>
+#include "hvc_console.h"
 
 #define hvc_rtas_cookie 0x67781e15
 struct hvc_struct *hvc_rtas_dev;
@@ -119,7 +119,7 @@ static void __exit hvc_rtas_exit(void)
 	if (hvc_rtas_dev)
 		hvc_remove(hvc_rtas_dev);
 }
-module_exit(hvc_rtas_exit); /* before drivers/char/hvc_console.c */
+module_exit(hvc_rtas_exit);
 
 /* This will happen prior to module init.  There is no tty at this time? */
 static int hvc_rtas_console_init(void)

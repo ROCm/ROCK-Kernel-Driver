@@ -31,7 +31,6 @@
 #include <asm/irq.h>
 #include <asm/hw_irq.h>
 
-
 /*
  * Low-level SAL-based PCI configuration access functions. Note that SAL
  * calls are already serialized (via sal_lock), so we don't need another
@@ -646,16 +645,7 @@ char *ia64_pci_get_legacy_mem(struct pci_bus *bus)
 int
 pci_mmap_legacy_page_range(struct pci_bus *bus, struct vm_area_struct *vma)
 {
-	unsigned long size;
 	char *addr;
-
-	/*
-	 * If we allow WB access to the region, we can't map it
-	 * UC at the same time.
-	 */
-	size = vma->vm_end - vma->vm_start;
-	if (valid_phys_addr_range(vma->vm_pgoff << PAGE_SHIFT, &size))
-		return -EINVAL;
 
 	addr = pci_get_legacy_mem(bus);
 	if (IS_ERR(addr))
@@ -666,7 +656,7 @@ pci_mmap_legacy_page_range(struct pci_bus *bus, struct vm_area_struct *vma)
 	vma->vm_flags |= (VM_SHM | VM_RESERVED | VM_IO);
 
 	if (remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
-			    size, vma->vm_page_prot))
+			    vma->vm_end - vma->vm_start, vma->vm_page_prot))
 		return -EAGAIN;
 
 	return 0;
@@ -716,7 +706,7 @@ int ia64_pci_legacy_read(struct pci_bus *bus, u16 port, u32 *val, u8 size)
  *
  * Simply writes @size bytes of @val to @port.
  */
-int ia64_pci_legacy_write(struct pci_dev *bus, u16 port, u32 val, u8 size)
+int ia64_pci_legacy_write(struct pci_bus *bus, u16 port, u32 val, u8 size)
 {
 	int ret = size;
 

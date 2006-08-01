@@ -49,6 +49,28 @@ config MMC_PXA
 
 	  If unsure, say N.
 
+config MMC_SDHCI
+	tristate "Secure Digital Host Controller Interface support  (EXPERIMENTAL)"
+	depends on PCI && MMC && EXPERIMENTAL
+	help
+	  This select the generic Secure Digital Host Controller Interface.
+	  It is used by manufacturers such as Texas Instruments(R), Ricoh(R)
+	  and Toshiba(R). Most controllers found in laptops are of this type.
+	  If you have a controller with this interface, say Y or M here.
+
+	  If unsure, say N.
+
+config MMC_OMAP
+	tristate "TI OMAP Multimedia Card Interface support"
+	depends on ARCH_OMAP && MMC
+	select TPS65010 if MACH_OMAP_H2
+	help
+	  This selects the TI OMAP Multimedia card Interface.
+	  If you have an OMAP board with a Multimedia Card slot,
+	  say Y or M here.
+
+	  If unsure, say N.
+
 config MMC_WBSD
 	tristate "Winbond W83L51xD SD/MMC Card Interface support"
 	depends on MMC && ISA_DMA_API
@@ -62,10 +84,28 @@ config MMC_WBSD
 
 config MMC_AU1X
 	tristate "Alchemy AU1XX0 MMC Card Interface support"
-	depends on SOC_AU1X00 && MMC
+	depends on MMC && SOC_AU1200
 	help
 	  This selects the AMD Alchemy(R) Multimedia card interface.
 	  If you have a Alchemy platform with a MMC slot, say Y or M here.
+
+	  If unsure, say N.
+
+config MMC_AT91RM9200
+	tristate "AT91RM9200 SD/MMC Card Interface support"
+	depends on ARCH_AT91RM9200 && MMC
+	help
+	  This selects the AT91RM9200 MCI controller.
+
+	  If unsure, say N.
+
+config MMC_IMX
+	tristate "Motorola i.MX Multimedia Card Interface support"
+	depends on ARCH_IMX && MMC
+	help
+	  This selects the Motorola i.MX Multimedia card Interface.
+	  If you have a i.MX platform with a Multimedia Card slot,
+	  say Y or M here.
 
 	  If unsure, say N.
 

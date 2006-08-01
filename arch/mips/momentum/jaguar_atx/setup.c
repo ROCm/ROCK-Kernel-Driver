@@ -229,8 +229,8 @@ void momenco_time_init(void)
 	mips_hpt_frequency = cpu_clock / 2;
 	board_timer_setup = momenco_timer_setup;
 
-	rtc_get_time = m48t37y_get_time;
-	rtc_set_time = m48t37y_set_time;
+	rtc_mips_get_time = m48t37y_get_time;
+	rtc_mips_set_time = m48t37y_set_time;
 }
 
 static struct resource mv_pci_io_mem0_resource = {
@@ -381,24 +381,24 @@ void __init plat_setup(void)
 	 * shut down ethernet ports, just to be sure our memory doesn't get
 	 * corrupted by random ethernet traffic.
 	 */
-	MV_WRITE(MV64340_ETH_TRANSMIT_QUEUE_COMMAND_REG(0), 0xff << 8);
-	MV_WRITE(MV64340_ETH_TRANSMIT_QUEUE_COMMAND_REG(1), 0xff << 8);
-	MV_WRITE(MV64340_ETH_TRANSMIT_QUEUE_COMMAND_REG(2), 0xff << 8);
-	MV_WRITE(MV64340_ETH_RECEIVE_QUEUE_COMMAND_REG(0), 0xff << 8);
-	MV_WRITE(MV64340_ETH_RECEIVE_QUEUE_COMMAND_REG(1), 0xff << 8);
-	MV_WRITE(MV64340_ETH_RECEIVE_QUEUE_COMMAND_REG(2), 0xff << 8);
-	while (MV_READ(MV64340_ETH_RECEIVE_QUEUE_COMMAND_REG(0)) & 0xff);
-	while (MV_READ(MV64340_ETH_RECEIVE_QUEUE_COMMAND_REG(1)) & 0xff);
-	while (MV_READ(MV64340_ETH_RECEIVE_QUEUE_COMMAND_REG(2)) & 0xff);
-	while (MV_READ(MV64340_ETH_TRANSMIT_QUEUE_COMMAND_REG(0)) & 0xff);
-	while (MV_READ(MV64340_ETH_TRANSMIT_QUEUE_COMMAND_REG(1)) & 0xff);
-	while (MV_READ(MV64340_ETH_TRANSMIT_QUEUE_COMMAND_REG(2)) & 0xff);
-	MV_WRITE(MV64340_ETH_PORT_SERIAL_CONTROL_REG(0),
-	         MV_READ(MV64340_ETH_PORT_SERIAL_CONTROL_REG(0)) & ~1);
-	MV_WRITE(MV64340_ETH_PORT_SERIAL_CONTROL_REG(1),
-	         MV_READ(MV64340_ETH_PORT_SERIAL_CONTROL_REG(1)) & ~1);
-	MV_WRITE(MV64340_ETH_PORT_SERIAL_CONTROL_REG(2),
-	         MV_READ(MV64340_ETH_PORT_SERIAL_CONTROL_REG(2)) & ~1);
+	MV_WRITE(MV643XX_ETH_TRANSMIT_QUEUE_COMMAND_REG(0), 0xff << 8);
+	MV_WRITE(MV643XX_ETH_TRANSMIT_QUEUE_COMMAND_REG(1), 0xff << 8);
+	MV_WRITE(MV643XX_ETH_TRANSMIT_QUEUE_COMMAND_REG(2), 0xff << 8);
+	MV_WRITE(MV643XX_ETH_RECEIVE_QUEUE_COMMAND_REG(0), 0xff << 8);
+	MV_WRITE(MV643XX_ETH_RECEIVE_QUEUE_COMMAND_REG(1), 0xff << 8);
+	MV_WRITE(MV643XX_ETH_RECEIVE_QUEUE_COMMAND_REG(2), 0xff << 8);
+	while (MV_READ(MV643XX_ETH_RECEIVE_QUEUE_COMMAND_REG(0)) & 0xff);
+	while (MV_READ(MV643XX_ETH_RECEIVE_QUEUE_COMMAND_REG(1)) & 0xff);
+	while (MV_READ(MV643XX_ETH_RECEIVE_QUEUE_COMMAND_REG(2)) & 0xff);
+	while (MV_READ(MV643XX_ETH_TRANSMIT_QUEUE_COMMAND_REG(0)) & 0xff);
+	while (MV_READ(MV643XX_ETH_TRANSMIT_QUEUE_COMMAND_REG(1)) & 0xff);
+	while (MV_READ(MV643XX_ETH_TRANSMIT_QUEUE_COMMAND_REG(2)) & 0xff);
+	MV_WRITE(MV643XX_ETH_PORT_SERIAL_CONTROL_REG(0),
+	         MV_READ(MV643XX_ETH_PORT_SERIAL_CONTROL_REG(0)) & ~1);
+	MV_WRITE(MV643XX_ETH_PORT_SERIAL_CONTROL_REG(1),
+	         MV_READ(MV643XX_ETH_PORT_SERIAL_CONTROL_REG(1)) & ~1);
+	MV_WRITE(MV643XX_ETH_PORT_SERIAL_CONTROL_REG(2),
+	         MV_READ(MV643XX_ETH_PORT_SERIAL_CONTROL_REG(2)) & ~1);
 
 	/* Turn off the Bit-Error LED */
 	JAGUAR_FPGA_WRITE(0x80, CLR);
@@ -461,7 +461,7 @@ void __init plat_setup(void)
 	  unsigned int tbControl;
 	  tbControl =
 	    0 << 26 |  /* post trigger delay 0 */
-	    	    0x2 << 16 |		/* sequential trace mode */
+		    0x2 << 16 |		/* sequential trace mode */
 	    //	    0x0 << 16 |		/* non-sequential trace mode */
 	    //	    0xf << 4 |		/* watchpoints disabled */
 	    2 << 2 |		/* armed */

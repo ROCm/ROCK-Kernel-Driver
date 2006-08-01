@@ -503,7 +503,7 @@ ia32_sys_call_table:
 	.quad sys_setdomainname
 	.quad sys_uname
 	.quad sys_modify_ldt
-	.quad sys32_adjtimex
+	.quad compat_sys_adjtimex
 	.quad sys32_mprotect		/* 125 */
 	.quad compat_sys_sigprocmask
 	.quad quiet_ni_syscall		/* create_module */
@@ -687,7 +687,13 @@ ia32_sys_call_table:
 	.quad sys_readlinkat		/* 305 */
 	.quad sys_fchmodat
 	.quad sys_faccessat
-	.quad sys_ni_syscall		/* pselect6 for now */
-	.quad sys_ni_syscall		/* ppoll for now */
+	.quad quiet_ni_syscall		/* pselect6 for now */
+	.quad quiet_ni_syscall		/* ppoll for now */
 	.quad sys_unshare		/* 310 */
+	.quad compat_sys_set_robust_list
+	.quad compat_sys_get_robust_list
+	.quad sys_splice
+	.quad sys_sync_file_range
+	.quad sys_tee
+	.quad compat_sys_vmsplice
 ia32_syscall_end:		

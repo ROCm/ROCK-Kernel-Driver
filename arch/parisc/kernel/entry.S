@@ -502,18 +502,20 @@
 	 * all ILP32 processes and all the kernel for machines with
 	 * under 4GB of memory) */
 	.macro		L3_ptep pgd,pte,index,va,fault
+#if PT_NLEVELS == 3 /* we might have a 2-Level scheme, e.g. with 16kb page size */
 	extrd,u		\va,63-ASM_PGDIR_SHIFT,ASM_BITS_PER_PGD,\index
 	copy		%r0,\pte
-	extrd,u,*=	\va,31,32,%r0
+	extrd,u,*=	\va,63-ASM_PGDIR_SHIFT,64-ASM_PGDIR_SHIFT,%r0
 	ldw,s		\index(\pgd),\pgd
-	extrd,u,*=	\va,31,32,%r0
+	extrd,u,*=	\va,63-ASM_PGDIR_SHIFT,64-ASM_PGDIR_SHIFT,%r0
 	bb,>=,n		\pgd,_PxD_PRESENT_BIT,\fault
-	extrd,u,*=	\va,31,32,%r0
+	extrd,u,*=	\va,63-ASM_PGDIR_SHIFT,64-ASM_PGDIR_SHIFT,%r0
 	shld		\pgd,PxD_VALUE_SHIFT,\index
-	extrd,u,*=	\va,31,32,%r0
+	extrd,u,*=	\va,63-ASM_PGDIR_SHIFT,64-ASM_PGDIR_SHIFT,%r0
 	copy		\index,\pgd
-	extrd,u,*<>	\va,31,32,%r0
+	extrd,u,*<>	\va,63-ASM_PGDIR_SHIFT,64-ASM_PGDIR_SHIFT,%r0
 	ldo		ASM_PGD_PMD_OFFSET(\pgd),\pgd
+#endif
 	L2_ptep		\pgd,\pte,\index,\va,\fault
 	.endm
 
@@ -563,10 +565,18 @@
 	extrd,u,*= 	\pte,_PAGE_GATEWAY_BIT+32,1,%r0
 	depd		%r0,11,2,\prot	/* If Gateway, Set PL2 to 0 */
 
-	/* Get rid of prot bits and convert to page addr for iitlbt */
+	/* Enforce uncacheable pages.
+	 * This should ONLY be use for MMIO on PA 2.0 machines.
+	 * Memory/DMA is cache coherent on all PA2.0 machines we support
+	 * (that means T-class is NOT supported) and the memory controllers
+	 * on most of those machines only handles cache transactions.
+	 */
+	extrd,u,*=	\pte,_PAGE_NO_CACHE_BIT+32,1,%r0
+	depi		1,12,1,\prot
 
-	depd		%r0,63,PAGE_SHIFT,\pte
-	extrd,u		\pte,56,32,\pte
+	/* Drop prot bits and convert to page addr for iitlbt and idtlbt */
+	extrd,u		\pte,(63-ASM_PFN_PTE_SHIFT)+(63-58),64-PAGE_SHIFT,\pte
+	depdi		_PAGE_SIZE_ENCODING_DEFAULT,63,63-58,\pte
 	.endm
 
 	/* Identical macro to make_insert_tlb above, except it
@@ -584,9 +594,8 @@
 
 	/* Get rid of prot bits and convert to page addr for iitlba */
 
-	depi		0,31,12,\pte
+	depi		_PAGE_SIZE_ENCODING_DEFAULT,31,ASM_PFN_PTE_SHIFT,\pte
 	extru		\pte,24,25,\pte
-
 	.endm
 
 	/* This is for ILP32 PA2.0 only.  The TLB insertion needs
@@ -1014,14 +1023,21 @@ intr_restore:
 	nop
 	nop
 
+#ifndef CONFIG_PREEMPT
+# define intr_do_preempt	intr_restore
+#endif /* !CONFIG_PREEMPT */
+
 	.import schedule,code
 intr_do_resched:
-	/* Only do reschedule if we are returning to user space */
+	/* Only call schedule on return to userspace. If we're returning
+	 * to kernel space, we may schedule if CONFIG_PREEMPT, otherwise
+	 * we jump back to intr_restore.
+	 */
 	LDREG	PT_IASQ0(%r16), %r20
-	CMPIB= 0,%r20,intr_restore /* backward */
+	CMPIB=	0, %r20, intr_do_preempt
 	nop
 	LDREG	PT_IASQ1(%r16), %r20
-	CMPIB= 0,%r20,intr_restore /* backward */
+	CMPIB=	0, %r20, intr_do_preempt
 	nop
 
 #ifdef CONFIG_64BIT
@@ -1037,6 +1053,32 @@ intr_do_resched:
 #endif
 	ldo	R%intr_check_sig(%r2), %r2
 
+	/* preempt the current task on returning to kernel
+	 * mode from an interrupt, iff need_resched is set,
+	 * and preempt_count is 0. otherwise, we continue on
+	 * our merry way back to the current running task.
+	 */
+#ifdef CONFIG_PREEMPT
+	.import preempt_schedule_irq,code
+intr_do_preempt:
+	rsm	PSW_SM_I, %r0		/* disable interrupts */
+
+	/* current_thread_info()->preempt_count */
+	mfctl	%cr30, %r1
+	LDREG	TI_PRE_COUNT(%r1), %r19
+	CMPIB<>	0, %r19, intr_restore	/* if preempt_count > 0 */
+	nop				/* prev insn branched backwards */
+
+	/* check if we interrupted a critical path */
+	LDREG	PT_PSW(%r16), %r20
+	bb,<,n	%r20, 31 - PSW_SM_I, intr_restore
+	nop
+
+	BL	preempt_schedule_irq, %r2
+	nop
+
+	b	intr_restore		/* ssm PSW_SM_I done by intr_restore */
+#endif /* CONFIG_PREEMPT */
 
 	.import do_signal,code
 intr_do_signal:
@@ -1168,10 +1210,9 @@ intr_save:
 	 */
 
 	/* adjust isr/ior. */
-
-	extrd,u         %r16,63,7,%r1    /* get high bits from isr for ior */
-	depd            %r1,31,7,%r17    /* deposit them into ior */
-	depdi           0,63,7,%r16      /* clear them from isr */
+	extrd,u         %r16,63,SPACEID_SHIFT,%r1	/* get high bits from isr for ior */
+	depd            %r1,31,SPACEID_SHIFT,%r17	/* deposit them into ior */
+	depdi           0,63,SPACEID_SHIFT,%r16		/* clear them from isr */
 #endif
 	STREG           %r16, PT_ISR(%r29)
 	STREG           %r17, PT_IOR(%r29)

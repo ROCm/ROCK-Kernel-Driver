@@ -666,5 +666,3 @@ void __init ip_fib_init(void)
 }
 
 EXPORT_SYMBOL(inet_addr_type);
-EXPORT_SYMBOL(ip_rt_ioctl);
-EXPORT_SYMBOL_GPL(ip_dev_find);

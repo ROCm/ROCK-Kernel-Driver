@@ -121,6 +121,10 @@ static __inline__ void fq_unlink(struct frag_queue *fq)
 	write_unlock(&ip6_frag_lock);
 }
 
+/*
+ * callers should be careful not to use the hash value outside the ipfrag_lock
+ * as doing so could race with ipfrag_hash_rnd being recalculated.
+ */
 static unsigned int ip6qhashfn(u32 id, struct in6_addr *saddr,
 			       struct in6_addr *daddr)
 {
@@ -203,7 +207,7 @@ static inline void frag_free_queue(struct frag_queue *fq, int *work)
 
 static inline struct frag_queue *frag_alloc_queue(void)
 {
-	struct frag_queue *fq = kmalloc(sizeof(struct frag_queue), GFP_ATOMIC);
+	struct frag_queue *fq = kzalloc(sizeof(struct frag_queue), GFP_ATOMIC);
 
 	if(!fq)
 		return NULL;
@@ -288,6 +292,7 @@ static void ip6_evictor(void)
 static void ip6_frag_expire(unsigned long data)
 {
 	struct frag_queue *fq = (struct frag_queue *) data;
+	struct net_device *dev;
 
 	spin_lock(&fq->lock);
 
@@ -299,22 +304,22 @@ static void ip6_frag_expire(unsigned long data)
 	IP6_INC_STATS_BH(IPSTATS_MIB_REASMTIMEOUT);
 	IP6_INC_STATS_BH(IPSTATS_MIB_REASMFAILS);
 
-	/* Send error only if the first segment arrived. */
-	if (fq->last_in&FIRST_IN && fq->fragments) {
-		struct net_device *dev = dev_get_by_index(fq->iif);
+	/* Don't send error if the first segment did not arrive. */
+	if (!(fq->last_in&FIRST_IN) || !fq->fragments)
+		goto out;
 
-		/*
-		   But use as source device on which LAST ARRIVED
-		   segment was received. And do not use fq->dev
-		   pointer directly, device might already disappeared.
-		 */
-		if (dev) {
-			fq->fragments->dev = dev;
-			icmpv6_send(fq->fragments, ICMPV6_TIME_EXCEED, ICMPV6_EXC_FRAGTIME, 0,
-				    dev);
-			dev_put(dev);
-		}
-	}
+	dev = dev_get_by_index(fq->iif);
+	if (!dev)
+		goto out;
+
+	/*
+	   But use as source device on which LAST ARRIVED
+	   segment was received. And do not use fq->dev
+	   pointer directly, device might already disappeared.
+	 */
+	fq->fragments->dev = dev;
+	icmpv6_send(fq->fragments, ICMPV6_TIME_EXCEED, ICMPV6_EXC_FRAGTIME, 0, dev);
+	dev_put(dev);
 out:
 	spin_unlock(&fq->lock);
 	fq_put(fq, NULL);
@@ -323,15 +328,16 @@ out:
 /* Creation primitives. */
 
 
-static struct frag_queue *ip6_frag_intern(unsigned int hash,
-					  struct frag_queue *fq_in)
+static struct frag_queue *ip6_frag_intern(struct frag_queue *fq_in)
 {
 	struct frag_queue *fq;
+	unsigned int hash;
 #ifdef CONFIG_SMP
 	struct hlist_node *n;
 #endif
 
 	write_lock(&ip6_frag_lock);
+	hash = ip6qhashfn(fq_in->id, &fq_in->saddr, &fq_in->daddr);
 #ifdef CONFIG_SMP
 	hlist_for_each_entry(fq, n, &ip6_frag_hash[hash], list) {
 		if (fq->id == fq_in->id && 
@@ -361,14 +367,12 @@ static struct frag_queue *ip6_frag_intern(unsigned int hash,
 
 
 static struct frag_queue *
-ip6_frag_create(unsigned int hash, u32 id, struct in6_addr *src, struct in6_addr *dst)
+ip6_frag_create(u32 id, struct in6_addr *src, struct in6_addr *dst)
 {
 	struct frag_queue *fq;
 
 	if ((fq = frag_alloc_queue()) == NULL)
 		goto oom;
-
-	memset(fq, 0, sizeof(struct frag_queue));
 
 	fq->id = id;
 	ipv6_addr_copy(&fq->saddr, src);
@@ -380,7 +384,7 @@ ip6_frag_create(unsigned int hash, u32 id, struct in6_addr *src, struct in6_addr
 	spin_lock_init(&fq->lock);
 	atomic_set(&fq->refcnt, 1);
 
-	return ip6_frag_intern(hash, fq);
+	return ip6_frag_intern(fq);
 
 oom:
 	IP6_INC_STATS_BH(IPSTATS_MIB_REASMFAILS);
@@ -392,9 +396,10 @@ fq_find(u32 id, struct in6_addr *src, struct in6_addr *dst)
 {
 	struct frag_queue *fq;
 	struct hlist_node *n;
-	unsigned int hash = ip6qhashfn(id, src, dst);
+	unsigned int hash;
 
 	read_lock(&ip6_frag_lock);
+	hash = ip6qhashfn(id, src, dst);
 	hlist_for_each_entry(fq, n, &ip6_frag_hash[hash], list) {
 		if (fq->id == id && 
 		    ipv6_addr_equal(src, &fq->saddr) &&
@@ -406,7 +411,7 @@ fq_find(u32 id, struct in6_addr *src, struct in6_addr *dst)
 	}
 	read_unlock(&ip6_frag_lock);
 
-	return ip6_frag_create(hash, id, src, dst);
+	return ip6_frag_create(id, src, dst);
 }
 
 

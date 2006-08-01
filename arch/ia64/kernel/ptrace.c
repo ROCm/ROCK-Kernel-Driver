@@ -1644,7 +1644,7 @@ syscall_trace_enter (long arg0, long arg1, long arg2, long arg3,
 			arch = AUDIT_ARCH_IA64;
 		}
 
-		audit_syscall_entry(current, arch, syscall, arg0, arg1, arg2, arg3);
+		audit_syscall_entry(arch, syscall, arg0, arg1, arg2, arg3);
 	}
 
 }
@@ -1656,8 +1656,14 @@ syscall_trace_leave (long arg0, long arg1, long arg2, long arg3,
 		     long arg4, long arg5, long arg6, long arg7,
 		     struct pt_regs regs)
 {
-	if (unlikely(current->audit_context))
-		audit_syscall_exit(current, AUDITSC_RESULT(regs.r10), regs.r8);
+	if (unlikely(current->audit_context)) {
+		int success = AUDITSC_RESULT(regs.r10);
+		long result = regs.r8;
+
+		if (success != AUDITSC_SUCCESS)
+			result = -result;
+		audit_syscall_exit(success, result);
+	}
 
 	if (test_thread_flag(TIF_SYSCALL_TRACE)
 	    && (current->ptrace & PT_PTRACED))

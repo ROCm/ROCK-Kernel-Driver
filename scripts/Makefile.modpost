@@ -4,7 +4,7 @@
 #
 # Stage one of module building created the following:
 # a) The individual .o files used for the module
-# b) A <module>.o file wich is the .o files above linked together
+# b) A <module>.o file which is the .o files above linked together
 # c) A <module>.mod file in $(MODVERDIR)/, listing the name of the
 #    the preliminary <module>.o file, plus all .o files
 
@@ -32,7 +32,7 @@
 # Step 4 is solely used to allow module versioning in external modules,
 # where the CRC of each module is retrieved from the Module.symers file.
 
-.PHONY: _modpost
+PHONY := _modpost
 _modpost: __modpost
 
 include .config
@@ -62,7 +62,7 @@ quiet_cmd_modpost = MODPOST
 				  $(objtree)/Module.supported /dev/null)) \
 	$(filter-out FORCE,$^)
 
-.PHONY: __modpost
+PHONY += __modpost
 __modpost: $(wildcard vmlinux) $(modules:.ko=.o) FORCE
 	$(call cmd,modpost)
 
@@ -99,7 +99,7 @@ targets += $(modules)
 # Add FORCE to the prequisites of a target to force it to be always rebuilt.
 # ---------------------------------------------------------------------------
 
-.PHONY: FORCE
+PHONY += FORCE
 
 FORCE:
 
@@ -114,3 +114,9 @@ cmd_files := $(wildcard $(foreach f,$(targets),$(dir $(f)).$(notdir $(f)).cmd))
 ifneq ($(cmd_files),)
   include $(cmd_files)
 endif
+
+
+# Declare the contents of the .PHONY variable as phony.  We keep that
+# information in a variable se we can use it in if_changed and friends.
+
+.PHONY: $(PHONY)

@@ -189,12 +189,10 @@ static ssize_t driver_bind(struct device_driver *drv,
 		if (dev->parent)
 			up(&dev->parent->sem);
 
-#ifdef CONFIG_XEN
 		if (err > 0) 		/* success */
 			err = count;
 		else if (err == 0)	/* driver didn't accept device */
 			err = -ENODEV;
-#endif
 	}
 	put_device(dev);
 	put_bus(bus);

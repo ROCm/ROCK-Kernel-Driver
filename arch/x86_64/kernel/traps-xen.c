@@ -30,7 +30,6 @@
 #include <linux/moduleparam.h>
 #include <linux/nmi.h>
 #include <linux/kprobes.h>
-#include <linux/kexec.h>
 
 #include <asm/system.h>
 #include <asm/uaccess.h>
@@ -390,7 +389,6 @@ void out_of_line_bug(void)
 
 static DEFINE_SPINLOCK(die_lock);
 static int die_owner = -1;
-static unsigned int die_nest_count;
 
 unsigned __kprobes long oops_begin(void)
 {
@@ -405,7 +403,6 @@ unsigned __kprobes long oops_begin(void)
 		else
 			spin_lock(&die_lock);
 	}
-	die_nest_count++;
 	die_owner = cpu;
 	console_verbose();
 	bust_spinlocks(1);
@@ -416,13 +413,7 @@ void __kprobes oops_end(unsigned long flags)
 { 
 	die_owner = -1;
 	bust_spinlocks(0);
-	die_nest_count--;
-	if (die_nest_count)
-		/* We still own the lock */
-		local_irq_restore(flags);
-	else
-		/* Nest count reaches zero, release the lock. */
-		spin_unlock_irqrestore(&die_lock, flags);
+	spin_unlock_irqrestore(&die_lock, flags);
 	if (panic_on_oops)
 		panic("Oops");
 }
@@ -441,15 +432,12 @@ void __kprobes __die(const char * str, struct pt_regs * regs, long err)
 	printk("DEBUG_PAGEALLOC");
 #endif
 	printk("\n");
-	sysfs_printk_last_file();
 	notify_die(DIE_OOPS, str, regs, err, current->thread.trap_no, SIGSEGV);
 	show_registers(regs);
 	/* Executive summary in case the oops scrolled away */
 	printk(KERN_ALERT "RIP ");
 	printk_address(regs->rip); 
 	printk(" RSP <%016lx>\n", regs->rsp); 
-	if (kexec_should_crash(current))
-		crash_kexec(regs);
 }
 
 void die(const char * str, struct pt_regs * regs, long err)
@@ -473,14 +461,10 @@ void __kprobes die_nmi(char *str, struct pt_regs *regs)
 	 */
 	printk(str, safe_smp_processor_id());
 	show_registers(regs);
-	if (kexec_should_crash(current))
-		crash_kexec(regs);
 	if (panic_on_timeout || panic_on_oops)
 		panic("nmi watchdog");
 	printk("console shuts up ...\n");
 	oops_end(flags);
-	nmi_exit();
-	local_irq_enable();
 	do_exit(SIGSEGV);
 }
 #endif

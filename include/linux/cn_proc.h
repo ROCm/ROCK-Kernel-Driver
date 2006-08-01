@@ -26,6 +26,7 @@
 #define CN_PROC_H
 
 #include <linux/types.h>
+#include <linux/time.h>
 #include <linux/connector.h>
 
 /*

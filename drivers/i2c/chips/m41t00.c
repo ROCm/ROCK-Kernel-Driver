@@ -24,13 +24,15 @@
 #include <linux/i2c.h>
 #include <linux/rtc.h>
 #include <linux/bcd.h>
+#include <linux/mutex.h>
+#include <linux/workqueue.h>
 
 #include <asm/time.h>
 #include <asm/rtc.h>
 
 #define	M41T00_DRV_NAME		"m41t00"
 
-static DECLARE_MUTEX(m41t00_mutex);
+static DEFINE_MUTEX(m41t00_mutex);
 
 static struct i2c_driver m41t00_driver;
 static struct i2c_client *save_client;
@@ -54,7 +56,7 @@ m41t00_get_rtc_time(void)
 	sec = min = hour = day = mon = year = 0;
 	sec1 = min1 = hour1 = day1 = mon1 = year1 = 0;
 
-	down(&m41t00_mutex);
+	mutex_lock(&m41t00_mutex);
 	do {
 		if (((sec = i2c_smbus_read_byte_data(save_client, 0)) >= 0)
 			&& ((min = i2c_smbus_read_byte_data(save_client, 1))
@@ -80,7 +82,7 @@ m41t00_get_rtc_time(void)
 		mon1 = mon;
 		year1 = year;
 	} while (--limit > 0);
-	up(&m41t00_mutex);
+	mutex_unlock(&m41t00_mutex);
 
 	if (limit == 0) {
 		dev_warn(&save_client->dev,
@@ -110,7 +112,7 @@ m41t00_get_rtc_time(void)
 }
 
 static void
-m41t00_set_tlet(ulong arg)
+m41t00_set(void *arg)
 {
 	struct rtc_time	tm;
 	ulong	nowtime = *(ulong *)arg;
@@ -125,7 +127,7 @@ m41t00_set_tlet(ulong arg)
 	BIN_TO_BCD(tm.tm_mday);
 	BIN_TO_BCD(tm.tm_year);
 
-	down(&m41t00_mutex);
+	mutex_lock(&m41t00_mutex);
 	if ((i2c_smbus_write_byte_data(save_client, 0, tm.tm_sec & 0x7f) < 0)
 		|| (i2c_smbus_write_byte_data(save_client, 1, tm.tm_min & 0x7f)
 			< 0)
@@ -140,13 +142,13 @@ m41t00_set_tlet(ulong arg)
 
 		dev_warn(&save_client->dev,"m41t00: can't write to rtc chip\n");
 
-	up(&m41t00_mutex);
+	mutex_unlock(&m41t00_mutex);
 	return;
 }
 
-static ulong	new_time;
-
-DECLARE_TASKLET_DISABLED(m41t00_tasklet, m41t00_set_tlet, (ulong)&new_time);
+static ulong new_time;
+static struct workqueue_struct *m41t00_wq;
+static DECLARE_WORK(m41t00_work, m41t00_set, &new_time);
 
 int
 m41t00_set_rtc_time(ulong nowtime)
@@ -154,9 +156,9 @@ m41t00_set_rtc_time(ulong nowtime)
 	new_time = nowtime;
 
 	if (in_interrupt())
-		tasklet_schedule(&m41t00_tasklet);
+		queue_work(m41t00_wq, &m41t00_work);
 	else
-		m41t00_set_tlet((ulong)&new_time);
+		m41t00_set(&new_time);
 
 	return 0;
 }
@@ -188,6 +190,7 @@ m41t00_probe(struct i2c_adapter *adap, int addr, int kind)
 		return rc;
 	}
 
+	m41t00_wq = create_singlethread_workqueue("m41t00");
 	save_client = client;
 	return 0;
 }
@@ -205,7 +208,7 @@ m41t00_detach(struct i2c_client *client)
 
 	if ((rc = i2c_detach_client(client)) == 0) {
 		kfree(client);
-		tasklet_kill(&m41t00_tasklet);
+		destroy_workqueue(m41t00_wq);
 	}
 	return rc;
 }

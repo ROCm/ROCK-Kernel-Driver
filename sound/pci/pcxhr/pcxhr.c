@@ -26,6 +26,7 @@
 #include <linux/interrupt.h>
 #include <linux/slab.h>
 #include <linux/pci.h>
+#include <linux/dma-mapping.h>
 #include <linux/delay.h>
 #include <linux/moduleparam.h>
 #include <linux/mutex.h>
@@ -72,7 +73,7 @@ enum {
 	PCI_ID_LAST
 };
 
-static struct pci_device_id pcxhr_ids[] = {
+static struct pci_device_id pcxhr_ids[] __devinitdata = {
 	{ 0x10b5, 0x9656, 0x1369, 0xb001, 0, 0, PCI_ID_VX882HR, },   /* VX882HR */
 	{ 0x10b5, 0x9656, 0x1369, 0xb101, 0, 0, PCI_ID_PCX882HR, },  /* PCX882HR */
 	{ 0x10b5, 0x9656, 0x1369, 0xb201, 0, 0, PCI_ID_VX881HR, },   /* VX881HR */
@@ -1217,7 +1218,7 @@ static int __devinit pcxhr_probe(struct pci_dev *pci, const struct pci_device_id
 	pci_set_master(pci);
 
 	/* check if we can restrict PCI DMA transfers to 32 bits */
-	if (pci_set_dma_mask(pci, 0xffffffff) < 0) {
+	if (pci_set_dma_mask(pci, DMA_32BIT_MASK) < 0) {
 		snd_printk(KERN_ERR "architecture does not support 32bit PCI busmaster DMA\n");
 		pci_disable_device(pci);
 		return -ENXIO;

@@ -50,11 +50,12 @@
 
 #include "../core/hcd.h"
 #include "uhci-hcd.h"
+#include "pci-quirks.h"
 
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v2.3"
+#define DRIVER_VERSION "v3.0"
 #define DRIVER_AUTHOR "Linus 'Frodo Rabbit' Torvalds, Johannes Erdfelt, \
 Randy Dunlap, Georg Acher, Deti Fliegl, Thomas Sailer, Roman Weissgaerber, \
 Alan Stern"
@@ -68,12 +69,16 @@ Alan Stern"
  * debug = 3, show all TDs in URBs when dumping
  */
 #ifdef DEBUG
+#define DEBUG_CONFIGURED	1
 static int debug = 1;
-#else
-static int debug = 0;
-#endif
 module_param(debug, int, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(debug, "Debug level");
+
+#else
+#define DEBUG_CONFIGURED	0
+#define debug			0
+#endif
+
 static char *errbuf;
 #define ERRBUF_LEN    (32 * 1024)
 
@@ -96,9 +101,6 @@ static void uhci_get_current_frame_number(struct uhci_hcd *uhci);
 #include "uhci-q.c"
 #include "uhci-hub.c"
 
-extern void uhci_reset_hc(struct pci_dev *pdev, unsigned long base);
-extern int uhci_check_and_reset_hc(struct pci_dev *pdev, unsigned long base);
-
 /*
  * Finish up a host controller reset and update the recorded state.
  */
@@ -113,8 +115,7 @@ static void finish_reset(struct uhci_hcd *uhci)
 	for (port = 0; port < uhci->rh_numports; ++port)
 		outw(0, uhci->io_addr + USBPORTSC1 + (port * 2));
 
-	uhci->port_c_suspend = uhci->suspended_ports =
-			uhci->resuming_ports = 0;
+	uhci->port_c_suspend = uhci->resuming_ports = 0;
 	uhci->rh_state = UHCI_RH_RESET;
 	uhci->is_stopped = UHCI_IS_STOPPED;
 	uhci_to_hcd(uhci)->state = HC_STATE_HALT;
@@ -338,6 +339,12 @@ static irqreturn_t uhci_irq(struct usb_hcd *hcd, struct pt_regs *regs)
 				dev_err(uhci_dev(uhci),
 					"host controller halted, "
 					"very bad!\n");
+				if (debug > 1 && errbuf) {
+					/* Print the schedule for debugging */
+					uhci_sprint_schedule(uhci,
+							errbuf, ERRBUF_LEN);
+					lprintk(errbuf);
+				}
 				hc_died(uhci);
 
 				/* Force a callback in case there are
@@ -376,6 +383,14 @@ static void release_uhci(struct uhci_hcd *uhci)
 {
 	int i;
 
+	if (DEBUG_CONFIGURED) {
+		spin_lock_irq(&uhci->lock);
+		uhci->is_initialized = 0;
+		spin_unlock_irq(&uhci->lock);
+
+		debugfs_remove(uhci->dentry);
+	}
+
 	for (i = 0; i < UHCI_NUM_SKELQH; i++)
 		uhci_free_qh(uhci, uhci->skelqh[i]);
 
@@ -390,8 +405,6 @@ static void release_uhci(struct uhci_hcd *uhci)
 	dma_free_coherent(uhci_dev(uhci),
 			UHCI_NUMFRAMES * sizeof(*uhci->frame),
 			uhci->frame, uhci->frame_dma_handle);
-
-	debugfs_remove(uhci->dentry);
 }
 
 static int uhci_reset(struct usb_hcd *hcd)
@@ -474,32 +487,28 @@ static int uhci_start(struct usb_hcd *hcd)
 
 	hcd->uses_new_polling = 1;
 
-	dentry = debugfs_create_file(hcd->self.bus_name,
-			S_IFREG|S_IRUGO|S_IWUSR, uhci_debugfs_root, uhci,
-			&uhci_debug_operations);
-	if (!dentry) {
-		dev_err(uhci_dev(uhci),
-				"couldn't create uhci debugfs entry\n");
-		retval = -ENOMEM;
-		goto err_create_debug_entry;
-	}
-	uhci->dentry = dentry;
-
 	uhci->fsbr = 0;
 	uhci->fsbrtimeout = 0;
 
 	spin_lock_init(&uhci->lock);
-	INIT_LIST_HEAD(&uhci->qh_remove_list);
 
 	INIT_LIST_HEAD(&uhci->td_remove_list);
-
-	INIT_LIST_HEAD(&uhci->urb_remove_list);
-
-	INIT_LIST_HEAD(&uhci->urb_list);
-
-	INIT_LIST_HEAD(&uhci->complete_list);
+	INIT_LIST_HEAD(&uhci->idle_qh_list);
 
 	init_waitqueue_head(&uhci->waitqh);
+
+	if (DEBUG_CONFIGURED) {
+		dentry = debugfs_create_file(hcd->self.bus_name,
+				S_IFREG|S_IRUGO|S_IWUSR, uhci_debugfs_root,
+				uhci, &uhci_debug_operations);
+		if (!dentry) {
+			dev_err(uhci_dev(uhci), "couldn't create uhci "
+					"debugfs entry\n");
+			retval = -ENOMEM;
+			goto err_create_debug_entry;
+		}
+		uhci->dentry = dentry;
+	}
 
 	uhci->frame = dma_alloc_coherent(uhci_dev(uhci),
 			UHCI_NUMFRAMES * sizeof(*uhci->frame),
@@ -540,7 +549,7 @@ static int uhci_start(struct usb_hcd *hcd)
 	}
 
 	for (i = 0; i < UHCI_NUM_SKELQH; i++) {
-		uhci->skelqh[i] = uhci_alloc_qh(uhci);
+		uhci->skelqh[i] = uhci_alloc_qh(uhci, NULL, NULL);
 		if (!uhci->skelqh[i]) {
 			dev_err(uhci_dev(uhci), "unable to allocate QH\n");
 			goto err_alloc_skelqh;
@@ -557,13 +566,17 @@ static int uhci_start(struct usb_hcd *hcd)
 			uhci->skel_int16_qh->link =
 			uhci->skel_int8_qh->link =
 			uhci->skel_int4_qh->link =
-			uhci->skel_int2_qh->link =
-			cpu_to_le32(uhci->skel_int1_qh->dma_handle) | UHCI_PTR_QH;
-	uhci->skel_int1_qh->link = cpu_to_le32(uhci->skel_ls_control_qh->dma_handle) | UHCI_PTR_QH;
+			uhci->skel_int2_qh->link = UHCI_PTR_QH |
+			cpu_to_le32(uhci->skel_int1_qh->dma_handle);
 
-	uhci->skel_ls_control_qh->link = cpu_to_le32(uhci->skel_fs_control_qh->dma_handle) | UHCI_PTR_QH;
-	uhci->skel_fs_control_qh->link = cpu_to_le32(uhci->skel_bulk_qh->dma_handle) | UHCI_PTR_QH;
-	uhci->skel_bulk_qh->link = cpu_to_le32(uhci->skel_term_qh->dma_handle) | UHCI_PTR_QH;
+	uhci->skel_int1_qh->link = UHCI_PTR_QH |
+			cpu_to_le32(uhci->skel_ls_control_qh->dma_handle);
+	uhci->skel_ls_control_qh->link = UHCI_PTR_QH |
+			cpu_to_le32(uhci->skel_fs_control_qh->dma_handle);
+	uhci->skel_fs_control_qh->link = UHCI_PTR_QH |
+			cpu_to_le32(uhci->skel_bulk_qh->dma_handle);
+	uhci->skel_bulk_qh->link = UHCI_PTR_QH |
+			cpu_to_le32(uhci->skel_term_qh->dma_handle);
 
 	/* This dummy TD is to work around a bug in Intel PIIX controllers */
 	uhci_fill_td(uhci->term_td, 0, uhci_explen(0) |
@@ -589,15 +602,15 @@ static int uhci_start(struct usb_hcd *hcd)
 
 		/*
 		 * ffs (Find First bit Set) does exactly what we need:
-		 * 1,3,5,...  => ffs = 0 => use skel_int2_qh = skelqh[6],
-		 * 2,6,10,... => ffs = 1 => use skel_int4_qh = skelqh[5], etc.
-		 * ffs > 6 => not on any high-period queue, so use
-		 *	skel_int1_qh = skelqh[7].
+		 * 1,3,5,...  => ffs = 0 => use skel_int2_qh = skelqh[8],
+		 * 2,6,10,... => ffs = 1 => use skel_int4_qh = skelqh[7], etc.
+		 * ffs >= 7 => not on any high-period queue, so use
+		 *	skel_int1_qh = skelqh[9].
 		 * Add UHCI_NUMFRAMES to insure at least one bit is set.
 		 */
-		irq = 6 - (int) __ffs(i + UHCI_NUMFRAMES);
-		if (irq < 0)
-			irq = 7;
+		irq = 8 - (int) __ffs(i + UHCI_NUMFRAMES);
+		if (irq <= 1)
+			irq = 9;
 
 		/* Only place we don't use the frame list routines */
 		uhci->frame[i] = UHCI_PTR_QH |
@@ -611,6 +624,7 @@ static int uhci_start(struct usb_hcd *hcd)
 	mb();
 
 	configure_hc(uhci);
+	uhci->is_initialized = 1;
 	start_rh(uhci);
 	return 0;
 
@@ -767,13 +781,30 @@ static int uhci_resume(struct usb_hcd *hcd)
 }
 #endif
 
-/* Wait until all the URBs for a particular device/endpoint are gone */
+/* Wait until a particular device/endpoint's QH is idle, and free it */
 static void uhci_hcd_endpoint_disable(struct usb_hcd *hcd,
-		struct usb_host_endpoint *ep)
+		struct usb_host_endpoint *hep)
 {
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
+	struct uhci_qh *qh;
 
-	wait_event_interruptible(uhci->waitqh, list_empty(&ep->urb_list));
+	spin_lock_irq(&uhci->lock);
+	qh = (struct uhci_qh *) hep->hcpriv;
+	if (qh == NULL)
+		goto done;
+
+	while (qh->state != QH_STATE_IDLE) {
+		++uhci->num_waiting;
+		spin_unlock_irq(&uhci->lock);
+		wait_event_interruptible(uhci->waitqh,
+				qh->state == QH_STATE_IDLE);
+		spin_lock_irq(&uhci->lock);
+		--uhci->num_waiting;
+	}
+
+	uhci_free_qh(uhci, qh);
+done:
+	spin_unlock_irq(&uhci->lock);
 }
 
 static int uhci_hcd_get_frame_number(struct usb_hcd *hcd)
@@ -827,7 +858,7 @@ static const struct hc_driver uhci_driver = {
 
 static const struct pci_device_id uhci_pci_ids[] = { {
 	/* handle any USB UHCI controller */
-	PCI_DEVICE_CLASS(((PCI_CLASS_SERIAL_USB << 8) | 0x00), ~0),
+	PCI_DEVICE_CLASS(PCI_CLASS_SERIAL_USB_UHCI, ~0),
 	.driver_data =	(unsigned long) &uhci_driver,
 	}, { /* end: all zeroes */ }
 };
@@ -857,15 +888,14 @@ static int __init uhci_hcd_init(void)
 	if (usb_disabled())
 		return -ENODEV;
 
-	if (debug) {
+	if (DEBUG_CONFIGURED) {
 		errbuf = kmalloc(ERRBUF_LEN, GFP_KERNEL);
 		if (!errbuf)
 			goto errbuf_failed;
+		uhci_debugfs_root = debugfs_create_dir("uhci", NULL);
+		if (!uhci_debugfs_root)
+			goto debug_failed;
 	}
-
-	uhci_debugfs_root = debugfs_create_dir("uhci", NULL);
-	if (!uhci_debugfs_root)
-		goto debug_failed;
 
 	uhci_up_cachep = kmem_cache_create("uhci_urb_priv",
 		sizeof(struct urb_priv), 0, 0, NULL, NULL);

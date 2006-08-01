@@ -12,8 +12,6 @@
 #ifdef __KERNEL__
 #include <linux/time.h>
 #include <linux/list.h>
-#include <linux/device.h>
-#include <linux/mod_devicetable.h>
 #else
 #include <sys/time.h>
 #include <sys/ioctl.h>
@@ -58,6 +56,8 @@ struct input_absinfo {
 
 #define EVIOCGVERSION		_IOR('E', 0x01, int)			/* get driver version */
 #define EVIOCGID		_IOR('E', 0x02, struct input_id)	/* get device ID */
+#define EVIOCGREP		_IOR('E', 0x03, int[2])			/* get repeat settings */
+#define EVIOCSREP		_IOW('E', 0x03, int[2])			/* set repeat settings */
 #define EVIOCGKEYCODE		_IOR('E', 0x04, int[2])			/* get keycode */
 #define EVIOCSKEYCODE		_IOW('E', 0x04, int[2])			/* set keycode */
 
@@ -345,6 +345,8 @@ struct input_absinfo {
 #define KEY_SAVE		234
 #define KEY_DOCUMENTS		235
 
+#define KEY_BATTERY		236
+
 #define KEY_UNKNOWN		240
 
 #define BTN_MISC		0x100
@@ -421,7 +423,7 @@ struct input_absinfo {
 #define BTN_GEAR_UP		0x151
 
 #define KEY_OK			0x160
-#define KEY_SELECT 		0x161
+#define KEY_SELECT		0x161
 #define KEY_GOTO		0x162
 #define KEY_CLEAR		0x163
 #define KEY_POWER2		0x164
@@ -512,6 +514,15 @@ struct input_absinfo {
 #define KEY_FN_S		0x1e3
 #define KEY_FN_B		0x1e4
 
+#define KEY_BRL_DOT1		0x1f1
+#define KEY_BRL_DOT2		0x1f2
+#define KEY_BRL_DOT3		0x1f3
+#define KEY_BRL_DOT4		0x1f4
+#define KEY_BRL_DOT5		0x1f5
+#define KEY_BRL_DOT6		0x1f6
+#define KEY_BRL_DOT7		0x1f7
+#define KEY_BRL_DOT8		0x1f8
+
 /* We avoid low common keys in module aliases so they don't get huge. */
 #define KEY_MIN_INTERESTING	KEY_MUTE
 #define KEY_MAX			0x1ff
@@ -568,15 +579,10 @@ struct input_absinfo {
  * Switch events
  */
 
-#define SW_0		0x00
-#define SW_1		0x01
-#define SW_2		0x02
-#define SW_3		0x03
-#define SW_4		0x04
-#define SW_5		0x05
-#define SW_6		0x06
-#define SW_7		0x07
-#define SW_MAX		0x0f
+#define SW_LID			0x00  /* set = lid shut */
+#define SW_TABLET_MODE		0x01  /* set = tablet mode */
+#define SW_HEADPHONE_INSERT	0x02  /* set = inserted */
+#define SW_MAX			0x0f
 
 /*
  * Misc events
@@ -796,52 +802,16 @@ struct ff_effect {
 
 #define FF_MAX		0x7f
 
-struct input_device_id {
-
-	kernel_ulong_t flags;
-
-	struct input_id id;
-
-	kernel_ulong_t evbit[EV_MAX/BITS_PER_LONG+1];
-	kernel_ulong_t keybit[KEY_MAX/BITS_PER_LONG+1];
-	kernel_ulong_t relbit[REL_MAX/BITS_PER_LONG+1];
-	kernel_ulong_t absbit[ABS_MAX/BITS_PER_LONG+1];
-	kernel_ulong_t mscbit[MSC_MAX/BITS_PER_LONG+1];
-	kernel_ulong_t ledbit[LED_MAX/BITS_PER_LONG+1];
-	kernel_ulong_t sndbit[SND_MAX/BITS_PER_LONG+1];
-	kernel_ulong_t ffbit[FF_MAX/BITS_PER_LONG+1];
-	kernel_ulong_t swbit[SW_MAX/BITS_PER_LONG+1];
-
-	kernel_ulong_t driver_info;
-};
-
-/*
- * Structure for hotplug & device<->driver matching.
- */
-
-#define INPUT_DEVICE_ID_MATCH_BUS	1
-#define INPUT_DEVICE_ID_MATCH_VENDOR	2
-#define INPUT_DEVICE_ID_MATCH_PRODUCT	4
-#define INPUT_DEVICE_ID_MATCH_VERSION	8
-
-#define INPUT_DEVICE_ID_MATCH_EVBIT	0x010
-#define INPUT_DEVICE_ID_MATCH_KEYBIT	0x020
-#define INPUT_DEVICE_ID_MATCH_RELBIT	0x040
-#define INPUT_DEVICE_ID_MATCH_ABSBIT	0x080
-#define INPUT_DEVICE_ID_MATCH_MSCIT	0x100
-#define INPUT_DEVICE_ID_MATCH_LEDBIT	0x200
-#define INPUT_DEVICE_ID_MATCH_SNDBIT	0x400
-#define INPUT_DEVICE_ID_MATCH_FFBIT	0x800
-#define INPUT_DEVICE_ID_MATCH_SWBIT	0x1000
-
 #ifdef __KERNEL__
 
 /*
  * In-kernel definitions.
  */
 
+#include <linux/device.h>
 #include <linux/fs.h>
 #include <linux/timer.h>
+#include <linux/mod_devicetable.h>
 
 #define NBITS(x) (((x)/BITS_PER_LONG)+1)
 #define BIT(x)	(1UL<<((x)%BITS_PER_LONG))
@@ -929,7 +899,7 @@ struct input_dev {
 
 	struct input_handle *grab;
 
-	struct semaphore sem;	/* serializes open and close operations */
+	struct mutex mutex;	/* serializes open and close operations */
 	unsigned int users;
 
 	struct class_device cdev;
@@ -942,9 +912,49 @@ struct input_dev {
 };
 #define to_input_dev(d) container_of(d, struct input_dev, cdev)
 
-#define INPUT_DEVICE_ID_MATCH_DEVICE\
+/*
+ * Verify that we are in sync with input_device_id mod_devicetable.h #defines
+ */
+
+#if EV_MAX != INPUT_DEVICE_ID_EV_MAX
+#error "EV_MAX and INPUT_DEVICE_ID_EV_MAX do not match"
+#endif
+
+#if KEY_MAX != INPUT_DEVICE_ID_KEY_MAX
+#error "KEY_MAX and INPUT_DEVICE_ID_KEY_MAX do not match"
+#endif
+
+#if REL_MAX != INPUT_DEVICE_ID_REL_MAX
+#error "REL_MAX and INPUT_DEVICE_ID_REL_MAX do not match"
+#endif
+
+#if ABS_MAX != INPUT_DEVICE_ID_ABS_MAX
+#error "ABS_MAX and INPUT_DEVICE_ID_ABS_MAX do not match"
+#endif
+
+#if MSC_MAX != INPUT_DEVICE_ID_MSC_MAX
+#error "MSC_MAX and INPUT_DEVICE_ID_MSC_MAX do not match"
+#endif
+
+#if LED_MAX != INPUT_DEVICE_ID_LED_MAX
+#error "LED_MAX and INPUT_DEVICE_ID_LED_MAX do not match"
+#endif
+
+#if SND_MAX != INPUT_DEVICE_ID_SND_MAX
+#error "SND_MAX and INPUT_DEVICE_ID_SND_MAX do not match"
+#endif
+
+#if FF_MAX != INPUT_DEVICE_ID_FF_MAX
+#error "FF_MAX and INPUT_DEVICE_ID_FF_MAX do not match"
+#endif
+
+#if SW_MAX != INPUT_DEVICE_ID_SW_MAX
+#error "SW_MAX and INPUT_DEVICE_ID_SW_MAX do not match"
+#endif
+
+#define INPUT_DEVICE_ID_MATCH_DEVICE \
 	(INPUT_DEVICE_ID_MATCH_BUS | INPUT_DEVICE_ID_MATCH_VENDOR | INPUT_DEVICE_ID_MATCH_PRODUCT)
-#define INPUT_DEVICE_ID_MATCH_DEVICE_AND_VERSION\
+#define INPUT_DEVICE_ID_MATCH_DEVICE_AND_VERSION \
 	(INPUT_DEVICE_ID_MATCH_DEVICE | INPUT_DEVICE_ID_MATCH_VERSION)
 
 struct input_handle;
@@ -957,7 +967,7 @@ struct input_handler {
 	struct input_handle* (*connect)(struct input_handler *handler, struct input_dev *dev, struct input_device_id *id);
 	void (*disconnect)(struct input_handle *handle);
 
-	struct file_operations *fops;
+	const struct file_operations *fops;
 	int minor;
 	char *name;
 
@@ -995,11 +1005,6 @@ static inline void init_input_dev(struct input_dev *dev)
 
 struct input_dev *input_allocate_device(void);
 
-static inline void input_free_device(struct input_dev *dev)
-{
-	kfree(dev);
-}
-
 static inline struct input_dev *input_get_device(struct input_dev *dev)
 {
 	return to_input_dev(class_device_get(&dev->cdev));
@@ -1008,6 +1013,12 @@ static inline struct input_dev *input_get_device(struct input_dev *dev)
 static inline void input_put_device(struct input_dev *dev)
 {
 	class_device_put(&dev->cdev);
+}
+
+static inline void input_free_device(struct input_dev *dev)
+{
+	if (dev)
+		input_put_device(dev);
 }
 
 int input_register_device(struct input_dev *);

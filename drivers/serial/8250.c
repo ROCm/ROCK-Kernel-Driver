@@ -46,19 +46,6 @@
 #include <asm/irq.h>
 
 #include "8250.h"
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-/*
- * kdb_serial_line records the serial line number of the first serial console.
- * NOTE: The kernel ignores characters on the serial line unless a user space
- * program has opened the line first.  To enter kdb before user space has opened
- * the serial line, you can use the 'kdb=early' flag to lilo and set the
- * appropriate breakpoints.
- */
-
-static int  kdb_serial_line = -1;
-static const char *kdb_serial_ptr = kdb_serial_str;
-#endif	/* CONFIG_KDB */
 
 #ifndef NO_PC_LEGACY_SERIAL_8250
 #define do_not_try_pc_legacy_8250 (0)
@@ -103,8 +90,6 @@ static unsigned int nr_uarts = CONFIG_SERIAL_8250_RUNTIME_UARTS;
 #ifdef CONFIG_SERIAL_8250_MANY_PORTS
 #define CONFIG_SERIAL_MANY_PORTS 1
 #endif
-
-#define arch_8250_sysrq_via_ctrl_o(a,b) (0)
 
 /*
  * HUB6 is always on.  This will be removed once the header
@@ -381,6 +366,40 @@ serial_out(struct uart_8250_port *up, int offset, int value)
 #define serial_inp(up, offset)		serial_in(up, offset)
 #define serial_outp(up, offset, value)	serial_out(up, offset, value)
 
+/* Uart divisor latch read */
+static inline int _serial_dl_read(struct uart_8250_port *up)
+{
+	return serial_inp(up, UART_DLL) | serial_inp(up, UART_DLM) << 8;
+}
+
+/* Uart divisor latch write */
+static inline void _serial_dl_write(struct uart_8250_port *up, int value)
+{
+	serial_outp(up, UART_DLL, value & 0xff);
+	serial_outp(up, UART_DLM, value >> 8 & 0xff);
+}
+
+#ifdef CONFIG_SERIAL_8250_AU1X00
+/* Au1x00 haven't got a standard divisor latch */
+static int serial_dl_read(struct uart_8250_port *up)
+{
+	if (up->port.iotype == UPIO_AU)
+		return __raw_readl(up->port.membase + 0x28);
+	else
+		return _serial_dl_read(up);
+}
+
+static void serial_dl_write(struct uart_8250_port *up, int value)
+{
+	if (up->port.iotype == UPIO_AU)
+		__raw_writel(value, up->port.membase + 0x28);
+	else
+		_serial_dl_write(up, value);
+}
+#else
+#define serial_dl_read(up) _serial_dl_read(up)
+#define serial_dl_write(up, value) _serial_dl_write(up, value)
+#endif
 
 /*
  * For the 16C950
@@ -513,7 +532,8 @@ static void disable_rsa(struct uart_8250_port *up)
  */
 static int size_fifo(struct uart_8250_port *up)
 {
-	unsigned char old_fcr, old_mcr, old_dll, old_dlm, old_lcr;
+	unsigned char old_fcr, old_mcr, old_lcr;
+	unsigned short old_dl;
 	int count;
 
 	old_lcr = serial_inp(up, UART_LCR);
@@ -524,10 +544,8 @@ static int size_fifo(struct uart_8250_port *up)
 		    UART_FCR_CLEAR_RCVR | UART_FCR_CLEAR_XMIT);
 	serial_outp(up, UART_MCR, UART_MCR_LOOP);
 	serial_outp(up, UART_LCR, UART_LCR_DLAB);
-	old_dll = serial_inp(up, UART_DLL);
-	old_dlm = serial_inp(up, UART_DLM);
-	serial_outp(up, UART_DLL, 0x01);
-	serial_outp(up, UART_DLM, 0x00);
+	old_dl = serial_dl_read(up);
+	serial_dl_write(up, 0x0001);
 	serial_outp(up, UART_LCR, 0x03);
 	for (count = 0; count < 256; count++)
 		serial_outp(up, UART_TX, count);
@@ -538,8 +556,7 @@ static int size_fifo(struct uart_8250_port *up)
 	serial_outp(up, UART_FCR, old_fcr);
 	serial_outp(up, UART_MCR, old_mcr);
 	serial_outp(up, UART_LCR, UART_LCR_DLAB);
-	serial_outp(up, UART_DLL, old_dll);
-	serial_outp(up, UART_DLM, old_dlm);
+	serial_dl_write(up, old_dl);
 	serial_outp(up, UART_LCR, old_lcr);
 
 	return count;
@@ -769,8 +786,7 @@ static void autoconfig_16550a(struct uart_8250_port *up)
 
 			serial_outp(up, UART_LCR, 0xE0);
 
-			quot = serial_inp(up, UART_DLM) << 8;
-			quot += serial_inp(up, UART_DLL);
+			quot = serial_dl_read(up);
 			quot <<= 3;
 
 			status1 = serial_in(up, 0x04); /* EXCR1 */
@@ -778,8 +794,7 @@ static void autoconfig_16550a(struct uart_8250_port *up)
 			status1 |= 0x10;  /* 1.625 divisor for baud_base --> 921600 */
 			serial_outp(up, 0x04, status1);
 			
-			serial_outp(up, UART_DLL, quot & 0xff);
-			serial_outp(up, UART_DLM, quot >> 8);
+			serial_dl_write(up, quot);
 
 			serial_outp(up, UART_LCR, 0);
 
@@ -1162,20 +1177,6 @@ receive_chars(struct uart_8250_port *up, int *status, struct pt_regs *regs)
 
 	do {
 		ch = serial_inp(up, UART_RX);
-#ifdef	CONFIG_KDB
-		if ((up->port.line == kdb_serial_line) && kdb_on == 1) {
-		    if (ch == *kdb_serial_ptr) {
-			if (!(*++kdb_serial_ptr)) {
-			    kdb(KDB_REASON_KEYBOARD, 0, regs);
-			    kdb_serial_ptr = kdb_serial_str;
-			    break;
-			}
-		    } else
-			kdb_serial_ptr = kdb_serial_str;
-		}
-#endif	/* CONFIG_KDB */
-		if (arch_8250_sysrq_via_ctrl_o(ch, &up->port))
-			goto ignore_char;
 		flag = TTY_NORMAL;
 		up->port.icount.rx++;
 
@@ -1460,47 +1461,6 @@ static void serial8250_timeout(unsigned long data)
 	mod_timer(&up->timer, jiffies + timeout);
 }
 
-static void serial8250_backup_timeout(unsigned long data)
-{
-	struct uart_8250_port *up = (struct uart_8250_port *)data;
-	unsigned int iir, ier = 0;
-	unsigned int timeout = up->port.timeout;
-
-	/*
-	 * Must disable interrupts or else we risk triggering an interrupt
-	 * and getting dead locked by the port.lock.
-	 */
-	if (is_real_interrupt(up->port.irq)) {
-		ier = serial_in(up, UART_IER);
-		serial_out(up, UART_IER, 0);
-	}
-
-	iir = serial_in(up, UART_IIR);
-
-	/*
-	 * This should be a safe test for anyone who doesn't trust the
-	 * IIR bits on their UART, but it's specifically designed for
-	 * the "Diva" UART used on the management processor on many HP
-	 * ia64 and parisc boxes.
-	 */
-	if ((iir & UART_IIR_NO_INT) && (up->ier & UART_IER_THRI) &&
-	    (!uart_circ_empty(&up->port.info->xmit) || up->port.x_char) &&
-	    (serial_in(up, UART_LSR) & UART_LSR_THRE)) {
-		iir &= ~(UART_IIR_ID | UART_IIR_NO_INT);
-		iir |= UART_IIR_THRI;
-	}
-
-	if (!(iir & UART_IIR_NO_INT))
-		serial8250_handle_port(up, NULL);
-
-	if (is_real_interrupt(up->port.irq))
-		serial_out(up, UART_IER, ier);
-
-	timeout = timeout > 6 ? (timeout / 2 - 2) : 1;
-
-	mod_timer(&up->timer, jiffies + (timeout * 100));
-}
-
 static unsigned int serial8250_tx_empty(struct uart_port *port)
 {
 	struct uart_8250_port *up = (struct uart_8250_port *)port;
@@ -1569,36 +1529,6 @@ static void serial8250_break_ctl(struct uart_port *port, int break_state)
 	spin_unlock_irqrestore(&up->port.lock, flags);
 }
 
-#define BOTH_EMPTY (UART_LSR_TEMT | UART_LSR_THRE)
-
-/*
- *	Wait for transmitter & holding register to empty
- */
-static void wait_for_xmitr(struct uart_8250_port *up, int bits)
-{
-	unsigned int status, tmout = 10000;
-
-	/* Wait up to 10ms for the character(s) to be sent. */
-	do {
-		status = serial_in(up, UART_LSR);
-
-		if (status & UART_LSR_BI)
-			up->lsr_break_flag = UART_LSR_BI;
-
-		if (--tmout == 0)
-			break;
-		udelay(1);
-	} while ((status & bits) != bits);
-
-	/* Wait up to 1s for flow control if necessary */
-	if (up->port.flags & UPF_CONS_FLOW) {
-		tmout = 1000000;
-		while (--tmout &&
-		       ((serial_in(up, UART_MSR) & UART_MSR_CTS) == 0))
-			udelay(1);
-	}
-}
-
 static int serial8250_startup(struct uart_port *port)
 {
 	struct uart_8250_port *up = (struct uart_8250_port *)port;
@@ -1632,7 +1562,7 @@ static int serial8250_startup(struct uart_port *port)
 
 	/*
 	 * Clear the FIFO buffers and disable them.
-	 * (they will be reeanbled in set_termios())
+	 * (they will be reenabled in set_termios())
 	 */
 	serial8250_clear_fifos(up);
 
@@ -1728,37 +1658,6 @@ static int serial8250_startup(struct uart_port *port)
 		up->bugs &= ~UART_BUG_TXEN;
 	}
 
-	if (is_real_interrupt(up->port.irq) && !timer_pending(&up->timer)) {
-		/*
-		 * Test for UARTs that do not reassert THRE when the
-		 * transmitter is idle and the interrupt has already
-		 * been cleared.  Real 16550s should always reassert
-		 * this interrupt whenever the transmitter is idle and
-		 * the interrupt is enabled.
-		 */
-		wait_for_xmitr(up, UART_LSR_THRE);
-		serial_outp(up, UART_IER, UART_IER_THRI);
-		(void)serial_in(up, UART_IIR);
-		serial_outp(up, UART_IER, 0);
-		serial_outp(up, UART_IER, UART_IER_THRI);
-		iir = serial_in(up, UART_IIR);
-		serial_outp(up, UART_IER, 0);
-
-		/*
-		 * If the interrupt is not reasserted, setup a timer to
-		 * kick the UART on a regular basis.
-		 */
-		if (iir & UART_IIR_NO_INT) {
-			unsigned int timeout = up->port.timeout;
-
-			pr_debug("ttyS%d - using backup timer\n", port->line);
-			timeout = timeout > 6 ? (timeout / 2 - 2) : 1;
-			up->timer.function = serial8250_backup_timeout;
-			up->timer.data = (unsigned long)up;
-			mod_timer(&up->timer, jiffies + (timeout * 100));
-		}
-	}
-
 	spin_unlock_irqrestore(&up->port.lock, flags);
 
 	/*
@@ -1831,9 +1730,9 @@ static void serial8250_shutdown(struct uart_port *port)
 	 */
 	(void) serial_in(up, UART_RX);
 
-	del_timer_sync(&up->timer);
-	up->timer.function = serial8250_timeout;
-	if (is_real_interrupt(up->port.irq))
+	if (!is_real_interrupt(up->port.irq))
+		del_timer_sync(&up->timer);
+	else
 		serial_unlink_irq_chain(up);
 }
 
@@ -1998,8 +1897,7 @@ serial8250_set_termios(struct uart_port *port, struct termios *termios,
 		serial_outp(up, UART_LCR, cval | UART_LCR_DLAB);/* set DLAB */
 	}
 
-	serial_outp(up, UART_DLL, quot & 0xff);		/* LS of divisor */
-	serial_outp(up, UART_DLM, quot >> 8);		/* MS of divisor */
+	serial_dl_write(up, quot);
 
 	/*
 	 * LCR DLAB must be set to enable 64-byte FIFO mode. If the FCR
@@ -2042,6 +1940,9 @@ static int serial8250_request_std_resource(struct uart_8250_port *up)
 	int ret = 0;
 
 	switch (up->port.iotype) {
+	case UPIO_AU:
+		size = 0x100000;
+		/* fall thru */
 	case UPIO_MEM:
 		if (!up->port.mapbase)
 			break;
@@ -2074,6 +1975,9 @@ static void serial8250_release_std_resource(struct uart_8250_port *up)
 	unsigned int size = 8 << up->port.regshift;
 
 	switch (up->port.iotype) {
+	case UPIO_AU:
+		size = 0x100000;
+		/* fall thru */
 	case UPIO_MEM:
 		if (!up->port.mapbase)
 			break;
@@ -2288,6 +2192,44 @@ serial8250_register_ports(struct uart_driver *drv, struct device *dev)
 
 #ifdef CONFIG_SERIAL_8250_CONSOLE
 
+#define BOTH_EMPTY (UART_LSR_TEMT | UART_LSR_THRE)
+
+/*
+ *	Wait for transmitter & holding register to empty
+ */
+static inline void wait_for_xmitr(struct uart_8250_port *up, int bits)
+{
+	unsigned int status, tmout = 10000;
+
+	/* Wait up to 10ms for the character(s) to be sent. */
+	do {
+		status = serial_in(up, UART_LSR);
+
+		if (status & UART_LSR_BI)
+			up->lsr_break_flag = UART_LSR_BI;
+
+		if (--tmout == 0)
+			break;
+		udelay(1);
+	} while ((status & bits) != bits);
+
+	/* Wait up to 1s for flow control if necessary */
+	if (up->port.flags & UPF_CONS_FLOW) {
+		tmout = 1000000;
+		while (--tmout &&
+		       ((serial_in(up, UART_MSR) & UART_MSR_CTS) == 0))
+			udelay(1);
+	}
+}
+
+static void serial8250_console_putchar(struct uart_port *port, int ch)
+{
+	struct uart_8250_port *up = (struct uart_8250_port *)port;
+
+	wait_for_xmitr(up, UART_LSR_THRE);
+	serial_out(up, UART_TX, ch);
+}
+
 /*
  *	Print a string to the serial port trying not to disturb
  *	any possible real use of the port...
@@ -2298,10 +2240,16 @@ static void
 serial8250_console_write(struct console *co, const char *s, unsigned int count)
 {
 	struct uart_8250_port *up = &serial8250_ports[co->index];
+	unsigned long flags;
 	unsigned int ier;
-	int i;
+	int locked = 1;
 
 	touch_nmi_watchdog();
+
+	if (oops_in_progress) {
+		locked = spin_trylock_irqsave(&up->port.lock, flags);
+	} else
+		spin_lock_irqsave(&up->port.lock, flags);
 
 	/*
 	 *	First save the IER then disable the interrupts
@@ -2313,29 +2261,17 @@ serial8250_console_write(struct console *co, const char *s, unsigned int count)
 	else
 		serial_out(up, UART_IER, 0);
 
-	/*
-	 *	Now, do each character
-	 */
-	for (i = 0; i < count; i++, s++) {
-		/*
-		 *	Send the character out.
-		 *	If a LF, also do CR...
-		 */
-		if (*s == 10) {
-			wait_for_xmitr(up, UART_LSR_THRE);
-			serial_out(up, UART_TX, 13);
-		}
-		wait_for_xmitr(up, UART_LSR_THRE);
-		serial_out(up, UART_TX, *s);
-	}
+	uart_console_write(&up->port, s, count, serial8250_console_putchar);
 
 	/*
 	 *	Finally, wait for transmitter to become empty
 	 *	and restore the IER
 	 */
 	wait_for_xmitr(up, BOTH_EMPTY);
-	up->ier |= UART_IER_THRI;
-	serial_out(up, UART_IER, ier | UART_IER_THRI);
+	serial_out(up, UART_IER, ier);
+
+	if (locked)
+		spin_unlock_irqrestore(&up->port.lock, flags);
 }
 
 static int serial8250_console_setup(struct console *co, char *options)
@@ -2356,30 +2292,6 @@ static int serial8250_console_setup(struct console *co, char *options)
 	port = &serial8250_ports[co->index].port;
 	if (!port->iobase && !port->membase)
 		return -ENODEV;
-
-#ifdef	CONFIG_KDB
-	/*
-	 * Remember the line number of the first serial
-	 * console.  We'll make this the kdb serial console too.
-	 */
-	if (co && kdb_serial_line == -1) {
-		kdb_serial_line = co->index;
-		kdb_serial.io_type = port->iotype;
-		switch (port->iotype) {
-		case SERIAL_IO_MEM:
-#ifdef  SERIAL_IO_MEM32
-		case SERIAL_IO_MEM32:
-#endif
-			kdb_serial.iobase = (unsigned long)(port->membase);
-			kdb_serial.ioreg_shift = port->regshift;
-			break;
-		default:
-			kdb_serial.iobase = port->iobase;
-			kdb_serial.ioreg_shift = 0;
-			break;
-		}
-	}
-#endif	/* CONFIG_KDB */
 
 	if (options)
 		uart_parse_options(options, &baud, &parity, &bits, &flow);

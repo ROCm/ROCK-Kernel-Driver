@@ -31,19 +31,10 @@
 #include <linux/efi.h>
 #include <linux/bitops.h>
 
-#if defined(CONFIG_LKCD_DUMP) || defined(CONFIG_LKCD_DUMP_MODULE)
-#include <linux/dump.h>
-#endif
-
 #include <asm/atomic.h>
 #include <asm/current.h>
 #include <asm/delay.h>
 #include <asm/machvec.h>
-
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#endif	/* CONFIG_KDB */
-
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/page.h>
@@ -75,14 +66,6 @@ static volatile struct call_data_struct *call_data;
 
 #define IPI_CALL_FUNC		0
 #define IPI_CPU_STOP		1
-#ifdef	CONFIG_KDB
-#define IPI_KDB_INTERRUPT	2
-#endif	/* CONFIG_KDB */
-
-#if defined(CONFIG_LKCD_DUMP) || defined(CONFIG_LKCD_DUMP_MODULE)
-#define IPI_DUMP_INTERRUPT      4
-	int (*dump_ipi_function_ptr)(struct pt_regs *) = NULL;
-#endif
 
 /* This needs to be cacheline aligned because it is written to by *other* CPUs.  */
 static DEFINE_PER_CPU(u64, ipi_operation) ____cacheline_aligned;
@@ -101,9 +84,7 @@ unlock_ipi_calllock(void)
 	spin_unlock_irq(&call_lock);
 }
 
-
-/*changed static void stop_this_cpu -> void stop_this_cpu */
-void
+static void
 stop_this_cpu (void)
 {
 	/*
@@ -174,22 +155,6 @@ handle_IPI (int irq, void *dev_id, struct pt_regs *regs)
 			      case IPI_CPU_STOP:
 				stop_this_cpu();
 				break;
-#if defined(CONFIG_LKCD_DUMP) || defined(CONFIG_LKCD_DUMP_MODULE)
-			case IPI_DUMP_INTERRUPT:
-                        if( dump_ipi_function_ptr != NULL ) {
-                                if (!dump_ipi_function_ptr(regs)) {
-                                         printk(KERN_ERR "(*dump_ipi_function_ptr)(): rejected IPI_DUMP_INTERRUPT\n");
-                                }
-                        }
-                        break;
-#endif
-
-#ifdef CONFIG_KDB
-			      case IPI_KDB_INTERRUPT:
-				if (!kdb_ipi(regs, NULL))
-					printk(KERN_ERR "kdb_ipi() rejected IPI_KDB_INTERRUPT\n");
-				break;
-#endif
 
 			      default:
 				printk(KERN_CRIT "Unknown IPI on CPU %d: %lu\n", this_cpu, which);
@@ -406,26 +371,9 @@ smp_send_stop (void)
 {
 	send_IPI_allbutself(IPI_CPU_STOP);
 }
-EXPORT_SYMBOL_GPL(smp_send_stop);
 
 int __init
 setup_profiling_timer (unsigned int multiplier)
 {
 	return -EINVAL;
 }
-
-#if defined(CONFIG_KDB)
-void
-smp_kdb_stop(void)
-{
-	if (!KDB_FLAG(NOIPI))
-		send_IPI_allbutself(IPI_KDB_INTERRUPT);
-}
-#endif	/* CONFIG_KDB */
-
-#if defined(CONFIG_LKCD_DUMP) || defined(CONFIG_LKCD_DUMP_MODULE)
-void dump_send_ipi(void)
-{
-	send_IPI_allbutself(IPI_DUMP_INTERRUPT);
-}
-#endif

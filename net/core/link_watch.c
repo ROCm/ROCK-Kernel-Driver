@@ -49,6 +49,45 @@ struct lw_event {
 /* Avoid kmalloc() for most systems */
 static struct lw_event singleevent;
 
+static unsigned char default_operstate(const struct net_device *dev)
+{
+	if (!netif_carrier_ok(dev))
+		return (dev->ifindex != dev->iflink ?
+			IF_OPER_LOWERLAYERDOWN : IF_OPER_DOWN);
+
+	if (netif_dormant(dev))
+		return IF_OPER_DORMANT;
+
+	return IF_OPER_UP;
+}
+
+
+static void rfc2863_policy(struct net_device *dev)
+{
+	unsigned char operstate = default_operstate(dev);
+
+	if (operstate == dev->operstate)
+		return;
+
+	write_lock_bh(&dev_base_lock);
+
+	switch(dev->link_mode) {
+	case IF_LINK_MODE_DORMANT:
+		if (operstate == IF_OPER_UP)
+			operstate = IF_OPER_DORMANT;
+		break;
+
+	case IF_LINK_MODE_DEFAULT:
+	default:
+		break;
+	};
+
+	dev->operstate = operstate;
+
+	write_unlock_bh(&dev_base_lock);
+}
+
+
 /* Must be called with the rtnl semaphore held */
 void linkwatch_run_queue(void)
 {
@@ -74,6 +113,7 @@ void linkwatch_run_queue(void)
 		 */
 		clear_bit(__LINK_STATE_LINKWATCH_PENDING, &dev->state);
 
+		rfc2863_policy(dev);
 		if (dev->flags & IFF_UP) {
 			if (netif_carrier_ok(dev)) {
 				WARN_ON(dev->qdisc_sleeping == &noop_qdisc);
@@ -99,9 +139,9 @@ static void linkwatch_event(void *dummy)
 	linkwatch_nextevent = jiffies + HZ;
 	clear_bit(LW_RUNNING, &linkwatch_flags);
 
-	rtnl_shlock();
+	rtnl_lock();
 	linkwatch_run_queue();
-	rtnl_shunlock();
+	rtnl_unlock();
 }
 
 
@@ -130,13 +170,13 @@ void linkwatch_fire_event(struct net_device *dev)
 		spin_unlock_irqrestore(&lweventlist_lock, flags);
 
 		if (!test_and_set_bit(LW_RUNNING, &linkwatch_flags)) {
-			unsigned long thisevent = jiffies;
+			unsigned long delay = linkwatch_nextevent - jiffies;
 
-			if (thisevent >= linkwatch_nextevent) {
+			/* If we wrap around we'll delay it by at most HZ. */
+			if (!delay || delay > HZ)
 				schedule_work(&linkwatch_work);
-			} else {
-				schedule_delayed_work(&linkwatch_work, linkwatch_nextevent - thisevent);
-			}
+			else
+				schedule_delayed_work(&linkwatch_work, delay);
 		}
 	}
 }

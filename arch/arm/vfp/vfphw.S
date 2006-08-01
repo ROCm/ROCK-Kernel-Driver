@@ -102,7 +102,6 @@ vfp_support_entry:
 	VFPFMRX	r8, FPINST2, NE		@ FPINST2 if needed - avoids reading
 					@ nonexistant reg on rev0
 	VFPFSTMIA r4 			@ save the working registers
-	add	r4, r4, #8*16+4
 	stmia	r4, {r1, r5, r6, r8}	@ save FPEXC, FPSCR, FPINST, FPINST2
 					@ and point r4 at the word at the
 					@ start of the register dump
@@ -111,10 +110,9 @@ no_old_VFP_process:
 	DBGSTR1	"load state %p", r10
 	str	r10, [r3]		@ update the last_VFP_context pointer
 					@ Load the saved state back into the VFP
-	add	r4, r10, #8*16+4
-	ldmia	r4, {r1, r5, r6, r8}	@ load FPEXC, FPSCR, FPINST, FPINST2
 	VFPFLDMIA r10	 		@ reload the working registers while
 					@ FPEXC is in a safe state
+	ldmia	r10, {r1, r5, r6, r8}	@ load FPEXC, FPSCR, FPINST, FPINST2
 	tst	r1, #FPEXC_FPV2		@ is there an FPINST2 to write?
 	VFPFMXR	FPINST2, r8, NE		@ FPINST2 if needed - avoids writing
 					@ nonexistant reg on rev0
@@ -191,11 +189,10 @@ vfp_put_float:
 
 	.globl	vfp_get_double
 vfp_get_double:
-	mov	r0, r0, lsr #1
 	add	pc, pc, r0, lsl #3
 	mov	r0, r0
 	.irp	dr,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
-	mrrc	p10, 1, r0, r1, c\dr	@ fmrrd	r0, r1, d\dr
+	mrrc	p11, 1, r0, r1, c\dr	@ fmrrd	r0, r1, d\dr
 	mov	pc, lr
 	.endr
 
@@ -206,10 +203,9 @@ vfp_get_double:
 
 	.globl	vfp_put_double
 vfp_put_double:
-	mov	r0, r0, lsr #1
 	add	pc, pc, r0, lsl #3
 	mov	r0, r0
 	.irp	dr,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
-	mcrr	p10, 1, r1, r2, c\dr	@ fmrrd	r1, r2, d\dr
+	mcrr	p11, 1, r1, r2, c\dr	@ fmdrr	r1, r2, d\dr
 	mov	pc, lr
 	.endr

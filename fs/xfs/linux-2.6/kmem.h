@@ -25,8 +25,6 @@
 /*
  * Process flags handling
  */
-  
-typedef unsigned long xfs_pflags_t;
 
 #define PFLAGS_TEST_NOIO()              (current->flags & PF_NOIO)
 #define PFLAGS_TEST_FSTRANS()           (current->flags & PF_FSTRANS)

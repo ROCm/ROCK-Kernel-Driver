@@ -10,6 +10,10 @@
  *              D E F I N E S
  *----------------------------------------------------------------------------*/
 
+#ifndef AAC_DRIVER_BUILD
+# define AAC_DRIVER_BUILD 2409
+# define AAC_DRIVER_BRANCH "-mh1"
+#endif
 #define MAXIMUM_NUM_CONTAINERS	32
 
 #define AAC_NUM_MGT_FIB         8
@@ -25,7 +29,6 @@
  * These macros convert from physical channels to virtual channels
  */
 #define CONTAINER_CHANNEL		(0)
-#define ID_LUN_TO_CONTAINER(id, lun)	(id)
 #define CONTAINER_TO_CHANNEL(cont)	(CONTAINER_CHANNEL)
 #define CONTAINER_TO_ID(cont)		(cont)
 #define CONTAINER_TO_LUN(cont)		(0)
@@ -789,6 +792,7 @@ struct fsa_dev_info {
 	u64		size;
 	u32		type;
 	u32		config_waiting_on;
+	unsigned long	config_waiting_stamp;
 	u16		queue_depth;
 	u8		config_needed;
 	u8		valid;
@@ -997,7 +1001,7 @@ struct aac_dev
 	int			maximum_num_physicals;
 	int			maximum_num_channels;
 	struct fsa_dev_info	*fsa_dev;
-	pid_t			thread_pid;
+	struct task_struct	*thread;
 	int			cardtype;
 	
 	/*
@@ -1017,7 +1021,6 @@ struct aac_dev
 	 *	AIF thread states
 	 */
 	u32			aif_thread;
-	struct completion	aif_completion;
 	struct aac_adapter_info adapter_info;
 	struct aac_supplement_adapter_info supplement_adapter_info;
 	/* These are in adapter info but they are in the io flow so
@@ -1772,6 +1775,11 @@ static inline u32 cap_to_cyls(sector_t capacity, u32 divisor)
 }
 
 struct scsi_cmnd;
+/* SCp.phase values */
+#define AAC_OWNER_MIDLEVEL	0x101
+#define AAC_OWNER_LOWLEVEL	0x102
+#define AAC_OWNER_ERROR_HANDLER	0x103
+#define AAC_OWNER_FIRMWARE	0x106
 
 const char *aac_driverinfo(struct Scsi_Host *);
 struct fib *aac_fib_alloc(struct aac_dev *dev);
@@ -1797,7 +1805,7 @@ int aac_sa_init(struct aac_dev *dev);
 unsigned int aac_response_normal(struct aac_queue * q);
 unsigned int aac_command_normal(struct aac_queue * q);
 unsigned int aac_intr_normal(struct aac_dev * dev, u32 Index);
-int aac_command_thread(struct aac_dev * dev);
+int aac_command_thread(void *data);
 int aac_close_fib_context(struct aac_dev * dev, struct aac_fib_context *fibctx);
 int aac_fib_adapter_complete(struct fib * fibptr, unsigned short size);
 struct aac_driver_ident* aac_get_driver_ident(int devtype);

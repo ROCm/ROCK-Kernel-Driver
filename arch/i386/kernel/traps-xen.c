@@ -371,8 +371,7 @@ void die(const char * str, struct pt_regs * regs, long err)
 #endif
 		if (nl)
 			printk("\n");
-		sysfs_printk_last_file();
-		notify_die(DIE_OOPS, (char *)str, regs, err, 255, SIGSEGV);
+	notify_die(DIE_OOPS, (char *)str, regs, err, 255, SIGSEGV);
 		show_registers(regs);
   	} else
 		printk(KERN_EMERG "Recursive die() failure, output suppressed\n");
@@ -1086,14 +1085,6 @@ void smp_trap_init(trap_info_t *trap_ctxt)
 		trap_ctxt[t->vector].address = t->address;
 	}
 }
-
-/* Actual parsing is done early in setup.c. */
-static int __init oops_dummy(char *s)
-{
-	panic_on_oops = 1;
-	return -1;
-}
-__setup("oops=", oops_dummy);
 
 static int __init kstack_setup(char *s)
 {

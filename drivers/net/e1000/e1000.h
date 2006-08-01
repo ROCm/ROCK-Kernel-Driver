@@ -53,7 +53,8 @@
 #include <linux/interrupt.h>
 #include <linux/string.h>
 #include <linux/pagemap.h>
-#include <asm/bitops.h>
+#include <linux/dma-mapping.h>
+#include <linux/bitops.h>
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <linux/capability.h>
@@ -75,8 +76,6 @@
 #define BAR_0		0
 #define BAR_1		1
 #define BAR_5		5
-#define PCI_DMA_64BIT	0xffffffffffffffffULL
-#define PCI_DMA_32BIT	0x00000000ffffffffULL
 
 #define INTEL_E1000_ETHERNET_DEVICE(device_id) {\
 	PCI_DEVICE(PCI_VENDOR_ID_INTEL, device_id)}
@@ -211,9 +210,6 @@ struct e1000_rx_ring {
 	struct e1000_ps_page *ps_page;
 	struct e1000_ps_page_dma *ps_page_dma;
 
-	struct sk_buff *rx_skb_top;
-	struct sk_buff *rx_skb_prev;
-
 	/* cpu for rx queue */
 	int cpu;
 
@@ -256,6 +252,7 @@ struct e1000_adapter {
 	spinlock_t tx_queue_lock;
 #endif
 	atomic_t irq_sem;
+	struct work_struct watchdog_task;
 	struct work_struct reset_task;
 	uint8_t fc_autoneg;
 
@@ -342,4 +339,26 @@ struct e1000_adapter {
 	boolean_t tso_force;
 #endif
 };
+
+
+/*  e1000_main.c  */
+extern char e1000_driver_name[];
+extern char e1000_driver_version[];
+int e1000_up(struct e1000_adapter *adapter);
+void e1000_down(struct e1000_adapter *adapter);
+void e1000_reset(struct e1000_adapter *adapter);
+int e1000_setup_all_tx_resources(struct e1000_adapter *adapter);
+void e1000_free_all_tx_resources(struct e1000_adapter *adapter);
+int e1000_setup_all_rx_resources(struct e1000_adapter *adapter);
+void e1000_free_all_rx_resources(struct e1000_adapter *adapter);
+void e1000_update_stats(struct e1000_adapter *adapter);
+int e1000_set_spd_dplx(struct e1000_adapter *adapter, uint16_t spddplx);
+
+/*  e1000_ethtool.c  */
+void e1000_set_ethtool_ops(struct net_device *netdev);
+
+/*  e1000_param.c  */
+void e1000_check_options(struct e1000_adapter *adapter);
+
+
 #endif /* _E1000_H_ */

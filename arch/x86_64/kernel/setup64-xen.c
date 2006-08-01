@@ -97,7 +97,7 @@ void __init setup_per_cpu_areas(void)
 	int i;
 	unsigned long size;
 
-#if defined(CONFIG_HOTPLUG_CPU) || (defined(CONFIG_XEN) && defined(CONFIG_SMP))
+#ifdef CONFIG_HOTPLUG_CPU
 	prefill_possible_map();
 #endif
 

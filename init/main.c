@@ -47,7 +47,6 @@
 #include <linux/rmap.h>
 #include <linux/mempolicy.h>
 #include <linux/key.h>
-#include <linux/delayacct.h>
 
 #include <asm/io.h>
 #include <asm/bugs.h>
@@ -58,10 +57,6 @@
 #ifdef CONFIG_X86_LOCAL_APIC
 #include <asm/smp.h>
 #endif
-
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#endif	/* CONFIG_KDB */
 
 /*
  * This is one of the first .c files built. Error out early if we have compiler
@@ -108,15 +103,6 @@ extern void tc_init(void);
 
 enum system_states system_state;
 EXPORT_SYMBOL(system_state);
-
-/*
- * The kernel_magic value represents the address of _end, which allows
- * namelist tools to "match" each other respectively.  That way a tool
- * that looks at /dev/mem can verify that it is using the right System.map
- * file -- if kernel_magic doesn't equal the namelist value of _end,
- * something's wrong.
- */
-unsigned long *kernel_magic = (unsigned long *)&_end;
 
 /*
  * Boot command-line arguments
@@ -169,26 +155,6 @@ char * envp_init[MAX_INIT_ENVS+2] = { "HOME=/", "TERM=linux", NULL, };
 static const char *panic_later, *panic_param;
 
 extern struct obs_kernel_param __setup_start[], __setup_end[];
-
-#ifdef	CONFIG_KDB
-static int __init kdb_setup(char *str)
-{
-	if (strcmp(str, "on") == 0) {
-		kdb_on = 1;
-	} else if (strcmp(str, "on-nokey") == 0) {
-		kdb_on = 2;
-	} else if (strcmp(str, "off") == 0) {
-		kdb_on = 0;
-	} else if (strcmp(str, "early") == 0) {
-		kdb_on = 1;
-		kdb_flags |= KDB_FLAG_EARLYKDB;
-	} else
-		printk("kdb flag %s not recognised\n", str);
-	return 0;
-}
-
-__setup("kdb=", kdb_setup);
-#endif	/* CONFIG_KDB */
 
 static int __init obsolete_checksetup(char *line)
 {
@@ -340,8 +306,6 @@ static int __init rdinit_setup(char *str)
 }
 __setup("rdinit=", rdinit_setup);
 
-extern void setup_arch(char **);
-
 #ifndef CONFIG_SMP
 
 #ifdef CONFIG_X86_LOCAL_APIC
@@ -359,7 +323,7 @@ static inline void smp_prepare_cpus(unsigned int maxcpus) { }
 #else
 
 #ifdef __GENERIC_PER_CPU
-unsigned long __per_cpu_offset[NR_CPUS];
+unsigned long __per_cpu_offset[NR_CPUS] __read_mostly;
 
 EXPORT_SYMBOL(__per_cpu_offset);
 
@@ -367,6 +331,7 @@ static void __init setup_per_cpu_areas(void)
 {
 	unsigned long size, i;
 	char *ptr;
+	unsigned long nr_possible_cpus = num_possible_cpus();
 
 	/* Copy section for each CPU (we discard the original) */
 	size = ALIGN(__per_cpu_end - __per_cpu_start, SMP_CACHE_BYTES);
@@ -374,12 +339,12 @@ static void __init setup_per_cpu_areas(void)
 	if (size < PERCPU_ENOUGH_ROOM)
 		size = PERCPU_ENOUGH_ROOM;
 #endif
+	ptr = alloc_bootmem(size * nr_possible_cpus);
 
-	ptr = alloc_bootmem(size * NR_CPUS);
-
-	for (i = 0; i < NR_CPUS; i++, ptr += size) {
+	for_each_possible_cpu(i) {
 		__per_cpu_offset[i] = ptr - __per_cpu_start;
 		memcpy(ptr, __per_cpu_start, __per_cpu_end - __per_cpu_start);
+		ptr += size;
 	}
 }
 #endif /* !__GENERIC_PER_CPU */
@@ -472,6 +437,15 @@ void __init parse_early_param(void)
  *	Activate the first processor.
  */
 
+static void __init boot_cpu_init(void)
+{
+	int cpu = smp_processor_id();
+	/* Mark the boot cpu "present", "online" etc for SMP and UP case */
+	cpu_set(cpu, cpu_online_map);
+	cpu_set(cpu, cpu_present_map);
+	cpu_set(cpu, cpu_possible_map);
+}
+
 asmlinkage void __init start_kernel(void)
 {
 	char * command_line;
@@ -481,17 +455,13 @@ asmlinkage void __init start_kernel(void)
  * enable them
  */
 	lock_kernel();
+	boot_cpu_init();
 	page_address_init();
 	printk(KERN_NOTICE);
 	printk(linux_banner);
 	setup_arch(&command_line);
 	setup_per_cpu_areas();
-
-	/*
-	 * Mark the boot cpu "online" so that it can call console drivers in
-	 * printk() and can access its per-cpu storage.
-	 */
-	smp_prepare_boot_cpu();
+	smp_prepare_boot_cpu();	/* arch-specific boot-cpu hooks */
 
 	/*
 	 * Set up the scheduler prior starting any interrupts (such as the
@@ -552,14 +522,6 @@ asmlinkage void __init start_kernel(void)
 	pgtable_cache_init();
 	prio_tree_init();
 	anon_vma_init();
-
-#ifdef	CONFIG_KDB
-	kdb_init();
-	if (KDB_FLAG(EARLYKDB)) {
-		KDB_ENTER();
-	}
-#endif	/* CONFIG_KDB */
-
 #ifdef CONFIG_X86
 	if (efi_enabled)
 		efi_enter_virtual_mode();
@@ -579,7 +541,6 @@ asmlinkage void __init start_kernel(void)
 	proc_root_init();
 #endif
 	cpuset_init();
-	delayacct_init();
 
 	check_bugs();
 
@@ -606,17 +567,23 @@ static void __init do_initcalls(void)
 	int count = preempt_count();
 
 	for (call = __initcall_start; call < __initcall_end; call++) {
-		char *msg;
+		char *msg = NULL;
+		char msgbuf[40];
+		int result;
 
 		if (initcall_debug) {
-			printk(KERN_DEBUG "Calling initcall 0x%p", *call);
-			print_fn_descriptor_symbol(": %s()", (unsigned long) *call);
+			printk("Calling initcall 0x%p", *call);
+			print_fn_descriptor_symbol(": %s()",
+					(unsigned long) *call);
 			printk("\n");
 		}
 
-		(*call)();
+		result = (*call)();
 
-		msg = NULL;
+		if (result && result != -ENODEV && initcall_debug) {
+			sprintf(msgbuf, "error code %d", result);
+			msg = msgbuf;
+		}
 		if (preempt_count() != count) {
 			msg = "preemption imbalance";
 			preempt_count() = count;
@@ -626,8 +593,10 @@ static void __init do_initcalls(void)
 			local_irq_enable();
 		}
 		if (msg) {
-			printk(KERN_WARNING "error in initcall at 0x%p: "
-				"returned with %s\n", *call, msg);
+			printk(KERN_WARNING "initcall at 0x%p", *call);
+			print_fn_descriptor_symbol(": %s()",
+					(unsigned long) *call);
+			printk(": returned with %s\n", msg);
 		}
 	}
 
@@ -674,24 +643,6 @@ static void run_init_process(char *init_filename)
 	execve(init_filename, argv_init, envp_init);
 }
 
-static inline void fixup_cpu_present_map(void)
-{
-#ifdef CONFIG_SMP
-	int i;
-
-	/*
-	 * If arch is not hotplug ready and did not populate
-	 * cpu_present_map, just make cpu_present_map same as cpu_possible_map
-	 * for other cpu bringup code to function as normal. e.g smp_init() etc.
-	 */
-	if (cpus_empty(cpu_present_map)) {
-		for_each_cpu(i) {
-			cpu_set(i, cpu_present_map);
-		}
-	}
-#endif
-}
-
 static int init(void * unused)
 {
 	lock_kernel();
@@ -721,7 +672,6 @@ static int init(void * unused)
 
 	do_pre_smp_initcalls();
 
-	fixup_cpu_present_map();
 	smp_init();
 	sched_init_smp();
 

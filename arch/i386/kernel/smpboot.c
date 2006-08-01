@@ -43,9 +43,6 @@
 #include <linux/kernel_stat.h>
 #include <linux/smp_lock.h>
 #include <linux/bootmem.h>
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#endif	/* CONFIG_KDB */
 #include <linux/notifier.h>
 #include <linux/cpu.h>
 #include <linux/percpu.h>
@@ -316,7 +313,9 @@ static void __init synchronize_tsc_bp (void)
 			if (tsc_values[i] < avg)
 				realdelta = -realdelta;
 
-			printk(KERN_INFO "CPU#%d had %ld usecs TSC skew, fixed it up.\n", i, realdelta);
+			if (realdelta > 0)
+				printk(KERN_INFO "CPU#%d had %ld usecs TSC "
+					"skew, fixed it up.\n", i, realdelta);
 		}
 
 		sum += delta;
@@ -436,11 +435,6 @@ static void __devinit smp_callin(void)
 	 * Allow the master to continue.
 	 */
 	cpu_set(cpuid, cpu_callin_map);
-
-#ifdef	CONFIG_KDB
-	/* Activate any preset global breakpoints on this cpu */
-	kdb(KDB_REASON_SILENT, 0, 0);
-#endif	/* CONFIG_KDB */
 
 	/*
 	 *      Synchronize the TSC with the BP
@@ -931,6 +925,7 @@ static int __devinit do_boot_cpu(int apicid, int cpu)
 	unsigned short nmi_high = 0, nmi_low = 0;
 
 	++cpucount;
+	alternatives_smp_switch(1);
 
 	/*
 	 * We can't use kernel_thread since we must avoid to
@@ -1034,7 +1029,6 @@ void cpu_exit_clear(void)
 
 	cpu_clear(cpu, cpu_callout_map);
 	cpu_clear(cpu, cpu_callin_map);
-	cpu_clear(cpu, cpu_present_map);
 
 	cpu_clear(cpu, smp_commenced_mask);
 	unmap_cpu_to_logical_apicid(cpu);
@@ -1046,30 +1040,19 @@ struct warm_boot_cpu_info {
 	int cpu;
 };
 
-static void __devinit do_warm_boot_cpu(void *p)
+static void __cpuinit do_warm_boot_cpu(void *p)
 {
 	struct warm_boot_cpu_info *info = p;
 	do_boot_cpu(info->apicid, info->cpu);
 	complete(info->complete);
 }
 
-int __devinit smp_prepare_cpu(int cpu)
+static int __cpuinit __smp_prepare_cpu(int cpu)
 {
 	DECLARE_COMPLETION(done);
 	struct warm_boot_cpu_info info;
 	struct work_struct task;
 	int	apicid, ret;
-
-	lock_cpu_hotplug();
-
-	/*
-	 * On x86, CPU0 is never offlined.  Trying to bring up an
-	 * already-booted CPU will hang.  So check for that case.
-	 */
-	if (cpu_online(cpu)) {
-		ret = -EINVAL;
-		goto exit;
-	}
 
 	apicid = x86_cpu_to_apicid[cpu];
 	if (apicid == BAD_APICID) {
@@ -1095,7 +1078,6 @@ int __devinit smp_prepare_cpu(int cpu)
 	zap_low_mappings();
 	ret = 0;
 exit:
-	unlock_cpu_hotplug();
 	return ret;
 }
 #endif
@@ -1250,11 +1232,6 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 		if (max_cpus <= cpucount+1)
 			continue;
 
-#ifdef CONFIG_SMP_ALTERNATIVES
-		if (kicked == 1)
-			prepare_for_smp();
-#endif
-
 		if (((cpu = alloc_cpu_id()) <= 0) || do_boot_cpu(apicid, cpu))
 			printk("CPU #%d not responding - cannot use it.\n",
 								apicid);
@@ -1405,6 +1382,8 @@ void __cpu_die(unsigned int cpu)
 		/* They ack this in play_dead by setting CPU_DEAD */
 		if (per_cpu(cpu_state, cpu) == CPU_DEAD) {
 			printk ("CPU %d is now offline\n", cpu);
+			if (1 == num_online_cpus())
+				alternatives_smp_switch(0);
 			return;
 		}
 		msleep(100);
@@ -1426,17 +1405,28 @@ void __cpu_die(unsigned int cpu)
 
 int __devinit __cpu_up(unsigned int cpu)
 {
+#ifdef CONFIG_HOTPLUG_CPU
+	int ret=0;
+
+	/*
+	 * We do warm boot only on cpus that had booted earlier
+	 * Otherwise cold boot is all handled from smp_boot_cpus().
+	 * cpu_callin_map is set during AP kickstart process. Its reset
+	 * when a cpu is taken offline from cpu_exit_clear().
+	 */
+	if (!cpu_isset(cpu, cpu_callin_map))
+		ret = __smp_prepare_cpu(cpu);
+
+	if (ret)
+		return -EIO;
+#endif
+
 	/* In case one didn't come up */
 	if (!cpu_isset(cpu, cpu_callin_map)) {
 		printk(KERN_DEBUG "skipping cpu%d, didn't come online\n", cpu);
 		local_irq_enable();
 		return -EIO;
 	}
-
-#ifdef CONFIG_SMP_ALTERNATIVES
-	if (num_online_cpus() == 1)
-		prepare_for_smp();
-#endif
 
 	local_irq_enable();
 	per_cpu(cpu_state, cpu) = CPU_UP_PREPARE;

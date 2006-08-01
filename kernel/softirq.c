@@ -16,6 +16,7 @@
 #include <linux/cpu.h>
 #include <linux/kthread.h>
 #include <linux/rcupdate.h>
+#include <linux/smp.h>
 
 #include <asm/irq.h>
 /*
@@ -341,38 +342,6 @@ void tasklet_kill(struct tasklet_struct *t)
 
 EXPORT_SYMBOL(tasklet_kill);
 
-struct tasklet_head saved_tasklet;
-
-void dump_clear_tasklet(void)
-{
-	saved_tasklet.list = __get_cpu_var(tasklet_vec).list;
-	__get_cpu_var(tasklet_vec).list = NULL;
-}
-
-EXPORT_SYMBOL_GPL(dump_clear_tasklet);
-
-void dump_run_tasklet(void)
-{
-	struct tasklet_struct *list;
-
-	list = __get_cpu_var(tasklet_vec).list;
-	__get_cpu_var(tasklet_vec).list = NULL;
-
-	while (list) {
-		struct tasklet_struct *t = list;
-		list = list->next;
-
-		if (!atomic_read(&t->count) &&
-		    (test_and_clear_bit(TASKLET_STATE_SCHED, &t->state)))
-				t->func(t->data);
-
-		t->next = __get_cpu_var(tasklet_vec).list;
-		__get_cpu_var(tasklet_vec).list = t;
-	}
-}
-
-EXPORT_SYMBOL_GPL(dump_run_tasklet);
-
 void __init softirq_init(void)
 {
 	open_softirq(TASKLET_SOFTIRQ, tasklet_action, NULL);
@@ -477,7 +446,7 @@ static void takeover_tasklets(unsigned int cpu)
 }
 #endif /* CONFIG_HOTPLUG_CPU */
 
-static int __devinit cpu_callback(struct notifier_block *nfb,
+static int cpu_callback(struct notifier_block *nfb,
 				  unsigned long action,
 				  void *hcpu)
 {
@@ -515,7 +484,7 @@ static int __devinit cpu_callback(struct notifier_block *nfb,
 	return NOTIFY_OK;
 }
 
-static struct notifier_block __devinitdata cpu_nfb = {
+static struct notifier_block cpu_nfb = {
 	.notifier_call = cpu_callback
 };
 
@@ -527,3 +496,22 @@ __init int spawn_ksoftirqd(void)
 	register_cpu_notifier(&cpu_nfb);
 	return 0;
 }
+
+#ifdef CONFIG_SMP
+/*
+ * Call a function on all processors
+ */
+int on_each_cpu(void (*func) (void *info), void *info, int retry, int wait)
+{
+	int ret = 0;
+
+	preempt_disable();
+	ret = smp_call_function(func, info, retry, wait);
+	local_irq_disable();
+	func(info);
+	local_irq_enable();
+	preempt_enable();
+	return ret;
+}
+EXPORT_SYMBOL(on_each_cpu);
+#endif

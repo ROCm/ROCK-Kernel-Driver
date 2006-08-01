@@ -785,7 +785,7 @@ qeth_dev_large_send_store(struct device *dev, struct device_attribute *attr, con
 	}
 	if (card->options.large_send == type)
 		return count;
-	if ((rc = qeth_set_large_send(card, type)))	
+	if ((rc = qeth_set_large_send(card, type)))
 		return rc;
 	return count;
 }
@@ -1145,11 +1145,10 @@ qeth_dev_ipato_add_store(const char *buf, size_t count,
 	if ((rc = qeth_parse_ipatoe(buf, proto, addr, &mask_bits)))
 		return rc;
 
-	if (!(ipatoe = kmalloc(sizeof(struct qeth_ipato_entry), GFP_KERNEL))){
+	if (!(ipatoe = kzalloc(sizeof(struct qeth_ipato_entry), GFP_KERNEL))){
 		PRINT_WARN("No memory to allocate ipato entry\n");
 		return -ENOMEM;
 	}
-	memset(ipatoe, 0, sizeof(struct qeth_ipato_entry));
 	ipatoe->proto = proto;
 	memcpy(ipatoe->addr, addr, (proto == QETH_PROT_IPV4)? 4:16);
 	ipatoe->mask_bits = mask_bits;
@@ -1683,7 +1682,7 @@ qeth_create_device_attributes(struct device *dev)
 	if (card->info.type == QETH_CARD_TYPE_OSN)
 		return sysfs_create_group(&dev->kobj,
 					  &qeth_osn_device_attr_group);
-   	
+
 	if ((ret = sysfs_create_group(&dev->kobj, &qeth_device_attr_group)))
 		return ret;
 	if ((ret = sysfs_create_group(&dev->kobj, &qeth_device_ipato_group))){
@@ -1714,7 +1713,7 @@ qeth_remove_device_attributes(struct device *dev)
 	if (card->info.type == QETH_CARD_TYPE_OSN)
 		return sysfs_remove_group(&dev->kobj,
 					  &qeth_osn_device_attr_group);
-		      
+
 	sysfs_remove_group(&dev->kobj, &qeth_device_attr_group);
 	sysfs_remove_group(&dev->kobj, &qeth_device_ipato_group);
 	sysfs_remove_group(&dev->kobj, &qeth_device_vipa_group);

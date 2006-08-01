@@ -65,7 +65,7 @@ cifs_hardlink(struct dentry *old_file, struct inode *inode,
 					cifs_sb_target->local_nls, 
 					cifs_sb_target->mnt_cifs_flags &
 						CIFS_MOUNT_MAP_SPECIAL_CHR);
-		if(rc == -EIO)
+		if((rc == -EIO) || (rc == -EINVAL))
 			rc = -EOPNOTSUPP;  
 	}
 
@@ -226,9 +226,9 @@ cifs_readlink(struct dentry *direntry, char __user *pBuffer, int buflen)
 
 /* BB would it be safe against deadlock to grab this sem 
       even though rename itself grabs the sem and calls lookup? */
-/*       down(&inode->i_sb->s_vfs_rename_sem);*/
+/*       mutex_lock(&inode->i_sb->s_vfs_rename_mutex);*/
 	full_path = build_path_from_dentry(direntry);
-/*       up(&inode->i_sb->s_vfs_rename_sem);*/
+/*       mutex_unlock(&inode->i_sb->s_vfs_rename_mutex);*/
 
 	if(full_path == NULL) {
 		FreeXid(xid);

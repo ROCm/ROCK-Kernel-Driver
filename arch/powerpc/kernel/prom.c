@@ -62,7 +62,7 @@ static int __initdata dt_root_addr_cells;
 static int __initdata dt_root_size_cells;
 
 #ifdef CONFIG_PPC64
-static int __initdata iommu_is_off;
+int __initdata iommu_is_off;
 int __initdata iommu_force_on;
 unsigned long tce_alloc_start, tce_alloc_end;
 #endif
@@ -383,14 +383,14 @@ static int __devinit finish_node_interrupts(struct device_node *np,
 			/* Apple uses bits in there in a different way, let's
 			 * only keep the real sense bit on macs
 			 */
-			if (_machine == PLATFORM_POWERMAC)
+			if (machine_is(powermac))
 				sense &= 0x1;
 			np->intrs[intrcount].sense = map_mpic_senses[sense];
 		}
 
 #ifdef CONFIG_PPC64
 		/* We offset irq numbers for the u3 MPIC by 128 in PowerMac */
-		if (_machine == PLATFORM_POWERMAC && ic && ic->parent) {
+		if (machine_is(powermac) && ic && ic->parent) {
 			char *name = get_property(ic->parent, "name", NULL);
 			if (name && !strcmp(name, "u3"))
 				np->intrs[intrcount].line += 128;
@@ -570,6 +570,18 @@ int __init of_scan_flat_dt(int (*it)(unsigned long node,
 	return rc;
 }
 
+unsigned long __init of_get_flat_dt_root(void)
+{
+	unsigned long p = ((unsigned long)initial_boot_params) +
+		initial_boot_params->off_dt_struct;
+
+	while(*((u32 *)p) == OF_DT_NOP)
+		p += 4;
+	BUG_ON (*((u32 *)p) != OF_DT_BEGIN_NODE);
+	p += 4;
+	return _ALIGN(p + strlen((char *)p) + 1, 4);
+}
+
 /**
  * This  function can be used within scan_flattened_dt callback to get
  * access to properties
@@ -610,6 +622,25 @@ void* __init of_get_flat_dt_prop(unsigned long node, const char *name,
 		p += sz;
 		p = _ALIGN(p, 4);
 	} while(1);
+}
+
+int __init of_flat_dt_is_compatible(unsigned long node, const char *compat)
+{
+	const char* cp;
+	unsigned long cplen, l;
+
+	cp = of_get_flat_dt_prop(node, "compatible", &cplen);
+	if (cp == NULL)
+		return 0;
+	while (cplen > 0) {
+		if (strncasecmp(cp, compat, strlen(compat)) == 0)
+			return 1;
+		l = strlen(cp) + 1;
+		cp += l;
+		cplen -= l;
+	}
+
+	return 0;
 }
 
 static void *__init unflatten_dt_alloc(unsigned long *mem, unsigned long size,
@@ -686,7 +717,7 @@ static unsigned long __init unflatten_dt_node(unsigned long mem,
 #ifdef DEBUG
 				if ((strlen(p) + l + 1) != allocl) {
 					DBG("%s: p: %d, l: %d, a: %d\n",
-					    pathp, strlen(p), l, allocl);
+					    pathp, (int)strlen(p), l, allocl);
 				}
 #endif
 				p += strlen(p);
@@ -829,10 +860,6 @@ void __init unflatten_device_tree(void)
 
 	/* Allocate memory for the expanded device tree */
 	mem = lmb_alloc(size + 4, __alignof__(struct device_node));
-	if (!mem) {
-		DBG("Couldn't allocate memory with lmb_alloc()!\n");
-		panic("Couldn't allocate memory with lmb_alloc()!\n");
-	}
 	mem = (unsigned long) __va(mem);
 
 	((u32 *)mem)[size / 4] = 0xdeadbeef;
@@ -858,13 +885,84 @@ void __init unflatten_device_tree(void)
 	DBG(" <- unflatten_device_tree()\n");
 }
 
+/*
+ * ibm,pa-features is a per-cpu property that contains a string of
+ * attribute descriptors, each of which has a 2 byte header plus up
+ * to 254 bytes worth of processor attribute bits.  First header
+ * byte specifies the number of bytes following the header.
+ * Second header byte is an "attribute-specifier" type, of which
+ * zero is the only currently-defined value.
+ * Implementation:  Pass in the byte and bit offset for the feature
+ * that we are interested in.  The function will return -1 if the
+ * pa-features property is missing, or a 1/0 to indicate if the feature
+ * is supported/not supported.  Note that the bit numbers are
+ * big-endian to match the definition in PAPR.
+ */
+static struct ibm_pa_feature {
+	unsigned long	cpu_features;	/* CPU_FTR_xxx bit */
+	unsigned int	cpu_user_ftrs;	/* PPC_FEATURE_xxx bit */
+	unsigned char	pabyte;		/* byte number in ibm,pa-features */
+	unsigned char	pabit;		/* bit number (big-endian) */
+	unsigned char	invert;		/* if 1, pa bit set => clear feature */
+} ibm_pa_features[] __initdata = {
+	{0, PPC_FEATURE_HAS_MMU,	0, 0, 0},
+	{0, PPC_FEATURE_HAS_FPU,	0, 1, 0},
+	{CPU_FTR_SLB, 0,		0, 2, 0},
+	{CPU_FTR_CTRL, 0,		0, 3, 0},
+	{CPU_FTR_NOEXECUTE, 0,		0, 6, 0},
+	{CPU_FTR_NODSISRALIGN, 0,	1, 1, 1},
+	{CPU_FTR_CI_LARGE_PAGE, 0,	1, 2, 0},
+};
+
+static void __init check_cpu_pa_features(unsigned long node)
+{
+	unsigned char *pa_ftrs;
+	unsigned long len, tablelen, i, bit;
+
+	pa_ftrs = of_get_flat_dt_prop(node, "ibm,pa-features", &tablelen);
+	if (pa_ftrs == NULL)
+		return;
+
+	/* find descriptor with type == 0 */
+	for (;;) {
+		if (tablelen < 3)
+			return;
+		len = 2 + pa_ftrs[0];
+		if (tablelen < len)
+			return;		/* descriptor 0 not found */
+		if (pa_ftrs[1] == 0)
+			break;
+		tablelen -= len;
+		pa_ftrs += len;
+	}
+
+	/* loop over bits we know about */
+	for (i = 0; i < ARRAY_SIZE(ibm_pa_features); ++i) {
+		struct ibm_pa_feature *fp = &ibm_pa_features[i];
+
+		if (fp->pabyte >= pa_ftrs[0])
+			continue;
+		bit = (pa_ftrs[2 + fp->pabyte] >> (7 - fp->pabit)) & 1;
+		if (bit ^ fp->invert) {
+			cur_cpu_spec->cpu_features |= fp->cpu_features;
+			cur_cpu_spec->cpu_user_features |= fp->cpu_user_ftrs;
+		} else {
+			cur_cpu_spec->cpu_features &= ~fp->cpu_features;
+			cur_cpu_spec->cpu_user_features &= ~fp->cpu_user_ftrs;
+		}
+	}
+}
+
 static int __init early_init_dt_scan_cpus(unsigned long node,
 					  const char *uname, int depth,
 					  void *data)
 {
 	static int logical_cpuid = 0;
 	char *type = of_get_flat_dt_prop(node, "device_type", NULL);
-	u32 *prop, *intserv;
+#ifdef CONFIG_ALTIVEC
+	u32 *prop;
+#endif
+	u32 *intserv;
 	int i, nthreads;
 	unsigned long len;
 	int found = 0;
@@ -939,6 +1037,8 @@ static int __init early_init_dt_scan_cpus(unsigned long node,
 	}
 #endif /* CONFIG_ALTIVEC */
 
+	check_cpu_pa_features(node);
+
 #ifdef CONFIG_PPC_PSERIES
 	if (nthreads > 1)
 		cur_cpu_spec->cpu_features |= CPU_FTR_SMT;
@@ -952,7 +1052,6 @@ static int __init early_init_dt_scan_cpus(unsigned long node,
 static int __init early_init_dt_scan_chosen(unsigned long node,
 					    const char *uname, int depth, void *data)
 {
-	u32 *prop;
 	unsigned long *lprop;
 	unsigned long l;
 	char *p;
@@ -962,14 +1061,6 @@ static int __init early_init_dt_scan_chosen(unsigned long node,
 	if (depth != 1 ||
 	    (strcmp(uname, "chosen") != 0 && strcmp(uname, "chosen@0") != 0))
 		return 0;
-
-	/* get platform type */
-	prop = (u32 *)of_get_flat_dt_prop(node, "linux,platform", NULL);
-	if (prop == NULL)
-		return 0;
-#ifdef CONFIG_PPC_MULTIPLATFORM
-	_machine = *prop;
-#endif
 
 #ifdef CONFIG_PPC64
 	/* check if iommu is forced on or off */
@@ -997,15 +1088,15 @@ static int __init early_init_dt_scan_chosen(unsigned long node,
 	 * set of RTAS infos now if available
 	 */
 	{
-		u64 *basep, *entryp;
+		u64 *basep, *entryp, *sizep;
 
 		basep = of_get_flat_dt_prop(node, "linux,rtas-base", NULL);
 		entryp = of_get_flat_dt_prop(node, "linux,rtas-entry", NULL);
-		prop = of_get_flat_dt_prop(node, "linux,rtas-size", NULL);
-		if (basep && entryp && prop) {
+		sizep = of_get_flat_dt_prop(node, "linux,rtas-size", NULL);
+		if (basep && entryp && sizep) {
 			rtas.base = *basep;
 			rtas.entry = *entryp;
-			rtas.size = *prop;
+			rtas.size = *sizep;
 		}
 	}
 #endif /* CONFIG_PPC_RTAS */
@@ -1034,25 +1125,13 @@ static int __init early_init_dt_scan_chosen(unsigned long node,
 
 	if (strstr(cmd_line, "mem=")) {
 		char *p, *q;
-		unsigned long maxmem = 0;
 
 		for (q = cmd_line; (p = strstr(q, "mem=")) != 0; ) {
 			q = p + 4;
 			if (p > cmd_line && p[-1] != ' ')
 				continue;
-			maxmem = simple_strtoul(q, &q, 0);
-			if (*q == 'k' || *q == 'K') {
-				maxmem <<= 10;
-				++q;
-			} else if (*q == 'm' || *q == 'M') {
-				maxmem <<= 20;
-				++q;
-			} else if (*q == 'g' || *q == 'G') {
-				maxmem <<= 30;
-				++q;
-			}
+			memory_limit = memparse(q, &q);
 		}
-		memory_limit = maxmem;
 	}
 
 	/* break now */
@@ -1788,7 +1867,7 @@ static int of_finish_dynamic_node(struct device_node *node)
 	/* We don't support that function on PowerMac, at least
 	 * not yet
 	 */
-	if (_machine == PLATFORM_POWERMAC)
+	if (machine_is(powermac))
 		return -ENODEV;
 
 	/* fix up new node's linux_phandle field */

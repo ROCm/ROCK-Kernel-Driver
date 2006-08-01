@@ -132,7 +132,7 @@ SYSCALL(sys_clone_glue,sys_clone_glue,sys32_clone_glue)		/* 120 */
 SYSCALL(sys_setdomainname,sys_setdomainname,sys32_setdomainname_wrapper)
 SYSCALL(sys_newuname,s390x_newuname,sys32_newuname_wrapper)
 NI_SYSCALL							/* modify_ldt for i386 */
-SYSCALL(sys_adjtimex,sys_adjtimex,sys32_adjtimex_wrapper)
+SYSCALL(sys_adjtimex,sys_adjtimex,compat_sys_adjtimex_wrapper)
 SYSCALL(sys_mprotect,sys_mprotect,sys32_mprotect_wrapper)	/* 125 */
 SYSCALL(sys_sigprocmask,sys_sigprocmask,compat_sys_sigprocmask_wrapper)
 NI_SYSCALL							/* old "create module" */
@@ -312,3 +312,9 @@ SYSCALL(sys_faccessat,sys_faccessat,sys_faccessat_wrapper)	/* 300 */
 SYSCALL(sys_pselect6,sys_pselect6,compat_sys_pselect6_wrapper)
 SYSCALL(sys_ppoll,sys_ppoll,compat_sys_ppoll_wrapper)
 SYSCALL(sys_unshare,sys_unshare,sys_unshare_wrapper)
+SYSCALL(sys_set_robust_list,sys_set_robust_list,compat_sys_set_robust_list_wrapper)
+SYSCALL(sys_get_robust_list,sys_get_robust_list,compat_sys_get_robust_list_wrapper)
+SYSCALL(sys_splice,sys_splice,sys_splice_wrapper)
+SYSCALL(sys_sync_file_range,sys_sync_file_range,sys_sync_file_range_wrapper)
+SYSCALL(sys_tee,sys_tee,sys_tee_wrapper)
+SYSCALL(sys_vmsplice,sys_vmsplice,compat_sys_vmsplice_wrapper)

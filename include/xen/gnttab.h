@@ -97,7 +97,6 @@ void gnttab_release_grant_reference(grant_ref_t *private_head,
 
 void gnttab_request_free_callback(struct gnttab_free_callback *callback,
 				  void (*fn)(void *), void *arg, u16 count);
-void gnttab_cancel_free_callback(struct gnttab_free_callback *callback);
 
 void gnttab_grant_foreign_access_ref(grant_ref_t ref, domid_t domid,
 				     unsigned long frame, int readonly);
@@ -115,3 +114,13 @@ int gnttab_suspend(void);
 int gnttab_resume(void);
 
 #endif /* __ASM_GNTTAB_H__ */
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

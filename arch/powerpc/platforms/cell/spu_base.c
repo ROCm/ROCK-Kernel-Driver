@@ -32,7 +32,7 @@
 
 #include <asm/io.h>
 #include <asm/prom.h>
-#include <asm/semaphore.h>
+#include <linux/mutex.h>
 #include <asm/spu.h>
 #include <asm/mmu_context.h>
 
@@ -111,7 +111,7 @@ static int __spu_trap_data_seg(struct spu *spu, unsigned long ea)
 extern int hash_page(unsigned long ea, unsigned long access, unsigned long trap); //XXX
 static int __spu_trap_data_map(struct spu *spu, unsigned long ea, u64 dsisr)
 {
-	pr_debug("%s\n", __FUNCTION__);
+	pr_debug("%s, %lx, %lx\n", __FUNCTION__, dsisr, ea);
 
 	/* Handle kernel space hash faults immediately.
 	   User hash faults need to be deferred to process context. */
@@ -168,7 +168,7 @@ static int __spu_trap_halt(struct spu *spu)
 static int __spu_trap_tag_group(struct spu *spu)
 {
 	pr_debug("%s\n", __FUNCTION__);
-	/* wake_up(&spu->dma_wq); */
+	spu->mfc_callback(spu);
 	return 0;
 }
 
@@ -242,6 +242,8 @@ spu_irq_class_1(int irq, void *data, struct pt_regs *regs)
 		spu_mfc_dsisr_set(spu, 0ul);
 	spu_int_stat_clear(spu, 1, stat);
 	spin_unlock(&spu->register_lock);
+	pr_debug("%s: %lx %lx %lx %lx\n", __FUNCTION__, mask, stat,
+			dar, dsisr);
 
 	if (stat & 1) /* segment fault */
 		__spu_trap_data_seg(spu, dar);
@@ -304,19 +306,19 @@ spu_request_irqs(struct spu *spu)
 
 	snprintf(spu->irq_c0, sizeof (spu->irq_c0), "spe%02d.0", spu->number);
 	ret = request_irq(irq_base + spu->isrc,
-		 spu_irq_class_0, 0, spu->irq_c0, spu);
+		 spu_irq_class_0, SA_INTERRUPT, spu->irq_c0, spu);
 	if (ret)
 		goto out;
 
 	snprintf(spu->irq_c1, sizeof (spu->irq_c1), "spe%02d.1", spu->number);
 	ret = request_irq(irq_base + IIC_CLASS_STRIDE + spu->isrc,
-		 spu_irq_class_1, 0, spu->irq_c1, spu);
+		 spu_irq_class_1, SA_INTERRUPT, spu->irq_c1, spu);
 	if (ret)
 		goto out1;
 
 	snprintf(spu->irq_c2, sizeof (spu->irq_c2), "spe%02d.2", spu->number);
 	ret = request_irq(irq_base + 2*IIC_CLASS_STRIDE + spu->isrc,
-		 spu_irq_class_2, 0, spu->irq_c2, spu);
+		 spu_irq_class_2, SA_INTERRUPT, spu->irq_c2, spu);
 	if (ret)
 		goto out2;
 	goto out;
@@ -342,7 +344,7 @@ spu_free_irqs(struct spu *spu)
 }
 
 static LIST_HEAD(spu_list);
-static DECLARE_MUTEX(spu_mutex);
+static DEFINE_MUTEX(spu_mutex);
 
 static void spu_init_channels(struct spu *spu)
 {
@@ -382,7 +384,7 @@ struct spu *spu_alloc(void)
 {
 	struct spu *spu;
 
-	down(&spu_mutex);
+	mutex_lock(&spu_mutex);
 	if (!list_empty(&spu_list)) {
 		spu = list_entry(spu_list.next, struct spu, list);
 		list_del_init(&spu->list);
@@ -391,7 +393,7 @@ struct spu *spu_alloc(void)
 		pr_debug("No SPU left\n");
 		spu = NULL;
 	}
-	up(&spu_mutex);
+	mutex_unlock(&spu_mutex);
 
 	if (spu)
 		spu_init_channels(spu);
@@ -402,9 +404,9 @@ EXPORT_SYMBOL_GPL(spu_alloc);
 
 void spu_free(struct spu *spu)
 {
-	down(&spu_mutex);
+	mutex_lock(&spu_mutex);
 	list_add_tail(&spu->list, &spu_list);
-	up(&spu_mutex);
+	mutex_unlock(&spu_mutex);
 }
 EXPORT_SYMBOL_GPL(spu_free);
 
@@ -484,14 +486,17 @@ int spu_irq_class_1_bottom(struct spu *spu)
 
 	ea = spu->dar;
 	dsisr = spu->dsisr;
-	if (dsisr & MFC_DSISR_PTE_NOT_FOUND) {
+	if (dsisr & (MFC_DSISR_PTE_NOT_FOUND | MFC_DSISR_ACCESS_DENIED)) {
+		u64 flags;
+
 		access = (_PAGE_PRESENT | _PAGE_USER);
 		access |= (dsisr & MFC_DSISR_ACCESS_PUT) ? _PAGE_RW : 0UL;
+		local_irq_save(flags);
 		if (hash_page(ea, access, 0x300) != 0)
 			error |= CLASS1_ENABLE_STORAGE_FAULT_INTR;
+		local_irq_restore(flags);
 	}
-	if ((error & CLASS1_ENABLE_STORAGE_FAULT_INTR) ||
-	    (dsisr & MFC_DSISR_ACCESS_DENIED)) {
+	if (error & CLASS1_ENABLE_STORAGE_FAULT_INTR) {
 		if ((ret = spu_handle_mm_fault(spu)) != 0)
 			error |= CLASS1_ENABLE_STORAGE_FAULT_INTR;
 		else
@@ -515,8 +520,50 @@ void spu_irq_setaffinity(struct spu *spu, int cpu)
 }
 EXPORT_SYMBOL_GPL(spu_irq_setaffinity);
 
-static void __iomem * __init map_spe_prop(struct device_node *n,
-						 const char *name)
+static int __init find_spu_node_id(struct device_node *spe)
+{
+	unsigned int *id;
+	struct device_node *cpu;
+	cpu = spe->parent->parent;
+	id = (unsigned int *)get_property(cpu, "node-id", NULL);
+	return id ? *id : 0;
+}
+
+static int __init cell_spuprop_present(struct spu *spu, struct device_node *spe,
+		const char *prop)
+{
+	static DEFINE_MUTEX(add_spumem_mutex);
+
+	struct address_prop {
+		unsigned long address;
+		unsigned int len;
+	} __attribute__((packed)) *p;
+	int proplen;
+
+	unsigned long start_pfn, nr_pages;
+	struct pglist_data *pgdata;
+	struct zone *zone;
+	int ret;
+
+	p = (void*)get_property(spe, prop, &proplen);
+	WARN_ON(proplen != sizeof (*p));
+
+	start_pfn = p->address >> PAGE_SHIFT;
+	nr_pages = ((unsigned long)p->len + PAGE_SIZE - 1) >> PAGE_SHIFT;
+
+	pgdata = NODE_DATA(spu->nid);
+	zone = pgdata->node_zones;
+
+	/* XXX rethink locking here */
+	mutex_lock(&add_spumem_mutex);
+	ret = __add_pages(zone, start_pfn, nr_pages);
+	mutex_unlock(&add_spumem_mutex);
+
+	return ret;
+}
+
+static void __iomem * __init map_spe_prop(struct spu *spu,
+		struct device_node *n, const char *name)
 {
 	struct address_prop {
 		unsigned long address;
@@ -525,6 +572,8 @@ static void __iomem * __init map_spe_prop(struct device_node *n,
 
 	void *p;
 	int proplen;
+	void* ret = NULL;
+	int err = 0;
 
 	p = get_property(n, name, &proplen);
 	if (proplen != sizeof (struct address_prop))
@@ -532,7 +581,14 @@ static void __iomem * __init map_spe_prop(struct device_node *n,
 
 	prop = p;
 
-	return ioremap(prop->address, prop->len);
+	err = cell_spuprop_present(spu, n, name);
+	if (err && (err != -EEXIST))
+		goto out;
+
+	ret = ioremap(prop->address, prop->len);
+
+ out:
+	return ret;
 }
 
 static void spu_unmap(struct spu *spu)
@@ -543,39 +599,45 @@ static void spu_unmap(struct spu *spu)
 	iounmap((u8 __iomem *)spu->local_store);
 }
 
-static int __init spu_map_device(struct spu *spu, struct device_node *spe)
+static int __init spu_map_device(struct spu *spu, struct device_node *node)
 {
 	char *prop;
 	int ret;
 
 	ret = -ENODEV;
-	prop = get_property(spe, "isrc", NULL);
+	prop = get_property(node, "isrc", NULL);
 	if (!prop)
 		goto out;
 	spu->isrc = *(unsigned int *)prop;
 
-	spu->name = get_property(spe, "name", NULL);
+	spu->name = get_property(node, "name", NULL);
 	if (!spu->name)
 		goto out;
 
-	prop = get_property(spe, "local-store", NULL);
+	prop = get_property(node, "local-store", NULL);
 	if (!prop)
 		goto out;
 	spu->local_store_phys = *(unsigned long *)prop;
 
 	/* we use local store as ram, not io memory */
-	spu->local_store = (void __force *)map_spe_prop(spe, "local-store");
+	spu->local_store = (void __force *)
+		map_spe_prop(spu, node, "local-store");
 	if (!spu->local_store)
 		goto out;
 
-	spu->problem= map_spe_prop(spe, "problem");
+	prop = get_property(node, "problem", NULL);
+	if (!prop)
+		goto out_unmap;
+	spu->problem_phys = *(unsigned long *)prop;
+
+	spu->problem= map_spe_prop(spu, node, "problem");
 	if (!spu->problem)
 		goto out_unmap;
 
-	spu->priv1= map_spe_prop(spe, "priv1");
+	spu->priv1= map_spe_prop(spu, node, "priv1");
 	/* priv1 is not available on a hypervisor */
 
-	spu->priv2= map_spe_prop(spe, "priv2");
+	spu->priv2= map_spe_prop(spu, node, "priv2");
 	if (!spu->priv2)
 		goto out_unmap;
 	ret = 0;
@@ -585,17 +647,6 @@ out_unmap:
 	spu_unmap(spu);
 out:
 	return ret;
-}
-
-static int __init find_spu_node_id(struct device_node *spe)
-{
-	unsigned int *id;
-	struct device_node *cpu;
-
-	cpu = spe->parent->parent;
-	id = (unsigned int *)get_property(cpu, "node-id", NULL);
-
-	return id ? *id : 0;
 }
 
 static int __init create_spu(struct device_node *spe)
@@ -614,6 +665,10 @@ static int __init create_spu(struct device_node *spe)
 		goto out_free;
 
 	spu->node = find_spu_node_id(spe);
+	spu->nid = of_node_to_nid(spe);
+	if (spu->nid == -1)
+		spu->nid = 0;
+
 	spu->stop_code = 0;
 	spu->slb_replace = 0;
 	spu->mm = NULL;
@@ -632,15 +687,16 @@ static int __init create_spu(struct device_node *spe)
 	spu->ibox_callback = NULL;
 	spu->wbox_callback = NULL;
 	spu->stop_callback = NULL;
+	spu->mfc_callback = NULL;
 
-	down(&spu_mutex);
+	mutex_lock(&spu_mutex);
 	spu->number = number++;
 	ret = spu_request_irqs(spu);
 	if (ret)
 		goto out_unmap;
 
 	list_add(&spu->list, &spu_list);
-	up(&spu_mutex);
+	mutex_unlock(&spu_mutex);
 
 	pr_debug(KERN_DEBUG "Using SPE %s %02x %p %p %p %p %d\n",
 		spu->name, spu->isrc, spu->local_store,
@@ -648,7 +704,7 @@ static int __init create_spu(struct device_node *spe)
 	goto out;
 
 out_unmap:
-	up(&spu_mutex);
+	mutex_unlock(&spu_mutex);
 	spu_unmap(spu);
 out_free:
 	kfree(spu);
@@ -668,10 +724,10 @@ static void destroy_spu(struct spu *spu)
 static void cleanup_spu_base(void)
 {
 	struct spu *spu, *tmp;
-	down(&spu_mutex);
+	mutex_lock(&spu_mutex);
 	list_for_each_entry_safe(spu, tmp, &spu_list, list)
 		destroy_spu(spu);
-	up(&spu_mutex);
+	mutex_unlock(&spu_mutex);
 }
 module_exit(cleanup_spu_base);
 

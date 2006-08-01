@@ -25,6 +25,7 @@
 #include <linux/tty.h>
 #include <linux/cpu.h>
 #include <linux/nodemask.h>
+#include <linux/pfn.h>
 
 #include <asm/processor.h>
 #include <asm/pgtable.h>

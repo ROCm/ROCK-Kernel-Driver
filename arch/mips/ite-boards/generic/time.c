@@ -29,6 +29,7 @@
 #include <linux/sched.h>
 #include <linux/time.h>
 #include <linux/spinlock.h>
+#include <linux/mc146818rtc.h>
 
 #include <asm/time.h>
 #include <asm/mipsregs.h>
@@ -227,8 +228,8 @@ void __init it8172_time_init(void)
 
 	local_irq_restore(flags);
 
-	rtc_get_time = it8172_rtc_get_time;
-	rtc_set_time = it8172_rtc_set_time;
+	rtc_mips_get_time = it8172_rtc_get_time;
+	rtc_mips_set_time = it8172_rtc_set_time;
 }
 
 #define ALLINTS (IE_IRQ0 | IE_IRQ1 | IE_IRQ2 | IE_IRQ3 | IE_IRQ4 | IE_IRQ5)

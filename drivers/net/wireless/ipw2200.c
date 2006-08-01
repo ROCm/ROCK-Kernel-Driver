@@ -1,6 +1,6 @@
 /******************************************************************************
 
-  Copyright(c) 2003 - 2005 Intel Corporation. All rights reserved.
+  Copyright(c) 2003 - 2006 Intel Corporation. All rights reserved.
 
   802.11 status code portion of this file from ethereal-0.10.6:
     Copyright 2000, Axis Communications AB
@@ -31,10 +31,11 @@
 ******************************************************************************/
 
 #include "ipw2200.h"
+#include <linux/version.h>
 
-#define IPW2200_VERSION "1.0.10"
+#define IPW2200_VERSION "git-1.1.1"
 #define DRV_DESCRIPTION	"Intel(R) PRO/Wireless 2200/2915 Network Driver"
-#define DRV_COPYRIGHT	"Copyright(c) 2003-2005 Intel Corporation"
+#define DRV_COPYRIGHT	"Copyright(c) 2003-2006 Intel Corporation"
 #define DRV_VERSION     IPW2200_VERSION
 
 #define ETH_P_80211_STATS (ETH_P_80211_RAW + 1)
@@ -151,12 +152,6 @@ static int init_supported_rates(struct ipw_priv *priv,
 				struct ipw_supported_rates *prates);
 static void ipw_set_hwcrypto_keys(struct ipw_priv *);
 static void ipw_send_wep_keys(struct ipw_priv *, int);
-
-static int ipw_is_valid_channel(struct ieee80211_device *, u8);
-static int ipw_channel_to_index(struct ieee80211_device *, u8);
-static u8 ipw_freq_to_channel(struct ieee80211_device *, u32);
-static int ipw_set_geo(struct ieee80211_device *, const struct ieee80211_geo *);
-static const struct ieee80211_geo *ipw_get_geo(struct ieee80211_device *);
 
 static int snprint_line(char *buf, size_t count,
 			const u8 * data, u32 len, u32 ofs)
@@ -509,7 +504,7 @@ static inline void ipw_disable_interrupts(struct ipw_priv *priv)
 	ipw_write32(priv, IPW_INTA_MASK_R, ~IPW_INTA_MASK_ALL);
 }
 
-#ifdef CONFIG_IPW2100_DEBUG
+#ifdef CONFIG_IPW2200_DEBUG
 static char *ipw_error_desc(u32 val)
 {
 	switch (val) {
@@ -748,7 +743,7 @@ static void ipw_init_ordinals(struct ipw_priv *priv)
 
 }
 
-u32 ipw_register_toggle(u32 reg)
+static u32 ipw_register_toggle(u32 reg)
 {
 	reg &= ~IPW_START_STANDBY;
 	if (reg & IPW_GATE_ODMA)
@@ -773,7 +768,7 @@ u32 ipw_register_toggle(u32 reg)
 #define LD_TIME_LINK_OFF msecs_to_jiffies(2700)
 #define LD_TIME_ACT_ON msecs_to_jiffies(250)
 
-void ipw_led_link_on(struct ipw_priv *priv)
+static void ipw_led_link_on(struct ipw_priv *priv)
 {
 	unsigned long flags;
 	u32 led;
@@ -811,12 +806,12 @@ void ipw_led_link_on(struct ipw_priv *priv)
 static void ipw_bg_led_link_on(void *data)
 {
 	struct ipw_priv *priv = data;
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	ipw_led_link_on(data);
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 }
 
-void ipw_led_link_off(struct ipw_priv *priv)
+static void ipw_led_link_off(struct ipw_priv *priv)
 {
 	unsigned long flags;
 	u32 led;
@@ -855,12 +850,12 @@ void ipw_led_link_off(struct ipw_priv *priv)
 static void ipw_bg_led_link_off(void *data)
 {
 	struct ipw_priv *priv = data;
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	ipw_led_link_off(data);
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 }
 
-static inline void __ipw_led_activity_on(struct ipw_priv *priv)
+static void __ipw_led_activity_on(struct ipw_priv *priv)
 {
 	u32 led;
 
@@ -894,6 +889,7 @@ static inline void __ipw_led_activity_on(struct ipw_priv *priv)
 	}
 }
 
+#if 0
 void ipw_led_activity_on(struct ipw_priv *priv)
 {
 	unsigned long flags;
@@ -901,8 +897,9 @@ void ipw_led_activity_on(struct ipw_priv *priv)
 	__ipw_led_activity_on(priv);
 	spin_unlock_irqrestore(&priv->lock, flags);
 }
+#endif  /*  0  */
 
-void ipw_led_activity_off(struct ipw_priv *priv)
+static void ipw_led_activity_off(struct ipw_priv *priv)
 {
 	unsigned long flags;
 	u32 led;
@@ -932,12 +929,12 @@ void ipw_led_activity_off(struct ipw_priv *priv)
 static void ipw_bg_led_activity_off(void *data)
 {
 	struct ipw_priv *priv = data;
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	ipw_led_activity_off(data);
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 }
 
-void ipw_led_band_on(struct ipw_priv *priv)
+static void ipw_led_band_on(struct ipw_priv *priv)
 {
 	unsigned long flags;
 	u32 led;
@@ -972,7 +969,7 @@ void ipw_led_band_on(struct ipw_priv *priv)
 	spin_unlock_irqrestore(&priv->lock, flags);
 }
 
-void ipw_led_band_off(struct ipw_priv *priv)
+static void ipw_led_band_off(struct ipw_priv *priv)
 {
 	unsigned long flags;
 	u32 led;
@@ -995,24 +992,24 @@ void ipw_led_band_off(struct ipw_priv *priv)
 	spin_unlock_irqrestore(&priv->lock, flags);
 }
 
-void ipw_led_radio_on(struct ipw_priv *priv)
+static void ipw_led_radio_on(struct ipw_priv *priv)
 {
 	ipw_led_link_on(priv);
 }
 
-void ipw_led_radio_off(struct ipw_priv *priv)
+static void ipw_led_radio_off(struct ipw_priv *priv)
 {
 	ipw_led_activity_off(priv);
 	ipw_led_link_off(priv);
 }
 
-void ipw_led_link_up(struct ipw_priv *priv)
+static void ipw_led_link_up(struct ipw_priv *priv)
 {
 	/* Set the Link Led on for all nic types */
 	ipw_led_link_on(priv);
 }
 
-void ipw_led_link_down(struct ipw_priv *priv)
+static void ipw_led_link_down(struct ipw_priv *priv)
 {
 	ipw_led_activity_off(priv);
 	ipw_led_link_off(priv);
@@ -1021,7 +1018,7 @@ void ipw_led_link_down(struct ipw_priv *priv)
 		ipw_led_radio_off(priv);
 }
 
-void ipw_led_init(struct ipw_priv *priv)
+static void ipw_led_init(struct ipw_priv *priv)
 {
 	priv->nic_type = priv->eeprom[EEPROM_NIC_TYPE];
 
@@ -1072,7 +1069,7 @@ void ipw_led_init(struct ipw_priv *priv)
 	}
 }
 
-void ipw_led_shutdown(struct ipw_priv *priv)
+static void ipw_led_shutdown(struct ipw_priv *priv)
 {
 	ipw_led_activity_off(priv);
 	ipw_led_link_off(priv);
@@ -1175,8 +1172,8 @@ static void ipw_free_error_log(struct ipw_fw_error *error)
 		kfree(error);
 }
 
-static ssize_t show_event_log(struct device *d, struct device_attribute *attr,
-			      char *buf)
+static ssize_t show_event_log(struct device *d,
+			      struct device_attribute *attr, char *buf)
 {
 	struct ipw_priv *priv = dev_get_drvdata(d);
 	u32 log_len = ipw_get_event_log_len(priv);
@@ -1196,8 +1193,8 @@ static ssize_t show_event_log(struct device *d, struct device_attribute *attr,
 
 static DEVICE_ATTR(event_log, S_IRUGO, show_event_log, NULL);
 
-static ssize_t show_error(struct device *d, struct device_attribute *attr,
-			  char *buf)
+static ssize_t show_error(struct device *d,
+			  struct device_attribute *attr, char *buf)
 {
 	struct ipw_priv *priv = dev_get_drvdata(d);
 	u32 len = 0, i;
@@ -1231,7 +1228,8 @@ static ssize_t show_error(struct device *d, struct device_attribute *attr,
 	return len;
 }
 
-static ssize_t clear_error(struct device *d, struct device_attribute *attr,
+static ssize_t clear_error(struct device *d,
+			   struct device_attribute *attr,
 			   const char *buf, size_t count)
 {
 	struct ipw_priv *priv = dev_get_drvdata(d);
@@ -1244,8 +1242,8 @@ static ssize_t clear_error(struct device *d, struct device_attribute *attr,
 
 static DEVICE_ATTR(error, S_IRUGO | S_IWUSR, show_error, clear_error);
 
-static ssize_t show_cmd_log(struct device *d, struct device_attribute *attr,
-			    char *buf)
+static ssize_t show_cmd_log(struct device *d,
+			    struct device_attribute *attr, char *buf)
 {
 	struct ipw_priv *priv = dev_get_drvdata(d);
 	u32 len = 0, i;
@@ -1282,7 +1280,7 @@ static ssize_t store_scan_age(struct device *d, struct device_attribute *attr,
 			      const char *buf, size_t count)
 {
 	struct ipw_priv *priv = dev_get_drvdata(d);
-#ifdef CONFIG_IPW2100_DEBUG
+#ifdef CONFIG_IPW2200_DEBUG
 	struct net_device *dev = priv->net_dev;
 #endif
 	char buffer[] = "00000000";
@@ -1349,8 +1347,8 @@ static ssize_t store_led(struct device *d, struct device_attribute *attr,
 
 static DEVICE_ATTR(led, S_IWUSR | S_IRUGO, show_led, store_led);
 
-static ssize_t show_status(struct device *d, struct device_attribute *attr,
-			   char *buf)
+static ssize_t show_status(struct device *d,
+			   struct device_attribute *attr, char *buf)
 {
 	struct ipw_priv *p = d->driver_data;
 	return sprintf(buf, "0x%08x\n", (int)p->status);
@@ -1367,8 +1365,8 @@ static ssize_t show_cfg(struct device *d, struct device_attribute *attr,
 
 static DEVICE_ATTR(cfg, S_IRUGO, show_cfg, NULL);
 
-static ssize_t show_nic_type(struct device *d, struct device_attribute *attr,
-			     char *buf)
+static ssize_t show_nic_type(struct device *d,
+			     struct device_attribute *attr, char *buf)
 {
 	struct ipw_priv *priv = d->driver_data;
 	return sprintf(buf, "TYPE: %d\n", priv->nic_type);
@@ -1376,8 +1374,8 @@ static ssize_t show_nic_type(struct device *d, struct device_attribute *attr,
 
 static DEVICE_ATTR(nic_type, S_IRUGO, show_nic_type, NULL);
 
-static ssize_t show_ucode_version(struct device *d, struct device_attribute *attr,
-				  char *buf)
+static ssize_t show_ucode_version(struct device *d,
+				  struct device_attribute *attr, char *buf)
 {
 	u32 len = sizeof(u32), tmp = 0;
 	struct ipw_priv *p = d->driver_data;
@@ -1408,13 +1406,14 @@ static DEVICE_ATTR(rtc, S_IWUSR | S_IRUGO, show_rtc, NULL);
  * Add a device attribute to view/control the delay between eeprom
  * operations.
  */
-static ssize_t show_eeprom_delay(struct device *d, struct device_attribute *attr,
-				 char *buf)
+static ssize_t show_eeprom_delay(struct device *d,
+				 struct device_attribute *attr, char *buf)
 {
 	int n = ((struct ipw_priv *)d->driver_data)->eeprom_delay;
 	return sprintf(buf, "%i\n", n);
 }
-static ssize_t store_eeprom_delay(struct device *d, struct device_attribute *attr,
+static ssize_t store_eeprom_delay(struct device *d,
+				  struct device_attribute *attr,
 				  const char *buf, size_t count)
 {
 	struct ipw_priv *p = d->driver_data;
@@ -1425,8 +1424,8 @@ static ssize_t store_eeprom_delay(struct device *d, struct device_attribute *att
 static DEVICE_ATTR(eeprom_delay, S_IWUSR | S_IRUGO,
 		   show_eeprom_delay, store_eeprom_delay);
 
-static ssize_t show_command_event_reg(struct device *d, struct device_attribute *attr,
-				      char *buf)
+static ssize_t show_command_event_reg(struct device *d,
+				      struct device_attribute *attr, char *buf)
 {
 	u32 reg = 0;
 	struct ipw_priv *p = d->driver_data;
@@ -1434,7 +1433,8 @@ static ssize_t show_command_event_reg(struct device *d, struct device_attribute 
 	reg = ipw_read_reg32(p, IPW_INTERNAL_CMD_EVENT);
 	return sprintf(buf, "0x%08x\n", reg);
 }
-static ssize_t store_command_event_reg(struct device *d, struct device_attribute *attr,
+static ssize_t store_command_event_reg(struct device *d,
+				       struct device_attribute *attr,
 				       const char *buf, size_t count)
 {
 	u32 reg;
@@ -1448,8 +1448,8 @@ static ssize_t store_command_event_reg(struct device *d, struct device_attribute
 static DEVICE_ATTR(command_event_reg, S_IWUSR | S_IRUGO,
 		   show_command_event_reg, store_command_event_reg);
 
-static ssize_t show_mem_gpio_reg(struct device *d, struct device_attribute *attr,
-				 char *buf)
+static ssize_t show_mem_gpio_reg(struct device *d,
+				 struct device_attribute *attr, char *buf)
 {
 	u32 reg = 0;
 	struct ipw_priv *p = d->driver_data;
@@ -1457,7 +1457,8 @@ static ssize_t show_mem_gpio_reg(struct device *d, struct device_attribute *attr
 	reg = ipw_read_reg32(p, 0x301100);
 	return sprintf(buf, "0x%08x\n", reg);
 }
-static ssize_t store_mem_gpio_reg(struct device *d, struct device_attribute *attr,
+static ssize_t store_mem_gpio_reg(struct device *d,
+				  struct device_attribute *attr,
 				  const char *buf, size_t count)
 {
 	u32 reg;
@@ -1471,8 +1472,8 @@ static ssize_t store_mem_gpio_reg(struct device *d, struct device_attribute *att
 static DEVICE_ATTR(mem_gpio_reg, S_IWUSR | S_IRUGO,
 		   show_mem_gpio_reg, store_mem_gpio_reg);
 
-static ssize_t show_indirect_dword(struct device *d, struct device_attribute *attr,
-				   char *buf)
+static ssize_t show_indirect_dword(struct device *d,
+				   struct device_attribute *attr, char *buf)
 {
 	u32 reg = 0;
 	struct ipw_priv *priv = d->driver_data;
@@ -1484,7 +1485,8 @@ static ssize_t show_indirect_dword(struct device *d, struct device_attribute *at
 
 	return sprintf(buf, "0x%08x\n", reg);
 }
-static ssize_t store_indirect_dword(struct device *d, struct device_attribute *attr,
+static ssize_t store_indirect_dword(struct device *d,
+				    struct device_attribute *attr,
 				    const char *buf, size_t count)
 {
 	struct ipw_priv *priv = d->driver_data;
@@ -1497,8 +1499,8 @@ static ssize_t store_indirect_dword(struct device *d, struct device_attribute *a
 static DEVICE_ATTR(indirect_dword, S_IWUSR | S_IRUGO,
 		   show_indirect_dword, store_indirect_dword);
 
-static ssize_t show_indirect_byte(struct device *d, struct device_attribute *attr,
-				  char *buf)
+static ssize_t show_indirect_byte(struct device *d,
+				  struct device_attribute *attr, char *buf)
 {
 	u8 reg = 0;
 	struct ipw_priv *priv = d->driver_data;
@@ -1510,7 +1512,8 @@ static ssize_t show_indirect_byte(struct device *d, struct device_attribute *att
 
 	return sprintf(buf, "0x%02x\n", reg);
 }
-static ssize_t store_indirect_byte(struct device *d, struct device_attribute *attr,
+static ssize_t store_indirect_byte(struct device *d,
+				   struct device_attribute *attr,
 				   const char *buf, size_t count)
 {
 	struct ipw_priv *priv = d->driver_data;
@@ -1523,8 +1526,8 @@ static ssize_t store_indirect_byte(struct device *d, struct device_attribute *at
 static DEVICE_ATTR(indirect_byte, S_IWUSR | S_IRUGO,
 		   show_indirect_byte, store_indirect_byte);
 
-static ssize_t show_direct_dword(struct device *d, struct device_attribute *attr,
-				 char *buf)
+static ssize_t show_direct_dword(struct device *d,
+				 struct device_attribute *attr, char *buf)
 {
 	u32 reg = 0;
 	struct ipw_priv *priv = d->driver_data;
@@ -1536,7 +1539,8 @@ static ssize_t show_direct_dword(struct device *d, struct device_attribute *attr
 
 	return sprintf(buf, "0x%08x\n", reg);
 }
-static ssize_t store_direct_dword(struct device *d, struct device_attribute *attr,
+static ssize_t store_direct_dword(struct device *d,
+				  struct device_attribute *attr,
 				  const char *buf, size_t count)
 {
 	struct ipw_priv *priv = d->driver_data;
@@ -1549,7 +1553,7 @@ static ssize_t store_direct_dword(struct device *d, struct device_attribute *att
 static DEVICE_ATTR(direct_dword, S_IWUSR | S_IRUGO,
 		   show_direct_dword, store_direct_dword);
 
-static inline int rf_kill_active(struct ipw_priv *priv)
+static int rf_kill_active(struct ipw_priv *priv)
 {
 	if (0 == (ipw_read32(priv, 0x30) & 0x10000))
 		priv->status |= STATUS_RF_KILL_HW;
@@ -1644,7 +1648,7 @@ static ssize_t store_speed_scan(struct device *d, struct device_attribute *attr,
 			break;
 		}
 
-		if (ipw_is_valid_channel(priv->ieee, channel))
+		if (ieee80211_is_valid_channel(priv->ieee, channel))
 			priv->speed_scan[pos++] = channel;
 		else
 			IPW_WARNING("Skipping invalid channel request: %d\n",
@@ -1792,10 +1796,10 @@ static void ipw_irq_tasklet(struct ipw_priv *priv)
 	}
 
 	if (inta & IPW_INTA_BIT_FATAL_ERROR) {
-		IPW_ERROR("Firmware error detected.  Restarting.\n");
+		IPW_WARNING("Firmware error detected.  Restarting.\n");
 		if (priv->error) {
-			IPW_ERROR("Sysfs 'error' log already exists.\n");
-#ifdef CONFIG_IPW2100_DEBUG
+			IPW_DEBUG_FW("Sysfs 'error' log already exists.\n");
+#ifdef CONFIG_IPW2200_DEBUG
 			if (ipw_debug_level & IPW_DL_FW_ERRORS) {
 				struct ipw_fw_error *error =
 				    ipw_alloc_error_log(priv);
@@ -1807,11 +1811,11 @@ static void ipw_irq_tasklet(struct ipw_priv *priv)
 		} else {
 			priv->error = ipw_alloc_error_log(priv);
 			if (priv->error)
-				IPW_ERROR("Sysfs 'error' log captured.\n");
+				IPW_DEBUG_FW("Sysfs 'error' log captured.\n");
 			else
-				IPW_ERROR("Error allocating sysfs 'error' "
-					  "log.\n");
-#ifdef CONFIG_IPW2100_DEBUG
+				IPW_DEBUG_FW("Error allocating sysfs 'error' "
+					     "log.\n");
+#ifdef CONFIG_IPW2200_DEBUG
 			if (ipw_debug_level & IPW_DL_FW_ERRORS)
 				ipw_dump_error_log(priv, priv->error);
 #endif
@@ -2084,9 +2088,9 @@ static void ipw_adapter_restart(void *adapter)
 static void ipw_bg_adapter_restart(void *data)
 {
 	struct ipw_priv *priv = data;
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	ipw_adapter_restart(data);
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 }
 
 #define IPW_SCAN_CHECK_WATCHDOG (5 * HZ)
@@ -2105,9 +2109,9 @@ static void ipw_scan_check(void *data)
 static void ipw_bg_scan_check(void *data)
 {
 	struct ipw_priv *priv = data;
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	ipw_scan_check(data);
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 }
 
 static int ipw_send_scan_request_ext(struct ipw_priv *priv,
@@ -2212,7 +2216,7 @@ static int ipw_send_tx_power(struct ipw_priv *priv, struct ipw_tx_power *power)
 
 static int ipw_set_tx_power(struct ipw_priv *priv)
 {
-	const struct ieee80211_geo *geo = ipw_get_geo(priv->ieee);
+	const struct ieee80211_geo *geo = ieee80211_get_geo(priv->ieee);
 	struct ipw_tx_power tx_power;
 	s8 max_power;
 	int i;
@@ -2356,7 +2360,7 @@ static inline void eeprom_write_reg(struct ipw_priv *p, u32 data)
 }
 
 /* perform a chip select operation */
-static inline void eeprom_cs(struct ipw_priv *priv)
+static void eeprom_cs(struct ipw_priv *priv)
 {
 	eeprom_write_reg(priv, 0);
 	eeprom_write_reg(priv, EEPROM_BIT_CS);
@@ -2365,7 +2369,7 @@ static inline void eeprom_cs(struct ipw_priv *priv)
 }
 
 /* perform a chip select operation */
-static inline void eeprom_disable_cs(struct ipw_priv *priv)
+static void eeprom_disable_cs(struct ipw_priv *priv)
 {
 	eeprom_write_reg(priv, EEPROM_BIT_CS);
 	eeprom_write_reg(priv, 0);
@@ -2472,7 +2476,7 @@ static void ipw_eeprom_init_sram(struct ipw_priv *priv)
 	IPW_DEBUG_TRACE("<<\n");
 }
 
-static inline void ipw_zero_memory(struct ipw_priv *priv, u32 start, u32 count)
+static void ipw_zero_memory(struct ipw_priv *priv, u32 start, u32 count)
 {
 	count >>= 2;
 	if (!count)
@@ -2773,7 +2777,7 @@ static inline int ipw_alive(struct ipw_priv *priv)
 }
 
 /* timeout in msec, attempted in 10-msec quanta */
-static inline int ipw_poll_bit(struct ipw_priv *priv, u32 addr, u32 mask,
+static int ipw_poll_bit(struct ipw_priv *priv, u32 addr, u32 mask,
 			       int timeout)
 {
 	int i = 0;
@@ -2825,32 +2829,10 @@ static void ipw_arc_release(struct ipw_priv *priv)
 	mdelay(5);
 }
 
-struct fw_header {
-	u32 version;
-	u32 mode;
-};
-
 struct fw_chunk {
 	u32 address;
 	u32 length;
 };
-
-#define IPW_FW_MAJOR_VERSION 2
-#define IPW_FW_MINOR_VERSION 4
-
-#define IPW_FW_MINOR(x) ((x & 0xff) >> 8)
-#define IPW_FW_MAJOR(x) (x & 0xff)
-
-#define IPW_FW_VERSION ((IPW_FW_MINOR_VERSION << 8) | IPW_FW_MAJOR_VERSION)
-
-#define IPW_FW_PREFIX "ipw-" __stringify(IPW_FW_MAJOR_VERSION) \
-"." __stringify(IPW_FW_MINOR_VERSION) "-"
-
-#if IPW_FW_MAJOR_VERSION >= 2 && IPW_FW_MINOR_VERSION > 0
-#define IPW_FW_NAME(x) IPW_FW_PREFIX "" x ".fw"
-#else
-#define IPW_FW_NAME(x) "ipw2200_" x ".fw"
-#endif
 
 static int ipw_load_ucode(struct ipw_priv *priv, u8 * data, size_t len)
 {
@@ -3120,39 +3102,53 @@ static int ipw_reset_nic(struct ipw_priv *priv)
 	return rc;
 }
 
+
+struct ipw_fw {
+	u32 ver;
+	u32 boot_size;
+	u32 ucode_size;
+	u32 fw_size;
+	u8 data[0];
+};
+
 static int ipw_get_fw(struct ipw_priv *priv,
-		      const struct firmware **fw, const char *name)
+		      const struct firmware **raw, const char *name)
 {
-	struct fw_header *header;
+	struct ipw_fw *fw;
 	int rc;
 
 	/* ask firmware_class module to get the boot firmware off disk */
-	rc = request_firmware(fw, name, &priv->pci_dev->dev);
+	rc = request_firmware(raw, name, &priv->pci_dev->dev);
 	if (rc < 0) {
-		IPW_ERROR("%s load failed: Reason %d\n", name, rc);
+		IPW_ERROR("%s request_firmware failed: Reason %d\n", name, rc);
 		return rc;
 	}
 
-	header = (struct fw_header *)(*fw)->data;
-	if (IPW_FW_MAJOR(le32_to_cpu(header->version)) != IPW_FW_MAJOR_VERSION) {
-		IPW_ERROR("'%s' firmware version not compatible (%d != %d)\n",
-			  name,
-			  IPW_FW_MAJOR(le32_to_cpu(header->version)),
-			  IPW_FW_MAJOR_VERSION);
+	if ((*raw)->size < sizeof(*fw)) {
+		IPW_ERROR("%s is too small (%zd)\n", name, (*raw)->size);
 		return -EINVAL;
 	}
 
-	IPW_DEBUG_INFO("Loading firmware '%s' file v%d.%d (%zd bytes)\n",
+	fw = (void *)(*raw)->data;
+
+	if ((*raw)->size < sizeof(*fw) +
+	    fw->boot_size + fw->ucode_size + fw->fw_size) {
+		IPW_ERROR("%s is too small or corrupt (%zd)\n",
+			  name, (*raw)->size);
+		return -EINVAL;
+	}
+
+	IPW_DEBUG_INFO("Read firmware '%s' image v%d.%d (%zd bytes)\n",
 		       name,
-		       IPW_FW_MAJOR(le32_to_cpu(header->version)),
-		       IPW_FW_MINOR(le32_to_cpu(header->version)),
-		       (*fw)->size - sizeof(struct fw_header));
+		       le32_to_cpu(fw->ver) >> 16,
+		       le32_to_cpu(fw->ver) & 0xff,
+		       (*raw)->size - sizeof(*fw));
 	return 0;
 }
 
 #define IPW_RX_BUF_SIZE (3000)
 
-static inline void ipw_rx_queue_reset(struct ipw_priv *priv,
+static void ipw_rx_queue_reset(struct ipw_priv *priv,
 				      struct ipw_rx_queue *rxq)
 {
 	unsigned long flags;
@@ -3186,17 +3182,13 @@ static inline void ipw_rx_queue_reset(struct ipw_priv *priv,
 
 #ifdef CONFIG_PM
 static int fw_loaded = 0;
-static const struct firmware *bootfw = NULL;
-static const struct firmware *firmware = NULL;
-static const struct firmware *ucode = NULL;
+static const struct firmware *raw = NULL;
 
 static void free_firmware(void)
 {
 	if (fw_loaded) {
-		release_firmware(bootfw);
-		release_firmware(ucode);
-		release_firmware(firmware);
-		bootfw = ucode = firmware = NULL;
+		release_firmware(raw);
+		raw = NULL;
 		fw_loaded = 0;
 	}
 }
@@ -3207,32 +3199,46 @@ static void free_firmware(void)
 static int ipw_load(struct ipw_priv *priv)
 {
 #ifndef CONFIG_PM
-	const struct firmware *bootfw = NULL;
-	const struct firmware *firmware = NULL;
-	const struct firmware *ucode = NULL;
+	const struct firmware *raw = NULL;
 #endif
-	char *ucode_name;
-	char *fw_name;
+	struct ipw_fw *fw;
+	u8 *boot_img, *ucode_img, *fw_img;
+	u8 *name = NULL;
 	int rc = 0, retries = 3;
 
 	switch (priv->ieee->iw_mode) {
 	case IW_MODE_ADHOC:
-		ucode_name = IPW_FW_NAME("ibss_ucode");
-		fw_name = IPW_FW_NAME("ibss");
+		name = "ipw2200-ibss.fw";
 		break;
 #ifdef CONFIG_IPW2200_MONITOR
 	case IW_MODE_MONITOR:
-		ucode_name = IPW_FW_NAME("sniffer_ucode");
-		fw_name = IPW_FW_NAME("sniffer");
+		name = "ipw2200-sniffer.fw";
 		break;
 #endif
 	case IW_MODE_INFRA:
-		ucode_name = IPW_FW_NAME("bss_ucode");
-		fw_name = IPW_FW_NAME("bss");
+		name = "ipw2200-bss.fw";
 		break;
-	default:
-		rc = -EINVAL;
 	}
+
+	if (!name) {
+		rc = -EINVAL;
+		goto error;
+	}
+
+#ifdef CONFIG_PM
+	if (!fw_loaded) {
+#endif
+		rc = ipw_get_fw(priv, &raw, name);
+		if (rc < 0)
+			goto error;
+#ifdef CONFIG_PM
+	}
+#endif
+
+	fw = (void *)raw->data;
+	boot_img = &fw->data[0];
+	ucode_img = &fw->data[fw->boot_size];
+	fw_img = &fw->data[fw->boot_size + fw->ucode_size];
 
 	if (rc < 0)
 		goto error;
@@ -3265,18 +3271,8 @@ static int ipw_load(struct ipw_priv *priv)
 	ipw_zero_memory(priv, IPW_NIC_SRAM_LOWER_BOUND,
 			IPW_NIC_SRAM_UPPER_BOUND - IPW_NIC_SRAM_LOWER_BOUND);
 
-#ifdef CONFIG_PM
-	if (!fw_loaded) {
-#endif
-		rc = ipw_get_fw(priv, &bootfw, IPW_FW_NAME("boot"));
-		if (rc < 0)
-			goto error;
-#ifdef CONFIG_PM
-	}
-#endif
 	/* DMA the initial boot firmware into the device */
-	rc = ipw_load_firmware(priv, bootfw->data + sizeof(struct fw_header),
-			       bootfw->size - sizeof(struct fw_header));
+	rc = ipw_load_firmware(priv, boot_img, fw->boot_size);
 	if (rc < 0) {
 		IPW_ERROR("Unable to load boot firmware: %d\n", rc);
 		goto error;
@@ -3297,19 +3293,8 @@ static int ipw_load(struct ipw_priv *priv)
 	/* ack fw init done interrupt */
 	ipw_write32(priv, IPW_INTA_RW, IPW_INTA_BIT_FW_INITIALIZATION_DONE);
 
-#ifdef CONFIG_PM
-	if (!fw_loaded) {
-#endif
-		rc = ipw_get_fw(priv, &ucode, ucode_name);
-		if (rc < 0)
-			goto error;
-#ifdef CONFIG_PM
-	}
-#endif
-
 	/* DMA the ucode into the device */
-	rc = ipw_load_ucode(priv, ucode->data + sizeof(struct fw_header),
-			    ucode->size - sizeof(struct fw_header));
+	rc = ipw_load_ucode(priv, ucode_img, fw->ucode_size);
 	if (rc < 0) {
 		IPW_ERROR("Unable to load ucode: %d\n", rc);
 		goto error;
@@ -3318,20 +3303,8 @@ static int ipw_load(struct ipw_priv *priv)
 	/* stop nic */
 	ipw_stop_nic(priv);
 
-#ifdef CONFIG_PM
-	if (!fw_loaded) {
-#endif
-		rc = ipw_get_fw(priv, &firmware, fw_name);
-		if (rc < 0)
-			goto error;
-#ifdef CONFIG_PM
-	}
-#endif
-
 	/* DMA bss firmware into the device */
-	rc = ipw_load_firmware(priv, firmware->data +
-			       sizeof(struct fw_header),
-			       firmware->size - sizeof(struct fw_header));
+	rc = ipw_load_firmware(priv, fw_img, fw->fw_size);
 	if (rc < 0) {
 		IPW_ERROR("Unable to load firmware: %d\n", rc);
 		goto error;
@@ -3396,9 +3369,7 @@ static int ipw_load(struct ipw_priv *priv)
 	ipw_write32(priv, IPW_INTA_RW, IPW_INTA_MASK_ALL);
 
 #ifndef CONFIG_PM
-	release_firmware(bootfw);
-	release_firmware(ucode);
-	release_firmware(firmware);
+	release_firmware(raw);
 #endif
 	return 0;
 
@@ -3408,15 +3379,11 @@ static int ipw_load(struct ipw_priv *priv)
 		priv->rxq = NULL;
 	}
 	ipw_tx_queue_free(priv);
-	if (bootfw)
-		release_firmware(bootfw);
-	if (ucode)
-		release_firmware(ucode);
-	if (firmware)
-		release_firmware(firmware);
+	if (raw)
+		release_firmware(raw);
 #ifdef CONFIG_PM
 	fw_loaded = 0;
-	bootfw = ucode = firmware = NULL;
+	raw = NULL;
 #endif
 
 	return rc;
@@ -3618,7 +3585,7 @@ static void ipw_tx_queue_free(struct ipw_priv *priv)
 	ipw_queue_tx_free(priv, &priv->txq[3]);
 }
 
-static inline void ipw_create_bssid(struct ipw_priv *priv, u8 * bssid)
+static void ipw_create_bssid(struct ipw_priv *priv, u8 * bssid)
 {
 	/* First 3 bytes are manufacturer */
 	bssid[0] = priv->mac_addr[0];
@@ -3632,7 +3599,7 @@ static inline void ipw_create_bssid(struct ipw_priv *priv, u8 * bssid)
 	bssid[0] |= 0x02;	/* set local assignment bit (IEEE802) */
 }
 
-static inline u8 ipw_add_station(struct ipw_priv *priv, u8 * bssid)
+static u8 ipw_add_station(struct ipw_priv *priv, u8 * bssid)
 {
 	struct ipw_station_entry entry;
 	int i;
@@ -3665,7 +3632,7 @@ static inline u8 ipw_add_station(struct ipw_priv *priv, u8 * bssid)
 	return i;
 }
 
-static inline u8 ipw_find_station(struct ipw_priv *priv, u8 * bssid)
+static u8 ipw_find_station(struct ipw_priv *priv, u8 * bssid)
 {
 	int i;
 
@@ -3725,9 +3692,9 @@ static int ipw_disassociate(void *data)
 static void ipw_bg_disassociate(void *data)
 {
 	struct ipw_priv *priv = data;
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	ipw_disassociate(data);
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 }
 
 static void ipw_system_config(void *data)
@@ -3788,7 +3755,7 @@ static const struct ipw_status_code ipw_status_codes[] = {
 	{0x2E, "Cipher suite is rejected per security policy"},
 };
 
-#ifdef CONFIG_IPW2100_DEBUG
+#ifdef CONFIG_IPW2200_DEBUG
 static const char *ipw_get_status_code(u16 status)
 {
 	int i;
@@ -3804,7 +3771,7 @@ static void inline average_init(struct average *avg)
 	memset(avg, 0, sizeof(*avg));
 }
 
-static void inline average_add(struct average *avg, s16 val)
+static void average_add(struct average *avg, s16 val)
 {
 	avg->sum -= avg->entries[avg->pos];
 	avg->sum += val;
@@ -3815,7 +3782,7 @@ static void inline average_add(struct average *avg, s16 val)
 	}
 }
 
-static s16 inline average_value(struct average *avg)
+static s16 average_value(struct average *avg)
 {
 	if (!unlikely(avg->init)) {
 		if (avg->pos)
@@ -3857,7 +3824,7 @@ static void ipw_reset_stats(struct ipw_priv *priv)
 
 }
 
-static inline u32 ipw_get_max_rate(struct ipw_priv *priv)
+static u32 ipw_get_max_rate(struct ipw_priv *priv)
 {
 	u32 i = 0x80000000;
 	u32 mask = priv->rates_mask;
@@ -4087,9 +4054,9 @@ static void ipw_gather_stats(struct ipw_priv *priv)
 static void ipw_bg_gather_stats(void *data)
 {
 	struct ipw_priv *priv = data;
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	ipw_gather_stats(data);
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 }
 
 /* Missed beacon behavior:
@@ -4097,7 +4064,7 @@ static void ipw_bg_gather_stats(void *data)
  * roaming_threshold -> disassociate_threshold, scan and roam for better signal.
  * Above disassociate threshold, give up and stop scanning.
  * Roaming is disabled if disassociate_threshold <= roaming_threshold  */
-static inline void ipw_handle_missed_beacon(struct ipw_priv *priv,
+static void ipw_handle_missed_beacon(struct ipw_priv *priv,
 					    int missed_count)
 {
 	priv->notif_missed_beacons = missed_count;
@@ -4167,7 +4134,7 @@ static inline void ipw_handle_missed_beacon(struct ipw_priv *priv,
  * Handle host notification packet.
  * Called from interrupt routine
  */
-static inline void ipw_rx_notification(struct ipw_priv *priv,
+static void ipw_rx_notification(struct ipw_priv *priv,
 				       struct ipw_rx_notification *notif)
 {
 	notif->size = le16_to_cpu(notif->size);
@@ -4260,7 +4227,7 @@ static inline void ipw_rx_notification(struct ipw_priv *priv,
 					if (priv->
 					    status & (STATUS_ASSOCIATED |
 						      STATUS_AUTH)) {
-#ifdef CONFIG_IPW2100_DEBUG
+#ifdef CONFIG_IPW2200_DEBUG
 						struct notif_authenticate *auth
 						    = &notif->u.auth;
 						IPW_DEBUG(IPW_DL_NOTIF |
@@ -4537,10 +4504,9 @@ static inline void ipw_rx_notification(struct ipw_priv *priv,
 
 			if (notif->size == sizeof(*x)) {
 				IPW_DEBUG(IPW_DL_NOTIF | IPW_DL_STATE,
-					  "link deterioration: '%s' " MAC_FMT
-					  " \n", escape_essid(priv->essid,
-							      priv->essid_len),
-					  MAC_ARG(priv->bssid));
+					"link deterioration: type %d, cnt %d\n",
+					x->silence_notification_type,
+					x->silence_count);
 				memcpy(&priv->last_link_deterioration, x,
 				       sizeof(*x));
 			} else {
@@ -4921,9 +4887,9 @@ static void ipw_rx_queue_replenish(void *data)
 static void ipw_bg_rx_queue_replenish(void *data)
 {
 	struct ipw_priv *priv = data;
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	ipw_rx_queue_replenish(data);
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 }
 
 /* Assumes that the skb field of the buffers in 'pool' is kept accurate.
@@ -4954,12 +4920,11 @@ static struct ipw_rx_queue *ipw_rx_queue_alloc(struct ipw_priv *priv)
 	struct ipw_rx_queue *rxq;
 	int i;
 
-	rxq = (struct ipw_rx_queue *)kmalloc(sizeof(*rxq), GFP_KERNEL);
+	rxq = kzalloc(sizeof(*rxq), GFP_KERNEL);
 	if (unlikely(!rxq)) {
 		IPW_ERROR("memory allocation failed\n");
 		return NULL;
 	}
-	memset(rxq, 0, sizeof(*rxq));
 	spin_lock_init(&rxq->lock);
 	INIT_LIST_HEAD(&rxq->rx_free);
 	INIT_LIST_HEAD(&rxq->rx_used);
@@ -5106,7 +5071,7 @@ static int ipw_compatible_rates(struct ipw_priv *priv,
 	return 1;
 }
 
-static inline void ipw_copy_rates(struct ipw_supported_rates *dest,
+static void ipw_copy_rates(struct ipw_supported_rates *dest,
 				  const struct ipw_supported_rates *src)
 {
 	u8 i;
@@ -5381,7 +5346,7 @@ static void ipw_merge_adhoc_network(void *data)
 			return;
 		}
 
-		down(&priv->sem);
+		mutex_lock(&priv->mutex);
 		if ((priv->ieee->iw_mode == IW_MODE_ADHOC)) {
 			IPW_DEBUG_MERGE("remove network %s\n",
 					escape_essid(priv->essid,
@@ -5391,7 +5356,7 @@ static void ipw_merge_adhoc_network(void *data)
 
 		ipw_disassociate(priv);
 		priv->assoc_network = match.network;
-		up(&priv->sem);
+		mutex_unlock(&priv->mutex);
 		return;
 	}
 }
@@ -5524,15 +5489,6 @@ static int ipw_best_network(struct ipw_priv *priv,
 		return 0;
 	}
 
-	if (!priv->ieee->wpa_enabled && (network->wpa_ie_len > 0 ||
-					 network->rsn_ie_len > 0)) {
-		IPW_DEBUG_ASSOC("Network '%s (" MAC_FMT ")' excluded "
-				"because of WPA capability mismatch.\n",
-				escape_essid(network->ssid, network->ssid_len),
-				MAC_ARG(network->bssid));
-		return 0;
-	}
-
 	if ((priv->config & CFG_STATIC_BSSID) &&
 	    memcmp(network->bssid, priv->bssid, ETH_ALEN)) {
 		IPW_DEBUG_ASSOC("Network '%s (" MAC_FMT ")' excluded "
@@ -5553,7 +5509,7 @@ static int ipw_best_network(struct ipw_priv *priv,
 	}
 
 	/* Filter out invalid channel in current GEO */
-	if (!ipw_is_valid_channel(priv->ieee, network->channel)) {
+	if (!ieee80211_is_valid_channel(priv->ieee, network->channel)) {
 		IPW_DEBUG_ASSOC("Network '%s (" MAC_FMT ")' excluded "
 				"because of invalid channel in current GEO\n",
 				escape_essid(network->ssid, network->ssid_len),
@@ -5598,7 +5554,7 @@ static int ipw_best_network(struct ipw_priv *priv,
 static void ipw_adhoc_create(struct ipw_priv *priv,
 			     struct ieee80211_network *network)
 {
-	const struct ieee80211_geo *geo = ipw_get_geo(priv->ieee);
+	const struct ieee80211_geo *geo = ieee80211_get_geo(priv->ieee);
 	int i;
 
 	/*
@@ -5613,12 +5569,11 @@ static void ipw_adhoc_create(struct ipw_priv *priv,
 	 * FW fatal error.
 	 *
 	 */
-	switch (ipw_is_valid_channel(priv->ieee, priv->channel)) {
+	switch (ieee80211_is_valid_channel(priv->ieee, priv->channel)) {
 	case IEEE80211_52GHZ_BAND:
 		network->mode = IEEE_A;
-		i = ipw_channel_to_index(priv->ieee, priv->channel);
-		if (i == -1)
-			BUG();
+		i = ieee80211_channel_to_index(priv->ieee, priv->channel);
+		BUG_ON(i == -1);
 		if (geo->a[i].flags & IEEE80211_CH_PASSIVE_ONLY) {
 			IPW_WARNING("Overriding invalid channel\n");
 			priv->channel = geo->a[0].channel;
@@ -5630,9 +5585,8 @@ static void ipw_adhoc_create(struct ipw_priv *priv,
 			network->mode = IEEE_G;
 		else
 			network->mode = IEEE_B;
-		i = ipw_channel_to_index(priv->ieee, priv->channel);
-		if (i == -1)
-			BUG();
+		i = ieee80211_channel_to_index(priv->ieee, priv->channel);
+		BUG_ON(i == -1);
 		if (geo->bg[i].flags & IEEE80211_CH_PASSIVE_ONLY) {
 			IPW_WARNING("Overriding invalid channel\n");
 			priv->channel = geo->bg[0].channel;
@@ -5826,12 +5780,12 @@ static void ipw_adhoc_check(void *data)
 static void ipw_bg_adhoc_check(void *data)
 {
 	struct ipw_priv *priv = data;
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	ipw_adhoc_check(data);
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 }
 
-#ifdef CONFIG_IPW2100_DEBUG
+#ifdef CONFIG_IPW2200_DEBUG
 static void ipw_debug_config(struct ipw_priv *priv)
 {
 	IPW_DEBUG_INFO("Scan completed, no valid APs matched "
@@ -5860,7 +5814,7 @@ static void ipw_debug_config(struct ipw_priv *priv)
 #define ipw_debug_config(x) do {} while (0)
 #endif
 
-static inline void ipw_set_fixed_rate(struct ipw_priv *priv, int mode)
+static void ipw_set_fixed_rate(struct ipw_priv *priv, int mode)
 {
 	/* TODO: Verify that this works... */
 	struct ipw_fixed_rate fr = {
@@ -5954,7 +5908,7 @@ static void ipw_add_scan_channels(struct ipw_priv *priv,
 	const struct ieee80211_geo *geo;
 	int i;
 
-	geo = ipw_get_geo(priv->ieee);
+	geo = ieee80211_get_geo(priv->ieee);
 
 	if (priv->ieee->freq_band & IEEE80211_52GHZ_BAND) {
 		int start = channel_index;
@@ -6014,7 +5968,7 @@ static void ipw_add_scan_channels(struct ipw_priv *priv,
 				channel_index++;
 				scan->channels_list[channel_index] = channel;
 				index =
-				    ipw_channel_to_index(priv->ieee, channel);
+				    ieee80211_channel_to_index(priv->ieee, channel);
 				ipw_set_scan_type(scan, channel_index,
 						  geo->bg[index].
 						  flags &
@@ -6055,7 +6009,7 @@ static int ipw_request_scan(struct ipw_priv *priv)
 	    (priv->status & STATUS_EXIT_PENDING))
 		return 0;
 
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 
 	if (priv->status & STATUS_SCANNING) {
 		IPW_DEBUG_HC("Concurrent scan requested.  Ignoring.\n");
@@ -6096,7 +6050,7 @@ static int ipw_request_scan(struct ipw_priv *priv)
 		u8 channel;
 		u8 band = 0;
 
-		switch (ipw_is_valid_channel(priv->ieee, priv->channel)) {
+		switch (ieee80211_is_valid_channel(priv->ieee, priv->channel)) {
 		case IEEE80211_52GHZ_BAND:
 			band = (u8) (IPW_A_MODE << 6) | 1;
 			channel = priv->channel;
@@ -6163,81 +6117,17 @@ static int ipw_request_scan(struct ipw_priv *priv)
 	queue_delayed_work(priv->workqueue, &priv->scan_check,
 			   IPW_SCAN_CHECK_WATCHDOG);
       done:
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 	return err;
 }
 
 static void ipw_bg_abort_scan(void *data)
 {
 	struct ipw_priv *priv = data;
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	ipw_abort_scan(data);
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 }
-
-#if WIRELESS_EXT < 18
-/* Support for wpa_supplicant before WE-18, deprecated. */
-
-/* following definitions must match definitions in driver_ipw.c */
-
-#define IPW_IOCTL_WPA_SUPPLICANT		SIOCIWFIRSTPRIV+30
-
-#define IPW_CMD_SET_WPA_PARAM			1
-#define	IPW_CMD_SET_WPA_IE			2
-#define IPW_CMD_SET_ENCRYPTION			3
-#define IPW_CMD_MLME				4
-
-#define IPW_PARAM_WPA_ENABLED			1
-#define IPW_PARAM_TKIP_COUNTERMEASURES		2
-#define IPW_PARAM_DROP_UNENCRYPTED		3
-#define IPW_PARAM_PRIVACY_INVOKED		4
-#define IPW_PARAM_AUTH_ALGS			5
-#define IPW_PARAM_IEEE_802_1X			6
-
-#define IPW_MLME_STA_DEAUTH			1
-#define IPW_MLME_STA_DISASSOC			2
-
-#define IPW_CRYPT_ERR_UNKNOWN_ALG		2
-#define IPW_CRYPT_ERR_UNKNOWN_ADDR		3
-#define IPW_CRYPT_ERR_CRYPT_INIT_FAILED		4
-#define IPW_CRYPT_ERR_KEY_SET_FAILED		5
-#define IPW_CRYPT_ERR_TX_KEY_SET_FAILED		6
-#define IPW_CRYPT_ERR_CARD_CONF_FAILED		7
-
-#define	IPW_CRYPT_ALG_NAME_LEN			16
-
-struct ipw_param {
-	u32 cmd;
-	u8 sta_addr[ETH_ALEN];
-	union {
-		struct {
-			u8 name;
-			u32 value;
-		} wpa_param;
-		struct {
-			u32 len;
-			u8 reserved[32];
-			u8 data[0];
-		} wpa_ie;
-		struct {
-			u32 command;
-			u32 reason_code;
-		} mlme;
-		struct {
-			u8 alg[IPW_CRYPT_ALG_NAME_LEN];
-			u8 set_tx;
-			u32 err;
-			u8 idx;
-			u8 seq[8];	/* sequence counter (set: RX, get: TX) */
-			u16 key_len;
-			u8 key[0];
-		} crypt;
-
-	} u;
-};
-
-/* end of driver_ipw.c code */
-#endif
 
 static int ipw_wpa_enable(struct ipw_priv *priv, int value)
 {
@@ -6246,12 +6136,6 @@ static int ipw_wpa_enable(struct ipw_priv *priv, int value)
 	priv->ieee->wpa_enabled = value;
 	return 0;
 }
-
-#if WIRELESS_EXT < 18
-#define IW_AUTH_ALG_OPEN_SYSTEM			0x1
-#define IW_AUTH_ALG_SHARED_KEY			0x2
-#define IW_AUTH_ALG_LEAP			0x4
-#endif
 
 static int ipw_wpa_set_auth_algs(struct ipw_priv *priv, int value)
 {
@@ -6281,7 +6165,8 @@ static int ipw_wpa_set_auth_algs(struct ipw_priv *priv, int value)
 	return ret;
 }
 
-void ipw_wpa_assoc_frame(struct ipw_priv *priv, char *wpa_ie, int wpa_ie_len)
+static void ipw_wpa_assoc_frame(struct ipw_priv *priv, char *wpa_ie,
+				int wpa_ie_len)
 {
 	/* make sure WPA is enabled */
 	ipw_wpa_enable(priv, 1);
@@ -6298,416 +6183,6 @@ static int ipw_set_rsn_capa(struct ipw_priv *priv,
 				capabilities);
 }
 
-#if WIRELESS_EXT < 18
-static int ipw_wpa_set_param(struct net_device *dev, u8 name, u32 value)
-{
-	struct ipw_priv *priv = ieee80211_priv(dev);
-	struct ieee80211_crypt_data *crypt;
-	unsigned long flags;
-	int ret = 0;
-
-	switch (name) {
-	case IPW_PARAM_WPA_ENABLED:
-		ret = ipw_wpa_enable(priv, value);
-		break;
-
-	case IPW_PARAM_TKIP_COUNTERMEASURES:
-		crypt = priv->ieee->crypt[priv->ieee->tx_keyidx];
-		if (!crypt || !crypt->ops->set_flags || !crypt->ops->get_flags) {
-			IPW_WARNING("Can't set TKIP countermeasures: "
-				    "crypt not set!\n");
-			break;
-		}
-
-		flags = crypt->ops->get_flags(crypt->priv);
-
-		if (value)
-			flags |= IEEE80211_CRYPTO_TKIP_COUNTERMEASURES;
-		else
-			flags &= ~IEEE80211_CRYPTO_TKIP_COUNTERMEASURES;
-
-		crypt->ops->set_flags(flags, crypt->priv);
-
-		break;
-
-	case IPW_PARAM_DROP_UNENCRYPTED:{
-			/* HACK:
-			 *
-			 * wpa_supplicant calls set_wpa_enabled when the driver
-			 * is loaded and unloaded, regardless of if WPA is being
-			 * used.  No other calls are made which can be used to
-			 * determine if encryption will be used or not prior to
-			 * association being expected.  If encryption is not being
-			 * used, drop_unencrypted is set to false, else true -- we
-			 * can use this to determine if the CAP_PRIVACY_ON bit should
-			 * be set.
-			 */
-			struct ieee80211_security sec = {
-				.flags = SEC_ENABLED,
-				.enabled = value,
-			};
-			priv->ieee->drop_unencrypted = value;
-			/* We only change SEC_LEVEL for open mode. Others
-			 * are set by ipw_wpa_set_encryption.
-			 */
-			if (!value) {
-				sec.flags |= SEC_LEVEL;
-				sec.level = SEC_LEVEL_0;
-			} else {
-				sec.flags |= SEC_LEVEL;
-				sec.level = SEC_LEVEL_1;
-			}
-			if (priv->ieee->set_security)
-				priv->ieee->set_security(priv->ieee->dev, &sec);
-			break;
-		}
-
-	case IPW_PARAM_PRIVACY_INVOKED:
-		priv->ieee->privacy_invoked = value;
-		break;
-
-	case IPW_PARAM_AUTH_ALGS:
-		ret = ipw_wpa_set_auth_algs(priv, value);
-		break;
-
-	case IPW_PARAM_IEEE_802_1X:
-		priv->ieee->ieee802_1x = value;
-		break;
-
-	default:
-		IPW_ERROR("%s: Unknown WPA param: %d\n", dev->name, name);
-		ret = -EOPNOTSUPP;
-	}
-
-	return ret;
-}
-
-static int ipw_wpa_mlme(struct net_device *dev, int command, int reason)
-{
-	struct ipw_priv *priv = ieee80211_priv(dev);
-	int ret = 0;
-
-	switch (command) {
-	case IPW_MLME_STA_DEAUTH:
-		// silently ignore
-		break;
-
-	case IPW_MLME_STA_DISASSOC:
-		ipw_disassociate(priv);
-		break;
-
-	default:
-		IPW_ERROR("%s: Unknown MLME request: %d\n", dev->name, command);
-		ret = -EOPNOTSUPP;
-	}
-
-	return ret;
-}
-
-static int ipw_wpa_ie_cipher2level(u8 cipher)
-{
-	switch (cipher) {
-	case 4:		/* CCMP */
-		return SEC_LEVEL_3;
-	case 2:		/* TKIP */
-		return SEC_LEVEL_2;
-	case 5:		/* WEP104 */
-	case 1:		/* WEP40 */
-		return SEC_LEVEL_1;
-	case 0:		/* NONE */
-		return SEC_LEVEL_0;
-	default:
-		return -1;
-	}
-}
-
-static int ipw_wpa_set_wpa_ie(struct net_device *dev,
-			      struct ipw_param *param, int plen)
-{
-	struct ipw_priv *priv = ieee80211_priv(dev);
-	struct ieee80211_device *ieee = priv->ieee;
-	u8 *buf;
-	u8 *ptk, *gtk;
-	int level;
-
-	if (param->u.wpa_ie.len > MAX_WPA_IE_LEN ||
-	    (param->u.wpa_ie.len && param->u.wpa_ie.data == NULL))
-		return -EINVAL;
-
-	if (param->u.wpa_ie.len) {
-		buf = kmalloc(param->u.wpa_ie.len, GFP_KERNEL);
-		if (buf == NULL)
-			return -ENOMEM;
-
-		memcpy(buf, param->u.wpa_ie.data, param->u.wpa_ie.len);
-		kfree(ieee->wpa_ie);
-		ieee->wpa_ie = buf;
-		ieee->wpa_ie_len = param->u.wpa_ie.len;
-	} else {
-		kfree(ieee->wpa_ie);
-		ieee->wpa_ie = NULL;
-		ieee->wpa_ie_len = 0;
-		goto done;
-	}
-
-	if (priv->ieee->host_encrypt)
-		goto done;
-
-	/* HACK: Parse wpa_ie here to get pairwise suite, otherwise
-	 * we need to change driver_ipw.c from wpa_supplicant. This
-	 * is OK since -Dipw is deprecated. The -Dwext driver has a
-	 * clean way to handle this. */
-	gtk = ptk = (u8 *) ieee->wpa_ie;
-	if (ieee->wpa_ie[0] == 0x30) {	/* RSN IE */
-		gtk += 4 + 3;
-		ptk += 4 + 4 + 2 + 3;
-	} else {		/* WPA IE */
-		gtk += 8 + 3;
-		ptk += 8 + 4 + 2 + 3;
-	}
-
-	if (ptk - (u8 *) ieee->wpa_ie > ieee->wpa_ie_len)
-		return -EINVAL;
-
-	level = ipw_wpa_ie_cipher2level(*gtk);
-	ipw_set_hw_decrypt_multicast(priv, level);
-
-	level = ipw_wpa_ie_cipher2level(*ptk);
-	ipw_set_hw_decrypt_unicast(priv, level);
-
-      done:
-	ipw_wpa_assoc_frame(priv, ieee->wpa_ie, ieee->wpa_ie_len);
-	return 0;
-}
-
-/* implementation borrowed from hostap driver */
-
-static int ipw_wpa_set_encryption(struct net_device *dev,
-				  struct ipw_param *param, int param_len)
-{
-	int ret = 0;
-	int group_key = 0;
-	struct ipw_priv *priv = ieee80211_priv(dev);
-	struct ieee80211_device *ieee = priv->ieee;
-	struct ieee80211_crypto_ops *ops;
-	struct ieee80211_crypt_data **crypt;
-
-	struct ieee80211_security sec = {
-		.flags = 0,
-	};
-
-	param->u.crypt.err = 0;
-	param->u.crypt.alg[IPW_CRYPT_ALG_NAME_LEN - 1] = '\0';
-
-	if (param_len !=
-	    (int)((char *)param->u.crypt.key - (char *)param) +
-	    param->u.crypt.key_len) {
-		IPW_DEBUG_INFO("Len mismatch %d, %d\n", param_len,
-			       param->u.crypt.key_len);
-		return -EINVAL;
-	}
-	if (param->sta_addr[0] == 0xff && param->sta_addr[1] == 0xff &&
-	    param->sta_addr[2] == 0xff && param->sta_addr[3] == 0xff &&
-	    param->sta_addr[4] == 0xff && param->sta_addr[5] == 0xff) {
-		if (param->u.crypt.idx >= WEP_KEYS)
-			return -EINVAL;
-		crypt = &ieee->crypt[param->u.crypt.idx];
-	} else {
-		return -EINVAL;
-	}
-
-	if (param->u.crypt.idx != 0)
-		group_key = 1;
-
-	sec.flags |= SEC_ENABLED | SEC_ENCRYPT;
-	if (strcmp(param->u.crypt.alg, "none") == 0) {
-		if (crypt) {
-			sec.enabled = 0;
-			sec.encrypt = 0;
-			sec.level = SEC_LEVEL_0;
-			sec.flags |= SEC_LEVEL;
-			ieee80211_crypt_delayed_deinit(ieee, crypt);
-		}
-		goto done;
-	}
-	sec.enabled = 1;
-	sec.encrypt = 1;
-
-	/* IPW HW cannot build TKIP MIC, host decryption still needed. */
-	if (strcmp(param->u.crypt.alg, "TKIP") == 0) {
-		if (group_key)
-			ieee->host_mc_decrypt = 1;
-		else
-			ieee->host_encrypt_msdu = 1;
-	}
-
-	/*if (!(ieee->host_encrypt || ieee->host_encrypt_msdu ||
-	   ieee->host_decrypt))
-	   goto skip_host_crypt; */
-	if (group_key ? !ieee->host_mc_decrypt :
-	    !(ieee->host_encrypt || ieee->host_decrypt ||
-	      ieee->host_encrypt_msdu))
-		goto skip_host_crypt;
-
-	ops = ieee80211_get_crypto_ops(param->u.crypt.alg);
-	if (ops == NULL && strcmp(param->u.crypt.alg, "WEP") == 0) {
-		request_module("ieee80211_crypt_wep");
-		ops = ieee80211_get_crypto_ops(param->u.crypt.alg);
-	} else if (ops == NULL && strcmp(param->u.crypt.alg, "TKIP") == 0) {
-		request_module("ieee80211_crypt_tkip");
-		ops = ieee80211_get_crypto_ops(param->u.crypt.alg);
-	} else if (ops == NULL && strcmp(param->u.crypt.alg, "CCMP") == 0) {
-		request_module("ieee80211_crypt_ccmp");
-		ops = ieee80211_get_crypto_ops(param->u.crypt.alg);
-	}
-	if (ops == NULL) {
-		IPW_DEBUG_INFO("%s: unknown crypto alg '%s'\n",
-			       dev->name, param->u.crypt.alg);
-		param->u.crypt.err = IPW_CRYPT_ERR_UNKNOWN_ALG;
-		ret = -EINVAL;
-		goto done;
-	}
-
-	if (*crypt == NULL || (*crypt)->ops != ops) {
-		struct ieee80211_crypt_data *new_crypt;
-
-		ieee80211_crypt_delayed_deinit(ieee, crypt);
-
-		new_crypt = (struct ieee80211_crypt_data *)
-		    kmalloc(sizeof(*new_crypt), GFP_KERNEL);
-		if (new_crypt == NULL) {
-			ret = -ENOMEM;
-			goto done;
-		}
-		memset(new_crypt, 0, sizeof(struct ieee80211_crypt_data));
-		new_crypt->ops = ops;
-		if (new_crypt->ops && try_module_get(new_crypt->ops->owner))
-			new_crypt->priv =
-			    new_crypt->ops->init(param->u.crypt.idx);
-
-		if (new_crypt->priv == NULL) {
-			kfree(new_crypt);
-			param->u.crypt.err = IPW_CRYPT_ERR_CRYPT_INIT_FAILED;
-			ret = -EINVAL;
-			goto done;
-		}
-
-		*crypt = new_crypt;
-	}
-
-	if (param->u.crypt.key_len > 0 && (*crypt)->ops->set_key &&
-	    (*crypt)->ops->set_key(param->u.crypt.key,
-				   param->u.crypt.key_len, param->u.crypt.seq,
-				   (*crypt)->priv) < 0) {
-		IPW_DEBUG_INFO("%s: key setting failed\n", dev->name);
-		param->u.crypt.err = IPW_CRYPT_ERR_KEY_SET_FAILED;
-		ret = -EINVAL;
-		goto done;
-	}
-
-      skip_host_crypt:
-	if (param->u.crypt.set_tx) {
-		ieee->tx_keyidx = param->u.crypt.idx;
-		sec.active_key = param->u.crypt.idx;
-		sec.flags |= SEC_ACTIVE_KEY;
-	} else
-		sec.flags &= ~SEC_ACTIVE_KEY;
-
-	if (param->u.crypt.alg != NULL) {
-		memcpy(sec.keys[param->u.crypt.idx],
-		       param->u.crypt.key, param->u.crypt.key_len);
-		sec.key_sizes[param->u.crypt.idx] = param->u.crypt.key_len;
-		sec.flags |= (1 << param->u.crypt.idx);
-
-		if (strcmp(param->u.crypt.alg, "WEP") == 0) {
-			sec.flags |= SEC_LEVEL;
-			sec.level = SEC_LEVEL_1;
-		} else if (strcmp(param->u.crypt.alg, "TKIP") == 0) {
-			sec.flags |= SEC_LEVEL;
-			sec.level = SEC_LEVEL_2;
-		} else if (strcmp(param->u.crypt.alg, "CCMP") == 0) {
-			sec.flags |= SEC_LEVEL;
-			sec.level = SEC_LEVEL_3;
-		}
-		/* Don't set sec level for group keys. */
-		if (group_key)
-			sec.flags &= ~SEC_LEVEL;
-	}
-      done:
-	if (ieee->set_security)
-		ieee->set_security(ieee->dev, &sec);
-
-	/* Do not reset port if card is in Managed mode since resetting will
-	 * generate new IEEE 802.11 authentication which may end up in looping
-	 * with IEEE 802.1X.  If your hardware requires a reset after WEP
-	 * configuration (for example... Prism2), implement the reset_port in
-	 * the callbacks structures used to initialize the 802.11 stack. */
-	if (ieee->reset_on_keychange &&
-	    ieee->iw_mode != IW_MODE_INFRA &&
-	    ieee->reset_port && ieee->reset_port(dev)) {
-		IPW_DEBUG_INFO("%s: reset_port failed\n", dev->name);
-		param->u.crypt.err = IPW_CRYPT_ERR_CARD_CONF_FAILED;
-		return -EINVAL;
-	}
-
-	return ret;
-}
-
-static int ipw_wpa_supplicant(struct net_device *dev, struct iw_point *p)
-{
-	struct ipw_param *param;
-	struct ipw_priv *priv = ieee80211_priv(dev);
-	int ret = 0;
-
-	IPW_DEBUG_INFO("wpa_supplicant: len=%d\n", p->length);
-
-	if (p->length < sizeof(struct ipw_param) || !p->pointer)
-		return -EINVAL;
-
-	param = (struct ipw_param *)kmalloc(p->length, GFP_KERNEL);
-	if (param == NULL)
-		return -ENOMEM;
-
-	if (copy_from_user(param, p->pointer, p->length)) {
-		kfree(param);
-		return -EFAULT;
-	}
-
-	down(&priv->sem);
-	switch (param->cmd) {
-
-	case IPW_CMD_SET_WPA_PARAM:
-		ret = ipw_wpa_set_param(dev, param->u.wpa_param.name,
-					param->u.wpa_param.value);
-		break;
-
-	case IPW_CMD_SET_WPA_IE:
-		ret = ipw_wpa_set_wpa_ie(dev, param, p->length);
-		break;
-
-	case IPW_CMD_SET_ENCRYPTION:
-		ret = ipw_wpa_set_encryption(dev, param, p->length);
-		break;
-
-	case IPW_CMD_MLME:
-		ret = ipw_wpa_mlme(dev, param->u.mlme.command,
-				   param->u.mlme.reason_code);
-		break;
-
-	default:
-		IPW_ERROR("%s: Unknown WPA supplicant request: %d\n",
-			  dev->name, param->cmd);
-		ret = -EOPNOTSUPP;
-	}
-
-	up(&priv->sem);
-	if (ret == 0 && copy_to_user(p->pointer, param, p->length))
-		ret = -EFAULT;
-
-	kfree(param);
-	return ret;
-}
-#else
 /*
  * WE-18 support
  */
@@ -6726,7 +6201,7 @@ static int ipw_wx_set_genie(struct net_device *dev,
 	    (wrqu->data.length && extra == NULL))
 		return -EINVAL;
 
-	//down(&priv->sem);
+	//mutex_lock(&priv->mutex);
 
 	//if (!ieee->wpa_enabled) {
 	//      err = -EOPNOTSUPP;
@@ -6752,7 +6227,7 @@ static int ipw_wx_set_genie(struct net_device *dev,
 
 	ipw_wpa_assoc_frame(priv, ieee->wpa_ie, ieee->wpa_ie_len);
       out:
-	//up(&priv->sem);
+	//mutex_unlock(&priv->mutex);
 	return err;
 }
 
@@ -6765,7 +6240,7 @@ static int ipw_wx_get_genie(struct net_device *dev,
 	struct ieee80211_device *ieee = priv->ieee;
 	int err = 0;
 
-	//down(&priv->sem);
+	//mutex_lock(&priv->mutex);
 
 	//if (!ieee->wpa_enabled) {
 	//      err = -EOPNOTSUPP;
@@ -6786,7 +6261,7 @@ static int ipw_wx_get_genie(struct net_device *dev,
 	memcpy(extra, ieee->wpa_ie, ieee->wpa_ie_len);
 
       out:
-	//up(&priv->sem);
+	//mutex_unlock(&priv->mutex);
 	return err;
 }
 
@@ -7030,7 +6505,6 @@ static int ipw_wx_set_mlme(struct net_device *dev,
 	}
 	return 0;
 }
-#endif
 
 #ifdef CONFIG_IPW_QOS
 
@@ -7039,7 +6513,7 @@ static int ipw_wx_set_mlme(struct net_device *dev,
 * get the modulation type of the current network or
 * the card current mode
 */
-u8 ipw_qos_current_mode(struct ipw_priv * priv)
+static u8 ipw_qos_current_mode(struct ipw_priv * priv)
 {
 	u8 mode = 0;
 
@@ -7239,8 +6713,7 @@ static int ipw_qos_association(struct ipw_priv *priv,
 
 	switch (priv->ieee->iw_mode) {
 	case IW_MODE_ADHOC:
-		if (!(network->capability & WLAN_CAPABILITY_IBSS))
-			BUG();
+		BUG_ON(!(network->capability & WLAN_CAPABILITY_IBSS));
 
 		qos_data = &ibss_data;
 		break;
@@ -7447,12 +6920,12 @@ static void ipw_bg_qos_activate(void *data)
 	if (priv == NULL)
 		return;
 
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 
 	if (priv->status & STATUS_ASSOCIATED)
 		ipw_qos_activate(priv, &(priv->assoc_network->qos_data));
 
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 }
 
 static int ipw_handle_probe_response(struct net_device *dev,
@@ -7753,9 +7226,9 @@ static void ipw_roam(void *data)
 static void ipw_bg_roam(void *data)
 {
 	struct ipw_priv *priv = data;
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	ipw_roam(data);
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 }
 
 static int ipw_associate(void *data)
@@ -7850,9 +7323,9 @@ static int ipw_associate(void *data)
 static void ipw_bg_associate(void *data)
 {
 	struct ipw_priv *priv = data;
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	ipw_associate(data);
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 }
 
 static void ipw_rebuild_decrypted_skb(struct ipw_priv *priv,
@@ -7894,12 +7367,6 @@ static void ipw_rebuild_decrypted_skb(struct ipw_priv *priv,
 	}
 }
 
-static inline int ipw_is_broadcast_ether_addr(const u8 * addr)
-{
-	return (addr[0] & 0xff && addr[1] & 0xff && addr[2] & 0xff &&
-		addr[3] & 0xff && addr[4] & 0xff && addr[5] & 0xff);
-}
-
 static void ipw_handle_data_packet(struct ipw_priv *priv,
 				   struct ipw_rx_mem_buffer *rxb,
 				   struct ieee80211_rx_stats *stats)
@@ -7936,8 +7403,7 @@ static void ipw_handle_data_packet(struct ipw_priv *priv,
 	/* HW decrypt will not clear the WEP bit, MIC, PN, etc. */
 	hdr = (struct ieee80211_hdr_4addr *)rxb->skb->data;
 	if (priv->ieee->iw_mode != IW_MODE_MONITOR &&
-	    ((is_multicast_ether_addr(hdr->addr1) ||
-	      ipw_is_broadcast_ether_addr(hdr->addr1)) ?
+	    (is_multicast_ether_addr(hdr->addr1) ?
 	     !priv->ieee->host_mc_decrypt : !priv->ieee->host_decrypt))
 		ipw_rebuild_decrypted_skb(priv, rxb->skb);
 
@@ -8116,7 +7582,7 @@ static void ipw_handle_data_packet_monitor(struct ipw_priv *priv,
 }
 #endif
 
-static inline int is_network_packet(struct ipw_priv *priv,
+static int is_network_packet(struct ipw_priv *priv,
 				    struct ieee80211_hdr_4addr *header)
 {
 	/* Filter incoming packets to determine if they are targetted toward
@@ -8128,8 +7594,7 @@ static inline int is_network_packet(struct ipw_priv *priv,
 			return 0;
 
 		/* {broad,multi}cast packets to our BSSID go through */
-		if (is_multicast_ether_addr(header->addr1) ||
-		    ipw_is_broadcast_ether_addr(header->addr1))
+		if (is_multicast_ether_addr(header->addr1))
 			return !memcmp(header->addr3, priv->bssid, ETH_ALEN);
 
 		/* packets to our adapter go through */
@@ -8142,8 +7607,7 @@ static inline int is_network_packet(struct ipw_priv *priv,
 			return 0;
 
 		/* {broad,multi}cast packets to our BSS go through */
-		if (is_multicast_ether_addr(header->addr1) ||
-		    ipw_is_broadcast_ether_addr(header->addr1))
+		if (is_multicast_ether_addr(header->addr1))
 			return !memcmp(header->addr2, priv->bssid, ETH_ALEN);
 
 		/* packets to our adapter go through */
@@ -8156,7 +7620,7 @@ static inline int is_network_packet(struct ipw_priv *priv,
 
 #define IPW_PACKET_RETRY_TIME HZ
 
-static inline int is_duplicate_packet(struct ipw_priv *priv,
+static  int is_duplicate_packet(struct ipw_priv *priv,
 				      struct ieee80211_hdr_4addr *header)
 {
 	u16 sc = le16_to_cpu(header->seq_ctl);
@@ -8295,12 +7759,10 @@ static void ipw_rx(struct ipw_priv *priv)
 
 	while (i != r) {
 		rxb = priv->rxq->queue[i];
-#ifdef CONFIG_IPW2100_DEBUG
 		if (unlikely(rxb == NULL)) {
 			printk(KERN_CRIT "Queue not allocated!\n");
 			break;
 		}
-#endif
 		priv->rxq->queue[i] = NULL;
 
 		pci_dma_sync_single_for_cpu(priv->pci_dev, rxb->dma_addr,
@@ -8319,7 +7781,8 @@ static void ipw_rx(struct ipw_priv *priv)
 					    le16_to_cpu(pkt->u.frame.rssi_dbm) -
 					    IPW_RSSI_TO_DBM,
 					.signal =
-					    le16_to_cpu(pkt->u.frame.signal),
+					    le16_to_cpu(pkt->u.frame.rssi_dbm) -
+					    IPW_RSSI_TO_DBM + 0x100,
 					.noise =
 					    le16_to_cpu(pkt->u.frame.noise),
 					.rate = pkt->u.frame.rate,
@@ -8383,7 +7846,8 @@ static void ipw_rx(struct ipw_priv *priv)
 					     le16_to_cpu(pkt->u.frame.length));
 
 				if (le16_to_cpu(pkt->u.frame.length) <
-				    frame_hdr_len(header)) {
+				    ieee80211_get_hdrlen(le16_to_cpu(
+						    header->frame_ctl))) {
 					IPW_DEBUG_DROP
 					    ("Received packet is too small. "
 					     "Dropping.\n");
@@ -8473,7 +7937,14 @@ static void ipw_rx(struct ipw_priv *priv)
 #define	DEFAULT_SHORT_RETRY_LIMIT 7U
 #define	DEFAULT_LONG_RETRY_LIMIT  4U
 
-static int ipw_sw_reset(struct ipw_priv *priv, int init)
+/**
+ * ipw_sw_reset
+ * @option: options to control different reset behaviour
+ * 	    0 = reset everything except the 'disable' module_param
+ * 	    1 = reset everything and print out driver info (for probe only)
+ * 	    2 = reset everything
+ */
+static int ipw_sw_reset(struct ipw_priv *priv, int option)
 {
 	int band, modulation;
 	int old_mode = priv->ieee->iw_mode;
@@ -8500,11 +7971,7 @@ static int ipw_sw_reset(struct ipw_priv *priv, int init)
 	priv->essid_len = 0;
 	memset(priv->essid, 0, IW_ESSID_MAX_SIZE);
 
-	priv->config &= ~CFG_STATIC_ESSID;
-	priv->essid_len = 0;
-	memset(priv->essid, 0, IW_ESSID_MAX_SIZE);
-
-	if (disable) {
+	if (disable && option) {
 		priv->status |= STATUS_RF_KILL_SW;
 		IPW_DEBUG_INFO("Radio disabled.\n");
 	}
@@ -8556,7 +8023,7 @@ static int ipw_sw_reset(struct ipw_priv *priv, int init)
 
 	if ((priv->pci_dev->device == 0x4223) ||
 	    (priv->pci_dev->device == 0x4224)) {
-		if (init)
+		if (option == 1)
 			printk(KERN_INFO DRV_NAME
 			       ": Detected Intel PRO/Wireless 2915ABG Network "
 			       "Connection\n");
@@ -8567,7 +8034,7 @@ static int ipw_sw_reset(struct ipw_priv *priv, int init)
 		priv->adapter = IPW_2915ABG;
 		priv->ieee->mode = IEEE_A | IEEE_G | IEEE_B;
 	} else {
-		if (init)
+		if (option == 1)
 			printk(KERN_INFO DRV_NAME
 			       ": Detected Intel PRO/Wireless 2200BG Network "
 			       "Connection\n");
@@ -8614,7 +8081,7 @@ static int ipw_wx_get_name(struct net_device *dev,
 			   union iwreq_data *wrqu, char *extra)
 {
 	struct ipw_priv *priv = ieee80211_priv(dev);
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	if (priv->status & STATUS_RF_KILL_MASK)
 		strcpy(wrqu->name, "radio off");
 	else if (!(priv->status & STATUS_ASSOCIATED))
@@ -8623,7 +8090,7 @@ static int ipw_wx_get_name(struct net_device *dev,
 		snprintf(wrqu->name, IFNAMSIZ, "IEEE 802.11%c",
 			 ipw_modes[priv->assoc_request.ieee_mode]);
 	IPW_DEBUG_WX("Name: %s\n", wrqu->name);
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 	return 0;
 }
 
@@ -8684,7 +8151,7 @@ static int ipw_wx_set_freq(struct net_device *dev,
 			   union iwreq_data *wrqu, char *extra)
 {
 	struct ipw_priv *priv = ieee80211_priv(dev);
-	const struct ieee80211_geo *geo = ipw_get_geo(priv->ieee);
+	const struct ieee80211_geo *geo = ieee80211_get_geo(priv->ieee);
 	struct iw_freq *fwrq = &wrqu->freq;
 	int ret = 0, i;
 	u8 channel, flags;
@@ -8692,24 +8159,24 @@ static int ipw_wx_set_freq(struct net_device *dev,
 
 	if (fwrq->m == 0) {
 		IPW_DEBUG_WX("SET Freq/Channel -> any\n");
-		down(&priv->sem);
+		mutex_lock(&priv->mutex);
 		ret = ipw_set_channel(priv, 0);
-		up(&priv->sem);
+		mutex_unlock(&priv->mutex);
 		return ret;
 	}
 	/* if setting by freq convert to channel */
 	if (fwrq->e == 1) {
-		channel = ipw_freq_to_channel(priv->ieee, fwrq->m);
+		channel = ieee80211_freq_to_channel(priv->ieee, fwrq->m);
 		if (channel == 0)
 			return -EINVAL;
 	} else
 		channel = fwrq->m;
 
-	if (!(band = ipw_is_valid_channel(priv->ieee, channel)))
+	if (!(band = ieee80211_is_valid_channel(priv->ieee, channel)))
 		return -EINVAL;
 
 	if (priv->ieee->iw_mode == IW_MODE_ADHOC) {
-		i = ipw_channel_to_index(priv->ieee, channel);
+		i = ieee80211_channel_to_index(priv->ieee, channel);
 		if (i == -1)
 			return -EINVAL;
 
@@ -8722,9 +8189,9 @@ static int ipw_wx_set_freq(struct net_device *dev,
 	}
 
 	IPW_DEBUG_WX("SET Freq/Channel -> %d \n", fwrq->m);
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	ret = ipw_set_channel(priv, channel);
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 	return ret;
 }
 
@@ -8738,14 +8205,14 @@ static int ipw_wx_get_freq(struct net_device *dev,
 
 	/* If we are associated, trying to associate, or have a statically
 	 * configured CHANNEL then return that; otherwise return ANY */
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	if (priv->config & CFG_STATIC_CHANNEL ||
 	    priv->status & (STATUS_ASSOCIATING | STATUS_ASSOCIATED))
 		wrqu->freq.m = priv->channel;
 	else
 		wrqu->freq.m = 0;
 
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 	IPW_DEBUG_WX("GET Freq/Channel -> %d \n", priv->channel);
 	return 0;
 }
@@ -8775,7 +8242,7 @@ static int ipw_wx_set_mode(struct net_device *dev,
 	if (wrqu->mode == priv->ieee->iw_mode)
 		return 0;
 
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 
 	ipw_sw_reset(priv, 0);
 
@@ -8798,7 +8265,7 @@ static int ipw_wx_set_mode(struct net_device *dev,
 	priv->ieee->iw_mode = wrqu->mode;
 
 	queue_work(priv->workqueue, &priv->adapter_restart);
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 	return err;
 }
 
@@ -8807,10 +8274,10 @@ static int ipw_wx_get_mode(struct net_device *dev,
 			   union iwreq_data *wrqu, char *extra)
 {
 	struct ipw_priv *priv = ieee80211_priv(dev);
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	wrqu->mode = priv->ieee->iw_mode;
 	IPW_DEBUG_WX("Get MODE -> %d\n", wrqu->mode);
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 	return 0;
 }
 
@@ -8837,7 +8304,7 @@ static int ipw_wx_get_range(struct net_device *dev,
 {
 	struct ipw_priv *priv = ieee80211_priv(dev);
 	struct iw_range *range = (struct iw_range *)extra;
-	const struct ieee80211_geo *geo = ipw_get_geo(priv->ieee);
+	const struct ieee80211_geo *geo = ieee80211_get_geo(priv->ieee);
 	int i = 0, j;
 
 	wrqu->data.length = sizeof(*range);
@@ -8849,7 +8316,7 @@ static int ipw_wx_get_range(struct net_device *dev,
 	range->max_qual.qual = 100;
 	/* TODO: Find real max RSSI and stick here */
 	range->max_qual.level = 0;
-	range->max_qual.noise = priv->ieee->worst_rssi + 0x100;
+	range->max_qual.noise = 0;
 	range->max_qual.updated = 7;	/* Updated all three */
 
 	range->avg_qual.qual = 70;
@@ -8857,7 +8324,7 @@ static int ipw_wx_get_range(struct net_device *dev,
 	range->avg_qual.level = 0;	/* FIXME to real average level */
 	range->avg_qual.noise = 0;
 	range->avg_qual.updated = 7;	/* Updated all three */
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	range->num_bitrates = min(priv->rates.num_rates, (u8) IW_MAX_BITRATES);
 
 	for (i = 0; i < range->num_bitrates; i++)
@@ -8875,7 +8342,7 @@ static int ipw_wx_get_range(struct net_device *dev,
 
 	/* Set the Wireless Extension versions */
 	range->we_version_compiled = WIRELESS_EXT;
-	range->we_version_source = 16;
+	range->we_version_source = 18;
 
 	i = 0;
 	if (priv->ieee->mode & (IEEE_B | IEEE_G)) {
@@ -8907,15 +8374,16 @@ static int ipw_wx_get_range(struct net_device *dev,
 	range->num_channels = i;
 	range->num_frequency = i;
 
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 
-#if WIRELESS_EXT >= 17
 	/* Event capability (kernel + driver) */
 	range->event_capa[0] = (IW_EVENT_CAPA_K_0 |
 				IW_EVENT_CAPA_MASK(SIOCGIWTHRSPY) |
 				IW_EVENT_CAPA_MASK(SIOCGIWAP));
 	range->event_capa[1] = IW_EVENT_CAPA_K_1;
-#endif
+
+	range->enc_capa = IW_ENC_CAPA_WPA | IW_ENC_CAPA_WPA2 |
+		IW_ENC_CAPA_CIPHER_TKIP | IW_ENC_CAPA_CIPHER_CCMP;
 
 	IPW_DEBUG_WX("GET Range\n");
 	return 0;
@@ -8936,7 +8404,7 @@ static int ipw_wx_set_wap(struct net_device *dev,
 
 	if (wrqu->ap_addr.sa_family != ARPHRD_ETHER)
 		return -EINVAL;
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	if (!memcmp(any, wrqu->ap_addr.sa_data, ETH_ALEN) ||
 	    !memcmp(off, wrqu->ap_addr.sa_data, ETH_ALEN)) {
 		/* we disable mandatory BSSID association */
@@ -8945,14 +8413,14 @@ static int ipw_wx_set_wap(struct net_device *dev,
 		IPW_DEBUG_ASSOC("Attempting to associate with new "
 				"parameters.\n");
 		ipw_associate(priv);
-		up(&priv->sem);
+		mutex_unlock(&priv->mutex);
 		return 0;
 	}
 
 	priv->config |= CFG_STATIC_BSSID;
 	if (!memcmp(priv->bssid, wrqu->ap_addr.sa_data, ETH_ALEN)) {
 		IPW_DEBUG_WX("BSSID set to current BSSID.\n");
-		up(&priv->sem);
+		mutex_unlock(&priv->mutex);
 		return 0;
 	}
 
@@ -8966,7 +8434,7 @@ static int ipw_wx_set_wap(struct net_device *dev,
 	if (!ipw_disassociate(priv))
 		ipw_associate(priv);
 
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 	return 0;
 }
 
@@ -8977,7 +8445,7 @@ static int ipw_wx_get_wap(struct net_device *dev,
 	struct ipw_priv *priv = ieee80211_priv(dev);
 	/* If we are associated, trying to associate, or have a statically
 	 * configured BSSID then return that; otherwise return ANY */
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	if (priv->config & CFG_STATIC_BSSID ||
 	    priv->status & (STATUS_ASSOCIATED | STATUS_ASSOCIATING)) {
 		wrqu->ap_addr.sa_family = ARPHRD_ETHER;
@@ -8987,7 +8455,7 @@ static int ipw_wx_get_wap(struct net_device *dev,
 
 	IPW_DEBUG_WX("Getting WAP BSSID: " MAC_FMT "\n",
 		     MAC_ARG(wrqu->ap_addr.sa_data));
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 	return 0;
 }
 
@@ -8998,7 +8466,7 @@ static int ipw_wx_set_essid(struct net_device *dev,
 	struct ipw_priv *priv = ieee80211_priv(dev);
 	char *essid = "";	/* ANY */
 	int length = 0;
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	if (wrqu->essid.flags && wrqu->essid.length) {
 		length = wrqu->essid.length - 1;
 		essid = extra;
@@ -9013,7 +8481,7 @@ static int ipw_wx_set_essid(struct net_device *dev,
 			priv->config &= ~CFG_STATIC_ESSID;
 			ipw_associate(priv);
 		}
-		up(&priv->sem);
+		mutex_unlock(&priv->mutex);
 		return 0;
 	}
 
@@ -9023,7 +8491,7 @@ static int ipw_wx_set_essid(struct net_device *dev,
 
 	if (priv->essid_len == length && !memcmp(priv->essid, extra, length)) {
 		IPW_DEBUG_WX("ESSID set to current ESSID.\n");
-		up(&priv->sem);
+		mutex_unlock(&priv->mutex);
 		return 0;
 	}
 
@@ -9038,7 +8506,7 @@ static int ipw_wx_set_essid(struct net_device *dev,
 	if (!ipw_disassociate(priv))
 		ipw_associate(priv);
 
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 	return 0;
 }
 
@@ -9050,7 +8518,7 @@ static int ipw_wx_get_essid(struct net_device *dev,
 
 	/* If we are associated, trying to associate, or have a statically
 	 * configured ESSID then return that; otherwise return ANY */
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	if (priv->config & CFG_STATIC_ESSID ||
 	    priv->status & (STATUS_ASSOCIATED | STATUS_ASSOCIATING)) {
 		IPW_DEBUG_WX("Getting essid: '%s'\n",
@@ -9063,7 +8531,7 @@ static int ipw_wx_get_essid(struct net_device *dev,
 		wrqu->essid.length = 0;
 		wrqu->essid.flags = 0;	/* active */
 	}
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 	return 0;
 }
 
@@ -9076,12 +8544,12 @@ static int ipw_wx_set_nick(struct net_device *dev,
 	IPW_DEBUG_WX("Setting nick to '%s'\n", extra);
 	if (wrqu->data.length > IW_ESSID_MAX_SIZE)
 		return -E2BIG;
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	wrqu->data.length = min((size_t) wrqu->data.length, sizeof(priv->nick));
 	memset(priv->nick, 0, sizeof(priv->nick));
 	memcpy(priv->nick, extra, wrqu->data.length);
 	IPW_DEBUG_TRACE("<<\n");
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 	return 0;
 
 }
@@ -9092,11 +8560,57 @@ static int ipw_wx_get_nick(struct net_device *dev,
 {
 	struct ipw_priv *priv = ieee80211_priv(dev);
 	IPW_DEBUG_WX("Getting nick\n");
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	wrqu->data.length = strlen(priv->nick) + 1;
 	memcpy(extra, priv->nick, wrqu->data.length);
 	wrqu->data.flags = 1;	/* active */
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
+	return 0;
+}
+
+static int ipw_wx_set_sens(struct net_device *dev,
+			    struct iw_request_info *info,
+			    union iwreq_data *wrqu, char *extra)
+{
+	struct ipw_priv *priv = ieee80211_priv(dev);
+	int err = 0;
+
+	IPW_DEBUG_WX("Setting roaming threshold to %d\n", wrqu->sens.value);
+	IPW_DEBUG_WX("Setting disassociate threshold to %d\n", 3*wrqu->sens.value);
+	mutex_lock(&priv->mutex);
+
+	if (wrqu->sens.fixed == 0)
+	{
+		priv->roaming_threshold = IPW_MB_ROAMING_THRESHOLD_DEFAULT;
+		priv->disassociate_threshold = IPW_MB_DISASSOCIATE_THRESHOLD_DEFAULT;
+		goto out;
+	}
+	if ((wrqu->sens.value > IPW_MB_ROAMING_THRESHOLD_MAX) ||
+	    (wrqu->sens.value < IPW_MB_ROAMING_THRESHOLD_MIN)) {
+		err = -EINVAL;
+		goto out;
+	}
+
+	priv->roaming_threshold = wrqu->sens.value;
+	priv->disassociate_threshold = 3*wrqu->sens.value;
+      out:
+	mutex_unlock(&priv->mutex);
+	return err;
+}
+
+static int ipw_wx_get_sens(struct net_device *dev,
+			    struct iw_request_info *info,
+			    union iwreq_data *wrqu, char *extra)
+{
+	struct ipw_priv *priv = ieee80211_priv(dev);
+	mutex_lock(&priv->mutex);
+	wrqu->sens.fixed = 1;
+	wrqu->sens.value = priv->roaming_threshold;
+	mutex_unlock(&priv->mutex);
+
+	IPW_DEBUG_WX("GET roaming threshold -> %s %d \n",
+		     wrqu->power.disabled ? "OFF" : "ON", wrqu->power.value);
+
 	return 0;
 }
 
@@ -9189,7 +8703,7 @@ static int ipw_wx_set_rate(struct net_device *dev,
       apply:
 	IPW_DEBUG_WX("Setting rate mask to 0x%08X [%s]\n",
 		     mask, fixed ? "fixed" : "sub-rates");
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	if (mask == IEEE80211_DEFAULT_RATES_MASK) {
 		priv->config &= ~CFG_FIXED_RATE;
 		ipw_set_fixed_rate(priv, priv->ieee->mode);
@@ -9198,7 +8712,7 @@ static int ipw_wx_set_rate(struct net_device *dev,
 
 	if (priv->rates_mask == mask) {
 		IPW_DEBUG_WX("Mask set to current mask.\n");
-		up(&priv->sem);
+		mutex_unlock(&priv->mutex);
 		return 0;
 	}
 
@@ -9209,7 +8723,7 @@ static int ipw_wx_set_rate(struct net_device *dev,
 	if (!ipw_disassociate(priv))
 		ipw_associate(priv);
 
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 	return 0;
 }
 
@@ -9218,9 +8732,9 @@ static int ipw_wx_get_rate(struct net_device *dev,
 			   union iwreq_data *wrqu, char *extra)
 {
 	struct ipw_priv *priv = ieee80211_priv(dev);
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	wrqu->bitrate.value = priv->last_rate;
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 	IPW_DEBUG_WX("GET Rate -> %d \n", wrqu->bitrate.value);
 	return 0;
 }
@@ -9230,20 +8744,20 @@ static int ipw_wx_set_rts(struct net_device *dev,
 			  union iwreq_data *wrqu, char *extra)
 {
 	struct ipw_priv *priv = ieee80211_priv(dev);
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	if (wrqu->rts.disabled)
 		priv->rts_threshold = DEFAULT_RTS_THRESHOLD;
 	else {
 		if (wrqu->rts.value < MIN_RTS_THRESHOLD ||
 		    wrqu->rts.value > MAX_RTS_THRESHOLD) {
-			up(&priv->sem);
+			mutex_unlock(&priv->mutex);
 			return -EINVAL;
 		}
 		priv->rts_threshold = wrqu->rts.value;
 	}
 
 	ipw_send_rts_threshold(priv, priv->rts_threshold);
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 	IPW_DEBUG_WX("SET RTS Threshold -> %d \n", priv->rts_threshold);
 	return 0;
 }
@@ -9253,11 +8767,11 @@ static int ipw_wx_get_rts(struct net_device *dev,
 			  union iwreq_data *wrqu, char *extra)
 {
 	struct ipw_priv *priv = ieee80211_priv(dev);
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	wrqu->rts.value = priv->rts_threshold;
 	wrqu->rts.fixed = 0;	/* no auto select */
 	wrqu->rts.disabled = (wrqu->rts.value == DEFAULT_RTS_THRESHOLD);
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 	IPW_DEBUG_WX("GET RTS Threshold -> %d \n", wrqu->rts.value);
 	return 0;
 }
@@ -9269,7 +8783,7 @@ static int ipw_wx_set_txpow(struct net_device *dev,
 	struct ipw_priv *priv = ieee80211_priv(dev);
 	int err = 0;
 
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	if (ipw_radio_kill_sw(priv, wrqu->power.disabled)) {
 		err = -EINPROGRESS;
 		goto out;
@@ -9292,7 +8806,7 @@ static int ipw_wx_set_txpow(struct net_device *dev,
 	priv->tx_power = wrqu->power.value;
 	err = ipw_set_tx_power(priv);
       out:
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 	return err;
 }
 
@@ -9301,12 +8815,12 @@ static int ipw_wx_get_txpow(struct net_device *dev,
 			    union iwreq_data *wrqu, char *extra)
 {
 	struct ipw_priv *priv = ieee80211_priv(dev);
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	wrqu->power.value = priv->tx_power;
 	wrqu->power.fixed = 1;
 	wrqu->power.flags = IW_TXPOW_DBM;
 	wrqu->power.disabled = (priv->status & STATUS_RF_KILL_MASK) ? 1 : 0;
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 
 	IPW_DEBUG_WX("GET TX Power -> %s %d \n",
 		     wrqu->power.disabled ? "OFF" : "ON", wrqu->power.value);
@@ -9319,13 +8833,13 @@ static int ipw_wx_set_frag(struct net_device *dev,
 			   union iwreq_data *wrqu, char *extra)
 {
 	struct ipw_priv *priv = ieee80211_priv(dev);
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	if (wrqu->frag.disabled)
 		priv->ieee->fts = DEFAULT_FTS;
 	else {
 		if (wrqu->frag.value < MIN_FRAG_THRESHOLD ||
 		    wrqu->frag.value > MAX_FRAG_THRESHOLD) {
-			up(&priv->sem);
+			mutex_unlock(&priv->mutex);
 			return -EINVAL;
 		}
 
@@ -9333,7 +8847,7 @@ static int ipw_wx_set_frag(struct net_device *dev,
 	}
 
 	ipw_send_frag_threshold(priv, wrqu->frag.value);
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 	IPW_DEBUG_WX("SET Frag Threshold -> %d \n", wrqu->frag.value);
 	return 0;
 }
@@ -9343,11 +8857,11 @@ static int ipw_wx_get_frag(struct net_device *dev,
 			   union iwreq_data *wrqu, char *extra)
 {
 	struct ipw_priv *priv = ieee80211_priv(dev);
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	wrqu->frag.value = priv->ieee->fts;
 	wrqu->frag.fixed = 0;	/* no auto select */
 	wrqu->frag.disabled = (wrqu->frag.value == DEFAULT_FTS);
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 	IPW_DEBUG_WX("GET Frag Threshold -> %d \n", wrqu->frag.value);
 
 	return 0;
@@ -9368,7 +8882,7 @@ static int ipw_wx_set_retry(struct net_device *dev,
 	if (wrqu->retry.value < 0 || wrqu->retry.value > 255)
 		return -EINVAL;
 
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	if (wrqu->retry.flags & IW_RETRY_MIN)
 		priv->short_retry_limit = (u8) wrqu->retry.value;
 	else if (wrqu->retry.flags & IW_RETRY_MAX)
@@ -9380,7 +8894,7 @@ static int ipw_wx_set_retry(struct net_device *dev,
 
 	ipw_send_retry_limit(priv, priv->short_retry_limit,
 			     priv->long_retry_limit);
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 	IPW_DEBUG_WX("SET retry limit -> short:%d long:%d\n",
 		     priv->short_retry_limit, priv->long_retry_limit);
 	return 0;
@@ -9392,11 +8906,11 @@ static int ipw_wx_get_retry(struct net_device *dev,
 {
 	struct ipw_priv *priv = ieee80211_priv(dev);
 
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	wrqu->retry.disabled = 0;
 
 	if ((wrqu->retry.flags & IW_RETRY_TYPE) == IW_RETRY_LIFETIME) {
-		up(&priv->sem);
+		mutex_unlock(&priv->mutex);
 		return -EINVAL;
 	}
 
@@ -9410,14 +8924,13 @@ static int ipw_wx_get_retry(struct net_device *dev,
 		wrqu->retry.flags = IW_RETRY_LIMIT;
 		wrqu->retry.value = priv->short_retry_limit;
 	}
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 
 	IPW_DEBUG_WX("GET retry -> %d \n", wrqu->retry.value);
 
 	return 0;
 }
 
-#if WIRELESS_EXT > 17
 static int ipw_request_direct_scan(struct ipw_priv *priv, char *essid,
 				   int essid_len)
 {
@@ -9428,7 +8941,7 @@ static int ipw_request_direct_scan(struct ipw_priv *priv, char *essid,
 	    (priv->status & STATUS_EXIT_PENDING))
 		return 0;
 
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 
 	if (priv->status & STATUS_RF_KILL_MASK) {
 		IPW_DEBUG_HC("Aborting scan due to RF kill activation\n");
@@ -9480,17 +8993,15 @@ static int ipw_request_direct_scan(struct ipw_priv *priv, char *essid,
 	priv->status |= STATUS_SCANNING;
 
       done:
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 	return err;
 }
-#endif				/* WIRELESS_EXT > 17 */
 
 static int ipw_wx_set_scan(struct net_device *dev,
 			   struct iw_request_info *info,
 			   union iwreq_data *wrqu, char *extra)
 {
 	struct ipw_priv *priv = ieee80211_priv(dev);
-#if WIRELESS_EXT > 17
 	struct iw_scan_req *req = NULL;
 	if (wrqu->data.length
 	    && wrqu->data.length == sizeof(struct iw_scan_req)) {
@@ -9501,7 +9012,7 @@ static int ipw_wx_set_scan(struct net_device *dev,
 			return 0;
 		}
 	}
-#endif
+
 	IPW_DEBUG_WX("Start scan\n");
 
 	queue_work(priv->workqueue, &priv->request_scan);
@@ -9525,7 +9036,7 @@ static int ipw_wx_set_encode(struct net_device *dev,
 	int ret;
 	u32 cap = priv->capability;
 
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	ret = ieee80211_wx_set_encode(priv->ieee, info, wrqu, key);
 
 	/* In IBSS mode, we need to notify the firmware to update
@@ -9535,7 +9046,7 @@ static int ipw_wx_set_encode(struct net_device *dev,
 	    priv->status & STATUS_ASSOCIATED)
 		ipw_disassociate(priv);
 
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 	return ret;
 }
 
@@ -9553,17 +9064,17 @@ static int ipw_wx_set_power(struct net_device *dev,
 {
 	struct ipw_priv *priv = ieee80211_priv(dev);
 	int err;
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	if (wrqu->power.disabled) {
 		priv->power_mode = IPW_POWER_LEVEL(priv->power_mode);
 		err = ipw_send_power_mode(priv, IPW_POWER_MODE_CAM);
 		if (err) {
 			IPW_DEBUG_WX("failed setting power mode.\n");
-			up(&priv->sem);
+			mutex_unlock(&priv->mutex);
 			return err;
 		}
 		IPW_DEBUG_WX("SET Power Management Mode -> off\n");
-		up(&priv->sem);
+		mutex_unlock(&priv->mutex);
 		return 0;
 	}
 
@@ -9575,7 +9086,7 @@ static int ipw_wx_set_power(struct net_device *dev,
 	default:		/* Otherwise we don't support it */
 		IPW_DEBUG_WX("SET PM Mode: %X not supported.\n",
 			     wrqu->power.flags);
-		up(&priv->sem);
+		mutex_unlock(&priv->mutex);
 		return -EOPNOTSUPP;
 	}
 
@@ -9588,12 +9099,12 @@ static int ipw_wx_set_power(struct net_device *dev,
 	err = ipw_send_power_mode(priv, IPW_POWER_LEVEL(priv->power_mode));
 	if (err) {
 		IPW_DEBUG_WX("failed setting power mode.\n");
-		up(&priv->sem);
+		mutex_unlock(&priv->mutex);
 		return err;
 	}
 
 	IPW_DEBUG_WX("SET Power Management Mode -> 0x%02X\n", priv->power_mode);
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 	return 0;
 }
 
@@ -9602,13 +9113,13 @@ static int ipw_wx_get_power(struct net_device *dev,
 			    union iwreq_data *wrqu, char *extra)
 {
 	struct ipw_priv *priv = ieee80211_priv(dev);
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	if (!(priv->power_mode & IPW_POWER_ENABLED))
 		wrqu->power.disabled = 1;
 	else
 		wrqu->power.disabled = 0;
 
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 	IPW_DEBUG_WX("GET Power Management Mode -> %02X\n", priv->power_mode);
 
 	return 0;
@@ -9621,7 +9132,7 @@ static int ipw_wx_set_powermode(struct net_device *dev,
 	struct ipw_priv *priv = ieee80211_priv(dev);
 	int mode = *(int *)extra;
 	int err;
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	if ((mode < 1) || (mode > IPW_POWER_LIMIT)) {
 		mode = IPW_POWER_AC;
 		priv->power_mode = mode;
@@ -9634,11 +9145,11 @@ static int ipw_wx_set_powermode(struct net_device *dev,
 
 		if (err) {
 			IPW_DEBUG_WX("failed setting power mode.\n");
-			up(&priv->sem);
+			mutex_unlock(&priv->mutex);
 			return err;
 		}
 	}
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 	return 0;
 }
 
@@ -9687,7 +9198,7 @@ static int ipw_wx_set_wireless_mode(struct net_device *dev,
 		IPW_WARNING("Attempt to set invalid wireless mode: %d\n", mode);
 		return -EINVAL;
 	}
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	if (priv->adapter == IPW_2915ABG) {
 		priv->ieee->abg_true = 1;
 		if (mode & IEEE_A) {
@@ -9699,7 +9210,7 @@ static int ipw_wx_set_wireless_mode(struct net_device *dev,
 		if (mode & IEEE_A) {
 			IPW_WARNING("Attempt to set 2200BG into "
 				    "802.11a mode\n");
-			up(&priv->sem);
+			mutex_unlock(&priv->mutex);
 			return -EINVAL;
 		}
 
@@ -9736,7 +9247,7 @@ static int ipw_wx_set_wireless_mode(struct net_device *dev,
 	IPW_DEBUG_WX("PRIV SET MODE: %c%c%c\n",
 		     mode & IEEE_A ? 'a' : '.',
 		     mode & IEEE_B ? 'b' : '.', mode & IEEE_G ? 'g' : '.');
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 	return 0;
 }
 
@@ -9745,7 +9256,7 @@ static int ipw_wx_get_wireless_mode(struct net_device *dev,
 				    union iwreq_data *wrqu, char *extra)
 {
 	struct ipw_priv *priv = ieee80211_priv(dev);
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	switch (priv->ieee->mode) {
 	case IEEE_A:
 		strncpy(extra, "802.11a (1)", MAX_WX_STRING);
@@ -9776,7 +9287,7 @@ static int ipw_wx_get_wireless_mode(struct net_device *dev,
 	IPW_DEBUG_WX("PRIV GET MODE: %s\n", extra);
 
 	wrqu->data.length = strlen(extra) + 1;
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 
 	return 0;
 }
@@ -9787,7 +9298,7 @@ static int ipw_wx_set_preamble(struct net_device *dev,
 {
 	struct ipw_priv *priv = ieee80211_priv(dev);
 	int mode = *(int *)extra;
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	/* Switching from SHORT -> LONG requires a disassociation */
 	if (mode == 1) {
 		if (!(priv->config & CFG_PREAMBLE_LONG)) {
@@ -9806,11 +9317,11 @@ static int ipw_wx_set_preamble(struct net_device *dev,
 		priv->config &= ~CFG_PREAMBLE_LONG;
 		goto done;
 	}
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 	return -EINVAL;
 
       done:
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 	return 0;
 }
 
@@ -9819,12 +9330,12 @@ static int ipw_wx_get_preamble(struct net_device *dev,
 			       union iwreq_data *wrqu, char *extra)
 {
 	struct ipw_priv *priv = ieee80211_priv(dev);
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	if (priv->config & CFG_PREAMBLE_LONG)
 		snprintf(wrqu->name, IFNAMSIZ, "long (1)");
 	else
 		snprintf(wrqu->name, IFNAMSIZ, "auto (0)");
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 	return 0;
 }
 
@@ -9836,7 +9347,7 @@ static int ipw_wx_set_monitor(struct net_device *dev,
 	struct ipw_priv *priv = ieee80211_priv(dev);
 	int *parms = (int *)extra;
 	int enable = (parms[0] > 0);
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	IPW_DEBUG_WX("SET MONITOR: %d %d\n", enable, parms[1]);
 	if (enable) {
 		if (priv->ieee->iw_mode != IW_MODE_MONITOR) {
@@ -9851,13 +9362,13 @@ static int ipw_wx_set_monitor(struct net_device *dev,
 		ipw_set_channel(priv, parms[1]);
 	} else {
 		if (priv->ieee->iw_mode != IW_MODE_MONITOR) {
-			up(&priv->sem);
+			mutex_unlock(&priv->mutex);
 			return 0;
 		}
 		priv->net_dev->type = ARPHRD_ETHER;
 		queue_work(priv->workqueue, &priv->adapter_restart);
 	}
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 	return 0;
 }
 
@@ -9887,9 +9398,9 @@ static int ipw_wx_sw_reset(struct net_device *dev,
 
 	IPW_DEBUG_WX("SW_RESET\n");
 
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 
-	ret = ipw_sw_reset(priv, 0);
+	ret = ipw_sw_reset(priv, 2);
 	if (!ret) {
 		free_firmware();
 		ipw_adapter_restart(priv);
@@ -9899,9 +9410,9 @@ static int ipw_wx_sw_reset(struct net_device *dev,
 	 * module parameter, so take appropriate action */
 	ipw_radio_kill_sw(priv, priv->status & STATUS_RF_KILL_SW);
 
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 	ieee80211_wx_set_encode(priv->ieee, info, &wrqu_sec, NULL);
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 
 	if (!(priv->status & STATUS_RF_KILL_MASK)) {
 		/* Configuration likely changed -- force [re]association */
@@ -9911,7 +9422,7 @@ static int ipw_wx_sw_reset(struct net_device *dev,
 			ipw_associate(priv);
 	}
 
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 
 	return 0;
 }
@@ -9924,6 +9435,8 @@ static iw_handler ipw_wx_handlers[] = {
 	IW_IOCTL(SIOCGIWFREQ) = ipw_wx_get_freq,
 	IW_IOCTL(SIOCSIWMODE) = ipw_wx_set_mode,
 	IW_IOCTL(SIOCGIWMODE) = ipw_wx_get_mode,
+	IW_IOCTL(SIOCSIWSENS) = ipw_wx_set_sens,
+	IW_IOCTL(SIOCGIWSENS) = ipw_wx_get_sens,
 	IW_IOCTL(SIOCGIWRANGE) = ipw_wx_get_range,
 	IW_IOCTL(SIOCSIWAP) = ipw_wx_set_wap,
 	IW_IOCTL(SIOCGIWAP) = ipw_wx_get_wap,
@@ -9951,7 +9464,6 @@ static iw_handler ipw_wx_handlers[] = {
 	IW_IOCTL(SIOCGIWSPY) = iw_handler_get_spy,
 	IW_IOCTL(SIOCSIWTHRSPY) = iw_handler_set_thrspy,
 	IW_IOCTL(SIOCGIWTHRSPY) = iw_handler_get_thrspy,
-#if WIRELESS_EXT > 17
 	IW_IOCTL(SIOCSIWGENIE) = ipw_wx_set_genie,
 	IW_IOCTL(SIOCGIWGENIE) = ipw_wx_get_genie,
 	IW_IOCTL(SIOCSIWMLME) = ipw_wx_set_mlme,
@@ -9959,7 +9471,6 @@ static iw_handler ipw_wx_handlers[] = {
 	IW_IOCTL(SIOCGIWAUTH) = ipw_wx_get_auth,
 	IW_IOCTL(SIOCSIWENCODEEXT) = ipw_wx_set_encodeext,
 	IW_IOCTL(SIOCGIWENCODEEXT) = ipw_wx_get_encodeext,
-#endif
 };
 
 enum {
@@ -10035,9 +9546,7 @@ static struct iw_handler_def ipw_wx_handler_def = {
 	.num_private_args = ARRAY_SIZE(ipw_priv_args),
 	.private = ipw_priv_handler,
 	.private_args = ipw_priv_args,
-#if WIRELESS_EXT >= 17
 	.get_wireless_stats = ipw_get_wireless_stats,
-#endif
 };
 
 /*
@@ -10073,7 +9582,7 @@ static struct iw_statistics *ipw_get_wireless_stats(struct net_device *dev)
 	wstats->qual.level = average_value(&priv->average_rssi);
 	wstats->qual.noise = average_value(&priv->average_noise);
 	wstats->qual.updated = IW_QUAL_QUAL_UPDATED | IW_QUAL_LEVEL_UPDATED |
-	    IW_QUAL_NOISE_UPDATED;
+	    IW_QUAL_NOISE_UPDATED | IW_QUAL_DBM;
 
 	wstats->miss.beacon = average_value(&priv->average_missed_beacons);
 	wstats->discard.retries = priv->last_tx_failures;
@@ -10088,7 +9597,7 @@ static struct iw_statistics *ipw_get_wireless_stats(struct net_device *dev)
 
 /* net device stuff */
 
-static inline void init_sys_config(struct ipw_sys_config *sys_config)
+static  void init_sys_config(struct ipw_sys_config *sys_config)
 {
 	memset(sys_config, 0, sizeof(struct ipw_sys_config));
 	sys_config->bt_coexistence = 0;
@@ -10099,12 +9608,13 @@ static inline void init_sys_config(struct ipw_sys_config *sys_config)
 	sys_config->disable_unicast_decryption = 1;
 	sys_config->exclude_multicast_unencrypted = 0;
 	sys_config->disable_multicast_decryption = 1;
-	sys_config->antenna_diversity = CFG_SYS_ANTENNA_BOTH;
+	sys_config->antenna_diversity = CFG_SYS_ANTENNA_SLOW_DIV;
 	sys_config->pass_crc_to_host = 0;	/* TODO: See if 1 gives us FCS */
 	sys_config->dot11g_auto_detection = 0;
 	sys_config->enable_cts_to_self = 0;
 	sys_config->bt_coexist_collision_thr = 0;
 	sys_config->pass_noise_stats_to_host = 1;	//1 -- fix for 256
+	sys_config->silence_threshold = 0x1e;
 }
 
 static int ipw_net_open(struct net_device *dev)
@@ -10112,11 +9622,11 @@ static int ipw_net_open(struct net_device *dev)
 	struct ipw_priv *priv = ieee80211_priv(dev);
 	IPW_DEBUG_INFO("dev->open\n");
 	/* we should be verifying the device is ready to be opened */
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	if (!(priv->status & STATUS_RF_KILL_MASK) &&
 	    (priv->status & STATUS_ASSOCIATED))
 		netif_start_queue(dev);
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 	return 0;
 }
 
@@ -10134,7 +9644,7 @@ modify to send one tfd per fragment instead of using chunking.  otherwise
 we need to heavily modify the ieee80211_skb_to_txb.
 */
 
-static inline int ipw_tx_skb(struct ipw_priv *priv, struct ieee80211_txb *txb,
+static int ipw_tx_skb(struct ipw_priv *priv, struct ieee80211_txb *txb,
 			     int pri)
 {
 	struct ieee80211_hdr_3addr *hdr = (struct ieee80211_hdr_3addr *)
@@ -10155,8 +9665,7 @@ static inline int ipw_tx_skb(struct ipw_priv *priv, struct ieee80211_txb *txb,
 	switch (priv->ieee->iw_mode) {
 	case IW_MODE_ADHOC:
 		hdr_len = IEEE80211_3ADDR_LEN;
-		unicast = !(is_multicast_ether_addr(hdr->addr1) ||
-			    ipw_is_broadcast_ether_addr(hdr->addr1));
+		unicast = !is_multicast_ether_addr(hdr->addr1);
 		id = ipw_find_station(priv, hdr->addr1);
 		if (id == IPW_INVALID_STATION) {
 			id = ipw_add_station(priv, hdr->addr1);
@@ -10171,8 +9680,7 @@ static inline int ipw_tx_skb(struct ipw_priv *priv, struct ieee80211_txb *txb,
 
 	case IW_MODE_INFRA:
 	default:
-		unicast = !(is_multicast_ether_addr(hdr->addr3) ||
-			    ipw_is_broadcast_ether_addr(hdr->addr3));
+		unicast = !is_multicast_ether_addr(hdr->addr3);
 		hdr_len = IEEE80211_3ADDR_LEN;
 		id = 0;
 		break;
@@ -10319,6 +9827,9 @@ static inline int ipw_tx_skb(struct ipw_priv *priv, struct ieee80211_txb *txb,
 	q->first_empty = ipw_queue_inc_wrap(q->first_empty, q->n_bd);
 	ipw_write32(priv, q->reg_w, q->first_empty);
 
+	if (ipw_queue_space(q) < q->high_mark)
+		netif_stop_queue(priv->net_dev);
+
 	return NETDEV_TX_OK;
 
       drop:
@@ -10369,7 +9880,7 @@ static int ipw_net_hard_start_xmit(struct ieee80211_txb *txb,
 
       fail_unlock:
 	spin_unlock_irqrestore(&priv->lock, flags);
-	return -1;
+	return 1;
 }
 
 static struct net_device_stats *ipw_net_get_stats(struct net_device *dev)
@@ -10392,13 +9903,13 @@ static int ipw_net_set_mac_address(struct net_device *dev, void *p)
 	struct sockaddr *addr = p;
 	if (!is_valid_ether_addr(addr->sa_data))
 		return -EADDRNOTAVAIL;
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	priv->config |= CFG_CUSTOM_MAC;
 	memcpy(priv->mac_addr, addr->sa_data, ETH_ALEN);
 	printk(KERN_INFO "%s: Setting MAC to " MAC_FMT "\n",
 	       priv->net_dev->name, MAC_ARG(priv->mac_addr));
 	queue_work(priv->workqueue, &priv->adapter_restart);
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 	return 0;
 }
 
@@ -10442,9 +9953,9 @@ static int ipw_ethtool_get_eeprom(struct net_device *dev,
 
 	if (eeprom->offset + eeprom->len > IPW_EEPROM_IMAGE_SIZE)
 		return -EINVAL;
-	down(&p->sem);
+	mutex_lock(&p->mutex);
 	memcpy(bytes, &p->eeprom[eeprom->offset], eeprom->len);
-	up(&p->sem);
+	mutex_unlock(&p->mutex);
 	return 0;
 }
 
@@ -10456,11 +9967,11 @@ static int ipw_ethtool_set_eeprom(struct net_device *dev,
 
 	if (eeprom->offset + eeprom->len > IPW_EEPROM_IMAGE_SIZE)
 		return -EINVAL;
-	down(&p->sem);
+	mutex_lock(&p->mutex);
 	memcpy(&p->eeprom[eeprom->offset], bytes, eeprom->len);
 	for (i = 0; i < IPW_EEPROM_IMAGE_SIZE; i++)
 		ipw_write8(p, i + IPW_EEPROM_DATA, p->eeprom[i]);
-	up(&p->sem);
+	mutex_unlock(&p->mutex);
 	return 0;
 }
 
@@ -10555,12 +10066,12 @@ static void ipw_rf_kill(void *adapter)
 static void ipw_bg_rf_kill(void *data)
 {
 	struct ipw_priv *priv = data;
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	ipw_rf_kill(data);
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 }
 
-void ipw_link_up(struct ipw_priv *priv)
+static void ipw_link_up(struct ipw_priv *priv)
 {
 	priv->last_seq_num = -1;
 	priv->last_frag_num = -1;
@@ -10590,12 +10101,12 @@ void ipw_link_up(struct ipw_priv *priv)
 static void ipw_bg_link_up(void *data)
 {
 	struct ipw_priv *priv = data;
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	ipw_link_up(data);
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 }
 
-void ipw_link_down(struct ipw_priv *priv)
+static void ipw_link_down(struct ipw_priv *priv)
 {
 	ipw_led_link_down(priv);
 	netif_carrier_off(priv->net_dev);
@@ -10618,9 +10129,9 @@ void ipw_link_down(struct ipw_priv *priv)
 static void ipw_bg_link_down(void *data)
 {
 	struct ipw_priv *priv = data;
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	ipw_link_down(data);
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 }
 
 static int ipw_setup_deferred_work(struct ipw_priv *priv)
@@ -10863,6 +10374,9 @@ static int ipw_config(struct ipw_priv *priv)
  * Altering this values, using it on other hardware, or in geographies
  * not intended for resale of the above mentioned Intel adapters has
  * not been tested.
+ *
+ * Remember to update the table in README.ipw2200 when changing this
+ * table.
  *
  */
 static const struct ieee80211_geo ipw_geos[] = {
@@ -11111,96 +10625,6 @@ static const struct ieee80211_geo ipw_geos[] = {
 	 }
 };
 
-/* GEO code borrowed from ieee80211_geo.c */
-static int ipw_is_valid_channel(struct ieee80211_device *ieee, u8 channel)
-{
-	int i;
-
-	/* Driver needs to initialize the geography map before using
-	 * these helper functions */
-	BUG_ON(ieee->geo.bg_channels == 0 && ieee->geo.a_channels == 0);
-
-	if (ieee->freq_band & IEEE80211_24GHZ_BAND)
-		for (i = 0; i < ieee->geo.bg_channels; i++)
-			/* NOTE: If G mode is currently supported but
-			 * this is a B only channel, we don't see it
-			 * as valid. */
-			if ((ieee->geo.bg[i].channel == channel) &&
-			    (!(ieee->mode & IEEE_G) ||
-			     !(ieee->geo.bg[i].flags & IEEE80211_CH_B_ONLY)))
-				return IEEE80211_24GHZ_BAND;
-
-	if (ieee->freq_band & IEEE80211_52GHZ_BAND)
-		for (i = 0; i < ieee->geo.a_channels; i++)
-			if (ieee->geo.a[i].channel == channel)
-				return IEEE80211_52GHZ_BAND;
-
-	return 0;
-}
-
-static int ipw_channel_to_index(struct ieee80211_device *ieee, u8 channel)
-{
-	int i;
-
-	/* Driver needs to initialize the geography map before using
-	 * these helper functions */
-	BUG_ON(ieee->geo.bg_channels == 0 && ieee->geo.a_channels == 0);
-
-	if (ieee->freq_band & IEEE80211_24GHZ_BAND)
-		for (i = 0; i < ieee->geo.bg_channels; i++)
-			if (ieee->geo.bg[i].channel == channel)
-				return i;
-
-	if (ieee->freq_band & IEEE80211_52GHZ_BAND)
-		for (i = 0; i < ieee->geo.a_channels; i++)
-			if (ieee->geo.a[i].channel == channel)
-				return i;
-
-	return -1;
-}
-
-static u8 ipw_freq_to_channel(struct ieee80211_device *ieee, u32 freq)
-{
-	int i;
-
-	/* Driver needs to initialize the geography map before using
-	 * these helper functions */
-	BUG_ON(ieee->geo.bg_channels == 0 && ieee->geo.a_channels == 0);
-
-	freq /= 100000;
-
-	if (ieee->freq_band & IEEE80211_24GHZ_BAND)
-		for (i = 0; i < ieee->geo.bg_channels; i++)
-			if (ieee->geo.bg[i].freq == freq)
-				return ieee->geo.bg[i].channel;
-
-	if (ieee->freq_band & IEEE80211_52GHZ_BAND)
-		for (i = 0; i < ieee->geo.a_channels; i++)
-			if (ieee->geo.a[i].freq == freq)
-				return ieee->geo.a[i].channel;
-
-	return 0;
-}
-
-static int ipw_set_geo(struct ieee80211_device *ieee,
-		       const struct ieee80211_geo *geo)
-{
-	memcpy(ieee->geo.name, geo->name, 3);
-	ieee->geo.name[3] = '\0';
-	ieee->geo.bg_channels = geo->bg_channels;
-	ieee->geo.a_channels = geo->a_channels;
-	memcpy(ieee->geo.bg, geo->bg, geo->bg_channels *
-	       sizeof(struct ieee80211_channel));
-	memcpy(ieee->geo.a, geo->a, ieee->geo.a_channels *
-	       sizeof(struct ieee80211_channel));
-	return 0;
-}
-
-static const struct ieee80211_geo *ipw_get_geo(struct ieee80211_device *ieee)
-{
-	return &ieee->geo;
-}
-
 #define MAX_HW_RESTARTS 5
 static int ipw_up(struct ipw_priv *priv)
 {
@@ -11247,13 +10671,10 @@ static int ipw_up(struct ipw_priv *priv)
 				    priv->eeprom[EEPROM_COUNTRY_CODE + 2]);
 			j = 0;
 		}
-		if (ipw_set_geo(priv->ieee, &ipw_geos[j])) {
+		if (ieee80211_set_geo(priv->ieee, &ipw_geos[j])) {
 			IPW_WARNING("Could not set geography.");
 			return 0;
 		}
-
-		IPW_DEBUG_INFO("Geography %03d [%s] detected.\n",
-			       j, priv->ieee->geo.name);
 
 		if (priv->status & STATUS_RF_KILL_SW) {
 			IPW_WARNING("Radio disabled by module parameter.\n");
@@ -11297,9 +10718,9 @@ static int ipw_up(struct ipw_priv *priv)
 static void ipw_bg_up(void *data)
 {
 	struct ipw_priv *priv = data;
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	ipw_up(data);
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 }
 
 static void ipw_deinit(struct ipw_priv *priv)
@@ -11368,41 +10789,23 @@ static void ipw_down(struct ipw_priv *priv)
 static void ipw_bg_down(void *data)
 {
 	struct ipw_priv *priv = data;
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 	ipw_down(data);
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 }
-
-#if WIRELESS_EXT < 18
-static int ipw_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
-{
-	struct iwreq *wrq = (struct iwreq *)rq;
-	int ret = -1;
-	switch (cmd) {
-	case IPW_IOCTL_WPA_SUPPLICANT:
-		ret = ipw_wpa_supplicant(dev, &wrq->u.data);
-		return ret;
-
-	default:
-		return -EOPNOTSUPP;
-	}
-
-	return -EOPNOTSUPP;
-}
-#endif
 
 /* Called by register_netdev() */
 static int ipw_net_init(struct net_device *dev)
 {
 	struct ipw_priv *priv = ieee80211_priv(dev);
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 
 	if (ipw_up(priv)) {
-		up(&priv->sem);
+		mutex_unlock(&priv->mutex);
 		return -EIO;
 	}
 
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 	return 0;
 }
 
@@ -11485,14 +10888,14 @@ static int ipw_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	priv->net_dev = net_dev;
 	priv->pci_dev = pdev;
-#ifdef CONFIG_IPW2100_DEBUG
+#ifdef CONFIG_IPW2200_DEBUG
 	ipw_debug_level = debug;
 #endif
 	spin_lock_init(&priv->lock);
 	for (i = 0; i < IPW_IBSS_MAC_HASH_SIZE; i++)
 		INIT_LIST_HEAD(&priv->ibss_mac_hash[i]);
 
-	init_MUTEX(&priv->sem);
+	mutex_init(&priv->mutex);
 	if (pci_enable_device(pdev)) {
 		err = -ENODEV;
 		goto out_free_ieee80211;
@@ -11550,7 +10953,7 @@ static int ipw_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	SET_MODULE_OWNER(net_dev);
 	SET_NETDEV_DEV(net_dev, &pdev->dev);
 
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 
 	priv->ieee->hard_start_xmit = ipw_net_hard_start_xmit;
 	priv->ieee->set_security = shim__set_security;
@@ -11568,22 +10971,11 @@ static int ipw_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	net_dev->open = ipw_net_open;
 	net_dev->stop = ipw_net_stop;
 	net_dev->init = ipw_net_init;
-#if WIRELESS_EXT < 18
-	net_dev->do_ioctl = ipw_ioctl;
-#endif
 	net_dev->get_stats = ipw_net_get_stats;
 	net_dev->set_multicast_list = ipw_net_set_multicast_list;
 	net_dev->set_mac_address = ipw_net_set_mac_address;
-#if IW_HANDLER_VERSION >= 6
 	priv->wireless_data.spy_data = &priv->ieee->spy_data;
 	net_dev->wireless_data = &priv->wireless_data;
-#else
-	net_dev->get_wireless_stats = ipw_get_wireless_stats;
-#if WIRELESS_EXT == 16
-	ipw_wx_handler_def.spy_offset = offsetof(struct ieee80211_device,
-						 spy_data);
-#endif
-#endif
 	net_dev->wireless_handlers = &ipw_wx_handler_def;
 	net_dev->ethtool_ops = &ipw_ethtool_ops;
 	net_dev->irq = pdev->irq;
@@ -11594,16 +10986,22 @@ static int ipw_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	err = sysfs_create_group(&pdev->dev.kobj, &ipw_attribute_group);
 	if (err) {
 		IPW_ERROR("failed to create sysfs device attributes\n");
-		up(&priv->sem);
+		mutex_unlock(&priv->mutex);
 		goto out_release_irq;
 	}
 
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 	err = register_netdev(net_dev);
 	if (err) {
 		IPW_ERROR("failed to register network device\n");
 		goto out_remove_sysfs;
 	}
+
+	printk(KERN_INFO DRV_NAME ": Detected geography %s (%d 802.11bg "
+	       "channels, %d 802.11a channels)\n",
+	       priv->ieee->geo.name, priv->ieee->geo.bg_channels,
+	       priv->ieee->geo.a_channels);
+
 	return 0;
 
       out_remove_sysfs:
@@ -11635,13 +11033,13 @@ static void ipw_pci_remove(struct pci_dev *pdev)
 	if (!priv)
 		return;
 
-	down(&priv->sem);
+	mutex_lock(&priv->mutex);
 
 	priv->status |= STATUS_EXIT_PENDING;
 	ipw_down(priv);
 	sysfs_remove_group(&pdev->dev.kobj, &ipw_attribute_group);
 
-	up(&priv->sem);
+	mutex_unlock(&priv->mutex);
 
 	unregister_netdev(priv->net_dev);
 
@@ -11703,7 +11101,6 @@ static int ipw_pci_suspend(struct pci_dev *pdev, pm_message_t state)
 
 	pci_save_state(pdev);
 	pci_disable_device(pdev);
-
 	pci_set_power_state(pdev, pci_choose_state(pdev, state));
 
 	return 0;
@@ -11795,8 +11192,10 @@ MODULE_PARM_DESC(auto_create, "auto create adhoc network (default on)");
 module_param(led, int, 0444);
 MODULE_PARM_DESC(led, "enable led control on some systems (default 0 off)\n");
 
+#ifdef CONFIG_IPW2200_DEBUG
 module_param(debug, int, 0444);
 MODULE_PARM_DESC(debug, "debug output mask");
+#endif
 
 module_param(channel, int, 0444);
 MODULE_PARM_DESC(channel, "channel to limit associate to (default 0 [ANY])");

@@ -7,6 +7,7 @@
 #include <linux/kobject.h>
 #include <linux/namei.h>
 #include <linux/limits.h>
+#include <linux/poll.h>
 #include <asm/uaccess.h>
 #include <asm/semaphore.h>
 
@@ -61,6 +62,7 @@ struct sysfs_buffer {
 	struct sysfs_ops	* ops;
 	struct semaphore	sem;
 	int			needs_read_fill;
+	int			event;
 };
 
 
@@ -76,6 +78,7 @@ struct sysfs_buffer {
  */
 static int fill_read_buffer(struct dentry * dentry, struct sysfs_buffer * buffer)
 {
+	struct sysfs_dirent * sd = dentry->d_fsdata;
 	struct attribute * attr = to_attr(dentry);
 	struct kobject * kobj = to_kobj(dentry->d_parent);
 	struct sysfs_ops * ops = buffer->ops;
@@ -87,6 +90,7 @@ static int fill_read_buffer(struct dentry * dentry, struct sysfs_buffer * buffer
 	if (!buffer->page)
 		return -ENOMEM;
 
+	buffer->event = atomic_read(&sd->s_event);
 	count = ops->show(kobj,attr,buffer->page);
 	buffer->needs_read_fill = 0;
 	BUG_ON(count > (ssize_t)PAGE_SIZE);
@@ -305,9 +309,8 @@ static int check_perm(struct inode * inode, struct file * file)
 	/* No error? Great, allocate a buffer for the file, and store it
 	 * it in file->private_data for easy access.
 	 */
-	buffer = kmalloc(sizeof(struct sysfs_buffer),GFP_KERNEL);
+	buffer = kzalloc(sizeof(struct sysfs_buffer), GFP_KERNEL);
 	if (buffer) {
-		memset(buffer,0,sizeof(struct sysfs_buffer));
 		init_MUTEX(&buffer->sem);
 		buffer->needs_read_fill = 1;
 		buffer->ops = ops;
@@ -362,12 +365,84 @@ static int sysfs_release(struct inode * inode, struct file * filp)
 	return 0;
 }
 
-struct file_operations sysfs_file_operations = {
+/* Sysfs attribute files are pollable.  The idea is that you read
+ * the content and then you use 'poll' or 'select' to wait for
+ * the content to change.  When the content changes (assuming the
+ * manager for the kobject supports notification), poll will
+ * return POLLERR|POLLPRI, and select will return the fd whether
+ * it is waiting for read, write, or exceptions.
+ * Once poll/select indicates that the value has changed, you
+ * need to close and re-open the file, as simply seeking and reading
+ * again will not get new data, or reset the state of 'poll'.
+ * Reminder: this only works for attributes which actively support
+ * it, and it is not possible to test an attribute from userspace
+ * to see if it supports poll (Nether 'poll' or 'select' return
+ * an appropriate error code).  When in doubt, set a suitable timeout value.
+ */
+static unsigned int sysfs_poll(struct file *filp, poll_table *wait)
+{
+	struct sysfs_buffer * buffer = filp->private_data;
+	struct kobject * kobj = to_kobj(filp->f_dentry->d_parent);
+	struct sysfs_dirent * sd = filp->f_dentry->d_fsdata;
+	int res = 0;
+
+	poll_wait(filp, &kobj->poll, wait);
+
+	if (buffer->event != atomic_read(&sd->s_event)) {
+		res = POLLERR|POLLPRI;
+		buffer->needs_read_fill = 1;
+	}
+
+	return res;
+}
+
+
+static struct dentry *step_down(struct dentry *dir, const char * name)
+{
+	struct dentry * de;
+
+	if (dir == NULL || dir->d_inode == NULL)
+		return NULL;
+
+	mutex_lock(&dir->d_inode->i_mutex);
+	de = lookup_one_len(name, dir, strlen(name));
+	mutex_unlock(&dir->d_inode->i_mutex);
+	dput(dir);
+	if (IS_ERR(de))
+		return NULL;
+	if (de->d_inode == NULL) {
+		dput(de);
+		return NULL;
+	}
+	return de;
+}
+
+void sysfs_notify(struct kobject * k, char *dir, char *attr)
+{
+	struct dentry *de = k->dentry;
+	if (de)
+		dget(de);
+	if (de && dir)
+		de = step_down(de, dir);
+	if (de && attr)
+		de = step_down(de, attr);
+	if (de) {
+		struct sysfs_dirent * sd = de->d_fsdata;
+		if (sd)
+			atomic_inc(&sd->s_event);
+		wake_up_interruptible(&k->poll);
+		dput(de);
+	}
+}
+EXPORT_SYMBOL_GPL(sysfs_notify);
+
+const struct file_operations sysfs_file_operations = {
 	.read		= sysfs_read_file,
 	.write		= sysfs_write_file,
 	.llseek		= generic_file_llseek,
 	.open		= sysfs_open_file,
 	.release	= sysfs_release,
+	.poll		= sysfs_poll,
 };
 
 
@@ -375,10 +450,12 @@ int sysfs_add_file(struct dentry * dir, const struct attribute * attr, int type)
 {
 	struct sysfs_dirent * parent_sd = dir->d_fsdata;
 	umode_t mode = (attr->mode & S_IALLUGO) | S_IFREG;
-	int error = 0;
+	int error = -EEXIST;
 
 	mutex_lock(&dir->d_inode->i_mutex);
-	error = sysfs_make_dirent(parent_sd, NULL, (void *) attr, mode, type);
+	if (!sysfs_dirent_exist(parent_sd, attr->name))
+		error = sysfs_make_dirent(parent_sd, NULL, (void *)attr,
+					  mode, type);
 	mutex_unlock(&dir->d_inode->i_mutex);
 
 	return error;

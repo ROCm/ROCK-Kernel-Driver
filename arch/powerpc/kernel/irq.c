@@ -1,6 +1,4 @@
 /*
- *  arch/ppc/kernel/irq.c
- *
  *  Derived from arch/i386/kernel/irq.c
  *    Copyright (C) 1992 Linus Torvalds
  *  Adapted from arch/i386 by Gary Thomas
@@ -137,9 +135,8 @@ skip:
 #ifdef CONFIG_TAU_INT
 		if (tau_initialized){
 			seq_puts(p, "TAU: ");
-			for (j = 0; j < NR_CPUS; j++)
-				if (cpu_online(j))
-					seq_printf(p, "%10u ", tau_interrupts(j));
+			for_each_online_cpu(j)
+				seq_printf(p, "%10u ", tau_interrupts(j));
 			seq_puts(p, "  PowerPC             Thermal Assist (cpu temp)\n");
 		}
 #endif
@@ -277,7 +274,7 @@ unsigned int virt_irq_to_real_map[NR_IRQS];
  * and 2 is the XICS IPI interrupt.
  * We limit virtual irqs to __irq_offet_value less than virt_irq_max so
  * that when we offset them we don't end up with an interrupt
- * number > virt_irq_max.
+ * number >= virt_irq_max.
  */
 #define MIN_VIRT_IRQ	3
 
@@ -390,7 +387,7 @@ void irq_ctx_init(void)
 	struct thread_info *tp;
 	int i;
 
-	for_each_cpu(i) {
+	for_each_possible_cpu(i) {
 		memset((void *)softirq_ctx[i], 0, THREAD_SIZE);
 		tp = softirq_ctx[i];
 		tp->cpu = i;

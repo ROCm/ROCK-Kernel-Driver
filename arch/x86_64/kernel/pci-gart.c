@@ -65,9 +65,7 @@ static u32 gart_unmapped_entry;
 
 #define for_all_nb(dev) \
 	dev = NULL;	\
-	while ((dev = pci_get_device(PCI_VENDOR_ID_AMD, 0x1103, dev))!=NULL)\
-	     if (dev->bus->number == 0 && 				     \
-		    (PCI_SLOT(dev->devfn) >= 24) && (PCI_SLOT(dev->devfn) <= 31))
+	while ((dev = pci_get_device(PCI_VENDOR_ID_AMD, 0x1103, dev))!=NULL)
 
 static struct pci_dev *northbridges[MAX_NB];
 static u32 northbridge_flush_word[MAX_NB];
@@ -633,11 +631,17 @@ static int __init pci_iommu_init(void)
 		printk(KERN_INFO "PCI-DMA: Disabling IOMMU.\n");
 		if (end_pfn > MAX_DMA32_PFN) {
 			printk(KERN_ERR "WARNING more than 4GB of memory "
-					"but IOMMU not compiled in.\n"
-			       KERN_ERR "WARNING 32bit PCI may malfunction.\n"
-			       KERN_ERR "You might want to enable "
-					"CONFIG_GART_IOMMU\n");
+					"but IOMMU not available.\n"
+			       KERN_ERR "WARNING 32bit PCI may malfunction.\n");
 		}
+		return -1;
+	}
+
+	i = 0;
+	for_all_nb(dev)
+		i++;
+	if (i > MAX_NB) {
+		printk(KERN_ERR "PCI-GART: Too many northbridges (%ld). Disabled\n", i);
 		return -1;
 	}
 

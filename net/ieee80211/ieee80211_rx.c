@@ -369,8 +369,8 @@ int ieee80211_rx(struct ieee80211_device *ieee, struct sk_buff *skb,
 
 	/* Put this code here so that we avoid duplicating it in all
 	 * Rx paths. - Jean II */
+#ifdef CONFIG_WIRELESS_EXT
 #ifdef IW_WIRELESS_SPY		/* defined in iw_handler.h */
-#ifdef CONFIG_NET_RADIO
 	/* If spy monitoring on */
 	if (ieee->spy_data.spy_number > 0) {
 		struct iw_quality wstats;
@@ -397,8 +397,8 @@ int ieee80211_rx(struct ieee80211_device *ieee, struct sk_buff *skb,
 		/* Update spy records */
 		wireless_spy_update(ieee->dev, hdr->addr2, &wstats);
 	}
-#endif				/* CONFIG_NET_RADIO */
 #endif				/* IW_WIRELESS_SPY */
+#endif				/* CONFIG_WIRELESS_EXT */
 
 #ifdef NOT_YET
 	hostap_update_rx_stats(local->ap, hdr, rx_stats);
@@ -574,7 +574,7 @@ int ieee80211_rx(struct ieee80211_device *ieee, struct sk_buff *skb,
 	/* skb: hdr + (possibly fragmented) plaintext payload */
 	// PR: FIXME: hostap has additional conditions in the "if" below:
 	// ieee->host_decrypt && (fc & IEEE80211_FCTL_PROTECTED) &&
-	if ((frag != 0 || (fc & IEEE80211_FCTL_MOREFRAGS))) {
+	if ((frag != 0) || (fc & IEEE80211_FCTL_MOREFRAGS)) {
 		int flen;
 		struct sk_buff *frag_skb = ieee80211_frag_cache_get(ieee, hdr);
 		IEEE80211_DEBUG_FRAG("Rx Fragment received (%u)\n", frag);
@@ -777,6 +777,80 @@ int ieee80211_rx(struct ieee80211_device *ieee, struct sk_buff *skb,
 	/* Returning 0 indicates to caller that we have not handled the SKB--
 	 * so it is still allocated and can be used again by underlying
 	 * hardware as a DMA target */
+	return 0;
+}
+
+/* Filter out unrelated packets, call ieee80211_rx[_mgt] */
+int ieee80211_rx_any(struct ieee80211_device *ieee,
+		     struct sk_buff *skb, struct ieee80211_rx_stats *stats)
+{
+	struct ieee80211_hdr_4addr *hdr;
+	int is_packet_for_us;
+	u16 fc;
+
+	if (ieee->iw_mode == IW_MODE_MONITOR)
+		return ieee80211_rx(ieee, skb, stats) ? 0 : -EINVAL;
+
+	hdr = (struct ieee80211_hdr_4addr *)skb->data;
+	fc = le16_to_cpu(hdr->frame_ctl);
+
+	if ((fc & IEEE80211_FCTL_VERS) != 0)
+		return -EINVAL;
+		
+	switch (fc & IEEE80211_FCTL_FTYPE) {
+	case IEEE80211_FTYPE_MGMT:
+		ieee80211_rx_mgt(ieee, hdr, stats);
+		return 0;
+	case IEEE80211_FTYPE_DATA:
+		break;
+	case IEEE80211_FTYPE_CTL:
+		return 0;
+	default:
+		return -EINVAL;
+	}
+
+	is_packet_for_us = 0;
+	switch (ieee->iw_mode) {
+	case IW_MODE_ADHOC:
+		/* our BSS and not from/to DS */
+		if (memcmp(hdr->addr3, ieee->bssid, ETH_ALEN) == 0)
+		if ((fc & (IEEE80211_FCTL_TODS+IEEE80211_FCTL_FROMDS)) == 0) {
+			/* promisc: get all */
+			if (ieee->dev->flags & IFF_PROMISC)
+				is_packet_for_us = 1;
+			/* to us */
+			else if (memcmp(hdr->addr1, ieee->dev->dev_addr, ETH_ALEN) == 0)
+				is_packet_for_us = 1;
+			/* mcast */
+			else if (is_multicast_ether_addr(hdr->addr1))
+				is_packet_for_us = 1;
+		}
+		break;
+	case IW_MODE_INFRA:
+		/* our BSS (== from our AP) and from DS */
+		if (memcmp(hdr->addr2, ieee->bssid, ETH_ALEN) == 0)
+		if ((fc & (IEEE80211_FCTL_TODS+IEEE80211_FCTL_FROMDS)) == IEEE80211_FCTL_FROMDS) {
+			/* promisc: get all */
+			if (ieee->dev->flags & IFF_PROMISC)
+				is_packet_for_us = 1;
+			/* to us */
+			else if (memcmp(hdr->addr1, ieee->dev->dev_addr, ETH_ALEN) == 0)
+				is_packet_for_us = 1;
+			/* mcast */
+			else if (is_multicast_ether_addr(hdr->addr1)) {
+				/* not our own packet bcasted from AP */
+				if (memcmp(hdr->addr3, ieee->dev->dev_addr, ETH_ALEN))
+					is_packet_for_us = 1;
+			}
+		}
+		break;
+	default:
+		/* ? */
+		break;
+	}
+
+	if (is_packet_for_us)
+		return (ieee80211_rx(ieee, skb, stats) ? 0 : -EINVAL);
 	return 0;
 }
 
@@ -1345,7 +1419,19 @@ static void update_network(struct ieee80211_network *dst,
 	ieee80211_network_reset(dst);
 	dst->ibss_dfs = src->ibss_dfs;
 
-	memcpy(&dst->stats, &src->stats, sizeof(struct ieee80211_rx_stats));
+	/* We only update the statistics if they were created by receiving
+	 * the network information on the actual channel the network is on.
+	 * 
+	 * This keeps beacons received on neighbor channels from bringing
+	 * down the signal level of an AP. */
+	if (dst->channel == src->stats.received_channel)
+		memcpy(&dst->stats, &src->stats,
+		       sizeof(struct ieee80211_rx_stats));
+	else
+		IEEE80211_DEBUG_SCAN("Network " MAC_FMT " info received "
+			"off channel (%d vs. %d)\n", MAC_ARG(src->bssid),
+			dst->channel, src->stats.received_channel);
+
 	dst->capability = src->capability;
 	memcpy(dst->rates, src->rates, src->rates_len);
 	dst->rates_len = src->rates_len;
@@ -1599,6 +1685,30 @@ void ieee80211_rx_mgt(struct ieee80211_device *ieee,
 			ieee->handle_action(ieee->dev,
 					    (struct ieee80211_action *)
 					    header, stats);
+		break;
+
+	case IEEE80211_STYPE_REASSOC_REQ:
+		IEEE80211_DEBUG_MGMT("received reassoc (%d)\n",
+				     WLAN_FC_GET_STYPE(le16_to_cpu
+						       (header->frame_ctl)));
+
+		IEEE80211_WARNING("%s: IEEE80211_REASSOC_REQ received\n",
+				  ieee->dev->name);
+		if (ieee->handle_reassoc_request != NULL)
+			ieee->handle_reassoc_request(ieee->dev,
+						    (struct ieee80211_reassoc_request *)
+						     header);
+		break;
+
+	case IEEE80211_STYPE_ASSOC_REQ:
+		IEEE80211_DEBUG_MGMT("received assoc (%d)\n",
+				     WLAN_FC_GET_STYPE(le16_to_cpu
+						       (header->frame_ctl)));
+
+		IEEE80211_WARNING("%s: IEEE80211_ASSOC_REQ received\n",
+				  ieee->dev->name);
+		if (ieee->handle_assoc_request != NULL)
+			ieee->handle_assoc_request(ieee->dev);
 		break;
 
 	case IEEE80211_STYPE_DEAUTH:

@@ -157,11 +157,10 @@ ccwgroup_create(struct device *root,
 	if (argc > 256) /* disallow dumb users */
 		return -EINVAL;
 
-	gdev = kmalloc(sizeof(*gdev) + argc*sizeof(gdev->cdev[0]), GFP_KERNEL);
+	gdev = kzalloc(sizeof(*gdev) + argc*sizeof(gdev->cdev[0]), GFP_KERNEL);
 	if (!gdev)
 		return -ENOMEM;
 
-	memset(gdev, 0, sizeof(*gdev) + argc*sizeof(gdev->cdev[0]));
 	atomic_set(&gdev->onoff, 0);
 
 	del_drvdata = 0;
@@ -405,24 +404,21 @@ ccwgroup_driver_register (struct ccwgroup_driver *cdriver)
 }
 
 static int
-__ccwgroup_match_all(struct device *dev, void *data)
+__ccwgroup_driver_unregister_device(struct device *dev, void *data)
 {
-	return 1;
+	__ccwgroup_remove_symlinks(to_ccwgroupdev(dev));
+	device_unregister(dev);
+	put_device(dev);
+	return 0;
 }
 
 void
 ccwgroup_driver_unregister (struct ccwgroup_driver *cdriver)
 {
-	struct device *dev;
-
 	/* We don't want ccwgroup devices to live longer than their driver. */
 	get_driver(&cdriver->driver);
-	while ((dev = driver_find_device(&cdriver->driver, NULL, NULL,
-					 __ccwgroup_match_all))) {
-		__ccwgroup_remove_symlinks(to_ccwgroupdev(dev));
-		device_unregister(dev);
-		put_device(dev);
-	}
+	driver_for_each_device(&cdriver->driver, NULL, NULL,
+			       __ccwgroup_driver_unregister_device);
 	put_driver(&cdriver->driver);
 	driver_unregister(&cdriver->driver);
 }

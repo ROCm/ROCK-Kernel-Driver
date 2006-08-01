@@ -21,7 +21,7 @@
 #include "skas.h"
 
 static int copy_sc_from_user_skas(struct pt_regs *regs,
-                                 struct sigcontext *from)
+                                 struct sigcontext __user *from)
 {
        int err = 0;
 
@@ -54,8 +54,10 @@ static int copy_sc_from_user_skas(struct pt_regs *regs,
        return(err);
 }
 
-int copy_sc_to_user_skas(struct sigcontext *to, struct _fpstate *to_fp,
-                        struct pt_regs *regs, unsigned long mask)
+int copy_sc_to_user_skas(struct sigcontext __user *to,
+			 struct _fpstate __user *to_fp,
+			 struct pt_regs *regs, unsigned long mask,
+			 unsigned long sp)
 {
         struct faultinfo * fi = &current->thread.arch.faultinfo;
 	int err = 0;
@@ -70,7 +72,11 @@ int copy_sc_to_user_skas(struct sigcontext *to, struct _fpstate *to_fp,
 	err |= PUTREG(regs, RDI, to, rdi);
 	err |= PUTREG(regs, RSI, to, rsi);
 	err |= PUTREG(regs, RBP, to, rbp);
-	err |= PUTREG(regs, RSP, to, rsp);
+        /* Must use orignal RSP, which is passed in, rather than what's in
+         * the pt_regs, because that's already been updated to point at the
+         * signal frame.
+         */
+	err |= __put_user(sp, &to->rsp);
 	err |= PUTREG(regs, RBX, to, rbx);
 	err |= PUTREG(regs, RDX, to, rdx);
 	err |= PUTREG(regs, RCX, to, rcx);
@@ -101,10 +107,11 @@ int copy_sc_to_user_skas(struct sigcontext *to, struct _fpstate *to_fp,
 #endif
 
 #ifdef CONFIG_MODE_TT
-int copy_sc_from_user_tt(struct sigcontext *to, struct sigcontext *from,
-                        int fpsize)
+int copy_sc_from_user_tt(struct sigcontext *to, struct sigcontext __user *from,
+			 int fpsize)
 {
-	struct _fpstate *to_fp, *from_fp;
+	struct _fpstate *to_fp;
+	struct _fpstate __user *from_fp;
 	unsigned long sigs;
 	int err;
 
@@ -119,20 +126,27 @@ int copy_sc_from_user_tt(struct sigcontext *to, struct sigcontext *from,
 	return(err);
 }
 
-int copy_sc_to_user_tt(struct sigcontext *to, struct _fpstate *fp,
-                      struct sigcontext *from, int fpsize)
+int copy_sc_to_user_tt(struct sigcontext __user *to, struct _fpstate __user *fp,
+		       struct sigcontext *from, int fpsize, unsigned long sp)
 {
-	struct _fpstate *to_fp, *from_fp;
+	struct _fpstate __user *to_fp;
+	struct _fpstate *from_fp;
 	int err;
 
-	to_fp = (fp ? fp : (struct _fpstate *) (to + 1));
+	to_fp = (fp ? fp : (struct _fpstate __user *) (to + 1));
 	from_fp = from->fpstate;
 	err = copy_to_user(to, from, sizeof(*to));
+	/* The SP in the sigcontext is the updated one for the signal
+	 * delivery.  The sp passed in is the original, and this needs
+	 * to be restored, so we stick it in separately.
+	 */
+	err |= copy_to_user(&SC_SP(to), &sp, sizeof(sp));
+
 	if(from_fp != NULL){
 		err |= copy_to_user(&to->fpstate, &to_fp, sizeof(to->fpstate));
 		err |= copy_to_user(to_fp, from_fp, fpsize);
 	}
-	return(err);
+	return err;
 }
 
 #endif
@@ -147,17 +161,19 @@ static int copy_sc_from_user(struct pt_regs *to, void __user *from)
        return(ret);
 }
 
-static int copy_sc_to_user(struct sigcontext *to, struct _fpstate *fp,
-                          struct pt_regs *from, unsigned long mask)
+static int copy_sc_to_user(struct sigcontext __user *to,
+			   struct _fpstate __user *fp,
+			   struct pt_regs *from, unsigned long mask,
+			   unsigned long sp)
 {
        return(CHOOSE_MODE(copy_sc_to_user_tt(to, fp, UPT_SC(&from->regs),
-                                             sizeof(*fp)),
-                          copy_sc_to_user_skas(to, fp, from, mask)));
+                                             sizeof(*fp), sp),
+                          copy_sc_to_user_skas(to, fp, from, mask, sp)));
 }
 
 struct rt_sigframe
 {
-       char *pretcode;
+       char __user *pretcode;
        struct ucontext uc;
        struct siginfo info;
 };
@@ -170,12 +186,13 @@ int setup_signal_stack_si(unsigned long stack_top, int sig,
 {
 	struct rt_sigframe __user *frame;
 	struct _fpstate __user *fp = NULL;
+	unsigned long save_sp = PT_REGS_RSP(regs);
 	int err = 0;
 	struct task_struct *me = current;
 
 	frame = (struct rt_sigframe __user *)
 		round_down(stack_top - sizeof(struct rt_sigframe), 16) - 8;
-        frame = (struct rt_sigframe *) ((unsigned long) frame - 128);
+        frame = (struct rt_sigframe __user *) ((unsigned long) frame - 128);
 
 	if (!access_ok(VERIFY_WRITE, fp, sizeof(struct _fpstate)))
 		goto out;
@@ -193,14 +210,25 @@ int setup_signal_stack_si(unsigned long stack_top, int sig,
 			goto out;
 	}
 
+	/* Update SP now because the page fault handler refuses to extend
+	 * the stack if the faulting address is too far below the current
+	 * SP, which frame now certainly is.  If there's an error, the original
+	 * value is restored on the way out.
+	 * When writing the sigcontext to the stack, we have to write the
+	 * original value, so that's passed to copy_sc_to_user, which does
+	 * the right thing with it.
+	 */
+	PT_REGS_RSP(regs) = (unsigned long) frame;
+
 	/* Create the ucontext.  */
 	err |= __put_user(0, &frame->uc.uc_flags);
 	err |= __put_user(0, &frame->uc.uc_link);
 	err |= __put_user(me->sas_ss_sp, &frame->uc.uc_stack.ss_sp);
-	err |= __put_user(sas_ss_flags(PT_REGS_SP(regs)),
+	err |= __put_user(sas_ss_flags(save_sp),
 			  &frame->uc.uc_stack.ss_flags);
 	err |= __put_user(me->sas_ss_size, &frame->uc.uc_stack.ss_size);
-	err |= copy_sc_to_user(&frame->uc.uc_mcontext, fp, regs, set->sig[0]);
+	err |= copy_sc_to_user(&frame->uc.uc_mcontext, fp, regs, set->sig[0],
+		save_sp);
 	err |= __put_user(fp, &frame->uc.uc_mcontext.fpstate);
 	if (sizeof(*set) == 16) {
 		__put_user(set->sig[0], &frame->uc.uc_sigmask.sig[0]);
@@ -217,10 +245,10 @@ int setup_signal_stack_si(unsigned long stack_top, int sig,
 		err |= __put_user(ka->sa.sa_restorer, &frame->pretcode);
 	else
 		/* could use a vstub here */
-		goto out;
+		goto restore_sp;
 
 	if (err)
-		goto out;
+		goto restore_sp;
 
 	/* Set up registers for signal handler */
 	{
@@ -238,10 +266,12 @@ int setup_signal_stack_si(unsigned long stack_top, int sig,
 	PT_REGS_RSI(regs) = (unsigned long) &frame->info;
 	PT_REGS_RDX(regs) = (unsigned long) &frame->uc;
 	PT_REGS_RIP(regs) = (unsigned long) ka->sa.sa_handler;
-
-	PT_REGS_RSP(regs) = (unsigned long) frame;
  out:
-	return(err);
+	return err;
+
+restore_sp:
+	PT_REGS_RSP(regs) = save_sp;
+	return err;
 }
 
 long sys_rt_sigreturn(struct pt_regs *regs)

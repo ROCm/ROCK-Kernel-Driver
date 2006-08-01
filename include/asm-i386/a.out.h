@@ -1,8 +1,6 @@
 #ifndef __I386_A_OUT_H__
 #define __I386_A_OUT_H__
 
-#include <linux/config.h>
-
 struct exec
 {
   unsigned long a_info;		/* Use macros N_MAGIC, etc for access */
@@ -21,11 +19,7 @@ struct exec
 
 #ifdef __KERNEL__
 
-#ifndef CONFIG_XEN
 #define STACK_TOP	TASK_SIZE
-#else
-#define STACK_TOP	(TASK_SIZE - 3*PAGE_SIZE)
-#endif
 
 #endif
 

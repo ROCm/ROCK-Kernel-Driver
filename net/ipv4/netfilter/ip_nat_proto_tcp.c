@@ -129,15 +129,14 @@ tcp_manip_pkt(struct sk_buff **pskb,
 	if (hdrsize < sizeof(*hdr))
 		return 1;
 
-#ifdef CONFIG_XEN
-	if ((*pskb)->proto_csum_blank)
+	if ((*pskb)->proto_csum_blank) {
 		hdr->check = ip_nat_cheat_check(oldip, ~newip, hdr->check);
-	else
-#endif
+	} else {
 		hdr->check = ip_nat_cheat_check(~oldip, newip,
 					ip_nat_cheat_check(oldport ^ 0xFFFF,
 							   newport,
 							   hdr->check));
+	}
 	return 1;
 }
 

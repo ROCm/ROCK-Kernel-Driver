@@ -88,6 +88,14 @@ EXPORT_SYMBOL(HYPERVISOR_shared_info);
 extern char hypercall_page[PAGE_SIZE];
 EXPORT_SYMBOL(hypercall_page);
 
+/* Allows setting of maximum possible memory size  */
+unsigned long xen_override_max_pfn;
+
+static int xen_panic_event(struct notifier_block *, unsigned long, void *);
+static struct notifier_block xen_panic_block = {
+	xen_panic_event, NULL, 0 /* try to go last */
+};
+
 unsigned long *phys_to_machine_mapping;
 unsigned long *pfn_to_mfn_frame_list_list, *pfn_to_mfn_frame_list[512];
 
@@ -134,9 +142,7 @@ struct sys_desc_table_struct {
 };
 
 struct edid_info edid_info;
-#ifndef CONFIG_XEN
 struct e820map e820;
-#endif
 
 extern int root_mountflags;
 
@@ -315,9 +321,7 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 {
 	char c = ' ', *to = command_line, *from = COMMAND_LINE;
 	int len = 0;
-#ifndef CONFIG_XEN
 	int userdef = 0;
-#endif
 
 	for (;;) {
 		if (c != ' ') 
@@ -397,7 +401,6 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 		if (!memcmp(from, "mem=", 4))
 			parse_memopt(from+4, &from); 
 
-#ifndef CONFIG_XEN
 		if (!memcmp(from, "memmap=", 7)) {
 			/* exactmap option is for used defined memory */
 			if (!memcmp(from+7, "exactmap", 8)) {
@@ -419,7 +422,6 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 				userdef = 1;
 			}
 		}
-#endif
 
 #ifdef CONFIG_NUMA
 		if (!memcmp(from, "numa=", 5))
@@ -479,12 +481,10 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 			break;
 		*(to++) = c;
 	}
-#ifndef CONFIG_XEN
 	if (userdef) {
 		printk(KERN_INFO "user-defined physical RAM map:\n");
 		e820_print_map("user");
 	}
-#endif
 	*to = '\0';
 	*cmdline_p = command_line;
 }
@@ -616,10 +616,10 @@ static inline void copy_edd(void)
 }
 #endif
 
+#ifndef CONFIG_XEN
 #define EBDA_ADDR_POINTER 0x40E
 static void __init reserve_ebda_region(void)
 {
-#ifndef CONFIG_XEN
 	unsigned int addr;
 	/** 
 	 * there is a real-mode segmented pointer pointing to the 
@@ -629,14 +629,17 @@ static void __init reserve_ebda_region(void)
 	addr <<= 4;
 	if (addr)
 		reserve_bootmem_generic(addr, PAGE_SIZE);
-#endif
 }
+#endif
 
 void __init setup_arch(char **cmdline_p)
 {
 	unsigned long kernel_end;
 
 #ifdef CONFIG_XEN
+	/* Register a call for panic conditions. */
+	notifier_chain_register(&panic_notifier_list, &xen_panic_block);
+
  	ROOT_DEV = MKDEV(RAMDISK_MAJOR,0); 
 	kernel_end = 0;		/* dummy */
  	screen_info = SCREEN_INFO;
@@ -666,6 +669,13 @@ void __init setup_arch(char **cmdline_p)
 #endif
 
 	setup_xen_features();
+
+	if (xen_feature(XENFEAT_auto_translated_physmap) &&
+	    xen_start_info->shared_info < xen_start_info->nr_pages) {
+		HYPERVISOR_shared_info =
+			(shared_info_t *)__va(xen_start_info->shared_info);
+		memset(empty_zero_page, 0, sizeof(empty_zero_page));
+	}
 
 	HYPERVISOR_vm_assist(VMASST_CMD_enable,
 			     VMASST_TYPE_writable_pagetables);
@@ -730,6 +740,7 @@ void __init setup_arch(char **cmdline_p)
 	contig_initmem_init(start_pfn, end_pfn);
 #endif
 
+#ifndef CONFIG_XEN
 	/* Reserve direct mapping */
 	reserve_bootmem_generic(table_start << PAGE_SHIFT, 
 				(table_end - table_start) << PAGE_SHIFT);
@@ -746,6 +757,7 @@ void __init setup_arch(char **cmdline_p)
 
 	/* reserve ebda region */
 	reserve_ebda_region();
+#endif
 
 #ifdef CONFIG_SMP
 	/*
@@ -765,20 +777,31 @@ void __init setup_arch(char **cmdline_p)
         */
        acpi_reserve_bootmem();
 #endif
+#ifdef CONFIG_XEN
 #ifdef CONFIG_BLK_DEV_INITRD
-#ifndef CONFIG_XEN
-	if (LOADER_TYPE && INITRD_START) {
-#else
 	if (xen_start_info->mod_start) {
+		if (INITRD_START + INITRD_SIZE <= (end_pfn << PAGE_SHIFT)) {
+			/*reserve_bootmem_generic(INITRD_START, INITRD_SIZE);*/
+			initrd_start = INITRD_START + PAGE_OFFSET;
+			initrd_end = initrd_start+INITRD_SIZE;
+			initrd_below_start_ok = 1;
+		} else {
+			printk(KERN_ERR "initrd extends beyond end of memory "
+				"(0x%08lx > 0x%08lx)\ndisabling initrd\n",
+				(unsigned long)(INITRD_START + INITRD_SIZE),
+				(unsigned long)(end_pfn << PAGE_SHIFT));
+			initrd_start = 0;
+		}
+	}
 #endif
+#else	/* CONFIG_XEN */
+#ifdef CONFIG_BLK_DEV_INITRD
+	if (LOADER_TYPE && INITRD_START) {
 		if (INITRD_START + INITRD_SIZE <= (end_pfn << PAGE_SHIFT)) {
 			reserve_bootmem_generic(INITRD_START, INITRD_SIZE);
 			initrd_start =
 				INITRD_START ? INITRD_START + PAGE_OFFSET : 0;
 			initrd_end = initrd_start+INITRD_SIZE;
-#ifdef CONFIG_XEN
-			initrd_below_start_ok = 1;
-#endif
 		}
 		else {
 			printk(KERN_ERR "initrd extends beyond end of memory "
@@ -789,6 +812,7 @@ void __init setup_arch(char **cmdline_p)
 		}
 	}
 #endif
+#endif	/* !CONFIG_XEN */
 #ifdef CONFIG_KEXEC
 	if (crashk_res.start != crashk_res.end) {
 		reserve_bootmem(crashk_res.start,
@@ -806,6 +830,14 @@ void __init setup_arch(char **cmdline_p)
 #ifdef CONFIG_XEN
 	{
 		int i, j, k, fpp;
+		unsigned long va;
+
+		/* 'Initial mapping' of initrd must be destroyed. */
+		for (va = xen_start_info->mod_start;
+		     va < (xen_start_info->mod_start+xen_start_info->mod_len);
+		     va += PAGE_SIZE) {
+			HYPERVISOR_update_va_mapping(va, __pte_ma(0), 0);
+		}
 
 		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
 			/* Make sure we have a large enough P->M table. */
@@ -820,6 +852,14 @@ void __init setup_arch(char **cmdline_p)
 				__pa(xen_start_info->mfn_list),
 				PFN_PHYS(PFN_UP(xen_start_info->nr_pages *
 						sizeof(unsigned long))));
+
+			/* Destroyed 'initial mapping' of old p2m table. */
+			for (va = xen_start_info->mfn_list;
+			     va < (xen_start_info->mfn_list +
+				   (xen_start_info->nr_pages*sizeof(unsigned long)));
+			     va += PAGE_SIZE) {
+				HYPERVISOR_update_va_mapping(va, __pte_ma(0), 0);
+			}
 
 			/*
 			 * Initialise the list of the frames that specify the
@@ -889,6 +929,9 @@ void __init setup_arch(char **cmdline_p)
 	init_apic_mappings();
 #endif
 #endif
+#if defined(CONFIG_XEN) && defined(CONFIG_SMP) && !defined(CONFIG_HOTPLUG_CPU)
+	prefill_possible_map();
+#endif
 
 #if defined(CONFIG_XEN_PRIVILEGED_GUEST) || !defined(CONFIG_XEN)
 	/*
@@ -951,6 +994,16 @@ void __init setup_arch(char **cmdline_p)
 
 #endif /* !CONFIG_XEN */
 }
+
+#ifdef CONFIG_XEN
+static int
+xen_panic_event(struct notifier_block *this, unsigned long event, void *ptr)
+{
+	HYPERVISOR_shutdown(SHUTDOWN_crash);
+	/* we're never actually going to get here... */
+	return NOTIFY_DONE;
+}
+#endif /* !CONFIG_XEN */
 
 
 static int __cpuinit get_model_name(struct cpuinfo_x86 *c)
@@ -1105,10 +1158,6 @@ static int __init init_amd(struct cpuinfo_x86 *c)
 	if (c->x86 == 15 && ((level >= 0x0f48 && level < 0x0f50) || level >= 0x0f58))
 		set_bit(X86_FEATURE_REP_GOOD, &c->x86_capability);
 
-	/* Enable workaround for FXSAVE leak */
-	if (c->x86 >= 6)
-		set_bit(X86_FEATURE_FXSAVE_LEAK, &c->x86_capability);
-
 	r = get_model_name(c);
 	if (!r) { 
 		switch (c->x86) { 
@@ -1127,6 +1176,8 @@ static int __init init_amd(struct cpuinfo_x86 *c)
 
 	if (c->extended_cpuid_level >= 0x80000008) {
 		c->x86_max_cores = (cpuid_ecx(0x80000008) & 0xff) + 1;
+		if (c->x86_max_cores & (c->x86_max_cores - 1))
+			c->x86_max_cores = 1;
 
 		amd_detect_cmp(c);
 	}
@@ -1142,6 +1193,8 @@ static void __cpuinit detect_ht(struct cpuinfo_x86 *c)
 	int 	cpu = smp_processor_id();
 
 	cpuid(1, &eax, &ebx, &ecx, &edx);
+
+	c->apicid = phys_pkg_id(0);
 
 	if (!cpu_has(c, X86_FEATURE_HT) || cpu_has(c, X86_FEATURE_CMP_LEGACY))
 		return;
@@ -1350,8 +1403,6 @@ void __cpuinit identify_cpu(struct cpuinfo_x86 *c)
 			c->x86_capability[2] = cpuid_edx(0x80860001);
 	}
 
-	c->apicid = phys_pkg_id(0);
-
 	/*
 	 * Vendor-specific initialization.  In this section we
 	 * canonicalize the feature flags, meaning if there are
@@ -1459,7 +1510,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 
 		/* Intel-defined (#2) */
-		"pni", NULL, NULL, "monitor", "ds_cpl", "vmx", "smx", "est",
+		"pni", NULL, NULL, "monitor", "ds_cpl", "vmx", NULL, "est",
 		"tm2", NULL, "cid", NULL, NULL, "cx16", "xtpr", NULL,
 		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,

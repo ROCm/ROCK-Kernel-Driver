@@ -426,7 +426,7 @@ static char channel_map_madi_qs[HDSPM_MAX_CHANNELS] = {
 };
 
 
-static struct pci_device_id snd_hdspm_ids[] = {
+static struct pci_device_id snd_hdspm_ids[] __devinitdata = {
 	{
 	 .vendor = PCI_VENDOR_ID_XILINX,
 	 .device = PCI_DEVICE_ID_XILINX_HAMMERFALL_DSP_MADI,
@@ -2256,7 +2256,7 @@ static int snd_hdspm_create_controls(struct snd_card *card, struct hdspm * hdspm
 	}
 
 	/* Channel playback mixer as default control 
-	   Note: the whole matrix would be 128*HDSPM_MIXER_CHANNELS Faders, thats to big for any alsamixer 
+	   Note: the whole matrix would be 128*HDSPM_MIXER_CHANNELS Faders, thats too big for any alsamixer
 	   they are accesible via special IOCTL on hwdep
 	   and the mixer 2dimensional mixer control */
 

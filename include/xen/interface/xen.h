@@ -370,6 +370,14 @@ typedef struct shared_info {
 
     arch_shared_info_t arch;
 
+    /*
+     * Indicator which PIRQs are shared with other domains, allowing the guest
+     * to not consider respective interrupts spurious even if no handler claims
+     * them, while still being able to detect spurious occurrences of un-shared
+     * interrupts.
+     */
+    unsigned long pirq_shared[256 / (8 * sizeof(unsigned long))];
+
 } shared_info_t;
 
 /*

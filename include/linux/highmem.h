@@ -7,22 +7,28 @@
 
 #include <asm/cacheflush.h>
 
+#ifndef ARCH_HAS_FLUSH_ANON_PAGE
+static inline void flush_anon_page(struct page *page, unsigned long vmaddr)
+{
+}
+#endif
+
+#ifndef ARCH_HAS_FLUSH_KERNEL_DCACHE_PAGE
+static inline void flush_kernel_dcache_page(struct page *page)
+{
+}
+#endif
+
 #ifdef CONFIG_HIGHMEM
 
 #include <asm/highmem.h>
 
 /* declarations for linux/mm/highmem.c */
 unsigned int nr_free_highpages(void);
-#ifdef CONFIG_XEN
-void kmap_flush_unused(void);
-#endif
 
 #else /* CONFIG_HIGHMEM */
 
 static inline unsigned int nr_free_highpages(void) { return 0; }
-#ifdef CONFIG_XEN
-static inline void kmap_flush_unused(void) { }
-#endif
 
 static inline void *kmap(struct page *page)
 {

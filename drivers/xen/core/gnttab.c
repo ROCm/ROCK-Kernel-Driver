@@ -68,7 +68,6 @@ EXPORT_SYMBOL_GPL(gnttab_free_grant_reference);
 EXPORT_SYMBOL_GPL(gnttab_claim_grant_reference);
 EXPORT_SYMBOL_GPL(gnttab_release_grant_reference);
 EXPORT_SYMBOL_GPL(gnttab_request_free_callback);
-EXPORT_SYMBOL_GPL(gnttab_cancel_free_callback);
 EXPORT_SYMBOL_GPL(gnttab_grant_foreign_access_ref);
 EXPORT_SYMBOL_GPL(gnttab_grant_foreign_transfer_ref);
 
@@ -360,21 +359,6 @@ gnttab_request_free_callback(struct gnttab_free_callback *callback,
 	spin_unlock_irqrestore(&gnttab_list_lock, flags);
 }
 
-void gnttab_cancel_free_callback(struct gnttab_free_callback *callback)
-{
-	struct gnttab_free_callback **pcb;
-	unsigned long flags;
-
-	spin_lock_irqsave(&gnttab_list_lock, flags);
-	for (pcb = &gnttab_free_callback_list; *pcb; pcb = &(*pcb)->next) {
-		if (*pcb == callback) {
-			*pcb = callback->next;
-			break;
-		}
-	}
-	spin_unlock_irqrestore(&gnttab_list_lock, flags);
-}
-
 #ifndef __ia64__
 static int map_pte_fn(pte_t *pte, struct page *pmd_page,
 		      unsigned long addr, void *data)
@@ -468,3 +452,13 @@ gnttab_init(void)
 }
 
 core_initcall(gnttab_init);
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

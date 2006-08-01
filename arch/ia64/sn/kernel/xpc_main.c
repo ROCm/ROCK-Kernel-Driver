@@ -52,7 +52,6 @@
 #include <linux/syscalls.h>
 #include <linux/cache.h>
 #include <linux/interrupt.h>
-#include <linux/slab.h>
 #include <linux/delay.h>
 #include <linux/reboot.h>
 #include <linux/completion.h>
@@ -84,7 +83,6 @@ struct device *xpc_chan = &xpc_chan_dbg_subname;
 
 
 static int xpc_kdebug_ignore;
-static int xpc_kdebug_entered;
 
 
 /* systune related variables for /proc/sys directories */
@@ -1179,8 +1177,6 @@ xpc_system_die(struct notifier_block *nb, unsigned long event, void *unused)
 		break;
 
 	case DIE_KDEBUG_ENTER:
-		xpc_kdebug_entered = 1;
-
 		/* Should lack of heartbeat be ignored by other partitions? */
 		if (!xpc_kdebug_ignore) {
 			break;
@@ -1193,8 +1189,6 @@ xpc_system_die(struct notifier_block *nb, unsigned long event, void *unused)
 		break;
 
 	case DIE_KDEBUG_LEAVE:
-		xpc_kdebug_entered = 0;
-
 		/* Is lack of heartbeat being ignored by other partitions? */
 		if (!xpc_kdebug_ignore) {
 			break;
@@ -1209,21 +1203,6 @@ xpc_system_die(struct notifier_block *nb, unsigned long event, void *unused)
 
 	return NOTIFY_DONE;
 }
-
-
-int
-xpc_kdebug_force_disengage(void)
-{
-	if (!xpc_kdebug_entered) {
-		/* not being called from kdebug */
-		return 1;
-	}
-
-	xpc_vars->heartbeat_offline = 0;
-	xpc_die_disengage();
-	return 0;
-}
-EXPORT_SYMBOL_GPL(xpc_kdebug_force_disengage);
 
 
 int __init

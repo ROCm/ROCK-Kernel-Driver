@@ -340,7 +340,10 @@ static void srp_disconnect_target(struct srp_target_port *target)
 	/* XXX should send SRP_I_LOGOUT request */
 
 	init_completion(&target->done);
-	ib_send_cm_dreq(target->cm_id, NULL, 0);
+	if (ib_send_cm_dreq(target->cm_id, NULL, 0)) {
+		printk(KERN_DEBUG PFX "Sending CM DREQ failed\n");
+		return;
+	}
 	wait_for_completion(&target->done);
 }
 
@@ -351,7 +354,6 @@ static void srp_remove_work(void *target_ptr)
 	spin_lock_irq(target->scsi_host->host_lock);
 	if (target->state != SRP_TARGET_DEAD) {
 		spin_unlock_irq(target->scsi_host->host_lock);
-		scsi_host_put(target->scsi_host);
 		return;
 	}
 	target->state = SRP_TARGET_REMOVED;
@@ -364,8 +366,6 @@ static void srp_remove_work(void *target_ptr)
 	scsi_remove_host(target->scsi_host);
 	ib_destroy_cm_id(target->cm_id);
 	srp_free_target_ib(target);
-	scsi_host_put(target->scsi_host);
-	/* And another put to really free the target port... */
 	scsi_host_put(target->scsi_host);
 }
 
@@ -407,6 +407,34 @@ static int srp_connect_target(struct srp_target_port *target)
 			return target->status;
 		}
 	}
+}
+
+static void srp_unmap_data(struct scsi_cmnd *scmnd,
+			   struct srp_target_port *target,
+			   struct srp_request *req)
+{
+	struct scatterlist *scat;
+	int nents;
+
+	if (!scmnd->request_buffer ||
+	    (scmnd->sc_data_direction != DMA_TO_DEVICE &&
+	     scmnd->sc_data_direction != DMA_FROM_DEVICE))
+		return;
+
+	/*
+	 * This handling of non-SG commands can be killed when the
+	 * SCSI midlayer no longer generates non-SG commands.
+	 */
+	if (likely(scmnd->use_sg)) {
+		nents = scmnd->use_sg;
+		scat  = scmnd->request_buffer;
+	} else {
+		nents = 1;
+		scat  = &req->fake_sg;
+	}
+
+	dma_unmap_sg(target->srp_host->dev->dma_device, scat, nents,
+		     scmnd->sc_data_direction);
 }
 
 static int srp_reconnect_target(struct srp_target_port *target)
@@ -455,16 +483,16 @@ static int srp_reconnect_target(struct srp_target_port *target)
 	list_for_each_entry(req, &target->req_queue, list) {
 		req->scmnd->result = DID_RESET << 16;
 		req->scmnd->scsi_done(req->scmnd);
+		srp_unmap_data(req->scmnd, target, req);
 	}
 
 	target->rx_head	 = 0;
 	target->tx_head	 = 0;
 	target->tx_tail  = 0;
-	target->req_head = 0;
-	for (i = 0; i < SRP_SQ_SIZE - 1; ++i)
-		target->req_ring[i].next = i + 1;
-	target->req_ring[SRP_SQ_SIZE - 1].next = -1;
+	INIT_LIST_HEAD(&target->free_reqs);
 	INIT_LIST_HEAD(&target->req_queue);
+	for (i = 0; i < SRP_SQ_SIZE; ++i)
+		list_add_tail(&target->req_ring[i].list, &target->free_reqs);
 
 	ret = srp_connect_target(target);
 	if (ret)
@@ -503,8 +531,10 @@ err:
 static int srp_map_data(struct scsi_cmnd *scmnd, struct srp_target_port *target,
 			struct srp_request *req)
 {
+	struct scatterlist *scat;
 	struct srp_cmd *cmd = req->cmd->buf;
-	int len;
+	int len, nents, count;
+	int i;
 	u8 fmt;
 
 	if (!scmnd->request_buffer || scmnd->sc_data_direction == DMA_NONE)
@@ -517,82 +547,66 @@ static int srp_map_data(struct scsi_cmnd *scmnd, struct srp_target_port *target,
 		return -EINVAL;
 	}
 
-	if (scmnd->use_sg) {
-		struct scatterlist *scat = scmnd->request_buffer;
-		int n;
-		int i;
-
-		n = dma_map_sg(target->srp_host->dev->dma_device,
-			       scat, scmnd->use_sg, scmnd->sc_data_direction);
-
-		if (n == 1) {
-			struct srp_direct_buf *buf = (void *) cmd->add_data;
-
-			fmt = SRP_DATA_DESC_DIRECT;
-
-			buf->va  = cpu_to_be64(sg_dma_address(scat));
-			buf->key = cpu_to_be32(target->srp_host->mr->rkey);
-			buf->len = cpu_to_be32(sg_dma_len(scat));
-
-			len = sizeof (struct srp_cmd) +
-				sizeof (struct srp_direct_buf);
-		} else {
-			struct srp_indirect_buf *buf = (void *) cmd->add_data;
-			u32 datalen = 0;
-
-			fmt = SRP_DATA_DESC_INDIRECT;
-
-			if (scmnd->sc_data_direction == DMA_TO_DEVICE)
-				cmd->data_out_desc_cnt = n;
-			else
-				cmd->data_in_desc_cnt = n;
-
-			buf->table_desc.va  = cpu_to_be64(req->cmd->dma +
-							  sizeof *cmd +
-							  sizeof *buf);
-			buf->table_desc.key =
-				cpu_to_be32(target->srp_host->mr->rkey);
-			buf->table_desc.len =
-				cpu_to_be32(n * sizeof (struct srp_direct_buf));
-
-			for (i = 0; i < n; ++i) {
-				buf->desc_list[i].va  = cpu_to_be64(sg_dma_address(&scat[i]));
-				buf->desc_list[i].key =
-					cpu_to_be32(target->srp_host->mr->rkey);
-				buf->desc_list[i].len = cpu_to_be32(sg_dma_len(&scat[i]));
-
-				datalen += sg_dma_len(&scat[i]);
-			}
-
-			buf->len = cpu_to_be32(datalen);
-
-			len = sizeof (struct srp_cmd) +
-				sizeof (struct srp_indirect_buf) +
-				n * sizeof (struct srp_direct_buf);
-		}
+	/*
+	 * This handling of non-SG commands can be killed when the
+	 * SCSI midlayer no longer generates non-SG commands.
+	 */
+	if (likely(scmnd->use_sg)) {
+		nents = scmnd->use_sg;
+		scat  = scmnd->request_buffer;
 	} else {
+		nents = 1;
+		scat  = &req->fake_sg;
+		sg_init_one(scat, scmnd->request_buffer, scmnd->request_bufflen);
+	}
+
+	count = dma_map_sg(target->srp_host->dev->dma_device, scat, nents,
+			   scmnd->sc_data_direction);
+
+	if (count == 1) {
 		struct srp_direct_buf *buf = (void *) cmd->add_data;
-		dma_addr_t dma;
-
-		dma = dma_map_single(target->srp_host->dev->dma_device,
-				     scmnd->request_buffer, scmnd->request_bufflen,
-				     scmnd->sc_data_direction);
-		if (dma_mapping_error(dma)) {
-			printk(KERN_WARNING PFX "unable to map %p/%d (dir %d)\n",
-			       scmnd->request_buffer, (int) scmnd->request_bufflen,
-			       scmnd->sc_data_direction);
-			return -EINVAL;
-		}
-
-		pci_unmap_addr_set(req, direct_mapping, dma);
-
-		buf->va  = cpu_to_be64(dma);
-		buf->key = cpu_to_be32(target->srp_host->mr->rkey);
-		buf->len = cpu_to_be32(scmnd->request_bufflen);
 
 		fmt = SRP_DATA_DESC_DIRECT;
 
-		len = sizeof (struct srp_cmd) + sizeof (struct srp_direct_buf);
+		buf->va  = cpu_to_be64(sg_dma_address(scat));
+		buf->key = cpu_to_be32(target->srp_host->mr->rkey);
+		buf->len = cpu_to_be32(sg_dma_len(scat));
+
+		len = sizeof (struct srp_cmd) +
+			sizeof (struct srp_direct_buf);
+	} else {
+		struct srp_indirect_buf *buf = (void *) cmd->add_data;
+		u32 datalen = 0;
+
+		fmt = SRP_DATA_DESC_INDIRECT;
+
+		if (scmnd->sc_data_direction == DMA_TO_DEVICE)
+			cmd->data_out_desc_cnt = count;
+		else
+			cmd->data_in_desc_cnt = count;
+
+		buf->table_desc.va  = cpu_to_be64(req->cmd->dma +
+						  sizeof *cmd +
+						  sizeof *buf);
+		buf->table_desc.key =
+			cpu_to_be32(target->srp_host->mr->rkey);
+		buf->table_desc.len =
+			cpu_to_be32(count * sizeof (struct srp_direct_buf));
+
+		for (i = 0; i < count; ++i) {
+			buf->desc_list[i].va  = cpu_to_be64(sg_dma_address(&scat[i]));
+			buf->desc_list[i].key =
+				cpu_to_be32(target->srp_host->mr->rkey);
+			buf->desc_list[i].len = cpu_to_be32(sg_dma_len(&scat[i]));
+
+			datalen += sg_dma_len(&scat[i]);
+		}
+
+		buf->len = cpu_to_be32(datalen);
+
+		len = sizeof (struct srp_cmd) +
+			sizeof (struct srp_indirect_buf) +
+			count * sizeof (struct srp_direct_buf);
 	}
 
 	if (scmnd->sc_data_direction == DMA_TO_DEVICE)
@@ -600,28 +614,13 @@ static int srp_map_data(struct scsi_cmnd *scmnd, struct srp_target_port *target,
 	else
 		cmd->buf_fmt = fmt;
 
-
 	return len;
 }
 
-static void srp_unmap_data(struct scsi_cmnd *scmnd,
-			   struct srp_target_port *target,
-			   struct srp_request *req)
+static void srp_remove_req(struct srp_target_port *target, struct srp_request *req)
 {
-	if (!scmnd->request_buffer ||
-	    (scmnd->sc_data_direction != DMA_TO_DEVICE &&
-	     scmnd->sc_data_direction != DMA_FROM_DEVICE))
-	    return;
-
-	if (scmnd->use_sg)
-		dma_unmap_sg(target->srp_host->dev->dma_device,
-			     (struct scatterlist *) scmnd->request_buffer,
-			     scmnd->use_sg, scmnd->sc_data_direction);
-	else
-		dma_unmap_single(target->srp_host->dev->dma_device,
-				 pci_unmap_addr(req, direct_mapping),
-				 scmnd->request_bufflen,
-				 scmnd->sc_data_direction);
+	srp_unmap_data(req->scmnd, target, req);
+	list_move_tail(&req->list, &target->free_reqs);
 }
 
 static void srp_process_rsp(struct srp_target_port *target, struct srp_rsp *rsp)
@@ -646,7 +645,7 @@ static void srp_process_rsp(struct srp_target_port *target, struct srp_rsp *rsp)
 			req->tsk_status = rsp->data[3];
 		complete(&req->done);
 	} else {
-		scmnd 	      = req->scmnd;
+		scmnd = req->scmnd;
 		if (!scmnd)
 			printk(KERN_ERR "Null scmnd for RSP w/tag %016llx\n",
 			       (unsigned long long) rsp->tag);
@@ -664,16 +663,11 @@ static void srp_process_rsp(struct srp_target_port *target, struct srp_rsp *rsp)
 		else if (rsp->flags & (SRP_RSP_FLAG_DIOVER | SRP_RSP_FLAG_DIUNDER))
 			scmnd->resid = be32_to_cpu(rsp->data_in_res_cnt);
 
-		srp_unmap_data(scmnd, target, req);
-
 		if (!req->tsk_mgmt) {
-			req->scmnd = NULL;
 			scmnd->host_scribble = (void *) -1L;
 			scmnd->scsi_done(scmnd);
 
-			list_del(&req->list);
-			req->next = target->req_head;
-			target->req_head = rsp->tag & ~SRP_TAG_TSK_MGMT;
+			srp_remove_req(target, req);
 		} else
 			req->cmd_done = 1;
 	}
@@ -860,7 +854,6 @@ static int srp_queuecommand(struct scsi_cmnd *scmnd,
 	struct srp_request *req;
 	struct srp_iu *iu;
 	struct srp_cmd *cmd;
-	long req_index;
 	int len;
 
 	if (target->state == SRP_TARGET_CONNECTING)
@@ -880,21 +873,19 @@ static int srp_queuecommand(struct scsi_cmnd *scmnd,
 	dma_sync_single_for_cpu(target->srp_host->dev->dma_device, iu->dma,
 				SRP_MAX_IU_LEN, DMA_TO_DEVICE);
 
-	req_index = target->req_head;
+	req = list_entry(target->free_reqs.next, struct srp_request, list);
 
 	scmnd->scsi_done     = done;
 	scmnd->result        = 0;
-	scmnd->host_scribble = (void *) req_index;
+	scmnd->host_scribble = (void *) (long) req->index;
 
 	cmd = iu->buf;
 	memset(cmd, 0, sizeof *cmd);
 
 	cmd->opcode = SRP_CMD;
 	cmd->lun    = cpu_to_be64((u64) scmnd->device->lun << 48);
-	cmd->tag    = req_index;
+	cmd->tag    = req->index;
 	memcpy(cmd->cdb, scmnd->cmnd, scmnd->cmd_len);
-
-	req = &target->req_ring[req_index];
 
 	req->scmnd    = scmnd;
 	req->cmd      = iu;
@@ -920,8 +911,7 @@ static int srp_queuecommand(struct scsi_cmnd *scmnd,
 		goto err_unmap;
 	}
 
-	target->req_head = req->next;
-	list_add_tail(&req->list, &target->req_queue);
+	list_move_tail(&req->list, &target->req_queue);
 
 	return 0;
 
@@ -1144,30 +1134,20 @@ static int srp_cm_handler(struct ib_cm_id *cm_id, struct ib_cm_event *event)
 	return 0;
 }
 
-static int srp_send_tsk_mgmt(struct scsi_cmnd *scmnd, u8 func)
+static int srp_send_tsk_mgmt(struct srp_target_port *target,
+			     struct srp_request *req, u8 func)
 {
-	struct srp_target_port *target = host_to_target(scmnd->device->host);
-	struct srp_request *req;
 	struct srp_iu *iu;
 	struct srp_tsk_mgmt *tsk_mgmt;
-	int req_index;
-	int ret = FAILED;
 
 	spin_lock_irq(target->scsi_host->host_lock);
 
 	if (target->state == SRP_TARGET_DEAD ||
 	    target->state == SRP_TARGET_REMOVED) {
-		scmnd->result = DID_BAD_TARGET << 16;
+		req->scmnd->result = DID_BAD_TARGET << 16;
 		goto out;
 	}
 
-	if (scmnd->host_scribble == (void *) -1L)
-		goto out;
-
-	req_index = (long) scmnd->host_scribble;
-	printk(KERN_ERR "Abort for req_index %d\n", req_index);
-
-	req = &target->req_ring[req_index];
 	init_completion(&req->done);
 
 	iu = __srp_get_tx_iu(target);
@@ -1178,10 +1158,10 @@ static int srp_send_tsk_mgmt(struct scsi_cmnd *scmnd, u8 func)
 	memset(tsk_mgmt, 0, sizeof *tsk_mgmt);
 
 	tsk_mgmt->opcode 	= SRP_TSK_MGMT;
-	tsk_mgmt->lun 		= cpu_to_be64((u64) scmnd->device->lun << 48);
-	tsk_mgmt->tag 		= req_index | SRP_TAG_TSK_MGMT;
+	tsk_mgmt->lun 		= cpu_to_be64((u64) req->scmnd->device->lun << 48);
+	tsk_mgmt->tag 		= req->index | SRP_TAG_TSK_MGMT;
 	tsk_mgmt->tsk_mgmt_func = func;
-	tsk_mgmt->task_tag 	= req_index;
+	tsk_mgmt->task_tag 	= req->index;
 
 	if (__srp_post_send(target, iu, sizeof *tsk_mgmt))
 		goto out;
@@ -1189,39 +1169,85 @@ static int srp_send_tsk_mgmt(struct scsi_cmnd *scmnd, u8 func)
 	req->tsk_mgmt = iu;
 
 	spin_unlock_irq(target->scsi_host->host_lock);
+
 	if (!wait_for_completion_timeout(&req->done,
 					 msecs_to_jiffies(SRP_ABORT_TIMEOUT_MS)))
-		return FAILED;
-	spin_lock_irq(target->scsi_host->host_lock);
+		return -1;
 
-	if (req->cmd_done) {
-		list_del(&req->list);
-		req->next = target->req_head;
-		target->req_head = req_index;
-
-		scmnd->scsi_done(scmnd);
-	} else if (!req->tsk_status) {
-		scmnd->result = DID_ABORT << 16;
-		ret = SUCCESS;
-	}
+	return 0;
 
 out:
 	spin_unlock_irq(target->scsi_host->host_lock);
-	return ret;
+	return -1;
+}
+
+static int srp_find_req(struct srp_target_port *target,
+			struct scsi_cmnd *scmnd,
+			struct srp_request **req)
+{
+	if (scmnd->host_scribble == (void *) -1L)
+		return -1;
+
+	*req = &target->req_ring[(long) scmnd->host_scribble];
+
+	return 0;
 }
 
 static int srp_abort(struct scsi_cmnd *scmnd)
 {
+	struct srp_target_port *target = host_to_target(scmnd->device->host);
+	struct srp_request *req;
+	int ret = SUCCESS;
+
 	printk(KERN_ERR "SRP abort called\n");
 
-	return srp_send_tsk_mgmt(scmnd, SRP_TSK_ABORT_TASK);
+	if (srp_find_req(target, scmnd, &req))
+		return FAILED;
+	if (srp_send_tsk_mgmt(target, req, SRP_TSK_ABORT_TASK))
+		return FAILED;
+
+	spin_lock_irq(target->scsi_host->host_lock);
+
+	if (req->cmd_done) {
+		srp_remove_req(target, req);
+		scmnd->scsi_done(scmnd);
+	} else if (!req->tsk_status) {
+		srp_remove_req(target, req);
+		scmnd->result = DID_ABORT << 16;
+	} else
+		ret = FAILED;
+
+	spin_unlock_irq(target->scsi_host->host_lock);
+
+	return ret;
 }
 
 static int srp_reset_device(struct scsi_cmnd *scmnd)
 {
+	struct srp_target_port *target = host_to_target(scmnd->device->host);
+	struct srp_request *req, *tmp;
+
 	printk(KERN_ERR "SRP reset_device called\n");
 
-	return srp_send_tsk_mgmt(scmnd, SRP_TSK_LUN_RESET);
+	if (srp_find_req(target, scmnd, &req))
+		return FAILED;
+	if (srp_send_tsk_mgmt(target, req, SRP_TSK_LUN_RESET))
+		return FAILED;
+	if (req->tsk_status)
+		return FAILED;
+
+	spin_lock_irq(target->scsi_host->host_lock);
+
+	list_for_each_entry_safe(req, tmp, &target->req_queue, list)
+		if (req->scmnd->device == scmnd->device) {
+			req->scmnd->result = DID_RESET << 16;
+			req->scmnd->scsi_done(req->scmnd);
+			srp_remove_req(target, req);
+		}
+
+	spin_unlock_irq(target->scsi_host->host_lock);
+
+	return SUCCESS;
 }
 
 static int srp_reset_host(struct scsi_cmnd *scmnd)
@@ -1237,6 +1263,87 @@ static int srp_reset_host(struct scsi_cmnd *scmnd)
 	return ret;
 }
 
+static ssize_t show_id_ext(struct class_device *cdev, char *buf)
+{
+	struct srp_target_port *target = host_to_target(class_to_shost(cdev));
+
+	if (target->state == SRP_TARGET_DEAD ||
+	    target->state == SRP_TARGET_REMOVED)
+		return -ENODEV;
+
+	return sprintf(buf, "0x%016llx\n",
+		       (unsigned long long) be64_to_cpu(target->id_ext));
+}
+
+static ssize_t show_ioc_guid(struct class_device *cdev, char *buf)
+{
+	struct srp_target_port *target = host_to_target(class_to_shost(cdev));
+
+	if (target->state == SRP_TARGET_DEAD ||
+	    target->state == SRP_TARGET_REMOVED)
+		return -ENODEV;
+
+	return sprintf(buf, "0x%016llx\n",
+		       (unsigned long long) be64_to_cpu(target->ioc_guid));
+}
+
+static ssize_t show_service_id(struct class_device *cdev, char *buf)
+{
+	struct srp_target_port *target = host_to_target(class_to_shost(cdev));
+
+	if (target->state == SRP_TARGET_DEAD ||
+	    target->state == SRP_TARGET_REMOVED)
+		return -ENODEV;
+
+	return sprintf(buf, "0x%016llx\n",
+		       (unsigned long long) be64_to_cpu(target->service_id));
+}
+
+static ssize_t show_pkey(struct class_device *cdev, char *buf)
+{
+	struct srp_target_port *target = host_to_target(class_to_shost(cdev));
+
+	if (target->state == SRP_TARGET_DEAD ||
+	    target->state == SRP_TARGET_REMOVED)
+		return -ENODEV;
+
+	return sprintf(buf, "0x%04x\n", be16_to_cpu(target->path.pkey));
+}
+
+static ssize_t show_dgid(struct class_device *cdev, char *buf)
+{
+	struct srp_target_port *target = host_to_target(class_to_shost(cdev));
+
+	if (target->state == SRP_TARGET_DEAD ||
+	    target->state == SRP_TARGET_REMOVED)
+		return -ENODEV;
+
+	return sprintf(buf, "%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x\n",
+		       be16_to_cpu(((__be16 *) target->path.dgid.raw)[0]),
+		       be16_to_cpu(((__be16 *) target->path.dgid.raw)[1]),
+		       be16_to_cpu(((__be16 *) target->path.dgid.raw)[2]),
+		       be16_to_cpu(((__be16 *) target->path.dgid.raw)[3]),
+		       be16_to_cpu(((__be16 *) target->path.dgid.raw)[4]),
+		       be16_to_cpu(((__be16 *) target->path.dgid.raw)[5]),
+		       be16_to_cpu(((__be16 *) target->path.dgid.raw)[6]),
+		       be16_to_cpu(((__be16 *) target->path.dgid.raw)[7]));
+}
+
+static CLASS_DEVICE_ATTR(id_ext,	S_IRUGO, show_id_ext,		NULL);
+static CLASS_DEVICE_ATTR(ioc_guid,	S_IRUGO, show_ioc_guid,		NULL);
+static CLASS_DEVICE_ATTR(service_id,	S_IRUGO, show_service_id,	NULL);
+static CLASS_DEVICE_ATTR(pkey,		S_IRUGO, show_pkey,		NULL);
+static CLASS_DEVICE_ATTR(dgid,		S_IRUGO, show_dgid,		NULL);
+
+static struct class_device_attribute *srp_host_attrs[] = {
+	&class_device_attr_id_ext,
+	&class_device_attr_ioc_guid,
+	&class_device_attr_service_id,
+	&class_device_attr_pkey,
+	&class_device_attr_dgid,
+	NULL
+};
+
 static struct scsi_host_template srp_template = {
 	.module				= THIS_MODULE,
 	.name				= DRV_NAME,
@@ -1249,7 +1356,8 @@ static struct scsi_host_template srp_template = {
 	.this_id			= -1,
 	.sg_tablesize			= SRP_MAX_INDIRECT,
 	.cmd_per_lun			= SRP_SQ_SIZE,
-	.use_clustering			= ENABLE_CLUSTERING
+	.use_clustering			= ENABLE_CLUSTERING,
+	.shost_attrs			= srp_host_attrs
 };
 
 static int srp_add_target(struct srp_host *host, struct srp_target_port *target)
@@ -1359,6 +1467,7 @@ static int srp_parse_options(const char *buf, struct srp_target_port *target)
 			p = match_strdup(args);
 			if (strlen(p) != 32) {
 				printk(KERN_WARNING PFX "bad dest GID parameter '%s'\n", p);
+				kfree(p);
 				goto out;
 			}
 
@@ -1366,6 +1475,7 @@ static int srp_parse_options(const char *buf, struct srp_target_port *target)
 				strlcpy(dgid, p + i * 2, 3);
 				target->path.dgid.raw[i] = simple_strtoul(dgid, NULL, 16);
 			}
+			kfree(p);
 			break;
 
 		case SRP_OPT_PKEY:
@@ -1437,10 +1547,12 @@ static ssize_t srp_create_target(struct class_device *class_dev,
 
 	INIT_WORK(&target->work, srp_reconnect_work, target);
 
-	for (i = 0; i < SRP_SQ_SIZE - 1; ++i)
-		target->req_ring[i].next = i + 1;
-	target->req_ring[SRP_SQ_SIZE - 1].next = -1;
+	INIT_LIST_HEAD(&target->free_reqs);
 	INIT_LIST_HEAD(&target->req_queue);
+	for (i = 0; i < SRP_SQ_SIZE; ++i) {
+		target->req_ring[i].index = i;
+		list_add_tail(&target->req_ring[i].list, &target->free_reqs);
+	}
 
 	ret = srp_parse_options(buf, target);
 	if (ret)

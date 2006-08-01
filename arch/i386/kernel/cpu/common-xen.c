@@ -260,7 +260,7 @@ static void __init early_cpu_detect(void)
 void __devinit generic_identify(struct cpuinfo_x86 * c)
 {
 	u32 tfms, xlvl;
-	int ebx;
+	int junk;
 
 	if (have_cpuid_p()) {
 		/* Get vendor name */
@@ -276,7 +276,7 @@ void __devinit generic_identify(struct cpuinfo_x86 * c)
 		/* Intel-defined flags: level 0x00000001 */
 		if ( c->cpuid_level >= 0x00000001 ) {
 			u32 capability, excap;
-			cpuid(0x00000001, &tfms, &ebx, &excap, &capability);
+			cpuid(0x00000001, &tfms, &junk, &excap, &capability);
 			c->x86_capability[0] = capability;
 			c->x86_capability[4] = excap;
 			c->x86 = (tfms >> 8) & 15;
@@ -286,11 +286,6 @@ void __devinit generic_identify(struct cpuinfo_x86 * c)
 			if (c->x86 >= 0x6)
 				c->x86_model += ((tfms >> 16) & 0xF) << 4;
 			c->x86_mask = tfms & 15;
-#ifdef CONFIG_SMP
-			c->apicid = phys_pkg_id((ebx >> 24) & 0xFF, 0);
-#else
-			c->apicid = (ebx >> 24) & 0xFF;
-#endif
 		} else {
 			/* Have CPUID level 0 only - unheard of */
 			c->x86 = 4;
@@ -468,6 +463,8 @@ void __devinit detect_ht(struct cpuinfo_x86 *c)
 	int 	cpu = smp_processor_id();
 
 	cpuid(1, &eax, &ebx, &ecx, &edx);
+
+	c->apicid = phys_pkg_id((ebx >> 24) & 0xFF, 0);
 
 	if (!cpu_has(c, X86_FEATURE_HT) || cpu_has(c, X86_FEATURE_CMP_LEGACY))
 		return;

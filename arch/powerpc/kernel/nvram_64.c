@@ -34,15 +34,6 @@
 
 #undef DEBUG_NVRAM
 
-/*
- * Old nvsetenv versions expect us to be able to return 8kb
- * of data in a single read, so use that as a limit for short
- * reads.
- * We can't simply use the requested size because large
- * kmalloc allocations often fail.
- */
-#define NVRAM_ALLOC_SIZE 8192
-
 static int nvram_scan_partitions(void);
 static int nvram_setup_partition(void);
 static int nvram_create_os_partition(void);
@@ -103,7 +94,7 @@ static ssize_t dev_nvram_read(struct file *file, char __user *buf,
 		goto out;
 
 	count = min_t(size_t, count, size - *ppos);
-	count = min(count, NVRAM_ALLOC_SIZE);
+	count = min(count, PAGE_SIZE);
 
 	ret = -ENOMEM;
 	tmp = kmalloc(count, GFP_KERNEL);
@@ -140,7 +131,7 @@ static ssize_t dev_nvram_write(struct file *file, const char __user *buf,
 		goto out;
 
 	count = min_t(size_t, count, size - *ppos);
-	count = min(count, NVRAM_ALLOC_SIZE);
+	count = min(count, PAGE_SIZE);
 
 	ret = -ENOMEM;
 	tmp = kmalloc(count, GFP_KERNEL);
@@ -169,7 +160,7 @@ static int dev_nvram_ioctl(struct inode *inode, struct file *file,
 	case IOC_NVRAM_GET_OFFSET: {
 		int part, offset;
 
-		if (_machine != PLATFORM_POWERMAC)
+		if (!machine_is(powermac))
 			return -EINVAL;
 		if (copy_from_user(&part, (void __user*)arg, sizeof(part)) != 0)
 			return -EFAULT;
@@ -183,8 +174,9 @@ static int dev_nvram_ioctl(struct inode *inode, struct file *file,
 		return 0;
 	}
 #endif /* CONFIG_PPC_PMAC */
+	default:
+		return -EINVAL;
 	}
-	return -EINVAL;
 }
 
 struct file_operations nvram_fops = {
@@ -452,7 +444,7 @@ static int nvram_setup_partition(void)
 	 * in our nvram, as Apple defined partitions use pretty much
 	 * all of the space
 	 */
-	if (_machine == PLATFORM_POWERMAC)
+	if (machine_is(powermac))
 		return -ENOSPC;
 
 	/* see if we have an OS partition that meets our needs.

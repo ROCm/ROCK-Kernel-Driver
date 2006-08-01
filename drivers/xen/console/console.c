@@ -47,10 +47,8 @@
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/console.h>
-#ifndef MODULE
 #include <linux/bootmem.h>
 #include <linux/sysrq.h>
-#endif
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/uaccess.h>
@@ -73,7 +71,7 @@
 static enum { XC_OFF, XC_DEFAULT, XC_TTY, XC_SERIAL } xc_mode = XC_DEFAULT;
 static int xc_num = -1;
 
-#if defined(CONFIG_MAGIC_SYSRQ) && !defined(MODULE)
+#ifdef CONFIG_MAGIC_SYSRQ
 static unsigned long sysrq_requested;
 extern int sysrq_enabled;
 #endif
@@ -107,12 +105,7 @@ static int __init xencons_setup(char *str)
 
 	return 1;
 }
-#ifndef MODULE
 __setup("xencons=", xencons_setup);
-#else
-static char __initdata mode_str[128];
-module_param_string(mode, mode_str, sizeof(mode_str), 0);
-#endif
 
 /* The kernel and user-land drivers share a common transmit buffer. */
 static unsigned int wbuf_size = 4096;
@@ -128,12 +121,7 @@ static int __init xencons_bufsz_setup(char *str)
 		wbuf_size <<= 1;
 	return 1;
 }
-#ifndef MODULE
 __setup("xencons_bufsz=", xencons_bufsz_setup);
-#else
-static char __initdata bufsz_str[32];
-module_param_string(bufsz, bufsz_str, sizeof(bufsz_str), 0);
-#endif
 
 /* This lock protects accesses to the common transmit buffer. */
 static spinlock_t xencons_lock = SPIN_LOCK_UNLOCKED;
@@ -227,27 +215,12 @@ static int __init xen_console_init(void)
 		return __RETCODE;
 	}
 
-#ifndef MODULE
 	wbuf = alloc_bootmem(wbuf_size);
-#else
-	wbuf = kmalloc(wbuf_size, GFP_KERNEL);
-#endif
-	if (!wbuf)
-		return -ENOMEM;
 
 	register_console(&kcons_info);
 
 	return __RETCODE;
 }
-
-static void xen_console_exit(void)
-{
-#ifdef MODULE
-	unregister_console(&kcons_info);
-#endif
-}
-
-#ifndef MODULE
 console_initcall(xen_console_init);
 
 /*** Useful function for console debugging -- goes straight to Xen. ***/
@@ -267,14 +240,9 @@ asmlinkage int xprintk(const char *fmt, ...)
 
 	return 0;
 }
-#endif
 
 /*** Forcibly flush console data before dying. ***/
-#ifndef MODULE
 void xencons_force_flush(void)
-#else
-static void _xencons_force_flush(void)
-#endif
 {
 	int sz;
 
@@ -291,15 +259,6 @@ static void _xencons_force_flush(void)
 		if (sent > 0)
 			wc += sent;
 	}
-}
-
-#ifndef MODULE
-void xencons_resume(void)
-#else
-static void _xencons_resume(void)
-#endif
-{
-	(void)xencons_ring_init();
 }
 
 
@@ -324,7 +283,7 @@ void xencons_rx(char *buf, unsigned len, struct pt_regs *regs)
 		goto out;
 
 	for (i = 0; i < len; i++) {
-#if defined(CONFIG_MAGIC_SYSRQ) && !defined(MODULE)
+#ifdef CONFIG_MAGIC_SYSRQ
 		if (sysrq_enabled) {
 			if (buf[i] == '\x0f') { /* ^O */
 				sysrq_requested = jiffies;
@@ -610,14 +569,6 @@ static int __init xencons_init(void)
 	if (xen_init() < 0)
 		return -ENODEV;
 
-#ifdef MODULE
-	xencons_setup(mode_str);
-	xencons_bufsz_setup(bufsz_str);
-	rc = xen_console_init();
-	if (rc)
-		return rc;
-#endif
-
 	if (xc_mode == XC_OFF)
 		return 0;
 
@@ -625,10 +576,8 @@ static int __init xencons_init(void)
 
 	xencons_driver = alloc_tty_driver((xc_mode == XC_SERIAL) ?
 					  1 : MAX_NR_CONSOLES);
-	if (xencons_driver == NULL) {
-		xen_console_exit();
+	if (xencons_driver == NULL)
 		return -ENOMEM;
-	}
 
 	DRV(xencons_driver)->name            = "xencons";
 	DRV(xencons_driver)->major           = TTY_MAJOR;
@@ -661,7 +610,6 @@ static int __init xencons_init(void)
 		       DRV(xencons_driver)->name_base);
 		put_tty_driver(xencons_driver);
 		xencons_driver = NULL;
-		xen_console_exit();
 		return rc;
 	}
 
@@ -682,14 +630,19 @@ static int __init xencons_init(void)
 	       DRV(xencons_driver)->name,
 	       DRV(xencons_driver)->name_base );
 
-#ifdef MODULE
-	__xencons_resume = _xencons_resume;
-	__xencons_force_flush = _xencons_force_flush;
-#endif
-
 	return 0;
 }
 
 module_init(xencons_init);
 
 MODULE_LICENSE("Dual BSD/GPL");
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

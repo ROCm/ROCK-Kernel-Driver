@@ -51,7 +51,8 @@ static inline void switch_mm(struct mm_struct *prev,
 	struct mmuext_op _op[2], *op = _op;
 
 	if (likely(prev != next)) {
-		BUG_ON(!test_bit(PG_pinned, &virt_to_page(next->pgd)->flags));
+		if (!test_bit(PG_pinned, &virt_to_page(next->pgd)->flags))
+			mm_pin(next);
 
 		/* stop flush ipis for the previous mm */
 		cpu_clear(cpu, prev->cpu_vm_mask);
@@ -98,11 +99,7 @@ static inline void switch_mm(struct mm_struct *prev,
 #define deactivate_mm(tsk, mm) \
 	asm("movl %0,%%fs ; movl %0,%%gs": :"r" (0))
 
-static inline void activate_mm(struct mm_struct *prev, struct mm_struct *next)
-{
-	if (!test_bit(PG_pinned, &virt_to_page(next->pgd)->flags))
-		mm_pin(next);
-	switch_mm(prev, next, NULL);
-}
+#define activate_mm(prev, next) \
+	switch_mm((prev),(next),NULL)
 
 #endif

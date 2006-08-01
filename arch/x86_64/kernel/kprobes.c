@@ -37,10 +37,12 @@
 #include <linux/string.h>
 #include <linux/slab.h>
 #include <linux/preempt.h>
+#include <linux/module.h>
 
 #include <asm/cacheflush.h>
 #include <asm/pgtable.h>
 #include <asm/kdebug.h>
+#include <asm/uaccess.h>
 
 void jprobe_return_end(void);
 static void __kprobes arch_copy_kprobe(struct kprobe *p);
@@ -51,7 +53,7 @@ DEFINE_PER_CPU(struct kprobe_ctlblk, kprobe_ctlblk);
 /*
  * returns non-zero if opcode modifies the interrupt flag.
  */
-static inline int is_IF_modifier(kprobe_opcode_t *insn)
+static __always_inline int is_IF_modifier(kprobe_opcode_t *insn)
 {
 	switch (*insn) {
 	case 0xfa:		/* cli */
@@ -82,7 +84,7 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
  * If it does, return the address of the 32-bit displacement word.
  * If not, return null.
  */
-static inline s32 *is_riprel(u8 *insn)
+static s32 __kprobes *is_riprel(u8 *insn)
 {
 #define W(row,b0,b1,b2,b3,b4,b5,b6,b7,b8,b9,ba,bb,bc,bd,be,bf)		      \
 	(((b0##UL << 0x0)|(b1##UL << 0x1)|(b2##UL << 0x2)|(b3##UL << 0x3) |   \
@@ -222,12 +224,12 @@ void __kprobes arch_disarm_kprobe(struct kprobe *p)
 
 void __kprobes arch_remove_kprobe(struct kprobe *p)
 {
-	down(&kprobe_mutex);
+	mutex_lock(&kprobe_mutex);
 	free_insn_slot(p->ainsn.insn);
-	up(&kprobe_mutex);
+	mutex_unlock(&kprobe_mutex);
 }
 
-static inline void save_previous_kprobe(struct kprobe_ctlblk *kcb)
+static void __kprobes save_previous_kprobe(struct kprobe_ctlblk *kcb)
 {
 	kcb->prev_kprobe.kp = kprobe_running();
 	kcb->prev_kprobe.status = kcb->kprobe_status;
@@ -235,7 +237,7 @@ static inline void save_previous_kprobe(struct kprobe_ctlblk *kcb)
 	kcb->prev_kprobe.saved_rflags = kcb->kprobe_saved_rflags;
 }
 
-static inline void restore_previous_kprobe(struct kprobe_ctlblk *kcb)
+static void __kprobes restore_previous_kprobe(struct kprobe_ctlblk *kcb)
 {
 	__get_cpu_var(current_kprobe) = kcb->prev_kprobe.kp;
 	kcb->kprobe_status = kcb->prev_kprobe.status;
@@ -243,7 +245,7 @@ static inline void restore_previous_kprobe(struct kprobe_ctlblk *kcb)
 	kcb->kprobe_saved_rflags = kcb->prev_kprobe.saved_rflags;
 }
 
-static inline void set_current_kprobe(struct kprobe *p, struct pt_regs *regs,
+static void __kprobes set_current_kprobe(struct kprobe *p, struct pt_regs *regs,
 				struct kprobe_ctlblk *kcb)
 {
 	__get_cpu_var(current_kprobe) = p;
@@ -512,13 +514,13 @@ static void __kprobes resume_execution(struct kprobe *p,
 		*tos = orig_rip + (*tos - copy_rip);
 		break;
 	case 0xff:
-		if ((*insn & 0x30) == 0x10) {
+		if ((insn[1] & 0x30) == 0x10) {
 			/* call absolute, indirect */
 			/* Fix return addr; rip is correct. */
 			next_rip = regs->rip;
 			*tos = orig_rip + (*tos - copy_rip);
-		} else if (((*insn & 0x31) == 0x20) ||	/* jmp near, absolute indirect */
-			   ((*insn & 0x31) == 0x21)) {	/* jmp far, absolute indirect */
+		} else if (((insn[1] & 0x31) == 0x20) ||	/* jmp near, absolute indirect */
+			   ((insn[1] & 0x31) == 0x21)) {	/* jmp far, absolute indirect */
 			/* rip is correct. */
 			next_rip = regs->rip;
 		}
@@ -578,16 +580,62 @@ int __kprobes kprobe_fault_handler(struct pt_regs *regs, int trapnr)
 {
 	struct kprobe *cur = kprobe_running();
 	struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
+	const struct exception_table_entry *fixup;
 
-	if (cur->fault_handler && cur->fault_handler(cur, regs, trapnr))
-		return 1;
-
-	if (kcb->kprobe_status & KPROBE_HIT_SS) {
-		resume_execution(cur, regs, kcb);
+	switch(kcb->kprobe_status) {
+	case KPROBE_HIT_SS:
+	case KPROBE_REENTER:
+		/*
+		 * We are here because the instruction being single
+		 * stepped caused a page fault. We reset the current
+		 * kprobe and the rip points back to the probe address
+		 * and allow the page fault handler to continue as a
+		 * normal page fault.
+		 */
+		regs->rip = (unsigned long)cur->addr;
 		regs->eflags |= kcb->kprobe_old_rflags;
-
-		reset_current_kprobe();
+		if (kcb->kprobe_status == KPROBE_REENTER)
+			restore_previous_kprobe(kcb);
+		else
+			reset_current_kprobe();
 		preempt_enable_no_resched();
+		break;
+	case KPROBE_HIT_ACTIVE:
+	case KPROBE_HIT_SSDONE:
+		/*
+		 * We increment the nmissed count for accounting,
+		 * we can also use npre/npostfault count for accouting
+		 * these specific fault cases.
+		 */
+		kprobes_inc_nmissed_count(cur);
+
+		/*
+		 * We come here because instructions in the pre/post
+		 * handler caused the page_fault, this could happen
+		 * if handler tries to access user space by
+		 * copy_from_user(), get_user() etc. Let the
+		 * user-specified handler try to fix it first.
+		 */
+		if (cur->fault_handler && cur->fault_handler(cur, regs, trapnr))
+			return 1;
+
+		/*
+		 * In case the user-specified fault handler returned
+		 * zero, try to fix up.
+		 */
+		fixup = search_exception_tables(regs->rip);
+		if (fixup) {
+			regs->rip = fixup->fixup;
+			return 1;
+		}
+
+		/*
+		 * fixup() could not handle it,
+		 * Let do_page_fault() fix it.
+		 */
+		break;
+	default:
+		break;
 	}
 	return 0;
 }
@@ -600,6 +648,9 @@ int __kprobes kprobe_exceptions_notify(struct notifier_block *self,
 {
 	struct die_args *args = (struct die_args *)data;
 	int ret = NOTIFY_DONE;
+
+	if (args->regs && user_mode(args->regs))
+		return ret;
 
 	switch (val) {
 	case DIE_INT3:

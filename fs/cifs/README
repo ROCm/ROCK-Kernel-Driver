@@ -422,6 +422,13 @@ A partial list of the supported mount options follows:
  nomapchars     Do not translate any of these seven characters (default).
  nocase         Request case insensitive path name matching (case
 		sensitive is the default if the server suports it).
+ posixpaths     If CIFS Unix extensions are supported, attempt to
+		negotiate posix path name support which allows certain
+		characters forbidden in typical CIFS filenames, without
+		requiring remapping. (default)
+ noposixpaths   If CIFS Unix extensions are supported, do not request
+		posix path name support (this may cause servers to
+		reject creatingfile with certain reserved characters).
  nobrl          Do not send byte range lock requests to the server.
 		This is necessary for certain applications that break
 		with cifs style mandatory byte range locks (and most
@@ -504,6 +511,14 @@ LinuxExtensionsEnabled	If set to one then the client will attempt to
 			support and want to map the uid and gid fields 
 			to values supplied at mount (rather than the 
 			actual values, then set this to zero. (default 1)
+Experimental            When set to 1 used to enable certain experimental
+			features (currently enables multipage writes
+			when signing is enabled, the multipage write
+			performance enhancement was disabled when
+			signing turned on in case buffer was modified
+			just before it was sent, also this flag will
+			be used to use the new experimental sessionsetup
+			code).
 
 These experimental features and tracing can be enabled by changing flags in 
 /proc/fs/cifs (after the cifs module has been installed or built into the 

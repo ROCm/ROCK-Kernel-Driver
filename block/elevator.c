@@ -33,6 +33,7 @@
 #include <linux/init.h>
 #include <linux/compiler.h>
 #include <linux/delay.h>
+#include <linux/blktrace_api.h>
 
 #include <asm/uaccess.h>
 
@@ -161,7 +162,7 @@ static elevator_t *elevator_alloc(struct elevator_type *e)
 		kobject_init(&eq->kobj);
 		snprintf(eq->kobj.name, KOBJ_NAME_LEN, "%s", "iosched");
 		eq->kobj.ktype = &elv_ktype;
-		sema_init(&eq->sysfs_lock, 1);
+		mutex_init(&eq->sysfs_lock);
 	} else {
 		elevator_put(e);
 	}
@@ -214,11 +215,11 @@ int elevator_init(request_queue_t *q, char *name)
 
 void elevator_exit(elevator_t *e)
 {
-	down(&e->sysfs_lock);
+	mutex_lock(&e->sysfs_lock);
 	if (e->ops->elevator_exit_fn)
 		e->ops->elevator_exit_fn(e);
 	e->ops = NULL;
-	up(&e->sysfs_lock);
+	mutex_unlock(&e->sysfs_lock);
 
 	kobject_put(&e->kobj);
 }
@@ -337,6 +338,8 @@ void elv_insert(request_queue_t *q, struct request *rq, int where)
 	struct list_head *pos;
 	unsigned ordseq;
 	int unplug_it = 1;
+
+	blk_add_trace_rq(q, rq, BLK_TA_INSERT);
 
 	rq->q = q;
 
@@ -509,6 +512,7 @@ struct request *elv_next_request(request_queue_t *q)
 			 * not be passed by new incoming requests
 			 */
 			rq->flags |= REQ_STARTED;
+			blk_add_trace_rq(q, rq, BLK_TA_ISSUE);
 		}
 
 		if (!q->boundary_rq || q->boundary_rq == rq) {
@@ -667,9 +671,9 @@ elv_attr_show(struct kobject *kobj, struct attribute *attr, char *page)
 	if (!entry->show)
 		return -EIO;
 
-	down(&e->sysfs_lock);
+	mutex_lock(&e->sysfs_lock);
 	error = e->ops ? entry->show(e, page) : -ENOENT;
-	up(&e->sysfs_lock);
+	mutex_unlock(&e->sysfs_lock);
 	return error;
 }
 
@@ -684,9 +688,9 @@ elv_attr_store(struct kobject *kobj, struct attribute *attr,
 	if (!entry->store)
 		return -EIO;
 
-	down(&e->sysfs_lock);
+	mutex_lock(&e->sysfs_lock);
 	error = e->ops ? entry->store(e, page, length) : -ENOENT;
-	up(&e->sysfs_lock);
+	mutex_unlock(&e->sysfs_lock);
 	return error;
 }
 

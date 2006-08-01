@@ -1393,10 +1393,10 @@ static int azx_free(struct azx *chip)
 		msleep(1);
 	}
 
-	if (chip->irq >= 0)
-		free_irq(chip->irq, (void*)chip);
 	if (chip->remap_addr)
 		iounmap(chip->remap_addr);
+	if (chip->irq >= 0)
+		free_irq(chip->irq, (void*)chip);
 
 	if (chip->bdl.area)
 		snd_dma_free_pages(&chip->bdl);
@@ -1614,7 +1614,7 @@ static void __devexit azx_remove(struct pci_dev *pci)
 }
 
 /* PCI IDs */
-static struct pci_device_id azx_ids[] = {
+static struct pci_device_id azx_ids[] __devinitdata = {
 	{ 0x8086, 0x2668, PCI_ANY_ID, PCI_ANY_ID, 0, 0, AZX_DRIVER_ICH }, /* ICH6 */
 	{ 0x8086, 0x27d8, PCI_ANY_ID, PCI_ANY_ID, 0, 0, AZX_DRIVER_ICH }, /* ICH7 */
 	{ 0x8086, 0x269a, PCI_ANY_ID, PCI_ANY_ID, 0, 0, AZX_DRIVER_ICH }, /* ESB2 */

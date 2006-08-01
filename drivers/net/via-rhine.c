@@ -470,7 +470,7 @@ struct rhine_private {
 	struct sk_buff *tx_skbuff[TX_RING_SIZE];
 	dma_addr_t tx_skbuff_dma[TX_RING_SIZE];
 
-	/* Tx bounce buffers */
+	/* Tx bounce buffers (Rhine-I only) */
 	unsigned char *tx_buf[TX_RING_SIZE];
 	unsigned char *tx_bufs;
 	dma_addr_t tx_bufs_dma;
@@ -491,8 +491,6 @@ struct rhine_private {
 	u8 tx_thresh, rx_thresh;
 
 	struct mii_if_info mii_if;
-	struct work_struct tx_timeout_task;
-	struct work_struct check_media_task;
 	void __iomem *base;
 };
 
@@ -500,8 +498,6 @@ static int  mdio_read(struct net_device *dev, int phy_id, int location);
 static void mdio_write(struct net_device *dev, int phy_id, int location, int value);
 static int  rhine_open(struct net_device *dev);
 static void rhine_tx_timeout(struct net_device *dev);
-static void rhine_tx_timeout_task(struct net_device *dev);
-static void rhine_check_media_task(struct net_device *dev);
 static int  rhine_start_tx(struct sk_buff *skb, struct net_device *dev);
 static irqreturn_t rhine_interrupt(int irq, void *dev_instance, struct pt_regs *regs);
 static void rhine_tx(struct net_device *dev);
@@ -856,12 +852,6 @@ static int __devinit rhine_init_one(struct pci_dev *pdev,
 	if (rp->quirks & rqRhineI)
 		dev->features |= NETIF_F_SG|NETIF_F_HW_CSUM;
 
-	INIT_WORK(&rp->tx_timeout_task,
-		  (void (*)(void *))rhine_tx_timeout_task, dev);
-
-	INIT_WORK(&rp->check_media_task,
-		  (void (*)(void *))rhine_check_media_task, dev);
-
 	/* dev->name not defined before register_netdev()! */
 	rc = register_netdev(dev);
 	if (rc)
@@ -1044,7 +1034,8 @@ static void alloc_tbufs(struct net_device* dev)
 		rp->tx_ring[i].desc_length = cpu_to_le32(TXDESC);
 		next += sizeof(struct tx_desc);
 		rp->tx_ring[i].next_desc = cpu_to_le32(next);
-		rp->tx_buf[i] = &rp->tx_bufs[i * PKT_BUF_SZ];
+		if (rp->quirks & rqRhineI)
+			rp->tx_buf[i] = &rp->tx_bufs[i * PKT_BUF_SZ];
 	}
 	rp->tx_ring[i-1].next_desc = cpu_to_le32(rp->tx_ring_dma);
 
@@ -1086,11 +1077,25 @@ static void rhine_check_media(struct net_device *dev, unsigned int init_media)
 	else
 	    iowrite8(ioread8(ioaddr + ChipCmd1) & ~Cmd1FDuplex,
 		   ioaddr + ChipCmd1);
+	if (debug > 1)
+		printk(KERN_INFO "%s: force_media %d, carrier %d\n", dev->name,
+			rp->mii_if.force_media, netif_carrier_ok(dev));
 }
 
-static void rhine_check_media_task(struct net_device *dev)
+/* Called after status of force_media possibly changed */
+static void rhine_set_carrier(struct mii_if_info *mii)
 {
-	rhine_check_media(dev, 0);
+	if (mii->force_media) {
+		/* autoneg is off: Link is always assumed to be up */
+		if (!netif_carrier_ok(mii->dev))
+			netif_carrier_on(mii->dev);
+	}
+	else	/* Let MMI library update carrier status */
+		rhine_check_media(mii->dev, 0);
+	if (debug > 1)
+		printk(KERN_INFO "%s: force_media %d, carrier %d\n",
+		       mii->dev->name, mii->force_media,
+		       netif_carrier_ok(mii->dev));
 }
 
 static void init_registers(struct net_device *dev)
@@ -1146,8 +1151,8 @@ static void rhine_disable_linkmon(void __iomem *ioaddr, u32 quirks)
 	if (quirks & rqRhineI) {
 		iowrite8(0x01, ioaddr + MIIRegAddr);	// MII_BMSR
 
-		/* Do not call from ISR! */
-		msleep(1);
+		/* Can be called from ISR. Evil. */
+		mdelay(1);
 
 		/* 0x80 must be set immediately before turning it off */
 		iowrite8(0x80, ioaddr + MIICmd);
@@ -1235,16 +1240,6 @@ static int rhine_open(struct net_device *dev)
 }
 
 static void rhine_tx_timeout(struct net_device *dev)
-{
-	struct rhine_private *rp = netdev_priv(dev);
-
-	/*
-	 * Move bulk of work outside of interrupt context
-	 */
-	schedule_work(&rp->tx_timeout_task);
-}
-
-static void rhine_tx_timeout_task(struct net_device *dev)
 {
 	struct rhine_private *rp = netdev_priv(dev);
 	void __iomem *ioaddr = rp->base;
@@ -1657,7 +1652,7 @@ static void rhine_error(struct net_device *dev, int intr_status)
 	spin_lock(&rp->lock);
 
 	if (intr_status & IntrLinkChange)
-		schedule_work(&rp->check_media_task);
+		rhine_check_media(dev, 0);
 	if (intr_status & IntrStatsMax) {
 		rp->stats.rx_crc_errors += ioread16(ioaddr + RxCRCErrs);
 		rp->stats.rx_missed_errors += ioread16(ioaddr + RxMissed);
@@ -1788,6 +1783,7 @@ static int netdev_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 	spin_lock_irq(&rp->lock);
 	rc = mii_ethtool_sset(&rp->mii_if, cmd);
 	spin_unlock_irq(&rp->lock);
+	rhine_set_carrier(&rp->mii_if);
 
 	return rc;
 }
@@ -1875,6 +1871,7 @@ static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	spin_lock_irq(&rp->lock);
 	rc = generic_mii_ioctl(&rp->mii_if, if_mii(rq), cmd, NULL);
 	spin_unlock_irq(&rp->lock);
+	rhine_set_carrier(&rp->mii_if);
 
 	return rc;
 }
@@ -1905,9 +1902,6 @@ static int rhine_close(struct net_device *dev)
 	spin_unlock_irq(&rp->lock);
 
 	free_irq(rp->pdev->irq, dev);
-
-	flush_scheduled_work();
-
 	free_rbufs(dev);
 	free_tbufs(dev);
 	free_ring(dev);

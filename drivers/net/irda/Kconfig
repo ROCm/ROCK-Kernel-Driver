@@ -33,7 +33,7 @@ config DONGLE
 
 config ESI_DONGLE
 	tristate "ESI JetEye PC dongle"
-	depends on DONGLE && IRDA
+	depends on IRTTY_SIR && DONGLE && IRDA
 	help
 	  Say Y here if you want to build support for the Extended Systems
 	  JetEye PC dongle.  To compile it as a module, choose M here. The ESI
@@ -44,7 +44,7 @@ config ESI_DONGLE
 
 config ACTISYS_DONGLE
 	tristate "ACTiSYS IR-220L and IR220L+ dongle"
-	depends on DONGLE && IRDA
+	depends on IRTTY_SIR && DONGLE && IRDA
 	help
 	  Say Y here if you want to build support for the ACTiSYS IR-220L and
 	  IR220L+ dongles.  To compile it as a module, choose M here. The
@@ -55,7 +55,7 @@ config ACTISYS_DONGLE
 
 config TEKRAM_DONGLE
 	tristate "Tekram IrMate 210B dongle"
-	depends on DONGLE && IRDA
+	depends on IRTTY_SIR && DONGLE && IRDA
 	help
 	  Say Y here if you want to build support for the Tekram IrMate 210B
 	  dongle.  To compile it as a module, choose M here. The Tekram dongle
@@ -64,9 +64,17 @@ config TEKRAM_DONGLE
 	  dongles you will have to start irattach like this:
 	  "irattach -d tekram".
 
+config TOIM3232_DONGLE
+	tristate "TOIM3232 IrDa dongle"
+	depends on IRTTY_SIR && DONGLE && IRDA
+	help
+	  Say Y here if you want to build support for the Vishay/Temic
+	  TOIM3232 and TOIM4232 based dongles.
+	  To compile it as a module, choose M here.
+
 config LITELINK_DONGLE
 	tristate "Parallax LiteLink dongle"
-	depends on DONGLE && IRDA
+	depends on IRTTY_SIR && DONGLE && IRDA
 	help
 	  Say Y here if you want to build support for the Parallax Litelink
 	  dongle.  To compile it as a module, choose M here.  The Parallax
@@ -77,7 +85,7 @@ config LITELINK_DONGLE
 
 config MA600_DONGLE
 	tristate "Mobile Action MA600 dongle"
-	depends on DONGLE && IRDA && EXPERIMENTAL
+	depends on IRTTY_SIR && DONGLE && IRDA && EXPERIMENTAL
 	help
 	  Say Y here if you want to build support for the Mobile Action MA600
 	  dongle.  To compile it as a module, choose M here. The MA600 dongle
@@ -90,7 +98,7 @@ config MA600_DONGLE
 
 config GIRBIL_DONGLE
 	tristate "Greenwich GIrBIL dongle"
-	depends on DONGLE && IRDA && EXPERIMENTAL
+	depends on IRTTY_SIR && DONGLE && IRDA && EXPERIMENTAL
 	help
 	  Say Y here if you want to build support for the Greenwich GIrBIL
 	  dongle.  If you want to compile it as a module, choose M here.
@@ -101,7 +109,7 @@ config GIRBIL_DONGLE
 
 config MCP2120_DONGLE
 	tristate "Microchip MCP2120"
-	depends on DONGLE && IRDA && EXPERIMENTAL
+	depends on IRTTY_SIR && DONGLE && IRDA && EXPERIMENTAL
 	help
 	  Say Y here if you want to build support for the Microchip MCP2120
 	  dongle.  If you want to compile it as a module, choose M here.
@@ -115,7 +123,7 @@ config MCP2120_DONGLE
 
 config OLD_BELKIN_DONGLE
 	tristate "Old Belkin dongle"
-	depends on DONGLE && IRDA && EXPERIMENTAL
+	depends on IRTTY_SIR && DONGLE && IRDA && EXPERIMENTAL
 	help
 	  Say Y here if you want to build support for the Adaptec Airport 1000
 	  and 2000 dongles.  If you want to compile it as a module, choose
@@ -124,7 +132,7 @@ config OLD_BELKIN_DONGLE
 
 config ACT200L_DONGLE
 	tristate "ACTiSYS IR-200L dongle"
-	depends on DONGLE && IRDA && EXPERIMENTAL
+	depends on IRTTY_SIR && DONGLE && IRDA && EXPERIMENTAL
 	help
 	  Say Y here if you want to build support for the ACTiSYS IR-200L
 	  dongle. If you want to compile it as a module, choose M here.
@@ -283,7 +291,7 @@ config USB_IRDA
 	  Say Y here if you want to build support for the USB IrDA FIR Dongle
 	  device driver.  To compile it as a module, choose M here: the module
 	  will be called irda-usb.  IrDA-USB support the various IrDA USB
-	  dongles available and most of their pecularities.  Those dongles
+	  dongles available and most of their peculiarities.  Those dongles
 	  plug in the USB port of your computer, are plug and play, and
 	  support SIR and FIR (4Mbps) speeds.  On the other hand, those
 	  dongles tend to be less efficient than a FIR chipset.
@@ -360,7 +368,7 @@ config ALI_FIR
 	help
 	  Say Y here if you want to build support for the ALi M5123 FIR
 	  Controller.  The ALi M5123 FIR Controller is embedded in ALi M1543C,
-	  M1535, M1535D, M1535+, M1535D Sourth Bridge.  This driver supports
+	  M1535, M1535D, M1535+, M1535D South Bridge.  This driver supports
 	  SIR, MIR and FIR (4Mbps) speeds.
 
 	  To compile it as a module, choose M here: the module will be called

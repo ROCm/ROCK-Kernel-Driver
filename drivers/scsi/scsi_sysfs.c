@@ -304,27 +304,11 @@ static int scsi_bus_resume(struct device * dev)
 	return err;
 }
 
-static void scsi_bus_shutdown(struct device * dev)
-{
-	struct scsi_device *sdev = to_scsi_device(dev);
-	struct scsi_host_template *sht = sdev->host->hostt;
-	int err;
-
-	err = scsi_device_quiesce(sdev);
-	if (err)
-		printk(KERN_DEBUG "%s: error (0x%x) during shutdown\n",
-			__FUNCTION__, err);
-
-	if (sht->shutdown)
-		sht->shutdown(sdev);
-}
-
 struct bus_type scsi_bus_type = {
         .name		= "scsi",
         .match		= scsi_bus_match,
 	.suspend	= scsi_bus_suspend,
 	.resume		= scsi_bus_resume,
-	.shutdown	= scsi_bus_shutdown,
 };
 
 int scsi_sysfs_register(void)

@@ -82,6 +82,7 @@ YAMAHA_DEVICE(0x1012, "TYROS"),
 YAMAHA_DEVICE(0x1013, "PF-500"),
 YAMAHA_DEVICE(0x1014, "S90"),
 YAMAHA_DEVICE(0x1015, "MOTIF-R"),
+YAMAHA_DEVICE(0x1016, "MDP-5"),
 YAMAHA_DEVICE(0x1017, "CVP-204"),
 YAMAHA_DEVICE(0x1018, "CVP-206"),
 YAMAHA_DEVICE(0x1019, "CVP-208"),
@@ -90,6 +91,7 @@ YAMAHA_DEVICE(0x101b, "PSR-1100"),
 YAMAHA_DEVICE(0x101c, "PSR-2100"),
 YAMAHA_DEVICE(0x101d, "CLP-175"),
 YAMAHA_DEVICE(0x101e, "PSR-K1"),
+YAMAHA_DEVICE(0x101f, "EZ-J24"),
 YAMAHA_DEVICE(0x1020, "EZ-250i"),
 YAMAHA_DEVICE(0x1021, "MOTIF ES 6"),
 YAMAHA_DEVICE(0x1022, "MOTIF ES 7"),
@@ -1406,6 +1408,27 @@ YAMAHA_DEVICE(0x7010, "UB99"),
 	}
 },
 
+/* Casio devices */
+{
+	USB_DEVICE(0x07cf, 0x6801),
+	.driver_info = (unsigned long) & (const struct snd_usb_audio_quirk) {
+		.vendor_name = "Casio",
+		.product_name = "PL-40R",
+		.ifnum = 0,
+		.type = QUIRK_MIDI_YAMAHA
+	}
+},
+{
+	/* this ID is used by several devices without a product ID */
+	USB_DEVICE(0x07cf, 0x6802),
+	.driver_info = (unsigned long) & (const struct snd_usb_audio_quirk) {
+		.vendor_name = "Casio",
+		.product_name = "Keyboard",
+		.ifnum = 0,
+		.type = QUIRK_MIDI_YAMAHA
+	}
+},
+
 /* Mark of the Unicorn devices */
 {
 	/* thanks to Robert A. Lerche <ral 'at' msbit.com> */
@@ -1507,6 +1530,24 @@ YAMAHA_DEVICE(0x7010, "UB99"),
 		.type = QUIRK_MIDI_STANDARD_INTERFACE
 	}
 },
+{
+	USB_DEVICE_VENDOR_SPEC(0x0ccd, 0x0014),
+	.driver_info = (unsigned long) & (const struct snd_usb_audio_quirk) {
+		.vendor_name = "TerraTec",
+		.product_name = "PHASE 26",
+		.ifnum = 3,
+		.type = QUIRK_MIDI_STANDARD_INTERFACE
+	}
+},
+{
+	USB_DEVICE(0x0ccd, 0x0035),
+	.driver_info = (unsigned long) & (const struct snd_usb_audio_quirk) {
+		.vendor_name = "Miditech",
+		.product_name = "Play'n Roll",
+		.ifnum = 0,
+		.type = QUIRK_MIDI_CME
+	}
+},
 
 /* Novation EMS devices */
 {
@@ -1537,22 +1578,24 @@ YAMAHA_DEVICE(0x7010, "UB99"),
 	}
 },
 
+/* Miditech devices */
 {
 	USB_DEVICE(0x4752, 0x0011),
 	.driver_info = (unsigned long) & (const struct snd_usb_audio_quirk) {
 		.vendor_name = "Miditech",
 		.product_name = "Midistart-2",
 		.ifnum = 0,
-		.type = QUIRK_MIDI_MIDITECH
+		.type = QUIRK_MIDI_CME
 	}
 },
+
+/* Central Music devices */
 {
+	/* this ID used by both Miditech MidiStudio-2 and CME UF-x */
 	USB_DEVICE(0x7104, 0x2202),
 	.driver_info = (unsigned long) & (const struct snd_usb_audio_quirk) {
-		.vendor_name = "Miditech",
-		.product_name = "MidiStudio-2",
 		.ifnum = 0,
-		.type = QUIRK_MIDI_MIDITECH
+		.type = QUIRK_MIDI_CME
 	}
 },
 

@@ -25,7 +25,6 @@
 #define MICROCODE_MINOR		184
 #define MWAVE_MINOR	219		/* ACP/Mwave Modem */
 #define MPT_MINOR	220
-#define LKCD_DUMP_MINOR   230		/* LKCD */
 #define MISC_DYNAMIC_MINOR 255
 
 #define TUN_MINOR	     200
@@ -37,7 +36,7 @@ struct class_device;
 struct miscdevice  {
 	int minor;
 	const char *name;
-	struct file_operations *fops;
+	const struct file_operations *fops;
 	struct list_head list;
 	struct device *dev;
 	struct class_device *class;

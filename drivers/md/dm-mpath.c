@@ -10,7 +10,6 @@
 #include "dm-hw-handler.h"
 #include "dm-bio-list.h"
 #include "dm-bio-record.h"
-#include "dm-netlink.h"
 
 #include <linux/ctype.h>
 #include <linux/init.h>
@@ -81,7 +80,6 @@ struct multipath {
 	unsigned queue_size;
 
 	struct work_struct trigger_event;
-	struct list_head evt_list;
 
 	/*
 	 * We must use a mempool of mpath_io structs so that we
@@ -181,9 +179,7 @@ static struct multipath *alloc_multipath(void)
 		m->queue_io = 1;
 		INIT_WORK(&m->process_queued_ios, process_queued_ios, m);
 		INIT_WORK(&m->trigger_event, trigger_event, m);
-		INIT_LIST_HEAD(&m->evt_list);
-		m->mpio_pool = mempool_create(MIN_IOS, mempool_alloc_slab,
-					      mempool_free_slab, _mpio_cache);
+		m->mpio_pool = mempool_create_slab_pool(MIN_IOS, _mpio_cache);
 		if (!m->mpio_pool) {
 			kfree(m);
 			return NULL;
@@ -429,19 +425,7 @@ out:
  */
 static void trigger_event(void *data)
 {
-	unsigned long flags;
 	struct multipath *m = (struct multipath *) data;
-	struct dm_evt *evt, *next;
-	LIST_HEAD(events);
-
-	spin_lock_irqsave(&m->lock, flags);
-	list_splice_init(&m->evt_list, &events);
-	spin_unlock_irqrestore(&m->lock, flags);
-
-	list_for_each_entry_safe(evt, next, &events, elist) {
-		list_del_init(&evt->elist);
-		dm_send_evt(evt);
-	}
 
 	dm_table_event(m->ti->table);
 }
@@ -813,10 +797,9 @@ static int multipath_map(struct dm_target *ti, struct bio *bio,
 /*
  * Take a path out of use.
  */
-static int __fail_path(struct pgpath *pgpath, struct bio *bio)
+static int fail_path(struct pgpath *pgpath)
 {
 	unsigned long flags;
-	struct dm_evt *evt;
 	struct multipath *m = pgpath->pg->m;
 
 	spin_lock_irqsave(&m->lock, flags);
@@ -835,21 +818,12 @@ static int __fail_path(struct pgpath *pgpath, struct bio *bio)
 	if (pgpath == m->current_pgpath)
 		m->current_pgpath = NULL;
 
-	/* Get error data from bio when available */
-	evt = dm_path_fail_evt(pgpath->path.dev->name, m->nr_valid_paths);
-	if (evt)
-		list_add(&evt->elist, &m->evt_list);
 	queue_work(kmultipathd, &m->trigger_event);
 
 out:
 	spin_unlock_irqrestore(&m->lock, flags);
 
 	return 0;
-}
-
-static int fail_path(struct pgpath *pgpath)
-{
-	return __fail_path(pgpath, NULL);
 }
 
 /*
@@ -859,7 +833,6 @@ static int reinstate_path(struct pgpath *pgpath)
 {
 	int r = 0;
 	unsigned long flags;
-	struct dm_evt *evt;
 	struct multipath *m = pgpath->pg->m;
 
 	spin_lock_irqsave(&m->lock, flags);
@@ -883,10 +856,6 @@ static int reinstate_path(struct pgpath *pgpath)
 	m->current_pgpath = NULL;
 	if (!m->nr_valid_paths++ && m->queue_size)
 		queue_work(kmultipathd, &m->process_queued_ios);
-
-	evt = dm_path_reinstate_evt(pgpath->path.dev->name, m->nr_valid_paths);
-	if (evt)
-		list_add(&evt->elist, &m->evt_list);
 
 	queue_work(kmultipathd, &m->trigger_event);
 
@@ -1058,7 +1027,7 @@ static int do_end_io(struct multipath *m, struct bio *bio,
 
 	if (mpio->pgpath) {
 		if (err_flags & MP_FAIL_PATH)
-			__fail_path(mpio->pgpath, bio);
+			fail_path(mpio->pgpath);
 
 		if (err_flags & MP_BYPASS_PG)
 			bypass_pg(m, mpio->pgpath->pg, 1);

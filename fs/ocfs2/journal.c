@@ -147,8 +147,7 @@ struct ocfs2_journal_handle *ocfs2_start_trans(struct ocfs2_super *osb,
 
 	mlog_entry("(max_buffs = %d)\n", max_buffs);
 
-	if (!osb || !osb->journal->j_journal)
-		BUG();
+	BUG_ON(!osb || !osb->journal->j_journal);
 
 	if (ocfs2_is_hard_readonly(osb)) {
 		ret = -EROFS;
@@ -378,7 +377,7 @@ int ocfs2_journal_access(struct ocfs2_journal_handle *handle,
 	BUG_ON(!bh);
 	BUG_ON(!(handle->flags & OCFS2_HANDLE_STARTED));
 
-	mlog_entry("bh->b_blocknr=%llu, type=%d (\"%s\"), bh->b_size = %hu\n",
+	mlog_entry("bh->b_blocknr=%llu, type=%d (\"%s\"), bh->b_size = %zu\n",
 		   (unsigned long long)bh->b_blocknr, type,
 		   (type == OCFS2_JOURNAL_ACCESS_CREATE) ?
 		   "OCFS2_JOURNAL_ACCESS_CREATE" :
@@ -401,7 +400,7 @@ int ocfs2_journal_access(struct ocfs2_journal_handle *handle,
 	 * j_trans_barrier for us. */
 	ocfs2_set_inode_lock_trans(OCFS2_SB(inode->i_sb)->journal, inode);
 
-	down(&OCFS2_I(inode)->ip_io_sem);
+	mutex_lock(&OCFS2_I(inode)->ip_io_mutex);
 	switch (type) {
 	case OCFS2_JOURNAL_ACCESS_CREATE:
 	case OCFS2_JOURNAL_ACCESS_WRITE:
@@ -416,7 +415,7 @@ int ocfs2_journal_access(struct ocfs2_journal_handle *handle,
 		status = -EINVAL;
 		mlog(ML_ERROR, "Uknown access type!\n");
 	}
-	up(&OCFS2_I(inode)->ip_io_sem);
+	mutex_unlock(&OCFS2_I(inode)->ip_io_mutex);
 
 	if (status < 0)
 		mlog(ML_ERROR, "Error %d getting %d access to buffer!\n",
@@ -444,6 +443,18 @@ int ocfs2_journal_dirty(struct ocfs2_journal_handle *handle,
 
 	mlog_exit(status);
 	return status;
+}
+
+int ocfs2_journal_dirty_data(handle_t *handle,
+			     struct buffer_head *bh)
+{
+	int err = journal_dirty_data(handle, bh);
+	if (err)
+		mlog_errno(err);
+	/* TODO: When we can handle it, abort the handle and go RO on
+	 * error here. */
+
+	return err;
 }
 
 /* We always assume you're adding a metadata lock at level 'ex' */
@@ -492,8 +503,8 @@ static void ocfs2_handle_cleanup_locks(struct ocfs2_journal *journal,
 		ocfs2_meta_unlock(inode, 1);
 		if (atomic_read(&inode->i_count) == 1)
 			mlog(ML_ERROR,
-			     "Inode %"MLFu64", I'm doing a last iput for!",
-			     OCFS2_I(inode)->ip_blkno);
+			     "Inode %llu, I'm doing a last iput for!",
+			     (unsigned long long)OCFS2_I(inode)->ip_blkno);
 		iput(inode);
 		kmem_cache_free(ocfs2_lock_cache, lock);
 	}
@@ -553,7 +564,7 @@ int ocfs2_journal_init(struct ocfs2_journal *journal, int *dirty)
 	 * changes in a live cluster so it can be considered an
 	 * exception to the rule. */
 	status = ocfs2_meta_lock_full(inode, NULL, &bh, 1,
-				      OCFS2_META_LOCK_RECOVERY, NULL, 0);
+				      OCFS2_META_LOCK_RECOVERY);
 	if (status < 0) {
 		if (status != -ERESTARTSYS)
 			mlog(ML_ERROR, "Could not get lock on journal!\n");
@@ -571,7 +582,8 @@ int ocfs2_journal_init(struct ocfs2_journal *journal, int *dirty)
 	}
 
 	mlog(0, "inode->i_size = %lld\n", inode->i_size);
-	mlog(0, "inode->i_blocks = %lu\n", inode->i_blocks);
+	mlog(0, "inode->i_blocks = %llu\n",
+			(unsigned long long)inode->i_blocks);
 	mlog(0, "inode->ip_clusters = %u\n", OCFS2_I(inode)->ip_clusters);
 
 	/* call the kernels journal init function now */
@@ -629,8 +641,9 @@ static int ocfs2_journal_toggle_dirty(struct ocfs2_super *osb,
 		/* This is called from startup/shutdown which will
 		 * handle the errors in a specific manner, so no need
 		 * to call ocfs2_error() here. */
-		mlog(ML_ERROR, "Journal dinode %"MLFu64"  has invalid "
-		     "signature: %.*s", fe->i_blkno, 7, fe->i_signature);
+		mlog(ML_ERROR, "Journal dinode %llu  has invalid "
+		     "signature: %.*s", (unsigned long long)fe->i_blkno, 7,
+		     fe->i_signature);
 		status = -EIO;
 		goto out;
 	}
@@ -664,8 +677,7 @@ void ocfs2_journal_shutdown(struct ocfs2_super *osb)
 
 	mlog_entry_void();
 
-	if (!osb)
-		BUG();
+	BUG_ON(!osb);
 
 	journal = osb->journal;
 	if (!journal)
@@ -797,8 +809,7 @@ int ocfs2_journal_wipe(struct ocfs2_journal *journal, int full)
 
 	mlog_entry_void();
 
-	if (!journal)
-		BUG();
+	BUG_ON(!journal);
 
 	status = journal_wipe(journal->j_journal, full);
 	if (status < 0) {
@@ -840,8 +851,9 @@ static int ocfs2_force_read_journal(struct inode *inode)
 
 	memset(bhs, 0, sizeof(struct buffer_head *) * CONCURRENT_JOURNAL_FILL);
 
-	mlog(0, "Force reading %lu blocks\n",
-	     (inode->i_blocks >> (inode->i_sb->s_blocksize_bits - 9)));
+	mlog(0, "Force reading %llu blocks\n",
+		(unsigned long long)(inode->i_blocks >>
+			(inode->i_sb->s_blocksize_bits - 9)));
 
 	v_blkno = 0;
 	while (v_blkno <
@@ -927,8 +939,8 @@ void ocfs2_complete_recovery(void *data)
 
 		la_dinode = item->lri_la_dinode;
 		if (la_dinode) {
-			mlog(0, "Clean up local alloc %"MLFu64"\n",
-			     la_dinode->i_blkno);
+			mlog(0, "Clean up local alloc %llu\n",
+			     (unsigned long long)la_dinode->i_blkno);
 
 			ret = ocfs2_complete_local_alloc_recovery(osb,
 								  la_dinode);
@@ -940,8 +952,8 @@ void ocfs2_complete_recovery(void *data)
 
 		tl_dinode = item->lri_tl_dinode;
 		if (tl_dinode) {
-			mlog(0, "Clean up truncate log %"MLFu64"\n",
-			     tl_dinode->i_blkno);
+			mlog(0, "Clean up truncate log %llu\n",
+			     (unsigned long long)tl_dinode->i_blkno);
 
 			ret = ocfs2_complete_truncate_log_recovery(osb,
 								   tl_dinode);
@@ -1066,10 +1078,10 @@ restart:
 					NULL);
 
 bail:
-	down(&osb->recovery_lock);
+	mutex_lock(&osb->recovery_lock);
 	if (!status &&
 	    !ocfs2_node_map_is_empty(osb, &osb->recovery_map)) {
-		up(&osb->recovery_lock);
+		mutex_unlock(&osb->recovery_lock);
 		goto restart;
 	}
 
@@ -1077,7 +1089,7 @@ bail:
 	mb(); /* sync with ocfs2_recovery_thread_running */
 	wake_up(&osb->recovery_event);
 
-	up(&osb->recovery_lock);
+	mutex_unlock(&osb->recovery_lock);
 
 	mlog_exit(status);
 	/* no one is callint kthread_stop() for us so the kthread() api
@@ -1092,7 +1104,7 @@ void ocfs2_recovery_thread(struct ocfs2_super *osb, int node_num)
 	mlog_entry("(node_num=%d, osb->node_num = %d)\n",
 		   node_num, osb->node_num);
 
-	down(&osb->recovery_lock);
+	mutex_lock(&osb->recovery_lock);
 	if (osb->disable_recovery)
 		goto out;
 
@@ -1114,7 +1126,7 @@ void ocfs2_recovery_thread(struct ocfs2_super *osb, int node_num)
 	}
 
 out:
-	up(&osb->recovery_lock);
+	mutex_unlock(&osb->recovery_lock);
 	wake_up(&osb->recovery_event);
 
 	mlog_exit_void();
@@ -1151,7 +1163,7 @@ static int ocfs2_replay_journal(struct ocfs2_super *osb,
 	SET_INODE_JOURNAL(inode);
 
 	status = ocfs2_meta_lock_full(inode, NULL, &bh, 1,
-				      OCFS2_META_LOCK_RECOVERY, NULL, 0);
+				      OCFS2_META_LOCK_RECOVERY);
 	if (status < 0) {
 		mlog(0, "status returned from ocfs2_meta_lock=%d\n", status);
 		if (status != -ERESTARTSYS)
@@ -1265,8 +1277,7 @@ static int ocfs2_recover_node(struct ocfs2_super *osb,
 
 	/* Should not ever be called to recover ourselves -- in that
 	 * case we should've called ocfs2_journal_load instead. */
-	if (osb->node_num == node_num)
-		BUG();
+	BUG_ON(osb->node_num == node_num);
 
 	slot_num = ocfs2_node_num_to_slot(si, node_num);
 	if (slot_num == OCFS2_INVALID_SLOT) {
@@ -1341,7 +1352,7 @@ static int ocfs2_trylock_journal(struct ocfs2_super *osb,
 	SET_INODE_JOURNAL(inode);
 
 	flags = OCFS2_META_LOCK_RECOVERY | OCFS2_META_LOCK_NOQUEUE;
-	status = ocfs2_meta_lock_full(inode, NULL, NULL, 1, flags, NULL, 0);
+	status = ocfs2_meta_lock_full(inode, NULL, NULL, 1, flags);
 	if (status < 0) {
 		if (status != -EAGAIN)
 			mlog_errno(status);
@@ -1467,11 +1478,11 @@ static int ocfs2_queue_orphans(struct ocfs2_super *osb,
 			if (de->file_type > OCFS2_FT_MAX) {
 				mlog(ML_ERROR,
 				     "block %llu contains invalid de: "
-				     "inode = %"MLFu64", rec_len = %u, "
+				     "inode = %llu, rec_len = %u, "
 				     "name_len = %u, file_type = %u, "
 				     "name='%.*s'\n",
 				     (unsigned long long)bh->b_blocknr,
-				     le64_to_cpu(de->inode),
+				     (unsigned long long)le64_to_cpu(de->inode),
 				     le16_to_cpu(de->rec_len),
 				     de->name_len,
 				     de->file_type,
@@ -1488,8 +1499,8 @@ static int ocfs2_queue_orphans(struct ocfs2_super *osb,
 			if (IS_ERR(iter))
 				continue;
 
-			mlog(0, "queue orphan %"MLFu64"\n",
-			     OCFS2_I(iter)->ip_blkno);
+			mlog(0, "queue orphan %llu\n",
+			     (unsigned long long)OCFS2_I(iter)->ip_blkno);
 			/* No locking is required for the next_orphan
 			 * queue as there is only ever a single
 			 * process doing orphan recovery. */
@@ -1526,8 +1537,6 @@ static void ocfs2_mark_recovering_orphan_dir(struct ocfs2_super *osb,
 	 * know to quit early. */
 	ocfs2_node_map_set_bit(osb, &osb->osb_recovering_orphan_dirs, slot);
 	while (osb->osb_orphan_wipes[slot]) {
-		mlog(0, "%u threads in iput from orphan dir %d, will wait\n",
-		     osb->osb_orphan_wipes[slot], slot);
 		/* If any processes are already in the middle of an
 		 * orphan wipe on this dir, then we need to wait for
 		 * them. */
@@ -1546,7 +1555,7 @@ static void ocfs2_clear_recovering_orphan_dir(struct ocfs2_super *osb,
 }
 
 /*
- * Orphan recovery. Each mounted node has its own orphan dir which we
+ * Orphan recovery. Each mounted node has it's own orphan dir which we
  * must run during recovery. Our strategy here is to build a list of
  * the inodes in the orphan dir and iget/iput them. The VFS does
  * (most) of the rest of the work.
@@ -1584,7 +1593,7 @@ static int ocfs2_recover_orphans(struct ocfs2_super *osb,
 
 	while (inode) {
 		oi = OCFS2_I(inode);
-		mlog(0, "iput orphan %"MLFu64"\n", oi->ip_blkno);
+		mlog(0, "iput orphan %llu\n", (unsigned long long)oi->ip_blkno);
 
 		iter = oi->ip_next_orphan;
 

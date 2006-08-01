@@ -995,7 +995,7 @@ asmlinkage long sys_kexec_load(unsigned long entry, unsigned long nr_segments,
 	image = xchg(dest_image, image);
 
 out:
-	(void) xchg(&kexec_lock, 0); /* Release the mutex */
+	xchg(&kexec_lock, 0); /* Release the mutex */
 	kimage_free(image);
 
 	return result;
@@ -1061,7 +1061,7 @@ void crash_kexec(struct pt_regs *regs)
 			machine_crash_shutdown(&fixed_regs);
 			machine_kexec(kexec_crash_image);
 		}
-		(void) xchg(&kexec_lock, 0);
+		xchg(&kexec_lock, 0);
 	}
 }
 

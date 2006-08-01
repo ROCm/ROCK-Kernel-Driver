@@ -423,11 +423,21 @@ static ssize_t bonding_store_mode(struct class_device *cd, const char *buf, size
 		ret = -EINVAL;
 		goto out;
 	} else {
-	        if (new_value == BOND_MODE_ACTIVEBACKUP) {
-	               INIT_WORK(&bond->arp_work, (void *)&bond_activebackup_arp_mon, bond->dev);
-                } else {
-                       INIT_WORK(&bond->arp_work, (void *)&bond_loadbalance_arp_mon, bond->dev);
-	        }
+		if (new_value == BOND_MODE_ACTIVEBACKUP) {
+			INIT_WORK(&bond->arp_work,
+				  (void *)&bond_activebackup_arp_mon,
+				  bond->dev);
+		} else {
+			INIT_WORK(&bond->arp_work,
+				  (void *)&bond_loadbalance_arp_mon,
+				  bond->dev);
+		}
+		if (bond->params.mode == BOND_MODE_8023AD)
+			bond_unset_master_3ad_flags(bond);
+
+		if (bond->params.mode == BOND_MODE_ALB)
+			bond_unset_master_alb_flags(bond);
+
 		bond->params.mode = new_value;
 		bond_set_mode_ops(bond, bond->params.mode);
 		printk(KERN_INFO DRV_NAME ": %s: setting mode to %s (%d).\n",

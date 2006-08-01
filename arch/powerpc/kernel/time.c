@@ -261,7 +261,7 @@ void snapshot_timebases(void)
 
 	if (!cpu_has_feature(CPU_FTR_PURR))
 		return;
-	for_each_cpu(cpu)
+	for_each_possible_cpu(cpu)
 		spin_lock_init(&per_cpu(cpu_purr_data, cpu).lock);
 	on_each_cpu(snapshot_tb_and_purr, NULL, 0, 1);
 }
@@ -740,13 +740,27 @@ void wakeup_decrementer(void)
 void __init smp_space_timers(unsigned int max_cpus)
 {
 	int i;
+	unsigned long half = tb_ticks_per_jiffy / 2;
 	unsigned long offset = tb_ticks_per_jiffy / max_cpus;
 	unsigned long previous_tb = per_cpu(last_jiffy, boot_cpuid);
 
 	/* make sure tb > per_cpu(last_jiffy, cpu) for all cpus always */
 	previous_tb -= tb_ticks_per_jiffy;
-	for_each_cpu(i) {
-		if (i != boot_cpuid) {
+	/*
+	 * The stolen time calculation for POWER5 shared-processor LPAR
+	 * systems works better if the two threads' timebase interrupts
+	 * are staggered by half a jiffy with respect to each other.
+	 */
+	for_each_possible_cpu(i) {
+		if (i == boot_cpuid)
+			continue;
+		if (i == (boot_cpuid ^ 1))
+			per_cpu(last_jiffy, i) =
+				per_cpu(last_jiffy, boot_cpuid) - half;
+		else if (i & 1)
+			per_cpu(last_jiffy, i) =
+				per_cpu(last_jiffy, i ^ 1) + half;
+		else {
 			previous_tb += offset;
 			per_cpu(last_jiffy, i) = previous_tb;
 		}

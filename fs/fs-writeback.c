@@ -381,8 +381,8 @@ sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)
 			list_move(&inode->i_list, &sb->s_dirty);
 		}
 		spin_unlock(&inode_lock);
-		cond_resched();
 		iput(inode);
+		cond_resched();
 		spin_lock(&inode_lock);
 		if (wbc->nr_to_write <= 0)
 			break;
@@ -642,6 +642,7 @@ int generic_osync_inode(struct inode *inode, struct address_space *mapping, int 
 	int need_write_inode_now = 0;
 	int err2;
 
+	current->flags |= PF_SYNCWRITE;
 	if (what & OSYNC_DATA)
 		err = filemap_fdatawrite(mapping);
 	if (what & (OSYNC_METADATA|OSYNC_DATA)) {
@@ -654,6 +655,7 @@ int generic_osync_inode(struct inode *inode, struct address_space *mapping, int 
 		if (!err)
 			err = err2;
 	}
+	current->flags &= ~PF_SYNCWRITE;
 
 	spin_lock(&inode_lock);
 	if ((inode->i_state & I_DIRTY) &&

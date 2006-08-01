@@ -294,6 +294,16 @@ void *kmem_cache_alloc(struct kmem_cache *c, gfp_t flags)
 }
 EXPORT_SYMBOL(kmem_cache_alloc);
 
+void *kmem_cache_zalloc(struct kmem_cache *c, gfp_t flags)
+{
+	void *ret = kmem_cache_alloc(c, flags);
+	if (ret)
+		memset(ret, 0, c->size);
+
+	return ret;
+}
+EXPORT_SYMBOL(kmem_cache_zalloc);
+
 void kmem_cache_free(struct kmem_cache *c, void *b)
 {
 	if (c->dtor)
@@ -344,9 +354,7 @@ void *__alloc_percpu(size_t size)
 	if (!pdata)
 		return NULL;
 
-	for (i = 0; i < NR_CPUS; i++) {
-		if (!cpu_possible(i))
-			continue;
+	for_each_possible_cpu(i) {
 		pdata->ptrs[i] = kmalloc(size, GFP_KERNEL);
 		if (!pdata->ptrs[i])
 			goto unwind_oom;
@@ -373,11 +381,9 @@ free_percpu(const void *objp)
 	int i;
 	struct percpu_data *p = (struct percpu_data *) (~(unsigned long) objp);
 
-	for (i = 0; i < NR_CPUS; i++) {
-		if (!cpu_possible(i))
-			continue;
+	for_each_possible_cpu(i)
 		kfree(p->ptrs[i]);
-	}
+
 	kfree(p);
 }
 EXPORT_SYMBOL(free_percpu);

@@ -56,12 +56,11 @@
 #define DRIVER_NAME "au1xxx-mmc"
 
 /* Set this to enable special debugging macros */
-/* #define MMC_DEBUG */
 
-#ifdef MMC_DEBUG
-#define DEBUG(fmt, idx, args...) printk("au1xx(%d): DEBUG: " fmt, idx, ##args)
+#ifdef DEBUG
+#define DBG(fmt, idx, args...) printk("au1xx(%d): DEBUG: " fmt, idx, ##args)
 #else
-#define DEBUG(fmt, idx, args...)
+#define DBG(fmt, idx, args...)
 #endif
 
 const struct {
@@ -311,7 +310,7 @@ static void au1xmmc_data_complete(struct au1xmmc_host *host, u32 status)
 		}
 		else
 			data->bytes_xfered =
-				(data->blocks * (1 << data->blksz_bits)) -
+				(data->blocks * data->blksz) -
 				host->pio.len;
 	}
 
@@ -424,18 +423,18 @@ static void au1xmmc_receive_pio(struct au1xmmc_host *host)
 			break;
 
 		if (status & SD_STATUS_RC) {
-			DEBUG("RX CRC Error [%d + %d].\n", host->id,
+			DBG("RX CRC Error [%d + %d].\n", host->id,
 					host->pio.len, count);
 			break;
 		}
 
 		if (status & SD_STATUS_RO) {
-			DEBUG("RX Overrun [%d + %d]\n", host->id,
+			DBG("RX Overrun [%d + %d]\n", host->id,
 					host->pio.len, count);
 			break;
 		}
 		else if (status & SD_STATUS_RU) {
-			DEBUG("RX Underrun [%d + %d]\n", host->id,
+			DBG("RX Underrun [%d + %d]\n", host->id,
 					host->pio.len,	count);
 			break;
 		}
@@ -576,7 +575,7 @@ static int
 au1xmmc_prepare_data(struct au1xmmc_host *host, struct mmc_data *data)
 {
 
-	int datalen = data->blocks * (1 << data->blksz_bits);
+	int datalen = data->blocks * data->blksz;
 
 	if (dma != 0)
 		host->flags |= HOST_F_DMA;
@@ -597,7 +596,7 @@ au1xmmc_prepare_data(struct au1xmmc_host *host, struct mmc_data *data)
 	if (host->dma.len == 0)
 		return MMC_ERR_TIMEOUT;
 
-	au_writel((1 << data->blksz_bits) - 1, HOST_BLKSIZE(host));
+	au_writel(data->blksz - 1, HOST_BLKSIZE(host));
 
 	if (host->flags & HOST_F_DMA) {
 		int i;
@@ -721,10 +720,6 @@ static void au1xmmc_set_ios(struct mmc_host* mmc, struct mmc_ios* ios)
 {
 	struct au1xmmc_host *host = mmc_priv(mmc);
 
-	DEBUG("set_ios (power=%u, clock=%uHz, vdd=%u, mode=%u)\n",
-	      host->id, ios->power_mode, ios->clock, ios->vdd,
-	      ios->bus_mode);
-
 	if (ios->power_mode == MMC_POWER_OFF)
 		au1xmmc_set_power(host, 0);
 	else if (ios->power_mode == MMC_POWER_ON) {
@@ -810,7 +805,7 @@ static irqreturn_t au1xmmc_irq(int irq, void *dev_id, struct pt_regs *regs)
 				au1xmmc_receive_pio(host);
 		}
 		else if (status & 0x203FBC70) {
-			DEBUG("Unhandled status %8.8x\n", host->id, status);
+			DBG("Unhandled status %8.8x\n", host->id, status);
 			handled = 0;
 		}
 
@@ -839,7 +834,7 @@ static void au1xmmc_poll_event(unsigned long arg)
 
 	if (host->mrq != NULL) {
 		u32 status = au_readl(HOST_STATUS(host));
-		DEBUG("PENDING - %8.8x\n", host->id, status);
+		DBG("PENDING - %8.8x\n", host->id, status);
 	}
 
 	mod_timer(&host->timer, jiffies + AU1XMMC_DETECT_TIMEOUT);

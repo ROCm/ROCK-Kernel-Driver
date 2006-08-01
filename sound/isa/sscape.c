@@ -1255,7 +1255,7 @@ static int __devinit create_sscape(int dev, struct snd_card **rcardp)
 }
 
 
-static int __init snd_sscape_probe(struct platform_device *pdev)
+static int __devinit snd_sscape_probe(struct platform_device *pdev)
 {
 	int dev = pdev->id;
 	struct snd_card *card;
@@ -1427,8 +1427,8 @@ static int __init sscape_manual_probe(void)
 		    dma[i] == SNDRV_AUTO_DMA) {
 			printk(KERN_INFO
 			       "sscape: insufficient parameters, need IO, IRQ, MPU-IRQ and DMA\n");
-			ret = -ENXIO;
-			goto errout;
+			sscape_unregister_all();
+			return -ENXIO;
 		}
 
 		/*
@@ -1436,17 +1436,15 @@ static int __init sscape_manual_probe(void)
 		 */
 		device = platform_device_register_simple(SSCAPE_DRIVER,
 							 i, NULL, 0);
-		if (IS_ERR(device)) {
-			ret = PTR_ERR(device);
-			goto errout;
+		if (IS_ERR(device))
+			continue;
+		if (!platform_get_drvdata(device)) {
+			platform_device_unregister(device);
+			continue;
 		}
 		platform_devices[i] = device;
 	}
 	return 0;
-
- errout:
-	sscape_unregister_all();
-	return ret;
 }
 
 static void sscape_exit(void)
@@ -1469,7 +1467,7 @@ static int __init sscape_init(void)
 	if (ret < 0)
 		return ret;
 #ifdef CONFIG_PNP
-	if (pnp_register_card_driver(&sscape_pnpc_driver) >= 0)
+	if (pnp_register_card_driver(&sscape_pnpc_driver) == 0)
 		pnp_registered = 1;
 #endif
 	return 0;

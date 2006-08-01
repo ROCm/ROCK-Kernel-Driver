@@ -170,9 +170,7 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		ret = skb_copy_bits(skb, -hlen, nskb->data - hlen,
 				     skb->len + hlen);
 		BUG_ON(ret);
-		/* Copy only the header fields we use in this driver. */
 		nskb->dev = skb->dev;
-		nskb->ip_summed = skb->ip_summed;
 		nskb->proto_data_valid = skb->proto_data_valid;
 		dev_kfree_skb(skb);
 		skb = nskb;
@@ -452,9 +450,6 @@ inline static void net_tx_action_dealloc(void)
 	dc = dealloc_cons;
 	dp = dealloc_prod;
 
-	/* Ensure we see all indexes enqueued by netif_idx_release(). */
-	smp_rmb();
-
 	/*
 	 * Free up any grants we have finished using
 	 */
@@ -692,10 +687,7 @@ static void netif_idx_release(u16 pending_idx)
 	unsigned long flags;
 
 	spin_lock_irqsave(&_lock, flags);
-	dealloc_ring[MASK_PEND_IDX(dealloc_prod)] = pending_idx;
-	/* Sync with net_tx_action_dealloc: insert idx /then/ incr producer. */
-	smp_wmb();
-	dealloc_prod++;
+	dealloc_ring[MASK_PEND_IDX(dealloc_prod++)] = pending_idx;
 	spin_unlock_irqrestore(&_lock, flags);
 
 	tasklet_schedule(&net_tx_tasklet);
@@ -850,9 +842,27 @@ static int __init netback_init(void)
 		&netif_be_dbg);
 #endif
 
+	__unsafe(THIS_MODULE);
+
 	return 0;
 }
 
+static void netback_cleanup(void)
+{
+	BUG();
+}
+
 module_init(netback_init);
+module_exit(netback_cleanup);
 
 MODULE_LICENSE("Dual BSD/GPL");
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

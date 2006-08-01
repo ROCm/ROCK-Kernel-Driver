@@ -39,109 +39,53 @@
 
 #include "buffer_head_io.h"
 
-void ocfs2_end_buffer_io_sync(struct buffer_head *bh,
-			      int uptodate)
+int ocfs2_write_block(struct ocfs2_super *osb, struct buffer_head *bh,
+		      struct inode *inode)
 {
-	if (!uptodate)
-		mlog_errno(-EIO);
+	int ret = 0;
 
-	if (uptodate)
-		set_buffer_uptodate(bh);
-	else
-		clear_buffer_uptodate(bh);
-	unlock_buffer(bh);
-}
+	mlog_entry("(bh->b_blocknr = %llu, inode=%p)\n",
+		   (unsigned long long)bh->b_blocknr, inode);
 
-int ocfs2_write_blocks(struct ocfs2_super *osb, struct buffer_head *bhs[],
-		       int nr, struct inode *inode)
-{
-	int status = 0;
-	int i;
-	struct buffer_head *bh;
-
-	mlog_entry("(bh[0]->b_blocknr = %llu, nr=%d, inode=%p)\n",
-		   (unsigned long long)bhs[0]->b_blocknr, nr, inode);
-
-	if (osb == NULL || osb->sb == NULL || bhs == NULL) {
-		status = -EINVAL;
-		mlog_errno(status);
-		goto bail;
-	}
+	BUG_ON(bh->b_blocknr < OCFS2_SUPER_BLOCK_BLKNO);
+	BUG_ON(buffer_jbd(bh));
 
 	/* No need to check for a soft readonly file system here. non
 	 * journalled writes are only ever done on system files which
 	 * can get modified during recovery even if read-only. */
 	if (ocfs2_is_hard_readonly(osb)) {
-		status = -EROFS;
-		goto bail;
+		ret = -EROFS;
+		goto out;
 	}
 
-	if (inode)
-		down(&OCFS2_I(inode)->ip_io_sem);
-	for (i = 0 ; i < nr ; i++) {
-		bh = bhs[i];
-		if (bh == NULL) {
-			if (inode)
-				up(&OCFS2_I(inode)->ip_io_sem);
-			status = -EIO;
-			mlog_errno(status);
-			goto bail;
-		}
+	mutex_lock(&OCFS2_I(inode)->ip_io_mutex);
 
-		if (unlikely(bh->b_blocknr < OCFS2_SUPER_BLOCK_BLKNO)) {
-			BUG();
-			status = -EIO;
-			mlog_errno(status);
-			goto bail;
-		}
+	lock_buffer(bh);
+	set_buffer_uptodate(bh);
 
-		if (unlikely(buffer_jbd(bh))) {
-			/* What are you thinking?! */
-			mlog(ML_ERROR, "trying to write a jbd managed bh "
-				       "(blocknr = %llu), nr=%d\n",
-			     (unsigned long long)bh->b_blocknr, nr);
-			BUG();
-		}
+	/* remove from dirty list before I/O. */
+	clear_buffer_dirty(bh);
 
-		lock_buffer(bh);
+	get_bh(bh); /* for end_buffer_write_sync() */                   
+	bh->b_end_io = end_buffer_write_sync;
+	submit_bh(WRITE, bh);
 
-		set_buffer_uptodate(bh);
+	wait_on_buffer(bh);
 
-		/* remove from dirty list before I/O. */
-		clear_buffer_dirty(bh);
-
-		bh->b_end_io = ocfs2_end_buffer_io_sync;
-		submit_bh(WRITE, bh);
+	if (buffer_uptodate(bh)) {
+		ocfs2_set_buffer_uptodate(inode, bh);
+	} else {
+		/* We don't need to remove the clustered uptodate
+		 * information for this bh as it's not marked locally
+		 * uptodate. */
+		ret = -EIO;
+		brelse(bh);
 	}
 
-	for (i = (nr - 1) ; i >= 0; i--) {
-		bh = bhs[i];
-
-		wait_on_buffer(bh);
-
-		if (!buffer_uptodate(bh)) {
-			/* Status won't be cleared from here on out,
-			 * so we can safely record this and loop back
-			 * to cleanup the other buffers. Don't need to
-			 * remove the clustered uptodate information
-			 * for this bh as it's not marked locally
-			 * uptodate. */
-			status = -EIO;
-			brelse(bh);
-			bhs[i] = NULL;
-			continue;
-		}
-
-		if (inode)
-			ocfs2_set_buffer_uptodate(inode, bh);
-	}
-	if (inode)
-		up(&OCFS2_I(inode)->ip_io_sem);
-
-bail:
-
-	mlog_exit(status);
-	return status;
+	mutex_unlock(&OCFS2_I(inode)->ip_io_mutex);
+out:
+	mlog_exit(ret);
+	return ret;
 }
 
 int ocfs2_read_blocks(struct ocfs2_super *osb, u64 block, int nr,
@@ -153,8 +97,8 @@ int ocfs2_read_blocks(struct ocfs2_super *osb, u64 block, int nr,
 	int i, ignore_cache = 0;
 	struct buffer_head *bh;
 
-	mlog_entry("(block=(%"MLFu64"), nr=(%d), flags=%d, inode=%p)\n",
-		   block, nr, flags, inode);
+	mlog_entry("(block=(%llu), nr=(%d), flags=%d, inode=%p)\n",
+		   (unsigned long long)block, nr, flags, inode);
 
 	if (osb == NULL || osb->sb == NULL || bhs == NULL) {
 		status = -EINVAL;
@@ -181,13 +125,13 @@ int ocfs2_read_blocks(struct ocfs2_super *osb, u64 block, int nr,
 		flags &= ~OCFS2_BH_CACHED;
 
 	if (inode)
-		down(&OCFS2_I(inode)->ip_io_sem);
+		mutex_lock(&OCFS2_I(inode)->ip_io_mutex);
 	for (i = 0 ; i < nr ; i++) {
 		if (bhs[i] == NULL) {
 			bhs[i] = sb_getblk(sb, block++);
 			if (bhs[i] == NULL) {
 				if (inode)
-					up(&OCFS2_I(inode)->ip_io_sem);
+					mutex_unlock(&OCFS2_I(inode)->ip_io_mutex);
 				status = -EIO;
 				mlog_errno(status);
 				goto bail;
@@ -199,9 +143,9 @@ int ocfs2_read_blocks(struct ocfs2_super *osb, u64 block, int nr,
 		if (flags & OCFS2_BH_CACHED &&
 		    !ocfs2_buffer_uptodate(inode, bh)) {
 			mlog(ML_UPTODATE,
-			     "bh (%llu), inode %"MLFu64" not uptodate\n",
+			     "bh (%llu), inode %llu not uptodate\n",
 			     (unsigned long long)bh->b_blocknr,
-			     OCFS2_I(inode)->ip_blkno);
+			     (unsigned long long)OCFS2_I(inode)->ip_blkno);
 			ignore_cache = 1;
 		}
 
@@ -238,7 +182,8 @@ int ocfs2_read_blocks(struct ocfs2_super *osb, u64 block, int nr,
 #endif
 			}
 			clear_buffer_uptodate(bh);
-			bh->b_end_io = ocfs2_end_buffer_io_sync;
+			get_bh(bh); /* for end_buffer_read_sync() */
+			bh->b_end_io = end_buffer_read_sync;
 			if (flags & OCFS2_BH_READAHEAD)
 				submit_bh(READA, bh);
 			else
@@ -275,9 +220,10 @@ int ocfs2_read_blocks(struct ocfs2_super *osb, u64 block, int nr,
 			ocfs2_set_buffer_uptodate(inode, bh);
 	}
 	if (inode)
-		up(&OCFS2_I(inode)->ip_io_sem);
+		mutex_unlock(&OCFS2_I(inode)->ip_io_mutex);
 
-	mlog(ML_BH_IO, "block=(%"MLFu64"), nr=(%d), cached=%s\n", block, nr,
+	mlog(ML_BH_IO, "block=(%llu), nr=(%d), cached=%s\n", 
+	     (unsigned long long)block, nr,
 	     (!(flags & OCFS2_BH_CACHED) || ignore_cache) ? "no" : "yes");
 
 bail:

@@ -27,8 +27,6 @@ extern void security_fixup_ops(struct security_operations *ops);
 extern struct security_operations capability_security_ops;
 
 struct security_operations *security_ops;	/* Initialized to NULL */
-int security_enabled;				/* ditto */
-EXPORT_SYMBOL(security_enabled);
 
 static inline int verify(struct security_operations *ops)
 {
@@ -66,7 +64,6 @@ int __init security_init(void)
 	}
 
 	security_ops = &capability_security_ops;
-	security_enabled = 0;
 
 	/* Initialize compiled-in security modules */
 	do_security_initcalls();
@@ -98,8 +95,7 @@ int register_security(struct security_operations *ops)
 		return -EAGAIN;
 
 	security_ops = ops;
-	security_enabled = 1;
-  
+
 	return 0;
 }
 
@@ -124,7 +120,6 @@ int unregister_security(struct security_operations *ops)
 	}
 
 	security_ops = &capability_security_ops;
-	security_enabled = 0;
 
 	return 0;
 }
@@ -182,31 +177,8 @@ int mod_unreg_security(const char *name, struct security_operations *ops)
 	return security_ops->unregister_security(name, ops);
 }
 
-/**
- * capable - calls the currently loaded security module's capable() function with the specified capability
- * @cap: the requested capability level.
- *
- * This function calls the currently loaded security module's capable()
- * function with a pointer to the current task and the specified @cap value.
- *
- * This allows the security module to implement the capable function call
- * however it chooses to.
- */
-int capable(int cap)
-{
-	if (security_ops->capable(current, cap)) {
-		/* capability denied */
-		return 0;
-	}
-
-	/* capability granted */
-	current->flags |= PF_SUPERPRIV;
-	return 1;
-}
-
 EXPORT_SYMBOL_GPL(register_security);
 EXPORT_SYMBOL_GPL(unregister_security);
 EXPORT_SYMBOL_GPL(mod_reg_security);
 EXPORT_SYMBOL_GPL(mod_unreg_security);
-EXPORT_SYMBOL(capable);
 EXPORT_SYMBOL(security_ops);

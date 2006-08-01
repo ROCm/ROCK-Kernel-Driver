@@ -1,6 +1,4 @@
 /*
- * arch/ppc/syslib/pq2_devices.c
- *
  * PQ2 Device descriptions
  *
  * Maintainer: Kumar Gala <galak@kernel.crashing.org>
@@ -123,13 +121,13 @@ struct platform_device ppc_sys_platform_devices[] = {
 		.num_resources	 = 3,
 		.resource = (struct resource[]) {
 			{
-				.name	= "scc_mem",
+				.name	= "regs",
 				.start	= 0x11A00,
 				.end	= 0x11A1F,
 				.flags	= IORESOURCE_MEM,
 			},
 			{
-				.name	= "scc_pram",
+				.name	= "pram",
 				.start	= 0x8000,
 				.end	= 0x80ff,
 				.flags	= IORESOURCE_MEM,
@@ -147,13 +145,13 @@ struct platform_device ppc_sys_platform_devices[] = {
 		.num_resources	 = 3,
 		.resource = (struct resource[]) {
 			{
-				.name	= "scc_mem",
+				.name	= "regs",
 				.start	= 0x11A20,
 				.end	= 0x11A3F,
 				.flags	= IORESOURCE_MEM,
 			},
 			{
-				.name	= "scc_pram",
+				.name	= "pram",
 				.start	= 0x8100,
 				.end	= 0x81ff,
 				.flags	= IORESOURCE_MEM,
@@ -171,13 +169,13 @@ struct platform_device ppc_sys_platform_devices[] = {
 		.num_resources	 = 3,
 		.resource = (struct resource[]) {
 			{
-				.name 	= "scc_mem",
+				.name 	= "regs",
 				.start	= 0x11A40,
 				.end	= 0x11A5F,
 				.flags	= IORESOURCE_MEM,
 			},
 			{
-				.name	= "scc_pram",
+				.name	= "pram",
 				.start	= 0x8200,
 				.end	= 0x82ff,
 				.flags	= IORESOURCE_MEM,
@@ -195,13 +193,13 @@ struct platform_device ppc_sys_platform_devices[] = {
 		.num_resources	 = 3,
 		.resource = (struct resource[]) {
 			{
-				.name	= "scc_mem",
+				.name	= "regs",
 				.start	= 0x11A60,
 				.end	= 0x11A7F,
 				.flags	= IORESOURCE_MEM,
 			},
 			{
-				.name	= "scc_pram",
+				.name	= "pram",
 				.start	= 0x8300,
 				.end	= 0x83ff,
 				.flags	= IORESOURCE_MEM,

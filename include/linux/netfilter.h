@@ -80,10 +80,14 @@ struct nf_sockopt_ops
 	int set_optmin;
 	int set_optmax;
 	int (*set)(struct sock *sk, int optval, void __user *user, unsigned int len);
+	int (*compat_set)(struct sock *sk, int optval,
+			void __user *user, unsigned int len);
 
 	int get_optmin;
 	int get_optmax;
 	int (*get)(struct sock *sk, int optval, void __user *user, int *len);
+	int (*compat_get)(struct sock *sk, int optval,
+			void __user *user, int *len);
 
 	/* Number of users inside set() or get(). */
 	unsigned int use;
@@ -106,6 +110,8 @@ struct nf_info
 /* Function to register/unregister hook points. */
 int nf_register_hook(struct nf_hook_ops *reg);
 void nf_unregister_hook(struct nf_hook_ops *reg);
+int nf_register_hooks(struct nf_hook_ops *reg, unsigned int n);
+void nf_unregister_hooks(struct nf_hook_ops *reg, unsigned int n);
 
 /* Functions to register get/setsockopt ranges (non-inclusive).  You
    need to check permissions yourself! */
@@ -246,6 +252,11 @@ int nf_setsockopt(struct sock *sk, int pf, int optval, char __user *opt,
 int nf_getsockopt(struct sock *sk, int pf, int optval, char __user *opt,
 		  int *len);
 
+int compat_nf_setsockopt(struct sock *sk, int pf, int optval,
+		char __user *opt, int len);
+int compat_nf_getsockopt(struct sock *sk, int pf, int optval,
+		char __user *opt, int *len);
+
 /* Packet queuing */
 struct nf_queue_handler {
 	int (*outfn)(struct sk_buff *skb, struct nf_info *info,
@@ -272,16 +283,42 @@ extern void nf_invalidate_cache(int pf);
    Returns true or false. */
 extern int skb_make_writable(struct sk_buff **pskb, unsigned int writable_len);
 
-struct nf_queue_rerouter {
-	void (*save)(const struct sk_buff *skb, struct nf_info *info);
-	int (*reroute)(struct sk_buff **skb, const struct nf_info *info);
-	int rer_size;
+struct nf_afinfo {
+	unsigned short	family;
+	unsigned int	(*checksum)(struct sk_buff *skb, unsigned int hook,
+				    unsigned int dataoff, u_int8_t protocol);
+	void		(*saveroute)(const struct sk_buff *skb,
+				     struct nf_info *info);
+	int		(*reroute)(struct sk_buff **skb,
+				   const struct nf_info *info);
+	int		route_key_size;
 };
 
-#define nf_info_reroute(x) ((void *)x + sizeof(struct nf_info))
+extern struct nf_afinfo *nf_afinfo[];
+static inline struct nf_afinfo *nf_get_afinfo(unsigned short family)
+{
+	return rcu_dereference(nf_afinfo[family]);
+}
 
-extern int nf_register_queue_rerouter(int pf, struct nf_queue_rerouter *rer);
-extern int nf_unregister_queue_rerouter(int pf);
+static inline unsigned int
+nf_checksum(struct sk_buff *skb, unsigned int hook, unsigned int dataoff,
+	    u_int8_t protocol, unsigned short family)
+{
+	struct nf_afinfo *afinfo;
+	unsigned int csum = 0;
+
+	rcu_read_lock();
+	afinfo = nf_get_afinfo(family);
+	if (afinfo)
+		csum = afinfo->checksum(skb, hook, dataoff, protocol);
+	rcu_read_unlock();
+	return csum;
+}
+
+extern int nf_register_afinfo(struct nf_afinfo *afinfo);
+extern void nf_unregister_afinfo(struct nf_afinfo *afinfo);
+
+#define nf_info_reroute(x) ((void *)x + sizeof(struct nf_info))
 
 #include <net/flow.h>
 extern void (*ip_nat_decode_session)(struct sk_buff *, struct flowi *);

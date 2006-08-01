@@ -963,7 +963,7 @@ static struct snd_kcontrol_new ad1983_mixers[] = {
 	},
 	{
 		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
-		.name = SNDRV_CTL_NAME_IEC958("",PLAYBACK,NONE) "Source",
+		.name = SNDRV_CTL_NAME_IEC958("",PLAYBACK,NONE) "Route",
 		.info = ad1983_spdif_route_info,
 		.get = ad1983_spdif_route_get,
 		.put = ad1983_spdif_route_put,
@@ -1103,7 +1103,7 @@ static struct snd_kcontrol_new ad1981_mixers[] = {
 	/* identical with AD1983 */
 	{
 		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
-		.name = SNDRV_CTL_NAME_IEC958("",PLAYBACK,NONE) "Source",
+		.name = SNDRV_CTL_NAME_IEC958("",PLAYBACK,NONE) "Route",
 		.info = ad1983_spdif_route_info,
 		.get = ad1983_spdif_route_get,
 		.put = ad1983_spdif_route_put,
@@ -1329,60 +1329,13 @@ static int ad1981_hp_init(struct hda_codec *codec)
 	return 0;
 }
 
-/* configuration for Lenovo Thinkpad T60 */
-static struct snd_kcontrol_new ad1981_thinkpad_mixers[] = {
-	HDA_CODEC_VOLUME("Master Playback Volume", 0x05, 0x0, HDA_OUTPUT),
-	HDA_CODEC_MUTE("Master Playback Switch", 0x05, 0x0, HDA_OUTPUT),
-	HDA_CODEC_VOLUME("PCM Playback Volume", 0x11, 0x0, HDA_OUTPUT),
-	HDA_CODEC_MUTE("PCM Playback Switch", 0x11, 0x0, HDA_OUTPUT),
-	HDA_CODEC_VOLUME("Mic Playback Volume", 0x12, 0x0, HDA_OUTPUT),
-	HDA_CODEC_MUTE("Mic Playback Switch", 0x12, 0x0, HDA_OUTPUT),
-	HDA_CODEC_VOLUME("CD Playback Volume", 0x1d, 0x0, HDA_OUTPUT),
-	HDA_CODEC_MUTE("CD Playback Switch", 0x1d, 0x0, HDA_OUTPUT),
-	HDA_CODEC_VOLUME("Mic Boost", 0x08, 0x0, HDA_INPUT),
-	HDA_CODEC_VOLUME("Capture Volume", 0x15, 0x0, HDA_OUTPUT),
-	HDA_CODEC_MUTE("Capture Switch", 0x15, 0x0, HDA_OUTPUT),
-	{
-		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
-		.name = "Capture Source",
-		.info = ad198x_mux_enum_info,
-		.get = ad198x_mux_enum_get,
-		.put = ad198x_mux_enum_put,
-	},
-	/* identical with AD1983 */
-	{
-		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
-		.name = SNDRV_CTL_NAME_IEC958("",PLAYBACK,NONE) "Source",
-		.info = ad1983_spdif_route_info,
-		.get = ad1983_spdif_route_get,
-		.put = ad1983_spdif_route_put,
-	},
-	{ } /* end */
-};
-
-static struct hda_input_mux ad1981_thinkpad_capture_source = {
-	.num_items = 3,
-	.items = {
-		{ "Mic", 0x0 },
-		{ "Mix", 0x2 },
-		{ "CD", 0x4 },
-	},
-};
-
 /* models */
-enum { AD1981_BASIC, AD1981_HP, AD1981_THINKPAD };
+enum { AD1981_BASIC, AD1981_HP };
 
 static struct hda_board_config ad1981_cfg_tbl[] = {
 	{ .modelname = "hp", .config = AD1981_HP },
 	/* All HP models */
 	{ .pci_subvendor = 0x103c, .config = AD1981_HP },
-	{ .pci_subvendor = 0x30b0, .pci_subdevice = 0x103c,
-	  .config = AD1981_HP }, /* HP nx6320 (reversed SSID, H/W bug) */
-	{ .modelname = "thinkpad", .config = AD1981_THINKPAD },
-	/* Lenovo Thinkpad T60/X60/Z6xx */
-	{ .pci_subvendor = 0x17aa, .config = AD1981_THINKPAD },
-	{ .pci_subvendor = 0x1014, .pci_subdevice = 0x0597,
-	  .config = AD1981_THINKPAD }, /* Z60m/t */
 	{ .modelname = "basic", .config = AD1981_BASIC },
 	{}
 };
@@ -1427,10 +1380,6 @@ static int patch_ad1981(struct hda_codec *codec)
 
 		codec->patch_ops.init = ad1981_hp_init;
 		codec->patch_ops.unsol_event = ad1981_hp_unsol_event;
-		break;
-	case AD1981_THINKPAD:
-		spec->mixers[0] = ad1981_thinkpad_mixers;
-		spec->input_mux = &ad1981_thinkpad_capture_source;
 		break;
 	}
 

@@ -7,12 +7,13 @@
  * Updated: Trusted Computer Solutions, Inc. <dgoeddel@trustedcs.com>
  *
  *	Support for enhanced MLS infrastructure.
+ *	Support for context based audit filters.
  *
  * Updated: Frank Mayer <mayerf@tresys.com> and Karl MacMillan <kmacmillan@tresys.com>
  *
  * 	Added conditional policy language extensions
  *
- * Copyright (C) 2004-2005 Trusted Computer Solutions, Inc.
+ * Copyright (C) 2004-2006 Trusted Computer Solutions, Inc.
  * Copyright (C) 2003 - 2004 Tresys Technology, LLC
  * Copyright (C) 2003 Red Hat, Inc., James Morris <jmorris@redhat.com>
  *	This program is free software; you can redistribute it and/or modify
@@ -27,7 +28,8 @@
 #include <linux/in.h>
 #include <linux/sched.h>
 #include <linux/audit.h>
-#include <asm/semaphore.h>
+#include <linux/mutex.h>
+
 #include "flask.h"
 #include "avc.h"
 #include "avc_ss.h"
@@ -48,9 +50,9 @@ static DEFINE_RWLOCK(policy_rwlock);
 #define POLICY_RDUNLOCK read_unlock(&policy_rwlock)
 #define POLICY_WRUNLOCK write_unlock_irq(&policy_rwlock)
 
-static DECLARE_MUTEX(load_sem);
-#define LOAD_LOCK down(&load_sem)
-#define LOAD_UNLOCK up(&load_sem)
+static DEFINE_MUTEX(load_mutex);
+#define LOAD_LOCK mutex_lock(&load_mutex)
+#define LOAD_UNLOCK mutex_unlock(&load_mutex)
 
 static struct sidtab sidtab;
 struct policydb policydb;
@@ -1762,19 +1764,22 @@ int security_set_bools(int len, int *values)
 		goto out;
 	}
 
-	printk(KERN_INFO "security: committed booleans { ");
 	for (i = 0; i < len; i++) {
+		if (!!values[i] != policydb.bool_val_to_struct[i]->state) {
+			audit_log(current->audit_context, GFP_ATOMIC,
+				AUDIT_MAC_CONFIG_CHANGE,
+				"bool=%s val=%d old_val=%d auid=%u",
+				policydb.p_bool_val_to_name[i],
+				!!values[i],
+				policydb.bool_val_to_struct[i]->state,
+				audit_get_loginuid(current->audit_context));
+		}
 		if (values[i]) {
 			policydb.bool_val_to_struct[i]->state = 1;
 		} else {
 			policydb.bool_val_to_struct[i]->state = 0;
 		}
-		if (i != 0)
-			printk(", ");
-		printk("%s:%d", policydb.p_bool_val_to_name[i],
-		       policydb.bool_val_to_struct[i]->state);
 	}
-	printk(" }\n");
 
 	for (cur = policydb.cond_list; cur != NULL; cur = cur->next) {
 		rc = evaluate_cond_node(&policydb, cur);
@@ -1810,4 +1815,236 @@ int security_get_bool_value(int bool)
 out:
 	POLICY_RDUNLOCK;
 	return rc;
+}
+
+struct selinux_audit_rule {
+	u32 au_seqno;
+	struct context au_ctxt;
+};
+
+void selinux_audit_rule_free(struct selinux_audit_rule *rule)
+{
+	if (rule) {
+		context_destroy(&rule->au_ctxt);
+		kfree(rule);
+	}
+}
+
+int selinux_audit_rule_init(u32 field, u32 op, char *rulestr,
+                            struct selinux_audit_rule **rule)
+{
+	struct selinux_audit_rule *tmprule;
+	struct role_datum *roledatum;
+	struct type_datum *typedatum;
+	struct user_datum *userdatum;
+	int rc = 0;
+
+	*rule = NULL;
+
+	if (!ss_initialized)
+		return -ENOTSUPP;
+
+	switch (field) {
+	case AUDIT_SE_USER:
+	case AUDIT_SE_ROLE:
+	case AUDIT_SE_TYPE:
+		/* only 'equals' and 'not equals' fit user, role, and type */
+		if (op != AUDIT_EQUAL && op != AUDIT_NOT_EQUAL)
+			return -EINVAL;
+		break;
+	case AUDIT_SE_SEN:
+	case AUDIT_SE_CLR:
+		/* we do not allow a range, indicated by the presense of '-' */
+		if (strchr(rulestr, '-'))
+			return -EINVAL;
+		break;
+	default:
+		/* only the above fields are valid */
+		return -EINVAL;
+	}
+
+	tmprule = kzalloc(sizeof(struct selinux_audit_rule), GFP_KERNEL);
+	if (!tmprule)
+		return -ENOMEM;
+
+	context_init(&tmprule->au_ctxt);
+
+	POLICY_RDLOCK;
+
+	tmprule->au_seqno = latest_granting;
+
+	switch (field) {
+	case AUDIT_SE_USER:
+		userdatum = hashtab_search(policydb.p_users.table, rulestr);
+		if (!userdatum)
+			rc = -EINVAL;
+		else
+			tmprule->au_ctxt.user = userdatum->value;
+		break;
+	case AUDIT_SE_ROLE:
+		roledatum = hashtab_search(policydb.p_roles.table, rulestr);
+		if (!roledatum)
+			rc = -EINVAL;
+		else
+			tmprule->au_ctxt.role = roledatum->value;
+		break;
+	case AUDIT_SE_TYPE:
+		typedatum = hashtab_search(policydb.p_types.table, rulestr);
+		if (!typedatum)
+			rc = -EINVAL;
+		else
+			tmprule->au_ctxt.type = typedatum->value;
+		break;
+	case AUDIT_SE_SEN:
+	case AUDIT_SE_CLR:
+		rc = mls_from_string(rulestr, &tmprule->au_ctxt, GFP_ATOMIC);
+		break;
+	}
+
+	POLICY_RDUNLOCK;
+
+	if (rc) {
+		selinux_audit_rule_free(tmprule);
+		tmprule = NULL;
+	}
+
+	*rule = tmprule;
+
+	return rc;
+}
+
+int selinux_audit_rule_match(u32 ctxid, u32 field, u32 op,
+                             struct selinux_audit_rule *rule,
+                             struct audit_context *actx)
+{
+	struct context *ctxt;
+	struct mls_level *level;
+	int match = 0;
+
+	if (!rule) {
+		audit_log(actx, GFP_ATOMIC, AUDIT_SELINUX_ERR,
+		          "selinux_audit_rule_match: missing rule\n");
+		return -ENOENT;
+	}
+
+	POLICY_RDLOCK;
+
+	if (rule->au_seqno < latest_granting) {
+		audit_log(actx, GFP_ATOMIC, AUDIT_SELINUX_ERR,
+		          "selinux_audit_rule_match: stale rule\n");
+		match = -ESTALE;
+		goto out;
+	}
+
+	ctxt = sidtab_search(&sidtab, ctxid);
+	if (!ctxt) {
+		audit_log(actx, GFP_ATOMIC, AUDIT_SELINUX_ERR,
+		          "selinux_audit_rule_match: unrecognized SID %d\n",
+		          ctxid);
+		match = -ENOENT;
+		goto out;
+	}
+
+	/* a field/op pair that is not caught here will simply fall through
+	   without a match */
+	switch (field) {
+	case AUDIT_SE_USER:
+		switch (op) {
+		case AUDIT_EQUAL:
+			match = (ctxt->user == rule->au_ctxt.user);
+			break;
+		case AUDIT_NOT_EQUAL:
+			match = (ctxt->user != rule->au_ctxt.user);
+			break;
+		}
+		break;
+	case AUDIT_SE_ROLE:
+		switch (op) {
+		case AUDIT_EQUAL:
+			match = (ctxt->role == rule->au_ctxt.role);
+			break;
+		case AUDIT_NOT_EQUAL:
+			match = (ctxt->role != rule->au_ctxt.role);
+			break;
+		}
+		break;
+	case AUDIT_SE_TYPE:
+		switch (op) {
+		case AUDIT_EQUAL:
+			match = (ctxt->type == rule->au_ctxt.type);
+			break;
+		case AUDIT_NOT_EQUAL:
+			match = (ctxt->type != rule->au_ctxt.type);
+			break;
+		}
+		break;
+	case AUDIT_SE_SEN:
+	case AUDIT_SE_CLR:
+		level = (op == AUDIT_SE_SEN ?
+		         &ctxt->range.level[0] : &ctxt->range.level[1]);
+		switch (op) {
+		case AUDIT_EQUAL:
+			match = mls_level_eq(&rule->au_ctxt.range.level[0],
+			                     level);
+			break;
+		case AUDIT_NOT_EQUAL:
+			match = !mls_level_eq(&rule->au_ctxt.range.level[0],
+			                      level);
+			break;
+		case AUDIT_LESS_THAN:
+			match = (mls_level_dom(&rule->au_ctxt.range.level[0],
+			                       level) &&
+			         !mls_level_eq(&rule->au_ctxt.range.level[0],
+			                       level));
+			break;
+		case AUDIT_LESS_THAN_OR_EQUAL:
+			match = mls_level_dom(&rule->au_ctxt.range.level[0],
+			                      level);
+			break;
+		case AUDIT_GREATER_THAN:
+			match = (mls_level_dom(level,
+			                      &rule->au_ctxt.range.level[0]) &&
+			         !mls_level_eq(level,
+			                       &rule->au_ctxt.range.level[0]));
+			break;
+		case AUDIT_GREATER_THAN_OR_EQUAL:
+			match = mls_level_dom(level,
+			                      &rule->au_ctxt.range.level[0]);
+			break;
+		}
+	}
+
+out:
+	POLICY_RDUNLOCK;
+	return match;
+}
+
+static int (*aurule_callback)(void) = NULL;
+
+static int aurule_avc_callback(u32 event, u32 ssid, u32 tsid,
+                               u16 class, u32 perms, u32 *retained)
+{
+	int err = 0;
+
+	if (event == AVC_CALLBACK_RESET && aurule_callback)
+		err = aurule_callback();
+	return err;
+}
+
+static int __init aurule_init(void)
+{
+	int err;
+
+	err = avc_add_callback(aurule_avc_callback, AVC_CALLBACK_RESET,
+	                       SECSID_NULL, SECSID_NULL, SECCLASS_NULL, 0);
+	if (err)
+		panic("avc_add_callback() failed, error %d\n", err);
+
+	return err;
+}
+__initcall(aurule_init);
+
+void selinux_audit_set_callback(int (*callback)(void))
+{
+	aurule_callback = callback;
 }

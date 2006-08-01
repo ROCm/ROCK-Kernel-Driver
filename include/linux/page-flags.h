@@ -48,8 +48,20 @@
 
 /*
  * Don't use the *_dontuse flags.  Use the macros.  Otherwise you'll break
- * locked- and dirty-page accounting.  The top eight bits of page->flags are
- * used for page->zone, so putting flag bits there doesn't work.
+ * locked- and dirty-page accounting.
+ *
+ * The page flags field is split into two parts, the main flags area
+ * which extends from the low bits upwards, and the fields area which
+ * extends from the high bits downwards.
+ *
+ *  | FIELD | ... | FLAGS |
+ *  N-1     ^             0
+ *          (N-FLAGS_RESERVED)
+ *
+ * The fields area is reserved for fields mapping zone, node and SPARSEMEM
+ * section.  The boundry between these two areas is defined by
+ * FLAGS_RESERVED which defines the width of the fields section
+ * (see linux/mmzone.h).  New flags must _not_ overlap with this area.
  */
 #define PG_locked	 	 0	/* Page is locked. Don't touch. */
 #define PG_error		 1
@@ -88,8 +100,9 @@
  * - The __xxx_page_state variants can be used safely when interrupts are
  * disabled.
  * - The __xxx_page_state variants can be used if the field is only
- * modified from process context, or only modified from interrupt context.
- * In this case, the field should be commented here.
+ * modified from process context and protected from preemption, or only
+ * modified from interrupt context.  In this case, the field should be
+ * commented here.
  */
 struct page_state {
 	unsigned long nr_dirty;		/* Dirty writeable pages */
@@ -241,22 +254,19 @@ extern void __mod_page_state_offset(unsigned long offset, unsigned long delta);
 #define __ClearPageDirty(page)	__clear_bit(PG_dirty, &(page)->flags)
 #define TestClearPageDirty(page) test_and_clear_bit(PG_dirty, &(page)->flags)
 
-#define SetPageLRU(page)	set_bit(PG_lru, &(page)->flags)
 #define PageLRU(page)		test_bit(PG_lru, &(page)->flags)
-#define TestSetPageLRU(page)	test_and_set_bit(PG_lru, &(page)->flags)
-#define TestClearPageLRU(page)	test_and_clear_bit(PG_lru, &(page)->flags)
+#define SetPageLRU(page)	set_bit(PG_lru, &(page)->flags)
+#define ClearPageLRU(page)	clear_bit(PG_lru, &(page)->flags)
+#define __ClearPageLRU(page)	__clear_bit(PG_lru, &(page)->flags)
 
 #define PageActive(page)	test_bit(PG_active, &(page)->flags)
 #define SetPageActive(page)	set_bit(PG_active, &(page)->flags)
 #define ClearPageActive(page)	clear_bit(PG_active, &(page)->flags)
-#define TestClearPageActive(page) test_and_clear_bit(PG_active, &(page)->flags)
-#define TestSetPageActive(page) test_and_set_bit(PG_active, &(page)->flags)
+#define __ClearPageActive(page)	__clear_bit(PG_active, &(page)->flags)
 
 #define PageSlab(page)		test_bit(PG_slab, &(page)->flags)
-#define SetPageSlab(page)	set_bit(PG_slab, &(page)->flags)
-#define ClearPageSlab(page)	clear_bit(PG_slab, &(page)->flags)
-#define TestClearPageSlab(page)	test_and_clear_bit(PG_slab, &(page)->flags)
-#define TestSetPageSlab(page)	test_and_set_bit(PG_slab, &(page)->flags)
+#define __SetPageSlab(page)	__set_bit(PG_slab, &(page)->flags)
+#define __ClearPageSlab(page)	__clear_bit(PG_slab, &(page)->flags)
 
 #ifdef CONFIG_HIGHMEM
 #define PageHighMem(page)	is_highmem(page_zone(page))
@@ -335,8 +345,8 @@ extern void __mod_page_state_offset(unsigned long offset, unsigned long delta);
 #define TestClearPageReclaim(page) test_and_clear_bit(PG_reclaim, &(page)->flags)
 
 #define PageCompound(page)	test_bit(PG_compound, &(page)->flags)
-#define SetPageCompound(page)	set_bit(PG_compound, &(page)->flags)
-#define ClearPageCompound(page)	clear_bit(PG_compound, &(page)->flags)
+#define __SetPageCompound(page)	__set_bit(PG_compound, &(page)->flags)
+#define __ClearPageCompound(page) __clear_bit(PG_compound, &(page)->flags)
 
 #ifdef CONFIG_SWAP
 #define PageSwapCache(page)	test_bit(PG_swapcache, &(page)->flags)

@@ -126,7 +126,7 @@ static inline int ocfs2_inode_is_new(struct inode *inode)
 }
 
 static inline void ocfs2_inode_set_new(struct ocfs2_super *osb,
-				      struct inode *inode)
+				       struct inode *inode)
 {
 	spin_lock(&trans_inc_lock);
 	OCFS2_I(inode)->ip_created_trans = osb->journal->j_trans_id;
@@ -247,6 +247,8 @@ static inline void ocfs2_checkpoint_inode(struct inode *inode)
  *                          buffer. Will have to call ocfs2_journal_dirty once
  *                          we've actually dirtied it. Type is one of . or .
  *  ocfs2_journal_dirty    - Mark a journalled buffer as having dirty data.
+ *  ocfs2_journal_dirty_data - Indicate that a data buffer should go out before
+ *                             the current handle commits.
  *  ocfs2_handle_add_lock  - Sometimes we need to delay lock release
  *                          until after a transaction has been completed. Use
  *                          ocfs2_handle_add_lock to indicate that a lock needs
@@ -260,11 +262,11 @@ static inline void ocfs2_checkpoint_inode(struct inode *inode)
  * dirtied any buffers. */
 struct ocfs2_journal_handle *ocfs2_alloc_handle(struct ocfs2_super *osb);
 struct ocfs2_journal_handle *ocfs2_start_trans(struct ocfs2_super *osb,
-					struct ocfs2_journal_handle *handle,
-					int max_buffs);
-void                 ocfs2_commit_trans(struct ocfs2_journal_handle *handle);
-int                  ocfs2_extend_trans(struct ocfs2_journal_handle *handle,
-					int nblocks);
+					       struct ocfs2_journal_handle *handle,
+					       int max_buffs);
+void			     ocfs2_commit_trans(struct ocfs2_journal_handle *handle);
+int			     ocfs2_extend_trans(struct ocfs2_journal_handle *handle,
+						int nblocks);
 
 /*
  * Create access is for when we get a newly created buffer and we're
@@ -306,6 +308,8 @@ int                  ocfs2_journal_access(struct ocfs2_journal_handle *handle,
  */
 int                  ocfs2_journal_dirty(struct ocfs2_journal_handle *handle,
 					 struct buffer_head *bh);
+int                  ocfs2_journal_dirty_data(handle_t *handle,
+					      struct buffer_head *bh);
 int                  ocfs2_handle_add_lock(struct ocfs2_journal_handle *handle,
 					   struct inode *inode);
 /*

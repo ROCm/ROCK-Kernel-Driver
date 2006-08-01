@@ -31,12 +31,13 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  *
- * $Id: mad_priv.h 2730 2005-06-28 16:43:03Z sean.hefty $
+ * $Id: mad_priv.h 5596 2006-03-03 01:00:07Z sean.hefty $
  */
 
 #ifndef __IB_MAD_PRIV_H__
 #define __IB_MAD_PRIV_H__
 
+#include <linux/completion.h>
 #include <linux/pci.h>
 #include <linux/kthread.h>
 #include <linux/workqueue.h>
@@ -85,6 +86,12 @@ struct ib_mad_private {
 	} mad;
 } __attribute__ ((packed));
 
+struct ib_rmpp_segment {
+	struct list_head list;
+	u32 num;
+	u8 data[0];
+};
+
 struct ib_mad_agent_private {
 	struct list_head agent_list;
 	struct ib_mad_agent agent;
@@ -102,7 +109,7 @@ struct ib_mad_agent_private {
 	struct list_head rmpp_list;
 
 	atomic_t refcount;
-	wait_queue_head_t wait;
+	struct completion comp;
 };
 
 struct ib_mad_snoop_private {
@@ -111,7 +118,7 @@ struct ib_mad_snoop_private {
 	int snoop_index;
 	int mad_snoop_flags;
 	atomic_t refcount;
-	wait_queue_head_t wait;
+	struct completion comp;
 };
 
 struct ib_mad_send_wr_private {
@@ -119,7 +126,8 @@ struct ib_mad_send_wr_private {
 	struct list_head agent_list;
 	struct ib_mad_agent_private *mad_agent_priv;
 	struct ib_mad_send_buf send_buf;
-	DECLARE_PCI_UNMAP_ADDR(mapping)
+	DECLARE_PCI_UNMAP_ADDR(header_mapping)
+	DECLARE_PCI_UNMAP_ADDR(payload_mapping)
 	struct ib_send_wr send_wr;
 	struct ib_sge sg_list[IB_MAD_SEND_REQ_MAX_SG];
 	__be64 tid;
@@ -130,11 +138,12 @@ struct ib_mad_send_wr_private {
 	enum ib_wc_status status;
 
 	/* RMPP control */
+	struct list_head rmpp_list;
+	struct ib_rmpp_segment *last_ack_seg;
+	struct ib_rmpp_segment *cur_seg;
 	int last_ack;
 	int seg_num;
 	int newwin;
-	int total_seg;
-	int data_offset;
 	int pad;
 };
 
@@ -208,7 +217,8 @@ extern kmem_cache_t *ib_mad_cache;
 int ib_send_mad(struct ib_mad_send_wr_private *mad_send_wr);
 
 struct ib_mad_send_wr_private *
-ib_find_send_mad(struct ib_mad_agent_private *mad_agent_priv, __be64 tid);
+ib_find_send_mad(struct ib_mad_agent_private *mad_agent_priv,
+		 struct ib_mad_recv_wc *mad_recv_wc);
 
 void ib_mad_complete_send_wr(struct ib_mad_send_wr_private *mad_send_wr,
 			     struct ib_mad_send_wc *mad_send_wc);

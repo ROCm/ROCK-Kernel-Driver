@@ -978,19 +978,12 @@ void stop_hz_timer(void)
 	unsigned int cpu = smp_processor_id();
 	unsigned long j;
 
+	/* We must do this /before/ checking rcu_pending(). */
 	cpu_set(cpu, nohz_cpu_mask);
-
-	/* See matching smp_mb in rcu_start_batch in rcupdate.c.  These mbs  */
-	/* ensure that if __rcu_pending (nested in rcu_needs_cpu) fetches a  */
-	/* value of rcp->cur that matches rdp->quiescbatch and allows us to  */
-	/* stop the hz timer then the cpumasks created for subsequent values */
-	/* of cur in rcu_start_batch are guaranteed to pick up the updated   */
-	/* nohz_cpu_mask and so will not depend on this cpu.                 */
-
 	smp_mb();
 
 	/* Leave ourselves in 'tick mode' if rcu or softirq pending. */
-	if (rcu_needs_cpu(cpu) || local_softirq_pending()) {
+	if (rcu_pending(cpu) || local_softirq_pending()) {
 		cpu_clear(cpu, nohz_cpu_mask);
 		j = jiffies + 1;
 	} else {
@@ -1092,3 +1085,13 @@ static int __init xen_sysctl_init(void)
 	return 0;
 }
 __initcall(xen_sysctl_init);
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

@@ -27,7 +27,6 @@
 #include <linux/sysdev.h>
 #include <linux/cpu.h>
 #include <linux/module.h>
-#include <linux/dmi.h>
 
 #include <asm/atomic.h>
 #include <asm/smp.h>
@@ -39,6 +38,7 @@
 #include <asm/i8253.h>
 
 #include <mach_apic.h>
+#include <mach_apicdef.h>
 #include <mach_ipi.h>
 
 #include "io_ports.h"
@@ -753,31 +753,22 @@ static void apic_pm_activate(void) { }
 
 static int __init apic_set_verbosity(char *str)
 {
-	if (*str == '=') 
-		str++;
-	if (*str == 0) 
-		;/* parsed early already */
-	else if (strcmp("debug", str) == 0)
+	if (strcmp("debug", str) == 0)
 		apic_verbosity = APIC_DEBUG;
 	else if (strcmp("verbose", str) == 0)
 		apic_verbosity = APIC_VERBOSE;
-	else
-		printk(KERN_WARNING "APIC Verbosity level %s not recognised"
-				" use apic=verbose or apic=debug\n", str);
-
-	return 0;
+	return 1;
 }
 
-__setup("apic", apic_set_verbosity);
+__setup("apic=", apic_set_verbosity);
 
 static int __init detect_init_APIC (void)
 {
 	u32 h, l, features;
-#ifdef CONFIG_X86_APIC_OFF
+
 	/* Disabled by kernel option? */
 	if (enable_local_apic < 0)
 		return -1;
-#endif
 
 	switch (boot_cpu_data.x86_vendor) {
 	case X86_VENDOR_AMD:
@@ -866,6 +857,8 @@ void __init init_apic_mappings(void)
 		apic_phys = mp_lapic_addr;
 
 	set_fixmap_nocache(FIX_APIC_BASE, apic_phys);
+	printk(KERN_DEBUG "mapped APIC to %08lx (%08lx)\n", APIC_BASE,
+	       apic_phys);
 
 	/*
 	 * Fetch the APIC ID of the BSP in case we have a
@@ -898,6 +891,8 @@ fake_ioapic_page:
 				ioapic_phys = __pa(ioapic_phys);
 			}
 			set_fixmap_nocache(idx, ioapic_phys);
+			printk(KERN_DEBUG "mapped IOAPIC to %08lx (%08lx)\n",
+			       __fix_to_virt(idx), ioapic_phys);
 			idx++;
 		}
 	}
@@ -1371,101 +1366,17 @@ fastcall void smp_error_interrupt(struct pt_regs *regs)
 	irq_exit();
 }
 
-static int __init need_apic(struct dmi_system_id *d)
-{ 
-#ifdef CONFIG_X86_LOCAL_APIC
-	extern int enable_local_apic;
-	if (enable_local_apic == 0)  {
-		enable_local_apic = 1;
-		printk(
-KERN_INFO "%s detected. Enabling local APIC. Overwrite with \"nolapic\"\n",
-		       d->ident);
-#endif
-	}
-	return 0;
-} 
-
-/* The table is mostly covered by the generic checks below anyways, but keep it for now */ 
-static struct dmi_system_id __initdata apic_dmi_table[] = {
-	/* Systems that need APIC */
-	/* Multinode Summit systems need APIC to boot */
-	{ need_apic, "IBM x445", 
-	  { DMI_MATCH(DMI_SYS_VENDOR, "IBM"),
-	    DMI_MATCH(DMI_PRODUCT_NAME, "xSeries 440") }},
-	{ need_apic, "IBM x445", 
-	  { DMI_MATCH(DMI_SYS_VENDOR, "IBM"),
-	    DMI_MATCH(DMI_PRODUCT_NAME, "xSeries 445") }},
-	{ need_apic, "IBM x460",
-	  { DMI_MATCH(DMI_SYS_VENDOR, "IBM"),
-	    DMI_MATCH(DMI_PRODUCT_NAME, "eserver xSeries 460")}},
-	{}
-};
-
-#ifdef CONFIG_X86_APIC_OFF
-static __init int dmi_enable_apic(void)
-{
-	int year;
-	char *vendor; 
-
-	/* If the machine has more than one CPU try to use APIC because it'll 
-	   be running the SMP kernel with APIC soon anyways. 
-	   This won't cover dual core, but they are handled by the date check 
-	   below. */
-	if (dmi_num_cpus > 1)
-		return 1;
-
-	year = dmi_get_year(DMI_BIOS_DATE);
-	vendor = dmi_get_system_info(DMI_BIOS_VENDOR);
-
-	/* All Intel BIOS since 1998 assumed APIC on. Don't include 1998 itself
-	   because we're not sure for that. */
-	if (vendor && !strncmp(vendor, "Intel", 5))
-		return year > 1998;
-
-	/* Use APIC for anything since 2001 */
-	return year >= 2001;
-}
-
-void __init dmi_check_apic(void)
-{
-	if (enable_local_apic != 0)
-		return;
-	if (!dmi_enable_apic()) {
-		enable_local_apic = -1;
-		clear_bit(X86_FEATURE_APIC, boot_cpu_data.x86_capability);
-		printk(
-	KERN_INFO "IO/L-APIC disabled because your old system seems to be old\n"); 
-		printk(KERN_INFO "overwrite with \"apic\"\n");
-	} else {
-		printk(
-	KERN_INFO "IO/L-APIC allowed because system is MP or new enough\n");
-	}
-}
-#endif
-
 /*
  * This initializes the IO-APIC and APIC hardware if this is
  * a UP kernel.
  */
 int __init APIC_init_uniprocessor (void)
 {
-	dmi_check_system(apic_dmi_table);
-
-#ifdef CONFIG_X86_APIC_OFF
-	if (enable_local_apic < 0) { 
-		clear_bit(X86_FEATURE_APIC, boot_cpu_data.x86_capability);
-		nr_ioapics = 0;
-		return -1;
-	}
-#endif
-
 	if (enable_local_apic < 0)
 		clear_bit(X86_FEATURE_APIC, boot_cpu_data.x86_capability);
 
-	if (!smp_found_config && !cpu_has_apic) { 
-		nr_ioapics = 0;
+	if (!smp_found_config && !cpu_has_apic)
 		return -1;
-	}
 
 	/*
 	 * Complain if the BIOS pretends there is one.

@@ -1,4 +1,4 @@
-/* 
+/*
  * IUCV network driver
  *
  * Copyright (C) 2001 IBM Deutschland Entwicklung GmbH, IBM Corporation
@@ -28,7 +28,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
  */
-
+
 /* #define DEBUG */
 
 #include <linux/module.h>
@@ -81,7 +81,7 @@ iucv_bus_match (struct device *dev, struct device_driver *drv)
 struct bus_type iucv_bus = {
 	.name = "iucv",
 	.match = iucv_bus_match,
-};	
+};
 
 struct device *iucv_root;
 
@@ -297,7 +297,7 @@ MODULE_LICENSE("GPL");
 /*
  * Debugging stuff
  *******************************************************************************/
-
+
 
 #ifdef DEBUG
 static int debuglevel = 0;
@@ -344,7 +344,7 @@ do { \
 /*
  * Internal functions
  *******************************************************************************/
-
+
 /**
  * print start banner
  */
@@ -386,7 +386,7 @@ iucv_init(void)
 	}
 
 	/* Note: GFP_DMA used used to get memory below 2G */
-	iucv_external_int_buffer = kmalloc(sizeof(iucv_GeneralInterrupt),
+	iucv_external_int_buffer = kzalloc(sizeof(iucv_GeneralInterrupt),
 					   GFP_KERNEL|GFP_DMA);
 	if (!iucv_external_int_buffer) {
 		printk(KERN_WARNING
@@ -396,10 +396,9 @@ iucv_init(void)
 		bus_unregister(&iucv_bus);
 		return -ENOMEM;
 	}
-	memset(iucv_external_int_buffer, 0, sizeof(iucv_GeneralInterrupt));
 
 	/* Initialize parameter pool */
-	iucv_param_pool = kmalloc(sizeof(iucv_param) * PARAM_POOL_SIZE,
+	iucv_param_pool = kzalloc(sizeof(iucv_param) * PARAM_POOL_SIZE,
 				  GFP_KERNEL|GFP_DMA);
 	if (!iucv_param_pool) {
 		printk(KERN_WARNING "%s: Could not allocate param pool\n",
@@ -410,7 +409,6 @@ iucv_init(void)
 		bus_unregister(&iucv_bus);
 		return -ENOMEM;
 	}
-	memset(iucv_param_pool, 0, sizeof(iucv_param) * PARAM_POOL_SIZE);
 
 	/* Initialize irq queue */
 	INIT_LIST_HEAD(&iucv_irq_queue);
@@ -793,15 +791,14 @@ iucv_register_program (__u8 pgmname[16],
 		}
 
 		max_connections = iucv_query_maxconn();
-		iucv_pathid_table = kmalloc(max_connections * sizeof(handler *),
-				       GFP_ATOMIC);
+		iucv_pathid_table = kcalloc(max_connections, sizeof(handler *),
+					GFP_ATOMIC);
 		if (iucv_pathid_table == NULL) {
 			printk(KERN_WARNING "%s: iucv_pathid_table storage "
 			       "allocation failed\n", __FUNCTION__);
 			kfree(new_handler);
 			return NULL;
 		}
-		memset (iucv_pathid_table, 0, max_connections * sizeof(handler *));
 	}
 	memset(new_handler, 0, sizeof (handler));
 	memcpy(new_handler->id.user_data, pgmname,
@@ -813,7 +810,7 @@ iucv_register_program (__u8 pgmname[16],
 			sizeof (new_handler->id.userid));
 		EBC_TOUPPER (new_handler->id.userid,
 			     sizeof (new_handler->id.userid));
-		
+
 		if (pgmmask) {
 			memcpy (new_handler->id.mask, pgmmask,
 				sizeof (new_handler->id.mask));
@@ -1232,7 +1229,7 @@ iucv_purge (__u16 pathid, __u32 msgid, __u32 srccls, __u32 *audit)
 		/* parm->ipaudit has only 3 bytes */
 		*audit >>= 8;
 	}
-	
+
 	release_param(parm);
 
 	iucv_debug(1, "b2f0_result = %ld", b2f0_result);
@@ -2333,14 +2330,14 @@ iucv_do_int(iucv_GeneralInterrupt * int_buf)
 					temp_buff1[j] &= (h->id.mask)[j];
 					temp_buff2[j] &= (h->id.mask)[j];
 				}
-				
+
 				iucv_dumpit("temp_buff1:",
 					    temp_buff1, sizeof(temp_buff1));
 				iucv_dumpit("temp_buff2",
 					    temp_buff2, sizeof(temp_buff2));
-				
+
 				if (!memcmp (temp_buff1, temp_buff2, 24)) {
-					
+
 					iucv_debug(2,
 						   "found a matching handler");
 					break;
@@ -2371,7 +2368,7 @@ iucv_do_int(iucv_GeneralInterrupt * int_buf)
 			} else
 				iucv_sever(int_buf->ippathid, no_listener);
 			break;
-			
+
 		case 0x02:		/*connection complete */
 			if (messagesDisabled) {
 			    iucv_setmask(~0);
@@ -2390,7 +2387,7 @@ iucv_do_int(iucv_GeneralInterrupt * int_buf)
 			} else
 				iucv_sever(int_buf->ippathid, no_listener);
 			break;
-			
+
 		case 0x03:		/* connection severed */
 			if (messagesDisabled) {
 			    iucv_setmask(~0);
@@ -2401,13 +2398,13 @@ iucv_do_int(iucv_GeneralInterrupt * int_buf)
 					interrupt->ConnectionSevered(
 						(iucv_ConnectionSevered *)int_buf,
 						h->pgm_data);
-				
+
 				else
 					iucv_sever (int_buf->ippathid, no_listener);
 			} else
 				iucv_sever(int_buf->ippathid, no_listener);
 			break;
-			
+
 		case 0x04:		/* connection quiesced */
 			if (messagesDisabled) {
 			    iucv_setmask(~0);
@@ -2423,7 +2420,7 @@ iucv_do_int(iucv_GeneralInterrupt * int_buf)
 						   "ConnectionQuiesced not called");
 			}
 			break;
-			
+
 		case 0x05:		/* connection resumed */
 			if (messagesDisabled) {
 			    iucv_setmask(~0);
@@ -2439,7 +2436,7 @@ iucv_do_int(iucv_GeneralInterrupt * int_buf)
 						   "ConnectionResumed not called");
 			}
 			break;
-			
+
 		case 0x06:		/* priority message complete */
 		case 0x07:		/* nonpriority message complete */
 			if (h) {
@@ -2452,7 +2449,7 @@ iucv_do_int(iucv_GeneralInterrupt * int_buf)
 						   "MessageComplete not called");
 			}
 			break;
-			
+
 		case 0x08:		/* priority message pending  */
 		case 0x09:		/* nonpriority message pending  */
 			if (h) {
@@ -2470,7 +2467,7 @@ iucv_do_int(iucv_GeneralInterrupt * int_buf)
 			       __FUNCTION__);
 			break;
 	}			/* end switch */
-	
+
 	iucv_debug(2, "exiting pathid %d, type %02X",
 		 int_buf->ippathid, int_buf->iptype);
 

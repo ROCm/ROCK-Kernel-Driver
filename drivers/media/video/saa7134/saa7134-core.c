@@ -32,6 +32,7 @@
 #include <linux/interrupt.h>
 #include <linux/delay.h>
 #include <linux/mutex.h>
+#include <linux/dma-mapping.h>
 
 #include "saa7134-reg.h"
 #include "saa7134.h"
@@ -65,6 +66,11 @@ MODULE_PARM_DESC(oss,"enable OSS DMA sound [dmasound]");
 static unsigned int latency = UNSET;
 module_param(latency, int, 0444);
 MODULE_PARM_DESC(latency,"pci latency timer");
+
+int saa7134_no_overlay=-1;
+module_param_named(no_overlay, saa7134_no_overlay, int, 0444);
+MODULE_PARM_DESC(no_overlay,"allow override overlay default (0 disables, 1 enables)"
+		" [some VIA/SIS chipsets are known to have problem with overlay]");
 
 static unsigned int video_nr[] = {[0 ... (SAA7134_MAXBOARDS - 1)] = UNSET };
 static unsigned int vbi_nr[]   = {[0 ... (SAA7134_MAXBOARDS - 1)] = UNSET };
@@ -249,13 +255,12 @@ void saa7134_pgtable_free(struct pci_dev *pci, struct saa7134_pgtable *pt)
 
 /* ------------------------------------------------------------------ */
 
-void saa7134_dma_free(struct saa7134_dev *dev,struct saa7134_buf *buf)
+void saa7134_dma_free(struct videobuf_queue *q,struct saa7134_buf *buf)
 {
-	if (in_interrupt())
-		BUG();
+	BUG_ON(in_interrupt());
 
 	videobuf_waiton(&buf->vb,0,0);
-	videobuf_dma_pci_unmap(dev->pci, &buf->vb.dma);
+	videobuf_dma_unmap(q, &buf->vb.dma);
 	videobuf_dma_free(&buf->vb.dma);
 	buf->vb.state = STATE_NEEDS_INIT;
 }
@@ -543,6 +548,8 @@ static irqreturn_t saa7134_irq(int irq, void *dev_id, struct pt_regs *regs)
 		if (report & SAA7134_IRQ_REPORT_GPIO16) {
 			switch (dev->has_remote) {
 				case SAA7134_REMOTE_GPIO:
+					if (!dev->remote)
+						break;
 					if  (dev->remote->mask_keydown & 0x10000) {
 						saa7134_input_irq(dev);
 					}
@@ -559,6 +566,8 @@ static irqreturn_t saa7134_irq(int irq, void *dev_id, struct pt_regs *regs)
 		if (report & SAA7134_IRQ_REPORT_GPIO18) {
 			switch (dev->has_remote) {
 				case SAA7134_REMOTE_GPIO:
+					if (!dev->remote)
+						break;
 					if ((dev->remote->mask_keydown & 0x40000) ||
 					    (dev->remote->mask_keyup & 0x40000)) {
 						saa7134_input_irq(dev);
@@ -613,7 +622,7 @@ static int saa7134_hwinit1(struct saa7134_dev *dev)
 
 	saa_writel(SAA7134_IRQ1, 0);
 	saa_writel(SAA7134_IRQ2, 0);
-	init_MUTEX(&dev->lock);
+	mutex_init(&dev->lock);
 	spin_lock_init(&dev->slock);
 
 	saa7134_track_gpio(dev,"pre-init");
@@ -671,7 +680,7 @@ static int saa7134_hwinit2(struct saa7134_dev *dev)
 		SAA7134_IRQ2_INTE_PE      |
 		SAA7134_IRQ2_INTE_AR;
 
-	if (dev->has_remote == SAA7134_REMOTE_GPIO) {
+	if (dev->has_remote == SAA7134_REMOTE_GPIO && dev->remote) {
 		if (dev->remote->mask_keydown & 0x10000)
 			irq2_mask |= SAA7134_IRQ2_INTE_GPIO16;
 		else if (dev->remote->mask_keydown & 0x40000)
@@ -835,6 +844,22 @@ static int __devinit saa7134_initdev(struct pci_dev *pci_dev,
 			latency = 0x0A;
 		}
 #endif
+		if (pci_pci_problems & PCIPCI_FAIL) {
+			printk(KERN_INFO "%s: quirk: this driver and your "
+					"chipset may not work together"
+					" in overlay mode.\n",dev->name);
+			if (!saa7134_no_overlay) {
+				printk(KERN_INFO "%s: quirk: overlay "
+						"mode will be disabled.\n",
+						dev->name);
+				saa7134_no_overlay = 1;
+			} else {
+				printk(KERN_INFO "%s: quirk: overlay "
+						"mode will be forced. Use this"
+						" option at your own risk.\n",
+						dev->name);
+			}
+		}
 	}
 	if (UNSET != latency) {
 		printk(KERN_INFO "%s: setting pci latency timer to %d\n",
@@ -850,7 +875,7 @@ static int __devinit saa7134_initdev(struct pci_dev *pci_dev,
 	       pci_name(pci_dev), dev->pci_rev, pci_dev->irq,
 	       dev->pci_lat,pci_resource_start(pci_dev,0));
 	pci_set_master(pci_dev);
-	if (!pci_dma_supported(pci_dev,0xffffffff)) {
+	if (!pci_dma_supported(pci_dev, DMA_32BIT_MASK)) {
 		printk("%s: Oops: no 32bit PCI DMA ???\n",dev->name);
 		err = -EIO;
 		goto fail1;
@@ -937,6 +962,11 @@ static int __devinit saa7134_initdev(struct pci_dev *pci_dev,
 	v4l2_prio_init(&dev->prio);
 
 	/* register v4l devices */
+	if (saa7134_no_overlay <= 0) {
+		saa7134_video_template.type |= VID_TYPE_OVERLAY;
+	} else {
+		printk("%s: Overlay support disabled.\n",dev->name);
+	}
 	dev->video_dev = vdev_init(dev,&saa7134_video_template,"video");
 	err = video_register_device(dev->video_dev,VFL_TYPE_GRABBER,
 				    video_nr[dev->nr]);

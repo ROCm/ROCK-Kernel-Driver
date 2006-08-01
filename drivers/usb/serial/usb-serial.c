@@ -27,10 +27,10 @@
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/spinlock.h>
+#include <linux/mutex.h>
 #include <linux/list.h>
 #include <linux/smp_lock.h>
 #include <asm/uaccess.h>
-#include <asm/semaphore.h>
 #include <linux/usb.h>
 #include "usb-serial.h"
 #include "pl2303.h"
@@ -189,11 +189,15 @@ static int serial_open (struct tty_struct *tty, struct file * filp)
 
 	portNumber = tty->index - serial->minor;
 	port = serial->port[portNumber];
-	if (!port)
-		return -ENODEV;
+	if (!port) {
+		retval = -ENODEV;
+		goto bailout_kref_put;
+	}
 
-	if (down_interruptible(&port->sem))
-		return -ERESTARTSYS;
+	if (mutex_lock_interruptible(&port->mutex)) {
+		retval = -ERESTARTSYS;
+		goto bailout_kref_put;
+	}
 	 
 	++port->open_count;
 
@@ -209,7 +213,7 @@ static int serial_open (struct tty_struct *tty, struct file * filp)
 		 * safe because we are called with BKL held */
 		if (!try_module_get(serial->type->driver.owner)) {
 			retval = -ENODEV;
-			goto bailout_kref_put;
+			goto bailout_mutex_unlock;
 		}
 
 		/* only call the device specific open if this 
@@ -219,15 +223,16 @@ static int serial_open (struct tty_struct *tty, struct file * filp)
 			goto bailout_module_put;
 	}
 
-	up(&port->sem);
+	mutex_unlock(&port->mutex);
 	return 0;
 
 bailout_module_put:
 	module_put(serial->type->driver.owner);
+bailout_mutex_unlock:
+	port->open_count = 0;
+	mutex_unlock(&port->mutex);
 bailout_kref_put:
 	kref_put(&serial->kref, destroy_serial);
-	port->open_count = 0;
-	up(&port->sem);
 	return retval;
 }
 
@@ -240,10 +245,10 @@ static void serial_close(struct tty_struct *tty, struct file * filp)
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
-	down(&port->sem);
+	mutex_lock(&port->mutex);
 
 	if (port->open_count == 0) {
-		up(&port->sem);
+		mutex_unlock(&port->mutex);
 		return;
 	}
 
@@ -262,7 +267,7 @@ static void serial_close(struct tty_struct *tty, struct file * filp)
 		module_put(port->serial->type->driver.owner);
 	}
 
-	up(&port->sem);
+	mutex_unlock(&port->mutex);
 	kref_put(&port->serial->kref, destroy_serial);
 }
 
@@ -564,12 +569,11 @@ static struct usb_serial * create_serial (struct usb_device *dev,
 {
 	struct usb_serial *serial;
 
-	serial = kmalloc (sizeof (*serial), GFP_KERNEL);
+	serial = kzalloc(sizeof(*serial), GFP_KERNEL);
 	if (!serial) {
 		dev_err(&dev->dev, "%s - out of memory\n", __FUNCTION__);
 		return NULL;
 	}
-	memset (serial, 0, sizeof(*serial));
 	serial->dev = usb_get_dev(dev);
 	serial->type = driver;
 	serial->interface = interface;
@@ -778,14 +782,13 @@ int usb_serial_probe(struct usb_interface *interface,
 	serial->num_port_pointers = max_endpoints;
 	dbg("%s - setting up %d port structures for this device", __FUNCTION__, max_endpoints);
 	for (i = 0; i < max_endpoints; ++i) {
-		port = kmalloc(sizeof(struct usb_serial_port), GFP_KERNEL);
+		port = kzalloc(sizeof(struct usb_serial_port), GFP_KERNEL);
 		if (!port)
 			goto probe_error;
-		memset(port, 0x00, sizeof(struct usb_serial_port));
 		port->number = i + serial->minor;
 		port->serial = serial;
 		spin_lock_init(&port->lock);
-		sema_init(&port->sem, 1);
+		mutex_init(&port->mutex);
 		INIT_WORK(&port->work, usb_serial_port_softint, port);
 		serial->port[i] = port;
 	}

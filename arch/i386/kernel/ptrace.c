@@ -34,10 +34,10 @@
 
 /*
  * Determines which flags the user has access to [1 = access, 0 = no access].
- * Prohibits changing ID(21), VIP(20), VIF(19), VM(17), IOPL(12-13), IF(9).
+ * Prohibits changing ID(21), VIP(20), VIF(19), VM(17), NT(14), IOPL(12-13), IF(9).
  * Also masks reserved bits (31-22, 15, 5, 3, 1).
  */
-#define FLAG_MASK 0x00054dd5
+#define FLAG_MASK 0x00050dd5
 
 /* set's the trap flag. */
 #define TRAP_FLAG 0x100
@@ -671,7 +671,7 @@ int do_syscall_trace(struct pt_regs *regs, int entryexit)
 
 	if (unlikely(current->audit_context)) {
 		if (entryexit)
-			audit_syscall_exit(current, AUDITSC_RESULT(regs->eax),
+			audit_syscall_exit(AUDITSC_RESULT(regs->eax),
 						regs->eax);
 		/* Debug traps, when using PTRACE_SINGLESTEP, must be sent only
 		 * on the syscall exit path. Normally, when TIF_SYSCALL_AUDIT is
@@ -720,14 +720,13 @@ int do_syscall_trace(struct pt_regs *regs, int entryexit)
 	ret = is_sysemu;
 out:
 	if (unlikely(current->audit_context) && !entryexit)
-		audit_syscall_entry(current, AUDIT_ARCH_I386, regs->orig_eax,
+		audit_syscall_entry(AUDIT_ARCH_I386, regs->orig_eax,
 				    regs->ebx, regs->ecx, regs->edx, regs->esi);
 	if (ret == 0)
 		return 0;
 
 	regs->orig_eax = -1; /* force skip of syscall restarting */
 	if (unlikely(current->audit_context))
-		audit_syscall_exit(current, AUDITSC_RESULT(regs->eax),
-				regs->eax);
+		audit_syscall_exit(AUDITSC_RESULT(regs->eax), regs->eax);
 	return 1;
 }

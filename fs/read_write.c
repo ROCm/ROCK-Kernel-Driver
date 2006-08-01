@@ -19,7 +19,7 @@
 #include <asm/uaccess.h>
 #include <asm/unistd.h>
 
-struct file_operations generic_ro_fops = {
+const struct file_operations generic_ro_fops = {
 	.llseek		= generic_file_llseek,
 	.read		= generic_file_read,
 	.mmap		= generic_file_readonly_mmap,
@@ -202,7 +202,7 @@ int rw_verify_area(int read_write, struct file *file, loff_t *ppos, size_t count
 		goto Einval;
 
 	inode = file->f_dentry->d_inode;
-	if (inode->i_flock && MANDATORY_LOCK(inode)) {
+	if (unlikely(inode->i_flock && MANDATORY_LOCK(inode))) {
 		int retval = locks_mandatory_area(
 			read_write == READ ? FLOCK_VERIFY_READ : FLOCK_VERIFY_WRITE,
 			inode, file, pos, count);
@@ -470,7 +470,7 @@ static ssize_t do_readv_writev(int type, struct file *file,
 	 * verify all the pointers
 	 */
 	ret = -EINVAL;
-	if ((nr_segs > UIO_MAXIOV) || (nr_segs <= 0))
+	if (nr_segs > UIO_MAXIOV)
 		goto out;
 	if (!file->f_op)
 		goto out;

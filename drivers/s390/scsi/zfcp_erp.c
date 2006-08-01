@@ -74,8 +74,8 @@ static int zfcp_erp_strategy_check_action(struct zfcp_erp_action *, int);
 static int zfcp_erp_adapter_strategy(struct zfcp_erp_action *);
 static int zfcp_erp_adapter_strategy_generic(struct zfcp_erp_action *, int);
 static int zfcp_erp_adapter_strategy_close(struct zfcp_erp_action *);
-static void zfcp_erp_adapter_strategy_close_qdio(struct zfcp_erp_action *);
-static void zfcp_erp_adapter_strategy_close_fsf(struct zfcp_erp_action *);
+static int zfcp_erp_adapter_strategy_close_qdio(struct zfcp_erp_action *);
+static int zfcp_erp_adapter_strategy_close_fsf(struct zfcp_erp_action *);
 static int zfcp_erp_adapter_strategy_open(struct zfcp_erp_action *);
 static int zfcp_erp_adapter_strategy_open_qdio(struct zfcp_erp_action *);
 static int zfcp_erp_adapter_strategy_open_fsf(struct zfcp_erp_action *);
@@ -103,10 +103,10 @@ static int zfcp_erp_unit_strategy_clearstati(struct zfcp_unit *);
 static int zfcp_erp_unit_strategy_close(struct zfcp_erp_action *);
 static int zfcp_erp_unit_strategy_open(struct zfcp_erp_action *);
 
-static void zfcp_erp_action_dismiss_adapter(struct zfcp_adapter *);
-static void zfcp_erp_action_dismiss_port(struct zfcp_port *);
-static void zfcp_erp_action_dismiss_unit(struct zfcp_unit *);
-static void zfcp_erp_action_dismiss(struct zfcp_erp_action *);
+static int zfcp_erp_action_dismiss_adapter(struct zfcp_adapter *);
+static int zfcp_erp_action_dismiss_port(struct zfcp_port *);
+static int zfcp_erp_action_dismiss_unit(struct zfcp_unit *);
+static int zfcp_erp_action_dismiss(struct zfcp_erp_action *);
 
 static int zfcp_erp_action_enqueue(int, struct zfcp_adapter *,
 				   struct zfcp_port *, struct zfcp_unit *);
@@ -124,24 +124,6 @@ static inline void zfcp_erp_action_to_running(struct zfcp_erp_action *);
 static void zfcp_erp_memwait_handler(unsigned long);
 static void zfcp_erp_timeout_handler(unsigned long);
 static inline void zfcp_erp_timeout_init(struct zfcp_erp_action *);
-
-
-/**
- * zfcp_adapter_erp_reset -- reset erp on adapter
- *
- * adapter->erp_lock must be held
- */
-void zfcp_adapter_erp_reset(struct zfcp_adapter *adapter)
-{
-	struct zfcp_erp_action erp_action;
-
-	memset(&erp_action, 0, sizeof(erp_action));
-	erp_action.adapter = adapter;
-
-	zfcp_erp_adapter_block(adapter, 0);
-	zfcp_erp_action_dismiss_adapter(adapter);
-	zfcp_erp_adapter_strategy_close_fsf(&erp_action);
-}
 
 /**
  * zfcp_fsf_request_timeout_handler - called if a request timed out
@@ -163,31 +145,29 @@ zfcp_fsf_request_timeout_handler(unsigned long data)
 	zfcp_erp_adapter_reopen(adapter, 0);
 }
 
-/**
- * zfcp_fsf_scsi_er_timeout_handler - timeout handler for scsi eh tasks
+/*
+ * function:	zfcp_fsf_scsi_er_timeout_handler
  *
- * This function needs to be called whenever a SCSI error recovery
- * action (abort/reset) does not return.  Re-opening the adapter means
- * that the abort/reset command can be returned by zfcp. It won't complete
- * via the adapter anymore (because qdio queues are closed). If ERP is
- * already running on this adapter it will be stopped via
- * zfcp_adapter_erp_reset.
+ * purpose:     This function needs to be called whenever a SCSI error recovery
+ *              action (abort/reset) does not return.
+ *              Re-opening the adapter means that the command can be returned
+ *              by zfcp (it is guarranteed that it does not return via the
+ *              adapter anymore). The buffer can then be used again.
+ *    
+ * returns:     sod all
  */
-void zfcp_fsf_scsi_er_timeout_handler(unsigned long data)
+void
+zfcp_fsf_scsi_er_timeout_handler(unsigned long data)
 {
 	struct zfcp_adapter *adapter = (struct zfcp_adapter *) data;
-	unsigned long flags;
 
 	ZFCP_LOG_NORMAL("warning: SCSI error recovery timed out. "
 			"Restarting all operations on the adapter %s\n",
 			zfcp_get_busid_by_adapter(adapter));
 	debug_text_event(adapter->erp_dbf, 1, "eh_lmem_tout");
-
-	write_lock_irqsave(&adapter->erp_lock, flags);
-	if (atomic_test_mask(ZFCP_STATUS_ADAPTER_ERP_PENDING, &adapter->status))
-		zfcp_adapter_erp_reset(adapter);
-	write_unlock_irqrestore(&adapter->erp_lock, flags);
 	zfcp_erp_adapter_reopen(adapter, 0);
+
+	return;
 }
 
 /*
@@ -724,28 +704,36 @@ zfcp_erp_unit_reopen(struct zfcp_unit *unit, int clear_mask)
 	return retval;
 }
 
-/**
- * zfcp_erp_adapter_block - mark adapter as blocked, block scsi requests
+/*
+ * function:	
+ *
+ * purpose:	disable I/O,
+ *		return any open requests and clean them up,
+ *		aim: no pending and incoming I/O
+ *
+ * returns:
  */
-static void zfcp_erp_adapter_block(struct zfcp_adapter *adapter, int clear_mask)
+static void
+zfcp_erp_adapter_block(struct zfcp_adapter *adapter, int clear_mask)
 {
 	debug_text_event(adapter->erp_dbf, 6, "a_bl");
-	if (adapter->scsi_host)
-		scsi_block_requests(adapter->scsi_host);
 	zfcp_erp_modify_adapter_status(adapter,
 				       ZFCP_STATUS_COMMON_UNBLOCKED |
 				       clear_mask, ZFCP_CLEAR);
 }
 
-/**
- * zfcp_erp_adapter_unblock - mark adapter as unblocked, allow scsi requests
+/*
+ * function:	
+ *
+ * purpose:	enable I/O
+ *
+ * returns:
  */
-static void zfcp_erp_adapter_unblock(struct zfcp_adapter *adapter)
+static void
+zfcp_erp_adapter_unblock(struct zfcp_adapter *adapter)
 {
 	debug_text_event(adapter->erp_dbf, 6, "a_ubl");
 	atomic_set_mask(ZFCP_STATUS_COMMON_UNBLOCKED, &adapter->status);
-	if (adapter->scsi_host)
-		scsi_unblock_requests(adapter->scsi_host);
 }
 
 /*
@@ -952,15 +940,23 @@ zfcp_erp_strategy_check_fsfreq(struct zfcp_erp_action *erp_action)
 	return retval;
 }
 
-/**
- * zfcp_erp_async_handler_nolock - complete erp_action
+/*
+ * purpose:	generic handler for asynchronous events related to erp_action events
+ *		(normal completion, time-out, dismissing, retry after
+ *		low memory condition)
  *
- * Used for normal completion, time-out, dismissal and failure after
- * low memory condition.
+ * note:	deletion of timer is not required (e.g. in case of a time-out),
+ *		but a second try does no harm,
+ *		we leave it in here to allow for greater simplification
+ *
+ * returns:	0 - there was an action to handle
+ *		!0 - otherwise
  */
-static void zfcp_erp_async_handler_nolock(struct zfcp_erp_action *erp_action,
-					  unsigned long set_mask)
+static int
+zfcp_erp_async_handler_nolock(struct zfcp_erp_action *erp_action,
+			      unsigned long set_mask)
 {
+	int retval;
 	struct zfcp_adapter *adapter = erp_action->adapter;
 
 	if (zfcp_erp_action_exists(erp_action) == ZFCP_ERP_ACTION_RUNNING) {
@@ -971,26 +967,43 @@ static void zfcp_erp_async_handler_nolock(struct zfcp_erp_action *erp_action,
 			del_timer(&erp_action->timer);
 		erp_action->status |= set_mask;
 		zfcp_erp_action_ready(erp_action);
+		retval = 0;
 	} else {
 		/* action is ready or gone - nothing to do */
 		debug_text_event(adapter->erp_dbf, 3, "a_asyh_gone");
 		debug_event(adapter->erp_dbf, 3, &erp_action->action,
 			    sizeof (int));
+		retval = 1;
 	}
+
+	return retval;
 }
 
-/**
- * zfcp_erp_async_handler - wrapper for erp_async_handler_nolock w/ locking 
+/*
+ * purpose:	generic handler for asynchronous events related to erp_action
+ *               events	(normal completion, time-out, dismissing, retry after
+ *		low memory condition)
+ *
+ * note:	deletion of timer is not required (e.g. in case of a time-out),
+ *		but a second try does no harm,
+ *		we leave it in here to allow for greater simplification
+ *
+ * returns:	0 - there was an action to handle
+ *		!0 - otherwise
  */
-void zfcp_erp_async_handler(struct zfcp_erp_action *erp_action,
-			    unsigned long set_mask)
+int
+zfcp_erp_async_handler(struct zfcp_erp_action *erp_action,
+		       unsigned long set_mask)
 {
 	struct zfcp_adapter *adapter = erp_action->adapter;
 	unsigned long flags;
+	int retval;
 
 	write_lock_irqsave(&adapter->erp_lock, flags);
-	zfcp_erp_async_handler_nolock(erp_action, set_mask);
+	retval = zfcp_erp_async_handler_nolock(erp_action, set_mask);
 	write_unlock_irqrestore(&adapter->erp_lock, flags);
+
+	return retval;
 }
 
 /*
@@ -1027,15 +1040,17 @@ zfcp_erp_timeout_handler(unsigned long data)
 	zfcp_erp_async_handler(erp_action, ZFCP_STATUS_ERP_TIMEDOUT);
 }
 
-/**
- * zfcp_erp_action_dismiss - dismiss an erp_action
+/*
+ * purpose:	is called for an erp_action which needs to be ended
+ *		though not being done,
+ *		this is usually required if an higher is generated,
+ *		action gets an appropriate flag and will be processed
+ *		accordingly
  *
- * adapter->erp_lock must be held
- * 
- * Dismissal of an erp_action is usually required if an erp_action of
- * higher priority is generated.
+ * locks:	erp_lock held (thus we need to call another handler variant)
  */
-static void zfcp_erp_action_dismiss(struct zfcp_erp_action *erp_action)
+static int
+zfcp_erp_action_dismiss(struct zfcp_erp_action *erp_action)
 {
 	struct zfcp_adapter *adapter = erp_action->adapter;
 
@@ -1043,6 +1058,8 @@ static void zfcp_erp_action_dismiss(struct zfcp_erp_action *erp_action)
 	debug_event(adapter->erp_dbf, 2, &erp_action->action, sizeof (int));
 
 	zfcp_erp_async_handler_nolock(erp_action, ZFCP_STATUS_ERP_DISMISSED);
+
+	return 0;
 }
 
 int
@@ -1605,12 +1622,10 @@ zfcp_erp_strategy_check_unit(struct zfcp_unit *unit, int result)
 	switch (result) {
 	case ZFCP_ERP_SUCCEEDED :
 		atomic_set(&unit->erp_counter, 0);
-		statistic_inc(unit->stat_erp, 1);
 		zfcp_erp_unit_unblock(unit);
 		break;
 	case ZFCP_ERP_FAILED :
 		atomic_inc(&unit->erp_counter);
-		statistic_inc(unit->stat_erp, -1);
 		if (atomic_read(&unit->erp_counter) > ZFCP_MAX_ERPS)
 			zfcp_erp_unit_failed(unit);
 		break;
@@ -1678,12 +1693,10 @@ zfcp_erp_strategy_check_adapter(struct zfcp_adapter *adapter, int result)
 	switch (result) {
 	case ZFCP_ERP_SUCCEEDED :
 		atomic_set(&adapter->erp_counter, 0);
-		statistic_inc(adapter->stat_erp, 1);
 		zfcp_erp_adapter_unblock(adapter);
 		break;
 	case ZFCP_ERP_FAILED :
 		atomic_inc(&adapter->erp_counter);
-		statistic_inc(adapter->stat_erp, -1);
 		if (atomic_read(&adapter->erp_counter) > ZFCP_MAX_ERPS)
 			zfcp_erp_adapter_failed(adapter);
 		break;
@@ -2164,12 +2177,18 @@ zfcp_erp_adapter_strategy_open_qdio(struct zfcp_erp_action *erp_action)
 	return retval;
 }
 
-/**
- * zfcp_erp_adapter_strategy_close_qdio - close qdio queues for an adapter
+/*
+ * function:    zfcp_qdio_cleanup
+ *
+ * purpose:	cleans up QDIO operation for the specified adapter
+ *
+ * returns:	0 - successful cleanup
+ *		!0 - failed cleanup
  */
-static void
+int
 zfcp_erp_adapter_strategy_close_qdio(struct zfcp_erp_action *erp_action)
 {
+	int retval = ZFCP_ERP_SUCCEEDED;
 	int first_used;
 	int used_count;
 	struct zfcp_adapter *adapter = erp_action->adapter;
@@ -2178,13 +2197,15 @@ zfcp_erp_adapter_strategy_close_qdio(struct zfcp_erp_action *erp_action)
 		ZFCP_LOG_DEBUG("error: attempt to shut down inactive QDIO "
 			       "queues on adapter %s\n",
 			       zfcp_get_busid_by_adapter(adapter));
-		return;
+		retval = ZFCP_ERP_FAILED;
+		goto out;
 	}
 
 	/*
 	 * Get queue_lock and clear QDIOUP flag. Thus it's guaranteed that
 	 * do_QDIO won't be called while qdio_shutdown is in progress.
 	 */
+
 	write_lock_irq(&adapter->request_queue.queue_lock);
 	atomic_clear_mask(ZFCP_STATUS_ADAPTER_QDIOUP, &adapter->status);
 	write_unlock_irq(&adapter->request_queue.queue_lock);
@@ -2216,6 +2237,8 @@ zfcp_erp_adapter_strategy_close_qdio(struct zfcp_erp_action *erp_action)
 	adapter->request_queue.free_index = 0;
 	atomic_set(&adapter->request_queue.free_count, 0);
 	adapter->request_queue.distance_from_int = 0;
+ out:
+	return retval;
 }
 
 static int
@@ -2379,12 +2402,18 @@ zfcp_erp_adapter_strategy_open_fsf_statusread(struct zfcp_erp_action
 	return retval;
 }
 
-/**
- * zfcp_erp_adapter_strategy_close_fsf - stop FSF operations for an adapter
+/*
+ * function:    zfcp_fsf_cleanup
+ *
+ * purpose:	cleanup FSF operation for specified adapter
+ *
+ * returns:	0 - FSF operation successfully cleaned up
+ *		!0 - failed to cleanup FSF operation for this adapter
  */
-static void
+static int
 zfcp_erp_adapter_strategy_close_fsf(struct zfcp_erp_action *erp_action)
 {
+	int retval = ZFCP_ERP_SUCCEEDED;
 	struct zfcp_adapter *adapter = erp_action->adapter;
 
 	/*
@@ -2398,6 +2427,8 @@ zfcp_erp_adapter_strategy_close_fsf(struct zfcp_erp_action *erp_action)
 	/* all ports and units are closed */
 	zfcp_erp_modify_adapter_status(adapter,
 				       ZFCP_STATUS_COMMON_OPEN, ZFCP_CLEAR);
+
+	return retval;
 }
 
 /*
@@ -3366,18 +3397,15 @@ zfcp_erp_action_cleanup(int action, struct zfcp_adapter *adapter,
  			scsi_scan_target(&port->rport->dev, 0,
 					 port->rport->scsi_target_id,
 					 unit->scsi_lun, 0);
-			zfcp_cb_unit_add(unit);
 		}
 		zfcp_unit_put(unit);
 		break;
 	case ZFCP_ERP_ACTION_REOPEN_PORT_FORCED:
 	case ZFCP_ERP_ACTION_REOPEN_PORT:
-		if (atomic_test_mask(ZFCP_STATUS_PORT_NO_WWPN, &port->status)) {
-			zfcp_port_put(port);
-			break;
-		}
-		
-		if ((result == ZFCP_ERP_SUCCEEDED) && !port->rport) {
+		if ((result == ZFCP_ERP_SUCCEEDED)
+		    && !atomic_test_mask(ZFCP_STATUS_PORT_NO_WWPN,
+					 &port->status)
+		    && !port->rport) {
 			struct fc_rport_identifiers ids;
 			ids.node_name = port->wwnn;
 			ids.port_name = port->wwpn;
@@ -3393,23 +3421,9 @@ zfcp_erp_action_cleanup(int action, struct zfcp_adapter *adapter,
 			else
 				scsi_flush_work(adapter->scsi_host);
 		}
-		if ((result != ZFCP_ERP_SUCCEEDED) && port->rport) {
-			fc_remote_port_delete(port->rport);
-			port->rport = NULL;
-		}
 		zfcp_port_put(port);
 		break;
 	case ZFCP_ERP_ACTION_REOPEN_ADAPTER:
-		if (result != ZFCP_ERP_SUCCEEDED) {
-			struct zfcp_port *port;
-			list_for_each_entry(port, &adapter->port_list_head, list)
-				if (port->rport &&
-				    !atomic_test_mask(ZFCP_STATUS_PORT_WKA,
-						      &port->status)) {
-					fc_remote_port_delete(port->rport);
-					port->rport = NULL;
-				}
-		}
 		zfcp_adapter_put(adapter);
 		break;
 	default:
@@ -3418,8 +3432,17 @@ zfcp_erp_action_cleanup(int action, struct zfcp_adapter *adapter,
 }
 
 
-static void zfcp_erp_action_dismiss_adapter(struct zfcp_adapter *adapter)
+/*
+ * function:	
+ *
+ * purpose:	
+ *
+ * returns:	FIXME
+ */
+static int
+zfcp_erp_action_dismiss_adapter(struct zfcp_adapter *adapter)
 {
+	int retval = 0;
 	struct zfcp_port *port;
 
 	debug_text_event(adapter->erp_dbf, 5, "a_actab");
@@ -3428,10 +3451,21 @@ static void zfcp_erp_action_dismiss_adapter(struct zfcp_adapter *adapter)
 	else
 		list_for_each_entry(port, &adapter->port_list_head, list)
 		    zfcp_erp_action_dismiss_port(port);
+
+	return retval;
 }
 
-static void zfcp_erp_action_dismiss_port(struct zfcp_port *port)
+/*
+ * function:	
+ *
+ * purpose:	
+ *
+ * returns:	FIXME
+ */
+static int
+zfcp_erp_action_dismiss_port(struct zfcp_port *port)
 {
+	int retval = 0;
 	struct zfcp_unit *unit;
 	struct zfcp_adapter *adapter = port->adapter;
 
@@ -3442,16 +3476,29 @@ static void zfcp_erp_action_dismiss_port(struct zfcp_port *port)
 	else
 		list_for_each_entry(unit, &port->unit_list_head, list)
 		    zfcp_erp_action_dismiss_unit(unit);
+
+	return retval;
 }
 
-static void zfcp_erp_action_dismiss_unit(struct zfcp_unit *unit)
+/*
+ * function:	
+ *
+ * purpose:	
+ *
+ * returns:	FIXME
+ */
+static int
+zfcp_erp_action_dismiss_unit(struct zfcp_unit *unit)
 {
+	int retval = 0;
 	struct zfcp_adapter *adapter = unit->port->adapter;
 
 	debug_text_event(adapter->erp_dbf, 5, "u_actab");
 	debug_event(adapter->erp_dbf, 5, &unit->fcp_lun, sizeof (fcp_lun_t));
 	if (atomic_test_mask(ZFCP_STATUS_COMMON_ERP_INUSE, &unit->status))
 		zfcp_erp_action_dismiss(&unit->erp_action);
+
+	return retval;
 }
 
 /*
@@ -3656,9 +3703,3 @@ zfcp_erp_unit_access_changed(struct zfcp_unit *unit)
 }
 
 #undef ZFCP_LOG_AREA
-
-EXPORT_SYMBOL(zfcp_erp_wait);
-EXPORT_SYMBOL(zfcp_erp_port_reopen);
-EXPORT_SYMBOL(zfcp_erp_unit_reopen);
-EXPORT_SYMBOL(zfcp_erp_unit_shutdown);
-EXPORT_SYMBOL(zfcp_fsf_request_timeout_handler);

@@ -1,6 +1,4 @@
 /*
- *  arch/ppc64/kernel/head.S
- *
  *  PowerPC version
  *    Copyright (C) 1995-1996 Gary Thomas (gdt@linuxppc.org)
  *
@@ -401,16 +399,52 @@ label##_common:						\
 	bl	hdlr;					\
 	b	.ret_from_except
 
+/*
+ * Like STD_EXCEPTION_COMMON, but for exceptions that can occur
+ * in the idle task and therefore need the special idle handling.
+ */
+#define STD_EXCEPTION_COMMON_IDLE(trap, label, hdlr)	\
+	.align	7;					\
+	.globl label##_common;				\
+label##_common:						\
+	EXCEPTION_PROLOG_COMMON(trap, PACA_EXGEN);	\
+	FINISH_NAP;					\
+	DISABLE_INTS;					\
+	bl	.save_nvgprs;				\
+	addi	r3,r1,STACK_FRAME_OVERHEAD;		\
+	bl	hdlr;					\
+	b	.ret_from_except
+
 #define STD_EXCEPTION_COMMON_LITE(trap, label, hdlr)	\
 	.align	7;					\
 	.globl label##_common;				\
 label##_common:						\
 	EXCEPTION_PROLOG_COMMON(trap, PACA_EXGEN);	\
+	FINISH_NAP;					\
 	DISABLE_INTS;					\
 	bl	.ppc64_runlatch_on;			\
 	addi	r3,r1,STACK_FRAME_OVERHEAD;		\
 	bl	hdlr;					\
 	b	.ret_from_except_lite
+
+/*
+ * When the idle code in power4_idle puts the CPU into NAP mode,
+ * it has to do so in a loop, and relies on the external interrupt
+ * and decrementer interrupt entry code to get it out of the loop.
+ * It sets the _TLF_NAPPING bit in current_thread_info()->local_flags
+ * to signal that it is in the loop and needs help to get out.
+ */
+#ifdef CONFIG_PPC_970_NAP
+#define FINISH_NAP				\
+BEGIN_FTR_SECTION				\
+	clrrdi	r11,r1,THREAD_SHIFT;		\
+	ld	r9,TI_LOCAL_FLAGS(r11);		\
+	andi.	r10,r9,_TLF_NAPPING;		\
+	bnel	power4_fixup_nap;		\
+END_FTR_SECTION_IFSET(CPU_FTR_CAN_NAP)
+#else
+#define FINISH_NAP
+#endif
 
 /*
  * Start of pSeries system interrupt routines
@@ -797,6 +831,7 @@ hardware_interrupt_iSeries_masked:
 	.globl machine_check_common
 machine_check_common:
 	EXCEPTION_PROLOG_COMMON(0x200, PACA_EXMC)
+	FINISH_NAP
 	DISABLE_INTS
 	bl	.save_nvgprs
 	addi	r3,r1,STACK_FRAME_OVERHEAD
@@ -808,7 +843,7 @@ machine_check_common:
 	STD_EXCEPTION_COMMON(0xb00, trap_0b, .unknown_exception)
 	STD_EXCEPTION_COMMON(0xd00, single_step, .single_step_exception)
 	STD_EXCEPTION_COMMON(0xe00, trap_0e, .unknown_exception)
-	STD_EXCEPTION_COMMON(0xf00, performance_monitor, .performance_monitor_exception)
+	STD_EXCEPTION_COMMON_IDLE(0xf00, performance_monitor, .performance_monitor_exception)
 	STD_EXCEPTION_COMMON(0x1300, instruction_breakpoint, .instruction_breakpoint_exception)
 #ifdef CONFIG_ALTIVEC
 	STD_EXCEPTION_COMMON(0x1700, altivec_assist, .altivec_assist_exception)
@@ -1059,12 +1094,22 @@ unrecov_slb:
 	.globl hardware_interrupt_entry
 hardware_interrupt_common:
 	EXCEPTION_PROLOG_COMMON(0x500, PACA_EXGEN)
+	FINISH_NAP
 hardware_interrupt_entry:
 	DISABLE_INTS
 	bl	.ppc64_runlatch_on
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	bl	.do_IRQ
 	b	.ret_from_except_lite
+
+#ifdef CONFIG_PPC_970_NAP
+power4_fixup_nap:
+	andc	r9,r9,r10
+	std	r9,TI_LOCAL_FLAGS(r11)
+	ld	r10,_LINK(r1)		/* make idle task do the */
+	std	r10,_NIP(r1)		/* equivalent of a blr */
+	blr
+#endif
 
 	.align	7
 	.globl alignment_common
@@ -1569,7 +1614,11 @@ _STATIC(__boot_from_prom)
 	mr	r28,r6
 	mr	r27,r7
 
-	/* Align the stack to 16-byte boundary for broken yaboot */
+	/*
+	 * Align the stack to 16-byte boundary
+	 * Depending on the size and layout of the ELF sections in the initial
+	 * boot binary, the stack pointer will be unalignet on PowerMac
+	 */
 	rldicr	r1,r1,0,59
 
 	/* Make sure we are running in 64 bits mode */

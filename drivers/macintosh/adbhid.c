@@ -1206,11 +1206,11 @@ init_ms_a3(int id)
 static int __init adbhid_init(void)
 {
 #ifdef CONFIG_PPC32
-	if ( (_machine != _MACH_chrp) && (_machine != _MACH_Pmac) )
-	    return 0;
+	if (!machine_is(chrp) && !machine_is(powermac))
+		return 0;
 #endif
 #ifdef CONFIG_PPC64
-	if (_machine != _MACH_Pmac)
+	if (!machine_is(powermac))
 		return 0;
 #endif
 
@@ -1218,7 +1218,8 @@ static int __init adbhid_init(void)
 
 	adbhid_probe();
 
-	notifier_chain_register(&adb_client_list, &adbhid_adb_notifier);
+	blocking_notifier_chain_register(&adb_client_list,
+			&adbhid_adb_notifier);
 
 	return 0;
 }

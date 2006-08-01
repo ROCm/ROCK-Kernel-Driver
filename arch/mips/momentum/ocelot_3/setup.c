@@ -58,6 +58,7 @@
 #include <linux/bootmem.h>
 #include <linux/mv643xx.h>
 #include <linux/pm.h>
+#include <linux/bcd.h>
 
 #include <asm/time.h>
 #include <asm/page.h>
@@ -131,9 +132,6 @@ void setup_wired_tlb_entries(void)
 	add_wired_entry(ENTRYLO(0xfc000000), ENTRYLO(0xfd000000), (signed)0xfc000000, PM_16M);
 }
 
-#define CONV_BCD_TO_BIN(val)	(((val) & 0xf) + (((val) >> 4) * 10))
-#define CONV_BIN_TO_BCD(val)	(((val) % 10) + (((val) / 10) << 4))
-
 unsigned long m48t37y_get_time(void)
 {
 	unsigned int year, month, day, hour, min, sec;
@@ -143,16 +141,16 @@ unsigned long m48t37y_get_time(void)
 	/* stop the update */
 	rtc_base[0x7ff8] = 0x40;
 
-	year = CONV_BCD_TO_BIN(rtc_base[0x7fff]);
-	year += CONV_BCD_TO_BIN(rtc_base[0x7ff1]) * 100;
+	year = BCD2BIN(rtc_base[0x7fff]);
+	year += BCD2BIN(rtc_base[0x7ff1]) * 100;
 
-	month = CONV_BCD_TO_BIN(rtc_base[0x7ffe]);
+	month = BCD2BIN(rtc_base[0x7ffe]);
 
-	day = CONV_BCD_TO_BIN(rtc_base[0x7ffd]);
+	day = BCD2BIN(rtc_base[0x7ffd]);
 
-	hour = CONV_BCD_TO_BIN(rtc_base[0x7ffb]);
-	min = CONV_BCD_TO_BIN(rtc_base[0x7ffa]);
-	sec = CONV_BCD_TO_BIN(rtc_base[0x7ff9]);
+	hour = BCD2BIN(rtc_base[0x7ffb]);
+	min = BCD2BIN(rtc_base[0x7ffa]);
+	sec = BCD2BIN(rtc_base[0x7ff9]);
 
 	/* start the update */
 	rtc_base[0x7ff8] = 0x00;
@@ -175,22 +173,22 @@ int m48t37y_set_time(unsigned long sec)
 	rtc_base[0x7ff8] = 0x80;
 
 	/* year */
-	rtc_base[0x7fff] = CONV_BIN_TO_BCD(tm.tm_year % 100);
-	rtc_base[0x7ff1] = CONV_BIN_TO_BCD(tm.tm_year / 100);
+	rtc_base[0x7fff] = BIN2BCD(tm.tm_year % 100);
+	rtc_base[0x7ff1] = BIN2BCD(tm.tm_year / 100);
 
 	/* month */
-	rtc_base[0x7ffe] = CONV_BIN_TO_BCD(tm.tm_mon);
+	rtc_base[0x7ffe] = BIN2BCD(tm.tm_mon);
 
 	/* day */
-	rtc_base[0x7ffd] = CONV_BIN_TO_BCD(tm.tm_mday);
+	rtc_base[0x7ffd] = BIN2BCD(tm.tm_mday);
 
 	/* hour/min/sec */
-	rtc_base[0x7ffb] = CONV_BIN_TO_BCD(tm.tm_hour);
-	rtc_base[0x7ffa] = CONV_BIN_TO_BCD(tm.tm_min);
-	rtc_base[0x7ff9] = CONV_BIN_TO_BCD(tm.tm_sec);
+	rtc_base[0x7ffb] = BIN2BCD(tm.tm_hour);
+	rtc_base[0x7ffa] = BIN2BCD(tm.tm_min);
+	rtc_base[0x7ff9] = BIN2BCD(tm.tm_sec);
 
 	/* day of week -- not really used, but let's keep it up-to-date */
-	rtc_base[0x7ffc] = CONV_BIN_TO_BCD(tm.tm_wday + 1);
+	rtc_base[0x7ffc] = BIN2BCD(tm.tm_wday + 1);
 
 	/* disable writing */
 	rtc_base[0x7ff8] = 0x00;
@@ -215,8 +213,8 @@ void momenco_time_init(void)
 	mips_hpt_frequency = cpu_clock / 2;
 	board_timer_setup = momenco_timer_setup;
 
-	rtc_get_time = m48t37y_get_time;
-	rtc_set_time = m48t37y_set_time;
+	rtc_mips_get_time = m48t37y_get_time;
+	rtc_mips_set_time = m48t37y_set_time;
 }
 
 /*
@@ -331,22 +329,22 @@ void __init plat_setup(void)
 	/* shut down ethernet ports, just to be sure our memory doesn't get
 	 * corrupted by random ethernet traffic.
 	 */
-	MV_WRITE(MV64340_ETH_TRANSMIT_QUEUE_COMMAND_REG(0), 0xff << 8);
-	MV_WRITE(MV64340_ETH_TRANSMIT_QUEUE_COMMAND_REG(1), 0xff << 8);
-	MV_WRITE(MV64340_ETH_RECEIVE_QUEUE_COMMAND_REG(0), 0xff << 8);
-	MV_WRITE(MV64340_ETH_RECEIVE_QUEUE_COMMAND_REG(1), 0xff << 8);
+	MV_WRITE(MV643XX_ETH_TRANSMIT_QUEUE_COMMAND_REG(0), 0xff << 8);
+	MV_WRITE(MV643XX_ETH_TRANSMIT_QUEUE_COMMAND_REG(1), 0xff << 8);
+	MV_WRITE(MV643XX_ETH_RECEIVE_QUEUE_COMMAND_REG(0), 0xff << 8);
+	MV_WRITE(MV643XX_ETH_RECEIVE_QUEUE_COMMAND_REG(1), 0xff << 8);
 	do {}
-	  while (MV_READ(MV64340_ETH_RECEIVE_QUEUE_COMMAND_REG(0)) & 0xff);
+	  while (MV_READ(MV643XX_ETH_RECEIVE_QUEUE_COMMAND_REG(0)) & 0xff);
 	do {}
-	  while (MV_READ(MV64340_ETH_RECEIVE_QUEUE_COMMAND_REG(1)) & 0xff);
+	  while (MV_READ(MV643XX_ETH_RECEIVE_QUEUE_COMMAND_REG(1)) & 0xff);
 	do {}
-	  while (MV_READ(MV64340_ETH_TRANSMIT_QUEUE_COMMAND_REG(0)) & 0xff);
+	  while (MV_READ(MV643XX_ETH_TRANSMIT_QUEUE_COMMAND_REG(0)) & 0xff);
 	do {}
-	  while (MV_READ(MV64340_ETH_TRANSMIT_QUEUE_COMMAND_REG(1)) & 0xff);
-	MV_WRITE(MV64340_ETH_PORT_SERIAL_CONTROL_REG(0),
-		 MV_READ(MV64340_ETH_PORT_SERIAL_CONTROL_REG(0)) & ~1);
-	MV_WRITE(MV64340_ETH_PORT_SERIAL_CONTROL_REG(1),
-		 MV_READ(MV64340_ETH_PORT_SERIAL_CONTROL_REG(1)) & ~1);
+	  while (MV_READ(MV643XX_ETH_TRANSMIT_QUEUE_COMMAND_REG(1)) & 0xff);
+	MV_WRITE(MV643XX_ETH_PORT_SERIAL_CONTROL_REG(0),
+		 MV_READ(MV643XX_ETH_PORT_SERIAL_CONTROL_REG(0)) & ~1);
+	MV_WRITE(MV643XX_ETH_PORT_SERIAL_CONTROL_REG(1),
+		 MV_READ(MV643XX_ETH_PORT_SERIAL_CONTROL_REG(1)) & ~1);
 
 	/* Turn off the Bit-Error LED */
 	OCELOT_FPGA_WRITE(0x80, CLR);

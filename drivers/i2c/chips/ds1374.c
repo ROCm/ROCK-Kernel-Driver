@@ -26,6 +26,8 @@
 #include <linux/i2c.h>
 #include <linux/rtc.h>
 #include <linux/bcd.h>
+#include <linux/mutex.h>
+#include <linux/workqueue.h>
 
 #define DS1374_REG_TOD0		0x00
 #define DS1374_REG_TOD1		0x01
@@ -41,7 +43,7 @@
 
 #define	DS1374_DRV_NAME		"ds1374"
 
-static DECLARE_MUTEX(ds1374_mutex);
+static DEFINE_MUTEX(ds1374_mutex);
 
 static struct i2c_driver ds1374_driver;
 static struct i2c_client *save_client;
@@ -114,7 +116,7 @@ ulong ds1374_get_rtc_time(void)
 	ulong t1, t2;
 	int limit = 10;		/* arbitrary retry limit */
 
-	down(&ds1374_mutex);
+	mutex_lock(&ds1374_mutex);
 
 	/*
 	 * Since the reads are being performed one byte at a time using
@@ -127,7 +129,7 @@ ulong ds1374_get_rtc_time(void)
 		t2 = ds1374_read_rtc();
 	} while (t1 != t2 && limit--);
 
-	up(&ds1374_mutex);
+	mutex_unlock(&ds1374_mutex);
 
 	if (t1 != t2) {
 		dev_warn(&save_client->dev,
@@ -138,14 +140,14 @@ ulong ds1374_get_rtc_time(void)
 	return t1;
 }
 
-static void ds1374_set_tlet(ulong arg)
+static void ds1374_set_work(void *arg)
 {
 	ulong t1, t2;
 	int limit = 10;		/* arbitrary retry limit */
 
 	t1 = *(ulong *) arg;
 
-	down(&ds1374_mutex);
+	mutex_lock(&ds1374_mutex);
 
 	/*
 	 * Since the writes are being performed one byte at a time using
@@ -158,7 +160,7 @@ static void ds1374_set_tlet(ulong arg)
 		t2 = ds1374_read_rtc();
 	} while (t1 != t2 && limit--);
 
-	up(&ds1374_mutex);
+	mutex_unlock(&ds1374_mutex);
 
 	if (t1 != t2)
 		dev_warn(&save_client->dev,
@@ -167,17 +169,18 @@ static void ds1374_set_tlet(ulong arg)
 
 static ulong new_time;
 
-static DECLARE_TASKLET_DISABLED(ds1374_tasklet, ds1374_set_tlet,
-				(ulong) & new_time);
+static struct workqueue_struct *ds1374_workqueue;
+
+static DECLARE_WORK(ds1374_work, ds1374_set_work, &new_time);
 
 int ds1374_set_rtc_time(ulong nowtime)
 {
 	new_time = nowtime;
 
 	if (in_interrupt())
-		tasklet_schedule(&ds1374_tasklet);
+		queue_work(ds1374_workqueue, &ds1374_work);
 	else
-		ds1374_set_tlet((ulong) & new_time);
+		ds1374_set_work(&new_time);
 
 	return 0;
 }
@@ -203,6 +206,8 @@ static int ds1374_probe(struct i2c_adapter *adap, int addr, int kind)
 	client->adapter = adap;
 	client->driver = &ds1374_driver;
 
+	ds1374_workqueue = create_singlethread_workqueue("ds1374");
+
 	if ((rc = i2c_attach_client(client)) != 0) {
 		kfree(client);
 		return rc;
@@ -226,7 +231,7 @@ static int ds1374_detach(struct i2c_client *client)
 
 	if ((rc = i2c_detach_client(client)) == 0) {
 		kfree(i2c_get_clientdata(client));
-		tasklet_kill(&ds1374_tasklet);
+		destroy_workqueue(ds1374_workqueue);
 	}
 	return rc;
 }

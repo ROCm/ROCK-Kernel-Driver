@@ -2,7 +2,7 @@
  *
  * Copyright 2003       Kai Germaschewski
  * Copyright 2002-2004  Rusty Russell, IBM Corporation
- *
+ * Copyright 2006       Sam Ravnborg
  * Based in part on module-init-tools/depmod.c,file2alias
  *
  * This software may be used and distributed according to the terms
@@ -85,7 +85,7 @@ static struct module *new_module(char *modname)
 {
 	struct module *mod;
 	char *p, *s;
-	
+
 	mod = NOFAIL(malloc(sizeof(*mod)));
 	memset(mod, 0, sizeof(*mod));
 	p = NOFAIL(strdup(modname));
@@ -191,7 +191,7 @@ static struct symbol *sym_add_exported(const char *name, struct module *mod)
 		s = new_symbol(name, mod);
 	} else {
 		if (!s->preloaded) {
-			warn("%s: duplicate symbol '%s' previous definition "
+			warn("%s: '%s' exported twice. Previous export "
 			     "was in %s%s\n", mod->name, name,
 			     s->module->name,
 			     is_vmlinux(s->module->name) ?"":".ko");
@@ -320,9 +320,9 @@ static void parse_elf(struct elf_info *info, const char *filename)
 			continue;
 
 		info->symtab_start = (void *)hdr + sechdrs[i].sh_offset;
-		info->symtab_stop  = (void *)hdr + sechdrs[i].sh_offset 
+		info->symtab_stop  = (void *)hdr + sechdrs[i].sh_offset
 			                         + sechdrs[i].sh_size;
-		info->strtab       = (void *)hdr + 
+		info->strtab       = (void *)hdr +
 			             sechdrs[sechdrs[i].sh_link].sh_offset;
 	}
 	if (!info->symtab_start) {
@@ -346,8 +346,8 @@ static void parse_elf_finish(struct elf_info *info)
 	release_file(info->hdr, info->size);
 }
 
-#define CRC_PFX     "__crc_"
-#define KSYMTAB_PFX "__ksymtab_"
+#define CRC_PFX     MODULE_SYMBOL_PREFIX "__crc_"
+#define KSYMTAB_PFX MODULE_SYMBOL_PREFIX "__ksymtab_"
 
 static void handle_modversions(struct module *mod, struct elf_info *info,
 			       Elf_Sym *sym, const char *symname)
@@ -387,15 +387,15 @@ static void handle_modversions(struct module *mod, struct elf_info *info,
 			/* Ignore register directives. */
 			if (ELF_ST_TYPE(sym->st_info) == STT_SPARC_REGISTER)
 				break;
- 			if (symname[0] == '.') {
- 				char *munged = strdup(symname);
- 				munged[0] = '_';
- 				munged[1] = toupper(munged[1]);
- 				symname = munged;
- 			}
+			if (symname[0] == '.') {
+				char *munged = strdup(symname);
+				munged[0] = '_';
+				munged[1] = toupper(munged[1]);
+				symname = munged;
+			}
 		}
 #endif
-		
+
 		if (memcmp(symname, MODULE_SYMBOL_PREFIX,
 			   strlen(MODULE_SYMBOL_PREFIX)) == 0)
 			mod->unres = alloc_symbol(symname +
@@ -449,6 +449,472 @@ static char *get_modinfo(void *modinfo, unsigned long modinfo_len,
 			return p + taglen + 1;
 	}
 	return NULL;
+}
+
+/**
+ * Test if string s ends in string sub
+ * return 0 if match
+ **/
+static int strrcmp(const char *s, const char *sub)
+{
+        int slen, sublen;
+
+	if (!s || !sub)
+		return 1;
+
+	slen = strlen(s);
+        sublen = strlen(sub);
+
+	if ((slen == 0) || (sublen == 0))
+		return 1;
+
+        if (sublen > slen)
+                return 1;
+
+        return memcmp(s + slen - sublen, sub, sublen);
+}
+
+/**
+ * Whitelist to allow certain references to pass with no warning.
+ * Pattern 1:
+ *   If a module parameter is declared __initdata and permissions=0
+ *   then this is legal despite the warning generated.
+ *   We cannot see value of permissions here, so just ignore
+ *   this pattern.
+ *   The pattern is identified by:
+ *   tosec   = .init.data
+ *   fromsec = .data*
+ *   atsym   =__param*
+ *
+ * Pattern 2:
+ *   Many drivers utilise a *driver container with references to
+ *   add, remove, probe functions etc.
+ *   These functions may often be marked __init and we do not want to
+ *   warn here.
+ *   the pattern is identified by:
+ *   tosec   = .init.text | .exit.text | .init.data
+ *   fromsec = .data
+ *   atsym = *driver, *_template, *_sht, *_ops, *_probe, *probe_one
+ **/
+static int secref_whitelist(const char *tosec, const char *fromsec,
+			    const char *atsym)
+{
+	int f1 = 1, f2 = 1;
+	const char **s;
+	const char *pat2sym[] = {
+		"driver",
+		"_template", /* scsi uses *_template a lot */
+		"_sht",      /* scsi also used *_sht to some extent */
+		"_ops",
+		"_probe",
+		"_probe_one",
+		NULL
+	};
+
+	/* Check for pattern 1 */
+	if (strcmp(tosec, ".init.data") != 0)
+		f1 = 0;
+	if (strncmp(fromsec, ".data", strlen(".data")) != 0)
+		f1 = 0;
+	if (strncmp(atsym, "__param", strlen("__param")) != 0)
+		f1 = 0;
+
+	if (f1)
+		return f1;
+
+	/* Check for pattern 2 */
+	if ((strcmp(tosec, ".init.text") != 0) &&
+	    (strcmp(tosec, ".exit.text") != 0) &&
+	    (strcmp(tosec, ".init.data") != 0))
+		f2 = 0;
+	if (strcmp(fromsec, ".data") != 0)
+		f2 = 0;
+
+	for (s = pat2sym; *s; s++)
+		if (strrcmp(atsym, *s) == 0)
+			f1 = 1;
+
+	return f1 && f2;
+}
+
+/**
+ * Find symbol based on relocation record info.
+ * In some cases the symbol supplied is a valid symbol so
+ * return refsym. If st_name != 0 we assume this is a valid symbol.
+ * In other cases the symbol needs to be looked up in the symbol table
+ * based on section and address.
+ *  **/
+static Elf_Sym *find_elf_symbol(struct elf_info *elf, Elf_Addr addr,
+				Elf_Sym *relsym)
+{
+	Elf_Sym *sym;
+
+	if (relsym->st_name != 0)
+		return relsym;
+	for (sym = elf->symtab_start; sym < elf->symtab_stop; sym++) {
+		if (sym->st_shndx != relsym->st_shndx)
+			continue;
+		if (sym->st_value == addr)
+			return sym;
+	}
+	return NULL;
+}
+
+/*
+ * Find symbols before or equal addr and after addr - in the section sec.
+ * If we find two symbols with equal offset prefer one with a valid name.
+ * The ELF format may have a better way to detect what type of symbol
+ * it is, but this works for now.
+ **/
+static void find_symbols_between(struct elf_info *elf, Elf_Addr addr,
+				 const char *sec,
+			         Elf_Sym **before, Elf_Sym **after)
+{
+	Elf_Sym *sym;
+	Elf_Ehdr *hdr = elf->hdr;
+	Elf_Addr beforediff = ~0;
+	Elf_Addr afterdiff = ~0;
+	const char *secstrings = (void *)hdr +
+				 elf->sechdrs[hdr->e_shstrndx].sh_offset;
+
+	*before = NULL;
+	*after = NULL;
+
+	for (sym = elf->symtab_start; sym < elf->symtab_stop; sym++) {
+		const char *symsec;
+
+		if (sym->st_shndx >= SHN_LORESERVE)
+			continue;
+		symsec = secstrings + elf->sechdrs[sym->st_shndx].sh_name;
+		if (strcmp(symsec, sec) != 0)
+			continue;
+		if (sym->st_value <= addr) {
+			if ((addr - sym->st_value) < beforediff) {
+				beforediff = addr - sym->st_value;
+				*before = sym;
+			}
+			else if ((addr - sym->st_value) == beforediff) {
+				/* equal offset, valid name? */
+				const char *name = elf->strtab + sym->st_name;
+				if (name && strlen(name))
+					*before = sym;
+			}
+		}
+		else
+		{
+			if ((sym->st_value - addr) < afterdiff) {
+				afterdiff = sym->st_value - addr;
+				*after = sym;
+			}
+			else if ((sym->st_value - addr) == afterdiff) {
+				/* equal offset, valid name? */
+				const char *name = elf->strtab + sym->st_name;
+				if (name && strlen(name))
+					*after = sym;
+			}
+		}
+	}
+}
+
+/**
+ * Print a warning about a section mismatch.
+ * Try to find symbols near it so user can find it.
+ * Check whitelist before warning - it may be a false positive.
+ **/
+static void warn_sec_mismatch(const char *modname, const char *fromsec,
+			      struct elf_info *elf, Elf_Sym *sym, Elf_Rela r)
+{
+	const char *refsymname = "";
+	Elf_Sym *before, *after;
+	Elf_Sym *refsym;
+	Elf_Ehdr *hdr = elf->hdr;
+	Elf_Shdr *sechdrs = elf->sechdrs;
+	const char *secstrings = (void *)hdr +
+				 sechdrs[hdr->e_shstrndx].sh_offset;
+	const char *secname = secstrings + sechdrs[sym->st_shndx].sh_name;
+
+	find_symbols_between(elf, r.r_offset, fromsec, &before, &after);
+
+	refsym = find_elf_symbol(elf, r.r_addend, sym);
+	if (refsym && strlen(elf->strtab + refsym->st_name))
+		refsymname = elf->strtab + refsym->st_name;
+
+	/* check whitelist - we may ignore it */
+	if (before &&
+	    secref_whitelist(secname, fromsec, elf->strtab + before->st_name))
+		return;
+
+	if (before && after) {
+		warn("%s - Section mismatch: reference to %s:%s from %s "
+		     "between '%s' (at offset 0x%llx) and '%s'\n",
+		     modname, secname, refsymname, fromsec,
+		     elf->strtab + before->st_name,
+		     (long long)r.r_offset,
+		     elf->strtab + after->st_name);
+	} else if (before) {
+		warn("%s - Section mismatch: reference to %s:%s from %s "
+		     "after '%s' (at offset 0x%llx)\n",
+		     modname, secname, refsymname, fromsec,
+		     elf->strtab + before->st_name,
+		     (long long)r.r_offset);
+	} else if (after) {
+		warn("%s - Section mismatch: reference to %s:%s from %s "
+		     "before '%s' (at offset -0x%llx)\n",
+		     modname, secname, refsymname, fromsec,
+		     elf->strtab + after->st_name,
+		     (long long)r.r_offset);
+	} else {
+		warn("%s - Section mismatch: reference to %s:%s from %s "
+		     "(offset 0x%llx)\n",
+		     modname, secname, fromsec, refsymname,
+		     (long long)r.r_offset);
+	}
+}
+
+/**
+ * A module includes a number of sections that are discarded
+ * either when loaded or when used as built-in.
+ * For loaded modules all functions marked __init and all data
+ * marked __initdata will be discarded when the module has been intialized.
+ * Likewise for modules used built-in the sections marked __exit
+ * are discarded because __exit marked function are supposed to be called
+ * only when a moduel is unloaded which never happes for built-in modules.
+ * The check_sec_ref() function traverses all relocation records
+ * to find all references to a section that reference a section that will
+ * be discarded and warns about it.
+ **/
+static void check_sec_ref(struct module *mod, const char *modname,
+			  struct elf_info *elf,
+			  int section(const char*),
+			  int section_ref_ok(const char *))
+{
+	int i;
+	Elf_Sym  *sym;
+	Elf_Ehdr *hdr = elf->hdr;
+	Elf_Shdr *sechdrs = elf->sechdrs;
+	const char *secstrings = (void *)hdr +
+				 sechdrs[hdr->e_shstrndx].sh_offset;
+
+	/* Walk through all sections */
+	for (i = 0; i < hdr->e_shnum; i++) {
+		const char *name = secstrings + sechdrs[i].sh_name;
+		const char *secname;
+		Elf_Rela r;
+		unsigned int r_sym;
+		/* We want to process only relocation sections and not .init */
+		if (sechdrs[i].sh_type == SHT_RELA) {
+			Elf_Rela *rela;
+			Elf_Rela *start = (void *)hdr + sechdrs[i].sh_offset;
+			Elf_Rela *stop  = (void*)start + sechdrs[i].sh_size;
+			name += strlen(".rela");
+			if (section_ref_ok(name))
+				continue;
+
+			for (rela = start; rela < stop; rela++) {
+				r.r_offset = TO_NATIVE(rela->r_offset);
+#if KERNEL_ELFCLASS == ELFCLASS64
+				if (hdr->e_machine == EM_MIPS) {
+					r_sym = ELF64_MIPS_R_SYM(rela->r_info);
+					r_sym = TO_NATIVE(r_sym);
+				} else {
+					r.r_info = TO_NATIVE(rela->r_info);
+					r_sym = ELF_R_SYM(r.r_info);
+				}
+#else
+				r.r_info = TO_NATIVE(rela->r_info);
+				r_sym = ELF_R_SYM(r.r_info);
+#endif
+				r.r_addend = TO_NATIVE(rela->r_addend);
+				sym = elf->symtab_start + r_sym;
+				/* Skip special sections */
+				if (sym->st_shndx >= SHN_LORESERVE)
+					continue;
+
+				secname = secstrings +
+					sechdrs[sym->st_shndx].sh_name;
+				if (section(secname))
+					warn_sec_mismatch(modname, name,
+							  elf, sym, r);
+			}
+		} else if (sechdrs[i].sh_type == SHT_REL) {
+			Elf_Rel *rel;
+			Elf_Rel *start = (void *)hdr + sechdrs[i].sh_offset;
+			Elf_Rel *stop  = (void*)start + sechdrs[i].sh_size;
+			name += strlen(".rel");
+			if (section_ref_ok(name))
+				continue;
+
+			for (rel = start; rel < stop; rel++) {
+				r.r_offset = TO_NATIVE(rel->r_offset);
+#if KERNEL_ELFCLASS == ELFCLASS64
+				if (hdr->e_machine == EM_MIPS) {
+					r_sym = ELF64_MIPS_R_SYM(rel->r_info);
+					r_sym = TO_NATIVE(r_sym);
+				} else {
+					r.r_info = TO_NATIVE(rel->r_info);
+					r_sym = ELF_R_SYM(r.r_info);
+				}
+#else
+				r.r_info = TO_NATIVE(rel->r_info);
+				r_sym = ELF_R_SYM(r.r_info);
+#endif
+				r.r_addend = 0;
+				sym = elf->symtab_start + r_sym;
+				/* Skip special sections */
+				if (sym->st_shndx >= SHN_LORESERVE)
+					continue;
+
+				secname = secstrings +
+					sechdrs[sym->st_shndx].sh_name;
+				if (section(secname))
+					warn_sec_mismatch(modname, name,
+							  elf, sym, r);
+			}
+		}
+	}
+}
+
+/**
+ * Functions used only during module init is marked __init and is stored in
+ * a .init.text section. Likewise data is marked __initdata and stored in
+ * a .init.data section.
+ * If this section is one of these sections return 1
+ * See include/linux/init.h for the details
+ **/
+static int init_section(const char *name)
+{
+	if (strcmp(name, ".init") == 0)
+		return 1;
+	if (strncmp(name, ".init.", strlen(".init.")) == 0)
+		return 1;
+	return 0;
+}
+
+/**
+ * Identify sections from which references to a .init section is OK.
+ *
+ * Unfortunately references to read only data that referenced .init
+ * sections had to be excluded. Almost all of these are false
+ * positives, they are created by gcc. The downside of excluding rodata
+ * is that there really are some user references from rodata to
+ * init code, e.g. drivers/video/vgacon.c:
+ *
+ * const struct consw vga_con = {
+ *        con_startup:            vgacon_startup,
+ *
+ * where vgacon_startup is __init.  If you want to wade through the false
+ * positives, take out the check for rodata.
+ **/
+static int init_section_ref_ok(const char *name)
+{
+	const char **s;
+	/* Absolute section names */
+	const char *namelist1[] = {
+		".init",
+		".opd",   /* see comment [OPD] at exit_section_ref_ok() */
+		".toc1",  /* used by ppc64 */
+		".stab",
+		".rodata",
+		".text.lock",
+		"__bug_table", /* used by powerpc for BUG() */
+		".pci_fixup_header",
+		".pci_fixup_final",
+		".pdr",
+		"__param",
+		NULL
+	};
+	/* Start of section names */
+	const char *namelist2[] = {
+		".init.",
+		".altinstructions",
+		".eh_frame",
+		".debug",
+		NULL
+	};
+	/* part of section name */
+	const char *namelist3 [] = {
+		".unwind",  /* sample: IA_64.unwind.init.text */
+		NULL
+	};
+
+	for (s = namelist1; *s; s++)
+		if (strcmp(*s, name) == 0)
+			return 1;
+	for (s = namelist2; *s; s++)
+		if (strncmp(*s, name, strlen(*s)) == 0)
+			return 1;
+	for (s = namelist3; *s; s++)
+		if (strstr(name, *s) != NULL)
+			return 1;
+	return 0;
+}
+
+/*
+ * Functions used only during module exit is marked __exit and is stored in
+ * a .exit.text section. Likewise data is marked __exitdata and stored in
+ * a .exit.data section.
+ * If this section is one of these sections return 1
+ * See include/linux/init.h for the details
+ **/
+static int exit_section(const char *name)
+{
+	if (strcmp(name, ".exit.text") == 0)
+		return 1;
+	if (strcmp(name, ".exit.data") == 0)
+		return 1;
+	return 0;
+
+}
+
+/*
+ * Identify sections from which references to a .exit section is OK.
+ *
+ * [OPD] Keith Ownes <kaos@sgi.com> commented:
+ * For our future {in}sanity, add a comment that this is the ppc .opd
+ * section, not the ia64 .opd section.
+ * ia64 .opd should not point to discarded sections.
+ * [.rodata] like for .init.text we ignore .rodata references -same reason
+ **/
+static int exit_section_ref_ok(const char *name)
+{
+	const char **s;
+	/* Absolute section names */
+	const char *namelist1[] = {
+		".exit.text",
+		".exit.data",
+		".init.text",
+		".rodata",
+		".opd", /* See comment [OPD] */
+		".toc1",  /* used by ppc64 */
+		".altinstructions",
+		".pdr",
+		"__bug_table", /* used by powerpc for BUG() */
+		".exitcall.exit",
+		".eh_frame",
+		".stab",
+		NULL
+	};
+	/* Start of section names */
+	const char *namelist2[] = {
+		".debug",
+		NULL
+	};
+	/* part of section name */
+	const char *namelist3 [] = {
+		".unwind",  /* Sample: IA_64.unwind.exit.text */
+		NULL
+	};
+
+	for (s = namelist1; *s; s++)
+		if (strcmp(*s, name) == 0)
+			return 1;
+	for (s = namelist2; *s; s++)
+		if (strncmp(*s, name, strlen(*s)) == 0)
+			return 1;
+	for (s = namelist3; *s; s++)
+		if (strstr(name, *s) != NULL)
+			return 1;
+	return 0;
 }
 
 void *supported_file;
@@ -518,6 +984,8 @@ static void read_symbols(char *modname)
 		handle_modversions(mod, &info, sym, symname);
 		handle_moddevtable(mod, &info, sym, symname);
 	}
+	check_sec_ref(mod, modname, &info, init_section, init_section_ref_ok);
+	check_sec_ref(mod, modname, &info, exit_section, exit_section_ref_ok);
 
 	version = get_modinfo(info.modinfo, info.modinfo_len, "version");
 	if (version)
@@ -549,7 +1017,7 @@ void __attribute__((format(printf, 2, 3))) buf_printf(struct buffer *buf,
 	char tmp[SZ];
 	int len;
 	va_list ap;
-	
+
 	va_start(ap, fmt);
 	len = vsnprintf(tmp, SZ, fmt, ap);
 	buf_write(buf, tmp, len);
@@ -791,7 +1259,7 @@ static int dump_sym(struct symbol *sym)
 		return 0;
 	return 1;
 }
-		
+
 static void write_dump(const char *fname)
 {
 	struct buffer buf = { };
@@ -803,7 +1271,7 @@ static void write_dump(const char *fname)
 		while (symbol) {
 			if (dump_sym(symbol))
 				buf_printf(&buf, "0x%08x\t%s\t%s\n",
-					symbol->crc, symbol->name, 
+					symbol->crc, symbol->name,
 					symbol->module->name);
 			symbol = symbol->next;
 		}
