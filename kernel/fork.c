@@ -121,7 +121,6 @@ void __put_task_struct(struct task_struct *tsk)
 	if (!profile_handoff_task(tsk))
 		free_task(tsk);
 }
-EXPORT_SYMBOL_GPL(__put_task_struct_cb);
 
 void __init fork_init(unsigned long mempages)
 {
