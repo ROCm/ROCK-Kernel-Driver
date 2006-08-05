@@ -36,14 +36,14 @@ static const struct rpc_call_ops nlmclnt_cancel_ops;
 /*
  * Cookie counter for NLM requests
  */
-static u32	nlm_cookie = 0x1234;
+static atomic_t	nlm_cookie = ATOMIC_INIT(0x1234);
 
-static inline void nlmclnt_next_cookie(struct nlm_cookie *c)
+void nlmclnt_next_cookie(struct nlm_cookie *c)
 {
-	memcpy(c->data, &nlm_cookie, 4);
-	memset(c->data+4, 0, 4);
+	u32	cookie = atomic_inc_return(&nlm_cookie);
+
+	memcpy(c->data, &cookie, 4);
 	c->len=4;
-	nlm_cookie++;
 }
 
 static struct nlm_lockowner *nlm_get_lockowner(struct nlm_lockowner *lockowner)
@@ -151,6 +151,7 @@ static void nlmclnt_release_lockargs(struct nlm_rqst *req)
 int
 nlmclnt_proc(struct inode *inode, int cmd, struct file_lock *fl)
 {
+	struct nfs_server	*nfssrv = NFS_SERVER(inode);
 	struct nlm_host		*host;
 	struct nlm_rqst		*call;
 	sigset_t		oldset;
@@ -166,7 +167,8 @@ nlmclnt_proc(struct inode *inode, int cmd, struct file_lock *fl)
 	/* Retrieve transport protocol from NFS client */
 	proto = NFS_CLIENT(inode)->cl_xprt->prot;
 
-	host = nlmclnt_lookup_host(NFS_ADDR(inode), proto, vers);
+	host = nlmclnt_lookup_host(NFS_ADDR(inode), proto, vers,
+				nfssrv->hostname, strlen(nfssrv->hostname));
 	if (host == NULL)
 		return -ENOLCK;
 
@@ -499,7 +501,7 @@ nlmclnt_lock(struct nlm_rqst *req, struct file_lock *fl)
 	unsigned char fl_flags = fl->fl_flags;
 	int status = -ENOLCK;
 
-	if (!host->h_monitored && nsm_monitor(host) < 0) {
+	if (nsm_monitor(host) < 0) {
 		printk(KERN_NOTICE "lockd: failed to monitor %s\n",
 					host->h_name);
 		goto out;
