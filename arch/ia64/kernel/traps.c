@@ -124,11 +124,8 @@ die (const char *str, struct pt_regs *regs, long err)
 	(void)kdb(KDB_REASON_OOPS, err, regs);
 #endif	/* CONFIG_KDB */
 
-	if (panic_on_oops) {
-		printk(KERN_EMERG "Fatal exception: panic in 5 seconds\n");
-		ssleep(5);
-		panic("Fatal exception");
-	}
+	if (panic_on_oops)
+		panic("Fatal exception: panic_on_oops");
 
   	do_exit(SIGSEGV);
 }

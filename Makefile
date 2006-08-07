@@ -1,7 +1,7 @@
 VERSION = 2
 PATCHLEVEL = 6
 SUBLEVEL = 18
-EXTRAVERSION = -rc3
+EXTRAVERSION = -rc4
 NAME=Crazed Snow-Weasel
 
 # *DOCUMENTATION*
@@ -311,8 +311,8 @@ CFLAGS          := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -Werror-implicit-function-declaration \
                    -fno-strict-aliasing -fno-common
 # Force gcc to behave correct even for buggy distributions
-CFLAGS          += $(call cc-option, -fno-stack-protector-all \
-                                     -fno-stack-protector)
+CFLAGS          += $(call cc-option, -fno-stack-protector)
+
 AFLAGS          := -D__ASSEMBLY__
 
 # Warn about unsupported modules in kernels built inside Autobuild
@@ -374,6 +374,7 @@ endif
 
 no-dot-config-targets := clean mrproper distclean \
 			 cscope TAGS tags help %docs check% \
+			 include/linux/version.h headers_% \
 			 kernelrelease kernelversion
 
 config-targets := 0

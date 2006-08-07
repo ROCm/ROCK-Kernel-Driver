@@ -876,7 +876,7 @@ static void __devinit rcu_online_cpu(int cpu)
 			rcu_process_remote_callbacks, 0UL);
 }
 
-static int __devinit rcu_cpu_notify(struct notifier_block *self,
+static int __cpuinit rcu_cpu_notify(struct notifier_block *self,
 				unsigned long action, void *hcpu)
 {
 	long cpu = (long)hcpu;
@@ -893,7 +893,7 @@ static int __devinit rcu_cpu_notify(struct notifier_block *self,
 	return NOTIFY_OK;
 }
 
-static struct notifier_block __devinitdata rcu_nb = {
+static struct notifier_block __cpuinitdata rcu_nb = {
 	.notifier_call	= rcu_cpu_notify,
 };
 

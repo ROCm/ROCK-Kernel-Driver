@@ -129,7 +129,6 @@ struct nlm_block {
 	unsigned long		b_when;		/* next re-xmit */
 	unsigned int		b_id;		/* block id */
 	unsigned char		b_granted;	/* VFS granted lock */
-	unsigned char		b_done;		/* callback complete */
 	struct nlm_file *	b_file;		/* file in question */
 };
 
