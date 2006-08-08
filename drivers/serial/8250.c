@@ -45,8 +45,8 @@
 #include <asm/irq.h>
 
 #include "8250.h"
-#ifdef	CONFIG_KDB
 #include <linux/kdb.h>
+#ifdef	CONFIG_KDB
 /*
  * kdb_serial_line records the serial line number of the first serial console.
  * NOTE: The kernel ignores characters on the serial line unless a user space
@@ -1205,7 +1205,9 @@ receive_chars(struct uart_8250_port *up, int *status, struct pt_regs *regs)
 		if ((up->port.line == kdb_serial_line) && kdb_on == 1) {
 		    if (ch == *kdb_serial_ptr) {
 			if (!(*++kdb_serial_ptr)) {
+			    atomic_inc(&kdb_8250);
 			    kdb(KDB_REASON_KEYBOARD, 0, regs);
+			    atomic_dec(&kdb_8250);
 			    kdb_serial_ptr = kdb_serial_str;
 			    break;
 			}
@@ -2286,7 +2288,7 @@ serial8250_console_write(struct console *co, const char *s, unsigned int count)
 	if (up->port.sysrq) {
 		/* serial8250_handle_port() already took the lock */
 		locked = 0;
-	} else if (oops_in_progress) {
+	} else if (oops_in_progress || KDB_8250()) {
 		locked = spin_trylock(&up->port.lock);
 	} else
 		spin_lock(&up->port.lock);

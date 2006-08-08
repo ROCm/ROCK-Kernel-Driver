@@ -34,12 +34,15 @@ extern int kdb_putuserarea_size(unsigned long, void *, size_t);
  * number whenever the kernel debugger is entered.
  */
 extern volatile int kdb_initial_cpu;
+extern atomic_t kdb_event;
+extern atomic_t kdb_8250;
 #ifdef	CONFIG_KDB
 #define KDB_IS_RUNNING() (kdb_initial_cpu != -1)
+#define KDB_8250() (atomic_read(&kdb_8250) != 0)
 #else
 #define KDB_IS_RUNNING() (0)
+#define KDB_8250() (0)
 #endif	/* CONFIG_KDB */
-extern atomic_t kdb_event;
 
 /*
  * kdb_on

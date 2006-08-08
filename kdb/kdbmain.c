@@ -50,6 +50,7 @@
  */
 volatile int kdb_flags;
 atomic_t kdb_event;
+atomic_t kdb_8250;
 
 /*
  * kdb_lock protects updates to kdb_initial_cpu.  Used to
@@ -1723,9 +1724,6 @@ kdb(kdb_reason_t reason, int error, struct pt_regs *regs)
 	case KDB_REASON_OOPS:
 	case KDB_REASON_NMI:
 		KDB_FLAG_SET(CATASTROPHIC);	/* kernel state is dubious now */
-		break;
-	case KDB_REASON_KEYBOARD:
-		bust_spinlocks(1);
 		break;
 	default:
 		break;

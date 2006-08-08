@@ -1,3 +1,17 @@
+2006-08-04 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.18-rc3-common-1.
+
+2006-07-18 Keith Owens  <kaos@sgi.com>
+
+	* 8250.c locking has been fixed so there is no need to break spinlocks
+	  for keyboard entry.
+	* kdb v4.4-2.6.18-rc2-common-2.
+
+2006-07-18 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.18-rc2-common-1.
+
 2006-07-12 Keith Owens  <kaos@sgi.com>
 
 	* Remove dead KDB_REASON codes.
