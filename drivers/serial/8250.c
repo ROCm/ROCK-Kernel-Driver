@@ -57,6 +57,8 @@
 
 static int  kdb_serial_line = -1;
 static const char *kdb_serial_ptr = kdb_serial_str;
+#else
+#define KDB_8250() 0
 #endif	/* CONFIG_KDB */
 
 #ifndef NO_PC_LEGACY_SERIAL_8250
