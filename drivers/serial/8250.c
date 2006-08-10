@@ -45,8 +45,8 @@
 #include <asm/irq.h>
 
 #include "8250.h"
-#include <linux/kdb.h>
 #ifdef	CONFIG_KDB
+#include <linux/kdb.h>
 /*
  * kdb_serial_line records the serial line number of the first serial console.
  * NOTE: The kernel ignores characters on the serial line unless a user space
