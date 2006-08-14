@@ -1,13 +1,45 @@
 /******************************************************************************
- * arch/xen/drivers/blkif/blktap/blktap.c
+ * drivers/xen/blktap/blktap.c
  * 
- * This is a modified version of the block backend driver that remaps requests
- * to a user-space memory region.  It is intended to be used to write 
- * application-level servers that provide block interfaces to client VMs.
+ * Back-end driver for user level virtual block devices. This portion of the
+ * driver exports a 'unified' block-device interface that can be accessed
+ * by any operating system that implements a compatible front end. Requests
+ * are remapped to a user-space memory region.
+ *
+ * Based on the blkback driver code.
+ * 
+ * Copyright (c) 2004-2005, Andrew Warfield and Julian Chesterfield
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License version 2
+ * as published by the Free Software Foundation; or, when distributed
+ * separately from the Linux kernel or incorporated into other
+ * software packages, subject to the following license:
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this source file (the "Software"), to deal in the Software without
+ * restriction, including without limitation the rights to use, copy, modify,
+ * merge, publish, distribute, sublicense, and/or sell copies of the Software,
+ * and to permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
 
-#include <linux/kernel.h>
 #include <linux/spinlock.h>
+#include <linux/kthread.h>
+#include <linux/list.h>
+#include <asm/hypervisor.h>
+#include "common.h"
 #include <xen/balloon.h>
 #include <linux/kernel.h>
 #include <linux/fs.h>
@@ -18,102 +50,84 @@
 #include <linux/gfp.h>
 #include <linux/poll.h>
 #include <asm/tlbflush.h>
-#include "common.h"
 
-/* Only one process may open /dev/xen/blktap at any time. */
-static unsigned long blktap_dev_inuse;
-unsigned long blktap_ring_ok; /* make this ring->state */
+#define MAX_TAP_DEV 100     /*the maximum number of tapdisk ring devices    */
+#define MAX_DEV_NAME 100    /*the max tapdisk ring device name e.g. blktap0 */
 
-/* Rings up to user space. */
-static blkif_front_ring_t blktap_ufe_ring;
+/*
+ * The maximum number of requests that can be outstanding at any time
+ * is determined by 
+ *
+ *   [mmap_alloc * MAX_PENDING_REQS * BLKIF_MAX_SEGMENTS_PER_REQUEST] 
+ *
+ * where mmap_alloc < MAX_DYNAMIC_MEM.
+ *
+ * TODO:
+ * mmap_alloc is initialised to 2 and should be adjustable on the fly via
+ * sysfs.
+ */
+#define MAX_DYNAMIC_MEM 64
+#define MAX_PENDING_REQS 64   
+#define MMAP_PAGES (MAX_PENDING_REQS * BLKIF_MAX_SEGMENTS_PER_REQUEST)
+#define MMAP_VADDR(_start, _req,_seg)                                   \
+        (_start +                                                       \
+         ((_req) * BLKIF_MAX_SEGMENTS_PER_REQUEST * PAGE_SIZE) +        \
+         ((_seg) * PAGE_SIZE))
+static int blkif_reqs = MAX_PENDING_REQS;
+static int mmap_pages = MMAP_PAGES;
 
-/* for poll: */
-static wait_queue_head_t blktap_wait;
+#define RING_PAGES 1 /* BLKTAP - immediately before the mmap area, we
+		      * have a bunch of pages reserved for shared
+		      * memory rings.
+		      */
 
-/* current switching mode */
-static unsigned long blktap_mode;
+/*Data struct associated with each of the tapdisk devices*/
+typedef struct tap_blkif {
+	struct vm_area_struct *vma;   /*Shared memory area                   */
+	unsigned long rings_vstart;   /*Kernel memory mapping                */
+	unsigned long user_vstart;    /*User memory mapping                  */
+	unsigned long dev_inuse;      /*One process opens device at a time.  */
+	unsigned long dev_pending;    /*In process of being opened           */
+	unsigned long ring_ok;        /*make this ring->state                */
+	blkif_front_ring_t ufe_ring;  /*Rings up to user space.              */
+	wait_queue_head_t wait;       /*for poll                             */
+	unsigned long mode;           /*current switching mode               */
+	int minor;                    /*Minor number for tapdisk device      */
+	pid_t pid;                    /*tapdisk process id                   */
+	enum { RUNNING, CLEANSHUTDOWN } status; /*Detect a clean userspace 
+						  shutdown                   */
+	unsigned long *idx_map;       /*Record the user ring id to kern 
+					[req id, idx] tuple                  */
+	blkif_t *blkif;               /*Associate blkif with tapdev          */
+} tap_blkif_t;
 
-/* local prototypes */
-static int blktap_read_ufe_ring(void);
+/*Private data struct associated with the inode*/
+typedef struct private_info {
+	int idx;
+} private_info_t;
+
+/*Data struct handed back to userspace for tapdisk device to VBD mapping*/
+typedef struct domid_translate {
+	unsigned short domid;
+	unsigned short busid;
+} domid_translate_t ;
 
 
-/* /dev/xen/blktap resides at device number major=10, minor=200        */ 
-#define BLKTAP_MINOR 202
+domid_translate_t  translate_domid[MAX_TAP_DEV];
+tap_blkif_t *tapfds[MAX_TAP_DEV];
 
-/* blktap IOCTLs:                                                      */
-#define BLKTAP_IOCTL_KICK_FE         1
-#define BLKTAP_IOCTL_KICK_BE         2 /* currently unused */
-#define BLKTAP_IOCTL_SETMODE         3
-#define BLKTAP_IOCTL_PRINT_IDXS      100  
-
-/* blktap switching modes: (Set with BLKTAP_IOCTL_SETMODE)             */
-#define BLKTAP_MODE_PASSTHROUGH      0x00000000  /* default            */
-#define BLKTAP_MODE_INTERCEPT_FE     0x00000001
-#define BLKTAP_MODE_INTERCEPT_BE     0x00000002  /* unimp. */
-#define BLKTAP_MODE_COPY_FE          0x00000004  /* unimp. */
-#define BLKTAP_MODE_COPY_BE          0x00000008  /* unimp. */
-#define BLKTAP_MODE_COPY_FE_PAGES    0x00000010  /* unimp. */
-#define BLKTAP_MODE_COPY_BE_PAGES    0x00000020  /* unimp. */
-
-#define BLKTAP_MODE_INTERPOSE \
-           (BLKTAP_MODE_INTERCEPT_FE | BLKTAP_MODE_INTERCEPT_BE)
-
-#define BLKTAP_MODE_COPY_BOTH \
-           (BLKTAP_MODE_COPY_FE | BLKTAP_MODE_COPY_BE)
-
-#define BLKTAP_MODE_COPY_BOTH_PAGES \
-           (BLKTAP_MODE_COPY_FE_PAGES | BLKTAP_MODE_COPY_BE_PAGES)
-
-static inline int BLKTAP_MODE_VALID(unsigned long arg)
+static int __init set_blkif_reqs(char *str)
 {
-	return ((arg == BLKTAP_MODE_PASSTHROUGH ) ||
-		(arg == BLKTAP_MODE_INTERCEPT_FE) ||
-		(arg == BLKTAP_MODE_INTERPOSE   ));
-/*
-  return (
-  ( arg == BLKTAP_MODE_PASSTHROUGH  ) ||
-  ( arg == BLKTAP_MODE_INTERCEPT_FE ) ||
-  ( arg == BLKTAP_MODE_INTERCEPT_BE ) ||
-  ( arg == BLKTAP_MODE_INTERPOSE    ) ||
-  ( (arg & ~BLKTAP_MODE_COPY_FE_PAGES) == BLKTAP_MODE_COPY_FE ) ||
-  ( (arg & ~BLKTAP_MODE_COPY_BE_PAGES) == BLKTAP_MODE_COPY_BE ) ||
-  ( (arg & ~BLKTAP_MODE_COPY_BOTH_PAGES) == BLKTAP_MODE_COPY_BOTH )
-  );
-*/
+	get_option(&str, &blkif_reqs);
+	return 1;
 }
+__setup("blkif_reqs=", set_blkif_reqs);
 
-
-/******************************************************************
- * MMAP REGION
- */
-
-/*
- * We use a big chunk of address space to map in-flight requests into,
- * and export this region up to user-space.  See the comments in blkback
- * about this -- the two must be kept in sync if the tap is used as a 
- * passthrough.
- */
-
-#define MAX_PENDING_REQS 64
-#define BATCH_PER_DOMAIN 16
-
-/* immediately before the mmap area, we have a bunch of pages reserved
- * for shared memory rings.
- */
-#define RING_PAGES 1 /* Front */ 
-
-/* Where things are inside the device mapping. */
-struct vm_area_struct *blktap_vma = NULL;
-unsigned long mmap_vstart;  /* Kernel pages for mapping in data. */
-unsigned long rings_vstart; /* start of mmaped vma               */
-unsigned long user_vstart;  /* start of user mappings            */
-
-#define MMAP_PAGES						\
-	(MAX_PENDING_REQS * BLKIF_MAX_SEGMENTS_PER_REQUEST)
-#define MMAP_VADDR(_start, _req,_seg)					\
-	(_start +							\
-	 ((_req) * BLKIF_MAX_SEGMENTS_PER_REQUEST * PAGE_SIZE) +	\
-	 ((_seg) * PAGE_SIZE))
+/* Run-time switchable: /sys/module/blktap/parameters/ */
+static unsigned int log_stats = 0;
+static unsigned int debug_lvl = 0;
+module_param(log_stats, int, 0644);
+module_param(debug_lvl, int, 0644);
 
 /*
  * Each outstanding request that we've passed to the lower device layers has a 
@@ -124,48 +138,45 @@ unsigned long user_vstart;  /* start of user mappings            */
 typedef struct {
 	blkif_t       *blkif;
 	unsigned long  id;
+	unsigned short mem_idx;
 	int            nr_pages;
 	atomic_t       pendcnt;
 	unsigned short operation;
 	int            status;
+	struct list_head free_list;
+	int            inuse;
 } pending_req_t;
 
-/*
- * We can't allocate pending_req's in order, since they may complete out of 
- * order. We therefore maintain an allocation ring. This ring also indicates 
- * when enough work has been passed down -- at that point the allocation ring 
- * will be empty.
- */
-static pending_req_t pending_reqs[MAX_PENDING_REQS];
-static unsigned char pending_ring[MAX_PENDING_REQS];
-static spinlock_t pend_prod_lock = SPIN_LOCK_UNLOCKED;
-/* NB. We use a different index type to differentiate from shared blk rings. */
+static pending_req_t *pending_reqs[MAX_PENDING_REQS];
+static struct list_head pending_free;
+static DEFINE_SPINLOCK(pending_free_lock);
+static DECLARE_WAIT_QUEUE_HEAD (pending_free_wq);
+static int alloc_pending_reqs;
+
 typedef unsigned int PEND_RING_IDX;
-#define MASK_PEND_IDX(_i) ((_i)&(MAX_PENDING_REQS-1))
-static PEND_RING_IDX pending_prod, pending_cons;
+
+static inline int MASK_PEND_IDX(int i) { 
+	return (i & (MAX_PENDING_REQS-1)); 
+}
+
+static inline unsigned int RTN_PEND_IDX(pending_req_t *req, int idx) {
+	return (req - pending_reqs[idx]);
+}
+
 #define NR_PENDING_REQS (MAX_PENDING_REQS - pending_prod + pending_cons)
 
-/* Requests passing through the tap to the backend hijack the id field
- * in the request message.  In it we put the AR index _AND_ the fe domid.
- * the domid is used by the backend to map the pages properly.
- */
+#define BLKBACK_INVALID_HANDLE (~0)
 
-static inline unsigned long MAKE_ID(domid_t fe_dom, PEND_RING_IDX idx)
-{
-	return ((fe_dom << 16) | MASK_PEND_IDX(idx));
-}
+typedef struct mmap_page {
+	unsigned long start;
+	struct page *mpage;
+} mmap_page_t;
 
-extern inline PEND_RING_IDX ID_TO_IDX(unsigned long id) 
-{ 
-	return (PEND_RING_IDX)(id & 0x0000ffff);
-}
-
-extern inline domid_t ID_TO_DOM(unsigned long id) 
-{ 
-	return (domid_t)(id >> 16); 
-}
-
-
+static mmap_page_t mmap_start[MAX_DYNAMIC_MEM];
+static unsigned short mmap_alloc = 0;
+static unsigned short mmap_lock = 0;
+static unsigned short mmap_inuse = 0;
+static unsigned long *pending_addrs[MAX_DYNAMIC_MEM];
 
 /******************************************************************
  * GRANT HANDLES
@@ -177,14 +188,90 @@ extern inline domid_t ID_TO_DOM(unsigned long id)
  */
 struct grant_handle_pair
 {
-	grant_handle_t kernel;
-	grant_handle_t user;
+        grant_handle_t kernel;
+        grant_handle_t user;
 };
-static struct grant_handle_pair pending_grant_handles[MMAP_PAGES];
-#define pending_handle(_idx, _i) \
-    (pending_grant_handles[((_idx) * BLKIF_MAX_SEGMENTS_PER_REQUEST) + (_i)])
+
+static struct grant_handle_pair 
+    pending_grant_handles[MAX_DYNAMIC_MEM][MMAP_PAGES];
+#define pending_handle(_id, _idx, _i) \
+    (pending_grant_handles[_id][((_idx) * BLKIF_MAX_SEGMENTS_PER_REQUEST) \
+    + (_i)])
+
+
+static int blktap_read_ufe_ring(int idx); /*local prototypes*/
+
+#define BLKTAP_MINOR 0  /*/dev/xen/blktap resides at device number
+			  major=254, minor numbers begin at 0            */ 
+#define BLKTAP_DEV_MAJOR 254         /* TODO: Make major number dynamic  *
+                                      * and create devices in the kernel *
+				      */
+#define BLKTAP_DEV_DIR  "/dev/xen"
+
+/* blktap IOCTLs: */
+#define BLKTAP_IOCTL_KICK_FE         1
+#define BLKTAP_IOCTL_KICK_BE         2 /* currently unused */
+#define BLKTAP_IOCTL_SETMODE         3
+#define BLKTAP_IOCTL_SENDPID	     4
+#define BLKTAP_IOCTL_NEWINTF	     5
+#define BLKTAP_IOCTL_MINOR	     6
+#define BLKTAP_IOCTL_MAJOR	     7
+#define BLKTAP_QUERY_ALLOC_REQS      8
+#define BLKTAP_IOCTL_FREEINTF        9
+#define BLKTAP_IOCTL_PRINT_IDXS      100  
+
+/* blktap switching modes: (Set with BLKTAP_IOCTL_SETMODE)             */
+#define BLKTAP_MODE_PASSTHROUGH      0x00000000  /* default            */
+#define BLKTAP_MODE_INTERCEPT_FE     0x00000001
+#define BLKTAP_MODE_INTERCEPT_BE     0x00000002  /* unimp.             */
+
+#define BLKTAP_MODE_INTERPOSE \
+           (BLKTAP_MODE_INTERCEPT_FE | BLKTAP_MODE_INTERCEPT_BE)
+
+
+static inline int BLKTAP_MODE_VALID(unsigned long arg)
+{
+	return ((arg == BLKTAP_MODE_PASSTHROUGH ) ||
+		(arg == BLKTAP_MODE_INTERCEPT_FE) ||
+                (arg == BLKTAP_MODE_INTERPOSE   ));
+}
+
+/* Requests passing through the tap to userspace are re-assigned an ID.
+ * We must record a mapping between the BE [IDX,ID] tuple and the userspace
+ * ring ID. 
+ */
+
+static inline unsigned long MAKE_ID(domid_t fe_dom, PEND_RING_IDX idx)
+{
+        return ((fe_dom << 16) | MASK_PEND_IDX(idx));
+}
+
+extern inline PEND_RING_IDX ID_TO_IDX(unsigned long id)
+{
+        return (PEND_RING_IDX)(id & 0x0000ffff);
+}
+
+extern inline int ID_TO_MIDX(unsigned long id)
+{
+        return (int)(id >> 16);
+}
+
+#define INVALID_REQ 0xdead0000
+
+/*TODO: Convert to a free list*/
+static inline int GET_NEXT_REQ(unsigned long *idx_map)
+{
+	int i;
+	for (i = 0; i < MAX_PENDING_REQS; i++)
+		if (idx_map[i] == INVALID_REQ) return i;
+
+	return INVALID_REQ;
+}
+
+
 #define BLKTAP_INVALID_HANDLE(_g) \
     (((_g->kernel) == 0xFFFF) && ((_g->user) == 0xFFFF))
+
 #define BLKTAP_INVALIDATE_HANDLE(_g) do {       \
     (_g)->kernel = 0xFFFF; (_g)->user = 0xFFFF; \
     } while(0)
@@ -199,59 +286,183 @@ static struct page *blktap_nopage(struct vm_area_struct *vma,
 				  int *type)
 {
 	/*
-	 * if the page has not been mapped in by the driver then generate
-	 * a SIGBUS to the domain.
+	 * if the page has not been mapped in by the driver then return
+	 * NOPAGE_SIGBUS to the domain.
 	 */
-	force_sig(SIGBUS, current);
 
-	return 0;
+	return NOPAGE_SIGBUS;
 }
 
 struct vm_operations_struct blktap_vm_ops = {
-	.nopage = blktap_nopage,
+	nopage:   blktap_nopage,
 };
 
 /******************************************************************
  * BLKTAP FILE OPS
  */
+ 
+/*Function Declarations*/
+static int get_next_free_dev(void);
+static int blktap_open(struct inode *inode, struct file *filp);
+static int blktap_release(struct inode *inode, struct file *filp);
+static int blktap_mmap(struct file *filp, struct vm_area_struct *vma);
+static int blktap_ioctl(struct inode *inode, struct file *filp,
+                        unsigned int cmd, unsigned long arg);
+static unsigned int blktap_poll(struct file *file, poll_table *wait);
+
+struct miscdevice *set_misc(int minor, char *name, int dev);
+
+static const struct file_operations blktap_fops = {
+	.owner   = THIS_MODULE,
+	.poll    = blktap_poll,
+	.ioctl   = blktap_ioctl,
+	.open    = blktap_open,
+	.release = blktap_release,
+	.mmap    = blktap_mmap,
+};
+
+
+static int get_next_free_dev(void)
+{
+	tap_blkif_t *info;
+	int i = 0, ret = -1;
+	unsigned long flags;
+
+	spin_lock_irqsave(&pending_free_lock, flags);
+	
+	while (i < MAX_TAP_DEV) {
+		info = tapfds[i];
+		if ( (tapfds[i] != NULL) && (info->dev_inuse == 0)
+			&& (info->dev_pending == 0) ) {
+			info->dev_pending = 1;
+			ret = i;
+			goto done;
+		}
+		i++;
+	}
+	
+done:
+	spin_unlock_irqrestore(&pending_free_lock, flags);
+	return ret;
+}
+
+int dom_to_devid(domid_t domid, int xenbus_id, blkif_t *blkif) 
+{
+	int i;
+		
+	for (i = 0; i < MAX_TAP_DEV; i++)
+		if ( (translate_domid[i].domid == domid)
+		    && (translate_domid[i].busid == xenbus_id) ) {
+			tapfds[i]->blkif = blkif;
+			tapfds[i]->status = RUNNING;
+			return i;
+		}
+	return -1;
+}
+
+void signal_tapdisk(int idx) 
+{
+	tap_blkif_t *info;
+	struct task_struct *ptask;
+
+	info = tapfds[idx];
+	if ( (idx > 0) && (idx < MAX_TAP_DEV) && (info->pid > 0) ) {
+		ptask = find_task_by_pid(info->pid);
+		if (ptask) { 
+			info->status = CLEANSHUTDOWN;
+ 		}
+	}
+	info->blkif = NULL;
+	return;
+}
 
 static int blktap_open(struct inode *inode, struct file *filp)
 {
 	blkif_sring_t *sring;
-
-	if (test_and_set_bit(0, &blktap_dev_inuse))
+	int idx = iminor(inode) - BLKTAP_MINOR;
+	tap_blkif_t *info;
+	private_info_t *prv;
+	int i;
+	
+	if (tapfds[idx] == NULL) {
+		WPRINTK("Unable to open device /dev/xen/blktap%d\n",
+		       idx);
+		return -ENOMEM;
+	}
+	DPRINTK("Opening device /dev/xen/blktap%d\n",idx);
+	
+	info = tapfds[idx];
+	
+	/*Only one process can access device at a time*/
+	if (test_and_set_bit(0, &info->dev_inuse))
 		return -EBUSY;
-    
+
+	info->dev_pending = 0;
+	    
 	/* Allocate the fe ring. */
 	sring = (blkif_sring_t *)get_zeroed_page(GFP_KERNEL);
 	if (sring == NULL)
-		return -ENOMEM;
+		goto fail_nomem;
 
 	SetPageReserved(virt_to_page(sring));
     
 	SHARED_RING_INIT(sring);
-	FRONT_RING_INIT(&blktap_ufe_ring, sring, PAGE_SIZE);
+	FRONT_RING_INIT(&info->ufe_ring, sring, PAGE_SIZE);
+	
+	prv = kzalloc(sizeof(private_info_t),GFP_KERNEL);
+	prv->idx = idx;
+	filp->private_data = prv;
+	info->vma = NULL;
 
+	info->idx_map = kmalloc(sizeof(unsigned long) * MAX_PENDING_REQS, 
+				GFP_KERNEL);
+	
+	if (idx > 0) {
+		init_waitqueue_head(&info->wait);
+		for (i = 0; i < MAX_PENDING_REQS; i++) 
+			info->idx_map[i] = INVALID_REQ;
+	}
+
+	DPRINTK("Tap open: device /dev/xen/blktap%d\n",idx);
 	return 0;
+
+ fail_nomem:
+	return -ENOMEM;
 }
 
 static int blktap_release(struct inode *inode, struct file *filp)
 {
-	blktap_dev_inuse = 0;
-	blktap_ring_ok = 0;
+	int idx = iminor(inode) - BLKTAP_MINOR;
+	tap_blkif_t *info;
+	
+	if (tapfds[idx] == NULL) {
+		WPRINTK("Trying to free device that doesn't exist "
+		       "[/dev/xen/blktap%d]\n",idx);
+		return -1;
+	}
+	info = tapfds[idx];
+	info->dev_inuse = 0;
+	DPRINTK("Freeing device [/dev/xen/blktap%d]\n",idx);
 
 	/* Free the ring page. */
-	ClearPageReserved(virt_to_page(blktap_ufe_ring.sring));
-	free_page((unsigned long) blktap_ufe_ring.sring);
+	ClearPageReserved(virt_to_page(info->ufe_ring.sring));
+	free_page((unsigned long) info->ufe_ring.sring);
 
 	/* Clear any active mappings and free foreign map table */
-	if (blktap_vma != NULL) {
+	if (info->vma) {
 		zap_page_range(
-			blktap_vma, blktap_vma->vm_start, 
-			blktap_vma->vm_end - blktap_vma->vm_start, NULL);
-		blktap_vma = NULL;
+			info->vma, info->vma->vm_start, 
+			info->vma->vm_end - info->vma->vm_start, NULL);
+		info->vma = NULL;
 	}
+	
+	if (filp->private_data) kfree(filp->private_data);
 
+	if ( (info->status != CLEANSHUTDOWN) && (info->blkif != NULL) ) {
+		kthread_stop(info->blkif->xenblkd);
+		info->blkif->xenblkd = NULL;
+		info->status = CLEANSHUTDOWN;
+	}	
 	return 0;
 }
 
@@ -279,45 +490,47 @@ static int blktap_mmap(struct file *filp, struct vm_area_struct *vma)
 	int size;
 	struct page **map;
 	int i;
+	private_info_t *prv;
+	tap_blkif_t *info;
 
-	DPRINTK(KERN_ALERT "blktap mmap (%lx, %lx)\n",
-		vma->vm_start, vma->vm_end);
-
+	/*Retrieve the dev info*/
+	prv = (private_info_t *)filp->private_data;
+	if (prv == NULL) {
+		WPRINTK("blktap: mmap, retrieving idx failed\n");
+		return -ENOMEM;
+	}
+	info = tapfds[prv->idx];
+	
 	vma->vm_flags |= VM_RESERVED;
 	vma->vm_ops = &blktap_vm_ops;
 
 	size = vma->vm_end - vma->vm_start;
-	if (size != ((MMAP_PAGES + RING_PAGES) << PAGE_SHIFT)) {
-		printk(KERN_INFO 
-		       "blktap: you _must_ map exactly %d pages!\n",
-		       MMAP_PAGES + RING_PAGES);
+	if (size != ((mmap_pages + RING_PAGES) << PAGE_SHIFT)) {
+		WPRINTK("you _must_ map exactly %d pages!\n",
+		       mmap_pages + RING_PAGES);
 		return -EAGAIN;
 	}
 
 	size >>= PAGE_SHIFT;
-	DPRINTK(KERN_INFO "blktap: 2 rings + %d pages.\n", size-1);
-    
-	rings_vstart = vma->vm_start;
-	user_vstart  = rings_vstart + (RING_PAGES << PAGE_SHIFT);
+	info->rings_vstart = vma->vm_start;
+	info->user_vstart  = info->rings_vstart + (RING_PAGES << PAGE_SHIFT);
     
 	/* Map the ring pages to the start of the region and reserve it. */
-
-	/* not sure if I really need to do this... */
 	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 
 	if (remap_pfn_range(vma, vma->vm_start, 
-			    __pa(blktap_ufe_ring.sring) >> PAGE_SHIFT, 
+			    __pa(info->ufe_ring.sring) >> PAGE_SHIFT, 
 			    PAGE_SIZE, vma->vm_page_prot)) {
 		WPRINTK("Mapping user ring failed!\n");
 		goto fail;
 	}
 
 	/* Mark this VM as containing foreign pages, and set up mappings. */
-	map = kmalloc(((vma->vm_end - vma->vm_start) >> PAGE_SHIFT)
+	map = kzalloc(((vma->vm_end - vma->vm_start) >> PAGE_SHIFT)
 		      * sizeof(struct page_struct*),
 		      GFP_KERNEL);
 	if (map == NULL) {
-		WPRINTK("Couldn't alloc VM_FOREIGH map.\n");
+		WPRINTK("Couldn't alloc VM_FOREIGN map.\n");
 		goto fail;
 	}
 
@@ -327,9 +540,8 @@ static int blktap_mmap(struct file *filp, struct vm_area_struct *vma)
 	vma->vm_private_data = map;
 	vma->vm_flags |= VM_FOREIGN;
 
-	blktap_vma = vma;
-	blktap_ring_ok = 1;
-
+	info->vma = vma;
+	info->ring_ok = 1;
 	return 0;
  fail:
 	/* Clear any active mappings. */
@@ -339,267 +551,515 @@ static int blktap_mmap(struct file *filp, struct vm_area_struct *vma)
 	return -ENOMEM;
 }
 
+
 static int blktap_ioctl(struct inode *inode, struct file *filp,
                         unsigned int cmd, unsigned long arg)
 {
+	int idx = iminor(inode) - BLKTAP_MINOR;
 	switch(cmd) {
-	case BLKTAP_IOCTL_KICK_FE: /* There are fe messages to process. */
-		return blktap_read_ufe_ring();
-
+	case BLKTAP_IOCTL_KICK_FE: 
+	{
+		/* There are fe messages to process. */
+		return blktap_read_ufe_ring(idx);
+	}
 	case BLKTAP_IOCTL_SETMODE:
-		if (BLKTAP_MODE_VALID(arg)) {
-			blktap_mode = arg;
-			/* XXX: may need to flush rings here. */
-			printk(KERN_INFO "blktap: set mode to %lx\n", arg);
-			return 0;
+	{
+		tap_blkif_t *info = tapfds[idx];
+		
+		if ( (idx > 0) && (idx < MAX_TAP_DEV) 
+		     && (tapfds[idx] != NULL) ) 
+		{
+			if (BLKTAP_MODE_VALID(arg)) {
+				info->mode = arg;
+				/* XXX: may need to flush rings here. */
+				DPRINTK("blktap: set mode to %lx\n", 
+				       arg);
+				return 0;
+			}
 		}
+		return 0;
+	}
 	case BLKTAP_IOCTL_PRINT_IDXS:
         {
-		//print_fe_ring_idxs();
-		WPRINTK("User Rings: \n-----------\n");
-		WPRINTK("UF: rsp_cons: %2d, req_prod_prv: %2d "
-			"| req_prod: %2d, rsp_prod: %2d\n",
-			blktap_ufe_ring.rsp_cons,
-			blktap_ufe_ring.req_prod_pvt,
-			blktap_ufe_ring.sring->req_prod,
-			blktap_ufe_ring.sring->rsp_prod);
-            
+		tap_blkif_t *info = tapfds[idx];
+		
+		if ( (idx > 0) && (idx < MAX_TAP_DEV) 
+		     && (tapfds[idx] != NULL) ) 
+		{
+			printk("User Rings: \n-----------\n");
+			printk("UF: rsp_cons: %2d, req_prod_prv: %2d "
+				"| req_prod: %2d, rsp_prod: %2d\n",
+				info->ufe_ring.rsp_cons,
+				info->ufe_ring.req_prod_pvt,
+				info->ufe_ring.sring->req_prod,
+				info->ufe_ring.sring->rsp_prod);
+		}
+            	return 0;
         }
+	case BLKTAP_IOCTL_SENDPID:
+	{
+		tap_blkif_t *info = tapfds[idx];
+		
+		if ( (idx > 0) && (idx < MAX_TAP_DEV) 
+		     && (tapfds[idx] != NULL) ) 
+		{
+			info->pid = (pid_t)arg;
+			DPRINTK("blktap: pid received %d\n", 
+			       info->pid);
+		}
+		return 0;
+	}
+	case BLKTAP_IOCTL_NEWINTF:
+	{		
+		uint64_t val = (uint64_t)arg;
+		domid_translate_t *tr = (domid_translate_t *)&val;
+		int newdev;
+
+		DPRINTK("NEWINTF Req for domid %d and bus id %d\n", 
+		       tr->domid, tr->busid);
+		newdev = get_next_free_dev();
+		if (newdev < 1) {
+			WPRINTK("Error initialising /dev/xen/blktap - "
+				"No more devices\n");
+			return -1;
+		}
+		translate_domid[newdev].domid = tr->domid;
+		translate_domid[newdev].busid = tr->busid;
+		return newdev;
+	}
+	case BLKTAP_IOCTL_FREEINTF:
+	{
+		unsigned long dev = arg;
+		tap_blkif_t *info = NULL;
+
+		if ( (dev > 0) && (dev < MAX_TAP_DEV) ) info = tapfds[dev];
+
+		if ( (info != NULL) && (info->dev_pending) )
+			info->dev_pending = 0;
+		return 0;
+	}
+	case BLKTAP_IOCTL_MINOR:
+	{
+		unsigned long dev = arg;
+		tap_blkif_t *info = NULL;
+		
+		if ( (dev > 0) && (dev < MAX_TAP_DEV) ) info = tapfds[dev];
+		
+		if (info != NULL) return info->minor;
+		else return -1;
+	}
+	case BLKTAP_IOCTL_MAJOR:
+		return BLKTAP_DEV_MAJOR;
+
+	case BLKTAP_QUERY_ALLOC_REQS:
+	{
+		WPRINTK("BLKTAP_QUERY_ALLOC_REQS ioctl: %d/%d\n",
+		       alloc_pending_reqs, blkif_reqs);
+		return (alloc_pending_reqs/blkif_reqs) * 100;
+	}
 	}
 	return -ENOIOCTLCMD;
 }
 
 static unsigned int blktap_poll(struct file *file, poll_table *wait)
 {
-	poll_wait(file, &blktap_wait, wait);
-	if (blktap_ufe_ring.req_prod_pvt != blktap_ufe_ring.sring->req_prod) {
+	private_info_t *prv;
+	tap_blkif_t *info;
+	
+	/*Retrieve the dev info*/
+	prv = (private_info_t *)file->private_data;
+	if (prv == NULL) {
+		WPRINTK(" poll, retrieving idx failed\n");
+		return 0;
+	}
+	
+	if (prv->idx == 0) return 0;
+	
+	info = tapfds[prv->idx];
+	
+	poll_wait(file, &info->wait, wait);
+	if (info->ufe_ring.req_prod_pvt != info->ufe_ring.sring->req_prod) {
 		flush_tlb_all();
-		RING_PUSH_REQUESTS(&blktap_ufe_ring);
+		RING_PUSH_REQUESTS(&info->ufe_ring);
 		return POLLIN | POLLRDNORM;
 	}
-
 	return 0;
 }
 
-void blktap_kick_user(void)
+void blktap_kick_user(int idx)
 {
-	/* blktap_ring->req_prod = blktap_req_prod; */
-	wake_up_interruptible(&blktap_wait);
+	tap_blkif_t *info;
+
+	if (idx == 0) return;
+	
+	info = tapfds[idx];
+	
+	if (info != NULL) wake_up_interruptible(&info->wait);
+	return;
 }
 
-static struct file_operations blktap_fops = {
-	.owner   = THIS_MODULE,
-	.poll    = blktap_poll,
-	.ioctl   = blktap_ioctl,
-	.open    = blktap_open,
-	.release = blktap_release,
-	.mmap    = blktap_mmap,
-};
-
-
-
-static int do_block_io_op(blkif_t *blkif, int max_to_do);
-static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req);
+static int do_block_io_op(blkif_t *blkif);
+static void dispatch_rw_block_io(blkif_t *blkif,
+				 blkif_request_t *req,
+				 pending_req_t *pending_req);
 static void make_response(blkif_t *blkif, unsigned long id, 
                           unsigned short op, int st);
 
+/******************************************************************
+ * misc small helpers
+ */
+/* FIXME: Return ENOMEM properly on failure to allocate additional reqs. */
+static void req_increase(void)
+{
+	int i, j;
+	struct page *page;
+	unsigned long flags;
 
-static void fast_flush_area(int idx, int nr_pages)
+	spin_lock_irqsave(&pending_free_lock, flags);
+
+	if (mmap_alloc >= MAX_PENDING_REQS || mmap_lock) 
+		goto done;
+
+	pending_reqs[mmap_alloc]  = kzalloc(sizeof(pending_req_t) *
+					blkif_reqs, GFP_KERNEL);
+	pending_addrs[mmap_alloc] = kzalloc(sizeof(unsigned long) *
+					mmap_pages, GFP_KERNEL);
+
+	if (!pending_reqs[mmap_alloc] || !pending_addrs[mmap_alloc]) {
+		kfree(pending_reqs[mmap_alloc]);
+		kfree(pending_addrs[mmap_alloc]);
+		WPRINTK("%s: out of memory\n", __FUNCTION__); 
+		goto done;
+	}
+
+#ifdef __ia64__
+	extern unsigned long alloc_empty_foreign_map_page_range(
+		unsigned long pages);
+	mmap_start[mmap_alloc].start = (unsigned long)
+		alloc_empty_foreign_map_page_range(mmap_pages);
+#else /* ! ia64 */
+	page = balloon_alloc_empty_page_range(mmap_pages);
+	BUG_ON(page == NULL);
+
+	/* Pin all of the pages. */
+	for (i=0; i<mmap_pages; i++)
+		get_page(&page[i]);
+
+	mmap_start[mmap_alloc].start = 
+		(unsigned long)pfn_to_kaddr(page_to_pfn(page));
+	mmap_start[mmap_alloc].mpage = page;
+
+#endif
+	DPRINTK("%s: reqs=%d, pages=%d, mmap_vstart=0x%lx\n",
+	        __FUNCTION__, blkif_reqs, mmap_pages, 
+	       mmap_start[mmap_alloc].start);
+
+	BUG_ON(mmap_start[mmap_alloc].start == 0);
+
+	for (i = 0; i < mmap_pages; i++) 
+		pending_addrs[mmap_alloc][i] = 
+			mmap_start[mmap_alloc].start + (i << PAGE_SHIFT);
+
+	for (i = 0; i < MAX_PENDING_REQS ; i++) {
+		list_add_tail(&pending_reqs[mmap_alloc][i].free_list, 
+			      &pending_free);
+		pending_reqs[mmap_alloc][i].mem_idx = mmap_alloc;
+		for (j = 0; j < BLKIF_MAX_SEGMENTS_PER_REQUEST; j++)
+			BLKTAP_INVALIDATE_HANDLE(&pending_handle(mmap_alloc, 
+								 i, j));
+	}
+
+	mmap_alloc++;
+	DPRINTK("# MMAPs increased to %d\n",mmap_alloc);
+ done:
+	spin_unlock_irqrestore(&pending_free_lock, flags);
+
+}
+
+static void mmap_req_del(int mmap)
+{
+	int i;
+	struct page *page;
+
+	/*Spinlock already acquired*/
+	kfree(pending_reqs[mmap]);
+	kfree(pending_addrs[mmap]);
+
+#ifdef __ia64__
+	/*Not sure what goes here yet!*/
+#else
+
+	/* Unpin all of the pages. */
+	page = mmap_start[mmap].mpage;
+	for (i=0; i<mmap_pages; i++)
+		put_page(&page[i]);
+
+	balloon_dealloc_empty_page_range(mmap_start[mmap].mpage, mmap_pages);
+#endif
+
+	mmap_lock = 0;
+	DPRINTK("# MMAPs decreased to %d\n",mmap_alloc);
+	mmap_alloc--;
+}
+
+/*N.B. Currently unused - will be accessed via sysfs*/
+static void req_decrease(void)
+{
+	pending_req_t *req;
+	int i;
+	unsigned long flags;
+
+	spin_lock_irqsave(&pending_free_lock, flags);
+
+	DPRINTK("Req decrease called.\n");
+	if (mmap_lock || mmap_alloc == 1) 
+		goto done;
+
+	mmap_lock = 1;
+	mmap_inuse = MAX_PENDING_REQS;
+	
+        /*Go through reqs and remove any that aren't in use*/
+	for (i = 0; i < MAX_PENDING_REQS ; i++) {
+		req = &pending_reqs[mmap_alloc-1][i];
+		if (req->inuse == 0) {
+			list_del(&req->free_list);
+			mmap_inuse--;
+		}
+	}
+	if (mmap_inuse == 0) mmap_req_del(mmap_alloc-1);
+ done:
+	spin_unlock_irqrestore(&pending_free_lock, flags);
+	return;
+}
+
+static pending_req_t* alloc_req(void)
+{
+	pending_req_t *req = NULL;
+	unsigned long flags;
+
+	spin_lock_irqsave(&pending_free_lock, flags);
+
+	if (!list_empty(&pending_free)) {
+		req = list_entry(pending_free.next, pending_req_t, free_list);
+		list_del(&req->free_list);
+	}
+
+	if (req) {
+		req->inuse = 1;
+		alloc_pending_reqs++;
+	}
+	spin_unlock_irqrestore(&pending_free_lock, flags);
+
+	return req;
+}
+
+static void free_req(pending_req_t *req)
+{
+	unsigned long flags;
+	int was_empty;
+
+	spin_lock_irqsave(&pending_free_lock, flags);
+
+	alloc_pending_reqs--;
+	req->inuse = 0;
+	if (mmap_lock && (req->mem_idx == mmap_alloc-1)) {
+		mmap_inuse--;
+		if (mmap_inuse == 0) mmap_req_del(mmap_alloc-1);
+		spin_unlock_irqrestore(&pending_free_lock, flags);
+		return;
+	}
+	was_empty = list_empty(&pending_free);
+	list_add(&req->free_list, &pending_free);
+
+	spin_unlock_irqrestore(&pending_free_lock, flags);
+
+	if (was_empty)
+		wake_up(&pending_free_wq);
+}
+
+static void fast_flush_area(pending_req_t *req, int k_idx, int u_idx, int 
+			    tapidx)
 {
 	struct gnttab_unmap_grant_ref unmap[BLKIF_MAX_SEGMENTS_PER_REQUEST*2];
-	unsigned int i, op = 0;
-	struct grant_handle_pair *handle;
+	unsigned int i, invcount = 0;
+	struct grant_handle_pair *khandle;
 	uint64_t ptep;
-	int ret;
+	int ret, mmap_idx;
+	unsigned long kvaddr, uvaddr;
 
-	for ( i = 0; i < nr_pages; i++)
-	{
-		handle = &pending_handle(idx, i);
-		if (BLKTAP_INVALID_HANDLE(handle))
+	tap_blkif_t *info = tapfds[tapidx];
+	
+	if (info == NULL) {
+		WPRINTK("fast_flush: Couldn't get info!\n");
+		return;
+	}
+	mmap_idx = req->mem_idx;
+
+	for (i = 0; i < req->nr_pages; i++) {
+		kvaddr = MMAP_VADDR(mmap_start[mmap_idx].start, k_idx, i);
+		uvaddr = MMAP_VADDR(info->user_vstart, u_idx, i);
+
+		khandle = &pending_handle(mmap_idx, k_idx, i);
+		if (BLKTAP_INVALID_HANDLE(khandle)) {
+			WPRINTK("BLKTAP_INVALID_HANDLE\n");
 			continue;
-
-		unmap[op].host_addr = MMAP_VADDR(mmap_vstart, idx, i);
-		unmap[op].dev_bus_addr = 0;
-		unmap[op].handle = handle->kernel;
-		op++;
+		}
+		gnttab_set_unmap_op(&unmap[invcount], 
+			MMAP_VADDR(mmap_start[mmap_idx].start, k_idx, i), 
+				    GNTMAP_host_map, khandle->kernel);
+		invcount++;
 
 		if (create_lookup_pte_addr(
-			    blktap_vma->vm_mm,
-			    MMAP_VADDR(user_vstart, idx, i), 
-			    &ptep) !=0) {
-			DPRINTK("Couldn't get a pte addr!\n");
+		    info->vma->vm_mm,
+		    MMAP_VADDR(info->user_vstart, u_idx, i), 
+		    &ptep) !=0) {
+			WPRINTK("Couldn't get a pte addr!\n");
 			return;
 		}
-		unmap[op].host_addr    = ptep;
-		unmap[op].dev_bus_addr = 0;
-		unmap[op].handle       = handle->user;
-		op++;
+
+		gnttab_set_unmap_op(&unmap[invcount], 
+			ptep, GNTMAP_host_map,
+			khandle->user);
+		invcount++;
             
-		BLKTAP_INVALIDATE_HANDLE(handle);
+		BLKTAP_INVALIDATE_HANDLE(khandle);
 	}
-
-	ret = HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, unmap, op);
+	ret = HYPERVISOR_grant_table_op(
+		GNTTABOP_unmap_grant_ref, unmap, invcount);
 	BUG_ON(ret);
-
-	if (blktap_vma != NULL)
-		zap_page_range(blktap_vma, 
-			       MMAP_VADDR(user_vstart, idx, 0), 
-			       nr_pages << PAGE_SHIFT, NULL);
+	
+	if (info->vma != NULL)
+		zap_page_range(info->vma, 
+			       MMAP_VADDR(info->user_vstart, u_idx, 0), 
+			       req->nr_pages << PAGE_SHIFT, NULL);
 }
-
-/******************************************************************
- * BLOCK-DEVICE SCHEDULER LIST MAINTENANCE
- */
-
-static struct list_head blkio_schedule_list;
-static spinlock_t blkio_schedule_list_lock;
-
-static int __on_blkdev_list(blkif_t *blkif)
-{
-	return blkif->blkdev_list.next != NULL;
-}
-
-static void remove_from_blkdev_list(blkif_t *blkif)
-{
-	unsigned long flags;
-
-	if (!__on_blkdev_list(blkif))
-		return;
-
-	spin_lock_irqsave(&blkio_schedule_list_lock, flags);
-	if (__on_blkdev_list(blkif)) {
-		list_del(&blkif->blkdev_list);
-		blkif->blkdev_list.next = NULL;
-		blkif_put(blkif);
-	}
-	spin_unlock_irqrestore(&blkio_schedule_list_lock, flags);
-}
-
-static void add_to_blkdev_list_tail(blkif_t *blkif)
-{
-	unsigned long flags;
-
-	if (__on_blkdev_list(blkif))
-		return;
-
-	spin_lock_irqsave(&blkio_schedule_list_lock, flags);
-	if (!__on_blkdev_list(blkif) && (blkif->status == CONNECTED)) {
-		list_add_tail(&blkif->blkdev_list, &blkio_schedule_list);
-		blkif_get(blkif);
-	}
-	spin_unlock_irqrestore(&blkio_schedule_list_lock, flags);
-}
-
 
 /******************************************************************
  * SCHEDULER FUNCTIONS
  */
 
-static DECLARE_WAIT_QUEUE_HEAD(blkio_schedule_wait);
-
-static int blkio_schedule(void *arg)
+static void print_stats(blkif_t *blkif)
 {
-	DECLARE_WAITQUEUE(wq, current);
+	printk(KERN_DEBUG "%s: oo %3d  |  rd %4d  |  wr %4d\n",
+	       current->comm, blkif->st_oo_req,
+	       blkif->st_rd_req, blkif->st_wr_req);
+	blkif->st_print = jiffies + msecs_to_jiffies(10 * 1000);
+	blkif->st_rd_req = 0;
+	blkif->st_wr_req = 0;
+	blkif->st_oo_req = 0;
+}
 
-	blkif_t          *blkif;
-	struct list_head *ent;
+int tap_blkif_schedule(void *arg)
+{
+	blkif_t *blkif = arg;
 
-	daemonize("xenblkd");
+	blkif_get(blkif);
 
-	for (;;) {
-		/* Wait for work to do. */
-		add_wait_queue(&blkio_schedule_wait, &wq);
-		set_current_state(TASK_INTERRUPTIBLE);
-		if ((NR_PENDING_REQS == MAX_PENDING_REQS) || 
-		    list_empty(&blkio_schedule_list))
-			schedule();
-		__set_current_state(TASK_RUNNING);
-		remove_wait_queue(&blkio_schedule_wait, &wq);
+	if (debug_lvl)
+		printk(KERN_DEBUG "%s: started\n", current->comm);
 
-		/* Queue up a batch of requests. */
-		while ((NR_PENDING_REQS < MAX_PENDING_REQS) &&
-		       !list_empty(&blkio_schedule_list)) {
-			ent = blkio_schedule_list.next;
-			blkif = list_entry(ent, blkif_t, blkdev_list);
-			blkif_get(blkif);
-			remove_from_blkdev_list(blkif);
-			if (do_block_io_op(blkif, BATCH_PER_DOMAIN))
-				add_to_blkdev_list_tail(blkif);
-			blkif_put(blkif);
-		}
+	while (!kthread_should_stop()) {
+		wait_event_interruptible(
+			blkif->wq,
+			blkif->waiting_reqs || kthread_should_stop());
+		wait_event_interruptible(
+			pending_free_wq,
+			!list_empty(&pending_free) || kthread_should_stop());
+
+		blkif->waiting_reqs = 0;
+		smp_mb(); /* clear flag *before* checking for work */
+
+		if (do_block_io_op(blkif))
+			blkif->waiting_reqs = 1;
+
+		if (log_stats && time_after(jiffies, blkif->st_print))
+			print_stats(blkif);
 	}
+
+	if (log_stats)
+		print_stats(blkif);
+	if (debug_lvl)
+		printk(KERN_DEBUG "%s: exiting\n", current->comm);
+
+	blkif->xenblkd = NULL;
+	blkif_put(blkif);
+
+	return 0;
 }
-
-static void maybe_trigger_blkio_schedule(void)
-{
-	/*
-	 * Needed so that two processes, who together make the following
-	 * predicate true, don't both read stale values and evaluate the
-	 * predicate incorrectly. Incredibly unlikely to stall the scheduler
-	 * on the x86, but...
-	 */
-	smp_mb();
-
-	if ((NR_PENDING_REQS < (MAX_PENDING_REQS/2)) &&
-	    !list_empty(&blkio_schedule_list))
-		wake_up(&blkio_schedule_wait);
-}
-
-
 
 /******************************************************************
- * COMPLETION CALLBACK -- Called as bh->b_end_io()
+ * COMPLETION CALLBACK -- Called by user level ioctl()
  */
 
-
-static int blktap_read_ufe_ring(void)
+static int blktap_read_ufe_ring(int idx)
 {
 	/* This is called to read responses from the UFE ring. */
-
 	RING_IDX i, j, rp;
 	blkif_response_t *resp;
-	blkif_t *blkif;
-	int pending_idx;
+	blkif_t *blkif=NULL;
+	int pending_idx, usr_idx, mmap_idx;
 	pending_req_t *pending_req;
-	unsigned long     flags;
-
-	/* if we are forwarding from UFERring to FERing */
-	if (blktap_mode & BLKTAP_MODE_INTERCEPT_FE) {
-
-		/* for each outstanding message on the UFEring  */
-		rp = blktap_ufe_ring.sring->rsp_prod;
-		rmb();
-        
-		for (i = blktap_ufe_ring.rsp_cons; i != rp; i++) {
-			resp = RING_GET_RESPONSE(&blktap_ufe_ring, i);
-			pending_idx = MASK_PEND_IDX(ID_TO_IDX(resp->id));
-			pending_req = &pending_reqs[pending_idx];
-            
-			blkif = pending_req->blkif;
-			for (j = 0; j < pending_req->nr_pages; j++) {
-				unsigned long vaddr;
-				struct page **map = blktap_vma->vm_private_data;
-				int offset; 
-
-				vaddr  = MMAP_VADDR(user_vstart, pending_idx, j);
-				offset = (vaddr - blktap_vma->vm_start) >> PAGE_SHIFT;
-
-				//ClearPageReserved(virt_to_page(vaddr));
-				ClearPageReserved((struct page *)map[offset]);
-				map[offset] = NULL;
-			}
-
-			fast_flush_area(pending_idx, pending_req->nr_pages);
-			make_response(blkif, pending_req->id, resp->operation, 
-				      resp->status);
-			blkif_put(pending_req->blkif);
-			spin_lock_irqsave(&pend_prod_lock, flags);
-			pending_ring[MASK_PEND_IDX(pending_prod++)] = pending_idx;
-			spin_unlock_irqrestore(&pend_prod_lock, flags);
-		}
-		blktap_ufe_ring.rsp_cons = i;
-		maybe_trigger_blkio_schedule();
+	tap_blkif_t *info;
+	
+	info = tapfds[idx];
+	if (info == NULL) {
+		return 0;
 	}
+
+	/* We currently only forward packets in INTERCEPT_FE mode. */
+	if (!(info->mode & BLKTAP_MODE_INTERCEPT_FE))
+		return 0;
+
+	/* for each outstanding message on the UFEring  */
+	rp = info->ufe_ring.sring->rsp_prod;
+	rmb();
+        
+	for (i = info->ufe_ring.rsp_cons; i != rp; i++) {
+		resp = RING_GET_RESPONSE(&info->ufe_ring, i);
+		++info->ufe_ring.rsp_cons;
+
+		/*retrieve [usr_idx] to [mmap_idx,pending_idx] mapping*/
+		usr_idx = (int)resp->id;
+		pending_idx = MASK_PEND_IDX(ID_TO_IDX(info->idx_map[usr_idx]));
+		mmap_idx = ID_TO_MIDX(info->idx_map[usr_idx]);
+
+		if ( (mmap_idx >= mmap_alloc) || 
+		   (ID_TO_IDX(info->idx_map[usr_idx]) >= MAX_PENDING_REQS) )
+			WPRINTK("Incorrect req map"
+			       "[%d], internal map [%d,%d (%d)]\n", 
+			       usr_idx, mmap_idx, 
+			       ID_TO_IDX(info->idx_map[usr_idx]),
+			       MASK_PEND_IDX(
+				       ID_TO_IDX(info->idx_map[usr_idx])));
+
+		pending_req = &pending_reqs[mmap_idx][pending_idx];
+		blkif = pending_req->blkif;
+
+		for (j = 0; j < pending_req->nr_pages; j++) {
+
+			unsigned long kvaddr, uvaddr;
+			struct page **map = info->vma->vm_private_data;
+			struct page *pg;
+			int offset; 
+
+			uvaddr  = MMAP_VADDR(info->user_vstart, usr_idx, j);
+			kvaddr = MMAP_VADDR(mmap_start[mmap_idx].start, 
+					    pending_idx, j);
+
+			pg = pfn_to_page(__pa(kvaddr) >> PAGE_SHIFT);
+			ClearPageReserved(pg);
+			offset = (uvaddr - info->vma->vm_start) 
+				>> PAGE_SHIFT;
+			map[offset] = NULL;
+		}
+		fast_flush_area(pending_req, pending_idx, usr_idx, idx); 
+		make_response(blkif, pending_req->id, resp->operation,
+			      resp->status);
+		info->idx_map[usr_idx] = INVALID_REQ;
+		blkif_put(pending_req->blkif);
+		free_req(pending_req);
+	}
+		
 	return 0;
 }
 
@@ -608,11 +1068,15 @@ static int blktap_read_ufe_ring(void)
  * NOTIFICATION FROM GUEST OS.
  */
 
-irqreturn_t blkif_be_int(int irq, void *dev_id, struct pt_regs *regs)
+static void blkif_notify_work(blkif_t *blkif)
 {
-	blkif_t *blkif = dev_id;
-	add_to_blkdev_list_tail(blkif);
-	maybe_trigger_blkio_schedule();
+	blkif->waiting_reqs = 1;
+	wake_up(&blkif->wq);
+}
+
+irqreturn_t tap_blkif_be_int(int irq, void *dev_id, struct pt_regs *regs)
+{
+	blkif_notify_work(dev_id);
 	return IRQ_HANDLED;
 }
 
@@ -621,198 +1085,260 @@ irqreturn_t blkif_be_int(int irq, void *dev_id, struct pt_regs *regs)
 /******************************************************************
  * DOWNWARD CALLS -- These interface with the block-device layer proper.
  */
-
-static int do_block_io_op(blkif_t *blkif, int max_to_do)
+static int print_dbug = 1;
+static int do_block_io_op(blkif_t *blkif)
 {
 	blkif_back_ring_t *blk_ring = &blkif->blk_ring;
 	blkif_request_t *req;
-	RING_IDX i, rp;
+	pending_req_t *pending_req;
+	RING_IDX rc, rp;
 	int more_to_do = 0;
-    
+	tap_blkif_t *info;
+
+	rc = blk_ring->req_cons;
 	rp = blk_ring->sring->req_prod;
 	rmb(); /* Ensure we see queued requests up to 'rp'. */
 
-	for (i = blk_ring->req_cons; 
-	     (i != rp) && !RING_REQUEST_CONS_OVERFLOW(blk_ring, i);
-	     i++ ) {
-		if ((max_to_do-- == 0) ||
-		    (NR_PENDING_REQS == MAX_PENDING_REQS)) {
+	/*Check blkif has corresponding UE ring*/
+	if (blkif->dev_num == -1) {
+		/*oops*/
+		if (print_dbug) {
+			WPRINTK("Corresponding UE " 
+			       "ring does not exist!\n");
+			print_dbug = 0; /*We only print this message once*/
+		}
+		return 1; 
+	}
+
+	info = tapfds[blkif->dev_num];
+	if (info == NULL || !info->dev_inuse) {
+		if (print_dbug) {
+			WPRINTK("Can't get UE info!\n");
+			print_dbug = 0;
+		}
+		return 1;
+	}
+
+	while (rc != rp) {
+		
+		if (RING_FULL(&info->ufe_ring)) {
+			WPRINTK("RING_FULL! More to do\n");
 			more_to_do = 1;
 			break;
 		}
-        
-		req = RING_GET_REQUEST(blk_ring, i);
+		
+		if (RING_REQUEST_CONS_OVERFLOW(blk_ring, rc)) {
+			WPRINTK("RING_REQUEST_CONS_OVERFLOW!"
+			       " More to do\n");
+			more_to_do = 1;
+			break;		
+		}
+
+		pending_req = alloc_req();
+		if (NULL == pending_req) {
+			blkif->st_oo_req++;
+			more_to_do = 1;
+			break;
+		}
+
+		req = RING_GET_REQUEST(blk_ring, rc);
+		blk_ring->req_cons = ++rc; /* before make_response() */	
+
 		switch (req->operation) {
 		case BLKIF_OP_READ:
+			blkif->st_rd_req++;
+			dispatch_rw_block_io(blkif, req, pending_req);
+			break;
+
 		case BLKIF_OP_WRITE:
-			dispatch_rw_block_io(blkif, req);
+			blkif->st_wr_req++;
+			dispatch_rw_block_io(blkif, req, pending_req);
 			break;
 
 		default:
-			DPRINTK("error: unknown block io operation [%d]\n",
+			WPRINTK("unknown operation [%d]\n",
 				req->operation);
 			make_response(blkif, req->id, req->operation,
 				      BLKIF_RSP_ERROR);
+			free_req(pending_req);
 			break;
 		}
 	}
-
-	blk_ring->req_cons = i;
-	blktap_kick_user();
+		
+	blktap_kick_user(blkif->dev_num);
 
 	return more_to_do;
 }
 
-static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
+static void dispatch_rw_block_io(blkif_t *blkif,
+				 blkif_request_t *req,
+				 pending_req_t *pending_req)
 {
-	blkif_request_t *target;
-	int i, pending_idx = pending_ring[MASK_PEND_IDX(pending_cons)];
-	pending_req_t *pending_req;
+	extern void ll_rw_block(int rw, int nr, struct buffer_head * bhs[]); 
+	int op, operation = (req->operation == BLKIF_OP_WRITE) ? WRITE : READ;
 	struct gnttab_map_grant_ref map[BLKIF_MAX_SEGMENTS_PER_REQUEST*2];
-	int op, ret;
 	unsigned int nseg;
-	int retval;
+	int ret, i;
+	tap_blkif_t *info = tapfds[blkif->dev_num];
+	uint64_t sector;
+	
+	blkif_request_t *target;
+	int pending_idx = RTN_PEND_IDX(pending_req,pending_req->mem_idx);
+	int usr_idx = GET_NEXT_REQ(info->idx_map);
+	uint16_t mmap_idx = pending_req->mem_idx;
 
+	/*Check we have space on user ring - should never fail*/
+	if(usr_idx == INVALID_REQ) goto fail_flush;
+	
 	/* Check that number of segments is sane. */
 	nseg = req->nr_segments;
-	if (unlikely(nseg == 0) || 
-	    unlikely(nseg > BLKIF_MAX_SEGMENTS_PER_REQUEST)) {
-		DPRINTK("Bad number of segments in request (%d)\n", nseg);
-		goto bad_descriptor;
+	if ( unlikely(nseg == 0) || 
+	    unlikely(nseg > BLKIF_MAX_SEGMENTS_PER_REQUEST) ) {
+		WPRINTK("Bad number of segments in request (%d)\n", nseg);
+		goto fail_response;
 	}
-
+	
 	/* Make sure userspace is ready. */
-	if (!blktap_ring_ok) {
-		DPRINTK("blktap: ring not ready for requests!\n");
-		goto bad_descriptor;
+	if (!info->ring_ok) {
+		WPRINTK("blktap: ring not ready for requests!\n");
+		goto fail_response;
 	}
-    
 
-	if (RING_FULL(&blktap_ufe_ring)) {
+	if (RING_FULL(&info->ufe_ring)) {
 		WPRINTK("blktap: fe_ring is full, can't add "
-			"(very broken!).\n");
-		goto bad_descriptor;
+			"IO Request will be dropped. %d %d\n",
+			RING_SIZE(&info->ufe_ring),
+			RING_SIZE(&blkif->blk_ring));
+		goto fail_response;
 	}
 
-	flush_cache_all(); /* a noop on intel... */
-
-	/* Map the foreign pages directly in to the application */    
+	pending_req->blkif     = blkif;
+	pending_req->id        = req->id;
+	pending_req->operation = operation;
+	pending_req->status    = BLKIF_RSP_OKAY;
+	pending_req->nr_pages  = nseg;
 	op = 0;
-	for (i = 0; i < req->nr_segments; i++) {
-
+	for (i = 0; i < nseg; i++) {
 		unsigned long uvaddr;
 		unsigned long kvaddr;
 		uint64_t ptep;
+		struct page *page;
+		uint32_t flags;
 
-		uvaddr = MMAP_VADDR(user_vstart, pending_idx, i);
-		kvaddr = MMAP_VADDR(mmap_vstart, pending_idx, i);
+		uvaddr = MMAP_VADDR(info->user_vstart, usr_idx, i);
+		kvaddr = MMAP_VADDR(mmap_start[mmap_idx].start, 
+				    pending_idx, i);
+		page = virt_to_page(kvaddr);
 
-		/* Map the remote page to kernel. */
-		map[op].host_addr = kvaddr;
-		map[op].dom   = blkif->domid;
-		map[op].ref   = req->seg[i].gref;
-		map[op].flags = GNTMAP_host_map;
-		/* This needs a bit more thought in terms of interposition: 
-		 * If we want to be able to modify pages during write using 
-		 * grant table mappings, the guest will either need to allow 
-		 * it, or we'll need to incur a copy. Bit of an fbufs moment. ;) */
-		if (req->operation == BLKIF_OP_WRITE)
-			map[op].flags |= GNTMAP_readonly;
+		sector = req->sector_number + (8*i);
+		if( (blkif->sectors > 0) && (sector >= blkif->sectors) ) {
+			WPRINTK("BLKTAP: Sector request greater" 
+			       "than size\n");
+			WPRINTK("BLKTAP: %s request sector" 
+			       "[%llu,%llu], Total [%llu]\n",
+			       (req->operation == 
+				BLKIF_OP_WRITE ? "WRITE" : "READ"),
+				(long long unsigned) sector,
+				(long long unsigned) sector>>9,
+				blkif->sectors);
+		}
+
+		flags = GNTMAP_host_map;
+		if (operation == WRITE)
+			flags |= GNTMAP_readonly;
+		gnttab_set_map_op(&map[op], kvaddr, flags,
+				  req->seg[i].gref, blkif->domid);
 		op++;
 
 		/* Now map it to user. */
-		ret = create_lookup_pte_addr(blktap_vma->vm_mm, uvaddr, &ptep);
+		ret = create_lookup_pte_addr(info->vma->vm_mm, 
+					     uvaddr, &ptep);
 		if (ret) {
-			DPRINTK("Couldn't get a pte addr!\n");
-			fast_flush_area(pending_idx, req->nr_segments);
-			goto bad_descriptor;
+			WPRINTK("Couldn't get a pte addr!\n");
+			fast_flush_area(pending_req, pending_idx, usr_idx, 
+					blkif->dev_num);
+			goto fail_flush;
 		}
 
-		map[op].host_addr = ptep;
-		map[op].dom       = blkif->domid;
-		map[op].ref       = req->seg[i].gref;
-		map[op].flags     = GNTMAP_host_map | GNTMAP_application_map
+		flags = GNTMAP_host_map | GNTMAP_application_map
 			| GNTMAP_contains_pte;
-		/* Above interposition comment applies here as well. */
-		if (req->operation == BLKIF_OP_WRITE)
-			map[op].flags |= GNTMAP_readonly;
+		if (operation == WRITE)
+			flags |= GNTMAP_readonly;
+		gnttab_set_map_op(&map[op], ptep, flags,
+				  req->seg[i].gref, blkif->domid);
 		op++;
 	}
 
-	retval = HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, map, op);
-	BUG_ON(retval);
+	ret = HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, map, op);
+	BUG_ON(ret);
 
-	op = 0;
-	for (i = 0; i < (req->nr_segments*2); i += 2) {
+	for (i = 0; i < (nseg*2); i+=2) {
 		unsigned long uvaddr;
 		unsigned long kvaddr;
 		unsigned long offset;
-		int cancel = 0;
+		struct page *pg;
 
-		uvaddr = MMAP_VADDR(user_vstart, pending_idx, i/2);
-		kvaddr = MMAP_VADDR(mmap_vstart, pending_idx, i/2);
+		uvaddr = MMAP_VADDR(info->user_vstart, usr_idx, i/2);
+		kvaddr = MMAP_VADDR(mmap_start[mmap_idx].start, 
+				    pending_idx, i/2);
 
-		if (unlikely(map[i].status)) {
-			DPRINTK("Error on kernel grant mapping (%d)\n",
-				map[i].status);
-			ret = map[i].status;
-			cancel = 1;
+		if (unlikely(map[i].status != 0)) {
+			WPRINTK("invalid kernel buffer -- "
+				"could not remap it\n");
+			goto fail_flush;
 		}
 
-		if (unlikely(map[i+1].status)) {
-			DPRINTK("Error on user grant mapping (%d)\n",
-				map[i+1].status);
-			ret = map[i+1].status;
-			cancel = 1;
+		if (unlikely(map[i+1].status != 0)) {
+			WPRINTK("invalid user buffer -- "
+				"could not remap it\n");
+			goto fail_flush;
 		}
 
-		if (cancel) {
-			fast_flush_area(pending_idx, req->nr_segments);
-			goto bad_descriptor;
-		}
-
-		/* Set the necessary mappings in p2m and in the VM_FOREIGN 
-		 * vm_area_struct to allow user vaddr -> struct page lookups
-		 * to work.  This is needed for direct IO to foreign pages. */
+		pending_handle(mmap_idx, pending_idx, i/2).kernel 
+			= map[i].handle;
+		pending_handle(mmap_idx, pending_idx, i/2).user   
+			= map[i+1].handle;
+#ifdef CONFIG_XEN_IA64_DOM0_NON_VP
+		pending_addrs[mmap_idx][vaddr_pagenr(pending_req, i)] =
+			(unsigned long)gnttab_map_vaddr(map[i]);
+#else
 		set_phys_to_machine(__pa(kvaddr) >> PAGE_SHIFT,
-				FOREIGN_FRAME(map[i].dev_bus_addr >> PAGE_SHIFT));
-
-		offset = (uvaddr - blktap_vma->vm_start) >> PAGE_SHIFT;
-		((struct page **)blktap_vma->vm_private_data)[offset] =
-			pfn_to_page(__pa(kvaddr) >> PAGE_SHIFT);
-
-		/* Save handles for unmapping later. */
-		pending_handle(pending_idx, i/2).kernel = map[i].handle;
-		pending_handle(pending_idx, i/2).user   = map[i+1].handle;
+			FOREIGN_FRAME(map[i].dev_bus_addr >> PAGE_SHIFT));
+#endif
+		offset = (uvaddr - info->vma->vm_start) >> PAGE_SHIFT;
+		pg = pfn_to_page(__pa(kvaddr) >> PAGE_SHIFT);
+		((struct page **)info->vma->vm_private_data)[offset] =
+			pg;
 	}
-
 	/* Mark mapped pages as reserved: */
 	for (i = 0; i < req->nr_segments; i++) {
 		unsigned long kvaddr;
-		kvaddr = MMAP_VADDR(mmap_vstart, pending_idx, i);
-		SetPageReserved(pfn_to_page(__pa(kvaddr) >> PAGE_SHIFT));
+		struct page *pg;
+
+		kvaddr = MMAP_VADDR(mmap_start[mmap_idx].start, 
+				    pending_idx, i);
+		pg = pfn_to_page(__pa(kvaddr) >> PAGE_SHIFT);
+		SetPageReserved(pg);
 	}
+	
+	/*record [mmap_idx,pending_idx] to [usr_idx] mapping*/
+	info->idx_map[usr_idx] = MAKE_ID(mmap_idx, pending_idx);
 
-	pending_req = &pending_reqs[pending_idx];
-	pending_req->blkif     = blkif;
-	pending_req->id        = req->id;
-	pending_req->operation = req->operation;
-	pending_req->status    = BLKIF_RSP_OKAY;
-	pending_req->nr_pages  = nseg;
-	req->id = MAKE_ID(blkif->domid, pending_idx);
-	//atomic_set(&pending_req->pendcnt, nbio);
-	pending_cons++;
 	blkif_get(blkif);
-
 	/* Finally, write the request message to the user ring. */
-	target = RING_GET_REQUEST(&blktap_ufe_ring,
-				  blktap_ufe_ring.req_prod_pvt);
+	target = RING_GET_REQUEST(&info->ufe_ring,
+				  info->ufe_ring.req_prod_pvt);
 	memcpy(target, req, sizeof(*req));
-	blktap_ufe_ring.req_prod_pvt++;
+	target->id = usr_idx;
+	info->ufe_ring.req_prod_pvt++;
 	return;
 
- bad_descriptor:
+ fail_flush:
+	WPRINTK("Reached Fail_flush\n");
+	fast_flush_area(pending_req, pending_idx, usr_idx, blkif->dev_num);
+ fail_response:
 	make_response(blkif, req->id, req->operation, BLKIF_RSP_ERROR);
+	free_req(pending_req);
 } 
 
 
@@ -828,83 +1354,82 @@ static void make_response(blkif_t *blkif, unsigned long id,
 	blkif_response_t *resp;
 	unsigned long     flags;
 	blkif_back_ring_t *blk_ring = &blkif->blk_ring;
+	int more_to_do = 0;
+	int notify;
 
-	/* Place on the response ring for the relevant domain. */ 
 	spin_lock_irqsave(&blkif->blk_ring_lock, flags);
+	/* Place on the response ring for the relevant domain. */ 
 	resp = RING_GET_RESPONSE(blk_ring, blk_ring->rsp_prod_pvt);
 	resp->id        = id;
 	resp->operation = op;
 	resp->status    = st;
-	wmb(); /* Ensure other side can see the response fields. */
 	blk_ring->rsp_prod_pvt++;
-	RING_PUSH_RESPONSES(blk_ring);
+	RING_PUSH_RESPONSES_AND_CHECK_NOTIFY(blk_ring, notify);
+
+	if (blk_ring->rsp_prod_pvt == blk_ring->req_cons) {
+		/*
+		 * Tail check for pending requests. Allows frontend to avoid
+		 * notifications if requests are already in flight (lower
+		 * overheads and promotes batching).
+		 */
+		RING_FINAL_CHECK_FOR_REQUESTS(blk_ring, more_to_do);
+	} else if (RING_HAS_UNCONSUMED_REQUESTS(blk_ring)) {
+		more_to_do = 1;
+
+	}	
 	spin_unlock_irqrestore(&blkif->blk_ring_lock, flags);
-
-	/* Kick the relevant domain. */
-	notify_remote_via_irq(blkif->irq);
-}
-
-static struct miscdevice blktap_miscdev = {
-	.minor        = BLKTAP_MINOR,
-	.name         = "blktap",
-	.fops         = &blktap_fops,
-	.devfs_name   = "misc/blktap",
-};
-
-void blkif_deschedule(blkif_t *blkif)
-{
-	remove_from_blkdev_list(blkif);
+	if (more_to_do)
+		blkif_notify_work(blkif);
+	if (notify)
+		notify_remote_via_irq(blkif->irq);
 }
 
 static int __init blkif_init(void)
 {
-	int i, j, err;
-	struct page *page;
+	int i,ret;
+	tap_blkif_t *info;
 
-	blkif_interface_init();
+	if (!is_running_on_xen())
+		return -ENODEV;
 
-	page = balloon_alloc_empty_page_range(MMAP_PAGES);
-	BUG_ON(page == NULL);
-	mmap_vstart = (unsigned long)pfn_to_kaddr(page_to_pfn(page));
+	INIT_LIST_HEAD(&pending_free);
+        for(i = 0; i < 2; i++) req_increase();
 
-	pending_cons = 0;
-	pending_prod = MAX_PENDING_REQS;
-	memset(pending_reqs, 0, sizeof(pending_reqs));
-	for ( i = 0; i < MAX_PENDING_REQS; i++ )
-		pending_ring[i] = i;
-    
-	spin_lock_init(&blkio_schedule_list_lock);
-	INIT_LIST_HEAD(&blkio_schedule_list);
+	tap_blkif_interface_init();
 
-	i = kernel_thread(blkio_schedule, 0, CLONE_FS | CLONE_FILES);
-	BUG_ON(i<0);
+	alloc_pending_reqs = 0;
 
-	blkif_xenbus_init();
+	tap_blkif_xenbus_init();
 
-	for (i = 0; i < MAX_PENDING_REQS ; i++)
-		for (j = 0; j < BLKIF_MAX_SEGMENTS_PER_REQUEST; j++)
-			BLKTAP_INVALIDATE_HANDLE(&pending_handle(i, j));
+	/*Create the blktap devices, but do not map memory or waitqueue*/
+	for(i = 0; i < MAX_TAP_DEV; i++) translate_domid[i].domid = 0xFFFF;
 
-	err = misc_register(&blktap_miscdev);
-	if (err != 0) {
-		printk(KERN_ALERT "Couldn't register /dev/misc/blktap (%d)\n",
-		       err);
-		return err;
+	ret = register_chrdev(BLKTAP_DEV_MAJOR,"blktap",&blktap_fops);
+
+	if ( (ret < 0) ) {
+		WPRINTK("Couldn't register /dev/xen/blktap\n");
+		return -ENOMEM;
+	}	
+	
+	for(i = 0; i < MAX_TAP_DEV; i++ ) {
+		info = tapfds[i] = kzalloc(sizeof(tap_blkif_t),GFP_KERNEL);
+		if(tapfds[i] == NULL) return -ENOMEM;
+		info->minor = i;
+		info->pid = 0;
+		info->blkif = NULL;
+
+		info->dev_pending = info->dev_inuse = 0;
+
+		//?? class_device_create(blktap_class, NULL, MKDEV(BLKTAP_DEV_MAJOR, i), NULL, "blktap%d", i);
+
+		DPRINTK("Created misc_dev [/dev/xen/blktap%d]\n",i);
 	}
-
-	init_waitqueue_head(&blktap_wait);
+	
+	DPRINTK("Blktap device successfully created\n");
 
 	return 0;
 }
 
-__initcall(blkif_init);
+module_init(blkif_init);
 
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */
+MODULE_LICENSE("Dual BSD/GPL");

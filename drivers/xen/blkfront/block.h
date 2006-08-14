@@ -47,7 +47,6 @@
 #include <linux/hdreg.h>
 #include <linux/blkdev.h>
 #include <linux/major.h>
-#include <linux/devfs_fs_kernel.h>
 #include <asm/hypervisor.h>
 #include <xen/xenbus.h>
 #include <xen/gnttab.h>
@@ -59,15 +58,15 @@
 #include <asm/uaccess.h>
 
 #if 1
-#define IPRINTK(fmt, args...) \
-    printk(KERN_INFO "xen_blk: " fmt, ##args)
+#define IPRINTK(fmt, args...)				\
+	printk(KERN_INFO "xen_blk: " fmt, ##args)
 #else
 #define IPRINTK(fmt, args...) ((void)0)
 #endif
 
 #if 1
-#define WPRINTK(fmt, args...) \
-    printk(KERN_WARNING "xen_blk: " fmt, ##args)
+#define WPRINTK(fmt, args...)				\
+	printk(KERN_WARNING "xen_blk: " fmt, ##args)
 #else
 #define WPRINTK(fmt, args...) ((void)0)
 #endif
@@ -139,7 +138,8 @@ extern spinlock_t blkif_io_lock;
 extern int blkif_open(struct inode *inode, struct file *filep);
 extern int blkif_release(struct inode *inode, struct file *filep);
 extern int blkif_ioctl(struct inode *inode, struct file *filep,
-                       unsigned command, unsigned long argument);
+		       unsigned command, unsigned long argument);
+extern int blkif_getgeo(struct block_device *, struct hd_geometry *);
 extern int blkif_check(dev_t dev);
 extern int blkif_revalidate(dev_t dev);
 extern void do_blkif_request (request_queue_t *rq);
@@ -153,13 +153,3 @@ int xlvbd_add(blkif_sector_t capacity, int device,
 void xlvbd_del(struct blkfront_info *info);
 
 #endif /* __XEN_DRIVERS_BLOCK_H__ */
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

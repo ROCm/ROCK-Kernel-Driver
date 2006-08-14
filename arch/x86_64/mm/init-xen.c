@@ -9,7 +9,6 @@
  *	Modified for Xen.
  */
 
-#include <linux/config.h>
 #include <linux/signal.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
@@ -26,6 +25,7 @@
 #include <linux/bootmem.h>
 #include <linux/proc_fs.h>
 #include <linux/pci.h>
+#include <linux/poison.h>
 #include <linux/dma-mapping.h>
 #include <linux/module.h>
 #include <linux/memory_hotplug.h>
@@ -44,8 +44,6 @@
 #include <asm/proto.h>
 #include <asm/smp.h>
 #include <asm/sections.h>
-#include <asm/dma-mapping.h>
-#include <asm/swiotlb.h>
 
 #include <xen/features.h>
 
@@ -180,7 +178,7 @@ void show_mem(void)
 	show_free_areas();
 	printk(KERN_INFO "Free swap:       %6ldkB\n", nr_swap_pages<<(PAGE_SHIFT-10));
 
-	for_each_pgdat(pgdat) {
+	for_each_online_pgdat(pgdat) {
                for (i = 0; i < pgdat->node_spanned_pages; ++i) {
 			page = pfn_to_page(pgdat->node_start_pfn + i);
 			total++;
@@ -198,16 +196,18 @@ void show_mem(void)
 	printk(KERN_INFO "%lu pages swap cached\n",cached);
 }
 
-/* References to section boundaries */
-
 int after_bootmem;
 
-static void *spp_getpage(void)
+static __init void *spp_getpage(void)
 { 
 	void *ptr;
 	if (after_bootmem)
 		ptr = (void *) get_zeroed_page(GFP_ATOMIC); 
-	else
+	else if (start_pfn < table_end) {
+		ptr = __va(start_pfn << PAGE_SHIFT);
+		start_pfn++;
+		memset(ptr, 0, PAGE_SIZE);
+	} else
 		ptr = alloc_bootmem_pages(PAGE_SIZE);
 	if (!ptr || ((unsigned long)ptr & ~PAGE_MASK))
 		panic("set_pte_phys: cannot allocate page data %s\n", after_bootmem?"after bootmem":"");
@@ -225,8 +225,8 @@ static inline pud_t *pud_offset_u(unsigned long address)
 	return pud + pud_index(address);
 }
 
-static void set_pte_phys(unsigned long vaddr,
-			 unsigned long phys, pgprot_t prot, int user_mode)
+static __init void set_pte_phys(unsigned long vaddr,
+				unsigned long phys, pgprot_t prot, int user_mode)
 {
 	pgd_t *pgd;
 	pud_t *pud;
@@ -275,8 +275,8 @@ static void set_pte_phys(unsigned long vaddr,
 	__flush_tlb_one(vaddr);
 }
 
-static void set_pte_phys_ma(unsigned long vaddr,
-			 unsigned long phys, pgprot_t prot)
+static __init void set_pte_phys_ma(unsigned long vaddr,
+				   unsigned long phys, pgprot_t prot)
 {
 	pgd_t *pgd;
 	pud_t *pud;
@@ -337,7 +337,8 @@ static void set_pte_phys_ma(unsigned long vaddr,
 #define SET_FIXMAP_USER   1
 
 /* NOTE: this is meant to be run only at boot */
-void __set_fixmap (enum fixed_addresses idx, unsigned long phys, pgprot_t prot)
+void __init 
+__set_fixmap (enum fixed_addresses idx, unsigned long phys, pgprot_t prot)
 {
 	unsigned long address = __fix_to_virt(idx);
 
@@ -356,9 +357,10 @@ void __set_fixmap (enum fixed_addresses idx, unsigned long phys, pgprot_t prot)
 }
 
 /*
- * At this point it only supports vsyscall area.
+ * This only supports vsyscall area.
  */
-void __set_fixmap_user (enum fixed_addresses idx, unsigned long phys, pgprot_t prot)
+void __init
+__set_fixmap_user (enum fixed_addresses idx, unsigned long phys, pgprot_t prot)
 {
 	unsigned long address = __fix_to_virt(idx);
 
@@ -370,11 +372,11 @@ void __set_fixmap_user (enum fixed_addresses idx, unsigned long phys, pgprot_t p
 	set_pte_phys(address, phys, prot, SET_FIXMAP_USER); 
 }
 
-unsigned long __initdata table_start, tables_space; 
+unsigned long __initdata table_start, table_end; 
 
 unsigned long get_machine_pfn(unsigned long addr)
 {
-	pud_t* pud = pud_offset_k(NULL, addr);
+	pud_t* pud = pud_offset(pgd_offset_k(addr), addr);
 	pmd_t* pmd = pmd_offset(pud, addr);
 	pte_t *pte = pte_offset_kernel(pmd, addr);
 
@@ -409,11 +411,17 @@ static inline int make_readonly(unsigned long paddr)
 {
 	int readonly = 0;
 
-	/* Make old and new page tables read-only. */
+	/* Make new page tables read-only. */
+	if (!xen_feature(XENFEAT_writable_page_tables)
+	    && (paddr >= (table_start << PAGE_SHIFT))
+	    && (paddr < (table_end << PAGE_SHIFT)))
+		readonly = 1;
+	/* Make old page tables read-only. */
 	if (!xen_feature(XENFEAT_writable_page_tables)
 	    && (paddr >= (xen_start_info->pt_base - __START_KERNEL_map))
-	    && (paddr < ((table_start << PAGE_SHIFT) + tables_space)))
+	    && (paddr < (start_pfn << PAGE_SHIFT)))
 		readonly = 1;
+
 	/*
 	 * No need for writable mapping of kernel image. This also ensures that
 	 * page and descriptor tables embedded inside don't have writable
@@ -425,6 +433,35 @@ static inline int make_readonly(unsigned long paddr)
 	return readonly;
 }
 
+#ifndef CONFIG_XEN
+/* Must run before zap_low_mappings */
+__init void *early_ioremap(unsigned long addr, unsigned long size)
+{
+	unsigned long map = round_down(addr, LARGE_PAGE_SIZE); 
+
+	/* actually usually some more */
+	if (size >= LARGE_PAGE_SIZE) { 
+		printk("SMBIOS area too long %lu\n", size);
+		return NULL;
+	}
+	set_pmd(temp_mappings[0].pmd,  __pmd(map | _KERNPG_TABLE | _PAGE_PSE));
+	map += LARGE_PAGE_SIZE;
+	set_pmd(temp_mappings[1].pmd,  __pmd(map | _KERNPG_TABLE | _PAGE_PSE));
+	__flush_tlb();
+	return temp_mappings[0].address + (addr & (LARGE_PAGE_SIZE-1));
+}
+
+/* To avoid virtual aliases later */
+__init void early_iounmap(void *addr, unsigned long size)
+{
+	if ((void *)round_down((unsigned long)addr, LARGE_PAGE_SIZE) != temp_mappings[0].address)
+		printk("early_iounmap: bad address %p\n", addr);
+	set_pmd(temp_mappings[0].pmd, __pmd(0));
+	set_pmd(temp_mappings[1].pmd, __pmd(0));
+	__flush_tlb();
+}
+#endif
+
 static void __meminit
 phys_pmd_init(pmd_t *pmd, unsigned long address, unsigned long end)
 {
@@ -435,8 +472,9 @@ phys_pmd_init(pmd_t *pmd, unsigned long address, unsigned long end)
 		pte_t *pte, *pte_save;
 
 		if (address >= end) {
-			for (; i < PTRS_PER_PMD; i++, pmd++)
-				set_pmd(pmd, __pmd(0));
+			if (!after_bootmem)
+				for (; i < PTRS_PER_PMD; i++, pmd++)
+					set_pmd(pmd, __pmd(0));
 			break;
 		}
 		pte = alloc_static_page(&pte_phys);
@@ -544,7 +582,7 @@ void __init xen_init_pt(void)
 		mk_kernel_pgd(__pa_symbol(level3_user_pgt)));
 }
 
-void __init extend_init_mapping(void) 
+void __init extend_init_mapping(unsigned long tables_space)
 {
 	unsigned long va = __START_KERNEL_map;
 	unsigned long phys, addr, *pte_page;
@@ -597,25 +635,36 @@ void __init extend_init_mapping(void)
 	}
 }
 
-static void __init find_early_table_space(unsigned long end)
+static unsigned long __init find_early_table_space(unsigned long end)
 {
-	unsigned long puds, pmds, ptes; 
+	unsigned long puds, pmds, ptes, tables; 
 
 	puds = (end + PUD_SIZE - 1) >> PUD_SHIFT;
 	pmds = (end + PMD_SIZE - 1) >> PMD_SHIFT;
 	ptes = (end + PTE_SIZE - 1) >> PAGE_SHIFT;
 
-	tables_space =
-		round_up(puds * 8, PAGE_SIZE) + 
+	tables = round_up(puds * 8, PAGE_SIZE) + 
 		round_up(pmds * 8, PAGE_SIZE) + 
 		round_up(ptes * 8, PAGE_SIZE); 
 
-	extend_init_mapping();
-
 	table_start = start_pfn;
+	table_end = table_start + (tables>>PAGE_SHIFT);
+
+	/* Also reserve pages for fixmaps that need to be set up early.
+	 * Their pud is shared with kernel pud.
+	 */
+	pmds = (PMD_SIZE - 1 - FIXADDR_START) >> PMD_SHIFT;
+	ptes = (PTE_SIZE - 1 - FIXADDR_START) >> PAGE_SHIFT;
+
+	tables += round_up(pmds * 8, PAGE_SIZE) + 
+		round_up(ptes * 8, PAGE_SIZE); 
+
+	extend_init_mapping(tables);
 
 	early_printk("kernel direct mapping tables up to %lx @ %lx-%lx\n",
-		end, table_start << PAGE_SHIFT, start_pfn << PAGE_SHIFT);
+		end, table_start << PAGE_SHIFT, table_end << PAGE_SHIFT);
+
+	return table_start + (tables>>PAGE_SHIFT);
 }
 
 /* Setup the direct mapping of the physical memory at PAGE_OFFSET.
@@ -623,7 +672,7 @@ static void __init find_early_table_space(unsigned long end)
    physical memory. To access them they are temporarily mapped. */
 void __meminit init_memory_mapping(unsigned long start, unsigned long end)
 { 
-	unsigned long next; 
+	unsigned long next, table_rsrv_end = 0;
 
 	Dprintk("init_memory_mapping\n");
 
@@ -634,7 +683,7 @@ void __meminit init_memory_mapping(unsigned long start, unsigned long end)
 	 * discovered.
 	 */
 	if (!after_bootmem)
-		find_early_table_space(end);
+		table_rsrv_end = find_early_table_space(end);
 
 	start = (unsigned long)__va(start);
 	end = (unsigned long)__va(end);
@@ -645,7 +694,7 @@ void __meminit init_memory_mapping(unsigned long start, unsigned long end)
 		pud_t *pud;
 
 		if (after_bootmem) {
-			pud = pud_offset_k(pgd, __PAGE_OFFSET);
+			pud = pud_offset(pgd, start & PGDIR_MASK);
 			make_page_readonly(pud, XENFEAT_writable_page_tables);
 			pud_phys = __pa(pud);
 		} else {
@@ -660,7 +709,53 @@ void __meminit init_memory_mapping(unsigned long start, unsigned long end)
 			set_pgd(pgd_offset_k(start), mk_kernel_pgd(pud_phys));
 	}
 
-	BUG_ON(!after_bootmem && start_pfn != table_start + (tables_space >> PAGE_SHIFT));
+	if (!after_bootmem) {
+		BUG_ON(start_pfn != table_end);
+		table_end = table_rsrv_end;
+
+		/* Re-vector virtual addresses pointing into the initial
+		   mapping to the just-established permanent ones. */
+		xen_start_info = __va(__pa(xen_start_info));
+		xen_start_info->pt_base = (unsigned long)
+			__va(__pa(xen_start_info->pt_base));
+		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
+			phys_to_machine_mapping =
+				__va(__pa(xen_start_info->mfn_list));
+			xen_start_info->mfn_list = (unsigned long)
+				phys_to_machine_mapping;
+		}
+		if (xen_start_info->mod_start)
+			xen_start_info->mod_start = (unsigned long)
+				__va(__pa(xen_start_info->mod_start));
+
+		/* Destroy the Xen-created mappings beyond the kernel image as
+		 * well as the temporary mappings created above. Prevents
+		 * overlap with modules area (if init mapping is very big).
+		 */
+		start = PAGE_ALIGN((unsigned long)_end);
+		end   = __START_KERNEL_map + (table_end << PAGE_SHIFT);
+		for (; start < end; start += PAGE_SIZE)
+			WARN_ON(HYPERVISOR_update_va_mapping(
+				start, __pte_ma(0), 0));
+
+		/* Switch to the real shared_info page, and clear the
+		 * dummy page. */
+		set_fixmap(FIX_SHARED_INFO, xen_start_info->shared_info);
+		HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
+		memset(empty_zero_page, 0, sizeof(empty_zero_page));
+
+		/* Setup mapping of lower 1st MB */
+		for (next = 0; next < NR_FIX_ISAMAPS; next++)
+			if (xen_start_info->flags & SIF_PRIVILEGED)
+				set_fixmap(FIX_ISAMAP_BEGIN - next, next * PAGE_SIZE);
+			else
+				__set_fixmap(FIX_ISAMAP_BEGIN - next,
+					     virt_to_mfn(empty_zero_page) << PAGE_SHIFT,
+					     PAGE_KERNEL_RO);
+
+		BUG_ON(start_pfn > table_end);
+		table_end = start_pfn;
+	}
 
 	__flush_tlb_all();
 }
@@ -738,7 +833,6 @@ size_zones(unsigned long *z, unsigned long *h,
 void __init paging_init(void)
 {
 	unsigned long zones[MAX_NR_ZONES], holes[MAX_NR_ZONES];
-	int i;
 
 	memory_present(0, 0, end_pfn);
 	sparse_init();
@@ -746,26 +840,7 @@ void __init paging_init(void)
 	free_area_init_node(0, NODE_DATA(0), zones,
 			    __pa(PAGE_OFFSET) >> PAGE_SHIFT, holes);
 
-	if (!xen_feature(XENFEAT_auto_translated_physmap) ||
-	    xen_start_info->shared_info >= xen_start_info->nr_pages) {
-		/* Switch to the real shared_info page, and clear the
-		 * dummy page. */
-		set_fixmap(FIX_SHARED_INFO, xen_start_info->shared_info);
-		HYPERVISOR_shared_info =
-			(shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
-		memset(empty_zero_page, 0, sizeof(empty_zero_page));
-	}
-
 	init_mm.context.pinned = 1;
-
-	/* Setup mapping of lower 1st MB */
-	for (i = 0; i < NR_FIX_ISAMAPS; i++)
-		if (xen_start_info->flags & SIF_PRIVILEGED)
-			set_fixmap(FIX_ISAMAP_BEGIN - i, i * PAGE_SIZE);
-		else
-			__set_fixmap(FIX_ISAMAP_BEGIN - i,
-				     virt_to_mfn(empty_zero_page) << PAGE_SHIFT,
-				     PAGE_KERNEL_RO);
 }
 #endif
 
@@ -805,22 +880,37 @@ void __init clear_kernel_mapping(unsigned long address, unsigned long size)
 
 /*
  * Memory hotplug specific functions
- * These are only for non-NUMA machines right now.
  */
-#ifdef CONFIG_MEMORY_HOTPLUG
-
 void online_page(struct page *page)
 {
 	ClearPageReserved(page);
-	set_page_count(page, 1);
+	init_page_count(page);
 	__free_page(page);
 	totalram_pages++;
 	num_physpages++;
 }
 
-int add_memory(u64 start, u64 size)
+#ifdef CONFIG_MEMORY_HOTPLUG
+/*
+ * XXX: memory_add_physaddr_to_nid() is to find node id from physical address
+ *	via probe interface of sysfs. If acpi notifies hot-add event, then it
+ *	can tell node id by searching dsdt. But, probe interface doesn't have
+ *	node id. So, return 0 as node id at this time.
+ */
+#ifdef CONFIG_NUMA
+int memory_add_physaddr_to_nid(u64 start)
 {
-	struct pglist_data *pgdat = NODE_DATA(0);
+	return 0;
+}
+#endif
+
+/*
+ * Memory is added always to NORMAL zone. This means you will never get
+ * additional DMA/DMA32 memory.
+ */
+int arch_add_memory(int nid, u64 start, u64 size)
+{
+	struct pglist_data *pgdat = NODE_DATA(nid);
 	struct zone *zone = pgdat->node_zones + MAX_NR_ZONES-2;
 	unsigned long start_pfn = start >> PAGE_SHIFT;
 	unsigned long nr_pages = size >> PAGE_SHIFT;
@@ -837,7 +927,7 @@ error:
 	printk("%s: Problem encountered in __add_pages!\n", __func__);
 	return ret;
 }
-EXPORT_SYMBOL_GPL(add_memory);
+EXPORT_SYMBOL_GPL(arch_add_memory);
 
 int remove_memory(u64 start, u64 size)
 {
@@ -845,7 +935,33 @@ int remove_memory(u64 start, u64 size)
 }
 EXPORT_SYMBOL_GPL(remove_memory);
 
-#endif
+#else /* CONFIG_MEMORY_HOTPLUG */
+/*
+ * Memory Hotadd without sparsemem. The mem_maps have been allocated in advance,
+ * just online the pages.
+ */
+int __add_pages(struct zone *z, unsigned long start_pfn, unsigned long nr_pages)
+{
+	int err = -EIO;
+	unsigned long pfn;
+	unsigned long total = 0, mem = 0;
+	for (pfn = start_pfn; pfn < start_pfn + nr_pages; pfn++) {
+		if (pfn_valid(pfn)) {
+			online_page(pfn_to_page(pfn));
+			err = 0;
+			mem++;
+		}
+		total++;
+	}
+	if (!err) {
+		z->spanned_pages += total;
+		z->present_pages += mem;
+		z->zone_pgdat->node_spanned_pages += total;
+		z->zone_pgdat->node_present_pages += mem;
+	}
+	return err;
+}
+#endif /* CONFIG_MEMORY_HOTPLUG */
 
 static struct kcore_list kcore_mem, kcore_vmalloc, kcore_kernel, kcore_modules,
 			 kcore_vsyscall;
@@ -853,16 +969,21 @@ static struct kcore_list kcore_mem, kcore_vmalloc, kcore_kernel, kcore_modules,
 void __init mem_init(void)
 {
 	long codesize, reservedpages, datasize, initsize;
+	unsigned long pfn;
 
 	contiguous_bitmap = alloc_bootmem_low_pages(
 		(end_pfn + 2*BITS_PER_LONG) >> 3);
 	BUG_ON(!contiguous_bitmap);
 	memset(contiguous_bitmap, 0, (end_pfn + 2*BITS_PER_LONG) >> 3);
 
+#ifndef CONFIG_XEN
+	pci_iommu_alloc();
+#else
 #if defined(CONFIG_SWIOTLB)
-	pci_swiotlb_init();	
+	pci_swiotlb_init();
 #endif
 	no_iommu_init();
+#endif
 
 	/* How many end-of-memory variables you have, grandma! */
 	max_low_pfn = end_pfn;
@@ -881,6 +1002,12 @@ void __init mem_init(void)
 #else
 	totalram_pages = free_all_bootmem();
 #endif
+	/* XEN: init and count pages outside initial allocation. */
+	for (pfn = xen_start_info->nr_pages; pfn < max_pfn; pfn++) {
+		ClearPageReserved(&mem_map[pfn]);
+		init_page_count(&mem_map[pfn]);
+		totalram_pages++;
+	}
 	reservedpages = end_pfn - totalram_pages - e820_hole_size(0, end_pfn);
 
 	after_bootmem = 1;
@@ -918,20 +1045,19 @@ void __init mem_init(void)
 #endif
 }
 
-void free_initmem(void)
+void free_init_pages(char *what, unsigned long begin, unsigned long end)
 {
-#ifdef __DO_LATER__
-	/*
-	 * Some pages can be pinned, but some are not. Unpinning such pages 
-	 * triggers BUG(). 
-	 */
 	unsigned long addr;
 
-	addr = (unsigned long)(&__init_begin);
-	for (; addr < (unsigned long)(&__init_end); addr += PAGE_SIZE) {
+	if (begin >= end)
+		return;
+
+	printk(KERN_INFO "Freeing %s: %ldk freed\n", what, (end - begin) >> 10);
+	for (addr = begin; addr < end; addr += PAGE_SIZE) {
 		ClearPageReserved(virt_to_page(addr));
-		set_page_count(virt_to_page(addr), 1);
-		memset((void *)(addr & ~(PAGE_SIZE-1)), 0xcc, PAGE_SIZE); 
+		init_page_count(virt_to_page(addr));
+		memset((void *)(addr & ~(PAGE_SIZE-1)),
+			POISON_FREE_INITMEM, PAGE_SIZE);
 		make_page_writable(
 			__va(__pa(addr)), XENFEAT_writable_page_tables);
 		/*
@@ -942,23 +1068,34 @@ void free_initmem(void)
 		free_page(addr);
 		totalram_pages++;
 	}
-	memset(__initdata_begin, 0xba, __initdata_end - __initdata_begin);
-	printk ("Freeing unused kernel memory: %luk freed\n", (__init_end - __init_begin) >> 10);
+}
+
+void free_initmem(void)
+{
+	memset(__initdata_begin, POISON_FREE_INITDATA,
+		__initdata_end - __initdata_begin);
+#ifdef __DO_LATER__
+	/*
+	 * Some pages can be pinned, but some are not. Unpinning such pages
+	 * triggers BUG().
+	 */
+	free_init_pages("unused kernel memory",
+			(unsigned long)(&__init_begin),
+			(unsigned long)(&__init_end));
 #endif
 }
 
 #ifdef CONFIG_DEBUG_RODATA
 
-extern char __start_rodata, __end_rodata;
 void mark_rodata_ro(void)
 {
-	unsigned long addr = (unsigned long)&__start_rodata;
+	unsigned long addr = (unsigned long)__start_rodata;
 
-	for (; addr < (unsigned long)&__end_rodata; addr += PAGE_SIZE)
+	for (; addr < (unsigned long)__end_rodata; addr += PAGE_SIZE)
 		change_page_attr_addr(addr, 1, PAGE_KERNEL_RO);
 
 	printk ("Write protecting the kernel read-only data: %luk\n",
-			(&__end_rodata - &__start_rodata) >> 10);
+			(__end_rodata - __start_rodata) >> 10);
 
 	/*
 	 * change_page_attr_addr() requires a global_flush_tlb() call after it.
@@ -973,15 +1110,7 @@ void mark_rodata_ro(void)
 #ifdef CONFIG_BLK_DEV_INITRD
 void free_initrd_mem(unsigned long start, unsigned long end)
 {
-	if (start >= end)
-		return;
-	printk ("Freeing initrd memory: %ldk freed\n", (end - start) >> 10);
-	for (; start < end; start += PAGE_SIZE) {
-		ClearPageReserved(virt_to_page(start));
-		set_page_count(virt_to_page(start), 1);
-		free_page(start);
-		totalram_pages++;
-	}
+	free_init_pages("initrd memory", start, end);
 }
 #endif
 
@@ -1013,7 +1142,7 @@ int kern_addr_valid(unsigned long addr)
 	if (pgd_none(*pgd))
 		return 0;
 
-	pud = pud_offset_k(pgd, addr);
+	pud = pud_offset(pgd, addr);
 	if (pud_none(*pud))
 		return 0; 
 
@@ -1089,13 +1218,3 @@ int in_gate_area_no_task(unsigned long addr)
 {
 	return (addr >= VSYSCALL_START) && (addr < VSYSCALL_END);
 }
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

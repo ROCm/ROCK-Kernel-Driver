@@ -11,12 +11,17 @@
 #include <xen/xenbus.h>
 #include <linux/list.h>
 #include <linux/spinlock.h>
+#include <linux/workqueue.h>
+#include <asm/atomic.h>
 #include <xen/interface/io/pciif.h>
 
 struct pci_dev_entry {
 	struct list_head list;
 	struct pci_dev *dev;
 };
+
+#define _PDEVF_op_active 	(0)
+#define PDEVF_op_active 	(1<<(_PDEVF_op_active))
 
 struct pciback_device {
 	void *pci_dev_data;
@@ -31,10 +36,16 @@ struct pciback_device {
 
 	struct vm_struct *sh_area;
 	struct xen_pci_sharedinfo *sh_info;
+
+	unsigned long flags;
+
+	struct work_struct op_work;
 };
 
 struct pciback_dev_data {
 	struct list_head config_fields;
+	int permissive;
+	int warned_on_write;
 };
 
 /* Get/Put PCI Devices that are hidden from the PCI Backend Domain */
@@ -49,9 +60,11 @@ void pcistub_put_pci_dev(struct pci_dev *dev);
 void pciback_reset_device(struct pci_dev *pdev);
 
 /* Access a virtual configuration space for a PCI device */
-int pciback_config_init(struct pci_dev *dev);
-void pciback_config_reset(struct pci_dev *dev);
-void pciback_config_free(struct pci_dev *dev);
+int pciback_config_init(void);
+int pciback_config_init_dev(struct pci_dev *dev);
+void pciback_config_free_dyn_fields(struct pci_dev *dev);
+void pciback_config_reset_dev(struct pci_dev *dev);
+void pciback_config_free_dev(struct pci_dev *dev);
 int pciback_config_read(struct pci_dev *dev, int offset, int size,
 			u32 * ret_val);
 int pciback_config_write(struct pci_dev *dev, int offset, int size, u32 value);
@@ -71,6 +84,7 @@ void pciback_release_devices(struct pciback_device *pdev);
 
 /* Handles events from front-end */
 irqreturn_t pciback_handle_event(int irq, void *dev_id, struct pt_regs *regs);
+void pciback_do_op(void *data);
 
 int pciback_xenbus_register(void);
 void pciback_xenbus_unregister(void);

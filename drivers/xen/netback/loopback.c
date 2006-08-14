@@ -125,7 +125,20 @@ static struct ethtool_ops network_ethtool_ops =
 {
 	.get_tx_csum = ethtool_op_get_tx_csum,
 	.set_tx_csum = ethtool_op_set_tx_csum,
+	.get_sg = ethtool_op_get_sg,
+	.set_sg = ethtool_op_set_sg,
+	.get_tso = ethtool_op_get_tso,
+	.set_tso = ethtool_op_set_tso,
+	.get_link = ethtool_op_get_link,
 };
+
+/*
+ * Nothing to do here. Virtual interface is point-to-point and the
+ * physical interface is probably promiscuous anyway.
+ */
+static void loopback_set_multicast_list(struct net_device *dev)
+{
+}
 
 static void loopback_construct(struct net_device *dev, struct net_device *lo)
 {
@@ -137,11 +150,15 @@ static void loopback_construct(struct net_device *dev, struct net_device *lo)
 	dev->stop            = loopback_close;
 	dev->hard_start_xmit = loopback_start_xmit;
 	dev->get_stats       = loopback_get_stats;
+	dev->set_multicast_list = loopback_set_multicast_list;
+	dev->change_mtu	     = NULL; /* allow arbitrary mtu */
 
 	dev->tx_queue_len    = 0;
 
 	dev->features        = (NETIF_F_HIGHDMA |
 				NETIF_F_LLTX |
+				NETIF_F_TSO |
+				NETIF_F_SG |
 				NETIF_F_IP_CSUM);
 
 	SET_ETHTOOL_OPS(dev, &network_ethtool_ops);
@@ -242,13 +259,3 @@ static void __exit loopback_exit(void)
 module_exit(loopback_exit);
 
 MODULE_LICENSE("Dual BSD/GPL");
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

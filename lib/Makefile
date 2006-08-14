@@ -51,6 +51,9 @@ obj-$(CONFIG_TEXTSEARCH_FSM) += ts_fsm.o
 obj-$(CONFIG_SMP) += percpu_counter.o
 
 obj-$(CONFIG_SWIOTLB) += swiotlb.o
+ifneq ($(CONFIG_XEN_IA64_DOM0_NON_VP),y)
+swiotlb-$(CONFIG_XEN) := ../arch/i386/kernel/swiotlb.o
+endif
 
 hostprogs-y	:= gen_crc32table
 clean-files	:= crc32table.h

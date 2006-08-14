@@ -126,6 +126,8 @@ int direct_remap_pfn_range(struct vm_area_struct *vma,
 	if (domid == DOMID_SELF)
 		return -EINVAL;
 
+	vma->vm_mm->context.has_foreign_mappings = 1;
+
 	return __direct_remap_pfn_range(
 		vma->vm_mm, address, mfn, size, prot, domid);
 }
@@ -176,6 +178,32 @@ int touch_pte_range(struct mm_struct *mm,
 } 
 
 EXPORT_SYMBOL(touch_pte_range);
+
+void *vm_map_xen_pages (unsigned long maddr, int vm_size, pgprot_t prot)
+{
+	int error;
+       
+	struct vm_struct *vma;
+	vma = get_vm_area (vm_size, VM_IOREMAP);
+      
+	if (vma == NULL) {
+		printk ("ioremap.c,vm_map_xen_pages(): "
+			"Failed to get VMA area\n");
+		return NULL;
+	}
+
+	error = direct_kernel_remap_pfn_range((unsigned long) vma->addr,
+					      maddr >> PAGE_SHIFT, vm_size,
+					      prot, DOMID_SELF );
+	if (error == 0) {
+		return vma->addr;
+	} else {
+		printk ("ioremap.c,vm_map_xen_pages(): "
+			"Failed to map xen shared pages into kernel space\n");
+		return NULL;
+	}
+}
+EXPORT_SYMBOL(vm_map_xen_pages);
 
 /*
  * Does @address reside within a non-highmem page that is local to this virtual
@@ -381,8 +409,6 @@ void iounmap(volatile void __iomem *addr)
 }
 EXPORT_SYMBOL(iounmap);
 
-#ifdef __i386__
-
 void __init *bt_ioremap(unsigned long phys_addr, unsigned long size)
 {
 	unsigned long offset, last_addr;
@@ -450,15 +476,3 @@ void __init bt_iounmap(void *addr, unsigned long size)
 		--nrpages;
 	}
 }
-
-#endif /* __i386__ */
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

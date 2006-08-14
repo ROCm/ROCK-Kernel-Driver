@@ -12,7 +12,6 @@
  *	<tomsoft@informatik.tu-chemnitz.de>
  */
 
-#include <linux/config.h>
 #include <linux/profile.h>
 #include <asm/atomic.h>
 #include <asm/irq.h>
@@ -67,7 +66,5 @@ extern atomic_t irq_err_count;
 extern atomic_t irq_mis_count;
 
 #define IO_APIC_IRQ(x) (((x) >= 16) || ((1<<(x)) & io_apic_irqs))
-
-extern void hw_resend_irq(struct hw_interrupt_type *h, unsigned int i);
 
 #endif /* _ASM_HW_IRQ_H */

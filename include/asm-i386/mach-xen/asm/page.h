@@ -12,7 +12,6 @@
 #ifdef __KERNEL__
 #ifndef __ASSEMBLY__
 
-#include <linux/config.h>
 #include <linux/string.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
@@ -67,6 +66,10 @@
 
 extern unsigned long *phys_to_machine_mapping;
 
+#undef machine_to_phys_mapping
+extern unsigned long *machine_to_phys_mapping;
+extern unsigned int   machine_to_phys_order;
+
 static inline unsigned long pfn_to_mfn(unsigned long pfn)
 {
 	if (xen_feature(XENFEAT_auto_translated_physmap))
@@ -84,24 +87,29 @@ static inline int phys_to_machine_mapping_valid(unsigned long pfn)
 
 static inline unsigned long mfn_to_pfn(unsigned long mfn)
 {
+	extern unsigned long max_mapnr;
 	unsigned long pfn;
 
 	if (xen_feature(XENFEAT_auto_translated_physmap))
 		return mfn;
 
-	/*
-	 * The array access can fail (e.g., device space beyond end of RAM).
-	 * In such cases it doesn't matter what we return (we return garbage),
-	 * but we must handle the fault without crashing!
-	 */
+	if (unlikely((mfn >> machine_to_phys_order) != 0))
+		return max_mapnr;
+
+	/* The array access can fail (e.g., device space beyond end of RAM). */
 	asm (
 		"1:	movl %1,%0\n"
 		"2:\n"
+		".section .fixup,\"ax\"\n"
+		"3:	movl %2,%0\n"
+		"	jmp  2b\n"
+		".previous\n"
 		".section __ex_table,\"a\"\n"
 		"	.align 4\n"
-		"	.long 1b,2b\n"
+		"	.long 1b,3b\n"
 		".previous"
-		: "=r" (pfn) : "m" (machine_to_phys_mapping[mfn]) );
+		: "=r" (pfn)
+		: "m" (machine_to_phys_mapping[mfn]), "m" (max_mapnr) );
 
 	return pfn;
 }
@@ -268,6 +276,8 @@ static inline unsigned long pgd_val(pgd_t x)
 
 #ifndef __ASSEMBLY__
 
+struct vm_area_struct;
+
 /*
  * This much address space is reserved for vmalloc() and iomap()
  * as well as fixmap mappings.
@@ -289,9 +299,10 @@ extern int page_is_ram(unsigned long pagenr);
 #endif
 #define __KERNEL_START		(__PAGE_OFFSET + __PHYSICAL_START)
 
+#ifdef CONFIG_XEN_COMPAT_030002
 #undef LOAD_OFFSET
 #define LOAD_OFFSET		0
-
+#endif /* CONFIG_XEN_COMPAT_030002 */
 
 #define PAGE_OFFSET		((unsigned long)__PAGE_OFFSET)
 #define VMALLOC_RESERVE		((unsigned long)__VMALLOC_RESERVE)
@@ -300,8 +311,6 @@ extern int page_is_ram(unsigned long pagenr);
 #define __va(x)			((void *)((unsigned long)(x)+PAGE_OFFSET))
 #define pfn_to_kaddr(pfn)      __va((pfn) << PAGE_SHIFT)
 #ifdef CONFIG_FLATMEM
-#define pfn_to_page(pfn)	(mem_map + (pfn))
-#define page_to_pfn(page)	((unsigned long)((page) - mem_map))
 #define pfn_valid(pfn)		((pfn) < max_mapnr)
 #endif /* CONFIG_FLATMEM */
 #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
@@ -318,10 +327,10 @@ extern int page_is_ram(unsigned long pagenr);
 #define virt_to_mfn(v)		(pfn_to_mfn(__pa(v) >> PAGE_SHIFT))
 #define mfn_to_virt(m)		(__va(mfn_to_pfn(m) << PAGE_SHIFT))
 
-#define __HAVE_ARCH_GATE_AREA 1
-
-#endif /* __KERNEL__ */
-
+#include <asm-generic/memory_model.h>
 #include <asm-generic/page.h>
+
+#define __HAVE_ARCH_GATE_AREA 1
+#endif /* __KERNEL__ */
 
 #endif /* _I386_PAGE_H */

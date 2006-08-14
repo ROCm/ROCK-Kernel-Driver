@@ -1,11 +1,11 @@
 
 
 .text
-#include <linux/config.h>
 #include <linux/threads.h>
 #include <linux/linkage.h>
 #include <asm/segment.h>
 #include <asm/page.h>
+#include <asm/cache.h>
 #include <asm/thread_info.h>
 #include <asm/asm-offsets.h>
 #include <xen/interface/arch-x86_32.h>
@@ -23,6 +23,8 @@
 #define X86_CAPABILITY	new_cpu_data+CPUINFO_x86_capability
 #define X86_VENDOR_ID	new_cpu_data+CPUINFO_x86_vendor_id
 
+#define VIRT_ENTRY_OFFSET 0x0
+.org VIRT_ENTRY_OFFSET
 ENTRY(startup_32)
 	movl %esi,xen_start_info
 	cld
@@ -88,6 +90,7 @@ ENTRY(empty_zero_page)
 /*
  * The Global Descriptor Table contains 28 quadwords, per-CPU.
  */
+	.align L1_CACHE_BYTES
 ENTRY(cpu_gdt_table)
 	.quad 0x0000000000000000	/* NULL descriptor */
 	.quad 0x0000000000000000	/* 0x0b reserved */
@@ -155,6 +158,14 @@ ENTRY(cpu_gdt_table)
 	.ascii	",XEN_VER=xen-3.0"
 	.ascii	",VIRT_BASE=0x"
 		utoa __PAGE_OFFSET
+#ifdef CONFIG_XEN_COMPAT_030002
+	.ascii	",ELF_PADDR_OFFSET=0x"
+		utoa __PAGE_OFFSET
+#else
+	.ascii	",ELF_PADDR_OFFSET=0x0"
+#endif /* !CONFIG_XEN_COMPAT_030002 */
+	.ascii	",VIRT_ENTRY=0x"
+		utoa (__PAGE_OFFSET + __PHYSICAL_START + VIRT_ENTRY_OFFSET)
 	.ascii	",HYPERCALL_PAGE=0x"
 		utoa ((__PHYSICAL_START+HYPERCALL_PAGE_OFFSET)>>PAGE_SHIFT)
 	.ascii  ",FEATURES=writable_page_tables"
@@ -163,7 +174,7 @@ ENTRY(cpu_gdt_table)
 	.ascii	         "|pae_pgdir_above_4gb"
 	.ascii	         "|supervisor_mode_kernel"
 #ifdef CONFIG_X86_PAE
-	.ascii	",PAE=yes"
+	.ascii	",PAE=yes[extended-cr3]"
 #else
 	.ascii	",PAE=no"
 #endif

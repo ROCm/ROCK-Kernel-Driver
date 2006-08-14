@@ -17,13 +17,10 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 
-
 #include <stdarg.h>
 #include <linux/module.h>
 #include <xen/xenbus.h>
-#include <xen/net_driver_util.h>
 #include "common.h"
-
 
 #if 0
 #undef DPRINTK
@@ -31,15 +28,13 @@
     printk("netback/xenbus (%s:%d) " fmt ".\n", __FUNCTION__, __LINE__, ##args)
 #endif
 
-
 struct backend_info
 {
 	struct xenbus_device *dev;
 	netif_t *netif;
 	struct xenbus_watch backend_watch;
-	XenbusState frontend_state;
+	enum xenbus_state frontend_state;
 };
-
 
 static int connect_rings(struct backend_info *);
 static void connect(struct backend_info *);
@@ -47,10 +42,9 @@ static void maybe_connect(struct backend_info *);
 static void backend_changed(struct xenbus_watch *, const char **,
 			    unsigned int);
 
-
 static int netback_remove(struct xenbus_device *dev)
 {
-	struct backend_info *be = dev->data;
+	struct backend_info *be = dev->dev.driver_data;
 
 	if (be->backend_watch.node) {
 		unregister_xenbus_watch(&be->backend_watch);
@@ -62,7 +56,7 @@ static int netback_remove(struct xenbus_device *dev)
 		be->netif = NULL;
 	}
 	kfree(be);
-	dev->data = NULL;
+	dev->dev.driver_data = NULL;
 	return 0;
 }
 
@@ -75,6 +69,8 @@ static int netback_remove(struct xenbus_device *dev)
 static int netback_probe(struct xenbus_device *dev,
 			 const struct xenbus_device_id *id)
 {
+	const char *message;
+	struct xenbus_transaction xbt;
 	int err;
 	struct backend_info *be = kzalloc(sizeof(struct backend_info),
 					  GFP_KERNEL);
@@ -85,12 +81,40 @@ static int netback_probe(struct xenbus_device *dev,
 	}
 
 	be->dev = dev;
-	dev->data = be;
+	dev->dev.driver_data = be;
 
 	err = xenbus_watch_path2(dev, dev->nodename, "handle",
 				 &be->backend_watch, backend_changed);
 	if (err)
 		goto fail;
+
+	do {
+		err = xenbus_transaction_start(&xbt);
+		if (err) {
+			xenbus_dev_fatal(dev, err, "starting transaction");
+			goto fail;
+		}
+
+		err = xenbus_printf(xbt, dev->nodename, "feature-sg", "%d", 1);
+		if (err) {
+			message = "writing feature-sg";
+			goto abort_transaction;
+		}
+
+		err = xenbus_printf(xbt, dev->nodename, "feature-gso-tcpv4",
+				    "%d", 1);
+		if (err) {
+			message = "writing feature-gso-tcpv4";
+			goto abort_transaction;
+		}
+
+		err = xenbus_transaction_end(xbt, 0);
+	} while (err == -EAGAIN);
+
+	if (err) {
+		xenbus_dev_fatal(dev, err, "completing transaction");
+		goto fail;
+	}
 
 	err = xenbus_switch_state(dev, XenbusStateInitWait);
 	if (err) {
@@ -99,6 +123,9 @@ static int netback_probe(struct xenbus_device *dev,
 
 	return 0;
 
+abort_transaction:
+	xenbus_transaction_end(xbt, 1);
+	xenbus_dev_fatal(dev, err, "%s", message);
 fail:
 	DPRINTK("failed");
 	netback_remove(dev);
@@ -114,14 +141,14 @@ fail:
 static int netback_uevent(struct xenbus_device *xdev, char **envp,
 			  int num_envp, char *buffer, int buffer_size)
 {
-	struct backend_info *be = xdev->data;
+	struct backend_info *be = xdev->dev.driver_data;
 	netif_t *netif = be->netif;
 	int i = 0, length = 0;
 	char *val;
 
 	DPRINTK("netback_uevent");
 
-	val = xenbus_read(XBT_NULL, xdev->nodename, "script", NULL);
+	val = xenbus_read(XBT_NIL, xdev->nodename, "script", NULL);
 	if (IS_ERR(val)) {
 		int err = PTR_ERR(val);
 		xenbus_dev_fatal(xdev, err, "reading script");
@@ -157,7 +184,7 @@ static void backend_changed(struct xenbus_watch *watch,
 
 	DPRINTK("");
 
-	err = xenbus_scanf(XBT_NULL, dev->nodename, "handle", "%li", &handle);
+	err = xenbus_scanf(XBT_NIL, dev->nodename, "handle", "%li", &handle);
 	if (XENBUS_EXIST_ERR(err)) {
 		/* Since this watch will fire once immediately after it is
 		   registered, we expect this.  Ignore it, and wait for the
@@ -172,7 +199,7 @@ static void backend_changed(struct xenbus_watch *watch,
 	if (be->netif == NULL) {
 		u8 be_mac[ETH_ALEN] = { 0, 0, 0, 0, 0, 0 };
 
-		be->netif = alloc_netif(dev->otherend_id, handle, be_mac);
+		be->netif = netif_alloc(dev->otherend_id, handle, be_mac);
 		if (IS_ERR(be->netif)) {
 			err = PTR_ERR(be->netif);
 			be->netif = NULL;
@@ -191,9 +218,9 @@ static void backend_changed(struct xenbus_watch *watch,
  * Callback received when the frontend's state changes.
  */
 static void frontend_changed(struct xenbus_device *dev,
-			     XenbusState frontend_state)
+			     enum xenbus_state frontend_state)
 {
-	struct backend_info *be = dev->data;
+	struct backend_info *be = dev->dev.driver_data;
 
 	DPRINTK("");
 
@@ -248,7 +275,7 @@ static void xen_net_read_rate(struct xenbus_device *dev,
 	*bytes = ~0UL;
 	*usec = 0;
 
-	ratestr = xenbus_read(XBT_NULL, dev->nodename, "rate", NULL);
+	ratestr = xenbus_read(XBT_NIL, dev->nodename, "rate", NULL);
 	if (IS_ERR(ratestr))
 		return;
 
@@ -273,6 +300,27 @@ static void xen_net_read_rate(struct xenbus_device *dev,
 	kfree(ratestr);
 }
 
+static int xen_net_read_mac(struct xenbus_device *dev, u8 mac[])
+{
+	char *s, *e, *macstr;
+	int i;
+
+	macstr = s = xenbus_read(XBT_NIL, dev->nodename, "mac", NULL);
+	if (IS_ERR(macstr))
+		return PTR_ERR(macstr);
+
+	for (i = 0; i < ETH_ALEN; i++) {
+		mac[i] = simple_strtoul(s, &e, 16);
+		if ((s == e) || (*e != ((i == ETH_ALEN-1) ? '\0' : ':'))) {
+			kfree(macstr);
+			return -ENOENT;
+		}
+		s = e+1;
+	}
+
+	kfree(macstr);
+	return 0;
+}
 
 static void connect(struct backend_info *be)
 {
@@ -303,10 +351,11 @@ static int connect_rings(struct backend_info *be)
 	unsigned long tx_ring_ref, rx_ring_ref;
 	unsigned int evtchn;
 	int err;
+	int val;
 
 	DPRINTK("");
 
-	err = xenbus_gather(XBT_NULL, dev->otherend,
+	err = xenbus_gather(XBT_NIL, dev->otherend,
 			    "tx-ring-ref", "%lu", &tx_ring_ref,
 			    "rx-ring-ref", "%lu", &rx_ring_ref,
 			    "event-channel", "%u", &evtchn, NULL);
@@ -315,6 +364,30 @@ static int connect_rings(struct backend_info *be)
 				 "reading %s/ring-ref and event-channel",
 				 dev->otherend);
 		return err;
+	}
+
+	if (xenbus_scanf(XBT_NIL, dev->otherend, "feature-rx-notify", "%d",
+			 &val) < 0)
+		val = 0;
+	if (val)
+		be->netif->can_queue = 1;
+	else
+		/* Must be non-zero for pfifo_fast to work. */
+		be->netif->dev->tx_queue_len = 1;
+
+	if (xenbus_scanf(XBT_NIL, dev->otherend, "feature-sg", "%d", &val) < 0)
+		val = 0;
+	if (val) {
+		be->netif->features |= NETIF_F_SG;
+		be->netif->dev->features |= NETIF_F_SG;
+	}
+
+	if (xenbus_scanf(XBT_NIL, dev->otherend, "feature-gso-tcpv4", "%d",
+			 &val) < 0)
+		val = 0;
+	if (val) {
+		be->netif->features |= NETIF_F_TSO;
+		be->netif->dev->features |= NETIF_F_TSO;
 	}
 
 	/* Map the shared frame, irq etc. */
@@ -353,14 +426,3 @@ void netif_xenbus_init(void)
 {
 	xenbus_register_backend(&netback);
 }
-
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

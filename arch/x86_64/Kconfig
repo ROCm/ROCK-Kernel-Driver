@@ -290,7 +290,7 @@ config SCHED_SMT
 
 config SCHED_MC
 	bool "Multi-core scheduler support"
-	depends on SMP
+	depends on SMP && !X86_64_XEN
 	default y
 	help
 	  Multi-core scheduler support improves the CPU scheduler's decision
@@ -362,7 +362,7 @@ config ARCH_DISCONTIGMEM_DEFAULT
 
 config ARCH_SPARSEMEM_ENABLE
 	def_bool y
-	depends on (NUMA || EXPERIMENTAL)
+	depends on (NUMA || EXPERIMENTAL) && !X86_64_XEN
 
 config ARCH_MEMORY_PROBE
 	def_bool y
@@ -430,7 +430,7 @@ config IOMMU
 	default y
 	select SWIOTLB
 	select AGP
-	depends on PCI
+	depends on PCI && !X86_64_XEN
 	help
 	  Support for full DMA access of devices with 32bit memory access only
 	  on systems with more than 3GB. This is usually needed for USB,
@@ -446,7 +446,7 @@ config CALGARY_IOMMU
 	bool "IBM Calgary IOMMU support"
 	default y
 	select SWIOTLB
-	depends on PCI && EXPERIMENTAL
+	depends on PCI && !X86_64_XEN && EXPERIMENTAL
 	help
 	  Support for hardware IOMMUs in IBM's xSeries x366 and x460
 	  systems. Needed to run systems with more than 3GB of memory
@@ -596,7 +596,9 @@ endif
 
 source "drivers/acpi/Kconfig"
 
+if !X86_64_XEN
 source "arch/x86_64/kernel/cpufreq/Kconfig"
+endif
 
 endmenu
 

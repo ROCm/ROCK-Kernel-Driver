@@ -71,7 +71,7 @@
  * [XEN]: This field is written by Xen and read by the sharing guest.
  * [GST]: This field is written by the guest and read by Xen.
  */
-typedef struct grant_entry {
+struct grant_entry {
     /* GTF_xxx: various type and flag information.  [XEN,GST] */
     uint16_t flags;
     /* The domain being granted foreign privileges. [GST] */
@@ -81,7 +81,8 @@ typedef struct grant_entry {
      * GTF_accept_transfer: Frame whose ownership transferred by @domid. [XEN]
      */
     uint32_t frame;
-} grant_entry_t;
+};
+typedef struct grant_entry grant_entry_t;
 
 /*
  * Type of grant entry.
@@ -144,9 +145,9 @@ typedef uint32_t grant_handle_t;
  * that must be presented later to destroy the mapping(s). On error, <handle>
  * is a negative status code.
  * NOTES:
- *  1. If GNTPIN_map_for_dev is specified then <dev_bus_addr> is the address
+ *  1. If GNTMAP_device_map is specified then <dev_bus_addr> is the address
  *     via which I/O devices may access the granted frame.
- *  2. If GNTPIN_map_for_host is specified then a mapping will be added at
+ *  2. If GNTMAP_host_map is specified then a mapping will be added at
  *     either a host virtual address in the current address space, or at
  *     a PTE at the specified machine address.  The type of mapping to
  *     perform is selected through the GNTMAP_contains_pte flag, and the 
@@ -156,7 +157,7 @@ typedef uint32_t grant_handle_t;
  *     to be accounted to the correct grant reference!
  */
 #define GNTTABOP_map_grant_ref        0
-typedef struct gnttab_map_grant_ref {
+struct gnttab_map_grant_ref {
     /* IN parameters. */
     uint64_t host_addr;
     uint32_t flags;               /* GNTMAP_* */
@@ -166,8 +167,9 @@ typedef struct gnttab_map_grant_ref {
     int16_t  status;              /* GNTST_* */
     grant_handle_t handle;
     uint64_t dev_bus_addr;
-} gnttab_map_grant_ref_t;
-DEFINE_GUEST_HANDLE(gnttab_map_grant_ref_t);
+};
+typedef struct gnttab_map_grant_ref gnttab_map_grant_ref_t;
+DEFINE_XEN_GUEST_HANDLE(gnttab_map_grant_ref_t);
 
 /*
  * GNTTABOP_unmap_grant_ref: Destroy one or more grant-reference mappings
@@ -181,15 +183,16 @@ DEFINE_GUEST_HANDLE(gnttab_map_grant_ref_t);
  *     mappings will remain in the device or host TLBs.
  */
 #define GNTTABOP_unmap_grant_ref      1
-typedef struct gnttab_unmap_grant_ref {
+struct gnttab_unmap_grant_ref {
     /* IN parameters. */
     uint64_t host_addr;
     uint64_t dev_bus_addr;
     grant_handle_t handle;
     /* OUT parameters. */
     int16_t  status;              /* GNTST_* */
-} gnttab_unmap_grant_ref_t;
-DEFINE_GUEST_HANDLE(gnttab_unmap_grant_ref_t);
+};
+typedef struct gnttab_unmap_grant_ref gnttab_unmap_grant_ref_t;
+DEFINE_XEN_GUEST_HANDLE(gnttab_unmap_grant_ref_t);
 
 /*
  * GNTTABOP_setup_table: Set up a grant table for <dom> comprising at least
@@ -201,28 +204,30 @@ DEFINE_GUEST_HANDLE(gnttab_unmap_grant_ref_t);
  *  3. Xen may not support more than a single grant-table page per domain.
  */
 #define GNTTABOP_setup_table          2
-typedef struct gnttab_setup_table {
+struct gnttab_setup_table {
     /* IN parameters. */
     domid_t  dom;
     uint32_t nr_frames;
     /* OUT parameters. */
     int16_t  status;              /* GNTST_* */
-    GUEST_HANDLE(ulong) frame_list;
-} gnttab_setup_table_t;
-DEFINE_GUEST_HANDLE(gnttab_setup_table_t);
+    XEN_GUEST_HANDLE(ulong) frame_list;
+};
+typedef struct gnttab_setup_table gnttab_setup_table_t;
+DEFINE_XEN_GUEST_HANDLE(gnttab_setup_table_t);
 
 /*
  * GNTTABOP_dump_table: Dump the contents of the grant table to the
  * xen console. Debugging use only.
  */
 #define GNTTABOP_dump_table           3
-typedef struct gnttab_dump_table {
+struct gnttab_dump_table {
     /* IN parameters. */
     domid_t dom;
     /* OUT parameters. */
     int16_t status;               /* GNTST_* */
-} gnttab_dump_table_t;
-DEFINE_GUEST_HANDLE(gnttab_dump_table_t);
+};
+typedef struct gnttab_dump_table gnttab_dump_table_t;
+DEFINE_XEN_GUEST_HANDLE(gnttab_dump_table_t);
 
 /*
  * GNTTABOP_transfer_grant_ref: Transfer <frame> to a foreign domain. The
@@ -233,15 +238,16 @@ DEFINE_GUEST_HANDLE(gnttab_dump_table_t);
  * to the calling domain *unless* the error is GNTST_bad_page.
  */
 #define GNTTABOP_transfer                4
-typedef struct gnttab_transfer {
+struct gnttab_transfer {
     /* IN parameters. */
-    unsigned long mfn;
+    xen_pfn_t     mfn;
     domid_t       domid;
     grant_ref_t   ref;
     /* OUT parameters. */
     int16_t       status;
-} gnttab_transfer_t;
-DEFINE_GUEST_HANDLE(gnttab_transfer_t);
+};
+typedef struct gnttab_transfer gnttab_transfer_t;
+DEFINE_XEN_GUEST_HANDLE(gnttab_transfer_t);
 
 /*
  * Bitfield values for update_pin_status.flags.

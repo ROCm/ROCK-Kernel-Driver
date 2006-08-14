@@ -13,6 +13,8 @@ int swiotlb __read_mostly;
 EXPORT_SYMBOL(swiotlb);
 #endif
 
+void swiotlb_init(void);
+
 struct dma_mapping_ops swiotlb_dma_ops = {
 #if 0
 	.mapping_error = swiotlb_dma_mapping_error,
@@ -36,9 +38,10 @@ void pci_swiotlb_init(void)
 {
 #if 0
 	/* don't initialize swiotlb if iommu=off (no_iommu=1) */
-	if (!iommu_aperture && !no_iommu &&
-	    (end_pfn > MAX_DMA32_PFN || force_iommu))
+	if (!iommu_detected && !no_iommu && end_pfn > MAX_DMA32_PFN)
 	       swiotlb = 1;
+	if (swiotlb_force)
+		swiotlb = 1;
 	if (swiotlb) {
 		printk(KERN_INFO "PCI-DMA: Using software bounce buffering for IO (SWIOTLB)\n");
 		swiotlb_init();

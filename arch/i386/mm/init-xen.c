@@ -6,7 +6,6 @@
  *  Support of BIGMEM added by Gerhard Wichert, Siemens AG, July 1999
  */
 
-#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/signal.h>
 #include <linux/sched.h>
@@ -23,12 +22,14 @@
 #include <linux/init.h>
 #include <linux/highmem.h>
 #include <linux/pagemap.h>
+#include <linux/poison.h>
 #include <linux/bootmem.h>
 #include <linux/slab.h>
 #include <linux/proc_fs.h>
 #include <linux/efi.h>
 #include <linux/memory_hotplug.h>
 #include <linux/initrd.h>
+#include <linux/cpumask.h>
 #include <linux/dma-mapping.h>
 #include <linux/scatterlist.h>
 
@@ -228,6 +229,12 @@ static inline int page_kills_ppro(unsigned long pagenr)
 	return 0;
 }
 
+#else
+
+#define page_kills_ppro(p)	0
+
+#endif
+
 extern int is_available_memory(efi_memory_desc_t *);
 
 int page_is_ram(unsigned long pagenr)
@@ -269,13 +276,6 @@ int page_is_ram(unsigned long pagenr)
 	return 0;
 }
 
-#else /* CONFIG_XEN */
-
-#define page_kills_ppro(p)	0
-#define page_is_ram(p)		1
-
-#endif
-
 #ifdef CONFIG_HIGHMEM
 pte_t *kmap_pte;
 pgprot_t kmap_prot;
@@ -314,7 +314,7 @@ static void __init permanent_kmaps_init(pgd_t *pgd_base)
 
 static void __meminit free_new_highpage(struct page *page, int pfn)
 {
-	set_page_count(page, 1);
+	init_page_count(page);
 	if (pfn < xen_start_info->nr_pages)
 		__free_page(page);
 	totalhigh_pages++;
@@ -416,7 +416,7 @@ static void __init pagetable_init (void)
 	permanent_kmaps_init(pgd_base);
 }
 
-#ifdef CONFIG_SOFTWARE_SUSPEND
+#if defined(CONFIG_SOFTWARE_SUSPEND) || defined(CONFIG_ACPI_SLEEP)
 /*
  * Swap suspend & friends need this for resume because things like the intel-agp
  * driver might have split up a kernel 4MB mapping.
@@ -559,15 +559,11 @@ void __init paging_init(void)
 
 	kmap_init();
 
-	if (!xen_feature(XENFEAT_auto_translated_physmap) ||
-	    xen_start_info->shared_info >= xen_start_info->nr_pages) {
-		/* Switch to the real shared_info page, and clear the
-		 * dummy page. */
-		set_fixmap(FIX_SHARED_INFO, xen_start_info->shared_info);
-		HYPERVISOR_shared_info =
-			(shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
-		memset(empty_zero_page, 0, sizeof(empty_zero_page));
-	}
+	/* Switch to the real shared_info page, and clear the
+	 * dummy page. */
+	set_fixmap(FIX_SHARED_INFO, xen_start_info->shared_info);
+	HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
+	memset(empty_zero_page, 0, sizeof(empty_zero_page));
 
 	/* Setup mapping of lower 1st MB */
 	for (i = 0; i < NR_FIX_ISAMAPS; i++)
@@ -669,7 +665,7 @@ void __init mem_init(void)
 	/* XEN: init and count low-mem pages outside initial allocation. */
 	for (pfn = xen_start_info->nr_pages; pfn < max_low_pfn; pfn++) {
 		ClearPageReserved(&mem_map[pfn]);
-		set_page_count(&mem_map[pfn], 1);
+		init_page_count(&mem_map[pfn]);
 		totalram_pages++;
 	}
 
@@ -726,8 +722,9 @@ void __init mem_init(void)
  * Specifically, in the case of x86, we will always add
  * memory to the highmem for now.
  */
+#ifdef CONFIG_MEMORY_HOTPLUG
 #ifndef CONFIG_NEED_MULTIPLE_NODES
-int add_memory(u64 start, u64 size)
+int arch_add_memory(int nid, u64 start, u64 size)
 {
 	struct pglist_data *pgdata = &contig_page_data;
 	struct zone *zone = pgdata->node_zones + MAX_NR_ZONES-1;
@@ -741,6 +738,7 @@ int remove_memory(u64 start, u64 size)
 {
 	return -EINVAL;
 }
+#endif
 #endif
 
 kmem_cache_t *pgd_cache;
@@ -768,7 +766,7 @@ void __init pgtable_cache_init(void)
 #endif
 				0,
 				pgd_ctor,
-				pgd_dtor);
+				PTRS_PER_PMD == 1 ? pgd_dtor : NULL);
 	if (!pgd_cache)
 		panic("pgtable_cache_init(): Cannot create pgd cache");
 }
@@ -800,33 +798,17 @@ static int noinline do_test_wp_bit(void)
 	return flag;
 }
 
-void free_initmem(void)
-{
-	unsigned long addr;
-
-	addr = (unsigned long)(&__init_begin);
-	for (; addr < (unsigned long)(&__init_end); addr += PAGE_SIZE) {
-		ClearPageReserved(virt_to_page(addr));
-		set_page_count(virt_to_page(addr), 1);
-		memset((void *)addr, 0xcc, PAGE_SIZE);
-		free_page(addr);
-		totalram_pages++;
-	}
-	printk (KERN_INFO "Freeing unused kernel memory: %dk freed\n", (__init_end - __init_begin) >> 10);
-}
-
 #ifdef CONFIG_DEBUG_RODATA
 
-extern char __start_rodata, __end_rodata;
 void mark_rodata_ro(void)
 {
-	unsigned long addr = (unsigned long)&__start_rodata;
+	unsigned long addr = (unsigned long)__start_rodata;
 
-	for (; addr < (unsigned long)&__end_rodata; addr += PAGE_SIZE)
+	for (; addr < (unsigned long)__end_rodata; addr += PAGE_SIZE)
 		change_page_attr(virt_to_page(addr), 1, PAGE_KERNEL_RO);
 
-	printk ("Write protecting the kernel read-only data: %luk\n",
-			(unsigned long)(&__end_rodata - &__start_rodata) >> 10);
+	printk("Write protecting the kernel read-only data: %uk\n",
+			(__end_rodata - __start_rodata) >> 10);
 
 	/*
 	 * change_page_attr() requires a global_flush_tlb() call after it.
@@ -838,17 +820,31 @@ void mark_rodata_ro(void)
 }
 #endif
 
+void free_init_pages(char *what, unsigned long begin, unsigned long end)
+{
+	unsigned long addr;
+
+	for (addr = begin; addr < end; addr += PAGE_SIZE) {
+		ClearPageReserved(virt_to_page(addr));
+		init_page_count(virt_to_page(addr));
+		memset((void *)addr, POISON_FREE_INITMEM, PAGE_SIZE);
+		free_page(addr);
+		totalram_pages++;
+	}
+	printk(KERN_INFO "Freeing %s: %ldk freed\n", what, (end - begin) >> 10);
+}
+
+void free_initmem(void)
+{
+	free_init_pages("unused kernel memory",
+			(unsigned long)(&__init_begin),
+			(unsigned long)(&__init_end));
+}
 
 #ifdef CONFIG_BLK_DEV_INITRD
 void free_initrd_mem(unsigned long start, unsigned long end)
 {
-	if (start < end)
-		printk (KERN_INFO "Freeing initrd memory: %ldk freed\n", (end - start) >> 10);
-	for (; start < end; start += PAGE_SIZE) {
-		ClearPageReserved(virt_to_page(start));
-		set_page_count(virt_to_page(start), 1);
-		free_page(start);
-		totalram_pages++;
-	}
+	free_init_pages("initrd memory", start, end);
 }
 #endif
+

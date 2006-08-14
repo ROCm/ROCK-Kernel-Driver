@@ -23,11 +23,8 @@
 #include <asm/pgalloc.h>
 #include <xen/evtchn.h>
 #include <xen/interface/vcpu.h>
+#include <xen/cpu_hotplug.h>
 #include <xen/xenbus.h>
-
-#ifdef CONFIG_SMP_ALTERNATIVES
-#include <asm/smp_alt.h>
-#endif
 
 extern irqreturn_t smp_reschedule_interrupt(int, void *, struct pt_regs *);
 extern irqreturn_t smp_call_function_interrupt(int, void *, struct pt_regs *);
@@ -79,32 +76,33 @@ EXPORT_SYMBOL(x86_cpu_to_apicid);
 unsigned int maxcpus = NR_CPUS;
 #endif
 
-/*
- * Set of CPUs that remote admin software will allow us to bring online.
- * Notified to us via xenbus.
- */
-static cpumask_t xenbus_allowed_cpumask;
-
-/* Set of CPUs that local admin will allow us to bring online. */
-static cpumask_t local_allowed_cpumask = CPU_MASK_ALL;
-
 void __init prefill_possible_map(void)
 {
 	int i, rc;
 
-	if (!cpus_empty(cpu_possible_map))
-		return;
-
 	for (i = 0; i < NR_CPUS; i++) {
+		if (cpu_possible(i))
+			continue;
 		rc = HYPERVISOR_vcpu_op(VCPUOP_is_up, i, NULL);
-		if (rc == -ENOENT)
-			break;
-		cpu_set(i, cpu_possible_map);
+		if (rc >= 0)
+			cpu_set(i, cpu_possible_map);
 	}
 }
 
 void __init smp_alloc_memory(void)
 {
+}
+
+static inline void
+set_cpu_sibling_map(int cpu)
+{
+	phys_proc_id[cpu] = cpu;
+	cpu_core_id[cpu]  = 0;
+
+	cpu_sibling_map[cpu] = cpumask_of_cpu(cpu);
+	cpu_core_map[cpu]    = cpumask_of_cpu(cpu);
+
+	cpu_data[cpu].booted_cores = 1;
 }
 
 static void xen_smp_intr_init(unsigned int cpu)
@@ -146,26 +144,31 @@ static void xen_smp_intr_exit(unsigned int cpu)
 }
 #endif
 
-static void cpu_bringup(void)
+void cpu_bringup(void)
 {
 	cpu_init();
 	touch_softlockup_watchdog();
 	preempt_disable();
 	local_irq_enable();
+}
+
+static void cpu_bringup_and_idle(void)
+{
+	cpu_bringup();
 	cpu_idle();
 }
 
-static void vcpu_prepare(int vcpu)
+void cpu_initialize_context(unsigned int cpu)
 {
 	vcpu_guest_context_t ctxt;
-	struct task_struct *idle = idle_task(vcpu);
+	struct task_struct *idle = idle_task(cpu);
 #ifdef __x86_64__
-	struct desc_ptr *gdt_descr = &cpu_gdt_descr[vcpu];
+	struct desc_ptr *gdt_descr = &cpu_gdt_descr[cpu];
 #else
-	struct Xgt_desc_struct *gdt_descr = &per_cpu(cpu_gdt_descr, vcpu);
+	struct Xgt_desc_struct *gdt_descr = &per_cpu(cpu_gdt_descr, cpu);
 #endif
 
-	if (vcpu == 0)
+	if (cpu == 0)
 		return;
 
 	memset(&ctxt, 0, sizeof(ctxt));
@@ -176,7 +179,7 @@ static void vcpu_prepare(int vcpu)
 	ctxt.user_regs.fs = 0;
 	ctxt.user_regs.gs = 0;
 	ctxt.user_regs.ss = __KERNEL_DS;
-	ctxt.user_regs.eip = (unsigned long)cpu_bringup;
+	ctxt.user_regs.eip = (unsigned long)cpu_bringup_and_idle;
 	ctxt.user_regs.eflags = X86_EFLAGS_IF | 0x1000; /* IOPL_RING1 */
 
 	memset(&ctxt.fpu_ctxt, 0, sizeof(ctxt.fpu_ctxt));
@@ -200,7 +203,7 @@ static void vcpu_prepare(int vcpu)
 	ctxt.failsafe_callback_cs  = __KERNEL_CS;
 	ctxt.failsafe_callback_eip = (unsigned long)failsafe_callback;
 
-	ctxt.ctrlreg[3] = virt_to_mfn(swapper_pg_dir) << PAGE_SHIFT;
+	ctxt.ctrlreg[3] = xen_pfn_to_cr3(virt_to_mfn(swapper_pg_dir));
 #else /* __x86_64__ */
 	ctxt.user_regs.cs = __KERNEL_CS;
 	ctxt.user_regs.esp = idle->thread.rsp0 - sizeof(struct pt_regs);
@@ -212,12 +215,12 @@ static void vcpu_prepare(int vcpu)
 	ctxt.failsafe_callback_eip = (unsigned long)failsafe_callback;
 	ctxt.syscall_callback_eip  = (unsigned long)system_call;
 
-	ctxt.ctrlreg[3] = virt_to_mfn(init_level4_pgt) << PAGE_SHIFT;
+	ctxt.ctrlreg[3] = xen_pfn_to_cr3(virt_to_mfn(init_level4_pgt));
 
-	ctxt.gs_base_kernel = (unsigned long)(cpu_pda(vcpu));
+	ctxt.gs_base_kernel = (unsigned long)(cpu_pda(cpu));
 #endif
 
-	BUG_ON(HYPERVISOR_vcpu_op(VCPUOP_initialise, vcpu, &ctxt));
+	BUG_ON(HYPERVISOR_vcpu_op(VCPUOP_initialise, cpu, &ctxt));
 }
 
 void __init smp_prepare_cpus(unsigned int max_cpus)
@@ -230,14 +233,20 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 	struct Xgt_desc_struct *gdt_descr;
 #endif
 
+	boot_cpu_data.apicid = 0;
 	cpu_data[0] = boot_cpu_data;
 
 	cpu_2_logical_apicid[0] = 0;
 	x86_cpu_to_apicid[0] = 0;
 
 	current_thread_info()->cpu = 0;
-	cpu_sibling_map[0] = cpumask_of_cpu(0);
-	cpu_core_map[0]    = cpumask_of_cpu(0);
+
+	for (cpu = 0; cpu < NR_CPUS; cpu++) {
+		cpus_clear(cpu_sibling_map[cpu]);
+		cpus_clear(cpu_core_map[cpu]);
+	}
+
+	set_cpu_sibling_map(0);
 
 	xen_smp_intr_init(0);
 
@@ -262,6 +271,8 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 			XENFEAT_writable_descriptor_tables);
 
 		cpu_data[cpu] = boot_cpu_data;
+		cpu_data[cpu].apicid = cpu;
+
 		cpu_2_logical_apicid[cpu] = cpu;
 		x86_cpu_to_apicid[cpu] = cpu;
 
@@ -284,10 +295,10 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 		cpu_set(cpu, cpu_present_map);
 #endif
 
-		vcpu_prepare(cpu);
+		cpu_initialize_context(cpu);
 	}
 
-	xenbus_allowed_cpumask = cpu_present_map;
+	init_xenbus_allowed_cpumask();
 
 	/* Currently, Xen gives no dynamic NUMA/HT info. */
 	for (cpu = 1; cpu < NR_CPUS; cpu++) {
@@ -308,17 +319,6 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 void __devinit smp_prepare_boot_cpu(void)
 {
 	prefill_possible_map();
-	cpu_present_map  = cpumask_of_cpu(0);
-	cpu_online_map   = cpumask_of_cpu(0);
-}
-
-static int local_cpu_hotplug_request(void)
-{
-	/*
-	 * We assume a CPU hotplug request comes from local admin if it is made
-	 * via a userspace process (i.e., one with a real mm_struct).
-	 */
-	return (current->mm != NULL);
 }
 
 #ifdef CONFIG_HOTPLUG_CPU
@@ -335,139 +335,16 @@ static int __init initialize_cpu_present_map(void)
 }
 core_initcall(initialize_cpu_present_map);
 
-static void vcpu_hotplug(unsigned int cpu)
+static void
+remove_siblinginfo(int cpu)
 {
-	int err;
-	char dir[32], state[32];
+	phys_proc_id[cpu] = BAD_APICID;
+	cpu_core_id[cpu]  = BAD_APICID;
 
-	if ((cpu >= NR_CPUS) || !cpu_possible(cpu))
-		return;
+	cpus_clear(cpu_sibling_map[cpu]);
+	cpus_clear(cpu_core_map[cpu]);
 
-	sprintf(dir, "cpu/%d", cpu);
-	err = xenbus_scanf(XBT_NULL, dir, "availability", "%s", state);
-	if (err != 1) {
-		printk(KERN_ERR "XENBUS: Unable to read cpu state\n");
-		return;
-	}
-
-	if (strcmp(state, "online") == 0) {
-		cpu_set(cpu, xenbus_allowed_cpumask);
-		(void)cpu_up(cpu);
-	} else if (strcmp(state, "offline") == 0) {
-		cpu_clear(cpu, xenbus_allowed_cpumask);
-		(void)cpu_down(cpu);
-	} else {
-		printk(KERN_ERR "XENBUS: unknown state(%s) on CPU%d\n",
-		       state, cpu);
-	}
-}
-
-static void handle_vcpu_hotplug_event(
-	struct xenbus_watch *watch, const char **vec, unsigned int len)
-{
-	int cpu;
-	char *cpustr;
-	const char *node = vec[XS_WATCH_PATH];
-
-	if ((cpustr = strstr(node, "cpu/")) != NULL) {
-		sscanf(cpustr, "cpu/%d", &cpu);
-		vcpu_hotplug(cpu);
-	}
-}
-
-static int smpboot_cpu_notify(struct notifier_block *notifier,
-			      unsigned long action, void *hcpu)
-{
-	int cpu = (long)hcpu;
-
-	/*
-	 * We do this in a callback notifier rather than __cpu_disable()
-	 * because local_cpu_hotplug_request() does not work in the latter
-	 * as it's always executed from within a stopmachine kthread.
-	 */
-	if ((action == CPU_DOWN_PREPARE) && local_cpu_hotplug_request())
-		cpu_clear(cpu, local_allowed_cpumask);
-
-	return NOTIFY_OK;
-}
-
-static int setup_cpu_watcher(struct notifier_block *notifier,
-			      unsigned long event, void *data)
-{
-	int i;
-
-	static struct xenbus_watch cpu_watch = {
-		.node = "cpu",
-		.callback = handle_vcpu_hotplug_event,
-		.flags = XBWF_new_thread };
-	(void)register_xenbus_watch(&cpu_watch);
-
-	if (!(xen_start_info->flags & SIF_INITDOMAIN)) {
-		for_each_cpu(i)
-			vcpu_hotplug(i);
-		printk(KERN_INFO "Brought up %ld CPUs\n",
-		       (long)num_online_cpus());
-	}
-
-	return NOTIFY_DONE;
-}
-
-static int __init setup_vcpu_hotplug_event(void)
-{
-	static struct notifier_block hotplug_cpu = {
-		.notifier_call = smpboot_cpu_notify };
-	static struct notifier_block xsn_cpu = {
-		.notifier_call = setup_cpu_watcher };
-
-	register_cpu_notifier(&hotplug_cpu);
-	register_xenstore_notifier(&xsn_cpu);
-
-	return 0;
-}
-
-arch_initcall(setup_vcpu_hotplug_event);
-
-int smp_suspend(void)
-{
-	int i, err;
-
-	lock_cpu_hotplug();
-
-	/*
-	 * Take all other CPUs offline. We hold the hotplug mutex to
-	 * avoid other processes bringing up CPUs under our feet.
-	 */
-	while (num_online_cpus() > 1) {
-		unlock_cpu_hotplug();
-		for_each_online_cpu(i) {
-			if (i == 0)
-				continue;
-			err = cpu_down(i);
-			if (err) {
-				printk(KERN_CRIT "Failed to take all CPUs "
-				       "down: %d.\n", err);
-				for_each_cpu(i)
-					vcpu_hotplug(i);
-				return err;
-			}
-		}
-		lock_cpu_hotplug();
-	}
-
-	return 0;
-}
-
-void smp_resume(void)
-{
-	int i;
-
-	for_each_cpu(i)
-		vcpu_prepare(i);
-
-	unlock_cpu_hotplug();
-
-	for_each_cpu(i)
-		vcpu_hotplug(i);
+	cpu_data[cpu].booted_cores = 0;
 }
 
 int __cpu_disable(void)
@@ -477,6 +354,8 @@ int __cpu_disable(void)
 
 	if (cpu == 0)
 		return -EBUSY;
+
+	remove_siblinginfo(cpu);
 
 	cpu_clear(cpu, map);
 	fixup_irqs(map);
@@ -494,27 +373,11 @@ void __cpu_die(unsigned int cpu)
 
 	xen_smp_intr_exit(cpu);
 
-#ifdef CONFIG_SMP_ALTERNATIVES
 	if (num_online_cpus() == 1)
-		unprepare_for_smp();
-#endif
+		alternatives_smp_switch(0);
 }
 
 #else /* !CONFIG_HOTPLUG_CPU */
-
-int smp_suspend(void)
-{
-	if (num_online_cpus() > 1) {
-		printk(KERN_WARNING "Can't suspend SMP guests "
-		       "without CONFIG_HOTPLUG_CPU\n");
-		return -EOPNOTSUPP;
-	}
-	return 0;
-}
-
-void smp_resume(void)
-{
-}
 
 int __cpu_disable(void)
 {
@@ -532,29 +395,22 @@ int __devinit __cpu_up(unsigned int cpu)
 {
 	int rc;
 
-	if (local_cpu_hotplug_request()) {
-		cpu_set(cpu, local_allowed_cpumask);
-		if (!cpu_isset(cpu, xenbus_allowed_cpumask)) {
-			printk("%s: attempt to bring up CPU %u disallowed by "
-			       "remote admin.\n", __FUNCTION__, cpu);
-			return -EBUSY;
-		}
-	} else if (!cpu_isset(cpu, local_allowed_cpumask) ||
-		   !cpu_isset(cpu, xenbus_allowed_cpumask)) {
-		return -EBUSY;
-	}
+	rc = cpu_up_check(cpu);
+	if (rc)
+		return rc;
 
-#ifdef CONFIG_SMP_ALTERNATIVES
 	if (num_online_cpus() == 1)
-		prepare_for_smp();
-#endif
+		alternatives_smp_switch(1);
+
+	/* This must be done before setting cpu_online_map */
+	set_cpu_sibling_map(cpu);
+	wmb();
 
 	xen_smp_intr_init(cpu);
 	cpu_set(cpu, cpu_online_map);
 
 	rc = HYPERVISOR_vcpu_op(VCPUOP_up, cpu, NULL);
-	if (rc != 0)
-		BUG();
+	BUG_ON(rc);
 
 	return 0;
 }
@@ -569,13 +425,3 @@ int setup_profiling_timer(unsigned int multiplier)
 	return -EINVAL;
 }
 #endif
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

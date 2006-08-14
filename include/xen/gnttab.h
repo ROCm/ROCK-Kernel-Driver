@@ -40,6 +40,7 @@
 #include <linux/config.h>
 #include <asm/hypervisor.h>
 #include <xen/interface/grant_table.h>
+#include <xen/features.h>
 
 /* NR_GRANT_FRAMES must be less than or equal to that configured in Xen */
 #ifdef __ia64__
@@ -90,6 +91,8 @@ void gnttab_free_grant_reference(grant_ref_t ref);
 
 void gnttab_free_grant_references(grant_ref_t head);
 
+int gnttab_empty_grant_references(const grant_ref_t *pprivate_head);
+
 int gnttab_claim_grant_reference(grant_ref_t *pprivate_head);
 
 void gnttab_release_grant_reference(grant_ref_t *private_head,
@@ -97,6 +100,7 @@ void gnttab_release_grant_reference(grant_ref_t *private_head,
 
 void gnttab_request_free_callback(struct gnttab_free_callback *callback,
 				  void (*fn)(void *), void *arg, u16 count);
+void gnttab_cancel_free_callback(struct gnttab_free_callback *callback);
 
 void gnttab_grant_foreign_access_ref(grant_ref_t ref, domid_t domid,
 				     unsigned long frame, int readonly);
@@ -113,14 +117,35 @@ void gnttab_grant_foreign_transfer_ref(grant_ref_t, domid_t domid,
 int gnttab_suspend(void);
 int gnttab_resume(void);
 
-#endif /* __ASM_GNTTAB_H__ */
+static inline void
+gnttab_set_map_op(struct gnttab_map_grant_ref *map, unsigned long addr,
+		  uint32_t flags, grant_ref_t ref, domid_t domid)
+{
+	if (flags & GNTMAP_contains_pte)
+		map->host_addr = addr;
+	else if (xen_feature(XENFEAT_auto_translated_physmap))
+		map->host_addr = __pa(addr);
+	else
+		map->host_addr = addr;
 
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */
+	map->flags = flags;
+	map->ref = ref;
+	map->dom = domid;
+}
+
+static inline void
+gnttab_set_unmap_op(struct gnttab_unmap_grant_ref *unmap, unsigned long addr,
+		    uint32_t flags, grant_handle_t handle)
+{
+	if (flags & GNTMAP_contains_pte)
+		unmap->host_addr = addr;
+	else if (xen_feature(XENFEAT_auto_translated_physmap))
+		unmap->host_addr = __pa(addr);
+	else
+		unmap->host_addr = addr;
+
+	unmap->handle = handle;
+	unmap->dev_bus_addr = 0;
+}
+
+#endif /* __ASM_GNTTAB_H__ */

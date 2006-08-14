@@ -43,7 +43,7 @@ static int do_pci_op(struct pcifront_device *pdev, struct xen_pci_op *op)
 	struct xen_pci_op *active_op = &pdev->sh_info->op;
 	unsigned long irq_flags;
 	evtchn_port_t port = pdev->evtchn;
-	nsec_t ns, ns_timeout;
+	s64 ns, ns_timeout;
 	struct timeval tv;
 
 	spin_lock_irqsave(&pdev->sh_info_lock, irq_flags);
@@ -62,7 +62,7 @@ static int do_pci_op(struct pcifront_device *pdev, struct xen_pci_op *op)
 	 * timeout in the past). 1s difference gives plenty of slack for error.
 	 */
 	do_gettimeofday(&tv);
-	ns_timeout = timeval_to_ns(&tv) + 2 * (nsec_t)NSEC_PER_SEC;
+	ns_timeout = timeval_to_ns(&tv) + 2 * (s64)NSEC_PER_SEC;
 
 	clear_evtchn(port);
 
@@ -105,7 +105,7 @@ static int pcifront_bus_read(struct pci_bus *bus, unsigned int devfn,
 		.size   = size,
 	};
 	struct pcifront_sd *sd = bus->sysdata;
-	struct pcifront_device *pdev = sd->pdev;
+	struct pcifront_device *pdev = pcifront_get_pdev(sd);
 
 	if (verbose_request)
 		dev_info(&pdev->xdev->dev,
@@ -144,7 +144,7 @@ static int pcifront_bus_write(struct pci_bus *bus, unsigned int devfn,
 		.value  = val,
 	};
 	struct pcifront_sd *sd = bus->sysdata;
-	struct pcifront_device *pdev = sd->pdev;
+	struct pcifront_device *pdev = pcifront_get_pdev(sd);
 
 	if (verbose_request)
 		dev_info(&pdev->xdev->dev,
@@ -207,12 +207,13 @@ int pcifront_scan_root(struct pcifront_device *pdev,
 		err = -ENOMEM;
 		goto err_out;
 	}
-	sd->domain = domain;
-	sd->pdev = pdev;
+	pcifront_init_sd(sd, domain, pdev);
 
-	b = pci_scan_bus_parented(&pdev->xdev->dev, bus, &pcifront_bus_ops, sd);
+	b = pci_scan_bus_parented(&pdev->xdev->dev, bus,
+				  &pcifront_bus_ops, sd);
 	if (!b) {
-		dev_err(&pdev->xdev->dev, "Error creating PCI Frontend Bus!\n");
+		dev_err(&pdev->xdev->dev,
+			"Error creating PCI Frontend Bus!\n");
 		err = -ENOMEM;
 		goto err_out;
 	}
@@ -236,19 +237,20 @@ int pcifront_scan_root(struct pcifront_device *pdev,
 
 static void free_root_bus_devs(struct pci_bus *bus)
 {
+	extern struct rw_semaphore pci_bus_sem;
 	struct pci_dev *dev;
 
-	spin_lock(&pci_bus_lock);
+	down_read(&pci_bus_sem);
 	while (!list_empty(&bus->devices)) {
 		dev = container_of(bus->devices.next, struct pci_dev, bus_list);
-		spin_unlock(&pci_bus_lock);
+		up_read(&pci_bus_sem);
 
 		dev_dbg(&dev->dev, "removing device\n");
 		pci_remove_bus_device(dev);
 
-		spin_lock(&pci_bus_lock);
+		down_read(&pci_bus_sem);
 	}
-	spin_unlock(&pci_bus_lock);
+	up_read(&pci_bus_sem);
 }
 
 void pcifront_free_roots(struct pcifront_device *pdev)

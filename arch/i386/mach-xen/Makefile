@@ -2,4 +2,4 @@
 # Makefile for the linux kernel.
 #
 
-obj-y				:= setup.o
+obj-y				:= setup.o irqflags.o

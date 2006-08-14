@@ -24,6 +24,8 @@
 
 	.text
 	.code64
+#define VIRT_ENTRY_OFFSET 0x0
+.org VIRT_ENTRY_OFFSET
 	.globl startup_64
 startup_64:
 ENTRY(_start)
@@ -74,9 +76,6 @@ NEXT_PAGE(level3_user_pgt)
 NEXT_PAGE(level2_kernel_pgt)
 	.fill	512,8,0
 
-NEXT_PAGE(empty_zero_page)
-	.skip PAGE_SIZE
-
 NEXT_PAGE(hypercall_page)
 	.fill	512,8,0
 
@@ -87,7 +86,7 @@ NEXT_PAGE(hypercall_page)
 	.align 16
 	.globl cpu_gdt_descr
 cpu_gdt_descr:
-	.word	gdt_end-cpu_gdt_table
+	.word	gdt_end-cpu_gdt_table-1
 gdt:
 	.quad	cpu_gdt_table
 #ifdef CONFIG_SMP
@@ -129,6 +128,11 @@ gdt_end:
 	/* zero the remaining page */
 	.fill PAGE_SIZE / 8 - GDT_ENTRIES,8,0
 
+	.section .bss.page_aligned, "aw", @nobits
+	.align PAGE_SIZE
+ENTRY(empty_zero_page)
+	.skip PAGE_SIZE
+
 /*
  * __xen_guest information
  */
@@ -146,8 +150,18 @@ gdt_end:
 .section __xen_guest
 	.ascii	"GUEST_OS=linux,GUEST_VER=2.6"
 	.ascii	",XEN_VER=xen-3.0"
-	.ascii	",VIRT_BASE=0x"; utoh __START_KERNEL_map
-	.ascii	",HYPERCALL_PAGE=0x"; utoh (phys_hypercall_page >> PAGE_SHIFT)
+	.ascii	",VIRT_BASE=0x"
+		utoh __START_KERNEL_map
+#ifdef CONFIG_XEN_COMPAT_030002
+	.ascii	",ELF_PADDR_OFFSET=0x"
+		utoh __START_KERNEL_map
+#else
+	.ascii	",ELF_PADDR_OFFSET=0x0"
+#endif /* !CONFIG_XEN_COMPAT_030002 */
+	.ascii	",VIRT_ENTRY=0x"
+		utoh (__START_KERNEL_map + __PHYSICAL_START + VIRT_ENTRY_OFFSET)
+	.ascii	",HYPERCALL_PAGE=0x"
+		utoh (phys_hypercall_page >> PAGE_SHIFT)
 	.ascii  ",FEATURES=writable_page_tables"
 	.ascii		 "|writable_descriptor_tables"
 	.ascii		 "|auto_translated_physmap"

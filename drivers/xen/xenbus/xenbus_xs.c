@@ -45,9 +45,6 @@
 #include <xen/xenbus.h>
 #include "xenbus_comms.h"
 
-/* xenbus_probe.c */
-extern char *kasprintf(const char *fmt, ...);
-
 struct xs_stored_msg {
 	struct list_head list;
 
@@ -192,7 +189,7 @@ void *xenbus_dev_request_and_reply(struct xsd_sockmsg *msg)
 }
 
 /* Send message to xs, get kmalloc'ed reply.  ERR_PTR() on error. */
-static void *xs_talkv(xenbus_transaction_t t,
+static void *xs_talkv(struct xenbus_transaction t,
 		      enum xsd_sockmsg_type type,
 		      const struct kvec *iovec,
 		      unsigned int num_vecs,
@@ -203,7 +200,7 @@ static void *xs_talkv(xenbus_transaction_t t,
 	unsigned int i;
 	int err;
 
-	msg.tx_id = t;
+	msg.tx_id = t.id;
 	msg.req_id = 0;
 	msg.type = type;
 	msg.len = 0;
@@ -251,7 +248,7 @@ static void *xs_talkv(xenbus_transaction_t t,
 }
 
 /* Simplified version of xs_talkv: single message. */
-static void *xs_single(xenbus_transaction_t t,
+static void *xs_single(struct xenbus_transaction t,
 		       enum xsd_sockmsg_type type,
 		       const char *string,
 		       unsigned int *len)
@@ -289,9 +286,9 @@ static char *join(const char *dir, const char *name)
 	char *buffer;
 
 	if (strlen(name) == 0)
-		buffer = kasprintf("%s", dir);
+		buffer = kasprintf(GFP_KERNEL, "%s", dir);
 	else
-		buffer = kasprintf("%s/%s", dir, name);
+		buffer = kasprintf(GFP_KERNEL, "%s/%s", dir, name);
 	return (!buffer) ? ERR_PTR(-ENOMEM) : buffer;
 }
 
@@ -318,7 +315,7 @@ static char **split(char *strings, unsigned int len, unsigned int *num)
 	return ret;
 }
 
-char **xenbus_directory(xenbus_transaction_t t,
+char **xenbus_directory(struct xenbus_transaction t,
 			const char *dir, const char *node, unsigned int *num)
 {
 	char *strings, *path;
@@ -338,7 +335,7 @@ char **xenbus_directory(xenbus_transaction_t t,
 EXPORT_SYMBOL_GPL(xenbus_directory);
 
 /* Check if a path exists. Return 1 if it does. */
-int xenbus_exists(xenbus_transaction_t t,
+int xenbus_exists(struct xenbus_transaction t,
 		  const char *dir, const char *node)
 {
 	char **d;
@@ -356,7 +353,7 @@ EXPORT_SYMBOL_GPL(xenbus_exists);
  * Returns a kmalloced value: call free() on it after use.
  * len indicates length in bytes.
  */
-void *xenbus_read(xenbus_transaction_t t,
+void *xenbus_read(struct xenbus_transaction t,
 		  const char *dir, const char *node, unsigned int *len)
 {
 	char *path;
@@ -375,7 +372,7 @@ EXPORT_SYMBOL_GPL(xenbus_read);
 /* Write the value of a single file.
  * Returns -err on failure.
  */
-int xenbus_write(xenbus_transaction_t t,
+int xenbus_write(struct xenbus_transaction t,
 		 const char *dir, const char *node, const char *string)
 {
 	const char *path;
@@ -398,7 +395,7 @@ int xenbus_write(xenbus_transaction_t t,
 EXPORT_SYMBOL_GPL(xenbus_write);
 
 /* Create a new directory. */
-int xenbus_mkdir(xenbus_transaction_t t,
+int xenbus_mkdir(struct xenbus_transaction t,
 		 const char *dir, const char *node)
 {
 	char *path;
@@ -415,7 +412,7 @@ int xenbus_mkdir(xenbus_transaction_t t,
 EXPORT_SYMBOL_GPL(xenbus_mkdir);
 
 /* Destroy a file or directory (directories must be empty). */
-int xenbus_rm(xenbus_transaction_t t, const char *dir, const char *node)
+int xenbus_rm(struct xenbus_transaction t, const char *dir, const char *node)
 {
 	char *path;
 	int ret;
@@ -433,19 +430,19 @@ EXPORT_SYMBOL_GPL(xenbus_rm);
 /* Start a transaction: changes by others will not be seen during this
  * transaction, and changes will not be visible to others until end.
  */
-int xenbus_transaction_start(xenbus_transaction_t *t)
+int xenbus_transaction_start(struct xenbus_transaction *t)
 {
 	char *id_str;
 
 	down_read(&xs_state.suspend_mutex);
 
-	id_str = xs_single(XBT_NULL, XS_TRANSACTION_START, "", NULL);
+	id_str = xs_single(XBT_NIL, XS_TRANSACTION_START, "", NULL);
 	if (IS_ERR(id_str)) {
 		up_read(&xs_state.suspend_mutex);
 		return PTR_ERR(id_str);
 	}
 
-	*t = simple_strtoul(id_str, NULL, 0);
+	t->id = simple_strtoul(id_str, NULL, 0);
 	kfree(id_str);
 	return 0;
 }
@@ -454,7 +451,7 @@ EXPORT_SYMBOL_GPL(xenbus_transaction_start);
 /* End a transaction.
  * If abandon is true, transaction is discarded instead of committed.
  */
-int xenbus_transaction_end(xenbus_transaction_t t, int abort)
+int xenbus_transaction_end(struct xenbus_transaction t, int abort)
 {
 	char abortstr[2];
 	int err;
@@ -473,7 +470,7 @@ int xenbus_transaction_end(xenbus_transaction_t t, int abort)
 EXPORT_SYMBOL_GPL(xenbus_transaction_end);
 
 /* Single read and scanf: returns -errno or num scanned. */
-int xenbus_scanf(xenbus_transaction_t t,
+int xenbus_scanf(struct xenbus_transaction t,
 		 const char *dir, const char *node, const char *fmt, ...)
 {
 	va_list ap;
@@ -496,7 +493,7 @@ int xenbus_scanf(xenbus_transaction_t t,
 EXPORT_SYMBOL_GPL(xenbus_scanf);
 
 /* Single printf and write: returns -errno or 0. */
-int xenbus_printf(xenbus_transaction_t t,
+int xenbus_printf(struct xenbus_transaction t,
 		  const char *dir, const char *node, const char *fmt, ...)
 {
 	va_list ap;
@@ -522,7 +519,7 @@ int xenbus_printf(xenbus_transaction_t t,
 EXPORT_SYMBOL_GPL(xenbus_printf);
 
 /* Takes tuples of names, scanf-style args, and void **, NULL terminated. */
-int xenbus_gather(xenbus_transaction_t t, const char *dir, ...)
+int xenbus_gather(struct xenbus_transaction t, const char *dir, ...)
 {
 	va_list ap;
 	const char *name;
@@ -560,7 +557,7 @@ static int xs_watch(const char *path, const char *token)
 	iov[1].iov_base = (void *)token;
 	iov[1].iov_len = strlen(token) + 1;
 
-	return xs_error(xs_talkv(XBT_NULL, XS_WATCH, iov,
+	return xs_error(xs_talkv(XBT_NIL, XS_WATCH, iov,
 				 ARRAY_SIZE(iov), NULL));
 }
 
@@ -573,7 +570,7 @@ static int xs_unwatch(const char *path, const char *token)
 	iov[1].iov_base = (char *)token;
 	iov[1].iov_len = strlen(token) + 1;
 
-	return xs_error(xs_talkv(XBT_NULL, XS_UNWATCH, iov,
+	return xs_error(xs_talkv(XBT_NIL, XS_UNWATCH, iov,
 				 ARRAY_SIZE(iov), NULL));
 }
 
@@ -844,13 +841,3 @@ int xs_init(void)
 
 	return 0;
 }
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

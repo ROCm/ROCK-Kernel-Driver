@@ -29,14 +29,19 @@ void wake_up_buffer_waiter(void);
 #define CPU_SWITCH_CODE 		2
 #define COOKIE_SWITCH_CODE 		3
 #define KERNEL_ENTER_SWITCH_CODE	4
-#define KERNEL_EXIT_SWITCH_CODE		5
+#define USER_ENTER_SWITCH_CODE		5
 #define MODULE_LOADED_CODE		6
 #define CTX_TGID_CODE			7
 #define TRACE_BEGIN_CODE		8
 #define TRACE_END_CODE			9
+#define XEN_ENTER_SWITCH_CODE		10
+#define DOMAIN_SWITCH_CODE		11
  
 #define INVALID_COOKIE ~0UL
 #define NO_COOKIE 0UL
+
+/* Constant used to refer to coordinator domain (Xen) */
+#define COORDINATOR_DOMAIN -1
 
 /* add data to the event buffer */
 void add_event_entry(unsigned long data);

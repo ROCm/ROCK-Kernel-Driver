@@ -235,19 +235,6 @@ config HPET_EMULATE_RTC
 	depends on HPET_TIMER && RTC=y
 	default y
 
-config SMP_ALTERNATIVES
-	bool "SMP alternatives support (EXPERIMENTAL)"
-	depends on SMP && EXPERIMENTAL
-	help
-	  Try to reduce the overhead of running an SMP kernel on a uniprocessor
-	  host slightly by replacing certain key instruction sequences
-	  according to whether we currently have more than one CPU available.
-	  This should provide a noticeable boost to performance when
-	  running SMP kernels on UP machines, and have negligible impact
-	  when running on an true SMP host.
-
-          If unsure, say N.
-
 config NR_CPUS
 	int "Maximum number of CPUs (2-255)"
 	range 2 255
@@ -264,7 +251,7 @@ config NR_CPUS
 
 config SCHED_SMT
 	bool "SMT (Hyperthreading) scheduler support"
-	depends on X86_HT && !X86_XEN
+	depends on X86_HT
 	help
 	  SMT scheduler support improves the CPU scheduler's decision making
 	  when dealing with Intel Pentium 4 chips with HyperThreading at a
@@ -273,7 +260,7 @@ config SCHED_SMT
 
 config SCHED_MC
 	bool "Multi-core scheduler support"
-	depends on X86_HT && !X86_XEN
+	depends on X86_HT
 	default y
 	help
 	  Multi-core scheduler support improves the CPU scheduler's decision
@@ -829,6 +816,7 @@ config HOTPLUG_CPU
 config COMPAT_VDSO
 	bool "Compat VDSO support"
 	default y
+	depends on !X86_XEN
 	help
 	  Map the VDSO to the predictable old-style address too.
 	---help---
@@ -1001,7 +989,9 @@ config APM_REAL_MODE_POWER_OFF
 
 endmenu
 
+if !X86_XEN
 source "arch/i386/kernel/cpu/cpufreq/Kconfig"
+endif
 
 endmenu
 
@@ -1184,9 +1174,7 @@ source "fs/Kconfig"
 menu "Instrumentation Support"
 	depends on EXPERIMENTAL
 
-if !X86_XEN
 source "arch/i386/oprofile/Kconfig"
-endif
 
 config KPROBES
 	bool "Kprobes (EXPERIMENTAL)"
@@ -1248,11 +1236,6 @@ config X86_TRAMPOLINE
 config X86_NO_TSS
 	bool
 	depends on X86_XEN
-	default y
-
-config X86_SYSENTER
-	bool
-	depends on !X86_NO_TSS
 	default y
 
 config X86_NO_IDT

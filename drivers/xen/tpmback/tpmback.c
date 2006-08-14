@@ -21,13 +21,15 @@
 #include <asm/uaccess.h>
 #include <xen/xenbus.h>
 #include <xen/interface/grant_table.h>
+#include <xen/gnttab.h>
 
 /* local data structures */
 struct data_exchange {
 	struct list_head pending_pak;
 	struct list_head current_pak;
 	unsigned int copied_so_far;
-	u8 has_opener;
+	u8 has_opener:1;
+	u8 aborted:1;
 	rwlock_t pak_lock;	// protects all of the previous fields
 	wait_queue_head_t wait_queue;
 };
@@ -53,7 +55,6 @@ struct packet {
 
 enum {
 	PACKET_FLAG_DISCARD_RESPONSE = 1,
-	PACKET_FLAG_CHECK_RESPONSESTATUS = 2,
 };
 
 /* local variables */
@@ -68,8 +69,6 @@ static int packet_read_shmem(struct packet *pak,
 			     u32 offset,
 			     char *buffer, int isuserbuffer, u32 left);
 static int vtpm_queue_packet(struct packet *pak);
-
-#define MIN(x,y)  (x) < (y) ? (x) : (y)
 
 /***************************************************************
  Buffer copying fo user and kernel space buffes.
@@ -98,6 +97,16 @@ static inline int copy_to_buffer(void *to,
 		memcpy(to, from, size);
 	}
 	return 0;
+}
+
+
+static void dataex_init(struct data_exchange *dataex)
+{
+	INIT_LIST_HEAD(&dataex->pending_pak);
+	INIT_LIST_HEAD(&dataex->current_pak);
+	dataex->has_opener = 0;
+	rwlock_init(&dataex->pak_lock);
+	init_waitqueue_head(&dataex->wait_queue);
 }
 
 /***************************************************************
@@ -147,11 +156,12 @@ static struct packet *packet_alloc(tpmif_t * tpmif,
 				   u32 size, u8 req_tag, u8 flags)
 {
 	struct packet *pak = NULL;
-	pak = kzalloc(sizeof (struct packet), GFP_KERNEL);
+	pak = kzalloc(sizeof (struct packet), GFP_ATOMIC);
 	if (NULL != pak) {
 		if (tpmif) {
 			pak->tpmif = tpmif;
-			pak->tpm_instance = tpmif->tpm_instance;
+			pak->tpm_instance = tpmback_get_instance(tpmif->bi);
+			tpmif_get(tpmif);
 		}
 		pak->data_len = size;
 		pak->req_tag = req_tag;
@@ -179,6 +189,9 @@ static void packet_free(struct packet *pak)
 	if (timer_pending(&pak->processing_timer)) {
 		BUG();
 	}
+
+	if (pak->tpmif)
+		tpmif_put(pak->tpmif);
 	kfree(pak->data_buffer);
 	/*
 	 * cannot do tpmif_put(pak->tpmif); bad things happen
@@ -187,21 +200,6 @@ static void packet_free(struct packet *pak)
 	kfree(pak);
 }
 
-static int packet_set(struct packet *pak,
-		      const unsigned char *buffer, u32 size)
-{
-	int rc = 0;
-	unsigned char *buf = kmalloc(size, GFP_KERNEL);
-
-	if (buf) {
-		pak->data_buffer = buf;
-		memcpy(buf, buffer, size);
-		pak->data_len = size;
-	} else {
-		rc = -ENOMEM;
-	}
-	return rc;
-}
 
 /*
  * Write data to the shared memory and send it to the FE.
@@ -210,29 +208,6 @@ static int packet_write(struct packet *pak,
 			const char *data, size_t size, int isuserbuffer)
 {
 	int rc = 0;
-
-	if ((pak->flags & PACKET_FLAG_CHECK_RESPONSESTATUS)) {
-#ifdef CONFIG_XEN_TPMDEV_CLOSE_IF_VTPM_FAILS
-		u32 res;
-
-		if (copy_from_buffer(&res,
-				     &data[2 + 4], sizeof (res),
-				     isuserbuffer)) {
-			return -EFAULT;
-		}
-
-		if (res != 0) {
-			/*
-			 * Close down this device. Should have the
-			 * FE notified about closure.
-			 */
-			if (!pak->tpmif) {
-				return -EFAULT;
-			}
-			pak->tpmif->status = DISCONNECTING;
-		}
-#endif
-	}
 
 	if (0 != (pak->flags & PACKET_FLAG_DISCARD_RESPONSE)) {
 		/* Don't send a respone to this packet. Just acknowledge it. */
@@ -278,10 +253,8 @@ int _packet_write(struct packet *pak,
 			return 0;
 		}
 
-		map_op.host_addr = MMAP_VADDR(tpmif, i);
-		map_op.flags = GNTMAP_host_map;
-		map_op.ref = tx->ref;
-		map_op.dom = tpmif->domid;
+		gnttab_set_map_op(&map_op, MMAP_VADDR(tpmif, i),
+				  GNTMAP_host_map, tx->ref, tpmif->domid);
 
 		if (unlikely(HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref,
 						       &map_op, 1))) {
@@ -294,11 +267,8 @@ int _packet_write(struct packet *pak,
 			DPRINTK(" Grant table operation failure !\n");
 			return 0;
 		}
-		set_phys_to_machine(__pa(MMAP_VADDR(tpmif, i)) >> PAGE_SHIFT,
-				    FOREIGN_FRAME(map_op.
-						  dev_bus_addr >> PAGE_SHIFT));
 
-		tocopy = MIN(size - offset, PAGE_SIZE);
+		tocopy = min_t(size_t, size - offset, PAGE_SIZE);
 
 		if (copy_from_buffer((void *)(MMAP_VADDR(tpmif, i) |
 					      (tx->addr & ~PAGE_MASK)),
@@ -308,9 +278,8 @@ int _packet_write(struct packet *pak,
 		}
 		tx->size = tocopy;
 
-		unmap_op.host_addr = MMAP_VADDR(tpmif, i);
-		unmap_op.handle = handle;
-		unmap_op.dev_bus_addr = 0;
+		gnttab_set_unmap_op(&unmap_op, MMAP_VADDR(tpmif, i),
+				    GNTMAP_host_map, handle);
 
 		if (unlikely
 		    (HYPERVISOR_grant_table_op
@@ -355,7 +324,7 @@ static int packet_read(struct packet *pak, size_t numbytes,
 		u32 instance_no = htonl(pak->tpm_instance);
 		u32 last_read = pak->last_read;
 
-		to_copy = MIN(4 - last_read, numbytes);
+		to_copy = min_t(size_t, 4 - last_read, numbytes);
 
 		if (copy_to_buffer(&buffer[0],
 				   &(((u8 *) & instance_no)[last_read]),
@@ -374,7 +343,7 @@ static int packet_read(struct packet *pak, size_t numbytes,
 
 	if (room_left > 0) {
 		if (pak->data_buffer) {
-			u32 to_copy = MIN(pak->data_len - offset, room_left);
+			u32 to_copy = min_t(u32, pak->data_len - offset, room_left);
 			u32 last_read = pak->last_read - 4;
 
 			if (copy_to_buffer(&buffer[offset],
@@ -414,7 +383,7 @@ static int packet_read_shmem(struct packet *pak,
 	 * and within that page at offset 'offset'.
 	 * Copy a maximum of 'room_left' bytes.
 	 */
-	to_copy = MIN(PAGE_SIZE - pg_offset, room_left);
+	to_copy = min_t(u32, PAGE_SIZE - pg_offset, room_left);
 	while (to_copy > 0) {
 		void *src;
 		struct gnttab_map_grant_ref map_op;
@@ -422,10 +391,8 @@ static int packet_read_shmem(struct packet *pak,
 
 		tx = &tpmif->tx->ring[i].req;
 
-		map_op.host_addr = MMAP_VADDR(tpmif, i);
-		map_op.flags = GNTMAP_host_map;
-		map_op.ref = tx->ref;
-		map_op.dom = tpmif->domid;
+		gnttab_set_map_op(&map_op, MMAP_VADDR(tpmif, i),
+				  GNTMAP_host_map, tx->ref, tpmif->domid);
 
 		if (unlikely(HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref,
 						       &map_op, 1))) {
@@ -443,7 +410,7 @@ static int packet_read_shmem(struct packet *pak,
 			/*
 			 * User requests more than what's available
 			 */
-			to_copy = MIN(tx->size, to_copy);
+			to_copy = min_t(u32, tx->size, to_copy);
 		}
 
 		DPRINTK("Copying from mapped memory at %08lx\n",
@@ -461,9 +428,8 @@ static int packet_read_shmem(struct packet *pak,
 			tpmif->domid, buffer[offset], buffer[offset + 1],
 			buffer[offset + 2], buffer[offset + 3]);
 
-		unmap_op.host_addr = MMAP_VADDR(tpmif, i);
-		unmap_op.handle = handle;
-		unmap_op.dev_bus_addr = 0;
+		gnttab_set_unmap_op(&unmap_op, MMAP_VADDR(tpmif, i),
+				    GNTMAP_host_map, handle);
 
 		if (unlikely
 		    (HYPERVISOR_grant_table_op
@@ -476,7 +442,7 @@ static int packet_read_shmem(struct packet *pak,
 		last_read += to_copy;
 		room_left -= to_copy;
 
-		to_copy = MIN(PAGE_SIZE, room_left);
+		to_copy = min_t(u32, PAGE_SIZE, room_left);
 		i++;
 	}			/* while (to_copy > 0) */
 	/*
@@ -513,27 +479,41 @@ static ssize_t vtpm_op_read(struct file *file,
 	unsigned long flags;
 
 	write_lock_irqsave(&dataex.pak_lock, flags);
+	if (dataex.aborted) {
+		dataex.aborted = 0;
+		dataex.copied_so_far = 0;
+		write_unlock_irqrestore(&dataex.pak_lock, flags);
+		return -EIO;
+	}
 
 	if (list_empty(&dataex.pending_pak)) {
 		write_unlock_irqrestore(&dataex.pak_lock, flags);
 		wait_event_interruptible(dataex.wait_queue,
 					 !list_empty(&dataex.pending_pak));
 		write_lock_irqsave(&dataex.pak_lock, flags);
+		dataex.copied_so_far = 0;
 	}
 
 	if (!list_empty(&dataex.pending_pak)) {
 		unsigned int left;
-		pak = list_entry(dataex.pending_pak.next, struct packet, next);
 
+		pak = list_entry(dataex.pending_pak.next, struct packet, next);
 		left = pak->data_len - dataex.copied_so_far;
+		list_del(&pak->next);
+		write_unlock_irqrestore(&dataex.pak_lock, flags);
 
 		DPRINTK("size given by app: %d, available: %d\n", size, left);
 
-		ret_size = MIN(size, left);
+		ret_size = min_t(size_t, size, left);
 
 		ret_size = packet_read(pak, ret_size, data, size, 1);
+
+		write_lock_irqsave(&dataex.pak_lock, flags);
+
 		if (ret_size < 0) {
-			ret_size = -EFAULT;
+			del_singleshot_timer_sync(&pak->processing_timer);
+			packet_free(pak);
+			dataex.copied_so_far = 0;
 		} else {
 			DPRINTK("Copied %d bytes to user buffer\n", ret_size);
 
@@ -544,7 +524,6 @@ static ssize_t vtpm_op_read(struct file *file,
 
 				del_singleshot_timer_sync(&pak->
 							  processing_timer);
-				list_del(&pak->next);
 				list_add_tail(&pak->next, &dataex.current_pak);
 				/*
 				 * The more fontends that are handled at the same time,
@@ -553,6 +532,8 @@ static ssize_t vtpm_op_read(struct file *file,
 				mod_timer(&pak->processing_timer,
 					  jiffies + (num_frontends * 60 * HZ));
 				dataex.copied_so_far = 0;
+			} else {
+				list_add(&pak->next, &dataex.pending_pak);
 			}
 		}
 	}
@@ -600,8 +581,8 @@ static ssize_t vtpm_op_write(struct file *file,
 
 	if (pak == NULL) {
 		write_unlock_irqrestore(&dataex.pak_lock, flags);
-		printk(KERN_ALERT "No associated packet! (inst=%d)\n",
-		       ntohl(vrh.instance_no));
+		DPRINTK(KERN_ALERT "No associated packet! (inst=%d)\n",
+		        ntohl(vrh.instance_no));
 		return -EFAULT;
 	}
 
@@ -648,7 +629,7 @@ static unsigned int vtpm_op_poll(struct file *file,
 	return flags;
 }
 
-static struct file_operations vtpm_ops = {
+static const struct file_operations vtpm_ops = {
 	.owner = THIS_MODULE,
 	.llseek = no_llseek,
 	.open = vtpm_op_open,
@@ -663,95 +644,6 @@ static struct miscdevice vtpms_miscdevice = {
 	.name = "vtpm",
 	.fops = &vtpm_ops,
 };
-
-/***************************************************************
- Virtual TPM functions and data stuctures
-***************************************************************/
-
-static u8 create_cmd[] = {
-	1, 193,			/* 0: TPM_TAG_RQU_COMMAMD */
-	0, 0, 0, 19,		/* 2: length */
-	0, 0, 0, 0x1,		/* 6: VTPM_ORD_OPEN */
-	0,			/* 10: VTPM type */
-	0, 0, 0, 0,		/* 11: domain id */
-	0, 0, 0, 0		/* 15: instance id */
-};
-
-int tpmif_vtpm_open(tpmif_t * tpmif, domid_t domid, u32 instance)
-{
-	int rc = 0;
-	struct packet *pak;
-
-	pak = packet_alloc(tpmif,
-			   sizeof (create_cmd),
-			   create_cmd[1],
-			   PACKET_FLAG_DISCARD_RESPONSE |
-			   PACKET_FLAG_CHECK_RESPONSESTATUS);
-	if (pak) {
-		u8 buf[sizeof (create_cmd)];
-		u32 domid_no = htonl((u32) domid);
-		u32 instance_no = htonl(instance);
-
-		memcpy(buf, create_cmd, sizeof (create_cmd));
-
-		memcpy(&buf[11], &domid_no, sizeof (u32));
-		memcpy(&buf[15], &instance_no, sizeof (u32));
-
-		/* copy the buffer into the packet */
-		rc = packet_set(pak, buf, sizeof (buf));
-
-		if (rc == 0) {
-			pak->tpm_instance = 0;
-			rc = vtpm_queue_packet(pak);
-		}
-		if (rc < 0) {
-			/* could not be queued or built */
-			packet_free(pak);
-		}
-	} else {
-		rc = -ENOMEM;
-	}
-	return rc;
-}
-
-static u8 destroy_cmd[] = {
-	1, 193,			/* 0: TPM_TAG_RQU_COMMAMD */
-	0, 0, 0, 14,		/* 2: length */
-	0, 0, 0, 0x2,		/* 6: VTPM_ORD_CLOSE */
-	0, 0, 0, 0		/* 10: instance id */
-};
-
-int tpmif_vtpm_close(u32 instid)
-{
-	int rc = 0;
-	struct packet *pak;
-
-	pak = packet_alloc(NULL,
-			   sizeof (destroy_cmd),
-			   destroy_cmd[1], PACKET_FLAG_DISCARD_RESPONSE);
-	if (pak) {
-		u8 buf[sizeof (destroy_cmd)];
-		u32 instid_no = htonl(instid);
-
-		memcpy(buf, destroy_cmd, sizeof (destroy_cmd));
-		memcpy(&buf[10], &instid_no, sizeof (u32));
-
-		/* copy the buffer into the packet */
-		rc = packet_set(pak, buf, sizeof (buf));
-
-		if (rc == 0) {
-			pak->tpm_instance = 0;
-			rc = vtpm_queue_packet(pak);
-		}
-		if (rc < 0) {
-			/* could not be queued or built */
-			packet_free(pak);
-		}
-	} else {
-		rc = -ENOMEM;
-	}
-	return rc;
-}
 
 /***************************************************************
  Utility functions
@@ -783,15 +675,17 @@ static int tpm_send_fail_message(struct packet *pak, u8 req_tag)
 	return rc;
 }
 
-static void _vtpm_release_packets(struct list_head *head,
-				  tpmif_t * tpmif, int send_msgs)
+static int _vtpm_release_packets(struct list_head *head,
+				 tpmif_t * tpmif, int send_msgs)
 {
+	int aborted = 0;
+	int c = 0;
 	struct packet *pak;
-	struct list_head *pos,
-	         *tmp;
+	struct list_head *pos, *tmp;
 
 	list_for_each_safe(pos, tmp, head) {
 		pak = list_entry(pos, struct packet, next);
+		c += 1;
 
 		if (tpmif == NULL || pak->tpmif == tpmif) {
 			int can_send = 0;
@@ -807,8 +701,11 @@ static void _vtpm_release_packets(struct list_head *head,
 				tpm_send_fail_message(pak, pak->req_tag);
 			}
 			packet_free(pak);
+			if (c == 1)
+				aborted = 1;
 		}
 	}
+	return aborted;
 }
 
 int vtpm_release_packets(tpmif_t * tpmif, int send_msgs)
@@ -817,7 +714,9 @@ int vtpm_release_packets(tpmif_t * tpmif, int send_msgs)
 
 	write_lock_irqsave(&dataex.pak_lock, flags);
 
-	_vtpm_release_packets(&dataex.pending_pak, tpmif, send_msgs);
+	dataex.aborted = _vtpm_release_packets(&dataex.pending_pak,
+					       tpmif,
+					       send_msgs);
 	_vtpm_release_packets(&dataex.current_pak, tpmif, send_msgs);
 
 	write_unlock_irqrestore(&dataex.pak_lock, flags);
@@ -914,11 +813,11 @@ static void processing_timeout(unsigned long ptr)
 	 */
 	if (pak == packet_find_packet(&dataex.pending_pak, pak) ||
 	    pak == packet_find_packet(&dataex.current_pak, pak)) {
-		list_del(&pak->next);
 		if ((pak->flags & PACKET_FLAG_DISCARD_RESPONSE) == 0) {
 			tpm_send_fail_message(pak, pak->req_tag);
 		}
-		packet_free(pak);
+		/* discard future responses */
+		pak->flags |= PACKET_FLAG_DISCARD_RESPONSE;
 	}
 
 	write_unlock_irqrestore(&dataex.pak_lock, flags);
@@ -1019,11 +918,7 @@ static int __init tpmback_init(void)
 		return rc;
 	}
 
-	INIT_LIST_HEAD(&dataex.pending_pak);
-	INIT_LIST_HEAD(&dataex.current_pak);
-	dataex.has_opener = 0;
-	rwlock_init(&dataex.pak_lock);
-	init_waitqueue_head(&dataex.wait_queue);
+	dataex_init(&dataex);
 
 	spin_lock_init(&tpm_schedule_list_lock);
 	INIT_LIST_HEAD(&tpm_schedule_list);
@@ -1038,23 +933,12 @@ static int __init tpmback_init(void)
 
 module_init(tpmback_init);
 
-static void __exit tpmback_exit(void)
+void __exit tpmback_exit(void)
 {
+	vtpm_release_packets(NULL, 0);
 	tpmif_xenbus_exit();
 	tpmif_interface_exit();
 	misc_deregister(&vtpms_miscdevice);
 }
 
-module_exit(tpmback_exit);
-
 MODULE_LICENSE("Dual BSD/GPL");
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

@@ -101,10 +101,8 @@ static inline void clear_evtchn(int port)
 
 static inline void notify_remote_via_evtchn(int port)
 {
-	evtchn_op_t op;
-	op.cmd         = EVTCHNOP_send,
-	op.u.send.port = port;
-	(void)HYPERVISOR_event_channel_op(&op);
+	struct evtchn_send send = { .port = port };
+	(void)HYPERVISOR_event_channel_op(EVTCHNOP_send, &send);
 }
 
 /*
@@ -114,13 +112,3 @@ static inline void notify_remote_via_evtchn(int port)
 extern void notify_remote_via_irq(int irq);
 
 #endif /* __ASM_EVTCHN_H__ */
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

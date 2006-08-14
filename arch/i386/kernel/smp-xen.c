@@ -117,7 +117,17 @@ DEFINE_PER_CPU(struct tlb_state, cpu_tlbstate) ____cacheline_aligned = { &init_m
 
 static inline int __prepare_ICR (unsigned int shortcut, int vector)
 {
-	return APIC_DM_FIXED | shortcut | vector | APIC_DEST_LOGICAL;
+	unsigned int icr = shortcut | APIC_DEST_LOGICAL;
+
+	switch (vector) {
+	default:
+		icr |= APIC_DM_FIXED | vector;
+		break;
+	case NMI_VECTOR:
+		icr |= APIC_DM_NMI;
+		break;
+	}
+	return icr;
 }
 
 static inline int __prepare_ICR2 (unsigned int mask)
@@ -442,6 +452,7 @@ void flush_tlb_mm(struct mm_struct * mm)
 { xen_tlb_flush_mask(&mm->cpu_vm_mask); }
 void flush_tlb_page(struct vm_area_struct *vma, unsigned long va)
 { xen_invlpg_mask(&vma->vm_mm->cpu_vm_mask, va); }
+EXPORT_SYMBOL(flush_tlb_page);
 void flush_tlb_all(void)
 { xen_tlb_flush_all(); }
 
@@ -482,27 +493,23 @@ void unlock_ipi_call_lock(void)
 	spin_unlock_irq(&call_lock);
 }
 
-static struct call_data_struct * call_data;
+static struct call_data_struct *call_data;
 
-/*
- * this function sends a 'generic call function' IPI to all other CPUs
- * in the system.
- */
-
-int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
-			int wait)
-/*
- * [SUMMARY] Run a function on all other CPUs.
- * <func> The function to run. This must be fast and non-blocking.
- * <info> An arbitrary pointer to pass to the function.
- * <nonatomic> currently unused.
- * <wait> If true, wait (atomically) until function has completed on other CPUs.
- * [RETURNS] 0 on success, else a negative status code. Does not return until
+/**
+ * smp_call_function(): Run a function on all other CPUs.
+ * @func: The function to run. This must be fast and non-blocking.
+ * @info: An arbitrary pointer to pass to the function.
+ * @nonatomic: currently unused.
+ * @wait: If true, wait (atomically) until function has completed on other CPUs.
+ *
+ * Returns 0 on success, else a negative status code. Does not return until
  * remote CPUs are nearly ready to execute <<func>> or are or have executed.
  *
  * You must not call this function with disabled interrupts or from a
  * hardware interrupt handler or from a bottom half handler.
  */
+int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
+			int wait)
 {
 	struct call_data_struct data;
 	int cpus;

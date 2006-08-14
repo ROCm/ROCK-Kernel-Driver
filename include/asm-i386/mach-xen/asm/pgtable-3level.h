@@ -107,6 +107,20 @@ static inline void pud_clear (pud_t * pud) { }
 #define pmd_offset(pud, address) ((pmd_t *) pud_page(*(pud)) + \
 			pmd_index(address))
 
+/*
+ * For PTEs and PDEs, we must clear the P-bit first when clearing a page table
+ * entry, so clear the bottom half first and enforce ordering with a compiler
+ * barrier.
+ */
+static inline void pte_clear(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
+{
+	ptep->pte_low = 0;
+	smp_wmb();
+	ptep->pte_high = 0;
+}
+
+#define pmd_clear(xp)	do { set_pmd(xp, __pmd(0)); } while (0)
+
 static inline pte_t ptep_get_and_clear(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
 {
 	pte_t res;
@@ -177,5 +191,7 @@ static inline pmd_t pfn_pmd(unsigned long page_nr, pgprot_t pgprot)
 #define __swp_entry_to_pte(x)		((pte_t){ 0, (x).val })
 
 #define __pmd_free_tlb(tlb, x)		do { } while (0)
+
+#define vmalloc_sync_all() ((void)0)
 
 #endif /* _I386_PGTABLE_3LEVEL_H */

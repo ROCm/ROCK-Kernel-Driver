@@ -30,8 +30,9 @@
  * IN THE SOFTWARE.
  */
 
-#define DPRINTK(fmt, args...) \
-    pr_debug("xenbus_probe (%s:%d) " fmt ".\n", __FUNCTION__, __LINE__, ##args)
+#define DPRINTK(fmt, args...)				\
+	pr_debug("xenbus_probe (%s:%d) " fmt ".\n",	\
+		 __FUNCTION__, __LINE__, ##args)
 
 #include <linux/kernel.h>
 #include <linux/err.h>
@@ -55,7 +56,7 @@
 
 extern struct mutex xenwatch_mutex;
 
-static struct notifier_block *xenstore_chain;
+static BLOCKING_NOTIFIER_HEAD(xenstore_chain);
 
 /* If something in array of ids matches this device, return it. */
 static const struct xenbus_device_id *
@@ -128,7 +129,7 @@ static void free_otherend_watch(struct xenbus_device *dev)
 static int read_otherend_details(struct xenbus_device *xendev,
 				 char *id_node, char *path_node)
 {
-	int err = xenbus_gather(XBT_NULL, xendev->nodename,
+	int err = xenbus_gather(XBT_NIL, xendev->nodename,
 				id_node, "%i", &xendev->otherend_id,
 				path_node, NULL, &xendev->otherend,
 				NULL);
@@ -139,8 +140,10 @@ static int read_otherend_details(struct xenbus_device *xendev,
 		return err;
 	}
 	if (strlen(xendev->otherend) == 0 ||
-	    !xenbus_exists(XBT_NULL, xendev->otherend, "")) {
-		xenbus_dev_fatal(xendev, -ENOENT, "missing other end from %s",
+	    !xenbus_exists(XBT_NIL, xendev->otherend, "")) {
+		xenbus_dev_fatal(xendev, -ENOENT,
+				 "unable to read other end from %s.  "
+				 "missing or inaccessible.",
 				 xendev->nodename);
 		free_otherend_details(xendev);
 		return -ENOENT;
@@ -195,14 +198,14 @@ static int backend_bus_id(char bus_id[BUS_ID_SIZE], const char *nodename)
 
 	devid = strrchr(nodename, '/') + 1;
 
-	err = xenbus_gather(XBT_NULL, nodename, "frontend-id", "%i", &domid,
+	err = xenbus_gather(XBT_NIL, nodename, "frontend-id", "%i", &domid,
 			    "frontend", NULL, &frontend,
 			    NULL);
 	if (err)
 		return err;
 	if (strlen(frontend) == 0)
 		err = -ERANGE;
-	if (!err && !xenbus_exists(XBT_NULL, frontend, ""))
+	if (!err && !xenbus_exists(XBT_NIL, frontend, ""))
 		err = -ENOENT;
 
 	kfree(frontend);
@@ -284,7 +287,7 @@ static void otherend_changed(struct xenbus_watch *watch,
 	struct xenbus_device *dev =
 		container_of(watch, struct xenbus_device, otherend_watch);
 	struct xenbus_driver *drv = to_xenbus_driver(dev->dev.driver);
-	XenbusState state;
+	enum xenbus_state state;
 
 	/* Protect us against watches firing on old details when the otherend
 	   details change, say immediately after a resume. */
@@ -494,27 +497,6 @@ static void xenbus_dev_release(struct device *dev)
 		kfree(to_xenbus_device(dev));
 }
 
-/* Simplified asprintf. */
-char *kasprintf(const char *fmt, ...)
-{
-	va_list ap;
-	unsigned int len;
-	char *p, dummy[1];
-
-	va_start(ap, fmt);
-	/* FIXME: vsnprintf has a bug, NULL should work */
-	len = vsnprintf(dummy, 0, fmt, ap);
-	va_end(ap);
-
-	p = kmalloc(len + 1, GFP_KERNEL);
-	if (!p)
-		return NULL;
-	va_start(ap, fmt);
-	vsprintf(p, fmt, ap);
-	va_end(ap);
-	return p;
-}
-
 static ssize_t xendev_show_nodename(struct device *dev,
 				    struct device_attribute *attr, char *buf)
 {
@@ -539,7 +521,7 @@ static int xenbus_probe_node(struct xen_bus_type *bus,
 	size_t stringlen;
 	char *tmpstring;
 
-	XenbusState state = xenbus_read_driver_state(nodename);
+	enum xenbus_state state = xenbus_read_driver_state(nodename);
 
 	if (state != XenbusStateInitialising) {
 		/* Device is not new, so ignore it.  This can happen if a
@@ -590,7 +572,7 @@ static int xenbus_probe_frontend(const char *type, const char *name)
 	char *nodename;
 	int err;
 
-	nodename = kasprintf("%s/%s/%s", xenbus_frontend.root, type, name);
+	nodename = kasprintf(GFP_KERNEL, "%s/%s/%s", xenbus_frontend.root, type, name);
 	if (!nodename)
 		return -ENOMEM;
 
@@ -609,7 +591,7 @@ static int xenbus_probe_backend_unit(const char *dir,
 	char *nodename;
 	int err;
 
-	nodename = kasprintf("%s/%s", dir, name);
+	nodename = kasprintf(GFP_KERNEL, "%s/%s", dir, name);
 	if (!nodename)
 		return -ENOMEM;
 
@@ -630,11 +612,11 @@ static int xenbus_probe_backend(const char *type, const char *domid)
 
 	DPRINTK("");
 
-	nodename = kasprintf("%s/%s/%s", xenbus_backend.root, type, domid);
+	nodename = kasprintf(GFP_KERNEL, "%s/%s/%s", xenbus_backend.root, type, domid);
 	if (!nodename)
 		return -ENOMEM;
 
-	dir = xenbus_directory(XBT_NULL, nodename, "", &dir_n);
+	dir = xenbus_directory(XBT_NIL, nodename, "", &dir_n);
 	if (IS_ERR(dir)) {
 		kfree(nodename);
 		return PTR_ERR(dir);
@@ -657,7 +639,7 @@ static int xenbus_probe_device_type(struct xen_bus_type *bus, const char *type)
 	unsigned int dir_n = 0;
 	int i;
 
-	dir = xenbus_directory(XBT_NULL, bus->root, type, &dir_n);
+	dir = xenbus_directory(XBT_NIL, bus->root, type, &dir_n);
 	if (IS_ERR(dir))
 		return PTR_ERR(dir);
 
@@ -676,7 +658,7 @@ static int xenbus_probe_devices(struct xen_bus_type *bus)
 	char **dir;
 	unsigned int i, dir_n;
 
-	dir = xenbus_directory(XBT_NULL, bus->root, "", &dir_n);
+	dir = xenbus_directory(XBT_NIL, bus->root, "", &dir_n);
 	if (IS_ERR(dir))
 		return PTR_ERR(dir);
 
@@ -722,7 +704,7 @@ static void dev_changed(const char *node, struct xen_bus_type *bus)
 	if (char_count(node, '/') < 2)
  		return;
 
-	exists = xenbus_exists(XBT_NULL, node, "");
+	exists = xenbus_exists(XBT_NIL, node, "");
 	if (!exists) {
 		xenbus_cleanup_devices(node, &bus->bus);
 		return;
@@ -736,7 +718,7 @@ static void dev_changed(const char *node, struct xen_bus_type *bus)
 	rootlen = strsep_len(node, '/', bus->levels);
 	if (rootlen < 0)
 		return;
-	root = kasprintf("%.*s", rootlen, node);
+	root = kasprintf(GFP_KERNEL, "%.*s", rootlen, node);
 	if (!root)
 		return;
 
@@ -806,6 +788,7 @@ static int resume_dev(struct device *dev, void *data)
 
 	if (dev->driver == NULL)
 		return 0;
+
 	drv = to_xenbus_driver(dev->driver);
 	xdev = container_of(dev, struct xenbus_device, dev);
 
@@ -817,6 +800,18 @@ static int resume_dev(struct device *dev, void *data)
 		return err;
 	}
 
+	xdev->state = XenbusStateInitialising;
+
+	if (drv->resume) {
+		err = drv->resume(xdev);
+		if (err) { 
+			printk(KERN_WARNING
+			       "xenbus: resume %s failed: %i\n", 
+			       dev->bus_id, err);
+			return err; 
+		}
+	}
+
 	err = watch_otherend(xdev);
 	if (err) {
 		printk(KERN_WARNING
@@ -825,14 +820,7 @@ static int resume_dev(struct device *dev, void *data)
 		return err;
 	}
 
-	xdev->state = XenbusStateInitialising;
-
-	if (drv->resume)
-		err = drv->resume(xdev);
-	if (err)
-		printk(KERN_WARNING
-		       "xenbus: resume %s failed: %i\n", dev->bus_id, err);
-	return err;
+	return 0; 
 }
 
 void xenbus_suspend(void)
@@ -866,7 +854,7 @@ int register_xenstore_notifier(struct notifier_block *nb)
 	if (xenstored_ready > 0)
 		ret = nb->notifier_call(nb, 0, NULL);
 	else
-		notifier_chain_register(&xenstore_chain, nb);
+		blocking_notifier_chain_register(&xenstore_chain, nb);
 
 	return ret;
 }
@@ -874,32 +862,9 @@ EXPORT_SYMBOL_GPL(register_xenstore_notifier);
 
 void unregister_xenstore_notifier(struct notifier_block *nb)
 {
-	notifier_chain_unregister(&xenstore_chain, nb);
+	blocking_notifier_chain_unregister(&xenstore_chain, nb);
 }
 EXPORT_SYMBOL_GPL(unregister_xenstore_notifier);
-
-
-static int all_devices_ready_(struct device *dev, void *data)
-{
-	struct xenbus_device *xendev = to_xenbus_device(dev);
-	int *result = data;
-
-	if (xendev->state != XenbusStateConnected) {
-		*result = 0;
-		return 1;
-	}
-
-	return 0;
-}
-
-
-static int all_devices_ready(void)
-{
-	int ready = 1;
-	bus_for_each_dev(&xenbus_frontend.bus, NULL, &ready,
-			 all_devices_ready_);
-	return ready;
-}
 
 
 void xenbus_probe(void *unused)
@@ -915,10 +880,11 @@ void xenbus_probe(void *unused)
 	register_xenbus_watch(&be_watch);
 
 	/* Notify others that xenstore is up */
-	notifier_call_chain(&xenstore_chain, 0, NULL);
+	blocking_notifier_call_chain(&xenstore_chain, 0, NULL);
 }
 
 
+#ifdef CONFIG_PROC_FS
 static struct file_operations xsd_kva_fops;
 static struct proc_dir_entry *xsd_kva_intf;
 static struct proc_dir_entry *xsd_port_intf;
@@ -939,7 +905,7 @@ static int xsd_kva_mmap(struct file *file, struct vm_area_struct *vma)
 }
 
 static int xsd_kva_read(char *page, char **start, off_t off,
-                        int count, int *eof, void *data)
+			int count, int *eof, void *data)
 {
 	int len;
 
@@ -957,6 +923,7 @@ static int xsd_port_read(char *page, char **start, off_t off,
 	*eof = 1;
 	return len;
 }
+#endif
 
 
 static int __init xenbus_probe_init(void)
@@ -966,10 +933,8 @@ static int __init xenbus_probe_init(void)
 
 	DPRINTK("");
 
-	if (xen_init() < 0) {
-		DPRINTK("failed");
+	if (!is_running_on_xen())
 		return -ENODEV;
-	}
 
 	/* Register ourselves with the kernel bus subsystem */
 	bus_register(&xenbus_frontend.bus);
@@ -981,7 +946,7 @@ static int __init xenbus_probe_init(void)
 	dom0 = (xen_start_info->store_evtchn == 0);
 
 	if (dom0) {
-		evtchn_op_t op = { 0 };
+		struct evtchn_alloc_unbound alloc_unbound;
 
 		/* Allocate page. */
 		page = get_zeroed_page(GFP_KERNEL);
@@ -993,16 +958,17 @@ static int __init xenbus_probe_init(void)
 				   PAGE_SHIFT);
 
 		/* Next allocate a local port which xenstored can bind to */
-		op.cmd = EVTCHNOP_alloc_unbound;
-		op.u.alloc_unbound.dom        = DOMID_SELF;
-		op.u.alloc_unbound.remote_dom = 0;
+		alloc_unbound.dom        = DOMID_SELF;
+		alloc_unbound.remote_dom = 0;
 
-		err = HYPERVISOR_event_channel_op(&op);
+		err = HYPERVISOR_event_channel_op(EVTCHNOP_alloc_unbound,
+						  &alloc_unbound);
 		if (err == -ENOSYS)
 			goto err;
 		BUG_ON(err);
-		xen_start_info->store_evtchn = op.u.alloc_unbound.port;
+		xen_start_info->store_evtchn = alloc_unbound.port;
 
+#ifdef CONFIG_PROC_FS
 		/* And finally publish the above info in /proc/xen */
 		xsd_kva_intf = create_xen_proc_entry("xsd_kva", 0600);
 		if (xsd_kva_intf) {
@@ -1015,6 +981,7 @@ static int __init xenbus_probe_init(void)
 		xsd_port_intf = create_xen_proc_entry("xsd_port", 0400);
 		if (xsd_port_intf)
 			xsd_port_intf->read_proc = xsd_port_read;
+#endif
 	} else
 		xenstored_ready = 1;
 
@@ -1040,16 +1007,53 @@ static int __init xenbus_probe_init(void)
 		free_page(page);
 
 	/*
-         * Do not unregister the xenbus front/backend buses here. The
-         * buses must exist because front/backend drivers will use
-         * them when they are registered.
-         */
+	 * Do not unregister the xenbus front/backend buses here. The buses
+	 * must exist because front/backend drivers will use them when they are
+	 * registered.
+	 */
 
 	return err;
 }
 
 postcore_initcall(xenbus_probe_init);
 
+
+static int is_disconnected_device(struct device *dev, void *data)
+{
+	struct xenbus_device *xendev = to_xenbus_device(dev);
+
+	/*
+	 * A device with no driver will never connect. We care only about
+	 * devices which should currently be in the process of connecting.
+	 */
+	if (!dev->driver)
+		return 0;
+
+	return (xendev->state != XenbusStateConnected);
+}
+
+static int exists_disconnected_device(void)
+{
+	return bus_for_each_dev(&xenbus_frontend.bus, NULL, NULL,
+				is_disconnected_device);
+}
+
+static int print_device_status(struct device *dev, void *data)
+{
+	struct xenbus_device *xendev = to_xenbus_device(dev);
+
+	if (!dev->driver) {
+		/* Information only: is this too noisy? */
+		printk(KERN_INFO "XENBUS: Device with no driver: %s\n",
+		       xendev->nodename);
+	} else if (xendev->state != XenbusStateConnected) {
+		printk(KERN_WARNING "XENBUS: Timeout connecting "
+		       "to device: %s (state %d)\n",
+		       xendev->nodename, xendev->state);
+	}
+
+	return 0;
+}
 
 /*
  * On a 10 second timeout, wait for all devices currently configured.  We need
@@ -1069,25 +1073,16 @@ static int __init wait_for_devices(void)
 {
 	unsigned long timeout = jiffies + 10*HZ;
 
-	while (time_before(jiffies, timeout)) {
-		if (all_devices_ready())
-			return 0;
-		schedule_timeout_interruptible(HZ/10);
-	}
+	if (!is_running_on_xen())
+		return -ENODEV;
 
-	printk(KERN_WARNING "XENBUS: Timeout connecting to devices!\n");
+	while (time_before(jiffies, timeout) && exists_disconnected_device())
+		schedule_timeout_interruptible(HZ/10);
+
+	bus_for_each_dev(&xenbus_frontend.bus, NULL, NULL,
+			 print_device_status);
+
 	return 0;
 }
 
 late_initcall(wait_for_devices);
-
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

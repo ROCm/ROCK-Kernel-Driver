@@ -8,7 +8,6 @@
  *  Shared /dev/zero mmaping support, Feb 2000, Kanoj Sarcar <kanoj@sgi.com>
  */
 
-#include <linux/config.h>
 #include <linux/mm.h>
 #include <linux/miscdevice.h>
 #include <linux/slab.h>
@@ -20,7 +19,6 @@
 #include <linux/tty.h>
 #include <linux/capability.h>
 #include <linux/smp_lock.h>
-#include <linux/devfs_fs_kernel.h>
 #include <linux/ptrace.h>
 #include <linux/device.h>
 #include <asm/pgalloc.h>
@@ -30,10 +28,10 @@
 
 static inline int uncached_access(struct file *file)
 {
-        if (file->f_flags & O_SYNC)
-                return 1;
-        /* Xen sets correct MTRR type on non-RAM for us. */
-        return 0;
+	if (file->f_flags & O_SYNC)
+		return 1;
+	/* Xen sets correct MTRR type on non-RAM for us. */
+	return 0;
 }
 
 /*
@@ -173,20 +171,10 @@ static int open_mem(struct inode * inode, struct file * filp)
 	return capable(CAP_SYS_RAWIO) ? 0 : -EPERM;
 }
 
-struct file_operations mem_fops = {
+const struct file_operations mem_fops = {
 	.llseek		= memory_lseek,
 	.read		= read_mem,
 	.write		= write_mem,
 	.mmap		= mmap_mem,
 	.open		= open_mem,
 };
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

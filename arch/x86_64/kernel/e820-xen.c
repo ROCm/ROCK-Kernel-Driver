@@ -1,7 +1,6 @@
 /* 
  * Handle the memory map.
  * The functions here do the job until bootmem takes over.
- * $Id: e820.c,v 1.4 2002/09/19 19:25:32 ak Exp $
  *
  *  Getting sanitize_e820_map() in sync with i386 version by applying change:
  *  -  Provisions for empty E820 memory regions (reported by certain BIOSes).
@@ -9,7 +8,6 @@
  *  Venkatesh Pallipadi <venkatesh.pallipadi@intel.com>
  *
  */
-#include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/init.h>
@@ -19,6 +17,7 @@
 #include <linux/kexec.h>
 #include <linux/module.h>
 
+#include <asm/pgtable.h>
 #include <asm/page.h>
 #include <asm/e820.h>
 #include <asm/proto.h>
@@ -26,45 +25,23 @@
 #include <asm/sections.h>
 #include <xen/interface/memory.h>
 
-unsigned long pci_mem_start = 0xaeedbabe;
-
 /* 
  * PFN of last memory page.
  */
 unsigned long end_pfn; 
 EXPORT_SYMBOL(end_pfn);
-unsigned long end_user_pfn = MAXMEM>>PAGE_SHIFT;  
-unsigned long end_pfn_map; 
-
-/* 
- * Add a memory region to the kernel e820 map.
- */ 
-void __init add_memory_region(unsigned long start, unsigned long size, int type)
-{
-	int x = e820.nr_map;
-
-	if (x == E820MAX) {
-		printk(KERN_ERR "Ooops! Too many entries in the memory map!\n");
-		return;
-	}
-
-	e820.map[x].addr = start;
-	e820.map[x].size = size;
-	e820.map[x].type = type;
-	e820.nr_map++;
-}
-
-#ifndef CONFIG_XEN
 
 /* 
  * end_pfn only includes RAM, while end_pfn_map includes all e820 entries.
  * The direct mapping extends to end_pfn_map, so that we can directly access
  * apertures, ACPI and other tables without having to play with fixmaps.
  */ 
+unsigned long end_pfn_map; 
 
 /* 
  * Last pfn which the user wants to use.
  */
+unsigned long end_user_pfn = MAXMEM>>PAGE_SHIFT;  
 
 extern struct resource code_resource, data_resource;
 
@@ -73,6 +50,7 @@ static inline int bad_addr(unsigned long *addrp, unsigned long size)
 { 
 	unsigned long addr = *addrp, last = addr + size; 
 
+#ifndef CONFIG_XEN
 	/* various gunk below that needed for SMP startup */
 	if (addr < 0x8000) { 
 		*addrp = 0x8000;
@@ -99,11 +77,29 @@ static inline int bad_addr(unsigned long *addrp, unsigned long size)
 		*addrp = __pa_symbol(&_end);
 		return 1;
 	}
+
+	if (last >= ebda_addr && addr < ebda_addr + ebda_size) {
+		*addrp = ebda_addr + ebda_size;
+		return 1;
+	}
+
 	/* XXX ramdisk image here? */ 
+#else
+	if (last < (table_end<<PAGE_SHIFT)) {
+		*addrp = table_end << PAGE_SHIFT;
+		return 1;
+	}
+#endif
 	return 0;
 } 
 
-int __init e820_mapped(unsigned long start, unsigned long end, unsigned type) 
+#ifndef CONFIG_XEN
+/*
+ * This function checks if any part of the range <start,end> is mapped
+ * with type.
+ */
+int __meminit
+e820_any_mapped(unsigned long start, unsigned long end, unsigned type)
 { 
 	int i;
 	for (i = 0; i < e820.nr_map; i++) { 
@@ -115,6 +111,70 @@ int __init e820_mapped(unsigned long start, unsigned long end, unsigned type)
 		return 1; 
 	} 
 	return 0;
+}
+#endif
+
+#ifdef CONFIG_XEN_PRIVILEGED_GUEST
+static struct e820entry *__initdata machine_e820;
+static unsigned __initdata machine_e820_count;
+#endif
+
+/*
+ * This function checks if the entire range <start,end> is mapped with type.
+ *
+ * Note: this function only works correct if the e820 table is sorted and
+ * not-overlapping, which is the case
+ */
+int __init e820_all_mapped(unsigned long start, unsigned long end, unsigned type)
+{
+#ifndef CONFIG_XEN
+	int i;
+	for (i = 0; i < e820.nr_map; i++) {
+		struct e820entry *ei = &e820.map[i];
+		if (type && ei->type != type)
+			continue;
+		/* is the region (part) in overlap with the current region ?*/
+		if (ei->addr >= end || ei->addr + ei->size <= start)
+			continue;
+
+		/* if the region is at the beginning of <start,end> we move
+		 * start to the end of the region since it's ok until there
+		 */
+		if (ei->addr <= start)
+			start = ei->addr + ei->size;
+		/* if start is now at or beyond end, we're done, full coverage */
+		if (start >= end)
+			return 1; /* we're done */
+	}
+	return 0;
+#else
+#ifdef CONFIG_XEN_PRIVILEGED_GUEST
+	if (xen_start_info->flags & SIF_INITDOMAIN) {
+		unsigned i;
+
+		WARN_ON(!machine_e820);
+		for (i = 0; i < machine_e820_count; i++) {
+			const struct e820entry *ei = &machine_e820[i];
+
+			if (type && ei->type != type)
+				continue;
+			/* is the region (part) in overlap with the current region ?*/
+			if (ei->addr >= end || ei->addr + ei->size <= start)
+				continue;
+			/* if the region is at the beginning of <start,end> we move
+			 * start to the end of the region since it's ok until there
+			 */
+			if (ei->addr <= start)
+				start = ei->addr + ei->size;
+			/* if start is now at or beyond end, we're done, full
+			 * coverage */
+			if (start >= end)
+				return 1; /* we're done */
+		}
+	}
+#endif
+	return 0;
+#endif
 }
 
 /* 
@@ -132,7 +192,7 @@ unsigned long __init find_e820_area(unsigned long start, unsigned long end, unsi
 			addr = start;
 		if (addr > ei->addr + ei->size) 
 			continue; 
-		while (bad_addr(&addr, size) && addr+size < ei->addr + ei->size)
+		while (bad_addr(&addr, size) && addr+size <= ei->addr+ei->size)
 			;
 		last = addr + size;
 		if (last > ei->addr + ei->size)
@@ -246,23 +306,39 @@ e820_hole_size(unsigned long start_pfn, unsigned long end_pfn)
 /*
  * Mark e820 reserved areas as busy for the resource manager.
  */
-void __init e820_reserve_resources(void)
+void __init e820_reserve_resources(struct e820entry *e820, int nr_map)
 {
 	int i;
-	for (i = 0; i < e820.nr_map; i++) {
+
+#ifdef CONFIG_XEN_PRIVILEGED_GUEST
+	if ((xen_start_info->flags & SIF_INITDOMAIN) && !e820 && nr_map < 0) {
+		struct xen_memory_map memmap;
+
+		machine_e820 = e820 = alloc_bootmem_low_pages(PAGE_SIZE);
+
+		BUILD_BUG_ON(E820MAX * sizeof(*e820) > PAGE_SIZE);
+		memmap.nr_entries = E820MAX;
+		set_xen_guest_handle(memmap.buffer, e820);
+
+		BUG_ON(HYPERVISOR_memory_op(XENMEM_machine_memory_map, &memmap));
+
+		machine_e820_count = nr_map = memmap.nr_entries;
+	}
+#endif
+	for (i = 0; i < nr_map; i++) {
 		struct resource *res;
 		res = alloc_bootmem_low(sizeof(struct resource));
-		switch (e820.map[i].type) {
+		switch (e820[i].type) {
 		case E820_RAM:	res->name = "System RAM"; break;
 		case E820_ACPI:	res->name = "ACPI Tables"; break;
 		case E820_NVS:	res->name = "ACPI Non-volatile Storage"; break;
 		default:	res->name = "reserved";
 		}
-		res->start = e820.map[i].addr;
-		res->end = res->start + e820.map[i].size - 1;
+		res->start = e820[i].addr;
+		res->end = res->start + e820[i].size - 1;
 		res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
 		request_resource(&iomem_resource, res);
-		if (e820.map[i].type == E820_RAM) {
+		if (e820[i].type == E820_RAM) {
 			/*
 			 *  We don't know which RAM region contains kernel data,
 			 *  so we try it repeatedly and let the resource manager
@@ -276,7 +352,24 @@ void __init e820_reserve_resources(void)
 		}
 	}
 }
-#endif /* CONFIG_XEN */
+
+/* 
+ * Add a memory region to the kernel e820 map.
+ */ 
+void __init add_memory_region(unsigned long start, unsigned long size, int type)
+{
+	int x = e820.nr_map;
+
+	if (x == E820MAX) {
+		printk(KERN_ERR "Ooops! Too many entries in the memory map!\n");
+		return;
+	}
+
+	e820.map[x].addr = start;
+	e820.map[x].size = size;
+	e820.map[x].type = type;
+	e820.nr_map++;
+}
 
 void __init e820_print_map(char *who)
 {
@@ -304,7 +397,6 @@ void __init e820_print_map(char *who)
 	}
 }
 
-#ifndef CONFIG_XEN
 /*
  * Sanitize the BIOS e820 map.
  *
@@ -491,9 +583,13 @@ static int __init sanitize_e820_map(struct e820entry * biosmap, char * pnr_map)
  */
 static int __init copy_e820_map(struct e820entry * biosmap, int nr_map)
 {
+#ifndef CONFIG_XEN
 	/* Only one memory region (or negative)? Ignore it */
 	if (nr_map < 2)
 		return -1;
+#else
+	BUG_ON(nr_map < 1);
+#endif
 
 	do {
 		unsigned long start = biosmap->addr;
@@ -505,6 +601,7 @@ static int __init copy_e820_map(struct e820entry * biosmap, int nr_map)
 		if (start > end)
 			return -1;
 
+#ifndef CONFIG_XEN
 		/*
 		 * Some BIOSes claim RAM in the 640k - 1M region.
 		 * Not right. Fix it up.
@@ -523,12 +620,14 @@ static int __init copy_e820_map(struct e820entry * biosmap, int nr_map)
 				size = end - start;
 			}
 		}
+#endif
 
 		add_memory_region(start, size, type);
 	} while (biosmap++,--nr_map);
 	return 0;
 }
 
+#ifndef CONFIG_XEN
 void __init setup_memory_region(void)
 {
 	char *who = "BIOS-e820";
@@ -562,104 +661,63 @@ void __init setup_memory_region(void)
 
 #else  /* CONFIG_XEN */
 
-extern unsigned long xen_override_max_pfn;
-extern union xen_start_info_union xen_start_info_union;
-
-unsigned long __init e820_end_of_ram(void)
+void __init setup_memory_region(void)
 {
-	unsigned long max_end_pfn;
-
-	if (xen_override_max_pfn == 0) {
-		max_end_pfn = xen_start_info->nr_pages;
-		/* Default 8MB slack (to balance backend allocations). */
-		max_end_pfn += 8 << (20 - PAGE_SHIFT);
-	} else if (xen_override_max_pfn > xen_start_info->nr_pages) {
-		max_end_pfn = xen_override_max_pfn;
-	} else {
-		max_end_pfn = xen_start_info->nr_pages;
-	}
-
-	return max_end_pfn;
-}
-
-unsigned long __init
-e820_hole_size(unsigned long start_pfn, unsigned long end_pfn)
-{
-	return 0;
-}
-
-void __init e820_reserve_resources(void) 
-{
-	dom0_op_t op;
-	struct dom0_memory_map_entry *map;
-	unsigned long gapstart, gapsize, round, last;
-	int i, found = 0;
-
-	if (!(xen_start_info->flags & SIF_INITDOMAIN))
-		return;
-
-	map = alloc_bootmem_low_pages(PAGE_SIZE);
-	op.cmd = DOM0_PHYSICAL_MEMORY_MAP;
-	op.u.physical_memory_map.memory_map = map;
-	op.u.physical_memory_map.max_map_entries =
-		PAGE_SIZE / sizeof(struct dom0_memory_map_entry);
-	BUG_ON(HYPERVISOR_dom0_op(&op));
-
-	last = 0x100000000ULL;
-	gapstart = 0x10000000;
-	gapsize = 0x400000;
-
-	for (i = op.u.physical_memory_map.nr_map_entries - 1; i >= 0; i--) {
-		struct resource *res;
-
-		if ((last > map[i].end) && ((last - map[i].end) > gapsize)) {
-			gapsize = last - map[i].end;
-			gapstart = map[i].end;
-			found = 1;
-		}
-		if (map[i].start < last)
-			last = map[i].start;
-
-		if (map[i].end > 0x100000000ULL)
-			continue;
-		res = alloc_bootmem_low(sizeof(struct resource));
-		res->name = map[i].is_ram ? "System RAM" : "reserved";
-		res->start = map[i].start;
-		res->end = map[i].end - 1;
-		res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
-		request_resource(&iomem_resource, res);
-	}
-
-	free_bootmem(__pa(map), PAGE_SIZE);
-
-	if (!found) {
-		gapstart = HYPERVISOR_memory_op(XENMEM_maximum_ram_page, NULL);
-		gapstart = (gapstart << PAGE_SHIFT) + 1024*1024;
-		printk(KERN_ERR "PCI: Warning: Cannot find a gap in the 32bit address range\n"
-		       KERN_ERR "PCI: Unassigned devices with 32bit resource registers may break!\n");
-	}
-
+	int rc;
+	struct xen_memory_map memmap;
 	/*
-	 * See how much we want to round up: start off with
-	 * rounding to the next 1MB area.
+	 * This is rather large for a stack variable but this early in
+	 * the boot process we know we have plenty slack space.
 	 */
-	round = 0x100000;
-	while ((gapsize >> 4) > round)
-		round += round;
-	/* Fun with two's complement */
-	pci_mem_start = (gapstart + round) & -round;
+	struct e820entry map[E820MAX];
 
-	printk(KERN_INFO "Allocating PCI resources starting at %lx (gap: %lx:%lx)\n",
-		pci_mem_start, gapstart, gapsize);
+	memmap.nr_entries = E820MAX;
+	set_xen_guest_handle(memmap.buffer, map);
+
+	rc = HYPERVISOR_memory_op(XENMEM_memory_map, &memmap);
+	if ( rc == -ENOSYS ) {
+		memmap.nr_entries = 1;
+		map[0].addr = 0ULL;
+		map[0].size = xen_start_info->nr_pages << PAGE_SHIFT;
+		/* 8MB slack (to balance backend allocations). */
+		map[0].size += 8 << 20;
+		map[0].type = E820_RAM;
+		rc = 0;
+	}
+	BUG_ON(rc);
+
+	sanitize_e820_map(map, (char *)&memmap.nr_entries);
+
+	BUG_ON(copy_e820_map(map, (char)memmap.nr_entries) < 0);
+
+	printk(KERN_INFO "BIOS-provided physical RAM map:\n");
+	e820_print_map("Xen");
 }
-
 #endif
 
 void __init parse_memopt(char *p, char **from) 
 { 
+	int i;
+	unsigned long current_end;
+	unsigned long end;
+
 	end_user_pfn = memparse(p, from);
 	end_user_pfn >>= PAGE_SHIFT;	
-	xen_override_max_pfn = (unsigned long) end_user_pfn;
+
+	end = end_user_pfn<<PAGE_SHIFT;
+	i = e820.nr_map-1;
+	current_end = e820.map[i].addr + e820.map[i].size;
+
+	if (current_end < end) {
+		/*
+                 * The e820 map ends before our requested size so
+                 * extend the final entry to the requested address.
+                 */
+		if (e820.map[i].type == E820_RAM)
+			e820.map[i].size = end - e820.map[i].addr;
+		else
+			add_memory_region(current_end, end - current_end, E820_RAM);
+	}
 } 
 
 void __init parse_memmapopt(char *p, char **from)
@@ -683,27 +741,35 @@ void __init parse_memmapopt(char *p, char **from)
 	p = *from;
 }
 
+unsigned long pci_mem_start = 0xaeedbabe;
+EXPORT_SYMBOL(pci_mem_start);
+
 /*
  * Search for the biggest gap in the low 32 bits of the e820
  * memory space.  We pass this space to PCI to assign MMIO resources
  * for hotplug or unconfigured devices in.
  * Hopefully the BIOS let enough space left.
  */
-__init void e820_setup_gap(void)
+__init void e820_setup_gap(struct e820entry *e820, int nr_map)
 {
-#ifndef CONFIG_XEN
-	unsigned long gapstart, gapsize;
+	unsigned long gapstart, gapsize, round;
 	unsigned long last;
 	int i;
 	int found = 0;
 
+#ifdef CONFIG_XEN_PRIVILEGED_GUEST
+	if (xen_start_info->flags & SIF_INITDOMAIN) {
+		e820 = machine_e820;
+		nr_map = machine_e820_count;
+	}
+#endif
 	last = 0x100000000ull;
 	gapstart = 0x10000000;
 	gapsize = 0x400000;
-	i = e820.nr_map;
+	i = nr_map;
 	while (--i >= 0) {
-		unsigned long long start = e820.map[i].addr;
-		unsigned long long end = start + e820.map[i].size;
+		unsigned long long start = e820[i].addr;
+		unsigned long long end = start + e820[i].size;
 
 		/*
 		 * Since "last" is at most 4GB, we know we'll
@@ -729,16 +795,15 @@ __init void e820_setup_gap(void)
 	}
 
 	/*
-	 * Start allocating dynamic PCI memory a bit into the gap,
-	 * aligned up to the nearest megabyte.
-	 *
-	 * Question: should we try to pad it up a bit (do something
-	 * like " + (gapsize >> 3)" in there too?). We now have the
-	 * technology.
+	 * See how much we want to round up: start off with
+	 * rounding to the next 1MB area.
 	 */
-	pci_mem_start = (gapstart + 0xfffff) & ~0xfffff;
+	round = 0x100000;
+	while ((gapsize >> 4) > round)
+		round += round;
+	/* Fun with two's complement */
+	pci_mem_start = (gapstart + round) & -round;
 
 	printk(KERN_INFO "Allocating PCI resources starting at %lx (gap: %lx:%lx)\n",
 		pci_mem_start, gapstart, gapsize);
-#endif
 }

@@ -33,20 +33,22 @@
 #ifndef __LINUX_PUBLIC_PRIVCMD_H__
 #define __LINUX_PUBLIC_PRIVCMD_H__
 
+#include <linux/types.h>
+
 #ifndef __user
 #define __user
 #endif
 
 typedef struct privcmd_hypercall
 {
-	unsigned long op;
-	unsigned long arg[5];
+	__u64 op;
+	__u64 arg[5];
 } privcmd_hypercall_t;
 
 typedef struct privcmd_mmap_entry {
-	unsigned long va;
-	unsigned long mfn;
-	unsigned long npages;
+	__u64 va;
+	__u64 mfn;
+	__u64 npages;
 } privcmd_mmap_entry_t; 
 
 typedef struct privcmd_mmap {
@@ -58,16 +60,9 @@ typedef struct privcmd_mmap {
 typedef struct privcmd_mmapbatch {
 	int num;     /* number of pages to populate */
 	domid_t dom; /* target domain */
-	unsigned long addr;  /* virtual address */
-	unsigned long __user *arr; /* array of mfns - top nibble set on err */
+	__u64 addr;  /* virtual address */
+	xen_pfn_t __user *arr; /* array of mfns - top nibble set on err */
 } privcmd_mmapbatch_t; 
-
-typedef struct privcmd_blkmsg
-{
-	unsigned long op;
-	void         *buf;
-	int           buf_size;
-} privcmd_blkmsg_t;
 
 /*
  * @cmd: IOCTL_PRIVCMD_HYPERCALL
@@ -82,13 +77,3 @@ typedef struct privcmd_blkmsg
 	_IOC(_IOC_NONE, 'P', 3, sizeof(privcmd_mmapbatch_t))
 
 #endif /* __LINUX_PUBLIC_PRIVCMD_H__ */
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

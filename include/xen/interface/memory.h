@@ -10,14 +10,14 @@
 #define __XEN_PUBLIC_MEMORY_H__
 
 /*
- * Increase or decrease the specified domain's memory reservation. Returns a
- * -ve errcode on failure, or the # extents successfully allocated or freed.
+ * Increase or decrease the specified domain's memory reservation. Returns the
+ * number of extents successfully allocated or freed.
  * arg == addr of struct xen_memory_reservation.
  */
 #define XENMEM_increase_reservation 0
 #define XENMEM_decrease_reservation 1
 #define XENMEM_populate_physmap     6
-typedef struct xen_memory_reservation {
+struct xen_memory_reservation {
 
     /*
      * XENMEM_increase_reservation:
@@ -29,10 +29,10 @@ typedef struct xen_memory_reservation {
      *   OUT: GMFN bases of extents that were allocated
      *   (NB. This command also updates the mach_to_phys translation table)
      */
-    GUEST_HANDLE(ulong) extent_start;
+    XEN_GUEST_HANDLE(xen_pfn_t) extent_start;
 
     /* Number of extents, and size/alignment of each (2^extent_order pages). */
-    unsigned long  nr_extents;
+    xen_ulong_t    nr_extents;
     unsigned int   extent_order;
 
     /*
@@ -48,9 +48,52 @@ typedef struct xen_memory_reservation {
      * Unprivileged domains can specify only DOMID_SELF.
      */
     domid_t        domid;
+};
+typedef struct xen_memory_reservation xen_memory_reservation_t;
+DEFINE_XEN_GUEST_HANDLE(xen_memory_reservation_t);
 
-} xen_memory_reservation_t;
-DEFINE_GUEST_HANDLE(xen_memory_reservation_t);
+/*
+ * An atomic exchange of memory pages. If return code is zero then
+ * @out.extent_list provides GMFNs of the newly-allocated memory.
+ * Returns zero on complete success, otherwise a negative error code.
+ * On complete success then always @nr_exchanged == @in.nr_extents.
+ * On partial success @nr_exchanged indicates how much work was done.
+ */
+#define XENMEM_exchange             11
+struct xen_memory_exchange {
+    /*
+     * [IN] Details of memory extents to be exchanged (GMFN bases).
+     * Note that @in.address_bits is ignored and unused.
+     */
+    struct xen_memory_reservation in;
+
+    /*
+     * [IN/OUT] Details of new memory extents.
+     * We require that:
+     *  1. @in.domid == @out.domid
+     *  2. @in.nr_extents  << @in.extent_order == 
+     *     @out.nr_extents << @out.extent_order
+     *  3. @in.extent_start and @out.extent_start lists must not overlap
+     *  4. @out.extent_start lists GPFN bases to be populated
+     *  5. @out.extent_start is overwritten with allocated GMFN bases
+     */
+    struct xen_memory_reservation out;
+
+    /*
+     * [OUT] Number of input extents that were successfully exchanged:
+     *  1. The first @nr_exchanged input extents were successfully
+     *     deallocated.
+     *  2. The corresponding first entries in the output extent list correctly
+     *     indicate the GMFNs that were successfully exchanged.
+     *  3. All other input and output extents are untouched.
+     *  4. If not all input exents are exchanged then the return code of this
+     *     command will be non-zero.
+     *  5. THIS FIELD MUST BE INITIALISED TO ZERO BY THE CALLER!
+     */
+    xen_ulong_t nr_exchanged;
+};
+typedef struct xen_memory_exchange xen_memory_exchange_t;
+DEFINE_XEN_GUEST_HANDLE(xen_memory_exchange_t);
 
 /*
  * Returns the maximum machine frame number of mapped RAM in this system.
@@ -74,7 +117,7 @@ DEFINE_GUEST_HANDLE(xen_memory_reservation_t);
  * arg == addr of xen_machphys_mfn_list_t.
  */
 #define XENMEM_machphys_mfn_list    5
-typedef struct xen_machphys_mfn_list {
+struct xen_machphys_mfn_list {
     /*
      * Size of the 'extent_start' array. Fewer entries will be filled if the
      * machphys table is smaller than max_extents * 2MB.
@@ -86,15 +129,30 @@ typedef struct xen_machphys_mfn_list {
      * any large discontiguities in the machine address space, 2MB gaps in
      * the machphys table will be represented by an MFN base of zero.
      */
-    GUEST_HANDLE(ulong) extent_start;
+    XEN_GUEST_HANDLE(xen_pfn_t) extent_start;
 
     /*
      * Number of extents written to the above array. This will be smaller
      * than 'max_extents' if the machphys table is smaller than max_e * 2MB.
      */
     unsigned int nr_extents;
-} xen_machphys_mfn_list_t;
-DEFINE_GUEST_HANDLE(xen_machphys_mfn_list_t);
+};
+typedef struct xen_machphys_mfn_list xen_machphys_mfn_list_t;
+DEFINE_XEN_GUEST_HANDLE(xen_machphys_mfn_list_t);
+
+/*
+ * Returns the location in virtual address space of the machine_to_phys
+ * mapping table. Architectures which do not have a m2p table, or which do not
+ * map it by default into guest address space, do not implement this command.
+ * arg == addr of xen_machphys_mapping_t.
+ */
+#define XENMEM_machphys_mapping     12
+struct xen_machphys_mapping {
+    xen_ulong_t v_start, v_end; /* Start and end virtual addresses.   */
+    xen_ulong_t max_mfn;        /* Maximum MFN that can be looked up. */
+};
+typedef struct xen_machphys_mapping xen_machphys_mapping_t;
+DEFINE_XEN_GUEST_HANDLE(xen_machphys_mapping_t);
 
 /*
  * Sets the GPFN at which a particular page appears in the specified guest's
@@ -102,7 +160,7 @@ DEFINE_GUEST_HANDLE(xen_machphys_mfn_list_t);
  * arg == addr of xen_add_to_physmap_t.
  */
 #define XENMEM_add_to_physmap      7
-typedef struct xen_add_to_physmap {
+struct xen_add_to_physmap {
     /* Which domain to change the mapping for. */
     domid_t domid;
 
@@ -112,35 +170,65 @@ typedef struct xen_add_to_physmap {
     unsigned int space;
 
     /* Index into source mapping space. */
-    unsigned long idx;
+    xen_ulong_t idx;
 
     /* GPFN where the source mapping page should appear. */
-    unsigned long gpfn;
-} xen_add_to_physmap_t;
-DEFINE_GUEST_HANDLE(xen_add_to_physmap_t);
+    xen_pfn_t     gpfn;
+};
+typedef struct xen_add_to_physmap xen_add_to_physmap_t;
+DEFINE_XEN_GUEST_HANDLE(xen_add_to_physmap_t);
 
 /*
  * Translates a list of domain-specific GPFNs into MFNs. Returns a -ve error
  * code on failure. This call only works for auto-translated guests.
  */
 #define XENMEM_translate_gpfn_list  8
-typedef struct xen_translate_gpfn_list {
+struct xen_translate_gpfn_list {
     /* Which domain to translate for? */
     domid_t domid;
 
     /* Length of list. */
-    unsigned long nr_gpfns;
+    xen_ulong_t nr_gpfns;
 
     /* List of GPFNs to translate. */
-    GUEST_HANDLE(ulong) gpfn_list;
+    XEN_GUEST_HANDLE(xen_pfn_t) gpfn_list;
 
     /*
      * Output list to contain MFN translations. May be the same as the input
      * list (in which case each input GPFN is overwritten with the output MFN).
      */
-    GUEST_HANDLE(ulong) mfn_list;
-} xen_translate_gpfn_list_t;
-DEFINE_GUEST_HANDLE(xen_translate_gpfn_list_t);
+    XEN_GUEST_HANDLE(xen_pfn_t) mfn_list;
+};
+typedef struct xen_translate_gpfn_list xen_translate_gpfn_list_t;
+DEFINE_XEN_GUEST_HANDLE(xen_translate_gpfn_list_t);
+
+/*
+ * Returns the pseudo-physical memory map as it was when the domain
+ * was started.
+ */
+#define XENMEM_memory_map           9
+struct xen_memory_map {
+    /*
+     * On call the number of entries which can be stored in buffer. On
+     * return the number of entries which have been stored in
+     * buffer.
+     */
+    unsigned int nr_entries;
+
+    /*
+     * Entries in the buffer are in the same format as returned by the
+     * BIOS INT 0x15 EAX=0xE820 call.
+     */
+    XEN_GUEST_HANDLE(void) buffer;
+};
+typedef struct xen_memory_map xen_memory_map_t;
+DEFINE_XEN_GUEST_HANDLE(xen_memory_map_t);
+
+/*
+ * Returns the real physical memory map. Passes the same structure as
+ * XENMEM_memory_map.
+ */
+#define XENMEM_machine_memory_map	10
 
 #endif /* __XEN_PUBLIC_MEMORY_H__ */
 

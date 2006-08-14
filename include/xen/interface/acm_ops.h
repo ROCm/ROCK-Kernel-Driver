@@ -2,7 +2,7 @@
  * acm_ops.h: Xen access control module hypervisor commands
  *
  * Reiner Sailer <sailer@watson.ibm.com>
- * Copyright (c) 2005, International Business Machines Corporation.
+ * Copyright (c) 2005,2006 International Business Machines Corporation.
  */
 
 #ifndef __XEN_PUBLIC_ACM_OPS_H__
@@ -17,49 +17,66 @@
  * This makes sure that old versions of acm tools will stop working in a
  * well-defined way (rather than crashing the machine, for instance).
  */
-#define ACM_INTERFACE_VERSION   0xAAAA0005
+#define ACM_INTERFACE_VERSION   0xAAAA0008
 
 /************************************************************************/
 
-#define ACM_SETPOLICY         4
+/*
+ * Prototype for this hypercall is:
+ *  int acm_op(int cmd, void *args)
+ * @cmd  == ACMOP_??? (access control module operation).
+ * @args == Operation-specific extra arguments (NULL if none).
+ */
+
+
+#define ACMOP_setpolicy         1
 struct acm_setpolicy {
-    /* OUT variables */
-    void *pushcache;
+    /* IN */
+    uint32_t interface_version;
+    XEN_GUEST_HANDLE(void) pushcache;
     uint32_t pushcache_size;
 };
 
 
-#define ACM_GETPOLICY         5
+#define ACMOP_getpolicy         2
 struct acm_getpolicy {
-    /* OUT variables */
-    void *pullcache;
+    /* IN */
+    uint32_t interface_version;
+    XEN_GUEST_HANDLE(void) pullcache;
     uint32_t pullcache_size;
 };
 
 
-#define ACM_DUMPSTATS         6
+#define ACMOP_dumpstats         3
 struct acm_dumpstats {
-    void *pullcache;
+    /* IN */
+    uint32_t interface_version;
+    XEN_GUEST_HANDLE(void) pullcache;
     uint32_t pullcache_size;
 };
 
 
-#define ACM_GETSSID           7
-enum get_type {UNSET=0, SSIDREF, DOMAINID};
+#define ACMOP_getssid           4
+#define ACM_GETBY_ssidref  1
+#define ACM_GETBY_domainid 2
 struct acm_getssid {
-    enum get_type get_ssid_by;
+    /* IN */
+    uint32_t interface_version;
+    uint32_t get_ssid_by; /* ACM_GETBY_* */
     union {
         domaintype_t domainid;
         ssidref_t    ssidref;
     } id;
-    void *ssidbuf;
+    XEN_GUEST_HANDLE(void) ssidbuf;
     uint32_t ssidbuf_size;
 };
 
-#define ACM_GETDECISION        8
+#define ACMOP_getdecision      5
 struct acm_getdecision {
-    enum get_type get_decision_by1; /* in */
-    enum get_type get_decision_by2;
+    /* IN */
+    uint32_t interface_version;
+    uint32_t get_decision_by1; /* ACM_GETBY_* */
+    uint32_t get_decision_by2; /* ACM_GETBY_* */
     union {
         domaintype_t domainid;
         ssidref_t    ssidref;
@@ -68,24 +85,12 @@ struct acm_getdecision {
         domaintype_t domainid;
         ssidref_t    ssidref;
     } id2;
-    enum acm_hook_type hook;
-    int acm_decision;           /* out */
+    uint32_t hook;
+    /* OUT */
+    uint32_t acm_decision;
 };
 
-typedef struct acm_op {
-    uint32_t cmd;
-    uint32_t interface_version;      /* ACM_INTERFACE_VERSION */
-    union {
-        struct acm_setpolicy setpolicy;
-        struct acm_getpolicy getpolicy;
-        struct acm_dumpstats dumpstats;
-        struct acm_getssid getssid;
-        struct acm_getdecision getdecision;
-    } u;
-} acm_op_t;
-DEFINE_GUEST_HANDLE(acm_op_t);
-
-#endif                          /* __XEN_PUBLIC_ACM_OPS_H__ */
+#endif /* __XEN_PUBLIC_ACM_OPS_H__ */
 
 /*
  * Local variables:

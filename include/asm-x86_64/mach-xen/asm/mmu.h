@@ -17,6 +17,7 @@ typedef struct {
 	struct semaphore sem; 
 #ifdef CONFIG_XEN
 	unsigned pinned:1;
+	unsigned has_foreign_mappings:1;
 	struct list_head unpinned;
 #endif
 } mm_context_t;
@@ -28,6 +29,10 @@ extern spinlock_t mm_unpinned_lock;
 /* mm/memory.c:exit_mmap hook */
 extern void _arch_exit_mmap(struct mm_struct *mm);
 #define arch_exit_mmap(_mm) _arch_exit_mmap(_mm)
+
+/* kernel/fork.c:dup_mmap hook */
+extern void _arch_dup_mmap(struct mm_struct *mm);
+#define arch_dup_mmap(mm, oldmm) ((void)(oldmm), _arch_dup_mmap(mm))
 #endif
 
 #endif

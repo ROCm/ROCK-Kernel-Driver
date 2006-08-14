@@ -93,7 +93,7 @@ void evtchn_device_upcall(int port)
 }
 
 static ssize_t evtchn_read(struct file *file, char __user *buf,
-                           size_t count, loff_t *ppos)
+			   size_t count, loff_t *ppos)
 {
 	int rc;
 	unsigned int c, p, bytes1 = 0, bytes2 = 0;
@@ -153,7 +153,7 @@ static ssize_t evtchn_read(struct file *file, char __user *buf,
 }
 
 static ssize_t evtchn_write(struct file *file, const char __user *buf,
-                            size_t count, loff_t *ppos)
+			    size_t count, loff_t *ppos)
 {
 	int  rc, i;
 	evtchn_port_t *kbuf = (evtchn_port_t *)__get_free_page(GFP_KERNEL);
@@ -201,73 +201,76 @@ static void evtchn_bind_to_user(struct per_user_data *u, int port)
 }
 
 static int evtchn_ioctl(struct inode *inode, struct file *file,
-                        unsigned int cmd, unsigned long arg)
+			unsigned int cmd, unsigned long arg)
 {
 	int rc;
 	struct per_user_data *u = file->private_data;
 	void __user *uarg = (void __user *) arg;
-	evtchn_op_t op = { 0 };
 
 	switch (cmd) {
 	case IOCTL_EVTCHN_BIND_VIRQ: {
 		struct ioctl_evtchn_bind_virq bind;
+		struct evtchn_bind_virq bind_virq;
 
 		rc = -EFAULT;
 		if (copy_from_user(&bind, uarg, sizeof(bind)))
 			break;
 
-		op.cmd = EVTCHNOP_bind_virq;
-		op.u.bind_virq.virq = bind.virq;
-		op.u.bind_virq.vcpu = 0;
-		rc = HYPERVISOR_event_channel_op(&op);
+		bind_virq.virq = bind.virq;
+		bind_virq.vcpu = 0;
+		rc = HYPERVISOR_event_channel_op(EVTCHNOP_bind_virq,
+						 &bind_virq);
 		if (rc != 0)
 			break;
 
-		rc = op.u.bind_virq.port;
+		rc = bind_virq.port;
 		evtchn_bind_to_user(u, rc);
 		break;
 	}
 
 	case IOCTL_EVTCHN_BIND_INTERDOMAIN: {
 		struct ioctl_evtchn_bind_interdomain bind;
+		struct evtchn_bind_interdomain bind_interdomain;
 
 		rc = -EFAULT;
 		if (copy_from_user(&bind, uarg, sizeof(bind)))
 			break;
 
-		op.cmd = EVTCHNOP_bind_interdomain;
-		op.u.bind_interdomain.remote_dom  = bind.remote_domain;
-		op.u.bind_interdomain.remote_port = bind.remote_port;
-		rc = HYPERVISOR_event_channel_op(&op);
+		bind_interdomain.remote_dom  = bind.remote_domain;
+		bind_interdomain.remote_port = bind.remote_port;
+		rc = HYPERVISOR_event_channel_op(EVTCHNOP_bind_interdomain,
+						 &bind_interdomain);
 		if (rc != 0)
 			break;
 
-		rc = op.u.bind_interdomain.local_port;
+		rc = bind_interdomain.local_port;
 		evtchn_bind_to_user(u, rc);
 		break;
 	}
 
 	case IOCTL_EVTCHN_BIND_UNBOUND_PORT: {
 		struct ioctl_evtchn_bind_unbound_port bind;
+		struct evtchn_alloc_unbound alloc_unbound;
 
 		rc = -EFAULT;
 		if (copy_from_user(&bind, uarg, sizeof(bind)))
 			break;
 
-		op.cmd = EVTCHNOP_alloc_unbound;
-		op.u.alloc_unbound.dom        = DOMID_SELF;
-		op.u.alloc_unbound.remote_dom = bind.remote_domain;
-		rc = HYPERVISOR_event_channel_op(&op);
+		alloc_unbound.dom        = DOMID_SELF;
+		alloc_unbound.remote_dom = bind.remote_domain;
+		rc = HYPERVISOR_event_channel_op(EVTCHNOP_alloc_unbound,
+						 &alloc_unbound);
 		if (rc != 0)
 			break;
 
-		rc = op.u.alloc_unbound.port;
+		rc = alloc_unbound.port;
 		evtchn_bind_to_user(u, rc);
 		break;
 	}
 
 	case IOCTL_EVTCHN_UNBIND: {
 		struct ioctl_evtchn_unbind unbind;
+		struct evtchn_close close;
 		int ret;
 
 		rc = -EFAULT;
@@ -291,9 +294,8 @@ static int evtchn_ioctl(struct inode *inode, struct file *file,
 
 		spin_unlock_irq(&port_user_lock);
 
-		op.cmd = EVTCHNOP_close;
-		op.u.close.port = unbind.port;
-		ret = HYPERVISOR_event_channel_op(&op);
+		close.port = unbind.port;
+		ret = HYPERVISOR_event_channel_op(EVTCHNOP_close, &close);
 		BUG_ON(ret);
 
 		rc = 0;
@@ -379,7 +381,7 @@ static int evtchn_release(struct inode *inode, struct file *filp)
 {
 	int i;
 	struct per_user_data *u = filp->private_data;
-	evtchn_op_t op = { 0 };
+	struct evtchn_close close;
 
 	spin_lock_irq(&port_user_lock);
 
@@ -393,9 +395,8 @@ static int evtchn_release(struct inode *inode, struct file *filp)
 		port_user[i] = NULL;
 		mask_evtchn(i);
 
-		op.cmd = EVTCHNOP_close;
-		op.u.close.port = i;
-		ret = HYPERVISOR_event_channel_op(&op);
+		close.port = i;
+		ret = HYPERVISOR_event_channel_op(EVTCHNOP_close, &close);
 		BUG_ON(ret);
 	}
 
@@ -406,7 +407,7 @@ static int evtchn_release(struct inode *inode, struct file *filp)
 	return 0;
 }
 
-static struct file_operations evtchn_fops = {
+static const struct file_operations evtchn_fops = {
 	.owner   = THIS_MODULE,
 	.read    = evtchn_read,
 	.write   = evtchn_write,
@@ -421,12 +422,14 @@ static struct miscdevice evtchn_miscdev = {
 	.minor        = EVTCHN_MINOR,
 	.name         = "evtchn",
 	.fops         = &evtchn_fops,
-	.devfs_name   = "misc/evtchn",
 };
 
 static int __init evtchn_init(void)
 {
 	int err;
+
+	if (!is_running_on_xen())
+		return -ENODEV;
 
 	spin_lock_init(&port_user_lock);
 	memset(port_user, 0, sizeof(port_user));
@@ -452,13 +455,3 @@ module_init(evtchn_init);
 module_exit(evtchn_cleanup);
 
 MODULE_LICENSE("Dual BSD/GPL");
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

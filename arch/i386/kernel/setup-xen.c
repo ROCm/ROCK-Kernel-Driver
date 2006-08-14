@@ -23,17 +23,17 @@
  * This file handles the architecture-dependent parts of initialization
  */
 
-#include <linux/config.h>
 #include <linux/sched.h>
 #include <linux/mm.h>
 #include <linux/mmzone.h>
-#include <linux/tty.h>
+#include <linux/screen_info.h>
 #include <linux/ioport.h>
 #include <linux/acpi.h>
 #include <linux/apm_bios.h>
 #include <linux/initrd.h>
 #include <linux/bootmem.h>
 #include <linux/seq_file.h>
+#include <linux/platform_device.h>
 #include <linux/console.h>
 #include <linux/mca.h>
 #include <linux/root_dev.h>
@@ -49,6 +49,7 @@
 #include <linux/kexec.h>
 #include <linux/crash_dump.h>
 #include <linux/dmi.h>
+#include <linux/pfn.h>
 
 #include <video/edid.h>
 
@@ -65,19 +66,11 @@
 #include <xen/interface/physdev.h>
 #include <xen/interface/memory.h>
 #include <xen/features.h>
-#include "setup_arch_pre.h"
+#include <setup_arch.h>
 #include <bios_ebda.h>
 
 /* Forward Declaration. */
 void __init find_max_pfn(void);
-
-/* Allows setting of maximum possible memory size  */
-static unsigned long xen_override_max_pfn;
-
-static int xen_panic_event(struct notifier_block *, unsigned long, void *);
-static struct notifier_block xen_panic_block = {
-	xen_panic_event, NULL, 0 /* try to go last */
-};
 
 extern char hypercall_page[PAGE_SIZE];
 EXPORT_SYMBOL(hypercall_page);
@@ -399,6 +392,26 @@ EXPORT_SYMBOL(phys_to_machine_mapping);
 start_info_t *xen_start_info;
 EXPORT_SYMBOL(xen_start_info);
 
+void __init add_memory_region(unsigned long long start,
+			      unsigned long long size, int type)
+{
+	int x;
+
+	if (!efi_enabled) {
+       		x = e820.nr_map;
+
+		if (x == E820MAX) {
+		    printk(KERN_ERR "Ooops! Too many entries in the memory map!\n");
+		    return;
+		}
+
+		e820.map[x].addr = start;
+		e820.map[x].size = size;
+		e820.map[x].type = type;
+		e820.nr_map++;
+	}
+} /* add_memory_region */
+
 static void __init limit_regions(unsigned long long size)
 {
 	unsigned long long current_addr = 0;
@@ -442,27 +455,20 @@ static void __init limit_regions(unsigned long long size)
 		}
 		return;
 	}
-}
-
-static void __init add_memory_region(unsigned long long start,
-                                  unsigned long long size, int type)
-{
-	int x;
-
-	if (!efi_enabled) {
-       		x = e820.nr_map;
-
-		if (x == E820MAX) {
-		    printk(KERN_ERR "Ooops! Too many entries in the memory map!\n");
-		    return;
-		}
-
-		e820.map[x].addr = start;
-		e820.map[x].size = size;
-		e820.map[x].type = type;
-		e820.nr_map++;
+#ifdef CONFIG_XEN
+	if (i==e820.nr_map && current_addr < size) {
+		/*
+                 * The e820 map finished before our requested size so
+                 * extend the final entry to the requested address.
+                 */
+		--i;
+		if (e820.map[i].type == E820_RAM)
+			e820.map[i].size -= current_addr - size;
+		else
+			add_memory_region(current_addr, size - current_addr, E820_RAM);
 	}
-} /* add_memory_region */
+#endif
+}
 
 #define E820_DEBUG	1
 
@@ -492,7 +498,6 @@ static void __init print_memory_map(char *who)
 	}
 }
 
-#if 0
 /*
  * Sanitize the BIOS e820 map.
  *
@@ -509,7 +514,7 @@ static struct change_member *change_point[2*E820MAX] __initdata;
 static struct e820entry *overlap_list[E820MAX] __initdata;
 static struct e820entry new_bios[E820MAX] __initdata;
 
-static int __init sanitize_e820_map(struct e820entry * biosmap, char * pnr_map)
+int __init sanitize_e820_map(struct e820entry * biosmap, char * pnr_map)
 {
 	struct change_member *change_tmp;
 	unsigned long current_type, last_type;
@@ -678,11 +683,15 @@ static int __init sanitize_e820_map(struct e820entry * biosmap, char * pnr_map)
  * thinkpad 560x, for example, does not cooperate with the memory
  * detection code.)
  */
-static int __init copy_e820_map(struct e820entry * biosmap, int nr_map)
+int __init copy_e820_map(struct e820entry * biosmap, int nr_map)
 {
+#ifndef CONFIG_XEN
 	/* Only one memory region (or negative)? Ignore it */
 	if (nr_map < 2)
 		return -1;
+#else
+	BUG_ON(nr_map < 1);
+#endif
 
 	do {
 		unsigned long long start = biosmap->addr;
@@ -694,6 +703,7 @@ static int __init copy_e820_map(struct e820entry * biosmap, int nr_map)
 		if (start > end)
 			return -1;
 
+#ifndef CONFIG_XEN
 		/*
 		 * Some BIOSes claim RAM in the 640k - 1M region.
 		 * Not right. Fix it up.
@@ -708,11 +718,11 @@ static int __init copy_e820_map(struct e820entry * biosmap, int nr_map)
 				size = end - start;
 			}
 		}
+#endif
 		add_memory_region(start, size, type);
 	} while (biosmap++,--nr_map);
 	return 0;
 }
-#endif
 
 #if defined(CONFIG_EDD) || defined(CONFIG_EDD_MODULE)
 struct edd edd;
@@ -736,12 +746,6 @@ static inline void copy_edd(void)
 {
 }
 #endif
-
-/*
- * Do NOT EVER look at the BIOS memory size location.
- * It does not work on many machines.
- */
-#define LOWMEMSIZE()	(0x9f000)
 
 static void __init parse_cmdline_early (char ** cmdline_p)
 {
@@ -785,13 +789,8 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 				unsigned long long mem_size;
  
 				mem_size = memparse(from+4, &from);
-#if 0
 				limit_regions(mem_size);
 				userdef=1;
-#else
-				xen_override_max_pfn =
-					(unsigned long)(mem_size>>PAGE_SHIFT);
-#endif
 			}
 		}
 
@@ -840,6 +839,8 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 		else if (!memcmp(from, "noexec=", 7))
 			noexec_setup(from + 7);
 
+		else if (!memcmp(from,"oops=panic", 10))
+			panic_on_oops = 1;
 
 #ifdef  CONFIG_X86_MPPARSE
 		/*
@@ -984,7 +985,6 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 	}
 }
 
-#if 0 /* !XEN */
 /*
  * Callback for efi_memory_walk.
  */
@@ -1006,6 +1006,74 @@ efi_memory_present_wrapper(unsigned long start, unsigned long end, void *arg)
 {
 	memory_present(0, start, end);
 	return 0;
+}
+
+#ifdef CONFIG_XEN_PRIVILEGED_GUEST
+static struct e820entry *__initdata machine_e820;
+static unsigned __initdata machine_e820_count;
+#endif
+
+ /*
+  * This function checks if the entire range <start,end> is mapped with type.
+  *
+  * Note: this function only works correct if the e820 table is sorted and
+  * not-overlapping, which is the case
+  */
+int __init
+e820_all_mapped(unsigned long s, unsigned long e, unsigned type)
+{
+#ifndef CONFIG_XEN
+	u64 start = s;
+	u64 end = e;
+	int i;
+	for (i = 0; i < e820.nr_map; i++) {
+		struct e820entry *ei = &e820.map[i];
+		if (type && ei->type != type)
+			continue;
+		/* is the region (part) in overlap with the current region ?*/
+		if (ei->addr >= end || ei->addr + ei->size <= start)
+			continue;
+		/* if the region is at the beginning of <start,end> we move
+		 * start to the end of the region since it's ok until there
+		 */
+		if (ei->addr <= start)
+			start = ei->addr + ei->size;
+		/* if start is now at or beyond end, we're done, full
+		 * coverage */
+		if (start >= end)
+			return 1; /* we're done */
+	}
+	return 0;
+#else
+#ifdef CONFIG_XEN_PRIVILEGED_GUEST
+	if (xen_start_info->flags & SIF_INITDOMAIN) {
+		u64 start = s;
+		u64 end = e;
+		unsigned i;
+
+		WARN_ON(!machine_e820);
+		for (i = 0; i < machine_e820_count; i++) {
+			const struct e820entry *ei = &machine_e820[i];
+
+			if (type && ei->type != type)
+				continue;
+			/* is the region (part) in overlap with the current region ?*/
+			if (ei->addr >= end || ei->addr + ei->size <= start)
+				continue;
+			/* if the region is at the beginning of <start,end> we move
+			 * start to the end of the region since it's ok until there
+			 */
+			if (ei->addr <= start)
+				start = ei->addr + ei->size;
+			/* if start is now at or beyond end, we're done, full
+			 * coverage */
+			if (start >= end)
+				return 1; /* we're done */
+		}
+	}
+#endif
+	return 0;
+#endif
 }
 
 /*
@@ -1036,21 +1104,6 @@ void __init find_max_pfn(void)
 		memory_present(0, start, end);
 	}
 }
-#else
-/* We don't use the fake e820 because we need to respond to user override. */
-void __init find_max_pfn(void)
-{
-	if (xen_override_max_pfn == 0) {
-		max_pfn = xen_start_info->nr_pages;
-		/* Default 8MB slack (to balance backend allocations). */
-		max_pfn += 8 << (20 - PAGE_SHIFT);
-	} else if (xen_override_max_pfn > xen_start_info->nr_pages) {
-		max_pfn = xen_override_max_pfn;
-	} else {
-		max_pfn = xen_start_info->nr_pages;
-	}
-}
-#endif /* XEN */
 
 /*
  * Determine low and high memory ranges:
@@ -1120,10 +1173,10 @@ static int __init
 free_available_memory(unsigned long start, unsigned long end, void *arg)
 {
 	/* check max_low_pfn */
-	if (start >= ((max_low_pfn + 1) << PAGE_SHIFT))
+	if (start >= (max_low_pfn << PAGE_SHIFT))
 		return 0;
-	if (end >= ((max_low_pfn + 1) << PAGE_SHIFT))
-		end = (max_low_pfn + 1) << PAGE_SHIFT;
+	if (end >= (max_low_pfn << PAGE_SHIFT))
+		end = max_low_pfn << PAGE_SHIFT;
 	if (start < end)
 		free_bootmem(start, end - start);
 
@@ -1157,6 +1210,15 @@ static void __init register_bootmem_low_pages(unsigned long max_low_pfn)
 		 * ... and at the end of the usable range downwards:
 		 */
 		last_pfn = PFN_DOWN(e820.map[i].addr + e820.map[i].size);
+
+#ifdef CONFIG_XEN
+		/*
+                 * Truncate to the number of actual pages currently
+                 * present.
+                 */
+		if (last_pfn > xen_start_info->nr_pages)
+			last_pfn = xen_start_info->nr_pages;
+#endif
 
 		if (last_pfn > max_low_pfn)
 			last_pfn = max_low_pfn;
@@ -1317,6 +1379,11 @@ void __init setup_bootmem_allocator(void)
 		}
 	}
 #endif
+#ifdef CONFIG_KEXEC
+	if (crashk_res.start != crashk_res.end)
+		reserve_bootmem(crashk_res.start,
+			crashk_res.end - crashk_res.start + 1);
+#endif
 
 	if (!xen_feature(XENFEAT_auto_translated_physmap))
 		phys_to_machine_mapping =
@@ -1346,83 +1413,37 @@ void __init remapped_pgdat_init(void)
  * and also for regions reported as reserved by the e820.
  */
 static void __init
-legacy_init_iomem_resources(struct resource *code_resource, struct resource *data_resource)
+legacy_init_iomem_resources(struct e820entry *e820, int nr_map,
+			    struct resource *code_resource,
+			    struct resource *data_resource)
 {
 	int i;
-#ifdef CONFIG_XEN
-	dom0_op_t op;
-	struct dom0_memory_map_entry *map;
-	unsigned long gapstart, gapsize;
-	unsigned long long last;
-#endif
 
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
+#if defined(CONFIG_XEN_PRIVILEGED_GUEST) || !defined(CONFIG_XEN)
 	probe_roms();
 #endif
 
-#ifdef CONFIG_XEN
-	map = alloc_bootmem_low_pages(PAGE_SIZE);
-	op.cmd = DOM0_PHYSICAL_MEMORY_MAP;
-	op.u.physical_memory_map.memory_map = map;
-	op.u.physical_memory_map.max_map_entries =
-		PAGE_SIZE / sizeof(struct dom0_memory_map_entry);
-	BUG_ON(HYPERVISOR_dom0_op(&op));
-
-	last = 0x100000000ULL;
-	gapstart = 0x10000000;
-	gapsize = 0x400000;
-
-	for (i = op.u.physical_memory_map.nr_map_entries - 1; i >= 0; i--) {
+	for (i = 0; i < nr_map; i++) {
 		struct resource *res;
-
-		if ((last > map[i].end) && ((last - map[i].end) > gapsize)) {
-			gapsize = last - map[i].end;
-			gapstart = map[i].end;
-		}
-		if (map[i].start < last)
-			last = map[i].start;
-
-		if (map[i].end > 0x100000000ULL)
+#ifndef CONFIG_RESOURCES_64BIT
+		if (e820[i].addr + e820[i].size > 0x100000000ULL)
 			continue;
-		res = alloc_bootmem_low(sizeof(struct resource));
-		res->name = map[i].is_ram ? "System RAM" : "reserved";
-		res->start = map[i].start;
-		res->end = map[i].end - 1;
-		res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
-		request_resource(&iomem_resource, res);
-	}
-
-	free_bootmem(__pa(map), PAGE_SIZE);
-
-	/*
-	 * Start allocating dynamic PCI memory a bit into the gap,
-	 * aligned up to the nearest megabyte.
-	 *
-	 * Question: should we try to pad it up a bit (do something
-	 * like " + (gapsize >> 3)" in there too?). We now have the
-	 * technology.
-	 */
-	pci_mem_start = (gapstart + 0xfffff) & ~0xfffff;
-
-	printk("Allocating PCI resources starting at %08lx (gap: %08lx:%08lx)\n",
-		pci_mem_start, gapstart, gapsize);
-#else
-	for (i = 0; i < e820.nr_map; i++) {
-		struct resource *res;
-		if (e820.map[i].addr + e820.map[i].size > 0x100000000ULL)
-			continue;
-		res = alloc_bootmem_low(sizeof(struct resource));
-		switch (e820.map[i].type) {
+#endif
+		res = kzalloc(sizeof(struct resource), GFP_ATOMIC);
+		switch (e820[i].type) {
 		case E820_RAM:	res->name = "System RAM"; break;
 		case E820_ACPI:	res->name = "ACPI Tables"; break;
 		case E820_NVS:	res->name = "ACPI Non-volatile Storage"; break;
 		default:	res->name = "reserved";
 		}
-		res->start = e820.map[i].addr;
-		res->end = res->start + e820.map[i].size - 1;
+		res->start = e820[i].addr;
+		res->end = res->start + e820[i].size - 1;
 		res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
-		request_resource(&iomem_resource, res);
-		if (e820.map[i].type == E820_RAM) {
+		if (request_resource(&iomem_resource, res)) {
+			kfree(res);
+			continue;
+		}
+		if (e820[i].type == E820_RAM) {
 			/*
 			 *  We don't know which RAM region contains kernel data,
 			 *  so we try it repeatedly and let the resource manager
@@ -1435,42 +1456,19 @@ legacy_init_iomem_resources(struct resource *code_resource, struct resource *dat
 #endif
 		}
 	}
-#endif
-#ifdef CONFIG_KEXEC
-	if (crashk_res.start != crashk_res.end)
-		reserve_bootmem(crashk_res.start,
-			crashk_res.end - crashk_res.start + 1);
-#endif
 }
 
 /*
- * Request address space for all standard resources
+ * Locate a unused range of the physical address space below 4G which
+ * can be used for PCI mappings.
  */
-static void __init register_memory(void)
+static void __init
+e820_setup_gap(struct e820entry *e820, int nr_map)
 {
-#ifndef CONFIG_XEN
 	unsigned long gapstart, gapsize, round;
 	unsigned long long last;
-#endif
-	int	      i;
+	int i;
 
-	/* Nothing to do if not running in dom0. */
-	if (!(xen_start_info->flags & SIF_INITDOMAIN))
-		return;
-
-	if (efi_enabled)
-		efi_initialize_iomem_resources(&code_resource, &data_resource);
-	else
-		legacy_init_iomem_resources(&code_resource, &data_resource);
-
-	/* EFI systems may still have VGA */
-	request_resource(&iomem_resource, &video_ram_resource);
-
-	/* request I/O space for devices used on all i[345]86 PCs */
-	for (i = 0; i < STANDARD_IO_RESOURCES; i++)
-		request_resource(&ioport_resource, &standard_io_resources[i]);
-
-#ifndef CONFIG_XEN
 	/*
 	 * Search for the bigest gap in the low 32 bits of the e820
 	 * memory space.
@@ -1478,10 +1476,10 @@ static void __init register_memory(void)
 	last = 0x100000000ull;
 	gapstart = 0x10000000;
 	gapsize = 0x400000;
-	i = e820.nr_map;
+	i = nr_map;
 	while (--i >= 0) {
-		unsigned long long start = e820.map[i].addr;
-		unsigned long long end = start + e820.map[i].size;
+		unsigned long long start = e820[i].addr;
+		unsigned long long end = start + e820[i].size;
 
 		/*
 		 * Since "last" is at most 4GB, we know we'll
@@ -1511,105 +1509,69 @@ static void __init register_memory(void)
 
 	printk("Allocating PCI resources starting at %08lx (gap: %08lx:%08lx)\n",
 		pci_mem_start, gapstart, gapsize);
-#endif
 }
 
-/* Use inline assembly to define this because the nops are defined 
-   as inline assembly strings in the include files and we cannot 
-   get them easily into strings. */
-asm("\t.data\nintelnops: " 
-    GENERIC_NOP1 GENERIC_NOP2 GENERIC_NOP3 GENERIC_NOP4 GENERIC_NOP5 GENERIC_NOP6
-    GENERIC_NOP7 GENERIC_NOP8); 
-asm("\t.data\nk8nops: " 
-    K8_NOP1 K8_NOP2 K8_NOP3 K8_NOP4 K8_NOP5 K8_NOP6
-    K8_NOP7 K8_NOP8); 
-asm("\t.data\nk7nops: " 
-    K7_NOP1 K7_NOP2 K7_NOP3 K7_NOP4 K7_NOP5 K7_NOP6
-    K7_NOP7 K7_NOP8); 
-    
-extern unsigned char intelnops[], k8nops[], k7nops[];
-static unsigned char *intel_nops[ASM_NOP_MAX+1] = { 
-     NULL,
-     intelnops,
-     intelnops + 1,
-     intelnops + 1 + 2,
-     intelnops + 1 + 2 + 3,
-     intelnops + 1 + 2 + 3 + 4,
-     intelnops + 1 + 2 + 3 + 4 + 5,
-     intelnops + 1 + 2 + 3 + 4 + 5 + 6,
-     intelnops + 1 + 2 + 3 + 4 + 5 + 6 + 7,
-}; 
-static unsigned char *k8_nops[ASM_NOP_MAX+1] = { 
-     NULL,
-     k8nops,
-     k8nops + 1,
-     k8nops + 1 + 2,
-     k8nops + 1 + 2 + 3,
-     k8nops + 1 + 2 + 3 + 4,
-     k8nops + 1 + 2 + 3 + 4 + 5,
-     k8nops + 1 + 2 + 3 + 4 + 5 + 6,
-     k8nops + 1 + 2 + 3 + 4 + 5 + 6 + 7,
-}; 
-static unsigned char *k7_nops[ASM_NOP_MAX+1] = { 
-     NULL,
-     k7nops,
-     k7nops + 1,
-     k7nops + 1 + 2,
-     k7nops + 1 + 2 + 3,
-     k7nops + 1 + 2 + 3 + 4,
-     k7nops + 1 + 2 + 3 + 4 + 5,
-     k7nops + 1 + 2 + 3 + 4 + 5 + 6,
-     k7nops + 1 + 2 + 3 + 4 + 5 + 6 + 7,
-}; 
-static struct nop { 
-     int cpuid; 
-     unsigned char **noptable; 
-} noptypes[] = { 
-     { X86_FEATURE_K8, k8_nops }, 
-     { X86_FEATURE_K7, k7_nops }, 
-     { -1, NULL }
-}; 
-
-/* Replace instructions with better alternatives for this CPU type.
-
-   This runs before SMP is initialized to avoid SMP problems with
-   self modifying code. This implies that assymetric systems where
-   APs have less capabilities than the boot processor are not handled. 
-   Tough. Make sure you disable such features by hand. */ 
-void apply_alternatives(void *start, void *end) 
-{ 
-	struct alt_instr *a; 
-	int diff, i, k;
-        unsigned char **noptable = intel_nops; 
-	for (i = 0; noptypes[i].cpuid >= 0; i++) { 
-		if (boot_cpu_has(noptypes[i].cpuid)) { 
-			noptable = noptypes[i].noptable;
-			break;
-		}
-	} 
-	for (a = start; (void *)a < end; a++) { 
-		if (!boot_cpu_has(a->cpuid))
-			continue;
-		BUG_ON(a->replacementlen > a->instrlen); 
-		memcpy(a->instr, a->replacement, a->replacementlen); 
-		diff = a->instrlen - a->replacementlen; 
-		/* Pad the rest with nops */
-		for (i = a->replacementlen; diff > 0; diff -= k, i += k) {
-			k = diff;
-			if (k > ASM_NOP_MAX)
-				k = ASM_NOP_MAX;
-			memcpy(a->instr + i, noptable[k], k); 
-		} 
-	}
-} 
-
-void __init alternative_instructions(void)
+/*
+ * Request address space for all standard resources
+ *
+ * This is called just before pcibios_init(), which is also a
+ * subsys_initcall, but is linked in later (in arch/i386/pci/common.c).
+ */
+static int __init request_standard_resources(void)
 {
-	extern struct alt_instr __alt_instructions[], __alt_instructions_end[];
-	apply_alternatives(__alt_instructions, __alt_instructions_end);
+	int i;
+
+	printk("Setting up standard PCI resources\n");
+	/* Nothing to do if not running in dom0. */
+	if (!(xen_start_info->flags & SIF_INITDOMAIN)) {
+		legacy_init_iomem_resources(e820.map, e820.nr_map,
+					    &code_resource, &data_resource);
+		return 0;
+	}
+
+#ifdef CONFIG_XEN_PRIVILEGED_GUEST
+	legacy_init_iomem_resources(machine_e820, machine_e820_count,
+				    &code_resource, &data_resource);
+#else
+	if (efi_enabled)
+		efi_initialize_iomem_resources(&code_resource, &data_resource);
+	else
+		legacy_init_iomem_resources(e820.map, e820.nr_map,
+					    &code_resource, &data_resource);
+#endif
+
+	/* EFI systems may still have VGA */
+	request_resource(&iomem_resource, &video_ram_resource);
+
+	/* request I/O space for devices used on all i[345]86 PCs */
+	for (i = 0; i < STANDARD_IO_RESOURCES; i++)
+		request_resource(&ioport_resource, &standard_io_resources[i]);
+	return 0;
 }
 
-static char * __init machine_specific_memory_setup(void);
+subsys_initcall(request_standard_resources);
+
+static void __init register_memory(void)
+{
+#ifdef CONFIG_XEN_PRIVILEGED_GUEST
+	if (xen_start_info->flags & SIF_INITDOMAIN) {
+		struct xen_memory_map memmap;
+
+		machine_e820 = alloc_bootmem_low_pages(PAGE_SIZE);
+
+		BUILD_BUG_ON(E820MAX * sizeof(*machine_e820) > PAGE_SIZE);
+		memmap.nr_entries = E820MAX;
+		set_xen_guest_handle(memmap.buffer, machine_e820);
+
+		BUG_ON(HYPERVISOR_memory_op(XENMEM_machine_memory_map, &memmap));
+
+		machine_e820_count = memmap.nr_entries;
+		e820_setup_gap(machine_e820, machine_e820_count);
+	}
+	else
+#endif
+		e820_setup_gap(e820.map, e820.nr_map);
+}
 
 #ifdef CONFIG_MCA
 static void set_mca_bus(int x)
@@ -1619,6 +1581,8 @@ static void set_mca_bus(int x)
 #else
 static void set_mca_bus(int x) { }
 #endif
+
+void init_cpu_khz(void);
 
 /*
  * Determine if we were loaded by an EFI loader.  If so, then we have also been
@@ -1630,16 +1594,8 @@ static void set_mca_bus(int x) { }
 void __init setup_arch(char **cmdline_p)
 {
 	int i, j, k, fpp;
-	physdev_op_t op;
+	struct physdev_set_iopl set_iopl;
 	unsigned long max_low_pfn;
-
-	/* Force a quick death if the kernel panics (not domain 0). */
-	extern int panic_timeout;
-	if (!panic_timeout && !(xen_start_info->flags & SIF_INITDOMAIN))
-		panic_timeout = 1;
-
-	/* Register a call for panic conditions. */
-	notifier_chain_register(&panic_notifier_list, &xen_panic_block);
 
 	HYPERVISOR_vm_assist(VMASST_CMD_enable, VMASST_TYPE_4gb_segments);
 	HYPERVISOR_vm_assist(VMASST_CMD_enable,
@@ -1716,13 +1672,22 @@ void __init setup_arch(char **cmdline_p)
 	init_mm.brk = (PFN_UP(__pa(xen_start_info->pt_base)) +
 		       xen_start_info->nr_pt_frames) << PAGE_SHIFT;
 
-	/* XEN: This is nonsense: kernel may not even be contiguous in RAM. */
-	/*code_resource.start = virt_to_phys(_text);*/
-	/*code_resource.end = virt_to_phys(_etext)-1;*/
-	/*data_resource.start = virt_to_phys(_etext);*/
-	/*data_resource.end = virt_to_phys(_edata)-1;*/
+	code_resource.start = virt_to_phys(_text);
+	code_resource.end = virt_to_phys(_etext)-1;
+	data_resource.start = virt_to_phys(_etext);
+	data_resource.end = virt_to_phys(_edata)-1;
 
 	parse_cmdline_early(cmdline_p);
+
+#ifdef CONFIG_EARLY_PRINTK
+	{
+		char *s = strstr(*cmdline_p, "earlyprintk=");
+		if (s) {
+			setup_early_printk(strchr(s, '=') + 1);
+			printk("early console enabled\n");
+		}
+	}
+#endif
 
 	max_low_pfn = setup_memory();
 
@@ -1762,7 +1727,7 @@ void __init setup_arch(char **cmdline_p)
 		       xen_start_info->nr_pages * sizeof(unsigned long));
 		free_bootmem(
 		     __pa(xen_start_info->mfn_list),
-		     PFN_PHYS(PFN_UP(xen_start_info->nr_pages *
+		     PFN_PHYS(PFN_UP((unsigned long long)xen_start_info->nr_pages *
 				     sizeof(unsigned long))));
 
 		/*
@@ -1794,18 +1759,6 @@ void __init setup_arch(char **cmdline_p)
 	 * NOTE: at this point the bootmem allocator is fully available.
 	 */
 
-#ifdef CONFIG_EARLY_PRINTK
-	{
-		char *s = strstr(*cmdline_p, "earlyprintk=");
-		if (s) {
-			extern void setup_early_printk(char *);
-
-			setup_early_printk(strchr(s, '=') + 1);
-			printk("early console enabled\n");
-		}
-	}
-#endif
-
 	if (xen_start_info->flags & SIF_INITDOMAIN)
 		dmi_scan_machine();
 
@@ -1815,13 +1768,8 @@ void __init setup_arch(char **cmdline_p)
 	if (efi_enabled)
 		efi_map_memmap();
 
-	op.cmd             = PHYSDEVOP_SET_IOPL;
-	op.u.set_iopl.iopl = 1;
-	HYPERVISOR_physdev_op(&op);
-
-#ifdef CONFIG_X86_IO_APIC
-	check_acpi_pci();	/* Checks more than just ACPI actually */
-#endif
+	set_iopl.iopl = 1;
+	HYPERVISOR_physdev_op(PHYSDEVOP_set_iopl, &set_iopl);
 
 #ifdef CONFIG_ACPI
 	if (!(xen_start_info->flags & SIF_INITDOMAIN)) {
@@ -1834,6 +1782,13 @@ void __init setup_arch(char **cmdline_p)
 	 * Parse the ACPI tables for possible boot-time SMP configuration.
 	 */
 	acpi_boot_table_init();
+#endif
+
+#ifdef CONFIG_X86_IO_APIC
+	check_acpi_pci();	/* Checks more than just ACPI actually */
+#endif
+
+#ifdef CONFIG_ACPI
 	acpi_boot_init();
 
 #if defined(CONFIG_SMP) && defined(CONFIG_X86_PC)
@@ -1847,10 +1802,9 @@ void __init setup_arch(char **cmdline_p)
 	if (smp_found_config)
 		get_smp_config();
 #endif
-
-	/* XXX Disable irqdebug until we have a way to avoid interrupt
-	 * conflicts. */
-	noirqdebug_setup("");
+#if defined(CONFIG_XEN) && defined(CONFIG_SMP)
+	prefill_possible_map();
+#endif
 
 	register_memory();
 
@@ -1872,17 +1826,30 @@ void __init setup_arch(char **cmdline_p)
 		extern int console_use_vt;
 		console_use_vt = 0;
 	}
+
+	init_cpu_khz();
 }
 
-static int
-xen_panic_event(struct notifier_block *this, unsigned long event, void *ptr)
+static __init int add_pcspkr(void)
 {
-	HYPERVISOR_shutdown(SHUTDOWN_crash);
-	/* we're never actually going to get here... */
-	return NOTIFY_DONE;
-}
+	struct platform_device *pd;
+	int ret;
 
-#include "setup_arch_post.h"
+	if (!(xen_start_info->flags & SIF_INITDOMAIN))
+		return 0;
+
+	pd = platform_device_alloc("pcspkr", -1);
+	if (!pd)
+		return -ENOMEM;
+
+	ret = platform_device_add(pd);
+	if (ret)
+		platform_device_put(pd);
+
+	return ret;
+}
+device_initcall(add_pcspkr);
+
 /*
  * Local Variables:
  * mode:c

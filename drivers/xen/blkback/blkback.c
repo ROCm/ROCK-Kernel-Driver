@@ -82,7 +82,7 @@ typedef struct {
 
 static pending_req_t *pending_reqs;
 static struct list_head pending_free;
-static spinlock_t pending_free_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(pending_free_lock);
 static DECLARE_WAIT_QUEUE_HEAD(pending_free_wq);
 
 #define BLKBACK_INVALID_HANDLE (~0)
@@ -105,24 +105,12 @@ static inline unsigned long vaddr(pending_req_t *req, int seg)
 	(pending_grant_handles[vaddr_pagenr(_req, _seg)])
 
 
-#ifdef CONFIG_XEN_BLKDEV_TAP_BE
-/*
- * If the tap driver is used, we may get pages belonging to either the tap
- * or (more likely) the real frontend.  The backend must specify which domain
- * a given page belongs to in update_va_mapping though.  For the moment, 
- * the tap rewrites the ID field of the request to contain the request index
- * and the id of the real front end domain.
- */
-#define BLKTAP_COOKIE 0xbeadfeed
-static inline domid_t ID_TO_DOM(unsigned long id) { return (id >> 16); }
-#endif
-
 static int do_block_io_op(blkif_t *blkif);
 static void dispatch_rw_block_io(blkif_t *blkif,
 				 blkif_request_t *req,
 				 pending_req_t *pending_req);
 static void make_response(blkif_t *blkif, unsigned long id, 
-                          unsigned short op, int st);
+			  unsigned short op, int st);
 
 /******************************************************************
  * misc small helpers
@@ -186,9 +174,8 @@ static void fast_flush_area(pending_req_t *req)
 		handle = pending_handle(req, i);
 		if (handle == BLKBACK_INVALID_HANDLE)
 			continue;
-		unmap[invcount].host_addr    = vaddr(req, i);
-		unmap[invcount].dev_bus_addr = 0;
-		unmap[invcount].handle       = handle;
+		gnttab_set_unmap_op(&unmap[i], vaddr(req, i), GNTMAP_host_map,
+				    handle);
 		pending_handle(req, i) = BLKBACK_INVALID_HANDLE;
 		invcount++;
 	}
@@ -225,16 +212,16 @@ int blkif_schedule(void *arg)
 	while (!kthread_should_stop()) {
 		wait_event_interruptible(
 			blkif->wq,
-			atomic_read(&blkif->io_pending) ||
-			kthread_should_stop());
+			blkif->waiting_reqs || kthread_should_stop());
 		wait_event_interruptible(
 			pending_free_wq,
-			!list_empty(&pending_free) ||
-			kthread_should_stop());
+			!list_empty(&pending_free) || kthread_should_stop());
 
-		atomic_set(&blkif->io_pending, 0);
+		blkif->waiting_reqs = 0;
+		smp_mb(); /* clear flag *before* checking for work */
+
 		if (do_block_io_op(blkif))
-			atomic_inc(&blkif->io_pending);
+			blkif->waiting_reqs = 1;
 		unplug_queue(blkif);
 
 		if (log_stats && time_after(jiffies, blkif->st_print))
@@ -287,12 +274,15 @@ static int end_block_io_op(struct bio *bio, unsigned int done, int error)
  * NOTIFICATION FROM GUEST OS.
  */
 
+static void blkif_notify_work(blkif_t *blkif)
+{
+	blkif->waiting_reqs = 1;
+	wake_up(&blkif->wq);
+}
+
 irqreturn_t blkif_be_int(int irq, void *dev_id, struct pt_regs *regs)
 {
-	blkif_t *blkif = dev_id;
-
-	atomic_inc(&blkif->io_pending);
-	wake_up(&blkif->wq);
+	blkif_notify_work(dev_id);
 	return IRQ_HANDLED;
 }
 
@@ -381,6 +371,8 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 	pending_req->nr_pages  = nseg;
 
 	for (i = 0; i < nseg; i++) {
+		uint32_t flags;
+
 		seg[i].nsec = req->seg[i].last_sect -
 			req->seg[i].first_sect + 1;
 
@@ -389,12 +381,11 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 			goto fail_response;
 		preq.nr_sects += seg[i].nsec;
 
-		map[i].host_addr = vaddr(pending_req, i);
-		map[i].dom = blkif->domid;
-		map[i].ref = req->seg[i].gref;
-		map[i].flags = GNTMAP_host_map;
+		flags = GNTMAP_host_map;
 		if ( operation == WRITE )
-			map[i].flags |= GNTMAP_readonly;
+			flags |= GNTMAP_readonly;
+		gnttab_set_map_op(&map[i], vaddr(pending_req, i), flags,
+				  req->seg[i].gref, blkif->domid);
 	}
 
 	ret = HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, map, nseg);
@@ -407,7 +398,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 		}
 
 		pending_handle(pending_req, i) = map[i].handle;
-#ifdef __ia64__
+#ifdef CONFIG_XEN_IA64_DOM0_NON_VP
 		pending_vaddrs[vaddr_pagenr(pending_req, i)] =
 			(unsigned long)gnttab_map_vaddr(map[i]);
 #else
@@ -443,7 +434,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 			bio = biolist[nbio++] = bio_alloc(GFP_KERNEL, nseg-i);
 			if (unlikely(bio == NULL))
 				goto fail_put_bio;
-                
+
 			bio->bi_bdev    = preq.bdev;
 			bio->bi_private = pending_req;
 			bio->bi_end_io  = end_block_io_op;
@@ -480,7 +471,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 
 
 static void make_response(blkif_t *blkif, unsigned long id, 
-                          unsigned short op, int st)
+			  unsigned short op, int st)
 {
 	blkif_response_t *resp;
 	unsigned long     flags;
@@ -512,10 +503,8 @@ static void make_response(blkif_t *blkif, unsigned long id,
 	}
 	spin_unlock_irqrestore(&blkif->blk_ring_lock, flags);
 
-	if (more_to_do) {
-		atomic_inc(&blkif->io_pending);
-		wake_up(&blkif->wq);
-	}
+	if (more_to_do)
+		blkif_notify_work(blkif);
 	if (notify)
 		notify_remote_via_irq(blkif->irq);
 }
@@ -525,7 +514,7 @@ static int __init blkif_init(void)
 	struct page *page;
 	int i;
 
-	if (xen_init() < 0)
+	if (!is_running_on_xen())
 		return -ENODEV;
 
 	mmap_pages            = blkif_reqs * BLKIF_MAX_SEGMENTS_PER_REQUEST;
@@ -545,7 +534,7 @@ static int __init blkif_init(void)
 
 	blkif_interface_init();
 	
-#ifdef __ia64__
+#ifdef CONFIG_XEN_IA64_DOM0_NON_VP
 	extern unsigned long alloc_empty_foreign_map_page_range(
 		unsigned long pages);
 	mmap_vstart = (unsigned long)
@@ -570,27 +559,10 @@ static int __init blkif_init(void)
 		list_add_tail(&pending_reqs[i].free_list, &pending_free);
     
 	blkif_xenbus_init();
-	__unsafe(THIS_MODULE);
+
 	return 0;
 }
 
 module_init(blkif_init);
 
-static void blkif_exit(void)
-{
-	BUG();
-}
-
-module_exit(blkif_exit);
-
 MODULE_LICENSE("Dual BSD/GPL");
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

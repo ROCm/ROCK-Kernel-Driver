@@ -226,7 +226,7 @@ EXPORT_SYMBOL(physmem_forget_descriptor);
 EXPORT_SYMBOL(physmem_remove_mapping);
 EXPORT_SYMBOL(physmem_subst_mapping);
 
-void arch_free_page(struct page *page, int order)
+int arch_free_page(struct page *page, int order)
 {
 	void *virt;
 	int i;
@@ -235,6 +235,8 @@ void arch_free_page(struct page *page, int order)
 		virt = __va(page_to_phys(page + i));
 		physmem_remove_mapping(virt);
 	}
+
+	return 0;
 }
 
 int is_remapped(void *virt)

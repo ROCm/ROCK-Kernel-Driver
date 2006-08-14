@@ -40,6 +40,8 @@
 #include <linux/errno.h>
 #include <xen/interface/xen.h>
 #include <xen/interface/dom0_ops.h>
+#include <xen/interface/event_channel.h>
+#include <xen/interface/physdev.h>
 #include <xen/interface/sched.h>
 #include <xen/interface/nmi.h>
 #include <asm/ptrace.h>
@@ -116,7 +118,7 @@ u64 jiffies_to_st(unsigned long jiffies);
 #define MULTI_UVMDOMID_INDEX 4
 #endif
 
-#define xen_init()	(0)
+#define is_running_on_xen() 1
 
 static inline int
 HYPERVISOR_yield(
@@ -162,14 +164,14 @@ static inline int
 HYPERVISOR_poll(
 	evtchn_port_t *ports, unsigned int nr_ports, u64 timeout)
 {
+	int rc;
 	struct sched_poll sched_poll = {
-		.ports = ports,
 		.nr_ports = nr_ports,
 		.timeout = jiffies_to_st(timeout)
 	};
+	set_xen_guest_handle(sched_poll.ports, ports);
 
-	int rc = HYPERVISOR_sched_op(SCHEDOP_poll, &sched_poll);
-
+	rc = HYPERVISOR_sched_op(SCHEDOP_poll, &sched_poll);
 	if (rc == -ENOSYS)
 		rc = HYPERVISOR_sched_op_compat(SCHEDOP_yield, 0);
 
@@ -185,16 +187,14 @@ MULTI_update_va_mapping(
     mcl->args[0] = va;
 #if defined(CONFIG_X86_64)
     mcl->args[1] = new_val.pte;
-    mcl->args[2] = flags;
 #elif defined(CONFIG_X86_PAE)
     mcl->args[1] = new_val.pte_low;
     mcl->args[2] = new_val.pte_high;
-    mcl->args[3] = flags;
 #else
     mcl->args[1] = new_val.pte_low;
     mcl->args[2] = 0;
-    mcl->args[3] = flags;
 #endif
+    mcl->args[MULTI_UVMFLAGS_INDEX] = flags;
 }
 
 static inline void
@@ -206,19 +206,15 @@ MULTI_update_va_mapping_otherdomain(
     mcl->args[0] = va;
 #if defined(CONFIG_X86_64)
     mcl->args[1] = new_val.pte;
-    mcl->args[2] = flags;
-    mcl->args[3] = domid;
 #elif defined(CONFIG_X86_PAE)
     mcl->args[1] = new_val.pte_low;
     mcl->args[2] = new_val.pte_high;
-    mcl->args[3] = flags;
-    mcl->args[4] = domid;
 #else
     mcl->args[1] = new_val.pte_low;
     mcl->args[2] = 0;
-    mcl->args[3] = flags;
-    mcl->args[4] = domid;
 #endif
+    mcl->args[MULTI_UVMFLAGS_INDEX] = flags;
+    mcl->args[MULTI_UVMDOMID_INDEX] = domid;
 }
 
 #endif /* __HYPERVISOR_H__ */

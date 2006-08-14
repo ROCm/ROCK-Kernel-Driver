@@ -65,7 +65,6 @@
 #include "mach_time.h"
 
 #include <linux/timex.h>
-#include <linux/config.h>
 
 #include <asm/hpet.h>
 
@@ -96,18 +95,6 @@ extern unsigned long wall_jiffies;
 
 DEFINE_SPINLOCK(rtc_lock);
 EXPORT_SYMBOL(rtc_lock);
-
-#if defined (__i386__)
-#include <asm/i8253.h>
-#endif
-
-DEFINE_SPINLOCK(i8253_lock);
-EXPORT_SYMBOL(i8253_lock);
-
-extern struct init_timer_opts timer_tsc_init;
-extern struct timer_opts timer_tsc;
-#define timer_none timer_tsc
-struct timer_opts *cur_timer __read_mostly = &timer_tsc;
 
 /* These are peridically updated in shared_info, and then copied here. */
 struct shadow_time_info {
@@ -166,23 +153,7 @@ static int __init __permitted_clock_jitter(char *str)
 }
 __setup("permitted_clock_jitter=", __permitted_clock_jitter);
 
-int tsc_disable __devinitdata = 0;
-
-static void delay_tsc(unsigned long loops)
-{
-	unsigned long bclock, now;
-
-	rdtscl(bclock);
-	do {
-		rep_nop();
-		rdtscl(now);
-	} while ((now - bclock) < loops);
-}
-
-struct timer_opts timer_tsc = {
-	.name = "tsc",
-	.delay = delay_tsc,
-};
+int tsc_disable __cpuinitdata = 0;
 
 /*
  * Scale a 64-bit delta by scaling and multiplying by a 32-bit fraction,
@@ -220,14 +191,6 @@ static inline u64 scale_delta(u64 delta, u32 mul_frac, int shift)
 	return product;
 }
 
-#if defined (__i386__)
-int read_current_timer(unsigned long *timer_val)
-{
-	rdtscl(*timer_val);
-	return 0;
-}
-#endif
-
 void init_cpu_khz(void)
 {
 	u64 __cpu_khz = 1000000ULL << 32;
@@ -248,6 +211,7 @@ static u64 get_nsec_offset(struct shadow_time_info *shadow)
 	return scale_delta(delta, shadow->tsc_to_nsec_mul, shadow->tsc_shift);
 }
 
+#ifdef CONFIG_X86_64
 static unsigned long get_usec_offset(struct shadow_time_info *shadow)
 {
 	u64 now, delta;
@@ -255,6 +219,7 @@ static unsigned long get_usec_offset(struct shadow_time_info *shadow)
 	delta = now - shadow->tsc_timestamp;
 	return scale_delta(delta, shadow->tsc_to_usec_mul, shadow->tsc_shift);
 }
+#endif
 
 static void __update_wallclock(time_t sec, long nsec)
 {
@@ -364,6 +329,8 @@ void rtc_cmos_write(unsigned char val, unsigned char addr)
 	lock_cmos_suffix(addr);
 }
 EXPORT_SYMBOL(rtc_cmos_write);
+
+#ifdef CONFIG_X86_64
 
 /*
  * This version of gettimeofday has microsecond resolution
@@ -494,6 +461,8 @@ int do_settimeofday(struct timespec *tv)
 
 EXPORT_SYMBOL(do_settimeofday);
 
+#endif
+
 static void sync_xen_wallclock(unsigned long dummy);
 static DEFINE_TIMER(sync_xen_wallclock_timer, sync_xen_wallclock, 0, 0);
 static void sync_xen_wallclock(unsigned long dummy)
@@ -529,28 +498,32 @@ static void sync_xen_wallclock(unsigned long dummy)
 static int set_rtc_mmss(unsigned long nowtime)
 {
 	int retval;
-
-	WARN_ON(irqs_disabled());
+	unsigned long flags;
 
 	if (independent_wallclock || !(xen_start_info->flags & SIF_INITDOMAIN))
 		return 0;
 
 	/* gets recalled with irq locally disabled */
-	spin_lock_irq(&rtc_lock);
+	/* XXX - does irqsave resolve this? -johnstul */
+	spin_lock_irqsave(&rtc_lock, flags);
 	if (efi_enabled)
 		retval = efi_set_rtc_mmss(nowtime);
 	else
 		retval = mach_set_rtc_mmss(nowtime);
-	spin_unlock_irq(&rtc_lock);
+	spin_unlock_irqrestore(&rtc_lock, flags);
 
 	return retval;
 }
 
+#ifdef CONFIG_X86_64
 /* monotonic_clock(): returns # of nanoseconds passed since time_init()
  *		Note: This function is required to return accurate
  *		time even in the absence of multiple timer ticks.
  */
 unsigned long long monotonic_clock(void)
+#else
+unsigned long long sched_clock(void)
+#endif
 {
 	int cpu = get_cpu();
 	struct shadow_time_info *shadow = &per_cpu(shadow_time, cpu);
@@ -570,12 +543,14 @@ unsigned long long monotonic_clock(void)
 
 	return time;
 }
+#ifdef CONFIG_X86_64
 EXPORT_SYMBOL(monotonic_clock);
 
 unsigned long long sched_clock(void)
 {
 	return monotonic_clock();
 }
+#endif
 
 #if defined(CONFIG_SMP) && defined(CONFIG_FRAME_POINTER)
 unsigned long profile_pc(struct pt_regs *regs)
@@ -589,7 +564,7 @@ unsigned long profile_pc(struct pt_regs *regs)
 	   is just accounted to the spinlock function.
 	   Better would be to write these functions in assembler again
 	   and check exactly. */
-	if (in_lock_functions(pc)) {
+	if (!user_mode(regs) && in_lock_functions(pc)) {
 		char *v = *(char **)regs->rsp;
 		if ((v >= _stext && v <= _etext) ||
 			(v >= _sinittext && v <= _einittext) ||
@@ -598,7 +573,7 @@ unsigned long profile_pc(struct pt_regs *regs)
 		return ((unsigned long *)regs->rsp)[1];
 	}
 #else
-	if (in_lock_functions(pc))
+	if (!user_mode_vm(regs) && in_lock_functions(pc))
 		return *(unsigned long *)(regs->ebp + 4);
 #endif
 
@@ -705,7 +680,7 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	if (delta_cpu > 0) {
 		do_div(delta_cpu, NS_PER_TICK);
 		per_cpu(processed_system_time, cpu) += delta_cpu * NS_PER_TICK;
-		if (user_mode(regs))
+		if (user_mode_vm(regs))
 			account_user_time(current, (cputime_t)delta_cpu);
 		else
 			account_system_time(current, HARDIRQ_OFFSET,
@@ -715,7 +690,7 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	/* Local timer processing (see update_process_times()). */
 	run_local_timers();
 	if (rcu_pending(cpu))
-		rcu_check_callbacks(cpu, user_mode(regs));
+		rcu_check_callbacks(cpu, user_mode_vm(regs));
 	scheduler_tick();
 	run_posix_cpu_timers(current);
 
@@ -743,15 +718,16 @@ static void init_missing_ticks_accounting(int cpu)
 unsigned long get_cmos_time(void)
 {
 	unsigned long retval;
+	unsigned long flags;
 
-	spin_lock(&rtc_lock);
+	spin_lock_irqsave(&rtc_lock, flags);
 
 	if (efi_enabled)
 		retval = efi_get_time();
 	else
 		retval = mach_get_cmos_time();
 
-	spin_unlock(&rtc_lock);
+	spin_unlock_irqrestore(&rtc_lock, flags);
 
 	return retval;
 }
@@ -809,7 +785,6 @@ void notify_arch_cmos_timer(void)
 
 static long clock_cmos_diff, sleep_start;
 
-static struct timer_opts *last_timer;
 static int timer_suspend(struct sys_device *dev, pm_message_t state)
 {
 	/*
@@ -818,10 +793,6 @@ static int timer_suspend(struct sys_device *dev, pm_message_t state)
 	clock_cmos_diff = -get_cmos_time();
 	clock_cmos_diff += get_seconds();
 	sleep_start = get_cmos_time();
-	last_timer = cur_timer;
-	cur_timer = &timer_none;
-	if (last_timer->suspend)
-		last_timer->suspend(state);
 	return 0;
 }
 
@@ -843,10 +814,6 @@ static int timer_resume(struct sys_device *dev)
 	jiffies_64 += sleep_length;
 	wall_jiffies += sleep_length;
 	write_sequnlock_irqrestore(&xtime_lock, flags);
-	if (last_timer->resume)
-		last_timer->resume();
-	cur_timer = last_timer;
-	last_timer = NULL;
 	touch_softlockup_watchdog();
 	return 0;
 }
@@ -887,9 +854,6 @@ static void __init hpet_time_init(void)
 	if ((hpet_enable() >= 0) && hpet_use_timer) {
 		printk("Using HPET for base-timer\n");
 	}
-
-	cur_timer = select_timer();
-	printk(KERN_INFO "Using %s for high-res timesource\n",cur_timer->name);
 
 	time_init_hook();
 }
@@ -958,11 +922,17 @@ u64 jiffies_to_st(unsigned long j)
 	do {
 		seq = read_seqbegin(&xtime_lock);
 		delta = j - jiffies;
-		/* NB. The next check can trigger in some wrap-around cases,
-		 * but that's ok: we'll just end up with a shorter timeout. */
-		if (delta < 1)
-			delta = 1;
-		st = processed_system_time + (delta * (u64)NS_PER_TICK);
+		if (delta < 1) {
+			/* Triggers in some wrap-around cases, but that's okay:
+			 * we just end up with a shorter timeout. */
+			st = processed_system_time + NS_PER_TICK;
+		} else if (((unsigned long)delta >> (BITS_PER_LONG-3)) != 0) {
+			/* Very long timeout means there is no pending timer.
+			 * We indicate this to Xen by passing zero timeout. */
+			st = 0;
+		} else {
+			st = processed_system_time + delta * (u64)NS_PER_TICK;
+		}
 	} while (read_seqretry(&xtime_lock, seq));
 
 	return st;
@@ -973,30 +943,53 @@ EXPORT_SYMBOL(jiffies_to_st);
  * stop_hz_timer / start_hz_timer - enter/exit 'tickless mode' on an idle cpu
  * These functions are based on implementations from arch/s390/kernel/time.c
  */
-void stop_hz_timer(void)
+static void stop_hz_timer(void)
 {
 	unsigned int cpu = smp_processor_id();
 	unsigned long j;
 
-	/* We must do this /before/ checking rcu_pending(). */
 	cpu_set(cpu, nohz_cpu_mask);
+
+	/* See matching smp_mb in rcu_start_batch in rcupdate.c.  These mbs  */
+	/* ensure that if __rcu_pending (nested in rcu_needs_cpu) fetches a  */
+	/* value of rcp->cur that matches rdp->quiescbatch and allows us to  */
+	/* stop the hz timer then the cpumasks created for subsequent values */
+	/* of cur in rcu_start_batch are guaranteed to pick up the updated   */
+	/* nohz_cpu_mask and so will not depend on this cpu.                 */
+
 	smp_mb();
 
-	/* Leave ourselves in 'tick mode' if rcu or softirq pending. */
-	if (rcu_pending(cpu) || local_softirq_pending()) {
+	/* Leave ourselves in tick mode if rcu or softirq or timer pending. */
+	if (rcu_needs_cpu(cpu) || local_softirq_pending() ||
+	    (j = next_timer_interrupt(), time_before_eq(j, jiffies))) {
 		cpu_clear(cpu, nohz_cpu_mask);
 		j = jiffies + 1;
-	} else {
-		j = next_timer_interrupt();
 	}
 
-	BUG_ON(HYPERVISOR_set_timer_op(jiffies_to_st(j)) != 0);
+	if (HYPERVISOR_set_timer_op(jiffies_to_st(j)) != 0)
+		BUG();
 }
 
-void start_hz_timer(void)
+static void start_hz_timer(void)
 {
 	cpu_clear(smp_processor_id(), nohz_cpu_mask);
 }
+
+void raw_safe_halt(void)
+{
+	stop_hz_timer();
+	/* Blocking includes an implicit local_irq_enable(). */
+	HYPERVISOR_block();
+	start_hz_timer();
+}
+EXPORT_SYMBOL(raw_safe_halt);
+
+void halt(void)
+{
+	if (irqs_disabled())
+		HYPERVISOR_vcpu_op(VCPUOP_down, smp_processor_id(), NULL);
+}
+EXPORT_SYMBOL(halt);
 
 /* No locking required. We are only CPU running, and interrupts are off. */
 void time_resume(void)
@@ -1048,6 +1041,49 @@ void local_teardown_timer(unsigned int cpu)
 }
 #endif
 
+#ifndef CONFIG_X86_64
+
+#include <linux/clocksource.h>
+
+void mark_tsc_unstable(void)
+{
+#ifndef CONFIG_XEN /* XXX Should tell the hypervisor about this fact. */
+	tsc_unstable = 1;
+#endif
+}
+EXPORT_SYMBOL_GPL(mark_tsc_unstable);
+
+static cycle_t read_tsc(void)
+{
+	cycle_t ret;
+
+	rdtscll(ret);
+
+	return ret;
+}
+
+static struct clocksource clocksource_xen = {
+	.name			= "xen",
+	.rating			= 300,
+	.read			= read_tsc,
+	.mask			= CLOCKSOURCE_MASK(64),
+	.mult			= 0, /* to be set */
+	.shift			= 22,
+	.is_continuous		= 1,
+};
+
+static int __init init_xen_clocksource(void)
+{
+	clocksource_xen.mult = clocksource_khz2mult(cpu_khz,
+						clocksource_xen.shift);
+
+	return clocksource_register(&clocksource_xen);
+}
+
+module_init(init_xen_clocksource);
+
+#endif
+
 /*
  * /proc/sys/xen: This really belongs in another file. It can stay here for
  * now however.
@@ -1085,13 +1121,3 @@ static int __init xen_sysctl_init(void)
 	return 0;
 }
 __initcall(xen_sysctl_init);
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

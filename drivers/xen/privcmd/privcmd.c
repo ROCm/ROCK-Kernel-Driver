@@ -35,11 +35,11 @@
 static struct proc_dir_entry *privcmd_intf;
 static struct proc_dir_entry *capabilities_intf;
 
-#define NR_HYPERCALLS 32
+#define NR_HYPERCALLS 64
 static DECLARE_BITMAP(hypercall_permission_map, NR_HYPERCALLS);
 
 static int privcmd_ioctl(struct inode *inode, struct file *file,
-                         unsigned int cmd, unsigned long data)
+			 unsigned int cmd, unsigned long data)
 {
 	int ret = -ENOSYS;
 	void __user *udata = (void __user *) data;
@@ -61,11 +61,11 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 		__asm__ __volatile__ (
 			"pushl %%ebx; pushl %%ecx; pushl %%edx; "
 			"pushl %%esi; pushl %%edi; "
-			"movl  4(%%eax),%%ebx ;"
-			"movl  8(%%eax),%%ecx ;"
-			"movl 12(%%eax),%%edx ;"
-			"movl 16(%%eax),%%esi ;"
-			"movl 20(%%eax),%%edi ;"
+			"movl  8(%%eax),%%ebx ;"
+			"movl 16(%%eax),%%ecx ;"
+			"movl 24(%%eax),%%edx ;"
+			"movl 32(%%eax),%%esi ;"
+			"movl 40(%%eax),%%edi ;"
 			"movl   (%%eax),%%eax ;"
 			"shll $5,%%eax ;"
 			"addl $hypercall_page,%%eax ;"
@@ -159,12 +159,10 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 	break;
 
 	case IOCTL_PRIVCMD_MMAPBATCH: {
-		mmu_update_t u;
 		privcmd_mmapbatch_t m;
 		struct vm_area_struct *vma = NULL;
-		unsigned long __user *p;
+		xen_pfn_t __user *p;
 		unsigned long addr, mfn; 
-		uint64_t ptep;
 		int i;
 
 		if (copy_from_user(&m, udata, sizeof(m))) {
@@ -198,26 +196,12 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 		for (i = 0; i < m.num; i++, addr += PAGE_SIZE, p++) {
 			if (get_user(mfn, p))
 				return -EFAULT;
-#ifdef __ia64__
-			ret = remap_pfn_range(vma,
-					      addr&PAGE_MASK,
-					      mfn,
-					      1<<PAGE_SHIFT,
-					      vma->vm_page_prot);
+
+			ret = direct_remap_pfn_range(vma, addr & PAGE_MASK,
+						     mfn, PAGE_SIZE,
+						     vma->vm_page_prot, m.dom);
 			if (ret < 0)
-			    goto batch_err;
-#else
-
-			ret = create_lookup_pte_addr(vma->vm_mm, addr, &ptep);
-			if (ret)
-				goto batch_err;
-
-			u.val = pte_val_ma(pfn_pte_ma(mfn, vma->vm_page_prot));
-			u.ptr = ptep;
-
-			if (HYPERVISOR_mmu_update(&u, 1, NULL, m.dom) < 0)
 				put_user(0xF0000000 | mfn, p);
-#endif
 		}
 
 		ret = 0;
@@ -226,7 +210,7 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 	batch_err:
 		printk("batch_err ret=%d vma=%p addr=%lx "
 		       "num=%d arr=%p %lx-%lx\n", 
-		       ret, vma, m.addr, m.num, m.arr,
+		       ret, vma, (unsigned long)m.addr, m.num, m.arr,
 		       vma ? vma->vm_start : 0, vma ? vma->vm_end : 0);
 		break;
 	}
@@ -241,6 +225,7 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 	return ret;
 }
 
+#ifndef HAVE_ARCH_PRIVCMD_MMAP
 static int privcmd_mmap(struct file * file, struct vm_area_struct * vma)
 {
 	/* DONTCOPY is essential for Xen as copy_page_range is broken. */
@@ -248,14 +233,15 @@ static int privcmd_mmap(struct file * file, struct vm_area_struct * vma)
 
 	return 0;
 }
+#endif
 
-static struct file_operations privcmd_file_ops = {
+static const struct file_operations privcmd_file_ops = {
 	.ioctl = privcmd_ioctl,
 	.mmap  = privcmd_mmap,
 };
 
 static int capabilities_read(char *page, char **start, off_t off,
-                        int count, int *eof, void *data)
+			     int count, int *eof, void *data)
 {
 	int len = 0;
 	*page = 0;
@@ -269,6 +255,9 @@ static int capabilities_read(char *page, char **start, off_t off,
 
 static int __init privcmd_init(void)
 {
+	if (!is_running_on_xen())
+		return -ENODEV;
+
 	/* Set of hypercalls that privileged applications may execute. */
 	set_bit(__HYPERVISOR_acm_op,           hypercall_permission_map);
 	set_bit(__HYPERVISOR_dom0_op,          hypercall_permission_map);
@@ -277,6 +266,11 @@ static int __init privcmd_init(void)
 	set_bit(__HYPERVISOR_mmu_update,       hypercall_permission_map);
 	set_bit(__HYPERVISOR_mmuext_op,        hypercall_permission_map);
 	set_bit(__HYPERVISOR_xen_version,      hypercall_permission_map);
+	set_bit(__HYPERVISOR_sched_op,         hypercall_permission_map);
+	set_bit(__HYPERVISOR_sched_op_compat,  hypercall_permission_map);
+	set_bit(__HYPERVISOR_event_channel_op_compat,
+		hypercall_permission_map);
+	set_bit(__HYPERVISOR_hvm_op,           hypercall_permission_map);
 
 	privcmd_intf = create_xen_proc_entry("privcmd", 0400);
 	if (privcmd_intf != NULL)
@@ -290,13 +284,3 @@ static int __init privcmd_init(void)
 }
 
 __initcall(privcmd_init);
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

@@ -38,19 +38,16 @@
 /* Based on Rusty Russell's skeleton driver's map_page */
 struct vm_struct *xenbus_map_ring_valloc(struct xenbus_device *dev, int gnt_ref)
 {
-	struct gnttab_map_grant_ref op = {
-		.flags = GNTMAP_host_map,
-		.ref   = gnt_ref,
-		.dom   = dev->otherend_id,
-	};
+	struct gnttab_map_grant_ref op;
 	struct vm_struct *area;
 
 	area = alloc_vm_area(PAGE_SIZE);
 	if (!area)
 		return ERR_PTR(-ENOMEM);
 
-	op.host_addr = (unsigned long)area->addr;
-
+	gnttab_set_map_op(&op, (unsigned long)area->addr, GNTMAP_host_map,
+			  gnt_ref, dev->otherend_id);
+	
 	lock_vm_area(area);
 	BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1));
 	unlock_vm_area(area);
@@ -75,13 +72,10 @@ EXPORT_SYMBOL_GPL(xenbus_map_ring_valloc);
 int xenbus_map_ring(struct xenbus_device *dev, int gnt_ref,
 		   grant_handle_t *handle, void *vaddr)
 {
-	struct gnttab_map_grant_ref op = {
-		.host_addr = (unsigned long)vaddr,
-		.flags     = GNTMAP_host_map,
-		.ref       = gnt_ref,
-		.dom       = dev->otherend_id,
-	};
-
+	struct gnttab_map_grant_ref op;
+	
+	gnttab_set_map_op(&op, (unsigned long)vaddr, GNTMAP_host_map,
+			  gnt_ref, dev->otherend_id);
 	BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1));
 
 	if (op.status != GNTST_okay) {
@@ -99,10 +93,10 @@ EXPORT_SYMBOL_GPL(xenbus_map_ring);
 /* Based on Rusty Russell's skeleton driver's unmap_page */
 int xenbus_unmap_ring_vfree(struct xenbus_device *dev, struct vm_struct *area)
 {
-	struct gnttab_unmap_grant_ref op = {
-		.host_addr = (unsigned long)area->addr,
-		.handle = (grant_handle_t)area->phys_addr
-	};
+	struct gnttab_unmap_grant_ref op;
+
+	gnttab_set_unmap_op(&op, (unsigned long)area->addr, GNTMAP_host_map,
+			    (grant_handle_t)area->phys_addr);
 
 	lock_vm_area(area);
 	BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1));
@@ -123,11 +117,10 @@ EXPORT_SYMBOL_GPL(xenbus_unmap_ring_vfree);
 int xenbus_unmap_ring(struct xenbus_device *dev,
 		     grant_handle_t handle, void *vaddr)
 {
-	struct gnttab_unmap_grant_ref op = {
-		.host_addr = (unsigned long)vaddr,
-		.handle    = handle,
-	};
+	struct gnttab_unmap_grant_ref op;
 
+	gnttab_set_unmap_op(&op, (unsigned long)vaddr, GNTMAP_host_map,
+			    handle);
 	BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1));
 
 	if (op.status != GNTST_okay)
@@ -139,13 +132,4 @@ int xenbus_unmap_ring(struct xenbus_device *dev,
 }
 EXPORT_SYMBOL_GPL(xenbus_unmap_ring);
 
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */
+MODULE_LICENSE("Dual BSD/GPL");

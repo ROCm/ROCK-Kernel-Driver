@@ -3,8 +3,6 @@
  *
  *  Copyright (C) 2000 Andrea Arcangeli <andrea@suse.de> SuSE
  *
- *  $Id: head64.c,v 1.22 2001/07/06 14:28:20 ak Exp $
- *
  *  Jun Nakajima <jun.nakajima@intel.com>
  *	Modified for Xen.
  */
@@ -15,6 +13,7 @@
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <linux/percpu.h>
+#include <linux/module.h>
 
 #include <asm/processor.h>
 #include <asm/proto.h>
@@ -92,8 +91,16 @@ static void __init setup_boot_cpu_data(void)
 	boot_cpu_data.x86_mask = eax & 0xf;
 }
 
+#include <xen/interface/memory.h>
+unsigned long *machine_to_phys_mapping;
+EXPORT_SYMBOL(machine_to_phys_mapping);
+unsigned int machine_to_phys_order;
+EXPORT_SYMBOL(machine_to_phys_order);
+
 void __init x86_64_start_kernel(char * real_mode_data)
 {
+	struct xen_machphys_mapping mapping;
+	unsigned long machine_to_phys_nr_ents;
 	char *s;
 	int i;
 
@@ -105,11 +112,26 @@ void __init x86_64_start_kernel(char * real_mode_data)
 			xen_start_info->nr_pt_frames;
 	}
 
+
+	machine_to_phys_mapping = (unsigned long *)MACH2PHYS_VIRT_START;
+	machine_to_phys_nr_ents = MACH2PHYS_NR_ENTRIES;
+	if (HYPERVISOR_memory_op(XENMEM_machphys_mapping, &mapping) == 0) {
+		machine_to_phys_mapping = (unsigned long *)mapping.v_start;
+		machine_to_phys_nr_ents = mapping.max_mfn + 1;
+	}
+	while ((1UL << machine_to_phys_order) < machine_to_phys_nr_ents )
+		machine_to_phys_order++;
+
 #if 0
 	for (i = 0; i < 256; i++)
 		set_intr_gate(i, early_idt_handler);
 	asm volatile("lidt %0" :: "m" (idt_descr));
 #endif
+
+	/*
+	 * This must be called really, really early:
+	 */
+	lockdep_init();
 
  	for (i = 0; i < NR_CPUS; i++)
  		cpu_pda(i) = &boot_cpu_pda[i];

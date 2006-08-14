@@ -32,7 +32,7 @@
 #include <linux/miscdevice.h>
 #include <linux/spinlock.h>
 #include <linux/mm.h>
-#include <linux/syscalls.h>
+#include <linux/mutex.h>
 
 #include <asm/msr.h>
 #include <asm/uaccess.h>
@@ -49,32 +49,34 @@ MODULE_LICENSE("GPL");
 #define DEFAULT_UCODE_TOTALSIZE (DEFAULT_UCODE_DATASIZE + MC_HEADER_SIZE) /* 2048 bytes */
 
 /* no concurrent ->write()s are allowed on /dev/cpu/microcode */
-static DECLARE_MUTEX(microcode_sem);
+static DEFINE_MUTEX(microcode_mutex);
 
-static void __user *user_buffer;	/* user area microcode data buffer */
-static unsigned int user_buffer_size;	/* it's size */
-				
 static int microcode_open (struct inode *unused1, struct file *unused2)
 {
 	return capable(CAP_SYS_RAWIO) ? 0 : -EPERM;
 }
 
 
-static int do_microcode_update (void)
+static int do_microcode_update (const void __user *ubuf, size_t len)
 {
 	int err;
-	dom0_op_t op;
+	void *kbuf;
 
-	err = sys_mlock((unsigned long)user_buffer, user_buffer_size);
-	if (err != 0)
-		return err;
+	kbuf = vmalloc(len);
+	if (!kbuf)
+		return -ENOMEM;
 
-	op.cmd = DOM0_MICROCODE;
-	op.u.microcode.data = user_buffer;
-	op.u.microcode.length = user_buffer_size;
-	err = HYPERVISOR_dom0_op(&op);
+	if (copy_from_user(kbuf, ubuf, len) == 0) {
+		dom0_op_t op;
 
-	(void)sys_munlock((unsigned long)user_buffer, user_buffer_size);
+		op.cmd = DOM0_MICROCODE;
+		set_xen_guest_handle(op.u.microcode.data, kbuf);
+		op.u.microcode.length = len;
+		err = HYPERVISOR_dom0_op(&op);
+	} else
+		err = -EFAULT;
+
+	vfree(kbuf);
 
 	return err;
 }
@@ -88,52 +90,26 @@ static ssize_t microcode_write (struct file *file, const char __user *buf, size_
 		return -EINVAL;
 	}
 
-	if ((len >> PAGE_SHIFT) > num_physpages) {
-		printk(KERN_ERR "microcode: too much data (max %ld pages)\n", num_physpages);
-		return -EINVAL;
-	}
+	mutex_lock(&microcode_mutex);
 
-	down(&microcode_sem);
-
-	user_buffer = (void __user *) buf;
-	user_buffer_size = (int) len;
-
-	ret = do_microcode_update();
+	ret = do_microcode_update(buf, len);
 	if (!ret)
 		ret = (ssize_t)len;
 
-	up(&microcode_sem);
+	mutex_unlock(&microcode_mutex);
 
 	return ret;
-}
-
-static int microcode_ioctl (struct inode *inode, struct file *file, 
-		unsigned int cmd, unsigned long arg)
-{
-	switch (cmd) {
-		/* 
-		 *  XXX: will be removed after microcode_ctl 
-		 *  is updated to ignore failure of this ioctl()
-		 */
-		case MICROCODE_IOCFREE:
-			return 0;
-		default:
-			return -EINVAL;
-	}
-	return -EINVAL;
 }
 
 static struct file_operations microcode_fops = {
 	.owner		= THIS_MODULE,
 	.write		= microcode_write,
-	.ioctl		= microcode_ioctl,
 	.open		= microcode_open,
 };
 
 static struct miscdevice microcode_dev = {
 	.minor		= MICROCODE_MINOR,
 	.name		= "microcode",
-	.devfs_name	= "cpu/microcode",
 	.fops		= &microcode_fops,
 };
 
@@ -157,7 +133,6 @@ static int __init microcode_init (void)
 static void __exit microcode_exit (void)
 {
 	misc_deregister(&microcode_dev);
-	printk(KERN_INFO "IA-32 Microcode Update Driver v" MICROCODE_VERSION " unregistered\n");
 }
 
 module_init(microcode_init)

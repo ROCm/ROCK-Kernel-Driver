@@ -88,7 +88,7 @@ static void fd_disable_dma(void)
 
 static int fd_request_irq(void)
 {
-	return request_irq(FLOPPY_IRQ, floppy_hardint,SA_INTERRUPT,
+	return request_irq(FLOPPY_IRQ, floppy_hardint, IRQF_DISABLED,
 					   "floppy", NULL);
 }
 

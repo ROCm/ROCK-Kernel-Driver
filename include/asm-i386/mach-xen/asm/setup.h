@@ -6,9 +6,7 @@
 #ifndef _i386_SETUP_H
 #define _i386_SETUP_H
 
-#define PFN_UP(x)	(((x) + PAGE_SIZE-1) >> PAGE_SHIFT)
-#define PFN_DOWN(x)	((x) >> PAGE_SHIFT)
-#define PFN_PHYS(x)	((unsigned long long)(x) << PAGE_SHIFT)
+#include <linux/pfn.h>
 
 /*
  * Reserved space for vmalloc and iomap - defined in asm/page.h
@@ -60,6 +58,22 @@ extern unsigned char boot_params[PARAM_SIZE];
 #define EDD_MBR_SIG_NR (*(unsigned char *) (PARAM+EDD_MBR_SIG_NR_BUF))
 #define EDD_MBR_SIGNATURE ((unsigned int *) (PARAM+EDD_MBR_SIG_BUF))
 #define EDD_BUF     ((struct edd_info *) (PARAM+EDDBUF))
+
+/*
+ * Do NOT EVER look at the BIOS memory size location.
+ * It does not work on many machines.
+ */
+#define LOWMEMSIZE()	(0x9f000)
+
+struct e820entry;
+
+char * __init machine_specific_memory_setup(void);
+void __init machine_specific_arch_setup(void);
+
+int __init copy_e820_map(struct e820entry * biosmap, int nr_map);
+int __init sanitize_e820_map(struct e820entry * biosmap, char * pnr_map);
+void __init add_memory_region(unsigned long long start,
+			      unsigned long long size, int type);
 
 #endif /* __ASSEMBLY__ */
 

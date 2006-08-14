@@ -15,6 +15,8 @@
 #include "arch-x86_64.h"
 #elif defined(__ia64__)
 #include "arch-ia64.h"
+#elif defined(__powerpc__)
+#include "arch-powerpc.h"
 #else
 #error "Unsupported architecture"
 #endif
@@ -37,7 +39,7 @@
 #define __HYPERVISOR_stack_switch          3
 #define __HYPERVISOR_set_callbacks         4
 #define __HYPERVISOR_fpu_taskswitch        5
-#define __HYPERVISOR_sched_op_compat       6 /* compat as of 0x00030101 */
+#define __HYPERVISOR_sched_op_compat       6 /* compat since 0x00030101 */
 #define __HYPERVISOR_dom0_op               7
 #define __HYPERVISOR_set_debugreg          8
 #define __HYPERVISOR_get_debugreg          9
@@ -46,10 +48,10 @@
 #define __HYPERVISOR_multicall            13
 #define __HYPERVISOR_update_va_mapping    14
 #define __HYPERVISOR_set_timer_op         15
-#define __HYPERVISOR_event_channel_op     16
+#define __HYPERVISOR_event_channel_op_compat 16 /* compat since 0x00030202 */
 #define __HYPERVISOR_xen_version          17
 #define __HYPERVISOR_console_io           18
-#define __HYPERVISOR_physdev_op           19
+#define __HYPERVISOR_physdev_op_compat    19 /* compat since 0x00030202 */
 #define __HYPERVISOR_grant_table_op       20
 #define __HYPERVISOR_vm_assist            21
 #define __HYPERVISOR_update_va_mapping_otherdomain 22
@@ -60,18 +62,51 @@
 #define __HYPERVISOR_acm_op               27
 #define __HYPERVISOR_nmi_op               28
 #define __HYPERVISOR_sched_op             29
+#define __HYPERVISOR_callback_op          30
+#define __HYPERVISOR_xenoprof_op          31
+#define __HYPERVISOR_event_channel_op     32
+#define __HYPERVISOR_physdev_op           33
+#define __HYPERVISOR_hvm_op               34
+
+/* Architecture-specific hypercall definitions. */
+#define __HYPERVISOR_arch_0               48
+#define __HYPERVISOR_arch_1               49
+#define __HYPERVISOR_arch_2               50
+#define __HYPERVISOR_arch_3               51
+#define __HYPERVISOR_arch_4               52
+#define __HYPERVISOR_arch_5               53
+#define __HYPERVISOR_arch_6               54
+#define __HYPERVISOR_arch_7               55
 
 /* 
  * VIRTUAL INTERRUPTS
  * 
  * Virtual interrupts that a guest OS may receive from Xen.
+ * 
+ * In the side comments, 'V.' denotes a per-VCPU VIRQ while 'G.' denotes a
+ * global VIRQ. The former can be bound once per VCPU and cannot be re-bound.
+ * The latter can be allocated only once per guest: they must initially be
+ * allocated to VCPU0 but can subsequently be re-bound.
  */
-#define VIRQ_TIMER      0  /* Timebase update, and/or requested timeout.  */
-#define VIRQ_DEBUG      1  /* Request guest to dump debug info.           */
-#define VIRQ_CONSOLE    2  /* (DOM0) Bytes received on emergency console. */
-#define VIRQ_DOM_EXC    3  /* (DOM0) Exceptional event for some domain.   */
-#define VIRQ_DEBUGGER   6  /* (DOM0) A domain has paused for debugging.   */
-#define NR_VIRQS        8
+#define VIRQ_TIMER      0  /* V. Timebase update, and/or requested timeout.  */
+#define VIRQ_DEBUG      1  /* V. Request guest to dump debug info.           */
+#define VIRQ_CONSOLE    2  /* G. (DOM0) Bytes received on emergency console. */
+#define VIRQ_DOM_EXC    3  /* G. (DOM0) Exceptional event for some domain.   */
+#define VIRQ_TBUF       4  /* G. (DOM0) Trace buffer has records available.  */
+#define VIRQ_DEBUGGER   6  /* G. (DOM0) A domain has paused for debugging.   */
+#define VIRQ_XENOPROF   7  /* V. XenOprofile interrupt: new sample available */
+
+/* Architecture-specific VIRQ definitions. */
+#define VIRQ_ARCH_0    16
+#define VIRQ_ARCH_1    17
+#define VIRQ_ARCH_2    18
+#define VIRQ_ARCH_3    19
+#define VIRQ_ARCH_4    20
+#define VIRQ_ARCH_5    21
+#define VIRQ_ARCH_6    22
+#define VIRQ_ARCH_7    23
+
+#define NR_VIRQS       24
 
 /*
  * MMU-UPDATE REQUESTS
@@ -161,11 +196,11 @@
 #define MMUEXT_NEW_USER_BASEPTR 15
 
 #ifndef __ASSEMBLY__
-typedef struct mmuext_op {
+struct mmuext_op {
     unsigned int cmd;
     union {
         /* [UN]PIN_TABLE, NEW_BASEPTR, NEW_USER_BASEPTR */
-        unsigned long mfn;
+        xen_pfn_t     mfn;
         /* INVLPG_LOCAL, INVLPG_ALL, SET_LDT */
         unsigned long linear_addr;
     } arg1;
@@ -175,8 +210,9 @@ typedef struct mmuext_op {
         /* TLB_FLUSH_MULTI, INVLPG_MULTI */
         void *vcpumask;
     } arg2;
-} mmuext_op_t;
-DEFINE_GUEST_HANDLE(mmuext_op_t);
+};
+typedef struct mmuext_op mmuext_op_t;
+DEFINE_XEN_GUEST_HANDLE(mmuext_op_t);
 #endif
 
 /* These are passed as 'flags' to update_va_mapping. They can be ORed. */
@@ -201,10 +237,24 @@ DEFINE_GUEST_HANDLE(mmuext_op_t);
  */
 #define VMASST_CMD_enable                0
 #define VMASST_CMD_disable               1
+
+/* x86/32 guests: simulate full 4GB segment limits. */
 #define VMASST_TYPE_4gb_segments         0
+
+/* x86/32 guests: trap (vector 15) whenever above vmassist is used. */
 #define VMASST_TYPE_4gb_segments_notify  1
+
+/*
+ * x86 guests: support writes to bottom-level PTEs.
+ * NB1. Page-directory entries cannot be written.
+ * NB2. Guest must continue to remove all writable mappings of PTEs.
+ */
 #define VMASST_TYPE_writable_pagetables  2
-#define MAX_VMASST_TYPE 2
+
+/* x86/PAE guests: support PDPTs above 4GB. */
+#define VMASST_TYPE_pae_extended_cr3     3
+
+#define MAX_VMASST_TYPE                  3
 
 #ifndef __ASSEMBLY__
 
@@ -239,21 +289,23 @@ typedef uint16_t domid_t;
  * Send an array of these to HYPERVISOR_mmu_update().
  * NB. The fields are natural pointer/address size for this architecture.
  */
-typedef struct mmu_update {
+struct mmu_update {
     uint64_t ptr;       /* Machine address of PTE. */
     uint64_t val;       /* New contents of PTE.    */
-} mmu_update_t;
-DEFINE_GUEST_HANDLE(mmu_update_t);
+};
+typedef struct mmu_update mmu_update_t;
+DEFINE_XEN_GUEST_HANDLE(mmu_update_t);
 
 /*
  * Send an array of these to HYPERVISOR_multicall().
  * NB. The fields are natural register size for this architecture.
  */
-typedef struct multicall_entry {
+struct multicall_entry {
     unsigned long op, result;
     unsigned long args[6];
-} multicall_entry_t;
-DEFINE_GUEST_HANDLE(multicall_entry_t);
+};
+typedef struct multicall_entry multicall_entry_t;
+DEFINE_XEN_GUEST_HANDLE(multicall_entry_t);
 
 /*
  * Event channel endpoints per domain:
@@ -261,7 +313,7 @@ DEFINE_GUEST_HANDLE(multicall_entry_t);
  */
 #define NR_EVENT_CHANNELS (sizeof(unsigned long) * sizeof(unsigned long) * 64)
 
-typedef struct vcpu_time_info {
+struct vcpu_time_info {
     /*
      * Updates to the following values are preceded and followed by an
      * increment of 'version'. The guest can therefore detect updates by
@@ -277,16 +329,18 @@ typedef struct vcpu_time_info {
     uint64_t system_time;     /* Time, in nanosecs, since boot.    */
     /*
      * Current system time:
-     *   system_time + ((tsc - tsc_timestamp) << tsc_shift) * tsc_to_system_mul
+     *   system_time +
+     *   ((((tsc - tsc_timestamp) << tsc_shift) * tsc_to_system_mul) >> 32)
      * CPU frequency (Hz):
      *   ((10^9 << 32) / tsc_to_system_mul) >> tsc_shift
      */
     uint32_t tsc_to_system_mul;
     int8_t   tsc_shift;
     int8_t   pad1[3];
-} vcpu_time_info_t; /* 32 bytes */
+}; /* 32 bytes */
+typedef struct vcpu_time_info vcpu_time_info_t;
 
-typedef struct vcpu_info {
+struct vcpu_info {
     /*
      * 'evtchn_upcall_pending' is written non-zero by Xen to indicate
      * a pending notification for a particular VCPU. It is then cleared 
@@ -315,16 +369,17 @@ typedef struct vcpu_info {
     uint8_t evtchn_upcall_pending;
     uint8_t evtchn_upcall_mask;
     unsigned long evtchn_pending_sel;
-    arch_vcpu_info_t arch;
-    vcpu_time_info_t time;
-} vcpu_info_t; /* 64 bytes (x86) */
+    struct arch_vcpu_info arch;
+    struct vcpu_time_info time;
+}; /* 64 bytes (x86) */
+typedef struct vcpu_info vcpu_info_t;
 
 /*
  * Xen/kernel shared data -- pointer provided in start_info.
  * NB. We expect that this struct is smaller than a page.
  */
-typedef struct shared_info {
-    vcpu_info_t vcpu_info[MAX_VIRT_CPUS];
+struct shared_info {
+    struct vcpu_info vcpu_info[MAX_VIRT_CPUS];
 
     /*
      * A domain can create "event channels" on which it can send and receive
@@ -368,17 +423,10 @@ typedef struct shared_info {
     uint32_t wc_sec;          /* Secs  00:00:00 UTC, Jan 1, 1970.  */
     uint32_t wc_nsec;         /* Nsecs 00:00:00 UTC, Jan 1, 1970.  */
 
-    arch_shared_info_t arch;
+    struct arch_shared_info arch;
 
-    /*
-     * Indicator which PIRQs are shared with other domains, allowing the guest
-     * to not consider respective interrupts spurious even if no handler claims
-     * them, while still being able to detect spurious occurrences of un-shared
-     * interrupts.
-     */
-    unsigned long pirq_shared[256 / (8 * sizeof(unsigned long))];
-
-} shared_info_t;
+};
+typedef struct shared_info shared_info_t;
 
 /*
  * Start-of-day memory layout for the initial domain (DOM0):
@@ -406,15 +454,15 @@ typedef struct shared_info {
  */
 
 #define MAX_GUEST_CMDLINE 1024
-typedef struct start_info {
+struct start_info {
     /* THE FOLLOWING ARE FILLED IN BOTH ON INITIAL BOOT AND ON RESUME.    */
     char magic[32];             /* "xen-<version>-<platform>".            */
     unsigned long nr_pages;     /* Total pages allocated to this domain.  */
     unsigned long shared_info;  /* MACHINE address of shared info struct. */
     uint32_t flags;             /* SIF_xxx flags.                         */
-    unsigned long store_mfn;    /* MACHINE page number of shared page.    */
+    xen_pfn_t store_mfn;        /* MACHINE page number of shared page.    */
     uint32_t store_evtchn;      /* Event channel for store communication. */
-    unsigned long console_mfn;  /* MACHINE address of console page.       */
+    xen_pfn_t console_mfn;      /* MACHINE page number of console page.   */
     uint32_t console_evtchn;    /* Event channel for console messages.    */
     /* THE FOLLOWING ARE ONLY FILLED IN ON INITIAL BOOT (NOT RESUME).     */
     unsigned long pt_base;      /* VIRTUAL address of page directory.     */
@@ -423,7 +471,8 @@ typedef struct start_info {
     unsigned long mod_start;    /* VIRTUAL address of pre-loaded module.  */
     unsigned long mod_len;      /* Size (bytes) of pre-loaded module.     */
     int8_t cmd_line[MAX_GUEST_CMDLINE];
-} start_info_t;
+};
+typedef struct start_info start_info_t;
 
 /* These flags are passed in the 'flags' field of start_info_t. */
 #define SIF_PRIVILEGED    (1<<0)  /* Is the domain privileged? */

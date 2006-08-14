@@ -32,10 +32,11 @@
 
 #include "common.h"
 #include <xen/evtchn.h>
+#include <linux/kthread.h>
 
 static kmem_cache_t *blkif_cachep;
 
-blkif_t *alloc_blkif(domid_t domid)
+blkif_t *blkif_alloc(domid_t domid)
 {
 	blkif_t *blkif;
 
@@ -45,11 +46,11 @@ blkif_t *alloc_blkif(domid_t domid)
 
 	memset(blkif, 0, sizeof(*blkif));
 	blkif->domid = domid;
-	blkif->status = DISCONNECTED;
 	spin_lock_init(&blkif->blk_ring_lock);
 	atomic_set(&blkif->refcnt, 1);
 	init_waitqueue_head(&blkif->wq);
 	blkif->st_print = jiffies;
+	init_waitqueue_head(&blkif->waiting_to_free);
 
 	return blkif;
 }
@@ -59,10 +60,8 @@ static int map_frontend_page(blkif_t *blkif, unsigned long shared_page)
 	struct gnttab_map_grant_ref op;
 	int ret;
 
-	op.host_addr = (unsigned long)blkif->blk_ring_area->addr;
-	op.flags     = GNTMAP_host_map;
-	op.ref       = shared_page;
-	op.dom       = blkif->domid;
+	gnttab_set_map_op(&op, (unsigned long)blkif->blk_ring_area->addr,
+			  GNTMAP_host_map, shared_page, blkif->domid);
 
 	lock_vm_area(blkif->blk_ring_area);
 	ret = HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1);
@@ -77,7 +76,7 @@ static int map_frontend_page(blkif_t *blkif, unsigned long shared_page)
 	blkif->shmem_ref = shared_page;
 	blkif->shmem_handle = op.handle;
 
-#ifdef __ia64__
+#ifdef CONFIG_XEN_IA64_DOM0_NON_VP
 	/* on some arch's, map_grant_ref behaves like mmap, in that the
 	 * passed address is a hint and a different address may be returned */
 	blkif->blk_ring_area->addr = gnttab_map_vaddr(op);
@@ -91,9 +90,8 @@ static void unmap_frontend_page(blkif_t *blkif)
 	struct gnttab_unmap_grant_ref op;
 	int ret;
 
-	op.host_addr    = (unsigned long)blkif->blk_ring_area->addr;
-	op.handle       = blkif->shmem_handle;
-	op.dev_bus_addr = 0;
+	gnttab_set_unmap_op(&op, (unsigned long)blkif->blk_ring_area->addr,
+			    GNTMAP_host_map, blkif->shmem_handle);
 
 	lock_vm_area(blkif->blk_ring_area);
 	ret = HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1);
@@ -105,10 +103,7 @@ int blkif_map(blkif_t *blkif, unsigned long shared_page, unsigned int evtchn)
 {
 	blkif_sring_t *sring;
 	int err;
-	evtchn_op_t op = {
-		.cmd = EVTCHNOP_bind_interdomain,
-		.u.bind_interdomain.remote_dom = blkif->domid,
-		.u.bind_interdomain.remote_port = evtchn };
+	struct evtchn_bind_interdomain bind_interdomain;
 
 	/* Already connected through? */
 	if (blkif->irq)
@@ -123,14 +118,18 @@ int blkif_map(blkif_t *blkif, unsigned long shared_page, unsigned int evtchn)
 		return err;
 	}
 
-	err = HYPERVISOR_event_channel_op(&op);
+	bind_interdomain.remote_dom  = blkif->domid;
+	bind_interdomain.remote_port = evtchn;
+
+	err = HYPERVISOR_event_channel_op(EVTCHNOP_bind_interdomain,
+					  &bind_interdomain);
 	if (err) {
 		unmap_frontend_page(blkif);
 		free_vm_area(blkif->blk_ring_area);
 		return err;
 	}
 
-	blkif->evtchn = op.u.bind_interdomain.local_port;
+	blkif->evtchn = bind_interdomain.local_port;
 
 	sring = (blkif_sring_t *)blkif->blk_ring_area->addr;
 	BACK_RING_INIT(&blkif->blk_ring, sring, PAGE_SIZE);
@@ -138,37 +137,37 @@ int blkif_map(blkif_t *blkif, unsigned long shared_page, unsigned int evtchn)
 	blkif->irq = bind_evtchn_to_irqhandler(
 		blkif->evtchn, blkif_be_int, 0, "blkif-backend", blkif);
 
-	/* We're potentially connected now */
-	update_blkif_status(blkif); 
-
 	return 0;
 }
 
-static void free_blkif(void *arg)
+void blkif_disconnect(blkif_t *blkif)
 {
-	blkif_t *blkif = (blkif_t *)arg;
+	if (blkif->xenblkd) {
+		kthread_stop(blkif->xenblkd);
+		blkif->xenblkd = NULL;
+	}
 
-	/* Already disconnected? */
+	atomic_dec(&blkif->refcnt);
+	wait_event(blkif->waiting_to_free, atomic_read(&blkif->refcnt) == 0);
+	atomic_inc(&blkif->refcnt);
+
 	if (blkif->irq) {
 		unbind_from_irqhandler(blkif->irq, blkif);
 		blkif->irq = 0;
 	}
-
-	vbd_free(&blkif->vbd);
 
 	if (blkif->blk_ring.sring) {
 		unmap_frontend_page(blkif);
 		free_vm_area(blkif->blk_ring_area);
 		blkif->blk_ring.sring = NULL;
 	}
-
-	kmem_cache_free(blkif_cachep, blkif);
 }
 
-void free_blkif_callback(blkif_t *blkif)
+void blkif_free(blkif_t *blkif)
 {
-	INIT_WORK(&blkif->free_work, free_blkif, (void *)blkif);
-	schedule_work(&blkif->free_work);
+	if (!atomic_dec_and_test(&blkif->refcnt))
+		BUG();
+	kmem_cache_free(blkif_cachep, blkif);
 }
 
 void __init blkif_interface_init(void)
@@ -176,13 +175,3 @@ void __init blkif_interface_init(void)
 	blkif_cachep = kmem_cache_create("blkif_cache", sizeof(blkif_t), 
 					 0, 0, NULL, NULL);
 }
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

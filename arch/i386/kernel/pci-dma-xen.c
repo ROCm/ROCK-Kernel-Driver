@@ -69,7 +69,7 @@ dma_map_sg(struct device *hwdev, struct scatterlist *sg, int nents,
 	} else {
 		for (i = 0; i < nents; i++ ) {
 			sg[i].dma_address =
-				page_to_phys(sg[i].page) + sg[i].offset;
+				page_to_bus(sg[i].page) + sg[i].offset;
 			sg[i].dma_length  = sg[i].length;
 			BUG_ON(!sg[i].page);
 			IOMMU_BUG_ON(address_needs_mapping(
@@ -93,6 +93,13 @@ dma_unmap_sg(struct device *hwdev, struct scatterlist *sg, int nents,
 }
 EXPORT_SYMBOL(dma_unmap_sg);
 
+/*
+ * XXX This file is also used by xenLinux/ia64. 
+ * "defined(__i386__) || defined (__x86_64__)" means "!defined(__ia64__)".
+ * This #if work around should be removed once this file is merbed back into
+ * i386' pci-dma or is moved to drivers/xen/core.
+ */
+#if defined(__i386__) || defined(__x86_64__)
 dma_addr_t
 dma_map_page(struct device *dev, struct page *page, unsigned long offset,
 	     size_t size, enum dma_data_direction direction)
@@ -105,7 +112,7 @@ dma_map_page(struct device *dev, struct page *page, unsigned long offset,
 		dma_addr = swiotlb_map_page(
 			dev, page, offset, size, direction);
 	} else {
-		dma_addr = page_to_phys(page) + offset;
+		dma_addr = page_to_bus(page) + offset;
 		IOMMU_BUG_ON(address_needs_mapping(dev, dma_addr));
 	}
 
@@ -122,6 +129,7 @@ dma_unmap_page(struct device *dev, dma_addr_t dma_address, size_t size,
 		swiotlb_unmap_page(dev, dma_address, size, direction);
 }
 EXPORT_SYMBOL(dma_unmap_page);
+#endif /* defined(__i386__) || defined(__x86_64__) */
 
 int
 dma_mapping_error(dma_addr_t dma_addr)
@@ -204,6 +212,7 @@ void dma_free_coherent(struct device *dev, size_t size,
 }
 EXPORT_SYMBOL(dma_free_coherent);
 
+#ifdef ARCH_HAS_DMA_DECLARE_COHERENT_MEMORY
 int dma_declare_coherent_memory(struct device *dev, dma_addr_t bus_addr,
 				dma_addr_t device_addr, size_t size, int flags)
 {
@@ -280,6 +289,7 @@ void *dma_mark_declared_memory_occupied(struct device *dev,
 	return mem->virt_base + (pos << PAGE_SHIFT);
 }
 EXPORT_SYMBOL(dma_mark_declared_memory_occupied);
+#endif /* ARCH_HAS_DMA_DECLARE_COHERENT_MEMORY */
 
 dma_addr_t
 dma_map_single(struct device *dev, void *ptr, size_t size,
@@ -332,13 +342,3 @@ dma_sync_single_for_device(struct device *dev, dma_addr_t dma_handle, size_t siz
 		swiotlb_sync_single_for_device(dev, dma_handle, size, direction);
 }
 EXPORT_SYMBOL(dma_sync_single_for_device);
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

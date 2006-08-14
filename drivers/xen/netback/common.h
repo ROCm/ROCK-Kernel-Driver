@@ -38,6 +38,7 @@
 #include <linux/in.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
+#include <linux/wait.h>
 #include <xen/evtchn.h>
 #include <xen/interface/io/netif.h>
 #include <asm/io.h>
@@ -46,12 +47,13 @@
 #include <xen/gnttab.h>
 #include <xen/driver_util.h>
 
-#define DPRINTK(_f, _a...) pr_debug("(file=%s, line=%d) " _f, \
-                                    __FILE__ , __LINE__ , ## _a )
-#define IPRINTK(fmt, args...) \
-    printk(KERN_INFO "xen_net: " fmt, ##args)
-#define WPRINTK(fmt, args...) \
-    printk(KERN_WARNING "xen_net: " fmt, ##args)
+#define DPRINTK(_f, _a...)			\
+	pr_debug("(file=%s, line=%d) " _f,	\
+		 __FILE__ , __LINE__ , ## _a )
+#define IPRINTK(fmt, args...)				\
+	printk(KERN_INFO "xen_net: " fmt, ##args)
+#define WPRINTK(fmt, args...)				\
+	printk(KERN_WARNING "xen_net: " fmt, ##args)
 
 typedef struct netif_st {
 	/* Unique identifier for this interface. */
@@ -74,6 +76,10 @@ typedef struct netif_st {
 	struct vm_struct *tx_comms_area;
 	struct vm_struct *rx_comms_area;
 
+	/* Set of features that can be turned on in dev->features. */
+	int features;
+	int can_queue;
+
 	/* Allow netif_be_start_xmit() to peek ahead in the rx request ring. */
 	RING_IDX rx_req_cons_peek;
 
@@ -84,14 +90,12 @@ typedef struct netif_st {
 	struct timer_list credit_timeout;
 
 	/* Miscellaneous private stuff. */
-	enum { DISCONNECTED, DISCONNECTING, CONNECTED } status;
-	int active;
 	struct list_head list;  /* scheduling list */
 	atomic_t         refcnt;
 	struct net_device *dev;
 	struct net_device_stats stats;
 
-	struct work_struct free_work;
+	wait_queue_head_t waiting_to_free;
 } netif_t;
 
 #define NET_TX_RING_SIZE __RING_SIZE((netif_tx_sring_t *)0, PAGE_SIZE)
@@ -99,8 +103,7 @@ typedef struct netif_st {
 
 void netif_disconnect(netif_t *netif);
 
-netif_t *alloc_netif(domid_t domid, unsigned int handle, u8 be_mac[ETH_ALEN]);
-void free_netif(netif_t *netif);
+netif_t *netif_alloc(domid_t domid, unsigned int handle, u8 be_mac[ETH_ALEN]);
 int netif_map(netif_t *netif, unsigned long tx_ring_ref,
 	      unsigned long rx_ring_ref, unsigned int evtchn);
 
@@ -108,7 +111,7 @@ int netif_map(netif_t *netif, unsigned long tx_ring_ref,
 #define netif_put(_b)						\
 	do {							\
 		if ( atomic_dec_and_test(&(_b)->refcnt) )	\
-			free_netif(_b);				\
+			wake_up(&(_b)->waiting_to_free);	\
 	} while (0)
 
 void netif_xenbus_init(void);
@@ -120,14 +123,16 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev);
 struct net_device_stats *netif_be_get_stats(struct net_device *dev);
 irqreturn_t netif_be_int(int irq, void *dev_id, struct pt_regs *regs);
 
-#endif /* __NETIF__BACKEND__COMMON_H__ */
+static inline int netbk_can_queue(struct net_device *dev)
+{
+	netif_t *netif = netdev_priv(dev);
+	return netif->can_queue;
+}
 
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */
+static inline int netbk_can_sg(struct net_device *dev)
+{
+	netif_t *netif = netdev_priv(dev);
+	return netif->features & NETIF_F_SG;
+}
+
+#endif /* __NETIF__BACKEND__COMMON_H__ */

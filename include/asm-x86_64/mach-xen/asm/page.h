@@ -1,7 +1,6 @@
 #ifndef _X86_64_PAGE_H
 #define _X86_64_PAGE_H
 
-#include <linux/config.h>
 /* #include <linux/string.h> */
 #ifndef __ASSEMBLY__
 #include <linux/kernel.h>
@@ -43,7 +42,7 @@
 #define EXCEPTION_STACK_ORDER 0
 #define EXCEPTION_STKSZ (PAGE_SIZE << EXCEPTION_STACK_ORDER)
 
-#define DEBUG_STACK_ORDER EXCEPTION_STACK_ORDER
+#define DEBUG_STACK_ORDER (EXCEPTION_STACK_ORDER + 1)
 #define DEBUG_STKSZ (PAGE_SIZE << DEBUG_STACK_ORDER)
 
 #define IRQSTACK_ORDER 2
@@ -85,6 +84,10 @@ void copy_page(void *, void *);
 
 extern unsigned long *phys_to_machine_mapping;
 
+#undef machine_to_phys_mapping
+extern unsigned long *machine_to_phys_mapping;
+extern unsigned int   machine_to_phys_order;
+
 static inline unsigned long pfn_to_mfn(unsigned long pfn)
 {
 	if (xen_feature(XENFEAT_auto_translated_physmap))
@@ -107,19 +110,23 @@ static inline unsigned long mfn_to_pfn(unsigned long mfn)
 	if (xen_feature(XENFEAT_auto_translated_physmap))
 		return mfn;
 
-	/*
-	 * The array access can fail (e.g., device space beyond end of RAM).
-	 * In such cases it doesn't matter what we return (we return garbage),
-	 * but we must handle the fault without crashing!
-	 */
+	if (unlikely((mfn >> machine_to_phys_order) != 0))
+		return end_pfn;
+
+	/* The array access can fail (e.g., device space beyond end of RAM). */
 	asm (
 		"1:	movq %1,%0\n"
 		"2:\n"
+		".section .fixup,\"ax\"\n"
+		"3:	movq %2,%0\n"
+		"	jmp  2b\n"
+		".previous\n"
 		".section __ex_table,\"a\"\n"
 		"	.align 8\n"
-		"	.quad 1b,2b\n"
+		"	.quad 1b,3b\n"
 		".previous"
-		: "=r" (pfn) : "m" (machine_to_phys_mapping[mfn]) );
+		: "=r" (pfn)
+		: "m" (machine_to_phys_mapping[mfn]), "m" (end_pfn) );
 
 	return pfn;
 }
@@ -260,8 +267,10 @@ static inline pgd_t __pgd(unsigned long x)
 #define __PAGE_OFFSET           0xffff880000000000
 #endif /* !__ASSEMBLY__ */
 
+#ifdef CONFIG_XEN_COMPAT_030002
 #undef LOAD_OFFSET
 #define LOAD_OFFSET		0
+#endif /* CONFIG_XEN_COMPAT_030002 */
 
 /* to align the pointer to the (next) page boundary */
 #define PAGE_ALIGN(addr)	(((addr)+PAGE_SIZE-1)&PAGE_MASK)
@@ -291,8 +300,6 @@ static inline pgd_t __pgd(unsigned long x)
 #define __boot_va(x)		__va(x)
 #define __boot_pa(x)		__pa(x)
 #ifdef CONFIG_FLATMEM
-#define pfn_to_page(pfn)	(mem_map + (pfn))
-#define page_to_pfn(page)	((unsigned long)((page) - mem_map))
 #define pfn_valid(pfn)		((pfn) < end_pfn)
 #endif
 
@@ -311,8 +318,9 @@ static inline pgd_t __pgd(unsigned long x)
 
 #define __HAVE_ARCH_GATE_AREA 1	
 
-#endif /* __KERNEL__ */
-
+#include <asm-generic/memory_model.h>
 #include <asm-generic/page.h>
+
+#endif /* __KERNEL__ */
 
 #endif /* _X86_64_PAGE_H */

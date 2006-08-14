@@ -17,7 +17,6 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 
-
 #include <stdarg.h>
 #include <linux/module.h>
 #include <linux/kthread.h>
@@ -25,29 +24,26 @@
 #include "common.h"
 
 #undef DPRINTK
-#define DPRINTK(fmt, args...) \
-    pr_debug("blkback/xenbus (%s:%d) " fmt ".\n", __FUNCTION__, __LINE__, ##args)
-
+#define DPRINTK(fmt, args...)				\
+	pr_debug("blkback/xenbus (%s:%d) " fmt ".\n",	\
+		 __FUNCTION__, __LINE__, ##args)
 
 struct backend_info
 {
 	struct xenbus_device *dev;
 	blkif_t *blkif;
 	struct xenbus_watch backend_watch;
-
 	unsigned major;
 	unsigned minor;
 	char *mode;
 };
-
 
 static void connect(struct backend_info *);
 static int connect_ring(struct backend_info *);
 static void backend_changed(struct xenbus_watch *, const char **,
 			    unsigned int);
 
-
-void update_blkif_status(blkif_t *blkif)
+static void update_blkif_status(blkif_t *blkif)
 { 
 	int err;
 
@@ -76,30 +72,75 @@ void update_blkif_status(blkif_t *blkif)
 }
 
 
-static ssize_t show_physical_device(struct device *_dev,
-				    struct device_attribute *attr, char *buf)
+/****************************************************************
+ *  sysfs interface for VBD I/O requests
+ */
+
+#define VBD_SHOW(name, format, args...)					\
+	static ssize_t show_##name(struct device *_dev,			\
+				   struct device_attribute *attr,	\
+				   char *buf)				\
+	{								\
+		struct xenbus_device *dev = to_xenbus_device(_dev);	\
+		struct backend_info *be = dev->dev.driver_data;		\
+									\
+		return sprintf(buf, format, ##args);			\
+	}								\
+	DEVICE_ATTR(name, S_IRUGO, show_##name, NULL)
+
+VBD_SHOW(oo_req, "%d\n", be->blkif->st_oo_req);
+VBD_SHOW(rd_req, "%d\n", be->blkif->st_rd_req);
+VBD_SHOW(wr_req, "%d\n", be->blkif->st_wr_req);
+
+static struct attribute *vbdstat_attrs[] = {
+	&dev_attr_oo_req.attr,
+	&dev_attr_rd_req.attr,
+	&dev_attr_wr_req.attr,
+	NULL
+};
+
+static struct attribute_group vbdstat_group = {
+	.name = "statistics",
+	.attrs = vbdstat_attrs,
+};
+
+VBD_SHOW(physical_device, "%x:%x\n", be->major, be->minor);
+VBD_SHOW(mode, "%s\n", be->mode);
+
+int xenvbd_sysfs_addif(struct xenbus_device *dev)
 {
-	struct xenbus_device *dev = to_xenbus_device(_dev);
-	struct backend_info *be = dev->data;
-	return sprintf(buf, "%x:%x\n", be->major, be->minor);
+	int error;
+	
+	error = device_create_file(&dev->dev, &dev_attr_physical_device);
+ 	if (error)
+		goto fail1;
+
+	error = device_create_file(&dev->dev, &dev_attr_mode);
+	if (error)
+		goto fail2;
+
+	error = sysfs_create_group(&dev->dev.kobj, &vbdstat_group);
+	if (error)
+		goto fail3;
+
+	return 0;
+
+fail3:	sysfs_remove_group(&dev->dev.kobj, &vbdstat_group);
+fail2:	device_remove_file(&dev->dev, &dev_attr_mode);
+fail1:	device_remove_file(&dev->dev, &dev_attr_physical_device);
+	return error;
 }
-DEVICE_ATTR(physical_device, S_IRUSR | S_IRGRP | S_IROTH,
-	    show_physical_device, NULL);
 
-
-static ssize_t show_mode(struct device *_dev, struct device_attribute *attr,
-			 char *buf)
+void xenvbd_sysfs_delif(struct xenbus_device *dev)
 {
-	struct xenbus_device *dev = to_xenbus_device(_dev);
-	struct backend_info *be = dev->data;
-	return sprintf(buf, "%s\n", be->mode);
+	sysfs_remove_group(&dev->dev.kobj, &vbdstat_group);
+	device_remove_file(&dev->dev, &dev_attr_mode);
+	device_remove_file(&dev->dev, &dev_attr_physical_device);
 }
-DEVICE_ATTR(mode, S_IRUSR | S_IRGRP | S_IROTH, show_mode, NULL);
-
 
 static int blkback_remove(struct xenbus_device *dev)
 {
-	struct backend_info *be = dev->data;
+	struct backend_info *be = dev->dev.driver_data;
 
 	DPRINTK("");
 
@@ -108,19 +149,19 @@ static int blkback_remove(struct xenbus_device *dev)
 		kfree(be->backend_watch.node);
 		be->backend_watch.node = NULL;
 	}
+
 	if (be->blkif) {
-		be->blkif->status = DISCONNECTED; 
-		if (be->blkif->xenblkd)
-			kthread_stop(be->blkif->xenblkd);
-		blkif_put(be->blkif);
+		blkif_disconnect(be->blkif);
+		vbd_free(&be->blkif->vbd);
+		blkif_free(be->blkif);
 		be->blkif = NULL;
 	}
 
-	device_remove_file(&dev->dev, &dev_attr_physical_device);
-	device_remove_file(&dev->dev, &dev_attr_mode);
+	if (be->major || be->minor)
+		xenvbd_sysfs_delif(dev);
 
 	kfree(be);
-	dev->data = NULL;
+	dev->dev.driver_data = NULL;
 	return 0;
 }
 
@@ -142,9 +183,9 @@ static int blkback_probe(struct xenbus_device *dev,
 		return -ENOMEM;
 	}
 	be->dev = dev;
-	dev->data = be;
+	dev->dev.driver_data = be;
 
-	be->blkif = alloc_blkif(dev->otherend_id);
+	be->blkif = blkif_alloc(dev->otherend_id);
 	if (IS_ERR(be->blkif)) {
 		err = PTR_ERR(be->blkif);
 		be->blkif = NULL;
@@ -190,7 +231,7 @@ static void backend_changed(struct xenbus_watch *watch,
 
 	DPRINTK("");
 
-	err = xenbus_scanf(XBT_NULL, dev->nodename, "physical-device", "%x:%x",
+	err = xenbus_scanf(XBT_NIL, dev->nodename, "physical-device", "%x:%x",
 			   &major, &minor);
 	if (XENBUS_EXIST_ERR(err)) {
 		/* Since this watch will fire once immediately after it is
@@ -203,8 +244,8 @@ static void backend_changed(struct xenbus_watch *watch,
 		return;
 	}
 
-	if (be->major && be->minor &&
-	    (be->major != major || be->minor != minor)) {
+	if ((be->major || be->minor) &&
+	    ((be->major != major) || (be->minor != minor))) {
 		printk(KERN_WARNING
 		       "blkback: changing physical device (from %x:%x to "
 		       "%x:%x) not supported.\n", be->major, be->minor,
@@ -212,7 +253,7 @@ static void backend_changed(struct xenbus_watch *watch,
 		return;
 	}
 
-	be->mode = xenbus_read(XBT_NULL, dev->nodename, "mode", NULL);
+	be->mode = xenbus_read(XBT_NIL, dev->nodename, "mode", NULL);
 	if (IS_ERR(be->mode)) {
 		err = PTR_ERR(be->mode);
 		be->mode = NULL;
@@ -232,14 +273,18 @@ static void backend_changed(struct xenbus_watch *watch,
 		err = vbd_create(be->blkif, handle, major, minor,
 				 (NULL == strchr(be->mode, 'w')));
 		if (err) {
-			be->major = 0;
-			be->minor = 0;
+			be->major = be->minor = 0;
 			xenbus_dev_fatal(dev, err, "creating vbd structure");
 			return;
 		}
 
-		device_create_file(&dev->dev, &dev_attr_physical_device);
-		device_create_file(&dev->dev, &dev_attr_mode);
+		err = xenvbd_sysfs_addif(dev);
+		if (err) {
+			vbd_free(&be->blkif->vbd);
+			be->major = be->minor = 0;
+			xenbus_dev_fatal(dev, err, "creating sysfs entries");
+			return;
+		}
 
 		/* We're potentially connected now */
 		update_blkif_status(be->blkif); 
@@ -251,9 +296,9 @@ static void backend_changed(struct xenbus_watch *watch,
  * Callback received when the frontend's state changes.
  */
 static void frontend_changed(struct xenbus_device *dev,
-			     XenbusState frontend_state)
+			     enum xenbus_state frontend_state)
 {
-	struct backend_info *be = dev->data;
+	struct backend_info *be = dev->dev.driver_data;
 	int err;
 
 	DPRINTK("");
@@ -277,6 +322,7 @@ static void frontend_changed(struct xenbus_device *dev,
 		break;
 
 	case XenbusStateClosing:
+		blkif_disconnect(be->blkif);
 		xenbus_switch_state(dev, XenbusStateClosing);
 		break;
 
@@ -303,7 +349,7 @@ static void frontend_changed(struct xenbus_device *dev,
  */
 static void connect(struct backend_info *be)
 {
-	xenbus_transaction_t xbt;
+	struct xenbus_transaction xbt;
 	int err;
 	struct xenbus_device *dev = be->dev;
 
@@ -368,7 +414,7 @@ static int connect_ring(struct backend_info *be)
 
 	DPRINTK("%s", dev->otherend);
 
-	err = xenbus_gather(XBT_NULL, dev->otherend, "ring-ref", "%lu", &ring_ref,
+	err = xenbus_gather(XBT_NIL, dev->otherend, "ring-ref", "%lu", &ring_ref,
 			    "event-channel", "%u", &evtchn, NULL);
 	if (err) {
 		xenbus_dev_fatal(dev, err,
@@ -412,14 +458,3 @@ void blkif_xenbus_init(void)
 {
 	xenbus_register_backend(&blkback);
 }
-
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

@@ -31,7 +31,7 @@ config TCG_TIS
 
 config TCG_NSC
 	tristate "National Semiconductor TPM Interface"
-	depends on TCG_TPM && PNPACPI && !XEN_UNPRIVILEGED_GUEST
+	depends on TCG_TPM && PNPACPI
 	---help---
 	  If you have a TPM security chip from National Semicondutor 
 	  say Yes and it will be accessible from within Linux.  To 
@@ -40,7 +40,7 @@ config TCG_NSC
 
 config TCG_ATMEL
 	tristate "Atmel TPM Interface"
-	depends on TCG_TPM && !XEN_UNPRIVILEGED_GUEST
+	depends on TCG_TPM
 	---help---
 	  If you have a TPM security chip from Atmel say Yes and it 
 	  will be accessible from within Linux.  To compile this driver 
@@ -48,7 +48,7 @@ config TCG_ATMEL
 
 config TCG_INFINEON
 	tristate "Infineon Technologies TPM Interface"
-	depends on TCG_TPM && PNPACPI && !XEN_UNPRIVILEGED_GUEST
+	depends on TCG_TPM && PNPACPI
 	---help---
 	  If you have a TPM security chip from Infineon Technologies
 	  (either SLD 9630 TT 1.1 or SLB 9635 TT 1.2) say Yes and it
@@ -60,13 +60,11 @@ config TCG_INFINEON
 
 config TCG_XEN
 	tristate "XEN TPM Interface"
-	depends on TCG_TPM && XEN && XEN_TPMDEV_FRONTEND
+	depends on TCG_TPM && XEN
 	---help---
-	  If you want to make TPM support available to a Xen
-	  user domain, say Yes and it will
-          be accessible from within Linux. To compile this driver
-          as a module, choose M here; the module will be called
-          tpm_xen.
+	  If you want to make TPM support available to a Xen user domain,
+	  say Yes and it will be accessible from within Linux.
+	  To compile this driver as a module, choose M here; the module
+	  will be called tpm_xenu.
 
 endmenu
-

@@ -18,6 +18,8 @@
 #include <net/xfrm.h>
 #include <net/icmp.h>
 
+extern int skb_checksum_setup(struct sk_buff *skb);
+
 static int xfrm4_tunnel_check_size(struct sk_buff *skb)
 {
 	int mtu, ret = 0;
@@ -48,6 +50,10 @@ static int xfrm4_output_one(struct sk_buff *skb)
 	struct xfrm_state *x = dst->xfrm;
 	int err;
 	
+	err = skb_checksum_setup(skb);
+	if (err)
+		goto error_nolock;
+
 	if (skb->ip_summed == CHECKSUM_HW) {
 		err = skb_checksum_help(skb, 0);
 		if (err)

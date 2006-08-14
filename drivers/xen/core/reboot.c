@@ -17,14 +17,7 @@
 #include <linux/kthread.h>
 #include <xen/gnttab.h>
 #include <xen/xencons.h>
-
-#if defined(__i386__) || defined(__x86_64__)
-/*
- * Power off function, if any
- */
-void (*pm_power_off)(void);
-EXPORT_SYMBOL(pm_power_off);
-#endif
+#include <xen/cpu_hotplug.h>
 
 extern void ctrl_alt_del(void);
 
@@ -37,6 +30,14 @@ extern void ctrl_alt_del(void);
  * the distinction when we return the reason code to them.
  */
 #define SHUTDOWN_HALT      4
+
+#if defined(__i386__) || defined(__x86_64__)
+
+/*
+ * Power off function, if any
+ */
+void (*pm_power_off)(void);
+EXPORT_SYMBOL(pm_power_off);
 
 void machine_emergency_restart(void)
 {
@@ -59,10 +60,8 @@ void machine_power_off(void)
 {
 	/* We really want to get pending console data out before we die. */
 	xencons_force_flush();
-#if defined(__i386__) || defined(__x86_64__)
 	if (pm_power_off)
 		pm_power_off();
-#endif
 	HYPERVISOR_shutdown(SHUTDOWN_poweroff);
 }
 
@@ -71,6 +70,7 @@ EXPORT_SYMBOL(machine_restart);
 EXPORT_SYMBOL(machine_halt);
 EXPORT_SYMBOL(machine_power_off);
 
+#endif /* defined(__i386__) || defined(__x86_64__) */
 
 /******************************************************************************
  * Stop/pickle callback handling.
@@ -81,13 +81,7 @@ static int shutting_down = SHUTDOWN_INVALID;
 static void __shutdown_handler(void *unused);
 static DECLARE_WORK(shutdown_work, __shutdown_handler, NULL);
 
-#ifdef CONFIG_SMP
-int  smp_suspend(void);
-void smp_resume(void);
-#else
-#define smp_suspend()	(0)
-#define smp_resume()	((void)0)
-#endif
+#if defined(__i386__) || defined(__x86_64__)
 
 /* Ensure we run on the idle task page tables so that we will
    switch page tables before running user space. This is needed
@@ -106,56 +100,21 @@ static void switch_idle_mm(void)
 	mmdrop(mm);
 }
 
-static int __do_suspend(void *ignore)
+static void pre_suspend(void)
 {
-	int i, j, k, fpp, err;
-
-	extern unsigned long max_pfn;
-	extern unsigned long *pfn_to_mfn_frame_list_list;
-	extern unsigned long *pfn_to_mfn_frame_list[];
-
-	extern void time_resume(void);
-
-	BUG_ON(smp_processor_id() != 0);
-	BUG_ON(in_interrupt());
-
-	if (xen_feature(XENFEAT_auto_translated_physmap)) {
-		printk(KERN_WARNING "Cannot suspend in "
-		       "auto_translated_physmap mode.\n");
-		return -EOPNOTSUPP;
-	}
-
-	err = smp_suspend();
-	if (err)
-		return err;
-
-	xenbus_suspend();
-
-	preempt_disable();
-
-#ifdef __i386__
-	kmem_cache_shrink(pgd_cache);
-#endif
-	mm_pin_all();
-
-	__cli();
-	preempt_enable();
-
-	gnttab_suspend();
-
 	HYPERVISOR_shared_info = (shared_info_t *)empty_zero_page;
 	clear_fixmap(FIX_SHARED_INFO);
 
 	xen_start_info->store_mfn = mfn_to_pfn(xen_start_info->store_mfn);
 	xen_start_info->console_mfn = mfn_to_pfn(xen_start_info->console_mfn);
+}
 
-	/*
-	 * We'll stop somewhere inside this hypercall. When it returns,
-	 * we'll start resuming after the restore.
-	 */
-	HYPERVISOR_suspend(virt_to_mfn(xen_start_info));
-
-	shutting_down = SHUTDOWN_INVALID;
+static void post_suspend(void)
+{
+	int i, j, k, fpp;
+	extern unsigned long max_pfn;
+	extern unsigned long *pfn_to_mfn_frame_list_list;
+	extern unsigned long *pfn_to_mfn_frame_list[];
 
 	set_fixmap(FIX_SHARED_INFO, xen_start_info->shared_info);
 
@@ -178,6 +137,59 @@ static int __do_suspend(void *ignore)
 			virt_to_mfn(&phys_to_machine_mapping[i]);
 	}
 	HYPERVISOR_shared_info->arch.max_pfn = max_pfn;
+}
+
+#else /* !(defined(__i386__) || defined(__x86_64__)) */
+
+#define switch_idle_mm()	((void)0)
+#define mm_pin_all()		((void)0)
+#define pre_suspend()		((void)0)
+#define post_suspend()		((void)0)
+
+#endif
+
+static int __do_suspend(void *ignore)
+{
+	int err;
+
+	extern void time_resume(void);
+
+	BUG_ON(smp_processor_id() != 0);
+	BUG_ON(in_interrupt());
+
+#if defined(__i386__) || defined(__x86_64__)
+	if (xen_feature(XENFEAT_auto_translated_physmap)) {
+		printk(KERN_WARNING "Cannot suspend in "
+		       "auto_translated_physmap mode.\n");
+		return -EOPNOTSUPP;
+	}
+#endif
+
+	err = smp_suspend();
+	if (err)
+		return err;
+
+	xenbus_suspend();
+
+	preempt_disable();
+
+	mm_pin_all();
+	local_irq_disable();
+	preempt_enable();
+
+	gnttab_suspend();
+
+	pre_suspend();
+
+	/*
+	 * We'll stop somewhere inside this hypercall. When it returns,
+	 * we'll start resuming after the restore.
+	 */
+	HYPERVISOR_suspend(virt_to_mfn(xen_start_info));
+
+	shutting_down = SHUTDOWN_INVALID;
+
+	post_suspend();
 
 	gnttab_resume();
 
@@ -187,7 +199,7 @@ static int __do_suspend(void *ignore)
 
 	switch_idle_mm();
 
-	__sti();
+	local_irq_enable();
 
 	xencons_resume();
 
@@ -257,7 +269,7 @@ static void shutdown_handler(struct xenbus_watch *watch,
 			     const char **vec, unsigned int len)
 {
 	char *str;
-	xenbus_transaction_t xbt;
+	struct xenbus_transaction xbt;
 	int err;
 
 	if (shutting_down != SHUTDOWN_INVALID)
@@ -305,7 +317,7 @@ static void sysrq_handler(struct xenbus_watch *watch, const char **vec,
 			  unsigned int len)
 {
 	char sysrq_key = '\0';
-	xenbus_transaction_t xbt;
+	struct xenbus_transaction xbt;
 	int err;
 
  again:
@@ -343,8 +355,8 @@ static struct xenbus_watch sysrq_watch = {
 };
 
 static int setup_shutdown_watcher(struct notifier_block *notifier,
-                                  unsigned long event,
-                                  void *data)
+				  unsigned long event,
+				  void *data)
 {
 	int err;
 
@@ -369,13 +381,3 @@ static int __init setup_shutdown_event(void)
 }
 
 subsys_initcall(setup_shutdown_event);
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

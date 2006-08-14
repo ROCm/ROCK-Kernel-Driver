@@ -42,8 +42,6 @@
 #include <xen/interface/io/xenbus.h>
 #include <xen/interface/io/xs_wire.h>
 
-#define XBT_NULL 0
-
 /* Register callback to watch this node. */
 struct xenbus_watch
 {
@@ -75,8 +73,7 @@ struct xenbus_device {
 	int otherend_id;
 	struct xenbus_watch otherend_watch;
 	struct device dev;
-	XenbusState state;
-	void *data;
+	enum xenbus_state state;
 };
 
 static inline struct xenbus_device *to_xenbus_device(struct device *dev)
@@ -98,7 +95,7 @@ struct xenbus_driver {
 	int (*probe)(struct xenbus_device *dev,
 		     const struct xenbus_device_id *id);
 	void (*otherend_changed)(struct xenbus_device *dev,
-				 XenbusState backend_state);
+				 enum xenbus_state backend_state);
 	int (*remove)(struct xenbus_device *dev);
 	int (*suspend)(struct xenbus_device *dev);
 	int (*resume)(struct xenbus_device *dev);
@@ -116,35 +113,41 @@ int xenbus_register_frontend(struct xenbus_driver *drv);
 int xenbus_register_backend(struct xenbus_driver *drv);
 void xenbus_unregister_driver(struct xenbus_driver *drv);
 
-typedef u32 xenbus_transaction_t;
+struct xenbus_transaction
+{
+	u32 id;
+};
 
-char **xenbus_directory(xenbus_transaction_t t,
+/* Nil transaction ID. */
+#define XBT_NIL ((struct xenbus_transaction) { 0 })
+
+char **xenbus_directory(struct xenbus_transaction t,
 			const char *dir, const char *node, unsigned int *num);
-void *xenbus_read(xenbus_transaction_t t,
+void *xenbus_read(struct xenbus_transaction t,
 		  const char *dir, const char *node, unsigned int *len);
-int xenbus_write(xenbus_transaction_t t,
+int xenbus_write(struct xenbus_transaction t,
 		 const char *dir, const char *node, const char *string);
-int xenbus_mkdir(xenbus_transaction_t t,
+int xenbus_mkdir(struct xenbus_transaction t,
 		 const char *dir, const char *node);
-int xenbus_exists(xenbus_transaction_t t,
+int xenbus_exists(struct xenbus_transaction t,
 		  const char *dir, const char *node);
-int xenbus_rm(xenbus_transaction_t t, const char *dir, const char *node);
-int xenbus_transaction_start(xenbus_transaction_t *t);
-int xenbus_transaction_end(xenbus_transaction_t t, int abort);
+int xenbus_rm(struct xenbus_transaction t, const char *dir, const char *node);
+int xenbus_transaction_start(struct xenbus_transaction *t);
+int xenbus_transaction_end(struct xenbus_transaction t, int abort);
 
 /* Single read and scanf: returns -errno or num scanned if > 0. */
-int xenbus_scanf(xenbus_transaction_t t,
+int xenbus_scanf(struct xenbus_transaction t,
 		 const char *dir, const char *node, const char *fmt, ...)
 	__attribute__((format(scanf, 4, 5)));
 
 /* Single printf and write: returns -errno or 0. */
-int xenbus_printf(xenbus_transaction_t t,
+int xenbus_printf(struct xenbus_transaction t,
 		  const char *dir, const char *node, const char *fmt, ...)
 	__attribute__((format(printf, 4, 5)));
 
 /* Generic read function: NULL-terminated triples of name,
  * sprintf-style type string, and pointer. Returns 0 or errno.*/
-int xenbus_gather(xenbus_transaction_t t, const char *dir, ...);
+int xenbus_gather(struct xenbus_transaction t, const char *dir, ...);
 
 /* notifer routines for when the xenstore comes up */
 int register_xenstore_notifier(struct notifier_block *nb);
@@ -207,7 +210,7 @@ int xenbus_watch_path2(struct xenbus_device *dev, const char *path,
  * Return 0 on success, or -errno on error.  On error, the device will switch
  * to XenbusStateClosing, and the error will be saved in the store.
  */
-int xenbus_switch_state(struct xenbus_device *dev, XenbusState new_state);
+int xenbus_switch_state(struct xenbus_device *dev, enum xenbus_state new_state);
 
 
 /**
@@ -273,7 +276,7 @@ int xenbus_free_evtchn(struct xenbus_device *dev, int port);
  * Return the state of the driver rooted at the given store path, or
  * XenbusStateClosed if no state can be read.
  */
-XenbusState xenbus_read_driver_state(const char *path);
+enum xenbus_state xenbus_read_driver_state(const char *path);
 
 
 /***
@@ -294,13 +297,3 @@ void xenbus_dev_fatal(struct xenbus_device *dev, int err, const char *fmt,
 
 
 #endif /* _XEN_XENBUS_H */
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

@@ -39,6 +39,7 @@
 #include <linux/interrupt.h>
 #include <linux/tty.h>
 #include <linux/tty_flip.h>
+#include <linux/vt.h>
 #include <linux/serial.h>
 #include <linux/major.h>
 #include <linux/ptrace.h>
@@ -117,14 +118,17 @@ static int __init xencons_bufsz_setup(char *str)
 {
 	unsigned int goal;
 	goal = simple_strtoul(str, NULL, 0);
-	while (wbuf_size < goal)
-		wbuf_size <<= 1;
+	if (goal) {
+		goal = roundup_pow_of_two(goal);
+		if (wbuf_size < goal)
+			wbuf_size = goal;
+	}
 	return 1;
 }
 __setup("xencons_bufsz=", xencons_bufsz_setup);
 
 /* This lock protects accesses to the common transmit buffer. */
-static spinlock_t xencons_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(xencons_lock);
 
 /* Common transmit-kick routine. */
 static void __xencons_tx_flush(void);
@@ -133,8 +137,7 @@ static struct tty_driver *xencons_driver;
 
 /******************** Kernel console driver ********************************/
 
-static void kcons_write(
-	struct console *c, const char *s, unsigned int count)
+static void kcons_write(struct console *c, const char *s, unsigned int count)
 {
 	int           i = 0;
 	unsigned long flags;
@@ -155,14 +158,14 @@ static void kcons_write(
 	spin_unlock_irqrestore(&xencons_lock, flags);
 }
 
-static void kcons_write_dom0(
-	struct console *c, const char *s, unsigned int count)
+static void kcons_write_dom0(struct console *c, const char *s, unsigned int count)
 {
-	int rc;
 
-	while ((count > 0) &&
-	       ((rc = HYPERVISOR_console_io(
-			CONSOLEIO_write, count, (char *)s)) > 0)) {
+	while (count > 0) {
+		int rc;
+		rc = HYPERVISOR_console_io( CONSOLEIO_write, count, (char *)s);
+		if (rc <= 0)
+			break;
 		count -= rc;
 		s += rc;
 	}
@@ -183,7 +186,7 @@ static struct console kcons_info = {
 #define __RETCODE 0
 static int __init xen_console_init(void)
 {
-	if (xen_init() < 0)
+	if (!is_running_on_xen())
 		return __RETCODE;
 
 	if (xen_start_info->flags & SIF_INITDOMAIN) {
@@ -265,7 +268,8 @@ void xencons_force_flush(void)
 /******************** User-space console driver (/dev/console) ************/
 
 #define DRV(_d)         (_d)
-#define TTY_INDEX(_tty) ((_tty)->index)
+#define DUMMY_TTY(_tty) ((xc_mode != XC_SERIAL) &&		\
+			 ((_tty)->index != (xc_num - 1)))
 
 static struct termios *xencons_termios[MAX_NR_CONSOLES];
 static struct termios *xencons_termios_locked[MAX_NR_CONSOLES];
@@ -362,7 +366,7 @@ void xencons_tx(void)
 
 /* Privileged receive callback and transmit kicker. */
 static irqreturn_t xencons_priv_interrupt(int irq, void *dev_id,
-                                          struct pt_regs *regs)
+					  struct pt_regs *regs)
 {
 	static char rbuf[16];
 	int         l;
@@ -389,7 +393,7 @@ static void xencons_send_xchar(struct tty_struct *tty, char ch)
 {
 	unsigned long flags;
 
-	if (TTY_INDEX(tty) != 0)
+	if (DUMMY_TTY(tty))
 		return;
 
 	spin_lock_irqsave(&xencons_lock, flags);
@@ -400,7 +404,7 @@ static void xencons_send_xchar(struct tty_struct *tty, char ch)
 
 static void xencons_throttle(struct tty_struct *tty)
 {
-	if (TTY_INDEX(tty) != 0)
+	if (DUMMY_TTY(tty))
 		return;
 
 	if (I_IXOFF(tty))
@@ -409,7 +413,7 @@ static void xencons_throttle(struct tty_struct *tty)
 
 static void xencons_unthrottle(struct tty_struct *tty)
 {
-	if (TTY_INDEX(tty) != 0)
+	if (DUMMY_TTY(tty))
 		return;
 
 	if (I_IXOFF(tty)) {
@@ -424,7 +428,7 @@ static void xencons_flush_buffer(struct tty_struct *tty)
 {
 	unsigned long flags;
 
-	if (TTY_INDEX(tty) != 0)
+	if (DUMMY_TTY(tty))
 		return;
 
 	spin_lock_irqsave(&xencons_lock, flags);
@@ -449,7 +453,7 @@ static int xencons_write(
 	int i;
 	unsigned long flags;
 
-	if (TTY_INDEX(tty) != 0)
+	if (DUMMY_TTY(tty))
 		return count;
 
 	spin_lock_irqsave(&xencons_lock, flags);
@@ -470,7 +474,7 @@ static void xencons_put_char(struct tty_struct *tty, u_char ch)
 {
 	unsigned long flags;
 
-	if (TTY_INDEX(tty) != 0)
+	if (DUMMY_TTY(tty))
 		return;
 
 	spin_lock_irqsave(&xencons_lock, flags);
@@ -482,7 +486,7 @@ static void xencons_flush_chars(struct tty_struct *tty)
 {
 	unsigned long flags;
 
-	if (TTY_INDEX(tty) != 0)
+	if (DUMMY_TTY(tty))
 		return;
 
 	spin_lock_irqsave(&xencons_lock, flags);
@@ -494,7 +498,7 @@ static void xencons_wait_until_sent(struct tty_struct *tty, int timeout)
 {
 	unsigned long orig_jiffies = jiffies;
 
-	if (TTY_INDEX(tty) != 0)
+	if (DUMMY_TTY(tty))
 		return;
 
 	while (DRV(tty->driver)->chars_in_buffer(tty)) {
@@ -513,7 +517,7 @@ static int xencons_open(struct tty_struct *tty, struct file *filp)
 {
 	unsigned long flags;
 
-	if (TTY_INDEX(tty) != 0)
+	if (DUMMY_TTY(tty))
 		return 0;
 
 	spin_lock_irqsave(&xencons_lock, flags);
@@ -530,21 +534,30 @@ static void xencons_close(struct tty_struct *tty, struct file *filp)
 {
 	unsigned long flags;
 
-	if (TTY_INDEX(tty) != 0)
+	if (DUMMY_TTY(tty))
 		return;
 
-	if (tty->count == 1) {
-		tty->closing = 1;
-		tty_wait_until_sent(tty, 0);
-		if (DRV(tty->driver)->flush_buffer != NULL)
-			DRV(tty->driver)->flush_buffer(tty);
-		if (tty->ldisc.flush_buffer != NULL)
-			tty->ldisc.flush_buffer(tty);
-		tty->closing = 0;
-		spin_lock_irqsave(&xencons_lock, flags);
-		xencons_tty = NULL;
-		spin_unlock_irqrestore(&xencons_lock, flags);
+	mutex_lock(&tty_mutex);
+
+	if (tty->count != 1) {
+		mutex_unlock(&tty_mutex);
+		return;
 	}
+
+	/* Prevent other threads from re-opening this tty. */
+	set_bit(TTY_CLOSING, &tty->flags);
+	mutex_unlock(&tty_mutex);
+
+	tty->closing = 1;
+	tty_wait_until_sent(tty, 0);
+	if (DRV(tty->driver)->flush_buffer != NULL)
+		DRV(tty->driver)->flush_buffer(tty);
+	if (tty->ldisc.flush_buffer != NULL)
+		tty->ldisc.flush_buffer(tty);
+	tty->closing = 0;
+	spin_lock_irqsave(&xencons_lock, flags);
+	xencons_tty = NULL;
+	spin_unlock_irqrestore(&xencons_lock, flags);
 }
 
 static struct tty_operations xencons_ops = {
@@ -566,7 +579,7 @@ static int __init xencons_init(void)
 {
 	int rc;
 
-	if (xen_init() < 0)
+	if (!is_running_on_xen())
 		return -ENODEV;
 
 	if (xc_mode == XC_OFF)
@@ -586,8 +599,7 @@ static int __init xencons_init(void)
 	DRV(xencons_driver)->init_termios    = tty_std_termios;
 	DRV(xencons_driver)->flags           =
 		TTY_DRIVER_REAL_RAW |
-		TTY_DRIVER_RESET_TERMIOS |
-		TTY_DRIVER_NO_DEVFS;
+		TTY_DRIVER_RESET_TERMIOS;
 	DRV(xencons_driver)->termios         = xencons_termios;
 	DRV(xencons_driver)->termios_locked  = xencons_termios_locked;
 
@@ -597,8 +609,8 @@ static int __init xencons_init(void)
 		DRV(xencons_driver)->name_base   = 0 + xc_num;
 	} else {
 		DRV(xencons_driver)->name        = "tty";
-		DRV(xencons_driver)->minor_start = xc_num;
-		DRV(xencons_driver)->name_base   = xc_num;
+		DRV(xencons_driver)->minor_start = 1;
+		DRV(xencons_driver)->name_base   = 1;
 	}
 
 	tty_set_operations(xencons_driver, &xencons_ops);
@@ -613,8 +625,6 @@ static int __init xencons_init(void)
 		return rc;
 	}
 
-	tty_register_device(xencons_driver, 0, NULL);
-
 	if (xen_start_info->flags & SIF_INITDOMAIN) {
 		xencons_priv_irq = bind_virq_to_irqhandler(
 			VIRQ_CONSOLE,
@@ -627,8 +637,7 @@ static int __init xencons_init(void)
 	}
 
 	printk("Xen virtual console successfully installed as %s%d\n",
-	       DRV(xencons_driver)->name,
-	       DRV(xencons_driver)->name_base );
+	       DRV(xencons_driver)->name, xc_num);
 
 	return 0;
 }
@@ -636,13 +645,3 @@ static int __init xencons_init(void)
 module_init(xencons_init);
 
 MODULE_LICENSE("Dual BSD/GPL");
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

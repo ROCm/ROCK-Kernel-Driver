@@ -83,7 +83,7 @@ static int blkfront_probe(struct xenbus_device *dev,
 	struct blkfront_info *info;
 
 	/* FIXME: Use dynamic device id if this is not set. */
-	err = xenbus_scanf(XBT_NULL, dev->nodename,
+	err = xenbus_scanf(XBT_NIL, dev->nodename,
 			   "virtual-device", "%i", &vdevice);
 	if (err != 1) {
 		xenbus_dev_fatal(dev, err, "reading virtual-device");
@@ -107,12 +107,12 @@ static int blkfront_probe(struct xenbus_device *dev,
 
 	/* Front end dir is a number, which is used as the id. */
 	info->handle = simple_strtoul(strrchr(dev->nodename,'/')+1, NULL, 0);
-	dev->data = info;
+	dev->dev.driver_data = info;
 
 	err = talk_to_backend(dev, info);
 	if (err) {
 		kfree(info);
-		dev->data = NULL;
+		dev->dev.driver_data = NULL;
 		return err;
 	}
 
@@ -128,7 +128,7 @@ static int blkfront_probe(struct xenbus_device *dev,
  */
 static int blkfront_resume(struct xenbus_device *dev)
 {
-	struct blkfront_info *info = dev->data;
+	struct blkfront_info *info = dev->dev.driver_data;
 	int err;
 
 	DPRINTK("blkfront_resume: %s\n", dev->nodename);
@@ -148,7 +148,7 @@ static int talk_to_backend(struct xenbus_device *dev,
 			   struct blkfront_info *info)
 {
 	const char *message = NULL;
-	xenbus_transaction_t xbt;
+	struct xenbus_transaction xbt;
 	int err;
 
 	/* Create shared ring, alloc event channel. */
@@ -247,9 +247,9 @@ fail:
  * Callback received when the backend's state changes.
  */
 static void backend_changed(struct xenbus_device *dev,
-			    XenbusState backend_state)
+			    enum xenbus_state backend_state)
 {
-	struct blkfront_info *info = dev->data;
+	struct blkfront_info *info = dev->dev.driver_data;
 	struct block_device *bd;
 
 	DPRINTK("blkfront:backend_changed.\n");
@@ -271,13 +271,13 @@ static void backend_changed(struct xenbus_device *dev,
 		if (bd == NULL)
 			xenbus_dev_fatal(dev, -ENODEV, "bdget failed");
 
-		down(&bd->bd_sem);
+		mutex_lock(&bd->bd_mutex);
 		if (info->users > 0)
 			xenbus_dev_error(dev, -EBUSY,
 					 "Device in use; refusing to close");
 		else
 			blkfront_closing(dev);
-		up(&bd->bd_sem);
+		mutex_unlock(&bd->bd_mutex);
 		bdput(bd);
 		break;
 	}
@@ -303,7 +303,7 @@ static void connect(struct blkfront_info *info)
 
 	DPRINTK("blkfront.c:connect:%s.\n", info->xbdev->otherend);
 
-	err = xenbus_gather(XBT_NULL, info->xbdev->otherend,
+	err = xenbus_gather(XBT_NIL, info->xbdev->otherend,
 			    "sectors", "%lu", &sectors,
 			    "info", "%u", &binfo,
 			    "sector-size", "%lu", &sector_size,
@@ -318,7 +318,7 @@ static void connect(struct blkfront_info *info)
 	err = xlvbd_add(sectors, info->vdevice, binfo, sector_size, info);
 	if (err) {
 		xenbus_dev_fatal(info->xbdev, err, "xlvbd_add at %s",
-		                 info->xbdev->otherend);
+				 info->xbdev->otherend);
 		return;
 	}
 
@@ -341,9 +341,21 @@ static void connect(struct blkfront_info *info)
  */
 static void blkfront_closing(struct xenbus_device *dev)
 {
-	struct blkfront_info *info = dev->data;
+	struct blkfront_info *info = dev->dev.driver_data;
+	unsigned long flags;
 
 	DPRINTK("blkfront_closing: %s removed\n", dev->nodename);
+
+	if (info->rq == NULL)
+		return;
+
+	spin_lock_irqsave(&blkif_io_lock, flags);
+	/* No more blkif_request(). */
+	blk_stop_queue(info->rq);
+	/* No more gnttab callback work. */
+	gnttab_cancel_free_callback(&info->callback);
+	flush_scheduled_work();
+	spin_unlock_irqrestore(&blkif_io_lock, flags);
 
 	xlvbd_del(info);
 
@@ -353,7 +365,7 @@ static void blkfront_closing(struct xenbus_device *dev)
 
 static int blkfront_remove(struct xenbus_device *dev)
 {
-	struct blkfront_info *info = dev->data;
+	struct blkfront_info *info = dev->dev.driver_data;
 
 	DPRINTK("blkfront_remove: %s removed\n", dev->nodename);
 
@@ -407,7 +419,8 @@ static void blkif_restart_queue(void *arg)
 {
 	struct blkfront_info *info = (struct blkfront_info *)arg;
 	spin_lock_irq(&blkif_io_lock);
-	kick_pending_request_queues(info);
+	if (info->connected == BLKIF_STATE_CONNECTED)
+		kick_pending_request_queues(info);
 	spin_unlock_irq(&blkif_io_lock);
 }
 
@@ -434,7 +447,7 @@ int blkif_release(struct inode *inode, struct file *filep)
 		   have ignored this request initially, as the device was
 		   still mounted. */
 		struct xenbus_device * dev = info->xbdev;
-		XenbusState state = xenbus_read_driver_state(dev->otherend);
+		enum xenbus_state state = xenbus_read_driver_state(dev->otherend);
 
 		if (state == XenbusStateClosing)
 			blkfront_closing(dev);
@@ -444,7 +457,7 @@ int blkif_release(struct inode *inode, struct file *filep)
 
 
 int blkif_ioctl(struct inode *inode, struct file *filep,
-                unsigned command, unsigned long argument)
+		unsigned command, unsigned long argument)
 {
 	int i;
 
@@ -452,10 +465,6 @@ int blkif_ioctl(struct inode *inode, struct file *filep,
 		      command, (long)argument, inode->i_rdev);
 
 	switch (command) {
-	case HDIO_GETGEO:
-		/* return ENOSYS to use defaults */
-		return -ENOSYS;
-
 	case CDROMMULTISESSION:
 		DPRINTK("FIXME: support multisession CDs later\n");
 		for (i = 0; i < sizeof(struct cdrom_multisession); i++)
@@ -469,6 +478,23 @@ int blkif_ioctl(struct inode *inode, struct file *filep,
 		return -EINVAL; /* same return as native Linux */
 	}
 
+	return 0;
+}
+
+
+int blkif_getgeo(struct block_device *bd, struct hd_geometry *hg)
+{
+	/* We don't have real geometry info, but let's at least return
+	   values consistent with the size of the device */
+	sector_t nsect = get_capacity(bd->bd_disk);
+	sector_t cylinders = nsect;
+
+	hg->heads = 0xff;
+	hg->sectors = 0x3f;
+	sector_div(cylinders, hg->heads * hg->sectors);
+	hg->cylinders = cylinders;
+	if ((sector_t)(hg->cylinders + 1) * hg->heads * hg->sectors < nsect)
+		hg->cylinders = 0xffff;
 	return 0;
 }
 
@@ -682,6 +708,12 @@ static void blkif_free(struct blkfront_info *info, int suspend)
 	spin_lock_irq(&blkif_io_lock);
 	info->connected = suspend ?
 		BLKIF_STATE_SUSPENDED : BLKIF_STATE_DISCONNECTED;
+	/* No more blkif_request(). */
+	if (info->rq)
+		blk_stop_queue(info->rq);
+	/* No more gnttab callback work. */
+	gnttab_cancel_free_callback(&info->callback);
+	flush_scheduled_work();
 	spin_unlock_irq(&blkif_io_lock);
 
 	/* Free resources associated with old device channel. */
@@ -755,17 +787,17 @@ static void blkif_recover(struct blkfront_info *info)
 
 	(void)xenbus_switch_state(info->xbdev, XenbusStateConnected);
 
-	/* Now safe for us to use the shared ring */
 	spin_lock_irq(&blkif_io_lock);
+
+	/* Now safe for us to use the shared ring */
 	info->connected = BLKIF_STATE_CONNECTED;
-	spin_unlock_irq(&blkif_io_lock);
 
 	/* Send off requeued requests */
 	flush_requests(info);
 
 	/* Kick any other new requests queued since we resumed */
-	spin_lock_irq(&blkif_io_lock);
 	kick_pending_request_queues(info);
+
 	spin_unlock_irq(&blkif_io_lock);
 }
 
@@ -792,7 +824,7 @@ static struct xenbus_driver blkfront = {
 
 static int __init xlblk_init(void)
 {
-	if (xen_init() < 0)
+	if (!is_running_on_xen())
 		return -ENODEV;
 
 	return xenbus_register_frontend(&blkfront);
@@ -807,13 +839,3 @@ static void xlblk_exit(void)
 module_exit(xlblk_exit);
 
 MODULE_LICENSE("Dual BSD/GPL");
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */
