@@ -16,8 +16,9 @@
 #include <linux/types.h>
 #include <linux/spinlock.h>
 #include <asm/atomic.h>
-
+#ifdef CONFIG_XEN
 #include <xen/interface/xenoprof.h>
+#endif
  
 struct super_block;
 struct dentry;

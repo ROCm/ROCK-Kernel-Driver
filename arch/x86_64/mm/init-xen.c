@@ -637,7 +637,7 @@ void __init extend_init_mapping(unsigned long tables_space)
 
 static unsigned long __init find_early_table_space(unsigned long end)
 {
-	unsigned long puds, pmds, ptes, tables; 
+	unsigned long puds, pmds, ptes, tables, fixmap_tables;
 
 	puds = (end + PUD_SIZE - 1) >> PUD_SHIFT;
 	pmds = (end + PMD_SIZE - 1) >> PMD_SHIFT;
@@ -647,24 +647,24 @@ static unsigned long __init find_early_table_space(unsigned long end)
 		round_up(pmds * 8, PAGE_SIZE) + 
 		round_up(ptes * 8, PAGE_SIZE); 
 
-	table_start = start_pfn;
-	table_end = table_start + (tables>>PAGE_SHIFT);
-
 	/* Also reserve pages for fixmaps that need to be set up early.
-	 * Their pud is shared with kernel pud.
+	 * Their pud is shared with the kernel pud.
 	 */
 	pmds = (PMD_SIZE - 1 - FIXADDR_START) >> PMD_SHIFT;
 	ptes = (PTE_SIZE - 1 - FIXADDR_START) >> PAGE_SHIFT;
 
-	tables += round_up(pmds * 8, PAGE_SIZE) + 
+	fixmap_tables = round_up(pmds * 8, PAGE_SIZE) + 
 		round_up(ptes * 8, PAGE_SIZE); 
 
-	extend_init_mapping(tables);
+	extend_init_mapping(tables + fixmap_tables);
+
+	table_start = start_pfn;
+	table_end = table_start + (tables>>PAGE_SHIFT);
 
 	early_printk("kernel direct mapping tables up to %lx @ %lx-%lx\n",
 		end, table_start << PAGE_SHIFT, table_end << PAGE_SHIFT);
 
-	return table_start + (tables>>PAGE_SHIFT);
+	return table_end + (fixmap_tables>>PAGE_SHIFT);
 }
 
 /* Setup the direct mapping of the physical memory at PAGE_OFFSET.
