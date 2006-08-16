@@ -78,6 +78,12 @@ void get_safe_registers(unsigned long *regs, unsigned long *fp_regs)
 		       HOST_FP_SIZE * sizeof(unsigned long));
 }
 
+#ifndef JB_PC
+#define JB_PC 7
+#define JB_RSP 6
+#define JB_RBP 1
+#endif
+
 void get_thread_regs(union uml_pt_regs *uml_regs, void *buffer)
 {
 	struct __jmp_buf_tag *jmpbuf = buffer;
