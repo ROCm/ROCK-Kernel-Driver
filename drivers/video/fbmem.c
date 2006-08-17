@@ -1212,8 +1212,8 @@ fb_mmap(struct file *file, struct vm_area_struct * vma)
 	if (io_remap_pfn_range(vma, vma->vm_start, off >> PAGE_SHIFT,
 			     vma->vm_end - vma->vm_start, vma->vm_page_prot))
 		return -EAGAIN;
-	return 0;
 #endif
+	return 0;
 #endif /* !sparc32 */
 }
 

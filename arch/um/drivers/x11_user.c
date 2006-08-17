@@ -282,6 +282,7 @@ struct x11_window *x11_open(int width, int height)
 	win = malloc(sizeof(*win));
 	if (NULL == win)
 		goto fail;
+	memset(win,0,sizeof(*win));
 
 	win->dpy = XOpenDisplay(NULL);
 	if (NULL == win->dpy)

@@ -305,18 +305,17 @@ int x11_mmap(struct fb_info *p, struct file *file,
 	     struct vm_area_struct * vma)
 {
 	struct x11_kerndata *kd = p->par;
-	struct x11_mapping *map;
+	struct x11_mapping *map = NULL;
 	int retval;
 	int map_pages;
 
 	down(&kd->mm_lock);
 
 	retval = -ENOMEM;
-	if (NULL == (map = kmalloc(sizeof(*map), GFP_KERNEL))) {
+	if (NULL == (map = kzalloc(sizeof(*map), GFP_KERNEL))) {
 		printk("%s: oops, out of memory\n",__FUNCTION__);
 		goto out;
 	}
-	memset(map,0,sizeof(*map));
 
 	retval = -EINVAL;
 	if (!(vma->vm_flags & VM_WRITE)) {
@@ -351,6 +350,8 @@ int x11_mmap(struct fb_info *p, struct file *file,
 	retval = 0;
 
 out:
+	if (map)
+		kfree(map);
 	up(&kd->mm_lock);
 	return retval;
 }
@@ -427,11 +428,6 @@ static int __init x11_probe(struct device *device)
 	kd->info->flags = FBINFO_FLAG_DEFAULT;
 
 	fb_alloc_cmap(&kd->info->cmap, 256, 0);
-	register_framebuffer(kd->info);
-	printk(KERN_INFO "fb%d: %s frame buffer device, %dx%d, %d fps, %d bpp (%d:%d:%d)\n",
-	       kd->info->node, kd->info->fix.id,
-	       kd->var->xres, kd->var->yres, x11_fps, kd->var->bits_per_pixel,
-	       kd->var->red.length, kd->var->green.length, kd->var->blue.length);
 
 	/* keyboard setup */
 	set_bit(EV_KEY, kd->kbd->evbit);
@@ -441,7 +437,6 @@ static int __init x11_probe(struct device *device)
 	kd->kbd->name = DRIVER_NAME " virtual keyboard";
 	kd->kbd->phys = DRIVER_NAME "/input0";
 	kd->kbd->cdev.dev = device;
-	input_register_device(kd->kbd);
 
 	/* mouse setup */
         init_input_dev(kd->mouse);
@@ -461,7 +456,6 @@ static int __init x11_probe(struct device *device)
 	kd->mouse->name = DRIVER_NAME " virtual mouse";
 	kd->mouse->phys = DRIVER_NAME "/input1";
 	kd->mouse->cdev.dev = device;
-	input_register_device(kd->mouse);
 
 	/* misc common kernel stuff */
 	init_MUTEX(&kd->mm_lock);
@@ -474,6 +468,15 @@ static int __init x11_probe(struct device *device)
 				  DRIVER_NAME " thread");
 	um_request_irq(X11_IRQ, x11_get_fd(kd->win), IRQ_READ, x11_irq,
 		       SA_INTERRUPT | SA_SHIRQ, DRIVER_NAME, kd);
+
+	/* register devices */
+	register_framebuffer(kd->info);
+	input_register_device(kd->kbd);
+	input_register_device(kd->mouse);
+	printk(KERN_INFO "fb%d: %s frame buffer device, %dx%d, %d fps, %d bpp (%d:%d:%d)\n",
+	       kd->info->node, kd->info->fix.id,
+	       kd->var->xres, kd->var->yres, x11_fps, kd->var->bits_per_pixel,
+	       kd->var->red.length, kd->var->green.length, kd->var->blue.length);
 
 	return 0;
 

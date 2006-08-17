@@ -14,11 +14,11 @@
 #include "linux/bootmem.h"
 #include "linux/spinlock.h"
 #include "linux/utsname.h"
-#include "linux/console.h"
 #include "linux/sysrq.h"
 #include "linux/seq_file.h"
 #include "linux/delay.h"
 #include "linux/module.h"
+#include "linux/console.h"
 #include "asm/page.h"
 #include "asm/pgtable.h"
 #include "asm/ptrace.h"
@@ -59,7 +59,7 @@ static void add_arg(char *arg)
 	strcat(command_line, arg);
 }
 
-struct cpuinfo_um boot_cpu_data = {
+struct cpuinfo_um boot_cpu_data = { 
 	.loops_per_jiffy	= 0,
 	.ipi_pipe		= { -1, -1 }
 };
@@ -225,7 +225,7 @@ static int __init uml_ncpus_setup(char *line, int *add)
 
 __uml_setup("ncpus=", uml_ncpus_setup,
 "ncpus=<# of desired CPUs>\n"
-"    This tells an SMP kernel how many virtual processors to start.\n\n"
+"    This tells an SMP kernel how many virtual processors to start.\n\n" 
 );
 #endif
 
@@ -410,7 +410,7 @@ int linux_main(int argc, char **argv)
 	argv1_begin = argv[1];
 	argv1_end = &argv[1][strlen(argv[1])];
 #endif
-
+  
 	highmem = 0;
 	iomem_size = (iomem_size + PAGE_SIZE - 1) & PAGE_MASK;
 	max_physmem = get_kmem_end() - uml_physmem - iomem_size - MIN_VMALLOC;
@@ -478,8 +478,6 @@ static struct notifier_block panic_exit_notifier = {
 	.next 			= NULL,
 	.priority 		= 0
 };
-
-extern int console_use_vt; /* FIXME */
 
 void __init setup_arch(char **cmdline_p)
 {

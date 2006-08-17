@@ -146,7 +146,7 @@ else
 endif
 UML_LIBS := -L/usr/$(libdir) -lutil
 ifeq ($(CONFIG_X11_FB),y)
-UML_LIBS += -L/usr/X11R6/$(libdir) -lX11 -lXext
+UML_LIBS += -L/usr/X11R6/$(libdir) -lX11 -lXext -lXau -lXdmcp
 endif
 
 CFLAGS_vmlinux := $(LINK-y) $(LINK_WRAPS)
