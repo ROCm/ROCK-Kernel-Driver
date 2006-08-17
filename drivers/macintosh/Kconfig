@@ -230,7 +230,7 @@ config ANSLCD
 
 config MACONLINUX
 	tristate "Mac on Linux kernel module"
-	depends on PPC32 && PPC_PMAC && !SMP && MODULES && NET
+	depends on PPC32 && PPC_PMAC && MODULES && NET
 	help
 	  call helpdesk
 
