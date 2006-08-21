@@ -810,14 +810,8 @@ void __init find_smp_config (void)
 	 */
 
 	address = get_bios_ebda();
-	if (address) {
-		/*
-		 * If this call of smp_scan_config() also returns 0 like the
-		 * three calls before, no mptable could be found at all.
-		 */
-		if (!smp_scan_config(address, 0x400))
-			printk(KERN_INFO "No mptable found.\n");
-	}
+	if (address)
+		smp_scan_config(address, 0x400);
 }
 
 int es7000_plat;
