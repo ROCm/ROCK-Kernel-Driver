@@ -155,7 +155,7 @@ static enum dlm_status dlmunlock_common(struct dlm_ctxt *dlm,
 	else
 		status = dlm_get_unlock_actions(dlm, res, lock, lksb, &actions);
 
-	if (status != DLM_NORMAL && status != DLM_CANCELGRANT)
+	if (status != DLM_NORMAL && (status != DLM_CANCELGRANT || !master_node))
 		goto leave;
 
 	/* By now this has been masked out of cancel requests. */
@@ -477,9 +477,8 @@ int dlm_unlock_lock_handler(struct o2net_msg *msg, u32 len, void *data)
 	/* lock was found on queue */
 	lksb = lock->lksb;
 	if (flags & (LKM_VALBLK|LKM_PUT_LVB) &&
-	    lock->ml.type != LKM_EXMODE) {
+	    lock->ml.type != LKM_EXMODE)
 		flags &= ~(LKM_VALBLK|LKM_PUT_LVB);
-	}
 
 	/* unlockast only called on originating node */
 	if (flags & LKM_PUT_LVB) {
@@ -621,9 +620,8 @@ retry:
 
 	spin_lock(&res->spinlock);
 	is_master = (res->owner == dlm->node_num);
-	if (flags & LKM_VALBLK && lock->ml.type != LKM_EXMODE) {
+	if (flags & LKM_VALBLK && lock->ml.type != LKM_EXMODE)
 		flags &= ~LKM_VALBLK;
-	}
 	spin_unlock(&res->spinlock);
 
 	if (is_master) {

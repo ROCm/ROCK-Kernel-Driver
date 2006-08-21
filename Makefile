@@ -1,7 +1,7 @@
 VERSION = 2
 PATCHLEVEL = 6
 SUBLEVEL = 18
-EXTRAVERSION = -rc4
+EXTRAVERSION = -rc4-git1
 NAME=Crazed Snow-Weasel
 
 # *DOCUMENTATION*
@@ -310,9 +310,6 @@ CPPFLAGS        := -D__KERNEL__ $(LINUXINCLUDE)
 CFLAGS          := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -Werror-implicit-function-declaration \
                    -fno-strict-aliasing -fno-common
-# Force gcc to behave correct even for buggy distributions
-CFLAGS          += $(call cc-option, -fno-stack-protector)
-
 AFLAGS          := -D__ASSEMBLY__
 
 # Warn about unsupported modules in kernels built inside Autobuild
@@ -492,6 +489,8 @@ else
 CFLAGS		+= -O2
 endif
 
+include $(srctree)/arch/$(ARCH)/Makefile
+
 ifdef CONFIG_FRAME_POINTER
 CFLAGS		+= -fno-omit-frame-pointer $(call cc-option,-fno-optimize-sibling-calls,)
 else
@@ -506,7 +505,8 @@ ifdef CONFIG_DEBUG_INFO
 CFLAGS		+= -g
 endif
 
-include $(srctree)/arch/$(ARCH)/Makefile
+# Force gcc to behave correct even for buggy distributions
+CFLAGS          += $(call cc-option, -fno-stack-protector)
 
 # arch Makefile may override CC so keep this after arch Makefile is included
 NOSTDINC_FLAGS += -nostdinc -isystem $(shell $(CC) -print-file-name=include)

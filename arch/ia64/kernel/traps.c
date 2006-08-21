@@ -125,7 +125,7 @@ die (const char *str, struct pt_regs *regs, long err)
 #endif	/* CONFIG_KDB */
 
 	if (panic_on_oops)
-		panic("Fatal exception: panic_on_oops");
+		panic("Fatal exception");
 
   	do_exit(SIGSEGV);
 }
