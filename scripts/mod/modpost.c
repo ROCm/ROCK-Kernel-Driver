@@ -1293,8 +1293,6 @@ static void add_depends(struct buffer *b, struct module *mod,
 	buf_printf(b, "__attribute__((section(\".modinfo\"))) =\n");
 	buf_printf(b, "\"depends=");
 	for (s = mod->unres; s; s = s->next) {
-		const char *r;
-
 		if (!s->module)
 			continue;
 
@@ -1302,10 +1300,8 @@ static void add_depends(struct buffer *b, struct module *mod,
 			continue;
 
 		s->module->seen = 1;
-		r = strrchr(s->module->name, '/');
-		if (! r)
-			continue;
-		buf_printf(b, "%s%s", first ? "" : ",", r + 1);
+		buf_printf(b, "%s%s", first ? "" : ",",
+			   strrchr(s->module->name, '/') + 1);
 		first = 0;
 	}
 	buf_printf(b, "\";\n");

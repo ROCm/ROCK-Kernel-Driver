@@ -73,10 +73,10 @@ static unsigned short int max_mbox_busy_wait = MBOX_BUSY_WAIT;
 module_param(max_mbox_busy_wait, ushort, 0);
 MODULE_PARM_DESC(max_mbox_busy_wait, "Maximum wait for mailbox in microseconds if busy (default=MBOX_BUSY_WAIT=10)");
 
-#define RDINDOOR(adapter)		readl((void __iomem *)((adapter)->base + 0x20))
-#define RDOUTDOOR(adapter)		readl((void __iomem *)((adapter)->base + 0x2C))
-#define WRINDOOR(adapter,value)		writel(value, (void __iomem *)((adapter)->base + 0x20))
-#define WROUTDOOR(adapter,value)	writel(value, (void __iomem *)((adapter)->base + 0x2C))
+#define RDINDOOR(adapter)		readl((adapter)->base + 0x20)
+#define RDOUTDOOR(adapter)		readl((adapter)->base + 0x2C)
+#define WRINDOOR(adapter,value)		writel(value, (adapter)->base + 0x20)
+#define WROUTDOOR(adapter,value)	writel(value, (adapter)->base + 0x2C)
 
 /*
  * Global variables
