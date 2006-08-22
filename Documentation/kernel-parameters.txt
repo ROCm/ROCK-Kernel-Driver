@@ -1021,6 +1021,10 @@ running once the system is up.
 	noapic		[SMP,APIC] Tells the kernel to not make use of any
 			IOAPICs that may be present in the system.
 
+	apic		[APIC,i386] Override default heuristics to enable/disable the local
+			APIC by CONFIG_X86_APIC_AUTO. When this option is set the kernel
+			will try to use the local APIC.
+
 	noasync		[HW,M68K] Disables async and sync negotiation for
 			all devices.
 

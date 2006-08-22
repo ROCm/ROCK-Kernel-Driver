@@ -299,6 +299,16 @@ config X86_LOCAL_APIC
 	depends on X86_UP_APIC || ((X86_VISWS || SMP) && !(X86_VOYAGER || XEN_UNPRIVILEGED_GUEST))
 	default y
 
+config X86_APIC_AUTO
+        bool "Use heuristics to enable/disable local APIC"
+	depends on X86_LOCAL_APIC
+	help
+	  This option uses some proven heuristics to automatically enable or disable the local
+	  APIC. All decisions can be overriden by command line options.
+	  In a nutshell very old systems run better with APIC off and newer or multiprocessor 
+	  systems prefer APIC on
+	  This is a useful default for distribution kernels.
+
 config X86_IO_APIC
 	bool
 	depends on X86_UP_IOAPIC || (SMP && !(X86_VISWS || X86_VOYAGER || XEN_UNPRIVILEGED_GUEST))
