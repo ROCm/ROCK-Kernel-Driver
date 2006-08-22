@@ -419,7 +419,6 @@ void * __init __alloc_bootmem(unsigned long size, unsigned long align, unsigned 
 	 * Whoops, we cannot satisfy the allocation request.
 	 */
 	printk(KERN_ALERT "bootmem alloc of %lu bytes failed!\n", size);
-	WARN_ON(1);
 	panic("Out of memory");
 	return NULL;
 }
