@@ -196,7 +196,7 @@ struct cfq_queue {
 	unsigned short ioprio_class, org_ioprio_class;
 
 	/* various state flags, see below */
-	unsigned long flags;
+	unsigned int flags;
 };
 
 struct cfq_rq {
@@ -208,7 +208,7 @@ struct cfq_rq {
 	struct cfq_queue *cfq_queue;
 	struct cfq_io_context *io_context;
 
-	unsigned long crq_flags;
+	unsigned int crq_flags;
 };
 
 enum cfqq_state_flags {
@@ -225,15 +225,15 @@ enum cfqq_state_flags {
 #define CFQ_CFQQ_FNS(name)						\
 static inline void cfq_mark_cfqq_##name(struct cfq_queue *cfqq)		\
 {									\
-	set_bit(CFQ_CFQQ_FLAG_##name, &(cfqq)->flags);			\
+	cfqq->flags |= (1 << CFQ_CFQQ_FLAG_##name);			\
 }									\
 static inline void cfq_clear_cfqq_##name(struct cfq_queue *cfqq)	\
 {									\
-	clear_bit(CFQ_CFQQ_FLAG_##name, &(cfqq)->flags);		\
+	cfqq->flags &= ~(1 << CFQ_CFQQ_FLAG_##name);			\
 }									\
 static inline int cfq_cfqq_##name(const struct cfq_queue *cfqq)		\
 {									\
-	return test_bit(CFQ_CFQQ_FLAG_##name, &(cfqq)->flags) != 0;	\
+	return (cfqq->flags & (1 << CFQ_CFQQ_FLAG_##name)) != 0;	\
 }
 
 CFQ_CFQQ_FNS(on_rr);
@@ -253,15 +253,15 @@ enum cfq_rq_state_flags {
 #define CFQ_CRQ_FNS(name)						\
 static inline void cfq_mark_crq_##name(struct cfq_rq *crq)		\
 {									\
-	set_bit(CFQ_CRQ_FLAG_##name, &(crq)->crq_flags);		\
+	crq->crq_flags |= (1 << CFQ_CRQ_FLAG_##name);			\
 }									\
 static inline void cfq_clear_crq_##name(struct cfq_rq *crq)		\
 {									\
-	clear_bit(CFQ_CRQ_FLAG_##name, &(crq)->crq_flags);		\
+	crq->crq_flags &= ~(1 << CFQ_CRQ_FLAG_##name);			\
 }									\
 static inline int cfq_crq_##name(const struct cfq_rq *crq)		\
 {									\
-	return test_bit(CFQ_CRQ_FLAG_##name, &(crq)->crq_flags) != 0;	\
+	return (crq->crq_flags & (1 << CFQ_CRQ_FLAG_##name)) != 0;	\
 }
 
 CFQ_CRQ_FNS(is_sync);
