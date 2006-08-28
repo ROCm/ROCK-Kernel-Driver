@@ -28,7 +28,6 @@ u16 cpu_to_node_map[NR_CPUS] __cacheline_aligned;
 EXPORT_SYMBOL(cpu_to_node_map);
 
 cpumask_t node_to_cpu_mask[MAX_NUMNODES] __cacheline_aligned;
-EXPORT_SYMBOL_GPL(node_to_cpu_mask);
 
 /**
  * build_cpu_to_node_map - setup cpu to node and node to cpumask arrays
