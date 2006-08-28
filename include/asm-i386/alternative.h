@@ -122,7 +122,7 @@ static inline void alternatives_smp_switch(int smp) {}
 		      ".previous\n"					\
 		      ".section .smp_altinstr_replacement,\"awx\"\n"   	\
 		      "663:\n\t" upinstr "\n"     /* replacement */	\
-		      "664:\n\t.fill 662b-661b,1,0x42\n" /* space for original */ \
+		      "664:\n\t.fill 662b-661b,1,0x90\n" /* space for original */ \
 		      ".previous" : args)
 
 #define LOCK_PREFIX \
