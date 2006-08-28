@@ -1003,7 +1003,9 @@ void __init pmac_pcibios_fixup(void)
 #if defined(CONFIG_SERIAL_8250) && defined(CONFIG_SERIAL_PMACZILOG)
 	do_not_try_pc_legacy_8250 = 1;
 #endif
+#ifdef CONFIG_PPC32
 	request_region(0x0UL, 0x10000UL, "reserved legacy io");
+#endif
 
 	for_each_pci_dev(dev) {
 		/* Read interrupt from the device-tree */
