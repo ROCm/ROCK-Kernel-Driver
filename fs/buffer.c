@@ -1338,8 +1338,6 @@ static DEFINE_PER_CPU(struct bh_lru, bh_lrus) = {{ NULL }};
 #define bh_lru_unlock()	preempt_enable()
 #endif
 
-static int lru_disabled __read_mostly;
-
 static inline void check_irqs_on(void)
 {
 #ifdef irqs_disabled
@@ -1354,9 +1352,6 @@ static void bh_lru_install(struct buffer_head *bh)
 {
 	struct buffer_head *evictee = NULL;
 	struct bh_lru *lru;
-
-	if (lru_disabled)
-		return; 
 
 	check_irqs_on();
 	bh_lru_lock();
@@ -1401,9 +1396,6 @@ lookup_bh_lru(struct block_device *bdev, sector_t block, int size)
 	struct buffer_head *ret = NULL;
 	struct bh_lru *lru;
 	int i;
-
-	if (lru_disabled)
-		return ret;	
 
 	check_irqs_on();
 	bh_lru_lock();
@@ -1526,8 +1518,7 @@ static void invalidate_bh_lru(void *arg)
 	
 static void invalidate_bh_lrus(void)
 {
-	if (!lru_disabled)
-		on_each_cpu(invalidate_bh_lru, NULL, 1, 1);
+	on_each_cpu(invalidate_bh_lru, NULL, 1, 1);
 }
 
 void set_bh_page(struct buffer_head *bh,
@@ -3133,9 +3124,6 @@ static void buffer_exit_cpu(int cpu)
 	int i;
 	struct bh_lru *b = &per_cpu(bh_lrus, cpu);
 
-	if (lru_disabled)
-		return;
-
 	for (i = 0; i < BH_LRU_SIZE; i++) {
 		brelse(b->bhs[i]);
 		b->bhs[i] = NULL;
@@ -3172,13 +3160,6 @@ void __init buffer_init(void)
 	max_buffer_heads = nrpages * (PAGE_SIZE / sizeof(struct buffer_head));
 	hotcpu_notifier(buffer_cpu_notify, 0);
 }
-
-static int __init disable_buffer_lru(char *s)
-{
-	lru_disabled = 1;
-	return 0;
-}
-__setup("disable_buffer_lru", disable_buffer_lru);
 
 EXPORT_SYMBOL(__bforget);
 EXPORT_SYMBOL(__brelse);
