@@ -2925,10 +2925,10 @@ int nfs4_proc_setclientid(struct nfs4_client *clp, u32 program, unsigned short p
 
 	for(;;) {
 		setclientid.sc_name_len = scnprintf(setclientid.sc_name,
-				sizeof(setclientid.sc_name), "%u %s/%u.%u.%u.%u %s",
-				clp->cl_id_uniquifier,
+				sizeof(setclientid.sc_name), "%s/%u.%u.%u.%u %s %u",
 				clp->cl_ipaddr, NIPQUAD(clp->cl_addr.s_addr),
-				cred->cr_ops->cr_name);
+				cred->cr_ops->cr_name,
+				clp->cl_id_uniquifier);
 		setclientid.sc_netid_len = scnprintf(setclientid.sc_netid,
 				sizeof(setclientid.sc_netid), "tcp");
 		setclientid.sc_uaddr_len = scnprintf(setclientid.sc_uaddr,
