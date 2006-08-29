@@ -898,7 +898,6 @@ icmp_fail:
 out_unregister_sock:
 	sock_unregister(PF_INET6);
 out_unregister_raw_proto:
-	sock_unregister(PF_INET6);
 	proto_unregister(&rawv6_prot);
 out_unregister_udp_proto:
 	proto_unregister(&udpv6_prot);
