@@ -691,7 +691,7 @@ source "arch/powerpc/platforms/pseries/Kconfig"
 
 config NUMA
 	bool "NUMA support"
-	depends on PPC64 && !CRASH_DUMP
+	depends on PPC64
 	default y if SMP && PPC_PSERIES
 
 config NODES_SHIFT

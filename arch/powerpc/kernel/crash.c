@@ -256,8 +256,6 @@ void crash_kexec_secondary(struct pt_regs *regs)
 #else
 static void crash_kexec_prepare_cpus(int cpu)
 {
-	unsigned int irq;
-
 	/*
 	 * move the secondarys to us so that we can copy
 	 * the new kernel 0-0x100 safely
