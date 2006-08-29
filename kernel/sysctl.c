@@ -163,8 +163,6 @@ extern ctl_table inotify_table[];
 int sysctl_legacy_va_layout;
 #endif
 
-extern int rcu_mask;
-
 /* /proc declarations: */
 
 #ifdef CONFIG_PROC_FS
@@ -309,14 +307,6 @@ static ctl_table kern_table[] = {
 		.data		= &tainted,
 		.maxlen		= sizeof(int),
 		.mode		= 0444,
-		.proc_handler	= &proc_dointvec,
-	},
-	{
-		.ctl_name	= KERN_RCU_MASK,
-		.procname	= "rcu_mask",
-		.data		= &rcu_mask,
-		.maxlen		= sizeof(int),
-		.mode		= 0644,
 		.proc_handler	= &proc_dointvec,
 	},
 #ifdef CONFIG_MODULES

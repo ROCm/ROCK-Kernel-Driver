@@ -108,10 +108,6 @@ struct rcu_data {
 	struct rcu_head barrier;
 #ifdef CONFIG_SMP
 	long		last_rs_qlen;	 /* qlen during the last resched */
-#ifdef CONFIG_IA64
-	spinlock_t	rmlock;		 /* for use with remote callback */
-	short		batch_stat;	 /* indicate processing being done */
-#endif
 #endif
 };
 
@@ -288,10 +284,6 @@ extern void FASTCALL(call_rcu_bh(struct rcu_head *head,
 extern void synchronize_rcu(void);
 void synchronize_idle(void);
 extern void rcu_barrier(void);
-#if defined(CONFIG_NUMA) && defined(CONFIG_IA64)
-extern int rcu_set_remote_rcu(int cpu);
-extern int rcu_clear_remote_rcu(int cpu);
-#endif
 
 #endif /* __KERNEL__ */
 #endif /* __LINUX_RCUPDATE_H */

@@ -152,7 +152,6 @@ enum
 	KERN_MAX_LOCK_DEPTH=74,
 	KERN_UNSUPPORTED=75,	/* int: allow loading of unsupported modules */
 	KERN_KDB=76,		/* int: kdb on/off */
-	KERN_RCU_MASK=77,       /* int: mask for slow rcu callback processing */
 };
 
 
