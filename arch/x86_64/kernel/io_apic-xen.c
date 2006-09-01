@@ -48,9 +48,9 @@ int sis_apic_bug; /* not actually supported, dummy for compile */
 
 static int no_timer_check;
 
+#ifndef CONFIG_XEN
 int disable_timer_pin_1 __initdata;
 
-#ifndef CONFIG_XEN
 int timer_over_8254 __initdata = 0;
 
 /* Where if anywhere is the i8259 connect in external int mode */
@@ -92,41 +92,12 @@ int vector_irq[NR_VECTORS] __read_mostly = { [0 ... NR_VECTORS - 1] = -1};
 
 #ifdef CONFIG_XEN
 
-#include <xen/interface/xen.h>
-#include <xen/interface/physdev.h>
-
 /* Fake i8259 */
 #define make_8259A_irq(_irq)     (io_apic_irqs &= ~(1UL<<(_irq)))
 #define disable_8259A_irq(_irq)  ((void)0)
 #define i8259A_irq_pending(_irq) (0)
 
 unsigned long io_apic_irqs;
-
-static inline unsigned int xen_io_apic_read(unsigned int apic, unsigned int reg)
-{
-	struct physdev_apic apic_op;
-	int ret;
-
-	apic_op.apic_physbase = mp_ioapics[apic].mpc_apicaddr;
-	apic_op.reg = reg;
-	ret = HYPERVISOR_physdev_op(PHYSDEVOP_apic_read, &apic_op);
-	if (ret)
-		return ret;
-	return apic_op.value;
-}
-
-static inline void xen_io_apic_write(unsigned int apic, unsigned int reg, unsigned int value)
-{
-	struct physdev_apic apic_op;
-
-	apic_op.apic_physbase = mp_ioapics[apic].mpc_apicaddr;
-	apic_op.reg = reg;
-	apic_op.value = value;
-	HYPERVISOR_physdev_op(PHYSDEVOP_apic_write, &apic_op);
-}
-
-#define io_apic_read(a,r)    xen_io_apic_read(a,r)
-#define io_apic_write(a,r,v) xen_io_apic_write(a,r,v)
 
 #define clear_IO_APIC() ((void)0)
 

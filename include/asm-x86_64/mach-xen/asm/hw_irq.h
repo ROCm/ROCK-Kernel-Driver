@@ -23,7 +23,6 @@
 struct hw_interrupt_type;
 #endif
 
-#define NMI_VECTOR		0x02
 /*
  * IDT vectors usable for external interrupt sources start
  * at 0x20:

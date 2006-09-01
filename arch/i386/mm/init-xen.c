@@ -567,7 +567,7 @@ void __init paging_init(void)
 
 	/* Setup mapping of lower 1st MB */
 	for (i = 0; i < NR_FIX_ISAMAPS; i++)
-		if (xen_start_info->flags & SIF_PRIVILEGED)
+		if (is_initial_xendomain())
 			set_fixmap(FIX_ISAMAP_BEGIN - i, i * PAGE_SIZE);
 		else
 			__set_fixmap(FIX_ISAMAP_BEGIN - i,
@@ -599,18 +599,6 @@ static void __init test_wp_bit(void)
 	} else {
 		printk("Ok.\n");
 	}
-}
-
-static void __init set_max_mapnr_init(void)
-{
-#ifdef CONFIG_HIGHMEM
-	num_physpages = highend_pfn;
-#else
-	num_physpages = max_low_pfn;
-#endif
-#ifdef CONFIG_FLATMEM
-	max_mapnr = num_physpages;
-#endif
 }
 
 static struct kcore_list kcore_mem, kcore_vmalloc; 
@@ -649,13 +637,6 @@ void __init mem_init(void)
 	}
 #endif
  
-	set_max_mapnr_init();
-
-#ifdef CONFIG_HIGHMEM
-	high_memory = (void *) __va(highstart_pfn * PAGE_SIZE - 1) + 1;
-#else
-	high_memory = (void *) __va(max_low_pfn * PAGE_SIZE - 1) + 1;
-#endif
 	printk("vmalloc area: %lx-%lx, maxmem %lx\n",
 	       VMALLOC_START,VMALLOC_END,MAXMEM);
 	BUG_ON(VMALLOC_START > VMALLOC_END);

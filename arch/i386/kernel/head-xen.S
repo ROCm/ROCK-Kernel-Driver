@@ -1,6 +1,7 @@
 
 
 .text
+#include <linux/elfnote.h>
 #include <linux/threads.h>
 #include <linux/linkage.h>
 #include <asm/segment.h>
@@ -9,6 +10,7 @@
 #include <asm/thread_info.h>
 #include <asm/asm-offsets.h>
 #include <xen/interface/arch-x86_32.h>
+#include <xen/interface/elfnote.h>
 
 /*
  * References to members of the new_cpu_data structure.
@@ -59,10 +61,8 @@ ENTRY(startup_32)
 	movl %eax,%gs
 	cld			# gcc2 wants the direction flag cleared at all times
 
-	call start_kernel
-L6:
-	jmp L6			# main should never return here, but
-				# just in case, we know what happens.
+	pushl %eax		# fake return address
+	jmp start_kernel
 
 #define HYPERCALL_PAGE_OFFSET 0x1000
 .org HYPERCALL_PAGE_OFFSET
@@ -139,6 +139,7 @@ ENTRY(cpu_gdt_table)
 	.quad 0x0000000000000000	/* 0xf0 - unused */
 	.quad 0x0000000000000000	/* 0xf8 - GDT entry 31: double-fault TSS */
 
+#ifdef CONFIG_XEN_COMPAT_030002
 /*
  * __xen_guest information
  */
@@ -158,12 +159,8 @@ ENTRY(cpu_gdt_table)
 	.ascii	",XEN_VER=xen-3.0"
 	.ascii	",VIRT_BASE=0x"
 		utoa __PAGE_OFFSET
-#ifdef CONFIG_XEN_COMPAT_030002
 	.ascii	",ELF_PADDR_OFFSET=0x"
 		utoa __PAGE_OFFSET
-#else
-	.ascii	",ELF_PADDR_OFFSET=0x0"
-#endif /* !CONFIG_XEN_COMPAT_030002 */
 	.ascii	",VIRT_ENTRY=0x"
 		utoa (__PAGE_OFFSET + __PHYSICAL_START + VIRT_ENTRY_OFFSET)
 	.ascii	",HYPERCALL_PAGE=0x"
@@ -180,3 +177,24 @@ ENTRY(cpu_gdt_table)
 #endif
 	.ascii	",LOADER=generic"
 	.byte	0
+#endif /* CONFIG_XEN_COMPAT_030002 */
+
+
+	ELFNOTE(Xen, XEN_ELFNOTE_GUEST_OS,       .asciz, "linux")	
+	ELFNOTE(Xen, XEN_ELFNOTE_GUEST_VERSION,  .asciz, "2.6")
+	ELFNOTE(Xen, XEN_ELFNOTE_XEN_VERSION,    .asciz, "xen-3.0")
+	ELFNOTE(Xen, XEN_ELFNOTE_VIRT_BASE,      .long,  __PAGE_OFFSET)
+#ifdef CONFIG_XEN_COMPAT_030002
+	ELFNOTE(Xen, XEN_ELFNOTE_PADDR_OFFSET,   .long,  __PAGE_OFFSET)
+#else
+	ELFNOTE(Xen, XEN_ELFNOTE_PADDR_OFFSET,   .long,  0)
+#endif /* !CONFIG_XEN_COMPAT_030002 */
+	ELFNOTE(Xen, XEN_ELFNOTE_ENTRY,          .long,  startup_32)
+	ELFNOTE(Xen, XEN_ELFNOTE_HYPERCALL_PAGE, .long,  hypercall_page)
+	ELFNOTE(Xen, XEN_ELFNOTE_FEATURES,       .asciz, "writable_page_tables|writable_descriptor_tables|auto_translated_physmap|pae_pgdir_above_4gb|supervisor_mode_kernel")
+#ifdef CONFIG_X86_PAE
+	ELFNOTE(Xen, XEN_ELFNOTE_PAE_MODE,       .asciz, "yes")
+#else
+	ELFNOTE(Xen, XEN_ELFNOTE_PAE_MODE,       .asciz, "no")
+#endif
+	ELFNOTE(Xen, XEN_ELFNOTE_LOADER,         .asciz, "generic")

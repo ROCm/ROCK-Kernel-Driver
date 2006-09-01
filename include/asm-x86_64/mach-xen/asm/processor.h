@@ -242,6 +242,11 @@ struct tss_struct {
 } __attribute__((packed)) ____cacheline_aligned;
 
 DECLARE_PER_CPU(struct tss_struct,init_tss);
+/* Save the original ist values for checking stack pointers during debugging */
+struct orig_ist {
+	unsigned long ist[7];
+};
+DECLARE_PER_CPU(struct orig_ist, orig_ist);
 #endif
 
 extern struct cpuinfo_x86 boot_cpu_data;

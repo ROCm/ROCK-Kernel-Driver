@@ -42,7 +42,7 @@ static inline void lapic_enable(void)
 	} while (0)
 
 
-#ifdef CONFIG_X86_LOCAL_APIC
+#if defined(CONFIG_X86_LOCAL_APIC) && !defined(CONFIG_XEN)
 
 /*
  * Basic functions accessing APICs.
@@ -119,19 +119,22 @@ extern void enable_NMI_through_LVT0 (void * dummy);
 
 extern int disable_timer_pin_1;
 
-#ifndef CONFIG_XEN
 void smp_send_timer_broadcast_ipi(struct pt_regs *regs);
 void switch_APIC_timer_to_ipi(void *cpumask);
 void switch_ipi_to_APIC_timer(void *cpumask);
 #define ARCH_APICTIMER_STOPS_ON_C3	1
-#endif
 
 extern int timer_over_8254;
 
 extern void dmi_check_apic(void);
 
-#else /* !CONFIG_X86_LOCAL_APIC */
+#else /* !CONFIG_X86_LOCAL_APIC || CONFIG_XEN */
+
 static inline void lapic_shutdown(void) { }
+
+#ifdef CONFIG_X86_LOCAL_APIC
+extern int APIC_init_uniprocessor (void);
+#endif
 
 #endif /* !CONFIG_X86_LOCAL_APIC */
 

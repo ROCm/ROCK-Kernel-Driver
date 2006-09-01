@@ -190,7 +190,6 @@ struct resource code_resource = {
 
 #define IORESOURCE_ROM (IORESOURCE_BUSY | IORESOURCE_READONLY | IORESOURCE_MEM)
 
-#if defined(CONFIG_XEN_PRIVILEGED_GUEST) || !defined(CONFIG_XEN)
 static struct resource system_rom_resource = {
 	.name = "System ROM",
 	.start = 0xf0000,
@@ -219,19 +218,16 @@ static struct resource adapter_rom_resources[] = {
 	{ .name = "Adapter ROM", .start = 0, .end = 0,
 		.flags = IORESOURCE_ROM }
 };
-#endif
 
 #define ADAPTER_ROM_RESOURCES \
 	(sizeof adapter_rom_resources / sizeof adapter_rom_resources[0])
 
-#if defined(CONFIG_XEN_PRIVILEGED_GUEST) || !defined(CONFIG_XEN)
 static struct resource video_rom_resource = {
 	.name = "Video ROM",
 	.start = 0xc0000,
 	.end = 0xc7fff,
 	.flags = IORESOURCE_ROM,
 };
-#endif
 
 static struct resource video_ram_resource = {
 	.name = "Video RAM area",
@@ -240,7 +236,6 @@ static struct resource video_ram_resource = {
 	.flags = IORESOURCE_RAM,
 };
 
-#if defined(CONFIG_XEN_PRIVILEGED_GUEST) || !defined(CONFIG_XEN)
 #define romsignature(x) (*(unsigned short *)(x) == 0xaa55)
 
 static int __init romchecksum(unsigned char *rom, unsigned long length)
@@ -257,6 +252,12 @@ static void __init probe_roms(void)
 	unsigned long start, length, upper;
 	unsigned char *rom;
 	int	      i;
+
+#ifdef CONFIG_XEN
+	/* Nothing to do if not running in dom0. */
+	if (!is_initial_xendomain())
+		return;
+#endif
 
 	/* video rom */
 	upper = adapter_rom_resources[0].start;
@@ -316,7 +317,6 @@ static void __init probe_roms(void)
 		start = adapter_rom_resources[i++].end & ~2047UL;
 	}
 }
-#endif
 
 /* Check for full argument with no trailing characters */
 static int fullarg(char *p, char *arg)
@@ -568,14 +568,11 @@ static void discover_ebda(void)
 
 void __init setup_arch(char **cmdline_p)
 {
-	unsigned long kernel_end;
-
 #ifdef CONFIG_XEN
  	ROOT_DEV = MKDEV(RAMDISK_MAJOR,0); 
-	kernel_end = 0;		/* dummy */
  	screen_info = SCREEN_INFO;
 
-	if (xen_start_info->flags & SIF_INITDOMAIN) {
+	if (is_initial_xendomain()) {
 		/* This is drawn from a dump from vgacon:startup in
 		 * standard Linux. */
 		screen_info.orig_video_mode = 3;
@@ -584,6 +581,35 @@ void __init setup_arch(char **cmdline_p)
 		screen_info.orig_video_cols = 80;
 		screen_info.orig_video_ega_bx = 3;
 		screen_info.orig_video_points = 16;
+		if (xen_start_info->console.dom0.info_size >=
+		    sizeof(struct dom0_vga_console_info)) {
+			const struct dom0_vga_console_info *info =
+				(struct dom0_vga_console_info *)(
+					(char *)xen_start_info +
+					xen_start_info->console.dom0.info_off);
+			screen_info.orig_video_mode = info->txt_mode;
+			screen_info.orig_video_isVGA = info->video_type;
+			screen_info.orig_video_lines = info->video_height;
+			screen_info.orig_video_cols = info->video_width;
+			screen_info.orig_video_points = info->txt_points;
+			screen_info.lfb_width = info->video_width;
+			screen_info.lfb_height = info->video_height;
+			screen_info.lfb_depth = info->lfb_depth;
+			screen_info.lfb_base = info->lfb_base;
+			screen_info.lfb_size = info->lfb_size;
+			screen_info.lfb_linelength = info->lfb_linelen;
+			screen_info.red_size = info->red_size;
+			screen_info.red_pos = info->red_pos;
+			screen_info.green_size = info->green_size;
+			screen_info.green_pos = info->green_pos;
+			screen_info.blue_size = info->blue_size;
+			screen_info.blue_pos = info->blue_pos;
+			screen_info.rsvd_size = info->rsvd_size;
+			screen_info.rsvd_pos = info->rsvd_pos;
+		}
+		screen_info.orig_y = screen_info.orig_video_lines - 1;
+		xen_start_info->console.domU.mfn = 0;
+		xen_start_info->console.domU.evtchn = 0;
 	} else
 		screen_info.orig_video_isVGA = 0;
 
@@ -650,7 +676,7 @@ void __init setup_arch(char **cmdline_p)
 
 	init_memory_mapping(0, (end_pfn_map << PAGE_SHIFT));
 
-	if (xen_start_info->flags & SIF_INITDOMAIN)
+	if (is_initial_xendomain())
 		dmi_scan_machine();
 
 #ifdef CONFIG_ACPI_NUMA
@@ -660,24 +686,30 @@ void __init setup_arch(char **cmdline_p)
 	acpi_numa_init();
 #endif
 
+	/* How many end-of-memory variables you have, grandma! */
+	max_low_pfn = end_pfn;
+	max_pfn = end_pfn;
+	high_memory = (void *)__va(end_pfn * PAGE_SIZE - 1) + 1;
+
 #ifdef CONFIG_NUMA
 	numa_initmem_init(0, end_pfn); 
 #else
 	contig_initmem_init(0, end_pfn);
 #endif
 
+#ifdef CONFIG_XEN
+	/* reserve kernel, physmap, start info and initial page tables */
+	reserve_bootmem_generic(__pa_symbol(&_text),
+	                        (table_end << PAGE_SHIFT) - __pa_symbol(&_text));
+#else
 	/* Reserve direct mapping */
 	reserve_bootmem_generic(table_start << PAGE_SHIFT, 
 				(table_end - table_start) << PAGE_SHIFT);
 
 	/* reserve kernel */
-	kernel_end = round_up(__pa_symbol(&_end),PAGE_SIZE);
-	reserve_bootmem_generic(HIGH_MEMORY, kernel_end - HIGH_MEMORY);
+	reserve_bootmem_generic(__pa_symbol(&_text),
+				__pa_symbol(&_end) - __pa_symbol(&_text));
 
-#ifdef CONFIG_XEN
-	/* reserve physmap, start info and initial page tables */
-	reserve_bootmem(kernel_end, (table_start<<PAGE_SHIFT)-kernel_end);
-#else
 	/*
 	 * reserve physical page 0 - it's a special BIOS page on many boxes,
 	 * enabling clean reboots, SMP operation, laptop functions.
@@ -687,7 +719,6 @@ void __init setup_arch(char **cmdline_p)
 	/* reserve ebda region */
 	if (ebda_addr)
 		reserve_bootmem_generic(ebda_addr, ebda_size);
-#endif
 
 #ifdef CONFIG_SMP
 	/*
@@ -700,6 +731,7 @@ void __init setup_arch(char **cmdline_p)
 	/* Reserve SMP trampoline */
 	reserve_bootmem_generic(SMP_TRAMPOLINE_BASE, PAGE_SIZE);
 #endif
+#endif
 
 #ifdef CONFIG_ACPI_SLEEP
        /*
@@ -707,28 +739,18 @@ void __init setup_arch(char **cmdline_p)
         */
        acpi_reserve_bootmem();
 #endif
-#ifdef CONFIG_XEN
 #ifdef CONFIG_BLK_DEV_INITRD
-	if (xen_start_info->mod_start) {
-		if (INITRD_START + INITRD_SIZE <= (end_pfn << PAGE_SHIFT)) {
-			/*reserve_bootmem_generic(INITRD_START, INITRD_SIZE);*/
-			initrd_start = INITRD_START + PAGE_OFFSET;
-			initrd_end = initrd_start+INITRD_SIZE;
-			initrd_below_start_ok = 1;
-		} else {
-			printk(KERN_ERR "initrd extends beyond end of memory "
-				"(0x%08lx > 0x%08lx)\ndisabling initrd\n",
-				(unsigned long)(INITRD_START + INITRD_SIZE),
-				(unsigned long)(end_pfn << PAGE_SHIFT));
-			initrd_start = 0;
-		}
-	}
-#endif
-#else	/* CONFIG_XEN */
-#ifdef CONFIG_BLK_DEV_INITRD
+#ifndef CONFIG_XEN
 	if (LOADER_TYPE && INITRD_START) {
+#else
+	if (xen_start_info->mod_start) {
+#endif
 		if (INITRD_START + INITRD_SIZE <= (end_pfn << PAGE_SHIFT)) {
+#ifndef CONFIG_XEN
 			reserve_bootmem_generic(INITRD_START, INITRD_SIZE);
+#else
+			initrd_below_start_ok = 1;
+#endif
 			initrd_start =
 				INITRD_START ? INITRD_START + PAGE_OFFSET : 0;
 			initrd_end = initrd_start+INITRD_SIZE;
@@ -742,7 +764,6 @@ void __init setup_arch(char **cmdline_p)
 		}
 	}
 #endif
-#endif	/* !CONFIG_XEN */
 #ifdef CONFIG_KEXEC
 	if (crashk_res.start != crashk_res.end) {
 		reserve_bootmem_generic(crashk_res.start,
@@ -803,8 +824,7 @@ void __init setup_arch(char **cmdline_p)
 
 	}
 
-	if ( ! (xen_start_info->flags & SIF_INITDOMAIN))
-	{
+	if (!is_initial_xendomain()) {
 		acpi_disabled = 1;
 #ifdef  CONFIG_ACPI
 		acpi_ht = 0;
@@ -854,19 +874,13 @@ void __init setup_arch(char **cmdline_p)
 	 * Request address space for all standard RAM and ROM resources
 	 * and also for regions reported as reserved by the e820.
 	 */
-#ifdef CONFIG_XEN
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
 	probe_roms();
-	if (xen_start_info->flags & SIF_INITDOMAIN)
+#ifdef CONFIG_XEN
+	if (is_initial_xendomain())
 		e820_reserve_resources(NULL, -1);
 	else
-#else
-		e820_reserve_resources(e820.map, e820.nr_map);
 #endif
-#else
-	probe_roms();
 	e820_reserve_resources(e820.map, e820.nr_map);
-#endif
 
 	request_resource(&iomem_resource, &video_ram_resource);
 
@@ -877,12 +891,12 @@ void __init setup_arch(char **cmdline_p)
 		request_resource(&ioport_resource, &standard_io_resources[i]);
 	}
 
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
-	if (xen_start_info->flags & SIF_INITDOMAIN)
+#ifdef CONFIG_XEN
+	if (is_initial_xendomain())
 		e820_setup_gap(NULL, -1);
-	else
-#endif
+#else
 	e820_setup_gap(e820.map, e820.nr_map);
+#endif
 
 #ifdef CONFIG_XEN
 	{
@@ -891,11 +905,7 @@ void __init setup_arch(char **cmdline_p)
 		set_iopl.iopl = 1;
 		HYPERVISOR_physdev_op(PHYSDEVOP_set_iopl, &set_iopl);
 
-		if (xen_start_info->flags & SIF_INITDOMAIN) {
-			if (!(xen_start_info->flags & SIF_PRIVILEGED))
-				panic("Xen granted us console access "
-				      "but not privileged status");
-		       
+		if (is_initial_xendomain()) {
 #ifdef CONFIG_VT
 #if defined(CONFIG_VGA_CONSOLE)
 			conswitchp = &vga_con;
@@ -904,8 +914,12 @@ void __init setup_arch(char **cmdline_p)
 #endif
 #endif
 		} else {
+#if defined(CONFIG_VT) && defined(CONFIG_DUMMY_CONSOLE)
+			conswitchp = &dummy_con;
+#else
 			extern int console_use_vt;
 			console_use_vt = 0;
+#endif
 		}
 	}
 #else	/* CONFIG_XEN */
@@ -1591,7 +1605,7 @@ static __init int add_pcspkr(void)
 	struct platform_device *pd;
 	int ret;
 
-	if (!(xen_start_info->flags & SIF_INITDOMAIN))
+	if (!is_initial_xendomain())
 		return 0;
 
 	pd = platform_device_alloc("pcspkr", -1);

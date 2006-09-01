@@ -42,6 +42,7 @@
 #include <xen/interface/memory.h>
 #include <linux/module.h>
 #include <linux/percpu.h>
+#include <linux/highmem.h>
 #include <asm/tlbflush.h>
 
 #ifdef CONFIG_X86_64
@@ -445,6 +446,67 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 		BUG();
 
 	balloon_unlock(flags);
+
+	if (unlikely(!success)) {
+		/* Try hard to get the special memory back to Xen. */
+		exchange.in.extent_order = 0;
+		set_xen_guest_handle(exchange.in.extent_start, &in_frame);
+
+		for (i = 0; i < (1UL<<order); i++) {
+			struct page *page = alloc_page(GFP_HIGHUSER);
+			unsigned long pfn;
+
+			if (!page) {
+				printk(KERN_WARNING "Xen and kernel out of memory "
+				       "while trying to release an order %u "
+				       "contiguous region\n", order);
+				break;
+			}
+			pfn = page_to_pfn(page);
+			if (!PageHighMem(page)) {
+				void *v = __va(pfn << PAGE_SHIFT);
+
+				scrub_pages(v, 1);
+				if (HYPERVISOR_update_va_mapping((unsigned long)v,
+								 __pte_ma(0),
+								 UVMF_INVLPG|UVMF_ALL))
+					BUG();
+			}
+#ifdef CONFIG_XEN_SCRUB_PAGES
+			else {
+				void *v = kmap(page);
+
+				scrub_pages(v, 1);
+				kunmap(page);
+				kmap_flush_unused();
+			}
+#endif
+
+			balloon_lock(flags);
+
+			frame = pfn_to_mfn(pfn);
+			set_phys_to_machine(pfn, INVALID_P2M_ENTRY);
+
+			if (HYPERVISOR_update_va_mapping(vstart,
+							 pfn_pte_ma(frame, PAGE_KERNEL),
+							 UVMF_INVLPG|UVMF_ALL))
+				BUG();
+			pfn = __pa(vstart) >> PAGE_SHIFT;
+			set_phys_to_machine(pfn, frame);
+			xen_machphys_update(frame, pfn);
+
+			if (HYPERVISOR_memory_op(XENMEM_decrease_reservation,
+						 &exchange.in) != 1)
+				BUG();
+
+			balloon_unlock(flags);
+
+			balloon_free_empty_page_range(page, 1);
+
+			in_frame++;
+			vstart += PAGE_SIZE;
+		}
+	}
 }
 
 #ifdef __i386__

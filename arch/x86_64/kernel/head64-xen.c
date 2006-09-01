@@ -149,7 +149,7 @@ void __init x86_64_start_kernel(char * real_mode_data)
 	if (s != NULL)
 		numa_setup(s+5);
 #endif
-#ifdef CONFIG_X86_IO_APIC
+#if defined(CONFIG_X86_IO_APIC) && !defined(CONFIG_XEN)
 	if (strstr(saved_command_line, "disableapic"))
 		disable_apic = 1;
 #endif

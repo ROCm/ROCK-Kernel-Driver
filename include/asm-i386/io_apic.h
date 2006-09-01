@@ -52,9 +52,14 @@ static inline void end_edge_ioapic_irq (unsigned int irq) { }
 #define end_edge_ioapic 	end_edge_ioapic_irq
 #endif
 
+#ifndef CONFIG_XEN
 #define IO_APIC_BASE(idx) \
 		((volatile int *)(__fix_to_virt(FIX_IO_APIC_BASE_0 + idx) \
 		+ (mp_ioapics[idx].mpc_apicaddr & ~PAGE_MASK)))
+#else
+#include <xen/interface/xen.h>
+#include <xen/interface/physdev.h>
+#endif
 
 /*
  * The structure of the IO-APIC:
@@ -161,14 +166,35 @@ extern int mpc_default_type;
 
 static inline unsigned int io_apic_read(unsigned int apic, unsigned int reg)
 {
+#ifndef CONFIG_XEN
 	*IO_APIC_BASE(apic) = reg;
 	return *(IO_APIC_BASE(apic)+4);
+#else
+	struct physdev_apic apic_op;
+	int ret;
+
+	apic_op.apic_physbase = mp_ioapics[apic].mpc_apicaddr;
+	apic_op.reg = reg;
+	ret = HYPERVISOR_physdev_op(PHYSDEVOP_apic_read, &apic_op);
+	if (ret)
+		return ret;
+	return apic_op.value;
+#endif
 }
 
 static inline void io_apic_write(unsigned int apic, unsigned int reg, unsigned int value)
 {
+#ifndef CONFIG_XEN
 	*IO_APIC_BASE(apic) = reg;
 	*(IO_APIC_BASE(apic)+4) = value;
+#else
+	struct physdev_apic apic_op;
+
+	apic_op.apic_physbase = mp_ioapics[apic].mpc_apicaddr;
+	apic_op.reg = reg;
+	apic_op.value = value;
+	HYPERVISOR_physdev_op(PHYSDEVOP_apic_write, &apic_op);
+#endif
 }
 
 /*
@@ -178,12 +204,16 @@ static inline void io_apic_write(unsigned int apic, unsigned int reg, unsigned i
  * Older SiS APIC requires we rewrite the index regiser
  */
 extern int sis_apic_bug;
+#ifndef CONFIG_XEN
 static inline void io_apic_modify(unsigned int apic, unsigned int reg, unsigned int value)
 {
 	if (sis_apic_bug)
 		*IO_APIC_BASE(apic) = reg;
 	*(IO_APIC_BASE(apic)+4) = value;
 }
+#else
+#define io_apic_modify io_apic_write
+#endif
 
 /* 1 if "noapic" boot option passed */
 extern int skip_ioapic_setup;

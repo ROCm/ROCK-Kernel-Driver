@@ -179,7 +179,7 @@ static struct tty_driver *kcons_device(struct console *c, int *index)
 
 static struct console kcons_info = {
 	.device	= kcons_device,
-	.flags	= CON_PRINTBUFFER,
+	.flags	= CON_PRINTBUFFER | CON_ENABLED,
 	.index	= -1,
 };
 
@@ -189,12 +189,10 @@ static int __init xen_console_init(void)
 	if (!is_running_on_xen())
 		return __RETCODE;
 
-	if (xen_start_info->flags & SIF_INITDOMAIN) {
+	if (is_initial_xendomain()) {
 		if (xc_mode == XC_DEFAULT)
 			xc_mode = XC_SERIAL;
 		kcons_info.write = kcons_write_dom0;
-		if (xc_mode == XC_SERIAL)
-			kcons_info.flags |= CON_ENABLED;
 	} else {
 		if (xc_mode == XC_DEFAULT)
 			xc_mode = XC_TTY;
@@ -250,7 +248,7 @@ void xencons_force_flush(void)
 	int sz;
 
 	/* Emergency console is synchronous, so there's nothing to flush. */
-	if (xen_start_info->flags & SIF_INITDOMAIN)
+	if (is_initial_xendomain())
 		return;
 
 	/* Spin until console data is flushed through to the daemon. */
@@ -321,7 +319,7 @@ static void __xencons_tx_flush(void)
 	int sent, sz, work_done = 0;
 
 	if (x_char) {
-		if (xen_start_info->flags & SIF_INITDOMAIN)
+		if (is_initial_xendomain())
 			kcons_write_dom0(NULL, &x_char, 1);
 		else
 			while (x_char)
@@ -335,7 +333,7 @@ static void __xencons_tx_flush(void)
 		sz = wp - wc;
 		if (sz > (wbuf_size - WBUF_MASK(wc)))
 			sz = wbuf_size - WBUF_MASK(wc);
-		if (xen_start_info->flags & SIF_INITDOMAIN) {
+		if (is_initial_xendomain()) {
 			kcons_write_dom0(NULL, &wbuf[WBUF_MASK(wc)], sz);
 			wc += sz;
 		} else {
@@ -625,7 +623,7 @@ static int __init xencons_init(void)
 		return rc;
 	}
 
-	if (xen_start_info->flags & SIF_INITDOMAIN) {
+	if (is_initial_xendomain()) {
 		xencons_priv_irq = bind_virq_to_irqhandler(
 			VIRQ_CONSOLE,
 			0,

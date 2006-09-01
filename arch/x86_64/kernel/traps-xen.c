@@ -107,7 +107,11 @@ static inline void preempt_conditional_cli(struct pt_regs *regs)
 }
 
 static int kstack_depth_to_print = 12;
+#ifdef CONFIG_STACK_UNWIND
 static int call_trace = 1;
+#else
+#define call_trace (-1)
+#endif
 
 #ifdef CONFIG_KALLSYMS
 # include <linux/kallsyms.h>
@@ -175,7 +179,7 @@ static unsigned long *in_exception_stack(unsigned cpu, unsigned long stack,
 			break;
 #endif
 		default:
-			end = per_cpu(init_tss, cpu).ist[k];
+			end = per_cpu(orig_ist, cpu).ist[k];
 			break;
 		}
 		/*
@@ -276,21 +280,21 @@ void show_trace(struct task_struct *tsk, struct pt_regs *regs, unsigned long * s
 			if (unwind_init_blocked(&info, tsk) == 0)
 				unw_ret = show_trace_unwind(&info, NULL);
 		}
-		if (unw_ret > 0 && !arch_unw_user_mode(&info)) {
-#ifdef CONFIG_STACK_UNWIND
-			unsigned long rip = info.regs.rip;
-			print_symbol("DWARF2 unwinder stuck at %s\n", rip);
-			if (call_trace == 1) {
-				printk("Leftover inexact backtrace:\n");
-				stack = (unsigned long *)info.regs.rsp;
-			} else if (call_trace > 1)
+		if (unw_ret > 0) {
+			if (call_trace == 1 && !arch_unw_user_mode(&info)) {
+				print_symbol("DWARF2 unwinder stuck at %s\n",
+					     UNW_PC(&info));
+				if ((long)UNW_SP(&info) < 0) {
+					printk("Leftover inexact backtrace:\n");
+					stack = (unsigned long *)UNW_SP(&info);
+				} else
+					printk("Full inexact backtrace again:\n");
+			} else if (call_trace >= 1)
 				return;
 			else
 				printk("Full inexact backtrace again:\n");
-#else
+		} else
 			printk("Inexact backtrace:\n");
-#endif
-		}
 	}
 
 	/*
@@ -531,7 +535,7 @@ void __kprobes oops_end(unsigned long flags)
 		/* Nest count reaches zero, release the lock. */
 		spin_unlock_irqrestore(&die_lock, flags);
 	if (panic_on_oops)
-		panic("Fatal exception: panic_on_oops");
+		panic("Fatal exception");
 }
 
 void __kprobes __die(const char * str, struct pt_regs * regs, long err)
@@ -582,8 +586,8 @@ void __kprobes die_nmi(char *str, struct pt_regs *regs)
 	show_registers(regs);
 	if (kexec_should_crash(current))
 		crash_kexec(regs);
-	if (panic_on_timeout || panic_on_oops)
-		panic("nmi watchdog");
+	if (panic_on_oops)
+		panic("Non-maskable interrupt");
 	printk("console shuts up ...\n");
 	oops_end(flags);
 	nmi_exit();
@@ -781,7 +785,7 @@ asmlinkage __kprobes void default_do_nmi(struct pt_regs *regs)
 		if (notify_die(DIE_NMI_IPI, "nmi_ipi", regs, reason, 2, SIGINT)
 								== NOTIFY_STOP)
 			return;
-#ifdef CONFIG_X86_LOCAL_APIC
+#if defined(CONFIG_X86_LOCAL_APIC) && !defined(CONFIG_XEN)
 		/*
 		 * Ok, so this is none of the documented NMI sources,
 		 * so it must be the NMI watchdog.
@@ -1155,6 +1159,7 @@ static int __init kstack_setup(char *s)
 }
 __setup("kstack=", kstack_setup);
 
+#ifdef CONFIG_STACK_UNWIND
 static int __init call_trace_setup(char *s)
 {
 	if (strcmp(s, "old") == 0)
@@ -1168,3 +1173,4 @@ static int __init call_trace_setup(char *s)
 	return 1;
 }
 __setup("call_trace=", call_trace_setup);
+#endif

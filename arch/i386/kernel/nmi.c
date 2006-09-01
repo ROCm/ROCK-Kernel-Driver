@@ -28,8 +28,13 @@
 
 #include "mach_traps.h"
 
-unsigned int nmi_watchdog = NMI_NONE;
+extern void die_nmi(struct pt_regs *, const char *msg);
+
 extern int unknown_nmi_panic;
+
+#ifndef CONFIG_XEN
+
+unsigned int nmi_watchdog = NMI_NONE;
 static unsigned int nmi_hz = HZ;
 static unsigned int nmi_perfctr_msr;	/* the MSR to reset in NMI handler */
 static unsigned int nmi_p4_cccr_val;
@@ -577,8 +582,6 @@ void touch_nmi_watchdog (void)
 }
 EXPORT_SYMBOL(touch_nmi_watchdog);
 
-extern void die_nmi(struct pt_regs *, const char *msg);
-
 void nmi_watchdog_tick (struct pt_regs * regs)
 {
 
@@ -630,6 +633,19 @@ void nmi_watchdog_tick (struct pt_regs * regs)
 	}
 }
 
+#else /* CONFIG_XEN */
+
+static inline int reserve_lapic_nmi(void)
+{
+	return 0;
+}
+
+static inline void release_lapic_nmi(void)
+{
+}
+
+#endif /* CONFIG_XEN */
+
 #ifdef CONFIG_SYSCTL
 
 static int unknown_nmi_panic_callback(struct pt_regs *regs, int cpu)
@@ -673,9 +689,11 @@ int proc_unknown_nmi_panic(ctl_table *table, int write, struct file *file,
 
 #endif
 
+#ifndef CONFIG_XEN
 EXPORT_SYMBOL(nmi_active);
 EXPORT_SYMBOL(nmi_watchdog);
 EXPORT_SYMBOL(reserve_lapic_nmi);
 EXPORT_SYMBOL(release_lapic_nmi);
 EXPORT_SYMBOL(disable_timer_nmi_watchdog);
 EXPORT_SYMBOL(enable_timer_nmi_watchdog);
+#endif

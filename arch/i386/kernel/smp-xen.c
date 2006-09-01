@@ -115,6 +115,7 @@ DEFINE_PER_CPU(struct tlb_state, cpu_tlbstate) ____cacheline_aligned = { &init_m
  * We use 'broadcast', CPU->CPU IPIs and self-IPIs too.
  */
 
+#ifndef CONFIG_XEN
 static inline int __prepare_ICR (unsigned int shortcut, int vector)
 {
 	unsigned int icr = shortcut | APIC_DEST_LOGICAL;
@@ -134,6 +135,7 @@ static inline int __prepare_ICR2 (unsigned int mask)
 {
 	return SET_APIC_DEST_FIELD(mask);
 }
+#endif
 
 DECLARE_PER_CPU(int, ipi_to_irq[NR_IPIS]);
 

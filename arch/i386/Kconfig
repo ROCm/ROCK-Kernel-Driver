@@ -303,7 +303,7 @@ config X86_LOCAL_APIC
 
 config X86_APIC_AUTO
         bool "Use heuristics to enable/disable local APIC"
-	depends on X86_LOCAL_APIC
+	depends on X86_LOCAL_APIC && !X86_XEN
 	help
 	  This option uses some proven heuristics to automatically enable or disable the local
 	  APIC. All decisions can be overriden by command line options.
@@ -828,7 +828,6 @@ config HOTPLUG_CPU
 config COMPAT_VDSO
 	bool "Compat VDSO support"
 	default y
-	depends on !X86_XEN
 	help
 	  Map the VDSO to the predictable old-style address too.
 	---help---

@@ -73,7 +73,11 @@ static inline int bad_addr(unsigned long *addrp, unsigned long size)
 #endif
 	/* kernel code + 640k memory hole (later should not be needed, but 
 	   be paranoid for now) */
-	if (last >= 640*1024 && addr < __pa_symbol(&_end)) { 
+	if (last >= 640*1024 && addr < 1024*1024) {
+		*addrp = 1024*1024;
+		return 1;
+	}
+	if (last >= __pa_symbol(&_text) && last < __pa_symbol(&_end)) {
 		*addrp = __pa_symbol(&_end);
 		return 1;
 	}
@@ -113,69 +117,6 @@ e820_any_mapped(unsigned long start, unsigned long end, unsigned type)
 	return 0;
 }
 #endif
-
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
-static struct e820entry *__initdata machine_e820;
-static unsigned __initdata machine_e820_count;
-#endif
-
-/*
- * This function checks if the entire range <start,end> is mapped with type.
- *
- * Note: this function only works correct if the e820 table is sorted and
- * not-overlapping, which is the case
- */
-int __init e820_all_mapped(unsigned long start, unsigned long end, unsigned type)
-{
-#ifndef CONFIG_XEN
-	int i;
-	for (i = 0; i < e820.nr_map; i++) {
-		struct e820entry *ei = &e820.map[i];
-		if (type && ei->type != type)
-			continue;
-		/* is the region (part) in overlap with the current region ?*/
-		if (ei->addr >= end || ei->addr + ei->size <= start)
-			continue;
-
-		/* if the region is at the beginning of <start,end> we move
-		 * start to the end of the region since it's ok until there
-		 */
-		if (ei->addr <= start)
-			start = ei->addr + ei->size;
-		/* if start is now at or beyond end, we're done, full coverage */
-		if (start >= end)
-			return 1; /* we're done */
-	}
-	return 0;
-#else
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
-	if (xen_start_info->flags & SIF_INITDOMAIN) {
-		unsigned i;
-
-		WARN_ON(!machine_e820);
-		for (i = 0; i < machine_e820_count; i++) {
-			const struct e820entry *ei = &machine_e820[i];
-
-			if (type && ei->type != type)
-				continue;
-			/* is the region (part) in overlap with the current region ?*/
-			if (ei->addr >= end || ei->addr + ei->size <= start)
-				continue;
-			/* if the region is at the beginning of <start,end> we move
-			 * start to the end of the region since it's ok until there
-			 */
-			if (ei->addr <= start)
-				start = ei->addr + ei->size;
-			/* if start is now at or beyond end, we're done, full
-			 * coverage */
-			if (start >= end)
-				return 1; /* we're done */
-		}
-	}
-#endif
-	return 0;
-#endif
-}
 
 /* 
  * Find a free area in a specific range. 
@@ -303,6 +244,11 @@ e820_hole_size(unsigned long start_pfn, unsigned long end_pfn)
 	return ((end - start) - ram) >> PAGE_SHIFT;
 }
 
+#ifdef CONFIG_XEN
+static struct e820entry *__initdata machine_e820;
+static unsigned __initdata machine_e820_count;
+#endif
+
 /*
  * Mark e820 reserved areas as busy for the resource manager.
  */
@@ -310,8 +256,8 @@ void __init e820_reserve_resources(struct e820entry *e820, int nr_map)
 {
 	int i;
 
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
-	if ((xen_start_info->flags & SIF_INITDOMAIN) && !e820 && nr_map < 0) {
+#ifdef CONFIG_XEN
+	if (is_initial_xendomain()) {
 		struct xen_memory_map memmap;
 
 		machine_e820 = e820 = alloc_bootmem_low_pages(PAGE_SIZE);
@@ -757,8 +703,8 @@ __init void e820_setup_gap(struct e820entry *e820, int nr_map)
 	int i;
 	int found = 0;
 
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
-	if (xen_start_info->flags & SIF_INITDOMAIN) {
+#ifdef CONFIG_XEN
+	if (is_initial_xendomain()) {
 		e820 = machine_e820;
 		nr_map = machine_e820_count;
 	}
@@ -787,6 +733,11 @@ __init void e820_setup_gap(struct e820entry *e820, int nr_map)
 		if (start < last)
 			last = start;
 	}
+
+#ifdef CONFIG_XEN
+	if (is_initial_xendomain())
+		free_bootmem(__pa(machine_e820), PAGE_SIZE);
+#endif
 
 	if (!found) {
 		gapstart = (end_pfn << PAGE_SHIFT) + 1024*1024;

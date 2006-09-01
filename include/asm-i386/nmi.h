@@ -25,6 +25,8 @@ void set_nmi_callback(nmi_callback_t callback);
  */
 void unset_nmi_callback(void);
 
+#ifndef CONFIG_XEN
+
 extern void setup_apic_nmi_watchdog (void);
 extern int reserve_lapic_nmi(void);
 extern void release_lapic_nmi(void);
@@ -38,5 +40,7 @@ extern unsigned int nmi_watchdog;
 #define NMI_IO_APIC	1
 #define NMI_LOCAL_APIC	2
 #define NMI_INVALID	3
+
+#endif
 
 #endif /* ASM_NMI_H */

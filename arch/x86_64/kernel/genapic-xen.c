@@ -130,7 +130,7 @@ print:
 /* Same for both flat and clustered. */
 
 #ifdef CONFIG_XEN
-extern void xen_send_IPI_shortcut(unsigned int shortcut, int vector, unsigned int dest);
+extern void xen_send_IPI_shortcut(unsigned int shortcut, int vector);
 #endif
 
 void send_IPI_self(int vector)
@@ -138,6 +138,6 @@ void send_IPI_self(int vector)
 #ifndef CONFIG_XEN
 	__send_IPI_shortcut(APIC_DEST_SELF, vector, APIC_DEST_PHYSICAL);
 #else
-	xen_send_IPI_shortcut(APIC_DEST_SELF, vector, APIC_DEST_PHYSICAL);
+	xen_send_IPI_shortcut(APIC_DEST_SELF, vector);
 #endif
 }

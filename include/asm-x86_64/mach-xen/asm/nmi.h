@@ -71,6 +71,8 @@ static inline unsigned char get_nmi_reason(void)
 extern int panic_on_timeout;
 extern int unknown_nmi_panic;
 
+#ifndef CONFIG_XEN
+
 extern int check_nmi_watchdog(void);
  
 extern void setup_apic_nmi_watchdog (void);
@@ -89,5 +91,7 @@ extern unsigned int nmi_watchdog;
 #define NMI_IO_APIC	1
 #define NMI_LOCAL_APIC	2
 #define NMI_INVALID	3
+
+#endif
 
 #endif /* ASM_NMI_H */

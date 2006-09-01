@@ -94,7 +94,10 @@ static struct irq_routing_table * __init pirq_find_routing_table(void)
 	u8 *addr;
 	struct irq_routing_table *rt;
 
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
+#ifdef CONFIG_XEN
+	if (!is_initial_xendomain())
+		return NULL;
+#endif
 	if (pirq_table_addr) {
 		rt = pirq_check_routing_table((u8 *) isa_bus_to_virt(pirq_table_addr));
 		if (rt)
@@ -106,7 +109,6 @@ static struct irq_routing_table * __init pirq_find_routing_table(void)
 		if (rt)
 			return rt;
 	}
-#endif
 	
 	return NULL;
 }

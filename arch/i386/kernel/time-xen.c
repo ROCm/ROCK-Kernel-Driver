@@ -437,8 +437,7 @@ int do_settimeofday(struct timespec *tv)
 	sec = tv->tv_sec;
 	__normalize_time(&sec, &nsec);
 
-	if ((xen_start_info->flags & SIF_INITDOMAIN) &&
-	    !independent_wallclock) {
+	if (is_initial_xendomain() && !independent_wallclock) {
 		op.cmd = DOM0_SETTIME;
 		op.u.settime.secs        = sec;
 		op.u.settime.nsecs       = nsec;
@@ -471,8 +470,7 @@ static void sync_xen_wallclock(unsigned long dummy)
 	s64 nsec;
 	dom0_op_t op;
 
-	if (!ntp_synced() || independent_wallclock ||
-	    !(xen_start_info->flags & SIF_INITDOMAIN))
+	if (!ntp_synced() || independent_wallclock || !is_initial_xendomain())
 		return;
 
 	write_seqlock_irq(&xtime_lock);
@@ -500,7 +498,7 @@ static int set_rtc_mmss(unsigned long nowtime)
 	int retval;
 	unsigned long flags;
 
-	if (independent_wallclock || !(xen_start_info->flags & SIF_INITDOMAIN))
+	if (independent_wallclock || !is_initial_xendomain())
 		return 0;
 
 	/* gets recalled with irq locally disabled */
@@ -896,11 +894,11 @@ void __init time_init(void)
 
 	update_wallclock();
 
+#if defined(__x86_64__)
 	init_cpu_khz();
 	printk(KERN_INFO "Xen reported: %u.%03u MHz processor.\n",
 	       cpu_khz / 1000, cpu_khz % 1000);
 
-#if defined(__x86_64__)
 	vxtime.mode = VXTIME_TSC;
 	vxtime.quot = (1000000L << 32) / vxtime_hz;
 	vxtime.tsc_quot = (1000L << 32) / cpu_khz;
@@ -1042,6 +1040,15 @@ void local_teardown_timer(unsigned int cpu)
 #endif
 
 #ifndef CONFIG_X86_64
+
+void tsc_init(void)
+{
+	init_cpu_khz();
+	printk(KERN_INFO "Xen reported: %u.%03u MHz processor.\n",
+	       cpu_khz / 1000, cpu_khz % 1000);
+
+	use_tsc_delay();
+}
 
 #include <linux/clocksource.h>
 

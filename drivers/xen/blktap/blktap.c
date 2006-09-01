@@ -156,7 +156,7 @@ static int alloc_pending_reqs;
 typedef unsigned int PEND_RING_IDX;
 
 static inline int MASK_PEND_IDX(int i) { 
-	return (i & (MAX_PENDING_REQS-1)); 
+	return (i & (MAX_PENDING_REQS-1));
 }
 
 static inline unsigned int RTN_PEND_IDX(pending_req_t *req, int idx) {
@@ -708,29 +708,18 @@ static void make_response(blkif_t *blkif, unsigned long id,
 /******************************************************************
  * misc small helpers
  */
-/* FIXME: Return ENOMEM properly on failure to allocate additional reqs. */
-static void req_increase(void)
+static int req_increase(void)
 {
 	int i, j;
 	struct page *page;
 	unsigned long flags;
+	int ret;
 
 	spin_lock_irqsave(&pending_free_lock, flags);
 
+	ret = -EINVAL;
 	if (mmap_alloc >= MAX_PENDING_REQS || mmap_lock) 
 		goto done;
-
-	pending_reqs[mmap_alloc]  = kzalloc(sizeof(pending_req_t) *
-					blkif_reqs, GFP_KERNEL);
-	pending_addrs[mmap_alloc] = kzalloc(sizeof(unsigned long) *
-					mmap_pages, GFP_KERNEL);
-
-	if (!pending_reqs[mmap_alloc] || !pending_addrs[mmap_alloc]) {
-		kfree(pending_reqs[mmap_alloc]);
-		kfree(pending_addrs[mmap_alloc]);
-		WPRINTK("%s: out of memory\n", __FUNCTION__); 
-		goto done;
-	}
 
 #ifdef __ia64__
 	extern unsigned long alloc_empty_foreign_map_page_range(
@@ -739,7 +728,11 @@ static void req_increase(void)
 		alloc_empty_foreign_map_page_range(mmap_pages);
 #else /* ! ia64 */
 	page = balloon_alloc_empty_page_range(mmap_pages);
-	BUG_ON(page == NULL);
+	ret = -ENOMEM;
+	if (page == NULL) {
+		printk("%s balloon_alloc_empty_page_range gave NULL\n", __FUNCTION__);
+		goto done;
+	}
 
 	/* Pin all of the pages. */
 	for (i=0; i<mmap_pages; i++)
@@ -750,6 +743,23 @@ static void req_increase(void)
 	mmap_start[mmap_alloc].mpage = page;
 
 #endif
+
+	pending_reqs[mmap_alloc]  = kzalloc(sizeof(pending_req_t) *
+					blkif_reqs, GFP_KERNEL);
+	pending_addrs[mmap_alloc] = kzalloc(sizeof(unsigned long) *
+					mmap_pages, GFP_KERNEL);
+
+	ret = -ENOMEM;
+	if (!pending_reqs[mmap_alloc] || !pending_addrs[mmap_alloc]) {
+		kfree(pending_reqs[mmap_alloc]);
+		kfree(pending_addrs[mmap_alloc]);
+		WPRINTK("%s: out of memory\n", __FUNCTION__);
+		ret = -ENOMEM;
+		goto done;
+	}
+
+	ret = 0;
+
 	DPRINTK("%s: reqs=%d, pages=%d, mmap_vstart=0x%lx\n",
 	        __FUNCTION__, blkif_reqs, mmap_pages, 
 	       mmap_start[mmap_alloc].start);
@@ -773,7 +783,7 @@ static void req_increase(void)
 	DPRINTK("# MMAPs increased to %d\n",mmap_alloc);
  done:
 	spin_unlock_irqrestore(&pending_free_lock, flags);
-
+	return ret;
 }
 
 static void mmap_req_del(int mmap)
@@ -1040,7 +1050,7 @@ static int blktap_read_ufe_ring(int idx)
 			unsigned long kvaddr, uvaddr;
 			struct page **map = info->vma->vm_private_data;
 			struct page *pg;
-			int offset; 
+			int offset;
 
 			uvaddr  = MMAP_VADDR(info->user_vstart, usr_idx, j);
 			kvaddr = MMAP_VADDR(mmap_start[mmap_idx].start, 
@@ -1052,7 +1062,7 @@ static int blktap_read_ufe_ring(int idx)
 				>> PAGE_SHIFT;
 			map[offset] = NULL;
 		}
-		fast_flush_area(pending_req, pending_idx, usr_idx, idx); 
+		fast_flush_area(pending_req, pending_idx, usr_idx, idx);
 		make_response(blkif, pending_req->id, resp->operation,
 			      resp->status);
 		info->idx_map[usr_idx] = INVALID_REQ;
@@ -1107,7 +1117,7 @@ static int do_block_io_op(blkif_t *blkif)
 			       "ring does not exist!\n");
 			print_dbug = 0; /*We only print this message once*/
 		}
-		return 1; 
+		return 1;
 	}
 
 	info = tapfds[blkif->dev_num];
@@ -1174,7 +1184,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 				 blkif_request_t *req,
 				 pending_req_t *pending_req)
 {
-	extern void ll_rw_block(int rw, int nr, struct buffer_head * bhs[]); 
+	extern void ll_rw_block(int rw, int nr, struct buffer_head * bhs[]);
 	int op, operation = (req->operation == BLKIF_OP_WRITE) ? WRITE : READ;
 	struct gnttab_map_grant_ref map[BLKIF_MAX_SEGMENTS_PER_REQUEST*2];
 	unsigned int nseg;
@@ -1298,13 +1308,8 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 			= map[i].handle;
 		pending_handle(mmap_idx, pending_idx, i/2).user   
 			= map[i+1].handle;
-#ifdef CONFIG_XEN_IA64_DOM0_NON_VP
-		pending_addrs[mmap_idx][vaddr_pagenr(pending_req, i)] =
-			(unsigned long)gnttab_map_vaddr(map[i]);
-#else
 		set_phys_to_machine(__pa(kvaddr) >> PAGE_SHIFT,
 			FOREIGN_FRAME(map[i].dev_bus_addr >> PAGE_SHIFT));
-#endif
 		offset = (uvaddr - info->vma->vm_start) >> PAGE_SHIFT;
 		pg = pfn_to_page(__pa(kvaddr) >> PAGE_SHIFT);
 		((struct page **)info->vma->vm_private_data)[offset] =
@@ -1393,7 +1398,13 @@ static int __init blkif_init(void)
 		return -ENODEV;
 
 	INIT_LIST_HEAD(&pending_free);
-        for(i = 0; i < 2; i++) req_increase();
+        for(i = 0; i < 2; i++) {
+		ret = req_increase();
+		if (ret)
+			break;
+	}
+	if (i == 0)
+		return ret;
 
 	tap_blkif_interface_init();
 

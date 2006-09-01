@@ -69,7 +69,7 @@ static inline int num_booting_cpus(void)
 
 #define raw_smp_processor_id() read_pda(cpunumber)
 
-#ifdef CONFIG_X86_LOCAL_APIC
+#if defined(CONFIG_X86_LOCAL_APIC) && !defined(CONFIG_XEN)
 static inline int hard_smp_processor_id(void)
 {
 	/* we don't want to mark this access volatile - bad code generation */
@@ -131,7 +131,7 @@ static inline int cpu_present_to_apicid(int mps_cpu)
 #endif
 
 #ifndef __ASSEMBLY__
-#ifdef CONFIG_X86_LOCAL_APIC
+#if defined(CONFIG_X86_LOCAL_APIC) && !defined(CONFIG_XEN)
 static __inline int logical_smp_processor_id(void)
 {
 	/* we don't want to mark this access volatile - bad code generation */

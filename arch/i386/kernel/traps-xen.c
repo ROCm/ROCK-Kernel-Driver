@@ -98,7 +98,11 @@ asmlinkage void fixup_4gb_segment(void);
 asmlinkage void machine_check(void);
 
 static int kstack_depth_to_print = 24;
+#ifdef CONFIG_STACK_UNWIND
 static int call_trace = 1;
+#else
+#define call_trace (-1)
+#endif
 ATOMIC_NOTIFIER_HEAD(i386die_chain);
 
 int register_die_notifier(struct notifier_block *nb)
@@ -193,22 +197,21 @@ static void show_trace_log_lvl(struct task_struct *task, struct pt_regs *regs,
 			if (unwind_init_blocked(&info, task) == 0)
 				unw_ret = show_trace_unwind(&info, log_lvl);
 		}
-		if (unw_ret > 0 && !arch_unw_user_mode(&info)) {
-#ifdef CONFIG_STACK_UNWIND
-			print_symbol("DWARF2 unwinder stuck at %s\n",
-				     UNW_PC(&info));
-			if (call_trace == 1) {
-				printk("Leftover inexact backtrace:\n");
-				if (UNW_SP(&info))
+		if (unw_ret > 0) {
+			if (call_trace == 1 && !arch_unw_user_mode(&info)) {
+				print_symbol("DWARF2 unwinder stuck at %s\n",
+					     UNW_PC(&info));
+				if (UNW_SP(&info) >= PAGE_OFFSET) {
+					printk("Leftover inexact backtrace:\n");
 					stack = (void *)UNW_SP(&info);
-			} else if (call_trace > 1)
+				} else
+					printk("Full inexact backtrace again:\n");
+			} else if (call_trace >= 1)
 				return;
 			else
 				printk("Full inexact backtrace again:\n");
-#else
+		} else
 			printk("Inexact backtrace:\n");
-#endif
-		}
 	}
 
 	if (task == current) {
@@ -461,7 +464,7 @@ void die(const char * str, struct pt_regs * regs, long err)
 		panic("Fatal exception in interrupt");
 
 	if (panic_on_oops)
-		panic("Fatal exception: panic_on_oops");
+		panic("Fatal exception");
 
 	oops_exit();
 	do_exit(SIGSEGV);
@@ -684,7 +687,7 @@ static void default_do_nmi(struct pt_regs * regs)
 		if (notify_die(DIE_NMI_IPI, "nmi_ipi", regs, reason, 2, SIGINT)
 							== NOTIFY_STOP)
 			return;
-#ifdef CONFIG_X86_LOCAL_APIC
+#if defined(CONFIG_X86_LOCAL_APIC) && !defined(CONFIG_XEN)
 		/*
 		 * Ok, so this is none of the documented NMI sources,
 		 * so it must be the NMI watchdog.
@@ -1175,6 +1178,7 @@ static int __init kstack_setup(char *s)
 }
 __setup("kstack=", kstack_setup);
 
+#ifdef CONFIG_STACK_UNWIND
 static int __init call_trace_setup(char *s)
 {
 	if (strcmp(s, "old") == 0)
@@ -1188,3 +1192,4 @@ static int __init call_trace_setup(char *s)
 	return 1;
 }
 __setup("call_trace=", call_trace_setup);
+#endif

@@ -67,7 +67,7 @@ static inline int num_booting_cpus(void)
 	return cpus_weight(cpu_possible_map);
 }
 
-#ifdef CONFIG_X86_LOCAL_APIC
+#if defined(CONFIG_X86_LOCAL_APIC) && !defined(CONFIG_XEN)
 
 #ifdef APIC_DEFINITION
 extern int hard_smp_processor_id(void);

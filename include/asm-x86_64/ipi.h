@@ -23,6 +23,8 @@
 #include <asm/apicdef.h>
 #include <asm/genapic.h>
 
+#ifndef CONFIG_XEN
+
 /*
  * the following functions deal with sending IPIs between CPUs.
  *
@@ -113,5 +115,7 @@ static inline void send_IPI_mask_sequence(cpumask_t mask, int vector)
 	}
 	local_irq_restore(flags);
 }
+
+#endif /* CONFIG_XEN */
 
 #endif /* __ASM_IPI_H */

@@ -59,7 +59,7 @@ static inline int gsi_irq_sharing(int gsi) { return gsi; }
 
 #define BAD_MADT_ENTRY(entry, end) (					    \
 		(!entry) || (unsigned long)entry + sizeof(*entry) > end ||  \
-		((acpi_table_entry_header *)entry)->length != sizeof(*entry))
+		((acpi_table_entry_header *)entry)->length < sizeof(*entry))
 
 #define PREFIX			"ACPI: "
 
@@ -76,7 +76,7 @@ acpi_interrupt_flags acpi_sci_flags __initdata;
 int acpi_sci_override_gsi __initdata;
 int acpi_skip_timer_override __initdata;
 
-#ifdef CONFIG_X86_LOCAL_APIC
+#if defined(CONFIG_X86_LOCAL_APIC) && !defined(CONFIG_XEN)
 static u64 acpi_lapic_addr __initdata = APIC_DEFAULT_PHYS_BASE;
 #endif
 
@@ -227,12 +227,14 @@ static int __init acpi_parse_madt(unsigned long phys_addr, unsigned long size)
 		return -ENODEV;
 	}
 
+#ifndef CONFIG_XEN
 	if (madt->lapic_address) {
 		acpi_lapic_addr = (u64) madt->lapic_address;
 
 		printk(KERN_DEBUG PREFIX "Local APIC address 0x%08x\n",
 		       madt->lapic_address);
 	}
+#endif
 
 	acpi_madt_oem_check(madt->header.oem_id, madt->header.oem_table_id);
 
@@ -272,6 +274,7 @@ static int __init
 acpi_parse_lapic_addr_ovr(acpi_table_entry_header * header,
 			  const unsigned long end)
 {
+#ifndef CONFIG_XEN
 	struct acpi_table_lapic_addr_ovr *lapic_addr_ovr = NULL;
 
 	lapic_addr_ovr = (struct acpi_table_lapic_addr_ovr *)header;
@@ -280,6 +283,7 @@ acpi_parse_lapic_addr_ovr(acpi_table_entry_header * header,
 		return -EINVAL;
 
 	acpi_lapic_addr = lapic_addr_ovr->address;
+#endif
 
 	return 0;
 }
@@ -714,7 +718,9 @@ static int __init acpi_parse_madt_lapic_entries(void)
 		return count;
 	}
 
+#ifndef CONFIG_XEN
 	mp_register_lapic_address(acpi_lapic_addr);
+#endif
 
 	count = acpi_table_parse_madt(ACPI_MADT_LAPIC, acpi_parse_lapic,
 				      MAX_APICS);

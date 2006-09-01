@@ -390,7 +390,11 @@ struct page *vm_normal_page(struct vm_area_struct *vma, unsigned long addr, pte_
 
 	if (unlikely(vma->vm_flags & VM_PFNMAP)) {
 		unsigned long off = (addr - vma->vm_start) >> PAGE_SHIFT;
+#ifndef CONFIG_XEN
 		if (pfn == vma->vm_pgoff + off)
+#else
+		if ((pfn == vma->vm_pgoff + off) || !pfn_valid(pfn))
+#endif
 			return NULL;
 		if (!is_cow_mapping(vma->vm_flags))
 			return NULL;
@@ -403,8 +407,7 @@ struct page *vm_normal_page(struct vm_area_struct *vma, unsigned long addr, pte_
 	 * and that the resulting page looks ok.
 	 */
 	if (unlikely(!pfn_valid(pfn))) {
-		if (!(vma->vm_flags & VM_RESERVED))
-			print_bad_pte(vma, pte, addr);
+		print_bad_pte(vma, pte, addr);
 		return NULL;
 	}
 
@@ -892,6 +895,7 @@ unsigned long zap_page_range(struct vm_area_struct *vma, unsigned long address,
 		tlb_finish_mmu(tlb, address, end);
 	return end;
 }
+EXPORT_SYMBOL_GPL(zap_page_range);
 
 /*
  * Do a quick page-table lookup for a single page.
@@ -1038,7 +1042,7 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 			if (map[offset] != NULL) {
 			        if (pages) {
 			                struct page *page = map[offset];
-					
+
 					pages[i] = page;
 					get_page(page);
 				}

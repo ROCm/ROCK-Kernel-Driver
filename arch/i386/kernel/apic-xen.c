@@ -66,6 +66,7 @@ int apic_verbosity;
 void ack_bad_irq(unsigned int irq)
 {
 	printk("unexpected IRQ trap at vector %02x\n", irq);
+#ifndef CONFIG_XEN
 	/*
 	 * Currently unexpected vectors happen only on SMP and APIC.
 	 * We _must_ ack these because every local APIC has only N
@@ -77,6 +78,7 @@ void ack_bad_irq(unsigned int irq)
 	 */
 	if (cpu_has_apic)
 		ack_APIC_irq();
+#endif
 }
 
 int get_physical_broadcast(void)

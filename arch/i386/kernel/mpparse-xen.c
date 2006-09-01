@@ -61,7 +61,9 @@ int mp_irq_entries;
 int nr_ioapics;
 
 int pic_mode;
+#ifndef CONFIG_XEN
 unsigned long mp_lapic_addr;
+#endif
 
 unsigned int def_to_bigsmp = 0;
 
@@ -425,6 +427,7 @@ static int __init smp_read_mpc(struct mp_config_table *mpc)
 
 	mps_oem_check(mpc, oem, str);
 
+#ifndef CONFIG_XEN
 	printk("APIC at: 0x%lX\n",mpc->mpc_lapic);
 
 	/* 
@@ -433,6 +436,7 @@ static int __init smp_read_mpc(struct mp_config_table *mpc)
 	 */
 	if (!acpi_lapic)
 		mp_lapic_addr = mpc->mpc_lapic;
+#endif
 
 	/*
 	 *	Now process the configuration blocks.
@@ -585,10 +589,12 @@ static inline void __init construct_default_ISA_mptable(int mpc_default_type)
 	int linttypes[2] = { mp_ExtINT, mp_NMI };
 	int i;
 
+#ifndef CONFIG_XEN
 	/*
 	 * local APIC has default address
 	 */
 	mp_lapic_addr = APIC_DEFAULT_PHYS_BASE;
+#endif
 
 	/*
 	 * 2 CPUs, numbered 0 & 1.
@@ -838,10 +844,10 @@ int es7000_plat;
 
 #ifdef CONFIG_ACPI
 
+#ifndef CONFIG_XEN
 void __init mp_register_lapic_address (
 	u64			address)
 {
-#ifndef CONFIG_XEN
 	mp_lapic_addr = (unsigned long) address;
 
 	set_fixmap_nocache(FIX_APIC_BASE, mp_lapic_addr);
@@ -850,8 +856,8 @@ void __init mp_register_lapic_address (
 		boot_cpu_physical_apicid = GET_APIC_ID(apic_read(APIC_ID));
 
 	Dprintk("Boot CPU = %d\n", boot_cpu_physical_apicid);
-#endif
 }
+#endif
 
 
 void __devinit mp_register_lapic (

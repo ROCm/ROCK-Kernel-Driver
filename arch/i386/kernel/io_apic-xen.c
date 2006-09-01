@@ -45,41 +45,12 @@
 
 #ifdef CONFIG_XEN
 
-#include <xen/interface/xen.h>
-#include <xen/interface/physdev.h>
-
 /* Fake i8259 */
 #define make_8259A_irq(_irq)     (io_apic_irqs &= ~(1UL<<(_irq)))
 #define disable_8259A_irq(_irq)  ((void)0)
 #define i8259A_irq_pending(_irq) (0)
 
 unsigned long io_apic_irqs;
-
-static inline unsigned int xen_io_apic_read(unsigned int apic, unsigned int reg)
-{
-	struct physdev_apic apic_op;
-	int ret;
-
-	apic_op.apic_physbase = mp_ioapics[apic].mpc_apicaddr;
-	apic_op.reg = reg;
-	ret = HYPERVISOR_physdev_op(PHYSDEVOP_apic_read, &apic_op);
-	if (ret)
-		return ret;
-	return apic_op.value;
-}
-
-static inline void xen_io_apic_write(unsigned int apic, unsigned int reg, unsigned int value)
-{
-	struct physdev_apic apic_op;
-
-	apic_op.apic_physbase = mp_ioapics[apic].mpc_apicaddr;
-	apic_op.reg = reg;
-	apic_op.value = value;
-	HYPERVISOR_physdev_op(PHYSDEVOP_apic_write, &apic_op);
-}
-
-#define io_apic_read(a,r)    xen_io_apic_read(a,r)
-#define io_apic_write(a,r,v) xen_io_apic_write(a,r,v)
 
 #endif /* CONFIG_XEN */
 
@@ -91,7 +62,9 @@ static struct { int pin, apic; } ioapic_i8259 = { -1, -1 };
 
 static DEFINE_SPINLOCK(ioapic_lock);
 
+#ifndef CONFIG_XEN
 int timer_over_8254 __initdata = 1;
+#endif
 
 /*
  *	Is the SiS APIC rmw bug present ?
@@ -104,7 +77,9 @@ int sis_apic_bug = -1;
  */
 int nr_ioapic_registers[MAX_IO_APICS];
 
+#ifndef CONFIG_XEN
 int disable_timer_pin_1 __initdata;
+#endif
 
 /*
  * Rough estimation of how many shared IRQs there are, can
@@ -2473,6 +2448,7 @@ void __init setup_IO_APIC(void)
 		print_IO_APIC();
 }
 
+#ifndef CONFIG_XEN
 static int __init setup_disable_8254_timer(char *s)
 {
 	timer_over_8254 = -1;
@@ -2486,6 +2462,7 @@ static int __init setup_enable_8254_timer(char *s)
 
 __setup("disable_8254_timer", setup_disable_8254_timer);
 __setup("enable_8254_timer", setup_enable_8254_timer);
+#endif
 
 /*
  *	Called after all the initialization is done. If we didnt find any
@@ -2496,7 +2473,7 @@ static int __init io_apic_bug_finalize(void)
 {
 	if(sis_apic_bug == -1)
 		sis_apic_bug = 0;
-	if (xen_start_info->flags & SIF_INITDOMAIN) {
+	if (is_initial_xendomain()) {
 		dom0_op_t op = { .cmd = DOM0_PLATFORM_QUIRK };
 		op.u.platform_quirk.quirk_id = sis_apic_bug ?
 			QUIRK_IOAPIC_BAD_REGSEL : QUIRK_IOAPIC_GOOD_REGSEL;

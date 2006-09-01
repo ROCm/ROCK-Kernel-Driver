@@ -54,6 +54,8 @@
 struct dma_mapping_ops* dma_ops;
 EXPORT_SYMBOL(dma_ops);
 
+int after_bootmem;
+
 extern unsigned long *contiguous_bitmap;
 
 static unsigned long dma_reserve __initdata;
@@ -72,7 +74,7 @@ extern unsigned long start_pfn;
 	(((mfn_to_pfn((addr) >> PAGE_SHIFT)) << PAGE_SHIFT) +	\
 	__START_KERNEL_map)))
 
-static void early_make_page_readonly(void *va, unsigned int feature)
+static void __meminit early_make_page_readonly(void *va, unsigned int feature)
 {
 	unsigned long addr, _va = (unsigned long)va;
 	pte_t pte, *ptep;
@@ -80,6 +82,11 @@ static void early_make_page_readonly(void *va, unsigned int feature)
 
 	if (xen_feature(feature))
 		return;
+
+	if (after_bootmem) {
+		make_page_readonly(va, feature);
+		return;
+	}
 
 	addr = (unsigned long) page[pgd_index(_va)];
 	addr_to_page(addr, page);
@@ -195,8 +202,6 @@ void show_mem(void)
 	printk(KERN_INFO "%lu pages shared\n",shared);
 	printk(KERN_INFO "%lu pages swap cached\n",cached);
 }
-
-int after_bootmem;
 
 static __init void *spp_getpage(void)
 { 
@@ -480,9 +485,9 @@ phys_pmd_init(pmd_t *pmd, unsigned long address, unsigned long end)
 		pte = alloc_static_page(&pte_phys);
 		pte_save = pte;
 		for (k = 0; k < PTRS_PER_PTE; pte++, k++, address += PTE_SIZE) {
-			if ((address >= end) ||
-			    ((address >> PAGE_SHIFT) >=
-			     xen_start_info->nr_pages)) { 
+			if (address >= (after_bootmem
+			                ? end
+			                : xen_start_info->nr_pages << PAGE_SHIFT)) {
 				__set_pte(pte, __pte(0)); 
 				continue;
 			}
@@ -561,7 +566,7 @@ void __init xen_init_pt(void)
 		mk_kernel_pgd(__pa_symbol(level3_kernel_pgt));
 	level3_kernel_pgt[pud_index(__START_KERNEL_map)] = 
 		__pud(__pa_symbol(level2_kernel_pgt) |
-		      _KERNPG_TABLE | _PAGE_USER);
+		      _KERNPG_TABLE);
 	memcpy((void *)level2_kernel_pgt, page, PAGE_SIZE);
 
 	early_make_page_readonly(init_level4_pgt,
@@ -582,7 +587,7 @@ void __init xen_init_pt(void)
 		mk_kernel_pgd(__pa_symbol(level3_user_pgt)));
 }
 
-void __init extend_init_mapping(unsigned long tables_space)
+static void __init extend_init_mapping(unsigned long tables_space)
 {
 	unsigned long va = __START_KERNEL_map;
 	unsigned long phys, addr, *pte_page;
@@ -610,7 +615,7 @@ void __init extend_init_mapping(unsigned long tables_space)
 			pte_page = alloc_static_page(&phys);
 			early_make_page_readonly(
 				pte_page, XENFEAT_writable_page_tables);
-			set_pmd(pmd, __pmd(phys | _KERNPG_TABLE | _PAGE_USER));
+			set_pmd(pmd, __pmd(phys | _KERNPG_TABLE));
 		} else {
 			addr = page[pmd_index(va)];
 			addr_to_page(addr, pte_page);
@@ -619,7 +624,7 @@ void __init extend_init_mapping(unsigned long tables_space)
 		if (pte_none(*pte)) {
 			new_pte = pfn_pte(
 				(va - __START_KERNEL_map) >> PAGE_SHIFT, 
-				__pgprot(_KERNPG_TABLE | _PAGE_USER));
+				__pgprot(_KERNPG_TABLE));
 			xen_l1_entry_update(pte, new_pte);
 		}
 		va += PAGE_SIZE;
@@ -746,7 +751,7 @@ void __meminit init_memory_mapping(unsigned long start, unsigned long end)
 
 		/* Setup mapping of lower 1st MB */
 		for (next = 0; next < NR_FIX_ISAMAPS; next++)
-			if (xen_start_info->flags & SIF_PRIVILEGED)
+			if (is_initial_xendomain())
 				set_fixmap(FIX_ISAMAP_BEGIN - next, next * PAGE_SIZE);
 			else
 				__set_fixmap(FIX_ISAMAP_BEGIN - next,
@@ -984,12 +989,6 @@ void __init mem_init(void)
 #endif
 	no_iommu_init();
 #endif
-
-	/* How many end-of-memory variables you have, grandma! */
-	max_low_pfn = end_pfn;
-	max_pfn = end_pfn;
-	num_physpages = end_pfn;
-	high_memory = (void *) __va(end_pfn * PAGE_SIZE);
 
 	/* clear the zero-page */
 	memset(empty_zero_page, 0, PAGE_SIZE);

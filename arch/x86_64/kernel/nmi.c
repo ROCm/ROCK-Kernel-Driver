@@ -28,6 +28,8 @@
 #include <asm/mce.h>
 #include <asm/intel_arch_perfmon.h>
 
+#ifndef CONFIG_XEN
+
 /*
  * lapic_nmi_owner tracks the ownership of the lapic NMI hardware:
  * - it may be reserved by some other driver, or not
@@ -583,6 +585,19 @@ void __kprobes nmi_watchdog_tick(struct pt_regs * regs, unsigned reason)
 	}
 }
 
+#else /* CONFIG_XEN */
+
+static inline int reserve_lapic_nmi(void)
+{
+	return 0;
+}
+
+static inline void release_lapic_nmi(void)
+{
+}
+
+#endif /* CONFIG_XEN */
+
 static __kprobes int dummy_nmi_callback(struct pt_regs * regs, int cpu)
 {
 	return 0;
@@ -657,6 +672,7 @@ int proc_unknown_nmi_panic(struct ctl_table *table, int write, struct file *file
 
 #endif
 
+#ifndef CONFIG_XEN
 EXPORT_SYMBOL(nmi_active);
 EXPORT_SYMBOL(nmi_watchdog);
 EXPORT_SYMBOL(reserve_lapic_nmi);
@@ -664,3 +680,4 @@ EXPORT_SYMBOL(release_lapic_nmi);
 EXPORT_SYMBOL(disable_timer_nmi_watchdog);
 EXPORT_SYMBOL(enable_timer_nmi_watchdog);
 EXPORT_SYMBOL(touch_nmi_watchdog);
+#endif /* CONFIG_XEN */

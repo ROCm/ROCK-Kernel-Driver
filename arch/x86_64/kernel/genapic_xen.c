@@ -35,7 +35,7 @@ static inline void __send_IPI_one(unsigned int cpu, int vector)
 	notify_remote_via_irq(irq);
 }
 
-void xen_send_IPI_shortcut(unsigned int shortcut, int vector, unsigned int dest)
+void xen_send_IPI_shortcut(unsigned int shortcut, int vector)
 {
 	int cpu;
 
@@ -90,13 +90,13 @@ static void xen_send_IPI_allbutself(int vector)
 	 */
 	Dprintk("%s\n", __FUNCTION__);
 	if (num_online_cpus() > 1)
-		xen_send_IPI_shortcut(APIC_DEST_ALLBUT, vector, APIC_DEST_LOGICAL);
+		xen_send_IPI_shortcut(APIC_DEST_ALLBUT, vector);
 }
 
 static void xen_send_IPI_all(int vector)
 {
 	Dprintk("%s\n", __FUNCTION__);
-	xen_send_IPI_shortcut(APIC_DEST_ALLINC, vector, APIC_DEST_LOGICAL);
+	xen_send_IPI_shortcut(APIC_DEST_ALLINC, vector);
 }
 
 static void xen_send_IPI_mask(cpumask_t cpumask, int vector)
@@ -146,8 +146,7 @@ struct genapic apic_xen =  {
 #ifdef CONFIG_XEN_PRIVILEGED_GUEST
 	.int_delivery_mode = dest_LowestPrio,
 #endif
-	.int_dest_mode = (APIC_DEST_LOGICAL != 0),
-	.int_delivery_dest = APIC_DEST_LOGICAL | APIC_DM_LOWEST,
+	.int_dest_mode = 1,
 	.target_cpus = xen_target_cpus,
 #ifdef CONFIG_XEN_PRIVILEGED_GUEST
 	.apic_id_registered = xen_apic_id_registered,

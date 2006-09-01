@@ -9,17 +9,45 @@
 #ifndef __XEN_PUBLIC_ARCH_X86_64_H__
 #define __XEN_PUBLIC_ARCH_X86_64_H__
 
+/*
+ * Hypercall interface:
+ *  Input:  %rdi, %rsi, %rdx, %r10, %r8 (arguments 1-5)
+ *  Output: %rax
+ * Access is via hypercall page (set up by guest loader or via a Xen MSR):
+ *  call hypercall_page + hypercall-number * 32
+ * Clobbered: argument registers (e.g., 2-arg hypercall clobbers %rdi,%rsi)
+ */
+
+#if __XEN_INTERFACE_VERSION__ < 0x00030203
+/*
+ * Legacy hypercall interface:
+ * As above, except the entry sequence to the hypervisor is:
+ *  mov $hypercall-number*32,%eax ; syscall
+ * Clobbered: %rcx, %r11, argument registers (as above)
+ */
+#define TRAP_INSTR "syscall"
+#endif
+
+/* Structural guest handles introduced in 0x00030201. */
+#if __XEN_INTERFACE_VERSION__ >= 0x00030201
 #define __DEFINE_XEN_GUEST_HANDLE(name, type) \
     typedef struct { type *p; } __guest_handle_ ## name
+#else
+#define __DEFINE_XEN_GUEST_HANDLE(name, type) \
+    typedef type * __guest_handle_ ## name
+#endif
 
 #define DEFINE_XEN_GUEST_HANDLE(name)   __DEFINE_XEN_GUEST_HANDLE(name, name)
 #define XEN_GUEST_HANDLE(name)          __guest_handle_ ## name
+#define XEN_GUEST_HANDLE_64(name)       __guest_handle_ ## name
 #define set_xen_guest_handle(hnd, val)  do { (hnd).p = val; } while (0)
 #ifdef __XEN_TOOLS__
 #define get_xen_guest_handle(val, hnd)  do { val = (hnd).p; } while (0)
 #endif
 
 #ifndef __ASSEMBLY__
+typedef uint64_t uint64_aligned_t;
+
 /* Guest handles for primitive C types. */
 __DEFINE_XEN_GUEST_HANDLE(uchar, unsigned char);
 __DEFINE_XEN_GUEST_HANDLE(uint,  unsigned int);
@@ -79,9 +107,6 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 #define FLAT_USER_SS64 FLAT_RING3_SS64
 #define FLAT_USER_SS32 FLAT_RING3_SS32
 #define FLAT_USER_SS   FLAT_USER_SS64
-
-/* And the trap vector is... */
-#define TRAP_INSTR "syscall"
 
 #define __HYPERVISOR_VIRT_START 0xFFFF800000000000
 #define __HYPERVISOR_VIRT_END   0xFFFF880000000000
@@ -261,6 +286,7 @@ struct arch_shared_info {
     /* Frame containing list of mfns containing list of mfns containing p2m. */
     xen_pfn_t     pfn_to_mfn_frame_list_list;
     unsigned long nmi_reason;
+    uint64_t pad[32];
 };
 typedef struct arch_shared_info arch_shared_info_t;
 

@@ -76,10 +76,11 @@ static unsigned long current_pages;
 static unsigned long target_pages;
 
 /* We increase/decrease in batches which fit in a page */
-static unsigned long frame_list[PAGE_SIZE / sizeof(unsigned long)]; 
+static unsigned long frame_list[PAGE_SIZE / sizeof(unsigned long)];
 
 /* VM /proc information for memory */
 extern unsigned long totalram_pages;
+extern unsigned long num_physpages;
 
 /* We may hit the hard limit in Xen. If we do then we remember it. */
 static unsigned long hard_limit;
@@ -482,22 +483,20 @@ static int balloon_read(char *page, char **start, off_t off,
 		page,
 		"Current allocation: %8lu kB\n"
 		"Requested target:   %8lu kB\n"
+		"Maximum target:     %8lu kB\n"
 		"Low-mem balloon:    %8lu kB\n"
 		"High-mem balloon:   %8lu kB\n"
+		"Driver pages:       %8lu kB\n"
 		"Xen hard limit:     ",
 		PAGES2KB(current_pages), PAGES2KB(target_pages), 
-		PAGES2KB(balloon_low), PAGES2KB(balloon_high));
+		PAGES2KB(num_physpages),
+		PAGES2KB(balloon_low), PAGES2KB(balloon_high),
+		PAGES2KB(driver_pages));
 
-	if (hard_limit != ~0UL) {
-		len += sprintf(
-			page + len, 
-			"%8lu kB (inc. %8lu kB driver headroom)\n",
-			PAGES2KB(hard_limit), PAGES2KB(driver_pages));
-	} else {
-		len += sprintf(
-			page + len,
-			"     ??? kB\n");
-	}
+	if (hard_limit != ~0UL)
+		len += sprintf(page + len, "%8lu kB\n", PAGES2KB(hard_limit));
+	else
+		len += sprintf(page + len, "     ??? kB\n");
 
 	*eof = 1;
 	return len;
@@ -607,10 +606,14 @@ struct page *balloon_alloc_empty_page_range(unsigned long nr_pages)
 		set_xen_guest_handle(reservation.extent_start, &gmfn);
 		ret = HYPERVISOR_memory_op(XENMEM_decrease_reservation,
 					   &reservation);
+		if (ret == -ENOSYS)
+			goto err;
 		BUG_ON(ret != 1);
 	} else {
 		ret = apply_to_page_range(&init_mm, vstart, PAGE_SIZE << order,
 					  dealloc_pte_fn, NULL);
+		if (ret == -ENOSYS)
+			goto err;
 		BUG_ON(ret);
 	}
 	current_pages -= 1UL << order;
@@ -627,19 +630,51 @@ struct page *balloon_alloc_empty_page_range(unsigned long nr_pages)
 		init_page_count(page + i);
 
 	return page;
+
+ err:
+	free_pages(vstart, order);
+	balloon_unlock(flags);
+	return NULL;
+}
+
+static void _balloon_free_empty_page_range(
+	struct page *page, unsigned long nr_pages, int account)
+{
+	unsigned long i, flags;
+
+	balloon_lock(flags);
+	for (i = 0; i < nr_pages; i++) {
+		BUG_ON(page_count(page + i) != 1);
+		balloon_append(page + i);
+	}
+	if (account) {
+		current_pages -= nr_pages;
+		totalram_pages = current_pages;
+	}
+	balloon_unlock(flags);
+
+	schedule_work(&balloon_worker);
 }
 
 void balloon_dealloc_empty_page_range(
 	struct page *page, unsigned long nr_pages)
 {
-	unsigned long i, flags;
-	unsigned int  order = get_order(nr_pages * PAGE_SIZE);
+	_balloon_free_empty_page_range(page, 1UL << get_order(nr_pages * PAGE_SIZE), 0);
+}
+
+void balloon_free_empty_page_range(
+	struct page *page, unsigned long nr_pages)
+{
+	_balloon_free_empty_page_range(page, nr_pages, 1);
+}
+
+void balloon_release_driver_page(struct page *page)
+{
+	unsigned long flags;
 
 	balloon_lock(flags);
-	for (i = 0; i < (1UL << order); i++) {
-		BUG_ON(page_count(page + i) != 1);
-		balloon_append(page + i);
-	}
+	balloon_append(page);
+	driver_pages--;
 	balloon_unlock(flags);
 
 	schedule_work(&balloon_worker);
@@ -648,5 +683,6 @@ void balloon_dealloc_empty_page_range(
 EXPORT_SYMBOL_GPL(balloon_update_driver_allowance);
 EXPORT_SYMBOL_GPL(balloon_alloc_empty_page_range);
 EXPORT_SYMBOL_GPL(balloon_dealloc_empty_page_range);
+EXPORT_SYMBOL_GPL(balloon_release_driver_page);
 
 MODULE_LICENSE("Dual BSD/GPL");
