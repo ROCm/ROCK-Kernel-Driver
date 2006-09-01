@@ -241,16 +241,6 @@ UNUSUAL_DEV(  0x0482, 0x0103, 0x0100, 0x0100,
 		"Finecam S5",
 		US_SC_DEVICE, US_PR_DEVICE, NULL, US_FL_FIX_INQUIRY),
 
-/* Patch for Kyocera Finecam L3
- * Submitted by Michael Krauth <michael.krauth@web.de>
- * and Alessandro Fracchetti <al.fracchetti@tin.it>
- */
-UNUSUAL_DEV(  0x0482, 0x0105, 0x0100, 0x0100,
-		"Kyocera",
-		"Finecam L3",
-		US_SC_SCSI, US_PR_BULK, NULL,
-		US_FL_FIX_INQUIRY),
-
 /* Reported by Paul Stewart <stewart@wetlogic.net>
  * This entry is needed because the device reports Sub=ff */
 UNUSUAL_DEV(  0x04a4, 0x0004, 0x0001, 0x0001,
@@ -1263,6 +1253,13 @@ UNUSUAL_DEV(  0x0fce, 0xd008, 0x0000, 0x0000,
 		"V800-Vodafone 802",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_NO_WP_DETECT ),
+
+/* Reported by Emmanuel Vasilakis <evas@forthnet.gr> */
+UNUSUAL_DEV(  0x0fce, 0xe031, 0x0000, 0x0000,
+		"Sony Ericsson",
+		"M600i",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_FIX_CAPACITY ),
 
 /* Reported by Kevin Cernekee <kpc-usbdev@gelato.uiuc.edu>
  * Tested on hardware version 1.10.
