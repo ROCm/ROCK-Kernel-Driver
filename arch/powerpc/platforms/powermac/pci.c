@@ -987,24 +987,16 @@ static int __init add_bridge(struct device_node *dev)
  * it claims ttyS0 and pmac_zilog init fails
  */
 #ifdef CONFIG_SERIAL_8250
-int do_not_try_pc_legacy_8250;
-EXPORT_SYMBOL(do_not_try_pc_legacy_8250);
+int do_not_probe_pc_legacy_8250;
+EXPORT_SYMBOL(do_not_probe_pc_legacy_8250);
 #endif
 
 void __init pmac_pcibios_fixup(void)
 {
 	struct pci_dev* dev = NULL;
 
-#ifdef CONFIG_ISAPNP
-	/* avoid a warning during boot */
-	extern int isapnp_disable;
-	isapnp_disable = 1;
-#endif
 #if defined(CONFIG_SERIAL_8250) && defined(CONFIG_SERIAL_PMACZILOG)
-	do_not_try_pc_legacy_8250 = 1;
-#endif
-#ifdef CONFIG_PPC32
-	request_region(0x0UL, 0x10000UL, "reserved legacy io");
+	do_not_probe_pc_legacy_8250 = 1;
 #endif
 
 	for_each_pci_dev(dev) {

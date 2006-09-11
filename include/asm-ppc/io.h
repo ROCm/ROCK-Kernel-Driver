@@ -565,7 +565,7 @@ extern void pci_iounmap(struct pci_dev *dev, void __iomem *);
 
 #if defined(CONFIG_PPC_PMAC) && defined(CONFIG_SERIAL_8250)
 #define NO_PC_LEGACY_SERIAL_8250 1
-extern int do_not_try_pc_legacy_8250;
+extern int do_not_probe_pc_legacy_8250;
 #endif
 
 /*

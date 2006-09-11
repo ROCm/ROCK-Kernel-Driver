@@ -62,7 +62,7 @@ static const char *kdb_serial_ptr = kdb_serial_str;
 #endif	/* CONFIG_KDB */
 
 #ifndef NO_PC_LEGACY_SERIAL_8250
-#define do_not_try_pc_legacy_8250 (0)
+#define do_not_probe_pc_legacy_8250 (0)
 #endif
 
 /*
@@ -2381,7 +2381,7 @@ static struct console serial8250_console = {
 
 static int __init serial8250_console_init(void)
 {
-	if (do_not_try_pc_legacy_8250)
+	if (do_not_probe_pc_legacy_8250)
 		return -ENODEV;
 	serial8250_isa_init_ports();
 	register_console(&serial8250_console);
@@ -2692,7 +2692,7 @@ static int __init serial8250_init(void)
 {
 	int ret, i;
 
-	if (do_not_try_pc_legacy_8250)
+	if (do_not_probe_pc_legacy_8250)
 		return -ENODEV;
 
 	if (nr_uarts > UART_NR)

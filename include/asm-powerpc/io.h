@@ -11,6 +11,8 @@
 
 /* Check of existence of legacy devices */
 extern int check_legacy_ioport(unsigned long base_port);
+#define PARALLEL_BASE	0x378
+#define PNPBIOS_BASE	0xf000	/* only relevant for PReP */
 
 #ifndef CONFIG_PPC64
 #include <asm-ppc/io.h>
@@ -439,7 +441,7 @@ out:
 
 #if defined(CONFIG_PPC_PMAC) && defined(CONFIG_SERIAL_8250)
 #define NO_PC_LEGACY_SERIAL_8250 1
-extern int do_not_try_pc_legacy_8250;
+extern int do_not_probe_pc_legacy_8250;
 #endif
 
 /*
