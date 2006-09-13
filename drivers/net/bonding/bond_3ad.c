@@ -29,7 +29,6 @@
 #include <linux/ethtool.h>
 #include <linux/if_bonding.h>
 #include <linux/pkt_sched.h>
-#include <linux/rtnetlink.h>
 #include "bonding.h"
 #include "bond_3ad.h"
 
@@ -2094,7 +2093,6 @@ void bond_3ad_state_machine_handler(struct bonding *bond)
 	struct port *port;
 	struct aggregator *aggregator;
 
-	rtnl_lock();
 	read_lock(&bond->lock);
 
 	if (bond->kill_timers) {
@@ -2145,7 +2143,6 @@ re_arm:
 	schedule_delayed_work(&(BOND_AD_INFO(bond).ad_work), ad_delta_in_ticks);
 out:
 	read_unlock(&bond->lock);
-	rtnl_unlock();
 }
 
 /**

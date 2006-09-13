@@ -2017,7 +2017,6 @@ void bond_mii_monitor(struct net_device *bond_dev)
 	int delta_in_ticks;
 	int i;
 
-	rtnl_lock();
 	read_lock(&bond->lock);
 
 	delta_in_ticks = (bond->params.miimon * HZ) / 1000;
@@ -2246,7 +2245,6 @@ re_arm:
 	}
 out:
 	read_unlock(&bond->lock);
-	rtnl_unlock();
 }
 
 
@@ -2446,7 +2444,6 @@ void bond_loadbalance_arp_mon(struct net_device *bond_dev)
 	int delta_in_ticks;
 	int i;
 
-	rtnl_lock();
 	read_lock(&bond->lock);
 
 	delta_in_ticks = (bond->params.arp_interval * HZ) / 1000;
@@ -2553,7 +2550,6 @@ re_arm:
 	}
 out:
 	read_unlock(&bond->lock);
-	rtnl_unlock();
 }
 
 /*
@@ -2578,7 +2574,6 @@ void bond_activebackup_arp_mon(struct net_device *bond_dev)
 	int delta_in_ticks;
 	int i;
 
-	rtnl_lock();
 	read_lock(&bond->lock);
 
 	delta_in_ticks = (bond->params.arp_interval * HZ) / 1000;
@@ -2802,7 +2797,6 @@ re_arm:
 	}
 out:
 	read_unlock(&bond->lock);
-	rtnl_unlock();
 }
 
 /*------------------------------ proc/seq_file-------------------------------*/

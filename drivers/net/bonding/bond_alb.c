@@ -28,7 +28,6 @@
 #include <linux/pkt_sched.h>
 #include <linux/spinlock.h>
 #include <linux/slab.h>
-#include <linux/rtnetlink.h>
 #include <linux/workqueue.h>
 #include <linux/ip.h>
 #include <linux/ipv6.h>
@@ -1374,7 +1373,6 @@ void bond_alb_monitor(struct bonding *bond)
 	struct slave *slave;
 	int i;
 
-	rtnl_lock();
 	read_lock(&bond->lock);
 
 	if (bond->kill_timers) {
@@ -1476,7 +1474,6 @@ re_arm:
 	schedule_delayed_work(&(bond_info->alb_work), alb_delta_in_ticks);
 out:
 	read_unlock(&bond->lock);
-	rtnl_unlock();
 }
 
 /* assumption: called before the slave is attached to the bond
