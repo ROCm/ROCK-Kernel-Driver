@@ -1027,6 +1027,9 @@ void audit_log_hex(struct audit_buffer *ab, const unsigned char *buf,
 	struct sk_buff *skb;
 	static const unsigned char *hex = "0123456789ABCDEF";
 
+	if (!ab)
+		return;
+
 	BUG_ON(!ab->skb);
 	skb = ab->skb;
 	avail = skb_tailroom(skb);
@@ -1058,6 +1061,9 @@ static void audit_log_n_string(struct audit_buffer *ab, size_t slen,
 	int avail, new_len;
 	unsigned char *ptr;
 	struct sk_buff *skb;
+
+	if (!ab)
+		return;
 
 	BUG_ON(!ab->skb);
 	skb = ab->skb;
