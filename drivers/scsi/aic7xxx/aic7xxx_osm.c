@@ -2539,7 +2539,14 @@ static void ahc_linux_set_iu(struct scsi_target *starget, int iu)
 static void ahc_linux_get_signalling(struct Scsi_Host *shost)
 {
 	struct ahc_softc *ahc = *(struct ahc_softc **)shost->hostdata;
-	u8 mode = ahc_inb(ahc, SBLKCTL);
+	unsigned long flags;
+	u8 mode;
+
+	ahc_lock(ahc, &flags);
+	ahc_pause(ahc);
+	mode = ahc_inb(ahc, SBLKCTL);
+	ahc_unpause(ahc);
+	ahc_unlock(ahc, &flags);
 
 	if (mode & ENAB40)
 		spi_signalling(shost) = SPI_SIGNAL_LVD;

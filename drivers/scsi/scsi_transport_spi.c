@@ -844,18 +844,14 @@ spi_dv_device_internal(struct scsi_device *sdev, u8 *buffer)
 		if (spi_min_period(starget) == 8)
 			DV_SET(pcomp_en, 1);
 	}
-	/* http://lkml.org/lkml/2006/9/5/79 */
-#ifndef CONFIG_PPC32
 	/* now that we've done all this, actually check the bus
 	 * signal type (if known).  Some devices are stupid on
 	 * a SE bus and still claim they can try LVD only settings */
 	if (i->f->get_signalling)
 		i->f->get_signalling(shost);
-
 	if (spi_signalling(shost) == SPI_SIGNAL_SE ||
 	    spi_signalling(shost) == SPI_SIGNAL_HVD)
 		DV_SET(dt, 0);
-#endif
 	/* Do the read only INQUIRY tests */
 	spi_dv_retrain(sdev, buffer, buffer + sdev->inquiry_len,
 		       spi_dv_device_compare_inquiry);
