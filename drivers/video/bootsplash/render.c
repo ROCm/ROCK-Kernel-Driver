@@ -1,4 +1,4 @@
-/* 
+/*
  *    linux/drivers/video/bootsplash/render.c - splash screen render functions.
  */
 
@@ -202,7 +202,7 @@ void splash_clear(struct splash_data *sd, struct vc_data *vc, struct fb_info *in
 	splashset(dst, height, width, info->fix.line_length, bgx);
 }
 
-void splash_bmove(struct splash_data *sd, struct vc_data *vc, struct fb_info *info, int sy, 
+void splash_bmove(struct splash_data *sd, struct vc_data *vc, struct fb_info *info, int sy,
 		int sx, int dy, int dx, int height, int width)
 {
 	struct fb_copyarea area;
@@ -228,7 +228,7 @@ void splash_clear_margins(struct splash_data *sd, struct vc_data *vc, struct fb_
 {
 	unsigned int tw = vc->vc_cols*vc->vc_font.width;
 	unsigned int th = vc->vc_rows*vc->vc_font.height;
-	
+
         if (console_blanked)
 	    return;
 	if (!bottom_only) {
@@ -250,7 +250,7 @@ int splash_cursor(struct splash_data *sd, struct fb_info *info, struct fb_cursor
 
 	if (info->state != FBINFO_STATE_RUNNING)
 		return 0;
-	
+
 	s_pitch = (cursor->image.width + 7) >> 3;
         dsize = s_pitch * cursor->image.height;
         if (cursor->enable) {

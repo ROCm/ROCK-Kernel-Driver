@@ -33,7 +33,7 @@
  * To have it as LSM may still be useful: It could be stacked on top
  * of another LSM (if the other LSM allows this or if the stacker
  * is used).
- * If the capability LSM is loaded, we do NOT register the 
+ * If the capability LSM is loaded, we do NOT register the
  * capability_security_ops but a second structure capability_ops
  * that has identical entries. We need to differentiate
  * between capabilities used as default and used as LSM as in

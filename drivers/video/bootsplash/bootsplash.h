@@ -1,10 +1,10 @@
-/* 
+/*
  *    linux/drivers/video/bootsplash/bootsplash.h - splash screen definition.
- *	
+ *
  *	(w) 2001-2003 by Volker Poplawski, <volker@poplawski.de>
  * 		    Stefan Reinauer, <stepan@suse.de>
- * 		    
- * 		    
+ *
+ *
  * 	idea and SuSE screen work by Ken Wimer, <wimer@suse.de>
  */
 
@@ -25,7 +25,7 @@ extern void splash_putc(struct splash_data *sd, struct vc_data *vc, struct fb_in
 extern void splashcopy(u8 *dst, u8 *src, int height, int width, int dstbytes, int srcbytes);
 extern void splash_clear(struct splash_data *sd, struct vc_data *vc, struct fb_info *info, int sy,
 			int sx, int height, int width);
-extern void splash_bmove(struct splash_data *sd, struct vc_data *vc, struct fb_info *info, int sy, 
+extern void splash_bmove(struct splash_data *sd, struct vc_data *vc, struct fb_info *info, int sy,
 			int sx, int dy, int dx, int height, int width);
 extern void splash_clear_margins(struct splash_data *sd, struct vc_data *vc, struct fb_info *info,
 			int bottom_only);

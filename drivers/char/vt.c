@@ -3767,7 +3767,7 @@ void con_remap_def_color(struct vc_data *vc, int new_color)
 	       while(len--) {
 		       c = *sbuf;
 		       if (((c ^ old_color) & 0xf000) == 0)
-			       *sbuf ^= (old_color ^ new_color) & 0xf000; 
+			       *sbuf ^= (old_color ^ new_color) & 0xf000;
 		       if (((c ^ old_color) & 0x0f00) == 0)
 			       *sbuf ^= (old_color ^ new_color) & 0x0f00;
 		       sbuf++;

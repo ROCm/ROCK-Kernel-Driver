@@ -34,7 +34,7 @@ struct splash_data {
     int splash_height;			/* height of image */
     int splash_text_xo;			/* text area origin */
     int splash_text_yo;
-    int splash_text_wi;			/* text area size */ 
+    int splash_text_wi;			/* text area size */
     int splash_text_he;
     int splash_showtext;		/* silent/verbose mode */
     int splash_boxcount;

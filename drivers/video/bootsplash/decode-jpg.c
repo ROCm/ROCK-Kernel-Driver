@@ -1,8 +1,8 @@
-/* 
+/*
  *    linux/drivers/video/bootsplash/decode-jpg.c - a tiny jpeg decoder.
- *      
+ *
  *      (w) August 2001 by Michael Schroeder, <mls@suse.de>
- *                  
+ *
  */
 
 #include <linux/config.h>
@@ -243,8 +243,8 @@ static int dec_checkmarker(void)
 int jpeg_check_size(unsigned char *buf, int width, int height)
 {
   	datap = buf;
-	getbyte(); 
-	getbyte(); 
+	getbyte();
+	getbyte();
 	readtables(M_SOF0);
 	getword();
 	getbyte();
@@ -319,14 +319,14 @@ struct jpeg_decdata *decdata;
 		dscans[i].hudc.dhuff = dec_huffdc + tdc;
 		dscans[i].huac.dhuff = dec_huffac + tac;
 	}
-	
+
 	i = getbyte();
 	j = getbyte();
 	m = getbyte();
-	
+
 	if (i != 0 || j != 63 || m != 0)
 		return ERR_NOT_SEQUENTIAL_DCT;
-	
+
 	if (dscans[0].cid != 1 || dscans[1].cid != 2 || dscans[2].cid != 3)
 		return ERR_NOT_YCBCR_221111;
 
@@ -360,7 +360,7 @@ struct jpeg_decdata *decdata;
 			if (info.dri && !--info.nm)
 				if (dec_checkmarker())
 					return ERR_WRONG_MARKER;
-			
+
 			decode_mcus(&in, decdata->dcts, 6, dscans, max);
 			idct(decdata->dcts, decdata->out, decdata->dquant[0], IFIX(128.5), max[0]);
 			idct(decdata->dcts + 64, decdata->out + 64, decdata->dquant[0], IFIX(128.5), max[1]);
@@ -382,7 +382,7 @@ struct jpeg_decdata *decdata;
 			}
 		}
 	}
-	
+
 	m = dec_readmarker(&in);
 	if (m != M_EOI)
 		return ERR_NO_EOI;
@@ -761,7 +761,7 @@ PREC *qout;
 
 	for (i = 0; i < 8; i++)
 		for (j = 0; j < 8; j++)
-			qout[zig[i * 8 + j]] = qin[zig[i * 8 + j]] * 
+			qout[zig[i * 8 + j]] = qin[zig[i * 8 + j]] *
 			  			IMULT(aaidct[i], aaidct[j]);
 }
 

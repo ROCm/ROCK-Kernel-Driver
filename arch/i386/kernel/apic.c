@@ -1345,11 +1345,11 @@ static __init int dmi_enable_apic(void)
 {
 	int year;
 	int apic;
-	char *vendor; 
+	char *vendor;
 
-	/* If the machine has more than one CPU try to use APIC because it'll 
-	   be running the SMP kernel with APIC soon anyways. 
-	   This won't cover dual core, but they are handled by the date check 
+	/* If the machine has more than one CPU try to use APIC because it'll
+	   be running the SMP kernel with APIC soon anyways.
+	   This won't cover dual core, but they are handled by the date check
 	   below. */
 	if (dmi_cpus > 1)
 		return 1;
@@ -1363,7 +1363,7 @@ static __init int dmi_enable_apic(void)
 	if (vendor && !strncmp(vendor, "Intel", 5))
 		apic = 1;
 	/* Use APIC for anything since 2001 */
-	else if (year >= 2001) 
+	else if (year >= 2001)
 		apic = 1;
 
 #ifdef CONFIG_ACPI
@@ -1374,7 +1374,7 @@ static __init int dmi_enable_apic(void)
 #endif
 
 	if (!apic)
-		apic_disabled_by_dmi = 1;	
+		apic_disabled_by_dmi = 1;
 
 	return apic;
 }
@@ -1387,7 +1387,7 @@ void __init dmi_check_apic(void)
 		clear_bit(X86_FEATURE_APIC, boot_cpu_data.x86_capability);
 		nr_ioapics = 0;
 		enable_local_apic = -1;
-		printk(KERN_INFO "IO/L-APIC disabled because your old system seems to be old\n"); 
+		printk(KERN_INFO "IO/L-APIC disabled because your old system seems to be old\n");
 		printk(KERN_INFO "overwrite with \"apic\"\n");
 		return;
 	}

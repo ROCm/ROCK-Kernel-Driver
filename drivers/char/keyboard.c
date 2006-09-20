@@ -1177,8 +1177,8 @@ static void kbd_keycode(unsigned int keycode, int down,
 	if (down == 1 && (keycode == 0x3c || keycode == 0x01)) {        /* F2 and ESC on PC keyboard */
 		extern int splash_verbose(void);
 		if (splash_verbose())
-			return; 
-	}       
+			return;
+	}
 #endif
 
 #ifdef CONFIG_MAGIC_SYSRQ	       /* Handle the SysRq Hack */

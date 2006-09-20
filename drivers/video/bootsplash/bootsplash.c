@@ -1,12 +1,12 @@
-/* 
- *           linux/drivers/video/bootsplash/bootsplash.c - 
+/*
+ *           linux/drivers/video/bootsplash/bootsplash.c -
  *                 splash screen handling functions.
- *	
+ *
  *	(w) 2001-2004 by Volker Poplawski, <volker@poplawski.de>,
  * 		    Stefan Reinauer, <stepan@suse.de>,
  * 		    Steffen Winterfeldt, <snwint@suse.de>,
  *                  Michael Schroeder <mls@suse.de>
- * 		    
+ *
  *        Ideas & SuSE screen work by Ken Wimer, <wimer@suse.de>
  *
  *  For more information on this code check http://www.bootsplash.org/
@@ -35,13 +35,13 @@ extern signed char con2fb_map[MAX_NR_CONSOLES];
 
 /* These errors have to match fbcon-jpegdec.h */
 static unsigned char *jpg_errors[] = {
-	"no SOI found", 
-	"not 8 bit", 
-	"height mismatch", 
+	"no SOI found",
+	"not 8 bit",
+	"height mismatch",
 	"width mismatch",
-	"bad width or height", 
-	"too many COMPPs", 
-	"illegal HV", 
+	"bad width or height",
+	"too many COMPPs",
+	"illegal HV",
 	"quant table selector",
 	"picture is not YCBCR 221111",
 	"unknow CID in scan",
@@ -591,7 +591,7 @@ static int splash_getraw(unsigned char *start, unsigned char *end, int *update)
     return -1;
 }
 
-int splash_verbose(void) 
+int splash_verbose(void)
 {
     struct vc_data *vc;
     struct fb_info *info;
@@ -668,7 +668,7 @@ int splash_prepare(struct vc_data *vc, struct fb_info *info)
 
 	if (vc->vc_splash_data->splash_silentjpeg && vc->vc_splash_data->splash_dosilent) {
 		/* fill area after framebuffer with other jpeg */
-		if ((err = jpeg_decode(vc->vc_splash_data->splash_silentjpeg, info->splash_pic, 
+		if ((err = jpeg_decode(vc->vc_splash_data->splash_silentjpeg, info->splash_pic,
 			 ((width + 15) & ~15), ((height + 15) & ~15), depth, decdata))) {
 			printk(KERN_INFO "bootsplash: error while decompressing silent picture: %s (%d)\n", jpg_errors[err - 1], err);
 			if (info->silent_screen_base)
@@ -676,7 +676,7 @@ int splash_prepare(struct vc_data *vc, struct fb_info *info)
 			vc->vc_splash_data->splash_dosilent = 0;
 		} else {
 			if (vc->vc_splash_data->splash_sboxcount)
-				boxit(info->splash_pic, sbytes, vc->vc_splash_data->splash_sboxes, 
+				boxit(info->splash_pic, sbytes, vc->vc_splash_data->splash_sboxes,
 					vc->vc_splash_data->splash_sboxcount, vc->vc_splash_data->splash_percent, 0);
 
 			if (!info->silent_screen_base)
@@ -687,7 +687,7 @@ int splash_prepare(struct vc_data *vc, struct fb_info *info)
 	} else if (info->silent_screen_base)
 		info->screen_base = info->silent_screen_base;
 
-	if ((err = jpeg_decode(vc->vc_splash_data->splash_jpeg, info->splash_pic, 
+	if ((err = jpeg_decode(vc->vc_splash_data->splash_jpeg, info->splash_pic,
 		 ((width + 15) & ~15), ((height + 15) & ~15), depth, decdata))) {
 		printk(KERN_INFO "bootsplash: error while decompressing picture: %s (%d) .\n", jpg_errors[err - 1], err);
 		splash_off(info);
@@ -823,7 +823,7 @@ static int splash_write_proc(struct file *file, const char *buffer,
 {
         int new, unit;
 	struct vc_data *vc;
-	
+
 	if (!buffer || !splash_default)
 		return count;
 

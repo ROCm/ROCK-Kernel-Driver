@@ -9,8 +9,8 @@ config BOOTSPLASH
 	depends on FRAMEBUFFER_CONSOLE && FB_VESA
 	default n
         ---help---
-          This option enables the Linux bootsplash screen. For more 
-          information on the bootsplash screen have a look at 
+          This option enables the Linux bootsplash screen. For more
+          information on the bootsplash screen have a look at
           http://www.bootsplash.org/.
           If you are unsure, say N
 endmenu
