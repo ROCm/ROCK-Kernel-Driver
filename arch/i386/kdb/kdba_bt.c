@@ -5,10 +5,9 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (c) 1999-2004 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 1999-2006 Silicon Graphics, Inc.  All Rights Reserved.
  */
 
-#include <linux/config.h>
 #include <linux/ctype.h>
 #include <linux/string.h>
 #include <linux/kernel.h>
@@ -19,15 +18,145 @@
 #include <linux/kdbprivate.h>
 #include <asm/system.h>
 
-#ifdef CONFIG_FRAME_POINTER
-#define EFPSTR	"EBP"
-#define EFP	ebp
-#define NOBP	0
-#else
-#define EFPSTR	"ESP"
-#define EFP	esp
-#define NOBP	esp
-#endif
+/* On a 4K stack kernel, hardirq_ctx and softirq_ctx are [NR_CPUS] arrays.  The
+ * first element of each per-cpu stack is a struct thread_info.
+ */
+void
+kdba_get_stack_info_alternate(kdb_machreg_t addr, int cpu,
+			      struct kdb_activation_record *ar)
+{
+#ifdef	CONFIG_4KSTACKS
+	struct thread_info *tinfo;
+	static int first_time = 1;
+	static struct thread_info **kdba_hardirq_ctx, **kdba_softirq_ctx;
+	if (first_time) {
+		kdb_symtab_t symtab;
+		kdbgetsymval("hardirq_ctx", &symtab);
+		kdba_hardirq_ctx = (struct thread_info **)symtab.sym_start;
+		kdbgetsymval("softirq_ctx", &symtab);
+		kdba_softirq_ctx = (struct thread_info **)symtab.sym_start;
+		first_time = 0;
+	}
+	tinfo = (struct thread_info *)(addr & -THREAD_SIZE);
+	if (cpu < 0) {
+		/* Arbitrary address, see if it falls within any of the irq
+		 * stacks
+		 */
+		int found = 0;
+		for_each_online_cpu(cpu) {
+			if (tinfo == kdba_hardirq_ctx[cpu] ||
+			    tinfo == kdba_softirq_ctx[cpu]) {
+				found = 1;
+				break;
+			}
+		}
+		if (!found)
+			return;
+	}
+	if (tinfo == kdba_hardirq_ctx[cpu] ||
+	    tinfo == kdba_softirq_ctx[cpu]) {
+		ar->stack.physical_start = (kdb_machreg_t)tinfo;
+		ar->stack.physical_end = ar->stack.physical_start + THREAD_SIZE;
+		ar->stack.logical_start = ar->stack.physical_start +
+					  sizeof(struct thread_info);
+		ar->stack.logical_end = ar->stack.physical_end;
+		ar->stack.next = tinfo->previous_esp;
+		if (tinfo == kdba_hardirq_ctx[cpu])
+			ar->stack.id = "hardirq_ctx";
+		else
+			ar->stack.id = "softirq_ctx";
+	}
+#endif	/* CONFIG_4KSTACKS */
+}
+
+/* Given an address which claims to be on a stack, an optional cpu number and
+ * an optional task address, get information about the stack.
+ *
+ * t == NULL, cpu < 0 indicates an arbitrary stack address with no associated
+ * struct task, the address can be in an alternate stack or any task's normal
+ * stack.
+ *
+ * t != NULL, cpu >= 0 indicates a running task, the address can be in an
+ * alternate stack or that task's normal stack.
+ *
+ * t != NULL, cpu < 0 indicates a blocked task, the address can only be in that
+ * task's normal stack.
+ *
+ * t == NULL, cpu >= 0 is not a valid combination.
+ */
+
+static void
+kdba_get_stack_info(kdb_machreg_t esp, int cpu,
+		    struct kdb_activation_record *ar,
+		    const struct task_struct *t)
+{
+	struct thread_info *tinfo;
+	struct task_struct *g, *p;
+	memset(&ar->stack, 0, sizeof(ar->stack));
+	if (KDB_DEBUG(ARA))
+		kdb_printf("%s: esp=0x%lx cpu=%d task=%p\n",
+			   __FUNCTION__, esp, cpu, t);
+	if (t == NULL || cpu >= 0) {
+		kdba_get_stack_info_alternate(esp, cpu, ar);
+		if (ar->stack.logical_start)
+			goto out;
+	}
+	esp &= -THREAD_SIZE;
+	tinfo = (struct thread_info *)esp;
+	if (t == NULL) {
+		/* Arbitrary stack address without an associated task, see if
+		 * it falls within any normal process stack, including the idle
+		 * tasks.
+		 */
+		kdb_do_each_thread(g, p) {
+			if (tinfo == p->thread_info) {
+				t = p;
+				goto found;
+			}
+		} kdb_while_each_thread(g, p);
+		for_each_online_cpu(cpu) {
+			p = idle_task(cpu);
+			if (tinfo == p->thread_info) {
+				t = p;
+				goto found;
+			}
+		}
+	found:
+		if (KDB_DEBUG(ARA))
+			kdb_printf("%s: found task %p\n", __FUNCTION__, t);
+	} else if (cpu >= 0) {
+		/* running task */
+		struct kdb_running_process *krp = kdb_running_process + cpu;
+		if (krp->p != t || tinfo != t->thread_info)
+			t = NULL;
+		if (KDB_DEBUG(ARA))
+			kdb_printf("%s: running task %p\n", __FUNCTION__, t);
+	} else {
+		/* blocked task */
+		if (tinfo != t->thread_info)
+			t = NULL;
+		if (KDB_DEBUG(ARA))
+			kdb_printf("%s: blocked task %p\n", __FUNCTION__, t);
+	}
+	if (t) {
+		ar->stack.physical_start = esp;
+		ar->stack.physical_end = esp + THREAD_SIZE;
+		ar->stack.logical_start = esp + sizeof(struct thread_info);
+		ar->stack.logical_end = ar->stack.physical_end;
+		ar->stack.next = 0;
+		ar->stack.id = "normal";
+	}
+out:
+	if (ar->stack.physical_start && KDB_DEBUG(ARA)) {
+		kdb_printf("%s: ar->stack\n", __FUNCTION__);
+		kdb_printf("    physical_start=0x%lx\n", ar->stack.physical_start);
+		kdb_printf("    physical_end=0x%lx\n", ar->stack.physical_end);
+		kdb_printf("    logical_start=0x%lx\n", ar->stack.logical_start);
+		kdb_printf("    logical_end=0x%lx\n", ar->stack.logical_end);
+		kdb_printf("    next=0x%lx\n", ar->stack.next);
+		kdb_printf("    id=%s\n", ar->stack.id);
+	}
+}
 
 /*
  * bt_print_one
@@ -36,8 +165,7 @@
  *
  * Inputs:
  *	eip	Current program counter, or return address.
- *	efp	#ifdef CONFIG_FRAME_POINTER: Previous frame pointer ebp,
- *		0 if not valid; #else: Stack pointer esp when at eip.
+ *	esp	Stack pointer esp when at eip.
  *	ar	Activation record for this frame.
  *	symtab	Information about symbol that eip falls within.
  *	argcount Maximum number of arguments to print.
@@ -52,7 +180,8 @@
  */
 
 static void
-bt_print_one(kdb_machreg_t eip, kdb_machreg_t efp, const kdb_ar_t *ar,
+bt_print_one(kdb_machreg_t eip, kdb_machreg_t esp,
+	     const struct kdb_activation_record *ar,
 	     const kdb_symtab_t *symtab, int argcount)
 {
 	int btsymarg = 0;
@@ -62,22 +191,16 @@ bt_print_one(kdb_machreg_t eip, kdb_machreg_t efp, const kdb_ar_t *ar,
 	kdbgetintenv("BTSYMARG", &btsymarg);
 	kdbgetintenv("NOSECT", &nosect);
 
-	if (efp)
-		kdb_printf("0x%08lx", efp);
-	else
-		kdb_printf("          ");
+	kdb_printf(kdb_machreg_fmt0, esp);
 	kdb_symbol_print(eip, symtab, KDB_SP_SPACEB|KDB_SP_VALUE);
 	if (argcount && ar->args) {
-		int i, argc = ar->args / 4;
-
+		int i, argc = ar->args;
 		kdb_printf(" (");
 		if (argc > argcount)
 			argc = argcount;
-
-		for(i=1; i<=argc; i++){
-			kdb_machreg_t argp = ar->arg0 - ar->args + 4*i;
-
-			if (i != 1)
+		for (i = 0; i < argc; i++) {
+			kdb_machreg_t argp = ar->arg[i];
+			if (i)
 				kdb_printf(", ");
 			kdb_getword(&word, argp, sizeof(word));
 			kdb_printf("0x%lx", word);
@@ -88,27 +211,25 @@ bt_print_one(kdb_machreg_t eip, kdb_machreg_t efp, const kdb_ar_t *ar,
 		if (!nosect) {
 			kdb_printf("\n");
 			kdb_printf("                               %s",
-				symtab->mod_name);
+				   symtab->mod_name);
 			if (symtab->sec_name && symtab->sec_start)
 				kdb_printf(" 0x%lx 0x%lx",
-					symtab->sec_start,
-					symtab->sec_end);
+					   symtab->sec_start, symtab->sec_end);
 			kdb_printf(" 0x%lx 0x%lx",
-				symtab->sym_start,
-				symtab->sym_end);
+				   symtab->sym_start, symtab->sym_end);
 		}
 	}
 	kdb_printf("\n");
 	if (argcount && ar->args && btsymarg) {
-		int i, argc = ar->args / 4;
+		int i, argc = ar->args;
 		kdb_symtab_t arg_symtab;
-		kdb_machreg_t arg;
-		for(i=1; i<=argc; i++){
-			kdb_machreg_t argp = ar->arg0 - ar->args + 4*i;
-			kdb_getword(&arg, argp, sizeof(arg));
-			if (kdbnearsym(arg, &arg_symtab)) {
+		for (i = 0; i < argc; i++) {
+			kdb_machreg_t argp = ar->arg[i];
+			kdb_getword(&word, argp, sizeof(word));
+			if (kdbnearsym(word, &arg_symtab)) {
 				kdb_printf("                               ");
-				kdb_symbol_print(arg, &arg_symtab, KDB_SP_DEFAULT|KDB_SP_NEWLINE);
+				kdb_symbol_print(word, &arg_symtab,
+						 KDB_SP_DEFAULT|KDB_SP_NEWLINE);
 			}
 		}
 	}
@@ -125,25 +246,35 @@ bt_print_one(kdb_machreg_t eip, kdb_machreg_t efp, const kdb_ar_t *ar,
  */
 
 static int
-kdba_bt_stack_running(const struct task_struct *p, kdb_machreg_t *eip,
-		      kdb_machreg_t *esp, kdb_machreg_t *ebp)
+kdba_bt_stack_running(const struct task_struct *p,
+		      const struct kdb_activation_record *ar,
+		      kdb_machreg_t *eip, kdb_machreg_t *esp,
+		      kdb_machreg_t *ebp)
 {
-	kdb_machreg_t addr, *sp;
+	kdb_machreg_t addr, sp;
 	kdb_symtab_t symtab;
 	struct kdb_running_process *krp = kdb_running_process + task_cpu(p);
+	int found = 0;
 
 	if (kdbgetsymval("kdb", &symtab) == 0)
 		return 0;
 	if (kdbnearsym(symtab.sym_start, &symtab) == 0)
 		return 0;
-	for (sp = (long *)krp->arch.esp; ; ++sp) {
-		addr = *sp;
-		if (addr >= symtab.sym_start && addr < symtab.sym_end)
+	sp = krp->arch.esp;
+	if (sp < ar->stack.logical_start || sp >= ar->stack.logical_end)
+		return 0;
+	while (sp < ar->stack.logical_end) {
+		addr = *(kdb_machreg_t *)sp;
+		if (addr >= symtab.sym_start && addr < symtab.sym_end) {
+			found = 1;
 			break;
+		}
+		sp += sizeof(kdb_machreg_t);
 	}
-	*esp = (kdb_machreg_t)sp;
-	*ebp = *esp;
-	*eip = *sp;
+	if (!found)
+		return 0;
+	*ebp = *esp = sp;
+	*eip = addr;
 	return 1;
 }
 
@@ -168,14 +299,15 @@ kdba_bt_stack_running(const struct task_struct *p, kdb_machreg_t *eip,
 static int
 kdba_bt_stack(kdb_machreg_t addr, int argcount, const struct task_struct *p)
 {
-	kdb_ar_t ar;
-	kdb_machreg_t eip, esp, ebp, ss, cs, esp_base;
+	struct kdb_activation_record ar;
+	kdb_machreg_t eip, esp, ebp, cs;
 	kdb_symtab_t symtab;
-	int count, kernel_stack, alt_stack = 0, btsp = 0, suppress;
+	int first_time = 1, count = 0, btsp = 0, suppress;
 	struct pt_regs *regs = NULL;
 
 	kdbgetintenv("BTSP", &btsp);
 	suppress = !btsp;
+	memset(&ar, 0, sizeof(ar));
 
 	/*
 	 * The caller may have supplied an address at which the
@@ -191,16 +323,20 @@ kdba_bt_stack(kdb_machreg_t addr, int argcount, const struct task_struct *p)
 		eip = 0;
 		ebp = 0;
 		esp = addr;
-		cs  = __KERNEL_CS;	/* have to assume kernel space */
+		cs = __KERNEL_CS;	/* have to assume kernel space */
 		suppress = 0;
+		kdba_get_stack_info(esp, -1, &ar, NULL);
 	} else {
 		if (task_curr(p)) {
-			struct kdb_running_process *krp = kdb_running_process + task_cpu(p);
+			struct kdb_running_process *krp =
+			    kdb_running_process + task_cpu(p);
 
-			if (krp->seqno && krp->p == p && krp->seqno >= kdb_seqno - 1) {
+			if (krp->seqno && krp->p == p
+			    && krp->seqno >= kdb_seqno - 1) {
 				/* valid saved state, continue processing */
 			} else {
-				kdb_printf("Process did not save state, cannot backtrace\n");
+				kdb_printf
+				    ("Process did not save state, cannot backtrace\n");
 				kdb_ps1(p);
 				return 0;
 			}
@@ -208,195 +344,84 @@ kdba_bt_stack(kdb_machreg_t addr, int argcount, const struct task_struct *p)
 			if (KDB_NULL_REGS(regs))
 				return KDB_BADREG;
 			kdba_getregcontents("xcs", regs, &cs);
+			if ((cs & 0xffff) != __KERNEL_CS) {
+				kdb_printf("Stack is not in kernel space, backtrace not available\n");
+				return 0;
+			}
 			kdba_getregcontents("eip", regs, &eip);
 			kdba_getregcontents("ebp", regs, &ebp);
-			esp = (long)regs;
-			if ((cs & 0xffff) == __KERNEL_CS &&
-			    kdba_bt_stack_running(p, &eip, &esp, &ebp) == 0) {
-				kdb_printf("%s: cannot find backtrace starting point for running task\n",
-					   __FUNCTION__);
+			esp = krp->arch.esp;
+			kdba_get_stack_info(esp, kdb_process_cpu(p), &ar, p);
+			if (kdba_bt_stack_running(p, &ar, &eip, &esp, &ebp) == 0) {
+				kdb_printf("%s: cannot adjust esp=0x%lx for a running task\n",
+					   __FUNCTION__, esp);
 			}
 		} else {
-			/* Not on cpu, assume blocked.  Blocked i386 tasks do
-			 * not have pt_regs.  p->thread.{esp,eip} are set, esp
+			/* Not on cpu, assume blocked.  Blocked tasks do not
+			 * have pt_regs.  p->thread.{esp,eip} are set, esp
 			 * points to the ebp value, assume kernel space.
 			 */
 			eip = p->thread.eip;
 			esp = p->thread.esp;
 			ebp = *(unsigned long *)esp;
-			cs  = __KERNEL_CS;
+			cs = __KERNEL_CS;
 			suppress = 0;
-		}
-		esp_base = (unsigned long)(p->thread_info);
-		kernel_stack = esp >= esp_base && esp < (esp_base + THREAD_SIZE);
-#ifdef	CONFIG_4KSTACKS
-		if (!kernel_stack && kdb_task_has_cpu(p)) {
-			int cpu = kdb_process_cpu(p);
-			struct thread_info *tinfo = (struct thread_info *)(esp & -THREAD_SIZE);
-			if (kdba_irq_ctx_type(cpu, tinfo))
-				alt_stack = kernel_stack = 1;
-		}
-#endif	/* CONFIG_4KSTACKS */
-		if (!kernel_stack) {
-			kdb_printf("esp is not in a valid kernel stack, backtrace not available\n");
-			kdb_printf("esp_base=%lx, esp=%lx\n", esp_base, esp);
-			return 0;
+			kdba_get_stack_info(esp, -1, &ar, p);
 		}
 	}
-	ss = esp & -THREAD_SIZE;
-
-	if ((cs & 0xffff) != __KERNEL_CS) {
-		kdb_printf("Stack is not in kernel space, backtrace not available\n");
+	if (!ar.stack.physical_start) {
+		kdb_printf("esp=0x%lx is not in a valid kernel stack, backtrace not available\n",
+			   esp);
 		return 0;
 	}
 
-	kdb_printf(EFPSTR "        EIP        Function (args)\n");
-	if (alt_stack && !suppress)
-		kdb_printf("Starting on an alternate kernel stack\n");
+	kdb_printf("esp        eip        Function (args)\n");
+	if (ar.stack.next && !suppress)
+		kdb_printf(" ======================= <%s>\n",
+			   ar.stack.id);
 
-	/*
-	 * Run through the activation records and print them.
-	 */
-
-	alt_stack = 0;
-	for (count = 0; count < 200; ++count) {
-		kdb_ar_t save_ar = ar;
-		kdbnearsym(eip, &symtab);
-		if (!kdb_get_next_ar(esp, symtab.sym_start, eip, ebp, ss,
-			&ar, &symtab)) {
-			struct thread_info *tinfo = (struct thread_info *)ss;
-			esp = tinfo->previous_esp;
-			if (!esp)
-				break;
-			ss = esp & -THREAD_SIZE;
-			if (!suppress)
-				kdb_printf(" =======================\n");
-			alt_stack = 1;
+	/* Run through all the stacks */
+	while (ar.stack.physical_start) {
+		if (!first_time)
+			eip = *(kdb_machreg_t *)esp;
+		first_time = 0;
+		if (!suppress && __kernel_text_address(eip)) {
+			kdbnearsym(eip, &symtab);
+			bt_print_one(eip, esp, &ar, &symtab, argcount);
+			++count;
 		}
-
-		if (strncmp(".text.lock.", symtab.sym_name, 11) == 0) {
-			/*
-			 * Instructions in the .text.lock area are generated by
-			 * the out of line code in lock handling, see
-			 * include/asm-i386 semaphore.h and rwlock.h.  There can
-			 * be multiple instructions which eventually end with a
-			 * jump back to the mainline code.  Use the disassmebler
-			 * to silently step through the code until we find the
-			 * jump, resolve its destination and translate it to a
-			 * symbol.  Replace '.text.lock' with the symbol.
-			 */
-			unsigned char inst;
-			kdb_machreg_t offset = 0, realeip = eip;
-			int length, offsize = 0;
-			kdb_symtab_t lock_symtab;
-			/* Dummy out the disassembler print function */
-			fprintf_ftype save_fprintf_func = kdb_di.fprintf_func;
-
-			kdb_di.fprintf_func = &kdb_dis_fprintf_dummy;
-			while((length = kdba_id_printinsn(realeip, &kdb_di)) > 0) {
-				kdb_getarea(inst, realeip);
-				offsize = 0;
-				switch (inst) {
-				case 0xeb:	/* jmp with 1 byte offset */
-					offsize = 1-4;
-					/* drop through */
-				case 0xe9:	/* jmp with 4 byte offset */
-					offsize += 4;
-					kdb_getword(&offset, realeip+1, offsize);
-					break;
-				default:
-					realeip += length;	/* next instruction */
-					break;
-				}
-				if (offsize)
-					break;
-			}
-			kdb_di.fprintf_func = save_fprintf_func;
-
-			if (offsize) {
-				realeip += 1 + offsize + (offsize == 1 ? (s8)offset : (s32)offset);
-				if (kdbnearsym(realeip, &lock_symtab)) {
-					/* Print the stext entry without args */
-					if (!suppress)
-						bt_print_one(eip, NOBP, &ar, &symtab, 0);
-					/* Point to mainline code */
-					eip = realeip;
-					ar = save_ar;	/* lock text does not consume an activation frame */
-					continue;
-				}
-			}
+		if ((struct pt_regs *)esp == regs) {
+			if (ar.stack.next && suppress)
+				kdb_printf(" ======================= <%s>\n",
+					   ar.stack.id);
+			++count;
+			suppress = 0;
 		}
-
-		if (strcmp("ret_from_intr", symtab.sym_name) == 0 ||
-		    strcmp("error_code", symtab.sym_name) == 0 ||
-		    strcmp("kdb_call", symtab.sym_name) == 0) {
-			    int parms;
-			if (strcmp("ret_from_intr", symtab.sym_name) == 0) {
-				/*
-				 * Non-standard frame.  ret_from_intr is
-				 * preceded by pt_regs;
-				 */
-				parms = 0;
-			} else if (strcmp("error_code", symtab.sym_name) == 0) {
-				/*
-				 * Non-standard frame.  error_code is preceded
-				 * by two parameters (-> registers, error
-				 * code), and pt_regs.
-				 */
-				parms = 2;
-			} else if (strcmp("kdb_call", symtab.sym_name) == 0) {
-				/*
-				 * Non-standard frame.  kdb_call is preceded by
-				 * three parameters (-> registers, error code,
-				 * kdb reason code) and pt_regs.
-				 */
-				parms = 3;
-			} else {
-				kdb_printf("%s: unexpected special case function name '%s'\n",
-					   __FUNCTION__, symtab.sym_name);
-				parms = 0;
-			}
-			/* Adjust esp to pt_regs by the number of parameters to
-			 * get pt_regs
-			 */
-			esp = ar.end + parms*4;
-			ebp = 0;
-			/* Adjust by the number of number of registers in
-			 * pt_regs (excluding the old esp and xss which may not
-			 * be on this stack) plus the original eax and the
-			 * return address.
-			 */
-			ar.start = esp + (9 + 2)*4;
-		}
-
-		if (alt_stack) {
-			ebp = 0;
-			alt_stack = 0;
-		} else {
-			if (!suppress)
-				bt_print_one(eip, EFP, &ar, &symtab, argcount);
-			if (ar.ret == 0)
-				break;	/* End of frames */
-			if (esp == (long)regs) {
-				/* reached the code that was interrupted */
-				if (!suppress) {
-					kdb_printf("Interrupt registers:\n");
-					kdba_dumpregs((struct pt_regs *)(esp), NULL, NULL);
-				}
-				eip = regs->eip;
-				kdbnearsym(eip, &symtab);
-				bt_print_one(eip, NOBP, &ar, &symtab, 0);
-				suppress = 0;
-			}
-			eip = ar.ret;
-			ebp = ar.oldfp;
-			esp = ar.start;
+		esp += sizeof(eip);
+		if (count > 200)
+			break;
+		if (esp < ar.stack.logical_end)
+			continue;
+		if (!ar.stack.next)
+			break;
+		esp = ar.stack.next;
+		if (KDB_DEBUG(ARA))
+			kdb_printf("new esp=0x%lx\n", esp);
+		kdba_get_stack_info(esp, -1, &ar, NULL);
+		if (!ar.stack.physical_start) {
+			kdb_printf("+++ Cannot resolve next stack\n");
+		} else if (!suppress) {
+			kdb_printf(" ======================= <%s>\n",
+				   ar.stack.id);
+			++count;
 		}
 	}
-	if (count >= 200)
+
+	if (count > 200)
 		kdb_printf("bt truncated, count limit reached\n");
 	else if (suppress)
-		kdb_printf("bt did not find pt_regs - no trace produced.  Suggest 'set BTSP 1'\n");
+		kdb_printf
+		    ("bt did not find pt_regs - no trace produced.  Suggest 'set BTSP 1'\n");
 
 	return 0;
 }
@@ -405,7 +430,7 @@ kdba_bt_stack(kdb_machreg_t addr, int argcount, const struct task_struct *p)
  * kdba_bt_address
  *
  *	Do a backtrace starting at a specified stack address.  Use this if the
- *	heuristics get the i386 stack decode wrong.
+ *	heuristics get the stack decode wrong.
  *
  * Inputs:
  *	addr	Address provided to 'bt' command.
@@ -421,8 +446,7 @@ kdba_bt_stack(kdb_machreg_t addr, int argcount, const struct task_struct *p)
  *	traceback.
  */
 
-int
-kdba_bt_address(kdb_machreg_t addr, int argcount)
+int kdba_bt_address(kdb_machreg_t addr, int argcount)
 {
 	return kdba_bt_stack(addr, argcount, NULL);
 }
@@ -443,8 +467,7 @@ kdba_bt_address(kdb_machreg_t addr, int argcount)
  *	none.
  */
 
-int
-kdba_bt_process(const struct task_struct *p, int argcount)
+int kdba_bt_process(const struct task_struct *p, int argcount)
 {
 	return kdba_bt_stack(0, argcount, p);
 }

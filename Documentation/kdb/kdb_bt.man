@@ -1,4 +1,4 @@
-.TH BT 1 "September 21, 2005"
+.TH BT 1 "August 25, 2006"
 .SH NAME
 bt \- Stack Traceback command
 .SH SYNOPSIS
@@ -84,8 +84,9 @@ The offset of the address within the function.
 Any parameters to the function.
 .PD 1
 .PP
-On the next line there are five fields which are designed to make it
-easier to match the trace against the kernel code\ :-
+If environment variable NOSECT is set to 0 then the next line contains
+five fields which are designed to make it easier to match the trace
+against the kernel code\ :-
 .IP * 3
 The module name that contains the address, "kernel" if it is in the
 base kernel.
@@ -114,6 +115,10 @@ The symbol name the argument maps to.
 .IP * 3
 The offset of the argument from the symbol, suppressed if 0.
 .PD 1
+.P
+On architectures that use nested stacks, the backtrace will indicate a
+switch to a new stack by printing a line of equal signs and the type of
+stack.
 .SH MATCHING TRACE TO KERNEL CODE
 The command "objdump\ -S" will disassemble an object and, if the code
 was compiled with debugging (gcc flag -g), objdump will interleave the

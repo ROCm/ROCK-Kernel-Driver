@@ -27,7 +27,6 @@
  * Inputs:
  *	ip	Current program counter.
  *	symtab	Information about symbol that ip falls within.
- *	ar	Activation record for this frame.
  *	argcount Maximum number of arguments to print.
  * Outputs:
  *	None.
@@ -40,36 +39,35 @@
  */
 
 static void
-bt_print_one(kdb_machreg_t ip, const kdb_ar_t *ar,
+bt_print_one(kdb_machreg_t ip,
 	     const kdb_symtab_t *symtab, int argcount,
-	     struct unw_frame_info *info /* FIXME: should be part of ar for ia64 */)
+	     struct unw_frame_info *info)
 {
 	int btsymarg = 0;		/* Convert arguments to symbols */
 	int btsp = 0;			/* Print stack and backing store pointers */
 	int nosect = 0;			/* Suppress section data */
-	kdb_machreg_t sp, bsp, cfm;	/* FIXME: should be part of ar for ia64 */
+	int args;
+	kdb_machreg_t sp, bsp, cfm;
 
 	kdbgetintenv("BTSYMARG", &btsymarg);
 	kdbgetintenv("BTSP", &btsp);
 	kdbgetintenv("NOSECT", &nosect);
 
-	unw_get_sp(info, &sp);		/* FIXME: should be part of ar for ia64 */
-	unw_get_bsp(info, &bsp);	/* FIXME: should be part of ar for ia64 */
-	unw_get_cfm(info, &cfm);	/* FIXME: info/cfm should be part of ar for ia64 */
+	unw_get_sp(info, &sp);
+	unw_get_bsp(info, &bsp);
+	unw_get_cfm(info, &cfm);
 	kdb_symbol_print(ip, symtab, KDB_SP_VALUE|KDB_SP_NEWLINE);
-	/* FIXME: number of args should be set in prologue code */
-	((kdb_ar_t *)ar)->args = (cfm >> 7) & 0x7f;	/* sol */
-	if (!ar->args)
-		((kdb_ar_t *)ar)->args = cfm & 0x7f;	/* no in/local, use sof instead */
-	if (argcount && ar->args) {
-		int i, argc = ar->args;
+	args = (cfm >> 7) & 0x7f;	/* sol */
+	if (!args)
+		args = cfm & 0x7f;	/* no in/local, use sof instead */
+	if (argcount && args) {
+		int i, argc = args;
 
 		kdb_printf("        args (");
 		if (argc > argcount)
 			argc = argcount;
 
 		for(i = 0; i < argc; i++){
-			/* FIXME: prologue code should extract arguments */
 			kdb_machreg_t arg;
 			char nat;
 			if (unw_access_gr(info, i+32, &arg, &nat, 0))
@@ -84,7 +82,6 @@ bt_print_one(kdb_machreg_t ip, const kdb_ar_t *ar,
 			kdb_symtab_t	arg_symtab;
 			kdb_machreg_t	arg;
 			for(i = 0; i < argc; i++){
-				/* FIXME: prologue code should extract arguments */
 				char nat;
 				if (unw_access_gr(info, i+32, &arg, &nat, 0))
 					arg = 0;
@@ -141,18 +138,14 @@ static int
 kdba_bt_stack(int argcount, const struct task_struct *p)
 {
 	kdb_symtab_t symtab;
-	kdb_ar_t ar;
-	struct unw_frame_info info;	/* FIXME: should be part of ar */
-	struct switch_stack *sw;	/* FIXME: should be part of ar */
-	struct pt_regs *regs = NULL;	/* FIXME: should be part of ar */
+	struct unw_frame_info info;
+	struct switch_stack *sw;
+	struct pt_regs *regs = NULL;
 	int count = 0;
 	int btsp = 0;			/* Backtrace the kdb code as well */
 	u64 *prev_pfs_loc = NULL;
 	extern char __attribute__ ((weak)) ia64_spinlock_contention_pre3_4[];
 	extern char __attribute__ ((weak)) ia64_spinlock_contention_pre3_4_end[];
-
-	/* FIXME: All the arch specific code should be in activation records, not here */
-	memset(&ar, 0, sizeof(ar));
 
 	/*
 	 * Upon entering kdb_main_loop, the stack frame looks like this:
@@ -199,14 +192,14 @@ kdba_bt_stack(int argcount, const struct task_struct *p)
 		return 0;
 	}
 
-	unw_init_frame_info(&info, (struct task_struct *)p, sw);	/* FIXME: should be using activation records */
+	unw_init_frame_info(&info, (struct task_struct *)p, sw);
 
 	/* If we have the address of pt_regs, suppress backtrace on the frames below
 	 * pt_regs.  No point in displaying kdb itself, unless the user is debugging
 	 * the unwinder using set BTSP=1.
 	 */
 	if (regs && !btsp) {
-		kdb_machreg_t sp;		/* FIXME: should be part of ar for ia64 */
+		kdb_machreg_t sp;
 		if (user_mode(regs)) {
 			kdb_printf("Process was interrupted in user mode, no backtrace available\n");
 			return 0;
@@ -215,7 +208,7 @@ kdba_bt_stack(int argcount, const struct task_struct *p)
 			unw_get_sp(&info, &sp);
 			if (sp >= (kdb_machreg_t)regs)
 				break;
-		} while (unw_unwind(&info) >= 0 && count++ < 200);	/* FIXME: should be using activation records */
+		} while (unw_unwind(&info) >= 0 && count++ < 200);
 	}
 
 	do {
@@ -245,7 +238,7 @@ kdba_bt_stack(int argcount, const struct task_struct *p)
 				info.ip < (u64)ia64_spinlock_contention_pre3_4_end) ?
 			       info.pfs_loc : NULL;
 
-		unw_get_ip(&info, &ip);	/* FIXME: should be using activation records */
+		unw_get_ip(&info, &ip);
 		if (ip == 0)
 			break;
 
@@ -255,8 +248,8 @@ kdba_bt_stack(int argcount, const struct task_struct *p)
 				(int)(2*sizeof(ip)), ip);
 			return 0;
 		}
-		bt_print_one(ip, &ar, &symtab, argcount, &info);
-	} while (unw_unwind(&info) >= 0 && count++ < 200);	/* FIXME: should be using activation records */
+		bt_print_one(ip, &symtab, argcount, &info);
+	} while (unw_unwind(&info) >= 0 && count++ < 200);
 	if (count >= 200)
 		kdb_printf("bt truncated, count limit reached\n");
 

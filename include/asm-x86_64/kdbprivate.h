@@ -8,7 +8,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (c) 1999-2004 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 1999-2006 Silicon Graphics, Inc.  All Rights Reserved.
  */
 
 typedef unsigned char kdb_machinst_t;
@@ -25,15 +25,13 @@ typedef unsigned char kdb_machinst_t;
 	 */
 #define KDB_MAXHARDBPT	 4
 
+/* Maximum number of arguments to a function  */
+#define KDBA_MAXARGS	16
+
 	/*
 	 * Platform specific environment entries
 	 */
 #define KDB_PLATFORM_ENV	"IDMODE=x86_64", "BYTESPERWORD=8", "IDCOUNT=16"
-
-	/*
-	 * Define the direction that the stack grows
-	 */
-#define KDB_STACK_DIRECTION	(-1)	/* Stack grows down */
 
 	/*
 	 * Support for ia32 debug registers
@@ -138,8 +136,6 @@ extern void kdba_putdr(int, kdb_machreg_t);
 
 extern kdb_machreg_t kdb_getcr(int);
 
-#define KDB_HAVE_LONGJMP
-#ifdef KDB_HAVE_LONGJMP
 /*
  * reg indicies for x86_64 setjmp/longjmp
  */
@@ -158,19 +154,22 @@ typedef struct __kdb_jmp_buf {
 
 extern int asmlinkage kdba_setjmp(kdb_jmp_buf *);
 extern void asmlinkage kdba_longjmp(kdb_jmp_buf *, int);
+#define kdba_setjmp kdba_setjmp
 
 extern kdb_jmp_buf  *kdbjmpbuf;
-#endif	/* KDB_HAVE_LONGJMP */
 
 /* Arch specific data saved for running processes */
 
 struct kdba_running_process {
-	int dummy[0];   /* Everything is in pt_regs for i386 */
+	long rsp;	/* KDB may be on a different stack */
 };
+
+register unsigned long current_stack_pointer asm("rsp") __attribute_used__;
 
 static inline
 void kdba_save_running(struct kdba_running_process *k, struct pt_regs *regs)
 {
+	k->rsp = current_stack_pointer;
 }
 
 static inline
@@ -178,6 +177,12 @@ void kdba_unsave_running(struct kdba_running_process *k, struct pt_regs *regs)
 {
 }
 
-#define kdba_wait_for_cpus()
+struct kdb_activation_record;
+extern void kdba_get_stack_info_alternate(kdb_machreg_t addr, int cpu,
+					  struct kdb_activation_record *ar);
+
+extern void kdba_wait_for_cpus(void);
+
+extern asmlinkage void kdb_interrupt(void);
 
 #endif	/* !_ASM_KDBPRIVATE_H */

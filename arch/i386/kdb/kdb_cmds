@@ -15,5 +15,3 @@ defcmd archkdbcommon "" "Common arch debugging"
   -dmesg 600
   -bt
 endefcmd
-
-set LINES 2000

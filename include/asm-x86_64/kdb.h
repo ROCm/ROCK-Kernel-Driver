@@ -18,7 +18,7 @@
 	 * a non-maskable entry method. The vector is KDB_VECTOR,
 	 * defined in hw_irq.h
 	 */
-#define KDB_ENTER()	do {if (kdb_on && !KDB_IS_RUNNING()) { asm("\tint $249\n"); }} while(0)
+#define KDB_ENTER()	do {if (kdb_on && !KDB_IS_RUNNING()) { asm("\tint $129\n"); }} while(0)
 
 	/*
 	 * Needed for exported symbols.

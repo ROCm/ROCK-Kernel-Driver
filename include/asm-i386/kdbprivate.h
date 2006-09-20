@@ -8,7 +8,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (c) 1999-2004 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 1999-2006 Silicon Graphics, Inc.  All Rights Reserved.
  */
 
 typedef unsigned char kdb_machinst_t;
@@ -25,15 +25,13 @@ typedef unsigned char kdb_machinst_t;
  */
 #define KDB_MAXHARDBPT	 4
 
+/* Maximum number of arguments to a function  */
+#define KDBA_MAXARGS	16
+
 /*
  * Platform specific environment entries
  */
 #define KDB_PLATFORM_ENV	"IDMODE=x86", "BYTESPERWORD=4", "IDCOUNT=16"
-
-/*
- * Define the direction that the stack grows
- */
-#define KDB_STACK_DIRECTION	(-1)	/* Stack grows down */
 
 /*
  * Support for ia32 debug registers
@@ -175,7 +173,9 @@ void kdba_unsave_running(struct kdba_running_process *k, struct pt_regs *regs)
 {
 }
 
-extern const char *kdba_irq_ctx_type(int cpu, struct thread_info *tinfo);
+struct kdb_activation_record;
+extern void kdba_get_stack_info_alternate(kdb_machreg_t addr, int cpu,
+					  struct kdb_activation_record *ar);
 
 extern void kdba_wait_for_cpus(void);
 

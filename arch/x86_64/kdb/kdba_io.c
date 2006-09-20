@@ -180,7 +180,7 @@ serial_inp(struct kdb_serial *kdb_serial, unsigned long offset)
 
 	switch (kdb_serial->io_type) {
 	case SERIAL_IO_MEM:
-		return readb((void *)(kdb_serial->iobase + offset));
+		return readb((void __iomem *)(kdb_serial->iobase + offset));
 		break;
 	default:
 		return inb(kdb_serial->iobase + offset);

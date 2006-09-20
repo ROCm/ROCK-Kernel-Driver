@@ -37,11 +37,6 @@ typedef struct {
 #define KDB_PLATFORM_ENV	"IDMODE=ia64", "BYTESPERWORD=4", "IDCOUNT=8"
 
 /*
- * Define the direction that the stack grows
- */
-#define KDB_STACK_DIRECTION	(-1)	/* Stack grows down */
-
-/*
  * Support for IA64 debug registers
  */
 typedef struct _kdbhard_bp {

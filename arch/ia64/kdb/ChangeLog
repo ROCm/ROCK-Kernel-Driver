@@ -1,3 +1,32 @@
+2006-09-20 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.18-ia64-1.
+
+2006-09-15 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.18-rc7-ia64-1.
+
+2006-08-29 Keith Owens  <kaos@sgi.com>
+
+	* Rewrite all backtrace code.
+	* kdb v4.4-2.6.18-rc5-ia64-2.
+
+2006-08-28 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.18-rc5-ia64-1.
+
+2006-08-08 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.18-rc4-ia64-1.
+
+2006-08-04 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.18-rc3-ia64-1.
+
+2006-07-18 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.18-rc2-ia64-1.
+
 2006-07-12 Keith Owens  <kaos@sgi.com>
 
 	* Remove dead KDB_REASON codes.

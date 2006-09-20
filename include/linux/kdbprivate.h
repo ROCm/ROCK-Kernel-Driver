@@ -249,32 +249,30 @@ extern void kdb_io_init(void);
 typedef int (*get_char_func)(void);
 extern get_char_func poll_funcs[];
 
+#ifndef	CONFIG_IA64
 	/*
 	 * Data for a single activation record on stack.
 	 */
 
-typedef struct __kdb_activation_record {
-	kdb_machreg_t	start;		/* -> start of activation record */
-	kdb_machreg_t	end;		/* -> end+1 of activation record */
-	kdb_machreg_t	ret;		/* Return address to caller */
-	kdb_machreg_t	oldfp;		/* Frame pointer for caller's frame */
-	kdb_machreg_t	fp;		/* Frame pointer for callee's frame */
-	kdb_machreg_t	arg0;		/* -> First argument on stack (in previous ar) */
-	unsigned long	locals;		/* Bytes allocated for local variables */
-	unsigned long	regs;		/* Bytes allocated for saved registers */
-	unsigned long	args;		/* Bytes allocated for arguments (in previous ar) */
-	unsigned long	setup;		/* Bytes allocated for setup data */
-} kdb_ar_t;
+struct kdb_stack_info {
+	kdb_machreg_t physical_start;
+	kdb_machreg_t physical_end;
+	kdb_machreg_t logical_start;
+	kdb_machreg_t logical_end;
+	kdb_machreg_t next;
+	const char *  id;
+};
 
-	/*
-	 * General Stack Traceback functions.
-	 */
-
-#if	defined(__i386__) || defined(__x86_64__)
-extern int kdb_get_next_ar(kdb_machreg_t, kdb_machreg_t,
-			   kdb_machreg_t, kdb_machreg_t,
-			   kdb_machreg_t,
-			   kdb_ar_t *, kdb_symtab_t *);
+struct kdb_activation_record {
+	struct kdb_stack_info	stack;		/* information about current stack */
+	kdb_machreg_t	start;			/* -> start of activation record */
+	kdb_machreg_t	end;			/* -> end+1 of activation record */
+	kdb_machreg_t	ret;			/* Return address to caller */
+	kdb_machreg_t	oldfp;			/* Frame pointer for caller's frame */
+	kdb_machreg_t	fp;			/* Frame pointer for callee's frame */
+	int		args;			/* number of arguments detected */
+	kdb_machreg_t	arg[KDBA_MAXARGS];	/* -> arguments */
+};
 #endif
 
 	/*
@@ -285,9 +283,7 @@ struct task_struct;
 
 extern int kdba_bt_address(kdb_machreg_t, int);
 extern int kdba_bt_process(const struct task_struct *, int);
-extern int kdba_prologue(const kdb_symtab_t *, kdb_machreg_t,
-			 kdb_machreg_t, kdb_machreg_t, kdb_machreg_t,
-			 int, kdb_ar_t *);
+
 	/*
 	 * KDB Command Table
 	 */

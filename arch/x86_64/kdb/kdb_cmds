@@ -14,4 +14,5 @@ defcmd archkdbcommon "" "Common arch debugging"
   -ps
   -dmesg 600
   -bt
+  -cpu_pda *
 endefcmd

@@ -1,3 +1,65 @@
+2006-09-20 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.18-x86_64-1.
+
+2006-09-15 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.18-rc7-x86_64-1.
+
+2006-08-30 Keith Owens  <kaos@sgi.com>
+
+	* Do not print debugstackptr in cpu_pda, it will be deleted soon.
+	* Add KDB_ENTER().
+	* Add warning for problems when following alternate stacks.
+	* kdb v4.4-2.6.18-rc5-x86_64-3.
+
+2006-08-29 Keith Owens  <kaos@sgi.com>
+
+	* Rewrite all backtrace code.
+	* Add pt_regs and cpu_pda commands.
+	* Include patch to define orig_ist, to be removed once that patch is in
+	  the community tree.
+	* kdb v4.4-2.6.18-rc5-x86_64-2.
+
+2006-08-28 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.18-rc5-x86_64-1.
+
+2006-08-08 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.18-rc4-x86_64-1.
+
+2006-08-04 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.18-rc3-x86_64-1.
+
+2006-07-18 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.18-rc2-x86_64-1.
+
+2006-07-12 Keith Owens  <kaos@sgi.com>
+
+	* sparse cleanups
+	* kdb v4.4-2.6.18-rc1-x86_64-2.
+
+2006-07-07 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.18-rc1-x86_64-1.
+
+2006-07-04 Keith Owens  <kaos@sgi.com>
+
+	* Make KDB rendezvous on x86_64 a two stage approach.
+	* Move smp_kdb_stop() and smp_kdb_interrupt() to kdbasupport.c.
+	* Move setting of interrupt traps to kdbasupport.c.
+	* Add KDB_REASON_CPU_UP support.
+	* Move per cpu setup to kdba_cpu_up().
+	* Delete kdba_enable_mce, architectures now do their own setup.
+	* Delete kdba_enable_lbr, kdba_disable_lbr, kdba_print_lbr,
+	  page_fault_mca.  Only ever implemented on x86, difficult to maintain
+	  and rarely used in the field.
+	* Replace #ifdef KDB_HAVE_LONGJMP with #ifdef kdba_setjmp.
+	* kdb v4.4-2.6.17-x86_64-2.
+
 2006-06-19 Keith Owens  <kaos@sgi.com>
 
 	* kdb v4.4-2.6.17-x86_64-1.
