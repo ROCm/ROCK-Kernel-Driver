@@ -308,7 +308,7 @@ LINUXINCLUDE    := -Iinclude \
 CPPFLAGS        := -D__KERNEL__ $(LINUXINCLUDE)
 
 CFLAGS          := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
-		   -Werror-implicit-function-declaration \
+                   -Werror-implicit-function-declaration \
                    -fno-strict-aliasing -fno-common
 AFLAGS          := -D__ASSEMBLY__
 
