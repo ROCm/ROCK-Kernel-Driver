@@ -8,7 +8,7 @@ DRIVER_OBJS = $(addprefix ../../../drivers/oprofile/, \
 
 ifdef CONFIG_XEN
 oprofile-y				:= $(DRIVER_OBJS) xenoprof.o
-else
+else 
 oprofile-y				:= $(DRIVER_OBJS) init.o backtrace.o
 oprofile-$(CONFIG_X86_LOCAL_APIC) 	+= nmi_int.o op_model_athlon.o \
 					   op_model_ppro.o op_model_p4.o

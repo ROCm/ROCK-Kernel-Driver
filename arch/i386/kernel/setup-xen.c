@@ -66,6 +66,7 @@
 #include <xen/interface/physdev.h>
 #include <xen/interface/memory.h>
 #include <xen/features.h>
+#include <xen/xencons.h>
 #include <setup_arch.h>
 #include <bios_ebda.h>
 
@@ -1006,6 +1007,52 @@ efi_memory_present_wrapper(unsigned long start, unsigned long end, void *arg)
 	return 0;
 }
 
+#ifdef CONFIG_XEN
+static struct e820entry *__initdata machine_e820;
+static unsigned __initdata machine_e820_count;
+#endif
+
+ /*
+  * This function checks if the entire range <start,end> is mapped with type.
+  *
+  * Note: this function only works correct if the e820 table is sorted and
+  * not-overlapping, which is the case
+  */
+int __init
+e820_all_mapped(unsigned long s, unsigned long e, unsigned type)
+{
+	u64 start = s;
+	u64 end = e;
+	int i;
+
+#ifndef CONFIG_XEN
+	for (i = 0; i < e820.nr_map; i++) {
+		struct e820entry *ei = &e820.map[i];
+#else
+	if (!is_initial_xendomain())
+		return 0;
+	WARN_ON(!machine_e820);
+	for (i = 0; i < machine_e820_count; ++i) {
+		const struct e820entry *ei = &machine_e820[i];
+#endif
+		if (type && ei->type != type)
+			continue;
+		/* is the region (part) in overlap with the current region ?*/
+		if (ei->addr >= end || ei->addr + ei->size <= start)
+			continue;
+		/* if the region is at the beginning of <start,end> we move
+		 * start to the end of the region since it's ok until there
+		 */
+		if (ei->addr <= start)
+			start = ei->addr + ei->size;
+		/* if start is now at or beyond end, we're done, full
+		 * coverage */
+		if (start >= end)
+			return 1; /* we're done */
+	}
+	return 0;
+}
+
 /*
  * Find the highest page frame number we have available
  */
@@ -1385,8 +1432,10 @@ legacy_init_iomem_resources(struct e820entry *e820, int nr_map,
 			 *  so we try it repeatedly and let the resource manager
 			 *  test it.
 			 */
+#ifndef CONFIG_XEN
 			request_resource(res, code_resource);
 			request_resource(res, data_resource);
+#endif
 #ifdef CONFIG_KEXEC
 			request_resource(res, &crashk_res);
 #endif
@@ -1447,11 +1496,6 @@ e820_setup_gap(struct e820entry *e820, int nr_map)
 		pci_mem_start, gapstart, gapsize);
 }
 
-#ifdef CONFIG_XEN
-static struct e820entry *__initdata machine_e820;
-static unsigned __initdata machine_e820_count;
-#endif
-
 /*
  * Request address space for all standard resources
  *
@@ -1462,29 +1506,21 @@ static int __init request_standard_resources(void)
 {
 	int i;
 
-	printk("Setting up standard PCI resources\n");
 	/* Nothing to do if not running in dom0. */
-	if (!is_initial_xendomain()) {
-		legacy_init_iomem_resources(e820.map, e820.nr_map,
-					    &code_resource, &data_resource);
+	if (!is_initial_xendomain())
 		return 0;
-	}
 
+	printk("Setting up standard PCI resources\n");
 #ifdef CONFIG_XEN
-	if (is_initial_xendomain()) {
-		legacy_init_iomem_resources(machine_e820, machine_e820_count,
-					    &code_resource, &data_resource);
-		free_init_pages("machine memory map",
-		                (unsigned long)machine_e820,
-		                (unsigned long)machine_e820 + PAGE_SIZE);
-	}
-	else
-#endif
+	legacy_init_iomem_resources(machine_e820, machine_e820_count,
+				    &code_resource, &data_resource);
+#else
 	if (efi_enabled)
 		efi_initialize_iomem_resources(&code_resource, &data_resource);
 	else
 		legacy_init_iomem_resources(e820.map, e820.nr_map,
 					    &code_resource, &data_resource);
+#endif
 
 	/* EFI systems may still have VGA */
 	request_resource(&iomem_resource, &video_ram_resource);
@@ -1587,33 +1623,15 @@ void __init setup_arch(char **cmdline_p)
 		screen_info.orig_video_cols = 80;
 		screen_info.orig_video_ega_bx = 3;
 		screen_info.orig_video_points = 16;
+		screen_info.orig_y = screen_info.orig_video_lines - 1;
 		if (xen_start_info->console.dom0.info_size >=
 		    sizeof(struct dom0_vga_console_info)) {
 			const struct dom0_vga_console_info *info =
 				(struct dom0_vga_console_info *)(
 					(char *)xen_start_info +
 					xen_start_info->console.dom0.info_off);
-			screen_info.orig_video_mode = info->txt_mode;
-			screen_info.orig_video_isVGA = info->video_type;
-			screen_info.orig_video_lines = info->video_height;
-			screen_info.orig_video_cols = info->video_width;
-			screen_info.orig_video_points = info->txt_points;
-			screen_info.lfb_width = info->video_width;
-			screen_info.lfb_height = info->video_height;
-			screen_info.lfb_depth = info->lfb_depth;
-			screen_info.lfb_base = info->lfb_base;
-			screen_info.lfb_size = info->lfb_size;
-			screen_info.lfb_linelength = info->lfb_linelen;
-			screen_info.red_size = info->red_size;
-			screen_info.red_pos = info->red_pos;
-			screen_info.green_size = info->green_size;
-			screen_info.green_pos = info->green_pos;
-			screen_info.blue_size = info->blue_size;
-			screen_info.blue_pos = info->blue_pos;
-			screen_info.rsvd_size = info->rsvd_size;
-			screen_info.rsvd_pos = info->rsvd_pos;
+			dom0_init_screen_info(info);
 		}
-		screen_info.orig_y = screen_info.orig_video_lines - 1;
 		xen_start_info->console.domU.mfn = 0;
 		xen_start_info->console.domU.evtchn = 0;
 	} else

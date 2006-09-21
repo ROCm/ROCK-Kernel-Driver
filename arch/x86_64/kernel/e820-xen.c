@@ -118,6 +118,50 @@ e820_any_mapped(unsigned long start, unsigned long end, unsigned type)
 }
 #endif
 
+#ifdef CONFIG_XEN
+static struct e820entry *__initdata machine_e820;
+static unsigned __initdata machine_e820_count;
+#endif
+
+/*
+ * This function checks if the entire range <start,end> is mapped with type.
+ *
+ * Note: this function only works correct if the e820 table is sorted and
+ * not-overlapping, which is the case
+ */
+int __init e820_all_mapped(unsigned long start, unsigned long end, unsigned type)
+{
+	int i;
+
+#ifndef CONFIG_XEN
+	for (i = 0; i < e820.nr_map; i++) {
+		struct e820entry *ei = &e820.map[i];
+#else
+	if (!is_initial_xendomain())
+		return 0;
+	WARN_ON(!machine_e820);
+	for (i = 0; i < machine_e820_count; i++) {
+		const struct e820entry *ei = &machine_e820[i];
+#endif
+
+		if (type && ei->type != type)
+			continue;
+		/* is the region (part) in overlap with the current region ?*/
+		if (ei->addr >= end || ei->addr + ei->size <= start)
+			continue;
+
+		/* if the region is at the beginning of <start,end> we move
+		 * start to the end of the region since it's ok until there
+		 */
+		if (ei->addr <= start)
+			start = ei->addr + ei->size;
+		/* if start is now at or beyond end, we're done, full coverage */
+		if (start >= end)
+			return 1; /* we're done */
+	}
+	return 0;
+}
+
 /* 
  * Find a free area in a specific range. 
  */ 
@@ -244,11 +288,6 @@ e820_hole_size(unsigned long start_pfn, unsigned long end_pfn)
 	return ((end - start) - ram) >> PAGE_SHIFT;
 }
 
-#ifdef CONFIG_XEN
-static struct e820entry *__initdata machine_e820;
-static unsigned __initdata machine_e820_count;
-#endif
-
 /*
  * Mark e820 reserved areas as busy for the resource manager.
  */
@@ -290,8 +329,10 @@ void __init e820_reserve_resources(struct e820entry *e820, int nr_map)
 			 *  so we try it repeatedly and let the resource manager
 			 *  test it.
 			 */
+#ifndef CONFIG_XEN
 			request_resource(res, &code_resource);
 			request_resource(res, &data_resource);
+#endif
 #ifdef CONFIG_KEXEC
 			request_resource(res, &crashk_res);
 #endif
@@ -733,11 +774,6 @@ __init void e820_setup_gap(struct e820entry *e820, int nr_map)
 		if (start < last)
 			last = start;
 	}
-
-#ifdef CONFIG_XEN
-	if (is_initial_xendomain())
-		free_bootmem(__pa(machine_e820), PAGE_SIZE);
-#endif
 
 	if (!found) {
 		gapstart = (end_pfn << PAGE_SHIFT) + 1024*1024;

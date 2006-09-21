@@ -67,6 +67,15 @@ SECTIONS
 
   _edata = .;			/* End of data section */
 
+#ifndef CONFIG_XEN
+  __bss_start = .;		/* BSS */
+  .bss : AT(ADDR(.bss) - LOAD_OFFSET) {
+	*(.bss.page_aligned)	
+	*(.bss)
+	}
+  __bss_stop = .;
+#endif
+
   . = ALIGN(PAGE_SIZE);
   . = ALIGN(CONFIG_X86_L1_CACHE_BYTES);
   .data.cacheline_aligned : AT(ADDR(.data.cacheline_aligned) - LOAD_OFFSET) {
@@ -226,6 +235,7 @@ SECTIONS
   . = ALIGN(4096);
   __nosave_end = .;
 
+#ifdef CONFIG_XEN
   __bss_start = .;		/* BSS */
   . = ALIGN(4096);
   .bss : AT(ADDR(.bss) - LOAD_OFFSET) {
@@ -233,6 +243,7 @@ SECTIONS
 	*(.bss)
 	}
   __bss_stop = .;
+#endif
 
   _end = . ;
 
