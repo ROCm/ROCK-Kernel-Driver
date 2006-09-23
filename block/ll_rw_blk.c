@@ -3759,9 +3759,8 @@ queue_ra_store(struct request_queue *q, const char *page, size_t count)
 	ssize_t ret = queue_var_store(&ra_kb, page, count);
 
 	spin_lock_irq(q->queue_lock);
-	/* Allow up to twice the max request size; 1 kB == 2 sectors */
-	if (ra_kb > q->max_sectors)
-		ra_kb = q->max_sectors;
+	if (ra_kb > (q->max_sectors >> 1))
+		ra_kb = (q->max_sectors >> 1);
 
 	q->backing_dev_info.ra_pages = ra_kb >> (PAGE_CACHE_SHIFT - 10);
 	spin_unlock_irq(q->queue_lock);
