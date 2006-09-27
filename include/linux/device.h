@@ -146,14 +146,20 @@ struct class {
 	struct list_head	interfaces;
 	struct semaphore	sem;	/* locks both the children and interfaces lists */
 
+	struct kobject		*virtual_dir;
+
 	struct class_attribute		* class_attrs;
 	struct class_device_attribute	* class_dev_attrs;
+	struct device_attribute		* dev_attrs;
 
 	int	(*uevent)(struct class_device *dev, char **envp,
 			   int num_envp, char *buffer, int buffer_size);
+	int	(*dev_uevent)(struct device *dev, char **envp, int num_envp,
+				char *buffer, int buffer_size);
 
 	void	(*release)(struct class_device *dev);
 	void	(*class_release)(struct class *class);
+	void	(*dev_release)(struct device *dev);
 };
 
 extern int class_register(struct class *);
@@ -266,6 +272,8 @@ struct class_interface {
 
 	int (*add)	(struct class_device *, struct class_interface *);
 	void (*remove)	(struct class_device *, struct class_interface *);
+	int (*add_dev)		(struct device *, struct class_interface *);
+	void (*remove_dev)	(struct device *, struct class_interface *);
 };
 
 extern int class_interface_register(struct class_interface *);
@@ -281,7 +289,6 @@ extern struct class_device *class_device_create(struct class *cls,
 					__attribute__((format(printf,5,6)));
 extern void class_device_destroy(struct class *cls, dev_t devt);
 
-
 /* interface for exporting device attributes */
 struct device_attribute {
 	struct attribute	attr;
@@ -296,6 +303,10 @@ struct device_attribute dev_attr_##_name = __ATTR(_name,_mode,_show,_store)
 
 extern int device_create_file(struct device *device, struct device_attribute * entry);
 extern void device_remove_file(struct device * dev, struct device_attribute * attr);
+extern int __must_check device_create_bin_file(struct device *dev,
+					       struct bin_attribute *attr);
+extern void device_remove_bin_file(struct device *dev,
+				   struct bin_attribute *attr);
 struct device {
 	struct klist		klist_children;
 	struct klist_node	knode_parent;		/* node in sibling list */
@@ -338,6 +349,7 @@ struct device {
 	struct list_head	node;
 	struct class		*class;		/* optional*/
 	dev_t			devt;		/* dev_t, creates the sysfs "dev" */
+	struct attribute_group	**groups;	/* optional groups */
 
 	void	(*release)(struct device * dev);
 };
@@ -369,6 +381,7 @@ extern int device_add(struct device * dev);
 extern void device_del(struct device * dev);
 extern int device_for_each_child(struct device *, void *,
 		     int (*fn)(struct device *, void *));
+extern int device_rename(struct device *dev, char *new_name);
 
 /*
  * Manual binding of a device to driver. See drivers/base/bus.c
@@ -387,6 +400,8 @@ extern struct device *device_create(struct class *cls, struct device *parent,
 				    dev_t devt, char *fmt, ...)
 				    __attribute__((format(printf,4,5)));
 extern void device_destroy(struct class *cls, dev_t devt);
+
+extern int virtual_device_parent(struct device *dev);
 
 /*
  * Platform "fixup" functions - allow the platform to have their say
