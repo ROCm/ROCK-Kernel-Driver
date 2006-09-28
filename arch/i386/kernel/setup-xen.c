@@ -1810,12 +1810,8 @@ void __init setup_arch(char **cmdline_p)
 #endif
 #endif
 	} else {
-#if defined(CONFIG_VT) && defined(CONFIG_DUMMY_CONSOLE)
-		conswitchp = &dummy_con;
-#else
 		extern int console_use_vt;
 		console_use_vt = 0;
-#endif
 	}
 
 	tsc_init();
