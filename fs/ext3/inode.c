@@ -38,6 +38,7 @@
 #include <linux/uio.h>
 #include "xattr.h"
 #include "acl.h"
+#include "nfs4acl.h"
 
 static int ext3_writepage_trans_blocks(struct inode *inode);
 
@@ -2967,8 +2968,12 @@ int ext3_setattr(struct dentry *dentry, struct iattr *attr)
 	if (inode->i_nlink)
 		ext3_orphan_del(NULL, inode);
 
-	if (!rc && (ia_valid & ATTR_MODE))
-		rc = ext3_acl_chmod(inode);
+	if (!rc && (ia_valid & ATTR_MODE)) {
+		if (test_opt(inode->i_sb, NFS4ACL))
+			rc = ext3_nfs4acl_chmod(inode);
+		else
+			rc = ext3_acl_chmod(inode);
+	}
 
 err_out:
 	ext3_std_error(inode->i_sb, error);

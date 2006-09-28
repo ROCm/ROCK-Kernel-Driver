@@ -40,6 +40,7 @@
 #include "namei.h"
 #include "xattr.h"
 #include "acl.h"
+#include "nfs4acl.h"
 
 /*
  * define how far ahead to read directories while searching them.
@@ -2359,6 +2360,16 @@ end_rename:
 	brelse (new_bh);
 	ext3_journal_stop(handle);
 	return retval;
+}
+
+int ext3_permission(struct inode *inode, int mask, struct nameidata *nd)
+{
+#ifdef CONFIG_EXT3_FS_NFS4ACL
+	if (test_opt(inode->i_sb, NFS4ACL))
+		return ext3_nfs4acl_permission(inode, mask);
+	else
+#endif
+        return generic_permission(inode, mask, ext3_check_acl);
 }
 
 /*

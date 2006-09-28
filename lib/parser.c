@@ -111,6 +111,19 @@ int match_token(char *s, match_table_t table, substring_t args[])
 }
 
 /**
+ * match_string: check for a particular parameter
+ * @s: substring to be scanned
+ * @str: string to scan for
+ *
+ * Description: Return if a &substring_t is equal to string @str.
+ */
+int match_string(substring_t *s, const char *str)
+{
+	return strlen(str) == s->to - s->from &&
+	       !memcmp(str, s->from, s->to - s->from);
+}
+
+/**
  * match_number: scan a number in the given base from a substring_t
  * @s: substring to be scanned
  * @result: resulting integer on success
@@ -213,6 +226,7 @@ char *match_strdup(substring_t *s)
 }
 
 EXPORT_SYMBOL(match_token);
+EXPORT_SYMBOL(match_string);
 EXPORT_SYMBOL(match_int);
 EXPORT_SYMBOL(match_octal);
 EXPORT_SYMBOL(match_hex);
