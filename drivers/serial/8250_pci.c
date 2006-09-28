@@ -33,6 +33,10 @@
 
 #undef SERIAL_DEBUG_PCI
 
+#ifndef NO_PC_LEGACY_SERIAL_8250
+#define do_not_probe_pc_legacy_8250 (0)
+#endif
+
 /*
  * init function returns:
  *  > 0 - number of ports
@@ -2382,6 +2386,9 @@ static struct pci_driver serial_pci_driver = {
 
 static int __init serial8250_pci_init(void)
 {
+	if (do_not_probe_pc_legacy_8250)
+		return -ENODEV;
+
 	return pci_register_driver(&serial_pci_driver);
 }
 
