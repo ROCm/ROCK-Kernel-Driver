@@ -3216,34 +3216,6 @@ static int st_ioctl(struct inode *inode, struct file *file,
 	char *name = tape_name(STp);
 	void __user *p = (void __user *)arg;
 
-	/* generic ioctls */
-	switch (cmd_in) {
-		case SCSI_IOCTL_TEST_UNIT_READY:
-		case SCSI_IOCTL_BENCHMARK_COMMAND:
-		case SCSI_IOCTL_SYNC:
-		case SCSI_IOCTL_START_UNIT:
-		case SCSI_IOCTL_STOP_UNIT:
-		case SCSI_IOCTL_DOORLOCK:
-		case SCSI_IOCTL_DOORUNLOCK:
-		case SCSI_IOCTL_GET_IDLUN:
-		case SCSI_IOCTL_PROBE_HOST:
-		case SCSI_IOCTL_GET_BUS_NUMBER:
-	        case SCSI_IOCTL_GET_PCI:
-			retval = scsi_ioctl(STp->device, cmd_in, p);
-			if (!retval && cmd_in == SCSI_IOCTL_STOP_UNIT) { /* unload */
-				STp->rew_at_close = 0;
-				STp->ready = ST_NO_TAPE;
-			}
-			return retval;
-		case SCSI_IOCTL_SEND_COMMAND:
-		case SG_IO:
-		case CDROM_SEND_PACKET:
-			if (!capable(CAP_SYS_RAWIO))
-				return -EPERM;
-			return scsi_cmd_ioctl(file, STp->disk, cmd_in, p);
-	}
-
-	/* tape specific ioctls */
 	if (down_interruptible(&STp->lock))
 		return -ERESTARTSYS;
 
@@ -3555,6 +3527,29 @@ static int st_ioctl(struct inode *inode, struct file *file,
 			retval = (-EFAULT);
 		goto out;
 	}
+	up(&STp->lock);
+	switch (cmd_in) {
+		case SCSI_IOCTL_GET_IDLUN:
+		case SCSI_IOCTL_GET_BUS_NUMBER:
+			break;
+		default:
+			if ((cmd_in == SG_IO ||
+			     cmd_in == SCSI_IOCTL_SEND_COMMAND ||
+			     cmd_in == CDROM_SEND_PACKET) &&
+			    !capable(CAP_SYS_RAWIO))
+				i = -EPERM;
+			else
+				i = scsi_cmd_ioctl(file, STp->disk, cmd_in, p);
+			if (i != -ENOTTY)
+				return i;
+			break;
+	}
+	retval = scsi_ioctl(STp->device, cmd_in, p);
+	if (!retval && cmd_in == SCSI_IOCTL_STOP_UNIT) { /* unload */
+		STp->rew_at_close = 0;
+		STp->ready = ST_NO_TAPE;
+	}
+	return retval;
 
  out:
 	up(&STp->lock);
