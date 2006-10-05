@@ -1326,7 +1326,7 @@ struct buffer_head *reiserfs_read_bitmap_block(struct super_block *sb,
 	bh = sb_bread(sb, block);
 	if (bh == NULL)
 		reiserfs_warning(sb, "sh-2029: %s: bitmap block (#%lu) "
-		                 "reading failed", __FUNCTION__, bh->b_blocknr);
+		                 "reading failed", __FUNCTION__, block);
 	else {
 		if (buffer_locked(bh)) {
 			PROC_INFO_INC(sb, scan_bitmap.wait);
