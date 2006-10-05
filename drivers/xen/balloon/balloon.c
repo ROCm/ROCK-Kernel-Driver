@@ -483,13 +483,14 @@ static int balloon_read(char *page, char **start, off_t off,
 		page,
 		"Current allocation: %8lu kB\n"
 		"Requested target:   %8lu kB\n"
+		"Minimum target:     %8lu kB\n"
 		"Maximum target:     %8lu kB\n"
 		"Low-mem balloon:    %8lu kB\n"
 		"High-mem balloon:   %8lu kB\n"
 		"Driver pages:       %8lu kB\n"
 		"Xen hard limit:     ",
 		PAGES2KB(current_pages), PAGES2KB(target_pages), 
-		PAGES2KB(num_physpages),
+		min_target(), PAGES2KB(num_physpages),
 		PAGES2KB(balloon_low), PAGES2KB(balloon_high),
 		PAGES2KB(driver_pages));
 
