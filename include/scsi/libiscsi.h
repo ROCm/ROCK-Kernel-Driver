@@ -76,7 +76,7 @@ struct iscsi_mgmt_task {
 	 * Becuae LLDs allocate their hdr differently, this is a pointer to
 	 * that storage. It must be setup at session creation time.
 	 */
-	struct iscsi_hdr	*hdr;
+	struct iscsi_hdr	*hdr; 
 	char			*data;		/* mgmt payload */
 	int			data_count;	/* counts data to be sent */
 	uint32_t		itt;		/* this ITT */
@@ -102,6 +102,8 @@ struct iscsi_cmd_task {
 	uint32_t		unsol_datasn;
 	int			imm_count;	/* imm-data (bytes)   */
 	int			unsol_count;	/* unsolicited (bytes)*/
+	/* offset in unsolicited stream (bytes); */
+	int			unsol_offset;
 	int			data_count;	/* remaining Data-Out */
 	struct scsi_cmnd	*sc;		/* associated SCSI cmd*/
 	int			total_length;
@@ -110,6 +112,7 @@ struct iscsi_cmd_task {
 
 	/* state set/tested under session->lock */
 	int			state;
+	atomic_t		refcount;
 	struct list_head	running;	/* running cmd list */
 	void			*dd_data;	/* driver/transport data */
 };
@@ -133,7 +136,6 @@ struct iscsi_conn {
 
 	/* control data */
 	int			id;		/* CID */
-	struct list_head	item;		/* maintains list of conns */
 	int			c_stage;	/* connection state */
 	/*
 	 * Preallocated buffer for pdus that have data but do not
@@ -232,10 +234,8 @@ struct iscsi_session {
 						 * - mgmtpool,		   *
 						 * - r2tpool		   */
 	int			state;		/* session state           */
-	struct list_head	item;
 	int			age;		/* counts session re-opens */
 
-	struct list_head	connections;	/* list of connections */
 	int			cmds_max;	/* size of cmds array */
 	struct iscsi_cmd_task	**cmds;		/* Original Cmds arr */
 	struct iscsi_queue	cmdpool;	/* PDU's pool */
@@ -290,8 +290,7 @@ extern int iscsi_conn_get_param(struct iscsi_cls_conn *cls_conn,
 extern int iscsi_check_assign_cmdsn(struct iscsi_session *,
 				    struct iscsi_nopin *);
 extern void iscsi_prep_unsolicit_data_pdu(struct iscsi_cmd_task *,
-					struct iscsi_data *hdr,
-					int transport_data_cnt);
+					struct iscsi_data *hdr);
 extern int iscsi_conn_send_pdu(struct iscsi_cls_conn *, struct iscsi_hdr *,
 				char *, uint32_t);
 extern int iscsi_complete_pdu(struct iscsi_conn *, struct iscsi_hdr *,

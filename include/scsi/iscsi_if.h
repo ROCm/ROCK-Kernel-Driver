@@ -147,7 +147,7 @@ struct iscsi_uevent {
 		struct msg_create_conn_ret {
 			uint32_t	sid;
 			uint32_t	cid;
-		} c_conn_ret;
+		} c_conn_ret;			
 		struct msg_recv_req {
 			uint32_t	sid;
 			uint32_t	cid;
@@ -277,7 +277,6 @@ enum iscsi_param {
  * These flags describes reason of stop_conn() call
  */
 #define STOP_CONN_TERM		0x1
-#define STOP_CONN_SUSPEND	0x2
 #define STOP_CONN_RECOVER	0x3
 
 #define ISCSI_STATS_CUSTOM_MAX		32
