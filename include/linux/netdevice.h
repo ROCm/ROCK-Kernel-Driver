@@ -522,11 +522,10 @@ struct net_device
 #endif /* CONFIG_NET_DIVERT */
 
 	/* class/net/name entry */
-	struct device		dev;
+	struct class_device	class_dev;
 	/* space for optional statistics and wireless sysfs groups */
 	struct attribute_group  *sysfs_groups[3];
 };
-#define to_net_dev(d) container_of(d, struct net_device, dev)
 
 #define	NETDEV_ALIGN		32
 #define	NETDEV_ALIGN_CONST	(NETDEV_ALIGN - 1)
@@ -542,7 +541,7 @@ static inline void *netdev_priv(struct net_device *dev)
 /* Set the sysfs physical device reference for the network logical device
  * if set prior to registration will cause a symlink during initialization.
  */
-#define SET_NETDEV_DEV(net, pdev)	((net)->dev.parent = (pdev))
+#define SET_NETDEV_DEV(net, pdev)	((net)->class_dev.dev = (pdev))
 
 struct packet_type {
 	__be16			type;	/* This is really htons(ether_type). */
