@@ -1487,7 +1487,7 @@ static void __devinit wbsd_request_dma(struct wbsd_host *host, int dma)
 	/*
 	 * Translate the address to a physical address.
 	 */
-	host->dma_addr = dma_map_single(host->mmc->dev, host->dma_buffer,
+	host->dma_addr = dma_map_single(mmc_dev(host->mmc), host->dma_buffer,
 		WBSD_DMA_SIZE, DMA_BIDIRECTIONAL);
 
 	/*
@@ -1511,7 +1511,7 @@ kfree:
 	 */
 	BUG_ON(1);
 
-	dma_unmap_single(host->mmc->dev, host->dma_addr,
+	dma_unmap_single(mmc_dev(host->mmc), host->dma_addr,
 		WBSD_DMA_SIZE, DMA_BIDIRECTIONAL);
 	host->dma_addr = (dma_addr_t)NULL;
 
@@ -1529,7 +1529,7 @@ err:
 static void __devexit wbsd_release_dma(struct wbsd_host *host)
 {
 	if (host->dma_addr) {
-		dma_unmap_single(host->mmc->dev, host->dma_addr,
+		dma_unmap_single(mmc_dev(host->mmc), host->dma_addr,
 			WBSD_DMA_SIZE, DMA_BIDIRECTIONAL);
 	}
 	kfree(host->dma_buffer);

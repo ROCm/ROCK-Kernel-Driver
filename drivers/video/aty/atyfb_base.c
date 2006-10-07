@@ -3578,7 +3578,7 @@ static int __devinit atyfb_pci_probe(struct pci_dev *pdev, const struct pci_devi
 	}
 	par = info->par;
 	info->fix = atyfb_fix;
-	info->device = &pdev->dev;
+	info->parent = &pdev->dev;
 	par->pci_id = aty_chips[i].pci_id;
 	par->res_start = res_start;
 	par->res_size = res_size;

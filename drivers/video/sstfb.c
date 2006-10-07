@@ -1495,7 +1495,7 @@ static int __devinit sstfb_probe(struct pci_dev *pdev,
 	fb_alloc_cmap(&info->cmap, 256, 0);
 
 	/* register fb */
-	info->device = &pdev->dev;
+	info->parent = &pdev->dev;
 	if (register_framebuffer(info) < 0) {
 		eprintk("can't register framebuffer.\n");
 		goto fail;
