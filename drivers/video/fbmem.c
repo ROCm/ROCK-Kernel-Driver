@@ -1299,7 +1299,7 @@ register_framebuffer(struct fb_info *fb_info)
 			break;
 	fb_info->node = i;
 
-	fb_info->dev = device_create(fb_class, fb_info->parent,
+	fb_info->dev = device_create(fb_class, fb_info->device,
 				     MKDEV(FB_MAJOR, i), "fb%d", i);
 	if (IS_ERR(fb_info->dev)) {
 		/* Not fatal */

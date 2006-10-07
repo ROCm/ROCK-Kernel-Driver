@@ -1882,7 +1882,7 @@ static int initMatrox2(WPMINFO struct board* b){
 /* We do not have to set currcon to 0... register_framebuffer do it for us on first console
  * and we do not want currcon == 0 for subsequent framebuffers */
 
-	ACCESS_FBINFO(fbcon).parent = &ACCESS_FBINFO(pcidev)->dev;
+	ACCESS_FBINFO(fbcon).device = &ACCESS_FBINFO(pcidev)->dev;
 	if (register_framebuffer(&ACCESS_FBINFO(fbcon)) < 0) {
 		goto failVideoIO;
 	}

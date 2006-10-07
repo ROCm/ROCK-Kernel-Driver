@@ -54,7 +54,7 @@ struct fb_info *framebuffer_alloc(size_t size, struct device *dev)
 	if (size)
 		info->par = p + fb_info_size;
 
-	info->parent = dev;
+	info->device = dev;
 
 #ifdef CONFIG_FB_BACKLIGHT
 	mutex_init(&info->bl_mutex);

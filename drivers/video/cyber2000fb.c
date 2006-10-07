@@ -1399,7 +1399,7 @@ static int __devinit cyberpro_common_probe(struct cfb_info *cfb)
 		h_sync / 1000, h_sync % 1000, v_sync);
 
 	if (cfb->dev)
-		cfb->fb.parent = &cfb->dev->dev;
+		cfb->fb.device = &cfb->dev->dev;
 	err = register_framebuffer(&cfb->fb);
 
 failed:

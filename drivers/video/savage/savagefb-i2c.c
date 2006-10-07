@@ -263,7 +263,7 @@ int savagefb_probe_i2c_connector(struct fb_info *info, u8 **out_edid)
 
 	if (!edid) {
 		/* try to get from firmware */
-		const u8 *e = fb_firmware_edid(info->parent);
+		const u8 *e = fb_firmware_edid(info->device);
 
 		if (e) {
 			edid = kmalloc(EDID_LENGTH, GFP_KERNEL);

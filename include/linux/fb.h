@@ -773,8 +773,8 @@ struct fb_info {
 #endif
 
 	struct fb_ops *fbops;
-	struct device *parent;
-	struct device *dev;		/* sysfs per device attrs */
+	struct device *device;		/* This is the parent */
+	struct device *dev;		/* This is this fb device */
 #ifdef CONFIG_FB_TILEBLITTING
 	struct fb_tile_ops *tileops;    /* Tile Blitting */
 #endif

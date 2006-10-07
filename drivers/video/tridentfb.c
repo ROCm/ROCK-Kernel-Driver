@@ -1171,7 +1171,7 @@ static int __devinit trident_pci_probe(struct pci_dev * dev, const struct pci_de
 		default_var.accel_flags &= ~FB_ACCELF_TEXT;
 	default_var.activate |= FB_ACTIVATE_NOW;
 	fb_info.var = default_var;
-	fb_info.parent = &dev->dev;
+	fb_info.device = &dev->dev;
 	if (register_framebuffer(&fb_info) < 0) {
 		printk(KERN_ERR "tridentfb: could not register Trident framebuffer\n");
 		return -EINVAL;

@@ -199,7 +199,7 @@ int i810_probe_i2c_connector(struct fb_info *info, u8 **out_edid, int conn)
 				break;
 		}
 	} else {
-		const u8 *e = fb_firmware_edid(info->parent);
+		const u8 *e = fb_firmware_edid(info->device);
 
 		if (e != NULL) {
 			DPRINTK("i810-i2c: Getting EDID from BIOS\n");
