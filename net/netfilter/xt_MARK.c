@@ -112,12 +112,46 @@ checkentry_v1(const char *tablename,
 	return 1;
 }
 
+#ifdef CONFIG_COMPAT
+struct compat_xt_mark_target_info_v1 {
+	compat_ulong_t	mark;
+	u_int8_t	mode;
+	u_int8_t	__pad1;
+	u_int16_t	__pad2;
+};
+
+static void compat_from_user_v1(void *dst, void *src)
+{
+	struct compat_xt_mark_target_info_v1 *cm = src;
+	struct xt_mark_target_info_v1 m = {
+		.mark	= cm->mark,
+		.mode	= cm->mode,
+	};
+	memcpy(dst, &m, sizeof(m));
+}
+
+static int compat_to_user_v1(void __user *dst, void *src)
+{
+	struct xt_mark_target_info_v1 *m = src;
+	struct compat_xt_mark_target_info_v1 cm = {
+		.mark	= m->mark,
+		.mode	= m->mode,
+	};
+	return copy_to_user(dst, &cm, sizeof(cm)) ? -EFAULT : 0;
+}
+#endif /* CONFIG_COMPAT */
+
 static struct xt_target ipt_mark_reg_v0 = {
 	.name		= "MARK",
 	.target		= target_v0,
 	.targetsize	= sizeof(struct xt_mark_target_info),
 	.table		= "mangle",
 	.checkentry	= checkentry_v0,
+#ifdef CONFIG_COMPAT
+		.compatsize	= sizeof(struct compat_xt_mark_target_info_v1),
+		.compat_from_user = compat_from_user_v1,
+		.compat_to_user	= compat_to_user_v1,
+#endif
 	.me		= THIS_MODULE,
 	.family		= AF_INET,
 	.revision	= 0,

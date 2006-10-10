@@ -82,12 +82,48 @@ destroy(const struct xt_match *match, void *matchinfo, unsigned int matchsize)
 #endif
 }
 
+#ifdef CONFIG_COMPAT
+struct compat_xt_connmark_info {
+	compat_ulong_t	mark, mask;
+	u_int8_t	invert;
+	u_int8_t	__pad1;
+	u_int16_t	__pad2;
+};
+
+static void compat_from_user(void *dst, void *src)
+{
+	struct compat_xt_connmark_info *cm = src;
+	struct xt_connmark_info m = {
+		.mark	= cm->mark,
+		.mask	= cm->mask,
+		.invert	= cm->invert,
+	};
+	memcpy(dst, &m, sizeof(m));
+}
+
+static int compat_to_user(void __user *dst, void *src)
+{
+	struct xt_connmark_info *m = src;
+	struct compat_xt_connmark_info cm = {
+		.mark	= m->mark,
+		.mask	= m->mask,
+		.invert	= m->invert,
+	};
+	return copy_to_user(dst, &cm, sizeof(cm)) ? -EFAULT : 0;
+}
+#endif /* CONFIG_COMPAT */
+
 static struct xt_match connmark_match = {
 	.name		= "connmark",
 	.match		= match,
 	.matchsize	= sizeof(struct xt_connmark_info),
 	.checkentry	= checkentry,
 	.destroy	= destroy,
+#ifdef CONFIG_COMPAT
+		.compatsize	= sizeof(struct compat_xt_connmark_info),
+		.compat_from_user = compat_from_user,
+		.compat_to_user	= compat_to_user,
+#endif
 	.family		= AF_INET,
 	.me		= THIS_MODULE
 };
