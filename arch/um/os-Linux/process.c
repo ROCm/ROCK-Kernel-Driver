@@ -3,6 +3,10 @@
  * Licensed under the GPL
  */
 
+#define __KERNEL__ /* need _syscall0 */
+#include <asm/unistd.h>
+#undef __KERNEL__
+
 #include <unistd.h>
 #include <stdio.h>
 #include <errno.h>
