@@ -1,3 +1,7 @@
+#define __KERNEL__ /* need _syscall1 */
+#include <asm/unistd.h>
+#undef __KERNEL__
+
 #include <errno.h>
 #include <linux/unistd.h>
 #include "sysdep/tls.h"
