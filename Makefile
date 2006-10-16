@@ -1,7 +1,7 @@
 VERSION = 2
 PATCHLEVEL = 6
 SUBLEVEL = 18
-EXTRAVERSION =
+EXTRAVERSION = .1
 NAME=Avast! A bilge rat!
 
 # *DOCUMENTATION*
@@ -901,6 +901,9 @@ export INSTALL_HDR_PATH
 
 PHONY += headers_install
 headers_install: include/linux/version.h
+	@if [ ! -r include/asm-$(ARCH)/Kbuild ]; then \
+	  echo '*** Error: Headers not exportable for this architecture ($(ARCH))'; \
+	  exit 1 ; fi
 	$(Q)unifdef -Ux /dev/null
 	$(Q)rm -rf $(INSTALL_HDR_PATH)/include
 	$(Q)$(MAKE) -rR -f $(srctree)/scripts/Makefile.headersinst obj=include
@@ -1083,13 +1086,17 @@ help:
 	@echo  '  cscope	  - Generate cscope index'
 	@echo  '  kernelrelease	  - Output the release version string'
 	@echo  '  kernelversion	  - Output the version stored in Makefile'
-	@echo  '  headers_install - Install sanitised kernel headers to INSTALL_HDR_PATH'
+	@if [ -r include/asm-$(ARCH)/Kbuild ]; then \
+	 echo  '  headers_install - Install sanitised kernel headers to INSTALL_HDR_PATH'; \
+	 fi
 	@echo  '                    (default: $(INSTALL_HDR_PATH))'
 	@echo  ''
 	@echo  'Static analysers'
 	@echo  '  checkstack      - Generate a list of stack hogs'
 	@echo  '  namespacecheck  - Name space analysis on compiled kernel'
-	@echo  '  headers_check   - Sanity check on exported headers'
+	@if [ -r include/asm-$(ARCH)/Kbuild ]; then \
+	 echo  '  headers_check   - Sanity check on exported headers'; \
+	 fi
 	@echo  ''
 	@echo  'Kernel packaging:'
 	@$(MAKE) $(build)=$(package-dir) help

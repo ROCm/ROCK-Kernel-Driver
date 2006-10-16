@@ -123,13 +123,13 @@ static int ata_acpi_check_handle(struct ata_port *ap, acpi_handle *handle)
 		goto err;
 	}
 	dinfo = buffer.pointer;
-	if (!dinfo || !(dinfo->valid & ACPI_VALID_ADR) || 
+	if (!dinfo || !(dinfo->valid & ACPI_VALID_ADR) ||
 	    dinfo->address != bus) {
 		if (ata_msg_probe(ap))
 			ata_port_printk(ap, KERN_DEBUG,
 					"%s: wrong bus for parent of %s"
 					" (%llu, should be %d)\n",
-					__FUNCTION__, pathname, 
+					__FUNCTION__, pathname,
 					dinfo ? (unsigned long long)dinfo->address
 					: -1ULL, bus);
 		goto err;
@@ -274,7 +274,7 @@ static int sata_get_dev_handle(struct ata_device *atadev)
  *                    _ADR    Adress of the device (0 master, 1 slave)
  *
  *
- * When a correct ACPI handle is found it is being attached to 
+ * When a correct ACPI handle is found it is being attached to
  * @atadev->obj_handle.
  * Returns 0 on success, <0 on error.
  */
@@ -313,7 +313,7 @@ static int pata_get_dev_handle(struct ata_device *atadev)
 		if (ata_msg_probe(ap))
 			ata_dev_printk(atadev, KERN_DEBUG,
 				       "%s: no ACPI handle for drive=%d:%d\n",
-				       __FUNCTION__, ap->port_no, 
+				       __FUNCTION__, ap->port_no,
 				       atadev->devno);
 		return -ENODEV;
 	}
@@ -398,7 +398,7 @@ static int pata_get_chan_handle(struct ata_port *ap,
 	if (ata_msg_probe(ap))
 		ata_port_printk(ap, KERN_DEBUG,
 				"%s: using %s (chan=%d, handle=0x%p)\n",
-				__FUNCTION__, objname, 
+				__FUNCTION__, objname,
 				ap->port_no, chan_handle);
 	kfree(objname);
 
@@ -502,7 +502,7 @@ EXPORT_SYMBOL_GPL(ata_acpi_push_id);
  * function return value is 0.
  */
 static int do_drive_get_GTF(struct ata_device *atadev,
-			    unsigned int *gtf_length, 
+			    unsigned int *gtf_length,
 			    unsigned long *gtf_address,
 			    unsigned long *obj_loc)
 {
@@ -758,7 +758,7 @@ int ata_acpi_exec_tfs(struct ata_device *atadev)
 	unsigned long	gtf_address;
 	unsigned long	obj_loc;
 
-	if (!(ata_acpi_flags(atadev,libata_acpi) & 
+	if (!(ata_acpi_flags(atadev,libata_acpi) &
 	      (ATA_ACPI_GTF | ATA_ACPI_TFX))) {
 		if (ata_msg_probe(ap))
 			ata_dev_printk(atadev, KERN_DEBUG,

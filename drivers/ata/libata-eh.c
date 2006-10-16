@@ -2006,7 +2006,7 @@ static int ata_eh_recover(struct ata_port *ap, ata_prereset_fn_t prereset,
 			ata_acpi_push_id(dev);
 
 			/* retrieve and execute the ATA task file of _GTF */
-			ata_acpi_exec_tfs(dev);			
+			ata_acpi_exec_tfs(dev);
 		}
 #endif
 	}

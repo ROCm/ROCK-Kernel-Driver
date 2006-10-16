@@ -418,6 +418,12 @@ static ssize_t store_bl_curve(struct device *device,
 	u8 tmp_curve[FB_BACKLIGHT_LEVELS];
 	unsigned int i;
 
+	/* Some drivers don't use framebuffer_alloc(), but those also
+	 * don't have backlights.
+	 */
+	if (!fb_info || !fb_info->bl_dev)
+		return -ENODEV;
+
 	if (count != (FB_BACKLIGHT_LEVELS / 8 * 24))
 		return -EINVAL;
 
@@ -451,6 +457,12 @@ static ssize_t show_bl_curve(struct device *device,
 	struct fb_info *fb_info = dev_get_drvdata(device);
 	ssize_t len = 0;
 	unsigned int i;
+
+	/* Some drivers don't use framebuffer_alloc(), but those also
+	 * don't have backlights.
+	 */
+	if (!fb_info || !fb_info->bl_dev)
+		return -ENODEV;
 
 	mutex_lock(&fb_info->bl_mutex);
 	for (i = 0; i < FB_BACKLIGHT_LEVELS; i += 8)
