@@ -145,9 +145,11 @@ void os_usr1_process(int pid)
  * syscalls, and also breaks with clone(), which does not unshare the TLS.
  */
 
+inline _syscall0(pid_t, getpid)
+
 int os_getpid(void)
 {
-	return syscall(__NR_getpid);
+	return(getpid());
 }
 
 int os_getpgrp(void)
