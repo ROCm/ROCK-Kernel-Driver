@@ -16,6 +16,9 @@
 
 #include <linux/config.h>
 #include <linux/version.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,18)
+#include <linux/utsrelease.h>
+#endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
 

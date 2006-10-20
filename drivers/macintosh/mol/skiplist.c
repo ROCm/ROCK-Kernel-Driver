@@ -152,6 +152,8 @@ skiplist_delete( skiplist_t *sl, int key )
 	skiplist_level_t delptr;
 	int n, level = -1;
 
+	delptr.next = 0;
+
 	for( n=SKIPLIST_MAX_HEIGHT-1; n>=0; n-- ) {
 		for( ; p->level[n].next->key < key ; p=p->level[n].next )
 			;

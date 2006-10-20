@@ -32,6 +32,10 @@ void		(*xx_store_pte_lowmem)( ulong *slot, int pte0, int pte1 );
 int
 arch_mmu_init( kernel_vars_t *kv )
 {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,18)
 	MMU.emulator_context = current->mm->context.id;
+#else
+	MMU.emulator_context = current->mm->context;
+#endif
 	return 0;
 }

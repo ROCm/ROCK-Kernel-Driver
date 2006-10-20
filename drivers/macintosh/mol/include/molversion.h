@@ -1,6 +1,6 @@
-#define MOL_BUILD_DATE "Jun 3 2006 22:58"
+#define MOL_BUILD_DATE "Oct 20 2006 09:04"
 #define MOL_VERSION_STR "0.9.71"
-#define MOL_RELEASE "0.9.71-pre8"
+#define MOL_RELEASE "0.9.71"
 #define MOL_MAJOR_VERSION 0
 #define MOL_MINOR_VERSION 9
 #define MOL_PATCHLEVEL 71
