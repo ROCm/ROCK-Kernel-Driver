@@ -729,13 +729,13 @@ static int init(void * unused)
 	 */
 	child_reaper = current;
 
-	/*
-	 * Do this before initcalls, because some drivers want to access
-	 * firmware files.
-	 */
-	populate_rootfs();
+ 	/*
+ 	 * Do this before initcalls, because some drivers want to access
+ 	 * firmware files.
+ 	 */
+ 	populate_rootfs();
 
-	acpi_early_init(); /* before LAPIC and SMP init */
+ 	acpi_early_init(); /* before LAPIC and SMP init */
 
 	smp_prepare_cpus(max_cpus);
 

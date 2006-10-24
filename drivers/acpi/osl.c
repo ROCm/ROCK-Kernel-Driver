@@ -43,8 +43,6 @@
 #include <asm/uaccess.h>
 
 #include <linux/efi.h>
-#include <linux/initrd.h>
-#include <linux/syscalls.h>
 
 #define _COMPONENT		ACPI_OS_SERVICES
 ACPI_MODULE_NAME("osl")
@@ -70,6 +68,10 @@ extern char line_buf[80];
 
 int acpi_specific_hotkey_enabled = TRUE;
 EXPORT_SYMBOL(acpi_specific_hotkey_enabled);
+
+#ifdef CONFIG_ACPI_CUSTOM_DSDT_INITRD
+int acpi_must_unregister_table = FALSE;
+#endif
 
 static unsigned int acpi_irq_irq;
 static acpi_osd_handler acpi_irq_handler;
@@ -220,77 +222,111 @@ acpi_os_predefined_override(const struct acpi_predefined_names *init_val,
 
 	return AE_OK;
 }
-#ifdef CONFIG_ACPI_INITRD
-static const char signature[] = "INITRDDSDT123DSDT123";
-static char ramfs_dsdt_name[] = "/DSDT.aml";
 
-static char *acpi_find_dsdt_initrd(void)
-{
-	char *dsdt_start = NULL;
-	char *dsdt_buffer = NULL;
-	unsigned long len = 0, len2 = 0;
-	int fd;
-	struct kstat stat;
+#ifdef CONFIG_ACPI_CUSTOM_DSDT_INITRD
+#define MAX_DS_SDTS 10
+static struct acpi_table_header *ds_sdt_buffers[MAX_DS_SDTS];
+static unsigned int tables_loaded = 0;
 
-	/* try to get dsdt from tail of initrd */
-	if ((fd = sys_open(ramfs_dsdt_name, O_RDONLY, 0)) < 0) {
-		if (initrd_start) {
-			char *data = (char *)initrd_start;
-
-			printk(KERN_INFO PREFIX "Looking for DSDT in initrd...");
-
-			/* Search for the start signature */
-			while (data < (char *)initrd_end - sizeof(signature) - 4) {
-				if (!memcmp(data, signature, sizeof(signature))) {
-					data += sizeof(signature);
-					if (!memcmp(data, "DSDT", 4))
-						dsdt_start = data;
-					break;
-				}
-				data++;
-			}
-
-			if (dsdt_start){
-				printk(" found at offset %zu",
-				       dsdt_start - (char *)initrd_start);
-				len = (char*) initrd_end - dsdt_start;
-				printk(", size: %lu bytes\n", len);
-				dsdt_buffer = ACPI_ALLOCATE(len + 1);
-				memcpy(dsdt_buffer, dsdt_start, len);
-				*(dsdt_buffer + len + 1)= '\0';
-			} else
-				printk(" not found!\n");
+void acpi_load_override_tables(void){
+	struct file         *firmware_file;
+	mm_segment_t        oldfs;
+	unsigned long       len, len2;
+	struct kstat        stat;
+	unsigned int        x, y;
+	char *ramfs_ds_sdt_names[MAX_DS_SDTS] = {
+		"/DSDT.aml",
+		"/SSDT.aml",
+		"/SSDT1.aml",
+		"/SSDT2.aml",
+		"/SSDT3.aml",
+		"/SSDT4.aml",
+		"/SSDT5.aml",
+		"/SSDT6.aml",
+		"/SSDT7.aml",
+		"/SSDT8.aml",
+	};
+	/*
+	 * Never do this at home, only the user-space is allowed to open a file.
+	 * The clean way would be to use the firmware loader. But this code must be run
+	 * before there is any userspace available. So we need a static/init firmware
+	 * infrastructure, which doesn't exist yet...
+	 */
+	for (x = 0; x < MAX_DS_SDTS; x++){
+		if (vfs_stat(ramfs_ds_sdt_names[x], &stat) < 0) {
+			continue;
 		}
-	} else {
-		printk(KERN_INFO PREFIX "Looking for DSDT in initramfs...");
-		if (vfs_stat(ramfs_dsdt_name, &stat) < 0){
-			printk ("error getting stats for file %s\n", ramfs_dsdt_name);
-			return NULL;
-		}
-
 		len = stat.size;
-		dsdt_buffer = ACPI_ALLOCATE(len + 1);
-		if (!dsdt_buffer) {
-			printk("Could not allocate %lu bytes of memory\n", len);
-			return NULL;
+		/* check especially against empty files */
+		if (len <= 4) {
+			printk("error file %s is too small, only %lu bytes.\n",
+			       ramfs_ds_sdt_names[x], len);
+			continue;
 		}
-		printk (" found %s ...", ramfs_dsdt_name);
 
-		len2 = sys_read (fd, (char __user *) dsdt_buffer, len);
-		if (len2 < len ){
-			printk("\n" PREFIX "Error trying to read %lu bytes from %s\n",
-			       len, ramfs_dsdt_name);
-			ACPI_FREE (dsdt_buffer);
-			dsdt_buffer = NULL;
-		} else {
-			printk(" successfully read %lu bytes from %s\n",
-			       len, ramfs_dsdt_name);
-			*(dsdt_buffer + len + 1) = '\0';
+		ds_sdt_buffers[x] = kmalloc(len, GFP_KERNEL);
+		if (!ds_sdt_buffers[x]) {
+			printk("error when allocating %lu bytes of memory.\n",
+			       len);
+			/* better free all tables again */
+			for (y = 0; y < x; y++){
+				if (ds_sdt_buffers[y])
+					kfree(ds_sdt_buffers[x]);
+			}
+			acpi_must_unregister_table = FALSE;
+			return;
+		}
+
+		firmware_file = filp_open(ramfs_ds_sdt_names[x], O_RDONLY, 0);
+		if (IS_ERR(firmware_file)) {
+			printk("error, could not open file %s.\n",
+			       ramfs_ds_sdt_names[x]);
+			kfree(ds_sdt_buffers[x]);
+			continue;
+		}
+
+		oldfs = get_fs();
+		set_fs(KERNEL_DS);
+		len2 = vfs_read(firmware_file,
+				(char __user *)ds_sdt_buffers[x],
+				len,
+				&firmware_file->f_pos);
+		set_fs(oldfs);
+		filp_close(firmware_file, NULL);
+		if (len2 < len) {
+			printk("error trying to read %lu bytes from %s.\n",
+			       len, ramfs_ds_sdt_names[x]);
+			kfree(ds_sdt_buffers[x]);
+			continue;
+		}
+		printk(PREFIX "successfully read %lu bytes from file %s\n",
+		       len, ramfs_ds_sdt_names[x]);
+	}
+}
+
+struct acpi_table_header * acpi_find_dsdt_initrd(struct acpi_table_header * t)
+{
+	struct acpi_table_header	*ret = NULL;
+	unsigned int                     x;
+	for (x = 0; x < MAX_DS_SDTS; x++){
+		if (ds_sdt_buffers[x]){
+			if (!memcmp(ds_sdt_buffers[x]->signature,
+				    t->signature, 4) &&
+			    !memcmp(ds_sdt_buffers[x]->oem_table_id,
+				    t->oem_table_id, 8)){
+				ret = ds_sdt_buffers[x];
+				printk(PREFIX "Override [%4.4s-%8.8s]"
+				       " from initramfs -"
+				       " tainting kernel\n",
+				       t->signature,
+				       t->oem_table_id);
+				add_taint(TAINT_NO_SUPPORT);
+				acpi_must_unregister_table = TRUE;
+				break;
+			}
 		}
 	}
-	if (!dsdt_buffer)
-		printk(" not found!\n");
-	return dsdt_buffer;
+	return ret;
 }
 #endif
 
@@ -302,15 +338,21 @@ acpi_os_table_override(struct acpi_table_header * existing_table,
 		return AE_BAD_PARAMETER;
 
 	*new_table = NULL;
-	if (strncmp(existing_table->signature, "DSDT", 4) == 0)
-#ifdef CONFIG_ACPI_CUSTOM_DSDT
-		*new_table = (struct acpi_table_header *)AmlCode;
-#elif defined(CONFIG_ACPI_INITRD)
-		*new_table = (struct acpi_table_header*)acpi_find_dsdt_initrd();
-#endif
-	if (*new_table)
-		printk(KERN_INFO PREFIX "Using customized DSDT\n");
 
+#ifdef CONFIG_ACPI_CUSTOM_DSDT
+	if (strncmp(existing_table->signature, "DSDT", 4) == 0)
+		*new_table = (struct acpi_table_header *)AmlCode;
+#endif
+#ifdef CONFIG_ACPI_CUSTOM_DSDT_INITRD
+	if (!tables_loaded){
+		acpi_load_override_tables();
+		tables_loaded = 1;
+	}
+	if (!strncmp(existing_table->signature, "DSDT", 4) ||
+	    !strncmp(existing_table->signature, "SSDT", 4)){
+		*new_table = acpi_find_dsdt_initrd(existing_table);
+	}
+#endif
 	return AE_OK;
 }
 

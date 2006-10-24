@@ -278,6 +278,14 @@ acpi_tb_table_override(struct acpi_table_header *header,
 	address.pointer.logical = new_table;
 
 	status = acpi_tb_get_this_table(&address, new_table, table_info);
+
+#ifdef CONFIG_ACPI_CUSTOM_DSDT_INITRD
+	if (acpi_must_unregister_table) {
+		kfree(new_table);
+		acpi_must_unregister_table = FALSE;
+	}
+#endif
+
 	if (ACPI_FAILURE(status)) {
 		ACPI_EXCEPTION((AE_INFO, status, "Could not copy ACPI table"));
 		return_ACPI_STATUS(status);
