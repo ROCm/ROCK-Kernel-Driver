@@ -11,7 +11,7 @@
 
 #include "apparmor.h"
 
-static const char *capnames[] = {
+static const char *cap_names[] = {
 	"chown",
 	"dac_override",
 	"dac_read_search",
@@ -45,10 +45,10 @@ static const char *capnames[] = {
 
 const char *capability_to_name(unsigned int cap)
 {
-	const char *capname;
+	const char *name;
 
-	capname = (cap < (sizeof(capnames) / sizeof(char *))
-		   ? capnames[cap] : "invalid-capability");
+	name = (cap < (sizeof(cap_names) / sizeof(char *))
+		   ? cap_names[cap] : "invalid-capability");
 
-	return capname;
+	return name;
 }

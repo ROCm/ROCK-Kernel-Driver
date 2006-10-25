@@ -15,25 +15,25 @@
 #include "apparmor.h"
 #include "inline.h"
 
-size_t sd_getprocattr(struct subdomain *sd, char *str, size_t size)
+size_t aa_getprocattr(struct aaprofile *active, char *str, size_t size)
 {
 	int error = -EACCES;	/* default to a perm denied */
 	size_t len;
 
-	if (__sd_is_confined(sd)) {
+	if (active) {
 		size_t lena, lenm, lenp = 0;
 		const char *enforce_str = " (enforce)";
 		const char *complain_str = " (complain)";
 		const char *mode_str =
-			SUBDOMAIN_COMPLAIN(sd) ? complain_str : enforce_str;
+			PROFILE_COMPLAIN(active) ? complain_str : enforce_str;
 
 		lenm = strlen(mode_str);
 
-		lena = strlen(sd->active->name);
+		lena = strlen(active->name);
 
 		len = lena;
-		if (sd->active != sd->profile) {
-			lenp = strlen(sd->profile->name);
+		if (IN_SUBPROFILE(active)) {
+			lenp = strlen(BASE_PROFILE(active)->name);
 			len += (lenp + 1);	/* +1 for ^ */
 		}
 		/* DONT null terminate strings we output via proc */
@@ -41,27 +41,32 @@ size_t sd_getprocattr(struct subdomain *sd, char *str, size_t size)
 
 		if (len <= size) {
 			if (lenp) {
-				memcpy(str, sd->profile->name, lenp);
+				memcpy(str, BASE_PROFILE(active)->name,
+				       lenp);
 				str += lenp;
 				*str++ = '^';
 			}
 
-			memcpy(str, sd->active->name, lena);
+			memcpy(str, active->name, lena);
 			str += lena;
 			memcpy(str, mode_str, lenm);
 			str += lenm;
 			*str++ = '\n';
 			error = len;
+		} else if (size == 0) {
+			error = len;
 		} else {
 			error = -ERANGE;
 		}
 	} else {
-		const char *unconstrained_str = SD_UNCONSTRAINED "\n";
+		const char *unconstrained_str = "unconstrained\n";
 		len = strlen(unconstrained_str);
 
 		/* DONT null terminate strings we output via proc */
 		if (len <= size) {
 			memcpy(str, unconstrained_str, len);
+			error = len;
+		} else if (size == 0) {
 			error = len;
 		} else {
 			error = -ERANGE;
@@ -71,15 +76,16 @@ size_t sd_getprocattr(struct subdomain *sd, char *str, size_t size)
 	return error;
 
 }
-int sd_setprocattr_changehat(char *hatinfo, size_t infosize)
+
+int aa_setprocattr_changehat(char *hatinfo, size_t infosize)
 {
 	int error = -EINVAL;
 	char *token = NULL, *hat, *smagic, *tmp;
-	__u32 magic;
+	u32 magic;
 	int rc, len, consumed;
 	unsigned long flags;
 
-	SD_DEBUG("%s: %p %zd\n", __FUNCTION__, hatinfo, infosize);
+	AA_DEBUG("%s: %p %zd\n", __FUNCTION__, hatinfo, infosize);
 
 	/* strip leading white space */
 	while (infosize && isspace(*hatinfo)) {
@@ -114,7 +120,7 @@ int sd_setprocattr_changehat(char *hatinfo, size_t infosize)
 	}
 
 	if (!*tmp || tmp == token) {
-		SD_WARN("%s: Invalid input '%s'\n", __FUNCTION__, token);
+		AA_WARN("%s: Invalid input '%s'\n", __FUNCTION__, token);
 		goto out;
 	}
 
@@ -133,7 +139,7 @@ int sd_setprocattr_changehat(char *hatinfo, size_t infosize)
 	rc = sscanf(smagic, "%x%n", &magic, &consumed);
 
 	if (rc != 1 || consumed != len) {
-		SD_WARN("%s: Invalid hex magic %s\n",
+		AA_WARN("%s: Invalid hex magic %s\n",
 			__FUNCTION__,
 			smagic);
 		goto out;
@@ -145,17 +151,17 @@ int sd_setprocattr_changehat(char *hatinfo, size_t infosize)
 		hat = NULL;
 
 	if (!hat && !magic) {
-		SD_WARN("%s: Invalid input, NULL hat and NULL magic\n",
+		AA_WARN("%s: Invalid input, NULL hat and NULL magic\n",
 			__FUNCTION__);
 		goto out;
 	}
 
-	SD_DEBUG("%s: Magic 0x%x Hat '%s'\n",
+	AA_DEBUG("%s: Magic 0x%x Hat '%s'\n",
 		 __FUNCTION__, magic, hat ? hat : NULL);
 
-	write_lock_irqsave(&sd_lock, flags);
-	error = sd_change_hat(hat, magic);
-	write_unlock_irqrestore(&sd_lock, flags);
+	spin_lock_irqsave(&sd_lock, flags);
+	error = aa_change_hat(hat, magic);
+	spin_unlock_irqrestore(&sd_lock, flags);
 
 out:
 	if (token) {
@@ -166,16 +172,16 @@ out:
 	return error;
 }
 
-int sd_setprocattr_setprofile(struct task_struct *p, char *profilename,
+int aa_setprocattr_setprofile(struct task_struct *p, char *profilename,
 			      size_t profilesize)
 {
 	int error = -EINVAL;
-	struct sdprofile *profile;
+	struct aaprofile *profile = NULL;
 	struct subdomain *sd;
 	char *name = NULL;
 	unsigned long flags;
 
-	SD_DEBUG("%s: current %s(%d)\n",
+	AA_DEBUG("%s: current %s(%d)\n",
 		 __FUNCTION__, current->comm, current->pid);
 
 	/* strip leading white space */
@@ -201,40 +207,38 @@ int sd_setprocattr_setprofile(struct task_struct *p, char *profilename,
 	strncpy(name, profilename, profilesize);
 	name[profilesize] = 0;
 
-	if (strcmp(name, SD_UNCONSTRAINED) == 0)
-		profile = null_profile;
-	else
-		profile = sd_profilelist_find(name);
+ repeat:
+	if (strcmp(name, "unconstrained") != 0) {
+		profile = aa_profilelist_find(name);
+		if (!profile) {
+			AA_WARN("%s: Unable to switch task %s(%d) to profile"
+				"'%s'. No such profile.\n",
+				__FUNCTION__,
+				p->comm, p->pid,
+				name);
 
-	if (!profile) {
-		SD_WARN("%s: Unable to switch task %s(%d) to profile '%s'. "
-			"No such profile.\n",
-			__FUNCTION__,
-			p->comm, p->pid,
-			name);
-
-		error = -EINVAL;
-		goto out;
+			error = -EINVAL;
+			goto out;
+		}
 	}
 
+	spin_lock_irqsave(&sd_lock, flags);
 
-	write_lock_irqsave(&sd_lock, flags);
-
-	sd = SD_SUBDOMAIN(p->security);
+	sd = AA_SUBDOMAIN(p->security);
 
 	/* switch to unconstrained */
-	if (profile == null_profile) {
-		if (__sd_is_confined(sd)) {
-			SD_WARN("%s: Unconstraining task %s(%d) "
+	if (!profile) {
+		if (__aa_is_confined(sd)) {
+			AA_WARN("%s: Unconstraining task %s(%d) "
 				"profile %s active %s\n",
 				__FUNCTION__,
 				p->comm, p->pid,
-				sd->profile->name,
+				BASE_PROFILE(sd->active)->name,
 				sd->active->name);
 
-			sd_switch_unconfined(sd);
+			aa_switch_unconfined(sd);
 		} else {
-			SD_WARN("%s: task %s(%d) "
+			AA_WARN("%s: task %s(%d) "
 				"is already unconstrained\n",
 				__FUNCTION__, p->comm, p->pid);
 		}
@@ -243,15 +247,15 @@ int sd_setprocattr_setprofile(struct task_struct *p, char *profilename,
 			/* this task was created before module was
 			 * loaded, allocate a subdomain
 			 */
-			SD_WARN("%s: task %s(%d) has no subdomain\n",
+			AA_WARN("%s: task %s(%d) has no subdomain\n",
 				__FUNCTION__, p->comm, p->pid);
 
 			/* unlock so we can safely GFP_KERNEL */
-			write_unlock_irqrestore(&sd_lock, flags);
+			spin_unlock_irqrestore(&sd_lock, flags);
 
 			sd = alloc_subdomain(p);
 			if (!sd) {
-				SD_WARN("%s: Unable to allocate subdomain for "
+				AA_WARN("%s: Unable to allocate subdomain for "
 					"task %s(%d). Cannot confine task to "
 					"profile %s\n",
 					__FUNCTION__,
@@ -259,17 +263,33 @@ int sd_setprocattr_setprofile(struct task_struct *p, char *profilename,
 					name);
 
 				error = -ENOMEM;
-				put_sdprofile(profile);
+				put_aaprofile(profile);
 
 				goto out;
 			}
 
-			write_lock_irqsave(&sd_lock, flags);
-			if (!p->security) {
+			spin_lock_irqsave(&sd_lock, flags);
+			if (!AA_SUBDOMAIN(p->security)) {
 				p->security = sd;
 			} else { /* race */
 				free_subdomain(sd);
-				sd = SD_SUBDOMAIN(p->security);
+				sd = AA_SUBDOMAIN(p->security);
+			}
+		}
+
+		/* ensure the profile hasn't been replaced */
+
+		if (unlikely(profile->isstale)) {
+			WARN_ON(profile == null_complain_profile);
+
+			/* drop refcnt obtained from earlier get_aaprofile */
+			put_aaprofile(profile);
+			profile = aa_profilelist_find(name);
+
+			if (!profile) {
+				/* Race, profile was removed. */
+				spin_unlock_irqrestore(&sd_lock, flags);
+				goto repeat;
 			}
 		}
 
@@ -280,29 +300,31 @@ int sd_setprocattr_setprofile(struct task_struct *p, char *profilename,
 		 * profile has a identical named hat.
 		 */
 
-		SD_WARN("%s: Switching task %s(%d) "
+		AA_WARN("%s: Switching task %s(%d) "
 			"profile %s active %s to new profile %s\n",
 			__FUNCTION__,
 			p->comm, p->pid,
-			sd->profile ? sd->profile->name : SD_UNCONSTRAINED,
-			sd->active ? sd->profile->name : SD_UNCONSTRAINED,
+			sd->active ? BASE_PROFILE(sd->active)->name :
+				"unconstrained",
+			sd->active ? sd->active->name : "unconstrained",
 			name);
 
-		sd_switch(sd, profile, profile);
+		aa_switch(sd, profile);
 
-		put_sdprofile(profile); /* drop ref we obtained above
-					 * from sd_profilelist_find
+		put_aaprofile(profile); /* drop ref we obtained above
+					 * from aa_profilelist_find
 					 */
 
 		/* Reset magic in case we were in a subhat before
 		 * This is the only case where we zero the magic after
-		 * calling sd_switch
+		 * calling aa_switch
 		 */
-		sd->sd_hat_magic = 0;
+		sd->hat_magic = 0;
 	}
 
-	write_unlock_irqrestore(&sd_lock, flags);
+	spin_unlock_irqrestore(&sd_lock, flags);
 
+	error = 0;
 out:
 	kfree(name);
 

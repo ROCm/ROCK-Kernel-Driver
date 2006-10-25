@@ -2,7 +2,7 @@ config SECURITY_APPARMOR
 	tristate "AppArmor support"
 	depends on SECURITY!=n
 	help
-	  This enables the Novell AppArmor security module.
+	  This enables the AppArmor security module.
 	  Required userspace tools (if they are not included in your
 	  distribution) and further information may be found at
 	  <http://forge.novell.com/modules/xfmod/project/?apparmor>

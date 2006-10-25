@@ -4,7 +4,7 @@
 
 obj-$(CONFIG_KEYS)			+= keys/
 subdir-$(CONFIG_SECURITY_SELINUX)	+= selinux
-subdir-$(CONFIG_SECURITY_APPARMOR)	+= apparmor
+obj-$(CONFIG_SECURITY_APPARMOR)		+= apparmor/
 
 # We always need commoncap as it's default
 obj-y		+= commoncap.o

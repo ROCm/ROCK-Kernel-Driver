@@ -1,0 +1,6 @@
+# Makefile for AppArmor aamatch submodule
+#
+
+obj-$(CONFIG_SECURITY_APPARMOR) += aamatch_pcre.o
+
+aamatch_pcre-y := match_pcre.o pcre_exec.o

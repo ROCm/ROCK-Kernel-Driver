@@ -1,10 +1,28 @@
-# Makefile for AppArmor Linux Security Module (previously called "SubDomain")
+# Makefile for AppArmor Linux Security Module
 #
-APPARMOR_VER=2.0-19.43r6320
+# kernel build Makefile is the Kbuild file
 
-EXTRA_CFLAGS += -DAPPARMOR_VERSION=\"${APPARMOR_VER}\"
+REPO_VERSION := $(shell if [ -x /usr/bin/svn ] ; then \
+       /usr/bin/svn info . 2> /dev/null | grep "^Last Changed Rev:" | sed "s/^Last Changed Rev: //" ; \
+       fi)
 
-subdir-$(CONFIG_SECURITY_APPARMOR) += aamatch
-obj-$(CONFIG_SECURITY_APPARMOR) += apparmor.o
+ifeq ("${REPO_VERSION}", "")
+REPO_VERSION := "unknown"
+endif
 
-apparmor-y := main.o list.o procattr.o lsm.o apparmorfs.o capabilities.o module_interface.o apparmor_version.o
+KERNELVER := $(shell uname -r)
+
+KERNELDIR := /lib/modules/${KERNELVER}/build
+
+all:
+	$(MAKE) -C $(KERNELDIR) M=`pwd` modules CONFIG_SECURITY_APPARMOR=m \
+					APPARMOR_VER=${REPO_VERSION}
+	mv apparmor.ko apparmor-${KERNELVER}.ko
+	mv match/aamatch_pcre.ko aamatch_pcre-${KERNELVER}.ko
+
+clean:
+	rm -f *~ *.o *.ko *.mod.c .*.cmd Modules.symvers \
+		match/*~ match/*.o match/*.ko match/.*.cmd match/*.mod.c
+	rm -rf .tmp_versions
+
+

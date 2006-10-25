@@ -1,0 +1,10 @@
+# Makefile for AppArmor Linux Security Module
+#
+EXTRA_CFLAGS += -DAPPARMOR_VERSION=\"${APPARMOR_VER}\"
+
+obj-$(CONFIG_SECURITY_APPARMOR) += apparmor.o
+
+apparmor-y := main.o list.o procattr.o lsm.o apparmorfs.o capabilities.o \
+	      module_interface.o
+
+obj-$(CONFIG_SECURITY_APPARMOR) += match/

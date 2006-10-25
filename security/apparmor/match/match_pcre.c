@@ -22,49 +22,49 @@
 
 static const char *features="literal tailglob pattern=pcre";
 
-struct sdmatch_entry
+struct aamatch_entry
 {
 	char *pattern;
 	pcre *compiled;
 };
 
-void* sdmatch_alloc(enum entry_t entry_type)
+void* aamatch_alloc(enum entry_match_type entry_type)
 {
 void *ptr=NULL;
 
-	if (entry_type == sd_entry_pattern) {
-		ptr = kmalloc(sizeof(struct sdmatch_entry), GFP_KERNEL);
+	if (entry_type == aa_entry_pattern) {
+		ptr = kmalloc(sizeof(struct aamatch_entry), GFP_KERNEL);
 		if (ptr)
-			memset(ptr, 0, sizeof(struct sdmatch_entry));
+			memset(ptr, 0, sizeof(struct aamatch_entry));
 		else
 			ptr=ERR_PTR(-ENOMEM);
-	} else if (entry_type != sd_entry_literal &&
-		   entry_type != sd_entry_tailglob) {
+	} else if (entry_type != aa_entry_literal &&
+		   entry_type != aa_entry_tailglob) {
 		ptr = ERR_PTR(-EINVAL);
 	}
 
 	return ptr;
 }
 
-void sdmatch_free(void *ptr)
+void aamatch_free(void *ptr)
 {
 	if (ptr) {
-		struct sdmatch_entry *ed = (struct sdmatch_entry *) ptr;
+		struct aamatch_entry *ed = (struct aamatch_entry *) ptr;
 		kfree(ed->pattern);
-		kfree(ed->compiled);	/* allocated by SD_READ_X */
+		kfree(ed->compiled);	/* allocated by AA_READ_X */
 	}
 	kfree(ptr);
 }
 
-const char *sdmatch_features(void)
+const char *aamatch_features(void)
 {
 	return features;
 }
 
-int sdmatch_serialize(void *entry_extradata, struct sd_ext *e,
-		      sdmatch_serializecb cb)
+int aamatch_serialize(void *entry_extradata, struct aa_ext *e,
+		      aamatch_serializecb cb)
 {
-#define SD_READ_X(E, C, D, N) \
+#define AA_READ_X(E, C, D, N) \
 	do { \
 		if (!cb((E), (C), (D), (N))) { \
 			error = -EINVAL; \
@@ -75,20 +75,20 @@ int sdmatch_serialize(void *entry_extradata, struct sd_ext *e,
 	int error = 0;
 	u32 size, magic, opts;
 	u8 t_char;
-	struct sdmatch_entry *ed = (struct sdmatch_entry *) entry_extradata;
+	struct aamatch_entry *ed = (struct aamatch_entry *) entry_extradata;
 
 	if (ed == NULL)
 		goto done;
 
-	SD_READ_X(e, SD_DYN_STRING, &ed->pattern, NULL);
+	AA_READ_X(e, AA_DYN_STRING, &ed->pattern, NULL);
 
 	/* size determines the real size of the pcre struct,
 	   it is size_t - sizeof(pcre) on user side.
 	   uschar must be the same in user and kernel space */
 	/* check that we are processing the correct structure */
-	SD_READ_X(e, SD_STRUCT, NULL, "pcre");
-	SD_READ_X(e, SD_U32, &size, "pattern.size");
-	SD_READ_X(e, SD_U32, &magic, "pattern.magic");
+	AA_READ_X(e, AA_STRUCT, NULL, "pcre");
+	AA_READ_X(e, AA_U32, &size, NULL);
+	AA_READ_X(e, AA_U32, &magic, NULL);
 
 	/* the allocation of pcre is delayed because it depends on the size
 	 * of the pattern */
@@ -102,20 +102,20 @@ int sdmatch_serialize(void *entry_extradata, struct sd_ext *e,
 	ed->compiled->magic_number = magic;
 	ed->compiled->size = size + sizeof(pcre);
 
-	SD_READ_X(e, SD_U32, &opts, "pattern.options");
+	AA_READ_X(e, AA_U32, &opts, NULL);
 	ed->compiled->options = opts;
-	SD_READ_X(e, SD_U16, &ed->compiled->top_bracket, "pattern.top_bracket");
-	SD_READ_X(e, SD_U16, &ed->compiled->top_backref, "pattern.top_backref");
-	SD_READ_X(e, SD_U8, &t_char, "pattern.first_char");
+	AA_READ_X(e, AA_U16, &ed->compiled->top_bracket, NULL);
+	AA_READ_X(e, AA_U16, &ed->compiled->top_backref, NULL);
+	AA_READ_X(e, AA_U8, &t_char, NULL);
 	ed->compiled->first_char = t_char;
-	SD_READ_X(e, SD_U8, &t_char, "pattern.req_char");
+	AA_READ_X(e, AA_U8, &t_char, NULL);
 	ed->compiled->req_char = t_char;
-	SD_READ_X(e, SD_U8, &t_char, "pattern.code[0]");
+	AA_READ_X(e, AA_U8, &t_char, NULL);
 	ed->compiled->code[0] = t_char;
 
-	SD_READ_X(e, SD_STATIC_BLOB, &ed->compiled->code[1], NULL);
+	AA_READ_X(e, AA_STATIC_BLOB, &ed->compiled->code[1], NULL);
 
-	SD_READ_X(e, SD_STRUCTEND, NULL, NULL);
+	AA_READ_X(e, AA_STRUCTEND, NULL, NULL);
 
 	/* stitch in pcre patterns, it was NULLed out by parser
 	 * pcre_default_tables defined in pcre_tables.h */
@@ -123,7 +123,7 @@ int sdmatch_serialize(void *entry_extradata, struct sd_ext *e,
 
 done:
 	if (error != 0 && ed) {
-		kfree(ed->pattern); /* allocated by SD_READ_X */
+		kfree(ed->pattern); /* allocated by AA_READ_X */
 		kfree(ed->compiled);
 		ed->pattern = NULL;
 		ed->compiled = NULL;
@@ -132,15 +132,15 @@ done:
 	return error;
 }
 
-unsigned int sdmatch_match(const char *pathname, const char *entry_name,
-			   enum entry_t entry_type, void *entry_extradata)
+unsigned int aamatch_match(const char *pathname, const char *entry_name,
+			   enum entry_match_type entry_type, void *entry_extradata)
 {
 	int ret;
 
-	if (entry_type == sd_entry_pattern) {
+	if (entry_type == aa_entry_pattern) {
 		int pcreret;
-		struct sdmatch_entry *ed =
-			(struct sdmatch_entry *) entry_extradata;
+		struct aamatch_entry *ed =
+			(struct aamatch_entry *) entry_extradata;
 
         	pcreret = pcre_exec(ed->compiled, NULL,
 				    pathname, strlen(pathname),
@@ -149,20 +149,20 @@ unsigned int sdmatch_match(const char *pathname, const char *entry_name,
         	ret = (pcreret >= 0);
 
 		// XXX - this needs access to subdomain_debug,  hmmm
-        	//SD_DEBUG("%s(%d): %s %s %d\n", __FUNCTION__,
+        	//AA_DEBUG("%s(%d): %s %s %d\n", __FUNCTION__,
 		//	 ret, pathname, ed->pattern, pcreret);
 	} else {
-		ret = sdmatch_match_common(pathname, entry_name, entry_type);
+		ret = aamatch_match_common(pathname, entry_name, entry_type);
 	}
 
         return ret;
 }
 
-EXPORT_SYMBOL_GPL(sdmatch_alloc);
-EXPORT_SYMBOL_GPL(sdmatch_free);
-EXPORT_SYMBOL_GPL(sdmatch_features);
-EXPORT_SYMBOL_GPL(sdmatch_serialize);
-EXPORT_SYMBOL_GPL(sdmatch_match);
+EXPORT_SYMBOL_GPL(aamatch_alloc);
+EXPORT_SYMBOL_GPL(aamatch_free);
+EXPORT_SYMBOL_GPL(aamatch_features);
+EXPORT_SYMBOL_GPL(aamatch_serialize);
+EXPORT_SYMBOL_GPL(aamatch_match);
 
 MODULE_DESCRIPTION("AppArmor aa_match module [pcre]");
 MODULE_AUTHOR("Tony Jones <tonyj@suse.de>");

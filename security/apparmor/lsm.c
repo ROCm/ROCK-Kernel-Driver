@@ -8,124 +8,109 @@
  *
  *	http://forge.novell.com/modules/xfmod/project/?apparmor
  *
- *	Immunix AppArmor LSM interface (previously called "SubDomain")
+ *	Immunix AppArmor LSM interface
  */
 
 #include <linux/security.h>
 #include <linux/module.h>
 #include <linux/mm.h>
-
-/* superblock types */
-
-/* PIPEFS_MAGIC */
-#include <linux/pipe_fs_i.h>
-/* from net/socket.c */
-#define SOCKFS_MAGIC 0x534F434B
-/* from inotify.c  */
-#define INOTIFYFS_MAGIC 0xBAD1DEA
-
-#define VALID_FSTYPE(inode) ((inode)->i_sb->s_magic != PIPEFS_MAGIC && \
-                             (inode)->i_sb->s_magic != SOCKFS_MAGIC && \
-                             (inode)->i_sb->s_magic != INOTIFYFS_MAGIC)
-
-#include <asm/mman.h>
+#include <linux/mman.h>
 
 #include "apparmor.h"
 #include "inline.h"
 
-/* main SD lock [see get_sdcopy and put_sdcopy] */
-rwlock_t sd_lock = RW_LOCK_UNLOCKED;
+/* struct subdomain write update lock (read side is RCU). */
+spinlock_t sd_lock = SPIN_LOCK_UNLOCKED;
 
-/* Flag values, also controllable via subdomainfs/control.
+/* Flag values, also controllable via apparmorfs/control.
  * We explicitly do not allow these to be modifiable when exported via
  * /sys/modules/parameters, as we want to do additional mediation and
  * don't want to add special path code. */
 
-/* Complain mode (used to be 'bitch' mode) */
-int subdomain_complain = 0;
-module_param_named(complain, subdomain_complain, int, S_IRUSR);
-MODULE_PARM_DESC(subdomain_complain, "Toggle AppArmor complain mode");
+/* Complain mode -- in complain mode access failures result in auditing only
+ * and task is allowed access.  audit events are processed by userspace to
+ * generate policy.  Default is 'enforce' (0).
+ * Value is also togglable per profile and referenced when global value is
+ * enforce.
+ */
+int apparmor_complain = 0;
+module_param_named(complain, apparmor_complain, int, S_IRUSR);
+MODULE_PARM_DESC(apparmor_complain, "Toggle AppArmor complain mode");
 
 /* Debug mode */
-int subdomain_debug = 0;
-module_param_named(debug, subdomain_debug, int, S_IRUSR);
-MODULE_PARM_DESC(subdomain_debug, "Toggle AppArmor debug mode");
+int apparmor_debug = 0;
+module_param_named(debug, apparmor_debug, int, S_IRUSR);
+MODULE_PARM_DESC(apparmor_debug, "Toggle AppArmor debug mode");
 
 /* Audit mode */
-int subdomain_audit = 0;
-module_param_named(audit, subdomain_audit, int, S_IRUSR);
-MODULE_PARM_DESC(subdomain_audit, "Toggle AppArmor audit mode");
+int apparmor_audit = 0;
+module_param_named(audit, apparmor_audit, int, S_IRUSR);
+MODULE_PARM_DESC(apparmor_audit, "Toggle AppArmor audit mode");
 
 /* Syscall logging mode */
-int subdomain_logsyscall = 0;
-module_param_named(logsyscall, subdomain_logsyscall, int, S_IRUSR);
-MODULE_PARM_DESC(subdomain_logsyscall, "Toggle AppArmor logsyscall mode");
+int apparmor_logsyscall = 0;
+module_param_named(logsyscall, apparmor_logsyscall, int, S_IRUSR);
+MODULE_PARM_DESC(apparmor_logsyscall, "Toggle AppArmor logsyscall mode");
 
 #ifndef MODULE
-static int __init sd_getopt_complain(char *str)
+static int __init aa_getopt_complain(char *str)
 {
-	get_option(&str, &subdomain_complain);
+	get_option(&str, &apparmor_complain);
 	return 1;
 }
-__setup("subdomain_complain=", sd_getopt_complain);
+__setup("apparmor_complain=", aa_getopt_complain);
 
-static int __init sd_getopt_debug(char *str)
+static int __init aa_getopt_debug(char *str)
 {
-	get_option(&str, &subdomain_debug);
+	get_option(&str, &apparmor_debug);
 	return 1;
 }
-__setup("subdomain_debug=", sd_getopt_debug);
+__setup("apparmor_debug=", aa_getopt_debug);
 
-static int __init sd_getopt_audit(char *str)
+static int __init aa_getopt_audit(char *str)
 {
-	get_option(&str, &subdomain_audit);
+	get_option(&str, &apparmor_audit);
 	return 1;
 }
-__setup("subdomain_audit=", sd_getopt_audit);
+__setup("apparmor_audit=", aa_getopt_audit);
 
-static int __init sd_getopt_logsyscall(char *str)
+static int __init aa_getopt_logsyscall(char *str)
 {
-	get_option(&str, &subdomain_logsyscall);
+	get_option(&str, &apparmor_logsyscall);
 	return 1;
 }
-__setup("subdomain_logsyscall=", sd_getopt_logsyscall);
+__setup("apparmor_logsyscall=", aa_getopt_logsyscall);
 #endif
 
-static int subdomain_ptrace(struct task_struct *parent,
+static int apparmor_ptrace(struct task_struct *parent,
 			    struct task_struct *child)
 {
 	int error;
-	struct subdomain *sd;
-	unsigned long flags;
+	struct aaprofile *active;
 
 	error = cap_ptrace(parent, child);
 
-	if (error == 0 && parent->security) {
-		read_lock_irqsave(&sd_lock, flags);
+	active = get_task_active_aaprofile(parent);
 
-		sd = SD_SUBDOMAIN(parent->security);
-
-		if (__sd_is_confined(sd)) {
-			error = sd_audit_syscallreject(sd, GFP_ATOMIC,
-						       "ptrace");
-			WARN_ON(error != -EPERM);
-		}
-
-		read_unlock_irqrestore(&sd_lock, flags);
+	if (!error && active) {
+		error = aa_audit_syscallreject(active, GFP_KERNEL, "ptrace");
+		WARN_ON(error != -EPERM);
 	}
+
+	put_aaprofile(active);
 
 	return error;
 }
 
-static int subdomain_capget(struct task_struct *target,
-			    kernel_cap_t * effective,
-			    kernel_cap_t * inheritable,
-			    kernel_cap_t * permitted)
+static int apparmor_capget(struct task_struct *target,
+			    kernel_cap_t *effective,
+			    kernel_cap_t *inheritable,
+			    kernel_cap_t *permitted)
 {
 	return cap_capget(target, effective, inheritable, permitted);
 }
 
-static int subdomain_capset_check(struct task_struct *target,
+static int apparmor_capset_check(struct task_struct *target,
 				  kernel_cap_t *effective,
 				  kernel_cap_t *inheritable,
 				  kernel_cap_t *permitted)
@@ -133,7 +118,7 @@ static int subdomain_capset_check(struct task_struct *target,
 	return cap_capset_check(target, effective, inheritable, permitted);
 }
 
-static void subdomain_capset_set(struct task_struct *target,
+static void apparmor_capset_set(struct task_struct *target,
 				 kernel_cap_t *effective,
 				 kernel_cap_t *inheritable,
 				 kernel_cap_t *permitted)
@@ -142,448 +127,416 @@ static void subdomain_capset_set(struct task_struct *target,
 	return;
 }
 
-static int subdomain_capable(struct task_struct *tsk, int cap)
+static int apparmor_capable(struct task_struct *tsk, int cap)
 {
 	int error;
 
 	/* cap_capable returns 0 on success, else -EPERM */
 	error = cap_capable(tsk, cap);
 
-	if (error == 0 && current->security) {
-		struct subdomain *sd, sdcopy;
-		unsigned long flags;
+	if (error == 0) {
+		struct aaprofile *active;
 
-		read_lock_irqsave(&sd_lock, flags);
-		sd = __get_sdcopy(&sdcopy, tsk);
-		read_unlock_irqrestore(&sd_lock, flags);
+		active = get_task_active_aaprofile(tsk);
 
-		error = sd_capability(sd, cap);
+		if (active)
+			error = aa_capability(active, cap);
 
-		put_sdcopy(sd);
+		put_aaprofile(active);
 	}
 
 	return error;
 }
 
-static int subdomain_sysctl(struct ctl_table *table, int op)
+static int apparmor_sysctl(struct ctl_table *table, int op)
 {
 	int error = 0;
-	struct subdomain *sd;
-	unsigned long flags;
+	struct aaprofile *active;
 
-	if (!current->security)
-		return 0;
+	active = get_active_aaprofile();
 
-	read_lock_irqsave(&sd_lock, flags);
-
-	sd = SD_SUBDOMAIN(current->security);
-
-	if ((op & 002) && __sd_is_confined(sd) && !capable(CAP_SYS_ADMIN)) {
-		error = sd_audit_syscallreject(sd, GFP_ATOMIC,
+	if ((op & 002) && active && !capable(CAP_SYS_ADMIN)) {
+		error = aa_audit_syscallreject(active, GFP_KERNEL,
 					       "sysctl (write)");
 		WARN_ON(error != -EPERM);
 	}
 
-	read_unlock_irqrestore(&sd_lock, flags);
+	put_aaprofile(active);
 
 	return error;
 }
 
-static int subdomain_syslog(int type)
+static int apparmor_syslog(int type)
 {
 	return cap_syslog(type);
 }
 
-static int subdomain_netlink_send(struct sock *sk, struct sk_buff *skb)
+static int apparmor_netlink_send(struct sock *sk, struct sk_buff *skb)
 {
 	return cap_netlink_send(sk, skb);
 }
 
-static int subdomain_netlink_recv(struct sk_buff *skb, int capability)
+static int apparmor_netlink_recv(struct sk_buff *skb, int cap)
 {
-	return cap_netlink_recv(skb, capability);
+	return cap_netlink_recv(skb, cap);
 }
 
-static void subdomain_bprm_apply_creds(struct linux_binprm *bprm, int unsafe)
+static void apparmor_bprm_apply_creds(struct linux_binprm *bprm, int unsafe)
 {
 	cap_bprm_apply_creds(bprm, unsafe);
 	return;
 }
 
-static int subdomain_bprm_set_security(struct linux_binprm *bprm)
+static int apparmor_bprm_set_security(struct linux_binprm *bprm)
 {
 	/* handle capability bits with setuid, etc */
 	cap_bprm_set_security(bprm);
 	/* already set based on script name */
 	if (bprm->sh_bang)
 		return 0;
-	return sd_register(bprm);
+	return aa_register(bprm);
 }
 
-static int subdomain_bprm_secureexec(struct linux_binprm *bprm)
+static int apparmor_bprm_secureexec(struct linux_binprm *bprm)
 {
 	int ret = cap_bprm_secureexec(bprm);
 
-	if (ret == 0 && (unsigned long)bprm->security & SD_SECURE_EXEC_NEEDED) {
-		SD_DEBUG("%s: secureexec required for %s\n",
-			__FUNCTION__, bprm->filename);
+	if (ret == 0 &&
+	    (unsigned long)bprm->security & AA_SECURE_EXEC_NEEDED) {
+		AA_DEBUG("%s: secureexec required for %s\n",
+			 __FUNCTION__, bprm->filename);
 		ret = 1;
 	}
 
 	return ret;
 }
 
-static int subdomain_sb_mount(char *dev_name, struct nameidata *nd, char *type,
+static int apparmor_sb_mount(char *dev_name, struct nameidata *nd, char *type,
 			      unsigned long flags, void *data)
 {
 	int error = 0;
-	struct subdomain *sd;
-	unsigned long lockflags;
+	struct aaprofile *active;
 
-	if (!current->security)
-		return 0;
+	active = get_active_aaprofile();
 
-	read_lock_irqsave(&sd_lock, lockflags);
-
-	sd = SD_SUBDOMAIN(current->security);
-
-	if (__sd_is_confined(sd)) {
-		error = sd_audit_syscallreject(sd, GFP_ATOMIC, "mount");
+	if (active) {
+		error = aa_audit_syscallreject(active, GFP_KERNEL, "mount");
 		WARN_ON(error != -EPERM);
 	}
 
-	read_unlock_irqrestore(&sd_lock, lockflags);
+	put_aaprofile(active);
 
 	return error;
 }
 
-static int subdomain_umount(struct vfsmount *mnt, int flags)
+static int apparmor_umount(struct vfsmount *mnt, int flags)
 {
 	int error = 0;
-	struct subdomain *sd;
-	unsigned long lockflags;
+	struct aaprofile *active;
 
-	if (!current->security)
-		return 0;
+	active = get_active_aaprofile();
 
-	read_lock_irqsave(&sd_lock, lockflags);
-
-	sd = SD_SUBDOMAIN(current->security);
-
-	if (__sd_is_confined(sd)) {
-		error = sd_audit_syscallreject(sd, GFP_ATOMIC, "umount");
+	if (active) {
+		error = aa_audit_syscallreject(active, GFP_ATOMIC, "umount");
 		WARN_ON(error != -EPERM);
 	}
 
-	read_unlock_irqrestore(&sd_lock, lockflags);
+	put_aaprofile(active);
 
 	return error;
 }
 
-static int subdomain_inode_mkdir(struct inode *inode, struct dentry *dentry,
+static int apparmor_inode_mkdir(struct inode *inode, struct dentry *dentry,
 				 int mask)
 {
-	struct subdomain sdcopy, *sd;
-	int error;
+	struct aaprofile *active;
+	int error = 0;
 
-	if (!current->security)
-		return 0;
+	active = get_active_aaprofile();
 
-	sd = get_sdcopy(&sdcopy);
+	if (active)
+		error = aa_perm_dir(active, dentry, aa_dir_mkdir);
 
-	error = sd_perm_dir(sd, dentry, SD_DIR_MKDIR);
-
-	put_sdcopy(sd);
+	put_aaprofile(active);
 
 	return error;
 }
 
-static int subdomain_inode_rmdir(struct inode *inode, struct dentry *dentry)
+static int apparmor_inode_rmdir(struct inode *inode, struct dentry *dentry)
 {
-	struct subdomain sdcopy, *sd;
-	int error;
+	struct aaprofile *active;
+	int error = 0;
 
-	if (!current->security)
-		return 0;
+	active = get_active_aaprofile();
 
-	sd = get_sdcopy(&sdcopy);
+	if (active)
+		error = aa_perm_dir(active, dentry, aa_dir_rmdir);
 
-	error = sd_perm_dir(sd, dentry, SD_DIR_RMDIR);
-
-	put_sdcopy(sd);
+	put_aaprofile(active);
 
 	return error;
 }
 
-static int subdomain_inode_create(struct inode *inode, struct dentry *dentry,
+static int apparmor_inode_create(struct inode *inode, struct dentry *dentry,
 				  int mask)
 {
-	struct subdomain sdcopy, *sd;
-	int error;
+	struct aaprofile *active;
+	int error = 0;
 
-	if (!current->security)
-		return 0;
-
-	sd = get_sdcopy(&sdcopy);
+	active = get_active_aaprofile();
 
 	/* At a minimum, need write perm to create */
-	error = sd_perm_dentry(sd, dentry, MAY_WRITE);
+	if (active)
+		error = aa_perm_dentry(active, dentry, MAY_WRITE);
 
-	put_sdcopy(sd);
+	put_aaprofile(active);
 
 	return error;
 }
 
-static int subdomain_inode_link(struct dentry *old_dentry, struct inode *inode,
+static int apparmor_inode_link(struct dentry *old_dentry, struct inode *inode,
 				struct dentry *new_dentry)
 {
 	int error = 0;
-	struct subdomain sdcopy, *sd;
+	struct aaprofile *active;
 
-	if (!current->security)
-		return 0;
+	active = get_active_aaprofile();
 
-	sd = get_sdcopy(&sdcopy);
-	error = sd_link(sd, new_dentry, old_dentry);
-	put_sdcopy(sd);
+	if (active)
+		error = aa_link(active, new_dentry, old_dentry);
 
-	return error;
-}
-
-static int subdomain_inode_unlink(struct inode *inode, struct dentry *dentry)
-{
-	struct subdomain sdcopy, *sd;
-	int error;
-
-	if (!current->security)
-		return 0;
-
-	sd = get_sdcopy(&sdcopy);
-
-	error = sd_perm_dentry(sd, dentry, MAY_WRITE);
-
-	put_sdcopy(sd);
+	put_aaprofile(active);
 
 	return error;
 }
 
-static int subdomain_inode_mknod(struct inode *inode, struct dentry *dentry,
-				 int mode, dev_t dev)
+static int apparmor_inode_unlink(struct inode *inode, struct dentry *dentry)
 {
-	struct subdomain sdcopy, *sd;
+	struct aaprofile *active;
 	int error = 0;
 
-	if (!current->security)
-		return 0;
+	active = get_active_aaprofile();
 
-	sd = get_sdcopy(&sdcopy);
+	if (active)
+		error = aa_perm_dentry(active, dentry, MAY_WRITE);
 
-	error = sd_perm_dentry(sd, dentry, MAY_WRITE);
-
-	put_sdcopy(sd);
+	put_aaprofile(active);
 
 	return error;
 }
 
-static int subdomain_inode_rename(struct inode *old_inode,
+static int apparmor_inode_mknod(struct inode *inode, struct dentry *dentry,
+				 int mode, dev_t dev)
+{
+	struct aaprofile *active;
+	int error = 0;
+
+	active = get_active_aaprofile();
+
+	if (active)
+		error = aa_perm_dentry(active, dentry, MAY_WRITE);
+
+	put_aaprofile(active);
+
+	return error;
+}
+
+static int apparmor_inode_rename(struct inode *old_inode,
 				  struct dentry *old_dentry,
 				  struct inode *new_inode,
 				  struct dentry *new_dentry)
 {
-	struct subdomain sdcopy, *sd;
+	struct aaprofile *active;
 	int error = 0;
 
-	if (!current->security)
-		return 0;
+	active = get_active_aaprofile();
 
-	sd = get_sdcopy(&sdcopy);
+	if (active) {
+		error = aa_perm_dentry(active, old_dentry, MAY_READ |
+				       MAY_WRITE);
 
-	error = sd_perm_dentry(sd, old_dentry,
-			       MAY_READ | MAY_WRITE);
+		if (!error)
+			error = aa_perm_dentry(active, new_dentry,
+					       MAY_WRITE);
+	}
 
-	if (!error)
-		error = sd_perm_dentry(sd, new_dentry, MAY_WRITE);
-
-	put_sdcopy(sd);
+	put_aaprofile(active);
 
 	return error;
 }
 
-static int subdomain_inode_permission(struct inode *inode, int mask,
+static int apparmor_inode_permission(struct inode *inode, int mask,
 				      struct nameidata *nd)
 {
 	int error = 0;
 
 	/* Do not perform check on pipes or sockets
-	 * Same as subdomain_file_permission
+	 * Same as apparmor_file_permission
 	 */
-	if (current->security && VALID_FSTYPE(inode)) {
-		struct subdomain sdcopy, *sd;
+	if (VALID_FSTYPE(inode)) {
+		struct aaprofile *active;
 
-		sd = get_sdcopy(&sdcopy);
-		error = sd_perm_nameidata(sd, nd, mask);
-		put_sdcopy(sd);
+		active = get_active_aaprofile();
+		if (active)
+			error = aa_perm_nameidata(active, nd, mask);
+		put_aaprofile(active);
 	}
 
 	return error;
 }
 
-static int subdomain_inode_setattr(struct dentry *dentry, struct iattr *iattr)
+static int apparmor_inode_setattr(struct dentry *dentry, struct iattr *iattr)
 {
-	struct subdomain sdcopy, *sd;
 	int error = 0;
 
-	if (current->security && VALID_FSTYPE(dentry->d_inode)) {
+	if (VALID_FSTYPE(dentry->d_inode)) {
+		struct aaprofile *active;
 
-		sd = get_sdcopy(&sdcopy);
-
+		active = get_active_aaprofile();
 		/*
 		 * Mediate any attempt to change attributes of a file
 		 * (chmod, chown, chgrp, etc)
 		 */
-		error = sd_attr(sd, dentry, iattr);
+		if (active)
+			error = aa_attr(active, dentry, iattr);
 
-		put_sdcopy(sd);
+		put_aaprofile(active);
 	}
 
 	return error;
 }
 
-static int subdomain_inode_setxattr(struct dentry *dentry, char *name,
+static int apparmor_inode_setxattr(struct dentry *dentry, char *name,
 				    void *value, size_t size, int flags)
 {
 	int error = 0;
 
-	if (current->security && VALID_FSTYPE(dentry->d_inode)) {
-		struct subdomain sdcopy, *sd;
+	if (VALID_FSTYPE(dentry->d_inode)) {
+		struct aaprofile *active;
 
-		sd = get_sdcopy(&sdcopy);
-		error = sd_xattr(sd, dentry, name, SD_XATTR_SET);
-		put_sdcopy(sd);
+		active = get_active_aaprofile();
+		if (active)
+			error = aa_xattr(active, dentry, name, aa_xattr_set);
+		put_aaprofile(active);
 	}
 
 	return error;
 }
 
-static int subdomain_inode_getxattr(struct dentry *dentry, char *name)
+static int apparmor_inode_getxattr(struct dentry *dentry, char *name)
 {
 	int error = 0;
 
-	if (current->security && VALID_FSTYPE(dentry->d_inode)) {
-		struct subdomain sdcopy, *sd;
+	if (VALID_FSTYPE(dentry->d_inode)) {
+		struct aaprofile *active;
 
-		sd = get_sdcopy(&sdcopy);
-		error = sd_xattr(sd, dentry, name, SD_XATTR_GET);
-		put_sdcopy(sd);
+		active = get_active_aaprofile();
+		if (active)
+			error = aa_xattr(active, dentry, name, aa_xattr_get);
+		put_aaprofile(active);
 	}
 
 	return error;
 }
-static int subdomain_inode_listxattr(struct dentry *dentry)
+static int apparmor_inode_listxattr(struct dentry *dentry)
 {
 	int error = 0;
 
-	if (current->security && VALID_FSTYPE(dentry->d_inode)) {
-		struct subdomain sdcopy, *sd;
+	if (VALID_FSTYPE(dentry->d_inode)) {
+		struct aaprofile *active;
 
-		sd = get_sdcopy(&sdcopy);
-		error = sd_xattr(sd, dentry, NULL, SD_XATTR_LIST);
-		put_sdcopy(sd);
-	}
-
-	return error;
-}
-
-static int subdomain_inode_removexattr(struct dentry *dentry, char *name)
-{
-	int error = 0;
-
-	if (current->security && VALID_FSTYPE(dentry->d_inode)) {
-		struct subdomain sdcopy, *sd;
-
-		sd = get_sdcopy(&sdcopy);
-		error = sd_xattr(sd, dentry, name, SD_XATTR_REMOVE);
-		put_sdcopy(sd);
+		active = get_active_aaprofile();
+		if (active)
+			error = aa_xattr(active, dentry, NULL, aa_xattr_list);
+		put_aaprofile(active);
 	}
 
 	return error;
 }
 
-static int subdomain_file_permission(struct file *file, int mask)
+static int apparmor_inode_removexattr(struct dentry *dentry, char *name)
 {
-	struct subdomain sdcopy, *sd;
-	struct sdfile *sdf;
 	int error = 0;
 
-	if (!current->security ||
-	    !(sdf = (struct sdfile *)file->f_security) ||
-	    !VALID_FSTYPE(file->f_dentry->d_inode))
-		return 0;
+	if (VALID_FSTYPE(dentry->d_inode)) {
+		struct aaprofile *active;
 
-	sd = get_sdcopy(&sdcopy);
+		active = get_active_aaprofile();
+		if (active)
+			error = aa_xattr(active, dentry, name,
+					 aa_xattr_remove);
+		put_aaprofile(active);
+	}
 
-	if (__sd_is_confined(sd) && sdf->profile != sd->active)
-		error = sd_perm(sd, file->f_dentry, file->f_vfsmnt,
+	return error;
+}
+
+static int apparmor_file_permission(struct file *file, int mask)
+{
+	struct aaprofile *active;
+	struct aafile *aaf;
+	int error = 0;
+
+	aaf = (struct aafile *)file->f_security;
+	/* bail out early if this isn't a mediated file */
+	if (!aaf || !VALID_FSTYPE(file->f_dentry->d_inode))
+		goto out;
+
+	active = get_active_aaprofile();
+	if (active && aaf->profile != active)
+		error = aa_perm(active, file->f_dentry, file->f_vfsmnt,
 				mask & (MAY_EXEC | MAY_WRITE | MAY_READ));
+	put_aaprofile(active);
 
-	put_sdcopy(sd);
-
+out:
 	return error;
 }
 
-static int subdomain_file_alloc_security(struct file *file)
+static int apparmor_file_alloc_security(struct file *file)
 {
-	struct subdomain sdcopy, *sd;
+	struct aaprofile *active;
 	int error = 0;
 
-	if (!current->security)
-		return 0;
+	active = get_active_aaprofile();
+	if (active) {
+		struct aafile *aaf;
+		aaf = kmalloc(sizeof(struct aafile), GFP_KERNEL);
 
-	sd = get_sdcopy(&sdcopy);
-
-	if (__sd_is_confined(sd)) {
-		struct sdfile *sdf;
-
-		sdf = kmalloc(sizeof(struct sdfile), GFP_KERNEL);
-
-		if (sdf) {
-			sdf->type = sd_file_default;
-			sdf->profile = get_sdprofile(sd->active);
+		if (aaf) {
+			aaf->type = aa_file_default;
+			aaf->profile = get_aaprofile(active);
 		} else {
 			error = -ENOMEM;
 		}
-
-		file->f_security = sdf;
+		file->f_security = aaf;
 	}
-
-	put_sdcopy(sd);
+	put_aaprofile(active);
 
 	return error;
 }
 
-static void subdomain_file_free_security(struct file *file)
+static void apparmor_file_free_security(struct file *file)
 {
-	struct sdfile *sdf = (struct sdfile *)file->f_security;
+	struct aafile *aaf = (struct aafile *)file->f_security;
 
-	if (sdf) {
-		put_sdprofile(sdf->profile);
-		kfree(sdf);
+	if (aaf) {
+		put_aaprofile(aaf->profile);
+		kfree(aaf);
 	}
 }
 
-static inline int sd_mmap(struct file *file, unsigned long prot,
-				 unsigned long flags)
+static inline int aa_mmap(struct file *file, unsigned long prot,
+			  unsigned long flags)
 {
 	int error = 0, mask = 0;
-	struct subdomain sdcopy, *sd;
-	struct sdfile *sdf;
+	struct aaprofile *active;
+	struct aafile *aaf;
 
-	if (!current->security || !file ||
-	    !(sdf = (struct sdfile *)file->f_security) ||
-	    sdf->type == sd_file_shmem)
-		return 0;
-
-	sd = get_sdcopy(&sdcopy);
+	active = get_active_aaprofile();
+	if (!active || !file ||
+	    !(aaf = (struct aafile *)file->f_security) ||
+	    aaf->type == aa_file_shmem)
+		goto out;
 
 	if (prot & PROT_READ)
 		mask |= MAY_READ;
@@ -592,83 +545,76 @@ static inline int sd_mmap(struct file *file, unsigned long prot,
 	 * write back to the files */
 	if (prot & PROT_WRITE && !(flags & MAP_PRIVATE))
 		mask |= MAY_WRITE;
-
 	if (prot & PROT_EXEC)
-		mask |= SD_EXEC_MMAP;
+		mask |= AA_EXEC_MMAP;
 
-	SD_DEBUG("%s: 0x%x\n", __FUNCTION__, mask);
+	AA_DEBUG("%s: 0x%x\n", __FUNCTION__, mask);
 
 	if (mask)
-		error = sd_perm(sd, file->f_dentry, file->f_vfsmnt, mask);
+		error = aa_perm(active, file->f_dentry, file->f_vfsmnt, mask);
 
-	put_sdcopy(sd);
+	put_aaprofile(active);
 
+out:
 	return error;
 }
 
-static int subdomain_file_mmap(struct file *file, unsigned long reqprot,
+static int apparmor_file_mmap(struct file *file, unsigned long reqprot,
 			       unsigned long prot, unsigned long flags)
 {
-	return sd_mmap(file, prot, flags);
+	return aa_mmap(file, prot, flags);
 }
 
-static int subdomain_file_mprotect(struct vm_area_struct* vma,
-				   unsigned long reqprot, unsigned long prot)
+static int apparmor_file_mprotect(struct vm_area_struct *vma,
+				  unsigned long reqprot, unsigned long prot)
 {
-	return sd_mmap(vma->vm_file, prot,
-		!(vma->vm_flags & VM_SHARED) ? MAP_PRIVATE : 0);
+	return aa_mmap(vma->vm_file, prot,
+		       !(vma->vm_flags & VM_SHARED) ? MAP_PRIVATE : 0);
 }
 
-static int subdomain_task_alloc_security(struct task_struct *p)
+static int apparmor_task_alloc_security(struct task_struct *p)
 {
-	return sd_fork(p);
+	return aa_fork(p);
 }
 
-static void subdomain_task_free_security(struct task_struct *p)
+static void apparmor_task_free_security(struct task_struct *p)
 {
-	if (p->security)
-		sd_release(p);
+	aa_release(p);
 }
 
-static int subdomain_task_post_setuid(uid_t id0, uid_t id1, uid_t id2,
-				      int flags)
+static int apparmor_task_post_setuid(uid_t id0, uid_t id1, uid_t id2,
+				     int flags)
 {
 	return cap_task_post_setuid(id0, id1, id2, flags);
 }
 
-static void subdomain_task_reparent_to_init(struct task_struct *p)
+static void apparmor_task_reparent_to_init(struct task_struct *p)
 {
 	cap_task_reparent_to_init(p);
 	return;
 }
 
-static int subdomain_shm_shmat(struct shmid_kernel* shp, char __user *shmaddr,
-			       int shmflg)
+static int apparmor_shm_shmat(struct shmid_kernel *shp, char __user *shmaddr,
+			      int shmflg)
 {
-	struct sdfile *sdf = (struct sdfile *)shp->shm_file->f_security;
+	struct aafile *aaf = (struct aafile *)shp->shm_file->f_security;
 
-	if (sdf)
-		sdf->type = sd_file_shmem;
+	if (aaf)
+		aaf->type = aa_file_shmem;
 
 	return 0;
 }
 
-static int subdomain_getprocattr(struct task_struct *p, char *name, void *value,
-				 size_t size)
+static int apparmor_getprocattr(struct task_struct *p, char *name, void *value,
+				size_t size)
 {
 	int error;
-	struct subdomain sdcopy, *sd;
+	struct aaprofile *active;
 	char *str = value;
-	unsigned long flags;
 
-	/* Subdomain only supports the "current" process attribute */
+	/* AppArmor only supports the "current" process attribute */
 	if (strcmp(name, "current") != 0) {
 		error = -EINVAL;
-		goto out;
-	}
-
-	if (!size) {
-		error = -ERANGE;
 		goto out;
 	}
 
@@ -678,20 +624,15 @@ static int subdomain_getprocattr(struct task_struct *p, char *name, void *value,
 		goto out;
 	}
 
-	read_lock_irqsave(&sd_lock, flags);
-
-	sd = __get_sdcopy(&sdcopy, p);
-
-	read_unlock_irqrestore(&sd_lock, flags);
-
-	error = sd_getprocattr(sd, str, size);
-	put_sdcopy(sd);
+	active = get_task_active_aaprofile(p);
+	error = aa_getprocattr(active, str, size);
+	put_aaprofile(active);
 
 out:
 	return error;
 }
 
-static int subdomain_setprocattr(struct task_struct *p, char *name, void *value,
+static int apparmor_setprocattr(struct task_struct *p, char *name, void *value,
 				 size_t size)
 {
 	const char *cmd_changehat = "changehat ",
@@ -711,7 +652,7 @@ static int subdomain_setprocattr(struct task_struct *p, char *name, void *value,
 		goto out;
 	}
 
-	/* CHANGE HAT */
+	/* CHANGE HAT -- switch task into a subhat (subprofile) if defined */
 	if (size > strlen(cmd_changehat) &&
 	    strncmp(cmd, cmd_changehat, strlen(cmd_changehat)) == 0) {
 		char *hatinfo = cmd + strlen(cmd_changehat);
@@ -719,7 +660,7 @@ static int subdomain_setprocattr(struct task_struct *p, char *name, void *value,
 
 		/* Only the current process may change it's hat */
 		if (current != p) {
-			SD_WARN("%s: Attempt by foreign task %s(%d) "
+			AA_WARN("%s: Attempt by foreign task %s(%d) "
 				"[user %d] to changehat of task %s(%d)\n",
 				__FUNCTION__,
 				current->comm,
@@ -732,7 +673,7 @@ static int subdomain_setprocattr(struct task_struct *p, char *name, void *value,
 			goto out;
 		}
 
-		error = sd_setprocattr_changehat(hatinfo, infosize);
+		error = aa_setprocattr_changehat(hatinfo, infosize);
 		if (error == 0)
 			/* success, set return to #bytes in orig request */
 			error = size;
@@ -740,15 +681,14 @@ static int subdomain_setprocattr(struct task_struct *p, char *name, void *value,
 	/* SET NEW PROFILE */
 	} else if (size > strlen(cmd_setprofile) &&
 		   strncmp(cmd, cmd_setprofile, strlen(cmd_setprofile)) == 0) {
-		int confined;
-		unsigned long flags;
+		struct aaprofile *active;
 
 		/* only an unconfined process with admin capabilities
 		 * may change the profile of another task
 		 */
 
 		if (!capable(CAP_SYS_ADMIN)) {
-			SD_WARN("%s: Unprivileged attempt by task %s(%d) "
+			AA_WARN("%s: Unprivileged attempt by task %s(%d) "
 				"[user %d] to assign profile to task %s(%d)\n",
 				__FUNCTION__,
 				current->comm,
@@ -760,22 +700,19 @@ static int subdomain_setprocattr(struct task_struct *p, char *name, void *value,
 			goto out;
 		}
 
-		read_lock_irqsave(&sd_lock, flags);
-		confined = sd_is_confined();
-		read_unlock_irqrestore(&sd_lock, flags);
-
-		if (!confined) {
+		active = get_active_aaprofile();
+		if (!active) {
 			char *profile = cmd + strlen(cmd_setprofile);
 			size_t profilesize = size - strlen(cmd_setprofile);
 
-			error = sd_setprocattr_setprofile(p, profile, profilesize);
+			error = aa_setprocattr_setprofile(p, profile, profilesize);
 			if (error == 0)
 				/* success,
 				 * set return to #bytes in orig request
 				 */
 				error = size;
 		} else {
-			SD_WARN("%s: Attempt by confined task %s(%d) "
+			AA_WARN("%s: Attempt by confined task %s(%d) "
 				"[user %d] to assign profile to task %s(%d)\n",
 				__FUNCTION__,
 				current->comm,
@@ -786,9 +723,10 @@ static int subdomain_setprocattr(struct task_struct *p, char *name, void *value,
 
 			error = -EACCES;
 		}
+		put_aaprofile(active);
 	} else {
 		/* unknown operation */
-		SD_WARN("%s: Unknown setprocattr command '%.*s' by task %s(%d) "
+		AA_WARN("%s: Unknown setprocattr command '%.*s' by task %s(%d) "
 			"[user %d] for task %s(%d)\n",
 			__FUNCTION__,
 			size < 16 ? (int)size : 16,
@@ -806,114 +744,113 @@ out:
 	return error;
 }
 
-struct security_operations subdomain_ops = {
-	.ptrace =			subdomain_ptrace,
-	.capget =			subdomain_capget,
-	.capset_check =			subdomain_capset_check,
-	.capset_set =			subdomain_capset_set,
-	.sysctl =			subdomain_sysctl,
-	.capable =			subdomain_capable,
-	.syslog =			subdomain_syslog,
+struct security_operations apparmor_ops = {
+	.ptrace =			apparmor_ptrace,
+	.capget =			apparmor_capget,
+	.capset_check =			apparmor_capset_check,
+	.capset_set =			apparmor_capset_set,
+	.sysctl =			apparmor_sysctl,
+	.capable =			apparmor_capable,
+	.syslog =			apparmor_syslog,
 
-	.netlink_send =			subdomain_netlink_send,
-	.netlink_recv =			subdomain_netlink_recv,
+	.netlink_send =			apparmor_netlink_send,
+	.netlink_recv =			apparmor_netlink_recv,
 
-	.bprm_apply_creds =		subdomain_bprm_apply_creds,
-	.bprm_set_security =		subdomain_bprm_set_security,
-	.bprm_secureexec =		subdomain_bprm_secureexec,
+	.bprm_apply_creds =		apparmor_bprm_apply_creds,
+	.bprm_set_security =		apparmor_bprm_set_security,
+	.bprm_secureexec =		apparmor_bprm_secureexec,
 
-	.sb_mount =			subdomain_sb_mount,
-	.sb_umount =			subdomain_umount,
+	.sb_mount =			apparmor_sb_mount,
+	.sb_umount =			apparmor_umount,
 
-	.inode_mkdir =			subdomain_inode_mkdir,
-	.inode_rmdir =			subdomain_inode_rmdir,
-	.inode_create =			subdomain_inode_create,
-	.inode_link =			subdomain_inode_link,
-	.inode_unlink =			subdomain_inode_unlink,
-	.inode_mknod =			subdomain_inode_mknod,
-	.inode_rename =			subdomain_inode_rename,
-	.inode_permission =		subdomain_inode_permission,
-	.inode_setattr =		subdomain_inode_setattr,
-	.inode_setxattr =		subdomain_inode_setxattr,
-	.inode_getxattr =		subdomain_inode_getxattr,
-	.inode_listxattr =		subdomain_inode_listxattr,
-	.inode_removexattr =		subdomain_inode_removexattr,
-	.file_permission =		subdomain_file_permission,
-	.file_alloc_security =		subdomain_file_alloc_security,
-	.file_free_security =		subdomain_file_free_security,
-	.file_mmap =			subdomain_file_mmap,
-	.file_mprotect =		subdomain_file_mprotect,
+	.inode_mkdir =			apparmor_inode_mkdir,
+	.inode_rmdir =			apparmor_inode_rmdir,
+	.inode_create =			apparmor_inode_create,
+	.inode_link =			apparmor_inode_link,
+	.inode_unlink =			apparmor_inode_unlink,
+	.inode_mknod =			apparmor_inode_mknod,
+	.inode_rename =			apparmor_inode_rename,
+	.inode_permission =		apparmor_inode_permission,
+	.inode_setattr =		apparmor_inode_setattr,
+	.inode_setxattr =		apparmor_inode_setxattr,
+	.inode_getxattr =		apparmor_inode_getxattr,
+	.inode_listxattr =		apparmor_inode_listxattr,
+	.inode_removexattr =		apparmor_inode_removexattr,
+	.file_permission =		apparmor_file_permission,
+	.file_alloc_security =		apparmor_file_alloc_security,
+	.file_free_security =		apparmor_file_free_security,
+	.file_mmap =			apparmor_file_mmap,
+	.file_mprotect =		apparmor_file_mprotect,
 
-	.task_alloc_security =		subdomain_task_alloc_security,
-	.task_free_security =		subdomain_task_free_security,
-	.task_post_setuid =		subdomain_task_post_setuid,
-	.task_reparent_to_init =	subdomain_task_reparent_to_init,
+	.task_alloc_security =		apparmor_task_alloc_security,
+	.task_free_security =		apparmor_task_free_security,
+	.task_post_setuid =		apparmor_task_post_setuid,
+	.task_reparent_to_init =	apparmor_task_reparent_to_init,
 
-	.shm_shmat =			subdomain_shm_shmat,
+	.shm_shmat =			apparmor_shm_shmat,
 
-	.getprocattr =			subdomain_getprocattr,
-	.setprocattr =			subdomain_setprocattr,
+	.getprocattr =			apparmor_getprocattr,
+	.setprocattr =			apparmor_setprocattr,
 };
 
-static int __init subdomain_init(void)
+static int __init apparmor_init(void)
 {
-	int error = 0;
+	int error;
 	const char *complainmsg = ": complainmode enabled";
 
-	if (!create_subdomainfs()) {
-		SD_ERROR("Unable to activate AppArmor filesystem\n");
-		error = -ENOENT;
+	if ((error = create_apparmorfs())) {
+		AA_ERROR("Unable to activate AppArmor filesystem\n");
 		goto createfs_out;
 	}
 
-	if (!alloc_nullprofiles()){
-		SD_ERROR("Unable to allocate null profiles\n");
-		error = -ENOMEM;
-		goto createfs_out;
+	if ((error = alloc_null_complain_profile())){
+		AA_ERROR("Unable to allocate null complain profile\n");
+		goto alloc_out;
 	}
 
-	if ((error = register_security(&subdomain_ops))) {
-		SD_WARN("Unable to load AppArmor\n");
-		goto dealloc_out;
+	if ((error = register_security(&apparmor_ops))) {
+		AA_ERROR("Unable to load AppArmor\n");
+		goto register_security_out;
 	}
 
-	SD_INFO("AppArmor (version %s) initialized%s\n",
-		apparmor_version(),
-		subdomain_complain ? complainmsg : "");
-	sd_audit_message(NULL, GFP_KERNEL, 0,
-		"AppArmor (version %s) initialized%s\n",
-		apparmor_version(),
-		subdomain_complain ? complainmsg : "");
+	AA_INFO("AppArmor initialized%s\n",
+		apparmor_complain ? complainmsg : "");
+	aa_audit_message(NULL, GFP_KERNEL, 0,
+		"AppArmor initialized%s\n",
+		apparmor_complain ? complainmsg : "");
 
 	return error;
 
-dealloc_out:
-	free_nullprofiles();
-	(void)destroy_subdomainfs();
+register_security_out:
+	free_null_complain_profile();
+
+alloc_out:
+	(void)destroy_apparmorfs();
 
 createfs_out:
 	return error;
 
 }
 
-static int subdomain_exit_removeall_iter(struct subdomain *sd, void *cookie)
+static int apparmor_exit_removeall_iter(struct subdomain *sd, void *cookie)
 {
-	/* write_lock(&sd_lock) held here */
+	/* spin_lock(&sd_lock) held here */
 
-	if (__sd_is_confined(sd)) {
-		SD_DEBUG("%s: Dropping profiles %s(%d) "
+	if (__aa_is_confined(sd)) {
+		AA_DEBUG("%s: Dropping profiles %s(%d) "
 			 "profile %s(%p) active %s(%p)\n",
 			 __FUNCTION__,
 			 sd->task->comm, sd->task->pid,
-			 sd->profile->name, sd->profile,
+			 BASE_PROFILE(sd->active)->name,
+			 BASE_PROFILE(sd->active),
 			 sd->active->name, sd->active);
-		sd_switch_unconfined(sd);
+		aa_switch_unconfined(sd);
 	}
 
 	return 0;
 }
 
-static void __exit subdomain_exit(void)
+static void __exit apparmor_exit(void)
 {
 	unsigned long flags;
 
@@ -921,7 +858,7 @@ static void __exit subdomain_exit(void)
 	 * This is just for tidyness as there is no way to reference this
 	 * list once the AppArmor lsm hooks are detached (below)
 	 */
-	sd_profilelist_release();
+	aa_profilelist_release();
 
 	/* Remove profiles from active tasks
 	 * If this is not done,  if module is reloaded after being removed,
@@ -929,29 +866,34 @@ static void __exit subdomain_exit(void)
 	 * reattached
 	 */
 
-	write_lock_irqsave(&sd_lock, flags);
-	sd_subdomainlist_iterate(subdomain_exit_removeall_iter, NULL);
-	write_unlock_irqrestore(&sd_lock, flags);
+	spin_lock_irqsave(&sd_lock, flags);
+	aa_subdomainlist_iterate(apparmor_exit_removeall_iter, NULL);
+	spin_unlock_irqrestore(&sd_lock, flags);
 
 	/* Free up list of active subdomain */
-	sd_subdomainlist_release();
+	aa_subdomainlist_release();
 
-	free_nullprofiles();
+	free_null_complain_profile();
 
-	if (!destroy_subdomainfs())
-		SD_WARN("Unable to properly deactivate AppArmor fs\n");
+	destroy_apparmorfs();
 
-	if (unregister_security(&subdomain_ops))
-		SD_WARN("Unable to properly unregister AppArmor\n");
+	if (unregister_security(&apparmor_ops))
+		AA_WARN("Unable to properly unregister AppArmor\n");
 
-	SD_INFO("AppArmor protection removed\n");
-	sd_audit_message(NULL, GFP_KERNEL, 0,
+	/* delay for an rcu cycle to make ensure that profiles pending
+	 * destruction in the rcu callback are freed.
+	 */
+	synchronize_rcu();
+
+	AA_INFO("AppArmor protection removed\n");
+	aa_audit_message(NULL, GFP_KERNEL, 0,
 		"AppArmor protection removed\n");
 }
 
-security_initcall(subdomain_init);
-module_exit(subdomain_exit);
+module_init(apparmor_init);
+module_exit(apparmor_exit);
 
+MODULE_VERSION(APPARMOR_VERSION);
 MODULE_DESCRIPTION("AppArmor process confinement");
 MODULE_AUTHOR("Tony Jones <tonyj@suse.de>");
 MODULE_LICENSE("GPL");

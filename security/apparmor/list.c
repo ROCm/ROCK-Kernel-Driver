@@ -22,45 +22,48 @@ static LIST_HEAD(subdomain_list);
 static rwlock_t subdomain_lock = RW_LOCK_UNLOCKED;
 
 /**
- * sd_profilelist_find
+ * aa_profilelist_find
  * @name: profile name (program name)
  *
  * Search the profile list for profile @name.  Return refcounted profile on
  * success, NULL on failure.
  */
-struct sdprofile *sd_profilelist_find(const char *name)
+struct aaprofile *aa_profilelist_find(const char *name)
 {
-	struct sdprofile *p = NULL;
+	struct aaprofile *p = NULL;
 	if (name) {
 		read_lock(&profile_lock);
-		p = __sd_find_profile(name, &profile_list);
+		p = __aa_find_profile(name, &profile_list);
 		read_unlock(&profile_lock);
 	}
 	return p;
 }
 
 /**
- * sd_profilelist_add
+ * aa_profilelist_add - add new profile to list
  * @profile: new profile to add to list
  *
- * Add new profile to list.  Reference count on profile is incremented.
- * Return 1 on success, 0 on failure (bad profile or already exists)
+ * NOTE: Caller must allocate necessary reference count that will be used
+ * by the profile_list.  This is because profile allocation alloc_aaprofile()
+ * returns an unreferenced object with a initial count of %1.
+ *
+ * Return %1 on success, %0 on failure (already exists)
  */
-int sd_profilelist_add(struct sdprofile *profile)
+int aa_profilelist_add(struct aaprofile *profile)
 {
-	struct sdprofile *old_profile;
+	struct aaprofile *old_profile;
 	int ret = 0;
 
 	if (!profile)
 		goto out;
 
 	write_lock(&profile_lock);
-	old_profile = __sd_find_profile(profile->name, &profile_list);
+	old_profile = __aa_find_profile(profile->name, &profile_list);
 	if (old_profile) {
-		put_sdprofile(old_profile);
+		put_aaprofile(old_profile);
 		goto out;
 	}
-	profile = get_sdprofile(profile);
+
 	list_add(&profile->list, &profile_list);
 	ret = 1;
  out:
@@ -69,16 +72,17 @@ int sd_profilelist_add(struct sdprofile *profile)
 }
 
 /**
- * sd_profilelist_remove
+ * aa_profilelist_remove - remove a profile from the list by name
  * @name: name of profile to be removed
  *
- * Remove profile from list.  Reference count on profile is decremented.
+ * If the profile exists remove profile from list and return its reference.
+ * The reference count on profile is not decremented and should be decremented
+ * when the profile is no longer needed
  */
-int sd_profilelist_remove(const char *name)
+struct aaprofile *aa_profilelist_remove(const char *name)
 {
-	struct sdprofile *profile = NULL;
-	struct sdprofile *p, *tmp;
-	int error = -ENOENT;
+	struct aaprofile *profile = NULL;
+	struct aaprofile *p, *tmp;
 
 	if (!name)
 		goto out;
@@ -87,42 +91,44 @@ int sd_profilelist_remove(const char *name)
 	list_for_each_entry_safe(p, tmp, &profile_list, list) {
 		if (!strcmp(p->name, name)) {
 			list_del_init(&p->list);
+			/* mark old profile as stale */
+			p->isstale = 1;
 			profile = p;
 			break;
 		}
 	}
 	write_unlock(&profile_lock);
-	if (!profile)
-		goto out;
 
-	put_sdprofile(profile);
-	error = 0;
 out:
-	return error;
+	return profile;
 }
 
 /**
- * sd_profilelist_replace
- * @profile - new profile
+ * aa_profilelist_replace - replace a profile on the list
+ * @profile: new profile
  *
  * Replace a profile on the profile list.  Find the old profile by name in
- * the list, and replace it with the new profile.  This is an atomic
- * list operation.  Returns the old profile (which is still refcounted) if
- * there was one, or NULL.
+ * the list, and replace it with the new profile.   NOTE: Caller must allocate
+ * necessary initial reference count for new profile as aa_profilelist_add().
+ *
+ * This is an atomic list operation.  Returns the old profile (which is still
+ * refcounted) if there was one, or NULL.
  */
-struct sdprofile *sd_profilelist_replace(struct sdprofile *profile)
+struct aaprofile *aa_profilelist_replace(struct aaprofile *profile)
 {
-	struct sdprofile *oldprofile;
+	struct aaprofile *oldprofile;
 
 	write_lock(&profile_lock);
-	oldprofile = __sd_find_profile(profile->name, &profile_list);
+	oldprofile = __aa_find_profile(profile->name, &profile_list);
 	if (oldprofile) {
 		list_del_init(&oldprofile->list);
+		/* mark old profile as stale */
+		oldprofile->isstale = 1;
 
-		/* __sd_find_profile incremented count, so adjust down */
-		put_sdprofile(oldprofile);
+		/* __aa_find_profile incremented count, so adjust down */
+		put_aaprofile(oldprofile);
 	}
-	profile = get_sdprofile(profile);
+
 	list_add(&profile->list, &profile_list);
 	write_unlock(&profile_lock);
 
@@ -130,49 +136,46 @@ struct sdprofile *sd_profilelist_replace(struct sdprofile *profile)
 }
 
 /**
- * sd_profilelist_release
- *
- * Remove all profiles from profile_list
+ * aa_profilelist_release - Remove all profiles from profile_list
  */
-void sd_profilelist_release(void)
+void aa_profilelist_release(void)
 {
-	struct sdprofile *p, *tmp;
+	struct aaprofile *p, *tmp;
 
 	write_lock(&profile_lock);
 	list_for_each_entry_safe(p, tmp, &profile_list, list) {
 		list_del_init(&p->list);
-		put_sdprofile(p);
+		put_aaprofile(p);
 	}
 	write_unlock(&profile_lock);
 }
 
 /**
- * sd_subdomainlist_add
+ * aa_subdomainlist_add - Add subdomain to subdomain_list
  * @sd: new subdomain
- *
- * Add subdomain to subdomain_list
  */
-void sd_subdomainlist_add(struct subdomain *sd)
+void aa_subdomainlist_add(struct subdomain *sd)
 {
 	unsigned long flags;
 
 	if (!sd) {
-		SD_INFO("%s: bad subdomain\n", __FUNCTION__);
+		AA_INFO("%s: bad subdomain\n", __FUNCTION__);
 		return;
 	}
 
 	write_lock_irqsave(&subdomain_lock, flags);
-	list_add(&sd->list, &subdomain_list);
+	/* new subdomains must be added to the end of the list due to a
+	 * subtle interaction between fork and profile replacement.
+	 */
+	list_add_tail(&sd->list, &subdomain_list);
 	write_unlock_irqrestore(&subdomain_lock, flags);
 }
 
 /**
- * sd_subdomainlist_remove
+ * aa_subdomainlist_remove - Remove subdomain from subdomain_list
  * @sd: subdomain to be removed
- *
- * Remove subdomain from subdomain_list
  */
-void sd_subdomainlist_remove(struct subdomain *sd)
+void aa_subdomainlist_remove(struct subdomain *sd)
 {
 	unsigned long flags;
 
@@ -184,13 +187,14 @@ void sd_subdomainlist_remove(struct subdomain *sd)
 }
 
 /**
- * sd_subdomainlist_iterate
+ * aa_subdomainlist_iterate - iterate over the subdomain list applying @func
  * @func: method to be called for each element
  * @cookie: user passed data
  *
- * Iterate over subdomain list, stop when sd_iter func returns non zero
+ * Iterate over subdomain list applying @func, stop when @func returns
+ * non zero
  */
-void sd_subdomainlist_iterate(sd_iter func, void *cookie)
+void aa_subdomainlist_iterate(aa_iter func, void *cookie)
 {
 	struct subdomain *node;
 	int ret = 0;
@@ -206,34 +210,9 @@ void sd_subdomainlist_iterate(sd_iter func, void *cookie)
 }
 
 /**
- * sd_subdomainlist_iterateremove
- * @func: method to be called for each element
- * @cookie: user passed data
- *
- * Iterate over subdomain_list, remove element when sd_iter func returns
- * non zero
+ * aa_subdomainlist_release - Remove all subdomains from subdomain_list
  */
-void sd_subdomainlist_iterateremove(sd_iter func, void *cookie)
-{
-	struct subdomain *node, *tmp;
-	int ret = 0;
-	unsigned long flags;
-
-	write_lock_irqsave(&subdomain_lock, flags);
-	list_for_each_entry_safe(node, tmp, &subdomain_list, list) {
-		ret = (*func) (node, cookie);
-		if (ret != 0)
-			list_del_init(&node->list);
-	}
-	write_unlock_irqrestore(&subdomain_lock, flags);
-}
-
-/**
- * sd_subdomainlist_release
- *
- * Remove all subdomains from subdomain_list
- */
-void sd_subdomainlist_release()
+void aa_subdomainlist_release(void)
 {
 	struct subdomain *node, *tmp;
 	unsigned long flags;
@@ -246,11 +225,11 @@ void sd_subdomainlist_release()
 }
 
 /* seq_file helper routines
- * Used by subdomainfs.c to iterate over profile_list
+ * Used by apparmorfs.c to iterate over profile_list
  */
 static void *p_start(struct seq_file *f, loff_t *pos)
 {
-	struct sdprofile *node;
+	struct aaprofile *node;
 	loff_t l = *pos;
 
 	read_lock(&profile_lock);
@@ -262,10 +241,10 @@ static void *p_start(struct seq_file *f, loff_t *pos)
 
 static void *p_next(struct seq_file *f, void *p, loff_t *pos)
 {
-	struct list_head *lh = ((struct sdprofile *)p)->list.next;
+	struct list_head *lh = ((struct aaprofile *)p)->list.next;
 	(*pos)++;
 	return lh == &profile_list ?
-			NULL : list_entry(lh, struct sdprofile, list);
+			NULL : list_entry(lh, struct aaprofile, list);
 }
 
 static void p_stop(struct seq_file *f, void *v)
@@ -275,13 +254,13 @@ static void p_stop(struct seq_file *f, void *v)
 
 static int seq_show_profile(struct seq_file *f, void *v)
 {
-	struct sdprofile *profile = (struct sdprofile *)v;
+	struct aaprofile *profile = (struct aaprofile *)v;
 	seq_printf(f, "%s (%s)\n", profile->name,
 		   PROFILE_COMPLAIN(profile) ? "complain" : "enforce");
 	return 0;
 }
 
-struct seq_operations subdomainfs_profiles_op = {
+struct seq_operations apparmorfs_profiles_op = {
 	.start =	p_start,
 	.next =		p_next,
 	.stop =		p_stop,

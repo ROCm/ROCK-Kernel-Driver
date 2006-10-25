@@ -17,61 +17,59 @@
 
 #include "apparmor.h"
 #include "inline.h"
+#include "match/match.h"
 
-#define SECFS_SD "apparmor"
-static struct dentry *sdfs_dentry = NULL;
+#define SECFS_AA "apparmor"
+static struct dentry *aafs_dentry = NULL;
 
 /* profile */
-extern struct seq_operations subdomainfs_profiles_op;
-static int sd_prof_open(struct inode *inode, struct file *file);
-static int sd_prof_release(struct inode *inode, struct file *file);
+extern struct seq_operations apparmorfs_profiles_op;
+static int aa_prof_open(struct inode *inode, struct file *file);
+static int aa_prof_release(struct inode *inode, struct file *file);
 
-static struct file_operations subdomainfs_profiles_fops = {
-	.open =		sd_prof_open,
+static struct file_operations apparmorfs_profiles_fops = {
+	.open =		aa_prof_open,
 	.read =		seq_read,
 	.llseek =	seq_lseek,
-	.release =	sd_prof_release,
+	.release =	aa_prof_release,
 };
 
-/* version */
-static ssize_t sd_version_read(struct file *file, char __user *buf,
+/* matching */
+static ssize_t aa_matching_read(struct file *file, char __user *buf,
 			       size_t size, loff_t *ppos);
 
-static struct file_operations subdomainfs_version_fops = {
-	.read = 	sd_version_read,
+static struct file_operations apparmorfs_matching_fops = {
+	.read = 	aa_matching_read,
 };
+
 
 /* interface */
-extern ssize_t sd_file_prof_add(void *, size_t);
-extern ssize_t sd_file_prof_repl(void *, size_t);
-extern ssize_t sd_file_prof_remove(const char *, int);
-
-static ssize_t sd_profile_load(struct file *f, const char __user *buf,
+static ssize_t aa_profile_load(struct file *f, const char __user *buf,
 			       size_t size, loff_t *pos);
-static ssize_t sd_profile_replace(struct file *f, const char __user *buf,
+static ssize_t aa_profile_replace(struct file *f, const char __user *buf,
 				  size_t size, loff_t *pos);
-static ssize_t sd_profile_remove(struct file *f, const char __user *buf,
+static ssize_t aa_profile_remove(struct file *f, const char __user *buf,
 				 size_t size, loff_t *pos);
 
-static struct file_operations subdomainfs_profile_load = {
-	.write = sd_profile_load
+static struct file_operations apparmorfs_profile_load = {
+	.write = aa_profile_load
 };
 
-static struct file_operations subdomainfs_profile_replace = {
-	.write = sd_profile_replace
+static struct file_operations apparmorfs_profile_replace = {
+	.write = aa_profile_replace
 };
 
-static struct file_operations subdomainfs_profile_remove = {
-	.write = sd_profile_remove
+static struct file_operations apparmorfs_profile_remove = {
+	.write = aa_profile_remove
 };
 
 
 /* control */
-static u64 sd_control_get(void *data);
-static void sd_control_set(void *data, u64 val);
+static u64 aa_control_get(void *data);
+static void aa_control_set(void *data, u64 val);
 
-DEFINE_SIMPLE_ATTRIBUTE(subdomainfs_control_fops, sd_control_get,
-			sd_control_set, "%lld\n");
+DEFINE_SIMPLE_ATTRIBUTE(apparmorfs_control_fops, aa_control_get,
+			aa_control_set, "%lld\n");
 
 
 
@@ -88,72 +86,73 @@ static struct root_entry {
 	struct dentry *dentry;
 	int parent_index;
 } root_entries[] = {
-	/* our root, normally /sys/kernel/security/subdomain */
-	{SECFS_SD, 	S_IFDIR, 0550},	/* DO NOT EDIT/MOVE */
+	/* our root, normally /sys/kernel/security/apparmor */
+	{SECFS_AA, 	S_IFDIR, 0550},	/* DO NOT EDIT/MOVE */
 
 	/* interface for obtaining list of profiles currently loaded */
-	{"profiles", 	S_IFREG, 0440, &subdomainfs_profiles_fops,
+	{"profiles", 	S_IFREG, 0440, &apparmorfs_profiles_fops,
 				       NULL},
 
-	/* interface for obtaining version# of subdomain */
-	{"version",  	S_IFREG, 0440, &subdomainfs_version_fops,
+	/* interface for obtaining matching features supported */
+	{"matching",  	S_IFREG, 0440, &apparmorfs_matching_fops,
 				       NULL},
 
 	/* interface for loading/removing/replacing profiles */
-	{".load",    	S_IFREG, 0640, &subdomainfs_profile_load,
+	{".load",    	S_IFREG, 0640, &apparmorfs_profile_load,
 				       NULL},
-	{".replace", 	S_IFREG, 0640, &subdomainfs_profile_replace,
+	{".replace", 	S_IFREG, 0640, &apparmorfs_profile_replace,
 				       NULL},
-	{".remove",  	S_IFREG, 0640, &subdomainfs_profile_remove,
+	{".remove",  	S_IFREG, 0640, &apparmorfs_profile_remove,
 				       NULL},
 
 	/* interface for setting binary config values */
 	{"control",  	S_IFDIR, 0550},
-	{"complain", 	S_IFREG, 0640, &subdomainfs_control_fops,
-				       &subdomain_complain},
-	{"audit",    	S_IFREG, 0640, &subdomainfs_control_fops,
-				       &subdomain_audit},
-	{"debug",    	S_IFREG, 0640, &subdomainfs_control_fops,
-				       &subdomain_debug},
-	{"logsyscall", 	S_IFREG, 0640, &subdomainfs_control_fops,
-				       &subdomain_logsyscall},
+	{"complain", 	S_IFREG, 0640, &apparmorfs_control_fops,
+				       &apparmor_complain},
+	{"audit",    	S_IFREG, 0640, &apparmorfs_control_fops,
+				       &apparmor_audit},
+	{"debug",    	S_IFREG, 0640, &apparmorfs_control_fops,
+				       &apparmor_debug},
+	{"logsyscall", 	S_IFREG, 0640, &apparmorfs_control_fops,
+				       &apparmor_logsyscall},
 	{NULL,       	S_IFDIR, 0},
 
 	/* root end */
 	{NULL,       	S_IFDIR, 0}
 };
 
-#define SDFS_DENTRY root_entries[0].dentry
+#define AAFS_DENTRY root_entries[0].dentry
 
 static const unsigned int num_entries =
 	sizeof(root_entries) / sizeof(struct root_entry);
 
 
 
-static int sd_prof_open(struct inode *inode, struct file *file)
+static int aa_prof_open(struct inode *inode, struct file *file)
 {
-	return seq_open(file, &subdomainfs_profiles_op);
+	return seq_open(file, &apparmorfs_profiles_op);
 }
 
 
-static int sd_prof_release(struct inode *inode, struct file *file)
+static int aa_prof_release(struct inode *inode, struct file *file)
 {
 	return seq_release(inode, file);
 }
 
-static ssize_t sd_version_read(struct file *file, char __user *buf,
+static ssize_t aa_matching_read(struct file *file, char __user *buf,
 			       size_t size, loff_t *ppos)
 {
-	const char *version = apparmor_version_nl();
+	const char *matching = aamatch_features();
 
-	return simple_read_from_buffer(buf, size, ppos, version,
-				       strlen(version));
+	return simple_read_from_buffer(buf, size, ppos, matching,
+				       strlen(matching));
 }
 
-static char *sd_simple_write_to_buffer(const char __user *userbuf,
+static char *aa_simple_write_to_buffer(const char __user *userbuf,
 				       size_t alloc_size, size_t copy_size,
 				       loff_t *pos, const char *msg)
 {
+	struct aaprofile *active;
 	char *data;
 
 	if (*pos != 0) {
@@ -166,17 +165,18 @@ static char *sd_simple_write_to_buffer(const char __user *userbuf,
 	 * No sane person would add rules allowing this to a profile
 	 * but we enforce the restriction anyways.
 	 */
-	if (sd_is_confined()) {
-		struct subdomain *sd = SD_SUBDOMAIN(current->security);
-
-		SD_WARN("REJECTING access to profile %s (%s(%d) "
+	rcu_read_lock();
+	active = get_activeptr_rcu();
+	if (active) {
+		AA_WARN("REJECTING access to profile %s (%s(%d) "
 			"profile %s active %s)\n",
 			msg, current->comm, current->pid,
-			sd->profile->name, sd->active->name);
+			BASE_PROFILE(active)->name, active->name);
 
 		data = ERR_PTR(-EPERM);
 		goto out;
 	}
+	rcu_read_unlock();
 
 	data = vmalloc(alloc_size);
 	if (data == NULL) {
@@ -194,16 +194,16 @@ out:
 	return data;
 }
 
-static ssize_t sd_profile_load(struct file *f, const char __user *buf,
+static ssize_t aa_profile_load(struct file *f, const char __user *buf,
 			       size_t size, loff_t *pos)
 {
 	char *data;
 	ssize_t error;
 
-	data = sd_simple_write_to_buffer(buf, size, size, pos, "load");
+	data = aa_simple_write_to_buffer(buf, size, size, pos, "load");
 
 	if (!IS_ERR(data)) {
-		error = sd_file_prof_add(data, size);
+		error = aa_file_prof_add(data, size);
 		vfree(data);
 	} else {
 		error = PTR_ERR(data);
@@ -212,16 +212,16 @@ static ssize_t sd_profile_load(struct file *f, const char __user *buf,
 	return error;
 }
 
-static ssize_t sd_profile_replace(struct file *f, const char __user *buf,
+static ssize_t aa_profile_replace(struct file *f, const char __user *buf,
 				  size_t size, loff_t *pos)
 {
 	char *data;
 	ssize_t error;
 
-	data = sd_simple_write_to_buffer(buf, size, size, pos, "replacement");
+	data = aa_simple_write_to_buffer(buf, size, size, pos, "replacement");
 
 	if (!IS_ERR(data)) {
-		error = sd_file_prof_repl(data, size);
+		error = aa_file_prof_repl(data, size);
 		vfree(data);
 	} else {
 		error = PTR_ERR(data);
@@ -230,20 +230,20 @@ static ssize_t sd_profile_replace(struct file *f, const char __user *buf,
 	return error;
 }
 
-static ssize_t sd_profile_remove(struct file *f, const char __user *buf,
+static ssize_t aa_profile_remove(struct file *f, const char __user *buf,
 				  size_t size, loff_t *pos)
 {
 	char *data;
 	ssize_t error;
 
-	/* sd_file_prof_remove needs a null terminated string so 1 extra
+	/* aa_file_prof_remove needs a null terminated string so 1 extra
 	 * byte is allocated and null the copied data is then null terminated
 	 */
-	data = sd_simple_write_to_buffer(buf, size+1, size, pos, "removal");
+	data = aa_simple_write_to_buffer(buf, size+1, size, pos, "removal");
 
 	if (!IS_ERR(data)) {
 		data[size] = 0;
-		error = sd_file_prof_remove(data, size);
+		error = aa_file_prof_remove(data, size);
 		vfree(data);
 	} else {
 		error = PTR_ERR(data);
@@ -252,12 +252,12 @@ static ssize_t sd_profile_remove(struct file *f, const char __user *buf,
 	return error;
 }
 
-static u64 sd_control_get(void *data)
+static u64 aa_control_get(void *data)
 {
 	return *(int *)data;
 }
 
-static void sd_control_set(void *data, u64 val)
+static void aa_control_set(void *data, u64 val)
 {
 	if (val > 1)
 		val = 1;
@@ -265,7 +265,7 @@ static void sd_control_set(void *data, u64 val)
 	*(int*)data = (int)val;
 }
 
-static void clear_subdomainfs(void)
+static void clear_apparmorfs(void)
 {
 	unsigned int i;
 
@@ -286,7 +286,7 @@ static void clear_subdomainfs(void)
 		if (root_entries[index].dentry) {
 			securityfs_remove(root_entries[index].dentry);
 
-			SD_DEBUG("%s: deleted subdomainfs entry name=%s "
+			AA_DEBUG("%s: deleted apparmorfs entry name=%s "
 				 "dentry=%p\n",
 				__FUNCTION__,
 				root_entries[index].name,
@@ -298,11 +298,9 @@ static void clear_subdomainfs(void)
 	}
 }
 
-static int populate_subdomainfs(struct dentry *root)
+static int populate_apparmorfs(struct dentry *root)
 {
 	unsigned int i, parent_index, depth;
-
-#define ENT root_entries[i]
 
 	for (i = 0; i < num_entries; i++) {
 		root_entries[i].dentry = NULL;
@@ -312,28 +310,30 @@ static int populate_subdomainfs(struct dentry *root)
 	/* 1. Verify entry 0 is valid [sanity check] */
 	if (num_entries == 0 ||
 	    !root_entries[0].name ||
-	    strcmp(root_entries[0].name, SECFS_SD) != 0 ||
+	    strcmp(root_entries[0].name, SECFS_AA) != 0 ||
 	    root_entries[0].mode != S_IFDIR) {
-		SD_ERROR("%s: root entry 0 is not SECFS_SD/dir\n",
+		AA_ERROR("%s: root entry 0 is not SECFS_AA/dir\n",
 			__FUNCTION__);
 		goto error;
 	}
 
-	/* 2. Verify table structure */
+	/* 2. Build back pointers */
 	parent_index = 0;
 	depth = 1;
 
 	for (i = 1; i < num_entries; i++) {
-		ENT.parent_index = parent_index;
+		root_entries[i].parent_index = parent_index;
 
-		if (ENT.name && ENT.mode == S_IFDIR) {
+		if (root_entries[i].name &&
+		    root_entries[i].mode == S_IFDIR) {
 			depth++;
 			parent_index = i;
-		} else if (!ENT.name) {
-			if (ENT.mode != S_IFDIR || depth == 0) {
-				SD_ERROR("%s: root_entry %d invalid (%u %d)",
+		} else if (!root_entries[i].name) {
+			if (root_entries[i].mode != S_IFDIR || depth == 0) {
+				AA_ERROR("%s: root_entry %d invalid (%u %d)",
 					 __FUNCTION__, i,
-					 ENT.mode, ENT.parent_index);
+					 root_entries[i].mode,
+					 root_entries[i].parent_index);
 				goto error;
 			}
 
@@ -343,75 +343,90 @@ static int populate_subdomainfs(struct dentry *root)
 	}
 
 	if (depth != 0) {
-		SD_ERROR("%s: root_entry table not correctly terminated\n",
+		AA_ERROR("%s: root_entry table not correctly terminated\n",
 			__FUNCTION__);
 		goto error;
 	}
 
 	/* 3. Create root (parent=NULL) */
-	i=0;
-
-	ENT.dentry = securityfs_create_file(ENT.name,
-					ENT.mode | ENT.access,
+	root_entries[0].dentry = securityfs_create_file(
+					root_entries[0].name,
+					root_entries[0].mode |
+						root_entries[0].access,
 					NULL, NULL, NULL);
 
-	if (ENT.dentry)
-		SD_DEBUG("%s: created securityfs/subdomain [dentry=%p]\n",
-			__FUNCTION__, ENT.dentry);
-	else
+	if (IS_ERR(root_entries[0].dentry))
 		goto error;
+	else
+		AA_DEBUG("%s: created securityfs/apparmor [dentry=%p]\n",
+			__FUNCTION__, root_entries[0].dentry);
 
 
 	/* 4. create remaining nodes */
 	for (i = 1; i < num_entries; i++) {
 		struct dentry *parent;
+		void *data = NULL;
+		struct file_operations *fops = NULL;
 
 		/* end of directory ? */
-		if (!ENT.name)
+		if (!root_entries[i].name)
 			continue;
 
-		parent = root_entries[ENT.parent_index].dentry;
+		parent = root_entries[root_entries[i].parent_index].dentry;
 
-		ENT.dentry = securityfs_create_file(ENT.name,
-					ENT.mode | ENT.access,
-					parent,
-					ENT.mode != S_IFDIR ? ENT.data : NULL,
-					ENT.mode != S_IFDIR ? ENT.fops : NULL);
+		if (root_entries[i].mode != S_IFDIR) {
+			data = root_entries[i].data;
+			fops = root_entries[i].fops;
+		}
 
-		if (!ENT.dentry)
+		root_entries[i].dentry = securityfs_create_file(
+						root_entries[i].name,
+						root_entries[i].mode |
+							root_entries[i].access,
+						parent,
+						data,
+						fops);
+
+		if (IS_ERR(root_entries[i].dentry))
 			goto cleanup_error;
 
-		SD_DEBUG("%s: added subdomainfs entry "
+		AA_DEBUG("%s: added apparmorfs entry "
 			 "name=%s mode=%x dentry=%p [parent %p]\n",
-			__FUNCTION__, ENT.name, ENT.mode|ENT.access,
-			ENT.dentry, parent);
+			__FUNCTION__, root_entries[i].name,
+			root_entries[i].mode|root_entries[i].access,
+			root_entries[i].dentry, parent);
 	}
 
-	return 1;
+	return 0;
 
 cleanup_error:
-	clear_subdomainfs();
+	clear_apparmorfs();
 
 error:
-	return 0;
+	return -EINVAL;
 }
 
-int create_subdomainfs(void)
+int create_apparmorfs(void)
 {
-	if (SDFS_DENTRY)
-		SD_ERROR("%s: Subdomain securityfs already exists\n",
-			__FUNCTION__);
-	else if (!populate_subdomainfs(sdfs_dentry))
-		SD_ERROR("%s: Error populating Subdomain securityfs\n",
-			__FUNCTION__);
+	int error = 0;
 
-	return (SDFS_DENTRY != NULL);
+	if (AAFS_DENTRY) {
+		error = -EEXIST;
+		AA_ERROR("%s: AppArmor securityfs already exists\n",
+			__FUNCTION__);
+	} else {
+		error = populate_apparmorfs(aafs_dentry);
+		if (error != 0) {
+			AA_ERROR("%s: Error populating AppArmor securityfs\n",
+				__FUNCTION__);
+		}
+	}
+
+	return error;
 }
 
-int destroy_subdomainfs(void)
+void destroy_apparmorfs(void)
 {
-	if (SDFS_DENTRY)
-		clear_subdomainfs();
-
-	return 1;
+	if (AAFS_DENTRY)
+		clear_apparmorfs();
 }
