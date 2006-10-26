@@ -608,6 +608,8 @@ static struct hash_cell *__find_device_hash_cell(struct dm_ioctl *param)
 	md = dm_get_md(huge_decode_dev(param->dev));
 	if (md)
 		mdptr = dm_get_mdptr(md);
+	if (md && !mdptr)
+		dm_put(md);
 
 	return mdptr;
 }
