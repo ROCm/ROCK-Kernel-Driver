@@ -896,6 +896,8 @@ unsigned long zap_page_range(struct vm_area_struct *vma, unsigned long address,
 	return end;
 }
 
+EXPORT_SYMBOL_GPL(zap_page_range);
+
 /*
  * Do a quick page-table lookup for a single page.
  */

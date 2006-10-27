@@ -116,13 +116,7 @@ typedef struct domid_translate {
 static domid_translate_t  translate_domid[MAX_TAP_DEV];
 static tap_blkif_t *tapfds[MAX_TAP_DEV];
 
-static int __init set_blkif_reqs(char *str)
-{
-	get_option(&str, &blkif_reqs);
-	return 1;
-}
-__setup("blkif_reqs=", set_blkif_reqs);
-
+module_param(blkif_reqs, int, 0);
 /* Run-time switchable: /sys/module/blktap/parameters/ */
 static unsigned int log_stats = 0;
 static unsigned int debug_lvl = 0;
