@@ -232,6 +232,7 @@ static void hidinput_configure_usage(struct hid_input *hidinput, struct hid_fiel
 	struct hid_device *device = input->private;
 	int max = 0, code;
 	unsigned long *bit = NULL;
+	unsigned char swap_key;
 
 	field->hidinput = hidinput;
 
@@ -255,7 +256,14 @@ static void hidinput_configure_usage(struct hid_input *hidinput, struct hid_fiel
 
 			if ((usage->hid & HID_USAGE) < 256) {
 				if (!hid_keyboard[usage->hid & HID_USAGE]) goto ignore;
-				map_key_clear(hid_keyboard[usage->hid & HID_USAGE]);
+				swap_key = usage->hid & HID_USAGE;
+				if (device->quirks & HID_QUIRK_POWERBOOK_ISO_KEYBOARD) {
+					if (swap_key == 100)
+						swap_key = 53;
+					else if (swap_key == 53)
+						swap_key = 100;
+				}
+				map_key_clear(hid_keyboard[swap_key]);
 			} else
 				map_key(KEY_UNKNOWN);
 
