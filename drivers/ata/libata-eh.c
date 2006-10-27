@@ -1634,10 +1634,13 @@ static int ata_eh_revalidate_and_attach(struct ata_port *ap,
 	DPRINTK("ENTER\n");
 
 	for (i = 0; i < ATA_MAX_DEVICES; i++) {
-		unsigned int action;
+		unsigned int action, readid_flags = 0;
 
 		dev = &ap->device[i];
 		action = ata_eh_dev_action(dev);
+
+		if (ehc->i.flags & ATA_EHI_DID_RESET)
+			readid_flags |= ATA_READID_POSTRESET;
 
 		if (action & ATA_EH_REVALIDATE && ata_dev_ready(dev)) {
 			if (ata_port_offline(ap)) {
@@ -1646,8 +1649,7 @@ static int ata_eh_revalidate_and_attach(struct ata_port *ap,
 			}
 
 			ata_eh_about_to_do(ap, dev, ATA_EH_REVALIDATE);
-			rc = ata_dev_revalidate(dev,
-					ehc->i.flags & ATA_EHI_DID_RESET);
+			rc = ata_dev_revalidate(dev, readid_flags);
 			if (rc)
 				break;
 
@@ -1660,18 +1662,33 @@ static int ata_eh_revalidate_and_attach(struct ata_port *ap,
 			   ata_class_enabled(ehc->classes[dev->devno])) {
 			dev->class = ehc->classes[dev->devno];
 
-			rc = ata_dev_read_id(dev, &dev->class, 1, dev->id);
+			if (ap->flags & ATA_FLAG_DETECT_POLLING)
+				readid_flags |= ATA_READID_DETECT;
+
+			rc = ata_dev_read_id(dev, &dev->class, readid_flags,
+					     dev->id);
 			if (rc == 0)
 				rc = ata_dev_configure(dev, 1);
+			else if (rc == -ENOENT) {
+				/* IDENTIFY was issued to non-existent
+				 * device.  No need to reset.  Just
+				 * thaw and kill the device.
+				 */
+				ata_eh_thaw_port(ap);
+				dev->class = ATA_DEV_UNKNOWN;
+				rc = 0;
+			}
 
 			if (rc) {
 				dev->class = ATA_DEV_UNKNOWN;
 				break;
 			}
 
-			spin_lock_irqsave(ap->lock, flags);
-			ap->pflags |= ATA_PFLAG_SCSI_HOTPLUG;
-			spin_unlock_irqrestore(ap->lock, flags);
+			if (ata_dev_enabled(dev)) {
+				spin_lock_irqsave(ap->lock, flags);
+				ap->pflags |= ATA_PFLAG_SCSI_HOTPLUG;
+				spin_unlock_irqrestore(ap->lock, flags);
+			}
 		}
 	}
 
@@ -2006,7 +2023,7 @@ static int ata_eh_recover(struct ata_port *ap, ata_prereset_fn_t prereset,
 			ata_acpi_push_id(dev);
 
 			/* retrieve and execute the ATA task file of _GTF */
-			ata_acpi_exec_tfs(dev);
+			ata_acpi_exec_tfs(dev);			
 		}
 #endif
 	}

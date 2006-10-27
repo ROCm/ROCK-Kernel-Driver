@@ -280,6 +280,79 @@ static void via_set_dmamode(struct ata_port *ap, struct ata_device *adev)
 	via_do_set_mode(ap, adev, adev->dma_mode, tclock[mode], set_ast, udma[mode]);
 }
 
+/**
+ *	pata_via_interrupt - ATA host interrupt handler for pata via
+ *	@irq: irq line (unused)
+ *	@dev_instance: pointer to our ata_host_set information structure
+ *	@regs: unused
+ *
+ *	Interrupt handler for via controller that is the default interrupt
+ *	handler with a quirk for some ATAPI devices.
+ *	Calls ata_host_intr() for each port that is not disabled.
+ *
+ *	LOCKING:
+ *	Obtains host_set lock during operation.
+ *
+ *	RETURNS:
+ *	IRQ_NONE or IRQ_HANDLED.
+ */
+
+static irqreturn_t pata_via_interrupt(int irq, void *dev_instance,
+					struct pt_regs *regs)
+{
+	struct ata_host *host = dev_instance;
+	unsigned int i;
+	unsigned int handled = 0;
+	unsigned long flags;
+
+	/* TODO: make _irqsave conditional on x86 PCI IDE legacy mode */
+	spin_lock_irqsave(&host->lock, flags);
+	for (i = 0; i < host->n_ports; i++) {
+		struct ata_port *ap;
+
+		ap = host->ports[i];
+		if (ap && !(ap->flags & ATA_FLAG_DISABLED)) {
+			struct ata_queued_cmd *qc;
+
+			qc = ata_qc_from_tag(ap, ap->active_tag);
+			if (!qc)
+				continue;
+			if (qc->tf.flags & ATA_TFLAG_POLLING)
+				continue;
+			if (!(qc->flags & ATA_QCFLAG_ACTIVE))
+				continue;
+			if (qc->tf.command == ATA_CMD_SET_FEATURES &&
+					qc->tf.feature == SETFEATURES_XFER) {
+				/*
+				 * With some ATAPI devices (CDR-6S48, ...), the
+				 * ata_altstatus take some times (~ 2us) to
+				 * become not busy.  Without this quirk, it is
+				 * impossible to set the xfer mode, and the
+				 * libata-core disable the device.
+				 */
+				int i;
+
+				for (i = 0; i < 10; i++) {
+					if (!(ata_altstatus(ap) & ATA_BUSY))
+						break;
+					udelay(1);
+				}
+
+				if (ata_altstatus(ap) & ATA_BUSY)
+					continue;	/* It's stuck */
+
+				if (i)
+					ata_port_printk(ap, KERN_WARNING,
+						"ata_altstatus take %dus\n", i);
+			}
+			handled |= ata_host_intr(ap, qc);
+		}
+	}
+	spin_unlock_irqrestore(&host->lock, flags);
+
+	return IRQ_RETVAL(handled);
+}
+
 static struct scsi_host_template via_sht = {
 	.module			= THIS_MODULE,
 	.name			= DRV_NAME,
@@ -325,7 +398,7 @@ static struct ata_port_operations via_port_ops = {
 
 	.data_xfer	= ata_pio_data_xfer,
 
-	.irq_handler	= ata_interrupt,
+	.irq_handler	= pata_via_interrupt,
 	.irq_clear	= ata_bmdma_irq_clear,
 
 	.port_start	= ata_port_start,
@@ -360,7 +433,7 @@ static struct ata_port_operations via_port_ops_noirq = {
 
 	.data_xfer	= ata_pio_data_xfer_noirq,
 
-	.irq_handler	= ata_interrupt,
+	.irq_handler	= pata_via_interrupt,
 	.irq_clear	= ata_bmdma_irq_clear,
 
 	.port_start	= ata_port_start,

@@ -26,7 +26,7 @@
 #include <linux/libata.h>
 
 #define DRV_NAME "ata_generic"
-#define DRV_VERSION "0.2.6"
+#define DRV_VERSION "0.2.7"
 
 /*
  *	A generic parallel ATA driver using libata
@@ -230,7 +230,7 @@ static struct pci_driver ata_generic_pci_driver = {
 
 static int __init ata_generic_init(void)
 {
-	return pci_module_init(&ata_generic_pci_driver);
+	return pci_register_driver(&ata_generic_pci_driver);
 }
 
 

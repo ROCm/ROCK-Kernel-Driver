@@ -195,8 +195,10 @@ enum {
 	ATA_FLAG_SKIP_D2H_BSY	= (1 << 12), /* can't wait for the first D2H
 					      * Register FIS clearing BSY */
 	ATA_FLAG_DEBUGMSG	= (1 << 13),
-	ATA_FLAG_PATA_MODE	= (1 << 14), /* port in PATA mode */
+	ATA_FLAG_DETECT_POLLING	= (1 << 14), /* detect device presence by
+					      * polling IDENTIFY */
 
+	ATA_FLAG_PATA_MODE	= (1 << 15), /* port in PATA mode */
 	/* The following flag belongs to ap->pflags but is kept in
 	 * ap->flags because it's referenced in many LLDs and will be
 	 * removed in not-too-distant future.
@@ -323,11 +325,13 @@ enum {
 	 * most devices.
 	 */
 	ATA_SPINUP_WAIT		= 8000,
-
+	
 	/* Horkage types. May be set by libata or controller on drives
 	   (some horkage may be drive/controller pair dependant */
 
 	ATA_HORKAGE_DIAGNOSTIC	= (1 << 0),	/* Failed boot diag */
+	ATA_HORKAGE_NODMA	= (1 << 1),	/* DMA problems */
+	ATA_HORKAGE_NONCQ	= (1 << 2),	/* Don't use NCQ */
 };
 
 enum hsm_task_states {
@@ -350,6 +354,7 @@ enum ata_completion_errors {
 	AC_ERR_SYSTEM		= (1 << 6), /* system error */
 	AC_ERR_INVALID		= (1 << 7), /* invalid argument */
 	AC_ERR_OTHER		= (1 << 8), /* unknown */
+	AC_ERR_NODEV_HINT	= (1 << 9), /* polling device detection hint */
 };
 
 /* forward declarations */
@@ -399,6 +404,7 @@ struct ata_probe_ent {
 	unsigned int		irq_flags;
 	unsigned long		port_flags;
 	unsigned long		_host_flags;
+	unsigned long		_port_flags[ATA_MAX_PORTS];
 	void __iomem		*mmio_base;
 	void			*private_data;
 
@@ -517,7 +523,6 @@ struct ata_device {
 	/* error history */
 	struct ata_ering	ering;
 	unsigned int		horkage;	/* List of broken features */
-
 #ifdef CONFIG_ATA_ACPI
 	/* ACPI objects info */
 	acpi_handle		obj_handle;
@@ -734,7 +739,6 @@ extern int ata_std_prereset(struct ata_port *ap);
 extern int ata_std_softreset(struct ata_port *ap, unsigned int *classes);
 extern int sata_std_hardreset(struct ata_port *ap, unsigned int *class);
 extern void ata_std_postreset(struct ata_port *ap, unsigned int *classes);
-extern int ata_dev_revalidate(struct ata_device *dev, int post_reset);
 extern void ata_port_disable(struct ata_port *);
 extern void ata_std_ports(struct ata_ioports *ioaddr);
 #ifdef CONFIG_PCI
@@ -820,6 +824,7 @@ extern void ata_id_string(const u16 *id, unsigned char *s,
 			  unsigned int ofs, unsigned int len);
 extern void ata_id_c_string(const u16 *id, unsigned char *s,
 			    unsigned int ofs, unsigned int len);
+extern unsigned long ata_device_blacklisted(const struct ata_device *dev);
 extern void ata_bmdma_setup (struct ata_queued_cmd *qc);
 extern void ata_bmdma_start (struct ata_queued_cmd *qc);
 extern void ata_bmdma_stop(struct ata_queued_cmd *qc);
@@ -1113,7 +1118,7 @@ static inline u8 ata_busy_wait(struct ata_port *ap, unsigned int bits,
 
 static inline u8 ata_wait_idle(struct ata_port *ap)
 {
-	u8 status = ata_busy_wait(ap, ATA_BUSY | ATA_DRQ, 1000);
+	u8 status = ata_busy_wait(ap, ATA_BUSY | ATA_DRQ, 100000); /* 1000msec */
 
 	if (status & (ATA_BUSY | ATA_DRQ)) {
 		unsigned long l = ap->ioaddr.status_addr;
