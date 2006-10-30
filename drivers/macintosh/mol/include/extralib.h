@@ -1,6 +1,6 @@
 /* 
  *   Creation Date: <1997/07/02 19:52:18 samuel>
- *   Time-stamp: <2004/01/18 00:57:48 samuel>
+ *   Time-stamp: <2004/04/03 18:29:26 samuel>
  *   
  *	<extralib.h>
  *	
@@ -32,6 +32,12 @@ extern char	*strncat0( char *dest, const char *str, size_t n );
 extern char	*strncat3( char *dest, const char *s1, const char *s2, size_t n );
 extern char	*strnpad( char *dest, const char *s1, size_t n );
 
+struct iovec;
+extern int	memcpy_tovec( const struct iovec *vec, size_t nvec, const char *src, unsigned int len );
+extern int	memcpy_fromvec( char *dst, const struct iovec *vec, size_t nvec, unsigned int len );
+extern int	iovec_getbyte( int offs, const struct iovec *vec, size_t nvec );
+extern int	iovec_skip( int skip, struct iovec *vec, size_t nvec );
+
 extern void	open_logfile( const char *filename );
 extern void	close_logfile( void );
 
@@ -41,15 +47,24 @@ extern int	aprint( const char *fmt,... ) __printf_format;
 extern void	perrorm(const char *fmt,... ) __printf_format;
 extern void	fatal(const char *fmt,... ) __printf_format __attribute__((noreturn));
 #define 	fatal_err(fmt, args...) \
-		{ printm("Fatal\n"); perrorm(fmt, ## args ); exit(1); }
+		do { printm("Fatal error: "); perrorm(fmt, ## args ); exit(1); } while(0)
 extern void	fail_nil( void *p );
 extern void	set_print_hook( int (*hook)(char *buf) );
-extern void	set_print_guard( void (*hook)( void ) );
+extern void	set_print_guard( void (*hook)(void) );
 
 extern int	script_exec( char *name, char *arg1, char *arg2 );
 
 /* in unicode.c */
 extern int	asc2uni( unsigned char *ustr, const char *astr, int maxlen );
 extern int	uni2asc( char *astr, const unsigned char *ustr, int ustrlen, int maxlen );
+
+/* in backtrace.c */
+extern void	print_btrace_sym( ulong addr, const char *sym_filename );
+
+/* color output support */
+#define C_GREEN         "\33[1;32m"
+#define C_YELLOW        "\33[1;33m"
+#define C_NORMAL        "\33[0;39m"
+#define C_RED           "\33[1;31m"
 
 #endif   /* _H_EXTRALIB */

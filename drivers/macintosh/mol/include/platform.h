@@ -1,6 +1,6 @@
 /* 
  *   Creation Date: <2001/12/29 19:46:46 samuel>
- *   Time-stamp: <2003/08/09 23:46:32 samuel>
+ *   Time-stamp: <2004/02/07 16:51:57 samuel>
  *   
  *	<platform.h>
  *	
@@ -56,6 +56,14 @@ typedef unsigned long long	u64;
 
 #ifndef HAVE_CLEARENV
 static inline int clearenv( void ) { extern char **environ; environ=NULL; return 0; }
+#endif
+
+#ifdef __darwin__
+#define ARCH_STR	"osx"
+#endif
+
+#ifdef __linux__
+#define ARCH_STR	"linux"
 #endif
 
 #endif   /* _H_PLATFORM */

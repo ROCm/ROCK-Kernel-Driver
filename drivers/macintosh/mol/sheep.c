@@ -368,8 +368,14 @@ memcpy_fromv( char *buf, const struct iovec *iv, int s )
 }
 
 static ssize_t 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,19)
+sheep_net_aio_read(struct kiocb *iocb, const struct iovec *iv, unsigned long count, loff_t pos)
+{
+	struct file *f = iocb->ki_filp;
+#else /* Linux 2.6.18 or older */
 sheep_net_readv( struct file *f, const struct iovec *iv, unsigned long count, loff_t *pos )
 {
+#endif
 	struct SheepVars *v = (struct SheepVars *)f->private_data;
 	struct sk_buff *skb;
 	int size = get_iovsize( iv, count );
@@ -398,8 +404,14 @@ sheep_net_readv( struct file *f, const struct iovec *iv, unsigned long count, lo
 }
 
 static ssize_t 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,19)
+sheep_net_aio_write(struct kiocb *iocb, const struct iovec *iv, unsigned long count, loff_t off)
+{
+	struct file *f = iocb->ki_filp;
+#else /* Linux 2.6.18 or older */
 sheep_net_writev( struct file *f, const struct iovec *iv, unsigned long count, loff_t *off )
 {
+#endif
 	struct SheepVars *v = (struct SheepVars *)f->private_data;
 	struct sk_buff *skb;
 	int size = get_iovsize( iv, count );
@@ -471,6 +483,8 @@ sheep_net_writev( struct file *f, const struct iovec *iv, unsigned long count, l
 	return size;
 }
 
+/* We take care of this using do_sync_* instead in 2.6.19 and newer */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19)
 static ssize_t
 sheep_net_read( struct file *f, char *buf, size_t count, loff_t *off )
 {
@@ -488,6 +502,7 @@ sheep_net_write( struct file *f, const char *buf, size_t count, loff_t *off )
 	iv.iov_base = (char *)buf;
 	return sheep_net_writev( f, &iv, 1, off );
 }
+#endif
 
 static unsigned int
 sheep_net_poll( struct file *f, struct poll_table_struct *wait )
@@ -623,6 +638,19 @@ error:
 /*	init / cleanup							*/
 /************************************************************************/
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,19)
+static struct file_operations sheep_net_fops = {
+	.owner		= THIS_MODULE,
+	.read		= do_sync_read,
+	.aio_read	= sheep_net_aio_read,
+	.write		= do_sync_write,
+	.aio_write	= sheep_net_aio_write,
+	.poll		= sheep_net_poll,
+	.ioctl		= sheep_net_ioctl,
+	.open		= sheep_net_open,
+	.release	= sheep_net_release,
+};
+#else
 static struct file_operations sheep_net_fops = {
 	.owner		= THIS_MODULE,
 	.read		= sheep_net_read,
@@ -634,6 +662,7 @@ static struct file_operations sheep_net_fops = {
 	.open		= sheep_net_open,
 	.release	= sheep_net_release,
 };
+#endif
 
 static struct miscdevice sheep_net_device = {
 	.minor		= SHEEP_NET_MINOR,

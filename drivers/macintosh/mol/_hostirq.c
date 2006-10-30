@@ -27,7 +27,11 @@
 #include "atomic.h"
 
 irqreturn_t
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 19)
+hostirq_handler(int irq, void *pkv)
+#else
 hostirq_handler(int irq, void *pkv, struct pt_regs *regs)
+#endif
 {
 	siginfo_t si;
 	kernel_vars_t *kv = (kernel_vars_t *) pkv;
