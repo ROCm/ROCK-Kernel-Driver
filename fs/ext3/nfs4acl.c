@@ -95,32 +95,27 @@ int
 ext3_nfs4acl_init(handle_t *handle, struct inode *inode, struct inode *dir)
 {
 	struct nfs4acl *dir_acl, *acl;
-	int retval = 0;
+	int retval;
 
 	BUG_ON(!test_opt(inode->i_sb, NFS4ACL));
 
 	dir_acl = ext3_get_nfs4acl(dir);
-	retval = PTR_ERR(dir_acl);
-	if (!dir_acl || IS_ERR(dir_acl))
-		goto out;
+	if (!dir_acl || IS_ERR(dir_acl)) {
+		retval = PTR_ERR(dir_acl);
+		inode->i_mode &= ~current->fs->umask;
+		return retval;
+	}
 	acl = nfs4acl_inherit(dir_acl, inode->i_mode,
 			      test_opt(inode->i_sb, NFS4ACL_MAX));
 	nfs4acl_free(dir_acl);
 
-	if (IS_ERR(acl))
-		return PTR_ERR(acl);
-	else if (acl) {
+	retval = PTR_ERR(acl);
+	if (acl && !IS_ERR(acl)) {
 		retval = ext3_set_nfs4acl(handle, inode, acl);
 		inode->i_mode = (inode->i_mode & ~S_IRWXUGO) |
 				nfs4acl_masks_to_mode(acl);
 		nfs4acl_free(acl);
-		return retval;
 	}
-
-out:
-	if (!retval)
-		inode->i_mode &= ~current->fs->umask;
-
 	return retval;
 }
 
