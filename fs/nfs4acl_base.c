@@ -186,7 +186,7 @@ static int
 __nfs4acl_permission(struct inode *inode, const struct nfs4acl *acl,
 		     unsigned int mask, int *in_group_class)
 {
-	struct nfs4ace *ace;
+	const struct nfs4ace *ace;
 	int retval = -EACCES;
 
 	nfs4acl_for_each_entry(ace, acl) {

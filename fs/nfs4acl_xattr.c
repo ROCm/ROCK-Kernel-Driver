@@ -105,7 +105,7 @@ size_t
 nfs4acl_xattr_size(const struct nfs4acl *acl)
 {
 	size_t size = sizeof(struct nfs4acl_xattr);
-	struct nfs4ace *ace;
+	const struct nfs4ace *ace;
 
 	nfs4acl_for_each_entry(ace, acl) {
 		size += sizeof(struct nfs4ace_xattr) +
@@ -121,7 +121,7 @@ nfs4acl_to_xattr(const struct nfs4acl *acl, void *buffer)
 {
 	struct nfs4acl_xattr *xattr_acl = buffer;
 	struct nfs4ace_xattr *xattr_ace;
-	struct nfs4ace *ace;
+	const struct nfs4ace *ace;
 
 	xattr_acl->a_version = ACL4_XATTR_VERSION;
 	xattr_acl->a_flags = 0;

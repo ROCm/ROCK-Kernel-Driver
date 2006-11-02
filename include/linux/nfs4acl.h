@@ -98,40 +98,40 @@ extern const char *nfs4ace_group_who;
 extern const char *nfs4ace_everyone_who;
 
 static inline int
-nfs4ace_is_owner(struct nfs4ace *ace)
+nfs4ace_is_owner(const struct nfs4ace *ace)
 {
 	return (ace->e_flags & ACE4_SPECIAL_WHO) &&
 	       ace->u.e_who == nfs4ace_owner_who;
 }
 
 static inline int
-nfs4ace_is_group(struct nfs4ace *ace)
+nfs4ace_is_group(const struct nfs4ace *ace)
 {
 	return (ace->e_flags & ACE4_SPECIAL_WHO) &&
 	       ace->u.e_who == nfs4ace_group_who;
 }
 
 static inline int
-nfs4ace_is_everyone(struct nfs4ace *ace)
+nfs4ace_is_everyone(const struct nfs4ace *ace)
 {
 	return (ace->e_flags & ACE4_SPECIAL_WHO) &&
 	       ace->u.e_who == nfs4ace_everyone_who;
 }
 
 static inline int
-nfs4ace_is_unix_id(struct nfs4ace *ace)
+nfs4ace_is_unix_id(const struct nfs4ace *ace)
 {
 	return !(ace->e_flags & ACE4_SPECIAL_WHO);
 }
 
 static inline int
-nfs4ace_is_inherit_only(struct nfs4ace *ace)
+nfs4ace_is_inherit_only(const struct nfs4ace *ace)
 {
 	return ace->e_flags & ACE4_INHERIT_ONLY_ACE;
 }
 
 static inline int
-nfs4ace_is_inheritable(struct nfs4ace *ace)
+nfs4ace_is_inheritable(const struct nfs4ace *ace)
 {
 	return ace->e_flags & (ACE4_FILE_INHERIT_ACE |
 			       ACE4_DIRECTORY_INHERIT_ACE);
@@ -147,13 +147,13 @@ nfs4ace_clear_inheritance_flags(struct nfs4ace *ace)
 }
 
 static inline int
-nfs4ace_is_allow(struct nfs4ace *ace)
+nfs4ace_is_allow(const struct nfs4ace *ace)
 {
 	return ace->e_type == ACE4_ACCESS_ALLOWED_ACE_TYPE;
 }
 
 static inline int
-nfs4ace_is_deny(struct nfs4ace *ace)
+nfs4ace_is_deny(const struct nfs4ace *ace)
 {
 	return ace->e_type == ACE4_ACCESS_DENIED_ACE_TYPE;
 }
