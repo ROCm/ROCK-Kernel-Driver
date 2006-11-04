@@ -4,8 +4,6 @@
 #ifndef _SKY2_H
 #define _SKY2_H
 
-#define ETH_JUMBO_MTU		9000	/* Maximum MTU supported */
-
 /* PCI config registers */
 enum {
 	PCI_DEV_REG1	= 0x40,
@@ -1320,14 +1318,6 @@ enum {
 };
 
 /* for Yukon-2 Gigabit Ethernet PHY (88E1112 only) */
-/*****  PHY_MARV_PHY_CTRL (page 1)		16 bit r/w	Fiber Specific Ctrl *****/
-enum {
-	PHY_M_FIB_FORCE_LNK	= 1<<10,/* Force Link Good */
-	PHY_M_FIB_SIGD_POL	= 1<<9,	/* SIGDET Polarity */
-	PHY_M_FIB_TX_DIS	= 1<<3,	/* Transmitter Disable */
-};
-
-/* for Yukon-2 Gigabit Ethernet PHY (88E1112 only) */
 /*****  PHY_MARV_PHY_CTRL (page 2)		16 bit r/w	MAC Specific Ctrl *****/
 enum {
 	PHY_M_MAC_MD_MSK	= 7<<7, /* Bit  9.. 7: Mode Select Mask */
@@ -1758,6 +1748,7 @@ enum {
 	INIT_SUM= 1<<3,
 	LOCK_SUM= 1<<4,
 	INS_VLAN= 1<<5,
+	FRC_STAT= 1<<6,
 	EOP	= 1<<7,
 };
 
@@ -1793,9 +1784,21 @@ enum {
 	OP_TXINDEXLE	= 0x68,
 };
 
-/* Yukon 2 hardware interface */
+/* Yukon 2 hardware interface
+ * Not tested on big endian
+ */
 struct sky2_tx_le {
-	__le32	addr;
+	union {
+		__le32	addr;
+		struct {
+			__le16	offset;
+			__le16	start;
+		} csum  __attribute((packed));
+		struct {
+			__le16	size;
+			__le16	rsvd;
+		} tso  __attribute((packed));
+	} tx;
 	__le16	length;	/* also vlan tag or checksum start */
 	u8	ctrl;
 	u8	opcode;
@@ -1818,21 +1821,12 @@ struct sky2_status_le {
 struct tx_ring_info {
 	struct sk_buff	*skb;
 	DECLARE_PCI_UNMAP_ADDR(mapaddr);
-	DECLARE_PCI_UNMAP_ADDR(maplen);
+	u16		idx;
 };
 
-struct rx_ring_info {
+struct ring_info {
 	struct sk_buff	*skb;
-	dma_addr_t	data_addr;
-	DECLARE_PCI_UNMAP_ADDR(data_size);
-	dma_addr_t	frag_addr[ETH_JUMBO_MTU >> PAGE_SHIFT];
-};
-
-enum flow_control {
-	FC_NONE	= 0,
-	FC_TX	= 1,
-	FC_RX	= 2,
-	FC_BOTH	= 3,
+	dma_addr_t	mapaddr;
 };
 
 struct sky2_port {
@@ -1842,6 +1836,7 @@ struct sky2_port {
 	u32		     msg_enable;
 	spinlock_t	     phy_lock;
 
+	spinlock_t	     tx_lock  ____cacheline_aligned_in_smp;
 	struct tx_ring_info  *tx_ring;
 	struct sky2_tx_le    *tx_le;
 	u16		     tx_cons;		/* next le to check */
@@ -1849,17 +1844,14 @@ struct sky2_port {
 	u32		     tx_addr64;
 	u16		     tx_pending;
 	u16		     tx_last_mss;
-	u32		     tx_tcpsum;
 
-	struct rx_ring_info  *rx_ring ____cacheline_aligned_in_smp;
+	struct ring_info     *rx_ring ____cacheline_aligned_in_smp;
 	struct sky2_rx_le    *rx_le;
 	u32		     rx_addr64;
 	u16		     rx_next;		/* next re to check */
 	u16		     rx_put;		/* next le index to use */
 	u16		     rx_pending;
-	u16		     rx_data_size;
-	u16		     rx_nfrags;
-
+	u16		     rx_bufsize;
 #ifdef SKY2_VLAN_TAG_USED
 	u16		     rx_tag;
 	struct vlan_group    *vlgrp;
@@ -1867,13 +1859,13 @@ struct sky2_port {
 
 	dma_addr_t	     rx_le_map;
 	dma_addr_t	     tx_le_map;
-	u16		     advertising;	/* ADVERTISED_ bits */
+	u32		     advertising;	/* ADVERTISED_ bits */
 	u16		     speed;	/* SPEED_1000, SPEED_100, ... */
 	u8		     autoneg;	/* AUTONEG_ENABLE, AUTONEG_DISABLE */
 	u8		     duplex;	/* DUPLEX_HALF, DUPLEX_FULL */
+	u8		     rx_pause;
+	u8		     tx_pause;
 	u8		     rx_csum;
- 	enum flow_control    flow_mode;
- 	enum flow_control    flow_status;
 
 	struct net_device_stats net_stats;
 
@@ -1887,7 +1879,7 @@ struct sky2_hw {
 	int		     pm_cap;
 	u8	     	     chip_id;
 	u8		     chip_rev;
-	u8		     pmd_type;
+	u8		     copper;
 	u8		     ports;
 
 	struct sky2_status_le *st_le;
@@ -1898,11 +1890,6 @@ struct sky2_hw {
 	int		     msi_detected;
 	wait_queue_head_t    msi_wait;
 };
-
-static inline int sky2_is_copper(const struct sky2_hw *hw)
-{
-	return !(hw->pmd_type == 'L' || hw->pmd_type == 'S' || hw->pmd_type == 'P');
-}
 
 /* Register accessor for memory mapped device */
 static inline u32 sky2_read32(const struct sky2_hw *hw, unsigned reg)
