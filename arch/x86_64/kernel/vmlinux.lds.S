@@ -70,7 +70,7 @@ SECTIONS
 #ifndef CONFIG_XEN
   __bss_start = .;		/* BSS */
   .bss : AT(ADDR(.bss) - LOAD_OFFSET) {
-	*(.bss.page_aligned)	
+	*(.bss.page_aligned)
 	*(.bss)
 	}
   __bss_stop = .;

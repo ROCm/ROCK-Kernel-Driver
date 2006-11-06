@@ -585,7 +585,7 @@ void __kprobes nmi_watchdog_tick(struct pt_regs * regs, unsigned reason)
 	}
 }
 
-#else /* CONFIG_XEN */
+#elif defined(CONFIG_X86_LOCAL_APIC) && defined(CONFIG_SYSCTL)
 
 static inline int reserve_lapic_nmi(void)
 {
@@ -596,7 +596,7 @@ static inline void release_lapic_nmi(void)
 {
 }
 
-#endif /* CONFIG_XEN */
+#endif
 
 static __kprobes int dummy_nmi_callback(struct pt_regs * regs, int cpu)
 {
@@ -629,7 +629,7 @@ void unset_nmi_callback(void)
 }
 EXPORT_SYMBOL_GPL(unset_nmi_callback);
 
-#ifdef CONFIG_SYSCTL
+#if defined(CONFIG_X86_LOCAL_APIC) && defined(CONFIG_SYSCTL)
 
 static int unknown_nmi_panic_callback(struct pt_regs *regs, int cpu)
 {

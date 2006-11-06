@@ -14,6 +14,7 @@ void xencons_force_flush(void);
 void xencons_resume(void);
 
 /* Interrupt work hooks. Receive data, or kick data out. */
+struct pt_regs;
 void xencons_rx(char *buf, unsigned len, struct pt_regs *regs);
 void xencons_tx(void);
 

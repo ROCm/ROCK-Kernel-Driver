@@ -4,7 +4,7 @@
 
 extra-y 	:= head.o head64.o init_task.o vmlinux.lds
 EXTRA_AFLAGS	:= -traditional
-obj-y	:= process.o signal.o entry.o traps.o irq.o \
+obj-y	:= process.o signal.o entry.o traps.o irq.o nmi.o \
 		ptrace.o time.o ioport.o ldt.o setup.o i8259.o sys_x86_64.o \
 		x8664_ksyms.o i387.o syscall.o vsyscall.o \
 		setup64.o bootflag.o e820.o reboot.o quirks.o i8237.o \
@@ -20,7 +20,7 @@ obj-$(CONFIG_X86_MSR)		+= msr.o
 obj-$(CONFIG_MICROCODE)		+= microcode.o
 obj-$(CONFIG_X86_CPUID)		+= cpuid.o
 obj-$(CONFIG_SMP)		+= smp.o smpboot.o trampoline.o
-obj-$(CONFIG_X86_LOCAL_APIC)	+= apic.o  nmi.o
+obj-$(CONFIG_X86_LOCAL_APIC)	+= apic.o
 obj-$(CONFIG_X86_XEN_GENAPIC)	+= genapic.o genapic_xen.o
 obj-$(CONFIG_X86_IO_APIC)	+= io_apic.o mpparse.o \
 		genapic.o genapic_cluster.o genapic_flat.o

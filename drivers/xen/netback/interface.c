@@ -34,6 +34,24 @@
 #include <linux/ethtool.h>
 #include <linux/rtnetlink.h>
 
+/*
+ * Module parameter 'queue_length':
+ * 
+ * Enables queuing in the network stack when a client has run out of receive
+ * descriptors. Although this feature can improve receive bandwidth by avoiding
+ * packet loss, it can also result in packets sitting in the 'tx_queue' for
+ * unbounded time. This is bad if those packets hold onto foreign resources.
+ * For example, consider a packet that holds onto resources belonging to the
+ * guest for which it is queued (e.g., packet received on vif1.0, destined for
+ * vif1.1 which is not activated in the guest): in this situation the guest
+ * will never be destroyed, unless vif1.1 is taken down (which flushes the
+ * 'tx_queue').
+ * 
+ * Only set this parameter to non-zero value if you know what you are doing!
+ */
+static unsigned long netbk_queue_length = 0;
+module_param_named(queue_length, netbk_queue_length, ulong, 0);
+
 static void __netif_up(netif_t *netif)
 {
 	enable_irq(netif->irq);
@@ -44,6 +62,7 @@ static void __netif_down(netif_t *netif)
 {
 	disable_irq(netif->irq);
 	netif_deschedule_work(netif);
+	del_timer_sync(&netif->credit_timeout);
 }
 
 static int net_open(struct net_device *dev)
@@ -107,7 +126,7 @@ static struct ethtool_ops network_ethtool_ops =
 	.get_link = ethtool_op_get_link,
 };
 
-netif_t *netif_alloc(domid_t domid, unsigned int handle, u8 be_mac[ETH_ALEN])
+netif_t *netif_alloc(domid_t domid, unsigned int handle)
 {
 	int err = 0, i;
 	struct net_device *dev;
@@ -134,6 +153,7 @@ netif_t *netif_alloc(domid_t domid, unsigned int handle, u8 be_mac[ETH_ALEN])
 	netif->credit_bytes = netif->remaining_credit = ~0UL;
 	netif->credit_usec  = 0UL;
 	init_timer(&netif->credit_timeout);
+	netif->credit_timeout.expires = jiffies;
 
 	dev->hard_start_xmit = netif_be_start_xmit;
 	dev->get_stats       = netif_be_get_stats;
@@ -144,26 +164,19 @@ netif_t *netif_alloc(domid_t domid, unsigned int handle, u8 be_mac[ETH_ALEN])
 
 	SET_ETHTOOL_OPS(dev, &network_ethtool_ops);
 
-	/*
-	 * Reduce default TX queuelen so that each guest interface only
-	 * allows it to eat around 6.4MB of host memory.
-	 */
-	dev->tx_queue_len = 100;
+	dev->tx_queue_len = netbk_queue_length;
+	if (dev->tx_queue_len != 0)
+		printk(KERN_WARNING "netbk: WARNING: device '%s' has non-zero "
+		       "queue length (%lu)!\n", dev->name, dev->tx_queue_len);
 
-	for (i = 0; i < ETH_ALEN; i++)
-		if (be_mac[i] != 0)
-			break;
-	if (i == ETH_ALEN) {
-		/*
-		 * Initialise a dummy MAC address. We choose the numerically
-		 * largest non-broadcast address to prevent the address getting
-		 * stolen by an Ethernet bridge for STP purposes.
-		 * (FE:FF:FF:FF:FF:FF)
-		 */ 
-		memset(dev->dev_addr, 0xFF, ETH_ALEN);
-		dev->dev_addr[0] &= ~0x01;
-	} else
-		memcpy(dev->dev_addr, be_mac, ETH_ALEN);
+	/*
+	 * Initialise a dummy MAC address. We choose the numerically
+	 * largest non-broadcast address to prevent the address getting
+	 * stolen by an Ethernet bridge for STP purposes.
+	 * (FE:FF:FF:FF:FF:FF)
+	 */ 
+	memset(dev->dev_addr, 0xFF, ETH_ALEN);
+	dev->dev_addr[0] &= ~0x01;
 
 	rtnl_lock();
 	err = register_netdevice(dev);

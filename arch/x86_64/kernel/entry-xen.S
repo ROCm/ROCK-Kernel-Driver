@@ -922,7 +922,6 @@ ENTRY(do_hypervisor_callback)   # do_hypervisor_callback(struct *pt_regs)
 	jmp  error_exit
 END(do_hypervisor_callback)
 
-#ifdef CONFIG_X86_LOCAL_APIC
 KPROBE_ENTRY(nmi)
 	zeroentry do_nmi_callback
 ENTRY(do_nmi_callback)
@@ -938,7 +937,6 @@ ENTRY(do_nmi_callback)
 	CFI_ENDPROC
 	.previous .text
 END(nmi)
-#endif
 
         ALIGN
 restore_all_enable_events:  

@@ -421,16 +421,15 @@ static irqreturn_t i8042_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	unsigned char str, data;
 	unsigned int dfl;
 	unsigned int port_no;
-	int ret;
 
 	mod_timer(&i8042_timer, jiffies + I8042_POLL_PERIOD);
 
 	spin_lock_irqsave(&i8042_lock, flags);
 	str = i8042_read_status();
 	if (unlikely(~str & I8042_STR_OBF)) {
+		spin_unlock_irqrestore(&i8042_lock, flags);
 		if (irq) dbg("Interrupt %d, without any data", irq);
-		ret = 0;
-		goto out;
+		return IRQ_NONE;
 	}
 	data = i8042_read_data();
 
@@ -486,10 +485,9 @@ static irqreturn_t i8042_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	if (likely(port->exists))
 		serio_interrupt(port->serio, data, dfl, regs);
 
-	ret = 1;
- out:
 	spin_unlock_irqrestore(&i8042_lock, flags);
-	return IRQ_RETVAL(ret);
+
+	return IRQ_HANDLED;
 }
 
 /*

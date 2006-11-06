@@ -326,6 +326,7 @@ int xen_create_contiguous_region(
 	success = (exchange.nr_exchanged == (1UL << order));
 	BUG_ON(!success && ((exchange.nr_exchanged != 0) || (rc == 0)));
 	BUG_ON(success && (rc != 0));
+#ifdef CONFIG_XEN_COMPAT_030002
 	if (unlikely(rc == -ENOSYS)) {
 		/* Compatibility when XENMEM_exchange is unsupported. */
 		if (HYPERVISOR_memory_op(XENMEM_decrease_reservation,
@@ -342,6 +343,7 @@ int xen_create_contiguous_region(
 				BUG();
 		}
 	}
+#endif
 
 	/* 3. Map the new extent in place of old pages. */
 	for (i = 0; i < (1UL<<order); i++) {
@@ -420,6 +422,7 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 	success = (exchange.nr_exchanged == 1);
 	BUG_ON(!success && ((exchange.nr_exchanged != 0) || (rc == 0)));
 	BUG_ON(success && (rc != 0));
+#ifdef CONFIG_XEN_COMPAT_030002
 	if (unlikely(rc == -ENOSYS)) {
 		/* Compatibility when XENMEM_exchange is unsupported. */
 		if (HYPERVISOR_memory_op(XENMEM_decrease_reservation,
@@ -430,6 +433,7 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 			BUG();
 		success = 1;
 	}
+#endif
 
 	/* 4. Map new pages in place of old pages. */
 	for (i = 0; i < (1UL<<order); i++) {
@@ -501,7 +505,7 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 
 			balloon_unlock(flags);
 
-			balloon_free_empty_page_range(page, 1);
+			free_empty_pages(&page, 1);
 
 			in_frame++;
 			vstart += PAGE_SIZE;

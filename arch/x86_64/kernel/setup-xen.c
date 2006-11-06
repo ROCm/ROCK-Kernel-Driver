@@ -145,6 +145,9 @@ struct sys_desc_table_struct {
 struct edid_info edid_info;
 EXPORT_SYMBOL_GPL(edid_info);
 struct e820map e820;
+#ifdef CONFIG_XEN
+struct e820map machine_e820;
+#endif
 
 extern int root_mountflags;
 
@@ -859,8 +862,18 @@ void __init setup_arch(char **cmdline_p)
 	 */
 	probe_roms();
 #ifdef CONFIG_XEN
-	if (is_initial_xendomain())
-		e820_reserve_resources(NULL, -1);
+	if (is_initial_xendomain()) {
+		struct xen_memory_map memmap;
+
+		memmap.nr_entries = E820MAX;
+		set_xen_guest_handle(memmap.buffer, machine_e820.map);
+
+		if (HYPERVISOR_memory_op(XENMEM_machine_memory_map, &memmap))
+			BUG();
+		machine_e820.nr_map = memmap.nr_entries;
+
+		e820_reserve_resources(machine_e820.map, machine_e820.nr_map);
+	}
 #else
 	e820_reserve_resources(e820.map, e820.nr_map);
 #endif
@@ -876,7 +889,7 @@ void __init setup_arch(char **cmdline_p)
 
 #ifdef CONFIG_XEN
 	if (is_initial_xendomain())
-		e820_setup_gap(NULL, -1);
+		e820_setup_gap(machine_e820.map, machine_e820.nr_map);
 #else
 	e820_setup_gap(e820.map, e820.nr_map);
 #endif

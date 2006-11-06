@@ -118,11 +118,6 @@ e820_any_mapped(unsigned long start, unsigned long end, unsigned type)
 }
 #endif
 
-#ifdef CONFIG_XEN
-static struct e820entry *__initdata machine_e820;
-static unsigned __initdata machine_e820_count;
-#endif
-
 /*
  * This function checks if the entire range <start,end> is mapped with type.
  *
@@ -137,11 +132,12 @@ int __init e820_all_mapped(unsigned long start, unsigned long end, unsigned type
 	for (i = 0; i < e820.nr_map; i++) {
 		struct e820entry *ei = &e820.map[i];
 #else
+	extern struct e820map machine_e820;
+
 	if (!is_initial_xendomain())
 		return 0;
-	WARN_ON(!machine_e820);
-	for (i = 0; i < machine_e820_count; i++) {
-		const struct e820entry *ei = &machine_e820[i];
+	for (i = 0; i < machine_e820.nr_map; i++) {
+		const struct e820entry *ei = &machine_e820.map[i];
 #endif
 
 		if (type && ei->type != type)
@@ -295,21 +291,6 @@ void __init e820_reserve_resources(struct e820entry *e820, int nr_map)
 {
 	int i;
 
-#ifdef CONFIG_XEN
-	if (is_initial_xendomain()) {
-		struct xen_memory_map memmap;
-
-		machine_e820 = e820 = alloc_bootmem_low_pages(PAGE_SIZE);
-
-		BUILD_BUG_ON(E820MAX * sizeof(*e820) > PAGE_SIZE);
-		memmap.nr_entries = E820MAX;
-		set_xen_guest_handle(memmap.buffer, e820);
-
-		BUG_ON(HYPERVISOR_memory_op(XENMEM_machine_memory_map, &memmap));
-
-		machine_e820_count = nr_map = memmap.nr_entries;
-	}
-#endif
 	for (i = 0; i < nr_map; i++) {
 		struct resource *res;
 		res = alloc_bootmem_low(sizeof(struct resource));
@@ -658,11 +639,14 @@ void __init setup_memory_region(void)
 	 */
 	struct e820entry map[E820MAX];
 
+#ifdef CONFIG_XEN_COMPAT_030002
 	memmap.nr_entries = E820MAX;
 	set_xen_guest_handle(memmap.buffer, map);
 
 	rc = HYPERVISOR_memory_op(XENMEM_memory_map, &memmap);
-	if ( rc == -ENOSYS ) {
+	if ( rc == -ENOSYS )
+#endif
+	{
 		memmap.nr_entries = 1;
 		map[0].addr = 0ULL;
 		map[0].size = xen_start_info->nr_pages << PAGE_SHIFT;
@@ -744,12 +728,6 @@ __init void e820_setup_gap(struct e820entry *e820, int nr_map)
 	int i;
 	int found = 0;
 
-#ifdef CONFIG_XEN
-	if (is_initial_xendomain()) {
-		e820 = machine_e820;
-		nr_map = machine_e820_count;
-	}
-#endif
 	last = 0x100000000ull;
 	gapstart = 0x10000000;
 	gapsize = 0x400000;

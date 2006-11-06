@@ -152,6 +152,9 @@ struct ist_info ist_info;
 EXPORT_SYMBOL(ist_info);
 #endif
 struct e820map e820;
+#ifdef CONFIG_XEN
+struct e820map machine_e820;
+#endif
 
 extern void early_cpu_init(void);
 extern void generic_apic_probe(char *);
@@ -1007,11 +1010,6 @@ efi_memory_present_wrapper(unsigned long start, unsigned long end, void *arg)
 	return 0;
 }
 
-#ifdef CONFIG_XEN
-static struct e820entry *__initdata machine_e820;
-static unsigned __initdata machine_e820_count;
-#endif
-
  /*
   * This function checks if the entire range <start,end> is mapped with type.
   *
@@ -1031,9 +1029,8 @@ e820_all_mapped(unsigned long s, unsigned long e, unsigned type)
 #else
 	if (!is_initial_xendomain())
 		return 0;
-	WARN_ON(!machine_e820);
-	for (i = 0; i < machine_e820_count; ++i) {
-		const struct e820entry *ei = &machine_e820[i];
+	for (i = 0; i < machine_e820.nr_map; ++i) {
+		const struct e820entry *ei = &machine_e820.map[i];
 #endif
 		if (type && ei->type != type)
 			continue;
@@ -1512,7 +1509,7 @@ static int __init request_standard_resources(void)
 
 	printk("Setting up standard PCI resources\n");
 #ifdef CONFIG_XEN
-	legacy_init_iomem_resources(machine_e820, machine_e820_count,
+	legacy_init_iomem_resources(machine_e820.map, machine_e820.nr_map,
 				    &code_resource, &data_resource);
 #else
 	if (efi_enabled)
@@ -1539,16 +1536,13 @@ static void __init register_memory(void)
 	if (is_initial_xendomain()) {
 		struct xen_memory_map memmap;
 
-		machine_e820 = alloc_bootmem_low_pages(PAGE_SIZE);
-
-		BUILD_BUG_ON(E820MAX * sizeof(*machine_e820) > PAGE_SIZE);
 		memmap.nr_entries = E820MAX;
-		set_xen_guest_handle(memmap.buffer, machine_e820);
+		set_xen_guest_handle(memmap.buffer, machine_e820.map);
 
 		BUG_ON(HYPERVISOR_memory_op(XENMEM_machine_memory_map, &memmap));
 
-		machine_e820_count = memmap.nr_entries;
-		e820_setup_gap(machine_e820, machine_e820_count);
+		machine_e820.nr_map = memmap.nr_entries;
+		e820_setup_gap(machine_e820.map, machine_e820.nr_map);
 	}
 	else
 #endif

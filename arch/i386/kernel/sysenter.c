@@ -45,7 +45,7 @@ extern asmlinkage void sysenter_entry(void);
 #ifdef CONFIG_XEN
 #include <xen/interface/callback.h>
 
-static struct callback_register sysenter_cb = {
+static struct callback_register __initdata sysenter_cb = {
 	.type = CALLBACKTYPE_sysenter,
 	.address = { __KERNEL_CS, (unsigned long)sysenter_entry },
 };

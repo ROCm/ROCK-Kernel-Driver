@@ -390,11 +390,7 @@ struct page *vm_normal_page(struct vm_area_struct *vma, unsigned long addr, pte_
 
 	if (unlikely(vma->vm_flags & VM_PFNMAP)) {
 		unsigned long off = (addr - vma->vm_start) >> PAGE_SHIFT;
-#ifndef CONFIG_XEN
 		if (pfn == vma->vm_pgoff + off)
-#else
-		if ((pfn == vma->vm_pgoff + off) || !pfn_valid(pfn))
-#endif
 			return NULL;
 		if (!is_cow_mapping(vma->vm_flags))
 			return NULL;
@@ -407,7 +403,10 @@ struct page *vm_normal_page(struct vm_area_struct *vma, unsigned long addr, pte_
 	 * and that the resulting page looks ok.
 	 */
 	if (unlikely(!pfn_valid(pfn))) {
-		print_bad_pte(vma, pte, addr);
+#ifdef CONFIG_XEN
+		if (!(vma->vm_flags & VM_RESERVED))
+#endif
+			print_bad_pte(vma, pte, addr);
 		return NULL;
 	}
 

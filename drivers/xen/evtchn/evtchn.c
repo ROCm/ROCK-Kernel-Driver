@@ -419,7 +419,7 @@ static const struct file_operations evtchn_fops = {
 };
 
 static struct miscdevice evtchn_miscdev = {
-	.minor        = EVTCHN_MINOR,
+	.minor        = MISC_DYNAMIC_MINOR,
 	.name         = "evtchn",
 	.fops         = &evtchn_fops,
 };

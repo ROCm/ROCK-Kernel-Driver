@@ -13,7 +13,6 @@
 
 #include <linux/kernel.h>
 #include <asm/apicdef.h>
-#include <xen/gnttab.h>
 #include <asm/page.h>
 #include <asm/vsyscall.h>
 #include <asm/vsyscall32.h>
