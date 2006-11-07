@@ -32,12 +32,14 @@ void lock_cpu_hotplug(void)
 	struct task_struct *tsk = current;
 
 	if (tsk == recursive) {
+#if 0
 		static int warnings = 10;
 		if (warnings) {
 			printk(KERN_ERR "Lukewarm IQ detected in hotplug locking\n");
 			WARN_ON(1);
 			warnings--;
 		}
+#endif
 		recursive_depth++;
 		return;
 	}
@@ -48,7 +50,6 @@ EXPORT_SYMBOL_GPL(lock_cpu_hotplug);
 
 void unlock_cpu_hotplug(void)
 {
-	WARN_ON(recursive != current);
 	if (recursive_depth) {
 		recursive_depth--;
 		return;
