@@ -52,9 +52,7 @@ static struct net_device_stats *islpci_statistics(struct net_device *);
  * Of course, this is not the final/real MAC address. It doesn't
  * matter, as you are suppose to be able to change it anytime via
  * ndev->set_mac_address. Jean II */
-/* Set dummy address to 00:00:00:00:00:00 so tools have a chance
-   to find out that this is no real mac address - jg */
-static const unsigned char	dummy_mac[6] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+static const unsigned char	dummy_mac[6] = { 0x00, 0x30, 0xB4, 0x00, 0x00, 0x00 };
 
 static int
 isl_upload_firmware(islpci_private *priv)
