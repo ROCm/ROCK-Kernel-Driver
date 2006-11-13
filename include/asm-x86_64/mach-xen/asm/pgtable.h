@@ -206,7 +206,7 @@ static inline pte_t ptep_get_and_clear_full(struct mm_struct *mm, unsigned long 
 #define _PAGE_NX        (1UL<<_PAGE_BIT_NX)
 
 #define _PAGE_TABLE	(_PAGE_PRESENT | _PAGE_RW | _PAGE_USER | _PAGE_ACCESSED | _PAGE_DIRTY)
-#define _KERNPG_TABLE	(_PAGE_PRESENT | _PAGE_RW | _PAGE_ACCESSED | _PAGE_DIRTY)
+#define _KERNPG_TABLE	_PAGE_TABLE
 
 #define _PAGE_CHG_MASK	(PTE_MASK | _PAGE_ACCESSED | _PAGE_DIRTY)
 
@@ -219,21 +219,22 @@ static inline pte_t ptep_get_and_clear_full(struct mm_struct *mm, unsigned long 
 #define PAGE_READONLY	__pgprot(_PAGE_PRESENT | _PAGE_USER | _PAGE_ACCESSED | _PAGE_NX)
 #define PAGE_READONLY_EXEC __pgprot(_PAGE_PRESENT | _PAGE_USER | _PAGE_ACCESSED)
 #define __PAGE_KERNEL \
-	(_PAGE_PRESENT | _PAGE_RW | _PAGE_DIRTY | _PAGE_ACCESSED | _PAGE_NX)
+	(_PAGE_PRESENT | _PAGE_RW | _PAGE_DIRTY | _PAGE_ACCESSED | _PAGE_NX | _PAGE_USER )
 #define __PAGE_KERNEL_EXEC \
-	(_PAGE_PRESENT | _PAGE_RW | _PAGE_DIRTY | _PAGE_ACCESSED)
+	(_PAGE_PRESENT | _PAGE_RW | _PAGE_DIRTY | _PAGE_ACCESSED | _PAGE_USER )
 #define __PAGE_KERNEL_NOCACHE \
-	(_PAGE_PRESENT | _PAGE_RW | _PAGE_DIRTY | _PAGE_PCD | _PAGE_ACCESSED | _PAGE_NX)
+	(_PAGE_PRESENT | _PAGE_RW | _PAGE_DIRTY | _PAGE_PCD | _PAGE_ACCESSED | _PAGE_NX | _PAGE_USER )
 #define __PAGE_KERNEL_RO \
-	(_PAGE_PRESENT | _PAGE_DIRTY | _PAGE_ACCESSED | _PAGE_NX)
+	(_PAGE_PRESENT | _PAGE_DIRTY | _PAGE_ACCESSED | _PAGE_NX | _PAGE_USER )
 #define __PAGE_KERNEL_VSYSCALL \
-	(_PAGE_PRESENT | _PAGE_USER | _PAGE_ACCESSED)
+	(_PAGE_PRESENT | _PAGE_USER | _PAGE_ACCESSED | _PAGE_USER )
 #define __PAGE_KERNEL_VSYSCALL_NOCACHE \
-	(_PAGE_PRESENT | _PAGE_USER | _PAGE_ACCESSED | _PAGE_PCD)
+	(_PAGE_PRESENT | _PAGE_USER | _PAGE_ACCESSED | _PAGE_PCD | _PAGE_USER )
 #define __PAGE_KERNEL_LARGE \
-	(__PAGE_KERNEL | _PAGE_PSE)
+	(__PAGE_KERNEL | _PAGE_PSE | _PAGE_USER )
 #define __PAGE_KERNEL_LARGE_EXEC \
-	(__PAGE_KERNEL_EXEC | _PAGE_PSE)
+	(__PAGE_KERNEL_EXEC | _PAGE_PSE | _PAGE_USER )
+
 
 /*
  * We don't support GLOBAL page in xenolinux64
@@ -409,7 +410,7 @@ static inline int pmd_large(pmd_t pte) {
    can temporarily clear it. */
 #define pmd_present(x)	(pmd_val(x))
 #define pmd_clear(xp)	do { set_pmd(xp, __pmd(0)); } while (0)
-#define	pmd_bad(x)	((pmd_val(x) & (~PAGE_MASK & ~_PAGE_USER & ~_PAGE_PRESENT)) != (_KERNPG_TABLE & ~_PAGE_PRESENT))
+#define	pmd_bad(x)	((pmd_val(x) & (~PAGE_MASK & ~_PAGE_PRESENT)) != (_KERNPG_TABLE & ~_PAGE_PRESENT))
 #define pfn_pmd(nr,prot) (__pmd(((nr) << PAGE_SHIFT) | pgprot_val(prot)))
 #define pmd_pfn(x)  ((pmd_val(x) & __PHYSICAL_MASK) >> PAGE_SHIFT)
 

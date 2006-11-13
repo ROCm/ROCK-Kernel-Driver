@@ -91,11 +91,13 @@ static void update_blkif_status(blkif_t *blkif)
 VBD_SHOW(oo_req, "%d\n", be->blkif->st_oo_req);
 VBD_SHOW(rd_req, "%d\n", be->blkif->st_rd_req);
 VBD_SHOW(wr_req, "%d\n", be->blkif->st_wr_req);
+VBD_SHOW(br_req, "%d\n", be->blkif->st_br_req);
 
 static struct attribute *vbdstat_attrs[] = {
 	&dev_attr_oo_req.attr,
 	&dev_attr_rd_req.attr,
 	&dev_attr_wr_req.attr,
+	&dev_attr_br_req.attr,
 	NULL
 };
 
@@ -165,6 +167,31 @@ static int blkback_remove(struct xenbus_device *dev)
 	return 0;
 }
 
+int blkback_barrier(struct backend_info *be, int state)
+{
+	struct xenbus_device *dev = be->dev;
+	struct xenbus_transaction xbt;
+	int err;
+
+	do {
+		err = xenbus_transaction_start(&xbt);
+		if (err) {
+			xenbus_dev_fatal(dev, err, "starting transaction");
+			return -1;
+		}
+
+		err = xenbus_printf(xbt, dev->nodename, "feature-barrier",
+				    "%d", state);
+		if (err) {
+			xenbus_transaction_end(xbt, 1);
+			xenbus_dev_fatal(dev, err, "writing feature-barrier");
+			return -1;
+		}
+
+		err = xenbus_transaction_end(xbt, 0);
+	} while (err == -EAGAIN);
+	return 0;
+}
 
 /**
  * Entry point to this code when a new device is created.  Allocate the basic
@@ -198,6 +225,10 @@ static int blkback_probe(struct xenbus_device *dev,
 
 	err = xenbus_watch_path2(dev, dev->nodename, "physical-device",
 				 &be->backend_watch, backend_changed);
+	if (err)
+		goto fail;
+
+	err = blkback_barrier(be, 1);
 	if (err)
 		goto fail;
 

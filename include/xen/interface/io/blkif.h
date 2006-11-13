@@ -29,8 +29,9 @@
 #endif
 #define blkif_sector_t uint64_t
 
-#define BLKIF_OP_READ      0
-#define BLKIF_OP_WRITE     1
+#define BLKIF_OP_READ              0
+#define BLKIF_OP_WRITE             1
+#define BLKIF_OP_WRITE_BARRIER     2
 
 /*
  * Maximum scatter/gather segments per request.
@@ -61,8 +62,9 @@ struct blkif_response {
 };
 typedef struct blkif_response blkif_response_t;
 
-#define BLKIF_RSP_ERROR  -1 /* non-specific 'error' */
-#define BLKIF_RSP_OKAY    0 /* non-specific 'okay'  */
+#define BLKIF_RSP_EOPNOTSUPP  -2 /* operation not supported (can happen on barrier writes) */
+#define BLKIF_RSP_ERROR       -1 /* non-specific 'error' */
+#define BLKIF_RSP_OKAY         0 /* non-specific 'okay'  */
 
 /*
  * Generate blkif ring structures and types.

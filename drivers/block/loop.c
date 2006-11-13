@@ -517,12 +517,24 @@ static int do_bio_filebacked(struct loop_device *lo, struct bio *bio)
 {
 	loff_t pos;
 	int ret;
+	int sync = bio_sync(bio);
+	int barrier = bio_barrier(bio);
+
+	if (barrier) {
+		ret = sync_file(lo->lo_backing_file, 1);
+		if (unlikely(ret))
+			return ret;
+	}
 
 	pos = ((loff_t) bio->bi_sector << 9) + lo->lo_offset;
 	if (bio_rw(bio) == WRITE)
 		ret = lo_send(lo, bio, lo->lo_blocksize, pos);
 	else
 		ret = lo_receive(lo, bio, lo->lo_blocksize, pos);
+
+	if ((barrier || sync) && !ret)
+		ret = sync_file(lo->lo_backing_file, 1);
+
 	return ret;
 }
 
