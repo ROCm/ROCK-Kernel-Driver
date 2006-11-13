@@ -2951,6 +2951,7 @@ static struct hpsb_protocol_driver raw1394_driver = {
 	.name = "raw1394 Driver",
 	.id_table = raw1394_id_table,
 	.driver = {
+		   .owner = THIS_MODULE,
 		   .name = "raw1394",
 		   .bus = &ieee1394_bus_type,
 		   },

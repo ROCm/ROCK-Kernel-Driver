@@ -477,6 +477,7 @@ static struct hpsb_protocol_driver eth1394_proto_driver = {
 	.id_table	= eth1394_id_table,
 	.update		= eth1394_update,
 	.driver		= {
+		.owner		= THIS_MODULE,
 		.name		= ETH1394_DRIVER_NAME,
 		.bus		= &ieee1394_bus_type,
 		.probe		= eth1394_probe,

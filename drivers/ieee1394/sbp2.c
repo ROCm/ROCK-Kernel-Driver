@@ -288,6 +288,7 @@ static struct hpsb_protocol_driver sbp2_driver = {
 	.id_table	= sbp2_id_table,
 	.update		= sbp2_update,
 	.driver		= {
+		.owner		= THIS_MODULE,
 		.name		= SBP2_DEVICE_NAME,
 		.bus		= &ieee1394_bus_type,
 		.probe		= sbp2_probe,

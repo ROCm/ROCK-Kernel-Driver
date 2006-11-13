@@ -1291,6 +1291,7 @@ static struct hpsb_protocol_driver video1394_driver = {
 	.name		= "1394 Digital Camera Driver",
 	.id_table	= video1394_id_table,
 	.driver		= {
+		.owner	= THIS_MODULE,
 		.name	= VIDEO1394_DRIVER_NAME,
 		.bus	= &ieee1394_bus_type,
 	},
