@@ -129,7 +129,7 @@ static struct hidinput_key_translation powerbook_iso_keyboard[] = {
 	{ }
 };
 
-static int usbhid_pb_fnmode = 1;
+static int usbhid_pb_fnmode = 2;
 module_param_named(pb_fnmode, usbhid_pb_fnmode, int, 0644);
 MODULE_PARM_DESC(pb_fnmode,
 	"Mode of fn key on PowerBooks (0 = disabled, 1 = fkeyslast, 2 = fkeysfirst)");
