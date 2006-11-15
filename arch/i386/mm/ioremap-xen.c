@@ -249,10 +249,7 @@ void __iomem * __ioremap(unsigned long phys_addr, unsigned long size, unsigned l
 		return NULL;
 	area->phys_addr = phys_addr;
 	addr = (void __iomem *) area->addr;
-	flags |= _PAGE_PRESENT | _PAGE_RW | _PAGE_DIRTY | _PAGE_ACCESSED;
-#ifdef __x86_64__
-	flags |= _PAGE_USER;
-#endif
+	flags |= _KERNPG_TABLE;
 	if (__direct_remap_pfn_range(&init_mm, (unsigned long)addr,
 				     phys_addr>>PAGE_SHIFT,
 				     size, __pgprot(flags), domid)) {

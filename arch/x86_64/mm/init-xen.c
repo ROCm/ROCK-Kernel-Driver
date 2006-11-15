@@ -54,6 +54,11 @@
 struct dma_mapping_ops* dma_ops;
 EXPORT_SYMBOL(dma_ops);
 
+#ifdef CONFIG_XEN_COMPAT_030002
+unsigned int __kernel_page_user;
+EXPORT_SYMBOL(__kernel_page_user);
+#endif
+
 int after_bootmem;
 
 extern unsigned long *contiguous_bitmap;
@@ -561,12 +566,39 @@ void __init xen_init_pt(void)
 	addr = page[pud_index(__START_KERNEL_map)];
 	addr_to_page(addr, page);
 
+#ifdef CONFIG_XEN_COMPAT_030002
+	/* On Xen 3.0.2 and older we may need to explicitly specify _PAGE_USER
+	   in kernel PTEs. We check that here. */
+	if (HYPERVISOR_xen_version(XENVER_version, NULL) <= 0x30000) {
+		unsigned long *pg;
+		pte_t pte;
+
+		/* Mess with the initial mapping of page 0. It's not needed. */
+		BUILD_BUG_ON(__START_KERNEL <= __START_KERNEL_map);
+		addr = page[pmd_index(__START_KERNEL_map)];
+		addr_to_page(addr, pg);
+		pte.pte = pg[pte_index(__START_KERNEL_map)];
+		BUG_ON(!(pte.pte & _PAGE_PRESENT));
+
+		/* If _PAGE_USER isn't set, we obviously do not need it. */
+		if (pte.pte & _PAGE_USER) {
+			/* _PAGE_USER is needed, but is it set implicitly? */
+			pte.pte &= ~_PAGE_USER;
+			if ((HYPERVISOR_update_va_mapping(__START_KERNEL_map,
+							  pte, 0) != 0) ||
+			    !(pg[pte_index(__START_KERNEL_map)] & _PAGE_USER))
+				/* We need to explicitly specify _PAGE_USER. */
+				__kernel_page_user = _PAGE_USER;
+		}
+	}
+#endif
+
 	/* Construct mapping of initial pte page in our own directories. */
 	init_level4_pgt[pgd_index(__START_KERNEL_map)] = 
 		mk_kernel_pgd(__pa_symbol(level3_kernel_pgt));
 	level3_kernel_pgt[pud_index(__START_KERNEL_map)] = 
 		__pud(__pa_symbol(level2_kernel_pgt) |
-		      _KERNPG_TABLE | _PAGE_USER);
+		      _KERNPG_TABLE);
 	memcpy((void *)level2_kernel_pgt, page, PAGE_SIZE);
 
 	early_make_page_readonly(init_level4_pgt,
@@ -615,7 +647,7 @@ static void __init extend_init_mapping(unsigned long tables_space)
 			pte_page = alloc_static_page(&phys);
 			early_make_page_readonly(
 				pte_page, XENFEAT_writable_page_tables);
-			set_pmd(pmd, __pmd(phys | _KERNPG_TABLE | _PAGE_USER));
+			set_pmd(pmd, __pmd(phys | _KERNPG_TABLE));
 		} else {
 			addr = page[pmd_index(va)];
 			addr_to_page(addr, pte_page);
@@ -624,7 +656,7 @@ static void __init extend_init_mapping(unsigned long tables_space)
 		if (pte_none(*pte)) {
 			new_pte = pfn_pte(
 				(va - __START_KERNEL_map) >> PAGE_SHIFT, 
-				__pgprot(_KERNPG_TABLE | _PAGE_USER));
+				__pgprot(_KERNPG_TABLE));
 			xen_l1_entry_update(pte, new_pte);
 		}
 		va += PAGE_SIZE;
