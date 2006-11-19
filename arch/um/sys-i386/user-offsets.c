@@ -2,8 +2,15 @@
 #include <signal.h>
 #include <asm/ptrace.h>
 #include <asm/user.h>
-#include <linux/stddef.h>
 #include <sys/poll.h>
+#ifndef __KERNEL__
+#define __KERNEL__
+#include <linux/stddef.h>
+#undef __KERNEL__
+#else
+#include <linux/stddef.h>
+#endif
+
 
 #define DEFINE(sym, val) \
 	asm volatile("\n->" #sym " %0 " #val : : "i" (val))
