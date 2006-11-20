@@ -4875,6 +4875,7 @@ unsigned int ata_qc_issue_prot(struct ata_queued_cmd *qc)
 inline unsigned int ata_host_intr (struct ata_port *ap,
 				   struct ata_queued_cmd *qc)
 {
+	struct ata_eh_info *ehi = &ap->eh_info;
 	u8 status, host_stat = 0;
 
 	VPRINTK("ata%u: protocol %d task_state %d\n",
@@ -4935,6 +4936,11 @@ inline unsigned int ata_host_intr (struct ata_port *ap,
 	ap->ops->irq_clear(ap);
 
 	ata_hsm_move(ap, qc, status, 0);
+
+	if (unlikely(qc->err_mask) && (qc->tf.protocol == ATA_PROT_DMA ||
+				       qc->tf.protocol == ATA_PROT_ATAPI_DMA))
+		ata_ehi_push_desc(ehi, "BMDMA stat 0x%x", host_stat);
+
 	return 1;	/* irq handled */
 
 idle_irq:
@@ -5615,9 +5621,8 @@ int ata_device_add(const struct ata_probe_ent *ent)
 				ap->ioaddr.bmdma_addr,
 				irq_line);
 
-		ata_chk_status(ap);
-		host->ops->irq_clear(ap);
-		ata_eh_freeze_port(ap);	/* freeze port before requesting IRQ */
+		/* freeze port before requesting IRQ */
+		ata_eh_freeze_port(ap);
 	}
 
 	/* obtain irq, that may be shared between channels */
