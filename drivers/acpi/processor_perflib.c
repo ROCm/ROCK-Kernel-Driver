@@ -83,8 +83,6 @@ static int acpi_processor_ppc_notifier(struct notifier_block *nb,
 		goto out;
 
 	ppc = (unsigned int)pr->performance_platform_limit;
-	if (!ppc)
-		goto out;
 
 	if (ppc > pr->performance->state_count)
 		goto out;
