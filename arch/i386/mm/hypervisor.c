@@ -457,7 +457,7 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 		set_xen_guest_handle(exchange.in.extent_start, &in_frame);
 
 		for (i = 0; i < (1UL<<order); i++) {
-			struct page *page = alloc_page(GFP_HIGHUSER);
+			struct page *page = alloc_page(GFP_NOWAIT|__GFP_HIGHMEM);
 			unsigned long pfn;
 
 			if (!page) {

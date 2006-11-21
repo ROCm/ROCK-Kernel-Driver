@@ -270,7 +270,10 @@ static __init void set_pte_phys(unsigned long vaddr,
 			return;
 		}
 	}
-	new_pte = pfn_pte(phys >> PAGE_SHIFT, prot);
+	if (pgprot_val(prot))
+		new_pte = pfn_pte(phys >> PAGE_SHIFT, prot);
+	else
+		new_pte = __pte(0);
 
 	pte = pte_offset_kernel(pmd, vaddr);
 	if (!pte_none(*pte) &&
@@ -554,10 +557,6 @@ static void __meminit phys_pud_init(pud_t *pud, unsigned long address, unsigned 
 void __init xen_init_pt(void)
 {
 	unsigned long addr, *page;
-
-	memset((void *)init_level4_pgt,   0, PAGE_SIZE);
-	memset((void *)level3_kernel_pgt, 0, PAGE_SIZE);
-	memset((void *)level2_kernel_pgt, 0, PAGE_SIZE);
 
 	/* Find the initial pte page that was built for us. */
 	page = (unsigned long *)xen_start_info->pt_base;
