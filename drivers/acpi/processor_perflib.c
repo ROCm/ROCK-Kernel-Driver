@@ -84,7 +84,7 @@ static int acpi_processor_ppc_notifier(struct notifier_block *nb,
 
 	ppc = (unsigned int)pr->performance_platform_limit;
 
-	if (ppc > pr->performance->state_count)
+	if (ppc >= pr->performance->state_count)
 		goto out;
 
 	cpufreq_verify_within_limits(policy, 0,
