@@ -323,12 +323,7 @@ static const struct pci_device_id ahci_pci_tbl[] = {
 	{ PCI_VDEVICE(JMICRON, 0x2366), board_ahci }, /* JMicron JMB366 */
 
 	/* ATI */
-	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_IXP600_SATA, PCI_ANY_ID,
-	  PCI_ANY_ID, 0x010600, 0xffff00, board_ahci }, /* ATI SB600 AHCI */
-	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_IXP600_SATA, PCI_ANY_ID,
-	  PCI_ANY_ID, 0x010400, 0xffff00, board_ahci }, /* ATI SB600 raid */
-	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_IXP600_SATA, PCI_ANY_ID,
-	  PCI_ANY_ID, (PCI_CLASS_STORAGE_IDE<<8)|0x8f, 0xffff05, board_ahci }, /* ATI SB600 native IDE */
+	{ PCI_VDEVICE(ATI, 0x4380), board_ahci }, /* ATI SB600 non-raid */
 	{ PCI_VDEVICE(ATI, 0x4381), board_ahci }, /* ATI SB600 raid */
 
 	/* VIA */
