@@ -133,6 +133,7 @@ extern int acpi_gsi_to_irq(u32 gsi, unsigned int *irq);
 #ifdef CONFIG_X86_IO_APIC
 extern int skip_ioapic_setup;
 extern int acpi_skip_timer_override;
+extern int acpi_use_timer_override;
 
 static inline void disable_ioapic_setup(void)
 {

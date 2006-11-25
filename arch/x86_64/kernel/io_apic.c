@@ -337,11 +337,16 @@ void __init check_ioapic(void)
 					nvidia_hpet_detected = 0;
 					acpi_table_parse(ACPI_HPET,
 							nvidia_hpet_check);
-					if (nvidia_hpet_detected == 0) {
+					if (!acpi_use_timer_override &&
+					    nvidia_hpet_detected == 0) {
 						acpi_skip_timer_override = 1;
 						printk(KERN_INFO "Nvidia board "
 						    "detected. Ignoring ACPI "
 						    "timer override.\n");
+						printk(KERN_INFO 
+						       "If you got timer trouble "
+						       "try acpi_use_timer_override\n");
+
 					}
 #endif
 					/* RED-PEN skip them on mptables too? */
