@@ -343,7 +343,7 @@ void __init check_ioapic(void)
 						printk(KERN_INFO "Nvidia board "
 						    "detected. Ignoring ACPI "
 						    "timer override.\n");
-						printk(KERN_INFO 
+						printk(KERN_INFO
 						       "If you got timer trouble "
 						       "try acpi_use_timer_override\n");
 
