@@ -1014,7 +1014,7 @@ static int aoa_fabric_layout_probe(struct soundbus_dev *sdev)
 
 	ldev->gpio.methods->init(&ldev->gpio);
 
-	err = aoa_fabric_register(&layout_fabric);
+	err = aoa_fabric_register(&layout_fabric, &sdev->ofdev.dev);
 	if (err && err != -EALREADY) {
 		printk(KERN_INFO "snd-aoa-fabric-layout: can't use,"
 				 " another fabric is active!\n");
@@ -1107,6 +1107,9 @@ static struct soundbus_driver aoa_soundbus_driver = {
 	.suspend = aoa_fabric_layout_suspend,
 	.resume = aoa_fabric_layout_resume,
 #endif
+	.driver = {
+		.owner = THIS_MODULE,
+	}
 };
 
 static int __init aoa_fabric_layout_init(void)
