@@ -303,9 +303,11 @@ static void __init iSeries_init_early(void)
 		initrd_start = (unsigned long)__va(naca.xRamDisk);
 		initrd_end = initrd_start + naca.xRamDiskSize * HW_PAGE_SIZE;
 		initrd_below_start_ok = 1;	// ramdisk in kernel space
+#if defined(CONFIG_BLK_DEV_RAM)
 		ROOT_DEV = Root_RAM0;
 		if (((rd_size * 1024) / HW_PAGE_SIZE) < naca.xRamDiskSize)
 			rd_size = (naca.xRamDiskSize * HW_PAGE_SIZE) / 1024;
+#endif
 	} else
 #endif /* CONFIG_BLK_DEV_INITRD */
 	{
