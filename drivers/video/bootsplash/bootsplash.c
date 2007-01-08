@@ -12,7 +12,6 @@
  *  For more information on this code check http://www.bootsplash.org/
  */
 
-#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/fb.h>

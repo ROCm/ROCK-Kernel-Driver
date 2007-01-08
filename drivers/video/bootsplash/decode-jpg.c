@@ -5,7 +5,6 @@
  *
  */
 
-#include <linux/config.h>
 #include <linux/string.h>
 #include <asm/byteorder.h>
 
