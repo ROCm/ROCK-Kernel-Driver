@@ -682,7 +682,7 @@ config FB_EPSON1355
 
 config FB_S1D13XXX
 	tristate "Epson S1D13XXX framebuffer support"
-	depends on FB && !UML
+	depends on FB
 	select FB_CFB_FILLRECT
 	select FB_CFB_COPYAREA
 	select FB_CFB_IMAGEBLIT

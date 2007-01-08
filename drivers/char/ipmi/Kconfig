@@ -5,7 +5,6 @@
 menu "IPMI"
 config IPMI_HANDLER
        tristate 'IPMI top-level message handler'
-       depends on !UML
        help
          This enables the central IPMI message handler, required for IPMI
 	 to work.
