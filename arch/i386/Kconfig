@@ -222,7 +222,6 @@ source "arch/i386/Kconfig.cpu"
 
 config HPET_TIMER
 	bool "HPET Timer Support"
-	depends on !X86_XEN
 	help
 	  This enables the use of the HPET for the kernel's internal timer.
 	  HPET is the next generation timer replacing legacy 8254s.
@@ -273,7 +272,7 @@ source "kernel/Kconfig.preempt"
 
 config X86_UP_APIC
 	bool "Local APIC support on uniprocessors"
-	depends on !SMP && !(X86_VISWS || X86_VOYAGER || XEN_UNPRIVILEGED_GUEST)
+	depends on !SMP && !(X86_VISWS || X86_VOYAGER)
 	help
 	  A local APIC (Advanced Programmable Interrupt Controller) is an
 	  integrated interrupt controller in the CPU. If you have a single-CPU
@@ -298,12 +297,12 @@ config X86_UP_IOAPIC
 
 config X86_LOCAL_APIC
 	bool
-	depends on X86_UP_APIC || ((X86_VISWS || SMP) && !(X86_VOYAGER || XEN_UNPRIVILEGED_GUEST))
+	depends on X86_UP_APIC || ((X86_VISWS || SMP) && !X86_VOYAGER)
 	default y
 
 config X86_APIC_AUTO
         bool "Use heuristics to enable/disable local APIC"
-	depends on X86_LOCAL_APIC && !X86_XEN
+	depends on X86_LOCAL_APIC
 	help
 	  This option uses some proven heuristics to automatically enable or disable the local
 	  APIC. All decisions can be overriden by command line options.
@@ -313,7 +312,7 @@ config X86_APIC_AUTO
 
 config X86_IO_APIC
 	bool
-	depends on X86_UP_IOAPIC || (SMP && !(X86_VISWS || X86_VOYAGER || XEN_UNPRIVILEGED_GUEST))
+	depends on X86_UP_IOAPIC || (SMP && !(X86_VISWS || X86_VOYAGER))
 	default y
 
 config X86_VISWS_APIC
@@ -427,7 +426,6 @@ config X86_REBOOTFIXUPS
 
 config MICROCODE
 	tristate "/dev/cpu/microcode - Intel IA32 CPU microcode support"
-	depends on !XEN_UNPRIVILEGED_GUEST
 	---help---
 	  If you say Y here and also to "/dev file system support" in the
 	  'File systems' section, you will be able to update the microcode on
@@ -445,7 +443,6 @@ config MICROCODE
 
 config X86_MSR
 	tristate "/dev/cpu/*/msr - Model-specific register support"
-	depends on !X86_XEN
 	help
 	  This device gives privileged processes access to the x86
 	  Model-Specific Registers (MSRs).  It is a character device with
@@ -638,7 +635,7 @@ config HAVE_ARCH_EARLY_PFN_TO_NID
 
 config HIGHPTE
 	bool "Allocate 3rd-level pagetables from highmem"
-	depends on (HIGHMEM4G || HIGHMEM64G) && !X86_XEN
+	depends on HIGHMEM4G || HIGHMEM64G
 	help
 	  The VM uses one page table entry for each page of physical memory.
 	  For systems with a lot of RAM, this can be wasteful of precious
@@ -647,7 +644,6 @@ config HIGHPTE
 
 config MATH_EMULATION
 	bool "Math emulation"
-	depends on !X86_XEN
 	---help---
 	  Linux can emulate a math coprocessor (used for floating point
 	  operations) if you don't have one. 486DX and Pentium processors have
@@ -673,8 +669,6 @@ config MATH_EMULATION
 
 config MTRR
 	bool "MTRR (Memory Type Range Register) support"
-	depends on !XEN_UNPRIVILEGED_GUEST
-	default y if X86_XEN
 	---help---
 	  On Intel P6 family processors (Pentium Pro, Pentium II and later)
 	  the Memory Type Range Registers (MTRRs) may be used to control
@@ -709,7 +703,7 @@ config MTRR
 
 config EFI
 	bool "Boot from EFI support"
-	depends on ACPI && !X86_XEN
+	depends on ACPI
 	default n
 	---help---
 	This enables the the kernel to boot on EFI platforms using
@@ -727,7 +721,7 @@ config EFI
 
 config IRQBALANCE
  	bool "Enable kernel irq balancing"
-	depends on SMP && X86_IO_APIC && !X86_XEN
+	depends on SMP && X86_IO_APIC
 	default y
 	help
  	  The default yes will allow the kernel to do irq load balancing.
@@ -775,7 +769,7 @@ source kernel/Kconfig.hz
 
 config KEXEC
 	bool "kexec system call (EXPERIMENTAL)"
-	depends on EXPERIMENTAL && !X86_XEN
+	depends on EXPERIMENTAL
 	help
 	  kexec is a system call that implements the ability to shutdown your
 	  current kernel, and to start another kernel.  It is like a reboot
@@ -1000,9 +994,7 @@ config APM_REAL_MODE_POWER_OFF
 
 endmenu
 
-if !X86_XEN
 source "arch/i386/kernel/cpu/cpufreq/Kconfig"
-endif
 
 endmenu
 
@@ -1044,7 +1036,6 @@ choice
 
 config PCI_GOBIOS
 	bool "BIOS"
-	depends on !X86_XEN
 
 config PCI_GOMMCONFIG
 	bool "MMConfig"
@@ -1101,7 +1092,7 @@ config ISA_DMA_API
 
 config ISA
 	bool "ISA support"
-	depends on !(X86_VOYAGER || X86_VISWS || X86_XEN)
+	depends on !(X86_VOYAGER || X86_VISWS)
 	help
 	  Find out whether you have ISA slots on your motherboard.  ISA is the
 	  name of a bus system, i.e. the way the CPU talks to the other stuff
@@ -1128,7 +1119,7 @@ config EISA
 source "drivers/eisa/Kconfig"
 
 config MCA
-	bool "MCA support" if !(X86_VISWS || X86_VOYAGER || X86_XEN)
+	bool "MCA support" if !(X86_VISWS || X86_VOYAGER)
 	default y if X86_VOYAGER
 	help
 	  MicroChannel Architecture is found in some IBM PS/2 machines and
