@@ -4,11 +4,13 @@
 
 
 #include <linux/module.h>
-#include <linux/config.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/slab.h>
+#include <linux/completion.h>
+#include <linux/jiffies.h>
+#include <linux/sched.h>
 #include <linux/moduleparam.h>
 
 static int module_exiting;
