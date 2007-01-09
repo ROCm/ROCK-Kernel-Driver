@@ -713,7 +713,7 @@ static void k_fn(struct vc_data *vc, unsigned char value, char up_flag)
 
 static void k_cur(struct vc_data *vc, unsigned char value, char up_flag)
 {
-	static const char *cur_chars = "BDCA";
+	static const char cur_chars[] = "BDCA";
 
 	if (up_flag)
 		return;
@@ -1176,7 +1176,7 @@ static void kbd_keycode(unsigned int keycode, int down, int hw_raw)
 
 #ifdef	CONFIG_KDB
 	if (down && !rep && keycode == KEY_PAUSE && kdb_on == 1) {
-		kdb(KDB_REASON_KEYBOARD, 0, regs);
+		kdb(KDB_REASON_KEYBOARD, 0, get_irq_regs());
 		return;
 	}
 #endif	/* CONFIG_KDB */

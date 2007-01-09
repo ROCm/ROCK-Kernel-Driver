@@ -15,6 +15,8 @@
 #include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/nfs4acl.h>
+#include <linux/capability.h>
+#include <linux/sched.h>
 
 MODULE_LICENSE("GPL");
 

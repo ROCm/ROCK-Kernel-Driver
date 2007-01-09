@@ -59,6 +59,7 @@ extern kdbhard_bp_t	kdb_hardbreaks[/* KDB_MAXHARDBPT */];
 #define DR6_B2  0x00000004
 #define DR6_B1  0x00000002
 #define DR6_B0  0x00000001
+#define DR6_DR_MASK  0x0000000F
 
 #define DR7_RW_VAL(dr, drnum) \
        (((dr) >> (16 + (4 * (drnum)))) & 0x3)

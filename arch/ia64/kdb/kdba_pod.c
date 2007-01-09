@@ -23,13 +23,11 @@ MODULE_LICENSE("GPL");
  * kdba_pod - enter POD mode from kdb
  * @argc: arg count
  * @argv: arg values
- * @envp: kdb env. vars
- * @regs: current register state
  *
  * Enter POD mode from kdb using SGI SN specific SAL function call.
  */
 static int
-kdba_pod(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdba_pod(int argc, const char **argv)
 {
 	kdb_printf("WARNING: pod commands are dangerous unless you know exactly\n"
 		   "what you are doing.  If in doubt, type exit immediately.\n");

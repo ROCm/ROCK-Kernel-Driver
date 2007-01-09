@@ -5,11 +5,12 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (c) 1999-2004 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 1999-2006 Silicon Graphics, Inc.  All Rights Reserved.
  */
 
 #include <linux/module.h>
 #include <linux/types.h>
+#include <linux/ctype.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/kdev_t.h>
@@ -356,16 +357,20 @@ kdb_read(char *buffer, size_t bufsize)
 				if (cp < lastchar) {
 					memcpy(tmpbuffer, cp, lastchar - cp);
 					memcpy(cp+1, tmpbuffer, lastchar - cp);
+					*++lastchar = '\0';
+					*cp = key;
+					kdb_printf("%s\r", cp);
+					++cp;
+					tmp = *cp;
+					*cp = '\0';
+					kdb_printf(kdb_prompt_str);
+					kdb_printf("%s", buffer);
+					*cp = tmp;
+				} else {
+					*++lastchar = '\0';
+					*cp++ = key;
+					kdb_printf("%c", key);
 				}
-				*(++lastchar) = '\0';
-				*cp = key;
-				kdb_printf("%s\r", cp);
-				++cp;
-				tmp = *cp;
-				*cp = '\0';
-				kdb_printf(kdb_prompt_str);
-				kdb_printf("%s", buffer);
-				*cp = tmp;
 			}
 			break;
 		}
@@ -615,7 +620,8 @@ kdb_printf(const char *fmt, ...)
  * Locking:
  *	None.
  * Remarks:
- *	Select a console device.
+ *	Select a console device.  Only use a VT console if the user specified
+ *	or defaulted console= /^tty[0-9]*$/
  */
 
 void __init
@@ -626,11 +632,18 @@ kdb_io_init(void)
 	 * Select a console.
 	 */
 	struct console *c = console_drivers;
+	int vt_console = 0;
 
 	while (c) {
-		if ((c->flags & CON_CONSDEV)) {
+		if ((c->flags & CON_CONSDEV) && !kdbcons)
 			kdbcons = c;
-			break;
+		if ((c->flags & CON_ENABLED) &&
+		    strncmp(c->name, "tty", 3) == 0) {
+			char *p = c->name + 3;
+			while (isdigit(*p))
+				++p;
+			if (*p == '\0')
+				vt_console = 1;
 		}
 		c = c->next;
 	}
@@ -640,6 +653,8 @@ kdb_io_init(void)
 		KDB_FLAG_SET(NO_CONSOLE);
 		kdb_on = 0;
 	}
+	if (!vt_console)
+		KDB_FLAG_SET(NO_VT_CONSOLE);
 	kdb_input_flush();
 #endif
 	return;

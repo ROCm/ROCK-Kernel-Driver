@@ -79,7 +79,9 @@ extern const char *kdb_diemsg;
 #define KDB_FLAG_NOIPI		(1 << 3)	/* Do not send IPIs */
 #define KDB_FLAG_ONLY_DO_DUMP	(1 << 4)	/* Only do a dump, used when kdb is off */
 #define KDB_FLAG_NO_CONSOLE	(1 << 5)	/* No console is available, kdb is disabled */
-#define KDB_FLAG_RECOVERY	(1 << 6)	/* kdb is being entered for an error which has been recovered */
+#define KDB_FLAG_NO_VT_CONSOLE	(1 << 6)	/* No VT console is available, do not use keyboard */
+#define KDB_FLAG_NO_I8042	(1 << 7)	/* No i8042 chip is available, do not use keyboard */
+#define KDB_FLAG_RECOVERY	(1 << 8)	/* kdb is being entered for an error which has been recovered */
 
 extern volatile int kdb_flags;			/* Global flags, see kdb_state for per cpu state */
 
@@ -111,7 +113,7 @@ typedef enum {
 } kdb_reason_t;
 
 #ifdef	CONFIG_KDB
-extern asmlinkage int kdb(kdb_reason_t, int, struct pt_regs *);
+extern fastcall int kdb(kdb_reason_t, int, struct pt_regs *);
 #else
 #define kdb(reason,error_code,frame) (0)
 #endif

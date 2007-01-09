@@ -37,14 +37,12 @@ void lock_cpu_hotplug(void)
 	struct task_struct *tsk = current;
 
 	if (tsk == recursive) {
-#if 0
 		static int warnings = 10;
 		if (warnings) {
 			printk(KERN_ERR "Lukewarm IQ detected in hotplug locking\n");
 			WARN_ON(1);
 			warnings--;
 		}
-#endif
 		recursive_depth++;
 		return;
 	}
@@ -55,6 +53,7 @@ EXPORT_SYMBOL_GPL(lock_cpu_hotplug);
 
 void unlock_cpu_hotplug(void)
 {
+	WARN_ON(recursive != current);
 	if (recursive_depth) {
 		recursive_depth--;
 		return;
@@ -259,7 +258,7 @@ static cpumask_t frozen_cpus;
 
 int disable_nonboot_cpus(void)
 {
-	int cpu, first_cpu, error;
+	int cpu, first_cpu, error = 0;
 
 	mutex_lock(&cpu_add_remove_lock);
 	first_cpu = first_cpu(cpu_present_map);
@@ -271,11 +270,7 @@ int disable_nonboot_cpus(void)
 			goto out;
 		}
 	}
-	error = set_cpus_allowed(current, cpumask_of_cpu(first_cpu));
-	if (error) {
-		printk(KERN_ERR "Could not run on CPU%d\n", first_cpu);
-		goto out;
-	}
+
 	/* We take down all of the non-boot CPUs in one shot to avoid races
 	 * with the userspace trying to use the CPU hotplug at the same time
 	 */
@@ -299,7 +294,7 @@ int disable_nonboot_cpus(void)
 		/* Make sure the CPUs won't be enabled by someone else */
 		cpu_hotplug_disabled = 1;
 	} else {
-		printk(KERN_ERR "Non-boot CPUs are not disabled");
+		printk(KERN_ERR "Non-boot CPUs are not disabled\n");
 	}
 out:
 	mutex_unlock(&cpu_add_remove_lock);

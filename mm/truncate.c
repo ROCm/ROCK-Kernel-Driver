@@ -13,6 +13,7 @@
 #include <linux/module.h>
 #include <linux/pagemap.h>
 #include <linux/pagevec.h>
+#include <linux/task_io_accounting_ops.h>
 #include <linux/buffer_head.h>	/* grr. try_to_release_page,
 				   do_invalidatepage */
 
@@ -50,6 +51,26 @@ static inline void truncate_partial_page(struct page *page, unsigned partial)
 		do_invalidatepage(page, partial);
 }
 
+void cancel_dirty_page(struct page *page, unsigned int account_size)
+{
+	/* If we're cancelling the page, it had better not be mapped any more */
+	if (page_mapped(page)) {
+		static unsigned int warncount;
+
+		WARN_ON(++warncount < 5);
+	}
+		
+	if (TestClearPageDirty(page)) {
+		struct address_space *mapping = page->mapping;
+		if (mapping && mapping_cap_account_dirty(mapping)) {
+			dec_zone_page_state(page, NR_FILE_DIRTY);
+			if (account_size)
+				task_io_account_cancelled_write(account_size);
+		}
+	}
+}
+EXPORT_SYMBOL(cancel_dirty_page);
+
 /*
  * If truncate cannot remove the fs-private metadata from the page, the page
  * becomes anonymous.  It will be left on the LRU and may even be mapped into
@@ -66,10 +87,11 @@ truncate_complete_page(struct address_space *mapping, struct page *page)
 	if (page->mapping != mapping)
 		return;
 
+	cancel_dirty_page(page, PAGE_CACHE_SIZE);
+
 	if (PagePrivate(page))
 		do_invalidatepage(page, 0);
 
-	clear_page_dirty(page);
 	ClearPageUptodate(page);
 	ClearPageMappedToDisk(page);
 	remove_from_page_cache(page);
@@ -326,14 +348,9 @@ failed:
  * @end: the page offset 'to' which to invalidate (inclusive)
  *
  * Any pages which are found to be mapped into pagetables are unmapped prior to
- * invalidation. invalidate_inode_pages2_range is non destructive and it can't
- * lose dirty data (if dirty data exists -EIO will be returned). It's up to
- * the caller to call unmap_mapping_range and filemap_write_and_wait before
- * invalidate_inode_pages2 if needed.
+ * invalidation.
  *
- * Returns -EIO if any pages could not be invalidated. Before returning -EIO
- * it tries invalidating all pages in the range, it doesn't stop at the first
- * page invalidation failure.
+ * Returns -EIO if any pages could not be invalidated.
  */
 int invalidate_inode_pages2_range(struct address_space *mapping,
 				  pgoff_t start, pgoff_t end)
@@ -347,10 +364,10 @@ int invalidate_inode_pages2_range(struct address_space *mapping,
 
 	pagevec_init(&pvec, 0);
 	next = start;
-	while (next <= end && !wrapped &&
+	while (next <= end && !ret && !wrapped &&
 		pagevec_lookup(&pvec, mapping, next,
 			min(end - next, (pgoff_t)PAGEVEC_SIZE - 1) + 1)) {
-		for (i = 0; i < pagevec_count(&pvec); i++) {
+		for (i = 0; !ret && i < pagevec_count(&pvec); i++) {
 			struct page *page = pvec.pages[i];
 			pgoff_t page_index;
 
@@ -388,7 +405,6 @@ int invalidate_inode_pages2_range(struct address_space *mapping,
 					  PAGE_CACHE_SIZE, 0);
 				}
 			}
-
 			if (!invalidate_complete_page2(mapping, page))
 				ret = -EIO;
 			unlock_page(page);

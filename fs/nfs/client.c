@@ -143,7 +143,7 @@ static struct nfs_client *nfs_alloc_client(const char *hostname,
 	INIT_LIST_HEAD(&clp->cl_state_owners);
 	INIT_LIST_HEAD(&clp->cl_unused);
 	spin_lock_init(&clp->cl_lock);
-	INIT_WORK(&clp->cl_renewd, nfs4_renew_state, clp);
+	INIT_DELAYED_WORK(&clp->cl_renewd, nfs4_renew_state);
 	rpc_init_wait_queue(&clp->cl_rpcwaitq, "NFS client");
 	clp->cl_boot_time = CURRENT_TIME;
 	clp->cl_state = 1 << NFS4CLNT_LEASE_EXPIRED;
@@ -656,7 +656,7 @@ static void nfs_server_set_fsinfo(struct nfs_server *server, struct nfs_fsinfo *
 	if (server->rsize > NFS_MAX_FILE_IO_SIZE)
 		server->rsize = NFS_MAX_FILE_IO_SIZE;
 	server->rpages = (server->rsize + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
-	server->backing_dev_info.ra_pages = server->rpages * NFS_MAX_READAHEAD;
+	server->backing_dev_info.ra_pages = server->rpages * nfs_max_readahead;
 
 	if (server->wsize > max_rpc_payload)
 		server->wsize = max_rpc_payload;

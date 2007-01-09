@@ -72,7 +72,7 @@ typedef enum {
 	KDB_REPEAT_WITH_ARGS,		/* Repeat the command including its arguments */
 } kdb_repeat_t;
 
-typedef int (*kdb_func_t)(int, const char **, const char **, struct pt_regs *);
+typedef int (*kdb_func_t)(int, const char **);
 
 	/*
 	 * Symbol table format returned by kallsyms.
@@ -118,7 +118,7 @@ extern int kdbgetularg(const char *, unsigned long *);
 extern char *kdbgetenv(const char *);
 extern int kdbgetintenv(const char *, int *);
 extern int kdbgetaddrarg(int, const char**, int*, unsigned long *,
-			 long *, char **, struct pt_regs *);
+			 long *, char **);
 extern int kdbgetsymval(const char *, kdb_symtab_t *);
 extern int kdbnearsym(unsigned long, kdb_symtab_t *);
 extern char *kdb_read(char *buffer, size_t bufsize);
@@ -302,8 +302,8 @@ typedef struct _kdbtab {
 	 * External command function declarations
 	 */
 
-extern int kdb_id(int, const char **, const char **, struct pt_regs *);
-extern int kdb_bt(int, const char **, const char **, struct pt_regs *);
+extern int kdb_id(int, const char **);
+extern int kdb_bt(int, const char **);
 
 	/*
 	 * External utility function declarations
@@ -392,7 +392,7 @@ extern char kdb_task_state_char (const struct task_struct *);
 extern unsigned long kdb_task_state(const struct task_struct *p, unsigned long mask);
 extern void kdb_ps_suppressed(void);
 extern void kdb_ps1(const struct task_struct *p);
-extern int kdb_parse(const char *cmdstr, struct pt_regs *regs);
+extern int kdb_parse(const char *cmdstr);
 extern void kdb_print_nameval(const char *name, unsigned long val);
 extern void kdb_send_sig_info(struct task_struct *p, struct siginfo *info, int seqno);
 #ifdef CONFIG_SWAP
@@ -467,8 +467,6 @@ extern void kdb_runqueue(unsigned long cpu, kdb_printf_t xxx_printf);
 
 extern void *debug_kmalloc(size_t size, gfp_t flags);
 extern void debug_kfree(const void *);
-
-extern void kdb_initsupport(void);
 
 extern void kdba_set_current_task(const struct task_struct *);
 extern const struct task_struct *kdb_current_task;

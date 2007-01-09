@@ -273,6 +273,8 @@ protected:
 	struct symbol *sym;
 	struct menu *menu;
 	bool _showDebug;
+
+	int has_dbg_info;
 };
 
 class ConfigSearchWindow : public QDialog {
@@ -297,6 +299,9 @@ protected:
 
 class ConfigMainWindow : public QMainWindow {
 	Q_OBJECT
+
+	static QAction *saveAction;
+	static void conf_changed(void);
 public:
 	ConfigMainWindow(void);
 public slots:

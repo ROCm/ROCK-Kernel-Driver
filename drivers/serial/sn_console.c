@@ -377,8 +377,8 @@ static int snp_startup(struct uart_port *port)
  *
  */
 static void
-snp_set_termios(struct uart_port *port, struct termios *termios,
-		struct termios *old)
+snp_set_termios(struct uart_port *port, struct ktermios *termios,
+		struct ktermios *old)
 {
 }
 
@@ -506,11 +506,11 @@ sn_receive_chars(struct sn_cons_port *port, unsigned long flags)
 		if (ch == *kdb_serial_ptr) {
 			if (!(*++kdb_serial_ptr)) {
 				spin_unlock_irqrestore(&port->sc_port.lock, flags);
-				if (!regs) {
+				if (!get_irq_regs()) {
 					KDB_STATE_SET(KEYBOARD);
 					KDB_ENTER();   /* to get some registers */
 				} else
-					kdb(KDB_REASON_KEYBOARD, 0, regs);
+					kdb(KDB_REASON_KEYBOARD, 0, get_irq_regs());
 				kdb_serial_ptr = (char *)kdb_serial_str;
 				spin_lock_irqsave(&port->sc_port.lock, flags);
 				break;

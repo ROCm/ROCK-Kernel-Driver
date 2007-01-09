@@ -1208,7 +1208,7 @@ receive_chars(struct uart_8250_port *up, int *status)
 		    if (ch == *kdb_serial_ptr) {
 			if (!(*++kdb_serial_ptr)) {
 			    atomic_inc(&kdb_8250);
-			    kdb(KDB_REASON_KEYBOARD, 0, regs);
+			    kdb(KDB_REASON_KEYBOARD, 0, get_irq_regs());
 			    atomic_dec(&kdb_8250);
 			    kdb_serial_ptr = kdb_serial_str;
 			    break;
@@ -1796,8 +1796,8 @@ static unsigned int serial8250_get_divisor(struct uart_port *port, unsigned int 
 }
 
 static void
-serial8250_set_termios(struct uart_port *port, struct termios *termios,
-		       struct termios *old)
+serial8250_set_termios(struct uart_port *port, struct ktermios *termios,
+		       struct ktermios *old)
 {
 	struct uart_8250_port *up = (struct uart_8250_port *)port;
 	unsigned char cval, fcr = 0;

@@ -63,6 +63,7 @@ static unsigned long		nlm_grace_period;
 static unsigned long		nlm_timeout = LOCKD_DFLT_TIMEO;
 static int			nlm_udpport, nlm_tcpport;
 int				nsm_use_hostnames = 0;
+int				nlm_max_hosts = 256;
 
 /*
  * Constants needed for the sysctl interface.
@@ -410,26 +411,15 @@ static ctl_table nlm_sysctls[] = {
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec,
 	},
-	{ .ctl_name = 0 }
-};
-
-static ctl_table nlm_sysctl_dir[] = {
 	{
 		.ctl_name	= CTL_UNNUMBERED,
-		.procname	= "nfs",
-		.mode		= 0555,
-		.child		= nlm_sysctls,
+		.procname	= "nlm_max_hosts",
+		.data		= &nlm_max_hosts,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
 	},
-	{ .ctl_name = 0 }
-};
 
-static ctl_table nlm_sysctl_root[] = {
-	{
-		.ctl_name	= CTL_FS,
-		.procname	= "fs",
-		.mode		= 0555,
-		.child		= nlm_sysctl_dir,
-	},
 	{ .ctl_name = 0 }
 };
 
@@ -506,15 +496,18 @@ module_param(nsm_use_hostnames, bool, 0644);
 
 static int __init init_nlm(void)
 {
-	nlm_sysctl_table = register_sysctl_table(nlm_sysctl_root, 0);
-	return nlm_sysctl_table ? 0 : -ENOMEM;
+	struct ctl_path ctl_path[] = { { CTL_FS, "fs", 0555 }, { -2, "nfs", 0555 }, { 0 } };
+
+	nlm_sysctl_table = register_sysctl_table_path(nlm_sysctls, ctl_path);
+	return 0;
 }
 
 static void __exit exit_nlm(void)
 {
 	/* FIXME: delete all NLM clients */
 	nlm_shutdown_hosts();
-	unregister_sysctl_table(nlm_sysctl_table);
+	if (nlm_sysctl_table)
+		unregister_sysctl_table(nlm_sysctl_table);
 }
 
 module_init(init_nlm);

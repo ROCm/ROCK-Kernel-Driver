@@ -3,7 +3,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (c) 1999-2004 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 1999-2006 Silicon Graphics, Inc.  All Rights Reserved.
  */
 
 #include <linux/blkdev.h>
@@ -23,20 +23,22 @@ MODULE_LICENSE("GPL");
 static char *
 kdb_cpus_allowed_string(struct task_struct *tp)
 {
-	static char maskbuf[(NR_CPUS + 31) / 32 * 9 + 1];
-	if (cpus_full(tp->cpus_allowed))
+	static char maskbuf[NR_CPUS * 8];
+	if (cpus_equal(tp->cpus_allowed, cpu_online_map))
 		strcpy(maskbuf, "ALL");
+	else if (cpus_full(tp->cpus_allowed))
+		strcpy(maskbuf, "ALL(NR_CPUS)");
 	else if (cpus_empty(tp->cpus_allowed))
 		strcpy(maskbuf, "NONE");
 	else if (cpus_weight(tp->cpus_allowed) == 1)
 		snprintf(maskbuf, sizeof(maskbuf), "ONLY(%d)", first_cpu(tp->cpus_allowed));
 	else
-		cpumask_scnprintf(maskbuf, sizeof(maskbuf), tp->cpus_allowed);
+		cpulist_scnprintf(maskbuf, sizeof(maskbuf), tp->cpus_allowed);
 	return maskbuf;
 }
 
 static int
-kdbm_task(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdbm_task(int argc, const char **argv)
 {
 	unsigned long addr;
 	long offset=0;
@@ -48,7 +50,7 @@ kdbm_task(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 		return KDB_ARGCOUNT;
 
 	nextarg = 1;
-	if ((e = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs)) != 0)
+	if ((e = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL)) != 0)
 		return(e);
 
 	if (!(tp = kmalloc(sizeof(*tp), GFP_ATOMIC))) {
@@ -67,8 +69,26 @@ kdbm_task(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 
 	kdb_printf("  cpu=%d policy=%lu ", kdb_process_cpu(tp), tp->policy);
 	kdb_printf(
-	    "prio=%d static_prio=%d cpus_allowed=%s",
-	    tp->prio, tp->static_prio, kdb_cpus_allowed_string(tp));
+	    "prio=%d static_prio=%d cpus_allowed=",
+	    tp->prio, tp->static_prio);
+	{
+		/* The cpus allowed string may be longer than kdb_printf() can
+		 * handle.  Print it in chunks.
+		 */
+		char c, *p;
+		p = kdb_cpus_allowed_string(tp);
+		while (1) {
+			if (strlen(p) < 100) {
+				kdb_printf("%s", p);
+				break;
+			}
+			c = p[100];
+			p[100] = '\0';
+			kdb_printf("%s", p);
+			p[100] = c;
+			p += 100;
+		}
+	}
 	kdb_printf(" &thread=0x%p\n", &tp1->thread);
 
 	kdb_printf("  need_resched=%d ",
@@ -116,7 +136,7 @@ out:
 }
 
 static int
-kdbm_sigset(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdbm_sigset(int argc, const char **argv)
 {
 	sigset_t *sp = NULL;
 	unsigned long addr;
@@ -133,7 +153,7 @@ kdbm_sigset(int argc, const char **argv, const char **envp, struct pt_regs *regs
 	kdb_printf("unavailable on this platform, _NSIG_WORDS not defined.\n");
 #else
 	nextarg = 1;
-	if ((e = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs)) != 0)
+	if ((e = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL)) != 0)
 		return(e);
 
 	if (!(sp = kmalloc(sizeof(*sp), GFP_ATOMIC))) {

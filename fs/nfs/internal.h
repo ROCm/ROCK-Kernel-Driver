@@ -8,14 +8,6 @@ struct nfs_string;
 struct nfs_mount_data;
 struct nfs4_mount_data;
 
-/* Maximum number of readahead requests
- * FIXME: this should really be a sysctl so that users may tune it to suit
- *        their needs. People that do NFS over a slow network, might for
- *        instance want to reduce it to something closer to 1 for improved
- *        interactive response.
- */
-#define NFS_MAX_READAHEAD	(RPC_DEF_SLOT_TABLE - 1)
-
 struct nfs_clone_mount {
 	const struct super_block *sb;
 	const struct dentry *dentry;
@@ -124,6 +116,7 @@ extern void nfs_clear_inode(struct inode *);
 #ifdef CONFIG_NFS_V4
 extern void nfs4_clear_inode(struct inode *);
 #endif
+extern unsigned int nfs_max_readahead;
 
 /* super.c */
 extern struct file_system_type nfs_xdev_fs_type;
@@ -216,4 +209,22 @@ void nfs_super_set_maxbytes(struct super_block *sb, __u64 maxfilesize)
 	sb->s_maxbytes = (loff_t)maxfilesize;
 	if (sb->s_maxbytes > MAX_LFS_FILESIZE || sb->s_maxbytes <= 0)
 		sb->s_maxbytes = MAX_LFS_FILESIZE;
+}
+
+/*
+ * Determine the number of bytes of data the page contains
+ */
+static inline
+unsigned int nfs_page_length(struct page *page)
+{
+	loff_t i_size = i_size_read(page->mapping->host);
+
+	if (i_size > 0) {
+		pgoff_t end_index = (i_size - 1) >> PAGE_CACHE_SHIFT;
+		if (page->index < end_index)
+			return PAGE_CACHE_SIZE;
+		if (page->index == end_index)
+			return ((i_size - 1) & ~PAGE_CACHE_MASK) + 1;
+	}
+	return 0;
 }

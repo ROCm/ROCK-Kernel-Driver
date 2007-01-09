@@ -5,8 +5,12 @@
  *
  * Author: Vamsi Krishna S. <vamsi_krishna@in.ibm.com>
  * (C) 2003 IBM Corporation.
+ * 2006-10-10 Keith Owens
+ *   Reworked to include x86_64 support
+ * Copyright (c) 2006 Silicon Graphics, Inc.  All Rights Reserved.
  */
 
+#include <linux/interrupt.h>
 #include <linux/types.h>
 #include <linux/kdb.h>
 #include <linux/kdbprivate.h>
@@ -26,50 +30,67 @@ MODULE_AUTHOR("Vamsi Krishna S./IBM");
 MODULE_DESCRIPTION("x86 specific information (gdt/idt/ldt/page tables)");
 MODULE_LICENSE("GPL");
 
-typedef struct _kdb_desc {
-	unsigned short limit;
-	unsigned short base;
-	unsigned char base_h1;
-	unsigned char type:4;
-	unsigned char seg:1;
-	unsigned char dpl:2;
-	unsigned char present:1;
-	unsigned char limit_h:4;
-	unsigned char avl:2;
-	unsigned char db:1;
-	unsigned char g:1; /* granularity */
-	unsigned char base_h2;
-} kdb_desc_t;
+/* Isolate as many of the i386/x86_64 differences as possible in one spot */
 
-typedef struct _kdb_gate_desc {
-	unsigned short offset;
-	unsigned short sel;
-	unsigned char res;
-	unsigned char type:4;
-	unsigned char seg:1;
-	unsigned char dpl:2;
-	unsigned char present:1;
-	unsigned short offset_h;
-} kdb_gate_desc_t;
+#ifdef	CONFIG_X86_64
+
+#define KDB_X86_64 1
+#define	MOVLQ "movq"
+
+typedef struct desc_struct kdb_desc_t;
+typedef struct gate_struct kdb_gate_desc_t;
+
+#define KDB_SYS_DESC_OFFSET(d) ((unsigned long)d->offset_high << 32 | d->offset_middle << 16 | d->offset_low)
+#define KDB_SYS_DESC_CALLG_COUNT(d) 0
+
+#else	/* !CONFIG_X86_64 */
+
+#define KDB_X86_64 0
+#define desc_ptr Xgt_desc_struct
+#define	MOVLQ "movl"
+
+/* i386 has no detailed mapping for the 8 byte segment descriptor, copy the
+ * x86_64 one and merge the l and avl bits.
+ */
+struct kdb_desc {
+	u16 limit0;
+	u16 base0;
+	unsigned base1 : 8, type : 4, s : 1, dpl : 2, p : 1;
+	unsigned limit : 4, avl : 2, d : 1, g : 1, base2 : 8;
+} __attribute__((packed));
+typedef struct kdb_desc kdb_desc_t;
+
+/* i386 has no detailed mapping for the 8 byte gate descriptor, base it on the
+ * x86_64 one.
+ */
+struct kdb_gate_desc {
+	u16 offset_low;
+	u16 segment;
+	unsigned res : 8, type : 4, s : 1, dpl : 2, p : 1;
+	u16 offset_middle;
+} __attribute__((packed));
+typedef struct kdb_gate_desc kdb_gate_desc_t;
+
+#define KDB_SYS_DESC_OFFSET(d) ((unsigned long)(d->offset_middle << 16 | d->offset_low))
+#define KDB_SYS_DESC_CALLG_COUNT(d) ((unsigned int)(d->res & 0x0F))
+
+#endif	/* CONFIG_X86_64 */
 
 #define KDB_SEL_MAX 			0x2000
 #define KDB_IDT_MAX 			0x100
-#define KDB_SYS_DESC_TYPE_TSS		0x01
+#define KDB_SYS_DESC_TYPE_TSS16		0x01
 #define KDB_SYS_DESC_TYPE_LDT		0x02
-#define KDB_SYS_DESC_TYPE_TSSB		0x03
-#define KDB_SYS_DESC_TYPE_CALLG		0x04
+#define KDB_SYS_DESC_TYPE_TSSB16	0x03
+#define KDB_SYS_DESC_TYPE_CALLG16	0x04
 #define KDB_SYS_DESC_TYPE_TASKG		0x05
-#define KDB_SYS_DESC_TYPE_INTG		0x06
-#define KDB_SYS_DESC_TYPE_TRAPG		0x07
+#define KDB_SYS_DESC_TYPE_INTG16	0x06
+#define KDB_SYS_DESC_TYPE_TRAP16	0x07
 
-#define KDB_SYS_DESC_TYPE_TSS32 	0x09
-#define KDB_SYS_DESC_TYPE_TSS32B	0x0b
-#define KDB_SYS_DESC_TYPE_CALLG32	0x0c
-#define KDB_SYS_DESC_TYPE_INTG32	0x0e
-#define KDB_SYS_DESC_TYPE_TRAPG32	0x0f
-
-#define KDB_SYS_DESC_OFFSET(d) ((unsigned long)(d->offset_h << 16 | d->offset))
-#define KDB_SYS_DESC_CALLG_COUNT(d) ((unsigned int)(d->res & 0x0F))
+#define KDB_SYS_DESC_TYPE_TSS 		0x09
+#define KDB_SYS_DESC_TYPE_TSSB		0x0b
+#define KDB_SYS_DESC_TYPE_CALLG		0x0c
+#define KDB_SYS_DESC_TYPE_INTG		0x0e
+#define KDB_SYS_DESC_TYPE_TRAPG		0x0f
 
 #define KDB_SEG_DESC_TYPE_CODE		0x08
 #define KDB_SEG_DESC_TYPE_CODE_R	0x02
@@ -78,34 +99,53 @@ typedef struct _kdb_gate_desc {
 #define KDB_SEG_DESC_TYPE_DATA_D	0x02    /* expand-down */
 #define KDB_SEG_DESC_TYPE_A		0x01	/* accessed */
 
-#define KDB_SEG_DESC_BASE(d) ((unsigned long)(d->base_h2 << 24 | d->base_h1 << 16 | d->base))
-#define _LIMIT(d) ((unsigned long)(d->limit_h << 16 | d->limit))
-#define KDB_SEG_DESC_LIMIT(d) (d->g ? ((_LIMIT(d)+1) << 12) -1 : _LIMIT(d))
+#define _LIMIT(d) ((unsigned long)((d)->limit << 16 | (d)->limit0))
+#define KDB_SEG_DESC_LIMIT(d) ((d)->g ? ((_LIMIT(d)+1) << 12) -1 : _LIMIT(d))
+
+static unsigned long kdb_seg_desc_base(kdb_desc_t *d)
+{
+	unsigned long base = d->base2 << 24 | d->base1 << 16 | d->base0;
+#ifdef	CONFIG_X86_64
+	switch (d->type) {
+	case KDB_SYS_DESC_TYPE_TSS:
+	case KDB_SYS_DESC_TYPE_TSSB:
+	case KDB_SYS_DESC_TYPE_LDT:
+		base += (unsigned long)(((struct ldttss_desc *)d)->base3) << 32;
+		break;
+	}
+#endif
+	return base;
+}
 
 /* helper functions to display system registers in verbose mode */
 static void display_gdtr(void)
 {
-	struct Xgt_desc_struct gdtr;
+	struct desc_ptr gdtr;
 
 	__asm__ __volatile__ ("sgdt %0\n\t" : "=m"(gdtr));
-	kdb_printf("gdtr.address = 0x%8.8lx, gdtr.size = 0x%x\n", gdtr.address, gdtr.size);
+	kdb_printf("gdtr.address = " kdb_machreg_fmt0 ", gdtr.size = 0x%x\n",
+		   gdtr.address, gdtr.size);
 
 	return;
 }
 
 static void display_ldtr(void)
 {
-	struct Xgt_desc_struct gdtr;
+	struct desc_ptr gdtr;
 	unsigned long ldtr;
 
 	__asm__ __volatile__ ("sgdt %0\n\t" : "=m"(gdtr));
 	__asm__ __volatile__ ("sldt %0\n\t" : "=m"(ldtr));
+	ldtr &= 0xfff8;		/* extract the index */
 
-	kdb_printf("ldtr = 0x%8.8lx ", ldtr);
+	kdb_printf("ldtr = " kdb_machreg_fmt0 " ", ldtr);
 
 	if (ldtr < gdtr.size) {
-		kdb_desc_t *ldt_desc = (kdb_desc_t *)(gdtr.address + (ldtr & ~7));
-		kdb_printf("base=0x%8.8lx, limit=0x%8.8lx\n", KDB_SEG_DESC_BASE(ldt_desc),
+		kdb_desc_t *ldt_desc =
+			(kdb_desc_t *)(gdtr.address + ldtr);
+		kdb_printf("base=" kdb_machreg_fmt0
+			   ", limit=" kdb_machreg_fmt "\n",
+				kdb_seg_desc_base(ldt_desc),
 				KDB_SEG_DESC_LIMIT(ldt_desc));
 	} else {
 		kdb_printf("invalid\n");
@@ -116,13 +156,14 @@ static void display_ldtr(void)
 
 static void display_idtr(void)
 {
-	struct Xgt_desc_struct idtr;
+	struct desc_ptr idtr;
 	__asm__ __volatile__ ("sidt %0\n\t" : "=m"(idtr));
-	kdb_printf("idtr.address = 0x%8.8lx, idtr.size = 0x%x\n", idtr.address, idtr.size);
+	kdb_printf("idtr.address = " kdb_machreg_fmt0 ", idtr.size = 0x%x\n",
+		   idtr.address, idtr.size);
 	return;
 }
 
-static char *cr0_flags[] = {
+static const char *cr0_flags[] = {
 	"pe", "mp", "em", "ts", "et", "ne", NULL, NULL,
 	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 	"wp", NULL, "am", NULL, NULL, NULL, NULL, NULL,
@@ -132,11 +173,11 @@ static void display_cr0(void)
 {
 	kdb_machreg_t cr0;
 	int i;
-	__asm__ ("movl %%cr0,%0\n\t":"=r"(cr0));
-	kdb_printf("cr0=0x%08lx ", cr0);
-	for (i = 0; i < 32; i++) {
+	__asm__ (MOVLQ " %%cr0,%0\n\t":"=r"(cr0));
+	kdb_printf("cr0 = " kdb_machreg_fmt0, cr0);
+	for (i = 0; i < ARRAY_SIZE(cr0_flags); i++) {
 		if (test_bit(i, &cr0) && cr0_flags[i])
-			kdb_printf("%s ", cr0_flags[i]);
+			kdb_printf(" %s", cr0_flags[i]);
 	}
 	kdb_printf("\n");
 	return;
@@ -145,31 +186,44 @@ static void display_cr0(void)
 static void display_cr3(void)
 {
 	kdb_machreg_t cr3;
-	__asm__ ("movl %%cr3,%0\n\t":"=r"(cr3));
-	kdb_printf("cr3 = 0x%08lx ", cr3);
+	__asm__ (MOVLQ " %%cr3,%0\n\t":"=r"(cr3));
+	kdb_printf("cr3 = " kdb_machreg_fmt0 " ", cr3);
 	if (cr3 & 0x08)
 		kdb_printf("pwt ");
 	if (cr3 & 0x10)
 		kdb_printf("pcd ");
-	kdb_printf("pgdir=%8.8lx\n", cr3 & PAGE_MASK);
+	kdb_printf("%s=" kdb_machreg_fmt0 "\n",
+		   KDB_X86_64 ? "pml4" : "pgdir", cr3 & PAGE_MASK);
 	return;
 }
 
-static char *cr4_flags[] = {
-	"vme", "pvi", "tsd", "de", "pse", "pae", "mce", "pge", "pce"};
+static const char *cr4_flags[] = {
+	"vme", "pvi", "tsd", "de",
+	"pse", "pae", "mce", "pge",
+	"pce", "osfxsr" "osxmmexcpt"};
 
 static void display_cr4(void)
 {
 	kdb_machreg_t cr4;
 	int i;
-	__asm__ ("movl %%cr4,%0\n\t":"=r"(cr4));
-	kdb_printf("cr4 = 0x%08lx ", cr4);
-	for (i = 0; i < 9; i++) {
+	__asm__ (MOVLQ " %%cr4,%0\n\t":"=r"(cr4));
+	kdb_printf("cr4 = " kdb_machreg_fmt0, cr4);
+	for (i = 0; i < ARRAY_SIZE(cr4_flags); i++) {
 		if (test_bit(i, &cr4))
-			kdb_printf("%s ", cr4_flags[i]);
+			kdb_printf(" %s", cr4_flags[i]);
 	}
 	kdb_printf("\n");
 	return;
+}
+
+static void display_cr8(void)
+{
+#ifdef	CONFIG_X86_64
+	kdb_machreg_t cr8;
+	__asm__ (MOVLQ " %%cr8,%0\n\t":"=r"(cr8));
+	kdb_printf("cr8 = " kdb_machreg_fmt0 "\n", cr8);
+	return;
+#endif	/* CONFIG_X86_64 */
 }
 
 static char *dr_type_name[] = { "exec", "write", "io", "rw" };
@@ -181,7 +235,7 @@ static void display_dr_status(int nr, int enabled, int local, int len, int type)
 		return;
 	}
 
-	kdb_printf("\tdebug register %d: %s, len = %d, type = %s\n",
+	kdb_printf("    debug register %d: %s, len = %d, type = %s\n",
 			nr,
 			local? " local":"global",
 			len,
@@ -193,16 +247,17 @@ static void display_dr(void)
 	kdb_machreg_t dr0, dr1, dr2, dr3, dr6, dr7;
 	int dbnr, set;
 
-	__asm__ ("movl %%db0,%0\n\t":"=r"(dr0));
-	__asm__ ("movl %%db1,%0\n\t":"=r"(dr1));
-	__asm__ ("movl %%db2,%0\n\t":"=r"(dr2));
-	__asm__ ("movl %%db3,%0\n\t":"=r"(dr3));
-	__asm__ ("movl %%db6,%0\n\t":"=r"(dr6));
-	__asm__ ("movl %%db7,%0\n\t":"=r"(dr7));
+	__asm__ (MOVLQ " %%db0,%0\n\t":"=r"(dr0));
+	__asm__ (MOVLQ " %%db1,%0\n\t":"=r"(dr1));
+	__asm__ (MOVLQ " %%db2,%0\n\t":"=r"(dr2));
+	__asm__ (MOVLQ " %%db3,%0\n\t":"=r"(dr3));
+	__asm__ (MOVLQ " %%db6,%0\n\t":"=r"(dr6));
+	__asm__ (MOVLQ " %%db7,%0\n\t":"=r"(dr7));
 
-	kdb_printf("dr0 = 0x%08lx dr1 = 0x%08lx dr2 = 0x%08lx dr3 = 0x%08lx\n",
+	kdb_printf("dr0 = " kdb_machreg_fmt0 " dr1 = " kdb_machreg_fmt0
+		   " dr2 = " kdb_machreg_fmt0 " dr3 = " kdb_machreg_fmt0 "\n",
 		   dr0, dr1, dr2, dr3);
-	kdb_printf("dr6 = 0x%08lx ", dr6);
+	kdb_printf("dr6 = " kdb_machreg_fmt0 " ", dr6);
 	dbnr = dr6 & DR6_DR_MASK;
 	if (dbnr) {
 		int nr;
@@ -224,7 +279,7 @@ static void display_dr(void)
 	}
 	kdb_printf("\n");
 
-	kdb_printf("dr7 = 0x%08lx\n", dr7);
+	kdb_printf("dr7 = " kdb_machreg_fmt0 "\n", dr7);
 	set = DR7_L0(dr7) || DR7_G0(dr7);
 	display_dr_status(0, set, DR7_L0(dr7), DR7_LEN0(dr7), DR7_RW0(dr7));
 	set = DR7_L1(dr7) || DR7_G1(dr7);
@@ -238,120 +293,166 @@ static void display_dr(void)
 static char *set_eflags[] = {
 	"carry", NULL, "parity",  NULL, "adjust",  NULL, "zero", "sign",
 	"trace", "intr-on", "dir", "overflow",  NULL, NULL, "nestedtask", NULL,
-	"resume", "vm", "align", "vif", "vip", "id", NULL, NULL,
-	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL};
+	"resume", "vm", "align", "vif", "vip", "id"};
 
 static void display_eflags(unsigned long ef)
 {
 	int i, iopl;
-	kdb_printf("eflags = 0x%08lx ", ef);
-	for (i = 0; i < 22; i++) {
+	kdb_printf("eflags = " kdb_machreg_fmt0 " ", ef);
+	for (i = 0; i < ARRAY_SIZE(set_eflags); i++) {
 		if (test_bit(i, &ef) && set_eflags[i])
 			kdb_printf("%s ", set_eflags[i]);
 	}
 
-	iopl = ((unsigned long)(ef & 0x00003000)) >> 12;
-	kdb_printf("iopl=%c\n", '0'+iopl);
+	iopl = (ef & 0x00003000) >> 12;
+	kdb_printf("iopl=%d\n", iopl);
 	return;
 }
 
 static void display_tss(struct tss_struct *t)
 {
-	kdb_printf("    cs = %04x,  eip = 0x%8.8lx\n", t->es, t->eip);
-	kdb_printf("    ss = %04x,  esp = 0x%8.8lx\n", t->ss, t->esp);
-	kdb_printf("   ss0 = %04x, esp0 = 0x%8.8lx\n", t->ss0, t->esp0);
-	kdb_printf("   ss1 = %04x, esp1 = 0x%8.8lx\n", t->ss1, t->esp1);
-	kdb_printf("   ss2 = %04x, esp2 = 0x%8.8lx\n", t->ss2, t->esp2);
-	kdb_printf("   ldt = %04x, cr3 = 0x%8.8lx\n", t->ldt, t->__cr3);
+#ifdef	CONFIG_X86_64
+	int i;
+	kdb_printf("    rsp0 = 0x%016Lx,  rsp1 = 0x%016Lx\n",
+		   t->rsp0, t->rsp1);
+	kdb_printf("    rsp2 = 0x%016Lx\n", t->rsp2);
+	for (i = 0; i < ARRAY_SIZE(t->ist); ++i)
+		kdb_printf("    ist[%d] = 0x%016Lx\n",
+			  i, t->ist[i]);
+	kdb_printf("   iomap = 0x%04x\n", t->io_bitmap_base);
+#else	/* !CONFIG_X86_64 */
+	kdb_printf("    cs = %04x,  eip = " kdb_machreg_fmt0 "\n",
+		   t->es, t->eip);
+	kdb_printf("    ss = %04x,  esp = " kdb_machreg_fmt0 "\n",
+		   t->ss, t->esp);
+	kdb_printf("   ss0 = %04x, esp0 = " kdb_machreg_fmt0 "\n",
+		   t->ss0, t->esp0);
+	kdb_printf("   ss1 = %04x, esp1 = " kdb_machreg_fmt0 "\n",
+		   t->ss1, t->esp1);
+	kdb_printf("   ss2 = %04x, esp2 = " kdb_machreg_fmt0 "\n",
+		   t->ss2, t->esp2);
+	kdb_printf("   ldt = %04x, cr3 = " kdb_machreg_fmt0 "\n",
+		   t->ldt, t->__cr3);
 	kdb_printf("    ds = %04x, es = %04x fs = %04x gs = %04x\n",
 			t->ds, t->es, t->fs, t->gs);
-	kdb_printf("   eax = 0x%8.8lx, ebx = 0x%8.8lx ecx = 0x%8.8lx edx = 0x%8.8lx\n",
-			t->eax, t->ebx, t->ecx, t->edx);
-	kdb_printf("   esi = 0x%8.8lx, edi = 0x%8.8lx ebp = 0x%8.8lx\n",
-			t->esi, t->edi, t->ebp);
+	kdb_printf("   eax = " kdb_machreg_fmt0 ", ebx = " kdb_machreg_fmt0
+		   " ecx = " kdb_machreg_fmt0 " edx = " kdb_machreg_fmt0 "\n",
+		   t->eax, t->ebx, t->ecx, t->edx);
+	kdb_printf("   esi = " kdb_machreg_fmt0 ", edi = " kdb_machreg_fmt0
+		   " ebp = " kdb_machreg_fmt0 "\n",
+		   t->esi, t->edi, t->ebp);
+	kdb_printf("   trace = %d, iomap = 0x%04x\n", t->trace, t->io_bitmap_base);
+#endif	/* CONFIG_X86_64 */
 }
 
 static char *gate_desc_types[] = {
-	"invalid", "tss-avlb", "ldt", "tss-busy",
-	"callgate", "taskgate", "intgate", "trapgate",
-	"invalid", "tss32-avlb", "invalid", "tss32-busy",
-	"callgate32", "invalid", "intgate32", "trapgate32",
-	NULL };
+#ifdef	CONFIG_X86_64
+	"reserved-0", "reserved-1", "ldt", "reserved-3",
+	"reserved-4", "reserved-5", "reserved-6", "reserved-7",
+	"reserved-8", "tss-avlb", "reserved-10", "tss-busy",
+	"callgate", "reserved-13", "intgate", "trapgate",
+#else	/* CONFIG_X86_64 */
+	"reserved-0", "tss16-avlb", "ldt", "tss16-busy",
+	"callgate16", "taskgate", "intgate16", "trapgate16",
+	"reserved-8", "tss-avlb", "reserved-10", "tss-busy",
+	"callgate", "reserved-13", "intgate", "trapgate",
+#endif	/* CONFIG_X86_64 */
+};
 
-static int
-display_gate_desc(kdb_gate_desc_t * d)
+static void
+display_gate_desc(kdb_gate_desc_t *d)
 {
 	kdb_printf("%-11s ", gate_desc_types[d->type]);
 
 	switch(d->type) {
 	case KDB_SYS_DESC_TYPE_LDT:
-		kdb_printf("base=0x%8.8lx limit=0x%8.8lx dpl=%d\n",
-			KDB_SEG_DESC_BASE(((kdb_desc_t *)d)),
-			KDB_SEG_DESC_LIMIT(((kdb_desc_t *)d)), d->dpl);
+		kdb_printf("base=");
+	       	kdb_symbol_print(kdb_seg_desc_base((kdb_desc_t *)d), NULL,
+				 KDB_SP_DEFAULT);
+		kdb_printf(" limit=" kdb_machreg_fmt " dpl=%d\n",
+			   KDB_SEG_DESC_LIMIT((kdb_desc_t *)d), d->dpl);
 		break;
-	case KDB_SYS_DESC_TYPE_TSS32:
-	case KDB_SYS_DESC_TYPE_TSS32B:
+	case KDB_SYS_DESC_TYPE_TSS:
+	case KDB_SYS_DESC_TYPE_TSS16:
+	case KDB_SYS_DESC_TYPE_TSSB:
+	case KDB_SYS_DESC_TYPE_TSSB16:
 	{
-		struct tss_struct *tss = (struct tss_struct *)KDB_SEG_DESC_BASE(((kdb_desc_t *)d));
-		kdb_printf("base=0x%8.8lx limit=0x%8.8lx dpl=%d\n",
-			(unsigned long)tss,
-			KDB_SEG_DESC_LIMIT(((kdb_desc_t *)d)), d->dpl);
+		struct tss_struct *tss =
+			(struct tss_struct *)
+			kdb_seg_desc_base((kdb_desc_t *)d);
+		kdb_printf("base=");
+	       	kdb_symbol_print((unsigned long)tss, NULL, KDB_SP_DEFAULT);
+		kdb_printf(" limit=" kdb_machreg_fmt " dpl=%d\n",
+			   KDB_SEG_DESC_LIMIT((kdb_desc_t *)d), d->dpl);
 		display_tss(tss);
 		break;
 	}
-	case KDB_SYS_DESC_TYPE_CALLG:
-		kdb_printf("sel=0x%4.4x off=0x%8.8lx dpl=%d wc=%d\n",
-			d->sel, KDB_SYS_DESC_OFFSET(d), d->dpl,
-			KDB_SYS_DESC_CALLG_COUNT(d));
+	case KDB_SYS_DESC_TYPE_CALLG16:
+		kdb_printf("segment=0x%4.4x off=", d->segment);
+	       	kdb_symbol_print(KDB_SYS_DESC_OFFSET(d), NULL, KDB_SP_DEFAULT);
+		kdb_printf(" dpl=%d wc=%d\n",
+			   d->dpl, KDB_SYS_DESC_CALLG_COUNT(d));
 		break;
-	case KDB_SYS_DESC_TYPE_CALLG32:
-		kdb_printf("sel=0x%4.4x off=0x%8.8lx dpl=%d dwc=%d\n",
-			d->sel, KDB_SYS_DESC_OFFSET(d), d->dpl,
-			KDB_SYS_DESC_CALLG_COUNT(d));
+	case KDB_SYS_DESC_TYPE_CALLG:
+		kdb_printf("segment=0x%4.4x off=", d->segment);
+	       	kdb_symbol_print(KDB_SYS_DESC_OFFSET(d), NULL, KDB_SP_DEFAULT);
+		kdb_printf(" dpl=%d\n", d->dpl);
 		break;
 	default:
-		kdb_printf("sel=0x%4.4x off=0x%8.8lx dpl=%d\n",
-			d->sel, KDB_SYS_DESC_OFFSET(d), d->dpl);
+		kdb_printf("segment=0x%4.4x off=", d->segment);
+		if (KDB_SYS_DESC_OFFSET(d))
+			kdb_symbol_print(KDB_SYS_DESC_OFFSET(d), NULL,
+					 KDB_SP_DEFAULT);
+		else
+			kdb_printf(kdb_machreg_fmt0, KDB_SYS_DESC_OFFSET(d));
+		kdb_printf(" dpl=%d", d->dpl);
+#ifdef	CONFIG_X86_64
+		if (d->ist)
+			kdb_printf(" ist=%d", d->ist);
+#endif	/* CONFIG_X86_64 */
+		kdb_printf("\n");
 		break;
 	}
-
-	return 0;
 }
 
-static int
-display_seg_desc(kdb_desc_t * d)
+static void
+display_seg_desc(kdb_desc_t *d)
 {
 	unsigned char type = d->type;
 
 	if (type & KDB_SEG_DESC_TYPE_CODE) {
-		kdb_printf("%-7s base=0x%8.8lx limit=0x%8.8lx dpl=%d %c%c%c %s %s %s \n",
-			"code",
-			KDB_SEG_DESC_BASE(d), KDB_SEG_DESC_LIMIT(d),
-			d->dpl,
-			(type & KDB_SEG_DESC_TYPE_CODE_R)?'r':'-',
-			'-', 'x',
-			d->db ? "32b" : "16b",
-			(type & KDB_SEG_DESC_TYPE_A)?"ac":"",
-			(type & KDB_SEG_DESC_TYPE_CODE_C)?"conf":"");
+		kdb_printf("%-11s base=" kdb_machreg_fmt0 " limit="
+			   kdb_machreg_fmt " dpl=%d %c%c%c %s %s %s \n",
+			   "code",
+			   kdb_seg_desc_base(d), KDB_SEG_DESC_LIMIT(d),
+			   d->dpl,
+			   (type & KDB_SEG_DESC_TYPE_CODE_R)?'r':'-',
+			   '-', 'x',
+#ifdef	CONFIG_X86_64
+			   d->l ? "64b" : d->d ? "32b" : "16b",
+#else	/* !CONFIG_X86_64 */
+			   d->d ? "32b" : "16b",
+#endif	/* CONFIG_X86_64 */
+			   (type & KDB_SEG_DESC_TYPE_A)?"ac":"",
+			   (type & KDB_SEG_DESC_TYPE_CODE_C)?"conf":"");
+	} else {
+		kdb_printf("%-11s base=" kdb_machreg_fmt0 " limit="
+			   kdb_machreg_fmt " dpl=%d %c%c%c %s %s %s \n",
+			   "data",
+			   kdb_seg_desc_base(d), KDB_SEG_DESC_LIMIT(d),
+			   d->dpl,
+			   'r',
+			   (type & KDB_SEG_DESC_TYPE_DATA_W)?'w':'-',
+			   '-',
+			   d->d ? "32b" : "16b",
+			   (type & KDB_SEG_DESC_TYPE_A)?"ac":"",
+			   (type & KDB_SEG_DESC_TYPE_DATA_D)?"down":"");
 	}
-	else {
-		kdb_printf("%-7s base=0x%8.8lx limit=0x%8.8lx dpl=%d %c%c%c %s %s %s \n",
-			"data",
-			KDB_SEG_DESC_BASE(d), KDB_SEG_DESC_LIMIT(d),
-			d->dpl,
-			'r',
-			(type & KDB_SEG_DESC_TYPE_DATA_W)?'w':'-',
-			'-',
-			d->db ? "32b" : "16b",
-			(type & KDB_SEG_DESC_TYPE_A)?"ac":"",
-			(type & KDB_SEG_DESC_TYPE_DATA_D)?"down":"");
-	}
-
-	return 0;
 }
 
 static int
-kdb_parse_two_numbers(int argc, const char **argv, int *sel, int *count, int *last_sel, int *last_count)
+kdb_parse_two_numbers(int argc, const char **argv, int *sel, int *count,
+		      int *last_sel, int *last_count)
 {
 	int diag;
 
@@ -396,8 +497,6 @@ kdb_parse_two_numbers(int argc, const char **argv, int *sel, int *count, int *la
  * Inputs:
  *	argc	argument count
  *	argv	argument vector
- *	envp	environment vector
- *	regs	registers at time kdb was entered.
  * Outputs:
  *	None.
  * Returns:
@@ -407,16 +506,17 @@ kdb_parse_two_numbers(int argc, const char **argv, int *sel, int *count, int *la
  * Remarks:
  */
 static int
-kdb_gdt(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdb_gdt(int argc, const char **argv)
 {
 	int sel = 0;
-	struct Xgt_desc_struct gdtr;
+	struct desc_ptr gdtr;
 	int diag, count = 8;
-	kdb_desc_t * gdt;
+	kdb_desc_t *gdt;
 	unsigned int max_sel;
 	static int last_sel = 0, last_count = 0;
 
-	diag = kdb_parse_two_numbers(argc, argv, &sel, &count, &last_sel, &last_count);
+	diag = kdb_parse_two_numbers(argc, argv, &sel, &count,
+				     &last_sel, &last_count);
 	if (diag)
 		return diag;
 
@@ -425,24 +525,30 @@ kdb_gdt(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 
 	max_sel = (gdtr.size + 1) / sizeof(kdb_desc_t);
 	if (sel >= max_sel) {
-		sel = 0;
+		kdb_printf("Maximum selector (%d) reached\n", max_sel);
+		return 0;
 	}
 
 	if (sel + count > max_sel)
 		count = max_sel - sel;
 
 	while (count--) {
-		kdb_desc_t * d = &gdt[sel];
+		kdb_desc_t *d = &gdt[sel];
 		kdb_printf("0x%4.4x ", sel++);
 
-		if (!d->present) {
+		if (!d->p) {
 			kdb_printf("not present\n");
 			continue;
 		}
-		if (d->seg)
+		if (d->s) {
 			display_seg_desc(d);
-		else
+		} else {
 			display_gate_desc((kdb_gate_desc_t *)d);
+			if (KDB_X86_64 && count) {
+				++sel;	/* this descriptor occupies two slots */
+				--count;
+			}
+		}
 	}
 
 	last_sel = sel;
@@ -459,8 +565,6 @@ kdb_gdt(int argc, const char **argv, const char **envp, struct pt_regs *regs)
  * Inputs:
  *	argc	argument count
  *	argv	argument vector
- *	envp	environment vector
- *	regs	registers at time kdb was entered.
  * Outputs:
  *	None.
  * Returns:
@@ -470,23 +574,26 @@ kdb_gdt(int argc, const char **argv, const char **envp, struct pt_regs *regs)
  * Remarks:
  */
 static int
-kdb_ldt(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdb_ldt(int argc, const char **argv)
 {
 	int sel = 0;
-	struct Xgt_desc_struct gdtr;
+	struct desc_ptr gdtr;
 	unsigned long ldtr = 0;
 	int diag, count = 8;
-	kdb_desc_t * ldt, *ldt_desc;
+	kdb_desc_t *ldt, *ldt_desc;
 	unsigned int max_sel;
 	static int last_sel = 0, last_count = 0;
 
-	diag = kdb_parse_two_numbers(argc, argv, &sel, &count, &last_sel, &last_count);
+	diag = kdb_parse_two_numbers(argc, argv, &sel, &count,
+				     &last_sel, &last_count);
 	if (diag)
 		return diag;
 
 	if (strcmp(argv[0], "ldtp") == 0) {
-		kdb_printf("pid=%d, process=%s\n", kdb_current_task->pid, kdb_current_task->comm);
-		if (!kdb_current_task->mm || !kdb_current_task->mm->context.ldt) {
+		kdb_printf("pid=%d, process=%s\n",
+			   kdb_current_task->pid, kdb_current_task->comm);
+		if (!kdb_current_task->mm ||
+		    !kdb_current_task->mm->context.ldt) {
 			kdb_printf("no special LDT for this process\n");
 			return 0;
 		}
@@ -497,32 +604,43 @@ kdb_ldt(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 		/* sldt gives the GDT selector for the segment containing LDT */
 		__asm__ __volatile__ ("sgdt %0\n\t" : "=m"(gdtr));
 		__asm__ __volatile__ ("sldt %0\n\t" : "=m"(ldtr));
+		ldtr &= 0xfff8;		/* extract the index */
 
 		if (ldtr > gdtr.size+1) {
 			kdb_printf("invalid ldtr\n");
 			return 0;
 		}
 
-		ldt_desc = (kdb_desc_t *)(gdtr.address + (ldtr & ~7));
-		ldt = (kdb_desc_t *) KDB_SEG_DESC_BASE(ldt_desc);
+		ldt_desc = (kdb_desc_t *)(gdtr.address + ldtr);
+		ldt = (kdb_desc_t *)kdb_seg_desc_base(ldt_desc);
 		max_sel = (KDB_SEG_DESC_LIMIT(ldt_desc)+1) / sizeof(kdb_desc_t);
 	}
 
 	if (sel >= max_sel) {
-		sel = 0;
+		kdb_printf("Maximum selector (%d) reached\n", max_sel);
+		return 0;
 	}
 
 	if (sel + count > max_sel)
 		count = max_sel - sel;
 
 	while (count--) {
-		kdb_desc_t * d = &ldt[sel];
+		kdb_desc_t *d = &ldt[sel];
 		kdb_printf("0x%4.4x ", sel++);
 
-		if (d->seg)
+		if (!d->p) {
+			kdb_printf("not present\n");
+			continue;
+		}
+		if (d->s) {
 			display_seg_desc(d);
-		else
+		} else {
 			display_gate_desc((kdb_gate_desc_t *)d);
+			if (KDB_X86_64 && count) {
+				++sel;	/* this descriptor occupies two slots */
+				--count;
+			}
+		}
 	}
 
 	last_sel = sel;
@@ -539,8 +657,6 @@ kdb_ldt(int argc, const char **argv, const char **envp, struct pt_regs *regs)
  * Inputs:
  *	argc	argument count
  *	argv	argument vector
- *	envp	environment vector
- *	regs	registers at time kdb was entered.
  * Outputs:
  *	None.
  * Returns:
@@ -550,41 +666,45 @@ kdb_ldt(int argc, const char **argv, const char **envp, struct pt_regs *regs)
  * Remarks:
  */
 static int
-kdb_idt(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdb_idt(int argc, const char **argv)
 {
 	int vec = 0;
-	struct Xgt_desc_struct idtr;
+	struct desc_ptr idtr;
 	int diag, count = 8;
-	kdb_gate_desc_t * idt;
+	kdb_gate_desc_t *idt;
 	unsigned int max_entries;
 	static int last_vec = 0, last_count = 0;
 
-	diag = kdb_parse_two_numbers(argc, argv, &vec, &count, &last_vec, &last_count);
+	diag = kdb_parse_two_numbers(argc, argv, &vec, &count,
+				     &last_vec, &last_count);
 	if (diag)
 		return diag;
 
 	__asm__ __volatile__ ("sidt %0\n\t" : "=m"(idtr));
-	idt = (kdb_gate_desc_t *) idtr.address;
+	idt = (kdb_gate_desc_t *)idtr.address;
 
 	max_entries = (idtr.size+1) / sizeof(kdb_gate_desc_t);
 	if (vec >= max_entries) {
-		vec = 0;
+		kdb_printf("Maximum vector (%d) reached\n", max_entries);
+		return 0;
 	}
 
 	if (vec + count > max_entries)
 		count = max_entries - vec;
 
 	while (count--) {
-		kdb_gate_desc_t * d = &idt[vec];
+		kdb_gate_desc_t *d = &idt[vec];
 		kdb_printf("0x%4.4x ", vec++);
-		if (!d->present) {
+		if (!d->p) {
 			kdb_printf("not present\n");
 			continue;
 		}
-		if (d->seg) {
+#ifndef	CONFIG_X86_64
+		if (d->s) {
 			kdb_printf("invalid\n");
 			continue;
 		}
+#endif	/* CONFIG_X86_64 */
 		display_gate_desc(d);
 	}
 
@@ -599,9 +719,9 @@ kdb_idt(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 static int
 get_pagetables(unsigned long addr, pgd_t **pgdir, pmd_t **pgmiddle, pte_t **pte)
 {
-	pgd_t * d;
-	pmd_t * m;
-	pte_t * t;
+	pgd_t *d;
+	pmd_t *m;
+	pte_t *t;
 
 	if (addr > PAGE_OFFSET) {
 		d = pgd_offset_k(addr);
@@ -765,8 +885,6 @@ display_pte(unsigned long addr, pte_t *pte, int count)
  * Inputs:
  *	argc	argument count
  *	argv	argument vector
- *	envp	environment vector
- *	regs	registers at time kdb was entered.
  * Outputs:
  *	None.
  * Returns:
@@ -776,7 +894,7 @@ display_pte(unsigned long addr, pte_t *pte, int count)
  * Remarks:
  */
 static int
-kdb_pte(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdb_pte(int argc, const char **argv)
 {
 	static unsigned long last_addr = 0, last_count = 0;
 	int count = 8;
@@ -801,7 +919,7 @@ kdb_pte(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 	} else {
 		kdb_machreg_t val;
 		int diag, nextarg = 1;
-		diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+		diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 		if (diag)
 			return diag;
 		if (argc > nextarg+1)
@@ -845,7 +963,7 @@ kdb_pte(int argc, const char **argv, const char **envp, struct pt_regs *regs)
  * renamed to pte_offset_kernel.
  */
 static int
-kdb_pte(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdb_pte(int argc, const char **argv)
 {
 	kdb_printf("not supported.");
 	return KDB_NOTIMP;
@@ -862,8 +980,6 @@ kdb_pte(int argc, const char **argv, const char **envp, struct pt_regs *regs)
  * Inputs:
  *	argc	argument count
  *	argv	argument vector
- *	envp	environment vector
- *	regs	registers at time kdb was entered.
  * Outputs:
  *	None.
  * Returns:
@@ -876,8 +992,9 @@ kdb_pte(int argc, const char **argv, const char **envp, struct pt_regs *regs)
  * 	that need not clutter arch/i386/kdb/kdbasupport.c.
  */
 static int
-kdb_rdv(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdb_rdv(int argc, const char **argv)
 {
+	struct pt_regs *regs = get_irq_regs();
 	kdba_dumpregs(regs, NULL, NULL);
 	kdb_printf("\n");
 	display_eflags(regs->eflags);
@@ -889,6 +1006,7 @@ kdb_rdv(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 	display_cr0();
 	display_cr3();
 	display_cr4();
+	display_cr8();
 	kdb_printf("\n");
 	display_dr();
 	return 0;

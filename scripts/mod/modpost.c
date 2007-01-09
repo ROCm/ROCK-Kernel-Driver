@@ -911,6 +911,7 @@ static int init_section_ref_ok(const char *name)
 		".toc1",  /* used by ppc64 */
 		".stab",
 		".rodata",
+		".parainstructions",
 		".text.lock",
 		"__bug_table", /* used by powerpc for BUG() */
 		".pci_fixup_header",
@@ -931,6 +932,7 @@ static int init_section_ref_ok(const char *name)
 		".altinstructions",
 		".eh_frame",
 		".debug",
+		".parainstructions",
 		NULL
 	};
 	/* part of section name */
@@ -995,6 +997,7 @@ static int exit_section_ref_ok(const char *name)
 		"__bug_table", /* used by powerpc for BUG() */
 		".exitcall.exit",
 		".eh_frame",
+		".parainstructions",
 		".stab",
 		"__ex_table",
 		".fixup",
@@ -1475,8 +1478,8 @@ int main(int argc, char **argv)
 	char fname[SZ];
 	char *kernel_read = NULL, *module_read = NULL;
 	char *dump_write = NULL;
-	const char *supported = NULL;
 	int opt;
+	const char *supported = NULL;
 	int err;
 
 	while ((opt = getopt(argc, argv, "i:I:mo:aws:")) != -1) {

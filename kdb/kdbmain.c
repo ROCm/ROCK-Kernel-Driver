@@ -41,6 +41,8 @@
 #endif
 #include <linux/cpu.h>
 
+#include <acpi/acpi_bus.h>
+
 #include <asm/system.h>
 #include <asm/kdebug.h>
 
@@ -401,8 +403,6 @@ kdbgetularg(const char *arg, unsigned long *value)
  * Inputs:
  *	argc	argument count
  *	argv	argument vector
- *	envp	environment vector
- *	regs	registers at time kdb was entered.
  * Outputs:
  *	None.
  * Returns:
@@ -413,7 +413,7 @@ kdbgetularg(const char *arg, unsigned long *value)
  */
 
 static int
-kdb_set(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdb_set(int argc, const char **argv)
 {
 	int i;
 	char *ep;
@@ -489,6 +489,17 @@ kdb_set(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 	return KDB_ENVFULL;
 }
 
+static int
+kdb_check_regs(void)
+{
+	if (!kdb_current_regs) {
+		kdb_printf("No current kdb registers."
+		           "  You may need to select another task\n");
+		return KDB_BADREG;
+	}
+	return 0;
+}
+
 /*
  * kdbgetaddrarg
  *
@@ -528,7 +539,7 @@ kdb_set(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 int
 kdbgetaddrarg(int argc, const char **argv, int *nextarg,
 	      kdb_machreg_t *value,  long *offset,
-	      char **name, struct pt_regs *regs)
+	      char **name)
 {
 	kdb_machreg_t addr;
 	long off = 0;
@@ -570,6 +581,8 @@ kdbgetaddrarg(int argc, const char **argv, int *nextarg,
 		if (diag)
 			return diag;
 	} else if (symname[0] == '%') {
+		if ((diag = kdb_check_regs()))
+			return diag;
 		diag = kdba_getregcontents(&symname[1], kdb_current_regs, &addr);
 		if (diag)
 			return diag;
@@ -679,8 +692,6 @@ kdb_cmderror(int diag)
  * Inputs:
  *	argc	argument count
  *	argv	argument vector
- *	envp	environment vector
- *	regs	registers at time kdb was entered.
  * Outputs:
  *	None.
  * Returns:
@@ -703,7 +714,7 @@ static int defcmd_set_count;
 static int defcmd_in_progress;
 
 /* Forward references */
-static int kdb_exec_defcmd(int argc, const char **argv, const char **envp, struct pt_regs *regs);
+static int kdb_exec_defcmd(int argc, const char **argv);
 
 static int
 kdb_defcmd2(const char *cmdstr, const char *argv0)
@@ -733,7 +744,7 @@ kdb_defcmd2(const char *cmdstr, const char *argv0)
 }
 
 static int
-kdb_defcmd(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdb_defcmd(int argc, const char **argv)
 {
 	struct defcmd_set *save_defcmd_set = defcmd_set, *s;
 	if (defcmd_in_progress) {
@@ -787,8 +798,6 @@ kdb_defcmd(int argc, const char **argv, const char **envp, struct pt_regs *regs)
  * Inputs:
  *	argc	argument count
  *	argv	argument vector
- *	envp	environment vector
- *	regs	registers at time kdb was entered.
  * Outputs:
  *	None.
  * Returns:
@@ -799,7 +808,7 @@ kdb_defcmd(int argc, const char **argv, const char **envp, struct pt_regs *regs)
  */
 
 static int
-kdb_exec_defcmd(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdb_exec_defcmd(int argc, const char **argv)
 {
 	int i, ret;
 	struct defcmd_set *s;
@@ -817,7 +826,7 @@ kdb_exec_defcmd(int argc, const char **argv, const char **envp, struct pt_regs *
 		/* Recursive use of kdb_parse, do not use argv after this point */
 		argv = NULL;
 		kdb_printf("[%s]kdb> %s\n", s->name, s->command[i]);
-		if ((ret = kdb_parse(s->command[i], regs)))
+		if ((ret = kdb_parse(s->command[i])))
 			return ret;
 	}
 	return 0;
@@ -866,7 +875,7 @@ static char cmd_cur[CMD_BUFLEN];
 #define MAXARGC	20
 
 int
-kdb_parse(const char *cmdstr, struct pt_regs *regs)
+kdb_parse(const char *cmdstr)
 {
 	static char *argv[MAXARGC];
 	static int argc = 0;
@@ -990,9 +999,7 @@ kdb_parse(const char *cmdstr, struct pt_regs *regs)
 		int result;
 		KDB_STATE_SET(CMD);
 		result = (*tp->cmd_func)(argc-1,
-				       (const char**)argv,
-				       (const char**)__env,
-				       regs);
+				       (const char**)argv);
 		if (result && ignore_errors && result > KDB_CMD_GO)
 			result = 0;
 		KDB_STATE_CLEAR(CMD);
@@ -1027,7 +1034,7 @@ kdb_parse(const char *cmdstr, struct pt_regs *regs)
 		int nextarg = 0;
 
 		if (kdbgetaddrarg(0, (const char **)argv, &nextarg,
-				  &value, &offset, &name, regs)) {
+				  &value, &offset, &name)) {
 			return KDB_NOTFOUND;
 		}
 
@@ -1079,12 +1086,12 @@ handle_ctrl_cmd(char *cmd)
  */
 
 static void
-kdb_do_dump(struct pt_regs *regs)
+kdb_do_dump(void)
 {
 #if defined(CONFIG_LKCD_DUMP) || defined(CONFIG_LKCD_DUMP_MODULE)
 	kdb_printf("Forcing dump (if configured)\n");
 	console_loglevel = 8;	/* to see the dump messages */
-	dump("kdb_do_dump", regs);
+	dump("kdb_do_dump");
 #endif
 }
 
@@ -1097,8 +1104,6 @@ kdb_do_dump(struct pt_regs *regs)
  * Inputs:
  *	argc	argument count
  *	argv	argument vector
- *	envp	environment vector
- *	regs	registers at time kdb was entered.
  * Outputs:
  *	None.
  * Returns:
@@ -1110,7 +1115,7 @@ kdb_do_dump(struct pt_regs *regs)
  */
 
 static int
-kdb_reboot(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdb_reboot(int argc, const char **argv)
 {
 	emergency_restart();
 	kdb_printf("Hmm, kdb_reboot did not reboot, spinning here\n");
@@ -1328,9 +1333,9 @@ kdb_local(kdb_reason_t reason, int error, struct pt_regs *regs, kdb_dbtrap_t db_
 			 * buffer in the dump.
 			 */
 			const char *setargs[] = { "set", "LOGGING", "1" };
-			kdb_set(2, setargs, NULL, regs);
-			kdb_do_dump(regs);
-			kdb_reboot(0, NULL, NULL, regs);
+			kdb_set(2, setargs);
+			kdb_do_dump();
+			kdb_reboot(0, NULL);
 			/*NOTREACHED*/
 		}
 
@@ -1367,7 +1372,7 @@ do_full_getstr:
 		}
 
 		cmdptr = cmd_head;
-		diag = kdb_parse(cmdbuf, regs);
+		diag = kdb_parse(cmdbuf);
 		if (diag == KDB_NOTFOUND) {
 			kdb_printf("Unknown kdb command: '%s'\n", cmdbuf);
 			diag = 0;
@@ -1592,6 +1597,22 @@ kdb_main_loop(kdb_reason_t reason, kdb_reason_t reason2, int error,
 	return result;
 }
 
+/* iapc_boot_arch was defined in ACPI 2.0, FADT revision 3 onwards.  For any
+ * FADT prior to revision 3, we have to assume that we have an i8042 I/O
+ * device.  ACPI initialises after KDB initialises but before using KDB, so
+ * check iapc_boot_arch on each entry to KDB.
+ */
+static void
+kdb_check_i8042(void)
+{
+	KDB_FLAG_CLEAR(NO_I8042);
+#ifdef	CONFIG_ACPI
+	if (acpi_fadt.revision >= 3 &&
+	    (acpi_fadt.iapc_boot_arch & BAF_8042_KEYBOARD_CONTROLLER) == 0)
+		KDB_FLAG_SET(NO_I8042);
+#endif	/* CONFIG_ACPI */
+}
+
 /*
  * kdb
  *
@@ -1708,7 +1729,7 @@ kdb_main_loop(kdb_reason_t reason, kdb_reason_t reason2, int error,
  *	  release all the cpus at once.
  */
 
-asmlinkage int
+fastcall int
 kdb(kdb_reason_t reason, int error, struct pt_regs *regs)
 {
 	kdb_intstate_t int_state;	/* Interrupt state */
@@ -1932,6 +1953,7 @@ kdb(kdb_reason_t reason, int error, struct pt_regs *regs)
 	 && !KDB_STATE(REENTRY)) {
 		KDB_STATE_CLEAR(HOLD_CPU);
 		KDB_STATE_CLEAR(WAIT_IPI);
+		kdb_check_i8042();
 		/*
 		 * Remove the global breakpoints.  This is only done
 		 * once from the initial processor on initial entry.
@@ -2099,8 +2121,6 @@ kdb_mdr(kdb_machreg_t addr, unsigned int count)
  * Inputs:
  *	argc	argument count
  *	argv	argument vector
- *	envp	environment vector
- *	regs	registers at time kdb was entered.
  * Outputs:
  *	None.
  * Returns:
@@ -2191,7 +2211,7 @@ kdb_md_line(const char *fmtstr, kdb_machreg_t addr,
 }
 
 static int
-kdb_md(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdb_md(int argc, const char **argv)
 {
 	static kdb_machreg_t last_addr;
 	static int last_radix, last_bytesperword, last_repeat;
@@ -2258,7 +2278,7 @@ kdb_md(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 	if (argc) {
 		kdb_machreg_t val;
 		int diag, nextarg = 1;
-		diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+		diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 		if (diag)
 			return diag;
 		if (argc > nextarg+2)
@@ -2375,8 +2395,6 @@ kdb_md(int argc, const char **argv, const char **envp, struct pt_regs *regs)
  * Inputs:
  *	argc	argument count
  *	argv	argument vector
- *	envp	environment vector
- *	regs	registers at time kdb was entered.
  * Outputs:
  *	None.
  * Returns:
@@ -2388,7 +2406,7 @@ kdb_md(int argc, const char **argv, const char **envp, struct pt_regs *regs)
  */
 
 static int
-kdb_mm(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdb_mm(int argc, const char **argv)
 {
 	int diag;
 	kdb_machreg_t addr;
@@ -2405,13 +2423,13 @@ kdb_mm(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 	}
 
 	nextarg = 1;
-	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs)))
+	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL)))
 		return diag;
 
 	if (nextarg > argc)
 		return KDB_ARGCOUNT;
 
-	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &contents, NULL, NULL, regs)))
+	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &contents, NULL, NULL)))
 		return diag;
 
 	if (nextarg != argc + 1)
@@ -2436,8 +2454,6 @@ kdb_mm(int argc, const char **argv, const char **envp, struct pt_regs *regs)
  * Inputs:
  *	argc	argument count
  *	argv	argument vector
- *	envp	environment vector
- *	regs	registers at time kdb was entered.
  * Outputs:
  *	None.
  * Returns:
@@ -2448,12 +2464,13 @@ kdb_mm(int argc, const char **argv, const char **envp, struct pt_regs *regs)
  */
 
 static int
-kdb_go(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdb_go(int argc, const char **argv)
 {
 	kdb_machreg_t addr;
 	int diag;
 	int nextarg;
 	long offset;
+	struct pt_regs *regs = get_irq_regs();
 
 	if (argc == 1) {
 		if (smp_processor_id() != kdb_initial_cpu) {
@@ -2462,7 +2479,7 @@ kdb_go(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 		}
 		nextarg = 1;
 		diag = kdbgetaddrarg(argc, argv, &nextarg,
-				     &addr, &offset, NULL, regs);
+				     &addr, &offset, NULL);
 		if (diag)
 			return diag;
 
@@ -2480,9 +2497,9 @@ kdb_go(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 			return 0;
 		}
 		if (kdb_continue_catastrophic == 2) {
-			kdb_do_dump(regs);
+			kdb_do_dump();
 			kdb_printf("forcing reboot\n");
-			kdb_reboot(0, NULL, NULL, regs);
+			kdb_reboot(0, NULL);
 		}
 		kdb_printf("attempting to continue\n");
 	}
@@ -2492,7 +2509,7 @@ kdb_go(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 		sprintf(buf, "cpu %d\n", kdb_initial_cpu);
 		/* Recursive use of kdb_parse, do not use argv after this point */
 		argv = NULL;
-		diag = kdb_parse(buf, regs);
+		diag = kdb_parse(buf);
 		if (diag == KDB_CMD_CPU)
 			KDB_STATE_SET_CPU(GO_SWITCH, kdb_initial_cpu);
 	}
@@ -2511,8 +2528,6 @@ kdb_go(int argc, const char **argv, const char **envp, struct pt_regs *regs)
  * Inputs:
  *	argc	argument count
  *	argv	argument vector
- *	envp	environment vector
- *	regs	registers at time kdb was entered.
  * Outputs:
  *	None.
  * Returns:
@@ -2523,9 +2538,12 @@ kdb_go(int argc, const char **argv, const char **envp, struct pt_regs *regs)
  */
 
 static int
-kdb_rd(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdb_rd(int argc, const char **argv)
 {
+	int diag;
 	if (argc == 0) {
+		if ((diag = kdb_check_regs()))
+			return diag;
 		return kdba_dumpregs(kdb_current_regs, NULL, NULL);
 	}
 
@@ -2533,6 +2551,8 @@ kdb_rd(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 		return KDB_ARGCOUNT;
 	}
 
+	if ((diag = kdb_check_regs()))
+		return diag;
 	return kdba_dumpregs(kdb_current_regs, argv[1], argc==2 ? argv[2]: NULL);
 }
 
@@ -2546,8 +2566,6 @@ kdb_rd(int argc, const char **argv, const char **envp, struct pt_regs *regs)
  * Inputs:
  *	argc	argument count
  *	argv	argument vector
- *	envp	environment vector
- *	regs	registers at time kdb was entered.
  * Outputs:
  *	None.
  * Returns:
@@ -2561,7 +2579,7 @@ kdb_rd(int argc, const char **argv, const char **envp, struct pt_regs *regs)
  */
 
 static int
-kdb_rm(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdb_rm(int argc, const char **argv)
 {
 	int diag;
 	int ind = 0;
@@ -2582,6 +2600,8 @@ kdb_rm(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 	if (diag)
 		return diag;
 
+	if ((diag = kdb_check_regs()))
+		return diag;
 	diag = kdba_setregcontents(&argv[1][ind], kdb_current_regs, contents);
 	if (diag)
 		return diag;
@@ -2601,8 +2621,6 @@ kdb_rm(int argc, const char **argv, const char **envp, struct pt_regs *regs)
  * Inputs:
  *	argc	argument count
  *	argv	argument vector
- *	envp	environment vector
- *	regs	registers at time kdb was entered.
  * Outputs:
  *	None.
  * Returns:
@@ -2613,18 +2631,18 @@ kdb_rm(int argc, const char **argv, const char **envp, struct pt_regs *regs)
  *	None.
  */
 static int
-kdb_sr(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdb_sr(int argc, const char **argv)
 {
-	extern int sysrq_enabled;
+	extern int __sysrq_enabled;
 	if (argc != 1) {
 		return KDB_ARGCOUNT;
 	}
-	if (!sysrq_enabled) {
+	if (!__sysrq_enabled) {
 		kdb_printf("Auto activating sysrq\n");
-		sysrq_enabled = 1;
+		__sysrq_enabled = 1;
 	}
 
-	handle_sysrq(*argv[1], regs, NULL);
+	handle_sysrq(*argv[1], NULL);
 
 	return 0;
 }
@@ -2642,8 +2660,6 @@ kdb_sr(int argc, const char **argv, const char **envp, struct pt_regs *regs)
  * Inputs:
  *	argc	argument count
  *	argv	argument vector
- *	envp	environment vector
- *	regs	registers at time kdb was entered.
  * Outputs:
  *	None.
  * Returns:
@@ -2655,7 +2671,7 @@ kdb_sr(int argc, const char **argv, const char **envp, struct pt_regs *regs)
  */
 
 static int
-kdb_ef(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdb_ef(int argc, const char **argv)
 {
 	int diag;
 	kdb_machreg_t addr;
@@ -2664,7 +2680,7 @@ kdb_ef(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 
 	if (argc == 1) {
 		nextarg = 1;
-		diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+		diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 		if (diag)
 			return diag;
 
@@ -2696,8 +2712,6 @@ struct module_use
  * Inputs:
  *	argc	argument count
  *	argv	argument vector
- *	envp	environment vector
- *	regs	registers at time kdb was entered.
  * Outputs:
  *	None.
  * Returns:
@@ -2709,7 +2723,7 @@ struct module_use
  */
 
 static int
-kdb_lsmod(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdb_lsmod(int argc, const char **argv)
 {
 	struct module *mod;
 
@@ -2756,8 +2770,6 @@ kdb_lsmod(int argc, const char **argv, const char **envp, struct pt_regs *regs)
  * Inputs:
  *	argc	argument count
  *	argv	argument vector
- *	envp	environment vector
- *	regs	registers at time kdb was entered.
  * Outputs:
  *	None.
  * Returns:
@@ -2768,7 +2780,7 @@ kdb_lsmod(int argc, const char **argv, const char **envp, struct pt_regs *regs)
  */
 
 static int
-kdb_env(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdb_env(int argc, const char **argv)
 {
 	int i;
 
@@ -2795,8 +2807,6 @@ kdb_env(int argc, const char **argv, const char **envp, struct pt_regs *regs)
  * Inputs:
  *	argc	argument count
  *	argv	argument vector
- *	envp	environment vector
- *	regs	registers at time kdb was entered.
  * Outputs:
  *	None.
  * Returns:
@@ -2808,7 +2818,7 @@ kdb_env(int argc, const char **argv, const char **envp, struct pt_regs *regs)
  */
 
 static int
-kdb_dmesg(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdb_dmesg(int argc, const char **argv)
 {
 	char *syslog_data[4], *start, *end, c = '\0', *p;
 	int diag, logging, logsize, lines = 0, adjust = 0, n;
@@ -2831,7 +2841,7 @@ kdb_dmesg(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 	diag = kdbgetintenv("LOGGING", &logging);
 	if (!diag && logging) {
 		const char *setargs[] = { "set", "LOGGING", "0" };
-		kdb_set(2, setargs, envp, regs);
+		kdb_set(2, setargs);
 	}
 
 	/* syslog_data[0,1] physical start, end+1.  syslog_data[2,3] logical start, end+1. */
@@ -2917,8 +2927,6 @@ kdb_dmesg(int argc, const char **argv, const char **envp, struct pt_regs *regs)
  * Inputs:
  *	argc	argument count
  *	argv	argument vector
- *	envp	environment vector
- *	regs	registers at time kdb was entered.
  * Outputs:
  *	None.
  * Returns:
@@ -2982,7 +2990,7 @@ kdb_cpu_status(void)
 }
 
 static int
-kdb_cpu(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdb_cpu(int argc, const char **argv)
 {
 	unsigned long cpunum;
 	int diag, i;
@@ -3072,8 +3080,6 @@ kdb_ps_suppressed(void)
  * Inputs:
  *	argc	argument count
  *	argv	argument vector
- *	envp	environment vector
- *	regs	registers at time kdb was entered.
  * Outputs:
  *	None.
  * Returns:
@@ -3107,7 +3113,7 @@ kdb_ps1(const struct task_struct *p)
 }
 
 static int
-kdb_ps(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdb_ps(int argc, const char **argv)
 {
 	struct task_struct *g, *p;
 	unsigned long mask, cpu;
@@ -3147,8 +3153,6 @@ kdb_ps(int argc, const char **argv, const char **envp, struct pt_regs *regs)
  * Inputs:
  *	argc	argument count
  *	argv	argument vector
- *	envp	environment vector
- *	regs	registers at time kdb was entered.
  * Outputs:
  *	None.
  * Returns:
@@ -3160,7 +3164,7 @@ kdb_ps(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 
 
 static int
-kdb_pid(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdb_pid(int argc, const char **argv)
 {
 	struct task_struct *p;
 	unsigned long val;
@@ -3202,8 +3206,6 @@ kdb_pid(int argc, const char **argv, const char **envp, struct pt_regs *regs)
  * Inputs:
  *	argc	argument count
  *	argv	argument vector
- *	envp	environment vector
- *	regs	registers at time kdb was entered.
  * Outputs:
  *	None.
  * Returns:
@@ -3214,7 +3216,7 @@ kdb_pid(int argc, const char **argv, const char **envp, struct pt_regs *regs)
  */
 
 static int
-kdb_ll(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdb_ll(int argc, const char **argv)
 {
 	int diag;
 	kdb_machreg_t addr;
@@ -3229,7 +3231,7 @@ kdb_ll(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 	}
 
 	nextarg = 1;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -3255,7 +3257,7 @@ kdb_ll(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 		char buf[80];
 
 		sprintf(buf, "%s " kdb_machreg_fmt "\n", command, va);
-		diag = kdb_parse(buf, regs);
+		diag = kdb_parse(buf);
 		if (diag)
 			return diag;
 
@@ -3276,8 +3278,6 @@ kdb_ll(int argc, const char **argv, const char **envp, struct pt_regs *regs)
  * Inputs:
  *	argc	argument count
  *	argv	argument vector
- *	envp	environment vector
- *	regs	registers at time kdb was entered.
  * Outputs:
  *	None.
  * Returns:
@@ -3288,15 +3288,17 @@ kdb_ll(int argc, const char **argv, const char **envp, struct pt_regs *regs)
  */
 
 static int
-kdb_help(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdb_help(int argc, const char **argv)
 {
 	kdbtab_t *kt;
+	int i;
 
 	kdb_printf("%-15.15s %-20.20s %s\n", "Command", "Usage", "Description");
 	kdb_printf("----------------------------------------------------------\n");
-	for(kt=kdb_commands; kt->cmd_name; kt++) {
-		kdb_printf("%-15.15s %-20.20s %s\n", kt->cmd_name,
-			kt->cmd_usage, kt->cmd_help);
+	for(i=0, kt=kdb_commands; i<kdb_max_commands; i++, kt++) {
+		if (kt->cmd_name)
+			kdb_printf("%-15.15s %-20.20s %s\n", kt->cmd_name,
+				   kt->cmd_usage, kt->cmd_help);
 	}
 	return 0;
 }
@@ -3311,8 +3313,6 @@ extern int kdb_wake_up_process(struct task_struct * p);
  * Inputs:
  *	argc	argument count
  *	argv	argument vector
- *	envp	environment vector
- *	regs	registers at time kdb was entered.
  * Outputs:
  *	None.
  * Returns:
@@ -3323,7 +3323,7 @@ extern int kdb_wake_up_process(struct task_struct * p);
  */
 
 static int
-kdb_kill(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdb_kill(int argc, const char **argv)
 {
 	long sig, pid;
 	char *endp;
@@ -3430,8 +3430,6 @@ kdb_sysinfo(struct sysinfo *val)
  * Inputs:
  *	argc	argument count
  *	argv	argument vector
- *	envp	environment vector
- *	regs	registers at time kdb was entered.
  * Outputs:
  *	None.
  * Returns:
@@ -3442,7 +3440,7 @@ kdb_sysinfo(struct sysinfo *val)
  */
 
 static int
-kdb_summary(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdb_summary(int argc, const char **argv)
 {
 	extern struct timespec xtime;
 	extern struct timezone sys_tz;
@@ -3452,12 +3450,12 @@ kdb_summary(int argc, const char **argv, const char **envp, struct pt_regs *regs
 	if (argc)
 		return KDB_ARGCOUNT;
 
-	kdb_printf("sysname    %s\n", system_utsname.sysname);
-	kdb_printf("release    %s\n", system_utsname.release);
-	kdb_printf("version    %s\n", system_utsname.version);
-	kdb_printf("machine    %s\n", system_utsname.machine);
-	kdb_printf("nodename   %s\n", system_utsname.nodename);
-	kdb_printf("domainname %s\n", system_utsname.domainname);
+	kdb_printf("sysname    %s\n", init_uts_ns.name.sysname);
+	kdb_printf("release    %s\n", init_uts_ns.name.release);
+	kdb_printf("version    %s\n", init_uts_ns.name.version);
+	kdb_printf("machine    %s\n", init_uts_ns.name.machine);
+	kdb_printf("nodename   %s\n", init_uts_ns.name.nodename);
+	kdb_printf("domainname %s\n", init_uts_ns.name.domainname);
 
 	kdb_gmtime(&xtime, &tm);
 	kdb_printf("date       %04d-%02d-%02d %02d:%02d:%02d tz_minuteswest %d\n",
@@ -3499,8 +3497,6 @@ kdb_summary(int argc, const char **argv, const char **envp, struct pt_regs *regs
  * Inputs:
  *	argc	argument count
  *	argv	argument vector
- *	envp	environment vector
- *	regs	registers at time kdb was entered.
  * Outputs:
  *	None.
  * Returns:
@@ -3511,7 +3507,7 @@ kdb_summary(int argc, const char **argv, const char **envp, struct pt_regs *regs
  */
 
 static int
-kdb_per_cpu(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdb_per_cpu(int argc, const char **argv)
 {
 	char buf[256], fmtstr[64];
 	kdb_symtab_t symtab;
@@ -3849,13 +3845,13 @@ kdb_cmd_init(void)
 	for (i = 0; kdb_cmds[i]; ++i) {
 		if (!defcmd_in_progress)
 			kdb_printf("kdb_cmd[%d]: %s", i, kdb_cmds[i]);
-		diag = kdb_parse(kdb_cmds[i], NULL);
+		diag = kdb_parse(kdb_cmds[i]);
 		if (diag)
 			kdb_printf("command failed, kdb diag %d\n", diag);
 	}
 	if (defcmd_in_progress) {
 		kdb_printf("Incomplete 'defcmd' set, forcing endefcmd\n");
-		kdb_parse("endefcmd", NULL);
+		kdb_parse("endefcmd");
 	}
 }
 
@@ -3967,7 +3963,6 @@ kdb_init(void)
 	kdb_inittab();		/* Initialize Command Table */
 	kdb_initbptab();	/* Initialize Breakpoint Table */
 	kdb_id_init();		/* Initialize Disassembler */
-	kdb_initsupport();	/* Initialize support routines */
 	kdba_init();		/* Architecture Dependent Initialization */
 
 	/*

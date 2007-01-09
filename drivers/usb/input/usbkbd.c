@@ -31,6 +31,9 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/usb/input.h>
+#ifdef	CONFIG_KDB_USB
+#include <linux/kdb.h>
+#endif
 
 /*
  * Version Information
@@ -80,10 +83,6 @@ struct usb_kbd {
 	dma_addr_t leds_dma;
 };
 
-#ifdef	CONFIG_KDB_USB
-#include <linux/kdb.h>
-#endif
-
 static void usb_kbd_irq(struct urb *urb)
 {
 	struct usb_kbd *kbd = urb->context;
@@ -126,7 +125,7 @@ static void usb_kbd_irq(struct urb *urb)
 	memcpy(kbd->old, kbd->new, 8);
 
 resubmit:
-	i = usb_submit_urb (urb, SLAB_ATOMIC);
+	i = usb_submit_urb (urb, GFP_ATOMIC);
 	if (i)
 		err ("can't resubmit intr, %s-%s/input0, status %d",
 				kbd->usbdev->bus->bus_name,
@@ -200,11 +199,11 @@ static int usb_kbd_alloc_mem(struct usb_device *dev, struct usb_kbd *kbd)
 		return -1;
 	if (!(kbd->led = usb_alloc_urb(0, GFP_KERNEL)))
 		return -1;
-	if (!(kbd->new = usb_buffer_alloc(dev, 8, SLAB_ATOMIC, &kbd->new_dma)))
+	if (!(kbd->new = usb_buffer_alloc(dev, 8, GFP_ATOMIC, &kbd->new_dma)))
 		return -1;
-	if (!(kbd->cr = usb_buffer_alloc(dev, sizeof(struct usb_ctrlrequest), SLAB_ATOMIC, &kbd->cr_dma)))
+	if (!(kbd->cr = usb_buffer_alloc(dev, sizeof(struct usb_ctrlrequest), GFP_ATOMIC, &kbd->cr_dma)))
 		return -1;
-	if (!(kbd->leds = usb_buffer_alloc(dev, 1, SLAB_ATOMIC, &kbd->leds_dma)))
+	if (!(kbd->leds = usb_buffer_alloc(dev, 1, GFP_ATOMIC, &kbd->leds_dma)))
 		return -1;
 
 	return 0;
@@ -212,10 +211,8 @@ static int usb_kbd_alloc_mem(struct usb_device *dev, struct usb_kbd *kbd)
 
 static void usb_kbd_free_mem(struct usb_device *dev, struct usb_kbd *kbd)
 {
-	if (kbd->irq)
-		usb_free_urb(kbd->irq);
-	if (kbd->led)
-		usb_free_urb(kbd->led);
+	usb_free_urb(kbd->irq);
+	usb_free_urb(kbd->led);
 	if (kbd->new)
 		usb_buffer_free(dev, 8, kbd->new, kbd->new_dma);
 	if (kbd->cr)
@@ -240,9 +237,7 @@ static int usb_kbd_probe(struct usb_interface *iface,
 		return -ENODEV;
 
 	endpoint = &interface->endpoint[0].desc;
-	if (!(endpoint->bEndpointAddress & USB_DIR_IN))
-		return -ENODEV;
-	if ((endpoint->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) != USB_ENDPOINT_XFER_INT)
+	if (!usb_endpoint_is_int_in(endpoint))
 		return -ENODEV;
 
 	pipe = usb_rcvintpipe(dev, endpoint->bEndpointAddress);

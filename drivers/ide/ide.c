@@ -187,12 +187,6 @@ int noautodma = 1;
 
 EXPORT_SYMBOL(noautodma);
 
-#ifdef CONFIG_BLK_DEV_IDEACPI
-int ide_noacpi = 0;
-int ide_noacpitfs = 1;
-int ide_noacpionboot = 1;
-#endif
-
 /*
  * This is declared extern in ide.h, for access by other IDE modules:
  */
@@ -979,8 +973,8 @@ ide_settings_t *ide_find_setting_by_name (ide_drive_t *drive, char *name)
  *	@drive: drive
  *
  *	Automatically remove all the driver specific settings for this
- *	drive. This function may sleep and must not be called from IRQ
- *	context. The caller must hold ide_setting_sem.
+ *	drive. This function may not be called from IRQ context. The
+ *	caller must hold ide_setting_sem.
  */
  
 static void auto_remove_settings (ide_drive_t *drive)
@@ -1220,14 +1214,9 @@ EXPORT_SYMBOL(system_bus_clock);
 static int generic_ide_suspend(struct device *dev, pm_message_t mesg)
 {
 	ide_drive_t *drive = dev->driver_data;
-	ide_hwif_t *hwif = HWIF(drive);
 	struct request rq;
 	struct request_pm_state rqpm;
 	ide_task_t args;
-
-	/* Call ACPI _GTM only once */
-	if (!(drive->dn % 2))
-		ide_acpi_get_timing(hwif);
 
 	memset(&rq, 0, sizeof(rq));
 	memset(&rqpm, 0, sizeof(rqpm));
@@ -1246,16 +1235,9 @@ static int generic_ide_suspend(struct device *dev, pm_message_t mesg)
 static int generic_ide_resume(struct device *dev)
 {
 	ide_drive_t *drive = dev->driver_data;
-	ide_hwif_t *hwif = HWIF(drive);
 	struct request rq;
 	struct request_pm_state rqpm;
 	ide_task_t args;
-
-	/* Call ACPI _STM only once */
-	if (!(drive->dn % 2))
-		ide_acpi_push_timing(hwif);
-
-	ide_acpi_exec_tfs(drive);
 
 	memset(&rq, 0, sizeof(rq));
 	memset(&rqpm, 0, sizeof(rqpm));
@@ -1560,24 +1542,6 @@ static int __init ide_setup(char *s)
 		return 1;
 	}
 #endif /* CONFIG_BLK_DEV_IDEPCI */
-
-#ifdef CONFIG_BLK_DEV_IDEACPI
-	if (!strcmp(s, "ide=noacpi")) {
-		//printk(" : Disable IDE ACPI support.\n");
-		ide_noacpi = 1;
-		return 1;
-	}
-	if (!strcmp(s, "ide=acpigtf")) {
-		//printk(" : Enable IDE ACPI _GTF support.\n");
-		ide_noacpitfs = 0;
-		return 1;
-	}
-	if (!strcmp(s, "ide=acpionboot")) {
-		//printk(" : Call IDE ACPI methods on boot.\n");
-		ide_noacpionboot = 0;
-		return 1;
-	}
-#endif /* CONFIG_BLK_DEV_IDEACPI */
 
 	/*
 	 * Look for drive options:  "hdx="
@@ -1910,11 +1874,22 @@ void ide_unregister_subdriver(ide_drive_t *drive, ide_driver_t *driver)
 {
 	unsigned long flags;
 	
-	down(&ide_setting_sem);
-	spin_lock_irqsave(&ide_lock, flags);
 #ifdef CONFIG_PROC_FS
 	ide_remove_proc_entries(drive->proc, driver->proc);
 #endif
+	down(&ide_setting_sem);
+	spin_lock_irqsave(&ide_lock, flags);
+	/*
+	 * ide_setting_sem protects the settings list
+	 * ide_lock protects the use of settings
+	 *
+	 * so we need to hold both, ide_settings_sem because we want to
+	 * modify the settings list, and ide_lock because we cannot take
+	 * a setting out that is being used.
+	 *
+	 * OTOH both ide_{read,write}_setting are only ever used under
+	 * ide_setting_sem.
+	 */
 	auto_remove_settings(drive);
 	spin_unlock_irqrestore(&ide_lock, flags);
 	up(&ide_setting_sem);

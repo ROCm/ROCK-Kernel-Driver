@@ -23,13 +23,11 @@ MODULE_LICENSE("GPL");
  * kdba_fru - capture FRU data
  * @argc: arg count
  * @argv: arg values
- * @envp: kdb env. vars
- * @regs: current register state
  *
  * Tell the system contollers to capture FRU data
  */
 static int
-kdba_fru(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdba_fru(int argc, const char **argv)
 {
 	u64 ret;
 

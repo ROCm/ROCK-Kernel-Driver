@@ -28,8 +28,6 @@ disassemble_info kdb_di;
  * Parameters:
  *	argc	Count of arguments in argv
  *	argv	Space delimited command line arguments
- *	envp	Environment value
- *	regs	Exception frame at entry to kernel debugger
  * Outputs:
  *	None.
  * Returns:
@@ -40,7 +38,7 @@ disassemble_info kdb_di;
  */
 
 int
-kdb_id(int argc, const char **argv, const char **envp, struct pt_regs* regs)
+kdb_id(int argc, const char **argv)
 {
 	kdb_machreg_t pc;
 	int icount;
@@ -70,7 +68,7 @@ kdb_id(int argc, const char **argv, const char **envp, struct pt_regs* regs)
 	 * try address.
 	 */
 	nextarg = 1;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &pc, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &pc, &offset, NULL);
 	if (diag)
 		return diag;
 	kdba_check_pc(&pc);

@@ -70,6 +70,7 @@
 #include <asm/pmac_feature.h>
 #include <asm/time.h>
 #include <asm/of_device.h>
+#include <asm/of_platform.h>
 #include <asm/mmu_context.h>
 #include <asm/iommu.h>
 #include <asm/smu.h>
@@ -361,7 +362,7 @@ char *bootdevice;
 void *boot_host;
 int boot_target;
 int boot_part;
-extern dev_t boot_dev;
+static dev_t boot_dev;
 
 #ifdef CONFIG_SCSI
 void __init note_scsi_host(struct device_node *node, void *host)
@@ -676,8 +677,6 @@ static int __init pmac_probe(void)
 
 #ifdef CONFIG_PPC32
 	/* isa_io_base gets set in pmac_pci_init */
-	isa_mem_base = PMAC_ISA_MEM_BASE;
-	pci_dram_offset = PMAC_PCI_DRAM_OFFSET;
 	ISA_DMA_THRESHOLD = ~0L;
 	DMA_MODE_READ = 1;
 	DMA_MODE_WRITE = 2;
@@ -719,6 +718,20 @@ static int pmac_pci_probe_mode(struct pci_bus *bus)
 }
 #endif
 
+#ifdef CONFIG_SERIAL_8250
+/*
+ * if both serial drivers exists, 8250 will be inited first
+ * it claims ttyS0 and pmac_zilog init fails
+ */
+int do_not_probe_pc_legacy_8250;
+EXPORT_SYMBOL(do_not_probe_pc_legacy_8250);
+#ifdef CONFIG_SERIAL_PMACZILOG
+static void pmac_pcibios_fixup(void) {
+	do_not_probe_pc_legacy_8250 = 1;
+}
+#endif
+#endif
+
 define_machine(powermac) {
 	.name			= "PowerMac",
 	.probe			= pmac_probe,
@@ -727,7 +740,10 @@ define_machine(powermac) {
 	.show_cpuinfo		= pmac_show_cpuinfo,
 	.init_IRQ		= pmac_pic_init,
 	.get_irq		= NULL,	/* changed later */
+#if defined(CONFIG_SERIAL_8250) && defined(CONFIG_SERIAL_PMACZILOG)
 	.pcibios_fixup		= pmac_pcibios_fixup,
+#endif
+	.pci_irq_fixup		= pmac_pci_irq_fixup,
 	.restart		= pmac_restart,
 	.power_off		= pmac_power_off,
 	.halt			= pmac_halt,

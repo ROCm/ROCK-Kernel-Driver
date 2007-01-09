@@ -240,7 +240,6 @@ $(ARCH_DIR)/include/user_constants.h: $(ARCH_DIR)/sys-$(SUBARCH)/user-offsets.s
 
 $(ARCH_DIR)/include/kern_constants.h: $(objtree)/$(ARCH_DIR)/include
 	@echo '  SYMLINK $@'
-	$(Q)mkdir -p $(ARCH_DIR)/include
 	$(Q)ln -sf ../../../include/asm-um/asm-offsets.h $@
 
 export SUBARCH USER_CFLAGS CFLAGS_NO_HARDENING OS

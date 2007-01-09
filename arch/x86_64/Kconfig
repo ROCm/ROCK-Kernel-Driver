@@ -96,6 +96,19 @@ config AUDIT_ARCH
 	bool
 	default y
 
+config GENERIC_BUG
+	bool
+	default y
+	depends on BUG
+
+config ARCH_HAS_ILOG2_U32
+	bool
+	default n
+
+config ARCH_HAS_ILOG2_U64
+	bool
+	default n
+
 source "init/Kconfig"
 
 
@@ -122,7 +135,7 @@ endchoice
 
 choice
 	prompt "Processor family"
-	default MK8
+	default GENERIC_CPU
 
 config MK8
 	bool "AMD-Opteron/Athlon64"
@@ -130,18 +143,49 @@ config MK8
 	  Optimize for AMD Opteron/Athlon64/Hammer/K8 CPUs.
 
 config MPSC
-       bool "Intel EM64T"
+       bool "Intel P4 / older Netburst based Xeon"
        help
-	  Optimize for Intel Pentium 4 and Xeon CPUs with Intel
-	  Extended Memory 64 Technology(EM64T). For details see
+	  Optimize for Intel Pentium 4 and older Nocona/Dempsey Xeon CPUs
+	  with Intel Extended Memory 64 Technology(EM64T). For details see
 	  <http://www.intel.com/technology/64bitextensions/>.
+	  Note the the latest Xeons (Xeon 51xx and 53xx) are not based on the
+          Netburst core and shouldn't use this option. You can distingush them
+	  using the cpu family field
+	  in /proc/cpuinfo. Family 15 is a older Xeon, Family 6 a newer one
+	  (this rule only applies to system that support EM64T)
+
+config MCORE2
+	bool "Intel Core2 / newer Xeon"
+	help
+	  Optimize for Intel Core2 and newer Xeons (51xx)
+	  You can distingush the newer Xeons from the older ones using
+	  the cpu family field in /proc/cpuinfo. 15 is a older Xeon
+	  (use CONFIG_MPSC then), 6 is a newer one. This rule only
+	  applies to CPUs that support EM64T.
 
 config GENERIC_CPU
 	bool "Generic-x86-64"
 	help
 	  Generic x86-64 CPU.
+	  Run equally well on all x86-64 CPUs.
 
 endchoice
+
+config X86_64_XEN
+	bool "Enable Xen compatible kernel"
+	select SWIOTLB
+	help
+	  This option will compile a kernel compatible with Xen hypervisor
+
+config X86_NO_TSS
+	bool
+	depends on X86_64_XEN
+	default y
+
+config X86_NO_IDT
+	bool
+	depends on X86_64_XEN
+	default y
 
 #
 # Define implied options from the CPU selection here
@@ -149,12 +193,12 @@ endchoice
 config X86_L1_CACHE_BYTES
 	int
 	default "128" if GENERIC_CPU || MPSC
-	default "64" if MK8
+	default "64" if MK8 || MCORE2
 
 config X86_L1_CACHE_SHIFT
 	int
 	default "7" if GENERIC_CPU || MPSC
-	default "6" if MK8
+	default "6" if MK8 || MCORE2
 
 config X86_INTERNODE_CACHE_BYTES
 	int
@@ -163,6 +207,7 @@ config X86_INTERNODE_CACHE_BYTES
 
 config X86_TSC
 	bool
+	depends on !X86_64_XEN
 	default y
 
 config X86_GOOD_APIC
@@ -211,7 +256,7 @@ config X86_CPUID
 
 config X86_HT
 	bool
-	depends on SMP && !MK8
+	depends on SMP && !MK8 && !X86_64_XEN
 	default y
 
 config MATH_EMULATION
@@ -225,14 +270,22 @@ config EISA
 
 config X86_IO_APIC
 	bool
+	depends !XEN_UNPRIVILEGED_GUEST
 	default y
+
+config X86_XEN_GENAPIC
+	bool
+	depends X86_64_XEN
+	default XEN_PRIVILEGED_GUEST || SMP
 
 config X86_LOCAL_APIC
 	bool
+	depends !XEN_UNPRIVILEGED_GUEST
 	default y
 
 config MTRR
 	bool "MTRR (Memory Type Range Register) support"
+	depends on !XEN_UNPRIVILEGED_GUEST
 	---help---
 	  On Intel P6 family processors (Pentium Pro, Pentium II and later)
 	  the Memory Type Range Registers (MTRRs) may be used to control
@@ -344,18 +397,13 @@ config ARCH_DISCONTIGMEM_ENABLE
        depends on NUMA
        default y
 
-
-config ARCH_DISCONTIGMEM_ENABLE
-	def_bool y
-	depends on NUMA
-
 config ARCH_DISCONTIGMEM_DEFAULT
 	def_bool y
 	depends on NUMA
 
 config ARCH_SPARSEMEM_ENABLE
 	def_bool y
-	depends on (NUMA || EXPERIMENTAL)
+	depends on (NUMA || EXPERIMENTAL) && !X86_64_XEN
 
 config ARCH_MEMORY_PROBE
 	def_bool y
@@ -405,6 +453,7 @@ config ARCH_ENABLE_MEMORY_HOTPLUG
 
 config HPET_TIMER
 	bool
+	depends on !X86_64_XEN
 	default y
 	help
 	  Use the IA-PC HPET (High Precision Event Timer) to manage
@@ -425,7 +474,7 @@ config IOMMU
 	default y
 	select SWIOTLB
 	select AGP
-	depends on PCI
+	depends on PCI && !X86_64_XEN
 	help
 	  Support for full DMA access of devices with 32bit memory access only
 	  on systems with more than 3GB. This is usually needed for USB,
@@ -455,12 +504,24 @@ config CALGARY_IOMMU
 	  Normally the kernel will make the right choice by itself.
 	  If unsure, say Y.
 
+config CALGARY_IOMMU_ENABLED_BY_DEFAULT
+	bool "Should Calgary be enabled by default?"
+	default y
+	depends on CALGARY_IOMMU
+	help
+	  Should Calgary be enabled by default? if you choose 'y', Calgary
+	  will be used (if it exists). If you choose 'n', Calgary will not be
+	  used even if it exists. If you choose 'n' and would like to use
+	  Calgary anyway, pass 'iommu=calgary' on the kernel command line.
+	  If unsure, say Y.
+
 # need this always selected by IOMMU for the VIA workaround
 config SWIOTLB
 	bool
 
 config X86_MCE
 	bool "Machine check support" if EMBEDDED
+	depends on !X86_64_XEN
 	default y
 	help
 	   Include a machine check error handler to report hardware errors.
@@ -550,7 +611,7 @@ config SECCOMP
 	  If unsure, say Y. Only embedded should say N here.
 
 config CC_STACKPROTECTOR
-	bool "Enable -fstack-protector buffer overflow detection (EXPRIMENTAL)"
+	bool "Enable -fstack-protector buffer overflow detection (EXPERIMENTAL)"
 	depends on EXPERIMENTAL
 	help
          This option turns on the -fstack-protector GCC feature. This
@@ -611,8 +672,11 @@ config GENERIC_PENDING_IRQ
 	default y
 
 menu "Power management options"
+	depends on !XEN_UNPRIVILEGED_GUEST
 
+if !X86_64_XEN
 source kernel/power/Kconfig
+endif
 
 source "drivers/acpi/Kconfig"
 
@@ -634,6 +698,21 @@ config PCI_DIRECT
 config PCI_MMCONFIG
 	bool "Support mmconfig PCI config space access"
 	depends on PCI && ACPI
+
+config XEN_PCIDEV_FRONTEND
+	bool "Xen PCI Frontend"
+	depends on PCI && X86_64_XEN
+	default y
+	help
+	  The PCI device frontend driver allows the kernel to import arbitrary
+	  PCI devices from a PCI backend to support PCI driver domains.
+
+config XEN_PCIDEV_FE_DEBUG
+	bool "Xen PCI Frontend Debugging"
+	depends on XEN_PCIDEV_FRONTEND
+	default n
+	help
+	  Enables some debug statements within the PCI Frontend.
 
 source "drivers/pci/pcie/Kconfig"
 
@@ -704,5 +783,7 @@ source "arch/x86_64/Kconfig.debug"
 source "security/Kconfig"
 
 source "crypto/Kconfig"
+
+source "drivers/xen/Kconfig"
 
 source "lib/Kconfig"

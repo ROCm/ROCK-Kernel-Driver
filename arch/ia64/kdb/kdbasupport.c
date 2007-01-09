@@ -18,6 +18,7 @@
 #include <linux/sched.h>
 #include <linux/kdb.h>
 #include <linux/kdbprivate.h>
+#include <linux/module.h>
 
 #include <asm/processor.h>
 #include <asm/uaccess.h>
@@ -32,7 +33,7 @@ struct kdb_running_process *kdb_running_process_save; /* [NR_CPUS] */
 static int kdba_show_handlers = 0;
 
 static int
-kdba_itm (int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdba_itm (int argc, const char **argv)
 {
 	int diag;
 	unsigned long val;
@@ -69,7 +70,7 @@ kdba_show_intregs(void)
 }
 
 static int
-kdba_sir (int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdba_sir (int argc, const char **argv)
 {
 	kdba_show_intregs();
 
@@ -84,8 +85,6 @@ kdba_sir (int argc, const char **argv, const char **envp, struct pt_regs *regs)
  * Inputs:
  *	argc	argument count
  *	argv	argument vector
- *	envp	environment vector
- *	regs	registers at time kdb was entered.
  * Outputs:
  *	None.
  * Returns:
@@ -93,11 +92,11 @@ kdba_sir (int argc, const char **argv, const char **envp, struct pt_regs *regs)
  * Locking:
  *	none.
  * Remarks:
- *	If no address is supplied, it uses regs.
+ *	If no address is supplied, it uses the current irq pt_regs.
  */
 
 static int
-kdba_pt_regs(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdba_pt_regs(int argc, const char **argv)
 {
 	int diag;
 	kdb_machreg_t addr;
@@ -106,10 +105,10 @@ kdba_pt_regs(int argc, const char **argv, const char **envp, struct pt_regs *reg
 	struct pt_regs *p;
 
 	if (argc == 0) {
-		addr = (kdb_machreg_t) regs;
+		addr = (kdb_machreg_t) get_irq_regs();
 	} else if (argc == 1) {
 		nextarg = 1;
-		diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+		diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 		if (diag)
 			return diag;
 	} else {
@@ -181,8 +180,6 @@ kdba_pt_regs(int argc, const char **argv, const char **envp, struct pt_regs *reg
  * Inputs:
  *	argc	argument count
  *	argv	argument vector
- *	envp	environment vector
- *	regs	registers at time kdb was entered.
  * Outputs:
  *	None.
  * Returns:
@@ -194,7 +191,7 @@ kdba_pt_regs(int argc, const char **argv, const char **envp, struct pt_regs *reg
  */
 
 static int
-kdba_stackdepth(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdba_stackdepth(int argc, const char **argv)
 {
 	int diag, threshold, used;
 	long percentage;
@@ -208,7 +205,7 @@ kdba_stackdepth(int argc, const char **argv, const char **envp, struct pt_regs *
 		percentage = 60;
 	} else if (argc == 1) {
 		nextarg = 1;
-		diag = kdbgetaddrarg(argc, argv, &nextarg, &percentage, &offset, NULL, regs);
+		diag = kdbgetaddrarg(argc, argv, &nextarg, &percentage, &offset, NULL);
 		if (diag)
 			return diag;
 	} else {
@@ -249,8 +246,6 @@ kdba_stackdepth(int argc, const char **argv, const char **envp, struct pt_regs *
  * Inputs:
  *	argc	argument count
  *	argv	argument vector
- *	envp	environment vector
- *	regs	registers at time kdb was entered.
  * Outputs:
  *	None.
  * Returns:
@@ -262,7 +257,7 @@ kdba_stackdepth(int argc, const char **argv, const char **envp, struct pt_regs *
  */
 
 static int
-kdba_switch_stack(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdba_switch_stack(int argc, const char **argv)
 {
 	int diag;
 	kdb_machreg_t addr;
@@ -274,7 +269,7 @@ kdba_switch_stack(int argc, const char **argv, const char **envp, struct pt_regs
 		addr = (kdb_machreg_t) kdb_running_process[smp_processor_id()].arch.sw;
 	} else if (argc == 1) {
 		nextarg = 1;
-		diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+		diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 		if (diag)
 			return diag;
 	} else {
@@ -337,8 +332,6 @@ kdba_switch_stack(int argc, const char **argv, const char **envp, struct pt_regs
  * Inputs:
  *	argc	argument count
  *	argv	argument vector
- *	envp	environment vector
- *	regs	registers at time kdb was entered.
  * Outputs:
  *	None.
  * Returns:
@@ -350,7 +343,7 @@ kdba_switch_stack(int argc, const char **argv, const char **envp, struct pt_regs
  */
 
 static int
-kdba_minstate(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdba_minstate(int argc, const char **argv)
 {
 	int diag;
 	kdb_machreg_t addr;
@@ -360,7 +353,7 @@ kdba_minstate(int argc, const char **argv, const char **envp, struct pt_regs *re
 
 	if (argc == 1) {
 		nextarg = 1;
-		diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+		diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 		if (diag)
 			return diag;
 	} else {
@@ -441,8 +434,6 @@ kdba_minstate(int argc, const char **argv, const char **envp, struct pt_regs *re
  * Inputs:
  *	argc	argument count
  *	argv	argument vector
- *	envp	environment vector
- *	regs	registers at time kdb was entered.
  * Outputs:
  *	None.
  * Returns:
@@ -454,7 +445,7 @@ kdba_minstate(int argc, const char **argv, const char **envp, struct pt_regs *re
  */
 
 static int
-kdba_cpuinfo(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdba_cpuinfo(int argc, const char **argv)
 {
 	int diag;
 	long cpunum = -1;
@@ -464,7 +455,7 @@ kdba_cpuinfo(int argc, const char **argv, const char **envp, struct pt_regs *reg
 
 	if (argc == 1) {
 		nextarg = 1;
-		diag = kdbgetaddrarg(argc, argv, &nextarg, &cpunum, &offset, NULL, regs);
+		diag = kdbgetaddrarg(argc, argv, &nextarg, &cpunum, &offset, NULL);
 		if (diag)
 			return diag;
 		if (cpunum >= NR_CPUS || !cpu_online(cpunum))
@@ -1053,6 +1044,7 @@ kdba_dumpregs(struct pt_regs *regs,
 	/* NOTREACHED */
 	return 0;
 }
+EXPORT_SYMBOL(kdba_dumpregs);
 
 kdb_machreg_t
 kdba_getpc(struct pt_regs *regs)
@@ -1195,8 +1187,6 @@ kdba_clearsinglestep(struct pt_regs *regs)
  * Parameters:
  *	argc	Count of arguments in argv
  *	argv	Space delimited command line arguments
- *	envp	Environment value
- *	regs	Exception frame at entry to kernel debugger
  * Outputs:
  *	None.
  * Returns:
@@ -1207,7 +1197,7 @@ kdba_clearsinglestep(struct pt_regs *regs)
  */
 #define __xtpa(x)		({ia64_va _v; asm("tpa %0=%1" : "=r"(_v.l) : "r"(x)); _v.l;})
 static int
-kdba_tpa(int argc, const char **argv, const char **envp, struct pt_regs* regs)
+kdba_tpa(int argc, const char **argv)
 {
 	kdb_machreg_t addr;
 	int diag;
@@ -1218,7 +1208,7 @@ kdba_tpa(int argc, const char **argv, const char **envp, struct pt_regs* regs)
 	nextarg = 1;
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 	if (kdb_getarea(c, addr))
@@ -1228,7 +1218,7 @@ kdba_tpa(int argc, const char **argv, const char **envp, struct pt_regs* regs)
 }
 #if defined(CONFIG_NUMA)
 static int
-kdba_tpav(int argc, const char **argv, const char **envp, struct pt_regs* regs)
+kdba_tpav(int argc, const char **argv)
 {
 	kdb_machreg_t addr, end, paddr;
 	int diag;
@@ -1239,10 +1229,10 @@ kdba_tpav(int argc, const char **argv, const char **envp, struct pt_regs* regs)
 	nextarg = 1;
 	if (argc != 2)
 		return KDB_ARGCOUNT;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &end, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &end, &offset, NULL);
 	if (diag)
 		return diag;
 	if (kdb_getarea(c, addr))
@@ -1277,8 +1267,6 @@ kdba_tpav(int argc, const char **argv, const char **envp, struct pt_regs* regs)
  * Inputs:
  *      argc    argument count
  *      argv    argument vector
- *      envp    environment vector
- *      regs    registers at time kdb was entered.
  * Outputs:
  *      None.
  * Returns:
@@ -1289,7 +1277,7 @@ kdba_tpav(int argc, const char **argv, const char **envp, struct pt_regs* regs)
  */
 
 static int
-kdba_sendinit(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdba_sendinit(int argc, const char **argv)
 {
 	unsigned long cpunum;
 	int diag;
@@ -1358,7 +1346,7 @@ kdba_handlers_modify(struct task_struct *p, int cpu)
  * of the MCA/INIT handlers.
  */
 static int
-kdba_handlers(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdba_handlers(int argc, const char **argv)
 {
 	int cpu;
 	struct kdb_running_process *krp;

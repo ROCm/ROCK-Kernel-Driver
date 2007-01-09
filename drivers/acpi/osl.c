@@ -50,6 +50,7 @@ ACPI_MODULE_NAME("osl")
 struct acpi_os_dpc {
 	acpi_osd_exec_callback function;
 	void *context;
+	struct work_struct work;
 };
 
 #ifdef CONFIG_ACPI_CUSTOM_DSDT
@@ -77,7 +78,6 @@ static unsigned int acpi_irq_irq;
 static acpi_osd_handler acpi_irq_handler;
 static void *acpi_irq_context;
 static struct workqueue_struct *kacpid_wq;
-static struct workqueue_struct *kacpi_notify_wq;
 
 acpi_status acpi_os_initialize(void)
 {
@@ -96,9 +96,8 @@ acpi_status acpi_os_initialize1(void)
 		return AE_NULL_ENTRY;
 	}
 	kacpid_wq = create_singlethread_workqueue("kacpid");
-	kacpi_notify_wq = create_singlethread_workqueue("kacpi_notify");
 	BUG_ON(!kacpid_wq);
-	BUG_ON(!kacpi_notify_wq);
+
 	return AE_OK;
 }
 
@@ -110,7 +109,6 @@ acpi_status acpi_os_terminate(void)
 	}
 
 	destroy_workqueue(kacpid_wq);
-	destroy_workqueue(kacpi_notify_wq);
 
 	return AE_OK;
 }
@@ -686,26 +684,10 @@ void acpi_os_derive_pci_id(acpi_handle rhandle,	/* upper bound  */
 	acpi_os_derive_pci_id_2(rhandle, chandle, id, &is_bridge, &bus_number);
 }
 
-static void acpi_os_execute_deferred(void *context)
+static void acpi_os_execute_deferred(struct work_struct *work)
 {
-	struct acpi_os_dpc *dpc = context;
-	if (!dpc) {
-		printk(KERN_ERR PREFIX "Invalid (NULL) context\n");
-		return;
-	}
+	struct acpi_os_dpc *dpc = container_of(work, struct acpi_os_dpc, work);
 
-	dpc->function(dpc->context);
-	kfree(dpc);
-
-	/* Yield cpu to notify thread */
-	cond_resched();
-
-	return;
-}
-
-static void acpi_os_execute_notify(void *context)
-{
-	struct acpi_os_dpc *dpc = context;
 	if (!dpc) {
 		printk(KERN_ERR PREFIX "Invalid (NULL) context\n");
 		return;
@@ -738,47 +720,38 @@ acpi_status acpi_os_execute(acpi_execute_type type,
 {
 	acpi_status status = AE_OK;
 	struct acpi_os_dpc *dpc;
-	struct work_struct *task;
+
+	ACPI_FUNCTION_TRACE("os_queue_for_execution");
 
 	ACPI_DEBUG_PRINT((ACPI_DB_EXEC,
 			  "Scheduling function [%p(%p)] for deferred execution.\n",
 			  function, context));
 
 	if (!function)
-		return AE_BAD_PARAMETER;
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 
 	/*
 	 * Allocate/initialize DPC structure.  Note that this memory will be
-	 * freed by the callee.  The kernel handles the tq_struct list  in a
+	 * freed by the callee.  The kernel handles the work_struct list  in a
 	 * way that allows us to also free its memory inside the callee.
 	 * Because we may want to schedule several tasks with different
 	 * parameters we can't use the approach some kernel code uses of
-	 * having a static tq_struct.
-	 * We can save time and code by allocating the DPC and tq_structs
-	 * from the same memory.
+	 * having a static work_struct.
 	 */
 
-	dpc = kzalloc(sizeof(struct acpi_os_dpc) +
-			sizeof(struct work_struct), GFP_ATOMIC);
+	dpc = kmalloc(sizeof(struct acpi_os_dpc), GFP_ATOMIC);
 	if (!dpc)
 		return_ACPI_STATUS(AE_NO_MEMORY);
 
 	dpc->function = function;
 	dpc->context = context;
 
-	task = (struct work_struct *)(dpc + 1);
-	if (type == OSL_NOTIFY_HANDLER) {
-		INIT_WORK(task, acpi_os_execute_notify, (void *)dpc);
-		if (!queue_work(kacpi_notify_wq, task)) {
-			status = AE_ERROR;
-			kfree(dpc);
-		}
-	} else {
-		INIT_WORK(task, acpi_os_execute_deferred, (void *)dpc);
-		if (!queue_work(kacpid_wq, task)) {
-			status = AE_ERROR;
-			kfree(dpc);
-		}
+	INIT_WORK(&dpc->work, acpi_os_execute_deferred);
+	if (!queue_work(kacpid_wq, &dpc->work)) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
+				  "Call to queue_work() failed.\n"));
+		kfree(dpc);
+		status = AE_ERROR;
 	}
 
 	return_ACPI_STATUS(status);
@@ -1178,7 +1151,7 @@ acpi_status
 acpi_os_create_cache(char *name, u16 size, u16 depth, acpi_cache_t ** cache)
 {
 	*cache = kmem_cache_create(name, size, 0, 0, NULL, NULL);
-	if (cache == NULL)
+	if (*cache == NULL)
 		return AE_ERROR;
 	else
 		return AE_OK;
@@ -1198,7 +1171,7 @@ acpi_os_create_cache(char *name, u16 size, u16 depth, acpi_cache_t ** cache)
 
 acpi_status acpi_os_purge_cache(acpi_cache_t * cache)
 {
-	(void)kmem_cache_shrink(cache);
+	kmem_cache_shrink(cache);
 	return (AE_OK);
 }
 

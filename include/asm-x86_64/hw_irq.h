@@ -30,8 +30,6 @@
 #define FIRST_EXTERNAL_VECTOR	0x20
 
 #define IA32_SYSCALL_VECTOR	0x80
-
-
 #define KDBENTER_VECTOR         0x81
 
 /*

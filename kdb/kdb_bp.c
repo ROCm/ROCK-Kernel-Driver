@@ -15,6 +15,7 @@
 #include <linux/kdbprivate.h>
 #include <linux/smp.h>
 #include <linux/sched.h>
+#include <linux/interrupt.h>
 #include <asm/system.h>
 
 /*
@@ -226,8 +227,6 @@ kdb_printbp(kdb_bp_t *bp, int i)
  * Parameters:
  *	argc	Count of arguments in argv
  *	argv	Space delimited command line arguments
- *	envp	Environment value
- *	regs	Exception frame at entry to kernel debugger
  * Outputs:
  *	None.
  * Returns:
@@ -243,7 +242,7 @@ kdb_printbp(kdb_bp_t *bp, int i)
  */
 
 static int
-kdb_bp(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdb_bp(int argc, const char **argv)
 {
 	int i, bpno;
 	kdb_bp_t *bp, *bp_check;
@@ -275,7 +274,7 @@ kdb_bp(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 		 || (strcmp(argv[0], "bpha") == 0));
 
 	nextarg = 1;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, &symname, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, &symname);
 	if (diag)
 		return diag;
 	if (!addr)
@@ -357,8 +356,6 @@ kdb_bp(int argc, const char **argv, const char **envp, struct pt_regs *regs)
  * Parameters:
  *	argc	Count of arguments in argv
  *	argv	Space delimited command line arguments
- *	envp	Environment value
- *	regs	Exception frame at entry to kernel debugger
  * Outputs:
  *	None.
  * Returns:
@@ -373,7 +370,7 @@ kdb_bp(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 #define KDBCMD_BD	2
 
 static int
-kdb_bc(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdb_bc(int argc, const char **argv)
 {
 	kdb_machreg_t addr;
 	kdb_bp_t *bp = NULL;
@@ -516,8 +513,6 @@ kdb_bc(int argc, const char **argv, const char **envp, struct pt_regs *regs)
  * Parameters:
  *	argc	Argument count
  *	argv	Argument vector
- *	envp	Environment vector
- *	regs	Registers at time of entry to kernel debugger
  * Outputs:
  *	None.
  * Returns:
@@ -536,9 +531,10 @@ kdb_bc(int argc, const char **argv, const char **envp, struct pt_regs *regs)
  */
 
 static int
-kdb_ss(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdb_ss(int argc, const char **argv)
 {
 	int ssb = 0;
+	struct pt_regs *regs = get_irq_regs();
 
 	ssb = (strcmp(argv[0], "ssb") == 0);
 	if (argc != 0)

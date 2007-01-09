@@ -17,8 +17,7 @@ MODULE_DESCRIPTION("Debug scheduler information");
 MODULE_LICENSE("GPL");
 
 static int
-kdbm_runqueues(int argc, const char **argv, const char **envp,
-	struct pt_regs *regs)
+kdbm_runqueues(int argc, const char **argv)
 {
 	unsigned long cpu;
 	int ret = 0;

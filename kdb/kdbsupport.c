@@ -953,12 +953,17 @@ void *debug_kmalloc(size_t size, gfp_t flags)
 {
 	unsigned int rem, h_offset;
 	struct debug_alloc_header *best, *bestprev, *prev, *h;
+	static int first_call = 1;
 	void *p = NULL;
 	if ((p = kmalloc(size, flags)))
 		return p;
 	if (!get_dap_lock())
 		return NULL;
 	h = (struct debug_alloc_header *)(debug_alloc_pool + dah_first);
+	if (first_call) {
+		h->size = sizeof(debug_alloc_pool_aligned) - sizeof(*h);
+		first_call = 0;
+	}
 	prev = best = bestprev = NULL;
 	while (1) {
 		if (h->size >= size && (!best || h->size < best->size)) {
@@ -1036,15 +1041,6 @@ void debug_kfree(const void *p)
 		h->next = next->next;
 	}
 	spin_unlock(&dap_lock);
-}
-
-void kdb_initsupport(void)
-{
-	struct debug_alloc_header *h;
-	h = (struct debug_alloc_header *)debug_alloc_pool;
-	h->next = 0;
-	h->size = sizeof(debug_alloc_pool_aligned) - sizeof(*h);
-	dah_first = 0;
 }
 
 /* Maintain a small stack of kdb_flags to allow recursion without disturbing

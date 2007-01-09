@@ -36,8 +36,6 @@
  * Inputs:
  *	argc	argument count
  *	argv	argument vector
- *	envp	environment vector
- *	regs	registers at time kdb was entered.
  * Outputs:
  *	None.
  * Returns:
@@ -78,7 +76,7 @@ kdb_bt1(const struct task_struct *p, unsigned long mask, int argcount, int btapr
 }
 
 int
-kdb_bt(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdb_bt(int argc, const char **argv)
 {
 	int diag;
 	int argcount = 5;
@@ -150,16 +148,16 @@ kdb_bt(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 				return 0;
 			}
 			sprintf(buf, "btt 0x%p\n", krp->p);
-			kdb_parse(buf, regs);
+			kdb_parse(buf);
 			return 0;
 		}
 		kdb_printf("btc: cpu status: ");
-		kdb_parse("cpu\n", regs);
+		kdb_parse("cpu\n");
 		for (cpu = 0, krp = kdb_running_process; cpu < NR_CPUS; ++cpu, ++krp) {
 			if (!cpu_online(cpu) || !krp->seqno)
 				continue;
 			sprintf(buf, "btt 0x%p\n", krp->p);
-			kdb_parse(buf, regs);
+			kdb_parse(buf);
 			touch_nmi_watchdog();
 		}
 		kdba_set_current_task(save_current_task);
@@ -168,7 +166,7 @@ kdb_bt(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 		if (argc) {
 			nextarg = 1;
 			diag = kdbgetaddrarg(argc, argv, &nextarg, &addr,
-					     &offset, NULL, regs);
+					     &offset, NULL);
 			if (diag)
 				return diag;
 			return kdba_bt_address(addr, argcount);

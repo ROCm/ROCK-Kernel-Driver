@@ -18,6 +18,8 @@
 #include <linux/hardirq.h>
 #include <linux/kdb.h>
 #include <linux/kdbprivate.h>
+#include <linux/interrupt.h>
+#include <linux/module.h>
 #include <asm/kdebug.h>
 #include <asm/processor.h>
 #include <asm/msr.h>
@@ -545,6 +547,7 @@ kdba_dumpregs(struct pt_regs *regs,
 	/* NOTREACHED */
 	return 0;
 }
+EXPORT_SYMBOL(kdba_dumpregs);
 
 kdb_machreg_t
 kdba_getpc(struct pt_regs *regs)
@@ -716,8 +719,6 @@ kdba_longjmp(kdb_jmp_buf *jb, int reason)
  * Inputs:
  *	argc	argument count
  *	argv	argument vector
- *	envp	environment vector
- *	regs	registers at time kdb was entered.
  * Outputs:
  *	None.
  * Returns:
@@ -725,11 +726,11 @@ kdba_longjmp(kdb_jmp_buf *jb, int reason)
  * Locking:
  *	none.
  * Remarks:
- *	If no address is supplied, it uses regs.
+ *	If no address is supplied, it uses the current irq pt_regs.
  */
 
 static int
-kdba_pt_regs(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdba_pt_regs(int argc, const char **argv)
 {
 	int diag;
 	kdb_machreg_t addr;
@@ -740,10 +741,10 @@ kdba_pt_regs(int argc, const char **argv, const char **envp, struct pt_regs *reg
 	static int first_time = 1;
 
 	if (argc == 0) {
-		addr = (kdb_machreg_t) regs;
+		addr = (kdb_machreg_t) get_irq_regs();
 	} else if (argc == 1) {
 		nextarg = 1;
-		diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+		diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 		if (diag)
 			return diag;
 	} else {
@@ -789,8 +790,6 @@ kdba_pt_regs(int argc, const char **argv, const char **envp, struct pt_regs *reg
  * Inputs:
  *	argc	argument count
  *	argv	argument vector
- *	envp	environment vector
- *	regs	registers at time kdb was entered.
  * Outputs:
  *	None.
  * Returns:
@@ -803,7 +802,7 @@ kdba_pt_regs(int argc, const char **argv, const char **envp, struct pt_regs *reg
  */
 
 static int
-kdba_cpu_pda(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdba_cpu_pda(int argc, const char **argv)
 {
 	int diag, nextarg, all_cpus = 0;
 	long cpu, offset = 0;
@@ -820,7 +819,7 @@ kdba_cpu_pda(int argc, const char **argv, const char **envp, struct pt_regs *reg
 			cpu = 0;
 		} else {
 			nextarg = 1;
-			diag = kdbgetaddrarg(argc, argv, &nextarg, &cpu, &offset, NULL, regs);
+			diag = kdbgetaddrarg(argc, argv, &nextarg, &cpu, &offset, NULL);
 			if (diag)
 				return diag;
 		}
@@ -898,11 +897,6 @@ static struct notifier_block kdba_notifier = {
 	.notifier_call = kdba_entry
 };
 
-static inline void set_trap_gate(int nr, void *func)
-{
-	_set_gate(&idt_table[nr], GATE_TRAP, (unsigned long) func, 0, 0);
-}
-
 asmlinkage int kdb_call(void);
 
 /* Executed once on each cpu at startup. */
@@ -941,7 +935,7 @@ kdba_late_init(void)
 #ifdef	CONFIG_SMP
 	set_intr_gate(KDB_VECTOR, kdb_interrupt);
 #endif
-	set_trap_gate(KDBENTER_VECTOR, kdb_call);
+	set_intr_gate(KDBENTER_VECTOR, kdb_call);
 	return 0;
 }
 
@@ -1001,10 +995,12 @@ smp_kdb_stop(void)
 asmlinkage void
 smp_kdb_interrupt(struct pt_regs *regs)
 {
-	irq_enter();
+	struct pt_regs *old_regs = set_irq_regs(regs);
 	ack_APIC_irq();
+	irq_enter();
 	kdb_ipi(regs, NULL);
 	irq_exit();
+	set_irq_regs(old_regs);
 }
 
 /* Invoked once from kdb_wait_for_cpus when waiting for cpus.  For those cpus

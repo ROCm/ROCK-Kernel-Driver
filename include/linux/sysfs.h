@@ -97,6 +97,9 @@ extern int __must_check
 sysfs_rename_dir(struct kobject *, const char *new_name);
 
 extern int __must_check
+sysfs_move_dir(struct kobject *, struct kobject *);
+
+extern int __must_check
 sysfs_create_file(struct kobject *, const struct attribute *);
 
 extern int __must_check
@@ -140,6 +143,11 @@ static inline void sysfs_remove_dir(struct kobject * k)
 }
 
 static inline int sysfs_rename_dir(struct kobject * k, const char *new_name)
+{
+	return 0;
+}
+
+static inline int sysfs_move_dir(struct kobject * k, struct kobject * new_parent)
 {
 	return 0;
 }

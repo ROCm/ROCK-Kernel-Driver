@@ -98,7 +98,6 @@
 #include <linux/seq_file.h>
 #include <linux/stat.h>
 #include <linux/if_bridge.h>
-#include <linux/divert.h>
 #include <net/dst.h>
 #include <net/pkt_sched.h>
 #include <net/checksum.h>
@@ -1174,7 +1173,7 @@ EXPORT_SYMBOL(netif_device_attach);
  */
 int skb_checksum_help(struct sk_buff *skb)
 {
-	unsigned int csum;
+	__wsum csum;
 	int ret = 0, offset = skb->h.raw - skb->data;
 
 	if (skb->ip_summed == CHECKSUM_COMPLETE)
@@ -1196,9 +1195,9 @@ int skb_checksum_help(struct sk_buff *skb)
 
 	offset = skb->tail - skb->h.raw;
 	BUG_ON(offset <= 0);
-	BUG_ON(skb->csum + 2 > offset);
+	BUG_ON(skb->csum_offset + 2 > offset);
 
-	*(u16*)(skb->h.raw + skb->csum) = csum_fold(csum);
+	*(__sum16*)(skb->h.raw + skb->csum_offset) = csum_fold(csum);
 
 out_set_summed:
 	skb->ip_summed = CHECKSUM_NONE;
@@ -1220,7 +1219,7 @@ struct sk_buff *skb_gso_segment(struct sk_buff *skb, int features)
 {
 	struct sk_buff *segs = ERR_PTR(-EPROTONOSUPPORT);
 	struct packet_type *ptype;
-	int type = skb->protocol;
+	__be16 type = skb->protocol;
 	int err;
 
 	BUG_ON(skb_shinfo(skb)->frag_list);
@@ -1771,7 +1770,7 @@ int netif_receive_skb(struct sk_buff *skb)
 	struct packet_type *ptype, *pt_prev;
 	struct net_device *orig_dev;
 	int ret = NET_RX_DROP;
-	unsigned short type;
+	__be16 type;
 
 	/* if we've gotten here through NAPI, check netpoll */
 	if (skb->dev->poll && netpoll_rx(skb))
@@ -1830,8 +1829,6 @@ int netif_receive_skb(struct sk_buff *skb)
 	skb->tc_verd = 0;
 ncls:
 #endif
-
-	handle_diverter(skb);
 
 	if (handle_bridge(&skb, &pt_prev, &ret, orig_dev))
 		goto out;
@@ -2902,10 +2899,6 @@ int register_netdevice(struct net_device *dev)
 	spin_lock_init(&dev->ingress_lock);
 #endif
 
-	ret = alloc_divert_blk(dev);
-	if (ret)
-		goto out;
-
 	dev->iflink = -1;
 
 	/* Init, if this function is available */
@@ -2914,13 +2907,13 @@ int register_netdevice(struct net_device *dev)
 		if (ret) {
 			if (ret > 0)
 				ret = -EIO;
-			goto out_err;
+			goto out;
 		}
 	}
  
 	if (!dev_valid_name(dev->name)) {
 		ret = -EINVAL;
-		goto out_err;
+		goto out;
 	}
 
 	dev->ifindex = dev_new_index();
@@ -2934,7 +2927,7 @@ int register_netdevice(struct net_device *dev)
 			= hlist_entry(p, struct net_device, name_hlist);
 		if (!strncmp(d->name, dev->name, IFNAMSIZ)) {
 			ret = -EEXIST;
- 			goto out_err;
+ 			goto out;
 		}
  	}
 
@@ -2978,7 +2971,7 @@ int register_netdevice(struct net_device *dev)
 
 	ret = netdev_register_sysfs(dev);
 	if (ret)
-		goto out_err;
+		goto out;
 	dev->reg_state = NETREG_REGISTERED;
 
 	/*
@@ -3005,9 +2998,6 @@ int register_netdevice(struct net_device *dev)
 
 out:
 	return ret;
-out_err:
-	free_divert_blk(dev);
-	goto out;
 }
 
 /**
@@ -3039,15 +3029,6 @@ int register_netdev(struct net_device *dev)
 			goto out;
 	}
 	
-	/*
-	 * Back compatibility hook. Kill this one in 2.5
-	 */
-	if (dev->name[0] == 0 || dev->name[0] == ' ') {
-		err = dev_alloc_name(dev, "eth%d");
-		if (err < 0)
-			goto out;
-	}
-
 	err = register_netdevice(dev);
 out:
 	rtnl_unlock();
@@ -3333,8 +3314,6 @@ int unregister_netdevice(struct net_device *dev)
 	/* Notifier chain MUST detach us from master device. */
 	BUG_TRAP(!dev->master);
 
-	free_divert_blk(dev);
-
 	/* Finish processing unregister after unlock */
 	net_set_todo(dev);
 
@@ -3365,7 +3344,6 @@ void unregister_netdev(struct net_device *dev)
 
 EXPORT_SYMBOL(unregister_netdev);
 
-#ifdef CONFIG_HOTPLUG_CPU
 static int dev_cpu_callback(struct notifier_block *nfb,
 			    unsigned long action,
 			    void *ocpu)
@@ -3409,7 +3387,6 @@ static int dev_cpu_callback(struct notifier_block *nfb,
 
 	return NOTIFY_OK;
 }
-#endif /* CONFIG_HOTPLUG_CPU */
 
 #ifdef CONFIG_NET_DMA
 /**

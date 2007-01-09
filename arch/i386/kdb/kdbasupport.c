@@ -718,8 +718,6 @@ kdba_longjmp(kdb_jmp_buf *jb, int reason)
  * Inputs:
  *	argc	argument count
  *	argv	argument vector
- *	envp	environment vector
- *	regs	registers at time kdb was entered.
  * Outputs:
  *	None.
  * Returns:
@@ -727,11 +725,11 @@ kdba_longjmp(kdb_jmp_buf *jb, int reason)
  * Locking:
  *	none.
  * Remarks:
- *	If no address is supplied, it uses regs.
+ *	If no address is supplied, it uses the last irq pt_regs.
  */
 
 static int
-kdba_pt_regs(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdba_pt_regs(int argc, const char **argv)
 {
 	int diag;
 	kdb_machreg_t addr;
@@ -741,10 +739,10 @@ kdba_pt_regs(int argc, const char **argv, const char **envp, struct pt_regs *reg
 	static const char *fmt = "  %-11.11s 0x%lx\n";
 
 	if (argc == 0) {
-		addr = (kdb_machreg_t) regs;
+		addr = (kdb_machreg_t) get_irq_regs();
 	} else if (argc == 1) {
 		nextarg = 1;
-		diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+		diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 		if (diag)
 			return diag;
 	} else {
@@ -780,8 +778,6 @@ kdba_pt_regs(int argc, const char **argv, const char **envp, struct pt_regs *reg
  * Inputs:
  *	argc	argument count
  *	argv	argument vector
- *	envp	environment vector
- *	regs	registers at time kdb was entered.
  * Outputs:
  *	None.
  * Returns:
@@ -817,7 +813,7 @@ kdba_stackdepth1(struct task_struct *p, unsigned long esp)
 }
 
 static int
-kdba_stackdepth(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdba_stackdepth(int argc, const char **argv)
 {
 	int diag, cpu, threshold, used, over;
 	long percentage;
@@ -832,7 +828,7 @@ kdba_stackdepth(int argc, const char **argv, const char **envp, struct pt_regs *
 		percentage = 60;
 	} else if (argc == 1) {
 		nextarg = 1;
-		diag = kdbgetaddrarg(argc, argv, &nextarg, &percentage, &offset, NULL, regs);
+		diag = kdbgetaddrarg(argc, argv, &nextarg, &percentage, &offset, NULL);
 		if (diag)
 			return diag;
 	} else {
@@ -874,30 +870,6 @@ kdba_stackdepth(int argc, const char **argv, const char **envp, struct pt_regs *
 
 	return 0;
 }
-
-/* Copied from arch/i386/kernel/traps.c */
-
-extern struct desc_struct idt_table[256];
-
-#define _set_gate(gate_addr,type,dpl,addr,seg) \
-do { \
-  int __d0, __d1; \
-  __asm__ __volatile__ ("movw %%dx,%%ax\n\t" \
-	"movw %4,%%dx\n\t" \
-	"movl %%eax,%0\n\t" \
-	"movl %%edx,%1" \
-	:"=m" (*((long *) (gate_addr))), \
-	 "=m" (*(1+(long *) (gate_addr))), "=&a" (__d0), "=&d" (__d1) \
-	:"i" ((short) (0x8000+(dpl<<13)+(type<<8))), \
-	 "3" ((char *) (addr)),"2" ((seg) << 16)); \
-} while (0)
-
-static void __init set_trap_gate(unsigned int n, void *addr)
-{
-	_set_gate(idt_table+n,15,0,addr,__KERNEL_CS);
-}
-
-/* End of copy from arch/i386/kernel/traps.c */
 
 asmlinkage int kdb_call(void);
 
@@ -1043,7 +1015,7 @@ kdba_late_init(void)
 #ifdef	CONFIG_SMP
 	set_intr_gate(KDB_VECTOR, kdb_interrupt);
 #endif
-	set_trap_gate(KDBENTER_VECTOR, kdb_call);
+	set_intr_gate(KDBENTER_VECTOR, kdb_call);
 	return 0;
 }
 
@@ -1067,10 +1039,12 @@ smp_kdb_stop(void)
 void
 smp_kdb_interrupt(struct pt_regs *regs)
 {
-	irq_enter();
+	struct pt_regs *old_regs = set_irq_regs(regs);
 	ack_APIC_irq();
+	irq_enter();
 	kdb_ipi(regs, NULL);
 	irq_exit();
+	set_irq_regs(old_regs);
 }
 
 /* Invoked once from kdb_wait_for_cpus when waiting for cpus.  For those cpus

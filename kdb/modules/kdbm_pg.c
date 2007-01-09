@@ -81,8 +81,7 @@ static char *map_flags(unsigned long flags, char *mapping[])
 }
 
 static int
-kdbm_buffers(int argc, const char **argv, const char **envp,
-	struct pt_regs *regs)
+kdbm_buffers(int argc, const char **argv)
 {
 	struct buffer_head bh;
 	unsigned long addr;
@@ -94,7 +93,7 @@ kdbm_buffers(int argc, const char **argv, const char **envp,
 		return KDB_ARGCOUNT;
 
 	nextarg = 1;
-	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs)) ||
+	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL)) ||
 	    (diag = kdb_getarea(bh, addr)))
 		return(diag);
 
@@ -145,8 +144,7 @@ print_biovec(struct bio_vec *vec, int vcount)
 }
 
 static int
-kdbm_bio(int argc, const char **argv, const char **envp,
-	struct pt_regs *regs)
+kdbm_bio(int argc, const char **argv)
 {
 	struct bio bio;
 	unsigned long addr;
@@ -158,7 +156,7 @@ kdbm_bio(int argc, const char **argv, const char **envp,
 		return KDB_ARGCOUNT;
 
 	nextarg = 1;
-	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs)) ||
+	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL)) ||
 	    (diag = kdb_getarea(bio, addr)))
 		return(diag);
 
@@ -189,8 +187,7 @@ static char *page_flags(unsigned long flags)
 }
 
 static int
-kdbm_page(int argc, const char **argv, const char **envp,
-	struct pt_regs *regs)
+kdbm_page(int argc, const char **argv)
 {
 	struct page page;
 	unsigned long addr;
@@ -202,7 +199,7 @@ kdbm_page(int argc, const char **argv, const char **envp,
 		return KDB_ARGCOUNT;
 
 	nextarg = 1;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -242,10 +239,9 @@ print_request(unsigned long addr)
 		return(0);
 
 	kdb_printf("struct request at 0x%lx\n", addr);
-	kdb_printf("  errors %d sector %llu nr_sectors %lu waiting 0x%p\n",
+	kdb_printf("  errors %d sector %llu nr_sectors %lu\n",
 			rq.errors,
-			(unsigned long long)rq.sector, rq.nr_sectors,
-			rq.waiting);
+			(unsigned long long)rq.sector, rq.nr_sectors);
 
 	kdb_printf("  hsect %llu hnrsect %lu nrseg %u nrhwseg %u currnrsect %u\n",
 			(unsigned long long)rq.hard_sector, rq.hard_nr_sectors,
@@ -256,8 +252,7 @@ print_request(unsigned long addr)
 }
 
 static int
-kdbm_request(int argc, const char **argv, const char **envp,
-	struct pt_regs *regs)
+kdbm_request(int argc, const char **argv)
 {
 	long offset = 0;
 	unsigned long addr;
@@ -268,7 +263,7 @@ kdbm_request(int argc, const char **argv, const char **envp,
 		return KDB_ARGCOUNT;
 
 	nextarg = 1;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		return diag;
 
@@ -278,8 +273,7 @@ kdbm_request(int argc, const char **argv, const char **envp,
 
 
 static int
-kdbm_rqueue(int argc, const char **argv, const char **envp,
-	struct pt_regs *regs)
+kdbm_rqueue(int argc, const char **argv)
 {
 	struct request_queue rq;
 	unsigned long addr, head_addr, next;
@@ -291,7 +285,7 @@ kdbm_rqueue(int argc, const char **argv, const char **envp,
 		return KDB_ARGCOUNT;
 
 	nextarg = 1;
-	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs)) ||
+	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL)) ||
 	    (diag = kdb_getarea(rq, addr)))
 		return(diag);
 
@@ -331,7 +325,7 @@ kdbm_show_page(struct page *page, int first)
 {
 	if (first)
 		kdb_printf("page_struct       index   cnt zone nid flags\n");
-	kdb_printf("%p%s %6lu %5d %3ld %3ld 0x%lx",
+	kdb_printf("%p%s %6lu %5d %3d %3d 0x%lx",
 		page_address(page), sizeof(void *) == 4 ? "        " : "",
 		page->index, atomic_read(&(page->_count)),
 		page_zonenum(page), page_to_nid(page),
@@ -382,8 +376,7 @@ kdbm_show_page(struct page *page, int first)
 }
 
 static int
-kdbm_inode_pages(int argc, const char **argv, const char **envp,
-	struct pt_regs *regs)
+kdbm_inode_pages(int argc, const char **argv)
 {
 	struct inode *inode = NULL;
 	struct address_space *ap = NULL;
@@ -396,14 +389,14 @@ kdbm_inode_pages(int argc, const char **argv, const char **envp,
 	int first;
 
 	nextarg = 1;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (diag)
 		goto out;
 
 	if (argc == 2) {
 		nextarg = 2;
 		diag = kdbgetaddrarg(argc, argv, &nextarg, &addr1,
-					&offset, NULL, regs);
+					&offset, NULL);
 		if (diag)
 			goto out;
 		kdb_printf("Looking for page index 0x%lx ... \n", addr1);
@@ -446,8 +439,7 @@ out:
 }
 
 static int
-kdbm_inode(int argc, const char **argv, const char **envp,
-	struct pt_regs *regs)
+kdbm_inode(int argc, const char **argv)
 {
 	struct inode *inode = NULL;
 	unsigned long addr;
@@ -460,7 +452,7 @@ kdbm_inode(int argc, const char **argv, const char **envp,
 		return KDB_ARGCOUNT;
 
 	nextarg = 1;
-	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs)))
+	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL)))
 		goto out;
 	if (!(inode = kmalloc(sizeof(*inode), GFP_ATOMIC))) {
 		kdb_printf("kdbm_inode: cannot kmalloc inode\n");
@@ -503,7 +495,7 @@ kdbm_inode(int argc, const char **argv, const char **envp,
 			   map_flags(inode->i_state, inode_flag_vals));
 
 	iaddr  = (char *)addr;
-	iaddr += offsetof(struct inode, u);
+	iaddr += offsetof(struct inode, i_private);
 
 	kdb_printf("  fs specific info @ 0x%p\n", iaddr);
 out:
@@ -513,8 +505,7 @@ out:
 }
 
 static int
-kdbm_sb(int argc, const char **argv, const char **envp,
-	struct pt_regs *regs)
+kdbm_sb(int argc, const char **argv)
 {
 	struct super_block *sb = NULL;
 	unsigned long addr;
@@ -526,7 +517,7 @@ kdbm_sb(int argc, const char **argv, const char **envp,
 		return KDB_ARGCOUNT;
 
 	nextarg = 1;
-	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs)))
+	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL)))
 		goto out;
 	if (!(sb = kmalloc(sizeof(*sb), GFP_ATOMIC))) {
 		kdb_printf("kdbm_sb: cannot kmalloc sb\n");
@@ -554,8 +545,7 @@ out:
  * other architectures will be greatefully accepted.
  */
 static int
-kdbm_memmap(int argc, const char **argv, const char **envp,
-	    struct pt_regs *regs)
+kdbm_memmap(int argc, const char **argv)
 {
 	struct page page;
 	int i, page_count;

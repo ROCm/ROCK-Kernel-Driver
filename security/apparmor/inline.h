@@ -10,7 +10,7 @@
 #ifndef __INLINE_H
 #define __INLINE_H
 
-#include <linux/namespace.h>
+#include <linux/mnt_namespace.h>
 
 static inline int __aa_is_confined(struct subdomain *sd)
 {
@@ -265,8 +265,8 @@ static inline void __aa_path_begin(struct dentry *rdentry,
 {
 	data->dentry = dentry;
 	data->root = dget(rdentry->d_sb->s_root);
-	data->namespace = current->namespace;
-	data->head = &data->namespace->list;
+	data->mnt_namespace = current->nsproxy->mnt_ns;
+	data->head = &data->mnt_namespace->list;
 	data->pos = data->head->next;
 	prefetch(data->pos->next);
 	data->errno = 0;

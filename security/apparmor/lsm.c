@@ -797,7 +797,7 @@ static int __init apparmor_init(void)
 {
 	int error;
 	const char *complainmsg = ": complainmode enabled";
-
+	return -EBUSY;
 	if ((error = create_apparmorfs())) {
 		AA_ERROR("Unable to activate AppArmor filesystem\n");
 		goto createfs_out;

@@ -193,7 +193,7 @@ typedef int (*aa_iter) (struct subdomain *, void *);
  */
 struct aa_path_data {
 	struct dentry *root, *dentry;
-	struct namespace *namespace;
+	struct mnt_namespace *mnt_namespace;
 	struct list_head *head, *pos;
 	int errno;
 };

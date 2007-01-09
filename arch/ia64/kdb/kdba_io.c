@@ -313,7 +313,7 @@ get_serial_char(void)
 
 #ifdef	CONFIG_VT_CONSOLE
 
-static int kbd_exists = -1;
+static int kbd_exists;
 
 /*
  * Check if the keyboard controller has a keypress for us.
@@ -329,16 +329,12 @@ static int get_kbd_char(void)
 	u_short keychar;
 	extern u_short plain_map[], shift_map[], ctrl_map[];
 
-	if (kbd_exists <= 0) {
-		if (kbd_exists == 0)
-			return -1;
-
-		if (inb(KBD_STATUS_REG) == 0xff && inb(KBD_DATA_REG) == 0xff) {
-			kbd_exists = 0;
-			return -1;
-		}
-		kbd_exists = 1;
+	if (KDB_FLAG(NO_I8042) || KDB_FLAG(NO_VT_CONSOLE) ||
+	    (inb(KBD_STATUS_REG) == 0xff && inb(KBD_DATA_REG) == 0xff)) {
+		kbd_exists = 0;
+		return -1;
 	}
+	kbd_exists = 1;
 
 	if ((inb(KBD_STATUS_REG) & KBD_STAT_OBF) == 0)
 		return -1;

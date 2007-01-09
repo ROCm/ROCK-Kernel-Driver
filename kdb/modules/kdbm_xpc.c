@@ -27,8 +27,7 @@ MODULE_LICENSE("GPL");
 
 
 static int
-kdbm_xpc_down(int argc, const char **argv, const char **envp,
-              struct pt_regs *regs)
+kdbm_xpc_down(int argc, const char **argv)
 {
 	if (xpc_rsvd_page == NULL) {
 		kdb_printf("Reserved Page has not been initialized.\n");
@@ -107,8 +106,7 @@ kdbm_xpc_get_ascii_reason_code(enum xpc_retval reason)
  *	xpcrp
  */
 static int
-kdbm_xpc_rsvd_page(int argc, const char **argv, const char **envp,
-			struct pt_regs *regs)
+kdbm_xpc_rsvd_page(int argc, const char **argv)
 {
 	struct xpc_rsvd_page *rp = (struct xpc_rsvd_page *) xpc_rsvd_page;
 
@@ -169,8 +167,7 @@ kdbm_xpc_print_vars_part(struct xpc_vars_part *vars_part, partid_t partid)
  *			partition, if initialized
  */
 static int
-kdbm_xpc_variables(int argc, const char **argv, const char **envp,
-			struct pt_regs *regs)
+kdbm_xpc_variables(int argc, const char **argv)
 {
 	int ret;
 	unsigned long ulong_partid;
@@ -285,8 +282,7 @@ kdbm_xpc_print_engaged(char *string, u64 mask, int verbose)
  *	    -v  - verbose mode, displays partition numbers.
  */
 static int
-kdbm_xpc_engaged(int argc, const char **argv, const char **envp,
-			struct pt_regs *regs)
+kdbm_xpc_engaged(int argc, const char **argv)
 {
 	int nextarg = 1;
 	int verbose = 0;
@@ -436,8 +432,7 @@ kdbm_xpc_print_part(struct xpc_partition *part, partid_t partid)
  *	xpcpart [ <vaddr> | <partid> ]
  */
 static int
-kdbm_xpc_partitions(int argc, const char **argv, const char **envp,
-			struct pt_regs *regs)
+kdbm_xpc_partitions(int argc, const char **argv)
 {
 	int ret;
 	int nextarg = 1;
@@ -452,7 +447,7 @@ kdbm_xpc_partitions(int argc, const char **argv, const char **envp,
 
 	} else if (argc == 1) {
 		ret = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset,
-								NULL, regs);
+								NULL);
 		if (ret) {
 			return ret;
 		}
@@ -604,8 +599,7 @@ kdbm_xpc_print_channel(struct xpc_channel *ch)
  * 	xpcchan <vaddr> | <partid> [ <channel> ]
  */
 static int
-kdbm_xpc_channels(int argc, const char **argv, const char **envp,
-			struct pt_regs *regs)
+kdbm_xpc_channels(int argc, const char **argv)
 {
 	int ret;
 	int nextarg = 1;
@@ -621,7 +615,7 @@ kdbm_xpc_channels(int argc, const char **argv, const char **envp,
 		return KDB_ARGCOUNT;
 	}
 
-	ret = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	ret = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (ret) {
 		return ret;
 	}
@@ -777,8 +771,7 @@ kdbm_xpc_print_remote_msgqueue(struct xpc_channel *ch)
  *	xpcmque <partid> <channel> local|remote
  */
 static int
-kdbm_xpc_msgqueue(int argc, const char **argv, const char **envp,
-			struct pt_regs *regs)
+kdbm_xpc_msgqueue(int argc, const char **argv)
 {
 	int ret, ch_number;
 	unsigned long ulong_partid;
@@ -865,8 +858,7 @@ kdbm_xpc_print_msg_flags(u8 flags)
  *	xpcmsg <vaddr>
  */
 static int
-kdbm_xpc_msg(int argc, const char **argv, const char **envp,
-			struct pt_regs *regs)
+kdbm_xpc_msg(int argc, const char **argv)
 {
 	int ret, nextarg = argc;
 	long offset = 0;
@@ -878,7 +870,7 @@ kdbm_xpc_msg(int argc, const char **argv, const char **envp,
 		return KDB_ARGCOUNT;
 	}
 
-	ret = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	ret = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
 	if (ret) {
 		return ret;
 	}
@@ -945,8 +937,7 @@ kdbm_xpc_print_notify_queue(struct xpc_channel *ch)
  *	xpcnque <partid> <channel>
  */
 static int
-kdbm_xpc_notify_queue(int argc, const char **argv, const char **envp,
-			struct pt_regs *regs)
+kdbm_xpc_notify_queue(int argc, const char **argv)
 {
 	int ret, ch_number;
 	unsigned long ulong_partid;
@@ -1029,8 +1020,7 @@ kdbm_xpc_print_users(struct xpc_registration *registration, int ch_number)
  *	xpcusers [ <channel> ]
  */
 static int
-kdbm_xpc_users(int argc, const char **argv, const char **envp,
-			struct pt_regs *regs)
+kdbm_xpc_users(int argc, const char **argv)
 {
 	int ret;
 	struct xpc_registration *registration;

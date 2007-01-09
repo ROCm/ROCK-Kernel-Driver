@@ -135,7 +135,7 @@ kdbm_print_vmp(struct vm_area_struct *vp, int verbose_flg)
  */
 
 static int
-kdbm_vm(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdbm_vm(int argc, const char **argv)
 {
 	unsigned long addr;
 	long offset = 0;
@@ -185,7 +185,7 @@ kdbm_vm(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 
 		nextarg = argc;
 		if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset,
-					  NULL, regs))
+					  NULL))
 		    || (diag = kdb_getarea(v, addr)))
 			return (diag);
 
@@ -242,7 +242,7 @@ kdbm_print_pte(pte_t * pte)
  */
 
 static int
-kdbm_pte(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdbm_pte(int argc, const char **argv)
 {
 	unsigned long addr;
 	long offset = 0;
@@ -290,7 +290,7 @@ kdbm_pte(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 
 		nextarg = 2;
 		if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset,
-					  NULL, regs))
+					  NULL))
 		    || (diag = kdb_getarea(copy_of_mm, addr)))
 			return (diag);
 		mm = &copy_of_mm;
@@ -354,7 +354,7 @@ kdbm_pte(int argc, const char **argv, const char **envp, struct pt_regs *regs)
  */
 
 static int
-kdbm_rpte(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdbm_rpte(int argc, const char **argv)
 {
 	unsigned long addr;
 	unsigned long pfn;
@@ -403,7 +403,7 @@ kdbm_rpte(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 
 		nextarg = 2;
 		if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset,
-					  NULL, regs))
+					  NULL))
 		    || (diag = kdb_getarea(copy_of_mm, addr)))
 			return (diag);
 		mm = &copy_of_mm;
@@ -534,7 +534,7 @@ kdbm_print_dentry(unsigned long daddr)
 }
 
 static int
-kdbm_filp(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdbm_filp(int argc, const char **argv)
 {
 	struct file   f;
 	int nextarg;
@@ -546,7 +546,7 @@ kdbm_filp(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 		return KDB_ARGCOUNT;
 
 	nextarg = 1;
-	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs)) ||
+	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL)) ||
 	    (diag = kdb_getarea(f, addr)))
 		return diag;
 
@@ -561,8 +561,10 @@ kdbm_filp(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 	kdb_printf(" f_count = %d f_flags = 0x%x f_mode = 0x%x\n",
 					atomic_read(&f.f_count), f.f_flags, f.f_mode);
 
-	kdb_printf(" f_pos = %Ld security = 0x%p\n",
-					f.f_pos, f.f_security);
+	kdb_printf(" f_pos = %Ld\n", f.f_pos);
+#ifdef	CONFIG_SECURITY
+	kdb_printf(" security = 0x%p\n", f.f_security);
+#endif
 
 	kdb_printf(" private_data = 0x%p f_mapping = 0x%p\n\n",
 					f.private_data, f.f_mapping);
@@ -571,7 +573,7 @@ kdbm_filp(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 }
 
 static int
-kdbm_fl(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdbm_fl(int argc, const char **argv)
 {
 	struct file_lock fl;
 	int nextarg;
@@ -584,7 +586,7 @@ kdbm_fl(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 		return KDB_ARGCOUNT;
 
 	nextarg = 1;
-	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs)) ||
+	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL)) ||
 		(diag = kdb_getarea(fl, addr)))
 			return diag;
 
@@ -624,7 +626,7 @@ kdbm_fl(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 
 
 static int
-kdbm_dentry(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdbm_dentry(int argc, const char **argv)
 {
 	int nextarg;
 	unsigned long addr;
@@ -635,14 +637,14 @@ kdbm_dentry(int argc, const char **argv, const char **envp, struct pt_regs *regs
 		return KDB_ARGCOUNT;
 
 	nextarg = 1;
-	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs)))
+	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL)))
 		return diag;
 
 	return kdbm_print_dentry(addr);
 }
 
 static int
-kdbm_kobject(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdbm_kobject(int argc, const char **argv)
 {
 	struct kobject k;
 	int nextarg;
@@ -654,7 +656,7 @@ kdbm_kobject(int argc, const char **argv, const char **envp, struct pt_regs *reg
 		return KDB_ARGCOUNT;
 
 	nextarg = 1;
-	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs)) ||
+	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL)) ||
 	    (diag = kdb_getarea(k, addr)))
 		return diag;
 
@@ -684,7 +686,7 @@ kdbm_kobject(int argc, const char **argv, const char **envp, struct pt_regs *reg
 }
 
 static int
-kdbm_sh(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdbm_sh(int argc, const char **argv)
 {
 	int diag;
 	int nextarg;
@@ -696,7 +698,7 @@ kdbm_sh(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 		return KDB_ARGCOUNT;
 
 	nextarg = 1;
-	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs)) ||
+	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL)) ||
 	    (diag = kdb_getarea(sh, addr)))
 		return diag;
 
@@ -719,7 +721,7 @@ kdbm_sh(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 }
 
 static int
-kdbm_sd(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdbm_sd(int argc, const char **argv)
 {
 	int diag;
 	int nextarg;
@@ -731,7 +733,7 @@ kdbm_sd(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 		return KDB_ARGCOUNT;
 
 	nextarg = 1;
-	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs)))
+	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL)))
 		goto out;
 	if (!(sd = kmalloc(sizeof(*sd), GFP_ATOMIC))) {
 		kdb_printf("kdbm_sd: cannot kmalloc sd\n");
@@ -757,7 +759,7 @@ out:
 }
 
 static int
-kdbm_sc(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdbm_sc(int argc, const char **argv)
 {
 	int diag;
 	int nextarg;
@@ -769,7 +771,7 @@ kdbm_sc(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 		return KDB_ARGCOUNT;
 
 	nextarg = 1;
-	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs)))
+	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL)))
 		goto out;
 	if (!(sc = kmalloc(sizeof(*sc), GFP_ATOMIC))) {
 		kdb_printf("kdbm_sc: cannot kmalloc sc\n");
