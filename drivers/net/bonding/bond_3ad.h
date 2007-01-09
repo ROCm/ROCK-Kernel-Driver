@@ -261,7 +261,7 @@ struct ad_bond_info {
 	int lacp_fast;		/* whether fast periodic tx should be
 				 * requested
 				 */
-	struct work_struct ad_work;
+	struct timer_list ad_timer;
 	struct packet_type ad_pkt_type;
 };
 

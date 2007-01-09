@@ -526,8 +526,6 @@ ahc_unlock(struct ahc_softc *ahc, unsigned long *flags)
 #define PCIR_SUBVEND_0	0x2c
 #define PCIR_SUBDEV_0	0x2e
 
-extern struct pci_driver aic7xxx_pci_driver;
-
 typedef enum
 {
 	AHC_POWER_STATE_D0,
@@ -823,7 +821,7 @@ int	ahc_platform_abort_scbs(struct ahc_softc *ahc, int target,
 				char channel, int lun, u_int tag,
 				role_t role, uint32_t status);
 irqreturn_t
-	ahc_linux_isr(int irq, void *dev_id, struct pt_regs * regs);
+	ahc_linux_isr(int irq, void *dev_id);
 void	ahc_platform_flushwork(struct ahc_softc *ahc);
 void	ahc_done(struct ahc_softc*, struct scb*);
 void	ahc_send_async(struct ahc_softc *, char channel,

@@ -43,6 +43,7 @@ extern int pcibus_to_node(struct pci_bus *bus);
 #define SD_NODE_INIT (struct sched_domain) {		\
 	.span			= CPU_MASK_NONE,	\
 	.parent			= NULL,			\
+	.child			= NULL,			\
 	.groups			= NULL,			\
 	.min_interval		= 8,			\
 	.max_interval		= 32,			\
@@ -95,7 +96,13 @@ static inline void sysfs_remove_device_from_node(struct sys_device *dev,
 
 #ifdef CONFIG_SMP
 #include <asm/cputable.h>
-#define smt_capable() 		(cpu_has_feature(CPU_FTR_SMT))
+#define smt_capable()		(cpu_has_feature(CPU_FTR_SMT))
+
+#ifdef CONFIG_PPC64
+#include <asm/smp.h>
+
+#define topology_thread_siblings(cpu)	(cpu_sibling_map[cpu])
+#endif
 #endif
 
 #endif /* __KERNEL__ */

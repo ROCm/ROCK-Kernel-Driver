@@ -397,14 +397,14 @@ static int fuse_readpages(struct file *file, struct address_space *mapping,
 
 	err = -EIO;
 	if (is_bad_inode(inode))
-		goto clean_pages_up;
+		goto out;
 
 	data.file = file;
 	data.inode = inode;
 	data.req = fuse_get_req(fc);
 	err = PTR_ERR(data.req);
 	if (IS_ERR(data.req))
-		goto clean_pages_up;
+		goto out;
 
 	err = read_cache_pages(mapping, pages, fuse_readpages_fill, &data);
 	if (!err) {
@@ -413,10 +413,7 @@ static int fuse_readpages(struct file *file, struct address_space *mapping,
 		else
 			fuse_put_request(fc, data.req);
 	}
-	return err;
-
-clean_pages_up:
-	put_pages_list(pages);
+out:
 	return err;
 }
 
@@ -759,8 +756,10 @@ static int fuse_file_lock(struct file *file, int cmd, struct file_lock *fl)
 
 static const struct file_operations fuse_file_operations = {
 	.llseek		= generic_file_llseek,
-	.read		= generic_file_read,
-	.write		= generic_file_write,
+	.read		= do_sync_read,
+	.aio_read	= generic_file_aio_read,
+	.write		= do_sync_write,
+	.aio_write	= generic_file_aio_write,
 	.mmap		= fuse_file_mmap,
 	.open		= fuse_open,
 	.flush		= fuse_flush,

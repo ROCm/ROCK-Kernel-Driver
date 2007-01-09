@@ -37,8 +37,7 @@ static int reiserfs_file_release(struct inode *inode, struct file *filp)
 	int err;
 	int jbegin_failure = 0;
 
-	if (!S_ISREG(inode->i_mode))
-		BUG();
+	BUG_ON(!S_ISREG(inode->i_mode));
 
 	/* fast out for when nothing needs to be done */
 	if ((atomic_read(&inode->i_count) > 1 ||
@@ -75,7 +74,8 @@ static int reiserfs_file_release(struct inode *inode, struct file *filp)
 			igrab(inode);
 			reiserfs_warning(inode->i_sb,
 					 "pinning inode %lu because the "
-					 "preallocation can't be freed");
+					 "preallocation can't be freed",
+					 inode->i_ino);
 			goto out;
 		}
 	}
@@ -124,8 +124,7 @@ static int reiserfs_sync_file(struct file *p_s_filp,
 	int n_err;
 	int barrier_done;
 
-	if (!S_ISREG(p_s_inode->i_mode))
-		BUG();
+	BUG_ON(!S_ISREG(p_s_inode->i_mode));
 	n_err = sync_mapping_buffers(p_s_inode->i_mapping);
 	reiserfs_write_lock(p_s_inode->i_sb);
 	barrier_done = reiserfs_commit_for_inode(p_s_inode);
@@ -1333,7 +1332,7 @@ static ssize_t reiserfs_file_write(struct file *file,	/* the file we are going t
 			if (err)
 				return err;
 		}
-		result = generic_file_write(file, buf, count, ppos);
+		result = do_sync_write(file, buf, count, ppos);
 
 		if (after_file_end) {	/* Now update i_size and remove the savelink */
 			struct reiserfs_transaction_handle th;
@@ -1565,10 +1564,14 @@ static ssize_t reiserfs_file_write(struct file *file,	/* the file we are going t
 }
 
 const struct file_operations reiserfs_file_operations = {
-	.read = generic_file_read,
+	.read = do_sync_read,
 	.write = reiserfs_file_write,
 	.ioctl = reiserfs_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl = reiserfs_compat_ioctl,
+#endif
 	.mmap = generic_file_mmap,
+	.open = generic_file_open,
 	.release = reiserfs_file_release,
 	.fsync = reiserfs_sync_file,
 	.sendfile = generic_file_sendfile,

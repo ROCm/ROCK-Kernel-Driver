@@ -31,10 +31,10 @@ struct cb_compound_hdr_arg {
 };
 
 struct cb_compound_hdr_res {
-	uint32_t *status;
+	__be32 *status;
 	int taglen;
 	const char *tag;
-	uint32_t *nops;
+	__be32 *nops;
 };
 
 struct cb_getattrargs {
@@ -44,7 +44,7 @@ struct cb_getattrargs {
 };
 
 struct cb_getattrres {
-	uint32_t status;
+	__be32 status;
 	uint32_t bitmap[2];
 	uint64_t size;
 	uint64_t change_attr;
@@ -59,11 +59,16 @@ struct cb_recallargs {
 	uint32_t truncate;
 };
 
-extern unsigned nfs4_callback_getattr(struct cb_getattrargs *args, struct cb_getattrres *res);
-extern unsigned nfs4_callback_recall(struct cb_recallargs *args, void *dummy);
+extern __be32 nfs4_callback_getattr(struct cb_getattrargs *args, struct cb_getattrres *res);
+extern __be32 nfs4_callback_recall(struct cb_recallargs *args, void *dummy);
 
+#ifdef CONFIG_NFS_V4
 extern int nfs_callback_up(void);
-extern int nfs_callback_down(void);
+extern void nfs_callback_down(void);
+#else
+#define nfs_callback_up()	(0)
+#define nfs_callback_down()	do {} while(0)
+#endif
 
 extern unsigned int nfs_callback_set_tcpport;
 extern unsigned short nfs_callback_tcpport;

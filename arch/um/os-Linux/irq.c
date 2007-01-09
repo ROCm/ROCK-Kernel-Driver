@@ -18,6 +18,7 @@
 #include "sigio.h"
 #include "irq_user.h"
 #include "os.h"
+#include "um_malloc.h"
 
 static struct pollfd *pollfds = NULL;
 static int pollfds_num = 0;
@@ -132,7 +133,7 @@ void os_set_pollfd(int i, int fd)
 
 void os_set_ioignore(void)
 {
-	set_handler(SIGIO, SIG_IGN, 0, -1);
+	signal(SIGIO, SIG_IGN);
 }
 
 void init_irq_signals(int on_sigstack)

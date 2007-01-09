@@ -51,6 +51,7 @@ extern struct bond_params bonding_defaults;
 extern struct bond_parm_tbl bond_mode_tbl[];
 extern struct bond_parm_tbl bond_lacp_tbl[];
 extern struct bond_parm_tbl xmit_hashtype_tbl[];
+extern struct bond_parm_tbl arp_validate_tbl[];
 
 static int expected_refcount = -1;
 static struct class *netdev_class;
@@ -423,15 +424,6 @@ static ssize_t bonding_store_mode(struct class_device *cd, const char *buf, size
 		ret = -EINVAL;
 		goto out;
 	} else {
-		if (new_value == BOND_MODE_ACTIVEBACKUP) {
-			INIT_WORK(&bond->arp_work,
-				  (void *)&bond_activebackup_arp_mon,
-				  bond->dev);
-		} else {
-			INIT_WORK(&bond->arp_work,
-				  (void *)&bond_loadbalance_arp_mon,
-				  bond->dev);
-		}
 		if (bond->params.mode == BOND_MODE_8023AD)
 			bond_unset_master_3ad_flags(bond);
 
@@ -512,6 +504,53 @@ out:
 static CLASS_DEVICE_ATTR(xmit_hash_policy, S_IRUGO | S_IWUSR, bonding_show_xmit_hash, bonding_store_xmit_hash);
 
 /*
+ * Show and set arp_validate.
+ */
+static ssize_t bonding_show_arp_validate(struct class_device *cd, char *buf)
+{
+	struct bonding *bond = to_bond(cd);
+
+	return sprintf(buf, "%s %d\n",
+		       arp_validate_tbl[bond->params.arp_validate].modename,
+		       bond->params.arp_validate) + 1;
+}
+
+static ssize_t bonding_store_arp_validate(struct class_device *cd, const char *buf, size_t count)
+{
+	int new_value;
+	struct bonding *bond = to_bond(cd);
+
+	new_value = bond_parse_parm((char *)buf, arp_validate_tbl);
+	if (new_value < 0) {
+		printk(KERN_ERR DRV_NAME
+		       ": %s: Ignoring invalid arp_validate value %s\n",
+		       bond->dev->name, buf);
+		return -EINVAL;
+	}
+	if (new_value && (bond->params.mode != BOND_MODE_ACTIVEBACKUP)) {
+		printk(KERN_ERR DRV_NAME
+		       ": %s: arp_validate only supported in active-backup mode.\n",
+		       bond->dev->name);
+		return -EINVAL;
+	}
+	printk(KERN_INFO DRV_NAME ": %s: setting arp_validate to %s (%d).\n",
+	       bond->dev->name, arp_validate_tbl[new_value].modename,
+	       new_value);
+
+	if (!bond->params.arp_validate && new_value) {
+		bond_register_arp(bond);
+	} else if (bond->params.arp_validate && !new_value) {
+		bond_unregister_arp(bond);
+	}
+
+	bond->params.arp_validate = new_value;
+
+	return count;
+}
+
+static CLASS_DEVICE_ATTR(arp_validate, S_IRUGO | S_IWUSR, bonding_show_arp_validate, bonding_store_arp_validate);
+
+/*
  * Show and set the arp timer interval.  There are two tricky bits
  * here.  First, if ARP monitoring is activated, then we must disable
  * MII monitoring.  Second, if the ARP timer isn't running, we must
@@ -554,7 +593,13 @@ static ssize_t bonding_store_arp_interval(struct class_device *cd, const char *b
 		       "%s Disabling MII monitoring.\n",
 		       bond->dev->name, bond->dev->name);
 		bond->params.miimon = 0;
-		cancel_rearming_delayed_work(&bond->mii_work);
+		/* Kill MII timer, else it brings bond's link down */
+		if (bond->arp_timer.function) {
+			printk(KERN_INFO DRV_NAME
+			": %s: Kill MII timer, else it brings bond's link down...\n",
+		       bond->dev->name);
+			del_timer_sync(&bond->mii_timer);
+		}
 	}
 	if (!bond->params.arp_targets[0]) {
 		printk(KERN_INFO DRV_NAME
@@ -568,8 +613,26 @@ static ssize_t bonding_store_arp_interval(struct class_device *cd, const char *b
 		 * timer will get fired off when the open function
 		 * is called.
 		 */
-		cancel_rearming_delayed_work(&bond->arp_work);
-		schedule_delayed_work(&bond->arp_work, 1);
+		if (bond->arp_timer.function) {
+			/* The timer's already set up, so fire it off */
+			mod_timer(&bond->arp_timer, jiffies + 1);
+		} else {
+			/* Set up the timer. */
+			init_timer(&bond->arp_timer);
+			bond->arp_timer.expires = jiffies + 1;
+			bond->arp_timer.data =
+				(unsigned long) bond->dev;
+			if (bond->params.mode == BOND_MODE_ACTIVEBACKUP) {
+				bond->arp_timer.function =
+					(void *)
+					&bond_activebackup_arp_mon;
+			} else {
+				bond->arp_timer.function =
+					(void *)
+					&bond_loadbalance_arp_mon;
+			}
+			add_timer(&bond->arp_timer);
+		}
 	}
 
 out:
@@ -899,7 +962,18 @@ static ssize_t bonding_store_miimon(struct class_device *cd, const char *buf, si
 			       "ARP monitoring. Disabling ARP monitoring...\n",
 			       bond->dev->name);
 			bond->params.arp_interval = 0;
-			cancel_rearming_delayed_work(&bond->arp_work);
+			if (bond->params.arp_validate) {
+				bond_unregister_arp(bond);
+				bond->params.arp_validate =
+					BOND_ARP_VALIDATE_NONE;
+			}
+			/* Kill ARP timer, else it brings bond's link down */
+			if (bond->mii_timer.function) {
+				printk(KERN_INFO DRV_NAME
+				": %s: Kill ARP timer, else it brings bond's link down...\n",
+			       bond->dev->name);
+				del_timer_sync(&bond->arp_timer);
+			}
 		}
 
 		if (bond->dev->flags & IFF_UP) {
@@ -908,8 +982,19 @@ static ssize_t bonding_store_miimon(struct class_device *cd, const char *buf, si
 			 * timer will get fired off when the open function
 			 * is called.
 			 */
-			cancel_rearming_delayed_work(&bond->mii_work);
-			schedule_delayed_work(&bond->mii_work, 1);
+			if (bond->mii_timer.function) {
+				/* The timer's already set up, so fire it off */
+				mod_timer(&bond->mii_timer, jiffies + 1);
+			} else {
+				/* Set up the timer. */
+				init_timer(&bond->mii_timer);
+				bond->mii_timer.expires = jiffies + 1;
+				bond->mii_timer.data =
+					(unsigned long) bond->dev;
+				bond->mii_timer.function =
+					(void *) &bond_mii_monitor;
+				add_timer(&bond->mii_timer);
+			}
 		}
 	}
 out:
@@ -1061,7 +1146,7 @@ static ssize_t bonding_store_active_slave(struct class_device *cd, const char *b
 			     strlen(slave->dev->name)) == 0) {
         			old_active = bond->curr_active_slave;
         			new_active = slave;
-        			if (new_active && (new_active == old_active)) {
+        			if (new_active == old_active) {
 					/* do nothing */
 					printk(KERN_INFO DRV_NAME
 				       	       ": %s: %s is already the current active slave.\n",
@@ -1241,6 +1326,7 @@ static CLASS_DEVICE_ATTR(ad_partner_mac, S_IRUGO, bonding_show_ad_partner_mac, N
 static struct attribute *per_bond_attrs[] = {
 	&class_device_attr_slaves.attr,
 	&class_device_attr_mode.attr,
+	&class_device_attr_arp_validate.attr,
 	&class_device_attr_arp_interval.attr,
 	&class_device_attr_arp_ip_target.attr,
 	&class_device_attr_downdelay.attr,

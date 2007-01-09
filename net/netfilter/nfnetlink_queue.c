@@ -377,9 +377,9 @@ nfqnl_build_packet_message(struct nfqnl_instance *queue,
 		break;
 	
 	case NFQNL_COPY_PACKET:
-		if (entskb->ip_summed == CHECKSUM_HW &&
-		    (*errp = skb_checksum_help(entskb,
-		                               outdev == NULL))) {
+		if ((entskb->ip_summed == CHECKSUM_PARTIAL ||
+		     entskb->ip_summed == CHECKSUM_COMPLETE) &&
+		    (*errp = skb_checksum_help(entskb))) {
 			spin_unlock_bh(&queue->lock);
 			return NULL;
 		}
@@ -414,7 +414,7 @@ nfqnl_build_packet_message(struct nfqnl_instance *queue,
 	nfmsg->res_id = htons(queue->queue_num);
 
 	pmsg.packet_id 		= htonl(entry->id);
-	pmsg.hw_protocol	= htons(entskb->protocol);
+	pmsg.hw_protocol	= entskb->protocol;
 	pmsg.hook		= entinf->hook;
 
 	NFA_PUT(skb, NFQA_PACKET_HDR, sizeof(pmsg), &pmsg);
@@ -584,7 +584,7 @@ nfqnl_enqueue_packet(struct sk_buff *skb, struct nf_info *info,
                 queue->queue_dropped++;
 		status = -ENOSPC;
 		if (net_ratelimit())
-		          printk(KERN_WARNING "ip_queue: full at %d entries, "
+		          printk(KERN_WARNING "nf_queue: full at %d entries, "
 				 "dropping packets(s). Dropped: %d\n", 
 				 queue->queue_total, queue->queue_dropped);
 		goto err_out_free_nskb;
@@ -622,9 +622,10 @@ nfqnl_mangle(void *data, int data_len, struct nfqnl_queue_entry *e)
 	int diff;
 
 	diff = data_len - e->skb->len;
-	if (diff < 0)
-		skb_trim(e->skb, data_len);
-	else if (diff > 0) {
+	if (diff < 0) {
+		if (pskb_trim(e->skb, data_len))
+			return -ENOMEM;
+	} else if (diff > 0) {
 		if (data_len > 0xFFFF)
 			return -EINVAL;
 		if (diff > skb_tailroom(e->skb)) {
@@ -635,7 +636,7 @@ nfqnl_mangle(void *data, int data_len, struct nfqnl_queue_entry *e)
 			                         diff,
 			                         GFP_ATOMIC);
 			if (newskb == NULL) {
-				printk(KERN_WARNING "ip_queue: OOM "
+				printk(KERN_WARNING "nf_queue: OOM "
 				      "in mangle, dropping packet\n");
 				return -ENOMEM;
 			}

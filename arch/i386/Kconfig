@@ -103,15 +103,6 @@ config X86_PC
 	help
 	  Choose this option if your computer is a standard PC or compatible.
 
-config X86_XEN
-	bool "Xen-compatible"
-	select X86_UP_APIC if !SMP && XEN_PRIVILEGED_GUEST
-	select X86_UP_IOAPIC if !SMP && XEN_PRIVILEGED_GUEST
-	select SWIOTLB
-	help
-	  Choose this option if you plan to run this kernel on top of the
-	  Xen Hypervisor.
-
 config X86_ELAN
 	bool "AMD Elan"
 	help
@@ -175,7 +166,6 @@ config X86_VISWS
 
 config X86_GENERICARCH
        bool "Generic architecture (Summit, bigsmp, ES7000, default)"
-       depends on SMP
        help
           This option compiles in the Summit, bigsmp, ES7000, default subarchitectures.
 	  It is intended for a generic binary kernel.
@@ -272,7 +262,7 @@ source "kernel/Kconfig.preempt"
 
 config X86_UP_APIC
 	bool "Local APIC support on uniprocessors"
-	depends on !SMP && !(X86_VISWS || X86_VOYAGER)
+	depends on !SMP && !(X86_VISWS || X86_VOYAGER || X86_GENERICARCH)
 	help
 	  A local APIC (Advanced Programmable Interrupt Controller) is an
 	  integrated interrupt controller in the CPU. If you have a single-CPU
@@ -297,22 +287,12 @@ config X86_UP_IOAPIC
 
 config X86_LOCAL_APIC
 	bool
-	depends on X86_UP_APIC || ((X86_VISWS || SMP) && !X86_VOYAGER)
+	depends on X86_UP_APIC || ((X86_VISWS || SMP) && !X86_VOYAGER) || X86_GENERICARCH
 	default y
-
-config X86_APIC_AUTO
-        bool "Use heuristics to enable/disable local APIC"
-	depends on X86_LOCAL_APIC
-	help
-	  This option uses some proven heuristics to automatically enable or disable the local
-	  APIC. All decisions can be overriden by command line options.
-	  In a nutshell very old systems run better with APIC off and newer or multiprocessor
-	  systems prefer APIC on
-	  This is a useful default for distribution kernels.
 
 config X86_IO_APIC
 	bool
-	depends on X86_UP_IOAPIC || (SMP && !(X86_VISWS || X86_VOYAGER))
+	depends on X86_UP_IOAPIC || (SMP && !(X86_VISWS || X86_VOYAGER)) || X86_GENERICARCH
 	default y
 
 config X86_VISWS_APIC
@@ -320,14 +300,9 @@ config X86_VISWS_APIC
 	depends on X86_VISWS
 	default y
 
-config X86_TSC
-	bool
-	depends on (MWINCHIP3D || MWINCHIP2 || MCRUSOE || MEFFICEON || MCYRIXIII || MK7 || MK6 || MPENTIUM4 || MPENTIUMM || MPENTIUMIII || MPENTIUMII || M686 || M586MMX || M586TSC || MK8 || MVIAC3_2 || MGEODEGX1) && !X86_NUMAQ && !X86_XEN
-	default y
-
 config X86_MCE
 	bool "Machine Check Exception"
-	depends on !(X86_VOYAGER || X86_XEN)
+	depends on !X86_VOYAGER
 	---help---
 	  Machine Check Exception support allows the processor to notify the
 	  kernel if it detects a problem (e.g. overheating, component failure).
@@ -426,6 +401,7 @@ config X86_REBOOTFIXUPS
 
 config MICROCODE
 	tristate "/dev/cpu/microcode - Intel IA32 CPU microcode support"
+	select FW_LOADER
 	---help---
 	  If you say Y here and also to "/dev file system support" in the
 	  'File systems' section, you will be able to update the microcode on
@@ -440,6 +416,11 @@ config MICROCODE
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called microcode.
+
+config MICROCODE_OLD_INTERFACE
+	bool
+	depends on MICROCODE
+	default y
 
 config X86_MSR
 	tristate "/dev/cpu/*/msr - Model-specific register support"
@@ -457,10 +438,6 @@ config X86_CPUID
 	  be executed on a specific processor.  It is a character device
 	  with major 203 and minors 0 to 31 for /dev/cpu/0/cpuid to
 	  /dev/cpu/31/cpuid.
-
-config SWIOTLB
-	bool
-	default n
 
 source "drivers/firmware/Kconfig"
 
@@ -522,7 +499,7 @@ config HIGHMEM64G
 endchoice
 
 choice
-	depends on EXPERIMENTAL && !X86_PAE
+	depends on EXPERIMENTAL
 	prompt "Memory split" if EMBEDDED
 	default VMSPLIT_3G
 	help
@@ -544,6 +521,7 @@ choice
 	config VMSPLIT_3G
 		bool "3G/1G user/kernel split"
 	config VMSPLIT_3G_OPT
+		depends on !HIGHMEM
 		bool "3G/1G user/kernel split (for full 1G low memory)"
 	config VMSPLIT_2G
 		bool "2G/2G user/kernel split"
@@ -626,12 +604,10 @@ config ARCH_SELECT_MEMORY_MODEL
 	def_bool y
 	depends on ARCH_SPARSEMEM_ENABLE
 
-source "mm/Kconfig"
+config ARCH_POPULATES_NODE_MAP
+	def_bool y
 
-config HAVE_ARCH_EARLY_PFN_TO_NID
-	bool
-	default y
-	depends on NUMA
+source "mm/Kconfig"
 
 config HIGHPTE
 	bool "Allocate 3rd-level pagetables from highmem"
@@ -706,7 +682,7 @@ config EFI
 	depends on ACPI
 	default n
 	---help---
-	This enables the the kernel to boot on EFI platforms using
+	This enables the kernel to boot on EFI platforms using
 	system configuration information passed to it from the firmware.
 	This also enables the kernel to use any EFI runtime services that are
 	available (such as the EFI variable services).
@@ -768,8 +744,7 @@ config SECCOMP
 source kernel/Kconfig.hz
 
 config KEXEC
-	bool "kexec system call (EXPERIMENTAL)"
-	depends on EXPERIMENTAL
+	bool "kexec system call"
 	help
 	  kexec is a system call that implements the ability to shutdown your
 	  current kernel, and to start another kernel.  It is like a reboot
@@ -790,6 +765,13 @@ config CRASH_DUMP
 	depends on HIGHMEM
 	help
 	  Generate crash dump after being started by kexec.
+          This should be normally only set in special crash dump kernels
+	  which are loaded in the main kernel with kexec-tools into
+	  a specially reserved region and then later executed after
+	  a crash by kdump/kexec. The crash dump kernel must be compiled
+          to a memory address not used by the main kernel or BIOS using
+          PHYSICAL_START.
+	  For more details see Documentation/kdump/kdump.txt
 
 config PHYSICAL_START
 	hex "Physical address where the kernel is loaded" if (EMBEDDED || CRASH_DUMP)
@@ -822,6 +804,7 @@ config HOTPLUG_CPU
 config COMPAT_VDSO
 	bool "Compat VDSO support"
 	default y
+	depends on !PARAVIRT
 	help
 	  Map the VDSO to the predictable old-style address too.
 	---help---
@@ -838,20 +821,18 @@ config ARCH_ENABLE_MEMORY_HOTPLUG
 	depends on HIGHMEM
 
 menu "Power management options (ACPI, APM)"
-	depends on !(X86_VOYAGER || XEN_UNPRIVILEGED_GUEST)
+	depends on !X86_VOYAGER
 
-if !X86_XEN
 source kernel/power/Kconfig
-endif
 
 source "drivers/acpi/Kconfig"
 
 menu "APM (Advanced Power Management) BIOS Support"
-depends on PM && !(X86_VISWS || X86_XEN)
+depends on PM && !X86_VISWS
 
 config APM
 	tristate "APM (Advanced Power Management) BIOS support"
-	depends on PM && PM_LEGACY
+	depends on PM
 	---help---
 	  APM is a BIOS specification for saving power using several different
 	  techniques. This is mostly useful for battery powered laptops with
@@ -1043,13 +1024,6 @@ config PCI_GOMMCONFIG
 config PCI_GODIRECT
 	bool "Direct"
 
-config PCI_GOXEN_FE
-	bool "Xen PCI Frontend"
-	depends on X86_XEN
-	help
-	  The PCI device frontend driver allows the kernel to import arbitrary
-	  PCI devices from a PCI backend to support PCI driver domains.
-
 config PCI_GOANY
 	bool "Any"
 
@@ -1057,7 +1031,7 @@ endchoice
 
 config PCI_BIOS
 	bool
-	depends on !(X86_VISWS || X86_XEN) && PCI && (PCI_GOBIOS || PCI_GOANY)
+	depends on !X86_VISWS && PCI && (PCI_GOBIOS || PCI_GOANY)
 	default y
 
 config PCI_DIRECT
@@ -1069,18 +1043,6 @@ config PCI_MMCONFIG
 	bool
 	depends on PCI && ACPI && (PCI_GOMMCONFIG || PCI_GOANY)
 	default y
-
-config XEN_PCIDEV_FRONTEND
-	bool
-	depends on PCI && X86_XEN && (PCI_GOXEN_FE || PCI_GOANY)
-	default y
-
-config XEN_PCIDEV_FE_DEBUG
-	bool "Xen PCI Frontend Debugging"
-	depends on XEN_PCIDEV_FRONTEND
-	default n
-	help
-	  Enables some debug statements within the PCI Frontend.
 
 source "drivers/pci/pcie/Kconfig"
 
@@ -1180,7 +1142,7 @@ source "arch/i386/oprofile/Kconfig"
 
 config KPROBES
 	bool "Kprobes (EXPERIMENTAL)"
-	depends on EXPERIMENTAL && MODULES
+	depends on KALLSYMS && EXPERIMENTAL && MODULES
 	help
 	  Kprobes allows you to trap at almost any kernel address and
 	  execute a callback function.  register_kprobe() establishes
@@ -1194,8 +1156,6 @@ source "arch/i386/Kconfig.debug"
 source "security/Kconfig"
 
 source "crypto/Kconfig"
-
-source "drivers/xen/Kconfig"
 
 source "lib/Kconfig"
 
@@ -1222,7 +1182,7 @@ config X86_SMP
 
 config X86_HT
 	bool
-	depends on SMP && !(X86_VISWS || X86_VOYAGER || X86_XEN)
+	depends on SMP && !(X86_VISWS || X86_VOYAGER)
 	default y
 
 config X86_BIOS_REBOOT
@@ -1233,16 +1193,6 @@ config X86_BIOS_REBOOT
 config X86_TRAMPOLINE
 	bool
 	depends on X86_SMP || (X86_VOYAGER && SMP)
-	default y
-
-config X86_NO_TSS
-	bool
-	depends on X86_XEN
-	default y
-
-config X86_NO_IDT
-	bool
-	depends on X86_XEN
 	default y
 
 config KTIME_SCALAR

@@ -201,6 +201,7 @@ static int dccp_v6_connect(struct sock *sk, struct sockaddr *uaddr,
 	fl.oif = sk->sk_bound_dev_if;
 	fl.fl_ip_dport = usin->sin6_port;
 	fl.fl_ip_sport = inet->sport;
+	security_sk_classify_flow(sk, &fl);
 
 	if (np->opt != NULL && np->opt->srcrt != NULL) {
 		const struct rt0_hdr *rt0 = (struct rt0_hdr *)np->opt->srcrt;
@@ -230,7 +231,7 @@ static int dccp_v6_connect(struct sock *sk, struct sockaddr *uaddr,
 	ipv6_addr_copy(&np->saddr, saddr);
 	inet->rcv_saddr = LOOPBACK4_IPV6;
 
-	__ip6_dst_store(sk, dst, NULL);
+	__ip6_dst_store(sk, dst, NULL, NULL);
 
 	icsk->icsk_ext_hdr_len = 0;
 	if (np->opt != NULL)
@@ -284,7 +285,7 @@ static void dccp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 	}
 
 	if (sk->sk_state == DCCP_TIME_WAIT) {
-		inet_twsk_put((struct inet_timewait_sock *)sk);
+		inet_twsk_put(inet_twsk(sk));
 		return;
 	}
 
@@ -322,6 +323,7 @@ static void dccp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 			fl.oif = sk->sk_bound_dev_if;
 			fl.fl_ip_dport = inet->dport;
 			fl.fl_ip_sport = inet->sport;
+			security_sk_classify_flow(sk, &fl);
 
 			err = ip6_dst_lookup(sk, &dst, &fl);
 			if (err) {
@@ -422,6 +424,7 @@ static int dccp_v6_send_response(struct sock *sk, struct request_sock *req,
 	fl.oif = ireq6->iif;
 	fl.fl_ip_dport = inet_rsk(req)->rmt_port;
 	fl.fl_ip_sport = inet_sk(sk)->sport;
+	security_req_classify_flow(req, &fl);
 
 	if (dst == NULL) {
 		opt = np->opt;
@@ -547,7 +550,7 @@ static void dccp_v6_ctl_send_reset(struct sk_buff *rxskb)
 	dccp_hdr_reset(skb)->dccph_reset_code =
 				DCCP_SKB_CB(rxskb)->dccpd_reset_code;
 
-	/* See "8.3.1. Abnormal Termination" in draft-ietf-dccp-spec-11 */
+	/* See "8.3.1. Abnormal Termination" in RFC 4340 */
 	seqno = 0;
 	if (DCCP_SKB_CB(rxskb)->dccpd_ack_seq != DCCP_PKT_WITHOUT_ACK_SEQ)
 		dccp_set_seqno(&seqno, DCCP_SKB_CB(rxskb)->dccpd_ack_seq + 1);
@@ -566,6 +569,7 @@ static void dccp_v6_ctl_send_reset(struct sk_buff *rxskb)
 	fl.oif = inet6_iif(rxskb);
 	fl.fl_ip_dport = dh->dccph_dport;
 	fl.fl_ip_sport = dh->dccph_sport;
+	security_skb_classify_flow(rxskb, &fl);
 
 	/* sk = NULL, but it is safe for now. RST socket required. */
 	if (!ip6_dst_lookup(NULL, &skb->dst, &fl)) {
@@ -622,6 +626,7 @@ static void dccp_v6_reqsk_send_ack(struct sk_buff *rxskb,
 	fl.oif = inet6_iif(rxskb);
 	fl.fl_ip_dport = dh->dccph_dport;
 	fl.fl_ip_sport = dh->dccph_sport;
+	security_req_classify_flow(req, &fl);
 
 	if (!ip6_dst_lookup(NULL, &skb->dst, &fl)) {
 		if (xfrm_lookup(&skb->dst, &fl, NULL, 0) >= 0) {
@@ -658,7 +663,7 @@ static struct sock *dccp_v6_hnd_req(struct sock *sk,struct sk_buff *skb)
 			bh_lock_sock(nsk);
 			return nsk;
 		}
-		inet_twsk_put((struct inet_timewait_sock *)nsk);
+		inet_twsk_put(inet_twsk(nsk));
 		return NULL;
 	}
 
@@ -667,7 +672,6 @@ static struct sock *dccp_v6_hnd_req(struct sock *sk,struct sk_buff *skb)
 
 static int dccp_v6_conn_request(struct sock *sk, struct sk_buff *skb)
 {
-	struct inet_request_sock *ireq;
 	struct dccp_sock dp;
 	struct request_sock *req;
 	struct dccp_request_sock *dreq;
@@ -696,7 +700,7 @@ static int dccp_v6_conn_request(struct sock *sk, struct sk_buff *skb)
 	if (sk_acceptq_is_full(sk) && inet_csk_reqsk_queue_young(sk) > 1)
 		goto drop;
 
-	req = inet6_reqsk_alloc(sk->sk_prot->rsk_prot);
+	req = inet6_reqsk_alloc(&dccp6_request_sock_ops);
 	if (req == NULL)
 		goto drop;
 
@@ -704,8 +708,10 @@ static int dccp_v6_conn_request(struct sock *sk, struct sk_buff *skb)
 
 	dccp_openreq_init(req, &dp, skb);
 
+	if (security_inet_conn_request(sk, skb, req))
+		goto drop_and_free;
+
 	ireq6 = inet6_rsk(req);
-	ireq = inet_rsk(req);
 	ipv6_addr_copy(&ireq6->rmt_addr, &skb->nh.ipv6h->saddr);
 	ipv6_addr_copy(&ireq6->loc_addr, &skb->nh.ipv6h->daddr);
 	req->rcv_wnd	= dccp_feat_default_sequence_window;
@@ -842,6 +848,7 @@ static struct sock *dccp_v6_request_recv_sock(struct sock *sk,
 		fl.oif = sk->sk_bound_dev_if;
 		fl.fl_ip_dport = inet_rsk(req)->rmt_port;
 		fl.fl_ip_sport = inet_sk(sk)->sport;
+		security_sk_classify_flow(sk, &fl);
 
 		if (ip6_dst_lookup(sk, &dst, &fl))
 			goto out;
@@ -863,7 +870,7 @@ static struct sock *dccp_v6_request_recv_sock(struct sock *sk,
 	 * comment in that function for the gory details. -acme
 	 */
 
-	__ip6_dst_store(newsk, dst, NULL);
+	__ip6_dst_store(newsk, dst, NULL, NULL);
 	newsk->sk_route_caps = dst->dev->features & ~(NETIF_F_IP_CSUM |
 						      NETIF_F_TSO);
 	newdp6 = (struct dccp6_sock *)newsk;
@@ -961,7 +968,7 @@ static int dccp_v6_do_rcv(struct sock *sk, struct sk_buff *skb)
 	if (skb->protocol == htons(ETH_P_IP))
 		return dccp_v4_do_rcv(sk, skb);
 
-	if (sk_filter(sk, skb, 0))
+	if (sk_filter(sk, skb))
 		goto discard;
 
 	/*
@@ -988,6 +995,10 @@ static int dccp_v6_do_rcv(struct sock *sk, struct sk_buff *skb)
 	if (sk->sk_state == DCCP_OPEN) { /* Fast path */
 		if (dccp_rcv_established(sk, skb, dccp_hdr(skb), skb->len))
 			goto reset;
+		if (opt_skb) {
+			/* This is where we would goto ipv6_pktoptions. */
+			__kfree_skb(opt_skb);
+		}
 		return 0;
 	}
 
@@ -1012,6 +1023,10 @@ static int dccp_v6_do_rcv(struct sock *sk, struct sk_buff *skb)
 
 	if (dccp_rcv_state_process(sk, skb, dccp_hdr(skb), skb->len))
 		goto reset;
+	if (opt_skb) {
+		/* This is where we would goto ipv6_pktoptions. */
+		__kfree_skb(opt_skb);
+	}
 	return 0;
 
 reset:
@@ -1100,7 +1115,7 @@ discard_and_relse:
 	goto discard_it;
 
 do_time_wait:
-	inet_twsk_put((struct inet_timewait_sock *)sk);
+	inet_twsk_put(inet_twsk(sk));
 	goto no_dccp_socket;
 }
 

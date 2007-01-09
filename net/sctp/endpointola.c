@@ -144,6 +144,13 @@ void sctp_endpoint_add_asoc(struct sctp_endpoint *ep,
 {
 	struct sock *sk = ep->base.sk;
 
+	/* If this is a temporary association, don't bother
+	 * since we'll be removing it shortly and don't
+	 * want anyone to find it anyway.
+	 */
+	if (asoc->temp)
+		return;
+
 	/* Now just add it to our list of asocs */
 	list_add_tail(&asoc->asocs, &ep->asocs);
 
@@ -173,7 +180,7 @@ static void sctp_endpoint_destroy(struct sctp_endpoint *ep)
 	SCTP_ASSERT(ep->base.dead, "Endpoint is not dead", return);
 
 	/* Free up the HMAC transform. */
-	sctp_crypto_free_tfm(sctp_sk(ep->base.sk)->hmac);
+	crypto_free_hash(sctp_sk(ep->base.sk)->hmac);
 
 	/* Cleanup. */
 	sctp_inq_free(&ep->base.inqueue);

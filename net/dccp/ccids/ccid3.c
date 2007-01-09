@@ -379,8 +379,7 @@ static void ccid3_hc_tx_packet_sent(struct sock *sk, int more, int len)
 		packet->dccphtx_seqno  = dp->dccps_gss;
 		/*
 		 * Check if win_count have changed
-		 * Algorithm in "8.1. Window Counter Valuer" in
-		 * draft-ietf-dccp-ccid3-11.txt
+		 * Algorithm in "8.1. Window Counter Value" in RFC 4342.
 		 */
 		quarter_rtt = timeval_delta(&now, &hctx->ccid3hctx_t_last_win_count);
 		if (likely(hctx->ccid3hctx_rtt > 8))
@@ -900,7 +899,7 @@ found:
 static void ccid3_hc_rx_update_li(struct sock *sk, u64 seq_loss, u8 win_loss)
 {
 	struct ccid3_hc_rx_sock *hcrx = ccid3_hc_rx_sk(sk);
-	struct dccp_li_hist_entry *next, *head;
+	struct dccp_li_hist_entry *head;
 	u64 seq_temp;
 
 	if (list_empty(&hcrx->ccid3hcrx_li_hist)) {
@@ -908,15 +907,15 @@ static void ccid3_hc_rx_update_li(struct sock *sk, u64 seq_loss, u8 win_loss)
 		   &hcrx->ccid3hcrx_li_hist, seq_loss, win_loss))
 			return;
 
-		next = (struct dccp_li_hist_entry *)
-		   hcrx->ccid3hcrx_li_hist.next;
-		next->dccplih_interval = ccid3_hc_rx_calc_first_li(sk);
+		head = list_entry(hcrx->ccid3hcrx_li_hist.next,
+		   struct dccp_li_hist_entry, dccplih_node);
+		head->dccplih_interval = ccid3_hc_rx_calc_first_li(sk);
 	} else {
 		struct dccp_li_hist_entry *entry;
 		struct list_head *tail;
 
-		head = (struct dccp_li_hist_entry *)
-		   hcrx->ccid3hcrx_li_hist.next;
+		head = list_entry(hcrx->ccid3hcrx_li_hist.next,
+		   struct dccp_li_hist_entry, dccplih_node);
 		/* FIXME win count check removed as was wrong */
 		/* should make this check with receive history */
 		/* and compare there as per section 10.2 of RFC4342 */
@@ -1240,7 +1239,7 @@ static int ccid3_hc_tx_getsockopt(struct sock *sk, const int optname, int len,
 }
 
 static struct ccid_operations ccid3 = {
-	.ccid_id		   = 3,
+	.ccid_id		   = DCCPC_CCID3,
 	.ccid_name		   = "ccid3",
 	.ccid_owner		   = THIS_MODULE,
 	.ccid_hc_tx_obj_size	   = sizeof(struct ccid3_hc_tx_sock),

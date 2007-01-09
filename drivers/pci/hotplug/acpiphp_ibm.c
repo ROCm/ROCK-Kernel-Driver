@@ -35,7 +35,6 @@
 #include <linux/moduleparam.h>
 
 #include "acpiphp.h"
-#include "pci_hotplug.h"
 
 #define DRIVER_VERSION	"1.0.1"
 #define DRIVER_AUTHOR	"Irene Zubarev <zubarev@us.ibm.com>, Vernon Mauery <vernux@us.ibm.com>"
@@ -487,9 +486,7 @@ static void __exit ibm_acpiphp_exit(void)
 	if (ACPI_FAILURE(status))
 		err("%s: Notification handler removal failed\n", __FUNCTION__);
 	/* remove the /sys entries */
-	if (sysfs_remove_bin_file(sysdir, &ibm_apci_table_attr))
-		err("%s: removal of sysfs file apci_table failed\n",
-				__FUNCTION__);
+	sysfs_remove_bin_file(sysdir, &ibm_apci_table_attr);
 }
 
 module_init(ibm_acpiphp_init);

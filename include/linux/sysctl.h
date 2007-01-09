@@ -6,10 +6,17 @@
  ****************************************************************
  ****************************************************************
  **
+ **  WARNING:
  **  The values in this file are exported to user space via 
- **  the sysctl() binary interface.  However this interface
- **  is unstable and deprecated and will be removed in the future. 
- **  For a stable interface use /proc/sys.
+ **  the sysctl() binary interface.  Do *NOT* change the
+ **  numbering of any existing values here, and do not change
+ **  any numbers within any one set of values.  If you have to
+ **  have to redefine an existing interface, use a new number for it.
+ **  The kernel will then return -ENOTDIR to any application using
+ **  the old binary interface.
+ **
+ **  For new interfaces unless you really need a binary number
+ **  please use CTL_UNNUMBERED.
  **
  ****************************************************************
  ****************************************************************
@@ -48,6 +55,7 @@ struct __sysctl_args {
 #ifdef __KERNEL__
 #define CTL_ANY		-1	/* Matches any name */
 #define CTL_NONE	0
+#define CTL_UNNUMBERED	CTL_NONE	/* sysctl without a binary number */
 #endif
 
 enum
@@ -150,8 +158,10 @@ enum
 	KERN_IA64_UNALIGNED=72, /* int: ia64 unaligned userland trap enable */
 	KERN_COMPAT_LOG=73,	/* int: print compat layer  messages */
 	KERN_MAX_LOCK_DEPTH=74,
-	KERN_UNSUPPORTED=75,	/* int: allow loading of unsupported modules */
-	KERN_KDB=76,		/* int: kdb on/off */
+	KERN_NMI_WATCHDOG=75, /* int: enable/disable nmi watchdog */
+	KERN_PANIC_ON_NMI=76, /* int: whether we will panic on an unrecovered */
+	KERN_UNSUPPORTED=77,	/* int: allow loading of unsupported modules */
+	KERN_KDB=78,		/* int: kdb on/off */
 };
 
 
@@ -414,6 +424,10 @@ enum
 	NET_IPV4_TCP_WORKAROUND_SIGNED_WINDOWS=115,
 	NET_TCP_DMA_COPYBREAK=116,
 	NET_TCP_SLOW_START_AFTER_IDLE=117,
+	NET_CIPSOV4_CACHE_ENABLE=118,
+	NET_CIPSOV4_CACHE_BUCKET_SIZE=119,
+	NET_CIPSOV4_RBM_OPTFMT=120,
+	NET_CIPSOV4_RBM_STRICTVALID=121,
 };
 
 enum {
@@ -555,6 +569,7 @@ enum {
 	NET_IPV6_ACCEPT_RA_RTR_PREF=20,
 	NET_IPV6_RTR_PROBE_INTERVAL=21,
 	NET_IPV6_ACCEPT_RA_RT_INFO_MAX_PLEN=22,
+	NET_IPV6_PROXY_NDP=23,
 	__NET_IPV6_MAX
 };
 
@@ -956,8 +971,8 @@ extern ctl_handler sysctl_ms_jiffies;
 /*
  * Register a set of sysctl names by calling register_sysctl_table
  * with an initialised array of ctl_table's.  An entry with zero
- * ctl_name terminates the table.  table->de will be set up by the
- * registration and need not be initialised in advance.
+ * ctl_name and NULL procname terminates the table.  table->de will be
+ * set up by the registration and need not be initialised in advance.
  *
  * sysctl names can be mirrored automatically under /proc/sys.  The
  * procname supplied controls /proc naming.
@@ -968,7 +983,10 @@ extern ctl_handler sysctl_ms_jiffies;
  * Leaf nodes in the sysctl tree will be represented by a single file
  * under /proc; non-leaf nodes will be represented by directories.  A
  * null procname disables /proc mirroring at this node.
- * 
+ *
+ * sysctl entries with a zero ctl_name will not be available through
+ * the binary sysctl interface.
+ *
  * sysctl(2) can automatically manage read and write requests through
  * the sysctl table.  The data and maxlen fields of the ctl_table
  * struct enable minimal validation of the values being written to be
@@ -1016,18 +1034,8 @@ struct ctl_table_header
 	struct completion *unregistering;
 };
 
-/* struct ctl_path describes where in the hierarchy a table is added */
-struct ctl_path
-{
-	int ctl_name;
-	const char *procname;
-	mode_t mode;
-};
-
 struct ctl_table_header * register_sysctl_table(ctl_table * table, 
 						int insert_at_head);
-struct ctl_table_header * register_sysctl_table_path(ctl_table *table,
-						struct ctl_path *path);
 void unregister_sysctl_table(struct ctl_table_header * table);
 
 #else /* __KERNEL__ */

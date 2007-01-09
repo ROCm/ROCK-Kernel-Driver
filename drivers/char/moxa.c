@@ -130,6 +130,7 @@ static moxa_isa_board_conf moxa_isa_boards[] =
 typedef struct _moxa_pci_devinfo {
 	ushort busNum;
 	ushort devNum;
+	struct pci_dev *pdev;
 } moxa_pci_devinfo;
 
 typedef struct _moxa_board_conf {
@@ -260,7 +261,7 @@ static void MoxaPortEnable(int);
 static void MoxaPortDisable(int);
 static long MoxaPortGetMaxBaud(int);
 static long MoxaPortSetBaud(int, long);
-static int MoxaPortSetTermio(int, struct termios *);
+static int MoxaPortSetTermio(int, struct termios *, speed_t);
 static int MoxaPortGetLineOut(int, int *, int *);
 static void MoxaPortLineCtrl(int, int, int);
 static void MoxaPortFlowCtrl(int, int, int, int, int, int);
@@ -281,7 +282,7 @@ static int moxa_get_serial_info(struct moxa_str *, struct serial_struct __user *
 static int moxa_set_serial_info(struct moxa_str *, struct serial_struct __user *);
 static void MoxaSetFifo(int port, int enable);
 
-static struct tty_operations moxa_ops = {
+static const struct tty_operations moxa_ops = {
 	.open = moxa_open,
 	.close = moxa_close,
 	.write = moxa_write,
@@ -324,6 +325,9 @@ static int moxa_get_PCI_conf(struct pci_dev *p, int board_type, moxa_board_conf 
 	board->busType = MOXA_BUS_TYPE_PCI;
 	board->pciInfo.busNum = p->bus->number;
 	board->pciInfo.devNum = p->devfn >> 3;
+	board->pciInfo.pdev = p;
+	/* don't lose the reference in the next pci_get_device iteration */
+	pci_dev_get(p);
 
 	return (0);
 }
@@ -493,6 +497,11 @@ static void __exit moxa_exit(void)
 	if (tty_unregister_driver(moxaDriver))
 		printk("Couldn't unregister MOXA Intellio family serial driver\n");
 	put_tty_driver(moxaDriver);
+
+	for (i = 0; i < MAX_BOARDS; i++)
+		if (moxa_boards[i].busType == MOXA_BUS_TYPE_PCI)
+			pci_dev_put(moxa_boards[i].pciInfo.pdev);
+
 	if (verbose)
 		printk("Done\n");
 }
@@ -986,7 +995,7 @@ static void set_tty_param(struct tty_struct *tty)
 	if (ts->c_iflag & IXANY)
 		xany = 1;
 	MoxaPortFlowCtrl(ch->port, rts, cts, txflow, rxflow, xany);
-	MoxaPortSetTermio(ch->port, ts);
+	MoxaPortSetTermio(ch->port, ts, tty_get_baud_rate(tty));
 }
 
 static int block_till_ready(struct tty_struct *tty, struct file *filp,
@@ -1900,9 +1909,10 @@ int MoxaPortsOfCard(int cardno)
  *
  *      Function 12:    Configure the port.
  *      Syntax:
- *      int  MoxaPortSetTermio(int port, struct termios *termio);
+ *      int  MoxaPortSetTermio(int port, struct termios *termio, speed_t baud);
  *           int port           : port number (0 - 127)
  *           struct termios * termio : termio structure pointer
+ *	     speed_t baud	: baud rate
  *
  *           return:    -1      : this port is invalid or termio == NULL
  *                      0       : setting O.K.
@@ -2182,11 +2192,10 @@ long MoxaPortSetBaud(int port, long baud)
 	return (baud);
 }
 
-int MoxaPortSetTermio(int port, struct termios *termio)
+int MoxaPortSetTermio(int port, struct termios *termio, speed_t baud)
 {
 	void __iomem *ofsAddr;
 	tcflag_t cflag;
-	long baud;
 	tcflag_t mode = 0;
 
 	if (moxaChkPort[port] == 0 || termio == 0)
@@ -2222,77 +2231,9 @@ int MoxaPortSetTermio(int port, struct termios *termio)
 
 	moxafunc(ofsAddr, FC_SetDataMode, (ushort) mode);
 
-	cflag &= (CBAUD | CBAUDEX);
-#ifndef B921600
-#define	B921600	(B460800+1)
-#endif
-	switch (cflag) {
-	case B921600:
-		baud = 921600L;
-		break;
-	case B460800:
-		baud = 460800L;
-		break;
-	case B230400:
-		baud = 230400L;
-		break;
-	case B115200:
-		baud = 115200L;
-		break;
-	case B57600:
-		baud = 57600L;
-		break;
-	case B38400:
-		baud = 38400L;
-		break;
-	case B19200:
-		baud = 19200L;
-		break;
-	case B9600:
-		baud = 9600L;
-		break;
-	case B4800:
-		baud = 4800L;
-		break;
-	case B2400:
-		baud = 2400L;
-		break;
-	case B1800:
-		baud = 1800L;
-		break;
-	case B1200:
-		baud = 1200L;
-		break;
-	case B600:
-		baud = 600L;
-		break;
-	case B300:
-		baud = 300L;
-		break;
-	case B200:
-		baud = 200L;
-		break;
-	case B150:
-		baud = 150L;
-		break;
-	case B134:
-		baud = 134L;
-		break;
-	case B110:
-		baud = 110L;
-		break;
-	case B75:
-		baud = 75L;
-		break;
-	case B50:
-		baud = 50L;
-		break;
-	default:
-		baud = 0;
-	}
 	if ((moxa_boards[port / MAX_PORTS_PER_BOARD].boardType == MOXA_BOARD_C320_ISA) ||
 	    (moxa_boards[port / MAX_PORTS_PER_BOARD].boardType == MOXA_BOARD_C320_PCI)) {
-		if (baud == 921600L)
+		if (baud >= 921600L)
 			return (-1);
 	}
 	MoxaPortSetBaud(port, baud);

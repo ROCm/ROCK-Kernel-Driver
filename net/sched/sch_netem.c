@@ -4,7 +4,7 @@
  * 		This program is free software; you can redistribute it and/or
  * 		modify it under the terms of the GNU General Public License
  * 		as published by the Free Software Foundation; either version
- * 		2 of the License, or (at your option) any later version.
+ * 		2 of the License.
  *
  *  		Many of the algorithms and ideas for this came from
  *		NIST Net which is not copyrighted. 
@@ -170,6 +170,8 @@ static int netem_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 		return NET_XMIT_BYPASS;
 	}
 
+	skb_orphan(skb);
+
 	/*
 	 * If we need to duplicate packet, then re-insert at top of the
 	 * qdisc tree, since parent queuer expects that only one
@@ -192,8 +194,8 @@ static int netem_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 	 */
 	if (q->corrupt && q->corrupt >= get_crandom(&q->corrupt_cor)) {
 		if (!(skb = skb_unshare(skb, GFP_ATOMIC))
-		    || (skb->ip_summed == CHECKSUM_HW
-			&& skb_checksum_help(skb, 0))) {
+		    || (skb->ip_summed == CHECKSUM_PARTIAL
+			&& skb_checksum_help(skb))) {
 			sch->qstats.drops++;
 			return NET_XMIT_DROP;
 		}

@@ -50,6 +50,9 @@
 #include <net/udp.h>
 #include <net/inet_common.h>
 #include <net/tcp_states.h>
+#ifdef CONFIG_IPV6_MIP6
+#include <net/mip6.h>
+#endif
 
 #include <net/rawv6.h>
 #include <net/xfrm.h>
@@ -169,8 +172,32 @@ int ipv6_raw_deliver(struct sk_buff *skb, int nexthdr)
 	sk = __raw_v6_lookup(sk, nexthdr, daddr, saddr, IP6CB(skb)->iif);
 
 	while (sk) {
+		int filtered;
+
 		delivered = 1;
-		if (nexthdr != IPPROTO_ICMPV6 || !icmpv6_filter(sk, skb)) {
+		switch (nexthdr) {
+		case IPPROTO_ICMPV6:
+			filtered = icmpv6_filter(sk, skb);
+			break;
+#ifdef CONFIG_IPV6_MIP6
+		case IPPROTO_MH:
+			/* XXX: To validate MH only once for each packet,
+			 * this is placed here. It should be after checking
+			 * xfrm policy, however it doesn't. The checking xfrm
+			 * policy is placed in rawv6_rcv() because it is
+			 * required for each socket.
+			 */
+			filtered = mip6_mh_filter(sk, skb);
+			break;
+#endif
+		default:
+			filtered = 0;
+			break;
+		}
+
+		if (filtered < 0)
+			break;
+		if (filtered == 0) {
 			struct sk_buff *clone = skb_clone(skb, GFP_ATOMIC);
 
 			/* Not releasing hash table! */
@@ -334,7 +361,7 @@ int rawv6_rcv(struct sock *sk, struct sk_buff *skb)
 	if (!rp->checksum)
 		skb->ip_summed = CHECKSUM_UNNECESSARY;
 
-	if (skb->ip_summed == CHECKSUM_HW) {
+	if (skb->ip_summed == CHECKSUM_COMPLETE) {
 		skb_postpull_rcsum(skb, skb->nh.raw,
 		                   skb->h.raw - skb->nh.raw);
 		if (!csum_ipv6_magic(&skb->nh.ipv6h->saddr,
@@ -577,16 +604,19 @@ error:
 	return err; 
 }
 
-static void rawv6_probe_proto_opt(struct flowi *fl, struct msghdr *msg)
+static int rawv6_probe_proto_opt(struct flowi *fl, struct msghdr *msg)
 {
 	struct iovec *iov;
 	u8 __user *type = NULL;
 	u8 __user *code = NULL;
+#ifdef CONFIG_IPV6_MIP6
+	u8 len = 0;
+#endif
 	int probed = 0;
 	int i;
 
 	if (!msg->msg_iov)
-		return;
+		return 0;
 
 	for (i = 0; i < msg->msg_iovlen; i++) {
 		iov = &msg->msg_iov[i];
@@ -608,11 +638,27 @@ static void rawv6_probe_proto_opt(struct flowi *fl, struct msghdr *msg)
 				code = iov->iov_base;
 
 			if (type && code) {
-				get_user(fl->fl_icmp_type, type);
-				get_user(fl->fl_icmp_code, code);
+				if (get_user(fl->fl_icmp_type, type) ||
+				    get_user(fl->fl_icmp_code, code))
+					return -EFAULT;
 				probed = 1;
 			}
 			break;
+#ifdef CONFIG_IPV6_MIP6
+		case IPPROTO_MH:
+			if (iov->iov_base && iov->iov_len < 1)
+				break;
+			/* check if type field is readable or not. */
+			if (iov->iov_len > 2 - len) {
+				u8 __user *p = iov->iov_base;
+				if (get_user(fl->fl_mh_type, &p[2 - len]))
+					return -EFAULT;
+				probed = 1;
+			} else
+				len += iov->iov_len;
+
+			break;
+#endif
 		default:
 			probed = 1;
 			break;
@@ -620,6 +666,7 @@ static void rawv6_probe_proto_opt(struct flowi *fl, struct msghdr *msg)
 		if (probed)
 			break;
 	}
+	return 0;
 }
 
 static int rawv6_sendmsg(struct kiocb *iocb, struct sock *sk,
@@ -743,7 +790,9 @@ static int rawv6_sendmsg(struct kiocb *iocb, struct sock *sk,
 	opt = ipv6_fixup_options(&opt_space, opt);
 
 	fl.proto = proto;
-	rawv6_probe_proto_opt(&fl, msg);
+	err = rawv6_probe_proto_opt(&fl, msg);
+	if (err)
+		goto out;
  
 	ipv6_addr_copy(&fl.fl6_dst, daddr);
 	if (ipv6_addr_any(&fl.fl6_src) && !ipv6_addr_any(&np->saddr))
@@ -759,6 +808,7 @@ static int rawv6_sendmsg(struct kiocb *iocb, struct sock *sk,
 
 	if (!fl.oif && ipv6_addr_is_multicast(&fl.fl6_dst))
 		fl.oif = np->mcast_oif;
+	security_sk_classify_flow(sk, &fl);
 
 	err = ip6_dst_lookup(sk, &dst, &fl);
 	if (err)

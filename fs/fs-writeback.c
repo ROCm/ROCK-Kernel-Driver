@@ -22,8 +22,7 @@
 #include <linux/blkdev.h>
 #include <linux/backing-dev.h>
 #include <linux/buffer_head.h>
-
-extern struct super_block *blockdev_superblock;
+#include "internal.h"
 
 /**
  *	__mark_inode_dirty -	internal function
@@ -320,7 +319,7 @@ sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)
 
 		if (!bdi_cap_writeback_dirty(bdi)) {
 			list_move(&inode->i_list, &sb->s_dirty);
-			if (sb == blockdev_superblock) {
+			if (sb_is_blkdev_sb(sb)) {
 				/*
 				 * Dirty memory-backed blockdev: the ramdisk
 				 * driver does this.  Skip just this inode
@@ -337,14 +336,14 @@ sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)
 
 		if (wbc->nonblocking && bdi_write_congested(bdi)) {
 			wbc->encountered_congestion = 1;
-			if (sb != blockdev_superblock)
+			if (!sb_is_blkdev_sb(sb))
 				break;		/* Skip a congested fs */
 			list_move(&inode->i_list, &sb->s_dirty);
 			continue;		/* Skip a congested blockdev */
 		}
 
 		if (wbc->bdi && bdi != wbc->bdi) {
-			if (sb != blockdev_superblock)
+			if (!sb_is_blkdev_sb(sb))
 				break;		/* fs has the wrong queue */
 			list_move(&inode->i_list, &sb->s_dirty);
 			continue;		/* blockdev has wrong queue */
@@ -389,29 +388,6 @@ sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)
 	}
 	return;		/* Leave any unwritten inodes on s_io */
 }
-
-void
-writeback_bdev(struct super_block *sb)
-{
-	struct address_space *mapping = sb->s_bdev->bd_inode->i_mapping;
-	filemap_flush(mapping);
-	blk_run_address_space(mapping);
-}
-EXPORT_SYMBOL_GPL(writeback_bdev);
-
-void
-writeback_inode(struct inode *inode)
-{
-
-	struct address_space *mapping = inode->i_mapping;
-	struct writeback_control wbc = {
-		.sync_mode = WB_SYNC_NONE,
-		.nr_to_write = 0,
-	};
-	sync_inode(inode, &wbc);
-	filemap_fdatawrite(mapping);
-}
-EXPORT_SYMBOL_GPL(writeback_inode);
 
 /*
  * Start writeback of dirty pagecache data against all unlocked inodes.

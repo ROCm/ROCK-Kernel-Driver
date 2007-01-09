@@ -17,6 +17,7 @@
 #define PCI_PROBE_CONF2		0x0004
 #define PCI_PROBE_MMCONF	0x0008
 #define PCI_PROBE_MASK		0x000f
+#define PCI_PROBE_NOEARLY	0x0010
 
 #define PCI_NO_SORT		0x0100
 #define PCI_BIOS_SORT		0x0200
@@ -29,13 +30,19 @@
 extern unsigned int pci_probe;
 extern unsigned long pirq_table_addr;
 
+enum pci_bf_sort_state {
+	pci_bf_sort_default,
+	pci_force_nobf,
+	pci_force_bf,
+	pci_dmi_bf,
+};
+
 /* pci-i386.c */
 
 extern unsigned int pcibios_max_latency;
 
 void pcibios_resource_survey(void);
 int pcibios_enable_resources(struct pci_dev *, int);
-void pcibios_disable_resources(struct pci_dev *);
 
 /* pci-pc.c */
 
@@ -81,7 +88,9 @@ extern int pci_conf1_write(unsigned int seg, unsigned int bus,
 extern int pci_conf1_read(unsigned int seg, unsigned int bus,
 			  unsigned int devfn, int reg, int len, u32 *value);
 
-extern void pci_direct_init(void);
+extern int pci_direct_probe(void);
+extern void pci_direct_init(int type);
 extern void pci_pcbios_init(void);
-extern void pci_mmcfg_init(void);
+extern void pci_mmcfg_init(int type);
 extern void pcibios_sort(void);
+

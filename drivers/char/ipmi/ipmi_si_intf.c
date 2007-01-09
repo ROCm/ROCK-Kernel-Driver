@@ -217,6 +217,11 @@ struct smi_info
 	struct list_head link;
 };
 
+#define SI_MAX_PARMS 4
+
+static int force_kipmid[SI_MAX_PARMS];
+static int num_force_kipmid;
+
 static int try_smi_init(struct smi_info *smi);
 
 static ATOMIC_NOTIFIER_HEAD(xaction_notifier_list);
@@ -867,7 +872,7 @@ static void smi_timeout(unsigned long data)
 	add_timer(&(smi_info->si_timer));
 }
 
-static irqreturn_t si_irq_handler(int irq, void *data, struct pt_regs *regs)
+static irqreturn_t si_irq_handler(int irq, void *data)
 {
 	struct smi_info *smi_info = data;
 	unsigned long   flags;
@@ -894,20 +899,21 @@ static irqreturn_t si_irq_handler(int irq, void *data, struct pt_regs *regs)
 	return IRQ_HANDLED;
 }
 
-static irqreturn_t si_bt_irq_handler(int irq, void *data, struct pt_regs *regs)
+static irqreturn_t si_bt_irq_handler(int irq, void *data)
 {
 	struct smi_info *smi_info = data;
 	/* We need to clear the IRQ flag for the BT interface. */
 	smi_info->io.outputb(&smi_info->io, IPMI_BT_INTMASK_REG,
 			     IPMI_BT_INTMASK_CLEAR_IRQ_BIT
 			     | IPMI_BT_INTMASK_ENABLE_IRQ_BIT);
-	return si_irq_handler(irq, data, regs);
+	return si_irq_handler(irq, data);
 }
 
 static int smi_start_processing(void       *send_info,
 				ipmi_smi_t intf)
 {
 	struct smi_info *new_smi = send_info;
+	int             enable = 0;
 
 	new_smi->intf = intf;
 
@@ -916,7 +922,19 @@ static int smi_start_processing(void       *send_info,
 	new_smi->last_timeout_jiffies = jiffies;
 	mod_timer(&new_smi->si_timer, jiffies + SI_TIMEOUT_JIFFIES);
 
- 	if (new_smi->si_type != SI_BT) {
+	/*
+	 * Check if the user forcefully enabled the daemon.
+	 */
+	if (new_smi->intf_num < num_force_kipmid)
+		enable = force_kipmid[new_smi->intf_num];
+	/*
+	 * The BT interface is efficient enough to not need a thread,
+	 * and there is no need for a thread if we have interrupts.
+	 */
+ 	else if ((new_smi->si_type != SI_BT) && (!new_smi->irq))
+		enable = 1;
+
+	if (enable) {
 		new_smi->thread = kthread_run(ipmi_thread, new_smi,
 					      "kipmi%d", new_smi->intf_num);
 		if (IS_ERR(new_smi->thread)) {
@@ -944,7 +962,6 @@ static struct ipmi_smi_handlers handlers =
 /* There can be 4 IO ports passed in (with or without IRQs), 4 addresses,
    a default IO port, and 1 ACPI/SPMI address.  That sets SI_MAX_DRIVERS */
 
-#define SI_MAX_PARMS 4
 static LIST_HEAD(smi_infos);
 static DEFINE_MUTEX(smi_infos_lock);
 static int smi_num; /* Used to sequence the SMIs */
@@ -1017,6 +1034,10 @@ MODULE_PARM_DESC(slave_addrs, "Set the default IPMB slave address for"
 		 " the controller.  Normally this is 0x20, but can be"
 		 " overridden by this parm.  This is an array indexed"
 		 " by interface number.");
+module_param_array(force_kipmid, int, &num_force_kipmid, 0);
+MODULE_PARM_DESC(force_kipmid, "Force the kipmi daemon to be enabled (1) or"
+		 " disabled(0).  Normally the IPMI driver auto-detects"
+		 " this, but the value may be overridden by this parm.");
 
 
 #define IPMI_IO_ADDR_SPACE  0
@@ -1190,7 +1211,7 @@ static void intf_mem_outb(struct si_sm_io *io, unsigned int offset,
 static unsigned char intf_mem_inw(struct si_sm_io *io, unsigned int offset)
 {
 	return (readw((io->addr)+(offset * io->regspacing)) >> io->regshift)
-		&& 0xff;
+		& 0xff;
 }
 
 static void intf_mem_outw(struct si_sm_io *io, unsigned int offset,
@@ -1202,7 +1223,7 @@ static void intf_mem_outw(struct si_sm_io *io, unsigned int offset,
 static unsigned char intf_mem_inl(struct si_sm_io *io, unsigned int offset)
 {
 	return (readl((io->addr)+(offset * io->regspacing)) >> io->regshift)
-		&& 0xff;
+		& 0xff;
 }
 
 static void intf_mem_outl(struct si_sm_io *io, unsigned int offset,
@@ -1215,7 +1236,7 @@ static void intf_mem_outl(struct si_sm_io *io, unsigned int offset,
 static unsigned char mem_inq(struct si_sm_io *io, unsigned int offset)
 {
 	return (readq((io->addr)+(offset * io->regspacing)) >> io->regshift)
-		&& 0xff;
+		& 0xff;
 }
 
 static void mem_outq(struct si_sm_io *io, unsigned int offset,
@@ -1730,6 +1751,7 @@ static void __devinit dmi_find_bmc(void)
 	int                  rv;
 
 	while ((dev = dmi_find_device(DMI_DEV_TYPE_IPMI, NULL, dev))) {
+		memset(&data, 0, sizeof(data));
 		rv = decode_dmi((struct dmi_header *) dev->device_data, &data);
 		if (!rv)
 			try_init_dmi(&data);
@@ -1767,7 +1789,7 @@ static int __devinit ipmi_pci_probe(struct pci_dev *pdev,
 
 	info = kzalloc(sizeof(*info), GFP_KERNEL);
 	if (!info)
-		return ENOMEM;
+		return -ENOMEM;
 
 	info->addr_source = "PCI";
 
@@ -1788,7 +1810,7 @@ static int __devinit ipmi_pci_probe(struct pci_dev *pdev,
 		kfree(info);
 		printk(KERN_INFO "ipmi_si: %s: Unknown IPMI type: %d\n",
 		       pci_name(pdev), class_type);
-		return ENOMEM;
+		return -ENOMEM;
 	}
 
 	rv = pci_enable_device(pdev);
@@ -2324,7 +2346,7 @@ static int try_smi_init(struct smi_info *new_smi)
 		new_smi->dev = &new_smi->pdev->dev;
 		new_smi->dev->driver = &ipmi_driver;
 
-		rv = platform_device_register(new_smi->pdev);
+		rv = platform_device_add(new_smi->pdev);
 		if (rv) {
 			printk(KERN_ERR
 			       "ipmi_si_intf:"

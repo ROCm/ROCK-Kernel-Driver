@@ -22,13 +22,10 @@
 
 #include <sound/driver.h>
 #include <linux/init.h>
-#include <linux/time.h>
-#include <linux/threads.h>
 #include <linux/interrupt.h>
 #include <linux/moduleparam.h>
 #include <sound/core.h>
 #include <sound/timer.h>
-#include <sound/info.h>
 
 #if defined(CONFIG_RTC) || defined(CONFIG_RTC_MODULE)
 
@@ -167,7 +164,7 @@ static int __init rtctimer_init(void)
 static void __exit rtctimer_exit(void)
 {
 	if (rtctimer) {
-		snd_timer_global_unregister(rtctimer);
+		snd_timer_global_free(rtctimer);
 		rtctimer = NULL;
 	}
 }

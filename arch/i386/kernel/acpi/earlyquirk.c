@@ -11,7 +11,7 @@
 #include <asm/acpi.h>
 #include <asm/apic.h>
 
-#if defined(CONFIG_ACPI) && !defined(CONFIG_XEN)
+#ifdef CONFIG_ACPI
 
 static int nvidia_hpet_detected __initdata;
 
@@ -24,7 +24,6 @@ static int __init nvidia_hpet_check(unsigned long phys, unsigned long size)
 
 static int __init check_bridge(int vendor, int device)
 {
-#ifndef CONFIG_XEN
 #ifdef CONFIG_ACPI
 	/* According to Nvidia all timer overrides are bogus unless HPET
 	   is enabled. */
@@ -47,7 +46,6 @@ static int __init check_bridge(int vendor, int device)
 		printk(KERN_INFO "ATI board detected. Disabling timer routing "
 				"over 8254.\n");
 	}
-#endif
 	return 0;
 }
 
@@ -56,7 +54,11 @@ void __init check_acpi_pci(void)
 	int num, slot, func;
 
 	/* Assume the machine supports type 1. If not it will 
-	   always read ffffffff and should not have any side effect. */
+	   always read ffffffff and should not have any side effect.
+	   Actually a few buggy systems can machine check. Allow the user
+	   to disable it by command line option at least -AK */
+	if (!early_pci_allowed())
+		return;
 
 	/* Poor man's PCI discovery */
 	for (num = 0; num < 32; num++) {

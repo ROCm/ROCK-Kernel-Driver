@@ -47,6 +47,9 @@ void shmem_acl_destroy_inode(struct inode *);
 
 extern struct xattr_handler shmem_xattr_acl_access_handler;
 extern struct xattr_handler shmem_xattr_acl_default_handler;
+
+extern struct generic_acl_operations shmem_acl_ops;
+
 #else
 static inline int shmem_acl_init(struct inode *inode, struct inode *dir)
 {

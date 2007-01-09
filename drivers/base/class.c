@@ -199,7 +199,7 @@ static int class_device_create_uevent(struct class_device *class_dev,
  * Note, the pointer created here is to be destroyed when finished by
  * making a call to class_destroy().
  */
-struct class *class_create(struct module *owner, char *name)
+struct class *class_create(struct module *owner, const char *name)
 {
 	struct class *cls;
 	int retval;
@@ -228,7 +228,7 @@ error:
 
 /**
  * class_destroy - destroys a struct class structure
- * @cs: pointer to the struct class that is to be destroyed
+ * @cls: pointer to the struct class that is to be destroyed
  *
  * Note, the pointer to be destroyed must have been created with a call
  * to class_create().
@@ -363,7 +363,7 @@ static int class_uevent(struct kset *kset, struct kobject *kobj, char **envp,
 	pr_debug("%s - name = %s\n", __FUNCTION__, class_dev->class_id);
 
 	if (class_dev->dev) {
-		/* add physical device, backing this device  */
+		/* add device, backing this class device (deprecated) */
 		struct device *dev = class_dev->dev;
 		char *path = kobject_get_path(&dev->kobj, GFP_KERNEL);
 
@@ -562,7 +562,10 @@ int class_device_add(struct class_device *class_dev)
 		goto out2;
 
 	/* add the needed attributes to this device */
-	sysfs_create_link(&class_dev->kobj, &parent_class->subsys.kset.kobj, "subsystem");
+	error = sysfs_create_link(&class_dev->kobj,
+				  &parent_class->subsys.kset.kobj, "subsystem");
+	if (error)
+		goto out3;
 	class_dev->uevent_attr.attr.name = "uevent";
 	class_dev->uevent_attr.attr.mode = S_IWUSR;
 	class_dev->uevent_attr.attr.owner = parent_class->owner;
@@ -658,9 +661,9 @@ int class_device_register(struct class_device *class_dev)
 
 /**
  * class_device_create - creates a class device and registers it with sysfs
- * @cs: pointer to the struct class that this device should be registered to.
+ * @cls: pointer to the struct class that this device should be registered to.
  * @parent: pointer to the parent struct class_device of this new device, if any.
- * @dev: the dev_t for the char device to be added.
+ * @devt: the dev_t for the char device to be added.
  * @device: a pointer to a struct device that is assiociated with this class device.
  * @fmt: string for the class device's name
  *
@@ -681,7 +684,8 @@ int class_device_register(struct class_device *class_dev)
 struct class_device *class_device_create(struct class *cls,
 					 struct class_device *parent,
 					 dev_t devt,
-					 struct device *device, char *fmt, ...)
+					 struct device *device,
+					 const char *fmt, ...)
 {
 	va_list args;
 	struct class_device *class_dev = NULL;
@@ -765,7 +769,7 @@ void class_device_unregister(struct class_device *class_dev)
 /**
  * class_device_destroy - removes a class device that was created with class_device_create()
  * @cls: the pointer to the struct class that this device was registered * with.
- * @dev: the dev_t of the device that was previously registered.
+ * @devt: the dev_t of the device that was previously registered.
  *
  * This call unregisters and cleans up a class device that was created with a
  * call to class_device_create()

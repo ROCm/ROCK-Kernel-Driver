@@ -80,25 +80,24 @@ void idle_notifier_unregister(struct notifier_block *n)
 }
 EXPORT_SYMBOL(idle_notifier_unregister);
 
-enum idle_state { CPU_IDLE, CPU_NOT_IDLE };
-static DEFINE_PER_CPU(enum idle_state, idle_state) = CPU_NOT_IDLE;
-
 void enter_idle(void)
 {
-	__get_cpu_var(idle_state) = CPU_IDLE;
+	write_pda(isidle, 1);
 	atomic_notifier_call_chain(&idle_notifier, IDLE_START, NULL);
 }
 
 static void __exit_idle(void)
 {
-	__get_cpu_var(idle_state) = CPU_NOT_IDLE;
+	if (test_and_clear_bit_pda(0, isidle) == 0)
+		return;
 	atomic_notifier_call_chain(&idle_notifier, IDLE_END, NULL);
 }
 
 /* Called from interrupts to signify idle end */
 void exit_idle(void)
 {
-	if (current->pid | read_pda(irqcount))
+	/* idle loop has pid 0 */
+	if (current->pid)
 		return;
 	__exit_idle();
 }
@@ -145,7 +144,7 @@ static void poll_idle (void)
 void cpu_idle_wait(void)
 {
 	unsigned int cpu, this_cpu = get_cpu();
-	cpumask_t map;
+	cpumask_t map, tmp = current->cpus_allowed;
 
 	set_cpus_allowed(current, cpumask_of_cpu(this_cpu));
 	put_cpu();
@@ -168,6 +167,8 @@ void cpu_idle_wait(void)
 		}
 		cpus_and(map, map, cpu_online_map);
 	} while (!cpus_empty(map));
+
+	set_cpus_allowed(current, tmp);
 }
 EXPORT_SYMBOL_GPL(cpu_idle_wait);
 
@@ -220,6 +221,9 @@ void cpu_idle (void)
 				play_dead();
 			enter_idle();
 			idle();
+			/* In many cases the interrupt that ended idle
+			   has already called exit_idle. But some idle
+			   loops can be woken up without interrupt. */
 			__exit_idle();
 		}
 
@@ -235,18 +239,26 @@ void cpu_idle (void)
  * We execute MONITOR against need_resched and enter optimized wait state
  * through MWAIT. Whenever someone changes need_resched, we would be woken
  * up from MWAIT (without an IPI).
+ *
+ * New with Core Duo processors, MWAIT can take some hints based on CPU
+ * capability.
  */
+void mwait_idle_with_hints(unsigned long eax, unsigned long ecx)
+{
+	if (!need_resched()) {
+		__monitor((void *)&current_thread_info()->flags, 0, 0);
+		smp_mb();
+		if (!need_resched())
+			__mwait(eax, ecx);
+	}
+}
+
+/* Default MONITOR/MWAIT with no hints, used for default C1 state */
 static void mwait_idle(void)
 {
 	local_irq_enable();
-
-	while (!need_resched()) {
-		__monitor((void *)&current_thread_info()->flags, 0, 0);
-		smp_mb();
-		if (need_resched())
-			break;
-		__mwait(0, 0);
-	}
+	while (!need_resched())
+		mwait_idle_with_hints(0,0);
 }
 
 void __cpuinit select_idle_routine(const struct cpuinfo_x86 *c)
@@ -291,9 +303,9 @@ void __show_regs(struct pt_regs * regs)
 	print_modules();
 	printk("Pid: %d, comm: %.20s %s %s %.*s\n",
 		current->pid, current->comm, print_tainted(),
-		system_utsname.release,
-		(int)strcspn(system_utsname.version, " "),
-		system_utsname.version);
+		init_utsname()->release,
+		(int)strcspn(init_utsname()->version, " "),
+		init_utsname()->version);
 	printk("RIP: %04lx:[<%016lx>] ", regs->cs & 0xffff, regs->rip);
 	printk_address(regs->rip); 
 	printk("RSP: %04lx:%016lx  EFLAGS: %08lx\n", regs->ss, regs->rsp,
@@ -350,6 +362,7 @@ void exit_thread(void)
 
 		kfree(t->io_bitmap_ptr);
 		t->io_bitmap_ptr = NULL;
+		clear_thread_flag(TIF_IO_BITMAP);
 		/*
 		 * Careful, clear this in the TSS too:
 		 */
@@ -369,6 +382,7 @@ void flush_thread(void)
 		if (t->flags & _TIF_IA32)
 			current_thread_info()->status |= TS_COMPAT;
 	}
+	t->flags &= ~_TIF_DEBUG;
 
 	tsk->thread.debugreg0 = 0;
 	tsk->thread.debugreg1 = 0;
@@ -461,7 +475,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long rsp,
 	asm("mov %%es,%0" : "=m" (p->thread.es));
 	asm("mov %%ds,%0" : "=m" (p->thread.ds));
 
-	if (unlikely(me->thread.io_bitmap_ptr != NULL)) { 
+	if (unlikely(test_tsk_thread_flag(me, TIF_IO_BITMAP))) {
 		p->thread.io_bitmap_ptr = kmalloc(IO_BITMAP_BYTES, GFP_KERNEL);
 		if (!p->thread.io_bitmap_ptr) {
 			p->thread.io_bitmap_max = 0;
@@ -469,6 +483,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long rsp,
 		}
 		memcpy(p->thread.io_bitmap_ptr, me->thread.io_bitmap_ptr,
 				IO_BITMAP_BYTES);
+		set_tsk_thread_flag(p, TIF_IO_BITMAP);
 	} 
 
 	/*
@@ -498,6 +513,40 @@ out:
  */
 #define loaddebug(thread,r) set_debugreg(thread->debugreg ## r, r)
 
+static inline void __switch_to_xtra(struct task_struct *prev_p,
+			     	    struct task_struct *next_p,
+			     	    struct tss_struct *tss)
+{
+	struct thread_struct *prev, *next;
+
+	prev = &prev_p->thread,
+	next = &next_p->thread;
+
+	if (test_tsk_thread_flag(next_p, TIF_DEBUG)) {
+		loaddebug(next, 0);
+		loaddebug(next, 1);
+		loaddebug(next, 2);
+		loaddebug(next, 3);
+		/* no 4 and 5 */
+		loaddebug(next, 6);
+		loaddebug(next, 7);
+	}
+
+	if (test_tsk_thread_flag(next_p, TIF_IO_BITMAP)) {
+		/*
+		 * Copy the relevant range of the IO bitmap.
+		 * Normally this is 128 bytes or less:
+		 */
+		memcpy(tss->io_bitmap, next->io_bitmap_ptr,
+		       max(prev->io_bitmap_max, next->io_bitmap_max));
+	} else if (test_tsk_thread_flag(prev_p, TIF_IO_BITMAP)) {
+		/*
+		 * Clear any possible leftover bits:
+		 */
+		memset(tss->io_bitmap, 0xff, prev->io_bitmap_max);
+	}
+}
+
 /*
  *	switch_to(x,y) should switch tasks from x to y.
  *
@@ -514,6 +563,10 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 				 *next = &next_p->thread;
 	int cpu = smp_processor_id();  
 	struct tss_struct *tss = &per_cpu(init_tss, cpu);
+
+	/* we're going to use this soon, after a few expensive things */
+	if (next_p->fpu_counter>5)
+		prefetch(&next->i387.fxsave);
 
 	/*
 	 * Reload esp0, LDT and the page table pointer:
@@ -582,41 +635,29 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 	write_pda(pcurrent, next_p); 
 
 	write_pda(kernelstack,
-		  task_stack_page(next_p) + THREAD_SIZE - PDA_STACKOFFSET);
+	(unsigned long)task_stack_page(next_p) + THREAD_SIZE - PDA_STACKOFFSET);
+#ifdef CONFIG_CC_STACKPROTECTOR
+	write_pda(stack_canary, next_p->stack_canary);
+	/*
+	 * Build time only check to make sure the stack_canary is at
+	 * offset 40 in the pda; this is a gcc ABI requirement
+	 */
+	BUILD_BUG_ON(offsetof(struct x8664_pda, stack_canary) != 40);
+#endif
 
 	/*
-	 * Now maybe reload the debug registers
+	 * Now maybe reload the debug registers and handle I/O bitmaps
 	 */
-	if (unlikely(next->debugreg7)) {
-		loaddebug(next, 0);
-		loaddebug(next, 1);
-		loaddebug(next, 2);
-		loaddebug(next, 3);
-		/* no 4 and 5 */
-		loaddebug(next, 6);
-		loaddebug(next, 7);
-	}
+	if (unlikely((task_thread_info(next_p)->flags & _TIF_WORK_CTXSW))
+	    || test_tsk_thread_flag(prev_p, TIF_IO_BITMAP))
+		__switch_to_xtra(prev_p, next_p, tss);
 
-
-	/* 
-	 * Handle the IO bitmap 
-	 */ 
-	if (unlikely(prev->io_bitmap_ptr || next->io_bitmap_ptr)) {
-		if (next->io_bitmap_ptr)
-			/*
-			 * Copy the relevant range of the IO bitmap.
-			 * Normally this is 128 bytes or less:
- 			 */
-			memcpy(tss->io_bitmap, next->io_bitmap_ptr,
-				max(prev->io_bitmap_max, next->io_bitmap_max));
-		else {
-			/*
-			 * Clear any possible leftover bits:
-			 */
-			memset(tss->io_bitmap, 0xff, prev->io_bitmap_max);
-		}
-	}
-
+	/* If the task has used fpu the last 5 timeslices, just do a full
+	 * restore of the math state immediately to avoid the trap; the
+	 * chances of needing FPU soon are obviously high now
+	 */
+	if (next_p->fpu_counter>5)
+		math_state_restore();
 	return prev_p;
 }
 
@@ -833,7 +874,7 @@ int dump_task_regs(struct task_struct *tsk, elf_gregset_t *regs)
 
 unsigned long arch_align_stack(unsigned long sp)
 {
-	if (randomize_va_space)
+	if (!(current->personality & ADDR_NO_RANDOMIZE) && randomize_va_space)
 		sp -= get_random_int() % 8192;
 	return sp & ~0xf;
 }

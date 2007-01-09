@@ -15,7 +15,7 @@
 #include "user.h"
 #include "signal_kern.h"
 #include "sysdep/sigcontext.h"
-#include "sysdep/signal.h"
+#include "sysdep/barrier.h"
 #include "sigcontext.h"
 #include "mode.h"
 #include "os.h"
@@ -35,20 +35,16 @@
 #define SIGALRM_BIT 2
 #define SIGALRM_MASK (1 << SIGALRM_BIT)
 
-static int signals_enabled = 1;
-static int pending = 0;
+/* These are used by both the signal handlers and
+ * block/unblock_signals.  I don't want modifications cached in a
+ * register - they must go straight to memory.
+ */
+static volatile int signals_enabled = 1;
+static volatile int pending = 0;
 
-void sig_handler(ARCH_SIGHDLR_PARAM)
+void sig_handler(int sig, struct sigcontext *sc)
 {
-	struct sigcontext *sc;
 	int enabled;
-
-	/* Must be the first thing that this handler does - x86_64 stores
-	 * the sigcontext in %rdx, and we need to save it before it has a
-	 * chance to get trashed.
-	 */
-
-	ARCH_GET_SIGCONTEXT(sc, sig);
 
 	enabled = signals_enabled;
 	if(!enabled && (sig == SIGIO)){
@@ -64,15 +60,8 @@ void sig_handler(ARCH_SIGHDLR_PARAM)
 	set_signals(enabled);
 }
 
-extern int timer_irq_inited;
-
 static void real_alarm_handler(int sig, struct sigcontext *sc)
 {
-	if(!timer_irq_inited){
-		signals_enabled = 1;
-		return;
-	}
-
 	if(sig == SIGALRM)
 		switch_timers(0);
 
@@ -84,12 +73,9 @@ static void real_alarm_handler(int sig, struct sigcontext *sc)
 
 }
 
-void alarm_handler(ARCH_SIGHDLR_PARAM)
+void alarm_handler(int sig, struct sigcontext *sc)
 {
-	struct sigcontext *sc;
 	int enabled;
-
-	ARCH_GET_SIGCONTEXT(sc, sig);
 
 	enabled = signals_enabled;
 	if(!signals_enabled){
@@ -126,6 +112,10 @@ void remove_sigstack(void)
 		panic("disabling signal stack failed, errno = %d\n", errno);
 }
 
+void (*handlers[_NSIG])(int sig, struct sigcontext *sc);
+
+extern void hard_handler(int sig);
+
 void set_handler(int sig, void (*handler)(int), int flags, ...)
 {
 	struct sigaction action;
@@ -133,13 +123,16 @@ void set_handler(int sig, void (*handler)(int), int flags, ...)
 	sigset_t sig_mask;
 	int mask;
 
-	va_start(ap, flags);
-	action.sa_handler = handler;
+	handlers[sig] = (void (*)(int, struct sigcontext *)) handler;
+	action.sa_handler = hard_handler;
+
 	sigemptyset(&action.sa_mask);
-	while((mask = va_arg(ap, int)) != -1){
+
+	va_start(ap, flags);
+	while((mask = va_arg(ap, int)) != -1)
 		sigaddset(&action.sa_mask, mask);
-	}
 	va_end(ap);
+
 	action.sa_flags = flags;
 	action.sa_restorer = NULL;
 	if(sigaction(sig, &action, NULL) < 0)
@@ -164,6 +157,12 @@ int change_sig(int signal, int on)
 void block_signals(void)
 {
 	signals_enabled = 0;
+	/* This must return with signals disabled, so this barrier
+	 * ensures that writes are flushed out before the return.
+	 * This might matter if gcc figures out how to inline this and
+	 * decides to shuffle this code into the caller.
+	 */
+	mb();
 }
 
 void unblock_signals(void)
@@ -183,9 +182,23 @@ void unblock_signals(void)
 		 */
 		signals_enabled = 1;
 
+		/* Setting signals_enabled and reading pending must
+		 * happen in this order.
+		 */
+		mb();
+
 		save_pending = pending;
-		if(save_pending == 0)
+		if(save_pending == 0){
+			/* This must return with signals enabled, so
+			 * this barrier ensures that writes are
+			 * flushed out before the return.  This might
+			 * matter if gcc figures out how to inline
+			 * this (unlikely, given its size) and decides
+			 * to shuffle this code into the caller.
+			 */
+			mb();
 			return;
+		}
 
 		pending = 0;
 

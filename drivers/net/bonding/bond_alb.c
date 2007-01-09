@@ -28,7 +28,7 @@
 #include <linux/pkt_sched.h>
 #include <linux/spinlock.h>
 #include <linux/slab.h>
-#include <linux/workqueue.h>
+#include <linux/timer.h>
 #include <linux/ip.h>
 #include <linux/ipv6.h>
 #include <linux/if_arp.h>
@@ -466,13 +466,13 @@ static void rlb_clear_slave(struct bonding *bond, struct slave *slave)
 
 	_unlock_rx_hashtbl(bond);
 
-	write_lock_bh(&bond->curr_slave_lock);
+	write_lock(&bond->curr_slave_lock);
 
 	if (slave != bond->curr_active_slave) {
 		rlb_teach_disabled_mac_on_primary(bond, slave->dev->dev_addr);
 	}
 
-	write_unlock_bh(&bond->curr_slave_lock);
+	write_unlock(&bond->curr_slave_lock);
 }
 
 static void rlb_update_client(struct rlb_client_info *client_info)
@@ -1471,7 +1471,7 @@ void bond_alb_monitor(struct bonding *bond)
 	}
 
 re_arm:
-	schedule_delayed_work(&(bond_info->alb_work), alb_delta_in_ticks);
+	mod_timer(&(bond_info->alb_timer), jiffies + alb_delta_in_ticks);
 out:
 	read_unlock(&bond->lock);
 }

@@ -78,14 +78,14 @@ static inline unsigned int file_hash(struct nfs_fh *f)
  * This is not quite right, but for now, we assume the client performs
  * the proper R/W checking.
  */
-u32
+__be32
 nlm_lookup_file(struct svc_rqst *rqstp, struct nlm_file **result,
 					struct nfs_fh *f)
 {
 	struct hlist_node *pos;
 	struct nlm_file	*file;
 	unsigned int	hash;
-	u32		nfserr;
+	__be32		nfserr;
 
 	nlm_debug_print_fh("nlm_file_lookup", f);
 
@@ -101,12 +101,12 @@ nlm_lookup_file(struct svc_rqst *rqstp, struct nlm_file **result,
 	nlm_debug_print_fh("creating file for", f);
 
 	nfserr = nlm_lck_denied_nolocks;
-	file = (struct nlm_file *) kzalloc(sizeof(*file), GFP_KERNEL);
+	file = kzalloc(sizeof(*file), GFP_KERNEL);
 	if (!file)
 		goto out_unlock;
 
 	memcpy(&file->f_handle, f, sizeof(struct nfs_fh));
-	init_MUTEX(&file->f_sema);
+	mutex_init(&file->f_mutex);
 	INIT_HLIST_NODE(&file->f_list);
 	INIT_LIST_HEAD(&file->f_blocks);
 
@@ -135,12 +135,6 @@ out_unlock:
 
 out_free:
 	kfree(file);
-#ifdef CONFIG_LOCKD_V4
-	if (nfserr == 1)
-		nfserr = nlm4_stale_fh;
-	else
-#endif
-	nfserr = nlm_lck_denied;
 	goto out_unlock;
 }
 
@@ -324,7 +318,16 @@ nlmsvc_same_host(struct nlm_host *host, struct nlm_host *other)
 static int
 nlmsvc_is_client(struct nlm_host *host, struct nlm_host *dummy)
 {
-	return host->h_server;
+	if (host->h_server) {
+		/* we are destroying locks even though the client
+		 * hasn't asked us too, so don't unmonitor the
+		 * client
+		 */
+		if (host->h_nsmhandle)
+			host->h_nsmhandle->sm_sticky = 1;
+		return 1;
+	} else
+		return 0;
 }
 
 /*
@@ -354,18 +357,16 @@ nlmsvc_free_host_resources(struct nlm_host *host)
 }
 
 /*
- * Delete all hosts structs for clients
+ * Remove all locks held for clients
  */
 void
 nlmsvc_invalidate_all(void)
 {
-	/* Release all locks held by a NFS clients.
+	/* Release all locks held by NFS clients.
 	 * Previously, the code would call
 	 * nlmsvc_free_host_resources for each client in
 	 * turn, which is about as inefficient as it gets.
+	 * Now we just do it once in nlm_traverse_files.
 	 */
 	nlm_traverse_files(NULL, nlmsvc_is_client);
-
-	/* Then destroy the host handles */
-	nlm_destroy_clients();
 }

@@ -921,7 +921,7 @@ static void handle_dma_error_intr(void *arg, uint32_t other_ir)
 {
 	struct ioc4_port *port = (struct ioc4_port *)arg;
 	struct hooks *hooks = port->ip_hooks;
-	unsigned int flags;
+	unsigned long flags;
 
 	spin_lock_irqsave(&port->ip_lock, flags);
 
@@ -987,10 +987,9 @@ intr_connect(struct ioc4_soft *soft, int type,
  * ioc4_intr - Top level IOC4 interrupt handler.
  * @irq: irq value
  * @arg: handler arg
- * @regs: registers
  */
 
-static irqreturn_t ioc4_intr(int irq, void *arg, struct pt_regs *regs)
+static irqreturn_t ioc4_intr(int irq, void *arg)
 {
 	struct ioc4_soft *soft;
 	uint32_t this_ir, this_mir;
@@ -1835,7 +1834,7 @@ static void handle_intr(void *arg, uint32_t sio_ir)
 	struct ioc4_port *port = (struct ioc4_port *)arg;
 	struct hooks *hooks = port->ip_hooks;
 	unsigned int rx_high_rd_aborted = 0;
-	unsigned int flags;
+	unsigned long flags;
 	struct uart_port *the_port;
 	int loop_counter;
 
@@ -2685,6 +2684,7 @@ static int ioc4_serial_remove_one(struct ioc4_driver_data *idd)
 	if (soft) {
 		free_irq(control->ic_irq, soft);
 		if (soft->is_ioc4_serial_addr) {
+			iounmap(soft->is_ioc4_serial_addr);
 			release_region((unsigned long)
 			     soft->is_ioc4_serial_addr,
 				sizeof(struct ioc4_serial));
@@ -2887,6 +2887,8 @@ out4:
 out3:
 	kfree(control);
 out2:
+	if (serial)
+		iounmap(serial);
 	release_region(tmp_addr1, sizeof(struct ioc4_serial));
 out1:
 
@@ -2933,7 +2935,7 @@ static void __devexit ioc4_serial_exit(void)
 	uart_unregister_driver(&ioc4_uart_rs422);
 }
 
-module_init(ioc4_serial_init);
+late_initcall(ioc4_serial_init); /* Call only after tty init is done */
 module_exit(ioc4_serial_exit);
 
 MODULE_AUTHOR("Pat Gefre - Silicon Graphics Inc. (SGI) <pfg@sgi.com>");

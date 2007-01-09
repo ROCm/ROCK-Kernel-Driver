@@ -21,27 +21,21 @@
  * Lock ordering in mm:
  *
  * inode->i_mutex	(while writing or truncating, not reading or faulting)
- *   inode->i_alloc_sem
- *
- * When a page fault occurs in writing from user to file, down_read
- * of mmap_sem nests within i_mutex; in sys_msync, i_mutex nests within
- * down_read of mmap_sem; i_mutex and down_write of mmap_sem are never
- * taken together; in truncation, i_mutex is taken outermost.
- *
- * mm->mmap_sem
- *   page->flags PG_locked (lock_page)
- *     mapping->i_mmap_lock
- *       anon_vma->lock
- *         mm->page_table_lock or pte_lock
- *           zone->lru_lock (in mark_page_accessed, isolate_lru_page)
- *           swap_lock (in swap_duplicate, swap_info_get)
- *             mmlist_lock (in mmput, drain_mmlist and others)
- *             mapping->private_lock (in __set_page_dirty_buffers)
- *             inode_lock (in set_page_dirty's __mark_inode_dirty)
- *               sb_lock (within inode_lock in fs/fs-writeback.c)
- *               mapping->tree_lock (widely used, in set_page_dirty,
- *                         in arch-dependent flush_dcache_mmap_lock,
- *                         within inode_lock in __sync_single_inode)
+ *   inode->i_alloc_sem (vmtruncate_range)
+ *   mm->mmap_sem
+ *     page->flags PG_locked (lock_page)
+ *       mapping->i_mmap_lock
+ *         anon_vma->lock
+ *           mm->page_table_lock or pte_lock
+ *             zone->lru_lock (in mark_page_accessed, isolate_lru_page)
+ *             swap_lock (in swap_duplicate, swap_info_get)
+ *               mmlist_lock (in mmput, drain_mmlist and others)
+ *               mapping->private_lock (in __set_page_dirty_buffers)
+ *               inode_lock (in set_page_dirty's __mark_inode_dirty)
+ *                 sb_lock (within inode_lock in fs/fs-writeback.c)
+ *                 mapping->tree_lock (widely used, in set_page_dirty,
+ *                           in arch-dependent flush_dcache_mmap_lock,
+ *                           within inode_lock in __sync_single_inode)
  */
 
 #include <linux/mm.h>
@@ -434,6 +428,71 @@ int page_referenced(struct page *page, int is_locked)
 	return referenced;
 }
 
+static int page_mkclean_one(struct page *page, struct vm_area_struct *vma)
+{
+	struct mm_struct *mm = vma->vm_mm;
+	unsigned long address;
+	pte_t *pte, entry;
+	spinlock_t *ptl;
+	int ret = 0;
+
+	address = vma_address(page, vma);
+	if (address == -EFAULT)
+		goto out;
+
+	pte = page_check_address(page, mm, address, &ptl);
+	if (!pte)
+		goto out;
+
+	if (!pte_dirty(*pte) && !pte_write(*pte))
+		goto unlock;
+
+	entry = ptep_get_and_clear(mm, address, pte);
+	entry = pte_mkclean(entry);
+	entry = pte_wrprotect(entry);
+	ptep_establish(vma, address, pte, entry);
+	lazy_mmu_prot_update(entry);
+	ret = 1;
+
+unlock:
+	pte_unmap_unlock(pte, ptl);
+out:
+	return ret;
+}
+
+static int page_mkclean_file(struct address_space *mapping, struct page *page)
+{
+	pgoff_t pgoff = page->index << (PAGE_CACHE_SHIFT - PAGE_SHIFT);
+	struct vm_area_struct *vma;
+	struct prio_tree_iter iter;
+	int ret = 0;
+
+	BUG_ON(PageAnon(page));
+
+	spin_lock(&mapping->i_mmap_lock);
+	vma_prio_tree_foreach(vma, &iter, &mapping->i_mmap, pgoff, pgoff) {
+		if (vma->vm_flags & VM_SHARED)
+			ret += page_mkclean_one(page, vma);
+	}
+	spin_unlock(&mapping->i_mmap_lock);
+	return ret;
+}
+
+int page_mkclean(struct page *page)
+{
+	int ret = 0;
+
+	BUG_ON(!PageLocked(page));
+
+	if (page_mapped(page)) {
+		struct address_space *mapping = page_mapping(page);
+		if (mapping)
+			ret = page_mkclean_file(mapping, page);
+	}
+
+	return ret;
+}
+
 /**
  * page_set_anon_rmap - setup new anonymous rmap
  * @page:	the page to add the mapping to
@@ -511,15 +570,14 @@ void page_add_file_rmap(struct page *page)
 void page_remove_rmap(struct page *page)
 {
 	if (atomic_add_negative(-1, &page->_mapcount)) {
-#ifdef CONFIG_DEBUG_VM
 		if (unlikely(page_mapcount(page) < 0)) {
 			printk (KERN_EMERG "Eeek! page_mapcount(page) went negative! (%d)\n", page_mapcount(page));
 			printk (KERN_EMERG "  page->flags = %lx\n", page->flags);
 			printk (KERN_EMERG "  page->count = %x\n", page_count(page));
 			printk (KERN_EMERG "  page->mapping = %p\n", page->mapping);
+			BUG();
 		}
-#endif
-		BUG_ON(page_mapcount(page) < 0);
+
 		/*
 		 * It would be tidy to reset the PageAnon mapping here,
 		 * but that might overwrite a racing page_add_anon_rmap

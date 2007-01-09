@@ -156,15 +156,14 @@ static __init void unreachable_devices(void)
 			addr = pci_dev_base(0, k, PCI_DEVFN(i, 0));
 			if (addr == NULL|| readl(addr) != val1) {
 				set_bit(i + 32*k, fallback_slots);
-				printk(KERN_NOTICE
-				"PCI: No mmconfig possible on device %x:%x\n",
-					k, i);
+				printk(KERN_NOTICE "PCI: No mmconfig possible"
+				       " on device %02x:%02x\n", k, i);
 			}
 		}
 	}
 }
 
-void __init pci_mmcfg_init(void)
+void __init pci_mmcfg_init(int type)
 {
 	int i;
 
@@ -177,7 +176,9 @@ void __init pci_mmcfg_init(void)
 	    (pci_mmcfg_config[0].base_address == 0))
 		return;
 
-	if (!e820_all_mapped(pci_mmcfg_config[0].base_address,
+	/* Only do this check when type 1 works. If it doesn't work
+           assume we run on a Mac and always use MCFG */
+	if (type == 1 && !e820_all_mapped(pci_mmcfg_config[0].base_address,
 			pci_mmcfg_config[0].base_address + MMCONFIG_APER_MIN,
 			E820_RESERVED)) {
 		printk(KERN_ERR "PCI: BIOS Bug: MCFG area at %x is not E820-reserved\n",
@@ -186,10 +187,9 @@ void __init pci_mmcfg_init(void)
 		return;
 	}
 
-	/* RED-PEN i386 doesn't do _nocache right now */
 	pci_mmcfg_virt = kmalloc(sizeof(*pci_mmcfg_virt) * pci_mmcfg_config_num, GFP_KERNEL);
 	if (pci_mmcfg_virt == NULL) {
-		printk("PCI: Can not allocate memory for mmconfig structures\n");
+		printk(KERN_ERR "PCI: Can not allocate memory for mmconfig structures\n");
 		return;
 	}
 	for (i = 0; i < pci_mmcfg_config_num; ++i) {
@@ -197,7 +197,8 @@ void __init pci_mmcfg_init(void)
 		pci_mmcfg_virt[i].virt = ioremap_nocache(pci_mmcfg_config[i].base_address,
 							 MMCONFIG_APER_MAX);
 		if (!pci_mmcfg_virt[i].virt) {
-			printk("PCI: Cannot map mmconfig aperture for segment %d\n",
+			printk(KERN_ERR "PCI: Cannot map mmconfig aperture for "
+					"segment %d\n",
 			       pci_mmcfg_config[i].pci_segment_group_number);
 			return;
 		}

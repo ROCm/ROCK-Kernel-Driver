@@ -17,11 +17,13 @@
 #include <linux/module.h>
 #include <linux/blkpg.h>
 #include <linux/buffer_head.h>
+#include <linux/writeback.h>
 #include <linux/mpage.h>
 #include <linux/mount.h>
 #include <linux/uio.h>
 #include <linux/namei.h>
 #include <asm/uaccess.h>
+#include "internal.h"
 
 struct bdev_inode {
 	struct block_device bdev;
@@ -543,11 +545,11 @@ static struct kobject *bdev_get_holder(struct block_device *bdev)
 		return kobject_get(bdev->bd_disk->holder_dir);
 }
 
-static void add_symlink(struct kobject *from, struct kobject *to)
+static int add_symlink(struct kobject *from, struct kobject *to)
 {
 	if (!from || !to)
-		return;
-	sysfs_create_link(from, to, kobject_name(to));
+		return 0;
+	return sysfs_create_link(from, to, kobject_name(to));
 }
 
 static void del_symlink(struct kobject *from, struct kobject *to)
@@ -640,38 +642,59 @@ static void free_bd_holder(struct bd_holder *bo)
 }
 
 /**
+ * find_bd_holder - find matching struct bd_holder from the block device
+ *
+ * @bdev:	struct block device to be searched
+ * @bo:		target struct bd_holder
+ *
+ * Returns matching entry with @bo in @bdev->bd_holder_list.
+ * If found, increment the reference count and return the pointer.
+ * If not found, returns NULL.
+ */
+static struct bd_holder *find_bd_holder(struct block_device *bdev,
+					struct bd_holder *bo)
+{
+	struct bd_holder *tmp;
+
+	list_for_each_entry(tmp, &bdev->bd_holder_list, list)
+		if (tmp->sdir == bo->sdir) {
+			tmp->count++;
+			return tmp;
+		}
+
+	return NULL;
+}
+
+/**
  * add_bd_holder - create sysfs symlinks for bd_claim() relationship
  *
  * @bdev:	block device to be bd_claimed
  * @bo:		preallocated and initialized by alloc_bd_holder()
  *
- * If there is no matching entry with @bo in @bdev->bd_holder_list,
- * add @bo to the list, create symlinks.
+ * Add @bo to @bdev->bd_holder_list, create symlinks.
  *
- * Returns 1 if @bo was added to the list.
- * Returns 0 if @bo wasn't used by any reason and should be freed.
+ * Returns 0 if symlinks are created.
+ * Returns -ve if something fails.
  */
 static int add_bd_holder(struct block_device *bdev, struct bd_holder *bo)
 {
-	struct bd_holder *tmp;
+	int ret;
 
 	if (!bo)
-		return 0;
-
-	list_for_each_entry(tmp, &bdev->bd_holder_list, list) {
-		if (tmp->sdir == bo->sdir) {
-			tmp->count++;
-			return 0;
-		}
-	}
+		return -EINVAL;
 
 	if (!bd_holder_grab_dirs(bdev, bo))
-		return 0;
+		return -EBUSY;
 
-	add_symlink(bo->sdir, bo->sdev);
-	add_symlink(bo->hdir, bo->hdev);
-	list_add_tail(&bo->list, &bdev->bd_holder_list);
-	return 1;
+	ret = add_symlink(bo->sdir, bo->sdev);
+	if (ret == 0) {
+		ret = add_symlink(bo->hdir, bo->hdev);
+		if (ret)
+			del_symlink(bo->sdir, bo->sdev);
+	}
+	if (ret == 0)
+		list_add_tail(&bo->list, &bdev->bd_holder_list);
+	return ret;
 }
 
 /**
@@ -730,7 +753,7 @@ static int bd_claim_by_kobject(struct block_device *bdev, void *holder,
 				struct kobject *kobj)
 {
 	int res;
-	struct bd_holder *bo;
+	struct bd_holder *bo, *found;
 
 	if (!kobj)
 		return -EINVAL;
@@ -741,7 +764,16 @@ static int bd_claim_by_kobject(struct block_device *bdev, void *holder,
 
 	mutex_lock_nested(&bdev->bd_mutex, BD_MUTEX_PARTITION);
 	res = bd_claim(bdev, holder);
-	if (res || !add_bd_holder(bdev, bo))
+	if (res == 0) {
+		found = find_bd_holder(bdev, bo);
+		if (found == NULL) {
+			res = add_bd_holder(bdev, bo);
+			if (res)
+				bd_release(bdev);
+		}
+	}
+
+	if (res || found)
 		free_bd_holder(bo);
 	mutex_unlock(&bdev->bd_mutex);
 
@@ -1021,7 +1053,7 @@ do_open(struct block_device *bdev, struct file *file, unsigned int subclass)
 				rescan_partitions(bdev->bd_disk, bdev);
 		} else {
 			mutex_lock_nested(&bdev->bd_contains->bd_mutex,
-					  BD_MUTEX_PARTITION);
+					  BD_MUTEX_WHOLE);
 			bdev->bd_contains->bd_part_count++;
 			mutex_unlock(&bdev->bd_contains->bd_mutex);
 		}
@@ -1119,6 +1151,8 @@ static int blkdev_open(struct inode * inode, struct file * filp)
 	filp->f_flags |= O_LARGEFILE;
 
 	bdev = bd_acquire(inode);
+	if (bdev == NULL)
+		return -ENOMEM;
 
 	res = do_open(bdev, filp, BD_MUTEX_NORMAL);
 	if (res)
@@ -1142,22 +1176,6 @@ static int blkdev_close(struct inode * inode, struct file * filp)
 	return blkdev_put(bdev);
 }
 
-static ssize_t blkdev_file_write(struct file *file, const char __user *buf,
-				   size_t count, loff_t *ppos)
-{
-	struct iovec local_iov = { .iov_base = (void __user *)buf, .iov_len = count };
-
-	return generic_file_write_nolock(file, &local_iov, 1, ppos);
-}
-
-static ssize_t blkdev_file_aio_write(struct kiocb *iocb, const char __user *buf,
-				   size_t count, loff_t pos)
-{
-	struct iovec local_iov = { .iov_base = (void __user *)buf, .iov_len = count };
-
-	return generic_file_aio_write_nolock(iocb, &local_iov, 1, &iocb->ki_pos);
-}
-
 static long block_ioctl(struct file *file, unsigned cmd, unsigned long arg)
 {
 	return blkdev_ioctl(file->f_mapping->host, file, cmd, arg);
@@ -1177,18 +1195,16 @@ const struct file_operations def_blk_fops = {
 	.open		= blkdev_open,
 	.release	= blkdev_close,
 	.llseek		= block_llseek,
-	.read		= generic_file_read,
-	.write		= blkdev_file_write,
+	.read		= do_sync_read,
+	.write		= do_sync_write,
   	.aio_read	= generic_file_aio_read,
-  	.aio_write	= blkdev_file_aio_write, 
+  	.aio_write	= generic_file_aio_write_nolock,
 	.mmap		= generic_file_mmap,
 	.fsync		= block_fsync,
 	.unlocked_ioctl	= block_ioctl,
 #ifdef CONFIG_COMPAT
 	.compat_ioctl	= compat_blkdev_ioctl,
 #endif
-	.readv		= generic_file_readv,
-	.writev		= generic_file_write_nolock,
 	.sendfile	= generic_file_sendfile,
 	.splice_read	= generic_file_splice_read,
 	.splice_write	= generic_file_splice_write,
@@ -1303,3 +1319,24 @@ void close_bdev_excl(struct block_device *bdev)
 }
 
 EXPORT_SYMBOL(close_bdev_excl);
+
+int __invalidate_device(struct block_device *bdev)
+{
+	struct super_block *sb = get_super(bdev);
+	int res = 0;
+
+	if (sb) {
+		/*
+		 * no need to lock the super, get_super holds the
+		 * read mutex so the filesystem cannot go away
+		 * under us (->put_super runs with the write lock
+		 * hold).
+		 */
+		shrink_dcache_sb(sb);
+		res = invalidate_inodes(sb);
+		drop_super(sb);
+	}
+	invalidate_bdev(bdev, 0);
+	return res;
+}
+EXPORT_SYMBOL(__invalidate_device);

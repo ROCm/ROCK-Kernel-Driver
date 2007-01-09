@@ -105,6 +105,8 @@
 /* Maximum msec timeout value storeable in a long int */
 #define EP_MAX_MSTIMEO min(1000ULL * MAX_SCHEDULE_TIMEOUT / HZ, (LONG_MAX - 999ULL) / HZ)
 
+#define EP_MAX_EVENTS (INT_MAX / sizeof(struct epoll_event))
+
 
 struct epoll_filefd {
 	struct file *file;
@@ -236,6 +238,8 @@ struct ep_pqueue {
 
 static void ep_poll_safewake_init(struct poll_safewake *psw);
 static void ep_poll_safewake(struct poll_safewake *psw, wait_queue_head_t *wq);
+static int ep_getfd(int *efd, struct inode **einode, struct file **efile,
+		    struct eventpoll *ep);
 static int ep_alloc(struct eventpoll **pep);
 static void ep_free(struct eventpoll *ep);
 static struct epitem *ep_find(struct eventpoll *ep, struct file *file, int fd);
@@ -265,7 +269,7 @@ static int ep_events_transfer(struct eventpoll *ep,
 static int ep_poll(struct eventpoll *ep, struct epoll_event __user *events,
 		   int maxevents, long timeout);
 static int eventpollfs_delete_dentry(struct dentry *dentry);
-static struct inode *ep_eventpoll_inode(const struct file_operations *fops);
+static struct inode *ep_eventpoll_inode(void);
 static int eventpollfs_get_sb(struct file_system_type *fs_type,
 			      int flags, const char *dev_name,
 			      void *data, struct vfsmount *mnt);
@@ -495,7 +499,7 @@ void eventpoll_release_file(struct file *file)
  */
 asmlinkage long sys_epoll_create(int size)
 {
-	int error, fd;
+	int error, fd = -1;
 	struct eventpoll *ep;
 	struct inode *inode;
 	struct file *file;
@@ -515,7 +519,7 @@ asmlinkage long sys_epoll_create(int size)
 	 * Creates all the items needed to setup an eventpoll file. That is,
 	 * a file structure, and inode and a free file descriptor.
 	 */
-	error = ep_getfd(&fd, &inode, &file, ep, &eventpoll_fops);
+	error = ep_getfd(&fd, &inode, &file, ep);
 	if (error)
 		goto eexit_2;
 
@@ -638,7 +642,6 @@ eexit_1:
 	return error;
 }
 
-#define MAX_EVENTS (INT_MAX / sizeof(struct epoll_event))
 
 /*
  * Implement the event wait interface for the eventpoll file. It is the kernel
@@ -655,7 +658,7 @@ asmlinkage long sys_epoll_wait(int epfd, struct epoll_event __user *events,
 		     current, epfd, events, maxevents, timeout));
 
 	/* The maximum number of event must be greater than zero */
-	if (maxevents <= 0 || maxevents > MAX_EVENTS)
+	if (maxevents <= 0 || maxevents > EP_MAX_EVENTS)
 		return -EINVAL;
 
 	/* Verify that the area passed by the user is writeable */
@@ -697,11 +700,60 @@ eexit_1:
 }
 
 
+#ifdef TIF_RESTORE_SIGMASK
+
+/*
+ * Implement the event wait interface for the eventpoll file. It is the kernel
+ * part of the user space epoll_pwait(2).
+ */
+asmlinkage long sys_epoll_pwait(int epfd, struct epoll_event __user *events,
+		int maxevents, int timeout, const sigset_t __user *sigmask,
+		size_t sigsetsize)
+{
+	int error;
+	sigset_t ksigmask, sigsaved;
+
+	/*
+	 * If the caller wants a certain signal mask to be set during the wait,
+	 * we apply it here.
+	 */
+	if (sigmask) {
+		if (sigsetsize != sizeof(sigset_t))
+			return -EINVAL;
+		if (copy_from_user(&ksigmask, sigmask, sizeof(ksigmask)))
+			return -EFAULT;
+		sigdelsetmask(&ksigmask, sigmask(SIGKILL) | sigmask(SIGSTOP));
+		sigprocmask(SIG_SETMASK, &ksigmask, &sigsaved);
+	}
+
+	error = sys_epoll_wait(epfd, events, maxevents, timeout);
+
+	/*
+	 * If we changed the signal mask, we need to restore the original one.
+	 * In case we've got a signal while waiting, we do not restore the
+	 * signal mask yet, and we allow do_signal() to deliver the signal on
+	 * the way back to userspace, before the signal mask is restored.
+	 */
+	if (sigmask) {
+		if (error == -EINTR) {
+			memcpy(&current->saved_sigmask, &sigsaved,
+				sizeof(sigsaved));
+			set_thread_flag(TIF_RESTORE_SIGMASK);
+		} else
+			sigprocmask(SIG_SETMASK, &sigsaved, NULL);
+	}
+
+	return error;
+}
+
+#endif /* #ifdef TIF_RESTORE_SIGMASK */
+
+
 /*
  * Creates the file descriptor to be used by the epoll interface.
  */
-int ep_getfd(int *efd, struct inode **einode, struct file **efile,
-		    struct eventpoll *ep, const struct file_operations *fops)
+static int ep_getfd(int *efd, struct inode **einode, struct file **efile,
+		    struct eventpoll *ep)
 {
 	struct qstr this;
 	char name[32];
@@ -717,10 +769,11 @@ int ep_getfd(int *efd, struct inode **einode, struct file **efile,
 		goto eexit_1;
 
 	/* Allocates an inode from the eventpoll file system */
-	inode = ep_eventpoll_inode(fops);
-	error = PTR_ERR(inode);
-	if (IS_ERR(inode))
+	inode = ep_eventpoll_inode();
+	if (IS_ERR(inode)) {
+		error = PTR_ERR(inode);
 		goto eexit_2;
+	}
 
 	/* Allocates a free descriptor to plug the file onto */
 	error = get_unused_fd();
@@ -748,7 +801,7 @@ int ep_getfd(int *efd, struct inode **einode, struct file **efile,
 
 	file->f_pos = 0;
 	file->f_flags = O_RDONLY;
-	file->f_op = fops;
+	file->f_op = &eventpoll_fops;
 	file->f_mode = FMODE_READ;
 	file->f_version = 0;
 	file->private_data = ep;
@@ -1567,7 +1620,7 @@ static int eventpollfs_delete_dentry(struct dentry *dentry)
 }
 
 
-static struct inode *ep_eventpoll_inode(const struct file_operations *fops)
+static struct inode *ep_eventpoll_inode(void)
 {
 	int error = -ENOMEM;
 	struct inode *inode = new_inode(eventpoll_mnt->mnt_sb);
@@ -1575,7 +1628,7 @@ static struct inode *ep_eventpoll_inode(const struct file_operations *fops)
 	if (!inode)
 		goto eexit_1;
 
-	inode->i_fop = fops;
+	inode->i_fop = &eventpoll_fops;
 
 	/*
 	 * Mark the inode dirty from the very beginning,
@@ -1588,7 +1641,6 @@ static struct inode *ep_eventpoll_inode(const struct file_operations *fops)
 	inode->i_uid = current->fsuid;
 	inode->i_gid = current->fsgid;
 	inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
-	inode->i_blksize = PAGE_SIZE;
 	return inode;
 
 eexit_1:

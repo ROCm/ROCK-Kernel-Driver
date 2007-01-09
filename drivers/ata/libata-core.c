@@ -90,10 +90,6 @@ static int ata_probe_timeout = ATA_TMOUT_INTERNAL / HZ;
 module_param(ata_probe_timeout, int, 0444);
 MODULE_PARM_DESC(ata_probe_timeout, "Set ATA probing timeout (seconds)");
 
-int libata_acpi = 0x73;
-module_param_named(ata_acpi, libata_acpi, int, 0444);
-MODULE_PARM_DESC(ata_acpi, "Controls use of ACPI objects");
-
 MODULE_AUTHOR("Jeff Garzik");
 MODULE_DESCRIPTION("Library module for ATA devices");
 MODULE_LICENSE("GPL");
@@ -1228,7 +1224,7 @@ unsigned int ata_pio_need_iordy(const struct ata_device *adev)
  *	ata_dev_read_id - Read ID data from the specified device
  *	@dev: target device
  *	@p_class: pointer to class of the target device (may be changed)
- *	@flags: ATA_READID_* flags
+ *	@post_reset: is this read ID post-reset?
  *	@id: buffer to read IDENTIFY data into
  *
  *	Read ID data from the specified device.  ATA_CMD_ID_ATA is
@@ -1243,7 +1239,7 @@ unsigned int ata_pio_need_iordy(const struct ata_device *adev)
  *	0 on success, -errno otherwise.
  */
 int ata_dev_read_id(struct ata_device *dev, unsigned int *p_class,
-		    unsigned int flags, u16 *id)
+		    int post_reset, u16 *id)
 {
 	struct ata_port *ap = dev->ap;
 	unsigned int class = *p_class;
@@ -1276,20 +1272,9 @@ int ata_dev_read_id(struct ata_device *dev, unsigned int *p_class,
 
 	tf.protocol = ATA_PROT_PIO;
 
-	/* presence detection using polling IDENTIFY? */
-	if (flags & ATA_READID_DETECT)
-		tf.flags |= ATA_TFLAG_POLLING;
-
 	err_mask = ata_exec_internal(dev, &tf, NULL, DMA_FROM_DEVICE,
 				     id, sizeof(id[0]) * ATA_ID_WORDS);
 	if (err_mask) {
-		if ((flags & ATA_READID_DETECT) &&
-		    (err_mask & AC_ERR_NODEV_HINT)) {
-			DPRINTK("ata%u.%d: NODEV after polling detection\n",
-				ap->id, dev->devno);
-			return -ENOENT;
-		}
-
 		rc = -EIO;
 		reason = "I/O error";
 		goto err_out;
@@ -1309,7 +1294,7 @@ int ata_dev_read_id(struct ata_device *dev, unsigned int *p_class,
 			goto err_out;
 	}
 
-	if ((flags & ATA_READID_POSTRESET) && class == ATA_DEV_ATA) {
+	if (post_reset && class == ATA_DEV_ATA) {
 		/*
 		 * The exact sequence expected by certain pre-ATA4 drives is:
 		 * SRST RESET
@@ -1329,7 +1314,7 @@ int ata_dev_read_id(struct ata_device *dev, unsigned int *p_class,
 			/* current CHS translation info (id[53-58]) might be
 			 * changed. reread the identify device info.
 			 */
-			flags &= ~ATA_READID_POSTRESET;
+			post_reset = 0;
 			goto retry;
 		}
 	}
@@ -1360,10 +1345,7 @@ static void ata_dev_config_ncq(struct ata_device *dev,
 		desc[0] = '\0';
 		return;
 	}
-	if (ata_device_blacklisted(dev) & ATA_HORKAGE_NONCQ) {
-		snprintf(desc, desc_sz, "NCQ (not used)");
-		return;
-	}
+
 	if (ap->flags & ATA_FLAG_NCQ) {
 		hdepth = min(ap->scsi_host->can_queue, ATA_MAX_QUEUE - 1);
 		dev->flags |= ATA_DFLAG_NCQ;
@@ -1426,10 +1408,10 @@ int ata_dev_configure(struct ata_device *dev, int print_info)
 	if (ata_msg_probe(ap))
 		ata_dev_printk(dev, KERN_DEBUG,
 			       "%s: cfg 49:%04x 82:%04x 83:%04x 84:%04x "
-			       "85:%04x 86:%04x 87:%04x 88:%04x 93:%04x\n",
+			       "85:%04x 86:%04x 87:%04x 88:%04x\n",
 			       __FUNCTION__,
-			       id[49], id[82], id[83], id[84], id[85],
-			       id[86], id[87], id[88], id[93]);
+			       id[49], id[82], id[83], id[84],
+			       id[85], id[86], id[87], id[88]);
 
 	/* initialize to-be-configured parameters */
 	dev->flags &= ~ATA_DFLAG_CFG_MASK;
@@ -1653,8 +1635,7 @@ int ata_bus_probe(struct ata_port *ap)
 		if (!ata_dev_enabled(dev))
 			continue;
 
-		rc = ata_dev_read_id(dev, &dev->class, ATA_READID_POSTRESET,
-				     dev->id);
+		rc = ata_dev_read_id(dev, &dev->class, 1, dev->id);
 		if (rc)
 			goto fail;
 
@@ -1669,32 +1650,6 @@ int ata_bus_probe(struct ata_port *ap)
 		down_xfermask = 1;
 		goto fail;
 	}
-
-#ifdef CONFIG_ATA_ACPI
-	if (!(ap->flags & ATA_FLAG_SATA)) {
-		/*  Call _GTM for PATA ports*/
-		ata_acpi_get_timing(ap);
-		/* Call _STM for PATA ports
-		 * required as _STM may modify _GTF information */
-		ata_acpi_push_timing(ap);
-	}
-
-	for (i = 0; i < ATA_MAX_DEVICES; i++) {
-		dev = &ap->device[i];
-
-		if (!ata_dev_enabled(dev))
-			continue;
-
-		if (ata_id_is_sata(dev->id)) {
-			/* Send down drive data via _SDD */
-			ata_acpi_push_id(dev);
-		}
-
-		/* retrieve and execute the ATA task file of _GTF */
-		ata_acpi_exec_tfs(dev);
-
-	}
-#endif
 
 	for (i = 0; i < ATA_MAX_DEVICES; i++)
 		if (ata_dev_enabled(&ap->device[i]))
@@ -2259,11 +2214,6 @@ int ata_set_mode(struct ata_port *ap, struct ata_device **r_failed_dev)
 				break;
 			}
 		}
-#ifdef CONFIG_ATA_ACPI
-		/* Call _GTM for PATA ports */
-		if (!(ap->flags & ATA_FLAG_SATA))
-			ata_acpi_get_timing(ap);
-#endif
 		return 0;
 	}
 
@@ -2343,11 +2293,6 @@ int ata_set_mode(struct ata_port *ap, struct ata_device **r_failed_dev)
 	/* step5: chip specific finalisation */
 	if (ap->ops->post_set_mode)
 		ap->ops->post_set_mode(ap);
-#ifdef CONFIG_ATA_ACPI
-	/* step6: Call _GTM for PATA ports */
-	if (!(ap->flags & ATA_FLAG_SATA))
-		ata_acpi_get_timing(ap);
-#endif
 
  out:
 	if (rc)
@@ -2836,9 +2781,9 @@ int ata_std_softreset(struct ata_port *ap, unsigned int *classes)
 }
 
 /**
- *	sata_port_hardreset - reset port via SATA phy reset
+ *	sata_std_hardreset - reset host port via SATA phy reset
  *	@ap: port to reset
- *	@timing: timing parameters { interval, duratinon, timeout } in msec
+ *	@class: resulting class of attached device
  *
  *	SATA phy-reset host port using DET bits of SControl register.
  *
@@ -2848,8 +2793,10 @@ int ata_std_softreset(struct ata_port *ap, unsigned int *classes)
  *	RETURNS:
  *	0 on success, -errno otherwise.
  */
-int sata_port_hardreset(struct ata_port *ap, const unsigned long *timing)
+int sata_std_hardreset(struct ata_port *ap, unsigned int *class)
 {
+	struct ata_eh_context *ehc = &ap->eh_context;
+	const unsigned long *timing = sata_ehc_deb_timing(ehc);
 	u32 scontrol;
 	int rc;
 
@@ -2862,24 +2809,24 @@ int sata_port_hardreset(struct ata_port *ap, const unsigned long *timing)
 		 * and Sil3124.
 		 */
 		if ((rc = sata_scr_read(ap, SCR_CONTROL, &scontrol)))
-			goto out;
+			return rc;
 
 		scontrol = (scontrol & 0x0f0) | 0x304;
 
 		if ((rc = sata_scr_write(ap, SCR_CONTROL, scontrol)))
-			goto out;
+			return rc;
 
 		sata_set_spd(ap);
 	}
 
 	/* issue phy wake/reset */
 	if ((rc = sata_scr_read(ap, SCR_CONTROL, &scontrol)))
-		goto out;
+		return rc;
 
 	scontrol = (scontrol & 0x0f0) | 0x301;
 
 	if ((rc = sata_scr_write_flush(ap, SCR_CONTROL, scontrol)))
-		goto out;
+		return rc;
 
 	/* Couldn't find anything in SATA I/II specs, but AHCI-1.1
 	 * 10.4.2 says at least 1 ms.
@@ -2887,40 +2834,7 @@ int sata_port_hardreset(struct ata_port *ap, const unsigned long *timing)
 	msleep(1);
 
 	/* bring phy back */
-	rc = sata_phy_resume(ap, timing);
- out:
-	DPRINTK("EXIT, rc=%d\n", rc);
-	return rc;
-}
-
-/**
- *	sata_std_hardreset - reset host port via SATA phy reset
- *	@ap: port to reset
- *	@class: resulting class of attached device
- *
- *	SATA phy-reset host port using DET bits of SControl register,
- *	wait for !BSY and classify the attached device.
- *
- *	LOCKING:
- *	Kernel thread context (may sleep)
- *
- *	RETURNS:
- *	0 on success, -errno otherwise.
- */
-int sata_std_hardreset(struct ata_port *ap, unsigned int *class)
-{
-	const unsigned long *timing = sata_ehc_deb_timing(&ap->eh_context);
-	int rc;
-
-	DPRINTK("ENTER\n");
-
-	/* do hardreset */
-	rc = sata_port_hardreset(ap, timing);
-	if (rc) {
-		ata_port_printk(ap, KERN_ERR,
-				"COMRESET failed (errno=%d)\n", rc);
-		return rc;
-	}
+	sata_phy_resume(ap, timing);
 
 	/* TODO: phy layer with polling, timeouts, etc. */
 	if (ata_port_offline(ap)) {
@@ -3059,7 +2973,7 @@ static int ata_dev_same_device(struct ata_device *dev, unsigned int new_class,
 /**
  *	ata_dev_revalidate - Revalidate ATA device
  *	@dev: device to revalidate
- *	@readid_flags: read ID flags
+ *	@post_reset: is this revalidation after reset?
  *
  *	Re-read IDENTIFY page and make sure @dev is still attached to
  *	the port.
@@ -3070,7 +2984,7 @@ static int ata_dev_same_device(struct ata_device *dev, unsigned int new_class,
  *	RETURNS:
  *	0 on success, negative errno otherwise
  */
-int ata_dev_revalidate(struct ata_device *dev, unsigned int readid_flags)
+int ata_dev_revalidate(struct ata_device *dev, int post_reset)
 {
 	unsigned int class = dev->class;
 	u16 *id = (void *)dev->ap->sector_buf;
@@ -3082,7 +2996,7 @@ int ata_dev_revalidate(struct ata_device *dev, unsigned int readid_flags)
 	}
 
 	/* read ID data */
-	rc = ata_dev_read_id(dev, &class, readid_flags, id);
+	rc = ata_dev_read_id(dev, &class, post_reset, id);
 	if (rc)
 		goto fail;
 
@@ -3104,55 +3018,37 @@ int ata_dev_revalidate(struct ata_device *dev, unsigned int readid_flags)
 	return rc;
 }
 
-struct ata_blacklist_entry {
-	const char *model_num;
-	const char *model_rev;
-	unsigned long horkage;
-};
-
-static const struct ata_blacklist_entry ata_device_blacklist [] = {
-	/* Devices with DMA related problems under Linux */
-	{ "WDC AC11000H",	NULL,		ATA_HORKAGE_NODMA },
-	{ "WDC AC22100H",	NULL,		ATA_HORKAGE_NODMA },
-	{ "WDC AC32500H",	NULL,		ATA_HORKAGE_NODMA },
-	{ "WDC AC33100H",	NULL,		ATA_HORKAGE_NODMA },
-	{ "WDC AC31600H",	NULL,		ATA_HORKAGE_NODMA },
-	{ "WDC AC32100H",	"24.09P07",	ATA_HORKAGE_NODMA },
-	{ "WDC AC23200L",	"21.10N21",	ATA_HORKAGE_NODMA },
-	{ "Compaq CRD-8241B", 	NULL,		ATA_HORKAGE_NODMA },
-	{ "CRD-8400B",		NULL, 		ATA_HORKAGE_NODMA },
-	{ "CRD-8480B",		NULL,		ATA_HORKAGE_NODMA },
-	{ "CRD-8482B",		NULL,		ATA_HORKAGE_NODMA },
-	{ "CRD-84",		NULL,		ATA_HORKAGE_NODMA },
-	{ "SanDisk SDP3B",	NULL,		ATA_HORKAGE_NODMA },
-	{ "SanDisk SDP3B-64",	NULL,		ATA_HORKAGE_NODMA },
-	{ "SANYO CD-ROM CRD",	NULL,		ATA_HORKAGE_NODMA },
-	{ "HITACHI CDR-8",	NULL,		ATA_HORKAGE_NODMA },
-	{ "HITACHI CDR-8335",	NULL,		ATA_HORKAGE_NODMA },
-	{ "HITACHI CDR-8435",	NULL,		ATA_HORKAGE_NODMA },
-	{ "Toshiba CD-ROM XM-6202B", NULL,	ATA_HORKAGE_NODMA },
-	{ "TOSHIBA CD-ROM XM-1702BC", NULL,	ATA_HORKAGE_NODMA },
-	{ "CD-532E-A", 		NULL,		ATA_HORKAGE_NODMA },
-	{ "E-IDE CD-ROM CR-840",NULL,		ATA_HORKAGE_NODMA },
-	{ "CD-ROM Drive/F5A",	NULL,		ATA_HORKAGE_NODMA },
-	{ "WPI CDD-820", 	NULL,		ATA_HORKAGE_NODMA },
-	{ "SAMSUNG CD-ROM SC-148C", NULL,	ATA_HORKAGE_NODMA },
-	{ "SAMSUNG CD-ROM SC",	NULL,		ATA_HORKAGE_NODMA },
-	{ "SanDisk SDP3B-64", 	NULL,		ATA_HORKAGE_NODMA },
-	{ "ATAPI CD-ROM DRIVE 40X MAXIMUM",NULL,ATA_HORKAGE_NODMA },
-	{ "_NEC DV5800A", 	NULL,		ATA_HORKAGE_NODMA },
-	{ "SAMSUNG CD-ROM SN-124","N001",	ATA_HORKAGE_NODMA },
-
-	/* Devices we expect to fail diagnostics */
-
-	/* Devices where NCQ should be avoided */
-	/* NCQ is slow */
-        { "WDC WD740ADFD-00",   NULL,		ATA_HORKAGE_NONCQ },
-
-	/* Devices with NCQ limits */
-
-	/* End Marker */
-	{ }
+static const char * const ata_dma_blacklist [] = {
+	"WDC AC11000H", NULL,
+	"WDC AC22100H", NULL,
+	"WDC AC32500H", NULL,
+	"WDC AC33100H", NULL,
+	"WDC AC31600H", NULL,
+	"WDC AC32100H", "24.09P07",
+	"WDC AC23200L", "21.10N21",
+	"Compaq CRD-8241B",  NULL,
+	"CRD-8400B", NULL,
+	"CRD-8480B", NULL,
+	"CRD-8482B", NULL,
+ 	"CRD-84", NULL,
+	"SanDisk SDP3B", NULL,
+	"SanDisk SDP3B-64", NULL,
+	"SANYO CD-ROM CRD", NULL,
+	"HITACHI CDR-8", NULL,
+	"HITACHI CDR-8335", NULL,
+	"HITACHI CDR-8435", NULL,
+	"Toshiba CD-ROM XM-6202B", NULL,
+	"TOSHIBA CD-ROM XM-1702BC", NULL,
+	"CD-532E-A", NULL,
+	"E-IDE CD-ROM CR-840", NULL,
+	"CD-ROM Drive/F5A", NULL,
+	"WPI CDD-820", NULL,
+	"SAMSUNG CD-ROM SC-148C", NULL,
+	"SAMSUNG CD-ROM SC", NULL,
+	"SanDisk SDP3B-64", NULL,
+	"ATAPI CD-ROM DRIVE 40X MAXIMUM",NULL,
+	"_NEC DV5800A", NULL,
+	"SAMSUNG CD-ROM SN-124", "N001"
 };
 
 static int ata_strim(char *s, size_t len)
@@ -3167,12 +3063,20 @@ static int ata_strim(char *s, size_t len)
 	return len;
 }
 
-unsigned long ata_device_blacklisted(const struct ata_device *dev)
+static int ata_dma_blacklisted(const struct ata_device *dev)
 {
 	unsigned char model_num[40];
 	unsigned char model_rev[16];
 	unsigned int nlen, rlen;
-	const struct ata_blacklist_entry *ad = ata_device_blacklist;
+	int i;
+
+	/* We don't support polling DMA.
+	 * DMA blacklist those ATAPI devices with CDB-intr (and use PIO)
+	 * if the LLDD handles only interrupts in the HSM_ST_LAST state.
+	 */
+	if ((dev->ap->flags & ATA_FLAG_PIO_POLLING) &&
+	    (dev->flags & ATA_DFLAG_CDB_INTR))
+		return 1;
 
 	ata_id_string(dev->id, model_num, ATA_ID_PROD_OFS,
 			  sizeof(model_num));
@@ -3181,28 +3085,15 @@ unsigned long ata_device_blacklisted(const struct ata_device *dev)
 	nlen = ata_strim(model_num, sizeof(model_num));
 	rlen = ata_strim(model_rev, sizeof(model_rev));
 
-	while (ad->model_num) {
-		if (!strncmp(ad->model_num, model_num, nlen)) {
-			if (ad->model_rev == NULL)
-				return ad->horkage;
-			if (!strncmp(ad->model_rev, model_rev, rlen))
-				return ad->horkage;
+	for (i = 0; i < ARRAY_SIZE(ata_dma_blacklist); i += 2) {
+		if (!strncmp(ata_dma_blacklist[i], model_num, nlen)) {
+			if (ata_dma_blacklist[i+1] == NULL)
+				return 1;
+			if (!strncmp(ata_dma_blacklist[i], model_rev, rlen))
+				return 1;
 		}
-		ad++;
 	}
 	return 0;
-}
-
-static int ata_dma_blacklisted(const struct ata_device *dev)
-{
-	/* We don't support polling DMA.
-	 * DMA blacklist those ATAPI devices with CDB-intr (and use PIO)
-	 * if the LLDD handles only interrupts in the HSM_ST_LAST state.
-	 */
-	if ((dev->ap->flags & ATA_FLAG_PIO_POLLING) &&
-	    (dev->flags & ATA_DFLAG_CDB_INTR))
-		return 1;
-	return (ata_device_blacklisted(dev) & ATA_HORKAGE_NODMA) ? 1 : 0;
 }
 
 /**
@@ -3232,13 +3123,6 @@ static void ata_dev_xfermask(struct ata_device *dev)
 	 */
 	if (ap->cbl == ATA_CBL_PATA40)
 		xfer_mask &= ~(0xF8 << ATA_SHIFT_UDMA);
-	/* Apply drive side cable rule. Unknown or 80 pin cables reported
-	 * host side are checked drive side as well. Cases where we know a
-	 * 40wire cable is used safely for 80 are not checked here.
-	 */
-        if (ata_drive_40wire(dev->id) && (ap->cbl == ATA_CBL_PATA_UNK || ap->cbl == ATA_CBL_PATA80))
-		xfer_mask &= ~(0xF8 << ATA_SHIFT_UDMA);
-
 
 	xfer_mask &= ata_pack_xfermask(dev->pio_mask,
 				       dev->mwdma_mask, dev->udma_mask);
@@ -4320,12 +4204,8 @@ fsm_start:
 					/* device stops HSM for abort/error */
 					qc->err_mask |= AC_ERR_DEV;
 				else
-					/* HSM violation. Let EH handle this.
-					 * Phantom devices also trigger this
-					 * condition.  Mark hint.
-					 */
-					qc->err_mask |= AC_ERR_HSM |
-							AC_ERR_NODEV_HINT;
+					/* HSM violation. Let EH handle this */
+					qc->err_mask |= AC_ERR_HSM;
 
 				ap->hsm_task_state = HSM_ST_ERR;
 				goto fsm_start;
@@ -4991,7 +4871,6 @@ idle_irq:
  *	ata_interrupt - Default ATA host interrupt handler
  *	@irq: irq line (unused)
  *	@dev_instance: pointer to our ata_host information structure
- *	@regs: unused
  *
  *	Default interrupt handler for PCI IDE devices.  Calls
  *	ata_host_intr() for each port that is not disabled.
@@ -5003,7 +4882,7 @@ idle_irq:
  *	IRQ_NONE or IRQ_HANDLED.
  */
 
-irqreturn_t ata_interrupt (int irq, void *dev_instance, struct pt_regs *regs)
+irqreturn_t ata_interrupt (int irq, void *dev_instance)
 {
 	struct ata_host *host = dev_instance;
 	unsigned int i;
@@ -5429,13 +5308,13 @@ void ata_port_init(struct ata_port *ap, struct ata_host *host,
 		ap->pio_mask = ent->pinfo2->pio_mask;
 		ap->mwdma_mask = ent->pinfo2->mwdma_mask;
 		ap->udma_mask = ent->pinfo2->udma_mask;
-		ap->flags |= ent->pinfo2->flags | ent->_port_flags[port_no];
+		ap->flags |= ent->pinfo2->flags;
 		ap->ops = ent->pinfo2->port_ops;
 	} else {
 		ap->pio_mask = ent->pio_mask;
 		ap->mwdma_mask = ent->mwdma_mask;
 		ap->udma_mask = ent->udma_mask;
-		ap->flags |= ent->port_flags | ent->_port_flags[port_no];
+		ap->flags |= ent->port_flags;
 		ap->ops = ent->port_ops;
 	}
 	ap->hw_sata_spd_limit = UINT_MAX;
@@ -5644,7 +5523,6 @@ int ata_device_add(const struct ata_probe_ent *ent)
 		/* print per-port info to dmesg */
 		ata_port_printk(ap, KERN_INFO, "%cATA max %s cmd 0x%lX "
 				"ctl 0x%lX bmdma 0x%lX irq %d\n",
-				ap->flags & ATA_FLAG_PATA_MODE ? 'P' :
 				ap->flags & ATA_FLAG_SATA ? 'S' : 'P',
 				ata_mode_string(xfer_mode_mask),
 				ap->ioaddr.cmd_addr,
@@ -6088,7 +5966,7 @@ static void __exit ata_exit(void)
 	destroy_workqueue(ata_aux_wq);
 }
 
-module_init(ata_init);
+subsys_initcall(ata_init);
 module_exit(ata_exit);
 
 static unsigned long ratelimit_time;
@@ -6251,7 +6129,6 @@ EXPORT_SYMBOL_GPL(__sata_phy_reset);
 EXPORT_SYMBOL_GPL(ata_bus_reset);
 EXPORT_SYMBOL_GPL(ata_std_prereset);
 EXPORT_SYMBOL_GPL(ata_std_softreset);
-EXPORT_SYMBOL_GPL(sata_port_hardreset);
 EXPORT_SYMBOL_GPL(sata_std_hardreset);
 EXPORT_SYMBOL_GPL(ata_std_postreset);
 EXPORT_SYMBOL_GPL(ata_dev_classify);
@@ -6278,7 +6155,6 @@ EXPORT_SYMBOL_GPL(ata_host_suspend);
 EXPORT_SYMBOL_GPL(ata_host_resume);
 EXPORT_SYMBOL_GPL(ata_id_string);
 EXPORT_SYMBOL_GPL(ata_id_c_string);
-EXPORT_SYMBOL_GPL(ata_device_blacklisted);
 EXPORT_SYMBOL_GPL(ata_scsi_simulate);
 
 EXPORT_SYMBOL_GPL(ata_pio_need_iordy);

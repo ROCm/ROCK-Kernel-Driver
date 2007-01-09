@@ -6,16 +6,6 @@
  *
  * Copyright (C) 2004 Takashi SHUDO <shudo@hitachi-ul.co.jp>
  */
-
-#ifdef CONFIG_IDE
-# ifndef IRQ_CFCARD
-#  define IRQ_CFCARD	14
-# endif
-# ifndef IRQ_PCMCIA
-#  define IRQ_PCMCIA	15
-# endif
-#endif
-
 #define INTC_BASE	0xffd00000
 #define INTC_ICR0	(INTC_BASE+0x0)
 #define INTC_ICR1	(INTC_BASE+0x1c)
@@ -144,11 +134,6 @@
 #define	TMU_CH5_IPR_ADDR	INTC_INT2PRI1
 #define	TMU_CH5_IPR_POS		1
 #define TMU_CH5_PRIORITY	2
-
-#define	RTC_IRQ		22
-#define	RTC_IPR_ADDR	INTC_INT2PRI1
-#define	RTC_IPR_POS	0
-#define	RTC_PRIORITY	TIMER_PRIORITY
 
 /* SCIF0 */
 #define SCIF0_ERI_IRQ	40

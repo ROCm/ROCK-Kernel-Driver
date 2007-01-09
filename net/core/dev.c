@@ -118,12 +118,6 @@
 #include <linux/err.h>
 #include <linux/ctype.h>
 
-#ifdef CONFIG_XEN
-#include <net/ip.h>
-#include <linux/tcp.h>
-#include <linux/udp.h>
-#endif
-
 /*
  *	The list of packet types we will receive (as opposed to discard)
  *	and the routines to invoke.
@@ -645,6 +639,8 @@ struct net_device * dev_get_by_flags(unsigned short if_flags, unsigned short mas
 int dev_valid_name(const char *name)
 {
 	if (*name == '\0')
+		return 0;
+	if (strlen(name) >= IFNAMSIZ)
 		return 0;
 	if (!strcmp(name, ".") || !strcmp(name, ".."))
 		return 0;
@@ -1176,12 +1172,12 @@ EXPORT_SYMBOL(netif_device_attach);
  * Invalidate hardware checksum when packet is to be mangled, and
  * complete checksum manually on outgoing path.
  */
-int skb_checksum_help(struct sk_buff *skb, int inward)
+int skb_checksum_help(struct sk_buff *skb)
 {
 	unsigned int csum;
 	int ret = 0, offset = skb->h.raw - skb->data;
 
-	if (inward)
+	if (skb->ip_summed == CHECKSUM_COMPLETE)
 		goto out_set_summed;
 
 	if (unlikely(skb_shinfo(skb)->gso_size)) {
@@ -1233,7 +1229,7 @@ struct sk_buff *skb_gso_segment(struct sk_buff *skb, int features)
 	skb->mac_len = skb->nh.raw - skb->data;
 	__skb_pull(skb, skb->mac_len);
 
-	if (unlikely(skb->ip_summed != CHECKSUM_HW)) {
+	if (unlikely(skb->ip_summed != CHECKSUM_PARTIAL)) {
 		if (skb_header_cloned(skb) &&
 		    (err = pskb_expand_head(skb, 0, 0, GFP_ATOMIC)))
 			return ERR_PTR(err);
@@ -1242,7 +1238,7 @@ struct sk_buff *skb_gso_segment(struct sk_buff *skb, int features)
 	rcu_read_lock();
 	list_for_each_entry_rcu(ptype, &ptype_base[ntohs(type) & 15], list) {
 		if (ptype->type == type && !ptype->dev && ptype->gso_segment) {
-			if (unlikely(skb->ip_summed != CHECKSUM_HW)) {
+			if (unlikely(skb->ip_summed != CHECKSUM_PARTIAL)) {
 				err = ptype->gso_send_check(skb);
 				segs = ERR_PTR(err);
 				if (err || skb_gso_ok(skb, features))
@@ -1401,43 +1397,6 @@ out_kfree_skb:
 	}						\
 }
 
-#ifdef CONFIG_XEN
-inline int skb_checksum_setup(struct sk_buff *skb)
-{
-	if (skb->proto_csum_blank) {
-		if (skb->protocol != htons(ETH_P_IP))
-			goto out;
-		skb->h.raw = (unsigned char *)skb->nh.iph + 4*skb->nh.iph->ihl;
-		if (skb->h.raw >= skb->tail)
-			goto out;
-		switch (skb->nh.iph->protocol) {
-		case IPPROTO_TCP:
-			skb->csum = offsetof(struct tcphdr, check);
-			break;
-		case IPPROTO_UDP:
-			skb->csum = offsetof(struct udphdr, check);
-			break;
-		default:
-			if (net_ratelimit())
-				printk(KERN_ERR "Attempting to checksum a non-"
-				       "TCP/UDP packet, dropping a protocol"
-				       " %d packet", skb->nh.iph->protocol);
-			goto out;
-		}
-		if ((skb->h.raw + skb->csum + 2) > skb->tail)
-			goto out;
-		skb->ip_summed = CHECKSUM_HW;
-		skb->proto_csum_blank = 0;
-	}
-	return 0;
-out:
-	return -EPROTO;
-}
-#else
-inline int skb_checksum_setup(struct sk_buff *skb) { return 0; }
-#endif
-
-
 /**
  *	dev_queue_xmit - transmit a buffer
  *	@skb: buffer to transmit
@@ -1470,12 +1429,6 @@ int dev_queue_xmit(struct sk_buff *skb)
 	struct Qdisc *q;
 	int rc = -ENOMEM;
 
- 	/* If a checksum-deferred packet is forwarded to a device that needs a
- 	 * checksum, correct the pointers and force checksumming.
- 	 */
- 	if (skb_checksum_setup(skb))
- 		goto out_kfree_skb;
-
 	/* GSO will handle the following emulations directly. */
 	if (netif_needs_gso(dev, skb))
 		goto gso;
@@ -1497,11 +1450,11 @@ int dev_queue_xmit(struct sk_buff *skb)
 	/* If packet is not checksummed and device does not support
 	 * checksumming for this protocol, complete checksumming here.
 	 */
-	if (skb->ip_summed == CHECKSUM_HW &&
+	if (skb->ip_summed == CHECKSUM_PARTIAL &&
 	    (!(dev->features & NETIF_F_GEN_CSUM) &&
 	     (!(dev->features & NETIF_F_IP_CSUM) ||
 	      skb->protocol != htons(ETH_P_IP))))
-	      	if (skb_checksum_help(skb, 0))
+	      	if (skb_checksum_help(skb))
 	      		goto out_kfree_skb;
 
 gso:
@@ -1848,19 +1801,6 @@ int netif_receive_skb(struct sk_buff *skb)
 	if (skb->tc_verd & TC_NCLS) {
 		skb->tc_verd = CLR_TC_NCLS(skb->tc_verd);
 		goto ncls;
-	}
-#endif
-
-#ifdef CONFIG_XEN
-	switch (skb->ip_summed) {
-	case CHECKSUM_UNNECESSARY:
-		skb->proto_data_valid = 1;
-		break;
-	case CHECKSUM_HW:
-		/* XXX Implement me. */
-	default:
-		skb->proto_data_valid = 0;
-		break;
 	}
 #endif
 
@@ -3259,13 +3199,15 @@ struct net_device *alloc_netdev(int sizeof_priv, const char *name,
 	struct net_device *dev;
 	int alloc_size;
 
+	BUG_ON(strlen(name) >= sizeof(dev->name));
+
 	/* ensure 32-byte alignment of both the device and private area */
 	alloc_size = (sizeof(*dev) + NETDEV_ALIGN_CONST) & ~NETDEV_ALIGN_CONST;
 	alloc_size += sizeof_priv + NETDEV_ALIGN_CONST;
 
 	p = kzalloc(alloc_size, GFP_KERNEL);
 	if (!p) {
-		printk(KERN_ERR "alloc_dev: Unable to allocate device.\n");
+		printk(KERN_ERR "alloc_netdev: Unable to allocate device.\n");
 		return NULL;
 	}
 
@@ -3564,8 +3506,6 @@ static int __init net_dev_init(void)
 
 	BUG_ON(!dev_boot_phase);
 
-	net_random_init();
-
 	if (dev_proc_init())
 		goto out;
 
@@ -3650,7 +3590,6 @@ EXPORT_SYMBOL(unregister_netdevice_notifier);
 EXPORT_SYMBOL(net_enable_timestamp);
 EXPORT_SYMBOL(net_disable_timestamp);
 EXPORT_SYMBOL(dev_get_flags);
-EXPORT_SYMBOL(skb_checksum_setup);
 
 #if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
 EXPORT_SYMBOL(br_handle_frame_hook);

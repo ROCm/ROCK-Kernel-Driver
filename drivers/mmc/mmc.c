@@ -475,7 +475,7 @@ static u32 mmc_select_voltage(struct mmc_host *host, u32 ocr)
 	if (bit) {
 		bit -= 1;
 
-		ocr = 3 << bit;
+		ocr &= 3 << bit;
 
 		host->ios.vdd = bit;
 		mmc_set_ios(host);
@@ -996,7 +996,6 @@ static void mmc_read_scrs(struct mmc_host *host)
 
 		mmc_set_data_timeout(&data, card, 0);
 
-		data.blksz_bits = 3;
 		data.blksz = 1 << 3;
 		data.blocks = 1;
 		data.flags = MMC_DATA_READ;
@@ -1167,9 +1166,9 @@ static void mmc_setup(struct mmc_host *host)
 void mmc_detect_change(struct mmc_host *host, unsigned long delay)
 {
 	if (delay)
-		schedule_delayed_work(&host->detect, delay);
+		mmc_schedule_delayed_work(&host->detect, delay);
 	else
-		schedule_work(&host->detect);
+		mmc_schedule_work(&host->detect);
 }
 
 EXPORT_SYMBOL(mmc_detect_change);
@@ -1179,13 +1178,28 @@ static void mmc_rescan(void *data)
 {
 	struct mmc_host *host = data;
 	struct list_head *l, *n;
+	unsigned char power_mode;
 
 	mmc_claim_host(host);
 
-	if (host->ios.power_mode == MMC_POWER_ON)
+	/*
+	 * Check for removed cards and newly inserted ones. We check for
+	 * removed cards first so we can intelligently re-select the VDD.
+	 */
+	power_mode = host->ios.power_mode;
+	if (power_mode == MMC_POWER_ON)
 		mmc_check_cards(host);
 
 	mmc_setup(host);
+
+	/*
+	 * Some broken cards process CMD1 even in stand-by state. There is
+	 * no reply, but an ILLEGAL_COMMAND error is cached and returned
+	 * after next command. We poll for card status here to clear any
+	 * possibly pending error.
+	 */
+	if (power_mode == MMC_POWER_ON)
+		mmc_check_cards(host);
 
 	if (!list_empty(&host->cards)) {
 		/*
@@ -1312,7 +1326,7 @@ EXPORT_SYMBOL(mmc_remove_host);
  */
 void mmc_free_host(struct mmc_host *host)
 {
-	flush_scheduled_work();
+	mmc_flush_scheduled_work();
 	mmc_free_host_sysfs(host);
 }
 

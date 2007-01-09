@@ -161,8 +161,8 @@ sysfs_read_file(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 		if ((retval = fill_read_buffer(file->f_dentry,buffer)))
 			goto out;
 	}
-	pr_debug("%s: count = %d, ppos = %lld, buf = %s\n",
-		 __FUNCTION__,count,*ppos,buffer->page);
+	pr_debug("%s: count = %zd, ppos = %lld, buf = %s\n",
+		 __FUNCTION__, count, *ppos, buffer->page);
 	retval = flush_read_buffer(buffer,buf,count,ppos);
 out:
 	up(&buffer->sem);
@@ -501,7 +501,7 @@ int sysfs_update_file(struct kobject * kobj, const struct attribute * attr)
 			d_drop(victim);
 		
 		/**
-		 * Drop the reference acquired from sysfs_get_dentry() above.
+		 * Drop the reference acquired from lookup_one_len() above.
 		 */
 		dput(victim);
 	}

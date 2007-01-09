@@ -275,6 +275,8 @@ struct ib_uverbs_resize_cq {
 
 struct ib_uverbs_resize_cq_resp {
 	__u32 cqe;
+	__u32 reserved;
+	__u64 driver_data[0];
 };
 
 struct ib_uverbs_poll_cq {
@@ -456,7 +458,7 @@ struct ib_uverbs_query_qp_resp {
 	__u8  cur_qp_state;
 	__u8  path_mtu;
 	__u8  path_mig_state;
-	__u8  en_sqd_async_notify;
+	__u8  sq_draining;
 	__u8  max_rd_atomic;
 	__u8  max_dest_rd_atomic;
 	__u8  min_rnr_timer;

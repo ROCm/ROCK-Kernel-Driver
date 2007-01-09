@@ -371,12 +371,31 @@ int bus_add_device(struct device * dev)
 	if (bus) {
 		pr_debug("bus %s: add device %s\n", bus->name, dev->bus_id);
 		error = device_add_attrs(bus, dev);
-		if (!error) {
-			sysfs_create_link(&bus->devices.kobj, &dev->kobj, dev->bus_id);
-			sysfs_create_link(&dev->kobj, &dev->bus->subsys.kset.kobj, "subsystem");
-			sysfs_create_link(&dev->kobj, &dev->bus->subsys.kset.kobj, "bus");
-		}
+		if (error)
+			goto out_put;
+		error = sysfs_create_link(&bus->devices.kobj,
+						&dev->kobj, dev->bus_id);
+		if (error)
+			goto out_id;
+		error = sysfs_create_link(&dev->kobj,
+				&dev->bus->subsys.kset.kobj, "subsystem");
+		if (error)
+			goto out_subsys;
+		error = sysfs_create_link(&dev->kobj,
+				&dev->bus->subsys.kset.kobj, "bus");
+		if (error)
+			goto out_deprecated;
 	}
+	return 0;
+
+out_deprecated:
+	sysfs_remove_link(&dev->kobj, "subsystem");
+out_subsys:
+	sysfs_remove_link(&bus->devices.kobj, dev->bus_id);
+out_id:
+	device_remove_attrs(bus, dev);
+out_put:
+	put_bus(dev->bus);
 	return error;
 }
 
@@ -384,16 +403,24 @@ int bus_add_device(struct device * dev)
  *	bus_attach_device - add device to bus
  *	@dev:	device tried to attach to a driver
  *
+ *	- Add device to bus's list of devices.
  *	- Try to attach to driver.
  */
-void bus_attach_device(struct device * dev)
+int bus_attach_device(struct device * dev)
 {
-	struct bus_type * bus = dev->bus;
+	struct bus_type *bus = dev->bus;
+	int ret = 0;
 
 	if (bus) {
-		device_attach(dev);
-		klist_add_tail(&dev->knode_bus, &bus->klist_devices);
+		dev->is_registered = 1;
+		ret = device_attach(dev);
+		if (ret >= 0) {
+			klist_add_tail(&dev->knode_bus, &bus->klist_devices);
+			ret = 0;
+		} else
+			dev->is_registered = 0;
 	}
+	return ret;
 }
 
 /**
@@ -412,7 +439,10 @@ void bus_remove_device(struct device * dev)
 		sysfs_remove_link(&dev->kobj, "bus");
 		sysfs_remove_link(&dev->bus->devices.kobj, dev->bus_id);
 		device_remove_attrs(dev->bus, dev);
-		klist_remove(&dev->knode_bus);
+		if (dev->is_registered) {
+			dev->is_registered = 0;
+			klist_del(&dev->knode_bus);
+		}
 		pr_debug("bus %s: remove device %s\n", dev->bus->name, dev->bus_id);
 		device_release_driver(dev);
 		put_bus(dev->bus);
@@ -455,10 +485,17 @@ static void driver_remove_attrs(struct bus_type * bus, struct device_driver * dr
  * Thanks to drivers making their tables __devinit, we can't allow manual
  * bind and unbind from userspace unless CONFIG_HOTPLUG is enabled.
  */
-static void add_bind_files(struct device_driver *drv)
+static int __must_check add_bind_files(struct device_driver *drv)
 {
-	driver_create_file(drv, &driver_attr_unbind);
-	driver_create_file(drv, &driver_attr_bind);
+	int ret;
+
+	ret = driver_create_file(drv, &driver_attr_unbind);
+	if (ret == 0) {
+		ret = driver_create_file(drv, &driver_attr_bind);
+		if (ret)
+			driver_remove_file(drv, &driver_attr_unbind);
+	}
+	return ret;
 }
 
 static void remove_bind_files(struct device_driver *drv)
@@ -467,7 +504,7 @@ static void remove_bind_files(struct device_driver *drv)
 	driver_remove_file(drv, &driver_attr_unbind);
 }
 #else
-static inline void add_bind_files(struct device_driver *drv) {}
+static inline int add_bind_files(struct device_driver *drv) { return 0; }
 static inline void remove_bind_files(struct device_driver *drv) {}
 #endif
 
@@ -476,34 +513,48 @@ static inline void remove_bind_files(struct device_driver *drv) {}
  *	@drv:	driver.
  *
  */
-int bus_add_driver(struct device_driver * drv)
+int bus_add_driver(struct device_driver *drv)
 {
 	struct bus_type * bus = get_bus(drv->bus);
 	int error = 0;
 
-	if (bus) {
-		pr_debug("bus %s: add driver %s\n", bus->name, drv->name);
-		error = kobject_set_name(&drv->kobj, "%s", drv->name);
-		if (error) {
-			put_bus(bus);
-			return error;
-		}
-		drv->kobj.kset = &bus->drivers;
-		if ((error = kobject_register(&drv->kobj))) {
-			put_bus(bus);
-			return error;
-		}
+	if (!bus)
+		return 0;
 
-		driver_attach(drv);
-		klist_add_tail(&drv->knode_bus, &bus->klist_drivers);
-		module_add_driver(drv->owner, drv);
+	pr_debug("bus %s: add driver %s\n", bus->name, drv->name);
+	error = kobject_set_name(&drv->kobj, "%s", drv->name);
+	if (error)
+		goto out_put_bus;
+	drv->kobj.kset = &bus->drivers;
+	if ((error = kobject_register(&drv->kobj)))
+		goto out_put_bus;
 
-		driver_add_attrs(bus, drv);
-		add_bind_files(drv);
+	error = driver_attach(drv);
+	if (error)
+		goto out_unregister;
+	klist_add_tail(&drv->knode_bus, &bus->klist_drivers);
+	module_add_driver(drv->owner, drv);
+
+	error = driver_add_attrs(bus, drv);
+	if (error) {
+		/* How the hell do we get out of this pickle? Give up */
+		printk(KERN_ERR "%s: driver_add_attrs(%s) failed\n",
+			__FUNCTION__, drv->name);
 	}
+	error = add_bind_files(drv);
+	if (error) {
+		/* Ditto */
+		printk(KERN_ERR "%s: add_bind_files(%s) failed\n",
+			__FUNCTION__, drv->name);
+	}
+
+	return error;
+out_unregister:
+	kobject_unregister(&drv->kobj);
+out_put_bus:
+	put_bus(bus);
 	return error;
 }
-
 
 /**
  *	bus_remove_driver - delete driver from bus's knowledge.
@@ -516,30 +567,36 @@ int bus_add_driver(struct device_driver * drv)
 
 void bus_remove_driver(struct device_driver * drv)
 {
-	if (drv->bus) {
-		remove_bind_files(drv);
-		driver_remove_attrs(drv->bus, drv);
-		klist_remove(&drv->knode_bus);
-		pr_debug("bus %s: remove driver %s\n", drv->bus->name, drv->name);
-		driver_detach(drv);
-		module_remove_driver(drv);
-		kobject_unregister(&drv->kobj);
-		put_bus(drv->bus);
-	}
+	if (!drv->bus)
+		return;
+
+	remove_bind_files(drv);
+	driver_remove_attrs(drv->bus, drv);
+	klist_remove(&drv->knode_bus);
+	pr_debug("bus %s: remove driver %s\n", drv->bus->name, drv->name);
+	driver_detach(drv);
+	module_remove_driver(drv);
+	kobject_unregister(&drv->kobj);
+	put_bus(drv->bus);
 }
 
 
 /* Helper for bus_rescan_devices's iter */
-static int bus_rescan_devices_helper(struct device *dev, void *data)
+static int __must_check bus_rescan_devices_helper(struct device *dev,
+						void *data)
 {
+	int ret = 0;
+
 	if (!dev->driver) {
 		if (dev->parent)	/* Needed for USB */
 			down(&dev->parent->sem);
-		device_attach(dev);
+		ret = device_attach(dev);
 		if (dev->parent)
 			up(&dev->parent->sem);
+		if (ret > 0)
+			ret = 0;
 	}
-	return 0;
+	return ret < 0 ? ret : 0;
 }
 
 /**
@@ -550,9 +607,9 @@ static int bus_rescan_devices_helper(struct device *dev, void *data)
  * attached and rescan it against existing drivers to see if it matches
  * any by calling device_attach() for the unbound devices.
  */
-void bus_rescan_devices(struct bus_type * bus)
+int bus_rescan_devices(struct bus_type * bus)
 {
-	bus_for_each_dev(bus, NULL, NULL, bus_rescan_devices_helper);
+	return bus_for_each_dev(bus, NULL, NULL, bus_rescan_devices_helper);
 }
 
 /**
@@ -564,7 +621,7 @@ void bus_rescan_devices(struct bus_type * bus)
  * to use if probing criteria changed during a devices lifetime and
  * driver attachment should change accordingly.
  */
-void device_reprobe(struct device *dev)
+int device_reprobe(struct device *dev)
 {
 	if (dev->driver) {
 		if (dev->parent)        /* Needed for USB */
@@ -573,14 +630,14 @@ void device_reprobe(struct device *dev)
 		if (dev->parent)
 			up(&dev->parent->sem);
 	}
-
-	bus_rescan_devices_helper(dev, NULL);
+	return bus_rescan_devices_helper(dev, NULL);
 }
 EXPORT_SYMBOL_GPL(device_reprobe);
 
-struct bus_type * get_bus(struct bus_type * bus)
+struct bus_type *get_bus(struct bus_type *bus)
 {
-	return bus ? container_of(subsys_get(&bus->subsys), struct bus_type, subsys) : NULL;
+	return bus ? container_of(subsys_get(&bus->subsys),
+				struct bus_type, subsys) : NULL;
 }
 
 void put_bus(struct bus_type * bus)
@@ -655,22 +712,6 @@ static void klist_devices_put(struct klist_node *n)
 	put_device(dev);
 }
 
-static void klist_drivers_get(struct klist_node *n)
-{
-	struct device_driver *drv = container_of(n, struct device_driver,
-						 knode_bus);
-
-	get_driver(drv);
-}
-
-static void klist_drivers_put(struct klist_node *n)
-{
-	struct device_driver *drv = container_of(n, struct device_driver,
-						 knode_bus);
-
-	put_driver(drv);
-}
-
 /**
  *	bus_register - register a bus with the system.
  *	@bus:	bus.
@@ -706,12 +747,16 @@ int bus_register(struct bus_type * bus)
 		goto bus_drivers_fail;
 
 	klist_init(&bus->klist_devices, klist_devices_get, klist_devices_put);
-	klist_init(&bus->klist_drivers, klist_drivers_get, klist_drivers_put);
-	bus_add_attrs(bus);
+	klist_init(&bus->klist_drivers, NULL, NULL);
+	retval = bus_add_attrs(bus);
+	if (retval)
+		goto bus_attrs_fail;
 
 	pr_debug("bus type '%s' registered\n", bus->name);
 	return 0;
 
+bus_attrs_fail:
+	kset_unregister(&bus->drivers);
 bus_drivers_fail:
 	kset_unregister(&bus->devices);
 bus_devices_fail:

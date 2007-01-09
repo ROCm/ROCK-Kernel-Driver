@@ -112,7 +112,7 @@ typedef struct user_fxsr_struct elf_fpxregset_t;
    For the moment, we have only optimizations for the Intel generations,
    but that could change... */
 
-#define ELF_PLATFORM  (system_utsname.machine)
+#define ELF_PLATFORM  (utsname()->machine)
 
 #define SET_PERSONALITY(ex, ibcs2) do { } while (0)
 
@@ -137,11 +137,7 @@ extern int dump_task_extended_fpu (struct task_struct *, struct user_fxsr_struct
 
 #ifdef CONFIG_COMPAT_VDSO
 # define VDSO_COMPAT_BASE	VDSO_HIGH_BASE
-# ifndef CONFIG_XEN
-#  define VDSO_PRELINK		VDSO_HIGH_BASE
-# else
-#  define VDSO_PRELINK		(0UL - FIX_VDSO * PAGE_SIZE)
-# endif
+# define VDSO_PRELINK		VDSO_HIGH_BASE
 #else
 # define VDSO_COMPAT_BASE	VDSO_BASE
 # define VDSO_PRELINK		0

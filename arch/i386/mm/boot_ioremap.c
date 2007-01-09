@@ -30,7 +30,7 @@
 
 #define BOOT_PTE_PTRS (PTRS_PER_PTE*2)
 
-static unsigned long boot_pte_index(unsigned long vaddr)
+static unsigned long boot_pte_index(unsigned long vaddr) 
 {
 	return __pa(vaddr) >> PAGE_SHIFT;
 }

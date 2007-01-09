@@ -78,7 +78,7 @@ static int ali_c2_cable_detect(struct ata_port *ap)
 	   implement the detect logic */
 
 	if (ali_cable_override(pdev))
-		return ATA_CBL_PATA40_SHORT;
+		return ATA_CBL_PATA80;
 
 	/* Host view cable detect 0x4A bit 0 primary bit 1 secondary
 	   Bit set for 40 pin */
@@ -337,13 +337,15 @@ static struct scsi_host_template ali_sht = {
 	.can_queue		= ATA_DEF_QUEUE,
 	.this_id		= ATA_SHT_THIS_ID,
 	.sg_tablesize		= LIBATA_MAX_PRD,
+	/* Keep LBA28 counts so large I/O's don't turn LBA48 and PIO
+	   with older controllers. Not locked so will grow on C5 or later */
+	.max_sectors		= 255,
 	.cmd_per_lun		= ATA_SHT_CMD_PER_LUN,
 	.emulated		= ATA_SHT_EMULATED,
 	.use_clustering		= ATA_SHT_USE_CLUSTERING,
 	.proc_name		= DRV_NAME,
 	.dma_boundary		= ATA_DMA_BOUNDARY,
 	.slave_configure	= ata_scsi_slave_config,
-	.slave_destroy		= ata_scsi_slave_destroy,
 	.bios_param		= ata_std_bios_param,
 };
 

@@ -320,14 +320,16 @@
 #define __NR_unshare		299
 #define __NR_set_robust_list	300
 #define __NR_get_robust_list	301
+#define __NR_migrate_pages	302
 
-#define NR_SYSCALLS		302
+#define NR_SYSCALLS		303
 
 #ifdef __KERNEL__
-/* WARNING: You MAY NOT add syscall numbers larger than 301, since
+
+/* WARNING: You MAY NOT add syscall numbers larger than 302, since
  *          all of the syscall tables in the Sparc kernel are
- *          sized to have 301 entries (starting at zero).  Therefore
- *          find a free slot in the 0-301 range.
+ *          sized to have 302 entries (starting at zero).  Therefore
+ *          find a free slot in the 0-302 range.
  */
 
 #define _syscall0(type,name) \
@@ -447,48 +449,6 @@ if (__res>=0) \
 errno = -__res; \
 return -1; \
 }
-#ifdef __KERNEL_SYSCALLS__
-
-#include <linux/compiler.h>
-#include <linux/types.h>
-
-/*
- * we need this inline - forking from kernel space will result
- * in NO COPY ON WRITE (!!!), until an execve is executed. This
- * is no problem, but for the stack. This is handled by not letting
- * main() use the stack at all after fork(). Thus, no function
- * calls - which means inline code for fork too, as otherwise we
- * would use the stack upon exit from 'fork()'.
- *
- * Actually only pause and fork are needed inline, so that there
- * won't be any messing with the stack from main(), but we define
- * some others too.
- */
-#define __NR__exit __NR_exit
-static __inline__ _syscall0(pid_t,setsid)
-static __inline__ _syscall3(int,write,int,fd,__const__ char *,buf,off_t,count)
-static __inline__ _syscall3(int,read,int,fd,char *,buf,off_t,count)
-static __inline__ _syscall3(off_t,lseek,int,fd,off_t,offset,int,count)
-static __inline__ _syscall1(int,dup,int,fd)
-static __inline__ _syscall3(int,execve,__const__ char *,file,char **,argv,char **,envp)
-static __inline__ _syscall3(int,open,__const__ char *,file,int,flag,int,mode)
-static __inline__ _syscall1(int,close,int,fd)
-static __inline__ _syscall3(pid_t,waitpid,pid_t,pid,int *,wait_stat,int,options)
-
-#include <linux/linkage.h>
-
-asmlinkage unsigned long sys_mmap(
-				unsigned long addr, unsigned long len,
-				unsigned long prot, unsigned long flags,
-				unsigned long fd, unsigned long off);
-struct sigaction;
-asmlinkage long sys_rt_sigaction(int sig,
-				const struct sigaction __user *act,
-				struct sigaction __user *oact,
-				void __user *restorer,
-				size_t sigsetsize);
-
-#endif /* __KERNEL_SYSCALLS__ */
 
 /* sysconf options, for SunOS compatibility */
 #define   _SC_ARG_MAX             1

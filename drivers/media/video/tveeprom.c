@@ -222,8 +222,8 @@ hauppauge_tuner[] =
 	{ TUNER_TCL_2002MB,    "TCL M2523_3DB_E"},
 	{ TUNER_ABSENT,        "Philips 8275A"},
 	{ TUNER_ABSENT,        "Microtune MT2060"},
-	{ TUNER_ABSENT,        "Philips FM1236 MK5"},
-	{ TUNER_ABSENT,        "Philips FM1216ME MK5"},
+	{ TUNER_PHILIPS_FM1236_MK3, "Philips FM1236 MK5"},
+	{ TUNER_PHILIPS_FM1216ME_MK3, "Philips FM1216ME MK5"},
 	{ TUNER_ABSENT,        "TCL M2523_3DI_E"},
 	{ TUNER_ABSENT,        "Samsung THPD5222FG30A"},
 	/* 120-129 */
@@ -468,7 +468,7 @@ void tveeprom_hauppauge_analog(struct i2c_client *c, struct tveeprom *tvee,
 				(eeprom_data[i+6] << 8) +
 				(eeprom_data[i+7] << 16);
 
-				if ( (eeprom_data[i + 8] && 0xf0) &&
+				if ( (eeprom_data[i + 8] & 0xf0) &&
 					(tvee->serial_number < 0xffffff) ) {
 					tvee->MAC_address[0] = 0x00;
 					tvee->MAC_address[1] = 0x0D;
@@ -605,6 +605,8 @@ void tveeprom_hauppauge_analog(struct i2c_client *c, struct tveeprom *tvee,
 			tvee->tuner_formats |= hauppauge_tuner_fmt[i].id;
 			t_fmt_name1[j++] = hauppauge_tuner_fmt[i].name;
 		}
+	}
+	for (i = j = 0; i < 8; i++) {
 		if (t_format2 & (1 << i)) {
 			tvee->tuner2_formats |= hauppauge_tuner_fmt[i].id;
 			t_fmt_name2[j++] = hauppauge_tuner_fmt[i].name;

@@ -36,6 +36,7 @@
 #include <linux/stacktrace.h>
 #include <linux/debug_locks.h>
 #include <linux/irqflags.h>
+#include <linux/utsname.h>
 
 #include <asm/sections.h>
 
@@ -121,8 +122,8 @@ static struct list_head chainhash_table[CHAINHASH_SIZE];
  * unique.
  */
 #define iterate_chain_key(key1, key2) \
-	(((key1) << MAX_LOCKDEP_KEYS_BITS/2) ^ \
-	((key1) >> (64-MAX_LOCKDEP_KEYS_BITS/2)) ^ \
+	(((key1) << MAX_LOCKDEP_KEYS_BITS) ^ \
+	((key1) >> (64-MAX_LOCKDEP_KEYS_BITS)) ^ \
 	(key2))
 
 void lockdep_off(void)
@@ -224,7 +225,14 @@ static int save_trace(struct stack_trace *trace)
 	trace->max_entries = MAX_STACK_TRACE_ENTRIES - nr_stack_trace_entries;
 	trace->entries = stack_trace + nr_stack_trace_entries;
 
-	save_stack_trace(trace, NULL, 0, 3);
+	trace->skip = 3;
+	trace->all_contexts = 0;
+
+	/* Make sure to not recurse in case the the unwinder needs to tak
+e	   locks. */
+	lockdep_off();
+	save_stack_trace(trace, NULL);
+	lockdep_on();
 
 	trace->max_entries = trace->nr_entries;
 
@@ -508,6 +516,13 @@ print_circular_bug_entry(struct lock_list *target, unsigned int depth)
 	return 0;
 }
 
+static void print_kernel_version(void)
+{
+	printk("%s %.*s\n", init_utsname()->release,
+		(int)strcspn(init_utsname()->version, " "),
+		init_utsname()->version);
+}
+
 /*
  * When a circular dependency is detected, print the
  * header first:
@@ -524,6 +539,7 @@ print_circular_bug_header(struct lock_list *entry, unsigned int depth)
 
 	printk("\n=======================================================\n");
 	printk(  "[ INFO: possible circular locking dependency detected ]\n");
+	print_kernel_version();
 	printk(  "-------------------------------------------------------\n");
 	printk("%s/%d is trying to acquire lock:\n",
 		curr->comm, curr->pid);
@@ -559,6 +575,8 @@ static noinline int print_circular_bug_tail(void)
 	return 0;
 }
 
+#define RECURSION_LIMIT 40
+
 static int noinline print_infinite_recursion_bug(void)
 {
 	__raw_spin_unlock(&hash_lock);
@@ -579,7 +597,7 @@ check_noncircular(struct lock_class *source, unsigned int depth)
 	debug_atomic_inc(&nr_cyclic_check_recursions);
 	if (depth > max_recursion_depth)
 		max_recursion_depth = depth;
-	if (depth >= 20)
+	if (depth >= RECURSION_LIMIT)
 		return print_infinite_recursion_bug();
 	/*
 	 * Check this lock's dependency list:
@@ -629,7 +647,7 @@ find_usage_forwards(struct lock_class *source, unsigned int depth)
 
 	if (depth > max_recursion_depth)
 		max_recursion_depth = depth;
-	if (depth >= 20)
+	if (depth >= RECURSION_LIMIT)
 		return print_infinite_recursion_bug();
 
 	debug_atomic_inc(&nr_find_usage_forwards_checks);
@@ -668,7 +686,7 @@ find_usage_backwards(struct lock_class *source, unsigned int depth)
 
 	if (depth > max_recursion_depth)
 		max_recursion_depth = depth;
-	if (depth >= 20)
+	if (depth >= RECURSION_LIMIT)
 		return print_infinite_recursion_bug();
 
 	debug_atomic_inc(&nr_find_usage_backwards_checks);
@@ -705,6 +723,7 @@ print_bad_irq_dependency(struct task_struct *curr,
 	printk("\n======================================================\n");
 	printk(  "[ INFO: %s-safe -> %s-unsafe lock order detected ]\n",
 		irqclass, irqclass);
+	print_kernel_version();
 	printk(  "------------------------------------------------------\n");
 	printk("%s/%d [HC%u[%lu]:SC%u[%lu]:HE%u:SE%u] is trying to acquire:\n",
 		curr->comm, curr->pid,
@@ -786,6 +805,7 @@ print_deadlock_bug(struct task_struct *curr, struct held_lock *prev,
 
 	printk("\n=============================================\n");
 	printk(  "[ INFO: possible recursive locking detected ]\n");
+	print_kernel_version();
 	printk(  "---------------------------------------------\n");
 	printk("%s/%d is trying to acquire lock:\n",
 		curr->comm, curr->pid);
@@ -1061,7 +1081,8 @@ static int static_obj(void *obj)
 	 */
 	for_each_possible_cpu(i) {
 		start = (unsigned long) &__per_cpu_start + per_cpu_offset(i);
-		end   = (unsigned long) &__per_cpu_end   + per_cpu_offset(i);
+		end   = (unsigned long) &__per_cpu_start + PERCPU_ENOUGH_ROOM
+					+ per_cpu_offset(i);
 
 		if ((addr >= start) && (addr < end))
 			return 1;
@@ -1095,8 +1116,6 @@ static int count_matching_names(struct lock_class *new_class)
 
 	return count + 1;
 }
-
-extern void __error_too_big_MAX_LOCKDEP_SUBCLASSES(void);
 
 /*
  * Register a lock's class in the hash-table, if the class is not present
@@ -1135,8 +1154,7 @@ look_up_lock_class(struct lockdep_map *lock, unsigned int subclass)
 	 * (or spin_lock_init()) call - which acts as the key. For static
 	 * locks we use the lock object itself as the key.
 	 */
-	if (sizeof(struct lock_class_key) > sizeof(struct lock_class))
-		__error_too_big_MAX_LOCKDEP_SUBCLASSES();
+	BUILD_BUG_ON(sizeof(struct lock_class_key) > sizeof(struct lock_class));
 
 	key = lock->key->subkeys + subclass;
 
@@ -1159,7 +1177,7 @@ look_up_lock_class(struct lockdep_map *lock, unsigned int subclass)
  * itself, so actual lookup of the hash should be once per lock object.
  */
 static inline struct lock_class *
-register_lock_class(struct lockdep_map *lock, unsigned int subclass)
+register_lock_class(struct lockdep_map *lock, unsigned int subclass, int force)
 {
 	struct lockdep_subclass_key *key;
 	struct list_head *hash_head;
@@ -1231,7 +1249,7 @@ register_lock_class(struct lockdep_map *lock, unsigned int subclass)
 out_unlock_set:
 	__raw_spin_unlock(&hash_lock);
 
-	if (!subclass)
+	if (!subclass || force)
 		lock->class_cache = class;
 
 	DEBUG_LOCKS_WARN_ON(class->subclass != subclass);
@@ -1368,6 +1386,7 @@ print_irq_inversion_bug(struct task_struct *curr, struct lock_class *other,
 
 	printk("\n=========================================================\n");
 	printk(  "[ INFO: possible irq lock inversion dependency detected ]\n");
+	print_kernel_version();
 	printk(  "---------------------------------------------------------\n");
 	printk("%s/%d just changed the state of lock:\n",
 		curr->comm, curr->pid);
@@ -1462,6 +1481,7 @@ print_usage_bug(struct task_struct *curr, struct held_lock *this,
 
 	printk("\n=================================\n");
 	printk(  "[ INFO: inconsistent lock state ]\n");
+	print_kernel_version();
 	printk(  "---------------------------------\n");
 
 	printk("inconsistent {%s} -> {%s} usage.\n",
@@ -1917,7 +1937,7 @@ void trace_softirqs_off(unsigned long ip)
  * Initialize a lock instance's lock-class mapping info:
  */
 void lockdep_init_map(struct lockdep_map *lock, const char *name,
-		      struct lock_class_key *key)
+		      struct lock_class_key *key, int subclass)
 {
 	if (unlikely(!debug_locks))
 		return;
@@ -1937,6 +1957,8 @@ void lockdep_init_map(struct lockdep_map *lock, const char *name,
 	lock->name = name;
 	lock->key = key;
 	lock->class_cache = NULL;
+	if (subclass)
+		register_lock_class(lock, subclass, 1);
 }
 
 EXPORT_SYMBOL_GPL(lockdep_init_map);
@@ -1975,7 +1997,7 @@ static int __lock_acquire(struct lockdep_map *lock, unsigned int subclass,
 	 * Not cached yet or subclass?
 	 */
 	if (unlikely(!class)) {
-		class = register_lock_class(lock, subclass);
+		class = register_lock_class(lock, subclass, 0);
 		if (!class)
 			return 0;
 	}

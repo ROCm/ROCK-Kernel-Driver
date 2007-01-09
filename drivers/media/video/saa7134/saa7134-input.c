@@ -193,6 +193,16 @@ int saa7134_input_init1(struct saa7134_dev *dev)
 		saa_setb(SAA7134_GPIO_GPMODE0, 0x4);
 		saa_setb(SAA7134_GPIO_GPSTATUS0, 0x4);
 		break;
+	case SAA7134_BOARD_AVERMEDIA_777:
+	case SAA7134_BOARD_AVERMEDIA_A16AR:
+		ir_codes     = ir_codes_avermedia;
+		mask_keycode = 0x02F200;
+		mask_keydown = 0x000400;
+		polling      = 50; // ms
+		/* Without this we won't receive key up events */
+		saa_setb(SAA7134_GPIO_GPMODE1, 0x1);
+		saa_setb(SAA7134_GPIO_GPSTATUS1, 0x1);
+		break;
 	case SAA7134_BOARD_KWORLD_TERMINATOR:
 		ir_codes     = ir_codes_pixelview;
 		mask_keycode = 0x00001f;
@@ -226,6 +236,12 @@ int saa7134_input_init1(struct saa7134_dev *dev)
 		ir_codes     = ir_codes_videomate_tv_pvr;
 		mask_keycode = 0x00003F;
 		mask_keyup   = 0x400000;
+		polling      = 50; // ms
+		break;
+	case SAA7134_BOARD_PROTEUS_2309:
+		ir_codes     = ir_codes_proteus_2309;
+		mask_keycode = 0x00007F;
+		mask_keyup   = 0x000080;
 		polling      = 50; // ms
 		break;
 	case SAA7134_BOARD_VIDEOMATE_DVBT_300:

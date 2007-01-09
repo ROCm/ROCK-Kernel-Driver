@@ -82,6 +82,7 @@
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/ethtool.h>
+#include <linux/if_arp.h>
 #include <linux/wireless.h>
 #include <net/iw_handler.h>
 #include <net/ieee80211.h>
@@ -164,7 +165,7 @@ static const u8 encaps_hdr[] = {0xaa, 0xaa, 0x03, 0x00, 0x00, 0x00};
 #define MAX_RID_LEN 1024
 
 static const struct iw_handler_def orinoco_handler_def;
-static struct ethtool_ops orinoco_ethtool_ops;
+static const struct ethtool_ops orinoco_ethtool_ops;
 
 /********************************************************************/
 /* Data tables                                                      */
@@ -1951,9 +1952,9 @@ static void __orinoco_ev_wterr(struct net_device *dev, hermes_t *hw)
 	       dev->name);
 }
 
-irqreturn_t orinoco_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+irqreturn_t orinoco_interrupt(int irq, void *dev_id)
 {
-	struct net_device *dev = (struct net_device *)dev_id;
+	struct net_device *dev = dev_id;
 	struct orinoco_private *priv = netdev_priv(dev);
 	hermes_t *hw = &priv->hw;
 	int count = MAX_IRQLOOPS_PER_IRQ;
@@ -2456,6 +2457,7 @@ void free_orinocodev(struct net_device *dev)
 /* Wireless extensions                                              */
 /********************************************************************/
 
+/* Return : < 0 -> error code ; >= 0 -> length */
 static int orinoco_hw_get_essid(struct orinoco_private *priv, int *active,
 				char buf[IW_ESSID_MAX_SIZE+1])
 {
@@ -2500,9 +2502,9 @@ static int orinoco_hw_get_essid(struct orinoco_private *priv, int *active,
 	len = le16_to_cpu(essidbuf.len);
 	BUG_ON(len > IW_ESSID_MAX_SIZE);
 
-	memset(buf, 0, IW_ESSID_MAX_SIZE+1);
+	memset(buf, 0, IW_ESSID_MAX_SIZE);
 	memcpy(buf, p, len);
-	buf[len] = '\0';
+	err = len;
 
  fail_unlock:
 	orinoco_unlock(priv, &flags);
@@ -3026,17 +3028,18 @@ static int orinoco_ioctl_getessid(struct net_device *dev,
 
 	if (netif_running(dev)) {
 		err = orinoco_hw_get_essid(priv, &active, essidbuf);
-		if (err)
+		if (err < 0)
 			return err;
+		erq->length = err;
 	} else {
 		if (orinoco_lock(priv, &flags) != 0)
 			return -EBUSY;
-		memcpy(essidbuf, priv->desired_essid, IW_ESSID_MAX_SIZE + 1);
+		memcpy(essidbuf, priv->desired_essid, IW_ESSID_MAX_SIZE);
+		erq->length = strlen(priv->desired_essid);
 		orinoco_unlock(priv, &flags);
 	}
 
 	erq->flags = 1;
-	erq->length = strlen(essidbuf) + 1;
 
 	return 0;
 }
@@ -3074,10 +3077,10 @@ static int orinoco_ioctl_getnick(struct net_device *dev,
 	if (orinoco_lock(priv, &flags) != 0)
 		return -EBUSY;
 
-	memcpy(nickbuf, priv->nick, IW_ESSID_MAX_SIZE+1);
+	memcpy(nickbuf, priv->nick, IW_ESSID_MAX_SIZE);
 	orinoco_unlock(priv, &flags);
 
-	nrq->length = strlen(nickbuf)+1;
+	nrq->length = strlen(priv->nick);
 
 	return 0;
 }
@@ -3574,14 +3577,14 @@ static int orinoco_ioctl_getretry(struct net_device *dev,
 		rrq->value = lifetime * 1000;	/* ??? */
 	} else {
 		/* By default, display the min number */
-		if ((rrq->flags & IW_RETRY_MAX)) {
-			rrq->flags = IW_RETRY_LIMIT | IW_RETRY_MAX;
+		if ((rrq->flags & IW_RETRY_LONG)) {
+			rrq->flags = IW_RETRY_LIMIT | IW_RETRY_LONG;
 			rrq->value = long_limit;
 		} else {
 			rrq->flags = IW_RETRY_LIMIT;
 			rrq->value = short_limit;
 			if(short_limit != long_limit)
-				rrq->flags |= IW_RETRY_MIN;
+				rrq->flags |= IW_RETRY_SHORT;
 		}
 	}
 
@@ -4292,7 +4295,7 @@ static void orinoco_get_drvinfo(struct net_device *dev,
 			 "PCMCIA %p", priv->hw.iobase);
 }
 
-static struct ethtool_ops orinoco_ethtool_ops = {
+static const struct ethtool_ops orinoco_ethtool_ops = {
 	.get_drvinfo = orinoco_get_drvinfo,
 	.get_link = ethtool_op_get_link,
 };

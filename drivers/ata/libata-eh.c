@@ -1433,39 +1433,16 @@ static void ata_eh_report(struct ata_port *ap)
 	}
 
 	for (tag = 0; tag < ATA_MAX_QUEUE; tag++) {
-		static const char *dma_str[] = {
-			[DMA_BIDIRECTIONAL]	= "bidi",
-			[DMA_TO_DEVICE]		= "out",
-			[DMA_FROM_DEVICE]	= "in",
-			[DMA_NONE]		= "",
-		};
 		struct ata_queued_cmd *qc = __ata_qc_from_tag(ap, tag);
-		struct ata_taskfile *cmd = &qc->tf, *res = &qc->result_tf;
-		unsigned int nbytes;
 
 		if (!(qc->flags & ATA_QCFLAG_FAILED) || !qc->err_mask)
 			continue;
 
-		nbytes = qc->nbytes;
-		if (!nbytes)
-			nbytes = qc->nsect << 9;
-
-		ata_dev_printk(qc->dev, KERN_ERR,
-			"cmd %02x/%02x:%02x:%02x:%02x:%02x/%02x:%02x:%02x:%02x:%02x/%02x "
-			"tag %d cdb 0x%x data %u %s\n         "
-			"res %02x/%02x:%02x:%02x:%02x:%02x/%02x:%02x:%02x:%02x:%02x/%02x "
-			"Emask 0x%x (%s)\n",
-			cmd->command, cmd->feature, cmd->nsect,
-			cmd->lbal, cmd->lbam, cmd->lbah,
-			cmd->hob_feature, cmd->hob_nsect,
-			cmd->hob_lbal, cmd->hob_lbam, cmd->hob_lbah,
-			cmd->device, qc->tag, qc->cdb[0], nbytes,
-			dma_str[qc->dma_dir],
-			res->command, res->feature, res->nsect,
-			res->lbal, res->lbam, res->lbah,
-			res->hob_feature, res->hob_nsect,
-			res->hob_lbal, res->hob_lbam, res->hob_lbah,
-			res->device, qc->err_mask, ata_err_string(qc->err_mask));
+		ata_dev_printk(qc->dev, KERN_ERR, "tag %d cmd 0x%x "
+			       "Emask 0x%x stat 0x%x err 0x%x (%s)\n",
+			       qc->tag, qc->tf.command, qc->err_mask,
+			       qc->result_tf.command, qc->result_tf.feature,
+			       ata_err_string(qc->err_mask));
 	}
 }
 
@@ -1657,13 +1634,10 @@ static int ata_eh_revalidate_and_attach(struct ata_port *ap,
 	DPRINTK("ENTER\n");
 
 	for (i = 0; i < ATA_MAX_DEVICES; i++) {
-		unsigned int action, readid_flags = 0;
+		unsigned int action;
 
 		dev = &ap->device[i];
 		action = ata_eh_dev_action(dev);
-
-		if (ehc->i.flags & ATA_EHI_DID_RESET)
-			readid_flags |= ATA_READID_POSTRESET;
 
 		if (action & ATA_EH_REVALIDATE && ata_dev_ready(dev)) {
 			if (ata_port_offline(ap)) {
@@ -1672,7 +1646,8 @@ static int ata_eh_revalidate_and_attach(struct ata_port *ap,
 			}
 
 			ata_eh_about_to_do(ap, dev, ATA_EH_REVALIDATE);
-			rc = ata_dev_revalidate(dev, readid_flags);
+			rc = ata_dev_revalidate(dev,
+					ehc->i.flags & ATA_EHI_DID_RESET);
 			if (rc)
 				break;
 
@@ -1685,33 +1660,18 @@ static int ata_eh_revalidate_and_attach(struct ata_port *ap,
 			   ata_class_enabled(ehc->classes[dev->devno])) {
 			dev->class = ehc->classes[dev->devno];
 
-			if (ap->flags & ATA_FLAG_DETECT_POLLING)
-				readid_flags |= ATA_READID_DETECT;
-
-			rc = ata_dev_read_id(dev, &dev->class, readid_flags,
-					     dev->id);
+			rc = ata_dev_read_id(dev, &dev->class, 1, dev->id);
 			if (rc == 0)
 				rc = ata_dev_configure(dev, 1);
-			else if (rc == -ENOENT) {
-				/* IDENTIFY was issued to non-existent
-				 * device.  No need to reset.  Just
-				 * thaw and kill the device.
-				 */
-				ata_eh_thaw_port(ap);
-				dev->class = ATA_DEV_UNKNOWN;
-				rc = 0;
-			}
 
 			if (rc) {
 				dev->class = ATA_DEV_UNKNOWN;
 				break;
 			}
 
-			if (ata_dev_enabled(dev)) {
-				spin_lock_irqsave(ap->lock, flags);
-				ap->pflags |= ATA_PFLAG_SCSI_HOTPLUG;
-				spin_unlock_irqrestore(ap->lock, flags);
-			}
+			spin_lock_irqsave(ap->lock, flags);
+			ap->pflags |= ATA_PFLAG_SCSI_HOTPLUG;
+			spin_unlock_irqrestore(ap->lock, flags);
 		}
 	}
 
@@ -2034,21 +1994,6 @@ static int ata_eh_recover(struct ata_port *ap, ata_prereset_fn_t prereset,
 			down_xfermask = 1;
 			goto dev_fail;
 		}
-
-#ifdef CONFIG_ATA_ACPI
-		for (i = 0; i < ATA_MAX_DEVICES; i++) {
-			dev = &ap->device[i];
-
-			if (!ata_dev_enabled(dev))
-				continue;
-
-			/* Send down drive data via _SDD */
-			ata_acpi_push_id(dev);
-
-			/* retrieve and execute the ATA task file of _GTF */
-			ata_acpi_exec_tfs(dev);			
-		}
-#endif
 	}
 
 	/* suspend devices */
@@ -2273,12 +2218,6 @@ static void ata_eh_handle_port_resume(struct ata_port *ap)
 	if (!(ap->pflags & ATA_PFLAG_SUSPENDED))
 		goto done;
 
-#ifdef CONFIG_ATA_ACPI
-	if (!(ap->flags & ATA_FLAG_SATA)) {
-		/* Call _STM for PATA ports */
-		ata_acpi_push_timing(ap);
-	}
-#endif
 	if (ap->ops->port_resume)
 		rc = ap->ops->port_resume(ap);
 

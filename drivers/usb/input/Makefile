@@ -3,6 +3,7 @@
 #
 
 # Multipart objects.
+wacom-objs	:= wacom_wac.o wacom_sys.o
 usbhid-objs	:= hid-core.o
 
 # Optional parts of multipart objects.
@@ -14,13 +15,16 @@ ifeq ($(CONFIG_USB_HIDINPUT),y)
 	usbhid-objs	+= hid-input.o
 endif
 ifeq ($(CONFIG_HID_PID),y)
-	usbhid-objs	+= pid.o
+	usbhid-objs	+= hid-pidff.o
 endif
 ifeq ($(CONFIG_LOGITECH_FF),y)
 	usbhid-objs	+= hid-lgff.o
 endif
 ifeq ($(CONFIG_THRUSTMASTER_FF),y)
 	usbhid-objs	+= hid-tmff.o
+endif
+ifeq ($(CONFIG_ZEROPLUS_FF),y)
+	usbhid-objs	+= hid-zpff.o
 endif
 ifeq ($(CONFIG_HID_FF),y)
 	usbhid-objs	+= hid-ff.o

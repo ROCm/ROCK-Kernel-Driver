@@ -1,6 +1,8 @@
 #ifndef _LINUX_MSDOS_FS_H
 #define _LINUX_MSDOS_FS_H
 
+#include <linux/magic.h>
+
 /*
  * The MS-DOS filesystem constants/structures
  */
@@ -17,8 +19,6 @@
 #define CT_LE_W(v)	cpu_to_le16(v)
 #define CT_LE_L(v)	cpu_to_le32(v)
 
-
-#define MSDOS_SUPER_MAGIC 0x4d44 /* MD */
 
 #define MSDOS_ROOT_INO	1	/* == MINIX_ROOT_INO */
 #define MSDOS_DIR_BITS	5	/* log2(sizeof(struct msdos_dir_entry)) */
@@ -402,6 +402,8 @@ extern const struct file_operations fat_file_operations;
 extern struct inode_operations fat_file_inode_operations;
 extern int fat_notify_change(struct dentry * dentry, struct iattr * attr);
 extern void fat_truncate(struct inode *inode);
+extern int fat_getattr(struct vfsmount *mnt, struct dentry *dentry,
+		       struct kstat *stat);
 
 /* fat/inode.c */
 extern void fat_attach(struct inode *inode, loff_t i_pos);
@@ -413,6 +415,8 @@ extern int fat_sync_inode(struct inode *inode);
 extern int fat_fill_super(struct super_block *sb, void *data, int silent,
 			struct inode_operations *fs_dir_inode_ops, int isvfat);
 
+extern int fat_flush_inodes(struct super_block *sb, struct inode *i1,
+		            struct inode *i2);
 /* fat/misc.c */
 extern void fat_fs_panic(struct super_block *s, const char *fmt, ...);
 extern void fat_clusters_flush(struct super_block *sb);

@@ -55,13 +55,23 @@ endif
 cflags-y += $(call cc-option,-funit-at-a-time)
 # prevent gcc from generating any FP code by mistake
 cflags-y += $(call cc-option,-mno-sse -mno-mmx -mno-sse2 -mno-3dnow,)
+# this works around some issues with generating unwind tables in older gccs
+# newer gccs do it by default
+cflags-y += -maccumulate-outgoing-args
 
-cppflags-$(CONFIG_XEN) += \
-	-D__XEN_INTERFACE_VERSION__=$(CONFIG_XEN_INTERFACE_VERSION)
+# do binutils support CFI?
+cflags-y += $(call as-instr,.cfi_startproc\n.cfi_endproc,-DCONFIG_AS_CFI=1,)
+AFLAGS += $(call as-instr,.cfi_startproc\n.cfi_endproc,-DCONFIG_AS_CFI=1,)
+
+# is .cfi_signal_frame supported too?
+cflags-y += $(call as-instr,.cfi_startproc\n.cfi_signal_frame\n.cfi_endproc,-DCONFIG_AS_CFI_SIGNAL_FRAME=1,)
+AFLAGS += $(call as-instr,.cfi_startproc\n.cfi_signal_frame\n.cfi_endproc,-DCONFIG_AS_CFI_SIGNAL_FRAME=1,)
+
+cflags-$(CONFIG_CC_STACKPROTECTOR) += $(shell $(CONFIG_SHELL) $(srctree)/scripts/gcc-x86_64-has-stack-protector.sh "$(CC)" -fstack-protector )
+cflags-$(CONFIG_CC_STACKPROTECTOR_ALL) += $(shell $(CONFIG_SHELL) $(srctree)/scripts/gcc-x86_64-has-stack-protector.sh "$(CC)" -fstack-protector-all )
 
 CFLAGS += $(cflags-y)
 CFLAGS_KERNEL += $(cflags-kernel-y)
-CPPFLAGS += $(cppflags-y)
 AFLAGS += -m64
 
 head-y := arch/x86_64/kernel/head.o arch/x86_64/kernel/head64.o arch/x86_64/kernel/init_task.o
@@ -80,21 +90,6 @@ boot := arch/x86_64/boot
 PHONY += bzImage bzlilo install archmrproper \
 	 fdimage fdimage144 fdimage288 isoimage archclean
 
-ifdef CONFIG_XEN
-CPPFLAGS := -Iinclude$(if $(KBUILD_SRC),2)/asm/mach-xen $(CPPFLAGS)
-head-y := arch/x86_64/kernel/head-xen.o arch/x86_64/kernel/head64-xen.o arch/x86_64/kernel/init_task.o
-LDFLAGS_vmlinux := -e _start
-boot := arch/i386/boot-xen
-.PHONY: vmlinuz
-#Default target when executing "make"
-all: vmlinuz
-
-vmlinuz: vmlinux
-	$(Q)$(MAKE) $(build)=$(boot) $@
-
-install:
-	$(Q)$(MAKE) $(build)=$(boot) XENGUEST=$(XENGUEST) $@
-else
 #Default target when executing "make"
 all: bzImage
 
@@ -115,7 +110,6 @@ fdimage fdimage144 fdimage288 isoimage: vmlinux
 
 install:
 	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(BOOTIMAGE) $@ 
-endif
 
 archclean:
 	$(Q)$(MAKE) $(clean)=$(boot)

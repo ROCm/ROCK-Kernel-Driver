@@ -182,7 +182,7 @@ static void indirect_write16(struct pd6729_socket *socket, unsigned short reg,
 
 /* Interrupt handler functionality */
 
-static irqreturn_t pd6729_interrupt(int irq, void *dev, struct pt_regs *regs)
+static irqreturn_t pd6729_interrupt(int irq, void *dev)
 {
 	struct pd6729_socket *socket = (struct pd6729_socket *)dev;
 	int i;
@@ -249,7 +249,7 @@ static void pd6729_interrupt_wrapper(unsigned long data)
 {
 	struct pd6729_socket *socket = (struct pd6729_socket *) data;
 
-	pd6729_interrupt(0, (void *)socket, NULL);
+	pd6729_interrupt(0, (void *)socket);
 	mod_timer(&socket->poll_timer, jiffies + HZ);
 }
 
@@ -575,7 +575,7 @@ static struct pccard_operations pd6729_operations = {
 	.set_mem_map		= pd6729_set_mem_map,
 };
 
-static irqreturn_t pd6729_test(int irq, void *dev, struct pt_regs *regs)
+static irqreturn_t pd6729_test(int irq, void *dev)
 {
 	dprintk("-> hit on irq %d\n", irq);
 	return IRQ_HANDLED;
@@ -755,6 +755,7 @@ static void __devexit pd6729_pci_remove(struct pci_dev *dev)
 	kfree(socket);
 }
 
+#ifdef CONFIG_PM
 static int pd6729_socket_suspend(struct pci_dev *dev, pm_message_t state)
 {
 	return pcmcia_socket_dev_suspend(&dev->dev, state);
@@ -764,6 +765,7 @@ static int pd6729_socket_resume(struct pci_dev *dev)
 {
 	return pcmcia_socket_dev_resume(&dev->dev);
 }
+#endif
 
 static struct pci_device_id pd6729_pci_ids[] = {
 	{
@@ -781,8 +783,10 @@ static struct pci_driver pd6729_pci_drv = {
 	.id_table	= pd6729_pci_ids,
 	.probe		= pd6729_pci_probe,
 	.remove		= __devexit_p(pd6729_pci_remove),
+#ifdef CONFIG_PM
 	.suspend	= pd6729_socket_suspend,
 	.resume		= pd6729_socket_resume,
+#endif
 };
 
 static int pd6729_module_init(void)

@@ -673,9 +673,13 @@ static struct lbuspath lbus_rec_path = {
 #define FIRMWARE_VERSIONS 1
 static union firmware_version firmware_versions[] = {
 	{
-	 .firmware.ASIC = 3,.firmware.CODEC = 2,
-	 .firmware.AUXDSP = 3,.firmware.PROG = 773,
-	 },
+		.firmware = {
+			.ASIC = 3,
+			.CODEC = 2,
+			.AUXDSP = 3,
+			.PROG = 773,
+		},
+	},
 };
 
 static u32 atoh(unsigned char *in, unsigned int len)
@@ -1174,9 +1178,9 @@ static int riptide_suspend(struct pci_dev *pci, pm_message_t state)
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	snd_pcm_suspend_all(chip->pcm);
 	snd_ac97_suspend(chip->ac97);
-	pci_set_power_state(pci, PCI_D3hot);
 	pci_disable_device(pci);
 	pci_save_state(pci);
+	pci_set_power_state(pci, pci_choose_state(pci, state));
 	return 0;
 }
 
@@ -1185,9 +1189,14 @@ static int riptide_resume(struct pci_dev *pci)
 	struct snd_card *card = pci_get_drvdata(pci);
 	struct snd_riptide *chip = card->private_data;
 
-	pci_restore_state(pci);
-	pci_enable_device(pci);
 	pci_set_power_state(pci, PCI_D0);
+	pci_restore_state(pci);
+	if (pci_enable_device(pci) < 0) {
+		printk(KERN_ERR "riptide: pci_enable_device failed, "
+		       "disabling device\n");
+		snd_card_disconnect(card);
+		return -EIO;
+	}
 	pci_set_master(pci);
 	snd_riptide_initialize(chip);
 	snd_ac97_resume(chip->ac97);
@@ -1732,7 +1741,7 @@ snd_riptide_pcm(struct snd_riptide *chip, int device, struct snd_pcm **rpcm)
 }
 
 static irqreturn_t
-snd_riptide_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+snd_riptide_interrupt(int irq, void *dev_id)
 {
 	struct snd_riptide *chip = dev_id;
 	struct cmdif *cif = chip->cif;
@@ -1747,8 +1756,7 @@ snd_riptide_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		if (chip->rmidi && IS_MPUIRQ(cif->hwport)) {
 			chip->handled_irqs++;
 			snd_mpu401_uart_interrupt(irq,
-						  chip->rmidi->private_data,
-						  regs);
+						  chip->rmidi->private_data);
 		}
 		SET_AIACK(cif->hwport);
 	}

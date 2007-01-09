@@ -134,7 +134,7 @@ static int  if_tiocmset(struct tty_struct *tty, struct file *file,
 static int  if_write(struct tty_struct *tty,
 		     const unsigned char *buf, int count);
 
-static struct tty_operations if_ops = {
+static const struct tty_operations if_ops = {
 	.open =			if_open,
 	.close =		if_close,
 	.ioctl =		if_ioctl,
@@ -625,13 +625,13 @@ void gigaset_if_init(struct cardstate *cs)
 		return;
 
 	tasklet_init(&cs->if_wake_tasklet, &if_wake, (unsigned long) cs);
-	cs->tty_dev = tty_register_device(drv->tty, cs->minor_index, NULL);
+	cs->class = tty_register_device(drv->tty, cs->minor_index, NULL);
 
-	if (!IS_ERR(cs->tty_dev))
-		dev_set_drvdata(cs->tty_dev, cs);
+	if (!IS_ERR(cs->class))
+		class_set_devdata(cs->class, cs);
 	else {
 		warn("could not register device to the tty subsystem");
-		cs->tty_dev = NULL;
+		cs->class = NULL;
 	}
 }
 
@@ -645,7 +645,7 @@ void gigaset_if_free(struct cardstate *cs)
 
 	tasklet_disable(&cs->if_wake_tasklet);
 	tasklet_kill(&cs->if_wake_tasklet);
-	cs->tty_dev = NULL;
+	cs->class = NULL;
 	tty_unregister_device(drv->tty, cs->minor_index);
 }
 

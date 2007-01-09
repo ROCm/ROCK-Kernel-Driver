@@ -31,6 +31,7 @@
 #include <linux/sunrpc/clnt.h>
 #include <linux/sunrpc/svc.h>
 #include <linux/sunrpc/svcsock.h>
+#include <net/ip.h>
 #include <linux/lockd/lockd.h>
 #include <linux/lockd/sm_inter.h>
 #include <linux/nfs.h>
@@ -40,7 +41,6 @@
 #define ALLOWED_SIGS		(sigmask(SIGKILL))
 
 static struct svc_program	nlmsvc_program;
-extern struct svc_program	nsmsvc_program;
 
 struct nlmsvc_binding *		nlmsvc_ops;
 EXPORT_SYMBOL(nlmsvc_ops);
@@ -48,6 +48,7 @@ EXPORT_SYMBOL(nlmsvc_ops);
 static DEFINE_MUTEX(nlmsvc_mutex);
 static unsigned int		nlmsvc_users;
 static pid_t			nlmsvc_pid;
+static struct svc_serv		*nlmsvc_serv;
 int				nlmsvc_grace_period;
 unsigned long			nlmsvc_timeout;
 
@@ -61,9 +62,7 @@ static DECLARE_WAIT_QUEUE_HEAD(lockd_exit);
 static unsigned long		nlm_grace_period;
 static unsigned long		nlm_timeout = LOCKD_DFLT_TIMEO;
 static int			nlm_udpport, nlm_tcpport;
-int				nlm_max_hosts = 256;
-int				nsm_use_hostnames = 1;
-static int			nsm_use_kstatd = 1;
+int				nsm_use_hostnames = 0;
 
 /*
  * Constants needed for the sysctl interface.
@@ -101,7 +100,6 @@ static inline void clear_grace_period(void)
 static void
 lockd(struct svc_rqst *rqstp)
 {
-	struct svc_serv	*serv = rqstp->rq_server;
 	int		err = 0;
 	unsigned long grace_period_expire;
 
@@ -117,21 +115,10 @@ lockd(struct svc_rqst *rqstp)
 	 * Let our maker know we're running.
 	 */
 	nlmsvc_pid = current->pid;
+	nlmsvc_serv = rqstp->rq_server;
 	complete(&lockd_start_done);
 
 	daemonize("lockd");
-
-	/* See if we should use the kernel statd. If not,
-	 * or if setting up the kernel statd fails, try
-	 * falling back to user land upcalls.
-	 */
-	if (nsm_use_kstatd && nsm_kernel_statd_init() < 0)
-		nsm_use_kstatd = 0;
-
-	if (nsm_use_kstatd == 0) {
-		/* Initialize the statd upcalls to rpc.statd */
-		nsm_statd_upcalls_init();
-	}
 
 	/* Process request with signals blocked, but allow SIGKILL.  */
 	allow_signal(SIGKILL);
@@ -178,7 +165,7 @@ lockd(struct svc_rqst *rqstp)
 		 * Find a socket with data available and call its
 		 * recvfrom routine.
 		 */
-		err = svc_recv(serv, rqstp, timeout);
+		err = svc_recv(rqstp, timeout);
 		if (err == -EAGAIN || err == -EINTR)
 			continue;
 		if (err < 0) {
@@ -191,7 +178,7 @@ lockd(struct svc_rqst *rqstp)
 		dprintk("lockd: request from %08x\n",
 			(unsigned)ntohl(rqstp->rq_addr.sin_addr.s_addr));
 
-		svc_process(serv, rqstp);
+		svc_process(rqstp);
 
 	}
 
@@ -206,6 +193,7 @@ lockd(struct svc_rqst *rqstp)
 			nlmsvc_invalidate_all();
 		nlm_shutdown_hosts();
 		nlmsvc_pid = 0;
+		nlmsvc_serv = NULL;
 	} else
 		printk(KERN_DEBUG
 			"lockd: new process, skipping host shutdown\n");
@@ -222,59 +210,77 @@ lockd(struct svc_rqst *rqstp)
 	module_put_and_exit(0);
 }
 
+
+static int find_socket(struct svc_serv *serv, int proto)
+{
+	struct svc_sock *svsk;
+	int found = 0;
+	list_for_each_entry(svsk, &serv->sv_permsocks, sk_list)
+		if (svsk->sk_sk->sk_protocol == proto) {
+			found = 1;
+			break;
+		}
+	return found;
+}
+
+static int make_socks(struct svc_serv *serv, int proto)
+{
+	/* Make any sockets that are needed but not present.
+	 * If nlm_udpport or nlm_tcpport were set as module
+	 * options, make those sockets unconditionally
+	 */
+	static int		warned;
+	int err = 0;
+	if (proto == IPPROTO_UDP || nlm_udpport)
+		if (!find_socket(serv, IPPROTO_UDP))
+			err = svc_makesock(serv, IPPROTO_UDP, nlm_udpport);
+	if (err == 0 && (proto == IPPROTO_TCP || nlm_tcpport))
+		if (!find_socket(serv, IPPROTO_TCP))
+			err= svc_makesock(serv, IPPROTO_TCP, nlm_tcpport);
+	if (!err)
+		warned = 0;
+	else if (warned++ == 0)
+		printk(KERN_WARNING
+		       "lockd_up: makesock failed, error=%d\n", err);
+	return err;
+}
+
 /*
  * Bring up the lockd process if it's not already up.
  */
 int
-lockd_up(void)
+lockd_up(int proto) /* Maybe add a 'family' option when IPv6 is supported ?? */
 {
-	static int		warned;
-	struct svc_program *	prog;
 	struct svc_serv *	serv;
 	int			error = 0;
 
 	mutex_lock(&nlmsvc_mutex);
 	/*
-	 * Unconditionally increment the user count ... this is
-	 * the number of clients who _want_ a lockd process.
-	 */
-	nlmsvc_users++; 
-	/*
 	 * Check whether we're already up and running.
 	 */
-	if (nlmsvc_pid)
+	if (nlmsvc_pid) {
+		if (proto)
+			error = make_socks(nlmsvc_serv, proto);
 		goto out;
+	}
 
 	/*
 	 * Sanity check: if there's no pid,
 	 * we should be the first user ...
 	 */
-	if (nlmsvc_users > 1)
+	if (nlmsvc_users)
 		printk(KERN_WARNING
 			"lockd_up: no pid, %d users??\n", nlmsvc_users);
 
-	/* Register NLM program and possibly NSM (if using kstatd) */
 	error = -ENOMEM;
-	prog = &nlmsvc_program;
-	if (nsm_use_kstatd)
-		prog = &nsmsvc_program;
-	serv = svc_create(prog, LOCKD_BUFSIZE);
+	serv = svc_create(&nlmsvc_program, LOCKD_BUFSIZE, NULL);
 	if (!serv) {
 		printk(KERN_WARNING "lockd_up: create service failed\n");
 		goto out;
 	}
 
-	if ((error = svc_makesock(serv, IPPROTO_UDP, nlm_udpport)) < 0 
-#ifdef CONFIG_NFSD_TCP
-	 || (error = svc_makesock(serv, IPPROTO_TCP, nlm_tcpport)) < 0
-#endif
-		) {
-		if (warned++ == 0) 
-			printk(KERN_WARNING
-				"lockd_up: makesock failed, error=%d\n", error);
+	if ((error = make_socks(serv, proto)) < 0)
 		goto destroy_and_out;
-	} 
-	warned = 0;
 
 	/*
 	 * Create the kernel thread and wait for it to start.
@@ -294,6 +300,8 @@ lockd_up(void)
 destroy_and_out:
 	svc_destroy(serv);
 out:
+	if (!error)
+		nlmsvc_users++;
 	mutex_unlock(&nlmsvc_mutex);
 	return error;
 }
@@ -345,9 +353,6 @@ EXPORT_SYMBOL(lockd_down);
  * Sysctl parameters (same as module parameters, different interface).
  */
 
-/* Something that isn't CTL_ANY, CTL_NONE or a value that may clash. */
-#define CTL_UNNUMBERED		-2
-
 static ctl_table nlm_sysctls[] = {
 	{
 		.ctl_name	= CTL_UNNUMBERED,
@@ -391,14 +396,6 @@ static ctl_table nlm_sysctls[] = {
 	},
 	{
 		.ctl_name	= CTL_UNNUMBERED,
-		.procname	= "nlm_max_hosts",
-		.data		= &nlm_max_hosts,
-		.maxlen		= sizeof(int),
-		.mode		= 0644,
-		.proc_handler	= &proc_dointvec,
-	},
-	{
-		.ctl_name	= CTL_UNNUMBERED,
 		.procname	= "nsm_use_hostnames",
 		.data		= &nsm_use_hostnames,
 		.maxlen		= sizeof(int),
@@ -413,16 +410,26 @@ static ctl_table nlm_sysctls[] = {
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec,
 	},
+	{ .ctl_name = 0 }
+};
+
+static ctl_table nlm_sysctl_dir[] = {
 	{
 		.ctl_name	= CTL_UNNUMBERED,
-		.procname	= "nsm_use_kstatd",
-		.data		= &nsm_use_kstatd,
-		.maxlen		= sizeof(int),
-		.mode		= 0444,
-		.proc_handler	= &proc_dointvec,
+		.procname	= "nfs",
+		.mode		= 0555,
+		.child		= nlm_sysctls,
 	},
+	{ .ctl_name = 0 }
+};
 
-
+static ctl_table nlm_sysctl_root[] = {
+	{
+		.ctl_name	= CTL_FS,
+		.procname	= "fs",
+		.mode		= 0555,
+		.child		= nlm_sysctl_dir,
+	},
 	{ .ctl_name = 0 }
 };
 
@@ -491,7 +498,7 @@ module_param_call(nlm_udpport, param_set_port, param_get_int,
 		  &nlm_udpport, 0644);
 module_param_call(nlm_tcpport, param_set_port, param_get_int,
 		  &nlm_tcpport, 0644);
-module_param(nsm_use_kstatd, int, 0444);
+module_param(nsm_use_hostnames, bool, 0644);
 
 /*
  * Initialising and terminating the module.
@@ -499,21 +506,15 @@ module_param(nsm_use_kstatd, int, 0444);
 
 static int __init init_nlm(void)
 {
-	struct ctl_path ctl_path[] = { { CTL_FS, "fs", 0555 }, { -2, "nfs", 0555 }, { 0 } };
-
-	/* Default NSM to making upcalls to statd. */
-	nsm_statd_upcalls_init();
-
-	nlm_sysctl_table = register_sysctl_table_path(nlm_sysctls, ctl_path);
-	return 0;
+	nlm_sysctl_table = register_sysctl_table(nlm_sysctl_root, 0);
+	return nlm_sysctl_table ? 0 : -ENOMEM;
 }
 
 static void __exit exit_nlm(void)
 {
 	/* FIXME: delete all NLM clients */
 	nlm_shutdown_hosts();
-	if (nlm_sysctl_table)
-		unregister_sysctl_table(nlm_sysctl_table);
+	unregister_sysctl_table(nlm_sysctl_table);
 }
 
 module_init(init_nlm);
@@ -561,31 +562,4 @@ static struct svc_program	nlmsvc_program = {
 	.pg_class		= "nfsd",		/* share authentication with nfsd */
 	.pg_stats		= &nlmsvc_stats,	/* stats table */
 	.pg_authenticate = &lockd_authenticate	/* export authentication */
-};
-
-/*
- * Define NSM program and procedures
- */
-static struct svc_version	nsmsvc_version1 = {
-		.vs_vers	= 1,
-		.vs_nproc	= 7,
-		.vs_proc	= nsmsvc_procedures,
-		.vs_xdrsize	= SMSVC_XDRSIZE,
-};
-static struct svc_version *	nsmsvc_version[] = {
-	[1] = &nsmsvc_version1,
-};
-
-static struct svc_stat		nsmsvc_stats;
-
-#define SM_NRVERS	(sizeof(nsmsvc_version)/sizeof(nsmsvc_version[0]))
-struct svc_program	nsmsvc_program = {
-	.pg_next		= &nlmsvc_program,
-	.pg_prog		= SM_PROGRAM,		/* program number */
-	.pg_nvers		= SM_NRVERS,		/* number of entries in nlmsvc_version */
-	.pg_vers		= nsmsvc_version,	/* version table */
-	.pg_name		= "statd",		/* service name */
-	.pg_class		= "nfsd",		/* share authentication with nfsd */
-	.pg_stats		= &nsmsvc_stats,	/* stats table */
-	.pg_authenticate	= &nsmsvc_authenticate	/* no authentication :-( */
 };

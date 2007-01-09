@@ -20,7 +20,7 @@ void __spin_lock_init(spinlock_t *lock, const char *name,
 	 * Make sure we are not reinitializing a held lock:
 	 */
 	debug_check_no_locks_freed((void *)lock, sizeof(*lock));
-	lockdep_init_map(&lock->dep_map, name, key);
+	lockdep_init_map(&lock->dep_map, name, key, 0);
 #endif
 	lock->raw_lock = (raw_spinlock_t)__RAW_SPIN_LOCK_UNLOCKED;
 	lock->magic = SPINLOCK_MAGIC;
@@ -38,7 +38,7 @@ void __rwlock_init(rwlock_t *lock, const char *name,
 	 * Make sure we are not reinitializing a held lock:
 	 */
 	debug_check_no_locks_freed((void *)lock, sizeof(*lock));
-	lockdep_init_map(&lock->dep_map, name, key);
+	lockdep_init_map(&lock->dep_map, name, key, 0);
 #endif
 	lock->raw_lock = (raw_rwlock_t) __RAW_RW_LOCK_UNLOCKED;
 	lock->magic = RWLOCK_MAGIC;
@@ -99,11 +99,12 @@ static inline void debug_spin_unlock(spinlock_t *lock)
 
 static void __spin_lock_debug(spinlock_t *lock)
 {
-	int print_once = 1;
 	u64 i;
+	u64 loops = loops_per_jiffy * HZ;
+	int print_once = 1;
 
 	for (;;) {
-		for (i = 0; i < loops_per_jiffy * HZ; i++) {
+		for (i = 0; i < loops; i++) {
 			if (__raw_spin_trylock(&lock->raw_lock))
 				return;
 			__delay(1);
@@ -165,11 +166,12 @@ static void rwlock_bug(rwlock_t *lock, const char *msg)
 #if 0		/* __write_lock_debug() can lock up - maybe this can too? */
 static void __read_lock_debug(rwlock_t *lock)
 {
-	int print_once = 1;
 	u64 i;
+	u64 loops = loops_per_jiffy * HZ;
+	int print_once = 1;
 
 	for (;;) {
-		for (i = 0; i < loops_per_jiffy * HZ; i++) {
+		for (i = 0; i < loops; i++) {
 			if (__raw_read_trylock(&lock->raw_lock))
 				return;
 			__delay(1);
@@ -239,11 +241,12 @@ static inline void debug_write_unlock(rwlock_t *lock)
 #if 0		/* This can cause lockups */
 static void __write_lock_debug(rwlock_t *lock)
 {
-	int print_once = 1;
 	u64 i;
+	u64 loops = loops_per_jiffy * HZ;
+	int print_once = 1;
 
 	for (;;) {
-		for (i = 0; i < loops_per_jiffy * HZ; i++) {
+		for (i = 0; i < loops; i++) {
 			if (__raw_write_trylock(&lock->raw_lock))
 				return;
 			__delay(1);

@@ -22,7 +22,6 @@
 
 #include <linux/kernel.h>
 #include <linux/version.h>
-#include <linux/videodev.h>
 #include "pvrusb2-context.h"
 #include "pvrusb2-hdw.h"
 #include "pvrusb2.h"
@@ -30,22 +29,16 @@
 #include "pvrusb2-v4l2.h"
 #include "pvrusb2-ioread.h"
 #include <linux/videodev2.h>
+#include <media/v4l2-dev.h>
 #include <media/v4l2-common.h>
-
-/* Mike Isely <isely@pobox.com> 23-Sep-2006 - This function is prototyped
- * only for V4L1 but is implemented regardless of the V4L1 compatibility
- * option state.  V4L2 has no replacement for this and we need it.  For now
- * copy the prototype here so we can avoid the compiler warning. */
-extern struct video_device* video_devdata(struct file*);
 
 struct pvr2_v4l2_dev;
 struct pvr2_v4l2_fh;
 struct pvr2_v4l2;
 
-
 struct pvr2_v4l2_dev {
+	struct video_device devbase; /* MUST be first! */
 	struct pvr2_v4l2 *v4lp;
-	struct video_device *vdev;
 	struct pvr2_context_stream *stream;
 	enum pvr2_config config;
 };
@@ -71,7 +64,7 @@ struct pvr2_v4l2 {
 	struct v4l2_prio_state prio;
 
 	/* streams */
-	struct pvr2_v4l2_dev video_dev;
+	struct pvr2_v4l2_dev *vdev;
 };
 
 static int video_nr[PVR_NUM] = {[0 ... PVR_NUM-1] = -1};
@@ -668,6 +661,20 @@ static int pvr2_v4l2_do_ioctl(struct inode *inode, struct file *file,
 		ret = 0;
 		break;
 	}
+#ifdef CONFIG_VIDEO_ADV_DEBUG
+	case VIDIOC_INT_G_REGISTER:
+	case VIDIOC_INT_S_REGISTER:
+	{
+		u32 val;
+		struct v4l2_register *req = (struct v4l2_register *)arg;
+		if (cmd == VIDIOC_INT_S_REGISTER) val = req->val;
+		ret = pvr2_hdw_register_access(
+			hdw,req->i2c_id,req->reg,
+			cmd == VIDIOC_INT_S_REGISTER,&val);
+		if (cmd == VIDIOC_INT_G_REGISTER) req->val = val;
+		break;
+	}
+#endif
 
 	default :
 		ret = v4l_compat_translate_ioctl(inode,file,cmd,
@@ -701,19 +708,34 @@ static int pvr2_v4l2_do_ioctl(struct inode *inode, struct file *file,
 static void pvr2_v4l2_dev_destroy(struct pvr2_v4l2_dev *dip)
 {
 	printk(KERN_INFO "pvrusb2: unregistering device video%d [%s]\n",
-	       dip->vdev->minor,pvr2_config_get_name(dip->config));
-	video_unregister_device(dip->vdev);
+	       dip->devbase.minor,pvr2_config_get_name(dip->config));
+
+	/* Paranoia */
+	dip->v4lp = NULL;
+	dip->stream = NULL;
+
+	/* Actual deallocation happens later when all internal references
+	   are gone. */
+	video_unregister_device(&dip->devbase);
 }
 
 
 static void pvr2_v4l2_destroy_no_lock(struct pvr2_v4l2 *vp)
 {
 	pvr2_hdw_v4l_store_minor_number(vp->channel.mc_head->hdw,-1);
-	pvr2_v4l2_dev_destroy(&vp->video_dev);
+	pvr2_v4l2_dev_destroy(vp->vdev);
 
 	pvr2_trace(PVR2_TRACE_STRUCT,"Destroying pvr2_v4l2 id=%p",vp);
 	pvr2_channel_done(&vp->channel);
 	kfree(vp);
+}
+
+
+static void pvr2_video_device_release(struct video_device *vdev)
+{
+	struct pvr2_v4l2_dev *dev;
+	dev = container_of(vdev,struct pvr2_v4l2_dev,devbase);
+	kfree(dev);
 }
 
 
@@ -788,17 +810,12 @@ static int pvr2_v4l2_release(struct inode *inode, struct file *file)
 
 static int pvr2_v4l2_open(struct inode *inode, struct file *file)
 {
-	struct pvr2_v4l2_dev *dip = NULL; /* Our own context pointer */
+	struct pvr2_v4l2_dev *dip; /* Our own context pointer */
 	struct pvr2_v4l2_fh *fhp;
 	struct pvr2_v4l2 *vp;
 	struct pvr2_hdw *hdw;
 
-	{
-		struct video_device *vdev = video_devdata(file);
-		dip = (struct pvr2_v4l2_dev *)video_get_drvdata(vdev);
-	}
-
-	if (!dip) return -ENODEV; /* Should be impossible but I'm paranoid */
+	dip = container_of(video_devdata(file),struct pvr2_v4l2_dev,devbase);
 
 	vp = dip->v4lp;
 	hdw = vp->channel.hdw;
@@ -1028,32 +1045,24 @@ static void pvr2_v4l2_dev_init(struct pvr2_v4l2_dev *dip,
 		return;
 	}
 
-	dip->vdev = video_device_alloc();
-	if (!dip->vdev) {
-		err("Alloc of pvrusb2 v4l video device failed");
-		return;
-	}
-
-	memcpy(dip->vdev,&vdev_template,sizeof(vdev_template));
-	dip->vdev->release = video_device_release;
-	video_set_drvdata(dip->vdev,dip);
+	memcpy(&dip->devbase,&vdev_template,sizeof(vdev_template));
+	dip->devbase.release = pvr2_video_device_release;
 
 	mindevnum = -1;
 	unit_number = pvr2_hdw_get_unit_number(vp->channel.mc_head->hdw);
 	if ((unit_number >= 0) && (unit_number < PVR_NUM)) {
 		mindevnum = video_nr[unit_number];
 	}
-	if ((video_register_device(dip->vdev, v4l_type, mindevnum) < 0) &&
-	    (video_register_device(dip->vdev, v4l_type, -1) < 0)) {
+	if ((video_register_device(&dip->devbase, v4l_type, mindevnum) < 0) &&
+	    (video_register_device(&dip->devbase, v4l_type, -1) < 0)) {
 		err("Failed to register pvrusb2 v4l video device");
 	} else {
 		printk(KERN_INFO "pvrusb2: registered device video%d [%s]\n",
-		       dip->vdev->minor,pvr2_config_get_name(dip->config));
+		       dip->devbase.minor,pvr2_config_get_name(dip->config));
 	}
 
-
 	pvr2_hdw_v4l_store_minor_number(vp->channel.mc_head->hdw,
-					dip->vdev->minor);
+					dip->devbase.minor);
 }
 
 
@@ -1064,14 +1073,19 @@ struct pvr2_v4l2 *pvr2_v4l2_create(struct pvr2_context *mnp)
 	vp = kmalloc(sizeof(*vp),GFP_KERNEL);
 	if (!vp) return vp;
 	memset(vp,0,sizeof(*vp));
+	vp->vdev = kmalloc(sizeof(*vp->vdev),GFP_KERNEL);
+	if (!vp->vdev) {
+		kfree(vp);
+		return NULL;
+	}
+	memset(vp->vdev,0,sizeof(*vp->vdev));
 	pvr2_channel_init(&vp->channel,mnp);
 	pvr2_trace(PVR2_TRACE_STRUCT,"Creating pvr2_v4l2 id=%p",vp);
 
 	vp->channel.check_func = pvr2_v4l2_internal_check;
 
 	/* register streams */
-	pvr2_v4l2_dev_init(&vp->video_dev,vp,pvr2_config_mpeg);
-
+	pvr2_v4l2_dev_init(vp->vdev,vp,pvr2_config_mpeg);
 
 	return vp;
 }

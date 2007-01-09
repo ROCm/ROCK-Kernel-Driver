@@ -392,7 +392,7 @@ int irlmp_connect_request(struct lsap_cb *self, __u8 dlsap_sel,
 
 	/* Any userdata? */
 	if (tx_skb == NULL) {
-		tx_skb = alloc_skb(64, GFP_ATOMIC);
+		tx_skb = alloc_skb(LMP_MAX_HEADER, GFP_ATOMIC);
 		if (!tx_skb)
 			return -ENOMEM;
 
@@ -1678,7 +1678,8 @@ static int irlmp_slsap_inuse(__u8 slsap_sel)
 	 *  every IrLAP connection and check every LSAP associated with each
 	 *  the connection.
 	 */
-	spin_lock_irqsave(&irlmp->links->hb_spinlock, flags);
+	spin_lock_irqsave_nested(&irlmp->links->hb_spinlock, flags,
+			SINGLE_DEPTH_NESTING);
 	lap = (struct lap_cb *) hashbin_get_first(irlmp->links);
 	while (lap != NULL) {
 		IRDA_ASSERT(lap->magic == LMP_LAP_MAGIC, goto errlap;);

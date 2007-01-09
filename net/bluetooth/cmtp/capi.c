@@ -196,9 +196,6 @@ static void cmtp_recv_interopmsg(struct cmtp_session *session, struct sk_buff *s
 
 	switch (CAPIMSG_SUBCOMMAND(skb->data)) {
 	case CAPI_CONF:
-		if (skb->len < CAPI_MSG_BASELEN + 10)
-			break;
-
 		func = CAPIMSG_U16(skb->data, CAPI_MSG_BASELEN + 5);
 		info = CAPIMSG_U16(skb->data, CAPI_MSG_BASELEN + 8);
 
@@ -229,9 +226,6 @@ static void cmtp_recv_interopmsg(struct cmtp_session *session, struct sk_buff *s
 			break;
 
 		case CAPI_FUNCTION_GET_PROFILE:
-			if (skb->len < CAPI_MSG_BASELEN + 11 + sizeof(capi_profile))
-				break;
-
 			controller = CAPIMSG_U16(skb->data, CAPI_MSG_BASELEN + 11);
 			msgnum = CAPIMSG_MSGID(skb->data);
 
@@ -252,26 +246,17 @@ static void cmtp_recv_interopmsg(struct cmtp_session *session, struct sk_buff *s
 			break;
 
 		case CAPI_FUNCTION_GET_MANUFACTURER:
-			if (skb->len < CAPI_MSG_BASELEN + 15)
-				break;
-
 			controller = CAPIMSG_U32(skb->data, CAPI_MSG_BASELEN + 10);
 
 			if (!info && ctrl) {
-				int len = min_t(uint, CAPI_MANUFACTURER_LEN,
-						skb->data[CAPI_MSG_BASELEN + 14]);
-
-				memset(ctrl->manu, 0, CAPI_MANUFACTURER_LEN);
 				strncpy(ctrl->manu,
-					skb->data + CAPI_MSG_BASELEN + 15, len);
+					skb->data + CAPI_MSG_BASELEN + 15,
+					skb->data[CAPI_MSG_BASELEN + 14]);
 			}
 
 			break;
 
 		case CAPI_FUNCTION_GET_VERSION:
-			if (skb->len < CAPI_MSG_BASELEN + 32)
-				break;
-
 			controller = CAPIMSG_U32(skb->data, CAPI_MSG_BASELEN + 12);
 
 			if (!info && ctrl) {
@@ -284,18 +269,13 @@ static void cmtp_recv_interopmsg(struct cmtp_session *session, struct sk_buff *s
 			break;
 
 		case CAPI_FUNCTION_GET_SERIAL_NUMBER:
-			if (skb->len < CAPI_MSG_BASELEN + 17)
-				break;
-
 			controller = CAPIMSG_U32(skb->data, CAPI_MSG_BASELEN + 12);
 
 			if (!info && ctrl) {
-				int len = min_t(uint, CAPI_SERIAL_LEN,
-						skb->data[CAPI_MSG_BASELEN + 16]);
-
 				memset(ctrl->serial, 0, CAPI_SERIAL_LEN);
 				strncpy(ctrl->serial,
-					skb->data + CAPI_MSG_BASELEN + 17, len);
+					skb->data + CAPI_MSG_BASELEN + 17,
+					skb->data[CAPI_MSG_BASELEN + 16]);
 			}
 
 			break;
@@ -304,18 +284,14 @@ static void cmtp_recv_interopmsg(struct cmtp_session *session, struct sk_buff *s
 		break;
 
 	case CAPI_IND:
-		if (skb->len < CAPI_MSG_BASELEN + 6)
-			break;
-
 		func = CAPIMSG_U16(skb->data, CAPI_MSG_BASELEN + 3);
 
 		if (func == CAPI_FUNCTION_LOOPBACK) {
-			int len = min_t(uint, skb->len - CAPI_MSG_BASELEN - 6,
-						skb->data[CAPI_MSG_BASELEN + 5]);
 			appl = CAPIMSG_APPID(skb->data);
 			msgnum = CAPIMSG_MSGID(skb->data);
 			cmtp_send_interopmsg(session, CAPI_RESP, appl, msgnum, func,
-						skb->data + CAPI_MSG_BASELEN + 6, len);
+						skb->data + CAPI_MSG_BASELEN + 6,
+						skb->data[CAPI_MSG_BASELEN + 5]);
 		}
 
 		break;
@@ -332,9 +308,6 @@ void cmtp_recv_capimsg(struct cmtp_session *session, struct sk_buff *skb)
 	__u32 contr;
 
 	BT_DBG("session %p skb %p len %d", session, skb, skb->len);
-
-	if (skb->len < CAPI_MSG_BASELEN)
-		return;
 
 	if (CAPIMSG_COMMAND(skb->data) == CAPI_INTEROPERABILITY) {
 		cmtp_recv_interopmsg(session, skb);

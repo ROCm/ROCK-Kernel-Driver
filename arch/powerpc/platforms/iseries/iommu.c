@@ -43,9 +43,6 @@ static void tce_build_iSeries(struct iommu_table *tbl, long index, long npages,
 	u64 rc;
 	u64 tce, rpn;
 
-	index <<= TCE_PAGE_FACTOR;
-	npages <<= TCE_PAGE_FACTOR;
-
 	while (npages--) {
 		rpn = virt_to_abs(uaddr) >> TCE_SHIFT;
 		tce = (rpn & TCE_RPN_MASK) << TCE_RPN_SHIFT;
@@ -75,9 +72,6 @@ static void tce_free_iSeries(struct iommu_table *tbl, long index, long npages)
 {
 	u64 rc;
 
-	npages <<= TCE_PAGE_FACTOR;
-	index <<= TCE_PAGE_FACTOR;
-
 	while (npages--) {
 		rc = HvCallXm_setTce((u64)tbl->it_index, (u64)index, 0);
 		if (rc)
@@ -86,6 +80,23 @@ static void tce_free_iSeries(struct iommu_table *tbl, long index, long npages)
 		index++;
 	}
 }
+
+/*
+ * Structure passed to HvCallXm_getTceTableParms
+ */
+struct iommu_table_cb {
+	unsigned long	itc_busno;	/* Bus number for this tce table */
+	unsigned long	itc_start;	/* Will be NULL for secondary */
+	unsigned long	itc_totalsize;	/* Size (in pages) of whole table */
+	unsigned long	itc_offset;	/* Index into real tce table of the
+					   start of our section */
+	unsigned long	itc_size;	/* Size (in pages) of our section */
+	unsigned long	itc_index;	/* Index of this tce table */
+	unsigned short	itc_maxtables;	/* Max num of tables for partition */
+	unsigned char	itc_virtbus;	/* Flag to indicate virtual bus */
+	unsigned char	itc_slotno;	/* IOA Tce Slot Index */
+	unsigned char	itc_rsvd[4];
+};
 
 /*
  * Call Hv with the architected data structure to get TCE table info.
@@ -119,10 +130,9 @@ void iommu_table_getparms_iSeries(unsigned long busno,
 		panic("PCI_DMA: parms->size is zero, parms is 0x%p", parms);
 
 	/* itc_size is in pages worth of table, it_size is in # of entries */
-	tbl->it_size = ((parms->itc_size * TCE_PAGE_SIZE) /
-			TCE_ENTRY_SIZE) >> TCE_PAGE_FACTOR;
+	tbl->it_size = (parms->itc_size * TCE_PAGE_SIZE) / TCE_ENTRY_SIZE;
 	tbl->it_busno = parms->itc_busno;
-	tbl->it_offset = parms->itc_offset >> TCE_PAGE_FACTOR;
+	tbl->it_offset = parms->itc_offset;
 	tbl->it_index = parms->itc_index;
 	tbl->it_blocksize = 1;
 	tbl->it_type = virtbus ? TCE_VB : TCE_PCI;
@@ -162,7 +172,7 @@ void iommu_devnode_init_iSeries(struct device_node *dn)
 {
 	struct iommu_table *tbl;
 	struct pci_dn *pdn = PCI_DN(dn);
-	u32 *lsn = (u32 *)get_property(dn, "linux,logical-slot-number", NULL);
+	const u32 *lsn = get_property(dn, "linux,logical-slot-number", NULL);
 
 	BUG_ON(lsn == NULL);
 

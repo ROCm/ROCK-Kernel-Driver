@@ -4,6 +4,7 @@
 
 #include <linux/mount.h>
 #include <linux/sched.h>
+#include <linux/nsproxy.h>
 
 /* exported for AppArmor (SubDomain) */
 extern struct rw_semaphore namespace_sem;
@@ -29,11 +30,8 @@ static inline void put_namespace(struct namespace *namespace)
 
 static inline void exit_namespace(struct task_struct *p)
 {
-	struct namespace *namespace = p->namespace;
+	struct namespace *namespace = p->nsproxy->namespace;
 	if (namespace) {
-		task_lock(p);
-		p->namespace = NULL;
-		task_unlock(p);
 		put_namespace(namespace);
 	}
 }

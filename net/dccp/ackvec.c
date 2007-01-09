@@ -113,7 +113,7 @@ int dccp_insert_option_ackvec(struct sock *sk, struct sk_buff *skb)
 
 	memcpy(to, from, len);
 	/*
-	 *	From draft-ietf-dccp-spec-11.txt:
+	 *	From RFC 4340, A.2:
 	 *
 	 *	For each acknowledgement it sends, the HC-Receiver will add an
 	 *	acknowledgement record.  ack_seqno will equal the HC-Receiver
@@ -142,14 +142,13 @@ struct dccp_ackvec *dccp_ackvec_alloc(const gfp_t priority)
 	struct dccp_ackvec *av = kmem_cache_alloc(dccp_ackvec_slab, priority);
 
 	if (av != NULL) {
-		av->dccpav_buf_head	=
-			av->dccpav_buf_tail = DCCP_MAX_ACKVEC_LEN - 1;
+		av->dccpav_buf_head	= DCCP_MAX_ACKVEC_LEN - 1;
 		av->dccpav_buf_ackno	= DCCP_MAX_SEQNO + 1;
 		av->dccpav_buf_nonce = av->dccpav_buf_nonce = 0;
 		av->dccpav_ack_ptr	= 0;
 		av->dccpav_time.tv_sec	= 0;
 		av->dccpav_time.tv_usec	= 0;
-		av->dccpav_sent_len	= av->dccpav_vec_len = 0;
+		av->dccpav_vec_len	= 0;
 		INIT_LIST_HEAD(&av->dccpav_records);
 	}
 
@@ -225,7 +224,7 @@ static inline int dccp_ackvec_set_buf_head_state(struct dccp_ackvec *av,
 }
 
 /*
- * Implements the draft-ietf-dccp-spec-11.txt Appendix A
+ * Implements the RFC 4340, Appendix A
  */
 int dccp_ackvec_add(struct dccp_ackvec *av, const struct sock *sk,
 		    const u64 ackno, const u8 state)
@@ -238,7 +237,7 @@ int dccp_ackvec_add(struct dccp_ackvec *av, const struct sock *sk,
 	 * We may well decide to do buffer compression, etc, but for now lets
 	 * just drop.
 	 *
-	 * From Appendix A:
+	 * From Appendix A.1.1 (`New Packets'):
 	 *
 	 *	Of course, the circular buffer may overflow, either when the
 	 *	HC-Sender is sending data at a very high rate, when the
@@ -275,9 +274,9 @@ int dccp_ackvec_add(struct dccp_ackvec *av, const struct sock *sk,
 		/*
 		 * A.1.2.  Old Packets
 		 *
-		 *	When a packet with Sequence Number S arrives, and
-		 *	S <= buf_ackno, the HC-Receiver will scan the table
-		 *	for the byte corresponding to S. (Indexing structures
+		 *	When a packet with Sequence Number S <= buf_ackno
+		 *	arrives, the HC-Receiver will scan the table for
+		 *	the byte corresponding to S. (Indexing structures
 		 *	could reduce the complexity of this scan.)
 		 */
 		u64 delta = dccp_delta_seqno(ackno, av->dccpav_buf_ackno);
@@ -353,11 +352,13 @@ static void dccp_ackvec_throw_record(struct dccp_ackvec *av,
 {
 	struct dccp_ackvec_record *next;
 
-	av->dccpav_buf_tail = avr->dccpavr_ack_ptr - 1;
-	if (av->dccpav_buf_tail == 0)
-		av->dccpav_buf_tail = DCCP_MAX_ACKVEC_LEN - 1;
-
-	av->dccpav_vec_len -= avr->dccpavr_sent_len;
+	/* sort out vector length */
+	if (av->dccpav_buf_head <= avr->dccpavr_ack_ptr)
+		av->dccpav_vec_len = avr->dccpavr_ack_ptr - av->dccpav_buf_head;
+	else
+		av->dccpav_vec_len = DCCP_MAX_ACKVEC_LEN - 1
+				     - av->dccpav_buf_head
+				     + avr->dccpavr_ack_ptr;
 
 	/* free records */
 	list_for_each_entry_safe_from(avr, next, &av->dccpav_records,
@@ -434,8 +435,7 @@ static void dccp_ackvec_check_rcv_ackvector(struct dccp_ackvec *av,
 		break;
 found:
 		if (between48(avr->dccpavr_ack_seqno, ackno_end_rl, ackno)) {
-			const u8 state = (*vector &
-					  DCCP_ACKVEC_STATE_MASK) >> 6;
+			const u8 state = *vector & DCCP_ACKVEC_STATE_MASK;
 			if (state != DCCP_ACKVEC_STATE_NOT_RECEIVED) {
 #ifdef CONFIG_IP_DCCP_DEBUG
 				struct dccp_sock *dp = dccp_sk(sk);

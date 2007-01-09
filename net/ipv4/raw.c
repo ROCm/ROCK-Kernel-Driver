@@ -38,8 +38,7 @@
  *		as published by the Free Software Foundation; either version
  *		2 of the License, or (at your option) any later version.
  */
- 
-#include <linux/config.h> 
+
 #include <linux/types.h>
 #include <asm/atomic.h>
 #include <asm/byteorder.h>
@@ -330,7 +329,7 @@ error:
 	return err; 
 }
 
-static void raw_probe_proto_opt(struct flowi *fl, struct msghdr *msg)
+static int raw_probe_proto_opt(struct flowi *fl, struct msghdr *msg)
 {
 	struct iovec *iov;
 	u8 __user *type = NULL;
@@ -339,7 +338,7 @@ static void raw_probe_proto_opt(struct flowi *fl, struct msghdr *msg)
 	unsigned int i;
 
 	if (!msg->msg_iov)
-		return;
+		return 0;
 
 	for (i = 0; i < msg->msg_iovlen; i++) {
 		iov = &msg->msg_iov[i];
@@ -361,8 +360,9 @@ static void raw_probe_proto_opt(struct flowi *fl, struct msghdr *msg)
 				code = iov->iov_base;
 
 			if (type && code) {
-				get_user(fl->fl_icmp_type, type);
-			        get_user(fl->fl_icmp_code, code);
+				if (get_user(fl->fl_icmp_type, type) ||
+				    get_user(fl->fl_icmp_code, code))
+					return -EFAULT;
 				probed = 1;
 			}
 			break;
@@ -373,6 +373,7 @@ static void raw_probe_proto_opt(struct flowi *fl, struct msghdr *msg)
 		if (probed)
 			break;
 	}
+	return 0;
 }
 
 static int raw_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
@@ -382,8 +383,8 @@ static int raw_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 	struct ipcm_cookie ipc;
 	struct rtable *rt = NULL;
 	int free = 0;
-	u32 daddr;
-	u32 saddr;
+	__be32 daddr;
+	__be32 saddr;
 	u8  tos;
 	int err;
 
@@ -481,9 +482,13 @@ static int raw_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 				    .proto = inet->hdrincl ? IPPROTO_RAW :
 					    		     sk->sk_protocol,
 				  };
-		if (!inet->hdrincl)
-			raw_probe_proto_opt(&fl, msg);
+		if (!inet->hdrincl) {
+			err = raw_probe_proto_opt(&fl, msg);
+			if (err)
+				goto done;
+		}
 
+		security_sk_classify_flow(sk, &fl);
 		err = ip_route_output_flow(&rt, &fl, sk, !(msg->msg_flags&MSG_DONTWAIT));
 	}
 	if (err)

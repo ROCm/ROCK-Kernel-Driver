@@ -80,6 +80,7 @@
 #include <net/neighbour.h>
 #include <net/dst.h>
 #include <net/flow.h>
+#include <net/fib_rules.h>
 #include <net/dn.h>
 #include <net/dn_dev.h>
 #include <net/dn_nsp.h>
@@ -266,9 +267,14 @@ static void dn_dst_link_failure(struct sk_buff *skb)
 
 static inline int compare_keys(struct flowi *fl1, struct flowi *fl2)
 {
-	return memcmp(&fl1->nl_u.dn_u, &fl2->nl_u.dn_u, sizeof(fl1->nl_u.dn_u)) == 0 &&
-		fl1->oif == fl2->oif &&
-		fl1->iif == fl2->iif;
+	return ((fl1->nl_u.dn_u.daddr ^ fl2->nl_u.dn_u.daddr) |
+		(fl1->nl_u.dn_u.saddr ^ fl2->nl_u.dn_u.saddr) |
+#ifdef CONFIG_DECNET_ROUTE_FWMARK
+		(fl1->nl_u.dn_u.fwmark ^ fl2->nl_u.dn_u.fwmark) |
+#endif
+		(fl1->nl_u.dn_u.scope ^ fl2->nl_u.dn_u.scope) |
+		(fl1->oif ^ fl2->oif) |
+		(fl1->iif ^ fl2->iif)) == 0;
 }
 
 static int dn_insert_route(struct dn_route *rt, unsigned hash, struct dn_route **rp)
@@ -1269,7 +1275,6 @@ static int dn_route_input_slow(struct sk_buff *skb)
 			goto e_inval;
 
 		res.type = RTN_LOCAL;
-		flags |= RTCF_DIRECTSRC;
 	} else {
 		__le16 src_map = fl.fld_src;
 		free_res = 1;
@@ -1284,7 +1289,7 @@ static int dn_route_input_slow(struct sk_buff *skb)
 		dev_hold(out_dev);
 
 		if (res.r)
-			src_map = dn_fib_rules_policy(fl.fld_src, &res, &flags);
+			src_map = fl.fld_src; /* no NAT support for now */
 
 		gateway = DN_FIB_RES_GW(res);
 		if (res.type == RTN_NAT) {
@@ -1340,7 +1345,7 @@ static int dn_route_input_slow(struct sk_buff *skb)
 			goto make_route;
 
 		/* Packet was intra-ethernet, so we know its on-link */
-		if (cb->rt_flags | DN_RT_F_IE) {
+		if (cb->rt_flags & DN_RT_F_IE) {
 			gateway = cb->src;
 			flags |= RTCF_DIRECTSRC;
 			goto make_route;
@@ -1485,6 +1490,7 @@ static int dn_rt_fill_info(struct sk_buff *skb, u32 pid, u32 seq,
 	r->rtm_src_len = 0;
 	r->rtm_tos = 0;
 	r->rtm_table = RT_TABLE_MAIN;
+	RTA_PUT_U32(skb, RTA_TABLE, RT_TABLE_MAIN);
 	r->rtm_type = rt->rt_type;
 	r->rtm_flags = (rt->rt_flags & ~0xFFFF) | RTM_F_CLONED;
 	r->rtm_scope = RT_SCOPE_UNIVERSE;
@@ -1609,9 +1615,7 @@ int dn_cache_getroute(struct sk_buff *in_skb, struct nlmsghdr *nlh, void *arg)
 		goto out_free;
 	}
 
-	err = netlink_unicast(rtnl, skb, NETLINK_CB(in_skb).pid, MSG_DONTWAIT);
-
-	return err;
+	return rtnl_unicast(skb, NETLINK_CB(in_skb).pid);
 
 out_free:
 	kfree_skb(skb);
@@ -1781,14 +1785,9 @@ void __init dn_route_init(void)
 {
 	int i, goal, order;
 
-	dn_dst_ops.kmem_cachep = kmem_cache_create("dn_dst_cache",
-						   sizeof(struct dn_route),
-						   0, SLAB_HWCACHE_ALIGN,
-						   NULL, NULL);
-
-	if (!dn_dst_ops.kmem_cachep)
-		panic("DECnet: Failed to allocate dn_dst_cache\n");
-
+	dn_dst_ops.kmem_cachep =
+		kmem_cache_create("dn_dst_cache", sizeof(struct dn_route), 0,
+				  SLAB_HWCACHE_ALIGN|SLAB_PANIC, NULL, NULL);
 	init_timer(&dn_route_timer);
 	dn_route_timer.function = dn_dst_check_expire;
 	dn_route_timer.expires = jiffies + decnet_dst_gc_interval * HZ;

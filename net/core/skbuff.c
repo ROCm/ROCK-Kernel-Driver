@@ -139,7 +139,6 @@ EXPORT_SYMBOL(skb_truesize_bug);
  *	Buffers may only be allocated from interrupts using a @gfp_mask of
  *	%GFP_ATOMIC.
  */
-#ifndef CONFIG_HAVE_ARCH_ALLOC_SKB
 struct sk_buff *__alloc_skb(unsigned int size, gfp_t gfp_mask,
 			    int fclone)
 {
@@ -157,7 +156,8 @@ struct sk_buff *__alloc_skb(unsigned int size, gfp_t gfp_mask,
 
 	/* Get the DATA. Size must match skb_add_mtu(). */
 	size = SKB_DATA_ALIGN(size);
-	data = ____kmalloc(size + sizeof(struct skb_shared_info), gfp_mask);
+	data = kmalloc_track_caller(size + sizeof(struct skb_shared_info),
+			gfp_mask);
 	if (!data)
 		goto nodata;
 
@@ -194,7 +194,6 @@ nodata:
 	skb = NULL;
 	goto out;
 }
-#endif /* !CONFIG_HAVE_ARCH_ALLOC_SKB */
 
 /**
  *	alloc_skb_from_cache	-	allocate a network buffer
@@ -212,18 +211,14 @@ nodata:
  */
 struct sk_buff *alloc_skb_from_cache(kmem_cache_t *cp,
 				     unsigned int size,
-				     gfp_t gfp_mask,
-				     int fclone)
+				     gfp_t gfp_mask)
 {
-	kmem_cache_t *cache;
-	struct skb_shared_info *shinfo;
 	struct sk_buff *skb;
 	u8 *data;
 
-	cache = fclone ? skbuff_fclone_cache : skbuff_head_cache;
-
 	/* Get the HEAD */
-	skb = kmem_cache_alloc(cache, gfp_mask & ~__GFP_DMA);
+	skb = kmem_cache_alloc(skbuff_head_cache,
+			       gfp_mask & ~__GFP_DMA);
 	if (!skb)
 		goto out;
 
@@ -240,29 +235,17 @@ struct sk_buff *alloc_skb_from_cache(kmem_cache_t *cp,
 	skb->data = data;
 	skb->tail = data;
 	skb->end  = data + size;
-	/* make sure we initialize shinfo sequentially */
-	shinfo = skb_shinfo(skb);
-	atomic_set(&shinfo->dataref, 1);
-	shinfo->nr_frags  = 0;
-	shinfo->gso_size = 0;
-	shinfo->gso_segs = 0;
-	shinfo->gso_type = 0;
-	shinfo->ip6_frag_id = 0;
-	shinfo->frag_list = NULL;
 
-	if (fclone) {
-		struct sk_buff *child = skb + 1;
-		atomic_t *fclone_ref = (atomic_t *) (child + 1);
-
-		skb->fclone = SKB_FCLONE_ORIG;
-		atomic_set(fclone_ref, 1);
-
-		child->fclone = SKB_FCLONE_UNAVAILABLE;
-	}
+	atomic_set(&(skb_shinfo(skb)->dataref), 1);
+	skb_shinfo(skb)->nr_frags  = 0;
+	skb_shinfo(skb)->gso_size = 0;
+	skb_shinfo(skb)->gso_segs = 0;
+	skb_shinfo(skb)->gso_type = 0;
+	skb_shinfo(skb)->frag_list = NULL;
 out:
 	return skb;
 nodata:
-	kmem_cache_free(cache, skb);
+	kmem_cache_free(skbuff_head_cache, skb);
 	skb = NULL;
 	goto out;
 }
@@ -482,10 +465,6 @@ struct sk_buff *skb_clone(struct sk_buff *skb, gfp_t gfp_mask)
 	C(local_df);
 	n->cloned = 1;
 	n->nohdr = 0;
-#ifdef CONFIG_XEN
-	C(proto_data_valid);
-	C(proto_csum_blank);
-#endif
 	C(pkt_type);
 	C(ip_summed);
 	C(priority);
@@ -1420,7 +1399,7 @@ void skb_copy_and_csum_dev(const struct sk_buff *skb, u8 *to)
 	unsigned int csum;
 	long csstart;
 
-	if (skb->ip_summed == CHECKSUM_HW)
+	if (skb->ip_summed == CHECKSUM_PARTIAL)
 		csstart = skb->h.raw - skb->data;
 	else
 		csstart = skb_headlen(skb);
@@ -1434,7 +1413,7 @@ void skb_copy_and_csum_dev(const struct sk_buff *skb, u8 *to)
 		csum = skb_copy_and_csum_bits(skb, csstart, to + csstart,
 					      skb->len - csstart, 0);
 
-	if (skb->ip_summed == CHECKSUM_HW) {
+	if (skb->ip_summed == CHECKSUM_PARTIAL) {
 		long csstuff = csstart + skb->csum;
 
 		*((unsigned short *)(to + csstuff)) = csum_fold(csum);
@@ -1921,10 +1900,10 @@ int skb_append_datato_frags(struct sock *sk, struct sk_buff *skb,
  *	@len: length of data pulled
  *
  *	This function performs an skb_pull on the packet and updates
- *	update the CHECKSUM_HW checksum.  It should be used on receive
- *	path processing instead of skb_pull unless you know that the
- *	checksum difference is zero (e.g., a valid IP header) or you
- *	are setting ip_summed to CHECKSUM_NONE.
+ *	update the CHECKSUM_COMPLETE checksum.  It should be used on
+ *	receive path processing instead of skb_pull unless you know
+ *	that the checksum difference is zero (e.g., a valid IP header)
+ *	or you are setting ip_summed to CHECKSUM_NONE.
  */
 unsigned char *skb_pull_rcsum(struct sk_buff *skb, unsigned int len)
 {
@@ -2016,7 +1995,7 @@ struct sk_buff *skb_segment(struct sk_buff *skb, int features)
 		frag = skb_shinfo(nskb)->frags;
 		k = 0;
 
-		nskb->ip_summed = CHECKSUM_HW;
+		nskb->ip_summed = CHECKSUM_PARTIAL;
 		nskb->csum = skb->csum;
 		memcpy(skb_put(nskb, hsize), skb->data + offset, hsize);
 
@@ -2068,19 +2047,14 @@ void __init skb_init(void)
 	skbuff_head_cache = kmem_cache_create("skbuff_head_cache",
 					      sizeof(struct sk_buff),
 					      0,
-					      SLAB_HWCACHE_ALIGN,
+					      SLAB_HWCACHE_ALIGN|SLAB_PANIC,
 					      NULL, NULL);
-	if (!skbuff_head_cache)
-		panic("cannot create skbuff cache");
-
 	skbuff_fclone_cache = kmem_cache_create("skbuff_fclone_cache",
 						(2*sizeof(struct sk_buff)) +
 						sizeof(atomic_t),
 						0,
-						SLAB_HWCACHE_ALIGN,
+						SLAB_HWCACHE_ALIGN|SLAB_PANIC,
 						NULL, NULL);
-	if (!skbuff_fclone_cache)
-		panic("cannot create skbuff cache");
 }
 
 EXPORT_SYMBOL(___pskb_trim);

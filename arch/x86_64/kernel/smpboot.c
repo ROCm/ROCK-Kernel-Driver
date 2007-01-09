@@ -46,9 +46,10 @@
 #include <linux/bootmem.h>
 #include <linux/thread_info.h>
 #include <linux/module.h>
-
 #include <linux/delay.h>
 #include <linux/mc146818rtc.h>
+#include <linux/smp.h>
+
 #include <asm/mtrr.h>
 #include <asm/pgalloc.h>
 #include <asm/desc.h>
@@ -580,12 +581,16 @@ void __cpuinit start_secondary(void)
 	 * smp_call_function().
 	 */
 	lock_ipi_call_lock();
+	spin_lock(&vector_lock);
 
+	/* Setup the per cpu irq handling data structures */
+	__setup_vector_irq(smp_processor_id());
 	/*
 	 * Allow the master to continue.
 	 */
 	cpu_set(smp_processor_id(), cpu_online_map);
 	per_cpu(cpu_state, smp_processor_id()) = CPU_ONLINE;
+	spin_unlock(&vector_lock);
 	unlock_ipi_call_lock();
 
 	cpu_idle();
@@ -797,7 +802,6 @@ static int __cpuinit do_boot_cpu(int cpu, int apicid)
 		"Could not allocate node local PDA for CPU %d on node %d\n",
 				cpu, node);
 	}
-
 
 	alternatives_smp_switch(1);
 
@@ -1090,7 +1094,6 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 	/*
 	 * Switch from PIC to APIC mode.
 	 */
-	connect_bsp_APIC();
 	setup_local_APIC();
 
 	if (GET_APIC_ID(apic_read(APIC_ID)) != boot_cpu_id) {
@@ -1175,12 +1178,9 @@ int __cpuinit __cpu_up(unsigned int cpu)
 void __init smp_cpus_done(unsigned int max_cpus)
 {
 	smp_cleanup_boot();
-
-#ifdef CONFIG_X86_IO_APIC
 	setup_ioapic_dest();
-#endif
-
 	check_nmi_watchdog();
+	time_init_gtod();
 }
 
 #ifdef CONFIG_HOTPLUG_CPU
@@ -1233,6 +1233,8 @@ int __cpu_disable(void)
 	if (cpu == 0)
 		return -EBUSY;
 
+	if (nmi_watchdog == NMI_LOCAL_APIC)
+		stop_apic_nmi_watchdog(NULL);
 	clear_local_APIC();
 
 	/*
@@ -1247,8 +1249,10 @@ int __cpu_disable(void)
 	local_irq_disable();
 	remove_siblinginfo(cpu);
 
+	spin_lock(&vector_lock);
 	/* It's now safe to remove this processor from the online map */
 	cpu_clear(cpu, cpu_online_map);
+	spin_unlock(&vector_lock);
 	remove_cpu_from_maps();
 	fixup_irqs(cpu_online_map);
 	return 0;
@@ -1272,11 +1276,11 @@ void __cpu_die(unsigned int cpu)
  	printk(KERN_ERR "CPU %u didn't die...\n", cpu);
 }
 
-__init int setup_additional_cpus(char *s)
+static __init int setup_additional_cpus(char *s)
 {
-	return get_option(&s, &additional_cpus);
+	return s && get_option(&s, &additional_cpus) ? 0 : -EINVAL;
 }
-__setup("additional_cpus=", setup_additional_cpus);
+early_param("additional_cpus", setup_additional_cpus);
 
 #else /* ... !CONFIG_HOTPLUG_CPU */
 

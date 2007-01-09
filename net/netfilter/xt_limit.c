@@ -110,7 +110,6 @@ ipt_limit_checkentry(const char *tablename,
 		     const void *inf,
 		     const struct xt_match *match,
 		     void *matchinfo,
-		     unsigned int matchsize,
 		     unsigned int hook_mask)
 {
 	struct xt_rateinfo *r = matchinfo;
@@ -123,16 +122,16 @@ ipt_limit_checkentry(const char *tablename,
 		return 0;
 	}
 
-	/* User avg in seconds * XT_LIMIT_SCALE: convert to jiffies *
-	   128. */
-	r->prev = jiffies;
-	r->credit = user2credits(r->avg * r->burst);	 /* Credits full. */
-	r->credit_cap = user2credits(r->avg * r->burst); /* Credits full. */
-	r->cost = user2credits(r->avg);
-
 	/* For SMP, we only want to use one set of counters. */
 	r->master = r;
-
+	if (r->cost == 0) {
+		/* User avg in seconds * XT_LIMIT_SCALE: convert to jiffies *
+		   128. */
+		r->prev = jiffies;
+		r->credit = user2credits(r->avg * r->burst);	 /* Credits full. */
+		r->credit_cap = user2credits(r->avg * r->burst); /* Credits full. */
+		r->cost = user2credits(r->avg);
+	}
 	return 1;
 }
 
@@ -180,47 +179,38 @@ static int compat_to_user(void __user *dst, void *src)
 }
 #endif /* CONFIG_COMPAT */
 
-static struct xt_match ipt_limit_reg = {
-	.name		= "limit",
-	.match		= ipt_limit_match,
-	.matchsize	= sizeof(struct xt_rateinfo),
-	.checkentry	= ipt_limit_checkentry,
-	.family		= AF_INET,
+static struct xt_match xt_limit_match[] = {
+	{
+		.name		= "limit",
+		.family		= AF_INET,
+		.checkentry	= ipt_limit_checkentry,
+		.match		= ipt_limit_match,
+		.matchsize	= sizeof(struct xt_rateinfo),
 #ifdef CONFIG_COMPAT
 		.compatsize	= sizeof(struct compat_xt_rateinfo),
 		.compat_from_user = compat_from_user,
 		.compat_to_user	= compat_to_user,
 #endif
-	.me		= THIS_MODULE,
-};
-static struct xt_match limit6_reg = {
-	.name		= "limit",
-	.match		= ipt_limit_match,
-	.matchsize	= sizeof(struct xt_rateinfo),
-	.checkentry	= ipt_limit_checkentry,
-	.family		= AF_INET6,
-	.me		= THIS_MODULE,
+		.me		= THIS_MODULE,
+	},
+	{
+		.name		= "limit",
+		.family		= AF_INET6,
+		.checkentry	= ipt_limit_checkentry,
+		.match		= ipt_limit_match,
+		.matchsize	= sizeof(struct xt_rateinfo),
+		.me		= THIS_MODULE,
+	},
 };
 
 static int __init xt_limit_init(void)
 {
-	int ret;
-	
-	ret = xt_register_match(&ipt_limit_reg);
-	if (ret)
-		return ret;
-	
-	ret = xt_register_match(&limit6_reg);
-	if (ret)
-		xt_unregister_match(&ipt_limit_reg);
-
-	return ret;
+	return xt_register_matches(xt_limit_match, ARRAY_SIZE(xt_limit_match));
 }
 
 static void __exit xt_limit_fini(void)
 {
-	xt_unregister_match(&ipt_limit_reg);
-	xt_unregister_match(&limit6_reg);
+	xt_unregister_matches(xt_limit_match, ARRAY_SIZE(xt_limit_match));
 }
 
 module_init(xt_limit_init);

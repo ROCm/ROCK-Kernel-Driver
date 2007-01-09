@@ -503,7 +503,7 @@
 
 /*
  * An mtfsf instruction with the L bit set. On CPUs that support this a
- * full 64bits of FPSCR is restored and on other CPUs it is ignored.
+ * full 64bits of FPSCR is restored and on other CPUs the L bit is ignored.
  *
  * Until binutils gets the new form of mtfsf, hardwire the instruction.
  */
@@ -591,7 +591,9 @@
 #define PV_630		0x0040
 #define PV_630p	0x0041
 #define PV_970MP	0x0044
+#define PV_970GX	0x0045
 #define PV_BE		0x0070
+#define PV_PA6T		0x0090
 
 /*
  * Number of entries in the SLB. If this ever changes we should handle
@@ -617,10 +619,35 @@
 				: "=r" (rval)); rval;})
 #define mtspr(rn, v)	asm volatile("mtspr " __stringify(rn) ",%0" : : "r" (v))
 
+#ifdef __powerpc64__
+#ifdef CONFIG_PPC_CELL
+#define mftb()		({unsigned long rval;				\
+			asm volatile(					\
+				"90:	mftb %0;\n"			\
+				"97:	cmpwi %0,0;\n"			\
+				"	beq- 90b;\n"			\
+				"99:\n"					\
+				".section __ftr_fixup,\"a\"\n"		\
+				".align 3\n"				\
+				"98:\n"					\
+				"	.llong %1\n"			\
+				"	.llong %1\n"			\
+				"	.llong 97b-98b\n"		\
+				"	.llong 99b-98b\n"		\
+				".previous"				\
+			: "=r" (rval) : "i" (CPU_FTR_CELL_TB_BUG)); rval;})
+#else
 #define mftb()		({unsigned long rval;	\
 			asm volatile("mftb %0" : "=r" (rval)); rval;})
+#endif /* !CONFIG_PPC_CELL */
+
+#else /* __powerpc64__ */
+
 #define mftbl()		({unsigned long rval;	\
 			asm volatile("mftbl %0" : "=r" (rval)); rval;})
+#define mftbu()		({unsigned long rval;	\
+			asm volatile("mftbu %0" : "=r" (rval)); rval;})
+#endif /* !__powerpc64__ */
 
 #define mttbl(v)	asm volatile("mttbl %0":: "r"(v))
 #define mttbu(v)	asm volatile("mttbu %0":: "r"(v))

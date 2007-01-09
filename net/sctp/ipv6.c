@@ -78,7 +78,6 @@
 
 #include <asm/uaccess.h>
 
-extern int sctp_inetaddr_event(struct notifier_block *, unsigned long, void *);
 static struct notifier_block sctp_inet6addr_notifier = {
 	.notifier_call = sctp_inetaddr_event,
 };
@@ -216,17 +215,17 @@ static struct dst_entry *sctp_v6_get_dst(struct sctp_association *asoc,
 	}
 
 	dst = ip6_route_output(NULL, &fl);
-	if (dst) {
+	if (!dst->error) {
 		struct rt6_info *rt;
 		rt = (struct rt6_info *)dst;
 		SCTP_DEBUG_PRINTK(
 			"rt6_dst:" NIP6_FMT " rt6_src:" NIP6_FMT "\n",
 			NIP6(rt->rt6i_dst.addr), NIP6(rt->rt6i_src.addr));
-	} else {
-		SCTP_DEBUG_PRINTK("NO ROUTE\n");
+		return dst;
 	}
-
-	return dst;
+	SCTP_DEBUG_PRINTK("NO ROUTE\n");
+	dst_release(dst);
+	return NULL;
 }
 
 /* Returns the number of consecutive initial bits that match in the 2 ipv6
@@ -322,9 +321,9 @@ static void sctp_v6_copy_addrlist(struct list_head *addrlist,
 	struct inet6_ifaddr *ifp;
 	struct sctp_sockaddr_entry *addr;
 
-	read_lock(&addrconf_lock);
+	rcu_read_lock();
 	if ((in6_dev = __in6_dev_get(dev)) == NULL) {
-		read_unlock(&addrconf_lock);
+		rcu_read_unlock();
 		return;
 	}
 
@@ -343,7 +342,7 @@ static void sctp_v6_copy_addrlist(struct list_head *addrlist,
 	}
 
 	read_unlock(&in6_dev->lock);
-	read_unlock(&addrconf_lock);
+	rcu_read_unlock();
 }
 
 /* Initialize a sockaddr_storage from in incoming skb. */

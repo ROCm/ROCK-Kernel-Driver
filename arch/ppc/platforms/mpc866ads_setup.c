@@ -137,7 +137,7 @@ void __init board_init(void)
 	iounmap(bcsr_io);
 }
 
-static void setup_fec1_ioports(void)
+static void setup_fec1_ioports(struct fs_platform_info*)
 {
 	immap_t *immap = (immap_t *) IMAP_ADDR;
 
@@ -145,7 +145,7 @@ static void setup_fec1_ioports(void)
 	setbits16(&immap->im_ioport.iop_pddir, 0x1fff);
 }
 
-static void setup_scc1_ioports(void)
+static void setup_scc1_ioports(struct fs_platform_info*)
 {
 	immap_t *immap = (immap_t *) IMAP_ADDR;
 	unsigned *bcsr_io;
@@ -194,7 +194,7 @@ static void setup_scc1_ioports(void)
 
 }
 
-static void setup_smc1_ioports(void)
+static void setup_smc1_ioports(struct fs_uart_platform_info*)
 {
 	immap_t *immap = (immap_t *) IMAP_ADDR;
 	unsigned *bcsr_io;
@@ -216,7 +216,7 @@ static void setup_smc1_ioports(void)
 
 }
 
-static void setup_smc2_ioports(void)
+static void setup_smc2_ioports(struct fs_uart_platform_info*)
 {
 	immap_t *immap = (immap_t *) IMAP_ADDR;
 	unsigned *bcsr_io;
@@ -259,7 +259,7 @@ static void mpc866ads_fixup_enet_pdata(struct platform_device *pdev, int fs_no)
 	/* Get pointer to Communication Processor */
 	cp = cpmp;
 
-	if(fs_no > ARRAY_SIZE(mpc8xx_enet_pdata)) {
+	if(fs_no >= ARRAY_SIZE(mpc8xx_enet_pdata)) {
 		printk(KERN_ERR"No network-suitable #%d device on bus", fs_no);
 		return;
 	}
@@ -305,7 +305,7 @@ static void __init mpc866ads_fixup_uart_pdata(struct platform_device *pdev,
 	int id = fs_uart_id_smc2fsid(idx);
 
 	/* no need to alter anything if console */
-	if ((id <= num) && (!pdev->dev.platform_data)) {
+	if ((id < num) && (!pdev->dev.platform_data)) {
 		pinfo = &mpc866_uart_pdata[id];
 		pinfo->uart_clk = bd->bi_intfreq;
 		pdev->dev.platform_data = pinfo;

@@ -39,18 +39,10 @@ struct ata_scsi_args {
 };
 
 /* libata-core.c */
-enum {
-	/* flags for ata_dev_read_id() */
-	ATA_READID_POSTRESET	= (1 << 0), /* reading ID after reset */
-	ATA_READID_DETECT	= (1 << 1), /* perform presence detection
-					     * using polling IDENTIFY */
-};
-
 extern struct workqueue_struct *ata_aux_wq;
 extern int atapi_enabled;
 extern int atapi_dmadir;
 extern int libata_fua;
-extern int libata_acpi;
 extern struct ata_queued_cmd *ata_qc_new_init(struct ata_device *dev);
 extern int ata_rwcmd_protocol(struct ata_queued_cmd *qc);
 extern void ata_dev_disable(struct ata_device *dev);
@@ -60,8 +52,8 @@ extern unsigned ata_exec_internal(struct ata_device *dev,
 				  int dma_dir, void *buf, unsigned int buflen);
 extern unsigned int ata_do_simple_cmd(struct ata_device *dev, u8 cmd);
 extern int ata_dev_read_id(struct ata_device *dev, unsigned int *p_class,
-			   unsigned int flags, u16 *id);
-extern int ata_dev_revalidate(struct ata_device *dev, unsigned int flags);
+			   int post_reset, u16 *id);
+extern int ata_dev_revalidate(struct ata_device *dev, int post_reset);
 extern int ata_dev_configure(struct ata_device *dev, int print_info);
 extern int sata_down_spd_limit(struct ata_port *ap);
 extern int sata_set_spd_needed(struct ata_port *ap);
@@ -127,13 +119,5 @@ extern enum scsi_eh_timer_return ata_scsi_timed_out(struct scsi_cmnd *cmd);
 extern void ata_scsi_error(struct Scsi_Host *host);
 extern void ata_port_wait_eh(struct ata_port *ap);
 extern void ata_qc_schedule_eh(struct ata_queued_cmd *qc);
-
-/* libata-acpi.c */
-#ifdef CONFIG_ATA_ACPI
-extern int ata_acpi_push_id(struct ata_device *atadev);
-extern int ata_acpi_exec_tfs(struct ata_device *atadev);
-extern void ata_acpi_get_timing(struct ata_port *ap);
-extern void ata_acpi_push_timing(struct ata_port *ap);
-#endif
 
 #endif /* __LIBATA_H__ */

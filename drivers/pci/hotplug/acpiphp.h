@@ -38,7 +38,7 @@
 #include <linux/acpi.h>
 #include <linux/kobject.h>	/* for KOBJ_NAME_LEN */
 #include <linux/mutex.h>
-#include "pci_hotplug.h"
+#include <linux/pci_hotplug.h>
 
 #define dbg(format, arg...)					\
 	do {							\
@@ -150,6 +150,11 @@ struct acpiphp_attention_info
 	struct module *owner;
 };
 
+struct acpiphp_ioapic {
+	struct pci_dev *dev;
+	u32 gsi_base;
+	struct list_head list;
+};
 
 /* PCI bus bridge HID */
 #define ACPI_PCI_HOST_HID		"PNP0A03"

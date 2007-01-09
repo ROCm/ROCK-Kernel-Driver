@@ -6,6 +6,7 @@ menu "Serial ATA (prod) and Parallel ATA (experimental) drivers"
 
 config ATA
 	tristate "ATA device support"
+	depends on BLOCK
 	depends on !(M32R || M68K) || BROKEN
 	depends on !SUN4 || BROKEN
 	select SCSI
@@ -144,21 +145,8 @@ config SATA_VITESSE
 
 config SATA_INTEL_COMBINED
 	bool
-	depends on IDE!=n && !BLK_DEV_IDE_SATA && (SATA_AHCI || ATA_PIIX)
+	depends on IDE=y && !BLK_DEV_IDE_SATA && (SATA_AHCI || ATA_PIIX)
 	default y
-
-config ATA_ACPI
-	bool "Handle ATA-related ACPI objects"
-	depends on ACPI && PCI
-	default y
-	help
-	  This option adds support for ATA-related ACPI objects.
-	  These ACPI objects add the ability to retrieve taskfiles
-	  from the ACPI BIOS and write them to the disk controller.
-	  These objects may be related to performance, security,
-	  power management, or other areas.
-	  You can disable this at kernel boot time by using the
-	  option 'libata.ata_acpi=0'.
 
 config PATA_ALI
 	tristate "ALi PATA support (Experimental)"
@@ -340,15 +328,6 @@ config PATA_TRIFLEX
 
 	  If unsure, say N.
 
-config PATA_MARVELL
-	tristate "Marvell PATA support via legacy mode"
-	depends on PCI
-	help
-	  This option enables limited support for the Marvell 88SE6145 ATA
-	  controller.
-
-	  If unsure, say N.
-
 config PATA_MPIIX
 	tristate "Intel PATA MPIIX support"
 	depends on PCI
@@ -503,13 +482,6 @@ config PATA_WINBOND
 	  Netwinder and some other systems
 
 	  If unsure, say N.
-
-config PATA_WINBOND_VLB
-	tristate "Winbond W83759A VLB PATA support (Experimental)"
-	depends on ISA && EXPERIMENTAL
-	help
-	  Support for the Winbond W83759A controller on Vesa Local Bus
-	  systems.
 
 endif
 endmenu

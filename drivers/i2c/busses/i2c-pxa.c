@@ -272,7 +272,8 @@ static int i2c_pxa_wait_slave(struct pxa_i2c *i2c)
 			dev_dbg(&i2c->adap.dev, "%s: %ld: ISR=%08x, ICR=%08x, IBMR=%02x\n",
 				__func__, (long)jiffies, ISR, ICR, IBMR);
 
-		if ((ISR & (ISR_UB|ISR_IBB|ISR_SAD)) == ISR_SAD ||
+		if ((ISR & (ISR_UB|ISR_IBB)) == 0 ||
+		    (ISR & ISR_SAD) != 0 ||
 		    (ICR & ICR_SCLE) == 0) {
 			if (i2c_debug > 1)
 				dev_dbg(&i2c->adap.dev, "%s: done\n", __func__);
@@ -492,7 +493,10 @@ static void i2c_pxa_slave_txempty(struct pxa_i2c *i2c, u32 isr)
 	if (isr & ISR_BED) {
 		/* what should we do here? */
 	} else {
-		int ret = i2c->slave->read(i2c->slave->data);
+		int ret = 0;
+
+		if (i2c->slave != NULL)
+			ret = i2c->slave->read(i2c->slave->data);
 
 		IDBR = ret;
 		ICR |= ICR_TB;   /* allow next byte */
@@ -850,7 +854,7 @@ static void i2c_pxa_irq_rxfull(struct pxa_i2c *i2c, u32 isr)
 	ICR = icr;
 }
 
-static irqreturn_t i2c_pxa_handler(int this_irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t i2c_pxa_handler(int this_irq, void *dev_id)
 {
 	struct pxa_i2c *i2c = dev_id;
 	u32 isr = ISR;
@@ -926,7 +930,7 @@ static u32 i2c_pxa_functionality(struct i2c_adapter *adap)
 	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL;
 }
 
-static struct i2c_algorithm i2c_pxa_algorithm = {
+static const struct i2c_algorithm i2c_pxa_algorithm = {
 	.master_xfer	= i2c_pxa_xfer,
 	.functionality	= i2c_pxa_functionality,
 };

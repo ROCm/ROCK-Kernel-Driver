@@ -76,6 +76,9 @@ nlmsvc_insert_block(struct nlm_block *block, unsigned long when)
 			if (time_after(b->b_when,when) || b->b_when == NLM_NEVER)
 				break;
 		}
+		/* On normal exit from the loop, pos == &nlm_blocked,
+		 * so we will be adding to the end of the list - good
+		 */
 	}
 
 	list_add_tail(&block->b_list, pos);
@@ -251,9 +254,9 @@ static void nlmsvc_free_block(struct kref *kref)
 	dprintk("lockd: freeing block %p...\n", block);
 
 	/* Remove block from file's list of blocks */
-	down(&file->f_sema);
+	mutex_lock(&file->f_mutex);
 	list_del_init(&block->b_flist);
-	up(&file->f_sema);
+	mutex_unlock(&file->f_mutex);
 
 	nlmsvc_freegrantargs(block->b_call);
 	nlm_release_call(block->b_call);
@@ -267,16 +270,6 @@ static void nlmsvc_release_block(struct nlm_block *block)
 		kref_put(&block->b_count, nlmsvc_free_block);
 }
 
-void nlmsvc_mark_blocks(struct nlm_file *file)
-{
-	struct nlm_block *block;
-
-	down(&file->f_sema);
-	list_for_each_entry(block, &file->f_blocks, b_flist)
-		block->b_host->h_inuse = 1;
-	up(&file->f_sema);
-}
-
 /*
  * Loop over all blocks and delete blocks held by
  * a matching host.
@@ -288,7 +281,7 @@ void nlmsvc_traverse_blocks(struct nlm_host *host,
 	struct nlm_block *block, *next;
 
 restart:
-	down(&file->f_sema);
+	mutex_lock(&file->f_mutex);
 	list_for_each_entry_safe(block, next, &file->f_blocks, b_flist) {
 		if (!match(block->b_host, host))
 			continue;
@@ -297,12 +290,12 @@ restart:
 		if (list_empty(&block->b_list))
 			continue;
 		kref_get(&block->b_count);
-		up(&file->f_sema);
+		mutex_unlock(&file->f_mutex);
 		nlmsvc_unlink_block(block);
 		nlmsvc_release_block(block);
 		goto restart;
 	}
-	up(&file->f_sema);
+	mutex_unlock(&file->f_mutex);
 }
 
 /*
@@ -313,7 +306,7 @@ static int nlmsvc_setgrantargs(struct nlm_rqst *call, struct nlm_lock *lock)
 {
 	locks_copy_lock(&call->a_args.lock.fl, &lock->fl);
 	memcpy(&call->a_args.lock.fh, &lock->fh, sizeof(call->a_args.lock.fh));
-	call->a_args.lock.caller = system_utsname.nodename;
+	call->a_args.lock.caller = utsname()->nodename;
 	call->a_args.lock.oh.len = lock->oh.len;
 
 	/* set default data area */
@@ -341,13 +334,13 @@ static void nlmsvc_freegrantargs(struct nlm_rqst *call)
  * Attempt to establish a lock, and if it can't be granted, block it
  * if required.
  */
-u32
+__be32
 nlmsvc_lock(struct svc_rqst *rqstp, struct nlm_file *file,
 			struct nlm_lock *lock, int wait, struct nlm_cookie *cookie)
 {
 	struct nlm_block	*block, *newblock = NULL;
 	int			error;
-	u32			ret;
+	__be32			ret;
 
 	dprintk("lockd: nlmsvc_lock(%s/%ld, ty=%d, pi=%d, %Ld-%Ld, bl=%d)\n",
 				file->f_file->f_dentry->d_inode->i_sb->s_id,
@@ -361,7 +354,7 @@ nlmsvc_lock(struct svc_rqst *rqstp, struct nlm_file *file,
 	lock->fl.fl_flags &= ~FL_SLEEP;
 again:
 	/* Lock file against concurrent access */
-	down(&file->f_sema);
+	mutex_lock(&file->f_mutex);
 	/* Get existing block (in case client is busy-waiting) */
 	block = nlmsvc_lookup_block(file, lock);
 	if (block == NULL) {
@@ -399,10 +392,10 @@ again:
 
 	/* If we don't have a block, create and initialize it. Then
 	 * retry because we may have slept in kmalloc. */
-	/* We have to release f_sema as nlmsvc_create_block may try to
+	/* We have to release f_mutex as nlmsvc_create_block may try to
 	 * to claim it while doing host garbage collection */
 	if (newblock == NULL) {
-		up(&file->f_sema);
+		mutex_unlock(&file->f_mutex);
 		dprintk("lockd: blocking on this lock (allocating).\n");
 		if (!(newblock = nlmsvc_create_block(rqstp, file, lock, cookie)))
 			return nlm_lck_denied_nolocks;
@@ -412,7 +405,7 @@ again:
 	/* Append to list of blocked */
 	nlmsvc_insert_block(newblock, NLM_NEVER);
 out:
-	up(&file->f_sema);
+	mutex_unlock(&file->f_mutex);
 	nlmsvc_release_block(newblock);
 	nlmsvc_release_block(block);
 	dprintk("lockd: nlmsvc_lock returned %u\n", ret);
@@ -422,7 +415,7 @@ out:
 /*
  * Test for presence of a conflicting lock.
  */
-u32
+__be32
 nlmsvc_testlock(struct nlm_file *file, struct nlm_lock *lock,
 				       struct nlm_lock *conflock)
 {
@@ -455,7 +448,7 @@ nlmsvc_testlock(struct nlm_file *file, struct nlm_lock *lock,
  * afterwards. In this case the block will still be there, and hence
  * must be removed.
  */
-u32
+__be32
 nlmsvc_unlock(struct nlm_file *file, struct nlm_lock *lock)
 {
 	int	error;
@@ -483,7 +476,7 @@ nlmsvc_unlock(struct nlm_file *file, struct nlm_lock *lock)
  * be in progress.
  * The calling procedure must check whether the file can be closed.
  */
-u32
+__be32
 nlmsvc_cancel_blocked(struct nlm_file *file, struct nlm_lock *lock)
 {
 	struct nlm_block	*block;
@@ -496,9 +489,9 @@ nlmsvc_cancel_blocked(struct nlm_file *file, struct nlm_lock *lock)
 				(long long)lock->fl.fl_start,
 				(long long)lock->fl.fl_end);
 
-	down(&file->f_sema);
+	mutex_lock(&file->f_mutex);
 	block = nlmsvc_lookup_block(file, lock);
-	up(&file->f_sema);
+	mutex_unlock(&file->f_mutex);
 	if (block != NULL) {
 		status = nlmsvc_unlink_block(block);
 		nlmsvc_release_block(block);

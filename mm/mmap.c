@@ -64,6 +64,13 @@ pgprot_t protection_map[16] = {
 	__S000, __S001, __S010, __S011, __S100, __S101, __S110, __S111
 };
 
+pgprot_t vm_get_page_prot(unsigned long vm_flags)
+{
+	return protection_map[vm_flags &
+				(VM_READ|VM_WRITE|VM_EXEC|VM_SHARED)];
+}
+EXPORT_SYMBOL(vm_get_page_prot);
+
 int sysctl_overcommit_memory = OVERCOMMIT_GUESS;  /* heuristic overcommit */
 int sysctl_overcommit_ratio = 50;	/* default is 50% */
 int sysctl_max_map_count __read_mostly = DEFAULT_MAX_MAP_COUNT;
@@ -109,7 +116,7 @@ int __vm_enough_memory(long pages, int cap_sys_admin)
 		 * which are reclaimable, under pressure.  The dentry
 		 * cache and most inode caches should fall into this
 		 */
-		free += atomic_read(&slab_reclaim_pages);
+		free += global_page_state(NR_SLAB_RECLAIMABLE);
 
 		/*
 		 * Leave the last 3% for root
@@ -893,17 +900,6 @@ unsigned long do_mmap_pgoff(struct file * file, unsigned long addr,
 	int accountable = 1;
 	unsigned long charged = 0, reqprot = prot;
 
-	if (file) {
-		if (is_file_hugepages(file))
-			accountable = 0;
-
-		if (!file->f_op || !file->f_op->mmap)
-			return -ENODEV;
-
-		if ((prot & PROT_EXEC) &&
-		    (file->f_vfsmnt->mnt_flags & MNT_NOEXEC))
-			return -EPERM;
-	}
 	/*
 	 * Does the application expect PROT_READ to imply PROT_EXEC?
 	 *
@@ -993,6 +989,16 @@ unsigned long do_mmap_pgoff(struct file * file, unsigned long addr,
 		case MAP_PRIVATE:
 			if (!(file->f_mode & FMODE_READ))
 				return -EACCES;
+			if (file->f_vfsmnt->mnt_flags & MNT_NOEXEC) {
+				if (vm_flags & VM_EXEC)
+					return -EPERM;
+				vm_flags &= ~VM_MAYEXEC;
+			}
+			if (is_file_hugepages(file))
+				accountable = 0;
+
+			if (!file->f_op || !file->f_op->mmap)
+				return -ENODEV;
 			break;
 
 		default:
@@ -1098,12 +1104,6 @@ munmap_back:
 			goto free_vma;
 	}
 
-	/* Don't make the VMA automatically writable if it's shared, but the
-	 * backer wishes to know when pages are first written to */
-	if (vma->vm_ops && vma->vm_ops->page_mkwrite)
-		vma->vm_page_prot =
-			protection_map[vm_flags & (VM_READ|VM_WRITE|VM_EXEC)];
-
 	/* We set VM_ACCOUNT in a shared mapping's vm_flags, to inform
 	 * shmem_zero_setup (perhaps called through /dev/zero's ->mmap)
 	 * that memory reservation must be checked; but that reservation
@@ -1120,6 +1120,10 @@ munmap_back:
 	addr = vma->vm_start;
 	pgoff = vma->vm_pgoff;
 	vm_flags = vma->vm_flags;
+
+	if (vma_wants_writenotify(vma))
+		vma->vm_page_prot =
+			protection_map[vm_flags & (VM_READ|VM_WRITE|VM_EXEC)];
 
 	if (!file || !vma_merge(mm, prev, addr, vma->vm_end,
 			vma->vm_flags, NULL, file, pgoff, vma_policy(vma))) {
@@ -1375,7 +1379,7 @@ get_unmapped_area(struct file *file, unsigned long addr, unsigned long len,
 		 * Check if the given range is hugepage aligned, and
 		 * can be made suitable for hugepages.
 		 */
-		ret = prepare_hugepage_range(addr, len);
+		ret = prepare_hugepage_range(addr, len, pgoff);
 	} else {
 		/*
 		 * Ensure that a normal request is not falling in a
@@ -1876,6 +1880,9 @@ unsigned long do_brk(unsigned long addr, unsigned long len)
 	if ((addr + len) > TASK_SIZE || (addr + len) < addr)
 		return -EINVAL;
 
+	if (is_hugepage_only_range(mm, addr, len))
+		return -EINVAL;
+
 	flags = VM_DATA_DEFAULT_FLAGS | VM_ACCOUNT | mm->def_flags;
 
 	error = arch_mmap_check(addr, len, flags);
@@ -1962,10 +1969,6 @@ void exit_mmap(struct mm_struct *mm)
 	struct vm_area_struct *vma = mm->mmap;
 	unsigned long nr_accounted = 0;
 	unsigned long end;
-
-#ifdef arch_exit_mmap
-	arch_exit_mmap(mm);
-#endif
 
 	lru_add_drain();
 	flush_cache_mm(mm);

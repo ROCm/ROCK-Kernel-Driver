@@ -31,10 +31,10 @@
 #include "i915_drm.h"
 #include "i915_drv.h"
 
-#define IS_I965G(dev) (dev->pdev->device == 0x2972 || \
-		       dev->pdev->device == 0x2982 || \
-		       dev->pdev->device == 0x2992 || \
-		       dev->pdev->device == 0x29A2)
+#define IS_I965G(dev) (dev->pci_device == 0x2972 || \
+		       dev->pci_device == 0x2982 || \
+		       dev->pci_device == 0x2992 || \
+		       dev->pci_device == 0x29A2)
 
 /* Really want an OS-independent resettable timer.  Would like to have
  * this loop run for (eg) 3 sec, but have the timer reset every time
@@ -260,7 +260,7 @@ static int i915_dma_init(DRM_IOCTL_ARGS)
 		retcode = i915_dma_resume(dev);
 		break;
 	default:
-		retcode = -EINVAL;
+		retcode = DRM_ERR(EINVAL);
 		break;
 	}
 
@@ -391,7 +391,7 @@ static int i915_emit_box(drm_device_t * dev,
 	RING_LOCALS;
 
 	if (DRM_COPY_FROM_USER_UNCHECKED(&box, &boxes[i], sizeof(box))) {
-		return EFAULT;
+		return DRM_ERR(EFAULT);
 	}
 
 	if (box.y2 <= box.y1 || box.x2 <= box.x1 || box.y2 <= 0 || box.x2 <= 0) {

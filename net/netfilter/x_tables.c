@@ -81,10 +81,40 @@ xt_unregister_target(struct xt_target *target)
 	int af = target->family;
 
 	mutex_lock(&xt[af].mutex);
-	LIST_DELETE(&xt[af].target, target);
+	list_del(&target->list);
 	mutex_unlock(&xt[af].mutex);
 }
 EXPORT_SYMBOL(xt_unregister_target);
+
+int
+xt_register_targets(struct xt_target *target, unsigned int n)
+{
+	unsigned int i;
+	int err = 0;
+
+	for (i = 0; i < n; i++) {
+		err = xt_register_target(&target[i]);
+		if (err)
+			goto err;
+	}
+	return err;
+
+err:
+	if (i > 0)
+		xt_unregister_targets(target, i);
+	return err;
+}
+EXPORT_SYMBOL(xt_register_targets);
+
+void
+xt_unregister_targets(struct xt_target *target, unsigned int n)
+{
+	unsigned int i;
+
+	for (i = 0; i < n; i++)
+		xt_unregister_target(&target[i]);
+}
+EXPORT_SYMBOL(xt_unregister_targets);
 
 int
 xt_register_match(struct xt_match *match)
@@ -108,10 +138,40 @@ xt_unregister_match(struct xt_match *match)
 	int af =  match->family;
 
 	mutex_lock(&xt[af].mutex);
-	LIST_DELETE(&xt[af].match, match);
+	list_del(&match->list);
 	mutex_unlock(&xt[af].mutex);
 }
 EXPORT_SYMBOL(xt_unregister_match);
+
+int
+xt_register_matches(struct xt_match *match, unsigned int n)
+{
+	unsigned int i;
+	int err = 0;
+
+	for (i = 0; i < n; i++) {
+		err = xt_register_match(&match[i]);
+		if (err)
+			goto err;
+	}
+	return err;
+
+err:
+	if (i > 0)
+		xt_unregister_matches(match, i);
+	return err;
+}
+EXPORT_SYMBOL(xt_register_matches);
+
+void
+xt_unregister_matches(struct xt_match *match, unsigned int n)
+{
+	unsigned int i;
+
+	for (i = 0; i < n; i++)
+		xt_unregister_match(&match[i]);
+}
+EXPORT_SYMBOL(xt_unregister_matches);
 
 
 /*
@@ -541,15 +601,18 @@ int xt_register_table(struct xt_table *table,
 {
 	int ret;
 	struct xt_table_info *private;
+	struct xt_table *t;
 
 	ret = mutex_lock_interruptible(&xt[table->af].mutex);
 	if (ret != 0)
 		return ret;
 
 	/* Don't autoload: we'd eat our tail... */
-	if (list_named_find(&xt[table->af].tables, table->name)) {
-		ret = -EEXIST;
-		goto unlock;
+	list_for_each_entry(t, &xt[table->af].tables, list) {
+		if (strcmp(t->name, table->name) == 0) {
+			ret = -EEXIST;
+			goto unlock;
+		}
 	}
 
 	/* Simplifies replace_table code. */
@@ -564,7 +627,7 @@ int xt_register_table(struct xt_table *table,
 	/* save number of initial entries */
 	private->initial_entries = private->number;
 
-	list_prepend(&xt[table->af].tables, table);
+	list_add(&table->list, &xt[table->af].tables);
 
 	ret = 0;
  unlock:
@@ -579,7 +642,7 @@ void *xt_unregister_table(struct xt_table *table)
 
 	mutex_lock(&xt[table->af].mutex);
 	private = table->private;
-	LIST_DELETE(&xt[table->af].tables, table);
+	list_del(&table->list);
 	mutex_unlock(&xt[table->af].mutex);
 
 	return private;

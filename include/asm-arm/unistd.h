@@ -347,19 +347,6 @@
 #define __NR_mbind			(__NR_SYSCALL_BASE+319)
 #define __NR_get_mempolicy		(__NR_SYSCALL_BASE+320)
 #define __NR_set_mempolicy		(__NR_SYSCALL_BASE+321)
-#define __NR_openat			(__NR_SYSCALL_BASE+322)
-#define __NR_mkdirat			(__NR_SYSCALL_BASE+323)
-#define __NR_mknodat			(__NR_SYSCALL_BASE+324)
-#define __NR_fchownat			(__NR_SYSCALL_BASE+325)
-#define __NR_futimesat			(__NR_SYSCALL_BASE+326)
-#define __NR_fstatat64			(__NR_SYSCALL_BASE+327)
-#define __NR_unlinkat			(__NR_SYSCALL_BASE+328)
-#define __NR_renameat			(__NR_SYSCALL_BASE+329)
-#define __NR_linkat			(__NR_SYSCALL_BASE+330)
-#define __NR_symlinkat			(__NR_SYSCALL_BASE+331)
-#define __NR_readlinkat			(__NR_SYSCALL_BASE+332)
-#define __NR_fchmodat			(__NR_SYSCALL_BASE+333)
-#define __NR_faccessat			(__NR_SYSCALL_BASE+334)
 
 /*
  * The following SWIs are ARM private.
@@ -390,6 +377,7 @@
 #endif
 
 #ifdef __KERNEL__
+#include <linux/err.h>
 #include <linux/linkage.h>
 
 #define __sys2(x) #x
@@ -409,7 +397,7 @@
 
 #define __syscall_return(type, res)					\
 do {									\
-	if ((unsigned long)(res) >= (unsigned long)(-129)) {		\
+	if ((unsigned long)(res) >= (unsigned long)(-MAX_ERRNO)) {	\
 		errno = -(res);						\
 		res = -1;						\
 	}								\
@@ -560,30 +548,6 @@ type name(type1 arg1, type2 arg2, type3 arg3, type4 arg4, type5 arg5, type6 arg6
 #define __ARCH_WANT_OLD_READDIR
 #define __ARCH_WANT_SYS_SOCKETCALL
 #endif
-
-#ifdef __KERNEL_SYSCALLS__
-
-#include <linux/compiler.h>
-#include <linux/types.h>
-#include <linux/syscalls.h>
-
-extern long execve(const char *file, char **argv, char **envp);
-
-struct pt_regs;
-asmlinkage int sys_execve(char *filenamei, char **argv, char **envp,
-			struct pt_regs *regs);
-asmlinkage int sys_clone(unsigned long clone_flags, unsigned long newsp,
-			struct pt_regs *regs);
-asmlinkage int sys_fork(struct pt_regs *regs);
-asmlinkage int sys_vfork(struct pt_regs *regs);
-asmlinkage int sys_pipe(unsigned long *fildes);
-struct sigaction;
-asmlinkage long sys_rt_sigaction(int sig,
-				const struct sigaction __user *act,
-				struct sigaction __user *oact,
-				size_t sigsetsize);
-
-#endif /* __KERNEL_SYSCALLS__ */
 
 /*
  * "Conditional" syscalls

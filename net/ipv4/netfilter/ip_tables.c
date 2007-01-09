@@ -180,8 +180,7 @@ ipt_error(struct sk_buff **pskb,
 	  const struct net_device *out,
 	  unsigned int hooknum,
 	  const struct xt_target *target,
-	  const void *targinfo,
-	  void *userinfo)
+	  const void *targinfo)
 {
 	if (net_ratelimit())
 		printk("ip_tables: error: `%s'\n", (char *)targinfo);
@@ -217,8 +216,7 @@ ipt_do_table(struct sk_buff **pskb,
 	     unsigned int hook,
 	     const struct net_device *in,
 	     const struct net_device *out,
-	     struct ipt_table *table,
-	     void *userdata)
+	     struct ipt_table *table)
 {
 	static const char nulldevname[IFNAMSIZ] __attribute__((aligned(sizeof(long))));
 	u_int16_t offset;
@@ -308,8 +306,7 @@ ipt_do_table(struct sk_buff **pskb,
 								     in, out,
 								     hook,
 								     t->u.kernel.target,
-								     t->data,
-								     userdata);
+								     t->data);
 
 #ifdef CONFIG_NETFILTER_DEBUG
 				if (((struct ipt_entry *)table_base)->comefrom
@@ -404,13 +401,6 @@ mark_source_chains(struct xt_table_info *newinfo,
 			    && unconditional(&e->ip)) {
 				unsigned int oldpos, size;
 
-				if (t->verdict < -NF_MAX_VERDICT - 1) {
-					duprintf("mark_source_chains: bad "
-						"negative verdict (%i)\n",
-								t->verdict);
-					return 0;
-				}
-
 				/* Return: backtrack through the last
 				   big jump. */
 				do {
@@ -448,13 +438,6 @@ mark_source_chains(struct xt_table_info *newinfo,
 				if (strcmp(t->target.u.user.name,
 					   IPT_STANDARD_TARGET) == 0
 				    && newpos >= 0) {
-					if (newpos > newinfo->size -
-						sizeof(struct ipt_entry)) {
-						duprintf("mark_source_chains: "
-							"bad verdict (%i)\n",
-								newpos);
-						return 0;
-					}
 					/* This a jump; chase it. */
 					duprintf("Jump rule %u -> %u\n",
 						 pos, newpos);
@@ -481,10 +464,30 @@ cleanup_match(struct ipt_entry_match *m, unsigned int *i)
 		return 1;
 
 	if (m->u.kernel.match->destroy)
-		m->u.kernel.match->destroy(m->u.kernel.match, m->data,
-					   m->u.match_size - sizeof(*m));
+		m->u.kernel.match->destroy(m->u.kernel.match, m->data);
 	module_put(m->u.kernel.match->me);
 	return 0;
+}
+
+static inline int
+standard_check(const struct ipt_entry_target *t,
+	       unsigned int max_offset)
+{
+	struct ipt_standard_target *targ = (void *)t;
+
+	/* Check standard info. */
+	if (targ->verdict >= 0
+	    && targ->verdict > max_offset - sizeof(struct ipt_entry)) {
+		duprintf("ipt_standard_check: bad verdict (%i)\n",
+			 targ->verdict);
+		return 0;
+	}
+	if (targ->verdict < -NF_MAX_VERDICT - 1) {
+		duprintf("ipt_standard_check: bad negative verdict (%i)\n",
+			 targ->verdict);
+		return 0;
+	}
+	return 1;
 }
 
 static inline int
@@ -514,7 +517,6 @@ check_match(struct ipt_entry_match *m,
 
 	if (m->u.kernel.match->checkentry
 	    && !m->u.kernel.match->checkentry(name, ip, match, m->data,
-					      m->u.match_size - sizeof(*m),
 					      hookmask)) {
 		duprintf("ip_tables: check failed for `%s'.\n",
 			 m->u.kernel.match->name);
@@ -574,10 +576,13 @@ check_entry(struct ipt_entry *e, const char *name, unsigned int size,
 	if (ret)
 		goto err;
 
-	if (t->u.kernel.target->checkentry
+	if (t->u.kernel.target == &ipt_standard_target) {
+		if (!standard_check(t, size)) {
+			ret = -EINVAL;
+			goto err;
+		}
+	} else if (t->u.kernel.target->checkentry
 		   && !t->u.kernel.target->checkentry(name, e, target, t->data,
-						      t->u.target_size
-						      - sizeof(*t),
 						      e->comefrom)) {
 		duprintf("ip_tables: check failed for `%s'.\n",
 			 t->u.kernel.target->name);
@@ -649,8 +654,7 @@ cleanup_entry(struct ipt_entry *e, unsigned int *i)
 	IPT_MATCH_ITERATE(e, cleanup_match, NULL);
 	t = ipt_get_target(e);
 	if (t->u.kernel.target->destroy)
-		t->u.kernel.target->destroy(t->u.kernel.target, t->data,
-					    t->u.target_size - sizeof(*t));
+		t->u.kernel.target->destroy(t->u.kernel.target, t->data);
 	module_put(t->u.kernel.target->me);
 	return 0;
 }
@@ -714,19 +718,17 @@ translate_table(const char *name,
 		}
 	}
 
-	if (!mark_source_chains(newinfo, valid_hooks, entry0))
-		return -ELOOP;
-
 	/* Finally, each sanity check must pass */
 	i = 0;
 	ret = IPT_ENTRY_ITERATE(entry0, newinfo->size,
 				check_entry, name, size, &i);
 
-	if (ret != 0) {
-		IPT_ENTRY_ITERATE(entry0, newinfo->size,
-				cleanup_entry, &i);
-		return ret;
-	}
+	if (ret != 0)
+		goto cleanup;
+
+	ret = -ELOOP;
+	if (!mark_source_chains(newinfo, valid_hooks, entry0))
+		goto cleanup;
 
 	/* And one copy for every other CPU */
 	for_each_possible_cpu(i) {
@@ -734,6 +736,9 @@ translate_table(const char *name,
 			memcpy(newinfo->entries[i], entry0, newinfo->size);
 	}
 
+	return 0;
+cleanup:
+	IPT_ENTRY_ITERATE(entry0, newinfo->size, cleanup_entry, &i);
 	return ret;
 }
 
@@ -1366,15 +1371,15 @@ struct compat_ipt_replace {
 };
 
 static inline int compat_copy_match_to_user(struct ipt_entry_match *m,
-		void * __user *dstptr, compat_uint_t *size)
+		void __user **dstptr, compat_uint_t *size)
 {
 	return xt_compat_match_to_user(m, dstptr, size);
 }
 
 static int compat_copy_entry_to_user(struct ipt_entry *e,
-		void * __user *dstptr, compat_uint_t *size)
+		void __user **dstptr, compat_uint_t *size)
 {
-	struct ipt_entry_target __user *t;
+	struct ipt_entry_target *t;
 	struct compat_ipt_entry __user *ce;
 	u_int16_t target_offset, next_offset;
 	compat_uint_t origsize;
@@ -1535,10 +1540,8 @@ static inline int compat_copy_match_from_user(struct ipt_entry_match *m,
 	ret = xt_check_match(match, AF_INET, dm->u.match_size - sizeof(*dm),
 			     name, hookmask, ip->proto,
 			     ip->invflags & IPT_INV_PROTO);
-
 	if (!ret && m->u.kernel.match->checkentry
 	    && !m->u.kernel.match->checkentry(name, ip, match, dm->data,
-					      dm->u.match_size - sizeof(*dm),
 					      hookmask)) {
 		duprintf("ip_tables: check failed for `%s'.\n",
 			 m->u.kernel.match->name);
@@ -1588,16 +1591,19 @@ static int compat_copy_entry_from_user(struct ipt_entry *e, void **dstptr,
 	if (ret)
 		goto err;
 
-	if (t->u.kernel.target->checkentry
+	ret = -EINVAL;
+	if (t->u.kernel.target == &ipt_standard_target) {
+		if (!standard_check(t, *size))
+			goto err;
+	} else if (t->u.kernel.target->checkentry
 		   && !t->u.kernel.target->checkentry(name, de, target,
-				t->data, t->u.target_size - sizeof(*t),
-				de->comefrom)) {
+						      t->data, de->comefrom)) {
 		duprintf("ip_tables: compat: check failed for `%s'.\n",
 			 t->u.kernel.target->name);
-		ret = -EINVAL;
 		goto err;
 	}
- err:
+	ret = 0;
+err:
 	return ret;
 }
 
@@ -2120,7 +2126,6 @@ icmp_checkentry(const char *tablename,
 	   const void *info,
 	   const struct xt_match *match,
 	   void *matchinfo,
-	   unsigned int matchsize,
 	   unsigned int hook_mask)
 {
 	const struct ipt_icmp *icmpinfo = matchinfo;

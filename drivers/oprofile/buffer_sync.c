@@ -6,10 +6,6 @@
  *
  * @author John Levon <levon@movementarian.org>
  *
- * Modified by Aravind Menon for Xen
- * These modifications are:
- * Copyright (C) 2005 Hewlett-Packard Co.
- *
  * This is the core of the buffer management. Each
  * CPU buffer is processed and entered into the
  * global event buffer. Such processing is necessary
@@ -279,31 +275,15 @@ static void add_cpu_switch(int i)
 	last_cookie = INVALID_COOKIE;
 }
 
-static void add_cpu_mode_switch(unsigned int cpu_mode)
+static void add_kernel_ctx_switch(unsigned int in_kernel)
 {
 	add_event_entry(ESCAPE_CODE);
-	switch (cpu_mode) {
-	case CPU_MODE_USER:
-		add_event_entry(USER_ENTER_SWITCH_CODE);
-		break;
-	case CPU_MODE_KERNEL:
-		add_event_entry(KERNEL_ENTER_SWITCH_CODE);
-		break;
-	case CPU_MODE_XEN:
-		add_event_entry(XEN_ENTER_SWITCH_CODE);
-	  	break;
-	default:
-		break;
-	}
+	if (in_kernel)
+		add_event_entry(KERNEL_ENTER_SWITCH_CODE); 
+	else
+		add_event_entry(KERNEL_EXIT_SWITCH_CODE); 
 }
-
-static void add_domain_switch(unsigned long domain_id)
-{
-	add_event_entry(ESCAPE_CODE);
-	add_event_entry(DOMAIN_SWITCH_CODE);
-	add_event_entry(domain_id);
-}
-
+ 
 static void
 add_user_ctx_switch(struct task_struct const * task, unsigned long cookie)
 {
@@ -368,9 +348,9 @@ static int add_us_sample(struct mm_struct * mm, struct op_sample * s)
  * for later lookup from userspace.
  */
 static int
-add_sample(struct mm_struct * mm, struct op_sample * s, int cpu_mode)
+add_sample(struct mm_struct * mm, struct op_sample * s, int in_kernel)
 {
-	if (cpu_mode >= CPU_MODE_KERNEL) {
+	if (in_kernel) {
 		add_sample_entry(s->eip, s->event);
 		return 1;
 	} else if (mm) {
@@ -516,11 +496,10 @@ void sync_buffer(int cpu)
 	struct mm_struct *mm = NULL;
 	struct task_struct * new;
 	unsigned long cookie = 0;
-	int cpu_mode = 1;
+	int in_kernel = 1;
 	unsigned int i;
 	sync_buffer_state state = sb_buffer_start;
 	unsigned long available;
-	int domain_switch = 0;
 
 	mutex_lock(&buffer_mutex);
  
@@ -533,18 +512,16 @@ void sync_buffer(int cpu)
 	for (i = 0; i < available; ++i) {
 		struct op_sample * s = &cpu_buf->buffer[cpu_buf->tail_pos];
  
-		if (is_code(s->eip) && !domain_switch) {
-			if (s->event <= CPU_MODE_XEN) {
-				/* xen/kernel/userspace switch */
-				cpu_mode = s->event;
+		if (is_code(s->eip)) {
+			if (s->event <= CPU_IS_KERNEL) {
+				/* kernel/userspace switch */
+				in_kernel = s->event;
 				if (state == sb_buffer_start)
 					state = sb_sample_start;
-				add_cpu_mode_switch(s->event);
+				add_kernel_ctx_switch(s->event);
 			} else if (s->event == CPU_TRACE_BEGIN) {
 				state = sb_bt_start;
 				add_trace_begin();
-			} else if (s->event == CPU_DOMAIN_SWITCH) {
-					domain_switch = 1;				
 			} else {
 				struct mm_struct * oldmm = mm;
 
@@ -558,16 +535,11 @@ void sync_buffer(int cpu)
 				add_user_ctx_switch(new, cookie);
 			}
 		} else {
-			if (domain_switch) {
-				add_domain_switch(s->eip);
-				domain_switch = 0;
-			} else {
-				if (state >= sb_bt_start &&
-				    !add_sample(mm, s, cpu_mode)) {
-					if (state == sb_bt_start) {
-						state = sb_bt_ignore;
-						atomic_inc(&oprofile_stats.bt_lost_no_mapping);
-					}
+			if (state >= sb_bt_start &&
+			    !add_sample(mm, s, in_kernel)) {
+				if (state == sb_bt_start) {
+					state = sb_bt_ignore;
+					atomic_inc(&oprofile_stats.bt_lost_no_mapping);
 				}
 			}
 		}

@@ -39,7 +39,6 @@ checkentry(const char *tablename,
            const void *entry,
 	   const struct xt_match *match,
            void *matchinfo,
-           unsigned int matchsize,
            unsigned int hook_mask)
 {
 	const struct xt_mark_info *minfo = matchinfo;
@@ -82,47 +81,38 @@ static int compat_to_user(void __user *dst, void *src)
 }
 #endif /* CONFIG_COMPAT */
 
-static struct xt_match mark_match = {
-	.name		= "mark",
-	.match		= match,
-	.matchsize	= sizeof(struct xt_mark_info),
-	.checkentry	= checkentry,
+static struct xt_match xt_mark_match[] = {
+	{
+		.name		= "mark",
+		.family		= AF_INET,
+		.checkentry	= checkentry,
+		.match		= match,
+		.matchsize	= sizeof(struct xt_mark_info),
 #ifdef CONFIG_COMPAT
 		.compatsize	= sizeof(struct compat_xt_mark_info),
 		.compat_from_user = compat_from_user,
 		.compat_to_user	= compat_to_user,
 #endif
-	.family		= AF_INET,
-	.me		= THIS_MODULE,
-};
-
-static struct xt_match mark6_match = {
-	.name		= "mark",
-	.match		= match,
-	.matchsize	= sizeof(struct xt_mark_info),
-	.checkentry	= checkentry,
-	.family		= AF_INET6,
-	.me		= THIS_MODULE,
+		.me		= THIS_MODULE,
+	},
+	{
+		.name		= "mark",
+		.family		= AF_INET6,
+		.checkentry	= checkentry,
+		.match		= match,
+		.matchsize	= sizeof(struct xt_mark_info),
+		.me		= THIS_MODULE,
+	},
 };
 
 static int __init xt_mark_init(void)
 {
-	int ret;
-	ret = xt_register_match(&mark_match);
-	if (ret)
-		return ret;
-
-	ret = xt_register_match(&mark6_match);
-	if (ret)
-		xt_unregister_match(&mark_match);
-
-	return ret;
+	return xt_register_matches(xt_mark_match, ARRAY_SIZE(xt_mark_match));
 }
 
 static void __exit xt_mark_fini(void)
 {
-	xt_unregister_match(&mark_match);
-	xt_unregister_match(&mark6_match);
+	xt_unregister_matches(xt_mark_match, ARRAY_SIZE(xt_mark_match));
 }
 
 module_init(xt_mark_init);

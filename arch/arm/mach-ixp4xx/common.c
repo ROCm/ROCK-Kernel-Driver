@@ -26,6 +26,7 @@
 #include <linux/bitops.h>
 #include <linux/time.h>
 #include <linux/timex.h>
+#include <linux/clocksource.h>
 
 #include <asm/hardware.h>
 #include <asm/uaccess.h>
@@ -85,7 +86,8 @@ enum ixp4xx_irq_type {
 	IXP4XX_IRQ_LEVEL, IXP4XX_IRQ_EDGE
 };
 
-static void ixp4xx_config_irq(unsigned irq, enum ixp4xx_irq_type type);
+/* Each bit represents an IRQ: 1: edge-triggered, 0: level triggered */
+static unsigned long long ixp4xx_irq_edge = 0;
 
 /*
  * IRQ -> GPIO mapping table
@@ -134,7 +136,11 @@ static int ixp4xx_set_irq_type(unsigned int irq, unsigned int type)
 	default:
 		return -EINVAL;
 	}
-	ixp4xx_config_irq(irq, irq_type);
+
+	if (irq_type == IXP4XX_IRQ_EDGE)
+		ixp4xx_irq_edge |= (1 << irq);
+	else
+		ixp4xx_irq_edge &= ~(1 << irq);
 
 	if (line >= 8) {	/* pins 8-15 */
 		line -= 8;
@@ -166,14 +172,6 @@ static void ixp4xx_irq_mask(unsigned int irq)
 		*IXP4XX_ICMR &= ~(1 << irq);
 }
 
-static void ixp4xx_irq_unmask(unsigned int irq)
-{
-	if (cpu_is_ixp46x() && irq >= 32)
-		*IXP4XX_ICMR2 |= (1 << (irq - 32));
-	else
-		*IXP4XX_ICMR |= (1 << irq);
-}
-
 static void ixp4xx_irq_ack(unsigned int irq)
 {
 	int line = (irq < 32) ? irq2gpio[irq] : -1;
@@ -186,40 +184,24 @@ static void ixp4xx_irq_ack(unsigned int irq)
  * Level triggered interrupts on GPIO lines can only be cleared when the
  * interrupt condition disappears.
  */
-static void ixp4xx_irq_level_unmask(unsigned int irq)
+static void ixp4xx_irq_unmask(unsigned int irq)
 {
-	ixp4xx_irq_ack(irq);
-	ixp4xx_irq_unmask(irq);
+	if (!(ixp4xx_irq_edge & (1 << irq)))
+		ixp4xx_irq_ack(irq);
+
+	if (cpu_is_ixp46x() && irq >= 32)
+		*IXP4XX_ICMR2 |= (1 << (irq - 32));
+	else
+		*IXP4XX_ICMR |= (1 << irq);
 }
 
-static struct irqchip ixp4xx_irq_level_chip = {
-	.ack		= ixp4xx_irq_mask,
-	.mask		= ixp4xx_irq_mask,
-	.unmask		= ixp4xx_irq_level_unmask,
-	.set_type	= ixp4xx_set_irq_type,
-};
-
-static struct irqchip ixp4xx_irq_edge_chip = {
+static struct irqchip ixp4xx_irq_chip = {
+	.name		= "IXP4xx",
 	.ack		= ixp4xx_irq_ack,
 	.mask		= ixp4xx_irq_mask,
 	.unmask		= ixp4xx_irq_unmask,
 	.set_type	= ixp4xx_set_irq_type,
 };
-
-static void ixp4xx_config_irq(unsigned irq, enum ixp4xx_irq_type type)
-{
-	switch (type) {
-	case IXP4XX_IRQ_LEVEL:
-		set_irq_chip(irq, &ixp4xx_irq_level_chip);
-		set_irq_handler(irq, do_level_IRQ);
-		break;
-	case IXP4XX_IRQ_EDGE:
-		set_irq_chip(irq, &ixp4xx_irq_edge_chip);
-		set_irq_handler(irq, do_edge_IRQ);
-		break;
-	}
-	set_irq_flags(irq, IRQF_VALID);
-}
 
 void __init ixp4xx_init_irq(void)
 {
@@ -240,8 +222,11 @@ void __init ixp4xx_init_irq(void)
 	}
 
         /* Default to all level triggered */
-	for(i = 0; i < NR_IRQS; i++)
-		ixp4xx_config_irq(i, IXP4XX_IRQ_LEVEL);
+	for(i = 0; i < NR_IRQS; i++) {
+		set_irq_chip(i, &ixp4xx_irq_chip);
+		set_irq_handler(i, do_level_IRQ);
+		set_irq_flags(i, IRQF_VALID);
+	}
 }
 
 
@@ -255,17 +240,7 @@ static unsigned volatile last_jiffy_time;
 
 #define CLOCK_TICKS_PER_USEC	((CLOCK_TICK_RATE + USEC_PER_SEC/2) / USEC_PER_SEC)
 
-/* IRQs are disabled before entering here from do_gettimeofday() */
-static unsigned long ixp4xx_gettimeoffset(void)
-{
-	u32 elapsed;
-
-	elapsed = *IXP4XX_OSTS - last_jiffy_time;
-
-	return elapsed / CLOCK_TICKS_PER_USEC;
-}
-
-static irqreturn_t ixp4xx_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t ixp4xx_timer_interrupt(int irq, void *dev_id)
 {
 	write_seqlock(&xtime_lock);
 
@@ -276,7 +251,7 @@ static irqreturn_t ixp4xx_timer_interrupt(int irq, void *dev_id, struct pt_regs 
 	 * Catch up with the real idea of time
 	 */
 	while ((signed long)(*IXP4XX_OSTS - last_jiffy_time) >= LATCH) {
-		timer_tick(regs);
+		timer_tick();
 		last_jiffy_time += LATCH;
 	}
 
@@ -309,7 +284,6 @@ static void __init ixp4xx_timer_init(void)
 
 struct sys_timer ixp4xx_timer = {
 	.init		= ixp4xx_timer_init,
-	.offset		= ixp4xx_gettimeoffset,
 };
 
 static struct resource ixp46x_i2c_resources[] = {
@@ -365,3 +339,29 @@ void __init ixp4xx_sys_init(void)
 			ixp4xx_exp_bus_size >> 20);
 }
 
+cycle_t ixp4xx_get_cycles(void)
+{
+	return *IXP4XX_OSTS;
+}
+
+static struct clocksource clocksource_ixp4xx = {
+	.name 		= "OSTS",
+	.rating		= 200,
+	.read		= ixp4xx_get_cycles,
+	.mask		= CLOCKSOURCE_MASK(32),
+	.shift 		= 20,
+	.is_continuous 	= 1,
+};
+
+unsigned long ixp4xx_timer_freq = FREQ;
+static int __init ixp4xx_clocksource_init(void)
+{
+	clocksource_ixp4xx.mult =
+		clocksource_hz2mult(ixp4xx_timer_freq,
+				    clocksource_ixp4xx.shift);
+	clocksource_register(&clocksource_ixp4xx);
+
+	return 0;
+}
+
+device_initcall(ixp4xx_clocksource_init);

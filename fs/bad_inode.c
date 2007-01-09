@@ -15,92 +15,58 @@
 #include <linux/smp_lock.h>
 #include <linux/namei.h>
 
-static int return_EIO_int(void)
+static int return_EIO(void)
 {
 	return -EIO;
 }
-#define EIO_ERROR_INT ((void *) (return_EIO_int))
 
-static ssize_t return_EIO_ssize(void)
-{
-	return -EIO;
-}
-#define EIO_ERROR_SSIZE ((void *) (return_EIO_ssize))
-
-static long return_EIO_long(void)
-{
-	return -EIO;
-}
-#define EIO_ERROR_LOFF ((void *) (return_EIO_loff))
-
-static loff_t return_EIO_loff(void)
-{
-	return -EIO;
-}
-#define EIO_ERROR_LONG ((void *) (return_EIO_long))
-
-static long * return_EIO_ptr(void)
-{
-	return ERR_PTR(-EIO);
-}
-#define EIO_ERROR_PTR ((void *) (return_EIO_ptr))
+#define EIO_ERROR ((void *) (return_EIO))
 
 static const struct file_operations bad_file_ops =
 {
-	.llseek		= EIO_ERROR_LOFF,
-	.read		= EIO_ERROR_SSIZE,
-	.write		= EIO_ERROR_SSIZE,
-	.aio_read	= EIO_ERROR_SSIZE,
-	.aio_write	= EIO_ERROR_SSIZE,
-	.readdir	= EIO_ERROR_INT,
-	.poll		= EIO_ERROR_INT,
-	.ioctl		= EIO_ERROR_INT,
-	.unlocked_ioctl	= EIO_ERROR_LONG,
-	.compat_ioctl	= EIO_ERROR_LONG,
-	.mmap		= EIO_ERROR_INT,
-	.open		= EIO_ERROR_INT,
-	.flush		= EIO_ERROR_INT,
-	.release	= EIO_ERROR_INT,
-	.fsync		= EIO_ERROR_INT,
-	.aio_fsync	= EIO_ERROR_INT,
-	.fasync		= EIO_ERROR_INT,
-	.lock		= EIO_ERROR_INT,
-	.readv		= EIO_ERROR_SSIZE,
-	.writev		= EIO_ERROR_SSIZE,
-	.sendfile	= EIO_ERROR_SSIZE,
-	.sendpage	= EIO_ERROR_SSIZE,
-	.get_unmapped_area = EIO_ERROR_LONG,
-	.check_flags	= EIO_ERROR_INT,
-	.dir_notify	= EIO_ERROR_INT,
-	.flock		= EIO_ERROR_INT,
-	.splice_write	= EIO_ERROR_SSIZE,
-	.splice_read	= EIO_ERROR_SSIZE,
+	.llseek		= EIO_ERROR,
+	.aio_read	= EIO_ERROR,
+	.read		= EIO_ERROR,
+	.write		= EIO_ERROR,
+	.aio_write	= EIO_ERROR,
+	.readdir	= EIO_ERROR,
+	.poll		= EIO_ERROR,
+	.ioctl		= EIO_ERROR,
+	.mmap		= EIO_ERROR,
+	.open		= EIO_ERROR,
+	.flush		= EIO_ERROR,
+	.release	= EIO_ERROR,
+	.fsync		= EIO_ERROR,
+	.aio_fsync	= EIO_ERROR,
+	.fasync		= EIO_ERROR,
+	.lock		= EIO_ERROR,
+	.sendfile	= EIO_ERROR,
+	.sendpage	= EIO_ERROR,
+	.get_unmapped_area = EIO_ERROR,
 };
 
 static struct inode_operations bad_inode_ops =
 {
-	.create		= EIO_ERROR_INT,
-	.lookup		= EIO_ERROR_PTR,
-	.link		= EIO_ERROR_INT,
-	.unlink		= EIO_ERROR_INT,
-	.symlink	= EIO_ERROR_INT,
-	.mkdir		= EIO_ERROR_INT,
-	.rmdir		= EIO_ERROR_INT,
-	.mknod		= EIO_ERROR_INT,
-	.rename		= EIO_ERROR_INT,
-	.readlink	= EIO_ERROR_INT,
+	.create		= EIO_ERROR,
+	.lookup		= EIO_ERROR,
+	.link		= EIO_ERROR,
+	.unlink		= EIO_ERROR,
+	.symlink	= EIO_ERROR,
+	.mkdir		= EIO_ERROR,
+	.rmdir		= EIO_ERROR,
+	.mknod		= EIO_ERROR,
+	.rename		= EIO_ERROR,
+	.readlink	= EIO_ERROR,
 	/* follow_link must be no-op, otherwise unmounting this inode
 	   won't work */
-	/* put_link is a void function */
-	/* truncate is a void function */
-	.permission	= EIO_ERROR_INT,
-	.getattr	= EIO_ERROR_INT,
-	.setattr	= EIO_ERROR_INT,
-	.setxattr	= EIO_ERROR_INT,
-	.getxattr	= EIO_ERROR_SSIZE,
-	.listxattr	= EIO_ERROR_SSIZE,
-	.removexattr	= EIO_ERROR_INT,
-	/* truncate_range is a void function */
+	.truncate	= EIO_ERROR,
+	.permission	= EIO_ERROR,
+	.getattr	= EIO_ERROR,
+	.setattr	= EIO_ERROR,
+	.setxattr	= EIO_ERROR,
+	.getxattr	= EIO_ERROR,
+	.listxattr	= EIO_ERROR,
+	.removexattr	= EIO_ERROR,
 };
 
 

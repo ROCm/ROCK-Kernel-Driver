@@ -33,7 +33,7 @@
 *
 */
 
-
+#include <linux/err.h>
 #include <linux/sunrpc/svc.h>
 #include <linux/nfsd/nfsd.h>
 #include <linux/nfs4.h>
@@ -83,38 +83,39 @@ md5_to_hex(char *out, char *md5)
 	*out = '\0';
 }
 
-int
+__be32
 nfs4_make_rec_clidname(char *dname, struct xdr_netobj *clname)
 {
 	struct xdr_netobj cksum;
-	struct crypto_tfm *tfm;
+	struct hash_desc desc;
 	struct scatterlist sg[1];
-	int status = nfserr_resource;
+	__be32 status = nfserr_resource;
 
 	dprintk("NFSD: nfs4_make_rec_clidname for %.*s\n",
 			clname->len, clname->data);
-	tfm = crypto_alloc_tfm("md5", CRYPTO_TFM_REQ_MAY_SLEEP);
-	if (tfm == NULL)
-		goto out;
-	cksum.len = crypto_tfm_alg_digestsize(tfm);
+	desc.flags = CRYPTO_TFM_REQ_MAY_SLEEP;
+	desc.tfm = crypto_alloc_hash("md5", 0, CRYPTO_ALG_ASYNC);
+	if (IS_ERR(desc.tfm))
+		goto out_no_tfm;
+	cksum.len = crypto_hash_digestsize(desc.tfm);
 	cksum.data = kmalloc(cksum.len, GFP_KERNEL);
 	if (cksum.data == NULL)
  		goto out;
-	crypto_digest_init(tfm);
 
 	sg[0].page = virt_to_page(clname->data);
 	sg[0].offset = offset_in_page(clname->data);
 	sg[0].length = clname->len;
 
-	crypto_digest_update(tfm, sg, 1);
-	crypto_digest_final(tfm, cksum.data);
+	if (crypto_hash_digest(&desc, sg, sg->length, cksum.data))
+		goto out;
 
 	md5_to_hex(dname, cksum.data);
 
 	kfree(cksum.data);
 	status = nfs_ok;
 out:
-	crypto_free_tfm(tfm);
+	crypto_free_hash(desc.tfm);
+out_no_tfm:
 	return status;
 }
 
@@ -183,7 +184,7 @@ struct dentry_list_arg {
 
 static int
 nfsd4_build_dentrylist(void *arg, const char *name, int namlen,
-		loff_t offset, ino_t ino, unsigned int d_type)
+		loff_t offset, u64 ino, unsigned int d_type)
 {
 	struct dentry_list_arg *dla = arg;
 	struct list_head *dentries = &dla->dentries;
@@ -192,7 +193,7 @@ nfsd4_build_dentrylist(void *arg, const char *name, int namlen,
 	struct dentry_list *child;
 
 	if (name && isdotent(name, namlen))
-		return nfs_ok;
+		return 0;
 	dentry = lookup_one_len(name, parent, namlen);
 	if (IS_ERR(dentry))
 		return PTR_ERR(dentry);
@@ -273,7 +274,7 @@ nfsd4_clear_clid_dir(struct dentry *dir, struct dentry *dentry)
 	 * any regular files anyway, just in case the directory was created by
 	 * a kernel from the future.... */
 	nfsd4_list_rec_dir(dentry, nfsd4_remove_clid_file);
-	mutex_lock(&dir->d_inode->i_mutex);
+	mutex_lock_nested(&dir->d_inode->i_mutex, I_MUTEX_PARENT);
 	status = vfs_rmdir(dir->d_inode, dentry);
 	mutex_unlock(&dir->d_inode->i_mutex);
 	return status;
@@ -332,14 +333,14 @@ purge_old(struct dentry *parent, struct dentry *child)
 	int status;
 
 	if (nfs4_has_reclaimed_state(child->d_name.name))
-		return nfs_ok;
+		return 0;
 
 	status = nfsd4_clear_clid_dir(parent, child);
 	if (status)
 		printk("failed to remove client recovery directory %s\n",
 				child->d_name.name);
 	/* Keep trying, success or failure: */
-	return nfs_ok;
+	return 0;
 }
 
 void
@@ -364,10 +365,10 @@ load_recdir(struct dentry *parent, struct dentry *child)
 		printk("nfsd4: illegal name %s in recovery directory\n",
 				child->d_name.name);
 		/* Keep trying; maybe the others are OK: */
-		return nfs_ok;
+		return 0;
 	}
 	nfs4_client_to_reclaim(child->d_name.name);
-	return nfs_ok;
+	return 0;
 }
 
 int

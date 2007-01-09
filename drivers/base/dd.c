@@ -18,6 +18,7 @@
 #include <linux/device.h>
 #include <linux/module.h>
 #include <linux/kthread.h>
+#include <linux/wait.h>
 
 #include "base.h"
 #include "power/power.h"
@@ -39,17 +40,29 @@
  *
  *	This function must be called with @dev->sem held.
  */
-void device_bind_driver(struct device * dev)
+int device_bind_driver(struct device *dev)
 {
-	if (klist_node_attached(&dev->knode_driver))
-		return;
+	int ret;
+
+	if (klist_node_attached(&dev->knode_driver)) {
+		printk(KERN_WARNING "%s: device %s already bound\n",
+			__FUNCTION__, kobject_name(&dev->kobj));
+		return 0;
+	}
 
 	pr_debug("bound device '%s' to driver '%s'\n",
 		 dev->bus_id, dev->driver->name);
 	klist_add_tail(&dev->knode_driver, &dev->driver->klist_devices);
-	sysfs_create_link(&dev->driver->kobj, &dev->kobj,
+	ret = sysfs_create_link(&dev->driver->kobj, &dev->kobj,
 			  kobject_name(&dev->kobj));
-	sysfs_create_link(&dev->kobj, &dev->driver->kobj, "driver");
+	if (ret == 0) {
+		ret = sysfs_create_link(&dev->kobj, &dev->driver->kobj,
+					"driver");
+		if (ret)
+			sysfs_remove_link(&dev->driver->kobj,
+					kobject_name(&dev->kobj));
+	}
+	return ret;
 }
 
 struct stupid_thread_structure {
@@ -58,6 +71,8 @@ struct stupid_thread_structure {
 };
 
 static atomic_t probe_count = ATOMIC_INIT(0);
+static DECLARE_WAIT_QUEUE_HEAD(probe_waitqueue);
+
 static int really_probe(void *void_data)
 {
 	struct stupid_thread_structure *data = void_data;
@@ -83,7 +98,11 @@ static int really_probe(void *void_data)
 			goto probe_failed;
 		}
 	}
-	device_bind_driver(dev);
+	if (device_bind_driver(dev)) {
+		printk(KERN_ERR "%s: device_bind_driver(%s) failed\n",
+			__FUNCTION__, dev->bus_id);
+		/* How does undo a ->probe?  We're screwed. */
+	}
 	ret = 1;
 	pr_debug("%s: Bound Device %s to Driver %s\n",
 		 drv->bus->name, dev->bus_id, drv->name);
@@ -105,6 +124,7 @@ probe_failed:
 done:
 	kfree(data);
 	atomic_dec(&probe_count);
+	wake_up(&probe_waitqueue);
 	return ret;
 }
 
@@ -146,6 +166,8 @@ int driver_probe_device(struct device_driver * drv, struct device * dev)
 	struct task_struct *probe_task;
 	int ret = 0;
 
+	if (!device_is_registered(dev))
+		return -ENODEV;
 	if (drv->bus->match && !drv->bus->match(dev, drv))
 		goto done;
 
@@ -153,6 +175,8 @@ int driver_probe_device(struct device_driver * drv, struct device * dev)
 		 drv->bus->name, dev->bus_id, drv->name);
 
 	data = kmalloc(sizeof(*data), GFP_KERNEL);
+	if (!data)
+		return -ENOMEM;
 	data->drv = drv;
 	data->dev = dev;
 
@@ -160,7 +184,7 @@ int driver_probe_device(struct device_driver * drv, struct device * dev)
 		probe_task = kthread_run(really_probe, data,
 					 "probe-%s", dev->bus_id);
 		if (IS_ERR(probe_task))
-			ret = PTR_ERR(probe_task);
+			ret = really_probe(data);
 	} else
 		ret = really_probe(data);
 
@@ -193,8 +217,9 @@ int device_attach(struct device * dev)
 
 	down(&dev->sem);
 	if (dev->driver) {
-		device_bind_driver(dev);
-		ret = 1;
+		ret = device_bind_driver(dev);
+		if (ret == 0)
+			ret = 1;
 	} else
 		ret = bus_for_each_drv(dev->bus, NULL, dev, __device_attach);
 	up(&dev->sem);
@@ -236,9 +261,9 @@ static int __driver_attach(struct device * dev, void * data)
  *	returns 0 and the @dev->driver is set, we've found a
  *	compatible pair.
  */
-void driver_attach(struct device_driver * drv)
+int driver_attach(struct device_driver * drv)
 {
-	bus_for_each_dev(drv->bus, NULL, drv, __driver_attach);
+	return bus_for_each_dev(drv->bus, NULL, drv, __driver_attach);
 }
 
 /**
@@ -316,6 +341,32 @@ void driver_detach(struct device_driver * drv)
 	}
 }
 
+#ifdef CONFIG_PCI_MULTITHREAD_PROBE
+static int __init wait_for_probes(void)
+{
+	DEFINE_WAIT(wait);
+
+	printk(KERN_INFO "%s: waiting for %d threads\n", __FUNCTION__,
+			atomic_read(&probe_count));
+	if (!atomic_read(&probe_count))
+		return 0;
+	while (atomic_read(&probe_count)) {
+		prepare_to_wait(&probe_waitqueue, &wait, TASK_UNINTERRUPTIBLE);
+		if (atomic_read(&probe_count))
+			schedule();
+	}
+	finish_wait(&probe_waitqueue, &wait);
+	return 0;
+}
+
+core_initcall_sync(wait_for_probes);
+postcore_initcall_sync(wait_for_probes);
+arch_initcall_sync(wait_for_probes);
+subsys_initcall_sync(wait_for_probes);
+fs_initcall_sync(wait_for_probes);
+device_initcall_sync(wait_for_probes);
+late_initcall_sync(wait_for_probes);
+#endif
 
 EXPORT_SYMBOL_GPL(device_bind_driver);
 EXPORT_SYMBOL_GPL(device_release_driver);

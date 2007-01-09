@@ -645,6 +645,7 @@ void add_input_randomness(unsigned int type, unsigned int code,
 	add_timer_randomness(&input_timer_state,
 			     (type << 4) ^ code ^ (code >> 4) ^ value);
 }
+EXPORT_SYMBOL_GPL(add_input_randomness);
 
 void add_interrupt_randomness(int irq)
 {
@@ -655,6 +656,7 @@ void add_interrupt_randomness(int irq)
 	add_timer_randomness(irq_timer_state[irq], 0x100 + irq);
 }
 
+#ifdef CONFIG_BLOCK
 void add_disk_randomness(struct gendisk *disk)
 {
 	if (!disk || !disk->random)
@@ -667,6 +669,7 @@ void add_disk_randomness(struct gendisk *disk)
 }
 
 EXPORT_SYMBOL(add_disk_randomness);
+#endif
 
 #define EXTRACT_SIZE 10
 
@@ -887,8 +890,8 @@ static void init_std_data(struct entropy_store *r)
 
 	do_gettimeofday(&tv);
 	add_entropy_words(r, (__u32 *)&tv, sizeof(tv)/4);
-	add_entropy_words(r, (__u32 *)&system_utsname,
-			  sizeof(system_utsname)/4);
+	add_entropy_words(r, (__u32 *)utsname(),
+			  sizeof(*(utsname()))/4);
 }
 
 static int __init rand_initialize(void)
@@ -918,6 +921,7 @@ void rand_initialize_irq(int irq)
 	}
 }
 
+#ifdef CONFIG_BLOCK
 void rand_initialize_disk(struct gendisk *disk)
 {
 	struct timer_rand_state *state;
@@ -932,6 +936,7 @@ void rand_initialize_disk(struct gendisk *disk)
 		disk->random = state;
 	}
 }
+#endif
 
 static ssize_t
 random_read(struct file * file, char __user * buf, size_t nbytes, loff_t *ppos)

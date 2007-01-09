@@ -444,7 +444,7 @@ struct cardstate {
 	struct gigaset_driver *driver;
 	unsigned minor_index;
 	struct device *dev;
-	struct device *tty_dev;
+	struct class_device *class;
 
 	const struct gigaset_ops *ops;
 

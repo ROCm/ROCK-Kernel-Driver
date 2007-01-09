@@ -47,6 +47,8 @@
 #define BCM43xx_WX_VERSION	18
 
 #define MAX_WX_STRING		80
+/* FIXME: the next line is a guess as to what the maximum RSSI value might be */
+#define RX_RSSI_MAX		60
 
 
 static int bcm43xx_wx_get_name(struct net_device *net_dev,
@@ -227,15 +229,14 @@ static int bcm43xx_wx_get_rangeparams(struct net_device *net_dev,
 	range->throughput = 27 * 1000 * 1000;
 
 	range->max_qual.qual = 100;
-	/* TODO: Real max RSSI */
-	range->max_qual.level = 3;
-	range->max_qual.noise = 100;
-	range->max_qual.updated = 7;
+	range->max_qual.level = 146; /* set floor at -110 dBm (146 - 256) */
+	range->max_qual.noise = 146;
+	range->max_qual.updated = IW_QUAL_ALL_UPDATED;
 
-	range->avg_qual.qual = 70;
-	range->avg_qual.level = 2;
-	range->avg_qual.noise = 40;
-	range->avg_qual.updated = 7;
+	range->avg_qual.qual = 50;
+	range->avg_qual.level = 0;
+	range->avg_qual.noise = 0;
+	range->avg_qual.updated = IW_QUAL_ALL_UPDATED;
 
 	range->min_rts = BCM43xx_MIN_RTS_THRESHOLD;
 	range->max_rts = BCM43xx_MAX_RTS_THRESHOLD;
@@ -333,7 +334,7 @@ static int bcm43xx_wx_get_nick(struct net_device *net_dev,
 	size_t len;
 
 	mutex_lock(&bcm->mutex);
-	len = strlen(bcm->nick) + 1;
+	len = strlen(bcm->nick);
 	memcpy(extra, bcm->nick, len);
 	data->data.length = (__u16)len;
 	data->data.flags = 1;
@@ -840,9 +841,13 @@ static struct iw_statistics *bcm43xx_get_wireless_stats(struct net_device *net_d
 	struct bcm43xx_private *bcm = bcm43xx_priv(net_dev);
 	struct ieee80211softmac_device *mac = ieee80211_priv(net_dev);
 	struct iw_statistics *wstats;
+	struct ieee80211_network *network = NULL;
+	static int tmp_level = 0;
+	static int tmp_qual = 0;
+	unsigned long flags;
 
 	wstats = &bcm->stats.wstats;
-	if (!mac->associated) {
+	if (!mac->associnfo.associated) {
 		wstats->miss.beacon = 0;
 //		bcm->ieee->ieee_stats.tx_retry_limit_exceeded = 0; // FIXME: should this be cleared here?
 		wstats->discard.retries = 0;
@@ -857,16 +862,28 @@ static struct iw_statistics *bcm43xx_get_wireless_stats(struct net_device *net_d
 		wstats->qual.level = 0;
 		wstats->qual.noise = 0;
 		wstats->qual.updated = 7;
-		wstats->qual.updated |= IW_QUAL_NOISE_INVALID |
-			IW_QUAL_QUAL_INVALID | IW_QUAL_LEVEL_INVALID;
+		wstats->qual.updated |= IW_QUAL_ALL_UPDATED | IW_QUAL_DBM;
 		return wstats;
 	}
 	/* fill in the real statistics when iface associated */
-	wstats->qual.qual = 100;     // TODO: get the real signal quality
-	wstats->qual.level = 3 - bcm->stats.link_quality;
+	spin_lock_irqsave(&mac->ieee->lock, flags);
+	list_for_each_entry(network, &mac->ieee->network_list, list) {
+		if (!memcmp(mac->associnfo.bssid, network->bssid, ETH_ALEN)) {
+			if (!tmp_level)	{	/* get initial values */
+				tmp_level = network->stats.signal;
+				tmp_qual = network->stats.rssi;
+			} else {		/* smooth results */
+				tmp_level = (15 * tmp_level + network->stats.signal)/16;
+				tmp_qual = (15 * tmp_qual + network->stats.rssi)/16;
+			}
+			break;
+		}
+	}
+	spin_unlock_irqrestore(&mac->ieee->lock, flags);
+	wstats->qual.level = tmp_level;
+	wstats->qual.qual = 100 * tmp_qual / RX_RSSI_MAX;
 	wstats->qual.noise = bcm->stats.noise;
-	wstats->qual.updated = IW_QUAL_QUAL_UPDATED | IW_QUAL_LEVEL_UPDATED |
-			IW_QUAL_NOISE_UPDATED;
+	wstats->qual.updated = IW_QUAL_ALL_UPDATED | IW_QUAL_DBM;
 	wstats->discard.code = bcm->ieee->ieee_stats.rx_discards_undecryptable;
 	wstats->discard.retries = bcm->ieee->ieee_stats.tx_retry_limit_exceeded;
 	wstats->discard.nwid = bcm->ieee->ieee_stats.tx_discards_wrong_sa;

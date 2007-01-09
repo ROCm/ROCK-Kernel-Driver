@@ -19,6 +19,7 @@
 #define _LINUX_NET_H
 
 #include <linux/wait.h>
+#include <linux/random.h>
 #include <asm/socket.h>
 
 struct poll_table_struct;
@@ -169,11 +170,6 @@ struct proto_ops {
 struct net_proto_family {
 	int		family;
 	int		(*create)(struct socket *sock, int protocol);
-	/* These are counters for the number of different methods of
-	   each we support */
-	short		authentication;
-	short		encryption;
-	short		encrypt_net;
 	struct module	*owner;
 };
 
@@ -181,8 +177,8 @@ struct iovec;
 struct kvec;
 
 extern int	     sock_wake_async(struct socket *sk, int how, int band);
-extern int	     sock_register(struct net_proto_family *fam);
-extern int	     sock_unregister(int family);
+extern int	     sock_register(const struct net_proto_family *fam);
+extern void	     sock_unregister(int family);
 extern int	     sock_create(int family, int type, int proto,
 				 struct socket **res);
 extern int	     sock_create_kern(int family, int type, int proto,
@@ -198,15 +194,34 @@ extern int 	     sock_map_fd(struct socket *sock);
 extern struct socket *sockfd_lookup(int fd, int *err);
 #define		     sockfd_put(sock) fput(sock->file)
 extern int	     net_ratelimit(void);
-extern unsigned long net_random(void);
-extern void	     net_srandom(unsigned long);
-extern void	     net_random_init(void);
+
+#define net_random()		random32()
+#define net_srandom(seed)	srandom32(seed)
 
 extern int   	     kernel_sendmsg(struct socket *sock, struct msghdr *msg,
 				    struct kvec *vec, size_t num, size_t len);
 extern int   	     kernel_recvmsg(struct socket *sock, struct msghdr *msg,
 				    struct kvec *vec, size_t num,
 				    size_t len, int flags);
+
+extern int kernel_bind(struct socket *sock, struct sockaddr *addr,
+		       int addrlen);
+extern int kernel_listen(struct socket *sock, int backlog);
+extern int kernel_accept(struct socket *sock, struct socket **newsock,
+			 int flags);
+extern int kernel_connect(struct socket *sock, struct sockaddr *addr,
+			  int addrlen, int flags);
+extern int kernel_getsockname(struct socket *sock, struct sockaddr *addr,
+			      int *addrlen);
+extern int kernel_getpeername(struct socket *sock, struct sockaddr *addr,
+			      int *addrlen);
+extern int kernel_getsockopt(struct socket *sock, int level, int optname,
+			     char *optval, int *optlen);
+extern int kernel_setsockopt(struct socket *sock, int level, int optname,
+			     char *optval, int optlen);
+extern int kernel_sendpage(struct socket *sock, struct page *page, int offset,
+			   size_t size, int flags);
+extern int kernel_sock_ioctl(struct socket *sock, int cmd, unsigned long arg);
 
 #ifndef CONFIG_SMP
 #define SOCKOPS_WRAPPED(name) name

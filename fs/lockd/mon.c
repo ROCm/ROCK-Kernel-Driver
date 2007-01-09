@@ -18,8 +18,6 @@
 #define NLMDBG_FACILITY		NLMDBG_MONITOR
 
 static struct rpc_clnt *	nsm_create(void);
-static int			__nsm_monitor(struct nlm_host *);
-static int			__nsm_unmonitor(struct nlm_host *);
 
 static struct rpc_program	nsm_program;
 
@@ -27,17 +25,6 @@ static struct rpc_program	nsm_program;
  * Local NSM state
  */
 int				nsm_local_state;
-
-/*
- * Initialize lockd for RPC statd upcalls
- */
-void
-nsm_statd_upcalls_init()
-{
-	nsm_monitor = __nsm_monitor;
-	nsm_unmonitor = __nsm_unmonitor;
-}
-
 
 /*
  * Common procedure for SM_MON/SM_UNMON calls
@@ -82,7 +69,7 @@ nsm_mon_unmon(struct nsm_handle *nsm, u32 proc, struct nsm_res *res)
  * Set up monitoring of a remote host
  */
 int
-__nsm_monitor(struct nlm_host *host)
+nsm_monitor(struct nlm_host *host)
 {
 	struct nsm_handle *nsm = host->h_nsmhandle;
 	struct nsm_res	res;
@@ -107,7 +94,7 @@ __nsm_monitor(struct nlm_host *host)
  * Cease to monitor remote host
  */
 int
-__nsm_unmonitor(struct nlm_host *host)
+nsm_unmonitor(struct nlm_host *host)
 {
 	struct nsm_handle *nsm = host->h_nsmhandle;
 	struct nsm_res	res;
@@ -138,38 +125,31 @@ __nsm_unmonitor(struct nlm_host *host)
 static struct rpc_clnt *
 nsm_create(void)
 {
-	struct rpc_xprt		*xprt;
-	struct rpc_clnt		*clnt;
-	struct sockaddr_in	sin;
+	struct sockaddr_in	sin = {
+		.sin_family	= AF_INET,
+		.sin_addr.s_addr = htonl(INADDR_LOOPBACK),
+		.sin_port	= 0,
+	};
+	struct rpc_create_args args = {
+		.protocol	= IPPROTO_UDP,
+		.address	= (struct sockaddr *)&sin,
+		.addrsize	= sizeof(sin),
+		.servername	= "localhost",
+		.program	= &nsm_program,
+		.version	= SM_VERSION,
+		.authflavor	= RPC_AUTH_NULL,
+		.flags		= (RPC_CLNT_CREATE_ONESHOT),
+	};
 
-	sin.sin_family = AF_INET;
-	sin.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-	sin.sin_port = 0;
-
-	xprt = xprt_create_proto(IPPROTO_UDP, &sin, NULL);
-	if (IS_ERR(xprt))
-		return (struct rpc_clnt *)xprt;
-	xprt->resvport = 1;	/* NSM requires a reserved port */
-
-	clnt = rpc_create_client(xprt, "localhost",
-				&nsm_program, SM_VERSION,
-				RPC_AUTH_NULL);
-	if (IS_ERR(clnt))
-		goto out_err;
-	clnt->cl_softrtry = 1;
-	clnt->cl_oneshot  = 1;
-	return clnt;
-
-out_err:
-	return clnt;
+	return rpc_create(&args);
 }
 
 /*
  * XDR functions for NSM.
  */
 
-static u32 *
-xdr_encode_common(struct rpc_rqst *rqstp, u32 *p, struct nsm_args *argp)
+static __be32 *
+xdr_encode_common(struct rpc_rqst *rqstp, __be32 *p, struct nsm_args *argp)
 {
 	char	buffer[20], *name;
 
@@ -186,7 +166,7 @@ xdr_encode_common(struct rpc_rqst *rqstp, u32 *p, struct nsm_args *argp)
 		name = buffer;
 	}
 	if (!(p = xdr_encode_string(p, name))
-	 || !(p = xdr_encode_string(p, system_utsname.nodename)))
+	 || !(p = xdr_encode_string(p, utsname()->nodename)))
 		return ERR_PTR(-EIO);
 	*p++ = htonl(argp->prog);
 	*p++ = htonl(argp->vers);
@@ -196,7 +176,7 @@ xdr_encode_common(struct rpc_rqst *rqstp, u32 *p, struct nsm_args *argp)
 }
 
 static int
-xdr_encode_mon(struct rpc_rqst *rqstp, u32 *p, struct nsm_args *argp)
+xdr_encode_mon(struct rpc_rqst *rqstp, __be32 *p, struct nsm_args *argp)
 {
 	p = xdr_encode_common(rqstp, p, argp);
 	if (IS_ERR(p))
@@ -212,7 +192,7 @@ xdr_encode_mon(struct rpc_rqst *rqstp, u32 *p, struct nsm_args *argp)
 }
 
 static int
-xdr_encode_unmon(struct rpc_rqst *rqstp, u32 *p, struct nsm_args *argp)
+xdr_encode_unmon(struct rpc_rqst *rqstp, __be32 *p, struct nsm_args *argp)
 {
 	p = xdr_encode_common(rqstp, p, argp);
 	if (IS_ERR(p))
@@ -222,7 +202,7 @@ xdr_encode_unmon(struct rpc_rqst *rqstp, u32 *p, struct nsm_args *argp)
 }
 
 static int
-xdr_decode_stat_res(struct rpc_rqst *rqstp, u32 *p, struct nsm_res *resp)
+xdr_decode_stat_res(struct rpc_rqst *rqstp, __be32 *p, struct nsm_res *resp)
 {
 	resp->status = ntohl(*p++);
 	resp->state = ntohl(*p++);
@@ -232,7 +212,7 @@ xdr_decode_stat_res(struct rpc_rqst *rqstp, u32 *p, struct nsm_res *resp)
 }
 
 static int
-xdr_decode_stat(struct rpc_rqst *rqstp, u32 *p, struct nsm_res *resp)
+xdr_decode_stat(struct rpc_rqst *rqstp, __be32 *p, struct nsm_res *resp)
 {
 	resp->state = ntohl(*p++);
 	return 0;

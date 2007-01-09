@@ -387,11 +387,7 @@ static void intel_i830_init_gtt_entries(void)
 	/* We obtain the size of the GTT, which is also stored (for some
 	 * reason) at the top of stolen memory. Then we add 4KB to that
 	 * for the video BIOS popup, which is also stored in there. */
-
-	if (IS_I965)
-		size = 512 + 4;
-	else
-		size = agp_bridge->driver->fetch_size() + 4;
+	size = agp_bridge->driver->fetch_size() + 4;
 
 	if (agp_bridge->dev->device == PCI_DEVICE_ID_INTEL_82830_HB ||
 	    agp_bridge->dev->device == PCI_DEVICE_ID_INTEL_82845G_HB) {
@@ -805,6 +801,26 @@ static int intel_i915_create_gatt_table(struct agp_bridge_data *bridge)
 
 	return 0;
 }
+
+/*
+ * The i965 supports 36-bit physical addresses, but to keep
+ * the format of the GTT the same, the bits that don't fit
+ * in a 32-bit word are shifted down to bits 4..7.
+ *
+ * Gcc is smart enough to notice that "(addr >> 28) & 0xf0"
+ * is always zero on 32-bit architectures, so no need to make
+ * this conditional.
+ */
+static unsigned long intel_i965_mask_memory(struct agp_bridge_data *bridge,
+	unsigned long addr, int type)
+{
+	/* Shift high bits down */
+	addr |= (addr >> 28) & 0xf0;
+
+	/* Type checking must be done elsewhere */
+	return addr | bridge->driver->masks[type].mask;
+}
+
 static int intel_i965_fetch_size(void)
 {
        struct aper_size_info_fixed *values;
@@ -832,7 +848,8 @@ static int intel_i965_fetch_size(void)
 
        agp_bridge->previous_size = agp_bridge->current_size = (void *)(values + offset);
 
-       return values[offset].size;
+	/* The i965 GTT is always sized as if it had a 512kB aperture size */
+	return 512;
 }
 
 /* The intel i965 automatically initializes the agp aperture during POST.
@@ -1392,7 +1409,7 @@ static struct agp_bridge_driver intel_830_driver = {
 	.owner			= THIS_MODULE,
 	.aperture_sizes		= intel_i830_sizes,
 	.size_type		= FIXED_APER_SIZE,
-	.num_aperture_sizes	= 3,
+	.num_aperture_sizes	= 4,
 	.needs_scratch_page	= TRUE,
 	.configure		= intel_i830_configure,
 	.fetch_size		= intel_i830_fetch_size,
@@ -1554,7 +1571,7 @@ static struct agp_bridge_driver intel_915_driver = {
 	.owner			= THIS_MODULE,
 	.aperture_sizes		= intel_i830_sizes,
 	.size_type		= FIXED_APER_SIZE,
-	.num_aperture_sizes	= 3,
+	.num_aperture_sizes	= 4,
 	.needs_scratch_page	= TRUE,
 	.configure		= intel_i915_configure,
 	.fetch_size		= intel_i915_fetch_size,
@@ -1584,7 +1601,7 @@ static struct agp_bridge_driver intel_i965_driver = {
        .fetch_size             = intel_i965_fetch_size,
        .cleanup                = intel_i915_cleanup,
        .tlb_flush              = intel_i810_tlbflush,
-       .mask_memory            = intel_i810_mask_memory,
+       .mask_memory            = intel_i965_mask_memory,
        .masks                  = intel_i810_masks,
        .agp_enable             = intel_i810_agp_enable,
        .cache_flush            = global_cache_flush,
@@ -1903,6 +1920,7 @@ static void __devexit agp_intel_remove(struct pci_dev *pdev)
 	agp_put_bridge(bridge);
 }
 
+#ifdef CONFIG_PM
 static int agp_intel_resume(struct pci_dev *pdev)
 {
 	struct agp_bridge_data *bridge = pci_get_drvdata(pdev);
@@ -1928,6 +1946,7 @@ static int agp_intel_resume(struct pci_dev *pdev)
 
 	return 0;
 }
+#endif
 
 static struct pci_device_id agp_intel_pci_table[] = {
 #define ID(x)						\
@@ -1978,7 +1997,9 @@ static struct pci_driver agp_intel_pci_driver = {
 	.id_table	= agp_intel_pci_table,
 	.probe		= agp_intel_probe,
 	.remove		= __devexit_p(agp_intel_remove),
+#ifdef CONFIG_PM
 	.resume		= agp_intel_resume,
+#endif
 };
 
 static int __init agp_intel_init(void)

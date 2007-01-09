@@ -792,6 +792,7 @@ static int uart_set_info(struct uart_state *state,
 			 * We failed anyway.
 			 */
 			retval = -EBUSY;
+			goto exit;  // Added to return the correct error -Ram Gupta
 		}
 	}
 
@@ -1662,16 +1663,16 @@ static int uart_line_info(char *buf, struct uart_driver *drv, int i)
 	struct uart_port *port = state->port;
 	char stat_buf[32];
 	unsigned int status;
-	int ret;
+	int mmio, ret;
 
 	if (!port)
 		return 0;
 
+	mmio = port->iotype >= UPIO_MEM;
 	ret = sprintf(buf, "%d: uart:%s %s%08lX irq:%d",
 			port->line, uart_type(port),
-			port->iotype == UPIO_MEM ? "mmio:0x" : "port:",
-			port->iotype == UPIO_MEM ? port->mapbase :
-						(unsigned long) port->iobase,
+			mmio ? "mmio:0x" : "port:",
+			mmio ? port->mapbase : (unsigned long) port->iobase,
 			port->irq);
 
 	if (port->type == PORT_UNKNOWN) {
@@ -1929,6 +1930,13 @@ int uart_suspend_port(struct uart_driver *drv, struct uart_port *port)
 
 	mutex_lock(&state->mutex);
 
+#ifdef CONFIG_DISABLE_CONSOLE_SUSPEND
+	if (uart_console(port)) {
+		mutex_unlock(&state->mutex);
+		return 0;
+	}
+#endif
+
 	if (state->info && state->info->flags & UIF_INITIALIZED) {
 		const struct uart_ops *ops = port->ops;
 
@@ -1969,6 +1977,13 @@ int uart_resume_port(struct uart_driver *drv, struct uart_port *port)
 	struct uart_state *state = drv->state + port->line;
 
 	mutex_lock(&state->mutex);
+
+#ifdef CONFIG_DISABLE_CONSOLE_SUSPEND
+	if (uart_console(port)) {
+		mutex_unlock(&state->mutex);
+		return 0;
+	}
+#endif
 
 	uart_change_pm(state, 0);
 
@@ -2102,7 +2117,7 @@ uart_configure_port(struct uart_driver *drv, struct uart_state *state,
 	}
 }
 
-static struct tty_operations uart_ops = {
+static const struct tty_operations uart_ops = {
 	.open		= uart_open,
 	.close		= uart_close,
 	.write		= uart_write,

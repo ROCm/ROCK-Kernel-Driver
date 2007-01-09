@@ -1,5 +1,5 @@
 /*
- * include/linux/writeback.h.
+ * include/linux/writeback.h
  */
 #ifndef WRITEBACK_H
 #define WRITEBACK_H
@@ -69,8 +69,6 @@ void wake_up_inode(struct inode *inode);
 int inode_wait(void *);
 void sync_inodes_sb(struct super_block *, int wait);
 void sync_inodes(int wait);
-void writeback_bdev(struct super_block *);
-void writeback_inode(struct inode *);
 
 /* writeback.h requires fs.h; it, too, is not included from here. */
 static inline void wait_on_inode(struct inode *inode)
@@ -112,11 +110,15 @@ balance_dirty_pages_ratelimited(struct address_space *mapping)
 }
 
 int pdflush_operation(void (*fn)(unsigned long), unsigned long arg0);
+extern int generic_writepages(struct address_space *mapping,
+			      struct writeback_control *wbc);
 int do_writepages(struct address_space *mapping, struct writeback_control *wbc);
 int sync_page_range(struct inode *inode, struct address_space *mapping,
 			loff_t pos, loff_t count);
 int sync_page_range_nolock(struct inode *inode, struct address_space *mapping,
 			   loff_t pos, loff_t count);
+void set_page_dirty_balance(struct page *page);
+void writeback_set_ratelimit(void);
 
 /* pdflush.c */
 extern int nr_pdflush_threads;	/* Global so it can be exported to sysctl

@@ -269,7 +269,7 @@ static ssize_t pp_write (struct file * file, const char __user * buf,
 	return bytes_written;
 }
 
-static void pp_irq (int irq, void * private, struct pt_regs * unused)
+static void pp_irq (int irq, void * private)
 {
 	struct pp_struct * pp = (struct pp_struct *) private;
 
@@ -752,13 +752,13 @@ static const struct file_operations pp_fops = {
 
 static void pp_attach(struct parport *port)
 {
-	device_create(ppdev_class, NULL, MKDEV(PP_MAJOR, port->number),
-			"parport%d", port->number);
+	class_device_create(ppdev_class, NULL, MKDEV(PP_MAJOR, port->number),
+			NULL, "parport%d", port->number);
 }
 
 static void pp_detach(struct parport *port)
 {
-	device_destroy(ppdev_class, MKDEV(PP_MAJOR, port->number));
+	class_device_destroy(ppdev_class, MKDEV(PP_MAJOR, port->number));
 }
 
 static struct parport_driver pp_driver = {

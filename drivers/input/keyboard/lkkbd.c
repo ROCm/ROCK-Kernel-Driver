@@ -59,11 +59,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
- *
- * Should you need to contact me, the author, you can do so either by
- * email or by paper mail:
- * Jan-Benedict Glaw, Lilienstraße 16, 33790 Hörste (near Halle/Westf.),
- * Germany.
  */
 
 #include <linux/delay.h>
@@ -453,8 +448,7 @@ lkkbd_detection_done (struct lkkbd *lk)
  * is received.
  */
 static irqreturn_t
-lkkbd_interrupt (struct serio *serio, unsigned char data, unsigned int flags,
-		struct pt_regs *regs)
+lkkbd_interrupt (struct serio *serio, unsigned char data, unsigned int flags)
 {
 	struct lkkbd *lk = serio_get_drvdata (serio);
 	int i;
@@ -473,7 +467,6 @@ lkkbd_interrupt (struct serio *serio, unsigned char data, unsigned int flags,
 
 	switch (data) {
 		case LK_ALL_KEYS_UP:
-			input_regs (lk->dev, regs);
 			for (i = 0; i < ARRAY_SIZE (lkkbd_keycode); i++)
 				if (lk->keycode[i] != KEY_RESERVED)
 					input_report_key (lk->dev, lk->keycode[i], 0);
@@ -501,7 +494,6 @@ lkkbd_interrupt (struct serio *serio, unsigned char data, unsigned int flags,
 
 		default:
 			if (lk->keycode[data] != KEY_RESERVED) {
-				input_regs (lk->dev, regs);
 				if (!test_bit (lk->keycode[data], lk->dev->key))
 					input_report_key (lk->dev, lk->keycode[data], 1);
 				else

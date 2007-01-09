@@ -26,7 +26,7 @@
 #include <linux/libata.h>
 
 #define DRV_NAME "ata_generic"
-#define DRV_VERSION "0.2.7"
+#define DRV_VERSION "0.2.6"
 
 /*
  *	A generic parallel ATA driver using libata
@@ -109,13 +109,13 @@ static struct scsi_host_template generic_sht = {
 	.can_queue		= ATA_DEF_QUEUE,
 	.this_id		= ATA_SHT_THIS_ID,
 	.sg_tablesize		= LIBATA_MAX_PRD,
+	.max_sectors		= ATA_MAX_SECTORS,
 	.cmd_per_lun		= ATA_SHT_CMD_PER_LUN,
 	.emulated		= ATA_SHT_EMULATED,
 	.use_clustering		= ATA_SHT_USE_CLUSTERING,
 	.proc_name		= DRV_NAME,
 	.dma_boundary		= ATA_DMA_BOUNDARY,
 	.slave_configure	= ata_scsi_slave_config,
-	.slave_destroy		= ata_scsi_slave_destroy,
 	.bios_param		= ata_std_bios_param,
 };
 
@@ -230,7 +230,7 @@ static struct pci_driver ata_generic_pci_driver = {
 
 static int __init ata_generic_init(void)
 {
-	return pci_register_driver(&ata_generic_pci_driver);
+	return pci_module_init(&ata_generic_pci_driver);
 }
 
 

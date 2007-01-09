@@ -23,6 +23,8 @@ int have_vmlinux = 0;
 static int all_versions = 0;
 /* If we are modposting external module set to 1 */
 static int external_module = 0;
+/* Only warn about unresolved symbols */
+static int warn_unresolved = 0;
 /* How a symbol is exported */
 enum export {
 	export_plain,      export_unused,     export_gpl,
@@ -581,8 +583,8 @@ static int strrcmp(const char *s, const char *sub)
  *   fromsec = .data
  *   atsym = *driver, *_template, *_sht, *_ops, *_probe, *probe_one
  **/
-static int secref_whitelist(const char *tosec, const char *fromsec,
-			    const char *atsym)
+static int secref_whitelist(const char *modname, const char *tosec,
+			    const char *fromsec, const char *atsym)
 {
 	int f1 = 1, f2 = 1;
 	const char **s;
@@ -618,8 +620,16 @@ static int secref_whitelist(const char *tosec, const char *fromsec,
 	for (s = pat2sym; *s; s++)
 		if (strrcmp(atsym, *s) == 0)
 			f1 = 1;
+	if (f1 && f2)
+		return 1;
 
-	return f1 && f2;
+	/* Whitelist all references from .pci_fixup section if vmlinux */
+	if (is_vmlinux(modname)) {
+		if ((strcmp(fromsec, ".pci_fixup") == 0) &&
+		    (strcmp(tosec, ".init.text") == 0))
+		return 1;
+	}
+	return 0;
 }
 
 /**
@@ -726,7 +736,8 @@ static void warn_sec_mismatch(const char *modname, const char *fromsec,
 
 	/* check whitelist - we may ignore it */
 	if (before &&
-	    secref_whitelist(secname, fromsec, elf->strtab + before->st_name))
+	    secref_whitelist(modname, secname, fromsec,
+			     elf->strtab + before->st_name))
 		return;
 
 	if (before && after) {
@@ -910,6 +921,8 @@ static int init_section_ref_ok(const char *name)
 		".fixup",
 		".smp_locks",
 		".plt",  /* seen on ARCH=um build on x86_64. Harmless */
+		"__ftr_fixup",		/* powerpc cpu feature fixup */
+		"__fw_ftr_fixup",	/* powerpc firmware feature fixup */
 		NULL
 	};
 	/* Start of section names */
@@ -1236,16 +1249,19 @@ void add_supported_flag(struct buffer *b, struct module *mod)
 /**
  * Record CRCs for unresolved symbols
  **/
-static void add_versions(struct buffer *b, struct module *mod)
+static int add_versions(struct buffer *b, struct module *mod)
 {
 	struct symbol *s, *exp;
+	int err = 0;
 
 	for (s = mod->unres; s; s = s->next) {
 		exp = find_symbol(s->name);
 		if (!exp || exp->module == mod) {
-			if (have_vmlinux && !s->weak)
+			if (have_vmlinux && !s->weak) {
 				warn("\"%s\" [%s.ko] undefined!\n",
 				     s->name, mod->name);
+				err = warn_unresolved ? 0 : 1;
+			}
 			continue;
 		}
 		s->module = exp->module;
@@ -1254,7 +1270,7 @@ static void add_versions(struct buffer *b, struct module *mod)
 	}
 
 	if (!modversions)
-		return;
+		return err;
 
 	buf_printf(b, "\n");
 	buf_printf(b, "static const struct modversion_info ____versions[]\n");
@@ -1274,6 +1290,8 @@ static void add_versions(struct buffer *b, struct module *mod)
 	}
 
 	buf_printf(b, "};\n");
+
+	return err;
 }
 
 static void add_depends(struct buffer *b, struct module *mod,
@@ -1459,8 +1477,9 @@ int main(int argc, char **argv)
 	char *dump_write = NULL;
 	const char *supported = NULL;
 	int opt;
+	int err;
 
-	while ((opt = getopt(argc, argv, "i:I:mo:as:")) != -1) {
+	while ((opt = getopt(argc, argv, "i:I:mo:aws:")) != -1) {
 		switch(opt) {
 			case 'i':
 				kernel_read = optarg;
@@ -1477,6 +1496,9 @@ int main(int argc, char **argv)
 				break;
 			case 'a':
 				all_versions = 1;
+				break;
+			case 'w':
+				warn_unresolved = 1;
 				break;
 			case 's':
 				supported = optarg;
@@ -1503,6 +1525,8 @@ int main(int argc, char **argv)
 		check_exports(mod);
 	}
 
+	err = 0;
+
 	for (mod = modules; mod; mod = mod->next) {
 		if (mod->skip)
 			continue;
@@ -1511,7 +1535,7 @@ int main(int argc, char **argv)
 
 		add_header(&buf, mod);
 		add_supported_flag(&buf, mod);
-		add_versions(&buf, mod);
+		err |= add_versions(&buf, mod);
 		add_depends(&buf, mod, modules);
 		add_moddevtable(&buf, mod);
 		add_srcversion(&buf, mod);
@@ -1523,5 +1547,5 @@ int main(int argc, char **argv)
 	if (dump_write)
 		write_dump(dump_write);
 
-	return 0;
+	return err;
 }

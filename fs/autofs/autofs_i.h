@@ -37,8 +37,6 @@
 #define DPRINTK(D) ((void)0)
 #endif
 
-#define AUTOFS_SUPER_MAGIC 0x0187
-
 /*
  * If the daemon returns a negative response (AUTOFS_IOC_FAIL) then the
  * kernel will keep the negative response cached for up to the time given
@@ -151,6 +149,7 @@ extern const struct file_operations autofs_root_operations;
 /* Initializing function */
 
 int autofs_fill_super(struct super_block *, void *, int);
+void autofs_kill_sb(struct super_block *sb);
 
 /* Queue management functions */
 

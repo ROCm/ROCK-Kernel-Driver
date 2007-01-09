@@ -1271,7 +1271,7 @@ static unsigned tx_le_req(const struct sk_buff *skb)
 	if (skb_is_gso(skb))
 		++count;
 
-	if (skb->ip_summed == CHECKSUM_HW)
+	if (skb->ip_summed == CHECKSUM_PARTIAL)
 		++count;
 
 	return count;
@@ -1345,7 +1345,7 @@ static int sky2_xmit_frame(struct sk_buff *skb, struct net_device *dev)
 #endif
 
 	/* Handle TCP checksum offload */
-	if (skb->ip_summed == CHECKSUM_HW) {
+	if (skb->ip_summed == CHECKSUM_PARTIAL) {
 		unsigned offset = skb->h.raw - skb->data;
 		u32 tcpsum;
 
@@ -2102,8 +2102,8 @@ static int sky2_status_intr(struct sky2_hw *hw, int to_do)
 #endif
 		case OP_RXCHKS:
 			skb = sky2->rx_ring[sky2->rx_next].skb;
-			skb->ip_summed = CHECKSUM_HW;
-			skb->csum = le16_to_cpu(status);
+			skb->ip_summed = CHECKSUM_COMPLETE;
+			skb->csum = status & 0xffff;
 			break;
 
 		case OP_TXINDEXLE:
@@ -2348,7 +2348,7 @@ static int sky2_poll(struct net_device *dev0, int *budget)
 	}
 }
 
-static irqreturn_t sky2_intr(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t sky2_intr(int irq, void *dev_id)
 {
 	struct sky2_hw *hw = dev_id;
 	struct net_device *dev0 = hw->dev[0];
@@ -3177,7 +3177,7 @@ static void sky2_get_regs(struct net_device *dev, struct ethtool_regs *regs,
 		      regs->len - B3_RI_WTO_R1);
 }
 
-static struct ethtool_ops sky2_ethtool_ops = {
+static const struct ethtool_ops sky2_ethtool_ops = {
 	.get_settings = sky2_get_settings,
 	.set_settings = sky2_set_settings,
 	.get_drvinfo = sky2_get_drvinfo,
@@ -3302,7 +3302,7 @@ static void __devinit sky2_show_addr(struct net_device *dev)
 }
 
 /* Handle software interrupt used during MSI test */
-static irqreturn_t __devinit sky2_test_intr(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t __devinit sky2_test_intr(int irq, void *dev_id)
 {
 	struct sky2_hw *hw = dev_id;
 	u32 status = sky2_read32(hw, B0_Y2_SP_ISRC2);

@@ -38,8 +38,7 @@ target(struct sk_buff **pskb,
        const struct net_device *out,
        unsigned int hooknum,
        const struct xt_target *target,
-       const void *targinfo,
-       void *userinfo)
+       const void *targinfo)
 {
 	const struct xt_connmark_target_info *markinfo = targinfo;
 	u_int32_t diff;
@@ -49,24 +48,37 @@ target(struct sk_buff **pskb,
 	u_int32_t *ctmark = nf_ct_get_mark(*pskb, &ctinfo);
 
 	if (ctmark) {
-	    switch(markinfo->mode) {
-	    case XT_CONNMARK_SET:
-		newmark = (*ctmark & ~markinfo->mask) | markinfo->mark;
-		if (newmark != *ctmark)
-		    *ctmark = newmark;
-		break;
-	    case XT_CONNMARK_SAVE:
-		newmark = (*ctmark & ~markinfo->mask) | ((*pskb)->nfmark & markinfo->mask);
-		if (*ctmark != newmark)
-		    *ctmark = newmark;
-		break;
-	    case XT_CONNMARK_RESTORE:
-		nfmark = (*pskb)->nfmark;
-		diff = (*ctmark ^ nfmark) & markinfo->mask;
-		if (diff != 0)
-		    (*pskb)->nfmark = nfmark ^ diff;
-		break;
-	    }
+		switch(markinfo->mode) {
+		case XT_CONNMARK_SET:
+			newmark = (*ctmark & ~markinfo->mask) | markinfo->mark;
+			if (newmark != *ctmark) {
+				*ctmark = newmark;
+#if defined(CONFIG_IP_NF_CONNTRACK) || defined(CONFIG_IP_NF_CONNTRACK_MODULE)
+				ip_conntrack_event_cache(IPCT_MARK, *pskb);
+#else
+				nf_conntrack_event_cache(IPCT_MARK, *pskb);
+#endif
+		}
+			break;
+		case XT_CONNMARK_SAVE:
+			newmark = (*ctmark & ~markinfo->mask) |
+				  ((*pskb)->nfmark & markinfo->mask);
+			if (*ctmark != newmark) {
+				*ctmark = newmark;
+#if defined(CONFIG_IP_NF_CONNTRACK) || defined(CONFIG_IP_NF_CONNTRACK_MODULE)
+				ip_conntrack_event_cache(IPCT_MARK, *pskb);
+#else
+				nf_conntrack_event_cache(IPCT_MARK, *pskb);
+#endif
+			}
+			break;
+		case XT_CONNMARK_RESTORE:
+			nfmark = (*pskb)->nfmark;
+			diff = (*ctmark ^ nfmark) & markinfo->mask;
+			if (diff != 0)
+				(*pskb)->nfmark = nfmark ^ diff;
+			break;
+		}
 	}
 
 	return XT_CONTINUE;
@@ -77,23 +89,22 @@ checkentry(const char *tablename,
 	   const void *entry,
 	   const struct xt_target *target,
 	   void *targinfo,
-	   unsigned int targinfosize,
 	   unsigned int hook_mask)
 {
 	struct xt_connmark_target_info *matchinfo = targinfo;
 
 	if (matchinfo->mode == XT_CONNMARK_RESTORE) {
-	    if (strcmp(tablename, "mangle") != 0) {
-		    printk(KERN_WARNING "CONNMARK: restore can only be called from \"mangle\" table, not \"%s\"\n", tablename);
-		    return 0;
-	    }
+		if (strcmp(tablename, "mangle") != 0) {
+			printk(KERN_WARNING "CONNMARK: restore can only be "
+			       "called from \"mangle\" table, not \"%s\"\n",
+			       tablename);
+			return 0;
+		}
 	}
-
 	if (matchinfo->mark > 0xffffffff || matchinfo->mask > 0xffffffff) {
 		printk(KERN_WARNING "CONNMARK: Only supports 32bit mark\n");
 		return 0;
 	}
-
 	return 1;
 }
 
@@ -128,50 +139,41 @@ static int compat_to_user(void __user *dst, void *src)
 }
 #endif /* CONFIG_COMPAT */
 
-static struct xt_target connmark_reg = {
-	.name		= "CONNMARK",
-	.target		= target,
-	.targetsize	= sizeof(struct xt_connmark_target_info),
-	.checkentry	= checkentry,
-	.family		= AF_INET,
+static struct xt_target xt_connmark_target[] = {
+	{
+		.name		= "CONNMARK",
+		.family		= AF_INET,
+		.checkentry	= checkentry,
+		.target		= target,
+		.targetsize	= sizeof(struct xt_connmark_target_info),
 #ifdef CONFIG_COMPAT
 		.compatsize	= sizeof(struct compat_xt_connmark_target_info),
 		.compat_from_user = compat_from_user,
 		.compat_to_user	= compat_to_user,
 #endif
-	.me		= THIS_MODULE
-};
-
-static struct xt_target connmark6_reg = {
-	.name		= "CONNMARK",
-	.target		= target,
-	.targetsize	= sizeof(struct xt_connmark_target_info),
-	.checkentry	= checkentry,
-	.family		= AF_INET6,
-	.me		= THIS_MODULE
+		.me		= THIS_MODULE
+	},
+	{
+		.name		= "CONNMARK",
+		.family		= AF_INET6,
+		.checkentry	= checkentry,
+		.target		= target,
+		.targetsize	= sizeof(struct xt_connmark_target_info),
+		.me		= THIS_MODULE
+	},
 };
 
 static int __init xt_connmark_init(void)
 {
-	int ret;
-
 	need_conntrack();
-
-	ret = xt_register_target(&connmark_reg);
-	if (ret)
-		return ret;
-
-	ret = xt_register_target(&connmark6_reg);
-	if (ret)
-		xt_unregister_target(&connmark_reg);
-
-	return ret;
+	return xt_register_targets(xt_connmark_target,
+				   ARRAY_SIZE(xt_connmark_target));
 }
 
 static void __exit xt_connmark_fini(void)
 {
-	xt_unregister_target(&connmark_reg);
-	xt_unregister_target(&connmark6_reg);
+	xt_unregister_targets(xt_connmark_target,
+			      ARRAY_SIZE(xt_connmark_target));
 }
 
 module_init(xt_connmark_init);

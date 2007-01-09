@@ -37,9 +37,7 @@ void
 rpc_register_sysctl(void)
 {
 	if (!sunrpc_table_header) {
-		struct ctl_path ctl_path[] = { { CTL_SUNRPC, "sunrpc", 0555 }, { 0 } };
-
-		sunrpc_table_header = register_sysctl_table_path(sunrpc_table, ctl_path);
+		sunrpc_table_header = register_sysctl_table(sunrpc_table, 1);
 #ifdef CONFIG_PROC_FS
 		if (sunrpc_table[0].de)
 			sunrpc_table[0].de->owner = THIS_MODULE;
@@ -126,7 +124,7 @@ static unsigned int max_slot_table_size = RPC_MAX_SLOT_TABLE;
 static unsigned int xprt_min_resvport_limit = RPC_MIN_RESVPORT;
 static unsigned int xprt_max_resvport_limit = RPC_MAX_RESVPORT;
 
-static ctl_table sunrpc_table[] = {
+static ctl_table debug_table[] = {
 	{
 		.ctl_name	= CTL_RPCDEBUG,
 		.procname	= "rpc_debug",
@@ -202,6 +200,16 @@ static ctl_table sunrpc_table[] = {
 		.strategy	= &sysctl_intvec,
 		.extra1		= &xprt_min_resvport_limit,
 		.extra2		= &xprt_max_resvport_limit
+	},
+	{ .ctl_name = 0 }
+};
+
+static ctl_table sunrpc_table[] = {
+	{
+		.ctl_name	= CTL_SUNRPC,
+		.procname	= "sunrpc",
+		.mode		= 0555,
+		.child		= debug_table
 	},
 	{ .ctl_name = 0 }
 };

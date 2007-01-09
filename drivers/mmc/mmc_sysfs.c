@@ -13,6 +13,7 @@
 #include <linux/init.h>
 #include <linux/device.h>
 #include <linux/idr.h>
+#include <linux/workqueue.h>
 
 #include <linux/mmc/card.h>
 #include <linux/mmc/host.h>
@@ -198,7 +199,7 @@ void mmc_init_card(struct mmc_card *card, struct mmc_host *host)
 	memset(card, 0, sizeof(struct mmc_card));
 	card->host = host;
 	device_initialize(&card->dev);
-	card->dev.parent = mmc_dev(host);
+	card->dev.parent = card->host->dev;
 	card->dev.bus = &mmc_bus_type;
 	card->dev.release = mmc_release_card;
 }
@@ -241,7 +242,7 @@ void mmc_remove_card(struct mmc_card *card)
 }
 
 
-static void mmc_host_classdev_release(struct device *dev)
+static void mmc_host_classdev_release(struct class_device *dev)
 {
 	struct mmc_host *host = cls_dev_to_mmc_host(dev);
 	kfree(host);
@@ -249,7 +250,7 @@ static void mmc_host_classdev_release(struct device *dev)
 
 static struct class mmc_host_class = {
 	.name		= "mmc_host",
-	.dev_release	= mmc_host_classdev_release,
+	.release	= mmc_host_classdev_release,
 };
 
 static DEFINE_IDR(mmc_host_idr);
@@ -266,10 +267,10 @@ struct mmc_host *mmc_alloc_host_sysfs(int extra, struct device *dev)
 	if (host) {
 		memset(host, 0, sizeof(struct mmc_host) + extra);
 
-		host->parent = dev;
-		host->class_dev.parent = dev;
+		host->dev = dev;
+		host->class_dev.dev = host->dev;
 		host->class_dev.class = &mmc_host_class;
-		device_initialize(&host->class_dev);
+		class_device_initialize(&host->class_dev);
 	}
 
 	return host;
@@ -291,10 +292,10 @@ int mmc_add_host_sysfs(struct mmc_host *host)
 	if (err)
 		return err;
 
-	snprintf(host->class_dev.bus_id, BUS_ID_SIZE,
+	snprintf(host->class_dev.class_id, BUS_ID_SIZE,
 		 "mmc%d", host->index);
 
-	return device_add(&host->class_dev);
+	return class_device_add(&host->class_dev);
 }
 
 /*
@@ -302,7 +303,7 @@ int mmc_add_host_sysfs(struct mmc_host *host)
  */
 void mmc_remove_host_sysfs(struct mmc_host *host)
 {
-	device_del(&host->class_dev);
+	class_device_del(&host->class_dev);
 
 	spin_lock(&mmc_host_lock);
 	idr_remove(&mmc_host_idr, host->index);
@@ -314,13 +315,44 @@ void mmc_remove_host_sysfs(struct mmc_host *host)
  */
 void mmc_free_host_sysfs(struct mmc_host *host)
 {
-	put_device(&host->class_dev);
+	class_device_put(&host->class_dev);
 }
 
+static struct workqueue_struct *workqueue;
+
+/*
+ * Internal function. Schedule work in the MMC work queue.
+ */
+int mmc_schedule_work(struct work_struct *work)
+{
+	return queue_work(workqueue, work);
+}
+
+/*
+ * Internal function. Schedule delayed work in the MMC work queue.
+ */
+int mmc_schedule_delayed_work(struct work_struct *work, unsigned long delay)
+{
+	return queue_delayed_work(workqueue, work, delay);
+}
+
+/*
+ * Internal function. Flush all scheduled work from the MMC work queue.
+ */
+void mmc_flush_scheduled_work(void)
+{
+	flush_workqueue(workqueue);
+}
 
 static int __init mmc_init(void)
 {
-	int ret = bus_register(&mmc_bus_type);
+	int ret;
+
+	workqueue = create_singlethread_workqueue("kmmcd");
+	if (!workqueue)
+		return -ENOMEM;
+
+	ret = bus_register(&mmc_bus_type);
 	if (ret == 0) {
 		ret = class_register(&mmc_host_class);
 		if (ret)
@@ -333,6 +365,7 @@ static void __exit mmc_exit(void)
 {
 	class_unregister(&mmc_host_class);
 	bus_unregister(&mmc_bus_type);
+	destroy_workqueue(workqueue);
 }
 
 module_init(mmc_init);

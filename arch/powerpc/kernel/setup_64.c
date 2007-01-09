@@ -56,7 +56,6 @@
 #include <asm/page.h>
 #include <asm/mmu.h>
 #include <asm/lmb.h>
-#include <asm/iseries/it_lp_naca.h>
 #include <asm/firmware.h>
 #include <asm/xmon.h>
 #include <asm/udbg.h>
@@ -79,10 +78,10 @@ u64 ppc64_pft_size;
  * before we've read this from the device tree.
  */
 struct ppc64_caches ppc64_caches = {
-	.dline_size = 0x80,
-	.log_dline_size = 7,
-	.iline_size = 0x80,
-	.log_iline_size = 7
+	.dline_size = 0x40,
+	.log_dline_size = 6,
+	.iline_size = 0x40,
+	.log_iline_size = 6
 };
 EXPORT_SYMBOL_GPL(ppc64_caches);
 
@@ -94,11 +93,6 @@ int dcache_bsize;
 int icache_bsize;
 int ucache_bsize;
 
-#ifdef CONFIG_MAGIC_SYSRQ
-unsigned long SYSRQ_KEY;
-#endif /* CONFIG_MAGIC_SYSRQ */
-
-
 #ifdef CONFIG_SMP
 
 static int smt_enabled_cmdline;
@@ -107,7 +101,7 @@ static int smt_enabled_cmdline;
 static void check_smt_enabled(void)
 {
 	struct device_node *dn;
-	char *smt_option;
+	const char *smt_option;
 
 	/* Allow the command line to overrule the OF option */
 	if (smt_enabled_cmdline)
@@ -116,7 +110,7 @@ static void check_smt_enabled(void)
 	dn = of_find_node_by_path("/options");
 
 	if (dn) {
-		smt_option = (char *)get_property(dn, "ibm,smt-enabled", NULL);
+		smt_option = get_property(dn, "ibm,smt-enabled", NULL);
 
                 if (smt_option) {
 			if (!strcmp(smt_option, "on"))
@@ -176,6 +170,9 @@ void __init setup_paca(int cpu)
 
 void __init early_setup(unsigned long dt_ptr)
 {
+	/* Identify CPU type */
+	identify_cpu(0);
+
 	/* Assume we're on cpu 0 for now. Don't write to the paca yet! */
 	setup_paca(0);
 
@@ -293,7 +290,7 @@ static void __init initialize_cache_info(void)
 		 */
 
 		if ( num_cpus == 1 ) {
-			u32 *sizep, *lsizep;
+			const u32 *sizep, *lsizep;
 			u32 size, lsize;
 			const char *dc, *ic;
 
@@ -308,10 +305,10 @@ static void __init initialize_cache_info(void)
 
 			size = 0;
 			lsize = cur_cpu_spec->dcache_bsize;
-			sizep = (u32 *)get_property(np, "d-cache-size", NULL);
+			sizep = get_property(np, "d-cache-size", NULL);
 			if (sizep != NULL)
 				size = *sizep;
-			lsizep = (u32 *) get_property(np, dc, NULL);
+			lsizep = get_property(np, dc, NULL);
 			if (lsizep != NULL)
 				lsize = *lsizep;
 			if (sizep == 0 || lsizep == 0)
@@ -325,10 +322,10 @@ static void __init initialize_cache_info(void)
 
 			size = 0;
 			lsize = cur_cpu_spec->icache_bsize;
-			sizep = (u32 *)get_property(np, "i-cache-size", NULL);
+			sizep = get_property(np, "i-cache-size", NULL);
 			if (sizep != NULL)
 				size = *sizep;
-			lsizep = (u32 *)get_property(np, ic, NULL);
+			lsizep = get_property(np, ic, NULL);
 			if (lsizep != NULL)
 				lsize = *lsizep;
 			if (sizep == 0 || lsizep == 0)
@@ -353,6 +350,14 @@ static void __init initialize_cache_info(void)
 void __init setup_system(void)
 {
 	DBG(" -> setup_system()\n");
+
+	/* Apply the CPUs-specific and firmware specific fixups to kernel
+	 * text (nop out sections not relevant to this CPU or this firmware)
+	 */
+	do_feature_fixups(cur_cpu_spec->cpu_features,
+			  &__start___ftr_fixup, &__stop___ftr_fixup);
+	do_feature_fixups(powerpc_firmware_features,
+			  &__start___fw_ftr_fixup, &__stop___fw_ftr_fixup);
 
 	/*
 	 * Unflatten the device-tree passed by prom_init or kexec
@@ -397,18 +402,14 @@ void __init setup_system(void)
 	find_legacy_serial_ports();
 
 	/*
-	 * Initialize xmon
-	 */
-#ifdef CONFIG_XMON_DEFAULT
-	xmon_init(1);
-#endif
-	/*
 	 * Register early console
 	 */
 	register_early_udbg_console();
 
-	if (do_early_xmon)
-		debugger(NULL);
+	/*
+	 * Initialize xmon
+	 */
+	xmon_setup();
 
 	check_smt_enabled();
 	smp_setup_cpu_maps();
@@ -420,7 +421,7 @@ void __init setup_system(void)
 	smp_release_cpus();
 #endif
 
-	printk("Starting Linux PPC64 %s\n", system_utsname.version);
+	printk("Starting Linux PPC64 %s\n", init_utsname()->version);
 
 	printk("-----------------------------------------------------\n");
 	printk("ppc64_pft_size                = 0x%lx\n", ppc64_pft_size);

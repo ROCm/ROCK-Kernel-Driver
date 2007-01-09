@@ -50,14 +50,11 @@ int dccp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	struct dccp_sock *dp = dccp_sk(sk);
 	const struct sockaddr_in *usin = (struct sockaddr_in *)uaddr;
 	struct rtable *rt;
-	u32 daddr, nexthop;
+	__be32 daddr, nexthop;
 	int tmp;
 	int err;
 
 	dp->dccps_role = DCCP_ROLE_CLIENT;
-
-	if (dccp_service_not_initialized(sk))
-		return -EPROTO;
 
 	if (addr_len < sizeof(struct sockaddr_in))
 		return -EINVAL;
@@ -186,7 +183,7 @@ static inline void dccp_do_pmtu_discovery(struct sock *sk,
 		dccp_sync_mss(sk, mtu);
 
 		/*
-		 * From: draft-ietf-dccp-spec-11.txt
+		 * From RFC 4340, sec. 14.1:
 		 *
 		 *	DCCP-Sync packets are the best choice for upward
 		 *	probing, since DCCP-Sync probes do not risk application
@@ -314,7 +311,7 @@ static void dccp_v4_err(struct sk_buff *skb, u32 info)
 	}
 
 	if (sk->sk_state == DCCP_TIME_WAIT) {
-		inet_twsk_put((struct inet_timewait_sock *)sk);
+		inet_twsk_put(inet_twsk(sk));
 		return;
 	}
 
@@ -452,6 +449,8 @@ static inline u64 dccp_v4_init_sequence(const struct sock *sk,
 					   dccp_hdr(skb)->dccph_sport);
 }
 
+static struct request_sock_ops dccp_request_sock_ops;
+
 int dccp_v4_conn_request(struct sock *sk, struct sk_buff *skb)
 {
 	struct inet_request_sock *ireq;
@@ -492,7 +491,7 @@ int dccp_v4_conn_request(struct sock *sk, struct sk_buff *skb)
 	if (sk_acceptq_is_full(sk) && inet_csk_reqsk_queue_young(sk) > 1)
 		goto drop;
 
-	req = reqsk_alloc(sk->sk_prot->rsk_prot);
+	req = reqsk_alloc(&dccp_request_sock_ops);
 	if (req == NULL)
 		goto drop;
 
@@ -500,6 +499,9 @@ int dccp_v4_conn_request(struct sock *sk, struct sk_buff *skb)
 		goto drop_and_free;
 
 	dccp_openreq_init(req, &dp, skb);
+
+	if (security_inet_conn_request(sk, skb, req))
+		goto drop_and_free;
 
 	ireq = inet_rsk(req);
 	ireq->loc_addr = daddr;
@@ -605,16 +607,16 @@ static struct sock *dccp_v4_hnd_req(struct sock *sk, struct sk_buff *skb)
 	if (req != NULL)
 		return dccp_check_req(sk, skb, req, prev);
 
-	nsk = __inet_lookup_established(&dccp_hashinfo,
-					iph->saddr, dh->dccph_sport,
-					iph->daddr, ntohs(dh->dccph_dport),
-					inet_iif(skb));
+	nsk = inet_lookup_established(&dccp_hashinfo,
+				      iph->saddr, dh->dccph_sport,
+				      iph->daddr, dh->dccph_dport,
+				      inet_iif(skb));
 	if (nsk != NULL) {
 		if (nsk->sk_state != DCCP_TIME_WAIT) {
 			bh_lock_sock(nsk);
 			return nsk;
 		}
-		inet_twsk_put((struct inet_timewait_sock *)nsk);
+		inet_twsk_put(inet_twsk(nsk));
 		return NULL;
 	}
 
@@ -678,6 +680,7 @@ static struct dst_entry* dccp_v4_route_skb(struct sock *sk,
 			   	     }
 			  };
 
+	security_skb_classify_flow(skb, &fl);
 	if (ip_route_output_flow(&rt, &fl, sk, 0)) {
 		IP_INC_STATS_BH(IPSTATS_MIB_OUTNOROUTES);
 		return NULL;
@@ -730,7 +733,7 @@ static void dccp_v4_ctl_send_reset(struct sk_buff *rxskb)
 	dccp_hdr_reset(skb)->dccph_reset_code =
 				DCCP_SKB_CB(rxskb)->dccpd_reset_code;
 
-	/* See "8.3.1. Abnormal Termination" in draft-ietf-dccp-spec-11 */
+	/* See "8.3.1. Abnormal Termination" in RFC 4340 */
 	seqno = 0;
 	if (DCCP_SKB_CB(rxskb)->dccpd_ack_seq != DCCP_PKT_WITHOUT_ACK_SEQ)
 		dccp_set_seqno(&seqno, DCCP_SKB_CB(rxskb)->dccpd_ack_seq + 1);
@@ -921,7 +924,7 @@ static int dccp_v4_rcv(struct sk_buff *skb)
 	 * 	Look up flow ID in table and get corresponding socket */
 	sk = __inet_lookup(&dccp_hashinfo,
 			   skb->nh.iph->saddr, dh->dccph_sport,
-			   skb->nh.iph->daddr, ntohs(dh->dccph_dport),
+			   skb->nh.iph->daddr, dh->dccph_dport,
 			   inet_iif(skb));
 
 	/* 
@@ -979,7 +982,7 @@ discard_and_relse:
 	goto discard_it;
 
 do_time_wait:
-	inet_twsk_put((struct inet_timewait_sock *)sk);
+	inet_twsk_put(inet_twsk(sk));
 	goto no_dccp_socket;
 }
 

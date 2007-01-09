@@ -38,6 +38,7 @@
 #include <asm/nvram.h>
 #include <asm/xmon.h>
 #include <asm/ocp.h>
+#include <asm/prom.h>
 
 #define USES_PPC_SYS (defined(CONFIG_85xx) || defined(CONFIG_83xx) || \
 		      defined(CONFIG_MPC10X_BRIDGE) || defined(CONFIG_8260) || \
@@ -53,8 +54,6 @@
 
 extern void platform_init(unsigned long r3, unsigned long r4,
 		unsigned long r5, unsigned long r6, unsigned long r7);
-extern void identify_cpu(unsigned long offset, unsigned long cpu);
-extern void do_cpu_ftr_fixups(unsigned long offset);
 extern void reloc_got2(unsigned long offset);
 
 extern void ppc6xx_idle(void);
@@ -85,10 +84,6 @@ EXPORT_SYMBOL(have_of);
 int ppc_do_canonicalize_irqs;
 EXPORT_SYMBOL(ppc_do_canonicalize_irqs);
 #endif
-
-#ifdef CONFIG_MAGIC_SYSRQ
-unsigned long SYSRQ_KEY = 0x54;
-#endif /* CONFIG_MAGIC_SYSRQ */
 
 #ifdef CONFIG_VGA_CONSOLE
 unsigned long vgacon_remap_base;
@@ -127,11 +122,8 @@ void machine_restart(char *cmd)
 	ppc_md.restart(cmd);
 }
 
-void machine_power_off(void)
+static void ppc_generic_power_off(void)
 {
-#ifdef CONFIG_NVRAM
-	nvram_sync();
-#endif
 	ppc_md.power_off();
 }
 
@@ -143,7 +135,17 @@ void machine_halt(void)
 	ppc_md.halt();
 }
 
-void (*pm_power_off)(void) = machine_power_off;
+void (*pm_power_off)(void) = ppc_generic_power_off;
+
+void machine_power_off(void)
+{
+#ifdef CONFIG_NVRAM
+	nvram_sync();
+#endif
+	if (pm_power_off)
+		pm_power_off();
+	ppc_generic_power_off();
+}
 
 #ifdef CONFIG_TAU
 extern u32 cpu_temp(unsigned long cpu);
@@ -298,6 +300,7 @@ early_init(int r3, int r4, int r5)
 {
  	unsigned long phys;
 	unsigned long offset = reloc_offset();
+	struct cpu_spec *spec;
 
  	/* Default */
  	phys = offset + KERNELBASE;
@@ -310,8 +313,10 @@ early_init(int r3, int r4, int r5)
 	 * Identify the CPU type and fix up code sections
 	 * that depend on which cpu we have.
 	 */
-	identify_cpu(offset, 0);
-	do_cpu_ftr_fixups(offset);
+	spec = identify_cpu(offset);
+	do_feature_fixups(spec->cpu_features,
+			  PTRRELOC(&__start___ftr_fixup),
+			  PTRRELOC(&__stop___ftr_fixup));
 
 	return phys;
 }

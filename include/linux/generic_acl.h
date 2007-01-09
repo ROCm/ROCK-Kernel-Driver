@@ -12,6 +12,12 @@
 #include <linux/posix_acl.h>
 #include <linux/posix_acl_xattr.h>
 
+/**
+ * struct generic_acl_operations  -  filesystem operations
+ *
+ * Filesystems must make these operations available to the generic
+ * operations.
+ */
 struct generic_acl_operations {
 	struct posix_acl *(*getacl)(struct inode *, int);
 	void (*setacl)(struct inode *, int, struct posix_acl *);

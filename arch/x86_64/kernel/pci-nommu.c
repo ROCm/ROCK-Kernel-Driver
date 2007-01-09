@@ -59,7 +59,6 @@ int nommu_map_sg(struct device *hwdev, struct scatterlist *sg,
 {
 	int i;
 
-	BUG_ON(direction == DMA_NONE);
  	for (i = 0; i < nents; i++ ) {
 		struct scatterlist *s = &sg[i];
 		BUG_ON(!s->page);
@@ -93,8 +92,6 @@ void __init no_iommu_init(void)
 	if (dma_ops)
 		return;
 
-#ifndef CONFIG_XEN
 	force_iommu = 0; /* no HW IOMMU */
-#endif
 	dma_ops = &nommu_dma_ops;
 }

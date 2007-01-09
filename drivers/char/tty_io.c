@@ -129,6 +129,7 @@ LIST_HEAD(tty_drivers);			/* linked list of tty drivers */
 /* Semaphore to protect creating and releasing a tty. This is shared with
    vt.c for deeply disgusting hack reasons */
 DEFINE_MUTEX(tty_mutex);
+EXPORT_SYMBOL(tty_mutex);
 
 int console_use_vt = 1;
 
@@ -162,17 +163,11 @@ static void release_mem(struct tty_struct *tty, int idx);
  *	been initialized in any way but has been zeroed
  *
  *	Locking: none
- *	FIXME: use kzalloc
  */
 
 static struct tty_struct *alloc_tty_struct(void)
 {
-	struct tty_struct *tty;
-
-	tty = kmalloc(sizeof(struct tty_struct), GFP_KERNEL);
-	if (tty)
-		memset(tty, 0, sizeof(struct tty_struct));
-	return tty;
+	return kzalloc(sizeof(struct tty_struct), GFP_KERNEL);
 }
 
 static void tty_buffer_free_all(struct tty_struct *);
@@ -485,10 +480,9 @@ int tty_insert_flip_string(struct tty_struct *tty, const unsigned char *chars,
 		tb->used += space;
 		copied += space;
 		chars += space;
-	}
-	/* There is a small chance that we need to split the data over
-	   several buffers. If this is the case we must loop */
-	while (unlikely(size > copied));
+		/* There is a small chance that we need to split the data over
+		   several buffers. If this is the case we must loop */
+	} while (unlikely(size > copied));
 	return copied;
 }
 EXPORT_SYMBOL(tty_insert_flip_string);
@@ -523,10 +517,9 @@ int tty_insert_flip_string_flags(struct tty_struct *tty,
 		copied += space;
 		chars += space;
 		flags += space;
-	}
-	/* There is a small chance that we need to split the data over
-	   several buffers. If this is the case we must loop */
-	while (unlikely(size > copied));
+		/* There is a small chance that we need to split the data over
+		   several buffers. If this is the case we must loop */
+	} while (unlikely(size > copied));
 	return copied;
 }
 EXPORT_SYMBOL(tty_insert_flip_string_flags);
@@ -628,9 +621,9 @@ EXPORT_SYMBOL_GPL(tty_prepare_flip_string_flags);
  
 static void tty_set_termios_ldisc(struct tty_struct *tty, int num)
 {
-	down(&tty->termios_sem);
+	mutex_lock(&tty->termios_mutex);
 	tty->termios->c_line = num;
-	up(&tty->termios_sem);
+	mutex_unlock(&tty->termios_mutex);
 }
 
 /*
@@ -1348,9 +1341,9 @@ static void do_tty_hangup(void *data)
 	 */
 	if (tty->driver->flags & TTY_DRIVER_RESET_TERMIOS)
 	{
-		down(&tty->termios_sem);
+		mutex_lock(&tty->termios_mutex);
 		*tty->termios = tty->driver->init_termios;
-		up(&tty->termios_sem);
+		mutex_unlock(&tty->termios_mutex);
 	}
 	
 	/* Defer ldisc switch */
@@ -2074,8 +2067,9 @@ fail_no_mem:
 
 	/* call the tty release_mem routine to clean out this slot */
 release_mem_out:
-	printk(KERN_INFO "init_dev: ldisc open failed, "
-			 "clearing slot %d\n", idx);
+	if (printk_ratelimit())
+		printk(KERN_INFO "init_dev: ldisc open failed, "
+				 "clearing slot %d\n", idx);
 	release_mem(tty, idx);
 	goto end_init;
 }
@@ -2728,6 +2722,8 @@ static int tty_fasync(int fd, struct file * filp, int on)
  *	Locking:
  *		Called functions take tty_ldisc_lock
  *		current->signal->tty check is safe without locks
+ *
+ *	FIXME: may race normal receive processing
  */
 
 static int tiocsti(struct tty_struct *tty, char __user *p)
@@ -2750,18 +2746,21 @@ static int tiocsti(struct tty_struct *tty, char __user *p)
  *	@tty; tty
  *	@arg: user buffer for result
  *
- *	Copies the kernel idea of the window size into the user buffer. No
- *	locking is done.
+ *	Copies the kernel idea of the window size into the user buffer.
  *
- *	FIXME: Returning random values racing a window size set is wrong
- *	should lock here against that
+ *	Locking: tty->termios_sem is taken to ensure the winsize data
+ *		is consistent.
  */
 
 static int tiocgwinsz(struct tty_struct *tty, struct winsize __user * arg)
 {
-	if (copy_to_user(arg, &tty->winsize, sizeof(*arg)))
-		return -EFAULT;
-	return 0;
+	int err;
+
+	mutex_lock(&tty->termios_mutex);
+	err = copy_to_user(arg, &tty->winsize, sizeof(*arg));
+	mutex_unlock(&tty->termios_mutex);
+
+	return err ? -EFAULT: 0;
 }
 
 /**
@@ -2774,12 +2773,11 @@ static int tiocgwinsz(struct tty_struct *tty, struct winsize __user * arg)
  *	actually has driver level meaning and triggers a VC resize.
  *
  *	Locking:
- *		The console_sem is used to ensure we do not try and resize
- *	the console twice at once.
- *	FIXME: Two racing size sets may leave the console and kernel
- *		parameters disagreeing. Is this exploitable ?
- *	FIXME: Random values racing a window size get is wrong
- *	should lock here against that
+ *		Called function use the console_sem is used to ensure we do
+ *	not try and resize the console twice at once.
+ *		The tty->termios_sem is used to ensure we don't double
+ *	resize and get confused. Lock order - tty->termios.sem before
+ *	console sem
  */
 
 static int tiocswinsz(struct tty_struct *tty, struct tty_struct *real_tty,
@@ -2789,17 +2787,18 @@ static int tiocswinsz(struct tty_struct *tty, struct tty_struct *real_tty,
 
 	if (copy_from_user(&tmp_ws, arg, sizeof(*arg)))
 		return -EFAULT;
+
+	mutex_lock(&tty->termios_mutex);
 	if (!memcmp(&tmp_ws, &tty->winsize, sizeof(*arg)))
-		return 0;
+		goto done;
+
 #ifdef CONFIG_VT
 	if (tty->driver->type == TTY_DRIVER_TYPE_CONSOLE) {
-		int rc;
-
-		acquire_console_sem();
-		rc = vc_resize(tty->driver_data, tmp_ws.ws_col, tmp_ws.ws_row);
-		release_console_sem();
-		if (rc)
-			return -ENXIO;
+		if (vc_lock_resize(tty->driver_data, tmp_ws.ws_col,
+					tmp_ws.ws_row)) {
+			mutex_unlock(&tty->termios_mutex);
+ 			return -ENXIO;
+		}
 	}
 #endif
 	if (tty->pgrp > 0)
@@ -2808,6 +2807,8 @@ static int tiocswinsz(struct tty_struct *tty, struct tty_struct *real_tty,
 		kill_pg(real_tty->pgrp, SIGWINCH, 1);
 	tty->winsize = tmp_ws;
 	real_tty->winsize = tmp_ws;
+done:
+	mutex_unlock(&tty->termios_mutex);
 	return 0;
 }
 
@@ -2882,9 +2883,7 @@ static int fionbio(struct file *file, int __user *p)
  *	Locking:
  *		Takes tasklist lock internally to walk sessions
  *		Takes task_lock() when updating signal->tty
- *
- *	FIXME: tty_mutex is needed to protect signal->tty references.
- *	FIXME: why task_lock on the signal->tty reference ??
+ *		Takes tty_mutex() to protect tty instance
  *
  */
 
@@ -2919,9 +2918,11 @@ static int tiocsctty(struct tty_struct *tty, int arg)
 		} else
 			return -EPERM;
 	}
+	mutex_lock(&tty_mutex);
 	task_lock(current);
 	current->signal->tty = tty;
 	task_unlock(current);
+	mutex_unlock(&tty_mutex);
 	current->signal->tty_old_pgrp = 0;
 	tty->session = current->signal->session;
 	tty->pgrp = process_group(current);
@@ -2961,8 +2962,6 @@ static int tiocgpgrp(struct tty_struct *tty, struct tty_struct *real_tty, pid_t 
  *	permitted where the tty session is our session.
  *
  *	Locking: None
- *
- *	FIXME: current->signal->tty referencing is unsafe.
  */
 
 static int tiocspgrp(struct tty_struct *tty, struct tty_struct *real_tty, pid_t __user *p)
@@ -3041,19 +3040,20 @@ static int tiocsetd(struct tty_struct *tty, int __user *p)
  *	timed break functionality.
  *
  *	Locking:
- *		None
+ *		atomic_write_lock serializes
  *
- *	FIXME:
- *		What if two overlap
  */
 
 static int send_break(struct tty_struct *tty, unsigned int duration)
 {
+	if (mutex_lock_interruptible(&tty->atomic_write_lock))
+		return -EINTR;
 	tty->driver->break_ctl(tty, -1);
 	if (!signal_pending(current)) {
 		msleep_interruptible(duration);
 	}
 	tty->driver->break_ctl(tty, 0);
+	mutex_unlock(&tty->atomic_write_lock);
 	if (signal_pending(current))
 		return -EINTR;
 	return 0;
@@ -3145,6 +3145,8 @@ int tty_ioctl(struct inode * inode, struct file * file,
 	tty = (struct tty_struct *)file->private_data;
 	if (tty_paranoia_check(tty, inode, "tty_ioctl"))
 		return -EINVAL;
+
+	/* CHECKME: is this safe as one end closes ? */
 
 	real_tty = tty;
 	if (tty->driver->type == TTY_DRIVER_TYPE_PTY &&
@@ -3597,7 +3599,7 @@ static void initialize_tty_struct(struct tty_struct *tty)
 	tty_buffer_init(tty);
 	INIT_WORK(&tty->buf.work, flush_to_ldisc, tty);
 	init_MUTEX(&tty->buf.pty_sem);
-	init_MUTEX(&tty->termios_sem);
+	mutex_init(&tty->termios_mutex);
 	init_waitqueue_head(&tty->write_wait);
 	init_waitqueue_head(&tty->read_wait);
 	INIT_WORK(&tty->hangup_work, do_tty_hangup, tty);
@@ -3627,8 +3629,7 @@ static struct class *tty_class;
  *		This field is optional, if there is no known struct device
  *		for this tty device it can be set to NULL safely.
  *
- *	Returns a pointer to the struct device for this tty device
- *	(or ERR_PTR(-EFOO) on error).
+ *	Returns a pointer to the class device (or ERR_PTR(-EFOO) on error).
  *
  *	This call is required to be made to register an individual tty device
  *	if the tty driver's flags have the TTY_DRIVER_DYNAMIC_DEV bit set.  If
@@ -3638,8 +3639,8 @@ static struct class *tty_class;
  *	Locking: ??
  */
 
-struct device *tty_register_device(struct tty_driver *driver, unsigned index,
-				   struct device *device)
+struct class_device *tty_register_device(struct tty_driver *driver,
+					 unsigned index, struct device *device)
 {
 	char name[64];
 	dev_t dev = MKDEV(driver->major, driver->minor_start) + index;
@@ -3655,7 +3656,7 @@ struct device *tty_register_device(struct tty_driver *driver, unsigned index,
 	else
 		tty_line_name(driver, index, name);
 
-	return device_create(tty_class, device, dev, name);
+	return class_device_create(tty_class, NULL, dev, device, "%s", name);
 }
 
 /**
@@ -3671,7 +3672,7 @@ struct device *tty_register_device(struct tty_driver *driver, unsigned index,
 
 void tty_unregister_device(struct tty_driver *driver, unsigned index)
 {
-	device_destroy(tty_class, MKDEV(driver->major, driver->minor_start) + index);
+	class_device_destroy(tty_class, MKDEV(driver->major, driver->minor_start) + index);
 }
 
 EXPORT_SYMBOL(tty_register_device);
@@ -3696,7 +3697,8 @@ void put_tty_driver(struct tty_driver *driver)
 	kfree(driver);
 }
 
-void tty_set_operations(struct tty_driver *driver, struct tty_operations *op)
+void tty_set_operations(struct tty_driver *driver,
+			const struct tty_operations *op)
 {
 	driver->open = op->open;
 	driver->close = op->close;
@@ -3910,20 +3912,20 @@ static int __init tty_init(void)
 	if (cdev_add(&tty_cdev, MKDEV(TTYAUX_MAJOR, 0), 1) ||
 	    register_chrdev_region(MKDEV(TTYAUX_MAJOR, 0), 1, "/dev/tty") < 0)
 		panic("Couldn't register /dev/tty driver\n");
-	device_create(tty_class, NULL, MKDEV(TTYAUX_MAJOR, 0), "tty");
+	class_device_create(tty_class, NULL, MKDEV(TTYAUX_MAJOR, 0), NULL, "tty");
 
 	cdev_init(&console_cdev, &console_fops);
 	if (cdev_add(&console_cdev, MKDEV(TTYAUX_MAJOR, 1), 1) ||
 	    register_chrdev_region(MKDEV(TTYAUX_MAJOR, 1), 1, "/dev/console") < 0)
 		panic("Couldn't register /dev/console driver\n");
-	device_create(tty_class, NULL, MKDEV(TTYAUX_MAJOR, 1), "console");
+	class_device_create(tty_class, NULL, MKDEV(TTYAUX_MAJOR, 1), NULL, "console");
 
 #ifdef CONFIG_UNIX98_PTYS
 	cdev_init(&ptmx_cdev, &ptmx_fops);
 	if (cdev_add(&ptmx_cdev, MKDEV(TTYAUX_MAJOR, 2), 1) ||
 	    register_chrdev_region(MKDEV(TTYAUX_MAJOR, 2), 1, "/dev/ptmx") < 0)
 		panic("Couldn't register /dev/ptmx driver\n");
-	device_create(tty_class, NULL, MKDEV(TTYAUX_MAJOR, 2), "ptmx");
+	class_device_create(tty_class, NULL, MKDEV(TTYAUX_MAJOR, 2), NULL, "ptmx");
 #endif
 
 #ifdef CONFIG_VT
@@ -3933,7 +3935,7 @@ static int __init tty_init(void)
 	if (cdev_add(&vc0_cdev, MKDEV(TTY_MAJOR, 0), 1) ||
 	    register_chrdev_region(MKDEV(TTY_MAJOR, 0), 1, "/dev/vc/0") < 0)
 		panic("Couldn't register /dev/tty0 driver\n");
-	device_create(tty_class, NULL, MKDEV(TTY_MAJOR, 0), "tty0");
+	class_device_create(tty_class, NULL, MKDEV(TTY_MAJOR, 0), NULL, "tty0");
 
 	vty_init();
  out_vt:

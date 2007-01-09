@@ -821,7 +821,7 @@ out:
  * addrs is a pointer to an array of one or more socket addresses. Each
  * address is contained in its appropriate structure (i.e. struct
  * sockaddr_in or struct sockaddr_in6) the family of the address type
- * must be used to distengish the address length (note that this
+ * must be used to distinguish the address length (note that this
  * representation is termed a "packed array" of addresses). The caller
  * specifies the number of addresses in the array with addrcnt.
  *
@@ -2081,13 +2081,13 @@ static int sctp_setsockopt_autoclose(struct sock *sk, char __user *optval,
  *                     SPP_SACKDELAY_ENABLE, setting both will have undefined
  *                     results.
  */
-int sctp_apply_peer_addr_params(struct sctp_paddrparams *params,
-				struct sctp_transport   *trans,
-				struct sctp_association *asoc,
-				struct sctp_sock        *sp,
-				int                      hb_change,
-				int                      pmtud_change,
-				int                      sackdelay_change)
+static int sctp_apply_peer_addr_params(struct sctp_paddrparams *params,
+				       struct sctp_transport   *trans,
+				       struct sctp_association *asoc,
+				       struct sctp_sock        *sp,
+				       int                      hb_change,
+				       int                      pmtud_change,
+				       int                      sackdelay_change)
 {
 	int error;
 
@@ -2970,7 +2970,7 @@ SCTP_STATIC struct sock *sctp_accept(struct sock *sk, int flags, int *err)
 		goto out;
 	}
 
-	timeo = sock_rcvtimeo(sk, sk->sk_socket->file->f_flags & O_NONBLOCK);
+	timeo = sock_rcvtimeo(sk, flags & O_NONBLOCK);
 
 	error = sctp_wait_for_accept(sk, timeo);
 	if (error)
@@ -3045,14 +3045,14 @@ SCTP_STATIC int sctp_init_sock(struct sock *sk)
 	sp->initmsg.sinit_num_ostreams   = sctp_max_outstreams;
 	sp->initmsg.sinit_max_instreams  = sctp_max_instreams;
 	sp->initmsg.sinit_max_attempts   = sctp_max_retrans_init;
-	sp->initmsg.sinit_max_init_timeo = jiffies_to_msecs(sctp_rto_max);
+	sp->initmsg.sinit_max_init_timeo = sctp_rto_max;
 
 	/* Initialize default RTO related parameters.  These parameters can
 	 * be modified for with the SCTP_RTOINFO socket option.
 	 */
-	sp->rtoinfo.srto_initial = jiffies_to_msecs(sctp_rto_initial);
-	sp->rtoinfo.srto_max     = jiffies_to_msecs(sctp_rto_max);
-	sp->rtoinfo.srto_min     = jiffies_to_msecs(sctp_rto_min);
+	sp->rtoinfo.srto_initial = sctp_rto_initial;
+	sp->rtoinfo.srto_max     = sctp_rto_max;
+	sp->rtoinfo.srto_min     = sctp_rto_min;
 
 	/* Initialize default association related parameters. These parameters
 	 * can be modified with the SCTP_ASSOCINFO socket option.
@@ -3061,8 +3061,7 @@ SCTP_STATIC int sctp_init_sock(struct sock *sk)
 	sp->assocparams.sasoc_number_peer_destinations = 0;
 	sp->assocparams.sasoc_peer_rwnd = 0;
 	sp->assocparams.sasoc_local_rwnd = 0;
-	sp->assocparams.sasoc_cookie_life = 
-		jiffies_to_msecs(sctp_valid_cookie_life);
+	sp->assocparams.sasoc_cookie_life = sctp_valid_cookie_life;
 
 	/* Initialize default event subscriptions. By default, all the
 	 * options are off. 
@@ -3072,10 +3071,10 @@ SCTP_STATIC int sctp_init_sock(struct sock *sk)
 	/* Default Peer Address Parameters.  These defaults can
 	 * be modified via SCTP_PEER_ADDR_PARAMS
 	 */
-	sp->hbinterval  = jiffies_to_msecs(sctp_hb_interval);
+	sp->hbinterval  = sctp_hb_interval;
 	sp->pathmaxrxt  = sctp_max_retrans_path;
 	sp->pathmtu     = 0; // allow default discovery
-	sp->sackdelay   = jiffies_to_msecs(sctp_sack_timeout);
+	sp->sackdelay   = sctp_sack_timeout;
 	sp->param_flags = SPP_HB_ENABLE |
 	                  SPP_PMTUD_ENABLE |
 	                  SPP_SACKDELAY_ENABLE;
@@ -3085,8 +3084,8 @@ SCTP_STATIC int sctp_init_sock(struct sock *sk)
 	 */
 	sp->disable_fragments = 0;
 
-	/* Turn on/off any Nagle-like algorithm.  */
-	sp->nodelay           = 1;
+	/* Enable Nagle algorithm by default.  */
+	sp->nodelay           = 0;
 
 	/* Enable by default. */
 	sp->v4mapped          = 1;
@@ -3373,6 +3372,7 @@ SCTP_STATIC int sctp_do_peeloff(struct sctp_association *asoc,
 {
 	struct sock *sk = asoc->base.sk;
 	struct socket *sock;
+	struct inet_sock *inetsk;
 	int err = 0;
 
 	/* An association cannot be branched off from an already peeled-off
@@ -3390,6 +3390,14 @@ SCTP_STATIC int sctp_do_peeloff(struct sctp_association *asoc,
 	 * asoc to the newsk.
 	 */
 	sctp_sock_migrate(sk, sock->sk, asoc, SCTP_SOCKET_UDP_HIGH_BANDWIDTH);
+
+	/* Make peeled-off sockets more like 1-1 accepted sockets.
+	 * Set the daddr and initialize id to something more random
+	 */
+	inetsk = inet_sk(sock->sk);
+	inetsk->daddr = asoc->peer.primary_addr.v4.sin_addr.s_addr;
+	inetsk->id = asoc->next_tsn ^ jiffies;
+
 	*sockp = sock;
 
 	return err;
@@ -4898,7 +4906,7 @@ SCTP_STATIC int sctp_stream_listen(struct sock *sk, int backlog)
 int sctp_inet_listen(struct socket *sock, int backlog)
 {
 	struct sock *sk = sock->sk;
-	struct crypto_tfm *tfm=NULL;
+	struct crypto_hash *tfm = NULL;
 	int err = -EINVAL;
 
 	if (unlikely(backlog < 0))
@@ -4911,7 +4919,7 @@ int sctp_inet_listen(struct socket *sock, int backlog)
 
 	/* Allocate HMAC for generating cookie. */
 	if (sctp_hmac_alg) {
-		tfm = sctp_crypto_alloc_tfm(sctp_hmac_alg, 0);
+		tfm = crypto_alloc_hash(sctp_hmac_alg, 0, CRYPTO_ALG_ASYNC);
 		if (!tfm) {
 			err = -ENOSYS;
 			goto out;
@@ -4937,7 +4945,7 @@ out:
 	sctp_release_sock(sk);
 	return err;
 cleanup:
-	sctp_crypto_free_tfm(tfm);
+	crypto_free_hash(tfm);
 	goto out;
 }
 
@@ -5363,6 +5371,20 @@ static void sctp_wfree(struct sk_buff *skb)
 	sctp_association_put(asoc);
 }
 
+/* Do accounting for the receive space on the socket.
+ * Accounting for the association is done in ulpevent.c
+ * We set this as a destructor for the cloned data skbs so that
+ * accounting is done at the correct time.
+ */
+void sctp_sock_rfree(struct sk_buff *skb)
+{
+	struct sock *sk = skb->sk;
+	struct sctp_ulpevent *event = sctp_skb2event(skb);
+
+	atomic_sub(event->rmem_len, &sk->sk_rmem_alloc);
+}
+
+
 /* Helper function to wait for space in the sndbuf.  */
 static int sctp_wait_for_sndbuf(struct sctp_association *asoc, long *timeo_p,
 				size_t msg_len)
@@ -5619,6 +5641,8 @@ static void sctp_sock_migrate(struct sock *oldsk, struct sock *newsk,
 	/* Copy the bind_addr list from the original endpoint to the new
 	 * endpoint so that we can handle restarts properly
 	 */
+	if (PF_INET6 == assoc->base.sk->sk_family)
+		flags = SCTP_ADDR6_ALLOWED;
 	if (assoc->peer.ipv4_address)
 		flags |= SCTP_ADDR4_PEERSUPP;
 	if (assoc->peer.ipv6_address)
@@ -5633,10 +5657,10 @@ static void sctp_sock_migrate(struct sock *oldsk, struct sock *newsk,
 	sctp_skb_for_each(skb, &oldsk->sk_receive_queue, tmp) {
 		event = sctp_skb2event(skb);
 		if (event->asoc == assoc) {
-			sock_rfree(skb);
+			sctp_sock_rfree(skb);
 			__skb_unlink(skb, &oldsk->sk_receive_queue);
 			__skb_queue_tail(&newsk->sk_receive_queue, skb);
-			skb_set_owner_r(skb, newsk);
+			sctp_skb_set_owner_r(skb, newsk);
 		}
 	}
 
@@ -5664,10 +5688,10 @@ static void sctp_sock_migrate(struct sock *oldsk, struct sock *newsk,
 		sctp_skb_for_each(skb, &oldsp->pd_lobby, tmp) {
 			event = sctp_skb2event(skb);
 			if (event->asoc == assoc) {
-				sock_rfree(skb);
+				sctp_sock_rfree(skb);
 				__skb_unlink(skb, &oldsp->pd_lobby);
 				__skb_queue_tail(queue, skb);
-				skb_set_owner_r(skb, newsk);
+				sctp_skb_set_owner_r(skb, newsk);
 			}
 		}
 

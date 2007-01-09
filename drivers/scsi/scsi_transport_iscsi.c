@@ -33,7 +33,7 @@
 #define ISCSI_SESSION_ATTRS 11
 #define ISCSI_CONN_ATTRS 11
 #define ISCSI_HOST_ATTRS 0
-#define ISCSI_TRANSPORT_VERSION "2.0-711"
+#define ISCSI_TRANSPORT_VERSION "2.0-724"
 
 struct iscsi_internal {
 	int daemon_pid;
@@ -606,7 +606,7 @@ iscsi_if_send_reply(int pid, int seq, int type, int done, int multi,
 	int flags = multi ? NLM_F_MULTI : 0;
 	int t = done ? NLMSG_DONE : type;
 
-	skb = alloc_skb(len, GFP_KERNEL);
+	skb = alloc_skb(len, GFP_ATOMIC);
 	/*
 	 * FIXME:
 	 * user is supposed to react on iferror == -ENOMEM;
@@ -647,7 +647,7 @@ iscsi_if_get_stats(struct iscsi_transport *transport, struct nlmsghdr *nlh)
 	do {
 		int actual_size;
 
-		skbstat = alloc_skb(len, GFP_KERNEL);
+		skbstat = alloc_skb(len, GFP_ATOMIC);
 		if (!skbstat) {
 			dev_printk(KERN_ERR, &conn->dev, "iscsi: can not "
 				   "deliver stats: OOM\n");
@@ -1414,7 +1414,7 @@ static __init int iscsi_transport_init(void)
 {
 	int err;
 
-	printk(KERN_INFO "Loading iSCSI transport class v%s.\n",
+	printk(KERN_INFO "Loading iSCSI transport class v%s.",
 		ISCSI_TRANSPORT_VERSION);
 
 	err = class_register(&iscsi_transport_class);

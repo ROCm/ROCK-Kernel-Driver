@@ -474,8 +474,7 @@ MODULE_VERSION(RTL8169_VERSION);
 
 static int rtl8169_open(struct net_device *dev);
 static int rtl8169_start_xmit(struct sk_buff *skb, struct net_device *dev);
-static irqreturn_t rtl8169_interrupt(int irq, void *dev_instance,
-			      struct pt_regs *regs);
+static irqreturn_t rtl8169_interrupt(int irq, void *dev_instance);
 static int rtl8169_init_ring(struct net_device *dev);
 static void rtl8169_hw_start(struct net_device *dev);
 static int rtl8169_close(struct net_device *dev);
@@ -1125,7 +1124,7 @@ static void rtl8169_get_strings(struct net_device *dev, u32 stringset, u8 *data)
 }
 
 
-static struct ethtool_ops rtl8169_ethtool_ops = {
+static const struct ethtool_ops rtl8169_ethtool_ops = {
 	.get_drvinfo		= rtl8169_get_drvinfo,
 	.get_regs_len		= rtl8169_get_regs_len,
 	.get_link		= ethtool_op_get_link,
@@ -1393,7 +1392,7 @@ static void rtl8169_netpoll(struct net_device *dev)
 	struct pci_dev *pdev = tp->pci_dev;
 
 	disable_irq(pdev->irq);
-	rtl8169_interrupt(pdev->irq, dev, NULL);
+	rtl8169_interrupt(pdev->irq, dev);
 	enable_irq(pdev->irq);
 }
 #endif
@@ -1474,8 +1473,8 @@ rtl8169_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	struct rtl8169_private *tp;
 	struct net_device *dev;
 	void __iomem *ioaddr;
-	unsigned int i, pm_cap;
-	int rc;
+	unsigned int pm_cap;
+	int i, rc;
 
 	if (netif_msg_drv(&debug)) {
 		printk(KERN_INFO "%s Gigabit Ethernet driver %s loaded\n",
@@ -2222,7 +2221,7 @@ static inline u32 rtl8169_tso_csum(struct sk_buff *skb, struct net_device *dev)
 		if (mss)
 			return LargeSend | ((mss & MSSMask) << MSSShift);
 	}
-	if (skb->ip_summed == CHECKSUM_HW) {
+	if (skb->ip_summed == CHECKSUM_PARTIAL) {
 		const struct iphdr *ip = skb->nh.iph;
 
 		if (ip->protocol == IPPROTO_TCP)
@@ -2555,7 +2554,7 @@ rtl8169_rx_interrupt(struct net_device *dev, struct rtl8169_private *tp,
 
 /* The interrupt handler does all of the Rx thread work and cleans up after the Tx thread. */
 static irqreturn_t
-rtl8169_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
+rtl8169_interrupt(int irq, void *dev_instance)
 {
 	struct net_device *dev = (struct net_device *) dev_instance;
 	struct rtl8169_private *tp = netdev_priv(dev);

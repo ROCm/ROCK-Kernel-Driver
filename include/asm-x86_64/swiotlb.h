@@ -42,15 +42,7 @@ extern void swiotlb_free_coherent (struct device *hwdev, size_t size,
 extern int swiotlb_dma_supported(struct device *hwdev, u64 mask);
 extern void swiotlb_init(void);
 
-#ifndef CONFIG_XEN
 extern int swiotlb_force;
-#else
-extern dma_addr_t swiotlb_map_page(struct device *hwdev, struct page *page,
-                                   unsigned long offset, size_t size,
-                                   enum dma_data_direction direction);
-extern void swiotlb_unmap_page(struct device *hwdev, dma_addr_t dma_address,
-                               size_t size, enum dma_data_direction direction);
-#endif
 
 #ifdef CONFIG_SWIOTLB
 extern int swiotlb;

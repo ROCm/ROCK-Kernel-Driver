@@ -175,7 +175,7 @@ static const struct ata_port_info pdc_port_info[] = {
 	/* board_2037x */
 	{
 		.sht		= &pdc_ata_sht,
-		.flags		= PDC_COMMON_FLAGS /* | ATA_FLAG_SATA */,
+		.flags		= PDC_COMMON_FLAGS | ATA_FLAG_SATA,
 		.pio_mask	= 0x1f, /* pio0-4 */
 		.mwdma_mask	= 0x07, /* mwdma0-2 */
 		.udma_mask	= 0x7f, /* udma0-6 ; FIXME */
@@ -355,27 +355,23 @@ static void pdc_reset_port(struct ata_port *ap)
 static void pdc_sata_phy_reset(struct ata_port *ap)
 {
 	pdc_reset_port(ap);
-	if (ap->flags & ATA_FLAG_SATA)
-		sata_phy_reset(ap);
-	else
-		pdc_pata_phy_reset(ap);
+	sata_phy_reset(ap);
 }
 
 static void pdc_pata_cbl_detect(struct ata_port *ap)
 {
 	u8 tmp;
-	void __iomem *mmio =
-		(void __iomem *) ap->ioaddr.cmd_addr + PDC_CTLSTAT + 0x03;
+	void __iomem *mmio = (void __iomem *) ap->ioaddr.cmd_addr + PDC_CTLSTAT + 0x03;
 
 	tmp = readb(mmio);
-	
+
 	if (tmp & 0x01) {
 		ap->cbl = ATA_CBL_PATA40;
 		ap->udma_mask &= ATA_UDMA_MASK_40C;
 	} else
 		ap->cbl = ATA_CBL_PATA80;
 }
-		
+
 static void pdc_pata_phy_reset(struct ata_port *ap)
 {
 	pdc_pata_cbl_detect(ap);
@@ -683,7 +679,6 @@ static int pdc_ata_init_one (struct pci_dev *pdev, const struct pci_device_id *e
 	unsigned int board_idx = (unsigned int) ent->driver_data;
 	int pci_dev_busy = 0;
 	int rc;
-	u8 tmp;
 
 	if (!printed_version++)
 		dev_printk(KERN_DEBUG, &pdev->dev, "version " DRV_VERSION "\n");
@@ -748,9 +743,6 @@ static int pdc_ata_init_one (struct pci_dev *pdev, const struct pci_device_id *e
 	probe_ent->port[0].scr_addr = base + 0x400;
 	probe_ent->port[1].scr_addr = base + 0x500;
 
-	probe_ent->_port_flags[0] = ATA_FLAG_SATA;
-	probe_ent->_port_flags[1] = ATA_FLAG_SATA;
-	
 	/* notice 4-port boards */
 	switch (board_idx) {
 	case board_40518:
@@ -765,29 +757,13 @@ static int pdc_ata_init_one (struct pci_dev *pdev, const struct pci_device_id *e
 
 		probe_ent->port[2].scr_addr = base + 0x600;
 		probe_ent->port[3].scr_addr = base + 0x700;
-	
-		probe_ent->_port_flags[2] = ATA_FLAG_SATA;
-		probe_ent->_port_flags[3] = ATA_FLAG_SATA;
 		break;
 	case board_2057x:
 		/* Override hotplug offset for SATAII150 */
 		hp->hotplug_offset = PDC2_SATA_PLUG_CSR;
 		/* Fall through */
 	case board_2037x:
-		/* Some boards have also PATA port */
-		tmp = readb(mmio_base + PDC_FLASH_CTL+1);
-		if (!(tmp & 0x80))
-		{
-			probe_ent->n_ports = 3;
-			
-			pdc_ata_setup_port(&probe_ent->port[2], base + 0x300);
-
-			probe_ent->_port_flags[2] = ATA_FLAG_SLAVE_POSS;
-			
-			printk(KERN_INFO DRV_NAME " PATA port found\n");
-		}
-		else
-       			probe_ent->n_ports = 2;
+		probe_ent->n_ports = 2;
 		break;
 	case board_20771:
 		probe_ent->n_ports = 2;

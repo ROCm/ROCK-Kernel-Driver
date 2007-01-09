@@ -7,6 +7,11 @@
  *
  * This file contains the spinlock/rwlock implementations for the
  * SMP and the DEBUG_SPINLOCK cases. (UP-nondebug inlines them)
+ *
+ * Note that some architectures have special knowledge about the
+ * stack frames of these functions in their profile_pc. If you
+ * change anything significant here that could change the stack
+ * frame contact the architecture maintainers.
  */
 
 #include <linux/linkage.h>
@@ -15,17 +20,6 @@
 #include <linux/interrupt.h>
 #include <linux/debug_locks.h>
 #include <linux/module.h>
-
-/*
- * Generic declaration of the raw read_trylock() function,
- * architectures are supposed to optimize this:
- */
-int __lockfunc generic__raw_read_trylock(raw_rwlock_t *lock)
-{
-	__raw_read_lock(lock);
-	return 1;
-}
-EXPORT_SYMBOL(generic__raw_read_trylock);
 
 int __lockfunc _spin_trylock(spinlock_t *lock)
 {
@@ -221,7 +215,7 @@ void __lockfunc _##op##_lock(locktype##_t *lock)			\
 		if (!(lock)->break_lock)				\
 			(lock)->break_lock = 1;				\
 		while (!op##_can_lock(lock) && (lock)->break_lock)	\
-			cpu_relax();					\
+			_raw_##op##_relax(&lock->raw_lock);		\
 	}								\
 	(lock)->break_lock = 0;						\
 }									\
@@ -243,7 +237,7 @@ unsigned long __lockfunc _##op##_lock_irqsave(locktype##_t *lock)	\
 		if (!(lock)->break_lock)				\
 			(lock)->break_lock = 1;				\
 		while (!op##_can_lock(lock) && (lock)->break_lock)	\
-			cpu_relax();					\
+			_raw_##op##_relax(&lock->raw_lock);		\
 	}								\
 	(lock)->break_lock = 0;						\
 	return flags;							\
@@ -299,6 +293,27 @@ void __lockfunc _spin_lock_nested(spinlock_t *lock, int subclass)
 }
 
 EXPORT_SYMBOL(_spin_lock_nested);
+unsigned long __lockfunc _spin_lock_irqsave_nested(spinlock_t *lock, int subclass)
+{
+	unsigned long flags;
+
+	local_irq_save(flags);
+	preempt_disable();
+	spin_acquire(&lock->dep_map, subclass, 0, _RET_IP_);
+	/*
+	 * On lockdep we dont want the hand-coded irq-enable of
+	 * _raw_spin_lock_flags() code, because lockdep assumes
+	 * that interrupts are not re-enabled during lock-acquire:
+	 */
+#ifdef CONFIG_PROVE_SPIN_LOCKING
+	_raw_spin_lock(lock);
+#else
+	_raw_spin_lock_flags(lock, &flags);
+#endif
+	return flags;
+}
+
+EXPORT_SYMBOL(_spin_lock_irqsave_nested);
 
 #endif
 

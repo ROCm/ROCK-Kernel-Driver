@@ -52,19 +52,23 @@ static inline void mapping_set_gfp_mask(struct address_space *m, gfp_t mask)
 void release_pages(struct page **pages, int nr, int cold);
 
 #ifdef CONFIG_NUMA
-extern struct page *page_cache_alloc(struct address_space *x);
-extern struct page *page_cache_alloc_cold(struct address_space *x);
+extern struct page *__page_cache_alloc(gfp_t gfp);
 #else
+static inline struct page *__page_cache_alloc(gfp_t gfp)
+{
+	return alloc_pages(gfp, 0);
+}
+#endif
+
 static inline struct page *page_cache_alloc(struct address_space *x)
 {
-	return alloc_pages(mapping_gfp_mask(x), 0);
+	return __page_cache_alloc(mapping_gfp_mask(x));
 }
 
 static inline struct page *page_cache_alloc_cold(struct address_space *x)
 {
-	return alloc_pages(mapping_gfp_mask(x)|__GFP_COLD, 0);
+	return __page_cache_alloc(mapping_gfp_mask(x)|__GFP_COLD);
 }
-#endif
 
 typedef int filler_t(void *, struct page *);
 
@@ -130,13 +134,28 @@ static inline pgoff_t linear_page_index(struct vm_area_struct *vma,
 }
 
 extern void FASTCALL(__lock_page(struct page *page));
+extern void FASTCALL(__lock_page_nosync(struct page *page));
 extern void FASTCALL(unlock_page(struct page *page));
 
+/*
+ * lock_page may only be called if we have the page's inode pinned.
+ */
 static inline void lock_page(struct page *page)
 {
 	might_sleep();
 	if (TestSetPageLocked(page))
 		__lock_page(page);
+}
+
+/*
+ * lock_page_nosync should only be used if we can't pin the page's inode.
+ * Doesn't play quite so well with block device plugging.
+ */
+static inline void lock_page_nosync(struct page *page)
+{
+	might_sleep();
+	if (TestSetPageLocked(page))
+		__lock_page_nosync(page);
 }
 	
 /*

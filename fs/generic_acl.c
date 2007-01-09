@@ -10,6 +10,10 @@
 #include <linux/fs.h>
 #include <linux/generic_acl.h>
 
+/**
+ * generic_acl_list  -  Generic xattr_handler->list() operation
+ * @ops:	Filesystem specific getacl and setacl callbacks
+ */
 size_t
 generic_acl_list(struct inode *inode, struct generic_acl_operations *ops,
 		 int type, char *list, size_t list_size)
@@ -41,6 +45,10 @@ generic_acl_list(struct inode *inode, struct generic_acl_operations *ops,
 	return size;
 }
 
+/**
+ * generic_acl_get  -  Generic xattr_handler->get() operation
+ * @ops:	Filesystem specific getacl and setacl callbacks
+ */
 int
 generic_acl_get(struct inode *inode, struct generic_acl_operations *ops,
 		int type, void *buffer, size_t size)
@@ -57,6 +65,10 @@ generic_acl_get(struct inode *inode, struct generic_acl_operations *ops,
 	return error;
 }
 
+/**
+ * generic_acl_set  -  Generic xattr_handler->set() operation
+ * @ops:	Filesystem specific getacl and setacl callbacks
+ */
 int
 generic_acl_set(struct inode *inode, struct generic_acl_operations *ops,
 		int type, const void *value, size_t size)
@@ -66,7 +78,7 @@ generic_acl_set(struct inode *inode, struct generic_acl_operations *ops,
 
 	if (S_ISLNK(inode->i_mode))
 		return -EOPNOTSUPP;
-	if ((current->fsuid != inode->i_uid) && !capable(CAP_FOWNER))
+	if (current->fsuid != inode->i_uid && !capable(CAP_FOWNER))
 		return -EPERM;
 	if (value) {
 		acl = posix_acl_from_xattr(value, size);
@@ -107,6 +119,13 @@ failed:
 	return error;
 }
 
+/**
+ * generic_acl_init  -  Take care of acl inheritance at @inode create time
+ * @ops:	Filesystem specific getacl and setacl callbacks
+ *
+ * Files created inside a directory with a default ACL inherit the
+ * directory's default ACL.
+ */
 int
 generic_acl_init(struct inode *inode, struct inode *dir,
 		 struct generic_acl_operations *ops)
@@ -136,9 +155,8 @@ generic_acl_init(struct inode *inode, struct inode *dir,
 		error = posix_acl_create_masq(clone, &mode);
 		if (error >= 0) {
 			inode->i_mode = mode;
-			if (error > 0) {
+			if (error > 0)
 				ops->setacl(inode, ACL_TYPE_ACCESS, clone);
-			}
 		}
 		posix_acl_release(clone);
 	}
@@ -149,6 +167,13 @@ cleanup:
 	return error;
 }
 
+/**
+ * generic_acl_chmod  -  change the access acl of @inode upon chmod()
+ * @ops:	FIlesystem specific getacl and setacl callbacks
+ *
+ * A chmod also changes the permissions of the owner, group/mask, and
+ * other ACL entries.
+ */
 int
 generic_acl_chmod(struct inode *inode, struct generic_acl_operations *ops)
 {

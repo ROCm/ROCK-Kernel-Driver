@@ -3,12 +3,13 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 2004, 2005 by Ralf Baechle
+ * Copyright (C) 2004, 05, 06 by Ralf Baechle
  * Copyright (C) 2005 by MIPS Technologies, Inc.
  */
 #include <linux/oprofile.h>
 #include <linux/interrupt.h>
 #include <linux/smp.h>
+#include <asm/irq_regs.h>
 
 #include "op_impl.h"
 
@@ -30,16 +31,18 @@
 #define M_COUNTER_OVERFLOW		(1UL      << 31)
 
 #ifdef CONFIG_MIPS_MT_SMP
-#define WHAT	(M_TC_EN_VPE | M_PERFCTL_VPEID(smp_processor_id()))
+#define WHAT		(M_TC_EN_VPE | M_PERFCTL_VPEID(smp_processor_id()))
+#define vpe_id()	smp_processor_id()
 #else
-#define WHAT	0
+#define WHAT		0
+#define vpe_id()	smp_processor_id()
 #endif
 
 #define __define_perf_accessors(r, n, np)				\
 									\
 static inline unsigned int r_c0_ ## r ## n(void)			\
 {									\
-	unsigned int cpu = smp_processor_id();				\
+	unsigned int cpu = vpe_id();					\
 									\
 	switch (cpu) {							\
 	case 0:								\
@@ -54,7 +57,7 @@ static inline unsigned int r_c0_ ## r ## n(void)			\
 									\
 static inline void w_c0_ ## r ## n(unsigned int value)			\
 {									\
-	unsigned int cpu = smp_processor_id();				\
+	unsigned int cpu = vpe_id();					\
 									\
 	switch (cpu) {							\
 	case 0:								\
@@ -170,7 +173,7 @@ static void mipsxx_cpu_stop(void *args)
 	}
 }
 
-static int mipsxx_perfcount_handler(struct pt_regs *regs)
+static int mipsxx_perfcount_handler(void)
 {
 	unsigned int counters = op_model_mipsxx_ops.num_counters;
 	unsigned int control;
@@ -184,7 +187,7 @@ static int mipsxx_perfcount_handler(struct pt_regs *regs)
 		counter = r_c0_perfcntr ## n();				\
 		if ((control & M_PERFCTL_INTERRUPT_ENABLE) &&		\
 		    (counter & M_COUNTER_OVERFLOW)) {			\
-			oprofile_add_sample(regs, n);			\
+			oprofile_add_sample(get_irq_regs(), n);		\
 			w_c0_perfcntr ## n(reg.counter[n]);		\
 			handled = 1;					\
 		}
@@ -217,7 +220,7 @@ static inline int n_counters(void)
 {
 	int counters = __n_counters();
 
-#ifndef CONFIG_SMP
+#ifdef CONFIG_MIPS_MT_SMP
 	if (current_cpu_data.cputype == CPU_34K)
 		return counters >> 1;
 #endif

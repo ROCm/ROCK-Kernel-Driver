@@ -100,12 +100,12 @@ int nlmclnt_block(struct nlm_wait *block, struct nlm_rqst *req, long timeout)
 /*
  * The server lockd has called us back to tell us the lock was granted
  */
-u32 nlmclnt_grant(const struct sockaddr_in *addr, const struct nlm_lock *lock)
+__be32 nlmclnt_grant(const struct sockaddr_in *addr, const struct nlm_lock *lock)
 {
 	const struct file_lock *fl = &lock->fl;
 	const struct nfs_fh *fh = &lock->fh;
 	struct nlm_wait	*block;
-	u32 res = nlm_lck_denied;
+	__be32 res = nlm_lck_denied;
 
 	/*
 	 * Look up blocked request based on arguments. 
@@ -174,7 +174,7 @@ reclaimer(void *ptr)
 	/* This one ensures that our parent doesn't terminate while the
 	 * reclaim is in progress */
 	lock_kernel();
-	lockd_up();
+	lockd_up(0); /* note: this cannot fail as lockd is already running */
 
 	dprintk("lockd: reclaiming locks for host %s", host->h_name);
 

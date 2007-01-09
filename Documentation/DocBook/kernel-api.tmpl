@@ -158,6 +158,7 @@ X!Ilib/string.c
 !Emm/filemap.c
 !Emm/memory.c
 !Emm/vmalloc.c
+!Imm/page_alloc.c
 !Emm/mempool.c
 !Emm/page-writeback.c
 !Emm/truncate.c
@@ -181,56 +182,19 @@ X!Ilib/string.c
      </sect1>
   </chapter>
 
-  <chapter id="proc">
-     <title>The proc filesystem</title>
- 
-     <sect1><title>sysctl interface</title>
-!Ekernel/sysctl.c
-     </sect1>
+  <chapter id="relayfs">
+     <title>relay interface support</title>
 
-     <sect1><title>proc filesystem interface</title>
-!Ifs/proc/base.c
-     </sect1>
-  </chapter>
+     <para>
+	Relay interface support
+	is designed to provide an efficient mechanism for tools and
+	facilities to relay large amounts of data from kernel space to
+	user space.
+     </para>
 
-  <chapter id="debugfs">
-     <title>The debugfs filesystem</title>
- 
-     <sect1><title>debugfs interface</title>
-!Efs/debugfs/inode.c
-!Efs/debugfs/file.c
-     </sect1>
-  </chapter>
-
-  <chapter id="vfs">
-     <title>The Linux VFS</title>
-     <sect1><title>The Filesystem types</title>
-!Iinclude/linux/fs.h
-     </sect1>
-     <sect1><title>The Directory Cache</title>
-!Efs/dcache.c
-!Iinclude/linux/dcache.h
-     </sect1>
-     <sect1><title>Inode Handling</title>
-!Efs/inode.c
-!Efs/bad_inode.c
-     </sect1>
-     <sect1><title>Registration and Superblocks</title>
-!Efs/super.c
-     </sect1>
-     <sect1><title>File Locks</title>
-!Efs/locks.c
-!Ifs/locks.c
-     </sect1>
-     <sect1><title>Other Functions</title>
-!Efs/mpage.c
-!Efs/namei.c
-!Efs/buffer.c
-!Efs/bio.c
-!Efs/seq_file.c
-!Efs/filesystems.c
-!Efs/fs-writeback.c
-!Efs/block_dev.c
+     <sect1><title>relay interface</title>
+!Ekernel/relay.c
+!Ikernel/relay.c
      </sect1>
   </chapter>
 
@@ -302,8 +266,13 @@ X!Ekernel/module.c
 !Ekernel/irq/manage.c
      </sect1>
 
+     <sect1><title>DMA Channels</title>
+!Ekernel/dma.c
+     </sect1>
+
      <sect1><title>Resources Management</title>
 !Ikernel/resource.c
+!Ekernel/resource.c
      </sect1>
 
      <sect1><title>MTRR Handling</title>
@@ -349,13 +318,6 @@ X!Earch/i386/kernel/mca.c
      </sect1>
   </chapter>
 
-  <chapter id="sysfs">
-     <title>The Filesystem for Exporting Kernel Objects</title>
-!Efs/sysfs/file.c
-!Efs/sysfs/symlink.c
-!Efs/sysfs/bin.c
-  </chapter>
-
   <chapter id="security">
      <title>Security Framework</title>
 !Esecurity/security.c
@@ -386,6 +348,7 @@ X!Iinclude/linux/device.h
 -->
 !Edrivers/base/driver.c
 !Edrivers/base/core.c
+!Edrivers/base/class.c
 !Edrivers/base/firmware_class.c
 !Edrivers/base/transport_class.c
 !Edrivers/base/dmapool.c
@@ -435,6 +398,11 @@ X!Edrivers/pnp/system.c
   <chapter id="blkdev">
      <title>Block Devices</title>
 !Eblock/ll_rw_blk.c
+  </chapter>
+
+  <chapter id="chrdev">
+	<title>Char devices</title>
+!Efs/char_dev.c
   </chapter>
 
   <chapter id="miscdev">

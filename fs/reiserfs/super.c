@@ -430,20 +430,29 @@ int remove_save_link(struct inode *inode, int truncate)
 	return journal_end(&th, inode->i_sb, JOURNAL_PER_BALANCE_CNT);
 }
 
+static void reiserfs_kill_sb(struct super_block *s)
+{
+	if (REISERFS_SB(s)) {
+		if (REISERFS_SB(s)->xattr_root) {
+			d_invalidate(REISERFS_SB(s)->xattr_root);
+			dput(REISERFS_SB(s)->xattr_root);
+			REISERFS_SB(s)->xattr_root = NULL;
+		}
+
+		if (REISERFS_SB(s)->priv_root) {
+			d_invalidate(REISERFS_SB(s)->priv_root);
+			dput(REISERFS_SB(s)->priv_root);
+			REISERFS_SB(s)->priv_root = NULL;
+		}
+	}
+
+	kill_block_super(s);
+}
+
 static void reiserfs_put_super(struct super_block *s)
 {
 	struct reiserfs_transaction_handle th;
 	th.t_trans_id = 0;
-
-	if (REISERFS_SB(s)->xattr_root) {
-		d_invalidate(REISERFS_SB(s)->xattr_root);
-		dput(REISERFS_SB(s)->xattr_root);
-	}
-
-	if (REISERFS_SB(s)->priv_root) {
-		d_invalidate(REISERFS_SB(s)->priv_root);
-		dput(REISERFS_SB(s)->priv_root);
-	}
 
 	/* change file system state to current state if it was mounted with read-write permissions */
 	if (!(s->s_flags & MS_RDONLY)) {
@@ -506,8 +515,10 @@ static void init_once(void *foo, kmem_cache_t * cachep, unsigned long flags)
 	    SLAB_CTOR_CONSTRUCTOR) {
 		INIT_LIST_HEAD(&ei->i_prealloc_list);
 		inode_init_once(&ei->vfs_inode);
+#ifdef CONFIG_REISERFS_FS_POSIX_ACL
 		ei->i_acl_access = NULL;
 		ei->i_acl_default = NULL;
+#endif
 	}
 }
 
@@ -526,9 +537,7 @@ static int init_inodecache(void)
 
 static void destroy_inodecache(void)
 {
-	if (kmem_cache_destroy(reiserfs_inode_cachep))
-		reiserfs_warning(NULL,
-				 "reiserfs_inode_cache: not all structures were freed");
+	kmem_cache_destroy(reiserfs_inode_cachep);
 }
 
 /* we don't mark inodes dirty, we just log them */
@@ -558,6 +567,7 @@ static void reiserfs_dirty_inode(struct inode *inode)
 	reiserfs_write_unlock(inode->i_sb);
 }
 
+#ifdef CONFIG_REISERFS_FS_POSIX_ACL
 static void reiserfs_clear_inode(struct inode *inode)
 {
 	struct posix_acl *acl;
@@ -572,6 +582,9 @@ static void reiserfs_clear_inode(struct inode *inode)
 		posix_acl_release(acl);
 	REISERFS_I(inode)->i_acl_default = NULL;
 }
+#else
+#define reiserfs_clear_inode NULL
+#endif
 
 #ifdef CONFIG_QUOTA
 static ssize_t reiserfs_quota_write(struct super_block *, int, const char *,
@@ -720,9 +733,6 @@ static const arg_desc_t error_actions[] = {
 #endif
 	{NULL, 0, 0},
 };
-
-/* FIXME: RPM breaks with the previous value of 128k! */
-int reiserfs_default_io_size = PAGE_SIZE;
 
 /* proceed only one option from a list *cur - string containing of mount options
    opts - array of options which are accepted
@@ -952,19 +962,8 @@ static int reiserfs_parse_options(struct super_block *s, char *options,	/* strin
 		}
 
 		if (c == 'w') {
-			char *p = NULL;
-			int val = simple_strtoul(arg, &p, 0);
-
-			if (*p != '\0') {
-				reiserfs_warning(s,
-						 "reiserfs_parse_options: non-numeric value %s for nolargeio option",
-						 arg);
-				return 0;
-			}
-			if (val)
-				reiserfs_default_io_size = PAGE_SIZE;
-			else
-				reiserfs_default_io_size = 128 * 1024;
+			reiserfs_warning(s, "reiserfs: nolargeio option is no longer supported");
+			return 0;
 		}
 
 		if (c == 'j') {
@@ -1639,12 +1638,9 @@ static int reiserfs_fill_super(struct super_block *s, void *data, int silent)
 	} else {
 		reiserfs_info(s, "using writeback data mode\n");
 	}
-	/* make barrer=flush the default */
-
-	if (!reiserfs_barrier_none(s))
-		REISERFS_SB(s)->s_mount_opt |= (1 << REISERFS_BARRIER_FLUSH);
-	if (reiserfs_barrier_flush(s))
+	if (reiserfs_barrier_flush(s)) {
 		printk("reiserfs: using flush barriers\n");
+	}
 	// set_device_ro(s->s_dev, 1) ;
 	if (journal_init(s, jdev_name, old_format, commit_max_age)) {
 		SWARN(silent, s,
@@ -2170,7 +2166,7 @@ struct file_system_type reiserfs_fs_type = {
 	.owner = THIS_MODULE,
 	.name = "reiserfs",
 	.get_sb = get_super_block,
-	.kill_sb = kill_block_super,
+	.kill_sb = reiserfs_kill_sb,
 	.fs_flags = FS_REQUIRES_DEV,
 };
 

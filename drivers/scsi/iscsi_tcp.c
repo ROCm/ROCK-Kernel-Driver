@@ -108,7 +108,7 @@ iscsi_hdr_digest(struct iscsi_conn *conn, struct iscsi_buf *buf,
 {
 	struct iscsi_tcp_conn *tcp_conn = conn->dd_data;
 
-	crypto_digest_digest(tcp_conn->tx_tfm, &buf->sg, 1, crc);
+	crypto_hash_digest(&tcp_conn->tx_hash, &buf->sg, buf->sg.length, crc);
 	buf->sg.length = tcp_conn->hdr_size;
 }
 
@@ -415,8 +415,8 @@ iscsi_r2t_rsp(struct iscsi_conn *conn, struct iscsi_cmd_task *ctask)
 	iscsi_solicit_data_init(conn, ctask, r2t);
 
 	tcp_ctask->exp_r2tsn = r2tsn + 1;
-	tcp_ctask->xmstate |= XMSTATE_SOL_HDR;
 	__kfifo_put(tcp_ctask->r2tqueue, (void*)&r2t, sizeof(void*));
+	tcp_ctask->xmstate |= XMSTATE_SOL_HDR;
 	list_move_tail(&ctask->running, &conn->xmitqueue);
 
 	scsi_queue_work(session->host, &conn->xmitwork);
@@ -468,7 +468,8 @@ iscsi_tcp_hdr_recv(struct iscsi_conn *conn)
 
 		sg_init_one(&sg, (u8 *)hdr,
 			    sizeof(struct iscsi_hdr) + ahslen);
-		crypto_digest_digest(tcp_conn->rx_tfm, &sg, 1, (u8 *)&cdgst);
+		crypto_hash_digest(&tcp_conn->rx_hash, &sg, sg.length,
+				   (u8 *)&cdgst);
 		rdgst = *(uint32_t*)((char*)hdr + sizeof(struct iscsi_hdr) +
 				     ahslen);
 		if (cdgst != rdgst) {
@@ -675,7 +676,7 @@ iscsi_tcp_copy(struct iscsi_conn *conn, int buf_size)
 }
 
 static inline void
-partial_sg_digest_update(struct crypto_tfm *tfm, struct scatterlist *sg,
+partial_sg_digest_update(struct hash_desc *desc, struct scatterlist *sg,
 			 int offset, int length)
 {
 	struct scatterlist temp;
@@ -683,7 +684,7 @@ partial_sg_digest_update(struct crypto_tfm *tfm, struct scatterlist *sg,
 	memcpy(&temp, sg, sizeof(struct scatterlist));
 	temp.offset = offset;
 	temp.length = length;
-	crypto_digest_update(tfm, &temp, 1);
+	crypto_hash_update(desc, &temp, length);
 }
 
 static void
@@ -692,7 +693,7 @@ iscsi_recv_digest_update(struct iscsi_tcp_conn *tcp_conn, char* buf, int len)
 	struct scatterlist tmp;
 
 	sg_init_one(&tmp, buf, len);
-	crypto_digest_update(tcp_conn->rx_tfm, &tmp, 1);
+	crypto_hash_update(&tcp_conn->rx_hash, &tmp, len);
 }
 
 static int iscsi_scsi_data_in(struct iscsi_conn *conn)
@@ -746,12 +747,12 @@ static int iscsi_scsi_data_in(struct iscsi_conn *conn)
 		if (!rc) {
 			if (conn->datadgst_en) {
 				if (!offset)
-					crypto_digest_update(
-							tcp_conn->rx_tfm,
+					crypto_hash_update(
+							&tcp_conn->rx_hash,
 							&sg[i], 1);
 				else
 					partial_sg_digest_update(
-							tcp_conn->rx_tfm,
+							&tcp_conn->rx_hash,
 							&sg[i],
 							sg[i].offset + offset,
 							sg[i].length - offset);
@@ -765,9 +766,10 @@ static int iscsi_scsi_data_in(struct iscsi_conn *conn)
 				/*
 				 * data-in is complete, but buffer not...
 				 */
-				partial_sg_digest_update(tcp_conn->rx_tfm,
-						&sg[i],
-						sg[i].offset, sg[i].length-rc);
+				partial_sg_digest_update(&tcp_conn->rx_hash,
+							 &sg[i],
+							 sg[i].offset,
+							 sg[i].length-rc);
 			rc = 0;
 			break;
 		}
@@ -885,7 +887,7 @@ more:
 		rc = iscsi_tcp_hdr_recv(conn);
 		if (!rc && tcp_conn->in.datalen) {
 			if (conn->datadgst_en)
-				crypto_digest_init(tcp_conn->rx_tfm);
+				crypto_hash_init(&tcp_conn->rx_hash);
 			tcp_conn->in_progress = IN_PROGRESS_DATA_RECV;
 		} else if (rc) {
 			iscsi_conn_failure(conn, rc);
@@ -904,7 +906,7 @@ more:
 				goto again;
 			iscsi_conn_failure(conn, ISCSI_ERR_CONN_FAILED);
 			return 0;
-		}	
+		}
 
 		memcpy(&recv_digest, conn->data, sizeof(uint32_t));
 		if (recv_digest != tcp_conn->in.datadgst) {
@@ -942,11 +944,11 @@ more:
 					  tcp_conn->in.padding);
 				memset(pad, 0, tcp_conn->in.padding);
 				sg_init_one(&sg, pad, tcp_conn->in.padding);
-				crypto_digest_update(tcp_conn->rx_tfm,
-						     &sg, 1);
+				crypto_hash_update(&tcp_conn->rx_hash,
+						   &sg, sg.length);
 			}
-			crypto_digest_final(tcp_conn->rx_tfm,
-					    (u8 *) &tcp_conn->in.datadgst);
+			crypto_hash_final(&tcp_conn->rx_hash,
+					  (u8 *) &tcp_conn->in.datadgst);
 			debug_tcp("rx digest 0x%x\n", tcp_conn->in.datadgst);
 			tcp_conn->in_progress = IN_PROGRESS_DDIGEST_RECV;
 			tcp_conn->data_copied = 0;
@@ -1191,7 +1193,7 @@ static inline void
 iscsi_data_digest_init(struct iscsi_tcp_conn *tcp_conn,
 		      struct iscsi_tcp_cmd_task *tcp_ctask)
 {
-	crypto_digest_init(tcp_conn->tx_tfm);
+	crypto_hash_init(&tcp_conn->tx_hash);
 	tcp_ctask->digest_count = 4;
 }
 
@@ -1304,7 +1306,7 @@ iscsi_tcp_cmd_init(struct iscsi_cmd_task *ctask)
 		debug_scsi("cmd [itt 0x%x total %d imm_data %d "
 			   "unsol count %d, unsol offset %d]\n",
 			   ctask->itt, ctask->total_length, ctask->imm_count,
-			   ctask->unsol_count, ctask->unsol_offset); 
+			   ctask->unsol_count, ctask->unsol_offset);
 	} else
 		tcp_ctask->xmstate = XMSTATE_R_HDR;
 
@@ -1447,15 +1449,16 @@ iscsi_send_padding(struct iscsi_conn *conn, struct iscsi_cmd_task *ctask)
 		iscsi_buf_init_iov(&tcp_ctask->sendbuf, (char*)&tcp_ctask->pad,
 				   tcp_ctask->pad_count);
 		if (conn->datadgst_en)
-			crypto_digest_update(tcp_conn->tx_tfm,
-					     &tcp_ctask->sendbuf.sg, 1);
+			crypto_hash_update(&tcp_conn->tx_hash,
+					   &tcp_ctask->sendbuf.sg,
+					   tcp_ctask->sendbuf.sg.length);
 	} else if (!(tcp_ctask->xmstate & XMSTATE_W_RESEND_PAD))
 		return 0;
 
 	tcp_ctask->xmstate &= ~XMSTATE_W_PAD;
 	tcp_ctask->xmstate &= ~XMSTATE_W_RESEND_PAD;
 	debug_scsi("sending %d pad bytes for itt 0x%x\n",
-		   tcp_ctask->pad_count, ctask->itt); 
+		   tcp_ctask->pad_count, ctask->itt);
 	rc = iscsi_sendpage(conn, &tcp_ctask->sendbuf, &tcp_ctask->pad_count,
 			   &sent);
 	if (rc) {
@@ -1480,11 +1483,11 @@ iscsi_send_digest(struct iscsi_conn *conn, struct iscsi_cmd_task *ctask,
 	tcp_conn = conn->dd_data;
 
 	if (!(tcp_ctask->xmstate & XMSTATE_W_RESEND_DATA_DIGEST)) {
-		crypto_digest_final(tcp_conn->tx_tfm, (u8*)digest);
+		crypto_hash_final(&tcp_conn->tx_hash, (u8*)digest);
 		iscsi_buf_init_iov(buf, (char*)digest, 4);
 	}
 	tcp_ctask->xmstate &= ~XMSTATE_W_RESEND_DATA_DIGEST;
-	
+
 	rc = iscsi_sendpage(conn, buf, &tcp_ctask->digest_count, &sent);
 	if (!rc)
 		debug_scsi("sent digest 0x%x for itt 0x%x\n", *digest,
@@ -1514,7 +1517,7 @@ iscsi_send_data(struct iscsi_cmd_task *ctask, struct iscsi_buf *sendbuf,
 		rc = iscsi_sendpage(conn, sendbuf, count, &buf_sent);
 		*sent = *sent + buf_sent;
 		if (buf_sent && conn->datadgst_en)
-			partial_sg_digest_update(tcp_conn->tx_tfm,
+			partial_sg_digest_update(&tcp_conn->tx_hash,
 				&sendbuf->sg, sendbuf->sg.offset + offset,
 				buf_sent);
 		if (!iscsi_buf_left(sendbuf) && *sg != tcp_ctask->bad_sg) {
@@ -1593,7 +1596,7 @@ send_hdr:
 		int start = tcp_ctask->sent;
 
 		rc = iscsi_send_data(ctask, &tcp_ctask->sendbuf, &tcp_ctask->sg,
-				     &tcp_ctask->sent, &ctask->data_count, 
+				     &tcp_ctask->sent, &ctask->data_count,
 				     &dtask->digestbuf, &dtask->digest);
 		ctask->unsol_count -= tcp_ctask->sent - start;
 		if (rc)
@@ -1624,9 +1627,12 @@ static int iscsi_send_sol_pdu(struct iscsi_conn *conn,
 	if (tcp_ctask->xmstate & XMSTATE_SOL_HDR) {
 		tcp_ctask->xmstate &= ~XMSTATE_SOL_HDR;
 		tcp_ctask->xmstate |= XMSTATE_SOL_DATA;
-		if (!tcp_ctask->r2t)
+		if (!tcp_ctask->r2t) {
+			spin_lock_bh(&session->lock);
 			__kfifo_get(tcp_ctask->r2tqueue, (void*)&tcp_ctask->r2t,
 				    sizeof(void*));
+			spin_unlock_bh(&session->lock);
+		}
 send_hdr:
 		r2t = tcp_ctask->r2t;
 		dtask = &r2t->dtask;
@@ -1768,18 +1774,22 @@ iscsi_tcp_conn_create(struct iscsi_cls_session *cls_session, uint32_t conn_idx)
 	/* initial operational parameters */
 	tcp_conn->hdr_size = sizeof(struct iscsi_hdr);
 
-	tcp_conn->tx_tfm = crypto_alloc_tfm("crc32c", 0);
-	if (!tcp_conn->tx_tfm)
+	tcp_conn->tx_hash.tfm = crypto_alloc_hash("crc32c", 0,
+						  CRYPTO_ALG_ASYNC);
+	tcp_conn->tx_hash.flags = 0;
+	if (!tcp_conn->tx_hash.tfm)
 		goto free_tcp_conn;
 
-	tcp_conn->rx_tfm = crypto_alloc_tfm("crc32c", 0);
-	if (!tcp_conn->rx_tfm)
+	tcp_conn->rx_hash.tfm = crypto_alloc_hash("crc32c", 0,
+						  CRYPTO_ALG_ASYNC);
+	tcp_conn->rx_hash.flags = 0;
+	if (!tcp_conn->rx_hash.tfm)
 		goto free_tx_tfm;
 
 	return cls_conn;
 
 free_tx_tfm:
-	crypto_free_tfm(tcp_conn->tx_tfm);
+	crypto_free_hash(tcp_conn->tx_hash.tfm);
 free_tcp_conn:
 	kfree(tcp_conn);
 tcp_conn_alloc_fail:
@@ -1809,21 +1819,14 @@ iscsi_tcp_conn_destroy(struct iscsi_cls_conn *cls_conn)
 {
 	struct iscsi_conn *conn = cls_conn->dd_data;
 	struct iscsi_tcp_conn *tcp_conn = conn->dd_data;
-	int digest = 0;
-
-	if (conn->hdrdgst_en || conn->datadgst_en)
-		digest = 1;
 
 	iscsi_tcp_release_conn(conn);
 	iscsi_conn_teardown(cls_conn);
 
-	/* now free tcp_conn */
-	if (digest) {
-		if (tcp_conn->tx_tfm)
-			crypto_free_tfm(tcp_conn->tx_tfm);
-		if (tcp_conn->rx_tfm)
-			crypto_free_tfm(tcp_conn->rx_tfm);
-	}
+	if (tcp_conn->tx_hash.tfm)
+		crypto_free_hash(tcp_conn->tx_hash.tfm);
+	if (tcp_conn->rx_hash.tfm)
+		crypto_free_hash(tcp_conn->rx_hash.tfm);
 
 	kfree(tcp_conn);
 }

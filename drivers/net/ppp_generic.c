@@ -304,7 +304,7 @@ static const int npindex_to_proto[NUM_NP] = {
 	PPP_MPLS_UC,
 	PPP_MPLS_MC,
 };
-	
+
 /* Translates an ethertype into an NP index */
 static inline int ethertype_to_npindex(int ethertype)
 {
@@ -860,7 +860,7 @@ static int __init ppp_init(void)
 			err = PTR_ERR(ppp_class);
 			goto out_chrdev;
 		}
-		device_create(ppp_class, NULL, MKDEV(PPP_MAJOR, 0), "ppp");
+		class_device_create(ppp_class, NULL, MKDEV(PPP_MAJOR, 0), NULL, "ppp");
 	}
 
 out:
@@ -1619,11 +1619,11 @@ ppp_receive_nonmp_frame(struct ppp *ppp, struct sk_buff *skb)
 	case PPP_VJC_UNCOMP:
 		if (ppp->vj == 0 || (ppp->flags & SC_REJ_COMP_TCP))
 			goto err;
-		
+
 		/* Until we fix the decompressor need to make sure
 		 * data portion is linear.
 		 */
-		if (!pskb_may_pull(skb, skb->len)) 
+		if (!pskb_may_pull(skb, skb->len))
 			goto err;
 
 		if (slhc_remember(ppp->vj, skb->data + 2, skb->len - 2) <= 0) {
@@ -2185,7 +2185,7 @@ ppp_ccp_peek(struct ppp *ppp, struct sk_buff *skb, int inbound)
 	switch (CCP_CODE(dp)) {
 	case CCP_CONFREQ:
 
-		/* A ConfReq starts negotiation of compression 
+		/* A ConfReq starts negotiation of compression
 		 * in one direction of transmission,
 		 * and hence brings it down...but which way?
 		 *
@@ -2195,16 +2195,16 @@ ppp_ccp_peek(struct ppp *ppp, struct sk_buff *skb, int inbound)
 		if(inbound)
 			/* He is proposing what I should send */
 			ppp->xstate &= ~SC_COMP_RUN;
-		else	
+		else
 			/* I am proposing to what he should send */
 			ppp->rstate &= ~SC_DECOMP_RUN;
-		
+
 		break;
-		
+
 	case CCP_TERMREQ:
 	case CCP_TERMACK:
 		/*
-		 * CCP is going down, both directions of transmission 
+		 * CCP is going down, both directions of transmission
 		 */
 		ppp->rstate &= ~SC_DECOMP_RUN;
 		ppp->xstate &= ~SC_COMP_RUN;
@@ -2675,7 +2675,7 @@ static void __exit ppp_cleanup(void)
 	cardmap_destroy(&all_ppp_units);
 	if (unregister_chrdev(PPP_MAJOR, "ppp") != 0)
 		printk(KERN_ERR "PPP: failed to unregister PPP device\n");
-	device_destroy(ppp_class, MKDEV(PPP_MAJOR, 0));
+	class_device_destroy(ppp_class, MKDEV(PPP_MAJOR, 0));
 	class_destroy(ppp_class);
 }
 

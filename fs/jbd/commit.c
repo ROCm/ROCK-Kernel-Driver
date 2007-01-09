@@ -1,5 +1,5 @@
 /*
- * linux/fs/commit.c
+ * linux/fs/jbd/commit.c
  *
  * Written by Stephen C. Tweedie <sct@redhat.com>, 1998
  *
@@ -160,7 +160,7 @@ static int journal_write_commit_record(journal_t *journal,
 	return (ret == -EIO);
 }
 
-void journal_do_submit_data(struct buffer_head **wbuf, int bufs)
+static void journal_do_submit_data(struct buffer_head **wbuf, int bufs)
 {
 	int i;
 

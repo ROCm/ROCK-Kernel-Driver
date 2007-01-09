@@ -237,12 +237,12 @@ void __init fill_ebus_device(struct device_node *dp, struct linux_ebus_device *d
 	dev->ofdev.node = dp;
 	dev->ofdev.dev.parent = &dev->bus->ofdev.dev;
 	dev->ofdev.dev.bus = &ebus_bus_type;
-	strcpy(dev->ofdev.dev.bus_id, dp->path_component_name);
+	sprintf(dev->ofdev.dev.bus_id, "ebus[%08x]", dp->node);
 
 	/* Register with core */
 	if (of_device_register(&dev->ofdev) != 0)
 		printk(KERN_DEBUG "ebus: device registration error for %s!\n",
-		       dev->ofdev.dev.bus_id);
+		       dp->path_component_name);
 
 	if ((dp = dp->child) != NULL) {
 		dev->children = (struct linux_ebus_child *)
@@ -277,7 +277,7 @@ void __init ebus_init(void)
 	struct pci_dev *pdev;
 	struct pcidev_cookie *cookie;
 	struct device_node *dp;
-	unsigned long addr, *base;
+	struct resource *p;
 	unsigned short pci_command;
 	int len, reg, nreg;
 	int num_ebus = 0;
@@ -321,24 +321,23 @@ void __init ebus_init(void)
 		}
 		nreg = len / sizeof(struct linux_prom_pci_registers);
 
-		base = &ebus->self->resource[0].start;
+		p = &ebus->self->resource[0];
 		for (reg = 0; reg < nreg; reg++) {
 			if (!(regs[reg].which_io & 0x03000000))
 				continue;
 
-			addr = regs[reg].phys_lo;
-			*base++ = addr;
+			(p++)->start = regs[reg].phys_lo;
 		}
 
 		ebus->ofdev.node = dp;
 		ebus->ofdev.dev.parent = &pdev->dev;
 		ebus->ofdev.dev.bus = &ebus_bus_type;
-		strcpy(ebus->ofdev.dev.bus_id, dp->path_component_name);
+		sprintf(ebus->ofdev.dev.bus_id, "ebus%d", num_ebus);
 
 		/* Register with core */
 		if (of_device_register(&ebus->ofdev) != 0)
 			printk(KERN_DEBUG "ebus: device registration error for %s!\n",
-			       ebus->ofdev.dev.bus_id);
+			       dp->path_component_name);
 
 
 		nd = dp->child;

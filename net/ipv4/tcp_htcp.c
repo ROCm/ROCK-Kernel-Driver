@@ -23,7 +23,7 @@ module_param(use_bandwidth_switch, int, 0644);
 MODULE_PARM_DESC(use_bandwidth_switch, "turn on/off bandwidth switcher");
 
 struct htcp {
-	u16	alpha;		/* Fixed point arith, << 7 */
+	u32	alpha;		/* Fixed point arith, << 7 */
 	u8	beta;           /* Fixed point arith, << 7 */
 	u8	modeswitch;     /* Delay modeswitch until we had at least one congestion event */
 	u32	last_cong;	/* Time since last congestion event end */
@@ -286,7 +286,7 @@ static struct tcp_congestion_ops htcp = {
 
 static int __init htcp_register(void)
 {
-	BUG_ON(sizeof(struct htcp) > ICSK_CA_PRIV_SIZE);
+	BUILD_BUG_ON(sizeof(struct htcp) > ICSK_CA_PRIV_SIZE);
 	BUILD_BUG_ON(BETA_MIN >= BETA_MAX);
 	return tcp_register_congestion_control(&htcp);
 }
