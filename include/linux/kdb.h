@@ -12,7 +12,6 @@
  * Copyright (C) 2000 Stephane Eranian <eranian@hpl.hp.com>
  */
 
-#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/sched.h>
 #include <asm/atomic.h>

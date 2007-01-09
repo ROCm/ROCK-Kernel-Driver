@@ -6,7 +6,6 @@
  * Copyright (c) 1999-2004 Silicon Graphics, Inc.  All Rights Reserved.
  */
 
-#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/mm.h>

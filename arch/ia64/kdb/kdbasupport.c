@@ -9,7 +9,6 @@
  * Copyright (C) David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
-#include <linux/config.h>
 #include <linux/string.h>
 #include <linux/stddef.h>
 #include <linux/kernel.h>

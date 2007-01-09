@@ -15,7 +15,6 @@
  * Eddie Dong <eddie.dong@intel.com> 8 Jan 03
  */
 
-#include <linux/config.h>
 #include <linux/ctype.h>
 #include <linux/string.h>
 #include <linux/kernel.h>

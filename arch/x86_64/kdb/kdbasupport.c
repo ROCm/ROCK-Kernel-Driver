@@ -8,7 +8,6 @@
  * Copyright (c) 1999-2004 Silicon Graphics, Inc.  All Rights Reserved.
  */
 
-#include <linux/config.h>
 #include <linux/string.h>
 #include <linux/stddef.h>
 #include <linux/kernel.h>

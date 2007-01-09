@@ -25,8 +25,6 @@
 #include <asm/tlbflush.h>
 #include <mach_apic.h>
 
-#include <linux/config.h>
-
 /*
  *	Some notes on x86 processor bugs affecting SMP operation:
  *

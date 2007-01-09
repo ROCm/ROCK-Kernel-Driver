@@ -3,7 +3,6 @@
  */
 
 #include <linux/mm.h>
-#include <linux/config.h>
 #ifdef	CONFIG_KDB
 #include <linux/kdb.h>
 #endif	/* CONFIG_KDB */

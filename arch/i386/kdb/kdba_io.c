@@ -8,7 +8,6 @@
  * Copyright (c) 1999-2006 Silicon Graphics, Inc.  All Rights Reserved.
  */
 
-#include <linux/config.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
 #include <asm/io.h>
