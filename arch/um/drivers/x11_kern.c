@@ -438,7 +438,7 @@ static int __init x11_probe(struct device *device)
 	kd->kbd->cdev.dev = device;
 
 	/* mouse setup */
-        init_input_dev(kd->mouse);
+
 	set_bit(EV_ABS,     kd->mouse->evbit);
 	set_bit(EV_KEY,     kd->mouse->evbit);
 	set_bit(BTN_TOUCH,  kd->mouse->keybit);
