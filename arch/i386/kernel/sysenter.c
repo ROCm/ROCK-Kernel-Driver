@@ -46,8 +46,18 @@ __setup("vdso=", vdso_setup);
 
 extern asmlinkage void sysenter_entry(void);
 
+#ifdef CONFIG_XEN
+#include <xen/interface/callback.h>
+
+static struct callback_register __initdata sysenter_cb = {
+	.type = CALLBACKTYPE_sysenter,
+	.address = { __KERNEL_CS, (unsigned long)sysenter_entry },
+};
+#endif
+
 void enable_sep_cpu(void)
 {
+#ifndef CONFIG_X86_NO_TSS
 	int cpu = get_cpu();
 	struct tss_struct *tss = &per_cpu(init_tss, cpu);
 
@@ -62,6 +72,7 @@ void enable_sep_cpu(void)
 	wrmsr(MSR_IA32_SYSENTER_ESP, tss->esp1, 0);
 	wrmsr(MSR_IA32_SYSENTER_EIP, (unsigned long) sysenter_entry, 0);
 	put_cpu();	
+#endif
 }
 
 /*
@@ -84,6 +95,12 @@ int __init sysenter_setup(void)
 	 * In the non-compat case the ELF coredumping code needs the fixmap:
 	 */
 	__set_fixmap(FIX_VDSO, __pa(syscall_page), PAGE_KERNEL_RO);
+#endif
+
+#ifdef CONFIG_XEN
+	if (boot_cpu_has(X86_FEATURE_SEP) &&
+	    HYPERVISOR_callback_op(CALLBACKOP_register, &sysenter_cb) < 0)
+		clear_bit(X86_FEATURE_SEP, boot_cpu_data.x86_capability);
 #endif
 
 	if (!boot_cpu_has(X86_FEATURE_SEP)) {

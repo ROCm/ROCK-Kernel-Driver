@@ -72,8 +72,12 @@ AFLAGS += $(call as-instr,.cfi_startproc\n.cfi_signal_frame\n.cfi_endproc,-DCONF
 cflags-$(CONFIG_CC_STACKPROTECTOR) += $(shell $(CONFIG_SHELL) $(srctree)/scripts/gcc-x86_64-has-stack-protector.sh "$(CC)" -fstack-protector )
 cflags-$(CONFIG_CC_STACKPROTECTOR_ALL) += $(shell $(CONFIG_SHELL) $(srctree)/scripts/gcc-x86_64-has-stack-protector.sh "$(CC)" -fstack-protector-all )
 
+cppflags-$(CONFIG_XEN) += \
+	-D__XEN_INTERFACE_VERSION__=$(CONFIG_XEN_INTERFACE_VERSION)
+
 CFLAGS += $(cflags-y)
 CFLAGS_KERNEL += $(cflags-kernel-y)
+CPPFLAGS += $(cppflags-y)
 AFLAGS += -m64
 
 head-y := arch/x86_64/kernel/head.o arch/x86_64/kernel/head64.o arch/x86_64/kernel/init_task.o
@@ -92,6 +96,21 @@ boot := arch/x86_64/boot
 PHONY += bzImage bzlilo install archmrproper \
 	 fdimage fdimage144 fdimage288 isoimage archclean
 
+ifdef CONFIG_XEN
+CPPFLAGS := -Iinclude$(if $(KBUILD_SRC),2)/asm/mach-xen $(CPPFLAGS)
+head-y := arch/x86_64/kernel/head-xen.o arch/x86_64/kernel/head64-xen.o arch/x86_64/kernel/init_task.o
+LDFLAGS_vmlinux := -e _start
+boot := arch/i386/boot-xen
+.PHONY: vmlinuz
+#Default target when executing "make"
+all: vmlinuz
+
+vmlinuz: vmlinux
+	$(Q)$(MAKE) $(build)=$(boot) $@
+
+install:
+	$(Q)$(MAKE) $(build)=$(boot) XENGUEST=$(XENGUEST) $@
+else
 #Default target when executing "make"
 all: bzImage
 
@@ -112,6 +131,7 @@ fdimage fdimage144 fdimage288 isoimage: vmlinux
 
 install:
 	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(BOOTIMAGE) $@ 
+endif
 
 archclean:
 	$(Q)$(MAKE) $(clean)=$(boot)

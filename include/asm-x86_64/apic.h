@@ -95,11 +95,13 @@ extern void setup_APIC_extened_lvt(unsigned char lvt_off, unsigned char vector,
 #define K8_APIC_EXT_INT_MSG_EXT 0x7
 #define K8_APIC_EXT_LVT_ENTRY_THRESHOLD    0
 
+#ifndef CONFIG_XEN
 void smp_send_timer_broadcast_ipi(void);
 void switch_APIC_timer_to_ipi(void *cpumask);
 void switch_ipi_to_APIC_timer(void *cpumask);
 
 #define ARCH_APICTIMER_STOPS_ON_C3	1
+#endif
 
 extern unsigned boot_cpu_id;
 

@@ -326,7 +326,7 @@ config SMP
 
 config SCHED_SMT
 	bool "SMT (Hyperthreading) scheduler support"
-	depends on SMP
+	depends on SMP && !X86_64_XEN
 	default n
 	help
 	  SMT scheduler support improves the CPU scheduler's decision making
@@ -336,7 +336,7 @@ config SCHED_SMT
 
 config SCHED_MC
 	bool "Multi-core scheduler support"
-	depends on SMP
+	depends on SMP && !X86_64_XEN
 	default y
 	help
 	  Multi-core scheduler support improves the CPU scheduler's decision
@@ -347,7 +347,7 @@ source "kernel/Kconfig.preempt"
 
 config NUMA
        bool "Non Uniform Memory Access (NUMA) Support"
-       depends on SMP
+       depends on SMP && !X86_64_XEN
        help
 	 Enable NUMA (Non Uniform Memory Access) support. The kernel 
 	 will try to allocate memory used by a CPU on the local memory 
@@ -431,6 +431,7 @@ config NR_CPUS
 	int "Maximum number of CPUs (2-256)"
 	range 2 255
 	depends on SMP
+	default "16" if X86_64_XEN
 	default "8"
 	help
 	  This allows you to specify the maximum number of CPUs which this
@@ -489,7 +490,7 @@ config IOMMU
 config CALGARY_IOMMU
 	bool "IBM Calgary IOMMU support"
 	select SWIOTLB
-	depends on PCI && EXPERIMENTAL
+	depends on PCI && !X86_64_XEN && EXPERIMENTAL
 	help
 	  Support for hardware IOMMUs in IBM's xSeries x366 and x460
 	  systems. Needed to run systems with more than 3GB of memory
@@ -547,6 +548,7 @@ config X86_MCE_AMD
 
 config KEXEC
 	bool "kexec system call"
+	depends on !XEN_UNPRIVILEGED_GUEST
 	help
 	  kexec is a system call that implements the ability to shutdown your
 	  current kernel, and to start another kernel.  It is like a reboot

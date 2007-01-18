@@ -15,6 +15,18 @@ static inline void clear_mem_error(unsigned char reason)
 	outb(reason, 0x61);
 }
 
+static inline void clear_io_check_error(unsigned char reason)
+{
+	unsigned long i;
+
+	reason = (reason & 0xf) | 8;
+	outb(reason, 0x61);
+	i = 2000;
+	while (--i) udelay(1000);
+	reason &= ~8;
+	outb(reason, 0x61);
+}
+
 static inline unsigned char get_nmi_reason(void)
 {
 	return inb(0x61);

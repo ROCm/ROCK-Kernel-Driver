@@ -286,6 +286,9 @@ static inline int dup_mmap(struct mm_struct *mm, struct mm_struct *oldmm)
 		if (retval)
 			goto out;
 	}
+#ifdef arch_dup_mmap
+	arch_dup_mmap(mm, oldmm);
+#endif
 	retval = 0;
 out:
 	up_write(&mm->mmap_sem);

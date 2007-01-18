@@ -1970,6 +1970,10 @@ void exit_mmap(struct mm_struct *mm)
 	unsigned long nr_accounted = 0;
 	unsigned long end;
 
+#ifdef arch_exit_mmap
+	arch_exit_mmap(mm);
+#endif
+
 	lru_add_drain();
 	flush_cache_mm(mm);
 	tlb = tlb_gather_mmu(mm, 1);
