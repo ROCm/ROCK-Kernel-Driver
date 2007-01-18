@@ -116,14 +116,12 @@ extern void enable_APIC_timer(void);
 
 extern void enable_NMI_through_LVT0 (void * dummy);
 
-#ifndef CONFIG_XEN
 void smp_send_timer_broadcast_ipi(void);
 void switch_APIC_timer_to_ipi(void *cpumask);
 void switch_ipi_to_APIC_timer(void *cpumask);
 #define ARCH_APICTIMER_STOPS_ON_C3	1
 
 extern int timer_over_8254;
-#endif
 
 #else /* !CONFIG_X86_LOCAL_APIC */
 static inline void lapic_shutdown(void) { }

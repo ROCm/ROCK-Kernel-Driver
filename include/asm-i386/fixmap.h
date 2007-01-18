@@ -19,7 +19,7 @@
  * Leave one empty page between vmalloc'ed areas and
  * the start of the fixmap.
  */
-#if !defined(CONFIG_COMPAT_VDSO) || defined(CONFIG_XEN)
+#ifndef CONFIG_COMPAT_VDSO
 extern unsigned long __FIXADDR_TOP;
 #else
 #define __FIXADDR_TOP  0xfffff000

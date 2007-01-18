@@ -27,7 +27,7 @@
 
 #include <mach_ipi.h>
 
-#ifndef CONFIG_XEN
+
 /* This keeps a track of which one is crashing cpu. */
 static int crashing_cpu;
 
@@ -112,7 +112,6 @@ static void nmi_shootdown_cpus(void)
 	/* There are no cpus to shootdown */
 }
 #endif
-#endif /* CONFIG_XEN */
 
 void machine_crash_shutdown(struct pt_regs *regs)
 {
@@ -127,7 +126,6 @@ void machine_crash_shutdown(struct pt_regs *regs)
 	/* The kernel is broken so disable interrupts */
 	local_irq_disable();
 
-#ifndef CONFIG_XEN
 	/* Make a note of crashing cpu. Will be used in NMI callback.*/
 	crashing_cpu = safe_smp_processor_id();
 	nmi_shootdown_cpus();
@@ -135,6 +133,5 @@ void machine_crash_shutdown(struct pt_regs *regs)
 #if defined(CONFIG_X86_IO_APIC)
 	disable_IO_APIC();
 #endif
-#endif /* CONFIG_XEN */
 	crash_save_cpu(regs, safe_smp_processor_id());
 }

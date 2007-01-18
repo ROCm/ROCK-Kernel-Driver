@@ -17,8 +17,3 @@ obj-$(CONFIG_X86_MCE)	+=	mcheck/
 
 obj-$(CONFIG_MTRR)	+= 	mtrr/
 obj-$(CONFIG_CPU_FREQ)	+=	cpufreq/
-
-ifdef CONFIG_XEN
-include $(srctree)/scripts/Makefile.xen
-obj-y := $(call cherrypickxen, $(obj-y), $(src))
-endif

@@ -238,6 +238,8 @@ struct ep_pqueue {
 
 static void ep_poll_safewake_init(struct poll_safewake *psw);
 static void ep_poll_safewake(struct poll_safewake *psw, wait_queue_head_t *wq);
+static int ep_getfd(int *efd, struct inode **einode, struct file **efile,
+		    struct eventpoll *ep);
 static int ep_alloc(struct eventpoll **pep);
 static void ep_free(struct eventpoll *ep);
 static struct epitem *ep_find(struct eventpoll *ep, struct file *file, int fd);
@@ -267,7 +269,7 @@ static int ep_events_transfer(struct eventpoll *ep,
 static int ep_poll(struct eventpoll *ep, struct epoll_event __user *events,
 		   int maxevents, long timeout);
 static int eventpollfs_delete_dentry(struct dentry *dentry);
-static struct inode *ep_eventpoll_inode(struct file_operations *fops);
+static struct inode *ep_eventpoll_inode(void);
 static int eventpollfs_get_sb(struct file_system_type *fs_type,
 			      int flags, const char *dev_name,
 			      void *data, struct vfsmount *mnt);
@@ -517,7 +519,7 @@ asmlinkage long sys_epoll_create(int size)
 	 * Creates all the items needed to setup an eventpoll file. That is,
 	 * a file structure, and inode and a free file descriptor.
 	 */
-	error = ep_getfd(&fd, &inode, &file, ep, &eventpoll_fops);
+	error = ep_getfd(&fd, &inode, &file, ep);
 	if (error)
 		goto eexit_2;
 
@@ -750,8 +752,8 @@ asmlinkage long sys_epoll_pwait(int epfd, struct epoll_event __user *events,
 /*
  * Creates the file descriptor to be used by the epoll interface.
  */
-int ep_getfd(int *efd, struct inode **einode, struct file **efile,
-		    struct eventpoll *ep, struct file_operations *fops)
+static int ep_getfd(int *efd, struct inode **einode, struct file **efile,
+		    struct eventpoll *ep)
 {
 	struct qstr this;
 	char name[32];
@@ -767,7 +769,7 @@ int ep_getfd(int *efd, struct inode **einode, struct file **efile,
 		goto eexit_1;
 
 	/* Allocates an inode from the eventpoll file system */
-	inode = ep_eventpoll_inode(fops);
+	inode = ep_eventpoll_inode();
 	if (IS_ERR(inode)) {
 		error = PTR_ERR(inode);
 		goto eexit_2;
@@ -799,7 +801,7 @@ int ep_getfd(int *efd, struct inode **einode, struct file **efile,
 
 	file->f_pos = 0;
 	file->f_flags = O_RDONLY;
-	file->f_op = fops;
+	file->f_op = &eventpoll_fops;
 	file->f_mode = FMODE_READ;
 	file->f_version = 0;
 	file->private_data = ep;
@@ -1618,7 +1620,7 @@ static int eventpollfs_delete_dentry(struct dentry *dentry)
 }
 
 
-static struct inode *ep_eventpoll_inode(struct file_operations *fops)
+static struct inode *ep_eventpoll_inode(void)
 {
 	int error = -ENOMEM;
 	struct inode *inode = new_inode(eventpoll_mnt->mnt_sb);
@@ -1626,7 +1628,7 @@ static struct inode *ep_eventpoll_inode(struct file_operations *fops)
 	if (!inode)
 		goto eexit_1;
 
-	inode->i_fop = fops;
+	inode->i_fop = &eventpoll_fops;
 
 	/*
 	 * Mark the inode dirty from the very beginning,

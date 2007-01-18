@@ -46,10 +46,6 @@
 #include <asm/div64.h>
 #include "internal.h"
 
-#ifdef CONFIG_XEN
-#include <include/xen/foreign_page.h>
-#endif
-
 /*
  * MCD - HACK: Find somewhere to initialize this EARLY, or make this
  * initializer cleaner
@@ -494,12 +490,6 @@ static void __free_pages_ok(struct page *page, unsigned int order)
 	int i;
 	int reserved = 0;
 
-#ifdef CONFIG_XEN
-	if (PageForeign(page)) {
-		(PageForeignDestructor(page))(page);
-		return;
-	}
-#endif
 	for (i = 0 ; i < (1 << order) ; ++i)
 		reserved += free_pages_check(page + i);
 	if (reserved)
@@ -794,12 +784,6 @@ static void fastcall free_hot_cold_page(struct page *page, int cold)
 	struct per_cpu_pages *pcp;
 	unsigned long flags;
 
-#ifdef CONFIG_XEN
-	if (PageForeign(page)) {
-		(PageForeignDestructor(page))(page);
-		return;
-	}
-#endif
 	if (PageAnon(page))
 		page->mapping = NULL;
 	if (free_pages_check(page))
