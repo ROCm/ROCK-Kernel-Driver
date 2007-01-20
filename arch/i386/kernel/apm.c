@@ -1879,7 +1879,9 @@ static int __init apm_setup(char *str)
 		if ((strncmp(str, "power-off", 9) == 0) ||
 		    (strncmp(str, "power_off", 9) == 0)) {
 			power_off = !invert;
+#ifdef CONFIG_SMP
 			power_off_set = 1;
+#endif
 		}
 		if (strncmp(str, "smp", 3) == 0)
 		{
