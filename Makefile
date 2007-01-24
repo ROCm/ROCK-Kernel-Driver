@@ -1,7 +1,7 @@
 VERSION = 2
 PATCHLEVEL = 6
 SUBLEVEL = 20
-EXTRAVERSION = -rc5-git1
+EXTRAVERSION = -rc5-git3
 NAME = Homicidal Dwarf Hamster
 
 # *DOCUMENTATION*
