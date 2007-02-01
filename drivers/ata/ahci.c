@@ -204,8 +204,9 @@ struct ahci_port_priv {
 	void			*rx_fis;
 	dma_addr_t		rx_fis_dma;
 	/* for NCQ spurious interrupt analysis */
-	int			spurious_sdb_cnt;
-	u32			seen_status;
+	int			ncq_saw_spurious_sdb_cnt;
+	unsigned int		ncq_saw_d2h:1;
+	unsigned int		ncq_saw_dmas:1;
 };
 
 static u32 ahci_scr_read (struct ata_port *ap, unsigned int sc_reg);
@@ -902,7 +903,7 @@ static int ahci_hardreset(struct ata_port *ap, unsigned int *class)
 
 	/* clear D2H reception area to properly wait for D2H FIS */
 	ata_tf_init(ap->device, &tf);
-	tf.command = 0xff;
+	tf.command = 0x80;
 	ata_tf_to_fis(&tf, d2h_fis, 0);
 
 	rc = sata_std_hardreset(ap, class);
@@ -1115,7 +1116,7 @@ static void ahci_host_intr(struct ata_port *ap)
 	struct ata_eh_info *ehi = &ap->eh_info;
 	struct ahci_port_priv *pp = ap->private_data;
 	u32 status, qc_active;
-	int rc;
+	int rc, known_irq = 0;
 
 	status = readl(port_mmio + PORT_IRQ_STAT);
 	writel(status, port_mmio + PORT_IRQ_STAT);
@@ -1148,32 +1149,45 @@ static void ahci_host_intr(struct ata_port *ap)
 	if (!ap->sactive)
 		return;
 
-	if ((status & PORT_IRQ_D2H_REG_FIS) &&
-	    !(pp->seen_status & PORT_IRQ_D2H_REG_FIS)) {
-		ata_port_printk(ap, KERN_INFO, "D2H reg with I during NCQ, "
+	if (status & PORT_IRQ_D2H_REG_FIS) {
+		if (!pp->ncq_saw_d2h)
+			ata_port_printk(ap, KERN_INFO,
+				"D2H reg with I during NCQ, "
 				"this message won't be printed again\n");
-		pp->seen_status |= PORT_IRQ_D2H_REG_FIS;
-	} else if ((status & PORT_IRQ_DMAS_FIS) &&
-		   !(pp->seen_status & PORT_IRQ_DMAS_FIS)) {
-		ata_port_printk(ap, KERN_INFO, "DMAS FIS during NCQ, "
+		pp->ncq_saw_d2h = 1;
+		known_irq = 1;
+	}
+
+	if (status & PORT_IRQ_DMAS_FIS) {
+		if (!pp->ncq_saw_dmas)
+			ata_port_printk(ap, KERN_INFO,
+				"DMAS FIS during NCQ, "
 				"this message won't be printed again\n");
-		pp->seen_status |= PORT_IRQ_DMAS_FIS;
-	} else if (status & PORT_IRQ_SDB_FIS && pp->spurious_sdb_cnt < 10) {
+		pp->ncq_saw_dmas = 1;
+		known_irq = 1;
+	}
+
+	if (status & PORT_IRQ_SDB_FIS &&
+		   pp->ncq_saw_spurious_sdb_cnt < 10) {
 		/* SDB FIS containing spurious completions might be
 		 * dangerous, we need to know more about them.  Print
 		 * more of it.
 		 */
 		const u32 *f = pp->rx_fis + RX_FIS_SDB;
 
-		pp->spurious_sdb_cnt++;
-
 		ata_port_printk(ap, KERN_INFO, "Spurious SDB FIS during NCQ "
 				"issue=0x%x SAct=0x%x FIS=%08x:%08x%s\n",
 				readl(port_mmio + PORT_CMD_ISSUE),
-				readl(port_mmio + PORT_SCR_ACT), f[0], f[1],
-				pp->spurious_sdb_cnt < 10 ?
+				readl(port_mmio + PORT_SCR_ACT),
+				le32_to_cpu(f[0]), le32_to_cpu(f[1]),
+				pp->ncq_saw_spurious_sdb_cnt < 10 ?
 				"" : ", shutting up");
-	} else
+
+		pp->ncq_saw_spurious_sdb_cnt++;
+		known_irq = 1;
+	}
+
+	if (!known_irq)
 		ata_port_printk(ap, KERN_INFO, "spurious interrupt "
 				"(irq_stat 0x%x active_tag 0x%x sactive 0x%x)\n",
 				status, ap->active_tag, ap->sactive);
@@ -1268,7 +1282,7 @@ static void ahci_thaw(struct ata_port *ap)
 	/* clear IRQ */
 	tmp = readl(port_mmio + PORT_IRQ_STAT);
 	writel(tmp, port_mmio + PORT_IRQ_STAT);
-	writel(1 << ap->id, mmio + HOST_IRQ_STAT);
+	writel(1 << ap->port_no, mmio + HOST_IRQ_STAT);
 
 	/* turn IRQ back on */
 	writel(DEF_PORT_IRQ, port_mmio + PORT_IRQ_MASK);

@@ -1,3 +1,17 @@
+2007-02-01 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.20-rc7-x86_64-1.
+
+2007-01-10 Keith Owens  <kaos@sgi.com>
+
+	* Correct setjmp for the FRAME_POINTER=y case.
+	* Remove duplicate longjmp code for FRAME_POINTER=n/y.
+	* kdb v4.4-2.6.20-rc4-x86_64-2.
+
+2007-01-08 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.20-rc4-x86_64-1.
+
 2007-01-02 Keith Owens  <kaos@sgi.com>
 
 	* kdb v4.4-2.6.20-rc3-x86_64-1.

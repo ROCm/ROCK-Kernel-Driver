@@ -651,28 +651,35 @@ kdba_clearsinglestep(struct pt_regs *regs)
 int asmlinkage
 kdba_setjmp(kdb_jmp_buf *jb)
 {
-#if defined(CONFIG_FRAME_POINTER)
-	__asm__("movq %rbx, (0*8)(%rdi);"
-		"movq %rbp, (1*8)(%rdi);"
-		"movq %r12, (2*8)(%rdi);"
-		"movq %r13, (3*8)(%rdi);"
-		"movq %r14, (4*8)(%rdi);"
-		"movq %r15, (5*8)(%rdi);"
-		"leaq 16(%rsp), %rdx;"
-		"movq %rdx, (6*8)(%rdi);"
-		"movq (%rsp), %rax;"
-		"movq %rax, (7*8)(%rdi)");
-#else	 /* CONFIG_FRAME_POINTER */
-	__asm__("movq %rbx, (0*8)(%rdi);"
-		"movq %rbp, (1*8)(%rdi);"
-		"movq %r12, (2*8)(%rdi);"
-		"movq %r13, (3*8)(%rdi);"
-		"movq %r14, (4*8)(%rdi);"
-		"movq %r15, (5*8)(%rdi);"
-		"leaq 8(%rsp), %rdx;"
-		"movq %rdx, (6*8)(%rdi);"
-		"movq (%rsp), %rax;"
-		"movq %rax, (7*8)(%rdi)");
+#ifdef	CONFIG_FRAME_POINTER
+	__asm__ __volatile__
+		("movq %%rbx, (0*8)(%%rdi);"
+		"movq %%rcx, (1*8)(%%rdi);"
+		"movq %%r12, (2*8)(%%rdi);"
+		"movq %%r13, (3*8)(%%rdi);"
+		"movq %%r14, (4*8)(%%rdi);"
+		"movq %%r15, (5*8)(%%rdi);"
+		"leaq 16(%%rsp), %%rdx;"
+		"movq %%rdx, (6*8)(%%rdi);"
+		"movq %%rax, (7*8)(%%rdi)"
+		:
+		: "a" (__builtin_return_address(0)),
+		  "c" (__builtin_frame_address(1))
+		);
+#else	 /* !CONFIG_FRAME_POINTER */
+	__asm__ __volatile__
+		("movq %%rbx, (0*8)(%%rdi);"
+		"movq %%rbp, (1*8)(%%rdi);"
+		"movq %%r12, (2*8)(%%rdi);"
+		"movq %%r13, (3*8)(%%rdi);"
+		"movq %%r14, (4*8)(%%rdi);"
+		"movq %%r15, (5*8)(%%rdi);"
+		"leaq 8(%%rsp), %%rdx;"
+		"movq %%rdx, (6*8)(%%rdi);"
+		"movq %%rax, (7*8)(%%rdi)"
+		:
+		: "a" (__builtin_return_address(0))
+		);
 #endif   /* CONFIG_FRAME_POINTER */
 	return 0;
 }
@@ -680,35 +687,16 @@ kdba_setjmp(kdb_jmp_buf *jb)
 void asmlinkage
 kdba_longjmp(kdb_jmp_buf *jb, int reason)
 {
-#if defined(CONFIG_FRAME_POINTER)
 	__asm__("movq (0*8)(%rdi),%rbx;"
 		"movq (1*8)(%rdi),%rbp;"
 		"movq (2*8)(%rdi),%r12;"
 		"movq (3*8)(%rdi),%r13;"
 		"movq (4*8)(%rdi),%r14;"
 		"movq (5*8)(%rdi),%r15;"
-		"test %esi,%esi;"
-		"mov $01,%eax;"
-		"cmove %eax,%esi;"
-		"mov %esi, %eax;"
 		"movq (7*8)(%rdi),%rdx;"
 		"movq (6*8)(%rdi),%rsp;"
+		"mov %rsi, %rax;"
 		"jmpq *%rdx");
-#else    /* CONFIG_FRAME_POINTER */
-	__asm__("movq (0*8)(%rdi),%rbx;"
-		"movq (1*8)(%rdi),%rbp;"
-		"movq (2*8)(%rdi),%r12;"
-		"movq (3*8)(%rdi),%r13;"
-		"movq (4*8)(%rdi),%r14;"
-		"movq (5*8)(%rdi),%r15;"
-		"test %esi,%esi;"
-		"mov $01,%eax;"
-		"cmove %eax,%esi;"
-		"mov %esi, %eax;"
-		"movq (7*8)(%rdi),%rdx;"
-		"movq (6*8)(%rdi),%rsp;"
-		"jmpq *%rdx");
-#endif	 /* CONFIG_FRAME_POINTER */
 }
 
 /*
