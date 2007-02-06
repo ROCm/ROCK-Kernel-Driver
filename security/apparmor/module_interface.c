@@ -434,7 +434,6 @@ static inline struct aa_entry *aa_activate_file_entry(struct aa_ext *e)
 	return entry;
 
 fail:
-	aamatch_free(entry->extradata);
 	free_aa_entry(entry);
 	return NULL;
 }

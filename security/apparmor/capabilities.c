@@ -40,7 +40,9 @@ static const char *cap_names[] = {
 	"sys_time",
 	"sys_tty_config",
 	"mknod",
-	"lease"
+	"lease",
+	"audit_write",
+	"audit_control"
 };
 
 const char *capability_to_name(unsigned int cap)
@@ -50,5 +52,20 @@ const char *capability_to_name(unsigned int cap)
 	name = (cap < (sizeof(cap_names) / sizeof(char *))
 		   ? cap_names[cap] : "invalid-capability");
 
+	return name;
+}
+
+static const char *syscall_names[] = {
+	"ptrace",
+	"sysctl (write)",
+	"mount",
+	"umount"
+};
+
+const char *syscall_to_name(enum aasyscall call)
+{
+	const char *name;
+	name = (call < (sizeof(syscall_names) / sizeof(char *))
+		? syscall_names[call] : "invalid-syscall");
 	return name;
 }

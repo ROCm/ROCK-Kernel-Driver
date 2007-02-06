@@ -295,8 +295,7 @@ static unsigned int aa_file_perm(struct aaprofile *active, const char *name,
 	 * Currently we only allow access if opened O_WRONLY
 	 */
 	if (mask == MAY_WRITE && strncmp(PROCPFX, name, PROCLEN) == 0 &&
-	    (!list_empty(&BASE_PROFILE(active)->sub) ||
-	     PROFILE_COMPLAIN(active)) && aa_taskattr_access(name + PROCLEN))
+	    aa_taskattr_access(name + PROCLEN))
 		goto done;
 
 	mode = 0;
@@ -547,22 +546,28 @@ int aa_audit_message(struct aaprofile *active, gfp_t gfp, int flags,
 /**
  * aa_audit_syscallreject - Log a syscall rejection to the audit subsystem
  * @active: profile to check against
- * @msg: string describing syscall being rejected
  * @gfp: memory allocation flags
+ * @call: aa syscall cache bit number
  */
 int aa_audit_syscallreject(struct aaprofile *active, gfp_t gfp,
-			   const char *msg)
+			   enum aasyscall call)
 {
 	struct aa_audit sa;
+	int error = -EPERM;
 
-	sa.type = AA_AUDITTYPE_SYSCALL;
-	sa.name = msg;
-	sa.flags = 0;
-	sa.gfp_mask = gfp;
-	sa.error_code = 0;
-	sa.result = 0; /* failure */
+	if (!syscall_is_cached(call)) {
+		sa.type = AA_AUDITTYPE_SYSCALL;
+		sa.name = syscall_to_name(call);
+		sa.flags = 0;
+		sa.gfp_mask = gfp;
+		sa.error_code = 0;
+		sa.result = 0; /* failure */
 
-	return aa_audit(active, &sa);
+		error = aa_audit(active, &sa);
+		if (error == -EPERM)
+			add_to_cached_syscalls(call);
+	}
+	return error;
 }
 
 /**
@@ -618,6 +623,16 @@ int aa_audit(struct aaprofile *active, const struct aa_audit *sa)
 	} else {
 		complain = PROFILE_COMPLAIN(active);
 		logcls = complain ? "PERMITTING" : "REJECTING";
+	}
+
+	/* test if event has already been logged and cached used to log
+	 * only first time event occurs.
+	 */
+	if (sa->type == AA_AUDITTYPE_CAP) {
+		if (cap_is_cached(sa->ival)) {
+			opspec_error = -EPERM;
+			goto skip_logging;
+		}
 	}
 
 	/* In future extend w/ per-profile flags
@@ -726,7 +741,7 @@ int aa_audit(struct aaprofile *active, const struct aa_audit *sa)
 		audit_log_format(ab,
 			"access to capability '%s' ",
 			capability_to_name(sa->ival));
-
+		add_to_cached_caps(sa->ival);
 		opspec_error = -EPERM;
 	} else if (sa->type == AA_AUDITTYPE_SYSCALL) {
 		audit_log_format(ab, "access to syscall '%s' ", sa->name);
@@ -743,6 +758,7 @@ int aa_audit(struct aaprofile *active, const struct aa_audit *sa)
 
 	audit_log_end(ab);
 
+skip_logging:
 	if (complain)
 		error = 0;
 	else
@@ -1595,6 +1611,13 @@ int aa_change_hat(const char *hat_name, u32 hat_magic)
 	/* check to see if an unconfined process is doing a changehat. */
 	if (!__aa_is_confined(sd)) {
 		error = -EPERM;
+		goto out;
+	}
+
+	/* check to see if the confined process has any hats. */
+	if (list_empty(&BASE_PROFILE(sd->active)->sub) &&
+	    !PROFILE_COMPLAIN(sd->active)) {
+		error = -ECHILD;
 		goto out;
 	}
 

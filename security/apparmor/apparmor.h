@@ -64,6 +64,18 @@ extern int apparmor_logsyscall;
 #define AA_WARN(fmt, args...)	printk(KERN_WARNING "AppArmor: " fmt, ##args)
 #define AA_ERROR(fmt, args...)	printk(KERN_ERR "AppArmor: " fmt, ##args)
 
+
+/* apparmor logged syscall reject caching */
+enum aasyscall {
+	AA_SYSCALL_PTRACE,
+	AA_SYSCALL_SYSCTL_WRITE,
+	AA_SYSCALL_MOUNT,
+	AA_SYSCALL_UMOUNT
+};
+
+#define AA_SYSCALL_TO_MASK(X) (1 << (X))
+
+
 /* basic AppArmor data structures */
 
 struct flagval {
@@ -172,6 +184,8 @@ struct aafile {
  * @hat_magic: the magic token controling the ability to leave a hat
  * @list: list this subdomain is on
  * @task: task that the subdomain confines
+ * @cached_caps: caps that have previously generated log entries
+ * @cached_syscalls: mediated syscalls that have previously been logged
  *
  * Contains the tasks current active profile (which could change due to
  * change_hat).  Plus the hat_magic needed during change_hat.
@@ -184,6 +198,9 @@ struct subdomain {
 	u32 hat_magic;			/* used with change_hat */
 	struct list_head list;		/* list of subdomains */
 	struct task_struct *task;
+
+	kernel_cap_t cached_caps;
+	unsigned int cached_syscalls;
 };
 
 typedef int (*aa_iter) (struct subdomain *, void *);
@@ -276,7 +293,7 @@ extern int attach_nullprofile(struct aaprofile *profile);
 extern int aa_audit_message(struct aaprofile *active, gfp_t gfp, int,
 			    const char *, ...);
 extern int aa_audit_syscallreject(struct aaprofile *active, gfp_t gfp,
-				  const char *);
+				  enum aasyscall call);
 extern int aa_audit(struct aaprofile *active, const struct aa_audit *);
 extern char *aa_get_name(struct dentry *dentry, struct vfsmount *mnt);
 
@@ -334,5 +351,6 @@ extern void destroy_apparmorfs(void);
 
 /* capabilities.c */
 extern const char *capability_to_name(unsigned int cap);
+extern const char *syscall_to_name(enum aasyscall call);
 
 #endif				/* __APPARMOR_H */

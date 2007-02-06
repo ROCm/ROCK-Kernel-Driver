@@ -92,10 +92,9 @@ static int apparmor_ptrace(struct task_struct *parent,
 
 	active = get_task_active_aaprofile(parent);
 
-	if (!error && active) {
-		error = aa_audit_syscallreject(active, GFP_KERNEL, "ptrace");
-		WARN_ON(error != -EPERM);
-	}
+	if (!error && active)
+		error = aa_audit_syscallreject(active, GFP_KERNEL,
+					       AA_SYSCALL_PTRACE);
 
 	put_aaprofile(active);
 
@@ -157,7 +156,7 @@ static int apparmor_sysctl(struct ctl_table *table, int op)
 
 	if ((op & 002) && active && !capable(CAP_SYS_ADMIN)) {
 		error = aa_audit_syscallreject(active, GFP_KERNEL,
-					       "sysctl (write)");
+					       AA_SYSCALL_SYSCTL_WRITE);
 		WARN_ON(error != -EPERM);
 	}
 
@@ -220,7 +219,8 @@ static int apparmor_sb_mount(char *dev_name, struct nameidata *nd, char *type,
 	active = get_active_aaprofile();
 
 	if (active) {
-		error = aa_audit_syscallreject(active, GFP_KERNEL, "mount");
+		error = aa_audit_syscallreject(active, GFP_KERNEL,
+					       AA_SYSCALL_MOUNT);
 		WARN_ON(error != -EPERM);
 	}
 
@@ -237,7 +237,8 @@ static int apparmor_umount(struct vfsmount *mnt, int flags)
 	active = get_active_aaprofile();
 
 	if (active) {
-		error = aa_audit_syscallreject(active, GFP_ATOMIC, "umount");
+		error = aa_audit_syscallreject(active, GFP_ATOMIC,
+					       AA_SYSCALL_UMOUNT);
 		WARN_ON(error != -EPERM);
 	}
 
@@ -797,7 +798,7 @@ static int __init apparmor_init(void)
 {
 	int error;
 	const char *complainmsg = ": complainmode enabled";
-	return -EBUSY;
+
 	if ((error = create_apparmorfs())) {
 		AA_ERROR("Unable to activate AppArmor filesystem\n");
 		goto createfs_out;
