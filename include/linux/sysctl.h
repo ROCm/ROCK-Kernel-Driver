@@ -161,7 +161,7 @@ enum
 	KERN_NMI_WATCHDOG=75, /* int: enable/disable nmi watchdog */
 	KERN_PANIC_ON_NMI=76, /* int: whether we will panic on an unrecovered */
 	KERN_UNSUPPORTED,	/* int: allow loading of unsupported modules */
-	KERN_KDB,		/* int: kdb on/off */
+	KERN_KDB=78,		/* int: kdb on/off */
 };
 
 
