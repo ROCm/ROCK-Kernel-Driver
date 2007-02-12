@@ -18,12 +18,11 @@
 #include <linux/init.h>
 #ifdef CONFIG_XEN_PRIVILEGED_GUEST
 #include <asm/smp.h>
-#include <asm/ipi.h>
 #else
 #include <asm/apic.h>
 #include <asm/apicdef.h>
-#include <asm/genapic.h>
 #endif
+#include <asm/genapic.h>
 #include <xen/evtchn.h>
 
 DECLARE_PER_CPU(int, ipi_to_irq[NR_IPIS]);

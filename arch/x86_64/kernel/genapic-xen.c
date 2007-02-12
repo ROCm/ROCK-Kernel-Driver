@@ -17,7 +17,7 @@
 #include <linux/module.h>
 
 #include <asm/smp.h>
-#include <asm/ipi.h>
+#include <asm/genapic.h>
 
 #if defined(CONFIG_ACPI)
 #include <acpi/acpi_bus.h>
