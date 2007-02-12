@@ -778,6 +778,19 @@ static int serio_driver_remove(struct device *dev)
 	return 0;
 }
 
+static void serio_cleanup(struct serio *serio)
+{
+	if (serio->drv && serio->drv->cleanup)
+		serio->drv->cleanup(serio);
+}
+
+static void serio_shutdown(struct device *dev)
+{
+	struct serio *serio = to_serio_port(dev);
+
+	serio_cleanup(serio);
+}
+
 static void serio_attach_driver(struct serio_driver *drv)
 {
 	int error;
@@ -908,6 +921,16 @@ static int serio_uevent(struct device *dev, char **envp, int num_envp, char *buf
 
 #endif /* CONFIG_HOTPLUG */
 
+static int serio_suspend(struct device *dev, pm_message_t state)
+{
+	struct serio *serio = to_serio_port(dev);
+
+	if (state.event == PM_EVENT_SUSPEND)
+		serio_cleanup(serio);
+
+	return 0;
+}
+
 static int serio_resume(struct device *dev)
 {
 	struct serio *serio = to_serio_port(dev);
@@ -972,6 +995,8 @@ static struct bus_type serio_bus = {
 	.uevent		= serio_uevent,
 	.probe		= serio_driver_probe,
 	.remove		= serio_driver_remove,
+	.shutdown	= serio_shutdown,
+	.suspend	= serio_suspend,
 	.resume		= serio_resume,
 };
 

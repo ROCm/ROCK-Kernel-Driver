@@ -987,8 +987,25 @@ static void psmouse_resync(struct work_struct *work)
 static void psmouse_cleanup(struct serio *serio)
 {
 	struct psmouse *psmouse = serio_get_drvdata(serio);
+	struct psmouse *parent = NULL;
 
+	mutex_lock(&psmouse_mutex);
+
+	if (serio->parent && serio->id.type == SERIO_PS_PSTHRU) {
+		parent = serio_get_drvdata(serio->parent);
+		psmouse_deactivate(parent);
+	}
+
+	psmouse_deactivate(psmouse);
+	if (psmouse->cleanup)
+		psmouse->cleanup(psmouse);
 	psmouse_reset(psmouse);
+	ps2_command(&psmouse->ps2dev, NULL, PSMOUSE_CMD_ENABLE);
+
+	if (parent)
+		psmouse_activate(parent);
+
+	mutex_unlock(&psmouse_mutex);
 }
 
 /*

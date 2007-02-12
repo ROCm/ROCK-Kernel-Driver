@@ -788,27 +788,6 @@ static void i8042_controller_reset(void)
 
 
 /*
- * Here we try to reset everything back to a state in which the BIOS will be
- * able to talk to the hardware when rebooting.
- */
-
-static void i8042_controller_cleanup(void)
-{
-	int i;
-
-/*
- * Reset anything that is connected to the ports.
- */
-
-	for (i = 0; i < I8042_NUM_PORTS; i++)
-		if (i8042_ports[i].serio)
-			serio_cleanup(i8042_ports[i].serio);
-
-	i8042_controller_reset();
-}
-
-
-/*
  * i8042_panic_blink() will flash the keyboard LEDs and is called when
  * kernel panics. Flashing LEDs is useful for users running X who may
  * not see the console and will help distingushing panics from "real"
@@ -854,12 +833,15 @@ static long i8042_panic_blink(long count)
 #undef DELAY
 
 /*
- * Here we try to restore the original BIOS settings
+ * Here we try to restore the original BIOS settings. We only want to
+ * do that once, when we really suspend, not when we need to take a
+ * snapshot.
  */
 
 static int i8042_suspend(struct platform_device *dev, pm_message_t state)
 {
-	i8042_controller_cleanup();
+	if (state.event == PM_EVENT_SUSPEND)
+		i8042_controller_reset();
 
 	return 0;
 }
@@ -915,7 +897,7 @@ static int i8042_resume(struct platform_device *dev)
 
 static void i8042_shutdown(struct platform_device *dev)
 {
-	i8042_controller_cleanup();
+	i8042_controller_reset();
 }
 
 static int __devinit i8042_create_kbd_port(void)
