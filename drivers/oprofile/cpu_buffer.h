@@ -36,7 +36,7 @@ struct oprofile_cpu_buffer {
 	volatile unsigned long tail_pos;
 	unsigned long buffer_size;
 	struct task_struct * last_task;
-	int last_is_kernel;
+	int last_cpu_mode;
 	int tracing;
 	struct op_sample * buffer;
 	unsigned long sample_received;
@@ -51,7 +51,10 @@ extern struct oprofile_cpu_buffer cpu_buffer[];
 void cpu_buffer_reset(struct oprofile_cpu_buffer * cpu_buf);
 
 /* transient events for the CPU buffer -> event buffer */
-#define CPU_IS_KERNEL 1
-#define CPU_TRACE_BEGIN 2
+#define CPU_MODE_USER           0
+#define CPU_MODE_KERNEL         1
+#define CPU_MODE_XEN            2
+#define CPU_TRACE_BEGIN         3
+#define CPU_DOMAIN_SWITCH       4
 
 #endif /* OPROFILE_CPU_BUFFER_H */

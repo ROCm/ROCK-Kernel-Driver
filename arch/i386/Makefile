@@ -60,6 +60,11 @@ AFLAGS += $(call as-instr,.cfi_startproc\n.cfi_signal_frame\n.cfi_endproc,-DCONF
 
 CFLAGS += $(cflags-y)
 
+cppflags-$(CONFIG_XEN) += \
+	-D__XEN_INTERFACE_VERSION__=$(CONFIG_XEN_INTERFACE_VERSION)
+
+CPPFLAGS += $(cppflags-y)
+
 # Default subarch .c files
 mcore-y  := mach-default
 
@@ -82,6 +87,10 @@ mcore-$(CONFIG_X86_BIGSMP)	:= mach-default
 #Summit subarch support
 mflags-$(CONFIG_X86_SUMMIT) := -Iinclude/asm-i386/mach-summit
 mcore-$(CONFIG_X86_SUMMIT)  := mach-default
+
+# Xen subarch support
+mflags-$(CONFIG_X86_XEN)	:= -Iinclude/asm-i386/mach-xen
+mcore-$(CONFIG_X86_XEN)		:= mach-xen
 
 # generic subarchitecture
 mflags-$(CONFIG_X86_GENERICARCH) := -Iinclude/asm-i386/mach-generic
@@ -118,6 +127,19 @@ boot := arch/i386/boot
 PHONY += zImage bzImage compressed zlilo bzlilo \
          zdisk bzdisk fdimage fdimage144 fdimage288 isoimage install
 
+ifdef CONFIG_XEN
+CPPFLAGS := -Iinclude$(if $(KBUILD_SRC),2)/asm/mach-xen $(CPPFLAGS)
+head-y := arch/i386/kernel/head-xen.o arch/i386/kernel/init_task-xen.o
+boot := arch/i386/boot-xen
+.PHONY: vmlinuz
+all: vmlinuz
+
+vmlinuz: vmlinux
+	$(Q)$(MAKE) $(build)=$(boot) $@
+
+install:
+	$(Q)$(MAKE) $(build)=$(boot) XENGUEST=$(XENGUEST) $@
+else
 all: bzImage
 
 # KBUILD_IMAGE specify target image being built
@@ -140,6 +162,7 @@ fdimage fdimage144 fdimage288 isoimage: vmlinux
 
 install:
 	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(KBUILD_IMAGE) install
+endif
 
 archclean:
 	$(Q)$(MAKE) $(clean)=arch/i386/boot
@@ -158,3 +181,4 @@ endef
 CLEAN_FILES += arch/$(ARCH)/boot/fdimage \
 	       arch/$(ARCH)/boot/image.iso \
 	       arch/$(ARCH)/boot/mtools.conf
+CLEAN_FILES += vmlinuz vmlinux-stripped

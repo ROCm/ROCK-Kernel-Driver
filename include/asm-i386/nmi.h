@@ -7,8 +7,6 @@
 #include <linux/pm.h>
 #include <asm/irq.h>
 
-#ifdef ARCH_HAS_NMI_WATCHDOG
-
 /**
  * do_nmi_callback
  *
@@ -16,6 +14,8 @@
  * if the handler exists and was handled successfully.
  */
 int do_nmi_callback(struct pt_regs *regs, int cpu);
+
+#ifdef ARCH_HAS_NMI_WATCHDOG
 
 extern int nmi_watchdog_enabled;
 extern int avail_to_resrv_perfctr_nmi_bit(unsigned int);
@@ -43,11 +43,12 @@ struct ctl_table;
 struct file;
 extern int proc_nmi_enabled(struct ctl_table *, int , struct file *,
 			void __user *, size_t *, loff_t *);
-extern int unknown_nmi_panic;
 
 void __trigger_all_cpu_backtrace(void);
 #define trigger_all_cpu_backtrace() __trigger_all_cpu_backtrace()
 
 #endif
+
+extern int unknown_nmi_panic;
 
 #endif /* ASM_NMI_H */

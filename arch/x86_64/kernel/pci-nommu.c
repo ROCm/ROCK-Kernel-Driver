@@ -92,6 +92,8 @@ void __init no_iommu_init(void)
 	if (dma_ops)
 		return;
 
+#ifndef CONFIG_XEN
 	force_iommu = 0; /* no HW IOMMU */
+#endif
 	dma_ops = &nommu_dma_ops;
 }

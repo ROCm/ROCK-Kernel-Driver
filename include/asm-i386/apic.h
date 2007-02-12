@@ -2,7 +2,9 @@
 #define __ASM_APIC_H
 
 #include <linux/pm.h>
+#ifndef CONFIG_XEN
 #include <asm/fixmap.h>
+#endif
 #include <asm/apicdef.h>
 #include <asm/processor.h>
 #include <asm/system.h>
@@ -32,7 +34,7 @@ extern int apic_verbosity;
 
 extern void generic_apic_probe(void);
 
-#ifdef CONFIG_X86_LOCAL_APIC
+#if defined(CONFIG_X86_LOCAL_APIC) && !defined(CONFIG_XEN)
 
 /*
  * Basic functions accessing APICs.
@@ -123,8 +125,13 @@ void switch_ipi_to_APIC_timer(void *cpumask);
 
 extern int timer_over_8254;
 
-#else /* !CONFIG_X86_LOCAL_APIC */
+#else /* !CONFIG_X86_LOCAL_APIC || CONFIG_XEN */
+
 static inline void lapic_shutdown(void) { }
+
+#ifdef CONFIG_X86_LOCAL_APIC
+extern int APIC_init_uniprocessor (void);
+#endif
 
 #endif /* !CONFIG_X86_LOCAL_APIC */
 

@@ -165,7 +165,7 @@ void apply_alternatives(struct alt_instr *start, struct alt_instr *end)
 #ifdef CONFIG_X86_64
 		/* vsyscall code is not mapped yet. resolve it manually. */
 		if (instr >= (u8 *)VSYSCALL_START && instr < (u8*)VSYSCALL_END) {
-			instr = __va(instr - (u8*)VSYSCALL_START + (u8*)__pa_symbol(&__vsyscall_0));
+			instr -= VSYSCALL_START - (unsigned long)&__vsyscall_0;
 			DPRINTK("%s: vsyscall fixup: %p => %p\n",
 				__FUNCTION__, a->instr, instr);
 		}

@@ -202,6 +202,8 @@ enum {
  *	@local_df: allow local fragmentation
  *	@cloned: Head may be cloned (check refcnt to be sure)
  *	@nohdr: Payload reference only, must not modify header
+ *	@proto_data_valid: Protocol data validated since arriving at localhost
+ *	@proto_csum_blank: Protocol csum must be added before leaving localhost
  *	@pkt_type: Packet class
  *	@fclone: skbuff clone status
  *	@ip_summed: Driver fed us an IP checksum
@@ -284,7 +286,13 @@ struct sk_buff {
 				nfctinfo:3;
 	__u8			pkt_type:3,
 				fclone:2,
+#ifndef CONFIG_XEN
 				ipvs_property:1;
+#else
+				ipvs_property:1,
+				proto_data_valid:1,
+				proto_csum_blank:1;
+#endif
 	__be16			protocol;
 
 	void			(*destructor)(struct sk_buff *skb);
@@ -1480,6 +1488,12 @@ static inline int skb_is_gso(const struct sk_buff *skb)
 {
 	return skb_shinfo(skb)->gso_size;
 }
+
+#ifdef CONFIG_XEN
+int skb_checksum_setup(struct sk_buff *skb);
+#else
+static inline int skb_checksum_setup(struct sk_buff *skb) { return 0; }
+#endif
 
 #endif	/* __KERNEL__ */
 #endif	/* _LINUX_SKBUFF_H */

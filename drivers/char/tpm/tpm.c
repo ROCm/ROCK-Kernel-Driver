@@ -30,7 +30,9 @@
 
 enum tpm_const {
 	TPM_MINOR = 224,	/* officially assigned */
+#ifndef CONFIG_XEN
 	TPM_BUFSIZE = 2048,
+#endif
 	TPM_NUM_DEVICES = 256,
 };
 
@@ -331,7 +333,11 @@ static void timeout_work(struct work_struct *work)
 
 	down(&chip->buffer_mutex);
 	atomic_set(&chip->data_pending, 0);
+#ifndef CONFIG_XEN
 	memset(chip->data_buffer, 0, TPM_BUFSIZE);
+#else
+	memset(chip->data_buffer, 0, get_chip_buffersize(chip));
+#endif
 	up(&chip->buffer_mutex);
 }
 
@@ -921,7 +927,12 @@ int tpm_open(struct inode *inode, struct file *file)
 
 	spin_unlock(&driver_lock);
 
+#ifndef CONFIG_XEN
 	chip->data_buffer = kmalloc(TPM_BUFSIZE * sizeof(u8), GFP_KERNEL);
+#else
+	chip->data_buffer = kmalloc(get_chip_buffersize(chip) * sizeof(u8),
+	                            GFP_KERNEL);
+#endif
 	if (chip->data_buffer == NULL) {
 		chip->num_opens--;
 		put_device(chip->dev);
@@ -969,8 +980,13 @@ ssize_t tpm_write(struct file *file, const char __user *buf,
 
 	down(&chip->buffer_mutex);
 
+#ifndef CONFIG_XEN
 	if (in_size > TPM_BUFSIZE)
 		in_size = TPM_BUFSIZE;
+#else
+	if (in_size > get_chip_buffersize(chip))
+		in_size = get_chip_buffersize(chip);
+#endif
 
 	if (copy_from_user
 	    (chip->data_buffer, (void __user *) buf, in_size)) {
@@ -979,9 +995,17 @@ ssize_t tpm_write(struct file *file, const char __user *buf,
 	}
 
 	/* atomic tpm command send and result receive */
+#ifndef CONFIG_XEN
 	out_size = tpm_transmit(chip, chip->data_buffer, TPM_BUFSIZE);
+#else
+	out_size = tpm_transmit(chip, chip->data_buffer,
+	                        get_chip_buffersize(chip));
+#endif
 
 	atomic_set(&chip->data_pending, out_size);
+#ifdef CONFIG_XEN
+	atomic_set(&chip->data_position, 0);
+#endif
 	up(&chip->buffer_mutex);
 
 	/* Set a timeout by which the reader must come claim the result */
@@ -996,21 +1020,52 @@ ssize_t tpm_read(struct file *file, char __user *buf,
 {
 	struct tpm_chip *chip = file->private_data;
 	int ret_size;
+#ifdef CONFIG_XEN
+	int pos, pending = 0;
+#endif
 
+#ifndef CONFIG_XEN
 	del_singleshot_timer_sync(&chip->user_read_timer);
 	flush_scheduled_work();
+#endif
 	ret_size = atomic_read(&chip->data_pending);
+#ifndef CONFIG_XEN
 	atomic_set(&chip->data_pending, 0);
+#endif
 	if (ret_size > 0) {	/* relay data */
 		if (size < ret_size)
 			ret_size = size;
 
+#ifdef CONFIG_XEN
+		pos = atomic_read(&chip->data_position);
+#endif
 		down(&chip->buffer_mutex);
+#ifndef CONFIG_XEN
 		if (copy_to_user(buf, chip->data_buffer, ret_size))
+#else
+		if (copy_to_user(buf, &chip->data_buffer[pos], ret_size)) {
+#endif
 			ret_size = -EFAULT;
+#ifdef CONFIG_XEN
+		} else {
+			pending = atomic_read(&chip->data_pending) - ret_size;
+			if ( pending ) {
+				atomic_set(&chip->data_pending, pending);
+				atomic_set(&chip->data_position,
+				           pos+ret_size);
+			}
+		}
+#endif
 		up(&chip->buffer_mutex);
 	}
 
+#ifdef CONFIG_XEN
+ 	if ( ret_size <= 0 || pending == 0 ) {
+		atomic_set(&chip->data_pending, 0);
+		del_singleshot_timer_sync(&chip->user_read_timer);
+		flush_scheduled_work();
+	}
+#endif
 	return ret_size;
 }
 EXPORT_SYMBOL_GPL(tpm_read);

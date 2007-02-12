@@ -25,12 +25,17 @@ static inline void flush_kernel_dcache_page(struct page *page)
 
 /* declarations for linux/mm/highmem.c */
 unsigned int nr_free_highpages(void);
+#ifdef CONFIG_XEN
+void kmap_flush_unused(void);
+#endif
 extern unsigned long totalhigh_pages;
 
 #else /* CONFIG_HIGHMEM */
 
 static inline unsigned int nr_free_highpages(void) { return 0; }
-
+#ifdef CONFIG_XEN
+static inline void kmap_flush_unused(void) { }
+#endif
 #define totalhigh_pages 0
 
 #ifndef ARCH_HAS_KMAP

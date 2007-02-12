@@ -243,6 +243,7 @@ struct sk_buff *alloc_skb_from_cache(struct kmem_cache *cp,
 	skb_shinfo(skb)->gso_size = 0;
 	skb_shinfo(skb)->gso_segs = 0;
 	skb_shinfo(skb)->gso_type = 0;
+	skb_shinfo(skb)->ip6_frag_id = 0;
 	skb_shinfo(skb)->frag_list = NULL;
 out:
 	return skb;
@@ -468,6 +469,10 @@ struct sk_buff *skb_clone(struct sk_buff *skb, gfp_t gfp_mask)
 	C(local_df);
 	n->cloned = 1;
 	n->nohdr = 0;
+#ifdef CONFIG_XEN
+	C(proto_data_valid);
+	C(proto_csum_blank);
+#endif
 	C(pkt_type);
 	C(ip_summed);
 	C(priority);

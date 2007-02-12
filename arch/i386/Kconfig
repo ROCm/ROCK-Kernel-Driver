@@ -314,7 +314,7 @@ config X86_UP_IOAPIC
 
 config X86_LOCAL_APIC
 	bool
-	depends on X86_UP_APIC || ((X86_VISWS || SMP) && !X86_VOYAGER && !XEN_UNPRIVILEGED_GUEST) || X86_GENERICARCH
+	depends on X86_UP_APIC || ((X86_VISWS || SMP) && !(X86_VOYAGER || XEN_UNPRIVILEGED_GUEST)) || X86_GENERICARCH
 	default y
 
 config X86_IO_APIC
@@ -1063,7 +1063,9 @@ config APM_REAL_MODE_POWER_OFF
 
 endmenu
 
+if !X86_XEN
 source "arch/i386/kernel/cpu/cpufreq/Kconfig"
+endif
 
 endmenu
 

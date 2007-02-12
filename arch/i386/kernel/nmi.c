@@ -31,7 +31,15 @@
 
 #include "mach_traps.h"
 
+#ifdef CONFIG_SYSCTL
 int unknown_nmi_panic;
+static int unknown_nmi_panic_callback(struct pt_regs *regs, int cpu);
+#endif
+
+extern void die_nmi(struct pt_regs *, const char *msg);
+
+#ifndef CONFIG_XEN
+
 int nmi_watchdog_enabled;
 
 /* perfctr_nmi_owner tracks the ownership of the perfctr registers:
@@ -71,10 +79,7 @@ struct nmi_watchdog_ctlblk {
 static DEFINE_PER_CPU(struct nmi_watchdog_ctlblk, nmi_watchdog_ctlblk);
 
 /* local prototypes */
-static int unknown_nmi_panic_callback(struct pt_regs *regs, int cpu);
-
 extern void show_registers(struct pt_regs *regs);
-extern int unknown_nmi_panic;
 
 /* converts an msr to an appropriate reservation bit */
 static inline unsigned int nmi_perfctr_msr_to_bit(unsigned int msr)
@@ -882,8 +887,6 @@ void touch_nmi_watchdog (void)
 }
 EXPORT_SYMBOL(touch_nmi_watchdog);
 
-extern void die_nmi(struct pt_regs *, const char *msg);
-
 __kprobes int nmi_watchdog_tick(struct pt_regs * regs, unsigned reason)
 {
 
@@ -980,6 +983,8 @@ done:
 	return rc;
 }
 
+#endif /* CONFIG_XEN */
+
 int do_nmi_callback(struct pt_regs * regs, int cpu)
 {
 #ifdef CONFIG_SYSCTL
@@ -1001,6 +1006,7 @@ static int unknown_nmi_panic_callback(struct pt_regs *regs, int cpu)
 	return 0;
 }
 
+#ifndef CONFIG_XEN
 /*
  * proc handler for /proc/sys/kernel/nmi
  */
@@ -1039,9 +1045,11 @@ int proc_nmi_enabled(struct ctl_table *table, int write, struct file *file,
 	}
 	return 0;
 }
+#endif
 
 #endif
 
+#ifndef CONFIG_XEN
 void __trigger_all_cpu_backtrace(void)
 {
 	int i;
@@ -1065,3 +1073,4 @@ EXPORT_SYMBOL(reserve_evntsel_nmi);
 EXPORT_SYMBOL(release_evntsel_nmi);
 EXPORT_SYMBOL(disable_timer_nmi_watchdog);
 EXPORT_SYMBOL(enable_timer_nmi_watchdog);
+#endif

@@ -138,7 +138,9 @@ extern int acpi_pci_disabled;
 
 extern u8 x86_acpiid_to_apicid[];
 
+#ifndef CONFIG_XEN
 #define ARCH_HAS_POWER_INIT 1
+#endif
 
 extern int acpi_skip_timer_override;
 extern int acpi_use_timer_override;

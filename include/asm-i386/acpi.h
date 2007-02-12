@@ -146,7 +146,9 @@ extern void acpi_reserve_bootmem(void);
 
 extern u8 x86_acpiid_to_apicid[];
 
+#ifndef CONFIG_XEN
 #define ARCH_HAS_POWER_INIT	1
+#endif
 
 #endif /*__KERNEL__*/
 

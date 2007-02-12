@@ -147,7 +147,11 @@ static inline struct thread_info *stack_thread_info(void)
 #define _TIF_ALLWORK_MASK (0x0000FFFF & ~_TIF_SECCOMP)
 
 /* flags to check in __switch_to() */
+#ifndef CONFIG_XEN
 #define _TIF_WORK_CTXSW (_TIF_DEBUG|_TIF_IO_BITMAP)
+#else
+#define _TIF_WORK_CTXSW _TIF_DEBUG
+#endif
 
 #define PREEMPT_ACTIVE     0x10000000
 

@@ -1,6 +1,8 @@
 #ifndef __ASM_APICDEF_H
 #define __ASM_APICDEF_H
 
+#ifndef CONFIG_XEN
+
 /*
  * Constants for various Intel APICs. (local APIC, IOAPIC, etc.)
  *
@@ -111,7 +113,19 @@
 
 #define APIC_BASE (fix_to_virt(FIX_APIC_BASE))
 
+#else /* CONFIG_XEN */
+
+enum {
+	APIC_DEST_ALLBUT = 0x1,
+	APIC_DEST_SELF,
+	APIC_DEST_ALLINC
+};
+
+#endif /* CONFIG_XEN */
+
 #define MAX_IO_APICS 64
+
+#ifndef CONFIG_XEN
 
 /*
  * the local APIC register structure, memory mapped. Not terribly well
@@ -371,5 +385,7 @@ struct local_apic {
 } __attribute__ ((packed));
 
 #undef u32
+
+#endif /* CONFIG_XEN */
 
 #endif

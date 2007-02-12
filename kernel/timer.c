@@ -616,7 +616,13 @@ unsigned long next_timer_interrupt(void)
 		if (hr_expires < 3)
 			return hr_expires + jiffies;
 	}
+#ifndef CONFIG_XEN
 	hr_expires += jiffies;
+#else
+	hr_expires = min_t(unsigned long,
+			   softlockup_get_next_event(),
+			   hr_expires) + jiffies;
+#endif
 
 	base = __get_cpu_var(tvec_bases);
 	spin_lock(&base->lock);

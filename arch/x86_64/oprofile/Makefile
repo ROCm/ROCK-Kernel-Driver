@@ -11,9 +11,15 @@ DRIVER_OBJS = $(addprefix ../../../drivers/oprofile/, \
 	oprofilefs.o oprofile_stats.o \
 	timer_int.o )
 
+ifdef CONFIG_XEN
+XENOPROF_COMMON_OBJS = $(addprefix ../../../drivers/xen/xenoprof/, \
+			 xenoprofile.o)
+OPROFILE-y := xenoprof.o
+else
 OPROFILE-y := init.o backtrace.o
 OPROFILE-$(CONFIG_X86_LOCAL_APIC) += nmi_int.o op_model_athlon.o op_model_p4.o \
 				     op_model_ppro.o
 OPROFILE-$(CONFIG_X86_IO_APIC)    += nmi_timer_int.o 
-
-oprofile-y = $(DRIVER_OBJS) $(addprefix ../../i386/oprofile/, $(OPROFILE-y))
+endif
+oprofile-y = $(DRIVER_OBJS) $(XENOPROF_COMMON_OBJS) \
+	     $(addprefix ../../i386/oprofile/, $(OPROFILE-y))

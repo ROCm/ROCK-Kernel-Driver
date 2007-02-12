@@ -90,7 +90,11 @@ static void set_pmd_pte(pte_t *kpte, unsigned long address, pte_t pte)
 	unsigned long flags;
 
 	set_pte_atomic(kpte, pte); 	/* change init_mm */
+#ifndef HAVE_SHARED_KERNEL_PMD
 	if (PTRS_PER_PMD > 1)
+#else
+	if (HAVE_SHARED_KERNEL_PMD)
+#endif
 		return;
 
 	spin_lock_irqsave(&pgd_lock, flags);

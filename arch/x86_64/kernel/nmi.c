@@ -29,9 +29,16 @@
 #include <asm/mce.h>
 #include <asm/intel_arch_perfmon.h>
 
+#ifdef CONFIG_SYSCTL
 int unknown_nmi_panic;
-int nmi_watchdog_enabled;
+static int unknown_nmi_panic_callback(struct pt_regs *regs, int cpu);
+#endif
+
 int panic_on_unrecovered_nmi;
+
+#ifndef CONFIG_XEN
+
+int nmi_watchdog_enabled;
 
 /* perfctr_nmi_owner tracks the ownership of the perfctr registers:
  * evtsel_nmi_owner tracks the ownership of the event selection
@@ -69,9 +76,6 @@ struct nmi_watchdog_ctlblk {
 	unsigned int evntsel_msr;  /* the MSR to select the events to handle */
 };
 static DEFINE_PER_CPU(struct nmi_watchdog_ctlblk, nmi_watchdog_ctlblk);
-
-/* local prototypes */
-static int unknown_nmi_panic_callback(struct pt_regs *regs, int cpu);
 
 /* converts an msr to an appropriate reservation bit */
 static inline unsigned int nmi_perfctr_msr_to_bit(unsigned int msr)
@@ -878,6 +882,8 @@ done:
 	return rc;
 }
 
+#endif
+
 asmlinkage __kprobes void do_nmi(struct pt_regs * regs, long error_code)
 {
 	nmi_enter();
@@ -907,6 +913,7 @@ static int unknown_nmi_panic_callback(struct pt_regs *regs, int cpu)
 	return 0;
 }
 
+#ifndef CONFIG_XEN
 /*
  * proc handler for /proc/sys/kernel/nmi
  */
@@ -941,9 +948,11 @@ int proc_nmi_enabled(struct ctl_table *table, int write, struct file *file,
 	}
 	return 0;
 }
+#endif
 
 #endif
 
+#ifndef CONFIG_XEN
 void __trigger_all_cpu_backtrace(void)
 {
 	int i;
@@ -968,3 +977,4 @@ EXPORT_SYMBOL(release_evntsel_nmi);
 EXPORT_SYMBOL(disable_timer_nmi_watchdog);
 EXPORT_SYMBOL(enable_timer_nmi_watchdog);
 EXPORT_SYMBOL(touch_nmi_watchdog);
+#endif /* CONFIG_XEN */

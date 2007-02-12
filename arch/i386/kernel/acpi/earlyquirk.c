@@ -12,7 +12,7 @@
 #include <asm/apic.h>
 #include <asm/irq.h>
 
-#ifdef CONFIG_ACPI
+#if defined(CONFIG_ACPI) && !defined(CONFIG_XEN)
 
 static int nvidia_hpet_detected __initdata;
 
@@ -25,6 +25,7 @@ static int __init nvidia_hpet_check(unsigned long phys, unsigned long size)
 
 static int __init check_bridge(int vendor, int device)
 {
+#ifndef CONFIG_XEN
 #ifdef CONFIG_ACPI
 	/* According to Nvidia all timer overrides are bogus unless HPET
 	   is enabled. */
@@ -47,6 +48,7 @@ static int __init check_bridge(int vendor, int device)
 		printk(KERN_INFO "ATI board detected. Disabling timer routing "
 				"over 8254.\n");
 	}
+#endif
 	return 0;
 }
 
@@ -60,7 +62,7 @@ static void check_intel(void)
 		return;
 
 	device = read_pci_config_16(0, 0, 0, PCI_DEVICE_ID);
-#ifdef CONFIG_SMP
+#if defined(CONFIG_SMP) || defined(CONFIG_XEN)
 	if (device == PCI_DEVICE_ID_INTEL_E7320_MCH ||
 	    device == PCI_DEVICE_ID_INTEL_E7520_MCH ||
 	    device == PCI_DEVICE_ID_INTEL_E7525_MCH)

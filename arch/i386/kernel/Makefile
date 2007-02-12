@@ -47,12 +47,18 @@ EXTRA_AFLAGS   := -traditional
 
 obj-$(CONFIG_SCx200)		+= scx200.o
 
+ifdef CONFIG_XEN
+vsyscall_note := vsyscall-note-xen.o
+else
+vsyscall_note := vsyscall-note.o
+endif
+
 # vsyscall.o contains the vsyscall DSO images as __initdata.
 # We must build both images before we can assemble it.
 # Note: kbuild does not track this dependency due to usage of .incbin
 $(obj)/vsyscall.o: $(obj)/vsyscall-int80.so $(obj)/vsyscall-sysenter.so
 targets += $(foreach F,int80 sysenter,vsyscall-$F.o vsyscall-$F.so)
-targets += vsyscall-note.o vsyscall.lds
+targets += $(vsyscall_note) vsyscall.lds
 
 # The DSO images are built using a special linker script.
 quiet_cmd_syscall = SYSCALL $@
@@ -68,8 +74,54 @@ SYSCFLAGS_vsyscall-int80.so	= $(vsyscall-flags)
 
 $(obj)/vsyscall-int80.so $(obj)/vsyscall-sysenter.so: \
 $(obj)/vsyscall-%.so: $(src)/vsyscall.lds \
-		      $(obj)/vsyscall-%.o $(obj)/vsyscall-note.o FORCE
+		      $(obj)/vsyscall-%.o $(obj)/$(vsyscall_note) FORCE
 	$(call if_changed,syscall)
+
+ifeq ($(CONFIG_XEN)$(CONFIG_COMPAT_VDSO),yy)
+
+# vsyscall.o also contains the vsyscall DSO relocation info as __initdata.
+# We must build both the alternative images before we can assemble it.
+# Note: kbuild does not track this dependency due to usage of .include
+$(obj)/vsyscall.o: $(obj)/vsyscall-int80.rel $(obj)/vsyscall-sysenter.rel
+targets += $(foreach F,int80 sysenter,vsyscall-$F.so.alt vsyscall-$F.rel)
+targets += vsyscall.lds.alt
+
+# The alternative DSO images are built using an alternate base address.
+quiet_cmd_syscall_alt = REBASE  $@
+      cmd_syscall_alt = sed 's,^\([[:space:]]*\.[[:space:]]*=[[:space:]]*\),\1-0x55AA0000 + ,' $< >$@
+
+quiet_cmd_syscall_rel = COMPARE $@
+      cmd_syscall_rel = set -e; \
+			cmp -l $(basename $<) $< \
+			| { read off1 old1 new1; \
+			    read off2 old2 new2; \
+			    test $$(expr $$off1 + 1) = $$off2; \
+			    echo " .long $$(expr $$off1 - 3)"; \
+			    while read off1 old3 new3; do \
+				read off2 old4 new4; \
+				test $$(expr $$off1 + 1) = $$off2; \
+				test $$old1 = $$old3 -a $$new1 = $$new3; \
+				test $$old2 = $$old4 -a $$new2 = $$new4; \
+				echo " .long $$(expr $$off1 - 3)"; \
+			    done; \
+			  } >$@
+
+SYSCFLAGS_vsyscall-sysenter.so.alt = $(vsyscall-flags)
+SYSCFLAGS_vsyscall-int80.so.alt    = $(vsyscall-flags)
+
+$(obj)/vsyscall.lds.alt: $(obj)/vsyscall.lds FORCE
+	$(call if_changed,syscall_alt)
+
+$(obj)/vsyscall-int80.so.alt $(obj)/vsyscall-sysenter.so.alt: \
+$(obj)/vsyscall-%.so.alt: $(obj)/vsyscall.lds.alt \
+		      $(obj)/vsyscall-%.o $(obj)/$(vsyscall_note) FORCE
+	$(call if_changed,syscall)
+
+$(obj)/vsyscall-int80.rel $(obj)/vsyscall-sysenter.rel: \
+$(obj)/vsyscall-%.rel: $(obj)/vsyscall-%.so.alt FORCE
+	$(call if_changed,syscall_rel)
+
+endif
 
 # We also create a special relocatable object that should mirror the symbol
 # table and layout of the linked DSO.  With ld -R we can then refer to
@@ -80,9 +132,20 @@ $(obj)/built-in.o: ld_flags += -R $(obj)/vsyscall-syms.o
 
 SYSCFLAGS_vsyscall-syms.o = -r
 $(obj)/vsyscall-syms.o: $(src)/vsyscall.lds \
-			$(obj)/vsyscall-sysenter.o $(obj)/vsyscall-note.o FORCE
+			$(obj)/vsyscall-sysenter.o $(obj)/$(vsyscall_note) FORCE
 	$(call if_changed,syscall)
 
 k8-y                      += ../../x86_64/kernel/k8.o
 stacktrace-y		  += ../../x86_64/kernel/stacktrace.o
 
+ifdef CONFIG_XEN
+include $(srctree)/scripts/Makefile.xen
+
+obj-y += fixup.o
+microcode-$(subst m,y,$(CONFIG_MICROCODE)) := microcode-xen.o
+n-obj-xen := i8259.o reboot.o smpboot.o trampoline.o tsc.o
+
+obj-y := $(call filterxen, $(obj-y), $(n-obj-xen))
+obj-y := $(call cherrypickxen, $(obj-y))
+extra-y := $(call cherrypickxen, $(extra-y))
+endif

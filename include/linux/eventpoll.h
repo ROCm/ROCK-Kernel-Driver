@@ -90,6 +90,12 @@ static inline void eventpoll_release(struct file *file)
 	eventpoll_release_file(file);
 }
 
+/*
+ * called by aio code to create fd that can poll the  aio event queueQ
+ */
+struct eventpoll;
+int ep_getfd(int *efd, struct inode **einode, struct file **efile,
+             struct eventpoll *ep, const struct file_operations *fops);
 #else
 
 static inline void eventpoll_init_file(struct file *file) {}

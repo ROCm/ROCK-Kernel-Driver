@@ -195,6 +195,12 @@ config XEN_KEYBOARD
 	  domain.  If you've said Y to CONFIG_XEN_FRAMEBUFFER, you probably
 	  want to say Y here.
 
+config XEN_CONSOLE
+	bool "Xen virtual console"
+	default y
+	help
+	  The Xen virtual console is ...
+
 config XEN_SCRUB_PAGES
 	bool "Scrub memory before freeing it to Xen"
 	default y
@@ -238,21 +244,19 @@ config XEN_COMPAT_030002
 
 endmenu
 
-config HAVE_ARCH_ALLOC_SKB
-	bool
-	default y
-
-config HAVE_ARCH_DEV_ALLOC_SKB
-	bool
-	default y
-
 config HAVE_IRQ_IGNORE_UNHANDLED
 	bool
 	default y
 
+config GENERIC_HARDIRQS_NO__DO_IRQ
+	def_bool y
+
 config NO_IDLE_HZ
 	bool
 	default y
+
+config PM
+	def_bool y
 
 config XEN_UTIL
 	bool
@@ -265,11 +269,6 @@ config XEN_BALLOON
 config XEN_DEVMEM
 	bool
 	default y
-
-config XEN_SKBUFF
-	bool
-	default y
-	depends on NET
 
 config XEN_REBOOT
 	bool
