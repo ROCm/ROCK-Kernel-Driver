@@ -855,6 +855,12 @@ static int i8042_resume(struct platform_device *dev)
 {
 	int error;
 
+/*
+ * Do not bother with restoring state if we haven't really suspened yet
+ */
+	if (dev->dev.power.power_state.event != PM_EVENT_SUSPEND)
+		return 0;
+
 	error = i8042_controller_check();
 	if (error)
 		return error;
@@ -867,6 +873,9 @@ static int i8042_resume(struct platform_device *dev)
  * Restore pre-resume CTR value and disable all ports
  */
 
+	i8042_ctr = i8042_initial_ctr;
+	if (i8042_direct)
+		i8042_ctr &= ~I8042_CTR_XLATE;
 	i8042_ctr |= I8042_CTR_AUXDIS | I8042_CTR_KBDDIS;
 	i8042_ctr &= ~(I8042_CTR_AUXINT | I8042_CTR_KBDINT);
 	if (i8042_command(&i8042_ctr, I8042_CMD_CTL_WCTR)) {

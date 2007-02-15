@@ -935,7 +935,8 @@ static int serio_resume(struct device *dev)
 {
 	struct serio *serio = to_serio_port(dev);
 
-	if (serio_reconnect_driver(serio)) {
+	if (dev->power.power_state.event == PM_EVENT_SUSPEND &&
+	    serio_reconnect_driver(serio)) {
 		/*
 		 * Driver re-probing can take a while, so better let kseriod
 		 * deal with it.
