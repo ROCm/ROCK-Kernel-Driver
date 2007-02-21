@@ -721,7 +721,7 @@ static int i8042_controller_init(void)
 	if (~i8042_read_status() & I8042_STR_KEYLOCK) {
 		if (i8042_unlock)
 			i8042_ctr |= I8042_CTR_IGNKEYLOCK;
-		 else
+		else
 			printk(KERN_WARNING "i8042.c: Warning: Keylock active.\n");
 	}
 	spin_unlock_irqrestore(&i8042_lock, flags);
@@ -832,16 +832,22 @@ static long i8042_panic_blink(long count)
 
 #undef DELAY
 
+#ifdef CONFIG_PM
 /*
  * Here we try to restore the original BIOS settings. We only want to
- * do that once, when we really suspend, not when we need to take a
- * snapshot.
+ * do that once, when we really suspend, not when we taking memory
+ * snapshot for swsusp (in this case we'll perform required cleanup
+ * as part of shutdown process).
  */
 
 static int i8042_suspend(struct platform_device *dev, pm_message_t state)
 {
-	if (state.event == PM_EVENT_SUSPEND)
-		i8042_controller_reset();
+	if (dev->dev.power.power_state.event != state.event) {
+		if (state.event == PM_EVENT_SUSPEND)
+			i8042_controller_reset();
+
+		dev->dev.power.power_state = state;
+	}
 
 	return 0;
 }
@@ -856,9 +862,9 @@ static int i8042_resume(struct platform_device *dev)
 	int error;
 
 /*
- * Do not bother with restoring state if we haven't really suspened yet
+ * Do not bother with restoring state if we haven't suspened yet
  */
-	if (dev->dev.power.power_state.event != PM_EVENT_SUSPEND)
+	if (dev->dev.power.power_state.event == PM_EVENT_ON)
 		return 0;
 
 	error = i8042_controller_check();
@@ -870,7 +876,7 @@ static int i8042_resume(struct platform_device *dev)
 		return error;
 
 /*
- * Restore pre-resume CTR value and disable all ports
+ * Restore original CTR value and disable all ports
  */
 
 	i8042_ctr = i8042_initial_ctr;
@@ -896,8 +902,11 @@ static int i8042_resume(struct platform_device *dev)
 
 	i8042_interrupt(0, NULL);
 
+	dev->dev.power.power_state = PMSG_ON;
+
 	return 0;
 }
+#endif /* CONFIG_PM */
 
 /*
  * We need to reset the 8042 back to original mode on system shutdown,
@@ -1141,9 +1150,11 @@ static struct platform_driver i8042_driver = {
 	},
 	.probe		= i8042_probe,
 	.remove		= __devexit_p(i8042_remove),
+	.shutdown	= i8042_shutdown,
+#ifdef CONFIG_PM
 	.suspend	= i8042_suspend,
 	.resume		= i8042_resume,
-	.shutdown	= i8042_shutdown,
+#endif
 };
 
 static int __init i8042_init(void)

@@ -997,13 +997,24 @@ static void psmouse_cleanup(struct serio *serio)
 	}
 
 	psmouse_deactivate(psmouse);
+
 	if (psmouse->cleanup)
 		psmouse->cleanup(psmouse);
+
 	psmouse_reset(psmouse);
+
+/*
+ * Some boxes, such as HP nx7400, get terribly confused if mouse
+ * is not fully enabled before suspending/shutting down.
+ */
 	ps2_command(&psmouse->ps2dev, NULL, PSMOUSE_CMD_ENABLE);
 
-	if (parent)
+	if (parent) {
+		if (parent->pt_deactivate)
+			parent->pt_deactivate(parent);
+
 		psmouse_activate(parent);
+	}
 
 	mutex_unlock(&psmouse_mutex);
 }

@@ -921,12 +921,15 @@ static int serio_uevent(struct device *dev, char **envp, int num_envp, char *buf
 
 #endif /* CONFIG_HOTPLUG */
 
+#ifdef CONFIG_PM
 static int serio_suspend(struct device *dev, pm_message_t state)
 {
-	struct serio *serio = to_serio_port(dev);
+	if (dev->power.power_state.event != state.event) {
+		if (state.event == PM_EVENT_SUSPEND)
+			serio_cleanup(to_serio_port(dev));
 
-	if (state.event == PM_EVENT_SUSPEND)
-		serio_cleanup(serio);
+		dev->power.power_state = state;
+	}
 
 	return 0;
 }
@@ -935,7 +938,7 @@ static int serio_resume(struct device *dev)
 {
 	struct serio *serio = to_serio_port(dev);
 
-	if (dev->power.power_state.event == PM_EVENT_SUSPEND &&
+	if (dev->power.power_state.event != PM_EVENT_ON &&
 	    serio_reconnect_driver(serio)) {
 		/*
 		 * Driver re-probing can take a while, so better let kseriod
@@ -944,8 +947,11 @@ static int serio_resume(struct device *dev)
 		serio_rescan(serio);
 	}
 
+	dev->power.power_state = PMSG_ON;
+
 	return 0;
 }
+#endif /* CONFIG_PM */
 
 /* called from serio_driver->connect/disconnect methods under serio_mutex */
 int serio_open(struct serio *serio, struct serio_driver *drv)
@@ -997,8 +1003,10 @@ static struct bus_type serio_bus = {
 	.probe		= serio_driver_probe,
 	.remove		= serio_driver_remove,
 	.shutdown	= serio_shutdown,
+#ifdef CONFIG_PM
 	.suspend	= serio_suspend,
 	.resume		= serio_resume,
+#endif
 };
 
 static int __init serio_init(void)
