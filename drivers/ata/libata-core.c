@@ -2653,6 +2653,8 @@ static unsigned int ata_bus_softreset(struct ata_port *ap,
 				      unsigned int devmask)
 {
 	struct ata_ioports *ioaddr = &ap->ioaddr;
+	unsigned long timeout;
+	u8 status;
 
 	DPRINTK("ata%u: bus reset via SRST\n", ap->id);
 
@@ -2683,11 +2685,22 @@ static unsigned int ata_bus_softreset(struct ata_port *ap,
 	 */
 	msleep(150);
 
+	/* For those controllers where the status could start out at
+	 * 0xFF even though the device is present we wait up to 2 seconds
+	 * longer for slower removable media devices to respond.
+	 */
+	status = ata_chk_status(ap);
+	timeout = jiffies + 2*HZ;
+	while (status == 0xFF && time_before(jiffies, timeout)) {
+		msleep(50);
+		status = ata_chk_status(ap);
+	}
+
 	/* Before we perform post reset processing we want to see if
 	 * the bus shows 0xFF because the odd clown forgets the D7
 	 * pulldown resistor.
 	 */
-	if (ata_check_status(ap) == 0xFF)
+	if (status == 0xFF)
 		return 0;
 
 	ata_bus_post_reset(ap, devmask);
@@ -2951,10 +2964,21 @@ int ata_std_prereset(struct ata_port *ap)
 	}
 
 	/* Wait for !BSY if the controller can wait for the first D2H
-	 * Reg FIS and we don't know that no device is attached.
+	 * Reg FIS and we don't know that no device is attached.  For
+	 * other controllers a brief wait (up to 3 secs) may be needed
+	 * for some devices.
 	 */
 	if (!(ap->flags & ATA_FLAG_SKIP_D2H_BSY) && !ata_port_offline(ap))
 		ata_busy_sleep(ap, ATA_TMOUT_BOOT_QUICK, ATA_TMOUT_BOOT);
+	else {
+		unsigned long timeout = jiffies + 3*HZ;
+		u8 status = ata_chk_status(ap);
+
+		while ((status & ATA_BUSY) && time_before(jiffies, timeout)) {
+			msleep(50);
+			status = ata_chk_status(ap);
+		}
+	}
 
 	return 0;
 }
