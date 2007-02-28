@@ -9,7 +9,7 @@ menuconfig INPUT_TOUCHSCREEN
 
 	  If unsure, say Y.
 
-if INPUT_TOUCHSCREEN && !UML
+if INPUT_TOUCHSCREEN
 
 config TOUCHSCREEN_ADS7846
 	tristate "ADS 7846 based touchscreens"

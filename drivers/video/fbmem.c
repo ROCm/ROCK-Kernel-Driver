@@ -1204,16 +1204,12 @@ fb_mmap(struct file *file, struct vm_area_struct * vma)
 		vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
 	else
 		vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
-#elif defined(CONFIG_UML)
-	/* nothing */
 #else
 #warning What do we have to do here??
 #endif
-#ifndef CONFIG_UML
 	if (io_remap_pfn_range(vma, vma->vm_start, off >> PAGE_SHIFT,
 			     vma->vm_end - vma->vm_start, vma->vm_page_prot))
 		return -EAGAIN;
-#endif
 	return 0;
 #endif /* !sparc32 */
 }

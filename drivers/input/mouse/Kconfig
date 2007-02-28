@@ -10,7 +10,7 @@ menuconfig INPUT_MOUSE
 
 	  If unsure, say Y.
 
-if INPUT_MOUSE && !UML
+if INPUT_MOUSE
 
 config MOUSE_PS2
 	tristate "PS/2 mouse"
