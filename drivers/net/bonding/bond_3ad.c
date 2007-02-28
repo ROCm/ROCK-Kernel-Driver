@@ -2097,8 +2097,10 @@ void bond_3ad_unbind_slave(struct slave *slave)
  * times out, and it selects an aggregator for the ports that are yet not
  * related to any aggregator, and selects the active aggregator for a bond.
  */
-void bond_3ad_state_machine_handler(struct bonding *bond)
+void bond_3ad_state_machine_handler(struct work_struct *work)
 {
+	struct ad_bond_info *ad_info = container_of(work, struct ad_bond_info, ad_work.work);
+	struct bonding *bond = (struct bonding *)((char *)ad_info - offsetof(struct bonding, ad_info));
 	struct port *port;
 	struct aggregator *aggregator;
 
@@ -2149,7 +2151,7 @@ void bond_3ad_state_machine_handler(struct bonding *bond)
 	}
 
 re_arm:
-	mod_timer(&(BOND_AD_INFO(bond).ad_timer), jiffies + ad_delta_in_ticks);
+	queue_delayed_work(bond_wq, &(BOND_AD_INFO(bond).ad_work), ad_delta_in_ticks);
 out:
 	read_unlock(&bond->lock);
 }

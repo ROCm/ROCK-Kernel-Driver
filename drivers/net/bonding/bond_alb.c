@@ -28,7 +28,7 @@
 #include <linux/pkt_sched.h>
 #include <linux/spinlock.h>
 #include <linux/slab.h>
-#include <linux/timer.h>
+#include <linux/workqueue.h>
 #include <linux/ip.h>
 #include <linux/ipv6.h>
 #include <linux/if_arp.h>
@@ -1367,9 +1367,10 @@ out:
 	return 0;
 }
 
-void bond_alb_monitor(struct bonding *bond)
+void bond_alb_monitor(struct work_struct *work)
 {
-	struct alb_bond_info *bond_info = &(BOND_ALB_INFO(bond));
+	struct alb_bond_info *bond_info = container_of(work, struct alb_bond_info, alb_work.work);
+	struct bonding *bond = (struct bonding *)((char *)bond_info - offsetof(struct bonding, alb_info));
 	struct slave *slave;
 	int i;
 
@@ -1471,7 +1472,7 @@ void bond_alb_monitor(struct bonding *bond)
 	}
 
 re_arm:
-	mod_timer(&(bond_info->alb_timer), jiffies + alb_delta_in_ticks);
+	queue_delayed_work(bond_wq, &(bond_info->alb_work), alb_delta_in_ticks);
 out:
 	read_unlock(&bond->lock);
 }

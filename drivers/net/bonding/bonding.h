@@ -15,7 +15,7 @@
 #ifndef _LINUX_BONDING_H
 #define _LINUX_BONDING_H
 
-#include <linux/timer.h>
+#include <linux/workqueue.h>
 #include <linux/proc_fs.h>
 #include <linux/if_bonding.h>
 #include <linux/kobject.h>
@@ -182,8 +182,8 @@ struct bonding {
 	s32      slave_cnt; /* never change this value outside the attach/detach wrappers */
 	rwlock_t lock;
 	rwlock_t curr_slave_lock;
-	struct   timer_list mii_timer;
-	struct   timer_list arp_timer;
+	struct   delayed_work mii_work;
+	struct   delayed_work arp_work;
 	s8       kill_timers;
 	struct   net_device_stats stats;
 #ifdef CONFIG_PROC_FS
@@ -301,9 +301,9 @@ void bond_destroy_slave_symlinks(struct net_device *master, struct net_device *s
 int bond_enslave(struct net_device *bond_dev, struct net_device *slave_dev);
 int bond_release(struct net_device *bond_dev, struct net_device *slave_dev);
 int bond_sethwaddr(struct net_device *bond_dev, struct net_device *slave_dev);
-void bond_mii_monitor(struct net_device *bond_dev);
-void bond_loadbalance_arp_mon(struct net_device *bond_dev);
-void bond_activebackup_arp_mon(struct net_device *bond_dev);
+void bond_mii_monitor(struct work_struct *work);
+void bond_loadbalance_arp_mon(struct work_struct *work);
+void bond_activebackup_arp_mon(struct work_struct *work);
 void bond_set_mode_ops(struct bonding *bond, int mode);
 int bond_parse_parm(char *mode_arg, struct bond_parm_tbl *tbl);
 const char *bond_mode_name(int mode);
@@ -312,5 +312,6 @@ void bond_change_active_slave(struct bonding *bond, struct slave *new_active);
 void bond_register_arp(struct bonding *);
 void bond_unregister_arp(struct bonding *);
 
-#endif /* _LINUX_BONDING_H */
+extern struct workqueue_struct *bond_wq;
 
+#endif /* _LINUX_BONDING_H */

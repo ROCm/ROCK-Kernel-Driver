@@ -261,7 +261,7 @@ struct ad_bond_info {
 	int lacp_fast;		/* whether fast periodic tx should be
 				 * requested
 				 */
-	struct timer_list ad_timer;
+	struct delayed_work ad_work;
 	struct packet_type ad_pkt_type;
 };
 
@@ -276,7 +276,7 @@ struct ad_slave_info {
 void bond_3ad_initialize(struct bonding *bond, u16 tick_resolution, int lacp_fast);
 int  bond_3ad_bind_slave(struct slave *slave);
 void bond_3ad_unbind_slave(struct slave *slave);
-void bond_3ad_state_machine_handler(struct bonding *bond);
+void bond_3ad_state_machine_handler(struct work_struct *work);
 void bond_3ad_adapter_speed_changed(struct slave *slave);
 void bond_3ad_adapter_duplex_changed(struct slave *slave);
 void bond_3ad_handle_link_change(struct slave *slave, char link);
