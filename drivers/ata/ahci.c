@@ -1167,23 +1167,23 @@ static void ahci_host_intr(struct ata_port *ap)
 		known_irq = 1;
 	}
 
-	if (status & PORT_IRQ_SDB_FIS &&
-		   pp->ncq_saw_spurious_sdb_cnt < 10) {
+	if (status & PORT_IRQ_SDB_FIS) {
 		/* SDB FIS containing spurious completions might be
 		 * dangerous, we need to know more about them.  Print
 		 * more of it.
 		 */
 		const u32 *f = pp->rx_fis + RX_FIS_SDB;
 
-		ata_port_printk(ap, KERN_INFO, "Spurious SDB FIS during NCQ "
-				"issue=0x%x SAct=0x%x FIS=%08x:%08x%s\n",
+		if (pp->ncq_saw_spurious_sdb_cnt < 10) {
+			pp->ncq_saw_spurious_sdb_cnt++;
+			ata_port_printk(ap, KERN_INFO, "Spurious SDB FIS during "
+				"NCQ issue=0x%x SAct=0x%x FIS=%08x:%08x%s\n",
 				readl(port_mmio + PORT_CMD_ISSUE),
 				readl(port_mmio + PORT_SCR_ACT),
 				le32_to_cpu(f[0]), le32_to_cpu(f[1]),
 				pp->ncq_saw_spurious_sdb_cnt < 10 ?
 				"" : ", shutting up");
-
-		pp->ncq_saw_spurious_sdb_cnt++;
+		}
 		known_irq = 1;
 	}
 
