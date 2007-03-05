@@ -378,19 +378,22 @@ static int send_request(struct request *req)
 
 static void viocd_end_request(struct request *req, int uptodate)
 {
-	int nsectors = req->hard_cur_sectors;
+	int nsectors = req->hard_nr_sectors;
 
-	/* Make sure it's fully ended */
+	/*
+	 * Make sure it's fully ended, and ensure that we process
+	 * at least one sector.
+	 */
 	if (blk_pc_request(req))
 		nsectors = (req->data_len + 511) >> 9;
 	if (!nsectors)
 		nsectors = 1;
 
-	if (!end_that_request_first(req, uptodate, nsectors)) {
-		add_disk_randomness(req->rq_disk);
-		blkdev_dequeue_request(req);
-		end_that_request_last(req, uptodate);
-	}
+	if (end_that_request_first(req, uptodate, nsectors))
+		BUG();
+	add_disk_randomness(req->rq_disk);
+	blkdev_dequeue_request(req);
+	end_that_request_last(req, uptodate);
 }
 
 static int rwreq;
