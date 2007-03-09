@@ -3,7 +3,7 @@
  *
  *  Copyright (C) 1991, 1992  Linus Torvalds
  *
- *  Added devfs support. 
+ *  Added devfs support.
  *    Jan-11-1998, C. Scott Ananian <cananian@alumni.princeton.edu>
  *  Shared /dev/zero mmaping support, Feb 2000, Kanoj Sarcar <kanoj@sgi.com>
  */
@@ -34,8 +34,8 @@ static inline int valid_phys_addr_range(unsigned long addr, size_t *count)
 #endif
 
 /*
- * This funcion reads the *physical* memory. The f_pos points directly to the 
- * memory location. 
+ * This funcion reads the *physical* memory. The f_pos points directly to the
+ * memory location.
  */
 static ssize_t read_mem(struct file * file, char __user * buf,
 			size_t count, loff_t *ppos)
@@ -88,7 +88,7 @@ static ssize_t read_mem(struct file * file, char __user * buf,
 	return read;
 }
 
-static ssize_t write_mem(struct file * file, const char __user * buf, 
+static ssize_t write_mem(struct file * file, const char __user * buf,
 			 size_t count, loff_t *ppos)
 {
 	unsigned long p = *ppos, ignored;

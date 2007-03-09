@@ -1,30 +1,30 @@
 /******************************************************************************
  * drivers/xen/netback/netback.c
- * 
+ *
  * Back-end of the driver for virtual network devices. This portion of the
  * driver exports a 'unified' network-device interface that can be accessed
- * by any operating system that implements a compatible front end. A 
+ * by any operating system that implements a compatible front end. A
  * reference front-end implementation can be found in:
  *  drivers/xen/netfront/netfront.c
- * 
+ *
  * Copyright (c) 2002-2005, K A Fraser
- * 
+ *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License version 2
  * as published by the Free Software Foundation; or, when distributed
  * separately from the Linux kernel or incorporated into other
  * software packages, subject to the following license:
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this source file (the "Software"), to deal in the Software without
  * restriction, including without limitation the rights to use, copy, modify,
  * merge, publish, distribute, sublicense, and/or sell copies of the Software,
  * and to permit persons to whom the Software is furnished to do so, subject to
  * the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -48,11 +48,11 @@ struct netbk_rx_meta {
 
 static void netif_idx_release(u16 pending_idx);
 static void netif_page_release(struct page *page);
-static void make_tx_response(netif_t *netif, 
+static void make_tx_response(netif_t *netif,
 			     netif_tx_request_t *txp,
 			     s8       st);
-static netif_rx_response_t *make_rx_response(netif_t *netif, 
-					     u16      id, 
+static netif_rx_response_t *make_rx_response(netif_t *netif,
+					     u16      id,
 					     s8       st,
 					     u16      offset,
 					     u16      size,
@@ -303,7 +303,7 @@ static void xen_network_done_notify(void)
 		eth0_dev = __dev_get_by_name("eth0");
 	netif_rx_schedule(eth0_dev);
 }
-/* 
+/*
  * Add following to poll() function in NAPI driver (Tigon3 is example):
  *  if ( xen_network_done() )
  *      tg3_enable_ints(tp);
@@ -837,7 +837,7 @@ inline static void net_tx_action_dealloc(void)
 
 		netif = pending_tx_info[pending_idx].netif;
 
-		make_tx_response(netif, &pending_tx_info[pending_idx].req, 
+		make_tx_response(netif, &pending_tx_info[pending_idx].req,
 				 NETIF_RSP_OKAY);
 
 		pending_ring[MASK_PEND_IDX(pending_prod++)] = pending_idx;
@@ -1116,7 +1116,7 @@ static void net_tx_action(unsigned long unused)
 		/* Credit-based scheduling. */
 		if (txreq.size > netif->remaining_credit) {
 			unsigned long now = jiffies;
-			unsigned long next_credit = 
+			unsigned long next_credit =
 				netif->credit_timeout.expires +
 				msecs_to_jiffies(netif->credit_usec / 1000);
 
@@ -1175,8 +1175,8 @@ static void net_tx_action(unsigned long unused)
 
 		/* No crossing a page as the payload mustn't fragment. */
 		if (unlikely((txreq.offset + txreq.size) > PAGE_SIZE)) {
-			DPRINTK("txreq.offset: %x, size: %u, end: %lu\n", 
-				txreq.offset, txreq.size, 
+			DPRINTK("txreq.offset: %x, size: %u, end: %lu\n",
+				txreq.offset, txreq.size,
 				(txreq.offset &~PAGE_MASK) + txreq.size);
 			netbk_tx_err(netif, &txreq, i);
 			continue;
@@ -1343,7 +1343,7 @@ irqreturn_t netif_be_int(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
-static void make_tx_response(netif_t *netif, 
+static void make_tx_response(netif_t *netif,
 			     netif_tx_request_t *txp,
 			     s8       st)
 {
@@ -1373,8 +1373,8 @@ static void make_tx_response(netif_t *netif,
 #endif
 }
 
-static netif_rx_response_t *make_rx_response(netif_t *netif, 
-					     u16      id, 
+static netif_rx_response_t *make_rx_response(netif_t *netif,
+					     u16      id,
 					     s8       st,
 					     u16      offset,
 					     u16      size,
@@ -1474,7 +1474,7 @@ static int __init netback_init(void)
 	(void)bind_virq_to_irqhandler(VIRQ_DEBUG,
 				      0,
 				      netif_be_dbg,
-				      SA_SHIRQ, 
+				      SA_SHIRQ,
 				      "net-be-dbg",
 				      &netif_be_dbg);
 #endif

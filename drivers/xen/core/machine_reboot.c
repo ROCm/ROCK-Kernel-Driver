@@ -98,7 +98,7 @@ static void post_suspend(int suspend_cancelled)
 		xen_start_info->console.domU.mfn =
 			pfn_to_mfn(xen_start_info->console.domU.mfn);
 	}
-	
+
 	set_fixmap(FIX_SHARED_INFO, xen_start_info->shared_info);
 
 	HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);

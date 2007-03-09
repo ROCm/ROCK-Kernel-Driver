@@ -1027,7 +1027,7 @@ e1000_probe(struct pci_dev *pdev,
 			DPRINTK(PROBE, ERR, "The EEPROM Checksum Is Not Valid\n");
 			goto err_eeprom;
 		} else
-			DPRINTK(PROBE, INFO, "The EEPROM Checksum failed in the first read, now OK\n");	
+			DPRINTK(PROBE, INFO, "The EEPROM Checksum failed in the first read, now OK\n");
 	}
 
 	/* copy the MAC address out of the EEPROM */

@@ -1,8 +1,8 @@
 /******************************************************************************
  * drivers/xen/blktap/interface.c
- * 
+ *
  * Block-device interface management.
- * 
+ *
  * Copyright (c) 2004, Keir Fraser
  *
  * This program is free software; you can redistribute it and/or
@@ -93,7 +93,7 @@ static void unmap_frontend_page(blkif_t *blkif)
 	BUG_ON(ret);
 }
 
-int tap_blkif_map(blkif_t *blkif, unsigned long shared_page, 
+int tap_blkif_map(blkif_t *blkif, unsigned long shared_page,
 		  unsigned int evtchn)
 {
 	int err;
@@ -174,6 +174,6 @@ void tap_blkif_free(blkif_t *blkif)
 
 void __init tap_blkif_interface_init(void)
 {
-	blkif_cachep = kmem_cache_create("blktapif_cache", sizeof(blkif_t), 
+	blkif_cachep = kmem_cache_create("blktapif_cache", sizeof(blkif_t),
 					 0, 0, NULL, NULL);
 }

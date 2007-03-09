@@ -1,26 +1,26 @@
 /******************************************************************************
  * arch/xen/drivers/netif/backend/interface.c
- * 
+ *
  * Network-device interface management.
- * 
+ *
  * Copyright (c) 2004-2005, Keir Fraser
- * 
+ *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License version 2
  * as published by the Free Software Foundation; or, when distributed
  * separately from the Linux kernel or incorporated into other
  * software packages, subject to the following license:
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this source file (the "Software"), to deal in the Software without
  * restriction, including without limitation the rights to use, copy, modify,
  * merge, publish, distribute, sublicense, and/or sell copies of the Software,
  * and to permit persons to whom the Software is furnished to do so, subject to
  * the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -36,7 +36,7 @@
 
 /*
  * Module parameter 'queue_length':
- * 
+ *
  * Enables queuing in the network stack when a client has run out of receive
  * descriptors. Although this feature can improve receive bandwidth by avoiding
  * packet loss, it can also result in packets sitting in the 'tx_queue' for
@@ -172,7 +172,7 @@ netif_t *netif_alloc(domid_t domid, unsigned int handle)
 	 * largest non-broadcast address to prevent the address getting
 	 * stolen by an Ethernet bridge for STP purposes.
 	 * (FE:FF:FF:FF:FF:FF)
-	 */ 
+	 */
 	memset(dev->dev_addr, 0xFF, ETH_ALEN);
 	dev->dev_addr[0] &= ~0x01;
 
@@ -198,13 +198,13 @@ static int map_frontend_pages(
 
 	gnttab_set_map_op(&op, (unsigned long)netif->tx_comms_area->addr,
 			  GNTMAP_host_map, tx_ring_ref, netif->domid);
-    
+
 	lock_vm_area(netif->tx_comms_area);
 	ret = HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1);
 	unlock_vm_area(netif->tx_comms_area);
 	BUG_ON(ret);
 
-	if (op.status) { 
+	if (op.status) {
 		DPRINTK(" Gnttab failure mapping tx_ring_ref!\n");
 		return op.status;
 	}
@@ -329,7 +329,7 @@ void netif_disconnect(netif_t *netif)
 
 	if (netif->irq)
 		unbind_from_irqhandler(netif->irq, netif);
-	
+
 	unregister_netdev(netif->dev);
 
 	if (netif->tx.sring) {

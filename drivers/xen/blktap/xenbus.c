@@ -78,19 +78,19 @@ static long get_id(const char *str)
         int len,end;
         const char *ptr;
         char *tptr, num[10];
-	
+
         len = strsep_len(str, '/', 2);
         end = strlen(str);
         if ( (len < 0) || (end < 0) ) return -1;
-	
+
         ptr = str + len + 1;
         strncpy(num,ptr,end - len);
         tptr = num + (end - (len + 1));
         *tptr = '\0';
 	DPRINTK("Get_id called for %s (%s)\n",str,num);
-	
+
         return simple_strtol(num, NULL, 10);
-}				
+}
 
 static int blktap_name(blkif_t *blkif, char *buf)
 {
@@ -98,9 +98,9 @@ static int blktap_name(blkif_t *blkif, char *buf)
 	struct xenbus_device *dev = blkif->be->dev;
 
 	devpath = xenbus_read(XBT_NIL, dev->nodename, "dev", NULL);
-	if (IS_ERR(devpath)) 
+	if (IS_ERR(devpath))
 		return PTR_ERR(devpath);
-	
+
 	if ((devname = strstr(devpath, "/dev/")) != NULL)
 		devname += strlen("/dev/");
 	else
@@ -108,19 +108,19 @@ static int blktap_name(blkif_t *blkif, char *buf)
 
 	snprintf(buf, TASK_COMM_LEN, "blktap.%d.%s", blkif->domid, devname);
 	kfree(devpath);
-	
+
 	return 0;
 }
 
 static void tap_update_blkif_status(blkif_t *blkif)
-{ 
+{
 	int err;
 	char name[TASK_COMM_LEN];
 
 	/* Not ready to connect? */
 	if(!blkif->irq || !blkif->sectors) {
 		return;
-	} 
+	}
 
 	/* Already connected? */
 	if (blkif->be->dev->state == XenbusStateConnected)
@@ -206,7 +206,7 @@ static int blktap_probe(struct xenbus_device *dev,
 				 &be->backend_watch, tap_backend_changed);
 	if (err)
 		goto fail;
-	
+
 	err = xenbus_switch_state(dev, XenbusStateInitWait);
 	if (err)
 		goto fail;
@@ -221,7 +221,7 @@ fail:
 
 /**
  * Callback received when the user space code has placed the device
- * information in xenstore. 
+ * information in xenstore.
  */
 static void tap_backend_changed(struct xenbus_watch *watch,
 			    const char **vec, unsigned int len)
@@ -231,14 +231,14 @@ static void tap_backend_changed(struct xenbus_watch *watch,
 	struct backend_info *be
 		= container_of(watch, struct backend_info, backend_watch);
 	struct xenbus_device *dev = be->dev;
-	
-	/** 
-	 * Check to see whether userspace code has opened the image 
+
+	/**
+	 * Check to see whether userspace code has opened the image
 	 * and written sector
 	 * and disk info to xenstore
 	 */
-	err = xenbus_gather(XBT_NIL, dev->nodename, "info", "%lu", &info, 
-			    NULL);	
+	err = xenbus_gather(XBT_NIL, dev->nodename, "info", "%lu", &info,
+			    NULL);
 	if (err) {
 		xenbus_dev_error(dev, err, "getting info");
 		return;
@@ -246,13 +246,13 @@ static void tap_backend_changed(struct xenbus_watch *watch,
 
 	DPRINTK("Userspace update on disk info, %lu\n",info);
 
-	err = xenbus_gather(XBT_NIL, dev->nodename, "sectors", "%llu", 
+	err = xenbus_gather(XBT_NIL, dev->nodename, "sectors", "%llu",
 			    &be->blkif->sectors, NULL);
 
 	/* Associate tap dev with domid*/
-	be->blkif->dev_num = dom_to_devid(be->blkif->domid, be->xenbus_id, 
+	be->blkif->dev_num = dom_to_devid(be->blkif->domid, be->xenbus_id,
 					  be->blkif);
-	DPRINTK("Thread started for domid [%d], connecting disk\n", 
+	DPRINTK("Thread started for domid [%d], connecting disk\n",
 		be->blkif->dev_num);
 
 	tap_update_blkif_status(be->blkif);
@@ -280,8 +280,8 @@ static void tap_frontend_changed(struct xenbus_device *dev,
 
 	case XenbusStateInitialised:
 	case XenbusStateConnected:
-		/* Ensure we connect even when two watches fire in 
-		   close successsion and we miss the intermediate value 
+		/* Ensure we connect even when two watches fire in
+		   close successsion and we miss the intermediate value
 		   of frontend_state. */
 		if (dev->state == XenbusStateConnected)
 			break;
@@ -345,7 +345,7 @@ static int connect_ring(struct backend_info *be)
 
 	DPRINTK("%s\n", dev->otherend);
 
-	err = xenbus_gather(XBT_NIL, dev->otherend, "ring-ref", "%lu", 
+	err = xenbus_gather(XBT_NIL, dev->otherend, "ring-ref", "%lu",
 			    &ring_ref, "event-channel", "%u", &evtchn, NULL);
 	if (err) {
 		xenbus_dev_fatal(dev, err,
@@ -384,7 +384,7 @@ static int connect_ring(struct backend_info *be)
 		xenbus_dev_fatal(dev, err, "mapping ring-ref %lu port %u",
 				 ring_ref, evtchn);
 		return err;
-	} 
+	}
 
 	return 0;
 }

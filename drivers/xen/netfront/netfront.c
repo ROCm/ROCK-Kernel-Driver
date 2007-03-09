@@ -1323,7 +1323,7 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 					   &pages_flipped);
 
 		if (unlikely(err)) {
-err:	
+err:
 			while ((skb = __skb_dequeue(&tmpq)))
 				__skb_queue_tail(&errq, skb);
 			np->stats.rx_errors++;
@@ -1883,7 +1883,7 @@ static int xennet_sysfs_addif(struct net_device *netdev)
 	int error = 0;
 
 	for (i = 0; i < ARRAY_SIZE(xennet_attrs); i++) {
-		error = class_device_create_file(&netdev->class_dev, 
+		error = class_device_create_file(&netdev->class_dev,
 						 &xennet_attrs[i]);
 		if (error)
 			goto fail;

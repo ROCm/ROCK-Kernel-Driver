@@ -392,7 +392,7 @@ int pciback_config_add_field_offset(struct pci_dev *dev,
 	return err;
 }
 
-/* This sets up the device's virtual configuration space to keep track of 
+/* This sets up the device's virtual configuration space to keep track of
  * certain registers (like the base address registers (BARs) so that we can
  * keep the client from manipulating them directly.
  */

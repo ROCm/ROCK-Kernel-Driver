@@ -233,7 +233,7 @@ int __init sysenter_setup(void)
 #endif
 
 #ifdef CONFIG_COMPAT_VDSO
-	__set_fixmap(FIX_VDSO, __pa(syscall_page), PAGE_READONLY);
+	__set_fixmap(FIX_VDSO, __pa(syscall_page), PAGE_READONLY_EXEC);
 	printk("Compat vDSO mapped to %08lx.\n", __fix_to_virt(FIX_VDSO));
 #endif
 

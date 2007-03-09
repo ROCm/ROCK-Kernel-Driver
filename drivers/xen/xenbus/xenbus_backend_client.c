@@ -4,23 +4,23 @@
  * driver.
  *
  * Copyright (C) 2005-2006 XenSource Ltd
- * 
+ *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License version 2
  * as published by the Free Software Foundation; or, when distributed
  * separately from the Linux kernel or incorporated into other
  * software packages, subject to the following license:
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this source file (the "Software"), to deal in the Software without
  * restriction, including without limitation the rights to use, copy, modify,
  * merge, publish, distribute, sublicense, and/or sell copies of the Software,
  * and to permit persons to whom the Software is furnished to do so, subject to
  * the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -47,7 +47,7 @@ struct vm_struct *xenbus_map_ring_valloc(struct xenbus_device *dev, int gnt_ref)
 
 	gnttab_set_map_op(&op, (unsigned long)area->addr, GNTMAP_host_map,
 			  gnt_ref, dev->otherend_id);
-	
+
 	lock_vm_area(area);
 	BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1));
 	unlock_vm_area(area);
@@ -73,7 +73,7 @@ int xenbus_map_ring(struct xenbus_device *dev, int gnt_ref,
 		   grant_handle_t *handle, void *vaddr)
 {
 	struct gnttab_map_grant_ref op;
-	
+
 	gnttab_set_map_op(&op, (unsigned long)vaddr, GNTMAP_host_map,
 			  gnt_ref, dev->otherend_id);
 	BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1));

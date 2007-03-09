@@ -154,7 +154,7 @@ static void xenoprof_handle_passive(void)
 {
 	int i, j;
 	int flag_domain, flag_switch = 0;
-	
+
 	for (i = 0; i < pdomains; i++) {
 		flag_domain = 0;
 		for (j = 0; j < passive_domains[i].nbuf; j++) {
@@ -176,7 +176,7 @@ done:
 		oprofile_add_domain_switch(COORDINATOR_DOMAIN);
 }
 
-static irqreturn_t 
+static irqreturn_t
 xenoprof_ovf_interrupt(int irq, void * dev_id)
 {
 	struct xenoprof_buf * buf;
@@ -230,7 +230,7 @@ static int bind_virq(void)
 
 		ovf_irq[i] = result;
 	}
-		
+
 	return 0;
 }
 
@@ -260,7 +260,7 @@ static int map_xenoprof_buffer(int max_samples)
 	nbuf = get_buffer.nbuf;
 
 	for (i=0; i< nbuf; i++) {
-		buf = (struct xenoprof_buf*) 
+		buf = (struct xenoprof_buf*)
 			&shared_buffer.buffer[i * get_buffer.bufsize];
 		BUG_ON(buf->vcpu_id >= MAX_VIRT_CPUS);
 		xenoprof_buf[buf->vcpu_id] = buf;
@@ -385,7 +385,7 @@ static int xenoprof_set_active(int * active_domains,
 		if (active_domains[i] == 0)
 			set_dom0 = 1;
 	}
-	/* dom0 must always be active but may not be in the list */ 
+	/* dom0 must always be active but may not be in the list */
 	if (!set_dom0) {
 		domid = 0;
 		ret = HYPERVISOR_xenoprof_op(XENOPROF_set_active, &domid);

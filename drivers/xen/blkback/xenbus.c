@@ -48,9 +48,9 @@ static int blkback_name(blkif_t *blkif, char *buf)
 	struct xenbus_device *dev = blkif->be->dev;
 
 	devpath = xenbus_read(XBT_NIL, dev->nodename, "dev", NULL);
-	if (IS_ERR(devpath)) 
+	if (IS_ERR(devpath))
 		return PTR_ERR(devpath);
-	
+
 	if ((devname = strstr(devpath, "/dev/")) != NULL)
 		devname += strlen("/dev/");
 	else
@@ -58,12 +58,12 @@ static int blkback_name(blkif_t *blkif, char *buf)
 
 	snprintf(buf, TASK_COMM_LEN, "blkback.%d.%s", blkif->domid, devname);
 	kfree(devpath);
-	
+
 	return 0;
 }
 
 static void update_blkif_status(blkif_t *blkif)
-{ 
+{
 	int err;
 	char name[TASK_COMM_LEN];
 
@@ -135,7 +135,7 @@ VBD_SHOW(mode, "%s\n", be->mode);
 int xenvbd_sysfs_addif(struct xenbus_device *dev)
 {
 	int error;
-	
+
 	error = device_create_file(&dev->dev, &dev_attr_physical_device);
  	if (error)
 		goto fail1;
@@ -352,8 +352,8 @@ static void frontend_changed(struct xenbus_device *dev,
 
 	case XenbusStateInitialised:
 	case XenbusStateConnected:
-		/* Ensure we connect even when two watches fire in 
-		   close successsion and we miss the intermediate value 
+		/* Ensure we connect even when two watches fire in
+		   close successsion and we miss the intermediate value
 		   of frontend_state. */
 		if (dev->state == XenbusStateConnected)
 			break;

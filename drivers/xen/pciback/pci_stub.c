@@ -868,7 +868,7 @@ static int __init pcistub_init(void)
 #ifndef MODULE
 /*
  * fs_initcall happens before device_initcall
- * so pciback *should* get called first (b/c we 
+ * so pciback *should* get called first (b/c we
  * want to suck up any device before other drivers
  * get a chance by being the first pci device
  * driver to register)

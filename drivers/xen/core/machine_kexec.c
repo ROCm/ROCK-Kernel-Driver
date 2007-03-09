@@ -1,5 +1,5 @@
 /*
- * drivers/xen/core/machine_kexec.c 
+ * drivers/xen/core/machine_kexec.c
  * handle transition of Linux booting another kernel
  */
 
@@ -9,7 +9,7 @@
 #include <linux/bootmem.h>
 #include <asm/hypercall.h>
 
-extern void machine_kexec_setup_load_arg(xen_kexec_image_t *xki, 
+extern void machine_kexec_setup_load_arg(xen_kexec_image_t *xki,
 					 struct kimage *image);
 
 int xen_max_nr_phys_cpus;
@@ -159,7 +159,7 @@ void xen_machine_kexec_unload(struct kimage *image)
  * Do not allocate memory (or fail in any way) in machine_kexec().
  * We are past the point of no return, committed to rebooting now.
  *
- * This has the hypervisor move to the prefered reboot CPU, 
+ * This has the hypervisor move to the prefered reboot CPU,
  * stop all CPUs and kexec. That is it combines machine_shutdown()
  * and machine_kexec() in Linux kexec terms.
  */

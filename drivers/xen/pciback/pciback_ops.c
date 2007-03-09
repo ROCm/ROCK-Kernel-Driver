@@ -70,7 +70,7 @@ void pciback_do_op(struct work_struct *work)
 	else
 		op->err = XEN_PCI_ERR_not_implemented;
 
-	/* Tell the driver domain that we're done. */ 
+	/* Tell the driver domain that we're done. */
 	wmb();
 	clear_bit(_XEN_PCIF_active, (unsigned long *)&pdev->sh_info->flags);
 	notify_remote_via_irq(pdev->evtchn_irq);

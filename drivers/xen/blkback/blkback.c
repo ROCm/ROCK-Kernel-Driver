@@ -1,31 +1,31 @@
 /******************************************************************************
  * arch/xen/drivers/blkif/backend/main.c
- * 
+ *
  * Back-end of the driver for virtual block devices. This portion of the
  * driver exports a 'unified' block-device interface that can be accessed
- * by any operating system that implements a compatible front end. A 
+ * by any operating system that implements a compatible front end. A
  * reference front-end implementation can be found in:
  *  arch/xen/drivers/blkif/frontend
- * 
+ *
  * Copyright (c) 2003-2004, Keir Fraser & Steve Hand
  * Copyright (c) 2005, Christopher Clark
- * 
+ *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License version 2
  * as published by the Free Software Foundation; or, when distributed
  * separately from the Linux kernel or incorporated into other
  * software packages, subject to the following license:
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this source file (the "Software"), to deal in the Software without
  * restriction, including without limitation the rights to use, copy, modify,
  * merge, publish, distribute, sublicense, and/or sell copies of the Software,
  * and to permit persons to whom the Software is furnished to do so, subject to
  * the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -46,9 +46,9 @@
  * These are rather arbitrary. They are fairly large because adjacent requests
  * pulled from a communication ring are quite likely to end up being part of
  * the same scatter/gather request at the disc.
- * 
+ *
  * ** TRY INCREASING 'blkif_reqs' IF WRITE SPEEDS SEEM TOO LOW **
- * 
+ *
  * This will increase the chances of being able to write whole tracks.
  * 64 should be enough to keep us competitive with Linux.
  */
@@ -63,9 +63,9 @@ module_param(log_stats, int, 0644);
 module_param(debug_lvl, int, 0644);
 
 /*
- * Each outstanding request that we've passed to the lower device layers has a 
- * 'pending_req' allocated to it. Each buffer_head that completes decrements 
- * the pendcnt towards zero. When it hits zero, the specified domain has a 
+ * Each outstanding request that we've passed to the lower device layers has a
+ * 'pending_req' allocated to it. Each buffer_head that completes decrements
+ * the pendcnt towards zero. When it hits zero, the specified domain has a
  * response queued for it, with the saved 'id' passed back.
  */
 typedef struct {
@@ -107,7 +107,7 @@ static int do_block_io_op(blkif_t *blkif);
 static void dispatch_rw_block_io(blkif_t *blkif,
 				 blkif_request_t *req,
 				 pending_req_t *pending_req);
-static void make_response(blkif_t *blkif, unsigned long id, 
+static void make_response(blkif_t *blkif, unsigned long id,
 			  unsigned short op, int st);
 
 /******************************************************************
@@ -366,7 +366,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 	extern void ll_rw_block(int rw, int nr, struct buffer_head * bhs[]);
 	struct gnttab_map_grant_ref map[BLKIF_MAX_SEGMENTS_PER_REQUEST];
 	struct phys_req preq;
-	struct { 
+	struct {
 		unsigned long buf; unsigned int nsec;
 	} seg[BLKIF_MAX_SEGMENTS_PER_REQUEST];
 	unsigned int nseg;
@@ -391,7 +391,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 
 	/* Check that number of segments is sane. */
 	nseg = req->nr_segments;
-	if (unlikely(nseg == 0) || 
+	if (unlikely(nseg == 0) ||
 	    unlikely(nseg > BLKIF_MAX_SEGMENTS_PER_REQUEST)) {
 		DPRINTK("Bad number of segments in request (%d)\n", nseg);
 		goto fail_response;
@@ -443,7 +443,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 		set_phys_to_machine(__pa(vaddr(
 			pending_req, i)) >> PAGE_SHIFT,
 			FOREIGN_FRAME(map[i].dev_bus_addr >> PAGE_SHIFT));
-		seg[i].buf  = map[i].dev_bus_addr | 
+		seg[i].buf  = map[i].dev_bus_addr |
 			(req->seg[i].first_sect << 9);
 	}
 
@@ -451,7 +451,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 		goto fail_flush;
 
 	if (vbd_translate(&preq, blkif, operation) != 0) {
-		DPRINTK("access denied: %s of [%llu,%llu] on dev=%04x\n", 
+		DPRINTK("access denied: %s of [%llu,%llu] on dev=%04x\n",
 			operation == READ ? "read" : "write",
 			preq.sector_number,
 			preq.sector_number + preq.nr_sects, preq.dev);
@@ -501,7 +501,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
  fail_response:
 	make_response(blkif, req->id, req->operation, BLKIF_RSP_ERROR);
 	free_req(pending_req);
-} 
+}
 
 
 
@@ -510,7 +510,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
  */
 
 
-static void make_response(blkif_t *blkif, unsigned long id, 
+static void make_response(blkif_t *blkif, unsigned long id,
 			  unsigned short op, int st)
 {
 	blkif_response_t  resp;

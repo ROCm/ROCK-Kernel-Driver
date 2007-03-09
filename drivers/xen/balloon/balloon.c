@@ -6,23 +6,23 @@
  * Copyright (c) 2003, B Dragovic
  * Copyright (c) 2003-2004, M Williamson, K Fraser
  * Copyright (c) 2005 Dan M. Smith, IBM Corporation
- * 
+ *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License version 2
  * as published by the Free Software Foundation; or, when distributed
  * separately from the Linux kernel or incorporated into other
  * software packages, subject to the following license:
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this source file (the "Software"), to deal in the Software without
  * restriction, including without limitation the rights to use, copy, modify,
  * merge, publish, distribute, sublicense, and/or sell copies of the Software,
  * and to permit persons to whom the Software is furnished to do so, subject to
  * the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -85,7 +85,7 @@ static void balloon_process(struct work_struct *unused);
 static DECLARE_WORK(balloon_worker, balloon_process);
 static struct timer_list balloon_timer;
 
-/* When ballooning out (allocating memory to return to Xen) we don't really 
+/* When ballooning out (allocating memory to return to Xen) we don't really
    want the kernel to try too hard since that can trigger the oom killer. */
 #define GFP_BALLOON \
 	(GFP_HIGHUSER | __GFP_NOWARN | __GFP_NORETRY | __GFP_NOMEMALLOC)
@@ -473,7 +473,7 @@ static int balloon_read(char *page, char **start, off_t off,
 		"High-mem balloon:   %8lu kB\n"
 		"Driver pages:       %8lu kB\n"
 		"Xen hard limit:     ",
-		PAGES2KB(bs.current_pages), PAGES2KB(bs.target_pages), 
+		PAGES2KB(bs.current_pages), PAGES2KB(bs.target_pages),
 		min_target(), PAGES2KB(num_physpages),
 		PAGES2KB(bs.balloon_low), PAGES2KB(bs.balloon_high),
 		PAGES2KB(bs.driver_pages));
@@ -514,7 +514,7 @@ static int __init balloon_init(void)
 	init_timer(&balloon_timer);
 	balloon_timer.data = 0;
 	balloon_timer.function = balloon_alarm;
-    
+
 #ifdef CONFIG_PROC_FS
 	if ((balloon_pde = create_xen_proc_entry("balloon", 0644)) == NULL) {
 		WPRINTK("Unable to create /proc/xen/balloon.\n");
@@ -539,7 +539,7 @@ static int __init balloon_init(void)
 	xenstore_notifier.notifier_call = balloon_init_watcher;
 
 	register_xenstore_notifier(&xenstore_notifier);
-    
+
 	return 0;
 }
 
