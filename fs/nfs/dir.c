@@ -154,6 +154,7 @@ typedef struct {
 	decode_dirent_t	decode;
 	int		plus;
 	int		error;
+	unsigned long	timestamp;
 } nfs_readdir_descriptor_t;
 
 /* Now we cache directories properly, by stuffing the dirent
@@ -207,6 +208,8 @@ int nfs_readdir_filler(nfs_readdir_descriptor_t *desc, struct page *page)
 		/* Should never happen */
 		nfs_zap_mapping(inode, inode->i_mapping);
 	}
+	if (page->index == 0)
+		desc->timestamp = timestamp;
 	unlock_page(page);
 	return 0;
  error:
@@ -1132,6 +1135,7 @@ static struct dentry *nfs_readdir_lookup(nfs_readdir_descriptor_t *desc)
 	if (dentry == NULL)
 		return NULL;
 	dentry->d_op = NFS_PROTO(dir)->dentry_ops;
+	entry->fattr->time_start = desc->timestamp;
 	inode = nfs_fhget(dentry->d_sb, entry->fh, entry->fattr);
 	if (IS_ERR(inode)) {
 		dput(dentry);
