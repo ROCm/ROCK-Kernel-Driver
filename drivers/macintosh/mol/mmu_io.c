@@ -128,7 +128,10 @@ bat_align( int flags, ulong ea, ulong lphys, ulong size, ulong bat[2] )
 	bat[0] = (ea & ~(s-1)) | (((s-1)>>17) << 2) | 3;
 	bat[1] = (lphys & ~(s-1)) | 2;	/* pp=10, R/W */
 
+#ifndef CONFIG_AMIGAONE
 	bat[1] |= BIT(27);		/* [M] (memory coherence) */
+#endif
+
 	if( !(flags & MAPPING_FORCE_CACHE) ) {
 		bat[1] |= BIT(26);	/* [I] (inhibit cache) */
 	} else {

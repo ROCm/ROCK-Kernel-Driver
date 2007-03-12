@@ -64,7 +64,7 @@ set_level_next( skiplist_level_t *level, skiplist_el_t *el )
 {
 	level->next = el;
 #ifdef __darwin__
-	level->next_phys = el ? tophys_mol(el) : NULL;
+	level->next_phys = el ? tophys_mol(el) : 0;
 #endif	
 }
 

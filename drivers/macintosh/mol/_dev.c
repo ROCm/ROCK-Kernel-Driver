@@ -69,6 +69,7 @@ send_ipi( void )
 static int
 find_physical_rom( int *base, int *size )
 {
+#ifndef CONFIG_AMIGAONE
 	struct device_node *dn;
 	int len, *p;
 	
@@ -84,6 +85,7 @@ find_physical_rom( int *base, int *size )
 		}
 		dn = dn->next;
 	} while( dn );
+#endif
 
 	return 0;
 }

@@ -28,7 +28,12 @@
 #define PTE1_I		BIT(26)
 #define PTE1_M		BIT(27)
 #define PTE1_G		BIT(28)
+#ifdef CONFIG_AMIGAONE
+/* Memory coherence locks up A1 compatible systems. */
+#define PTE1_WIMG	(PTE1_W | PTE1_I | PTE1_G)
+#else
 #define PTE1_WIMG	(PTE1_W | PTE1_I | PTE1_M | PTE1_G)
+#endif
 #define PTE1_PP		0x3
 #define PTE1_RPN	(~0xfffUL)
 

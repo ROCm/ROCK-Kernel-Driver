@@ -50,8 +50,12 @@
 #include "dbg.h"
 
 /* these are declared, but we just want to be sure the definition does not change */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 extern int flush_hash_pages( unsigned context, unsigned long va, unsigned long pmdval, int count ); /* 2.6 */
+#else
 extern int flush_hash_page( unsigned context, unsigned long va, pte_t *ptep ); /* 2.5 */
+#endif /* Linux 2.6 */
+
 #endif /* __ASSEMBLY__ */
 
 #ifdef LINUX_26

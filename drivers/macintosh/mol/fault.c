@@ -341,8 +341,13 @@ insert_pte( kernel_vars_t *kv, fault_param_t *pb, const int ebits )
 	ulong pte0, pte1, *slot;
 	ulong lvptr;
 
+#ifdef CONFIG_AMIGAONE
+	pte1 = PTE1_R | (pb->pte1 & (PTE1_R | PTE1_C | PTE1_WIMG))
+		| (is_write(ebits) ? 2:3);
+#else
 	pte1 = PTE1_M | PTE1_R | (pb->pte1 & (PTE1_R | PTE1_C | PTE1_WIMG))
 		| (is_write(ebits) ? 2:3);
+#endif
 
 	/* PP and WIMG bits must set before the call to mphys_to_pte */
 	status = mphys_to_pte( kv, mphys, &pte1, is_write(ebits), &lvrange );
