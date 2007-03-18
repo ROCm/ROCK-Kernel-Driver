@@ -167,6 +167,13 @@ config BLK_DEV_IDECS
 	  Support for Compact Flash cards, outboard IDE disks, tape drives,
 	  and CD-ROM drives connected through a PCMCIA card.
 
+config BLK_DEV_DELKIN
+	tristate "Cardbus IDE support (Delkin/ASKA/Workbit)"
+	depends on CARDBUS && PCI
+	help
+	  Support for Delkin, ASKA, and Workbit Cardbus CompactFlash
+	  Adapters.  This may also work for similar SD and XD adapters.
+
 config BLK_DEV_IDECD
 	tristate "Include IDE/ATAPI CDROM support"
 	---help---
@@ -263,6 +270,13 @@ config BLK_DEV_IDESCSI
 
 	  If both this SCSI emulation and native ATAPI support are compiled
 	  into the kernel, the native support will be used.
+
+config BLK_DEV_IDEACPI
+	bool "IDE ACPI support"
+	depends on ACPI
+	---help---
+	  Implement ACPI support for generic IDE devices. On modern
+	  machines ACPI support is required to properly handle ACPI S3 states.
 
 config IDE_TASK_IOCTL
 	bool "IDE Taskfile Access"
@@ -369,6 +383,9 @@ config BLK_DEV_OFFBOARD
 config BLK_DEV_GENERIC
 	tristate "Generic PCI IDE Chipset Support"
 	depends on BLK_DEV_IDEPCI
+        help
+          This option provides generic support for various PCI IDE Chipsets
+          which otherwise might not be supported.
 
 config BLK_DEV_OPTI621
 	tristate "OPTi 82C621 chipset enhanced support (EXPERIMENTAL)"
@@ -417,24 +434,8 @@ config BLK_DEV_IDEDMA_FORCED
 
 	  Generally say N here.
 
-config IDEDMA_PCI_AUTO
-	bool "Use PCI DMA by default when available"
-	---help---
-	  Prior to kernel version 2.1.112, Linux used to automatically use
-	  DMA for IDE drives and chipsets which support it. Due to concerns
-	  about a couple of cases where buggy hardware may have caused damage,
-	  the default is now to NOT use DMA automatically. To revert to the
-	  previous behaviour, say Y to this question.
-
-	  If you suspect your hardware is at all flakey, say N here.
-	  Do NOT email the IDE kernel people regarding this issue!
-
-	  It is normally safe to answer Y to this question unless your
-	  motherboard uses a VIA VP2 chipset, in which case you should say N.
-
 config IDEDMA_ONLYDISK
 	bool "Enable DMA only for disks "
-	depends on IDEDMA_PCI_AUTO
 	help
 	  This is used if you know your ATAPI Devices are going to fail DMA
 	  Transfers.
@@ -606,6 +607,11 @@ config BLK_DEV_PIIX
 	  the kernel to change PIO, DMA and UDMA speeds and to configure
 	  the chip to optimum performance.
 
+config BLK_DEV_IT8213
+	tristate "IT8213 IDE support"
+	help
+	 This driver adds support for the ITE 8213 IDE controller.
+
 config BLK_DEV_IT821X
 	tristate "IT821X IDE support"
 	help
@@ -742,6 +748,19 @@ config BLK_DEV_VIA82CXXX
 	  This allows the kernel to change PIO, DMA and UDMA speeds and to
 	  configure the chip to optimum performance.
 
+config BLK_DEV_TC86C001
+	tristate "Toshiba TC86C001 support"
+	help
+	This driver adds support for Toshiba TC86C001 GOKU-S chip.
+
+config BLK_DEV_CELLEB
+	tristate "Toshiba's Cell Reference Set IDE support"
+	depends on PPC_CELLEB
+	help
+	  This driver provides support for the built-in IDE controller on
+	  Toshiba Cell Reference Board.
+	  If unsure, say Y.
+
 endif
 
 config BLK_DEV_IDE_PMAC
@@ -815,19 +834,6 @@ config BLK_DEV_IDEDMA_ICS
 	help
 	  Say Y here if you want to add DMA (Direct Memory Access) support to
 	  the ICS IDE driver.
-
-config IDEDMA_ICS_AUTO
-	bool "Use ICS DMA by default"
-	depends on BLK_DEV_IDEDMA_ICS
-	help
-	  Prior to kernel version 2.1.112, Linux used to automatically use
-	  DMA for IDE drives and chipsets which support it. Due to concerns
-	  about a couple of cases where buggy hardware may have caused damage,
-	  the default is now to NOT use DMA automatically. To revert to the
-	  previous behaviour, say Y to this question.
-
-	  If you suspect your hardware is at all flakey, say N here.
-	  Do NOT email the IDE kernel people regarding this issue!
 
 config BLK_DEV_IDE_RAPIDE
 	tristate "RapIDE interface support"
@@ -988,7 +994,7 @@ config BLK_DEV_4DRIVES
 config BLK_DEV_ALI14XX
 	tristate "ALI M14xx support"
 	help
-	  This driver is enabled at runtime using the "ide0=ali14xx" kernel
+	  This driver is enabled at runtime using the "ali14xx.probe" kernel
 	  boot parameter.  It enables support for the secondary IDE interface
 	  of the ALI M1439/1443/1445/1487/1489 chipsets, and permits faster
 	  I/O speeds to be set as well.  See the files
@@ -998,7 +1004,7 @@ config BLK_DEV_ALI14XX
 config BLK_DEV_DTC2278
 	tristate "DTC-2278 support"
 	help
-	  This driver is enabled at runtime using the "ide0=dtc2278" kernel
+	  This driver is enabled at runtime using the "dtc2278.probe" kernel
 	  boot parameter. It enables support for the secondary IDE interface
 	  of the DTC-2278 card, and permits faster I/O speeds to be set as
 	  well. See the <file:Documentation/ide.txt> and
@@ -1007,7 +1013,7 @@ config BLK_DEV_DTC2278
 config BLK_DEV_HT6560B
 	tristate "Holtek HT6560B support"
 	help
-	  This driver is enabled at runtime using the "ide0=ht6560b" kernel
+	  This driver is enabled at runtime using the "ht6560b.probe" kernel
 	  boot parameter. It enables support for the secondary IDE interface
 	  of the Holtek card, and permits faster I/O speeds to be set as well.
 	  See the <file:Documentation/ide.txt> and
@@ -1016,7 +1022,7 @@ config BLK_DEV_HT6560B
 config BLK_DEV_QD65XX
 	tristate "QDI QD65xx support"
 	help
-	  This driver is enabled at runtime using the "ide0=qd65xx" kernel
+	  This driver is enabled at runtime using the "qd65xx.probe" kernel
 	  boot parameter.  It permits faster I/O speeds to be set.  See the
 	  <file:Documentation/ide.txt> and <file:drivers/ide/legacy/qd65xx.c> for
 	  more info.
@@ -1024,7 +1030,7 @@ config BLK_DEV_QD65XX
 config BLK_DEV_UMC8672
 	tristate "UMC-8672 support"
 	help
-	  This driver is enabled at runtime using the "ide0=umc8672" kernel
+	  This driver is enabled at runtime using the "umc8672.probe" kernel
 	  boot parameter. It enables support for the secondary IDE interface
 	  of the UMC-8672, and permits faster I/O speeds to be set as well.
 	  See the files <file:Documentation/ide.txt> and
@@ -1050,9 +1056,6 @@ config IDEDMA_IVB
 	  any of your problems, it could even cause more of them.
 
 	  It is normally safe to answer Y; however, the default is N.
-
-config IDEDMA_AUTO
-	def_bool IDEDMA_PCI_AUTO || IDEDMA_ICS_AUTO
 
 endif
 

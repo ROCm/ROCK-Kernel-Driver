@@ -91,7 +91,7 @@ static int dccp_check_seqno(struct sock *sk, struct sk_buff *skb)
 		else
 			return -1;
 	}
-	
+
 	/*
 	 *   Step 6: Check sequence numbers
 	 *      Let LSWL = S.SWL and LAWL = S.AWL
@@ -136,7 +136,7 @@ static int dccp_check_seqno(struct sock *sk, struct sk_buff *skb)
 			  (unsigned long long) DCCP_SKB_CB(skb)->dccpd_seq,
 			  (unsigned long long) dp->dccps_swh,
 			  (DCCP_SKB_CB(skb)->dccpd_ack_seq ==
-			        DCCP_PKT_WITHOUT_ACK_SEQ) ? "doesn't exist" : "exists",
+				DCCP_PKT_WITHOUT_ACK_SEQ) ? "doesn't exist" : "exists",
 			  (unsigned long long) lawl,
 			  (unsigned long long) DCCP_SKB_CB(skb)->dccpd_ack_seq,
 			  (unsigned long long) dp->dccps_awh);
@@ -248,18 +248,8 @@ int dccp_rcv_established(struct sock *sk, struct sk_buff *skb,
 			    DCCP_ACKVEC_STATE_RECEIVED))
 		goto discard;
 
-	/*
-	 * Deliver to the CCID module in charge.
-	 * FIXME: Currently DCCP operates one-directional only, i.e. a listening
-	 *        server is not at the same time a connecting client. There is
-	 *        not much sense in delivering to both rx/tx sides at the moment
-	 *        (only one is active at a time); when moving to bidirectional
-	 *        service, this needs to be revised.
-	 */
-	if (dccp_sk(sk)->dccps_role == DCCP_ROLE_SERVER)
-		ccid_hc_rx_packet_recv(dp->dccps_hc_rx_ccid, sk, skb);
-	else
-		ccid_hc_tx_packet_recv(dp->dccps_hc_tx_ccid, sk, skb);
+	ccid_hc_rx_packet_recv(dp->dccps_hc_rx_ccid, sk, skb);
+	ccid_hc_tx_packet_recv(dp->dccps_hc_tx_ccid, sk, skb);
 
 	return __dccp_rcv_established(sk, skb, dh, len);
 discard:
@@ -308,11 +298,11 @@ static int dccp_rcv_request_sent_state_process(struct sock *sk,
 		if (dccp_parse_options(sk, skb))
 			goto out_invalid_packet;
 
-                if (dccp_msk(sk)->dccpms_send_ack_vector &&
-                    dccp_ackvec_add(dp->dccps_hc_rx_ackvec, sk,
-                                    DCCP_SKB_CB(skb)->dccpd_seq,
-                                    DCCP_ACKVEC_STATE_RECEIVED))
-                        goto out_invalid_packet; /* FIXME: change error code */
+		if (dccp_msk(sk)->dccpms_send_ack_vector &&
+		    dccp_ackvec_add(dp->dccps_hc_rx_ackvec, sk,
+				    DCCP_SKB_CB(skb)->dccpd_seq,
+				    DCCP_ACKVEC_STATE_RECEIVED))
+			goto out_invalid_packet; /* FIXME: change error code */
 
 		dp->dccps_isr = DCCP_SKB_CB(skb)->dccpd_seq;
 		dccp_update_gsr(sk, dp->dccps_isr);
@@ -494,11 +484,8 @@ int dccp_rcv_state_process(struct sock *sk, struct sk_buff *skb,
 				    DCCP_ACKVEC_STATE_RECEIVED))
 			goto discard;
 
-		/* XXX see the comments in dccp_rcv_established about this */
-		if (dccp_sk(sk)->dccps_role == DCCP_ROLE_SERVER)
-			ccid_hc_rx_packet_recv(dp->dccps_hc_rx_ccid, sk, skb);
-		else
-			ccid_hc_tx_packet_recv(dp->dccps_hc_tx_ccid, sk, skb);
+		ccid_hc_rx_packet_recv(dp->dccps_hc_rx_ccid, sk, skb);
+		ccid_hc_tx_packet_recv(dp->dccps_hc_tx_ccid, sk, skb);
 	}
 
 	/*

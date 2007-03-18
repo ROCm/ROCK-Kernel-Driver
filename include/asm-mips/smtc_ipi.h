@@ -4,6 +4,8 @@
 #ifndef __ASM_SMTC_IPI_H
 #define __ASM_SMTC_IPI_H
 
+#include <linux/spinlock.h>
+
 //#define SMTC_IPI_DEBUG
 
 #ifdef SMTC_IPI_DEBUG
@@ -43,9 +45,6 @@ struct smtc_ipi_q {
 	struct smtc_ipi *tail;
 	int depth;
 };
-
-extern struct smtc_ipi_q IPIQ[NR_CPUS];
-extern struct smtc_ipi_q freeIPIq;
 
 static inline void smtc_ipi_nq(struct smtc_ipi_q *q, struct smtc_ipi *p)
 {

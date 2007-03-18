@@ -1,3 +1,25 @@
+2007-03-14 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.21-rc3-x86_64-1.
+
+2007-03-14 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.21-rc2-x86_64-1.
+
+2007-03-01 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.21-rc1-x86_64-1.
+
+2007-03-01 Keith Owens  <kaos@sgi.com>
+
+	* Remove sparse warnings.
+	* kdb v4.4-2.6.20-x86_64-3.
+
+2007-02-16 Keith Owens  <kaos@sgi.com>
+
+	* Initialise variable bits of struct disassemble_info each time.
+	* kdb v4.4-2.6.20-x86_64-2.
+
 2007-02-06 Keith Owens  <kaos@sgi.com>
 
 	* kdb v4.4-2.6.20-x86_64-1.

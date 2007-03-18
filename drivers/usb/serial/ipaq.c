@@ -247,6 +247,8 @@ static struct usb_device_id ipaq_id_table [] = {
 	{ USB_DEVICE(0x04AD, 0x0301) }, /* USB Sync 0301 */
 	{ USB_DEVICE(0x04AD, 0x0302) }, /* USB Sync 0302 */
 	{ USB_DEVICE(0x04AD, 0x0303) }, /* USB Sync 0303 */
+	{ USB_DEVICE(0x04AD, 0x0306) }, /* GPS Pocket PC USB Sync */
+	{ USB_DEVICE(0x04B7, 0x0531) }, /* MyGuide 7000 XL USB Sync */
 	{ USB_DEVICE(0x04C5, 0x1058) }, /* FUJITSU USB Sync */
 	{ USB_DEVICE(0x04C5, 0x1079) }, /* FUJITSU USB Sync */
 	{ USB_DEVICE(0x04DA, 0x2500) }, /* Panasonic USB Sync */
@@ -563,6 +565,7 @@ static struct usb_serial_driver ipaq_device = {
 		.name =		"ipaq",
 	},
 	.description =		"PocketPC PDA",
+	.usb_driver = 		&ipaq_driver,
 	.id_table =		ipaq_id_table,
 	.num_interrupt_in =	NUM_DONT_CARE,
 	.num_bulk_in =		1,

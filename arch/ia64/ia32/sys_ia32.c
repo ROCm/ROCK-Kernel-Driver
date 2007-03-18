@@ -1267,6 +1267,10 @@ sys32_getdents (unsigned int fd, struct compat_dirent __user *dirent, unsigned i
 	struct getdents32_callback buf;
 	int error;
 
+	error = -EFAULT;
+	if (!access_ok(VERIFY_WRITE, dirent, count))
+		goto out;
+
 	error = -EBADF;
 	file = fget(fd);
 	if (!file)
@@ -1283,10 +1287,10 @@ sys32_getdents (unsigned int fd, struct compat_dirent __user *dirent, unsigned i
 	error = buf.error;
 	lastdirent = buf.previous;
 	if (lastdirent) {
-		error = -EINVAL;
 		if (put_user(file->f_pos, &lastdirent->d_off))
-			goto out_putf;
-		error = count - buf.count;
+			error = -EFAULT;
+		else
+			error = count - buf.count;
 	}
 
 out_putf:
@@ -2206,74 +2210,6 @@ sys32_fstat64 (unsigned int fd, struct stat64 __user *statbuf)
 	long ret = vfs_fstat(fd, &s);
 	if (!ret)
 		ret = putstat64(statbuf, &s);
-	return ret;
-}
-
-struct sysinfo32 {
-	s32 uptime;
-	u32 loads[3];
-	u32 totalram;
-	u32 freeram;
-	u32 sharedram;
-	u32 bufferram;
-	u32 totalswap;
-	u32 freeswap;
-	u16 procs;
-	u16 pad;
-	u32 totalhigh;
-	u32 freehigh;
-	u32 mem_unit;
-	char _f[8];
-};
-
-asmlinkage long
-sys32_sysinfo (struct sysinfo32 __user *info)
-{
-	struct sysinfo s;
-	long ret, err;
-	int bitcount = 0;
-	mm_segment_t old_fs = get_fs();
-
-	set_fs(KERNEL_DS);
-	ret = sys_sysinfo((struct sysinfo __user *) &s);
-	set_fs(old_fs);
-	/* Check to see if any memory value is too large for 32-bit and
-	 * scale down if needed.
-	 */
-	if ((s.totalram >> 32) || (s.totalswap >> 32)) {
-		while (s.mem_unit < PAGE_SIZE) {
-			s.mem_unit <<= 1;
-			bitcount++;
-		}
-		s.totalram >>= bitcount;
-		s.freeram >>= bitcount;
-		s.sharedram >>= bitcount;
-		s.bufferram >>= bitcount;
-		s.totalswap >>= bitcount;
-		s.freeswap >>= bitcount;
-		s.totalhigh >>= bitcount;
-		s.freehigh >>= bitcount;
-	}
-
-	if (!access_ok(VERIFY_WRITE, info, sizeof(*info)))
-		return -EFAULT;
-
-	err  = __put_user(s.uptime, &info->uptime);
-	err |= __put_user(s.loads[0], &info->loads[0]);
-	err |= __put_user(s.loads[1], &info->loads[1]);
-	err |= __put_user(s.loads[2], &info->loads[2]);
-	err |= __put_user(s.totalram, &info->totalram);
-	err |= __put_user(s.freeram, &info->freeram);
-	err |= __put_user(s.sharedram, &info->sharedram);
-	err |= __put_user(s.bufferram, &info->bufferram);
-	err |= __put_user(s.totalswap, &info->totalswap);
-	err |= __put_user(s.freeswap, &info->freeswap);
-	err |= __put_user(s.procs, &info->procs);
-	err |= __put_user (s.totalhigh, &info->totalhigh);
-	err |= __put_user (s.freehigh, &info->freehigh);
-	err |= __put_user (s.mem_unit, &info->mem_unit);
-	if (err)
-		return -EFAULT;
 	return ret;
 }
 

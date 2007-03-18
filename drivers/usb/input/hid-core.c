@@ -4,7 +4,7 @@
  *  Copyright (c) 1999 Andreas Gal
  *  Copyright (c) 2000-2005 Vojtech Pavlik <vojtech@suse.cz>
  *  Copyright (c) 2005 Michael Haboustak <mike-@cinci.rr.com> for Concept2, Inc
- *  Copyright (c) 2006 Jiri Kosina
+ *  Copyright (c) 2006-2007 Jiri Kosina
  */
 
 /*
@@ -18,7 +18,6 @@
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/list.h>
 #include <linux/mm.h>
 #include <linux/smp_lock.h>
@@ -28,13 +27,11 @@
 #include <linux/input.h>
 #include <linux/wait.h>
 
-#undef DEBUG
-#undef DEBUG_DATA
-
 #include <linux/usb.h>
 
 #include <linux/hid.h>
 #include <linux/hiddev.h>
+#include <linux/hid-debug.h>
 #include "usbhid.h"
 
 /*
@@ -223,23 +220,6 @@ static void hid_irq_in(struct urb *urb)
 		}
 	}
 }
-
-/*
- * Find a report field with a specified HID usage.
- */
-#if 0
-struct hid_field *hid_find_field_by_usage(struct hid_device *hid, __u32 wanted_usage, int type)
-{
-	struct hid_report *report;
-	int i;
-
-	list_for_each_entry(report, &hid->report_enum[type].report_list, list)
-		for (i = 0; i < report->maxfield; i++)
-			if (report->field[i]->logical == wanted_usage)
-				return report->field[i];
-	return NULL;
-}
-#endif  /*  0  */
 
 static int hid_submit_out(struct hid_device *hid)
 {
@@ -505,7 +485,7 @@ static int hid_get_class_descriptor(struct usb_device *dev, int ifnum,
 {
 	int result, retries = 4;
 
-	memset(buf,0,size);	// Make sure we parse really received data
+	memset(buf, 0, size);
 
 	do {
 		result = usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
@@ -532,22 +512,11 @@ void usbhid_close(struct hid_device *hid)
 		usb_kill_urb(usbhid->urbin);
 }
 
-static int hidinput_open(struct input_dev *dev)
-{
-	struct hid_device *hid = dev->private;
-	return usbhid_open(hid);
-}
-
-static void hidinput_close(struct input_dev *dev)
-{
-	struct hid_device *hid = dev->private;
-	usbhid_close(hid);
-}
-
 #define USB_VENDOR_ID_PANJIT		0x134c
 
 #define USB_VENDOR_ID_TURBOX		0x062a
 #define USB_DEVICE_ID_TURBOX_KEYBOARD	0x0201
+#define USB_VENDOR_ID_CIDC		0x1677
 
 /*
  * Initialize all reports
@@ -581,7 +550,6 @@ void usbhid_init_reports(struct hid_device *hid)
 }
 
 #define USB_VENDOR_ID_GTCO		0x078c
-#define USB_VENDOR_ID_GTCO_IPANEL_2     0x5543
 #define USB_DEVICE_ID_GTCO_90		0x0090
 #define USB_DEVICE_ID_GTCO_100		0x0100
 #define USB_DEVICE_ID_GTCO_101		0x0101
@@ -627,8 +595,6 @@ void usbhid_init_reports(struct hid_device *hid)
 #define USB_DEVICE_ID_GTCO_1004		0x1004
 #define USB_DEVICE_ID_GTCO_1005		0x1005
 #define USB_DEVICE_ID_GTCO_1006		0x1006
-#define USB_DEVICE_ID_GTCO_8		0x0008
-#define USB_DEVICE_ID_GTCO_d            0x000d
 
 #define USB_VENDOR_ID_WACOM		0x056a
 
@@ -724,10 +690,8 @@ void usbhid_init_reports(struct hid_device *hid)
 #define USB_DEVICE_ID_SMARTJOY_DUAL_PLUS 0x8802
 
 #define USB_VENDOR_ID_CODEMERCS		0x07c0
-#define USB_DEVICE_ID_CODEMERCS_IOW40	0x1500
-#define USB_DEVICE_ID_CODEMERCS_IOW24	0x1501
-#define USB_DEVICE_ID_CODEMERCS_IOW48	0x1502
-#define USB_DEVICE_ID_CODEMERCS_IOW28	0x1503
+#define USB_DEVICE_ID_CODEMERCS_IOW_FIRST	0x1500
+#define USB_DEVICE_ID_CODEMERCS_IOW_LAST	0x15ff
 
 #define USB_VENDOR_ID_DELORME		0x1163
 #define USB_DEVICE_ID_DELORME_EARTHMATE 0x0100
@@ -793,9 +757,17 @@ void usbhid_init_reports(struct hid_device *hid)
 
 #define USB_VENDOR_ID_LOGITECH		0x046d
 #define USB_DEVICE_ID_LOGITECH_USB_RECEIVER	0xc101
+#define USB_DEVICE_ID_LOGITECH_USB_RECEIVER_2	0xc517
+#define USB_DEVICE_ID_DINOVO_EDGE	0xc714
 
 #define USB_VENDOR_ID_IMATION		0x0718
 #define USB_DEVICE_ID_DISC_STAKKA	0xd000
+
+#define USB_VENDOR_ID_PANTHERLORD	0x0810
+#define USB_DEVICE_ID_PANTHERLORD_TWIN_USB_JOYSTICK	0x0001
+
+#define USB_VENDOR_ID_SONY			0x054c
+#define USB_DEVICE_ID_SONY_PS3_CONTROLLER	0x0268
 
 /*
  * Alphabetically sorted blacklist by quirk type.
@@ -807,6 +779,8 @@ static const struct hid_blacklist {
 	unsigned quirks;
 } hid_blacklist[] = {
 
+	{ USB_VENDOR_ID_LOGITECH, USB_DEVICE_ID_DINOVO_EDGE, HID_QUIRK_DUPLICATE_USAGES },
+
 	{ USB_VENDOR_ID_AIPTEK, USB_DEVICE_ID_AIPTEK_01, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_AIPTEK, USB_DEVICE_ID_AIPTEK_10, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_AIPTEK, USB_DEVICE_ID_AIPTEK_20, HID_QUIRK_IGNORE },
@@ -817,10 +791,6 @@ static const struct hid_blacklist {
 	{ USB_VENDOR_ID_AIRCABLE, USB_DEVICE_ID_AIRCABLE1, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_ALCOR, USB_DEVICE_ID_ALCOR_USBRS232, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_BERKSHIRE, USB_DEVICE_ID_BERKSHIRE_PCWD, HID_QUIRK_IGNORE },
-	{ USB_VENDOR_ID_CODEMERCS, USB_DEVICE_ID_CODEMERCS_IOW40, HID_QUIRK_IGNORE },
-	{ USB_VENDOR_ID_CODEMERCS, USB_DEVICE_ID_CODEMERCS_IOW24, HID_QUIRK_IGNORE },
-	{ USB_VENDOR_ID_CODEMERCS, USB_DEVICE_ID_CODEMERCS_IOW48, HID_QUIRK_IGNORE },
-	{ USB_VENDOR_ID_CODEMERCS, USB_DEVICE_ID_CODEMERCS_IOW28, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_CYPRESS, USB_DEVICE_ID_CYPRESS_HIDCOM, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_CYPRESS, USB_DEVICE_ID_CYPRESS_ULTRAMOUSE, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_DELORME, USB_DEVICE_ID_DELORME_EARTHMATE, HID_QUIRK_IGNORE },
@@ -881,8 +851,6 @@ static const struct hid_blacklist {
 	{ USB_VENDOR_ID_GTCO, USB_DEVICE_ID_GTCO_1004, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_GTCO, USB_DEVICE_ID_GTCO_1005, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_GTCO, USB_DEVICE_ID_GTCO_1006, HID_QUIRK_IGNORE },
-	{ USB_VENDOR_ID_GTCO_IPANEL_2, USB_DEVICE_ID_GTCO_8, HID_QUIRK_IGNORE },
-	{ USB_VENDOR_ID_GTCO_IPANEL_2, USB_DEVICE_ID_GTCO_d, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_IMATION, USB_DEVICE_ID_DISC_STAKKA, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_KBGEAR, USB_DEVICE_ID_KBGEAR_JAMSTUDIO, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_LD, USB_DEVICE_ID_LD_CASSY, HID_QUIRK_IGNORE },
@@ -965,6 +933,8 @@ static const struct hid_blacklist {
 	{ USB_VENDOR_ID_APPLE, USB_DEVICE_ID_APPLE_FOUNTAIN_TP_ONLY, HID_QUIRK_POWERBOOK_HAS_FN | HID_QUIRK_IGNORE_MOUSE },
 	{ USB_VENDOR_ID_APPLE, USB_DEVICE_ID_APPLE_GEYSER1_TP_ONLY, HID_QUIRK_POWERBOOK_HAS_FN | HID_QUIRK_IGNORE_MOUSE },
 
+	{ USB_VENDOR_ID_APPLE, USB_DEVICE_ID_APPLE_IR, HID_QUIRK_IGNORE },
+
 	{ USB_VENDOR_ID_PANJIT, 0x0001, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_PANJIT, 0x0002, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_PANJIT, 0x0003, HID_QUIRK_IGNORE },
@@ -973,6 +943,13 @@ static const struct hid_blacklist {
 	{ USB_VENDOR_ID_TURBOX, USB_DEVICE_ID_TURBOX_KEYBOARD, HID_QUIRK_NOGET },
 
 	{ USB_VENDOR_ID_LOGITECH, USB_DEVICE_ID_LOGITECH_USB_RECEIVER, HID_QUIRK_BAD_RELATIVE_KEYS },
+	{ USB_VENDOR_ID_LOGITECH, USB_DEVICE_ID_LOGITECH_USB_RECEIVER_2, HID_QUIRK_LOGITECH_S510_DESCRIPTOR },
+
+	{ USB_VENDOR_ID_PANTHERLORD, USB_DEVICE_ID_PANTHERLORD_TWIN_USB_JOYSTICK, HID_QUIRK_MULTI_INPUT | HID_QUIRK_SKIP_OUTPUT_REPORTS },
+
+	{ USB_VENDOR_ID_SONY, USB_DEVICE_ID_SONY_PS3_CONTROLLER, HID_QUIRK_SONY_PS3_CONTROLLER },
+
+	{ USB_VENDOR_ID_CIDC, 0x0103, HID_QUIRK_IGNORE },
 
 	{ 0, 0 }
 };
@@ -1038,6 +1015,48 @@ static void hid_fixup_cymotion_descriptor(char *rdesc, int rsize)
 	}
 }
 
+/*
+ * Sending HID_REQ_GET_REPORT changes the operation mode of the ps3 controller
+ * to "operational".  Without this, the ps3 controller will not report any
+ * events.
+ */
+static void hid_fixup_sony_ps3_controller(struct usb_device *dev, int ifnum)
+{
+	int result;
+	char *buf = kmalloc(18, GFP_KERNEL);
+
+	if (!buf)
+		return;
+
+	result = usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
+				 HID_REQ_GET_REPORT,
+				 USB_DIR_IN | USB_TYPE_CLASS |
+				 USB_RECIP_INTERFACE,
+				 (3 << 8) | 0xf2, ifnum, buf, 17,
+				 USB_CTRL_GET_TIMEOUT);
+
+	if (result < 0)
+		err("%s failed: %d\n", __func__, result);
+
+	kfree(buf);
+}
+
+/*
+ * Logitech S510 keyboard sends in report #3 keys which are far
+ * above the logical maximum described in descriptor. This extends
+ * the original value of 0x28c of logical maximum to 0x104d
+ */
+static void hid_fixup_s510_descriptor(unsigned char *rdesc, int rsize)
+{
+	if (rsize >= 90 && rdesc[83] == 0x26
+			&& rdesc[84] == 0x8c
+			&& rdesc[85] == 0x02) {
+		info("Fixing up Logitech S510 report descriptor");
+		rdesc[84] = rdesc[89] = 0x4d;
+		rdesc[85] = rdesc[90] = 0x10;
+	}
+}
+
 static struct hid_device *usb_hid_configure(struct usb_interface *intf)
 {
 	struct usb_host_interface *interface = intf->cur_altsetting;
@@ -1049,9 +1068,14 @@ static struct hid_device *usb_hid_configure(struct usb_interface *intf)
 	int n, len, insize = 0;
 	struct usbhid_device *usbhid;
 
-        /* Ignore all Wacom devices */
-        if (le16_to_cpu(dev->descriptor.idVendor) == USB_VENDOR_ID_WACOM)
-                return NULL;
+	/* Ignore all Wacom devices */
+	if (le16_to_cpu(dev->descriptor.idVendor) == USB_VENDOR_ID_WACOM)
+		return NULL;
+	/* ignore all Code Mercenaries IOWarrior devices */
+	if (le16_to_cpu(dev->descriptor.idVendor) == USB_VENDOR_ID_CODEMERCS)
+		if (le16_to_cpu(dev->descriptor.idProduct) >= USB_DEVICE_ID_CODEMERCS_IOW_FIRST &&
+		    le16_to_cpu(dev->descriptor.idProduct) <= USB_DEVICE_ID_CODEMERCS_IOW_LAST)
+			return NULL;
 
 	for (n = 0; hid_blacklist[n].idVendor; n++)
 		if ((hid_blacklist[n].idVendor == le16_to_cpu(dev->descriptor.idVendor)) &&
@@ -1106,7 +1130,10 @@ static struct hid_device *usb_hid_configure(struct usb_interface *intf)
 	if ((quirks & HID_QUIRK_CYMOTION))
 		hid_fixup_cymotion_descriptor(rdesc, rsize);
 
-#ifdef DEBUG_DATA
+	if (quirks & HID_QUIRK_LOGITECH_S510_DESCRIPTOR)
+		hid_fixup_s510_descriptor(rdesc, rsize);
+
+#ifdef CONFIG_HID_DEBUG
 	printk(KERN_DEBUG __FILE__ ": report descriptor (size %u, read %d) = ", rsize, n);
 	for (n = 0; n < rsize; n++)
 		printk(" %02x", (unsigned char) rdesc[n]);
@@ -1245,8 +1272,8 @@ static struct hid_device *usb_hid_configure(struct usb_interface *intf)
 	usbhid->urbctrl->transfer_dma = usbhid->ctrlbuf_dma;
 	usbhid->urbctrl->transfer_flags |= (URB_NO_TRANSFER_DMA_MAP | URB_NO_SETUP_DMA_MAP);
 	hid->hidinput_input_event = usb_hidinput_input_event;
-	hid->hidinput_open = hidinput_open;
-	hid->hidinput_close = hidinput_close;
+	hid->hid_open = usbhid_open;
+	hid->hid_close = usbhid_close;
 #ifdef CONFIG_USB_HIDDEV
 	hid->hiddev_hid_event = hiddev_hid_event;
 	hid->hiddev_report_event = hiddev_report_event;
@@ -1331,12 +1358,12 @@ static int hid_probe(struct usb_interface *intf, const struct usb_device_id *id)
 		return -ENODEV;
 	}
 
-	/* This only gets called when we are a single-input (most of the
-	 * time). IOW, not a HID_QUIRK_MULTI_INPUT. The hid_ff_init() is
-	 * only useful in this case, and not for multi-input quirks. */
-	if ((hid->claimed & HID_CLAIMED_INPUT) &&
-			!(hid->quirks & HID_QUIRK_MULTI_INPUT))
+	if ((hid->claimed & HID_CLAIMED_INPUT))
 		hid_ff_init(hid);
+
+	if (hid->quirks & HID_QUIRK_SONY_PS3_CONTROLLER)
+		hid_fixup_sony_ps3_controller(interface_to_usbdev(intf),
+			intf->cur_altsetting->desc.bInterfaceNumber);
 
 	printk(KERN_INFO);
 

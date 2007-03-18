@@ -88,9 +88,6 @@ static DECLARE_WAIT_QUEUE_HEAD(khubd_wait);
 
 static struct task_struct *khubd_task;
 
-/* multithreaded probe logic */
-static int multithread_probe = 0;
-
 /* cycle leds on hubs that aren't blinking for attention */
 static int blinkenlights = 0;
 module_param (blinkenlights, bool, S_IRUGO);
@@ -1255,16 +1252,32 @@ static void show_string(struct usb_device *udev, char *id, char *string)
 static int __usb_port_suspend(struct usb_device *, int port1);
 #endif
 
-static int __usb_new_device(void *void_data)
+/**
+ * usb_new_device - perform initial device setup (usbcore-internal)
+ * @udev: newly addressed device (in ADDRESS state)
+ *
+ * This is called with devices which have been enumerated, but not yet
+ * configured.  The device descriptor is available, but not descriptors
+ * for any device configuration.  The caller must have locked either
+ * the parent hub (if udev is a normal device) or else the
+ * usb_bus_list_lock (if udev is a root hub).  The parent's pointer to
+ * udev has already been installed, but udev is not yet visible through
+ * sysfs or other filesystem code.
+ *
+ * It will return if the device is configured properly or not.  Zero if
+ * the interface was registered with the driver core; else a negative
+ * errno value.
+ *
+ * This call is synchronous, and may not be used in an interrupt context.
+ *
+ * Only the hub driver or root-hub registrar should ever call this.
+ */
+int usb_new_device(struct usb_device *udev)
 {
-	struct usb_device *udev = void_data;
 	int err;
 
-	/* Lock ourself into memory in order to keep a probe sequence
-	 * sleeping in a new thread from allowing us to be unloaded.
-	 */
-	if (!try_module_get(THIS_MODULE))
-		return -EINVAL;
+	/* Determine quirks */
+	usb_detect_quirks(udev);
 
 	err = usb_get_configuration(udev);
 	if (err < 0) {
@@ -1369,50 +1382,11 @@ static int __usb_new_device(void *void_data)
 		usb_autoresume_device(udev->parent);
 
 exit:
-	module_put(THIS_MODULE);
 	return err;
 
 fail:
 	usb_set_device_state(udev, USB_STATE_NOTATTACHED);
 	goto exit;
-}
-
-/**
- * usb_new_device - perform initial device setup (usbcore-internal)
- * @udev: newly addressed device (in ADDRESS state)
- *
- * This is called with devices which have been enumerated, but not yet
- * configured.  The device descriptor is available, but not descriptors
- * for any device configuration.  The caller must have locked either
- * the parent hub (if udev is a normal device) or else the
- * usb_bus_list_lock (if udev is a root hub).  The parent's pointer to
- * udev has already been installed, but udev is not yet visible through
- * sysfs or other filesystem code.
- *
- * The return value for this function depends on if the
- * multithread_probe variable is set or not.  If it's set, it will
- * return a if the probe thread was successfully created or not.  If the
- * variable is not set, it will return if the device is configured
- * properly or not.  interfaces, in sysfs); else a negative errno value.
- *
- * This call is synchronous, and may not be used in an interrupt context.
- *
- * Only the hub driver or root-hub registrar should ever call this.
- */
-int usb_new_device(struct usb_device *udev)
-{
-	struct task_struct *probe_task;
-	int ret = 0;
-
-	if (multithread_probe) {
-		probe_task = kthread_run(__usb_new_device, udev,
-					 "usb-probe-%s", udev->devnum);
-		if (IS_ERR(probe_task))
-			ret = PTR_ERR(probe_task);
-	} else
-		ret = __usb_new_device(udev);
-
-	return ret;
 }
 
 static int hub_port_status(struct usb_hub *hub, int port1,
@@ -1930,6 +1904,7 @@ static int hub_suspend(struct usb_interface *intf, pm_message_t msg)
 	struct usb_hub		*hub = usb_get_intfdata (intf);
 	struct usb_device	*hdev = hub->hdev;
 	unsigned		port1;
+	int			status = 0;
 
 	/* fail if children aren't already suspended */
 	for (port1 = 1; port1 <= hdev->maxchild; port1++) {
@@ -1953,24 +1928,18 @@ static int hub_suspend(struct usb_interface *intf, pm_message_t msg)
 
 	dev_dbg(&intf->dev, "%s\n", __FUNCTION__);
 
-	/* "global suspend" of the downstream HC-to-USB interface */
-	if (!hdev->parent) {
-		struct usb_bus	*bus = hdev->bus;
-		if (bus) {
-			int	status = hcd_bus_suspend (bus);
-
-			if (status != 0) {
-				dev_dbg(&hdev->dev, "'global' suspend %d\n",
-					status);
-				return status;
-			}
-		} else
-			return -EOPNOTSUPP;
-	}
-
 	/* stop khubd and related activity */
 	hub_quiesce(hub);
-	return 0;
+
+	/* "global suspend" of the downstream HC-to-USB interface */
+	if (!hdev->parent) {
+		status = hcd_bus_suspend(hdev->bus);
+		if (status != 0) {
+			dev_dbg(&hdev->dev, "'global' suspend %d\n", status);
+			hub_activate(hub);
+		}
+	}
+	return status;
 }
 
 static int hub_resume(struct usb_interface *intf)
@@ -2465,7 +2434,7 @@ static void hub_port_connect_change(struct usb_hub *hub, int port1,
 
 	if (portchange & USB_PORT_STAT_C_CONNECTION) {
 		status = hub_port_debounce(hub, port1);
-		if (status < 0) {
+		if (status < 0 && printk_ratelimit()) {
 			dev_err (hub_dev,
 				"connect-debounce failed, port %d disabled\n",
 				port1);

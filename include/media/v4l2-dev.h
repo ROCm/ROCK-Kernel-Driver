@@ -271,6 +271,12 @@ struct video_device
 					struct v4l2_jpegcompression *a);
 	int (*vidioc_s_jpegcomp)       (struct file *file, void *fh,
 					struct v4l2_jpegcompression *a);
+	int (*vidioc_g_enc_index)      (struct file *file, void *fh,
+					struct v4l2_enc_idx *a);
+	int (*vidioc_encoder_cmd)      (struct file *file, void *fh,
+					struct v4l2_encoder_cmd *a);
+	int (*vidioc_try_encoder_cmd)  (struct file *file, void *fh,
+					struct v4l2_encoder_cmd *a);
 
 	/* Stream type-dependent parameter ioctls */
 	int (*vidioc_g_parm)           (struct file *file, void *fh,
@@ -294,6 +300,15 @@ struct video_device
 
 	/* Log status ioctl */
 	int (*vidioc_log_status)       (struct file *file, void *fh);
+
+
+	/* Debugging ioctls */
+#ifdef CONFIG_VIDEO_ADV_DEBUG
+	int (*vidioc_g_register)       (struct file *file, void *fh,
+					struct v4l2_register *reg);
+	int (*vidioc_s_register)       (struct file *file, void *fh,
+					struct v4l2_register *reg);
+#endif
 
 
 #ifdef OBSOLETE_OWNER /* to be removed soon */

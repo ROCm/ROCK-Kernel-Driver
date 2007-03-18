@@ -60,9 +60,9 @@ unsigned long mp_lapic_addr = 0;
 /* Processor that is doing the boot up */
 unsigned int boot_cpu_id = -1U;
 /* Internal processor count */
-unsigned int num_processors __initdata = 0;
+unsigned int num_processors __cpuinitdata = 0;
 
-unsigned disabled_cpus __initdata;
+unsigned disabled_cpus __cpuinitdata;
 
 /* Bitmask of physically existing CPUs */
 physid_mask_t phys_cpu_present_map = PHYSID_MASK_NONE;
@@ -798,7 +798,7 @@ int mp_register_gsi(u32 gsi, int triggering, int polarity)
 		return gsi;
 
 	/* Don't set up the ACPI SCI because it's already set up */
-	if (acpi_fadt.sci_int == gsi)
+	if (acpi_gbl_FADT.sci_interrupt == gsi)
 		return gsi;
 
 	ioapic = mp_find_ioapic(gsi);

@@ -1,3 +1,25 @@
+2007-03-14 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.21-rc3-i386-1.
+
+2007-03-14 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.21-rc2-i386-1.
+
+2007-03-01 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.21-rc1-i386-1.
+
+2007-03-01 Keith Owens  <kaos@sgi.com>
+
+	* Remove sparse warnings.
+	* kdb v4.4-2.6.20-i386-3.
+
+2007-02-16 Keith Owens  <kaos@sgi.com>
+
+	* Initialise variable bits of struct disassemble_info each time.
+	* kdb v4.4-2.6.20-i386-2.
+
 2007-02-06 Keith Owens  <kaos@sgi.com>
 
 	* kdb v4.4-2.6.20-i386-1.

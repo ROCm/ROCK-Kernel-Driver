@@ -23,6 +23,7 @@
 #include <linux/nls.h>
 
 struct statfs;
+struct smb_vol;
 
 /*
  *****************************************************************
@@ -42,7 +43,7 @@ extern void _FreeXid(unsigned int);
 #define FreeXid(curr_xid) {_FreeXid(curr_xid); cFYI(1,("CIFS VFS: leaving %s (xid = %d) rc = %d",__FUNCTION__,curr_xid,(int)rc));}
 extern char *build_path_from_dentry(struct dentry *);
 extern char *build_wildcard_path_from_dentry(struct dentry *direntry);
-extern void renew_parental_timestamps(struct dentry *direntry);
+/* extern void renew_parental_timestamps(struct dentry *direntry);*/
 extern int SendReceive(const unsigned int /* xid */ , struct cifsSesInfo *,
 			struct smb_hdr * /* input */ ,
 			struct smb_hdr * /* out */ ,
@@ -57,7 +58,7 @@ extern int SendReceiveBlockingLock(const unsigned int /* xid */ ,
 				int * /* bytes returned */);
 extern int checkSMB(struct smb_hdr *smb, __u16 mid, unsigned int length);
 extern int is_valid_oplock_break(struct smb_hdr *smb, struct TCP_Server_Info *);
-extern int is_size_safe_to_change(struct cifsInodeInfo *);
+extern int is_size_safe_to_change(struct cifsInodeInfo *, __u64 eof);
 extern struct cifsFileInfo *find_writable_file(struct cifsInodeInfo *);
 extern unsigned int smbCalcSize(struct smb_hdr *ptr);
 extern unsigned int smbCalcSize_LE(struct smb_hdr *ptr);
@@ -147,6 +148,8 @@ extern int get_dfs_path(int xid, struct cifsSesInfo *pSesInfo,
 			unsigned int *pnum_referrals, 
 			unsigned char ** preferrals,
 			int remap);
+extern void reset_cifs_unix_caps(int xid, struct cifsTconInfo *tcon,
+				 struct super_block * sb, struct smb_vol * vol);
 extern int CIFSSMBQFSInfo(const int xid, struct cifsTconInfo *tcon,
 			struct kstatfs *FSData);
 extern int SMBOldQFSInfo(const int xid, struct cifsTconInfo *tcon,

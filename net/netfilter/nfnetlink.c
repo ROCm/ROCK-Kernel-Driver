@@ -19,7 +19,6 @@
 #include <linux/socket.h>
 #include <linux/kernel.h>
 #include <linux/major.h>
-#include <linux/sched.h>
 #include <linux/timer.h>
 #include <linux/string.h>
 #include <linux/sockios.h>
@@ -105,7 +104,7 @@ static inline struct nfnl_callback *
 nfnetlink_find_client(u_int16_t type, struct nfnetlink_subsystem *ss)
 {
 	u_int8_t cb_id = NFNL_MSG_TYPE(type);
-	
+
 	if (cb_id >= ss->cb_count) {
 		DEBUGP("msgtype %u >= %u, returning\n", type, ss->cb_count);
 		return NULL;
@@ -187,7 +186,7 @@ nfnetlink_check_attributes(struct nfnetlink_subsystem *subsys,
 	/* implicit: if nlmsg_len == min_len, we return 0, and an empty
 	 * (zeroed) cda[] array. The message is valid, but empty. */
 
-        return 0;
+	return 0;
 }
 
 int nfnetlink_has_listeners(unsigned int group)
@@ -198,13 +197,12 @@ EXPORT_SYMBOL_GPL(nfnetlink_has_listeners);
 
 int nfnetlink_send(struct sk_buff *skb, u32 pid, unsigned group, int echo)
 {
-	gfp_t allocation = in_interrupt() ? GFP_ATOMIC : GFP_KERNEL;
 	int err = 0;
 
 	NETLINK_CB(skb).dst_group = group;
 	if (echo)
 		atomic_inc(&skb->users);
-	netlink_broadcast(nfnl, skb, pid, group, allocation);
+	netlink_broadcast(nfnl, skb, pid, group, gfp_any());
 	if (echo)
 		err = netlink_unicast(nfnl, skb, pid, MSG_DONTWAIT);
 
@@ -268,12 +266,12 @@ static int nfnetlink_rcv_msg(struct sk_buff *skb,
 	}
 
 	{
-		u_int16_t attr_count = 
+		u_int16_t attr_count =
 			ss->cb[NFNL_MSG_TYPE(nlh->nlmsg_type)].attr_count;
 		struct nfattr *cda[attr_count];
 
 		memset(cda, 0, sizeof(struct nfattr *) * attr_count);
-		
+
 		err = nfnetlink_check_attributes(ss, nlh, cda);
 		if (err < 0)
 			goto err_inval;
@@ -357,7 +355,7 @@ static int __init nfnetlink_init(void)
 	printk("Netfilter messages via NETLINK v%s.\n", nfversion);
 
 	nfnl = netlink_kernel_create(NETLINK_NETFILTER, NFNLGRP_MAX,
-	                             nfnetlink_rcv, THIS_MODULE);
+				     nfnetlink_rcv, THIS_MODULE);
 	if (!nfnl) {
 		printk(KERN_ERR "cannot initialize nfnetlink!\n");
 		return -1;

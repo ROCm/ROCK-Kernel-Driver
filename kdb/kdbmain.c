@@ -542,7 +542,7 @@ kdbgetaddrarg(int argc, const char **argv, int *nextarg,
 	      char **name)
 {
 	kdb_machreg_t addr;
-	long off = 0;
+	unsigned long off = 0;
 	int positive;
 	int diag;
 	int found = 0;
@@ -1159,8 +1159,6 @@ kdb_quiet(int reason)
  *	none
  */
 
-extern char kdb_prompt_str[];
-
 static int
 kdb_local(kdb_reason_t reason, int error, struct pt_regs *regs, kdb_dbtrap_t db_result)
 {
@@ -1607,8 +1605,8 @@ kdb_check_i8042(void)
 {
 	KDB_FLAG_CLEAR(NO_I8042);
 #ifdef	CONFIG_ACPI
-	if (acpi_fadt.revision >= 3 &&
-	    (acpi_fadt.iapc_boot_arch & BAF_8042_KEYBOARD_CONTROLLER) == 0)
+	if (acpi_gbl_FADT.header.revision >= 3 &&
+	    (acpi_gbl_FADT.boot_flags & BAF_8042_KEYBOARD_CONTROLLER) == 0)
 		KDB_FLAG_SET(NO_I8042);
 #endif	/* CONFIG_ACPI */
 }
@@ -1735,7 +1733,8 @@ kdb(kdb_reason_t reason, int error, struct pt_regs *regs)
 	kdb_intstate_t int_state;	/* Interrupt state */
 	kdb_reason_t reason2 = reason;
 	int result = 0;	/* Default is kdb did not handle it */
-	int ss_event;
+	int ss_event, old_regs_saved = 0;
+	struct pt_regs *old_regs = NULL;
 	kdb_dbtrap_t db_result=KDB_DB_NOBPT;
 	preempt_disable();
 	atomic_inc(&kdb_event);
@@ -1744,6 +1743,23 @@ kdb(kdb_reason_t reason, int error, struct pt_regs *regs)
 	case KDB_REASON_OOPS:
 	case KDB_REASON_NMI:
 		KDB_FLAG_SET(CATASTROPHIC);	/* kernel state is dubious now */
+		break;
+	default:
+		break;
+	}
+	switch(reason) {
+	case KDB_REASON_ENTER:
+	case KDB_REASON_ENTER_SLAVE:
+	case KDB_REASON_BREAK:
+	case KDB_REASON_DEBUG:
+	case KDB_REASON_OOPS:
+	case KDB_REASON_SWITCH:
+	case KDB_REASON_KEYBOARD:
+	case KDB_REASON_NMI:
+		if (regs && regs != get_irq_regs()) {
+			old_regs = set_irq_regs(regs);
+			old_regs_saved = 1;
+		}
 		break;
 	default:
 		break;
@@ -2007,12 +2023,16 @@ kdb(kdb_reason_t reason, int error, struct pt_regs *regs)
 	  !KDB_STATE(DOING_SS) &&
 	  !KDB_STATE(RECURSE)) {
 		/*
-		 * (Re)install the global breakpoints.  This is only done
-		 * once from the initial processor on go.
+		 * (Re)install the global breakpoints and cleanup the cached
+		 * symbol table.  This is only done once from the initial
+		 * processor on go.
 		 */
 		KDB_DEBUG_STATE("kdb 12", reason);
-		if (!kdb_quiet(reason) || smp_processor_id() == 0)
+		if (!kdb_quiet(reason) || smp_processor_id() == 0) {
 			kdb_bp_install_global(regs);
+			kdbnearsym_cleanup();
+			debug_kusage();
+		}
 		if (!KDB_STATE(GO1)) {
 			/*
 			 * Release all other cpus which will see KDB_STATE(LEAVING) is set.
@@ -2056,6 +2076,8 @@ kdb(kdb_reason_t reason, int error, struct pt_regs *regs)
 	if (!(KDB_STATE(DOING_SS) || KDB_STATE(SSBPT) || KDB_STATE(RECURSE))) {
 		KDB_DEBUG_STATE("kdb 15", result);
 		kdb_bp_install_local(regs);
+		if (old_regs_saved)
+			set_irq_regs(old_regs);
 		KDB_STATE_CLEAR(KDB_CONTROL);
 	}
 
@@ -2901,7 +2923,8 @@ kdb_dmesg(int argc, const char **argv)
 	/* Do a line at a time (max 200 chars) to reduce protocol overhead */
 	c = '\n';
 	while (start != end) {
-		char buf[201], *p = buf;
+		char buf[201];
+	       	p = buf;
 		while (start < end && (c = *KDB_WRAP(start)) && (p - buf) < sizeof(buf)-1) {
 			++start;
 			*p++ = c;
@@ -3993,7 +4016,7 @@ kdb_init(void)
 static int __init
 kdb_late_init(void)
 {
-	register_sysctl_table(kdb_root_table, 0);
+	register_sysctl_table(kdb_root_table);
 	return 0;
 }
 

@@ -1,3 +1,40 @@
+2007-03-14 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.21-rc3-common-1.
+
+2007-03-14 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.21-rc2-common-1.
+
+2007-03-01 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.21-rc1-common-1.
+
+2007-03-01 Keith Owens  <kaos@sgi.com>
+
+	* Remove sparse warnings.
+	* kdb v4.4-2.6.20-common-6.
+
+2007-02-27 Keith Owens  <kaos@sgi.com>
+
+	* set_irq_regs() on entry to kdb() if they are not already set.
+	* kdb v4.4-2.6.20-common-5.
+
+2007-02-22 Keith Owens  <kaos@sgi.com>
+
+	* Initialise struct disassemble_info in kdb_id1().
+	* kdb v4.4-2.6.20-common-4.
+
+2007-02-16 Keith Owens  <kaos@sgi.com>
+
+	* Clean up debug_alloc_pool code.
+	* kdb v4.4-2.6.20-common-3.
+
+2007-02-16 Keith Owens  <kaos@sgi.com>
+
+	* Initialise variable bits of struct disassemble_info each time.
+	* kdb v4.4-2.6.20-common-2.
+
 2007-02-06 Keith Owens  <kaos@sgi.com>
 
 	* kdb v4.4-2.6.20-common-1.

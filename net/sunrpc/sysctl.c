@@ -35,16 +35,8 @@ static ctl_table		sunrpc_table[];
 void
 rpc_register_sysctl(void)
 {
-	if (!sunrpc_table_header) {
-		struct ctl_path ctl_path[] = { { CTL_SUNRPC, "sunrpc", 0555 }, { 0 } };
-
-		sunrpc_table_header = register_sysctl_table_path(sunrpc_table, ctl_path);
-#ifdef CONFIG_PROC_FS
-		if (sunrpc_table[0].de)
-			sunrpc_table[0].de->owner = THIS_MODULE;
-#endif
-	}
-			
+	if (!sunrpc_table_header)
+		sunrpc_table_header = register_sysctl_table(sunrpc_table);
 }
 
 void
@@ -120,7 +112,7 @@ done:
 }
 
 
-static ctl_table sunrpc_table[] = {
+static ctl_table debug_table[] = {
 	{
 		.ctl_name	= CTL_RPCDEBUG,
 		.procname	= "rpc_debug",
@@ -128,7 +120,7 @@ static ctl_table sunrpc_table[] = {
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= &proc_dodebug
-	}, 
+	},
 	{
 		.ctl_name	= CTL_NFSDEBUG,
 		.procname	= "nfs_debug",
@@ -136,7 +128,7 @@ static ctl_table sunrpc_table[] = {
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= &proc_dodebug
-	}, 
+	},
 	{
 		.ctl_name	= CTL_NFSDDEBUG,
 		.procname	= "nfsd_debug",
@@ -144,7 +136,7 @@ static ctl_table sunrpc_table[] = {
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= &proc_dodebug
-	}, 
+	},
 	{
 		.ctl_name	= CTL_NLMDEBUG,
 		.procname	= "nlm_debug",
@@ -152,7 +144,17 @@ static ctl_table sunrpc_table[] = {
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= &proc_dodebug
-	}, 
+	},
+	{ .ctl_name = 0 }
+};
+
+static ctl_table sunrpc_table[] = {
+	{
+		.ctl_name	= CTL_SUNRPC,
+		.procname	= "sunrpc",
+		.mode		= 0555,
+		.child		= debug_table
+	},
 	{ .ctl_name = 0 }
 };
 

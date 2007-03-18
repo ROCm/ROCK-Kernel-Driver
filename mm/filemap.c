@@ -327,7 +327,7 @@ EXPORT_SYMBOL(sync_page_range);
  * @pos:	beginning offset in pages to write
  * @count:	number of bytes to write
  *
- * Note: Holding i_mutex across sync_page_range_nolock is not a good idea
+ * Note: Holding i_mutex across sync_page_range_nolock() is not a good idea
  * as it forces O_SYNC writers to different parts of the same file
  * to be serialised right until io completion.
  */
@@ -606,26 +606,6 @@ struct page * find_get_page(struct address_space *mapping, unsigned long offset)
 EXPORT_SYMBOL(find_get_page);
 
 /**
- * find_trylock_page - find and lock a page
- * @mapping: the address_space to search
- * @offset: the page index
- *
- * Same as find_get_page(), but trylock it instead of incrementing the count.
- */
-struct page *find_trylock_page(struct address_space *mapping, unsigned long offset)
-{
-	struct page *page;
-
-	read_lock_irq(&mapping->tree_lock);
-	page = radix_tree_lookup(&mapping->page_tree, offset);
-	if (page && TestSetPageLocked(page))
-		page = NULL;
-	read_unlock_irq(&mapping->tree_lock);
-	return page;
-}
-EXPORT_SYMBOL(find_trylock_page);
-
-/**
  * find_lock_page - locate, pin and lock a pagecache page
  * @mapping: the address_space to search
  * @offset: the page index
@@ -804,7 +784,7 @@ unsigned find_get_pages_tag(struct address_space *mapping, pgoff_t *index,
  * @mapping: target address_space
  * @index: the page index
  *
- * Same as grab_cache_page, but do not wait if the page is unavailable.
+ * Same as grab_cache_page(), but do not wait if the page is unavailable.
  * This is intended for speculative data generators, where the data can
  * be regenerated if the page couldn't be grabbed.  This routine should
  * be safe to call while holding the lock for another page.
@@ -2099,21 +2079,27 @@ generic_file_buffered_write(struct kiocb *iocb, const struct iovec *iov,
 		/* Limit the size of the copy to the caller's write size */
 		bytes = min(bytes, count);
 
-		/*
-		 * Limit the size of the copy to that of the current segment,
-		 * because fault_in_pages_readable() doesn't know how to walk
-		 * segments.
+		/* We only need to worry about prefaulting when writes are from
+		 * user-space.  NFSd uses vfs_writev with several non-aligned
+		 * segments in the vector, and limiting to one segment a time is
+		 * a noticeable performance for re-write
 		 */
-		bytes = min(bytes, cur_iov->iov_len - iov_base);
+		if (!segment_eq(get_fs(), KERNEL_DS)) {
+			/*
+			 * Limit the size of the copy to that of the current
+			 * segment, because fault_in_pages_readable() doesn't
+			 * know how to walk segments.
+			 */
+			bytes = min(bytes, cur_iov->iov_len - iov_base);
 
-		/*
-		 * Bring in the user page that we will copy from _first_.
-		 * Otherwise there's a nasty deadlock on copying from the
-		 * same page as we're writing to, without it being marked
-		 * up-to-date.
-		 */
-		fault_in_pages_readable(buf, bytes);
-
+			/*
+			 * Bring in the user page that we will copy from
+			 * _first_.  Otherwise there's a nasty deadlock on
+			 * copying from the same page as we're writing to,
+			 * without it being marked up-to-date.
+			 */
+			fault_in_pages_readable(buf, bytes);
+		}
 		page = __grab_cache_page(mapping,index,&cached_page,&lru_pvec);
 		if (!page) {
 			status = -ENOMEM;
@@ -2406,7 +2392,8 @@ generic_file_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
 	struct file *file = iocb->ki_filp;
 	struct address_space *mapping = file->f_mapping;
 	ssize_t retval;
-	size_t write_len = 0;
+	size_t write_len;
+	pgoff_t end = 0; /* silence gcc */
 
 	/*
 	 * If it's a write, unmap all mmappings of the file up-front.  This
@@ -2415,23 +2402,46 @@ generic_file_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
 	 */
 	if (rw == WRITE) {
 		write_len = iov_length(iov, nr_segs);
+		end = (offset + write_len - 1) >> PAGE_CACHE_SHIFT;
 	       	if (mapping_mapped(mapping))
 			unmap_mapping_range(mapping, offset, write_len, 0);
 	}
 
 	retval = filemap_write_and_wait(mapping);
-	if (retval == 0) {
-		retval = mapping->a_ops->direct_IO(rw, iocb, iov,
-						offset, nr_segs);
-		if (rw == WRITE && mapping->nrpages) {
-			pgoff_t end = (offset + write_len - 1)
-						>> PAGE_CACHE_SHIFT;
-			int err = invalidate_inode_pages2_range(mapping,
+	if (retval)
+		goto out;
+
+	/*
+	 * After a write we want buffered reads to be sure to go to disk to get
+	 * the new data.  We invalidate clean cached page from the region we're
+	 * about to write.  We do this *before* the write so that we can return
+	 * -EIO without clobbering -EIOCBQUEUED from ->direct_IO().
+	 */
+	if (rw == WRITE && mapping->nrpages) {
+		retval = invalidate_inode_pages2_range(mapping,
 					offset >> PAGE_CACHE_SHIFT, end);
-			if (err)
-				retval = err;
-		}
+		if (retval)
+			goto out;
 	}
+
+	retval = mapping->a_ops->direct_IO(rw, iocb, iov, offset, nr_segs);
+	if (retval)
+		goto out;
+
+	/*
+	 * Finally, try again to invalidate clean pages which might have been
+	 * faulted in by get_user_pages() if the source of the write was an
+	 * mmap()ed region of the file we're writing.  That's a pretty crazy
+	 * thing to do, so we don't support it 100%.  If this invalidation
+	 * fails and we have -EIOCBQUEUED we ignore the failure.
+	 */
+	if (rw == WRITE && mapping->nrpages) {
+		int err = invalidate_inode_pages2_range(mapping,
+					      offset >> PAGE_CACHE_SHIFT, end);
+		if (err && retval >= 0)
+			retval = err;
+	}
+out:
 	return retval;
 }
 

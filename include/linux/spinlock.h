@@ -228,15 +228,30 @@ do {								\
 # define read_unlock_irq(lock)		_read_unlock_irq(lock)
 # define write_unlock_irq(lock)		_write_unlock_irq(lock)
 #else
-# define spin_unlock(lock)		__raw_spin_unlock(&(lock)->raw_lock)
-# define read_unlock(lock)		__raw_read_unlock(&(lock)->raw_lock)
-# define write_unlock(lock)		__raw_write_unlock(&(lock)->raw_lock)
-# define spin_unlock_irq(lock) \
-    do { __raw_spin_unlock(&(lock)->raw_lock); local_irq_enable(); } while (0)
-# define read_unlock_irq(lock) \
-    do { __raw_read_unlock(&(lock)->raw_lock); local_irq_enable(); } while (0)
-# define write_unlock_irq(lock) \
-    do { __raw_write_unlock(&(lock)->raw_lock); local_irq_enable(); } while (0)
+# define spin_unlock(lock) \
+    do {__raw_spin_unlock(&(lock)->raw_lock); __release(lock); } while (0)
+# define read_unlock(lock) \
+    do {__raw_read_unlock(&(lock)->raw_lock); __release(lock); } while (0)
+# define write_unlock(lock) \
+    do {__raw_write_unlock(&(lock)->raw_lock); __release(lock); } while (0)
+# define spin_unlock_irq(lock)			\
+do {						\
+	__raw_spin_unlock(&(lock)->raw_lock);	\
+	__release(lock);			\
+	local_irq_enable();			\
+} while (0)
+# define read_unlock_irq(lock)			\
+do {						\
+	__raw_read_unlock(&(lock)->raw_lock);	\
+	__release(lock);			\
+	local_irq_enable();			\
+} while (0)
+# define write_unlock_irq(lock)			\
+do {						\
+	__raw_write_unlock(&(lock)->raw_lock);	\
+	__release(lock);			\
+	local_irq_enable();			\
+} while (0)
 #endif
 
 #define spin_unlock_irqrestore(lock, flags) \
@@ -266,6 +281,43 @@ do {								\
 	spin_trylock(lock) ? \
 	1 : ({ local_irq_restore(flags); 0; }); \
 })
+
+/*
+ * Locks two spinlocks l1 and l2.
+ * l1_first indicates if spinlock l1 should be taken first.
+ */
+static inline void double_spin_lock(spinlock_t *l1, spinlock_t *l2,
+				    bool l1_first)
+	__acquires(l1)
+	__acquires(l2)
+{
+	if (l1_first) {
+		spin_lock(l1);
+		spin_lock(l2);
+	} else {
+		spin_lock(l2);
+		spin_lock(l1);
+	}
+}
+
+/*
+ * Unlocks two spinlocks l1 and l2.
+ * l1_taken_first indicates if spinlock l1 was taken first and therefore
+ * should be released after spinlock l2.
+ */
+static inline void double_spin_unlock(spinlock_t *l1, spinlock_t *l2,
+				      bool l1_taken_first)
+	__releases(l1)
+	__releases(l2)
+{
+	if (l1_taken_first) {
+		spin_unlock(l2);
+		spin_unlock(l1);
+	} else {
+		spin_unlock(l1);
+		spin_unlock(l2);
+	}
+}
 
 /*
  * Pull the atomic_t declaration:

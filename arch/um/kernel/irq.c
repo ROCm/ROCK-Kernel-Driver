@@ -79,7 +79,7 @@ skip:
 	return 0;
 }
 
-struct irq_fd *active_fds = NULL;
+static struct irq_fd *active_fds = NULL;
 static struct irq_fd **last_irq_ptr = &active_fds;
 
 extern void free_irqs(void);
@@ -124,8 +124,8 @@ int activate_fd(int irq, int fd, int type, void *dev_id)
 	if (err < 0)
 		goto out;
 
-	new_fd = um_kmalloc(sizeof(*new_fd));
 	err = -ENOMEM;
+	new_fd = kmalloc(sizeof(struct irq_fd), GFP_KERNEL);
 	if (new_fd == NULL)
 		goto out;
 
@@ -142,6 +142,7 @@ int activate_fd(int irq, int fd, int type, void *dev_id)
 				     .events 		= events,
 				     .current_events 	= 0 } );
 
+	err = -EBUSY;
 	spin_lock_irqsave(&irq_lock, flags);
 	for (irq_fd = active_fds; irq_fd != NULL; irq_fd = irq_fd->next) {
 		if ((irq_fd->fd == fd) && (irq_fd->type == type)) {
@@ -176,9 +177,8 @@ int activate_fd(int irq, int fd, int type, void *dev_id)
 		 */
 		spin_unlock_irqrestore(&irq_lock, flags);
 		kfree(tmp_pfd);
-		tmp_pfd = NULL;
 
-		tmp_pfd = um_kmalloc(n);
+		tmp_pfd = kmalloc(n, GFP_KERNEL);
 		if (tmp_pfd == NULL)
 			goto out_kfree;
 

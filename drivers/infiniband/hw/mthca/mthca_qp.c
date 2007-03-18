@@ -399,7 +399,7 @@ static int to_ib_qp_access_flags(int mthca_flags)
 static void to_ib_ah_attr(struct mthca_dev *dev, struct ib_ah_attr *ib_ah_attr,
 				struct mthca_qp_path *path)
 {
-	memset(ib_ah_attr, 0, sizeof *path);
+	memset(ib_ah_attr, 0, sizeof *ib_ah_attr);
 	ib_ah_attr->port_num 	  = (be32_to_cpu(path->port_pkey) >> 24) & 0x3;
 
 	if (ib_ah_attr->port_num == 0 || ib_ah_attr->port_num > dev->limits.num_ports)
@@ -570,6 +570,11 @@ int mthca_modify_qp(struct ib_qp *ibqp, struct ib_qp_attr *attr, int attr_mask,
 			  "%d->%d with attr 0x%08x\n",
 			  qp->transport, cur_state, new_state,
 			  attr_mask);
+		goto out;
+	}
+
+	if (cur_state == new_state && cur_state == IB_QPS_RESET) {
+		err = 0;
 		goto out;
 	}
 
@@ -1083,21 +1088,21 @@ static void mthca_unmap_memfree(struct mthca_dev *dev,
 static int mthca_alloc_memfree(struct mthca_dev *dev,
 			       struct mthca_qp *qp)
 {
-	int ret = 0;
-
 	if (mthca_is_memfree(dev)) {
 		qp->rq.db_index = mthca_alloc_db(dev, MTHCA_DB_TYPE_RQ,
 						 qp->qpn, &qp->rq.db);
 		if (qp->rq.db_index < 0)
-			return ret;
+			return -ENOMEM;
 
 		qp->sq.db_index = mthca_alloc_db(dev, MTHCA_DB_TYPE_SQ,
 						 qp->qpn, &qp->sq.db);
-		if (qp->sq.db_index < 0)
+		if (qp->sq.db_index < 0) {
 			mthca_free_db(dev, MTHCA_DB_TYPE_RQ, qp->rq.db_index);
+			return -ENOMEM;
+		}
 	}
 
-	return ret;
+	return 0;
 }
 
 static void mthca_free_memfree(struct mthca_dev *dev,

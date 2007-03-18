@@ -24,6 +24,7 @@
 #include <asm/machdep.h>
 #include <asm/cputable.h>
 #include <asm/tlb.h>
+#include <asm/spu.h>
 
 #include <linux/sysctl.h>
 
@@ -513,6 +514,9 @@ int prepare_hugepage_range(unsigned long addr, unsigned long len, pgoff_t pgoff)
 	if ((addr + len) > 0x100000000UL)
 		err = open_high_hpage_areas(current->mm,
 					    HTLB_AREA_MASK(addr, len));
+#ifdef CONFIG_SPE_BASE
+	spu_flush_all_slbs(current->mm);
+#endif
 	if (err) {
 		printk(KERN_DEBUG "prepare_hugepage_range(%lx, %lx)"
 		       " failed (lowmask: 0x%04hx, highmask: 0x%04hx)\n",
@@ -1014,7 +1018,6 @@ repeat:
 
 		/* Primary is full, try the secondary */
 		if (unlikely(slot == -1)) {
-			new_pte |= _PAGE_F_SECOND;
 			hpte_group = ((~hash & htab_hash_mask) *
 				      HPTES_PER_GROUP) & ~0x7UL; 
 			slot = ppc_md.hpte_insert(hpte_group, va, pa, rflags,
@@ -1033,7 +1036,7 @@ repeat:
 		if (unlikely(slot == -2))
 			panic("hash_huge_page: pte_insert failed\n");
 
-		new_pte |= (slot << 12) & _PAGE_F_GIX;
+		new_pte |= (slot << 12) & (_PAGE_F_SECOND | _PAGE_F_GIX);
 	}
 
 	/*

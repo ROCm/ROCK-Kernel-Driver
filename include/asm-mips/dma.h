@@ -74,7 +74,7 @@
  *
  */
 
-#ifndef GENERIC_ISA_DMA_SUPPORT_BROKEN
+#ifndef CONFIG_GENERIC_ISA_DMA_SUPPORT_BROKEN
 #define MAX_DMA_CHANNELS	8
 #endif
 
@@ -91,6 +91,7 @@
 #else
 #define MAX_DMA_ADDRESS		(PAGE_OFFSET + 0x01000000)
 #endif
+#define MAX_DMA_PFN		PFN_DOWN(virt_to_phys((void *)MAX_DMA_ADDRESS))
 
 /* 8237 DMA controllers */
 #define IO_DMA1_BASE	0x00	/* 8 bit slave DMA, channels 0..3 */

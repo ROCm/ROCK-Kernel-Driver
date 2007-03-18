@@ -194,7 +194,7 @@ static int
 kdba_stackdepth(int argc, const char **argv)
 {
 	int diag, threshold, used;
-	long percentage;
+	unsigned long percentage;
 	unsigned long esp;
 	long offset = 0;
 	int nextarg;
@@ -448,7 +448,7 @@ static int
 kdba_cpuinfo(int argc, const char **argv)
 {
 	int diag;
-	long cpunum = -1;
+	unsigned long cpunum = -1;
 	long offset = 0;
 	int nextarg, c, i;
 	struct cpuinfo_ia64 *cpuinfo;
@@ -464,8 +464,8 @@ kdba_cpuinfo(int argc, const char **argv)
 		return KDB_ARGCOUNT;
 	}
 
-	for (c = (cpunum < 0 ? 0 : cpunum);
-	     c < (cpunum < 0 ? NR_CPUS : cpunum+1);
+	for (c = (cpunum == -1 ? 0 : cpunum);
+	     c < (cpunum == -1 ? NR_CPUS : cpunum+1);
 	     ++c) {
 		if (!cpu_online(c))
 			continue;
@@ -1319,14 +1319,14 @@ kdba_wait_for_cpus(void)
  * it makes the original task look blocked.
  */
 static void
-kdba_handlers_modify(struct task_struct *p, int cpu)
+kdba_handlers_modify(struct task_struct *task, int cpu)
 {
 	struct kdb_running_process *work, *save;
 	work = kdb_running_process + cpu;
 	save = kdb_running_process_save + cpu;
 	*work = *save;
-	if (!kdba_show_handlers && REGION_NUMBER(p) >= RGN_GATE &&
-	    (p->thread_info->flags & _TIF_MCA_INIT)) {
+	if (!kdba_show_handlers && REGION_NUMBER(task) >= RGN_GATE &&
+	    (task->thread_info->flags & _TIF_MCA_INIT)) {
 		struct ia64_sal_os_state *sos = (struct ia64_sal_os_state *)
 			((unsigned long)save->p + MCA_SOS_OFFSET);
 		char *p;

@@ -35,7 +35,6 @@
  */
 
 //#define DEBUG /* uncomment if you want debugging info (pr_debug) */
-#include <linux/sched.h>
 #include <linux/fs.h>
 #include <linux/bio.h>
 #include <linux/kernel.h>
@@ -1180,8 +1179,10 @@ static int __init mm_init(void)
 		return -ENOMEM;
 
 	err = major_nr = register_blkdev(0, "umem");
-	if (err < 0)
+	if (err < 0) {
+		pci_unregister_driver(&mm_pci_driver);
 		return -EIO;
+	}
 
 	for (i = 0; i < num_cards; i++) {
 		mm_gendisk[i] = alloc_disk(1 << MM_SHIFT);
@@ -1208,6 +1209,7 @@ static int __init mm_init(void)
 	return 0;
 
 out:
+	pci_unregister_driver(&mm_pci_driver);
 	unregister_blkdev(major_nr, "umem");
 	while (i--)
 		put_disk(mm_gendisk[i]);

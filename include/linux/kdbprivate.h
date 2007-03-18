@@ -121,6 +121,7 @@ extern int kdbgetaddrarg(int, const char**, int*, unsigned long *,
 			 long *, char **);
 extern int kdbgetsymval(const char *, kdb_symtab_t *);
 extern int kdbnearsym(unsigned long, kdb_symtab_t *);
+extern void kdbnearsym_cleanup(void);
 extern char *kdb_read(char *buffer, size_t bufsize);
 extern char *kdb_strdup(const char *str, gfp_t type);
 extern void kdb_symbol_print(kdb_machreg_t, const kdb_symtab_t *, unsigned int);
@@ -467,6 +468,7 @@ extern void kdb_runqueue(unsigned long cpu, kdb_printf_t xxx_printf);
 
 extern void *debug_kmalloc(size_t size, gfp_t flags);
 extern void debug_kfree(const void *);
+extern void debug_kusage(void);
 
 extern void kdba_set_current_task(const struct task_struct *);
 extern const struct task_struct *kdb_current_task;
@@ -489,5 +491,6 @@ extern int kdba_verify_rw(unsigned long addr, size_t size);
 
 extern int kdb_wait_for_cpus_secs;
 extern void kdba_cpu_up(void);
+extern char kdb_prompt_str[];
 
 #endif	/* !_KDBPRIVATE_H */

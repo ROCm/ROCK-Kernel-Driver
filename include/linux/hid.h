@@ -6,7 +6,7 @@
  *
  *  Copyright (c) 1999 Andreas Gal
  *  Copyright (c) 2000-2001 Vojtech Pavlik
- *  Copyright (c) 2006 Jiri Kosina
+ *  Copyright (c) 2006-2007 Jiri Kosina
  */
 
 /*
@@ -264,7 +264,11 @@ struct hid_item {
 #define HID_QUIRK_INVERT_HWHEEL			0x00004000
 #define HID_QUIRK_POWERBOOK_ISO_KEYBOARD        0x00008000
 #define HID_QUIRK_BAD_RELATIVE_KEYS		0x00010000
-#define HID_QUIRK_IGNORE_MOUSE			0x00020000
+#define HID_QUIRK_SKIP_OUTPUT_REPORTS		0x00020000
+#define HID_QUIRK_IGNORE_MOUSE			0x00040000
+#define HID_QUIRK_SONY_PS3_CONTROLLER		0x00080000
+#define HID_QUIRK_LOGITECH_S510_DESCRIPTOR	0x00100000
+#define HID_QUIRK_DUPLICATE_USAGES		0x00200000
 
 /*
  * This is the global environment of the parser. This information is
@@ -290,7 +294,7 @@ struct hid_global {
  */
 
 #define HID_MAX_DESCRIPTOR_SIZE		4096
-#define HID_MAX_USAGES			1024
+#define HID_MAX_USAGES			8192
 #define HID_DEFAULT_NUM_COLLECTIONS	16
 
 struct hid_local {
@@ -431,8 +435,8 @@ struct hid_device {							/* device report descriptor */
 
 	/* device-specific function pointers */
 	int (*hidinput_input_event) (struct input_dev *, unsigned int, unsigned int, int);
-	int (*hidinput_open) (struct input_dev *);
-	void (*hidinput_close) (struct input_dev *);
+	int (*hid_open) (struct hid_device *);
+	void (*hid_close) (struct hid_device *);
 
 	/* hiddev event handler */
 	void (*hiddev_hid_event) (struct hid_device *, struct hid_field *field,
@@ -472,16 +476,6 @@ struct hid_descriptor {
 	struct hid_class_descriptor desc[1];
 } __attribute__ ((packed));
 
-#ifdef DEBUG
-#include "hid-debug.h"
-#else
-#define hid_dump_input(a,b)	do { } while (0)
-#define hid_dump_device(c)	do { } while (0)
-#define hid_dump_field(a,b)	do { } while (0)
-#define resolv_usage(a)		do { } while (0)
-#define resolv_event(a,b)	do { } while (0)
-#endif
-
 /* Applications from HID Usage Tables 4/8/99 Version 1.1 */
 /* We ignore a few input applications that are not widely used */
 #define IS_INPUT_APPLICATION(a) (((a >= 0x00010000) && (a <= 0x00010008)) || (a == 0x00010080) || (a == 0x000c0001))
@@ -504,6 +498,7 @@ struct hid_device *hid_parse_report(__u8 *start, unsigned size);
 int hid_ff_init(struct hid_device *hid);
 
 int hid_lgff_init(struct hid_device *hid);
+int hid_plff_init(struct hid_device *hid);
 int hid_tmff_init(struct hid_device *hid);
 int hid_zpff_init(struct hid_device *hid);
 #ifdef CONFIG_HID_PID

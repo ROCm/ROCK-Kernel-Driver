@@ -816,7 +816,7 @@ static int
 kdba_stackdepth(int argc, const char **argv)
 {
 	int diag, cpu, threshold, used, over;
-	long percentage;
+	unsigned long percentage;
 	unsigned long esp;
 	long offset = 0;
 	int nextarg;

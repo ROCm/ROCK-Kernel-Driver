@@ -56,4 +56,12 @@ extern void pte_free(struct page *pte);
 
 #define check_pgt_cache()	do { } while (0)
 
+/* FIXME */
+#define paravirt_alloc_pt(pfn) do { } while (0)
+#define paravirt_alloc_pd(pfn) do { } while (0)
+#define paravirt_alloc_pd(pfn) do { } while (0)
+#define paravirt_alloc_pd_clone(pfn, clonepfn, start, count) do { } while (0)
+#define paravirt_release_pt(pfn) do { } while (0)
+#define paravirt_release_pd(pfn) do { } while (0)
+
 #endif /* _I386_PGALLOC_H */

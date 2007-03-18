@@ -32,6 +32,14 @@ static inline int dma_set_mask(struct device *dev, u64 dma_mask)
 	return 0;
 }
 
+/*
+ * dma_map_single can't fail as it is implemented now.
+ */
+static inline int dma_mapping_error(dma_addr_t addr)
+{
+	return 0;
+}
+
 /**
  * dma_alloc_coherent - allocate consistent memory for DMA
  * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
@@ -264,6 +272,24 @@ dma_sync_single_for_device(struct device *dev, dma_addr_t dma_handle,
 			   size_t size, enum dma_data_direction direction)
 {
 	dma_cache_sync(dev, bus_to_virt(dma_handle), size, direction);
+}
+
+static inline void
+dma_sync_single_range_for_cpu(struct device *dev, dma_addr_t dma_handle,
+			      unsigned long offset, size_t size,
+			      enum dma_data_direction direction)
+{
+	/* just sync everything, that's all the pci API can do */
+	dma_sync_single_for_cpu(dev, dma_handle, offset+size, direction);
+}
+
+static inline void
+dma_sync_single_range_for_device(struct device *dev, dma_addr_t dma_handle,
+				 unsigned long offset, size_t size,
+				 enum dma_data_direction direction)
+{
+	/* just sync everything, that's all the pci API can do */
+	dma_sync_single_for_device(dev, dma_handle, offset+size, direction);
 }
 
 /**

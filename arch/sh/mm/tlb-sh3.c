@@ -72,7 +72,7 @@ void update_mmu_cache(struct vm_area_struct * vma,
 	local_irq_restore(flags);
 }
 
-void __flush_tlb_page(unsigned long asid, unsigned long page)
+void local_flush_tlb_one(unsigned long asid, unsigned long page)
 {
 	unsigned long addr, data;
 	int i, ways = MMU_NTLB_WAYS;
@@ -86,7 +86,7 @@ void __flush_tlb_page(unsigned long asid, unsigned long page)
 	addr = MMU_TLB_ADDRESS_ARRAY | (page & 0x1F000);
 	data = (page & 0xfffe0000) | asid; /* VALID bit is off */
 
-	if ((cpu_data->flags & CPU_HAS_MMU_PAGE_ASSOC)) {
+	if ((current_cpu_data.flags & CPU_HAS_MMU_PAGE_ASSOC)) {
 		addr |= MMU_PAGE_ASSOC_BIT;
 		ways = 1;	/* we already know the way .. */
 	}

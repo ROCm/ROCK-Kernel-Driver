@@ -90,7 +90,7 @@ static int ncp_remount(struct super_block *sb, int *flags, char* data)
 	return 0;
 }
 
-static struct super_operations ncp_sops =
+static const struct super_operations ncp_sops =
 {
 	.alloc_inode	= ncp_alloc_inode,
 	.destroy_inode	= ncp_destroy_inode,
@@ -229,7 +229,7 @@ static void ncp_set_attr(struct inode *inode, struct ncp_entry_info *nwinfo)
 }
 
 #if defined(CONFIG_NCPFS_EXTRAS) || defined(CONFIG_NCPFS_NFS_NS)
-static struct inode_operations ncp_symlink_inode_operations = {
+static const struct inode_operations ncp_symlink_inode_operations = {
 	.readlink	= generic_readlink,
 	.follow_link	= page_follow_link_light,
 	.put_link	= page_put_link,
@@ -576,6 +576,12 @@ static int ncp_fill_super(struct super_block *sb, void *raw_data, int silent)
 	server->packet = vmalloc(NCP_PACKET_SIZE);
 	if (server->packet == NULL)
 		goto out_nls;
+	server->txbuf = vmalloc(NCP_PACKET_SIZE);
+	if (server->txbuf == NULL)
+		goto out_packet;
+	server->rxbuf = vmalloc(NCP_PACKET_SIZE);
+	if (server->rxbuf == NULL)
+		goto out_txbuf;
 
 	sock->sk->sk_data_ready	  = ncp_tcp_data_ready;
 	sock->sk->sk_error_report = ncp_tcp_error_report;
@@ -597,7 +603,7 @@ static int ncp_fill_super(struct super_block *sb, void *raw_data, int silent)
 	error = ncp_connect(server);
 	ncp_unlock_server(server);
 	if (error < 0)
-		goto out_packet;
+		goto out_rxbuf;
 	DPRINTK("ncp_fill_super: NCP_SBP(sb) = %x\n", (int) NCP_SBP(sb));
 
 	error = -EMSGSIZE;	/* -EREMOTESIDEINCOMPATIBLE */
@@ -666,8 +672,12 @@ out_disconnect:
 	ncp_lock_server(server);
 	ncp_disconnect(server);
 	ncp_unlock_server(server);
-out_packet:
+out_rxbuf:
 	ncp_stop_tasks(server);
+	vfree(server->rxbuf);
+out_txbuf:
+	vfree(server->txbuf);
+out_packet:
 	vfree(server->packet);
 out_nls:
 #ifdef CONFIG_NCPFS_NLS
@@ -723,6 +733,8 @@ static void ncp_put_super(struct super_block *sb)
 
 	kfree(server->priv.data);
 	kfree(server->auth.object_name);
+	vfree(server->rxbuf);
+	vfree(server->txbuf);
 	vfree(server->packet);
 	sb->s_fs_info = NULL;
 	kfree(server);

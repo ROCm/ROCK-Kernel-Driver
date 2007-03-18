@@ -136,9 +136,6 @@ const struct consw *conswitchp;
 #define DEFAULT_BELL_PITCH	750
 #define DEFAULT_BELL_DURATION	(HZ/8)
 
-extern void vcs_make_sysfs(struct tty_struct *tty);
-extern void vcs_remove_sysfs(struct tty_struct *tty);
-
 struct vc vc_cons [MAX_NR_CONSOLES];
 
 #ifndef VT_SINGLE_DRIVER
@@ -213,7 +210,7 @@ static int scrollback_delta;
  */
 int (*console_blank_hook)(int);
 
-static struct timer_list console_timer;
+static DEFINE_TIMER(console_timer, blank_screen_t, 0, 0);
 static int blank_state;
 static int blank_timer_expired;
 enum {
@@ -727,6 +724,7 @@ int vc_allocate(unsigned int currcons)	/* return 0 on success */
 		return -ENOMEM;
 	    memset(vc, 0, sizeof(*vc));
 	    vc_cons[currcons].d = vc;
+	    INIT_WORK(&vc_cons[currcons].SAK_work, vc_SAK);
 	    visual_init(vc, currcons, 1);
 	    if (!*vc->vc_uni_pagedir_loc)
 		con_set_default_unimap(vc);
@@ -869,8 +867,8 @@ int vc_resize(struct vc_data *vc, unsigned int cols, unsigned int lines)
 		ws.ws_col = vc->vc_cols;
 		ws.ws_ypixel = vc->vc_scan_lines;
 		if ((ws.ws_row != cws->ws_row || ws.ws_col != cws->ws_col) &&
-		    vc->vc_tty->pgrp > 0)
-			kill_pg(vc->vc_tty->pgrp, SIGWINCH, 1);
+		    vc->vc_tty->pgrp)
+			kill_pgrp(vc->vc_tty->pgrp, SIGWINCH, 1);
 		*cws = ws;
 	}
 
@@ -2188,10 +2186,28 @@ static void console_callback(struct work_struct *ignored)
 	release_console_sem();
 }
 
-void set_console(int nr)
+int set_console(int nr)
 {
+	struct vc_data *vc = vc_cons[fg_console].d;
+
+	if (!vc_cons_allocated(nr) || vt_dont_switch ||
+		(vc->vt_mode.mode == VT_AUTO && vc->vc_mode == KD_GRAPHICS)) {
+
+		/*
+		 * Console switch will fail in console_callback() or
+		 * change_console() so there is no point scheduling
+		 * the callback
+		 *
+		 * Existing set_console() users don't check the return
+		 * value so this shouldn't break anything
+		 */
+		return -EINVAL;
+	}
+
 	want_console = nr;
 	schedule_console_callback();
+
+	return 0;
 }
 
 struct tty_driver *console_driver;
@@ -2628,8 +2644,6 @@ static int __init con_init(void)
 	for (i = 0; i < MAX_NR_CONSOLES; i++)
 		con_driver_map[i] = conswitchp;
 
-	init_timer(&console_timer);
-	console_timer.function = blank_screen_t;
 	if (blankinterval) {
 		blank_state = blank_normal_wait;
 		mod_timer(&console_timer, jiffies + blankinterval);
@@ -2640,6 +2654,7 @@ static int __init con_init(void)
 	 */
 	for (currcons = 0; currcons < MIN_NR_CONSOLES; currcons++) {
 		vc_cons[currcons].d = vc = alloc_bootmem(sizeof(struct vc_data));
+		INIT_WORK(&vc_cons[currcons].SAK_work, vc_SAK);
 		visual_init(vc, currcons, 1);
 		vc->vc_screenbuf = (unsigned short *)alloc_bootmem(vc->vc_screenbuf_size);
 		vc->vc_kmalloced = 0;

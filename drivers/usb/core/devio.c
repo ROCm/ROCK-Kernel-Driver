@@ -522,19 +522,19 @@ static int check_ctrlrecip(struct dev_state *ps, unsigned int requesttype, unsig
 
 static struct usb_device *usbdev_lookup_minor(int minor)
 {
-	struct class_device *class_dev;
-	struct usb_device *dev = NULL;
+	struct device *device;
+	struct usb_device *udev = NULL;
 
 	down(&usb_device_class->sem);
-	list_for_each_entry(class_dev, &usb_device_class->children, node) {
-		if (class_dev->devt == MKDEV(USB_DEVICE_MAJOR, minor)) {
-			dev = class_dev->class_data;
+	list_for_each_entry(device, &usb_device_class->devices, node) {
+		if (device->devt == MKDEV(USB_DEVICE_MAJOR, minor)) {
+			udev = device->platform_data;
 			break;
 		}
 	}
 	up(&usb_device_class->sem);
 
-	return dev;
+	return udev;
 };
 
 /*
@@ -570,6 +570,7 @@ static int usbdev_open(struct inode *inode, struct file *file)
 	ps->dev = dev;
 	ps->file = file;
 	spin_lock_init(&ps->lock);
+	INIT_LIST_HEAD(&ps->list);
 	INIT_LIST_HEAD(&ps->async_pending);
 	INIT_LIST_HEAD(&ps->async_completed);
 	init_waitqueue_head(&ps->wait);
@@ -856,11 +857,11 @@ static int proc_setintf(struct dev_state *ps, void __user *arg)
 
 static int proc_setconfig(struct dev_state *ps, void __user *arg)
 {
-	unsigned int u;
+	int u;
 	int status = 0;
  	struct usb_host_config *actconfig;
 
-	if (get_user(u, (unsigned int __user *)arg))
+	if (get_user(u, (int __user *)arg))
 		return -EFAULT;
 
  	actconfig = ps->dev->actconfig;
@@ -911,7 +912,7 @@ static int proc_do_submiturb(struct dev_state *ps, struct usbdevfs_urb *uurb,
 	struct async *as;
 	struct usb_ctrlrequest *dr = NULL;
 	unsigned int u, totlen, isofrmlen;
-	int ret, interval = 0, ifnum = -1;
+	int ret, ifnum = -1;
 
 	if (uurb->flags & ~(USBDEVFS_URB_ISO_ASAP|USBDEVFS_URB_SHORT_NOT_OK|
 			   URB_NO_FSBR|URB_ZERO_PACKET))
@@ -991,7 +992,6 @@ static int proc_do_submiturb(struct dev_state *ps, struct usbdevfs_urb *uurb,
 		if ((ep->desc.bmAttributes & USB_ENDPOINT_XFERTYPE_MASK)
 				!= USB_ENDPOINT_XFER_ISOC)
 			return -EINVAL;
-		interval = 1 << min (15, ep->desc.bInterval - 1);
 		isofrmlen = sizeof(struct usbdevfs_iso_packet_desc) * uurb->number_of_packets;
 		if (!(isopkt = kmalloc(isofrmlen, GFP_KERNEL)))
 			return -ENOMEM;
@@ -1020,10 +1020,6 @@ static int proc_do_submiturb(struct dev_state *ps, struct usbdevfs_urb *uurb,
 		if ((ep->desc.bmAttributes & USB_ENDPOINT_XFERTYPE_MASK)
 				!= USB_ENDPOINT_XFER_INT)
 			return -EINVAL;
-		if (ps->dev->speed == USB_SPEED_HIGH)
-			interval = 1 << min (15, ep->desc.bInterval - 1);
-		else
-			interval = ep->desc.bInterval;
 		if (uurb->buffer_length > MAX_USBFS_BUFFER_SIZE)
 			return -EINVAL;
 		if (!access_ok((uurb->endpoint & USB_DIR_IN) ? VERIFY_WRITE : VERIFY_READ, uurb->buffer, uurb->buffer_length))
@@ -1052,7 +1048,11 @@ static int proc_do_submiturb(struct dev_state *ps, struct usbdevfs_urb *uurb,
 	as->urb->setup_packet = (unsigned char*)dr;
 	as->urb->start_frame = uurb->start_frame;
 	as->urb->number_of_packets = uurb->number_of_packets;
-	as->urb->interval = interval;
+	if (uurb->type == USBDEVFS_URB_TYPE_ISO ||
+			ps->dev->speed == USB_SPEED_HIGH)
+		as->urb->interval = 1 << min(15, ep->desc.bInterval - 1);
+	else
+		as->urb->interval = ep->desc.bInterval;
         as->urb->context = as;
         as->urb->complete = async_completed;
 	for (totlen = u = 0; u < uurb->number_of_packets; u++) {
@@ -1596,19 +1596,19 @@ static int usbdev_add(struct usb_device *dev)
 {
 	int minor = ((dev->bus->busnum-1) * 128) + (dev->devnum-1);
 
-	dev->class_dev = class_device_create(usb_device_class, NULL,
-				MKDEV(USB_DEVICE_MAJOR, minor), &dev->dev,
+	dev->usbfs_dev = device_create(usb_device_class, &dev->dev,
+				MKDEV(USB_DEVICE_MAJOR, minor),
 				"usbdev%d.%d", dev->bus->busnum, dev->devnum);
-	if (IS_ERR(dev->class_dev))
-		return PTR_ERR(dev->class_dev);
+	if (IS_ERR(dev->usbfs_dev))
+		return PTR_ERR(dev->usbfs_dev);
 
-	dev->class_dev->class_data = dev;
+	dev->usbfs_dev->platform_data = dev;
 	return 0;
 }
 
 static void usbdev_remove(struct usb_device *dev)
 {
-	class_device_unregister(dev->class_dev);
+	device_unregister(dev->usbfs_dev);
 }
 
 static int usbdev_notify(struct notifier_block *self, unsigned long action,

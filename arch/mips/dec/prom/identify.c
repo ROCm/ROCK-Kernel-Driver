@@ -26,9 +26,6 @@
 
 #include "dectypes.h"
 
-extern unsigned long mips_machgroup;
-extern unsigned long mips_machtype;
-
 static const char *dec_system_strings[] = {
 	[MACH_DSUNKNOWN]	"unknown DECstation",
 	[MACH_DS23100]		"DECstation 2100/3100",
@@ -88,6 +85,7 @@ static inline void prom_init_kn02(void)
 {
 	dec_kn_slot_base = KN02_SLOT_BASE;
 	dec_kn_slot_size = KN02_SLOT_SIZE;
+	dec_tc_bus = 1;
 
 	dec_rtc_base = (void *)CKSEG1ADDR(dec_kn_slot_base + KN02_RTC);
 }
@@ -96,6 +94,7 @@ static inline void prom_init_kn02xa(void)
 {
 	dec_kn_slot_base = KN02XA_SLOT_BASE;
 	dec_kn_slot_size = IOASIC_SLOT_SIZE;
+	dec_tc_bus = 1;
 
 	ioasic_base = (void *)CKSEG1ADDR(dec_kn_slot_base + IOASIC_IOCTL);
 	dec_rtc_base = (void *)CKSEG1ADDR(dec_kn_slot_base + IOASIC_TOY);
@@ -105,6 +104,7 @@ static inline void prom_init_kn03(void)
 {
 	dec_kn_slot_base = KN03_SLOT_BASE;
 	dec_kn_slot_size = IOASIC_SLOT_SIZE;
+	dec_tc_bus = 1;
 
 	ioasic_base = (void *)CKSEG1ADDR(dec_kn_slot_base + IOASIC_IOCTL);
 	dec_rtc_base = (void *)CKSEG1ADDR(dec_kn_slot_base + IOASIC_TOY);

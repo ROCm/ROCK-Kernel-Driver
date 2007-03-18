@@ -371,7 +371,7 @@ static int mixer_ioctl(struct inode *inode, struct file *file, u_int cmd,
 	return -EINVAL;
 }
 
-static struct file_operations mixer_fops =
+static const struct file_operations mixer_fops =
 {
 	.owner		= THIS_MODULE,
 	.llseek		= no_llseek,
@@ -1337,7 +1337,7 @@ static int sq_ioctl(struct inode *inode, struct file *file, u_int cmd,
 	return -EINVAL;
 }
 
-static struct file_operations sq_fops =
+static const struct file_operations sq_fops =
 {
 	.owner		= THIS_MODULE,
 	.llseek		= no_llseek,
@@ -1346,22 +1346,34 @@ static struct file_operations sq_fops =
 	.ioctl		= sq_ioctl,
 	.open		= sq_open,
 	.release	= sq_release,
-#ifdef HAS_RECORD
-	.read		= NULL	/* default to no read for compat mode */
-#endif
 };
+
+#ifdef HAS_RECORD
+static const struct file_operations sq_fops_record =
+{
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.write		= sq_write,
+	.poll		= sq_poll,
+	.ioctl		= sq_ioctl,
+	.open		= sq_open,
+	.release	= sq_release,
+	.read		= sq_read,
+};
+#endif
 
 static int sq_init(void)
 {
+	const struct file_operations *fops = &sq_fops;
 #ifndef MODULE
 	int sq_unit;
 #endif
 
 #ifdef HAS_RECORD
 	if (dmasound.mach.record)
-		sq_fops.read = sq_read ;
+		fops = &sq_fops_record;
 #endif
-	sq_unit = register_sound_dsp(&sq_fops, -1);
+	sq_unit = register_sound_dsp(fops, -1);
 	if (sq_unit < 0) {
 		printk(KERN_ERR "dmasound_core: couldn't register fops\n") ;
 		return sq_unit ;
@@ -1561,7 +1573,7 @@ static ssize_t state_read(struct file *file, char __user *buf, size_t count,
 	return n;
 }
 
-static struct file_operations state_fops = {
+static const struct file_operations state_fops = {
 	.owner		= THIS_MODULE,
 	.llseek		= no_llseek,
 	.read		= state_read,

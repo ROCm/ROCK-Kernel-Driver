@@ -21,6 +21,7 @@ struct mm_struct;
 struct pci_bus;
 struct task_struct;
 struct pci_dev;
+struct msi_desc;
 
 typedef void ia64_mv_setup_t (char **);
 typedef void ia64_mv_cpu_init_t (void);
@@ -79,7 +80,7 @@ typedef unsigned short ia64_mv_readw_relaxed_t (const volatile void __iomem *);
 typedef unsigned int ia64_mv_readl_relaxed_t (const volatile void __iomem *);
 typedef unsigned long ia64_mv_readq_relaxed_t (const volatile void __iomem *);
 
-typedef int ia64_mv_setup_msi_irq_t (unsigned int irq, struct pci_dev *pdev);
+typedef int ia64_mv_setup_msi_irq_t (struct pci_dev *pdev, struct msi_desc *);
 typedef void ia64_mv_teardown_msi_irq_t (unsigned int irq);
 
 static inline void
@@ -167,6 +168,7 @@ extern void machvec_tlb_migrate_finish (struct mm_struct *);
 #  define platform_setup_msi_irq	ia64_mv.setup_msi_irq
 #  define platform_teardown_msi_irq	ia64_mv.teardown_msi_irq
 #  define platform_pci_fixup_bus	ia64_mv.pci_fixup_bus
+#  define platform_kernel_launch_event	ia64_mv.kernel_launch_event
 # endif
 
 /* __attribute__((__aligned__(16))) is required to make size of the
@@ -268,6 +270,7 @@ struct ia64_machine_vector {
 	platform_setup_msi_irq,			\
 	platform_teardown_msi_irq,		\
 	platform_pci_fixup_bus,			\
+	platform_kernel_launch_event            \
 }
 
 extern struct ia64_machine_vector ia64_mv;

@@ -793,7 +793,8 @@ static int
 kdba_cpu_pda(int argc, const char **argv)
 {
 	int diag, nextarg, all_cpus = 0;
-	long cpu, offset = 0;
+	long offset = 0;
+	unsigned long cpu;
 	struct x8664_pda *c;
 	static const char *fmtl = "  %-17.17s 0x%lx\n";
 	static const char *fmtd = "  %-17.17s %d\n";
@@ -980,6 +981,7 @@ smp_kdb_stop(void)
 }
 
 /* The normal KDB IPI handler */
+extern asmlinkage void smp_kdb_interrupt(struct pt_regs *regs);	/* for sparse */
 asmlinkage void
 smp_kdb_interrupt(struct pt_regs *regs)
 {

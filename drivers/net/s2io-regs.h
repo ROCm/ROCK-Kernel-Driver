@@ -15,7 +15,7 @@
 
 #define TBD 0
 
-typedef struct _XENA_dev_config {
+struct XENA_dev_config {
 /* Convention: mHAL_XXX is mask, vHAL_XXX is value */
 
 /* General Control-Status Registers */
@@ -300,6 +300,7 @@ typedef struct _XENA_dev_config {
 	u64 gpio_control;
 #define GPIO_CTRL_GPIO_0		BIT(8)
 	u64 misc_control;
+#define FAULT_BEHAVIOUR			BIT(0)
 #define EXT_REQ_EN			BIT(1)
 #define MISC_LINK_STABILITY_PRD(val)   vBIT(val,29,3)
 
@@ -429,6 +430,7 @@ typedef struct _XENA_dev_config {
 #define TX_PA_CFG_IGNORE_SNAP_OUI          BIT(2)
 #define TX_PA_CFG_IGNORE_LLC_CTRL          BIT(3)
 #define	TX_PA_CFG_IGNORE_L2_ERR			   BIT(6)
+#define RX_PA_CFG_STRIP_VLAN_TAG		BIT(15)
 
 /* Recent add, used only debug purposes. */
 	u64 pcc_enable;
@@ -851,9 +853,9 @@ typedef struct _XENA_dev_config {
 #define SPI_CONTROL_DONE		BIT(6)
 	u64 spi_data;
 #define SPI_DATA_WRITE(data,len)	vBIT(data,0,len)
-} XENA_dev_config_t;
+};
 
-#define XENA_REG_SPACE	sizeof(XENA_dev_config_t)
+#define XENA_REG_SPACE	sizeof(struct XENA_dev_config)
 #define	XENA_EEPROM_SPACE (0x01 << 11)
 
 #endif				/* _REGS_H */

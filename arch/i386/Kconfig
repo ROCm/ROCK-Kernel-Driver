@@ -18,6 +18,19 @@ config GENERIC_TIME
 	bool
 	default y
 
+config CLOCKSOURCE_WATCHDOG
+	bool
+	default y
+
+config GENERIC_CLOCKEVENTS
+	bool
+	default y
+
+config GENERIC_CLOCKEVENTS_BROADCAST
+	bool
+	default y
+	depends on X86_LOCAL_APIC
+
 config LOCKDEP_SUPPORT
 	bool
 	default y
@@ -35,6 +48,10 @@ config X86
 	default y
 
 config MMU
+	bool
+	default y
+
+config ZONE_DMA
 	bool
 	default y
 
@@ -69,6 +86,8 @@ config DMI
 source "init/Kconfig"
 
 menu "Processor type and features"
+
+source "kernel/time/Kconfig"
 
 config SMP
 	bool "Symmetric multi-processing support"
@@ -207,6 +226,15 @@ config PARAVIRT
 	  under a hypervisor, improving performance significantly.
 	  However, when run without a hypervisor the kernel is
 	  theoretically slower.  If in doubt, say N.
+
+config VMI
+	bool "VMI Paravirt-ops support"
+	depends on PARAVIRT && !COMPAT_VDSO
+	help
+	  VMI provides a paravirtualized interface to the VMware ESX server
+	  (it could be used by other hypervisors in theory too, but is not
+	  at the moment), by linking the kernel to a GPL-ed ROM module
+	  provided by the hypervisor.
 
 config ACPI_SRAT
 	bool
@@ -890,7 +918,6 @@ config HOTPLUG_CPU
 config COMPAT_VDSO
 	bool "Compat VDSO support"
 	default y
-	depends on !PARAVIRT
 	help
 	  Map the VDSO to the predictable old-style address too.
 	---help---

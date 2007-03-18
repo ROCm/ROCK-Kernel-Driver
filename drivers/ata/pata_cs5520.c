@@ -41,7 +41,7 @@
 #include <linux/libata.h>
 
 #define DRV_NAME	"pata_cs5520"
-#define DRV_VERSION	"0.6.3"
+#define DRV_VERSION	"0.6.4"
 
 struct pio_clocks
 {
@@ -99,9 +99,9 @@ static void cs5520_set_timings(struct ata_port *ap, struct ata_device *adev, int
 static void cs5520_enable_dma(struct ata_port *ap, struct ata_device *adev)
 {
 	/* Set the DMA enable/disable flag */
-	u8 reg = inb(ap->ioaddr.bmdma_addr + 0x02);
+	u8 reg = ioread8(ap->ioaddr.bmdma_addr + 0x02);
 	reg |= 1<<(adev->devno + 5);
-	outb(reg, ap->ioaddr.bmdma_addr + 0x02);
+	iowrite8(reg, ap->ioaddr.bmdma_addr + 0x02);
 }
 
 /**
@@ -195,19 +195,20 @@ static struct ata_port_operations cs5520_port_ops = {
 	.bmdma_status		= ata_bmdma_status,
 	.qc_prep		= ata_qc_prep,
 	.qc_issue		= ata_qc_issue_prot,
-	.data_xfer		= ata_pio_data_xfer,
+	.data_xfer		= ata_data_xfer,
 
 	.irq_handler		= ata_interrupt,
 	.irq_clear		= ata_bmdma_irq_clear,
+	.irq_on			= ata_irq_on,
+	.irq_ack		= ata_irq_ack,
 
 	.port_start		= ata_port_start,
-	.port_stop		= ata_port_stop,
-	.host_stop		= ata_host_stop,
 };
 
 static int __devinit cs5520_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
 	u8 pcicfg;
+	void __iomem *iomap[5];
 	static struct ata_probe_ent probe[2];
 	int ports = 0;
 
@@ -238,6 +239,16 @@ static int __devinit cs5520_init_one(struct pci_dev *dev, const struct pci_devic
 		return -ENODEV;
 	}
 
+	/* Map IO ports */
+	iomap[0] = devm_ioport_map(&dev->dev, 0x1F0, 8);
+	iomap[1] = devm_ioport_map(&dev->dev, 0x3F6, 1);
+	iomap[2] = devm_ioport_map(&dev->dev, 0x170, 8);
+	iomap[3] = devm_ioport_map(&dev->dev, 0x376, 1);
+	iomap[4] = pcim_iomap(dev, 2, 0);
+
+	if (!iomap[0] || !iomap[1] || !iomap[2] || !iomap[3] || !iomap[4])
+		return -ENOMEM;
+
 	/* We have to do our own plumbing as the PCI setup for this
 	   chipset is non-standard so we can't punt to the libata code */
 
@@ -251,10 +262,10 @@ static int __devinit cs5520_init_one(struct pci_dev *dev, const struct pci_devic
 	probe[0].irq_flags = 0;
 	probe[0].port_flags = ATA_FLAG_SLAVE_POSS|ATA_FLAG_SRST;
 	probe[0].n_ports = 1;
-	probe[0].port[0].cmd_addr = 0x1F0;
-	probe[0].port[0].ctl_addr = 0x3F6;
-	probe[0].port[0].altstatus_addr = 0x3F6;
-	probe[0].port[0].bmdma_addr = pci_resource_start(dev, 2);
+	probe[0].port[0].cmd_addr = iomap[0];
+	probe[0].port[0].ctl_addr = iomap[1];
+	probe[0].port[0].altstatus_addr = iomap[1];
+	probe[0].port[0].bmdma_addr = iomap[4];
 
 	/* The secondary lurks at different addresses but is otherwise
 	   the same beastie */
@@ -262,10 +273,10 @@ static int __devinit cs5520_init_one(struct pci_dev *dev, const struct pci_devic
 	probe[1] = probe[0];
 	INIT_LIST_HEAD(&probe[1].node);
 	probe[1].irq = 15;
-	probe[1].port[0].cmd_addr = 0x170;
-	probe[1].port[0].ctl_addr = 0x376;
-	probe[1].port[0].altstatus_addr = 0x376;
-	probe[1].port[0].bmdma_addr = pci_resource_start(dev, 2) + 8;
+	probe[1].port[0].cmd_addr = iomap[2];
+	probe[1].port[0].ctl_addr = iomap[3];
+	probe[1].port[0].altstatus_addr = iomap[3];
+	probe[1].port[0].bmdma_addr = iomap[4] + 8;
 
 	/* Let libata fill in the port details */
 	ata_std_ports(&probe[0].port[0]);
@@ -296,8 +307,7 @@ static void __devexit cs5520_remove_one(struct pci_dev *pdev)
 	struct device *dev = pci_dev_to_dev(pdev);
 	struct ata_host *host = dev_get_drvdata(dev);
 
-	ata_host_remove(host);
-	dev_set_drvdata(dev, NULL);
+	ata_host_detach(host);
 }
 
 #ifdef CONFIG_PM
@@ -308,7 +318,7 @@ static void __devexit cs5520_remove_one(struct pci_dev *pdev)
  *	Do any reconfiguration work needed by a resume from RAM. We need
  *	to restore DMA mode support on BIOSen which disabled it
  */
- 
+
 static int cs5520_reinit_one(struct pci_dev *pdev)
 {
 	u8 pcicfg;
@@ -317,7 +327,30 @@ static int cs5520_reinit_one(struct pci_dev *pdev)
 		pci_write_config_byte(pdev, 0x60, pcicfg | 0x40);
 	return ata_pci_device_resume(pdev);
 }
-#endif
+
+/**
+ *	cs5520_pci_device_suspend	-	device suspend
+ *	@pdev: PCI device
+ *
+ *	We have to cut and waste bits from the standard method because
+ *	the 5520 is a bit odd and not just a pure ATA device. As a result
+ *	we must not disable it. The needed code is short and this avoids
+ *	chip specific mess in the core code.
+ */
+
+static int cs5520_pci_device_suspend(struct pci_dev *pdev, pm_message_t mesg)
+{
+	struct ata_host *host = dev_get_drvdata(&pdev->dev);
+	int rc = 0;
+
+	rc = ata_host_suspend(host, mesg);
+	if (rc)
+		return rc;
+
+	pci_save_state(pdev);
+	return 0;
+}
+#endif /* CONFIG_PM */
 
 /* For now keep DMA off. We can set it for all but A rev CS5510 once the
    core ATA code can handle it */
@@ -335,7 +368,7 @@ static struct pci_driver cs5520_pci_driver = {
 	.probe 		= cs5520_init_one,
 	.remove		= cs5520_remove_one,
 #ifdef CONFIG_PM
-	.suspend	= ata_pci_device_suspend,
+	.suspend	= cs5520_pci_device_suspend,
 	.resume		= cs5520_reinit_one,
 #endif
 };

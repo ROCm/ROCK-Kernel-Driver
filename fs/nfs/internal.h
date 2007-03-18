@@ -8,6 +8,14 @@ struct nfs_string;
 struct nfs_mount_data;
 struct nfs4_mount_data;
 
+/* Maximum number of readahead requests
+ * FIXME: this should really be a sysctl so that users may tune it to suit
+ *        their needs. People that do NFS over a slow network, might for
+ *        instance want to reduce it to something closer to 1 for improved
+ *        interactive response.
+ */
+#define NFS_MAX_READAHEAD	(RPC_DEF_SLOT_TABLE - 1)
+
 struct nfs_clone_mount {
 	const struct super_block *sb;
 	const struct dentry *dentry;
@@ -99,10 +107,6 @@ extern __be32 *nfs4_decode_dirent(__be32 *p, struct nfs_entry *entry, int plus);
 /* nfs4proc.c */
 #ifdef CONFIG_NFS_V4
 extern struct rpc_procinfo nfs4_procedures[];
-
-extern int nfs4_proc_fs_locations(struct inode *dir, struct dentry *dentry,
-				  struct nfs4_fs_locations *fs_locations,
-				  struct page *page);
 #endif
 
 /* dir.c */
@@ -116,7 +120,6 @@ extern void nfs_clear_inode(struct inode *);
 #ifdef CONFIG_NFS_V4
 extern void nfs4_clear_inode(struct inode *);
 #endif
-extern unsigned int nfs_max_readahead;
 
 /* super.c */
 extern struct file_system_type nfs_xdev_fs_type;

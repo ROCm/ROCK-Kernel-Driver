@@ -56,7 +56,7 @@ kdba_dis_getsym(bfd_vma addr, disassemble_info *dip)
  */
 
 /* ARGSUSED */
-void
+static void
 kdba_printaddress(kdb_machreg_t addr, disassemble_info *dip, int flag)
 {
 	kdb_symtab_t symtab;
@@ -240,7 +240,7 @@ kdba_id_printinsn(kdb_machreg_t pc, disassemble_info *dip)
  * Remarks:
  */
 
-void __init
+void
 kdba_id_init(disassemble_info *dip)
 {
 	dip->read_memory_func       = kdba_dis_getmem;

@@ -31,6 +31,7 @@
 #include <linux/capability.h>
 #include <linux/stat.h>
 #include <linux/sysdev.h>
+#include <linux/module.h>
 #include "common.h"
 
 #define BALLOON_CLASS_NAME "memory"

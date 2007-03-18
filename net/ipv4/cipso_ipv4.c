@@ -732,11 +732,12 @@ static int cipso_v4_map_lvl_hton(const struct cipso_v4_doi *doi_def,
 		*net_lvl = host_lvl;
 		return 0;
 	case CIPSO_V4_MAP_STD:
-		if (host_lvl < doi_def->map.std->lvl.local_size) {
+		if (host_lvl < doi_def->map.std->lvl.local_size &&
+		    doi_def->map.std->lvl.local[host_lvl] < CIPSO_V4_INV_LVL) {
 			*net_lvl = doi_def->map.std->lvl.local[host_lvl];
 			return 0;
 		}
-		break;
+		return -EPERM;
 	}
 
 	return -EINVAL;
@@ -771,7 +772,7 @@ static int cipso_v4_map_lvl_ntoh(const struct cipso_v4_doi *doi_def,
 			*host_lvl = doi_def->map.std->lvl.cipso[net_lvl];
 			return 0;
 		}
-		break;
+		return -EPERM;
 	}
 
 	return -EINVAL;
@@ -1931,6 +1932,11 @@ int cipso_v4_skbuff_getattr(const struct sk_buff *skb,
 		ret_val = cipso_v4_parsetag_enum(doi_def,
 						 &cipso_ptr[6],
 						 secattr);
+		break;
+	case CIPSO_V4_TAG_RANGE:
+		ret_val = cipso_v4_parsetag_rng(doi_def,
+						&cipso_ptr[6],
+						secattr);
 		break;
 	}
 

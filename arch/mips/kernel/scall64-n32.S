@@ -217,7 +217,7 @@ EXPORT(sysn32_call_table)
 	PTR	sys32_gettimeofday
 	PTR	compat_sys_getrlimit		/* 6095 */
 	PTR	compat_sys_getrusage
-	PTR	sys32_sysinfo
+	PTR	compat_sys_sysinfo
 	PTR	compat_sys_times
 	PTR	sys32_ptrace
 	PTR	sys_getuid			/* 6100 */
@@ -340,7 +340,7 @@ EXPORT(sysn32_call_table)
 	PTR	compat_sys_statfs64
 	PTR	compat_sys_fstatfs64
 	PTR	sys_sendfile64
-	PTR	sys32_timer_create		/* 6220 */
+	PTR	compat_sys_timer_create		/* 6220 */
 	PTR	compat_sys_timer_settime
 	PTR	compat_sys_timer_gettime
 	PTR	sys_timer_getoverrun
@@ -361,7 +361,7 @@ EXPORT(sysn32_call_table)
 	PTR	compat_sys_mq_notify
 	PTR	compat_sys_mq_getsetattr
 	PTR	sys_ni_syscall			/* 6240, sys_vserver */
-	PTR	sysn32_waitid
+	PTR	compat_sys_waitid
 	PTR	sys_ni_syscall			/* available, was setaltroot */
 	PTR	sys_add_key
 	PTR	sys_request_key
@@ -384,7 +384,7 @@ EXPORT(sysn32_call_table)
 	PTR	sys_readlinkat
 	PTR	sys_fchmodat
 	PTR	sys_faccessat
-	PTR	sys_pselect6
+	PTR	compat_sys_pselect6
 	PTR	sys_ppoll			/* 6265 */
 	PTR	sys_unshare
 	PTR	sys_splice
@@ -395,5 +395,8 @@ EXPORT(sysn32_call_table)
 	PTR	compat_sys_set_robust_list
 	PTR	compat_sys_get_robust_list
 	PTR	compat_sys_kexec_load
-	PTR	sys_getcpu
-	PTR	sys_epoll_pwait
+	PTR	sys_getcpu			/* 6275 */
+	PTR	compat_sys_epoll_pwait
+	PTR	sys_ioprio_set
+	PTR	sys_ioprio_get
+	.size	sysn32_call_table,.-sysn32_call_table

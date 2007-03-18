@@ -514,7 +514,7 @@ kdba_id_printinsn(kdb_machreg_t pc, disassemble_info *dip)
  * Remarks:
  */
 
-void __init
+void
 kdba_id_init(disassemble_info *dip)
 {
 	dip->read_memory_func       = kdba_dis_getmem;

@@ -46,7 +46,7 @@
 #include <linux/in.h>
 #include <linux/if_ether.h>
 #include <linux/io.h>
-#include <linux/moduleparam.h>
+#include <linux/module.h>
 #include <net/sock.h>
 #include <net/pkt_sched.h>
 #include <net/arp.h>
@@ -1776,20 +1776,18 @@ static struct ethtool_ops network_ethtool_ops =
 };
 
 #ifdef CONFIG_SYSFS
-static ssize_t show_rxbuf_min(struct class_device *cd, char *buf)
+static ssize_t show_rxbuf_min(struct device *dev, struct device_attribute *attr, char *buf)
 {
-	struct net_device *netdev = container_of(cd, struct net_device,
-						 class_dev);
+	struct net_device *netdev = container_of(dev, struct net_device, dev);
 	struct netfront_info *info = netdev_priv(netdev);
 
 	return sprintf(buf, "%u\n", info->rx_min_target);
 }
 
-static ssize_t store_rxbuf_min(struct class_device *cd,
+static ssize_t store_rxbuf_min(struct device *dev, struct device_attribute *attr,
 			       const char *buf, size_t len)
 {
-	struct net_device *netdev = container_of(cd, struct net_device,
-						 class_dev);
+	struct net_device *netdev = container_of(dev, struct net_device, dev);
 	struct netfront_info *np = netdev_priv(netdev);
 	char *endp;
 	unsigned long target;
@@ -1819,20 +1817,17 @@ static ssize_t store_rxbuf_min(struct class_device *cd,
 	return len;
 }
 
-static ssize_t show_rxbuf_max(struct class_device *cd, char *buf)
+static ssize_t show_rxbuf_max(struct device *dev, struct device_attribute *attr, char *buf)
 {
-	struct net_device *netdev = container_of(cd, struct net_device,
-						 class_dev);
+	struct net_device *netdev = container_of(dev, struct net_device, dev);
 	struct netfront_info *info = netdev_priv(netdev);
 
 	return sprintf(buf, "%u\n", info->rx_max_target);
 }
 
-static ssize_t store_rxbuf_max(struct class_device *cd,
-			       const char *buf, size_t len)
+static ssize_t store_rxbuf_max(struct device *dev, struct device_attribute *attr, const char *buf, size_t len)
 {
-	struct net_device *netdev = container_of(cd, struct net_device,
-						 class_dev);
+	struct net_device *netdev = container_of(dev, struct net_device, dev);
 	struct netfront_info *np = netdev_priv(netdev);
 	char *endp;
 	unsigned long target;
@@ -1862,16 +1857,15 @@ static ssize_t store_rxbuf_max(struct class_device *cd,
 	return len;
 }
 
-static ssize_t show_rxbuf_cur(struct class_device *cd, char *buf)
+static ssize_t show_rxbuf_cur(struct device *dev, struct device_attribute *attr, char *buf)
 {
-	struct net_device *netdev = container_of(cd, struct net_device,
-						 class_dev);
+	struct net_device *netdev = container_of(dev, struct net_device, dev);
 	struct netfront_info *info = netdev_priv(netdev);
 
 	return sprintf(buf, "%u\n", info->rx_target);
 }
 
-static const struct class_device_attribute xennet_attrs[] = {
+static struct device_attribute xennet_attrs[] = {
 	__ATTR(rxbuf_min, S_IRUGO|S_IWUSR, show_rxbuf_min, store_rxbuf_min),
 	__ATTR(rxbuf_max, S_IRUGO|S_IWUSR, show_rxbuf_max, store_rxbuf_max),
 	__ATTR(rxbuf_cur, S_IRUGO, show_rxbuf_cur, NULL),
@@ -1883,8 +1877,7 @@ static int xennet_sysfs_addif(struct net_device *netdev)
 	int error = 0;
 
 	for (i = 0; i < ARRAY_SIZE(xennet_attrs); i++) {
-		error = class_device_create_file(&netdev->class_dev,
-						 &xennet_attrs[i]);
+		error = device_create_file(&netdev->dev, &xennet_attrs[i]);
 		if (error)
 			goto fail;
 	}
@@ -1892,7 +1885,7 @@ static int xennet_sysfs_addif(struct net_device *netdev)
 
  fail:
 	while (--i >= 0)
-		class_device_remove_file(&netdev->class_dev,
+		device_remove_file(&netdev->dev,
 					 &xennet_attrs[i]);
 	return error;
 }
@@ -1902,7 +1895,7 @@ static void xennet_sysfs_delif(struct net_device *netdev)
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(xennet_attrs); i++) {
-		class_device_remove_file(&netdev->class_dev,
+		device_remove_file(&netdev->dev,
 					 &xennet_attrs[i]);
 	}
 }

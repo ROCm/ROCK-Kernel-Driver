@@ -94,13 +94,14 @@ kdbgetsymval(const char *symname, kdb_symtab_t *symtab)
  *	more than ~20 later calls before using a saved value.
  */
 
+static char *kdb_name_table[100];	/* arbitrary size */
+
 int
 kdbnearsym(unsigned long addr, kdb_symtab_t *symtab)
 {
 	int ret = 0;
 	unsigned long symbolsize;
 	unsigned long offset;
-	static char *knt[100];	/* kdb name table, arbitrary size */
 #define knt1_size 128		/* must be >= kallsyms table size */
 	char *knt1 = NULL;
 
@@ -137,21 +138,23 @@ kdbnearsym(unsigned long addr, kdb_symtab_t *symtab)
 			strncpy(knt1, symtab->sym_name, knt1_size);
 			knt1[knt1_size-1] = '\0';
 		}
-		for (i = 0; i < ARRAY_SIZE(knt); ++i) {
-			if (knt[i] && strcmp(knt[i], knt1) == 0)
+		for (i = 0; i < ARRAY_SIZE(kdb_name_table); ++i) {
+			if (kdb_name_table[i] && strcmp(kdb_name_table[i], knt1) == 0)
 				break;
 		}
-		if (i >= ARRAY_SIZE(knt)) {
-			debug_kfree(knt[0]);
-			memcpy(knt, knt+1, sizeof(knt[0])*(ARRAY_SIZE(knt)-1));
+		if (i >= ARRAY_SIZE(kdb_name_table)) {
+			debug_kfree(kdb_name_table[0]);
+			memcpy(kdb_name_table, kdb_name_table+1,
+			       sizeof(kdb_name_table[0])*(ARRAY_SIZE(kdb_name_table)-1));
 		} else {
 			debug_kfree(knt1);
-			knt1 = knt[i];
-			memcpy(knt+i, knt+i+1, sizeof(knt[0])*(ARRAY_SIZE(knt)-i-1));
+			knt1 = kdb_name_table[i];
+			memcpy(kdb_name_table+i, kdb_name_table+i+1,
+			       sizeof(kdb_name_table[0])*(ARRAY_SIZE(kdb_name_table)-i-1));
 		}
-		i = ARRAY_SIZE(knt) - 1;
-		knt[i] = knt1;
-		symtab->sym_name = knt[i];
+		i = ARRAY_SIZE(kdb_name_table) - 1;
+		kdb_name_table[i] = knt1;
+		symtab->sym_name = kdb_name_table[i];
 		knt1 = NULL;
 	}
 
@@ -163,6 +166,18 @@ kdbnearsym(unsigned long addr, kdb_symtab_t *symtab)
 out:
 	debug_kfree(knt1);
 	return ret;
+}
+
+void
+kdbnearsym_cleanup(void)
+{
+	int i;
+	for (i = 0; i < ARRAY_SIZE(kdb_name_table); ++i) {
+		if (kdb_name_table[i]) {
+			debug_kfree(kdb_name_table[i]);
+			kdb_name_table[i] = NULL;
+		}
+	}
 }
 
 /*
@@ -918,17 +933,21 @@ struct debug_alloc_header {
 
 static u64 debug_alloc_pool_aligned[64*1024/dah_align];	/* 64K pool */
 static char *debug_alloc_pool = (char *)debug_alloc_pool_aligned;
-static u32 dah_first;
+static u32 dah_first, dah_first_call = 1;
 
 /* Locking is awkward.  The debug code is called from all contexts, including
  * non maskable interrupts.  A normal spinlock is not safe in NMI context.  Try
  * to get the debug allocator lock, if it cannot be obtained after a second
  * then give up.  If the lock could not be previously obtained on this cpu then
  * only try once.
+ *
+ * sparse has no annotation for "this function _sometimes_ acquires a lock", so
+ * fudge the acquire/release notation.
  */
 static DEFINE_SPINLOCK(dap_lock);
-static
-int get_dap_lock(void)
+static int
+get_dap_lock(void)
+	__acquires(dap_lock)
 {
 	static int dap_locked = -1;
 	int count;
@@ -946,23 +965,24 @@ int get_dap_lock(void)
 		udelay(1000);
 	}
 	dap_locked = smp_processor_id();
+	__acquire(dap_lock);
 	return 0;
 }
 
-void *debug_kmalloc(size_t size, gfp_t flags)
+void
+*debug_kmalloc(size_t size, gfp_t flags)
 {
 	unsigned int rem, h_offset;
 	struct debug_alloc_header *best, *bestprev, *prev, *h;
-	static int first_call = 1;
 	void *p = NULL;
-	if ((p = kmalloc(size, flags)))
-		return p;
-	if (!get_dap_lock())
+	if (!get_dap_lock()) {
+		__release(dap_lock);	/* we never actually got it */
 		return NULL;
+	}
 	h = (struct debug_alloc_header *)(debug_alloc_pool + dah_first);
-	if (first_call) {
+	if (dah_first_call) {
 		h->size = sizeof(debug_alloc_pool_aligned) - sizeof(*h);
-		first_call = 0;
+		dah_first_call = 0;
 	}
 	prev = best = bestprev = NULL;
 	while (1) {
@@ -999,7 +1019,8 @@ out:
 	return p;
 }
 
-void debug_kfree(const void *p)
+void
+debug_kfree(const void *p)
 {
 	struct debug_alloc_header *h;
 	unsigned int h_offset;
@@ -1010,8 +1031,10 @@ void debug_kfree(const void *p)
 		kfree(p);
 		return;
 	}
-	if (!get_dap_lock())
+	if (!get_dap_lock()) {
+		__release(dap_lock);	/* we never actually got it */
 		return;		/* memory leak, cannot be helped */
+	}
 	h = (struct debug_alloc_header *)p - 1;
 	h_offset = (char *)h - debug_alloc_pool;
 	if (h_offset < dah_first) {
@@ -1019,16 +1042,18 @@ void debug_kfree(const void *p)
 		dah_first = h_offset;
 	} else {
 		struct debug_alloc_header *prev;
+		unsigned int prev_offset;
 		prev = (struct debug_alloc_header *)(debug_alloc_pool + dah_first);
 		while (1) {
 			if (!prev->next || prev->next > h_offset)
 				break;
 			prev = (struct debug_alloc_header *)(debug_alloc_pool + prev->next);
 		}
-		if (sizeof(*prev) + prev->size == h_offset) {
+		prev_offset = (char *)prev - debug_alloc_pool;
+		if (prev_offset + sizeof(*prev) + prev->size == h_offset) {
 			prev->size += sizeof(*h) + h->size;
 			h = prev;
-			h_offset = (char *)h - debug_alloc_pool;
+			h_offset = prev_offset;
 		} else {
 			h->next = prev->next;
 			prev->next = h_offset;
@@ -1040,6 +1065,41 @@ void debug_kfree(const void *p)
 		h->size += sizeof(*next) + next->size;
 		h->next = next->next;
 	}
+	spin_unlock(&dap_lock);
+}
+
+void
+debug_kusage(void)
+{
+	struct debug_alloc_header *h;
+#ifdef	CONFIG_IA64
+	/* FIXME: using dah for ia64 unwind always results in a memory leak.
+	 * Fix that memory leak first, then set debug_kusage_one_time = 1 for
+	 * all architectures.
+	 */
+	static int debug_kusage_one_time = 0;
+#else
+	static int debug_kusage_one_time = 1;
+#endif
+	if (!get_dap_lock()) {
+		__release(dap_lock);	/* we never actually got it */
+		return;
+	}
+	h = (struct debug_alloc_header *)(debug_alloc_pool + dah_first);
+	if (dah_first == 0 &&
+	    (h->size == sizeof(debug_alloc_pool_aligned) - sizeof(*h) ||
+	     dah_first_call))
+		goto out;
+	if (!debug_kusage_one_time)
+		goto out;
+	debug_kusage_one_time = 0;
+	kdb_printf("%s: debug_kmalloc memory leak dah_first %d\n",
+		   __FUNCTION__, dah_first);
+	do {
+		kdb_printf("%s: h %p size %d\n", __FUNCTION__, h, h->size);
+		h = (struct debug_alloc_header *)(debug_alloc_pool + h->next);
+	} while (h->next);
+out:
 	spin_unlock(&dap_lock);
 }
 

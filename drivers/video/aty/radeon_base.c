@@ -268,6 +268,11 @@ static int nomtrr = 0;
 #endif
 static int force_sleep;
 static int ignore_devlist;
+#ifdef CONFIG_PMAC_BACKLIGHT
+static int backlight = 1;
+#else
+static int backlight = 0;
+#endif
 
 /*
  * prototypes
@@ -1026,8 +1031,7 @@ int radeon_screen_blank(struct radeonfb_info *rinfo, int blank, int mode_switch)
 		break;
 	}
 
-	/* let fbcon do a soft blank for us */
-	return (blank == FB_BLANK_NORMAL) ? -EINVAL : 0;
+	return 0;
 }
 
 static int radeonfb_blank (int blank, struct fb_info *info)
@@ -2349,7 +2353,8 @@ static int __devinit radeonfb_pci_register (struct pci_dev *pdev,
 						 MTRR_TYPE_WRCOMB, 1);
 #endif
 
-	radeonfb_bl_init(rinfo);
+	if (backlight)
+		radeonfb_bl_init(rinfo);
 
 	printk ("radeonfb (%s): %s\n", pci_name(rinfo->pdev), rinfo->name);
 
@@ -2393,7 +2398,6 @@ static void __devexit radeonfb_pci_unregister (struct pci_dev *pdev)
         if (!rinfo)
                 return;
 
-	radeonfb_bl_exit(rinfo);
 	radeonfb_pm_exit(rinfo);
 
 	if (rinfo->mon1_EDID)
@@ -2419,6 +2423,8 @@ static void __devexit radeonfb_pci_unregister (struct pci_dev *pdev)
 #endif
 
         unregister_framebuffer(info);
+
+        radeonfb_bl_exit(rinfo);
 
         iounmap(rinfo->mmio_base);
         iounmap(rinfo->fb_base);
@@ -2469,6 +2475,8 @@ static int __init radeonfb_setup (char *options)
 			force_dfp = 1;
 		} else if (!strncmp(this_opt, "panel_yres:", 11)) {
 			panel_yres = simple_strtoul((this_opt+11), NULL, 0);
+		} else if (!strncmp(this_opt, "backlight:", 10)) {
+			backlight = simple_strtoul(this_opt+10, NULL, 0);
 #ifdef CONFIG_MTRR
 		} else if (!strncmp(this_opt, "nomtrr", 6)) {
 			nomtrr = 1;

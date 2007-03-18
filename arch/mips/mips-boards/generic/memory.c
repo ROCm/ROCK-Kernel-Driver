@@ -59,11 +59,12 @@ struct prom_pmemblock * __init prom_getmdesc(void)
 	/* otherwise look in the environment */
 	memsize_str = prom_getenv("memsize");
 	if (!memsize_str) {
-		prom_printf("memsize not set in boot prom, set to default (32Mb)\n");
+		printk(KERN_WARNING
+		       "memsize not set in boot prom, set to default (32Mb)\n");
 		physical_memsize = 0x02000000;
 	} else {
 #ifdef DEBUG
-		prom_printf("prom_memsize = %s\n", memsize_str);
+		pr_debug("prom_memsize = %s\n", memsize_str);
 #endif
 		physical_memsize = simple_strtol(memsize_str, NULL, 0);
 	}
@@ -141,12 +142,12 @@ void __init prom_meminit(void)
 	struct prom_pmemblock *p;
 
 #ifdef DEBUG
-	prom_printf("YAMON MEMORY DESCRIPTOR dump:\n");
+	pr_debug("YAMON MEMORY DESCRIPTOR dump:\n");
 	p = prom_getmdesc();
 	while (p->size) {
 		int i = 0;
-		prom_printf("[%d,%p]: base<%08lx> size<%08lx> type<%s>\n",
-			    i, p, p->base, p->size, mtypes[p->type]);
+		pr_debug("[%d,%p]: base<%08lx> size<%08lx> type<%s>\n",
+			 i, p, p->base, p->size, mtypes[p->type]);
 		p++;
 		i++;
 	}
@@ -166,9 +167,8 @@ void __init prom_meminit(void)
 	}
 }
 
-unsigned long __init prom_free_prom_memory(void)
+void __init prom_free_prom_memory(void)
 {
-	unsigned long freed = 0;
 	unsigned long addr;
 	int i;
 
@@ -176,17 +176,8 @@ unsigned long __init prom_free_prom_memory(void)
 		if (boot_mem_map.map[i].type != BOOT_MEM_ROM_DATA)
 			continue;
 
-		addr = PAGE_ALIGN(boot_mem_map.map[i].addr);
-		while (addr < boot_mem_map.map[i].addr
-			      + boot_mem_map.map[i].size) {
-			ClearPageReserved(virt_to_page(__va(addr)));
-			init_page_count(virt_to_page(__va(addr)));
-			free_page((unsigned long)__va(addr));
-			addr += PAGE_SIZE;
-			freed += PAGE_SIZE;
-		}
+		addr = boot_mem_map.map[i].addr;
+		free_init_pages("prom memory",
+				addr, addr + boot_mem_map.map[i].size);
 	}
-	printk("Freeing prom memory: %ldkb freed\n", freed >> 10);
-
-	return freed;
 }

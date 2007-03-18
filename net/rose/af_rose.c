@@ -700,23 +700,7 @@ static int rose_connect(struct socket *sock, struct sockaddr *uaddr, int addr_le
 	unsigned char cause, diagnostic;
 	struct net_device *dev;
 	ax25_uid_assoc *user;
-	int n;
-
-	if (sk->sk_state == TCP_ESTABLISHED && sock->state == SS_CONNECTING) {
-		sock->state = SS_CONNECTED;
-		return 0;	/* Connect completed during a ERESTARTSYS event */
-	}
-
-	if (sk->sk_state == TCP_CLOSE && sock->state == SS_CONNECTING) {
-		sock->state = SS_UNCONNECTED;
-		return -ECONNREFUSED;
-	}
-
-	if (sk->sk_state == TCP_ESTABLISHED)
-		return -EISCONN;	/* No reconnect on a seqpacket socket */
-
-	sk->sk_state   = TCP_CLOSE;
-	sock->state = SS_UNCONNECTED;
+	int n, err = 0;
 
 	if (addr_len != sizeof(struct sockaddr_rose) && addr_len != sizeof(struct full_sockaddr_rose))
 		return -EINVAL;
@@ -734,24 +718,53 @@ static int rose_connect(struct socket *sock, struct sockaddr *uaddr, int addr_le
 	if ((rose->source_ndigis + addr->srose_ndigis) > ROSE_MAX_DIGIS)
 		return -EINVAL;
 
+	lock_sock(sk);
+
+	if (sk->sk_state == TCP_ESTABLISHED && sock->state == SS_CONNECTING) {
+		/* Connect completed during a ERESTARTSYS event */
+		sock->state = SS_CONNECTED;
+		goto out_release;
+	}
+
+	if (sk->sk_state == TCP_CLOSE && sock->state == SS_CONNECTING) {
+		sock->state = SS_UNCONNECTED;
+		err = -ECONNREFUSED;
+		goto out_release;
+	}
+
+	if (sk->sk_state == TCP_ESTABLISHED) {
+		/* No reconnect on a seqpacket socket */
+		err = -EISCONN;
+		goto out_release;
+	}
+
+	sk->sk_state   = TCP_CLOSE;
+	sock->state = SS_UNCONNECTED;
+
 	rose->neighbour = rose_get_neigh(&addr->srose_addr, &cause,
 					 &diagnostic);
 	if (!rose->neighbour)
 		return -ENETUNREACH;
 
 	rose->lci = rose_new_lci(rose->neighbour);
-	if (!rose->lci)
-		return -ENETUNREACH;
+	if (!rose->lci) {
+		err = -ENETUNREACH;
+		goto out_release;
+	}
 
 	if (sock_flag(sk, SOCK_ZAPPED)) {	/* Must bind first - autobinding in this may or may not work */
 		sock_reset_flag(sk, SOCK_ZAPPED);
 
-		if ((dev = rose_dev_first()) == NULL)
-			return -ENETUNREACH;
+		if ((dev = rose_dev_first()) == NULL) {
+			err = -ENETUNREACH;
+			goto out_release;
+		}
 
 		user = ax25_findbyuid(current->euid);
-		if (!user)
-			return -EINVAL;
+		if (!user) {
+			err = -EINVAL;
+			goto out_release;
+		}
 
 		memcpy(&rose->source_addr, dev->dev_addr, ROSE_ADDR_LEN);
 		rose->source_call = user->call;
@@ -789,8 +802,10 @@ rose_try_next_neigh:
 	rose_start_t1timer(sk);
 
 	/* Now the loop */
-	if (sk->sk_state != TCP_ESTABLISHED && (flags & O_NONBLOCK))
-		return -EINPROGRESS;
+	if (sk->sk_state != TCP_ESTABLISHED && (flags & O_NONBLOCK)) {
+		err = -EINPROGRESS;
+		goto out_release;
+	}
 
 	/*
 	 * A Connect Ack with Choke or timeout or failed routing will go to
@@ -805,8 +820,10 @@ rose_try_next_neigh:
 			set_current_state(TASK_INTERRUPTIBLE);
 			if (sk->sk_state != TCP_SYN_SENT)
 				break;
+			release_sock(sk);
 			if (!signal_pending(tsk)) {
 				schedule();
+				lock_sock(sk);
 				continue;
 			}
 			current->state = TASK_RUNNING;
@@ -822,14 +839,19 @@ rose_try_next_neigh:
 		rose->neighbour = rose_get_neigh(&addr->srose_addr, &cause, &diagnostic);
 		if (rose->neighbour)
 			goto rose_try_next_neigh;
-	/* No more neighbour */
+
+		/* No more neighbours */
 		sock->state = SS_UNCONNECTED;
-		return sock_error(sk);	/* Always set at this point */
+		err = sock_error(sk);	/* Always set at this point */
+		goto out_release;
 	}
 
 	sock->state = SS_CONNECTED;
 
-	return 0;
+out_release:
+	release_sock(sk);
+
+	return err;
 }
 
 static int rose_accept(struct socket *sock, struct socket *newsock, int flags)
@@ -877,6 +899,8 @@ static int rose_accept(struct socket *sock, struct socket *newsock, int flags)
 			lock_sock(sk);
 			continue;
 		}
+		current->state = TASK_RUNNING;
+		remove_wait_queue(sk->sk_sleep, &wait);
 		return -ERESTARTSYS;
 	}
 	current->state = TASK_RUNNING;
@@ -1351,7 +1375,7 @@ static void *rose_info_start(struct seq_file *seq, loff_t *pos)
 	spin_lock_bh(&rose_list_lock);
 	if (*pos == 0)
 		return SEQ_START_TOKEN;
-	
+
 	i = 1;
 	sk_for_each(s, node, &rose_list) {
 		if (i == *pos)
@@ -1365,10 +1389,10 @@ static void *rose_info_next(struct seq_file *seq, void *v, loff_t *pos)
 {
 	++*pos;
 
-	return (v == SEQ_START_TOKEN) ? sk_head(&rose_list) 
+	return (v == SEQ_START_TOKEN) ? sk_head(&rose_list)
 		: sk_next((struct sock *)v);
 }
-	
+
 static void rose_info_stop(struct seq_file *seq, void *v)
 {
 	spin_unlock_bh(&rose_list_lock);
@@ -1379,7 +1403,7 @@ static int rose_info_show(struct seq_file *seq, void *v)
 	char buf[11];
 
 	if (v == SEQ_START_TOKEN)
-		seq_puts(seq, 
+		seq_puts(seq,
 			 "dest_addr  dest_call src_addr   src_call  dev   lci neigh st vs vr va   t  t1  t2  t3  hb    idle Snd-Q Rcv-Q inode\n");
 
 	else {
@@ -1392,7 +1416,7 @@ static int rose_info_show(struct seq_file *seq, void *v)
 			devname = "???";
 		else
 			devname = dev->name;
-		
+
 		seq_printf(seq, "%-10s %-9s ",
 			rose2asc(&rose->dest_addr),
 			ax2asc(buf, &rose->dest_call));
@@ -1440,7 +1464,7 @@ static int rose_info_open(struct inode *inode, struct file *file)
 	return seq_open(file, &rose_info_seqops);
 }
 
-static struct file_operations rose_info_fops = {
+static const struct file_operations rose_info_fops = {
 	.owner = THIS_MODULE,
 	.open = rose_info_open,
 	.read = seq_read,
@@ -1520,7 +1544,7 @@ static int __init rose_proto_init(void)
 		char name[IFNAMSIZ];
 
 		sprintf(name, "rose%d", i);
-		dev = alloc_netdev(sizeof(struct net_device_stats), 
+		dev = alloc_netdev(sizeof(struct net_device_stats),
 				   name, rose_setup);
 		if (!dev) {
 			printk(KERN_ERR "ROSE: rose_proto_init - unable to allocate memory\n");

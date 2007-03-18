@@ -123,7 +123,6 @@ kdb_bt(int argc, const char **argv)
 		kdb_printf("No process with pid == %ld found\n", pid);
 		return 0;
 	} else if (strcmp(argv[0], "btt") == 0) {
-		unsigned long addr;
 		if (argc != 1)
 			return KDB_ARGCOUNT;
 		if ((diag = kdbgetularg((char *)argv[1], &addr)))

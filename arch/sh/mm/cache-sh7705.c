@@ -32,9 +32,9 @@ static inline void cache_wback_all(void)
 {
 	unsigned long ways, waysize, addrstart;
 
-	ways = cpu_data->dcache.ways;
-	waysize = cpu_data->dcache.sets;
-	waysize <<= cpu_data->dcache.entry_shift;
+	ways = current_cpu_data.dcache.ways;
+	waysize = current_cpu_data.dcache.sets;
+	waysize <<= current_cpu_data.dcache.entry_shift;
 
 	addrstart = CACHE_OC_ADDRESS_ARRAY;
 
@@ -43,7 +43,7 @@ static inline void cache_wback_all(void)
 
 		for (addr = addrstart;
 		     addr < addrstart + waysize;
-		     addr += cpu_data->dcache.linesz) {
+		     addr += current_cpu_data.dcache.linesz) {
 			unsigned long data;
 			int v = SH_CACHE_UPDATED | SH_CACHE_VALID;
 
@@ -54,7 +54,7 @@ static inline void cache_wback_all(void)
 
 		}
 
-		addrstart += cpu_data->dcache.way_incr;
+		addrstart += current_cpu_data.dcache.way_incr;
 	} while (--ways);
 }
 
@@ -94,9 +94,9 @@ static void __flush_dcache_page(unsigned long phys)
 	local_irq_save(flags);
 	jump_to_P2();
 
-	ways = cpu_data->dcache.ways;
-	waysize = cpu_data->dcache.sets;
-	waysize <<= cpu_data->dcache.entry_shift;
+	ways = current_cpu_data.dcache.ways;
+	waysize = current_cpu_data.dcache.sets;
+	waysize <<= current_cpu_data.dcache.entry_shift;
 
 	addrstart = CACHE_OC_ADDRESS_ARRAY;
 
@@ -105,7 +105,7 @@ static void __flush_dcache_page(unsigned long phys)
 
 		for (addr = addrstart;
 		     addr < addrstart + waysize;
-		     addr += cpu_data->dcache.linesz) {
+		     addr += current_cpu_data.dcache.linesz) {
 			unsigned long data;
 
 			data = ctrl_inl(addr) & (0x1ffffC00 | SH_CACHE_VALID);
@@ -115,7 +115,7 @@ static void __flush_dcache_page(unsigned long phys)
 			}
 		}
 
-		addrstart += cpu_data->dcache.way_incr;
+		addrstart += current_cpu_data.dcache.way_incr;
 	} while (--ways);
 
 	back_to_P1();

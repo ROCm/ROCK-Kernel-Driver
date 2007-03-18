@@ -77,7 +77,7 @@ void update_mmu_cache(struct vm_area_struct * vma,
 	local_irq_restore(flags);
 }
 
-void __flush_tlb_page(unsigned long asid, unsigned long page)
+void local_flush_tlb_one(unsigned long asid, unsigned long page)
 {
 	unsigned long addr, data;
 

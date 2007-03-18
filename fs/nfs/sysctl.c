@@ -50,6 +50,14 @@ static ctl_table nfs_cb_sysctls[] = {
 		.proc_handler	= &proc_dointvec_jiffies,
 		.strategy	= &sysctl_jiffies,
 	},
+	{
+		.ctl_name	= CTL_UNNUMBERED,
+		.procname	= "nfs_congestion_kb",
+		.data		= &nfs_congestion_kb,
+		.maxlen		= sizeof(nfs_congestion_kb),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
 	{ .ctl_name = 0 }
 };
 
@@ -75,7 +83,7 @@ static ctl_table nfs_cb_sysctl_root[] = {
 
 int nfs_register_sysctl(void)
 {
-	nfs_callback_sysctl_table = register_sysctl_table(nfs_cb_sysctl_root, 0);
+	nfs_callback_sysctl_table = register_sysctl_table(nfs_cb_sysctl_root);
 	if (nfs_callback_sysctl_table == NULL)
 		return -ENOMEM;
 	return 0;

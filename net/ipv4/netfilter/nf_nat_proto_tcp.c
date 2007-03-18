@@ -8,6 +8,7 @@
 
 #include <linux/types.h>
 #include <linux/init.h>
+#include <linux/random.h>
 #include <linux/ip.h>
 #include <linux/tcp.h>
 
@@ -75,6 +76,9 @@ tcp_unique_tuple(struct nf_conntrack_tuple *tuple,
 		range_size = ntohs(range->max.tcp.port) - min + 1;
 	}
 
+	if (range->flags & IP_NAT_RANGE_PROTO_RANDOM)
+		port =  net_random();
+
 	for (i = 0; i < range_size; i++, port++) {
 		*portptr = htons(min + port % range_size);
 		if (!nf_nat_used_tuple(tuple, ct))
@@ -140,8 +144,7 @@ struct nf_nat_protocol nf_nat_protocol_tcp = {
 	.manip_pkt		= tcp_manip_pkt,
 	.in_range		= tcp_in_range,
 	.unique_tuple		= tcp_unique_tuple,
-#if defined(CONFIG_IP_NF_CONNTRACK_NETLINK) || \
-    defined(CONFIG_IP_NF_CONNTRACK_NETLINK_MODULE)
+#if defined(CONFIG_NF_CT_NETLINK) || defined(CONFIG_NF_CT_NETLINK_MODULE)
 	.range_to_nfattr	= nf_nat_port_range_to_nfattr,
 	.nfattr_to_range	= nf_nat_port_nfattr_to_range,
 #endif

@@ -126,8 +126,6 @@
 #define	REVISION	"Revision: 7.00alpha2"
 #define	VERSION		"Id: ide.c 7.00a2 20020906"
 
-#undef REALLY_SLOW_IO		/* most systems can safely undef this */
-
 #define _IDE_C			/* Tell ide.h it's really us */
 
 #include <linux/module.h>
@@ -179,13 +177,15 @@ DECLARE_MUTEX(ide_cfg_sem);
 static int ide_scan_direction; /* THIS was formerly 2.2.x pci=reverse */
 #endif
 
-#ifdef CONFIG_IDEDMA_AUTO
 int noautodma = 0;
-#else
-int noautodma = 1;
-#endif
 
 EXPORT_SYMBOL(noautodma);
+
+#ifdef CONFIG_BLK_DEV_IDEACPI
+int ide_noacpi = 0;
+int ide_noacpitfs = 1;
+int ide_noacpionboot = 1;
+#endif
 
 /*
  * This is declared extern in ide.h, for access by other IDE modules:
@@ -383,9 +383,8 @@ int ide_hwif_request_regions(ide_hwif_t *hwif)
 	unsigned long addr;
 	unsigned int i;
 
-	if (hwif->mmio == 2)
+	if (hwif->mmio)
 		return 0;
-	BUG_ON(hwif->mmio == 1);
 	addr = hwif->io_ports[IDE_CONTROL_OFFSET];
 	if (addr && !hwif_request_region(hwif, addr, 1))
 		goto control_region_busy;
@@ -432,7 +431,7 @@ void ide_hwif_release_regions(ide_hwif_t *hwif)
 {
 	u32 i = 0;
 
-	if (hwif->mmio == 2)
+	if (hwif->mmio)
 		return;
 	if (hwif->io_ports[IDE_CONTROL_OFFSET])
 		release_region(hwif->io_ports[IDE_CONTROL_OFFSET], 1);
@@ -501,24 +500,22 @@ static void ide_hwif_restore(ide_hwif_t *hwif, ide_hwif_t *tmp_hwif)
 	hwif->ide_dma_end		= tmp_hwif->ide_dma_end;
 	hwif->ide_dma_check		= tmp_hwif->ide_dma_check;
 	hwif->ide_dma_on		= tmp_hwif->ide_dma_on;
-	hwif->ide_dma_off_quietly	= tmp_hwif->ide_dma_off_quietly;
+	hwif->dma_off_quietly		= tmp_hwif->dma_off_quietly;
 	hwif->ide_dma_test_irq		= tmp_hwif->ide_dma_test_irq;
 	hwif->ide_dma_clear_irq		= tmp_hwif->ide_dma_clear_irq;
-	hwif->ide_dma_host_on		= tmp_hwif->ide_dma_host_on;
-	hwif->ide_dma_host_off		= tmp_hwif->ide_dma_host_off;
+	hwif->dma_host_on		= tmp_hwif->dma_host_on;
+	hwif->dma_host_off		= tmp_hwif->dma_host_off;
 	hwif->ide_dma_lostirq		= tmp_hwif->ide_dma_lostirq;
 	hwif->ide_dma_timeout		= tmp_hwif->ide_dma_timeout;
 
 	hwif->OUTB			= tmp_hwif->OUTB;
 	hwif->OUTBSYNC			= tmp_hwif->OUTBSYNC;
 	hwif->OUTW			= tmp_hwif->OUTW;
-	hwif->OUTL			= tmp_hwif->OUTL;
 	hwif->OUTSW			= tmp_hwif->OUTSW;
 	hwif->OUTSL			= tmp_hwif->OUTSL;
 
 	hwif->INB			= tmp_hwif->INB;
 	hwif->INW			= tmp_hwif->INW;
-	hwif->INL			= tmp_hwif->INL;
 	hwif->INSW			= tmp_hwif->INSW;
 	hwif->INSL			= tmp_hwif->INSL;
 
@@ -546,7 +543,6 @@ static void ide_hwif_restore(ide_hwif_t *hwif, ide_hwif_t *tmp_hwif)
 	hwif->extra_ports		= tmp_hwif->extra_ports;
 	hwif->autodma			= tmp_hwif->autodma;
 	hwif->udma_four			= tmp_hwif->udma_four;
-	hwif->no_dsc			= tmp_hwif->no_dsc;
 
 	hwif->hwif_data			= tmp_hwif->hwif_data;
 }
@@ -1133,12 +1129,11 @@ static int set_using_dma (ide_drive_t *drive, int arg)
 	if (HWIF(drive)->ide_dma_check == NULL)
 		return -EPERM;
 	if (arg) {
-		if (HWIF(drive)->ide_dma_check(drive)) return -EIO;
-		if (HWIF(drive)->ide_dma_on(drive)) return -EIO;
-	} else {
-		if (__ide_dma_off(drive))
+		if (ide_set_dma(drive))
 			return -EIO;
-	}
+		if (HWIF(drive)->ide_dma_on(drive)) return -EIO;
+	} else
+		ide_dma_off(drive);
 	return 0;
 #else
 	return -EPERM;
@@ -1215,9 +1210,14 @@ EXPORT_SYMBOL(system_bus_clock);
 static int generic_ide_suspend(struct device *dev, pm_message_t mesg)
 {
 	ide_drive_t *drive = dev->driver_data;
+	ide_hwif_t *hwif = HWIF(drive);
 	struct request rq;
 	struct request_pm_state rqpm;
 	ide_task_t args;
+
+	/* Call ACPI _GTM only once */
+	if (!(drive->dn % 2))
+		ide_acpi_get_timing(hwif);
 
 	memset(&rq, 0, sizeof(rq));
 	memset(&rqpm, 0, sizeof(rqpm));
@@ -1236,9 +1236,16 @@ static int generic_ide_suspend(struct device *dev, pm_message_t mesg)
 static int generic_ide_resume(struct device *dev)
 {
 	ide_drive_t *drive = dev->driver_data;
+	ide_hwif_t *hwif = HWIF(drive);
 	struct request rq;
 	struct request_pm_state rqpm;
 	ide_task_t args;
+
+	/* Call ACPI _STM only once */
+	if (!(drive->dn % 2))
+		ide_acpi_push_timing(hwif);
+
+	ide_acpi_exec_tfs(drive);
 
 	memset(&rq, 0, sizeof(rq));
 	memset(&rqpm, 0, sizeof(rqpm));
@@ -1473,23 +1480,23 @@ static int __init match_parm (char *s, const char *keywords[], int vals[], int m
 }
 
 #ifdef CONFIG_BLK_DEV_ALI14XX
-static int __initdata probe_ali14xx;
+extern int probe_ali14xx;
 extern int ali14xx_init(void);
 #endif
 #ifdef CONFIG_BLK_DEV_UMC8672
-static int __initdata probe_umc8672;
+extern int probe_umc8672;
 extern int umc8672_init(void);
 #endif
 #ifdef CONFIG_BLK_DEV_DTC2278
-static int __initdata probe_dtc2278;
+extern int probe_dtc2278;
 extern int dtc2278_init(void);
 #endif
 #ifdef CONFIG_BLK_DEV_HT6560B
-static int __initdata probe_ht6560b;
+extern int probe_ht6560b;
 extern int ht6560b_init(void);
 #endif
 #ifdef CONFIG_BLK_DEV_QD65XX
-static int __initdata probe_qd65xx;
+extern int probe_qd65xx;
 extern int qd65xx_init(void);
 #endif
 
@@ -1544,12 +1551,30 @@ static int __init ide_setup(char *s)
 	}
 #endif /* CONFIG_BLK_DEV_IDEPCI */
 
+#ifdef CONFIG_BLK_DEV_IDEACPI
+	if (!strcmp(s, "ide=noacpi")) {
+		//printk(" : Disable IDE ACPI support.\n");
+		ide_noacpi = 1;
+		return 1;
+	}
+	if (!strcmp(s, "ide=acpigtf")) {
+		//printk(" : Enable IDE ACPI _GTF support.\n");
+		ide_noacpitfs = 0;
+		return 1;
+	}
+	if (!strcmp(s, "ide=acpionboot")) {
+		//printk(" : Call IDE ACPI methods on boot.\n");
+		ide_noacpionboot = 0;
+		return 1;
+	}
+#endif /* CONFIG_BLK_DEV_IDEACPI */
+
 	/*
 	 * Look for drive options:  "hdx="
 	 */
 	if (s[0] == 'h' && s[1] == 'd' && s[2] >= 'a' && s[2] <= max_drive) {
 		const char *hd_words[] = {
-			"none", "noprobe", "nowerr", "cdrom", "serialize",
+			"none", "noprobe", "nowerr", "cdrom", "minus5",
 			"autotune", "noautotune", "minus8", "swapdata", "bswap",
 			"noflush", "remap", "remap63", "scsi", NULL };
 		unit = s[2] - 'a';
@@ -1577,9 +1602,6 @@ static int __init ide_setup(char *s)
 				drive->ready_stat = 0;
 				hwif->noprobe = 0;
 				goto done;
-			case -5: /* "serialize" */
-				printk(" -- USE \"ide%d=serialize\" INSTEAD", hw);
-				goto do_serialize;
 			case -6: /* "autotune" */
 				drive->autotune = IDE_TUNE_AUTO;
 				goto obsolete_option;
@@ -1640,7 +1662,7 @@ static int __init ide_setup(char *s)
 		 * (-8, -9, -10) are reserved to ease the hardcoding.
 		 */
 		static const char *ide_words[] = {
-			"noprobe", "serialize", "autotune", "noautotune", 
+			"noprobe", "serialize", "minus3", "minus4",
 			"reset", "dma", "ata66", "minus8", "minus9",
 			"minus10", "four", "qd65xx", "ht6560b", "cmd640_vlb",
 			"dtc2278", "umc8672", "ali14xx", NULL };
@@ -1711,12 +1733,17 @@ static int __init ide_setup(char *s)
 				hwif->chipset = mate->chipset = ide_4drives;
 				mate->irq = hwif->irq;
 				memcpy(mate->io_ports, hwif->io_ports, sizeof(hwif->io_ports));
-				goto do_serialize;
+				hwif->mate = mate;
+				mate->mate = hwif;
+				hwif->serialized = mate->serialized = 1;
+				goto obsolete_option;
 			}
 #endif /* CONFIG_BLK_DEV_4DRIVES */
 			case -10: /* minus10 */
 			case -9: /* minus9 */
 			case -8: /* minus8 */
+			case -4:
+			case -3:
 				goto bad_option;
 			case -7: /* ata66 */
 #ifdef CONFIG_BLK_DEV_IDEPCI
@@ -1731,16 +1758,7 @@ static int __init ide_setup(char *s)
 			case -5: /* "reset" */
 				hwif->reset = 1;
 				goto obsolete_option;
-			case -4: /* "noautotune" */
-				hwif->drives[0].autotune = IDE_TUNE_NOAUTO;
-				hwif->drives[1].autotune = IDE_TUNE_NOAUTO;
-				goto obsolete_option;
-			case -3: /* "autotune" */
-				hwif->drives[0].autotune = IDE_TUNE_AUTO;
-				hwif->drives[1].autotune = IDE_TUNE_AUTO;
-				goto obsolete_option;
 			case -2: /* "serialize" */
-			do_serialize:
 				hwif->mate = &ide_hwifs[hw^1];
 				hwif->mate->mate = hwif;
 				hwif->serialized = hwif->mate->serialized = 1;
@@ -1809,8 +1827,8 @@ static void __init probe_for_hwifs (void)
 #endif /* CONFIG_BLK_DEV_CMD640 */
 #ifdef CONFIG_BLK_DEV_IDE_PMAC
 	{
-		extern void pmac_ide_probe(void);
-		pmac_ide_probe();
+		extern int pmac_ide_probe(void);
+		(void)pmac_ide_probe();
 	}
 #endif /* CONFIG_BLK_DEV_IDE_PMAC */
 #ifdef CONFIG_BLK_DEV_GAYLE

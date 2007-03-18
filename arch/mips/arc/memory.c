@@ -118,11 +118,11 @@ void __init prom_meminit(void)
 #ifdef DEBUG
 	int i = 0;
 
-	prom_printf("ARCS MEMORY DESCRIPTOR dump:\n");
+	printk("ARCS MEMORY DESCRIPTOR dump:\n");
 	p = ArcGetMemoryDescriptor(PROM_NULL_MDESC);
 	while(p) {
-		prom_printf("[%d,%p]: base<%08lx> pages<%08lx> type<%s>\n",
-			    i, p, p->base, p->pages, mtypes(p->type));
+		printk("[%d,%p]: base<%08lx> pages<%08lx> type<%s>\n",
+		       i, p, p->base, p->pages, mtypes(p->type));
 		p = ArcGetMemoryDescriptor(p);
 		i++;
 	}
@@ -141,30 +141,20 @@ void __init prom_meminit(void)
 	}
 }
 
-unsigned long __init prom_free_prom_memory(void)
+void __init prom_free_prom_memory(void)
 {
-	unsigned long freed = 0;
 	unsigned long addr;
 	int i;
 
 	if (prom_flags & PROM_FLAG_DONT_FREE_TEMP)
-		return 0;
+		return;
 
 	for (i = 0; i < boot_mem_map.nr_map; i++) {
 		if (boot_mem_map.map[i].type != BOOT_MEM_ROM_DATA)
 			continue;
 
 		addr = boot_mem_map.map[i].addr;
-		while (addr < boot_mem_map.map[i].addr
-			      + boot_mem_map.map[i].size) {
-			ClearPageReserved(virt_to_page(__va(addr)));
-			init_page_count(virt_to_page(__va(addr)));
-			free_page((unsigned long)__va(addr));
-			addr += PAGE_SIZE;
-			freed += PAGE_SIZE;
-		}
+		free_init_pages("prom memory",
+				addr, addr + boot_mem_map.map[i].size);
 	}
-	printk(KERN_INFO "Freeing prom memory: %ldkb freed\n", freed >> 10);
-
-	return freed;
 }

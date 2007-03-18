@@ -64,9 +64,6 @@
 /* Prints the ioctl in a human-readable format */
 extern void v4l_printk_ioctl(unsigned int cmd);
 
-/* Prints the ioctl and arg in a human-readable format */
-extern void v4l_printk_ioctl_arg(char *s,unsigned int cmd, void *arg);
-
 /* Use this macro for non-I2C drivers. Pass the driver name as the first arg. */
 #define v4l_print_ioctl(name, cmd)  		 \
 	do {  					 \
@@ -97,14 +94,15 @@ u32 v4l2_ctrl_next(const u32 * const *ctrl_classes, u32 id);
 
 /* ------------------------------------------------------------------------- */
 
-/* Internal ioctls */
+/* Register/chip ident helper function */
 
-/* VIDIOC_INT_G_REGISTER and VIDIOC_INT_S_REGISTER */
-struct v4l2_register {
-	u32 i2c_id; 		/* I2C driver ID of the I2C chip. 0 for the I2C adapter. */
-	unsigned long reg;
-	u32 val;
-};
+struct i2c_client; /* forward reference */
+int v4l2_chip_match_i2c_client(struct i2c_client *c, u32 id_type, u32 chip_id);
+int v4l2_chip_match_host(u32 id_type, u32 chip_id);
+
+/* ------------------------------------------------------------------------- */
+
+/* Internal ioctls */
 
 /* VIDIOC_INT_DECODE_VBI_LINE */
 struct v4l2_decode_vbi_line {
@@ -175,9 +173,7 @@ enum v4l2_chip_ident {
    Replacement of TUNER_SET_STANDBY. */
 #define VIDIOC_INT_S_STANDBY 	     _IOW('d', 94, u32)
 
-/* only implemented if CONFIG_VIDEO_ADV_DEBUG is defined */
-#define	VIDIOC_INT_S_REGISTER 		_IOW ('d', 100, struct v4l2_register)
-#define	VIDIOC_INT_G_REGISTER 		_IOWR('d', 101, struct v4l2_register)
+/* 100, 101 used by  VIDIOC_DBG_[SG]_REGISTER */
 
 /* Generic reset command. The argument selects which subsystems to reset.
    Passing 0 will always reset the whole chip. */

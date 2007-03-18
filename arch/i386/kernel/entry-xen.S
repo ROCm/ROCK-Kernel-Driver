@@ -352,11 +352,11 @@ sysenter_past_esp:
 	movl PT_OLDESP(%esp), %ecx
 	xorl %ebp,%ebp
 	TRACE_IRQS_ON
-1:	mov  PT_GS(%esp), %gs
+1:	mov  PT_FS(%esp), %gs
 	ENABLE_INTERRUPTS_SYSEXIT
 	CFI_ENDPROC
 .pushsection .fixup,"ax"
-2:	movl $0,PT_GS(%esp)
+2:	movl $0,PT_FS(%esp)
 	jmp 1b
 .section __ex_table,"a"
 	.align 4
@@ -722,10 +722,10 @@ error_code:
 	popl %ecx
 	CFI_ADJUST_CFA_OFFSET -4
 	/*CFI_REGISTER es, ecx*/
-	movl PT_GS(%esp), %edi		# get the function address
+	movl PT_FS(%esp), %edi		# get the function address
 	movl PT_ORIG_EAX(%esp), %edx	# get the error code
 	movl $-1, PT_ORIG_EAX(%esp)	# no syscall to restart
-	mov  %ecx, PT_GS(%esp)
+	mov  %ecx, PT_FS(%esp)
 	/*CFI_REL_OFFSET gs, ES*/
 	movl $(__USER_DS), %ecx
 	movl %ecx, %ds

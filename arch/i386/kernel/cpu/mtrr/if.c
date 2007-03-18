@@ -158,9 +158,8 @@ mtrr_ioctl(struct file *file, unsigned int cmd, unsigned long __arg)
 	struct mtrr_sentry sentry;
 	struct mtrr_gentry gentry;
 	void __user *arg = (void __user *) __arg;
-	unsigned int compat_cmd = cmd;
 
-	switch (compat_cmd) {
+	switch (cmd) {
 	case MTRRIOC_ADD_ENTRY:
 	case MTRRIOC_SET_ENTRY:
 	case MTRRIOC_DEL_ENTRY:
@@ -178,20 +177,14 @@ mtrr_ioctl(struct file *file, unsigned int cmd, unsigned long __arg)
 			return -EFAULT;
 		break;
 #ifdef CONFIG_COMPAT
-#define MTRR_COMPAT_OP(op, type)\
-	case MTRRIOC32_##op:	\
-	cmd = MTRRIOC_##op;	\
-	goto compat_get_##type
-
-	MTRR_COMPAT_OP(ADD_ENTRY, sentry);
-	MTRR_COMPAT_OP(SET_ENTRY, sentry);
-	MTRR_COMPAT_OP(DEL_ENTRY, sentry);
-	MTRR_COMPAT_OP(KILL_ENTRY, sentry);
-	MTRR_COMPAT_OP(ADD_PAGE_ENTRY, sentry);
-	MTRR_COMPAT_OP(SET_PAGE_ENTRY, sentry);
-	MTRR_COMPAT_OP(DEL_PAGE_ENTRY, sentry);
-	MTRR_COMPAT_OP(KILL_PAGE_ENTRY, sentry);
-compat_get_sentry: {
+	case MTRRIOC32_ADD_ENTRY:
+	case MTRRIOC32_SET_ENTRY:
+	case MTRRIOC32_DEL_ENTRY:
+	case MTRRIOC32_KILL_ENTRY:
+	case MTRRIOC32_ADD_PAGE_ENTRY:
+	case MTRRIOC32_SET_PAGE_ENTRY:
+	case MTRRIOC32_DEL_PAGE_ENTRY:
+	case MTRRIOC32_KILL_PAGE_ENTRY: {
 		struct mtrr_sentry32 __user *s32 = (struct mtrr_sentry32 __user *)__arg;
 		err = get_user(sentry.base, &s32->base);
 		err |= get_user(sentry.size, &s32->size);
@@ -200,9 +193,8 @@ compat_get_sentry: {
 			return err;
 		break;
 	}
-	MTRR_COMPAT_OP(GET_ENTRY, gentry);
-	MTRR_COMPAT_OP(GET_PAGE_ENTRY, gentry);
-compat_get_gentry: {
+	case MTRRIOC32_GET_ENTRY:
+	case MTRRIOC32_GET_PAGE_ENTRY: {
 		struct mtrr_gentry32 __user *g32 = (struct mtrr_gentry32 __user *)__arg;
 		err = get_user(gentry.regnum, &g32->regnum);
 		err |= get_user(gentry.base, &g32->base);
@@ -212,7 +204,6 @@ compat_get_gentry: {
 			return err;
 		break;
 	}
-#undef MTRR_COMPAT_OP
 #endif
 	}
 
@@ -220,6 +211,9 @@ compat_get_gentry: {
 	default:
 		return -ENOTTY;
 	case MTRRIOC_ADD_ENTRY:
+#ifdef CONFIG_COMPAT
+	case MTRRIOC32_ADD_ENTRY:
+#endif
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
 		err =
@@ -227,21 +221,33 @@ compat_get_gentry: {
 				  file, 0);
 		break;
 	case MTRRIOC_SET_ENTRY:
+#ifdef CONFIG_COMPAT
+	case MTRRIOC32_SET_ENTRY:
+#endif
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
 		err = mtrr_add(sentry.base, sentry.size, sentry.type, 0);
 		break;
 	case MTRRIOC_DEL_ENTRY:
+#ifdef CONFIG_COMPAT
+	case MTRRIOC32_DEL_ENTRY:
+#endif
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
 		err = mtrr_file_del(sentry.base, sentry.size, file, 0);
 		break;
 	case MTRRIOC_KILL_ENTRY:
+#ifdef CONFIG_COMPAT
+	case MTRRIOC32_KILL_ENTRY:
+#endif
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
 		err = mtrr_del(-1, sentry.base, sentry.size);
 		break;
 	case MTRRIOC_GET_ENTRY:
+#ifdef CONFIG_COMPAT
+	case MTRRIOC32_GET_ENTRY:
+#endif
 		if (gentry.regnum >= num_var_ranges)
 			return -EINVAL;
 		mtrr_if->get(gentry.regnum, &gentry.base, &size, &type);
@@ -258,6 +264,9 @@ compat_get_gentry: {
 
 		break;
 	case MTRRIOC_ADD_PAGE_ENTRY:
+#ifdef CONFIG_COMPAT
+	case MTRRIOC32_ADD_PAGE_ENTRY:
+#endif
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
 		err =
@@ -265,21 +274,33 @@ compat_get_gentry: {
 				  file, 1);
 		break;
 	case MTRRIOC_SET_PAGE_ENTRY:
+#ifdef CONFIG_COMPAT
+	case MTRRIOC32_SET_PAGE_ENTRY:
+#endif
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
 		err = mtrr_add_page(sentry.base, sentry.size, sentry.type, 0);
 		break;
 	case MTRRIOC_DEL_PAGE_ENTRY:
+#ifdef CONFIG_COMPAT
+	case MTRRIOC32_DEL_PAGE_ENTRY:
+#endif
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
 		err = mtrr_file_del(sentry.base, sentry.size, file, 1);
 		break;
 	case MTRRIOC_KILL_PAGE_ENTRY:
+#ifdef CONFIG_COMPAT
+	case MTRRIOC32_KILL_PAGE_ENTRY:
+#endif
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
 		err = mtrr_del_page(-1, sentry.base, sentry.size);
 		break;
 	case MTRRIOC_GET_PAGE_ENTRY:
+#ifdef CONFIG_COMPAT
+	case MTRRIOC32_GET_PAGE_ENTRY:
+#endif
 		if (gentry.regnum >= num_var_ranges)
 			return -EINVAL;
 		mtrr_if->get(gentry.regnum, &gentry.base, &size, &type);
@@ -296,7 +317,7 @@ compat_get_gentry: {
 	if (err)
 		return err;
 
-	switch(compat_cmd) {
+	switch(cmd) {
 	case MTRRIOC_GET_ENTRY:
 	case MTRRIOC_GET_PAGE_ENTRY:
 		if (copy_to_user(arg, &gentry, sizeof gentry))
@@ -348,7 +369,7 @@ static int mtrr_open(struct inode *inode, struct file *file)
 	return single_open(file, mtrr_seq_show, NULL);
 }
 
-static struct file_operations mtrr_fops = {
+static const struct file_operations mtrr_fops = {
 	.owner   = THIS_MODULE,
 	.open	 = mtrr_open, 
 	.read    = seq_read,

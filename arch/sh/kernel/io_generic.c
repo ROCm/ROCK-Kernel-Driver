@@ -1,9 +1,8 @@
-/* $Id: io_generic.c,v 1.2 2003/05/04 19:29:53 lethal Exp $
- *
- * linux/arch/sh/kernel/io_generic.c
+/*
+ * arch/sh/kernel/io_generic.c
  *
  * Copyright (C) 2000  Niibe Yutaka
- * Copyright (C) 2005  Paul Mundt
+ * Copyright (C) 2005 - 2007 Paul Mundt
  *
  * Generic I/O routine. These can be used where a machine specific version
  * is not required.
@@ -13,7 +12,7 @@
  * for more details.
  */
 #include <linux/module.h>
-#include <asm/io.h>
+#include <linux/io.h>
 #include <asm/machvec.h>
 
 #ifdef CONFIG_CPU_SH3

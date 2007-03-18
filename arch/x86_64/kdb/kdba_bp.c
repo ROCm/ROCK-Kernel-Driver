@@ -412,7 +412,7 @@ kdba_bptype(kdbhard_bp_t *bph)
  * Remarks:
  */
 
-void
+static void
 kdba_printbpreg(kdbhard_bp_t *bph)
 {
 	kdb_printf(" in dr%ld", bph->bph_reg);

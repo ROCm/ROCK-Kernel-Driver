@@ -1132,7 +1132,7 @@ static struct clocksource clocksource_xen = {
 	.mask			= CLOCKSOURCE_MASK(64),
 	.mult			= 0, /* to be set */
 	.shift			= 22,
-	.is_continuous		= 1,
+	.flags			= CLOCK_SOURCE_IS_CONTINUOUS,
 };
 
 static int __init init_xen_clocksource(void)
@@ -1180,7 +1180,7 @@ static ctl_table xen_table[] = {
 };
 static int __init xen_sysctl_init(void)
 {
-	(void)register_sysctl_table(xen_table, 0);
+	(void)register_sysctl_table(xen_table);
 	return 0;
 }
 __initcall(xen_sysctl_init);

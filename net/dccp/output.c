@@ -87,7 +87,7 @@ static int dccp_transmit_skb(struct sock *sk, struct sk_buff *skb)
 			kfree_skb(skb);
 			return -EPROTO;
 		}
-		
+
 
 		/* Build DCCP header and checksum it. */
 		dh = dccp_zeroed_hdr(skb, dccp_header_size);
@@ -213,19 +213,6 @@ do_interrupted:
 	goto out;
 }
 
-static void dccp_write_xmit_timer(unsigned long data) {
-	struct sock *sk = (struct sock *)data;
-	struct dccp_sock *dp = dccp_sk(sk);
-
-	bh_lock_sock(sk);
-	if (sock_owned_by_user(sk))
-		sk_reset_timer(sk, &dp->dccps_xmit_timer, jiffies+1);
-	else
-		dccp_write_xmit(sk, 0);
-	bh_unlock_sock(sk);
-	sock_put(sk);
-}
-
 void dccp_write_xmit(struct sock *sk, int block)
 {
 	struct dccp_sock *dp = dccp_sk(sk);
@@ -269,7 +256,7 @@ void dccp_write_xmit(struct sock *sk, int block)
 					 err);
 		} else {
 			dccp_pr_debug("packet discarded\n");
-			kfree(skb);
+			kfree_skb(skb);
 		}
 	}
 }
@@ -415,7 +402,7 @@ static inline void dccp_connect_init(struct sock *sk)
 
 	sk->sk_err = 0;
 	sock_reset_flag(sk, SOCK_DONE);
-	
+
 	dccp_sync_mss(sk, dst_mtu(dst));
 
 	/*
@@ -434,9 +421,6 @@ static inline void dccp_connect_init(struct sock *sk)
 	dp->dccps_gar = dp->dccps_iss;
 
 	icsk->icsk_retransmits = 0;
-	init_timer(&dp->dccps_xmit_timer);
-	dp->dccps_xmit_timer.data = (unsigned long)sk;
-	dp->dccps_xmit_timer.function = dccp_write_xmit_timer;
 }
 
 int dccp_connect(struct sock *sk)

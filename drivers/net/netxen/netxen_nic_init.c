@@ -38,13 +38,15 @@
 #include "netxen_nic_phan_reg.h"
 
 struct crb_addr_pair {
-	long addr;
-	long data;
+	u32 addr;
+	u32 data;
 };
+
+unsigned long last_schedule_time;
 
 #define NETXEN_MAX_CRB_XFORM 60
 static unsigned int crb_addr_xform[NETXEN_MAX_CRB_XFORM];
-#define NETXEN_ADDR_ERROR ((unsigned long ) 0xffffffff )
+#define NETXEN_ADDR_ERROR (0xffffffff)
 
 #define crb_addr_transform(name) \
 	crb_addr_xform[NETXEN_HW_PX_MAP_CRB_##name] = \
@@ -110,6 +112,7 @@ static void crb_addr_transform_setup(void)
 	crb_addr_transform(CAM);
 	crb_addr_transform(C2C1);
 	crb_addr_transform(C2C0);
+	crb_addr_transform(SMB);
 }
 
 int netxen_init_firmware(struct netxen_adapter *adapter)
@@ -251,10 +254,10 @@ void netxen_initialize_adapter_ops(struct netxen_adapter *adapter)
  * netxen_decode_crb_addr(0 - utility to translate from internal Phantom CRB
  * address to external PCI CRB address.
  */
-unsigned long netxen_decode_crb_addr(unsigned long addr)
+u32 netxen_decode_crb_addr(u32 addr)
 {
 	int i;
-	unsigned long base_addr, offset, pci_base;
+	u32 base_addr, offset, pci_base;
 
 	crb_addr_transform_setup();
 
@@ -276,6 +279,7 @@ unsigned long netxen_decode_crb_addr(unsigned long addr)
 
 static long rom_max_timeout = 10000;
 static long rom_lock_timeout = 1000000;
+static long rom_write_timeout = 700;
 
 static inline int rom_lock(struct netxen_adapter *adapter)
 {
@@ -402,6 +406,11 @@ static inline int do_rom_fast_write(struct netxen_adapter *adapter, int addr,
 static inline int
 do_rom_fast_read(struct netxen_adapter *adapter, int addr, int *valp)
 {
+	if (jiffies > (last_schedule_time + (8 * HZ))) {
+		last_schedule_time = jiffies;
+		schedule();
+	}
+
 	netxen_nic_reg_write(adapter, NETXEN_ROMUSB_ROM_ADDRESS, addr);
 	netxen_nic_reg_write(adapter, NETXEN_ROMUSB_ROM_ABYTE_CNT, 3);
 	udelay(100);		/* prevent bursting on CRB */
@@ -418,6 +427,39 @@ do_rom_fast_read(struct netxen_adapter *adapter, int addr, int *valp)
 
 	*valp = netxen_nic_reg_read(adapter, NETXEN_ROMUSB_ROM_RDATA);
 	return 0;
+}
+
+static inline int 
+do_rom_fast_read_words(struct netxen_adapter *adapter, int addr,
+			u8 *bytes, size_t size)
+{
+	int addridx;
+	int ret = 0;
+
+	for (addridx = addr; addridx < (addr + size); addridx += 4) {
+		ret = do_rom_fast_read(adapter, addridx, (int *)bytes);
+		if (ret != 0)
+			break;
+		bytes += 4;
+	}
+
+	return ret;
+}
+
+int
+netxen_rom_fast_read_words(struct netxen_adapter *adapter, int addr, 
+				u8 *bytes, size_t size)
+{
+	int ret;
+
+	ret = rom_lock(adapter);
+	if (ret < 0)
+		return ret;
+
+	ret = do_rom_fast_read_words(adapter, addr, bytes, size);
+
+	netxen_rom_unlock(adapter);
+	return ret;
 }
 
 int netxen_rom_fast_read(struct netxen_adapter *adapter, int addr, int *valp)
@@ -443,6 +485,155 @@ int netxen_rom_fast_write(struct netxen_adapter *adapter, int addr, int data)
 	netxen_rom_unlock(adapter);
 	return ret;
 }
+
+static inline int do_rom_fast_write_words(struct netxen_adapter *adapter, 
+						int addr, u8 *bytes, size_t size)
+{
+	int addridx = addr;
+	int ret = 0;
+
+	while (addridx < (addr + size)) {
+		int last_attempt = 0;
+		int timeout = 0;
+		int data;
+
+		data = *(u32*)bytes;
+
+		ret = do_rom_fast_write(adapter, addridx, data);
+		if (ret < 0)
+			return ret;
+			
+		while(1) {
+			int data1;
+
+			ret = do_rom_fast_read(adapter, addridx, &data1);
+			if (ret < 0)
+				return ret;
+
+			if (data1 == data)
+				break;
+
+			if (timeout++ >= rom_write_timeout) {
+				if (last_attempt++ < 4) {
+					ret = do_rom_fast_write(adapter, 
+								addridx, data);
+					if (ret < 0)
+						return ret;
+				}
+				else {
+					printk(KERN_INFO "Data write did not "
+					   "succeed at address 0x%x\n", addridx);
+					break;
+				}
+			}
+		}
+
+		bytes += 4;
+		addridx += 4;
+	}
+
+	return ret;
+}
+
+int netxen_rom_fast_write_words(struct netxen_adapter *adapter, int addr, 
+					u8 *bytes, size_t size)
+{
+	int ret = 0;
+
+	ret = rom_lock(adapter);
+	if (ret < 0)
+		return ret;
+
+	ret = do_rom_fast_write_words(adapter, addr, bytes, size);
+	netxen_rom_unlock(adapter);
+
+	return ret;
+}
+
+int netxen_rom_wrsr(struct netxen_adapter *adapter, int data)
+{
+	int ret;
+
+	ret = netxen_rom_wren(adapter);
+	if (ret < 0)
+		return ret;
+
+	netxen_crb_writelit_adapter(adapter, NETXEN_ROMUSB_ROM_WDATA, data);
+	netxen_crb_writelit_adapter(adapter, 
+					NETXEN_ROMUSB_ROM_INSTR_OPCODE, 0x1);
+
+	ret = netxen_wait_rom_done(adapter);
+	if (ret < 0)
+		return ret;
+
+	return netxen_rom_wip_poll(adapter);
+}
+
+int netxen_rom_rdsr(struct netxen_adapter *adapter)
+{
+	int ret;
+
+	ret = rom_lock(adapter);
+	if (ret < 0)
+		return ret;
+
+	ret = netxen_do_rom_rdsr(adapter);
+	netxen_rom_unlock(adapter);
+	return ret;
+}
+
+int netxen_backup_crbinit(struct netxen_adapter *adapter)
+{
+	int ret = FLASH_SUCCESS;
+	int val;
+	char *buffer = kmalloc(FLASH_SECTOR_SIZE, GFP_KERNEL);
+
+	if (!buffer)
+		return -ENOMEM;	
+	/* unlock sector 63 */
+	val = netxen_rom_rdsr(adapter);
+	val = val & 0xe3;
+	ret = netxen_rom_wrsr(adapter, val);
+	if (ret != FLASH_SUCCESS)
+		goto out_kfree;
+
+	ret = netxen_rom_wip_poll(adapter);
+	if (ret != FLASH_SUCCESS)
+		goto out_kfree;
+
+	/* copy  sector 0 to sector 63 */
+	ret = netxen_rom_fast_read_words(adapter, CRBINIT_START, 
+						buffer, FLASH_SECTOR_SIZE);
+	if (ret != FLASH_SUCCESS)
+		goto out_kfree;
+
+	ret = netxen_rom_fast_write_words(adapter, FIXED_START, 
+						buffer, FLASH_SECTOR_SIZE);
+	if (ret != FLASH_SUCCESS)
+		goto out_kfree;
+
+	/* lock sector 63 */
+	val = netxen_rom_rdsr(adapter);
+	if (!(val & 0x8)) {
+		val |= (0x1 << 2);
+		/* lock sector 63 */
+		if (netxen_rom_wrsr(adapter, val) == 0) {
+			ret = netxen_rom_wip_poll(adapter);
+			if (ret != FLASH_SUCCESS)
+				goto out_kfree;
+
+			/* lock SR writes */
+			ret = netxen_rom_wip_poll(adapter);
+			if (ret != FLASH_SUCCESS)
+				goto out_kfree;
+		}
+	}
+
+out_kfree:
+	kfree(buffer);
+	return ret;
+}
+
 int netxen_do_rom_se(struct netxen_adapter *adapter, int addr)
 {
 	netxen_rom_wren(adapter);
@@ -457,6 +648,27 @@ int netxen_do_rom_se(struct netxen_adapter *adapter, int addr)
 	return netxen_rom_wip_poll(adapter);
 }
 
+void check_erased_flash(struct netxen_adapter *adapter, int addr)
+{
+	int i;
+	int val;
+	int count = 0, erased_errors = 0;
+	int range;
+
+	range = (addr == USER_START) ? FIXED_START : addr + FLASH_SECTOR_SIZE;
+	
+	for (i = addr; i < range; i += 4) {
+		netxen_rom_fast_read(adapter, i, &val);
+		if (val != 0xffffffff)
+			erased_errors++;
+		count++;
+	}
+
+	if (erased_errors)
+		printk(KERN_INFO "0x%x out of 0x%x words fail to be erased "
+			"for sector address: %x\n", erased_errors, count, addr);
+}
+
 int netxen_rom_se(struct netxen_adapter *adapter, int addr)
 {
 	int ret = 0;
@@ -465,6 +677,76 @@ int netxen_rom_se(struct netxen_adapter *adapter, int addr)
 	}
 	ret = netxen_do_rom_se(adapter, addr);
 	netxen_rom_unlock(adapter);
+	msleep(30);
+	check_erased_flash(adapter, addr);
+
+	return ret;
+}
+
+int
+netxen_flash_erase_sections(struct netxen_adapter *adapter, int start, int end)
+{
+	int ret = FLASH_SUCCESS;
+	int i;
+
+	for (i = start; i < end; i++) {
+		ret = netxen_rom_se(adapter, i * FLASH_SECTOR_SIZE);
+		if (ret)
+			break;
+		ret = netxen_rom_wip_poll(adapter);
+		if (ret < 0)
+			return ret;
+	}
+
+	return ret;
+}
+
+int
+netxen_flash_erase_secondary(struct netxen_adapter *adapter)
+{
+	int ret = FLASH_SUCCESS;
+	int start, end;
+
+	start = SECONDARY_START / FLASH_SECTOR_SIZE;
+	end   = USER_START / FLASH_SECTOR_SIZE;
+	ret = netxen_flash_erase_sections(adapter, start, end);
+
+	return ret;
+}
+
+int
+netxen_flash_erase_primary(struct netxen_adapter *adapter)
+{
+	int ret = FLASH_SUCCESS;
+	int start, end;
+
+	start = PRIMARY_START / FLASH_SECTOR_SIZE;
+	end   = SECONDARY_START / FLASH_SECTOR_SIZE;
+	ret = netxen_flash_erase_sections(adapter, start, end);
+
+	return ret;
+}
+
+void netxen_halt_pegs(struct netxen_adapter *adapter)
+{
+	 netxen_crb_writelit_adapter(adapter, NETXEN_CRB_PEG_NET_0 + 0x3c, 1);
+	 netxen_crb_writelit_adapter(adapter, NETXEN_CRB_PEG_NET_1 + 0x3c, 1);
+	 netxen_crb_writelit_adapter(adapter, NETXEN_CRB_PEG_NET_2 + 0x3c, 1);
+	 netxen_crb_writelit_adapter(adapter, NETXEN_CRB_PEG_NET_3 + 0x3c, 1);
+}
+
+int netxen_flash_unlock(struct netxen_adapter *adapter)
+{
+	int ret = 0;
+
+	ret = netxen_rom_wrsr(adapter, 0);
+	if (ret < 0)
+		return ret;
+
+	ret = netxen_rom_wren(adapter);
+	if (ret < 0)
+		return ret;
+
 	return ret;
 }
 
@@ -481,7 +763,7 @@ int netxen_pinit_from_rom(struct netxen_adapter *adapter, int verbose)
 	int n, i;
 	int init_delay = 0;
 	struct crb_addr_pair *buf;
-	unsigned long off;
+	u32 off;
 
 	/* resetall */
 	status = netxen_nic_get_board_info(adapter);
@@ -538,14 +820,17 @@ int netxen_pinit_from_rom(struct netxen_adapter *adapter, int verbose)
 			if (verbose)
 				printk("%s: PCI:     0x%08x == 0x%08x\n",
 				       netxen_nic_driver_name, (unsigned int)
-				       netxen_decode_crb_addr((unsigned long)
-							      addr), val);
+				       netxen_decode_crb_addr(addr), val);
 		}
 		for (i = 0; i < n; i++) {
 
-			off =
-			    netxen_decode_crb_addr((unsigned long)buf[i].addr) +
-			    NETXEN_PCI_CRBSPACE;
+			off = netxen_decode_crb_addr(buf[i].addr);
+			if (off == NETXEN_ADDR_ERROR) {
+				printk(KERN_ERR"CRB init value out of range %x\n",
+					buf[i].addr);
+				continue;
+			}
+			off += NETXEN_PCI_CRBSPACE;
 			/* skipping cold reboot MAGIC */
 			if (off == NETXEN_CAM_RAM(0x1fc))
 				continue;
@@ -648,6 +933,10 @@ int netxen_initialize_adapter_offload(struct netxen_adapter *adapter)
 void netxen_free_adapter_offload(struct netxen_adapter *adapter)
 {
 	if (adapter->dummy_dma.addr) {
+		writel(0, NETXEN_CRB_NORMALIZE(adapter,
+			CRB_HOST_DUMMY_BUF_ADDR_HI));
+		writel(0, NETXEN_CRB_NORMALIZE(adapter,
+			CRB_HOST_DUMMY_BUF_ADDR_LO));
 		pci_free_consistent(adapter->ahw.pdev,
 				    NETXEN_HOST_DUMMY_DMA_SIZE,
 				    adapter->dummy_dma.addr,
@@ -662,6 +951,7 @@ void netxen_phantom_init(struct netxen_adapter *adapter, int pegtune_val)
 	int loops = 0;
 
 	if (!pegtune_val) {
+		val = readl(NETXEN_CRB_NORMALIZE(adapter, CRB_CMDPEG_STATE));
 		while (val != PHAN_INITIALIZE_COMPLETE && loops < 200000) {
 			udelay(100);
 			schedule();
@@ -977,7 +1267,7 @@ int netxen_process_cmd_ring(unsigned long data)
 	 * the netdev which is associated with that device.
 	 */
 
-	consumer = *(adapter->cmd_consumer);
+	consumer = le32_to_cpu(*(adapter->cmd_consumer));
 	if (last_consumer == consumer) {	/* Ring is empty    */
 		DPRINTK(INFO, "last_consumer %d == consumer %d\n",
 			last_consumer, consumer);
@@ -1071,7 +1361,7 @@ int netxen_process_cmd_ring(unsigned long data)
 	if (adapter->last_cmd_consumer == consumer &&
 	    (((adapter->cmd_producer + 1) %
 	      adapter->max_tx_desc_count) == adapter->last_cmd_consumer)) {
-		consumer = *(adapter->cmd_consumer);
+		consumer = le32_to_cpu(*(adapter->cmd_consumer));
 	}
 	done = (adapter->last_cmd_consumer == consumer);
 

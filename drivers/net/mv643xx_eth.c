@@ -147,13 +147,13 @@ static void mv643xx_eth_rx_refill_descs(struct net_device *dev)
 	int unaligned;
 
 	while (mp->rx_desc_count < mp->rx_ring_size) {
-		skb = dev_alloc_skb(ETH_RX_SKB_SIZE + ETH_DMA_ALIGN);
+		skb = dev_alloc_skb(ETH_RX_SKB_SIZE + dma_get_cache_alignment());
 		if (!skb)
 			break;
 		mp->rx_desc_count++;
-		unaligned = (u32)skb->data & (ETH_DMA_ALIGN - 1);
+		unaligned = (u32)skb->data & (dma_get_cache_alignment() - 1);
 		if (unaligned)
-			skb_reserve(skb, ETH_DMA_ALIGN - unaligned);
+			skb_reserve(skb, dma_get_cache_alignment() - unaligned);
 		pkt_info.cmd_sts = ETH_RX_ENABLE_INTERRUPT;
 		pkt_info.byte_cnt = ETH_RX_SKB_SIZE;
 		pkt_info.buf_ptr = dma_map_single(NULL, skb->data,
@@ -787,6 +787,12 @@ static int mv643xx_eth_open(struct net_device *dev)
 	unsigned int size;
 	int err;
 
+	/* Clear any pending ethernet port interrupts */
+	mv_write(MV643XX_ETH_INTERRUPT_CAUSE_REG(port_num), 0);
+	mv_write(MV643XX_ETH_INTERRUPT_CAUSE_EXTEND_REG(port_num), 0);
+	/* wait for previous write to complete */
+	mv_read (MV643XX_ETH_INTERRUPT_CAUSE_EXTEND_REG(port_num));
+
 	err = request_irq(dev->irq, mv643xx_eth_int_handler,
 			IRQF_SHARED | IRQF_SAMPLE_RANDOM, dev->name, dev);
 	if (err) {
@@ -874,10 +880,6 @@ static int mv643xx_eth_open(struct net_device *dev)
 	ether_init_rx_desc_ring(mp);
 
 	mv643xx_eth_rx_refill_descs(dev);	/* Fill RX ring with skb's */
-
-	/* Clear any pending ethernet port interrupts */
-	mv_write(MV643XX_ETH_INTERRUPT_CAUSE_REG(port_num), 0);
-	mv_write(MV643XX_ETH_INTERRUPT_CAUSE_EXTEND_REG(port_num), 0);
 
 	eth_port_start(dev);
 
@@ -1309,7 +1311,7 @@ static void mv643xx_init_ethtool_cmd(struct net_device *dev, int phy_address,
 static int mv643xx_eth_probe(struct platform_device *pdev)
 {
 	struct mv643xx_eth_platform_data *pd;
-	int port_num = pdev->id;
+	int port_num;
 	struct mv643xx_private *mp;
 	struct net_device *dev;
 	u8 *p;
@@ -1318,6 +1320,12 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
 	struct ethtool_cmd cmd;
 	int duplex = DUPLEX_HALF;
 	int speed = 0;			/* default to auto-negotiation */
+
+	pd = pdev->dev.platform_data;
+	if (pd == NULL) {
+		printk(KERN_ERR "No mv643xx_eth_platform_data\n");
+		return -ENODEV;
+	}
 
 	dev = alloc_etherdev(sizeof(struct mv643xx_private));
 	if (!dev)
@@ -1330,8 +1338,6 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
 	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
 	BUG_ON(!res);
 	dev->irq = res->start;
-
-	mp->port_num = port_num;
 
 	dev->open = mv643xx_eth_open;
 	dev->stop = mv643xx_eth_stop;
@@ -1373,38 +1379,39 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
 
 	spin_lock_init(&mp->lock);
 
+	port_num = pd->port_number;
+
 	/* set default config values */
 	eth_port_uc_addr_get(dev, dev->dev_addr);
 	mp->rx_ring_size = MV643XX_ETH_PORT_DEFAULT_RECEIVE_QUEUE_SIZE;
 	mp->tx_ring_size = MV643XX_ETH_PORT_DEFAULT_TRANSMIT_QUEUE_SIZE;
 
-	pd = pdev->dev.platform_data;
-	if (pd) {
-		if (pd->mac_addr)
-			memcpy(dev->dev_addr, pd->mac_addr, 6);
+	if (is_valid_ether_addr(pd->mac_addr))
+		memcpy(dev->dev_addr, pd->mac_addr, 6);
 
-		if (pd->phy_addr || pd->force_phy_addr)
-			ethernet_phy_set(port_num, pd->phy_addr);
+	if (pd->phy_addr || pd->force_phy_addr)
+		ethernet_phy_set(port_num, pd->phy_addr);
 
-		if (pd->rx_queue_size)
-			mp->rx_ring_size = pd->rx_queue_size;
+	if (pd->rx_queue_size)
+		mp->rx_ring_size = pd->rx_queue_size;
 
-		if (pd->tx_queue_size)
-			mp->tx_ring_size = pd->tx_queue_size;
+	if (pd->tx_queue_size)
+		mp->tx_ring_size = pd->tx_queue_size;
 
-		if (pd->tx_sram_size) {
-			mp->tx_sram_size = pd->tx_sram_size;
-			mp->tx_sram_addr = pd->tx_sram_addr;
-		}
-
-		if (pd->rx_sram_size) {
-			mp->rx_sram_size = pd->rx_sram_size;
-			mp->rx_sram_addr = pd->rx_sram_addr;
-		}
-
-		duplex = pd->duplex;
-		speed = pd->speed;
+	if (pd->tx_sram_size) {
+		mp->tx_sram_size = pd->tx_sram_size;
+		mp->tx_sram_addr = pd->tx_sram_addr;
 	}
+
+	if (pd->rx_sram_size) {
+		mp->rx_sram_size = pd->rx_sram_size;
+		mp->rx_sram_addr = pd->rx_sram_addr;
+	}
+
+	duplex = pd->duplex;
+	speed = pd->speed;
+
+	mp->port_num = port_num;
 
 	/* Hook up MII support for ethtool */
 	mp->mii.dev = dev;
@@ -2780,7 +2787,6 @@ static const struct ethtool_ops mv643xx_ethtool_ops = {
 	.get_link               = mv643xx_eth_get_link,
 	.get_sg			= ethtool_op_get_sg,
 	.set_sg			= ethtool_op_set_sg,
-	.get_strings            = mv643xx_get_strings,
 	.get_stats_count        = mv643xx_get_stats_count,
 	.get_ethtool_stats      = mv643xx_get_ethtool_stats,
 	.get_strings            = mv643xx_get_strings,

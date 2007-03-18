@@ -34,7 +34,6 @@
 // #define	VERBOSE			// more; success messages
 
 #include <linux/module.h>
-#include <linux/sched.h>
 #include <linux/init.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
@@ -148,7 +147,7 @@ int usbnet_get_endpoints(struct usbnet *dev, struct usb_interface *intf)
 		if (tmp < 0)
 			return tmp;
 	}
-	
+
 	dev->in = usb_rcvbulkpipe (dev->udev,
 			in->desc.bEndpointAddress & USB_ENDPOINT_NUMBER_MASK);
 	dev->out = usb_sndbulkpipe (dev->udev,
@@ -328,7 +327,7 @@ static void rx_submit (struct usbnet *dev, struct urb *urb, gfp_t flags)
 	if (netif_running (dev->net)
 			&& netif_device_present (dev->net)
 			&& !test_bit (EVENT_RX_HALT, &dev->flags)) {
-		switch (retval = usb_submit_urb (urb, GFP_ATOMIC)){ 
+		switch (retval = usb_submit_urb (urb, GFP_ATOMIC)){
 		case -EPIPE:
 			usbnet_defer_kevent (dev, EVENT_RX_HALT);
 			break;
@@ -444,7 +443,7 @@ block:
 	    case -EOVERFLOW:
 		dev->stats.rx_over_errors++;
 		// FALLTHROUGH
-	    
+
 	    default:
 		entry->state = rx_cleanup;
 		dev->stats.rx_errors++;
@@ -561,7 +560,7 @@ static int usbnet_stop (struct net_device *net)
 
 	if (netif_msg_ifdown (dev))
 		devinfo (dev, "stop stats: rx/tx %ld/%ld, errs %ld/%ld",
-			dev->stats.rx_packets, dev->stats.tx_packets, 
+			dev->stats.rx_packets, dev->stats.tx_packets,
 			dev->stats.rx_errors, dev->stats.tx_errors
 			);
 
@@ -579,7 +578,7 @@ static int usbnet_stop (struct net_device *net)
 			devdbg (dev, "waited for %d urb completions", temp);
 	}
 	dev->wait = NULL;
-	remove_wait_queue (&unlink_wakeup, &wait); 
+	remove_wait_queue (&unlink_wakeup, &wait);
 
 	usb_kill_urb(dev->interrupt);
 
@@ -835,7 +834,7 @@ kevent (struct work_struct *work)
 	}
 
 	if (test_bit (EVENT_LINK_RESET, &dev->flags)) {
-		struct driver_info 	*info = dev->driver_info;
+		struct driver_info	*info = dev->driver_info;
 		int			retval = 0;
 
 		clear_bit (EVENT_LINK_RESET, &dev->flags);
@@ -1067,7 +1066,7 @@ static void usbnet_bh (unsigned long param)
  * USB Device Driver support
  *
  *-------------------------------------------------------------------------*/
- 
+
 // precondition: never called in_interrupt
 
 void usbnet_disconnect (struct usb_interface *intf)
@@ -1088,7 +1087,7 @@ void usbnet_disconnect (struct usb_interface *intf)
 			intf->dev.driver->name,
 			xdev->bus->bus_name, xdev->devpath,
 			dev->driver_info->description);
-	
+
 	net = dev->net;
 	unregister_netdev (net);
 
@@ -1112,7 +1111,7 @@ int
 usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 {
 	struct usbnet			*dev;
-	struct net_device 		*net;
+	struct net_device		*net;
 	struct usb_host_interface	*interface;
 	struct driver_info		*info;
 	struct usb_device		*xdev;
@@ -1259,7 +1258,7 @@ EXPORT_SYMBOL_GPL(usbnet_probe);
 int usbnet_suspend (struct usb_interface *intf, pm_message_t message)
 {
 	struct usbnet		*dev = usb_get_intfdata(intf);
-	
+
 	/* accelerate emptying of the rx and queues, to avoid
 	 * having everything error out.
 	 */
@@ -1290,7 +1289,7 @@ static int __init usbnet_init(void)
 			< sizeof (struct skb_data));
 
 	random_ether_addr(node_id);
- 	return 0;
+	return 0;
 }
 module_init(usbnet_init);
 

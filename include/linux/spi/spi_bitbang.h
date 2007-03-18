@@ -25,7 +25,6 @@ struct spi_bitbang {
 	spinlock_t		lock;
 	struct list_head	queue;
 	u8			busy;
-	u8			shutdown;
 	u8			use_dma;
 
 	struct spi_master	*master;
@@ -55,7 +54,7 @@ struct spi_bitbang {
  * methods, if you like.
  */
 extern int spi_bitbang_setup(struct spi_device *spi);
-extern void spi_bitbang_cleanup(const struct spi_device *spi);
+extern void spi_bitbang_cleanup(struct spi_device *spi);
 extern int spi_bitbang_transfer(struct spi_device *spi, struct spi_message *m);
 extern int spi_bitbang_setup_transfer(struct spi_device *spi,
 				      struct spi_transfer *t);

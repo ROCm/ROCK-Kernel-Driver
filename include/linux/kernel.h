@@ -92,11 +92,6 @@ extern int cond_resched(void);
 		(__x < 0) ? -__x : __x;		\
 	})
 
-#define labs(x) ({				\
-		long __x = (x);			\
-		(__x < 0) ? -__x : __x;		\
-	})
-
 extern struct atomic_notifier_head panic_notifier_list;
 extern long (*panic_blink)(long time);
 NORET_TYPE void panic(const char * fmt, ...)
@@ -139,7 +134,8 @@ extern unsigned long long memparse(char *ptr, char **retptr);
 extern int core_kernel_text(unsigned long addr);
 extern int __kernel_text_address(unsigned long addr);
 extern int kernel_text_address(unsigned long addr);
-extern int session_of_pgrp(int pgrp);
+struct pid;
+extern struct pid *session_of_pgrp(struct pid *pgrp);
 
 extern void dump_thread(struct pt_regs *regs, struct user *dump);
 
@@ -176,6 +172,7 @@ static inline void console_verbose(void)
 }
 
 extern void bust_spinlocks(int yes);
+extern void wake_up_klogd(void);
 extern int oops_in_progress;		/* If set, an oops, panic(), BUG() or die() is in progress */
 extern int panic_timeout;
 extern int panic_on_oops;
@@ -201,8 +198,9 @@ extern enum system_states {
 #define TAINT_FORCED_RMMOD		(1<<3)
 #define TAINT_MACHINE_CHECK		(1<<4)
 #define TAINT_BAD_PAGE			(1<<5)
-#define TAINT_NO_SUPPORT		(1<<6)
-#define TAINT_EXTERNAL_SUPPORT		(1<<7)
+#define TAINT_USER			(1<<6)
+#define TAINT_NO_SUPPORT		(1<<7)
+#define TAINT_EXTERNAL_SUPPORT		(1<<8)
 
 extern void dump_stack(void);
 
@@ -314,6 +312,9 @@ static inline int __attribute__ ((format (printf, 1, 2))) pr_debug(const char * 
 ({	typeof(type) __tmp = function; \
 	(void)__tmp; \
 })
+
+struct sysinfo;
+extern int do_sysinfo(struct sysinfo *info);
 
 #endif /* __KERNEL__ */
 

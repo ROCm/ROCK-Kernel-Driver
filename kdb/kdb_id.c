@@ -52,6 +52,9 @@ kdb_id(int argc, const char **argv)
 	char lastbuf[50];
 	unsigned long word;
 
+	kdb_di.fprintf_func = kdb_dis_fprintf;
+	kdba_id_init(&kdb_di);
+
 	if (argc != 1)  {
 		if (lastpc == 0) {
 			return KDB_ARGCOUNT;
@@ -119,6 +122,9 @@ kdb_id1(unsigned long pc)
 {
 	char *mode;
 	int diag;
+
+	kdb_di.fprintf_func = kdb_dis_fprintf;
+	kdba_id_init(&kdb_di);
 
 	/*
 	 * Allow the user to specify that this instruction
@@ -227,7 +233,4 @@ kdb_id_init(void)
 	kdb_di.insn_type	= 0;
 	kdb_di.target		= 0;
 	kdb_di.target2		= 0;
-	kdb_di.fprintf_func	= kdb_dis_fprintf;
-
-	kdba_id_init(&kdb_di);
 }
