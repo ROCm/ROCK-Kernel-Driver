@@ -74,10 +74,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 * Driver also support big endian architecture.
 */
 
-/* TODO
-*
-* See TODO file in this package
-*/
+/* Enable this to have a lot of debug printouts */
+#define DEBUG
+
 
 #include <linux/module.h>
 #include <linux/pci.h>
@@ -92,15 +91,15 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <linux/kfifo.h>
 #include <asm/uaccess.h>
 
+#include <linux/delay.h>
+
+
 #define VERSION_STRING DRIVER_DESC " 2.1 (build date: " __DATE__ " " __TIME__ ")"
 
 /*    Macros definitions */
 
-/* Enable this to have a lot of debug printouts */
-/* #define NOZOMI_DEBUG */
-
 /* Default debug printout level */
-#define NOZOMI_DEBUG_LEVEL 0x1
+#define NOZOMI_DEBUG_LEVEL 0x00
 
 #define P_BUF_SIZE 128
 #define NFO( _err_flag_, args...)					\
@@ -111,8 +110,6 @@ do {									\
 		__FUNCTION__, t_m_p_);					\
 } while(0)
 
-#define ERR(args...)  NFO( KERN_ERR, ##args)
-
 #define D1(args...) D_(0x01, ##args)
 #define D2(args...) D_(0x02, ##args)
 #define D3(args...) D_(0x04, ##args)
@@ -122,18 +119,18 @@ do {									\
 #define D7(args...) D_(0x40, ##args)
 #define D8(args...) D_(0x80, ##args)
 
-#ifdef NOZOMI_DEBUG
+#ifdef DEBUG
 #define D_(lvl, args...) D(lvl, ##args)
   /* Do we need this settable at runtime? */
-static int nzdebug = NOZOMI_DEBUG_LEVEL;
+static int debug = NOZOMI_DEBUG_LEVEL;
 
-#define D(lvl, args...)  do{if(lvl & nzdebug) NFO(KERN_DEBUG, ##args );}while(0)
+#define D(lvl, args...)  do{if(lvl & debug) NFO(KERN_DEBUG, ##args );}while(0)
 #define D_(lvl, args...) D(lvl, ##args)
 
 /* These printouts are always printed */
 
 #else
-static const int nzdebug = 0;
+static int debug = 0;
 #define D_(lvl, args...)
 #endif
 
@@ -161,13 +158,11 @@ static const int nzdebug = 0;
 
 #define GET_MEM(value__, addr__, length__) \
   do {  \
-/*    read_mem32( (u32*) (value__), (u32) (addr__), (length__)); */\
     read_mem32( (u32*) (value__), (addr__), (length__));\
 } while(0)
 
 #define GET_MEM_BUF(value__, addr__, length__) \
   do {  \
-/*    read_mem32_buf( (u32*) (value__), (u32) (addr__), (length__)); */\
     read_mem32_buf( (u32*) (value__), (addr__), (length__));\
 } while(0)
 
@@ -296,22 +291,22 @@ enum port_type {
 #ifdef __ARMEB__
 /* Big endian */
 
-typedef struct {
+struct toggles {
 	unsigned enabled:5;	/* Toggle fields are valid if enabled is 0, else A-channels
 				   must always be used. */
 	unsigned diag_dl:1;
 	unsigned mdm_dl:1;
 	unsigned mdm_ul:1;
-} __attribute__ ((packed)) toggles_t;
+} __attribute__ ((packed));
 
 /* Configuration table to read at startup of card */
 /* Is for now only needed during initialization phase */
-typedef struct {
+struct config_table {
 	u32 signature;
 	u16 product_information;
 	u16 version;
 	u8 pad3[3];
-	toggles_t toggle;
+	struct toggles toggle;
 	u8 pad1[4];
 	u16 dl_mdm_len1;	/* If this is 64, it can hold 60 bytes + 4 that is length field */
 	u16 dl_start;
@@ -331,44 +326,44 @@ typedef struct {
 	u16 ul_app1_len;
 	u16 ul_app2_len;
 	u16 ul_ctrl_len;
-} __attribute__ ((packed)) config_table_t;
+} __attribute__ ((packed));
 
 /* This stores all control downlink flags */
-typedef struct {
+struct ctrl_dl {
 	u8 port;
 	unsigned reserved:4;
 	unsigned CTS:1;
 	unsigned RI:1;
 	unsigned DCD:1;
 	unsigned DSR:1;
-} __attribute__ ((packed)) ctrl_dl_t;
+} __attribute__ ((packed));
 
 /* This stores all control uplink flags */
-typedef struct {
+struct ctrl_ul {
 	u8 port;
 	unsigned reserved:6;
 	unsigned RTS:1;
 	unsigned DTR:1;
-} __attribute__ ((packed)) ctrl_ul_t;
+} __attribute__ ((packed));
 
 #else
 /* Little endian */
 
 /* This represents the toggle information */
-typedef struct {
+struct toggles {
 	unsigned mdm_ul:1;
 	unsigned mdm_dl:1;
 	unsigned diag_dl:1;
 	unsigned enabled:5;	/* Toggle fields are valid if enabled is 0, else A-channels
 				   must always be used. */
-} __attribute__ ((packed)) toggles_t;
+} __attribute__ ((packed));
 
 /* Configuration table to read at startup of card */
-typedef struct {
+struct config_table {
 	u32 signature;
 	u16 version;
 	u16 product_information;
-	toggles_t toggle;
+	struct toggles toggle;
 	u8 pad1[7];
 	u16 dl_start;
 	u16 dl_mdm_len1;	/* If this is 64, it can hold 60 bytes + 4 that is length field */
@@ -386,32 +381,32 @@ typedef struct {
 	u16 ul_app1_len;
 	u16 ul_app2_len;
 	u16 ul_ctrl_len;
-} __attribute__ ((packed)) config_table_t;
+} __attribute__ ((packed));
 
 /* This stores all control downlink flags */
-typedef struct {
+struct ctrl_dl {
 	unsigned DSR:1;
 	unsigned DCD:1;
 	unsigned RI:1;
 	unsigned CTS:1;
 	unsigned reserverd:4;
 	u8 port;
-} __attribute__ ((packed)) ctrl_dl_t;
+} __attribute__ ((packed));
 
 /* This stores all control uplink flags */
-typedef struct {
+struct ctrl_ul {
 	unsigned DTR:1;
 	unsigned RTS:1;
 	unsigned reserved:6;
 	u8 port;
-} __attribute__ ((packed)) ctrl_ul_t;
+} __attribute__ ((packed));
 #endif
 
 /* This holds all information that is needed regarding a port */
 struct port {
 	u8 update_flow_control;
-	ctrl_ul_t ctrl_ul;
-	ctrl_dl_t ctrl_dl;
+	struct ctrl_ul ctrl_ul;
+	struct ctrl_dl ctrl_dl;
 	struct kfifo *fifo_ul;
 //    u32                                dl_addr[2];
 	void __iomem *dl_addr[2];
@@ -435,7 +430,7 @@ struct port {
 };
 
 /* Private data one for each card in the system */
-typedef struct {
+struct nozomi {
 	void __iomem *base_addr;
 	u8 closing;
 
@@ -446,7 +441,7 @@ typedef struct {
 
 	u16 ier_last_written;
 	enum card_type card_type;
-	config_table_t config_table;	/* Configuration table */
+	struct config_table config_table;	/* Configuration table */
 	struct pci_dev *pdev;
 	struct port port[NOZOMI_MAX_PORTS];
 	u8 *send_buf;
@@ -461,7 +456,7 @@ typedef struct {
 	spinlock_t spin_mutex;
 
 	u32 open_ttys;
-} dc_t;
+};
 
 /* This is a data packet that is read or written to/from card */
 struct buffer {
@@ -470,7 +465,7 @@ struct buffer {
 } __attribute__ ((packed));
 
 /*    Function declarations */
-static int ntty_tty_init(dc_t * dc);
+static int ntty_tty_init(struct nozomi * dc);
 
 /*    Global variables */
 static struct pci_device_id nozomi_pci_tbl[] = {
@@ -481,36 +476,26 @@ static struct pci_device_id nozomi_pci_tbl[] = {
 MODULE_DEVICE_TABLE(pci, nozomi_pci_tbl);
 
 /* Used to store interrupt variables */
-typedef struct {
+struct irq {
 	u16 read_iir;		/* Holds current interrupt tokens */
-} irq_t;
+};
 
 /* Representing the pci device of interest */
 static int cards_found;
-static dc_t *my_dev = NULL;
-static irq_t my_irq;
+static struct nozomi *my_dev = NULL;
+static struct irq my_irq;
 
-static inline dc_t *get_dc_by_pdev(struct pci_dev *pdev)
+static struct nozomi *get_dc_by_index(s32 index)
 {
 	return my_dev;
 }
 
-static inline dc_t *get_dc_by_index(s32 index)
+static struct port *get_port_by_tty(struct tty_struct *tty)
 {
-	return my_dev;
+	return &my_dev->port[tty->index];
 }
 
-static inline s32 get_index(struct tty_struct *tty)
-{
-	return tty->index;
-}
-
-static inline struct port *get_port_by_tty(struct tty_struct *tty)
-{
-	return &my_dev->port[get_index(tty)];
-}
-
-static inline dc_t *get_dc_by_tty(struct tty_struct *tty)
+static struct nozomi *get_dc_by_tty(struct tty_struct *tty)
 {
 	return my_dev;
 }
@@ -524,6 +509,9 @@ static void read_mem32(u32 * buf, void __iomem * mem_addr_start, u32 size_bytes)
 	u32 i = 0;
 	u32 *ptr = (__force u32 *) mem_addr_start;
 	u16 *buf16;
+
+	if (!ptr || !buf)
+		return;
 
 	/* 2 bytes */
 	if (size_bytes == 2) {
@@ -559,6 +547,9 @@ static void read_mem32_buf(u32 * buf, void __iomem * mem_addr_start,
 	u32 i = 0;
 	u32 *ptr = (u32 *) mem_addr_start;
 	u16 *buf16;
+
+	if (!ptr || !buf)
+		return;
 
 	/* 2 bytes */
 	if (size_bytes == 2) {
@@ -596,6 +587,9 @@ static u32 write_mem32(void __iomem * mem_addr_start, u32 * buf, u32 size_bytes)
 	u32 *ptr = (__force u32 *) mem_addr_start;
 	u16 *buf16;
 
+	if (!ptr || !buf)
+		return 0;
+
 	/* 2 bytes */
 	if (size_bytes == 2) {
 		buf16 = (u16 *) buf;
@@ -631,6 +625,9 @@ static u32 write_mem32_buf(void __iomem * mem_addr_start, u32 * buf,
 	u32 *ptr = (u32 *) mem_addr_start;
 	u16 *buf16;
 
+	if (!ptr || !buf)
+		return 0;
+
 	/* 2 bytes */
 	if (size_bytes == 2) {
 		buf16 = (u16 *) buf;
@@ -659,7 +656,7 @@ static u32 write_mem32_buf(void __iomem * mem_addr_start, u32 * buf,
 }
 
 /* Setup pointers to different channels and also setup buffer sizes. */
-static void setup_memory(dc_t * dc)
+static void setup_memory(struct nozomi *dc)
 {
 	void __iomem *offset = dc->base_addr + dc->config_table.dl_start;
 	/* The length reported is including the length field of 4 bytes, hence subtract with 4. */
@@ -715,8 +712,8 @@ static void setup_memory(dc_t * dc)
 }
 
 /* Dump config table under initalization phase */
-#ifdef NOZOMI_DEBUG
-static void dump_table(dc_t * dc)
+#ifdef DEBUG
+static void dump_table(struct nozomi * dc)
 {
 	D3("signature: 0x%08X", dc->config_table.signature);
 	D3("version: 0x%04X", dc->config_table.version);
@@ -756,14 +753,15 @@ static void dump_table(dc_t * dc)
 	D3("ul_ctrl_len: 0x%04X, %d", dc->config_table.ul_ctrl_len,
 	   dc->config_table.ul_ctrl_len);
 }
+#else
+static __inline__ void dump_table(struct nozomi * dc) { }
 #endif
 
 /* Read configuration table from card under intalization phase */
 /* Returns 1 if ok, else 0 */
-static int nozomi_read_config_table(dc_t * dc)
+static int nozomi_read_config_table(struct nozomi * dc)
 {
-
-	GET_MEM(&dc->config_table, dc->base_addr + 0, sizeof(config_table_t));
+	GET_MEM(&dc->config_table, dc->base_addr + 0, sizeof(struct config_table));
 
 	/* D1( "0x%08X == 0x%08X ", dc->config_table.signature, CONFIG_MAGIC); */
 
@@ -787,14 +785,13 @@ static int nozomi_read_config_table(dc_t * dc)
 		   dc->port[PORT_MDM].toggle_ul,
 		   dc->port[PORT_MDM].toggle_dl, dc->port[PORT_DIAG].toggle_dl);
 
-#ifdef NOZOMI_DEBUG
 		dump_table(dc);
-#endif
+
 		for (i = PORT_MDM; i < MAX_PORT; i++) {
 			dc->port[i].fifo_ul =
 			    kfifo_alloc(FIFO_BUFFER_SIZE_UL, GFP_ATOMIC, NULL);
-			memset(&dc->port[i].ctrl_dl, 0, sizeof(ctrl_dl_t));
-			memset(&dc->port[i].ctrl_ul, 0, sizeof(ctrl_ul_t));
+			memset(&dc->port[i].ctrl_dl, 0, sizeof(struct ctrl_dl));
+			memset(&dc->port[i].ctrl_ul, 0, sizeof(struct ctrl_ul));
 		}
 
 		/* Enable control channel */
@@ -830,7 +827,7 @@ static int nozomi_read_config_table(dc_t * dc)
 }
 
 /* Enable uplink interrupts  */
-static void enable_transmit_ul(enum port_type port, dc_t * dc)
+static void enable_transmit_ul(enum port_type port, struct nozomi * dc)
 {
 
 	switch (port) {
@@ -856,7 +853,7 @@ static void enable_transmit_ul(enum port_type port, dc_t * dc)
 }
 
 /* Disable uplink interrupts  */
-static void disable_transmit_ul(enum port_type port, dc_t * dc)
+static void disable_transmit_ul(enum port_type port, struct nozomi * dc)
 {
 	switch (port) {
 	case PORT_MDM:
@@ -881,7 +878,7 @@ static void disable_transmit_ul(enum port_type port, dc_t * dc)
 }
 
 /* Enable downlink interrupts */
-static void enable_transmit_dl(enum port_type port, dc_t * dc)
+static void enable_transmit_dl(enum port_type port, struct nozomi * dc)
 {
 	switch (port) {
 	case PORT_MDM:
@@ -906,7 +903,7 @@ static void enable_transmit_dl(enum port_type port, dc_t * dc)
 }
 
 /* Disable downlink interrupts */
-static void disable_transmit_dl(enum port_type port, dc_t * dc)
+static void disable_transmit_dl(enum port_type port, struct nozomi * dc)
 {
 	switch (port) {
 	case PORT_MDM:
@@ -932,7 +929,7 @@ static void disable_transmit_dl(enum port_type port, dc_t * dc)
 
 /* Return 1 - send buffer to card and ack. */
 /* Return 0 - don't ack, don't send buffer to card. */
-static int send_data(enum port_type index, dc_t * dc)
+static int send_data(enum port_type index, struct nozomi * dc)
 {
 	u32 size = 0;
 	struct port *port = &dc->port[index];
@@ -970,7 +967,7 @@ static int send_data(enum port_type index, dc_t * dc)
 }
 
 /* If all data has been read, return 1, else 0 */
-static int receive_data(enum port_type index, dc_t * dc)
+static int receive_data(enum port_type index, struct nozomi * dc)
 {
 	u8 buf[RECEIVE_BUF_MAX] = { 0 };
 	int size;
@@ -1022,7 +1019,7 @@ static int receive_data(enum port_type index, dc_t * dc)
 }
 
 /* Debug for interrupts */
-#ifdef NOZOMI_DEBUG
+#ifdef DEBUG
 static char *interrupt2str(u16 interrupt)
 {
 	static char buf[TMP_BUF_MAX];
@@ -1056,11 +1053,11 @@ static char *interrupt2str(u16 interrupt)
 
 /* Receive flow control */
 /* Return 1 - If ok, else 0 */
-static int receive_flow_control(dc_t * dc, irq_t * m)
+static int receive_flow_control(struct nozomi * dc, struct irq * m)
 {
 	enum port_type port = PORT_MDM;
-	ctrl_dl_t ctrl_dl;
-	ctrl_dl_t old_ctrl;
+	struct ctrl_dl ctrl_dl;
+	struct ctrl_dl old_ctrl;
 	u16 enable_ier = 0;
 
 	GET_MEM(&ctrl_dl, dc->port[PORT_CTRL].dl_addr[CH_A], 2);
@@ -1141,7 +1138,7 @@ static int receive_flow_control(dc_t * dc, irq_t * m)
 
 /* TODO:  */
 /* - return enum ctrl_port_type */
-static u8 port2ctrl(enum port_type port, dc_t * dc)
+static u8 port2ctrl(enum port_type port, struct nozomi * dc)
 {
 	switch (port) {
 	case PORT_MDM:
@@ -1162,7 +1159,7 @@ static u8 port2ctrl(enum port_type port, dc_t * dc)
 /* Send flow control, can only update one channel at a time */
 /* Return 0 - If we have updated all flow control */
 /* Return 1 - If we need to update more flow control, ack current enable more */
-static int send_flow_control(dc_t * dc)
+static int send_flow_control(struct nozomi * dc)
 {
 	u32 i, more_flow_control_to_be_updated = 0;
 	u16 *ctrl;
@@ -1188,7 +1185,7 @@ static int send_flow_control(dc_t * dc)
 /* Handle donlink data, ports that are handled are modem and diagnostics */
 /* Return 1 - ok */
 /* Return 0 - toggle fields are out of sync */
-static int handle_data_dl(dc_t * dc, irq_t * m, enum port_type port,
+static int handle_data_dl(struct nozomi * dc, struct irq *m, enum port_type port,
 			  u8 * toggle, u16 mask1, u16 mask2)
 {
 
@@ -1217,7 +1214,8 @@ static int handle_data_dl(dc_t * dc, irq_t * m, enum port_type port,
 			}
 		}
 	} else {
-		ERR("port out of sync!, toggle:%d", *toggle);
+		dev_err(&dc->pdev->dev, "port out of sync!, toggle:%d\n",
+			*toggle);
 		return 0;
 	}
 	return 1;
@@ -1226,7 +1224,7 @@ static int handle_data_dl(dc_t * dc, irq_t * m, enum port_type port,
 /* Handle uplink data, this is currently for the modem port */
 /* Return 1 - ok */
 /* Return 0 - toggle field are out of sync */
-static int handle_data_ul(dc_t * dc, irq_t * m, enum port_type port)
+static int handle_data_ul(struct nozomi * dc, struct irq * m, enum port_type port)
 {
 
 	u8 *toggle = &(dc->port[port].toggle_ul);
@@ -1266,7 +1264,7 @@ static int handle_data_ul(dc_t * dc, irq_t * m, enum port_type port)
 		}
 	} else {
 		SET_FCR(m->read_iir & MDM_UL);
-		ERR("port out of sync!");
+		dev_err(&dc->pdev->dev, "port out of sync!\n");
 		return 0;
 	}
 	return 1;
@@ -1274,33 +1272,25 @@ static int handle_data_ul(dc_t * dc, irq_t * m, enum port_type port)
 
 static irqreturn_t interrupt_handler(int irq, void *dev_id)
 {
-	dc_t *dc = NULL;
-	irq_t *m = &my_irq;
+	struct nozomi *dc = dev_id;
+	struct irq *m = &my_irq;
 
-	if (my_dev && my_dev->pdev != dev_id) {
+	if (!dc)
 		return IRQ_NONE;
-	}
 
-	if (!(dc = get_dc_by_pdev(dev_id))) {
-		ERR("Could not find device context from pci_dev: %p", dev_id);
-		return IRQ_NONE;
-	}
-
+	spin_lock(&dc->spin_mutex);
 	GET_IIR(m->read_iir);
+
+	/* Card removed */
+	if (m->read_iir == (u16)-1)
+		goto none;
 
 	/* Just handle interrupt enabled in IER (by masking with dc->ier_last_written) */
 	m->read_iir &= dc->ier_last_written;
 
-	if (m->read_iir == 0) {
-		return IRQ_NONE;
-	}
+	if (m->read_iir == 0)
+		goto none;
 
-	if (dc == NULL) {
-		ERR("ERROR!!");
-		return IRQ_NONE;
-	}
-
-	spin_lock(&dc->spin_mutex);
 
 	D4("%s irq:0x%04X, prev:0x%04X", interrupt2str(m->read_iir),
 	   m->read_iir, dc->ier_last_written);
@@ -1308,7 +1298,8 @@ static irqreturn_t interrupt_handler(int irq, void *dev_id)
 	if (m->read_iir & RESET) {
 		if (!nozomi_read_config_table(dc)) {
 			SET_IER(0, 0xFFFF);
-			ERR("ERR: Could not read status from card, we should disable interface");
+			dev_err(&dc->pdev->dev, "Could not read status from "
+				"card, we should disable interface\n");
 		} else {
 			SET_FCR(RESET);
 		}
@@ -1331,13 +1322,13 @@ static irqreturn_t interrupt_handler(int irq, void *dev_id)
 		    (handle_data_dl
 		     (dc, m, PORT_MDM, &(dc->port[PORT_MDM].toggle_dl), MDM_DL1,
 		      MDM_DL2))) {
-			ERR("MDM_DL out of sync!");
+			dev_err(&dc->pdev->dev, "MDM_DL out of sync!\n");
 			goto exit_handler;
 		}
 	}
 	if (m->read_iir & MDM_UL) {
 		if (!handle_data_ul(dc, m, PORT_MDM)) {
-			ERR("MDM_UL out of sync!");
+			dev_err(&dc->pdev->dev, "MDM_UL out of sync!\n");
 			goto exit_handler;
 		}
 	}
@@ -1346,7 +1337,7 @@ static irqreturn_t interrupt_handler(int irq, void *dev_id)
 		    (handle_data_dl
 		     (dc, m, PORT_DIAG, &(dc->port[PORT_DIAG].toggle_dl),
 		      DIAG_DL1, DIAG_DL2))) {
-			ERR("DIAG_DL out of sync!");
+			dev_err(&dc->pdev->dev, "DIAG_DL out of sync!\n");
 			goto exit_handler;
 		}
 	}
@@ -1382,28 +1373,29 @@ static irqreturn_t interrupt_handler(int irq, void *dev_id)
 		}
 	}
 
-      exit_handler:
+exit_handler:
 	spin_unlock(&dc->spin_mutex);
 	return IRQ_HANDLED;
+none:
+	spin_unlock(&dc->spin_mutex);
+	return IRQ_NONE;
 }
 
 /* Request a shared IRQ from system */
-static int nozomi_setup_interrupt(struct pci_dev *pdev)
+static int nozomi_setup_interrupt(struct nozomi *dc)
 {
+	int rval;
 
-	int rval = 0;
-
-	if ((rval =
-	     request_irq(pdev->irq, &interrupt_handler, SA_SHIRQ, NOZOMI_NAME,
-			 pdev))) {
-		ERR("Cannot open because IRQ %d is already in use.", pdev->irq);
-		return rval;
-	}
+	rval = request_irq(dc->pdev->irq, &interrupt_handler, IRQF_SHARED,
+			   NOZOMI_NAME, dc);
+	if (rval)
+		dev_err(&dc->pdev->dev, "Cannot open because IRQ %d "
+			"is already in use.\n", dc->pdev->irq);
 
 	return rval;
 }
 
-static void nozomi_get_card_type(dc_t * dc)
+static void nozomi_get_card_type(struct nozomi * dc)
 {
 	int i;
 	u32 size = 0;
@@ -1417,7 +1409,7 @@ static void nozomi_get_card_type(dc_t * dc)
 	dev_info(&dc->pdev->dev, "Card type is: %d\n", dc->card_type);
 }
 
-static void nozomi_setup_private_data(dc_t * dc)
+static void nozomi_setup_private_data(struct nozomi * dc)
 {
 	void __iomem *offset = dc->base_addr + dc->card_type / 2;
 	int i;
@@ -1441,7 +1433,7 @@ static void nozomi_setup_private_data(dc_t * dc)
 
 static void tty_flip_queue_function(struct work_struct *work)
 {
-	dc_t *dc = container_of(work, dc_t, tty_flip_wq_struct);
+	struct nozomi *dc = container_of(work, struct nozomi, tty_flip_wq_struct);
 	int i;
 	unsigned long flags;
 
@@ -1461,28 +1453,26 @@ static ssize_t card_type_show(struct device *dev, struct device_attribute *attr,
 			  char *buf)
 {
 	struct pci_dev *pdev = to_pci_dev(dev);
-	dc_t *dc = pci_get_drvdata(pdev);
+	struct nozomi *dc = pci_get_drvdata(pdev);
 
 	return sprintf(buf, "%d\n", dc->card_type);
 }
-
 static DEVICE_ATTR(card_type, 0444, card_type_show, NULL);
 
 static ssize_t open_ttys_show(struct device *dev, struct device_attribute *attr,
 			  char *buf)
 {
 	struct pci_dev *pdev = to_pci_dev(dev);
-	dc_t *dc = pci_get_drvdata(pdev);
+	struct nozomi *dc = pci_get_drvdata(pdev);
 
 	return sprintf(buf, "%d\n", dc->open_ttys);
 }
-
 static DEVICE_ATTR(open_ttys, 0444, open_ttys_show, NULL);
 
 #if 0
 static int read_proc_rtx(char *buf, char **start, off_t offset, int len)
 {
-	dc_t *dc = get_dc_by_index(0);
+	struct nozomi *dc = get_dc_by_index(0);
 	int i;
 
 	len = 0;
@@ -1496,7 +1486,7 @@ static int read_proc_rtx(char *buf, char **start, off_t offset, int len)
 }
 #endif
 
-static void make_sysfs_files(dc_t * dc)
+static void make_sysfs_files(struct nozomi * dc)
 {
 	int retval;
 
@@ -1504,7 +1494,7 @@ static void make_sysfs_files(dc_t * dc)
 	retval = device_create_file(&dc->pdev->dev, &dev_attr_open_ttys);
 }
 
-static void remove_sysfs_files(dc_t * dc)
+static void remove_sysfs_files(struct nozomi * dc)
 {
 	device_remove_file(&dc->pdev->dev, &dev_attr_card_type);
 	device_remove_file(&dc->pdev->dev, &dev_attr_open_ttys);
@@ -1516,25 +1506,25 @@ static int __devinit nozomi_card_init(struct pci_dev *pdev,
 {
 	resource_size_t start;
 	int ret = -EIO;
-	dc_t *dc = NULL;
+	struct nozomi *dc = NULL;
 
 	cards_found++;
-	dev_info(&pdev->dev, "Init, cards_found: %d\n", cards_found);
-
-	if (!(my_dev = kmalloc(sizeof(dc_t), GFP_KERNEL))) {
-		D1("Could not allocate memory");
-		return -EIO;
-	}
-
-	memset(my_dev, 0, sizeof(dc_t));
-
 	if (cards_found > 1) {
 		dev_err(&pdev->dev, "This driver only supports 1 device\n");
 		return -ENODEV;
 	}
+	dev_dbg(&pdev->dev, "Init, cards_found: %d\n", cards_found);
 
-	my_dev->pdev = pdev;
-	dc = my_dev;
+	dc = kzalloc(sizeof(struct nozomi), GFP_KERNEL);
+	if (!dc) {
+		dev_err(&pdev->dev, "Could not allocate memory\n");
+		return -ENOMEM;
+	}
+	dc->pdev = pdev;
+	pci_set_drvdata(pdev, dc);
+
+	/* FIXME */
+	my_dev = dc;
 
 	/* Find out what card type it is */
 	nozomi_get_card_type(dc);
@@ -1579,16 +1569,16 @@ static int __devinit nozomi_card_init(struct pci_dev *pdev,
 	SET_IER(0, 0xFFFF);
 
 	/* Setup interrupt handler */
-	if (nozomi_setup_interrupt(dc->pdev)) {
+	if (nozomi_setup_interrupt(dc)) {
 		ret = -EIO;
 		goto err_disable_regions;
 	}
 
-	D1("base_addr: 0x%08X", dc->base_addr);
+	D1("base_addr: %p", dc->base_addr);
 
-	if (!(dc->tty_flip_wq = create_singlethread_workqueue(NOZOMI_NAME))) {
-		ERR("Could not create workqueue?");
-		BUG_ON(!dc->tty_flip_wq);
+	dc->tty_flip_wq = create_singlethread_workqueue(NOZOMI_NAME);
+	if (!dc->tty_flip_wq) {
+		dev_err(&dc->pdev->dev, "Could not create workqueue?\n");
 		return -ENOMEM;
 	}
 	INIT_WORK(&dc->tty_flip_wq_struct, tty_flip_queue_function);
@@ -1617,17 +1607,18 @@ static int __devinit nozomi_card_init(struct pci_dev *pdev,
 	return ret;
 }
 
-static void tty_do_close(dc_t * dc, struct port *port)
+static void tty_do_close(struct nozomi * dc, struct port *port)
 {
 	unsigned long flags;
 
-	if (down_interruptible(&port->tty_sem)) {
+	if (!dc || !port)
 		return;
-	}
 
-	if (!port->tty_open_count) {
+	if (down_interruptible(&port->tty_sem))
+		return;
+
+	if (!port->tty_open_count)
 		goto exit;
-	}
 
 	dc->open_ttys--;
 	port->tty_open_count--;
@@ -1637,38 +1628,47 @@ static void tty_do_close(dc_t * dc, struct port *port)
 		spin_lock_irqsave(&dc->spin_mutex, flags);
 		SET_IER(0, port->token_dl);
 		spin_unlock_irqrestore(&dc->spin_mutex, flags);
+		port->tty = NULL;
 	}
 
-      exit:
+exit:
 	up(&port->tty_sem);
 }
 
 static void __devexit tty_exit(void)
 {
-	dc_t *dc = my_dev;
-	int i;
+	struct nozomi *dc = my_dev;
+	int i, ret;
 
 	D1(" ");
 
 	for (i = 0; i < NTTY_TTY_MINORS; i++) {
-		while (dc->port[i].tty_open_count)
-			tty_do_close(dc, &dc->port[i]);
-		dc->port[i].tty = NULL;
+		if (dc->port[i].tty)
+			tty_hangup(dc->port[i].tty);
+	}
+
+	while (dc->open_ttys) {
+		msleep_interruptible(1);
 	}
 
 	for (i = 0; i < NTTY_TTY_MINORS; ++i)
 		tty_unregister_device(dc->tty_driver, i);
 
-	tty_unregister_driver(dc->tty_driver);
+	ret = tty_unregister_driver(dc->tty_driver);
+	if (ret) {
+		printk(KERN_ERR "Unable to unregister the tty driver ! (%d)\n", ret);
+	}
 	put_tty_driver(dc->tty_driver);
 }
 
 /* Deallocate memory for one device */
-static void __devexit nozomi_card_exit(struct pci_dev *pdev)
+static void nozomi_card_exit(struct pci_dev *pdev)
 {
 	int i;
-	ctrl_ul_t ctrl;
-	dc_t *dc = get_dc_by_pdev(pdev);
+	struct ctrl_ul ctrl;
+	struct nozomi *dc = pci_get_drvdata(pdev);
+
+	tty_exit();
 
 	/* Disable all interrupts */
 	SET_IER(0, 0xFFFF);
@@ -1695,30 +1695,26 @@ static void __devexit nozomi_card_exit(struct pci_dev *pdev)
 	D1("pci_disable_device");
 	pci_disable_device(pdev);
 
-	free_irq(pdev->irq, pdev);
+	free_irq(pdev->irq, dc);
 
-	for (i = PORT_MDM; i < MAX_PORT; i++) {
+	for (i = PORT_MDM; i < MAX_PORT; i++)
 		kfree(dc->port[i].fifo_ul);
-	}
 
 	kfree(dc->send_buf);
-
-	tty_exit();
 
 	remove_sysfs_files(dc);
 
 	destroy_workqueue(dc->tty_flip_wq);
 
-	if (my_dev) {
-		kfree(my_dev);
-	}
+	kfree(my_dev);
+	my_dev = NULL;
 
 	cards_found--;
 }
 
 static void set_rts(int index, int rts)
 {
-	dc_t *dc = get_dc_by_index(index);
+	struct nozomi *dc = get_dc_by_index(index);
 
 	dc->port[index].ctrl_ul.RTS = rts;
 	dc->port[index].update_flow_control = 1;
@@ -1727,7 +1723,7 @@ static void set_rts(int index, int rts)
 
 static void set_dtr(int index, int dtr)
 {
-	dc_t *dc = get_dc_by_index(index);
+	struct nozomi *dc = get_dc_by_index(index);
 
 	D1("SETTING DTR index: %d, dtr: %d", index, dtr);
 
@@ -1743,26 +1739,23 @@ static void set_dtr(int index, int dtr)
 /* Called when the userspace process opens the tty, /dev/noz*. */
 static int ntty_open(struct tty_struct *tty, struct file *file)
 {
-
-	s32 index = get_index(tty);
 	struct port *port = get_port_by_tty(tty);
-	dc_t *dc = get_dc_by_tty(tty);
+	struct nozomi *dc = get_dc_by_tty(tty);
 	unsigned long flags;
 
 	if (down_interruptible(&port->tty_sem)) {
 		return -ERESTARTSYS;
 	}
 
-	tty->low_latency = 1;
-	tty->driver_data = port;
-	port->tty = tty;
-	port->tty_index = index;
-
 	port->tty_open_count++;
 	dc->open_ttys++;
 
 	/* Enable interrupt downlink for channel */
 	if (port->tty_open_count == 1) {
+		tty->low_latency = 1;
+		tty->driver_data = port;
+		port->tty = tty;
+		port->tty_index = tty->index;
 		port->rx_data = port->tx_data = 0;
 		D1("open: %d", port->token_dl);
 		spin_lock_irqsave(&dc->spin_mutex, flags);
@@ -1778,7 +1771,7 @@ static int ntty_open(struct tty_struct *tty, struct file *file)
 /* Called when the userspace process close the tty, /dev/noz*. */
 static void ntty_close(struct tty_struct *tty, struct file *file)
 {
-	dc_t *dc = get_dc_by_tty(tty);
+	struct nozomi *dc = get_dc_by_tty(tty);
 	tty_do_close(dc, (struct port *)tty->driver_data);
 }
 
@@ -1788,18 +1781,19 @@ static int ntty_write(struct tty_struct *tty, const unsigned char *buffer,
 		      int count)
 {
 	int rval = -EINVAL;
-	dc_t *dc = get_dc_by_tty(tty);
+	struct nozomi *dc = get_dc_by_tty(tty);
 	struct port *port = (struct port *)tty->driver_data;
 	unsigned long flags;
 
 	/* D1( "WRITEx: %d, index = %d", count, index); */
 
-	if (!port) {
+	if (!dc || !port)
 		return -ENODEV;
-	}
 
-	if (down_trylock(&port->tty_sem)) {	// must test lock as tty layer wraps calls to this function with BKL
-		ERR("Would have deadlocked - return ERESTARTSYS");
+	if (down_trylock(&port->tty_sem)) {
+		/* must test lock as tty layer wraps calls to this function with BKL */
+		dev_err(&dc->pdev->dev, "Would have deadlocked -"
+			"return ERESTARTSYS\n");
 		return -ERESTARTSYS;
 	}
 
@@ -1823,7 +1817,7 @@ static int ntty_write(struct tty_struct *tty, const unsigned char *buffer,
 			D4("Enable interrupt");
 			enable_transmit_ul(port->tty_index, dc);
 		} else {
-			ERR("CTS not active on modem port?");
+			dev_err(&dc->pdev->dev, "CTS not active on modem port?\n");
 		}
 	} else {
 		enable_transmit_ul(port->tty_index, dc);
@@ -1843,9 +1837,9 @@ static int ntty_write_room(struct tty_struct *tty)
 	struct port *port = (struct port *)tty->driver_data;
 	int room = 0;
 //      u32      flags = 0;
-//      dc_t *dc = get_dc_by_tty(tty);
+	struct nozomi *dc = get_dc_by_tty(tty);
 
-	if (!port) {
+	if (!dc || !port) {
 		return 0;
 	}
 	if (down_trylock(&port->tty_sem)) {
@@ -1929,25 +1923,21 @@ static void ntty_set_termios(struct tty_struct *tty,
 	/* if we are implementing XON/XOFF, set the start and
 	 * stop character in the device */
 	if (I_IXOFF(tty) || I_IXON(tty)) {
-#ifdef NOZOMI_DEBUG
-		unsigned char stop_char = STOP_CHAR(tty);
-		unsigned char start_char = START_CHAR(tty);
-#endif
 		/* if we are implementing INBOUND XON/XOFF */
-		if (I_IXOFF(tty)) {
+		if (I_IXOFF(tty))
 			D1(" - INBOUND XON/XOFF is enabled, "
-			   "XON = %2x, XOFF = %2x", start_char, stop_char);
-		} else {
+			   "XON = %2x, XOFF = %2x",
+			   START_CHAR(tty), STOP_CHAR(tty));
+		else
 			D1(" - INBOUND XON/XOFF is disabled");
-		}
 
 		/* if we are implementing OUTBOUND XON/XOFF */
-		if (I_IXON(tty)) {
+		if (I_IXON(tty))
 			D1(" - OUTBOUND XON/XOFF is enabled, "
-			   "XON = %2x, XOFF = %2x", start_char, stop_char);
-		} else {
+			   "XON = %2x, XOFF = %2x",
+			   START_CHAR(tty), STOP_CHAR(tty));
+		else
 			D1(" - OUTBOUND XON/XOFF is disabled");
-		}
 	}
 
       exit_termios:
@@ -1958,8 +1948,8 @@ static void ntty_set_termios(struct tty_struct *tty,
 static int ntty_tiocmget(struct tty_struct *tty, struct file *file)
 {
 	struct port *port = tty->driver_data;
-	ctrl_dl_t *ctrl_dl = &port->ctrl_dl;
-	ctrl_ul_t *ctrl_ul = &port->ctrl_ul;
+	struct ctrl_dl *ctrl_dl = &port->ctrl_dl;
+	struct ctrl_ul *ctrl_ul = &port->ctrl_ul;
 
 	return 0 | (ctrl_ul->RTS ? TIOCM_RTS : 0)
 	    | (ctrl_ul->DTR ? TIOCM_DTR : 0)
@@ -2050,7 +2040,7 @@ static int ntty_ioctl(struct tty_struct *tty, struct file *file,
 		      unsigned int cmd, unsigned long arg)
 {
 	struct port *port = tty->driver_data;
-	dc_t *dc = get_dc_by_tty(tty);
+	struct nozomi *dc = get_dc_by_tty(tty);
 	unsigned long flags;
 	int mask;
 	int rval = -ENOIOCTLCMD;
@@ -2123,7 +2113,7 @@ static int ntty_ioctl(struct tty_struct *tty, struct file *file,
 static void ntty_unthrottle(struct tty_struct *tty)
 {
 	struct port *port = (struct port *)tty->driver_data;
-	dc_t *dc = get_dc_by_tty(tty);
+	struct nozomi *dc = get_dc_by_tty(tty);
 	unsigned long flags;
 
 	D1("UNTHROTTLE");
@@ -2139,7 +2129,7 @@ static void ntty_unthrottle(struct tty_struct *tty)
 static void ntty_throttle(struct tty_struct *tty)
 {
 	struct port *port = (struct port *)tty->driver_data;
-	dc_t *dc = get_dc_by_tty(tty);
+	struct nozomi *dc = get_dc_by_tty(tty);
 	unsigned long flags;
 
 	D1("THROTTLE");
@@ -2157,15 +2147,16 @@ static void ntty_put_char(struct tty_struct *tty, unsigned char c)
 static s32 ntty_chars_in_buffer(struct tty_struct *tty)
 {
 	struct port *port = (struct port *)tty->driver_data;
+	struct nozomi *dc = get_dc_by_tty(tty);
 	s32 rval;
 
-	if (!port) {
+	if (!dc || !port) {
 		rval = -ENODEV;
 		goto exit_in_buffer;
 	}
 
 	if (!port->tty_open_count) {
-		ERR("No tty open?");
+		dev_err(&dc->pdev->dev, "No tty open?\n");
 		rval = -ENODEV;
 		goto exit_in_buffer;
 	}
@@ -2190,7 +2181,7 @@ static struct tty_operations tty_ops = {
 };
 
 /* Initializes the tty */
-static int ntty_tty_init(dc_t * dc)
+static int ntty_tty_init(struct nozomi *dc)
 {
 	struct tty_driver *td;
 	int rval;
@@ -2236,7 +2227,7 @@ static struct pci_driver nozomi_driver = {
 	.name = NOZOMI_NAME,
 	.id_table = nozomi_pci_tbl,
 	.probe = nozomi_card_init,
-	.remove = __devexit_p(nozomi_card_exit),
+	.remove = nozomi_card_exit,
 };
 
 static __init int nozomi_init(void)
@@ -2247,16 +2238,14 @@ static __init int nozomi_init(void)
 
 static __exit void nozomi_exit(void)
 {
-	printk(KERN_INFO "Unloading %s", DRIVER_DESC);
+	printk(KERN_INFO "Unloading %s\n", DRIVER_DESC);
 	pci_unregister_driver(&nozomi_driver);
 }
 
 module_init(nozomi_init);
 module_exit(nozomi_exit);
 
-#ifdef NOZOMI_DEBUG
-MODULE_PARM(nzdebug, "i");
-#endif
+module_param(debug, int, S_IRUGO | S_IWUSR);
 
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_DESCRIPTION(DRIVER_DESC);
