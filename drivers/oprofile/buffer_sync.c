@@ -565,7 +565,7 @@ void sync_buffer(int cpu)
 				add_trace_begin();
 #ifdef CONFIG_XEN
 			} else if (s->event == CPU_DOMAIN_SWITCH) {
-				domain_switch = 1;
+					domain_switch = 1;
 #endif
 			} else {
 				struct mm_struct * oldmm = mm;

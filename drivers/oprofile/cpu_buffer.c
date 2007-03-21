@@ -197,7 +197,7 @@ static int log_sample(struct oprofile_cpu_buffer * cpu_buf, unsigned long pc,
 		cpu_buf->last_cpu_mode = cpu_mode;
 		add_code(cpu_buf, cpu_mode);
 	}
-	
+
 	/* notice a task switch */
 	/* if not processing other domain samples */
 	if ((cpu_buf->last_task != task) &&
@@ -290,9 +290,9 @@ int oprofile_add_domain_switch(int32_t domain_id)
 {
 	struct oprofile_cpu_buffer * cpu_buf = &cpu_buffer[smp_processor_id()];
 
-	/* should have space for switching into and out of domain 
+	/* should have space for switching into and out of domain
 	   (2 slots each) plus one sample and one cpu mode switch */
-	if (((nr_available_slots(cpu_buf) < 6) && 
+	if (((nr_available_slots(cpu_buf) < 6) &&
 	     (domain_id != COORDINATOR_DOMAIN)) ||
 	    (nr_available_slots(cpu_buf) < 2))
 		return 0;
