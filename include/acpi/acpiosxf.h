@@ -95,10 +95,6 @@ acpi_status
 acpi_os_table_override(struct acpi_table_header *existing_table,
 		       struct acpi_table_header **new_table);
 
-#ifdef CONFIG_ACPI_CUSTOM_DSDT_INITRD
-extern int acpi_must_unregister_table;
-#endif
-
 /*
  * Spinlock primitives
  */
