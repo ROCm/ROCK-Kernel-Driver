@@ -9,7 +9,6 @@
 
 #include <asm/scatterlist.h>
 #include <asm/io.h>
-#include <asm/swiotlb.h>
 
 struct dma_mapping_ops {
 	int             (*mapping_error)(dma_addr_t dma_addr);
