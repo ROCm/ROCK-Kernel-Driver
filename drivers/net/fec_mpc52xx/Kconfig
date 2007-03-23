@@ -1,0 +1,23 @@
+menu "MPC5200 Networking Options"
+	depends PPC_MPC52xx && NET_ETHERNET
+
+config FEC_MPC52xx
+	bool "FEC Ethernet"
+	depends on NET_ETHERNET
+	select PPC_BESTCOMM
+	select CRC32
+	---help---
+	  This option enables support for the MPC5200's on-chip
+	  Fast Ethernet Controller
+
+config USE_MDIO
+	bool "Use external Ethernet MII PHY"
+	select MII
+	depends FEC_MPC52xx
+	---help---
+	  The MPC5200's FEC can connect to the Ethernet either with
+	  an external MII PHY chip or 10 Mbps 7-wire interface
+	  (Motorola? industry standard).
+	  If your board uses an external PHY, say y, else n.
+
+endmenu
