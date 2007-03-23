@@ -15,7 +15,7 @@
 #include <asm/hypervisor.h>
 
 extern pud_t level3_user_pgt[512];
-extern pud_t init_level4_user_pgt[];
+extern pgd_t init_level4_user_pgt[];
 
 extern void xen_init_pt(void);
 
@@ -286,19 +286,20 @@ static inline unsigned long pmd_bad(pmd_t pmd)
 
 #define pages_to_mb(x) ((x) >> (20-PAGE_SHIFT))
 
-#define pte_mfn(_pte) (((_pte).pte & PTE_MASK) >> PAGE_SHIFT)
-#define pte_pfn(_pte) mfn_to_local_pfn(pte_mfn(_pte))
+#define __pte_mfn(_pte) (((_pte).pte & PTE_MASK) >> PAGE_SHIFT)
+#define pte_mfn(_pte) ((_pte).pte & _PAGE_PRESENT ? \
+	__pte_mfn(_pte) : pfn_to_mfn(__pte_mfn(_pte)))
+#define pte_pfn(_pte) ((_pte).pte & _PAGE_PRESENT ? \
+	mfn_to_local_pfn(__pte_mfn(_pte)) : __pte_mfn(_pte))
 
 #define pte_page(x)	pfn_to_page(pte_pfn(x))
 
 static inline pte_t pfn_pte(unsigned long page_nr, pgprot_t pgprot)
 {
-	pte_t pte;
-        
-	(pte).pte = (pfn_to_mfn(page_nr) << PAGE_SHIFT);
-	(pte).pte |= pgprot_val(pgprot);
-	(pte).pte &= __supported_pte_mask;
-	return pte;
+	unsigned long pte = page_nr << PAGE_SHIFT;
+	pte |= pgprot_val(pgprot);
+	pte &= __supported_pte_mask;
+	return __pte(pte);
 }
 
 /*
@@ -380,7 +381,7 @@ static inline int pmd_large(pmd_t pte) {
 #define pgd_page(pgd)		(pfn_to_page(pgd_val(pgd) >> PAGE_SHIFT))
 #define pgd_index(address) (((address) >> PGDIR_SHIFT) & (PTRS_PER_PGD-1))
 #define pgd_offset(mm, addr) ((mm)->pgd + pgd_index(addr))
-#define pgd_offset_k(address) (pgd_t *)(init_level4_pgt + pgd_index(address))
+#define pgd_offset_k(address) (init_level4_pgt + pgd_index(address))
 #define pgd_present(pgd) (pgd_val(pgd) & _PAGE_PRESENT)
 #define mk_kernel_pgd(address) __pgd((address) | _KERNPG_TABLE)
 
@@ -416,22 +417,20 @@ static inline int pmd_large(pmd_t pte) {
 #define mk_pte(page, pgprot)	pfn_pte(page_to_pfn(page), (pgprot))
 #define mk_pte_huge(entry) (pte_val(entry) |= _PAGE_PRESENT | _PAGE_PSE)
  
-/* physical address -> PTE */
-static inline pte_t mk_pte_phys(unsigned long physpage, pgprot_t pgprot)
-{ 
-	pte_t pte;
-	(pte).pte = physpage | pgprot_val(pgprot); 
-	(pte).pte &= __supported_pte_mask;
-	return pte; 
-}
- 
 /* Change flags of a PTE */
 static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 { 
-        (pte).pte &= _PAGE_CHG_MASK;
-	(pte).pte |= pgprot_val(newprot);
-	(pte).pte &= __supported_pte_mask;
-       return pte; 
+	/*
+	 * Since this might change the present bit (which controls whether
+	 * a pte_t object has undergone p2m translation), we must use
+	 * pte_val() on the input pte and __pte() for the return value.
+	 */
+	unsigned long pteval = pte_val(pte);
+
+	pteval &= _PAGE_CHG_MASK;
+	pteval |= pgprot_val(newprot);
+	pteval &= __supported_pte_mask;
+	return __pte(pteval);
 }
 
 #define pte_index(address) \
@@ -453,24 +452,18 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
  * race with other CPU's that might be updating the dirty
  * bit at the same time. */
 #define  __HAVE_ARCH_PTEP_SET_ACCESS_FLAGS
-#if 0
 #define ptep_set_access_flags(__vma, __address, __ptep, __entry, __dirty) \
 	do {								  \
 		if (__dirty) {						  \
-			set_pte(__ptep, __entry);			  \
-			flush_tlb_page(__vma, __address);		  \
-		}							  \
-	} while (0)
-#endif
-#define ptep_set_access_flags(__vma, __address, __ptep, __entry, __dirty) \
-	do {								  \
-		if (__dirty) {						  \
-		        if ( likely((__vma)->vm_mm == current->mm) ) {    \
-			    BUG_ON(HYPERVISOR_update_va_mapping((__address), (__entry), UVMF_INVLPG|UVMF_MULTI|(unsigned long)((__vma)->vm_mm->cpu_vm_mask.bits))); \
-			} else {                                          \
-                            xen_l1_entry_update((__ptep), (__entry)); \
-			    flush_tlb_page((__vma), (__address));         \
-			}                                                 \
+			if ( likely((__vma)->vm_mm == current->mm) ) {	  \
+				BUG_ON(HYPERVISOR_update_va_mapping(__address, \
+					__entry,			  \
+					(unsigned long)(__vma)->vm_mm->cpu_vm_mask.bits| \
+						UVMF_INVLPG|UVMF_MULTI)); \
+			} else {					  \
+				xen_l1_entry_update(__ptep, __entry);	  \
+				flush_tlb_page(__vma, __address);	  \
+			}						  \
 		}							  \
 	} while (0)
 

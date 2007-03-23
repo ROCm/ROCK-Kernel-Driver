@@ -147,7 +147,7 @@ void xen_tlb_flush_mask(cpumask_t *mask)
 	if ( cpus_empty(*mask) )
 		return;
 	op.cmd = MMUEXT_TLB_FLUSH_MULTI;
-	op.arg2.vcpumask = mask->bits;
+	set_xen_guest_handle(op.arg2.vcpumask, mask->bits);
 	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
 
@@ -166,7 +166,7 @@ void xen_invlpg_mask(cpumask_t *mask, unsigned long ptr)
 		return;
 	op.cmd = MMUEXT_INVLPG_MULTI;
 	op.arg1.linear_addr = ptr & PAGE_MASK;
-	op.arg2.vcpumask    = mask->bits;
+	set_xen_guest_handle(op.arg2.vcpumask, mask->bits);
 	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
 
@@ -446,6 +446,8 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 		for (i = 0; i < (1UL<<order); i++) {
 			struct page *page = alloc_page(__GFP_HIGHMEM);
 			unsigned long pfn;
+			mmu_update_t mmu;
+			unsigned int j = 0;
 
 			if (!page) {
 				printk(KERN_WARNING "Xen and kernel out of memory "
@@ -454,40 +456,55 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 				break;
 			}
 			pfn = page_to_pfn(page);
+
+			balloon_lock(flags);
+
 			if (!PageHighMem(page)) {
 				void *v = __va(pfn << PAGE_SHIFT);
 
 				scrub_pages(v, 1);
-				if (HYPERVISOR_update_va_mapping((unsigned long)v,
-								 __pte_ma(0),
-								 UVMF_INVLPG|UVMF_ALL))
-					BUG();
+				MULTI_update_va_mapping(cr_mcl + j, (unsigned long)v,
+							__pte_ma(0), UVMF_INVLPG|UVMF_ALL);
+				++j;
 			}
 #ifdef CONFIG_XEN_SCRUB_PAGES
 			else {
-				void *v = kmap(page);
-
-				scrub_pages(v, 1);
+				scrub_pages(kmap(page), 1);
 				kunmap(page);
 				kmap_flush_unused();
 			}
 #endif
 
-			balloon_lock(flags);
-
 			frame = pfn_to_mfn(pfn);
 			set_phys_to_machine(pfn, INVALID_P2M_ENTRY);
 
-			if (HYPERVISOR_update_va_mapping(vstart,
-							 pfn_pte_ma(frame, PAGE_KERNEL),
-							 UVMF_INVLPG|UVMF_ALL))
-				BUG();
+			MULTI_update_va_mapping(cr_mcl + j, vstart,
+						pfn_pte_ma(frame, PAGE_KERNEL),
+						UVMF_INVLPG|UVMF_ALL);
+			++j;
+
 			pfn = __pa(vstart) >> PAGE_SHIFT;
 			set_phys_to_machine(pfn, frame);
+			if (!xen_feature(XENFEAT_auto_translated_physmap)) {
+				mmu.ptr = ((uint64_t)frame << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE;
+				mmu.val = pfn;
+				cr_mcl[j].op = __HYPERVISOR_mmu_update;
+				cr_mcl[j].args[0] = (unsigned long)&mmu;
+				cr_mcl[j].args[1] = 1;
+				cr_mcl[j].args[2] = 0;
+				cr_mcl[j].args[3] = DOMID_SELF;
+				++j;
+			}
 
-			if (HYPERVISOR_memory_op(XENMEM_decrease_reservation,
-						 &exchange.in) != 1)
+			cr_mcl[j].op = __HYPERVISOR_memory_op;
+			cr_mcl[j].args[0] = XENMEM_decrease_reservation;
+			cr_mcl[j].args[1] = (unsigned long)&exchange.in;
+
+			if (HYPERVISOR_multicall(cr_mcl, j + 1))
 				BUG();
+			BUG_ON(cr_mcl[j].result != 1);
+			while (j--)
+				BUG_ON(cr_mcl[j].result != 0);
 
 			balloon_unlock(flags);
 

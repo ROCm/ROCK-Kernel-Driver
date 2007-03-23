@@ -125,7 +125,7 @@ int __devinit xenkbd_probe(struct xenbus_device *dev,
 	kbd->phys = info->phys;
 	kbd->id.bustype = BUS_PCI;
 	kbd->id.vendor = 0x5853;
-	kbd->id.product = 0x2;
+	kbd->id.product = 0xffff;
 	kbd->evbit[0] = BIT(EV_KEY);
 	for (i = KEY_ESC; i < KEY_UNKNOWN; i++)
 		set_bit(i, kbd->keybit);
@@ -148,7 +148,7 @@ int __devinit xenkbd_probe(struct xenbus_device *dev,
 	ptr->phys = info->phys;
 	ptr->id.bustype = BUS_PCI;
 	ptr->id.vendor = 0x5853;
-	ptr->id.product = 0x3;
+	ptr->id.product = 0xfffe;
 	ptr->evbit[0] = BIT(EV_KEY) | BIT(EV_REL) | BIT(EV_ABS);
 	for (i = BTN_LEFT; i <= BTN_TASK; i++)
 		set_bit(i, ptr->keybit);

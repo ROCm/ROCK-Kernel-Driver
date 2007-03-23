@@ -91,6 +91,8 @@
 #define PG_nosave_free		18	/* Used for system suspend/resume */
 #define PG_buddy		19	/* Page is free, on buddy lists */
 
+#define PG_foreign		20	/* Page is owned by foreign allocator. */
+
 /* PG_owner_priv_1 users should have descriptive aliases */
 #define PG_checked		PG_owner_priv_1 /* Used by some filesystems */
 
@@ -104,8 +106,6 @@
  */
 #define PG_uncached		31	/* Page has been mapped as uncached */
 #endif
-
-#define PG_foreign		20	/* Page is owned by foreign allocator. */
 
 /*
  * Manipulation of page state flags
@@ -258,14 +258,14 @@ static inline void SetPageUptodate(struct page *page)
 #define PageForeign(page)	test_bit(PG_foreign, &(page)->flags)
 #define SetPageForeign(page, dtor) do {		\
 	set_bit(PG_foreign, &(page)->flags);	\
-	(page)->mapping = (void *)dtor;		\
+	(page)->index = (long)(dtor);		\
 } while (0)
 #define ClearPageForeign(page) do {		\
 	clear_bit(PG_foreign, &(page)->flags);	\
-	(page)->mapping = NULL;			\
+	(page)->index = 0;			\
 } while (0)
 #define PageForeignDestructor(page)		\
-	( (void (*) (struct page *)) (page)->mapping )(page)
+	( (void (*) (struct page *)) (page)->index )(page)
 
 struct page;	/* forward declaration */
 

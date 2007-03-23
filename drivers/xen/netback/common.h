@@ -1,22 +1,22 @@
 /******************************************************************************
  * arch/xen/drivers/netif/backend/common.h
- *
+ * 
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License version 2
  * as published by the Free Software Foundation; or, when distributed
  * separately from the Linux kernel or incorporated into other
  * software packages, subject to the following license:
- *
+ * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this source file (the "Software"), to deal in the Software without
  * restriction, including without limitation the rights to use, copy, modify,
  * merge, publish, distribute, sublicense, and/or sell copies of the Software,
  * and to permit persons to whom the Software is furnished to do so, subject to
  * the following conditions:
- *
+ * 
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- *
+ * 
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -99,8 +99,20 @@ typedef struct netif_st {
 	struct net_device *dev;
 	struct net_device_stats stats;
 
+	unsigned int carrier;
+
 	wait_queue_head_t waiting_to_free;
 } netif_t;
+
+/*
+ * Implement our own carrier flag: the network stack's version causes delays
+ * when the carrier is re-enabled (in particular, dev_activate() may not
+ * immediately be called, which can cause packet loss; also the etherbridge
+ * can be rather lazy in activating its port).
+ */
+#define netback_carrier_on(netif)	((netif)->carrier = 1)
+#define netback_carrier_off(netif)	((netif)->carrier = 0)
+#define netback_carrier_ok(netif)	((netif)->carrier)
 
 #define NET_TX_RING_SIZE __RING_SIZE((netif_tx_sring_t *)0, PAGE_SIZE)
 #define NET_RX_RING_SIZE __RING_SIZE((netif_rx_sring_t *)0, PAGE_SIZE)
@@ -120,7 +132,8 @@ int netif_map(netif_t *netif, unsigned long tx_ring_ref,
 
 void netif_xenbus_init(void);
 
-#define netif_schedulable(dev) (netif_running(dev) && netif_carrier_ok(dev))
+#define netif_schedulable(netif)				\
+	(netif_running((netif)->dev) && netback_carrier_ok(netif))
 
 void netif_schedule_work(netif_t *netif);
 void netif_deschedule_work(netif_t *netif);

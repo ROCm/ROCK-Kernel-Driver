@@ -100,7 +100,7 @@ relocate_kernel(unsigned long indirection_page,
 
 
 /* Under Xen we need to work with machine addresses. These macros give the
- * machine address of a certain page to the generic kexec code instead of
+ * machine address of a certain page to the generic kexec code instead of 
  * the pseudo physical address which would be given by the default macros.
  */
 

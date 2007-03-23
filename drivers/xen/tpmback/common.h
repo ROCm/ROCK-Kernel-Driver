@@ -2,8 +2,8 @@
  * drivers/xen/tpmback/common.h
  */
 
-#ifndef __NETIF__BACKEND__COMMON_H__
-#define __NETIF__BACKEND__COMMON_H__
+#ifndef __TPM__BACKEND__COMMON_H__
+#define __TPM__BACKEND__COMMON_H__
 
 #include <linux/version.h>
 #include <linux/module.h>

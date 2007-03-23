@@ -6,12 +6,23 @@
 #include <linux/mm.h>		/* for struct page */
 #include <asm/io.h>		/* for phys_to_virt and page_to_pseudophys */
 
-#define pmd_populate_kernel(mm, pmd, pte) \
-		set_pmd(pmd, __pmd(_PAGE_TABLE + __pa(pte)))
+#define paravirt_alloc_pt(pfn) do { } while (0)
+#define paravirt_alloc_pd(pfn) do { } while (0)
+#define paravirt_alloc_pd(pfn) do { } while (0)
+#define paravirt_alloc_pd_clone(pfn, clonepfn, start, count) do { } while (0)
+#define paravirt_release_pt(pfn) do { } while (0)
+#define paravirt_release_pd(pfn) do { } while (0)
+
+#define pmd_populate_kernel(mm, pmd, pte)			\
+do {								\
+	paravirt_alloc_pt(__pa(pte) >> PAGE_SHIFT);		\
+	set_pmd(pmd, __pmd(_PAGE_TABLE + __pa(pte)));		\
+} while (0)
 
 #define pmd_populate(mm, pmd, pte) 					\
 do {									\
 	unsigned long pfn = page_to_pfn(pte);				\
+	paravirt_alloc_pt(pfn);						\
 	if (test_bit(PG_pinned, &virt_to_page((mm)->pgd)->flags)) {	\
 		if (!PageHighMem(pte))					\
 			BUG_ON(HYPERVISOR_update_va_mapping(		\
@@ -42,7 +53,11 @@ static inline void pte_free_kernel(pte_t *pte)
 
 extern void pte_free(struct page *pte);
 
-#define __pte_free_tlb(tlb,pte) tlb_remove_page((tlb),(pte))
+#define __pte_free_tlb(tlb,pte) 					\
+do {									\
+	paravirt_release_pt(page_to_pfn(pte));				\
+	tlb_remove_page((tlb),(pte));					\
+} while (0)
 
 #ifdef CONFIG_X86_PAE
 /*
@@ -55,13 +70,5 @@ extern void pte_free(struct page *pte);
 #endif
 
 #define check_pgt_cache()	do { } while (0)
-
-/* FIXME */
-#define paravirt_alloc_pt(pfn) do { } while (0)
-#define paravirt_alloc_pd(pfn) do { } while (0)
-#define paravirt_alloc_pd(pfn) do { } while (0)
-#define paravirt_alloc_pd_clone(pfn, clonepfn, start, count) do { } while (0)
-#define paravirt_release_pt(pfn) do { } while (0)
-#define paravirt_release_pd(pfn) do { } while (0)
 
 #endif /* _I386_PGALLOC_H */

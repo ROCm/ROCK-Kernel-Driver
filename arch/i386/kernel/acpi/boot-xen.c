@@ -675,7 +675,7 @@ static int __init acpi_parse_hpet(struct acpi_table_header *table)
 static int __init acpi_parse_fadt(struct acpi_table_header *table)
 {
 
-#if defined(CONFIG_X86_PM_TIMER) && !defined(CONFIG_XEN)
+#ifdef CONFIG_X86_PM_TIMER
 	/* detect the location of the ACPI PM Timer */
 	if (acpi_gbl_FADT.header.revision >= FADT2_REVISION_ID) {
 		/* FADT rev. 2 */

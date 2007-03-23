@@ -2,23 +2,23 @@
  * balloon/sysfs.c
  *
  * Xen balloon driver - sysfs interfaces.
- *
+ * 
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License version 2
  * as published by the Free Software Foundation; or, when distributed
  * separately from the Linux kernel or incorporated into other
  * software packages, subject to the following license:
- *
+ * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this source file (the "Software"), to deal in the Software without
  * restriction, including without limitation the rights to use, copy, modify,
  * merge, publish, distribute, sublicense, and/or sell copies of the Software,
  * and to permit persons to whom the Software is furnished to do so, subject to
  * the following conditions:
- *
+ * 
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- *
+ * 
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -66,16 +66,16 @@ static ssize_t store_target_kb(struct sys_device *dev,
 
 	if (!capable(CAP_SYS_ADMIN))
 		return -EPERM;
-
+	
 	if (count <= 1)
 		return -EBADMSG; /* runt */
 	if (count > sizeof(memstring))
 		return -EFBIG;   /* too long */
 	strcpy(memstring, buf);
-
+	
 	target_bytes = memparse(memstring, &endchar);
 	balloon_set_new_target(target_bytes >> PAGE_SHIFT);
-
+	
 	return count;
 }
 
@@ -132,7 +132,7 @@ static int register_balloon(struct sys_device *sysdev)
 	error = sysfs_create_group(&sysdev->kobj, &balloon_info_group);
 	if (error)
 		goto fail;
-
+	
 	return 0;
 
  fail:

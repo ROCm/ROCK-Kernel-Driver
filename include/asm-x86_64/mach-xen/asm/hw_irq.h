@@ -30,10 +30,32 @@
 
 #define IA32_SYSCALL_VECTOR	0x80
 
+#ifndef CONFIG_XEN
 
+/* Reserve the lowest usable priority level 0x20 - 0x2f for triggering
+ * cleanup after irq migration.
+ */
+#define IRQ_MOVE_CLEANUP_VECTOR	FIRST_EXTERNAL_VECTOR
+ 
 /*
  * Vectors 0x20-0x2f are used for ISA interrupts.
  */
+#define IRQ0_VECTOR		FIRST_EXTERNAL_VECTOR + 0x10
+#define IRQ1_VECTOR		IRQ0_VECTOR + 1
+#define IRQ2_VECTOR		IRQ0_VECTOR + 2
+#define IRQ3_VECTOR		IRQ0_VECTOR + 3
+#define IRQ4_VECTOR		IRQ0_VECTOR + 4
+#define IRQ5_VECTOR		IRQ0_VECTOR + 5 
+#define IRQ6_VECTOR		IRQ0_VECTOR + 6
+#define IRQ7_VECTOR		IRQ0_VECTOR + 7
+#define IRQ8_VECTOR		IRQ0_VECTOR + 8
+#define IRQ9_VECTOR		IRQ0_VECTOR + 9
+#define IRQ10_VECTOR		IRQ0_VECTOR + 10
+#define IRQ11_VECTOR		IRQ0_VECTOR + 11
+#define IRQ12_VECTOR		IRQ0_VECTOR + 12
+#define IRQ13_VECTOR		IRQ0_VECTOR + 13
+#define IRQ14_VECTOR		IRQ0_VECTOR + 14
+#define IRQ15_VECTOR		IRQ0_VECTOR + 15
 
 /*
  * Special IRQ vectors used by the SMP architecture, 0xf0-0xff
@@ -42,7 +64,6 @@
  *  into a single vector (CALL_FUNCTION_VECTOR) to save vector space.
  *  TLB, reschedule and local APIC vectors are performance-critical.
  */
-#ifndef CONFIG_XEN
 #define SPURIOUS_APIC_VECTOR	0xff
 #define ERROR_APIC_VECTOR	0xfe
 #define RESCHEDULE_VECTOR	0xfd
@@ -56,7 +77,6 @@
 #define INVALIDATE_TLB_VECTOR_START	0xf0	/* f0-f7 used for TLB flush */
 
 #define NUM_INVALIDATE_TLB_VECTORS	8
-#endif
 
 /*
  * Local APIC timer IRQ vector is on a different priority level,
@@ -67,12 +87,13 @@
 
 /*
  * First APIC vector available to drivers: (vectors 0x30-0xee)
- * we start at 0x31 to spread out vectors evenly between priority
+ * we start at 0x41 to spread out vectors evenly between priority
  * levels. (0x80 is the syscall vector)
  */
-#define FIRST_DEVICE_VECTOR	0x31
+#define FIRST_DEVICE_VECTOR	(IRQ15_VECTOR + 2)
 #define FIRST_SYSTEM_VECTOR	0xef   /* duplicated in irq.h */
 
+#endif
 
 #ifndef __ASSEMBLY__
 typedef int vector_irq_t[NR_VECTORS];
@@ -92,7 +113,7 @@ extern void enable_8259A_irq(unsigned int irq);
 extern int i8259A_irq_pending(unsigned int irq);
 extern void make_8259A_irq(unsigned int irq);
 extern void init_8259A(int aeoi);
-extern void FASTCALL(send_IPI_self(int vector));
+extern void send_IPI_self(int vector);
 extern void init_VISWS_APIC_irqs(void);
 extern void setup_IO_APIC(void);
 extern void disable_IO_APIC(void);

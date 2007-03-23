@@ -1,26 +1,26 @@
 /******************************************************************************
  * console.c
- *
+ * 
  * Virtual console driver.
- *
+ * 
  * Copyright (c) 2002-2004, K A Fraser.
- *
+ * 
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License version 2
  * as published by the Free Software Foundation; or, when distributed
  * separately from the Linux kernel or incorporated into other
  * software packages, subject to the following license:
- *
+ * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this source file (the "Software"), to deal in the Software without
  * restriction, including without limitation the rights to use, copy, modify,
  * merge, publish, distribute, sublicense, and/or sell copies of the Software,
  * and to permit persons to whom the Software is furnished to do so, subject to
  * the following conditions:
- *
+ * 
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- *
+ * 
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -67,7 +67,7 @@
  *  'xencons=ttyS' [XC_SERIAL]:  Console attached to '/dev/ttyS[0-9]+'.
  *  'xencons=xvc'  [XC_XVC]:     Console attached to '/dev/xvc0'.
  *  default:                     DOM0 -> XC_SERIAL ; all others -> XC_TTY.
- *
+ * 
  * NB. In mode XC_TTY, we create dummy consoles for tty2-63. This suppresses
  * warnings from standard distro startup scripts.
  */
@@ -316,8 +316,11 @@ void xencons_rx(char *buf, unsigned len)
 			static unsigned long sysrq_requested;
 
 			if (buf[i] == '\x0f') { /* ^O */
-				sysrq_requested = jiffies;
-				continue; /* don't print the sysrq key */
+				if (!sysrq_requested) {
+					sysrq_requested = jiffies;
+					continue; /* don't print sysrq key */
+				}
+				sysrq_requested = 0;
 			} else if (sysrq_requested) {
 				unsigned long sysrq_timeout =
 					sysrq_requested + HZ*2;

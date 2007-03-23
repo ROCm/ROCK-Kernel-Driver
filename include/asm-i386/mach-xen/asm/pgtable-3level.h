@@ -49,53 +49,19 @@ static inline int pte_exec_kernel(pte_t pte)
  * value and then use set_pte to update it.  -ben
  */
 
-#if 1
-/* use writable pagetables */
 static inline void set_pte(pte_t *ptep, pte_t pte)
 {
 	ptep->pte_high = pte.pte_high;
 	smp_wmb();
 	ptep->pte_low = pte.pte_low;
 }
-/*
- * Since this is only called on user PTEs, and the page fault handler
- * must handle the already racy situation of simultaneous page faults,
- * we are justified in merely clearing the PTE present bit, followed
- * by a set.  The ordering here is important.
- */
-static inline void set_pte_present(struct mm_struct *mm, unsigned long addr, pte_t *ptep, pte_t pte)
-{
-	if ((mm != current->mm && mm != &init_mm)
-	    || HYPERVISOR_update_va_mapping(addr, pte, 0)) {
-		ptep->pte_low = 0;
-		smp_wmb();
-		ptep->pte_high = pte.pte_high;
-		smp_wmb();
-		ptep->pte_low = pte.pte_low;
-	}
-}
-# define set_pte_atomic(pteptr,pteval) \
+#define set_pte_atomic(pteptr,pteval) \
 		set_64bit((unsigned long long *)(pteptr),pte_val_ma(pteval))
-#else
-/* no writable pagetables */
-# define set_pte(pteptr,pteval)				\
-		xen_l1_entry_update((pteptr), (pteval))
-# define set_pte_present(mm,addr,pteptr,pteval) set_pte_at(mm,addr,pteptr,pteval)
-# define set_pte_atomic(pteptr,pteval) set_pte(pteptr,pteval)
-#endif
 
 #define set_pte_at(_mm,addr,ptep,pteval) do {				\
 	if (((_mm) != current->mm && (_mm) != &init_mm) ||		\
 	    HYPERVISOR_update_va_mapping((addr), (pteval), 0))		\
 		set_pte((ptep), (pteval));				\
-} while (0)
-
-#define set_pte_at_sync(_mm,addr,ptep,pteval) do {			\
-	if (((_mm) != current->mm && (_mm) != &init_mm) ||		\
-	    HYPERVISOR_update_va_mapping((addr), (pteval), UVMF_INVLPG)) { \
-		set_pte((ptep), (pteval));				\
-		xen_invlpg((addr));					\
-	}								\
 } while (0)
 
 #define set_pmd(pmdptr,pmdval)				\
@@ -161,21 +127,24 @@ static inline int pte_none(pte_t pte)
 	return !pte.pte_low && !pte.pte_high;
 }
 
-#define pte_mfn(_pte) (((_pte).pte_low >> PAGE_SHIFT) |\
-		       (((_pte).pte_high & 0xfff) << (32-PAGE_SHIFT)))
-#define pte_pfn(_pte) mfn_to_local_pfn(pte_mfn(_pte))
+#define __pte_mfn(_pte) (((_pte).pte_low >> PAGE_SHIFT) | \
+			 ((_pte).pte_high << (32-PAGE_SHIFT)))
+#define pte_mfn(_pte) ((_pte).pte_low & _PAGE_PRESENT ? \
+	__pte_mfn(_pte) : pfn_to_mfn(__pte_mfn(_pte)))
+#define pte_pfn(_pte) ((_pte).pte_low & _PAGE_PRESENT ? \
+	mfn_to_local_pfn(__pte_mfn(_pte)) : __pte_mfn(_pte))
 
 extern unsigned long long __supported_pte_mask;
 
 static inline pte_t pfn_pte(unsigned long page_nr, pgprot_t pgprot)
 {
-	return pfn_pte_ma(pfn_to_mfn(page_nr), pgprot);
+	return __pte((((unsigned long long)page_nr << PAGE_SHIFT) |
+			pgprot_val(pgprot)) & __supported_pte_mask);
 }
 
 static inline pmd_t pfn_pmd(unsigned long page_nr, pgprot_t pgprot)
 {
-	BUG(); panic("needs review");
-	return __pmd((((unsigned long long)page_nr << PAGE_SHIFT) | \
+	return __pmd((((unsigned long long)page_nr << PAGE_SHIFT) |
 			pgprot_val(pgprot)) & __supported_pte_mask);
 }
 
@@ -196,6 +165,6 @@ static inline pmd_t pfn_pmd(unsigned long page_nr, pgprot_t pgprot)
 
 #define __pmd_free_tlb(tlb, x)		do { } while (0)
 
-#define vmalloc_sync_all() ((void)0)
+void vmalloc_sync_all(void);
 
 #endif /* _I386_PGTABLE_3LEVEL_H */

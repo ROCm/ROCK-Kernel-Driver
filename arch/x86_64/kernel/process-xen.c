@@ -50,7 +50,7 @@
 #include <asm/pda.h>
 #include <asm/prctl.h>
 #include <asm/kdebug.h>
-#include <xen/interface/dom0_ops.h>
+#include <xen/interface/platform.h>
 #include <xen/interface/physdev.h>
 #include <xen/interface/vcpu.h>
 #include <asm/desc.h>
@@ -116,7 +116,7 @@ void exit_idle(void)
  * to poll the ->need_resched flag instead of waiting for the
  * cross-CPU IPI to arrive. Use this option with caution.
  */
-static void poll_idle(void)
+static void poll_idle (void)
 {
 	local_irq_enable();
 	cpu_relax();
@@ -172,9 +172,7 @@ void cpu_idle (void)
 			if (__get_cpu_var(cpu_idle_state))
 				__get_cpu_var(cpu_idle_state) = 0;
 			rmb();
-			idle = pm_idle;
-			if (!idle)
-				idle = xen_idle;
+			idle = xen_idle; /* no alternatives */
 			if (cpu_is_offline(smp_processor_id()))
 				play_dead();
 			/*
@@ -310,7 +308,8 @@ void exit_thread(void)
 		struct tss_struct *tss = &per_cpu(init_tss, get_cpu());
 #endif
 #ifdef CONFIG_XEN
-		struct physdev_set_iobitmap iobmp_op = { 0 };
+		struct physdev_set_iobitmap iobmp_op;
+		memset(&iobmp_op, 0, sizeof(iobmp_op));
 #endif
 
 		kfree(t->io_bitmap_ptr);
@@ -338,14 +337,17 @@ void load_gs_index(unsigned gs)
 void flush_thread(void)
 {
 	struct task_struct *tsk = current;
-	struct thread_info *t = current_thread_info();
 
-	if (t->flags & _TIF_ABI_PENDING) {
-		t->flags ^= (_TIF_ABI_PENDING | _TIF_IA32);
-		if (t->flags & _TIF_IA32)
+	if (test_tsk_thread_flag(tsk, TIF_ABI_PENDING)) {
+		clear_tsk_thread_flag(tsk, TIF_ABI_PENDING);
+		if (test_tsk_thread_flag(tsk, TIF_IA32)) {
+			clear_tsk_thread_flag(tsk, TIF_IA32);
+		} else {
+			set_tsk_thread_flag(tsk, TIF_IA32);
 			current_thread_info()->status |= TS_COMPAT;
+		}
 	}
-	t->flags &= ~_TIF_DEBUG;
+	clear_tsk_thread_flag(tsk, TIF_DEBUG);
 
 	tsk->thread.debugreg0 = 0;
 	tsk->thread.debugreg1 = 0;
@@ -570,9 +572,9 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 		mcl++;
 	}
 
-	if (unlikely(test_tsk_thread_flag(next_p, TIF_IO_BITMAP)
-	          || test_tsk_thread_flag(prev_p, TIF_IO_BITMAP))) {
-		iobmp_op.bitmap   = (char *)next->io_bitmap_ptr;
+	if (unlikely(prev->io_bitmap_ptr || next->io_bitmap_ptr)) {
+		set_xen_guest_handle(iobmp_op.bitmap,
+				     (char *)next->io_bitmap_ptr);
 		iobmp_op.nr_ports = next->io_bitmap_ptr ? IO_BITMAP_BITS : 0;
 		mcl->op      = __HYPERVISOR_physdev_op;
 		mcl->args[0] = PHYSDEVOP_set_iobitmap;

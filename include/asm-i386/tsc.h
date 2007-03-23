@@ -54,11 +54,7 @@ static __always_inline cycles_t get_cycles_sync(void)
 
 extern void tsc_init(void);
 extern void mark_tsc_unstable(void);
-#ifdef CONFIG_XEN
-static inline int unsynchronized_tsc(void) { return 0; }
-#else
 extern int unsynchronized_tsc(void);
-#endif
 extern void init_tsc_clocksource(void);
 
 /*

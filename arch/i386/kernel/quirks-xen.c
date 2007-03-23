@@ -70,11 +70,11 @@ void __init quirk_intel_irqbalance(void)
 	word = read_pci_config_16(0, 0, 0x40, 0x4c);
 
 	if (!(word & (1 << 13))) {
-		dom0_op_t op;
+		struct xen_platform_op op;
 		printk(KERN_INFO "Disabling irq balancing and affinity\n");
-		op.cmd = DOM0_PLATFORM_QUIRK;
+		op.cmd = XENPF_platform_quirk;
 		op.u.platform_quirk.quirk_id = QUIRK_NOIRQBALANCING;
-		(void)HYPERVISOR_dom0_op(&op);
+		(void)HYPERVISOR_platform_op(&op);
 	}
 
 	/* put back the original value for config space */

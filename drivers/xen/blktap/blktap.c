@@ -1,13 +1,13 @@
 /******************************************************************************
  * drivers/xen/blktap/blktap.c
- *
+ * 
  * Back-end driver for user level virtual block devices. This portion of the
  * driver exports a 'unified' block-device interface that can be accessed
  * by any operating system that implements a compatible front end. Requests
  * are remapped to a user-space memory region.
  *
  * Based on the blkback driver code.
- *
+ * 
  * Copyright (c) 2004-2005, Andrew Warfield and Julian Chesterfield
  *
  * Clean ups and fix ups:
@@ -18,17 +18,17 @@
  * as published by the Free Software Foundation; or, when distributed
  * separately from the Linux kernel or incorporated into other
  * software packages, subject to the following license:
- *
+ * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this source file (the "Software"), to deal in the Software without
  * restriction, including without limitation the rights to use, copy, modify,
  * merge, publish, distribute, sublicense, and/or sell copies of the Software,
  * and to permit persons to whom the Software is furnished to do so, subject to
  * the following conditions:
- *
+ * 
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- *
+ * 
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -82,9 +82,9 @@ int setup_xen_class(void)
 
 /*
  * The maximum number of requests that can be outstanding at any time
- * is determined by
+ * is determined by 
  *
- *   [mmap_alloc * MAX_PENDING_REQS * BLKIF_MAX_SEGMENTS_PER_REQUEST]
+ *   [mmap_alloc * MAX_PENDING_REQS * BLKIF_MAX_SEGMENTS_PER_REQUEST] 
  *
  * where mmap_alloc < MAX_DYNAMIC_MEM.
  *
@@ -127,9 +127,9 @@ typedef struct tap_blkif {
 	unsigned long mode;           /*current switching mode               */
 	int minor;                    /*Minor number for tapdisk device      */
 	pid_t pid;                    /*tapdisk process id                   */
-	enum { RUNNING, CLEANSHUTDOWN } status; /*Detect a clean userspace
+	enum { RUNNING, CLEANSHUTDOWN } status; /*Detect a clean userspace 
 						  shutdown                   */
-	unsigned long *idx_map;       /*Record the user ring id to kern
+	unsigned long *idx_map;       /*Record the user ring id to kern 
 					[req id, idx] tuple                  */
 	blkif_t *blkif;               /*Associate blkif with tapdev          */
 	struct domid_translate trans; /*Translation from domid to bus.       */
@@ -146,9 +146,9 @@ module_param(log_stats, int, 0644);
 module_param(debug_lvl, int, 0644);
 
 /*
- * Each outstanding request that we've passed to the lower device layers has a
- * 'pending_req' allocated to it. Each buffer_head that completes decrements
- * the pendcnt towards zero. When it hits zero, the specified domain has a
+ * Each outstanding request that we've passed to the lower device layers has a 
+ * 'pending_req' allocated to it. Each buffer_head that completes decrements 
+ * the pendcnt towards zero. When it hits zero, the specified domain has a 
  * response queued for it, with the saved 'id' passed back.
  */
 typedef struct {
@@ -171,7 +171,7 @@ static int alloc_pending_reqs;
 
 typedef unsigned int PEND_RING_IDX;
 
-static inline int MASK_PEND_IDX(int i) {
+static inline int MASK_PEND_IDX(int i) { 
 	return (i & (MAX_PENDING_REQS-1));
 }
 
@@ -211,7 +211,7 @@ struct grant_handle_pair
 };
 #define INVALID_GRANT_HANDLE	0xFFFF
 
-static struct grant_handle_pair
+static struct grant_handle_pair 
     pending_grant_handles[MAX_DYNAMIC_MEM][MMAP_PAGES];
 #define pending_handle(_id, _idx, _i) \
     (pending_grant_handles[_id][((_idx) * BLKIF_MAX_SEGMENTS_PER_REQUEST) \
@@ -235,7 +235,7 @@ static int blktap_major;
 #define BLKTAP_IOCTL_MAJOR	     7
 #define BLKTAP_QUERY_ALLOC_REQS      8
 #define BLKTAP_IOCTL_FREEINTF        9
-#define BLKTAP_IOCTL_PRINT_IDXS      100
+#define BLKTAP_IOCTL_PRINT_IDXS      100  
 
 /* blktap switching modes: (Set with BLKTAP_IOCTL_SETMODE)             */
 #define BLKTAP_MODE_PASSTHROUGH      0x00000000  /* default            */
@@ -255,7 +255,7 @@ static inline int BLKTAP_MODE_VALID(unsigned long arg)
 
 /* Requests passing through the tap to userspace are re-assigned an ID.
  * We must record a mapping between the BE [IDX,ID] tuple and the userspace
- * ring ID.
+ * ring ID. 
  */
 
 static inline unsigned long MAKE_ID(domid_t fe_dom, PEND_RING_IDX idx)
@@ -319,7 +319,7 @@ struct vm_operations_struct blktap_vm_ops = {
 /******************************************************************
  * BLKTAP FILE OPS
  */
-
+ 
 /*Function Declarations*/
 static tap_blkif_t *get_next_free_dev(void);
 static int blktap_open(struct inode *inode, struct file *filp);
@@ -412,7 +412,7 @@ out:
 	return info;
 }
 
-int dom_to_devid(domid_t domid, int xenbus_id, blkif_t *blkif)
+int dom_to_devid(domid_t domid, int xenbus_id, blkif_t *blkif) 
 {
 	tap_blkif_t *info;
 	int i;
@@ -430,7 +430,7 @@ int dom_to_devid(domid_t domid, int xenbus_id, blkif_t *blkif)
 	return -1;
 }
 
-void signal_tapdisk(int idx)
+void signal_tapdisk(int idx) 
 {
 	tap_blkif_t *info;
 	struct task_struct *ptask;
@@ -455,7 +455,7 @@ static int blktap_open(struct inode *inode, struct file *filp)
 	int idx = iminor(inode) - BLKTAP_MINOR;
 	tap_blkif_t *info;
 	int i;
-
+	
 	/* ctrl device, treat differently */
 	if (!idx)
 		return 0;
@@ -469,32 +469,32 @@ static int blktap_open(struct inode *inode, struct file *filp)
 	}
 
 	DPRINTK("Opening device /dev/xen/blktap%d\n",idx);
-
+	
 	/*Only one process can access device at a time*/
 	if (test_and_set_bit(0, &info->dev_inuse))
 		return -EBUSY;
 
 	info->dev_pending = 0;
-
+	    
 	/* Allocate the fe ring. */
 	sring = (blkif_sring_t *)get_zeroed_page(GFP_KERNEL);
 	if (sring == NULL)
 		goto fail_nomem;
 
 	SetPageReserved(virt_to_page(sring));
-
+    
 	SHARED_RING_INIT(sring);
 	FRONT_RING_INIT(&info->ufe_ring, sring, PAGE_SIZE);
-
+	
 	filp->private_data = info;
 	info->vma = NULL;
 
-	info->idx_map = kmalloc(sizeof(unsigned long) * MAX_PENDING_REQS,
+	info->idx_map = kmalloc(sizeof(unsigned long) * MAX_PENDING_REQS, 
 				GFP_KERNEL);
-
+	
 	if (idx > 0) {
 		init_waitqueue_head(&info->wait);
-		for (i = 0; i < MAX_PENDING_REQS; i++)
+		for (i = 0; i < MAX_PENDING_REQS; i++) 
 			info->idx_map[i] = INVALID_REQ;
 	}
 
@@ -508,7 +508,7 @@ static int blktap_open(struct inode *inode, struct file *filp)
 static int blktap_release(struct inode *inode, struct file *filp)
 {
 	tap_blkif_t *info = filp->private_data;
-
+	
 	/* check for control device */
 	if (!info)
 		return 0;
@@ -523,18 +523,18 @@ static int blktap_release(struct inode *inode, struct file *filp)
 	/* Clear any active mappings and free foreign map table */
 	if (info->vma) {
 		zap_page_range(
-			info->vma, info->vma->vm_start,
+			info->vma, info->vma->vm_start, 
 			info->vma->vm_end - info->vma->vm_start, NULL);
 		info->vma = NULL;
 	}
-
+	
 	if ( (info->status != CLEANSHUTDOWN) && (info->blkif != NULL) ) {
 		if (info->blkif->xenblkd != NULL) {
 			kthread_stop(info->blkif->xenblkd);
 			info->blkif->xenblkd = NULL;
 		}
 		info->status = CLEANSHUTDOWN;
-	}
+	}	
 	return 0;
 }
 
@@ -542,7 +542,7 @@ static int blktap_release(struct inode *inode, struct file *filp)
 /* Note on mmap:
  * We need to map pages to user space in a way that will allow the block
  * subsystem set up direct IO to them.  This couldn't be done before, because
- * there isn't really a sane way to translate a user virtual address down to a
+ * there isn't really a sane way to translate a user virtual address down to a 
  * physical address when the page belongs to another domain.
  *
  * My first approach was to map the page in to kernel memory, add an entry
@@ -553,7 +553,7 @@ static int blktap_release(struct inode *inode, struct file *filp)
  *
  * The new approach is to provide explicit support for this in xen linux.
  * The VMA now has a flag, VM_FOREIGN, to indicate that it contains pages
- * mapped from other vms.  vma->vm_private_data is set up as a mapping
+ * mapped from other vms.  vma->vm_private_data is set up as a mapping 
  * from pages to actual page structs.  There is a new clause in get_user_pages
  * that does the right thing for this sort of mapping.
  */
@@ -568,7 +568,7 @@ static int blktap_mmap(struct file *filp, struct vm_area_struct *vma)
 		WPRINTK("blktap: mmap, retrieving idx failed\n");
 		return -ENOMEM;
 	}
-
+	
 	vma->vm_flags |= VM_RESERVED;
 	vma->vm_ops = &blktap_vm_ops;
 
@@ -582,10 +582,10 @@ static int blktap_mmap(struct file *filp, struct vm_area_struct *vma)
 	size >>= PAGE_SHIFT;
 	info->rings_vstart = vma->vm_start;
 	info->user_vstart  = info->rings_vstart + (RING_PAGES << PAGE_SHIFT);
-
+    
 	/* Map the ring pages to the start of the region and reserve it. */
-	if (remap_pfn_range(vma, vma->vm_start,
-			    __pa(info->ufe_ring.sring) >> PAGE_SHIFT,
+	if (remap_pfn_range(vma, vma->vm_start, 
+			    __pa(info->ufe_ring.sring) >> PAGE_SHIFT, 
 			    PAGE_SIZE, vma->vm_page_prot)) {
 		WPRINTK("Mapping user ring failed!\n");
 		goto fail;
@@ -602,7 +602,7 @@ static int blktap_mmap(struct file *filp, struct vm_area_struct *vma)
 
 	for (i = 0; i < ((vma->vm_end - vma->vm_start) >> PAGE_SHIFT); i++)
 		map[i] = NULL;
-
+    
 	vma->vm_private_data = map;
 	vma->vm_flags |= VM_FOREIGN;
 
@@ -611,7 +611,7 @@ static int blktap_mmap(struct file *filp, struct vm_area_struct *vma)
 	return 0;
  fail:
 	/* Clear any active mappings. */
-	zap_page_range(vma, vma->vm_start,
+	zap_page_range(vma, vma->vm_start, 
 		       vma->vm_end - vma->vm_start, NULL);
 
 	return -ENOMEM;
@@ -624,7 +624,7 @@ static int blktap_ioctl(struct inode *inode, struct file *filp,
 	tap_blkif_t *info = filp->private_data;
 
 	switch(cmd) {
-	case BLKTAP_IOCTL_KICK_FE:
+	case BLKTAP_IOCTL_KICK_FE: 
 	{
 		/* There are fe messages to process. */
 		return blktap_read_ufe_ring(info);
@@ -635,7 +635,7 @@ static int blktap_ioctl(struct inode *inode, struct file *filp,
 			if (BLKTAP_MODE_VALID(arg)) {
 				info->mode = arg;
 				/* XXX: may need to flush rings here. */
-				DPRINTK("blktap: set mode to %lx\n",
+				DPRINTK("blktap: set mode to %lx\n", 
 				       arg);
 				return 0;
 			}
@@ -659,17 +659,17 @@ static int blktap_ioctl(struct inode *inode, struct file *filp,
 	{
 		if (info) {
 			info->pid = (pid_t)arg;
-			DPRINTK("blktap: pid received %d\n",
+			DPRINTK("blktap: pid received %d\n", 
 			       info->pid);
 		}
 		return 0;
 	}
 	case BLKTAP_IOCTL_NEWINTF:
-	{
+	{		
 		uint64_t val = (uint64_t)arg;
 		domid_translate_t *tr = (domid_translate_t *)&val;
 
-		DPRINTK("NEWINTF Req for domid %d and bus id %d\n",
+		DPRINTK("NEWINTF Req for domid %d and bus id %d\n", 
 		       tr->domid, tr->busid);
 		info = get_next_free_dev();
 		if (!info) {
@@ -725,7 +725,7 @@ static int blktap_ioctl(struct inode *inode, struct file *filp,
 static unsigned int blktap_poll(struct file *filp, poll_table *wait)
 {
 	tap_blkif_t *info = filp->private_data;
-
+	
 	/* do not work on the control device */
 	if (!info)
 		return 0;
@@ -756,7 +756,7 @@ static int do_block_io_op(blkif_t *blkif);
 static void dispatch_rw_block_io(blkif_t *blkif,
 				 blkif_request_t *req,
 				 pending_req_t *pending_req);
-static void make_response(blkif_t *blkif, unsigned long id,
+static void make_response(blkif_t *blkif, unsigned long id, 
                           unsigned short op, int st);
 
 /******************************************************************
@@ -766,7 +766,7 @@ static int req_increase(void)
 {
 	int i, j;
 
-	if (mmap_alloc >= MAX_PENDING_REQS || mmap_lock)
+	if (mmap_alloc >= MAX_PENDING_REQS || mmap_lock) 
 		return -EINVAL;
 
 	pending_reqs[mmap_alloc]  = kzalloc(sizeof(pending_req_t)
@@ -780,11 +780,11 @@ static int req_increase(void)
 		__FUNCTION__, blkif_reqs, mmap_pages);
 
 	for (i = 0; i < MAX_PENDING_REQS; i++) {
-		list_add_tail(&pending_reqs[mmap_alloc][i].free_list,
+		list_add_tail(&pending_reqs[mmap_alloc][i].free_list, 
 			      &pending_free);
 		pending_reqs[mmap_alloc][i].mem_idx = mmap_alloc;
 		for (j = 0; j < BLKIF_MAX_SEGMENTS_PER_REQUEST; j++)
-			BLKTAP_INVALIDATE_HANDLE(&pending_handle(mmap_alloc,
+			BLKTAP_INVALIDATE_HANDLE(&pending_handle(mmap_alloc, 
 								 i, j));
 	}
 
@@ -869,7 +869,7 @@ static void fast_flush_area(pending_req_t *req, int k_idx, int u_idx,
 	int ret, mmap_idx;
 	unsigned long kvaddr, uvaddr;
 	tap_blkif_t *info;
-
+	
 
 	info = tapfds[tapidx];
 
@@ -881,8 +881,8 @@ static void fast_flush_area(pending_req_t *req, int k_idx, int u_idx,
 	if (info->vma != NULL &&
 	    xen_feature(XENFEAT_auto_translated_physmap)) {
 		down_write(&info->vma->vm_mm->mmap_sem);
-		zap_page_range(info->vma,
-			       MMAP_VADDR(info->user_vstart, u_idx, 0),
+		zap_page_range(info->vma, 
+			       MMAP_VADDR(info->user_vstart, u_idx, 0), 
 			       req->nr_pages << PAGE_SHIFT, NULL);
 		up_write(&info->vma->vm_mm->mmap_sem);
 	}
@@ -925,10 +925,10 @@ static void fast_flush_area(pending_req_t *req, int k_idx, int u_idx,
 	ret = HYPERVISOR_grant_table_op(
 		GNTTABOP_unmap_grant_ref, unmap, invcount);
 	BUG_ON(ret);
-
+	
 	if (info->vma != NULL && !xen_feature(XENFEAT_auto_translated_physmap))
-		zap_page_range(info->vma,
-			       MMAP_VADDR(info->user_vstart, u_idx, 0),
+		zap_page_range(info->vma, 
+			       MMAP_VADDR(info->user_vstart, u_idx, 0), 
 			       req->nr_pages << PAGE_SHIFT, NULL);
 }
 
@@ -997,7 +997,7 @@ static int blktap_read_ufe_ring(tap_blkif_t *info)
 	blkif_t *blkif=NULL;
 	int pending_idx, usr_idx, mmap_idx;
 	pending_req_t *pending_req;
-
+	
 	if (!info)
 		return 0;
 
@@ -1008,7 +1008,7 @@ static int blktap_read_ufe_ring(tap_blkif_t *info)
 	/* for each outstanding message on the UFEring  */
 	rp = info->ufe_ring.sring->rsp_prod;
 	rmb();
-
+        
 	for (i = info->ufe_ring.rsp_cons; i != rp; i++) {
 		blkif_response_t res;
 		resp = RING_GET_RESPONSE(&info->ufe_ring, i);
@@ -1021,11 +1021,11 @@ static int blktap_read_ufe_ring(tap_blkif_t *info)
 		pending_idx = MASK_PEND_IDX(ID_TO_IDX(info->idx_map[usr_idx]));
 		mmap_idx = ID_TO_MIDX(info->idx_map[usr_idx]);
 
-		if ( (mmap_idx >= mmap_alloc) ||
+		if ( (mmap_idx >= mmap_alloc) || 
 		   (ID_TO_IDX(info->idx_map[usr_idx]) >= MAX_PENDING_REQS) )
 			WPRINTK("Incorrect req map"
-			       "[%d], internal map [%d,%d (%d)]\n",
-			       usr_idx, mmap_idx,
+			       "[%d], internal map [%d,%d (%d)]\n", 
+			       usr_idx, mmap_idx, 
 			       ID_TO_IDX(info->idx_map[usr_idx]),
 			       MASK_PEND_IDX(
 				       ID_TO_IDX(info->idx_map[usr_idx])));
@@ -1045,7 +1045,7 @@ static int blktap_read_ufe_ring(tap_blkif_t *info)
 
 			pg = pfn_to_page(__pa(kvaddr) >> PAGE_SHIFT);
 			ClearPageReserved(pg);
-			offset = (uvaddr - info->vma->vm_start)
+			offset = (uvaddr - info->vma->vm_start) 
 				>> PAGE_SHIFT;
 			map[offset] = NULL;
 		}
@@ -1056,7 +1056,7 @@ static int blktap_read_ufe_ring(tap_blkif_t *info)
 		blkif_put(pending_req->blkif);
 		free_req(pending_req);
 	}
-
+		
 	return 0;
 }
 
@@ -1100,7 +1100,7 @@ static int do_block_io_op(blkif_t *blkif)
 	if (blkif->dev_num < 0) {
 		/*oops*/
 		if (print_dbug) {
-			WPRINTK("Corresponding UE "
+			WPRINTK("Corresponding UE " 
 			       "ring does not exist!\n");
 			print_dbug = 0; /*We only print this message once*/
 		}
@@ -1118,7 +1118,7 @@ static int do_block_io_op(blkif_t *blkif)
 	}
 
 	while (rc != rp) {
-
+		
 		if (RING_FULL(&info->ufe_ring)) {
 			WPRINTK("RING_FULL! More to do\n");
 			more_to_do = 1;
@@ -1129,7 +1129,7 @@ static int do_block_io_op(blkif_t *blkif)
 			WPRINTK("RING_REQUEST_CONS_OVERFLOW!"
 			       " More to do\n");
 			more_to_do = 1;
-			break;
+			break;		
 		}
 
 		pending_req = alloc_req();
@@ -1175,7 +1175,7 @@ static int do_block_io_op(blkif_t *blkif)
 			break;
 		}
 	}
-
+		
 	blktap_kick_user(blkif->dev_num);
 
 	return more_to_do;
@@ -1189,7 +1189,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 	int op, operation = (req->operation == BLKIF_OP_WRITE) ? WRITE : READ;
 	struct gnttab_map_grant_ref map[BLKIF_MAX_SEGMENTS_PER_REQUEST*2];
 	unsigned int nseg;
-	int ret, i;
+	int ret, i, nr_sects = 0;
 	tap_blkif_t *info;
 	uint64_t sector;
 	blkif_request_t *target;
@@ -1213,12 +1213,12 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 
 	/* Check that number of segments is sane. */
 	nseg = req->nr_segments;
-	if ( unlikely(nseg == 0) ||
+	if ( unlikely(nseg == 0) || 
 	    unlikely(nseg > BLKIF_MAX_SEGMENTS_PER_REQUEST) ) {
 		WPRINTK("Bad number of segments in request (%d)\n", nseg);
 		goto fail_response;
 	}
-
+	
 	/* Make sure userspace is ready. */
 	if (!info->ring_ok) {
 		WPRINTK("blktap: ring not ready for requests!\n");
@@ -1250,11 +1250,11 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 
 		sector = req->sector_number + ((PAGE_SIZE / 512) * i);
 		if( (blkif->sectors > 0) && (sector >= blkif->sectors) ) {
-			WPRINTK("BLKTAP: Sector request greater"
+			WPRINTK("BLKTAP: Sector request greater" 
 			       "than size\n");
-			WPRINTK("BLKTAP: %s request sector"
+			WPRINTK("BLKTAP: %s request sector" 
 			       "[%llu,%llu], Total [%llu]\n",
-			       (req->operation ==
+			       (req->operation == 
 				BLKIF_OP_WRITE ? "WRITE" : "READ"),
 				(long long unsigned) sector,
 				(long long unsigned) sector>>9,
@@ -1270,7 +1270,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 
 		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
 			/* Now map it to user. */
-			ret = create_lookup_pte_addr(info->vma->vm_mm,
+			ret = create_lookup_pte_addr(info->vma->vm_mm, 
 						     uvaddr, &ptep);
 			if (ret) {
 				WPRINTK("Couldn't get a pte addr!\n");
@@ -1285,6 +1285,9 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 					  req->seg[i].gref, blkif->domid);
 			op++;
 		}
+
+		nr_sects += (req->seg[i].last_sect - 
+			     req->seg[i].first_sect + 1);
 	}
 
 	ret = HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, map, op);
@@ -1314,9 +1317,9 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 				map[i+1].handle = INVALID_GRANT_HANDLE;
 			}
 
-			pending_handle(mmap_idx, pending_idx, i/2).kernel
+			pending_handle(mmap_idx, pending_idx, i/2).kernel 
 				= map[i].handle;
-			pending_handle(mmap_idx, pending_idx, i/2).user
+			pending_handle(mmap_idx, pending_idx, i/2).user   
 				= map[i+1].handle;
 
 			if (ret)
@@ -1347,7 +1350,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 				map[i].handle = INVALID_GRANT_HANDLE;
 			}
 
-			pending_handle(mmap_idx, pending_idx, i).kernel
+			pending_handle(mmap_idx, pending_idx, i).kernel 
 				= map[i].handle;
 
 			if (ret)
@@ -1385,7 +1388,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 	}
 	if (xen_feature(XENFEAT_auto_translated_physmap))
 		up_write(&info->vma->vm_mm->mmap_sem);
-
+	
 	/*record [mmap_idx,pending_idx] to [usr_idx] mapping*/
 	info->idx_map[usr_idx] = MAKE_ID(mmap_idx, pending_idx);
 
@@ -1397,6 +1400,12 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 	target->id = usr_idx;
 	wmb(); /* blktap_poll() reads req_prod_pvt asynchronously */
 	info->ufe_ring.req_prod_pvt++;
+
+	if (operation == READ)
+		blkif->st_rd_sect += nr_sects;
+	else if (operation == WRITE)
+		blkif->st_wr_sect += nr_sects;
+
 	return;
 
  fail_flush:
@@ -1405,7 +1414,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
  fail_response:
 	make_response(blkif, req->id, req->operation, BLKIF_RSP_ERROR);
 	free_req(pending_req);
-}
+} 
 
 
 
@@ -1414,7 +1423,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
  */
 
 
-static void make_response(blkif_t *blkif, unsigned long id,
+static void make_response(blkif_t *blkif, unsigned long id, 
                           unsigned short op, int st)
 {
 	blkif_response_t  resp;
@@ -1497,8 +1506,8 @@ static int __init blkif_init(void)
 	if (ret < 0) {
 		WPRINTK("Couldn't register /dev/xen/blktap\n");
 		return -ENOMEM;
-	}
-
+	}	
+	
 	blktap_major = ret;
 
 	/* tapfds[0] is always NULL */

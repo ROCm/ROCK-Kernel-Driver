@@ -101,7 +101,7 @@ __OUTS(l)
 
 #define IO_SPACE_LIMIT 0xffff
 
-#if defined(__KERNEL__) && __x86_64__
+#if defined(__KERNEL__) && defined(__x86_64__)
 
 #include <linux/vmalloc.h>
 
@@ -266,12 +266,6 @@ void memset_io(volatile void __iomem *a, int b, size_t c);
  * analogy with PCI is quite large):
  */
 #define __ISA_IO_base ((char __iomem *)(fix_to_virt(FIX_ISAMAP_BEGIN)))
-
-/*
- * Again, x86-64 does not require mem IO specific function.
- */
-
-#define eth_io_copy_and_sum(a,b,c,d)		eth_copy_and_sum((a),(void *)(b),(c),(d))
 
 /* Nothing to do */
 

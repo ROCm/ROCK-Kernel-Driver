@@ -80,7 +80,7 @@ $(obj)/vsyscall-%.so: $(src)/vsyscall.lds \
 ifeq ($(CONFIG_XEN)$(CONFIG_COMPAT_VDSO),yy)
 
 # vsyscall.o also contains the vsyscall DSO relocation info as __initdata.
-# We must build both the alternative images before we can assemble it.
+# We must build both alternative images before we can assemble it.
 # Note: kbuild does not track this dependency due to usage of .include
 $(obj)/vsyscall.o: $(obj)/vsyscall-int80.rel $(obj)/vsyscall-sysenter.rel
 targets += $(foreach F,int80 sysenter,vsyscall-$F.so.alt vsyscall-$F.rel)
@@ -143,9 +143,10 @@ include $(srctree)/scripts/Makefile.xen
 
 obj-y += fixup.o
 microcode-$(subst m,y,$(CONFIG_MICROCODE)) := microcode-xen.o
-n-obj-xen := i8259.o reboot.o smpboot.o trampoline.o tsc.o
+n-obj-xen := i8253.o i8259.o reboot.o smpboot.o trampoline.o tsc.o tsc_sync.o
 
 obj-y := $(call filterxen, $(obj-y), $(n-obj-xen))
 obj-y := $(call cherrypickxen, $(obj-y))
 extra-y := $(call cherrypickxen, $(extra-y))
+%/head-xen.o %/head-xen.s: EXTRA_AFLAGS :=
 endif

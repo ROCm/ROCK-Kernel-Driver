@@ -267,6 +267,7 @@ static inline pte_t pte_mkhuge(pte_t pte)	{ (pte).pte_low |= _PAGE_PSE; return p
  */
 #define pte_update(mm, addr, ptep)		do { } while (0)
 #define pte_update_defer(mm, addr, ptep)	do { } while (0)
+#define paravirt_map_pt_hook(slot, va, pfn)	do { } while (0)
 
 /*
  * We only update the dirty/accessed state if we set
@@ -276,19 +277,20 @@ static inline pte_t pte_mkhuge(pte_t pte)	{ (pte).pte_low |= _PAGE_PSE; return p
  * bit at the same time.
  */
 #define  __HAVE_ARCH_PTEP_SET_ACCESS_FLAGS
-#define ptep_set_access_flags(vma, address, ptep, entry, dirty)		\
-do {									\
-	if (dirty) {							\
-		if ( likely((vma)->vm_mm == current->mm) ) {		\
-			BUG_ON(HYPERVISOR_update_va_mapping(address,	\
-				entry,					\
-				UVMF_INVLPG|UVMF_MULTI|(unsigned long)((vma)->vm_mm->cpu_vm_mask.bits))); \
-		} else {						\
-			xen_l1_entry_update(ptep, entry);		\
-			flush_tlb_page(vma, address);			\
-		}							\
-	}								\
-} while (0)
+#define ptep_set_access_flags(vma, address, ptep, entry, dirty) \
+	do {								  \
+		if (dirty) {						  \
+			if ( likely((vma)->vm_mm == current->mm) ) {	  \
+				BUG_ON(HYPERVISOR_update_va_mapping(address, \
+					entry,				  \
+					(unsigned long)(vma)->vm_mm->cpu_vm_mask.bits| \
+					UVMF_INVLPG|UVMF_MULTI));	  \
+			} else {					  \
+				xen_l1_entry_update(ptep, entry);	  \
+				flush_tlb_page(vma, address);		  \
+			}						  \
+		}							  \
+	} while (0)
 
 /*
  * We don't actually have these, but we want to advertise them so that
@@ -310,18 +312,26 @@ do {									\
 #define __HAVE_ARCH_PTEP_CLEAR_DIRTY_FLUSH
 #define ptep_clear_flush_dirty(vma, address, ptep)			\
 ({									\
-	int __dirty;							\
-	__dirty = pte_dirty(*(ptep));					\
-	ptep_set_access_flags(vma, address, ptep, pte_mkclean(*(ptep)), __dirty); \
+	pte_t __pte = *(ptep);						\
+	int __dirty = pte_dirty(__pte);					\
+	__pte = pte_mkclean(__pte);					\
+	if (test_bit(PG_pinned, &virt_to_page((vma)->vm_mm->pgd)->flags)) \
+		ptep_set_access_flags(vma, address, ptep, __pte, __dirty); \
+	else if (__dirty)						\
+		(ptep)->pte_low = __pte.pte_low;			\
 	__dirty;							\
 })
 
 #define __HAVE_ARCH_PTEP_CLEAR_YOUNG_FLUSH
 #define ptep_clear_flush_young(vma, address, ptep)			\
 ({									\
-	int __young;							\
-	__young = pte_young(*(ptep));					\
-	ptep_set_access_flags(vma, address, ptep, pte_mkold(*(ptep)), __young); \
+	pte_t __pte = *(ptep);						\
+	int __young = pte_young(__pte);					\
+	__pte = pte_mkold(__pte);					\
+	if (test_bit(PG_pinned, &virt_to_page((vma)->vm_mm->pgd)->flags)) \
+		ptep_set_access_flags(vma, address, ptep, __pte, __young); \
+	else if (__young)						\
+		(ptep)->pte_low = __pte.pte_low;			\
 	__young;							\
 })
 
@@ -386,18 +396,19 @@ static inline void clone_pgd_range(pgd_t *dst, pgd_t *src, int count)
 
 static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 {
-	pte.pte_low &= _PAGE_CHG_MASK;
-	pte.pte_low |= pgprot_val(newprot);
-#ifdef CONFIG_X86_PAE
 	/*
-	 * Chop off the NX bit (if present), and add the NX portion of
-	 * the newprot (if present):
+	 * Since this might change the present bit (which controls whether
+	 * a pte_t object has undergone p2m translation), we must use
+	 * pte_val() on the input pte and __pte() for the return value.
 	 */
-	pte.pte_high &= ~(1 << (_PAGE_BIT_NX - 32));
-	pte.pte_high |= (pgprot_val(newprot) >> 32) & \
-					(__supported_pte_mask >> 32);
+	paddr_t pteval = pte_val(pte);
+
+	pteval &= _PAGE_CHG_MASK;
+	pteval |= pgprot_val(newprot);
+#ifdef CONFIG_X86_PAE
+	pteval &= __supported_pte_mask;
 #endif
-	return pte;
+	return __pte(pteval);
 }
 
 #define pmd_large(pmd) \
@@ -470,12 +481,24 @@ extern pte_t *lookup_address(unsigned long address);
 #endif
 
 #if defined(CONFIG_HIGHPTE)
-#define pte_offset_map(dir, address) \
-	((pte_t *)kmap_atomic_pte(pmd_page(*(dir)),KM_PTE0) + \
-	 pte_index(address))
-#define pte_offset_map_nested(dir, address) \
-	((pte_t *)kmap_atomic_pte(pmd_page(*(dir)),KM_PTE1) + \
-	 pte_index(address))
+#define pte_offset_map(dir, address)				\
+({								\
+	pte_t *__ptep;						\
+	unsigned pfn = pmd_val(*(dir)) >> PAGE_SHIFT;		\
+	__ptep = (pte_t *)kmap_atomic_pte(pfn_to_page(pfn),KM_PTE0); \
+	paravirt_map_pt_hook(KM_PTE0,__ptep, pfn);		\
+	__ptep = __ptep + pte_index(address);			\
+	__ptep;							\
+})
+#define pte_offset_map_nested(dir, address)			\
+({								\
+	pte_t *__ptep;						\
+	unsigned pfn = pmd_val(*(dir)) >> PAGE_SHIFT;		\
+	__ptep = (pte_t *)kmap_atomic_pte(pfn_to_page(pfn),KM_PTE1); \
+	paravirt_map_pt_hook(KM_PTE1,__ptep, pfn);		\
+	__ptep = __ptep + pte_index(address);			\
+	__ptep;							\
+})
 #define pte_unmap(pte) kunmap_atomic(pte, KM_PTE0)
 #define pte_unmap_nested(pte) kunmap_atomic(pte, KM_PTE1)
 #else
@@ -488,7 +511,7 @@ extern pte_t *lookup_address(unsigned long address);
 
 /* Clear a kernel PTE and flush it from the TLB */
 #define kpte_clear_flush(ptep, vaddr) \
-	set_pte_at_sync(&init_mm,vaddr,ptep,__pte(0))
+	HYPERVISOR_update_va_mapping(vaddr, __pte(0), UVMF_INVLPG)
 
 /*
  * The i386 doesn't have any external MMU info: the kernel page

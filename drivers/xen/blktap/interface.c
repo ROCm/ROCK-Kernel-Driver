@@ -1,8 +1,8 @@
 /******************************************************************************
  * drivers/xen/blktap/interface.c
- *
+ * 
  * Block-device interface management.
- *
+ * 
  * Copyright (c) 2004, Keir Fraser
  *
  * This program is free software; you can redistribute it and/or
@@ -58,15 +58,12 @@ blkif_t *tap_alloc_blkif(domid_t domid)
 static int map_frontend_page(blkif_t *blkif, unsigned long shared_page)
 {
 	struct gnttab_map_grant_ref op;
-	int ret;
 
 	gnttab_set_map_op(&op, (unsigned long)blkif->blk_ring_area->addr,
 			  GNTMAP_host_map, shared_page, blkif->domid);
 
-	lock_vm_area(blkif->blk_ring_area);
-	ret = HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1);
-	unlock_vm_area(blkif->blk_ring_area);
-	BUG_ON(ret);
+	if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1))
+		BUG();
 
 	if (op.status) {
 		DPRINTK(" Grant table operation failure !\n");
@@ -82,18 +79,15 @@ static int map_frontend_page(blkif_t *blkif, unsigned long shared_page)
 static void unmap_frontend_page(blkif_t *blkif)
 {
 	struct gnttab_unmap_grant_ref op;
-	int ret;
 
 	gnttab_set_unmap_op(&op, (unsigned long)blkif->blk_ring_area->addr,
 			    GNTMAP_host_map, blkif->shmem_handle);
 
-	lock_vm_area(blkif->blk_ring_area);
-	ret = HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1);
-	unlock_vm_area(blkif->blk_ring_area);
-	BUG_ON(ret);
+	if (HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1))
+		BUG();
 }
 
-int tap_blkif_map(blkif_t *blkif, unsigned long shared_page,
+int tap_blkif_map(blkif_t *blkif, unsigned long shared_page, 
 		  unsigned int evtchn)
 {
 	int err;
@@ -174,6 +168,6 @@ void tap_blkif_free(blkif_t *blkif)
 
 void __init tap_blkif_interface_init(void)
 {
-	blkif_cachep = kmem_cache_create("blktapif_cache", sizeof(blkif_t),
+	blkif_cachep = kmem_cache_create("blktapif_cache", sizeof(blkif_t), 
 					 0, 0, NULL, NULL);
 }

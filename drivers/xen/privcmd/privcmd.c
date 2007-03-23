@@ -1,8 +1,8 @@
 /******************************************************************************
  * privcmd.c
- *
+ * 
  * Interface to privileged domain-0 commands.
- *
+ * 
  * Copyright (c) 2002-2004, K A Fraser, B Dragovic
  */
 
@@ -28,7 +28,6 @@
 #include <asm/hypervisor.h>
 #include <xen/public/privcmd.h>
 #include <xen/interface/xen.h>
-#include <xen/interface/dom0_ops.h>
 #include <xen/xen_proc.h>
 
 static struct proc_dir_entry *privcmd_intf;
@@ -47,7 +46,7 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 	switch (cmd) {
 	case IOCTL_PRIVCMD_HYPERCALL: {
 		privcmd_hypercall_t hypercall;
-
+  
 		if (copy_from_user(&hypercall, udata, sizeof(hypercall)))
 			return -EFAULT;
 
@@ -140,9 +139,9 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 
 			if ((rc = direct_remap_pfn_range(
 				vma,
-				msg.va & PAGE_MASK,
-				msg.mfn,
-				msg.npages << PAGE_SHIFT,
+				msg.va & PAGE_MASK, 
+				msg.mfn, 
+				msg.npages << PAGE_SHIFT, 
 				vma->vm_page_prot,
 				mmapcmd.dom)) < 0)
 				goto mmap_out;

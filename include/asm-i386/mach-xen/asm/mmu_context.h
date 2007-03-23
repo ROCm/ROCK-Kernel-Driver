@@ -27,13 +27,13 @@ static inline void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk)
 static inline void __prepare_arch_switch(void)
 {
 	/*
-	 * Save away %fs. No need to save %gs, as it was saved on the
+	 * Save away %gs. No need to save %fs, as it was saved on the
 	 * stack on entry.  No need to save %es and %ds, as those are
 	 * always kernel segments while inside the kernel.
 	 */
-	asm volatile ( "mov %%fs,%0"
-		: "=m" (current->thread.fs));
-	asm volatile ( "movl %0,%%fs"
+	asm volatile ( "mov %%gs,%0"
+		: "=m" (current->thread.gs));
+	asm volatile ( "movl %0,%%gs"
 		: : "r" (0) );
 }
 
@@ -95,7 +95,7 @@ static inline void switch_mm(struct mm_struct *prev,
 }
 
 #define deactivate_mm(tsk, mm)			\
-	asm("movl %0,%%fs": :"r" (0));
+	asm("movl %0,%%gs": :"r" (0));
 
 static inline void activate_mm(struct mm_struct *prev, struct mm_struct *next)
 {

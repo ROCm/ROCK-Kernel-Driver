@@ -229,6 +229,8 @@ void __set_fixmap (enum fixed_addresses idx, maddr_t phys, pgprot_t flags)
 void __init reserve_top_address(unsigned long reserve)
 {
 	BUG_ON(fixmaps > 0);
+	printk(KERN_INFO "Reserving virtual address space above 0x%08x\n",
+	       (int)-reserve);
 	__FIXADDR_TOP = -reserve - PAGE_SIZE;
 	__VMALLOC_RESERVE += reserve;
 }
@@ -265,8 +267,9 @@ void pte_free(struct page *pte)
 		unsigned long va = (unsigned long)__va(pfn << PAGE_SHIFT);
 
 		if (!pte_write(*virt_to_ptep(va)))
-			BUG_ON(HYPERVISOR_update_va_mapping(
-			       va, pfn_pte(pfn, PAGE_KERNEL), 0));
+			if (HYPERVISOR_update_va_mapping(
+				va, pfn_pte(pfn, PAGE_KERNEL), 0))
+				BUG();
 	} else
 		clear_bit(PG_pinned, &pte->flags);
 
@@ -331,6 +334,12 @@ void pgd_ctor(void *pgd, struct kmem_cache *cache, unsigned long unused)
 				swapper_pg_dir + USER_PTRS_PER_PGD,
 				KERNEL_PGD_PTRS);
 		memset(pgd, 0, USER_PTRS_PER_PGD*sizeof(pgd_t));
+
+		/* must happen under lock */
+		paravirt_alloc_pd_clone(__pa(pgd) >> PAGE_SHIFT,
+			__pa(swapper_pg_dir) >> PAGE_SHIFT,
+			USER_PTRS_PER_PGD, PTRS_PER_PGD - USER_PTRS_PER_PGD);
+
 		pgd_list_add(pgd);
 		spin_unlock_irqrestore(&pgd_lock, flags);
 	}
@@ -341,6 +350,7 @@ void pgd_dtor(void *pgd, struct kmem_cache *cache, unsigned long unused)
 {
 	unsigned long flags; /* can be called from interrupt context */
 
+	paravirt_release_pd(__pa(pgd) >> PAGE_SHIFT);
 	spin_lock_irqsave(&pgd_lock, flags);
 	pgd_list_del(pgd);
 	spin_unlock_irqrestore(&pgd_lock, flags);
@@ -387,6 +397,7 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
 		pmd[i] = kmem_cache_alloc(pmd_cache, GFP_KERNEL);
 		if (!pmd[i])
 			goto out_oom;
+		paravirt_alloc_pd(__pa(pmd) >> PAGE_SHIFT);
 	}
 
 	spin_lock_irqsave(&pgd_lock, flags);
@@ -427,12 +438,17 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
 
 out_oom:
 	if (HAVE_SHARED_KERNEL_PMD) {
-		for (i--; i >= 0; i--)
-			kmem_cache_free(pmd_cache,
-					(void *)__va(pgd_val(pgd[i])-1));
+		for (i--; i >= 0; i--) {
+			pgd_t pgdent = pgd[i];
+			void* pmd = (void *)__va(pgd_val(pgdent)-1);
+			paravirt_release_pd(__pa(pmd) >> PAGE_SHIFT);
+			kmem_cache_free(pmd_cache, pmd);
+		}
 	} else {
-		for (i--; i >= 0; i--)
+		for (i--; i >= 0; i--) {
+			paravirt_release_pd(__pa(pmd[i]) >> PAGE_SHIFT);
 			kmem_cache_free(pmd_cache, pmd[i]);
+		}
 		kfree(pmd);
 	}
 	kmem_cache_free(pgd_cache, pgd);
@@ -456,7 +472,9 @@ void pgd_free(pgd_t *pgd)
 	/* in the PAE case user pgd entries are overwritten before usage */
 	if (PTRS_PER_PMD > 1) {
 		for (i = 0; i < USER_PTRS_PER_PGD; ++i) {
-			pmd_t *pmd = (void *)__va(pgd_val(pgd[i])-1);
+			pgd_t pgdent = pgd[i];
+			void* pmd = (void *)__va(pgd_val(pgdent)-1);
+			paravirt_release_pd(__pa(pmd) >> PAGE_SHIFT);
 			kmem_cache_free(pmd_cache, pmd);
 		}
 
@@ -582,64 +600,125 @@ void make_pages_writable(void *va, unsigned int nr, unsigned int feature)
 	}
 }
 
-static inline int pgd_walk_set_prot(struct page *page, pgprot_t flags)
+static void _pin_lock(struct mm_struct *mm, int lock) {
+	if (lock)
+		spin_lock(&mm->page_table_lock);
+#if NR_CPUS >= CONFIG_SPLIT_PTLOCK_CPUS
+	/* While mm->page_table_lock protects us against insertions and
+	 * removals of higher level page table pages, it doesn't protect
+	 * against updates of pte-s. Such updates, however, require the
+	 * pte pages to be in consistent state (unpinned+writable or
+	 * pinned+readonly). The pinning and attribute changes, however
+	 * cannot be done atomically, which is why such updates must be
+	 * prevented from happening concurrently.
+	 * Note that no pte lock can ever elsewhere be acquired nesting
+	 * with an already acquired one in the same mm, or with the mm's
+	 * page_table_lock already acquired, as that would break in the
+	 * non-split case (where all these are actually resolving to the
+	 * one page_table_lock). Thus acquiring all of them here is not
+	 * going to result in dead locks, and the order of acquires
+	 * doesn't matter.
+	 */
+	{
+		pgd_t *pgd = mm->pgd;
+		unsigned g;
+
+		for (g = 0; g < USER_PTRS_PER_PGD; g++, pgd++) {
+			pud_t *pud;
+			unsigned u;
+
+			if (pgd_none(*pgd))
+				continue;
+			pud = pud_offset(pgd, 0);
+			for (u = 0; u < PTRS_PER_PUD; u++, pud++) {
+				pmd_t *pmd;
+				unsigned m;
+
+				if (pud_none(*pud))
+					continue;
+				pmd = pmd_offset(pud, 0);
+				for (m = 0; m < PTRS_PER_PMD; m++, pmd++) {
+					spinlock_t *ptl;
+
+					if (pmd_none(*pmd))
+						continue;
+					ptl = pte_lockptr(0, pmd);
+					if (lock)
+						spin_lock(ptl);
+					else
+						spin_unlock(ptl);
+				}
+			}
+		}
+	}
+#endif
+	if (!lock)
+		spin_unlock(&mm->page_table_lock);
+}
+#define pin_lock(mm) _pin_lock(mm, 1)
+#define pin_unlock(mm) _pin_lock(mm, 0)
+
+static inline void pgd_walk_set_prot(struct page *page, pgprot_t flags)
 {
 	unsigned long pfn = page_to_pfn(page);
+	int rc;
 
-	if (PageHighMem(page))
-		return pgprot_val(flags) & _PAGE_RW
-		       ? test_and_clear_bit(PG_pinned, &page->flags)
-		       : !test_and_set_bit(PG_pinned, &page->flags);
-
-	BUG_ON(HYPERVISOR_update_va_mapping(
-		(unsigned long)__va(pfn << PAGE_SHIFT),
-		pfn_pte(pfn, flags), 0));
-
-	return 0;
+	if (PageHighMem(page)) {
+		if (pgprot_val(flags) & _PAGE_RW)
+			clear_bit(PG_pinned, &page->flags);
+		else
+			set_bit(PG_pinned, &page->flags);
+	} else {
+		rc = HYPERVISOR_update_va_mapping(
+			(unsigned long)__va(pfn << PAGE_SHIFT),
+			pfn_pte(pfn, flags), 0);
+		if (rc)
+			BUG();
+	}
 }
 
-static int pgd_walk(pgd_t *pgd_base, pgprot_t flags)
+static void pgd_walk(pgd_t *pgd_base, pgprot_t flags)
 {
 	pgd_t *pgd = pgd_base;
 	pud_t *pud;
 	pmd_t *pmd;
-	int    g, u, m, flush;
+	int    g, u, m, rc;
 
 	if (xen_feature(XENFEAT_auto_translated_physmap))
-		return 0;
+		return;
 
-	for (g = 0, flush = 0; g < USER_PTRS_PER_PGD; g++, pgd++) {
+	for (g = 0; g < USER_PTRS_PER_PGD; g++, pgd++) {
 		if (pgd_none(*pgd))
 			continue;
 		pud = pud_offset(pgd, 0);
 		if (PTRS_PER_PUD > 1) /* not folded */
-			flush |= pgd_walk_set_prot(virt_to_page(pud),flags);
+			pgd_walk_set_prot(virt_to_page(pud),flags);
 		for (u = 0; u < PTRS_PER_PUD; u++, pud++) {
 			if (pud_none(*pud))
 				continue;
 			pmd = pmd_offset(pud, 0);
 			if (PTRS_PER_PMD > 1) /* not folded */
-				flush |= pgd_walk_set_prot(virt_to_page(pmd),flags);
+				pgd_walk_set_prot(virt_to_page(pmd),flags);
 			for (m = 0; m < PTRS_PER_PMD; m++, pmd++) {
 				if (pmd_none(*pmd))
 					continue;
-				flush |= pgd_walk_set_prot(pmd_page(*pmd),flags);
+				pgd_walk_set_prot(pmd_page(*pmd),flags);
 			}
 		}
 	}
 
-	BUG_ON(HYPERVISOR_update_va_mapping(
+	rc = HYPERVISOR_update_va_mapping(
 		(unsigned long)pgd_base,
 		pfn_pte(virt_to_phys(pgd_base)>>PAGE_SHIFT, flags),
-		UVMF_TLB_FLUSH));
-
-	return flush;
+		UVMF_TLB_FLUSH);
+	if (rc)
+		BUG();
 }
 
 static void __pgd_pin(pgd_t *pgd)
 {
-	if (pgd_walk(pgd, PAGE_KERNEL_RO))
-		kmap_flush_unused();
+	pgd_walk(pgd, PAGE_KERNEL_RO);
+	kmap_flush_unused();
 	xen_pgd_pin(__pa(pgd));
 	set_bit(PG_pinned, &virt_to_page(pgd)->flags);
 }
@@ -647,8 +726,7 @@ static void __pgd_pin(pgd_t *pgd)
 static void __pgd_unpin(pgd_t *pgd)
 {
 	xen_pgd_unpin(__pa(pgd));
-	if (pgd_walk(pgd, PAGE_KERNEL))
-		kmap_flush_unused();
+	pgd_walk(pgd, PAGE_KERNEL);
 	clear_bit(PG_pinned, &virt_to_page(pgd)->flags);
 }
 
@@ -662,34 +740,40 @@ void mm_pin(struct mm_struct *mm)
 {
 	if (xen_feature(XENFEAT_writable_page_tables))
 		return;
-	spin_lock(&mm->page_table_lock);
+	pin_lock(mm);
 	__pgd_pin(mm->pgd);
-	spin_unlock(&mm->page_table_lock);
+	pin_unlock(mm);
 }
 
 void mm_unpin(struct mm_struct *mm)
 {
 	if (xen_feature(XENFEAT_writable_page_tables))
 		return;
-	spin_lock(&mm->page_table_lock);
+	pin_lock(mm);
 	__pgd_unpin(mm->pgd);
-	spin_unlock(&mm->page_table_lock);
+	pin_unlock(mm);
 }
 
 void mm_pin_all(void)
 {
 	struct page *page;
-
-	/* Only pgds on the pgd_list please: none hidden in the slab cache. */
-	kmem_cache_shrink(pgd_cache);
+	unsigned long flags;
 
 	if (xen_feature(XENFEAT_writable_page_tables))
 		return;
 
+	/*
+	 * Allow uninterrupted access to the pgd_list. Also protects
+	 * __pgd_pin() by disabling preemption.
+	 * All other CPUs must be at a safe point (e.g., in stop_machine
+	 * or offlined entirely).
+	 */
+	spin_lock_irqsave(&pgd_lock, flags);
 	for (page = pgd_list; page; page = (struct page *)page->index) {
 		if (!test_bit(PG_pinned, &page->flags))
 			__pgd_pin((pgd_t *)page_address(page));
 	}
+	spin_unlock_irqrestore(&pgd_lock, flags);
 }
 
 void _arch_dup_mmap(struct mm_struct *mm)

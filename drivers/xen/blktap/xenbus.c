@@ -39,6 +39,7 @@
 #include <linux/kthread.h>
 #include <xen/xenbus.h>
 #include "common.h"
+#include "../core/domctl.h"
 
 
 struct backend_info
@@ -47,6 +48,7 @@ struct backend_info
 	blkif_t *blkif;
 	struct xenbus_watch backend_watch;
 	int xenbus_id;
+	int group_added;
 };
 
 
@@ -78,19 +80,19 @@ static long get_id(const char *str)
         int len,end;
         const char *ptr;
         char *tptr, num[10];
-
+	
         len = strsep_len(str, '/', 2);
         end = strlen(str);
         if ( (len < 0) || (end < 0) ) return -1;
-
+	
         ptr = str + len + 1;
         strncpy(num,ptr,end - len);
         tptr = num + (end - (len + 1));
         *tptr = '\0';
 	DPRINTK("Get_id called for %s (%s)\n",str,num);
-
+	
         return simple_strtol(num, NULL, 10);
-}
+}				
 
 static int blktap_name(blkif_t *blkif, char *buf)
 {
@@ -98,9 +100,9 @@ static int blktap_name(blkif_t *blkif, char *buf)
 	struct xenbus_device *dev = blkif->be->dev;
 
 	devpath = xenbus_read(XBT_NIL, dev->nodename, "dev", NULL);
-	if (IS_ERR(devpath))
+	if (IS_ERR(devpath)) 
 		return PTR_ERR(devpath);
-
+	
 	if ((devname = strstr(devpath, "/dev/")) != NULL)
 		devname += strlen("/dev/");
 	else
@@ -108,42 +110,59 @@ static int blktap_name(blkif_t *blkif, char *buf)
 
 	snprintf(buf, TASK_COMM_LEN, "blktap.%d.%s", blkif->domid, devname);
 	kfree(devpath);
-
+	
 	return 0;
 }
 
-static void tap_update_blkif_status(blkif_t *blkif)
+/****************************************************************
+ *  sysfs interface for VBD I/O requests
+ */
+
+#define VBD_SHOW(name, format, args...)					\
+	static ssize_t show_##name(struct device *_dev,			\
+				   struct device_attribute *attr,	\
+				   char *buf)				\
+	{								\
+		struct xenbus_device *dev = to_xenbus_device(_dev);	\
+		struct backend_info *be = dev->dev.driver_data;		\
+									\
+		return sprintf(buf, format, ##args);			\
+	}								\
+	DEVICE_ATTR(name, S_IRUGO, show_##name, NULL)
+
+VBD_SHOW(tap_oo_req,  "%d\n", be->blkif->st_oo_req);
+VBD_SHOW(tap_rd_req,  "%d\n", be->blkif->st_rd_req);
+VBD_SHOW(tap_wr_req,  "%d\n", be->blkif->st_wr_req);
+VBD_SHOW(tap_rd_sect, "%d\n", be->blkif->st_rd_sect);
+VBD_SHOW(tap_wr_sect, "%d\n", be->blkif->st_wr_sect);
+
+static struct attribute *tapstat_attrs[] = {
+	&dev_attr_tap_oo_req.attr,
+	&dev_attr_tap_rd_req.attr,
+	&dev_attr_tap_wr_req.attr,
+	&dev_attr_tap_rd_sect.attr,
+	&dev_attr_tap_wr_sect.attr,
+	NULL
+};
+
+static struct attribute_group tapstat_group = {
+	.name = "statistics",
+	.attrs = tapstat_attrs,
+};
+
+int xentap_sysfs_addif(struct xenbus_device *dev)
 {
 	int err;
-	char name[TASK_COMM_LEN];
+	struct backend_info *be = dev->dev.driver_data;
+	err = sysfs_create_group(&dev->dev.kobj, &tapstat_group);
+	if (!err)
+		be->group_added = 1;
+	return err;
+}
 
-	/* Not ready to connect? */
-	if(!blkif->irq || !blkif->sectors) {
-		return;
-	}
-
-	/* Already connected? */
-	if (blkif->be->dev->state == XenbusStateConnected)
-		return;
-
-	/* Attempt to connect: exit if we fail to. */
-	connect(blkif->be);
-	if (blkif->be->dev->state != XenbusStateConnected)
-		return;
-
-	err = blktap_name(blkif, name);
-	if (err) {
-		xenbus_dev_error(blkif->be->dev, err, "get blktap dev name");
-		return;
-	}
-
-	blkif->xenblkd = kthread_run(tap_blkif_schedule, blkif, name);
-	if (IS_ERR(blkif->xenblkd)) {
-		err = PTR_ERR(blkif->xenblkd);
-		blkif->xenblkd = NULL;
-		xenbus_dev_fatal(blkif->be->dev, err, "start xenblkd");
-		WPRINTK("Error starting thread\n");
-	}
+void xentap_sysfs_delif(struct xenbus_device *dev)
+{
+	sysfs_remove_group(&dev->dev.kobj, &tapstat_group);
 }
 
 static int blktap_remove(struct xenbus_device *dev)
@@ -162,9 +181,52 @@ static int blktap_remove(struct xenbus_device *dev)
 		tap_blkif_free(be->blkif);
 		be->blkif = NULL;
 	}
+	if (be->group_added)
+		xentap_sysfs_delif(be->dev);
 	kfree(be);
 	dev->dev.driver_data = NULL;
 	return 0;
+}
+
+static void tap_update_blkif_status(blkif_t *blkif)
+{ 
+	int err;
+	char name[TASK_COMM_LEN];
+
+	/* Not ready to connect? */
+	if(!blkif->irq || !blkif->sectors) {
+		return;
+	} 
+
+	/* Already connected? */
+	if (blkif->be->dev->state == XenbusStateConnected)
+		return;
+
+	/* Attempt to connect: exit if we fail to. */
+	connect(blkif->be);
+	if (blkif->be->dev->state != XenbusStateConnected)
+		return;
+
+	err = blktap_name(blkif, name);
+	if (err) {
+		xenbus_dev_error(blkif->be->dev, err, "get blktap dev name");
+		return;
+	}
+
+	err = xentap_sysfs_addif(blkif->be->dev);
+	if (err) {
+		xenbus_dev_fatal(blkif->be->dev, err, 
+				 "creating sysfs entries");
+		return;
+	}
+
+	blkif->xenblkd = kthread_run(tap_blkif_schedule, blkif, name);
+	if (IS_ERR(blkif->xenblkd)) {
+		err = PTR_ERR(blkif->xenblkd);
+		blkif->xenblkd = NULL;
+		xenbus_dev_fatal(blkif->be->dev, err, "start xenblkd");
+		WPRINTK("Error starting thread\n");
+	}
 }
 
 /**
@@ -206,7 +268,7 @@ static int blktap_probe(struct xenbus_device *dev,
 				 &be->backend_watch, tap_backend_changed);
 	if (err)
 		goto fail;
-
+	
 	err = xenbus_switch_state(dev, XenbusStateInitWait);
 	if (err)
 		goto fail;
@@ -221,7 +283,7 @@ fail:
 
 /**
  * Callback received when the user space code has placed the device
- * information in xenstore.
+ * information in xenstore. 
  */
 static void tap_backend_changed(struct xenbus_watch *watch,
 			    const char **vec, unsigned int len)
@@ -231,14 +293,16 @@ static void tap_backend_changed(struct xenbus_watch *watch,
 	struct backend_info *be
 		= container_of(watch, struct backend_info, backend_watch);
 	struct xenbus_device *dev = be->dev;
-
-	/**
-	 * Check to see whether userspace code has opened the image
+	
+	/** 
+	 * Check to see whether userspace code has opened the image 
 	 * and written sector
 	 * and disk info to xenstore
 	 */
-	err = xenbus_gather(XBT_NIL, dev->nodename, "info", "%lu", &info,
+	err = xenbus_gather(XBT_NIL, dev->nodename, "info", "%lu", &info, 
 			    NULL);
+	if (XENBUS_EXIST_ERR(err))
+		return;
 	if (err) {
 		xenbus_dev_error(dev, err, "getting info");
 		return;
@@ -246,13 +310,13 @@ static void tap_backend_changed(struct xenbus_watch *watch,
 
 	DPRINTK("Userspace update on disk info, %lu\n",info);
 
-	err = xenbus_gather(XBT_NIL, dev->nodename, "sectors", "%llu",
+	err = xenbus_gather(XBT_NIL, dev->nodename, "sectors", "%llu", 
 			    &be->blkif->sectors, NULL);
 
 	/* Associate tap dev with domid*/
-	be->blkif->dev_num = dom_to_devid(be->blkif->domid, be->xenbus_id,
+	be->blkif->dev_num = dom_to_devid(be->blkif->domid, be->xenbus_id, 
 					  be->blkif);
-	DPRINTK("Thread started for domid [%d], connecting disk\n",
+	DPRINTK("Thread started for domid [%d], connecting disk\n", 
 		be->blkif->dev_num);
 
 	tap_update_blkif_status(be->blkif);
@@ -272,7 +336,7 @@ static void tap_frontend_changed(struct xenbus_device *dev,
 	switch (frontend_state) {
 	case XenbusStateInitialising:
 		if (dev->state == XenbusStateClosed) {
-			printk("%s: %s: prepare for reconnect\n",
+			printk(KERN_INFO "%s: %s: prepare for reconnect\n",
 			       __FUNCTION__, dev->nodename);
 			xenbus_switch_state(dev, XenbusStateInitWait);
 		}
@@ -280,8 +344,8 @@ static void tap_frontend_changed(struct xenbus_device *dev,
 
 	case XenbusStateInitialised:
 	case XenbusStateConnected:
-		/* Ensure we connect even when two watches fire in
-		   close successsion and we miss the intermediate value
+		/* Ensure we connect even when two watches fire in 
+		   close successsion and we miss the intermediate value 
 		   of frontend_state. */
 		if (dev->state == XenbusStateConnected)
 			break;
@@ -334,7 +398,6 @@ static void connect(struct backend_info *be)
 	return;
 }
 
-
 static int connect_ring(struct backend_info *be)
 {
 	struct xenbus_device *dev = be->dev;
@@ -345,7 +408,7 @@ static int connect_ring(struct backend_info *be)
 
 	DPRINTK("%s\n", dev->otherend);
 
-	err = xenbus_gather(XBT_NIL, dev->otherend, "ring-ref", "%lu",
+	err = xenbus_gather(XBT_NIL, dev->otherend, "ring-ref", "%lu", 
 			    &ring_ref, "event-channel", "%u", &evtchn, NULL);
 	if (err) {
 		xenbus_dev_fatal(dev, err,
@@ -357,8 +420,10 @@ static int connect_ring(struct backend_info *be)
 	be->blkif->blk_protocol = BLKIF_PROTOCOL_NATIVE;
 	err = xenbus_gather(XBT_NIL, dev->otherend, "protocol",
 			    "%63s", protocol, NULL);
-	if (err)
-		strcpy(protocol, "unspecified, assuming native");
+	if (err) {
+		strcpy(protocol, "unspecified");
+		be->blkif->blk_protocol = xen_guest_blkif_protocol(be->blkif->domid);
+	}
 	else if (0 == strcmp(protocol, XEN_IO_PROTO_ABI_NATIVE))
 		be->blkif->blk_protocol = BLKIF_PROTOCOL_NATIVE;
 	else if (0 == strcmp(protocol, XEN_IO_PROTO_ABI_X86_32))
@@ -375,7 +440,8 @@ static int connect_ring(struct backend_info *be)
 		xenbus_dev_fatal(dev, err, "unknown fe protocol %s", protocol);
 		return -1;
 	}
-	printk("blktap: ring-ref %ld, event-channel %d, protocol %d (%s)\n",
+	printk(KERN_INFO
+	       "blktap: ring-ref %ld, event-channel %d, protocol %d (%s)\n",
 	       ring_ref, evtchn, be->blkif->blk_protocol, protocol);
 
 	/* Map the shared frame, irq etc. */
@@ -384,7 +450,7 @@ static int connect_ring(struct backend_info *be)
 		xenbus_dev_fatal(dev, err, "mapping ring-ref %lu port %u",
 				 ring_ref, evtchn);
 		return err;
-	}
+	} 
 
 	return 0;
 }

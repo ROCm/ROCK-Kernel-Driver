@@ -19,7 +19,7 @@
 #include <asm/page.h>
 #include <asm/msr.h>
 #include <asm/cache.h>
-
+#include <asm/dwarf2.h>
 #include <xen/interface/elfnote.h>
 
 	.section .bootstrap.text, "ax", @progbits
@@ -47,7 +47,7 @@ ENTRY(_stext)
 #define NEXT_PAGE(name) \
 	$page = $page + 1; \
 	.org $page * 0x1000; \
-	phys_/**/name = $page * 0x1000 + __PHYSICAL_START; \
+	phys_##name = $page * 0x1000 + __PHYSICAL_START; \
 ENTRY(name)
 
 NEXT_PAGE(init_level4_pgt)
@@ -78,7 +78,25 @@ NEXT_PAGE(level2_kernel_pgt)
 	.fill	512,8,0
 
 NEXT_PAGE(hypercall_page)
-	.fill	512,8,0
+	CFI_STARTPROC
+	.rept 0x1000 / 0x20
+	.skip 1 /* push %rcx */
+	CFI_ADJUST_CFA_OFFSET	8
+	CFI_REL_OFFSET	rcx,0
+	.skip 2 /* push %r11 */
+	CFI_ADJUST_CFA_OFFSET	8
+	CFI_REL_OFFSET	rcx,0
+	.skip 5 /* mov $#,%eax */
+	.skip 2 /* syscall */
+	.skip 2 /* pop %r11 */
+	CFI_ADJUST_CFA_OFFSET -8
+	CFI_RESTORE r11
+	.skip 1 /* pop %rcx */
+	CFI_ADJUST_CFA_OFFSET -8
+	CFI_RESTORE rcx
+	.align 0x20,0 /* ret */
+	.endr
+	CFI_ENDPROC
 
 #undef NEXT_PAGE
 
@@ -179,5 +197,7 @@ ENTRY(empty_zero_page)
 #endif /* !CONFIG_XEN_COMPAT_030002 */
 	ELFNOTE(Xen, XEN_ELFNOTE_ENTRY,          .quad,  startup_64)
 	ELFNOTE(Xen, XEN_ELFNOTE_HYPERCALL_PAGE, .quad,  hypercall_page)
+	ELFNOTE(Xen, XEN_ELFNOTE_L1_MFN_VALID,   .quad,  _PAGE_PRESENT,_PAGE_PRESENT)
 	ELFNOTE(Xen, XEN_ELFNOTE_FEATURES,       .asciz, "writable_page_tables|writable_descriptor_tables|auto_translated_physmap|pae_pgdir_above_4gb|supervisor_mode_kernel")
 	ELFNOTE(Xen, XEN_ELFNOTE_LOADER,         .asciz, "generic")
+	ELFNOTE(Xen, XEN_ELFNOTE_SUSPEND_CANCEL, .long,  1)

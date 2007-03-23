@@ -38,22 +38,22 @@
 #include <linux/version.h>
 #include <linux/errno.h>
 #include <xen/interface/xen.h>
-#include <xen/interface/dom0_ops.h>
+#include <xen/interface/platform.h>
 #include <xen/interface/event_channel.h>
 #include <xen/interface/physdev.h>
 #include <xen/interface/sched.h>
 #include <xen/interface/nmi.h>
 #include <asm/ptrace.h>
 #include <asm/page.h>
-#if defined(__i386__)
-#  ifdef CONFIG_X86_PAE
-#   include <asm-generic/pgtable-nopud.h>
-#  else
-#   include <asm-generic/pgtable-nopmd.h>
-#  endif
-#endif
 
 extern shared_info_t *HYPERVISOR_shared_info;
+
+#define vcpu_info(cpu) (HYPERVISOR_shared_info->vcpu_info + (cpu))
+#ifdef CONFIG_SMP
+#define current_vcpu_info() vcpu_info(smp_processor_id())
+#else
+#define current_vcpu_info() vcpu_info(0)
+#endif
 
 #ifdef CONFIG_X86_32
 extern unsigned long hypervisor_virt_start;

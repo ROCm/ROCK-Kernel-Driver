@@ -69,12 +69,12 @@ static int do_microcode_update (const void __user *ubuf, size_t len)
 		return -ENOMEM;
 
 	if (copy_from_user(kbuf, ubuf, len) == 0) {
-		dom0_op_t op;
+		struct xen_platform_op op;
 
-		op.cmd = DOM0_MICROCODE;
+		op.cmd = XENPF_microcode_update;
 		set_xen_guest_handle(op.u.microcode.data, kbuf);
 		op.u.microcode.length = len;
-		err = HYPERVISOR_dom0_op(&op);
+		err = HYPERVISOR_platform_op(&op);
 	} else
 		err = -EFAULT;
 
@@ -108,7 +108,7 @@ static ssize_t microcode_write (struct file *file, const char __user *buf, size_
 	return ret;
 }
 
-static struct file_operations microcode_fops = {
+static const struct file_operations microcode_fops = {
 	.owner		= THIS_MODULE,
 	.write		= microcode_write,
 	.open		= microcode_open,
@@ -155,7 +155,7 @@ static int request_microcode(void)
 	const struct cpuinfo_x86 *c = &boot_cpu_data;
 	const struct firmware *firmware;
 	int error;
-	dom0_op_t op;
+	struct xen_platform_op op;
 
 	sprintf(name,"intel-ucode/%02x-%02x-%02x",
 		c->x86, c->x86_model, c->x86_mask);
@@ -165,10 +165,10 @@ static int request_microcode(void)
 		return error;
 	}
 
-	op.cmd = DOM0_MICROCODE;
+	op.cmd = XENPF_microcode_update;
 	set_xen_guest_handle(op.u.microcode.data, (void *)firmware->data);
 	op.u.microcode.length = firmware->size;
-	error = HYPERVISOR_dom0_op(&op);
+	error = HYPERVISOR_platform_op(&op);
 
 	release_firmware(firmware);
 

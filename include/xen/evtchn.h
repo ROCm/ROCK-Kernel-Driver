@@ -104,6 +104,8 @@ void evtchn_device_upcall(int port);
 void mask_evtchn(int port);
 void unmask_evtchn(int port);
 
+extern void mask_evtchn_local(void);
+
 static inline void clear_evtchn(int port)
 {
 	shared_info_t *s = HYPERVISOR_shared_info;

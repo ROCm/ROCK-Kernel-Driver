@@ -1,41 +1,41 @@
 /******************************************************************************
  * netback/loopback.c
- *
+ * 
  * A two-interface loopback device to emulate a local netfront-netback
  * connection. This ensures that local packet delivery looks identical
  * to inter-domain delivery. Most importantly, packets delivered locally
  * originating from other domains will get *copied* when they traverse this
  * driver. This prevents unbounded delays in socket-buffer queues from
  * causing the netback driver to "seize up".
- *
+ * 
  * This driver creates a symmetric pair of loopback interfaces with names
  * vif0.0 and veth0. The intention is that 'vif0.0' is bound to an Ethernet
  * bridge, just like a proper netback interface, while a local IP interface
  * is configured on 'veth0'.
- *
+ * 
  * As with a real netback interface, vif0.0 is configured with a suitable
  * dummy MAC address. No default is provided for veth0: a reasonable strategy
  * is to transfer eth0's MAC address to veth0, and give eth0 a dummy address
  * (to avoid confusing the Etherbridge).
- *
+ * 
  * Copyright (c) 2005 K A Fraser
- *
+ * 
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License version 2
  * as published by the Free Software Foundation; or, when distributed
  * separately from the Linux kernel or incorporated into other
  * software packages, subject to the following license:
- *
+ * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this source file (the "Software"), to deal in the Software without
  * restriction, including without limitation the rights to use, copy, modify,
  * merge, publish, distribute, sublicense, and/or sell copies of the Software,
  * and to permit persons to whom the Software is furnished to do so, subject to
  * the following conditions:
- *
+ * 
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- *
+ * 
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -104,7 +104,7 @@ static int skb_remove_foreign_references(struct sk_buff *skb)
 		pfn = page_to_pfn(skb_shinfo(skb)->frags[i].page);
 		if (!is_foreign(pfn))
 			continue;
-
+		
 		page = alloc_page(GFP_ATOMIC | __GFP_NOWARN);
 		if (unlikely(!page))
 			return 0;

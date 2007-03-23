@@ -13,7 +13,7 @@ config XEN
 if XEN
 config XEN_INTERFACE_VERSION
 	hex
-	default 0x00030203
+	default 0x00030205
 
 menu "XEN"
 
@@ -59,11 +59,11 @@ config XEN_BLKDEV_TAP
 	depends on XEN_BACKEND
 	default XEN_PRIVILEGED_GUEST
 	help
-	  The block tap driver is an alternative to the block back driver
+	  The block tap driver is an alternative to the block back driver 
           and allows VM block requests to be redirected to userspace through
-          a device interface.  The tap allows user-space development of
+          a device interface.  The tap allows user-space development of 
           high-performance block backends, where disk images may be implemented
-          as files, in memory, or on other hosts across the network.  This
+          as files, in memory, or on other hosts across the network.  This 
 	  driver can safely coexist with the existing blockback driver.
 
 config XEN_NETDEV_BACKEND
@@ -233,6 +233,9 @@ choice
 	config XEN_COMPAT_030002_AND_LATER
 		bool "3.0.2 and later"
 
+	config XEN_COMPAT_030004_AND_LATER
+		bool "3.0.4 and later"
+
 	config XEN_COMPAT_LATEST_ONLY
 		bool "no compatibility code"
 
@@ -241,6 +244,10 @@ endchoice
 config XEN_COMPAT_030002
 	bool
 	default XEN_COMPAT_030002_AND_LATER
+
+config XEN_COMPAT_030004
+	bool
+	default XEN_COMPAT_030002_AND_LATER || XEN_COMPAT_030004_AND_LATER
 
 endmenu
 

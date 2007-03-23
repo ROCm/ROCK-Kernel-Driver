@@ -1,30 +1,30 @@
 /******************************************************************************
  * drivers/xen/netback/netback.c
- *
+ * 
  * Back-end of the driver for virtual network devices. This portion of the
  * driver exports a 'unified' network-device interface that can be accessed
- * by any operating system that implements a compatible front end. A
+ * by any operating system that implements a compatible front end. A 
  * reference front-end implementation can be found in:
  *  drivers/xen/netfront/netfront.c
- *
+ * 
  * Copyright (c) 2002-2005, K A Fraser
- *
+ * 
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License version 2
  * as published by the Free Software Foundation; or, when distributed
  * separately from the Linux kernel or incorporated into other
  * software packages, subject to the following license:
- *
+ * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this source file (the "Software"), to deal in the Software without
  * restriction, including without limitation the rights to use, copy, modify,
  * merge, publish, distribute, sublicense, and/or sell copies of the Software,
  * and to permit persons to whom the Software is furnished to do so, subject to
  * the following conditions:
- *
+ * 
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- *
+ * 
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -38,7 +38,10 @@
 #include <xen/balloon.h>
 #include <xen/interface/memory.h>
 
-/*#define NETBE_DEBUG_INTERRUPT*/
+/*define NETBE_DEBUG_INTERRUPT*/
+
+/* extra field used in struct page */
+#define netif_page_index(pg) (*(long *)&(pg)->mapping)
 
 struct netbk_rx_meta {
 	skb_frag_t frag;
@@ -48,11 +51,11 @@ struct netbk_rx_meta {
 
 static void netif_idx_release(u16 pending_idx);
 static void netif_page_release(struct page *page);
-static void make_tx_response(netif_t *netif,
+static void make_tx_response(netif_t *netif, 
 			     netif_tx_request_t *txp,
 			     s8       st);
-static netif_rx_response_t *make_rx_response(netif_t *netif,
-					     u16      id,
+static netif_rx_response_t *make_rx_response(netif_t *netif, 
+					     u16      id, 
 					     s8       st,
 					     u16      offset,
 					     u16      size,
@@ -107,6 +110,7 @@ static unsigned int alloc_index = 0;
 
 static inline unsigned long alloc_mfn(void)
 {
+	BUG_ON(alloc_index == 0);
 	return mfn_list[--alloc_index];
 }
 
@@ -231,7 +235,7 @@ static inline int netbk_queue_full(netif_t *netif)
 static void tx_queue_callback(unsigned long data)
 {
 	netif_t *netif = (netif_t *)data;
-	if (netif_schedulable(netif->dev))
+	if (netif_schedulable(netif))
 		netif_wake_queue(netif->dev);
 }
 
@@ -242,7 +246,7 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	BUG_ON(skb->dev != dev);
 
 	/* Drop the packet if the target domain has no receive buffers. */
-	if (unlikely(!netif_schedulable(dev) || netbk_queue_full(netif)))
+	if (unlikely(!netif_schedulable(netif) || netbk_queue_full(netif)))
 		goto drop;
 
 	/*
@@ -303,7 +307,7 @@ static void xen_network_done_notify(void)
 		eth0_dev = __dev_get_by_name("eth0");
 	netif_rx_schedule(eth0_dev);
 }
-/*
+/* 
  * Add following to poll() function in NAPI driver (Tigon3 is example):
  *  if ( xen_network_done() )
  *      tg3_enable_ints(tp);
@@ -352,7 +356,7 @@ static u16 netbk_gop_frag(netif_t *netif, struct netbk_rx_meta *meta,
 		copy_gop->flags = GNTCOPY_dest_gref;
 		if (PageForeign(page)) {
 			struct pending_tx_info *src_pend =
-				&pending_tx_info[page->index];
+				&pending_tx_info[netif_page_index(page)];
 			copy_gop->source.domid = src_pend->netif->domid;
 			copy_gop->source.u.ref = src_pend->req.gref;
 			copy_gop->flags |= GNTCOPY_source_gref;
@@ -549,6 +553,7 @@ static void net_rx_action(unsigned long unused)
 		*(int *)skb->cb = nr_frags;
 
 		if (!xen_feature(XENFEAT_auto_translated_physmap) &&
+		    !((netif_t *)netdev_priv(skb->dev))->copying_receiver &&
 		    check_mfn(nr_frags + 1)) {
 			/* Memory squeeze? Back off for an arbitrary while. */
 			if ( net_ratelimit() )
@@ -681,7 +686,7 @@ static void net_rx_action(unsigned long unused)
 		}
 
 		if (netif_queue_stopped(netif->dev) &&
-		    netif_schedulable(netif->dev) &&
+		    netif_schedulable(netif) &&
 		    !netbk_queue_full(netif))
 			netif_wake_queue(netif->dev);
 
@@ -739,7 +744,7 @@ static void add_to_net_schedule_list_tail(netif_t *netif)
 
 	spin_lock_irq(&net_schedule_list_lock);
 	if (!__on_net_schedule_list(netif) &&
-	    likely(netif_schedulable(netif->dev))) {
+	    likely(netif_schedulable(netif))) {
 		list_add_tail(&netif->list, &net_schedule_list);
 		netif_get(netif);
 	}
@@ -837,7 +842,7 @@ inline static void net_tx_action_dealloc(void)
 
 		netif = pending_tx_info[pending_idx].netif;
 
-		make_tx_response(netif, &pending_tx_info[pending_idx].req,
+		make_tx_response(netif, &pending_tx_info[pending_idx].req, 
 				 NETIF_RSP_OKAY);
 
 		pending_ring[MASK_PEND_IDX(pending_prod++)] = pending_idx;
@@ -1116,7 +1121,7 @@ static void net_tx_action(unsigned long unused)
 		/* Credit-based scheduling. */
 		if (txreq.size > netif->remaining_credit) {
 			unsigned long now = jiffies;
-			unsigned long next_credit =
+			unsigned long next_credit = 
 				netif->credit_timeout.expires +
 				msecs_to_jiffies(netif->credit_usec / 1000);
 
@@ -1175,8 +1180,8 @@ static void net_tx_action(unsigned long unused)
 
 		/* No crossing a page as the payload mustn't fragment. */
 		if (unlikely((txreq.offset + txreq.size) > PAGE_SIZE)) {
-			DPRINTK("txreq.offset: %x, size: %u, end: %lu\n",
-				txreq.offset, txreq.size,
+			DPRINTK("txreq.offset: %x, size: %u, end: %lu\n", 
+				txreq.offset, txreq.size, 
 				(txreq.offset &~PAGE_MASK) + txreq.size);
 			netbk_tx_err(netif, &txreq, i);
 			continue;
@@ -1262,7 +1267,7 @@ static void net_tx_action(unsigned long unused)
 
 		/* Check the remap error code. */
 		if (unlikely(netbk_tx_check_mop(skb, &mop))) {
-			printk(KERN_ALERT "#### netback grant fails\n");
+			DPRINTK("netback grant failed.\n");
 			skb_shinfo(skb)->nr_frags = 0;
 			kfree_skb(skb);
 			continue;
@@ -1327,7 +1332,7 @@ static void netif_page_release(struct page *page)
 	/* Ready for next use. */
 	init_page_count(page);
 
-	netif_idx_release(page->index);
+	netif_idx_release(netif_page_index(page));
 }
 
 irqreturn_t netif_be_int(int irq, void *dev_id)
@@ -1337,13 +1342,13 @@ irqreturn_t netif_be_int(int irq, void *dev_id)
 	add_to_net_schedule_list_tail(netif);
 	maybe_schedule_tx_action();
 
-	if (netif_schedulable(netif->dev) && !netbk_queue_full(netif))
+	if (netif_schedulable(netif) && !netbk_queue_full(netif))
 		netif_wake_queue(netif->dev);
 
 	return IRQ_HANDLED;
 }
 
-static void make_tx_response(netif_t *netif,
+static void make_tx_response(netif_t *netif, 
 			     netif_tx_request_t *txp,
 			     s8       st)
 {
@@ -1373,8 +1378,8 @@ static void make_tx_response(netif_t *netif,
 #endif
 }
 
-static netif_rx_response_t *make_rx_response(netif_t *netif,
-					     u16      id,
+static netif_rx_response_t *make_rx_response(netif_t *netif, 
+					     u16      id, 
 					     s8       st,
 					     u16      offset,
 					     u16      size,
@@ -1457,7 +1462,7 @@ static int __init netback_init(void)
 	for (i = 0; i < MAX_PENDING_REQS; i++) {
 		page = mmap_pages[i];
 		SetPageForeign(page, netif_page_release);
-		page->index = i;
+		netif_page_index(page) = i;
 	}
 
 	pending_cons = 0;
@@ -1474,7 +1479,7 @@ static int __init netback_init(void)
 	(void)bind_virq_to_irqhandler(VIRQ_DEBUG,
 				      0,
 				      netif_be_dbg,
-				      SA_SHIRQ,
+				      SA_SHIRQ, 
 				      "net-be-dbg",
 				      &netif_be_dbg);
 #endif

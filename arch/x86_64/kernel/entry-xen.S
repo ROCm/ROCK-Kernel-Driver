@@ -643,6 +643,9 @@ END(invalidate_interrupt\num)
 ENTRY(call_function_interrupt)
 	apicinterrupt CALL_FUNCTION_VECTOR,smp_call_function_interrupt
 END(call_function_interrupt)
+ENTRY(irq_move_cleanup_interrupt)
+	apicinterrupt IRQ_MOVE_CLEANUP_VECTOR,smp_irq_move_cleanup_interrupt
+END(irq_move_cleanup_interrupt)
 #endif
 
 ENTRY(apic_timer_interrupt)
@@ -907,17 +910,23 @@ END(hypervisor_callback)
 # existing activation in its critical region -- if so, we pop the current
 # activation and restart the handler using the previous one.
 ENTRY(do_hypervisor_callback)   # do_hypervisor_callback(struct *pt_regs)
+	CFI_STARTPROC
 # Since we don't modify %rdi, evtchn_do_upall(struct *pt_regs) will
 # see the correct pointer to the pt_regs
 	movq %rdi, %rsp            # we don't return, adjust the stack frame
-11:	movq %gs:pda_irqstackptr,%rax
-	incl %gs:pda_irqcount
-	cmovzq %rax,%rsp
-	pushq %rdi
+	CFI_ENDPROC
+	CFI_DEFAULT_STACK
+11:	incl %gs:pda_irqcount
+	movq %rsp,%rbp
+	CFI_DEF_CFA_REGISTER rbp
+	cmovzq %gs:pda_irqstackptr,%rsp
+	pushq %rbp			# backlink for old unwinder
 	call evtchn_do_upcall
 	popq %rsp
+	CFI_DEF_CFA_REGISTER rsp
 	decl %gs:pda_irqcount
 	jmp  error_exit
+	CFI_ENDPROC
 END(do_hypervisor_callback)
 
         ALIGN
@@ -1133,11 +1142,13 @@ KPROBE_END(nmi)
 do_nmi_callback:
 	CFI_STARTPROC
 	addq $8, %rsp
-	CFI_DEFAULT_STACK start=0,adj=1
+	CFI_ENDPROC
+	CFI_DEFAULT_STACK
 	call do_nmi
 	orl  $NMI_MASK,EFLAGS(%rsp)
 	RESTORE_REST
 	XEN_BLOCK_EVENTS(%rsi)
+	TRACE_IRQS_OFF
 	GET_THREAD_INFO(%rcx)
 	jmp  retint_restore_args
 	CFI_ENDPROC

@@ -19,26 +19,20 @@
 		set_pte((ptep), (pteval));				\
 } while (0)
 
-#define set_pte_at_sync(_mm,addr,ptep,pteval) do {			\
-	if (((_mm) != current->mm && (_mm) != &init_mm) ||		\
-	    HYPERVISOR_update_va_mapping((addr), (pteval), UVMF_INVLPG)) { \
-		set_pte((ptep), (pteval));				\
-		xen_invlpg((addr));					\
-	}								\
-} while (0)
-
 #define set_pmd(pmdptr, pmdval) xen_l2_entry_update((pmdptr), (pmdval))
 
 #define set_pte_atomic(pteptr, pteval) set_pte(pteptr,pteval)
-#define set_pte_present(mm,addr,ptep,pteval) set_pte_at(mm,addr,ptep,pteval)
 
 #define pte_clear(mm,addr,xp)	do { set_pte_at(mm, addr, xp, __pte(0)); } while (0)
 #define pmd_clear(xp)	do { set_pmd(xp, __pmd(0)); } while (0)
 
-#define raw_ptep_get_and_clear(xp)	__pte_ma(xchg(&(xp)->pte_low, 0))
+#define raw_ptep_get_and_clear(xp) __pte_ma(xchg(&(xp)->pte_low, 0))
 
-#define pte_mfn(_pte) ((_pte).pte_low >> PAGE_SHIFT)
-#define pte_pfn(_pte) mfn_to_local_pfn(pte_mfn(_pte))
+#define __pte_mfn(_pte) ((_pte).pte_low >> PAGE_SHIFT)
+#define pte_mfn(_pte) ((_pte).pte_low & _PAGE_PRESENT ? \
+	__pte_mfn(_pte) : pfn_to_mfn(__pte_mfn(_pte)))
+#define pte_pfn(_pte) ((_pte).pte_low & _PAGE_PRESENT ? \
+	mfn_to_local_pfn(__pte_mfn(_pte)) : __pte_mfn(_pte))
 
 #define pte_page(_pte) pfn_to_page(pte_pfn(_pte))
 

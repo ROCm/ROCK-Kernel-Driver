@@ -4,23 +4,23 @@
  * Low level code to talks to Xen Store: ringbuffer and event channel.
  *
  * Copyright (C) 2005 Rusty Russell, IBM Corporation
- *
+ * 
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License version 2
  * as published by the Free Software Foundation; or, when distributed
  * separately from the Linux kernel or incorporated into other
  * software packages, subject to the following license:
- *
+ * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this source file (the "Software"), to deal in the Software without
  * restriction, including without limitation the rights to use, copy, modify,
  * merge, publish, distribute, sublicense, and/or sell copies of the Software,
  * and to permit persons to whom the Software is furnished to do so, subject to
  * the following conditions:
- *
+ * 
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- *
+ * 
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -110,7 +110,6 @@ int xb_write(const void *data, unsigned len)
 		/* Read indexes, then verify. */
 		cons = intf->req_cons;
 		prod = intf->req_prod;
-		mb();
 		if (!check_indexes(cons, prod)) {
 			intf->req_cons = intf->req_prod = 0;
 			return -EIO;
@@ -122,19 +121,33 @@ int xb_write(const void *data, unsigned len)
 		if (avail > len)
 			avail = len;
 
+		/* Must write data /after/ reading the consumer index. */
+		mb();
+
 		memcpy(dst, data, avail);
 		data += avail;
 		len -= avail;
 
-		/* Other side must not see new header until data is there. */
+		/* Other side must not see new producer until data is there. */
 		wmb();
 		intf->req_prod += avail;
 
-		/* This implies mb() before other side sees interrupt. */
+		/* Implies mb(): other side will see the updated producer. */
 		notify_remote_via_evtchn(xen_store_evtchn);
 	}
 
 	return 0;
+}
+
+int xb_data_to_read(void)
+{
+	struct xenstore_domain_interface *intf = xen_store_interface;
+	return (intf->rsp_cons != intf->rsp_prod);
+}
+
+int xb_wait_for_data_to_read(void)
+{
+	return wait_event_interruptible(xb_waitq, xb_data_to_read());
 }
 
 int xb_read(void *data, unsigned len)
@@ -147,16 +160,13 @@ int xb_read(void *data, unsigned len)
 		unsigned int avail;
 		const char *src;
 
-		rc = wait_event_interruptible(
-			xb_waitq,
-			intf->rsp_cons != intf->rsp_prod);
+		rc = xb_wait_for_data_to_read();
 		if (rc < 0)
 			return rc;
 
 		/* Read indexes, then verify. */
 		cons = intf->rsp_cons;
 		prod = intf->rsp_prod;
-		mb();
 		if (!check_indexes(cons, prod)) {
 			intf->rsp_cons = intf->rsp_prod = 0;
 			return -EIO;
@@ -168,7 +178,7 @@ int xb_read(void *data, unsigned len)
 		if (avail > len)
 			avail = len;
 
-		/* We must read header before we read data. */
+		/* Must read data /after/ reading the producer index. */
 		rmb();
 
 		memcpy(data, src, avail);
@@ -181,7 +191,7 @@ int xb_read(void *data, unsigned len)
 
 		pr_debug("Finished read of %i bytes (%i to go)\n", avail, len);
 
-		/* Implies mb(): they will see new header. */
+		/* Implies mb(): other side will see the updated consumer. */
 		notify_remote_via_evtchn(xen_store_evtchn);
 	}
 
@@ -191,7 +201,19 @@ int xb_read(void *data, unsigned len)
 /* Set up interrupt handler off store event channel. */
 int xb_init_comms(void)
 {
+	struct xenstore_domain_interface *intf = xen_store_interface;
 	int err;
+
+	if (intf->req_prod != intf->req_cons)
+		printk(KERN_ERR "XENBUS request ring is not quiescent "
+		       "(%08x:%08x)!\n", intf->req_cons, intf->req_prod);
+
+	if (intf->rsp_prod != intf->rsp_cons) {
+		printk(KERN_WARNING "XENBUS response ring is not quiescent "
+		       "(%08x:%08x): fixing up\n",
+		       intf->rsp_cons, intf->rsp_prod);
+		intf->rsp_cons = intf->rsp_prod;
+	}
 
 	if (xenbus_irq)
 		unbind_from_irqhandler(xenbus_irq, &xb_waitq);

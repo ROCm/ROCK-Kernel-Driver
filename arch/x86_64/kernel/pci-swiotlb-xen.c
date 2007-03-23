@@ -35,7 +35,7 @@ struct dma_mapping_ops swiotlb_dma_ops = {
 #endif
 };
 
-void pci_swiotlb_init(void)
+void __init pci_swiotlb_init(void)
 {
 #if 0
 	/* don't initialize swiotlb if iommu=off (no_iommu=1) */

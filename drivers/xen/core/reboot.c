@@ -24,13 +24,16 @@ MODULE_LICENSE("Dual BSD/GPL");
 /* Ignore multiple shutdown requests. */
 static int shutting_down = SHUTDOWN_INVALID;
 
+/* Can we leave APs online when we suspend? */
+static int fast_suspend;
+
 static void __shutdown_handler(struct work_struct *unused);
 static DECLARE_DELAYED_WORK(shutdown_work, __shutdown_handler);
 
 #ifdef CONFIG_XEN
-int __xen_suspend(void);
+int __xen_suspend(int fast_suspend);
 #else
-#define __xen_suspend() (void)0
+#define __xen_suspend(fast_suspend) 0
 #endif
 
 static int shutdown_process(void *__unused)
@@ -44,7 +47,8 @@ static int shutdown_process(void *__unused)
 
 	if ((shutting_down == SHUTDOWN_POWEROFF) ||
 	    (shutting_down == SHUTDOWN_HALT)) {
-		if (call_usermodehelper("/sbin/poweroff", poweroff_argv, envp, 0) < 0) {
+		if (call_usermodehelper("/sbin/poweroff", poweroff_argv,
+					envp, 0) < 0) {
 #ifdef CONFIG_XEN
 			sys_reboot(LINUX_REBOOT_MAGIC1,
 				   LINUX_REBOOT_MAGIC2,
@@ -61,7 +65,9 @@ static int shutdown_process(void *__unused)
 
 static int xen_suspend(void *__unused)
 {
-	__xen_suspend();
+	int err = __xen_suspend(fast_suspend);
+	if (err)
+		printk(KERN_ERR "Xen suspend failed (%d)\n", err);
 	shutting_down = SHUTDOWN_INVALID;
 	return 0;
 }
@@ -100,6 +106,7 @@ static void __shutdown_handler(struct work_struct *unused)
 static void shutdown_handler(struct xenbus_watch *watch,
 			     const char **vec, unsigned int len)
 {
+	extern void ctrl_alt_del(void);
 	char *str;
 	struct xenbus_transaction xbt;
 	int err;
@@ -129,7 +136,7 @@ static void shutdown_handler(struct xenbus_watch *watch,
 	if (strcmp(str, "poweroff") == 0)
 		shutting_down = SHUTDOWN_POWEROFF;
 	else if (strcmp(str, "reboot") == 0)
-		kill_proc(1, SIGINT, 1); /* interrupt init */
+		ctrl_alt_del();
 	else if (strcmp(str, "suspend") == 0)
 		shutting_down = SHUTDOWN_SUSPEND;
 	else if (strcmp(str, "halt") == 0)
@@ -191,6 +198,10 @@ static int setup_shutdown_watcher(struct notifier_block *notifier,
 				  void *data)
 {
 	int err;
+
+	xenbus_scanf(XBT_NIL, "control",
+		     "platform-feature-multiprocessor-suspend",
+		     "%d", &fast_suspend);
 
 	err = register_xenbus_watch(&shutdown_watch);
 	if (err)

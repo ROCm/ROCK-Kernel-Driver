@@ -1,28 +1,28 @@
 /*
  * xenbus_dev.c
- *
+ * 
  * Driver giving user-space access to the kernel's xenbus connection
  * to xenstore.
- *
+ * 
  * Copyright (c) 2005, Christian Limpach
  * Copyright (c) 2005, Rusty Russell, IBM Corporation
- *
+ * 
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License version 2
  * as published by the Free Software Foundation; or, when distributed
  * separately from the Linux kernel or incorporated into other
  * software packages, subject to the following license:
- *
+ * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this source file (the "Software"), to deal in the Software without
  * restriction, including without limitation the rights to use, copy, modify,
  * merge, publish, distribute, sublicense, and/or sell copies of the Software,
  * and to permit persons to whom the Software is furnished to do so, subject to
  * the following conditions:
- *
+ * 
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- *
+ * 
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -155,7 +155,7 @@ static void watch_fired(struct xenbus_watch *watch,
 
 	hdr.type = XS_WATCH_EVENT;
 	hdr.len = body_len;
-
+	
 	queue_reply(adap->dev_data, (char *)&hdr, sizeof(hdr));
 	queue_reply(adap->dev_data, (char *)path, path_len);
 	queue_reply(adap->dev_data, (char *)token, tok_len);
@@ -173,17 +173,22 @@ static ssize_t xenbus_dev_write(struct file *filp,
 	void *reply;
 	char *path, *token;
 	struct watch_adapter *watch, *tmp_watch;
-	int err;
+	int err, rc = len;
 
-	if ((len + u->len) > sizeof(u->u.buffer))
-		return -EINVAL;
+	if ((len + u->len) > sizeof(u->u.buffer)) {
+		rc = -EINVAL;
+		goto out;
+	}
 
-	if (copy_from_user(u->u.buffer + u->len, ubuf, len) != 0)
-		return -EFAULT;
+	if (copy_from_user(u->u.buffer + u->len, ubuf, len) != 0) {
+		rc = -EFAULT;
+		goto out;
+	}
 
 	u->len += len;
-	if (u->len < (sizeof(u->u.msg) + u->u.msg.len))
-		return len;
+	if ((u->len < sizeof(u->u.msg)) ||
+	    (u->len < (sizeof(u->u.msg) + u->u.msg.len)))
+		return rc;
 
 	msg_type = u->u.msg.type;
 
@@ -201,14 +206,17 @@ static ssize_t xenbus_dev_write(struct file *filp,
 	case XS_SET_PERMS:
 		if (msg_type == XS_TRANSACTION_START) {
 			trans = kmalloc(sizeof(*trans), GFP_KERNEL);
-			if (!trans)
-				return -ENOMEM;
+			if (!trans) {
+				rc = -ENOMEM;
+				goto out;
+			}
 		}
 
 		reply = xenbus_dev_request_and_reply(&u->u.msg);
 		if (IS_ERR(reply)) {
 			kfree(trans);
-			return PTR_ERR(reply);
+			rc = PTR_ERR(reply);
+			goto out;
 		}
 
 		if (msg_type == XS_TRANSACTION_START) {
@@ -231,8 +239,10 @@ static ssize_t xenbus_dev_write(struct file *filp,
 	case XS_UNWATCH:
 		path = u->u.buffer + sizeof(u->u.msg);
 		token = memchr(path, 0, u->u.msg.len);
-		if (token == NULL)
-			return -EILSEQ;
+		if (token == NULL) {
+			rc = -EILSEQ;
+			goto out;
+		}
 		token++;
 
 		if (msg_type == XS_WATCH) {
@@ -251,9 +261,10 @@ static ssize_t xenbus_dev_write(struct file *filp,
 			err = register_xenbus_watch(&watch->watch);
 			if (err) {
 				free_watch_adapter(watch);
-				return err;
+				rc = err;
+				goto out;
 			}
-
+			
 			list_add(&watch->list, &u->watches);
 
 			hdr.type = XS_WATCH;
@@ -265,7 +276,6 @@ static ssize_t xenbus_dev_write(struct file *filp,
                                                  &u->watches, list) {
 				if (!strcmp(watch->token, token) &&
 				    !strcmp(watch->watch.node, path))
-					break;
 				{
 					unregister_xenbus_watch(&watch->watch);
 					list_del(&watch->list);
@@ -278,11 +288,13 @@ static ssize_t xenbus_dev_write(struct file *filp,
 		break;
 
 	default:
-		return -EINVAL;
+		rc = -EINVAL;
+		break;
 	}
 
+ out:
 	u->len = 0;
-	return len;
+	return rc;
 }
 
 static int xenbus_dev_open(struct inode *inode, struct file *filp)

@@ -42,7 +42,6 @@ static void __init clear_bss(void)
 #define OLD_CL_BASE_ADDR        0x90000
 #define OLD_CL_OFFSET           0x90022
 
-
 static void __init copy_bootdata(char *real_mode_data)
 {
 #ifndef CONFIG_XEN

@@ -71,6 +71,7 @@ atomic_t irq_mis_count;
 static struct { int pin, apic; } ioapic_i8259 = { -1, -1 };
 
 static DEFINE_SPINLOCK(ioapic_lock);
+static DEFINE_SPINLOCK(vector_lock);
 
 #ifndef CONFIG_XEN
 int timer_over_8254 __initdata = 1;
@@ -167,7 +168,7 @@ static inline void io_apic_write(unsigned int apic, unsigned int reg, unsigned i
  */
 static inline void io_apic_modify(unsigned int apic, unsigned int reg, unsigned int value)
 {
-	volatile struct io_apic *io_apic = io_apic_base(apic);
+	volatile struct io_apic __iomem *io_apic = io_apic_base(apic);
 	if (sis_apic_bug)
 		writel(reg, &io_apic->index);
 	writel(value, &io_apic->data);
@@ -529,8 +530,8 @@ static void do_irq_balance(void)
 		package_index = CPU_TO_PACKAGEINDEX(i);
 		for (j = 0; j < NR_IRQS; j++) {
 			unsigned long value_now, delta;
-			/* Is this an active IRQ? */
-			if (!irq_desc[j].action)
+			/* Is this an active IRQ or balancing disabled ? */
+			if (!irq_desc[j].action || irq_balancing_disabled(j))
 				continue;
 			if ( package_index == i )
 				IRQ_DELTA(package_index,j) = 0;
@@ -1277,8 +1278,9 @@ static inline int IO_APIC_irq_trigger(int irq)
 /* irq_vectors is indexed by the sum of all RTEs in all I/O APICs. */
 static u8 irq_vector[NR_IRQ_VECTORS] __read_mostly; /* = { FIRST_DEVICE_VECTOR , 0 }; */
 
-static int assign_irq_vector(int irq)
+static int __assign_irq_vector(int irq)
 {
+	int vector;
 	struct physdev_irq irq_op;
 
 	BUG_ON((unsigned)irq >= NR_IRQ_VECTORS);
@@ -1290,9 +1292,22 @@ static int assign_irq_vector(int irq)
 	if (HYPERVISOR_physdev_op(PHYSDEVOP_alloc_irq_vector, &irq_op))
 		return -ENOSPC;
 
-	irq_vector[irq] = irq_op.vector;
+	vector = irq_op.vector;
+	irq_vector[irq] = vector;
 
-	return irq_op.vector;
+	return vector;
+}
+
+static int assign_irq_vector(int irq)
+{
+	unsigned long flags;
+	int vector;
+
+	spin_lock_irqsave(&vector_lock, flags);
+	vector = __assign_irq_vector(irq);
+	spin_unlock_irqrestore(&vector_lock, flags);
+
+	return vector;
 }
 
 #ifndef CONFIG_XEN
@@ -1308,11 +1323,9 @@ static void ioapic_register_intr(int irq, int vector, unsigned long trigger)
 			trigger == IOAPIC_LEVEL)
 		set_irq_chip_and_handler_name(irq, &ioapic_chip,
 					 handle_fasteoi_irq, "fasteoi");
-	else {
-		irq_desc[irq].status |= IRQ_DELAYED_DISABLE;
+	else
 		set_irq_chip_and_handler_name(irq, &ioapic_chip,
 					 handle_edge_irq, "edge");
-	}
 	set_intr_gate(vector, interrupt[irq]);
 }
 #else
@@ -1386,7 +1399,6 @@ static void __init setup_IO_APIC_irqs(void)
 		}
 		spin_lock_irqsave(&ioapic_lock, flags);
 		__ioapic_write_entry(apic, pin, entry);
-		irq_desc[irq].affinity = TARGET_CPUS;
 		spin_unlock_irqrestore(&ioapic_lock, flags);
 	}
 	}
@@ -1619,7 +1631,7 @@ void /*__init*/ print_local_APIC(void * dummy)
 	v = apic_read(APIC_LVR);
 	printk(KERN_INFO "... APIC VERSION: %08x\n", v);
 	ver = GET_APIC_VERSION(v);
-	maxlvt = get_maxlvt();
+	maxlvt = lapic_get_maxlvt();
 
 	v = apic_read(APIC_TASKPRI);
 	printk(KERN_DEBUG "... APIC TASKPRI: %08x (%02x)\n", v, v & APIC_TPRI_MASK);
@@ -1958,7 +1970,7 @@ static void __init setup_ioapic_ids_from_mpc(void) { }
 #endif
 
 #ifndef CONFIG_XEN
-static int no_timer_check __initdata;
+int no_timer_check __initdata;
 
 static int __init notimercheck(char *s)
 {
@@ -2351,7 +2363,7 @@ static inline void __init check_timer(void)
 
 	disable_8259A_irq(0);
 	set_irq_chip_and_handler_name(0, &lapic_chip, handle_fasteoi_irq,
-				      "fasteio");
+				      "fasteoi");
 	apic_write_around(APIC_LVT0, APIC_DM_FIXED | vector);	/* Fixed mode */
 	enable_8259A_irq(0);
 
@@ -2445,10 +2457,10 @@ static int __init io_apic_bug_finalize(void)
 	if(sis_apic_bug == -1)
 		sis_apic_bug = 0;
 	if (is_initial_xendomain()) {
-		dom0_op_t op = { .cmd = DOM0_PLATFORM_QUIRK };
+		struct xen_platform_op op = { .cmd = XENPF_platform_quirk };
 		op.u.platform_quirk.quirk_id = sis_apic_bug ?
 			QUIRK_IOAPIC_BAD_REGSEL : QUIRK_IOAPIC_GOOD_REGSEL;
-		HYPERVISOR_dom0_op(&op);
+		HYPERVISOR_platform_op(&op);
 	}
 	return 0;
 }
@@ -2665,25 +2677,32 @@ static struct irq_chip msi_chip = {
 	.retrigger	= ioapic_retrigger_irq,
 };
 
-int arch_setup_msi_irq(unsigned int irq, struct pci_dev *dev)
+int arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
 {
 	struct msi_msg msg;
-	int ret;
+	int irq, ret;
+	irq = create_irq();
+	if (irq < 0)
+		return irq;
+
+	set_irq_msi(irq, desc);
 	ret = msi_compose_msg(dev, irq, &msg);
-	if (ret < 0)
+	if (ret < 0) {
+		destroy_irq(irq);
 		return ret;
+	}
 
 	write_msi_msg(irq, &msg);
 
 	set_irq_chip_and_handler_name(irq, &msi_chip, handle_edge_irq,
 				      "edge");
 
-	return 0;
+	return irq;
 }
 
 void arch_teardown_msi_irq(unsigned int irq)
 {
-	return;
+	destroy_irq(irq);
 }
 
 #endif /* CONFIG_PCI_MSI */
@@ -2931,7 +2950,6 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level, int a
 
 	spin_lock_irqsave(&ioapic_lock, flags);
 	__ioapic_write_entry(ioapic, pin, entry);
-	irq_desc[irq].affinity = TARGET_CPUS;
 	spin_unlock_irqrestore(&ioapic_lock, flags);
 
 	return 0;

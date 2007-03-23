@@ -1,26 +1,26 @@
 /******************************************************************************
  * evtchn.c
- *
+ * 
  * Communication via Xen event channels.
- *
+ * 
  * Copyright (c) 2002-2005, K A Fraser
- *
+ * 
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License version 2
  * as published by the Free Software Foundation; or, when distributed
  * separately from the Linux kernel or incorporated into other
  * software packages, subject to the following license:
- *
+ * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this source file (the "Software"), to deal in the Software without
  * restriction, including without limitation the rights to use, copy, modify,
  * merge, publish, distribute, sublicense, and/or sell copies of the Software,
  * and to permit persons to whom the Software is furnished to do so, subject to
  * the following conditions:
- *
+ * 
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- *
+ * 
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -152,6 +152,16 @@ static void init_evtchn_cpu_bindings(void)
 static inline unsigned int cpu_from_evtchn(unsigned int evtchn)
 {
 	return cpu_evtchn[evtchn];
+}
+
+void mask_evtchn_local(void)
+{
+	unsigned i, cpu = smp_processor_id();
+	shared_info_t *s = HYPERVISOR_shared_info;
+
+	for (i = 0; i < NR_EVENT_CHANNELS; ++i)
+		if (cpu_evtchn[i] == cpu)
+			synch_set_bit(i, &s->evtchn_mask[0]);
 }
 
 #else
@@ -600,7 +610,7 @@ static void rebind_irq_to_cpu(unsigned irq, unsigned tcpu)
 	bind_vcpu.vcpu = tcpu;
 
 	/*
-	 * If this fails, it usually just indicates that we're dealing with a
+	 * If this fails, it usually just indicates that we're dealing with a 
 	 * virq or IPI channel, which don't actually need to be rebound. Ignore
 	 * it, but don't do the xenlinux-level rebind in that case.
 	 */
@@ -882,11 +892,67 @@ void unmask_evtchn(int port)
 }
 EXPORT_SYMBOL_GPL(unmask_evtchn);
 
-void irq_resume(void)
+static void restore_cpu_virqs(int cpu)
 {
 	struct evtchn_bind_virq bind_virq;
-	struct evtchn_bind_ipi  bind_ipi;
-	int cpu, pirq, virq, ipi, irq, evtchn;
+	int virq, irq, evtchn;
+
+	for (virq = 0; virq < NR_VIRQS; virq++) {
+		if ((irq = per_cpu(virq_to_irq, cpu)[virq]) == -1)
+			continue;
+
+		BUG_ON(irq_info[irq] != mk_irq_info(IRQT_VIRQ, virq, 0));
+
+		/* Get a new binding from Xen. */
+		bind_virq.virq = virq;
+		bind_virq.vcpu = cpu;
+		if (HYPERVISOR_event_channel_op(EVTCHNOP_bind_virq,
+						&bind_virq) != 0)
+			BUG();
+		evtchn = bind_virq.port;
+
+		/* Record the new mapping. */
+		evtchn_to_irq[evtchn] = irq;
+		irq_info[irq] = mk_irq_info(IRQT_VIRQ, virq, evtchn);
+		bind_evtchn_to_cpu(evtchn, cpu);
+
+		/* Ready for use. */
+		unmask_evtchn(evtchn);
+	}
+}
+
+static void restore_cpu_ipis(int cpu)
+{
+	struct evtchn_bind_ipi bind_ipi;
+	int ipi, irq, evtchn;
+
+	for (ipi = 0; ipi < NR_IPIS; ipi++) {
+		if ((irq = per_cpu(ipi_to_irq, cpu)[ipi]) == -1)
+			continue;
+
+		BUG_ON(irq_info[irq] != mk_irq_info(IRQT_IPI, ipi, 0));
+
+		/* Get a new binding from Xen. */
+		bind_ipi.vcpu = cpu;
+		if (HYPERVISOR_event_channel_op(EVTCHNOP_bind_ipi,
+						&bind_ipi) != 0)
+			BUG();
+		evtchn = bind_ipi.port;
+
+		/* Record the new mapping. */
+		evtchn_to_irq[evtchn] = irq;
+		irq_info[irq] = mk_irq_info(IRQT_IPI, ipi, evtchn);
+		bind_evtchn_to_cpu(evtchn, cpu);
+
+		/* Ready for use. */
+		unmask_evtchn(evtchn);
+
+	}
+}
+
+void irq_resume(void)
+{
+	int cpu, pirq, irq, evtchn;
 
 	init_evtchn_cpu_bindings();
 
@@ -898,66 +964,17 @@ void irq_resume(void)
 	for (pirq = 0; pirq < NR_PIRQS; pirq++)
 		BUG_ON(irq_info[pirq_to_irq(pirq)] != IRQ_UNBOUND);
 
-	/* Secondary CPUs must have no VIRQ or IPI bindings. */
-	for_each_possible_cpu(cpu) {
-		if (cpu == 0)
-			continue;
-		for (virq = 0; virq < NR_VIRQS; virq++)
-			BUG_ON(per_cpu(virq_to_irq, cpu)[virq] != -1);
-		for (ipi = 0; ipi < NR_IPIS; ipi++)
-			BUG_ON(per_cpu(ipi_to_irq, cpu)[ipi] != -1);
-	}
-
 	/* No IRQ <-> event-channel mappings. */
 	for (irq = 0; irq < NR_IRQS; irq++)
 		irq_info[irq] &= ~0xFFFF; /* zap event-channel binding */
 	for (evtchn = 0; evtchn < NR_EVENT_CHANNELS; evtchn++)
 		evtchn_to_irq[evtchn] = -1;
 
-	/* Primary CPU: rebind VIRQs automatically. */
-	for (virq = 0; virq < NR_VIRQS; virq++) {
-		if ((irq = per_cpu(virq_to_irq, 0)[virq]) == -1)
-			continue;
-
-		BUG_ON(irq_info[irq] != mk_irq_info(IRQT_VIRQ, virq, 0));
-
-		/* Get a new binding from Xen. */
-		bind_virq.virq = virq;
-		bind_virq.vcpu = 0;
-		if (HYPERVISOR_event_channel_op(EVTCHNOP_bind_virq,
-						&bind_virq) != 0)
-			BUG();
-		evtchn = bind_virq.port;
-
-		/* Record the new mapping. */
-		evtchn_to_irq[evtchn] = irq;
-		irq_info[irq] = mk_irq_info(IRQT_VIRQ, virq, evtchn);
-
-		/* Ready for use. */
-		unmask_evtchn(evtchn);
+	for_each_possible_cpu(cpu) {
+		restore_cpu_virqs(cpu);
+		restore_cpu_ipis(cpu);
 	}
 
-	/* Primary CPU: rebind IPIs automatically. */
-	for (ipi = 0; ipi < NR_IPIS; ipi++) {
-		if ((irq = per_cpu(ipi_to_irq, 0)[ipi]) == -1)
-			continue;
-
-		BUG_ON(irq_info[irq] != mk_irq_info(IRQT_IPI, ipi, 0));
-
-		/* Get a new binding from Xen. */
-		bind_ipi.vcpu = 0;
-		if (HYPERVISOR_event_channel_op(EVTCHNOP_bind_ipi,
-						&bind_ipi) != 0)
-			BUG();
-		evtchn = bind_ipi.port;
-
-		/* Record the new mapping. */
-		evtchn_to_irq[evtchn] = irq;
-		irq_info[irq] = mk_irq_info(IRQT_IPI, ipi, evtchn);
-
-		/* Ready for use. */
-		unmask_evtchn(evtchn);
-	}
 }
 
 void __init xen_init_IRQ(void)

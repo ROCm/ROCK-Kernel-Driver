@@ -5,6 +5,8 @@
 
 extern spinlock_t i8253_lock;
 
+#ifdef CONFIG_GENERIC_CLOCKEVENTS
+
 extern struct clock_event_device *global_clock_event;
 
 /**
@@ -17,5 +19,7 @@ static inline void pit_interrupt_hook(void)
 {
 	global_clock_event->event_handler(global_clock_event);
 }
+
+#endif
 
 #endif	/* __ASM_I8253_H__ */

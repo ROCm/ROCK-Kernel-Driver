@@ -138,8 +138,8 @@ __setup("swiotlb=", setup_io_tlb_npages);
  * Statically reserve bounce buffer space and initialize bounce buffer data
  * structures for the software IO TLB used to implement the PCI DMA API.
  */
-void
-swiotlb_init_with_default_size (size_t default_size)
+void __init
+swiotlb_init_with_default_size(size_t default_size)
 {
 	unsigned long i, bytes;
 	int rc;
@@ -227,7 +227,7 @@ swiotlb_init_with_default_size (size_t default_size)
 	       dma_bits);
 }
 
-void
+void __init
 swiotlb_init(void)
 {
 	long ram_end;
@@ -447,7 +447,7 @@ swiotlb_full(struct device *dev, size_t size, int dir, int do_panic)
 	 * When the mapping is small enough return a static buffer to limit
 	 * the damage, or panic when the transfer is too big.
 	 */
-	printk(KERN_ERR "PCI-DMA: Out of SW-IOMMU space for %lu bytes at "
+	printk(KERN_ERR "PCI-DMA: Out of SW-IOMMU space for %zu bytes at "
 	       "device %s\n", (unsigned long)size, dev ? dev->bus_id : "?");
 
 	if (size > io_tlb_overflow && do_panic) {
@@ -584,7 +584,7 @@ swiotlb_map_sg(struct device *hwdev, struct scatterlist *sg, int nelems,
 				sg[0].dma_length = 0;
 				return 0;
 			}
-			sg->dma_address = (dma_addr_t)virt_to_bus(map);
+			sg->dma_address = virt_to_bus(map);
 		} else
 			sg->dma_address = dev_addr;
 		sg->dma_length = sg->length;
@@ -606,8 +606,7 @@ swiotlb_unmap_sg(struct device *hwdev, struct scatterlist *sg, int nelems,
 
 	for (i = 0; i < nelems; i++, sg++)
 		if (sg->dma_address != SG_ENT_PHYS_ADDRESS(sg))
-			unmap_single(hwdev, 
-				     (void *)bus_to_virt(sg->dma_address),
+			unmap_single(hwdev, bus_to_virt(sg->dma_address),
 				     sg->dma_length, dir);
 }
 
@@ -628,8 +627,7 @@ swiotlb_sync_sg_for_cpu(struct device *hwdev, struct scatterlist *sg,
 
 	for (i = 0; i < nelems; i++, sg++)
 		if (sg->dma_address != SG_ENT_PHYS_ADDRESS(sg))
-			sync_single(hwdev,
-				    (void *)bus_to_virt(sg->dma_address),
+			sync_single(hwdev, bus_to_virt(sg->dma_address),
 				    sg->dma_length, dir);
 }
 
@@ -643,8 +641,7 @@ swiotlb_sync_sg_for_device(struct device *hwdev, struct scatterlist *sg,
 
 	for (i = 0; i < nelems; i++, sg++)
 		if (sg->dma_address != SG_ENT_PHYS_ADDRESS(sg))
-			sync_single(hwdev,
-				    (void *)bus_to_virt(sg->dma_address),
+			sync_single(hwdev, bus_to_virt(sg->dma_address),
 				    sg->dma_length, dir);
 }
 

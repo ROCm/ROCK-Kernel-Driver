@@ -331,13 +331,27 @@ static int kimage_is_destination_range(struct kimage *image,
 	return 0;
 }
 
-static struct page *kimage_alloc_pages(gfp_t gfp_mask, unsigned int order)
+static struct page *kimage_alloc_pages(gfp_t gfp_mask, unsigned int order, unsigned long limit)
 {
 	struct page *pages;
 
 	pages = alloc_pages(gfp_mask, order);
 	if (pages) {
 		unsigned int count, i;
+#ifdef CONFIG_XEN
+		int address_bits;
+
+		if (limit == ~0UL)
+			address_bits = BITS_PER_LONG;
+		else
+			address_bits = long_log2(limit);
+
+		if (xen_create_contiguous_region((unsigned long)page_address(pages),
+						 order, address_bits) < 0) {
+			__free_pages(pages, order);
+			return NULL;
+		}
+#endif
 		pages->mapping = NULL;
 		set_page_private(pages, order);
 		count = 1 << order;
@@ -356,6 +370,9 @@ static void kimage_free_pages(struct page *page)
 	count = 1 << order;
 	for (i = 0; i < count; i++)
 		ClearPageReserved(page + i);
+#ifdef CONFIG_XEN
+	xen_destroy_contiguous_region((unsigned long)page_address(page), order);
+#endif
 	__free_pages(page, order);
 }
 
@@ -401,7 +418,7 @@ static struct page *kimage_alloc_normal_control_pages(struct kimage *image,
 	do {
 		unsigned long pfn, epfn, addr, eaddr;
 
-		pages = kimage_alloc_pages(GFP_KERNEL, order);
+		pages = kimage_alloc_pages(GFP_KERNEL, order, KEXEC_CONTROL_MEMORY_LIMIT);
 		if (!pages)
 			break;
 		pfn   = kexec_page_to_pfn(pages);
@@ -710,7 +727,7 @@ static struct page *kimage_alloc_page(struct kimage *image,
 		kimage_entry_t *old;
 
 		/* Allocate a page, if we run out of memory give up */
-		page = kimage_alloc_pages(gfp_mask, 0);
+		page = kimage_alloc_pages(gfp_mask, 0, KEXEC_SOURCE_MEMORY_LIMIT);
 		if (!page)
 			return NULL;
 		/* If the page cannot be used file it away */

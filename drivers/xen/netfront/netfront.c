@@ -46,7 +46,7 @@
 #include <linux/in.h>
 #include <linux/if_ether.h>
 #include <linux/io.h>
-#include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <net/sock.h>
 #include <net/pkt_sched.h>
 #include <net/arp.h>
@@ -154,6 +154,7 @@ struct netfront_info {
 
 	unsigned int irq;
 	unsigned int copying_receiver;
+	unsigned int carrier;
 
 	/* Receive-ring batched refills. */
 #define RX_MIN_TARGET 8
@@ -191,6 +192,15 @@ struct netfront_rx_info {
 	struct netif_rx_response rx;
 	struct netif_extra_info extras[XEN_NETIF_EXTRA_TYPE_MAX - 1];
 };
+
+/*
+ * Implement our own carrier flag: the network stack's version causes delays
+ * when the carrier is re-enabled (in particular, dev_activate() may not
+ * immediately be called, which can cause packet loss).
+ */
+#define netfront_carrier_on(netif)	((netif)->carrier = 1)
+#define netfront_carrier_off(netif)	((netif)->carrier = 0)
+#define netfront_carrier_ok(netif)	((netif)->carrier)
 
 /*
  * Access macros for acquiring freeing slots in tx_skbs[].
@@ -590,26 +600,6 @@ static int send_fake_arp(struct net_device *dev)
 	return dev_queue_xmit(skb);
 }
 
-static int network_open(struct net_device *dev)
-{
-	struct netfront_info *np = netdev_priv(dev);
-
-	memset(&np->stats, 0, sizeof(np->stats));
-
-	spin_lock(&np->rx_lock);
-	if (netif_carrier_ok(dev)) {
-		network_alloc_rx_buffers(dev);
-		np->rx.sring->rsp_event = np->rx.rsp_cons + 1;
-		if (RING_HAS_UNCONSUMED_RESPONSES(&np->rx))
-			netif_rx_schedule(dev);
-	}
-	spin_unlock(&np->rx_lock);
-
-	netif_start_queue(dev);
-
-	return 0;
-}
-
 static inline int netfront_tx_slot_available(struct netfront_info *np)
 {
 	return ((np->tx.req_prod_pvt - np->tx.rsp_cons) <
@@ -626,6 +616,26 @@ static inline void network_maybe_wake_tx(struct net_device *dev)
 		netif_wake_queue(dev);
 }
 
+static int network_open(struct net_device *dev)
+{
+	struct netfront_info *np = netdev_priv(dev);
+
+	memset(&np->stats, 0, sizeof(np->stats));
+
+	spin_lock(&np->rx_lock);
+	if (netfront_carrier_ok(np)) {
+		network_alloc_rx_buffers(dev);
+		np->rx.sring->rsp_event = np->rx.rsp_cons + 1;
+		if (RING_HAS_UNCONSUMED_RESPONSES(&np->rx))
+			netif_rx_schedule(dev);
+	}
+	spin_unlock(&np->rx_lock);
+
+	network_maybe_wake_tx(dev);
+
+	return 0;
+}
+
 static void network_tx_buf_gc(struct net_device *dev)
 {
 	RING_IDX cons, prod;
@@ -633,7 +643,7 @@ static void network_tx_buf_gc(struct net_device *dev)
 	struct netfront_info *np = netdev_priv(dev);
 	struct sk_buff *skb;
 
-	BUG_ON(!netif_carrier_ok(dev));
+	BUG_ON(!netfront_carrier_ok(np));
 
 	do {
 		prod = np->tx.sring->rsp_prod;
@@ -703,7 +713,7 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 	int nr_flips;
 	netif_rx_request_t *req;
 
-	if (unlikely(!netif_carrier_ok(dev)))
+	if (unlikely(!netfront_carrier_ok(np)))
 		return;
 
 	/*
@@ -934,7 +944,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	spin_lock_irq(&np->tx_lock);
 
-	if (unlikely(!netif_carrier_ok(dev) ||
+	if (unlikely(!netfront_carrier_ok(np) ||
 		     (frags > 1 && !xennet_can_sg(dev)) ||
 		     netif_needs_gso(dev, skb))) {
 		spin_unlock_irq(&np->tx_lock);
@@ -1024,7 +1034,7 @@ static irqreturn_t netif_int(int irq, void *dev_id)
 
 	spin_lock_irqsave(&np->tx_lock, flags);
 
-	if (likely(netif_carrier_ok(dev))) {
+	if (likely(netfront_carrier_ok(np))) {
 		network_tx_buf_gc(dev);
 		/* Under tx_lock: protects access to rx shared-ring indexes. */
 		if (RING_HAS_UNCONSUMED_RESPONSES(&np->rx))
@@ -1299,7 +1309,7 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 
 	spin_lock(&np->rx_lock);
 
-	if (unlikely(!netif_carrier_ok(dev))) {
+	if (unlikely(!netfront_carrier_ok(np))) {
 		spin_unlock(&np->rx_lock);
 		return 0;
 	}
@@ -1317,13 +1327,13 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 	work_done = 0;
 	while ((i != rp) && (work_done < budget)) {
 		memcpy(rx, RING_GET_RESPONSE(&np->rx, i), sizeof(*rx));
-		memset(extras, 0, sizeof(extras));
+		memset(extras, 0, sizeof(rinfo.extras));
 
 		err = xennet_get_responses(np, &rinfo, rp, &tmpq,
 					   &pages_flipped);
 
 		if (unlikely(err)) {
-err:
+err:	
 			while ((skb = __skb_dequeue(&tmpq)))
 				__skb_queue_tail(&errq, skb);
 			np->stats.rx_errors++;
@@ -1504,7 +1514,7 @@ static void netif_release_rx_bufs(struct netfront_info *np)
 	int id, ref;
 
 	if (np->copying_receiver) {
-		printk("%s: fix me for copying receiver.\n", __FUNCTION__);
+		WPRINTK("%s: fix me for copying receiver.\n", __FUNCTION__);
 		return;
 	}
 
@@ -1554,8 +1564,8 @@ static void netif_release_rx_bufs(struct netfront_info *np)
 		xfer++;
 	}
 
-	printk("%s: %d xfer, %d noxfer, %d unused\n",
-	       __FUNCTION__, xfer, noxfer, unused);
+	IPRINTK("%s: %d xfer, %d noxfer, %d unused\n",
+		__FUNCTION__, xfer, noxfer, unused);
 
 	if (xfer) {
 		/* Some pages are no longer absent... */
@@ -1744,7 +1754,7 @@ static int network_connect(struct net_device *dev)
 	 * domain a kick because we've probably just requeued some
 	 * packets.
 	 */
-	netif_carrier_on(dev);
+	netfront_carrier_on(np);
 	notify_remote_via_irq(np->irq);
 	network_tx_buf_gc(dev);
 	network_alloc_rx_buffers(dev);
@@ -1776,18 +1786,19 @@ static struct ethtool_ops network_ethtool_ops =
 };
 
 #ifdef CONFIG_SYSFS
-static ssize_t show_rxbuf_min(struct device *dev, struct device_attribute *attr, char *buf)
+static ssize_t show_rxbuf_min(struct device *dev,
+			      struct device_attribute *attr, char *buf)
 {
-	struct net_device *netdev = container_of(dev, struct net_device, dev);
-	struct netfront_info *info = netdev_priv(netdev);
+	struct netfront_info *info = netdev_priv(to_net_dev(dev));
 
 	return sprintf(buf, "%u\n", info->rx_min_target);
 }
 
-static ssize_t store_rxbuf_min(struct device *dev, struct device_attribute *attr,
+static ssize_t store_rxbuf_min(struct device *dev,
+			       struct device_attribute *attr,
 			       const char *buf, size_t len)
 {
-	struct net_device *netdev = container_of(dev, struct net_device, dev);
+	struct net_device *netdev = to_net_dev(dev);
 	struct netfront_info *np = netdev_priv(netdev);
 	char *endp;
 	unsigned long target;
@@ -1817,17 +1828,19 @@ static ssize_t store_rxbuf_min(struct device *dev, struct device_attribute *attr
 	return len;
 }
 
-static ssize_t show_rxbuf_max(struct device *dev, struct device_attribute *attr, char *buf)
+static ssize_t show_rxbuf_max(struct device *dev,
+			      struct device_attribute *attr, char *buf)
 {
-	struct net_device *netdev = container_of(dev, struct net_device, dev);
-	struct netfront_info *info = netdev_priv(netdev);
+	struct netfront_info *info = netdev_priv(to_net_dev(dev));
 
 	return sprintf(buf, "%u\n", info->rx_max_target);
 }
 
-static ssize_t store_rxbuf_max(struct device *dev, struct device_attribute *attr, const char *buf, size_t len)
+static ssize_t store_rxbuf_max(struct device *dev,
+			       struct device_attribute *attr,
+			       const char *buf, size_t len)
 {
-	struct net_device *netdev = container_of(dev, struct net_device, dev);
+	struct net_device *netdev = to_net_dev(dev);
 	struct netfront_info *np = netdev_priv(netdev);
 	char *endp;
 	unsigned long target;
@@ -1857,10 +1870,10 @@ static ssize_t store_rxbuf_max(struct device *dev, struct device_attribute *attr
 	return len;
 }
 
-static ssize_t show_rxbuf_cur(struct device *dev, struct device_attribute *attr, char *buf)
+static ssize_t show_rxbuf_cur(struct device *dev,
+			      struct device_attribute *attr, char *buf)
 {
-	struct net_device *netdev = container_of(dev, struct net_device, dev);
-	struct netfront_info *info = netdev_priv(netdev);
+	struct netfront_info *info = netdev_priv(to_net_dev(dev));
 
 	return sprintf(buf, "%u\n", info->rx_target);
 }
@@ -1877,7 +1890,8 @@ static int xennet_sysfs_addif(struct net_device *netdev)
 	int error = 0;
 
 	for (i = 0; i < ARRAY_SIZE(xennet_attrs); i++) {
-		error = device_create_file(&netdev->dev, &xennet_attrs[i]);
+		error = device_create_file(&netdev->dev,
+					   &xennet_attrs[i]);
 		if (error)
 			goto fail;
 	}
@@ -1885,8 +1899,7 @@ static int xennet_sysfs_addif(struct net_device *netdev)
 
  fail:
 	while (--i >= 0)
-		device_remove_file(&netdev->dev,
-					 &xennet_attrs[i]);
+		device_remove_file(&netdev->dev, &xennet_attrs[i]);
 	return error;
 }
 
@@ -1894,10 +1907,8 @@ static void xennet_sysfs_delif(struct net_device *netdev)
 {
 	int i;
 
-	for (i = 0; i < ARRAY_SIZE(xennet_attrs); i++) {
-		device_remove_file(&netdev->dev,
-					 &xennet_attrs[i]);
-	}
+	for (i = 0; i < ARRAY_SIZE(xennet_attrs); i++)
+		device_remove_file(&netdev->dev, &xennet_attrs[i]);
 }
 
 #endif /* CONFIG_SYSFS */
@@ -1982,7 +1993,7 @@ static struct net_device * __devinit create_netdev(struct xenbus_device *dev)
 
 	np->netdev = netdev;
 
-	netif_carrier_off(netdev);
+	netfront_carrier_off(np);
 
 	return netdev;
 
@@ -2016,7 +2027,7 @@ static void netif_disconnect_backend(struct netfront_info *info)
 	/* Stop old i/f to prevent errors whilst we rebuild the state. */
 	spin_lock_irq(&info->tx_lock);
 	spin_lock(&info->rx_lock);
-	netif_carrier_off(info->netdev);
+	netfront_carrier_off(info);
 	spin_unlock(&info->rx_lock);
 	spin_unlock_irq(&info->tx_lock);
 

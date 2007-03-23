@@ -66,6 +66,7 @@
 #include "mach_time.h"
 
 #include <linux/timex.h>
+#include <linux/clocksource.h>
 
 #include <asm/hpet.h>
 
@@ -74,19 +75,16 @@
 #include <xen/evtchn.h>
 #include <xen/interface/vcpu.h>
 
-#if defined (__i386__)
-#include <asm/i8259.h>
-#endif
-
+#ifdef CONFIG_X86_32
+#include <asm/i8253.h>
+DEFINE_SPINLOCK(i8253_lock);
+EXPORT_SYMBOL(i8253_lock);
 int pit_latch_buggy;              /* extern */
-
-#if defined(__x86_64__)
-unsigned long vxtime_hz = PIT_TICK_RATE;
-struct vxtime_data __vxtime __section_vxtime;   /* for vsyscalls */
+#else
 volatile unsigned long __jiffies __section_jiffies = INITIAL_JIFFIES;
-struct timespec __xtime __section_xtime;
-struct timezone __sys_tz __section_sys_tz;
 #endif
+
+#define XEN_SHIFT 22
 
 unsigned int cpu_khz;	/* Detected as we calibrate the TSC */
 EXPORT_SYMBOL(cpu_khz);
@@ -213,11 +211,10 @@ int read_current_timer(unsigned long *timer_val)
 }
 #endif
 
-void init_cpu_khz(void)
+static void init_cpu_khz(void)
 {
 	u64 __cpu_khz = 1000000ULL << 32;
-	struct vcpu_time_info *info;
-	info = &HYPERVISOR_shared_info->vcpu_info[0].time;
+	struct vcpu_time_info *info = &vcpu_info(0)->time;
 	do_div(__cpu_khz, info->tsc_to_system_mul);
 	if (info->tsc_shift < 0)
 		cpu_khz = __cpu_khz << -info->tsc_shift;
@@ -232,16 +229,6 @@ static u64 get_nsec_offset(struct shadow_time_info *shadow)
 	delta = now - shadow->tsc_timestamp;
 	return scale_delta(delta, shadow->tsc_to_nsec_mul, shadow->tsc_shift);
 }
-
-#ifdef CONFIG_X86_64
-static unsigned long get_usec_offset(struct shadow_time_info *shadow)
-{
-	u64 now, delta;
-	rdtscll(now);
-	delta = now - shadow->tsc_timestamp;
-	return scale_delta(delta, shadow->tsc_to_usec_mul, shadow->tsc_shift);
-}
-#endif
 
 static void __update_wallclock(time_t sec, long nsec)
 {
@@ -288,14 +275,13 @@ static void update_wallclock(void)
  * Reads a consistent set of time-base values from Xen, into a shadow data
  * area.
  */
-static void get_time_values_from_xen(void)
+static void get_time_values_from_xen(int cpu)
 {
-	shared_info_t           *s = HYPERVISOR_shared_info;
 	struct vcpu_time_info   *src;
 	struct shadow_time_info *dst;
 
-	src = &s->vcpu_info[smp_processor_id()].time;
-	dst = &per_cpu(shadow_time, smp_processor_id());
+	src = &vcpu_info(cpu)->time;
+	dst = &per_cpu(shadow_time, cpu);
 
 	do {
 		dst->version = src->version;
@@ -315,7 +301,7 @@ static inline int time_values_up_to_date(int cpu)
 	struct vcpu_time_info   *src;
 	struct shadow_time_info *dst;
 
-	src = &HYPERVISOR_shared_info->vcpu_info[cpu].time;
+	src = &vcpu_info(cpu)->time;
 	dst = &per_cpu(shadow_time, cpu);
 
 	rmb();
@@ -351,137 +337,13 @@ void rtc_cmos_write(unsigned char val, unsigned char addr)
 }
 EXPORT_SYMBOL(rtc_cmos_write);
 
-#ifdef CONFIG_X86_64
-
-/*
- * This version of gettimeofday has microsecond resolution
- * and better than microsecond precision on fast x86 machines with TSC.
- */
-void do_gettimeofday(struct timeval *tv)
-{
-	unsigned long seq;
-	unsigned long usec, sec;
-	unsigned long max_ntp_tick;
-	s64 nsec;
-	unsigned int cpu;
-	struct shadow_time_info *shadow;
-	u32 local_time_version;
-
-	cpu = get_cpu();
-	shadow = &per_cpu(shadow_time, cpu);
-
-	do {
-		local_time_version = shadow->version;
-		seq = read_seqbegin(&xtime_lock);
-
-		usec = get_usec_offset(shadow);
-
-		/*
-		 * If time_adjust is negative then NTP is slowing the clock
-		 * so make sure not to go into next possible interval.
-		 * Better to lose some accuracy than have time go backwards..
-		 */
-		if (unlikely(time_adjust < 0)) {
-			max_ntp_tick = (USEC_PER_SEC / HZ) - tickadj;
-			usec = min(usec, max_ntp_tick);
-		}
-
-		sec = xtime.tv_sec;
-		usec += (xtime.tv_nsec / NSEC_PER_USEC);
-
-		nsec = shadow->system_timestamp - processed_system_time;
-		__normalize_time(&sec, &nsec);
-		usec += (long)nsec / NSEC_PER_USEC;
-
-		if (unlikely(!time_values_up_to_date(cpu))) {
-			/*
-			 * We may have blocked for a long time,
-			 * rendering our calculations invalid
-			 * (e.g. the time delta may have
-			 * overflowed). Detect that and recalculate
-			 * with fresh values.
-			 */
-			get_time_values_from_xen();
-			continue;
-		}
-	} while (read_seqretry(&xtime_lock, seq) ||
-		 (local_time_version != shadow->version));
-
-	put_cpu();
-
-	while (usec >= USEC_PER_SEC) {
-		usec -= USEC_PER_SEC;
-		sec++;
-	}
-
-	tv->tv_sec = sec;
-	tv->tv_usec = usec;
-}
-
-EXPORT_SYMBOL(do_gettimeofday);
-
-int do_settimeofday(struct timespec *tv)
-{
-	time_t sec;
-	s64 nsec;
-	unsigned int cpu;
-	struct shadow_time_info *shadow;
-	dom0_op_t op;
-
-	if ((unsigned long)tv->tv_nsec >= NSEC_PER_SEC)
-		return -EINVAL;
-
-	cpu = get_cpu();
-	shadow = &per_cpu(shadow_time, cpu);
-
-	write_seqlock_irq(&xtime_lock);
-
-	/*
-	 * Ensure we don't get blocked for a long time so that our time delta
-	 * overflows. If that were to happen then our shadow time values would
-	 * be stale, so we can retry with fresh ones.
-	 */
-	for (;;) {
-		nsec = tv->tv_nsec - get_nsec_offset(shadow);
-		if (time_values_up_to_date(cpu))
-			break;
-		get_time_values_from_xen();
-	}
-	sec = tv->tv_sec;
-	__normalize_time(&sec, &nsec);
-
-	if (is_initial_xendomain() && !independent_wallclock) {
-		op.cmd = DOM0_SETTIME;
-		op.u.settime.secs        = sec;
-		op.u.settime.nsecs       = nsec;
-		op.u.settime.system_time = shadow->system_timestamp;
-		HYPERVISOR_dom0_op(&op);
-		update_wallclock();
-	} else if (independent_wallclock) {
-		nsec -= shadow->system_timestamp;
-		__normalize_time(&sec, &nsec);
-		__update_wallclock(sec, nsec);
-	}
-
-	write_sequnlock_irq(&xtime_lock);
-
-	put_cpu();
-
-	clock_was_set();
-	return 0;
-}
-
-EXPORT_SYMBOL(do_settimeofday);
-
-#endif
-
 static void sync_xen_wallclock(unsigned long dummy);
 static DEFINE_TIMER(sync_xen_wallclock_timer, sync_xen_wallclock, 0, 0);
 static void sync_xen_wallclock(unsigned long dummy)
 {
 	time_t sec;
 	s64 nsec;
-	dom0_op_t op;
+	struct xen_platform_op op;
 
 	if (!ntp_synced() || independent_wallclock || !is_initial_xendomain())
 		return;
@@ -492,11 +354,11 @@ static void sync_xen_wallclock(unsigned long dummy)
 	nsec = xtime.tv_nsec;
 	__normalize_time(&sec, &nsec);
 
-	op.cmd = DOM0_SETTIME;
+	op.cmd = XENPF_settime;
 	op.u.settime.secs        = sec;
 	op.u.settime.nsecs       = nsec;
 	op.u.settime.system_time = processed_system_time;
-	HYPERVISOR_dom0_op(&op);
+	HYPERVISOR_platform_op(&op);
 
 	update_wallclock();
 
@@ -523,15 +385,7 @@ static int set_rtc_mmss(unsigned long nowtime)
 	return retval;
 }
 
-#ifdef CONFIG_X86_64
-/* monotonic_clock(): returns # of nanoseconds passed since time_init()
- *		Note: This function is required to return accurate
- *		time even in the absence of multiple timer ticks.
- */
-unsigned long long monotonic_clock(void)
-#else
 unsigned long long sched_clock(void)
-#endif
 {
 	int cpu = get_cpu();
 	struct shadow_time_info *shadow = &per_cpu(shadow_time, cpu);
@@ -543,7 +397,7 @@ unsigned long long sched_clock(void)
 		barrier();
 		time = shadow->system_timestamp + get_nsec_offset(shadow);
 		if (!time_values_up_to_date(cpu))
-			get_time_values_from_xen();
+			get_time_values_from_xen(cpu);
 		barrier();
 	} while (local_time_version != shadow->version);
 
@@ -551,14 +405,6 @@ unsigned long long sched_clock(void)
 
 	return time;
 }
-#ifdef CONFIG_X86_64
-EXPORT_SYMBOL(monotonic_clock);
-
-unsigned long long sched_clock(void)
-{
-	return monotonic_clock();
-}
-#endif
 
 unsigned long profile_pc(struct pt_regs *regs)
 {
@@ -581,15 +427,13 @@ unsigned long profile_pc(struct pt_regs *regs)
 	}
 #else
 #ifdef CONFIG_SMP
-	if (!user_mode_vm(regs) && in_lock_functions(pc)) {
+	if (!v8086_mode(regs) && SEGMENT_IS_KERNEL_CODE(regs->xcs) &&
+	    in_lock_functions(pc)) {
 #ifdef CONFIG_FRAME_POINTER
 		return *(unsigned long *)(regs->ebp + 4);
 #else
-		unsigned long *sp;
-		if ((regs->xcs & 2) == 0)
-			sp = (unsigned long *)&regs->esp;
-		else
-			sp = (unsigned long *)regs->esp;
+		unsigned long *sp = (unsigned long *)&regs->esp;
+
 		/* Return address is either directly at stack pointer
 		   or above a saved eflags. Eflags has bits 22-31 zero,
 		   kernel addresses don't. */
@@ -629,7 +473,7 @@ irqreturn_t timer_interrupt(int irq, void *dev_id)
 	write_seqlock(&xtime_lock);
 
 	do {
-		get_time_values_from_xen();
+		get_time_values_from_xen(cpu);
 
 		/* Obtain a consistent snapshot of elapsed wallclock cycles. */
 		delta = delta_cpu =
@@ -738,6 +582,39 @@ irqreturn_t timer_interrupt(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
+void mark_tsc_unstable(void)
+{
+#ifndef CONFIG_XEN /* XXX Should tell the hypervisor about this fact. */
+	tsc_unstable = 1;
+#endif
+}
+EXPORT_SYMBOL_GPL(mark_tsc_unstable);
+
+static cycle_t xen_clocksource_read(void)
+{
+	int cpu = get_cpu();
+	struct shadow_time_info *shadow = &per_cpu(shadow_time, cpu);
+	cycle_t ret;
+
+	get_time_values_from_xen(cpu);
+
+	ret = shadow->system_timestamp + get_nsec_offset(shadow);
+
+	put_cpu();
+
+	return ret;
+}
+
+static struct clocksource clocksource_xen = {
+	.name			= "xen",
+	.rating			= 400,
+	.read			= xen_clocksource_read,
+	.mask			= CLOCKSOURCE_MASK(64),
+	.mult			= 1 << XEN_SHIFT,		/* time directly in nanoseconds */
+	.shift			= XEN_SHIFT,
+	.flags			= CLOCK_SOURCE_IS_CONTINUOUS,
+};
+
 static void init_missing_ticks_accounting(int cpu)
 {
 	struct vcpu_register_runstate_memory_area area;
@@ -756,7 +633,7 @@ static void init_missing_ticks_accounting(int cpu)
 }
 
 /* not static: needed by APM */
-unsigned long get_cmos_time(void)
+unsigned long read_persistent_clock(void)
 {
 	unsigned long retval;
 	unsigned long flags;
@@ -769,11 +646,11 @@ unsigned long get_cmos_time(void)
 
 	return retval;
 }
-EXPORT_SYMBOL(get_cmos_time);
 
 static void sync_cmos_clock(unsigned long dummy);
 
 static DEFINE_TIMER(sync_cmos_timer, sync_cmos_clock, 0, 0);
+int no_sync_cmos_clock;
 
 static void sync_cmos_clock(unsigned long dummy)
 {
@@ -817,7 +694,8 @@ static void sync_cmos_clock(unsigned long dummy)
 
 void notify_arch_cmos_timer(void)
 {
-	mod_timer(&sync_cmos_timer, jiffies + 1);
+	if (!no_sync_cmos_clock)
+		mod_timer(&sync_cmos_timer, jiffies + 1);
 	mod_timer(&sync_xen_wallclock_timer, jiffies + 1);
 }
 
@@ -829,7 +707,7 @@ static int timer_suspend(struct sys_device *dev, pm_message_t state)
 	/*
 	 * Estimate time zone so that set_time can update the clock
 	 */
-	unsigned long ctime =  get_cmos_time();
+	unsigned long ctime = read_persistent_clock();
 
 	clock_cmos_diff = -ctime;
 	clock_cmos_diff += get_seconds();
@@ -841,7 +719,7 @@ static int timer_resume(struct sys_device *dev)
 {
 	unsigned long flags;
 	unsigned long sec;
-	unsigned long ctime = get_cmos_time();
+	unsigned long ctime = read_persistent_clock();
 	long sleep_length = (ctime - sleep_start) * HZ;
 	struct timespec ts;
 
@@ -853,10 +731,6 @@ static int timer_resume(struct sys_device *dev)
 		sleep_length = 0;
 		ctime = sleep_start;
 	}
-#ifdef CONFIG_HPET_TIMER
-	if (is_hpet_enabled())
-		hpet_reenable();
-#endif
 
 	sec = ctime + clock_cmos_diff;
 	ts.tv_sec = sec;
@@ -892,29 +766,11 @@ static int time_init_device(void)
 
 device_initcall(time_init_device);
 
-#ifdef CONFIG_HPET_TIMER
 extern void (*late_time_init)(void);
-/* Duplicate of time_init() below, with hpet_enable part added */
-static void __init hpet_time_init(void)
-{
-	struct timespec ts;
-	ts.tv_sec = get_cmos_time();
-	ts.tv_nsec = (INITIAL_JIFFIES % HZ) * (NSEC_PER_SEC / HZ);
-
-	do_settimeofday(&ts);
-
-	if ((hpet_enable() >= 0) && hpet_use_timer) {
-		printk("Using HPET for base-timer\n");
-	}
-
-	do_time_init();
-}
-#endif
 
 /* Dynamically-mapped IRQ. */
 DEFINE_PER_CPU(int, timer_irq);
 
-extern void (*late_time_init)(void);
 static void setup_cpu0_timer_irq(void)
 {
 	per_cpu(timer_irq, 0) =
@@ -928,36 +784,31 @@ static void setup_cpu0_timer_irq(void)
 	BUG_ON(per_cpu(timer_irq, 0) < 0);
 }
 
+static struct vcpu_set_periodic_timer xen_set_periodic_tick = {
+	.period_ns = NS_PER_TICK
+};
+
 void __init time_init(void)
 {
-#ifdef CONFIG_HPET_TIMER
-	if (is_hpet_capable()) {
-		/*
-		 * HPET initialization needs to do memory-mapped io. So, let
-		 * us do a late initialization after mem_init().
-		 */
-		late_time_init = hpet_time_init;
-		return;
-	}
-#endif
-	get_time_values_from_xen();
+	init_cpu_khz();
+	printk(KERN_INFO "Xen reported: %u.%03u MHz processor.\n",
+	       cpu_khz / 1000, cpu_khz % 1000);
+
+	HYPERVISOR_vcpu_op(VCPUOP_set_periodic_timer, 0,
+			   &xen_set_periodic_tick);
+
+	get_time_values_from_xen(0);
 
 	processed_system_time = per_cpu(shadow_time, 0).system_timestamp;
 	per_cpu(processed_system_time, 0) = processed_system_time;
 	init_missing_ticks_accounting(0);
 
+	clocksource_register(&clocksource_xen);
+
 	update_wallclock();
 
-#ifdef CONFIG_X86_64
-	init_cpu_khz();
-	printk(KERN_INFO "Xen reported: %u.%03u MHz processor.\n",
-	       cpu_khz / 1000, cpu_khz % 1000);
-
-	vxtime.mode = VXTIME_TSC;
-	vxtime.quot = (1000000L << 32) / vxtime_hz;
-	vxtime.tsc_quot = (1000L << 32) / cpu_khz;
-	sync_core();
-	rdtscll(vxtime.last_tsc);
+#ifndef CONFIG_X86_64
+	use_tsc_delay();
 #endif
 
 	/* Cannot request_irq() until kmem is initialised. */
@@ -997,8 +848,10 @@ EXPORT_SYMBOL(jiffies_to_st);
  */
 static void stop_hz_timer(void)
 {
+	struct vcpu_set_singleshot_timer singleshot;
 	unsigned int cpu = smp_processor_id();
 	unsigned long j;
+	int rc;
 
 	cpu_set(cpu, nohz_cpu_mask);
 
@@ -1018,8 +871,16 @@ static void stop_hz_timer(void)
 		j = jiffies + 1;
 	}
 
-	if (HYPERVISOR_set_timer_op(jiffies_to_st(j)) != 0)
-		BUG();
+	singleshot.timeout_abs_ns = jiffies_to_st(j);
+	singleshot.flags = 0;
+	rc = HYPERVISOR_vcpu_op(VCPUOP_set_singleshot_timer, cpu, &singleshot);
+#ifdef CONFIG_XEN_COMPAT_030004
+	if (rc) {
+		BUG_ON(rc != -ENOSYS);
+		rc = HYPERVISOR_set_timer_op(singleshot.timeout_abs_ns);
+	}
+#endif
+	BUG_ON(rc);
 }
 
 static void start_hz_timer(void)
@@ -1043,16 +904,23 @@ void halt(void)
 }
 EXPORT_SYMBOL(halt);
 
-/* No locking required. We are only CPU running, and interrupts are off. */
+/* No locking required. Interrupts are disabled on all CPUs. */
 void time_resume(void)
 {
+	unsigned int cpu;
+
 	init_cpu_khz();
 
-	get_time_values_from_xen();
+	for_each_online_cpu(cpu) {
+		HYPERVISOR_vcpu_op(VCPUOP_set_periodic_timer, cpu,
+				   &xen_set_periodic_tick);
+		get_time_values_from_xen(cpu);
+		per_cpu(processed_system_time, cpu) =
+			per_cpu(shadow_time, 0).system_timestamp;
+		init_missing_ticks_accounting(cpu);
+	}
 
 	processed_system_time = per_cpu(shadow_time, 0).system_timestamp;
-	per_cpu(processed_system_time, 0) = processed_system_time;
-	init_missing_ticks_accounting(0);
 
 	update_wallclock();
 }
@@ -1065,6 +933,9 @@ int local_setup_timer(unsigned int cpu)
 	int seq, irq;
 
 	BUG_ON(cpu == 0);
+
+	HYPERVISOR_vcpu_op(VCPUOP_set_periodic_timer, cpu,
+			   &xen_set_periodic_tick);
 
 	do {
 		seq = read_seqbegin(&xtime_lock);
@@ -1093,58 +964,6 @@ void local_teardown_timer(unsigned int cpu)
 	BUG_ON(cpu == 0);
 	unbind_from_irqhandler(per_cpu(timer_irq, cpu), NULL);
 }
-#endif
-
-#ifndef CONFIG_X86_64
-
-void tsc_init(void)
-{
-	init_cpu_khz();
-	printk(KERN_INFO "Xen reported: %u.%03u MHz processor.\n",
-	       cpu_khz / 1000, cpu_khz % 1000);
-
-	use_tsc_delay();
-}
-
-#include <linux/clocksource.h>
-
-void mark_tsc_unstable(void)
-{
-#ifndef CONFIG_XEN /* XXX Should tell the hypervisor about this fact. */
-	tsc_unstable = 1;
-#endif
-}
-EXPORT_SYMBOL_GPL(mark_tsc_unstable);
-
-static cycle_t read_tsc(void)
-{
-	cycle_t ret;
-
-	rdtscll(ret);
-
-	return ret;
-}
-
-static struct clocksource clocksource_xen = {
-	.name			= "xen",
-	.rating			= 300,
-	.read			= read_tsc,
-	.mask			= CLOCKSOURCE_MASK(64),
-	.mult			= 0, /* to be set */
-	.shift			= 22,
-	.flags			= CLOCK_SOURCE_IS_CONTINUOUS,
-};
-
-static int __init init_xen_clocksource(void)
-{
-	clocksource_xen.mult = clocksource_khz2mult(cpu_khz,
-						clocksource_xen.shift);
-
-	return clocksource_register(&clocksource_xen);
-}
-
-module_init(init_xen_clocksource);
-
 #endif
 
 /*

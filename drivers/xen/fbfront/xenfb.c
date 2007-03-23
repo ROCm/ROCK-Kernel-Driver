@@ -245,7 +245,7 @@ static int xenfb_setcolreg(unsigned regno, unsigned red, unsigned green,
 		((u32 *)info->pseudo_palette)[regno] = v;
 		break;
 	}
-
+	
 	return 0;
 }
 

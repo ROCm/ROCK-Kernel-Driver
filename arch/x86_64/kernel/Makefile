@@ -69,11 +69,12 @@ microcode-$(subst m,y,$(CONFIG_MICROCODE))  := ../../i386/kernel/microcode-xen.o
 quirks-y			:= ../../i386/kernel/quirks-xen.o
 
 n-obj-xen := early-quirks.o genapic_cluster.o genapic_flat.o i8237.o i8259.o \
-		reboot.o smpboot.o trampoline.o
+	reboot.o smpboot.o trampoline.o tsc.o tsc_sync.o
 
 include $(srctree)/scripts/Makefile.xen
 
 obj-y := $(call filterxen, $(obj-y), $(n-obj-xen))
 obj-y := $(call cherrypickxen, $(obj-y))
 extra-y := $(call cherrypickxen, $(extra-y))
+%/head-xen.o %/head-xen.s: EXTRA_AFLAGS :=
 endif

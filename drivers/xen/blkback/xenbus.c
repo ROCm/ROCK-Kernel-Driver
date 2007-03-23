@@ -21,6 +21,7 @@
 #include <linux/module.h>
 #include <linux/kthread.h>
 #include "common.h"
+#include "../core/domctl.h"
 
 #undef DPRINTK
 #define DPRINTK(fmt, args...)				\
@@ -48,9 +49,9 @@ static int blkback_name(blkif_t *blkif, char *buf)
 	struct xenbus_device *dev = blkif->be->dev;
 
 	devpath = xenbus_read(XBT_NIL, dev->nodename, "dev", NULL);
-	if (IS_ERR(devpath))
+	if (IS_ERR(devpath)) 
 		return PTR_ERR(devpath);
-
+	
 	if ((devname = strstr(devpath, "/dev/")) != NULL)
 		devname += strlen("/dev/");
 	else
@@ -58,12 +59,12 @@ static int blkback_name(blkif_t *blkif, char *buf)
 
 	snprintf(buf, TASK_COMM_LEN, "blkback.%d.%s", blkif->domid, devname);
 	kfree(devpath);
-
+	
 	return 0;
 }
 
 static void update_blkif_status(blkif_t *blkif)
-{
+{ 
 	int err;
 	char name[TASK_COMM_LEN];
 
@@ -111,16 +112,20 @@ static void update_blkif_status(blkif_t *blkif)
 	}								\
 	DEVICE_ATTR(name, S_IRUGO, show_##name, NULL)
 
-VBD_SHOW(oo_req, "%d\n", be->blkif->st_oo_req);
-VBD_SHOW(rd_req, "%d\n", be->blkif->st_rd_req);
-VBD_SHOW(wr_req, "%d\n", be->blkif->st_wr_req);
-VBD_SHOW(br_req, "%d\n", be->blkif->st_br_req);
+VBD_SHOW(oo_req,  "%d\n", be->blkif->st_oo_req);
+VBD_SHOW(rd_req,  "%d\n", be->blkif->st_rd_req);
+VBD_SHOW(wr_req,  "%d\n", be->blkif->st_wr_req);
+VBD_SHOW(br_req,  "%d\n", be->blkif->st_br_req);
+VBD_SHOW(rd_sect, "%d\n", be->blkif->st_rd_sect);
+VBD_SHOW(wr_sect, "%d\n", be->blkif->st_wr_sect);
 
 static struct attribute *vbdstat_attrs[] = {
 	&dev_attr_oo_req.attr,
 	&dev_attr_rd_req.attr,
 	&dev_attr_wr_req.attr,
 	&dev_attr_br_req.attr,
+	&dev_attr_rd_sect.attr,
+	&dev_attr_wr_sect.attr,
 	NULL
 };
 
@@ -135,7 +140,7 @@ VBD_SHOW(mode, "%s\n", be->mode);
 int xenvbd_sysfs_addif(struct xenbus_device *dev)
 {
 	int error;
-
+	
 	error = device_create_file(&dev->dev, &dev_attr_physical_device);
  	if (error)
 		goto fail1;
@@ -344,7 +349,7 @@ static void frontend_changed(struct xenbus_device *dev,
 	switch (frontend_state) {
 	case XenbusStateInitialising:
 		if (dev->state == XenbusStateClosed) {
-			printk("%s: %s: prepare for reconnect\n",
+			printk(KERN_INFO "%s: %s: prepare for reconnect\n",
 			       __FUNCTION__, dev->nodename);
 			xenbus_switch_state(dev, XenbusStateInitWait);
 		}
@@ -352,8 +357,8 @@ static void frontend_changed(struct xenbus_device *dev,
 
 	case XenbusStateInitialised:
 	case XenbusStateConnected:
-		/* Ensure we connect even when two watches fire in
-		   close successsion and we miss the intermediate value
+		/* Ensure we connect even when two watches fire in 
+		   close successsion and we miss the intermediate value 
 		   of frontend_state. */
 		if (dev->state == XenbusStateConnected)
 			break;
@@ -453,7 +458,6 @@ again:
 	xenbus_transaction_end(xbt, 1);
 }
 
-
 static int connect_ring(struct backend_info *be)
 {
 	struct xenbus_device *dev = be->dev;
@@ -476,8 +480,10 @@ static int connect_ring(struct backend_info *be)
 	be->blkif->blk_protocol = BLKIF_PROTOCOL_NATIVE;
 	err = xenbus_gather(XBT_NIL, dev->otherend, "protocol",
 			    "%63s", protocol, NULL);
-	if (err)
-		strcpy(protocol, "unspecified, assuming native");
+	if (err) {
+		strcpy(protocol, "unspecified");
+		be->blkif->blk_protocol = xen_guest_blkif_protocol(be->blkif->domid);
+	}
 	else if (0 == strcmp(protocol, XEN_IO_PROTO_ABI_NATIVE))
 		be->blkif->blk_protocol = BLKIF_PROTOCOL_NATIVE;
 	else if (0 == strcmp(protocol, XEN_IO_PROTO_ABI_X86_32))
@@ -494,7 +500,8 @@ static int connect_ring(struct backend_info *be)
 		xenbus_dev_fatal(dev, err, "unknown fe protocol %s", protocol);
 		return -1;
 	}
-	printk("blkback: ring-ref %ld, event-channel %d, protocol %d (%s)\n",
+	printk(KERN_INFO
+	       "blkback: ring-ref %ld, event-channel %d, protocol %d (%s)\n",
 	       ring_ref, evtchn, be->blkif->blk_protocol, protocol);
 
 	/* Map the shared frame, irq etc. */

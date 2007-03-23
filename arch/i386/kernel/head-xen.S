@@ -10,6 +10,7 @@
 #include <asm/thread_info.h>
 #include <asm/asm-offsets.h>
 #include <asm/boot.h>
+#include <asm/dwarf2.h>
 #include <xen/interface/xen.h>
 #include <xen/interface/elfnote.h>
 
@@ -26,6 +27,7 @@
 #define X86_CAPABILITY	new_cpu_data+CPUINFO_x86_capability
 #define X86_VENDOR_ID	new_cpu_data+CPUINFO_x86_vendor_id
 
+.section .text.head,"ax",@progbits
 #define VIRT_ENTRY_OFFSET 0x0
 .org VIRT_ENTRY_OFFSET
 ENTRY(startup_32)
@@ -59,11 +61,11 @@ ENTRY(startup_32)
 
 	movb $1,X86_HARD_MATH
 
-	xorl %eax,%eax			# Clear FS
-	movl %eax,%fs
+	xorl %eax,%eax		# Clear GS
+	movl %eax,%gs
 
 	movl $(__KERNEL_PDA),%eax
-	mov  %eax,%gs
+	mov  %eax,%fs
 
 	cld			# gcc2 wants the direction flag cleared at all times
 
@@ -74,7 +76,7 @@ ENTRY(startup_32)
  * Point the GDT at this CPU's PDA.  This will be
  * cpu_gdt_table and boot_pda.
  */
-setup_pda:
+ENTRY(setup_pda)
 	/* get the PDA pointer */
 	movl $boot_pda, %eax
 
@@ -114,7 +116,9 @@ setup_pda:
 #define HYPERCALL_PAGE_OFFSET 0x1000
 .org HYPERCALL_PAGE_OFFSET
 ENTRY(hypercall_page)
+	CFI_STARTPROC
 .skip 0x1000
+	CFI_ENDPROC
 
 /*
  * Real beginning of normal "text" segment
@@ -244,7 +248,10 @@ ENTRY(cpu_gdt_table)
 	ELFNOTE(Xen, XEN_ELFNOTE_FEATURES,       .asciz, "writable_page_tables|writable_descriptor_tables|auto_translated_physmap|pae_pgdir_above_4gb|supervisor_mode_kernel")
 #ifdef CONFIG_X86_PAE
 	ELFNOTE(Xen, XEN_ELFNOTE_PAE_MODE,       .asciz, "yes")
+	ELFNOTE(Xen, XEN_ELFNOTE_L1_MFN_VALID,   .quad,  _PAGE_PRESENT,_PAGE_PRESENT)
 #else
 	ELFNOTE(Xen, XEN_ELFNOTE_PAE_MODE,       .asciz, "no")
+	ELFNOTE(Xen, XEN_ELFNOTE_L1_MFN_VALID,   .long,  _PAGE_PRESENT,_PAGE_PRESENT)
 #endif
 	ELFNOTE(Xen, XEN_ELFNOTE_LOADER,         .asciz, "generic")
+	ELFNOTE(Xen, XEN_ELFNOTE_SUSPEND_CANCEL, .long,  1)

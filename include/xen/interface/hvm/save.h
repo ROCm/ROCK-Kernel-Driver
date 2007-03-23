@@ -140,10 +140,16 @@ struct hvm_hw_cpu {
     uint64_t sysenter_esp;
     uint64_t sysenter_eip;
 
-    /* MSRs */
+    /* msr for em64t */
     uint64_t shadow_gs;
     uint64_t flags;
-    uint64_t msr_items[6];
+
+    /* msr content saved/restored. */
+    uint64_t msr_lstar;
+    uint64_t msr_star;
+    uint64_t msr_cstar;
+    uint64_t msr_syscall_mask;
+    uint64_t msr_efer;
 
     /* guest's idea of what rdtsc() would return */
     uint64_t tsc;
@@ -306,11 +312,10 @@ struct hvm_hw_pci_link {
      * the traditional 'barber's pole' mapping ((device + INTx#) & 3).
      * The router provides a programmable mapping from each link to a GSI.
      */
-    u8 route[4];
+    uint8_t route[4];
 };
 
 DECLARE_HVM_SAVE_TYPE(PCI_LINK, 9, struct hvm_hw_pci_link);
-
 
 /* 
  *  PIT
@@ -382,10 +387,20 @@ struct hvm_hw_hpet {
 DECLARE_HVM_SAVE_TYPE(HPET, 12, struct hvm_hw_hpet);
 
 
+/*
+ * PM timer
+ */
+
+struct hvm_hw_pmtimer {
+    uint32_t timer;
+};
+
+DECLARE_HVM_SAVE_TYPE(PMTIMER, 13, struct hvm_hw_pmtimer);
+
 /* 
  * Largest type-code in use
  */
-#define HVM_SAVE_CODE_MAX 12
+#define HVM_SAVE_CODE_MAX 13
 
 
 /* 

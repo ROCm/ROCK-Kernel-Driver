@@ -1,26 +1,26 @@
 /******************************************************************************
  * arch/xen/drivers/blkif/backend/interface.c
- *
+ * 
  * Block-device interface management.
- *
+ * 
  * Copyright (c) 2004, Keir Fraser
- *
+ * 
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License version 2
  * as published by the Free Software Foundation; or, when distributed
  * separately from the Linux kernel or incorporated into other
  * software packages, subject to the following license:
- *
+ * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this source file (the "Software"), to deal in the Software without
  * restriction, including without limitation the rights to use, copy, modify,
  * merge, publish, distribute, sublicense, and/or sell copies of the Software,
  * and to permit persons to whom the Software is furnished to do so, subject to
  * the following conditions:
- *
+ * 
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- *
+ * 
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -58,15 +58,12 @@ blkif_t *blkif_alloc(domid_t domid)
 static int map_frontend_page(blkif_t *blkif, unsigned long shared_page)
 {
 	struct gnttab_map_grant_ref op;
-	int ret;
 
 	gnttab_set_map_op(&op, (unsigned long)blkif->blk_ring_area->addr,
 			  GNTMAP_host_map, shared_page, blkif->domid);
 
-	lock_vm_area(blkif->blk_ring_area);
-	ret = HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1);
-	unlock_vm_area(blkif->blk_ring_area);
-	BUG_ON(ret);
+	if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1))
+		BUG();
 
 	if (op.status) {
 		DPRINTK(" Grant table operation failure !\n");
@@ -82,15 +79,12 @@ static int map_frontend_page(blkif_t *blkif, unsigned long shared_page)
 static void unmap_frontend_page(blkif_t *blkif)
 {
 	struct gnttab_unmap_grant_ref op;
-	int ret;
 
 	gnttab_set_unmap_op(&op, (unsigned long)blkif->blk_ring_area->addr,
 			    GNTMAP_host_map, blkif->shmem_handle);
 
-	lock_vm_area(blkif->blk_ring_area);
-	ret = HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1);
-	unlock_vm_area(blkif->blk_ring_area);
-	BUG_ON(ret);
+	if (HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1))
+		BUG();
 }
 
 int blkif_map(blkif_t *blkif, unsigned long shared_page, unsigned int evtchn)
@@ -181,6 +175,6 @@ void blkif_free(blkif_t *blkif)
 
 void __init blkif_interface_init(void)
 {
-	blkif_cachep = kmem_cache_create("blkif_cache", sizeof(blkif_t),
+	blkif_cachep = kmem_cache_create("blkif_cache", sizeof(blkif_t), 
 					 0, 0, NULL, NULL);
 }

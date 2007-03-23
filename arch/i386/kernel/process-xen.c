@@ -38,6 +38,7 @@
 #include <linux/ptrace.h>
 #include <linux/random.h>
 #include <linux/personality.h>
+#include <linux/tick.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -57,9 +58,6 @@
 #include <xen/cpu_hotplug.h>
 
 #include <linux/err.h>
-
-#include <asm/tlbflush.h>
-#include <asm/cpu.h>
 
 #include <asm/tlbflush.h>
 #include <asm/cpu.h>
@@ -106,7 +104,7 @@ EXPORT_SYMBOL(enable_hlt);
  * to poll the ->work.need_resched flag instead of waiting for the
  * cross-CPU IPI to arrive. Use this option with caution.
  */
-static void poll_idle(void)
+static void poll_idle (void)
 {
 	cpu_relax();
 }
@@ -163,6 +161,7 @@ void cpu_idle(void)
 
 	/* endless idle loop with no priority at all */
 	while (1) {
+		tick_nohz_stop_sched_tick();
 		while (!need_resched()) {
 			void (*idle)(void);
 
@@ -170,10 +169,7 @@ void cpu_idle(void)
 				__get_cpu_var(cpu_idle_state) = 0;
 
 			rmb();
-			idle = pm_idle;
-
-			if (!idle)
-				idle = xen_idle;
+			idle = xen_idle; /* no alternatives */
 
 			if (cpu_is_offline(cpu))
 				play_dead();
@@ -181,6 +177,7 @@ void cpu_idle(void)
 			__get_cpu_var(irq_stat).idle_timestamp = jiffies;
 			idle();
 		}
+		tick_nohz_restart_sched_tick();
 		preempt_enable_no_resched();
 		schedule();
 		preempt_disable();
@@ -305,7 +302,8 @@ void exit_thread(void)
 	if (unlikely(test_thread_flag(TIF_IO_BITMAP))) {
 		struct task_struct *tsk = current;
 		struct thread_struct *t = &tsk->thread;
-		struct physdev_set_iobitmap set_iobitmap = { 0 };
+		struct physdev_set_iobitmap set_iobitmap;
+		memset(&set_iobitmap, 0, sizeof(set_iobitmap));
 		HYPERVISOR_physdev_op(PHYSDEVOP_set_iobitmap, &set_iobitmap);
 		kfree(t->io_bitmap_ptr);
 		t->io_bitmap_ptr = NULL;
@@ -360,7 +358,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 
 	p->thread.eip = (unsigned long) ret_from_fork;
 
-	savesegment(fs,p->thread.fs);
+	savesegment(gs,p->thread.gs);
 
 	tsk = current;
 	if (unlikely(test_tsk_thread_flag(tsk, TIF_IO_BITMAP))) {
@@ -438,8 +436,8 @@ void dump_thread(struct pt_regs * regs, struct user * dump)
 	dump->regs.eax = regs->eax;
 	dump->regs.ds = regs->xds;
 	dump->regs.es = regs->xes;
-	savesegment(fs,dump->regs.fs);
-	dump->regs.gs = regs->xfs;
+	dump->regs.fs = regs->xfs;
+	savesegment(gs,dump->regs.gs);
 	dump->regs.orig_eax = regs->orig_eax;
 	dump->regs.eip = regs->eip;
 	dump->regs.cs = regs->xcs;
@@ -601,9 +599,9 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 		mcl++;
 	}
 
-	if (unlikely(test_tsk_thread_flag(prev_p, TIF_IO_BITMAP)
-	             || test_tsk_thread_flag(next_p, TIF_IO_BITMAP))) {
-		iobmp_op.bitmap   = (char *)next->io_bitmap_ptr;
+	if (unlikely(prev->io_bitmap_ptr || next->io_bitmap_ptr)) {
+		set_xen_guest_handle(iobmp_op.bitmap,
+				     (char *)next->io_bitmap_ptr);
 		iobmp_op.nr_ports = next->io_bitmap_ptr ? IO_BITMAP_BITS : 0;
 		mcl->op      = __HYPERVISOR_physdev_op;
 		mcl->args[0] = PHYSDEVOP_set_iobitmap;
@@ -618,16 +616,6 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 		prefetch(&next->i387.fxsave);
 
 	/*
-	 * Restore %fs if needed.
-	 *
-	 * Glibc normally makes %fs be zero.
-	 */
-	if (unlikely(next->fs))
-		loadsegment(fs, next->fs);
-
-	write_pda(pcurrent, next_p);
-
-	/*
 	 * Now maybe handle debug registers
 	 */
 	if (unlikely(task_thread_info(next_p)->flags & _TIF_WORK_CTXSW))
@@ -635,12 +623,29 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 
 	disable_tsc(prev_p, next_p);
 
+	/*
+	 * Leave lazy mode, flushing any hypercalls made here.
+	 * This must be done before restoring TLS segments so
+	 * the GDT and LDT are properly updated, and must be
+	 * done before math_state_restore, so the TS bit is up
+	 * to date.
+	 */
+	arch_leave_lazy_cpu_mode();
+
 	/* If the task has used fpu the last 5 timeslices, just do a full
 	 * restore of the math state immediately to avoid the trap; the
 	 * chances of needing FPU soon are obviously high now
 	 */
 	if (next_p->fpu_counter > 5)
 		math_state_restore();
+
+	/*
+	 * Restore %gs if needed (which is common)
+	 */
+	if (prev->gs | next->gs)
+		loadsegment(gs, next->gs);
+
+	write_pda(pcurrent, next_p);
 
 	return prev_p;
 }
