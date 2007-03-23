@@ -113,5 +113,6 @@ extern void clustered_apic_check(void);
 #endif /* CONFIG_XEN / CONFIG_X86_LOCAL_APIC */
 
 extern unsigned boot_cpu_id;
+extern int local_apic_timer_c2_ok;
 
 #endif /* __ASM_APIC_H */
