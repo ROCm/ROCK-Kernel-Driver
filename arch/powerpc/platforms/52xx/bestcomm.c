@@ -278,7 +278,7 @@ static int __init mpc52xx_sdma_init(void)
 	int ret = -ENODEV;
 
 	/* Find SDMA registers */
-	sdma_node = of_find_compatible_node(NULL, "dma-controller", "mpc52xx-bestcomm");
+	sdma_node = of_find_compatible_node(NULL, "dma-controller", /* "mpc52xx-bestcomm"*/ "mpc5200-pcidma");
 	if (!sdma_node) {
 		printk (KERN_ERR DRIVER_NAME ": could not locate SDRAM controller\n");
 		goto out;
@@ -290,7 +290,7 @@ static int __init mpc52xx_sdma_init(void)
 	}
 
 	/* Find SRAM location */
-	sram_node = of_find_compatible_node(NULL, "sram", "mpc52xx-sram");
+	sram_node = of_find_compatible_node(NULL, "sram", /* "mpc52xx-sram" */ "mpc5200-sram");
 	if (!sram_node) {
 		printk (KERN_ERR DRIVER_NAME ": could not locate SRAM\n");
 		goto out;
