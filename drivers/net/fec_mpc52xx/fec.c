@@ -34,7 +34,7 @@
 #include <asm/of_device.h>
 #include <asm/of_platform.h>
 #include <platforms/52xx/bestcomm.h>
-#include <platforms/52xx/fec.h>
+#include "sdma_fec.h"
 #else
 #include <syslib/bestcomm/bestcomm.h>
 #include <syslib/bestcomm/fec.h>
@@ -337,10 +337,10 @@ static irqreturn_t fec_interrupt(int irq, void *dev_id)
 	out_be32(&fec->ievent, ievent);		/* clear pending events */
 
 	if (ievent & (FEC_IEVENT_RFIFO_ERROR | FEC_IEVENT_XFIFO_ERROR)) {
-		if (net_ratelimit() && (ievent & FEC_IEVENT_RFIFO_ERROR))
+		if (netif_running(dev) && net_ratelimit() && (ievent & FEC_IEVENT_RFIFO_ERROR))
 			printk(KERN_WARNING "FEC_IEVENT_RFIFO_ERROR (%.8x)\n",
 			       ievent);
-		if (net_ratelimit() && (ievent & FEC_IEVENT_XFIFO_ERROR))
+		if (netif_running(dev) && net_ratelimit() && (ievent & FEC_IEVENT_XFIFO_ERROR))
 			printk(KERN_WARNING "FEC_IEVENT_XFIFO_ERROR (%.8x)\n",
 			       ievent);
 		fec_reinit(dev);
@@ -731,6 +731,8 @@ mpc52xx_fec_probe(struct device *dev)
 	fec_mii_init(ndev);
 
 	/* We're done ! */
+	printk(KERN_INFO "%s: mpc52xx-fec at %#lx\n",
+	       ndev->name, (long)mem->start);
 #if defined(CONFIG_PPC_MERGE)
 	dev_set_drvdata(&op->dev, ndev);
 #else
@@ -804,9 +806,10 @@ mpc52xx_fec_remove(struct device *dev)
 #if defined(CONFIG_PPC_MERGE)
 static struct of_device_id mpc52xx_fec_of_match[] = {
 	{ .compatible = "mpc5200-ethernet", },
-	{ .compatible = "mpc52xx-fec", },
+	{ .compatible = "mpc5200-fec", },
 	{},
 };
+MODULE_DEVICE_TABLE(of, mpc52xx_fec_of_match);
 
 static struct of_platform_driver mpc52xx_fec_driver = {
 	.name = DRIVER_NAME,

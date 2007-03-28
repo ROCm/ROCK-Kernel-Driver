@@ -113,15 +113,6 @@ static void __init lite5200_setup_arch(void)
 		mpc52xx_add_bridge(np);
 #endif
 
-#ifdef CONFIG_PCI
-	np = of_find_node_by_type(np, "pci");
-	if (np)
-		mpc52xx_add_bridge(np);
-
-	//ppc_md.pci_swizzle = common_swizzle;
-	//ppc_md.pci_exclude_device = mpc52xx_exclude_device;
-#endif
-
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (initrd_start)
 		ROOT_DEV = Root_RAM0;

@@ -12,7 +12,7 @@
  * or implied.
  */
 
-#ifdef CONFIG_USE_MDIO
+#ifdef CONFIG_FEC_MPC52xx_USE_MDIO
 #define MII_ADVERTISE_HALF	(ADVERTISE_100HALF | ADVERTISE_10HALF | \
 				 ADVERTISE_CSMA)
 
@@ -50,7 +50,7 @@ typedef struct {
 #define fec_mii_wait(dev)	0
 #define fec_mii(dev)	printk(KERN_WARNING "unexpected FEC_IEVENT_MII\n")
 #define fec_mii_init(dev)
-#endif	/* CONFIG_USE_MDIO */
+#endif	/* CONFIG_FEC_MPC52xx_USE_MDIO */
 
 /* MII-related definitions */
 #define FEC_MII_DATA_ST		0x40000000	/* Start frame */

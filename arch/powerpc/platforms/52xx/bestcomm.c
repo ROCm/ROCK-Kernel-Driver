@@ -259,6 +259,7 @@ struct sdma *sdma_alloc(int queue_size)
 	s->node = sdma_node;
 	return s;
 }
+EXPORT_SYMBOL_GPL(sdma_alloc);
 
 void sdma_free(struct sdma *s)
 {
@@ -278,9 +279,8 @@ static int __init mpc52xx_sdma_init(void)
 	int ret = -ENODEV;
 
 	/* Find SDMA registers */
-	sdma_node = of_find_compatible_node(NULL, "dma-controller", /* "mpc52xx-bestcomm"*/ "mpc5200-pcidma");
+	sdma_node = of_find_compatible_node(NULL, "dma-controller", "mpc5200-bestcomm");
 	if (!sdma_node) {
-		printk (KERN_ERR DRIVER_NAME ": could not locate SDRAM controller\n");
 		goto out;
 	}
 
@@ -290,7 +290,7 @@ static int __init mpc52xx_sdma_init(void)
 	}
 
 	/* Find SRAM location */
-	sram_node = of_find_compatible_node(NULL, "sram", /* "mpc52xx-sram" */ "mpc5200-sram");
+	sram_node = of_find_compatible_node(NULL, "sram", "mpc5200-sram");
 	if (!sram_node) {
 		printk (KERN_ERR DRIVER_NAME ": could not locate SRAM\n");
 		goto out;
@@ -379,7 +379,6 @@ req_sram_error:
 map_io_error:
 	release_mem_region(mem_io.start, mem_io.end - mem_io.start + 1);
 out:
-	printk(KERN_ERR "DMA: MPC52xx BestComm init FAILED !!!\n");
 	return ret;
 }
 

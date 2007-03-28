@@ -36,7 +36,7 @@ struct fec_priv {
 	spinlock_t lock;
 	unsigned long open_time;
 	struct net_device_stats stats;
-#ifdef CONFIG_USE_MDIO
+#ifdef CONFIG_FEC_MPC52xx_USE_MDIO
 	uint phy_id;
 	uint phy_id_done;
 	uint phy_status;
@@ -49,7 +49,7 @@ struct fec_priv {
 	u16 old_status;
 	phys_addr_t rx_fifo;
 	phys_addr_t tx_fifo;
-#endif	/* CONFIG_USE_MDIO */
+#endif	/* CONFIG_FEC_FEC52xx_USE_MDIO */
 };
 
 

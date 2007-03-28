@@ -25,9 +25,9 @@
 #include <asm/io.h>
 
 #include <asm/mpc52xx.h>
+#include <platforms/52xx/bestcomm.h>
 
-#include "bestcomm.h"
-#include "fec.h"
+#include "sdma_fec.h"
 
 /*
  * Initialize FEC receive task.
