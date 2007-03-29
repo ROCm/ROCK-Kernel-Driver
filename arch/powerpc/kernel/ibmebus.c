@@ -370,7 +370,7 @@ static int ibmebus_bus_uevent(struct device *dev,
 		return -ENODEV;
 
 	ebus_dev = to_ibmebus_dev(dev);
-	if (ebus_dev==ibmebus_bus_device)	/* filter dummy root device */
+	if (ebus_dev==&ibmebus_bus_device)	/* filter dummy root device */
 		return -ENODEV;
 
 	return of_device_uevent(dev, envp, num_envp, buffer, buffer_size);
