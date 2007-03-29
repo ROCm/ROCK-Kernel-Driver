@@ -361,9 +361,25 @@ static int ibmebus_bus_match(struct device *dev, struct device_driver *drv)
 	return 0;
 }
 
+static int ibmebus_bus_uevent(struct device *dev,
+		char **envp, int num_envp, char *buffer, int buffer_size)
+{
+	struct ibmebus_dev *ebus_dev;
+
+	if (!dev)
+		return -ENODEV;
+
+	ebus_dev = to_ibmebus_dev(dev);
+	if (ebus_dev==ibmebus_bus_device)	/* filter dummy root device */
+		return -ENODEV;
+
+	return of_device_uevent(dev, envp, num_envp, buffer, buffer_size);
+}
+
 struct bus_type ibmebus_bus_type = {
 	.name = "ibmebus",
 	.match = ibmebus_bus_match,
+	.uevent = ibmebus_bus_uevent,
 };
 EXPORT_SYMBOL(ibmebus_bus_type);
 
