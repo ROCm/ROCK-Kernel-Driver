@@ -3,15 +3,13 @@ menu "MPC5200 Networking Options"
 
 config FEC_MPC52xx
 	tristate "FEC Ethernet"
-	depends on NET_ETHERNET
-	select PPC_BESTCOMM
 	select CRC32
 	---help---
 	  This option enables support for the MPC5200's on-chip
 	  Fast Ethernet Controller
 
 config FEC_MPC52xx_USE_MDIO
-	bool "  Use external Ethernet MII PHY"
+	bool "Use external Ethernet MII PHY"
 	select MII
 	depends on FEC_MPC52xx != n
 	---help---
