@@ -17,10 +17,9 @@
 
 #include "apparmor.h"
 #include "inline.h"
-#include "match/match.h"
 
 #define SECFS_AA "apparmor"
-static struct dentry *aafs_dentry = NULL;
+static struct dentry *aa_fs_dentry = NULL;
 
 /* profile */
 extern struct seq_operations apparmorfs_profiles_op;
@@ -87,14 +86,14 @@ static struct root_entry {
 	int parent_index;
 } root_entries[] = {
 	/* our root, normally /sys/kernel/security/apparmor */
-	{SECFS_AA, 	S_IFDIR, 0550},	/* DO NOT EDIT/MOVE */
+	{SECFS_AA, 	S_IFDIR, 0555},	/* DO NOT EDIT/MOVE */
 
 	/* interface for obtaining list of profiles currently loaded */
 	{"profiles", 	S_IFREG, 0440, &apparmorfs_profiles_fops,
 				       NULL},
 
 	/* interface for obtaining matching features supported */
-	{"matching",  	S_IFREG, 0440, &apparmorfs_matching_fops,
+	{"matching",  	S_IFREG, 0444, &apparmorfs_matching_fops,
 				       NULL},
 
 	/* interface for loading/removing/replacing profiles */
@@ -121,7 +120,7 @@ static struct root_entry {
 	{NULL,       	S_IFDIR, 0}
 };
 
-#define AAFS_DENTRY root_entries[0].dentry
+#define AA_FS_DENTRY root_entries[0].dentry
 
 static const unsigned int num_entries =
 	sizeof(root_entries) / sizeof(struct root_entry);
@@ -142,7 +141,7 @@ static int aa_prof_release(struct inode *inode, struct file *file)
 static ssize_t aa_matching_read(struct file *file, char __user *buf,
 			       size_t size, loff_t *ppos)
 {
-	const char *matching = aamatch_features();
+	const char *matching = "pattern=aadfa";
 
 	return simple_read_from_buffer(buf, size, ppos, matching,
 				       strlen(matching));
@@ -152,7 +151,7 @@ static char *aa_simple_write_to_buffer(const char __user *userbuf,
 				       size_t alloc_size, size_t copy_size,
 				       loff_t *pos, const char *msg)
 {
-	struct aaprofile *active;
+	struct aa_profile *profile;
 	char *data;
 
 	if (*pos != 0) {
@@ -165,18 +164,17 @@ static char *aa_simple_write_to_buffer(const char __user *userbuf,
 	 * No sane person would add rules allowing this to a profile
 	 * but we enforce the restriction anyways.
 	 */
-	rcu_read_lock();
-	active = get_activeptr_rcu();
-	if (active) {
-		AA_WARN("REJECTING access to profile %s (%s(%d) "
+	profile = aa_get_profile(current);
+	if (profile) {
+		AA_WARN(GFP_KERNEL, "REJECTING access to profile %s (%s(%d) "
 			"profile %s active %s)\n",
 			msg, current->comm, current->pid,
-			BASE_PROFILE(active)->name, active->name);
+			profile->parent->name, profile->name);
+		aa_put_profile(profile);
 
 		data = ERR_PTR(-EPERM);
 		goto out;
 	}
-	rcu_read_unlock();
 
 	data = vmalloc(alloc_size);
 	if (data == NULL) {
@@ -221,7 +219,7 @@ static ssize_t aa_profile_replace(struct file *f, const char __user *buf,
 	data = aa_simple_write_to_buffer(buf, size, size, pos, "replacement");
 
 	if (!IS_ERR(data)) {
-		error = aa_file_prof_repl(data, size);
+		error = aa_file_prof_replace(data, size);
 		vfree(data);
 	} else {
 		error = PTR_ERR(data);
@@ -237,7 +235,7 @@ static ssize_t aa_profile_remove(struct file *f, const char __user *buf,
 	ssize_t error;
 
 	/* aa_file_prof_remove needs a null terminated string so 1 extra
-	 * byte is allocated and null the copied data is then null terminated
+	 * byte is allocated and the copied data is then null terminated
 	 */
 	data = aa_simple_write_to_buffer(buf, size+1, size, pos, "removal");
 
@@ -410,12 +408,12 @@ int create_apparmorfs(void)
 {
 	int error = 0;
 
-	if (AAFS_DENTRY) {
+	if (AA_FS_DENTRY) {
 		error = -EEXIST;
 		AA_ERROR("%s: AppArmor securityfs already exists\n",
 			__FUNCTION__);
 	} else {
-		error = populate_apparmorfs(aafs_dentry);
+		error = populate_apparmorfs(aa_fs_dentry);
 		if (error != 0) {
 			AA_ERROR("%s: Error populating AppArmor securityfs\n",
 				__FUNCTION__);
@@ -427,6 +425,6 @@ int create_apparmorfs(void)
 
 void destroy_apparmorfs(void)
 {
-	if (AAFS_DENTRY)
+	if (AA_FS_DENTRY)
 		clear_apparmorfs();
 }

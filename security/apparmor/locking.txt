@@ -1,0 +1,46 @@
+Locking in AppArmor
+===================
+
+Lock hierarchy:
+
+	profile_list_lock
+	  aa_profile->lock
+	    task_lock()
+
+
+Which lock protects what?
+
+	/-----------------------+-------------------------------\
+	| Variable		| Lock				|
+	>-----------------------+-------------------------------<
+	| profile_list,		| profile_list_lock		|
+	+-----------------------+-------------------------------+
+	| aa_profile		| (reference count)		|
+	+-----------------------+-------------------------------+
+	| aa_profile->		| aa_profile->lock		|
+	|   isstale,		|				|
+	|   task_contexts	|				|
+	+-----------------------+-------------------------------+
+	| task_struct->security	| read: RCU			|
+	|			| write: task_lock()		|
+	+-----------------------+-------------------------------+
+	| aa_profile->sub	| handle on the profile (list	|
+	|			| is never modified)		|
+	\-----------------------+-------------------------------/
+
+(Obviously, the list_heads embedded in data structures are always
+protected with the lock that also protects the list.)
+
+When moving a task context from one profile to another, we grab both
+profile locks with lock_both_profiles(). This ensures that both locks
+are always taken in the same order, and so we won't deadlock.
+
+Since task_struct->security is RCU protected the aa_task_struct it
+references is only guarenteed to exist for the rcu cycle.  Where
+aa_task_context->profile is needed in blocking operations the
+profile's reference count is incremented and the profile reference
+is used.
+
+Profiles on profile_list are never stale: when a profile becomes stale,
+it is removed from profile_list at the same time (under profile_list_lock
+and aa_profile->lock).

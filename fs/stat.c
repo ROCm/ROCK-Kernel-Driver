@@ -307,7 +307,7 @@ asmlinkage long sys_readlinkat(int dfd, const char __user *path,
 
 		error = -EINVAL;
 		if (inode->i_op && inode->i_op->readlink) {
-			error = security_inode_readlink(nd.dentry);
+			error = security_inode_readlink(nd.dentry, nd.mnt);
 			if (!error) {
 				touch_atime(nd.mnt, nd.dentry);
 				error = inode->i_op->readlink(nd.dentry, buf, bufsiz);

@@ -11,79 +11,56 @@
 
 /* for isspace */
 #include <linux/ctype.h>
-
 #include "apparmor.h"
 #include "inline.h"
 
-size_t aa_getprocattr(struct aaprofile *active, char *str, size_t size)
+int aa_getprocattr(struct aa_profile *profile, char **string, unsigned *len)
 {
-	int error = -EACCES;	/* default to a perm denied */
-	size_t len;
+	char *str;
 
-	if (active) {
-		size_t lena, lenm, lenp = 0;
-		const char *enforce_str = " (enforce)";
-		const char *complain_str = " (complain)";
-		const char *mode_str =
-			PROFILE_COMPLAIN(active) ? complain_str : enforce_str;
+	if (profile) {
+		const char *mode_str = PROFILE_COMPLAIN(profile) ?
+			" (complain)" : " (enforce)";
 
-		lenm = strlen(mode_str);
+		*len = ((profile != profile->parent) ?
+		           strlen(profile->parent->name) + 1 : 0) +
+		       strlen(mode_str) + strlen(profile->name) + 1;
+		str = kmalloc(*len, GFP_ATOMIC);
+		if (!str)
+			return -ENOMEM;
 
-		lena = strlen(active->name);
-
-		len = lena;
-		if (IN_SUBPROFILE(active)) {
-			lenp = strlen(BASE_PROFILE(active)->name);
-			len += (lenp + 1);	/* +1 for ^ */
+		if (profile != profile->parent) {
+			memcpy(str, profile->parent->name,
+			       strlen(profile->parent->name));
+			str += strlen(profile->parent->name);
+			*str++ = '^';
 		}
-		/* DONT null terminate strings we output via proc */
-		len += (lenm + 1);	/* for \n */
-
-		if (len <= size) {
-			if (lenp) {
-				memcpy(str, BASE_PROFILE(active)->name,
-				       lenp);
-				str += lenp;
-				*str++ = '^';
-			}
-
-			memcpy(str, active->name, lena);
-			str += lena;
-			memcpy(str, mode_str, lenm);
-			str += lenm;
-			*str++ = '\n';
-			error = len;
-		} else if (size == 0) {
-			error = len;
-		} else {
-			error = -ERANGE;
-		}
+		memcpy(str, profile->name, strlen(profile->name));
+		str += strlen(profile->name);
+		memcpy(str, mode_str, strlen(mode_str));
+		str += strlen(mode_str);
+		*str++ = '\n';
+		str -= *len;
 	} else {
-		const char *unconstrained_str = "unconstrained\n";
-		len = strlen(unconstrained_str);
+		const char *unconfined_str = "unconfined\n";
 
-		/* DONT null terminate strings we output via proc */
-		if (len <= size) {
-			memcpy(str, unconstrained_str, len);
-			error = len;
-		} else if (size == 0) {
-			error = len;
-		} else {
-			error = -ERANGE;
-		}
+		*len = strlen(unconfined_str);
+		str = kmalloc(*len, GFP_ATOMIC);
+		if (!str)
+			return -ENOMEM;
+
+		memcpy(str, unconfined_str, *len);
 	}
+	*string = str;
 
-	return error;
-
+	return 0;
 }
 
 int aa_setprocattr_changehat(char *hatinfo, size_t infosize)
 {
 	int error = -EINVAL;
-	char *token = NULL, *hat, *smagic, *tmp;
-	u32 magic;
-	int rc, len, consumed;
-	unsigned long flags;
+	char *token = NULL, *hat;
+	u64 magic;
 
 	AA_DEBUG("%s: %p %zd\n", __FUNCTION__, hatinfo, infosize);
 
@@ -94,7 +71,7 @@ int aa_setprocattr_changehat(char *hatinfo, size_t infosize)
 	}
 
 	if (infosize == 0)
-		goto out;
+		return -EINVAL;
 
 	/*
 	 * Copy string to a new buffer so we can play with it
@@ -102,66 +79,35 @@ int aa_setprocattr_changehat(char *hatinfo, size_t infosize)
 	 * for 100% safety
 	 */
 	token = kmalloc(infosize + 1, GFP_KERNEL);
-
-	if (!token) {
-		error = -ENOMEM;
-		goto out;
-	}
-
+	if (!token)
+		return -ENOMEM;
 	memcpy(token, hatinfo, infosize);
 	token[infosize] = 0;
 
-	/* error is INVAL until we have at least parsed something */
-	error = -EINVAL;
-
-	tmp = token;
-	while (*tmp && *tmp != '^') {
-		tmp++;
-	}
-
-	if (!*tmp || tmp == token) {
-		AA_WARN("%s: Invalid input '%s'\n", __FUNCTION__, token);
+	magic = simple_strtoull(token, &hat, 16);
+	if (hat == token || *hat != '^') {
+		AA_WARN(GFP_KERNEL, "%s: Invalid input '%s'\n",
+			__FUNCTION__, token);
 		goto out;
 	}
 
-	/* split magic and hat into two strings */
-	*tmp = 0;
-	smagic = token;
-
-	/*
-	 * Initially set consumed=strlen(magic), as if sscanf
-	 * consumes all input via the %x it will not process the %n
-	 * directive. Otherwise, if sscanf does not consume all the
-	 * input it will process the %n and update consumed.
-	 */
-	consumed = len = strlen(smagic);
-
-	rc = sscanf(smagic, "%x%n", &magic, &consumed);
-
-	if (rc != 1 || consumed != len) {
-		AA_WARN("%s: Invalid hex magic %s\n",
-			__FUNCTION__,
-			smagic);
-		goto out;
-	}
-
-	hat = tmp + 1;
+	/* skip ^ */
+	hat++;
 
 	if (!*hat)
 		hat = NULL;
 
 	if (!hat && !magic) {
-		AA_WARN("%s: Invalid input, NULL hat and NULL magic\n",
+		AA_WARN(GFP_KERNEL,
+			"%s: Invalid input, NULL hat and NULL magic\n",
 			__FUNCTION__);
 		goto out;
 	}
 
-	AA_DEBUG("%s: Magic 0x%x Hat '%s'\n",
+	AA_DEBUG("%s: Magic 0x%llx Hat '%s'\n",
 		 __FUNCTION__, magic, hat ? hat : NULL);
 
-	spin_lock_irqsave(&sd_lock, flags);
 	error = aa_change_hat(hat, magic);
-	spin_unlock_irqrestore(&sd_lock, flags);
 
 out:
 	if (token) {
@@ -172,161 +118,89 @@ out:
 	return error;
 }
 
-int aa_setprocattr_setprofile(struct task_struct *p, char *profilename,
-			      size_t profilesize)
+int aa_setprocattr_setprofile(struct task_struct *task, char *name, size_t size)
 {
-	int error = -EINVAL;
-	struct aaprofile *profile = NULL;
-	struct subdomain *sd;
-	char *name = NULL;
-	unsigned long flags;
+	struct aa_profile *old_profile, *new_profile;
+	char *name_copy = NULL;
+	int error;
 
 	AA_DEBUG("%s: current %s(%d)\n",
 		 __FUNCTION__, current->comm, current->pid);
 
 	/* strip leading white space */
-	while (profilesize && isspace(*profilename)) {
-		profilename++;
-		profilesize--;
+	while (size && isspace(*name)) {
+		name++;
+		size--;
 	}
+	if (size == 0)
+		return -EINVAL;
 
-	if (profilesize == 0)
-		goto out;
+	/* Create a zero-terminated copy if the name. */
+	name_copy = kmalloc(size + 1, GFP_KERNEL);
+	if (!name_copy)
+		return -ENOMEM;
 
-	/*
-	 * Copy string to a new buffer so we guarantee it is zero
-	 * terminated
-	 */
-	name = kmalloc(profilesize + 1, GFP_KERNEL);
+	strncpy(name_copy, name, size);
+	name_copy[size] = 0;
 
-	if (!name) {
-		error = -ENOMEM;
-		goto out;
-	}
-
-	strncpy(name, profilename, profilesize);
-	name[profilesize] = 0;
-
- repeat:
-	if (strcmp(name, "unconstrained") != 0) {
-		profile = aa_profilelist_find(name);
-		if (!profile) {
-			AA_WARN("%s: Unable to switch task %s(%d) to profile"
+repeat:
+	if (strcmp(name_copy, "unconfined") != 0) {
+		new_profile = aa_find_profile(name_copy);
+		if (!new_profile) {
+			AA_WARN(GFP_KERNEL,
+				"%s: Unable to switch task %s(%d) to profile"
 				"'%s'. No such profile.\n",
 				__FUNCTION__,
-				p->comm, p->pid,
-				name);
+				task->comm, task->pid,
+				name_copy);
 
 			error = -EINVAL;
 			goto out;
 		}
+	} else
+		new_profile = NULL;
+
+	old_profile = aa_replace_profile(task, new_profile, 0);
+	if (IS_ERR(old_profile)) {
+		aa_put_profile(new_profile);
+		error = PTR_ERR(old_profile);
+		if (error == -ESTALE)
+			goto repeat;
+		goto out;
 	}
 
-	spin_lock_irqsave(&sd_lock, flags);
-
-	sd = AA_SUBDOMAIN(p->security);
-
-	/* switch to unconstrained */
-	if (!profile) {
-		if (__aa_is_confined(sd)) {
-			AA_WARN("%s: Unconstraining task %s(%d) "
-				"profile %s active %s\n",
-				__FUNCTION__,
-				p->comm, p->pid,
-				BASE_PROFILE(sd->active)->name,
-				sd->active->name);
-
-			aa_switch_unconfined(sd);
-		} else {
-			AA_WARN("%s: task %s(%d) "
-				"is already unconstrained\n",
-				__FUNCTION__, p->comm, p->pid);
-		}
-	} else {
-		if (!sd) {
-			/* this task was created before module was
-			 * loaded, allocate a subdomain
-			 */
-			AA_WARN("%s: task %s(%d) has no subdomain\n",
-				__FUNCTION__, p->comm, p->pid);
-
-			/* unlock so we can safely GFP_KERNEL */
-			spin_unlock_irqrestore(&sd_lock, flags);
-
-			sd = alloc_subdomain(p);
-			if (!sd) {
-				AA_WARN("%s: Unable to allocate subdomain for "
-					"task %s(%d). Cannot confine task to "
-					"profile %s\n",
-					__FUNCTION__,
-					p->comm, p->pid,
-					name);
-
-				error = -ENOMEM;
-				put_aaprofile(profile);
-
-				goto out;
-			}
-
-			spin_lock_irqsave(&sd_lock, flags);
-			if (!AA_SUBDOMAIN(p->security)) {
-				p->security = sd;
-			} else { /* race */
-				free_subdomain(sd);
-				sd = AA_SUBDOMAIN(p->security);
-			}
-		}
-
-		/* ensure the profile hasn't been replaced */
-
-		if (unlikely(profile->isstale)) {
-			WARN_ON(profile == null_complain_profile);
-
-			/* drop refcnt obtained from earlier get_aaprofile */
-			put_aaprofile(profile);
-			profile = aa_profilelist_find(name);
-
-			if (!profile) {
-				/* Race, profile was removed. */
-				spin_unlock_irqrestore(&sd_lock, flags);
-				goto repeat;
-			}
-		}
-
-		/* we do not do a normal task replace since we are not
-		 * replacing with the same profile.
-		 * If existing process is in a hat, it will be moved
-		 * into the new parent profile, even if this new
-		 * profile has a identical named hat.
-		 */
-
-		AA_WARN("%s: Switching task %s(%d) "
+	if (new_profile) {
+		AA_WARN(GFP_KERNEL,
+			"%s: Switching task %s(%d) "
 			"profile %s active %s to new profile %s\n",
 			__FUNCTION__,
-			p->comm, p->pid,
-			sd->active ? BASE_PROFILE(sd->active)->name :
-				"unconstrained",
-			sd->active ? sd->active->name : "unconstrained",
-			name);
-
-		aa_switch(sd, profile);
-
-		put_aaprofile(profile); /* drop ref we obtained above
-					 * from aa_profilelist_find
-					 */
-
-		/* Reset magic in case we were in a subhat before
-		 * This is the only case where we zero the magic after
-		 * calling aa_switch
-		 */
-		sd->hat_magic = 0;
+			task->comm, task->pid,
+			old_profile ? old_profile->parent->name :
+				"unconfined",
+			old_profile ? old_profile->name : "unconfined",
+			name_copy);
+	} else {
+		if (old_profile) {
+			AA_WARN(GFP_KERNEL,
+				"%s: Unconfining task %s(%d) "
+				"profile %s active %s\n",
+				__FUNCTION__,
+				task->comm, task->pid,
+				old_profile->parent->name,
+				old_profile->name);
+		} else {
+			AA_WARN(GFP_KERNEL,
+				"%s: task %s(%d) "
+				"is already unconfined\n",
+				__FUNCTION__, task->comm, task->pid);
+		}
 	}
 
-	spin_unlock_irqrestore(&sd_lock, flags);
-
+	aa_put_profile(old_profile);
+	aa_put_profile(new_profile);
 	error = 0;
-out:
-	kfree(name);
 
+out:
+	kfree(name_copy);
 	return error;
 }

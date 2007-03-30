@@ -1532,7 +1532,8 @@ int do_coredump(long signr, int exit_code, struct pt_regs * regs)
 		goto close_fail;
 	if (!file->f_op->write)
 		goto close_fail;
-	if (!ispipe && do_truncate(file->f_path.dentry, 0, 0, file) != 0)
+	if (!ispipe &&
+	    do_truncate(file->f_path.dentry, file->f_path.mnt, 0, 0, file) != 0)
 		goto close_fail;
 
 	retval = binfmt->core_dump(signr, regs, file);

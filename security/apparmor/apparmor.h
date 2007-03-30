@@ -12,11 +12,28 @@
 #ifndef __APPARMOR_H
 #define __APPARMOR_H
 
+#include <linux/sched.h>
 #include <linux/fs.h>	/* Include for defn of iattr */
 #include <linux/binfmts.h>	/* defn of linux_binprm */
 #include <linux/rcupdate.h>
 
-#include "shared.h"
+#include "match.h"
+
+/*
+ * We use MAY_READ, MAY_WRITE, MAY_EXEC, and the following flags for
+ * profile permissions (we don't use MAY_APPEND):
+ */
+#define AA_MAY_LINK			0x0010
+#define AA_EXEC_INHERIT			0x0020
+#define AA_EXEC_UNCONFINED		0x0040
+#define AA_EXEC_PROFILE			0x0080
+#define AA_EXEC_MMAP			0x0100
+#define AA_EXEC_UNSAFE			0x0200
+#define AA_INVALID_PERM			0x0400
+
+#define AA_EXEC_MODIFIERS		(AA_EXEC_INHERIT | \
+					 AA_EXEC_UNCONFINED | \
+					 AA_EXEC_PROFILE)
 
 /* Control parameters (0 or 1), settable thru module/boot flags or
  * via /sys/kernel/security/apparmor/control */
@@ -24,31 +41,26 @@ extern int apparmor_complain;
 extern int apparmor_debug;
 extern int apparmor_audit;
 extern int apparmor_logsyscall;
+extern int apparmor_path_max;
 
-/* PIPEFS_MAGIC */
-#include <linux/pipe_fs_i.h>
-/* from net/socket.c */
-#define SOCKFS_MAGIC 0x534F434B
-/* from inotify.c  */
-#define INOTIFYFS_MAGIC 0xBAD1DEA
-
-#define VALID_FSTYPE(inode) ((inode)->i_sb->s_magic != PIPEFS_MAGIC && \
-                             (inode)->i_sb->s_magic != SOCKFS_MAGIC && \
-                             (inode)->i_sb->s_magic != INOTIFYFS_MAGIC)
+static inline int mediated_filesystem(struct inode *inode)
+{
+	return !(inode->i_sb->s_flags & MS_NOUSER);
+}
 
 #define PROFILE_COMPLAIN(_profile) \
 	(apparmor_complain == 1 || ((_profile) && (_profile)->flags.complain))
 
-#define SUBDOMAIN_COMPLAIN(_sd) \
+#define APPARMOR_COMPLAIN(_cxt) \
 	(apparmor_complain == 1 || \
-	 ((_sd) && (_sd)->active && (_sd)->active->flags.complain))
+	 ((_cxt) && (_cxt)->profile && (_cxt)->profile->flags.complain))
 
 #define PROFILE_AUDIT(_profile) \
 	(apparmor_audit == 1 || ((_profile) && (_profile)->flags.audit))
 
-#define SUBDOMAIN_AUDIT(_sd) \
+#define APPARMOR_AUDIT(_cxt) \
 	(apparmor_audit == 1 || \
-	 ((_sd) && (_sd)->active && (_sd)->active->flags.audit))
+	 ((_cxt) && (_cxt)->profile && (_cxt)->profile->flags.audit))
 
 /*
  * DEBUG remains global (no per profile flag) since it is mostly used in sysctl
@@ -60,168 +72,94 @@ extern int apparmor_logsyscall;
 		if (apparmor_debug)					\
 			printk(KERN_DEBUG "AppArmor: " fmt, ##args);	\
 	} while (0)
-#define AA_INFO(fmt, args...)	printk(KERN_INFO "AppArmor: " fmt, ##args)
-#define AA_WARN(fmt, args...)	printk(KERN_WARNING "AppArmor: " fmt, ##args)
+#define AA_INFO(gfp, fmt, args...) \
+	do { \
+		printk(KERN_INFO "AppArmor: " fmt, ##args); \
+		aa_audit_message(NULL, gfp, 0, fmt, ##args); \
+	} while (0)
+#define AA_WARN(gfp, fmt, args...) \
+	aa_audit_message(NULL, gfp, 0, fmt, ##args);
+
 #define AA_ERROR(fmt, args...)	printk(KERN_ERR "AppArmor: " fmt, ##args)
-
-
-/* apparmor logged syscall reject caching */
-enum aasyscall {
-	AA_SYSCALL_PTRACE,
-	AA_SYSCALL_SYSCTL_WRITE,
-	AA_SYSCALL_MOUNT,
-	AA_SYSCALL_UMOUNT
-};
-
-#define AA_SYSCALL_TO_MASK(X) (1 << (X))
-
 
 /* basic AppArmor data structures */
 
-struct flagval {
-	int debug;
-	int complain;
-	int audit;
-};
-
-enum entry_match_type {
-	aa_entry_literal,
-	aa_entry_tailglob,
-	aa_entry_pattern,
-	aa_entry_invalid
-};
-
-/* struct aa_entry - file ACL *
- * @filename: filename controlled by this ACL
- * @mode: permissions granted by ACL
- * @type: type of match to perform against @filename
- * @extradata: any extra data needed by an extended matching type
- * @list: list the ACL is on
- * @listp: permission partitioned lists this ACL is on.
- *
- * Each entry describes a file and an allowed access mode.
- */
-struct aa_entry {
-	char *filename;
-	int mode;		/* mode is 'or' of READ, WRITE, EXECUTE,
-				 * INHERIT, UNCONSTRAINED, and LIBRARY
-				 * (meaning don't prefetch). */
-
-	enum entry_match_type type;
-	void *extradata;
-
-	struct list_head list;
-	struct list_head listp[POS_AA_FILE_MAX + 1];
-};
-
 #define AA_SECURE_EXEC_NEEDED 0x00000001
 
-#define AA_EXEC_MODIFIER_MASK(mask) ((mask) & AA_EXEC_MODIFIERS)
-#define AA_EXEC_MASK(mask) ((mask) & (AA_MAY_EXEC | AA_EXEC_MODIFIERS))
-#define AA_EXEC_UNSAFE_MASK(mask) ((mask) & (AA_MAY_EXEC | AA_EXEC_MODIFIERS |\
-					     AA_EXEC_UNSAFE))
-
-/* struct aaprofile - basic confinement data
+/* struct aa_profile - basic confinement data
  * @parent: non refcounted pointer to parent profile
  * @name: the profiles name
- * @file_entry: file ACL
- * @file_entryp: vector of file ACL by permission granted
+ * @file_rules: dfa containing the profiles file rules
  * @list: list this profile is on
  * @sub: profiles list of subprofiles (HATS)
  * @flags: flags controlling profile behavior
  * @null_profile: if needed per profile learning and null confinement profile
- * @isstale: flag to indicate the profile is stale
- * @num_file_entries: number of file entries the profile contains
- * @num_file_pentries: number of file entries for each partitioned list
+ * @isstale: flag indicating if profile is stale
  * @capabilities: capabilities granted by the process
- * @rcu: rcu head used when freeing the profile
  * @count: reference count of the profile
  *
  * The AppArmor profile contains the basic confinement data.  Each profile
- * has a name and potentially a list of profile entries. The profiles are
- * connected in a list
+ * has a name and potentially a list of profile entries. All profiles are
+ * on the profile_list.
+ *
+ * The task_contexts list and the isstale flag are protected by the
+ * profile lock.
+ *
+ * If a task context is moved between two profiles, we first need to grab
+ * both profile locks. lock_both_profiles() does that in a deadlock-safe
+ * way.
  */
-struct aaprofile {
-	struct aaprofile *parent;
+struct aa_profile {
+	struct aa_profile *parent;
 	char *name;
-
-	struct list_head file_entry;
-	struct list_head file_entryp[POS_AA_FILE_MAX + 1];
+	struct aa_dfa *file_rules;
 	struct list_head list;
 	struct list_head sub;
-	struct flagval flags;
-	struct aaprofile *null_profile;
+	struct {
+		int complain;
+		int audit;
+	} flags;
+	struct aa_profile *null_profile;
 	int isstale;
 
-	int num_file_entries;
-	int num_file_pentries[POS_AA_FILE_MAX + 1];
-
 	kernel_cap_t capabilities;
-
-	struct rcu_head rcu;
-
 	struct kref count;
+	struct list_head task_contexts;
+	spinlock_t lock;
+	unsigned long int_flags;
 };
 
-enum aafile_type {
-	aa_file_default,
-	aa_file_shmem
-};
-
-/**
- * aafile - file pointer confinement data
- *
- * Data structure assigned to each open file (by apparmor_file_alloc_security)
- */
-struct aafile {
-	enum aafile_type type;
-	struct aaprofile *profile;
-};
+extern struct list_head profile_list;
+extern rwlock_t profile_list_lock;
+extern struct mutex aa_interface_lock;
 
 /**
- * struct subdomain - primary label for confined tasks
- * @active: the current active profile
+ * struct aa_task_context - primary label for confined tasks
+ * @profile: the current profile
  * @hat_magic: the magic token controling the ability to leave a hat
- * @list: list this subdomain is on
- * @task: task that the subdomain confines
- * @cached_caps: caps that have previously generated log entries
- * @cached_syscalls: mediated syscalls that have previously been logged
+ * @list: list this aa_task_context is on
+ * @task: task that the aa_task_context confines
+ * @rcu: rcu head used when freeing the aa_task_context
+ * @caps_logged: caps that have previously generated log entries
  *
- * Contains the tasks current active profile (which could change due to
+ * Contains the task's current profile (which could change due to
  * change_hat).  Plus the hat_magic needed during change_hat.
- *
- * N.B AppArmor's previous product name SubDomain was derived from the name
- * of this structure/concept (changehat reducing a task into a sub-domain).
  */
-struct subdomain {
-	struct aaprofile *active;	/* The current active profile */
-	u32 hat_magic;			/* used with change_hat */
-	struct list_head list;		/* list of subdomains */
+struct aa_task_context {
+	struct aa_profile *profile;	/* The current profile */
+	u64 hat_magic;			/* used with change_hat */
+	struct list_head list;
 	struct task_struct *task;
-
-	kernel_cap_t cached_caps;
-	unsigned int cached_syscalls;
+	struct rcu_head rcu;
+	kernel_cap_t caps_logged;
 };
 
-typedef int (*aa_iter) (struct subdomain *, void *);
+static inline struct aa_task_context *aa_task_context(struct task_struct *task)
+{
+	return rcu_dereference((struct aa_task_context *)task->security);
+}
 
-/* aa_path_data
- * temp (cookie) data used by aa_path_* functions, see inline.h
- */
-struct aa_path_data {
-	struct dentry *root, *dentry;
-	struct mnt_namespace *mnt_namespace;
-	struct list_head *head, *pos;
-	int errno;
-};
-
-#define AA_SUBDOMAIN(sec)	((struct subdomain*)(sec))
-#define AA_PROFILE(sec)		((struct aaprofile*)(sec))
-
-/* Lock protecting access to 'struct subdomain' accesses */
-extern spinlock_t sd_lock;
-
-extern struct aaprofile *null_complain_profile;
+extern struct aa_profile *null_complain_profile;
 
 /* aa_audit - AppArmor auditing structure
  * Structure is populated by access control code and passed to aa_audit which
@@ -234,8 +172,12 @@ struct aa_audit {
 	gfp_t gfp_mask;
 	int error_code;
 
+	const char *operation;
 	const char *name;
-	unsigned int ival;
+	union {
+		int capability;
+		int mask;
+	};
 	union {
 		const void *pval;
 		va_list vaval;
@@ -269,88 +211,78 @@ struct aa_audit {
 			"LOGPROF-HINT " hint " " fmt, ##args);\
 	} while(0)
 
-/* directory op type, for aa_perm_dir */
-enum aa_diroptype {
-	aa_dir_mkdir,
-	aa_dir_rmdir
-};
-
-/* xattr op type, for aa_xattr */
-enum aa_xattroptype {
-	aa_xattr_get,
-	aa_xattr_set,
-	aa_xattr_list,
-	aa_xattr_remove
-};
-
-#define BASE_PROFILE(p) ((p)->parent ? (p)->parent : (p))
-#define IN_SUBPROFILE(p) ((p)->parent)
+/* Flags for the permission check functions */
+#define AA_CHECK_LEAF	1  /* this is the leaf lookup component */
+#define AA_CHECK_FD	2  /* coming from a file descriptor */
+#define AA_CHECK_DIR	4  /* file type is directory */
 
 /* main.c */
+extern void free_aa_task_context_rcu_callback(struct rcu_head *head);
 extern int alloc_null_complain_profile(void);
 extern void free_null_complain_profile(void);
-extern int attach_nullprofile(struct aaprofile *profile);
-extern int aa_audit_message(struct aaprofile *active, gfp_t gfp, int,
+extern int attach_nullprofile(struct aa_profile *profile);
+extern int aa_audit_message(struct aa_profile *profile, gfp_t gfp, int,
 			    const char *, ...);
-extern int aa_audit_syscallreject(struct aaprofile *active, gfp_t gfp,
-				  enum aasyscall call);
-extern int aa_audit(struct aaprofile *active, const struct aa_audit *);
-extern char *aa_get_name(struct dentry *dentry, struct vfsmount *mnt);
+extern int aa_audit_syscallreject(struct aa_profile *profile, gfp_t gfp,
+				  const char *);
+extern int aa_audit(struct aa_profile *profile, const struct aa_audit *);
 
-extern int aa_attr(struct aaprofile *active, struct dentry *dentry,
-		   struct iattr *iattr);
-extern int aa_xattr(struct aaprofile *active, struct dentry *dentry,
-		    const char *xattr, enum aa_xattroptype xattroptype);
-extern int aa_capability(struct aaprofile *active, int cap);
-extern int aa_perm(struct aaprofile *active, struct dentry *dentry,
-		   struct vfsmount *mnt, int mask);
-extern int aa_perm_nameidata(struct aaprofile *active, struct nameidata *nd,
-			     int mask);
-extern int aa_perm_dentry(struct aaprofile *active, struct dentry *dentry,
-			  int mask);
-extern int aa_perm_dir(struct aaprofile *active, struct dentry *dentry,
-		       enum aa_diroptype diroptype);
-extern int aa_link(struct aaprofile *active,
-		   struct dentry *link, struct dentry *target);
-extern int aa_fork(struct task_struct *p);
+extern int aa_attr(struct aa_profile *profile, struct dentry *dentry,
+		   struct vfsmount *mnt, struct iattr *iattr);
+extern int aa_perm_xattr(struct aa_profile *profile, struct dentry *dentry,
+			 struct vfsmount *mnt, const char *operation,
+			 const char *xattr_xattr, int mask, int check);
+extern int aa_capability(struct aa_task_context *cxt, int cap);
+extern int aa_perm(struct aa_profile *profile, struct dentry *dentry,
+		   struct vfsmount *mnt, int mask, int check);
+extern int aa_perm_dir(struct aa_profile *profile, struct dentry *dentry,
+		       struct vfsmount *mnt, const char *operation, int mask);
+extern int aa_link(struct aa_profile *profile,
+		   struct dentry *link, struct vfsmount *link_mnt,
+		   struct dentry *target, struct vfsmount *target_mnt);
+extern int aa_clone(struct task_struct *task);
 extern int aa_register(struct linux_binprm *bprm);
-extern void aa_release(struct task_struct *p);
-extern int aa_change_hat(const char *id, u32 hat_magic);
-extern int aa_associate_filp(struct file *filp);
+extern void aa_release(struct task_struct *task);
+extern int aa_change_hat(const char *id, u64 hat_magic);
+extern struct aa_profile *__aa_find_profile(const char *name,
+					    struct list_head *list);
+extern struct aa_profile *aa_replace_profile(struct task_struct *task,
+					     struct aa_profile *profile,
+					     u32 hat_magic);
+extern struct aa_task_context *lock_task_and_profiles(struct task_struct *task,
+						      struct aa_profile *profile);
+extern void aa_change_task_context(struct task_struct *task,
+				   struct aa_task_context *new_cxt,
+				   struct aa_profile *profile, u64 hat_magic);
 
 /* list.c */
-extern struct aaprofile *aa_profilelist_find(const char *name);
-extern int aa_profilelist_add(struct aaprofile *profile);
-extern struct aaprofile *aa_profilelist_remove(const char *name);
 extern void aa_profilelist_release(void);
-extern struct aaprofile *aa_profilelist_replace(struct aaprofile *profile);
-extern void aa_profile_dump(struct aaprofile *);
-extern void aa_profilelist_dump(void);
-extern void aa_subdomainlist_add(struct subdomain *);
-extern void aa_subdomainlist_remove(struct subdomain *);
-extern void aa_subdomainlist_iterate(aa_iter, void *);
-extern void aa_subdomainlist_iterateremove(aa_iter, void *);
-extern void aa_subdomainlist_release(void);
 
 /* module_interface.c */
 extern ssize_t aa_file_prof_add(void *, size_t);
-extern ssize_t aa_file_prof_repl(void *, size_t);
+extern ssize_t aa_file_prof_replace(void *, size_t);
 extern ssize_t aa_file_prof_remove(const char *, size_t);
-extern void free_aaprofile(struct aaprofile *profile);
-extern void free_aaprofile_kref(struct kref *kref);
+extern void free_aa_profile(struct aa_profile *profile);
+extern void free_aa_profile_kref(struct kref *kref);
+extern void aa_unconfine_tasks(struct aa_profile *profile);
 
 /* procattr.c */
-extern size_t aa_getprocattr(struct aaprofile *active, char *str, size_t size);
+extern int aa_getprocattr(struct aa_profile *profile, char **string,
+			  unsigned *len);
 extern int aa_setprocattr_changehat(char *hatinfo, size_t infosize);
-extern int aa_setprocattr_setprofile(struct task_struct *p, char *profilename,
+extern int aa_setprocattr_setprofile(struct task_struct *task,
+				     char *profilename,
 				     size_t profilesize);
 
 /* apparmorfs.c */
 extern int create_apparmorfs(void);
 extern void destroy_apparmorfs(void);
 
-/* capabilities.c */
-extern const char *capability_to_name(unsigned int cap);
-extern const char *syscall_to_name(enum aasyscall call);
+/* match.c */
+struct aa_dfa *aa_match_alloc(void);
+void aa_match_free(struct aa_dfa *dfa);
+int unpack_dfa(struct aa_dfa *dfa, void *blob, size_t size);
+int verify_dfa(struct aa_dfa *dfa);
+unsigned int aa_match(struct aa_dfa *dfa, const char *pathname);
 
 #endif				/* __APPARMOR_H */

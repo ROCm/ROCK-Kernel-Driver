@@ -596,7 +596,7 @@ int sysfs_chmod_file(struct kobject *kobj, struct attribute *attr, mode_t mode)
 			newattrs.ia_mode = (mode & S_IALLUGO) |
 						(inode->i_mode & ~S_IALLUGO);
 			newattrs.ia_valid = ATTR_MODE | ATTR_CTIME;
-			res = notify_change(victim, &newattrs);
+			res = notify_change(victim, NULL, &newattrs);
 			mutex_unlock(&inode->i_mutex);
 		}
 		dput(victim);

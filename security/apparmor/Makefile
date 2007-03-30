@@ -1,28 +1,13 @@
 # Makefile for AppArmor Linux Security Module
 #
-# kernel build Makefile is the Kbuild file
+obj-$(CONFIG_SECURITY_APPARMOR) += apparmor.o
 
-REPO_VERSION := $(shell if [ -x /usr/bin/svn ] ; then \
-       /usr/bin/svn info . 2> /dev/null | grep "^Last Changed Rev:" | sed "s/^Last Changed Rev: //" ; \
-       fi)
+apparmor-y := main.o list.o procattr.o lsm.o apparmorfs.o \
+	      module_interface.o match.o
 
-ifeq ("${REPO_VERSION}", "")
-REPO_VERSION := "unknown"
-endif
+quiet_cmd_make-caps = GEN     $@
+cmd_make-caps = sed -n -e "/CAP_FS_MASK/d" -e "s/^\#define[ \\t]\\+CAP_\\([A-Z0-9_]\\+\\)[ \\t]\\+\\([0-9]\\+\\)\$$/[\\2]  = \"\\1\",/p" $< | tr A-Z a-z > $@
 
-KERNELVER := $(shell uname -r)
-
-KERNELDIR := /lib/modules/${KERNELVER}/build
-
-all:
-	$(MAKE) -C $(KERNELDIR) M=`pwd` modules CONFIG_SECURITY_APPARMOR=m \
-					APPARMOR_VER=${REPO_VERSION}
-	mv apparmor.ko apparmor-${KERNELVER}.ko
-	mv match/aamatch_pcre.ko aamatch_pcre-${KERNELVER}.ko
-
-clean:
-	rm -f *~ *.o *.ko *.mod.c .*.cmd Module{s,}.symvers \
-		match/*~ match/*.o match/*.ko match/.*.cmd match/*.mod.c
-	rm -rf .tmp_versions
-
-
+$(obj)/main.o : $(obj)/capability_names.h
+$(obj)/capability_names.h : $(srctree)/include/linux/capability.h
+	$(call cmd,make-caps)

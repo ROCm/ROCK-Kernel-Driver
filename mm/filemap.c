@@ -1849,9 +1849,9 @@ repeat:
  *	if suid or (sgid and xgrp)
  *		remove privs
  */
-int should_remove_suid(struct dentry *dentry)
+int should_remove_suid(struct path *path)
 {
-	mode_t mode = dentry->d_inode->i_mode;
+	mode_t mode = path->dentry->d_inode->i_mode;
 	int kill = 0;
 
 	/* suid always must be killed */
@@ -1872,20 +1872,20 @@ int should_remove_suid(struct dentry *dentry)
 }
 EXPORT_SYMBOL(should_remove_suid);
 
-int __remove_suid(struct dentry *dentry, int kill)
+int __remove_suid(struct path *path, int kill)
 {
 	struct iattr newattrs;
 
 	newattrs.ia_valid = ATTR_FORCE | kill;
-	return notify_change(dentry, &newattrs);
+	return notify_change(path->dentry, path->mnt, &newattrs);
 }
 
-int remove_suid(struct dentry *dentry)
+int remove_suid(struct path *path)
 {
-	int kill = should_remove_suid(dentry);
+	int kill = should_remove_suid(path);
 
 	if (unlikely(kill))
-		return __remove_suid(dentry, kill);
+		return __remove_suid(path, kill);
 
 	return 0;
 }
@@ -2265,7 +2265,7 @@ __generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
 	if (count == 0)
 		goto out;
 
-	err = remove_suid(file->f_path.dentry);
+	err = remove_suid(&file->f_path);
 	if (err)
 		goto out;
 

@@ -112,7 +112,7 @@
 #define AUDIT_LAST_KERN_ANOM_MSG    1799
 #define AUDIT_ANOM_PROMISCUOUS      1700 /* Device changed promiscuous mode */
 
-#define AUDIT_SD		1500	/* AppArmor (SubDomain) audit */
+#define AUDIT_APPARMOR		1500	/* AppArmor audit */
 
 #define AUDIT_KERNEL		2000	/* Asynchronous audit record. NOT A REQUEST. */
 

@@ -6,9 +6,6 @@
 #include <linux/sched.h>
 #include <linux/nsproxy.h>
 
-/* exported for AppArmor (SubDomain) */
-extern struct rw_semaphore namespace_sem;
-
 struct mnt_namespace {
 	atomic_t		count;
 	struct vfsmount *	root;

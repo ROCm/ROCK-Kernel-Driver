@@ -62,7 +62,7 @@ asmlinkage long sys_utime(char __user * filename, struct utimbuf __user * times)
 			goto dput_and_out;
 	}
 	mutex_lock(&inode->i_mutex);
-	error = notify_change(nd.dentry, &newattrs);
+	error = notify_change(nd.dentry, nd.mnt, &newattrs);
 	mutex_unlock(&inode->i_mutex);
 dput_and_out:
 	path_release(&nd);
@@ -115,7 +115,7 @@ long do_utimes(int dfd, char __user *filename, struct timeval *times)
 			goto dput_and_out;
 	}
 	mutex_lock(&inode->i_mutex);
-	error = notify_change(nd.dentry, &newattrs);
+	error = notify_change(nd.dentry, nd.mnt, &newattrs);
 	mutex_unlock(&inode->i_mutex);
 dput_and_out:
 	path_release(&nd);

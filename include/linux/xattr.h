@@ -46,10 +46,13 @@ struct xattr_handler {
 		   size_t size, int flags);
 };
 
-ssize_t vfs_getxattr(struct dentry *, char *, void *, size_t);
-ssize_t vfs_listxattr(struct dentry *d, char *list, size_t size);
-int vfs_setxattr(struct dentry *, char *, void *, size_t, int);
-int vfs_removexattr(struct dentry *, char *);
+ssize_t vfs_getxattr(struct dentry *, struct vfsmount *, char *, void *,
+		     size_t, struct file *);
+ssize_t vfs_listxattr(struct dentry *d, struct vfsmount *, char *list,
+		      size_t size, struct file *);
+int vfs_setxattr(struct dentry *, struct vfsmount *, char *, void *, size_t,
+		 int, struct file *);
+int vfs_removexattr(struct dentry *, struct vfsmount *, char *, struct file *);
 
 ssize_t generic_getxattr(struct dentry *dentry, const char *name, void *buffer, size_t size);
 ssize_t generic_listxattr(struct dentry *dentry, char *buffer, size_t buffer_size);

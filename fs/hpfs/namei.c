@@ -426,7 +426,7 @@ again:
 			/*printk("HPFS: truncating file before delete.\n");*/
 			newattrs.ia_size = 0;
 			newattrs.ia_valid = ATTR_SIZE | ATTR_CTIME;
-			err = notify_change(dentry, &newattrs);
+			err = notify_change(dentry, NULL, &newattrs);
 			put_write_access(inode);
 			if (!err)
 				goto again;

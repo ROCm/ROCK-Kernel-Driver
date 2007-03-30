@@ -10,384 +10,216 @@
 #ifndef __INLINE_H
 #define __INLINE_H
 
-#include <linux/mnt_namespace.h>
-
-static inline int __aa_is_confined(struct subdomain *sd)
-{
-	return (sd && sd->active);
-}
+#include <linux/sched.h>
 
 /**
- *  aa_is_confined
- *  Determine whether current task contains a valid profile (confined).
- *  Return %1 if confined, %0 otherwise.
- */
-static inline int aa_is_confined(void)
-{
-	struct subdomain *sd = AA_SUBDOMAIN(current->security);
-	return __aa_is_confined(sd);
-}
-
-static inline int __aa_sub_defined(struct subdomain *sd)
-{
-    return __aa_is_confined(sd) && !list_empty(&BASE_PROFILE(sd->active)->sub);
-}
-
-/**
- * aa_sub_defined - check to see if current task has any subprofiles
- * Return 1 if true, 0 otherwise
- */
-static inline int aa_sub_defined(void)
-{
-	struct subdomain *sd = AA_SUBDOMAIN(current->security);
-	return __aa_sub_defined(sd);
-}
-
-/**
- * get_aaprofile - increment refcount on profile @p
+ * aa_dup_profile - increment refcount on profile @p
  * @p: profile
  */
-static inline struct aaprofile *get_aaprofile(struct aaprofile *p)
+static inline struct aa_profile *aa_dup_profile(struct aa_profile *p)
 {
 	if (p)
-		kref_get(&(BASE_PROFILE(p)->count));
+		kref_get(&(p->parent->count));
 
 	return p;
 }
 
 /**
- * put_aaprofile - decrement refcount on profile @p
+ * aa_put_profile - decrement refcount on profile @p
  * @p: profile
  */
-static inline void put_aaprofile(struct aaprofile *p)
+static inline void aa_put_profile(struct aa_profile *p)
 {
 	if (p)
-		kref_put(&BASE_PROFILE(p)->count, free_aaprofile_kref);
+		kref_put(&p->parent->count, free_aa_profile_kref);
 }
 
-/**
- * get_task_activeptr_rcu - get pointer to @tsk's active profile.
- * @tsk: task to get active profile from
- *
- * Requires rcu_read_lock is held
- */
-static inline struct aaprofile *get_task_activeptr_rcu(struct task_struct *tsk)
+static inline struct aa_profile *aa_get_profile(struct task_struct *task)
 {
-	struct subdomain *sd = AA_SUBDOMAIN(tsk->security);
-	struct aaprofile *active = NULL;
-
-	if (sd)
-		active = (struct aaprofile *) rcu_dereference(sd->active);
-
-	return active;
-}
-
-/**
- * get_activeptr_rcu - get pointer to current task's active profile
- * Requires rcu_read_lock is held
- */
-static inline struct aaprofile *get_activeptr_rcu(void)
-{
-	return get_task_activeptr_rcu(current);
-}
-
-/**
- * get_task_active_aaprofile - get a reference to tsk's active profile.
- * @tsk: the task to get the active profile reference for
- */
-static inline struct aaprofile *get_task_active_aaprofile(struct task_struct *tsk)
-{
-	struct aaprofile *active;
+	struct aa_task_context *cxt;
+	struct aa_profile *profile = NULL;
 
 	rcu_read_lock();
-	active = get_aaprofile(get_task_activeptr_rcu(tsk));
+	cxt = aa_task_context(task);
+	if (cxt) {
+		profile = cxt->profile;
+		aa_dup_profile(profile);
+	}
 	rcu_read_unlock();
 
-	return active;
+	return profile;
 }
 
-/**
- * get_active_aaprofile - get a reference to the current tasks active profile
- */
-static inline struct aaprofile *get_active_aaprofile(void)
+static inline struct aa_profile *aa_find_profile(const char *name)
 {
-	return get_task_active_aaprofile(current);
+	struct aa_profile *profile = NULL;
+
+	read_lock(&profile_list_lock);
+	profile = aa_dup_profile(__aa_find_profile(name, &profile_list));
+	read_unlock(&profile_list_lock);
+
+	return profile;
 }
 
-/**
- * cap_is_cached - check if @cap access has already been logged for current
- * @cap: capability to test if cached
- */
-static inline int cap_is_cached(int cap)
+static inline struct aa_task_context *aa_alloc_task_context(gfp_t flags)
 {
-	struct subdomain *sd = AA_SUBDOMAIN(current->security);
-	return cap_raised(sd->cached_caps, cap);
+	struct aa_task_context *cxt;
+
+	cxt = kzalloc(sizeof(*cxt), flags);
+	if (cxt) {
+		INIT_LIST_HEAD(&cxt->list);
+		INIT_RCU_HEAD(&cxt->rcu);
+	}
+
+	return cxt;
 }
 
-/**
- * add_to_cached_caps - add a capability to the tasks logged capabilities cache
- * @cap: the capability to add
- */
-static inline void add_to_cached_caps(int cap)
+static inline void aa_free_task_context(struct aa_task_context *cxt)
 {
-	struct subdomain *sd = AA_SUBDOMAIN(current->security);
-	sd->cached_caps = cap_combine(sd->cached_caps, CAP_TO_MASK(cap));
+	if (cxt) {
+		aa_put_profile(cxt->profile);
+		kfree(cxt);
+	}
 }
 
 /**
- * clear_cached_caps - clear the tasks logged capabilities cache
- */
-static inline void clear_cached_caps(struct subdomain *sd)
-{
-	sd->cached_caps = CAP_EMPTY_SET;
-}
-
-/**
- * syscall_is_cached - check if @call access has already been logged
- * @call: syscall to test if cached
- */
-static inline int syscall_is_cached(enum aasyscall call)
-{
-	struct subdomain *sd = AA_SUBDOMAIN(current->security);
-	return sd->cached_syscalls & AA_SYSCALL_TO_MASK(call);
-}
-
-/**
- * add_to_cached_syscalls - add a syscall to the tasks logged syscalls cache
- * @call: the syscall to add
- */
-static inline void add_to_cached_syscalls(enum aasyscall call)
-{
-	struct subdomain *sd = AA_SUBDOMAIN(current->security);
-	sd->cached_syscalls |= AA_SYSCALL_TO_MASK(call);
-}
-
-/**
- * clear_cached_syscalls - clear the tasks logged syscalls cache
- */
-static inline void clear_cached_syscalls(struct subdomain *sd)
-{
-	sd->cached_syscalls = 0;
-}
-
-/**
- * aa_switch - change subdomain to use a new profile
- * @sd: subdomain to switch the active profile on
- * @newactive: new active profile
- *
- * aa_switch handles the changing of a subdomain's active profile.  The
- * sd_lock must be held to ensure consistency against other writers.
- * Some write paths (ex. aa_register) require sd->active not to change
- * over several operations, so the calling function is responsible
- * for grabing the sd_lock to meet its consistency constraints before
- * calling aa_switch
- */
-static inline void aa_switch(struct subdomain *sd, struct aaprofile *newactive)
-{
-	struct aaprofile *oldactive = sd->active;
-
-	/* noop if NULL */
-	rcu_assign_pointer(sd->active, get_aaprofile(newactive));
-	clear_cached_caps(sd);
-	clear_cached_syscalls(sd);
-	put_aaprofile(oldactive);
-}
-
-/**
- * aa_switch_unconfined - change subdomain to be unconfined (no profile)
- * @sd: subdomain to switch
- *
- * aa_switch_unconfined handles the removal of a subdomain's active profile.
- * The sd_lock must be held to ensure consistency against other writers.
- * Like aa_switch the sd_lock is used to maintain consistency.
- */
-static inline void aa_switch_unconfined(struct subdomain *sd)
-{
-	aa_switch(sd, NULL);
-
-	/* reset magic in case we were in a subhat before */
-	sd->hat_magic = 0;
-}
-
-/**
- * alloc_subdomain - allocate a new subdomain
- * @tsk: task struct
- *
- * Allocate a new subdomain including a backpointer to it's referring task.
- */
-static inline struct subdomain *alloc_subdomain(struct task_struct *tsk)
-{
-	struct subdomain *sd;
-
-	sd = kzalloc(sizeof(struct subdomain), GFP_KERNEL);
-	if (!sd)
-		goto out;
-
-	/* back pointer to task */
-	sd->task = tsk;
-
-	/* any readers of the list must make sure that they can handle
-	 * case where sd->active is not yet set (null)
-	 */
-	aa_subdomainlist_add(sd);
-
-out:
-	return sd;
-}
-
-/**
- * free_subdomain - Free a subdomain previously allocated by alloc_subdomain
- * @sd: subdomain
- */
-static inline void free_subdomain(struct subdomain *sd)
-{
-	aa_subdomainlist_remove(sd);
-	kfree(sd);
-}
-
-/**
- * alloc_aaprofile - Allocate, initialize and return a new zeroed profile.
+ * alloc_aa_profile - Allocate, initialize and return a new zeroed profile.
  * Returns NULL on failure.
  */
-static inline struct aaprofile *alloc_aaprofile(void)
+static inline struct aa_profile *alloc_aa_profile(void)
 {
-	struct aaprofile *profile;
+	struct aa_profile *profile;
 
-	profile = (struct aaprofile *)kzalloc(sizeof(struct aaprofile),
-					      GFP_KERNEL);
+	profile = kzalloc(sizeof(*profile), GFP_KERNEL);
 	AA_DEBUG("%s(%p)\n", __FUNCTION__, profile);
 	if (profile) {
-		int i;
-
+		profile->parent = profile;
 		INIT_LIST_HEAD(&profile->list);
 		INIT_LIST_HEAD(&profile->sub);
-		INIT_LIST_HEAD(&profile->file_entry);
-		for (i = 0; i <= POS_AA_FILE_MAX; i++) {
-			INIT_LIST_HEAD(&profile->file_entryp[i]);
-		}
-		INIT_RCU_HEAD(&profile->rcu);
 		kref_init(&profile->count);
+		INIT_LIST_HEAD(&profile->task_contexts);
+		spin_lock_init(&profile->lock);
 	}
 	return profile;
 }
 
 /**
- * aa_put_name
- * @name: name to release.
+ * lock_profile - lock a profile
+ * @profile: the profile to lock
  *
- * Release space (free_page) allocated to hold pathname
- * name may be NULL (checked for by free_page)
+ * While the profile is locked, local interrupts are disabled. This also
+ * gives us RCU reader safety.
  */
-static inline void aa_put_name(const char *name)
+static inline void lock_profile(struct aa_profile *profile)
 {
-	free_page((unsigned long)name);
+	/* We always lock top-level profiles instead of children. */
+	if (profile)
+		profile = profile->parent;
+
+	/*
+	 * Lock the profile.
+	 *
+	 * Need to disable interrupts here because this lock is used in
+	 * the task_free_security hook, which may run in RCU context.
+	 */
+	if (profile)
+		spin_lock_irqsave(&profile->lock, profile->int_flags);
 }
 
-/** __aa_find_profile
- * @name: name of profile to find
- * @head: list to search
- *
- * Return reference counted copy of profile. NULL if not found
- * Caller must hold any necessary locks
+/**
+ * unlock_profile - unlock a profile
+ * @profile: the profile to unlock
  */
-static inline struct aaprofile *__aa_find_profile(const char *name,
-						  struct list_head *head)
+static inline void unlock_profile(struct aa_profile *profile)
 {
-	struct aaprofile *p;
+	/* We always lock top-level profiles instead of children. */
+	if (profile)
+		profile = profile->parent;
 
-	if (!name || !head)
-		return NULL;
+	/* Unlock the profile. */
+	if (profile)
+		spin_unlock_irqrestore(&profile->lock, profile->int_flags);
+}
 
-	AA_DEBUG("%s: finding profile %s\n", __FUNCTION__, name);
-	list_for_each_entry(p, head, list) {
-		if (!strcmp(p->name, name)) {
-			/* return refcounted object */
-			p = get_aaprofile(p);
-			return p;
-		} else {
-			AA_DEBUG("%s: skipping %s\n", __FUNCTION__, p->name);
-		}
+/**
+ * lock_both_profiles  -  lock two profiles in a deadlock-free way
+ * @profile1:	profile to lock (may be NULL)
+ * @profile2:	profile to lock (may be NULL)
+ *
+ * The order in which profiles are passed into lock_both_profiles() /
+ * unlock_both_profiles() does not matter.
+ * While the profile is locked, local interrupts are disabled. This also
+ * gives us RCU reader safety.
+ */
+static inline void lock_both_profiles(struct aa_profile *profile1,
+				      struct aa_profile *profile2)
+{
+	/* We always lock top-level profiles instead of children. */
+	if (profile1)
+		profile1 = profile1->parent;
+	if (profile2)
+		profile2 = profile2->parent;
+
+	/*
+	 * Lock the two profiles.
+	 *
+	 * We need to disable interrupts because the profile locks are
+	 * used in the task_free_security hook, which may run in RCU
+	 * context.
+	 *
+	 * Do not nest spin_lock_irqsave()/spin_unlock_irqresore():
+	 * interrupts only need to be turned off once.
+	 */
+	if (!profile1 || profile1 == profile2) {
+		if (profile2)
+			spin_lock_irqsave(&profile2->lock, profile2->int_flags);
+	} else if (profile1 > profile2) {
+		/* profile1 cannot be NULL here. */
+		spin_lock_irqsave(&profile1->lock, profile1->int_flags);
+		if (profile2)
+			spin_lock(&profile2->lock);
+
+	} else {
+		/* profile2 cannot be NULL here. */
+		spin_lock_irqsave(&profile2->lock, profile2->int_flags);
+		spin_lock(&profile1->lock);
 	}
-	return NULL;
 }
 
-/** __aa_path_begin
- * @rdentry: filesystem root dentry (searching for vfsmnts matching this)
- * @dentry: dentry object to obtain pathname from (relative to matched vfsmnt)
+/**
+ * unlock_both_profiles  -  unlock two profiles in a deadlock-free way
+ * @profile1:	profile to unlock (may be NULL)
+ * @profile2:	profile to unlock (may be NULL)
  *
- * Setup data for iterating over vfsmounts (in current tasks namespace).
+ * The order in which profiles are passed into lock_both_profiles() /
+ * unlock_both_profiles() does not matter.
+ * While the profile is locked, local interrupts are disabled. This also
+ * gives us RCU reader safety.
  */
-static inline void __aa_path_begin(struct dentry *rdentry,
-				   struct dentry *dentry,
-				   struct aa_path_data *data)
+static inline void unlock_both_profiles(struct aa_profile *profile1,
+				        struct aa_profile *profile2)
 {
-	data->dentry = dentry;
-	data->root = dget(rdentry->d_sb->s_root);
-	data->mnt_namespace = current->nsproxy->mnt_ns;
-	data->head = &data->mnt_namespace->list;
-	data->pos = data->head->next;
-	prefetch(data->pos->next);
-	data->errno = 0;
+	/* We always lock top-level profiles instead of children. */
+	if (profile1)
+		profile1 = profile1->parent;
+	if (profile2)
+		profile2 = profile2->parent;
 
-	down_read(&namespace_sem);
-}
-
-/** aa_path_begin
- * @dentry: filesystem root dentry and object to obtain pathname from
- *
- * Utility function for calling _aa_path_begin for when the dentry we are
- * looking for and the root are the same (this is the usual case).
- */
-static inline void aa_path_begin(struct dentry *dentry,
-				     struct aa_path_data *data)
-{
-	__aa_path_begin(dentry, dentry, data);
-}
-
-/** aa_path_end
- * @data: data object previously initialized by aa_path_begin
- *
- * End iterating over vfsmounts.
- * If an error occured in begin or get, it is returned. Otherwise 0.
- */
-static inline int aa_path_end(struct aa_path_data *data)
-{
-	up_read(&namespace_sem);
-	dput(data->root);
-
-	return data->errno;
-}
-
-/** aa_path_getname
- * @data: data object previously initialized by aa_path_begin
- *
- * Return the next mountpoint which has the same root dentry as data->root.
- * If no more mount points exist (or in case of error) NULL is returned
- * (caller should call aa_path_end() and inspect return code to differentiate)
- */
-static inline char *aa_path_getname(struct aa_path_data *data)
-{
-	char *name = NULL;
-	struct vfsmount *mnt;
-
-	while (data->pos != data->head) {
-		mnt = list_entry(data->pos, struct vfsmount, mnt_list);
-
-		/* advance to next -- so that it is done before we break */
-		data->pos = data->pos->next;
-		prefetch(data->pos->next);
-
-		if (mnt->mnt_root == data->root) {
-			name = aa_get_name(data->dentry, mnt);
-			if (IS_ERR(name)) {
-				data->errno = PTR_ERR(name);
-				name = NULL;
-			}
-			break;
-		}
+	/* Unlock the two profiles. */
+	if (!profile1 || profile1 == profile2) {
+		if (profile2)
+			spin_unlock_irqrestore(&profile2->lock,
+					       profile2->int_flags);
+	} else if (profile1 > profile2) {
+		/* profile1 cannot be NULL here. */
+		if (profile2)
+			spin_unlock(&profile2->lock);
+		spin_unlock_irqrestore(&profile1->lock, profile1->int_flags);
+	} else {
+		/* profile2 cannot be NULL here. */
+		spin_unlock(&profile1->lock);
+		spin_unlock_irqrestore(&profile2->lock, profile2->int_flags);
 	}
-
-	return name;
 }
 
 #endif /* __INLINE_H__ */

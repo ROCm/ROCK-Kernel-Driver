@@ -103,5 +103,7 @@ extern void shrink_submounts(struct vfsmount *mountpoint, struct list_head *moun
 extern spinlock_t vfsmount_lock;
 extern dev_t name_to_dev_t(char *name);
 
+extern char *d_namespace_path(struct dentry *, struct vfsmount *, char *, int);
+
 #endif
 #endif /* _LINUX_MOUNT_H */

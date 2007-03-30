@@ -13,172 +13,48 @@
 
 #include "apparmor.h"
 #include "inline.h"
-#include "module_interface.h"
-#include "match/match.h"
 
-/* aa_code defined in module_interface.h */
+/*
+ * This mutex is used to synchronize profile adds, replacements, and
+ * removals: we only allow one of these operations at a time.
+ * We do not use the profile list lock here in order to avoid blocking
+ * exec during those operations.  (Exec involves a profile list lookup
+ * for named-profile transitions.)
+ */
+DEFINE_MUTEX(aa_interface_lock);
 
-const int aacode_datasize[] = { 1, 2, 4, 8, 2, 2, 4, 0, 0, 0, 0, 0, 0 };
+/* The AppArmor interface treats data as a type byte followed by the
+ * actual data.  The interface has the notion of a a named entry
+ * which has a name (AA_NAME typecode followed by name string) followed by
+ * the entries typecode and data.  Named types allow for optional
+ * elements and extensions to be added and tested for without breaking
+ * backwards compatability.
+ */
 
-struct aa_taskreplace_data {
-	struct aaprofile *old_profile;
-	struct aaprofile *new_profile;
+enum aa_code {
+	AA_U8,
+	AA_U16,
+	AA_U32,
+	AA_U64,
+	AA_NAME,	/* same as string except it is items name */
+	AA_STRING,
+	AA_BLOB,
+	AA_STRUCT,
+	AA_STRUCTEND,
+	AA_LIST,
+	AA_LISTEND,
 };
 
-/* inlines must be forward of there use in newer version of gcc,
-   just forward declaring with a prototype won't work anymore */
-
-static inline void free_aa_entry(struct aa_entry *entry)
-{
-	if (entry) {
-		kfree(entry->filename);
-		aamatch_free(entry->extradata);
-		kfree(entry);
-	}
-}
-
-/**
- * alloc_aa_entry - create new empty aa_entry
- * This routine allocates, initializes, and returns a new aa_entry
- * file entry structure.  Structure is zeroed.  Returns new structure on
- * success, %NULL on failure.
+/* aa_ext is the read of the buffer containing the serialized profile.  The
+ * data is copied into a kernel buffer in apparmorfs and then handed off to
+ * the unpack routines.
  */
-static inline struct aa_entry *alloc_aa_entry(void)
-{
-	struct aa_entry *entry;
-
-	AA_DEBUG("%s\n", __FUNCTION__);
-	entry = kzalloc(sizeof(struct aa_entry), GFP_KERNEL);
-	if (entry) {
-		int i;
-		INIT_LIST_HEAD(&entry->list);
-		for (i = 0; i <= POS_AA_FILE_MAX; i++) {
-			INIT_LIST_HEAD(&entry->listp[i]);
-		}
-	}
-	return entry;
-}
-
-/**
- * free_aaprofile_rcu - rcu callback for free profiles
- * @head: rcu_head struct of the profile whose reference is being put.
- *
- * the rcu callback routine, which delays the freeing of a profile when
- * its last reference is put.
- */
-static void free_aaprofile_rcu(struct rcu_head *head)
-{
-	struct aaprofile *p = container_of(head, struct aaprofile, rcu);
-	free_aaprofile(p);
-}
-
-/**
- * task_remove - remove profile from a task's subdomain
- * @sd: task's subdomain
- *
- * remove the active profile from a task's subdomain, switching the task
- * to an unconfined state.
- */
-static inline void task_remove(struct subdomain *sd)
-{
-	/* spin_lock(&sd_lock) held here */
-	AA_DEBUG("%s: removing profile from task %s(%d) profile %s active %s\n",
-		 __FUNCTION__,
-		 sd->task->comm,
-		 sd->task->pid,
-		 BASE_PROFILE(sd->active)->name,
-		 sd->active->name);
-
-	aa_switch_unconfined(sd);
-}
-
-/** taskremove_iter - Iterator to unconfine subdomains which match cookie
- * @sd: subdomain to consider for profile removal
- * @cookie: pointer to the oldprofile which is being removed
- *
- * If the subdomain's active profile matches old_profile,  then call
- * task_remove() to remove the profile leaving the task (subdomain) unconfined.
- */
-static int taskremove_iter(struct subdomain *sd, void *cookie)
-{
-	struct aaprofile *old_profile = (struct aaprofile *)cookie;
-	unsigned long flags;
-
-	spin_lock_irqsave(&sd_lock, flags);
-
-	if (__aa_is_confined(sd) && BASE_PROFILE(sd->active) == old_profile) {
-		task_remove(sd);
-	}
-
-	spin_unlock_irqrestore(&sd_lock, flags);
-
-	return 0;
-}
-
-/** task_replace - replace subdomain's current profile with a new profile
- * @sd: subdomain to replace the profile on
- * @new: new profile
- *
- * Replace a task's (subdomain's) active profile with a new profile.  If
- * task was in a hat then the new profile will also be in the equivalent
- * hat in the new profile if it exists.  If it doesn't exist the
- * task will be placed in the special null_profile state.
- */
-static inline void task_replace(struct subdomain *sd, struct aaprofile *new)
-{
-	AA_DEBUG("%s: replacing profile for task %s(%d) "
-		 "profile=%s (%p) active=%s (%p)\n",
-		 __FUNCTION__,
-		 sd->task->comm, sd->task->pid,
-		 BASE_PROFILE(sd->active)->name, BASE_PROFILE(sd->active),
-		 sd->active->name, sd->active);
-
-	if (!sd->active)
-		goto out;
-
-	if (IN_SUBPROFILE(sd->active)) {
-		struct aaprofile *nactive;
-
-		/* The old profile was in a hat, check to see if the new
-		 * profile has an equivalent hat */
-		nactive = __aa_find_profile(sd->active->name, &new->sub);
-
-		if (!nactive)
-			nactive = get_aaprofile(new->null_profile);
-
-		aa_switch(sd, nactive);
-		put_aaprofile(nactive);
-	} else {
-		aa_switch(sd, new);
-	}
-
- out:
-	return;
-}
-
-/** taskreplace_iter - Iterator to replace a subdomain's profile
- * @sd: subdomain to consider for profile replacement
- * @cookie: pointer to the old profile which is being replaced.
- *
- * If the subdomain's active profile matches old_profile call
- * task_replace() to replace with the subdomain's active profile with
- * the new profile.
- */
-static int taskreplace_iter(struct subdomain *sd, void *cookie)
-{
-	struct aa_taskreplace_data *data = (struct aa_taskreplace_data *)cookie;
-	unsigned long flags;
-
-	spin_lock_irqsave(&sd_lock, flags);
-
-	if (__aa_is_confined(sd) &&
-	    BASE_PROFILE(sd->active) == data->old_profile)
-		task_replace(sd, data->new_profile);
-
-	spin_unlock_irqrestore(&sd_lock, flags);
-
-	return 0;
-}
+struct aa_ext {
+	void *start;
+	void *end;
+	void *pos;	/* pointer to current position in the buffer */
+	u32 version;
+};
 
 static inline int aa_inbounds(struct aa_ext *e, size_t size)
 {
@@ -186,564 +62,443 @@ static inline int aa_inbounds(struct aa_ext *e, size_t size)
 }
 
 /**
- * aaconvert - convert trailing values of serialized type codes
- * @code: type code
- * @dest: pointer to object to receive the converted value
- * @src:  pointer to value to convert
+ * aa_u16_chunck - test and do bounds checking for a u16 size based chunk
+ * @e: serialized data read head
+ * @chunk: start address for chunk of data
  *
- * for serialized type codes which have a trailing value, convert it
- * and place it in @dest.  If a code does not have a trailing value nop.
+ * return the size of chunk found with the read head at the end of
+ * the chunk.
  */
-static void aaconvert(enum aa_code code, void *dest, void *src)
-{
-	switch (code) {
-	case AA_U8:
-		*(u8 *)dest = *(u8 *) src;
-		break;
-	case AA_U16:
-	case AA_NAME:
-	case AA_DYN_STRING:
-		*(u16 *)dest = le16_to_cpu(get_unaligned((u16 *)src));
-		break;
-	case AA_U32:
-	case AA_STATIC_BLOB:
-		*(u32 *)dest = le32_to_cpu(get_unaligned((u32 *)src));
-		break;
-	case AA_U64:
-		*(u64 *)dest = le64_to_cpu(get_unaligned((u64 *)src));
-		break;
-	default:
-		/* nop - all other type codes do not have a trailing value */
-		;
-	}
-}
-
-/**
- * aa_is_X - check if the next element is of type X
- * @e: serialized data extent information
- * @code: type code
- * @data: object located at @e->pos (of type @code) is written into @data
- *        if @data is non-null.  if data is null it means skip this
- *        entry
- * check to see if the next element in the serialized data stream is of type
- * X and check that it is with in bounds, if so put the associated value in
- * @data.
- * return the size of bytes associated with the returned data
- *        for complex object like blob and string a pointer to the allocated
- *        data is returned in data, but the size of the blob or string is
- *        returned.
- */
-static u32 aa_is_X(struct aa_ext *e, enum aa_code code, void *data)
+static size_t aa_is_u16_chunk(struct aa_ext *e, char **chunk)
 {
 	void *pos = e->pos;
-	int ret = 0;
-	if (!aa_inbounds(e, AA_CODE_BYTE + aacode_datasize[code]))
+	size_t size = 0;
+
+	if (!aa_inbounds(e, sizeof(u16)))
 		goto fail;
-	if (code != *(u8 *)e->pos)
-		goto out;
-	e->pos += AA_CODE_BYTE;
-	if (code == AA_NAME) {
-		u16 size;
-		/* name codes are followed by X bytes */
-		size = le16_to_cpu(get_unaligned((u16 *)e->pos));
-		if (!aa_inbounds(e, (size_t) size))
-			goto fail;
-		if (data)
-			*(u16 *)data = size;
-		e->pos += aacode_datasize[code];
-		ret = 1 + aacode_datasize[code];
-	} else if (code == AA_DYN_STRING) {
-		u16 size;
-		char *str;
-		/* strings codes are followed by X bytes */
-		size = le16_to_cpu(get_unaligned((u16 *)e->pos));
-		e->pos += aacode_datasize[code];
-		if (!aa_inbounds(e, (size_t) size))
-			goto fail;
-		if (data) {
-			* (char **)data = NULL;
-			str = kmalloc(size, GFP_KERNEL);
-			if (!str)
-				goto fail;
-			memcpy(str, e->pos, (size_t) size);
-			str[size-1] = '\0';
-			* (char **)data = str;
-		}
-		e->pos += size;
-		ret = size;
-	} else if (code == AA_STATIC_BLOB) {
-		u32 size;
-		/* blobs are followed by X bytes, that can be 2^32 */
-		size = le32_to_cpu(get_unaligned((u32 *)e->pos));
-		e->pos += aacode_datasize[code];
-		if (!aa_inbounds(e, (size_t) size))
-			goto fail;
-		if (data)
-			memcpy(data, e->pos, (size_t) size);
-		e->pos += size;
-		ret = size;
-	} else {
-		if (data)
-			aaconvert(code, data, e->pos);
-		e->pos += aacode_datasize[code];
-		ret = 1 + aacode_datasize[code];
-	}
-out:
-	return ret;
+	size = le16_to_cpu(get_unaligned((u16 *)e->pos));
+	e->pos += sizeof(u16);
+	if (!aa_inbounds(e, size))
+		goto fail;
+	*chunk = e->pos;
+	e->pos += size;
+	return size;
+
 fail:
 	e->pos = pos;
 	return 0;
+}
+
+static inline int aa_is_X(struct aa_ext *e, enum aa_code code)
+{
+	if (!aa_inbounds(e, 1))
+		return 0;
+	if (*(u8 *) e->pos != code)
+		return 0;
+	e->pos++;
+	return 1;
 }
 
 /**
  * aa_is_nameX - check is the next element is of type X with a name of @name
  * @e: serialized data extent information
  * @code: type code
- * @data: location to store deserialized data if match isX criteria
  * @name: name to match to the serialized element.
  *
  * check that the next serialized data element is of type X and has a tag
- * name @name.  If the code matches and name (if specified) matches then
- * the packed data is unpacked into *data.  (Note for strings this is the
- * size, and the next data in the stream is the string data)
- * returns %0 if either match failes
+ * name @name.  If @name is specified then there must be a matching
+ * name element in the stream.  If @name is NULL any name element will be
+ * skipped and only the typecode will be tested.
+ * returns 1 on success (both type code and name tests match) and the read
+ * head is advanced past the headers
+ * returns %0 if either match failes, the read head does not move
  */
-static int aa_is_nameX(struct aa_ext *e, enum aa_code code, void *data,
-		       const char *name)
+static int aa_is_nameX(struct aa_ext *e, enum aa_code code, const char *name)
 {
 	void *pos = e->pos;
-	u16 size;
-	u32 ret;
 	/* check for presence of a tagname, and if present name size
 	 * AA_NAME tag value is a u16 */
-	if (aa_is_X(e, AA_NAME, &size)) {
+	if (aa_is_X(e, AA_NAME)) {
+		char *tag;
+		size_t size = aa_is_u16_chunk(e, &tag);
 		/* if a name is specified it must match. otherwise skip tag */
-		if (name && ((strlen(name) != size-1) ||
-			     strncmp(name, (char *)e->pos, (size_t)size-1)))
+		if (name && (!size || strcmp(name, tag)))
 			goto fail;
-		e->pos += size;
 	} else if (name) {
+		/* if a name is specified and there is no name tag fail */
 		goto fail;
 	}
 
-	/* now check if data actually matches */
-	ret = aa_is_X(e, code, data);
-	if (!ret)
-		goto fail;
-	return ret;
+	/* now check if type code matches */
+	if (aa_is_X(e, code))
+		return 1;
 
 fail:
 	e->pos = pos;
 	return 0;
 }
 
-/* macro to wrap error case to make a block of reads look nicer */
-#define AA_READ_X(E, C, D, N) \
-	do { \
-		u32 __ret; \
-		__ret = aa_is_nameX((E), (C), (D), (N)); \
-		if (!__ret) \
-			goto fail; \
-	} while (0)
-
-/**
- * aa_activate_net_entry - unpacked serialized net entries
- * @e: serialized data extent information
- *
- * Ignore/skips net entries if they are present in the serialized data
- * stream.  Network confinement rules are currently unsupported but some
- * user side tools can generate them so they are currently ignored.
- */
-static inline int aa_activate_net_entry(struct aa_ext *e)
+static int aa_is_u32(struct aa_ext *e, u32 *data, const char *name)
 {
-	AA_READ_X(e, AA_STRUCT, NULL, "ne");
-	AA_READ_X(e, AA_U32, NULL, NULL);
-	AA_READ_X(e, AA_U32, NULL, NULL);
-	AA_READ_X(e, AA_U32, NULL, NULL);
-	AA_READ_X(e, AA_U16, NULL, NULL);
-	AA_READ_X(e, AA_U16, NULL, NULL);
-	AA_READ_X(e, AA_U32, NULL, NULL);
-	AA_READ_X(e, AA_U32, NULL, NULL);
-	AA_READ_X(e, AA_U16, NULL, NULL);
-	AA_READ_X(e, AA_U16, NULL, NULL);
-	/* interface name is optional so just ignore return code */
-	aa_is_nameX(e, AA_DYN_STRING, NULL, NULL);
-	AA_READ_X(e, AA_STRUCTEND, NULL, NULL);
-
-	return 1;
+	void *pos = e->pos;
+	if (aa_is_nameX(e, AA_U32, name)) {
+		if (!aa_inbounds(e, sizeof(u32)))
+			goto fail;
+		if (data)
+			*data = le32_to_cpu(get_unaligned((u32 *)e->pos));
+		e->pos += sizeof(u32);
+		return 1;
+	}
 fail:
+	e->pos = pos;
+	return 0;
+}
+
+static size_t aa_is_blob(struct aa_ext *e, char **blob, const char *name)
+{
+	void *pos = e->pos;
+	if (aa_is_nameX(e, AA_BLOB, name)) {
+		u32 size;
+		if (!aa_inbounds(e, sizeof(u32)))
+			goto fail;
+		size = le32_to_cpu(get_unaligned((u32 *)e->pos));
+		e->pos += sizeof(u32);
+		if (aa_inbounds(e, (size_t) size)) {
+			* blob = e->pos;
+			e->pos += size;
+			return size;
+		}
+	}
+fail:
+	e->pos = pos;
+	return 0;
+}
+
+static int aa_is_dynstring(struct aa_ext *e, char **string, const char *name)
+{
+	char *src_str;
+	size_t size = 0;
+	void *pos = e->pos;
+	*string = NULL;
+	if (aa_is_nameX(e, AA_STRING, name) &&
+	    (size = aa_is_u16_chunk(e, &src_str))) {
+		char *str;
+		if (!(str = kmalloc(size, GFP_KERNEL)))
+			goto fail;
+		memcpy(str, src_str, size);
+		*string = str;
+	}
+
+	return size;
+
+fail:
+	e->pos = pos;
 	return 0;
 }
 
 /**
- * aa_activate_file_entry - unpack serialized file entry
+ * aa_unpack_dfa - unpack a file rule dfa
  * @e: serialized data extent information
  *
- * unpack the information used for a file ACL entry.
+ * returns dfa or ERR_PTR
  */
-static inline struct aa_entry *aa_activate_file_entry(struct aa_ext *e)
+struct aa_dfa *aa_unpack_dfa(struct aa_ext *e)
 {
-	struct aa_entry *entry = NULL;
+	char *blob = NULL;
+	size_t size, error = 0;
+	struct aa_dfa *dfa = NULL;
 
-	if (!(entry = alloc_aa_entry()))
-		goto fail;
+	size = aa_is_blob(e, &blob, "aadfa");
+	if (size) {
+		dfa = aa_match_alloc();
+		if (dfa) {
+			/* the dfa is aligned with in the blob to 8 bytes
+			 * from the beginning of the stream
+			 */
+			size_t pad = pad64(blob - (char *) e->start) -
+				(blob - (char *) e->start);
+			error = unpack_dfa(dfa, blob + pad, size - pad);
+			if (!error)
+				error = verify_dfa(dfa);
+		} else {
+			error = -ENOMEM;
+		}
 
-	AA_READ_X(e, AA_STRUCT, NULL, "fe");
-	AA_READ_X(e, AA_DYN_STRING, &entry->filename, NULL);
-	AA_READ_X(e, AA_U32, &entry->mode, NULL);
-	AA_READ_X(e, AA_U32, &entry->type, NULL);
-
-	entry->extradata = aamatch_alloc(entry->type);
-	if (IS_ERR(entry->extradata)) {
-		entry->extradata = NULL;
-		goto fail;
+		if (error) {
+			aa_match_free(dfa);
+			dfa = ERR_PTR(error);
+		}
 	}
 
-	if (entry->extradata &&
-	    aamatch_serialize(entry->extradata, e, aa_is_nameX) != 0) {
-		goto fail;
-	}
-	AA_READ_X(e, AA_STRUCTEND, NULL, NULL);
-
-	switch (entry->type) {
-	case aa_entry_literal:
-		AA_DEBUG("%s: %s [no pattern] mode=0x%x\n",
-			 __FUNCTION__,
-			 entry->filename,
-			 entry->mode);
-		break;
-	case aa_entry_tailglob:
-		AA_DEBUG("%s: %s [tailglob] mode=0x%x\n",
-			 __FUNCTION__,
-			 entry->filename,
-			 entry->mode);
-		break;
-	case aa_entry_pattern:
-		AA_DEBUG("%s: %s mode=0x%x\n",
-			 __FUNCTION__,
-			 entry->filename,
-			 entry->mode);
-		break;
-	default:
-		AA_WARN("%s: INVALID entry_match_type %d\n",
-			__FUNCTION__,
-			(int)entry->type);
-		goto fail;
-	}
-
-	return entry;
-
-fail:
-	free_aa_entry(entry);
-	return NULL;
+	return dfa;
 }
 
 /**
- * check_rule_and_add - check a file rule is valid and add to a profile
- * @file_entry: file rule to add
- * @profile: profile to add the rule to
- * @message: error message returned if the addition failes.
- *
- * perform consistency check to ensure that a file rule entry is valid.
- * If the rule is valid it is added to the profile.
- */
-static inline int check_rule_and_add(struct aa_entry *file_entry,
-				     struct aaprofile *profile,
-				     const char **message)
-{
-	/* verify consistency of x, px, ix, ux for entry against
-	   possible duplicates for this entry */
-	int mode = AA_EXEC_MODIFIER_MASK(file_entry->mode);
-	int i;
-
-	if (mode && !(AA_MAY_EXEC & file_entry->mode)) {
-		*message = "inconsistent rule, x modifiers without x";
-		goto out;
-	}
-
-	/* check that only 1 of the modifiers is set */
-	if (mode && (mode & (mode - 1))) {
-		*message = "inconsistent rule, multiple x modifiers";
-		goto out;
-	}
-
-	/* ix -> m (required so that target exec binary may map itself) */
-  	         if (mode & AA_EXEC_INHERIT)
-  	                 file_entry->mode |= AA_EXEC_MMAP;
-
-	list_add(&file_entry->list, &profile->file_entry);
-	profile->num_file_entries++;
-
-	mode = file_entry->mode;
-
-	/* Handle partitioned lists
-	 * Chain entries onto sublists based on individual
-	 * permission bits. This allows more rapid searching.
-	 */
-	for (i = 0; i <= POS_AA_FILE_MAX; i++) {
-		if (mode & (1 << i))
-			/* profile->file_entryp[i] initially set to
-			 * NULL in alloc_aaprofile() */
-			list_add(&file_entry->listp[i],
-				 &profile->file_entryp[i]);
-	}
-
-	return 1;
-
-out:
-	free_aa_entry(file_entry);
-	return 0;
-}
-
-#define AA_ENTRY_LIST(NAME) \
-	do { \
-	if (aa_is_nameX(e, AA_LIST, NULL, (NAME))) { \
-		rulename = ""; \
-		error_string = "Invalid file entry"; \
-		while (!aa_is_nameX(e, AA_LISTEND, NULL, NULL)) { \
-			struct aa_entry *file_entry; \
-			file_entry = aa_activate_file_entry(e); \
-			if (!file_entry) \
-				goto fail; \
-			if (!check_rule_and_add(file_entry, profile, \
-						&error_string)) { \
-				rulename = file_entry->filename; \
-				goto fail; \
-			} \
-		} \
-	} \
-	} while (0)
-
-/**
- * aa_activate_profile - unpack a serialized profile
+ * aa_unpack_profile - unpack a serialized profile
  * @e: serialized data extent information
  * @error: error code returned if unpacking fails
  */
-static struct aaprofile *aa_activate_profile(struct aa_ext *e, ssize_t *error)
+static struct aa_profile *aa_unpack_profile(struct aa_ext *e)
 {
-	struct aaprofile *profile = NULL;
-	const char *rulename = "";
-	const char *error_string = "Invalid Profile";
+	struct aa_profile *profile = NULL;
 
-	*error = -EPROTO;
+	int error = -EPROTO;
 
-	profile = alloc_aaprofile();
-	if (!profile) {
-		error_string = "Could not allocate profile";
-		*error = -ENOMEM;
+	profile = alloc_aa_profile();
+	if (!profile)
+		return ERR_PTR(-ENOMEM);
+
+	/* check that we have the right struct being passed */
+	if (!aa_is_nameX(e, AA_STRUCT, "profile"))
+		goto fail;
+	if (!aa_is_dynstring(e, &profile->name, NULL))
+		goto fail;
+
+	/* per profile debug flags (complain, audit) */
+	if (!aa_is_nameX(e, AA_STRUCT, "flags"))
+		goto fail;
+	if (!aa_is_u32(e, NULL, NULL))
+		goto fail;
+	if (!aa_is_u32(e, &(profile->flags.complain), NULL))
+		goto fail;
+	if (!aa_is_u32(e, &(profile->flags.audit), NULL))
+		goto fail;
+	if (!aa_is_nameX(e, AA_STRUCTEND, NULL))
+		goto fail;
+
+	if (!aa_is_u32(e, &(profile->capabilities), NULL))
+		goto fail;
+
+	/* get file rules */
+	profile->file_rules = aa_unpack_dfa(e);
+	if (IS_ERR(profile->file_rules)) {
+		error = PTR_ERR(profile->file_rules);
+		profile->file_rules = NULL;
 		goto fail;
 	}
 
-	/* check that we have the right struct being passed */
-	AA_READ_X(e, AA_STRUCT, NULL, "profile");
-	AA_READ_X(e, AA_DYN_STRING, &profile->name, NULL);
-
-	error_string = "Invalid flags";
-	/* per profile debug flags (debug, complain, audit) */
-	AA_READ_X(e, AA_STRUCT, NULL, "flags");
-	AA_READ_X(e, AA_U32, &(profile->flags.debug), NULL);
-	AA_READ_X(e, AA_U32, &(profile->flags.complain), NULL);
-	AA_READ_X(e, AA_U32, &(profile->flags.audit), NULL);
-	AA_READ_X(e, AA_STRUCTEND, NULL, NULL);
-
-	error_string = "Invalid capabilities";
-	AA_READ_X(e, AA_U32, &(profile->capabilities), NULL);
-
-	/* get the file entries. */
-	AA_ENTRY_LIST("pgent");		/* pcre rules */
-	AA_ENTRY_LIST("sgent");		/* simple globs */
-	AA_ENTRY_LIST("fent");		/* regular file entries */
-
-	/* get the net entries */
-	if (aa_is_nameX(e, AA_LIST, NULL, "net")) {
-		error_string = "Invalid net entry";
-		while (!aa_is_nameX(e, AA_LISTEND, NULL, NULL)) {
-			if (!aa_activate_net_entry(e))
+	/* get optional subprofiles */
+	if (aa_is_nameX(e, AA_LIST, "hats")) {
+		while (!aa_is_nameX(e, AA_LISTEND, NULL)) {
+			struct aa_profile *subprofile;
+			subprofile = aa_unpack_profile(e);
+			if (IS_ERR(subprofile)) {
+				error = PTR_ERR(subprofile);
 				goto fail;
-		}
-	}
-	rulename = "";
-
-	/* get subprofiles */
-	if (aa_is_nameX(e, AA_LIST, NULL, "hats")) {
-		error_string = "Invalid profile hat";
-		while (!aa_is_nameX(e, AA_LISTEND, NULL, NULL)) {
-			struct aaprofile *subprofile;
-			subprofile = aa_activate_profile(e, error);
-			if (!subprofile)
-				goto fail;
+			}
 			subprofile->parent = profile;
 			list_add(&subprofile->list, &profile->sub);
 		}
 	}
 
-	error_string = "Invalid end of profile";
-	AA_READ_X(e, AA_STRUCTEND, NULL, NULL);
+	if (!aa_is_nameX(e, AA_STRUCTEND, NULL))
+		goto fail;
 
 	return profile;
 
 fail:
-	AA_WARN("%s: %s %s in profile %s\n", INTERFACE_ID, rulename,
-		error_string, profile && profile->name ? profile->name
-		: "unknown");
+	AA_WARN(GFP_KERNEL, "Invalid profile %s\n",
+		profile && profile->name ? profile->name : "unknown");
 
-	if (profile) {
-		free_aaprofile(profile);
-		profile = NULL;
-	}
+	if (profile)
+		free_aa_profile(profile);
 
-	return NULL;
+	return ERR_PTR(error);
 }
 
 /**
- * aa_activate_top_profile - unpack a serialized base profile
+ * aa_unpack_profile_wrapper - unpack a serialized base profile
  * @e: serialized data extent information
- * @error: error code returned if unpacking fails
  *
  * check interface version unpack a profile and all its hats and patch
  * in any extra information that the profile needs.
  */
-static void *aa_activate_top_profile(struct aa_ext *e, ssize_t *error)
+static struct aa_profile *aa_unpack_profile_wrapper(struct aa_ext *e)
 {
-	struct aaprofile *profile = NULL;
-
-	/* get the interface version */
-	if (!aa_is_nameX(e, AA_U32, &e->version, "version")) {
-		AA_WARN("%s: version missing\n", INTERFACE_ID);
-		*error = -EPROTONOSUPPORT;
-		goto fail;
+	struct aa_profile *profile = aa_unpack_profile(e);
+	if (!IS_ERR(profile) &&
+	    (!list_empty(&profile->sub) || profile->flags.complain)) {
+		int error;
+		if ((error = attach_nullprofile(profile))) {
+			aa_put_profile(profile);
+			return ERR_PTR(error);
+		}
 	}
 
-	/* check that the interface version is currently supported */
-	if (e->version != 2) {
-		AA_WARN("%s: unsupported interface version (%d)\n",
-			INTERFACE_ID, e->version);
-		*error = -EPROTONOSUPPORT;
-		goto fail;
-	}
-
-	profile = aa_activate_profile(e, error);
-	if (!profile)
-		goto fail;
-
-	if (!list_empty(&profile->sub) || profile->flags.complain) {
-		if (attach_nullprofile(profile))
-			goto fail;
-	}
 	return profile;
-
-fail:
-	free_aaprofile(profile);
-	return NULL;
 }
 
 /**
- * aa_file_prof_add - add a new profile to the profile list
+ * aa_verify_head - unpack serialized stream header
+ * @e: serialized data read head
+ *
+ * returns error or 0 if header is good
+ */
+static int aa_verify_header(struct aa_ext *e)
+{
+	/* get the interface version */
+	if (!aa_is_u32(e, &e->version, "version")) {
+		AA_WARN(GFP_KERNEL, "Interface version missing\n");
+		return -EPROTONOSUPPORT;
+	}
+
+	/* check that the interface version is currently supported */
+	if (e->version != 3) {
+		AA_WARN(GFP_KERNEL,
+			"Unsupported interface version (%d)\n", e->version);
+		return -EPROTONOSUPPORT;
+	}
+	return 0;
+}
+
+/**
+ * aa_file_prof_add - Unpack and add a new profile to the profile list
  * @data: serialized data stream
  * @size: size of the serialized data stream
- *
- * unpack and add a profile to the profile list.  Return %0 or error
  */
 ssize_t aa_file_prof_add(void *data, size_t size)
 {
-	struct aaprofile *profile = NULL;
-
+	struct aa_profile *profile = NULL;
 	struct aa_ext e = {
 		.start = data,
 		.end = data + size,
 		.pos = data
 	};
-	ssize_t error;
+	ssize_t error = aa_verify_header(&e);
+	if (error)
+		return error;
 
-	profile = aa_activate_top_profile(&e, &error);
-	if (!profile) {
-		AA_DEBUG("couldn't activate profile\n");
-		goto out;
+	profile = aa_unpack_profile_wrapper(&e);
+	if (IS_ERR(profile))
+		return PTR_ERR(profile);
+
+	mutex_lock(&aa_interface_lock);
+	write_lock(&profile_list_lock);
+	if (__aa_find_profile(profile->name, &profile_list)) {
+		/* A profile with this name exists already. */
+		write_unlock(&profile_list_lock);
+		mutex_unlock(&aa_interface_lock);
+		aa_put_profile(profile);
+		return -EEXIST;
 	}
+	list_add(&profile->list, &profile_list);
+	write_unlock(&profile_list_lock);
+	mutex_unlock(&aa_interface_lock);
 
-	/* aa_activate_top_profile allocates profile with initial 1 count
-	 * aa_profilelist_add transfers that ref to profile list without
-	 * further incrementing
-	 */
-	if (aa_profilelist_add(profile)) {
-		error = size;
-	} else {
-		AA_WARN("trying to add profile (%s) that already exists.\n",
-			profile->name);
-		put_aaprofile(profile);
-		error = -EEXIST;
-	}
+	return size;
+}
 
-out:
-	return error;
+/** task_replace - replace aa_task_context's current profile with a new profile
+ * @task: task to replace profile on
+ * @new_cxt: new aa_task_context to do replacement with
+ * @new: new profile
+ *
+ * Replace a task's (aa_task_context's) profile with a new profile.  If
+ * task was in a hat then the new profile will also be in the equivalent
+ * hat in the new profile if it exists.  If it doesn't exist the
+ * task will be placed in the special null_profile state.
+ */
+static inline void task_replace(struct task_struct *task,
+				struct aa_task_context *new_cxt,
+				struct aa_profile *new_profile)
+{
+	struct aa_task_context *cxt = aa_task_context(task);
+
+	AA_DEBUG("%s: replacing profile for task %s(%d) "
+		 "profile=%s (%p) hat=%s (%p)\n",
+		 __FUNCTION__,
+		 cxt->task->comm, cxt->task->pid,
+		 cxt->profile->parent->name, cxt->profile->parent,
+		 cxt->profile->name, cxt->profile);
+
+	if (cxt->profile != cxt->profile->parent) {
+		struct aa_profile *hat;
+
+		/* The old profile was in a hat, check to see if the new
+		 * profile has an equivalent hat */
+		hat = __aa_find_profile(cxt->profile->name, &new_profile->sub);
+
+		if (!hat)
+			hat = aa_dup_profile(new_profile->null_profile);
+
+		aa_change_task_context(task, new_cxt, hat, cxt->hat_magic);
+		aa_put_profile(hat);
+	} else
+		aa_change_task_context(task, new_cxt, new_profile,
+				       cxt->hat_magic);
 }
 
 /**
- * aa_file_prof_repl - replace a profile on the profile list
+ * aa_file_prof_replace - replace a profile on the profile list
  * @udata: serialized data stream
  * @size: size of the serialized data stream
  *
  * unpack and replace a profile on the profile list and uses of that profile
- * by any subdomain.  If the profile does not exist on the profile list
+ * by any aa_task_context.  If the profile does not exist on the profile list
  * it is added.  Return %0 or error.
  */
-ssize_t aa_file_prof_repl(void *udata, size_t size)
+ssize_t aa_file_prof_replace(void *udata, size_t size)
 {
-	struct aa_taskreplace_data data;
+	struct aa_profile *old_profile, *new_profile;
+	struct aa_task_context *new_cxt;
 	struct aa_ext e = {
 		.start = udata,
 		.end = udata + size,
 		.pos = udata
 	};
+	ssize_t error = aa_verify_header(&e);
+	if (error)
+		return error;
 
-	ssize_t error;
+	new_profile = aa_unpack_profile_wrapper(&e);
+	if (IS_ERR(new_profile))
+		return PTR_ERR(new_profile);
 
-	data.new_profile = aa_activate_top_profile(&e, &error);
-	if (!data.new_profile) {
-		AA_DEBUG("couldn't activate profile\n");
+	mutex_lock(&aa_interface_lock);
+	write_lock(&profile_list_lock);
+	old_profile = __aa_find_profile(new_profile->name, &profile_list);
+	if (old_profile) {
+		lock_profile(old_profile);
+		old_profile->isstale = 1;
+		unlock_profile(old_profile);
+		list_del_init(&old_profile->list);
+	}
+	list_add(&new_profile->list, &profile_list);
+	write_unlock(&profile_list_lock);
+
+	if (!old_profile)
 		goto out;
-	}
 
-	/* Refcount on data.new_profile is 1 (aa_activate_top_profile).
-	 *
-	 * This reference will be inherited by aa_profilelist_replace for it's
-	 * profile list reference but this isn't sufficient.
-	 *
-	 * Another replace (*for-same-profile*) may race us here.
-	 * Task A calls aa_profilelist_replace(new_profile) and is interrupted.
-	 * Task B old_profile = aa_profilelist_replace() will return task A's
-	 * new_profile with the count of 1.  If task B proceeeds to put this
-	 * profile it will dissapear from under task A.
-	 *
-	 * Grab extra reference on new_profile to prevent this
+	/*
+	 * Replacement needs to allocate a new aa_task_context for each
+	 * task confined by old_profile.  To do this the profile locks
+	 * are only held when the actual switch is done per task.  While
+	 * looping to allocate a new aa_task_context the old_task list
+	 * may get shorter if tasks exit/change their profile but will
+	 * not get longer as new task will not use old_profile detecting
+	 * that is stale.
 	 */
+	do {
+		new_cxt = aa_alloc_task_context(GFP_KERNEL | __GFP_NOFAIL);
 
-	get_aaprofile(data.new_profile);
-
-	data.old_profile = aa_profilelist_replace(data.new_profile);
-
-	/* If there was an old profile,  find all currently executing tasks
-	 * using this profile and replace the old profile with the new.
-	 */
-	if (data.old_profile) {
-		AA_DEBUG("%s: try to replace profile (%p)%s\n",
-			 __FUNCTION__,
-			 data.old_profile,
-			 data.old_profile->name);
-
-		aa_subdomainlist_iterate(taskreplace_iter, (void *)&data);
-
-		/* it's off global list, and we are done replacing */
-		put_aaprofile(data.old_profile);
-	}
-
-	/* release extra reference obtained above (race) */
-	put_aaprofile(data.new_profile);
-
-	error = size;
+		lock_both_profiles(old_profile, new_profile);
+		if (!list_empty(&old_profile->task_contexts)) {
+			struct task_struct *task =
+				list_entry(old_profile->task_contexts.next,
+					   struct aa_task_context, list)->task;
+			task_lock(task);
+			task_replace(task, new_cxt, new_profile);
+			task_unlock(task);
+			new_cxt = NULL;
+		}
+		unlock_both_profiles(old_profile, new_profile);
+	} while (!new_cxt);
+	aa_free_task_context(new_cxt);
+	aa_put_profile(old_profile);
 
 out:
-	return error;
+	mutex_unlock(&aa_interface_lock);
+	return size;
 }
 
 /**
@@ -751,57 +506,60 @@ out:
  * @name: name of the profile to remove
  * @size: size of the name
  *
- * remove a profile from the profile list and all subdomain references
- * to said profile.  Return %0 on success, else error.
+ * remove a profile from the profile list and all aa_task_context references
+ * to said profile.
  */
 ssize_t aa_file_prof_remove(const char *name, size_t size)
 {
-	struct aaprofile *old_profile;
+	struct aa_profile *profile;
 
-	/* if the old profile exists it will be removed from the list and
-	 * a reference is returned.
-	 */
-	old_profile = aa_profilelist_remove(name);
-
-	if (old_profile) {
-		/* remove profile from any tasks using it */
-		aa_subdomainlist_iterate(taskremove_iter, (void *)old_profile);
-
-		/* drop reference obtained by aa_profilelist_remove */
-		put_aaprofile(old_profile);
-	} else {
-		AA_WARN("%s: trying to remove profile (%s) that "
-			"doesn't exist - skipping.\n", __FUNCTION__, name);
+	mutex_lock(&aa_interface_lock);
+	write_lock(&profile_list_lock);
+	profile = __aa_find_profile(name, &profile_list);
+	if (!profile) {
+		write_unlock(&profile_list_lock);
+		mutex_unlock(&aa_interface_lock);
 		return -ENOENT;
 	}
+
+	/* Remove the profile from each task context it is on. */
+	lock_profile(profile);
+	profile->isstale = 1;
+	aa_unconfine_tasks(profile);
+	unlock_profile(profile);
+
+	/* Release the profile itself. */
+	list_del_init(&profile->list);
+	aa_put_profile(profile);
+	write_unlock(&profile_list_lock);
+	mutex_unlock(&aa_interface_lock);
 
 	return size;
 }
 
 /**
- * free_aaprofile_kref - free aaprofile by kref (called by put_aaprofile)
+ * free_aa_profile_kref - free aa_profile by kref (called by aa_put_profile)
  * @kr: kref callback for freeing of a profile
  */
-void free_aaprofile_kref(struct kref *kr)
+void free_aa_profile_kref(struct kref *kr)
 {
-	struct aaprofile *p=container_of(kr, struct aaprofile, count);
+	struct aa_profile *p=container_of(kr, struct aa_profile, count);
 
-	call_rcu(&p->rcu, free_aaprofile_rcu);
+	free_aa_profile(p);
 }
 
 /**
- * free_aaprofile - free aaprofile structure
+ * free_aa_profile - free aa_profile structure
  * @profile: the profile to free
  *
  * free a profile, its file entries hats and null_profile.  All references
  * to the profile, its hats and null_profile must have been put.
- * If the profile was referenced by a subdomain free_aaprofile should be
+ * If the profile was referenced by a aa_task_context free_aa_profile should be
  * called from an rcu callback routine.
  */
-void free_aaprofile(struct aaprofile *profile)
+void free_aa_profile(struct aa_profile *profile)
 {
-	struct aa_entry *ent, *tmp;
-	struct aaprofile *p, *ptmp;
+	struct aa_profile *p, *ptmp;
 
 	AA_DEBUG("%s(%p)\n", __FUNCTION__, profile);
 
@@ -817,23 +575,17 @@ void free_aaprofile(struct aaprofile *profile)
 		BUG();
 	}
 
-	list_for_each_entry_safe(ent, tmp, &profile->file_entry, list) {
-		if (ent->filename)
-			AA_DEBUG("freeing aa_entry: %p %s\n",
-				 ent->filename, ent->filename);
-		list_del_init(&ent->list);
-		free_aa_entry(ent);
-	}
+	aa_match_free(profile->file_rules);
 
-	/* use free_aaprofile instead of put_aaprofile to destroy the
+	/* use free_aa_profile instead of aa_put_profile to destroy the
 	 * null_profile, because the null_profile use the same reference
 	 * counting as hats, ie. the count goes to the base profile.
 	 */
-	free_aaprofile(profile->null_profile);
+	free_aa_profile(profile->null_profile);
 	list_for_each_entry_safe(p, ptmp, &profile->sub, list) {
 		list_del_init(&p->list);
-		p->parent = NULL;
-		put_aaprofile(p);
+		p->parent = p;
+		aa_put_profile(p);
 	}
 
 	if (profile->name) {
@@ -842,4 +594,22 @@ void free_aaprofile(struct aaprofile *profile)
 	}
 
 	kfree(profile);
+}
+
+/**
+ * aa_unconfine_tasks - remove tasks on @profiles task_contexts list
+ * @profile: profile to remove associated tasks
+ *
+ * Assumes that @profile lock is held
+ */
+void aa_unconfine_tasks(struct aa_profile *profile)
+{
+	while (!list_empty(&profile->task_contexts)) {
+		struct task_struct *task =
+			list_entry(profile->task_contexts.next,
+				   struct aa_task_context, list)->task;
+		task_lock(task);
+		aa_change_task_context(task, NULL, NULL, 0);
+		task_unlock(task);
+	}
 }

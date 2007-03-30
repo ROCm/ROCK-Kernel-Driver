@@ -37,8 +37,7 @@ static int event;
 static struct list_head *mount_hashtable __read_mostly;
 static int hash_mask __read_mostly, hash_bits __read_mostly;
 static struct kmem_cache *mnt_cache __read_mostly;
-struct rw_semaphore namespace_sem;
-EXPORT_SYMBOL_GPL(namespace_sem);
+static struct rw_semaphore namespace_sem;
 
 /* /sys/fs */
 decl_subsys(fs, NULL, NULL);
@@ -349,8 +348,16 @@ static inline void mangle(struct seq_file *m, const char *s)
 	seq_escape(m, s, " \t\n\\");
 }
 
+/* Keep in sync with fs/proc/base.c! */
+struct proc_mounts {
+        struct seq_file m;
+        void *page;
+        int event;
+};
+
 static int show_vfsmnt(struct seq_file *m, void *v)
 {
+	void *page = container_of(m, struct proc_mounts, m)->page;
 	struct vfsmount *mnt = v;
 	int err = 0;
 	static struct proc_fs_info {
@@ -373,9 +380,13 @@ static int show_vfsmnt(struct seq_file *m, void *v)
 	};
 	struct proc_fs_info *fs_infop;
 
+	char *path = d_path(mnt->mnt_root, mnt, page, PAGE_SIZE);
+	if (IS_ERR(path) || *path != '/')
+		return err;
+
 	mangle(m, mnt->mnt_devname ? mnt->mnt_devname : "none");
 	seq_putc(m, ' ');
-	seq_path(m, mnt, mnt->mnt_root, " \t\n\\");
+	mangle(m, path);
 	seq_putc(m, ' ');
 	mangle(m, mnt->mnt_sb->s_type->name);
 	seq_puts(m, mnt->mnt_sb->s_flags & MS_RDONLY ? " ro" : " rw");
@@ -402,8 +413,13 @@ struct seq_operations mounts_op = {
 
 static int show_vfsstat(struct seq_file *m, void *v)
 {
+	void *page = container_of(m, struct proc_mounts, m)->page;
 	struct vfsmount *mnt = v;
 	int err = 0;
+
+	char *path = d_path(mnt->mnt_root, mnt, page, PAGE_SIZE);
+	if (IS_ERR(path) || *path != '/')
+		return err; /* error or path unreachable from chroot */
 
 	/* device */
 	if (mnt->mnt_devname) {
@@ -414,7 +430,7 @@ static int show_vfsstat(struct seq_file *m, void *v)
 
 	/* mount point */
 	seq_puts(m, " mounted on ");
-	seq_path(m, mnt, mnt->mnt_root, " \t\n\\");
+	mangle(m, path);
 	seq_putc(m, ' ');
 
 	/* file system type */
@@ -1878,3 +1894,25 @@ void __put_mnt_ns(struct mnt_namespace *ns)
 	release_mounts(&umount_list);
 	kfree(ns);
 }
+
+char *d_namespace_path(struct dentry *dentry, struct vfsmount *vfsmnt,
+		       char *buf, int buflen)
+{
+	char *res;
+	struct vfsmount *rootmnt, *nsrootmnt;
+	struct dentry *root;
+
+	read_lock(&current->fs->lock);
+	rootmnt = mntget(current->fs->rootmnt);
+	read_unlock(&current->fs->lock);
+	spin_lock(&vfsmount_lock);
+	nsrootmnt = mntget(rootmnt->mnt_ns->root);
+	root = dget(nsrootmnt->mnt_root);
+	spin_unlock(&vfsmount_lock);
+	mntput(rootmnt);
+	res = __d_path(dentry, vfsmnt, root, nsrootmnt, buf, buflen, 1);
+	dput(root);
+	mntput(nsrootmnt);
+	return res;
+}
+EXPORT_SYMBOL(d_namespace_path);

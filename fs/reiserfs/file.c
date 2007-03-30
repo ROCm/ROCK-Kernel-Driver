@@ -1353,7 +1353,7 @@ static ssize_t reiserfs_file_write(struct file *file,	/* the file we are going t
 	if (count == 0)
 		goto out;
 
-	res = remove_suid(file->f_path.dentry);
+	res = remove_suid(&file->f_path);
 	if (res)
 		goto out;
 

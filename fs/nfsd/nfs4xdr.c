@@ -1470,7 +1470,7 @@ nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
 	}
 	if (bmval0 & (FATTR4_WORD0_ACL | FATTR4_WORD0_ACLSUPPORT
 			| FATTR4_WORD0_SUPPORTED_ATTRS)) {
-		err = nfsd4_get_nfs4_acl(rqstp, dentry, &acl);
+		err = nfsd4_get_nfs4_acl(rqstp, dentry, exp->ex_mnt, &acl);
 		aclsupport = (err == 0);
 		if (bmval0 & FATTR4_WORD0_ACL) {
 			if (err == -EOPNOTSUPP)

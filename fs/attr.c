@@ -101,7 +101,8 @@ int inode_setattr(struct inode * inode, struct iattr * attr)
 }
 EXPORT_SYMBOL(inode_setattr);
 
-int notify_change(struct dentry * dentry, struct iattr * attr)
+int notify_change(struct dentry *dentry, struct vfsmount *mnt,
+		  struct iattr *attr)
 {
 	struct inode *inode = dentry->d_inode;
 	mode_t mode;
@@ -144,13 +145,13 @@ int notify_change(struct dentry * dentry, struct iattr * attr)
 		down_write(&dentry->d_inode->i_alloc_sem);
 
 	if (inode->i_op && inode->i_op->setattr) {
-		error = security_inode_setattr(dentry, attr);
+		error = security_inode_setattr(dentry, mnt, attr);
 		if (!error)
 			error = inode->i_op->setattr(dentry, attr);
 	} else {
 		error = inode_change_ok(inode, attr);
 		if (!error)
-			error = security_inode_setattr(dentry, attr);
+			error = security_inode_setattr(dentry, mnt, attr);
 		if (!error) {
 			if ((ia_valid & ATTR_UID && attr->ia_uid != inode->i_uid) ||
 			    (ia_valid & ATTR_GID && attr->ia_gid != inode->i_gid))

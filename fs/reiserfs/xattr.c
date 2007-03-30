@@ -527,7 +527,7 @@ reiserfs_xattr_set(struct inode *inode, const char *name, const void *buffer,
 	newattrs.ia_size = buffer_size;
 	newattrs.ia_valid = ATTR_SIZE | ATTR_CTIME;
 	mutex_lock(&xinode->i_mutex);
-	err = notify_change(fp->f_path.dentry, &newattrs);
+	err = notify_change(fp->f_path.dentry, NULL, &newattrs);
 	if (err)
 		goto out_filp;
 
@@ -823,7 +823,7 @@ int reiserfs_delete_xattrs(struct inode *inode)
 	if (dir->d_inode->i_nlink <= 2) {
 		root = get_xa_root(inode->i_sb);
 		reiserfs_write_lock_xattrs(inode->i_sb);
-		err = vfs_rmdir(root->d_inode, dir);
+		err = vfs_rmdir(root->d_inode, dir, NULL);
 		reiserfs_write_unlock_xattrs(inode->i_sb);
 		dput(root);
 	} else {
@@ -867,7 +867,7 @@ reiserfs_chown_xattrs_filler(void *buf, const char *name, int namelen,
 	}
 
 	if (!S_ISDIR(xafile->d_inode->i_mode))
-		err = notify_change(xafile, attrs);
+		err = notify_change(xafile, NULL, attrs);
 	dput(xafile);
 
 	return err;
@@ -919,7 +919,7 @@ int reiserfs_chown_xattrs(struct inode *inode, struct iattr *attrs)
 		goto out_dir;
 	}
 
-	err = notify_change(dir, attrs);
+	err = notify_change(dir, NULL, attrs);
 	unlock_kernel();
 
       out_dir:
