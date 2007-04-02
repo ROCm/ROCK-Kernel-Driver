@@ -130,6 +130,8 @@ static int of_platform_device_resume(struct device * dev)
 	return error;
 }
 
+extern struct device_attribute of_platform_device_attrs[];
+
 struct bus_type of_platform_bus_type = {
        .name	= "of_platform",
        .match	= of_platform_bus_match,
@@ -138,6 +140,7 @@ struct bus_type of_platform_bus_type = {
        .remove	= of_platform_device_remove,
        .suspend	= of_platform_device_suspend,
        .resume	= of_platform_device_resume,
+       .dev_attrs = of_platform_device_attrs,
 };
 EXPORT_SYMBOL(of_platform_bus_type);
 

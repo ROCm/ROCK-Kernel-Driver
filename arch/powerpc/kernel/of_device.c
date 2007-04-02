@@ -72,16 +72,47 @@ void of_dev_put(struct of_device *dev)
 		put_device(&dev->dev);
 }
 
-static ssize_t dev_show_devspec(struct device *dev,
+static ssize_t devspec_show(struct device *dev,
 				struct device_attribute *attr, char *buf)
 {
 	struct of_device *ofdev;
 
 	ofdev = to_of_device(dev);
-	return sprintf(buf, "%s", ofdev->node->full_name);
+	return sprintf(buf, "%s\n", ofdev->node->full_name);
 }
 
-static DEVICE_ATTR(devspec, S_IRUGO, dev_show_devspec, NULL);
+static ssize_t modalias_show (struct device *dev, struct device_attribute *attr,
+			      char *buf)
+{
+	struct of_device *ofdev;
+	const char *compat;
+	int cplen;
+	int length;
+
+	ofdev = to_of_device(dev);
+	compat = get_property(ofdev->node, "compatible", &cplen);
+	if (!compat) compat = "", cplen = 1;
+	length = sprintf (buf, "of:N%sT%s", ofdev->node->name, ofdev->node->type);
+	buf += length;
+	while (cplen > 0) {
+		int l;
+		l = sprintf (buf, "C%s", compat);
+		length += l;
+		buf += l;
+		l = strlen (compat) + 1;
+		compat += l;
+		cplen -= l;
+	}
+	length += sprintf (buf, "\n");
+
+	return length;
+}
+
+struct device_attribute of_platform_device_attrs[] = {
+	__ATTR_RO(devspec),
+	__ATTR_RO(modalias),
+	__ATTR_NULL
+};
 
 /**
  * of_release_dev - free an of device structure when all users of it are finished.
@@ -101,21 +132,13 @@ void of_release_dev(struct device *dev)
 
 int of_device_register(struct of_device *ofdev)
 {
-	int rc;
-
 	BUG_ON(ofdev->node == NULL);
 
-	rc = device_register(&ofdev->dev);
-	if (rc)
-		return rc;
-
-	return device_create_file(&ofdev->dev, &dev_attr_devspec);
+	return device_register(&ofdev->dev);
 }
 
 void of_device_unregister(struct of_device *ofdev)
 {
-	device_remove_file(&ofdev->dev, &dev_attr_devspec);
-
 	device_unregister(&ofdev->dev);
 }
 
