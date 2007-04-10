@@ -464,13 +464,13 @@ static void rlb_clear_slave(struct bonding *bond, struct slave *slave)
 
 	_unlock_rx_hashtbl(bond);
 
-	write_lock(&bond->curr_slave_lock);
+	write_lock_bh(&bond->curr_slave_lock);
 
 	if (slave != bond->curr_active_slave) {
 		rlb_teach_disabled_mac_on_primary(bond, slave->dev->dev_addr);
 	}
 
-	write_unlock(&bond->curr_slave_lock);
+	write_unlock_bh(&bond->curr_slave_lock);
 }
 
 static void rlb_update_client(struct rlb_client_info *client_info)
