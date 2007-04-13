@@ -226,21 +226,28 @@ static void __init efika_init_early(void)
 {
 #ifdef CONFIG_SERIAL_MPC52xx
 	struct device_node *stdout_node;
-	const char *device_type;
+	const char *property;
 
 	if (strstr(cmd_line, "console="))
 		return;
 	/* find the boot console from /chosen/stdout */
 	if (!of_chosen)
 		return;
-	device_type = get_property(of_chosen, "linux,stdout-path", NULL);
-	if (!device_type)
+	property = get_property(of_chosen, "linux,stdout-path", NULL);
+	if (!property)
 		return;
-	stdout_node = of_find_node_by_path(device_type);
+	stdout_node = of_find_node_by_path(property);
 	if (stdout_node) {
-		device_type = get_property(stdout_node, "device_type", NULL);
-		if (device_type && strcmp(device_type, "serial") == 0)
-			add_preferred_console("ttyPSC", 0, NULL);
+		property = get_property(stdout_node, "device_type", NULL);
+		if (property && strcmp(property, "serial") == 0) {
+			/*
+			 * The 9pin connector is either /failsafe or /builtin/serial.
+			 * The optional graphics card has also type serial in VGA mode.
+			 */
+			property = get_property(stdout_node, "name", NULL);
+			if (property && (strcmp(property, "serial") == 0 || strcmp(property, "failsafe") == 0))
+				add_preferred_console("ttyPSC", 0, NULL);
+		}
 		of_node_put(stdout_node);
 	}
 #endif
