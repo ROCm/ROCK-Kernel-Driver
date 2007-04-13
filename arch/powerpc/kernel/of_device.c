@@ -133,7 +133,6 @@ void of_release_dev(struct device *dev)
 int of_device_register(struct of_device *ofdev)
 {
 	BUG_ON(ofdev->node == NULL);
-
 	return device_register(&ofdev->dev);
 }
 
