@@ -28,6 +28,7 @@
 #include <asm/spu_priv1.h>
 #include <asm/lv1call.h>
 
+#include "../cell/spufs/spufs.h"
 #include "platform.h"
 
 /* spu_management_ops */
@@ -230,19 +231,19 @@ static int __init setup_interrupts(struct spu *spu)
 {
 	int result;
 
-	result = ps3_alloc_spe_irq(PS3_BINDING_CPU_ANY, spu_pdata(spu)->spe_id,
+	result = ps3_spe_irq_setup(PS3_BINDING_CPU_ANY, spu_pdata(spu)->spe_id,
 		0, &spu->irqs[0]);
 
 	if (result)
 		goto fail_alloc_0;
 
-	result = ps3_alloc_spe_irq(PS3_BINDING_CPU_ANY, spu_pdata(spu)->spe_id,
+	result = ps3_spe_irq_setup(PS3_BINDING_CPU_ANY, spu_pdata(spu)->spe_id,
 		1, &spu->irqs[1]);
 
 	if (result)
 		goto fail_alloc_1;
 
-	result = ps3_alloc_spe_irq(PS3_BINDING_CPU_ANY, spu_pdata(spu)->spe_id,
+	result = ps3_spe_irq_setup(PS3_BINDING_CPU_ANY, spu_pdata(spu)->spe_id,
 		2, &spu->irqs[2]);
 
 	if (result)
@@ -251,9 +252,9 @@ static int __init setup_interrupts(struct spu *spu)
 	return result;
 
 fail_alloc_2:
-	ps3_free_spe_irq(spu->irqs[1]);
+	ps3_spe_irq_destroy(spu->irqs[1]);
 fail_alloc_1:
-	ps3_free_spe_irq(spu->irqs[0]);
+	ps3_spe_irq_destroy(spu->irqs[0]);
 fail_alloc_0:
 	spu->irqs[0] = spu->irqs[1] = spu->irqs[2] = NO_IRQ;
 	return result;
@@ -301,9 +302,9 @@ static int ps3_destroy_spu(struct spu *spu)
 	result = lv1_disable_logical_spe(spu_pdata(spu)->spe_id, 0);
 	BUG_ON(result);
 
-	ps3_free_spe_irq(spu->irqs[2]);
-	ps3_free_spe_irq(spu->irqs[1]);
-	ps3_free_spe_irq(spu->irqs[0]);
+	ps3_spe_irq_destroy(spu->irqs[2]);
+	ps3_spe_irq_destroy(spu->irqs[1]);
+	ps3_spe_irq_destroy(spu->irqs[0]);
 
 	spu->irqs[0] = spu->irqs[1] = spu->irqs[2] = NO_IRQ;
 
@@ -407,10 +408,23 @@ static int __init ps3_enumerate_spus(int (*fn)(void *data))
 	return result;
 }
 
+static int ps3_enable_spu(struct spu_context *ctx)
+{
+	return -ENOSYS;
+}
+
+static int ps3_disable_spu(struct spu_context *ctx)
+{
+	ctx->ops->runcntl_stop(ctx);
+	return -ENOSYS;
+}
+
 const struct spu_management_ops spu_management_ps3_ops = {
 	.enumerate_spus = ps3_enumerate_spus,
 	.create_spu = ps3_create_spu,
 	.destroy_spu = ps3_destroy_spu,
+	.enable_spu = ps3_enable_spu,
+	.disable_spu = ps3_disable_spu,
 };
 
 /* spu_priv1_ops */

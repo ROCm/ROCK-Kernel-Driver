@@ -117,9 +117,9 @@ static void prealloc(struct ps3_prealloc *p)
 
 #ifdef CONFIG_FB_PS3
 struct ps3_prealloc ps3fb_videomemory = {
-    .name = "ps3fb videomemory",
-    .size = CONFIG_FB_PS3_DEFAULT_SIZE_M*1024*1024,
-    .align = 1024*1024			/* the GPU requires 1 MiB alignment */
+	.name = "ps3fb videomemory",
+	.size = CONFIG_FB_PS3_DEFAULT_SIZE_M*1024*1024,
+	.align = 1024*1024		/* the GPU requires 1 MiB alignment */
 };
 #define prealloc_ps3fb_videomemory()	prealloc(&ps3fb_videomemory)
 
@@ -137,6 +137,24 @@ early_param("ps3fb", early_parse_ps3fb);
 #define prealloc_ps3fb_videomemory()	do { } while (0)
 #endif
 
+#if defined(CONFIG_PS3_STORAGE) || defined(CONFIG_PS3_STORAGE_MODULE)
+struct ps3_prealloc ps3_stor_bounce_buffer = {
+	.name = "ps3_stor bounce buffer",
+	.size = 256*1024,
+	.align = 256*1024
+};
+EXPORT_SYMBOL_GPL(ps3_stor_bounce_buffer);
+#define prealloc_ps3_stor_bounce_buffer()	prealloc(&ps3_stor_bounce_buffer)
+#else
+#define prealloc_ps3_stor_bounce_buffer()	do { } while (0)
+#endif
+
+static int ps3_set_dabr(u64 dabr)
+{
+	enum {DABR_USER = 1, DABR_KERNEL = 2,};
+
+	return lv1_set_dabr(dabr, DABR_KERNEL | DABR_USER) ? -1 : 0;
+}
 
 static void __init ps3_setup_arch(void)
 {
@@ -160,6 +178,8 @@ static void __init ps3_setup_arch(void)
 #endif
 
 	prealloc_ps3fb_videomemory();
+	prealloc_ps3_stor_bounce_buffer();
+
 	ppc_md.power_save = ps3_power_save;
 
 	DBG(" <- %s:%d\n", __func__, __LINE__);
@@ -234,6 +254,7 @@ define_machine(ps3) {
 	.get_boot_time			= ps3_get_boot_time,
 	.set_rtc_time			= ps3_set_rtc_time,
 	.get_rtc_time			= ps3_get_rtc_time,
+	.set_dabr			= ps3_set_dabr,
 	.calibrate_decr			= ps3_calibrate_decr,
 	.progress			= ps3_progress,
 	.restart			= ps3_restart,

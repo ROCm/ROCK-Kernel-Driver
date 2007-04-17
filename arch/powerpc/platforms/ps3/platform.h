@@ -134,6 +134,8 @@ struct ps3_repository_device {
 	struct ps3_device_id did;
 };
 
+int ps3_repository_find_bus(enum ps3_bus_type bus_type, unsigned int from,
+	unsigned int *bus_index);
 int ps3_repository_find_device(enum ps3_bus_type bus_type,
 	enum ps3_dev_type dev_type,
 	const struct ps3_repository_device *start_dev,

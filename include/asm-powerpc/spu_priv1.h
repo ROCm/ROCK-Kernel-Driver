@@ -178,6 +178,8 @@ struct spu_management_ops {
 	int (*enumerate_spus)(int (*fn)(void *data));
 	int (*create_spu)(struct spu *spu, void *data);
 	int (*destroy_spu)(struct spu *spu);
+	int (*enable_spu)(struct spu_context *ctx);
+	int (*disable_spu)(struct spu_context *ctx);
 };
 
 extern const struct spu_management_ops* spu_management_ops;
@@ -198,6 +200,18 @@ static inline int
 spu_destroy_spu (struct spu *spu)
 {
 	return spu_management_ops->destroy_spu(spu);
+}
+
+static inline int
+spu_enable_spu (struct spu_context *ctx)
+{
+	return spu_management_ops->enable_spu(ctx);
+}
+
+static inline int
+spu_disable_spu (struct spu_context *ctx)
+{
+	return spu_management_ops->disable_spu(ctx);
 }
 
 /*

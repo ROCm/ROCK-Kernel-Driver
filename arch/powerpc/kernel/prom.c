@@ -719,6 +719,7 @@ static int __init early_init_dt_scan_chosen(unsigned long node,
 					    const char *uname, int depth, void *data)
 {
 	unsigned long *lprop;
+	u32 *prop;
 	unsigned long l;
 	char *p;
 
@@ -759,6 +760,22 @@ static int __init early_init_dt_scan_chosen(unsigned long node,
        if (lprop)
                crashk_res.end = crashk_res.start + *lprop - 1;
 #endif
+
+#ifdef CONFIG_BLK_DEV_INITRD
+	DBG("Looking for initrd properties... ");
+	prop = of_get_flat_dt_prop(node, "linux,initrd-start", &l);
+	if (prop) {
+		initrd_start = (unsigned long)__va(of_read_ulong(prop, l/4));
+		prop = of_get_flat_dt_prop(node, "linux,initrd-end", &l);
+		if (prop) {
+			initrd_end = (unsigned long)__va(of_read_ulong(prop, l/4));
+			initrd_below_start_ok = 1;
+		} else {
+			initrd_start = 0;
+		}
+	}
+	DBG("initrd_start=0x%lx  initrd_end=0x%lx\n", initrd_start, initrd_end);
+#endif /* CONFIG_BLK_DEV_INITRD */
 
 	/* Retreive command line */
  	p = of_get_flat_dt_prop(node, "bootargs", &l);
@@ -906,6 +923,12 @@ static int __init early_init_dt_scan_memory(unsigned long node,
 				size = 0x80000000ul - base;
 		}
 #endif
+#if defined(CONFIG_PPC_PS3)
+	/* temporary hack for the legacy bootloader */
+	if (of_flat_dt_is_compatible(of_get_flat_dt_root(), "PS3PF")) {
+		size = 0x8000000;
+	}
+#endif
 		lmb_add(base, size);
 	}
 	return 0;
@@ -925,6 +948,12 @@ static void __init early_reserve_mem(void)
 	self_base = __pa((unsigned long)initial_boot_params);
 	self_size = initial_boot_params->totalsize;
 	lmb_reserve(self_base, self_size);
+
+#ifdef CONFIG_BLK_DEV_INITRD
+	/* then reserve the initrd, if any */
+	if (initrd_start && (initrd_end > initrd_start))
+		lmb_reserve(__pa(initrd_start), initrd_end - initrd_start);
+#endif /* CONFIG_BLK_DEV_INITRD */
 
 #ifdef CONFIG_PPC32
 	/* 
@@ -954,9 +983,6 @@ static void __init early_reserve_mem(void)
 		size = *(reserve_map++);
 		if (size == 0)
 			break;
-		/* skip if the reservation is for the blob */
-		if (base == self_base && size == self_size)
-			continue;
 		DBG("reserving: %llx -> %llx\n", base, size);
 		lmb_reserve(base, size);
 	}

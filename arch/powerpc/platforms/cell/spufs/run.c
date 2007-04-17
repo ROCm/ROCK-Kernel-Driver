@@ -313,7 +313,7 @@ long spufs_run_spu(struct file *file, struct spu_context *ctx,
 	if (down_interruptible(&ctx->run_sema))
 		return -ERESTARTSYS;
 
-	ctx->ops->master_start(ctx);
+	spu_enable_spu(ctx);
 	ctx->event_return = 0;
 	ret = spu_run_init(ctx, npc);
 	if (ret)
@@ -343,7 +343,7 @@ long spufs_run_spu(struct file *file, struct spu_context *ctx,
 	} while (!ret && !(status & (SPU_STATUS_STOPPED_BY_STOP |
 				      SPU_STATUS_STOPPED_BY_HALT)));
 
-	ctx->ops->master_stop(ctx);
+	spu_disable_spu(ctx);
 	ret = spu_run_fini(ctx, npc, &status);
 	spu_yield(ctx);
 
