@@ -360,6 +360,10 @@ static int pSeries_check_legacy_ioport(unsigned int baseport)
 			return -ENODEV;
 		of_node_put(np);
 		break;
+	default:
+		printk("%s rejected access to port %u\n", __FUNCTION__, baseport);
+		WARN_ON(baseport);
+		return -ENODEV;
 	}
 	return 0;
 }

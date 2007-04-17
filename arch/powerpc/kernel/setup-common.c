@@ -498,8 +498,14 @@ void probe_machine(void)
 
 int check_legacy_ioport(unsigned long base_port)
 {
-	if (ppc_md.check_legacy_ioport == NULL)
+	struct device_node *np;
+	if (ppc_md.check_legacy_ioport == NULL) {
+		np = of_find_node_by_type(NULL, "isa");
+		if (np == NULL)
+			return -ENODEV;
+		of_node_put(np);
 		return 0;
+	}
 	return ppc_md.check_legacy_ioport(base_port);
 }
 EXPORT_SYMBOL(check_legacy_ioport);

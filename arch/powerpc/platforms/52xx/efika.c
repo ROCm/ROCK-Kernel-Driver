@@ -186,12 +186,6 @@ static void efika_show_cpuinfo(struct seq_file *m)
 	of_node_put(root);
 }
 
-static int efika_check_legacy_ioport(unsigned int baseport)
-{
-	printk(KERN_WARNING "XXX rejected access to port %u\n", baseport);
-	return -ENODEV;
-}
-
 static void __init efika_setup_arch(void)
 {
 	rtas_initialize();
@@ -278,6 +272,5 @@ define_machine(efika)
 	.get_boot_time		= rtas_get_boot_time,
 	.calibrate_decr		= generic_calibrate_decr,
 	.phys_mem_access_prot	= pci_phys_mem_access_prot,
-	.check_legacy_ioport	= efika_check_legacy_ioport,
 };
 
