@@ -503,8 +503,6 @@ int check_legacy_ioport(unsigned long base_port)
 	}
 	return -ENODEV;
 }
-
-}
 EXPORT_SYMBOL(check_legacy_ioport);
 
 static int ppc_panic_event(struct notifier_block *this,
