@@ -482,7 +482,7 @@ int check_legacy_ioport(unsigned long base_port)
 {
 	struct device_node *np;
 
-	switch(baseport) {
+	switch(base_port) {
 	case I8042_DATA_REG:
 		np = of_find_node_by_type(NULL, "8042");
 		if (np == NULL)
@@ -498,8 +498,8 @@ int check_legacy_ioport(unsigned long base_port)
 	case PNPBIOS_BASE:
 		/* implement me */
 	default:
-		printk("%s rejected access to port %u\n", __FUNCTION__, baseport);
-		WARN_ON(baseport);
+		printk("%s rejected access to port %u\n", __FUNCTION__, base_port);
+		WARN_ON(base_port);
 	}
 	return -ENODEV;
 }
