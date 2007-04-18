@@ -1685,6 +1685,7 @@ gelic_net_setup_netdev(struct gelic_net_card *card)
 	uint64_t status, v1, v2;
 
 	SET_MODULE_OWNER(netdev);
+	SET_NETDEV_DEV(netdev, &card->dev->core);
 	spin_lock_init(&card->intmask_lock);
 
 	card->rx_csum = GELIC_NET_RX_CSUM_DEFAULT;
