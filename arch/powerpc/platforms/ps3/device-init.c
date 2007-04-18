@@ -441,6 +441,9 @@ ps3_register_known_devices (void)
 
 	pr_debug(" -> %s:%d\n", __func__, __LINE__);
 
+	if (!firmware_has_feature(FW_FEATURE_PS3_LV1))
+		return -ENODEV;
+
 	//ps3_repository_dump_bus_info();
 
 	result = ps3_register_ohci_0();
