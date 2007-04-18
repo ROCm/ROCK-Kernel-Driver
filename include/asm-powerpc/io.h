@@ -11,6 +11,8 @@
 
 /* Check of existence of legacy devices */
 extern int check_legacy_ioport(unsigned long base_port);
+#define I8042_DATA_REG	0x60
+#define FDC_BASE	0x3f0
 #define PNPBIOS_BASE	0xf000	/* only relevant for PReP */
 
 #include <linux/compiler.h>

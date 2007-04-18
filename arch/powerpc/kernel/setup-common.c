@@ -481,14 +481,29 @@ void probe_machine(void)
 int check_legacy_ioport(unsigned long base_port)
 {
 	struct device_node *np;
-	if (ppc_md.check_legacy_ioport == NULL) {
-		np = of_find_node_by_type(NULL, "isa");
+
+	switch(baseport) {
+	case I8042_DATA_REG:
+		np = of_find_node_by_type(NULL, "8042");
 		if (np == NULL)
 			return -ENODEV;
 		of_node_put(np);
 		return 0;
+	case FDC_BASE:
+		np = of_find_node_by_type(NULL, "fdc");
+		if (np == NULL)
+			return -ENODEV;
+		of_node_put(np);
+		return 0;
+	case PNPBIOS_BASE:
+		/* implement me */
+	default:
+		printk("%s rejected access to port %u\n", __FUNCTION__, baseport);
+		WARN_ON(baseport);
 	}
-	return ppc_md.check_legacy_ioport(base_port);
+	return -ENODEV;
+}
+
 }
 EXPORT_SYMBOL(check_legacy_ioport);
 
