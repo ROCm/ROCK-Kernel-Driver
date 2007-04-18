@@ -1732,7 +1732,7 @@ static void ps3_stor_device_release(struct device * device)
 }
 
 const static struct platform_device ps3_stor_platform_device = {
-	.name           = "ps3_stor",
+	.name           = "ps3_storage",
 	.dev            = {
 		.release        = ps3_stor_device_release
 	}
