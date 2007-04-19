@@ -2525,7 +2525,7 @@ static struct device_attribute *ps3_stor_sysfs_device_attr_list[] = {
 };
 
 static struct scsi_host_template ps3_stor_driver_template = {
-	.name =			"ps3_stor",
+	.name =			"ps3_storage",
 	.slave_alloc =		ps3_stor_slave_alloc,
 	.slave_configure =	ps3_stor_slave_configure,
 	.slave_destroy =	ps3_stor_slave_destroy,
@@ -2620,7 +2620,7 @@ static void ps3_stor_driver_shutdown(struct platform_device * dev)
 
 static struct platform_driver ps3_stor_platform_driver = {
 	.driver = {
-		.name = "ps3_stor"
+		.name = "ps3_storage"
 	},
 	.probe          = ps3_stor_driver_probe,
 	.remove         = ps3_stor_driver_remove,
