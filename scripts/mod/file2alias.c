@@ -355,7 +355,8 @@ static int do_pcmcia_entry(const char *filename,
 static int do_of_entry (const char *filename, struct of_device_id *of, char *alias)
 {
     char *tmp;
-    sprintf (alias, "of:N%sT%sC%s",
+    /* the "*C%s" is there to match strings with multiple C entries */
+    sprintf (alias, "of:N%sT%s*C%s",
                     of->name[0] ? of->name : "*",
                     of->type[0] ? of->type : "*",
                     of->compatible[0] ? of->compatible : "*");
