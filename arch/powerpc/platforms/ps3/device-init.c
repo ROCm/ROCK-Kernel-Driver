@@ -22,6 +22,7 @@
 
 #include <linux/kernel.h>
 #include <linux/init.h>
+#include <asm/firmware.h>
 
 #include "platform.h"
 
@@ -439,10 +440,10 @@ ps3_register_known_devices (void)
 {
 	int result;
 
-	pr_debug(" -> %s:%d\n", __func__, __LINE__);
-
 	if (!firmware_has_feature(FW_FEATURE_PS3_LV1))
 		return -ENODEV;
+
+	pr_debug(" -> %s:%d\n", __func__, __LINE__);
 
 	//ps3_repository_dump_bus_info();
 

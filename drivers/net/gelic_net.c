@@ -56,6 +56,7 @@
 #include <asm/pci-bridge.h>
 #include <net/checksum.h>
 #include <asm/io.h>
+#include <asm/firmware.h>
 #include <asm/ps3.h>
 #include <asm/lv1call.h>
 
@@ -1850,9 +1851,9 @@ static struct ps3_system_bus_driver ps3_gelic_driver = {
 static int __init
 ps3_gelic_driver_init (void)
 {
-	if (!firmware_has_feature(FW_FEATURE_PS3_LV1))
-		return -ENODEV;
-	return ps3_system_bus_driver_register(&ps3_gelic_driver);
+	return firmware_has_feature(FW_FEATURE_PS3_LV1)
+		? ps3_system_bus_driver_register(&ps3_gelic_driver)
+		: -ENODEV;
 }
 
 static void __exit
