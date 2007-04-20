@@ -13,7 +13,10 @@
 extern int check_legacy_ioport(unsigned long base_port);
 #define I8042_DATA_REG	0x60
 #define FDC_BASE	0x3f0
-#define PNPBIOS_BASE	0xf000	/* only relevant for PReP */
+/* only relevant for PReP */
+#define _PIDXR		0x279
+#define _PNPWRP		0xa79
+#define PNPBIOS_BASE	0xf000
 
 #include <linux/compiler.h>
 #include <asm/page.h>

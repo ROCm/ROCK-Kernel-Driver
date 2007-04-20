@@ -483,22 +483,41 @@ int check_legacy_ioport(unsigned long base_port)
 	struct device_node *np;
 
 	switch(base_port) {
+#ifdef CONFIG_SERIO_I8042
 	case I8042_DATA_REG:
 		np = of_find_node_by_type(NULL, "8042");
 		if (np == NULL)
 			return -ENODEV;
 		of_node_put(np);
 		return 0;
-	case FDC_BASE:
+#endif
+#ifdef CONFIG_BLK_DEV_FD
+	case FDC_BASE: /* FDC1 */
 		np = of_find_node_by_type(NULL, "fdc");
 		if (np == NULL)
 			return -ENODEV;
 		of_node_put(np);
 		return 0;
+#endif
+#ifdef CONFIG_IPMI_HANDLER
+	/* IPMI */
+	case 0xca2:
+	case 0xca9:
+	case 0xe4:
+		np = of_find_node_by_type(NULL, "ipmi");
+		if (np == NULL)
+			return -ENODEV;
+		of_node_put(np);
+		return 0;
+#endif
+#ifdef CONFIG_PPC_PREP
+	case _PIDXR:
+	case _PNPWRP:
 	case PNPBIOS_BASE:
-		/* implement me */
+		/* implement me for PReP */
+#endif
 	default:
-		printk("%s rejected access to port %u\n", __FUNCTION__, base_port);
+		printk(KERN_DEBUG "%s rejected access to port %u\n", __FUNCTION__, base_port);
 		WARN_ON(base_port);
 	}
 	return -ENODEV;
