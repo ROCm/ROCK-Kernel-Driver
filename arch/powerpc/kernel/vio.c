@@ -342,9 +342,24 @@ static ssize_t devspec_show(struct device *dev,
 	return sprintf(buf, "%s\n", of_node ? of_node->full_name : "none");
 }
 
+static ssize_t modalias_show (struct device *dev, struct device_attribute *attr,
+			      char *buf)
+{
+	struct device_node *of_node = dev->archdata.of_node;
+	const char *compat;
+	int i = 0;
+
+	if (of_node) {
+		compat = get_property(of_node, "compatible", &i);
+		i = sprintf (buf, "vio:T%sS%s\n", of_node->type, compat);
+	}
+	return i;
+}
+
 static struct device_attribute vio_dev_attrs[] = {
 	__ATTR_RO(name),
 	__ATTR_RO(devspec),
+	__ATTR_RO(modalias),
 	__ATTR_NULL
 };
 
