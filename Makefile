@@ -1,7 +1,7 @@
 VERSION = 2
 PATCHLEVEL = 6
 SUBLEVEL = 21
-EXTRAVERSION = -rc7-git5
+EXTRAVERSION = -rc7-git7
 NAME = Nocturnal Monster Puppy
 
 # *DOCUMENTATION*

@@ -131,7 +131,7 @@ int avail_to_resrv_perfctr_nmi_bit(unsigned int counter)
 	int cpu;
 	BUG_ON(counter > NMI_MAX_COUNTER_BITS);
 	for_each_possible_cpu (cpu) {
-		if (test_bit(counter, &per_cpu(perfctr_nmi_owner, cpu)))
+		if (test_bit(counter, &per_cpu(perfctr_nmi_owner, cpu)[0]))
 			return 0;
 	}
 	return 1;
@@ -147,7 +147,7 @@ int avail_to_resrv_perfctr_nmi(unsigned int msr)
 	BUG_ON(counter > NMI_MAX_COUNTER_BITS);
 
 	for_each_possible_cpu (cpu) {
-		if (test_bit(counter, &per_cpu(perfctr_nmi_owner, cpu)))
+		if (test_bit(counter, &per_cpu(perfctr_nmi_owner, cpu)[0]))
 			return 0;
 	}
 	return 1;
@@ -162,7 +162,7 @@ static int __reserve_perfctr_nmi(int cpu, unsigned int msr)
 	counter = nmi_perfctr_msr_to_bit(msr);
 	BUG_ON(counter > NMI_MAX_COUNTER_BITS);
 
-	if (!test_and_set_bit(counter, &per_cpu(perfctr_nmi_owner, cpu)))
+	if (!test_and_set_bit(counter, &per_cpu(perfctr_nmi_owner, cpu)[0]))
 		return 1;
 	return 0;
 }
@@ -176,7 +176,7 @@ static void __release_perfctr_nmi(int cpu, unsigned int msr)
 	counter = nmi_perfctr_msr_to_bit(msr);
 	BUG_ON(counter > NMI_MAX_COUNTER_BITS);
 
-	clear_bit(counter, &per_cpu(perfctr_nmi_owner, cpu));
+	clear_bit(counter, &per_cpu(perfctr_nmi_owner, cpu)[0]);
 }
 
 int reserve_perfctr_nmi(unsigned int msr)
