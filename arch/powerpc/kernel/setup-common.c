@@ -480,40 +480,39 @@ void probe_machine(void)
 
 int check_legacy_ioport(unsigned long base_port)
 {
-	struct device_node *np = NULL;
+	struct device_node *parent, *np = NULL;
+	int ret = -ENODEV;
 
 	switch(base_port) {
-#if defined(CONFIG_SERIO_I8042) || defined(CONFIG_SERIO_I8042_MODULE)
 	case I8042_DATA_REG:
 		np = of_find_node_by_type(NULL, "8042");
 		break;
-#endif
-#if defined(CONFIG_BLK_DEV_FD) || defined(CONFIG_BLK_DEV_FD_MODULE)
 	case FDC_BASE: /* FDC1 */
 		np = of_find_node_by_type(NULL, "fdc");
 		break;
-#endif
-#if defined(CONFIG_IPMI_HANDLER) || defined(CONFIG_IPMI_HANDLER_MODULE)
 	case 0xca2:
 	case 0xca9:
 	case 0xe4:
 		np = of_find_node_by_type(NULL, "ipmi");
 		break;
-#endif
 #ifdef CONFIG_PPC_PREP
 	case _PIDXR:
 	case _PNPWRP:
 	case PNPBIOS_BASE:
-		/* implement me for PReP */
+		/* implement me */
 #endif
 	default:
 		break;
 	}
 	if (np) {
+		parent = of_get_parent(np);
+		if (parent) {
+			ret = strcmp(parent->type, "isa");
+			of_node_put(parent);
+		}
 		of_node_put(np);
-		return 0;
 	}
-	return -ENODEV;
+	return ret;
 }
 EXPORT_SYMBOL(check_legacy_ioport);
 
