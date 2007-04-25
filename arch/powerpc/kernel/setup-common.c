@@ -478,6 +478,7 @@ void probe_machine(void)
 	printk(KERN_INFO "Using %s machine description\n", ppc_md.name);
 }
 
+/* Match a class of boards, not a specific device configuration. */
 int check_legacy_ioport(unsigned long base_port)
 {
 	struct device_node *parent, *np = NULL;
@@ -490,11 +491,6 @@ int check_legacy_ioport(unsigned long base_port)
 	case FDC_BASE: /* FDC1 */
 		np = of_find_node_by_type(NULL, "fdc");
 		break;
-	case 0xca2:
-	case 0xca9:
-	case 0xe4:
-		np = of_find_node_by_type(NULL, "ipmi");
-		break;
 #ifdef CONFIG_PPC_PREP
 	case _PIDXR:
 	case _PNPWRP:
@@ -502,16 +498,18 @@ int check_legacy_ioport(unsigned long base_port)
 		/* implement me */
 #endif
 	default:
+		/* ipmi is supposed to fail here */
 		break;
 	}
-	if (np) {
-		parent = of_get_parent(np);
-		if (parent) {
-			ret = strcmp(parent->type, "isa");
-			of_node_put(parent);
-		}
-		of_node_put(np);
+	if (!np)
+		return ret;
+	parent = of_get_parent(np);
+	if (parent) {
+		if (strcmp(parent->type, "isa") == 0)
+			ret = 0;
+		of_node_put(parent);
 	}
+	of_node_put(np);
 	return ret;
 }
 EXPORT_SYMBOL(check_legacy_ioport);
