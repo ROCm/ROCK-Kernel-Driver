@@ -66,8 +66,8 @@
 #define GELIC_NET_DEBUG
 
 #ifdef GELIC_NET_DEBUG
-#define DPRINTK(fmt,arg...)   printk(KERN_ERR fmt ,##arg)
-#define DPRINTKK(fmt,arg...)  printk(KERN_ERR fmt ,##arg)
+#define DPRINTK(fmt,arg...)   printk(KERN_DEBUG fmt ,##arg)
+#define DPRINTKK(fmt,arg...)  printk(KERN_DEBUG fmt ,##arg)
 #else
 #define DPRINTK(fmt,arg...)
 #define DPRINTKK(fmt,arg...)
