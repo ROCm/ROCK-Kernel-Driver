@@ -237,19 +237,28 @@ static void __init efika_init_early(void)
 	if (!property)
 		return;
 	stdout_node = of_find_node_by_path(property);
-	if (stdout_node) {
-		property = get_property(stdout_node, "device_type", NULL);
-		if (property && strcmp(property, "serial") == 0) {
-			/*
-			 * The 9pin connector is either /failsafe or /builtin/serial.
-			 * The optional graphics card has also type serial in VGA mode.
-			 */
-			property = get_property(stdout_node, "name", NULL);
-			if (property && (strcmp(property, "serial") == 0 || strcmp(property, "failsafe") == 0))
+	if (!stdout_node)
+		return;
+	property = get_property(stdout_node, "device_type", NULL);
+	if (property && strcmp(property, "serial") == 0) {
+		/*
+		 * The 9pin connector is either /failsafe or /builtin/serial.
+		 * The optional graphics card has also type 'serial' in VGA mode.
+		 */
+		property = get_property(stdout_node, "name", NULL);
+		if (property) {
+			if (strcmp(property, "failsafe") == 0)
 				add_preferred_console("ttyPSC", 0, NULL);
+			else {
+				if (strcmp(property, "serial") == 0) {
+					property = get_property(stdout_node, "model", NULL);
+					if (property && strcmp(property, "mpc5200-serial") == 0)
+						add_preferred_console("ttyPSC", 0, NULL);
+				}
+			}
 		}
-		of_node_put(stdout_node);
 	}
+	of_node_put(stdout_node);
 #endif
 }
 
