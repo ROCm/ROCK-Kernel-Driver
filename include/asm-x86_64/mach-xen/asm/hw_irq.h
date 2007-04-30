@@ -36,16 +36,16 @@
  * cleanup after irq migration.
  */
 #define IRQ_MOVE_CLEANUP_VECTOR	FIRST_EXTERNAL_VECTOR
- 
+
 /*
- * Vectors 0x20-0x2f are used for ISA interrupts.
+ * Vectors 0x30-0x3f are used for ISA interrupts.
  */
 #define IRQ0_VECTOR		FIRST_EXTERNAL_VECTOR + 0x10
 #define IRQ1_VECTOR		IRQ0_VECTOR + 1
 #define IRQ2_VECTOR		IRQ0_VECTOR + 2
 #define IRQ3_VECTOR		IRQ0_VECTOR + 3
 #define IRQ4_VECTOR		IRQ0_VECTOR + 4
-#define IRQ5_VECTOR		IRQ0_VECTOR + 5 
+#define IRQ5_VECTOR		IRQ0_VECTOR + 5
 #define IRQ6_VECTOR		IRQ0_VECTOR + 6
 #define IRQ7_VECTOR		IRQ0_VECTOR + 7
 #define IRQ8_VECTOR		IRQ0_VECTOR + 8

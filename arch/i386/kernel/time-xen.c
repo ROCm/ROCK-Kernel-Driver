@@ -513,10 +513,14 @@ irqreturn_t timer_interrupt(int irq, void *dev_id)
 	}
 
 	/* System-wide jiffy work. */
-	while (delta >= NS_PER_TICK) {
-		delta -= NS_PER_TICK;
-		processed_system_time += NS_PER_TICK;
-		do_timer(1);
+	if (delta >= NS_PER_TICK) {
+		do_div(delta, NS_PER_TICK);
+		processed_system_time += delta * NS_PER_TICK;
+		while (delta > HZ) {
+			do_timer(HZ);
+			delta -= HZ;
+		}
+		do_timer(delta);
 	}
 
 	if (shadow_tv_version != HYPERVISOR_shared_info->wc_version) {
@@ -874,7 +878,7 @@ static void stop_hz_timer(void)
 	singleshot.timeout_abs_ns = jiffies_to_st(j);
 	singleshot.flags = 0;
 	rc = HYPERVISOR_vcpu_op(VCPUOP_set_singleshot_timer, cpu, &singleshot);
-#ifdef CONFIG_XEN_COMPAT_030004
+#if CONFIG_XEN_COMPAT <= 0x030004
 	if (rc) {
 		BUG_ON(rc != -ENOSYS);
 		rc = HYPERVISOR_set_timer_op(singleshot.timeout_abs_ns);

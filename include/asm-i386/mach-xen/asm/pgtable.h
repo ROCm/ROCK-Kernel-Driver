@@ -210,9 +210,13 @@ extern unsigned long pg0[];
 
 /* To avoid harmful races, pmd_none(x) should check only the lower when PAE */
 #define pmd_none(x)	(!(unsigned long)pmd_val(x))
+#if CONFIG_XEN_COMPAT <= 0x030002
 /* pmd_present doesn't just test the _PAGE_PRESENT bit since wr.p.t.
    can temporarily clear it. */
 #define pmd_present(x)	(pmd_val(x))
+#else
+#define pmd_present(x)	(pmd_val(x) & _PAGE_PRESENT)
+#endif
 #define pmd_bad(x)	((pmd_val(x) & (~PAGE_MASK & ~_PAGE_USER & ~_PAGE_PRESENT)) != (_KERNPG_TABLE & ~_PAGE_PRESENT))
 
 
@@ -277,20 +281,11 @@ static inline pte_t pte_mkhuge(pte_t pte)	{ (pte).pte_low |= _PAGE_PSE; return p
  * bit at the same time.
  */
 #define  __HAVE_ARCH_PTEP_SET_ACCESS_FLAGS
-#define ptep_set_access_flags(vma, address, ptep, entry, dirty) \
-	do {								  \
-		if (dirty) {						  \
-			if ( likely((vma)->vm_mm == current->mm) ) {	  \
-				BUG_ON(HYPERVISOR_update_va_mapping(address, \
-					entry,				  \
-					(unsigned long)(vma)->vm_mm->cpu_vm_mask.bits| \
-					UVMF_INVLPG|UVMF_MULTI));	  \
-			} else {					  \
-				xen_l1_entry_update(ptep, entry);	  \
-				flush_tlb_page(vma, address);		  \
-			}						  \
-		}							  \
-	} while (0)
+#define ptep_set_access_flags(vma, address, ptep, entry, dirty)		\
+do {									\
+	if (dirty)							\
+		ptep_establish(vma, address, ptep, entry);		\
+} while (0)
 
 /*
  * We don't actually have these, but we want to advertise them so that
@@ -306,7 +301,15 @@ static inline pte_t pte_mkhuge(pte_t pte)	{ (pte).pte_low |= _PAGE_PSE; return p
 #define __HAVE_ARCH_PTEP_ESTABLISH
 #define ptep_establish(vma, address, ptep, pteval)			\
 do {									\
-	ptep_set_access_flags(vma, address, ptep, pteval, 1);		\
+	if ( likely((vma)->vm_mm == current->mm) ) {			\
+		BUG_ON(HYPERVISOR_update_va_mapping(address,		\
+			pteval,						\
+			(unsigned long)(vma)->vm_mm->cpu_vm_mask.bits|	\
+				UVMF_INVLPG|UVMF_MULTI));		\
+	} else {							\
+		xen_l1_entry_update(ptep, pteval);			\
+		flush_tlb_page(vma, address);				\
+	}								\
 } while (0)
 
 #define __HAVE_ARCH_PTEP_CLEAR_DIRTY_FLUSH
@@ -338,31 +341,35 @@ do {									\
 #define __HAVE_ARCH_PTEP_GET_AND_CLEAR
 static inline pte_t ptep_get_and_clear(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
 {
-	pte_t pte = raw_ptep_get_and_clear(ptep);
-	pte_update(mm, addr, ptep);
+	pte_t pte = *ptep;
+	if (!pte_none(pte)) {
+		if (mm != &init_mm) {
+			pte = raw_ptep_get_and_clear(ptep, pte);
+			pte_update(mm, addr, ptep);
+		} else
+			HYPERVISOR_update_va_mapping(addr, __pte(0), 0);
+	}
 	return pte;
 }
 
 #define __HAVE_ARCH_PTEP_GET_AND_CLEAR_FULL
-static inline pte_t ptep_get_and_clear_full(struct mm_struct *mm, unsigned long addr, pte_t *ptep, int full)
-{
-	pte_t pte;
-	if (full) {
-		pte = *ptep;
-		pte_clear(mm, addr, ptep);
-	} else {
-		pte = ptep_get_and_clear(mm, addr, ptep);
-	}
-	return pte;
-}
+#define ptep_get_and_clear_full(mm, addr, ptep, full)			\
+	((full) ? ({							\
+		pte_t __res = *(ptep);					\
+		if (test_bit(PG_pinned, &virt_to_page((mm)->pgd)->flags)) \
+			xen_l1_entry_update(ptep, __pte(0));		\
+		else							\
+			*(ptep) = __pte(0);				\
+		__res;							\
+	 }) :								\
+	 ptep_get_and_clear(mm, addr, ptep))
 
 #define __HAVE_ARCH_PTEP_SET_WRPROTECT
 static inline void ptep_set_wrprotect(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
 {
-	if (pte_write(*ptep)) {
-		clear_bit(_PAGE_BIT_RW, &ptep->pte_low);
-		pte_update(mm, addr, ptep);
-	}
+	pte_t pte = *ptep;
+	if (pte_write(pte))
+		set_pte_at(mm, addr, ptep, pte_wrprotect(pte));
 }
 
 /*

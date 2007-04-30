@@ -76,9 +76,12 @@ static inline void set_pte(pte_t *ptep, pte_t pte)
  */
 static inline void pte_clear(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
 {
-	ptep->pte_low = 0;
-	smp_wmb();
-	ptep->pte_high = 0;
+	if ((mm != current->mm && mm != &init_mm)
+	    || HYPERVISOR_update_va_mapping(addr, __pte(0), 0)) {
+		ptep->pte_low = 0;
+		smp_wmb();
+		ptep->pte_high = 0;
+	}
 }
 
 #define pmd_clear(xp)	do { set_pmd(xp, __pmd(0)); } while (0)
@@ -102,17 +105,35 @@ static inline void pud_clear (pud_t * pud) { }
 #define pmd_offset(pud, address) ((pmd_t *) pud_page(*(pud)) + \
 			pmd_index(address))
 
-static inline pte_t raw_ptep_get_and_clear(pte_t *ptep)
+static inline pte_t raw_ptep_get_and_clear(pte_t *ptep, pte_t res)
 {
-	pte_t res;
-
-	/* xchg acts as a barrier before the setting of the high bits */
-	res.pte_low = xchg(&ptep->pte_low, 0);
-	res.pte_high = ptep->pte_high;
-	ptep->pte_high = 0;
-
+	uint64_t val = pte_val_ma(res);
+	if (__cmpxchg64(ptep, val, 0) != val) {
+		/* xchg acts as a barrier before the setting of the high bits */
+		res.pte_low = xchg(&ptep->pte_low, 0);
+		res.pte_high = ptep->pte_high;
+		ptep->pte_high = 0;
+	}
 	return res;
 }
+
+#define __HAVE_ARCH_PTEP_CLEAR_FLUSH
+#define ptep_clear_flush(vma, addr, ptep)			\
+({								\
+	pte_t *__ptep = (ptep);					\
+	pte_t __res = *__ptep;					\
+	if (!pte_none(__res) &&					\
+	    ((vma)->vm_mm != current->mm ||			\
+	     HYPERVISOR_update_va_mapping(addr,	__pte(0),	\
+			(unsigned long)(vma)->vm_mm->cpu_vm_mask.bits| \
+				UVMF_INVLPG|UVMF_MULTI))) {	\
+		__ptep->pte_low = 0;				\
+		smp_wmb();					\
+		__ptep->pte_high = 0;				\
+		flush_tlb_page(vma, addr);			\
+	}							\
+	__res;							\
+})
 
 #define __HAVE_ARCH_PTE_SAME
 static inline int pte_same(pte_t a, pte_t b)
@@ -124,7 +145,7 @@ static inline int pte_same(pte_t a, pte_t b)
 
 static inline int pte_none(pte_t pte)
 {
-	return !pte.pte_low && !pte.pte_high;
+	return !(pte.pte_low | pte.pte_high);
 }
 
 #define __pte_mfn(_pte) (((_pte).pte_low >> PAGE_SHIFT) | \

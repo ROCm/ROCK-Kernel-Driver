@@ -90,11 +90,6 @@ extern unsigned long empty_zero_page[PAGE_SIZE/sizeof(unsigned long)];
 #define pgd_none(x)	(!pgd_val(x))
 #define pud_none(x)	(!pud_val(x))
 
-#define set_pte_batched(pteptr, pteval) \
-	queue_l1_entry_update(pteptr, (pteval))
-
-extern inline int pud_present(pud_t pud)	{ return !pud_none(pud); }
-
 static inline void set_pte(pte_t *dst, pte_t val)
 {
 	*dst = val;
@@ -115,32 +110,6 @@ static inline void pgd_clear (pgd_t * pgd)
 {
         set_pgd(pgd, __pgd(0));
         set_pgd(__user_pgd(pgd), __pgd(0));
-}
-
-#define ptep_get_and_clear(mm,addr,xp)	__pte_ma(xchg(&(xp)->pte, 0))
-
-#if 0
-static inline pte_t ptep_get_and_clear(struct mm_struct *mm, unsigned long addr, pte_t *xp)
-{
-        pte_t pte = *xp;
-        if (pte.pte)
-                set_pte(xp, __pte_ma(0));
-        return pte;
-}
-#endif
-
-struct mm_struct;
-
-static inline pte_t ptep_get_and_clear_full(struct mm_struct *mm, unsigned long addr, pte_t *ptep, int full)
-{
-	pte_t pte;
-	if (full) {
-		pte = *ptep;
-		*ptep = __pte(0);
-	} else {
-		pte = ptep_get_and_clear(mm, addr, ptep);
-	}
-	return pte;
 }
 
 #define pte_same(a, b)		((a).pte == (b).pte)
@@ -190,7 +159,7 @@ static inline pte_t ptep_get_and_clear_full(struct mm_struct *mm, unsigned long 
 #define _PAGE_PROTNONE	0x080	/* If not present */
 #define _PAGE_NX        (1UL<<_PAGE_BIT_NX)
 
-#ifdef CONFIG_XEN_COMPAT_030002
+#if CONFIG_XEN_COMPAT <= 0x030002
 extern unsigned int __kernel_page_user;
 #else
 #define __kernel_page_user 0
@@ -302,6 +271,46 @@ static inline pte_t pfn_pte(unsigned long page_nr, pgprot_t pgprot)
 	return __pte(pte);
 }
 
+static inline pte_t ptep_get_and_clear(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
+{
+	pte_t pte = *ptep;
+	if (!pte_none(pte)) {
+		if (mm != &init_mm)
+			pte = __pte_ma(xchg(&ptep->pte, 0));
+		else
+			HYPERVISOR_update_va_mapping(addr, __pte(0), 0);
+	}
+	return pte;
+}
+
+static inline pte_t ptep_get_and_clear_full(struct mm_struct *mm, unsigned long addr, pte_t *ptep, int full)
+{
+	if (full) {
+		pte_t pte = *ptep;
+		if (mm->context.pinned)
+			xen_l1_entry_update(ptep, __pte(0));
+		else
+			*ptep = __pte(0);
+		return pte;
+	}
+	return ptep_get_and_clear(mm, addr, ptep);
+}
+
+#define ptep_clear_flush(vma, addr, ptep)			\
+({								\
+	pte_t *__ptep = (ptep);					\
+	pte_t __res = *__ptep;					\
+	if (!pte_none(__res) &&					\
+	    ((vma)->vm_mm != current->mm ||			\
+	     HYPERVISOR_update_va_mapping(addr,	__pte(0), 	\
+			(unsigned long)(vma)->vm_mm->cpu_vm_mask.bits| \
+				UVMF_INVLPG|UVMF_MULTI))) {	\
+		__ptep->pte = 0;				\
+		flush_tlb_page(vma, addr);			\
+	}							\
+	__res;							\
+})
+
 /*
  * The following only work if pte_present() is true.
  * Undefined behaviour if not..
@@ -331,31 +340,11 @@ static inline pte_t pte_mkwrite(pte_t pte)	{ __pte_val(pte) |= _PAGE_RW; return 
 static inline pte_t pte_mkhuge(pte_t pte)	{ __pte_val(pte) |= _PAGE_PSE; return pte; }
 static inline pte_t pte_clrhuge(pte_t pte)	{ __pte_val(pte) &= ~_PAGE_PSE; return pte; }
 
-struct vm_area_struct;
-
-static inline int ptep_test_and_clear_dirty(struct vm_area_struct *vma, unsigned long addr, pte_t *ptep)
-{
-	pte_t pte = *ptep;
-	int ret = pte_dirty(pte);
-	if (ret)
-		set_pte(ptep, pte_mkclean(pte));
-	return ret;
-}
-
-static inline int ptep_test_and_clear_young(struct vm_area_struct *vma, unsigned long addr, pte_t *ptep)
-{
-	pte_t pte = *ptep;
-	int ret = pte_young(pte);
-	if (ret)
-		set_pte(ptep, pte_mkold(pte));
-	return ret;
-}
-
 static inline void ptep_set_wrprotect(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
 {
 	pte_t pte = *ptep;
 	if (pte_write(pte))
-		set_pte(ptep, pte_wrprotect(pte));
+		set_pte_at(mm, addr, ptep, pte_wrprotect(pte));
 }
 
 /*
@@ -391,6 +380,7 @@ static inline int pmd_large(pmd_t pte) {
 #define pud_page(pud)		(pfn_to_page(pud_val(pud) >> PAGE_SHIFT))
 #define pud_index(address) (((address) >> PUD_SHIFT) & (PTRS_PER_PUD-1))
 #define pud_offset(pgd, address) ((pud_t *) pgd_page_vaddr(*(pgd)) + pud_index(address))
+#define pud_present(pud) (pud_val(pud) & _PAGE_PRESENT)
 
 /* PMD  - Level 2 access */
 #define pmd_page_vaddr(pmd) ((unsigned long) __va(pmd_val(pmd) & PTE_MASK))
@@ -400,9 +390,13 @@ static inline int pmd_large(pmd_t pte) {
 #define pmd_offset(dir, address) ((pmd_t *) pud_page_vaddr(*(dir)) + \
                                   pmd_index(address))
 #define pmd_none(x)	(!pmd_val(x))
+#if CONFIG_XEN_COMPAT <= 0x030002
 /* pmd_present doesn't just test the _PAGE_PRESENT bit since wr.p.t.
    can temporarily clear it. */
 #define pmd_present(x)	(pmd_val(x))
+#else
+#define pmd_present(x)	(pmd_val(x) & _PAGE_PRESENT)
+#endif
 #define pmd_clear(xp)	do { set_pmd(xp, __pmd(0)); } while (0)
 #define pfn_pmd(nr,prot) (__pmd(((nr) << PAGE_SHIFT) | pgprot_val(prot)))
 #define pmd_pfn(x)  ((pmd_val(x) & __PHYSICAL_MASK) >> PAGE_SHIFT)
@@ -446,26 +440,69 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 
 #define update_mmu_cache(vma,address,pte) do { } while (0)
 
+/*
+ * Rules for using ptep_establish: the pte MUST be a user pte, and
+ * must be a present->present transition.
+ */
+#define __HAVE_ARCH_PTEP_ESTABLISH
+#define ptep_establish(vma, address, ptep, pteval)			\
+	do {								\
+		if ( likely((vma)->vm_mm == current->mm) ) {		\
+			BUG_ON(HYPERVISOR_update_va_mapping(address,	\
+				pteval,					\
+				(unsigned long)(vma)->vm_mm->cpu_vm_mask.bits| \
+					UVMF_INVLPG|UVMF_MULTI));	\
+		} else {						\
+			xen_l1_entry_update(ptep, pteval);		\
+			flush_tlb_page(vma, address);			\
+		}							\
+	} while (0)
+
 /* We only update the dirty/accessed state if we set
  * the dirty bit by hand in the kernel, since the hardware
  * will do the accessed bit for us, and we don't want to
  * race with other CPU's that might be updating the dirty
  * bit at the same time. */
 #define  __HAVE_ARCH_PTEP_SET_ACCESS_FLAGS
-#define ptep_set_access_flags(__vma, __address, __ptep, __entry, __dirty) \
-	do {								  \
-		if (__dirty) {						  \
-			if ( likely((__vma)->vm_mm == current->mm) ) {	  \
-				BUG_ON(HYPERVISOR_update_va_mapping(__address, \
-					__entry,			  \
-					(unsigned long)(__vma)->vm_mm->cpu_vm_mask.bits| \
-						UVMF_INVLPG|UVMF_MULTI)); \
-			} else {					  \
-				xen_l1_entry_update(__ptep, __entry);	  \
-				flush_tlb_page(__vma, __address);	  \
-			}						  \
-		}							  \
+#define ptep_set_access_flags(vma, address, ptep, entry, dirty)		\
+	do {								\
+		if (dirty)						\
+			ptep_establish(vma, address, ptep, entry);	\
 	} while (0)
+
+
+/*
+ * i386 says: We don't actually have these, but we want to advertise
+ * them so that we can encompass the flush here.
+ */
+#define __HAVE_ARCH_PTEP_TEST_AND_CLEAR_DIRTY
+#define __HAVE_ARCH_PTEP_TEST_AND_CLEAR_YOUNG
+
+#define __HAVE_ARCH_PTEP_CLEAR_DIRTY_FLUSH
+#define ptep_clear_flush_dirty(vma, address, ptep)			\
+({									\
+	pte_t __pte = *(ptep);						\
+	int __dirty = pte_dirty(__pte);					\
+	__pte = pte_mkclean(__pte);					\
+	if ((vma)->vm_mm->context.pinned)				\
+		ptep_set_access_flags(vma, address, ptep, __pte, __dirty); \
+	else if (__dirty)						\
+		set_pte(ptep, __pte);					\
+	__dirty;							\
+})
+
+#define __HAVE_ARCH_PTEP_CLEAR_YOUNG_FLUSH
+#define ptep_clear_flush_young(vma, address, ptep)			\
+({									\
+	pte_t __pte = *(ptep);						\
+	int __young = pte_young(__pte);					\
+	__pte = pte_mkold(__pte);					\
+	if ((vma)->vm_mm->context.pinned)				\
+		ptep_set_access_flags(vma, address, ptep, __pte, __young); \
+	else if (__young)						\
+		set_pte(ptep, __pte);					\
+	__young;							\
+})
 
 /* Encode and de-code a swap entry */
 #define __swp_type(x)			(((x).val >> 1) & 0x3f)
@@ -483,6 +520,8 @@ void vmalloc_sync_all(void);
 extern int kern_addr_valid(unsigned long addr); 
 
 #define DOMID_LOCAL (0xFFFFU)
+
+struct vm_area_struct;
 
 int direct_remap_pfn_range(struct vm_area_struct *vma,
                             unsigned long address,
@@ -529,6 +568,7 @@ int touch_pte_range(struct mm_struct *mm,
 #define __HAVE_ARCH_PTEP_TEST_AND_CLEAR_DIRTY
 #define __HAVE_ARCH_PTEP_GET_AND_CLEAR
 #define __HAVE_ARCH_PTEP_GET_AND_CLEAR_FULL
+#define __HAVE_ARCH_PTEP_CLEAR_FLUSH
 #define __HAVE_ARCH_PTEP_SET_WRPROTECT
 #define __HAVE_ARCH_PTE_SAME
 #include <asm-generic/pgtable.h>

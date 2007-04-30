@@ -37,7 +37,7 @@ static void __init machine_specific_arch_setup(void)
 		ret = HYPERVISOR_callback_op(CALLBACKOP_register, &failsafe);
 	if (ret == 0)
 		ret = HYPERVISOR_callback_op(CALLBACKOP_register, &syscall);
-#ifdef CONFIG_XEN_COMPAT_030002
+#if CONFIG_XEN_COMPAT <= 0x030002
 	if (ret == -ENOSYS)
 		ret = HYPERVISOR_set_callbacks(
 			event.address,
@@ -47,7 +47,7 @@ static void __init machine_specific_arch_setup(void)
 	BUG_ON(ret);
 
 	ret = HYPERVISOR_callback_op(CALLBACKOP_register, &nmi_cb);
-#ifdef CONFIG_XEN_COMPAT_030002
+#if CONFIG_XEN_COMPAT <= 0x030002
 	if (ret == -ENOSYS) {
 		static struct xennmi_callback __initdata cb = {
 			.handler_address = (unsigned long)nmi

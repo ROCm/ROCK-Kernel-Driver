@@ -9,6 +9,10 @@
 #include <xen/xenbus.h>
 #include <linux/kthread.h>
 
+#ifdef HAVE_XEN_PLATFORM_COMPAT_H
+#include <xen/platform-compat.h>
+#endif
+
 MODULE_LICENSE("Dual BSD/GPL");
 
 #define SHUTDOWN_INVALID  -1
@@ -30,11 +34,7 @@ static int fast_suspend;
 static void __shutdown_handler(struct work_struct *unused);
 static DECLARE_DELAYED_WORK(shutdown_work, __shutdown_handler);
 
-#ifdef CONFIG_XEN
 int __xen_suspend(int fast_suspend);
-#else
-#define __xen_suspend(fast_suspend) 0
-#endif
 
 static int shutdown_process(void *__unused)
 {
@@ -118,6 +118,7 @@ static void shutdown_handler(struct xenbus_watch *watch,
 	err = xenbus_transaction_start(&xbt);
 	if (err)
 		return;
+
 	str = (char *)xenbus_read(xbt, "control", "shutdown", NULL);
 	/* Ignore read errors and empty reads. */
 	if (XENBUS_IS_ERR_READ(str)) {
@@ -189,13 +190,11 @@ static struct xenbus_watch shutdown_watch = {
 };
 
 static struct xenbus_watch sysrq_watch = {
-	.node ="control/sysrq",
+	.node = "control/sysrq",
 	.callback = sysrq_handler
 };
 
-static int setup_shutdown_watcher(struct notifier_block *notifier,
-				  unsigned long event,
-				  void *data)
+static int setup_shutdown_watcher(void)
 {
 	int err;
 
@@ -204,24 +203,34 @@ static int setup_shutdown_watcher(struct notifier_block *notifier,
 		     "%d", &fast_suspend);
 
 	err = register_xenbus_watch(&shutdown_watch);
-	if (err)
+	if (err) {
 		printk(KERN_ERR "Failed to set shutdown watcher\n");
-	else
-		xenbus_write(XBT_NIL, "control", "feature-reboot", "1");
+		return err;
+	}
 
 	err = register_xenbus_watch(&sysrq_watch);
-	if (err)
+	if (err) {
 		printk(KERN_ERR "Failed to set sysrq watcher\n");
-	else
-		xenbus_write(XBT_NIL, "control", "feature-sysrq", "1");
+		return err;
+	}
 
+	return 0;
+}
+
+#ifdef CONFIG_XEN
+
+static int shutdown_event(struct notifier_block *notifier,
+			  unsigned long event,
+			  void *data)
+{
+	setup_shutdown_watcher();
 	return NOTIFY_DONE;
 }
 
 static int __init setup_shutdown_event(void)
 {
 	static struct notifier_block xenstore_notifier = {
-		.notifier_call = setup_shutdown_watcher
+		.notifier_call = shutdown_event
 	};
 	register_xenstore_notifier(&xenstore_notifier);
 
@@ -229,3 +238,12 @@ static int __init setup_shutdown_event(void)
 }
 
 subsys_initcall(setup_shutdown_event);
+
+#else /* !defined(CONFIG_XEN) */
+
+int xen_reboot_init(void)
+{
+	return setup_shutdown_watcher();
+}
+
+#endif /* !defined(CONFIG_XEN) */

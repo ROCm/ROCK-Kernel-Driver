@@ -636,6 +636,8 @@ static int __init xencons_init(void)
 
 	switch (xc_mode) {
 	case XC_XVC:
+		printk(KERN_INFO "xencons_init: Initializing xen vfb;"
+		       " pass xencons=tty to prevent this\n");
 		DRV(xencons_driver)->name        = "xvc";
 		DRV(xencons_driver)->major       = XEN_XVC_MAJOR;
 		DRV(xencons_driver)->minor_start = XEN_XVC_MINOR;

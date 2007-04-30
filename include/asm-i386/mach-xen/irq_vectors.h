@@ -34,7 +34,7 @@
  * Vectors 0x20-0x2f are used for ISA interrupts.
  */
 
-#if 0
+#ifndef CONFIG_XEN
 /*
  * Special IRQ vectors used by the SMP architecture, 0xf0-0xff
  *
@@ -57,7 +57,6 @@
  * sources per level' errata.
  */
 #define LOCAL_TIMER_VECTOR	0xef
-#endif
 
 #define SPURIOUS_APIC_VECTOR	0xff
 #define ERROR_APIC_VECTOR	0xfe
@@ -79,6 +78,7 @@
  * Since vectors 0x00-0x1f are used/reserved for the CPU,
  * the usable vector space is 0x20-0xff (224 vectors)
  */
+#endif
 
 #define RESCHEDULE_VECTOR	0
 #define CALL_FUNCTION_VECTOR	1

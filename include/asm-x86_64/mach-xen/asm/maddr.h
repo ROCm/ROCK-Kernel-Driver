@@ -135,15 +135,20 @@ static inline paddr_t pte_machine_to_phys(maddr_t machine)
 	return phys;
 }
 
+#define __pte_ma(x)     ((pte_t) { (x) } )
+#define pfn_pte_ma(pfn, prot)	__pte_ma((((pfn) << PAGE_SHIFT) | pgprot_val(prot)) & __supported_pte_mask)
+
 #else /* !CONFIG_XEN */
 
 #define pfn_to_mfn(pfn) (pfn)
 #define mfn_to_pfn(mfn) (mfn)
 #define mfn_to_local_pfn(mfn) (mfn)
-#define set_phys_to_machine(pfn, mfn) BUG_ON((pfn) != (mfn))
+#define set_phys_to_machine(pfn, mfn) ((void)0)
 #define phys_to_machine_mapping_valid(pfn) (1)
 #define phys_to_machine(phys) ((maddr_t)(phys))
 #define machine_to_phys(mach) ((paddr_t)(mach))
+#define pfn_pte_ma(pfn, prot) pfn_pte(pfn, prot)
+#define __pte_ma(x) __pte(x)
 
 #endif /* !CONFIG_XEN */
 
@@ -151,9 +156,6 @@ static inline paddr_t pte_machine_to_phys(maddr_t machine)
 #define virt_to_machine(v)	(phys_to_machine(__pa(v)))
 #define virt_to_mfn(v)		(pfn_to_mfn(__pa(v) >> PAGE_SHIFT))
 #define mfn_to_virt(m)		(__va(mfn_to_pfn(m) << PAGE_SHIFT))
-
-#define __pte_ma(x)     ((pte_t) { (x) } )
-#define pfn_pte_ma(pfn, prot)	__pte_ma((((pfn) << PAGE_SHIFT) | pgprot_val(prot)) & __supported_pte_mask)
 
 #endif /* _X86_64_MADDR_H */
 

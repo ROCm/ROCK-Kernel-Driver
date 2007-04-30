@@ -67,6 +67,13 @@
 #include <xen/platform-compat.h>
 #endif
 
+struct netfront_cb {
+	struct page *page;
+	unsigned offset;
+};
+
+#define NETFRONT_SKB_CB(skb)	((struct netfront_cb *)((skb)->cb))
+
 /*
  * Mutually-exclusive module options to select receive data path:
  *  rx_copy : Packets are copied by network backend into local memory
@@ -622,14 +629,14 @@ static int network_open(struct net_device *dev)
 
 	memset(&np->stats, 0, sizeof(np->stats));
 
-	spin_lock(&np->rx_lock);
+	spin_lock_bh(&np->rx_lock);
 	if (netfront_carrier_ok(np)) {
 		network_alloc_rx_buffers(dev);
 		np->rx.sring->rsp_event = np->rx.rsp_cons + 1;
 		if (RING_HAS_UNCONSUMED_RESPONSES(&np->rx))
 			netif_rx_schedule(dev);
 	}
-	spin_unlock(&np->rx_lock);
+	spin_unlock_bh(&np->rx_lock);
 
 	network_maybe_wake_tx(dev);
 
@@ -1307,7 +1314,7 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 	int pages_flipped = 0;
 	int err;
 
-	spin_lock(&np->rx_lock);
+	spin_lock(&np->rx_lock); /* no need for spin_lock_bh() in ->poll() */
 
 	if (unlikely(!netfront_carrier_ok(np))) {
 		spin_unlock(&np->rx_lock);
@@ -1354,8 +1361,8 @@ err:
 			}
 		}
 
-		skb->nh.raw = (void *)skb_shinfo(skb)->frags[0].page;
-		skb->h.raw = skb->nh.raw + rx->offset;
+		NETFRONT_SKB_CB(skb)->page = skb_shinfo(skb)->frags[0].page;
+		NETFRONT_SKB_CB(skb)->offset = rx->offset;
 
 		len = rx->status;
 		if (len > RX_COPY_THRESHOLD)
@@ -1439,11 +1446,11 @@ err:
 		kfree_skb(skb);
 
 	while ((skb = __skb_dequeue(&rxq)) != NULL) {
-		struct page *page = (struct page *)skb->nh.raw;
+		struct page *page = NETFRONT_SKB_CB(skb)->page;
 		void *vaddr = page_address(page);
+		unsigned offset = NETFRONT_SKB_CB(skb)->offset;
 
-		memcpy(skb->data, vaddr + (skb->h.raw - skb->nh.raw),
-		       skb_headlen(skb));
+		memcpy(skb->data, vaddr + offset, skb_headlen(skb));
 
 		if (page != skb_shinfo(skb)->frags[0].page)
 			__free_page(page);
@@ -1511,7 +1518,7 @@ static void netif_release_rx_bufs(struct netfront_info *np)
 	struct sk_buff *skb;
 	unsigned long mfn;
 	int xfer = 0, noxfer = 0, unused = 0;
-	int id, ref;
+	int id, ref, rc;
 
 	if (np->copying_receiver) {
 		WPRINTK("%s: fix me for copying receiver.\n", __FUNCTION__);
@@ -1520,7 +1527,7 @@ static void netif_release_rx_bufs(struct netfront_info *np)
 
 	skb_queue_head_init(&free_list);
 
-	spin_lock(&np->rx_lock);
+	spin_lock_bh(&np->rx_lock);
 
 	for (id = 0; id < NET_RX_RING_SIZE; id++) {
 		if ((ref = np->grant_rx_ref[id]) == GRANT_INVALID_REF) {
@@ -1579,14 +1586,16 @@ static void netif_release_rx_bufs(struct netfront_info *np)
 			mcl->args[2] = 0;
 			mcl->args[3] = DOMID_SELF;
 			mcl++;
-			HYPERVISOR_multicall(np->rx_mcl, mcl - np->rx_mcl);
+			rc = HYPERVISOR_multicall_check(
+				np->rx_mcl, mcl - np->rx_mcl, NULL);
+			BUG_ON(rc);
 		}
 	}
 
 	while ((skb = __skb_dequeue(&free_list)) != NULL)
 		dev_kfree_skb(skb);
 
-	spin_unlock(&np->rx_lock);
+	spin_unlock_bh(&np->rx_lock);
 }
 
 static int network_close(struct net_device *dev)
@@ -1706,8 +1715,8 @@ static int network_connect(struct net_device *dev)
 	IPRINTK("device %s has %sing receive path.\n",
 		dev->name, np->copying_receiver ? "copy" : "flipp");
 
+	spin_lock_bh(&np->rx_lock);
 	spin_lock_irq(&np->tx_lock);
-	spin_lock(&np->rx_lock);
 
 	/*
 	 * Recovery procedure:
@@ -1759,8 +1768,8 @@ static int network_connect(struct net_device *dev)
 	network_tx_buf_gc(dev);
 	network_alloc_rx_buffers(dev);
 
-	spin_unlock(&np->rx_lock);
 	spin_unlock_irq(&np->tx_lock);
+	spin_unlock_bh(&np->rx_lock);
 
 	return 0;
 }
@@ -1815,7 +1824,7 @@ static ssize_t store_rxbuf_min(struct device *dev,
 	if (target > RX_MAX_TARGET)
 		target = RX_MAX_TARGET;
 
-	spin_lock(&np->rx_lock);
+	spin_lock_bh(&np->rx_lock);
 	if (target > np->rx_max_target)
 		np->rx_max_target = target;
 	np->rx_min_target = target;
@@ -1824,7 +1833,7 @@ static ssize_t store_rxbuf_min(struct device *dev,
 
 	network_alloc_rx_buffers(netdev);
 
-	spin_unlock(&np->rx_lock);
+	spin_unlock_bh(&np->rx_lock);
 	return len;
 }
 
@@ -1857,7 +1866,7 @@ static ssize_t store_rxbuf_max(struct device *dev,
 	if (target > RX_MAX_TARGET)
 		target = RX_MAX_TARGET;
 
-	spin_lock(&np->rx_lock);
+	spin_lock_bh(&np->rx_lock);
 	if (target < np->rx_min_target)
 		np->rx_min_target = target;
 	np->rx_max_target = target;
@@ -1866,7 +1875,7 @@ static ssize_t store_rxbuf_max(struct device *dev,
 
 	network_alloc_rx_buffers(netdev);
 
-	spin_unlock(&np->rx_lock);
+	spin_unlock_bh(&np->rx_lock);
 	return len;
 }
 
@@ -2025,11 +2034,11 @@ inetdev_notify(struct notifier_block *this, unsigned long event, void *ptr)
 static void netif_disconnect_backend(struct netfront_info *info)
 {
 	/* Stop old i/f to prevent errors whilst we rebuild the state. */
+	spin_lock_bh(&info->rx_lock);
 	spin_lock_irq(&info->tx_lock);
-	spin_lock(&info->rx_lock);
 	netfront_carrier_off(info);
-	spin_unlock(&info->rx_lock);
 	spin_unlock_irq(&info->tx_lock);
+	spin_unlock_bh(&info->rx_lock);
 
 	if (info->irq)
 		unbind_from_irqhandler(info->irq, info->netdev);
