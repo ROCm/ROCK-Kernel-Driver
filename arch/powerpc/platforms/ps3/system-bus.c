@@ -167,6 +167,30 @@ static int ps3_system_bus_remove(struct device *_dev)
 	return 0;
 }
 
+static const char *ps3_system_bus_modalias(enum ps3_match_id match_id)
+{
+	const char *p;
+	switch (match_id) {
+		case PS3_MATCH_ID_EHCI:
+			p = "ps3-ehci";
+			break;
+		case PS3_MATCH_ID_OHCI:
+			p = "ps3-ohci";
+			break;
+		case PS3_MATCH_ID_GELIC:
+			p = "gelic_net";
+			break;
+		case PS3_MATCH_ID_AV_SETTINGS:
+			p = "ps3av";
+			break;
+		case PS3_MATCH_ID_SYSTEM_MANAGER:
+		default:
+			p = "unknown";
+			break;
+	}
+	return p;
+}
+
 static int ps3_system_bus_uevent(struct device *_dev, char **envp,
 				 int num_envp, char *buffer, int buffer_size)
 {
@@ -174,8 +198,8 @@ static int ps3_system_bus_uevent(struct device *_dev, char **envp,
 	int i=0, length = 0;
 
 	if (add_uevent_var(envp, num_envp, &i, buffer, buffer_size,
-			   &length, "MODALIAS=ps3:%d",
-			   dev->match_id))
+			   &length, "MODALIAS=%s",
+			   ps3_system_bus_modalias(dev->match_id)))
 		return -ENOMEM;
 
 	envp[i] = NULL;
@@ -186,7 +210,7 @@ static ssize_t modalias_show(struct device *_dev, struct device_attribute *a,
 			     char *buf)
 {
 	struct ps3_system_bus_device *dev = to_ps3_system_bus_device(_dev);
-        int len = snprintf(buf, PAGE_SIZE, "ps3:%d\n", dev->match_id);
+        int len = snprintf(buf, PAGE_SIZE, "%s\n", ps3_system_bus_modalias(dev->match_id));
 
         return (len >= PAGE_SIZE) ? (PAGE_SIZE - 1) : len;
 }
