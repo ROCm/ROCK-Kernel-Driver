@@ -2487,9 +2487,10 @@ static inline void security_inode_delete (struct inode *inode)
 
 static inline int security_inode_setxattr (struct dentry *dentry,
 					   struct vfsmount *mnt, char *name,
-					   void *value, size_t size, int flags)
+					   void *value, size_t size, int flags,
+					   struct file *file)
 {
-	return cap_inode_setxattr(dentry, mnt, name, value, size, flags);
+	return cap_inode_setxattr(dentry, mnt, name, value, size, flags, file);
 }
 
 static inline void security_inode_post_setxattr (struct dentry *dentry,
@@ -2500,21 +2501,24 @@ static inline void security_inode_post_setxattr (struct dentry *dentry,
 { }
 
 static inline int security_inode_getxattr (struct dentry *dentry,
-					    struct vfsmount *mnt, char *name)
+					    struct vfsmount *mnt, char *name,
+					    struct file *file)
 {
 	return 0;
 }
 
 static inline int security_inode_listxattr (struct dentry *dentry,
-					    struct vfsmount *mnt)
+					    struct vfsmount *mnt,
+					    struct file *file)
 {
 	return 0;
 }
 
 static inline int security_inode_removexattr (struct dentry *dentry,
-					      struct vfsmount *mnt, char *name)
+					      struct vfsmount *mnt, char *name,
+					      struct file *file)
 {
-	return cap_inode_removexattr(dentry, mnt, name);
+	return cap_inode_removexattr(dentry, mnt, name, file);
 }
 
 static inline const char *security_inode_xattr_getsuffix (void)

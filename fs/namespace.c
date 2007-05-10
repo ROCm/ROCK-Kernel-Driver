@@ -348,16 +348,8 @@ static inline void mangle(struct seq_file *m, const char *s)
 	seq_escape(m, s, " \t\n\\");
 }
 
-/* Keep in sync with fs/proc/base.c! */
-struct proc_mounts {
-        struct seq_file m;
-        void *page;
-        int event;
-};
-
 static int show_vfsmnt(struct seq_file *m, void *v)
 {
-	void *page = container_of(m, struct proc_mounts, m)->page;
 	struct vfsmount *mnt = v;
 	int err = 0;
 	static struct proc_fs_info {
@@ -380,13 +372,9 @@ static int show_vfsmnt(struct seq_file *m, void *v)
 	};
 	struct proc_fs_info *fs_infop;
 
-	char *path = d_path(mnt->mnt_root, mnt, page, PAGE_SIZE);
-	if (IS_ERR(path) || *path != '/')
-		return err;
-
 	mangle(m, mnt->mnt_devname ? mnt->mnt_devname : "none");
 	seq_putc(m, ' ');
-	mangle(m, path);
+	seq_path(m, mnt, mnt->mnt_root, " \t\n\\");
 	seq_putc(m, ' ');
 	mangle(m, mnt->mnt_sb->s_type->name);
 	seq_puts(m, mnt->mnt_sb->s_flags & MS_RDONLY ? " ro" : " rw");
@@ -413,13 +401,8 @@ struct seq_operations mounts_op = {
 
 static int show_vfsstat(struct seq_file *m, void *v)
 {
-	void *page = container_of(m, struct proc_mounts, m)->page;
 	struct vfsmount *mnt = v;
 	int err = 0;
-
-	char *path = d_path(mnt->mnt_root, mnt, page, PAGE_SIZE);
-	if (IS_ERR(path) || *path != '/')
-		return err; /* error or path unreachable from chroot */
 
 	/* device */
 	if (mnt->mnt_devname) {
@@ -430,7 +413,7 @@ static int show_vfsstat(struct seq_file *m, void *v)
 
 	/* mount point */
 	seq_puts(m, " mounted on ");
-	mangle(m, path);
+	seq_path(m, mnt, mnt->mnt_root, " \t\n\\");
 	seq_putc(m, ' ');
 
 	/* file system type */
@@ -1898,21 +1881,26 @@ void __put_mnt_ns(struct mnt_namespace *ns)
 char *d_namespace_path(struct dentry *dentry, struct vfsmount *vfsmnt,
 		       char *buf, int buflen)
 {
+	struct vfsmount *rootmnt, *nsrootmnt = NULL;
+	struct dentry *root = NULL;
 	char *res;
-	struct vfsmount *rootmnt, *nsrootmnt;
-	struct dentry *root;
 
 	read_lock(&current->fs->lock);
 	rootmnt = mntget(current->fs->rootmnt);
 	read_unlock(&current->fs->lock);
 	spin_lock(&vfsmount_lock);
-	nsrootmnt = mntget(rootmnt->mnt_ns->root);
-	root = dget(nsrootmnt->mnt_root);
+	if (rootmnt->mnt_ns)
+		nsrootmnt = mntget(rootmnt->mnt_ns->root);
 	spin_unlock(&vfsmount_lock);
 	mntput(rootmnt);
+	if (nsrootmnt)
+		root = dget(nsrootmnt->mnt_root);
 	res = __d_path(dentry, vfsmnt, root, nsrootmnt, buf, buflen, 1);
 	dput(root);
 	mntput(nsrootmnt);
+	/* Prevent empty path for lazily unmounted filesystems. */
+	if (!IS_ERR(res) && *res == '\0')
+		*--res = '.';
 	return res;
 }
 EXPORT_SYMBOL(d_namespace_path);

@@ -1,6 +1,7 @@
 config SECURITY_APPARMOR
 	tristate "AppArmor support"
-	depends on SECURITY!=n
+	depends on SECURITY
+	select AUDIT
 	help
 	  This enables the AppArmor security module.
 	  Required userspace tools (if they are not included in your

@@ -1,19 +1,17 @@
 /*
- *	Copyright (C) 2002-2005 Novell/SUSE
+ *	Copyright (C) 2007 Novell/SUSE
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License as
  *	published by the Free Software Foundation, version 2 of the
  *	License.
  *
- *	http://forge.novell.com/modules/xfmod/project/?apparmor
- *
- *	AppArmor aa_match submodule (w/ pattern expansion).
- *
+ *	Regular expression transition table matching
  */
 
-#include <asm/unaligned.h>
-#include <linux/module.h>
+#include <linux/kernel.h>
+#include <linux/slab.h>
+#include <linux/errno.h>
 #include "match.h"
 
 static struct table_header *unpack_table(void *blob, size_t bsize)
@@ -25,9 +23,9 @@ static struct table_header *unpack_table(void *blob, size_t bsize)
 	if (bsize < sizeof(struct table_header))
 		goto out;
 
-	th.td_id = ntohs(*(u16 *) (blob));
-	th.td_flags = ntohs(*(u16 *) (blob + 2));
-	th.td_lolen = ntohl(*(u32 *) (blob + 8));
+	th.td_id = be16_to_cpu(*(u16 *) (blob));
+	th.td_flags = be16_to_cpu(*(u16 *) (blob + 2));
+	th.td_lolen = be32_to_cpu(*(u32 *) (blob + 8));
 	blob += sizeof(struct table_header);
 
 	if (!(th.td_flags == YYTD_DATA16 || th.td_flags == YYTD_DATA32 ||
@@ -43,13 +41,13 @@ static struct table_header *unpack_table(void *blob, size_t bsize)
 		*table = th;
 		if (th.td_flags == YYTD_DATA8)
 			UNPACK_ARRAY(table->td_data, blob, th.td_lolen,
-				     u8, ntohb);
+				     u8, byte_to_byte);
 		else if (th.td_flags == YYTD_DATA16)
 			UNPACK_ARRAY(table->td_data, blob, th.td_lolen,
-				     u16, ntohs);
+				     u16, be16_to_cpu);
 		else
 			UNPACK_ARRAY(table->td_data, blob, th.td_lolen,
-				     u32, ntohl);
+				     u32, be32_to_cpu);
 	}
 
 out:
@@ -58,27 +56,24 @@ out:
 
 int unpack_dfa(struct aa_dfa *dfa, void *blob, size_t size)
 {
-	int i;
+	int hsize, i;
 	int error = -ENOMEM;
 
 	/* get dfa table set header */
 	if (size < sizeof(struct table_set_header))
 		goto fail;
 
-	dfa->th.th_magic = ntohl(*(u32 *) (blob + 0));
-	dfa->th.th_hsize = ntohl(*(u32 *) (blob + 4));
-	dfa->th.th_ssize = ntohl(*(u32 *) (blob + 8));
-	dfa->th.th_flags = ntohs(*(u16 *) (blob + 12));
-
-	if (dfa->th.th_magic != YYTH_MAGIC)
+	if (ntohl(*(u32 *)blob) != YYTH_MAGIC)
 		goto fail;
 
-	if (size < dfa->th.th_hsize)
+	hsize = ntohl(*(u32 *)(blob + 4));
+	if (size < hsize)
 		goto fail;
 
-	blob += dfa->th.th_hsize;
-	size -= dfa->th.th_hsize;
+	blob += hsize;
+	size -= hsize;
 
+	error = -EPROTO;
 	while (size > 0) {
 		struct table_header *table;
 		table = unpack_table(blob, size);
@@ -90,37 +85,33 @@ int unpack_dfa(struct aa_dfa *dfa, void *blob, size_t size)
 		case YYTD_ID_BASE:
 			dfa->tables[table->td_id - 1] = table;
 			if (table->td_flags != YYTD_DATA32)
-				goto fail_proto;
+				goto fail;
 			break;
 		case YYTD_ID_DEF:
 		case YYTD_ID_NXT:
 		case YYTD_ID_CHK:
 			dfa->tables[table->td_id - 1] = table;
 			if (table->td_flags != YYTD_DATA16)
-				goto fail_proto;
+				goto fail;
 			break;
 		case YYTD_ID_EC:
 			dfa->tables[table->td_id - 1] = table;
 			if (table->td_flags != YYTD_DATA8)
-				goto fail_proto;
+				goto fail;
 			break;
 		default:
 			kfree(table);
-			goto fail_proto;
+			goto fail;
 		}
 
 		blob += table_size(table->td_lolen, table->td_flags);
 		size -= table_size(table->td_lolen, table->td_flags);
 	}
 
-	error = 0;
+	return 0;
 
-	return error;
-
-fail_proto:
-	error = -EPROTO;
 fail:
-	for (i = 0; i < YYTD_ID_NXT; i++) {
+	for (i = 0; i < ARRAY_SIZE(dfa->tables); i++) {
 		if (dfa->tables[i]) {
 			kfree(dfa->tables[i]);
 			dfa->tables[i] = NULL;
@@ -193,9 +184,9 @@ void aa_match_free(struct aa_dfa *dfa)
 {
 	if (dfa) {
 		int i;
-		for (i = 0; i < YYTD_ID_NXT; i++) {
+
+		for (i = 0; i < ARRAY_SIZE(dfa->tables); i++)
 			kfree(dfa->tables[i]);
-		}
 	}
 	kfree(dfa);
 }
@@ -210,7 +201,7 @@ void aa_match_free(struct aa_dfa *dfa)
  * finished matching in. The final state is used to look up the accepting
  * label.
  */
-inline unsigned int aa_dfa_match(struct aa_dfa *dfa, const char *str)
+unsigned int aa_dfa_match(struct aa_dfa *dfa, const char *str)
 {
 	u16 *def = DEFAULT_TABLE(dfa);
 	u32 *base = BASE_TABLE(dfa);
@@ -238,9 +229,4 @@ inline unsigned int aa_dfa_match(struct aa_dfa *dfa, const char *str)
 		}
 	}
 	return ACCEPT_TABLE(dfa)[state];
-}
-
-unsigned int aa_match(struct aa_dfa *dfa, const char *pathname)
-{
-	return dfa ? aa_dfa_match(dfa, pathname) : 0;
 }

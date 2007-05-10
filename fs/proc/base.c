@@ -353,16 +353,13 @@ static const struct inode_operations proc_def_inode_operations = {
 	.setattr	= proc_setattr,
 };
 
-/* Keep in sync with fs/namespace.c! */
 extern struct seq_operations mounts_op;
 struct proc_mounts {
 	struct seq_file m;
-	void *page;
 	int event;
 };
 
-static int __mounts_open(struct inode *inode, struct file *file,
-			 struct seq_operations *seq_ops)
+static int mounts_open(struct inode *inode, struct file *file)
 {
 	struct task_struct *task = get_proc_task(inode);
 	struct mnt_namespace *ns = NULL;
@@ -385,16 +382,12 @@ static int __mounts_open(struct inode *inode, struct file *file,
 		p = kmalloc(sizeof(struct proc_mounts), GFP_KERNEL);
 		if (p) {
 			file->private_data = &p->m;
-			p->page = (void *)__get_free_page(GFP_KERNEL);
-			if (p->page)
-				ret = seq_open(file, seq_ops);
+			ret = seq_open(file, &mounts_op);
 			if (!ret) {
 				p->m.private = ns;
 				p->event = ns->event;
 				return 0;
 			}
-			if (p->page)
-				free_page((unsigned long)p->page);
 			kfree(p);
 		}
 		put_mnt_ns(ns);
@@ -402,25 +395,17 @@ static int __mounts_open(struct inode *inode, struct file *file,
 	return ret;
 }
 
-static int mounts_open(struct inode *inode, struct file *file)
-{
-	return __mounts_open(inode, file, &mounts_op);
-}
-
 static int mounts_release(struct inode *inode, struct file *file)
 {
-	struct proc_mounts *p =
-		container_of(file->private_data, struct proc_mounts, m);
-	struct mnt_namespace *ns = p->m.private;
-	free_page((unsigned long)p->page);
+	struct seq_file *m = file->private_data;
+	struct mnt_namespace *ns = m->private;
 	put_mnt_ns(ns);
 	return seq_release(inode, file);
 }
 
 static unsigned mounts_poll(struct file *file, poll_table *wait)
 {
-	struct proc_mounts *p =
-		container_of(file->private_data, struct proc_mounts, m);
+	struct proc_mounts *p = file->private_data;
 	struct mnt_namespace *ns = p->m.private;
 	unsigned res = 0;
 
@@ -447,7 +432,31 @@ static const struct file_operations proc_mounts_operations = {
 extern struct seq_operations mountstats_op;
 static int mountstats_open(struct inode *inode, struct file *file)
 {
-	return __mounts_open(inode, file, &mountstats_op);
+	int ret = seq_open(file, &mountstats_op);
+
+	if (!ret) {
+		struct seq_file *m = file->private_data;
+		struct mnt_namespace *mnt_ns = NULL;
+		struct task_struct *task = get_proc_task(inode);
+
+		if (task) {
+			task_lock(task);
+			if (task->nsproxy)
+				mnt_ns = task->nsproxy->mnt_ns;
+			if (mnt_ns)
+				get_mnt_ns(mnt_ns);
+			task_unlock(task);
+			put_task_struct(task);
+		}
+
+		if (mnt_ns)
+			m->private = mnt_ns;
+		else {
+			seq_release(inode, file);
+			ret = -EINVAL;
+		}
+	}
+	return ret;
 }
 
 static const struct file_operations proc_mountstats_operations = {

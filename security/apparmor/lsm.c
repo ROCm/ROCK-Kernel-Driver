@@ -1,14 +1,12 @@
 /*
- *	Copyright (C) 2002-2005 Novell/SUSE
+ *	Copyright (C) 1998-2007 Novell/SUSE
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License as
  *	published by the Free Software Foundation, version 2 of the
  *	License.
  *
- *	http://forge.novell.com/modules/xfmod/project/?apparmor
- *
- *	Immunix AppArmor LSM interface
+ *	AppArmor LSM interface
  */
 
 #include <linux/security.h>
@@ -17,45 +15,80 @@
 #include <linux/mman.h>
 #include <linux/mount.h>
 #include <linux/namei.h>
+#include <linux/ctype.h>
+#include <linux/sysctl.h>
 
 #include "apparmor.h"
 #include "inline.h"
 
-/* Flag values, also controllable via apparmorfs/control.
- * We explicitly do not allow these to be modifiable when exported via
- * /sys/modules/parameters, as we want to do additional mediation and
- * don't want to add special path code. */
+static int param_set_aabool(const char *val, struct kernel_param *kp);
+static int param_get_aabool(char *buffer, struct kernel_param *kp);
+#define param_check_aabool(name, p) __param_check(name, p, int)
 
-/* Complain mode -- in complain mode access failures result in auditing only
+static int param_set_aauint(const char *val, struct kernel_param *kp);
+static int param_get_aauint(char *buffer, struct kernel_param *kp);
+#define param_check_aauint(name, p) __param_check(name, p, int)
+
+/* Flag values, also controllable via /sys/module/apparmor/parameters
+ * We define special types as we want to do additional mediation.
+ *
+ * Complain mode -- in complain mode access failures result in auditing only
  * and task is allowed access.  audit events are processed by userspace to
  * generate policy.  Default is 'enforce' (0).
  * Value is also togglable per profile and referenced when global value is
  * enforce.
  */
 int apparmor_complain = 0;
-module_param_named(complain, apparmor_complain, int, S_IRUSR);
+module_param_named(complain, apparmor_complain, aabool, S_IRUSR | S_IWUSR);
 MODULE_PARM_DESC(apparmor_complain, "Toggle AppArmor complain mode");
 
 /* Debug mode */
 int apparmor_debug = 0;
-module_param_named(debug, apparmor_debug, int, S_IRUSR);
+module_param_named(debug, apparmor_debug, aabool, S_IRUSR | S_IWUSR);
 MODULE_PARM_DESC(apparmor_debug, "Toggle AppArmor debug mode");
 
 /* Audit mode */
 int apparmor_audit = 0;
-module_param_named(audit, apparmor_audit, int, S_IRUSR);
+module_param_named(audit, apparmor_audit, aabool, S_IRUSR | S_IWUSR);
 MODULE_PARM_DESC(apparmor_audit, "Toggle AppArmor audit mode");
 
 /* Syscall logging mode */
 int apparmor_logsyscall = 0;
-module_param_named(logsyscall, apparmor_logsyscall, int, S_IRUSR);
+module_param_named(logsyscall, apparmor_logsyscall, aabool, S_IRUSR | S_IWUSR);
 MODULE_PARM_DESC(apparmor_logsyscall, "Toggle AppArmor logsyscall mode");
 
 /* Maximum pathname length before accesses will start getting rejected */
-int apparmor_path_max = 2 * PATH_MAX;
-module_param_named(path_max, apparmor_path_max, int, S_IRUSR);
+unsigned int apparmor_path_max = 2 * PATH_MAX;
+module_param_named(path_max, apparmor_path_max, aauint, S_IRUSR | S_IWUSR);
 MODULE_PARM_DESC(apparmor_path_max, "Maximum pathname length allowed");
 
+static int param_set_aabool(const char *val, struct kernel_param *kp)
+{
+	if (aa_task_context(current))
+		return -EPERM;
+	return param_set_bool(val, kp);
+}
+
+static int param_get_aabool(char *buffer, struct kernel_param *kp)
+{
+	if (aa_task_context(current))
+		return -EPERM;
+	return param_get_bool(buffer, kp);
+}
+
+static int param_set_aauint(const char *val, struct kernel_param *kp)
+{
+	if (aa_task_context(current))
+		return -EPERM;
+	return param_set_uint(val, kp);
+}
+
+static int param_get_aauint(char *buffer, struct kernel_param *kp)
+{
+	if (aa_task_context(current))
+		return -EPERM;
+	return param_get_uint(buffer, kp);
+}
 
 static int aa_reject_syscall(struct task_struct *task, gfp_t flags,
 			     const char *name)
@@ -72,56 +105,45 @@ static int aa_reject_syscall(struct task_struct *task, gfp_t flags,
 }
 
 static int apparmor_ptrace(struct task_struct *parent,
-			    struct task_struct *child)
+			   struct task_struct *child)
 {
-	int error;
+	struct aa_task_context *cxt;
+	struct aa_task_context *child_cxt;
+	struct aa_profile *child_profile;
+	int error = 0;
 
 	/**
-	 * Right now, we only allow confined processes to ptrace other
-	 * processes if they have CAP_SYS_PTRACE. We could allow ptrace
-	 * under the rules that the kernel normally permits if the two
-	 * processes are running under the same profile, but then we
-	 * would probably have to reject profile changes for processes
-	 * that are being ptraced as well as for processes ptracing
-	 * others.
+	 * parent can ptrace child when
+	 * - parent is unconfined
+	 * - parent & child are in the same namespace &&
+	 *   - parent is in complain mode
+	 *   - parent and child are confined by the same profile
+	 *   - parent profile has CAP_SYS_PTRACE
 	 */
 
-	error = cap_ptrace(parent, child);
-	if (!error) {
-		struct aa_task_context *cxt;
-
-		rcu_read_lock();
-		cxt = aa_task_context(parent);
-		if (cxt)
-			error = aa_capability(cxt, CAP_SYS_PTRACE);
-		rcu_read_unlock();
+	rcu_read_lock();
+	cxt = aa_task_context(parent);
+	child_cxt = aa_task_context(child);
+	child_profile = child_cxt ? child_cxt->profile : NULL;
+	if (cxt && (parent->nsproxy != child->nsproxy)) {
+		aa_audit_message(NULL, GFP_ATOMIC, "REJECTING ptrace across "
+				 "namespace of %d by %d",
+				 parent->pid, child->pid);
+		error = -EPERM;
+	} else {
+		error = aa_may_ptrace(cxt, child_profile);
+		if (cxt && PROFILE_COMPLAIN(cxt->profile)) {
+			aa_audit_message(cxt->profile, GFP_ATOMIC,
+					 "LOGPROF-HINT ptrace pid=%d child=%d "
+					 "(%d profile %s active %s)",
+					 current->pid, child->pid, current->pid,
+					 cxt->profile->parent->name,
+					 cxt->profile->name);
+		}
 	}
+	rcu_read_unlock();
 
 	return error;
-}
-
-static int apparmor_capget(struct task_struct *task,
-			    kernel_cap_t *effective,
-			    kernel_cap_t *inheritable,
-			    kernel_cap_t *permitted)
-{
-	return cap_capget(task, effective, inheritable, permitted);
-}
-
-static int apparmor_capset_check(struct task_struct *task,
-				  kernel_cap_t *effective,
-				  kernel_cap_t *inheritable,
-				  kernel_cap_t *permitted)
-{
-	return cap_capset_check(task, effective, inheritable, permitted);
-}
-
-static void apparmor_capset_set(struct task_struct *task,
-				 kernel_cap_t *effective,
-				 kernel_cap_t *inheritable,
-				 kernel_cap_t *permitted)
-{
-	cap_capset_set(task, effective, inheritable, permitted);
 }
 
 static int apparmor_capable(struct task_struct *task, int cap)
@@ -146,33 +168,34 @@ static int apparmor_capable(struct task_struct *task, int cap)
 
 static int apparmor_sysctl(struct ctl_table *table, int op)
 {
+	struct aa_profile *profile = aa_get_profile(current);
 	int error = 0;
 
-	if ((op & 002) && !capable(CAP_SYS_ADMIN))
-		error = aa_reject_syscall(current, GFP_KERNEL,
-					  "sysctl (write)");
+	if (profile) {
+		char *buffer, *name;
+		int mask;
 
+		mask = 0;
+		if (op & 4)
+			mask |= MAY_READ;
+		if (op & 2)
+			mask |= MAY_WRITE;
+
+		error = -ENOMEM;
+		buffer = (char*)__get_free_page(GFP_KERNEL);
+		if (!buffer)
+			goto out;
+		name = sysctl_pathname(table, buffer, PAGE_SIZE);
+		if (name && name - buffer >= 5) {
+			name -= 5;
+			memcpy(name, "/proc", 5);
+			error = aa_perm_path(profile, name, mask);
+		}
+		free_page((unsigned long)buffer);
+	}
+
+out:
 	return error;
-}
-
-static int apparmor_syslog(int type)
-{
-	return cap_syslog(type);
-}
-
-static int apparmor_netlink_send(struct sock *sk, struct sk_buff *skb)
-{
-	return cap_netlink_send(sk, skb);
-}
-
-static int apparmor_netlink_recv(struct sk_buff *skb, int cap)
-{
-	return cap_netlink_recv(skb, cap);
-}
-
-static void apparmor_bprm_apply_creds(struct linux_binprm *bprm, int unsafe)
-{
-	cap_bprm_apply_creds(bprm, unsafe);
 }
 
 static int apparmor_bprm_set_security(struct linux_binprm *bprm)
@@ -268,7 +291,7 @@ static int aa_permission(struct inode *inode, struct dentry *dentry,
 static int apparmor_inode_create(struct inode *dir, struct dentry *dentry,
 				 struct vfsmount *mnt, int mask)
 {
-	return aa_permission(dir, dentry, mnt, MAY_WRITE, AA_CHECK_LEAF);
+	return aa_permission(dir, dentry, mnt, MAY_WRITE, 0);
 }
 
 static int apparmor_inode_link(struct dentry *old_dentry,
@@ -297,7 +320,7 @@ out:
 static int apparmor_inode_unlink(struct inode *dir, struct dentry *dentry,
 				 struct vfsmount *mnt)
 {
-	int check = AA_CHECK_LEAF;
+	int check = 0;
 
 	if (S_ISDIR(dentry->d_inode->i_mode))
 		check |= AA_CHECK_DIR;
@@ -307,13 +330,13 @@ static int apparmor_inode_unlink(struct inode *dir, struct dentry *dentry,
 static int apparmor_inode_symlink(struct inode *dir, struct dentry *dentry,
 				  struct vfsmount *mnt, const char *old_name)
 {
-	return aa_permission(dir, dentry, mnt, MAY_WRITE, AA_CHECK_LEAF);
+	return aa_permission(dir, dentry, mnt, MAY_WRITE, 0);
 }
 
 static int apparmor_inode_mknod(struct inode *dir, struct dentry *dentry,
 				struct vfsmount *mnt, int mode, dev_t dev)
 {
-	return aa_permission(dir, dentry, mnt, MAY_WRITE, AA_CHECK_LEAF);
+	return aa_permission(dir, dentry, mnt, MAY_WRITE, 0);
 }
 
 static int apparmor_inode_rename(struct inode *old_dir,
@@ -333,7 +356,7 @@ static int apparmor_inode_rename(struct inode *old_dir,
 
 	if (profile) {
 		struct inode *inode = old_dentry->d_inode;
-		int check = AA_CHECK_LEAF;
+		int check = 0;
 
 		if (inode && S_ISDIR(inode->i_mode))
 			check |= AA_CHECK_DIR;
@@ -358,13 +381,14 @@ static int apparmor_inode_permission(struct inode *inode, int mask,
 {
 	int check = 0;
 
-	if (!nd)
+	if (!nd || nd->flags & (LOOKUP_PARENT | LOOKUP_CONTINUE))
 		return 0;
-	if (S_ISDIR(inode->i_mode))
-		check |= AA_CHECK_DIR;
 	mask &= (MAY_READ | MAY_WRITE | MAY_EXEC);
-
-	/* Assume we are not checking a leaf directory. */
+	if (S_ISDIR(inode->i_mode)) {
+		check |= AA_CHECK_DIR;
+		/* allow traverse accesses to directories */
+		mask &= ~MAY_EXEC;
+	}
 	return aa_permission(inode, nd->dentry, nd->mnt, mask, check);
 }
 
@@ -395,8 +419,8 @@ out:
 }
 
 static int aa_xattr_permission(struct dentry *dentry, struct vfsmount *mnt,
-			       const char *name, const char *operation,
-			       int mask, struct file *file)
+			       const char *operation, int mask,
+			       struct file *file)
 {
 	int error = 0;
 
@@ -405,8 +429,8 @@ static int aa_xattr_permission(struct dentry *dentry, struct vfsmount *mnt,
 		int check = file ? AA_CHECK_FD : 0;
 
 		if (profile)
-			error = aa_perm_xattr(profile, dentry, mnt, name,
-					      operation, mask, check);
+			error = aa_perm_xattr(profile, dentry, mnt, operation,
+					      mask, check);
 		aa_put_profile(profile);
 	}
 
@@ -417,30 +441,27 @@ static int apparmor_inode_setxattr(struct dentry *dentry, struct vfsmount *mnt,
 				   char *name, void *value, size_t size,
 				   int flags, struct file *file)
 {
-	return aa_xattr_permission(dentry, mnt, name, "xattr set", MAY_WRITE,
-				   file);
+	return aa_xattr_permission(dentry, mnt, "xattr set", MAY_WRITE, file);
 }
 
 static int apparmor_inode_getxattr(struct dentry *dentry, struct vfsmount *mnt,
 				   char *name, struct file *file)
 {
-	return aa_xattr_permission(dentry, mnt, name, "xattr get", MAY_READ,
-				   file);
+	return aa_xattr_permission(dentry, mnt, "xattr get", MAY_READ, file);
 }
 
 static int apparmor_inode_listxattr(struct dentry *dentry, struct vfsmount *mnt,
 				    struct file *file)
 {
-	return aa_xattr_permission(dentry, mnt, NULL, "xattr list", MAY_READ,
-				   file);
+	return aa_xattr_permission(dentry, mnt, "xattr list", MAY_READ, file);
 }
 
 static int apparmor_inode_removexattr(struct dentry *dentry,
 				      struct vfsmount *mnt, char *name,
 				      struct file *file)
 {
-	return aa_xattr_permission(dentry, mnt, name, "xattr remove",
-				   MAY_WRITE, file);
+	return aa_xattr_permission(dentry, mnt, "xattr remove", MAY_WRITE,
+				   file);
 }
 
 static int apparmor_file_permission(struct file *file, int mask)
@@ -461,7 +482,7 @@ static int apparmor_file_permission(struct file *file, int mask)
 		struct dentry *dentry = file->f_dentry;
 		struct vfsmount *mnt = file->f_vfsmnt;
 		struct inode *inode = dentry->d_inode;
-		int check = AA_CHECK_LEAF | AA_CHECK_FD;
+		int check = AA_CHECK_FD;
 
 		/*
 		 * FIXME: We should remember which profiles we revalidated
@@ -475,22 +496,6 @@ static int apparmor_file_permission(struct file *file, int mask)
 	aa_put_profile(profile);
 
 out:
-	return error;
-}
-
-static int apparmor_task_create(unsigned long clone_flags)
-{
-	struct aa_profile *profile;
-	int error = 0;
-
-	profile = aa_get_profile(current);
-	if (profile) {
-		/* Don't allow to create new namespaces. */
-		if (clone_flags & CLONE_NEWNS)
-			error = -EPERM;
-	}
-	aa_put_profile(profile);
-
 	return error;
 }
 
@@ -532,7 +537,7 @@ static inline int aa_mmap(struct file *file, unsigned long prot,
 
 	dentry = file->f_dentry;
 	return aa_permission(dentry->d_inode, dentry, file->f_vfsmnt, mask,
-			     AA_CHECK_LEAF | AA_CHECK_FD);
+			     AA_CHECK_FD);
 }
 
 static int apparmor_file_mmap(struct file *file, unsigned long reqprot,
@@ -561,17 +566,6 @@ static void apparmor_task_free_security(struct task_struct *task)
 	aa_release(task);
 }
 
-static int apparmor_task_post_setuid(uid_t id0, uid_t id1, uid_t id2,
-				     int flags)
-{
-	return cap_task_post_setuid(id0, id1, id2, flags);
-}
-
-static void apparmor_task_reparent_to_init(struct task_struct *task)
-{
-	cap_task_reparent_to_init(task);
-}
-
 static int apparmor_getprocattr(struct task_struct *task, char *name,
 				char **value)
 {
@@ -580,16 +574,12 @@ static int apparmor_getprocattr(struct task_struct *task, char *name,
 	struct aa_profile *profile;
 
 	/* AppArmor only supports the "current" process attribute */
-	if (strcmp(name, "current") != 0) {
-		error = -EINVAL;
-		goto out;
-	}
+	if (strcmp(name, "current") != 0)
+		return -EINVAL;
 
 	/* must be task querying itself or admin */
-	if (current != task && !capable(CAP_SYS_ADMIN)) {
-		error = -EPERM;
-		goto out;
-	}
+	if (current != task && !capable(CAP_SYS_ADMIN))
+		return -EPERM;
 
 	profile = aa_get_profile(task);
 	error = aa_getprocattr(profile, value, &len);
@@ -597,134 +587,82 @@ static int apparmor_getprocattr(struct task_struct *task, char *name,
 	if (!error)
 		error = len;
 
-out:
 	return error;
 }
 
 static int apparmor_setprocattr(struct task_struct *task, char *name,
 				void *value, size_t size)
 {
-	const char *cmd_changehat = "changehat ",
-		   *cmd_setprofile = "setprofile ";
-
+	char *command, *args;
 	int error;
-	char *cmd = (char *)value;
 
-	error = -EINVAL;
-	if (strcmp(name, "current") != 0)
-		goto out;
-	error = -ERANGE;
-	if (!size)
-		goto out;
+	if (strcmp(name, "current") != 0 || size == 0 || size >= PAGE_SIZE)
+		return -EINVAL;
+	args = value;
+	args[size] = '\0';
+	args = strstrip(args);
+	command = strsep(&args, " ");
+	if (!args)
+		return -EINVAL;
+	while (isspace(*args))
+		args++;
+	if (!*args)
+		return -EINVAL;
 
-	/* CHANGE HAT -- switch task into a subhat (subprofile) if defined */
-	if (size > strlen(cmd_changehat) &&
-	    strncmp(cmd, cmd_changehat, strlen(cmd_changehat)) == 0) {
-		char *hatinfo = cmd + strlen(cmd_changehat);
-		size_t infosize = size - strlen(cmd_changehat);
-
-		/* Only the current process may change it's hat */
-		if (current != task) {
-			AA_WARN(GFP_KERNEL,
-				"%s: Attempt by foreign task %s(%d) "
-				"[user %d] to changehat of task %s(%d)\n",
-				__FUNCTION__,
-				current->comm,
-				current->pid,
-				current->uid,
-				task->comm,
-				task->pid);
-
-			error = -EACCES;
-			goto out;
-		}
-
-		error = aa_setprocattr_changehat(hatinfo, infosize);
-		if (!error)
-			error = size;
-
-	/* SET NEW PROFILE */
-	} else if (size > strlen(cmd_setprofile) &&
-		   strncmp(cmd, cmd_setprofile, strlen(cmd_setprofile)) == 0) {
+	if (strcmp(command, "changehat") == 0) {
+		if (current != task)
+			return -EACCES;
+		error = aa_setprocattr_changehat(args);
+	} else if (strcmp(command, "setprofile")) {
 		struct aa_profile *profile;
 
-		/* only an unconfined process with admin capabilities
-		 * may change the profile of another task
+		/* Only an unconfined process with admin capabilities
+		 * may change the profile of another task.
 		 */
 
-		if (!capable(CAP_SYS_ADMIN)) {
-			AA_WARN(GFP_KERNEL,
-				"%s: Unprivileged attempt by task %s(%d) "
-				"[user %d] to assign profile to task %s(%d)\n",
-				__FUNCTION__,
-				current->comm,
-				current->pid,
-				current->uid,
-				task->comm,
-				task->pid);
-			error = -EACCES;
-			goto out;
-		}
+		if (!capable(CAP_SYS_ADMIN))
+			return -EACCES;
 
 		profile = aa_get_profile(current);
-		if (!profile) {
-			char *profile = cmd + strlen(cmd_setprofile);
-			size_t profilesize = size - strlen(cmd_setprofile);
-
-			error = aa_setprocattr_setprofile(task, profile, profilesize);
-			if (!error)
-				/* success,
-				 * set return to #bytes in orig request
-				 */
-				error = size;
-		} else {
-			AA_WARN(GFP_KERNEL,
-				"%s: Attempt by confined task %s(%d) "
-				"[user %d] to assign profile to task %s(%d)\n",
-				__FUNCTION__,
-				current->comm,
-				current->pid,
-				current->uid,
-				task->comm,
-				task->pid);
-
-			error = -EACCES;
+		if (profile) {
+			aa_put_profile(profile);
+			aa_audit_message(NULL, GFP_KERNEL, "Attempt by "
+					 "confined task %d [user %d] to "
+					 "assign profile to task %d",
+					 current->pid, current->uid,
+					 task->pid);
+			return -EACCES;
 		}
-		aa_put_profile(profile);
+		error = aa_setprocattr_setprofile(task, args);
 	} else {
-		/* unknown operation */
-		AA_WARN(GFP_KERNEL,
-			"%s: Unknown setprocattr command '%.*s' by task %s(%d)"
-			" [user %d] for task %s(%d)\n",
-			__FUNCTION__,
+		AA_ERROR("Unknown setprocattr command '%.*s' "
+			"by task %d [user %d] for task %d",
 			size < 16 ? (int)size : 16,
-			cmd,
-			current->comm,
+			command,
 			current->pid,
 			current->uid,
-			task->comm,
 			task->pid);
-
 		error = -EINVAL;
 	}
 
-out:
+	if (!error)
+		error = size;
 	return error;
 }
 
 struct security_operations apparmor_ops = {
 	.ptrace =			apparmor_ptrace,
-	.capget =			apparmor_capget,
-	.capset_check =			apparmor_capset_check,
-	.capset_set =			apparmor_capset_set,
+	.capget =			cap_capget,
+	.capset_check =			cap_capset_check,
+	.capset_set =			cap_capset_set,
 	.sysctl =			apparmor_sysctl,
 	.capable =			apparmor_capable,
-	.syslog =			apparmor_syslog,
+	.syslog =			cap_syslog,
 
-	.netlink_send =			apparmor_netlink_send,
-	.netlink_recv =			apparmor_netlink_recv,
+	.netlink_send =			cap_netlink_send,
+	.netlink_recv =			cap_netlink_recv,
 
-	.bprm_apply_creds =		apparmor_bprm_apply_creds,
+	.bprm_apply_creds =		cap_bprm_apply_creds,
 	.bprm_set_security =		apparmor_bprm_set_security,
 	.bprm_secureexec =		apparmor_bprm_secureexec,
 
@@ -751,20 +689,24 @@ struct security_operations apparmor_ops = {
 	.file_mmap =			apparmor_file_mmap,
 	.file_mprotect =		apparmor_file_mprotect,
 
-	.task_create =			apparmor_task_create,
 	.task_alloc_security =		apparmor_task_alloc_security,
 	.task_free_security =		apparmor_task_free_security,
-	.task_post_setuid =		apparmor_task_post_setuid,
-	.task_reparent_to_init =	apparmor_task_reparent_to_init,
+	.task_post_setuid =		cap_task_post_setuid,
+	.task_reparent_to_init =	cap_task_reparent_to_init,
 
 	.getprocattr =			apparmor_getprocattr,
 	.setprocattr =			apparmor_setprocattr,
 };
 
+static void info_message(const char *str)
+{
+	printk(KERN_INFO "AppArmor: %s", str);
+	aa_audit_message(NULL, GFP_KERNEL, "%s", str);
+}
+
 static int __init apparmor_init(void)
 {
 	int error;
-	const char *complainmsg = ": complainmode enabled";
 
 	if ((error = create_apparmorfs())) {
 		AA_ERROR("Unable to activate AppArmor filesystem\n");
@@ -781,11 +723,10 @@ static int __init apparmor_init(void)
 		goto register_security_out;
 	}
 
-	AA_INFO(GFP_KERNEL, "AppArmor initialized%s\n",
-		apparmor_complain ? complainmsg : "");
-	aa_audit_message(NULL, GFP_KERNEL, 0,
-		"AppArmor initialized%s\n",
-		apparmor_complain ? complainmsg : "");
+	if (apparmor_complain)
+		info_message("AppArmor initialized: complainmode enabled");
+	else
+		info_message("AppArmor initialized");
 
 	return error;
 
@@ -793,7 +734,7 @@ register_security_out:
 	free_null_complain_profile();
 
 alloc_out:
-	(void)destroy_apparmorfs();
+	destroy_apparmorfs();
 
 createfs_out:
 	return error;
@@ -836,17 +777,14 @@ static void __exit apparmor_exit(void)
 	mutex_unlock(&aa_interface_lock);
 
 	if (unregister_security(&apparmor_ops))
-		AA_INFO(GFP_KERNEL, "Unable to properly unregister "
-			"AppArmor\n");
+		info_message("Unable to properly unregister AppArmor");
 
-	AA_INFO(GFP_KERNEL, "AppArmor protection removed\n");
-	aa_audit_message(NULL, GFP_KERNEL, 0,
-		"AppArmor protection removed\n");
+	info_message("AppArmor protection removed");
 }
 
 module_init(apparmor_init);
 module_exit(apparmor_exit);
 
 MODULE_DESCRIPTION("AppArmor process confinement");
-MODULE_AUTHOR("Tony Jones <tonyj@suse.de>");
+MODULE_AUTHOR("Novell/Immunix, http://bugs.opensuse.org");
 MODULE_LICENSE("GPL");

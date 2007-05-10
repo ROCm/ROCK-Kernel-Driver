@@ -3,9 +3,10 @@ Locking in AppArmor
 
 Lock hierarchy:
 
-	profile_list_lock
-	  aa_profile->lock
-	    task_lock()
+	aa_interface_lock
+	  profile_list_lock
+	    aa_profile->lock
+	      task_lock()
 
 
 Which lock protects what?
@@ -13,7 +14,7 @@ Which lock protects what?
 	/-----------------------+-------------------------------\
 	| Variable		| Lock				|
 	>-----------------------+-------------------------------<
-	| profile_list,		| profile_list_lock		|
+	| profile_list		| profile_list_lock		|
 	+-----------------------+-------------------------------+
 	| aa_profile		| (reference count)		|
 	+-----------------------+-------------------------------+
@@ -44,3 +45,15 @@ is used.
 Profiles on profile_list are never stale: when a profile becomes stale,
 it is removed from profile_list at the same time (under profile_list_lock
 and aa_profile->lock).
+
+The aa_interface_lock is taken whenever user-space modifies the profile
+list, and can sleep. This ensures that profile loading/replacement/removal
+won't race with itself. We release the profile_list_lock as soon as
+possible to avoid stalling exec during profile loading/replacement/removal.
+
+lock_dep reports a false 'possible irq lock inversion dependency detected'
+when the profile lock is taken in aa_release.  This is due to that the
+task_lock is often taken inside the profile lock but other kernel code
+takes the task_lock with interrupts enabled.  A deadlock will not actually
+occur because apparmor does not take the task_lock in hard_irq or soft_irq
+context.

@@ -1,5 +1,5 @@
 /*
- *	Copyright (C) 1998-2005 Novell/SUSE
+ *	Copyright (C) 1998-2007 Novell/SUSE
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License as
@@ -52,9 +52,6 @@ void aa_profilelist_release(void)
 	write_unlock(&profile_list_lock);
 }
 
-/* seq_file helper routines
- * Used by apparmorfs.c to iterate over profile_list
- */
 static void *p_start(struct seq_file *f, loff_t *pos)
 {
 	struct aa_profile *node;
@@ -88,6 +85,7 @@ static int seq_show_profile(struct seq_file *f, void *v)
 	return 0;
 }
 
+/* Used in apparmorfs.c */
 struct seq_operations apparmorfs_profiles_op = {
 	.start =	p_start,
 	.next =		p_next,

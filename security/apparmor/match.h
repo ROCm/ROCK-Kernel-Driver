@@ -1,5 +1,5 @@
 /*
- *	Copyright (C) 2002-2005 Novell/SUSE
+ *	Copyright (C) 2007 Novell/SUSE
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License as
@@ -12,10 +12,19 @@
 #ifndef __MATCH_H
 #define __MATCH_H
 
+/**
+ * The format used for transition tables is based on the GNU flex table
+ * file format (--tables-file option; see Table File Format in the flex
+ * info pages and the flex sources for documentation). The magic number
+ * used in the header is 0x1B5E783D insted of 0xF13C57B1 though, because
+ * the YY_ID_CHK (check) and YY_ID_DEF (default) tables are used
+ * slightly differently (see the apparmor-parser package).
+ */
+
 #define YYTH_MAGIC	0x1B5E783D
 
 struct table_set_header {
-	u32		th_magic;	/* TH_MAGIC */
+	u32		th_magic;	/* YYTH_MAGIC */
 	u32		th_hsize;
 	u32		th_ssize;
 	u16		th_flags;
@@ -52,11 +61,9 @@ struct table_header {
 
 struct aa_dfa {
 	struct table_header *tables[YYTD_ID_NXT];
-
-	struct table_set_header th;
 };
 
-#define ntohb(X) (X)
+#define byte_to_byte(X) (X)
 
 #define UNPACK_ARRAY(TABLE, BLOB, LEN, TYPE, NTOHX) \
 	do { \
@@ -68,14 +75,9 @@ struct aa_dfa {
 		} \
 	} while (0)
 
-static inline size_t pad64(size_t i)
-{
-	return (i + (size_t)7) & ~(size_t)7;
-}
-
 static inline size_t table_size(size_t len, size_t el_size)
 {
-	return pad64(sizeof(struct table_header) + len * el_size);
+	return ALIGN(sizeof(struct table_header) + len * el_size, 8);
 }
 
 #endif /* __MATCH_H */

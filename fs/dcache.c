@@ -1829,11 +1829,8 @@ global_root:
 			buffer++;
 			buflen++;
 		}
-		if (is_slash) {
-			if (*buffer == '\0')
-				*--buffer = '.';
+		if (is_slash)
 			goto out;
-		}
 	}
 	if (buflen < namelen)
 		goto Elong;
@@ -1844,6 +1841,18 @@ global_root:
 Elong:
 	buffer = ERR_PTR(-ENAMETOOLONG);
 	goto out;
+}
+
+static char *__connect_d_path(char *path, char *buffer)
+{
+	if (!IS_ERR(path) && *path != '/') {
+		/* Pretend that disconnected paths are hanging off the root. */
+		if (path == buffer)
+			path = ERR_PTR(-ENAMETOOLONG);
+		else
+			*--path = '/';
+	}
+	return path;
 }
 
 /* write full pathname into buffer and return start of pathname */
@@ -1859,6 +1868,7 @@ char *d_path(struct dentry *dentry, struct vfsmount *vfsmnt, char *buf,
 	root = dget(current->fs->root);
 	read_unlock(&current->fs->lock);
 	res = __d_path(dentry, vfsmnt, root, rootmnt, buf, buflen, 0);
+	res = __connect_d_path(res, buf);
 	dput(root);
 	mntput(rootmnt);
 	return res;
@@ -1900,11 +1910,9 @@ asmlinkage long sys_getcwd(char __user *buf, unsigned long size)
 	read_unlock(&current->fs->lock);
 
 	cwd = __d_path(pwd, pwdmnt, root, rootmnt, page, PAGE_SIZE, 1);
+	cwd = __connect_d_path(cwd, page);
 	error = PTR_ERR(cwd);
 	if (IS_ERR(cwd))
-		goto out;
-	error = -ENOENT;
-	if (*cwd != '/')
 		goto out;
 
 	error = -ERANGE;

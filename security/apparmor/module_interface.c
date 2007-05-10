@@ -1,5 +1,5 @@
 /*
- *	Copyright (C) 1998-2005 Novell/SUSE
+ *	Copyright (C) 1998-2007 Novell/SUSE
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License as
@@ -23,7 +23,8 @@
  */
 DEFINE_MUTEX(aa_interface_lock);
 
-/* The AppArmor interface treats data as a type byte followed by the
+/*
+ * The AppArmor interface treats data as a type byte followed by the
  * actual data.  The interface has the notion of a a named entry
  * which has a name (AA_NAME typecode followed by name string) followed by
  * the entries typecode and data.  Named types allow for optional
@@ -45,7 +46,8 @@ enum aa_code {
 	AA_LISTEND,
 };
 
-/* aa_ext is the read of the buffer containing the serialized profile.  The
+/*
+ * aa_ext is the read of the buffer containing the serialized profile.  The
  * data is copied into a kernel buffer in apparmorfs and then handed off to
  * the unpack routines.
  */
@@ -58,7 +60,7 @@ struct aa_ext {
 
 static inline int aa_inbounds(struct aa_ext *e, size_t size)
 {
-	return (e->pos + size <= e->end);
+	return (size <= e->end - e->pos);
 }
 
 /**
@@ -116,8 +118,10 @@ static inline int aa_is_X(struct aa_ext *e, enum aa_code code)
 static int aa_is_nameX(struct aa_ext *e, enum aa_code code, const char *name)
 {
 	void *pos = e->pos;
-	/* check for presence of a tagname, and if present name size
-	 * AA_NAME tag value is a u16 */
+	/*
+	 * Check for presence of a tagname, and if present name size
+	 * AA_NAME tag value is a u16.
+	 */
 	if (aa_is_X(e, AA_NAME)) {
 		char *tag;
 		size_t size = aa_is_u16_chunk(e, &tag);
@@ -212,11 +216,12 @@ struct aa_dfa *aa_unpack_dfa(struct aa_ext *e)
 	if (size) {
 		dfa = aa_match_alloc();
 		if (dfa) {
-			/* the dfa is aligned with in the blob to 8 bytes
-			 * from the beginning of the stream
+			/*
+			 * The dfa is aligned with in the blob to 8 bytes
+			 * from the beginning of the stream.
 			 */
-			size_t pad = pad64(blob - (char *) e->start) -
-				(blob - (char *) e->start);
+			size_t sz = blob - (char *) e->start;
+			size_t pad = ALIGN(sz, 8) - sz;
 			error = unpack_dfa(dfa, blob + pad, size - pad);
 			if (!error)
 				error = verify_dfa(dfa);
@@ -238,7 +243,7 @@ struct aa_dfa *aa_unpack_dfa(struct aa_ext *e)
  * @e: serialized data extent information
  * @error: error code returned if unpacking fails
  */
-static struct aa_profile *aa_unpack_profile(struct aa_ext *e)
+static struct aa_profile *aa_unpack_profile(struct aa_ext *e, int depth)
 {
 	struct aa_profile *profile = NULL;
 
@@ -279,9 +284,11 @@ static struct aa_profile *aa_unpack_profile(struct aa_ext *e)
 
 	/* get optional subprofiles */
 	if (aa_is_nameX(e, AA_LIST, "hats")) {
+		if (depth > 0)
+			goto fail;
 		while (!aa_is_nameX(e, AA_LISTEND, NULL)) {
 			struct aa_profile *subprofile;
-			subprofile = aa_unpack_profile(e);
+			subprofile = aa_unpack_profile(e, depth + 1);
 			if (IS_ERR(subprofile)) {
 				error = PTR_ERR(subprofile);
 				goto fail;
@@ -297,8 +304,8 @@ static struct aa_profile *aa_unpack_profile(struct aa_ext *e)
 	return profile;
 
 fail:
-	AA_WARN(GFP_KERNEL, "Invalid profile %s\n",
-		profile && profile->name ? profile->name : "unknown");
+	aa_audit_message(NULL, GFP_KERNEL, "Invalid profile %s",
+			 profile && profile->name ? profile->name : "unknown");
 
 	if (profile)
 		free_aa_profile(profile);
@@ -315,7 +322,7 @@ fail:
  */
 static struct aa_profile *aa_unpack_profile_wrapper(struct aa_ext *e)
 {
-	struct aa_profile *profile = aa_unpack_profile(e);
+	struct aa_profile *profile = aa_unpack_profile(e, 0);
 	if (!IS_ERR(profile) &&
 	    (!list_empty(&profile->sub) || profile->flags.complain)) {
 		int error;
@@ -338,25 +345,25 @@ static int aa_verify_header(struct aa_ext *e)
 {
 	/* get the interface version */
 	if (!aa_is_u32(e, &e->version, "version")) {
-		AA_WARN(GFP_KERNEL, "Interface version missing\n");
+		aa_audit_message(NULL, GFP_KERNEL, "Interface version missing");
 		return -EPROTONOSUPPORT;
 	}
 
 	/* check that the interface version is currently supported */
 	if (e->version != 3) {
-		AA_WARN(GFP_KERNEL,
-			"Unsupported interface version (%d)\n", e->version);
+		aa_audit_message(NULL, GFP_KERNEL, "Unsupported interface "
+				 "version (%d)", e->version);
 		return -EPROTONOSUPPORT;
 	}
 	return 0;
 }
 
 /**
- * aa_file_prof_add - Unpack and add a new profile to the profile list
+ * aa_add_profile - Unpack and add a new profile to the profile list
  * @data: serialized data stream
  * @size: size of the serialized data stream
  */
-ssize_t aa_file_prof_add(void *data, size_t size)
+ssize_t aa_add_profile(void *data, size_t size)
 {
 	struct aa_profile *profile = NULL;
 	struct aa_ext e = {
@@ -388,15 +395,11 @@ ssize_t aa_file_prof_add(void *data, size_t size)
 	return size;
 }
 
-/** task_replace - replace aa_task_context's current profile with a new profile
+/**
+ * task_replace - replace a task's profile
  * @task: task to replace profile on
  * @new_cxt: new aa_task_context to do replacement with
- * @new: new profile
- *
- * Replace a task's (aa_task_context's) profile with a new profile.  If
- * task was in a hat then the new profile will also be in the equivalent
- * hat in the new profile if it exists.  If it doesn't exist the
- * task will be placed in the special null_profile state.
+ * @new_profile: new profile
  */
 static inline void task_replace(struct task_struct *task,
 				struct aa_task_context *new_cxt,
@@ -404,18 +407,20 @@ static inline void task_replace(struct task_struct *task,
 {
 	struct aa_task_context *cxt = aa_task_context(task);
 
-	AA_DEBUG("%s: replacing profile for task %s(%d) "
+	AA_DEBUG("%s: replacing profile for task %d "
 		 "profile=%s (%p) hat=%s (%p)\n",
 		 __FUNCTION__,
-		 cxt->task->comm, cxt->task->pid,
+		 cxt->task->pid,
 		 cxt->profile->parent->name, cxt->profile->parent,
 		 cxt->profile->name, cxt->profile);
 
 	if (cxt->profile != cxt->profile->parent) {
 		struct aa_profile *hat;
 
-		/* The old profile was in a hat, check to see if the new
-		 * profile has an equivalent hat */
+		/*
+		 * The old profile was in a hat, check to see if the new
+		 * profile has an equivalent hat.
+		 */
 		hat = __aa_find_profile(cxt->profile->name, &new_profile->sub);
 
 		if (!hat)
@@ -429,7 +434,7 @@ static inline void task_replace(struct task_struct *task,
 }
 
 /**
- * aa_file_prof_replace - replace a profile on the profile list
+ * aa_replace_profile - replace a profile on the profile list
  * @udata: serialized data stream
  * @size: size of the serialized data stream
  *
@@ -437,7 +442,7 @@ static inline void task_replace(struct task_struct *task,
  * by any aa_task_context.  If the profile does not exist on the profile list
  * it is added.  Return %0 or error.
  */
-ssize_t aa_file_prof_replace(void *udata, size_t size)
+ssize_t aa_replace_profile(void *udata, size_t size)
 {
 	struct aa_profile *old_profile, *new_profile;
 	struct aa_task_context *new_cxt;
@@ -502,14 +507,14 @@ out:
 }
 
 /**
- * aa_file_prof_remove - remove a profile from the system
+ * aa_remove_profile - remove a profile from the system
  * @name: name of the profile to remove
  * @size: size of the name
  *
  * remove a profile from the profile list and all aa_task_context references
  * to said profile.
  */
-ssize_t aa_file_prof_remove(const char *name, size_t size)
+ssize_t aa_remove_profile(const char *name, size_t size)
 {
 	struct aa_profile *profile;
 
@@ -541,21 +546,43 @@ ssize_t aa_file_prof_remove(const char *name, size_t size)
  * free_aa_profile_kref - free aa_profile by kref (called by aa_put_profile)
  * @kr: kref callback for freeing of a profile
  */
-void free_aa_profile_kref(struct kref *kr)
+void free_aa_profile_kref(struct kref *kref)
 {
-	struct aa_profile *p=container_of(kr, struct aa_profile, count);
+	struct aa_profile *p=container_of(kref, struct aa_profile, count);
 
 	free_aa_profile(p);
 }
 
 /**
- * free_aa_profile - free aa_profile structure
+ * alloc_aa_profile - allocate, initialize and return a new profile
+ * Returns NULL on failure.
+ */
+struct aa_profile *alloc_aa_profile(void)
+{
+	struct aa_profile *profile;
+
+	profile = kzalloc(sizeof(*profile), GFP_KERNEL);
+	AA_DEBUG("%s(%p)\n", __FUNCTION__, profile);
+	if (profile) {
+		profile->parent = profile;
+		INIT_LIST_HEAD(&profile->list);
+		INIT_LIST_HEAD(&profile->sub);
+		kref_init(&profile->count);
+		INIT_LIST_HEAD(&profile->task_contexts);
+		spin_lock_init(&profile->lock);
+	}
+	return profile;
+}
+
+/**
+ * free_aa_profile - free a profile
  * @profile: the profile to free
  *
- * free a profile, its file entries hats and null_profile.  All references
- * to the profile, its hats and null_profile must have been put.
- * If the profile was referenced by a aa_task_context free_aa_profile should be
- * called from an rcu callback routine.
+ * Free a profile, its hats and null_profile. All references to the profile,
+ * its hats and null_profile must have been put.
+ *
+ * If the profile was referenced from a task context, free_aa_profile() will
+ * be called from an rcu callback routine, so we must not sleep here.
  */
 void free_aa_profile(struct aa_profile *profile)
 {
@@ -577,7 +604,8 @@ void free_aa_profile(struct aa_profile *profile)
 
 	aa_match_free(profile->file_rules);
 
-	/* use free_aa_profile instead of aa_put_profile to destroy the
+	/*
+	 * Use free_aa_profile instead of aa_put_profile to destroy the
 	 * null_profile, because the null_profile use the same reference
 	 * counting as hats, ie. the count goes to the base profile.
 	 */
@@ -597,10 +625,10 @@ void free_aa_profile(struct aa_profile *profile)
 }
 
 /**
- * aa_unconfine_tasks - remove tasks on @profiles task_contexts list
- * @profile: profile to remove associated tasks
+ * aa_unconfine_tasks - remove tasks on a profile's task context list
+ * @profile: profile to remove tasks from
  *
- * Assumes that @profile lock is held
+ * Assumes that @profile lock is held.
  */
 void aa_unconfine_tasks(struct aa_profile *profile)
 {

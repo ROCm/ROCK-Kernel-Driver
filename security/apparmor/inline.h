@@ -1,5 +1,5 @@
 /*
- *	Copyright (C) 2005 Novell/SUSE
+ *	Copyright (C) 1998-2007 Novell/SUSE
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License as
@@ -11,6 +11,16 @@
 #define __INLINE_H
 
 #include <linux/sched.h>
+
+static inline int mediated_filesystem(struct inode *inode)
+{
+	return !(inode->i_sb->s_flags & MS_NOUSER);
+}
+
+static inline struct aa_task_context *aa_task_context(struct task_struct *task)
+{
+	return rcu_dereference((struct aa_task_context *)task->security);
+}
 
 /**
  * aa_dup_profile - increment refcount on profile @p
@@ -80,27 +90,6 @@ static inline void aa_free_task_context(struct aa_task_context *cxt)
 		aa_put_profile(cxt->profile);
 		kfree(cxt);
 	}
-}
-
-/**
- * alloc_aa_profile - Allocate, initialize and return a new zeroed profile.
- * Returns NULL on failure.
- */
-static inline struct aa_profile *alloc_aa_profile(void)
-{
-	struct aa_profile *profile;
-
-	profile = kzalloc(sizeof(*profile), GFP_KERNEL);
-	AA_DEBUG("%s(%p)\n", __FUNCTION__, profile);
-	if (profile) {
-		profile->parent = profile;
-		INIT_LIST_HEAD(&profile->list);
-		INIT_LIST_HEAD(&profile->sub);
-		kref_init(&profile->count);
-		INIT_LIST_HEAD(&profile->task_contexts);
-		spin_lock_init(&profile->lock);
-	}
-	return profile;
 }
 
 /**
@@ -220,6 +209,11 @@ static inline void unlock_both_profiles(struct aa_profile *profile1,
 		spin_unlock(&profile1->lock);
 		spin_unlock_irqrestore(&profile2->lock, profile2->int_flags);
 	}
+}
+
+static inline unsigned int aa_match(struct aa_dfa *dfa, const char *pathname)
+{
+	        return dfa ? aa_dfa_match(dfa, pathname) : 0;
 }
 
 #endif /* __INLINE_H__ */
