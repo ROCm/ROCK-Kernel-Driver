@@ -591,12 +591,18 @@ static int ps3_sys_manager_probe(struct ps3_vuart_port_device *dev)
 	return result;
 }
 
+static void ps3_sys_manager_remove(struct ps3_vuart_port_device *dev)
+{
+}
+
 static struct ps3_vuart_port_driver ps3_sys_manager = {
 	.match_id = PS3_MATCH_ID_SYSTEM_MANAGER,
 	.core = {
 		.name = "ps3_sys_manager",
 	},
 	.probe = ps3_sys_manager_probe,
+	.remove = ps3_sys_manager_remove,
+	.shutdown = ps3_sys_manager_remove,
 };
 
 static int __init ps3_sys_manager_init(void)

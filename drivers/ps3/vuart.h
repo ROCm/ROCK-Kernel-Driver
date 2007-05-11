@@ -34,7 +34,6 @@ struct ps3_vuart_stats {
 struct ps3_vuart_work {
 	struct work_struct work;
 	unsigned long trigger;
-	spinlock_t lock;
 	struct ps3_vuart_port_device* dev; /* to convert work to device */
 };
 
@@ -51,12 +50,12 @@ struct ps3_vuart_port_priv {
 		struct list_head head;
 	} tx_list;
 	struct {
+		struct ps3_vuart_work work;
 		unsigned long bytes_held;
 		spinlock_t lock;
 		struct list_head head;
 	} rx_list;
 	struct ps3_vuart_stats stats;
-	struct ps3_vuart_work work;
 };
 
 /**
