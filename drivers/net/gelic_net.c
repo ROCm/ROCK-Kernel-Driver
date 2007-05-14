@@ -1844,6 +1844,7 @@ static struct ps3_system_bus_driver ps3_gelic_driver = {
 	.probe = ps3_gelic_driver_probe,
 	.remove = ps3_gelic_driver_remove,
 	.core = {
+		.owner = THIS_MODULE,
 		.name = "ps3_gelic_driver",
 	},
 };

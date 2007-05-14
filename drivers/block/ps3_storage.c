@@ -2620,6 +2620,7 @@ static void ps3_stor_driver_shutdown(struct platform_device * dev)
 
 static struct platform_driver ps3_stor_platform_driver = {
 	.driver = {
+		.owner = THIS_MODULE,
 		.name = "ps3_storage"
 	},
 	.probe          = ps3_stor_driver_probe,
