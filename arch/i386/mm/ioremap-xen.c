@@ -118,7 +118,7 @@ int direct_remap_pfn_range(struct vm_area_struct *vma,
 	if (domid == DOMID_SELF)
 		return -EINVAL;
 
-	vma->vm_flags |= VM_IO | VM_RESERVED;
+	vma->vm_flags |= VM_IO | VM_RESERVED | VM_PFNMAP;
 
 	vma->vm_mm->context.has_foreign_mappings = 1;
 

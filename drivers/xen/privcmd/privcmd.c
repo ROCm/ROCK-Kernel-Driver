@@ -234,7 +234,7 @@ static int privcmd_mmap(struct file * file, struct vm_area_struct * vma)
 		return -ENOSYS;
 
 	/* DONTCOPY is essential for Xen as copy_page_range is broken. */
-	vma->vm_flags |= VM_RESERVED | VM_IO | VM_DONTCOPY;
+	vma->vm_flags |= VM_RESERVED | VM_IO | VM_PFNMAP | VM_DONTCOPY;
 	vma->vm_ops = &privcmd_vm_ops;
 	vma->vm_private_data = NULL;
 

@@ -870,7 +870,7 @@ config PHYSICAL_START
 
 config RELOCATABLE
 	bool "Build a relocatable kernel(EXPERIMENTAL)"
-	depends on EXPERIMENTAL
+	depends on EXPERIMENTAL && !X86_XEN
 	help
 	  This build a kernel image that retains relocation information
           so it can be loaded someplace besides the default 1MB.
