@@ -119,7 +119,7 @@ demasquerade( struct sk_buff *skb, struct SheepVars *v )
 {
 	const char *local_addr = v->ether->dev_addr;
 	const char *fake_addr = v->fake_addr;
-	char *p = skb->mac.raw;
+	char *p = skb_mac_header(skb);
 	int proto = *(short*)&p[12];
 	
 	cpyaddr( &p[6], local_addr );		// Source address
@@ -211,7 +211,7 @@ sheep_net_receiver( struct sk_buff *skb, struct net_device *dev, struct packet_t
 			// filter IP-traffic
 			if( (skb->protocol == htons(ETH_P_IP)) ) {
 				// drop if not addreesed to MOL?
-				if( !v->ipfilter || (skb->h.ipiph->daddr != v->ipfilter) )
+				if( !v->ipfilter || (ipip_hdr(skb)->daddr != v->ipfilter) )
 					goto drop;
 				// we don't want this packet interpreted by linux...
 				skb->protocol = PROT_MAGIC;
@@ -236,7 +236,7 @@ sheep_net_receiver( struct sk_buff *skb, struct net_device *dev, struct packet_t
 		cpyaddr( &ETH_HDR(skb)->h_dest[0], v->fake_addr );
 
 	// We also want the Ethernet header
-	skb_push( skb, skb->data - skb->mac.raw );
+	skb_push( skb, skb->data - skb_mac_header(skb) );
 
 	// Enqueue packet
 	skb_queue_tail( &v->queue, skb );
@@ -447,8 +447,9 @@ sheep_net_writev( struct file *f, const struct iovec *iv, unsigned long count, l
 	skb->sk = v->skt;
 	skb->dev = v->ether;
 	skb->priority = 0;
-	skb->nh.raw = skb->h.raw = skb->data + v->ether->hard_header_len;
-	skb->mac.raw = skb->data;
+	skb_set_network_header(skb, v->ether->hard_header_len);
+	skb_set_transport_header(skb, v->ether->hard_header_len);
+	skb_reset_mac_header(skb);
 
 	// Base the IP-filter on the IP address of outgoing ARPs
 	if( ETH_HDR(skb)->h_proto == htons(ETH_P_ARP) ) {
