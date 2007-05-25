@@ -446,17 +446,6 @@ extern struct task_struct *kdb_curr_task(int);
  */
 extern int kdb_seqno;
 
-#ifdef	MODULE
-#define kdb_module_init(fn) module_init(fn)
-#define kdb_module_exit(fn) module_exit(fn)
-#else	/* !MODULE */
-extern initcall_t __kdb_initcall_start, __kdb_initcall_end;
-#define kdb_module_init(fn) \
-	static initcall_t __kdb_initcall_##fn __attribute_used__ __attribute__ ((__section__ (".kdb_initcall.init"))) = fn;
-#define kdb_module_exit(fn) \
-	static exitcall_t __kdb_exitcall_##fn __attribute_used__ __attribute__ ((__section__ (".kdb_exitcall.exit"))) = fn;
-#endif	/* MODULE */
-
 #define kdb_task_has_cpu(p) (task_curr(p))
 extern void kdb_runqueue(unsigned long cpu, kdb_printf_t xxx_printf);
 

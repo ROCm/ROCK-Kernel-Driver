@@ -322,26 +322,26 @@ static void display_tss(struct tss_struct *t)
 	kdb_printf("   iomap = 0x%04x\n", t->io_bitmap_base);
 #else	/* !CONFIG_X86_64 */
 	kdb_printf("    cs = %04x,  eip = " kdb_machreg_fmt0 "\n",
-		   t->es, t->eip);
+		   t->x86_tss.es, t->x86_tss.eip);
 	kdb_printf("    ss = %04x,  esp = " kdb_machreg_fmt0 "\n",
-		   t->ss, t->esp);
+		   t->x86_tss.ss, t->x86_tss.esp);
 	kdb_printf("   ss0 = %04x, esp0 = " kdb_machreg_fmt0 "\n",
-		   t->ss0, t->esp0);
+		   t->x86_tss.ss0, t->x86_tss.esp0);
 	kdb_printf("   ss1 = %04x, esp1 = " kdb_machreg_fmt0 "\n",
-		   t->ss1, t->esp1);
+		   t->x86_tss.ss1, t->x86_tss.esp1);
 	kdb_printf("   ss2 = %04x, esp2 = " kdb_machreg_fmt0 "\n",
-		   t->ss2, t->esp2);
+		   t->x86_tss.ss2, t->x86_tss.esp2);
 	kdb_printf("   ldt = %04x, cr3 = " kdb_machreg_fmt0 "\n",
-		   t->ldt, t->__cr3);
+		   t->x86_tss.ldt, t->x86_tss.__cr3);
 	kdb_printf("    ds = %04x, es = %04x fs = %04x gs = %04x\n",
-			t->ds, t->es, t->fs, t->gs);
+			t->x86_tss.ds, t->x86_tss.es, t->x86_tss.fs, t->x86_tss.gs);
 	kdb_printf("   eax = " kdb_machreg_fmt0 ", ebx = " kdb_machreg_fmt0
 		   " ecx = " kdb_machreg_fmt0 " edx = " kdb_machreg_fmt0 "\n",
-		   t->eax, t->ebx, t->ecx, t->edx);
+		   t->x86_tss.eax, t->x86_tss.ebx, t->x86_tss.ecx, t->x86_tss.edx);
 	kdb_printf("   esi = " kdb_machreg_fmt0 ", edi = " kdb_machreg_fmt0
 		   " ebp = " kdb_machreg_fmt0 "\n",
-		   t->esi, t->edi, t->ebp);
-	kdb_printf("   trace = %d, iomap = 0x%04x\n", t->trace, t->io_bitmap_base);
+		   t->x86_tss.esi, t->x86_tss.edi, t->x86_tss.ebp);
+	kdb_printf("   trace = %d, iomap = 0x%04x\n", t->x86_tss.trace, t->x86_tss.io_bitmap_base);
 #endif	/* CONFIG_X86_64 */
 }
 
@@ -1012,6 +1012,61 @@ kdb_rdv(int argc, const char **argv)
 	return 0;
 }
 
+static int
+kdb_rdmsr(int argc, const char **argv)
+{
+	unsigned long addr;
+	uint32_t l, h;
+	int diag;
+	struct cpuinfo_x86 *c = cpu_data + smp_processor_id();
+
+	if (argc != 1)
+		return KDB_ARGCOUNT;
+
+	if ((diag = kdbgetularg(argv[1], &addr)))
+		return diag;
+
+	if (!cpu_has(c, X86_FEATURE_MSR))
+		return KDB_NOTIMP;
+
+	kdb_printf("msr(0x%lx) = ", addr);
+	if ((diag = rdmsr_safe(addr, &l, &h))) {
+		kdb_printf("error %d\n", diag);
+		return KDB_BADINT;
+	} else {
+		kdb_printf("0x%08x_%08x\n", h, l);
+	}
+
+	return 0;
+}
+
+static int
+kdb_wrmsr(int argc, const char **argv)
+{
+	unsigned long addr;
+	unsigned long l, h;
+	int diag;
+	struct cpuinfo_x86 *c = cpu_data + smp_processor_id();
+
+	if (argc != 3)
+		return KDB_ARGCOUNT;
+
+	if ((diag = kdbgetularg(argv[1], &addr))
+			|| (diag = kdbgetularg(argv[2], &h))
+			|| (diag = kdbgetularg(argv[3], &l)))
+		return diag;
+
+	if (!cpu_has(c, X86_FEATURE_MSR))
+		return KDB_NOTIMP;
+
+	if ((diag = wrmsr_safe(addr, l, h))) {
+		kdb_printf("error %d\n", diag);
+		return KDB_BADINT;
+	}
+
+	return 0;
+}
+
 static int __init kdbm_x86_init(void)
 {
 	kdb_register("rdv", kdb_rdv, NULL, "Display registers in verbose mode", 0);
@@ -1020,6 +1075,8 @@ static int __init kdbm_x86_init(void)
 	kdb_register_repeat("ldt", kdb_ldt, "<sel> [<count>]", "Display LDT", 0, KDB_REPEAT_NO_ARGS);
 	kdb_register_repeat("ptex", kdb_pte, "<addr> [<count>]", "Display pagetables", 0, KDB_REPEAT_NO_ARGS);
 	kdb_register_repeat("ldtp", kdb_ldt, "<sel> [<count>]", "Display Process LDT", 0, KDB_REPEAT_NO_ARGS);
+	kdb_register("rdmsr", kdb_rdmsr, "<maddr>", "Display Model Specific Register", 0);
+	kdb_register("wrmsr", kdb_wrmsr, "<maddr> <h> <l>", "Modify Model Specific Register", 0);
 	return 0;
 }
 
@@ -1031,6 +1088,8 @@ static void __exit kdbm_x86_exit(void)
 	kdb_unregister("idt");
 	kdb_unregister("ptex");
 	kdb_unregister("ldtp");
+	kdb_unregister("rdmsr");
+	kdb_unregister("wrmsr");
 }
 
 module_init(kdbm_x86_init)

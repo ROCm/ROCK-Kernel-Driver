@@ -71,11 +71,11 @@
 #include <linux/smp.h>
 #include <linux/workqueue.h>
 #include <linux/cpumask.h>
+#include <linux/kdebug.h>
 #ifdef	CONFIG_KDB
 #include <linux/kdb.h>
 #include <linux/kdbprivate.h>	/* for switch state wrappers */
 #endif	/* CONFIG_KDB */
-#include <linux/kdebug.h>
 
 #include <asm/delay.h>
 #include <asm/machvec.h>

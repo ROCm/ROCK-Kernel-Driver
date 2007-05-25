@@ -160,14 +160,14 @@ kdba_get_stack_info(kdb_machreg_t rsp, int cpu,
 		 * tasks.
 		 */
 		kdb_do_each_thread(g, p) {
-			if (tinfo == p->thread_info) {
+			if (tinfo == task_thread_info(p)) {
 				t = p;
 				goto found;
 			}
 		} kdb_while_each_thread(g, p);
 		for_each_online_cpu(cpu) {
 			p = idle_task(cpu);
-			if (tinfo == p->thread_info) {
+			if (tinfo == task_thread_info(p)) {
 				t = p;
 				goto found;
 			}
@@ -178,13 +178,13 @@ kdba_get_stack_info(kdb_machreg_t rsp, int cpu,
 	} else if (cpu >= 0) {
 		/* running task */
 		struct kdb_running_process *krp = kdb_running_process + cpu;
-		if (krp->p != t || tinfo != t->thread_info)
+		if (krp->p != t || tinfo != task_thread_info(t))
 			t = NULL;
 		if (KDB_DEBUG(ARA))
 			kdb_printf("%s: running task %p\n", __FUNCTION__, t);
 	} else {
 		/* blocked task */
-		if (tinfo != t->thread_info)
+		if (tinfo != task_thread_info(t))
 			t = NULL;
 		if (KDB_DEBUG(ARA))
 			kdb_printf("%s: blocked task %p\n", __FUNCTION__, t);

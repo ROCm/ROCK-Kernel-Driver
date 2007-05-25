@@ -60,5 +60,5 @@ kdba_pod_exit(void)
 		kdb_unregister("pod");
 }
 
-kdb_module_init(kdba_pod_init)
-kdb_module_exit(kdba_pod_exit)
+module_init(kdba_pod_init)
+module_exit(kdba_pod_exit)

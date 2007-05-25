@@ -61,5 +61,5 @@ kdba_fru_exit(void)
 	kdb_unregister("fru");
 }
 
-kdb_module_init(kdba_fru_init)
-kdb_module_exit(kdba_fru_exit)
+module_init(kdba_fru_init)
+module_exit(kdba_fru_exit)

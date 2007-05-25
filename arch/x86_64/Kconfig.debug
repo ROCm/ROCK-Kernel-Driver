@@ -19,6 +19,8 @@ config DEBUG_RODATA
 config KDB
 	bool "Built-in Kernel Debugger support"
 	depends on DEBUG_KERNEL
+	select KALLSYMS
+	select KALLSYMS_ALL
 	help
 	  This option provides a built-in kernel debugger.  The built-in
 	  kernel debugger contains commands which allow memory to be examined,
@@ -83,7 +85,6 @@ config KDB_CONTINUE_CATASTROPHIC
 	  reboot.
 	  If you are not sure, say 0.  Read Documentation/kdb/dump.txt before
 	  setting to 2.
-
 
 config IOMMU_DEBUG
        depends on IOMMU && DEBUG_KERNEL

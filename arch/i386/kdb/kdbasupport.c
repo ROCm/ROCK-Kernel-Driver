@@ -474,13 +474,14 @@ kdba_setregcontents(const char *regname,
  *	argument is NULL (struct pt_regs).   The alternate register
  *	set types supported by this function:
  *
- *	d 		Debug registers
+ *	d		Debug registers
  *	c		Control registers
  *	u		User registers at most recent entry to kernel
  *			for the process currently selected with "pid" command.
  * Following not yet implemented:
- *	m		Model Specific Registers (extra defines register #)
  *	r		Memory Type Range Registers (extra defines register)
+ *
+ * MSR on i386/x86_64 are handled by rdmsr/wrmsr commands.
  */
 
 int
@@ -546,8 +547,6 @@ kdba_dumpregs(struct pt_regs *regs,
 			   cr[0], cr[1], cr[2], cr[3], cr[4]);
 		return 0;
 	}
-	case 'm':
-		break;
 	case 'r':
 		break;
 	default:
@@ -879,6 +878,18 @@ kdba_cpu_up(void)
 {
 }
 
+static int __init
+kdba_arch_init(void)
+{
+#ifdef	CONFIG_SMP
+	set_intr_gate(KDB_VECTOR, kdb_interrupt);
+#endif
+	set_intr_gate(KDBENTER_VECTOR, kdb_call);
+	return 0;
+}
+
+arch_initcall(kdba_arch_init);
+
 /*
  * kdba_init
  *
@@ -897,6 +908,7 @@ kdba_cpu_up(void)
 void __init
 kdba_init(void)
 {
+	kdba_arch_init();	/* Need to register KDBENTER_VECTOR early */
 	kdb_register("pt_regs", kdba_pt_regs, "address", "Format struct pt_regs", 0);
 	kdb_register("stackdepth", kdba_stackdepth, "[percentage]", "Print processes using >= stack percentage", 0);
 
@@ -1008,18 +1020,6 @@ kdba_verify_rw(unsigned long addr, size_t size)
 	unsigned char data[size];
 	return(kdba_getarea_size(data, addr, size) || kdba_putarea_size(addr, data, size));
 }
-
-static int __init
-kdba_late_init(void)
-{
-#ifdef	CONFIG_SMP
-	set_intr_gate(KDB_VECTOR, kdb_interrupt);
-#endif
-	set_intr_gate(KDBENTER_VECTOR, kdb_call);
-	return 0;
-}
-
-__initcall(kdba_late_init);
 
 #ifdef	CONFIG_SMP
 

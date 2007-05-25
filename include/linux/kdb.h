@@ -153,7 +153,7 @@ extern struct kdb_usb_exchange kdb_usb_infos; /* KDB common structure */
 static inline
 int kdb_process_cpu(const struct task_struct *p)
 {
-	unsigned int cpu = p->thread_info->cpu;
+	unsigned int cpu = task_thread_info(p)->cpu;
 	if (cpu > NR_CPUS)
 		cpu = 0;
 	return cpu;

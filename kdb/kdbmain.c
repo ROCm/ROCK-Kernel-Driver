@@ -40,6 +40,7 @@
 #include <linux/dump.h>
 #endif
 #include <linux/cpu.h>
+#include <linux/kdebug.h>
 
 #include <acpi/acpi_bus.h>
 
@@ -213,7 +214,7 @@ kdb_curr_task(int cpu)
 	struct task_struct *p = curr_task(cpu);
 #ifdef	_TIF_MCA_INIT
 	struct kdb_running_process *krp = kdb_running_process + cpu;
-	if ((p->thread_info->flags & _TIF_MCA_INIT) && krp->p)
+	if ((task_thread_info(p)->flags & _TIF_MCA_INIT) && krp->p)
 		p = krp->p;
 #endif
 	return p;
@@ -2596,8 +2597,7 @@ kdb_rd(int argc, const char **argv)
  *	none.
  * Remarks:
  *	Currently doesn't allow modification of control or
- *	debug registers, nor does it allow modification
- *	of model-specific registers (MSR).
+ *	debug registers.
  */
 
 static int
@@ -3791,7 +3791,6 @@ kdb_inittab(void)
 {
 	int i;
 	kdbtab_t *kp;
-	initcall_t *call;
 
 	for(i=0, kp=kdb_commands; i < kdb_max_commands; i++,kp++) {
 		kp->cmd_name = NULL;
@@ -3832,15 +3831,6 @@ kdb_inittab(void)
 	kdb_register_repeat("kill", kdb_kill, "<-signal> <pid>", "Send a signal to a process", 0, KDB_REPEAT_NONE);
 	kdb_register_repeat("summary", kdb_summary, "", "Summarize the system", 4, KDB_REPEAT_NONE);
 	kdb_register_repeat("per_cpu", kdb_per_cpu, "", "Display per_cpu variables", 3, KDB_REPEAT_NONE);
-
-	/* Any kdb commands that are not in the base code but are required
-	 * earlier than normal initcall processing.
-	 */
-	call = &__kdb_initcall_start;
-	while (call < &__kdb_initcall_end) {
-		(*call)();
-		call++;
-	};
 }
 
 /*

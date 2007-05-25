@@ -28,7 +28,6 @@ SECTIONS
 	*(.exit.text)
 	*(.exit.data)
 	*(.exitcall.exit)
-	*(.kdb_exitcall.exit)
 	*(.IA_64.unwind.exit.text)
 	*(.IA_64.unwind_info.exit.text)
 	}
@@ -168,12 +167,6 @@ SECTIONS
 #endif
 
   . = ALIGN(8);
-  .kdb_initcall.init : AT(ADDR(.kdb_initcall.init) - LOAD_OFFSET)
-	{
-	  __kdb_initcall_start = .;
-	  *(.kdb_initcall.init)
-	  __kdb_initcall_end = .;
-	}
    __con_initcall_start = .;
   .con_initcall.init : AT(ADDR(.con_initcall.init) - LOAD_OFFSET)
 	{ *(.con_initcall.init) }

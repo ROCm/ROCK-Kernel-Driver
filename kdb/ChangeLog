@@ -1,3 +1,48 @@
+2007-05-22 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.22-rc2-common-1.
+
+2007-05-22 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.22-rc1-common-1.
+
+2007-05-17 Keith Owens  <kaos@sgi.com>
+
+	* Add rdmsr and wrmsr commands for i386 and x86_64.  Original patch by
+	  Bernardo Innocenti for i386, reworked by Keith Owens to make it safe
+	  on all cpu models and to handle both i386 and x86_64.
+	* kdb v4.4-2.6.21-common-3.
+
+2007-05-15 Keith Owens  <kaos@sgi.com>
+
+	* Correct alignment of debug_alloc_header.
+	* kdb v4.4-2.6.21-common-2.
+
+2007-04-29 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.21-common-1.
+
+2007-04-16 Keith Owens  <kaos@sgi.com>
+
+	* Remove dead symbol declarations.
+	* kdb v4.4-2.6.21-rc7-common-2.
+
+2007-04-16 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.21-rc7-common-1.
+
+2007-04-10 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.21-rc6-common-1.
+
+2007-04-02 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.21-rc5-common-1.
+
+2007-03-19 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.21-rc4-common-1.
+
 2007-03-14 Keith Owens  <kaos@sgi.com>
 
 	* kdb v4.4-2.6.21-rc3-common-1.

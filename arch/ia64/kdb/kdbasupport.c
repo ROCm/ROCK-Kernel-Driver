@@ -1326,7 +1326,7 @@ kdba_handlers_modify(struct task_struct *task, int cpu)
 	save = kdb_running_process_save + cpu;
 	*work = *save;
 	if (!kdba_show_handlers && REGION_NUMBER(task) >= RGN_GATE &&
-	    (task->thread_info->flags & _TIF_MCA_INIT)) {
+	    (task_thread_info(task)->flags & _TIF_MCA_INIT)) {
 		struct ia64_sal_os_state *sos = (struct ia64_sal_os_state *)
 			((unsigned long)save->p + MCA_SOS_OFFSET);
 		char *p;
@@ -1373,7 +1373,7 @@ kdba_handlers(int argc, const char **argv)
 		if (!p)
 			continue;
 		kdb_printf("%4d", cpu);
-		if (p->thread_info->flags & _TIF_MCA_INIT) {
+		if (task_thread_info(p)->flags & _TIF_MCA_INIT) {
 			struct ia64_sal_os_state *sos;
 			kdb_printf(" " kdb_machreg_fmt0 " %-*s  ",
 				   (unsigned long)p, (int)sizeof(p->comm), p->comm);

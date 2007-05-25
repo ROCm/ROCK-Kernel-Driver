@@ -25,13 +25,13 @@ MODULE_LICENSE("GPL");
 /* Standard Linux page stuff */
 
 #ifndef CONFIG_DISCONTIGMEM
-/* From include/linux/page_flags.h */
+/* From include/linux/page-flags.h */
 static char *pg_flag_vals[] = {
 	"PG_locked", "PG_error", "PG_referenced", "PG_uptodate",
 	"PG_dirty", "PG_lru", "PG_active", "PG_slab",
 	"PG_checked", "PG_arch_1", "PG_reserved", "PG_private",
-	"PG_writeback", "PG_nosave", "PG_compound", "PG_swapcache",
-	"PG_mappedtodisk", "PG_reclaim", "PG_nosave_free", "PG_buddy",
+	"PG_writeback", "?? 13 ??", "PG_compound", "PG_swapcache",
+	"PG_mappedtodisk", "PG_reclaim", "?? 18 ??", "PG_buddy",
 	NULL };
 #endif
 
@@ -40,7 +40,7 @@ static char *bh_state_vals[] = {
 	"Uptodate", "Dirty", "Lock", "Req",
 	"Uptodate_Lock", "Mapped", "New", "Async_read",
 	"Async_write", "Delay", "Boundary", "Write_EIO",
-	"Ordered", "Eopnotsupp", "Private",
+	"Ordered", "Eopnotsupp", "Unwritten", "Private",
 	NULL };
 
 /* From include/linux/bio.h */
@@ -345,12 +345,10 @@ kdbm_show_page(struct page *page, int first)
 	kdb_page_flags(page, Reserved);
 	kdb_page_flags(page, Private);
 	kdb_page_flags(page, Writeback);
-	kdb_page_flags(page, Nosave);
 	kdb_page_flags(page, Compound);
 	kdb_page_flags(page, SwapCache);
 	kdb_page_flags(page, MappedToDisk);
 	kdb_page_flags(page, Reclaim);
-	kdb_page_flags(page, NosaveFree);
 	kdb_page_flags(page, Buddy);
 
 	/* PageHighMem is not a flag any more, but treat it as one */

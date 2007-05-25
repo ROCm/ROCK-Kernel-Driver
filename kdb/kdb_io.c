@@ -25,11 +25,7 @@
 #include <linux/kdbprivate.h>
 #include <linux/kallsyms.h>
 
-#ifdef CONFIG_SPARC64
-#include <asm/oplib.h>
-#else
 static struct console *kdbcons;
-#endif
 
 #ifdef CONFIG_PPC64
 #include <asm/udbg.h>
@@ -626,12 +622,16 @@ kdb_printf(const char *fmt, ...)
  * Remarks:
  *	Select a console device.  Only use a VT console if the user specified
  *	or defaulted console= /^tty[0-9]*$/
+ *
+ *	FIXME: 2.6.22-rc1 initializes the serial console long after kdb starts,
+ *	so booting with 'console=tty console=ttyS0' does not create the console
+ *	entry for ttyS0 in time.  For now simply assume that we have a working
+ *	console, until a better solution can be found.
  */
 
 void __init
 kdb_io_init(void)
 {
-#ifndef CONFIG_SPARC64 /* we don't register serial consoles in time */
 	/*
 	 * Select a console.
 	 */
@@ -639,8 +639,13 @@ kdb_io_init(void)
 	int vt_console = 0;
 
 	while (c) {
+#if 0 /* FIXME: we don't register serial consoles in time */
 		if ((c->flags & CON_CONSDEV) && !kdbcons)
 			kdbcons = c;
+#else
+		if (!kdbcons)
+			kdbcons = c;
+#endif
 		if ((c->flags & CON_ENABLED) &&
 		    strncmp(c->name, "tty", 3) == 0) {
 			char *p = c->name + 3;
@@ -660,7 +665,6 @@ kdb_io_init(void)
 	if (!vt_console)
 		KDB_FLAG_SET(NO_VT_CONSOLE);
 	kdb_input_flush();
-#endif
 	return;
 }
 

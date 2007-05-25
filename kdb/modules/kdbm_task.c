@@ -64,10 +64,10 @@ kdbm_task(int argc, const char **argv)
 
 	tp1 = (struct task_struct *)addr;
 	kdb_printf(
-	    "struct task at 0x%lx, pid=%d flags=0x%lx state=%ld comm=\"%s\"\n",
+	    "struct task at 0x%lx, pid=%d flags=0x%x state=%ld comm=\"%s\"\n",
 	    addr, tp->pid, tp->flags, tp->state, tp->comm);
 
-	kdb_printf("  cpu=%d policy=%lu ", kdb_process_cpu(tp), tp->policy);
+	kdb_printf("  cpu=%d policy=%u ", kdb_process_cpu(tp), tp->policy);
 	kdb_printf(
 	    "prio=%d static_prio=%d cpus_allowed=",
 	    tp->prio, tp->static_prio);
@@ -126,8 +126,8 @@ kdbm_task(int argc, const char **argv)
 	    tp->signal ? tp->signal->cutime : 0L,
 	    tp->signal ? tp->signal->cstime : 0L);
 
-	kdb_printf("  thread_info=0x%p\n", tp->thread_info);
-	kdb_printf("  ti flags=0x%lx\n", (unsigned long)tp->thread_info->flags);
+	kdb_printf("  thread_info=0x%p\n", task_thread_info(tp));
+	kdb_printf("  ti flags=0x%lx\n", (unsigned long)task_thread_info(tp)->flags);
 
 out:
 	if (tp)
@@ -195,5 +195,5 @@ static void __exit kdbm_task_exit(void)
 	kdb_unregister("sigset");
 }
 
-kdb_module_init(kdbm_task_init)
-kdb_module_exit(kdbm_task_exit)
+module_init(kdbm_task_init)
+module_exit(kdbm_task_exit)

@@ -148,11 +148,6 @@ SECTIONS
 	*(.con_initcall.init)
   	__con_initcall_end = .;
   }
-  __kdb_initcall_start = .;
-  .kdb_initcall.init : AT(ADDR(.kdb_initcall.init) - LOAD_OFFSET) {
-	*(.kdb_initcall.init)
-  }
-  __kdb_initcall_end = .;
   SECURITY_INIT
   . = ALIGN(4);
   .altinstructions : AT(ADDR(.altinstructions) - LOAD_OFFSET) {

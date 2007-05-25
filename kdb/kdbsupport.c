@@ -27,10 +27,6 @@
 #include <linux/kdb.h>
 #include <linux/kdbprivate.h>
 
-#ifdef CONFIG_MODULES
-extern struct list_head *kdb_modules;
-#endif
-
 /*
  * Symbol table functions.
  */
@@ -929,7 +925,15 @@ struct debug_alloc_header {
 	u32 next;	/* offset of next header from start of pool */
 	u32 size;
 };
+
+/* The memory returned by this allocator must be aligned, which means so must
+ * the header size.  Do not assume that sizeof(struct debug_alloc_header) is a
+ * multiple of the alignment, explicitly calculate the overhead of this header,
+ * including the alignment.  The rest of this code must not use sizeof() on any
+ * header or pointer to a header.
+ */
 #define dah_align 8
+#define dah_overhead ALIGN(sizeof(struct debug_alloc_header), dah_align)
 
 static u64 debug_alloc_pool_aligned[64*1024/dah_align];	/* 64K pool */
 static char *debug_alloc_pool = (char *)debug_alloc_pool_aligned;
@@ -981,14 +985,17 @@ void
 	}
 	h = (struct debug_alloc_header *)(debug_alloc_pool + dah_first);
 	if (dah_first_call) {
-		h->size = sizeof(debug_alloc_pool_aligned) - sizeof(*h);
+		h->size = sizeof(debug_alloc_pool_aligned) - dah_overhead;
 		dah_first_call = 0;
 	}
+	size = ALIGN(size, dah_align);
 	prev = best = bestprev = NULL;
 	while (1) {
 		if (h->size >= size && (!best || h->size < best->size)) {
 			best = h;
 			bestprev = prev;
+			if (h->size == size)
+				break;
 		}
 		if (!h->next)
 			break;
@@ -997,15 +1004,16 @@ void
 	}
 	if (!best)
 		goto out;
-	rem = (best->size - size) & -dah_align;
+	rem = best->size - size;
 	/* The pool must always contain at least one header */
-	if (best->next == 0 && bestprev == NULL && rem < sizeof(*h))
+	if (best->next == 0 && bestprev == NULL && rem < dah_overhead)
 		goto out;
-	if (rem >= sizeof(*h)) {
-		best->size = (size + dah_align - 1) & -dah_align;
-		h_offset = (char *)best - debug_alloc_pool + sizeof(*best) + best->size;
+	if (rem >= dah_overhead) {
+		best->size = size;
+		h_offset = ((char *)best - debug_alloc_pool) +
+			   dah_overhead + best->size;
 		h = (struct debug_alloc_header *)(debug_alloc_pool + h_offset);
-		h->size = rem - sizeof(*h);
+		h->size = rem - dah_overhead;
 		h->next = best->next;
 	} else
 		h_offset = best->next;
@@ -1013,7 +1021,7 @@ void
 		bestprev->next = h_offset;
 	else
 		dah_first = h_offset;
-	p = best+1;
+	p = (char *)best + dah_overhead;
 out:
 	spin_unlock(&dap_lock);
 	return p;
@@ -1035,7 +1043,7 @@ debug_kfree(const void *p)
 		__release(dap_lock);	/* we never actually got it */
 		return;		/* memory leak, cannot be helped */
 	}
-	h = (struct debug_alloc_header *)p - 1;
+	h = (struct debug_alloc_header *)((char *)p - dah_overhead);
 	h_offset = (char *)h - debug_alloc_pool;
 	if (h_offset < dah_first) {
 		h->next = dah_first;
@@ -1047,11 +1055,12 @@ debug_kfree(const void *p)
 		while (1) {
 			if (!prev->next || prev->next > h_offset)
 				break;
-			prev = (struct debug_alloc_header *)(debug_alloc_pool + prev->next);
+			prev = (struct debug_alloc_header *)
+				(debug_alloc_pool + prev->next);
 		}
 		prev_offset = (char *)prev - debug_alloc_pool;
-		if (prev_offset + sizeof(*prev) + prev->size == h_offset) {
-			prev->size += sizeof(*h) + h->size;
+		if (prev_offset + dah_overhead + prev->size == h_offset) {
+			prev->size += dah_overhead + h->size;
 			h = prev;
 			h_offset = prev_offset;
 		} else {
@@ -1059,10 +1068,11 @@ debug_kfree(const void *p)
 			prev->next = h_offset;
 		}
 	}
-	if (h_offset + sizeof(*h) + h->size == h->next) {
+	if (h_offset + dah_overhead + h->size == h->next) {
 		struct debug_alloc_header *next;
-		next = (struct debug_alloc_header *)(debug_alloc_pool + h->next);
-		h->size += sizeof(*next) + next->size;
+		next = (struct debug_alloc_header *)
+			(debug_alloc_pool + h->next);
+		h->size += dah_overhead + next->size;
 		h->next = next->next;
 	}
 	spin_unlock(&dap_lock);
@@ -1087,7 +1097,7 @@ debug_kusage(void)
 	}
 	h = (struct debug_alloc_header *)(debug_alloc_pool + dah_first);
 	if (dah_first == 0 &&
-	    (h->size == sizeof(debug_alloc_pool_aligned) - sizeof(*h) ||
+	    (h->size == sizeof(debug_alloc_pool_aligned) - dah_overhead ||
 	     dah_first_call))
 		goto out;
 	if (!debug_kusage_one_time)

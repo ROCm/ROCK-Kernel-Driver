@@ -1,3 +1,48 @@
+2007-05-22 Keith Owens  <kaos@sgi.com>
+
+	* Register KDBENTER_VECTOR early on the boot cpu.
+	* kdb v4.4-2.6.22-rc2-i386-2.
+
+2007-05-22 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.22-rc2-i386-1.
+
+2007-05-22 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.22-rc1-i386-1.
+
+2007-05-17 Keith Owens  <kaos@sgi.com>
+
+	* Update dumpregs comments for rdmsr and wrmsr commands.
+	  Bernardo Innocenti.
+	* kdb v4.4-2.6.21-i386-3.
+
+2007-05-15 Keith Owens  <kaos@sgi.com>
+
+	* Change kdba_late_init to kdba_arch_init so KDB_ENTER() can be used
+	  earlier.
+	* kdb v4.4-2.6.21-i386-2.
+
+2007-04-29 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.21-i386-1.
+
+2007-04-16 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.21-rc7-i386-1.
+
+2007-04-10 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.21-rc6-i386-1.
+
+2007-04-02 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.21-rc5-i386-1.
+
+2007-03-19 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.21-rc4-i386-1.
+
 2007-03-14 Keith Owens  <kaos@sgi.com>
 
 	* kdb v4.4-2.6.21-rc3-i386-1.
