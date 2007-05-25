@@ -971,7 +971,7 @@ MODULE_LICENSE ("GPL");
 
 #ifdef CONFIG_PPC_PS3
 #include "ohci-ps3.c"
-#define PS3_SYSTEM_BUS_DRIVER	ps3_ohci_sb_driver
+#define PS3_SYSTEM_BUS_DRIVER	ps3_ohci_driver
 #endif
 
 #if	!defined(PCI_DRIVER) &&		\
@@ -995,8 +995,8 @@ static int __init ohci_hcd_mod_init(void)
 
 #ifdef PS3_SYSTEM_BUS_DRIVER
 	if (firmware_has_feature(FW_FEATURE_PS3_LV1)) {
-		retval = ps3_system_bus_driver_register(
-				&PS3_SYSTEM_BUS_DRIVER);
+		retval = ps3_system_bus_driver_register(&PS3_SYSTEM_BUS_DRIVER,
+							PS3_IOBUS_SB);
 		if (retval < 0)
 			goto error_ps3;
 	}

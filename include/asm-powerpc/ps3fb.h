@@ -43,14 +43,6 @@ struct ps3fb_ioctl_res {
 
 #ifdef __KERNEL__
 
-#ifdef CONFIG_FB_PS3
-extern void ps3fb_flip_ctl(int on);
-extern void ps3fb_cleanup(void);
-#else
-static inline void ps3fb_flip_ctl(int on) {}
-static inline void ps3fb_cleanup(void) {}
-#endif
-
 #endif /* __KERNEL__ */
 
 #endif /* _ASM_POWERPC_PS3FB_H_ */

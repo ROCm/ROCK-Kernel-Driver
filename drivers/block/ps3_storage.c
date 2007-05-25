@@ -1414,8 +1414,8 @@ static u64 ps3_free_dma_region(const struct ps3_device_id *did, u64 dma)
 static void *ps3_stor_alloc_separate_memory(int alloc_size, u64 *lpar_addr)
 {
 	void * va;
-	BUG_ON(alloc_size != ps3_stor_bounce_buffer.size);
-	va = ps3_stor_bounce_buffer.address;
+	BUG_ON(alloc_size != ps3flash_bounce_buffer.size);
+	va = ps3flash_bounce_buffer.address;
 	*lpar_addr = ps3_mm_phys_to_lpar(__pa(va));
 	return va;
 }
@@ -1713,12 +1713,24 @@ static unsigned int ps3_stor_enum_storage_drives(void)
 {
 	unsigned int devices = 0;
 
+#if defined(CONFIG_PS3_DISK) || defined(CONFIG_PS3_DISK_MODULE)
+	printk("NOT looking for disk devices!!!\n");
+#else
 	printk("Looking for disk devices...\n");
 	devices += ps3_stor_enum_storage_type(PS3_DEV_TYPE_STOR_DISK);
+#endif
+#if defined(CONFIG_PS3_ROM) || defined(CONFIG_PS3_ROM_MODULE)
+	printk("Not looking for ROM devices...\n");
+#else
 	printk("Looking for ROM devices...\n");
 	devices += ps3_stor_enum_storage_type(PS3_DEV_TYPE_STOR_ROM);
+#endif
+#if defined(CONFIG_PS3_FLASH) || defined(CONFIG_PS3_FLASH_MODULE)
+	printk("NOT looking for FLASH devices!!!\n");
+#else
 	printk("Looking for FLASH devices...\n");
 	devices += ps3_stor_enum_storage_type(PS3_DEV_TYPE_STOR_FLASH);
+#endif
 
 	return devices;
 }

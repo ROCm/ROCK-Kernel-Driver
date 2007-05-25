@@ -2270,6 +2270,13 @@ config GELIC_NET
 	  To compile this driver as a module, choose M here: the
 	  module will be called gelic_net.
 
+config GELIC_WIRELESS
+	bool "Gelic net Wireless Extension"
+	depends on GELIC_NET
+	select WIRELESS_EXT
+	help
+	  Wireless Extension support for Gelic Gigabit Ethernet driver
+
 config GIANFAR
 	tristate "Gianfar Ethernet"
 	depends on 85xx || 83xx || PPC_86xx

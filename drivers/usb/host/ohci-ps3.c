@@ -19,6 +19,7 @@
  */
 
 #include <asm/ps3.h>
+#include <asm/lv1call.h>
 
 static int ps3_ohci_hc_reset(struct usb_hcd *hcd)
 {
@@ -83,7 +84,7 @@ static inline int __attribute__ ((format (printf, 2, 3))) dev_dbg(
 	const struct device *_dev, const char *fmt, ...) {return 0;}
 #endif
 
-static int ps3_ohci_sb_probe(struct ps3_system_bus_device *dev)
+static int ps3_ohci_probe(struct ps3_system_bus_device *dev)
 {
 	int result;
 	struct usb_hcd *hcd;
@@ -92,7 +93,26 @@ static int ps3_ohci_sb_probe(struct ps3_system_bus_device *dev)
 
 	if (usb_disabled()) {
 		result = -ENODEV;
+		BUG();
 		goto fail_start;
+	}
+
+	result = ps3_open_hv_device(dev);
+
+	if (result) {
+		dev_dbg(&dev->core, "%s:%d: lv1_open_device failed: %s\n",
+			__func__, __LINE__, ps3_result(result));
+		result = -EPERM;
+		goto fail_open;
+	}
+
+	result = ps3_dma_region_create(dev->d_region);
+
+	if (result) {
+		dev_dbg(&dev->core, "%s:%d: ps3_dma_region_create failed: "
+			"(%d)\n", __func__, __LINE__, result);
+		BUG_ON("check region type");
+		goto fail_dma_region;
 	}
 
 	result = ps3_mmio_region_create(dev->m_region);
@@ -101,7 +121,7 @@ static int ps3_ohci_sb_probe(struct ps3_system_bus_device *dev)
 		dev_dbg(&dev->core, "%s:%d: ps3_map_mmio_region failed\n",
 			__func__, __LINE__);
 		result = -EPERM;
-		goto fail_mmio;
+		goto fail_mmio_region;
 	}
 
 	dev_dbg(&dev->core, "%s:%d: mmio mapped_addr %lxh\n", __func__,
@@ -130,6 +150,11 @@ static int ps3_ohci_sb_probe(struct ps3_system_bus_device *dev)
 
 	hcd->rsrc_start = dev->m_region->lpar_addr;
 	hcd->rsrc_len = dev->m_region->len;
+
+	if (!request_mem_region(hcd->rsrc_start, hcd->rsrc_len, hcd_name))
+		dev_dbg(&dev->core, "%s:%d: request_mem_region failed\n",
+			__func__, __LINE__);
+
 	hcd->regs = ioremap(dev->m_region->lpar_addr, dev->m_region->len);
 
 	if (!hcd->regs) {
@@ -163,34 +188,61 @@ static int ps3_ohci_sb_probe(struct ps3_system_bus_device *dev)
 fail_add_hcd:
 	iounmap(hcd->regs);
 fail_ioremap:
+	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
 	usb_put_hcd(hcd);
 fail_create_hcd:
 	ps3_io_irq_destroy(virq);
 fail_irq:
 	ps3_free_mmio_region(dev->m_region);
-fail_mmio:
+fail_mmio_region:
+	ps3_dma_region_free(dev->d_region);
+fail_dma_region:
+	ps3_close_hv_device(dev);
+fail_open:
 fail_start:
 	return result;
 }
 
-static int ps3_ohci_sb_remove (struct ps3_system_bus_device *dev)
+static int ps3_ohci_remove (struct ps3_system_bus_device *dev)
 {
+	unsigned int tmp;
 	struct usb_hcd *hcd =
 		(struct usb_hcd *)ps3_system_bus_get_driver_data(dev);
 
-	usb_put_hcd(hcd);
+	BUG_ON(!hcd);
+
+	dev_dbg(&dev->core, "%s:%d: regs %p\n", __func__, __LINE__, hcd->regs);
+	dev_dbg(&dev->core, "%s:%d: irq %u\n", __func__, __LINE__, hcd->irq);
+
+	tmp = hcd->irq;
+
+	usb_remove_hcd(hcd);
+
 	ps3_system_bus_set_driver_data(dev, NULL);
+
+	BUG_ON(!hcd->regs);
+	iounmap(hcd->regs);
+
+	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
+	usb_put_hcd(hcd);
+
+	ps3_io_irq_destroy(tmp);
+	ps3_free_mmio_region(dev->m_region);
+
+	ps3_dma_region_free(dev->d_region);
+	ps3_close_hv_device(dev);
 
 	return 0;
 }
 
 MODULE_ALIAS("ps3-ohci");
 
-static struct ps3_system_bus_driver ps3_ohci_sb_driver = {
+static struct ps3_system_bus_driver ps3_ohci_driver = {
 	.match_id = PS3_MATCH_ID_OHCI,
 	.core = {
 		.name = "ps3-ohci-driver",
 	},
-	.probe = ps3_ohci_sb_probe,
-	.remove = ps3_ohci_sb_remove,
+	.probe = ps3_ohci_probe,
+	.remove = ps3_ohci_remove,
+	.shutdown = ps3_ohci_remove,
 };

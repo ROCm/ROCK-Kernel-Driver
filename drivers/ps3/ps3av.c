@@ -1,32 +1,30 @@
 /*
- * Copyright (C) 2006 Sony Computer Entertainment Inc.
- * Copyright 2006, 2007 Sony Corporation
+ *  PS3 AV backend support.
  *
- * AV backend support for PS3
+ *  Copyright (C) 2007 Sony Computer Entertainment Inc.
+ *  Copyright 2007 Sony Corp.
  *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published
- * by the Free Software Foundation; version 2 of the License.
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; version 2 of the License.
  *
- * This program is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * General Public License for more details.
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program; if not, write to the Free Software
+ *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-
+#undef DEBUG
+#include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/delay.h>
 #include <linux/notifier.h>
-#include <linux/reboot.h>
-#include <linux/kernel.h>
 #include <linux/ioctl.h>
 
 #include <asm/firmware.h>
-#include <asm/lv1call.h>
 #include <asm/ps3av.h>
 #include <asm/ps3.h>
 
@@ -55,6 +53,7 @@ static struct ps3av {
 	u32 audio_port;
 	int ps3av_mode;
 	int ps3av_mode_old;
+	void (*flip_ctl)(int on);
 } ps3av;
 
 static struct ps3_vuart_port_device ps3av_dev = {
@@ -176,7 +175,7 @@ static int ps3av_parse_event_packet(const struct ps3av_reply_hdr *hdr)
 		else
 			printk(KERN_ERR
 			       "%s: failed event packet, cid:%08x size:%d\n",
-			       __FUNCTION__, hdr->cid, hdr->size);
+			       __func__, hdr->cid, hdr->size);
 		return 1;	/* receive event packet */
 	}
 	return 0;
@@ -198,7 +197,7 @@ static int ps3av_send_cmd_pkt(const struct ps3av_send_hdr *send_buf,
 	if (res < 0) {
 		dev_dbg(&ps3av_dev.core,
 			"%s: ps3av_vuart_write() failed (result=%d)\n",
-			__FUNCTION__, res);
+			__func__, res);
 		return res;
 	}
 
@@ -211,7 +210,7 @@ static int ps3av_send_cmd_pkt(const struct ps3av_send_hdr *send_buf,
 		if (res != PS3AV_HDR_SIZE) {
 			dev_dbg(&ps3av_dev.core,
 				"%s: ps3av_vuart_read() failed (result=%d)\n",
-				__FUNCTION__, res);
+				__func__, res);
 			return res;
 		}
 
@@ -221,7 +220,7 @@ static int ps3av_send_cmd_pkt(const struct ps3av_send_hdr *send_buf,
 		if (res < 0) {
 			dev_dbg(&ps3av_dev.core,
 				"%s: ps3av_vuart_read() failed (result=%d)\n",
-				__FUNCTION__, res);
+				__func__, res);
 			return res;
 		}
 		res += PS3AV_HDR_SIZE;	/* total len */
@@ -231,7 +230,7 @@ static int ps3av_send_cmd_pkt(const struct ps3av_send_hdr *send_buf,
 
 	if ((cmd | PS3AV_REPLY_BIT) != recv_buf->cid) {
 		dev_dbg(&ps3av_dev.core, "%s: reply err (result=%x)\n",
-			__FUNCTION__, recv_buf->cid);
+			__func__, recv_buf->cid);
 		return -EINVAL;
 	}
 
@@ -293,7 +292,7 @@ int ps3av_do_pkt(u32 cid, u16 send_len, size_t usr_buf_size,
 	if (res < 0) {
 		printk(KERN_ERR
 		       "%s: ps3av_send_cmd_pkt() failed (result=%d)\n",
-		       __FUNCTION__, res);
+		       __func__, res);
 		goto err;
 	}
 
@@ -302,7 +301,7 @@ int ps3av_do_pkt(u32 cid, u16 send_len, size_t usr_buf_size,
 					 usr_buf_size);
 	if (res < 0) {
 		printk(KERN_ERR "%s: put_return_status() failed (result=%d)\n",
-		       __FUNCTION__, res);
+		       __func__, res);
 		goto err;
 	}
 
@@ -311,7 +310,7 @@ int ps3av_do_pkt(u32 cid, u16 send_len, size_t usr_buf_size,
 
       err:
 	mutex_unlock(&ps3av.mutex);
-	printk(KERN_ERR "%s: failed cid:%x res:%d\n", __FUNCTION__, cid, res);
+	printk(KERN_ERR "%s: failed cid:%x res:%d\n", __func__, cid, res);
 	return res;
 }
 
@@ -522,7 +521,7 @@ static void ps3av_set_videomode_cont(u32 id, u32 old_id)
 	if (res == PS3AV_STATUS_NO_SYNC_HEAD)
 		printk(KERN_WARNING
 		       "%s: Command failed. Please try your request again. \n",
-		       __FUNCTION__);
+		       __func__);
 	else if (res)
 		dev_dbg(&ps3av_dev.core, "ps3av_cmd_avb_param failed\n");
 
@@ -715,8 +714,7 @@ int ps3av_set_video_mode(u32 id, int boot)
 
 	size = ARRAY_SIZE(video_mode_table);
 	if ((id & PS3AV_MODE_MASK) > size - 1 || id < 0) {
-		dev_dbg(&ps3av_dev.core, "%s: error id :%d\n", __FUNCTION__,
-			id);
+		dev_dbg(&ps3av_dev.core, "%s: error id :%d\n", __func__, id);
 		return -EINVAL;
 	}
 
@@ -725,8 +723,7 @@ int ps3av_set_video_mode(u32 id, int boot)
 	if ((id & PS3AV_MODE_MASK) == 0) {
 		id = ps3av_auto_videomode(&ps3av.av_hw_conf, boot);
 		if (id < 1) {
-			printk(KERN_ERR "%s: invalid id :%d\n", __FUNCTION__,
-			       id);
+			printk(KERN_ERR "%s: invalid id :%d\n", __func__, id);
 			return -EINVAL;
 		}
 		id |= option;
@@ -743,6 +740,13 @@ int ps3av_set_video_mode(u32 id, int boot)
 }
 
 EXPORT_SYMBOL_GPL(ps3av_set_video_mode);
+
+int ps3av_get_auto_mode(int boot)
+{
+	return ps3av_auto_videomode(&ps3av.av_hw_conf, boot);
+}
+
+EXPORT_SYMBOL_GPL(ps3av_get_auto_mode);
 
 int ps3av_set_mode(u32 id, int boot)
 {
@@ -779,7 +783,7 @@ int ps3av_get_scanmode(int id)
 	id = id & PS3AV_MODE_MASK;
 	size = ARRAY_SIZE(video_mode_table);
 	if (id > size - 1 || id < 0) {
-		printk(KERN_ERR "%s: invalid mode %d\n", __FUNCTION__, id);
+		printk(KERN_ERR "%s: invalid mode %d\n", __func__, id);
 		return -EINVAL;
 	}
 	return video_mode_table[id].interlace;
@@ -794,7 +798,7 @@ int ps3av_get_refresh_rate(int id)
 	id = id & PS3AV_MODE_MASK;
 	size = ARRAY_SIZE(video_mode_table);
 	if (id > size - 1 || id < 0) {
-		printk(KERN_ERR "%s: invalid mode %d\n", __FUNCTION__, id);
+		printk(KERN_ERR "%s: invalid mode %d\n", __func__, id);
 		return -EINVAL;
 	}
 	return video_mode_table[id].freq;
@@ -810,7 +814,7 @@ int ps3av_video_mode2res(u32 id, u32 *xres, u32 *yres)
 	id = id & PS3AV_MODE_MASK;
 	size = ARRAY_SIZE(video_mode_table);
 	if (id > size - 1 || id < 0) {
-		printk(KERN_ERR "%s: invalid mode %d\n", __FUNCTION__, id);
+		printk(KERN_ERR "%s: invalid mode %d\n", __func__, id);
 		return -EINVAL;
 	}
 	*xres = video_mode_table[id].x;
@@ -837,46 +841,21 @@ int ps3av_audio_mute(int mute)
 
 EXPORT_SYMBOL_GPL(ps3av_audio_mute);
 
-int ps3av_dev_open(void)
+void ps3av_register_flip_ctl(void (*flip_ctl)(int on))
 {
-	int status = 0;
-
 	mutex_lock(&ps3av.mutex);
-	if (!ps3av.open_count++) {
-		status = lv1_gpu_open(0);
-		if (status) {
-			printk(KERN_ERR "%s: lv1_gpu_open failed %d\n",
-			       __FUNCTION__, status);
-			ps3av.open_count--;
-		}
-	}
+	ps3av.flip_ctl = flip_ctl;
 	mutex_unlock(&ps3av.mutex);
-
-	return status;
 }
+EXPORT_SYMBOL_GPL(ps3av_register_flip_ctl);
 
-EXPORT_SYMBOL_GPL(ps3av_dev_open);
-
-int ps3av_dev_close(void)
+void ps3av_flip_ctl(int on)
 {
-	int status = 0;
-
 	mutex_lock(&ps3av.mutex);
-	if (ps3av.open_count <= 0) {
-		printk(KERN_ERR "%s: GPU already closed\n", __FUNCTION__);
-		status = -1;
-	} else if (!--ps3av.open_count) {
-		status = lv1_gpu_close();
-		if (status)
-			printk(KERN_WARNING "%s: lv1_gpu_close failed %d\n",
-			       __FUNCTION__, status);
-	}
+	if (ps3av.flip_ctl)
+		ps3av.flip_ctl(on);
 	mutex_unlock(&ps3av.mutex);
-
-	return status;
 }
-
-EXPORT_SYMBOL_GPL(ps3av_dev_close);
 
 static int ps3av_probe(struct ps3_vuart_port_device *dev)
 {
@@ -919,7 +898,7 @@ static int ps3av_probe(struct ps3_vuart_port_device *dev)
 	/* init avsetting modules */
 	res = ps3av_cmd_init();
 	if (res < 0)
-		printk(KERN_ERR "%s: ps3av_cmd_init failed %d\n", __FUNCTION__,
+		printk(KERN_ERR "%s: ps3av_cmd_init failed %d\n", __func__,
 		       res);
 
 	ps3av_get_hw_conf(&ps3av);
@@ -971,7 +950,7 @@ static int ps3av_module_init(void)
 	if (error) {
 		printk(KERN_ERR
 		       "%s: ps3_vuart_port_driver_register failed %d\n",
-		       __FUNCTION__, error);
+		       __func__, error);
 		return error;
 	}
 
@@ -979,7 +958,7 @@ static int ps3av_module_init(void)
 	if (error)
 		printk(KERN_ERR
 		       "%s: ps3_vuart_port_device_register failed %d\n",
-		       __FUNCTION__, error);
+		       __func__, error);
 
 	return error;
 }

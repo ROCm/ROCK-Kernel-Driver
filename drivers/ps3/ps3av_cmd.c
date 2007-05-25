@@ -854,7 +854,7 @@ int ps3av_cmd_avb_param(struct ps3av_pkt_avb_param *avb, u32 send_len)
 {
 	int res;
 
-	ps3fb_flip_ctl(0);	/* flip off */
+	ps3av_flip_ctl(0);	/* flip off */
 
 	/* avb packet */
 	res = ps3av_do_pkt(PS3AV_CID_AVB_PARAM, send_len, sizeof(*avb),
@@ -868,7 +868,7 @@ int ps3av_cmd_avb_param(struct ps3av_pkt_avb_param *avb, u32 send_len)
 			 res);
 
       out:
-	ps3fb_flip_ctl(1);	/* flip on */
+	ps3av_flip_ctl(1);	/* flip on */
 	return res;
 }
 

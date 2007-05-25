@@ -46,6 +46,9 @@
 
 #include <net/bluetooth/bluetooth.h>
 #include <net/bluetooth/hci_core.h>
+#if defined(CONFIG_PPC_PS3)
+#include <asm/firmware.h>
+#endif
 
 #ifndef CONFIG_BT_HCI_CORE_DEBUG
 #undef  BT_DBG
@@ -238,6 +241,22 @@ static void hci_init_req(struct hci_dev *hdev, unsigned long opt)
 		cp.flt_type  = HCI_FLT_CLEAR_ALL;
 		hci_send_cmd(hdev, OGF_HOST_CTL, OCF_SET_EVENT_FLT, sizeof(cp), &cp);
 	}
+
+#if defined(CONFIG_PPC_PS3)
+	/*
+	 * The PS3 built-in bluetooth host controler doesn't support the
+	 * HCI_FLT_CLEAR_ALL command properly.  Use the HCI_FLT_CONN_SETUP
+	 * command to clear the event filter.
+	 */
+	if (firmware_has_feature(FW_FEATURE_PS3_LV1)) {
+		struct hci_cp_set_event_flt_conn cp;
+		cp.flt_type = HCI_FLT_CONN_SETUP;
+		cp.cond_type = 0; /* all devices */
+		cp.condition = 1; /* auto accept is off */
+		hci_send_cmd(hdev, OGF_HOST_CTL, OCF_SET_EVENT_FLT, sizeof(cp),
+			&cp);
+	}
+#endif
 
 	/* Page timeout ~20 secs */
 	param = __cpu_to_le16(0x8000);

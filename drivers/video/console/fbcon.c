@@ -201,7 +201,7 @@ static void fbcon_redraw_move(struct vc_data *vc, struct display *p,
 static void fbcon_modechanged(struct fb_info *info);
 static void fbcon_set_all_vcs(struct fb_info *info);
 static void fbcon_start(void);
-static void fbcon_exit(void);
+void fbcon_exit(void);
 static struct class_device *fbcon_class_device;
 
 #ifdef CONFIG_MAC
@@ -462,6 +462,8 @@ static void fbcon_add_cursor_timer(struct fb_info *info)
 static void fbcon_del_cursor_timer(struct fb_info *info)
 {
 	struct fbcon_ops *ops = info->fbcon_par;
+
+	printk("%s:%d:\n", __func__, __LINE__);
 
 	if (info->queue.func == fb_flashcursor &&
 	    ops->flags & FBCON_FLAGS_CURSOR_TIMER) {
@@ -3055,6 +3057,43 @@ static void fbcon_new_modelist(struct fb_info *info)
 	}
 }
 
+static void fbcon_get_requirement(struct fb_info *info,
+				  struct fb_blit_caps *caps)
+{
+	struct vc_data *vc;
+	struct display *p;
+	int charcnt;
+
+	if (caps->flags) {
+		int i;
+
+		for (i = first_fb_vc; i <= last_fb_vc; i++) {
+			vc = vc_cons[i].d;
+			if (vc && vc->vc_mode == KD_TEXT) {
+				p = &fb_display[i];
+				caps->x |= 1 << (vc->vc_font.width - 1);
+				caps->y |= 1 << (vc->vc_font.height - 1);
+				charcnt = (p->userfont) ?
+					FNTCHARCNT(p->fontdata) : 256;
+				if (caps->len < charcnt)
+					caps->len = charcnt;
+			}
+		}
+	} else {
+		vc = vc_cons[fg_console].d;
+
+		if (vc && vc->vc_mode == KD_TEXT) {
+			p = &fb_display[fg_console];
+			caps->x |= 1 << (vc->vc_font.width - 1);
+			caps->y |= 1 << (vc->vc_font.height - 1);
+			charcnt = (p->userfont) ?
+				FNTCHARCNT(p->fontdata) : 256;
+			if (caps->len < charcnt)
+				caps->len = charcnt;
+		}
+	}
+}
+
 static int fbcon_event_notify(struct notifier_block *self, 
 			      unsigned long action, void *data)
 {
@@ -3062,6 +3101,7 @@ static int fbcon_event_notify(struct notifier_block *self,
 	struct fb_info *info = event->info;
 	struct fb_videomode *mode;
 	struct fb_con2fbmap *con2fb;
+	struct fb_blit_caps *caps;
 	int ret = 0;
 
 	/*
@@ -3109,6 +3149,10 @@ static int fbcon_event_notify(struct notifier_block *self,
 		break;
 	case FB_EVENT_NEW_MODELIST:
 		fbcon_new_modelist(info);
+		break;
+	case FB_EVENT_GET_REQ:
+		caps = event->data;
+		fbcon_get_requirement(info, caps);
 		break;
 	}
 
@@ -3268,7 +3312,7 @@ static void fbcon_start(void)
 	}
 }
 
-static void fbcon_exit(void)
+void fbcon_exit(void)
 {
 	struct fb_info *info;
 	int i, j, mapped;
@@ -3320,6 +3364,7 @@ static void fbcon_exit(void)
 
 	fbcon_has_exited = 1;
 }
+EXPORT_SYMBOL_GPL(fbcon_exit);
 
 static int __init fb_console_init(void)
 {

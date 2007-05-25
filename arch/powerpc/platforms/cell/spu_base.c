@@ -36,6 +36,8 @@
 #include <asm/xmon.h>
 
 const struct spu_management_ops *spu_management_ops;
+EXPORT_SYMBOL_GPL(spu_management_ops);
+
 const struct spu_priv1_ops *spu_priv1_ops;
 
 static struct list_head spu_list[MAX_NUMNODES];
@@ -44,7 +46,6 @@ static DEFINE_MUTEX(spu_mutex);
 static spinlock_t spu_list_lock = SPIN_LOCK_UNLOCKED;
 
 EXPORT_SYMBOL_GPL(spu_priv1_ops);
-EXPORT_SYMBOL_GPL(spu_management_ops);
 
 void spu_invalidate_slbs(struct spu *spu)
 {
@@ -571,8 +572,21 @@ int spu_irq_class_1_bottom(struct spu *spu)
 	return ret;
 }
 
+static int spu_shutdown(struct sys_device *sysdev)
+{
+	struct spu *spu = container_of(sysdev, struct spu, sysdev);
+
+	// what else here???
+
+	spu_free_irqs(spu);
+	spu_destroy_spu(spu);
+	kfree(spu);
+	return 0;
+}
+
 struct sysdev_class spu_sysdev_class = {
-	set_kset_name("spu")
+	set_kset_name("spu"),
+	.shutdown = spu_shutdown,
 };
 
 int spu_add_sysdev_attr(struct sysdev_attribute *attr)
@@ -731,6 +745,9 @@ static int __init init_spu_base(void)
 {
 	int i, ret;
 
+	for (i = 0; i < MAX_NUMNODES; i++)
+		INIT_LIST_HEAD(&spu_list[i]);
+
 	if (!spu_management_ops)
 		return 0;
 
@@ -738,9 +755,6 @@ static int __init init_spu_base(void)
 	ret = sysdev_class_register(&spu_sysdev_class);
 	if (ret)
 		return ret;
-
-	for (i = 0; i < MAX_NUMNODES; i++)
-		INIT_LIST_HEAD(&spu_list[i]);
 
 	ret = spu_enumerate_spus(create_spu);
 

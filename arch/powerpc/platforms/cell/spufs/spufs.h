@@ -50,12 +50,11 @@ struct spu_context {
 	spinlock_t mmio_lock;		  /* protects mmio access */
 	struct address_space *local_store; /* local store mapping.  */
 	struct address_space *mfc;	   /* 'mfc' area mappings. */
-	struct address_space *cntl;	   /* 'control' area mappings. */
-	struct address_space *signal1;	   /* 'signal1' area mappings. */
-	struct address_space *signal2;	   /* 'signal2' area mappings. */
-	struct address_space *mss;	   /* 'mss' area mappings. */
-	struct address_space *psmap;	   /* 'psmap' area mappings. */
-	spinlock_t mapping_lock;
+	struct address_space *cntl; 	   /* 'control' area mappings. */
+	struct address_space *signal1; 	   /* 'signal1' area mappings. */
+	struct address_space *signal2; 	   /* 'signal2' area mappings. */
+	struct address_space *mss; 	   /* 'mss' area mappings. */
+	struct address_space *psmap; 	   /* 'psmap' area mappings. */
 	u64 object_id;		   /* user space pointer for oprofile */
 
 	enum { SPU_STATE_RUNNABLE, SPU_STATE_SAVED } state;
@@ -151,7 +150,6 @@ struct spufs_inode_info {
 	struct spu_context *i_ctx;
 	struct spu_gang *i_gang;
 	struct inode vfs_inode;
-	int i_openers;
 };
 #define SPUFS_I(inode) \
 	container_of(inode, struct spufs_inode_info, vfs_inode)

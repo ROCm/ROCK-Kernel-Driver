@@ -251,6 +251,12 @@ struct hci_cp_set_event_flt {
 	__u8     condition[0];
 } __attribute__ ((packed));
 
+struct hci_cp_set_event_flt_conn {
+	__u8 flt_type;
+	__u8 cond_type;
+	__u8 condition;
+} __attribute__ ((packed));
+
 /* Filter types */
 #define HCI_FLT_CLEAR_ALL	0x00
 #define HCI_FLT_INQ_RESULT	0x01
