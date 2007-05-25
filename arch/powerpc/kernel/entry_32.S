@@ -191,7 +191,6 @@ stack_ovf:
 0:
 
 _GLOBAL(DoSyscall)
-	stw	r0,THREAD+LAST_SYSCALL(r2)
 	stw	r3,ORIG_GPR3(r1)
 	li	r12,0
 	stw	r12,RESULT(r1)
@@ -597,7 +596,11 @@ fast_exception_return:
 	mr	r12,r4		/* restart at exc_exit_restart */
 	b	2b
 
-	.comm	fee_restarts,4
+	.section .bss
+	.align	2
+fee_restarts:
+	.space	4
+	.previous
 
 /* aargh, a nonrecoverable interrupt, panic */
 /* aargh, we don't know which trap this is */
@@ -852,7 +855,11 @@ load_dbcr0:
 	mtspr	SPRN_DBSR,r11	/* clear all pending debug events */
 	blr
 
-	.comm	global_dbcr0,8
+	.section .bss
+	.align	4
+global_dbcr0:
+	.space	8
+	.previous
 #endif /* !(CONFIG_4xx || CONFIG_BOOKE) */
 
 do_work:			/* r10 contains MSR_KERNEL here */
@@ -927,7 +934,11 @@ END_FTR_SECTION_IFSET(CPU_FTR_601)
 	/* shouldn't return */
 	b	4b
 
-	.comm	ee_restarts,4
+	.section .bss
+	.align	2
+ee_restarts:
+	.space	4
+	.previous
 
 /*
  * PROM code for specific machines follows.  Put it

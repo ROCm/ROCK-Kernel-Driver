@@ -1,28 +1,32 @@
 Overview of Linux kernel SPI support
 ====================================
 
-02-Dec-2005
+21-May-2007
 
 What is SPI?
 ------------
 The "Serial Peripheral Interface" (SPI) is a synchronous four wire serial
 link used to connect microcontrollers to sensors, memory, and peripherals.
+It's a simple "de facto" standard, not complicated enough to acquire a
+standardization body.  SPI uses a master/slave configuration.
 
-The three signal wires hold a clock (SCLK, often on the order of 10 MHz),
+The three signal wires hold a clock (SCK, often on the order of 10 MHz),
 and parallel data lines with "Master Out, Slave In" (MOSI) or "Master In,
 Slave Out" (MISO) signals.  (Other names are also used.)  There are four
 clocking modes through which data is exchanged; mode-0 and mode-3 are most
 commonly used.  Each clock cycle shifts data out and data in; the clock
-doesn't cycle except when there is data to shift.
+doesn't cycle except when there is a data bit to shift.  Not all data bits
+are used though; not every protocol uses those full duplex capabilities.
 
-SPI masters may use a "chip select" line to activate a given SPI slave
+SPI masters use a fourth "chip select" line to activate a given SPI slave
 device, so those three signal wires may be connected to several chips
-in parallel.  All SPI slaves support chipselects.  Some devices have
+in parallel.  All SPI slaves support chipselects; they are usually active
+low signals, labeled nCSx for slave 'x' (e.g. nCS0).  Some devices have
 other signals, often including an interrupt to the master.
 
-Unlike serial busses like USB or SMBUS, even low level protocols for
+Unlike serial busses like USB or SMBus, even low level protocols for
 SPI slave functions are usually not interoperable between vendors
-(except for cases like SPI memory chips).
+(except for commodities like SPI memory chips).
 
   - SPI may be used for request/response style device protocols, as with
     touchscreen sensors and memory chips.
@@ -32,6 +36,11 @@ SPI slave functions are usually not interoperable between vendors
 
   - Some devices may use eight bit words.  Others may different word
     lengths, such as streams of 12-bit or 20-bit digital samples.
+
+  - Words are usually sent with their most significant bit (MSB) first,
+    but sometimes the least significant bit (LSB) goes first instead.
+
+  - Sometimes SPI is used to daisy-chain devices, like shift registers.
 
 In the same way, SPI slaves will only rarely support any kind of automatic
 discovery/enumeration protocol.  The tree of slave devices accessible from
@@ -43,6 +52,14 @@ most controllers have no problem handling "MicroWire" (think of it as
 half-duplex SPI, for request/response protocols), SSP ("Synchronous
 Serial Protocol"), PSP ("Programmable Serial Protocol"), and other
 related protocols.
+
+Some chips eliminate a signal line by combining MOSI and MISO, and
+limiting themselves to half-duplex at the hardware level.  In fact
+some SPI chips have this signal mode as a strapping option.  These
+can be accessed using the same programming interface as SPI, but of
+course they won't handle full duplex transfers.  You may find such
+chips described as using "three wire" signaling: SCK, data, nCSx.
+(That data line is sometimes called MOMI or SISO.)
 
 Microcontrollers often support both master and slave sides of the SPI
 protocol.  This document (and Linux) currently only supports the master
@@ -74,11 +91,38 @@ interfaces with SPI modes.  Given SPI support, they could use MMC or SD
 cards without needing a special purpose MMC/SD/SDIO controller.
 
 
+I'm confused.  What are these four SPI "clock modes"?
+-----------------------------------------------------
+It's easy to be confused here, and the vendor documentation you'll
+find isn't necessarily helpful.  The four modes combine two mode bits:
+
+ - CPOL indicates the initial clock polarity.  CPOL=0 means the
+   clock starts low, so the first (leading) edge is rising, and
+   the second (trailing) edge is falling.  CPOL=1 means the clock
+   starts high, so the first (leading) edge is falling.
+
+ - CPHA indicates the clock phase used to sample data; CPHA=0 says
+   sample on the leading edge, CPHA=1 means the trailing edge.
+
+   Since the signal needs to stablize before it's sampled, CPHA=0
+   implies that its data is written half a clock before the first
+   clock edge.  The chipselect may have made it become available.
+
+Chip specs won't always say "uses SPI mode X" in as many words,
+but their timing diagrams will make the CPOL and CPHA modes clear.
+
+In the SPI mode number, CPOL is the high order bit and CPHA is the
+low order bit.  So when a chip's timing diagram shows the clock
+starting low (CPOL=0) and data stabilized for sampling during the
+trailing clock edge (CPHA=1), that's SPI mode 1.
+
+
 How do these driver programming interfaces work?
 ------------------------------------------------
 The <linux/spi/spi.h> header file includes kerneldoc, as does the
-main source code, and you should certainly read that.  This is just
-an overview, so you get the big picture before the details.
+main source code, and you should certainly read that chapter of the
+kernel API document.  This is just an overview, so you get the big
+picture before those details.
 
 SPI requests always go into I/O queues.  Requests for a given SPI device
 are always executed in FIFO order, and complete asynchronously through
@@ -88,7 +132,7 @@ a command and then reading its response.
 
 There are two types of SPI driver, here called:
 
-  Controller drivers ... these are often built in to System-On-Chip
+  Controller drivers ... controllers may be built in to System-On-Chip
 	processors, and often support both Master and Slave roles.
 	These drivers touch hardware registers and may use DMA.
 	Or they can be PIO bitbangers, needing just GPIO pins.
@@ -108,18 +152,18 @@ those two types of driver.  At this writing, Linux has no slave side
 programming interface.
 
 There is a minimal core of SPI programming interfaces, focussing on
-using driver model to connect controller and protocol drivers using
+using the driver model to connect controller and protocol drivers using
 device tables provided by board specific initialization code.  SPI
 shows up in sysfs in several locations:
 
-   /sys/devices/.../CTLR/spiB.C ... spi_device for on bus "B",
+   /sys/devices/.../CTLR/spiB.C ... spi_device on bus "B",
 	chipselect C, accessed through CTLR.
 
    /sys/devices/.../CTLR/spiB.C/modalias ... identifies the driver
 	that should be used with this device (for hotplug/coldplug)
 
    /sys/bus/spi/devices/spiB.C ... symlink to the physical
-   	spiB-C device
+   	spiB.C device
 
    /sys/bus/spi/drivers/D ... driver for one or more spi*.* devices
 
@@ -240,7 +284,7 @@ The board_info should provide enough information to let the system work
 without the chip's driver being loaded.  The most troublesome aspect of
 that is likely the SPI_CS_HIGH bit in the spi_device.mode field, since
 sharing a bus with a device that interprets chipselect "backwards" is
-not possible.
+not possible until the infrastructure knows how to deselect it.
 
 Then your board initialization code would register that table with the SPI
 infrastructure, so that it's available later when the SPI master controller
@@ -268,16 +312,14 @@ board info based on the board that was hotplugged.  Of course, you'd later
 call at least spi_unregister_device() when that board is removed.
 
 When Linux includes support for MMC/SD/SDIO/DataFlash cards through SPI, those
-configurations will also be dynamic.  Fortunately, those devices all support
-basic device identification probes, so that support should hotplug normally.
+configurations will also be dynamic.  Fortunately, such devices all support
+basic device identification probes, so they should hotplug normally.
 
 
 How do I write an "SPI Protocol Driver"?
 ----------------------------------------
-All SPI drivers are currently kernel drivers.  A userspace driver API
-would just be another kernel driver, probably offering some lowlevel
-access through aio_read(), aio_write(), and ioctl() calls and using the
-standard userspace sysfs mechanisms to bind to a given SPI device.
+Most SPI drivers are currently kernel drivers, but there's also support
+for userspace drivers.  Here we talk only about kernel drivers.
 
 SPI protocol drivers somewhat resemble platform device drivers:
 
@@ -319,7 +361,8 @@ might look like this unless you're creating a class_device:
 
 As soon as it enters probe(), the driver may issue I/O requests to
 the SPI device using "struct spi_message".  When remove() returns,
-the driver guarantees that it won't submit any more such messages.
+or after probe() fails, the driver guarantees that it won't submit
+any more such messages.
 
   - An spi_message is a sequence of protocol operations, executed
     as one atomic sequence.  SPI driver controls include:
@@ -368,7 +411,8 @@ the driver guarantees that it won't submit any more such messages.
 Some drivers may need to modify spi_device characteristics like the
 transfer mode, wordsize, or clock rate.  This is done with spi_setup(),
 which would normally be called from probe() before the first I/O is
-done to the device.
+done to the device.  However, that can also be called at any time
+that no message is pending for that device.
 
 While "spi_device" would be the bottom boundary of the driver, the
 upper boundaries might include sysfs (especially for sensor readings),
@@ -445,11 +489,15 @@ SPI MASTER METHODS
 	This sets up the device clock rate, SPI mode, and word sizes.
 	Drivers may change the defaults provided by board_info, and then
 	call spi_setup(spi) to invoke this routine.  It may sleep.
+	Unless each SPI slave has its own configuration registers, don't
+	change them right away ... otherwise drivers could corrupt I/O
+	that's in progress for other SPI devices.
 
     master->transfer(struct spi_device *spi, struct spi_message *message)
     	This must not sleep.  Its responsibility is arrange that the
-	transfer happens and its complete() callback is issued; the two
-	will normally happen later, after other transfers complete.
+	transfer happens and its complete() callback is issued.  The two
+	will normally happen later, after other transfers complete, and
+	if the controller is idle it will need to be kickstarted.
 
     master->cleanup(struct spi_device *spi)
 	Your controller driver may use spi_device.controller_state to hold

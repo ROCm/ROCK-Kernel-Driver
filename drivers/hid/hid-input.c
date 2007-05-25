@@ -240,11 +240,94 @@ static inline void hidinput_pb_setup(struct input_dev *input)
 }
 #endif
 
+static inline int match_scancode(int code, int scancode)
+{
+	if (scancode == 0)
+		return 1;
+	return ((code & (HID_USAGE_PAGE | HID_USAGE)) == scancode);
+}
+
+static inline int match_keycode(int code, int keycode)
+{
+	if (keycode == 0)
+		return 1;
+	return (code == keycode);
+}
+
+static struct hid_usage *hidinput_find_key(struct hid_device *hid,
+		int scancode, int keycode)
+{
+	int i, j, k;
+	struct hid_report *report;
+	struct hid_usage *usage;
+
+	for (k = HID_INPUT_REPORT; k <= HID_OUTPUT_REPORT; k++) {
+		list_for_each_entry(report, &hid->report_enum[k].report_list, list) {
+			for (i = 0; i < report->maxfield; i++) {
+				for ( j = 0; j < report->field[i]->maxusage; j++) {
+					usage = report->field[i]->usage + j;
+					if (usage->type == EV_KEY &&
+						match_scancode(usage->hid, scancode) &&
+						match_keycode(usage->code, keycode))
+						return usage;
+				}
+			}
+		}
+	}
+	return NULL;
+}
+
+static int hidinput_getkeycode(struct input_dev *dev, int scancode,
+				int *keycode)
+{
+	struct hid_device *hid = dev->private;
+	struct hid_usage *usage;
+	
+	usage = hidinput_find_key(hid, scancode, 0);
+	if (usage) {
+		*keycode = usage->code;
+		return 0;
+	}
+	return -EINVAL;
+}
+
+static int hidinput_setkeycode(struct input_dev *dev, int scancode,
+				int keycode)
+{
+	struct hid_device *hid = dev->private;
+	struct hid_usage *usage;
+	int old_keycode;
+	
+	if (keycode < 0 || keycode > KEY_MAX)
+		return -EINVAL;
+	
+	usage = hidinput_find_key(hid, scancode, 0);
+	if (usage) {
+		old_keycode = usage->code;
+		usage->code = keycode;
+		
+		clear_bit(old_keycode, dev->keybit);
+		set_bit(usage->code, dev->keybit);
+#ifdef CONFIG_HID_DEBUG
+		printk (KERN_DEBUG "Assigned keycode %d to HID usage code %x\n", keycode, scancode);
+#endif
+		/* Set the keybit for the old keycode if the old keycode is used
+		 * by another key */
+		if (hidinput_find_key (hid, 0, old_keycode))
+			set_bit(old_keycode, dev->keybit);
+		
+		return 0;
+	}
+	
+	return -EINVAL;
+}
+
+
 static void hidinput_configure_usage(struct hid_input *hidinput, struct hid_field *field,
 				     struct hid_usage *usage)
 {
 	struct input_dev *input = hidinput->input;
-	struct hid_device *device = input->private;
+	struct hid_device *device = input_get_drvdata(input);
 	int max = 0, code;
 	unsigned long *bit = NULL;
 
@@ -431,6 +514,15 @@ static void hidinput_configure_usage(struct hid_input *hidinput, struct hid_fiel
 				case 0x000: goto ignore;
 				case 0x034: map_key_clear(KEY_SLEEP);		break;
 				case 0x036: map_key_clear(BTN_MISC);		break;
+				/*
+				 * The next three are reported by Belkin wireless
+				 * keyboard (1020:0006). These values are "reserved"
+				 * in HUT 1.12.
+				 */
+				case 0x03a: map_key_clear(KEY_SOUND);           break;
+				case 0x03b: map_key_clear(KEY_CAMERA);          break;
+				case 0x03c: map_key_clear(KEY_DOCUMENTS);       break;
+
 				case 0x040: map_key_clear(KEY_MENU);		break;
 				case 0x045: map_key_clear(KEY_RADIO);		break;
 
@@ -531,13 +623,33 @@ static void hidinput_configure_usage(struct hid_input *hidinput, struct hid_fiel
 				case 0x302: map_key_clear(KEY_PROG2);		break;
 				case 0x303: map_key_clear(KEY_PROG3);		break;
 
-				/* Reported on Logitech S510 wireless keyboard */
+				/* Reported on certain Logitech wireless keyboards */
+				case 0x1001: map_key_clear(KEY_MESSENGER);	break;
+				case 0x1003: map_key_clear(KEY_SOUND);		break;
+				case 0x1004: map_key_clear(KEY_VIDEO);		break;
+				case 0x1005: map_key_clear(KEY_AUDIO);		break;
+				case 0x100a: map_key_clear(KEY_DOCUMENTS);	break;
+				case 0x1011: map_key_clear(KEY_PREVIOUSSONG);	break;
+				case 0x1012: map_key_clear(KEY_NEXTSONG);	break;
+				case 0x1013: map_key_clear(KEY_CAMERA);		break;
+				case 0x1014: map_key_clear(KEY_MESSENGER);	break;
+				case 0x1015: map_key_clear(KEY_RECORD);		break;
+				case 0x1016: map_key_clear(KEY_PLAYER);		break;
+				case 0x1017: map_key_clear(KEY_EJECTCD);	break;
+				case 0x1018: map_key_clear(KEY_MEDIA);          break;
+				case 0x1019: map_key_clear(KEY_PROG1);		break;
+				case 0x101a: map_key_clear(KEY_PROG2);		break;
+				case 0x101b: map_key_clear(KEY_PROG3);		break;
 				case 0x101f: map_key_clear(KEY_ZOOMIN);		break;
 				case 0x1020: map_key_clear(KEY_ZOOMOUT);	break;
 				case 0x1021: map_key_clear(KEY_ZOOMRESET);	break;
+				case 0x1023: map_key_clear(KEY_CLOSE);		break;
+				case 0x1027: map_key_clear(KEY_MENU);           break;
 				/* this one is marked as 'Rotate' */
 				case 0x1028: map_key_clear(KEY_ANGLE);		break;
 				case 0x1029: map_key_clear(KEY_SHUFFLE);	break;
+				case 0x102a: map_key_clear(KEY_BACK);           break;
+				case 0x102b: map_key_clear(KEY_CYCLEWINDOWS);   break;
 				case 0x1041: map_key_clear(KEY_BATTERY);	break;
 				case 0x1042: map_key_clear(KEY_WORDPROCESSOR);	break;
 				case 0x1043: map_key_clear(KEY_SPREADSHEET);	break;
@@ -830,13 +942,15 @@ EXPORT_SYMBOL_GPL(hidinput_find_field);
 
 static int hidinput_open(struct input_dev *dev)
 {
-	struct hid_device *hid = dev->private;
+	struct hid_device *hid = input_get_drvdata(dev);
+
 	return hid->hid_open(hid);
 }
 
 static void hidinput_close(struct input_dev *dev)
 {
-	struct hid_device *hid = dev->private;
+	struct hid_device *hid = input_get_drvdata(dev);
+
 	hid->hid_close(hid);
 }
 
@@ -884,10 +998,12 @@ int hidinput_connect(struct hid_device *hid)
 					return -1;
 				}
 
-				input_dev->private = hid;
+				input_set_drvdata(input_dev, hid);
 				input_dev->event = hid->hidinput_input_event;
 				input_dev->open = hidinput_open;
 				input_dev->close = hidinput_close;
+				input_dev->setkeycode = hidinput_setkeycode;
+				input_dev->getkeycode = hidinput_getkeycode;
 
 				input_dev->name = hid->name;
 				input_dev->phys = hid->phys;
@@ -896,7 +1012,7 @@ int hidinput_connect(struct hid_device *hid)
 				input_dev->id.vendor  = hid->vendor;
 				input_dev->id.product = hid->product;
 				input_dev->id.version = hid->version;
-				input_dev->cdev.dev = hid->dev;
+				input_dev->dev.parent = hid->dev;
 				hidinput->input = input_dev;
 				list_add_tail(&hidinput->list, &hid->inputs);
 			}

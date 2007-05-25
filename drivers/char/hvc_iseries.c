@@ -575,11 +575,11 @@ static int hvc_find_vtys(void)
 				(num_found >= VTTY_PORTS))
 			break;
 
-		vtermno = get_property(vty, "reg", NULL);
+		vtermno = of_get_property(vty, "reg", NULL);
 		if (!vtermno)
 			continue;
 
-		if (!device_is_compatible(vty, "IBM,iSeries-vty"))
+		if (!of_device_is_compatible(vty, "IBM,iSeries-vty"))
 			continue;
 
 		if (num_found == 0)

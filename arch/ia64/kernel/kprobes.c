@@ -29,9 +29,9 @@
 #include <linux/slab.h>
 #include <linux/preempt.h>
 #include <linux/moduleloader.h>
+#include <linux/kdebug.h>
 
 #include <asm/pgtable.h>
-#include <asm/kdebug.h>
 #include <asm/sections.h>
 #include <asm/uaccess.h>
 
@@ -151,12 +151,12 @@ static uint __kprobes is_cmp_ctype_unc_inst(uint template, uint slot,
 
 	cmp_inst.l = kprobe_inst;
 	if ((cmp_inst.f.x2 == 0) || (cmp_inst.f.x2 == 1)) {
-		/* Integere compare - Register Register (A6 type)*/
+		/* Integer compare - Register Register (A6 type)*/
 		if ((cmp_inst.f.tb == 0) && (cmp_inst.f.ta == 0)
 				&&(cmp_inst.f.c == 1))
 			ctype_unc = 1;
 	} else if ((cmp_inst.f.x2 == 2)||(cmp_inst.f.x2 == 3)) {
-		/* Integere compare - Immediate Register (A8 type)*/
+		/* Integer compare - Immediate Register (A8 type)*/
 		if ((cmp_inst.f.ta == 0) &&(cmp_inst.f.c == 1))
 			ctype_unc = 1;
 	}
@@ -370,14 +370,18 @@ static int __kprobes valid_kprobe_addr(int template, int slot,
 
 static void __kprobes save_previous_kprobe(struct kprobe_ctlblk *kcb)
 {
-	kcb->prev_kprobe.kp = kprobe_running();
-	kcb->prev_kprobe.status = kcb->kprobe_status;
+	unsigned int i;
+	i = atomic_add_return(1, &kcb->prev_kprobe_index);
+	kcb->prev_kprobe[i-1].kp = kprobe_running();
+	kcb->prev_kprobe[i-1].status = kcb->kprobe_status;
 }
 
 static void __kprobes restore_previous_kprobe(struct kprobe_ctlblk *kcb)
 {
-	__get_cpu_var(current_kprobe) = kcb->prev_kprobe.kp;
-	kcb->kprobe_status = kcb->prev_kprobe.status;
+	unsigned int i;
+	i = atomic_sub_return(1, &kcb->prev_kprobe_index);
+	__get_cpu_var(current_kprobe) = kcb->prev_kprobe[i].kp;
+	kcb->kprobe_status = kcb->prev_kprobe[i].status;
 }
 
 static void __kprobes set_current_kprobe(struct kprobe *p,
@@ -444,7 +448,8 @@ int __kprobes trampoline_probe_handler(struct kprobe *p, struct pt_regs *regs)
 			break;
 	}
 
-	BUG_ON(!orig_ret_address || (orig_ret_address == trampoline_address));
+	kretprobe_assert(ri, orig_ret_address, trampoline_address);
+
 	regs->cr_iip = orig_ret_address;
 
 	reset_current_kprobe();
@@ -464,23 +469,13 @@ int __kprobes trampoline_probe_handler(struct kprobe *p, struct pt_regs *regs)
 }
 
 /* Called with kretprobe_lock held */
-void __kprobes arch_prepare_kretprobe(struct kretprobe *rp,
+void __kprobes arch_prepare_kretprobe(struct kretprobe_instance *ri,
 				      struct pt_regs *regs)
 {
-	struct kretprobe_instance *ri;
+	ri->ret_addr = (kprobe_opcode_t *)regs->b0;
 
-	if ((ri = get_free_rp_inst(rp)) != NULL) {
-		ri->rp = rp;
-		ri->task = current;
-		ri->ret_addr = (kprobe_opcode_t *)regs->b0;
-
-		/* Replace the return addr with trampoline addr */
-		regs->b0 = ((struct fnptr *)kretprobe_trampoline)->ip;
-
-		add_rp_inst(ri);
-	} else {
-		rp->nmissed++;
-	}
+	/* Replace the return addr with trampoline addr */
+	regs->b0 = ((struct fnptr *)kretprobe_trampoline)->ip;
 }
 
 int __kprobes arch_prepare_kprobe(struct kprobe *p)
@@ -825,7 +820,7 @@ out:
 	return 1;
 }
 
-static int __kprobes kprobes_fault_handler(struct pt_regs *regs, int trapnr)
+int __kprobes kprobes_fault_handler(struct pt_regs *regs, int trapnr)
 {
 	struct kprobe *cur = kprobe_running();
 	struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
@@ -909,13 +904,6 @@ int __kprobes kprobe_exceptions_notify(struct notifier_block *self,
 			if (post_kprobes_handler(args->regs))
 				ret = NOTIFY_STOP;
 		break;
-	case DIE_PAGE_FAULT:
-		/* kprobe_running() needs smp_processor_id() */
-		preempt_disable();
-		if (kprobe_running() &&
-			kprobes_fault_handler(args->regs, args->trapnr))
-			ret = NOTIFY_STOP;
-		preempt_enable();
 	default:
 		break;
 	}
@@ -959,7 +947,7 @@ int __kprobes setjmp_pre_handler(struct kprobe *p, struct pt_regs *regs)
 	/*
 	 * Callee owns the argument space and could overwrite it, eg
 	 * tail call optimization. So to be absolutely safe
-	 * we save the argument space before transfering the control
+	 * we save the argument space before transferring the control
 	 * to instrumented jprobe function which runs in
 	 * the process context
 	 */
@@ -1020,4 +1008,13 @@ int __init arch_init_kprobes(void)
 	trampoline_p.addr =
 		(kprobe_opcode_t *)((struct fnptr *)kretprobe_trampoline)->ip;
 	return register_kprobe(&trampoline_p);
+}
+
+int __kprobes arch_trampoline_kprobe(struct kprobe *p)
+{
+	if (p->addr ==
+		(kprobe_opcode_t *)((struct fnptr *)kretprobe_trampoline)->ip)
+		return 1;
+
+	return 0;
 }

@@ -26,80 +26,69 @@
 #include <asm/hardware.h>
 #include <asm/mach-types.h>
 #include <asm/arch/irqs.h>
+#include <asm/arch/msi.h>
 
 /* INTCTL0 CP6 R0 Page 4
  */
-static inline u32 read_intctl_0(void)
+static u32 read_intctl_0(void)
 {
 	u32 val;
 	asm volatile("mrc p6, 0, %0, c0, c4, 0":"=r" (val));
 	return val;
 }
-static inline void write_intctl_0(u32 val)
+static void write_intctl_0(u32 val)
 {
 	asm volatile("mcr p6, 0, %0, c0, c4, 0"::"r" (val));
 }
 
 /* INTCTL1 CP6 R1 Page 4
  */
-static inline u32 read_intctl_1(void)
+static u32 read_intctl_1(void)
 {
 	u32 val;
 	asm volatile("mrc p6, 0, %0, c1, c4, 0":"=r" (val));
 	return val;
 }
-static inline void write_intctl_1(u32 val)
+static void write_intctl_1(u32 val)
 {
 	asm volatile("mcr p6, 0, %0, c1, c4, 0"::"r" (val));
 }
 
 /* INTCTL2 CP6 R2 Page 4
  */
-static inline u32 read_intctl_2(void)
+static u32 read_intctl_2(void)
 {
 	u32 val;
 	asm volatile("mrc p6, 0, %0, c2, c4, 0":"=r" (val));
 	return val;
 }
-static inline void write_intctl_2(u32 val)
+static void write_intctl_2(u32 val)
 {
 	asm volatile("mcr p6, 0, %0, c2, c4, 0"::"r" (val));
 }
 
 /* INTCTL3 CP6 R3 Page 4
  */
-static inline u32 read_intctl_3(void)
+static u32 read_intctl_3(void)
 {
 	u32 val;
 	asm volatile("mrc p6, 0, %0, c3, c4, 0":"=r" (val));
 	return val;
 }
-static inline void write_intctl_3(u32 val)
+static void write_intctl_3(u32 val)
 {
 	asm volatile("mcr p6, 0, %0, c3, c4, 0"::"r" (val));
 }
 
 /* INTSTR0 CP6 R0 Page 5
  */
-static inline u32 read_intstr_0(void)
-{
-	u32 val;
-	asm volatile("mrc p6, 0, %0, c0, c5, 0":"=r" (val));
-	return val;
-}
-static inline void write_intstr_0(u32 val)
+static void write_intstr_0(u32 val)
 {
 	asm volatile("mcr p6, 0, %0, c0, c5, 0"::"r" (val));
 }
 
 /* INTSTR1 CP6 R1 Page 5
  */
-static inline u32 read_intstr_1(void)
-{
-	u32 val;
-	asm volatile("mrc p6, 0, %0, c1, c5, 0":"=r" (val));
-	return val;
-}
 static void write_intstr_1(u32 val)
 {
 	asm volatile("mcr p6, 0, %0, c1, c5, 0"::"r" (val));
@@ -107,12 +96,6 @@ static void write_intstr_1(u32 val)
 
 /* INTSTR2 CP6 R2 Page 5
  */
-static inline u32 read_intstr_2(void)
-{
-	u32 val;
-	asm volatile("mrc p6, 0, %0, c2, c5, 0":"=r" (val));
-	return val;
-}
 static void write_intstr_2(u32 val)
 {
 	asm volatile("mcr p6, 0, %0, c2, c5, 0"::"r" (val));
@@ -120,12 +103,6 @@ static void write_intstr_2(u32 val)
 
 /* INTSTR3 CP6 R3 Page 5
  */
-static inline u32 read_intstr_3(void)
-{
-	u32 val;
-	asm volatile("mrc p6, 0, %0, c3, c5, 0":"=r" (val));
-	return val;
-}
 static void write_intstr_3(u32 val)
 {
 	asm volatile("mcr p6, 0, %0, c3, c5, 0"::"r" (val));
@@ -133,12 +110,6 @@ static void write_intstr_3(u32 val)
 
 /* INTBASE CP6 R0 Page 2
  */
-static inline u32 read_intbase(void)
-{
-	u32 val;
-	asm volatile("mrc p6, 0, %0, c0, c2, 0":"=r" (val));
-	return val;
-}
 static void write_intbase(u32 val)
 {
 	asm volatile("mcr p6, 0, %0, c0, c2, 0"::"r" (val));
@@ -146,12 +117,6 @@ static void write_intbase(u32 val)
 
 /* INTSIZE CP6 R2 Page 2
  */
-static inline u32 read_intsize(void)
-{
-	u32 val;
-	asm volatile("mrc p6, 0, %0, c2, c2, 0":"=r" (val));
-	return val;
-}
 static void write_intsize(u32 val)
 {
 	asm volatile("mcr p6, 0, %0, c2, c2, 0"::"r" (val));
@@ -258,7 +223,7 @@ void __init iop13xx_init_irq(void)
 	write_intbase(INTBASE);
 	write_intsize(INTSIZE_4);
 
-	for(i = 0; i < NR_IOP13XX_IRQS; i++) {
+	for(i = 0; i <= IRQ_IOP13XX_HPI; i++) {
 		if (i < 32)
 			set_irq_chip(i, &iop13xx_irqchip1);
 		else if (i < 64)
@@ -271,4 +236,6 @@ void __init iop13xx_init_irq(void)
 		set_irq_handler(i, handle_level_irq);
 		set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
 	}
+
+	iop13xx_msi_init();
 }

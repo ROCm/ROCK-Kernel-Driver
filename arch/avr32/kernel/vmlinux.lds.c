@@ -26,10 +26,16 @@ SECTIONS
 			_sinittext = .;
 			*(.text.reset)
 			*(.init.text)
+			/*
+			 * .exit.text is discarded at runtime, not
+			 * link time, to deal with references from
+			 * __bug_table
+			 */
+			*(.exit.text)
 			_einittext = .;
 		. = ALIGN(4);
 		__tagtable_begin = .;
-			*(.taglist)
+			*(.taglist.init)
 		__tagtable_end = .;
 			*(.init.data)
 		. = ALIGN(16);
@@ -70,7 +76,7 @@ SECTIONS
 		. = 0x100;
 		*(.scall.text)
 		*(.irq.text)
-		*(.text)
+		TEXT_TEXT
 		SCHED_TEXT
 		LOCK_TEXT
 		KPROBES_TEXT
@@ -85,6 +91,8 @@ SECTIONS
 		*(__ex_table)
 		__stop___ex_table = .;
 	}
+
+	BUG_TABLE
 
 	RODATA
 
@@ -104,7 +112,7 @@ SECTIONS
 
 		/* And the rest... */
 		*(.data.rel*)
-		*(.data)
+		DATA_DATA
 		CONSTRUCTORS
 
 		_edata = .;
@@ -126,7 +134,6 @@ SECTIONS
 	 * thrown away, as cleanup code is never called unless it's a module.
 	 */
 	/DISCARD/       	: {
-		*(.exit.text)
 		*(.exit.data)
 		*(.exitcall.exit)
 	}

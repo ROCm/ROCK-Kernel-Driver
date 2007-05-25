@@ -116,6 +116,7 @@ struct io_context {
 
 	struct as_io_context *aic;
 	struct rb_root cic_root;
+	void *ioc_data;
 };
 
 void put_io_context(struct io_context *ioc);
@@ -853,7 +854,7 @@ static inline void put_dev_sector(Sector p)
 
 struct work_struct;
 int kblockd_schedule_work(struct work_struct *work);
-void kblockd_flush(void);
+void kblockd_flush_work(struct work_struct *work);
 
 #define MODULE_ALIAS_BLOCKDEV(major,minor) \
 	MODULE_ALIAS("block-major-" __stringify(major) "-" __stringify(minor))

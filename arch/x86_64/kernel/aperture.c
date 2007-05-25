@@ -51,7 +51,6 @@ static void __init insert_aperture_resource(u32 aper_base, u32 aper_size)
 
 static u32 __init allocate_aperture(void) 
 {
-	pg_data_t *nd0 = NODE_DATA(0);
 	u32 aper_size;
 	void *p; 
 
@@ -65,12 +64,12 @@ static u32 __init allocate_aperture(void)
 	 * Unfortunately we cannot move it up because that would make the
 	 * IOMMU useless.
 	 */
-	p = __alloc_bootmem_node(nd0, aper_size, aper_size, 0); 
+	p = __alloc_bootmem_nopanic(aper_size, aper_size, 0);
 	if (!p || __pa(p)+aper_size > 0xffffffff) {
 		printk("Cannot allocate aperture memory hole (%p,%uK)\n",
 		       p, aper_size>>10);
 		if (p)
-			free_bootmem_node(nd0, __pa(p), aper_size); 
+			free_bootmem(__pa(p), aper_size);
 		return 0;
 	}
 	printk("Mapping aperture over %d KB of RAM @ %lx\n",
@@ -87,7 +86,7 @@ static int __init aperture_valid(u64 aper_base, u32 aper_size)
 		printk("Aperture too small (%d MB)\n", aper_size>>20);
 		return 0;
 	}
-	if (aper_base + aper_size >= 0xffffffff) { 
+	if (aper_base + aper_size > 0x100000000UL) {
 		printk("Aperture beyond 4GB. Ignoring.\n");
 		return 0; 
 	}

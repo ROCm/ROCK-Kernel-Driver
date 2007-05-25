@@ -214,8 +214,10 @@ static unsigned long get_symbol_pos(unsigned long addr,
 			symbol_end = (unsigned long)_etext;
 	}
 
-	*symbolsize = symbol_end - symbol_start;
-	*offset = addr - symbol_start;
+	if (symbolsize)
+		*symbolsize = symbol_end - symbol_start;
+	if (offset)
+		*offset = addr - symbol_start;
 
 	return low;
 }
@@ -267,27 +269,69 @@ const char *kallsyms_lookup(unsigned long addr,
 	return NULL;
 }
 
-/* Replace "%s" in format with address, or returns -errno. */
-void __print_symbol(const char *fmt, unsigned long address)
+int lookup_symbol_name(unsigned long addr, char *symname)
+{
+	symname[0] = '\0';
+	symname[KSYM_NAME_LEN] = '\0';
+
+	if (is_ksym_addr(addr)) {
+		unsigned long pos;
+
+		pos = get_symbol_pos(addr, NULL, NULL);
+		/* Grab name */
+		kallsyms_expand_symbol(get_symbol_offset(pos), symname);
+		return 0;
+	}
+	/* see if it's in a module */
+	return lookup_module_symbol_name(addr, symname);
+}
+
+int lookup_symbol_attrs(unsigned long addr, unsigned long *size,
+			unsigned long *offset, char *modname, char *name)
+{
+	name[0] = '\0';
+	name[KSYM_NAME_LEN] = '\0';
+
+	if (is_ksym_addr(addr)) {
+		unsigned long pos;
+
+		pos = get_symbol_pos(addr, size, offset);
+		/* Grab name */
+		kallsyms_expand_symbol(get_symbol_offset(pos), name);
+		modname[0] = '\0';
+		return 0;
+	}
+	/* see if it's in a module */
+	return lookup_module_symbol_attrs(addr, size, offset, modname, name);
+}
+
+/* Look up a kernel symbol and return it in a text buffer. */
+int sprint_symbol(char *buffer, unsigned long address)
 {
 	char *modname;
 	const char *name;
 	unsigned long offset, size;
 	char namebuf[KSYM_NAME_LEN+1];
-	char buffer[sizeof("%s+%#lx/%#lx [%s]") + KSYM_NAME_LEN +
-		    2*(BITS_PER_LONG*3/10) + MODULE_NAME_LEN + 1];
 
 	name = kallsyms_lookup(address, &size, &offset, &modname, namebuf);
-
 	if (!name)
-		sprintf(buffer, "0x%lx", address);
+		return sprintf(buffer, "0x%lx", address);
 	else {
 		if (modname)
-			sprintf(buffer, "%s+%#lx/%#lx [%s]", name, offset,
+			return sprintf(buffer, "%s+%#lx/%#lx [%s]", name, offset,
 				size, modname);
 		else
-			sprintf(buffer, "%s+%#lx/%#lx", name, offset, size);
+			return sprintf(buffer, "%s+%#lx/%#lx", name, offset, size);
 	}
+}
+
+/* Look up a kernel symbol and print it to the kernel messages. */
+void __print_symbol(const char *fmt, unsigned long address)
+{
+	char buffer[KSYM_SYMBOL_LEN];
+
+	sprint_symbol(buffer, address);
+
 	printk(fmt, buffer);
 }
 
@@ -295,25 +339,20 @@ void __print_symbol(const char *fmt, unsigned long address)
 struct kallsym_iter
 {
 	loff_t pos;
-	struct module *owner;
 	unsigned long value;
 	unsigned int nameoff; /* If iterating in core kernel symbols */
 	char type;
 	char name[KSYM_NAME_LEN+1];
+	char module_name[MODULE_NAME_LEN + 1];
+	int exported;
 };
 
 static int get_ksymbol_mod(struct kallsym_iter *iter)
 {
-	iter->owner = module_get_kallsym(iter->pos - kallsyms_num_syms,
-					 &iter->value, &iter->type,
-					 iter->name, sizeof(iter->name));
-	if (iter->owner == NULL)
+	if (module_get_kallsym(iter->pos - kallsyms_num_syms, &iter->value,
+				&iter->type, iter->name, iter->module_name,
+				&iter->exported) < 0)
 		return 0;
-
-	/* Label it "global" if it is exported, "local" if not exported. */
-	iter->type = is_exported(iter->name, iter->owner)
-		? toupper(iter->type) : tolower(iter->type);
-
 	return 1;
 }
 
@@ -322,7 +361,7 @@ static unsigned long get_ksymbol_core(struct kallsym_iter *iter)
 {
 	unsigned off = iter->nameoff;
 
-	iter->owner = NULL;
+	iter->module_name[0] = '\0';
 	iter->value = kallsyms_addresses[iter->pos];
 
 	iter->type = kallsyms_get_symbol_type(off);
@@ -386,12 +425,17 @@ static int s_show(struct seq_file *m, void *p)
 	if (!iter->name[0])
 		return 0;
 
-	if (iter->owner)
+	if (iter->module_name[0]) {
+		char type;
+
+		/* Label it "global" if it is exported,
+		 * "local" if not exported. */
+		type = iter->exported ? toupper(iter->type) :
+					tolower(iter->type);
 		seq_printf(m, "%0*lx %c %s\t[%s]\n",
 			   (int)(2*sizeof(void*)),
-			   iter->value, iter->type, iter->name,
-			   module_name(iter->owner));
-	else
+			   iter->value, type, iter->name, iter->module_name);
+	} else
 		seq_printf(m, "%0*lx %c %s\n",
 			   (int)(2*sizeof(void*)),
 			   iter->value, iter->type, iter->name);
@@ -426,18 +470,11 @@ static int kallsyms_open(struct inode *inode, struct file *file)
 	return ret;
 }
 
-static int kallsyms_release(struct inode *inode, struct file *file)
-{
-	struct seq_file *m = (struct seq_file *)file->private_data;
-	kfree(m->private);
-	return seq_release(inode, file);
-}
-
 static const struct file_operations kallsyms_operations = {
 	.open = kallsyms_open,
 	.read = seq_read,
 	.llseek = seq_lseek,
-	.release = kallsyms_release,
+	.release = seq_release_private,
 };
 
 static int __init kallsyms_init(void)
@@ -452,6 +489,7 @@ static int __init kallsyms_init(void)
 __initcall(kallsyms_init);
 
 EXPORT_SYMBOL(__print_symbol);
+EXPORT_SYMBOL_GPL(sprint_symbol);
 
 #ifdef	CONFIG_KDB
 #include <linux/kdb.h>

@@ -70,17 +70,17 @@ static struct map_desc enp2611_io_desc[] __initdata = {
 		.virtual	= ENP2611_CALEB_VIRT_BASE,
 		.pfn		= __phys_to_pfn(ENP2611_CALEB_PHYS_BASE),
 		.length		= ENP2611_CALEB_SIZE,
-		.type		= MT_IXP2000_DEVICE,
+		.type		= MT_DEVICE_IXP2000,
 	}, {
 		.virtual	= ENP2611_PM3386_0_VIRT_BASE,
 		.pfn		= __phys_to_pfn(ENP2611_PM3386_0_PHYS_BASE),
 		.length		= ENP2611_PM3386_0_SIZE,
-		.type		= MT_IXP2000_DEVICE,
+		.type		= MT_DEVICE_IXP2000,
 	}, {
 		.virtual	= ENP2611_PM3386_1_VIRT_BASE,
 		.pfn		= __phys_to_pfn(ENP2611_PM3386_1_PHYS_BASE),
 		.length		= ENP2611_PM3386_1_SIZE,
-		.type		= MT_IXP2000_DEVICE,
+		.type		= MT_DEVICE_IXP2000,
 	}
 };
 
@@ -198,7 +198,7 @@ subsys_initcall(enp2611_pci_init);
 
 
 /*************************************************************************
- * ENP-2611 Machine Intialization
+ * ENP-2611 Machine Initialization
  *************************************************************************/
 static struct flash_platform_data enp2611_flash_platform_data = {
 	.map_name	= "cfi_probe",

@@ -27,7 +27,7 @@
 #include <linux/libata.h>
 
 #define DRV_NAME	"pata_hpt366"
-#define DRV_VERSION	"0.6.0"
+#define DRV_VERSION	"0.6.1"
 
 struct hpt_clock {
 	u8	xfer_speed;
@@ -169,13 +169,12 @@ static int hpt_dma_blacklisted(const struct ata_device *dev, char *modestr, cons
 
 /**
  *	hpt366_filter	-	mode selection filter
- *	@ap: ATA interface
  *	@adev: ATA device
  *
  *	Block UDMA on devices that cause trouble with this controller.
  */
 
-static unsigned long hpt366_filter(const struct ata_port *ap, struct ata_device *adev, unsigned long mask)
+static unsigned long hpt366_filter(struct ata_device *adev, unsigned long mask)
 {
 	if (adev->class == ATA_DEV_ATA) {
 		if (hpt_dma_blacklisted(adev, "UDMA",  bad_ata33))
@@ -185,7 +184,7 @@ static unsigned long hpt366_filter(const struct ata_port *ap, struct ata_device 
 		if (hpt_dma_blacklisted(adev, "UDMA4", bad_ata66_4))
 			mask &= ~(0x0F << ATA_SHIFT_UDMA);
 	}
-	return ata_pci_default_filter(ap, adev, mask);
+	return ata_pci_default_filter(adev, mask);
 }
 
 /**
@@ -210,37 +209,15 @@ static u32 hpt36x_find_mode(struct ata_port *ap, int speed)
 	return 0xffffffffU;	/* silence compiler warning */
 }
 
-static int hpt36x_pre_reset(struct ata_port *ap)
+static int hpt36x_cable_detect(struct ata_port *ap)
 {
-	static const struct pci_bits hpt36x_enable_bits[] = {
-		{ 0x50, 1, 0x04, 0x04 },
-		{ 0x54, 1, 0x04, 0x04 }
-	};
-
 	u8 ata66;
 	struct pci_dev *pdev = to_pci_dev(ap->host->dev);
 
-	if (!pci_test_config_bits(pdev, &hpt36x_enable_bits[ap->port_no]))
-		return -ENOENT;
-
 	pci_read_config_byte(pdev, 0x5A, &ata66);
 	if (ata66 & (1 << ap->port_no))
-		ap->cbl = ATA_CBL_PATA40;
-	else
-		ap->cbl = ATA_CBL_PATA80;
-	return ata_std_prereset(ap);
-}
-
-/**
- *	hpt36x_error_handler	-	reset the hpt36x bus
- *	@ap: ATA port to reset
- *
- *	Perform the reset handling for the 366/368
- */
-
-static void hpt36x_error_handler(struct ata_port *ap)
-{
-	ata_bmdma_drive_eh(ap, hpt36x_pre_reset, ata_std_softreset, NULL, ata_std_postreset);
+		return ATA_CBL_PATA40;
+	return ATA_CBL_PATA80;
 }
 
 /**
@@ -328,10 +305,6 @@ static struct scsi_host_template hpt36x_sht = {
 	.slave_configure	= ata_scsi_slave_config,
 	.slave_destroy		= ata_scsi_slave_destroy,
 	.bios_param		= ata_std_bios_param,
-#ifdef CONFIG_PM
-	.resume			= ata_scsi_device_resume,
-	.suspend		= ata_scsi_device_suspend,
-#endif
 };
 
 /*
@@ -352,8 +325,9 @@ static struct ata_port_operations hpt366_port_ops = {
 
 	.freeze		= ata_bmdma_freeze,
 	.thaw		= ata_bmdma_thaw,
-	.error_handler	= hpt36x_error_handler,
+	.error_handler	= ata_bmdma_error_handler,
 	.post_internal_cmd = ata_bmdma_post_internal_cmd,
+	.cable_detect	= hpt36x_cable_detect,
 
 	.bmdma_setup 	= ata_bmdma_setup,
 	.bmdma_start 	= ata_bmdma_start,
@@ -417,7 +391,7 @@ static void hpt36x_init_chipset(struct pci_dev *dev)
 
 static int hpt36x_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	static struct ata_port_info info_hpt366 = {
+	static const struct ata_port_info info_hpt366 = {
 		.sht = &hpt36x_sht,
 		.flags = ATA_FLAG_SLAVE_POSS | ATA_FLAG_SRST,
 		.pio_mask = 0x1f,
@@ -425,7 +399,8 @@ static int hpt36x_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 		.udma_mask = 0x1f,
 		.port_ops = &hpt366_port_ops
 	};
-	struct ata_port_info *port_info[2] = {&info_hpt366, &info_hpt366};
+	struct ata_port_info info = info_hpt366;
+	const struct ata_port_info *ppi[] = { &info, NULL };
 
 	u32 class_rev;
 	u32 reg1;
@@ -446,17 +421,17 @@ static int hpt36x_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 	/* info_hpt366 is safe against re-entry so we can scribble on it */
 	switch((reg1 & 0x700) >> 8) {
 		case 5:
-			info_hpt366.private_data = &hpt366_40;
+			info.private_data = &hpt366_40;
 			break;
 		case 9:
-			info_hpt366.private_data = &hpt366_25;
+			info.private_data = &hpt366_25;
 			break;
 		default:
-			info_hpt366.private_data = &hpt366_33;
+			info.private_data = &hpt366_33;
 			break;
 	}
 	/* Now kick off ATA set up */
-	return ata_pci_init_one(dev, port_info, 2);
+	return ata_pci_init_one(dev, ppi);
 }
 
 #ifdef CONFIG_PM

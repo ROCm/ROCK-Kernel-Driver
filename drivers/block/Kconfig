@@ -444,6 +444,13 @@ config CDROM_PKTCDVD_WCACHE
 	  this option is dangerous unless the CD-RW media is known good, as we
 	  don't do deferred write error handling yet.
 
+config ATA_OVER_ETH
+	tristate "ATA over Ethernet support"
+	depends on NET
+	help
+	This driver provides Support for ATA over Ethernet block
+	devices like the Coraid EtherDrive (R) Storage Blade.
+
 config CIPHER_TWOFISH
 	tristate "Twofish encryption for loop device for old S.u.S.E. crypto partitions"
 	depends on BLK_DEV_LOOP
@@ -451,13 +458,6 @@ config CIPHER_TWOFISH
 	  Say Y here if you want to support old S.u.S.E. crypto partitions.
 
 source "drivers/s390/block/Kconfig"
-
-config ATA_OVER_ETH
-	tristate "ATA over Ethernet support"
-	depends on NET
-	help
-	This driver provides Support for ATA over Ethernet block
-	devices like the Coraid EtherDrive (R) Storage Blade.
 
 config PS3_STORAGE_OLD
        tristate "Support PS3 internal HDD/CDROM drives"

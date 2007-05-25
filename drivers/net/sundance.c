@@ -110,8 +110,7 @@ static char *media[MAX_UNITS];
 
 /* These identify the driver base version and may not be removed. */
 static char version[] =
-KERN_INFO DRV_NAME ".c:v" DRV_VERSION " " DRV_RELDATE "  Written by Donald Becker\n"
-KERN_INFO "  http://www.scyld.com/network/sundance.html\n";
+KERN_INFO DRV_NAME ".c:v" DRV_VERSION " " DRV_RELDATE "  Written by Donald Becker\n";
 
 MODULE_AUTHOR("Donald Becker <becker@scyld.com>");
 MODULE_DESCRIPTION("Sundance Alta Ethernet driver");
@@ -1308,7 +1307,6 @@ static void rx_poll(unsigned long data)
 			   to a minimally-sized skbuff. */
 			if (pkt_len < rx_copybreak
 				&& (skb = dev_alloc_skb(pkt_len + 2)) != NULL) {
-				skb->dev = dev;
 				skb_reserve(skb, 2);	/* 16 byte align the IP header */
 				pci_dma_sync_single_for_cpu(np->pci_dev,
 							    desc->frag[0].addr,

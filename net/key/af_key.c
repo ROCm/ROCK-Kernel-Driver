@@ -379,7 +379,7 @@ static int verify_address_len(void *p)
 		 */
 		return -EINVAL;
 		break;
-	};
+	}
 
 	return 0;
 }
@@ -1447,8 +1447,6 @@ static int pfkey_add(struct sock *sk, struct sk_buff *skb, struct sadb_msg *hdr,
 	struct xfrm_state *x;
 	int err;
 	struct km_event c;
-
-	xfrm_probe_algs();
 
 	x = pfkey_msg2xfrm_state(hdr, ext_hdrs);
 	if (IS_ERR(x))
@@ -3667,7 +3665,7 @@ static int pfkey_recvmsg(struct kiocb *kiocb,
 		copied = len;
 	}
 
-	skb->h.raw = skb->data;
+	skb_reset_transport_header(skb);
 	err = skb_copy_datagram_iovec(skb, 0, msg->msg_iov, copied);
 	if (err)
 		goto out_free;

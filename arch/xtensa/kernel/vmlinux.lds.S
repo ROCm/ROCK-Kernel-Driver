@@ -84,7 +84,8 @@ SECTIONS
   {
     /* The .head.text section must be the first section! */
     *(.head.text)
-    *(.literal .text)
+    *(.literal)
+    TEXT_TEXT
     *(.srom.text)
     VMLINUX_SYMBOL(__sched_text_start) = .;
     *(.sched.literal .sched.text)
@@ -144,7 +145,8 @@ SECTIONS
   _fdata = .;
   .data :
   {
-    *(.data) CONSTRUCTORS
+    DATA_DATA
+    CONSTRUCTORS
     . = ALIGN(XCHAL_ICACHE_LINESIZE);
     *(.data.cacheline_aligned)
   }
@@ -198,7 +200,7 @@ SECTIONS
   __ftr_fixup : { *(__ftr_fixup) }
   __stop___ftr_fixup = .;
 
-  . = ALIGN(32);
+  . = ALIGN(4096);
   __per_cpu_start = .;
   .data.percpu  : { *(.data.percpu) }
   __per_cpu_end = .;

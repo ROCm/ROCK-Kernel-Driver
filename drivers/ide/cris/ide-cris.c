@@ -730,7 +730,7 @@ static int speed_cris_ide(ide_drive_t *drive, u8 speed)
 
 	if (speed >= XFER_PIO_0 && speed <= XFER_PIO_4) {
 		tune_cris_ide(drive, speed - XFER_PIO_0);
-		return 0;
+		return ide_config_drive_speed(drive, speed);
 	}
 
 	switch(speed)
@@ -760,7 +760,8 @@ static int speed_cris_ide(ide_drive_t *drive, u8 speed)
 			hold = ATA_DMA2_HOLD;
 			break;
 		default:
-			return 0;
+			BUG();
+			break;
 	}
 
 	if (speed >= XFER_UDMA_0)
@@ -768,7 +769,7 @@ static int speed_cris_ide(ide_drive_t *drive, u8 speed)
 	else
 		cris_ide_set_speed(TYPE_DMA, 0, strobe, hold);
 
-	return 0;
+	return ide_config_drive_speed(drive, speed);
 }
 
 void __init
@@ -795,7 +796,7 @@ init_e100_ide (void)
 		                ide_offsets,
 		                0, 0, cris_ide_ack_intr,
 		                ide_default_irq(0));
-		ide_register_hw(&hw, &hwif);
+		ide_register_hw(&hw, 1, &hwif);
 		hwif->mmio = 1;
 		hwif->chipset = ide_etrax100;
 		hwif->tuneproc = &tune_cris_ide;
@@ -821,7 +822,6 @@ init_e100_ide (void)
 		hwif->udma_four = 0;
 		hwif->ultra_mask = cris_ultra_mask;
 		hwif->mwdma_mask = 0x07; /* Multiword DMA 0-2 */
-		hwif->swdma_mask = 0x07; /* Singleword DMA 0-2 */
 		hwif->autodma = 1;
 		hwif->drives[0].autodma = 1;
 		hwif->drives[1].autodma = 1;
@@ -1002,19 +1002,6 @@ static int cris_ide_build_dmatable (ide_drive_t *drive)
 	return 1;	/* let the PIO routines handle this weirdness */
 }
 
-static int cris_config_drive_for_dma (ide_drive_t *drive)
-{
-	u8 speed = ide_dma_speed(drive, 1);
-
-	if (!speed)
-		return 0;
-
-	speed_cris_ide(drive, speed);
-	ide_config_drive_speed(drive, speed);
-
-	return ide_dma_enable(drive);
-}
-
 /*
  * cris_dma_intr() is the handler for disk read/write DMA interrupts
  */
@@ -1044,7 +1031,7 @@ static ide_startstop_t cris_dma_intr (ide_drive_t *drive)
 
 static int cris_dma_check(ide_drive_t *drive)
 {
-	if (ide_use_dma(drive) && cris_config_drive_for_dma(drive))
+	if (ide_tune_dma(drive))
 		return 0;
 
 	return -1;

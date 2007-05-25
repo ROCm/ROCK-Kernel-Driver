@@ -23,26 +23,7 @@
 #include <linux/libata.h>
 
 #define DRV_NAME	"pata_hpt3x3"
-#define DRV_VERSION	"0.4.2"
-
-static int hpt3x3_probe_init(struct ata_port *ap)
-{
-	ap->cbl = ATA_CBL_PATA40;
-	return ata_std_prereset(ap);
-}
-
-/**
- *	hpt3x3_probe_reset	-	reset the hpt3x3 bus
- *	@ap: ATA port to reset
- *
- *	Perform the housekeeping when doing an ATA bus reeset. We just
- *	need to force the cable type.
- */
-
-static void hpt3x3_error_handler(struct ata_port *ap)
-{
-	return ata_bmdma_drive_eh(ap, hpt3x3_probe_init, ata_std_softreset, NULL, ata_std_postreset);
-}
+#define DRV_VERSION	"0.4.3"
 
 /**
  *	hpt3x3_set_piomode		-	PIO setup
@@ -119,10 +100,6 @@ static struct scsi_host_template hpt3x3_sht = {
 	.slave_configure	= ata_scsi_slave_config,
 	.slave_destroy		= ata_scsi_slave_destroy,
 	.bios_param		= ata_std_bios_param,
-#ifdef CONFIG_PM
-	.resume			= ata_scsi_device_resume,
-	.suspend		= ata_scsi_device_suspend,
-#endif
 };
 
 static struct ata_port_operations hpt3x3_port_ops = {
@@ -139,8 +116,9 @@ static struct ata_port_operations hpt3x3_port_ops = {
 
 	.freeze		= ata_bmdma_freeze,
 	.thaw		= ata_bmdma_thaw,
-	.error_handler	= hpt3x3_error_handler,
+	.error_handler	= ata_bmdma_error_handler,
 	.post_internal_cmd = ata_bmdma_post_internal_cmd,
+	.cable_detect	= ata_cable_40wire,
 
 	.bmdma_setup 	= ata_bmdma_setup,
 	.bmdma_start 	= ata_bmdma_start,
@@ -193,7 +171,7 @@ static void hpt3x3_init_chipset(struct pci_dev *dev)
 
 static int hpt3x3_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	static struct ata_port_info info = {
+	static const struct ata_port_info info = {
 		.sht = &hpt3x3_sht,
 		.flags = ATA_FLAG_SLAVE_POSS|ATA_FLAG_SRST,
 		.pio_mask = 0x1f,
@@ -201,11 +179,11 @@ static int hpt3x3_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 		.udma_mask = 0x07,
 		.port_ops = &hpt3x3_port_ops
 	};
-	static struct ata_port_info *port_info[2] = { &info, &info };
+	const struct ata_port_info *ppi[] = { &info, NULL };
 
 	hpt3x3_init_chipset(dev);
 	/* Now kick off ATA set up */
-	return ata_pci_init_one(dev, port_info, 2);
+	return ata_pci_init_one(dev, ppi);
 }
 
 #ifdef CONFIG_PM

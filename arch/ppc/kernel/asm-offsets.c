@@ -35,12 +35,11 @@ int
 main(void)
 {
 	DEFINE(THREAD, offsetof(struct task_struct, thread));
-	DEFINE(THREAD_INFO, offsetof(struct task_struct, thread_info));
+	DEFINE(THREAD_INFO, offsetof(struct task_struct, stack));
 	DEFINE(MM, offsetof(struct task_struct, mm));
 	DEFINE(PTRACE, offsetof(struct task_struct, ptrace));
 	DEFINE(KSP, offsetof(struct thread_struct, ksp));
 	DEFINE(PGDIR, offsetof(struct thread_struct, pgdir));
-	DEFINE(LAST_SYSCALL, offsetof(struct thread_struct, last_syscall));
 	DEFINE(PT_REGS, offsetof(struct thread_struct, regs));
 	DEFINE(THREAD_FPEXC_MODE, offsetof(struct thread_struct, fpexc_mode));
 	DEFINE(THREAD_FPR0, offsetof(struct thread_struct, fpr[0]));

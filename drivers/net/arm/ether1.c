@@ -875,7 +875,6 @@ ether1_recv_done (struct net_device *dev)
 			skb = dev_alloc_skb (length + 2);
 
 			if (skb) {
-				skb->dev = dev;
 				skb_reserve (skb, 2);
 
 				ether1_readbuffer (dev, skb_put (skb, length), rbd.rbd_bufl, length);
@@ -1015,8 +1014,7 @@ ether1_probe(struct expansion_card *ec, const struct ecard_id *id)
 	SET_NETDEV_DEV(dev, &ec->dev);
 
 	dev->irq = ec->irq;
-	priv(dev)->base = ioremap(ecard_resource_start(ec, ECARD_RES_IOCFAST),
-				  ecard_resource_len(ec, ECARD_RES_IOCFAST));
+	priv(dev)->base = ecardm_iomap(ec, ECARD_RES_IOCFAST, 0, 0);
 	if (!priv(dev)->base) {
 		ret = -ENOMEM;
 		goto free;
@@ -1057,8 +1055,6 @@ ether1_probe(struct expansion_card *ec, const struct ecard_id *id)
 	return 0;
 
  free:
-	if (priv(dev)->base)
-		iounmap(priv(dev)->base);
 	free_netdev(dev);
  release:
 	ecard_release_resources(ec);
@@ -1073,7 +1069,6 @@ static void __devexit ether1_remove(struct expansion_card *ec)
 	ecard_set_drvdata(ec, NULL);	
 
 	unregister_netdev(dev);
-	iounmap(priv(dev)->base);
 	free_netdev(dev);
 	ecard_release_resources(ec);
 }

@@ -104,7 +104,7 @@ static const u8 def_control_mpage[CONTROL_MPAGE_LEN] = {
  * libata transport template.  libata doesn't do real transport stuff.
  * It just needs the eh_timed_out hook.
  */
-struct scsi_transport_template ata_scsi_transport_template = {
+static struct scsi_transport_template ata_scsi_transport_template = {
 	.eh_strategy_handler	= ata_scsi_error,
 	.eh_timed_out		= ata_scsi_timed_out,
 	.user_scan		= ata_scsi_user_scan,
@@ -510,133 +510,6 @@ static void ata_dump_status(unsigned id, struct ata_taskfile *tf)
 	}
 }
 
-#ifdef CONFIG_PM
-/**
- *	ata_scsi_device_suspend - suspend ATA device associated with sdev
- *	@sdev: the SCSI device to suspend
- *	@mesg: target power management message
- *
- *	Request suspend EH action on the ATA device associated with
- *	@sdev and wait for the operation to complete.
- *
- *	LOCKING:
- *	Kernel thread context (may sleep).
- *
- *	RETURNS:
- *	0 on success, -errno otherwise.
- */
-int ata_scsi_device_suspend(struct scsi_device *sdev, pm_message_t mesg)
-{
-	struct ata_port *ap = ata_shost_to_port(sdev->host);
-	struct ata_device *dev = ata_scsi_find_dev(ap, sdev);
-	unsigned long flags;
-	unsigned int action;
-	int rc = 0;
-
-	if (!dev)
-		goto out;
-
-	spin_lock_irqsave(ap->lock, flags);
-
-	/* wait for the previous resume to complete */
-	while (dev->flags & ATA_DFLAG_SUSPENDED) {
-		spin_unlock_irqrestore(ap->lock, flags);
-		ata_port_wait_eh(ap);
-		spin_lock_irqsave(ap->lock, flags);
-	}
-
-	/* if @sdev is already detached, nothing to do */
-	if (sdev->sdev_state == SDEV_OFFLINE ||
-	    sdev->sdev_state == SDEV_CANCEL || sdev->sdev_state == SDEV_DEL)
-		goto out_unlock;
-
-	/* request suspend */
-	action = ATA_EH_SUSPEND;
-	if (mesg.event != PM_EVENT_SUSPEND)
-		action |= ATA_EH_PM_FREEZE;
-	ap->eh_info.dev_action[dev->devno] |= action;
-	ap->eh_info.flags |= ATA_EHI_QUIET;
-	ata_port_schedule_eh(ap);
-
-	spin_unlock_irqrestore(ap->lock, flags);
-
-	/* wait for EH to do the job */
-	ata_port_wait_eh(ap);
-
-	spin_lock_irqsave(ap->lock, flags);
-
-	/* If @sdev is still attached but the associated ATA device
-	 * isn't suspended, the operation failed.
-	 */
-	if (sdev->sdev_state != SDEV_OFFLINE &&
-	    sdev->sdev_state != SDEV_CANCEL && sdev->sdev_state != SDEV_DEL &&
-	    !(dev->flags & ATA_DFLAG_SUSPENDED))
-		rc = -EIO;
-
- out_unlock:
-	spin_unlock_irqrestore(ap->lock, flags);
- out:
-	if (rc == 0)
-		sdev->sdev_gendev.power.power_state = mesg;
-	return rc;
-}
-
-/**
- *	ata_scsi_device_resume - resume ATA device associated with sdev
- *	@sdev: the SCSI device to resume
- *
- *	Request resume EH action on the ATA device associated with
- *	@sdev and return immediately.  This enables parallel
- *	wakeup/spinup of devices.
- *
- *	LOCKING:
- *	Kernel thread context (may sleep).
- *
- *	RETURNS:
- *	0.
- */
-int ata_scsi_device_resume(struct scsi_device *sdev)
-{
-	struct ata_port *ap = ata_shost_to_port(sdev->host);
-	struct ata_device *dev = ata_scsi_find_dev(ap, sdev);
-	struct ata_eh_info *ehi = &ap->eh_info;
-	unsigned long flags;
-	unsigned int action;
-
-	if (!dev)
-		goto out;
-
-	spin_lock_irqsave(ap->lock, flags);
-
-	/* if @sdev is already detached, nothing to do */
-	if (sdev->sdev_state == SDEV_OFFLINE ||
-	    sdev->sdev_state == SDEV_CANCEL || sdev->sdev_state == SDEV_DEL)
-		goto out_unlock;
-
-	/* request resume */
-	action = ATA_EH_RESUME;
-	if (sdev->sdev_gendev.power.power_state.event == PM_EVENT_SUSPEND)
-		__ata_ehi_hotplugged(ehi);
-	else
-		action |= ATA_EH_PM_FREEZE | ATA_EH_SOFTRESET;
-	ehi->dev_action[dev->devno] |= action;
-
-	/* We don't want autopsy and verbose EH messages.  Disable
-	 * those if we're the only device on this link.
-	 */
-	if (ata_port_max_devices(ap) == 1)
-		ehi->flags |= ATA_EHI_NO_AUTOPSY | ATA_EHI_QUIET;
-
-	ata_port_schedule_eh(ap);
-
- out_unlock:
-	spin_unlock_irqrestore(ap->lock, flags);
- out:
-	sdev->sdev_gendev.power.power_state = PMSG_ON;
-	return 0;
-}
-#endif /* CONFIG_PM */
-
 /**
  *	ata_to_sense_error - convert ATA error to SCSI error
  *	@id: ATA device number
@@ -929,6 +802,8 @@ int ata_scsi_slave_config(struct scsi_device *sdev)
 
 	blk_queue_max_phys_segments(sdev->request_queue, LIBATA_MAX_PRD);
 
+	sdev->manage_start_stop = 1;
+
 	if (dev)
 		ata_scsi_dev_config(sdev, dev);
 
@@ -1018,6 +893,23 @@ int ata_scsi_change_queue_depth(struct scsi_device *sdev, int queue_depth)
 	return queue_depth;
 }
 
+/* XXX: for spindown warning */
+static void ata_delayed_done_timerfn(unsigned long arg)
+{
+	struct scsi_cmnd *scmd = (void *)arg;
+
+	scmd->scsi_done(scmd);
+}
+
+/* XXX: for spindown warning */
+static void ata_delayed_done(struct scsi_cmnd *scmd)
+{
+	static struct timer_list timer;
+
+	setup_timer(&timer, ata_delayed_done_timerfn, (unsigned long)scmd);
+	mod_timer(&timer, jiffies + 5 * HZ);
+}
+
 /**
  *	ata_scsi_start_stop_xlat - Translate SCSI START STOP UNIT command
  *	@qc: Storage for translated ATA taskfile
@@ -1069,9 +961,37 @@ static unsigned int ata_scsi_start_stop_xlat(struct ata_queued_cmd *qc)
 		}
 
 		tf->command = ATA_CMD_VERIFY;	/* READ VERIFY */
-	} else
+	} else {
+		/* XXX: This is for backward compatibility, will be
+		 * removed.  Read Documentation/feature-removal-schedule.txt
+		 * for more info.
+		 */
+		if ((qc->dev->flags & ATA_DFLAG_SPUNDOWN) &&
+		    (system_state == SYSTEM_HALT ||
+		     system_state == SYSTEM_POWER_OFF)) {
+			static unsigned long warned = 0;
+
+			if (!test_and_set_bit(0, &warned)) {
+				ata_dev_printk(qc->dev, KERN_WARNING,
+					"DISK MIGHT NOT BE SPUN DOWN PROPERLY. "
+					"UPDATE SHUTDOWN UTILITY\n");
+				ata_dev_printk(qc->dev, KERN_WARNING,
+					"For more info, visit "
+					"http://linux-ata.org/shutdown.html\n");
+
+				/* ->scsi_done is not used, use it for
+				 * delayed completion.
+				 */
+				scmd->scsi_done = qc->scsidone;
+				qc->scsidone = ata_delayed_done;
+			}
+			scmd->result = SAM_STAT_GOOD;
+			return 1;
+		}
+
 		/* Issue ATA STANDBY IMMEDIATE command */
 		tf->command = ATA_CMD_STANDBYNOW1;
+	}
 
 	/*
 	 * Standby and Idle condition timers could be implemented but that
@@ -1474,6 +1394,14 @@ static void ata_scsi_qc_complete(struct ata_queued_cmd *qc)
 		}
 	}
 
+	/* XXX: track spindown state for spindown skipping and warning */
+	if (unlikely(qc->tf.command == ATA_CMD_STANDBY ||
+		     qc->tf.command == ATA_CMD_STANDBYNOW1))
+		qc->dev->flags |= ATA_DFLAG_SPUNDOWN;
+	else if (likely(system_state != SYSTEM_HALT &&
+			system_state != SYSTEM_POWER_OFF))
+		qc->dev->flags &= ~ATA_DFLAG_SPUNDOWN;
+
 	if (need_sense && !ap->ops->error_handler)
 		ata_dump_status(ap->print_id, &qc->result_tf);
 
@@ -1587,14 +1515,14 @@ static int ata_scsi_translate(struct ata_device *dev, struct scsi_cmnd *cmd,
 
 early_finish:
         ata_qc_free(qc);
-	done(cmd);
+	qc->scsidone(cmd);
 	DPRINTK("EXIT - early finish (good or error)\n");
 	return 0;
 
 err_did:
 	ata_qc_free(qc);
 	cmd->result = (DID_ERROR << 16);
-	done(cmd);
+	qc->scsidone(cmd);
 err_mem:
 	DPRINTK("EXIT - internal\n");
 	return 0;
@@ -2678,6 +2606,18 @@ static unsigned int ata_scsi_pass_thru(struct ata_queued_cmd *qc)
 		tf->device = qc->dev->devno ?
 			tf->device | ATA_DEV1 : tf->device & ~ATA_DEV1;
 
+	/* READ/WRITE LONG use a non-standard sect_size */
+	qc->sect_size = ATA_SECT_SIZE;
+	switch (tf->command) {
+	case ATA_CMD_READ_LONG:
+	case ATA_CMD_READ_LONG_ONCE:
+	case ATA_CMD_WRITE_LONG:
+	case ATA_CMD_WRITE_LONG_ONCE:
+		if (tf->protocol != ATA_PROT_PIO || tf->nsect != 1)
+			goto invalid_fld;
+		qc->sect_size = scmd->request_bufflen;
+	}
+
 	/*
 	 * Filter SET_FEATURES - XFER MODE command -- otherwise,
 	 * SET_FEATURES - XFER MODE must be preceded/succeeded
@@ -2792,8 +2732,9 @@ static inline int __ata_scsi_queuecmd(struct scsi_cmnd *scmd,
 {
 	int rc = 0;
 
-	if (unlikely(!scmd->cmd_len)) {
-		ata_dev_printk(dev, KERN_WARNING, "WARNING: zero len CDB\n");
+	if (unlikely(!scmd->cmd_len || scmd->cmd_len > dev->cdb_len)) {
+		DPRINTK("bad CDB len=%u, max=%u\n",
+			scmd->cmd_len, dev->cdb_len);
 		scmd->result = DID_ERROR << 16;
 		done(scmd);
 		return 0;
@@ -2946,6 +2887,48 @@ void ata_scsi_simulate(struct ata_device *dev, struct scsi_cmnd *cmd,
 			done(cmd);
 			break;
 	}
+}
+
+int ata_scsi_add_hosts(struct ata_host *host, struct scsi_host_template *sht)
+{
+	int i, rc;
+
+	for (i = 0; i < host->n_ports; i++) {
+		struct ata_port *ap = host->ports[i];
+		struct Scsi_Host *shost;
+
+		rc = -ENOMEM;
+		shost = scsi_host_alloc(sht, sizeof(struct ata_port *));
+		if (!shost)
+			goto err_alloc;
+
+		*(struct ata_port **)&shost->hostdata[0] = ap;
+		ap->scsi_host = shost;
+
+		shost->transportt = &ata_scsi_transport_template;
+		shost->unique_id = ap->print_id;
+		shost->max_id = 16;
+		shost->max_lun = 1;
+		shost->max_channel = 1;
+		shost->max_cmd_len = 16;
+
+		rc = scsi_add_host(ap->scsi_host, ap->host->dev);
+		if (rc)
+			goto err_add;
+	}
+
+	return 0;
+
+ err_add:
+	scsi_host_put(host->ports[i]->scsi_host);
+ err_alloc:
+	while (--i >= 0) {
+		struct Scsi_Host *shost = host->ports[i]->scsi_host;
+
+		scsi_remove_host(shost);
+		scsi_host_put(shost);
+	}
+	return rc;
 }
 
 void ata_scsi_scan_host(struct ata_port *ap)
@@ -3224,21 +3207,21 @@ struct ata_port *ata_sas_port_alloc(struct ata_host *host,
 				    struct ata_port_info *port_info,
 				    struct Scsi_Host *shost)
 {
-	struct ata_port *ap = kzalloc(sizeof(*ap), GFP_KERNEL);
-	struct ata_probe_ent *ent;
+	struct ata_port *ap;
 
+	ap = ata_port_alloc(host);
 	if (!ap)
 		return NULL;
 
-	ent = ata_probe_ent_alloc(host->dev, port_info);
-	if (!ent) {
-		kfree(ap);
-		return NULL;
-	}
-
-	ata_port_init(ap, host, ent, 0);
+	ap->port_no = 0;
 	ap->lock = shost->host_lock;
-	devm_kfree(host->dev, ent);
+	ap->pio_mask = port_info->pio_mask;
+	ap->mwdma_mask = port_info->mwdma_mask;
+	ap->udma_mask = port_info->udma_mask;
+	ap->flags |= port_info->flags;
+	ap->ops = port_info->port_ops;
+	ap->cbl = ATA_CBL_SATA;
+
 	return ap;
 }
 EXPORT_SYMBOL_GPL(ata_sas_port_alloc);
@@ -3294,8 +3277,10 @@ int ata_sas_port_init(struct ata_port *ap)
 {
 	int rc = ap->ops->port_start(ap);
 
-	if (!rc)
+	if (!rc) {
+		ap->print_id = ata_print_id++;
 		rc = ata_bus_probe(ap);
+	}
 
 	return rc;
 }

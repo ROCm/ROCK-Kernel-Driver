@@ -113,6 +113,12 @@ static int  option_send_setup(struct usb_serial_port *port);
 #define ANYDATA_VENDOR_ID			0x16d5
 #define ANYDATA_PRODUCT_ID			0x6501
 
+#define BANDRICH_VENDOR_ID			0x1A8D
+#define BANDRICH_PRODUCT_C100_1			0x1002
+#define BANDRICH_PRODUCT_C100_2			0x1003
+
+#define DELL_VENDOR_ID				0x413C
+
 static struct usb_device_id option_ids[] = {
 	{ USB_DEVICE(OPTION_VENDOR_ID, OPTION_PRODUCT_COLT) },
 	{ USB_DEVICE(OPTION_VENDOR_ID, OPTION_PRODUCT_RICOLA) },
@@ -159,12 +165,14 @@ static struct usb_device_id option_ids[] = {
 	{ USB_DEVICE(NOVATELWIRELESS_VENDOR_ID, 0x1410) }, /* Novatel U740 */
 	{ USB_DEVICE(NOVATELWIRELESS_VENDOR_ID, 0x1420) }, /* Novatel EU870 */
 	{ USB_DEVICE(NOVATELWIRELESS_VENDOR_ID, 0x1430) }, /* Novatel Merlin XU870 HSDPA/3G */
-	{ USB_DEVICE(NOVATELWIRELESS_VENDOR_ID, 0x1430) }, /* Novatel XU870 */
 	{ USB_DEVICE(NOVATELWIRELESS_VENDOR_ID, 0x2100) }, /* Novatel EV620 CDMA/EV-DO */
 	{ USB_DEVICE(NOVATELWIRELESS_VENDOR_ID, 0x2110) }, /* Novatel Merlin ES620 / Merlin ES720 / Ovation U720 */
 	{ USB_DEVICE(NOVATELWIRELESS_VENDOR_ID, 0x2130) }, /* Novatel Merlin ES620 SM Bus */
 	{ USB_DEVICE(NOVATELWIRELESS_VENDOR_ID, 0x2410) }, /* Novatel EU740 */
 	{ USB_DEVICE(ANYDATA_VENDOR_ID, ANYDATA_PRODUCT_ID) },
+	{ USB_DEVICE(BANDRICH_VENDOR_ID, BANDRICH_PRODUCT_C100_1) },
+	{ USB_DEVICE(BANDRICH_VENDOR_ID, BANDRICH_PRODUCT_C100_2) },
+	{ USB_DEVICE(DELL_VENDOR_ID, 0x8118) },		/* Dell Wireless 5510 Mobile Broadband HSDPA ExpressCard */
 	{ } /* Terminating entry */
 };
 MODULE_DEVICE_TABLE(usb, option_ids);
@@ -591,12 +599,6 @@ static int option_open(struct usb_serial_port *port, struct file *filp)
 	return (0);
 }
 
-static inline void stop_urb(struct urb *urb)
-{
-	if (urb && urb->status == -EINPROGRESS)
-		usb_kill_urb(urb);
-}
-
 static void option_close(struct usb_serial_port *port, struct file *filp)
 {
 	int i;
@@ -614,9 +616,9 @@ static void option_close(struct usb_serial_port *port, struct file *filp)
 
 		/* Stop reading/writing urbs */
 		for (i = 0; i < N_IN_URB; i++)
-			stop_urb(portdata->in_urbs[i]);
+			usb_kill_urb(portdata->in_urbs[i]);
 		for (i = 0; i < N_OUT_URB; i++)
-			stop_urb(portdata->out_urbs[i]);
+			usb_kill_urb(portdata->out_urbs[i]);
 	}
 	port->tty = NULL;
 }
@@ -747,9 +749,9 @@ static void option_shutdown(struct usb_serial *serial)
 		port = serial->port[i];
 		portdata = usb_get_serial_port_data(port);
 		for (j = 0; j < N_IN_URB; j++)
-			stop_urb(portdata->in_urbs[j]);
+			usb_kill_urb(portdata->in_urbs[j]);
 		for (j = 0; j < N_OUT_URB; j++)
-			stop_urb(portdata->out_urbs[j]);
+			usb_kill_urb(portdata->out_urbs[j]);
 	}
 
 	/* Now free them */

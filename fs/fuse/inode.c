@@ -17,6 +17,7 @@
 #include <linux/parser.h>
 #include <linux/statfs.h>
 #include <linux/random.h>
+#include <linux/sched.h>
 
 MODULE_AUTHOR("Miklos Szeredi <miklos@szeredi.hu>");
 MODULE_DESCRIPTION("Filesystem in Userspace");
@@ -453,6 +454,7 @@ static const struct super_operations fuse_super_operations = {
 	.destroy_inode  = fuse_destroy_inode,
 	.read_inode	= fuse_read_inode,
 	.clear_inode	= fuse_clear_inode,
+	.drop_inode	= generic_delete_inode,
 	.remount_fs	= fuse_remount_fs,
 	.put_super	= fuse_put_super,
 	.umount_begin	= fuse_umount_begin,
@@ -636,6 +638,7 @@ static int fuse_get_sb(struct file_system_type *fs_type,
 static struct file_system_type fuse_fs_type = {
 	.owner		= THIS_MODULE,
 	.name		= "fuse",
+	.fs_flags	= FS_HAS_SUBTYPE,
 	.get_sb		= fuse_get_sb,
 	.kill_sb	= kill_anon_super,
 };
@@ -652,6 +655,7 @@ static int fuse_get_sb_blk(struct file_system_type *fs_type,
 static struct file_system_type fuseblk_fs_type = {
 	.owner		= THIS_MODULE,
 	.name		= "fuseblk",
+	.fs_flags	= FS_HAS_SUBTYPE,
 	.get_sb		= fuse_get_sb_blk,
 	.kill_sb	= kill_block_super,
 	.fs_flags	= FS_REQUIRES_DEV,
@@ -685,9 +689,7 @@ static void fuse_inode_init_once(void *foo, struct kmem_cache *cachep,
 {
 	struct inode * inode = foo;
 
-	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
-	    SLAB_CTOR_CONSTRUCTOR)
-		inode_init_once(inode);
+	inode_init_once(inode);
 }
 
 static int __init fuse_fs_init(void)
@@ -731,12 +733,12 @@ static int fuse_sysfs_init(void)
 {
 	int err;
 
-	kset_set_kset_s(&fuse_subsys, fs_subsys);
+	kobj_set_kset_s(&fuse_subsys, fs_subsys);
 	err = subsystem_register(&fuse_subsys);
 	if (err)
 		goto out_err;
 
-	kset_set_kset_s(&connections_subsys, fuse_subsys);
+	kobj_set_kset_s(&connections_subsys, fuse_subsys);
 	err = subsystem_register(&connections_subsys);
 	if (err)
 		goto out_fuse_unregister;

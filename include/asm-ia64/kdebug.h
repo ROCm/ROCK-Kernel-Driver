@@ -28,27 +28,24 @@
  */
 #include <linux/notifier.h>
 
-struct pt_regs;
-
-struct die_args {
-	struct pt_regs *regs;
-	const char *str;
-	long err;
-	int trapnr;
-	int signr;
-};
-
-extern int register_die_notifier(struct notifier_block *);
-extern int unregister_die_notifier(struct notifier_block *);
-extern int register_page_fault_notifier(struct notifier_block *);
-extern int unregister_page_fault_notifier(struct notifier_block *);
-extern struct atomic_notifier_head ia64die_chain;
+/*
+ * These are only here because kprobes.c wants them to implement a
+ * blatant layering violation.  Will hopefully go away soon once all
+ * architectures are updated.
+ */
+static inline int register_page_fault_notifier(struct notifier_block *nb)
+{
+	return 0;
+}
+static inline int unregister_page_fault_notifier(struct notifier_block *nb)
+{
+	return 0;
+}
 
 enum die_val {
 	DIE_BREAK = 1,
 	DIE_FAULT,
 	DIE_OOPS,
-	DIE_PAGE_FAULT,
 	DIE_MACHINE_HALT,
 	DIE_MACHINE_RESTART,
 	DIE_MCA_MONARCH_ENTER,
@@ -73,19 +70,5 @@ enum die_val {
 	DIE_KDUMP_ENTER,
 	DIE_KDUMP_LEAVE,
 };
-
-static inline int notify_die(enum die_val val, char *str, struct pt_regs *regs,
-			     long err, int trap, int sig)
-{
-	struct die_args args = {
-		.regs   = regs,
-		.str    = str,
-		.err    = err,
-		.trapnr = trap,
-		.signr  = sig
-	};
-
-	return atomic_notifier_call_chain(&ia64die_chain, val, &args);
-}
 
 #endif

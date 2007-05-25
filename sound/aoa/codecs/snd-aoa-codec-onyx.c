@@ -1018,7 +1018,7 @@ static int onyx_create(struct i2c_adapter *adapter,
 	onyx->i2c.driver = &onyx_driver;
 	onyx->i2c.adapter = adapter;
 	onyx->i2c.addr = addr & 0x7f;
-	strlcpy(onyx->i2c.name, "onyx audio codec", I2C_NAME_SIZE-1);
+	strlcpy(onyx->i2c.name, "onyx audio codec", I2C_NAME_SIZE);
 
 	if (i2c_attach_client(&onyx->i2c)) {
 		printk(KERN_ERR PFX "failed to attach to i2c\n");
@@ -1033,7 +1033,7 @@ static int onyx_create(struct i2c_adapter *adapter,
 		goto fail;
 	}
 
-	strlcpy(onyx->codec.name, "onyx", MAX_CODEC_NAME_LEN-1);
+	strlcpy(onyx->codec.name, "onyx", MAX_CODEC_NAME_LEN);
 	onyx->codec.owner = THIS_MODULE;
 	onyx->codec.init = onyx_init_codec;
 	onyx->codec.exit = onyx_exit_codec;
@@ -1061,10 +1061,10 @@ static int onyx_i2c_attach(struct i2c_adapter *adapter)
 	busnode = pmac_i2c_get_bus_node(bus);
 
 	while ((dev = of_get_next_child(busnode, dev)) != NULL) {
-		if (device_is_compatible(dev, "pcm3052")) {
-			u32 *addr;
+		if (of_device_is_compatible(dev, "pcm3052")) {
+			const u32 *addr;
 			printk(KERN_DEBUG PFX "found pcm3052\n");
-			addr = (u32 *) get_property(dev, "reg", NULL);
+			addr = of_get_property(dev, "reg", NULL);
 			if (!addr)
 				return -ENODEV;
 			return onyx_create(adapter, dev, (*addr)>>1);
@@ -1074,7 +1074,7 @@ static int onyx_i2c_attach(struct i2c_adapter *adapter)
 	/* if that didn't work, try desperate mode for older
 	 * machines that have stuff missing from the device tree */
 	
-	if (!device_is_compatible(busnode, "k2-i2c"))
+	if (!of_device_is_compatible(busnode, "k2-i2c"))
 		return -ENODEV;
 
 	printk(KERN_DEBUG PFX "found k2-i2c, checking if onyx chip is on it\n");

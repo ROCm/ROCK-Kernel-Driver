@@ -21,7 +21,6 @@
 	#size-cells = <1>;
 
 	cpus {
-		#cpus = <1>;
 		#address-cells = <1>;
 		#size-cells = <0>;
 
@@ -57,6 +56,22 @@
 		ranges = <0 e0000000 00100000>;
 		reg = <e0000000 00100000>;
 		bus-frequency = <0>;
+
+		memory-controller@2000 {
+			compatible = "fsl,8568-memory-controller";
+			reg = <2000 1000>;
+			interrupt-parent = <&mpic>;
+			interrupts = <2 2>;
+		};
+
+		l2-cache-controller@20000 {
+			compatible = "fsl,8568-l2-cache-controller";
+			reg = <20000 1000>;
+			cache-line-size = <20>;	// 32 bytes
+			cache-size = <80000>;	// L2, 512K
+			interrupt-parent = <&mpic>;
+			interrupts = <0 2>;
+		};
 
 		i2c@3000 {
 			device_type = "i2c";
@@ -289,6 +304,7 @@
 			rx-clock = <0>;
 			tx-clock = <19>;
 			phy-handle = <&qe_phy0>;
+			phy-connection-type = "gmii";
 			pio-handle = <&pio1>;
 		};
 
@@ -304,6 +320,7 @@
 			rx-clock = <0>;
 			tx-clock = <14>;
 			phy-handle = <&qe_phy1>;
+			phy-connection-type = "gmii";
 			pio-handle = <&pio2>;
 		};
 
@@ -321,28 +338,24 @@
 				interrupts = <31 1>;
 				reg = <0>;
 				device_type = "ethernet-phy";
-				interface = <6>; //ENET_1000_GMII
 			};
 			qe_phy1: ethernet-phy@01 {
 				interrupt-parent = <&mpic>;
 				interrupts = <32 1>;
 				reg = <1>;
 				device_type = "ethernet-phy";
-				interface = <6>;
 			};
 			qe_phy2: ethernet-phy@02 {
 				interrupt-parent = <&mpic>;
 				interrupts = <31 1>;
 				reg = <2>;
 				device_type = "ethernet-phy";
-				interface = <6>; //ENET_1000_GMII
 			};
 			qe_phy3: ethernet-phy@03 {
 				interrupt-parent = <&mpic>;
 				interrupts = <32 1>;
 				reg = <3>;
 				device_type = "ethernet-phy";
-				interface = <6>; //ENET_1000_GMII
 			};
 		};
 

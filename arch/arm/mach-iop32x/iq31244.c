@@ -104,7 +104,7 @@ void __init iq31244_map_io(void)
 /*
  * EP80219/IQ31244 PCI.
  */
-static inline int __init
+static int __init
 ep80219_pci_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 {
 	int irq;
@@ -140,7 +140,7 @@ static struct hw_pci ep80219_pci __initdata = {
 	.map_irq	= ep80219_pci_map_irq,
 };
 
-static inline int __init
+static int __init
 iq31244_pci_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 {
 	int irq;
@@ -178,9 +178,10 @@ static struct hw_pci iq31244_pci __initdata = {
 
 static int __init iq31244_pci_init(void)
 {
-	if (is_ep80219())
-		pci_common_init(&ep80219_pci);
-	else if (machine_is_iq31244()) {
+	if (is_ep80219()) {
+		if (iop3xx_get_init_atu() == IOP3XX_INIT_ATU_ENABLE)
+			pci_common_init(&ep80219_pci);
+	} else if (machine_is_iq31244()) {
 		if (is_80219()) {
 			printk("note: iq31244 board type has been selected\n");
 			printk("note: to select ep80219 operation:\n");
@@ -189,7 +190,9 @@ static int __init iq31244_pci_init(void)
 			printk("\t2/ update boot loader to pass"
 				" the ep80219 id: %d\n", MACH_TYPE_EP80219);
 		}
-		pci_common_init(&iq31244_pci);
+
+		if (iop3xx_get_init_atu() == IOP3XX_INIT_ATU_ENABLE)
+			pci_common_init(&iq31244_pci);
 	}
 
 	return 0;

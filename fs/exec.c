@@ -50,6 +50,7 @@
 #include <linux/tsacct_kern.h>
 #include <linux/cn_proc.h>
 #include <linux/audit.h>
+#include <linux/signalfd.h>
 
 #include <asm/uaccess.h>
 #include <asm/mmu_context.h>
@@ -59,7 +60,7 @@
 #endif
 
 int core_uses_pid;
-char core_pattern[128] = "core";
+char core_pattern[CORENAME_MAX_SIZE] = "core";
 int suid_dumpable = 0;
 
 EXPORT_SYMBOL(suid_dumpable);
@@ -100,6 +101,7 @@ int unregister_binfmt(struct linux_binfmt * fmt)
 	while (*tmp) {
 		if (fmt == *tmp) {
 			*tmp = fmt->next;
+			fmt->next = NULL;
 			write_unlock(&binfmt_lock);
 			return 0;
 		}
@@ -132,6 +134,9 @@ asmlinkage long sys_uselib(const char __user * library)
 	if (error)
 		goto out;
 
+	error = -EACCES;
+	if (nd.mnt->mnt_flags & MNT_NOEXEC)
+		goto exit;
 	error = -EINVAL;
 	if (!S_ISREG(nd.dentry->d_inode->i_mode))
 		goto exit;
@@ -581,6 +586,13 @@ static int de_thread(struct task_struct *tsk)
 	int count;
 
 	/*
+	 * Tell all the sighand listeners that this sighand has
+	 * been detached. The signalfd_detach() function grabs the
+	 * sighand lock, if signal listeners are present on the sighand.
+	 */
+	signalfd_detach(tsk);
+
+	/*
 	 * If we don't share sighandlers, then we aren't sharing anything
 	 * and we can just re-use it all.
 	 */
@@ -701,7 +713,7 @@ static int de_thread(struct task_struct *tsk)
 		 */
 		detach_pid(tsk, PIDTYPE_PID);
 		tsk->pid = leader->pid;
-		attach_pid(tsk, PIDTYPE_PID,  tsk->pid);
+		attach_pid(tsk, PIDTYPE_PID,  find_pid(tsk->pid));
 		transfer_pid(leader, tsk, PIDTYPE_PGID);
 		transfer_pid(leader, tsk, PIDTYPE_SID);
 		list_replace_rcu(&leader->tasks, &tsk->tasks);
@@ -756,8 +768,7 @@ no_thread_group:
 		spin_unlock(&oldsighand->siglock);
 		write_unlock_irq(&tasklist_lock);
 
-		if (atomic_dec_and_test(&oldsighand->count))
-			kmem_cache_free(sighand_cachep, oldsighand);
+		__cleanup_sighand(oldsighand);
 	}
 
 	BUG_ON(!thread_group_leader(tsk));
@@ -982,33 +993,51 @@ void compute_creds(struct linux_binprm *bprm)
 	task_unlock(current);
 	security_bprm_post_apply_creds(bprm);
 }
-
 EXPORT_SYMBOL(compute_creds);
 
+/*
+ * Arguments are '\0' separated strings found at the location bprm->p
+ * points to; chop off the first by relocating brpm->p to right after
+ * the first '\0' encountered.
+ */
 void remove_arg_zero(struct linux_binprm *bprm)
 {
 	if (bprm->argc) {
-		unsigned long offset;
-		char * kaddr;
-		struct page *page;
+		char ch;
 
-		offset = bprm->p % PAGE_SIZE;
-		goto inside;
+		do {
+			unsigned long offset;
+			unsigned long index;
+			char *kaddr;
+			struct page *page;
 
-		while (bprm->p++, *(kaddr+offset++)) {
-			if (offset != PAGE_SIZE)
-				continue;
-			offset = 0;
-			kunmap_atomic(kaddr, KM_USER0);
-inside:
-			page = bprm->page[bprm->p/PAGE_SIZE];
+			offset = bprm->p & ~PAGE_MASK;
+			index = bprm->p >> PAGE_SHIFT;
+
+			page = bprm->page[index];
 			kaddr = kmap_atomic(page, KM_USER0);
-		}
-		kunmap_atomic(kaddr, KM_USER0);
+
+			/* run through page until we reach end or find NUL */
+			do {
+				ch = *(kaddr + offset);
+
+				/* discard that character... */
+				bprm->p++;
+				offset++;
+			} while (offset < PAGE_SIZE && ch != '\0');
+
+			kunmap_atomic(kaddr, KM_USER0);
+
+			/* free the old page */
+			if (offset == PAGE_SIZE) {
+				__free_page(page);
+				bprm->page[index] = NULL;
+			}
+		} while (ch != '\0');
+
 		bprm->argc--;
 	}
 }
-
 EXPORT_SYMBOL(remove_arg_zero);
 
 /*
@@ -1238,8 +1267,6 @@ int set_binfmt(struct linux_binfmt *new)
 
 EXPORT_SYMBOL(set_binfmt);
 
-#define CORENAME_MAX_SIZE 64
-
 /* format_corename will inspect the pattern parameter, and output a
  * name into corename, which must have space for at least
  * CORENAME_MAX_SIZE bytes plus one byte for the zero terminator.
@@ -1468,6 +1495,8 @@ int do_coredump(long signr, int exit_code, struct pt_regs * regs)
 	int fsuid = current->fsuid;
 	int flag = 0;
 	int ispipe = 0;
+
+	audit_core_dumps(signr);
 
 	binfmt = current->binfmt;
 	if (!binfmt || !binfmt->core_dump)

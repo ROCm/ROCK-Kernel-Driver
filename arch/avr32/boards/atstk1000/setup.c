@@ -8,43 +8,56 @@
  * published by the Free Software Foundation.
  */
 #include <linux/bootmem.h>
+#include <linux/fb.h>
 #include <linux/init.h>
 #include <linux/types.h>
 #include <linux/linkage.h>
 
-#include <asm/setup.h>
+#include <video/atmel_lcdc.h>
 
+#include <asm/setup.h>
 #include <asm/arch/board.h>
+
+#include "atstk1000.h"
 
 /* Initialized by bootloader-specific startup code. */
 struct tag *bootloader_tags __initdata;
 
-struct lcdc_platform_data __initdata atstk1000_fb0_data;
+static struct fb_videomode __initdata ltv350qv_modes[] = {
+	{
+		.name		= "320x240 @ 75",
+		.refresh	= 75,
+		.xres		= 320,		.yres		= 240,
+		.pixclock	= KHZ2PICOS(6891),
 
-void __init board_setup_fbmem(unsigned long fbmem_start,
-			      unsigned long fbmem_size)
-{
-	if (!fbmem_size)
-		return;
+		.left_margin	= 17,		.right_margin	= 33,
+		.upper_margin	= 10,		.lower_margin	= 10,
+		.hsync_len	= 16,		.vsync_len	= 1,
 
-	if (!fbmem_start) {
-		void *fbmem;
+		.sync		= 0,
+		.vmode		= FB_VMODE_NONINTERLACED,
+	},
+};
 
-		fbmem = alloc_bootmem_low_pages(fbmem_size);
-		fbmem_start = __pa(fbmem);
-	} else {
-		pg_data_t *pgdat;
+static struct fb_monspecs __initdata atstk1000_default_monspecs = {
+	.manufacturer		= "SNG",
+	.monitor		= "LTV350QV",
+	.modedb			= ltv350qv_modes,
+	.modedb_len		= ARRAY_SIZE(ltv350qv_modes),
+	.hfmin			= 14820,
+	.hfmax			= 22230,
+	.vfmin			= 60,
+	.vfmax			= 90,
+	.dclkmax		= 30000000,
+};
 
-		for_each_online_pgdat(pgdat) {
-			if (fbmem_start >= pgdat->bdata->node_boot_start
-			    && fbmem_start <= pgdat->bdata->node_low_pfn)
-				reserve_bootmem_node(pgdat, fbmem_start,
-						     fbmem_size);
-		}
-	}
-
-	printk("%luKiB framebuffer memory at address 0x%08lx\n",
-	       fbmem_size >> 10, fbmem_start);
-	atstk1000_fb0_data.fbmem_start = fbmem_start;
-	atstk1000_fb0_data.fbmem_size = fbmem_size;
-}
+struct atmel_lcdfb_info __initdata atstk1000_lcdc_data = {
+	.default_bpp		= 24,
+	.default_dmacon		= ATMEL_LCDC_DMAEN | ATMEL_LCDC_DMA2DEN,
+	.default_lcdcon2	= (ATMEL_LCDC_DISTYPE_TFT
+				   | ATMEL_LCDC_INVCLK
+				   | ATMEL_LCDC_CLKMOD_ALWAYSACTIVE
+				   | ATMEL_LCDC_MEMOR_BIG),
+	.default_monspecs	= &atstk1000_default_monspecs,
+	.guard_time		= 2,
+};

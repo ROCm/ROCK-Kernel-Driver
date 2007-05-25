@@ -42,7 +42,6 @@
 #include <linux/proc_fs.h>
 #include <linux/module.h>
 #include <linux/smp.h>
-#include <linux/smp_lock.h>
 #include <linux/timer.h>
 #include <linux/vmalloc.h>
 
@@ -163,7 +162,7 @@ static DEFINE_SPINLOCK(data_saved_lock);
 /** salinfo_platform_oemdata - optional callback to decode oemdata from an error
  * record.
  * @sect_header: pointer to the start of the section to decode.
- * @oemdata: returns vmalloc area containing the decded output.
+ * @oemdata: returns vmalloc area containing the decoded output.
  * @oemdata_size: returns length of decoded output (strlen).
  *
  * Description: If user space asks for oem data to be decoded by the kernel
@@ -583,6 +582,7 @@ salinfo_cpu_callback(struct notifier_block *nb, unsigned long action, void *hcpu
 	struct salinfo_data *data;
 	switch (action) {
 	case CPU_ONLINE:
+	case CPU_ONLINE_FROZEN:
 		spin_lock_irqsave(&data_saved_lock, flags);
 		for (i = 0, data = salinfo_data;
 		     i < ARRAY_SIZE(salinfo_data);
@@ -593,6 +593,7 @@ salinfo_cpu_callback(struct notifier_block *nb, unsigned long action, void *hcpu
 		spin_unlock_irqrestore(&data_saved_lock, flags);
 		break;
 	case CPU_DEAD:
+	case CPU_DEAD_FROZEN:
 		spin_lock_irqsave(&data_saved_lock, flags);
 		for (i = 0, data = salinfo_data;
 		     i < ARRAY_SIZE(salinfo_data);

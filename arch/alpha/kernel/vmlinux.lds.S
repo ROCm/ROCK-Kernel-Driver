@@ -15,7 +15,7 @@ SECTIONS
 
   _text = .;					/* Text and read-only data */
   .text : { 
-	*(.text) 
+	TEXT_TEXT
 	SCHED_TEXT
 	LOCK_TEXT
 	*(.fixup)
@@ -69,7 +69,7 @@ SECTIONS
   . = ALIGN(8);
   SECURITY_INIT
 
-  . = ALIGN(64);
+  . = ALIGN(8192);
   __per_cpu_start = .;
   .data.percpu : { *(.data.percpu) }
   __per_cpu_end = .;
@@ -89,7 +89,7 @@ SECTIONS
 
   _data = .;
   .data : {					/* Data */
-	*(.data)
+	DATA_DATA
 	CONSTRUCTORS
   }
 

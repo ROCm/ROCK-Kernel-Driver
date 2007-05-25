@@ -330,7 +330,7 @@ struct request_sock;
  *	@dentry contains the dentry structure of the new file.
  *	@mnt is the vfsmount corresponding to @dentry (may be NULL).
  *	@mode contains the mode of the new file.
- *	@dev contains the the device number.
+ *	@dev contains the device number.
  *	Return 0 if permission is granted.
  * @inode_rename:
  *	Check for permission to rename a file or directory.

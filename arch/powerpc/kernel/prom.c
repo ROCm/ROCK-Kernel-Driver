@@ -390,18 +390,19 @@ static unsigned long __init unflatten_dt_node(unsigned long mem,
 		if (allnextpp) {
 			pp->name = "name";
 			pp->length = sz;
-			pp->value = (unsigned char *)(pp + 1);
+			pp->value = pp + 1;
 			*prev_pp = pp;
 			prev_pp = &pp->next;
 			memcpy(pp->value, ps, sz - 1);
 			((char *)pp->value)[sz - 1] = 0;
-			DBG("fixed up name for %s -> %s\n", pathp, pp->value);
+			DBG("fixed up name for %s -> %s\n", pathp,
+				(char *)pp->value);
 		}
 	}
 	if (allnextpp) {
 		*prev_pp = NULL;
-		np->name = get_property(np, "name", NULL);
-		np->type = get_property(np, "device_type", NULL);
+		np->name = of_get_property(np, "name", NULL);
+		np->type = of_get_property(np, "device_type", NULL);
 
 		if (!np->name)
 			np->name = "<NULL>";
@@ -715,11 +716,40 @@ static int __init early_init_dt_scan_cpus(unsigned long node,
 	return 0;
 }
 
+#ifdef CONFIG_BLK_DEV_INITRD
+static void __init early_init_dt_check_for_initrd(unsigned long node)
+{
+	unsigned long l;
+	u32 *prop;
+
+	DBG("Looking for initrd properties... ");
+
+	prop = of_get_flat_dt_prop(node, "linux,initrd-start", &l);
+	if (prop) {
+		initrd_start = (unsigned long)__va(of_read_ulong(prop, l/4));
+
+		prop = of_get_flat_dt_prop(node, "linux,initrd-end", &l);
+		if (prop) {
+			initrd_end = (unsigned long)
+					__va(of_read_ulong(prop, l/4));
+			initrd_below_start_ok = 1;
+		} else {
+			initrd_start = 0;
+		}
+	}
+
+	DBG("initrd_start=0x%lx  initrd_end=0x%lx\n", initrd_start, initrd_end);
+}
+#else
+static inline void early_init_dt_check_for_initrd(unsigned long node)
+{
+}
+#endif /* CONFIG_BLK_DEV_INITRD */
+
 static int __init early_init_dt_scan_chosen(unsigned long node,
 					    const char *uname, int depth, void *data)
 {
 	unsigned long *lprop;
-	u32 *prop;
 	unsigned long l;
 	char *p;
 
@@ -761,21 +791,7 @@ static int __init early_init_dt_scan_chosen(unsigned long node,
                crashk_res.end = crashk_res.start + *lprop - 1;
 #endif
 
-#ifdef CONFIG_BLK_DEV_INITRD
-	DBG("Looking for initrd properties... ");
-	prop = of_get_flat_dt_prop(node, "linux,initrd-start", &l);
-	if (prop) {
-		initrd_start = (unsigned long)__va(of_read_ulong(prop, l/4));
-		prop = of_get_flat_dt_prop(node, "linux,initrd-end", &l);
-		if (prop) {
-			initrd_end = (unsigned long)__va(of_read_ulong(prop, l/4));
-			initrd_below_start_ok = 1;
-		} else {
-			initrd_start = 0;
-		}
-	}
-	DBG("initrd_start=0x%lx  initrd_end=0x%lx\n", initrd_start, initrd_end);
-#endif /* CONFIG_BLK_DEV_INITRD */
+	early_init_dt_check_for_initrd(node);
 
 	/* Retreive command line */
  	p = of_get_flat_dt_prop(node, "bootargs", &l);
@@ -1047,102 +1063,46 @@ void __init early_init_devtree(void *params)
 
 #undef printk
 
-int
-prom_n_addr_cells(struct device_node* np)
+int of_n_addr_cells(struct device_node* np)
 {
 	const int *ip;
 	do {
 		if (np->parent)
 			np = np->parent;
-		ip = get_property(np, "#address-cells", NULL);
+		ip = of_get_property(np, "#address-cells", NULL);
 		if (ip != NULL)
 			return *ip;
 	} while (np->parent);
 	/* No #address-cells property for the root node, default to 1 */
 	return 1;
 }
-EXPORT_SYMBOL(prom_n_addr_cells);
+EXPORT_SYMBOL(of_n_addr_cells);
 
-int
-prom_n_size_cells(struct device_node* np)
+int of_n_size_cells(struct device_node* np)
 {
 	const int* ip;
 	do {
 		if (np->parent)
 			np = np->parent;
-		ip = get_property(np, "#size-cells", NULL);
+		ip = of_get_property(np, "#size-cells", NULL);
 		if (ip != NULL)
 			return *ip;
 	} while (np->parent);
 	/* No #size-cells property for the root node, default to 1 */
 	return 1;
 }
-EXPORT_SYMBOL(prom_n_size_cells);
-
-/**
- * Construct and return a list of the device_nodes with a given name.
- */
-struct device_node *find_devices(const char *name)
-{
-	struct device_node *head, **prevp, *np;
-
-	prevp = &head;
-	for (np = allnodes; np != 0; np = np->allnext) {
-		if (np->name != 0 && strcasecmp(np->name, name) == 0) {
-			*prevp = np;
-			prevp = &np->next;
-		}
-	}
-	*prevp = NULL;
-	return head;
-}
-EXPORT_SYMBOL(find_devices);
-
-/**
- * Construct and return a list of the device_nodes with a given type.
- */
-struct device_node *find_type_devices(const char *type)
-{
-	struct device_node *head, **prevp, *np;
-
-	prevp = &head;
-	for (np = allnodes; np != 0; np = np->allnext) {
-		if (np->type != 0 && strcasecmp(np->type, type) == 0) {
-			*prevp = np;
-			prevp = &np->next;
-		}
-	}
-	*prevp = NULL;
-	return head;
-}
-EXPORT_SYMBOL(find_type_devices);
-
-/**
- * Returns all nodes linked together
- */
-struct device_node *find_all_nodes(void)
-{
-	struct device_node *head, **prevp, *np;
-
-	prevp = &head;
-	for (np = allnodes; np != 0; np = np->allnext) {
-		*prevp = np;
-		prevp = &np->next;
-	}
-	*prevp = NULL;
-	return head;
-}
-EXPORT_SYMBOL(find_all_nodes);
+EXPORT_SYMBOL(of_n_size_cells);
 
 /** Checks if the given "compat" string matches one of the strings in
  * the device's "compatible" property
  */
-int device_is_compatible(const struct device_node *device, const char *compat)
+int of_device_is_compatible(const struct device_node *device,
+		const char *compat)
 {
 	const char* cp;
 	int cplen, l;
 
-	cp = get_property(device, "compatible", &cplen);
+	cp = of_get_property(device, "compatible", &cplen);
 	if (cp == NULL)
 		return 0;
 	while (cplen > 0) {
@@ -1155,7 +1115,7 @@ int device_is_compatible(const struct device_node *device, const char *compat)
 
 	return 0;
 }
-EXPORT_SYMBOL(device_is_compatible);
+EXPORT_SYMBOL(of_device_is_compatible);
 
 
 /**
@@ -1169,50 +1129,12 @@ int machine_is_compatible(const char *compat)
 
 	root = of_find_node_by_path("/");
 	if (root) {
-		rc = device_is_compatible(root, compat);
+		rc = of_device_is_compatible(root, compat);
 		of_node_put(root);
 	}
 	return rc;
 }
 EXPORT_SYMBOL(machine_is_compatible);
-
-/**
- * Construct and return a list of the device_nodes with a given type
- * and compatible property.
- */
-struct device_node *find_compatible_devices(const char *type,
-					    const char *compat)
-{
-	struct device_node *head, **prevp, *np;
-
-	prevp = &head;
-	for (np = allnodes; np != 0; np = np->allnext) {
-		if (type != NULL
-		    && !(np->type != 0 && strcasecmp(np->type, type) == 0))
-			continue;
-		if (device_is_compatible(np, compat)) {
-			*prevp = np;
-			prevp = &np->next;
-		}
-	}
-	*prevp = NULL;
-	return head;
-}
-EXPORT_SYMBOL(find_compatible_devices);
-
-/**
- * Find the device_node with a given full_name.
- */
-struct device_node *find_path_device(const char *path)
-{
-	struct device_node *np;
-
-	for (np = allnodes; np != 0; np = np->allnext)
-		if (np->full_name != 0 && strcasecmp(np->full_name, path) == 0)
-			return np;
-	return NULL;
-}
-EXPORT_SYMBOL(find_path_device);
 
 /*******
  *
@@ -1306,7 +1228,7 @@ struct device_node *of_find_compatible_node(struct device_node *from,
 		if (type != NULL
 		    && !(np->type != 0 && strcasecmp(np->type, type) == 0))
 			continue;
-		if (device_is_compatible(np, compatible) && of_node_get(np))
+		if (of_device_is_compatible(np, compatible) && of_node_get(np))
 			break;
 	}
 	of_node_put(from);
@@ -1553,8 +1475,13 @@ static int of_finish_dynamic_node(struct device_node *node)
 	int err = 0;
 	const phandle *ibm_phandle;
 
-	node->name = get_property(node, "name", NULL);
-	node->type = get_property(node, "device_type", NULL);
+	node->name = of_get_property(node, "name", NULL);
+	node->type = of_get_property(node, "device_type", NULL);
+
+	if (!node->name)
+		node->name = "<NULL>";
+	if (!node->type)
+		node->type = "<NULL>";
 
 	if (!parent) {
 		err = -ENODEV;
@@ -1568,7 +1495,7 @@ static int of_finish_dynamic_node(struct device_node *node)
 		return -ENODEV;
 
 	/* fix up new node's linux_phandle field */
-	if ((ibm_phandle = get_property(node, "ibm,phandle", NULL)))
+	if ((ibm_phandle = of_get_property(node, "ibm,phandle", NULL)))
 		node->linux_phandle = *ibm_phandle;
 
 out:
@@ -1631,13 +1558,13 @@ EXPORT_SYMBOL(of_find_property);
  * Find a property with a given name for a given node
  * and return the value.
  */
-const void *get_property(const struct device_node *np, const char *name,
+const void *of_get_property(const struct device_node *np, const char *name,
 			 int *lenp)
 {
 	struct property *pp = of_find_property(np,name,lenp);
 	return pp ? pp->value : NULL;
 }
-EXPORT_SYMBOL(get_property);
+EXPORT_SYMBOL(of_get_property);
 
 /*
  * Add a property to a node
@@ -1768,10 +1695,10 @@ struct device_node *of_get_cpu_node(int cpu, unsigned int *thread)
 		/* Check for ibm,ppc-interrupt-server#s. If it doesn't exist
 		 * fallback to "reg" property and assume no threads
 		 */
-		intserv = get_property(np, "ibm,ppc-interrupt-server#s",
+		intserv = of_get_property(np, "ibm,ppc-interrupt-server#s",
 				&plen);
 		if (intserv == NULL) {
-			const u32 *reg = get_property(np, "reg", NULL);
+			const u32 *reg = of_get_property(np, "reg", NULL);
 			if (reg == NULL)
 				continue;
 			if (*reg == hardid) {

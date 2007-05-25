@@ -29,7 +29,7 @@ CROSS32CC	:= $(CC) -m32
 CROSS32AS	:= $(AS) -a32
 CROSS32LD	:= $(LD) -m elf32ppc
 CROSS32OBJCOPY	:= $(OBJCOPY)
-CROSS32AR	:= $(AR)
+CROSS32AR	:= GNUTARGET=elf32-powerpc $(AR)
 endif
 endif
 
@@ -58,6 +58,7 @@ ifeq ($(HAS_BIARCH),y)
 override AS	+= -a$(SZ)
 override LD	+= -m elf$(SZ)ppc
 override CC	+= -m$(SZ)
+override AR	:= GNUTARGET=elf$(SZ)-powerpc $(AR)
 endif
 
 LDFLAGS_vmlinux	:= -Bstatic
@@ -102,9 +103,9 @@ CFLAGS += $(call cc-option,-mno-altivec)
 # kernel considerably.
 CFLAGS += $(call cc-option,-funit-at-a-time)
 
-ifndef CONFIG_FSL_BOOKE
-CFLAGS		+= -mstring
-endif
+# Never use string load/store instructions as they are
+# often slow when they are implemented at all
+CFLAGS		+= -mno-string
 
 ifeq ($(CONFIG_6xx),y)
 CFLAGS		+= -mcpu=powerpc
@@ -148,7 +149,7 @@ all: $(KBUILD_IMAGE)
 
 CPPFLAGS_vmlinux.lds	:= -Upowerpc
 
-BOOT_TARGETS = zImage zImage.initrd uImage
+BOOT_TARGETS = zImage zImage.initrd zImage.dts zImage.dts_initrd uImage
 
 PHONY += $(BOOT_TARGETS)
 
@@ -165,6 +166,9 @@ define archhelp
   @echo '                    install to $$(INSTALL_PATH) and run lilo'
   @echo '  *_defconfig     - Select default config from arch/$(ARCH)/configs'
 endef
+
+install:
+	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(KBUILD_IMAGE) install
 
 archclean:
 	$(Q)$(MAKE) $(clean)=$(boot)

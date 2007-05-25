@@ -415,7 +415,8 @@ isdnloop_sendbuf(int channel, struct sk_buff *skb, isdnloop_card * card)
 		spin_lock_irqsave(&card->isdnloop_lock, flags);
 		nskb = dev_alloc_skb(skb->len);
 		if (nskb) {
-			memcpy(skb_put(nskb, len), skb->data, len);
+			skb_copy_from_linear_data(skb,
+						  skb_put(nskb, len), len);
 			skb_queue_tail(&card->bqueue[channel], nskb);
 			dev_kfree_skb(skb);
 		} else
@@ -1461,7 +1462,7 @@ isdnloop_initcard(char *id)
 		skb_queue_head_init(&card->bqueue[i]);
 	}
 	skb_queue_head_init(&card->dqueue);
-	card->isdnloop_lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&card->isdnloop_lock);
 	card->next = cards;
 	cards = card;
 	if (!register_isdn(&card->interface)) {

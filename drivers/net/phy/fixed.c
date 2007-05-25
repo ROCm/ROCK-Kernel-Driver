@@ -89,6 +89,7 @@ EXPORT_SYMBOL(fixed_mdio_set_link_update);
 /*-----------------------------------------------------------------------------
  *  This is used for updating internal mii regs from the status
  *-----------------------------------------------------------------------------*/
+#if defined(CONFIG_FIXED_MII_100_FDX) || defined(CONFIG_FIXED_MII_10_FDX)
 static int fixed_mdio_update_regs(struct fixed_info *fixed)
 {
 	u16 *regs = fixed->regs;
@@ -165,6 +166,7 @@ static int fixed_mii_reset(struct mii_bus *bus)
 	/*nothing here - no way/need to reset it*/
 	return 0;
 }
+#endif
 
 static int fixed_config_aneg(struct phy_device *phydev)
 {
@@ -194,6 +196,7 @@ static struct phy_driver fixed_mdio_driver = {
  * number is used to create multiple fixed PHYs, so that several devices can
  * utilize them simultaneously.
  *-----------------------------------------------------------------------------*/
+#if defined(CONFIG_FIXED_MII_100_FDX) || defined(CONFIG_FIXED_MII_10_FDX)
 static int fixed_mdio_register_device(int number, int speed, int duplex)
 {
 	struct mii_bus *new_bus;
@@ -276,21 +279,15 @@ static int fixed_mdio_register_device(int number, int speed, int duplex)
 	   artificially, we are binding the driver here by hand;
 	   it will be the same for all the fixed phys anyway.
 	 */
-	down_write(&phydev->dev.bus->subsys.rwsem);
-
 	phydev->dev.driver = &fixed_mdio_driver.driver;
 
 	err = phydev->dev.driver->probe(&phydev->dev);
 	if(err < 0) {
 		printk(KERN_ERR "Phy %s: problems with fixed driver\n",phydev->dev.bus_id);
-		up_write(&phydev->dev.bus->subsys.rwsem);
 		goto probe_fail;
 	}
 
 	err = device_bind_driver(&phydev->dev);
-
-	up_write(&phydev->dev.bus->subsys.rwsem);
-
 	if (err)
 		goto probe_fail;
 
@@ -307,6 +304,7 @@ device_create_fail:
 
 	return err;
 }
+#endif
 
 
 MODULE_DESCRIPTION("Fixed PHY device & driver for PAL");

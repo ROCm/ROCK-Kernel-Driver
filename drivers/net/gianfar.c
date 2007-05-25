@@ -942,18 +942,18 @@ static inline void gfar_tx_checksum(struct sk_buff *skb, struct txfcb *fcb)
 
 	/* Tell the controller what the protocol is */
 	/* And provide the already calculated phcs */
-	if (skb->nh.iph->protocol == IPPROTO_UDP) {
+	if (ip_hdr(skb)->protocol == IPPROTO_UDP) {
 		flags |= TXFCB_UDP;
-		fcb->phcs = skb->h.uh->check;
+		fcb->phcs = udp_hdr(skb)->check;
 	} else
-		fcb->phcs = skb->h.th->check;
+		fcb->phcs = udp_hdr(skb)->check;
 
 	/* l3os is the distance between the start of the
 	 * frame (skb->data) and the start of the IP hdr.
 	 * l4os is the distance between the start of the
 	 * l3 hdr and the l4 hdr */
-	fcb->l3os = (u16)(skb->nh.raw - skb->data - GMAC_FCB_LEN);
-	fcb->l4os = (u16)(skb->h.raw - skb->nh.raw);
+	fcb->l3os = (u16)(skb_network_offset(skb) - GMAC_FCB_LEN);
+	fcb->l4os = skb_network_header_len(skb);
 
 	fcb->flags = flags;
 }
@@ -1025,6 +1025,15 @@ static int gfar_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	dev->trans_start = jiffies;
 
+	/* The powerpc-specific eieio() is used, as wmb() has too strong
+	 * semantics (it requires synchronization between cacheable and
+	 * uncacheable mappings, which eieio doesn't provide and which we
+	 * don't need), thus requiring a more expensive sync instruction.  At
+	 * some point, the set of architecture-independent barrier functions
+	 * should be expanded to include weaker barriers.
+	 */
+
+	eieio();
 	txbdp->status = status;
 
 	/* If this was the last BD in the ring, the next one */
@@ -1295,14 +1304,13 @@ struct sk_buff * gfar_new_skb(struct net_device *dev, struct rxbd8 *bdp)
 	 */
 	skb_reserve(skb, alignamount);
 
-	skb->dev = dev;
-
 	bdp->bufPtr = dma_map_single(NULL, skb->data,
 			priv->rx_buffer_size, DMA_FROM_DEVICE);
 
 	bdp->length = 0;
 
 	/* Mark the buffer empty */
+	eieio();
 	bdp->status |= (RXBD_EMPTY | RXBD_INTERRUPT);
 
 	return skb;
@@ -1486,6 +1494,7 @@ int gfar_clean_rx_ring(struct net_device *dev, int rx_work_limit)
 	bdp = priv->cur_rx;
 
 	while (!((bdp->status & RXBD_EMPTY) || (--rx_work_limit < 0))) {
+		rmb();
 		skb = priv->rx_skbuff[priv->skb_currx];
 
 		if (!(bdp->status &

@@ -21,7 +21,6 @@
 
 #ifndef __ASSEMBLY__
 
-#include <asm/fixmap.h>
 #include <asm/ptrace.h>
 #include <asm/string.h>
 
@@ -29,10 +28,6 @@
  * KEXEC_SOURCE_MEMORY_LIMIT maximum page get_free_page can return.
  * I.e. Maximum page that is mapped directly into kernel memory,
  * and kmap is not required.
- *
- * Someone correct me if FIXADDR_START - PAGEOFFSET is not the correct
- * calculation for the amount of memory directly mappable into the
- * kernel memory space.
  */
 
 /* Maximum physical address we can use pages from */
@@ -49,8 +44,6 @@
 
 /* We can also handle crash dumps from 64 bit kernel. */
 #define vmcore_elf_check_arch_cross(x) ((x)->e_machine == EM_X86_64)
-
-#define MAX_NOTE_BYTES 1024
 
 /* CPU does not save ss and esp on stack if execution is already
  * running in kernel mode at the time of NMI occurrence. This code
@@ -100,20 +93,6 @@ relocate_kernel(unsigned long indirection_page,
 		unsigned long control_page,
 		unsigned long start_address,
 		unsigned int has_pae) ATTRIB_NORET;
-
-
-/* Under Xen we need to work with machine addresses. These macros give the
- * machine address of a certain page to the generic kexec code instead of 
- * the pseudo physical address which would be given by the default macros.
- */
-
-#ifdef CONFIG_XEN
-#define KEXEC_ARCH_HAS_PAGE_MACROS
-#define kexec_page_to_pfn(page)  pfn_to_mfn(page_to_pfn(page))
-#define kexec_pfn_to_page(pfn)   pfn_to_page(mfn_to_pfn(pfn))
-#define kexec_virt_to_phys(addr) virt_to_machine(addr)
-#define kexec_phys_to_virt(addr) phys_to_virt(machine_to_phys(addr))
-#endif
 
 #endif /* __ASSEMBLY__ */
 

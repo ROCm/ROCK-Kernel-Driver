@@ -35,11 +35,11 @@
 #include "sis.h"
 
 #define DRV_NAME	"pata_sis"
-#define DRV_VERSION	"0.5.0"
+#define DRV_VERSION	"0.5.1"
 
 struct sis_chipset {
-	u16 device;			/* PCI host ID */
-	struct ata_port_info *info;	/* Info block */
+	u16 device;				/* PCI host ID */
+	const struct ata_port_info *info;	/* Info block */
 	/* Probably add family, cable detect type etc here to clean
 	   up code later */
 };
@@ -73,27 +73,71 @@ static int sis_short_ata40(struct pci_dev *dev)
 }
 
 /**
- *	sis_port_base		-	return PCI configuration base for dev
+ *	sis_old_port_base		-	return PCI configuration base for dev
  *	@adev: device
  *
  *	Returns the base of the PCI configuration registers for this port
  *	number.
  */
 
-static int sis_port_base(struct ata_device *adev)
+static int sis_old_port_base(struct ata_device *adev)
 {
 	return  0x40 + (4 * adev->ap->port_no) +  (2 * adev->devno);
 }
 
 /**
- *	sis_133_pre_reset	-	check for 40/80 pin
+ *	sis_133_cable_detect	-	check for 40/80 pin
  *	@ap: Port
+ *	@deadline: deadline jiffies for the operation
  *
  *	Perform cable detection for the later UDMA133 capable
  *	SiS chipset.
  */
 
-static int sis_133_pre_reset(struct ata_port *ap)
+static int sis_133_cable_detect(struct ata_port *ap)
+{
+	struct pci_dev *pdev = to_pci_dev(ap->host->dev);
+	u16 tmp;
+
+	/* The top bit of this register is the cable detect bit */
+	pci_read_config_word(pdev, 0x50 + 2 * ap->port_no, &tmp);
+	if ((tmp & 0x8000) && !sis_short_ata40(pdev))
+		return ATA_CBL_PATA40;
+	return ATA_CBL_PATA80;
+}
+
+/**
+ *	sis_66_cable_detect	-	check for 40/80 pin
+ *	@ap: Port
+ *	@deadline: deadline jiffies for the operation
+ *
+ *	Perform cable detection on the UDMA66, UDMA100 and early UDMA133
+ *	SiS IDE controllers.
+ */
+
+static int sis_66_cable_detect(struct ata_port *ap)
+{
+	struct pci_dev *pdev = to_pci_dev(ap->host->dev);
+	u8 tmp;
+
+	/* Older chips keep cable detect in bits 4/5 of reg 0x48 */
+	pci_read_config_byte(pdev, 0x48, &tmp);
+	tmp >>= ap->port_no;
+	if ((tmp & 0x10) && !sis_short_ata40(pdev))
+		return ATA_CBL_PATA40;
+	return ATA_CBL_PATA80;
+}
+
+
+/**
+ *	sis_pre_reset		-	probe begin
+ *	@ap: ATA port
+ *	@deadline: deadline jiffies for the operation
+ *
+ *	Set up cable type and use generic probe init
+ */
+
+static int sis_pre_reset(struct ata_port *ap, unsigned long deadline)
 {
 	static const struct pci_bits sis_enable_bits[] = {
 		{ 0x4aU, 1U, 0x02UL, 0x02UL },	/* port 0 */
@@ -101,20 +145,13 @@ static int sis_133_pre_reset(struct ata_port *ap)
 	};
 
 	struct pci_dev *pdev = to_pci_dev(ap->host->dev);
-	u16 tmp;
 
 	if (!pci_test_config_bits(pdev, &sis_enable_bits[ap->port_no]))
 		return -ENOENT;
 
-	/* The top bit of this register is the cable detect bit */
-	pci_read_config_word(pdev, 0x50 + 2 * ap->port_no, &tmp);
-	if ((tmp & 0x8000) && !sis_short_ata40(pdev))
-		ap->cbl = ATA_CBL_PATA40;
-	else
-		ap->cbl = ATA_CBL_PATA80;
-
-	return ata_std_prereset(ap);
+	return ata_std_prereset(ap, deadline);
 }
+
 
 /**
  *	sis_error_handler - Probe specified port on PATA host controller
@@ -124,97 +161,9 @@ static int sis_133_pre_reset(struct ata_port *ap)
  *	None (inherited from caller).
  */
 
-static void sis_133_error_handler(struct ata_port *ap)
+static void sis_error_handler(struct ata_port *ap)
 {
-	ata_bmdma_drive_eh(ap, sis_133_pre_reset, ata_std_softreset, NULL, ata_std_postreset);
-}
-
-
-/**
- *	sis_66_pre_reset	-	check for 40/80 pin
- *	@ap: Port
- *
- *	Perform cable detection on the UDMA66, UDMA100 and early UDMA133
- *	SiS IDE controllers.
- */
-
-static int sis_66_pre_reset(struct ata_port *ap)
-{
-	static const struct pci_bits sis_enable_bits[] = {
-		{ 0x4aU, 1U, 0x02UL, 0x02UL },	/* port 0 */
-		{ 0x4aU, 1U, 0x04UL, 0x04UL },	/* port 1 */
-	};
-
-	struct pci_dev *pdev = to_pci_dev(ap->host->dev);
-	u8 tmp;
-
-	if (!pci_test_config_bits(pdev, &sis_enable_bits[ap->port_no])) {
-		ata_port_disable(ap);
-		ata_port_printk(ap, KERN_INFO, "port disabled. ignoring.\n");
-		return 0;
-	}
-	/* Older chips keep cable detect in bits 4/5 of reg 0x48 */
-	pci_read_config_byte(pdev, 0x48, &tmp);
-	tmp >>= ap->port_no;
-	if ((tmp & 0x10) && !sis_short_ata40(pdev))
-		ap->cbl = ATA_CBL_PATA40;
-	else
-		ap->cbl = ATA_CBL_PATA80;
-
-	return ata_std_prereset(ap);
-}
-
-/**
- *	sis_66_error_handler - Probe specified port on PATA host controller
- *	@ap: Port to probe
- *	@classes:
- *
- *	LOCKING:
- *	None (inherited from caller).
- */
-
-static void sis_66_error_handler(struct ata_port *ap)
-{
-	ata_bmdma_drive_eh(ap, sis_66_pre_reset, ata_std_softreset, NULL, ata_std_postreset);
-}
-
-/**
- *	sis_old_pre_reset		-	probe begin
- *	@ap: ATA port
- *
- *	Set up cable type and use generic probe init
- */
-
-static int sis_old_pre_reset(struct ata_port *ap)
-{
-	static const struct pci_bits sis_enable_bits[] = {
-		{ 0x4aU, 1U, 0x02UL, 0x02UL },	/* port 0 */
-		{ 0x4aU, 1U, 0x04UL, 0x04UL },	/* port 1 */
-	};
-
-	struct pci_dev *pdev = to_pci_dev(ap->host->dev);
-
-	if (!pci_test_config_bits(pdev, &sis_enable_bits[ap->port_no])) {
-		ata_port_disable(ap);
-		ata_port_printk(ap, KERN_INFO, "port disabled. ignoring.\n");
-		return 0;
-	}
-	ap->cbl = ATA_CBL_PATA40;
-	return ata_std_prereset(ap);
-}
-
-
-/**
- *	sis_old_error_handler - Probe specified port on PATA host controller
- *	@ap: Port to probe
- *
- *	LOCKING:
- *	None (inherited from caller).
- */
-
-static void sis_old_error_handler(struct ata_port *ap)
-{
-	ata_bmdma_drive_eh(ap, sis_old_pre_reset, ata_std_softreset, NULL, ata_std_postreset);
+	ata_bmdma_drive_eh(ap, sis_pre_reset, ata_std_softreset, NULL, ata_std_postreset);
 }
 
 /**
@@ -262,7 +211,7 @@ static void sis_set_fifo(struct ata_port *ap, struct ata_device *adev)
 static void sis_old_set_piomode (struct ata_port *ap, struct ata_device *adev)
 {
 	struct pci_dev *pdev	= to_pci_dev(ap->host->dev);
-	int port = sis_port_base(adev);
+	int port = sis_old_port_base(adev);
 	u8 t1, t2;
 	int speed = adev->pio_mode - XFER_PIO_0;
 
@@ -299,7 +248,7 @@ static void sis_old_set_piomode (struct ata_port *ap, struct ata_device *adev)
 static void sis_100_set_piomode (struct ata_port *ap, struct ata_device *adev)
 {
 	struct pci_dev *pdev	= to_pci_dev(ap->host->dev);
-	int port = sis_port_base(adev);
+	int port = sis_old_port_base(adev);
 	int speed = adev->pio_mode - XFER_PIO_0;
 
 	const u8 actrec[] = { 0x00, 0x67, 0x44, 0x33, 0x31 };
@@ -379,7 +328,7 @@ static void sis_old_set_dmamode (struct ata_port *ap, struct ata_device *adev)
 {
 	struct pci_dev *pdev	= to_pci_dev(ap->host->dev);
 	int speed = adev->dma_mode - XFER_MW_DMA_0;
-	int drive_pci = sis_port_base(adev);
+	int drive_pci = sis_old_port_base(adev);
 	u16 timing;
 
 	const u16 mwdma_bits[] = { 0x707, 0x202, 0x202 };
@@ -418,7 +367,7 @@ static void sis_66_set_dmamode (struct ata_port *ap, struct ata_device *adev)
 {
 	struct pci_dev *pdev	= to_pci_dev(ap->host->dev);
 	int speed = adev->dma_mode - XFER_MW_DMA_0;
-	int drive_pci = sis_port_base(adev);
+	int drive_pci = sis_old_port_base(adev);
 	u16 timing;
 
 	const u16 mwdma_bits[] = { 0x707, 0x202, 0x202 };
@@ -429,12 +378,12 @@ static void sis_66_set_dmamode (struct ata_port *ap, struct ata_device *adev)
 	if (adev->dma_mode < XFER_UDMA_0) {
 		/* bits 3-0 hold recovery timing bits 8-10 active timing and
 		   the higer bits are dependant on the device, bit 15 udma */
-		timing &= ~ 0x870F;
+		timing &= ~0x870F;
 		timing |= mwdma_bits[speed];
 	} else {
 		/* Bit 15 is UDMA on/off, bit 12-14 are cycle time */
 		speed = adev->dma_mode - XFER_UDMA_0;
-		timing &= ~0x6000;
+		timing &= ~0xF000;
 		timing |= udma_bits[speed];
 	}
 	pci_write_config_word(pdev, drive_pci, timing);
@@ -456,22 +405,22 @@ static void sis_100_set_dmamode (struct ata_port *ap, struct ata_device *adev)
 {
 	struct pci_dev *pdev	= to_pci_dev(ap->host->dev);
 	int speed = adev->dma_mode - XFER_MW_DMA_0;
-	int drive_pci = sis_port_base(adev);
-	u16 timing;
+	int drive_pci = sis_old_port_base(adev);
+	u8 timing;
 
-	const u16 udma_bits[]  = { 0x8B00, 0x8700, 0x8500, 0x8300, 0x8200, 0x8100};
+	const u8 udma_bits[]  = { 0x8B, 0x87, 0x85, 0x83, 0x82, 0x81};
 
-	pci_read_config_word(pdev, drive_pci, &timing);
+	pci_read_config_byte(pdev, drive_pci + 1, &timing);
 
 	if (adev->dma_mode < XFER_UDMA_0) {
 		/* NOT SUPPORTED YET: NEED DATA SHEET. DITTO IN OLD DRIVER */
 	} else {
-		/* Bit 15 is UDMA on/off, bit 12-14 are cycle time */
+		/* Bit 7 is UDMA on/off, bit 0-3 are cycle time */
 		speed = adev->dma_mode - XFER_UDMA_0;
-		timing &= ~0x0F00;
+		timing &= ~0x8F;
 		timing |= udma_bits[speed];
 	}
-	pci_write_config_word(pdev, drive_pci, timing);
+	pci_write_config_byte(pdev, drive_pci + 1, timing);
 }
 
 /**
@@ -491,22 +440,22 @@ static void sis_133_early_set_dmamode (struct ata_port *ap, struct ata_device *a
 {
 	struct pci_dev *pdev	= to_pci_dev(ap->host->dev);
 	int speed = adev->dma_mode - XFER_MW_DMA_0;
-	int drive_pci = sis_port_base(adev);
-	u16 timing;
+	int drive_pci = sis_old_port_base(adev);
+	u8 timing;
+	/* Low 4 bits are timing */
+	static const u8 udma_bits[]  = { 0x8F, 0x8A, 0x87, 0x85, 0x83, 0x82, 0x81};
 
-	const u16 udma_bits[]  = { 0x8F00, 0x8A00, 0x8700, 0x8500, 0x8300, 0x8200, 0x8100};
-
-	pci_read_config_word(pdev, drive_pci, &timing);
+	pci_read_config_byte(pdev, drive_pci + 1, &timing);
 
 	if (adev->dma_mode < XFER_UDMA_0) {
 		/* NOT SUPPORTED YET: NEED DATA SHEET. DITTO IN OLD DRIVER */
 	} else {
-		/* Bit 15 is UDMA on/off, bit 12-14 are cycle time */
+		/* Bit 7 is UDMA on/off, bit 0-3 are cycle time */
 		speed = adev->dma_mode - XFER_UDMA_0;
-		timing &= ~0x0F00;
+		timing &= ~0x8F;
 		timing |= udma_bits[speed];
 	}
-	pci_write_config_word(pdev, drive_pci, timing);
+	pci_write_config_byte(pdev, drive_pci + 1, timing);
 }
 
 /**
@@ -531,8 +480,8 @@ static void sis_133_set_dmamode (struct ata_port *ap, struct ata_device *adev)
 	u32 reg54;
 
 	/* bits 4- cycle time 8 - cvs time */
-	const u32 timing_u100[] = { 0x6B0, 0x470, 0x350, 0x140, 0x120, 0x110, 0x000 };
-	const u32 timing_u133[] = { 0x9F0, 0x6A0, 0x470, 0x250, 0x230, 0x220, 0x210 };
+	static const u32 timing_u100[] = { 0x6B0, 0x470, 0x350, 0x140, 0x120, 0x110, 0x000 };
+	static const u32 timing_u133[] = { 0x9F0, 0x6A0, 0x470, 0x250, 0x230, 0x220, 0x210 };
 
 	/* If bit 14 is set then the registers are mapped at 0x70 not 0x40 */
 	pci_read_config_dword(pdev, 0x54, &reg54);
@@ -575,10 +524,6 @@ static struct scsi_host_template sis_sht = {
 	.slave_configure	= ata_scsi_slave_config,
 	.slave_destroy		= ata_scsi_slave_destroy,
 	.bios_param		= ata_std_bios_param,
-#ifdef CONFIG_PM
-	.resume			= ata_scsi_device_resume,
-	.suspend		= ata_scsi_device_suspend,
-#endif
 };
 
 static const struct ata_port_operations sis_133_ops = {
@@ -595,8 +540,9 @@ static const struct ata_port_operations sis_133_ops = {
 
 	.freeze			= ata_bmdma_freeze,
 	.thaw			= ata_bmdma_thaw,
-	.error_handler		= sis_133_error_handler,
+	.error_handler		= sis_error_handler,
 	.post_internal_cmd	= ata_bmdma_post_internal_cmd,
+	.cable_detect		= sis_133_cable_detect,
 
 	.bmdma_setup		= ata_bmdma_setup,
 	.bmdma_start		= ata_bmdma_start,
@@ -628,8 +574,9 @@ static const struct ata_port_operations sis_133_early_ops = {
 
 	.freeze			= ata_bmdma_freeze,
 	.thaw			= ata_bmdma_thaw,
-	.error_handler		= sis_66_error_handler,
+	.error_handler		= sis_error_handler,
 	.post_internal_cmd	= ata_bmdma_post_internal_cmd,
+	.cable_detect		= sis_66_cable_detect,
 
 	.bmdma_setup		= ata_bmdma_setup,
 	.bmdma_start		= ata_bmdma_start,
@@ -661,9 +608,9 @@ static const struct ata_port_operations sis_100_ops = {
 
 	.freeze			= ata_bmdma_freeze,
 	.thaw			= ata_bmdma_thaw,
-	.error_handler		= sis_66_error_handler,
+	.error_handler		= sis_error_handler,
 	.post_internal_cmd	= ata_bmdma_post_internal_cmd,
-
+	.cable_detect		= sis_66_cable_detect,
 
 	.bmdma_setup		= ata_bmdma_setup,
 	.bmdma_start		= ata_bmdma_start,
@@ -692,10 +639,11 @@ static const struct ata_port_operations sis_66_ops = {
 	.check_status		= ata_check_status,
 	.exec_command		= ata_exec_command,
 	.dev_select		= ata_std_dev_select,
+	.cable_detect		= sis_66_cable_detect,
 
 	.freeze			= ata_bmdma_freeze,
 	.thaw			= ata_bmdma_thaw,
-	.error_handler		= sis_66_error_handler,
+	.error_handler		= sis_error_handler,
 	.post_internal_cmd	= ata_bmdma_post_internal_cmd,
 
 	.bmdma_setup		= ata_bmdma_setup,
@@ -728,8 +676,9 @@ static const struct ata_port_operations sis_old_ops = {
 
 	.freeze			= ata_bmdma_freeze,
 	.thaw			= ata_bmdma_thaw,
-	.error_handler		= sis_old_error_handler,
+	.error_handler		= sis_error_handler,
 	.post_internal_cmd	= ata_bmdma_post_internal_cmd,
+	.cable_detect		= ata_cable_40wire,
 
 	.bmdma_setup		= ata_bmdma_setup,
 	.bmdma_start		= ata_bmdma_start,
@@ -747,7 +696,7 @@ static const struct ata_port_operations sis_old_ops = {
 	.port_start		= ata_port_start,
 };
 
-static struct ata_port_info sis_info = {
+static const struct ata_port_info sis_info = {
 	.sht		= &sis_sht,
 	.flags		= ATA_FLAG_SLAVE_POSS | ATA_FLAG_SRST,
 	.pio_mask	= 0x1f,	/* pio0-4 */
@@ -755,7 +704,7 @@ static struct ata_port_info sis_info = {
 	.udma_mask	= 0,
 	.port_ops	= &sis_old_ops,
 };
-static struct ata_port_info sis_info33 = {
+static const struct ata_port_info sis_info33 = {
 	.sht		= &sis_sht,
 	.flags		= ATA_FLAG_SLAVE_POSS | ATA_FLAG_SRST,
 	.pio_mask	= 0x1f,	/* pio0-4 */
@@ -763,35 +712,35 @@ static struct ata_port_info sis_info33 = {
 	.udma_mask	= ATA_UDMA2,	/* UDMA 33 */
 	.port_ops	= &sis_old_ops,
 };
-static struct ata_port_info sis_info66 = {
+static const struct ata_port_info sis_info66 = {
 	.sht		= &sis_sht,
 	.flags		= ATA_FLAG_SLAVE_POSS | ATA_FLAG_SRST,
 	.pio_mask	= 0x1f,	/* pio0-4 */
 	.udma_mask	= ATA_UDMA4,	/* UDMA 66 */
 	.port_ops	= &sis_66_ops,
 };
-static struct ata_port_info sis_info100 = {
+static const struct ata_port_info sis_info100 = {
 	.sht		= &sis_sht,
 	.flags		= ATA_FLAG_SLAVE_POSS | ATA_FLAG_SRST,
 	.pio_mask	= 0x1f,	/* pio0-4 */
 	.udma_mask	= ATA_UDMA5,
 	.port_ops	= &sis_100_ops,
 };
-static struct ata_port_info sis_info100_early = {
+static const struct ata_port_info sis_info100_early = {
 	.sht		= &sis_sht,
 	.flags		= ATA_FLAG_SLAVE_POSS | ATA_FLAG_SRST,
 	.udma_mask	= ATA_UDMA5,
 	.pio_mask	= 0x1f,	/* pio0-4 */
 	.port_ops	= &sis_66_ops,
 };
-struct ata_port_info sis_info133 = {
+const struct ata_port_info sis_info133 = {
 	.sht		= &sis_sht,
 	.flags		= ATA_FLAG_SLAVE_POSS | ATA_FLAG_SRST,
 	.pio_mask	= 0x1f,	/* pio0-4 */
 	.udma_mask	= ATA_UDMA6,
 	.port_ops	= &sis_133_ops,
 };
-static struct ata_port_info sis_info133_early = {
+static const struct ata_port_info sis_info133_early = {
 	.sht		= &sis_sht,
 	.flags		= ATA_FLAG_SLAVE_POSS | ATA_FLAG_SRST,
 	.pio_mask	= 0x1f,	/* pio0-4 */
@@ -874,8 +823,8 @@ static void sis_fixup(struct pci_dev *pdev, struct sis_chipset *sis)
 static int sis_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 {
 	static int printed_version;
-	static struct ata_port_info *port_info[2];
-	struct ata_port_info *port;
+	struct ata_port_info port;
+	const struct ata_port_info *ppi[] = { &port, NULL };
 	struct pci_dev *host = NULL;
 	struct sis_chipset *chipset = NULL;
 	struct sis_chipset *sets;
@@ -1015,13 +964,12 @@ static int sis_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	if (chipset == NULL)
 		return -ENODEV;
 
-	port = chipset->info;
-	port->private_data = chipset;
+	port = *chipset->info;
+	port.private_data = chipset;
 
 	sis_fixup(pdev, chipset);
 
-	port_info[0] = port_info[1] = port;
-	return ata_pci_init_one(pdev, port_info, 2);
+	return ata_pci_init_one(pdev, ppi);
 }
 
 static const struct pci_device_id sis_pci_tbl[] = {

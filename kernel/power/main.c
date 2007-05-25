@@ -30,7 +30,6 @@
 DEFINE_MUTEX(pm_mutex);
 
 struct pm_ops *pm_ops;
-suspend_disk_method_t pm_disk_mode = PM_DISK_PLATFORM;
 
 /**
  *	pm_set_ops - Set the global power method table. 
@@ -43,6 +42,19 @@ void pm_set_ops(struct pm_ops * ops)
 	pm_ops = ops;
 	mutex_unlock(&pm_mutex);
 }
+
+/**
+ * pm_valid_only_mem - generic memory-only valid callback
+ *
+ * pm_ops drivers that implement mem suspend only and only need
+ * to check for that in their .valid callback can use this instead
+ * of rolling their own .valid callback.
+ */
+int pm_valid_only_mem(suspend_state_t state)
+{
+	return state == PM_SUSPEND_MEM;
+}
+
 
 static inline void pm_finish(suspend_state_t state)
 {
@@ -85,25 +97,26 @@ static int suspend_prepare(suspend_state_t state)
 		}
 	}
 
-	if (pm_ops->prepare) {
-		if ((error = pm_ops->prepare(state)))
-			goto Thaw;
-	}
-
 	suspend_console();
 	error = device_suspend(PMSG_SUSPEND);
 	if (error) {
 		printk(KERN_ERR "Some devices failed to suspend\n");
-		goto Resume_devices;
+		goto Resume_console;
 	}
+	if (pm_ops->prepare) {
+		if ((error = pm_ops->prepare(state)))
+			goto Resume_devices;
+	}
+
 	error = disable_nonboot_cpus();
 	if (!error)
 		return 0;
 
 	enable_nonboot_cpus();
- Resume_devices:
 	pm_finish(state);
+ Resume_devices:
 	device_resume();
+ Resume_console:
 	resume_console();
  Thaw:
 	thaw_processes();
@@ -111,13 +124,24 @@ static int suspend_prepare(suspend_state_t state)
 	return error;
 }
 
+/* default implementation */
+void __attribute__ ((weak)) arch_suspend_disable_irqs(void)
+{
+	local_irq_disable();
+}
+
+/* default implementation */
+void __attribute__ ((weak)) arch_suspend_enable_irqs(void)
+{
+	local_irq_enable();
+}
 
 int suspend_enter(suspend_state_t state)
 {
 	int error = 0;
-	unsigned long flags;
 
-	local_irq_save(flags);
+	arch_suspend_disable_irqs();
+	BUG_ON(!irqs_disabled());
 
 	if ((error = device_power_down(PMSG_SUSPEND))) {
 		printk(KERN_ERR "Some devices failed to power down\n");
@@ -126,7 +150,8 @@ int suspend_enter(suspend_state_t state)
 	error = pm_ops->enter(state);
 	device_power_up();
  Done:
-	local_irq_restore(flags);
+	arch_suspend_enable_irqs();
+	BUG_ON(irqs_disabled());
 	return error;
 }
 
@@ -155,22 +180,14 @@ static void suspend_finish(suspend_state_t state)
 static const char * const pm_states[PM_SUSPEND_MAX] = {
 	[PM_SUSPEND_STANDBY]	= "standby",
 	[PM_SUSPEND_MEM]	= "mem",
-#ifdef CONFIG_SOFTWARE_SUSPEND
-	[PM_SUSPEND_DISK]	= "disk",
-#endif
 };
 
 static inline int valid_state(suspend_state_t state)
 {
-	/* Suspend-to-disk does not really need low-level support.
-	 * It can work with reboot if needed. */
-	if (state == PM_SUSPEND_DISK)
-		return 1;
-
-	/* all other states need lowlevel support and need to be
-	 * valid to the lowlevel implementation, no valid callback
-	 * implies that all are valid. */
-	if (!pm_ops || (pm_ops->valid && !pm_ops->valid(state)))
+	/* All states need lowlevel support and need to be valid
+	 * to the lowlevel implementation, no valid callback
+	 * implies that none are valid. */
+	if (!pm_ops || !pm_ops->valid || !pm_ops->valid(state))
 		return 0;
 	return 1;
 }
@@ -196,11 +213,6 @@ static int enter_state(suspend_state_t state)
 	if (!mutex_trylock(&pm_mutex))
 		return -EBUSY;
 
-	if (state == PM_SUSPEND_DISK) {
-		error = pm_suspend_disk();
-		goto Unlock;
-	}
-
 	pr_debug("PM: Preparing system for %s sleep\n", pm_states[state]);
 	if ((error = suspend_prepare(state)))
 		goto Unlock;
@@ -215,19 +227,10 @@ static int enter_state(suspend_state_t state)
 	return error;
 }
 
-/*
- * This is main interface to the outside world. It needs to be
- * called from process context.
- */
-int software_suspend(void)
-{
-	return enter_state(PM_SUSPEND_DISK);
-}
-
 
 /**
  *	pm_suspend - Externally visible function for suspending system.
- *	@state:		Enumarted value of state to enter.
+ *	@state:		Enumerated value of state to enter.
  *
  *	Determine whether or not value is within range, get state 
  *	structure, and enter (above).
@@ -256,7 +259,7 @@ decl_subsys(power,NULL,NULL);
  *	proper enumerated value, and initiates a suspend transition.
  */
 
-static ssize_t state_show(struct subsystem * subsys, char * buf)
+static ssize_t state_show(struct kset *kset, char *buf)
 {
 	int i;
 	char * s = buf;
@@ -265,11 +268,17 @@ static ssize_t state_show(struct subsystem * subsys, char * buf)
 		if (pm_states[i] && valid_state(i))
 			s += sprintf(s,"%s ", pm_states[i]);
 	}
-	s += sprintf(s,"\n");
+#ifdef CONFIG_SOFTWARE_SUSPEND
+	s += sprintf(s, "%s\n", "disk");
+#else
+	if (s != buf)
+		/* convert the last space to a newline */
+		*(s-1) = '\n';
+#endif
 	return (s - buf);
 }
 
-static ssize_t state_store(struct subsystem * subsys, const char * buf, size_t n)
+static ssize_t state_store(struct kset *kset, const char *buf, size_t n)
 {
 	suspend_state_t state = PM_SUSPEND_STANDBY;
 	const char * const *s;
@@ -280,8 +289,14 @@ static ssize_t state_store(struct subsystem * subsys, const char * buf, size_t n
 	p = memchr(buf, '\n', n);
 	len = p ? p - buf : n;
 
+	/* First, check if we are requested to hibernate */
+	if (len == 4 && !strncmp(buf, "disk", len)) {
+		error = hibernate();
+		return error ? error : n;
+	}
+
 	for (s = &pm_states[state]; state < PM_SUSPEND_MAX; s++, state++) {
-		if (*s && !strncmp(buf, *s, len))
+		if (*s && len == strlen(*s) && !strncmp(buf, *s, len))
 			break;
 	}
 	if (state < PM_SUSPEND_MAX && *s)
@@ -296,13 +311,13 @@ power_attr(state);
 #ifdef CONFIG_PM_TRACE
 int pm_trace_enabled;
 
-static ssize_t pm_trace_show(struct subsystem * subsys, char * buf)
+static ssize_t pm_trace_show(struct kset *kset, char *buf)
 {
 	return sprintf(buf, "%d\n", pm_trace_enabled);
 }
 
 static ssize_t
-pm_trace_store(struct subsystem * subsys, const char * buf, size_t n)
+pm_trace_store(struct kset *kset, const char *buf, size_t n)
 {
 	int val;
 
@@ -336,7 +351,7 @@ static int __init pm_init(void)
 {
 	int error = subsystem_register(&power_subsys);
 	if (!error)
-		error = sysfs_create_group(&power_subsys.kset.kobj,&attr_group);
+		error = sysfs_create_group(&power_subsys.kobj,&attr_group);
 	return error;
 }
 

@@ -190,23 +190,6 @@ scc_ide_outsl(unsigned long port, void *addr, u32 count)
 }
 
 /**
- *	scc_ratemask	-	Compute available modes
- *	@drive: IDE drive
- *
- *	Compute the available speeds for the devices on the interface.
- *	Enforce UDMA33 as a limit if there is no 80pin cable present.
- */
-
-static u8 scc_ratemask(ide_drive_t *drive)
-{
-	u8 mode = 4;
-
-	if (!eighty_ninty_three(drive))
-		mode = min(mode, (u8)1);
-	return mode;
-}
-
-/**
  *	scc_tuneproc	-	tune a drive PIO mode
  *	@drive: drive to tune
  *	@mode_wanted: the target operating mode
@@ -273,7 +256,7 @@ static void scc_tuneproc(ide_drive_t *drive, byte mode_wanted)
 static int scc_tune_chipset(ide_drive_t *drive, byte xferspeed)
 {
 	ide_hwif_t *hwif = HWIF(drive);
-	u8 speed = ide_rate_filter(scc_ratemask(drive), xferspeed);
+	u8 speed = ide_rate_filter(drive, xferspeed);
 	struct scc_ports *ports = ide_get_hwifdata(hwif);
 	unsigned long ctl_base = ports->ctl;
 	unsigned long cckctrl_port = ctl_base + 0xff0;
@@ -339,26 +322,6 @@ static int scc_tune_chipset(ide_drive_t *drive, byte xferspeed)
 }
 
 /**
- *	scc_config_chipset_for_dma	-	configure for DMA
- *	@drive: drive to configure
- *
- *	Called by scc_config_drive_for_dma().
- */
-
-static int scc_config_chipset_for_dma(ide_drive_t *drive)
-{
-	u8 speed = ide_dma_speed(drive, scc_ratemask(drive));
-
-	if (!speed)
-		return 0;
-
-	if (scc_tune_chipset(drive, speed))
-		return 0;
-
-	return ide_dma_enable(drive);
-}
-
-/**
  *	scc_configure_drive_for_dma	-	set up for DMA transfers
  *	@drive: drive we are going to set up
  *
@@ -371,7 +334,7 @@ static int scc_config_chipset_for_dma(ide_drive_t *drive)
 
 static int scc_config_drive_for_dma(ide_drive_t *drive)
 {
-	if (ide_use_dma(drive) && scc_config_chipset_for_dma(drive))
+	if (ide_tune_dma(drive))
 		return 0;
 
 	if (ide_use_fast_pio(drive))

@@ -143,7 +143,7 @@ h7202_timer_interrupt(int irq, void *dev_id)
 }
 
 /*
- * mask multiplexed timer irq's
+ * mask multiplexed timer IRQs
  */
 static void inline mask_timerx_irq (u32 irq)
 {
@@ -153,7 +153,7 @@ static void inline mask_timerx_irq (u32 irq)
 }
 
 /*
- * unmask multiplexed timer irq's
+ * unmask multiplexed timer IRQs
  */
 static void inline unmask_timerx_irq (u32 irq)
 {
@@ -170,7 +170,7 @@ static struct irq_chip h7202_timerx_chip = {
 
 static struct irqaction h7202_timer_irq = {
 	.name		= "h7202 Timer Tick",
-	.flags		= IRQF_DISABLED | IRQF_TIMER,
+	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
 	.handler	= h7202_timer_interrupt,
 };
 

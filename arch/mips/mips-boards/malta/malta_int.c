@@ -42,8 +42,6 @@
 #include <asm/mips-boards/msc01_pci.h>
 #include <asm/msc01_ic.h>
 
-extern void mips_timer_interrupt(void);
-
 static DEFINE_SPINLOCK(mips_irq_lock);
 
 static inline int mips_pcibios_iack(void)
@@ -85,7 +83,7 @@ static inline int mips_pcibios_iack(void)
 		dummy = BONITO_PCIMAP_CFG;
 		iob();    /* sync */
 
-		irq = *(volatile u32 *)(_pcictrl_bonito_pcicfg);
+		irq = readl((u32 *)_pcictrl_bonito_pcicfg);
 		iob();    /* sync */
 		irq &= 0xff;
 		BONITO_PCIMAP_CFG = 0;
@@ -313,16 +311,21 @@ void __init arch_init_irq(void)
 	if (!cpu_has_veic)
 		mips_cpu_irq_init();
 
-        switch(mips_revision_corid) {
-        case MIPS_REVISION_CORID_CORE_MSC:
-        case MIPS_REVISION_CORID_CORE_FPGA2:
-        case MIPS_REVISION_CORID_CORE_FPGA3:
-        case MIPS_REVISION_CORID_CORE_24K:
-        case MIPS_REVISION_CORID_CORE_EMUL_MSC:
+        switch(mips_revision_sconid) {
+        case MIPS_REVISION_SCON_SOCIT:
+        case MIPS_REVISION_SCON_ROCIT:
 		if (cpu_has_veic)
-			init_msc_irqs (MSC01E_INT_BASE, msc_eicirqmap, msc_nr_eicirqs);
+			init_msc_irqs (MIPS_MSC01_IC_REG_BASE, MSC01E_INT_BASE, msc_eicirqmap, msc_nr_eicirqs);
 		else
-			init_msc_irqs (MSC01C_INT_BASE, msc_irqmap, msc_nr_irqs);
+			init_msc_irqs (MIPS_MSC01_IC_REG_BASE, MSC01C_INT_BASE, msc_irqmap, msc_nr_irqs);
+		break;
+
+        case MIPS_REVISION_SCON_SOCITSC:
+        case MIPS_REVISION_SCON_SOCITSCP:
+		if (cpu_has_veic)
+			init_msc_irqs (MIPS_SOCITSC_IC_REG_BASE, MSC01E_INT_BASE, msc_eicirqmap, msc_nr_eicirqs);
+		else
+			init_msc_irqs (MIPS_SOCITSC_IC_REG_BASE, MSC01C_INT_BASE, msc_irqmap, msc_nr_irqs);
 	}
 
 	if (cpu_has_veic) {

@@ -18,7 +18,7 @@ gianfar_driver-objs := gianfar.o \
 		gianfar_sysfs.o
 
 obj-$(CONFIG_UCC_GETH) += ucc_geth_driver.o
-ucc_geth_driver-objs := ucc_geth.o ucc_geth_phy.o
+ucc_geth_driver-objs := ucc_geth.o ucc_geth_mii.o
 
 #
 # link order important here
@@ -202,6 +202,7 @@ obj-$(CONFIG_DM9000) += dm9000.o
 obj-$(CONFIG_FEC_8XX) += fec_8xx/
 obj-$(CONFIG_FEC_MPC52xx) += fec_mpc52xx/
 obj-$(CONFIG_PASEMI_MAC) += pasemi_mac.o
+obj-$(CONFIG_MLX4_CORE) += mlx4/
 
 obj-$(CONFIG_MACB) += macb.o
 
@@ -211,7 +212,15 @@ obj-$(CONFIG_TR) += tokenring/
 obj-$(CONFIG_WAN) += wan/
 obj-$(CONFIG_ARCNET) += arcnet/
 obj-$(CONFIG_NET_PCMCIA) += pcmcia/
-obj-$(CONFIG_NET_RADIO) += wireless/
+
+obj-$(CONFIG_USB_CATC)          += usb/
+obj-$(CONFIG_USB_KAWETH)        += usb/
+obj-$(CONFIG_USB_PEGASUS)       += usb/
+obj-$(CONFIG_USB_RTL8150)       += usb/
+obj-$(CONFIG_USB_USBNET)        += usb/
+obj-$(CONFIG_USB_ZD1201)        += usb/
+
+obj-y += wireless/
 obj-$(CONFIG_NET_TULIP) += tulip/
 obj-$(CONFIG_HAMRADIO) += hamradio/
 obj-$(CONFIG_IRDA) += irda/

@@ -273,11 +273,17 @@ static __u16 product;
 
 /* struct ftdi_sio_quirk is used by devices requiring special attention. */
 struct ftdi_sio_quirk {
+	int (*probe)(struct usb_serial *);
 	void (*setup)(struct usb_serial *); /* Special settings during startup. */
 };
 
+static int   ftdi_olimex_probe		(struct usb_serial *serial);
 static void  ftdi_USB_UIRT_setup	(struct usb_serial *serial);
 static void  ftdi_HE_TIRA1_setup	(struct usb_serial *serial);
+
+static struct ftdi_sio_quirk ftdi_olimex_quirk = {
+	.probe	= ftdi_olimex_probe,
+};
 
 static struct ftdi_sio_quirk ftdi_USB_UIRT_quirk = {
 	.setup = ftdi_USB_UIRT_setup,
@@ -319,6 +325,7 @@ static struct usb_device_id id_table_combined [] = {
 	{ USB_DEVICE(FTDI_VID, FTDI_8U2232C_PID) },
 	{ USB_DEVICE(FTDI_VID, FTDI_MICRO_CHAMELEON_PID) },
 	{ USB_DEVICE(FTDI_VID, FTDI_RELAIS_PID) },
+	{ USB_DEVICE(FTDI_VID, FTDI_OPENDCC_PID) },
 	{ USB_DEVICE(INTERBIOMETRICS_VID, INTERBIOMETRICS_IOBOARD_PID) },
 	{ USB_DEVICE(INTERBIOMETRICS_VID, INTERBIOMETRICS_MINI_IOBOARD_PID) },
 	{ USB_DEVICE(FTDI_VID, FTDI_XF_632_PID) },
@@ -342,6 +349,7 @@ static struct usb_device_id id_table_combined [] = {
 	{ USB_DEVICE(FTDI_VID, FTDI_PERLE_ULTRAPORT_PID) },
 	{ USB_DEVICE(FTDI_VID, FTDI_PIEGROUP_PID) },
 	{ USB_DEVICE(FTDI_VID, FTDI_TNC_X_PID) },
+	{ USB_DEVICE(FTDI_VID, FTDI_USBX_707_PID) },
 	{ USB_DEVICE(SEALEVEL_VID, SEALEVEL_2101_PID) },
 	{ USB_DEVICE(SEALEVEL_VID, SEALEVEL_2102_PID) },
 	{ USB_DEVICE(SEALEVEL_VID, SEALEVEL_2103_PID) },
@@ -524,6 +532,9 @@ static struct usb_device_id id_table_combined [] = {
 	{ USB_DEVICE(FTDI_VID, FTDI_TACTRIX_OPENPORT_13U_PID) },
 	{ USB_DEVICE(ELEKTOR_VID, ELEKTOR_FT323R_PID) },
 	{ USB_DEVICE(TELLDUS_VID, TELLDUS_TELLSTICK_PID) },
+	{ USB_DEVICE(FTDI_VID, FTDI_MAXSTREAM_PID) },
+	{ USB_DEVICE(OLIMEX_VID, OLIMEX_ARM_USB_OCD_PID),
+		.driver_info = (kernel_ulong_t)&ftdi_olimex_quirk },
 	{ },					/* Optional parameter entry */
 	{ }					/* Terminating entry */
 };
@@ -668,7 +679,7 @@ static struct usb_serial_driver ftdi_sio_device = {
 
 /*
  * ***************************************************************************
- * Utlity functions
+ * Utility functions
  * ***************************************************************************
  */
 
@@ -1170,9 +1181,17 @@ static void remove_sysfs_attrs(struct usb_serial_port *port)
 /* Probe function to check for special devices */
 static int ftdi_sio_probe (struct usb_serial *serial, const struct usb_device_id *id)
 {
+	struct ftdi_sio_quirk *quirk = (struct ftdi_sio_quirk *)id->driver_info;
+
+	if (quirk && quirk->probe) {
+		int ret = quirk->probe(serial);
+		if (ret != 0)
+			return ret;
+	}
+
 	usb_set_serial_data(serial, (void *)id->driver_info);
 
-	return (0);
+	return 0;
 }
 
 static int ftdi_sio_port_probe(struct usb_serial_port *port)
@@ -1267,6 +1286,24 @@ static void ftdi_HE_TIRA1_setup (struct usb_serial *serial)
 	priv->force_rtscts = 1;
 } /* ftdi_HE_TIRA1_setup */
 
+/*
+ * First port on Olimex arm-usb-ocd is reserved for JTAG interface
+ * and can be accessed from userspace using openocd.
+ */
+static int ftdi_olimex_probe(struct usb_serial *serial)
+{
+	struct usb_device *udev = serial->dev;
+	struct usb_interface *interface = serial->interface;
+
+	dbg("%s",__FUNCTION__);
+
+	if (interface == udev->actconfig->interface[0]) {
+		info("Ignoring reserved serial port on Olimex arm-usb-ocd\n");
+		return -ENODEV;
+	}
+
+	return 0;
+}
 
 /* ftdi_shutdown is called from usbserial:usb_serial_disconnect
  *   it is called when the usb device is disconnected
@@ -1433,6 +1470,7 @@ static int ftdi_write (struct usb_serial_port *port,
 		dbg("%s - write limit hit\n", __FUNCTION__);
 		return 0;
 	}
+	priv->tx_outstanding_urbs++;
 	spin_unlock_irqrestore(&priv->tx_lock, flags);
 
 	data_offset = priv->write_offset;
@@ -1450,14 +1488,15 @@ static int ftdi_write (struct usb_serial_port *port,
 	buffer = kmalloc (transfer_size, GFP_ATOMIC);
 	if (!buffer) {
 		err("%s ran out of kernel memory for urb ...", __FUNCTION__);
-		return -ENOMEM;
+		count = -ENOMEM;
+		goto error_no_buffer;
 	}
 
 	urb = usb_alloc_urb(0, GFP_ATOMIC);
 	if (!urb) {
 		err("%s - no more free urbs", __FUNCTION__);
-		kfree (buffer);
-		return -ENOMEM;
+		count = -ENOMEM;
+		goto error_no_urb;
 	}
 
 	/* Copy data */
@@ -1499,10 +1538,9 @@ static int ftdi_write (struct usb_serial_port *port,
 	if (status) {
 		err("%s - failed submitting write urb, error %d", __FUNCTION__, status);
 		count = status;
-		kfree (buffer);
+		goto error;
 	} else {
 		spin_lock_irqsave(&priv->tx_lock, flags);
-		++priv->tx_outstanding_urbs;
 		priv->tx_outstanding_bytes += count;
 		priv->tx_bytes += count;
 		spin_unlock_irqrestore(&priv->tx_lock, flags);
@@ -1510,9 +1548,18 @@ static int ftdi_write (struct usb_serial_port *port,
 
 	/* we are done with this urb, so let the host driver
 	 * really free it when it is finished with it */
-	usb_free_urb (urb);
+	usb_free_urb(urb);
 
 	dbg("%s write returning: %d", __FUNCTION__, count);
+	return count;
+error:
+	usb_free_urb(urb);
+error_no_urb:
+	kfree (buffer);
+error_no_buffer:
+	spin_lock_irqsave(&priv->tx_lock, flags);
+	priv->tx_outstanding_urbs--;
+	spin_unlock_irqrestore(&priv->tx_lock, flags);
 	return count;
 } /* ftdi_write */
 

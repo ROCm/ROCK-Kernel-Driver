@@ -1013,14 +1013,14 @@ static struct {
 	u64 latest_fw;
 	u32 flags;
 } mthca_hca_table[] = {
-	[TAVOR]        = { .latest_fw = MTHCA_FW_VER(3, 4, 0),
+	[TAVOR]        = { .latest_fw = MTHCA_FW_VER(3, 5, 0),
 			   .flags     = 0 },
-	[ARBEL_COMPAT] = { .latest_fw = MTHCA_FW_VER(4, 7, 600),
+	[ARBEL_COMPAT] = { .latest_fw = MTHCA_FW_VER(4, 8, 200),
 			   .flags     = MTHCA_FLAG_PCIE },
-	[ARBEL_NATIVE] = { .latest_fw = MTHCA_FW_VER(5, 1, 400),
+	[ARBEL_NATIVE] = { .latest_fw = MTHCA_FW_VER(5, 2, 0),
 			   .flags     = MTHCA_FLAG_MEMFREE |
 					MTHCA_FLAG_PCIE },
-	[SINAI]        = { .latest_fw = MTHCA_FW_VER(1, 1, 0),
+	[SINAI]        = { .latest_fw = MTHCA_FW_VER(1, 2, 0),
 			   .flags     = MTHCA_FLAG_MEMFREE |
 					MTHCA_FLAG_PCIE    |
 					MTHCA_FLAG_SINAI_OPT }
@@ -1135,7 +1135,7 @@ static int __mthca_init_one(struct pci_dev *pdev, int hca_type)
 		goto err_cmd;
 
 	if (mdev->fw_ver < mthca_hca_table[hca_type].latest_fw) {
-		mthca_warn(mdev, "HCA FW version %d.%d.%d is old (%d.%d.%d is current).\n",
+		mthca_warn(mdev, "HCA FW version %d.%d.%3d is old (%d.%d.%3d is current).\n",
 			   (int) (mdev->fw_ver >> 32), (int) (mdev->fw_ver >> 16) & 0xffff,
 			   (int) (mdev->fw_ver & 0xffff),
 			   (int) (mthca_hca_table[hca_type].latest_fw >> 32),
@@ -1250,12 +1250,14 @@ static void __mthca_remove_one(struct pci_dev *pdev)
 int __mthca_restart_one(struct pci_dev *pdev)
 {
 	struct mthca_dev *mdev;
+	int hca_type;
 
 	mdev = pci_get_drvdata(pdev);
 	if (!mdev)
 		return -ENODEV;
+	hca_type = mdev->hca_type;
 	__mthca_remove_one(pdev);
-	return __mthca_init_one(pdev, mdev->hca_type);
+	return __mthca_init_one(pdev, hca_type);
 }
 
 static int __devinit mthca_init_one(struct pci_dev *pdev,

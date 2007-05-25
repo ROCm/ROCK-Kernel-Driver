@@ -145,9 +145,7 @@ extern void acpi_reserve_bootmem(void);
 
 #endif /*CONFIG_ACPI_SLEEP*/
 
-#ifndef CONFIG_XEN
 #define ARCH_HAS_POWER_INIT	1
-#endif
 
 #endif /*__KERNEL__*/
 

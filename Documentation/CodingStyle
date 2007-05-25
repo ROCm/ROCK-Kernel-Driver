@@ -160,6 +160,21 @@ supply of new-lines on your screen is not a renewable resource (think
 25-line terminal screens here), you have more empty lines to put
 comments on.
 
+Do not unnecessarily use braces where a single statement will do.
+
+if (condition)
+	action();
+
+This does not apply if one branch of a conditional statement is a single
+statement. Use braces in both branches.
+
+if (condition) {
+	do_this();
+	do_that();
+} else {
+	otherwise();
+}
+
 		3.1:  Spaces
 
 Linux kernel style for use of spaces depends (mostly) on
@@ -480,29 +495,40 @@ re-formatting you may want to take a look at the man page.  But
 remember: "indent" is not a fix for bad programming.
 
 
-		Chapter 10: Configuration-files
+		Chapter 10: Kconfig configuration files
 
-For configuration options (arch/xxx/Kconfig, and all the Kconfig files),
-somewhat different indentation is used.
+For all of the Kconfig* configuration files throughout the source tree,
+the indentation is somewhat different.  Lines under a "config" definition
+are indented with one tab, while help text is indented an additional two
+spaces.  Example:
 
-Help text is indented with 2 spaces.
-
-if CONFIG_EXPERIMENTAL
-	tristate CONFIG_BOOM
-	default n
+config AUDIT
+	bool "Auditing support"
+	depends on NET
 	help
-	  Apply nitroglycerine inside the keyboard (DANGEROUS)
-	bool CONFIG_CHEER
-	depends on CONFIG_BOOM
-	default y
-	help
-	  Output nice messages when you explode
-endif
+	  Enable auditing infrastructure that can be used with another
+	  kernel subsystem, such as SELinux (which requires this for
+	  logging of avc messages output).  Does not do system-call
+	  auditing without CONFIG_AUDITSYSCALL.
 
-Generally, CONFIG_EXPERIMENTAL should surround all options not considered
-stable. All options that are known to trash data (experimental write-
-support for file-systems, for instance) should be denoted (DANGEROUS), other
-experimental options should be denoted (EXPERIMENTAL).
+Features that might still be considered unstable should be defined as
+dependent on "EXPERIMENTAL":
+
+config SLUB
+	depends on EXPERIMENTAL && !ARCH_USES_SLAB_PAGE_STRUCT
+	bool "SLUB (Unqueued Allocator)"
+	...
+
+while seriously dangerous features (such as write support for certain
+filesystems) should advertise this prominently in their prompt string:
+
+config ADFS_FS_RW
+	bool "ADFS write support (DANGEROUS)"
+	depends on ADFS_FS
+	...
+
+For full documentation on the configuration files, see the file
+Documentation/kbuild/kconfig-language.txt.
 
 
 		Chapter 11: Data structures
@@ -625,7 +651,7 @@ language.
 
 There appears to be a common misperception that gcc has a magic "make me
 faster" speedup option called "inline". While the use of inlines can be
-appropriate (for example as a means of replacing macros, see Chapter 11), it
+appropriate (for example as a means of replacing macros, see Chapter 12), it
 very often is not. Abundant use of the inline keyword leads to a much bigger
 kernel, which in turn slows the system as a whole down, due to a bigger
 icache footprint for the CPU and simply because there is less memory

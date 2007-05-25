@@ -34,7 +34,7 @@
 #include <linux/dmi.h>
 
 #define DRV_NAME "pata_ali"
-#define DRV_VERSION "0.7.3"
+#define DRV_VERSION "0.7.4"
 
 /*
  *	Cable special cases
@@ -90,59 +90,6 @@ static int ali_c2_cable_detect(struct ata_port *ap)
 }
 
 /**
- *	ali_early_error_handler	-	reset for eary chip
- *	@ap: ATA port
- *
- *	Handle the reset callback for the later chips with cable detect
- */
-
-static int ali_c2_pre_reset(struct ata_port *ap)
-{
-	ap->cbl = ali_c2_cable_detect(ap);
-	return ata_std_prereset(ap);
-}
-
-static void ali_c2_error_handler(struct ata_port *ap)
-{
-	ata_bmdma_drive_eh(ap, ali_c2_pre_reset,
-			       ata_std_softreset, NULL,
-			       ata_std_postreset);
-}
-
-/**
- *	ali_early_cable_detect	-	cable detection
- *	@ap: ATA port
- *
- *	Perform cable detection for older chipsets. This turns out to be
- *	rather easy to implement
- */
-
-static int ali_early_cable_detect(struct ata_port *ap)
-{
-	return ATA_CBL_PATA40;
-}
-
-/**
- *	ali_early_probe_init	-	reset for early chip
- *	@ap: ATA port
- *
- *	Handle the reset callback for the early (pre cable detect) chips.
- */
-
-static int ali_early_pre_reset(struct ata_port *ap)
-{
-	ap->cbl = ali_early_cable_detect(ap);
-	return ata_std_prereset(ap);
-}
-
-static void ali_early_error_handler(struct ata_port *ap)
-{
-	return ata_bmdma_drive_eh(ap, ali_early_pre_reset,
-				     ata_std_softreset, NULL,
-				     ata_std_postreset);
-}
-
-/**
  *	ali_20_filter		-	filter for earlier ALI DMA
  *	@ap: ALi ATA port
  *	@adev: attached device
@@ -151,7 +98,7 @@ static void ali_early_error_handler(struct ata_port *ap)
  *	fix that later on. Also ensure we do not do UDMA on WDC drives
  */
 
-static unsigned long ali_20_filter(const struct ata_port *ap, struct ata_device *adev, unsigned long mask)
+static unsigned long ali_20_filter(struct ata_device *adev, unsigned long mask)
 {
 	char model_num[ATA_ID_PROD_LEN + 1];
 	/* No DMA on anything but a disk for now */
@@ -160,7 +107,7 @@ static unsigned long ali_20_filter(const struct ata_port *ap, struct ata_device 
 	ata_id_c_string(adev->id, model_num, ATA_ID_PROD, sizeof(model_num));
 	if (strstr(model_num, "WDC"))
 		return mask &= ~ATA_MASK_UDMA;
-	return ata_pci_default_filter(ap, adev, mask);
+	return ata_pci_default_filter(adev, mask);
 }
 
 /**
@@ -314,7 +261,6 @@ static void ali_set_dmamode(struct ata_port *ap, struct ata_device *adev)
 
 /**
  *	ali_lock_sectors	-	Keep older devices to 255 sector mode
- *	@ap: ATA port
  *	@adev: Device
  *
  *	Called during the bus probe for each device that is found. We use
@@ -324,7 +270,7 @@ static void ali_set_dmamode(struct ata_port *ap, struct ata_device *adev)
  *	slower PIO methods
  */
 
-static void ali_lock_sectors(struct ata_port *ap, struct ata_device *adev)
+static void ali_lock_sectors(struct ata_device *adev)
 {
 	adev->max_sectors = 255;
 }
@@ -345,10 +291,6 @@ static struct scsi_host_template ali_sht = {
 	.slave_configure	= ata_scsi_slave_config,
 	.slave_destroy		= ata_scsi_slave_destroy,
 	.bios_param		= ata_std_bios_param,
-#ifdef CONFIG_PM
-	.resume			= ata_scsi_device_resume,
-	.suspend		= ata_scsi_device_suspend,
-#endif
 };
 
 /*
@@ -366,8 +308,9 @@ static struct ata_port_operations ali_early_port_ops = {
 
 	.freeze		= ata_bmdma_freeze,
 	.thaw		= ata_bmdma_thaw,
-	.error_handler	= ali_early_error_handler,
+	.error_handler	= ata_bmdma_error_handler,
 	.post_internal_cmd = ata_bmdma_post_internal_cmd,
+	.cable_detect	= ata_cable_40wire,
 
 	.qc_prep 	= ata_qc_prep,
 	.qc_issue	= ata_qc_issue_prot,
@@ -402,8 +345,9 @@ static struct ata_port_operations ali_20_port_ops = {
 
 	.freeze		= ata_bmdma_freeze,
 	.thaw		= ata_bmdma_thaw,
-	.error_handler	= ali_early_error_handler,
+	.error_handler	= ata_bmdma_error_handler,
 	.post_internal_cmd = ata_bmdma_post_internal_cmd,
+	.cable_detect	= ata_cable_40wire,
 
 	.bmdma_setup 	= ata_bmdma_setup,
 	.bmdma_start 	= ata_bmdma_start,
@@ -440,8 +384,9 @@ static struct ata_port_operations ali_c2_port_ops = {
 
 	.freeze		= ata_bmdma_freeze,
 	.thaw		= ata_bmdma_thaw,
-	.error_handler	= ali_c2_error_handler,
+	.error_handler	= ata_bmdma_error_handler,
 	.post_internal_cmd = ata_bmdma_post_internal_cmd,
+	.cable_detect	= ali_c2_cable_detect,
 
 	.bmdma_setup 	= ata_bmdma_setup,
 	.bmdma_start 	= ata_bmdma_start,
@@ -477,8 +422,9 @@ static struct ata_port_operations ali_c5_port_ops = {
 
 	.freeze		= ata_bmdma_freeze,
 	.thaw		= ata_bmdma_thaw,
-	.error_handler	= ali_c2_error_handler,
+	.error_handler	= ata_bmdma_error_handler,
 	.post_internal_cmd = ata_bmdma_post_internal_cmd,
+	.cable_detect	= ali_c2_cable_detect,
 
 	.bmdma_setup 	= ata_bmdma_setup,
 	.bmdma_start 	= ata_bmdma_start,
@@ -572,14 +518,14 @@ static void ali_init_chipset(struct pci_dev *pdev)
 
 static int ali_init_one(struct pci_dev *pdev, const struct pci_device_id *id)
 {
-	static struct ata_port_info info_early = {
+	static const struct ata_port_info info_early = {
 		.sht = &ali_sht,
 		.flags = ATA_FLAG_SLAVE_POSS | ATA_FLAG_SRST,
 		.pio_mask = 0x1f,
 		.port_ops = &ali_early_port_ops
 	};
 	/* Revision 0x20 added DMA */
-	static struct ata_port_info info_20 = {
+	static const struct ata_port_info info_20 = {
 		.sht = &ali_sht,
 		.flags = ATA_FLAG_SLAVE_POSS | ATA_FLAG_SRST | ATA_FLAG_PIO_LBA48,
 		.pio_mask = 0x1f,
@@ -587,7 +533,7 @@ static int ali_init_one(struct pci_dev *pdev, const struct pci_device_id *id)
 		.port_ops = &ali_20_port_ops
 	};
 	/* Revision 0x20 with support logic added UDMA */
-	static struct ata_port_info info_20_udma = {
+	static const struct ata_port_info info_20_udma = {
 		.sht = &ali_sht,
 		.flags = ATA_FLAG_SLAVE_POSS | ATA_FLAG_SRST | ATA_FLAG_PIO_LBA48,
 		.pio_mask = 0x1f,
@@ -596,7 +542,7 @@ static int ali_init_one(struct pci_dev *pdev, const struct pci_device_id *id)
 		.port_ops = &ali_20_port_ops
 	};
 	/* Revision 0xC2 adds UDMA66 */
-	static struct ata_port_info info_c2 = {
+	static const struct ata_port_info info_c2 = {
 		.sht = &ali_sht,
 		.flags = ATA_FLAG_SLAVE_POSS | ATA_FLAG_SRST | ATA_FLAG_PIO_LBA48,
 		.pio_mask = 0x1f,
@@ -605,7 +551,7 @@ static int ali_init_one(struct pci_dev *pdev, const struct pci_device_id *id)
 		.port_ops = &ali_c2_port_ops
 	};
 	/* Revision 0xC3 is UDMA100 */
-	static struct ata_port_info info_c3 = {
+	static const struct ata_port_info info_c3 = {
 		.sht = &ali_sht,
 		.flags = ATA_FLAG_SLAVE_POSS | ATA_FLAG_SRST | ATA_FLAG_PIO_LBA48,
 		.pio_mask = 0x1f,
@@ -614,7 +560,7 @@ static int ali_init_one(struct pci_dev *pdev, const struct pci_device_id *id)
 		.port_ops = &ali_c2_port_ops
 	};
 	/* Revision 0xC4 is UDMA133 */
-	static struct ata_port_info info_c4 = {
+	static const struct ata_port_info info_c4 = {
 		.sht = &ali_sht,
 		.flags = ATA_FLAG_SLAVE_POSS | ATA_FLAG_SRST | ATA_FLAG_PIO_LBA48,
 		.pio_mask = 0x1f,
@@ -623,7 +569,7 @@ static int ali_init_one(struct pci_dev *pdev, const struct pci_device_id *id)
 		.port_ops = &ali_c2_port_ops
 	};
 	/* Revision 0xC5 is UDMA133 with LBA48 DMA */
-	static struct ata_port_info info_c5 = {
+	static const struct ata_port_info info_c5 = {
 		.sht = &ali_sht,
 		.flags = ATA_FLAG_SLAVE_POSS | ATA_FLAG_SRST,
 		.pio_mask = 0x1f,
@@ -632,7 +578,7 @@ static int ali_init_one(struct pci_dev *pdev, const struct pci_device_id *id)
 		.port_ops = &ali_c5_port_ops
 	};
 
-	static struct ata_port_info *port_info[2];
+	const struct ata_port_info *ppi[] = { NULL, NULL };
 	u8 rev, tmp;
 	struct pci_dev *isa_bridge;
 
@@ -644,17 +590,17 @@ static int ali_init_one(struct pci_dev *pdev, const struct pci_device_id *id)
 	 */
 
 	if (rev < 0x20) {
-		port_info[0] = port_info[1] = &info_early;
+		ppi[0] = &info_early;
 	} else if (rev < 0xC2) {
-        	port_info[0] = port_info[1] = &info_20;
+        	ppi[0] = &info_20;
 	} else if (rev == 0xC2) {
-        	port_info[0] = port_info[1] = &info_c2;
+        	ppi[0] = &info_c2;
 	} else if (rev == 0xC3) {
-        	port_info[0] = port_info[1] = &info_c3;
+        	ppi[0] = &info_c3;
 	} else if (rev == 0xC4) {
-        	port_info[0] = port_info[1] = &info_c4;
+        	ppi[0] = &info_c4;
 	} else
-        	port_info[0] = port_info[1] = &info_c5;
+        	ppi[0] = &info_c5;
 
 	ali_init_chipset(pdev);
 
@@ -663,10 +609,10 @@ static int ali_init_one(struct pci_dev *pdev, const struct pci_device_id *id)
 		/* Are we paired with a UDMA capable chip */
 		pci_read_config_byte(isa_bridge, 0x5E, &tmp);
 		if ((tmp & 0x1E) == 0x12)
-	        	port_info[0] = port_info[1] = &info_20_udma;
+	        	ppi[0] = &info_20_udma;
 		pci_dev_put(isa_bridge);
 	}
-	return ata_pci_init_one(pdev, port_info, 2);
+	return ata_pci_init_one(pdev, ppi);
 }
 
 #ifdef CONFIG_PM

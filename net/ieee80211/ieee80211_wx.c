@@ -5,8 +5,8 @@
   Portions of this file are based on the WEP enablement code provided by the
   Host AP project hostap-drivers v0.1.3
   Copyright (c) 2001-2002, SSH Communications Security Corp and Jouni Malinen
-  <jkmaline@cc.hut.fi>
-  Copyright (c) 2002-2003, Jouni Malinen <jkmaline@cc.hut.fi>
+  <j@w1.fi>
+  Copyright (c) 2002-2003, Jouni Malinen <j@w1.fi>
 
   This program is free software; you can redistribute it and/or modify it
   under the terms of version 2 of the GNU General Public License as
@@ -89,13 +89,15 @@ static char *ieee80211_translate_scan(struct ieee80211_device *ieee,
 		start = iwe_stream_add_event(start, stop, &iwe, IW_EV_UINT_LEN);
 	}
 
-	/* Add frequency/channel */
+	/* Add channel and frequency */
 	iwe.cmd = SIOCGIWFREQ;
-/*	iwe.u.freq.m = ieee80211_frequency(network->channel, network->mode);
-	iwe.u.freq.e = 3; */
 	iwe.u.freq.m = network->channel;
 	iwe.u.freq.e = 0;
 	iwe.u.freq.i = 0;
+	start = iwe_stream_add_event(start, stop, &iwe, IW_EV_FREQ_LEN);
+
+	iwe.u.freq.m = ieee80211_channel_to_freq(ieee, network->channel);
+	iwe.u.freq.e = 6;
 	start = iwe_stream_add_event(start, stop, &iwe, IW_EV_FREQ_LEN);
 
 	/* Add encryption capability */

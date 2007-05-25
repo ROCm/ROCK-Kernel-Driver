@@ -41,11 +41,14 @@
 
 #define TS_WIDTH		(2 * TS_SIZE)
 #define TS_WIDTH_ACTIVY		TS_SIZE
+#define TS_WIDTH_DVBC		TS_SIZE
 #define TS_HEIGHT_MASK		0xf00
 #define TS_HEIGHT_MASK_ACTIVY	0xc00
+#define TS_HEIGHT_MASK_DVBC	0xe00
 #define TS_MIN_BUFSIZE_K	188
 #define TS_MAX_BUFSIZE_K	1410
 #define TS_MAX_BUFSIZE_K_ACTIVY	564
+#define TS_MAX_BUFSIZE_K_DVBC	1316
 #define BUFFER_WARNING_WAIT	(30*HZ)
 
 int budget_debug;
@@ -106,6 +109,19 @@ static int start_ts_capture(struct budget *budget)
 		saa7146_write(dev, MC2, (MASK_10 | MASK_26));
 		saa7146_write(dev, BRS_CTRL, 0x60000000);
 		break;
+	case BUDGET_CIN1200C_MK3:
+	case BUDGET_KNC1C_MK3:
+	case BUDGET_KNC1CP_MK3:
+		if (budget->video_port == BUDGET_VIDEO_PORTA) {
+			saa7146_write(dev, DD1_INIT, 0x06000200);
+			saa7146_write(dev, MC2, (MASK_09 | MASK_25 | MASK_10 | MASK_26));
+			saa7146_write(dev, BRS_CTRL, 0x00000000);
+		} else {
+			saa7146_write(dev, DD1_INIT, 0x00000600);
+			saa7146_write(dev, MC2, (MASK_09 | MASK_25 | MASK_10 | MASK_26));
+			saa7146_write(dev, BRS_CTRL, 0x60000000);
+		}
+		break;
 	default:
 		if (budget->video_port == BUDGET_VIDEO_PORTA) {
 			saa7146_write(dev, DD1_INIT, 0x06000200);
@@ -122,7 +138,13 @@ static int start_ts_capture(struct budget *budget)
 	mdelay(10);
 
 	saa7146_write(dev, BASE_ODD3, 0);
-	saa7146_write(dev, BASE_EVEN3, 0);
+	if (budget->buffer_size > budget->buffer_height * budget->buffer_width) {
+		// using odd/even buffers
+		saa7146_write(dev, BASE_EVEN3, budget->buffer_height * budget->buffer_width);
+	} else {
+		// using a single buffer
+		saa7146_write(dev, BASE_EVEN3, 0);
+	}
 	saa7146_write(dev, PROT_ADDR3, budget->buffer_size);
 	saa7146_write(dev, BASE_PAGE3, budget->pt.dma | ME1 | 0x90);
 
@@ -172,6 +194,9 @@ static void vpeirq(unsigned long data)
 	u32 olddma = budget->ttbp;
 	u32 newdma = saa7146_read(budget->dev, PCI_VDP3);
 	u32 count;
+
+	/* Ensure streamed PCI data is synced to CPU */
+	pci_dma_sync_sg_for_cpu(budget->dev->pci, budget->pt.slist, budget->pt.nents, PCI_DMA_FROMDEVICE);
 
 	/* nearest lower position divisible by 188 */
 	newdma -= newdma % 188;
@@ -399,11 +424,25 @@ int ttpci_budget_init(struct budget *budget, struct saa7146_dev *dev,
 	budget->card = bi;
 	budget->dev = (struct saa7146_dev *) dev;
 
-	if (budget->card->type == BUDGET_FS_ACTIVY) {
+	switch(budget->card->type) {
+	case BUDGET_FS_ACTIVY:
 		budget->buffer_width = TS_WIDTH_ACTIVY;
 		max_bufsize = TS_MAX_BUFSIZE_K_ACTIVY;
 		height_mask = TS_HEIGHT_MASK_ACTIVY;
-	} else {
+		break;
+
+	case BUDGET_KNC1C:
+	case BUDGET_KNC1CP:
+	case BUDGET_CIN1200C:
+	case BUDGET_KNC1C_MK3:
+	case BUDGET_KNC1CP_MK3:
+	case BUDGET_CIN1200C_MK3:
+		budget->buffer_width = TS_WIDTH_DVBC;
+		max_bufsize = TS_MAX_BUFSIZE_K_DVBC;
+		height_mask = TS_HEIGHT_MASK_DVBC;
+		break;
+
+	default:
 		budget->buffer_width = TS_WIDTH;
 		max_bufsize = TS_MAX_BUFSIZE_K;
 		height_mask = TS_HEIGHT_MASK;
@@ -415,14 +454,22 @@ int ttpci_budget_init(struct budget *budget, struct saa7146_dev *dev,
 		dma_buffer_size = max_bufsize;
 
 	budget->buffer_height = dma_buffer_size * 1024 / budget->buffer_width;
-	budget->buffer_height &= height_mask;
-	budget->buffer_size = budget->buffer_height * budget->buffer_width;
+	if (budget->buffer_height > 0xfff) {
+		budget->buffer_height /= 2;
+		budget->buffer_height &= height_mask;
+		budget->buffer_size = 2 * budget->buffer_height * budget->buffer_width;
+	} else {
+		budget->buffer_height &= height_mask;
+		budget->buffer_size = budget->buffer_height * budget->buffer_width;
+	}
 	budget->buffer_warning_threshold = budget->buffer_size * 80/100;
 	budget->buffer_warnings = 0;
 	budget->buffer_warning_time = jiffies;
 
-	dprintk(2, "%s: width = %d, height = %d\n",
-		budget->dev->name, budget->buffer_width, budget->buffer_height);
+	dprintk(2, "%s: buffer type = %s, width = %d, height = %d\n",
+		budget->dev->name,
+		budget->buffer_size > budget->buffer_width * budget->buffer_height ? "odd/even" : "single",
+		budget->buffer_width, budget->buffer_height);
 	printk("%s: dma buffer size %u\n", budget->dev->name, budget->buffer_size);
 
 	if ((ret = dvb_register_adapter(&budget->dvb_adapter, budget->card->name, owner, &budget->dev->pci->dev)) < 0) {
@@ -460,16 +507,16 @@ int ttpci_budget_init(struct budget *budget, struct saa7146_dev *dev,
 	strcpy(budget->i2c_adap.name, budget->card->name);
 
 	if (i2c_add_adapter(&budget->i2c_adap) < 0) {
-		dvb_unregister_adapter(&budget->dvb_adapter);
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto err_dvb_unregister;
 	}
 
 	ttpci_eeprom_parse_mac(&budget->i2c_adap, budget->dvb_adapter.proposed_mac);
 
-	if (NULL ==
-	    (budget->grabbing = saa7146_vmalloc_build_pgtable(dev->pci, budget->buffer_size, &budget->pt))) {
+	budget->grabbing = saa7146_vmalloc_build_pgtable(dev->pci, budget->buffer_size, &budget->pt);
+	if (NULL == budget->grabbing) {
 		ret = -ENOMEM;
-		goto err;
+		goto err_del_i2c;
 	}
 
 	saa7146_write(dev, PCI_BT_V1, 0x001c0000);
@@ -482,14 +529,16 @@ int ttpci_budget_init(struct budget *budget, struct saa7146_dev *dev,
 	if (bi->type != BUDGET_FS_ACTIVY)
 		saa7146_setgpio(dev, 2, SAA7146_GPIO_OUTHI);
 
-	if (budget_register(budget) == 0) {
-		return 0;
-	}
-err:
+	if (budget_register(budget) == 0)
+		return 0; /* Everything OK */
+
+	/* An error occurred, cleanup resources */
+	saa7146_vfree_destroy_pgtable(dev->pci, budget->grabbing, &budget->pt);
+
+err_del_i2c:
 	i2c_del_adapter(&budget->i2c_adap);
 
-	vfree(budget->grabbing);
-
+err_dvb_unregister:
 	dvb_unregister_adapter(&budget->dvb_adapter);
 
 	return ret;
@@ -511,15 +560,13 @@ int ttpci_budget_deinit(struct budget *budget)
 
 	budget_unregister(budget);
 
+	tasklet_kill(&budget->vpe_tasklet);
+
+	saa7146_vfree_destroy_pgtable(dev->pci, budget->grabbing, &budget->pt);
+
 	i2c_del_adapter(&budget->i2c_adap);
 
 	dvb_unregister_adapter(&budget->dvb_adapter);
-
-	tasklet_kill(&budget->vpe_tasklet);
-
-	saa7146_pgtable_free(dev->pci, &budget->pt);
-
-	vfree(budget->grabbing);
 
 	return 0;
 }

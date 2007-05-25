@@ -46,8 +46,8 @@ struct powernow_k8_data {
 #define CPUID_XFAM			0x0ff00000	/* extended family */
 #define CPUID_XFAM_K8			0
 #define CPUID_XMOD			0x000f0000	/* extended model */
-#define CPUID_XMOD_REV_G		0x00060000
-#define CPUID_XFAM_10H 			0x00100000	/* family 0x10 */
+#define CPUID_XMOD_REV_MASK		0x00080000
+#define CPUID_XFAM_10H			0x00100000	/* family 0x10 */
 #define CPUID_USE_XFAM_XMOD		0x00000f00
 #define CPUID_GET_MAX_CAPABILITIES	0x80000000
 #define CPUID_FREQ_VOLT_CAPABILITIES	0x80000007
@@ -215,8 +215,10 @@ static int core_frequency_transition(struct powernow_k8_data *data, u32 reqfid);
 
 static void powernow_k8_acpi_pst_values(struct powernow_k8_data *data, unsigned int index);
 
+#ifdef CONFIG_X86_POWERNOW_K8_ACPI
 static int fill_powernow_table_pstate(struct powernow_k8_data *data, struct cpufreq_frequency_table *powernow_table);
 static int fill_powernow_table_fidvid(struct powernow_k8_data *data, struct cpufreq_frequency_table *powernow_table);
+#endif
 
 #ifdef CONFIG_SMP
 static inline void define_siblings(int cpu, cpumask_t cpu_sharedcore_mask[])

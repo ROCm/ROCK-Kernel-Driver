@@ -404,10 +404,7 @@ struct page *vm_normal_page(struct vm_area_struct *vma, unsigned long addr, pte_
 	 * and that the resulting page looks ok.
 	 */
 	if (unlikely(!pfn_valid(pfn))) {
-#ifdef CONFIG_XEN
-		if (!(vma->vm_flags & VM_RESERVED))
-#endif
-			print_bad_pte(vma, pte, addr);
+		print_bad_pte(vma, pte, addr);
 		return NULL;
 	}
 
@@ -484,7 +481,7 @@ copy_one_pte(struct mm_struct *dst_mm, struct mm_struct *src_mm,
 	page = vm_normal_page(vma, addr, pte);
 	if (page) {
 		get_page(page);
-		page_dup_rmap(page);
+		page_dup_rmap(page, vma, addr);
 		rss[!!PageAnon(page)]++;
 	}
 
@@ -665,14 +662,8 @@ static unsigned long zap_pte_range(struct mmu_gather *tlb,
 				     page->index > details->last_index))
 					continue;
 			}
-#ifdef CONFIG_XEN
-			if (unlikely(vma->vm_ops && vma->vm_ops->zap_pte))
-				ptent = vma->vm_ops->zap_pte(vma, addr, pte,
-							     tlb->fullmm);
-			else
-#endif
-				ptent = ptep_get_and_clear_full(mm, addr, pte,
-								tlb->fullmm);
+			ptent = ptep_get_and_clear_full(mm, addr, pte,
+							tlb->fullmm);
 			tlb_remove_tlb_entry(tlb, pte, addr);
 			if (unlikely(!page))
 				continue;
@@ -905,7 +896,6 @@ unsigned long zap_page_range(struct vm_area_struct *vma, unsigned long address,
 		tlb_finish_mmu(tlb, address, end);
 	return end;
 }
-EXPORT_SYMBOL(zap_page_range);
 
 /*
  * Do a quick page-table lookup for a single page.
@@ -1045,26 +1035,6 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 			continue;
 		}
 
-#ifdef CONFIG_XEN
-		if (vma && (vma->vm_flags & VM_FOREIGN)) {
-			struct page **map = vma->vm_private_data;
-			int offset = (start - vma->vm_start) >> PAGE_SHIFT;
-			if (map[offset] != NULL) {
-			        if (pages) {
-			                struct page *page = map[offset];
-
-					pages[i] = page;
-					get_page(page);
-				}
-				if (vmas)
-					vmas[i] = vma;
-				i++;
-				start += PAGE_SIZE;
-				len--;
-				continue;
-			}
-		}
-#endif
 		if (!vma || (vma->vm_flags & (VM_IO | VM_PFNMAP))
 				|| !(vm_flags & vma->vm_flags))
 			return i ? : -EFAULT;
@@ -1478,15 +1448,14 @@ int remap_pfn_range(struct vm_area_struct *vma, unsigned long addr,
 }
 EXPORT_SYMBOL(remap_pfn_range);
 
-#ifdef CONFIG_XEN
-static inline int apply_to_pte_range(struct mm_struct *mm, pmd_t *pmd,
+static int apply_to_pte_range(struct mm_struct *mm, pmd_t *pmd,
 				     unsigned long addr, unsigned long end,
 				     pte_fn_t fn, void *data)
 {
 	pte_t *pte;
 	int err;
 	struct page *pmd_page;
-	spinlock_t *ptl;
+	spinlock_t *uninitialized_var(ptl);
 
 	pte = (mm == &init_mm) ?
 		pte_alloc_kernel(pmd, addr) :
@@ -1509,7 +1478,7 @@ static inline int apply_to_pte_range(struct mm_struct *mm, pmd_t *pmd,
 	return err;
 }
 
-static inline int apply_to_pmd_range(struct mm_struct *mm, pud_t *pud,
+static int apply_to_pmd_range(struct mm_struct *mm, pud_t *pud,
 				     unsigned long addr, unsigned long end,
 				     pte_fn_t fn, void *data)
 {
@@ -1529,7 +1498,7 @@ static inline int apply_to_pmd_range(struct mm_struct *mm, pud_t *pud,
 	return err;
 }
 
-static inline int apply_to_pud_range(struct mm_struct *mm, pgd_t *pgd,
+static int apply_to_pud_range(struct mm_struct *mm, pgd_t *pgd,
 				     unsigned long addr, unsigned long end,
 				     pte_fn_t fn, void *data)
 {
@@ -1572,7 +1541,6 @@ int apply_to_page_range(struct mm_struct *mm, unsigned long addr,
 	return err;
 }
 EXPORT_SYMBOL_GPL(apply_to_page_range);
-#endif
 
 /*
  * handle_pte_fault chooses page fault handler according to an entry
@@ -2665,12 +2633,6 @@ int __pud_alloc(struct mm_struct *mm, pgd_t *pgd, unsigned long address)
 	spin_unlock(&mm->page_table_lock);
 	return 0;
 }
-#else
-/* Workaround for gcc 2.96 */
-int __pud_alloc(struct mm_struct *mm, pgd_t *pgd, unsigned long address)
-{
-	return 0;
-}
 #endif /* __PAGETABLE_PUD_FOLDED */
 
 #ifndef __PAGETABLE_PMD_FOLDED
@@ -2697,12 +2659,6 @@ int __pmd_alloc(struct mm_struct *mm, pud_t *pud, unsigned long address)
 		pgd_populate(mm, pud, new);
 #endif /* __ARCH_HAS_4LEVEL_HACK */
 	spin_unlock(&mm->page_table_lock);
-	return 0;
-}
-#else
-/* Workaround for gcc 2.96 */
-int __pmd_alloc(struct mm_struct *mm, pud_t *pud, unsigned long address)
-{
 	return 0;
 }
 #endif /* __PAGETABLE_PMD_FOLDED */

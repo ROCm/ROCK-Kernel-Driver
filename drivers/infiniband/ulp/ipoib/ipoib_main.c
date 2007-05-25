@@ -107,7 +107,7 @@ int ipoib_open(struct net_device *dev)
 		return -EINVAL;
 
 	if (ipoib_ib_dev_up(dev)) {
-		ipoib_ib_dev_stop(dev);
+		ipoib_ib_dev_stop(dev, 1);
 		return -EINVAL;
 	}
 
@@ -152,7 +152,7 @@ static int ipoib_stop(struct net_device *dev)
 	flush_workqueue(ipoib_workqueue);
 
 	ipoib_ib_dev_down(dev, 1);
-	ipoib_ib_dev_stop(dev);
+	ipoib_ib_dev_stop(dev, 1);
 
 	if (!test_bit(IPOIB_FLAG_SUBINTERFACE, &priv->flags)) {
 		struct ipoib_dev_priv *cpriv;
@@ -395,14 +395,10 @@ static void path_rec_completion(int status,
 	skb_queue_head_init(&skqueue);
 
 	if (!status) {
-		struct ib_ah_attr av = {
-			.dlid 	       = be16_to_cpu(pathrec->dlid),
-			.sl 	       = pathrec->sl,
-			.port_num      = priv->port,
-			.static_rate   = pathrec->rate
-		};
+		struct ib_ah_attr av;
 
-		ah = ipoib_create_ah(dev, priv->pd, &av);
+		if (!ib_init_ah_from_path(priv->ca, priv->port, pathrec, &av))
+			ah = ipoib_create_ah(dev, priv->pd, &av);
 	}
 
 	spin_lock_irqsave(&priv->lock, flags);
@@ -952,6 +948,8 @@ static void ipoib_setup(struct net_device *dev)
 	dev->hard_header 	 = ipoib_hard_header;
 	dev->set_multicast_list  = ipoib_set_mcast_list;
 	dev->neigh_setup         = ipoib_neigh_setup_dev;
+	dev->poll                = ipoib_poll;
+	dev->weight              = 100;
 
 	dev->watchdog_timeo 	 = HZ;
 
@@ -990,7 +988,8 @@ static void ipoib_setup(struct net_device *dev)
 	INIT_LIST_HEAD(&priv->dead_ahs);
 	INIT_LIST_HEAD(&priv->multicast_list);
 
-	INIT_DELAYED_WORK(&priv->pkey_task,    ipoib_pkey_poll);
+	INIT_DELAYED_WORK(&priv->pkey_poll_task, ipoib_pkey_poll);
+	INIT_WORK(&priv->pkey_event_task, ipoib_pkey_event);
 	INIT_DELAYED_WORK(&priv->mcast_task,   ipoib_mcast_join_task);
 	INIT_WORK(&priv->flush_task,   ipoib_ib_dev_flush);
 	INIT_WORK(&priv->restart_task, ipoib_mcast_restart_task);

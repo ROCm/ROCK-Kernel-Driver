@@ -1,5 +1,5 @@
 /*
- * ata-serverworks.c 	- Serverworks PATA for new ATA layer
+ * pata_serverworks.c 	- Serverworks PATA for new ATA layer
  *			  (C) 2005 Red Hat Inc
  *			  Alan Cox <alan@redhat.com>
  *
@@ -41,7 +41,7 @@
 #include <linux/libata.h>
 
 #define DRV_NAME "pata_serverworks"
-#define DRV_VERSION "0.4.0"
+#define DRV_VERSION "0.4.1"
 
 #define SVWKS_CSB5_REVISION_NEW	0x92 /* min PCI_REVISION_ID for UDMA5 (A2.0) */
 #define SVWKS_CSB6_REVISION	0xa0 /* min PCI_REVISION_ID for UDMA4 (A1.0) */
@@ -137,14 +137,16 @@ static struct sv_cable_table cable_detect[] = {
 };
 
 /**
- *	serverworks_pre_reset		-	cable detection
+ *	serverworks_cable_detect	-	cable detection
  *	@ap: ATA port
+ *	@deadline: deadline jiffies for the operation
  *
  *	Perform cable detection according to the device and subvendor
  *	identifications
  */
 
-static int serverworks_pre_reset(struct ata_port *ap) {
+static int serverworks_cable_detect(struct ata_port *ap)
+{
 	struct pci_dev *pdev = to_pci_dev(ap->host->dev);
 	struct sv_cable_table *cb = cable_detect;
 
@@ -152,19 +154,13 @@ static int serverworks_pre_reset(struct ata_port *ap) {
 		if (cb->device == pdev->device &&
 		    (cb->subvendor == pdev->subsystem_vendor ||
 		      cb->subvendor == PCI_ANY_ID)) {
-			ap->cbl = cb->cable_detect(ap);
-			return ata_std_prereset(ap);
+			return cb->cable_detect(ap);
 		}
 		cb++;
 	}
 
 	BUG();
 	return -1;	/* kill compiler warning */
-}
-
-static void serverworks_error_handler(struct ata_port *ap)
-{
-	return ata_bmdma_drive_eh(ap, serverworks_pre_reset, ata_std_softreset, NULL, ata_std_postreset);
 }
 
 /**
@@ -191,31 +187,31 @@ static u8 serverworks_is_csb(struct pci_dev *pdev)
 
 /**
  *	serverworks_osb4_filter	-	mode selection filter
- *	@ap: ATA interface
  *	@adev: ATA device
+ *	@mask: Mask of proposed modes
  *
  *	Filter the offered modes for the device to apply controller
  *	specific rules. OSB4 requires no UDMA for disks due to a FIFO
  *	bug we hit.
  */
 
-static unsigned long serverworks_osb4_filter(const struct ata_port *ap, struct ata_device *adev, unsigned long mask)
+static unsigned long serverworks_osb4_filter(struct ata_device *adev, unsigned long mask)
 {
 	if (adev->class == ATA_DEV_ATA)
 		mask &= ~ATA_MASK_UDMA;
-	return ata_pci_default_filter(ap, adev, mask);
+	return ata_pci_default_filter(adev, mask);
 }
 
 
 /**
  *	serverworks_csb_filter	-	mode selection filter
- *	@ap: ATA interface
  *	@adev: ATA device
+ *	@mask: Mask of proposed modes
  *
  *	Check the blacklist and disable UDMA5 if matched
  */
 
-static unsigned long serverworks_csb_filter(const struct ata_port *ap, struct ata_device *adev, unsigned long mask)
+static unsigned long serverworks_csb_filter(struct ata_device *adev, unsigned long mask)
 {
 	const char *p;
 	char model_num[ATA_ID_PROD_LEN + 1];
@@ -223,7 +219,7 @@ static unsigned long serverworks_csb_filter(const struct ata_port *ap, struct at
 
 	/* Disk, UDMA */
 	if (adev->class != ATA_DEV_ATA)
-		return ata_pci_default_filter(ap, adev, mask);
+		return ata_pci_default_filter(adev, mask);
 
 	/* Actually do need to check */
 	ata_id_c_string(adev->id, model_num, ATA_ID_PROD, sizeof(model_num));
@@ -232,7 +228,7 @@ static unsigned long serverworks_csb_filter(const struct ata_port *ap, struct at
 		if (!strcmp(p, model_num))
 			mask &= ~(0x1F << ATA_SHIFT_UDMA);
 	}
-	return ata_pci_default_filter(ap, adev, mask);
+	return ata_pci_default_filter(adev, mask);
 }
 
 
@@ -319,10 +315,6 @@ static struct scsi_host_template serverworks_sht = {
 	.slave_configure	= ata_scsi_slave_config,
 	.slave_destroy		= ata_scsi_slave_destroy,
 	.bios_param		= ata_std_bios_param,
-#ifdef CONFIG_PM
-	.resume			= ata_scsi_device_resume,
-	.suspend		= ata_scsi_device_suspend,
-#endif
 };
 
 static struct ata_port_operations serverworks_osb4_port_ops = {
@@ -339,8 +331,9 @@ static struct ata_port_operations serverworks_osb4_port_ops = {
 
 	.freeze		= ata_bmdma_freeze,
 	.thaw		= ata_bmdma_thaw,
-	.error_handler	= serverworks_error_handler,
+	.error_handler	= ata_bmdma_error_handler,
 	.post_internal_cmd = ata_bmdma_post_internal_cmd,
+	.cable_detect	= serverworks_cable_detect,
 
 	.bmdma_setup 	= ata_bmdma_setup,
 	.bmdma_start 	= ata_bmdma_start,
@@ -374,8 +367,9 @@ static struct ata_port_operations serverworks_csb_port_ops = {
 
 	.freeze		= ata_bmdma_freeze,
 	.thaw		= ata_bmdma_thaw,
-	.error_handler	= serverworks_error_handler,
+	.error_handler	= ata_bmdma_error_handler,
 	.post_internal_cmd = ata_bmdma_post_internal_cmd,
+	.cable_detect	= serverworks_cable_detect,
 
 	.bmdma_setup 	= ata_bmdma_setup,
 	.bmdma_start 	= ata_bmdma_start,
@@ -481,8 +475,7 @@ static void serverworks_fixup_ht1000(struct pci_dev *pdev)
 
 static int serverworks_init_one(struct pci_dev *pdev, const struct pci_device_id *id)
 {
-	int ports = 2;
-	static struct ata_port_info info[4] = {
+	static const struct ata_port_info info[4] = {
 		{ /* OSB4 */
 			.sht = &serverworks_sht,
 			.flags = ATA_FLAG_SLAVE_POSS | ATA_FLAG_SRST,
@@ -513,8 +506,7 @@ static int serverworks_init_one(struct pci_dev *pdev, const struct pci_device_id
 			.port_ops = &serverworks_csb_port_ops
 		}
 	};
-	static struct ata_port_info *port_info[2];
-	struct ata_port_info *devinfo = &info[id->driver_data];
+	const struct ata_port_info *ppi[] = { &info[id->driver_data], NULL };
 
 	/* Force master latency timer to 64 PCI clocks */
 	pci_write_config_byte(pdev, PCI_LATENCY_TIMER, 0x40);
@@ -523,7 +515,7 @@ static int serverworks_init_one(struct pci_dev *pdev, const struct pci_device_id
 	if (pdev->device == PCI_DEVICE_ID_SERVERWORKS_OSB4IDE) {
 		/* Select non UDMA capable OSB4 if we can't do fixups */
 		if ( serverworks_fixup_osb4(pdev) < 0)
-			devinfo = &info[1];
+			ppi[0] = &info[1];
 	}
 	/* setup CSB5/CSB6 : South Bridge and IDE option RAID */
 	else if ((pdev->device == PCI_DEVICE_ID_SERVERWORKS_CSB5IDE) ||
@@ -533,11 +525,11 @@ static int serverworks_init_one(struct pci_dev *pdev, const struct pci_device_id
 		 /* If the returned btr is the newer revision then
 		    select the right info block */
 		 if (serverworks_fixup_csb(pdev) == 3)
-		 	devinfo = &info[3];
+		 	ppi[0] = &info[3];
 
 		/* Is this the 3rd channel CSB6 IDE ? */
 		if (pdev->device == PCI_DEVICE_ID_SERVERWORKS_CSB6IDE2)
-			ports = 1;
+			ppi[1] = &ata_dummy_port_info;
 	}
 	/* setup HT1000E */
 	else if (pdev->device == PCI_DEVICE_ID_SERVERWORKS_HT1000IDE)
@@ -546,8 +538,7 @@ static int serverworks_init_one(struct pci_dev *pdev, const struct pci_device_id
 	if (pdev->device == PCI_DEVICE_ID_SERVERWORKS_CSB5IDE)
 		ata_pci_clear_simplex(pdev);
 
-	port_info[0] = port_info[1] = devinfo;
-	return ata_pci_init_one(pdev, port_info, ports);
+	return ata_pci_init_one(pdev, ppi);
 }
 
 #ifdef CONFIG_PM

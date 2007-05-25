@@ -18,6 +18,7 @@
 #include <linux/types.h>
 #include <linux/proc_fs.h>
 #include <linux/platform_device.h>
+#include <asm/irq.h>
 #include <asm/atomic.h>
 
 /* Definitions used by the flattened device tree */
@@ -58,6 +59,8 @@ struct boot_param_header
 	u32	boot_cpuid_phys;	/* Physical CPU id we're booting on */
 	/* version 3 fields below */
 	u32	dt_strings_size;	/* size of the DT strings block */
+	/* version 17 fields below */
+	u32	dt_struct_size;		/* size of the DT structure block */
 };
 
 
@@ -68,7 +71,7 @@ typedef u32 ihandle;
 struct property {
 	char	*name;
 	int	length;
-	unsigned char *value;
+	void	*value;
 	struct property *next;
 };
 
@@ -107,14 +110,6 @@ static inline void set_node_proc_entry(struct device_node *dn, struct proc_dir_e
 	dn->pde = de;
 }
 
-
-/* OBSOLETE: Old style node lookup */
-extern struct device_node *find_devices(const char *name);
-extern struct device_node *find_type_devices(const char *type);
-extern struct device_node *find_path_device(const char *path);
-extern struct device_node *find_compatible_devices(const char *type,
-						   const char *compat);
-extern struct device_node *find_all_nodes(void);
 
 /* New style node lookup */
 extern struct device_node *of_find_node_by_name(struct device_node *from,
@@ -159,15 +154,17 @@ extern void of_detach_node(const struct device_node *);
 extern void finish_device_tree(void);
 extern void unflatten_device_tree(void);
 extern void early_init_devtree(void *);
-extern int device_is_compatible(const struct device_node *device,
+extern int of_device_is_compatible(const struct device_node *device,
 				const char *);
+#define device_is_compatible(d, c)	of_device_is_compatible((d), (c))
 extern int machine_is_compatible(const char *compat);
-extern const void *get_property(const struct device_node *node,
+extern const void *of_get_property(const struct device_node *node,
 				const char *name,
 				int *lenp);
+#define get_property(a, b, c)	of_get_property((a), (b), (c))
 extern void print_properties(struct device_node *node);
-extern int prom_n_addr_cells(struct device_node* np);
-extern int prom_n_size_cells(struct device_node* np);
+extern int of_n_addr_cells(struct device_node* np);
+extern int of_n_size_cells(struct device_node* np);
 extern int prom_n_intr_cells(struct device_node* np);
 extern void prom_get_irq_senses(unsigned char *senses, int off, int max);
 extern int prom_add_property(struct device_node* np, struct property* prop);
@@ -336,20 +333,17 @@ extern int of_irq_map_one(struct device_node *device, int index,
 struct pci_dev;
 extern int of_irq_map_pci(struct pci_dev *pdev, struct of_irq *out_irq);
 
-static inline int of_irq_to_resource(struct device_node *dev, int index, struct resource *r)
-{
-	int irq = irq_of_parse_and_map(dev, index);
+extern int of_irq_to_resource(struct device_node *dev, int index,
+			struct resource *r);
 
-	/* Only dereference the resource if both the
-	 * resource and the irq are valid. */
-	if (r && irq != NO_IRQ) {
-		r->start = r->end = irq;
-		r->flags = IORESOURCE_IRQ;
-	}
-
-	return irq;
-}
-
+/**
+ * of_iomap - Maps the memory mapped IO for a given device_node
+ * @device:	the device whose io range will be mapped
+ * @index:	index of the io range
+ *
+ * Returns a pointer to the mapped memory
+ */
+extern void __iomem *of_iomap(struct device_node *device, int index);
 
 #endif /* __KERNEL__ */
 #endif /* _POWERPC_PROM_H */

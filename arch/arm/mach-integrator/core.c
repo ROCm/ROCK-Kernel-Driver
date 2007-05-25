@@ -257,23 +257,7 @@ integrator_timer_interrupt(int irq, void *dev_id)
 	 */
 	writel(1, TIMER1_VA_BASE + TIMER_INTCLR);
 
-	/*
-	 * the clock tick routines are only processed on the
-	 * primary CPU
-	 */
-	if (hard_smp_processor_id() == 0) {
-		timer_tick();
-#ifdef CONFIG_SMP
-		smp_send_timer();
-#endif
-	}
-
-#ifdef CONFIG_SMP
-	/*
-	 * this is the ARM equivalent of the APIC timer interrupt
-	 */
-	update_process_times(user_mode(get_irq_regs()));
-#endif /* CONFIG_SMP */
+	timer_tick();
 
 	write_sequnlock(&xtime_lock);
 
@@ -282,7 +266,7 @@ integrator_timer_interrupt(int irq, void *dev_id)
 
 static struct irqaction integrator_timer_irq = {
 	.name		= "Integrator Timer Tick",
-	.flags		= IRQF_DISABLED | IRQF_TIMER,
+	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
 	.handler	= integrator_timer_interrupt,
 };
 

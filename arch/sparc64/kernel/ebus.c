@@ -13,16 +13,17 @@
 #include <linux/string.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
+#include <linux/pci.h>
 
 #include <asm/system.h>
 #include <asm/page.h>
-#include <asm/pbm.h>
 #include <asm/ebus.h>
 #include <asm/oplib.h>
 #include <asm/prom.h>
 #include <asm/of_device.h>
 #include <asm/bpp.h>
 #include <asm/irq.h>
+#include <asm/io.h>
 
 /* EBUS dma library. */
 
@@ -285,7 +286,7 @@ static void __init fill_ebus_child(struct device_node *dp,
 				   int non_standard_regs)
 {
 	struct of_device *op;
-	int *regs;
+	const int *regs;
 	int i, len;
 
 	dev->prom_node = dp;
@@ -438,11 +439,9 @@ static struct pci_dev *find_next_ebus(struct pci_dev *start, int *is_rio_p)
 
 void __init ebus_init(void)
 {
-	struct pci_pbm_info *pbm;
 	struct linux_ebus_device *dev;
 	struct linux_ebus *ebus;
 	struct pci_dev *pdev;
-	struct pcidev_cookie *cookie;
 	struct device_node *dp;
 	int is_rio;
 	int num_ebus = 0;
@@ -453,8 +452,7 @@ void __init ebus_init(void)
 		return;
 	}
 
-	cookie = pdev->sysdata;
-	dp = cookie->prom_node;
+	dp = pci_device_to_OF_node(pdev);
 
 	ebus_chain = ebus = ebus_alloc(sizeof(struct linux_ebus));
 	ebus->next = NULL;
@@ -480,8 +478,7 @@ void __init ebus_init(void)
 				break;
 			}
 			ebus->is_rio = is_rio;
-			cookie = pdev->sysdata;
-			dp = cookie->prom_node;
+			dp = pci_device_to_OF_node(pdev);
 			continue;
 		}
 		printk("ebus%d:", num_ebus);
@@ -489,7 +486,6 @@ void __init ebus_init(void)
 		ebus->index = num_ebus;
 		ebus->prom_node = dp;
 		ebus->self = pdev;
-		ebus->parent = pbm = cookie->pbm;
 
 		ebus->ofdev.node = dp;
 		ebus->ofdev.dev.parent = &pdev->dev;
@@ -531,8 +527,7 @@ void __init ebus_init(void)
 		if (!pdev)
 			break;
 
-		cookie = pdev->sysdata;
-		dp = cookie->prom_node;
+		dp = pci_device_to_OF_node(pdev);
 
 		ebus->next = ebus_alloc(sizeof(struct linux_ebus));
 		ebus = ebus->next;

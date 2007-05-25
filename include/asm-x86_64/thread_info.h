@@ -147,11 +147,7 @@ static inline struct thread_info *stack_thread_info(void)
 #define _TIF_ALLWORK_MASK (0x0000FFFF & ~_TIF_SECCOMP)
 
 /* flags to check in __switch_to() */
-#ifndef CONFIG_XEN
 #define _TIF_WORK_CTXSW (_TIF_DEBUG|_TIF_IO_BITMAP)
-#else
-#define _TIF_WORK_CTXSW _TIF_DEBUG
-#endif
 
 #define PREEMPT_ACTIVE     0x10000000
 
@@ -166,7 +162,7 @@ static inline struct thread_info *stack_thread_info(void)
 #define TS_COMPAT		0x0002	/* 32bit syscall active */
 #define TS_POLLING		0x0004	/* true if in idle loop and not sleeping */
 
-#define tsk_is_polling(t) ((t)->thread_info->status & TS_POLLING)
+#define tsk_is_polling(t) (task_thread_info(t)->status & TS_POLLING)
 
 #endif /* __KERNEL__ */
 

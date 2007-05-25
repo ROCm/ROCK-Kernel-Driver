@@ -1126,7 +1126,7 @@ static void eepro_tx_timeout (struct net_device *dev)
 	printk (KERN_ERR "%s: transmit timed out, %s?\n", dev->name,
 		"network cable problem");
 	/* This is not a duplicate. One message for the console,
-	   one for the the log file  */
+	   one for the log file  */
 	printk (KERN_DEBUG "%s: transmit timed out, %s?\n", dev->name,
 		"network cable problem");
 	eepro_complete_selreset(ioaddr);
@@ -1591,7 +1591,6 @@ eepro_rx(struct net_device *dev)
 
 				break;
 			}
-			skb->dev = dev;
 			skb_reserve(skb,2);
 
 			if (lp->version == LAN595)

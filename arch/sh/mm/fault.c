@@ -2,7 +2,7 @@
  * Page fault handler for SH with an MMU.
  *
  *  Copyright (C) 1999  Niibe Yutaka
- *  Copyright (C) 2003  Paul Mundt
+ *  Copyright (C) 2003 - 2007  Paul Mundt
  *
  *  Based on linux/arch/i386/mm/fault.c:
  *   Copyright (C) 1995  Linus Torvalds
@@ -19,8 +19,6 @@
 #include <asm/mmu_context.h>
 #include <asm/tlbflush.h>
 #include <asm/kgdb.h>
-
-extern void die(const char *,struct pt_regs *,long);
 
 /*
  * This routine handles page faults.  It determines the address,
@@ -250,7 +248,7 @@ asmlinkage int __kprobes __do_page_fault(struct pt_regs *regs,
 	pte_t *pte;
 	pte_t entry;
 	struct mm_struct *mm = current->mm;
-	spinlock_t *ptl;
+	spinlock_t *ptl = NULL;
 	int ret = 1;
 
 #ifdef CONFIG_SH_KGDB

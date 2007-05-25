@@ -16,7 +16,6 @@
 #include <linux/sched.h>
 #include <linux/list.h>
 #include <linux/slab.h>
-#include <linux/smp_lock.h>
 #include <linux/ioctl.h>
 #include <linux/usb.h>
 #include <linux/usbdevice_fs.h>
@@ -119,8 +118,7 @@ MODULE_PARM_DESC(use_both_schemes,
 		"first one fails");
 
 
-#ifdef	DEBUG
-static inline char *portspeed (int portstatus)
+static inline char *portspeed(int portstatus)
 {
 	if (portstatus & (1 << USB_PORT_FEAT_HIGHSPEED))
     		return "480 Mb/s";
@@ -129,7 +127,6 @@ static inline char *portspeed (int portstatus)
 	else
 		return "12 Mb/s";
 }
-#endif
 
 /* Note that hdev or one of its children must be locked! */
 static inline struct usb_hub *hdev_to_hub(struct usb_device *hdev)
@@ -1367,11 +1364,15 @@ int usb_new_device(struct usb_device *udev)
 	}
 #endif
 
+	/* export the usbdev device-node for libusb */
+	udev->dev.devt = MKDEV(USB_DEVICE_MAJOR,
+			(((udev->bus->busnum-1) * 128) + (udev->devnum-1)));
+
 	/* Register the device.  The device driver is responsible
-	 * for adding the device files to usbfs and sysfs and for
-	 * configuring the device.
+	 * for adding the device files to sysfs and for configuring
+	 * the device.
 	 */
-	err = device_add (&udev->dev);
+	err = device_add(&udev->dev);
 	if (err) {
 		dev_err(&udev->dev, "can't device_add, error %d\n", err);
 		goto fail;
@@ -1855,12 +1856,8 @@ static int remote_wakeup(struct usb_device *udev)
 	usb_lock_device(udev);
 	if (udev->state == USB_STATE_SUSPENDED) {
 		dev_dbg(&udev->dev, "usb %sresume\n", "wakeup-");
-		status = usb_autoresume_device(udev);
-
-		/* Give the interface drivers a chance to do something,
-		 * then autosuspend the device again. */
-		if (status == 0)
-			usb_autosuspend_device(udev);
+		usb_mark_last_busy(udev);
+		status = usb_external_resume_device(udev);
 	}
 	usb_unlock_device(udev);
 	return status;
@@ -1983,13 +1980,6 @@ static inline int remote_wakeup(struct usb_device *udev)
 #define hub_suspend NULL
 #define hub_resume NULL
 #endif
-
-void usb_resume_root_hub(struct usb_device *hdev)
-{
-	struct usb_hub *hub = hdev_to_hub(hdev);
-
-	kick_khubd(hub);
-}
 
 
 /* USB 2.0 spec, 7.1.7.3 / fig 7-29:
@@ -2209,14 +2199,9 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 				continue;
 			}
 
-			/* Use a short timeout the first time through,
-			 * so that recalcitrant full-speed devices with
-			 * 8- or 16-byte ep0-maxpackets won't slow things
-			 * down tremendously by NAKing the unexpectedly
-			 * early status stage.  Also, retry on all errors;
-			 * some devices are flakey.
-			 * 255 is for WUSB devices, we actually need to use 512.
-			 * WUSB1.0[4.8.1].
+			/* Retry on all errors; some devices are flakey.
+			 * 255 is for WUSB devices, we actually need to use
+			 * 512 (WUSB1.0[4.8.1]).
 			 */
 			for (j = 0; j < 3; ++j) {
 				buf->bMaxPacketSize0 = 0;
@@ -2224,7 +2209,7 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 					USB_REQ_GET_DESCRIPTOR, USB_DIR_IN,
 					USB_DT_DEVICE << 8, 0,
 					buf, GET_DESCRIPTOR_BUFSIZE,
-					(i ? USB_CTRL_GET_TIMEOUT : 1000));
+					USB_CTRL_GET_TIMEOUT);
 				switch (buf->bMaxPacketSize0) {
 				case 8: case 16: case 32: case 64: case 255:
 					if (buf->bDescriptorType ==
@@ -2434,10 +2419,10 @@ static void hub_port_connect_change(struct usb_hub *hub, int port1,
 
 	if (portchange & USB_PORT_STAT_C_CONNECTION) {
 		status = hub_port_debounce(hub, port1);
-		if (status < 0 && printk_ratelimit()) {
-			dev_err (hub_dev,
-				"connect-debounce failed, port %d disabled\n",
-				port1);
+		if (status < 0) {
+			if (printk_ratelimit())
+				dev_err (hub_dev, "connect-debounce failed, "
+						"port %d disabled\n", port1);
 			goto done;
 		}
 		portstatus = status;

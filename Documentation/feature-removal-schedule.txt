@@ -6,6 +6,26 @@ be removed from this file.
 
 ---------------------------
 
+What:	MXSER
+When:	December 2007
+Why:	Old mxser driver is obsoleted by the mxser_new. Give it some time yet
+	and remove it.
+Who:	Jiri Slaby <jirislaby@gmail.com>
+
+---------------------------
+
+What:	V4L2 VIDIOC_G_MPEGCOMP and VIDIOC_S_MPEGCOMP
+When:	October 2007
+Why:	Broken attempt to set MPEG compression parameters. These ioctls are
+	not able to implement the wide variety of parameters that can be set
+	by hardware MPEG encoders. A new MPEG control mechanism was created
+	in kernel 2.6.18 that replaces these ioctls. See the V4L2 specification
+	(section 1.9: Extended controls) for more information on this topic.
+Who:	Hans Verkuil <hverkuil@xs4all.nl> and
+	Mauro Carvalho Chehab <mchehab@infradead.org>
+
+---------------------------
+
 What:	/sys/devices/.../power/state
 	dev->power.power_state
 	dpm_runtime_{suspend,resume)()
@@ -36,6 +56,15 @@ Why:	Deprecated in favour of the more efficient and robust rawiso interface.
 	(raw1394_iso_write, raw1394_start_iso_write, raw1394_start_iso_rcv,
 	raw1394_stop_iso_rcv) or bypass	libraw1394.
 Who:	Dan Dennedy <dan@dennedy.org>, Stefan Richter <stefanr@s5r6.in-berlin.de>
+
+---------------------------
+
+What:	old NCR53C9x driver
+When:	October 2007
+Why:	Replaced by the much better esp_scsi driver.  Actual low-level
+	driver can ported over almost trivially.
+Who:	David Miller <davem@davemloft.net>
+	Christoph Hellwig <hch@lst.de>
 
 ---------------------------
 
@@ -105,25 +134,6 @@ Who:   Adrian Bunk <bunk@stusta.de>
 
 ---------------------------
 
-What:	pci_module_init(driver)
-When:	January 2007
-Why:	Is replaced by pci_register_driver(pci_driver).
-Who:	Richard Knutsson <ricknu-0@student.ltu.se> and Greg Kroah-Hartman <gregkh@suse.de>
-
----------------------------
-
-What:	Usage of invalid timevals in setitimer
-When:	March 2007
-Why:	POSIX requires to validate timevals in the setitimer call. This
-	was never done by Linux. The invalid (e.g. negative timevals) were
-	silently converted to more or less random timeouts and intervals.
-	Until the removal a per boot limited number of warnings is printed
-	and the timevals are sanitized.
-
-Who:	Thomas Gleixner <tglx@linutronix.de>
-
----------------------------
-
 What:	Unused EXPORT_SYMBOL/EXPORT_SYMBOL_GPL exports
 	(temporary transition config option provided until then)
 	The transition config option will also be removed at the same time.
@@ -131,15 +141,6 @@ When:	before 2.6.19
 Why:	Unused symbols are both increasing the size of the kernel binary
 	and are often a sign of "wrong API"
 Who:	Arjan van de Ven <arjan@linux.intel.com>
-
----------------------------
-
-What:	mount/umount uevents
-When:	February 2007
-Why:	These events are not correct, and do not properly let userspace know
-	when a file system has been mounted or unmounted.  Userspace should
-	poll the /proc/mounts file instead to detect this properly.
-Who:	Greg Kroah-Hartman <gregkh@suse.de>
 
 ---------------------------
 
@@ -160,7 +161,7 @@ Who:	Greg Kroah-Hartman <gregkh@suse.de>
 ---------------------------
 
 What:	Interrupt only SA_* flags
-When:	Januar 2007
+When:	September 2007
 Why:	The interrupt related SA_* flags are replaced by IRQF_* to move them
 	out of the signal namespace.
 
@@ -187,18 +188,10 @@ Who:	Jean Delvare <khali@linux-fr.org>
 
 ---------------------------
 
-What:	i2c_adapter.dev
-	i2c_adapter.list
+What:	i2c_adapter.list
 When:	July 2007
-Why:	Superfluous, given i2c_adapter.class_dev:
-	  * The "dev" was a stand-in for the physical device node that legacy
-	    drivers would not have; but now it's almost always present.  Any
-	    remaining legacy drivers must upgrade (they now trigger warnings).
-	  * The "list" duplicates class device children.
-	The delay in removing this is so upgraded lm_sensors and libsensors
-	can get deployed.  (Removal causes minor changes in the sysfs layout,
-	notably the location of the adapter type name and parenting the i2c
-	client hardware directly from their controller.)
+Why:	Superfluous, this list duplicates the one maintained by the driver
+	core.
 Who:	Jean Delvare <khali@linux-fr.org>,
 	David Brownell <dbrownell@users.sourceforge.net>
 
@@ -208,15 +201,6 @@ What:  drivers depending on OBSOLETE_OSS
 When:  options in 2.6.22, code in 2.6.24
 Why:   OSS drivers with ALSA replacements
 Who:   Adrian Bunk <bunk@stusta.de>
-
----------------------------
-
-What:	IPv4 only connection tracking/NAT/helpers
-When:	2.6.22
-Why:	The new layer 3 independant connection tracking replaces the old
-	IPv4 only version. After some stabilization of the new code the
-	old one will be removed.
-Who:	Patrick McHardy <kaber@trash.net>
 
 ---------------------------
 
@@ -294,22 +278,71 @@ Who:	Richard Purdie <rpurdie@rpsys.net>
 
 ---------------------------
 
-What:	Wireless extensions over netlink (CONFIG_NET_WIRELESS_RTNETLINK)
-When:	with the merge of wireless-dev, 2.6.22 or later
-Why:	The option/code is
-	 * not enabled on most kernels
-	 * not required by any userspace tools (except an experimental one,
-	   and even there only for some parts, others use ioctl)
-	 * pointless since wext is no longer evolving and the ioctl
-	   interface needs to be kept
-Who:	Johannes Berg <johannes@sipsolutions.net>
+What:	Multipath cached routing support in ipv4
+When:	in 2.6.23
+Why:	Code was merged, then submitter immediately disappeared leaving
+	us with no maintainer and lots of bugs.  The code should not have
+	been merged in the first place, and many aspects of it's
+	implementation are blocking more critical core networking
+	development.  It's marked EXPERIMENTAL and no distribution
+	enables it because it cause obscure crashes due to unfixable bugs
+	(interfaces don't return errors so memory allocation can't be
+	handled, calling contexts of these interfaces make handling
+	errors impossible too because they get called after we've
+	totally commited to creating a route object, for example).
+	This problem has existed for years and no forward progress
+	has ever been made, and nobody steps up to try and salvage
+	this code, so we're going to finally just get rid of it.
+Who:	David S. Miller <davem@davemloft.net>
 
 ---------------------------
 
-What:	i8xx_tco watchdog driver
-When:	in 2.6.22
-Why:	the i8xx_tco watchdog driver has been replaced by the iTCO_wdt
-	watchdog driver.
-Who:	Wim Van Sebroeck <wim@iguana.be>
+What:	read_dev_chars(), read_conf_data{,_lpm}() (s390 common I/O layer)
+When:	December 2007
+Why:	These functions are a leftover from 2.4 times. They have several
+	problems:
+	- Duplication of checks that are done in the device driver's
+	  interrupt handler
+	- common I/O layer can't do device specific error recovery
+	- device driver can't be notified for conditions happening during
+	  execution of the function
+	Device drivers should issue the read device characteristics and read
+	configuration data ccws and do the appropriate error handling
+	themselves.
+Who:	Cornelia Huck <cornelia.huck@de.ibm.com>
 
 ---------------------------
+
+What:	i2c-ixp2000, i2c-ixp4xx and scx200_i2c drivers
+When:	September 2007
+Why:	Obsolete. The new i2c-gpio driver replaces all hardware-specific
+	I2C-over-GPIO drivers.
+Who:	Jean Delvare <khali@linux-fr.org>
+
+---------------------------
+
+What:  drivers depending on OSS_OBSOLETE
+When:  options in 2.6.23, code in 2.6.25
+Why:   obsolete OSS drivers
+Who:   Adrian Bunk <bunk@stusta.de>
+
+---------------------------
+
+What: libata spindown skipping and warning
+When: Dec 2008
+Why:  Some halt(8) implementations synchronize caches for and spin
+      down libata disks because libata didn't use to spin down disk on
+      system halt (only synchronized caches).
+      Spin down on system halt is now implemented.  sysfs node
+      /sys/class/scsi_disk/h:c:i:l/manage_start_stop is present if
+      spin down support is available.
+      Because issuing spin down command to an already spun down disk
+      makes some disks spin up just to spin down again, libata tracks
+      device spindown status to skip the extra spindown command and
+      warn about it.
+      This is to give userspace tools the time to get updated and will
+      be removed after userspace is reasonably updated.
+Who:  Tejun Heo <htejun@gmail.com>
+
+---------------------------
+

@@ -317,7 +317,7 @@ static void __meminit scatter_node_data(void)
 	 * node_online_map is not set for hot-added nodes at this time,
 	 * because we are halfway through initialization of the new node's
 	 * structures.  If for_each_online_node() is used, a new node's
-	 * pg_data_ptrs will be not initialized. Insted of using it,
+	 * pg_data_ptrs will be not initialized. Instead of using it,
 	 * pgdat_list[] is checked.
 	 */
 	for_each_node(node) {
@@ -561,7 +561,7 @@ void show_mem(void)
 	printk(KERN_INFO "%d pages shared\n", total_shared);
 	printk(KERN_INFO "%d pages swap cached\n", total_cached);
 	printk(KERN_INFO "Total of %ld pages in page table cache\n",
-	       pgtable_quicklist_total_size());
+	       quicklist_total_size());
 	printk(KERN_INFO "%d free buffer pages\n", nr_free_buffer_pages());
 }
 
@@ -693,6 +693,7 @@ void __init paging_init(void)
 	zero_page_memmap_ptr = virt_to_page(ia64_imva(empty_zero_page));
 }
 
+#ifdef CONFIG_MEMORY_HOTPLUG
 pg_data_t *arch_alloc_nodedata(int nid)
 {
 	unsigned long size = compute_pernodesize(nid);
@@ -710,3 +711,4 @@ void arch_refresh_nodedata(int update_node, pg_data_t *update_pgdat)
 	pgdat_list[update_node] = update_pgdat;
 	scatter_node_data();
 }
+#endif

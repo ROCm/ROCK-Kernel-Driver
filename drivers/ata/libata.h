@@ -52,6 +52,7 @@ enum {
 	ATA_DNXFER_QUIET	= (1 << 31),
 };
 
+extern unsigned int ata_print_id;
 extern struct workqueue_struct *ata_aux_wq;
 extern int atapi_enabled;
 extern int atapi_dmadir;
@@ -74,7 +75,8 @@ extern unsigned ata_exec_internal_sg(struct ata_device *dev,
 extern unsigned int ata_do_simple_cmd(struct ata_device *dev, u8 cmd);
 extern int ata_dev_read_id(struct ata_device *dev, unsigned int *p_class,
 			   unsigned int flags, u16 *id);
-extern int ata_dev_revalidate(struct ata_device *dev, unsigned int flags);
+extern int ata_dev_reread_id(struct ata_device *dev, unsigned int readid_flags);
+extern int ata_dev_revalidate(struct ata_device *dev, unsigned int readid_flags);
 extern int ata_dev_configure(struct ata_device *dev);
 extern int sata_down_spd_limit(struct ata_port *ap);
 extern int sata_set_spd_needed(struct ata_port *ap);
@@ -92,29 +94,26 @@ extern int ata_flush_cache(struct ata_device *dev);
 extern void ata_dev_init(struct ata_device *dev);
 extern int ata_task_ioctl(struct scsi_device *scsidev, void __user *arg);
 extern int ata_cmd_ioctl(struct scsi_device *scsidev, void __user *arg);
-extern void ata_port_init(struct ata_port *ap, struct ata_host *host,
-			  const struct ata_probe_ent *ent, unsigned int port_no);
-extern struct ata_probe_ent *ata_probe_ent_alloc(struct device *dev,
-						 const struct ata_port_info *port);
+extern struct ata_port *ata_port_alloc(struct ata_host *host);
 
 /* libata-acpi.c */
-#ifdef CONFIG_SATA_ACPI
+#ifdef CONFIG_ATA_ACPI
 extern int ata_acpi_exec_tfs(struct ata_port *ap);
-extern int ata_acpi_push_id(struct ata_port *ap, unsigned int ix);
+extern int ata_acpi_push_id(struct ata_device *dev);
 #else
 static inline int ata_acpi_exec_tfs(struct ata_port *ap)
 {
 	return 0;
 }
-static inline int ata_acpi_push_id(struct ata_port *ap, unsigned int ix)
+static inline int ata_acpi_push_id(struct ata_device *dev)
 {
 	return 0;
 }
 #endif
 
 /* libata-scsi.c */
-extern struct scsi_transport_template ata_scsi_transport_template;
-
+extern int ata_scsi_add_hosts(struct ata_host *host,
+			      struct scsi_host_template *sht);
 extern void ata_scsi_scan_host(struct ata_port *ap);
 extern int ata_scsi_offline_dev(struct ata_device *dev);
 extern void ata_scsi_hotplug(struct work_struct *work);

@@ -19,10 +19,11 @@
 
 #include <linux/pci.h>
 #include <linux/delay.h>
-
+#include <linux/jiffies.h>
 #include <asm/irq.h>
 #include <asm/hardware.h>
 #include <asm/sizes.h>
+#include <asm/signal.h>
 #include <asm/mach/pci.h>
 #include <asm/arch/pci.h>
 
@@ -88,9 +89,9 @@ void iop13xx_map_pci_memory(void)
 
 				if (end) {
 					iop13xx_atux_mem_base =
-					(u32) __ioremap_pfn(
+					(u32) __arm_ioremap_pfn(
 					__phys_to_pfn(IOP13XX_PCIX_LOWER_MEM_PA)
-					, 0, iop13xx_atux_mem_size, 0);
+					, 0, iop13xx_atux_mem_size, MT_DEVICE);
 					if (!iop13xx_atux_mem_base) {
 						printk("%s: atux allocation "
 						       "failed\n", __FUNCTION__);
@@ -114,9 +115,9 @@ void iop13xx_map_pci_memory(void)
 
 				if (end) {
 					iop13xx_atue_mem_base =
-					(u32) __ioremap_pfn(
+					(u32) __arm_ioremap_pfn(
 					__phys_to_pfn(IOP13XX_PCIE_LOWER_MEM_PA)
-					, 0, iop13xx_atue_mem_size, 0);
+					, 0, iop13xx_atue_mem_size, MT_DEVICE);
 					if (!iop13xx_atue_mem_base) {
 						printk("%s: atue allocation "
 						       "failed\n", __FUNCTION__);
@@ -144,7 +145,7 @@ void iop13xx_map_pci_memory(void)
 	}
 }
 
-static inline int iop13xx_atu_function(int atu)
+static int iop13xx_atu_function(int atu)
 {
 	int func = 0;
 	/* the function number depends on the value of the
@@ -259,7 +260,7 @@ static int iop13xx_atux_pci_status(int clear)
  * data.  Note that the data dependency on %0 encourages an abort
  * to be detected before we return.
  */
-static inline u32 iop13xx_atux_read(unsigned long addr)
+static u32 iop13xx_atux_read(unsigned long addr)
 {
 	u32 val;
 
@@ -387,7 +388,7 @@ static int iop13xx_atue_pci_status(int clear)
 	return err;
 }
 
-static inline int __init
+static int
 iop13xx_pcie_map_irq(struct pci_dev *dev, u8 idsel, u8 pin)
 {
 	WARN_ON(idsel != 0);
@@ -401,7 +402,7 @@ iop13xx_pcie_map_irq(struct pci_dev *dev, u8 idsel, u8 pin)
 	}
 }
 
-static inline u32 iop13xx_atue_read(unsigned long addr)
+static u32 iop13xx_atue_read(unsigned long addr)
 {
 	u32 val;
 
@@ -558,6 +559,14 @@ void __init iop13xx_atue_setup(void)
 {
 	int func = iop13xx_atu_function(IOP13XX_INIT_ATU_ATUE);
 	u32 reg_val;
+
+#ifdef CONFIG_PCI_MSI
+	/* BAR 0 (inbound msi window) */
+	__raw_writel(IOP13XX_MU_BASE_PHYS, IOP13XX_MU_MUBAR);
+	__raw_writel(~(IOP13XX_MU_WINDOW_SIZE - 1), IOP13XX_ATUE_IALR0);
+	__raw_writel(IOP13XX_MU_BASE_PHYS, IOP13XX_ATUE_IATVR0);
+	__raw_writel(IOP13XX_MU_BASE_PCI, IOP13XX_ATUE_IABAR0);
+#endif
 
 	/* BAR 1 (1:1 mapping with Physical RAM) */
 	/* Set limit and enable */
@@ -719,6 +728,14 @@ void __init iop13xx_atux_setup(void)
 	}
 	else
 		atux_trhfa_timeout = jiffies;
+
+#ifdef CONFIG_PCI_MSI
+	/* BAR 0 (inbound msi window) */
+	__raw_writel(IOP13XX_MU_BASE_PHYS, IOP13XX_MU_MUBAR);
+	__raw_writel(~(IOP13XX_MU_WINDOW_SIZE - 1), IOP13XX_ATUX_IALR0);
+	__raw_writel(IOP13XX_MU_BASE_PHYS, IOP13XX_ATUX_IATVR0);
+	__raw_writel(IOP13XX_MU_BASE_PCI, IOP13XX_ATUX_IABAR0);
+#endif
 
 	/* BAR 1 (1:1 mapping with Physical RAM) */
 	/* Set limit and enable */
@@ -973,7 +990,7 @@ void __init iop13xx_pci_init(void)
 			"imprecise external abort");
 }
 
-/* intialize the pci memory space.  handle any combination of
+/* initialize the pci memory space.  handle any combination of
  * atue and atux enabled/disabled
  */
 int iop13xx_pci_setup(int nr, struct pci_sys_data *sys)
@@ -1023,7 +1040,7 @@ int iop13xx_pci_setup(int nr, struct pci_sys_data *sys)
 				  << IOP13XX_ATUX_PCIXSR_FUNC_NUM;
 		__raw_writel(pcixsr, IOP13XX_ATUX_PCIXSR);
 
-		res[0].start = IOP13XX_PCIX_LOWER_IO_PA;
+		res[0].start = IOP13XX_PCIX_LOWER_IO_PA + IOP13XX_PCIX_IO_BUS_OFFSET;
 		res[0].end   = IOP13XX_PCIX_UPPER_IO_PA;
 		res[0].name  = "IQ81340 ATUX PCI I/O Space";
 		res[0].flags = IORESOURCE_IO;
@@ -1033,7 +1050,7 @@ int iop13xx_pci_setup(int nr, struct pci_sys_data *sys)
 		res[1].name  = "IQ81340 ATUX PCI Memory Space";
 		res[1].flags = IORESOURCE_MEM;
 		sys->mem_offset = IOP13XX_PCIX_MEM_OFFSET;
-		sys->io_offset = IOP13XX_PCIX_IO_OFFSET;
+		sys->io_offset = IOP13XX_PCIX_LOWER_IO_PA;
 		break;
 	case IOP13XX_INIT_ATU_ATUE:
 		/* Note: the function number field in the PCSR is ro */
@@ -1044,7 +1061,7 @@ int iop13xx_pci_setup(int nr, struct pci_sys_data *sys)
 
 		__raw_writel(pcsr, IOP13XX_ATUE_PCSR);
 
-		res[0].start = IOP13XX_PCIE_LOWER_IO_PA;
+		res[0].start = IOP13XX_PCIE_LOWER_IO_PA + IOP13XX_PCIE_IO_BUS_OFFSET;
 		res[0].end   = IOP13XX_PCIE_UPPER_IO_PA;
 		res[0].name  = "IQ81340 ATUE PCI I/O Space";
 		res[0].flags = IORESOURCE_IO;
@@ -1054,7 +1071,7 @@ int iop13xx_pci_setup(int nr, struct pci_sys_data *sys)
 		res[1].name  = "IQ81340 ATUE PCI Memory Space";
 		res[1].flags = IORESOURCE_MEM;
 		sys->mem_offset = IOP13XX_PCIE_MEM_OFFSET;
-		sys->io_offset = IOP13XX_PCIE_IO_OFFSET;
+		sys->io_offset = IOP13XX_PCIE_LOWER_IO_PA;
 		sys->map_irq = iop13xx_pcie_map_irq;
 		break;
 	default:

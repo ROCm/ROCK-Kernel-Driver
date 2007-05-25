@@ -75,7 +75,7 @@ enum SINF_BITS { SINF_NUM_BATTERIES = 0,
 static int __devinit acpi_pcc_hotkey_add (struct acpi_device *device);
 static int __devexit acpi_pcc_hotkey_remove (struct acpi_device *device,
 						int type);
-static int acpi_pcc_hotkey_resume(struct acpi_device *device, int state);
+static int acpi_pcc_hotkey_resume(struct acpi_device *device);
 
 static struct acpi_driver acpi_pcc_driver = {
 	.name =		"Panasonic PCC extra driver",
@@ -890,7 +890,7 @@ static int acpi_pcc_hotkey_remove(struct acpi_device *device, int type)
 	return 0;
 }
 
-static int acpi_pcc_hotkey_resume(struct acpi_device *device, int state)
+static int acpi_pcc_hotkey_resume(struct acpi_device *device)
 {
 	acpi_status status;
 	struct acpi_hotkey *hotkey = acpi_driver_data(device);

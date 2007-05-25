@@ -183,13 +183,6 @@ extern void nf_conntrack_hash_insert(struct nf_conn *ct);
 
 extern void nf_conntrack_flush(void);
 
-extern struct nf_conntrack_helper *
-nf_ct_helper_find_get( const struct nf_conntrack_tuple *tuple);
-extern void nf_ct_helper_put(struct nf_conntrack_helper *helper);
-
-extern struct nf_conntrack_helper *
-__nf_conntrack_helper_find_byname(const char *name);
-
 extern int nf_ct_invert_tuplepr(struct nf_conntrack_tuple *inverse,
 				const struct nf_conntrack_tuple *orig);
 
@@ -248,6 +241,11 @@ static inline int nf_ct_is_confirmed(struct nf_conn *ct)
 static inline int nf_ct_is_dying(struct nf_conn *ct)
 {
 	return test_bit(IPS_DYING_BIT, &ct->status);
+}
+
+static inline int nf_ct_is_untracked(const struct sk_buff *skb)
+{
+	return (skb->nfct == &nf_conntrack_untracked.ct_general);
 }
 
 extern unsigned int nf_conntrack_htable_size;

@@ -29,6 +29,7 @@
 #include <asm/pci-bridge.h>
 #include <asm/ppc-pci.h>
 #include <asm/firmware.h>
+#include <asm/eeh.h>
 
 static struct pci_bus *
 find_bus_among_children(struct pci_bus *bus,
@@ -78,6 +79,7 @@ pcibios_remove_pci_devices(struct pci_bus *bus)
 		pci_remove_bus_device(dev);
 	}
 }
+EXPORT_SYMBOL_GPL(pcibios_remove_pci_devices);
 
 /* Must be called before pci_bus_add_devices */
 void

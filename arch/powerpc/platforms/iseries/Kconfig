@@ -1,9 +1,15 @@
+config PPC_ISERIES
+	bool "IBM Legacy iSeries"
+	depends on PPC_MULTIPLATFORM && PPC64
+	select PPC_INDIRECT_IO
 
 menu "iSeries device drivers"
 	depends on PPC_ISERIES
 
 config VIOCONS
-	tristate "iSeries Virtual Console Support (Obsolete)"
+	bool "iSeries Virtual Console Support (Obsolete)"
+	depends on !HVC_ISERIES
+	default n
 	help
 	  This is the old virtual console driver for legacy iSeries.
 	  You should use the iSeries Hypervisor Virtual Console

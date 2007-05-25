@@ -1179,13 +1179,19 @@ UNUSUAL_DEV( 0x0a17, 0x006, 0x0000, 0xffff,
                 US_SC_DEVICE, US_PR_DEVICE, NULL,
                 US_FL_FIX_INQUIRY ),
 
-/* This is a virtual windows driver CD, which the zd1211rw driver automatically
- * converts into a WLAN device. */
+/* These are virtual windows driver CDs, which the zd1211rw driver automatically
+ * converts into a WLAN devices. */
 UNUSUAL_DEV( 0x0ace, 0x2011, 0x0101, 0x0101,
                 "ZyXEL",
                 "G-220F USB-WLAN Install",
                 US_SC_DEVICE, US_PR_DEVICE, NULL,
                 US_FL_IGNORE_DEVICE ),
+
+UNUSUAL_DEV( 0x0ace, 0x20ff, 0x0101, 0x0101,
+		"SiteCom",
+		"WL-117 USB-WLAN Install",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_IGNORE_DEVICE ),
 
 #ifdef CONFIG_USB_STORAGE_ISD200
 UNUSUAL_DEV(  0x0bf6, 0xa001, 0x0100, 0x0110,
@@ -1370,15 +1376,6 @@ UNUSUAL_DEV(  0x1210, 0x0003, 0x0100, 0x0100,
 		"DigiTech Mass Storage",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_IGNORE_RESIDUE ),
-
-/* This prevents the kernel from detecting the virtual cd-drive with the
- * Windows drivers.  <johann.wilhelm@student.tugraz.at>
-*/
-UNUSUAL_DEV( 0x12d1, 0x1003, 0x0000, 0xffff,
-		"HUAWEI",
-		"E220 USB-UMTS Install",
-		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_IGNORE_DEVICE),
 
 /* Reported by Vilius Bilinkevicius <vilisas AT xxx DOT lt) */
 UNUSUAL_DEV(  0x132b, 0x000b, 0x0001, 0x0001,

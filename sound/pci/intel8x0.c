@@ -1799,6 +1799,18 @@ static struct ac97_quirk ac97_quirks[] __devinitdata = {
 	},
 	{
 		.subvendor = 0x1028,
+		.subdevice = 0x0186,
+		.name = "Dell Latitude D810", /* cf. Malone #41015 */
+		.type = AC97_TUNE_HP_MUTE_LED
+	},
+	{
+		.subvendor = 0x1028,
+		.subdevice = 0x0188,
+		.name = "Dell Inspiron 6000",
+		.type = AC97_TUNE_HP_MUTE_LED /* cf. Malone #41015 */
+	},
+	{
+		.subvendor = 0x1028,
 		.subdevice = 0x0191,
 		.name = "Dell Inspiron 8600",
 		.type = AC97_TUNE_HP_ONLY
@@ -1819,7 +1831,7 @@ static struct ac97_quirk ac97_quirks[] __devinitdata = {
 		.subvendor = 0x103c,
 		.subdevice = 0x088c,
 		.name = "HP nc8000",
-		.type = AC97_TUNE_MUTE_LED
+		.type = AC97_TUNE_HP_MUTE_LED
 	},
 	{
 		.subvendor = 0x103c,
@@ -1909,6 +1921,12 @@ static struct ac97_quirk ac97_quirks[] __devinitdata = {
 		.subvendor = 0x10cf,
 		.subdevice = 0x1253,
 		.name = "Fujitsu S6210",	/* STAC9750/51 */
+		.type = AC97_TUNE_HP_ONLY
+	},
+	{
+		.subvendor = 0x10cf,
+		.subdevice = 0x127e,
+		.name = "Fujitsu Lifebook C1211D",
 		.type = AC97_TUNE_HP_ONLY
 	},
 	{
@@ -2493,6 +2511,7 @@ static int intel8x0_resume(struct pci_dev *pci)
 		return -EIO;
 	}
 	pci_set_master(pci);
+	snd_intel8x0_chip_init(chip, 0);
 	if (request_irq(pci->irq, snd_intel8x0_interrupt,
 			IRQF_SHARED, card->shortname, chip)) {
 		printk(KERN_ERR "intel8x0: unable to grab IRQ %d, "
@@ -2502,7 +2521,6 @@ static int intel8x0_resume(struct pci_dev *pci)
 	}
 	chip->irq = pci->irq;
 	synchronize_irq(chip->irq);
-	snd_intel8x0_chip_init(chip, 0);
 
 	/* re-initialize mixer stuff */
 	if (chip->device_type == DEVICE_INTEL_ICH4 && !spdif_aclink) {
@@ -2862,16 +2880,7 @@ static int __devinit snd_intel8x0_create(struct snd_card *card,
 		ICH_REG_ALI_INTERRUPTSR : ICH_REG_GLOB_STA;
 	chip->int_sta_mask = int_sta_masks;
 
-	/* request irq after initializaing int_sta_mask, etc */
-	if (request_irq(pci->irq, snd_intel8x0_interrupt,
-			IRQF_SHARED, card->shortname, chip)) {
-		snd_printk(KERN_ERR "unable to grab IRQ %d\n", pci->irq);
-		snd_intel8x0_free(chip);
-		return -EBUSY;
-	}
-	chip->irq = pci->irq;
 	pci_set_master(pci);
-	synchronize_irq(chip->irq);
 
 	switch(chip->device_type) {
 	case DEVICE_INTEL_ICH4:
@@ -2900,6 +2909,15 @@ static int __devinit snd_intel8x0_create(struct snd_card *card,
 		snd_intel8x0_free(chip);
 		return err;
 	}
+
+	/* request irq after initializaing int_sta_mask, etc */
+	if (request_irq(pci->irq, snd_intel8x0_interrupt,
+			IRQF_SHARED, card->shortname, chip)) {
+		snd_printk(KERN_ERR "unable to grab IRQ %d\n", pci->irq);
+		snd_intel8x0_free(chip);
+		return -EBUSY;
+	}
+	chip->irq = pci->irq;
 
 	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, chip, &ops)) < 0) {
 		snd_intel8x0_free(chip);

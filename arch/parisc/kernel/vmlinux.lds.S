@@ -51,7 +51,7 @@ SECTIONS
 
   _text = .;			/* Text and read-only data */
   .text ALIGN(16) : {
-	*(.text)
+	TEXT_TEXT
 	SCHED_TEXT
 	LOCK_TEXT
 	*(.text.do_softirq)
@@ -91,7 +91,7 @@ SECTIONS
 
   . = ALIGN(L1_CACHE_BYTES);
   .data : {			/* Data */
-	*(.data)
+	DATA_DATA
 	CONSTRUCTORS
 	}
 
@@ -181,7 +181,7 @@ SECTIONS
   .init.ramfs : { *(.init.ramfs) }
   __initramfs_end = .;
 #endif
-  . = ALIGN(32);
+  . = ALIGN(ASM_PAGE_SIZE);
   __per_cpu_start = .;
   .data.percpu  : { *(.data.percpu) }
   __per_cpu_end = .;

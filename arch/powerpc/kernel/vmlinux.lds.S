@@ -34,7 +34,7 @@ SECTIONS
 	/* Text and gots */
 	.text : {
 		_text = .;
-		*(.text .text.*)
+		TEXT_TEXT
 		SCHED_TEXT
 		LOCK_TEXT
 		KPROBES_TEXT
@@ -139,11 +139,7 @@ SECTIONS
 		__initramfs_end = .;
 	}
 #endif
-#ifdef CONFIG_PPC32
-	. = ALIGN(32);
-#else
-	. = ALIGN(128);
-#endif
+	. = ALIGN(PAGE_SIZE);
 	.data.percpu : {
 		__per_cpu_start = .;
 		*(.data.percpu)
@@ -171,7 +167,7 @@ SECTIONS
 #ifdef CONFIG_PPC32
 	.data    :
 	{
-		*(.data)
+		DATA_DATA
 		*(.sdata)
 		*(.got.plt) *(.got)
 	}

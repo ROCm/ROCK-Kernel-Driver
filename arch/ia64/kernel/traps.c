@@ -19,32 +19,16 @@
 #include <linux/hardirq.h>
 #include <linux/kprobes.h>
 #include <linux/delay.h>		/* for ssleep() */
+#include <linux/kdebug.h>
 
 #include <asm/fpswa.h>
 #include <asm/ia32.h>
 #include <asm/intrinsics.h>
 #include <asm/processor.h>
 #include <asm/uaccess.h>
-#include <asm/kdebug.h>
 
 fpswa_interface_t *fpswa_interface;
 EXPORT_SYMBOL(fpswa_interface);
-
-ATOMIC_NOTIFIER_HEAD(ia64die_chain);
-
-int
-register_die_notifier(struct notifier_block *nb)
-{
-	return atomic_notifier_chain_register(&ia64die_chain, nb);
-}
-EXPORT_SYMBOL_GPL(register_die_notifier);
-
-int
-unregister_die_notifier(struct notifier_block *nb)
-{
-	return atomic_notifier_chain_unregister(&ia64die_chain, nb);
-}
-EXPORT_SYMBOL_GPL(unregister_die_notifier);
 
 void __init
 trap_init (void)
@@ -62,9 +46,9 @@ die (const char *str, struct pt_regs *regs, long err)
 		u32 lock_owner;
 		int lock_owner_depth;
 	} die = {
-		.lock =			SPIN_LOCK_UNLOCKED,
-		.lock_owner =		-1,
-		.lock_owner_depth =	0
+		.lock =	__SPIN_LOCK_UNLOCKED(die.lock),
+		.lock_owner = -1,
+		.lock_owner_depth = 0
 	};
 	static int die_counter;
 	int cpu = get_cpu();
@@ -338,7 +322,7 @@ handle_fpu_swa (int fp_fault, struct pt_regs *regs, unsigned long isr)
 			 * Lower 4 bits are used as a count. Upper bits are a sequence
 			 * number that is updated when count is reset. The cmpxchg will
 			 * fail is seqno has changed. This minimizes mutiple cpus
-			 * reseting the count.
+			 * resetting the count.
 			 */
 			if (current_jiffies > last.time)
 				(void) cmpxchg_acq(&last.count, count, 16 + (count & ~15));

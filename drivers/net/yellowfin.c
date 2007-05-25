@@ -109,7 +109,6 @@ static int gx_fix;
 /* These identify the driver base version and may not be removed. */
 static char version[] __devinitdata =
 KERN_INFO DRV_NAME ".c:v1.05  1/09/2001  Written by Donald Becker <becker@scyld.com>\n"
-KERN_INFO "  http://www.scyld.com/network/yellowfin.html\n"
 KERN_INFO "  (unofficial 2.4.x port, " DRV_VERSION ", " DRV_RELDATE ")\n";
 
 MODULE_AUTHOR("Donald Becker <becker@scyld.com>");
@@ -1137,7 +1136,6 @@ static int yellowfin_rx(struct net_device *dev)
 				skb = dev_alloc_skb(pkt_len + 2);
 				if (skb == NULL)
 					break;
-				skb->dev = dev;
 				skb_reserve(skb, 2);	/* 16 byte align the IP header */
 				eth_copy_and_sum(skb, rx_skb->data, pkt_len, 0);
 				skb_put(skb, pkt_len);

@@ -445,9 +445,12 @@ END_FTR_SECTION(CPU_FTR_NOEXECUTE|CPU_FTR_COHERENT_ICACHE, CPU_FTR_NOEXECUTE)
 
 htab_insert_pte:
 	/* real page number in r5, PTE RPN value + index */
-	rldicl	r5,r31,64-PTE_RPN_SHIFT,PTE_RPN_SHIFT
+	andis.	r0,r31,_PAGE_4K_PFN@h
+	srdi	r5,r31,PTE_RPN_SHIFT
+	bne-	htab_special_pfn
 	sldi	r5,r5,PAGE_SHIFT-HW_PAGE_SHIFT
 	add	r5,r5,r25
+htab_special_pfn:
 	sldi	r5,r5,HW_PAGE_SHIFT
 
 	/* Calculate primary group hash */
@@ -612,6 +615,9 @@ htab_pte_insert_failure:
 	li	r3,-1
 	b	htab_bail
 
+#endif /* CONFIG_PPC_64K_PAGES */
+
+#ifdef CONFIG_PPC_HAS_HASH_64K
 
 /*****************************************************************************
  *                                                                           *
@@ -867,7 +873,7 @@ ht64_pte_insert_failure:
 	b	ht64_bail
 
 
-#endif /* CONFIG_PPC_64K_PAGES */
+#endif /* CONFIG_PPC_HAS_HASH_64K */
 
 
 /*****************************************************************************

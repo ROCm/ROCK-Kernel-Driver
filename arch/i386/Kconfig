@@ -21,17 +21,15 @@ config GENERIC_TIME
 config CLOCKSOURCE_WATCHDOG
 	bool
 	default y
-	depends on !X86_XEN
 
 config GENERIC_CLOCKEVENTS
 	bool
 	default y
-	depends on !X86_XEN
 
 config GENERIC_CLOCKEVENTS_BROADCAST
 	bool
 	default y
-	depends on X86_LOCAL_APIC && !X86_XEN
+	depends on X86_LOCAL_APIC
 
 config LOCKDEP_SUPPORT
 	bool
@@ -54,6 +52,10 @@ config MMU
 	default y
 
 config ZONE_DMA
+	bool
+	default y
+
+config QUICKLIST
 	bool
 	default y
 
@@ -128,15 +130,6 @@ config X86_PC
 	bool "PC-compatible"
 	help
 	  Choose this option if your computer is a standard PC or compatible.
-
-config X86_XEN
-	bool "Xen-compatible"
-	select X86_UP_APIC if !SMP && XEN_PRIVILEGED_GUEST
-	select X86_UP_IOAPIC if !SMP && XEN_PRIVILEGED_GUEST
-	select SWIOTLB
-	help
-	  Choose this option if you plan to run this kernel on top of the
-	  Xen Hypervisor.
 
 config X86_ELAN
 	bool "AMD Elan"
@@ -220,7 +213,7 @@ endchoice
 config PARAVIRT
 	bool "Paravirtualization support (EXPERIMENTAL)"
 	depends on EXPERIMENTAL
-	depends on !(X86_VISWS || X86_VOYAGER || X86_XEN)
+	depends on !(X86_VISWS || X86_VOYAGER)
 	help
 	  Paravirtualization is a way of running multiple instances of
 	  Linux on the same machine, under a hypervisor.  This option
@@ -231,7 +224,7 @@ config PARAVIRT
 
 config VMI
 	bool "VMI Paravirt-ops support"
-	depends on PARAVIRT && !COMPAT_VDSO
+	depends on PARAVIRT
 	help
 	  VMI provides a paravirtualized interface to the VMware ESX server
 	  (it could be used by other hypervisors in theory too, but is not
@@ -268,7 +261,6 @@ source "arch/i386/Kconfig.cpu"
 
 config HPET_TIMER
 	bool "HPET Timer Support"
-	depends on !X86_XEN
 	help
 	  This enables the use of the HPET for the kernel's internal timer.
 	  HPET is the next generation timer replacing legacy 8254s.
@@ -319,7 +311,7 @@ source "kernel/Kconfig.preempt"
 
 config X86_UP_APIC
 	bool "Local APIC support on uniprocessors"
-	depends on !SMP && !(X86_VISWS || X86_VOYAGER || X86_GENERICARCH || XEN_UNPRIVILEGED_GUEST)
+	depends on !SMP && !(X86_VISWS || X86_VOYAGER || X86_GENERICARCH)
 	help
 	  A local APIC (Advanced Programmable Interrupt Controller) is an
 	  integrated interrupt controller in the CPU. If you have a single-CPU
@@ -344,12 +336,12 @@ config X86_UP_IOAPIC
 
 config X86_LOCAL_APIC
 	bool
-	depends on X86_UP_APIC || ((X86_VISWS || SMP) && !(X86_VOYAGER || XEN_UNPRIVILEGED_GUEST)) || X86_GENERICARCH
+	depends on X86_UP_APIC || ((X86_VISWS || SMP) && !X86_VOYAGER) || X86_GENERICARCH
 	default y
 
 config X86_IO_APIC
 	bool
-	depends on X86_UP_IOAPIC || (SMP && !(X86_VISWS || X86_VOYAGER || XEN_UNPRIVILEGED_GUEST)) || X86_GENERICARCH
+	depends on X86_UP_IOAPIC || (SMP && !(X86_VISWS || X86_VOYAGER)) || X86_GENERICARCH
 	default y
 
 config X86_VISWS_APIC
@@ -359,7 +351,7 @@ config X86_VISWS_APIC
 
 config X86_MCE
 	bool "Machine Check Exception"
-	depends on !(X86_VOYAGER || X86_XEN)
+	depends on !X86_VOYAGER
 	---help---
 	  Machine Check Exception support allows the processor to notify the
 	  kernel if it detects a problem (e.g. overheating, component failure).
@@ -458,7 +450,6 @@ config X86_REBOOTFIXUPS
 
 config MICROCODE
 	tristate "/dev/cpu/microcode - Intel IA32 CPU microcode support"
-	depends on !XEN_UNPRIVILEGED_GUEST
 	select FW_LOADER
 	---help---
 	  If you say Y here and also to "/dev file system support" in the
@@ -482,7 +473,6 @@ config MICROCODE_OLD_INTERFACE
 
 config X86_MSR
 	tristate "/dev/cpu/*/msr - Model-specific register support"
-	depends on !X86_XEN
 	help
 	  This device gives privileged processes access to the x86
 	  Model-Specific Registers (MSRs).  It is a character device with
@@ -497,10 +487,6 @@ config X86_CPUID
 	  be executed on a specific processor.  It is a character device
 	  with major 203 and minors 0 to 31 for /dev/cpu/0/cpuid to
 	  /dev/cpu/31/cpuid.
-
-config SWIOTLB
-	bool
-	default n
 
 source "drivers/firmware/Kconfig"
 
@@ -589,6 +575,9 @@ choice
 		bool "3G/1G user/kernel split (for full 1G low memory)"
 	config VMSPLIT_2G
 		bool "2G/2G user/kernel split"
+	config VMSPLIT_2G_OPT
+		depends on !HIGHMEM
+		bool "2G/2G user/kernel split (for full 2G low memory)"
 	config VMSPLIT_1G
 		bool "1G/3G user/kernel split"
 endchoice
@@ -596,7 +585,8 @@ endchoice
 config PAGE_OFFSET
 	hex
 	default 0xB0000000 if VMSPLIT_3G_OPT
-	default 0x78000000 if VMSPLIT_2G
+	default 0x80000000 if VMSPLIT_2G
+	default 0x78000000 if VMSPLIT_2G_OPT
 	default 0x40000000 if VMSPLIT_1G
 	default 0xC0000000
 
@@ -684,7 +674,6 @@ config HIGHPTE
 
 config MATH_EMULATION
 	bool "Math emulation"
-	depends on !X86_XEN
 	---help---
 	  Linux can emulate a math coprocessor (used for floating point
 	  operations) if you don't have one. 486DX and Pentium processors have
@@ -710,8 +699,6 @@ config MATH_EMULATION
 
 config MTRR
 	bool "MTRR (Memory Type Range Register) support"
-	depends on !XEN_UNPRIVILEGED_GUEST
-	default y if X86_XEN
 	---help---
 	  On Intel P6 family processors (Pentium Pro, Pentium II and later)
 	  the Memory Type Range Registers (MTRRs) may be used to control
@@ -746,7 +733,7 @@ config MTRR
 
 config EFI
 	bool "Boot from EFI support"
-	depends on ACPI && !X86_XEN
+	depends on ACPI
 	default n
 	---help---
 	This enables the kernel to boot on EFI platforms using
@@ -764,7 +751,7 @@ config EFI
 
 config IRQBALANCE
  	bool "Enable kernel irq balancing"
-	depends on SMP && X86_IO_APIC && !X86_XEN
+	depends on SMP && X86_IO_APIC
 	default y
 	help
  	  The default yes will allow the kernel to do irq load balancing.
@@ -798,7 +785,6 @@ source kernel/Kconfig.hz
 
 config KEXEC
 	bool "kexec system call"
-	depends on !XEN_UNPRIVILEGED_GUEST
 	help
 	  kexec is a system call that implements the ability to shutdown your
 	  current kernel, and to start another kernel.  It is like a reboot
@@ -870,11 +856,11 @@ config PHYSICAL_START
 
 config RELOCATABLE
 	bool "Build a relocatable kernel(EXPERIMENTAL)"
-	depends on EXPERIMENTAL && !X86_XEN
+	depends on EXPERIMENTAL
 	help
-	  This build a kernel image that retains relocation information
+	  This builds a kernel image that retains relocation information
           so it can be loaded someplace besides the default 1MB.
-	  The relocations tend to the kernel binary about 10% larger,
+	  The relocations tend to make the kernel binary about 10% larger,
           but are discarded at runtime.
 
 	  One use is for the kexec on panic case where the recovery kernel
@@ -905,7 +891,7 @@ config PHYSICAL_ALIGN
 	  Don't change this unless you know what you are doing.
 
 config HOTPLUG_CPU
-	bool "Support for hot-pluggable CPUs (EXPERIMENTAL)"
+	bool "Support for suspend on SMP and hot-pluggable CPUs (EXPERIMENTAL)"
 	depends on SMP && HOTPLUG && EXPERIMENTAL && !X86_VOYAGER
 	---help---
 	  Say Y here to experiment with turning CPUs off and on, and to
@@ -931,20 +917,15 @@ config ARCH_ENABLE_MEMORY_HOTPLUG
 	depends on HIGHMEM
 
 menu "Power management options (ACPI, APM)"
-	depends on !(X86_VOYAGER || XEN_UNPRIVILEGED_GUEST)
+	depends on !X86_VOYAGER
 
-if !X86_XEN
 source kernel/power/Kconfig
-endif
 
 source "drivers/acpi/Kconfig"
 
-menu "APM (Advanced Power Management) BIOS Support"
-depends on PM && !(X86_VISWS || X86_XEN)
-
-config APM
+menuconfig APM
 	tristate "APM (Advanced Power Management) BIOS support"
-	depends on PM && PM_LEGACY
+	depends on PM && !X86_VISWS
 	---help---
 	  APM is a BIOS specification for saving power using several different
 	  techniques. This is mostly useful for battery powered laptops with
@@ -1001,9 +982,10 @@ config APM
 	  To compile this driver as a module, choose M here: the
 	  module will be called apm.
 
+if APM
+
 config APM_IGNORE_USER_SUSPEND
 	bool "Ignore USER SUSPEND"
-	depends on APM
 	help
 	  This option will ignore USER SUSPEND requests. On machines with a
 	  compliant APM BIOS, you want to say N. However, on the NEC Versa M
@@ -1011,7 +993,6 @@ config APM_IGNORE_USER_SUSPEND
 
 config APM_DO_ENABLE
 	bool "Enable PM at boot time"
-	depends on APM
 	---help---
 	  Enable APM features at boot time. From page 36 of the APM BIOS
 	  specification: "When disabled, the APM BIOS does not automatically
@@ -1029,7 +1010,6 @@ config APM_DO_ENABLE
 
 config APM_CPU_IDLE
 	bool "Make CPU Idle calls when idle"
-	depends on APM
 	help
 	  Enable calls to APM CPU Idle/CPU Busy inside the kernel's idle loop.
 	  On some machines, this can activate improved power savings, such as
@@ -1041,7 +1021,6 @@ config APM_CPU_IDLE
 
 config APM_DISPLAY_BLANK
 	bool "Enable console blanking using APM"
-	depends on APM
 	help
 	  Enable console blanking using the APM. Some laptops can use this to
 	  turn off the LCD backlight when the screen blanker of the Linux
@@ -1053,22 +1032,8 @@ config APM_DISPLAY_BLANK
 	  backlight at all, or it might print a lot of errors to the console,
 	  especially if you are using gpm.
 
-config APM_RTC_IS_GMT
-	bool "RTC stores time in GMT"
-	depends on APM
-	help
-	  Say Y here if your RTC (Real Time Clock a.k.a. hardware clock)
-	  stores the time in GMT (Greenwich Mean Time). Say N if your RTC
-	  stores localtime.
-
-	  It is in fact recommended to store GMT in your RTC, because then you
-	  don't have to worry about daylight savings time changes. The only
-	  reason not to use GMT in your RTC is if you also run a broken OS
-	  that doesn't understand GMT.
-
 config APM_ALLOW_INTS
 	bool "Allow interrupts during APM BIOS calls"
-	depends on APM
 	help
 	  Normally we disable external interrupts while we are making calls to
 	  the APM BIOS as a measure to lessen the effects of a badly behaving
@@ -1079,17 +1044,14 @@ config APM_ALLOW_INTS
 
 config APM_REAL_MODE_POWER_OFF
 	bool "Use real mode APM BIOS call to power off"
-	depends on APM
 	help
 	  Use real mode APM BIOS calls to switch off the computer. This is
 	  a work-around for a number of buggy BIOSes. Switch this option on if
 	  your computer crashes instead of powering off properly.
 
-endmenu
+endif # APM
 
-if !X86_XEN
 source "arch/i386/kernel/cpu/cpufreq/Kconfig"
-endif
 
 endmenu
 
@@ -1099,6 +1061,7 @@ config PCI
 	bool "PCI support" if !X86_VISWS
 	depends on !X86_VOYAGER
 	default y if X86_VISWS
+	select ARCH_SUPPORTS_MSI if (X86_LOCAL_APIC && X86_IO_APIC)
 	help
 	  Find out whether you have a PCI motherboard. PCI is the name of a
 	  bus system, i.e. the way the CPU talks to the other stuff inside
@@ -1131,20 +1094,12 @@ choice
 
 config PCI_GOBIOS
 	bool "BIOS"
-	depends on !X86_XEN
 
 config PCI_GOMMCONFIG
 	bool "MMConfig"
 
 config PCI_GODIRECT
 	bool "Direct"
-
-config PCI_GOXEN_FE
-	bool "Xen PCI Frontend"
-	depends on X86_XEN
-	help
-	  The PCI device frontend driver allows the kernel to import arbitrary
-	  PCI devices from a PCI backend to support PCI driver domains.
 
 config PCI_GOANY
 	bool "Any"
@@ -1153,7 +1108,7 @@ endchoice
 
 config PCI_BIOS
 	bool
-	depends on !(X86_VISWS || X86_XEN) && PCI && (PCI_GOBIOS || PCI_GOANY)
+	depends on !X86_VISWS && PCI && (PCI_GOBIOS || PCI_GOANY)
 	default y
 
 config PCI_DIRECT
@@ -1166,18 +1121,6 @@ config PCI_MMCONFIG
 	depends on PCI && ACPI && (PCI_GOMMCONFIG || PCI_GOANY)
 	default y
 
-config XEN_PCIDEV_FRONTEND
-	bool
-	depends on PCI && X86_XEN && (PCI_GOXEN_FE || PCI_GOANY)
-	default y
-
-config XEN_PCIDEV_FE_DEBUG
-	bool "Xen PCI Frontend Debugging"
-	depends on XEN_PCIDEV_FRONTEND
-	default n
-	help
-	  Enables some debug statements within the PCI Frontend.
-
 source "drivers/pci/pcie/Kconfig"
 
 source "drivers/pci/Kconfig"
@@ -1188,7 +1131,7 @@ config ISA_DMA_API
 
 config ISA
 	bool "ISA support"
-	depends on !(X86_VOYAGER || X86_VISWS || X86_XEN)
+	depends on !(X86_VOYAGER || X86_VISWS)
 	help
 	  Find out whether you have ISA slots on your motherboard.  ISA is the
 	  name of a bus system, i.e. the way the CPU talks to the other stuff
@@ -1215,7 +1158,7 @@ config EISA
 source "drivers/eisa/Kconfig"
 
 config MCA
-	bool "MCA support" if !(X86_VISWS || X86_VOYAGER || X86_XEN)
+	bool "MCA support" if !(X86_VISWS || X86_VOYAGER)
 	default y if X86_VOYAGER
 	help
 	  MicroChannel Architecture is found in some IBM PS/2 machines and
@@ -1291,8 +1234,6 @@ source "security/Kconfig"
 
 source "crypto/Kconfig"
 
-source "drivers/xen/Kconfig"
-
 source "lib/Kconfig"
 
 #
@@ -1318,7 +1259,7 @@ config X86_SMP
 
 config X86_HT
 	bool
-	depends on SMP && !(X86_VISWS || X86_VOYAGER || X86_XEN)
+	depends on SMP && !(X86_VISWS || X86_VOYAGER)
 	default y
 
 config X86_BIOS_REBOOT
@@ -1329,16 +1270,6 @@ config X86_BIOS_REBOOT
 config X86_TRAMPOLINE
 	bool
 	depends on X86_SMP || (X86_VOYAGER && SMP)
-	default y
-
-config X86_NO_TSS
-	bool
-	depends on X86_XEN
-	default y
-
-config X86_NO_IDT
-	bool
-	depends on X86_XEN
 	default y
 
 config KTIME_SCALAR

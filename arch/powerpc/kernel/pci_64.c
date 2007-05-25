@@ -41,6 +41,7 @@
 
 unsigned long pci_probe_only = 1;
 int pci_assign_all_buses = 0;
+static int pci_initial_scan_done;
 
 static void fixup_resource(struct resource *res, struct pci_dev *dev);
 static void do_bus_setup(struct pci_bus *bus);
@@ -61,14 +62,24 @@ void iSeries_pcibios_init(void);
 
 LIST_HEAD(hose_list);
 
-struct dma_mapping_ops *pci_dma_ops;
-EXPORT_SYMBOL(pci_dma_ops);
+static struct dma_mapping_ops *pci_dma_ops;
 
 int global_phb_number;		/* Global phb counter */
 
 /* Cached ISA bridge dev. */
 struct pci_dev *ppc64_isabridge_dev = NULL;
 EXPORT_SYMBOL_GPL(ppc64_isabridge_dev);
+
+void set_pci_dma_ops(struct dma_mapping_ops *dma_ops)
+{
+	pci_dma_ops = dma_ops;
+}
+
+struct dma_mapping_ops *get_pci_dma_ops(void)
+{
+	return pci_dma_ops;
+}
+EXPORT_SYMBOL(get_pci_dma_ops);
 
 static void fixup_broken_pcnet32(struct pci_dev* dev)
 {
@@ -258,7 +269,7 @@ static u32 get_int_prop(struct device_node *np, const char *name, u32 def)
 	const u32 *prop;
 	int len;
 
-	prop = get_property(np, name, &len);
+	prop = of_get_property(np, name, &len);
 	if (prop && len >= 4)
 		return *prop;
 	return def;
@@ -291,7 +302,7 @@ static void pci_parse_of_addrs(struct device_node *node, struct pci_dev *dev)
 	u32 i;
 	int proplen;
 
-	addrs = get_property(node, "assigned-addresses", &proplen);
+	addrs = of_get_property(node, "assigned-addresses", &proplen);
 	if (!addrs)
 		return;
 	DBG("    parse addresses (%d bytes) @ %p\n", proplen, addrs);
@@ -330,10 +341,10 @@ struct pci_dev *of_create_pci_dev(struct device_node *node,
 	struct pci_dev *dev;
 	const char *type;
 
-	dev = kzalloc(sizeof(struct pci_dev), GFP_KERNEL);
+	dev = alloc_pci_dev();
 	if (!dev)
 		return NULL;
-	type = get_property(node, "device_type", NULL);
+	type = of_get_property(node, "device_type", NULL);
 	if (type == NULL)
 		type = "";
 
@@ -397,7 +408,7 @@ void __devinit of_scan_bus(struct device_node *node,
 
 	while ((child = of_get_next_child(node, child)) != NULL) {
 		DBG("  * %s\n", child->full_name);
-		reg = get_property(child, "reg", &reglen);
+		reg = of_get_property(child, "reg", &reglen);
 		if (reg == NULL || reglen < 20)
 			continue;
 		devfn = (reg[0] >> 8) & 0xff;
@@ -430,13 +441,13 @@ void __devinit of_scan_pci_bridge(struct device_node *node,
 	DBG("of_scan_pci_bridge(%s)\n", node->full_name);
 
 	/* parse bus-range property */
-	busrange = get_property(node, "bus-range", &len);
+	busrange = of_get_property(node, "bus-range", &len);
 	if (busrange == NULL || len != 8) {
 		printk(KERN_DEBUG "Can't get bus-range for PCI-PCI bridge %s\n",
 		       node->full_name);
 		return;
 	}
-	ranges = get_property(node, "ranges", &len);
+	ranges = of_get_property(node, "ranges", &len);
 	if (ranges == NULL) {
 		printk(KERN_DEBUG "Can't get ranges for PCI-PCI bridge %s\n",
 		       node->full_name);
@@ -593,6 +604,8 @@ static int __init pcibios_init(void)
 	if (!firmware_has_feature(FW_FEATURE_ISERIES))
 		/* map in PCI I/O space */
 		phbs_remap_io();
+
+	pci_initial_scan_done = 1;
 
 	printk(KERN_DEBUG "PCI: Probing PCI hardware done\n");
 
@@ -900,7 +913,7 @@ static void __devinit pci_process_ISA_OF_ranges(struct device_node *isa_node,
 	unsigned int size;
 	int rlen = 0;
 
-	range = get_property(isa_node, "ranges", &rlen);
+	range = of_get_property(isa_node, "ranges", &rlen);
 	if (range == NULL || (rlen < sizeof(struct isa_range))) {
 		printk(KERN_ERR "no ISA ranges or unexpected isa range size,"
 		       "mapping 64k\n");
@@ -947,7 +960,7 @@ void __devinit pci_process_bridge_OF_ranges(struct pci_controller *hose,
 	int rlen = 0;
 	int memno = 0;
 	struct resource *res;
-	int np, na = prom_n_addr_cells(dev);
+	int np, na = of_n_addr_cells(dev);
 	unsigned long pci_addr, cpu_phys_addr;
 
 	np = na + 5;
@@ -960,7 +973,7 @@ void __devinit pci_process_bridge_OF_ranges(struct pci_controller *hose,
 	 *			(size depending on dev->n_addr_cells)
 	 *   cells 4+5 or 5+6:	the size of the range
 	 */
-	ranges = get_property(dev, "ranges", &rlen);
+	ranges = of_get_property(dev, "ranges", &rlen);
 	if (ranges == NULL)
 		return;
 	hose->io_base_phys = 0;
@@ -1032,12 +1045,15 @@ void __devinit pci_process_bridge_OF_ranges(struct pci_controller *hose,
 	}
 }
 
-void __init pci_setup_phb_io(struct pci_controller *hose, int primary)
+void __devinit pci_setup_phb_io(struct pci_controller *hose, int primary)
 {
 	unsigned long size = hose->pci_io_size;
 	unsigned long io_virt_offset;
 	struct resource *res;
 	struct device_node *isa_dn;
+
+	if (size == 0)
+		return;
 
 	hose->io_base_virt = reserve_phb_iospace(size);
 	DBG("phb%d io_base_phys 0x%lx io_base_virt 0x%lx\n",
@@ -1059,6 +1075,15 @@ void __init pci_setup_phb_io(struct pci_controller *hose, int primary)
 	res = &hose->io_resource;
 	res->start += io_virt_offset;
 	res->end += io_virt_offset;
+
+	/* If this is called after the initial PCI scan, then we need to
+	 * proceed to IO mappings now
+	 */
+	if (pci_initial_scan_done)
+		__ioremap_explicit(hose->io_base_phys,
+				   (unsigned long)hose->io_base_virt,
+				   hose->pci_io_size,
+				   _PAGE_NO_CACHE | _PAGE_GUARDED);
 }
 
 void __devinit pci_setup_phb_io_dynamic(struct pci_controller *hose,
@@ -1067,6 +1092,9 @@ void __devinit pci_setup_phb_io_dynamic(struct pci_controller *hose,
 	unsigned long size = hose->pci_io_size;
 	unsigned long io_virt_offset;
 	struct resource *res;
+
+	if (size == 0)
+		return;
 
 	hose->io_base_virt = __ioremap(hose->io_base_phys, size,
 					_PAGE_NO_CACHE | _PAGE_GUARDED);
@@ -1095,6 +1123,9 @@ static int get_bus_io_range(struct pci_bus *bus, unsigned long *start_phys,
 	else
 		/* Root Bus */
 		res = &hose->io_resource;
+
+	if (res->end == 0 && res->start == 0)
+		return 1;
 
 	*start_virt = pci_io_base + res->start;
 	*start_phys = *start_virt + hose->io_base_phys

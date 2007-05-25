@@ -35,7 +35,7 @@ static unsigned long ns9xxx_timer_gettimeoffset(void)
 {
 	/* return the microseconds which have passed since the last interrupt
 	 * was _serviced_.  That is, if an interrupt is pending or the counter
-	 * reloads, return one periode more. */
+	 * reloads, return one period more. */
 
 	u32 counter1 = SYS_TR(0);
 	int pending = SYS_ISR & (1 << IRQ_TIMER0);
@@ -53,7 +53,7 @@ static unsigned long ns9xxx_timer_gettimeoffset(void)
 
 static struct irqaction ns9xxx_timer_irq = {
 	.name = "NS9xxx Timer Tick",
-	.flags = IRQF_DISABLED | IRQF_TIMER,
+	.flags = IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
 	.handler = ns9xxx_timer_interrupt,
 };
 

@@ -113,7 +113,7 @@ void __init efika_pcisetup(void)
 		return;
 	}
 
-	bus_range = get_property(pcictrl, "bus-range", &len);
+	bus_range = of_get_property(pcictrl, "bus-range", &len);
 	if (bus_range == NULL || len < 2 * sizeof(int)) {
 		printk(KERN_WARNING EFIKA_PLATFORM_NAME
 		       ": Can't get bus-range for %s\n", pcictrl->full_name);
@@ -159,18 +159,17 @@ void __init efika_pcisetup(void)
 static void efika_show_cpuinfo(struct seq_file *m)
 {
 	struct device_node *root;
-	const char *revision = NULL;
-	const char *codegendescription = NULL;
-	const char *codegenvendor = NULL;
+	const char *revision;
+	const char *codegendescription;
+	const char *codegenvendor;
 
 	root = of_find_node_by_path("/");
 	if (!root)
 		return;
 
-	revision = get_property(root, "revision", NULL);
-	codegendescription =
-		    get_property(root, "CODEGEN,description", NULL);
-	codegenvendor = get_property(root, "CODEGEN,vendor", NULL);
+	revision = of_get_property(root, "revision", NULL);
+	codegendescription = of_get_property(root, "CODEGEN,description", NULL);
+	codegenvendor = of_get_property(root, "CODEGEN,vendor", NULL);
 
 	if (codegendescription)
 		seq_printf(m, "machine\t\t: %s\n", codegendescription);
@@ -186,6 +185,16 @@ static void efika_show_cpuinfo(struct seq_file *m)
 	of_node_put(root);
 }
 
+#ifdef CONFIG_PM
+static void efika_suspend_prepare(void __iomem *mbar)
+{
+	u8 pin = 4;	/* GPIO_WKUP_4 (GPIO_PSC6_0 - IRDA_RX) */
+	u8 level = 1;	/* wakeup on high level */
+	/* IOW. to wake it up, short pins 1 and 3 on IRDA connector */
+	mpc52xx_set_wakeup_gpio(pin, level);
+}
+#endif
+
 static void __init efika_setup_arch(void)
 {
 	rtas_initialize();
@@ -200,6 +209,11 @@ static void __init efika_setup_arch(void)
 		ROOT_DEV = Root_SDA2;	/* sda2 (sda1 is for the kernel) */
 
 	efika_pcisetup();
+
+#ifdef CONFIG_PM
+	mpc52xx_suspend.board_suspend_prepare = efika_suspend_prepare;
+	mpc52xx_pm_init();
+#endif
 
 	if (ppc_md.progress)
 		ppc_md.progress("Linux/PPC " UTS_RELEASE " running on Efika ;-)\n", 0x0);

@@ -24,7 +24,6 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/smp.h>
-#include <linux/smp_lock.h>
 #include <linux/interrupt.h>
 #include <linux/kernel_stat.h>
 #include <linux/delay.h>
@@ -264,6 +263,7 @@ static void __init psurge_quad_init(void)
 static int __init smp_psurge_probe(void)
 {
 	int i, ncpus;
+	struct device_node *dn;
 
 	/* We don't do SMP on the PPC601 -- paulus */
 	if (PVR_VER(mfspr(SPRN_PVR)) == 1)
@@ -279,8 +279,10 @@ static int __init smp_psurge_probe(void)
 	 * in the hammerhead memory controller in the case of the
 	 * dual-cpu powersurge board.  -- paulus.
 	 */
-	if (find_devices("hammerhead") == NULL)
+	dn = of_find_node_by_name(NULL, "hammerhead");
+	if (dn == NULL)
 		return 1;
+	of_node_put(dn);
 
 	hhead_base = ioremap(HAMMERHEAD_BASE, 0x800);
 	quad_base = ioremap(PSURGE_QUAD_REG_ADDR, 1024);
@@ -559,7 +561,7 @@ static void __init smp_core99_setup_i2c_hwsync(int ncpus)
 	/* Look for the clock chip */
 	while ((cc = of_find_node_by_name(cc, "i2c-hwclock")) != NULL) {
 		p = of_get_parent(cc);
-		ok = p && device_is_compatible(p, "uni-n-i2c");
+		ok = p && of_device_is_compatible(p, "uni-n-i2c");
 		of_node_put(p);
 		if (!ok)
 			continue;
@@ -567,16 +569,16 @@ static void __init smp_core99_setup_i2c_hwsync(int ncpus)
 		pmac_tb_clock_chip_host = pmac_i2c_find_bus(cc);
 		if (pmac_tb_clock_chip_host == NULL)
 			continue;
-		reg = get_property(cc, "reg", NULL);
+		reg = of_get_property(cc, "reg", NULL);
 		if (reg == NULL)
 			continue;
 		switch (*reg) {
 		case 0xd2:
-			if (device_is_compatible(cc,"pulsar-legacy-slewing")) {
+			if (of_device_is_compatible(cc,"pulsar-legacy-slewing")) {
 				pmac_tb_freeze = smp_core99_pulsar_tb_freeze;
 				pmac_tb_pulsar_addr = 0xd2;
 				name = "Pulsar";
-			} else if (device_is_compatible(cc, "cy28508")) {
+			} else if (of_device_is_compatible(cc, "cy28508")) {
 				pmac_tb_freeze = smp_core99_cypress_tb_freeze;
 				name = "Cypress";
 			}
@@ -695,7 +697,7 @@ static void __init smp_core99_setup(int ncpus)
 		struct device_node *cpus =
 			of_find_node_by_path("/cpus");
 		if (cpus &&
-		    get_property(cpus, "platform-cpu-timebase", NULL)) {
+		    of_get_property(cpus, "platform-cpu-timebase", NULL)) {
 			pmac_tb_freeze = smp_core99_pfunc_tb_freeze;
 			printk(KERN_INFO "Processor timebase sync using"
 			       " platform function\n");
@@ -712,7 +714,7 @@ static void __init smp_core99_setup(int ncpus)
 		core99_tb_gpio = KL_GPIO_TB_ENABLE;	/* default value */
 		cpu = of_find_node_by_type(NULL, "cpu");
 		if (cpu != NULL) {
-			tbprop = get_property(cpu, "timebase-enable", NULL);
+			tbprop = of_get_property(cpu, "timebase-enable", NULL);
 			if (tbprop)
 				core99_tb_gpio = *tbprop;
 			of_node_put(cpu);
@@ -897,7 +899,7 @@ void smp_core99_cpu_die(unsigned int cpu)
 	cpu_dead[cpu] = 0;
 }
 
-#endif
+#endif /* CONFIG_HOTPLUG_CPU && CONFIG_PP32 */
 
 /* Core99 Macs (dual G4s and G5s) */
 struct smp_ops_t core99_smp_ops = {
@@ -907,8 +909,16 @@ struct smp_ops_t core99_smp_ops = {
 	.setup_cpu	= smp_core99_setup_cpu,
 	.give_timebase	= smp_core99_give_timebase,
 	.take_timebase	= smp_core99_take_timebase,
-#if defined(CONFIG_HOTPLUG_CPU) && defined(CONFIG_PPC32)
+#if defined(CONFIG_HOTPLUG_CPU)
+# if defined(CONFIG_PPC32)
 	.cpu_disable	= smp_core99_cpu_disable,
 	.cpu_die	= smp_core99_cpu_die,
+# endif
+# if defined(CONFIG_PPC64)
+	.cpu_disable	= generic_cpu_disable,
+	.cpu_die	= generic_cpu_die,
+	/* intentionally do *NOT* assign cpu_enable,
+	 * the generic code will use kick_cpu then! */
+# endif
 #endif
 };

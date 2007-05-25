@@ -517,12 +517,11 @@ void ehca_process_eq(struct ehca_shca *shca, int is_irq)
 			else {
 				struct ehca_cq *cq = eq->eqe_cache[i].cq;
 				comp_event_callback(cq);
-				spin_lock_irqsave(&ehca_cq_idr_lock, flags);
+				spin_lock(&ehca_cq_idr_lock);
 				cq->nr_events--;
 				if (!cq->nr_events)
 					wake_up(&cq->wait_completion);
-				spin_unlock_irqrestore(&ehca_cq_idr_lock,
-						       flags);
+				spin_unlock(&ehca_cq_idr_lock);
 			}
 		} else {
 			ehca_dbg(&shca->ib_device, "Got non completion event");
@@ -711,6 +710,7 @@ static void destroy_comp_task(struct ehca_comp_pool *pool,
 		kthread_stop(task);
 }
 
+#ifdef CONFIG_HOTPLUG_CPU
 static void take_over_work(struct ehca_comp_pool *pool,
 			   int cpu)
 {
@@ -735,7 +735,6 @@ static void take_over_work(struct ehca_comp_pool *pool,
 
 }
 
-#ifdef CONFIG_HOTPLUG_CPU
 static int comp_pool_callback(struct notifier_block *nfb,
 			      unsigned long action,
 			      void *hcpu)
@@ -745,6 +744,7 @@ static int comp_pool_callback(struct notifier_block *nfb,
 
 	switch (action) {
 	case CPU_UP_PREPARE:
+	case CPU_UP_PREPARE_FROZEN:
 		ehca_gen_dbg("CPU: %x (CPU_PREPARE)", cpu);
 		if(!create_comp_task(pool, cpu)) {
 			ehca_gen_err("Can't create comp_task for cpu: %x", cpu);
@@ -752,24 +752,29 @@ static int comp_pool_callback(struct notifier_block *nfb,
 		}
 		break;
 	case CPU_UP_CANCELED:
+	case CPU_UP_CANCELED_FROZEN:
 		ehca_gen_dbg("CPU: %x (CPU_CANCELED)", cpu);
 		cct = per_cpu_ptr(pool->cpu_comp_tasks, cpu);
 		kthread_bind(cct->task, any_online_cpu(cpu_online_map));
 		destroy_comp_task(pool, cpu);
 		break;
 	case CPU_ONLINE:
+	case CPU_ONLINE_FROZEN:
 		ehca_gen_dbg("CPU: %x (CPU_ONLINE)", cpu);
 		cct = per_cpu_ptr(pool->cpu_comp_tasks, cpu);
 		kthread_bind(cct->task, cpu);
 		wake_up_process(cct->task);
 		break;
 	case CPU_DOWN_PREPARE:
+	case CPU_DOWN_PREPARE_FROZEN:
 		ehca_gen_dbg("CPU: %x (CPU_DOWN_PREPARE)", cpu);
 		break;
 	case CPU_DOWN_FAILED:
+	case CPU_DOWN_FAILED_FROZEN:
 		ehca_gen_dbg("CPU: %x (CPU_DOWN_FAILED)", cpu);
 		break;
 	case CPU_DEAD:
+	case CPU_DEAD_FROZEN:
 		ehca_gen_dbg("CPU: %x (CPU_DEAD)", cpu);
 		destroy_comp_task(pool, cpu);
 		take_over_work(pool, cpu);

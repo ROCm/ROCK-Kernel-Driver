@@ -1,7 +1,6 @@
 #ifndef _I386_PGALLOC_H
 #define _I386_PGALLOC_H
 
-#include <asm/fixmap.h>
 #include <linux/threads.h>
 #include <linux/mm.h>		/* for struct page */
 
@@ -65,7 +64,5 @@ do {									\
 #define __pmd_free_tlb(tlb,x)		do { } while (0)
 #define pud_populate(mm, pmd, pte)	BUG()
 #endif
-
-#define check_pgt_cache()	do { } while (0)
 
 #endif /* _I386_PGALLOC_H */

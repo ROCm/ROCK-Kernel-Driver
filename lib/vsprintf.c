@@ -825,6 +825,17 @@ int vsscanf(const char * buf, const char * fmt, va_list args)
 			break;
 		str = next;
 	}
+
+	/*
+	 * Now we've come all the way through so either the input string or the
+	 * format ended. In the former case, there can be a %n at the current
+	 * position in the format that needs to be filled.
+	 */
+	if (*fmt == '%' && *(fmt + 1) == 'n') {
+		int *p = (int *)va_arg(args, int *);
+		*p = str - buf;
+	}
+
 	return num;
 }
 
@@ -851,23 +862,35 @@ EXPORT_SYMBOL(sscanf);
 
 
 /* Simplified asprintf. */
-char *kasprintf(gfp_t gfp, const char *fmt, ...)
+char *kvasprintf(gfp_t gfp, const char *fmt, va_list ap)
 {
-	va_list ap;
 	unsigned int len;
 	char *p;
+	va_list aq;
 
-	va_start(ap, fmt);
-	len = vsnprintf(NULL, 0, fmt, ap);
-	va_end(ap);
+	va_copy(aq, ap);
+	len = vsnprintf(NULL, 0, fmt, aq);
+	va_end(aq);
 
 	p = kmalloc(len+1, gfp);
 	if (!p)
 		return NULL;
-	va_start(ap, fmt);
+
 	vsnprintf(p, len+1, fmt, ap);
-	va_end(ap);
+
 	return p;
 }
+EXPORT_SYMBOL(kvasprintf);
 
+char *kasprintf(gfp_t gfp, const char *fmt, ...)
+{
+	va_list ap;
+	char *p;
+
+	va_start(ap, fmt);
+	p = kvasprintf(gfp, fmt, ap);
+	va_end(ap);
+
+	return p;
+}
 EXPORT_SYMBOL(kasprintf);

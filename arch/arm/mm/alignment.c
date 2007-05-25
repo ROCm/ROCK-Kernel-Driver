@@ -3,7 +3,7 @@
  *
  *  Copyright (C) 1995  Linus Torvalds
  *  Modifications for ARM processor (c) 1995-2001 Russell King
- *  Thumb aligment fault fixups (c) 2004 MontaVista Software, Inc.
+ *  Thumb alignment fault fixups (c) 2004 MontaVista Software, Inc.
  *  - Adapted from gdb/sim/arm/thumbemu.c -- Thumb instruction emulation.
  *    Copyright (C) 1996, Cygnus Software Technologies Ltd.
  *
@@ -15,7 +15,6 @@
 #include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/string.h>
-#include <linux/ptrace.h>
 #include <linux/proc_fs.h>
 #include <linux/init.h>
 

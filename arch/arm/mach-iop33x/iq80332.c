@@ -55,7 +55,7 @@ static struct sys_timer iq80332_timer = {
 /*
  * IQ80332 PCI.
  */
-static inline int __init
+static int __init
 iq80332_pci_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 {
 	int irq;
@@ -96,7 +96,8 @@ static struct hw_pci iq80332_pci __initdata = {
 
 static int __init iq80332_pci_init(void)
 {
-	if (machine_is_iq80332())
+	if ((iop3xx_get_init_atu() == IOP3XX_INIT_ATU_ENABLE) &&
+		machine_is_iq80332())
 		pci_common_init(&iq80332_pci);
 
 	return 0;

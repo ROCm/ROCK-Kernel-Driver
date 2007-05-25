@@ -29,7 +29,6 @@
 #include <asm/ppc-pci.h>
 #include <asm/atomic.h>
 
-
 /*
  * The list of OF IDs below is used for matching bus types in the
  * system whose devices are to be exposed as of_platform_devices.
@@ -181,7 +180,7 @@ static void of_platform_make_bus_id(struct of_device *dev)
 	 * and 'D' for MMIO DCRs.
 	 */
 #ifdef CONFIG_PPC_DCR
-	reg = get_property(node, "dcr-reg", NULL);
+	reg = of_get_property(node, "dcr-reg", NULL);
 	if (reg) {
 #ifdef CONFIG_PPC_DCR_NATIVE
 		snprintf(name, BUS_ID_SIZE, "d%x.%s",
@@ -201,7 +200,7 @@ static void of_platform_make_bus_id(struct of_device *dev)
 	/*
 	 * For MMIO, get the physical address
 	 */
-	reg = get_property(node, "reg", NULL);
+	reg = of_get_property(node, "reg", NULL);
 	if (reg) {
 		addr = of_translate_address(node, reg);
 		if (addr != OF_BAD_ADDR) {
@@ -431,11 +430,13 @@ static int __devinit of_pci_phb_probe(struct of_device *dev,
 	/* Process "ranges" property */
 	pci_process_bridge_OF_ranges(phb, dev->node, 0);
 
-	/* Setup IO space.
-	 * This will not work properly for ISA IOs, something needs to be done
-	 * about it if we ever generalize that way of probing PCI brigdes
+	/* Setup IO space. We use the non-dynamic version of that code here,
+	 * which doesn't quite support unplugging. Next kernel release will
+	 * have a better fix for this.
+	 * Note also that we don't do ISA, this will also be fixed with a
+	 * more massive rework.
 	 */
-	pci_setup_phb_io_dynamic(phb, 0);
+	pci_setup_phb_io(phb, 0);
 
 	/* Init pci_dn data structures */
 	pci_devs_phb_init_dynamic(phb);
@@ -479,9 +480,6 @@ static struct of_platform_driver of_pci_phb_driver = {
        .name = "of-pci",
        .match_table = of_pci_phb_ids,
        .probe = of_pci_phb_probe,
-       .driver = {
-	       .multithread_probe = 1,
-       },
 };
 
 static __init int of_pci_phb_init(void)

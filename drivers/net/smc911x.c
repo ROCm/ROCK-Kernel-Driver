@@ -77,7 +77,6 @@ static const char version[] =
 #include <linux/skbuff.h>
 
 #include <asm/io.h>
-#include <asm/irq.h>
 
 #include "smc911x.h"
 
@@ -499,10 +498,9 @@ static inline void	 smc911x_rcv(struct net_device *dev)
 		SMC_SET_RX_CFG(RX_CFG_RX_END_ALGN4_ | ((2<<8) & RX_CFG_RXDOFF_));
 		SMC_PULL_DATA(data, pkt_len+2+3);
 
-		DBG(SMC_DEBUG_PKTS, "%s: Received packet\n", dev->name,);
+		DBG(SMC_DEBUG_PKTS, "%s: Received packet\n", dev->name);
 		PRINT_PKT(data, ((pkt_len - 4) <= 64) ? pkt_len - 4 : 64);
 		dev->last_rx = jiffies;
-		skb->dev = dev;
 		skb->protocol = eth_type_trans(skb, dev);
 		netif_rx(skb);
 		lp->stats.rx_packets++;
@@ -1307,7 +1305,6 @@ smc911x_rx_dma_irq(int dma, void *data)
 	lp->current_rx_skb = NULL;
 	PRINT_PKT(skb->data, skb->len);
 	dev->last_rx = jiffies;
-	skb->dev = dev;
 	skb->protocol = eth_type_trans(skb, dev);
 	netif_rx(skb);
 	lp->stats.rx_packets++;
@@ -2086,11 +2083,10 @@ static int __init smc911x_probe(struct net_device *dev, unsigned long ioaddr)
 	lp->ctl_rspeed = 100;
 
 	/* Grab the IRQ */
-	retval = request_irq(dev->irq, &smc911x_interrupt, IRQF_SHARED, dev->name, dev);
+	retval = request_irq(dev->irq, &smc911x_interrupt,
+			IRQF_SHARED | IRQF_TRIGGER_FALLING, dev->name, dev);
 	if (retval)
 		goto err_out;
-
-	set_irq_type(dev->irq, IRQT_FALLING);
 
 #ifdef SMC_USE_DMA
 	lp->rxdma = SMC_DMA_REQUEST(dev, smc911x_rx_dma_irq);

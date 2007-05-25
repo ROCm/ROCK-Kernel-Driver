@@ -45,6 +45,19 @@
 #define __exitdata	__attribute__ ((__section__(".exit.data")))
 #define __exit_call	__attribute_used__ __attribute__ ((__section__ (".exitcall.exit")))
 
+/* modpost check for section mismatches during the kernel build.
+ * A section mismatch happens when there are references from a
+ * code or data section to an init section (both code or data).
+ * The init sections are (for most archs) discarded by the kernel
+ * when early init has completed so all such references are potential bugs.
+ * For exit sections the same issue exists.
+ * The following markers are used for the cases where the reference to
+ * the init/exit section (code or data) is valid and will teach modpost
+ * not to issue a warning.
+ * The markers follow same syntax rules as __init / __initdata. */
+#define __init_refok     noinline __attribute__ ((__section__ (".text.init.refok")))
+#define __initdata_refok          __attribute__ ((__section__ (".data.init.refok")))
+
 #ifdef MODULE
 #define __exit		__attribute__ ((__section__(".exit.text")))
 #else
@@ -72,7 +85,8 @@ extern char *saved_command_line;
 extern unsigned int reset_devices;
 
 /* used by init/main.c */
-extern void setup_arch(char **);
+void setup_arch(char **);
+void prepare_namespace(void);
 
 #endif
   
@@ -228,7 +242,7 @@ void __init parse_early_param(void);
 #define __obsolete_setup(str) 			/* nothing */
 #endif
 
-/* Data marked not to be saved by software_suspend() */
+/* Data marked not to be saved by software suspend */
 #define __nosavedata __attribute__ ((__section__ (".data.nosave")))
 
 /* This means "can be init if no module support, otherwise module load

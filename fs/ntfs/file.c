@@ -26,6 +26,7 @@
 #include <linux/swap.h>
 #include <linux/uio.h>
 #include <linux/writeback.h>
+#include <linux/sched.h>
 
 #include <asm/page.h>
 #include <asm/uaccess.h>
@@ -236,8 +237,7 @@ do_non_resident_extend:
 			err = PTR_ERR(page);
 			goto init_err_out;
 		}
-		wait_on_page_locked(page);
-		if (unlikely(!PageUptodate(page) || PageError(page))) {
+		if (unlikely(PageError(page))) {
 			page_cache_release(page);
 			err = -EIO;
 			goto init_err_out;
@@ -607,11 +607,8 @@ do_next_page:
 					ntfs_submit_bh_for_read(bh);
 					*wait_bh++ = bh;
 				} else {
-					u8 *kaddr = kmap_atomic(page, KM_USER0);
-					memset(kaddr + bh_offset(bh), 0,
-							blocksize);
-					kunmap_atomic(kaddr, KM_USER0);
-					flush_dcache_page(page);
+					zero_user_page(page, bh_offset(bh),
+							blocksize, KM_USER0);
 					set_buffer_uptodate(bh);
 				}
 			}
@@ -686,12 +683,9 @@ map_buffer_cached:
 						ntfs_submit_bh_for_read(bh);
 						*wait_bh++ = bh;
 					} else {
-						u8 *kaddr = kmap_atomic(page,
-								KM_USER0);
-						memset(kaddr + bh_offset(bh),
-								0, blocksize);
-						kunmap_atomic(kaddr, KM_USER0);
-						flush_dcache_page(page);
+						zero_user_page(page,
+							bh_offset(bh),
+							blocksize, KM_USER0);
 						set_buffer_uptodate(bh);
 					}
 				}
@@ -709,11 +703,8 @@ map_buffer_cached:
 			 */
 			if (bh_end <= pos || bh_pos >= end) {
 				if (!buffer_uptodate(bh)) {
-					u8 *kaddr = kmap_atomic(page, KM_USER0);
-					memset(kaddr + bh_offset(bh), 0,
-							blocksize);
-					kunmap_atomic(kaddr, KM_USER0);
-					flush_dcache_page(page);
+					zero_user_page(page, bh_offset(bh),
+							blocksize, KM_USER0);
 					set_buffer_uptodate(bh);
 				}
 				mark_buffer_dirty(bh);
@@ -752,10 +743,8 @@ map_buffer_cached:
 				if (!buffer_uptodate(bh))
 					set_buffer_uptodate(bh);
 			} else if (!buffer_uptodate(bh)) {
-				u8 *kaddr = kmap_atomic(page, KM_USER0);
-				memset(kaddr + bh_offset(bh), 0, blocksize);
-				kunmap_atomic(kaddr, KM_USER0);
-				flush_dcache_page(page);
+				zero_user_page(page, bh_offset(bh), blocksize,
+						KM_USER0);
 				set_buffer_uptodate(bh);
 			}
 			continue;
@@ -879,11 +868,8 @@ rl_not_mapped_enoent:
 					if (!buffer_uptodate(bh))
 						set_buffer_uptodate(bh);
 				} else if (!buffer_uptodate(bh)) {
-					u8 *kaddr = kmap_atomic(page, KM_USER0);
-					memset(kaddr + bh_offset(bh), 0,
-							blocksize);
-					kunmap_atomic(kaddr, KM_USER0);
-					flush_dcache_page(page);
+					zero_user_page(page, bh_offset(bh),
+							blocksize, KM_USER0);
 					set_buffer_uptodate(bh);
 				}
 				continue;
@@ -1138,16 +1124,12 @@ rl_not_mapped_enoent:
 			 * to zero the overflowing region.
 			 */
 			if (unlikely(bh_pos + blocksize > initialized_size)) {
-				u8 *kaddr;
 				int ofs = 0;
 
 				if (likely(bh_pos < initialized_size))
 					ofs = initialized_size - bh_pos;
-				kaddr = kmap_atomic(page, KM_USER0);
-				memset(kaddr + bh_offset(bh) + ofs, 0,
-						blocksize - ofs);
-				kunmap_atomic(kaddr, KM_USER0);
-				flush_dcache_page(page);
+				zero_user_page(page, bh_offset(bh) + ofs,
+						blocksize - ofs, KM_USER0);
 			}
 		} else /* if (unlikely(!buffer_uptodate(bh))) */
 			err = -EIO;
@@ -1287,11 +1269,8 @@ rl_not_mapped_enoent:
 				if (PageUptodate(page))
 					set_buffer_uptodate(bh);
 				else {
-					u8 *kaddr = kmap_atomic(page, KM_USER0);
-					memset(kaddr + bh_offset(bh), 0,
-							blocksize);
-					kunmap_atomic(kaddr, KM_USER0);
-					flush_dcache_page(page);
+					zero_user_page(page, bh_offset(bh),
+							blocksize, KM_USER0);
 					set_buffer_uptodate(bh);
 				}
 			}
@@ -1351,9 +1330,7 @@ err_out:
 		len = PAGE_CACHE_SIZE;
 		if (len > bytes)
 			len = bytes;
-		kaddr = kmap_atomic(*pages, KM_USER0);
-		memset(kaddr, 0, len);
-		kunmap_atomic(kaddr, KM_USER0);
+		zero_user_page(*pages, 0, len, KM_USER0);
 	}
 	goto out;
 }
@@ -1474,9 +1451,7 @@ err_out:
 		len = PAGE_CACHE_SIZE;
 		if (len > bytes)
 			len = bytes;
-		kaddr = kmap_atomic(*pages, KM_USER0);
-		memset(kaddr, 0, len);
-		kunmap_atomic(kaddr, KM_USER0);
+		zero_user_page(*pages, 0, len, KM_USER0);
 	}
 	goto out;
 }
@@ -2130,28 +2105,13 @@ static ssize_t ntfs_file_aio_write_nolock(struct kiocb *iocb,
 	struct address_space *mapping = file->f_mapping;
 	struct inode *inode = mapping->host;
 	loff_t pos;
-	unsigned long seg;
 	size_t count;		/* after file limit checks */
 	ssize_t written, err;
 
 	count = 0;
-	for (seg = 0; seg < nr_segs; seg++) {
-		const struct iovec *iv = &iov[seg];
-		/*
-		 * If any segment has a negative length, or the cumulative
-		 * length ever wraps negative then return -EINVAL.
-		 */
-		count += iv->iov_len;
-		if (unlikely((ssize_t)(count|iv->iov_len) < 0))
-			return -EINVAL;
-		if (access_ok(VERIFY_READ, iv->iov_base, iv->iov_len))
-			continue;
-		if (!seg)
-			return -EFAULT;
-		nr_segs = seg;
-		count -= iv->iov_len;	/* This segment is no good */
-		break;
-	}
+	err = generic_segment_checks(iov, &nr_segs, &count, VERIFY_READ);
+	if (err)
+		return err;
 	pos = *ppos;
 	vfs_check_frozen(inode->i_sb, SB_FREEZE_WRITE);
 	/* We can write back this queue in page reclaim. */

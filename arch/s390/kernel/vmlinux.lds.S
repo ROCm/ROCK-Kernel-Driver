@@ -21,7 +21,7 @@ SECTIONS
   . = 0x00000000;
   _text = .;			/* Text and read-only data */
   .text : {
-	*(.text)
+	TEXT_TEXT
 	SCHED_TEXT
 	LOCK_TEXT
 	KPROBES_TEXT
@@ -45,8 +45,10 @@ SECTIONS
   __ex_table : { *(__ex_table) }
   __stop___ex_table = .;
 
+  BUG_TABLE
+
   .data : {			/* Data */
-	*(.data)
+	DATA_DATA
 	CONSTRUCTORS
 	}
 
@@ -77,6 +79,12 @@ SECTIONS
 	*(.init.text)
 	_einittext = .;
   }
+  /*
+   * .exit.text is discarded at runtime, not link time,
+   * to deal with references from __bug_table
+   */
+  .exit.text :	 { *(.exit.text) }
+
   .init.data : { *(.init.data) }
   . = ALIGN(256);
   __setup_start = .;
@@ -99,7 +107,7 @@ SECTIONS
   . = ALIGN(2);
   __initramfs_end = .;
 #endif
-  . = ALIGN(256);
+  . = ALIGN(4096);
   __per_cpu_start = .;
   .data.percpu  : { *(.data.percpu) }
   __per_cpu_end = .;
@@ -116,7 +124,7 @@ SECTIONS
 
   /* Sections to be discarded */
   /DISCARD/ : {
-	*(.exit.text) *(.exit.data) *(.exitcall.exit)
+	*(.exit.data) *(.exitcall.exit)
 	}
 
   /* Stabs debugging sections.  */

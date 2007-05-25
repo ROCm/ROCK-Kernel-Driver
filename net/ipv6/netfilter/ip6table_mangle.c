@@ -7,8 +7,6 @@
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
- *
- * Extended to all five netfilter hooks by Brad Chapman & Harald Welte
  */
 #include <linux/module.h>
 #include <linux/netfilter_ipv6/ip6_tables.h>
@@ -34,73 +32,35 @@ static struct
 	struct ip6t_replace repl;
 	struct ip6t_standard entries[5];
 	struct ip6t_error term;
-} initial_table __initdata
-= { { "mangle", MANGLE_VALID_HOOKS, 6,
-      sizeof(struct ip6t_standard) * 5 + sizeof(struct ip6t_error),
-      { [NF_IP6_PRE_ROUTING] 	= 0,
-	[NF_IP6_LOCAL_IN]	= sizeof(struct ip6t_standard),
-	[NF_IP6_FORWARD]	= sizeof(struct ip6t_standard) * 2,
-	[NF_IP6_LOCAL_OUT] 	= sizeof(struct ip6t_standard) * 3,
-	[NF_IP6_POST_ROUTING]	= sizeof(struct ip6t_standard) * 4},
-      { [NF_IP6_PRE_ROUTING] 	= 0,
-	[NF_IP6_LOCAL_IN]	= sizeof(struct ip6t_standard),
-	[NF_IP6_FORWARD]	= sizeof(struct ip6t_standard) * 2,
-	[NF_IP6_LOCAL_OUT] 	= sizeof(struct ip6t_standard) * 3,
-	[NF_IP6_POST_ROUTING]	= sizeof(struct ip6t_standard) * 4},
-      0, NULL, { } },
-    {
-	    /* PRE_ROUTING */
-	    { { { { { { 0 } } }, { { { 0 } } }, { { { 0 } } }, { { { 0 } } }, "", "", { 0 }, { 0 }, 0, 0, 0 },
-		0,
-		sizeof(struct ip6t_entry),
-		sizeof(struct ip6t_standard),
-		0, { 0, 0 }, { } },
-	      { { { { IP6T_ALIGN(sizeof(struct ip6t_standard_target)), "" } }, { } },
-		-NF_ACCEPT - 1 } },
-	    /* LOCAL_IN */
-	    { { { { { { 0 } } }, { { { 0 } } }, { { { 0 } } }, { { { 0 } } }, "", "", { 0 }, { 0 }, 0, 0, 0 },
-		0,
-		sizeof(struct ip6t_entry),
-		sizeof(struct ip6t_standard),
-		0, { 0, 0 }, { } },
-	      { { { { IP6T_ALIGN(sizeof(struct ip6t_standard_target)), "" } }, { } },
-		-NF_ACCEPT - 1 } },
-	    /* FORWARD */
-	    { { { { { { 0 } } }, { { { 0 } } }, { { { 0 } } }, { { { 0 } } }, "", "", { 0 }, { 0 }, 0, 0, 0 },
-		0,
-		sizeof(struct ip6t_entry),
-		sizeof(struct ip6t_standard),
-		0, { 0, 0 }, { } },
-	      { { { { IP6T_ALIGN(sizeof(struct ip6t_standard_target)), "" } }, { } },
-		-NF_ACCEPT - 1 } },
-	    /* LOCAL_OUT */
-	    { { { { { { 0 } } }, { { { 0 } } }, { { { 0 } } }, { { { 0 } } }, "", "", { 0 }, { 0 }, 0, 0, 0 },
-		0,
-		sizeof(struct ip6t_entry),
-		sizeof(struct ip6t_standard),
-		0, { 0, 0 }, { } },
-	      { { { { IP6T_ALIGN(sizeof(struct ip6t_standard_target)), "" } }, { } },
-		-NF_ACCEPT - 1 } },
-	    /* POST_ROUTING */
-	    { { { { { { 0 } } }, { { { 0 } } }, { { { 0 } } }, { { { 0 } } }, "", "", { 0 }, { 0 }, 0, 0, 0 },
-		0,
-		sizeof(struct ip6t_entry),
-		sizeof(struct ip6t_standard),
-		0, { 0, 0 }, { } },
-	      { { { { IP6T_ALIGN(sizeof(struct ip6t_standard_target)), "" } }, { } },
-		-NF_ACCEPT - 1 } }
-    },
-    /* ERROR */
-    { { { { { { 0 } } }, { { { 0 } } }, { { { 0 } } }, { { { 0 } } }, "", "", { 0 }, { 0 }, 0, 0, 0 },
-	0,
-	sizeof(struct ip6t_entry),
-	sizeof(struct ip6t_error),
-	0, { 0, 0 }, { } },
-      { { { { IP6T_ALIGN(sizeof(struct ip6t_error_target)), IP6T_ERROR_TARGET } },
-	  { } },
-	"ERROR"
-      }
-    }
+} initial_table __initdata = {
+	.repl = {
+		.name = "mangle",
+		.valid_hooks = MANGLE_VALID_HOOKS,
+		.num_entries = 6,
+		.size = sizeof(struct ip6t_standard) * 5 + sizeof(struct ip6t_error),
+		.hook_entry = {
+			[NF_IP6_PRE_ROUTING] 	= 0,
+			[NF_IP6_LOCAL_IN]	= sizeof(struct ip6t_standard),
+			[NF_IP6_FORWARD]	= sizeof(struct ip6t_standard) * 2,
+			[NF_IP6_LOCAL_OUT] 	= sizeof(struct ip6t_standard) * 3,
+			[NF_IP6_POST_ROUTING]	= sizeof(struct ip6t_standard) * 4,
+		},
+		.underflow = {
+			[NF_IP6_PRE_ROUTING] 	= 0,
+			[NF_IP6_LOCAL_IN]	= sizeof(struct ip6t_standard),
+			[NF_IP6_FORWARD]	= sizeof(struct ip6t_standard) * 2,
+			[NF_IP6_LOCAL_OUT] 	= sizeof(struct ip6t_standard) * 3,
+			[NF_IP6_POST_ROUTING]	= sizeof(struct ip6t_standard) * 4,
+		},
+	},
+	.entries = {
+		IP6T_STANDARD_INIT(NF_ACCEPT),	/* PRE_ROUTING */
+		IP6T_STANDARD_INIT(NF_ACCEPT),	/* LOCAL_IN */
+		IP6T_STANDARD_INIT(NF_ACCEPT),	/* FORWARD */
+		IP6T_STANDARD_INIT(NF_ACCEPT),	/* LOCAL_OUT */
+		IP6T_STANDARD_INIT(NF_ACCEPT),	/* POST_ROUTING */
+	},
+	.term = IP6T_ERROR_INIT,		/* ERROR */
 };
 
 static struct xt_table packet_mangler = {
@@ -138,7 +98,7 @@ ip6t_local_hook(unsigned int hook,
 #if 0
 	/* root is playing with raw sockets. */
 	if ((*pskb)->len < sizeof(struct iphdr)
-	    || (*pskb)->nh.iph->ihl * 4 < sizeof(struct iphdr)) {
+	    || ip_hdrlen(*pskb) < sizeof(struct iphdr)) {
 		if (net_ratelimit())
 			printk("ip6t_hook: happy cracking.\n");
 		return NF_ACCEPT;
@@ -146,21 +106,21 @@ ip6t_local_hook(unsigned int hook,
 #endif
 
 	/* save source/dest address, mark, hoplimit, flowlabel, priority,  */
-	memcpy(&saddr, &(*pskb)->nh.ipv6h->saddr, sizeof(saddr));
-	memcpy(&daddr, &(*pskb)->nh.ipv6h->daddr, sizeof(daddr));
+	memcpy(&saddr, &ipv6_hdr(*pskb)->saddr, sizeof(saddr));
+	memcpy(&daddr, &ipv6_hdr(*pskb)->daddr, sizeof(daddr));
 	mark = (*pskb)->mark;
-	hop_limit = (*pskb)->nh.ipv6h->hop_limit;
+	hop_limit = ipv6_hdr(*pskb)->hop_limit;
 
 	/* flowlabel and prio (includes version, which shouldn't change either */
-	flowlabel = *((u_int32_t *) (*pskb)->nh.ipv6h);
+	flowlabel = *((u_int32_t *)ipv6_hdr(*pskb));
 
 	ret = ip6t_do_table(pskb, hook, in, out, &packet_mangler);
 
 	if (ret != NF_DROP && ret != NF_STOLEN
-		&& (memcmp(&(*pskb)->nh.ipv6h->saddr, &saddr, sizeof(saddr))
-		    || memcmp(&(*pskb)->nh.ipv6h->daddr, &daddr, sizeof(daddr))
+		&& (memcmp(&ipv6_hdr(*pskb)->saddr, &saddr, sizeof(saddr))
+		    || memcmp(&ipv6_hdr(*pskb)->daddr, &daddr, sizeof(daddr))
 		    || (*pskb)->mark != mark
-		    || (*pskb)->nh.ipv6h->hop_limit != hop_limit))
+		    || ipv6_hdr(*pskb)->hop_limit != hop_limit))
 		return ip6_route_me_harder(*pskb) == 0 ? ret : NF_DROP;
 
 	return ret;

@@ -176,7 +176,7 @@ psa_write(struct net_device *	dev,
   volatile u_char __iomem *verify = lp->mem + PSA_ADDR +
     (psaoff(0, psa_comp_number) << 1);
 
-  /* Authorize writting to PSA */
+  /* Authorize writing to PSA */
   hacr_write(base, HACR_PWR_STAT | HACR_ROM_WEN);
 
   while(n-- > 0)
@@ -1676,7 +1676,7 @@ wv_set_frequency(u_long		base,	/* i/o port of the card */
       fee_write(base, 0x60,
 		dac, 2);
 
-      /* We now should verify here that the EEprom writting was ok */
+      /* We now should verify here that the EEprom writing was ok */
 
       /* ReRead the first area */
       fee_read(base, 0x00,
@@ -2884,14 +2884,12 @@ wv_packet_read(struct net_device *		dev,
       return;
     }
 
-  skb->dev = dev;
-
   skb_reserve(skb, 2);
   fd_p = read_ringbuf(dev, fd_p, (char *) skb_put(skb, sksize), sksize);
   skb->protocol = eth_type_trans(skb, dev);
 
 #ifdef DEBUG_RX_INFO
-  wv_packet_info(skb->mac.raw, sksize, dev->name, "wv_packet_read");
+  wv_packet_info(skb_mac_header(skb), sksize, dev->name, "wv_packet_read");
 #endif	/* DEBUG_RX_INFO */
      
   /* Statistics gathering & stuff associated.
@@ -2925,7 +2923,7 @@ wv_packet_read(struct net_device *		dev,
 #endif	/* WAVELAN_ROAMING */
 	  
 #ifdef WIRELESS_SPY
-      wl_spy_gather(dev, skb->mac.raw + WAVELAN_ADDR_SIZE, stats);
+      wl_spy_gather(dev, skb_mac_header(skb) + WAVELAN_ADDR_SIZE, stats);
 #endif	/* WIRELESS_SPY */
 #ifdef HISTOGRAM
       wl_his_gather(dev, stats);

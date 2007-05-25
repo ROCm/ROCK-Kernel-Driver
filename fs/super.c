@@ -107,6 +107,7 @@ out:
 static inline void destroy_super(struct super_block *s)
 {
 	security_sb_free(s);
+	kfree(s->s_subtype);
 	kfree(s);
 }
 
@@ -735,16 +736,6 @@ static int test_bdev_super(struct super_block *s, void *data)
 	return (void *)s->s_bdev == data;
 }
 
-static void bdev_uevent(struct block_device *bdev, enum kobject_action action)
-{
-	if (bdev->bd_disk) {
-		if (bdev->bd_part)
-			kobject_uevent(&bdev->bd_part->kobj, action);
-		else
-			kobject_uevent(&bdev->bd_disk->kobj, action);
-	}
-}
-
 int get_sb_bdev(struct file_system_type *fs_type,
 	int flags, const char *dev_name, void *data,
 	int (*fill_super)(struct super_block *, void *, int),
@@ -792,7 +783,6 @@ int get_sb_bdev(struct file_system_type *fs_type,
 		}
 
 		s->s_flags |= MS_ACTIVE;
-		bdev_uevent(bdev, KOBJ_MOUNT);
 	}
 
 	return simple_set_mnt(mnt, s);
@@ -811,7 +801,6 @@ void kill_block_super(struct super_block *sb)
 {
 	struct block_device *bdev = sb->s_bdev;
 
-	bdev_uevent(bdev, KOBJ_UMOUNT);
 	generic_shutdown_super(sb);
 	sync_blockdev(bdev);
 	close_bdev_excl(bdev);
@@ -929,6 +918,29 @@ out:
 
 EXPORT_SYMBOL_GPL(vfs_kern_mount);
 
+static struct vfsmount *fs_set_subtype(struct vfsmount *mnt, const char *fstype)
+{
+	int err;
+	const char *subtype = strchr(fstype, '.');
+	if (subtype) {
+		subtype++;
+		err = -EINVAL;
+		if (!subtype[0])
+			goto err;
+	} else
+		subtype = "";
+
+	mnt->mnt_sb->s_subtype = kstrdup(subtype, GFP_KERNEL);
+	err = -ENOMEM;
+	if (!mnt->mnt_sb->s_subtype)
+		goto err;
+	return mnt;
+
+ err:
+	mntput(mnt);
+	return ERR_PTR(err);
+}
+
 struct vfsmount *
 do_kern_mount(const char *fstype, int flags, const char *name, void *data)
 {
@@ -937,6 +949,9 @@ do_kern_mount(const char *fstype, int flags, const char *name, void *data)
 	if (!type)
 		return ERR_PTR(-ENODEV);
 	mnt = vfs_kern_mount(type, flags, name, data);
+	if (!IS_ERR(mnt) && (type->fs_flags & FS_HAS_SUBTYPE) &&
+	    !mnt->mnt_sb->s_subtype)
+		mnt = fs_set_subtype(mnt, fstype);
 	put_filesystem(type);
 	return mnt;
 }

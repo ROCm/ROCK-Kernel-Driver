@@ -29,10 +29,10 @@
 #include <linux/file.h>
 #include <linux/stat.h>
 #include <linux/string.h>
-#include <linux/smp_lock.h>
 #include <linux/inet.h>
 #include <linux/pagemap.h>
 #include <linux/idr.h>
+#include <linux/sched.h>
 
 #include "debug.h"
 #include "v9fs.h"

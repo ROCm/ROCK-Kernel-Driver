@@ -8,8 +8,7 @@ obj-y				+= pci.o pci-dac.o
 # PCI bus host bridge specific code
 #
 obj-$(CONFIG_MIPS_BONITO64)	+= ops-bonito64.o
-obj-$(CONFIG_MIPS_GT64111)	+= ops-gt64111.o
-obj-$(CONFIG_MIPS_GT64120)	+= ops-gt64120.o
+obj-$(CONFIG_PCI_GT64XXX_PCI0)	+= ops-gt64xxx_pci0.o
 obj-$(CONFIG_PCI_MARVELL)	+= ops-marvell.o
 obj-$(CONFIG_MIPS_MSC)		+= ops-msc.o
 obj-$(CONFIG_MIPS_NILE4)	+= ops-nile4.o
@@ -31,11 +30,9 @@ obj-$(CONFIG_SOC_AU1500)	+= fixup-au1000.o ops-au1000.o
 obj-$(CONFIG_SOC_AU1550)	+= fixup-au1000.o ops-au1000.o
 obj-$(CONFIG_SOC_PNX8550)	+= fixup-pnx8550.o ops-pnx8550.o
 obj-$(CONFIG_MIPS_MALTA)	+= fixup-malta.o
-obj-$(CONFIG_MOMENCO_JAGUAR_ATX)+= fixup-jaguar.o
 obj-$(CONFIG_MOMENCO_OCELOT)	+= fixup-ocelot.o pci-ocelot.o
 obj-$(CONFIG_MOMENCO_OCELOT_3)	+= fixup-ocelot3.o
 obj-$(CONFIG_MOMENCO_OCELOT_C)	+= fixup-ocelot-c.o pci-ocelot-c.o
-obj-$(CONFIG_MOMENCO_OCELOT_G)	+= fixup-ocelot-g.o pci-ocelot-g.o
 obj-$(CONFIG_PMC_YOSEMITE)	+= fixup-yosemite.o ops-titan.o ops-titan-ht.o \
 				   pci-yosemite.o
 obj-$(CONFIG_SGI_IP27)		+= ops-bridge.o pci-ip27.o

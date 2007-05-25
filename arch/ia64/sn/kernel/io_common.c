@@ -364,7 +364,7 @@ void sn_bus_store_sysdata(struct pci_dev *dev)
 
 	element = kzalloc(sizeof(struct sysdata_el), GFP_KERNEL);
 	if (!element) {
-		dev_dbg(dev, "%s: out of memory!\n", __FUNCTION__);
+		dev_dbg(&dev->dev, "%s: out of memory!\n", __FUNCTION__);
 		return;
 	}
 	element->sysdata = SN_PCIDEV_INFO(dev);
@@ -479,7 +479,7 @@ sn_io_early_init(void)
 	}
 
 	/*
-	 * prime sn_pci_provider[].  Individial provider init routines will
+	 * prime sn_pci_provider[].  Individual provider init routines will
 	 * override their respective default entries.
 	 */
 

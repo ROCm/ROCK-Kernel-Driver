@@ -23,7 +23,6 @@
 #include <sound/driver.h>
 #include <linux/init.h>
 #include <linux/slab.h>
-#include <linux/pci.h>
 #include <sound/core.h>
 #include "hda_codec.h"
 #include "hda_local.h"
@@ -134,7 +133,7 @@ static int add_new_node(struct hda_codec *codec, struct hda_gspec *spec, hda_nid
 			return -ENOMEM;
 		}
 	}
-	memcpy(node->conn_list, conn_list, nconns);
+	memcpy(node->conn_list, conn_list, nconns * sizeof(hda_nid_t));
 	node->nconns = nconns;
 	node->wid_caps = get_wcaps(codec, nid);
 	node->type = (node->wid_caps & AC_WCAP_TYPE) >> AC_WCAP_TYPE_SHIFT;

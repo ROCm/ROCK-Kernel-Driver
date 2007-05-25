@@ -49,7 +49,6 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
-#include <linux/smp_lock.h>
 #include <linux/signal.h>
 #include <linux/poll.h>
 #include <linux/init.h>
@@ -1004,7 +1003,7 @@ abort:
 				usblp->writebuf, usblp->writeurb->transfer_dma);
 		if (usblp->readbuf)
 			usb_buffer_free (usblp->dev, USBLP_BUF_SIZE,
-				usblp->readbuf, usblp->writeurb->transfer_dma);
+				usblp->readbuf, usblp->readurb->transfer_dma);
 		kfree(usblp->statusbuf);
 		kfree(usblp->device_id_string);
 		usb_free_urb(usblp->writeurb);

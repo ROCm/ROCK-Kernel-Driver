@@ -45,7 +45,7 @@ SECTIONS
   .text : AT(ADDR(.text) - LOAD_OFFSET)
     {
 	IVT_TEXT
-	*(.text)
+	TEXT_TEXT
 	SCHED_TEXT
 	LOCK_TEXT
 	KPROBES_TEXT
@@ -77,6 +77,13 @@ SECTIONS
 	  __start___mca_table = .;
 	  *(__mca_table)
 	  __stop___mca_table = .;
+	}
+
+  .data.patch.phys_stack_reg : AT(ADDR(.data.patch.phys_stack_reg) - LOAD_OFFSET)
+	{
+	  __start___phys_stack_reg_patchlist = .;
+	  *(.data.patch.phys_stack_reg)
+	  __end___phys_stack_reg_patchlist = .;
 	}
 
   /* Global data */
@@ -214,7 +221,12 @@ SECTIONS
 
   data : { } :data
   .data : AT(ADDR(.data) - LOAD_OFFSET)
-	{ *(.data) *(.data1) *(.gnu.linkonce.d*) CONSTRUCTORS }
+	{
+		DATA_DATA
+		*(.data1)
+		*(.gnu.linkonce.d*)
+		CONSTRUCTORS
+	}
 
   . = ALIGN(16);	/* gp must be 16-byte aligned for exc. table */
   .got : AT(ADDR(.got) - LOAD_OFFSET)

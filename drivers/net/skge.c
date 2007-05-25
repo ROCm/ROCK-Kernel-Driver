@@ -42,7 +42,7 @@
 #include "skge.h"
 
 #define DRV_NAME		"skge"
-#define DRV_VERSION		"1.10"
+#define DRV_VERSION		"1.11"
 #define PFX			DRV_NAME " "
 
 #define DEFAULT_TX_RING_SIZE	128
@@ -135,10 +135,13 @@ static void skge_get_regs(struct net_device *dev, struct ethtool_regs *regs,
 /* Wake on Lan only supported on Yukon chips with rev 1 or above */
 static u32 wol_supported(const struct skge_hw *hw)
 {
-	if (hw->chip_id == CHIP_ID_YUKON && hw->chip_rev != 0)
-		return WAKE_MAGIC | WAKE_PHY;
-	else
+	if (hw->chip_id == CHIP_ID_GENESIS)
 		return 0;
+
+	if (hw->chip_id == CHIP_ID_YUKON && hw->chip_rev == 0)
+		return 0;
+
+	return WAKE_MAGIC | WAKE_PHY;
 }
 
 static u32 pci_wake_enabled(struct pci_dev *dev)
@@ -2621,6 +2624,7 @@ static int skge_down(struct net_device *dev)
 
 static inline int skge_avail(const struct skge_ring *ring)
 {
+	smp_mb();
 	return ((ring->to_clean > ring->to_use) ? 0 : ring->count)
 		+ (ring->to_clean - ring->to_use) - 1;
 }
@@ -2654,12 +2658,12 @@ static int skge_xmit_frame(struct sk_buff *skb, struct net_device *dev)
 	td->dma_hi = map >> 32;
 
 	if (skb->ip_summed == CHECKSUM_PARTIAL) {
-		int offset = skb->h.raw - skb->data;
+		const int offset = skb_transport_offset(skb);
 
 		/* This seems backwards, but it is what the sk98lin
 		 * does.  Looks like hardware is wrong?
 		 */
-		if (skb->h.ipiph->protocol == IPPROTO_UDP
+		if (ipip_hdr(skb)->protocol == IPPROTO_UDP
 	            && hw->chip_rev == 0 && hw->chip_id == CHIP_ID_YUKON)
 			control = BMU_TCP_CHECK;
 		else
@@ -2709,6 +2713,8 @@ static int skge_xmit_frame(struct sk_buff *skb, struct net_device *dev)
 		       dev->name, e - skge->tx_ring.start, skb->len);
 
 	skge->tx_ring.to_use = e->next;
+	smp_wmb();
+
 	if (skge_avail(&skge->tx_ring) <= TX_LOW_WATER) {
 		pr_debug("%s: transmit queue full\n", dev->name);
 		netif_stop_queue(dev);
@@ -2725,8 +2731,6 @@ static void skge_tx_free(struct skge_port *skge, struct skge_element *e,
 			 u32 control)
 {
 	struct pci_dev *pdev = skge->hw->pdev;
-
-	BUG_ON(!e->skb);
 
 	/* skb header vs. fragment */
 	if (control & BMU_STF)
@@ -2745,7 +2749,6 @@ static void skge_tx_free(struct skge_port *skge, struct skge_element *e,
 
 		dev_kfree_skb(e->skb);
 	}
-	e->skb = NULL;
 }
 
 /* Free all buffers in transmit ring */
@@ -2950,7 +2953,7 @@ static struct sk_buff *skge_rx_get(struct net_device *dev,
 		pci_dma_sync_single_for_cpu(skge->hw->pdev,
 					    pci_unmap_addr(e, mapaddr),
 					    len, PCI_DMA_FROMDEVICE);
-		memcpy(skb->data, e->skb->data, len);
+		skb_copy_from_linear_data(e->skb, skb->data, len);
 		pci_dma_sync_single_for_device(skge->hw->pdev,
 					       pci_unmap_addr(e, mapaddr),
 					       len, PCI_DMA_FROMDEVICE);
@@ -3017,21 +3020,29 @@ static void skge_tx_done(struct net_device *dev)
 
 	skge_write8(skge->hw, Q_ADDR(txqaddr[skge->port], Q_CSR), CSR_IRQ_CL_F);
 
-	netif_tx_lock(dev);
 	for (e = ring->to_clean; e != ring->to_use; e = e->next) {
-		struct skge_tx_desc *td = e->desc;
+		u32 control = ((const struct skge_tx_desc *) e->desc)->control;
 
-		if (td->control & BMU_OWN)
+		if (control & BMU_OWN)
 			break;
 
-		skge_tx_free(skge, e, td->control);
+		skge_tx_free(skge, e, control);
 	}
 	skge->tx_ring.to_clean = e;
 
-	if (skge_avail(&skge->tx_ring) > TX_LOW_WATER)
-		netif_wake_queue(dev);
+	/* Can run lockless until we need to synchronize to restart queue. */
+	smp_mb();
 
-	netif_tx_unlock(dev);
+	if (unlikely(netif_queue_stopped(dev) &&
+		     skge_avail(&skge->tx_ring) > TX_LOW_WATER)) {
+		netif_tx_lock(dev);
+		if (unlikely(netif_queue_stopped(dev) &&
+			     skge_avail(&skge->tx_ring) > TX_LOW_WATER)) {
+			netif_wake_queue(dev);
+
+		}
+		netif_tx_unlock(dev);
+	}
 }
 
 static int skge_poll(struct net_device *dev, int *budget)
@@ -3583,7 +3594,9 @@ static struct net_device *skge_devinit(struct skge_hw *hw, int port,
 	skge->duplex = -1;
 	skge->speed = -1;
 	skge->advertising = skge_supported_modes(hw);
-	skge->wol = pci_wake_enabled(hw->pdev) ? wol_supported(hw) : 0;
+
+	if (pci_wake_enabled(hw->pdev))
+		skge->wol = wol_supported(hw) & WAKE_MAGIC;
 
 	hw->dev[port] = dev;
 
@@ -3789,6 +3802,9 @@ static int skge_suspend(struct pci_dev *pdev, pm_message_t state)
 	struct skge_hw *hw  = pci_get_drvdata(pdev);
 	int i, err, wol = 0;
 
+	if (!hw)
+		return 0;
+
 	err = pci_save_state(pdev);
 	if (err)
 		return err;
@@ -3816,6 +3832,9 @@ static int skge_resume(struct pci_dev *pdev)
 {
 	struct skge_hw *hw  = pci_get_drvdata(pdev);
 	int i, err;
+
+	if (!hw)
+		return 0;
 
 	err = pci_set_power_state(pdev, PCI_D0);
 	if (err)
@@ -3854,6 +3873,9 @@ static void skge_shutdown(struct pci_dev *pdev)
 {
 	struct skge_hw *hw  = pci_get_drvdata(pdev);
 	int i, wol = 0;
+
+	if (!hw)
+		return;
 
 	for (i = 0; i < hw->ports; i++) {
 		struct net_device *dev = hw->dev[i];

@@ -74,7 +74,7 @@ static void spider_io_flush(const volatile void __iomem *addr)
 	/* Fast path if we have a non-0 token, it indicates which bus we
 	 * are on.
 	 *
-	 * If the token is 0, that means either the the ioremap was done
+	 * If the token is 0, that means either that the ioremap was done
 	 * before we initialized this layer, or it's a PIO operation. We
 	 * fallback to a low path in this case. Hopefully, internal devices
 	 * which are ioremap'ed early should use in_XX/out_XX functions
@@ -318,7 +318,7 @@ static int __init spider_pci_workaround_init(void)
 	 */
 	list_for_each_entry(phb, &hose_list, list_node) {
 		struct device_node *np = phb->arch_data;
-		const char *model = get_property(np, "model", NULL);
+		const char *model = of_get_property(np, "model", NULL);
 
 		/* If no model property or name isn't exactly "pci", skip */
 		if (model == NULL || strcmp(np->name, "pci"))

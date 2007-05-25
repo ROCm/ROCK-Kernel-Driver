@@ -29,6 +29,10 @@ config GENERIC_TIME
 	bool
 	default n
 
+config GENERIC_CLOCKEVENTS
+	bool
+	default n
+
 config MMU
 	bool
 	default y
@@ -67,6 +71,14 @@ config GENERIC_HARDIRQS
 	bool
 	default y
 
+config STACKTRACE_SUPPORT
+	bool
+	default y
+
+config LOCKDEP_SUPPORT
+	bool
+	default y
+
 config TRACE_IRQFLAGS_SUPPORT
 	bool
 	default y
@@ -101,9 +113,6 @@ config GENERIC_HWEIGHT
 config GENERIC_CALIBRATE_DELAY
 	bool
 	default y
-
-config GENERIC_BUST_SPINLOCK
-	bool
 
 config ARCH_MAY_HAVE_PC_FDC
 	bool
@@ -162,6 +171,8 @@ config ARCH_VERSATILE
 	select ARM_AMBA
 	select ARM_VIC
 	select ICST307
+	select GENERIC_TIME
+	select GENERIC_CLOCKEVENTS
 	help
 	  This enables support for ARM Ltd Versatile board.
 
@@ -233,6 +244,15 @@ config ARCH_IMX
 	help
 	  Support for Motorola's i.MX family of processors (MX1, MXL).
 
+config ARCH_IOP13XX
+	bool "IOP13xx-based"
+	depends on MMU
+	select PLAT_IOP
+	select PCI
+	select ARCH_SUPPORTS_MSI
+	help
+	  Support for Intel's IOP13XX (XScale) family of processors.
+
 config ARCH_IOP32X
 	bool "IOP32x-based"
 	depends on MMU
@@ -250,20 +270,12 @@ config ARCH_IOP33X
 	help
 	  Support for Intel's IOP33X (XScale) family of processors.
 
-config ARCH_IOP13XX
-	bool "IOP13xx-based"
+config ARCH_IXP23XX
+ 	bool "IXP23XX-based"
 	depends on MMU
-	select PLAT_IOP
-	select PCI
+ 	select PCI
 	help
-	  Support for Intel's IOP13XX (XScale) family of processors.
-
-config ARCH_IXP4XX
-	bool "IXP4xx-based"
-	depends on MMU
-	select GENERIC_TIME
-	help
-	  Support for Intel's IXP4XX (XScale) family of processors.
+	  Support for Intel's IXP23xx (XScale) family of processors.
 
 config ARCH_IXP2000
 	bool "IXP2400/2800-based"
@@ -272,12 +284,14 @@ config ARCH_IXP2000
 	help
 	  Support for Intel's IXP2400/2800 (XScale) family of processors.
 
-config ARCH_IXP23XX
- 	bool "IXP23XX-based"
+config ARCH_IXP4XX
+	bool "IXP4xx-based"
 	depends on MMU
- 	select PCI
+	select GENERIC_GPIO
+	select GENERIC_TIME
+	select GENERIC_CLOCKEVENTS
 	help
-	  Support for Intel's IXP23xx (XScale) family of processors.
+	  Support for Intel's IXP4XX (XScale) family of processors.
 
 config ARCH_L7200
 	bool "LinkUp-L7200"
@@ -291,6 +305,12 @@ config ARCH_L7200
 
 	  If you have any questions or comments about the Linux kernel port
 	  to this board, send e-mail to <sjhill@cotw.com>.
+
+config ARCH_KS8695
+	bool "Micrel/Kendin KS8695"
+	help
+	  Support for Micrel/Kendin KS8695 "Centaur" (ARM922T) based
+	  System-on-Chip devices.
 
 config ARCH_NS9XXX
 	bool "NetSilicon NS9xxx"
@@ -360,9 +380,17 @@ config ARCH_LH7A40X
 	  core with a wide array of integrated devices for
 	  hand-held and low-power applications.
 
+config ARCH_DAVINCI
+	bool "TI DaVinci"
+	select GENERIC_TIME
+	select GENERIC_CLOCKEVENTS
+	help
+	  Support for TI's DaVinci platform.
+
 config ARCH_OMAP
 	bool "TI OMAP"
 	select GENERIC_GPIO
+	select GENERIC_TIME
 	help
 	  Support for TI's OMAP platform (OMAP1 and OMAP2).
 
@@ -427,6 +455,10 @@ source "arch/arm/mach-netx/Kconfig"
 
 source "arch/arm/mach-ns9xxx/Kconfig"
 
+source "arch/arm/mach-davinci/Kconfig"
+
+source "arch/arm/mach-ks8695/Kconfig"
+
 # Definitions to make life easier
 config ARCH_ACORN
 	bool
@@ -487,7 +519,7 @@ config ISA_DMA_API
 	bool
 
 config PCI
-	bool "PCI support" if ARCH_INTEGRATOR_AP || ARCH_VERSATILE_PB || ARCH_IXP4XX
+	bool "PCI support" if ARCH_INTEGRATOR_AP || ARCH_VERSATILE_PB || ARCH_IXP4XX || ARCH_KS8695
 	help
 	  Find out whether you have a PCI motherboard. PCI is the name of a
 	  bus system, i.e. the way the CPU talks to the other stuff inside
@@ -512,6 +544,8 @@ source "drivers/pcmcia/Kconfig"
 endmenu
 
 menu "Kernel Features"
+
+source "kernel/time/Kconfig"
 
 config SMP
 	bool "Symmetric Multi-Processing (EXPERIMENTAL)"
@@ -572,6 +606,7 @@ config PREEMPT
 
 config NO_IDLE_HZ
 	bool "Dynamic tick timer"
+	depends on !GENERIC_CLOCKEVENTS
 	help
 	  Select this option if you want to disable continuous timer ticks
 	  and have them programmed to occur as required. This option saves
@@ -653,7 +688,8 @@ config LEDS
 		   ARCH_LUBBOCK || MACH_MAINSTONE || ARCH_NETWINDER || \
 		   ARCH_OMAP || ARCH_P720T || ARCH_PXA_IDP || \
 		   ARCH_SA1100 || ARCH_SHARK || ARCH_VERSATILE || \
-		   ARCH_AT91 || MACH_TRIZEPS4
+		   ARCH_AT91 || MACH_TRIZEPS4 || ARCH_DAVINCI || \
+		   ARCH_KS8695
 	help
 	  If you say Y here, the LEDs on your machine will be used
 	  to provide useful information about your current system status.
@@ -669,6 +705,7 @@ config LEDS_TIMER
 	bool "Timer LED" if (!ARCH_CDB89712 && !ARCH_OMAP) || \
 			    MACH_OMAP_H2 || MACH_OMAP_PERSEUS2
 	depends on LEDS
+	depends on !GENERIC_CLOCKEVENTS
 	default y if ARCH_EBSA110
 	help
 	  If you say Y here, one of the system LEDs (the green one on the

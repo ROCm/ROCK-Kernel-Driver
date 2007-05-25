@@ -117,6 +117,7 @@
 #define I2C_DRIVERID_ISL1208	88	/* Intersil ISL1208 RTC		*/
 #define I2C_DRIVERID_WM8731		89	/* Wolfson WM8731 audio codec */
 #define I2C_DRIVERID_WM8750		90	/* Wolfson WM8750 audio codec */
+#define I2C_DRIVERID_WM8753		91	/* Wolfson WM8753 audio codec */
 
 #define I2C_DRIVERID_I2CDEV	900
 #define I2C_DRIVERID_ARP        902    /* SMBus ARP Client              */
@@ -258,8 +259,9 @@
 /* --- MCP107 adapter */
 #define I2C_HW_MPC107		0x0d0000
 
-/* --- Marvell mv64xxx i2c adapter */
+/* --- Embedded adapters */
 #define I2C_HW_MV64XXX		0x190000
+#define I2C_HW_BLACKFIN		0x190001 /* ADI Blackfin I2C TWI driver */
 
 /* --- Miscellaneous adapters */
 #define I2C_HW_SAA7146		0x060000 /* SAA7146 video decoder bus */

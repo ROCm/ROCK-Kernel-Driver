@@ -28,7 +28,6 @@
 #include <linux/delay.h>
 #include <linux/ioport.h>
 #include <linux/slab.h>
-#include <linux/smp_lock.h>
 #include <linux/errno.h>
 #include <linux/init.h>
 #include <linux/timer.h>
@@ -282,6 +281,9 @@ MODULE_PARM_DESC(host_addr, "Host Ethernet Address");
 #define DEV_CONFIG_CDC
 #endif
 
+#ifdef CONFIG_USB_GADGET_FSL_USB2
+#define DEV_CONFIG_CDC
+#endif
 
 /* For CDC-incapable hardware, choose the simple cdc subset.
  * Anything that talks bulk (without notable bugs) can do this.
@@ -1735,7 +1737,8 @@ enomem:
 		defer_kevent (dev, WORK_RX_MEMORY);
 	if (retval) {
 		DEBUG (dev, "rx submit --> %d\n", retval);
-		dev_kfree_skb_any (skb);
+		if (skb)
+			dev_kfree_skb_any(skb);
 		spin_lock(&dev->req_lock);
 		list_add (&req->list, &dev->rx_reqs);
 		spin_unlock(&dev->req_lock);
@@ -1766,7 +1769,6 @@ static void rx_complete (struct usb_ep *ep, struct usb_request *req)
 			break;
 		}
 
-		skb->dev = dev->net;
 		skb->protocol = eth_type_trans (skb, dev->net);
 		dev->stats.rx_packets++;
 		dev->stats.rx_bytes += skb->len;

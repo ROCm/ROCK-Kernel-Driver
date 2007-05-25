@@ -28,7 +28,6 @@
 #include <linux/mm.h>
 #include <linux/vmalloc.h>
 #include <linux/smp.h>
-#include <linux/smp_lock.h>
 #include <linux/stddef.h>
 #include <linux/unistd.h>
 #include <linux/poll.h>
@@ -355,6 +354,11 @@ static int spu_backing_send_mfc_command(struct spu_context *ctx,
 	return ret;
 }
 
+static void spu_backing_restart_dma(struct spu_context *ctx)
+{
+	/* nothing to do here */
+}
+
 struct spu_context_ops spu_backing_ops = {
 	.mbox_read = spu_backing_mbox_read,
 	.mbox_stat_read = spu_backing_mbox_stat_read,
@@ -382,4 +386,5 @@ struct spu_context_ops spu_backing_ops = {
 	.read_mfc_tagstatus = spu_backing_read_mfc_tagstatus,
 	.get_mfc_free_elements = spu_backing_get_mfc_free_elements,
 	.send_mfc_command = spu_backing_send_mfc_command,
+	.restart_dma = spu_backing_restart_dma,
 };

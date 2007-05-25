@@ -264,8 +264,8 @@ static inline void list_del_init(struct list_head *entry)
  */
 static inline void list_move(struct list_head *list, struct list_head *head)
 {
-        __list_del(list->prev, list->next);
-        list_add(list, head);
+	__list_del(list->prev, list->next);
+	list_add(list, head);
 }
 
 /**
@@ -276,8 +276,8 @@ static inline void list_move(struct list_head *list, struct list_head *head)
 static inline void list_move_tail(struct list_head *list,
 				  struct list_head *head)
 {
-        __list_del(list->prev, list->next);
-        list_add_tail(list, head);
+	__list_del(list->prev, list->next);
+	list_add_tail(list, head);
 }
 
 /**
@@ -424,6 +424,17 @@ static inline void list_splice_init_rcu(struct list_head *list,
  */
 #define list_entry(ptr, type, member) \
 	container_of(ptr, type, member)
+
+/**
+ * list_first_entry - get the first element from a list
+ * @ptr:	the list head to take the element from.
+ * @type:	the type of the struct this is embedded in.
+ * @member:	the name of the list_struct within the struct.
+ *
+ * Note, that list is expected to be not empty.
+ */
+#define list_first_entry(ptr, type, member) \
+	list_entry((ptr)->next, type, member)
 
 /**
  * list_for_each	-	iterate over a list

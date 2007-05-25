@@ -52,7 +52,7 @@ static char *radeon_get_mon_name(int type)
 }
 
 
-#ifdef CONFIG_PPC_OF
+#if defined(CONFIG_PPC_OF) || defined(CONFIG_SPARC)
 /*
  * Try to find monitor informations & EDID data out of the Open Firmware
  * device-tree. This also contains some "hacks" to work around a few machine
@@ -70,7 +70,7 @@ static int __devinit radeon_parse_montype_prop(struct device_node *dp, u8 **out_
         int i, mt = MT_NONE;  
 	
 	RTRACE("analyzing OF properties...\n");
-	pmt = get_property(dp, "display-type", NULL);
+	pmt = of_get_property(dp, "display-type", NULL);
 	if (!pmt)
 		return MT_NONE;
 	RTRACE("display-type: %s\n", pmt);
@@ -89,7 +89,7 @@ static int __devinit radeon_parse_montype_prop(struct device_node *dp, u8 **out_
 	}
 
 	for (i = 0; propnames[i] != NULL; ++i) {
-		pedid = get_property(dp, propnames[i], NULL);
+		pedid = of_get_property(dp, propnames[i], NULL);
 		if (pedid != NULL)
 			break;
 	}
@@ -98,9 +98,10 @@ static int __devinit radeon_parse_montype_prop(struct device_node *dp, u8 **out_
 	 * single-head cards have hdno == -1 and skip this step
 	 */
 	if (pedid == NULL && dp->parent && (hdno != -1))
-		pedid = get_property(dp->parent, (hdno == 0) ? "EDID1" : "EDID2", NULL);
+		pedid = of_get_property(dp->parent,
+				(hdno == 0) ? "EDID1" : "EDID2", NULL);
 	if (pedid == NULL && dp->parent && (hdno == 0))
-		pedid = get_property(dp->parent, "EDID", NULL);
+		pedid = of_get_property(dp->parent, "EDID", NULL);
 	if (pedid == NULL)
 		return mt;
 
@@ -130,7 +131,7 @@ static int __devinit radeon_probe_OF_head(struct radeonfb_info *rinfo, int head_
 		do {
 			if (!dp)
 				return MT_NONE;
-			pname = get_property(dp, "name", NULL);
+			pname = of_get_property(dp, "name", NULL);
 			if (!pname)
 				return MT_NONE;
 			len = strlen(pname);
@@ -156,7 +157,7 @@ static int __devinit radeon_probe_OF_head(struct radeonfb_info *rinfo, int head_
 	}
         return MT_NONE;
 }
-#endif /* CONFIG_PPC_OF */
+#endif /* CONFIG_PPC_OF || CONFIG_SPARC */
 
 
 static int __devinit radeon_get_panel_info_BIOS(struct radeonfb_info *rinfo)
@@ -495,11 +496,11 @@ void __devinit radeon_probe_screens(struct radeonfb_info *rinfo,
 		 * Old single head cards
 		 */
 		if (!rinfo->has_CRTC2) {
-#ifdef CONFIG_PPC_OF
+#if defined(CONFIG_PPC_OF) || defined(CONFIG_SPARC)
 			if (rinfo->mon1_type == MT_NONE)
 				rinfo->mon1_type = radeon_probe_OF_head(rinfo, 0,
 									&rinfo->mon1_EDID);
-#endif /* CONFIG_PPC_OF */
+#endif /* CONFIG_PPC_OF || CONFIG_SPARC */
 #ifdef CONFIG_FB_RADEON_I2C
 			if (rinfo->mon1_type == MT_NONE)
 				rinfo->mon1_type =
@@ -544,11 +545,11 @@ void __devinit radeon_probe_screens(struct radeonfb_info *rinfo,
 		/*
 		 * Probe primary head (DVI or laptop internal panel)
 		 */
-#ifdef CONFIG_PPC_OF
+#if defined(CONFIG_PPC_OF) || defined(CONFIG_SPARC)
 		if (rinfo->mon1_type == MT_NONE)
 			rinfo->mon1_type = radeon_probe_OF_head(rinfo, 0,
 								&rinfo->mon1_EDID);
-#endif /* CONFIG_PPC_OF */
+#endif /* CONFIG_PPC_OF || CONFIG_SPARC */
 #ifdef CONFIG_FB_RADEON_I2C
 		if (rinfo->mon1_type == MT_NONE)
 			rinfo->mon1_type = radeon_probe_i2c_connector(rinfo, ddc_dvi,
@@ -572,11 +573,11 @@ void __devinit radeon_probe_screens(struct radeonfb_info *rinfo,
 		/*
 		 * Probe secondary head (mostly VGA, can be DVI)
 		 */
-#ifdef CONFIG_PPC_OF
+#if defined(CONFIG_PPC_OF) || defined(CONFIG_SPARC)
 		if (rinfo->mon2_type == MT_NONE)
 			rinfo->mon2_type = radeon_probe_OF_head(rinfo, 1,
 								&rinfo->mon2_EDID);
-#endif /* CONFIG_PPC_OF */
+#endif /* CONFIG_PPC_OF || defined(CONFIG_SPARC) */
 #ifdef CONFIG_FB_RADEON_I2C
 		if (rinfo->mon2_type == MT_NONE)
 			rinfo->mon2_type = radeon_probe_i2c_connector(rinfo, ddc_vga,

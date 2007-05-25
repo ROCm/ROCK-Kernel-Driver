@@ -14,8 +14,7 @@
 
 #include "sysfs.h"
 
-#define to_subsys(k) container_of(k,struct subsystem,kset.kobj)
-#define to_sattr(a) container_of(a,struct subsys_attribute,attr)
+#define to_sattr(a) container_of(a,struct subsys_attribute, attr)
 
 /* used in crash dumps to help with debugging */
 static char last_sysfs_file[PATH_MAX];
@@ -28,12 +27,12 @@ static char last_sysfs_file[PATH_MAX];
 static ssize_t 
 subsys_attr_show(struct kobject * kobj, struct attribute * attr, char * page)
 {
-	struct subsystem * s = to_subsys(kobj);
+	struct kset *kset = to_kset(kobj);
 	struct subsys_attribute * sattr = to_sattr(attr);
 	ssize_t ret = -EIO;
 
 	if (sattr->show)
-		ret = sattr->show(s,page);
+		ret = sattr->show(kset, page);
 	return ret;
 }
 
@@ -41,12 +40,12 @@ static ssize_t
 subsys_attr_store(struct kobject * kobj, struct attribute * attr, 
 		  const char * page, size_t count)
 {
-	struct subsystem * s = to_subsys(kobj);
+	struct kset *kset = to_kset(kobj);
 	struct subsys_attribute * sattr = to_sattr(attr);
 	ssize_t ret = -EIO;
 
 	if (sattr->store)
-		ret = sattr->store(s,page,count);
+		ret = sattr->store(kset, page, count);
 	return ret;
 }
 
@@ -116,36 +115,6 @@ static int fill_read_buffer(struct dentry * dentry, struct sysfs_buffer * buffer
 	return ret;
 }
 
-
-/**
- *	flush_read_buffer - push buffer to userspace.
- *	@buffer:	data buffer for file.
- *	@buf:		user-passed buffer.
- *	@count:		number of bytes requested.
- *	@ppos:		file position.
- *
- *	Copy the buffer we filled in fill_read_buffer() to userspace.
- *	This is done at the reader's leisure, copying and advancing 
- *	the amount they specify each time.
- *	This may be called continuously until the buffer is empty.
- */
-static int flush_read_buffer(struct sysfs_buffer * buffer, char __user * buf,
-			     size_t count, loff_t * ppos)
-{
-	int error;
-
-	if (*ppos > buffer->count)
-		return 0;
-
-	if (count > (buffer->count - *ppos))
-		count = buffer->count - *ppos;
-
-	error = copy_to_user(buf,buffer->page + *ppos,count);
-	if (!error)
-		*ppos += count;
-	return error ? -EFAULT : count;
-}
-
 /**
  *	sysfs_read_file - read an attribute. 
  *	@file:	file pointer.
@@ -182,7 +151,8 @@ sysfs_read_file(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 	}
 	pr_debug("%s: count = %zd, ppos = %lld, buf = %s\n",
 		 __FUNCTION__, count, *ppos, buffer->page);
-	retval = flush_read_buffer(buffer,buf,count,ppos);
+	retval = simple_read_from_buffer(buf, count, ppos, buffer->page,
+					 buffer->count);
 out:
 	up(&buffer->sem);
 	return retval;
@@ -645,6 +615,7 @@ struct sysfs_schedule_callback_struct {
 	struct kobject 		*kobj;
 	void			(*func)(void *);
 	void			*data;
+	struct module		*owner;
 	struct work_struct	work;
 };
 
@@ -655,6 +626,7 @@ static void sysfs_schedule_callback_work(struct work_struct *work)
 
 	(ss->func)(ss->data);
 	kobject_put(ss->kobj);
+	module_put(ss->owner);
 	kfree(ss);
 }
 
@@ -663,6 +635,7 @@ static void sysfs_schedule_callback_work(struct work_struct *work)
  * @kobj: object we're acting for.
  * @func: callback function to invoke later.
  * @data: argument to pass to @func.
+ * @owner: module owning the callback code
  *
  * sysfs attribute methods must not unregister themselves or their parent
  * kobject (which would amount to the same thing).  Attempts to do so will
@@ -675,20 +648,25 @@ static void sysfs_schedule_callback_work(struct work_struct *work)
  * until @func returns.
  *
  * Returns 0 if the request was submitted, -ENOMEM if storage could not
- * be allocated.
+ * be allocated, -ENODEV if a reference to @owner isn't available.
  */
 int sysfs_schedule_callback(struct kobject *kobj, void (*func)(void *),
-		void *data)
+		void *data, struct module *owner)
 {
 	struct sysfs_schedule_callback_struct *ss;
 
+	if (!try_module_get(owner))
+		return -ENODEV;
 	ss = kmalloc(sizeof(*ss), GFP_KERNEL);
-	if (!ss)
+	if (!ss) {
+		module_put(owner);
 		return -ENOMEM;
+	}
 	kobject_get(kobj);
 	ss->kobj = kobj;
 	ss->func = func;
 	ss->data = data;
+	ss->owner = owner;
 	INIT_WORK(&ss->work, sysfs_schedule_callback_work);
 	schedule_work(&ss->work);
 	return 0;

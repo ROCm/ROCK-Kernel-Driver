@@ -28,7 +28,7 @@
 #include <scsi/scsi_device.h>
 
 #define DRV_NAME	"sata_inic162x"
-#define DRV_VERSION	"0.1"
+#define DRV_VERSION	"0.2"
 
 enum {
 	MMIO_BAR		= 5,
@@ -135,10 +135,6 @@ static struct scsi_host_template inic_sht = {
 	.slave_configure	= inic_slave_config,
 	.slave_destroy		= ata_scsi_slave_destroy,
 	.bios_param		= ata_std_bios_param,
-#ifdef CONFIG_PM
-	.suspend		= ata_scsi_device_suspend,
-	.resume			= ata_scsi_device_resume,
-#endif
 };
 
 static const int scr_map[] = {
@@ -420,7 +416,8 @@ static void inic_thaw(struct ata_port *ap)
  * SRST and SControl hardreset don't give valid signature on this
  * controller.  Only controller specific hardreset mechanism works.
  */
-static int inic_hardreset(struct ata_port *ap, unsigned int *class)
+static int inic_hardreset(struct ata_port *ap, unsigned int *class,
+			  unsigned long deadline)
 {
 	void __iomem *port_base = inic_port_base(ap);
 	void __iomem *idma_ctl = port_base + PORT_IDMA_CTL;
@@ -437,7 +434,7 @@ static int inic_hardreset(struct ata_port *ap, unsigned int *class)
 	msleep(1);
 	writew(val & ~IDMA_CTL_RST_ATA, idma_ctl);
 
-	rc = sata_phy_resume(ap, timing);
+	rc = sata_phy_resume(ap, timing, deadline);
 	if (rc) {
 		ata_port_printk(ap, KERN_WARNING, "failed to resume "
 				"link after reset (errno=%d)\n", rc);
@@ -451,10 +448,12 @@ static int inic_hardreset(struct ata_port *ap, unsigned int *class)
 		/* wait a while before checking status */
 		msleep(150);
 
-		if (ata_busy_sleep(ap, ATA_TMOUT_BOOT_QUICK, ATA_TMOUT_BOOT)) {
-			ata_port_printk(ap, KERN_WARNING,
-					"device busy after hardreset\n");
-			return -EIO;
+		rc = ata_wait_ready(ap, deadline);
+		/* link occupied, -ENODEV too is an error */
+		if (rc) {
+			ata_port_printk(ap, KERN_WARNING, "device not ready "
+					"after hardreset (errno=%d)\n", rc);
+			return rc;
 		}
 
 		ata_tf_read(ap, &tf);
@@ -488,11 +487,11 @@ static void inic_error_handler(struct ata_port *ap)
 static void inic_post_internal_cmd(struct ata_queued_cmd *qc)
 {
 	/* make DMA engine forget about the failed command */
-	if (qc->err_mask)
+	if (qc->flags & ATA_QCFLAG_FAILED)
 		inic_reset_port(inic_port_base(qc->ap));
 }
 
-static void inic_dev_config(struct ata_port *ap, struct ata_device *dev)
+static void inic_dev_config(struct ata_device *dev)
 {
 	/* inic can only handle upto LBA28 max sectors */
 	if (dev->max_sectors > ATA_MAX_SECTORS)
@@ -559,7 +558,6 @@ static struct ata_port_operations inic_port_ops = {
 	.bmdma_stop		= inic_bmdma_stop,
 	.bmdma_status		= inic_bmdma_status,
 
-	.irq_handler		= inic_interrupt,
 	.irq_clear		= inic_irq_clear,
 	.irq_on			= ata_irq_on,
 	.irq_ack		= ata_irq_ack,
@@ -580,7 +578,6 @@ static struct ata_port_operations inic_port_ops = {
 };
 
 static struct ata_port_info inic_port_info = {
-	.sht			= &inic_sht,
 	/* For some reason, ATA_PROT_ATAPI is broken on this
 	 * controller, and no, PIO_POLLING does't fix it.  It somehow
 	 * manages to report the wrong ireason and ignoring ireason
@@ -642,7 +639,9 @@ static int inic_pci_device_resume(struct pci_dev *pdev)
 	void __iomem *mmio_base = host->iomap[MMIO_BAR];
 	int rc;
 
-	ata_pci_device_do_resume(pdev);
+	rc = ata_pci_device_do_resume(pdev);
+	if (rc)
+		return rc;
 
 	if (pdev->dev.power.power_state.event == PM_EVENT_SUSPEND) {
 		rc = init_controller(mmio_base, hpriv->cached_hctl);
@@ -659,8 +658,8 @@ static int inic_pci_device_resume(struct pci_dev *pdev)
 static int inic_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 {
 	static int printed_version;
-	struct ata_port_info *pinfo = &inic_port_info;
-	struct ata_probe_ent *probe_ent;
+	const struct ata_port_info *ppi[] = { &inic_port_info, NULL };
+	struct ata_host *host;
 	struct inic_host_priv *hpriv;
 	void __iomem * const *iomap;
 	int i, rc;
@@ -668,6 +667,15 @@ static int inic_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	if (!printed_version++)
 		dev_printk(KERN_DEBUG, &pdev->dev, "version " DRV_VERSION "\n");
 
+	/* alloc host */
+	host = ata_host_alloc_pinfo(&pdev->dev, ppi, NR_PORTS);
+	hpriv = devm_kzalloc(&pdev->dev, sizeof(*hpriv), GFP_KERNEL);
+	if (!host || !hpriv)
+		return -ENOMEM;
+
+	host->private_data = hpriv;
+
+	/* acquire resources and fill host */
 	rc = pcim_enable_device(pdev);
 	if (rc)
 		return rc;
@@ -675,7 +683,22 @@ static int inic_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	rc = pcim_iomap_regions(pdev, 0x3f, DRV_NAME);
 	if (rc)
 		return rc;
-	iomap = pcim_iomap_table(pdev);
+	host->iomap = iomap = pcim_iomap_table(pdev);
+
+	for (i = 0; i < NR_PORTS; i++) {
+		struct ata_ioports *port = &host->ports[i]->ioaddr;
+		void __iomem *port_base = iomap[MMIO_BAR] + i * PORT_SIZE;
+
+		port->cmd_addr = iomap[2 * i];
+		port->altstatus_addr =
+		port->ctl_addr = (void __iomem *)
+			((unsigned long)iomap[2 * i + 1] | ATA_PCI_CTL_OFS);
+		port->scr_addr = port_base + PORT_SCR;
+
+		ata_std_ports(port);
+	}
+
+	hpriv->cached_hctl = readw(iomap[MMIO_BAR] + HOST_CTL);
 
 	/* Set dma_mask.  This devices doesn't support 64bit addressing. */
 	rc = pci_set_dma_mask(pdev, DMA_32BIT_MASK);
@@ -692,43 +715,6 @@ static int inic_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 		return rc;
 	}
 
-	probe_ent = devm_kzalloc(&pdev->dev, sizeof(*probe_ent), GFP_KERNEL);
-	hpriv = devm_kzalloc(&pdev->dev, sizeof(*hpriv), GFP_KERNEL);
-	if (!probe_ent || !hpriv)
-		return -ENOMEM;
-
-	probe_ent->dev = &pdev->dev;
-	INIT_LIST_HEAD(&probe_ent->node);
-
-	probe_ent->sht			= pinfo->sht;
-	probe_ent->port_flags		= pinfo->flags;
-	probe_ent->pio_mask		= pinfo->pio_mask;
-	probe_ent->mwdma_mask		= pinfo->mwdma_mask;
-	probe_ent->udma_mask		= pinfo->udma_mask;
-	probe_ent->port_ops		= pinfo->port_ops;
-	probe_ent->n_ports		= NR_PORTS;
-
-	probe_ent->irq = pdev->irq;
-	probe_ent->irq_flags = IRQF_SHARED;
-
-	probe_ent->iomap = iomap;
-
-	for (i = 0; i < NR_PORTS; i++) {
-		struct ata_ioports *port = &probe_ent->port[i];
-		void __iomem *port_base = iomap[MMIO_BAR] + i * PORT_SIZE;
-
-		port->cmd_addr = iomap[2 * i];
-		port->altstatus_addr =
-		port->ctl_addr = (void __iomem *)
-			((unsigned long)iomap[2 * i + 1] | ATA_PCI_CTL_OFS);
-		port->scr_addr = port_base + PORT_SCR;
-
-		ata_std_ports(port);
-	}
-
-	probe_ent->private_data = hpriv;
-	hpriv->cached_hctl = readw(iomap[MMIO_BAR] + HOST_CTL);
-
 	rc = init_controller(iomap[MMIO_BAR], hpriv->cached_hctl);
 	if (rc) {
 		dev_printk(KERN_ERR, &pdev->dev,
@@ -737,13 +723,8 @@ static int inic_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	}
 
 	pci_set_master(pdev);
-
-	if (!ata_device_add(probe_ent))
-		return -ENODEV;
-
-	devm_kfree(&pdev->dev, probe_ent);
-
-	return 0;
+	return ata_host_activate(host, pdev->irq, inic_interrupt, IRQF_SHARED,
+				 &inic_sht);
 }
 
 static const struct pci_device_id inic_pci_tbl[] = {

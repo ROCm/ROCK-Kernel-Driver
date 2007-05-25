@@ -1,7 +1,6 @@
 #ifndef _LINUX_MM_H
 #define _LINUX_MM_H
 
-#include <linux/sched.h>
 #include <linux/errno.h>
 #include <linux/capability.h>
 
@@ -20,6 +19,7 @@
 
 struct mempolicy;
 struct anon_vma;
+struct user_struct;
 
 #ifndef CONFIG_DISCONTIGMEM          /* Don't use mapnrs, do it properly */
 extern unsigned long max_mapnr;
@@ -169,9 +169,6 @@ extern unsigned int kobjsize(const void *objp);
 #define VM_MAPPED_COPY	0x01000000	/* T if mapped copy of data (nommu mmap) */
 #define VM_INSERTPAGE	0x02000000	/* The vma has had "vm_insert_page()" done on it */
 #define VM_ALWAYSDUMP	0x04000000	/* Always include in core dumps */
-#ifdef CONFIG_XEN
-#define VM_FOREIGN	0x08000000	/* Has pages belonging to another VM */
-#endif
 
 #ifndef VM_STACK_DEFAULT_FLAGS		/* arch can override this */
 #define VM_STACK_DEFAULT_FLAGS VM_DATA_DEFAULT_FLAGS
@@ -211,12 +208,6 @@ struct vm_operations_struct {
 	/* notification that a previously read-only page is about to become
 	 * writable, if an error is returned it will cause a SIGBUS */
 	int (*page_mkwrite)(struct vm_area_struct *vma, struct page *page);
-#ifdef CONFIG_XEN
-	/* Area-specific function for clearing the PTE at @ptep. Returns the
-	 * original value of @ptep. */
-	pte_t (*zap_pte)(struct vm_area_struct *vma, 
-			 unsigned long addr, pte_t *ptep, int is_fullmm);
-#endif
 #ifdef CONFIG_NUMA
 	int (*set_policy)(struct vm_area_struct *vma, struct mempolicy *new);
 	struct mempolicy *(*get_policy)(struct vm_area_struct *vma,
@@ -276,19 +267,29 @@ static inline int get_page_unless_zero(struct page *page)
 	return atomic_inc_not_zero(&page->_count);
 }
 
+static inline struct page *compound_head(struct page *page)
+{
+	if (unlikely(PageTail(page)))
+		return page->first_page;
+	return page;
+}
+
 static inline int page_count(struct page *page)
 {
-	if (unlikely(PageCompound(page)))
-		page = (struct page *)page_private(page);
-	return atomic_read(&page->_count);
+	return atomic_read(&compound_head(page)->_count);
 }
 
 static inline void get_page(struct page *page)
 {
-	if (unlikely(PageCompound(page)))
-		page = (struct page *)page_private(page);
+	page = compound_head(page);
 	VM_BUG_ON(atomic_read(&page->_count) == 0);
 	atomic_inc(&page->_count);
+}
+
+static inline struct page *virt_to_head_page(const void *x)
+{
+	struct page *page = virt_to_page(x);
+	return compound_head(page);
 }
 
 /*
@@ -321,6 +322,18 @@ static inline void set_compound_page_dtor(struct page *page,
 static inline compound_page_dtor *get_compound_page_dtor(struct page *page)
 {
 	return (compound_page_dtor *)page[1].lru.next;
+}
+
+static inline int compound_order(struct page *page)
+{
+	if (!PageHead(page))
+		return 0;
+	return (unsigned long)page[1].lru.prev;
+}
+
+static inline void set_compound_order(struct page *page, unsigned long order)
+{
+	page[1].lru.prev = (void *)order;
 }
 
 /*
@@ -704,14 +717,7 @@ extern unsigned long shmem_get_unmapped_area(struct file *file,
 					     unsigned long flags);
 #endif
 
-static inline int can_do_mlock(void)
-{
-	if (capable(CAP_IPC_LOCK))
-		return 1;
-	if (current->signal->rlim[RLIMIT_MEMLOCK].rlim_cur != 0)
-		return 1;
-	return 0;
-}
+extern int can_do_mlock(void);
 extern int user_shm_lock(size_t, struct user_struct *);
 extern void user_shm_unlock(size_t, struct user_struct *);
 
@@ -859,8 +865,26 @@ static inline int vma_wants_writenotify(struct vm_area_struct *vma)
 
 extern pte_t *FASTCALL(get_locked_pte(struct mm_struct *mm, unsigned long addr, spinlock_t **ptl));
 
+#ifdef __PAGETABLE_PUD_FOLDED
+static inline int __pud_alloc(struct mm_struct *mm, pgd_t *pgd,
+						unsigned long address)
+{
+	return 0;
+}
+#else
 int __pud_alloc(struct mm_struct *mm, pgd_t *pgd, unsigned long address);
+#endif
+
+#ifdef __PAGETABLE_PMD_FOLDED
+static inline int __pmd_alloc(struct mm_struct *mm, pud_t *pud,
+						unsigned long address)
+{
+	return 0;
+}
+#else
 int __pmd_alloc(struct mm_struct *mm, pud_t *pud, unsigned long address);
+#endif
+
 int __pte_alloc(struct mm_struct *mm, pmd_t *pmd, unsigned long address);
 int __pte_alloc_kernel(pmd_t *pmd, unsigned long address);
 
@@ -1139,12 +1163,10 @@ struct page *follow_page(struct vm_area_struct *, unsigned long address,
 #define FOLL_GET	0x04	/* do get_page on page */
 #define FOLL_ANON	0x08	/* give ZERO_PAGE if no pgtable */
 
-#ifdef CONFIG_XEN
 typedef int (*pte_fn_t)(pte_t *pte, struct page *pmd_page, unsigned long addr,
 			void *data);
 extern int apply_to_page_range(struct mm_struct *mm, unsigned long address,
 			       unsigned long size, pte_fn_t fn, void *data);
-#endif
 
 #ifdef CONFIG_PROC_FS
 void vm_stat_account(struct mm_struct *, unsigned long, struct file *, long);

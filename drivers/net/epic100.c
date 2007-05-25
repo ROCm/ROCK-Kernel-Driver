@@ -93,8 +93,6 @@ static int rx_copybreak;
 static char version[] __devinitdata =
 DRV_NAME ".c:v1.11 1/7/2001 Written by Donald Becker <becker@scyld.com>\n";
 static char version2[] __devinitdata =
-"  http://www.scyld.com/network/epic100.html\n";
-static char version3[] __devinitdata =
 "  (unofficial 2.4.x kernel port, version " DRV_VERSION ", " DRV_RELDATE ")\n";
 
 MODULE_AUTHOR("Donald Becker <becker@scyld.com>");
@@ -323,8 +321,8 @@ static int __devinit epic_init_one (struct pci_dev *pdev,
 #ifndef MODULE
 	static int printed_version;
 	if (!printed_version++)
-		printk (KERN_INFO "%s" KERN_INFO "%s" KERN_INFO "%s",
-			version, version2, version3);
+		printk (KERN_INFO "%s" KERN_INFO "%s",
+			version, version2);
 #endif
 
 	card_idx++;
@@ -934,7 +932,6 @@ static void epic_init_ring(struct net_device *dev)
 		ep->rx_skbuff[i] = skb;
 		if (skb == NULL)
 			break;
-		skb->dev = dev;			/* Mark as being used by this device. */
 		skb_reserve(skb, 2);	/* 16 byte align the IP header. */
 		ep->rx_ring[i].bufaddr = pci_map_single(ep->pci_dev,
 			skb->data, ep->rx_buf_sz, PCI_DMA_FROMDEVICE);
@@ -1199,7 +1196,6 @@ static int epic_rx(struct net_device *dev, int budget)
 			   to a minimally-sized skbuff. */
 			if (pkt_len < rx_copybreak
 				&& (skb = dev_alloc_skb(pkt_len + 2)) != NULL) {
-				skb->dev = dev;
 				skb_reserve(skb, 2);	/* 16 byte align the IP header */
 				pci_dma_sync_single_for_cpu(ep->pci_dev,
 							    ep->rx_ring[entry].bufaddr,
@@ -1236,7 +1232,6 @@ static int epic_rx(struct net_device *dev, int budget)
 			skb = ep->rx_skbuff[entry] = dev_alloc_skb(ep->rx_buf_sz);
 			if (skb == NULL)
 				break;
-			skb->dev = dev;			/* Mark as being used by this device. */
 			skb_reserve(skb, 2);	/* Align IP on 16 byte boundaries */
 			ep->rx_ring[entry].bufaddr = pci_map_single(ep->pci_dev,
 				skb->data, ep->rx_buf_sz, PCI_DMA_FROMDEVICE);
@@ -1599,8 +1594,8 @@ static int __init epic_init (void)
 {
 /* when a module, this is printed whether or not devices are found in probe */
 #ifdef MODULE
-	printk (KERN_INFO "%s" KERN_INFO "%s" KERN_INFO "%s",
-		version, version2, version3);
+	printk (KERN_INFO "%s" KERN_INFO "%s",
+		version, version2);
 #endif
 
 	return pci_register_driver(&epic_driver);

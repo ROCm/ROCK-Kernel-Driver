@@ -12,7 +12,7 @@ SECTIONS
   .text 0xf0004000 :
   {
     _text = .;
-    *(.text)
+    TEXT_TEXT
     SCHED_TEXT
     LOCK_TEXT
     *(.gnu.warning)
@@ -22,7 +22,7 @@ SECTIONS
   RODATA
   .data    :
   {
-    *(.data)
+    DATA_DATA
     CONSTRUCTORS
   }
   .data1   : { *(.data1) }
@@ -65,7 +65,7 @@ SECTIONS
   __initramfs_end = .;
 #endif
 
-  . = ALIGN(32);
+  . = ALIGN(4096);
   __per_cpu_start = .;
   .data.percpu  : { *(.data.percpu) }
   __per_cpu_end = .;

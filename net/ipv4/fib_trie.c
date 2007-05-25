@@ -50,7 +50,7 @@
  *		Patrick McHardy <kaber@trash.net>
  */
 
-#define VERSION "0.407"
+#define VERSION "0.408"
 
 #include <asm/uaccess.h>
 #include <asm/system.h>
@@ -292,8 +292,8 @@ static inline void check_tnode(const struct tnode *tn)
 
 static int halve_threshold = 25;
 static int inflate_threshold = 50;
-static int halve_threshold_root = 15;
-static int inflate_threshold_root = 25;
+static int halve_threshold_root = 8;
+static int inflate_threshold_root = 15;
 
 
 static void __alias_free_mem(struct rcu_head *head)
@@ -350,11 +350,10 @@ static void __tnode_free_rcu(struct rcu_head *head)
 
 static inline void tnode_free(struct tnode *tn)
 {
-	if(IS_LEAF(tn)) {
+	if (IS_LEAF(tn)) {
 		struct leaf *l = (struct leaf *) tn;
 		call_rcu_bh(&l->rcu, __leaf_free_rcu);
-	}
-	else
+	} else
 		call_rcu(&tn->rcu, __tnode_free_rcu);
 }
 
@@ -459,6 +458,7 @@ static struct node *resize(struct trie *t, struct tnode *tn)
 	struct tnode *old_tn;
 	int inflate_threshold_use;
 	int halve_threshold_use;
+	int max_resize;
 
 	if (!tn)
 		return NULL;
@@ -553,13 +553,14 @@ static struct node *resize(struct trie *t, struct tnode *tn)
 
 	/* Keep root node larger  */
 
-	if(!tn->parent)
+	if (!tn->parent)
 		inflate_threshold_use = inflate_threshold_root;
 	else
 		inflate_threshold_use = inflate_threshold;
 
 	err = 0;
-	while ((tn->full_children > 0 &&
+	max_resize = 10;
+	while ((tn->full_children > 0 &&  max_resize-- &&
 	       50 * (tn->full_children + tnode_child_length(tn) - tn->empty_children) >=
 				inflate_threshold_use * tnode_child_length(tn))) {
 
@@ -574,6 +575,15 @@ static struct node *resize(struct trie *t, struct tnode *tn)
 		}
 	}
 
+	if (max_resize < 0) {
+		if (!tn->parent)
+			printk(KERN_WARNING "Fix inflate_threshold_root. Now=%d size=%d bits\n",
+			       inflate_threshold_root, tn->bits);
+		else
+			printk(KERN_WARNING "Fix inflate_threshold. Now=%d size=%d bits\n",
+			       inflate_threshold, tn->bits);
+	}
+
 	check_tnode(tn);
 
 	/*
@@ -584,13 +594,14 @@ static struct node *resize(struct trie *t, struct tnode *tn)
 
 	/* Keep root node larger  */
 
-	if(!tn->parent)
+	if (!tn->parent)
 		halve_threshold_use = halve_threshold_root;
 	else
 		halve_threshold_use = halve_threshold;
 
 	err = 0;
-	while (tn->bits > 1 &&
+	max_resize = 10;
+	while (tn->bits > 1 &&  max_resize-- &&
 	       100 * (tnode_child_length(tn) - tn->empty_children) <
 	       halve_threshold_use * tnode_child_length(tn)) {
 
@@ -605,6 +616,14 @@ static struct node *resize(struct trie *t, struct tnode *tn)
 		}
 	}
 
+	if (max_resize < 0) {
+		if (!tn->parent)
+			printk(KERN_WARNING "Fix halve_threshold_root. Now=%d size=%d bits\n",
+			       halve_threshold_root, tn->bits);
+		else
+			printk(KERN_WARNING "Fix halve_threshold. Now=%d size=%d bits\n",
+			       halve_threshold, tn->bits);
+	}
 
 	/* Only one child remains */
 	if (tn->empty_children == tnode_child_length(tn) - 1)
@@ -1207,6 +1226,8 @@ static int fn_trie_insert(struct fib_table *tb, struct fib_config *cfg)
 			fib_release_info(fi_drop);
 			if (state & FA_S_ACCESSED)
 				rt_cache_flush(-1);
+			rtmsg_fib(RTM_NEWROUTE, htonl(key), new_fa, plen,
+				tb->tb_id, &cfg->fc_nlinfo, NLM_F_REPLACE);
 
 			goto succeeded;
 		}
@@ -1259,7 +1280,7 @@ static int fn_trie_insert(struct fib_table *tb, struct fib_config *cfg)
 
 	rt_cache_flush(-1);
 	rtmsg_fib(RTM_NEWROUTE, htonl(key), new_fa, plen, tb->tb_id,
-		  &cfg->fc_nlinfo);
+		  &cfg->fc_nlinfo, 0);
 succeeded:
 	return 0;
 
@@ -1605,7 +1626,7 @@ static int fn_trie_delete(struct fib_table *tb, struct fib_config *cfg)
 
 	fa = fa_to_delete;
 	rtmsg_fib(RTM_DELROUTE, htonl(key), fa, plen, tb->tb_id,
-		  &cfg->fc_nlinfo);
+		  &cfg->fc_nlinfo, 0);
 
 	l = fib_find_node(t, key);
 	li = find_leaf_info(l, plen);
@@ -2039,12 +2060,12 @@ static struct node *fib_trie_get_first(struct fib_trie_iter *iter,
 {
 	struct node *n ;
 
-	if(!t)
+	if (!t)
 		return NULL;
 
 	n = rcu_dereference(t->trie);
 
-	if(!iter)
+	if (!iter)
 		return NULL;
 
 	if (n) {
@@ -2084,7 +2105,7 @@ static void trie_collect_stats(struct trie *t, struct trie_stat *s)
 			int i;
 
 			s->tnodes++;
-			if(tn->bits < MAX_STAT_DEPTH)
+			if (tn->bits < MAX_STAT_DEPTH)
 				s->nodesizes[tn->bits]++;
 
 			for (i = 0; i < (1<<tn->bits); i++)
@@ -2250,7 +2271,7 @@ static inline const char *rtn_scope(enum rt_scope_t s)
 {
 	static char buf[32];
 
-	switch(s) {
+	switch (s) {
 	case RT_SCOPE_UNIVERSE: return "universe";
 	case RT_SCOPE_SITE:	return "site";
 	case RT_SCOPE_LINK:	return "link";
@@ -2340,7 +2361,7 @@ static int fib_trie_seq_show(struct seq_file *seq, void *v)
 	return 0;
 }
 
-static struct seq_operations fib_trie_seq_ops = {
+static const struct seq_operations fib_trie_seq_ops = {
 	.start  = fib_trie_seq_start,
 	.next   = fib_trie_seq_next,
 	.stop   = fib_trie_seq_stop,
@@ -2461,7 +2482,7 @@ static int fib_route_seq_show(struct seq_file *seq, void *v)
 	return 0;
 }
 
-static struct seq_operations fib_route_seq_ops = {
+static const struct seq_operations fib_route_seq_ops = {
 	.start  = fib_trie_seq_start,
 	.next   = fib_trie_seq_next,
 	.stop   = fib_trie_seq_stop,

@@ -65,16 +65,16 @@ quiet_cmd_modpost = MODPOST $(words $(filter-out vmlinux FORCE, $^)) modules
 	$(if $(KBUILD_EXTMOD),-o $(modulesymfile)) \
 	$(if $(KBUILD_EXTMOD)$(KBUILD_MODPOST_WARN),-w) \
 	-s $(firstword $(wildcard $(dir $(MODVERDIR))/Module.supported \
-				  $(objtree)/Module.supported /dev/null)) \
-	$(wildcard vmlinux) $(filter-out FORCE,$^)
+				  $(objtree)/Module.supported /dev/null))
 
 PHONY += __modpost
 __modpost: $(modules:.ko=.o) FORCE
-	$(call cmd,modpost)
+	$(call cmd,modpost) $(wildcard vmlinux) $(filter-out FORCE,$^)
 
 quiet_cmd_kernel-mod = MODPOST $@
-      cmd_kernel-mod = $(cmd_modpost)
+      cmd_kernel-mod = $(cmd_modpost) $(KBUILD_VMLINUX_OBJS)
 
+PHONY += vmlinux
 vmlinux: FORCE
 	$(call cmd,kernel-mod)
 

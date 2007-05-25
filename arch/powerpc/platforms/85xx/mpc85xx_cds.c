@@ -197,7 +197,7 @@ static void __init mpc85xx_cds_pic_init(void)
 #ifdef CONFIG_PPC_I8259
 	/* Initialize the i8259 controller */
 	for_each_node_by_type(np, "interrupt-controller")
-		if (device_is_compatible(np, "chrp,iic")) {
+		if (of_device_is_compatible(np, "chrp,iic")) {
 			cascade_node = np;
 			break;
 		}
@@ -237,7 +237,7 @@ static void __init mpc85xx_cds_setup_arch(void)
 	if (cpu != 0) {
 		const unsigned int *fp;
 
-		fp = get_property(cpu, "clock-frequency", NULL);
+		fp = of_get_property(cpu, "clock-frequency", NULL);
 		if (fp != 0)
 			loops_per_jiffy = *fp / HZ;
 		else

@@ -39,6 +39,7 @@
 #include <linux/miscdevice.h>
 #include <linux/init.h>
 #include <linux/completion.h>
+#include <linux/kdebug.h>
 #include <linux/rwsem.h>
 #include <linux/errno.h>
 #include <asm/uaccess.h>
@@ -50,6 +51,7 @@
 #include <linux/string.h>
 #include <linux/ctype.h>
 #include <asm/atomic.h>
+
 #ifdef CONFIG_X86_LOCAL_APIC
 #include <asm/apic.h>
 #endif

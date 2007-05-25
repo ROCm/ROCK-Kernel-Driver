@@ -37,8 +37,6 @@
 #include <asm/irq_regs.h>
 
 
-unsigned int pcic_pin_to_irq(unsigned int pin, char *name);
-
 /*
  * I studied different documents and many live PROMs both from 2.30
  * family and 3.xx versions. I came to the amazing conclusion: there is
@@ -681,7 +679,7 @@ void __devinit pcibios_fixup_bus(struct pci_bus *bus)
  * pcic_pin_to_irq() is exported to ebus.c.
  */
 unsigned int
-pcic_pin_to_irq(unsigned int pin, char *name)
+pcic_pin_to_irq(unsigned int pin, const char *name)
 {
 	struct linux_pcic *pcic = &pcic0;
 	unsigned int irq;
@@ -757,7 +755,7 @@ void __init pci_time_init(void)
 static __inline__ unsigned long do_gettimeoffset(void)
 {
 	/*
-	 * We devide all to 100
+	 * We divide all by 100
 	 * to have microsecond resolution and to avoid overflow
 	 */
 	unsigned long count =
@@ -958,7 +956,7 @@ EXPORT_SYMBOL(pci_device_to_OF_node);
  * Also, think for a moment about likes of floppy.c that
  * include architecture specific parts. They may want to redefine ins/outs.
  *
- * We do not use horroble macroses here because we want to
+ * We do not use horrible macros here because we want to
  * advance pointer by sizeof(size).
  */
 void outsb(unsigned long addr, const void *src, unsigned long count)

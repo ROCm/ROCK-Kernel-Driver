@@ -9,10 +9,6 @@
 #ifndef __MTD_MTD_H__
 #define __MTD_MTD_H__
 
-#ifndef __KERNEL__
-#error This is a kernel header. Perhaps include mtd-user.h instead?
-#endif
-
 #include <linux/types.h>
 #include <linux/module.h>
 #include <linux/uio.h>
@@ -53,6 +49,7 @@ struct mtd_erase_region_info {
 	u_int32_t offset;			/* At which this region starts, from the beginning of the MTD */
 	u_int32_t erasesize;		/* For this region */
 	u_int32_t numblocks;		/* Number of blocks of erasesize in this region */
+	unsigned long *lockmap;		/* If keeping bitmap of locks */
 };
 
 /*
@@ -135,9 +132,6 @@ struct mtd_info {
 	 */
 	int numeraseregions;
 	struct mtd_erase_region_info *eraseregions;
-
-	/* This really shouldn't be here. It can go away in 2.5 */
-	u_int32_t bank_size;
 
 	int (*erase) (struct mtd_info *mtd, struct erase_info *instr);
 

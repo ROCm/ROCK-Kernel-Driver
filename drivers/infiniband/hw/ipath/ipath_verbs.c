@@ -438,6 +438,10 @@ void ipath_ib_rcv(struct ipath_ibdev *dev, void *rhdr, void *data,
 		struct ipath_mcast *mcast;
 		struct ipath_mcast_qp *p;
 
+		if (lnh != IPATH_LRH_GRH) {
+			dev->n_pkt_drops++;
+			goto bail;
+		}
 		mcast = ipath_mcast_find(&hdr->u.l.grh.dgid);
 		if (mcast == NULL) {
 			dev->n_pkt_drops++;
@@ -445,8 +449,7 @@ void ipath_ib_rcv(struct ipath_ibdev *dev, void *rhdr, void *data,
 		}
 		dev->n_multicast_rcv++;
 		list_for_each_entry_rcu(p, &mcast->qp_list, list)
-			ipath_qp_rcv(dev, hdr, lnh == IPATH_LRH_GRH, data,
-				     tlen, p->qp);
+			ipath_qp_rcv(dev, hdr, 1, data, tlen, p->qp);
 		/*
 		 * Notify ipath_multicast_detach() if it is waiting for us
 		 * to finish.
@@ -773,7 +776,6 @@ int ipath_verbs_send(struct ipath_devdata *dd, u32 hdrwords,
 	/* +1 is for the qword padding of pbc */
 	plen = hdrwords + ((len + 3) >> 2) + 1;
 	if (unlikely((plen << 2) > dd->ipath_ibmaxlen)) {
-		ipath_dbg("packet len 0x%x too long, failing\n", plen);
 		ret = -EINVAL;
 		goto bail;
 	}
@@ -980,14 +982,14 @@ static int ipath_query_device(struct ib_device *ibdev,
 	props->max_cqe = ib_ipath_max_cqes;
 	props->max_mr = dev->lk_table.max;
 	props->max_pd = ib_ipath_max_pds;
-	props->max_qp_rd_atom = 1;
-	props->max_qp_init_rd_atom = 1;
+	props->max_qp_rd_atom = IPATH_MAX_RDMA_ATOMIC;
+	props->max_qp_init_rd_atom = 255;
 	/* props->max_res_rd_atom */
 	props->max_srq = ib_ipath_max_srqs;
 	props->max_srq_wr = ib_ipath_max_srq_wrs;
 	props->max_srq_sge = ib_ipath_max_srq_sges;
 	/* props->local_ca_ack_delay */
-	props->atomic_cap = IB_ATOMIC_HCA;
+	props->atomic_cap = IB_ATOMIC_GLOB;
 	props->max_pkeys = ipath_get_npkeys(dev->dd);
 	props->max_mcast_grp = ib_ipath_max_mcast_grps;
 	props->max_mcast_qp_attach = ib_ipath_max_mcast_qp_attached;
@@ -1385,13 +1387,12 @@ static int enable_timer(struct ipath_devdata *dd)
 	 * processing.
 	 */
 	if (dd->ipath_flags & IPATH_GPIO_INTR) {
-		u64 val;
 		ipath_write_kreg(dd, dd->ipath_kregs->kr_debugportselect,
 				 0x2074076542310ULL);
 		/* Enable GPIO bit 2 interrupt */
-		val = ipath_read_kreg64(dd, dd->ipath_kregs->kr_gpio_mask);
-		val |= (u64) (1 << IPATH_GPIO_PORT0_BIT);
-		ipath_write_kreg( dd, dd->ipath_kregs->kr_gpio_mask, val);
+		dd->ipath_gpio_mask |= (u64) (1 << IPATH_GPIO_PORT0_BIT);
+		ipath_write_kreg(dd, dd->ipath_kregs->kr_gpio_mask,
+				 dd->ipath_gpio_mask);
 	}
 
 	init_timer(&dd->verbs_timer);
@@ -1410,8 +1411,9 @@ static int disable_timer(struct ipath_devdata *dd)
                 u64 val;
                 /* Disable GPIO bit 2 interrupt */
                 val = ipath_read_kreg64(dd, dd->ipath_kregs->kr_gpio_mask);
-                val &= ~((u64) (1 << IPATH_GPIO_PORT0_BIT));
-                ipath_write_kreg( dd, dd->ipath_kregs->kr_gpio_mask, val);
+		dd->ipath_gpio_mask &= ~((u64) (1 << IPATH_GPIO_PORT0_BIT));
+		ipath_write_kreg(dd, dd->ipath_kregs->kr_gpio_mask,
+				 dd->ipath_gpio_mask);
 		/*
 		 * We might want to undo changes to debugportselect,
 		 * but how?
@@ -1474,7 +1476,10 @@ int ipath_register_ib_device(struct ipath_devdata *dd)
 		ret = -ENOMEM;
 		goto err_lk;
 	}
+	INIT_LIST_HEAD(&idev->pending_mmaps);
 	spin_lock_init(&idev->pending_lock);
+	idev->mmap_offset = PAGE_SIZE;
+	spin_lock_init(&idev->mmap_offset_lock);
 	INIT_LIST_HEAD(&idev->pending[0]);
 	INIT_LIST_HEAD(&idev->pending[1]);
 	INIT_LIST_HEAD(&idev->pending[2]);
@@ -1556,8 +1561,8 @@ int ipath_register_ib_device(struct ipath_devdata *dd)
 		(1ull << IB_USER_VERBS_CMD_POST_SRQ_RECV);
 	dev->node_type = RDMA_NODE_IB_CA;
 	dev->phys_port_cnt = 1;
+	dev->num_comp_vectors = 1;
 	dev->dma_device = &dd->pcidev->dev;
-	dev->class_dev.dev = dev->dma_device;
 	dev->query_device = ipath_query_device;
 	dev->modify_device = ipath_modify_device;
 	dev->query_port = ipath_query_port;

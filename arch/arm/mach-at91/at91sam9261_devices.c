@@ -23,9 +23,6 @@
 
 #include "generic.h"
 
-#define SZ_512	0x00000200
-#define SZ_256	0x00000100
-#define SZ_16	0x00000010
 
 /* --------------------------------------------------------------------
  *  USB Host
@@ -430,9 +427,9 @@ void __init at91_add_device_spi(struct spi_board_info *devices, int nr_devices) 
  *  LCD Controller
  * -------------------------------------------------------------------- */
 
-#if defined(CONFIG_FB_AT91) || defined(CONFIG_FB_AT91_MODULE)
+#if defined(CONFIG_FB_ATMEL) || defined(CONFIG_FB_ATMEL_MODULE)
 static u64 lcdc_dmamask = 0xffffffffUL;
-static struct at91fb_info lcdc_data;
+static struct atmel_lcdfb_info lcdc_data;
 
 static struct resource lcdc_resources[] = {
 	[0] = {
@@ -455,7 +452,7 @@ static struct resource lcdc_resources[] = {
 };
 
 static struct platform_device at91_lcdc_device = {
-	.name		= "at91-fb",
+	.name		= "atmel_lcdfb",
 	.id		= 0,
 	.dev		= {
 				.dma_mask		= &lcdc_dmamask,
@@ -466,7 +463,7 @@ static struct platform_device at91_lcdc_device = {
 	.num_resources	= ARRAY_SIZE(lcdc_resources),
 };
 
-void __init at91_add_device_lcdc(struct at91fb_info *data)
+void __init at91_add_device_lcdc(struct atmel_lcdfb_info *data)
 {
 	if (!data) {
 		return;
@@ -499,7 +496,7 @@ void __init at91_add_device_lcdc(struct at91fb_info *data)
 	platform_device_register(&at91_lcdc_device);
 }
 #else
-void __init at91_add_device_lcdc(struct at91fb_info *data) {}
+void __init at91_add_device_lcdc(struct atmel_lcdfb_info *data) {}
 #endif
 
 

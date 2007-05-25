@@ -85,6 +85,28 @@ error:
 	iounmap(gpio);
 }
 
+#ifdef CONFIG_PM
+static u32 descr_a;
+static void lite5200_suspend_prepare(void __iomem *mbar)
+{
+	u8 pin = 1;	/* GPIO_WKUP_1 (GPIO_PSC2_4) */
+	u8 level = 0;	/* wakeup on low level */
+	mpc52xx_set_wakeup_gpio(pin, level);
+
+	/*
+	 * power down usb port
+	 * this needs to be called before of-ohci suspend code
+	 */
+	descr_a = in_be32(mbar + 0x1048);
+	out_be32(mbar + 0x1048, (descr_a & ~0x200) | 0x100);
+}
+
+static void lite5200_resume_finish(void __iomem *mbar)
+{
+	out_be32(mbar + 0x1048, descr_a);
+}
+#endif
+
 static void __init lite5200_setup_arch(void)
 {
 	struct device_node *np;
@@ -94,8 +116,8 @@ static void __init lite5200_setup_arch(void)
 
 	np = of_find_node_by_type(NULL, "cpu");
 	if (np) {
-		unsigned int *fp =
-		    (int *)get_property(np, "clock-frequency", NULL);
+		const unsigned int *fp =
+			of_get_property(np, "clock-frequency", NULL);
 		if (fp != 0)
 			loops_per_jiffy = *fp / HZ;
 		else
@@ -107,10 +129,18 @@ static void __init lite5200_setup_arch(void)
 	mpc52xx_setup_cpu();	/* Generic */
 	lite5200_setup_cpu();	/* Platorm specific */
 
+#ifdef CONFIG_PM
+	mpc52xx_suspend.board_suspend_prepare = lite5200_suspend_prepare;
+	mpc52xx_suspend.board_resume_finish = lite5200_resume_finish;
+	mpc52xx_pm_init();
+#endif
+
 #ifdef CONFIG_PCI
-	np = of_find_node_by_type(np, "pci");
-	if (np)
+	np = of_find_node_by_type(NULL, "pci");
+	if (np) {
 		mpc52xx_add_bridge(np);
+		of_node_put(np);
+	}
 #endif
 
 #ifdef CONFIG_BLK_DEV_INITRD
@@ -132,7 +162,7 @@ void lite5200_show_cpuinfo(struct seq_file *m)
 	const char *model = NULL;
 
 	if (np)
-		model = get_property(np, "model", NULL);
+		model = of_get_property(np, "model", NULL);
 
 	seq_printf(m, "vendor\t\t:	Freescale Semiconductor\n");
 	seq_printf(m, "machine\t\t:	%s\n", model ? model : "unknown");

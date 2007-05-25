@@ -17,7 +17,6 @@
 #include <linux/random.h>
 #include <linux/init.h>
 #include <linux/smp.h>
-#include <linux/smp_lock.h>
 #include <linux/spinlock.h>
 #include <linux/seq_file.h>
 
@@ -522,7 +521,7 @@ static void __init sun4d_init_timers(irq_handler_t counter_fn)
 		lvl14_save[2] += smp4d_ticker - real_irq_entry;
 
 		/* For SMP we use the level 14 ticker, however the bootup code
-		 * has copied the firmwares level 14 vector into boot cpu's
+		 * has copied the firmware's level 14 vector into the boot cpu's
 		 * trap table, we must fix this now or we get squashed.
 		 */
 		local_irq_save(flags);

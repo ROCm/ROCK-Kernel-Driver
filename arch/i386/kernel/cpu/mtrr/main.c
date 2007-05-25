@@ -639,7 +639,7 @@ static struct sysdev_driver mtrr_sysdev_driver = {
  * initialized (i.e. before smp_init()).
  * 
  */
-void __init mtrr_bp_init(void)
+void mtrr_bp_init(void)
 {
 	init_ifs();
 
@@ -727,6 +727,17 @@ void mtrr_ap_init(void)
 	mtrr_if->set_all();
 
 	local_irq_restore(flags);
+}
+
+/**
+ * Save current fixed-range MTRR state of the BSP
+ */
+void mtrr_save_state(void)
+{
+	if (smp_processor_id() == 0)
+		mtrr_save_fixed_ranges(NULL);
+	else
+		smp_call_function_single(0, mtrr_save_fixed_ranges, NULL, 1, 1);
 }
 
 static int __init mtrr_init_finialize(void)

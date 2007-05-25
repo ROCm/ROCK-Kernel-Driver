@@ -47,7 +47,8 @@ static char const rcsid[] =
 #include <linux/bitops.h>
 #include <linux/wait.h>
 #include <linux/jiffies.h>
-#include <asm/semaphore.h>
+#include <linux/mutex.h>
+
 #include <asm/io.h>
 #include <asm/uaccess.h>
 #include <asm/atomic.h>
@@ -1065,7 +1066,8 @@ dequeue_rx(struct idt77252_dev *card, struct rsq_entry *rsqe)
 	vcc = vc->rx_vcc;
 
 	pci_dma_sync_single_for_cpu(card->pcidev, IDT77252_PRV_PADDR(skb),
-				    skb->end - skb->data, PCI_DMA_FROMDEVICE);
+				    skb_end_pointer(skb) - skb->data,
+				    PCI_DMA_FROMDEVICE);
 
 	if ((vcc->qos.aal == ATM_AAL0) ||
 	    (vcc->qos.aal == ATM_AAL34)) {
@@ -1194,7 +1196,8 @@ dequeue_rx(struct idt77252_dev *card, struct rsq_entry *rsqe)
 		}
 
 		pci_unmap_single(card->pcidev, IDT77252_PRV_PADDR(skb),
-				 skb->end - skb->data, PCI_DMA_FROMDEVICE);
+				 skb_end_pointer(skb) - skb->data,
+				 PCI_DMA_FROMDEVICE);
 		sb_pool_remove(card, skb);
 
 		skb_trim(skb, len);
@@ -1267,7 +1270,7 @@ idt77252_rx_raw(struct idt77252_dev *card)
 	tail = readl(SAR_REG_RAWCT);
 
 	pci_dma_sync_single_for_cpu(card->pcidev, IDT77252_PRV_PADDR(queue),
-				    queue->end - queue->head - 16,
+				    skb_end_pointer(queue) - queue->head - 16,
 				    PCI_DMA_FROMDEVICE);
 
 	while (head != tail) {
@@ -1363,7 +1366,8 @@ drop:
 				queue = card->raw_cell_head;
 				pci_dma_sync_single_for_cpu(card->pcidev,
 							    IDT77252_PRV_PADDR(queue),
-							    queue->end - queue->data,
+							    (skb_end_pointer(queue) -
+							     queue->data),
 							    PCI_DMA_FROMDEVICE);
 			} else {
 				card->raw_cell_head = NULL;
@@ -1816,7 +1820,8 @@ push_rx_skb(struct idt77252_dev *card, struct sk_buff *skb, int queue)
 	u32 handle;
 	u32 addr;
 
-	skb->data = skb->tail = skb->head;
+	skb->data = skb->head;
+	skb_reset_tail_pointer(skb);
 	skb->len = 0;
 
 	skb_reserve(skb, 16);
@@ -1835,7 +1840,6 @@ push_rx_skb(struct idt77252_dev *card, struct sk_buff *skb, int queue)
 		skb_put(skb, SAR_FB_SIZE_3);
 		break;
 	default:
-		dev_kfree_skb(skb);
 		return -1;
 	}
 
@@ -1874,7 +1878,7 @@ add_rx_skb(struct idt77252_dev *card, int queue,
 		}
 
 		paddr = pci_map_single(card->pcidev, skb->data,
-				       skb->end - skb->data,
+				       skb_end_pointer(skb) - skb->data,
 				       PCI_DMA_FROMDEVICE);
 		IDT77252_PRV_PADDR(skb) = paddr;
 
@@ -1888,7 +1892,7 @@ add_rx_skb(struct idt77252_dev *card, int queue,
 
 outunmap:
 	pci_unmap_single(card->pcidev, IDT77252_PRV_PADDR(skb),
-			 skb->end - skb->data, PCI_DMA_FROMDEVICE);
+			 skb_end_pointer(skb) - skb->data, PCI_DMA_FROMDEVICE);
 
 	handle = IDT77252_PRV_POOL(skb);
 	card->sbpool[POOL_QUEUE(handle)].skb[POOL_INDEX(handle)] = NULL;
@@ -1905,12 +1909,14 @@ recycle_rx_skb(struct idt77252_dev *card, struct sk_buff *skb)
 	int err;
 
 	pci_dma_sync_single_for_device(card->pcidev, IDT77252_PRV_PADDR(skb),
-				       skb->end - skb->data, PCI_DMA_FROMDEVICE);
+				       skb_end_pointer(skb) - skb->data,
+				       PCI_DMA_FROMDEVICE);
 
 	err = push_rx_skb(card, skb, POOL_QUEUE(handle));
 	if (err) {
 		pci_unmap_single(card->pcidev, IDT77252_PRV_PADDR(skb),
-				 skb->end - skb->data, PCI_DMA_FROMDEVICE);
+				 skb_end_pointer(skb) - skb->data,
+				 PCI_DMA_FROMDEVICE);
 		sb_pool_remove(card, skb);
 		dev_kfree_skb(skb);
 	}
@@ -2430,7 +2436,7 @@ idt77252_open(struct atm_vcc *vcc)
 
 	set_bit(ATM_VF_ADDR, &vcc->flags);
 
-	down(&card->mutex);
+	mutex_lock(&card->mutex);
 
 	OPRINTK("%s: opening vpi.vci: %d.%d\n", card->name, vpi, vci);
 
@@ -2441,7 +2447,7 @@ idt77252_open(struct atm_vcc *vcc)
 		break;
 	default:
 		printk("%s: Unsupported AAL: %d\n", card->name, vcc->qos.aal);
-		up(&card->mutex);
+		mutex_unlock(&card->mutex);
 		return -EPROTONOSUPPORT;
 	}
 
@@ -2450,7 +2456,7 @@ idt77252_open(struct atm_vcc *vcc)
 		card->vcs[index] = kzalloc(sizeof(struct vc_map), GFP_KERNEL);
 		if (!card->vcs[index]) {
 			printk("%s: can't alloc vc in open()\n", card->name);
-			up(&card->mutex);
+			mutex_unlock(&card->mutex);
 			return -ENOMEM;
 		}
 		card->vcs[index]->card = card;
@@ -2479,14 +2485,14 @@ idt77252_open(struct atm_vcc *vcc)
 	if (inuse) {
 		printk("%s: %s vci already in use.\n", card->name,
 		       inuse == 1 ? "tx" : inuse == 2 ? "rx" : "tx and rx");
-		up(&card->mutex);
+		mutex_unlock(&card->mutex);
 		return -EADDRINUSE;
 	}
 
 	if (vcc->qos.txtp.traffic_class != ATM_NONE) {
 		error = idt77252_init_tx(card, vc, vcc, &vcc->qos);
 		if (error) {
-			up(&card->mutex);
+			mutex_unlock(&card->mutex);
 			return error;
 		}
 	}
@@ -2494,14 +2500,14 @@ idt77252_open(struct atm_vcc *vcc)
 	if (vcc->qos.rxtp.traffic_class != ATM_NONE) {
 		error = idt77252_init_rx(card, vc, vcc, &vcc->qos);
 		if (error) {
-			up(&card->mutex);
+			mutex_unlock(&card->mutex);
 			return error;
 		}
 	}
 
 	set_bit(ATM_VF_READY, &vcc->flags);
 
-	up(&card->mutex);
+	mutex_unlock(&card->mutex);
 	return 0;
 }
 
@@ -2515,7 +2521,7 @@ idt77252_close(struct atm_vcc *vcc)
 	unsigned long addr;
 	unsigned long timeout;
 
-	down(&card->mutex);
+	mutex_lock(&card->mutex);
 
 	IPRINTK("%s: idt77252_close: vc = %d (%d.%d)\n",
 		card->name, vc->index, vcc->vpi, vcc->vci);
@@ -2586,7 +2592,7 @@ done:
 		free_scq(card, vc->scq);
 	}
 
-	up(&card->mutex);
+	mutex_unlock(&card->mutex);
 }
 
 static int
@@ -2597,7 +2603,7 @@ idt77252_change_qos(struct atm_vcc *vcc, struct atm_qos *qos, int flags)
 	struct vc_map *vc = vcc->dev_data;
 	int error = 0;
 
-	down(&card->mutex);
+	mutex_lock(&card->mutex);
 
 	if (qos->txtp.traffic_class != ATM_NONE) {
 	    	if (!test_bit(VCF_TX, &vc->flags)) {
@@ -2643,7 +2649,7 @@ idt77252_change_qos(struct atm_vcc *vcc, struct atm_qos *qos, int flags)
 	set_bit(ATM_VF_HASQOS, &vcc->flags);
 
 out:
-	up(&card->mutex);
+	mutex_unlock(&card->mutex);
 	return error;
 }
 
@@ -3122,7 +3128,8 @@ deinit_card(struct idt77252_dev *card)
 			if (skb) {
 				pci_unmap_single(card->pcidev,
 						 IDT77252_PRV_PADDR(skb),
-						 skb->end - skb->data,
+						 (skb_end_pointer(skb) -
+						  skb->data),
 						 PCI_DMA_FROMDEVICE);
 				card->sbpool[i].skb[j] = NULL;
 				dev_kfree_skb(skb);
@@ -3703,7 +3710,7 @@ idt77252_init_one(struct pci_dev *pcidev, const struct pci_device_id *id)
 	membase = pci_resource_start(pcidev, 1);
 	srambase = pci_resource_start(pcidev, 2);
 
-	init_MUTEX(&card->mutex);
+	mutex_init(&card->mutex);
 	spin_lock_init(&card->cmd_lock);
 	spin_lock_init(&card->tst_lock);
 

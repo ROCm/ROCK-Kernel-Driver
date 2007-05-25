@@ -106,6 +106,7 @@ struct ehca_shca {
 	struct ehca_mr *maxmr;
 	struct ehca_pd *pd;
 	struct h_galpas galpas;
+	struct mutex modify_mutex;
 };
 
 struct ehca_pd {
@@ -175,6 +176,7 @@ struct ehca_mr {
 		struct ib_mr ib_mr;	/* must always be first in ehca_mr */
 		struct ib_fmr ib_fmr;	/* must always be first in ehca_mr */
 	} ib;
+	struct ib_umem *umem;
 	spinlock_t mrlock;
 
 	enum ehca_mr_flag flags;
@@ -275,6 +277,7 @@ void ehca_cleanup_mrmw_cache(void);
 
 extern spinlock_t ehca_qp_idr_lock;
 extern spinlock_t ehca_cq_idr_lock;
+extern spinlock_t hcall_lock;
 extern struct idr ehca_qp_idr;
 extern struct idr ehca_cq_idr;
 

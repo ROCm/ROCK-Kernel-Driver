@@ -302,7 +302,7 @@ static void acpi_device_shutdown(struct device *dev)
 	return ;
 }
 
-static struct bus_type acpi_bus_type = {
+struct bus_type acpi_bus_type = {
 	.name		= "acpi",
 	.suspend	= acpi_device_suspend,
 	.resume		= acpi_device_resume,
@@ -1068,7 +1068,9 @@ acpi_add_single_object(struct acpi_device **child,
 		}
 		break;
 	default:
-		STRUCT_TO_INT(device->status) = 0x0F;
+		STRUCT_TO_INT(device->status) =
+		    ACPI_STA_DEVICE_PRESENT | ACPI_STA_DEVICE_ENABLED |
+		    ACPI_STA_DEVICE_UI      | ACPI_STA_DEVICE_FUNCTIONING;
 		break;
 	}
 

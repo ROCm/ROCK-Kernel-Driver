@@ -477,7 +477,7 @@ static int xics_host_match(struct irq_host *h, struct device_node *node)
 	 * like vdevices, events, etc... The trick we use here is to match
 	 * everything here except the legacy 8259 which is compatible "chrp,iic"
 	 */
-	return !device_is_compatible(node, "chrp,iic");
+	return !of_device_is_compatible(node, "chrp,iic");
 }
 
 static int xics_host_map_direct(struct irq_host *h, unsigned int virq,
@@ -576,7 +576,7 @@ static void __init xics_init_one_node(struct device_node *np,
 	 * This happens to be the case so far but we are playing with fire...
 	 * should be fixed one of these days. -BenH.
 	 */
-	ireg = get_property(np, "ibm,interrupt-server-ranges", NULL);
+	ireg = of_get_property(np, "ibm,interrupt-server-ranges", NULL);
 
 	/* Do that ever happen ? we'll know soon enough... but even good'old
 	 * f80 does have that property ..
@@ -588,7 +588,7 @@ static void __init xics_init_one_node(struct device_node *np,
 		 */
 		*indx = *ireg;
 	}
-	ireg = get_property(np, "reg", &ilen);
+	ireg = of_get_property(np, "reg", &ilen);
 	if (!ireg)
 		panic("xics_init_IRQ: can't find interrupt reg property");
 
@@ -618,7 +618,7 @@ static void __init xics_setup_8259_cascade(void)
 	unsigned long intack = 0;
 
 	for_each_node_by_type(np, "interrupt-controller")
-		if (device_is_compatible(np, "chrp,iic")) {
+		if (of_device_is_compatible(np, "chrp,iic")) {
 			found = np;
 			break;
 		}
@@ -640,10 +640,10 @@ static void __init xics_setup_8259_cascade(void)
 			break;
 		if (strcmp(np->name, "pci") != 0)
 			continue;
-		addrp = get_property(np, "8259-interrupt-acknowledge", NULL);
+		addrp = of_get_property(np, "8259-interrupt-acknowledge", NULL);
 		if (addrp == NULL)
 			continue;
-		naddr = prom_n_addr_cells(np);
+		naddr = of_n_addr_cells(np);
 		intack = addrp[naddr-1];
 		if (naddr > 1)
 			intack |= ((unsigned long)addrp[naddr-2]) << 32;
@@ -664,10 +664,11 @@ static struct device_node *cpuid_to_of_node(int cpu)
 		int i, len;
 		const u32 *intserv;
 
-		intserv = get_property(np, "ibm,ppc-interrupt-server#s", &len);
+		intserv = of_get_property(np, "ibm,ppc-interrupt-server#s",
+					&len);
 
 		if (!intserv)
-			intserv = get_property(np, "reg", &len);
+			intserv = of_get_property(np, "reg", &len);
 
 		i = len / sizeof(u32);
 
@@ -709,7 +710,7 @@ void __init xics_init_IRQ(void)
 	/* Find the server numbers for the boot cpu. */
 	np = cpuid_to_of_node(boot_cpuid);
 	BUG_ON(!np);
-	ireg = get_property(np, "ibm,ppc-interrupt-gserver#s", &ilen);
+	ireg = of_get_property(np, "ibm,ppc-interrupt-gserver#s", &ilen);
 	if (!ireg)
 		goto skip_gserver_check;
 	i = ilen / sizeof(int);
@@ -725,7 +726,7 @@ void __init xics_init_IRQ(void)
 			default_server = hcpuid;
 			default_distrib_server = ireg[j+1];
 
-			isize = get_property(np,
+			isize = of_get_property(np,
 					"ibm,interrupt-server#-size", NULL);
 			if (isize)
 				interrupt_server_size = *isize;

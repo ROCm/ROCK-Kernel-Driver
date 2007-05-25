@@ -37,6 +37,7 @@
 #include <linux/vmalloc.h>
 #include <linux/dma-mapping.h>
 #include <linux/mm.h>
+#include <linux/sched.h>
 #include <asm/io.h>
 #include <asm/cacheflush.h>
 #include <asm/pgtable.h>
@@ -50,28 +51,6 @@ int agp_memory_reserved;
  * nice to do this some other way instead of needing this export.
  */
 EXPORT_SYMBOL_GPL(agp_memory_reserved);
-
-#if defined(CONFIG_X86)
-int map_page_into_agp(struct page *page)
-{
-	int i;
-	i = change_page_attr(page, 1, PAGE_KERNEL_NOCACHE);
-	/* Caller's responsibility to call global_flush_tlb() for
-	 * performance reasons */
-	return i;
-}
-EXPORT_SYMBOL_GPL(map_page_into_agp);
-
-int unmap_page_from_agp(struct page *page)
-{
-	int i;
-	i = change_page_attr(page, 1, PAGE_KERNEL);
-	/* Caller's responsibility to call global_flush_tlb() for
-	 * performance reasons */
-	return i;
-}
-EXPORT_SYMBOL_GPL(unmap_page_from_agp);
-#endif
 
 /*
  * Generic routines for handling agp_memory structures -

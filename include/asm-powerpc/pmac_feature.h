@@ -28,8 +28,8 @@
  */
 
 #ifdef __KERNEL__
-#ifndef __PPC_ASM_PMAC_FEATURE_H
-#define __PPC_ASM_PMAC_FEATURE_H
+#ifndef __ASM_POWERPC_PMAC_FEATURE_H
+#define __ASM_POWERPC_PMAC_FEATURE_H
 
 #include <asm/macio.h>
 #include <asm/machdep.h>
@@ -146,7 +146,7 @@ struct device_node;
 static inline long pmac_call_feature(int selector, struct device_node* node,
 					long param, long value)
 {
-	if (!ppc_md.feature_call)
+	if (!ppc_md.feature_call || !machine_is(powermac))
 		return -ENODEV;
 	return ppc_md.feature_call(selector, node, param, value);
 }
@@ -393,5 +393,5 @@ extern u32 __iomem *uninorth_base;
 #define UN_BIC(r,v)	(UN_OUT((r), UN_IN(r) & ~(v)))
 
 
-#endif /* __PPC_ASM_PMAC_FEATURE_H */
+#endif /* __ASM_POWERPC_PMAC_FEATURE_H */
 #endif /* __KERNEL__ */

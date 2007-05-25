@@ -30,15 +30,11 @@
 #include <linux/highmem.h>
 #include <linux/workqueue.h>
 #include <linux/security.h>
+#include <linux/eventfd.h>
 
 #include <asm/kmap_types.h>
 #include <asm/uaccess.h>
 #include <asm/mmu_context.h>
-
-#ifdef CONFIG_EPOLL
-#include <linux/poll.h>
-#include <linux/eventpoll.h>
-#endif
 
 #if DEBUG > 1
 #define dprintk		printk
@@ -73,10 +69,8 @@ static void aio_queue_work(struct kioctx *);
  */
 static int __init aio_setup(void)
 {
-	kiocb_cachep = kmem_cache_create("kiocb", sizeof(struct kiocb),
-				0, SLAB_HWCACHE_ALIGN|SLAB_PANIC, NULL, NULL);
-	kioctx_cachep = kmem_cache_create("kioctx", sizeof(struct kioctx),
-				0, SLAB_HWCACHE_ALIGN|SLAB_PANIC, NULL, NULL);
+	kiocb_cachep = KMEM_CACHE(kiocb, SLAB_HWCACHE_ALIGN|SLAB_PANIC);
+	kioctx_cachep = KMEM_CACHE(kioctx,SLAB_HWCACHE_ALIGN|SLAB_PANIC);
 
 	aio_wq = create_workqueue("aio");
 
@@ -353,10 +347,9 @@ void fastcall exit_aio(struct mm_struct *mm)
 
 		wait_for_all_aios(ctx);
 		/*
-		 * this is an overkill, but ensures we don't leave
-		 * the ctx on the aio_wq
+		 * Ensure we don't leave the ctx on the aio_wq
 		 */
-		flush_workqueue(aio_wq);
+		cancel_work_sync(&ctx->wq.work);
 
 		if (1 != atomic_read(&ctx->users))
 			printk(KERN_DEBUG
@@ -379,7 +372,7 @@ void fastcall __put_ioctx(struct kioctx *ctx)
 	BUG_ON(ctx->reqs_active);
 
 	cancel_delayed_work(&ctx->wq);
-	flush_workqueue(aio_wq);
+	cancel_work_sync(&ctx->wq.work);
 	aio_free_ring(ctx);
 	mmdrop(ctx->mm);
 	ctx->mm = NULL;
@@ -425,6 +418,7 @@ static struct kiocb fastcall *__aio_get_req(struct kioctx *ctx)
 	req->private = NULL;
 	req->ki_iovec = NULL;
 	INIT_LIST_HEAD(&req->ki_run_list);
+	req->ki_eventfd = ERR_PTR(-EINVAL);
 
 	/* Check if the completion queue has enough free space to
 	 * accept an event from this io.
@@ -466,6 +460,8 @@ static inline void really_put_req(struct kioctx *ctx, struct kiocb *req)
 {
 	assert_spin_locked(&ctx->ctx_lock);
 
+	if (!IS_ERR(req->ki_eventfd))
+		fput(req->ki_eventfd);
 	if (req->ki_dtor)
 		req->ki_dtor(req);
 	if (req->ki_iovec != &req->ki_inline_vec)
@@ -950,6 +946,14 @@ int fastcall aio_complete(struct kiocb *iocb, long res, long res2)
 		return 1;
 	}
 
+	/*
+	 * Check if the user asked us to deliver the result through an
+	 * eventfd. The eventfd_signal() function is safe to be called
+	 * from IRQ context.
+	 */
+	if (!IS_ERR(iocb->ki_eventfd))
+		eventfd_signal(iocb->ki_eventfd, 1);
+
 	info = &ctx->ring_info;
 
 	/* add a completion event to the ring buffer.
@@ -1005,11 +1009,6 @@ put_rq:
 	if (waitqueue_active(&ctx->wait))
 		wake_up(&ctx->wait);
 
-#ifdef CONFIG_EPOLL
-	if (ctx->file && waitqueue_active(&ctx->poll_wait))
-		wake_up(&ctx->poll_wait);
-#endif
-
 	spin_unlock_irqrestore(&ctx->ctx_lock, flags);
 	return ret;
 }
@@ -1017,8 +1016,6 @@ put_rq:
 /* aio_read_evt
  *	Pull an event off of the ioctx's event ring.  Returns the number of 
  *	events fetched (0 or 1 ;-)
- *	If ent parameter is 0, just returns the number of events that would
- *	be fetched.
  *	FIXME: make this use cmpxchg.
  *	TODO: make the ringbuffer user mmap()able (requires FIXME).
  */
@@ -1041,18 +1038,13 @@ static int aio_read_evt(struct kioctx *ioctx, struct io_event *ent)
 
 	head = ring->head % info->nr;
 	if (head != ring->tail) {
-		if (ent) { /* event requested */
-			struct io_event *evp =
-				aio_ring_event(info, head, KM_USER1);
-			*ent = *evp;
-			head = (head + 1) % info->nr;
-			/* finish reading the event before updatng the head */
-			smp_mb();
-			ring->head = head;
-			ret = 1;
-			put_aio_ring_event(evp, KM_USER1);
-		} else /* only need to know availability */
-			ret = 1;
+		struct io_event *evp = aio_ring_event(info, head, KM_USER1);
+		*ent = *evp;
+		head = (head + 1) % info->nr;
+		smp_mb(); /* finish reading the event before updatng the head */
+		ring->head = head;
+		ret = 1;
+		put_aio_ring_event(evp, KM_USER1);
 	}
 	spin_unlock(&info->ring_lock);
 
@@ -1235,77 +1227,8 @@ static void io_destroy(struct kioctx *ioctx)
 
 	aio_cancel_all(ioctx);
 	wait_for_all_aios(ioctx);
-#ifdef CONFIG_EPOLL
-	/* forget the poll file, but it's up to the user to close it */
-	if (ioctx->file) {
-		ioctx->file->private_data = 0;
-		ioctx->file = 0;
-	}
-#endif
 	put_ioctx(ioctx);	/* once for the lookup */
 }
-
-#ifdef CONFIG_EPOLL
-
-static int aio_queue_fd_close(struct inode *inode, struct file *file)
-{
-	struct kioctx *ioctx = file->private_data;
-	if (ioctx) {
-		file->private_data = 0;
-		spin_lock_irq(&ioctx->ctx_lock);
-		ioctx->file = 0;
-		spin_unlock_irq(&ioctx->ctx_lock);
-	}
-	return 0;
-}
-
-static unsigned int aio_queue_fd_poll(struct file *file, poll_table *wait)
-{	unsigned int pollflags = 0;
-	struct kioctx *ioctx = file->private_data;
-
-	if (ioctx) {
-
-		spin_lock_irq(&ioctx->ctx_lock);
-		/* Insert inside our poll wait queue */
-		poll_wait(file, &ioctx->poll_wait, wait);
-
-		/* Check our condition */
-		if (aio_read_evt(ioctx, 0))
-			pollflags = POLLIN | POLLRDNORM;
-		spin_unlock_irq(&ioctx->ctx_lock);
-	}
-
-	return pollflags;
-}
-
-static const struct file_operations aioq_fops = {
-	.release	= aio_queue_fd_close,
-	.poll		= aio_queue_fd_poll
-};
-
-/* make_aio_fd:
- *  Create a file descriptor that can be used to poll the event queue.
- *  Based and piggybacked on the excellent epoll code.
- */
-
-static int make_aio_fd(struct kioctx *ioctx)
-{
-	int error, fd;
-	struct inode *inode;
-	struct file *file;
-
-	error = ep_getfd(&fd, &inode, &file, NULL, &aioq_fops);
-	if (error)
-		return error;
-
-	/* associate the file with the IO context */
-	file->private_data = ioctx;
-	ioctx->file = file;
-	init_waitqueue_head(&ioctx->poll_wait);
-	return fd;
-}
-#endif
-
 
 /* sys_io_setup:
  *	Create an aio_context capable of receiving at least nr_events.
@@ -1319,30 +1242,18 @@ static int make_aio_fd(struct kioctx *ioctx)
  *	resources are available.  May fail with -EFAULT if an invalid
  *	pointer is passed for ctxp.  Will fail with -ENOSYS if not
  *	implemented.
- *
- *	To request a selectable fd, the user context has to be initialized
- *	to 1, instead of 0, and the return value is the fd.
- *	This keeps the system call compatible, since a non-zero value
- *	was not allowed so far.
  */
 asmlinkage long sys_io_setup(unsigned nr_events, aio_context_t __user *ctxp)
 {
 	struct kioctx *ioctx = NULL;
 	unsigned long ctx;
 	long ret;
-	int make_fd = 0;
 
 	ret = get_user(ctx, ctxp);
 	if (unlikely(ret))
 		goto out;
 
 	ret = -EINVAL;
-#ifdef CONFIG_EPOLL
-	if (ctx == 1) {
-		make_fd = 1;
-		ctx = 0;
-	}
-#endif
 	if (unlikely(ctx || nr_events == 0)) {
 		pr_debug("EINVAL: io_setup: ctx %lu nr_events %u\n",
 		         ctx, nr_events);
@@ -1353,12 +1264,8 @@ asmlinkage long sys_io_setup(unsigned nr_events, aio_context_t __user *ctxp)
 	ret = PTR_ERR(ioctx);
 	if (!IS_ERR(ioctx)) {
 		ret = put_user(ioctx->user_id, ctxp);
-#ifdef CONFIG_EPOLL
-		if (make_fd && ret >= 0)
-			ret = make_aio_fd(ioctx);
-#endif
-		if (ret >= 0)
-			return ret;
+		if (!ret)
+			return 0;
 
 		get_ioctx(ioctx); /* io_destroy() expects us to hold a ref */
 		io_destroy(ioctx);
@@ -1631,8 +1538,7 @@ int fastcall io_submit_one(struct kioctx *ctx, struct iocb __user *user_iocb,
 	ssize_t ret;
 
 	/* enforce forwards compatibility on users */
-	if (unlikely(iocb->aio_reserved1 || iocb->aio_reserved2 ||
-		     iocb->aio_reserved3)) {
+	if (unlikely(iocb->aio_reserved1 || iocb->aio_reserved2)) {
 		pr_debug("EINVAL: io_submit: reserve field set\n");
 		return -EINVAL;
 	}
@@ -1655,6 +1561,19 @@ int fastcall io_submit_one(struct kioctx *ctx, struct iocb __user *user_iocb,
 	if (unlikely(!req)) {
 		fput(file);
 		return -EAGAIN;
+	}
+	if (iocb->aio_flags & IOCB_FLAG_RESFD) {
+		/*
+		 * If the IOCB_FLAG_RESFD flag of aio_flags is set, get an
+		 * instance of the file* now. The file descriptor must be
+		 * an eventfd() fd, and will be signaled for each completed
+		 * event using the eventfd_signal() function.
+		 */
+		req->ki_eventfd = eventfd_fget((int) iocb->aio_resfd);
+		if (unlikely(IS_ERR(req->ki_eventfd))) {
+			ret = PTR_ERR(req->ki_eventfd);
+			goto out_put_req;
+		}
 	}
 
 	req->ki_filp = file;

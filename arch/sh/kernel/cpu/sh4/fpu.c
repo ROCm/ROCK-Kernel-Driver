@@ -16,6 +16,7 @@
 #include <linux/sched.h>
 #include <linux/signal.h>
 #include <asm/processor.h>
+#include <asm/system.h>
 #include <asm/io.h>
 
 /* The PR (precision) bit in the FP Status Register must be clear when
@@ -137,7 +138,7 @@ restore_fpu(struct task_struct *tsk)
 /*
  * Load the FPU with signalling NANS.  This bit pattern we're using
  * has the property that no matter wether considered as single or as
- * double precission represents signaling NANS.  
+ * double precision represents signaling NANS.  
  */
 
 static void
@@ -265,7 +266,7 @@ ieee_fpe_handler (struct pt_regs *regs)
 		nextpc = regs->pr;
 		finsn = *(unsigned short *) (regs->pc + 2);
 	} else {
-		nextpc = regs->pc + 2;
+		nextpc = regs->pc + instruction_size(insn);
 		finsn = insn;
 	}
 

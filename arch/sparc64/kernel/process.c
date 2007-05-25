@@ -19,7 +19,6 @@
 #include <linux/kallsyms.h>
 #include <linux/mm.h>
 #include <linux/smp.h>
-#include <linux/smp_lock.h>
 #include <linux/stddef.h>
 #include <linux/ptrace.h>
 #include <linux/slab.h>
@@ -28,6 +27,7 @@
 #include <linux/reboot.h>
 #include <linux/delay.h>
 #include <linux/compat.h>
+#include <linux/tick.h>
 #include <linux/init.h>
 
 #include <asm/oplib.h>
@@ -88,12 +88,14 @@ void cpu_idle(void)
 	set_thread_flag(TIF_POLLING_NRFLAG);
 
 	while(1) {
-		if (need_resched()) {
-			preempt_enable_no_resched();
-			schedule();
-			preempt_disable();
-		}
-		sparc64_yield();
+		tick_nohz_stop_sched_tick();
+		while (!need_resched())
+			sparc64_yield();
+		tick_nohz_restart_sched_tick();
+
+		preempt_enable_no_resched();
+		schedule();
+		preempt_disable();
 	}
 }
 
@@ -675,7 +677,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long sp,
  * NOTE! Only a kernel-only process(ie the swapper or direct descendants
  * who haven't done an "execve()") should use this: it will work within
  * a system call from a "real" process, but the process memory space will
- * not be free'd until both the parent and the child have exited.
+ * not be freed until both the parent and the child have exited.
  */
 pid_t kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 {

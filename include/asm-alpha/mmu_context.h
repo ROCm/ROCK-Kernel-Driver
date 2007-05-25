@@ -10,6 +10,7 @@
 #include <asm/system.h>
 #include <asm/machvec.h>
 #include <asm/compiler.h>
+#include <asm-generic/mm_hooks.h>
 
 /*
  * Force a context reload. This is needed when we change the page
@@ -84,8 +85,8 @@ __reload_thread(struct pcb_struct *pcb)
  * +-------------+----------------+--------------+
  */
 
-#ifdef CONFIG_SMP
 #include <asm/smp.h>
+#ifdef CONFIG_SMP
 #define cpu_last_asn(cpuid)	(cpu_data[cpuid].last_asn)
 #else
 extern unsigned long last_asn;

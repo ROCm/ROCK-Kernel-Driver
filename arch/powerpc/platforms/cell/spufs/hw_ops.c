@@ -25,7 +25,6 @@
 #include <linux/mm.h>
 #include <linux/poll.h>
 #include <linux/smp.h>
-#include <linux/smp_lock.h>
 #include <linux/stddef.h>
 #include <linux/unistd.h>
 
@@ -305,6 +304,14 @@ static int spu_hw_send_mfc_command(struct spu_context *ctx,
 	}
 }
 
+static void spu_hw_restart_dma(struct spu_context *ctx)
+{
+	struct spu_priv2 __iomem *priv2 = ctx->spu->priv2;
+
+	if (!test_bit(SPU_CONTEXT_SWITCH_PENDING, &ctx->spu->flags))
+		out_be64(&priv2->mfc_control_RW, MFC_CNTL_RESTART_DMA_COMMAND);
+}
+
 struct spu_context_ops spu_hw_ops = {
 	.mbox_read = spu_hw_mbox_read,
 	.mbox_stat_read = spu_hw_mbox_stat_read,
@@ -330,4 +337,5 @@ struct spu_context_ops spu_hw_ops = {
 	.read_mfc_tagstatus = spu_hw_read_mfc_tagstatus,
 	.get_mfc_free_elements = spu_hw_get_mfc_free_elements,
 	.send_mfc_command = spu_hw_send_mfc_command,
+	.restart_dma = spu_hw_restart_dma,
 };

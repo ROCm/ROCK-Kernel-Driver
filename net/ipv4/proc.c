@@ -87,19 +87,6 @@ static const struct file_operations sockstat_seq_fops = {
 	.release = single_release,
 };
 
-static unsigned long
-fold_field(void *mib[], int offt)
-{
-	unsigned long res = 0;
-	int i;
-
-	for_each_possible_cpu(i) {
-		res += *(((unsigned long *) per_cpu_ptr(mib[0], i)) + offt);
-		res += *(((unsigned long *) per_cpu_ptr(mib[1], i)) + offt);
-	}
-	return res;
-}
-
 /* snmp items */
 static const struct snmp_mib snmp4_ipstats_list[] = {
 	SNMP_MIB_ITEM("InReceives", IPSTATS_MIB_INRECEIVES),
@@ -119,6 +106,17 @@ static const struct snmp_mib snmp4_ipstats_list[] = {
 	SNMP_MIB_ITEM("FragOKs", IPSTATS_MIB_FRAGOKS),
 	SNMP_MIB_ITEM("FragFails", IPSTATS_MIB_FRAGFAILS),
 	SNMP_MIB_ITEM("FragCreates", IPSTATS_MIB_FRAGCREATES),
+	SNMP_MIB_SENTINEL
+};
+
+/* Following RFC4293 items are displayed in /proc/net/netstat */
+static const struct snmp_mib snmp4_ipextstats_list[] = {
+	SNMP_MIB_ITEM("InNoRoutes", IPSTATS_MIB_INNOROUTES),
+	SNMP_MIB_ITEM("InTruncatedPkts", IPSTATS_MIB_INTRUNCATEDPKTS),
+	SNMP_MIB_ITEM("InMcastPkts", IPSTATS_MIB_INMCASTPKTS),
+	SNMP_MIB_ITEM("OutMcastPkts", IPSTATS_MIB_OUTMCASTPKTS),
+	SNMP_MIB_ITEM("InBcastPkts", IPSTATS_MIB_INBCASTPKTS),
+	SNMP_MIB_ITEM("OutBcastPkts", IPSTATS_MIB_OUTBCASTPKTS),
 	SNMP_MIB_SENTINEL
 };
 
@@ -266,8 +264,8 @@ static int snmp_seq_show(struct seq_file *seq, void *v)
 
 	for (i = 0; snmp4_ipstats_list[i].name != NULL; i++)
 		seq_printf(seq, " %lu",
-			   fold_field((void **) ip_statistics,
-				      snmp4_ipstats_list[i].entry));
+			   snmp_fold_field((void **)ip_statistics,
+					   snmp4_ipstats_list[i].entry));
 
 	seq_puts(seq, "\nIcmp:");
 	for (i = 0; snmp4_icmp_list[i].name != NULL; i++)
@@ -276,8 +274,8 @@ static int snmp_seq_show(struct seq_file *seq, void *v)
 	seq_puts(seq, "\nIcmp:");
 	for (i = 0; snmp4_icmp_list[i].name != NULL; i++)
 		seq_printf(seq, " %lu",
-			   fold_field((void **) icmp_statistics,
-				      snmp4_icmp_list[i].entry));
+			   snmp_fold_field((void **)icmp_statistics,
+					   snmp4_icmp_list[i].entry));
 
 	seq_puts(seq, "\nTcp:");
 	for (i = 0; snmp4_tcp_list[i].name != NULL; i++)
@@ -288,12 +286,12 @@ static int snmp_seq_show(struct seq_file *seq, void *v)
 		/* MaxConn field is signed, RFC 2012 */
 		if (snmp4_tcp_list[i].entry == TCP_MIB_MAXCONN)
 			seq_printf(seq, " %ld",
-				   fold_field((void **) tcp_statistics,
-					      snmp4_tcp_list[i].entry));
+				   snmp_fold_field((void **)tcp_statistics,
+						   snmp4_tcp_list[i].entry));
 		else
 			seq_printf(seq, " %lu",
-				   fold_field((void **) tcp_statistics,
-					      snmp4_tcp_list[i].entry));
+				   snmp_fold_field((void **)tcp_statistics,
+						   snmp4_tcp_list[i].entry));
 	}
 
 	seq_puts(seq, "\nUdp:");
@@ -303,8 +301,8 @@ static int snmp_seq_show(struct seq_file *seq, void *v)
 	seq_puts(seq, "\nUdp:");
 	for (i = 0; snmp4_udp_list[i].name != NULL; i++)
 		seq_printf(seq, " %lu",
-			   fold_field((void **) udp_statistics,
-				      snmp4_udp_list[i].entry));
+			   snmp_fold_field((void **)udp_statistics,
+					   snmp4_udp_list[i].entry));
 
 	/* the UDP and UDP-Lite MIBs are the same */
 	seq_puts(seq, "\nUdpLite:");
@@ -314,8 +312,8 @@ static int snmp_seq_show(struct seq_file *seq, void *v)
 	seq_puts(seq, "\nUdpLite:");
 	for (i = 0; snmp4_udp_list[i].name != NULL; i++)
 		seq_printf(seq, " %lu",
-			   fold_field((void **) udplite_statistics,
-				      snmp4_udp_list[i].entry)     );
+			   snmp_fold_field((void **)udplite_statistics,
+					   snmp4_udp_list[i].entry));
 
 	seq_putc(seq, '\n');
 	return 0;
@@ -348,8 +346,18 @@ static int netstat_seq_show(struct seq_file *seq, void *v)
 	seq_puts(seq, "\nTcpExt:");
 	for (i = 0; snmp4_net_list[i].name != NULL; i++)
 		seq_printf(seq, " %lu",
-			   fold_field((void **) net_statistics,
-				      snmp4_net_list[i].entry));
+			   snmp_fold_field((void **)net_statistics,
+					   snmp4_net_list[i].entry));
+
+	seq_puts(seq, "\nIpExt:");
+	for (i = 0; snmp4_ipextstats_list[i].name != NULL; i++)
+		seq_printf(seq, " %s", snmp4_ipextstats_list[i].name);
+
+	seq_puts(seq, "\nIpExt:");
+	for (i = 0; snmp4_ipextstats_list[i].name != NULL; i++)
+		seq_printf(seq, " %lu",
+			   snmp_fold_field((void **)ip_statistics,
+					   snmp4_ipextstats_list[i].entry));
 
 	seq_putc(seq, '\n');
 	return 0;

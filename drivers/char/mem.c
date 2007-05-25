@@ -18,7 +18,6 @@
 #include <linux/raw.h>
 #include <linux/tty.h>
 #include <linux/capability.h>
-#include <linux/smp_lock.h>
 #include <linux/ptrace.h>
 #include <linux/device.h>
 #include <linux/highmem.h>
@@ -102,7 +101,6 @@ static inline int valid_mmap_phys_addr_range(unsigned long pfn, size_t size)
 }
 #endif
 
-#ifndef ARCH_HAS_DEV_MEM
 /*
  * This funcion reads the *physical* memory. The f_pos points directly to the 
  * memory location. 
@@ -225,7 +223,6 @@ static ssize_t write_mem(struct file * file, const char __user * buf,
 	*ppos += written;
 	return written;
 }
-#endif
 
 #ifndef __HAVE_PHYS_MEM_ACCESS_PROT
 static pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
@@ -554,7 +551,7 @@ static ssize_t write_kmem(struct file * file, const char __user * buf,
  	return virtr + wrote;
 }
 
-#if (defined(CONFIG_ISA) || defined(CONFIG_PCI)) && !defined(__mc68000__)
+#ifdef CONFIG_DEVPORT
 static ssize_t read_port(struct file * file, char __user * buf,
 			 size_t count, loff_t *ppos)
 {
@@ -812,7 +809,6 @@ static int open_port(struct inode * inode, struct file * filp)
 #define open_kmem	open_mem
 #define open_oldmem	open_mem
 
-#ifndef ARCH_HAS_DEV_MEM
 static const struct file_operations mem_fops = {
 	.llseek		= memory_lseek,
 	.read		= read_mem,
@@ -821,9 +817,6 @@ static const struct file_operations mem_fops = {
 	.open		= open_mem,
 	.get_unmapped_area = get_unmapped_area_mem,
 };
-#else
-extern const struct file_operations mem_fops;
-#endif
 
 static const struct file_operations kmem_fops = {
 	.llseek		= memory_lseek,
@@ -841,7 +834,7 @@ static const struct file_operations null_fops = {
 	.splice_write	= splice_write_null,
 };
 
-#if (defined(CONFIG_ISA) || defined(CONFIG_PCI)) && !defined(__mc68000__)
+#ifdef CONFIG_DEVPORT
 static const struct file_operations port_fops = {
 	.llseek		= memory_lseek,
 	.read		= read_port,
@@ -919,7 +912,7 @@ static int memory_open(struct inode * inode, struct file * filp)
 		case 3:
 			filp->f_op = &null_fops;
 			break;
-#if (defined(CONFIG_ISA) || defined(CONFIG_PCI)) && !defined(__mc68000__)
+#ifdef CONFIG_DEVPORT
 		case 4:
 			filp->f_op = &port_fops;
 			break;
@@ -966,7 +959,7 @@ static const struct {
 	{1, "mem",     S_IRUSR | S_IWUSR | S_IRGRP, &mem_fops},
 	{2, "kmem",    S_IRUSR | S_IWUSR | S_IRGRP, &kmem_fops},
 	{3, "null",    S_IRUGO | S_IWUGO,           &null_fops},
-#if (defined(CONFIG_ISA) || defined(CONFIG_PCI)) && !defined(__mc68000__)
+#ifdef CONFIG_DEVPORT
 	{4, "port",    S_IRUSR | S_IWUSR | S_IRGRP, &port_fops},
 #endif
 	{5, "zero",    S_IRUGO | S_IWUGO,           &zero_fops},

@@ -40,15 +40,18 @@
 #include <linux/device.h>
 #include <linux/init.h>
 #include <linux/mutex.h>
+#include <linux/kthread.h>
+#include <linux/io.h>
 
 #include <asm/dma.h>
 #include <asm/ecard.h>
 #include <asm/hardware.h>
-#include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/mmu_context.h>
 #include <asm/mach/irq.h>
 #include <asm/tlbflush.h>
+
+#include "ecard.h"
 
 #ifndef CONFIG_ARCH_RPC
 #define HAVE_EXPMASK
@@ -123,7 +126,7 @@ static void ecard_task_reset(struct ecard_request *req)
 
 	res = ec->slot_no == 8
 		? &ec->resource[ECARD_RES_MEMC]
-		: ec->type == ECARD_EASI
+		: ec->easi
 		  ? &ec->resource[ECARD_RES_EASI]
 		  : &ec->resource[ECARD_RES_IOCSYNC];
 
@@ -178,7 +181,7 @@ static void ecard_task_readbytes(struct ecard_request *req)
 			index += 1;
 		}
 	} else {
-		unsigned long base = (ec->type == ECARD_EASI
+		unsigned long base = (ec->easi
 			 ? &ec->resource[ECARD_RES_EASI]
 			 : &ec->resource[ECARD_RES_IOCSYNC])->start;
 		void __iomem *pbase = (void __iomem *)base;
@@ -263,8 +266,6 @@ static int ecard_init_mm(void)
 static int
 ecard_task(void * unused)
 {
-	daemonize("kecardd");
-
 	/*
 	 * Allocate a mm.  We're not a lazy-TLB kernel task since we need
 	 * to set page table entries where the user space would be.  Note
@@ -727,7 +728,7 @@ static int ecard_prints(char *buffer, ecard_t *ec)
 	char *start = buffer;
 
 	buffer += sprintf(buffer, "  %d: %s ", ec->slot_no,
-			  ec->type == ECARD_EASI ? "EASI" : "    ");
+			  ec->easi ? "EASI" : "    ");
 
 	if (ec->cid.id == 0) {
 		struct in_chunk_dir incd;
@@ -814,7 +815,7 @@ static struct expansion_card *__init ecard_alloc_card(int type, int slot)
 	}
 
 	ec->slot_no = slot;
-	ec->type = type;
+	ec->easi = type == ECARD_EASI;
 	ec->irq = NO_IRQ;
 	ec->fiq = NO_IRQ;
 	ec->dma = NO_DMA;
@@ -825,6 +826,7 @@ static struct expansion_card *__init ecard_alloc_card(int type, int slot)
 	ec->dev.bus = &ecard_bus_type;
 	ec->dev.dma_mask = &ec->dma_mask;
 	ec->dma_mask = (u64)0xffffffff;
+	ec->dev.coherent_dma_mask = ec->dma_mask;
 
 	if (slot < 4) {
 		ec_set_resource(ec, ECARD_RES_MEMC,
@@ -907,7 +909,7 @@ static ssize_t ecard_show_device(struct device *dev, struct device_attribute *at
 static ssize_t ecard_show_type(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	struct expansion_card *ec = ECARD_DEV(dev);
-	return sprintf(buf, "%s\n", ec->type == ECARD_EASI ? "EASI" : "IOC");
+	return sprintf(buf, "%s\n", ec->easi ? "EASI" : "IOC");
 }
 
 static struct device_attribute ecard_dev_attrs[] = {
@@ -955,6 +957,31 @@ void ecard_release_resources(struct expansion_card *ec)
 					   ecard_resource_len(ec, i));
 }
 EXPORT_SYMBOL(ecard_release_resources);
+
+void ecard_setirq(struct expansion_card *ec, const struct expansion_card_ops *ops, void *irq_data)
+{
+	ec->irq_data = irq_data;
+	barrier();
+	ec->ops = ops;
+}
+EXPORT_SYMBOL(ecard_setirq);
+
+void __iomem *ecardm_iomap(struct expansion_card *ec, unsigned int res,
+			   unsigned long offset, unsigned long maxsize)
+{
+	unsigned long start = ecard_resource_start(ec, res);
+	unsigned long end = ecard_resource_end(ec, res);
+
+	if (offset > (end - start))
+		return NULL;
+
+	start += offset;
+	if (maxsize && end - start > maxsize)
+		end = start + maxsize;
+	
+	return devm_ioremap(&ec->dev, start, end - start);
+}
+EXPORT_SYMBOL(ecardm_iomap);
 
 /*
  * Probe for an expansion card.
@@ -1058,13 +1085,14 @@ ecard_probe(int slot, card_type_t type)
  */
 static int __init ecard_init(void)
 {
-	int slot, irqhw, ret;
+	struct task_struct *task;
+	int slot, irqhw;
 
-	ret = kernel_thread(ecard_task, NULL, CLONE_KERNEL);
-	if (ret < 0) {
-		printk(KERN_ERR "Ecard: unable to create kernel thread: %d\n",
-		       ret);
-		return ret;
+	task = kthread_run(ecard_task, NULL, "kecardd");
+	if (IS_ERR(task)) {
+		printk(KERN_ERR "Ecard: unable to create kernel thread: %ld\n",
+		       PTR_ERR(task));
+		return PTR_ERR(task);
 	}
 
 	printk("Probing expansion cards\n");
@@ -1129,6 +1157,14 @@ static int ecard_drv_remove(struct device *dev)
 
 	drv->remove(ec);
 	ecard_release(ec);
+
+	/*
+	 * Restore the default operations.  We ensure that the
+	 * ops are set before we change the data.
+	 */
+	ec->ops = &ecard_default_ops;
+	barrier();
+	ec->irq_data = NULL;
 
 	return 0;
 }

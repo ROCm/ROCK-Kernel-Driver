@@ -11,6 +11,7 @@
 #include <asm/psr.h>
 #include <asm/ptrace.h>
 #include <asm/btfixup.h>
+#include <asm/smp.h>
 
 #ifndef __ASSEMBLY__
 
@@ -241,7 +242,6 @@ static inline unsigned long xchg_u32(__volatile__ unsigned long *m, unsigned lon
 }
 
 #define xchg(ptr,x) ((__typeof__(*(ptr)))__xchg((unsigned long)(x),(ptr),sizeof(*(ptr))))
-#define tas(ptr) (xchg((ptr),1))
 
 extern void __xchg_called_with_bad_pointer(void);
 

@@ -1,4 +1,4 @@
-/* linux/include/asm-arm/arch-s3c2410/regs-clock.h
+/* linux/include/asm-arm/arch-s3c2410/regs-s3c2443-clock.h
  *
  * Copyright (c) 2007 Simtec Electronics
  *	Ben Dooks <ben@simtec.co.uk>
@@ -129,6 +129,7 @@
 #define S3C2443_PCLKCON_IIC		(1<<4)
 #define S3C2443_PCLKCON_SDI		(1<<5)
 #define S3C2443_PCLKCON_ADC		(1<<7)
+#define S3C2443_PCLKCON_AC97		(1<<8)
 #define S3C2443_PCLKCON_IIS		(1<<9)
 #define S3C2443_PCLKCON_PWMT		(1<<10)
 #define S3C2443_PCLKCON_WDT		(1<<11)

@@ -22,45 +22,17 @@
 #include <linux/libata.h>
 
 #define DRV_NAME "pata_pdc202xx_old"
-#define DRV_VERSION "0.4.0"
+#define DRV_VERSION "0.4.2"
 
-/**
- *	pdc2024x_pre_reset		-	probe begin
- *	@ap: ATA port
- *
- *	Set up cable type and use generic probe init
- */
-
-static int pdc2024x_pre_reset(struct ata_port *ap)
-{
-	ap->cbl = ATA_CBL_PATA40;
-	return ata_std_prereset(ap);
-}
-
-
-static void pdc2024x_error_handler(struct ata_port *ap)
-{
-	ata_bmdma_drive_eh(ap, pdc2024x_pre_reset, ata_std_softreset, NULL, ata_std_postreset);
-}
-
-
-static int pdc2026x_pre_reset(struct ata_port *ap)
+static int pdc2026x_cable_detect(struct ata_port *ap)
 {
 	struct pci_dev *pdev = to_pci_dev(ap->host->dev);
 	u16 cis;
 
 	pci_read_config_word(pdev, 0x50, &cis);
 	if (cis & (1 << (10 + ap->port_no)))
-		ap->cbl = ATA_CBL_PATA80;
-	else
-		ap->cbl = ATA_CBL_PATA40;
-
-	return ata_std_prereset(ap);
-}
-
-static void pdc2026x_error_handler(struct ata_port *ap)
-{
-	ata_bmdma_drive_eh(ap, pdc2026x_pre_reset, ata_std_softreset, NULL, ata_std_postreset);
+		return ATA_CBL_PATA80;
+	return ATA_CBL_PATA40;
 }
 
 /**
@@ -244,7 +216,6 @@ static void pdc2026x_bmdma_stop(struct ata_queued_cmd *qc)
 
 /**
  *	pdc2026x_dev_config	-	device setup hook
- *	@ap: ATA port
  *	@adev: newly found device
  *
  *	Perform chip specific early setup. We need to lock the transfer
@@ -252,7 +223,7 @@ static void pdc2026x_bmdma_stop(struct ata_queued_cmd *qc)
  *	barf.
  */
 
-static void pdc2026x_dev_config(struct ata_port *ap, struct ata_device *adev)
+static void pdc2026x_dev_config(struct ata_device *adev)
 {
 	adev->max_sectors = 256;
 }
@@ -273,10 +244,6 @@ static struct scsi_host_template pdc202xx_sht = {
 	.slave_configure	= ata_scsi_slave_config,
 	.slave_destroy		= ata_scsi_slave_destroy,
 	.bios_param		= ata_std_bios_param,
-#ifdef CONFIG_PM
-	.resume			= ata_scsi_device_resume,
-	.suspend		= ata_scsi_device_suspend,
-#endif
 };
 
 static struct ata_port_operations pdc2024x_port_ops = {
@@ -292,8 +259,9 @@ static struct ata_port_operations pdc2024x_port_ops = {
 
 	.freeze		= ata_bmdma_freeze,
 	.thaw		= ata_bmdma_thaw,
-	.error_handler	= pdc2024x_error_handler,
+	.error_handler	= ata_bmdma_error_handler,
 	.post_internal_cmd = ata_bmdma_post_internal_cmd,
+	.cable_detect	= ata_cable_40wire,
 
 	.bmdma_setup 	= ata_bmdma_setup,
 	.bmdma_start 	= ata_bmdma_start,
@@ -326,8 +294,9 @@ static struct ata_port_operations pdc2026x_port_ops = {
 
 	.freeze		= ata_bmdma_freeze,
 	.thaw		= ata_bmdma_thaw,
-	.error_handler	= pdc2026x_error_handler,
+	.error_handler	= ata_bmdma_error_handler,
 	.post_internal_cmd = ata_bmdma_post_internal_cmd,
+	.cable_detect	= pdc2026x_cable_detect,
 
 	.bmdma_setup 	= ata_bmdma_setup,
 	.bmdma_start 	= pdc2026x_bmdma_start,
@@ -348,7 +317,7 @@ static struct ata_port_operations pdc2026x_port_ops = {
 
 static int pdc202xx_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	static struct ata_port_info info[3] = {
+	static const struct ata_port_info info[3] = {
 		{
 			.sht = &pdc202xx_sht,
 			.flags = ATA_FLAG_SLAVE_POSS | ATA_FLAG_SRST,
@@ -375,9 +344,7 @@ static int pdc202xx_init_one(struct pci_dev *dev, const struct pci_device_id *id
 		}
 
 	};
-	static struct ata_port_info *port_info[2];
-
-	port_info[0] = port_info[1] = &info[id->driver_data];
+	const struct ata_port_info *ppi[] = { &info[id->driver_data], NULL };
 
 	if (dev->device == PCI_DEVICE_ID_PROMISE_20265) {
 		struct pci_dev *bridge = dev->bus->self;
@@ -389,7 +356,7 @@ static int pdc202xx_init_one(struct pci_dev *dev, const struct pci_device_id *id
 				return -ENODEV;
 		}
 	}
-	return ata_pci_init_one(dev, port_info, 2);
+	return ata_pci_init_one(dev, ppi);
 }
 
 static const struct pci_device_id pdc202xx[] = {

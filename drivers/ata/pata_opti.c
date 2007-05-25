@@ -34,7 +34,7 @@
 #include <linux/libata.h>
 
 #define DRV_NAME "pata_opti"
-#define DRV_VERSION "0.2.8"
+#define DRV_VERSION "0.2.9"
 
 enum {
 	READ_REG	= 0,	/* index of Read cycle timing register */
@@ -47,11 +47,12 @@ enum {
 /**
  *	opti_pre_reset		-	probe begin
  *	@ap: ATA port
+ *	@deadline: deadline jiffies for the operation
  *
  *	Set up cable type and use generic probe init
  */
 
-static int opti_pre_reset(struct ata_port *ap)
+static int opti_pre_reset(struct ata_port *ap, unsigned long deadline)
 {
 	struct pci_dev *pdev = to_pci_dev(ap->host->dev);
 	static const struct pci_bits opti_enable_bits[] = {
@@ -62,8 +63,7 @@ static int opti_pre_reset(struct ata_port *ap)
 	if (!pci_test_config_bits(pdev, &opti_enable_bits[ap->port_no]))
 		return -ENOENT;
 
-	ap->cbl = ATA_CBL_PATA40;
-	return ata_std_prereset(ap);
+	return ata_std_prereset(ap, deadline);
 }
 
 /**
@@ -179,10 +179,6 @@ static struct scsi_host_template opti_sht = {
 	.slave_configure	= ata_scsi_slave_config,
 	.slave_destroy		= ata_scsi_slave_destroy,
 	.bios_param		= ata_std_bios_param,
-#ifdef CONFIG_PM
-	.resume			= ata_scsi_device_resume,
-	.suspend		= ata_scsi_device_suspend,
-#endif
 };
 
 static struct ata_port_operations opti_port_ops = {
@@ -198,6 +194,7 @@ static struct ata_port_operations opti_port_ops = {
 	.thaw		= ata_bmdma_thaw,
 	.error_handler	= opti_error_handler,
 	.post_internal_cmd = ata_bmdma_post_internal_cmd,
+	.cable_detect	= ata_cable_40wire,
 
 	.bmdma_setup 	= ata_bmdma_setup,
 	.bmdma_start 	= ata_bmdma_start,
@@ -219,19 +216,19 @@ static struct ata_port_operations opti_port_ops = {
 
 static int opti_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	static struct ata_port_info info = {
+	static const struct ata_port_info info = {
 		.sht = &opti_sht,
 		.flags = ATA_FLAG_SLAVE_POSS | ATA_FLAG_SRST,
 		.pio_mask = 0x1f,
 		.port_ops = &opti_port_ops
 	};
-	static struct ata_port_info *port_info[2] = { &info, &info };
+	const struct ata_port_info *ppi[] = { &info, NULL };
 	static int printed_version;
 
 	if (!printed_version++)
 		dev_printk(KERN_DEBUG, &dev->dev, "version " DRV_VERSION "\n");
 
-	return ata_pci_init_one(dev, port_info, 2);
+	return ata_pci_init_one(dev, ppi);
 }
 
 static const struct pci_device_id opti[] = {

@@ -72,7 +72,7 @@ void __init iq80321_map_io(void)
 /*
  * IQ80321 PCI.
  */
-static inline int __init
+static int __init
 iq80321_pci_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 {
 	int irq;
@@ -113,7 +113,8 @@ static struct hw_pci iq80321_pci __initdata = {
 
 static int __init iq80321_pci_init(void)
 {
-	if (machine_is_iq80321())
+	if ((iop3xx_get_init_atu() == IOP3XX_INIT_ATU_ENABLE) &&
+		machine_is_iq80321())
 		pci_common_init(&iq80321_pci);
 
 	return 0;

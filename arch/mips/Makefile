@@ -92,7 +92,7 @@ cflags-y += -ffreestanding
 # when fed the toolchain default!
 #
 # Certain gcc versions upto gcc 4.1.1 (probably 4.2-subversion as of
-# 2006-10-10 don't properly change the the predefined symbols if -EB / -EL
+# 2006-10-10 don't properly change the predefined symbols if -EB / -EL
 # are used, so we kludge that here.  A bug has been filed at
 # http://gcc.gnu.org/bugzilla/show_bug.cgi?id=29413.
 #
@@ -343,15 +343,6 @@ cflags-$(CONFIG_MOMENCO_OCELOT)	+= -Iinclude/asm-mips/mach-ocelot
 load-$(CONFIG_MOMENCO_OCELOT)	+= 0xffffffff80100000
 
 #
-# Momentum Ocelot-G board
-#
-# The Ocelot-G setup.o must be linked early - it does the ioremap() for the
-# mips_io_port_base.
-#
-core-$(CONFIG_MOMENCO_OCELOT_G)	+= arch/mips/momentum/ocelot_g/
-load-$(CONFIG_MOMENCO_OCELOT_G)	+= 0xffffffff80100000
-
-#
 # Momentum Ocelot-C and -CS boards
 #
 # The Ocelot-C[S] setup.o must be linked early - it does the ioremap() for the
@@ -386,17 +377,6 @@ load-$(CONFIG_MOMENCO_OCELOT_3) 	+= 0xffffffff80100000
 core-$(CONFIG_BASLER_EXCITE)	+= arch/mips/basler/excite/
 cflags-$(CONFIG_BASLER_EXCITE)	+= -Iinclude/asm-mips/mach-excite
 load-$(CONFIG_BASLER_EXCITE)	+= 0x80100000
-
-#
-# Momentum Jaguar ATX
-#
-core-$(CONFIG_MOMENCO_JAGUAR_ATX)	+= arch/mips/momentum/jaguar_atx/
-cflags-$(CONFIG_MOMENCO_JAGUAR_ATX)	+= -Iinclude/asm-mips/mach-ja
-#ifdef CONFIG_JAGUAR_DMALOW
-#load-$(CONFIG_MOMENCO_JAGUAR_ATX)	+= 0xffffffff88000000
-#else
-load-$(CONFIG_MOMENCO_JAGUAR_ATX)	+= 0xffffffff80100000
-#endif
 
 #
 # NEC DDB
@@ -530,25 +510,29 @@ cflags-$(CONFIG_SGI_IP32)	+= -Iinclude/asm-mips/mach-ip32
 load-$(CONFIG_SGI_IP32)		+= 0xffffffff80004000
 
 #
-# Sibyte SB1250 SOC
+# Sibyte SB1250/BCM1480 SOC
 #
 # This is a LIB so that it links at the end, and initcalls are later
 # the sequence; but it is built as an object so that modules don't get
 # removed (as happens, even if they have __initcall/module_init)
 #
 core-$(CONFIG_SIBYTE_BCM112X)	+= arch/mips/sibyte/sb1250/
+core-$(CONFIG_SIBYTE_BCM112X)	+= arch/mips/sibyte/common/
 cflags-$(CONFIG_SIBYTE_BCM112X)	+= -Iinclude/asm-mips/mach-sibyte \
 			-DSIBYTE_HDR_FEATURES=SIBYTE_HDR_FMASK_1250_112x_ALL
 
 core-$(CONFIG_SIBYTE_SB1250)	+= arch/mips/sibyte/sb1250/
+core-$(CONFIG_SIBYTE_SB1250)	+= arch/mips/sibyte/common/
 cflags-$(CONFIG_SIBYTE_SB1250)	+= -Iinclude/asm-mips/mach-sibyte \
 			-DSIBYTE_HDR_FEATURES=SIBYTE_HDR_FMASK_1250_112x_ALL
 
 core-$(CONFIG_SIBYTE_BCM1x55)	+= arch/mips/sibyte/bcm1480/
+core-$(CONFIG_SIBYTE_BCM1x55)	+= arch/mips/sibyte/common/
 cflags-$(CONFIG_SIBYTE_BCM1x55)	+= -Iinclude/asm-mips/mach-sibyte \
 			-DSIBYTE_HDR_FEATURES=SIBYTE_HDR_FMASK_1480_ALL
 
 core-$(CONFIG_SIBYTE_BCM1x80)	+= arch/mips/sibyte/bcm1480/
+core-$(CONFIG_SIBYTE_BCM1x80)	+= arch/mips/sibyte/common/
 cflags-$(CONFIG_SIBYTE_BCM1x80)	+= -Iinclude/asm-mips/mach-sibyte \
 			-DSIBYTE_HDR_FEATURES=SIBYTE_HDR_FMASK_1480_ALL
 
@@ -725,3 +709,25 @@ archclean:
 CLEAN_FILES += vmlinux.32 \
 	       vmlinux.64 \
 	       vmlinux.ecoff
+
+quiet_cmd_syscalls_n32 = CALL-N32 $<
+      cmd_syscalls_n32 = $(CONFIG_SHELL) $< $(CC) $(c_flags) -mabi=n32
+
+quiet_cmd_syscalls_o32 = CALL-O32 $<
+      cmd_syscalls_o32 = $(CONFIG_SHELL) $< $(CC) $(c_flags) -mabi=32
+
+PHONY += missing-syscalls-n32 missing-syscalls-o32
+
+missing-syscalls-n32: scripts/checksyscalls.sh FORCE
+	$(call cmd,syscalls_n32)
+
+missing-syscalls-o32: scripts/checksyscalls.sh FORCE
+	$(call cmd,syscalls_o32)
+
+archprepare:
+ifdef CONFIG_MIPS32_N32
+	$(Q)$(MAKE) $(build)=arch/mips missing-syscalls-n32
+endif
+ifdef CONFIG_MIPS32_O32
+	$(Q)$(MAKE) $(build)=arch/mips missing-syscalls-o32
+endif

@@ -21,7 +21,6 @@
 #include <linux/delay.h>
 #include <linux/initrd.h>
 #include <linux/platform_device.h>
-#include <linux/ide.h>
 #include <linux/seq_file.h>
 #include <linux/ioport.h>
 #include <linux/console.h>
@@ -353,11 +352,12 @@ void __init smp_setup_cpu_maps(void)
 		const int *intserv;
 		int j, len = sizeof(u32), nthreads = 1;
 
-		intserv = get_property(dn, "ibm,ppc-interrupt-server#s", &len);
+		intserv = of_get_property(dn, "ibm,ppc-interrupt-server#s",
+				&len);
 		if (intserv)
 			nthreads = len / sizeof(int);
 		else {
-			intserv = get_property(dn, "reg", NULL);
+			intserv = of_get_property(dn, "reg", NULL);
 			if (!intserv)
 				intserv = &cpu;	/* assume logical == phys */
 		}
@@ -380,10 +380,10 @@ void __init smp_setup_cpu_maps(void)
 		int num_addr_cell, num_size_cell, maxcpus;
 		const unsigned int *ireg;
 
-		num_addr_cell = prom_n_addr_cells(dn);
-		num_size_cell = prom_n_size_cells(dn);
+		num_addr_cell = of_n_addr_cells(dn);
+		num_size_cell = of_n_size_cells(dn);
 
-		ireg = get_property(dn, "ibm,lrdr-capacity", NULL);
+		ireg = of_get_property(dn, "ibm,lrdr-capacity", NULL);
 
 		if (!ireg)
 			goto out;
@@ -530,3 +530,44 @@ void __init setup_panic(void)
 {
 	atomic_notifier_chain_register(&panic_notifier_list, &ppc_panic_block);
 }
+
+#ifdef CONFIG_CHECK_CACHE_COHERENCY
+/*
+ * For platforms that have configurable cache-coherency.  This function
+ * checks that the cache coherency setting of the kernel matches the setting
+ * left by the firmware, as indicated in the device tree.  Since a mismatch
+ * will eventually result in DMA failures, we print * and error and call
+ * BUG() in that case.
+ */
+
+#ifdef CONFIG_NOT_COHERENT_CACHE
+#define KERNEL_COHERENCY	0
+#else
+#define KERNEL_COHERENCY	1
+#endif
+
+static int __init check_cache_coherency(void)
+{
+	struct device_node *np;
+	const void *prop;
+	int devtree_coherency;
+
+	np = of_find_node_by_path("/");
+	prop = of_get_property(np, "coherency-off", NULL);
+	of_node_put(np);
+
+	devtree_coherency = prop ? 0 : 1;
+
+	if (devtree_coherency != KERNEL_COHERENCY) {
+		printk(KERN_ERR
+			"kernel coherency:%s != device tree_coherency:%s\n",
+			KERNEL_COHERENCY ? "on" : "off",
+			devtree_coherency ? "on" : "off");
+		BUG();
+	}
+
+	return 0;
+}
+
+late_initcall(check_cache_coherency);
+#endif /* CONFIG_CHECK_CACHE_COHERENCY */

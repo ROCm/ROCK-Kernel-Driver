@@ -16,7 +16,7 @@
 
 #include <asm/io.h>
 
-#ifdef CONFIG_PPC_OF
+#if defined(CONFIG_PPC_OF) || defined(CONFIG_SPARC)
 #include <asm/prom.h>
 #endif
 
@@ -48,6 +48,7 @@ enum radeon_family {
 	CHIP_FAMILY_RV350,
 	CHIP_FAMILY_RV380,    /* RV370/RV380/M22/M24 */
 	CHIP_FAMILY_R420,     /* R420/R423/M18 */
+	CHIP_FAMILY_RS480,
 	CHIP_FAMILY_LAST,
 };
 
@@ -64,7 +65,8 @@ enum radeon_family {
 				((rinfo)->family == CHIP_FAMILY_RV350) || \
 				((rinfo)->family == CHIP_FAMILY_R350)  || \
 				((rinfo)->family == CHIP_FAMILY_RV380) || \
-				((rinfo)->family == CHIP_FAMILY_R420))
+				((rinfo)->family == CHIP_FAMILY_R420)  || \
+		                ((rinfo)->family == CHIP_FAMILY_RS480) )
 
 /*
  * Chip flags
@@ -292,7 +294,7 @@ struct radeonfb_info {
 	unsigned long		fb_local_base;
 
 	struct pci_dev		*pdev;
-#ifdef CONFIG_PPC_OF
+#if defined(CONFIG_PPC_OF) || defined(CONFIG_SPARC)
 	struct device_node	*of_node;
 #endif
 

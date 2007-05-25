@@ -54,7 +54,7 @@
 
 static struct resource	gpmc_mem_root;
 static struct resource	gpmc_cs_mem[GPMC_CS_NUM];
-static spinlock_t	gpmc_mem_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(gpmc_mem_lock);
 static unsigned		gpmc_cs_map;
 
 static void __iomem *gpmc_base =
@@ -246,14 +246,22 @@ static int gpmc_cs_mem_enabled(int cs)
 	return l & (1 << 6);
 }
 
-static void gpmc_cs_set_reserved(int cs, int reserved)
+int gpmc_cs_set_reserved(int cs, int reserved)
 {
+	if (cs > GPMC_CS_NUM)
+		return -ENODEV;
+
 	gpmc_cs_map &= ~(1 << cs);
 	gpmc_cs_map |= (reserved ? 1 : 0) << cs;
+
+	return 0;
 }
 
-static int gpmc_cs_reserved(int cs)
+int gpmc_cs_reserved(int cs)
 {
+	if (cs > GPMC_CS_NUM)
+		return -ENODEV;
+
 	return gpmc_cs_map & (1 << cs);
 }
 

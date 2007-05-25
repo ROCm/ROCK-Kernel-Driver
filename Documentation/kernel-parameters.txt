@@ -64,6 +64,7 @@ parameter is applicable:
 	GENERIC_TIME The generic timeofday code is enabled.
 	NFS	Appropriate NFS support is enabled.
 	OSS	OSS sound support is enabled.
+	PV_OPS	A paravirtualized kernel
 	PARIDE	The ParIDE subsystem is enabled.
 	PARISC	The PA-RISC architecture is enabled.
 	PCI	PCI bus support is enabled.
@@ -181,19 +182,41 @@ and is between 256 and 4096 characters. It is defined in the file
 			that require a timer override, but don't have
 			HPET
 
-	acpi_dbg_layer=	[HW,ACPI]
+	acpi.debug_layer=	[HW,ACPI]
 			Format: <int>
 			Each bit of the <int> indicates an ACPI debug layer,
 			1: enable, 0: disable. It is useful for boot time
 			debugging. After system has booted up, it can be set
-			via /proc/acpi/debug_layer.
+			via /sys/module/acpi/parameters/debug_layer.
+			CONFIG_ACPI_DEBUG must be enabled for this to produce any output.
+			Available bits (add the numbers together) to enable debug output
+			for specific parts of the ACPI subsystem:
+			0x01 utilities 0x02 hardware 0x04 events 0x08 tables
+			0x10 namespace 0x20 parser 0x40 dispatcher
+			0x80 executer 0x100 resources 0x200 acpica debugger
+			0x400 os services 0x800 acpica disassembler.
+			The number can be in decimal or prefixed with 0x in hex.
+			Warning: Many of these options can produce a lot of
+			output and make your system unusable. Be very careful.
 
-	acpi_dbg_level=	[HW,ACPI]
+	acpi.debug_level=	[HW,ACPI]
 			Format: <int>
 			Each bit of the <int> indicates an ACPI debug level,
 			1: enable, 0: disable. It is useful for boot time
 			debugging. After system has booted up, it can be set
-			via /proc/acpi/debug_level.
+			via /sys/module/acpi/parameters/debug_level.
+			CONFIG_ACPI_DEBUG must be enabled for this to produce any output.
+			Available bits (add the numbers together) to enable different
+			debug output levels of the ACPI subsystem:
+			0x01 error 0x02 warn 0x04 init 0x08 debug object
+			0x10 info 0x20 init names 0x40 parse 0x80 load
+			0x100 dispatch 0x200 execute 0x400 names 0x800 operation region
+			0x1000 bfield 0x2000 tables 0x4000 values 0x8000 objects
+			0x10000 resources 0x20000 user requests 0x40000 package.
+			The number can be in decimal or prefixed with 0x in hex.
+			Warning: Many of these options can produce a lot of
+			output and make your system unusable. Be very careful.
+
 
 	acpi_fake_ecdt	[HW,ACPI] Workaround failure due to BIOS lacking ECDT
 
@@ -373,6 +396,26 @@ and is between 256 and 4096 characters. It is defined in the file
 			clocksource is not available, it defaults to PIT.
 			Format: { pit | tsc | cyclone | pmtmr }
 
+	clocksource=	[GENERIC_TIME] Override the default clocksource
+			Format: <string>
+			Override the default clocksource and use the clocksource
+			with the name specified.
+			Some clocksource names to choose from, depending on
+			the platform:
+			[all] jiffies (this is the base, fallback clocksource)
+			[ACPI] acpi_pm
+			[ARM] imx_timer1,OSTS,netx_timer,mpu_timer2,
+				pxa_timer,timer3,32k_counter,timer0_1
+			[AVR32] avr32
+			[IA-32] pit,hpet,tsc,vmi-timer;
+				scx200_hrt on Geode; cyclone on IBM x440
+			[MIPS] MIPS
+			[PARISC] cr16
+			[S390] tod
+			[SH] SuperH
+			[SPARC64] tick
+			[X86-64] hpet,tsc
+
 	code_bytes	[IA32] How many bytes of object code to print in an
 			oops report.
 			Range: 0 - 8192
@@ -472,6 +515,30 @@ and is between 256 and 4096 characters. It is defined in the file
 	decnet=		[HW,NET]
 			Format: <area>[,<node>]
 			See also Documentation/networking/decnet.txt.
+
+	default_blu=	[VT]
+			Format: <blue0>,<blue1>,<blue2>,...,<blue15>
+			Change the default blue palette of the console.
+			This is a 16-member array composed of values
+			ranging from 0-255.
+
+	default_grn=	[VT]
+			Format: <green0>,<green1>,<green2>,...,<green15>
+			Change the default green palette of the console.
+			This is a 16-member array composed of values
+			ranging from 0-255.
+
+	default_red=	[VT]
+			Format: <red0>,<red1>,<red2>,...,<red15>
+			Change the default red palette of the console.
+			This is a 16-member array composed of values
+			ranging from 0-255.
+
+	default_utf8=   [VT]
+			Format=<0|1>
+			Set system-wide default UTF-8 mode for all tty's.
+			Default is 0 and by setting to 1, it enables UTF-8
+			mode for all newly opened or allocated terminals.
 
 	dhash_entries=	[KNL]
 			Set number of hash buckets for dentry cache.
@@ -673,8 +740,15 @@ and is between 256 and 4096 characters. It is defined in the file
 	idebus=		[HW] (E)IDE subsystem - VLB/PCI bus speed
 			See Documentation/ide.txt.
 
-	idle=		[HW]
-			Format: idle=poll or idle=halt
+	idle=		[X86]
+			Format: idle=poll or idle=mwait
+			Poll forces a polling idle loop that can slightly improves the performance
+			of waking up a idle CPU, but will use a lot of power and make the system
+			run hot. Not recommended.
+			idle=mwait. On systems which support MONITOR/MWAIT but the kernel chose
+			to not use it because it doesn't save as much power as a normal idle
+			loop use the MONITOR/MWAIT idle loop anyways. Performance should be the same
+			as idle=poll.
 
 	ignore_loglevel	[KNL]
 			Ignore loglevel setting - this will print /all/
@@ -699,14 +773,6 @@ and is between 256 and 4096 characters. It is defined in the file
 
 	inport.irq=	[HW] Inport (ATI XL and Microsoft) busmouse driver
 			Format: <irq>
-
-	combined_mode=	[HW] control which driver uses IDE ports in combined
-			mode: legacy IDE driver, libata, or both
-			(in the libata case, libata.atapi_enabled=1 may be
-			useful as well).  Note that using the ide or libata
-			options may affect your device naming (e.g. by
-			changing hdc to sdb).
-			Format: combined (default), ide, or libata
 
 	inttest=	[IA64]
 
@@ -785,6 +851,11 @@ and is between 256 and 4096 characters. It is defined in the file
 
 	lasi=		[HW,SCSI] PARISC LASI driver for the 53c700 chip
 			Format: addr:<io>,irq:<irq>
+
+	legacy_serial.force [HW,IA-32,X86-64]
+			Probe for COM ports at legacy addresses even
+			if PNPBIOS or ACPI should describe them.  This
+			is for working around firmware defects.
 
 	llsc*=		[IA64] See function print_params() in
 			arch/ia64/sn/kernel/llsc4.c.
@@ -1134,6 +1205,11 @@ and is between 256 and 4096 characters. It is defined in the file
 	nomca		[IA-64] Disable machine check abort handling
 
 	nomce		[IA-32] Machine Check Exception
+
+	noreplace-paravirt	[IA-32,PV_OPS] Don't patch paravirt_ops
+
+	noreplace-smp	[IA-32,SMP] Don't replace SMP instructions
+			with UP alternatives
 
 	noresidual	[PPC] Don't use residual data on PReP machines.
 
@@ -1540,6 +1616,20 @@ and is between 256 and 4096 characters. It is defined in the file
 	smart2=		[HW]
 			Format: <io1>[,<io2>[,...,<io8>]]
 
+	smp-alt-once	[IA-32,SMP] On a hotplug CPU system, only
+			attempt to substitute SMP alternatives once at boot.
+
+	smsc-ircc2.nopnp	[HW] Don't use PNP to discover SMC devices
+	smsc-ircc2.ircc_cfg=	[HW] Device configuration I/O port
+	smsc-ircc2.ircc_sir=	[HW] SIR base I/O port
+	smsc-ircc2.ircc_fir=	[HW] FIR base I/O port
+	smsc-ircc2.ircc_irq=	[HW] IRQ line
+	smsc-ircc2.ircc_dma=	[HW] DMA channel
+	smsc-ircc2.ircc_transceiver= [HW] Transceiver type:
+				0: Toshiba Satellite 1800 (GP data pin select)
+				1: Fast pin select (default)
+				2: ATC IRMode
+
 	snd-ad1816a=	[HW,ALSA]
 
 	snd-ad1848=	[HW,ALSA]
@@ -1743,10 +1833,6 @@ and is between 256 and 4096 characters. It is defined in the file
 
 	time		Show timing data prefixed to each printk message line
 
-	clocksource=	[GENERIC_TIME] Override the default clocksource
-			Override the default clocksource and use the clocksource
-			with the name specified.
-
 	tipar.timeout=	[HW,PPT]
 			Set communications timeout in tenths of a second
 			(default 15).
@@ -1798,12 +1884,13 @@ and is between 256 and 4096 characters. It is defined in the file
 			for newly-detected USB devices (default 2).  This
 			is the time required before an idle device will be
 			autosuspended.  Devices for which the delay is set
-			to 0 won't be autosuspended at all.
+			to a negative value won't be autosuspended at all.
 
 	usbhid.mousepoll=
 			[USBHID] The interval which mice are to be polled at.
 
 	vdso=		[IA-32,SH]
+			vdso=2: enable compat VDSO (default with COMPAT_VDSO)
 			vdso=1: enable VDSO (default)
 			vdso=0: disable VDSO mapping
 

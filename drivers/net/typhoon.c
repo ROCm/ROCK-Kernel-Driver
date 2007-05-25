@@ -639,7 +639,7 @@ typhoon_issue_command(struct typhoon *tp, int num_cmd, struct cmd_desc *cmd,
 
 	typhoon_inc_cmd_index(&ring->lastWrite, num_cmd);
 
-	/* "I feel a presence... another warrior is on the the mesa."
+	/* "I feel a presence... another warrior is on the mesa."
 	 */
 	wmb();
 	iowrite32(ring->lastWrite, tp->ioaddr + TYPHOON_REG_CMD_READY);
@@ -1708,7 +1708,6 @@ typhoon_rx(struct typhoon *tp, struct basic_ring *rxRing, volatile u32 * ready,
 
 		if(pkt_len < rx_copybreak &&
 		   (new_skb = dev_alloc_skb(pkt_len + 2)) != NULL) {
-			new_skb->dev = tp->dev;
 			skb_reserve(new_skb, 2);
 			pci_dma_sync_single_for_cpu(tp->pdev, dma_addr,
 						    PKT_BUF_SZ,

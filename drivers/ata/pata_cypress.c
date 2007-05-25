@@ -18,7 +18,7 @@
 #include <linux/libata.h>
 
 #define DRV_NAME "pata_cypress"
-#define DRV_VERSION "0.1.4"
+#define DRV_VERSION "0.1.5"
 
 /* here are the offset definitions for the registers */
 
@@ -40,17 +40,6 @@ enum {
 	CY82_INDEX_CHANNEL1	= 0x31,
 	CY82_INDEX_TIMEOUT	= 0x32
 };
-
-static int cy82c693_pre_reset(struct ata_port *ap)
-{
-	ap->cbl = ATA_CBL_PATA40;
-	return ata_std_prereset(ap);
-}
-
-static void cy82c693_error_handler(struct ata_port *ap)
-{
-	ata_bmdma_drive_eh(ap, cy82c693_pre_reset, ata_std_softreset, NULL, ata_std_postreset);
-}
 
 /**
  *	cy82c693_set_piomode	-	set initial PIO mode data
@@ -136,10 +125,6 @@ static struct scsi_host_template cy82c693_sht = {
 	.slave_configure	= ata_scsi_slave_config,
 	.slave_destroy		= ata_scsi_slave_destroy,
 	.bios_param		= ata_std_bios_param,
-#ifdef CONFIG_PM
-	.resume			= ata_scsi_device_resume,
-	.suspend		= ata_scsi_device_suspend,
-#endif
 };
 
 static struct ata_port_operations cy82c693_port_ops = {
@@ -156,8 +141,9 @@ static struct ata_port_operations cy82c693_port_ops = {
 
 	.freeze		= ata_bmdma_freeze,
 	.thaw		= ata_bmdma_thaw,
-	.error_handler	= cy82c693_error_handler,
+	.error_handler	= ata_bmdma_error_handler,
 	.post_internal_cmd = ata_bmdma_post_internal_cmd,
+	.cable_detect	= ata_cable_40wire,
 
 	.bmdma_setup 	= ata_bmdma_setup,
 	.bmdma_start 	= ata_bmdma_start,
@@ -179,14 +165,14 @@ static struct ata_port_operations cy82c693_port_ops = {
 
 static int cy82c693_init_one(struct pci_dev *pdev, const struct pci_device_id *id)
 {
-	static struct ata_port_info info = {
+	static const struct ata_port_info info = {
 		.sht = &cy82c693_sht,
 		.flags = ATA_FLAG_SLAVE_POSS | ATA_FLAG_SRST,
 		.pio_mask = 0x1f,
 		.mwdma_mask = 0x07,
 		.port_ops = &cy82c693_port_ops
 	};
-	static struct ata_port_info *port_info[1] = { &info };
+	const struct ata_port_info *ppi[] = { &info, &ata_dummy_port_info };
 
 	/* Devfn 1 is the ATA primary. The secondary is magic and on devfn2.
 	   For the moment we don't handle the secondary. FIXME */
@@ -194,7 +180,7 @@ static int cy82c693_init_one(struct pci_dev *pdev, const struct pci_device_id *i
 	if (PCI_FUNC(pdev->devfn) != 1)
 		return -ENODEV;
 
-	return ata_pci_init_one(pdev, port_info, 1);
+	return ata_pci_init_one(pdev, ppi);
 }
 
 static const struct pci_device_id cy82c693[] = {

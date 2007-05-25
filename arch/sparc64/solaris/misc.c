@@ -6,7 +6,6 @@
 
 #include <linux/module.h> 
 #include <linux/types.h>
-#include <linux/smp_lock.h>
 #include <linux/utsname.h>
 #include <linux/limits.h>
 #include <linux/mm.h>
@@ -224,7 +223,8 @@ static char *serial(char *buffer, int sz)
 
 	*buffer = 0;
 	if (dp) {
-		char *val = of_get_property(dp, "system-board-serial#", &len);
+		const char *val =
+			of_get_property(dp, "system-board-serial#", &len);
 
 		if (val && len > 0) {
 			if (len > sz)

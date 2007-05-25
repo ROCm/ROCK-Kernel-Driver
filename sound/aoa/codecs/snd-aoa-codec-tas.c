@@ -899,14 +899,14 @@ static int tas_create(struct i2c_adapter *adapter,
 	tas->i2c.addr = addr;
 	/* seems that half is a saner default */
 	tas->drc_range = TAS3004_DRC_MAX / 2;
-	strlcpy(tas->i2c.name, "tas audio codec", I2C_NAME_SIZE-1);
+	strlcpy(tas->i2c.name, "tas audio codec", I2C_NAME_SIZE);
 
 	if (i2c_attach_client(&tas->i2c)) {
 		printk(KERN_ERR PFX "failed to attach to i2c\n");
 		goto fail;
 	}
 
-	strlcpy(tas->codec.name, "tas", MAX_CODEC_NAME_LEN-1);
+	strlcpy(tas->codec.name, "tas", MAX_CODEC_NAME_LEN);
 	tas->codec.owner = THIS_MODULE;
 	tas->codec.init = tas_init_codec;
 	tas->codec.exit = tas_exit_codec;
@@ -938,10 +938,10 @@ static int tas_i2c_attach(struct i2c_adapter *adapter)
 	busnode = pmac_i2c_get_bus_node(bus);
 
 	while ((dev = of_get_next_child(busnode, dev)) != NULL) {
-		if (device_is_compatible(dev, "tas3004")) {
-			u32 *addr;
+		if (of_device_is_compatible(dev, "tas3004")) {
+			const u32 *addr;
 			printk(KERN_DEBUG PFX "found tas3004\n");
-			addr = (u32 *) get_property(dev, "reg", NULL);
+			addr = of_get_property(dev, "reg", NULL);
 			if (!addr)
 				continue;
 			return tas_create(adapter, dev, ((*addr) >> 1) & 0x7f);
@@ -950,9 +950,10 @@ static int tas_i2c_attach(struct i2c_adapter *adapter)
 		 * property that says 'tas3004', they just have a 'deq'
 		 * node without any such property... */
 		if (strcmp(dev->name, "deq") == 0) {
-			u32 *_addr, addr;
+			const u32 *_addr;
+			u32 addr;
 			printk(KERN_DEBUG PFX "found 'deq' node\n");
-			_addr = (u32 *) get_property(dev, "i2c-address", NULL);
+			_addr = of_get_property(dev, "i2c-address", NULL);
 			if (!_addr)
 				continue;
 			addr = ((*_addr) >> 1) & 0x7f;

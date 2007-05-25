@@ -71,7 +71,7 @@ static void cell_show_cpuinfo(struct seq_file *m)
 
 	root = of_find_node_by_path("/");
 	if (root)
-		model = get_property(root, "model", NULL);
+		model = of_get_property(root, "model", NULL);
 	seq_printf(m, "machine\t\t: CHRP %s\n", model);
 	of_node_put(root);
 }
@@ -112,7 +112,7 @@ static void __init mpic_init_IRQ(void)
 
 	for (dn = NULL;
 	     (dn = of_find_node_by_name(dn, "interrupt-controller"));) {
-		if (!device_is_compatible(dn, "CBEA,platform-open-pic"))
+		if (!of_device_is_compatible(dn, "CBEA,platform-open-pic"))
 			continue;
 
 		/* The MPIC driver will get everything it needs from the

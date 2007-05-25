@@ -13,6 +13,7 @@
 #include <linux/pagemap.h>
 #include <linux/spinlock.h>
 #include <linux/module.h>
+#include <linux/quicklist.h>
 
 #include <asm/system.h>
 #include <asm/pgtable.h>
@@ -144,10 +145,8 @@ void set_pmd_pfn(unsigned long vaddr, unsigned long pfn, pgprot_t flags)
 }
 
 static int fixmaps;
-#ifndef CONFIG_COMPAT_VDSO
 unsigned long __FIXADDR_TOP = 0xfffff000;
 EXPORT_SYMBOL(__FIXADDR_TOP);
-#endif
 
 void __set_fixmap (enum fixed_addresses idx, unsigned long phys, pgprot_t flags)
 {
@@ -173,12 +172,8 @@ void reserve_top_address(unsigned long reserve)
 	BUG_ON(fixmaps > 0);
 	printk(KERN_INFO "Reserving virtual address space above 0x%08x\n",
 	       (int)-reserve);
-#ifdef CONFIG_COMPAT_VDSO
-	BUG_ON(reserve != 0);
-#else
 	__FIXADDR_TOP = -reserve - PAGE_SIZE;
 	__VMALLOC_RESERVE += reserve;
-#endif
 }
 
 pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
@@ -211,8 +206,6 @@ void pmd_ctor(void *pmd, struct kmem_cache *cache, unsigned long flags)
  * against pageattr.c; it is the unique case in which a valid change
  * of kernel pagetables can't be lazily synchronized by vmalloc faults.
  * vmalloc faults work because attached pagetables are never freed.
- * The locking scheme was chosen on the basis of manfred's
- * recommendations and having no core impact whatsoever.
  * -- wli
  */
 DEFINE_SPINLOCK(pgd_lock);
@@ -238,35 +231,57 @@ static inline void pgd_list_del(pgd_t *pgd)
 		set_page_private(next, (unsigned long)pprev);
 }
 
-void pgd_ctor(void *pgd, struct kmem_cache *cache, unsigned long unused)
+
+
+#if (PTRS_PER_PMD == 1)
+/* Non-PAE pgd constructor */
+void pgd_ctor(void *pgd)
 {
 	unsigned long flags;
 
-	if (PTRS_PER_PMD == 1) {
-		memset(pgd, 0, USER_PTRS_PER_PGD*sizeof(pgd_t));
-		spin_lock_irqsave(&pgd_lock, flags);
-	}
+	/* !PAE, no pagetable sharing */
+	memset(pgd, 0, USER_PTRS_PER_PGD*sizeof(pgd_t));
 
+	spin_lock_irqsave(&pgd_lock, flags);
+
+	/* must happen under lock */
 	clone_pgd_range((pgd_t *)pgd + USER_PTRS_PER_PGD,
 			swapper_pg_dir + USER_PTRS_PER_PGD,
 			KERNEL_PGD_PTRS);
-
-	if (PTRS_PER_PMD > 1)
-		return;
-
-	/* must happen under lock */
 	paravirt_alloc_pd_clone(__pa(pgd) >> PAGE_SHIFT,
-			__pa(swapper_pg_dir) >> PAGE_SHIFT,
-			USER_PTRS_PER_PGD, PTRS_PER_PGD - USER_PTRS_PER_PGD);
-
+				__pa(swapper_pg_dir) >> PAGE_SHIFT,
+				USER_PTRS_PER_PGD,
+				KERNEL_PGD_PTRS);
 	pgd_list_add(pgd);
 	spin_unlock_irqrestore(&pgd_lock, flags);
 }
+#else  /* PTRS_PER_PMD > 1 */
+/* PAE pgd constructor */
+void pgd_ctor(void *pgd)
+{
+	/* PAE, kernel PMD may be shared */
 
-/* never called when PTRS_PER_PMD > 1 */
-void pgd_dtor(void *pgd, struct kmem_cache *cache, unsigned long unused)
+	if (SHARED_KERNEL_PMD) {
+		clone_pgd_range((pgd_t *)pgd + USER_PTRS_PER_PGD,
+				swapper_pg_dir + USER_PTRS_PER_PGD,
+				KERNEL_PGD_PTRS);
+	} else {
+		unsigned long flags;
+
+		memset(pgd, 0, USER_PTRS_PER_PGD*sizeof(pgd_t));
+		spin_lock_irqsave(&pgd_lock, flags);
+		pgd_list_add(pgd);
+		spin_unlock_irqrestore(&pgd_lock, flags);
+	}
+}
+#endif	/* PTRS_PER_PMD */
+
+void pgd_dtor(void *pgd)
 {
 	unsigned long flags; /* can be called from interrupt context */
+
+	if (SHARED_KERNEL_PMD)
+		return;
 
 	paravirt_release_pd(__pa(pgd) >> PAGE_SHIFT);
 	spin_lock_irqsave(&pgd_lock, flags);
@@ -274,18 +289,51 @@ void pgd_dtor(void *pgd, struct kmem_cache *cache, unsigned long unused)
 	spin_unlock_irqrestore(&pgd_lock, flags);
 }
 
+#define UNSHARED_PTRS_PER_PGD				\
+	(SHARED_KERNEL_PMD ? USER_PTRS_PER_PGD : PTRS_PER_PGD)
+
+/* If we allocate a pmd for part of the kernel address space, then
+   make sure its initialized with the appropriate kernel mappings.
+   Otherwise use a cached zeroed pmd.  */
+static pmd_t *pmd_cache_alloc(int idx)
+{
+	pmd_t *pmd;
+
+	if (idx >= USER_PTRS_PER_PGD) {
+		pmd = (pmd_t *)__get_free_page(GFP_KERNEL);
+
+		if (pmd)
+			memcpy(pmd,
+			       (void *)pgd_page_vaddr(swapper_pg_dir[idx]),
+			       sizeof(pmd_t) * PTRS_PER_PMD);
+	} else
+		pmd = kmem_cache_alloc(pmd_cache, GFP_KERNEL);
+
+	return pmd;
+}
+
+static void pmd_cache_free(pmd_t *pmd, int idx)
+{
+	if (idx >= USER_PTRS_PER_PGD)
+		free_page((unsigned long)pmd);
+	else
+		kmem_cache_free(pmd_cache, pmd);
+}
+
 pgd_t *pgd_alloc(struct mm_struct *mm)
 {
 	int i;
-	pgd_t *pgd = kmem_cache_alloc(pgd_cache, GFP_KERNEL);
+	pgd_t *pgd = quicklist_alloc(0, GFP_KERNEL, pgd_ctor);
 
 	if (PTRS_PER_PMD == 1 || !pgd)
 		return pgd;
 
-	for (i = 0; i < USER_PTRS_PER_PGD; ++i) {
-		pmd_t *pmd = kmem_cache_alloc(pmd_cache, GFP_KERNEL);
+ 	for (i = 0; i < UNSHARED_PTRS_PER_PGD; ++i) {
+		pmd_t *pmd = pmd_cache_alloc(i);
+
 		if (!pmd)
 			goto out_oom;
+
 		paravirt_alloc_pd(__pa(pmd) >> PAGE_SHIFT);
 		set_pgd(&pgd[i], __pgd(1 + __pa(pmd)));
 	}
@@ -296,9 +344,9 @@ out_oom:
 		pgd_t pgdent = pgd[i];
 		void* pmd = (void *)__va(pgd_val(pgdent)-1);
 		paravirt_release_pd(__pa(pmd) >> PAGE_SHIFT);
-		kmem_cache_free(pmd_cache, pmd);
+		pmd_cache_free(pmd, i);
 	}
-	kmem_cache_free(pgd_cache, pgd);
+	quicklist_free(0, pgd_dtor, pgd);
 	return NULL;
 }
 
@@ -308,12 +356,18 @@ void pgd_free(pgd_t *pgd)
 
 	/* in the PAE case user pgd entries are overwritten before usage */
 	if (PTRS_PER_PMD > 1)
-		for (i = 0; i < USER_PTRS_PER_PGD; ++i) {
+		for (i = 0; i < UNSHARED_PTRS_PER_PGD; ++i) {
 			pgd_t pgdent = pgd[i];
 			void* pmd = (void *)__va(pgd_val(pgdent)-1);
 			paravirt_release_pd(__pa(pmd) >> PAGE_SHIFT);
-			kmem_cache_free(pmd_cache, pmd);
+			pmd_cache_free(pmd, i);
 		}
 	/* in the non-PAE case, free_pgtables() clears user pgd entries */
-	kmem_cache_free(pgd_cache, pgd);
+	quicklist_free(0, pgd_dtor, pgd);
 }
+
+void check_pgt_cache(void)
+{
+	quicklist_trim(0, pgd_dtor, 25, 16);
+}
+

@@ -37,6 +37,7 @@
 #include <asm/system.h>
 
 #include "../platforms/cell/interrupt.h"
+#include "../platforms/cell/cbe_regs.h"
 
 #define PPU_CYCLES_EVENT_NUM 1	/*  event number for CYCLES */
 #define PPU_CYCLES_GRP_NUM   1  /* special group number for identifying
@@ -130,7 +131,7 @@ static int pm_rtas_token;
 static u32 reset_value[NR_PHYS_CTRS];
 static int num_counters;
 static int oprofile_running;
-static spinlock_t virt_cntr_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(virt_cntr_lock);
 
 static u32 ctr_enabled;
 
@@ -746,7 +747,7 @@ cell_handle_interrupt(struct pt_regs *regs, struct op_counter_config *ctr)
 		 * counter value etc.) are not copied to the actual registers
 		 * until the performance monitor is enabled.  In order to get
 		 * this to work as desired, the permormance monitor needs to
-		 * be disabled while writting to the latches.  This is a
+		 * be disabled while writing to the latches.  This is a
 		 * HW design issue.
 		 */
 		cbe_enable_pm(cpu);

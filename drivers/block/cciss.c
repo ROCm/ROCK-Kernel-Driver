@@ -46,8 +46,9 @@
 #include <linux/genhd.h>
 #include <linux/completion.h>
 #include <scsi/scsi.h>
-#include <scsi/scsi_ioctl.h>
 #include <scsi/sg.h>
+#include <scsi/scsi_ioctl.h>
+#include <linux/cdrom.h>
 
 #define CCISS_DRIVER_VERSION(maj,min,submin) ((maj<<16)|(min<<8)|(submin))
 #define DRIVER_NAME "HP CISS Driver (v 3.6.14)"
@@ -1155,163 +1156,30 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 			kfree(ioc);
 			return status;
 		}
-	case SG_IO: {
-		struct sg_io_hdr hdr;
-		CommandList_struct *c;
-		char *buff = NULL;
-		u64bit temp64;
-		unsigned long flags;
-		DECLARE_COMPLETION_ONSTACK(wait);
 
-		if (!capable(CAP_SYS_RAWIO))
-			return -EPERM;
+	/* scsi_cmd_ioctl handles these, below, though some are not */
+	/* very meaningful for cciss.  SG_IO is the main one people want. */
 
-		if (copy_from_user(&hdr, argp, sizeof(hdr)))
-			return -EFAULT;
+	case SG_GET_VERSION_NUM:
+	case SG_SET_TIMEOUT:
+	case SG_GET_TIMEOUT:
+	case SG_GET_RESERVED_SIZE:
+	case SG_SET_RESERVED_SIZE:
+	case SG_EMULATED_HOST:
+	case SG_IO:
+	case SCSI_IOCTL_SEND_COMMAND:
+		return scsi_cmd_ioctl(filep, disk, cmd, argp);
 
-		if (hdr.interface_id != 'S')
-			return -EINVAL;
+	/* scsi_cmd_ioctl would normally handle these, below, but */
+	/* they aren't a good fit for cciss, as CD-ROMs are */
+	/* not supported, and we don't have any bus/target/lun */
+	/* which we present to the kernel. */
 
-		/* cciss only supports 16-byte commands */
-		if (hdr.cmd_len > 16)
-			return -EINVAL;
-
-		/* We don't support proper scatter-gather (yet) */
-		if (hdr.iovec_count)
-			return -EINVAL;
-
-		if ((hdr.dxfer_len < 1) &&
-		    (hdr.dxfer_direction != SG_DXFER_NONE))
-			return -EINVAL;
-
-		if (hdr.dxfer_len > 0) {
-			buff = kmalloc(hdr.dxfer_len, GFP_KERNEL);
-			if (buff == NULL)
-				return -EFAULT;
-		}
-		if ((hdr.dxfer_direction == SG_DXFER_TO_DEV) ||
-		    (hdr.dxfer_direction == SG_DXFER_TO_FROM_DEV)) {
-			/* Copy the data into the buffer we created */
-			if (copy_from_user (buff, hdr.dxferp,
-					    hdr.dxfer_len)) {
-				kfree(buff);
-				return -EFAULT;
-			}
-		} else
-			memset(buff, 0, hdr.dxfer_len);
-
-		if ((c = cmd_alloc(host, 0)) == NULL) {
-			kfree(buff);
-			return -ENOMEM;
-		}
-
-		/* Copy CDB */
-		if (copy_from_user(c->Request.CDB, hdr.cmdp, hdr.cmd_len))
-			return -EFAULT;
-
-		/* Fill in the command type */
-		c->cmd_type = CMD_IOCTL_PEND;
-		/* Fill in Command Header */
-		c->Header.ReplyQueue = 0;
-		if (hdr.dxfer_len > 0) {
-			c->Header.SGList = 1;
-			c->Header.SGTotal = 1;
-		} else {
-			c->Header.SGList = 0;
-			c->Header.SGTotal = 0;
-		}
-		/* Default to LUN the ioctl was directed to */
-		c->Header.LUN.LogDev.VolId = drv->LunID & 0x3FFFFFFF;
-		c->Header.LUN.LogDev.Mode = 0x01; /* Logical volume */
-		c->Header.Tag.lower = c->busaddr;
-
-		/* Fill in Request block */
-		c->Request.CDBLen = hdr.cmd_len;
-		c->Request.Type.Type = TYPE_CMD;
-		c->Request.Type.Attribute = ATTR_SIMPLE;
-		switch(hdr.dxfer_direction) {
-		    case SG_DXFER_NONE:
-			c->Request.Type.Direction = XFER_NONE;
-			break;
-		    case SG_DXFER_TO_DEV:
-			c->Request.Type.Direction = XFER_WRITE;
-			break;
-		    case SG_DXFER_FROM_DEV:
-			c->Request.Type.Direction = XFER_READ;
-			break;
-		    case SG_DXFER_TO_FROM_DEV:
-			c->Request.Type.Direction = XFER_RSVD;
-			break;
-		}
-		c->Request.Timeout = hdr.timeout;
-
-		/* Fill in the scatter gather information */
-		if (hdr.dxfer_len > 0) {
-			temp64.val = pci_map_single(host->pdev, buff,
-						    hdr.dxfer_len,
-						    PCI_DMA_BIDIRECTIONAL);
-			c->SG[0].Addr.lower = temp64.val32.lower;
-			c->SG[0].Addr.upper = temp64.val32.upper;
-			c->SG[0].Len = hdr.dxfer_len;
-			c->SG[0].Ext = 0;
-		}
-		c->waiting = &wait;
-
-		/* Put the request on the tail of the request queue */
-		spin_lock_irqsave(CCISS_LOCK(ctlr), flags);
-		addQ(&host->reqQ, c);
-		host->Qdepth++;
-		start_io(host);
-		spin_unlock_irqrestore(CCISS_LOCK(ctlr), flags);
-
-		wait_for_completion(&wait);
-
-		/* unlock the buffers from DMA */
-		temp64.val32.lower = c->SG[0].Addr.lower;
-		temp64.val32.upper = c->SG[0].Addr.upper;
-		pci_unmap_single(host->pdev, (dma_addr_t) temp64.val,
-				 hdr.dxfer_len,
-				 PCI_DMA_BIDIRECTIONAL);
-
-		/* Copy the error information out */
-		hdr.status = c->err_info->ScsiStatus;
-		if (c->err_info->SenseLen && hdr.mx_sb_len > 0) {
-			int sense_len = c->err_info->SenseLen;
-
-			if (sense_len > hdr.mx_sb_len)
-				sense_len = hdr.mx_sb_len;
-
-			if (copy_to_user(hdr.sbp, c->err_info->SenseInfo,
-					 sense_len)) {
-				kfree(buff);
-				cmd_free(host, c, 0);
-				return -EFAULT;
-			}
-			hdr.sb_len_wr = sense_len;
-		}
-		hdr.resid = c->err_info->ResidualCnt;
-		/* Copy out the header */
-		if (copy_to_user(argp, &hdr, sizeof(hdr))) {
-			kfree(buff);
-			cmd_free(host, c, 0);
-			return -EFAULT;
-		}
-
-		if ((hdr.dxfer_direction == SG_DXFER_FROM_DEV) ||
-		    (hdr.dxfer_direction == SG_DXFER_TO_FROM_DEV)) {
-			/* Copy the data out to the buffer we created */
-			if (copy_to_user
-			    (hdr.dxferp, buff, hdr.dxfer_len)) {
-				kfree(buff);
-				cmd_free(host, c, 0);
-				return -EFAULT;
-			}
-		}
-
-		kfree(buff);
-		cmd_free(host, c, 0);
-		return 0;
-		}
+	case CDROM_SEND_PACKET:
+	case CDROMCLOSETRAY:
+	case CDROMEJECT:
+	case SCSI_IOCTL_GET_IDLUN:
+	case SCSI_IOCTL_GET_BUS_NUMBER:
 	default:
 		return -ENOTTY;
 	}
@@ -1394,7 +1262,7 @@ static void cciss_softirq_done(struct request *rq)
 		pci_unmap_page(h->pdev, temp64.val, cmd->SG[i].Len, ddir);
 	}
 
-	complete_buffers(rq->bio, rq->errors);
+	complete_buffers(rq->bio, (rq->errors == 0));
 
 	if (blk_fs_request(rq)) {
 		const int rw = rq_data_dir(rq);
@@ -1408,7 +1276,7 @@ static void cciss_softirq_done(struct request *rq)
 
 	add_disk_randomness(rq->rq_disk);
 	spin_lock_irqsave(&h->lock, flags);
-	end_that_request_last(rq, rq->errors);
+	end_that_request_last(rq, (rq->errors == 0));
 	cmd_free(h, cmd, 1);
 	cciss_check_queues(h);
 	spin_unlock_irqrestore(&h->lock, flags);
@@ -2496,6 +2364,44 @@ static inline void resend_cciss_cmd(ctlr_info_t *h, CommandList_struct *c)
 	start_io(h);
 }
 
+static inline int evaluate_target_status(CommandList_struct *cmd)
+{
+	unsigned char sense_key;
+	int error_count = 1;
+
+	if (cmd->err_info->ScsiStatus != 0x02) { /* not check condition? */
+		if (!blk_pc_request(cmd->rq))
+			printk(KERN_WARNING "cciss: cmd %p "
+			       "has SCSI Status 0x%x\n",
+			       cmd, cmd->err_info->ScsiStatus);
+		return error_count;
+	}
+
+	/* check the sense key */
+	sense_key = 0xf & cmd->err_info->SenseInfo[2];
+	/* no status or recovered error */
+	if ((sense_key == 0x0) || (sense_key == 0x1))
+		error_count = 0;
+
+	if (!blk_pc_request(cmd->rq)) { /* Not SG_IO or similar? */
+		if (error_count != 0)
+			printk(KERN_WARNING "cciss: cmd %p has CHECK CONDITION"
+			       " sense key = 0x%x\n", cmd, sense_key);
+		return error_count;
+	}
+
+	/* SG_IO or similar, copy sense data back */
+	if (cmd->rq->sense) {
+		if (cmd->rq->sense_len > cmd->err_info->SenseLen)
+			cmd->rq->sense_len = cmd->err_info->SenseLen;
+		memcpy(cmd->rq->sense, cmd->err_info->SenseInfo,
+			cmd->rq->sense_len);
+	} else
+		cmd->rq->sense_len = 0;
+
+	return error_count;
+}
+
 /* checks the status of the job and calls complete buffers to mark all
  * buffers for the completed job. Note that this function does not need
  * to hold the hba/queue lock.
@@ -2503,109 +2409,99 @@ static inline void resend_cciss_cmd(ctlr_info_t *h, CommandList_struct *c)
 static inline void complete_command(ctlr_info_t *h, CommandList_struct *cmd,
 				    int timeout)
 {
-	int status = 1;
 	int retry_cmd = 0;
+	struct request *rq = cmd->rq;
+
+	rq->errors = 0;
 
 	if (timeout)
-		status = 0;
+		rq->errors = 1;
 
-	if (cmd->err_info->CommandStatus != 0) {	/* an error has occurred */
-		switch (cmd->err_info->CommandStatus) {
-			unsigned char sense_key;
-		case CMD_TARGET_STATUS:
-			status = 0;
+	if (cmd->err_info->CommandStatus == 0)	/* no error has occurred */
+		goto after_error_processing;
 
-			if (cmd->err_info->ScsiStatus == 0x02) {
-				printk(KERN_WARNING "cciss: cmd %p "
-				       "has CHECK CONDITION "
-				       " byte 2 = 0x%x\n", cmd,
-				       cmd->err_info->SenseInfo[2]
-				    );
-				/* check the sense key */
-				sense_key = 0xf & cmd->err_info->SenseInfo[2];
-				/* no status or recovered error */
-				if ((sense_key == 0x0) || (sense_key == 0x1)) {
-					status = 1;
-				}
-			} else {
-				printk(KERN_WARNING "cciss: cmd %p "
-				       "has SCSI Status 0x%x\n",
-				       cmd, cmd->err_info->ScsiStatus);
-			}
-			break;
-		case CMD_DATA_UNDERRUN:
+	switch (cmd->err_info->CommandStatus) {
+	case CMD_TARGET_STATUS:
+		rq->errors = evaluate_target_status(cmd);
+		break;
+	case CMD_DATA_UNDERRUN:
+		if (blk_fs_request(cmd->rq)) {
 			printk(KERN_WARNING "cciss: cmd %p has"
 			       " completed with data underrun "
 			       "reported\n", cmd);
-			break;
-		case CMD_DATA_OVERRUN:
+			cmd->rq->data_len = cmd->err_info->ResidualCnt;
+		}
+		break;
+	case CMD_DATA_OVERRUN:
+		if (blk_fs_request(cmd->rq))
 			printk(KERN_WARNING "cciss: cmd %p has"
 			       " completed with data overrun "
 			       "reported\n", cmd);
-			break;
-		case CMD_INVALID:
-			printk(KERN_WARNING "cciss: cmd %p is "
-			       "reported invalid\n", cmd);
-			status = 0;
-			break;
-		case CMD_PROTOCOL_ERR:
-			printk(KERN_WARNING "cciss: cmd %p has "
-			       "protocol error \n", cmd);
-			status = 0;
-			break;
-		case CMD_HARDWARE_ERR:
-			printk(KERN_WARNING "cciss: cmd %p had "
-			       " hardware error\n", cmd);
-			status = 0;
-			break;
-		case CMD_CONNECTION_LOST:
-			printk(KERN_WARNING "cciss: cmd %p had "
-			       "connection lost\n", cmd);
-			status = 0;
-			break;
-		case CMD_ABORTED:
-			printk(KERN_WARNING "cciss: cmd %p was "
-			       "aborted\n", cmd);
-			status = 0;
-			break;
-		case CMD_ABORT_FAILED:
-			printk(KERN_WARNING "cciss: cmd %p reports "
-			       "abort failed\n", cmd);
-			status = 0;
-			break;
-		case CMD_UNSOLICITED_ABORT:
-			printk(KERN_WARNING "cciss%d: unsolicited "
-			       "abort %p\n", h->ctlr, cmd);
-			if (cmd->retry_count < MAX_CMD_RETRIES) {
-				retry_cmd = 1;
-				printk(KERN_WARNING
-				       "cciss%d: retrying %p\n", h->ctlr, cmd);
-				cmd->retry_count++;
-			} else
-				printk(KERN_WARNING
-				       "cciss%d: %p retried too "
-				       "many times\n", h->ctlr, cmd);
-			status = 0;
-			break;
-		case CMD_TIMEOUT:
-			printk(KERN_WARNING "cciss: cmd %p timedout\n", cmd);
-			status = 0;
-			break;
-		default:
-			printk(KERN_WARNING "cciss: cmd %p returned "
-			       "unknown status %x\n", cmd,
-			       cmd->err_info->CommandStatus);
-			status = 0;
-		}
+		break;
+	case CMD_INVALID:
+		printk(KERN_WARNING "cciss: cmd %p is "
+		       "reported invalid\n", cmd);
+		rq->errors = 1;
+		break;
+	case CMD_PROTOCOL_ERR:
+		printk(KERN_WARNING "cciss: cmd %p has "
+		       "protocol error \n", cmd);
+		rq->errors = 1;
+		break;
+	case CMD_HARDWARE_ERR:
+		printk(KERN_WARNING "cciss: cmd %p had "
+		       " hardware error\n", cmd);
+		rq->errors = 1;
+		break;
+	case CMD_CONNECTION_LOST:
+		printk(KERN_WARNING "cciss: cmd %p had "
+		       "connection lost\n", cmd);
+		rq->errors = 1;
+		break;
+	case CMD_ABORTED:
+		printk(KERN_WARNING "cciss: cmd %p was "
+		       "aborted\n", cmd);
+		rq->errors = 1;
+		break;
+	case CMD_ABORT_FAILED:
+		printk(KERN_WARNING "cciss: cmd %p reports "
+		       "abort failed\n", cmd);
+		rq->errors = 1;
+		break;
+	case CMD_UNSOLICITED_ABORT:
+		printk(KERN_WARNING "cciss%d: unsolicited "
+		       "abort %p\n", h->ctlr, cmd);
+		if (cmd->retry_count < MAX_CMD_RETRIES) {
+			retry_cmd = 1;
+			printk(KERN_WARNING
+			       "cciss%d: retrying %p\n", h->ctlr, cmd);
+			cmd->retry_count++;
+		} else
+			printk(KERN_WARNING
+			       "cciss%d: %p retried too "
+			       "many times\n", h->ctlr, cmd);
+		rq->errors = 1;
+		break;
+	case CMD_TIMEOUT:
+		printk(KERN_WARNING "cciss: cmd %p timedout\n", cmd);
+		rq->errors = 1;
+		break;
+	default:
+		printk(KERN_WARNING "cciss: cmd %p returned "
+		       "unknown status %x\n", cmd,
+		       cmd->err_info->CommandStatus);
+		rq->errors = 1;
 	}
+
+after_error_processing:
+
 	/* We need to return this command */
 	if (retry_cmd) {
 		resend_cciss_cmd(h, cmd);
 		return;
 	}
-
+	cmd->rq->data_len = 0;
 	cmd->rq->completion_data = cmd;
-	cmd->rq->errors = status;
 	blk_add_trace_rq(cmd->rq->q, cmd->rq, BLK_TA_COMPLETE);
 	blk_complete_request(cmd->rq);
 }
@@ -2699,32 +2595,40 @@ static void do_cciss_request(request_queue_t *q)
 #endif				/* CCISS_DEBUG */
 
 	c->Header.SGList = c->Header.SGTotal = seg;
-	if(h->cciss_read == CCISS_READ_10) {
-		c->Request.CDB[1] = 0;
-		c->Request.CDB[2] = (start_blk >> 24) & 0xff;	//MSB
-		c->Request.CDB[3] = (start_blk >> 16) & 0xff;
-		c->Request.CDB[4] = (start_blk >> 8) & 0xff;
-		c->Request.CDB[5] = start_blk & 0xff;
-		c->Request.CDB[6] = 0;	// (sect >> 24) & 0xff; MSB
-		c->Request.CDB[7] = (creq->nr_sectors >> 8) & 0xff;
-		c->Request.CDB[8] = creq->nr_sectors & 0xff;
-		c->Request.CDB[9] = c->Request.CDB[11] = c->Request.CDB[12] = 0;
+	if (likely(blk_fs_request(creq))) {
+		if(h->cciss_read == CCISS_READ_10) {
+			c->Request.CDB[1] = 0;
+			c->Request.CDB[2] = (start_blk >> 24) & 0xff;	//MSB
+			c->Request.CDB[3] = (start_blk >> 16) & 0xff;
+			c->Request.CDB[4] = (start_blk >> 8) & 0xff;
+			c->Request.CDB[5] = start_blk & 0xff;
+			c->Request.CDB[6] = 0;	// (sect >> 24) & 0xff; MSB
+			c->Request.CDB[7] = (creq->nr_sectors >> 8) & 0xff;
+			c->Request.CDB[8] = creq->nr_sectors & 0xff;
+			c->Request.CDB[9] = c->Request.CDB[11] = c->Request.CDB[12] = 0;
+		} else {
+			c->Request.CDBLen = 16;
+			c->Request.CDB[1]= 0;
+			c->Request.CDB[2]= (start_blk >> 56) & 0xff;	//MSB
+			c->Request.CDB[3]= (start_blk >> 48) & 0xff;
+			c->Request.CDB[4]= (start_blk >> 40) & 0xff;
+			c->Request.CDB[5]= (start_blk >> 32) & 0xff;
+			c->Request.CDB[6]= (start_blk >> 24) & 0xff;
+			c->Request.CDB[7]= (start_blk >> 16) & 0xff;
+			c->Request.CDB[8]= (start_blk >>  8) & 0xff;
+			c->Request.CDB[9]= start_blk & 0xff;
+			c->Request.CDB[10]= (creq->nr_sectors >>  24) & 0xff;
+			c->Request.CDB[11]= (creq->nr_sectors >>  16) & 0xff;
+			c->Request.CDB[12]= (creq->nr_sectors >>  8) & 0xff;
+			c->Request.CDB[13]= creq->nr_sectors & 0xff;
+			c->Request.CDB[14] = c->Request.CDB[15] = 0;
+		}
+	} else if (blk_pc_request(creq)) {
+		c->Request.CDBLen = creq->cmd_len;
+		memcpy(c->Request.CDB, creq->cmd, BLK_MAX_CDB);
 	} else {
-		c->Request.CDBLen = 16;
-		c->Request.CDB[1]= 0;
-		c->Request.CDB[2]= (start_blk >> 56) & 0xff;	//MSB
-		c->Request.CDB[3]= (start_blk >> 48) & 0xff;
-		c->Request.CDB[4]= (start_blk >> 40) & 0xff;
-		c->Request.CDB[5]= (start_blk >> 32) & 0xff;
-		c->Request.CDB[6]= (start_blk >> 24) & 0xff;
-		c->Request.CDB[7]= (start_blk >> 16) & 0xff;
-		c->Request.CDB[8]= (start_blk >>  8) & 0xff;
-		c->Request.CDB[9]= start_blk & 0xff;
-		c->Request.CDB[10]= (creq->nr_sectors >>  24) & 0xff;
-		c->Request.CDB[11]= (creq->nr_sectors >>  16) & 0xff;
-		c->Request.CDB[12]= (creq->nr_sectors >>  8) & 0xff;
-		c->Request.CDB[13]= creq->nr_sectors & 0xff;
-		c->Request.CDB[14] = c->Request.CDB[15] = 0;
+		printk(KERN_WARNING "cciss%d: bad request type %d\n", h->ctlr, creq->cmd_type);
+		BUG();
 	}
 
 	spin_lock_irq(q->queue_lock);
@@ -3565,12 +3469,38 @@ static int __devinit cciss_init_one(struct pci_dev *pdev,
 	return -1;
 }
 
-static void cciss_remove_one(struct pci_dev *pdev)
+static void cciss_shutdown(struct pci_dev *pdev)
+{
+	ctlr_info_t *tmp_ptr;
+	int i;
+	char flush_buf[4];
+	int return_code;
+
+	tmp_ptr = pci_get_drvdata(pdev);
+	if (tmp_ptr == NULL)
+		return;
+	i = tmp_ptr->ctlr;
+	if (hba[i] == NULL)
+		return;
+
+	/* Turn board interrupts off  and send the flush cache command */
+	/* sendcmd will turn off interrupt, and send the flush...
+	 * To write all data in the battery backed cache to disks */
+	memset(flush_buf, 0, 4);
+	return_code = sendcmd(CCISS_CACHE_FLUSH, i, flush_buf, 4, 0, 0, 0, NULL,
+			      TYPE_CMD);
+	if (return_code == IO_OK) {
+		printk(KERN_INFO "Completed flushing cache on controller %d\n", i);
+	} else {
+		printk(KERN_WARNING "Error flushing cache on controller %d\n", i);
+	}
+	free_irq(hba[i]->intr[2], hba[i]);
+}
+
+static void __devexit cciss_remove_one(struct pci_dev *pdev)
 {
 	ctlr_info_t *tmp_ptr;
 	int i, j;
-	char flush_buf[4];
-	int return_code;
 
 	if (pci_get_drvdata(pdev) == NULL) {
 		printk(KERN_ERR "cciss: Unable to remove device \n");
@@ -3602,18 +3532,7 @@ static void cciss_remove_one(struct pci_dev *pdev)
 
 	cciss_unregister_scsi(i);	/* unhook from SCSI subsystem */
 
-	/* Turn board interrupts off  and send the flush cache command */
-	/* sendcmd will turn off interrupt, and send the flush...
-	 * To write all data in the battery backed cache to disks */
-	memset(flush_buf, 0, 4);
-	return_code = sendcmd(CCISS_CACHE_FLUSH, i, flush_buf, 4, 0, 0, 0, NULL,
-			      TYPE_CMD);
-	if (return_code == IO_OK) {
-		printk(KERN_INFO "Completed flushing cache on controller %d\n", i);
-	} else {
-		printk(KERN_WARNING "Error flushing cache on controller %d\n", i);
-	}
-	free_irq(hba[i]->intr[2], hba[i]);
+	cciss_shutdown(pdev);
 
 #ifdef CONFIG_PCI_MSI
 	if (hba[i]->msix_vector)
@@ -3646,7 +3565,7 @@ static struct pci_driver cciss_pci_driver = {
 	.probe = cciss_init_one,
 	.remove = __devexit_p(cciss_remove_one),
 	.id_table = cciss_pci_device_id,	/* id_table */
-	.shutdown = cciss_remove_one,
+	.shutdown = cciss_shutdown,
 };
 
 /*

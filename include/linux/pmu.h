@@ -168,24 +168,16 @@ extern int pmu_get_model(void);
 
 struct pmu_sleep_notifier
 {
-	int (*notifier_call)(struct pmu_sleep_notifier *self, int when);
+	void (*notifier_call)(struct pmu_sleep_notifier *self, int when);
 	int priority;
 	struct list_head list;
 };
 
 /* Code values for calling sleep/wakeup handlers
- *
- * Note: If a sleep request got cancelled, all drivers will get
- * the PBOOK_SLEEP_REJECT, even those who didn't get the PBOOK_SLEEP_REQUEST.
  */
 #define PBOOK_SLEEP_REQUEST	1
 #define PBOOK_SLEEP_NOW		2
-#define PBOOK_SLEEP_REJECT	3
-#define PBOOK_WAKE		4
-
-/* Result codes returned by the notifiers */
-#define PBOOK_SLEEP_OK		0
-#define PBOOK_SLEEP_REFUSE	-1
+#define PBOOK_WAKE		3
 
 /* priority levels in notifiers */
 #define SLEEP_LEVEL_VIDEO	100	/* Video driver (first wake) */
@@ -232,5 +224,13 @@ extern unsigned int pmu_power_flags;
 
 /* Backlight */
 extern void pmu_backlight_init(void);
+
+/* some code needs to know if the PMU was suspended for hibernation */
+#if defined(CONFIG_PM) && defined(CONFIG_PPC32)
+extern int pmu_sys_suspended;
+#else
+/* if power management is not configured it can't be suspended */
+#define pmu_sys_suspended	0
+#endif
 
 #endif	/* __KERNEL__ */

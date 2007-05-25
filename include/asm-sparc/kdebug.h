@@ -58,6 +58,10 @@ static inline void sp_enter_debugger(void)
 	       sp_enter_debugger(); \
 		       } while(0)
 
+enum die_val {
+	DIE_UNUSED,
+};
+
 #endif /* !(__ASSEMBLY__) */
 
 /* Some nice offset defines for assembler code. */

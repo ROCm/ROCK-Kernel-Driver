@@ -85,8 +85,10 @@ unsigned long __init mmu_mapin_ram(void)
 	unsigned long max_size = (256<<20);
 	unsigned long align;
 
-	if (__map_without_bats)
+	if (__map_without_bats) {
+		printk(KERN_DEBUG "RAM mapped without BATs\n");
 		return 0;
+	}
 
 	/* Set up BAT2 and if necessary BAT3 to cover RAM. */
 
@@ -183,7 +185,7 @@ void hash_preload(struct mm_struct *mm, unsigned long ea,
 
 	if (Hash == 0)
 		return;
-	pmd = pmd_offset(pgd_offset(mm, ea), ea);
+	pmd = pmd_offset(pud_offset(pgd_offset(mm, ea), ea), ea);
 	if (!pmd_none(*pmd))
 		add_hash_page(mm->context.id, ea, pmd_val(*pmd));
 }

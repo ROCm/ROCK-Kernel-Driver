@@ -40,7 +40,6 @@
 #include <linux/err.h>
 #include <linux/idr.h>
 #include <linux/interrupt.h>
-#include <linux/pci.h>
 #include <linux/random.h>
 #include <linux/rbtree.h>
 #include <linux/spinlock.h>
@@ -307,7 +306,9 @@ static int cm_alloc_id(struct cm_id_private *cm_id_priv)
 	do {
 		spin_lock_irqsave(&cm.lock, flags);
 		ret = idr_get_new_above(&cm.local_id_table, cm_id_priv,
-					next_id++, &id);
+					next_id, &id);
+		if (!ret)
+			next_id = ((unsigned) id + 1) & MAX_ID_MASK;
 		spin_unlock_irqrestore(&cm.lock, flags);
 	} while( (ret == -EAGAIN) && idr_pre_get(&cm.local_id_table, GFP_KERNEL) );
 

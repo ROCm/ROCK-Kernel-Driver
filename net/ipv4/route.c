@@ -82,7 +82,6 @@
 #include <linux/proc_fs.h>
 #include <linux/init.h>
 #include <linux/skbuff.h>
-#include <linux/rtnetlink.h>
 #include <linux/inetdevice.h>
 #include <linux/igmp.h>
 #include <linux/pkt_sched.h>
@@ -104,6 +103,7 @@
 #include <net/xfrm.h>
 #include <net/ip_mp_alg.h>
 #include <net/netevent.h>
+#include <net/rtnetlink.h>
 #ifdef CONFIG_SYSCTL
 #include <linux/sysctl.h>
 #endif
@@ -364,7 +364,7 @@ static int rt_cache_seq_show(struct seq_file *seq, void *v)
 	return 0;
 }
 
-static struct seq_operations rt_cache_seq_ops = {
+static const struct seq_operations rt_cache_seq_ops = {
 	.start  = rt_cache_seq_start,
 	.next   = rt_cache_seq_next,
 	.stop   = rt_cache_seq_stop,
@@ -470,7 +470,7 @@ static int rt_cpu_seq_show(struct seq_file *seq, void *v)
 	return 0;
 }
 
-static struct seq_operations rt_cpu_seq_ops = {
+static const struct seq_operations rt_cpu_seq_ops = {
 	.start  = rt_cpu_seq_start,
 	.next   = rt_cpu_seq_next,
 	.stop   = rt_cpu_seq_stop,
@@ -1519,7 +1519,7 @@ static void ipv4_link_failure(struct sk_buff *skb)
 static int ip_rt_bug(struct sk_buff *skb)
 {
 	printk(KERN_DEBUG "ip_rt_bug: %u.%u.%u.%u -> %u.%u.%u.%u, %s\n",
-		NIPQUAD(skb->nh.iph->saddr), NIPQUAD(skb->nh.iph->daddr),
+		NIPQUAD(ip_hdr(skb)->saddr), NIPQUAD(ip_hdr(skb)->daddr),
 		skb->dev ? skb->dev->name : "?");
 	kfree_skb(skb);
 	return 0;
@@ -1698,9 +1698,9 @@ static void ip_handle_martian_source(struct net_device *dev,
 		printk(KERN_WARNING "martian source %u.%u.%u.%u from "
 			"%u.%u.%u.%u, on dev %s\n",
 			NIPQUAD(daddr), NIPQUAD(saddr), dev->name);
-		if (dev->hard_header_len && skb->mac.raw) {
+		if (dev->hard_header_len && skb_mac_header_was_set(skb)) {
 			int i;
-			unsigned char *p = skb->mac.raw;
+			const unsigned char *p = skb_mac_header(skb);
 			printk(KERN_WARNING "ll header: ");
 			for (i = 0; i < dev->hard_header_len; i++, p++) {
 				printk("%02x", *p);
@@ -2134,7 +2134,7 @@ int ip_route_input(struct sk_buff *skb, __be32 daddr, __be32 saddr,
 		rcu_read_lock();
 		if ((in_dev = __in_dev_get_rcu(dev)) != NULL) {
 			int our = ip_check_mc(in_dev, daddr, saddr,
-				skb->nh.iph->protocol);
+				ip_hdr(skb)->protocol);
 			if (our
 #ifdef CONFIG_IP_MROUTE
 			    || (!LOCAL_MCAST(daddr) && IN_DEV_MFORWARD(in_dev))
@@ -2598,6 +2598,69 @@ int __ip_route_output_key(struct rtable **rp, const struct flowi *flp)
 
 EXPORT_SYMBOL_GPL(__ip_route_output_key);
 
+static void ipv4_rt_blackhole_update_pmtu(struct dst_entry *dst, u32 mtu)
+{
+}
+
+static struct dst_ops ipv4_dst_blackhole_ops = {
+	.family			=	AF_INET,
+	.protocol		=	__constant_htons(ETH_P_IP),
+	.destroy		=	ipv4_dst_destroy,
+	.check			=	ipv4_dst_check,
+	.update_pmtu		=	ipv4_rt_blackhole_update_pmtu,
+	.entry_size		=	sizeof(struct rtable),
+};
+
+
+static int ipv4_blackhole_output(struct sk_buff *skb)
+{
+	kfree_skb(skb);
+	return 0;
+}
+
+static int ipv4_dst_blackhole(struct rtable **rp, struct flowi *flp, struct sock *sk)
+{
+	struct rtable *ort = *rp;
+	struct rtable *rt = (struct rtable *)
+		dst_alloc(&ipv4_dst_blackhole_ops);
+
+	if (rt) {
+		struct dst_entry *new = &rt->u.dst;
+
+		atomic_set(&new->__refcnt, 1);
+		new->__use = 1;
+		new->input = ipv4_blackhole_output;
+		new->output = ipv4_blackhole_output;
+		memcpy(new->metrics, ort->u.dst.metrics, RTAX_MAX*sizeof(u32));
+
+		new->dev = ort->u.dst.dev;
+		if (new->dev)
+			dev_hold(new->dev);
+
+		rt->fl = ort->fl;
+
+		rt->idev = ort->idev;
+		if (rt->idev)
+			in_dev_hold(rt->idev);
+		rt->rt_flags = ort->rt_flags;
+		rt->rt_type = ort->rt_type;
+		rt->rt_dst = ort->rt_dst;
+		rt->rt_src = ort->rt_src;
+		rt->rt_iif = ort->rt_iif;
+		rt->rt_gateway = ort->rt_gateway;
+		rt->rt_spec_dst = ort->rt_spec_dst;
+		rt->peer = ort->peer;
+		if (rt->peer)
+			atomic_inc(&rt->peer->refcnt);
+
+		dst_free(new);
+	}
+
+	dst_release(&(*rp)->u.dst);
+	*rp = rt;
+	return (rt ? 0 : -ENOMEM);
+}
+
 int ip_route_output_flow(struct rtable **rp, struct flowi *flp, struct sock *sk, int flags)
 {
 	int err;
@@ -2610,7 +2673,11 @@ int ip_route_output_flow(struct rtable **rp, struct flowi *flp, struct sock *sk,
 			flp->fl4_src = (*rp)->rt_src;
 		if (!flp->fl4_dst)
 			flp->fl4_dst = (*rp)->rt_dst;
-		return xfrm_lookup((struct dst_entry **)rp, flp, sk, flags);
+		err = __xfrm_lookup((struct dst_entry **)rp, flp, sk, flags);
+		if (err == -EREMOTE)
+			err = ipv4_dst_blackhole(rp, flp, sk);
+
+		return err;
 	}
 
 	return 0;
@@ -2683,7 +2750,7 @@ static int rt_fill_info(struct sk_buff *skb, u32 pid, u32 seq, int event,
 		id = rt->peer->ip_id_count;
 		if (rt->peer->tcp_ts_stamp) {
 			ts = rt->peer->tcp_ts;
-			tsage = xtime.tv_sec - rt->peer->tcp_ts_stamp;
+			tsage = get_seconds() - rt->peer->tcp_ts_stamp;
 		}
 	}
 
@@ -2721,7 +2788,7 @@ nla_put_failure:
 	return -EMSGSIZE;
 }
 
-int inet_rtm_getroute(struct sk_buff *in_skb, struct nlmsghdr* nlh, void *arg)
+static int inet_rtm_getroute(struct sk_buff *in_skb, struct nlmsghdr* nlh, void *arg)
 {
 	struct rtmsg *rtm;
 	struct nlattr *tb[RTA_MAX+1];
@@ -2747,10 +2814,11 @@ int inet_rtm_getroute(struct sk_buff *in_skb, struct nlmsghdr* nlh, void *arg)
 	/* Reserve room for dummy headers, this skb can pass
 	   through good chunk of routing engine.
 	 */
-	skb->mac.raw = skb->nh.raw = skb->data;
+	skb_reset_mac_header(skb);
+	skb_reset_network_header(skb);
 
 	/* Bugfix: need to give ip_route_input enough of an IP header to not gag. */
-	skb->nh.iph->protocol = IPPROTO_ICMP;
+	ip_hdr(skb)->protocol = IPPROTO_ICMP;
 	skb_reserve(skb, MAX_HEADER + sizeof(struct iphdr));
 
 	src = tb[RTA_SRC] ? nla_get_be32(tb[RTA_SRC]) : 0;
@@ -3138,6 +3206,8 @@ int __init ip_rt_init(void)
 		kmem_cache_create("ip_dst_cache", sizeof(struct rtable), 0,
 				  SLAB_HWCACHE_ALIGN|SLAB_PANIC, NULL, NULL);
 
+	ipv4_dst_blackhole_ops.kmem_cachep = ipv4_dst_ops.kmem_cachep;
+
 	rt_hash_table = (struct rt_hash_bucket *)
 		alloc_large_system_hash("IP route cache",
 					sizeof(struct rt_hash_bucket),
@@ -3193,6 +3263,8 @@ int __init ip_rt_init(void)
 	xfrm_init();
 	xfrm4_init();
 #endif
+	rtnl_register(PF_INET, RTM_GETROUTE, inet_rtm_getroute, NULL);
+
 	return rc;
 }
 

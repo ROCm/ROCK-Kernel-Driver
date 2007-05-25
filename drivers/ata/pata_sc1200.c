@@ -40,7 +40,7 @@
 #include <linux/libata.h>
 
 #define DRV_NAME	"sc1200"
-#define DRV_VERSION	"0.2.4"
+#define DRV_VERSION	"0.2.5"
 
 #define SC1200_REV_A	0x00
 #define SC1200_REV_B1	0x01
@@ -194,10 +194,6 @@ static struct scsi_host_template sc1200_sht = {
 	.slave_configure	= ata_scsi_slave_config,
 	.slave_destroy		= ata_scsi_slave_destroy,
 	.bios_param		= ata_std_bios_param,
-#ifdef CONFIG_PM
-	.resume			= ata_scsi_device_resume,
-	.suspend		= ata_scsi_device_suspend,
-#endif
 };
 
 static struct ata_port_operations sc1200_port_ops = {
@@ -216,6 +212,7 @@ static struct ata_port_operations sc1200_port_ops = {
 	.thaw		= ata_bmdma_thaw,
 	.error_handler	= ata_bmdma_error_handler,
 	.post_internal_cmd = ata_bmdma_post_internal_cmd,
+	.cable_detect	= ata_cable_40wire,
 
 	.bmdma_setup 	= ata_bmdma_setup,
 	.bmdma_start 	= ata_bmdma_start,
@@ -246,7 +243,7 @@ static struct ata_port_operations sc1200_port_ops = {
 
 static int sc1200_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	static struct ata_port_info info = {
+	static const struct ata_port_info info = {
 		.sht = &sc1200_sht,
 		.flags = ATA_FLAG_SLAVE_POSS|ATA_FLAG_SRST,
 		.pio_mask = 0x1f,
@@ -254,10 +251,10 @@ static int sc1200_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 		.udma_mask = 0x07,
 		.port_ops = &sc1200_port_ops
 	};
-	static struct ata_port_info *port_info[2] = { &info, &info };
-
 	/* Can't enable port 2 yet, see top comments */
-	return ata_pci_init_one(dev, port_info, 1);
+	const struct ata_port_info *ppi[] = { &info, &ata_dummy_port_info };
+
+	return ata_pci_init_one(dev, ppi);
 }
 
 static const struct pci_device_id sc1200[] = {

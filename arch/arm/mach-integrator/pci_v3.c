@@ -22,7 +22,6 @@
  */
 #include <linux/kernel.h>
 #include <linux/pci.h>
-#include <linux/ptrace.h>
 #include <linux/slab.h>
 #include <linux/ioport.h>
 #include <linux/interrupt.h>
@@ -34,6 +33,7 @@
 #include <asm/irq.h>
 #include <asm/system.h>
 #include <asm/mach/pci.h>
+#include <asm/irq_regs.h>
 
 #include <asm/hardware/pci_v3.h>
 

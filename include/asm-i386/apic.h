@@ -2,9 +2,8 @@
 #define __ASM_APIC_H
 
 #include <linux/pm.h>
-#ifndef CONFIG_XEN
+#include <linux/delay.h>
 #include <asm/fixmap.h>
-#endif
 #include <asm/apicdef.h>
 #include <asm/processor.h>
 #include <asm/system.h>
@@ -34,7 +33,7 @@ extern int apic_verbosity;
 
 extern void generic_apic_probe(void);
 
-#if defined(CONFIG_X86_LOCAL_APIC) && !defined(CONFIG_XEN)
+#ifdef CONFIG_X86_LOCAL_APIC
 
 /*
  * Basic functions accessing APICs.
@@ -66,12 +65,8 @@ static __inline fastcall unsigned long native_apic_read(unsigned long reg)
 	return *((volatile unsigned long *)(APIC_BASE+reg));
 }
 
-static __inline__ void apic_wait_icr_idle(void)
-{
-	while ( apic_read( APIC_ICR ) & APIC_ICR_BUSY )
-		cpu_relax();
-}
-
+void apic_wait_icr_idle(void);
+unsigned long safe_apic_wait_icr_idle(void);
 int get_physical_broadcast(void);
 
 #ifdef CONFIG_X86_GOOD_APIC
@@ -121,13 +116,8 @@ extern void enable_NMI_through_LVT0 (void * dummy);
 extern int timer_over_8254;
 extern int local_apic_timer_c2_ok;
 
-#else /* !CONFIG_X86_LOCAL_APIC || CONFIG_XEN */
-
+#else /* !CONFIG_X86_LOCAL_APIC */
 static inline void lapic_shutdown(void) { }
-
-#ifdef CONFIG_X86_LOCAL_APIC
-extern int APIC_init_uniprocessor (void);
-#endif
 
 #endif /* !CONFIG_X86_LOCAL_APIC */
 

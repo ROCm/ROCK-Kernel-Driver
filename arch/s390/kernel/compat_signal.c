@@ -14,7 +14,6 @@
 #include <linux/sched.h>
 #include <linux/mm.h>
 #include <linux/smp.h>
-#include <linux/smp_lock.h>
 #include <linux/kernel.h>
 #include <linux/signal.h>
 #include <linux/errno.h>
@@ -255,9 +254,9 @@ sys32_rt_sigaction(int sig, const struct sigaction32 __user *act,
 }
 
 asmlinkage long
-sys32_sigaltstack(const stack_t32 __user *uss, stack_t32 __user *uoss,
-							struct pt_regs *regs)
+sys32_sigaltstack(const stack_t32 __user *uss, stack_t32 __user *uoss)
 {
+	struct pt_regs *regs = task_pt_regs(current);
 	stack_t kss, koss;
 	unsigned long ss_sp;
 	int ret, err = 0;
@@ -344,8 +343,9 @@ static int restore_sigregs32(struct pt_regs *regs,_sigregs32 __user *sregs)
 	return 0;
 }
 
-asmlinkage long sys32_sigreturn(struct pt_regs *regs)
+asmlinkage long sys32_sigreturn(void)
 {
+	struct pt_regs *regs = task_pt_regs(current);
 	sigframe32 __user *frame = (sigframe32 __user *)regs->gprs[15];
 	sigset_t set;
 
@@ -370,8 +370,9 @@ badframe:
 	return 0;
 }
 
-asmlinkage long sys32_rt_sigreturn(struct pt_regs *regs)
+asmlinkage long sys32_rt_sigreturn(void)
 {
+	struct pt_regs *regs = task_pt_regs(current);
 	rt_sigframe32 __user *frame = (rt_sigframe32 __user *)regs->gprs[15];
 	sigset_t set;
 	stack_t st;
@@ -407,8 +408,8 @@ asmlinkage long sys32_rt_sigreturn(struct pt_regs *regs)
 	return regs->gprs[2];
 
 badframe:
-        force_sig(SIGSEGV, current);
-        return 0;
+	force_sig(SIGSEGV, current);
+	return 0;
 }	
 
 /*

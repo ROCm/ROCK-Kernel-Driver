@@ -17,7 +17,7 @@
 #include <linux/buffer_head.h>
 #include <linux/mutex.h>
 
-struct subsystem block_subsys;
+struct kset block_subsys;
 static DEFINE_MUTEX(block_subsys_lock);
 
 /*
@@ -213,6 +213,59 @@ struct gendisk *get_gendisk(dev_t dev, int *part)
 	return  kobj ? to_disk(kobj) : NULL;
 }
 
+/*
+ * print a full list of all partitions - intended for places where the root
+ * filesystem can't be mounted and thus to give the victim some idea of what
+ * went wrong
+ */
+void __init printk_all_partitions(void)
+{
+	int n;
+	struct gendisk *sgp;
+
+	mutex_lock(&block_subsys_lock);
+	/* For each block device... */
+	list_for_each_entry(sgp, &block_subsys.list, kobj.entry) {
+		char buf[BDEVNAME_SIZE];
+		/*
+		 * Don't show empty devices or things that have been surpressed
+		 */
+		if (get_capacity(sgp) == 0 ||
+		    (sgp->flags & GENHD_FL_SUPPRESS_PARTITION_INFO))
+			continue;
+
+		/*
+		 * Note, unlike /proc/partitions, I am showing the numbers in
+		 * hex - the same format as the root= option takes.
+		 */
+		printk("%02x%02x %10llu %s",
+			sgp->major, sgp->first_minor,
+			(unsigned long long)get_capacity(sgp) >> 1,
+			disk_name(sgp, 0, buf));
+		if (sgp->driverfs_dev != NULL &&
+		    sgp->driverfs_dev->driver != NULL)
+			printk(" driver: %s\n",
+				sgp->driverfs_dev->driver->name);
+		else
+			printk(" (driver?)\n");
+
+		/* now show the partitions */
+		for (n = 0; n < sgp->minors - 1; ++n) {
+			if (sgp->part[n] == NULL)
+				continue;
+			if (sgp->part[n]->nr_sects == 0)
+				continue;
+			printk("  %02x%02x %10llu %s\n",
+				sgp->major, n + 1 + sgp->first_minor,
+				(unsigned long long)sgp->part[n]->nr_sects >> 1,
+				disk_name(sgp, n + 1, buf));
+		} /* partition subloop */
+	} /* Block device loop */
+
+	mutex_unlock(&block_subsys_lock);
+	return;
+}
+
 #ifdef CONFIG_PROC_FS
 /* iterator */
 static void *part_start(struct seq_file *part, loff_t *pos)
@@ -221,7 +274,7 @@ static void *part_start(struct seq_file *part, loff_t *pos)
 	loff_t l = *pos;
 
 	mutex_lock(&block_subsys_lock);
-	list_for_each(p, &block_subsys.kset.list)
+	list_for_each(p, &block_subsys.list)
 		if (!l--)
 			return list_entry(p, struct gendisk, kobj.entry);
 	return NULL;
@@ -231,7 +284,7 @@ static void *part_next(struct seq_file *part, void *v, loff_t *pos)
 {
 	struct list_head *p = ((struct gendisk *)v)->kobj.entry.next;
 	++*pos;
-	return p==&block_subsys.kset.list ? NULL : 
+	return p==&block_subsys.list ? NULL :
 		list_entry(p, struct gendisk, kobj.entry);
 }
 
@@ -246,7 +299,7 @@ static int show_partition(struct seq_file *part, void *v)
 	int n;
 	char buf[BDEVNAME_SIZE];
 
-	if (&sgp->kobj.entry == block_subsys.kset.list.next)
+	if (&sgp->kobj.entry == block_subsys.list.next)
 		seq_puts(part, "major minor  #blocks  name\n\n");
 
 	/* Don't show non-partitionable removeable devices or empty devices */
@@ -370,7 +423,10 @@ static ssize_t disk_size_read(struct gendisk * disk, char *page)
 {
 	return sprintf(page, "%llu\n", (unsigned long long)get_capacity(disk));
 }
-
+static ssize_t disk_capability_read(struct gendisk *disk, char *page)
+{
+	return sprintf(page, "%x\n", disk->flags);
+}
 static ssize_t disk_stats_read(struct gendisk * disk, char *page)
 {
 	preempt_disable();
@@ -413,6 +469,10 @@ static struct disk_attribute disk_attr_size = {
 	.attr = {.name = "size", .mode = S_IRUGO },
 	.show	= disk_size_read
 };
+static struct disk_attribute disk_attr_capability = {
+	.attr = {.name = "capability", .mode = S_IRUGO },
+	.show	= disk_capability_read
+};
 static struct disk_attribute disk_attr_stat = {
 	.attr = {.name = "stat", .mode = S_IRUGO },
 	.show	= disk_stats_read
@@ -453,6 +513,7 @@ static struct attribute * default_attrs[] = {
 	&disk_attr_removable.attr,
 	&disk_attr_size.attr,
 	&disk_attr_stat.attr,
+	&disk_attr_capability.attr,
 #ifdef CONFIG_FAIL_MAKE_REQUEST
 	&disk_attr_fail.attr,
 #endif
@@ -565,7 +626,7 @@ static void *diskstats_start(struct seq_file *part, loff_t *pos)
 	struct list_head *p;
 
 	mutex_lock(&block_subsys_lock);
-	list_for_each(p, &block_subsys.kset.list)
+	list_for_each(p, &block_subsys.list)
 		if (!k--)
 			return list_entry(p, struct gendisk, kobj.entry);
 	return NULL;
@@ -575,7 +636,7 @@ static void *diskstats_next(struct seq_file *part, void *v, loff_t *pos)
 {
 	struct list_head *p = ((struct gendisk *)v)->kobj.entry.next;
 	++*pos;
-	return p==&block_subsys.kset.list ? NULL :
+	return p==&block_subsys.list ? NULL :
 		list_entry(p, struct gendisk, kobj.entry);
 }
 
@@ -635,6 +696,27 @@ struct seq_operations diskstats_op = {
 	.show	= diskstats_show
 };
 
+static void media_change_notify_thread(struct work_struct *work)
+{
+	struct gendisk *gd = container_of(work, struct gendisk, async_notify);
+	char event[] = "MEDIA_CHANGE=1";
+	char *envp[] = { event, NULL };
+
+	/*
+	 * set enviroment vars to indicate which event this is for
+	 * so that user space will know to go check the media status.
+	 */
+	kobject_uevent_env(&gd->kobj, KOBJ_CHANGE, envp);
+	put_device(gd->driverfs_dev);
+}
+
+void genhd_media_change_notify(struct gendisk *disk)
+{
+	get_device(disk->driverfs_dev);
+	schedule_work(&disk->async_notify);
+}
+EXPORT_SYMBOL_GPL(genhd_media_change_notify);
+
 struct gendisk *alloc_disk(int minors)
 {
 	return alloc_disk_node(minors, -1);
@@ -664,6 +746,8 @@ struct gendisk *alloc_disk_node(int minors, int node_id)
 		kobj_set_kset_s(disk,block_subsys);
 		kobject_init(&disk->kobj);
 		rand_initialize_disk(disk);
+		INIT_WORK(&disk->async_notify,
+			media_change_notify_thread);
 	}
 	return disk;
 }

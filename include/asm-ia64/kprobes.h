@@ -71,13 +71,15 @@ struct prev_kprobe {
 
 #define	MAX_PARAM_RSE_SIZE	(0x60+0x60/0x3f)
 /* per-cpu kprobe control block */
+#define ARCH_PREV_KPROBE_SZ 2
 struct kprobe_ctlblk {
 	unsigned long kprobe_status;
 	struct pt_regs jprobe_saved_regs;
 	unsigned long jprobes_saved_stacked_regs[MAX_PARAM_RSE_SIZE];
 	unsigned long *bsp;
 	unsigned long cfm;
-	struct prev_kprobe prev_kprobe;
+	atomic_t prev_kprobe_index;
+	struct prev_kprobe prev_kprobe[ARCH_PREV_KPROBE_SZ];
 };
 
 #define JPROBE_ENTRY(pentry)	(kprobe_opcode_t *)pentry
@@ -118,6 +120,7 @@ struct arch_specific_insn {
 	unsigned short slot;
 };
 
+extern int kprobes_fault_handler(struct pt_regs *regs, int trapnr);
 extern int kprobe_exceptions_notify(struct notifier_block *self,
 				    unsigned long val, void *data);
 

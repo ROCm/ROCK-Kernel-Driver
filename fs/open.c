@@ -7,7 +7,6 @@
 #include <linux/string.h>
 #include <linux/mm.h>
 #include <linux/file.h>
-#include <linux/smp_lock.h>
 #include <linux/quotaops.h>
 #include <linux/fsnotify.h>
 #include <linux/module.h>
@@ -199,6 +198,7 @@ int do_truncate(struct dentry *dentry, struct vfsmount *mnt, loff_t length,
 {
 	int err;
 	struct iattr newattrs;
+	struct path path = { .mnt = mnt, .dentry = dentry };
 
 	/* Not pretty: "inode->i_size" shouldn't really be signed. But it is. */
 	if (length < 0)
@@ -210,6 +210,9 @@ int do_truncate(struct dentry *dentry, struct vfsmount *mnt, loff_t length,
 		newattrs.ia_file = filp;
 		newattrs.ia_valid |= ATTR_FILE;
 	}
+
+	/* Remove suid/sgid on truncate too */
+	newattrs.ia_valid |= should_remove_suid(&path);
 
 	mutex_lock(&dentry->d_inode->i_mutex);
 	err = notify_change(dentry, mnt, &newattrs);

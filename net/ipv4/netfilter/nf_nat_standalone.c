@@ -80,14 +80,12 @@ nf_nat_fn(unsigned int hooknum,
 	struct nf_conn *ct;
 	enum ip_conntrack_info ctinfo;
 	struct nf_conn_nat *nat;
-	struct nf_nat_info *info;
 	/* maniptype == SRC for postrouting. */
 	enum nf_nat_manip_type maniptype = HOOK2MANIP(hooknum);
 
 	/* We never see fragments: conntrack defrags on pre-routing
 	   and local-out, and nf_nat_out protects post-routing. */
-	NF_CT_ASSERT(!((*pskb)->nh.iph->frag_off
-		       & htons(IP_MF|IP_OFFSET)));
+	NF_CT_ASSERT(!(ip_hdr(*pskb)->frag_off & htons(IP_MF | IP_OFFSET)));
 
 	ct = nf_ct_get(*pskb, &ctinfo);
 	/* Can't track?  It's not due to stress, or conntrack would
@@ -98,11 +96,10 @@ nf_nat_fn(unsigned int hooknum,
 		/* Exception: ICMP redirect to new connection (not in
 		   hash table yet).  We must not let this through, in
 		   case we're doing NAT to the same network. */
-		if ((*pskb)->nh.iph->protocol == IPPROTO_ICMP) {
+		if (ip_hdr(*pskb)->protocol == IPPROTO_ICMP) {
 			struct icmphdr _hdr, *hp;
 
-			hp = skb_header_pointer(*pskb,
-						(*pskb)->nh.iph->ihl*4,
+			hp = skb_header_pointer(*pskb, ip_hdrlen(*pskb),
 						sizeof(_hdr), &_hdr);
 			if (hp != NULL &&
 			    hp->type == ICMP_REDIRECT)
@@ -122,7 +119,7 @@ nf_nat_fn(unsigned int hooknum,
 	switch (ctinfo) {
 	case IP_CT_RELATED:
 	case IP_CT_RELATED+IP_CT_IS_REPLY:
-		if ((*pskb)->nh.iph->protocol == IPPROTO_ICMP) {
+		if (ip_hdr(*pskb)->protocol == IPPROTO_ICMP) {
 			if (!nf_nat_icmp_reply_translation(ct, ctinfo,
 							   hooknum, pskb))
 				return NF_DROP;
@@ -131,7 +128,6 @@ nf_nat_fn(unsigned int hooknum,
 		}
 		/* Fall thru... (Only ICMPs can be IP_CT_IS_REPLY) */
 	case IP_CT_NEW:
-		info = &nat->info;
 
 		/* Seen it before?  This can happen for loopback, retrans,
 		   or local packets.. */
@@ -140,14 +136,13 @@ nf_nat_fn(unsigned int hooknum,
 
 			if (unlikely(nf_ct_is_confirmed(ct)))
 				/* NAT module was loaded late */
-				ret = alloc_null_binding_confirmed(ct, info,
-								   hooknum);
+				ret = alloc_null_binding_confirmed(ct, hooknum);
 			else if (hooknum == NF_IP_LOCAL_IN)
 				/* LOCAL_IN hook doesn't have a chain!  */
-				ret = alloc_null_binding(ct, info, hooknum);
+				ret = alloc_null_binding(ct, hooknum);
 			else
 				ret = nf_nat_rule_find(pskb, hooknum, in, out,
-						       ct, info);
+						       ct);
 
 			if (ret != NF_ACCEPT) {
 				return ret;
@@ -162,10 +157,8 @@ nf_nat_fn(unsigned int hooknum,
 		/* ESTABLISHED */
 		NF_CT_ASSERT(ctinfo == IP_CT_ESTABLISHED ||
 			     ctinfo == (IP_CT_ESTABLISHED+IP_CT_IS_REPLY));
-		info = &nat->info;
 	}
 
-	NF_CT_ASSERT(info);
 	return nf_nat_packet(ct, ctinfo, hooknum, pskb);
 }
 
@@ -177,11 +170,11 @@ nf_nat_in(unsigned int hooknum,
 	  int (*okfn)(struct sk_buff *))
 {
 	unsigned int ret;
-	__be32 daddr = (*pskb)->nh.iph->daddr;
+	__be32 daddr = ip_hdr(*pskb)->daddr;
 
 	ret = nf_nat_fn(hooknum, pskb, in, out, okfn);
 	if (ret != NF_DROP && ret != NF_STOLEN &&
-	    daddr != (*pskb)->nh.iph->daddr) {
+	    daddr != ip_hdr(*pskb)->daddr) {
 		dst_release((*pskb)->dst);
 		(*pskb)->dst = NULL;
 	}
@@ -203,7 +196,7 @@ nf_nat_out(unsigned int hooknum,
 
 	/* root is playing with raw sockets. */
 	if ((*pskb)->len < sizeof(struct iphdr) ||
-	    (*pskb)->nh.iph->ihl * 4 < sizeof(struct iphdr))
+	    ip_hdrlen(*pskb) < sizeof(struct iphdr))
 		return NF_ACCEPT;
 
 	ret = nf_nat_fn(hooknum, pskb, in, out, okfn);
@@ -236,7 +229,7 @@ nf_nat_local_fn(unsigned int hooknum,
 
 	/* root is playing with raw sockets. */
 	if ((*pskb)->len < sizeof(struct iphdr) ||
-	    (*pskb)->nh.iph->ihl * 4 < sizeof(struct iphdr))
+	    ip_hdrlen(*pskb) < sizeof(struct iphdr))
 		return NF_ACCEPT;
 
 	ret = nf_nat_fn(hooknum, pskb, in, out, okfn);

@@ -104,11 +104,7 @@ static struct s3c2410_uartcfg smdk2443_uartcfgs[] __initdata = {
 static struct platform_device *smdk2443_devices[] __initdata = {
 	&s3c_device_wdt,
 	&s3c_device_i2c,
-};
-
-static struct s3c24xx_board smdk2443_board __initdata = {
-	.devices       = smdk2443_devices,
-	.devices_count = ARRAY_SIZE(smdk2443_devices)
+	&s3c_device_hsmmc,
 };
 
 static void __init smdk2443_map_io(void)
@@ -116,11 +112,11 @@ static void __init smdk2443_map_io(void)
 	s3c24xx_init_io(smdk2443_iodesc, ARRAY_SIZE(smdk2443_iodesc));
 	s3c24xx_init_clocks(12000000);
 	s3c24xx_init_uarts(smdk2443_uartcfgs, ARRAY_SIZE(smdk2443_uartcfgs));
-	s3c24xx_set_board(&smdk2443_board);
 }
 
 static void __init smdk2443_machine_init(void)
 {
+	platform_add_devices(smdk2443_devices, ARRAY_SIZE(smdk2443_devices));
 	smdk_machine_init();
 }
 

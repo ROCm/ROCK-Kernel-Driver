@@ -38,6 +38,7 @@
 #include <linux/inet.h>
 #include <linux/errno.h>
 #include <linux/delay.h>
+#include <linux/sched.h>
 #include <linux/sunrpc/xdr.h>
 #include <linux/sunrpc/svc.h>
 #include <linux/sunrpc/clnt.h>
@@ -315,16 +316,13 @@ out:
 /*
  * RPC procedure tables
  */
-#ifndef MAX
-# define MAX(a, b)      (((a) > (b))? (a) : (b))
-#endif
-
 #define PROC(proc, call, argtype, restype)                              \
 [NFSPROC4_CLNT_##proc] = {                                      	\
         .p_proc   = NFSPROC4_CB_##call,					\
         .p_encode = (kxdrproc_t) nfs4_xdr_##argtype,                    \
         .p_decode = (kxdrproc_t) nfs4_xdr_##restype,                    \
-        .p_bufsiz = MAX(NFS4_##argtype##_sz,NFS4_##restype##_sz) << 2,  \
+        .p_arglen = NFS4_##argtype##_sz,                                \
+        .p_replen = NFS4_##restype##_sz,                                \
         .p_statidx = NFSPROC4_CB_##call,				\
 	.p_name   = #proc,                                              \
 }

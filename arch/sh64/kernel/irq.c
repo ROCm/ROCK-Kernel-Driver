@@ -26,7 +26,6 @@
 #include <linux/slab.h>
 #include <linux/random.h>
 #include <linux/smp.h>
-#include <linux/smp_lock.h>
 #include <linux/init.h>
 #include <linux/seq_file.h>
 #include <linux/bitops.h>
@@ -95,6 +94,7 @@ asmlinkage void do_NMI(unsigned long vector_num, struct pt_regs * regs)
  */
 asmlinkage int do_IRQ(unsigned long vector_num, struct pt_regs * regs)
 {
+	struct pt_regs *old_regs = set_irq_regs(regs);
 	int irq;
 
 	irq_enter();
@@ -102,13 +102,14 @@ asmlinkage int do_IRQ(unsigned long vector_num, struct pt_regs * regs)
 	irq = irq_demux(vector_num);
 
 	if (irq >= 0) {
-		__do_IRQ(irq, regs);
+		__do_IRQ(irq);
 	} else {
 		printk("unexpected IRQ trap at vector %03lx\n", vector_num);
 	}
 
 	irq_exit();
 
+	set_irq_regs(old_regs);
 	return 1;
 }
 

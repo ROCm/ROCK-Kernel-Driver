@@ -21,7 +21,6 @@
 #include <linux/moduleparam.h>
 #include <linux/init.h>
 #include <linux/smp.h>
-#include <linux/smp_lock.h>
 #include <linux/sched.h>
 #include <linux/completion.h>
 #include <linux/delay.h>
@@ -208,16 +207,7 @@ static int ucb1x00_thread(void *_ts)
 	struct ucb1x00_ts *ts = _ts;
 	struct task_struct *tsk = current;
 	DECLARE_WAITQUEUE(wait, tsk);
-	int valid;
-
-	/*
-	 * We could run as a real-time thread.  However, thus far
-	 * this doesn't seem to be necessary.
-	 */
-//	tsk->policy = SCHED_FIFO;
-//	tsk->rt_priority = 1;
-
-	valid = 0;
+	int valid = 0;
 
 	add_wait_queue(&ts->irq_wait, &wait);
 	while (!kthread_should_stop()) {

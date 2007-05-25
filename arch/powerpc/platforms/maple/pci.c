@@ -44,11 +44,11 @@ static int __init fixup_one_level_bus_range(struct device_node *node, int higher
 		int len;
 
 		/* For PCI<->PCI bridges or CardBus bridges, we go down */
-		class_code = get_property(node, "class-code", NULL);
+		class_code = of_get_property(node, "class-code", NULL);
 		if (!class_code || ((*class_code >> 8) != PCI_CLASS_BRIDGE_PCI &&
 			(*class_code >> 8) != PCI_CLASS_BRIDGE_CARDBUS))
 			continue;
-		bus_range = get_property(node, "bus-range", &len);
+		bus_range = of_get_property(node, "bus-range", &len);
 		if (bus_range != NULL && len > 2 * sizeof(int)) {
 			if (bus_range[1] > higher)
 				higher = bus_range[1];
@@ -77,7 +77,7 @@ static void __init fixup_bus_range(struct device_node *bridge)
 			       bridge->full_name);
 		return;
 	}
-	bus_range = (int *)prop->value;
+	bus_range = prop->value;
 	bus_range[1] = fixup_one_level_bus_range(bridge->child, bus_range[1]);
 }
 
@@ -454,7 +454,7 @@ static int __init add_bridge(struct device_node *dev)
 
 	DBG("Adding PCI host bridge %s\n", dev->full_name);
 
-	bus_range = get_property(dev, "bus-range", &len);
+	bus_range = of_get_property(dev, "bus-range", &len);
 	if (bus_range == NULL || len < 2 * sizeof(int)) {
 		printk(KERN_WARNING "Can't get bus-range for %s, assume bus 0\n",
 		dev->full_name);
@@ -467,15 +467,15 @@ static int __init add_bridge(struct device_node *dev)
 	hose->last_busno = bus_range ? bus_range[1] : 0xff;
 
 	disp_name = NULL;
-	if (device_is_compatible(dev, "u3-agp")) {
+	if (of_device_is_compatible(dev, "u3-agp")) {
 		setup_u3_agp(hose);
 		disp_name = "U3-AGP";
 		primary = 0;
-	} else if (device_is_compatible(dev, "u3-ht")) {
+	} else if (of_device_is_compatible(dev, "u3-ht")) {
 		setup_u3_ht(hose);
 		disp_name = "U3-HT";
 		primary = 1;
-        } else if (device_is_compatible(dev, "u4-pcie")) {
+        } else if (of_device_is_compatible(dev, "u4-pcie")) {
                 setup_u4_pcie(hose);
                 disp_name = "U4-PCIE";
                 primary = 0;
@@ -556,12 +556,12 @@ void __init maple_pci_init(void)
 			continue;
 		if (strcmp(np->type, "pci") && strcmp(np->type, "ht"))
 			continue;
-		if ((device_is_compatible(np, "u4-pcie") ||
-		     device_is_compatible(np, "u3-agp")) &&
+		if ((of_device_is_compatible(np, "u4-pcie") ||
+		     of_device_is_compatible(np, "u3-agp")) &&
 		    add_bridge(np) == 0)
 			of_node_get(np);
 
-		if (device_is_compatible(np, "u3-ht")) {
+		if (of_device_is_compatible(np, "u3-ht")) {
 			of_node_get(np);
 			ht = np;
 		}
