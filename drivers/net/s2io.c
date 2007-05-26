@@ -2898,7 +2898,7 @@ static void tx_intr_handler(struct fifo_info *fifo_data)
 
 			/* update t_code statistics */
 			err >>= 48;
-			switch(err) {
+			switch((int)err) {
 				case 2:
 					nic->mac_control.stats_info->sw_stat.
 							tx_buf_abort_cnt++;
@@ -6825,7 +6825,7 @@ static int rx_osm_handler(struct ring_info *ring_data, struct RxD_t * rxdp)
 			sp->mac_control.stats_info->sw_stat.parity_err_cnt++;
 		}
 		err >>= 48;
-		switch(err) {
+		switch((int)err) {
 			case 1:
 				sp->mac_control.stats_info->sw_stat.
 				rx_parity_err_cnt++;
