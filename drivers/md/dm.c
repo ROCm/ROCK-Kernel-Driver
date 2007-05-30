@@ -304,19 +304,25 @@ static int dm_blk_ioctl(struct inode *inode, struct file *file,
 	if (!map || !dm_table_get_size(map))
 		goto out;
 
-	/* We only support devices that have a single target */
-	if (dm_table_get_num_targets(map) != 1)
-		goto out;
-
-	tgt = dm_table_get_target(map, 0);
-
 	if (dm_suspended(md)) {
 		r = -EAGAIN;
 		goto out;
 	}
 
-	if (tgt->type->ioctl)
-		r = tgt->type->ioctl(tgt, inode, file, cmd, arg);
+	if (cmd == BLKRRPART) {
+		/* Emulate Re-read partitions table */
+		kobject_uevent(&md->disk->kobj, KOBJ_CHANGE);
+		r = 0;
+	} else {
+		/* We only support devices that have a single target */
+		if (dm_table_get_num_targets(map) != 1)
+			goto out;
+
+		tgt = dm_table_get_target(map, 0);
+
+		if (tgt->type->ioctl)
+			r = tgt->type->ioctl(tgt, inode, file, cmd, arg);
+	}
 
 out:
 	dm_table_put(map);
