@@ -2159,7 +2159,6 @@ int ext4_ext_writepage_trans_blocks(struct inode *inode, int num)
 }
 
 EXPORT_SYMBOL(ext4_mark_inode_dirty);
-EXPORT_SYMBOL(ext4_ext_invalidate_cache);
 EXPORT_SYMBOL(ext4_ext_insert_extent);
 EXPORT_SYMBOL(ext4_ext_walk_space);
 EXPORT_SYMBOL(ext4_ext_find_goal);
