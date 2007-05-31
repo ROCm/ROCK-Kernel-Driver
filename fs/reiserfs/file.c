@@ -20,14 +20,14 @@
 ** insertion/balancing, for files that are written in one write.
 ** It avoids unnecessary tail packings (balances) for files that are written in
 ** multiple writes and are small enough to have tails.
-** 
+**
 ** file_release is called by the VFS layer when the file is closed.  If
 ** this is the last open file descriptor, and the file
 ** small enough to have a tail, and the tail is currently in an
 ** unformatted node, the tail is converted back into a direct item.
-** 
+**
 ** We use reiserfs_truncate_file to pack the tail, since it already has
-** all the conditions coded.  
+** all the conditions coded.
 */
 static int reiserfs_file_release(struct inode *inode, struct file *filp)
 {
@@ -76,7 +76,7 @@ static int reiserfs_file_release(struct inode *inode, struct file *filp)
 			 * and let the admin know what is going on.
 			 */
 			igrab(inode);
-			reiserfs_warning(inode->i_sb,
+			reiserfs_warning(inode->i_sb, "clm-9001",
 					 "pinning inode %lu because the "
 					 "preallocation can't be freed",
 					 inode->i_ino);
@@ -134,23 +134,23 @@ static void reiserfs_vfs_truncate_file(struct inode *inode)
  * be removed...
  */
 
-static int reiserfs_sync_file(struct file *p_s_filp,
-			      struct dentry *p_s_dentry, int datasync)
+static int reiserfs_sync_file(struct file *filp,
+			      struct dentry *dentry, int datasync)
 {
-	struct inode *p_s_inode = p_s_dentry->d_inode;
-	int n_err;
+	struct inode *inode = dentry->d_inode;
+	int err;
 	int barrier_done;
 
-	BUG_ON(!S_ISREG(p_s_inode->i_mode));
-	n_err = sync_mapping_buffers(p_s_inode->i_mapping);
-	reiserfs_write_lock(p_s_inode->i_sb);
-	barrier_done = reiserfs_commit_for_inode(p_s_inode);
-	reiserfs_write_unlock(p_s_inode->i_sb);
-	if (barrier_done != 1 && reiserfs_barrier_flush(p_s_inode->i_sb))
-		blkdev_issue_flush(p_s_inode->i_sb->s_bdev, NULL);
+	BUG_ON(!S_ISREG(inode->i_mode));
+	err = sync_mapping_buffers(inode->i_mapping);
+	reiserfs_write_lock(inode->i_sb);
+	barrier_done = reiserfs_commit_for_inode(inode);
+	reiserfs_write_unlock(inode->i_sb);
+	if (barrier_done != 1 && reiserfs_barrier_flush(inode->i_sb))
+		blkdev_issue_flush(inode->i_sb->s_bdev, NULL);
 	if (barrier_done < 0)
 		return barrier_done;
-	return (n_err < 0) ? -EIO : 0;
+	return (err < 0) ? -EIO : 0;
 }
 
 /* I really do not want to play with memory shortage right now, so
@@ -395,9 +395,10 @@ static int reiserfs_allocate_blocks_for_region(struct reiserfs_transaction_handl
 					if (res != ITEM_NOT_FOUND) {
 						/* item should not exist, otherwise we have error */
 						if (res != -ENOSPC) {
-							reiserfs_warning(inode->
+							reiserfs_error(inode->
 									 i_sb,
-									 "green-9008: search_by_key (%K) returned %d",
+									 "green-9008",
+									 "search_by_key (%K) returned %d",
 									 &key,
 									 res);
 						}
@@ -411,8 +412,9 @@ static int reiserfs_allocate_blocks_for_region(struct reiserfs_transaction_handl
 								 inode,
 								 (char *)zeros);
 				} else {
-					reiserfs_panic(inode->i_sb,
-						       "green-9011: Unexpected key type %K\n",
+					reiserfs_error(inode->i_sb,
+					               "green-9011",
+						       "Unexpected key type %K",
 						       &key);
 				}
 				if (res) {
@@ -598,10 +600,11 @@ static int reiserfs_allocate_blocks_for_region(struct reiserfs_transaction_handl
 				/* Well, if we have found such item already, or some error
 				   occured, we need to warn user and return error */
 				if (res != -ENOSPC) {
-					reiserfs_warning(inode->i_sb,
-							 "green-9009: search_by_key (%K) "
-							 "returned %d", &key,
-							 res);
+					reiserfs_error(inode->i_sb,
+					               "green-9009",
+					               "search_by_key (%K) "
+					               "returned %d", &key,
+					               res);
 				}
 				res = -EIO;
 				goto error_exit_free_blocks;
@@ -613,9 +616,8 @@ static int reiserfs_allocate_blocks_for_region(struct reiserfs_transaction_handl
 						 (char *)(allocated_blocks +
 							  curr_block));
 		} else {
-			reiserfs_panic(inode->i_sb,
-				       "green-9010: unexpected item type for key %K\n",
-				       &key);
+			reiserfs_panic(inode->i_sb, "green-9010",
+			               "unexpected item type for key %K", &key);
 		}
 	}
 	// the caller is responsible for closing the transaction
@@ -640,15 +642,16 @@ static int reiserfs_allocate_blocks_for_region(struct reiserfs_transaction_handl
 		int block_start, block_end;	// in-page offsets for buffers.
 
 		if (!page_buffers(page))
-			reiserfs_panic(inode->i_sb,
-				       "green-9005: No buffers for prepared page???");
+			reiserfs_panic(inode->i_sb, "green-9005",
+			               "No buffers for prepared page???");
 
 		/* For each buffer in page */
 		for (bh = head, block_start = 0; bh != head || !block_start;
 		     block_start = block_end, bh = bh->b_this_page) {
 			if (!bh)
-				reiserfs_panic(inode->i_sb,
-					       "green-9006: Allocated but absent buffer for a page?");
+				reiserfs_panic(inode->i_sb, "green-9006",
+				               "Allocated but absent buffer "
+					       "for a page?");
 			block_end = block_start + inode->i_sb->s_blocksize;
 			if (i == 0 && block_end <= from)
 				/* if this buffer is before requested data to map, skip it */
@@ -720,7 +723,7 @@ static void reiserfs_unprepare_pages(struct page **prepared_pages,	/* list of lo
 static int reiserfs_copy_from_user_to_file_region(loff_t pos,	/* In-file position */
 						  int num_pages,	/* Number of pages affected */
 						  int write_bytes,	/* Amount of bytes to write */
-						  struct page **prepared_pages,	/* pointer to 
+						  struct page **prepared_pages,	/* pointer to
 										   array to
 										   prepared pages
 										 */
@@ -801,7 +804,7 @@ int reiserfs_commit_page(struct inode *inode, struct page *page,
 				/* do data=ordered on any page past the end
 				 * of file and any buffer marked BH_New.
 				 */
-				if (reiserfs_data_ordered(inode->i_sb) &&
+				if (reiserfs_file_data_ordered(inode) &&
 				    (new || page->index >= i_size_index)) {
 					reiserfs_add_ordered_list(inode, bh);
 				}
@@ -897,7 +900,7 @@ static int reiserfs_submit_file_region_for_write(struct reiserfs_transaction_han
 	}
 	th->t_trans_id = 0;
 
-	/* 
+	/*
 	 * we have to unlock the pages after updating i_size, otherwise
 	 * we race with writepage
 	 */
@@ -968,7 +971,7 @@ static int reiserfs_check_for_tail_and_convert(struct inode *inode,	/* inode to 
    @prepared_pages array. Also buffers are allocated for these pages.
    First and last page of the region is read if it is overwritten only
    partially. If last page did not exist before write (file hole or file
-   append), it is zeroed, then. 
+   append), it is zeroed, then.
    Returns number of unallocated blocks that should be allocated to cover
    new file data.*/
 static int reiserfs_prepare_file_region_for_write(struct inode *inode
@@ -1015,8 +1018,7 @@ static int reiserfs_prepare_file_region_for_write(struct inode *inode
 	int item_pos = -1;	/* Position in indirect item */
 
 	if (num_pages < 1) {
-		reiserfs_warning(inode->i_sb,
-				 "green-9001: reiserfs_prepare_file_region_for_write "
+		reiserfs_warning(inode->i_sb, "green-9001",
 				 "called with zero number of pages to process");
 		return -EFAULT;
 	}
@@ -1090,8 +1092,9 @@ static int reiserfs_prepare_file_region_for_write(struct inode *inode
 		for (bh = head, block_start = 0; bh != head || !block_start;
 		     block_start = block_end, bh = bh->b_this_page) {
 			if (!bh)
-				reiserfs_panic(inode->i_sb,
-					       "green-9002: Allocated but absent buffer for a page?");
+				reiserfs_panic(inode->i_sb, "green-9002",
+				               "Allocated but absent "
+					       "buffer for a page?");
 			/* Find where this buffer ends */
 			block_end = block_start + inode->i_sb->s_blocksize;
 			if (i == 0 && block_end <= from)
@@ -1177,8 +1180,9 @@ static int reiserfs_prepare_file_region_for_write(struct inode *inode
 		     block_start = block_end, bh = bh->b_this_page) {
 
 			if (!bh)
-				reiserfs_panic(inode->i_sb,
-					       "green-9002: Allocated but absent buffer for a page?");
+				reiserfs_panic(inode->i_sb, "green-9002",
+				               "Allocated but absent "
+					       "buffer for a page?");
 			/* Find where this buffer ends */
 			block_end = block_start + inode->i_sb->s_blocksize;
 			if (block_end <= from)
@@ -1211,8 +1215,9 @@ static int reiserfs_prepare_file_region_for_write(struct inode *inode
 		     block_start = block_end, bh = bh->b_this_page) {
 
 			if (!bh)
-				reiserfs_panic(inode->i_sb,
-					       "green-9002: Allocated but absent buffer for a page?");
+				reiserfs_panic(inode->i_sb, "green-9002",
+				               "Allocated but absent "
+					       "buffer for a page?");
 			/* Find where this buffer ends */
 			block_end = block_start + inode->i_sb->s_blocksize;
 			if (block_start >= to)
@@ -1251,7 +1256,7 @@ static int reiserfs_prepare_file_region_for_write(struct inode *inode
 }
 
 /* Write @count bytes at position @ppos in a file indicated by @file
-   from the buffer @buf.  
+   from the buffer @buf.
 
    generic_file_write() is only appropriate for filesystems that are not seeking to optimize performance and want
    something simple that works.  It is not for serious use by general purpose filesystems, excepting the one that it was

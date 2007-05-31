@@ -514,7 +514,7 @@ int reiserfs_proc_info_init(struct super_block *sb)
 		add_file(sb, "journal", show_journal);
 		return 0;
 	}
-	reiserfs_warning(sb, "reiserfs: cannot create /proc/%s/%s",
+	reiserfs_warning(sb, "cannot create /proc/%s/%s",
 			 proc_info_root_name, b);
 	return 1;
 }
@@ -570,8 +570,7 @@ int reiserfs_proc_info_global_init(void)
 		if (proc_info_root) {
 			proc_info_root->owner = THIS_MODULE;
 		} else {
-			reiserfs_warning(NULL,
-					 "reiserfs: cannot create /proc/%s",
+			reiserfs_warning(NULL, "cannot create /proc/%s",
 					 proc_info_root_name);
 			return 1;
 		}
@@ -646,7 +645,7 @@ int reiserfs_global_version_in_proc(char *buffer, char **start,
  *
  */
 
-/* 
+/*
  * Make Linus happy.
  * Local variables:
  * c-indentation-style: "K&R"
