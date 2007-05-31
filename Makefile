@@ -1,7 +1,7 @@
 VERSION = 2
 PATCHLEVEL = 6
 SUBLEVEL = 22
-EXTRAVERSION = -rc3-git1
+EXTRAVERSION = -rc3-git2
 NAME = Jeff Thinks I Should Change This, But To What?
 
 # *DOCUMENTATION*
