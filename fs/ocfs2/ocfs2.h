@@ -270,6 +270,7 @@ struct ocfs2_super
 	unsigned int net_response_ids;
 	struct list_head net_response_list;
 
+	struct o2hb_heartbeat_resource *osb_hb_res;
 	struct o2hb_callback_func osb_hb_up;
 	struct o2hb_callback_func osb_hb_down;
 

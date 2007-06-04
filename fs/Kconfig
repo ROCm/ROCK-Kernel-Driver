@@ -473,6 +473,16 @@ config OCFS2_DEBUG_MASKLOG
 	  This option will enlarge your kernel, but it allows debugging of
 	  ocfs2 filesystem issues.
 
+config OCFS2_FS_USERSPACE_CLUSTER
+	tristate "Userspace Clustering"
+	depends on OCFS2_FS
+	default y
+	help
+	  This option will allow OCFS2 to use userspace clustering services
+	  via configfs and sysfs. Currently, the only supported userspace
+	  clustering agent is the Linux-HA project from http://www.linux-ha.org.
+	  If you are using a userspace cluster manager, choose this option.
+
 config MINIX_FS
 	tristate "Minix fs support"
 	help

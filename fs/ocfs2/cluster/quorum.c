@@ -49,6 +49,8 @@
 #include <linux/reboot.h>
 
 #include "heartbeat.h"
+#include "disk_heartbeat.h"
+#include "tcp.h"
 #include "nodemanager.h"
 #define MLOG_MASK_PREFIX ML_QUORUM
 #include "masklog.h"
@@ -64,18 +66,29 @@ static struct o2quo_state {
 	unsigned long		qs_conn_bm[BITS_TO_LONGS(O2NM_MAX_NODES)];
 	int			qs_holds;
 	unsigned long		qs_hold_bm[BITS_TO_LONGS(O2NM_MAX_NODES)];
+	struct delayed_work	qs_node_work[O2NM_MAX_NODES];
 } o2quo_state;
+
+static struct o2hb_callback_func o2quo_hb_up_cb, o2quo_hb_down_cb;
+#define O2QUO_HB_PRI 0x1
+#define O2QUO_DELAY_MS   ((o2hb_dead_threshold + 2) * O2HB_REGION_TIMEOUT_MS)
+
+unsigned int o2quo_fence_option = 0;
 
 /* this is horribly heavy-handed.  It should instead flip the file
  * system RO and call some userspace script. */
 static void o2quo_fence_self(void)
 {
-	/* panic spins with interrupts enabled.  with preempt
-	 * threads can still schedule, etc, etc */
-	o2hb_stop_all_regions();
-
-	printk("ocfs2 is very sorry to be fencing this system by restarting\n");
-	emergency_restart();
+	switch (o2quo_fence_option) {
+	case FENCE_PANIC_OPTION:
+		/* panic spins with interrupts enabled.  with preempt
+	 	* threads can still schedule, etc, etc */
+		o2hb_stop_all_regions();
+		panic("*** ocfs2 is very sorry to be fencing this system by panicing ***\n");
+	default:
+		printk("*** ocfs2 is very sorry to be fencing this system by restarting ***\n");
+		emergency_restart();
+	}
 }
 
 /* Indicate that a timeout occured on a hearbeat region write. The
@@ -187,7 +200,7 @@ static void o2quo_clear_hold(struct o2quo_state *qs, u8 node)
  * the connection.  the hold will be droped in conn_up or hb_down.  it might be
  * perpetuated by con_err until hb_down.  if we already have a conn, we might
  * be dropping a hold that conn_up got. */
-void o2quo_hb_up(u8 node)
+static void o2quo_hb_up(struct o2nm_node *_node, int node, void *data)
 {
 	struct o2quo_state *qs = &o2quo_state;
 
@@ -211,7 +224,7 @@ void o2quo_hb_up(u8 node)
 
 /* hb going down releases any holds we might have had due to this node from
  * conn_up, conn_err, or hb_up */
-void o2quo_hb_down(u8 node)
+static void o2quo_hb_down(struct o2nm_node *_node, int node, void *data)
 {
 	struct o2quo_state *qs = &o2quo_state;
 
@@ -229,6 +242,8 @@ void o2quo_hb_down(u8 node)
 	o2quo_clear_hold(qs, node);
 
 	spin_unlock(&qs->qs_lock);
+
+	cancel_delayed_work(&qs->qs_node_work[node]);
 }
 
 /* this tells us that we've decided that the node is still heartbeating
@@ -236,9 +251,11 @@ void o2quo_hb_down(u8 node)
  * and indicates that we must now make a quorum decision in the future,
  * though we might be doing so after waiting for holds to drain.  Here
  * we'll be dropping the hold from conn_err. */
-void o2quo_hb_still_up(u8 node)
+void o2quo_hb_still_up(struct work_struct *work)
 {
 	struct o2quo_state *qs = &o2quo_state;
+	struct delayed_work *dw = container_of(work, struct delayed_work, work);
+	u8 node = ((void *)dw - (void *)&qs->qs_node_work) / sizeof (*dw);
 
 	spin_lock(&qs->qs_lock);
 
@@ -281,7 +298,7 @@ void o2quo_conn_up(u8 node)
  * still heartbeating we grab a hold that will delay decisions until either the
  * node stops heartbeating from hb_down or the caller decides that the node is
  * still up and calls still_up */
-void o2quo_conn_err(u8 node)
+void o2quo_conn_down(u8 node)
 {
 	struct o2quo_state *qs = &o2quo_state;
 
@@ -304,15 +321,84 @@ void o2quo_conn_err(u8 node)
 	spin_unlock(&qs->qs_lock);
 }
 
-void o2quo_init(void)
+void o2quo_conn_err(u8 node)
 {
 	struct o2quo_state *qs = &o2quo_state;
+	o2quo_conn_down(node);
+	schedule_delayed_work(&qs->qs_node_work[node],
+	                      msecs_to_jiffies(O2QUO_DELAY_MS));
+}
+
+static int o2quo_net_notifier(struct notifier_block *self, unsigned long type,
+                              void *data)
+{
+	u8 node_num = *(u8 *) data;
+	switch (type) {
+	case O2NET_CONN_UP:
+                o2quo_conn_up(node_num);
+                break;
+	case O2NET_CONN_DOWN:
+                o2quo_conn_down(node_num);
+                break;
+	case O2NET_CONN_ERR:
+                o2quo_conn_err(node_num);
+                break;
+	}
+
+	return 0;
+}
+
+static struct notifier_block o2quo_net_nb = {
+	.notifier_call = o2quo_net_notifier,
+};
+
+static void o2quo_unregister_hb_callbacks(void)
+{
+	o2hb_unregister_callback(&o2quo_hb_up_cb);
+	o2hb_unregister_callback(&o2quo_hb_down_cb);
+}
+
+static int o2quo_register_hb_callbacks(void)
+{
+	int ret;
+
+	o2hb_setup_callback(&o2quo_hb_down_cb, O2HB_NODE_DOWN_CB,
+	                    o2quo_hb_down, NULL, O2QUO_HB_PRI, NULL);
+	o2hb_setup_callback(&o2quo_hb_up_cb, O2HB_NODE_UP_CB,
+	                    o2quo_hb_up, NULL, O2QUO_HB_PRI, NULL);
+
+	ret = o2hb_register_callback(&o2quo_hb_up_cb);
+	if (ret == 0)
+		ret = o2hb_register_callback(&o2quo_hb_down_cb);
+
+	if (ret)
+		o2quo_unregister_hb_callbacks();
+
+	return ret;
+}
+
+int o2quo_init(void)
+{
+	struct o2quo_state *qs = &o2quo_state;
+	long i;
 
 	spin_lock_init(&qs->qs_lock);
 	INIT_WORK(&qs->qs_work, o2quo_make_decision);
+	for (i = 0; i < O2NM_MAX_NODES; i++)
+		INIT_DELAYED_WORK(&qs->qs_node_work[i], o2quo_hb_still_up);
+
+	o2net_register_notifier(&o2quo_net_nb);
+	return o2quo_register_hb_callbacks();
 }
 
 void o2quo_exit(void)
 {
+	struct o2quo_state *qs = &o2quo_state;
+	long i;
+	for (i = 0; i < O2NM_MAX_NODES; i++)
+		cancel_delayed_work(&qs->qs_node_work[i]);
+
 	flush_scheduled_work();
+	o2quo_unregister_hb_callbacks();
+	o2net_unregister_notifier(&o2quo_net_nb);
 }

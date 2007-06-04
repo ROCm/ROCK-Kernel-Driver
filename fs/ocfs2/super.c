@@ -529,6 +529,27 @@ static int ocfs2_verify_heartbeat(struct ocfs2_super *osb)
 	return 0;
 }
 
+void
+copy_uuid_from_super(char *buf, struct buffer_head *bh)
+{
+	struct ocfs2_dinode *di = NULL;
+	int i;
+	char *ptr;
+	int ret;
+	di = (struct ocfs2_dinode *)bh->b_data;
+
+	for (i = 0, ptr = buf; i < OCFS2_VOL_UUID_LEN; i++) {
+		/* print with null */
+		ret = snprintf(ptr, 3, "%02X", di->id2.i_super.s_uuid[i]);
+		if (ret != 2) { /* drop super cleans up */
+			memset (buf, 0, OCFS2_VOL_UUID_LEN * 2);
+			return;
+		}
+		/* then only advance past the last char */
+		ptr += 2;
+	}
+}
+
 static int ocfs2_fill_super(struct super_block *sb, void *data, int silent)
 {
 	struct dentry *root;
@@ -538,6 +559,7 @@ static int ocfs2_fill_super(struct super_block *sb, void *data, int silent)
 	struct ocfs2_super *osb = NULL;
 	struct buffer_head *bh = NULL;
 	char nodestr[8];
+	char uuid[33];
 
 	mlog_entry("%p, %p, %i", sb, data, silent);
 
@@ -546,6 +568,16 @@ static int ocfs2_fill_super(struct super_block *sb, void *data, int silent)
 		goto read_super_error;
 	}
 
+	/* probe for superblock */
+	status = ocfs2_sb_probe(sb, &bh, &sector_size);
+	if (status < 0) {
+		mlog(ML_ERROR, "superblock probe failed!\n");
+		goto read_super_error;
+	}
+
+	copy_uuid_from_super(uuid, bh);
+
+#if 0
 	/* for now we only have one cluster/node, make sure we see it
 	 * in the heartbeat universe */
 	if (parsed_opt & OCFS2_MOUNT_HB_LOCAL) {
@@ -554,13 +586,7 @@ static int ocfs2_fill_super(struct super_block *sb, void *data, int silent)
 			goto read_super_error;
 		}
 	}
-
-	/* probe for superblock */
-	status = ocfs2_sb_probe(sb, &bh, &sector_size);
-	if (status < 0) {
-		mlog(ML_ERROR, "superblock probe failed!\n");
-		goto read_super_error;
-	}
+#endif
 
 	status = ocfs2_initialize_super(sb, bh, sector_size);
 	osb = OCFS2_SB(sb);
@@ -1315,8 +1341,6 @@ static int ocfs2_initialize_super(struct super_block *sb,
 	osb->local_alloc_state = OCFS2_LA_UNUSED;
 	osb->local_alloc_bh = NULL;
 
-	ocfs2_setup_hb_callbacks(osb);
-
 	init_waitqueue_head(&osb->osb_mount_event);
 
 	osb->vol_label = kmalloc(OCFS2_MAX_VOL_LABEL_LEN, GFP_KERNEL);
@@ -1327,6 +1351,21 @@ static int ocfs2_initialize_super(struct super_block *sb,
 	}
 
 	di = (struct ocfs2_dinode *)bh->b_data;
+
+	if (ocfs2_setup_osb_uuid(osb, di->id2.i_super.s_uuid,
+				 sizeof(di->id2.i_super.s_uuid))) {
+		mlog(ML_ERROR, "Out of memory trying to setup our uuid.\n");
+		status = -ENOMEM;
+		goto bail;
+	}
+
+	/* This moves way down here because we need the UUID to do it */
+	if (ocfs2_setup_hb_callbacks(osb)) {
+		mlog(ML_ERROR, "Could not find heartbeat group for file "
+		     "system %s\n", osb->uuid_str);
+		status = -EINVAL;
+		goto bail;
+	}
 
 	osb->max_slots = le16_to_cpu(di->id2.i_super.s_max_slots);
 	if (osb->max_slots > OCFS2_MAX_SLOTS || osb->max_slots == 0) {
@@ -1416,13 +1455,6 @@ static int ocfs2_initialize_super(struct super_block *sb,
 		mlog(ML_ERROR, "Volume might try to write to blocks beyond "
 		     "what jbd can address in 32 bits.\n");
 		status = -EINVAL;
-		goto bail;
-	}
-
-	if (ocfs2_setup_osb_uuid(osb, di->id2.i_super.s_uuid,
-				 sizeof(di->id2.i_super.s_uuid))) {
-		mlog(ML_ERROR, "Out of memory trying to setup our uuid.\n");
-		status = -ENOMEM;
 		goto bail;
 	}
 

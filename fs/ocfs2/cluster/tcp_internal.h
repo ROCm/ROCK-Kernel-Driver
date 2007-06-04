@@ -103,11 +103,6 @@ struct o2net_node {
 	 * established.  this expiring gives up on the node and errors out
 	 * transmits */
 	struct delayed_work		nn_connect_expired;
-
-	/* after we give up on a socket we wait a while before deciding
-	 * that it is still heartbeating and that we should do some
-	 * quorum work */
-	struct delayed_work		nn_still_up;
 };
 
 struct o2net_sock_container {

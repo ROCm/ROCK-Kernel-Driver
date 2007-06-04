@@ -50,6 +50,7 @@ struct o2nm_node {
 	int			nd_local;
 
 	unsigned long		nd_set_attributes;
+	atomic_t		nd_count;
 };
 
 struct o2nm_cluster {
@@ -76,5 +77,10 @@ struct o2nm_node *o2nm_get_node_by_num(u8 node_num);
 struct o2nm_node *o2nm_get_node_by_ip(__be32 addr);
 void o2nm_node_get(struct o2nm_node *node);
 void o2nm_node_put(struct o2nm_node *node);
+
+static inline struct o2nm_node *to_o2nm_node(struct config_item *item)
+{
+	return container_of(item, struct o2nm_node, nd_item);
+}
 
 #endif /* O2CLUSTER_NODEMANAGER_H */

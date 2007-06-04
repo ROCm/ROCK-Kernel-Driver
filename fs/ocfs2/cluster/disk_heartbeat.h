@@ -1,7 +1,9 @@
 /* -*- mode: c; c-basic-offset: 8; -*-
  * vim: noexpandtab sw=8 ts=8 sts=0:
  *
- * Copyright (C) 2005 Oracle.  All rights reserved.
+ * disk_heartbeat.h
+ *
+ * Copyright (C) 2004 Oracle.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public
@@ -20,19 +22,21 @@
  *
  */
 
-#ifndef O2CLUSTER_QUORUM_H
-#define O2CLUSTER_QUORUM_H
+#ifndef O2CLUSTER_DISK_HEARTBEAT_H
+#define O2CLUSTER_DISK_HEARTBEAT_H
 
-extern unsigned int o2quo_fence_option;
-#define FENCE_PANIC_OPTION	1
+#define O2HB_REGION_TIMEOUT_MS		2000
 
-int o2quo_init(void);
-void o2quo_exit(void);
-void o2quo_disk_timeout(void);
+extern unsigned int o2hb_dead_threshold;
+/* number of changes to be seen as live */
+#define O2HB_LIVE_THRESHOLD	   2
+/* number of equal samples to be seen as dead */
+#define O2HB_DEFAULT_DEAD_THRESHOLD	   7
+/* Otherwise MAX_WRITE_TIMEOUT will be zero... */
+#define O2HB_MIN_DEAD_THRESHOLD	  2
+#define O2HB_MAX_WRITE_TIMEOUT_MS (O2HB_REGION_TIMEOUT_MS * (o2hb_dead_threshold - 1))
+void o2hb_stop_all_regions(void);
+int o2hb_disk_heartbeat_init(void);
+void o2hb_disk_heartbeat_exit(void);
 
-/* we're delaying our quorum decision so that heartbeat will have timed
- * out truly dead nodes by the time we come around to making decisions
- * on their number */
-#define O2NET_QUORUM_DELAY_MS	((o2hb_dead_threshold + 2) * O2HB_REGION_TIMEOUT_MS)
-
-#endif /* O2CLUSTER_QUORUM_H */
+#endif /* O2CLUSTER_DISK_HEARTBEAT_H */

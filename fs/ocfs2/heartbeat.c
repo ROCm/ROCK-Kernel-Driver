@@ -70,12 +70,22 @@ void ocfs2_init_node_maps(struct ocfs2_super *osb)
 	ocfs2_node_map_init(&osb->osb_recovering_orphan_dirs);
 }
 
+static void ocfs2_handle_fencing(int node_num, struct ocfs2_super *osb)
+{
+	/* I would much rather handle this by setting the file system
+	 * read only, but that's for a later date. -jdm */
+	panic("ocfs2 is very sorry to be fencing this system by panicing\n");
+}
+
 static void ocfs2_do_node_down(int node_num,
 			       struct ocfs2_super *osb)
 {
-	BUG_ON(osb->node_num == node_num);
-
 	mlog(0, "ocfs2: node down event for %d\n", node_num);
+
+	if (osb->node_num == node_num) {
+		ocfs2_handle_fencing(node_num, osb);
+		return;
+	}
 
 	if (!osb->dlm) {
 		/*
@@ -133,20 +143,27 @@ static void ocfs2_hb_node_up_cb(struct o2nm_node *node,
 	ocfs2_node_map_clear_bit(osb, &osb->umount_map, node_num);
 }
 
-void ocfs2_setup_hb_callbacks(struct ocfs2_super *osb)
+int ocfs2_setup_hb_callbacks(struct ocfs2_super *osb)
 {
+	osb->osb_hb_res = o2hb_heartbeat_resource_get_by_name(osb->uuid_str);
+
+	if (!osb->osb_hb_res)
+		return -EINVAL;
+
 	o2hb_setup_callback(&osb->osb_hb_down, O2HB_NODE_DOWN_CB,
 			    ocfs2_hb_node_down_cb, osb,
-			    OCFS2_HB_NODE_DOWN_PRI);
+			    OCFS2_HB_NODE_DOWN_PRI, osb->osb_hb_res);
 
 	o2hb_setup_callback(&osb->osb_hb_up, O2HB_NODE_UP_CB,
-			    ocfs2_hb_node_up_cb, osb, OCFS2_HB_NODE_UP_PRI);
+			    ocfs2_hb_node_up_cb, osb,
+			    OCFS2_HB_NODE_UP_PRI, osb->osb_hb_res);
 
 	/* Not exactly a heartbeat callback, but leads to essentially
 	 * the same path so we set it up here. */
 	dlm_setup_eviction_cb(&osb->osb_eviction_cb,
 			      ocfs2_dlm_eviction_cb,
 			      osb);
+	return 0;
 }
 
 /* Most functions here are just stubs for now... */
@@ -178,8 +195,13 @@ void ocfs2_clear_hb_callbacks(struct ocfs2_super *osb)
 	if (ocfs2_mount_local(osb))
 		return;
 
+	if (osb->osb_hb_res == NULL)
+		return;
+
 	o2hb_unregister_callback(&osb->osb_hb_down);
 	o2hb_unregister_callback(&osb->osb_hb_up);
+
+	o2hb_heartbeat_resource_put(osb->osb_hb_res);
 }
 
 void ocfs2_stop_heartbeat(struct ocfs2_super *osb)
