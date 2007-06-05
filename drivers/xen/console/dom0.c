@@ -1,0 +1,70 @@
+/******************************************************************************
+ * dom0.c
+ *
+ * Dom0 console parameter initialization.
+ *
+ * Copyright (c) 2002-2004, K A Fraser.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License version 2
+ * as published by the Free Software Foundation; or, when distributed
+ * separately from the Linux kernel or incorporated into other
+ * software packages, subject to the following license:
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this source file (the "Software"), to deal in the Software without
+ * restriction, including without limitation the rights to use, copy, modify,
+ * merge, publish, distribute, sublicense, and/or sell copies of the Software,
+ * and to permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
+
+#include <linux/types.h>
+#include <linux/screen_info.h>
+#include <xen/interface/xen.h>
+#include <xen/xencons.h>
+
+void dom0_init_screen_info(const struct dom0_vga_console_info *info)
+{
+	switch (info->video_type) {
+	case XEN_VGATYPE_TEXT_MODE_3:
+		screen_info.orig_video_mode = 3;
+		screen_info.orig_video_ega_bx = 3;
+		screen_info.orig_video_isVGA = 1;
+		screen_info.orig_video_lines = info->u.text_mode_3.rows;
+		screen_info.orig_video_cols = info->u.text_mode_3.columns;
+		screen_info.orig_x = info->u.text_mode_3.cursor_x;
+		screen_info.orig_y = info->u.text_mode_3.cursor_y;
+		screen_info.orig_video_points =
+			info->u.text_mode_3.font_height;
+		break;
+	case XEN_VGATYPE_VESA_LFB:
+		screen_info.orig_video_isVGA = VIDEO_TYPE_VLFB;
+		screen_info.lfb_width = info->u.vesa_lfb.width;
+		screen_info.lfb_height = info->u.vesa_lfb.height;
+		screen_info.lfb_depth = info->u.vesa_lfb.bits_per_pixel;
+		screen_info.lfb_base = info->u.vesa_lfb.lfb_base;
+		screen_info.lfb_size = info->u.vesa_lfb.lfb_size;
+		screen_info.lfb_linelength = info->u.vesa_lfb.bytes_per_line;
+		screen_info.red_size = info->u.vesa_lfb.red_size;
+		screen_info.red_pos = info->u.vesa_lfb.red_pos;
+		screen_info.green_size = info->u.vesa_lfb.green_size;
+		screen_info.green_pos = info->u.vesa_lfb.green_pos;
+		screen_info.blue_size = info->u.vesa_lfb.blue_size;
+		screen_info.blue_pos = info->u.vesa_lfb.blue_pos;
+		screen_info.rsvd_size = info->u.vesa_lfb.rsvd_size;
+		screen_info.rsvd_pos = info->u.vesa_lfb.rsvd_pos;
+		break;
+	}
+}

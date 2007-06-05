@@ -232,11 +232,16 @@ extern void update_process_times(int user);
 extern void scheduler_tick(void);
 
 #ifdef CONFIG_DETECT_SOFTLOCKUP
+extern unsigned long softlockup_get_next_event(void);
 extern void softlockup_tick(void);
 extern void spawn_softlockup_task(void);
 extern void touch_softlockup_watchdog(void);
 extern void touch_all_softlockup_watchdogs(void);
 #else
+static inline unsigned long softlockup_get_next_event(void)
+{
+	return MAX_JIFFY_OFFSET;
+}
 static inline void softlockup_tick(void)
 {
 }

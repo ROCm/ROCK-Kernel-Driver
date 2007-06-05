@@ -19,3 +19,10 @@ obj-$(CONFIG_MTRR)	+= 	mtrr/
 obj-$(CONFIG_CPU_FREQ)	+=	cpufreq/
 
 obj-$(CONFIG_X86_LOCAL_APIC) += perfctr-watchdog.o
+
+ifdef CONFIG_XEN
+include $(srctree)/scripts/Makefile.xen
+n-obj-xen := perfctr-watchdog.o
+obj-y := $(call filterxen, $(obj-y), $(n-obj-xen))
+obj-y := $(call cherrypickxen, $(obj-y), $(src))
+endif

@@ -206,7 +206,11 @@ static void bad_page(struct page *page)
 			1 << PG_slab    |
 			1 << PG_swapcache |
 			1 << PG_writeback |
-			1 << PG_buddy );
+			1 << PG_buddy	|
+#ifdef CONFIG_X86_XEN
+			1 << PG_pinned	|
+#endif
+			1 << PG_foreign );
 	set_page_count(page, 0);
 	reset_page_mapcount(page);
 	page->mapping = NULL;
@@ -442,7 +446,11 @@ static inline int free_pages_check(struct page *page)
 			1 << PG_swapcache |
 			1 << PG_writeback |
 			1 << PG_reserved |
-			1 << PG_buddy ))))
+			1 << PG_buddy	|
+#ifdef CONFIG_X86_XEN
+			1 << PG_pinned	|
+#endif
+			1 << PG_foreign ))))
 		bad_page(page);
 	/*
 	 * PageReclaim == PageTail. It is only an error
@@ -504,6 +512,12 @@ static void __free_pages_ok(struct page *page, unsigned int order)
 	int i;
 	int reserved = 0;
 
+#ifdef CONFIG_XEN
+	if (PageForeign(page)) {
+		PageForeignDestructor(page);
+		return;
+	}
+#endif
 	for (i = 0 ; i < (1 << order) ; ++i)
 		reserved += free_pages_check(page + i);
 	if (reserved)
@@ -598,7 +612,11 @@ static int prep_new_page(struct page *page, int order, gfp_t gfp_flags)
 			1 << PG_swapcache |
 			1 << PG_writeback |
 			1 << PG_reserved |
-			1 << PG_buddy ))))
+			1 << PG_buddy	|
+#ifdef CONFIG_X86_XEN
+			1 << PG_pinned	|
+#endif
+			1 << PG_foreign ))))
 		bad_page(page);
 
 	/*
@@ -781,6 +799,12 @@ static void fastcall free_hot_cold_page(struct page *page, int cold)
 	struct per_cpu_pages *pcp;
 	unsigned long flags;
 
+#ifdef CONFIG_XEN
+	if (PageForeign(page)) {
+		PageForeignDestructor(page);
+		return;
+	}
+#endif
 	if (PageAnon(page))
 		page->mapping = NULL;
 	if (free_pages_check(page))

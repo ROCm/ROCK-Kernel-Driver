@@ -522,6 +522,7 @@ static ctl_table kern_table[] = {
 		.mode           = 0644,
 		.proc_handler   = &proc_dointvec,
 	},
+#ifndef CONFIG_XEN
 	{
 		.ctl_name       = KERN_NMI_WATCHDOG,
 		.procname       = "nmi_watchdog",
@@ -530,6 +531,7 @@ static ctl_table kern_table[] = {
 		.mode           = 0644,
 		.proc_handler   = &proc_nmi_enabled,
 	},
+#endif
 #endif
 #if defined(CONFIG_X86)
 	{

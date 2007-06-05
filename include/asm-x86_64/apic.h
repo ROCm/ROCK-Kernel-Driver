@@ -3,7 +3,9 @@
 
 #include <linux/pm.h>
 #include <linux/delay.h>
+#ifndef CONFIG_XEN
 #include <asm/fixmap.h>
+#endif
 #include <asm/apicdef.h>
 #include <asm/system.h>
 
@@ -31,6 +33,8 @@ extern int apic_mapped;
 		if ((v) <= apic_verbosity) \
 			printk(s, ##a);    \
 	} while (0)
+
+#ifndef CONFIG_XEN
 
 struct pt_regs;
 
@@ -98,6 +102,13 @@ void switch_APIC_timer_to_ipi(void *cpumask);
 void switch_ipi_to_APIC_timer(void *cpumask);
 
 #define ARCH_APICTIMER_STOPS_ON_C3	1
+
+#elif defined(CONFIG_X86_LOCAL_APIC)
+
+extern int APIC_init_uniprocessor (void);
+extern void setup_apic_routing(void);
+
+#endif /* CONFIG_XEN / CONFIG_X86_LOCAL_APIC */
 
 extern unsigned boot_cpu_id;
 extern int local_apic_timer_c2_ok;

@@ -136,7 +136,9 @@ extern void acpi_reserve_bootmem(void);
 extern int acpi_disabled;
 extern int acpi_pci_disabled;
 
+#ifndef CONFIG_XEN
 #define ARCH_HAS_POWER_INIT 1
+#endif
 
 extern int acpi_skip_timer_override;
 extern int acpi_use_timer_override;

@@ -9,3 +9,13 @@ obj-$(CONFIG_K8_NUMA) += k8topology.o
 obj-$(CONFIG_ACPI_NUMA) += srat.o
 
 hugetlbpage-y = ../../i386/mm/hugetlbpage.o
+
+ifdef CONFIG_XEN
+include $(srctree)/scripts/Makefile.xen
+
+ioremap-y	+= ../../i386/mm/ioremap-xen.o
+hypervisor-y	+= ../../i386/mm/hypervisor.o
+obj-y		+= hypervisor.o
+
+obj-y := $(call cherrypickxen, $(obj-y))
+endif

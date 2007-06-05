@@ -16,6 +16,9 @@
 #include <linux/types.h>
 #include <linux/spinlock.h>
 #include <asm/atomic.h>
+#ifdef CONFIG_XEN
+#include <xen/interface/xenoprof.h>
+#endif
  
 struct super_block;
 struct dentry;
@@ -27,6 +30,12 @@ struct oprofile_operations {
 	/* create any necessary configuration files in the oprofile fs.
 	 * Optional. */
 	int (*create_files)(struct super_block * sb, struct dentry * root);
+#ifdef CONFIG_XEN
+	/* setup active domains with Xen */
+	int (*set_active)(int *active_domains, unsigned int adomains);
+        /* setup passive domains with Xen */
+        int (*set_passive)(int *passive_domains, unsigned int pdomains);
+#endif
 	/* Do any necessary interrupt setup. Optional. */
 	int (*setup)(void);
 	/* Do any necessary interrupt shutdown. Optional. */
@@ -78,6 +87,8 @@ void oprofile_add_pc(unsigned long pc, int is_kernel, unsigned long event);
 /* add a backtrace entry, to be called from the ->backtrace callback */
 void oprofile_add_trace(unsigned long eip);
 
+/* add a domain switch entry */
+int oprofile_add_domain_switch(int32_t domain_id);
 
 /**
  * Create a file of the given name as a child of the given root, with

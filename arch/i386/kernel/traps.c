@@ -656,18 +656,11 @@ mem_parity_error(unsigned char reason, struct pt_regs * regs)
 static __kprobes void
 io_check_error(unsigned char reason, struct pt_regs * regs)
 {
-	unsigned long i;
-
 	printk(KERN_EMERG "NMI: IOCK error (debug interrupt?)\n");
 	show_registers(regs);
 
 	/* Re-enable the IOCK line, wait for a few seconds */
-	reason = (reason & 0xf) | 8;
-	outb(reason, 0x61);
-	i = 2000;
-	while (--i) udelay(1000);
-	reason &= ~8;
-	outb(reason, 0x61);
+	clear_io_check_error(reason);
 }
 
 static __kprobes void

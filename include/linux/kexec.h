@@ -46,6 +46,13 @@
 			    KEXEC_CORE_NOTE_NAME_BYTES +		\
 			    KEXEC_CORE_NOTE_DESC_BYTES )
 
+#ifndef KEXEC_ARCH_HAS_PAGE_MACROS
+#define kexec_page_to_pfn(page)  page_to_pfn(page)
+#define kexec_pfn_to_page(pfn)   pfn_to_page(pfn)
+#define kexec_virt_to_phys(addr) virt_to_phys(addr)
+#define kexec_phys_to_virt(addr) phys_to_virt(addr)
+#endif
+
 /*
  * This structure is used to hold the arguments that are used when loading
  * kernel binaries.
@@ -106,6 +113,12 @@ struct kimage {
 extern NORET_TYPE void machine_kexec(struct kimage *image) ATTRIB_NORET;
 extern int machine_kexec_prepare(struct kimage *image);
 extern void machine_kexec_cleanup(struct kimage *image);
+#ifdef CONFIG_XEN
+extern int xen_machine_kexec_load(struct kimage *image);
+extern void xen_machine_kexec_unload(struct kimage *image);
+extern void xen_machine_kexec_setup_resources(void);
+extern void xen_machine_kexec_register_resources(struct resource *res);
+#endif
 extern asmlinkage long sys_kexec_load(unsigned long entry,
 					unsigned long nr_segments,
 					struct kexec_segment __user *segments,

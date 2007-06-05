@@ -48,7 +48,7 @@ if ACPI
 
 config ACPI_SLEEP
 	bool "Sleep States"
-	depends on X86 && (!SMP || SUSPEND_SMP)
+	depends on X86 && (!SMP || SUSPEND_SMP) && !XEN
 	depends on PM
 	default y
 	---help---
@@ -331,6 +331,7 @@ config ACPI_SYSTEM
 config X86_PM_TIMER
 	bool "Power Management Timer Support" if EMBEDDED
 	depends on X86
+	depends on !XEN
 	default y
 	help
 	  The Power Management Timer is available on all ACPI-capable,

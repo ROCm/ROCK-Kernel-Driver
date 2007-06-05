@@ -16,6 +16,9 @@
 #include <asm/processor.h>
 #include <asm/thread_info.h>
 #include <asm/elf.h>
+#ifdef CONFIG_XEN
+#include <xen/interface/xen.h>
+#endif
 
 #define DEFINE(sym, val) \
         asm volatile("\n->" #sym " %0 " #val : : "i" (val))
@@ -55,6 +58,7 @@ void foo(void)
 	OFFSET(TI_exec_domain, thread_info, exec_domain);
 	OFFSET(TI_flags, thread_info, flags);
 	OFFSET(TI_status, thread_info, status);
+	OFFSET(TI_cpu, thread_info, cpu);
 	OFFSET(TI_preempt_count, thread_info, preempt_count);
 	OFFSET(TI_addr_limit, thread_info, addr_limit);
 	OFFSET(TI_restart_block, thread_info, restart_block);
@@ -92,9 +96,14 @@ void foo(void)
 	OFFSET(pbe_orig_address, pbe, orig_address);
 	OFFSET(pbe_next, pbe, next);
 
+#ifndef CONFIG_X86_NO_TSS
 	/* Offset from the sysenter stack to tss.esp0 */
-	DEFINE(TSS_sysenter_esp0, offsetof(struct tss_struct, x86_tss.esp0) -
+	DEFINE(SYSENTER_stack_esp0, offsetof(struct tss_struct, x86_tss.esp0) -
 		 sizeof(struct tss_struct));
+#else
+	/* sysenter stack points directly to esp0 */
+	DEFINE(SYSENTER_stack_esp0, 0);
+#endif
 
 	DEFINE(PAGE_SIZE_asm, PAGE_SIZE);
 	DEFINE(PAGE_SHIFT_asm, PAGE_SHIFT);
@@ -105,6 +114,11 @@ void foo(void)
 	DEFINE(VDSO_PRELINK_asm, VDSO_PRELINK);
 
 	OFFSET(crypto_tfm_ctx_offset, crypto_tfm, __crt_ctx);
+
+#ifdef CONFIG_XEN
+	BLANK();
+	OFFSET(XEN_START_mfn_list, start_info, mfn_list);
+#endif
 
 #ifdef CONFIG_PARAVIRT
 	BLANK();

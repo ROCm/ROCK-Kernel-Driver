@@ -404,7 +404,10 @@ struct page *vm_normal_page(struct vm_area_struct *vma, unsigned long addr, pte_
 	 * and that the resulting page looks ok.
 	 */
 	if (unlikely(!pfn_valid(pfn))) {
-		print_bad_pte(vma, pte, addr);
+#ifdef CONFIG_XEN
+		if (!(vma->vm_flags & VM_RESERVED))
+#endif
+			print_bad_pte(vma, pte, addr);
 		return NULL;
 	}
 
@@ -662,8 +665,14 @@ static unsigned long zap_pte_range(struct mmu_gather *tlb,
 				     page->index > details->last_index))
 					continue;
 			}
-			ptent = ptep_get_and_clear_full(mm, addr, pte,
-							tlb->fullmm);
+#ifdef CONFIG_XEN
+			if (unlikely(vma->vm_ops && vma->vm_ops->zap_pte))
+				ptent = vma->vm_ops->zap_pte(vma, addr, pte,
+							     tlb->fullmm);
+			else
+#endif
+				ptent = ptep_get_and_clear_full(mm, addr, pte,
+								tlb->fullmm);
 			tlb_remove_tlb_entry(tlb, pte, addr);
 			if (unlikely(!page))
 				continue;
@@ -896,6 +905,7 @@ unsigned long zap_page_range(struct vm_area_struct *vma, unsigned long address,
 		tlb_finish_mmu(tlb, address, end);
 	return end;
 }
+EXPORT_SYMBOL(zap_page_range);
 
 /*
  * Do a quick page-table lookup for a single page.
@@ -1035,6 +1045,26 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 			continue;
 		}
 
+#ifdef CONFIG_XEN
+		if (vma && (vma->vm_flags & VM_FOREIGN)) {
+			struct page **map = vma->vm_private_data;
+			int offset = (start - vma->vm_start) >> PAGE_SHIFT;
+			if (map[offset] != NULL) {
+			        if (pages) {
+			                struct page *page = map[offset];
+
+					pages[i] = page;
+					get_page(page);
+				}
+				if (vmas)
+					vmas[i] = vma;
+				i++;
+				start += PAGE_SIZE;
+				len--;
+				continue;
+			}
+		}
+#endif
 		if (!vma || (vma->vm_flags & (VM_IO | VM_PFNMAP))
 				|| !(vm_flags & vma->vm_flags))
 			return i ? : -EFAULT;

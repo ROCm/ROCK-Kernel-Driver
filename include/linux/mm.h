@@ -169,6 +169,9 @@ extern unsigned int kobjsize(const void *objp);
 #define VM_MAPPED_COPY	0x01000000	/* T if mapped copy of data (nommu mmap) */
 #define VM_INSERTPAGE	0x02000000	/* The vma has had "vm_insert_page()" done on it */
 #define VM_ALWAYSDUMP	0x04000000	/* Always include in core dumps */
+#ifdef CONFIG_XEN
+#define VM_FOREIGN	0x08000000	/* Has pages belonging to another VM */
+#endif
 
 #ifndef VM_STACK_DEFAULT_FLAGS		/* arch can override this */
 #define VM_STACK_DEFAULT_FLAGS VM_DATA_DEFAULT_FLAGS
@@ -208,6 +211,12 @@ struct vm_operations_struct {
 	/* notification that a previously read-only page is about to become
 	 * writable, if an error is returned it will cause a SIGBUS */
 	int (*page_mkwrite)(struct vm_area_struct *vma, struct page *page);
+#ifdef CONFIG_XEN
+	/* Area-specific function for clearing the PTE at @ptep. Returns the
+	 * original value of @ptep. */
+	pte_t (*zap_pte)(struct vm_area_struct *vma, 
+			 unsigned long addr, pte_t *ptep, int is_fullmm);
+#endif
 #ifdef CONFIG_NUMA
 	int (*set_policy)(struct vm_area_struct *vma, struct mempolicy *new);
 	struct mempolicy *(*get_policy)(struct vm_area_struct *vma,

@@ -88,6 +88,7 @@
 
 #define PG_mappedtodisk		16	/* Has blocks allocated on-disk */
 #define PG_reclaim		17	/* To be reclaimed asap */
+#define PG_foreign		18	/* Page is owned by foreign allocator. */
 #define PG_buddy		19	/* Page is free, on buddy lists */
 
 /* PG_owner_priv_1 users should have descriptive aliases */
@@ -269,6 +270,18 @@ static inline void __ClearPageTail(struct page *page)
 #define PageUncached(page)	test_bit(PG_uncached, &(page)->flags)
 #define SetPageUncached(page)	set_bit(PG_uncached, &(page)->flags)
 #define ClearPageUncached(page)	clear_bit(PG_uncached, &(page)->flags)
+
+#define PageForeign(page)	test_bit(PG_foreign, &(page)->flags)
+#define SetPageForeign(page, dtor) do {		\
+	set_bit(PG_foreign, &(page)->flags);	\
+	(page)->index = (long)(dtor);		\
+} while (0)
+#define ClearPageForeign(page) do {		\
+	clear_bit(PG_foreign, &(page)->flags);	\
+	(page)->index = 0;			\
+} while (0)
+#define PageForeignDestructor(page)		\
+	( (void (*) (struct page *)) (page)->index )(page)
 
 struct page;	/* forward declaration */
 

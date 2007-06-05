@@ -25,6 +25,7 @@
 #include <asm/hw_irq.h>
 #include <asm/mach_apic.h>
 
+#ifndef CONFIG_XEN
 /* This keeps a track of which one is crashing cpu. */
 static int crashing_cpu;
 
@@ -107,6 +108,7 @@ static void nmi_shootdown_cpus(void)
 	/* There are no cpus to shootdown */
 }
 #endif
+#endif /* CONFIG_XEN */
 
 void machine_crash_shutdown(struct pt_regs *regs)
 {
@@ -122,14 +124,16 @@ void machine_crash_shutdown(struct pt_regs *regs)
 	/* The kernel is broken so disable interrupts */
 	local_irq_disable();
 
+#ifndef CONFIG_XEN
 	/* Make a note of crashing cpu. Will be used in NMI callback.*/
 	crashing_cpu = smp_processor_id();
+
 	nmi_shootdown_cpus();
 
 	if(cpu_has_apic)
 		 disable_local_APIC();
 
 	disable_IO_APIC();
-
+#endif /* CONFIG_XEN */
 	crash_save_cpu(regs, smp_processor_id());
 }

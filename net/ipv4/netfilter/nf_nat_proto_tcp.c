@@ -132,6 +132,9 @@ tcp_manip_pkt(struct sk_buff **pskb,
 	if (hdrsize < sizeof(*hdr))
 		return 1;
 
+	if (skb_checksum_setup(*pskb))
+		return 0;
+
 	nf_proto_csum_replace4(&hdr->check, *pskb, oldip, newip, 1);
 	nf_proto_csum_replace2(&hdr->check, *pskb, oldport, newport, 0);
 	return 1;

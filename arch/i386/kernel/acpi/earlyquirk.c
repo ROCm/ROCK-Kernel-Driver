@@ -11,7 +11,7 @@
 #include <asm/acpi.h>
 #include <asm/apic.h>
 
-#ifdef CONFIG_ACPI
+#if defined(CONFIG_ACPI) && !defined(CONFIG_XEN)
 
 static int __init nvidia_hpet_check(struct acpi_table_header *header)
 {
@@ -21,6 +21,7 @@ static int __init nvidia_hpet_check(struct acpi_table_header *header)
 
 static int __init check_bridge(int vendor, int device)
 {
+#ifndef CONFIG_XEN
 #ifdef CONFIG_ACPI
 	static int warned;
 	/* According to Nvidia all timer overrides are bogus unless HPET
@@ -44,6 +45,7 @@ static int __init check_bridge(int vendor, int device)
 		printk(KERN_INFO "ATI board detected. Disabling timer routing "
 				"over 8254.\n");
 	}
+#endif
 	return 0;
 }
 

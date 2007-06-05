@@ -60,6 +60,19 @@ void touch_all_softlockup_watchdogs(void)
 }
 EXPORT_SYMBOL(touch_all_softlockup_watchdogs);
 
+unsigned long softlockup_get_next_event(void)
+{
+	int this_cpu = smp_processor_id();
+	unsigned long touch_timestamp = per_cpu(touch_timestamp, this_cpu);
+
+	if (per_cpu(print_timestamp, this_cpu) == touch_timestamp ||
+		did_panic ||
+			!per_cpu(watchdog_task, this_cpu))
+		return MAX_JIFFY_OFFSET;
+
+	return max_t(long, 0, touch_timestamp + HZ - jiffies);
+}
+
 /*
  * This callback runs from the timer interrupt, and checks
  * whether the watchdog thread has hung or not:

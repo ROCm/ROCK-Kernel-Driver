@@ -37,6 +37,10 @@ enum {
 #define VDSO_DEFAULT	VDSO_ENABLED
 #endif
 
+#ifdef CONFIG_XEN
+#include <xen/interface/callback.h>
+#endif
+
 /*
  * Should the kernel map a VDSO page into processes and pass its
  * address down to glibc upon exec()?
@@ -175,6 +179,7 @@ static __init void relocate_vdso(Elf32_Ehdr *ehdr)
 
 void enable_sep_cpu(void)
 {
+#ifndef CONFIG_X86_NO_TSS
 	int cpu = get_cpu();
 	struct tss_struct *tss = &per_cpu(init_tss, cpu);
 
@@ -189,6 +194,7 @@ void enable_sep_cpu(void)
 	wrmsr(MSR_IA32_SYSENTER_ESP, tss->x86_tss.esp1, 0);
 	wrmsr(MSR_IA32_SYSENTER_EIP, (unsigned long) sysenter_entry, 0);
 	put_cpu();	
+#endif
 }
 
 static struct vm_area_struct gate_vma;
@@ -241,6 +247,18 @@ int __init sysenter_setup(void)
 	size_t vsyscall_len;
 
 	syscall_pages[0] = virt_to_page(syscall_page);
+
+#ifdef CONFIG_XEN
+	if (boot_cpu_has(X86_FEATURE_SEP)) {
+		static struct callback_register __initdata sysenter = {
+			.type = CALLBACKTYPE_sysenter,
+			.address = { __KERNEL_CS, (unsigned long)sysenter_entry },
+		};
+
+		if (HYPERVISOR_callback_op(CALLBACKOP_register, &sysenter) < 0)
+			clear_bit(X86_FEATURE_SEP, boot_cpu_data.x86_capability);
+	}
+#endif
 
 	gate_vma_init();
 

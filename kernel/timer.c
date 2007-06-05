@@ -790,7 +790,17 @@ unsigned long get_next_timer_interrupt(unsigned long now)
 	if (time_before_eq(expires, now))
 		return now;
 
+#ifndef CONFIG_XEN
 	return cmp_next_hrtimer_event(now, expires);
+#else
+	expires = cmp_next_hrtimer_event(now, expires);
+	{
+		unsigned long sl_next = softlockup_get_next_event();
+
+		return expires <= now || expires - now < sl_next
+		       ? expires : now + sl_next;
+	}
+#endif
 }
 
 #ifdef CONFIG_NO_IDLE_HZ

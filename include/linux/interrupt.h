@@ -207,6 +207,12 @@ static inline int disable_irq_wake(unsigned int irq)
 
 #endif /* CONFIG_GENERIC_HARDIRQS */
 
+#ifdef CONFIG_HAVE_IRQ_IGNORE_UNHANDLED
+int irq_ignore_unhandled(unsigned int irq);
+#else
+#define irq_ignore_unhandled(irq) 0
+#endif
+
 #ifndef __ARCH_SET_SOFTIRQ_PENDING
 #define set_softirq_pending(x) (local_softirq_pending() = (x))
 #define or_softirq_pending(x)  (local_softirq_pending() |= (x))

@@ -172,7 +172,8 @@ void note_interrupt(unsigned int irq, struct irq_desc *desc,
 		    irqreturn_t action_ret)
 {
 	if (unlikely(action_ret != IRQ_HANDLED)) {
-		desc->irqs_unhandled++;
+		if (!irq_ignore_unhandled(irq))
+			desc->irqs_unhandled++;
 		if (unlikely(action_ret != IRQ_NONE))
 			report_bad_irq(irq, desc, action_ret);
 	}

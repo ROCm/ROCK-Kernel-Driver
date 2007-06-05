@@ -118,6 +118,12 @@
 #include <linux/ctype.h>
 #include <linux/if_arp.h>
 
+#ifdef CONFIG_XEN
+#include <net/ip.h>
+#include <linux/tcp.h>
+#include <linux/udp.h>
+#endif
+
 /*
  *	The list of packet types we will receive (as opposed to discard)
  *	and the routines to invoke.
@@ -1456,6 +1462,44 @@ out_kfree_skb:
 	}						\
 }
 
+#ifdef CONFIG_XEN
+inline int skb_checksum_setup(struct sk_buff *skb)
+{
+	if (skb->proto_csum_blank) {
+		struct iphdr *iph;
+
+		if (skb->protocol != htons(ETH_P_IP))
+			goto out;
+		iph = ip_hdr(skb);
+		skb->transport_header = skb->network_header + 4 * iph->ihl;
+		if (skb->transport_header >= skb->tail)
+			goto out;
+		switch (iph->protocol) {
+		case IPPROTO_TCP:
+			skb->csum = offsetof(struct tcphdr, check);
+			break;
+		case IPPROTO_UDP:
+			skb->csum = offsetof(struct udphdr, check);
+			break;
+		default:
+			if (net_ratelimit())
+				printk(KERN_ERR "Attempting to checksum a non-"
+				       "TCP/UDP packet, dropping a protocol"
+				       " %d packet", iph->protocol);
+			goto out;
+		}
+		if ((skb->transport_header + skb->csum + 2) > skb->tail)
+			goto out;
+		skb->ip_summed = CHECKSUM_PARTIAL;
+		skb->proto_csum_blank = 0;
+	}
+	return 0;
+out:
+	return -EPROTO;
+}
+#endif
+
+
 /**
  *	dev_queue_xmit - transmit a buffer
  *	@skb: buffer to transmit
@@ -1487,6 +1531,12 @@ int dev_queue_xmit(struct sk_buff *skb)
 	struct net_device *dev = skb->dev;
 	struct Qdisc *q;
 	int rc = -ENOMEM;
+
+ 	/* If a checksum-deferred packet is forwarded to a device that needs a
+ 	 * checksum, correct the pointers and force checksumming.
+ 	 */
+ 	if (skb_checksum_setup(skb))
+ 		goto out_kfree_skb;
 
 	/* GSO will handle the following emulations directly. */
 	if (netif_needs_gso(dev, skb))
@@ -1871,6 +1921,19 @@ int netif_receive_skb(struct sk_buff *skb)
 	if (skb->tc_verd & TC_NCLS) {
 		skb->tc_verd = CLR_TC_NCLS(skb->tc_verd);
 		goto ncls;
+	}
+#endif
+
+#ifdef CONFIG_XEN
+	switch (skb->ip_summed) {
+	case CHECKSUM_UNNECESSARY:
+		skb->proto_data_valid = 1;
+		break;
+	case CHECKSUM_PARTIAL:
+		/* XXX Implement me. */
+	default:
+		skb->proto_data_valid = 0;
+		break;
 	}
 #endif
 
@@ -3738,6 +3801,7 @@ EXPORT_SYMBOL(unregister_netdevice_notifier);
 EXPORT_SYMBOL(net_enable_timestamp);
 EXPORT_SYMBOL(net_disable_timestamp);
 EXPORT_SYMBOL(dev_get_flags);
+EXPORT_SYMBOL(skb_checksum_setup);
 
 #if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
 EXPORT_SYMBOL(br_handle_frame_hook);
