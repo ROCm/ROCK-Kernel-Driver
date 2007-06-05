@@ -1,5 +1,5 @@
 config PPC_PS3
-	bool "Sony PS3 (incomplete)"
+	tristate "Sony PS3 (incomplete)"
 	depends on PPC_MULTIPLATFORM && PPC64
 	select PPC_CELL
 	select USB_ARCH_HAS_OHCI
