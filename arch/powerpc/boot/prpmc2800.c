@@ -569,7 +569,7 @@ void platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 asm ("	.globl _zimage_start\n\
 	_zimage_start:\n\
 		mfmsr	10\n\
-		rlwinm	10,10,0,~(1<<15)	/* Clear MSR_EE */\n\
+		rlwinm	10,10,0,17,15	 	/* Clear MSR_EE */\n\
 		sync\n\
 		mtmsr	10\n\
 		isync\n\
