@@ -78,14 +78,10 @@ MODULE_LICENSE("GPL");
 
 static uid_t asus_uid;
 static gid_t asus_gid;
-static int force;
 module_param(asus_uid, uint, 0);
 MODULE_PARM_DESC(asus_uid, "UID for entries in /proc/acpi/asus.\n");
 module_param(asus_gid, uint, 0);
 MODULE_PARM_DESC(asus_gid, "GID for entries in /proc/acpi/asus.\n");
-module_param(force, int, 0);
-MODULE_PARM_DESC(force, "Force loading of the module even if the laptop"
-		 "model is not listed.\n");
 
 /* For each model, all features implemented, 
  * those marked with R are relative to HOTK, A for absolute */
@@ -1202,22 +1198,11 @@ static int asus_hotk_get_info(void)
 			printk(KERN_NOTICE
 			       "  Samsung P30 detected, supported\n");
 		} else {
-			if (force){
-				hotk->model = M2E;
-				printk(KERN_NOTICE "  unsupported model"
-				       "%s, trying default values\n",
-				       string);
-				printk(KERN_NOTICE
-				       "  send /proc/acpi/dsdt"
-				       " to the developers\n");
-			}
-			else{
-				printk(KERN_NOTICE "  %s unsupported model %s,"
-				       " aborting.\nForce loading with force=1"
-				       " parameter\n",
-				       ACPI_HOTK_NAME, string);
-				return -ENODEV;
-			}
+			hotk->model = M2E;
+			printk(KERN_NOTICE "  unsupported model %s, trying "
+			       "default values\n", string);
+			printk(KERN_NOTICE
+			       "  send /proc/acpi/dsdt to the developers\n");
 		}
 		hotk->methods = &model_conf[hotk->model];
 		return AE_OK;
@@ -1413,7 +1398,7 @@ static int __init asus_acpi_init(void)
 	if (!asus_hotk_found) {
 		acpi_bus_unregister_driver(&asus_hotk_driver);
 		remove_proc_entry(PROC_ASUS, acpi_root_dir);
-		return -ENODEV;
+		return result;
 	}
 
 	asus_backlight_device = backlight_device_register("asus",NULL,NULL,

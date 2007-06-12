@@ -245,35 +245,6 @@ config ACPI_TOSHIBA
 	  If you have a legacy free Toshiba laptop (such as the Libretto L1
 	  series), say Y.
 
-config ACPI_SONY
-	tristate "Sony Laptop Extras"
-	depends on X86
-	default m
-	  ---help---
-	  This mini-driver drives the ACPI SNC device present in the
-	  ACPI BIOS of the Sony Vaio laptops.
-
-	  It gives access to some extra laptop functionalities. In
-	  its current form, the only thing this driver does is letting
-	  the user set or query the screen brightness.
-
-	  Read <file:Documentation/acpi/sony_acpi.txt> for more information.
-
-config ACPI_PCC
-        tristate "Panasonic Laptop Extras"
-        depends on X86
-        default m
-           ---help---
-           This driver implements hotkey functionality and access to
-	   various hardware (e.g. LCD brightness) for the
-           Panasonic R1 (N variant), R2, R3, T2, W2, and Y2 laptops.
-
-           Further details and user space tools are available at
-           <http://www.da-cha.org/letsnote/>.
-
-	   If you have one of the above listed Panasonic laptops
-	   say Y or M here.
-
 config ACPI_CUSTOM_DSDT
 	bool "Include Custom DSDT"
 	depends on !STANDALONE
@@ -325,6 +296,14 @@ config ACPI_DEBUG
 	  The ACPI driver can optionally report errors with a great deal
 	  of verbosity. Saying Y enables these statements. This will increase
 	  your kernel size by around 50K.
+
+config ACPI_DEBUG_FUNC_TRACE
+	bool "Additionally enable ACPI function tracing"
+	default n
+	depends on ACPI_DEBUG
+	help
+	  ACPI Debug Statements slow down ACPI processing. Function trace
+	  is about half of the penalty and is rarely useful.
 
 config ACPI_EC
 	bool
