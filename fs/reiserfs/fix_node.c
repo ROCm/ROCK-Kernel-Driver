@@ -399,8 +399,8 @@ static int get_num_ver(int mode, struct tree_balance *tb, int h,
 
 	/* snum012 [0-2] - number of items, that lay
 	   to S[0], first new node and second new node */
-	snum012[3] = -1;	/* sbytes[0] */
-	snum012[4] = -1;	/* sbytes[1] */
+	snum012[3] = -1;	/* s1bytes */
+	snum012[4] = -1;	/* s2bytes */
 
 	/* internal level */
 	if (h > 0) {
@@ -526,7 +526,7 @@ static int get_num_ver(int mode, struct tree_balance *tb, int h,
 		    ((split_item_positions[0] ==
 		      split_item_positions[1]) ? snum012[3] : 0);
 
-		// sbytes[2]
+		// s2bytes
 		snum012[4] =
 		    op_unit_num(&vn->vn_vi[split_item_num]) - snum012[4] -
 		    bytes_to_r - bytes_to_l - bytes_to_S1new;
@@ -554,7 +554,7 @@ static int get_num_ver(int mode, struct tree_balance *tb, int h,
 		    ((split_item_positions[0] == split_item_positions[1]
 		      && snum012[4] != -1) ? snum012[4] : 0);
 
-		// sbytes[0]
+		// s1bytes
 		snum012[3] =
 		    op_unit_num(&vn->vn_vi[split_item_num]) - snum012[3] -
 		    bytes_to_r - bytes_to_l - bytes_to_S2new;
@@ -581,7 +581,7 @@ extern struct tree_balance *cur_tb;
  *		not shifted entirely
  *	rbytes	number of bytes which flow to the right neighbor from the item that is not
  *		not shifted entirely
- *	sbytes[0]	number of bytes which flow to the first  new node when S[0] splits (this number is contained in s012 array)
+ *	s1bytes	number of bytes which flow to the first  new node when S[0] splits (this number is contained in s012 array)
  */
 
 static void set_parameters(struct tree_balance *tb, int h, int lnum,
@@ -595,9 +595,9 @@ static void set_parameters(struct tree_balance *tb, int h, int lnum,
 	if (h == 0) {		/* only for leaf level */
 		if (s012 != NULL) {
 			tb->s0num = *s012++,
-			    tb->snum[0] = *s012++, tb->snum[1] = *s012++;
-			tb->sbytes[0] = *s012++;
-			tb->sbytes[2] = *s012;
+			    tb->s1num = *s012++, tb->s2num = *s012++;
+			tb->s1bytes = *s012++;
+			tb->s2bytes = *s012;
 		}
 		tb->lbytes = lb;
 		tb->rbytes = rb;
@@ -1235,9 +1235,9 @@ static int ip_check_balance(struct tree_balance *tb, int h)
 	   nodes that might be created. */
 
 	/* we perform 8 calls to get_num_ver().  For each call we calculate five parameters.
-	   where 4th parameter is sbytes[0] and 5th - sbytes[2]
+	   where 4th parameter is s1bytes and 5th - s2bytes
 	 */
-	short snum012[40] = { 0, };	/* s0num, snum[0], snum[1] for 8 cases
+	short snum012[40] = { 0, };	/* s0num, s1num, s2num for 8 cases
 					   0,1 - do not shift and do not shift but bottle
 					   2 - shift only whole item to left
 					   3 - shift to left and bottle as much as possible
@@ -1374,7 +1374,7 @@ static int ip_check_balance(struct tree_balance *tb, int h)
 		/* calculate number of blocks S[h] must be split into when
 		   nothing is shifted to the neighbors,
 		   as well as number of items in each part of the split node (s012 numbers),
-		   and number of bytes (sbytes[0]) of the shared drop which flow to S1 if any */
+		   and number of bytes (s1bytes) of the shared drop which flow to S1 if any */
 		nset = NOTHING_SHIFT_NO_FLOW;
 		nver = get_num_ver(vn->vn_mode, tb, h,
 				   0, -1, h ? vn->vn_nr_item : 0, -1,
@@ -1395,7 +1395,7 @@ static int ip_check_balance(struct tree_balance *tb, int h)
 		   l_shift_num first items and l_shift_bytes of the right most
 		   liquid item to be shifted are shifted to the left neighbor,
 		   as well as number of items in each part of the splitted node (s012 numbers),
-		   and number of bytes (sbytes[0]) of the shared drop which flow to S1 if any
+		   and number of bytes (s1bytes) of the shared drop which flow to S1 if any
 		 */
 		lset = LEFT_SHIFT_NO_FLOW;
 		lnver = get_num_ver(vn->vn_mode, tb, h,
@@ -1418,7 +1418,7 @@ static int ip_check_balance(struct tree_balance *tb, int h)
 		   r_shift_num first items and r_shift_bytes of the left most
 		   liquid item to be shifted are shifted to the right neighbor,
 		   as well as number of items in each part of the splitted node (s012 numbers),
-		   and number of bytes (sbytes[0]) of the shared drop which flow to S1 if any
+		   and number of bytes (s1bytes) of the shared drop which flow to S1 if any
 		 */
 		rset = RIGHT_SHIFT_NO_FLOW;
 		rnver = get_num_ver(vn->vn_mode, tb, h,
@@ -1446,7 +1446,7 @@ static int ip_check_balance(struct tree_balance *tb, int h)
 		/* calculate number of blocks S[h] must be split into when
 		   items are shifted in both directions,
 		   as well as number of items in each part of the splitted node (s012 numbers),
-		   and number of bytes (sbytes[0]) of the shared drop which flow to S1 if any
+		   and number of bytes (s1bytes) of the shared drop which flow to S1 if any
 		 */
 		lrset = LR_SHIFT_NO_FLOW;
 		lrnver = get_num_ver(vn->vn_mode, tb, h,

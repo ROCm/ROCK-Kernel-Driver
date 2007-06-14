@@ -14,23 +14,6 @@ static char error_buf[1024];
 static char fmt_buf[1024];
 static char off_buf[80];
 
-const char *tb_mode_names(enum tb_modes mode)
-{
-	char * const names[] = {
-	"INSERT",
-	"PASTE",
-	"DELETE",
-	"CUT",
-	"INTERNAL",
-	"SKIP_BALANCING",
-	"CONVERT",
-	};
-
-	if (mode >= M_MAX_MODES)
-		return "UNKNOWN";
-	return names[mode];
-}
-
 static char *reiserfs_cpu_offset(struct cpu_key *key)
 {
 	if (cpu_key_k_type(key) == TYPE_DIRENTRY)
@@ -390,28 +373,13 @@ void __reiserfs_panic(struct super_block *sb, const char *id,
 		      id ? id : "", id ? " " : "", function, error_buf);
 }
 
-void reiserfs_handle_error(struct super_block *sb, int errno)
-{
-
-	if (sb->s_flags & MS_RDONLY)
-		return;
-
-	if (reiserfs_error_ro(sb)) {
-		reiserfs_info(sb, "Remounting filesystem read-only\n");
-		sb->s_flags |= MS_RDONLY;
-	} else {
-		reiserfs_journal_abort(sb, errno);
-	}
-
-	if (reiserfs_error_panic(sb)) {
-		reiserfs_panic (sb, "", "panic forced after error");
-	}
-}
-
 void __reiserfs_error(struct super_block *sb, const char *id,
                       const char *function, const char *fmt, ...)
 {
 	do_reiserfs_warning(fmt);
+
+	if (reiserfs_error_panic(sb))
+		__reiserfs_panic(sb, id, function, error_buf);
 
 	if (id && id[0])
 		printk(KERN_CRIT "REISERFS error (device %s): %s %s: %s\n",
@@ -420,7 +388,12 @@ void __reiserfs_error(struct super_block *sb, const char *id,
 		printk(KERN_CRIT "REISERFS error (device %s): %s: %s\n",
 	               sb->s_id, function, error_buf);
 
-	reiserfs_handle_error(sb, -EIO);
+	if (sb->s_flags & MS_RDONLY)
+		return;
+
+	reiserfs_info(sb, "Remounting filesystem read-only\n");
+	sb->s_flags |= MS_RDONLY;
+	reiserfs_abort_journal(sb, -EIO);
 }
 
 void reiserfs_abort(struct super_block *sb, int errno, const char *fmt, ...)
@@ -439,7 +412,7 @@ void reiserfs_abort(struct super_block *sb, int errno, const char *fmt, ...)
 	       error_buf);
 
 	sb->s_flags |= MS_RDONLY;
-	reiserfs_journal_abort(sb, errno);
+	reiserfs_abort_journal(sb, errno);
 }
 
 /* this prints internal nodes (4 keys/items in line) (dc_number,
@@ -694,9 +667,9 @@ void store_print_tb(struct tree_balance *tb)
 		"* h * size * ln * lb * rn * rb * blkn * s0 * s1 * s1b * s2 * s2b * curb * lk * rk *\n"
 		"* 0 * %4d * %2d * %2d * %2d * %2d * %4d * %2d * %2d * %3d * %2d * %3d * %4d * %2d * %2d *\n",
 		tb->insert_size[0], tb->lnum[0], tb->lbytes, tb->rnum[0],
-		tb->rbytes, tb->blknum[0], tb->s0num, tb->snum[0],
-		tb->sbytes[0], tb->snum[1], tb->sbytes[1], tb->cur_blknum,
-		tb->lkey[0], tb->rkey[0]);
+		tb->rbytes, tb->blknum[0], tb->s0num, tb->s1num, tb->s1bytes,
+		tb->s2num, tb->s2bytes, tb->cur_blknum, tb->lkey[0],
+		tb->rkey[0]);
 
 	/* this prints balance parameters for non-leaf levels */
 	h = 0;

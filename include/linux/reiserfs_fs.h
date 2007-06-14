@@ -1366,15 +1366,17 @@ struct tree_balance {
 	/* fields that are used only for balancing leaves of the tree */
 	int cur_blknum;		/* number of empty blocks having been already allocated                 */
 	int s0num;		/* number of items that fall into left most  node when S[0] splits     */
-	int snum[2];		/* number of items that fall into first and second new node when S[0] splits     */
+	int s1num;		/* number of items that fall into first  new node when S[0] splits     */
+	int s2num;		/* number of items that fall into second new node when S[0] splits     */
 	int lbytes;		/* number of bytes which can flow to the left neighbor from the        left    */
 	/* most liquid item that cannot be shifted from S[0] entirely         */
 	/* if -1 then nothing will be partially shifted */
 	int rbytes;		/* number of bytes which will flow to the right neighbor from the right        */
 	/* most liquid item that cannot be shifted from S[0] entirely         */
 	/* if -1 then nothing will be partially shifted                           */
-	int sbytes[2];		/* number of bytes which flow to the first and second new node when S[0] splits   */
+	int s1bytes;		/* number of bytes which flow to the first  new node when S[0] splits   */
 	/* note: if S[0] splits into 3 nodes, then items do not need to be cut  */
+	int s2bytes;
 	struct buffer_head *buf_to_free[MAX_FREE_BLOCK];	/* buffers which are to be freed after do_balance finishes by unfix_nodes */
 	char *vn_buf;		/* kmalloced memory. Used to create
 				   virtual node and keep map of
@@ -1388,24 +1390,27 @@ struct tree_balance {
 	struct in_core_key key;	/* key pointer, to pass to block allocator or
 				   another low-level subsystem */
 #endif
-	struct bl_context *context;
 };
 
 /* These are modes of balancing */
-enum tb_modes {
-	M_INSERT = 0,	/* When inserting an item. */
-	M_PASTE,	/* When inserting into (directories only) or
-			 * appending onto an already existant item. */
-	M_DELETE,	/* When deleting an item. */
-	M_CUT,		/* When truncating an item or removing an entry
-	                 * from a (directory) item. */
-	M_INTERNAL,	/* used when balancing on leaf level
-			 * skipped (in reiserfsck) */
-	M_SKIP_BALANCING, /* When further balancing is not needed,
-			   * then do_balance does not need to be called. */
-	M_CONVERT,
-	M_MAX_MODES
-};
+
+/* When inserting an item. */
+#define M_INSERT	'i'
+/* When inserting into (directories only) or appending onto an already
+   existant item. */
+#define M_PASTE		'p'
+/* When deleting an item. */
+#define M_DELETE	'd'
+/* When truncating an item or removing an entry from a (directory) item. */
+#define M_CUT 		'c'
+
+/* used when balancing on leaf level skipped (in reiserfsck) */
+#define M_INTERNAL	'n'
+
+/* When further balancing is not needed, then do_balance does not need
+   to be called. */
+#define M_SKIP_BALANCING 		's'
+#define M_CONVERT	'v'
 
 /* modes of leaf_move_items */
 #define LEAF_FROM_S_TO_L 0
@@ -1760,7 +1765,7 @@ int journal_begin(struct reiserfs_transaction_handle *,
 		  struct super_block *sb, unsigned long);
 int journal_join_abort(struct reiserfs_transaction_handle *,
 		       struct super_block *sb, unsigned long);
-void reiserfs_journal_abort(struct super_block *sb, int errno);
+void reiserfs_abort_journal(struct super_block *sb, int errno);
 void reiserfs_abort(struct super_block *sb, int errno, const char *fmt, ...);
 int reiserfs_allocate_list_bitmaps(struct super_block *s,
 				   struct reiserfs_list_bitmap *, int);
@@ -2024,7 +2029,6 @@ void check_leaf(struct buffer_head *bh);
 void check_internal(struct buffer_head *bh);
 void print_statistics(struct super_block *s);
 char *reiserfs_hashname(int code);
-const char *tb_mode_names(enum tb_modes);
 
 /* lbalance.c */
 int leaf_move_items(int shift_mode, struct tree_balance *tb, int mov_num,

@@ -4256,14 +4256,15 @@ static int do_journal_end(struct reiserfs_transaction_handle *th,
 	return journal->j_errno;
 }
 
-static void __reiserfs_journal_abort_hard(struct super_block *sb)
+/* Send the file system read only and refuse new transactions */
+void reiserfs_abort_journal(struct super_block *sb, int errno)
 {
 	struct reiserfs_journal *journal = SB_JOURNAL(sb);
 	if (test_bit(J_ABORTED, &journal->j_state))
 		return;
 
-	printk(KERN_CRIT "REISERFS: Aborting journal for filesystem on %s\n",
-	       reiserfs_bdevname(sb));
+	if (!journal->j_errno)
+		journal->j_errno = errno;
 
 	sb->s_flags |= MS_RDONLY;
 	set_bit(J_ABORTED, &journal->j_state);
@@ -4273,19 +4274,3 @@ static void __reiserfs_journal_abort_hard(struct super_block *sb)
 #endif
 }
 
-static void __reiserfs_journal_abort_soft(struct super_block *sb, int errno)
-{
-	struct reiserfs_journal *journal = SB_JOURNAL(sb);
-	if (test_bit(J_ABORTED, &journal->j_state))
-		return;
-
-	if (!journal->j_errno)
-		journal->j_errno = errno;
-
-	__reiserfs_journal_abort_hard(sb);
-}
-
-void reiserfs_journal_abort(struct super_block *sb, int errno)
-{
-	return __reiserfs_journal_abort_soft(sb, errno);
-}

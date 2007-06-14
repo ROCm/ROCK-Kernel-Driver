@@ -432,19 +432,17 @@ void reiserfs_free_block(struct reiserfs_transaction_handle *th,
 			 int for_unformatted)
 {
 	struct super_block *s = th->t_super;
-	__u32 blocks = sb_block_count(REISERFS_SB(s)->s_rs);
-
 	BUG_ON(!th->t_trans_id);
 
 	RFALSE(!s, "vs-4061: trying to free block on nonexistent device");
 	if (!is_reusable(s, block, 1))
 		return;
 
-	if (block > blocks) {
+	if (block > sb_block_count(REISERFS_SB(s)->s_rs)) {
 		reiserfs_error(th->t_super, "bitmap-4072",
 		               "Trying to free block outside file system "
 			       "boundaries (%lu > %lu)",
-			       block, blocks);
+			       block, sb_block_count(REISERFS_SB(s)->s_rs));
 		return;
 	}
 	/* mark it before we clear it, just in case */
