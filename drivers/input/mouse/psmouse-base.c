@@ -1541,7 +1541,8 @@ static ssize_t psmouse_attr_set_resolution(struct psmouse *psmouse, void *data, 
 }
 
 
-static int psmouse_set_maxproto(const char *val, struct kernel_param *kp)
+/* These two should be static, but it causes a section type conflict */
+int psmouse_set_maxproto(const char *val, struct kernel_param *kp)
 {
 	const struct psmouse_protocol *proto;
 
@@ -1558,7 +1559,7 @@ static int psmouse_set_maxproto(const char *val, struct kernel_param *kp)
 	return 0;
 }
 
-static int psmouse_get_maxproto(char *buffer, struct kernel_param *kp)
+int psmouse_get_maxproto(char *buffer, struct kernel_param *kp)
 {
 	int type = *((unsigned int *)kp->arg);
 
