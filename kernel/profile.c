@@ -200,10 +200,10 @@ EXPORT_SYMBOL_GPL(unregister_timer_hook);
 EXPORT_SYMBOL_GPL(task_handoff_register);
 EXPORT_SYMBOL_GPL(task_handoff_unregister);
 
-#endif /* CONFIG_PROFILING */
 
 EXPORT_SYMBOL_GPL(profile_event_register);
 EXPORT_SYMBOL_GPL(profile_event_unregister);
+#endif /* CONFIG_PROFILING */
 
 #ifdef CONFIG_SMP
 /*

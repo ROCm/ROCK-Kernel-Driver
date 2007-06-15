@@ -36,6 +36,8 @@
 #include <asm/uaccess.h>
 
 extern void jprobe_inst_return(void);
+/* ia64 doesn't need this, but the symbol is exported */
+void jprobe_return(void) {}
 
 DEFINE_PER_CPU(struct kprobe *, current_kprobe) = NULL;
 DEFINE_PER_CPU(struct kprobe_ctlblk, kprobe_ctlblk);

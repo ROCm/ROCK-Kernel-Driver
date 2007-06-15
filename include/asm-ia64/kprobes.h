@@ -125,9 +125,7 @@ extern int kprobe_exceptions_notify(struct notifier_block *self,
 				    unsigned long val, void *data);
 
 /* ia64 does not need this */
-static inline void jprobe_return(void)
-{
-}
+void jprobe_return(void);
 extern void invalidate_stacked_regs(void);
 extern void flush_register_stack(void);
 extern void arch_remove_kprobe(struct kprobe *p);
