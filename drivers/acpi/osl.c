@@ -68,10 +68,6 @@ EXPORT_SYMBOL(acpi_in_debugger);
 extern char line_buf[80];
 #endif				/*ENABLE_DEBUGGER */
 
-#ifdef CONFIG_ACPI_CUSTOM_DSDT_INITRD
-int acpi_must_unregister_table = FALSE;
-#endif
-
 static unsigned int acpi_irq_irq;
 static acpi_osd_handler acpi_irq_handler;
 static void *acpi_irq_context;
@@ -279,113 +275,6 @@ acpi_os_predefined_override(const struct acpi_predefined_names *init_val,
 	return AE_OK;
 }
 
-#ifdef CONFIG_ACPI_CUSTOM_DSDT_INITRD
-#define MAX_DS_SDTS 10
-static struct acpi_table_header *ds_sdt_buffers[MAX_DS_SDTS];
-static unsigned int tables_loaded = 0;
-
-void acpi_load_override_tables(void){
-	struct file         *firmware_file;
-	mm_segment_t        oldfs;
-	unsigned long       len, len2;
-	struct kstat        stat;
-	unsigned int        x, y;
-	char *ramfs_ds_sdt_names[MAX_DS_SDTS] = {
-		"/DSDT.aml",
-		"/SSDT.aml",
-		"/SSDT1.aml",
-		"/SSDT2.aml",
-		"/SSDT3.aml",
-		"/SSDT4.aml",
-		"/SSDT5.aml",
-		"/SSDT6.aml",
-		"/SSDT7.aml",
-		"/SSDT8.aml",
-	};
-	/*
-	 * Never do this at home, only the user-space is allowed to open a file.
-	 * The clean way would be to use the firmware loader. But this code must be run
-	 * before there is any userspace available. So we need a static/init firmware
-	 * infrastructure, which doesn't exist yet...
-	 */
-	for (x = 0; x < MAX_DS_SDTS; x++){
-		if (vfs_stat(ramfs_ds_sdt_names[x], &stat) < 0) {
-			continue;
-		}
-		len = stat.size;
-		/* check especially against empty files */
-		if (len <= 4) {
-			printk("error file %s is too small, only %lu bytes.\n",
-			       ramfs_ds_sdt_names[x], len);
-			continue;
-		}
-
-		ds_sdt_buffers[x] = kmalloc(len, GFP_KERNEL);
-		if (!ds_sdt_buffers[x]) {
-			printk("error when allocating %lu bytes of memory.\n",
-			       len);
-			/* better free all tables again */
-			for (y = 0; y < x; y++){
-				if (ds_sdt_buffers[y])
-					kfree(ds_sdt_buffers[x]);
-			}
-			acpi_must_unregister_table = FALSE;
-			return;
-		}
-
-		firmware_file = filp_open(ramfs_ds_sdt_names[x], O_RDONLY, 0);
-		if (IS_ERR(firmware_file)) {
-			printk("error, could not open file %s.\n",
-			       ramfs_ds_sdt_names[x]);
-			kfree(ds_sdt_buffers[x]);
-			continue;
-		}
-
-		oldfs = get_fs();
-		set_fs(KERNEL_DS);
-		len2 = vfs_read(firmware_file,
-				(char __user *)ds_sdt_buffers[x],
-				len,
-				&firmware_file->f_pos);
-		set_fs(oldfs);
-		filp_close(firmware_file, NULL);
-		if (len2 < len) {
-			printk("error trying to read %lu bytes from %s.\n",
-			       len, ramfs_ds_sdt_names[x]);
-			kfree(ds_sdt_buffers[x]);
-			continue;
-		}
-		printk(PREFIX "successfully read %lu bytes from file %s\n",
-		       len, ramfs_ds_sdt_names[x]);
-	}
-}
-
-struct acpi_table_header * acpi_find_dsdt_initrd(struct acpi_table_header * t)
-{
-	struct acpi_table_header	*ret = NULL;
-	unsigned int                     x;
-	for (x = 0; x < MAX_DS_SDTS; x++){
-		if (ds_sdt_buffers[x]){
-			if (!memcmp(ds_sdt_buffers[x]->signature,
-				    t->signature, 4) &&
-			    !memcmp(ds_sdt_buffers[x]->oem_table_id,
-				    t->oem_table_id, 8)){
-				ret = ds_sdt_buffers[x];
-				printk(PREFIX "Override [%4.4s-%8.8s]"
-				       " from initramfs -"
-				       " tainting kernel\n",
-				       t->signature,
-				       t->oem_table_id);
-				add_taint(TAINT_NO_SUPPORT);
-				acpi_must_unregister_table = TRUE;
-				break;
-			}
-		}
-	}
-	return ret;
-}
-#endif
-
 acpi_status
 acpi_os_table_override(struct acpi_table_header * existing_table,
 		       struct acpi_table_header ** new_table)
@@ -393,21 +282,13 @@ acpi_os_table_override(struct acpi_table_header * existing_table,
 	if (!existing_table || !new_table)
 		return AE_BAD_PARAMETER;
 
-	*new_table = NULL;
-
 #ifdef CONFIG_ACPI_CUSTOM_DSDT
 	if (strncmp(existing_table->signature, "DSDT", 4) == 0)
 		*new_table = (struct acpi_table_header *)AmlCode;
-#endif
-#ifdef CONFIG_ACPI_CUSTOM_DSDT_INITRD
-	if (!tables_loaded){
-		acpi_load_override_tables();
-		tables_loaded = 1;
-	}
-	if (!strncmp(existing_table->signature, "DSDT", 4) ||
-	    !strncmp(existing_table->signature, "SSDT", 4)){
-		*new_table = acpi_find_dsdt_initrd(existing_table);
-	}
+	else
+		*new_table = NULL;
+#else
+	*new_table = NULL;
 #endif
 	return AE_OK;
 }

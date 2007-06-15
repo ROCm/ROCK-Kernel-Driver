@@ -541,28 +541,6 @@ skip:
 
 #endif
 
-#ifdef CONFIG_ACPI_CUSTOM_DSDT_INITRD
-/* Tries to read the initramfs if it's already there, for ACPI Table Overiding */
-void __init early_populate_rootfs(void)
-{
-     char *err = unpack_to_rootfs(__initramfs_start,
-                      __initramfs_end - __initramfs_start, 0);
-     if (err)
-             return;
-#ifdef CONFIG_BLK_DEV_INITRD
-     if (initrd_start) {
-             printk(KERN_INFO "Early unpacking initramfs...");
-             err = unpack_to_rootfs((char *)initrd_start,
-                     initrd_end - initrd_start, 0);
-             if (err)
-                     return;
-             printk(" done\n");
-     }
-#endif /* CONFIG_BLK_DEV_INITRD */
-     return;
-}
-#endif /* CONFIG_ACPI_CUSTOM_DSDT_INITRD */
-
 static int __init populate_rootfs(void)
 {
 	char *err = unpack_to_rootfs(__initramfs_start,
