@@ -31,6 +31,7 @@
 #include <linux/mm.h>
 #include <linux/io.h>
 #include <linux/mutex.h>
+#include <linux/linux_logo.h>
 #include <asm/spu.h>
 #include <asm/spu_priv1.h>
 #include <asm/xmon.h>
@@ -469,8 +470,18 @@ void spu_free(struct spu *spu)
 }
 EXPORT_SYMBOL_GPL(spu_free);
 
+static int spu_shutdown(struct sys_device *sysdev)
+{
+	struct spu *spu = container_of(sysdev, struct spu, sysdev);
+
+	spu_free_irqs(spu);
+	spu_destroy_spu(spu);
+	return 0;
+}
+
 struct sysdev_class spu_sysdev_class = {
-	set_kset_name("spu")
+	set_kset_name("spu"),
+	.shutdown = spu_shutdown,
 };
 
 int spu_add_sysdev_attr(struct sysdev_attribute *attr)
@@ -610,11 +621,14 @@ static int __init init_spu_base(void)
 
 	ret = spu_enumerate_spus(create_spu);
 
-	if (ret) {
+	if (ret < 0) {
 		printk(KERN_WARNING "%s: Error initializing spus\n",
 			__FUNCTION__);
 		goto out_unregister_sysdev_class;
 	}
+
+	if (ret > 0)
+		fb_append_extra_logo(&logo_spe_clut224, ret);
 
 	xmon_register_spus(&spu_full_list);
 

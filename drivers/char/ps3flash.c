@@ -18,40 +18,46 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#undef DEBUG
-
 #include <linux/dma-mapping.h>
 #include <linux/interrupt.h>
 #include <linux/miscdevice.h>
+#include <linux/uaccess.h>
 
-#include <asm/uaccess.h>
-#include <asm/lv1call.h>
 #include <asm/ps3stor.h>
 
 
 #define DEVICE_NAME		"ps3flash"
 
-
 #define FLASH_BLOCK_SIZE	(256*1024)
 
 
 struct ps3flash_private {
-	struct mutex mutex;
+	struct mutex mutex;	/* Bounce buffer mutex */
 };
 #define ps3flash_priv(dev)	((dev)->sbd.core.driver_data)
 
 static struct ps3_storage_device *ps3flash_dev;
 
-enum {
-	PS3FLASH_READ	= 0,
-	PS3FLASH_WRITE	= 1,
-};
+static ssize_t ps3flash_read_write_sectors(struct ps3_storage_device *dev,
+					   u64 lpar, u64 start_sector,
+					   u64 sectors, int write)
+{
+	const char *op = write ? "write" : "read";
+	u64 res = ps3stor_read_write_sectors(dev, lpar, start_sector, sectors,
+					     write);
+	if (res) {
+		dev_err(&dev->sbd.core, "%s:%u: %s failed 0x%lx\n", __func__,
+			__LINE__, op, res);
+		return -EIO;
+	}
+	return sectors;
+}
 
 static ssize_t ps3flash_read_sectors(struct ps3_storage_device *dev,
 				     u64 start_sector, u64 sectors,
 				     unsigned int sector_offset)
 {
-	u64 max_sectors, lpar, res;
+	u64 max_sectors, lpar;
 
 	max_sectors = dev->bounce_size / dev->blk_size;
 	if (sectors > max_sectors) {
@@ -61,21 +67,17 @@ static ssize_t ps3flash_read_sectors(struct ps3_storage_device *dev,
 	}
 
 	lpar = dev->bounce_lpar + sector_offset * dev->blk_size;
-	res = ps3stor_read_write_sectors(dev, lpar, start_sector, sectors, 0);
-	return res ? -EIO : sectors;
+	return ps3flash_read_write_sectors(dev, lpar, start_sector, sectors,
+					   0);
 }
 
 static ssize_t ps3flash_write_chunk(struct ps3_storage_device *dev,
 				    u64 start_sector)
 {
-	u64 sectors, res;
-
-	sectors = dev->bounce_size / dev->blk_size;
-	res = ps3stor_read_write_sectors(dev, dev->bounce_lpar, start_sector,
-					 sectors, 1);
-	return res ? -EIO : sectors;
+       u64 sectors = dev->bounce_size / dev->blk_size;
+       return ps3flash_read_write_sectors(dev, dev->bounce_lpar, start_sector,
+					  sectors, 1);
 }
-
 
 static loff_t ps3flash_llseek(struct file *file, loff_t offset, int origin)
 {
@@ -117,8 +119,8 @@ static ssize_t ps3flash_read(struct file *file, char __user *buf, size_t count,
 	if (*pos+count > size) {
 		dev_dbg(&dev->sbd.core,
 			"%s:%u Truncating count from %zu to %llu\n", __func__,
-			__LINE__, count, size-*pos);
-		count = size-*pos;
+			__LINE__, count, size - *pos);
+		count = size - *pos;
 	}
 
 	start_sector = do_div_llr(*pos, dev->blk_size, &offset);
@@ -166,6 +168,7 @@ static ssize_t ps3flash_write(struct file *file, const char __user *buf,
 	    end_read_sector, start_read_sector, head, tail, offset;
 	ssize_t res;
 	size_t remaining, n;
+	unsigned int sec_off;
 
 	dev_dbg(&dev->sbd.core,
 		"%s:%u: Writing %zu bytes at position %lld from user 0x%p\n",
@@ -178,8 +181,8 @@ static ssize_t ps3flash_write(struct file *file, const char __user *buf,
 	if (*pos+count > size) {
 		dev_dbg(&dev->sbd.core,
 			"%s:%u Truncating count from %zu to %llu\n", __func__,
-			__LINE__, count, size-*pos);
-		count = size-*pos;
+			__LINE__, count, size - *pos);
+		count = size - *pos;
 	}
 
 	chunk_sectors = dev->bounce_size / dev->blk_size;
@@ -218,13 +221,12 @@ static ssize_t ps3flash_write(struct file *file, const char __user *buf,
 						    chunk_sectors, 0);
 			if (res < 0)
 				goto fail;
-
-
 		} else {
 			if (head) {
 				/* Read head */
-			dev_dbg(&dev->sbd.core, "head: %lu sectors at %lu\n",
-				head, start_write_sector);
+				dev_dbg(&dev->sbd.core,
+					"head: %lu sectors at %lu\n", head,
+					start_write_sector);
 				res = ps3flash_read_sectors(dev,
 							    start_write_sector,
 							    head, 0);
@@ -236,20 +238,14 @@ static ssize_t ps3flash_write(struct file *file, const char __user *buf,
 				/* Read tail */
 				dev_dbg(&dev->sbd.core,
 					"tail: %lu sectors at %lu\n", tail,
-					start_read_sector-start_write_sector);
+					start_read_sector);
+				sec_off = start_read_sector-start_write_sector;
 				res = ps3flash_read_sectors(dev,
 							    start_read_sector,
-							    tail,
-							    start_read_sector-start_write_sector);
+							    tail, sec_off);
 				if (res < 0)
 					goto fail;
 			}
-		}
-
-		if (start_read_sector < start_write_sector+chunk_sectors) {
-
-
-
 		}
 
 		n = min(remaining, dev->bounce_size-offset);
@@ -300,43 +296,35 @@ static int __devinit ps3flash_probe(struct ps3_system_bus_device *_dev)
 {
 	struct ps3_storage_device *dev = to_ps3_storage_device(&_dev->core);
 	struct ps3flash_private *priv;
-	int res, error;
+	int error;
 	unsigned long tmp;
-
-	error = ps3stor_probe_access(dev);
-	if (error) {
-		dev_err(&dev->sbd.core, "%s:%u: No accessible regions found\n",
-			__func__, __LINE__);
-		return error;
-	}
-
-	if (!ps3flash_bounce_buffer.address)
-		return -ENOMEM;
-
-	if (ps3flash_dev) {
-		dev_dbg(&dev->sbd.core,
-			"Only one FLASH device is supported\n");
-		return -EBUSY;
-	}
-
-	ps3flash_dev = dev;
 
 	tmp = dev->regions[dev->region_idx].start*dev->blk_size;
 	if (tmp % FLASH_BLOCK_SIZE) {
 		dev_err(&dev->sbd.core,
 			"%s:%u region start %lu is not aligned\n", __func__,
 			__LINE__, tmp);
-		error = -EINVAL;
-		goto fail;
+		return -EINVAL;
 	}
 	tmp = dev->regions[dev->region_idx].size*dev->blk_size;
 	if (tmp % FLASH_BLOCK_SIZE) {
 		dev_err(&dev->sbd.core,
 			"%s:%u region size %lu is not aligned\n", __func__,
 			__LINE__, tmp);
-		error = -EINVAL;
-		goto fail;
+		return -EINVAL;
 	}
+
+	/* use static buffer, kmalloc cannot allocate 256 KiB */
+	if (!ps3flash_bounce_buffer.address)
+		return -ENOMEM;
+
+	if (ps3flash_dev) {
+		dev_err(&dev->sbd.core,
+			"Only one FLASH device is supported\n");
+		return -EBUSY;
+	}
+
+	ps3flash_dev = dev;
 
 	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
 	if (!priv) {
@@ -347,82 +335,27 @@ static int __devinit ps3flash_probe(struct ps3_system_bus_device *_dev)
 	ps3flash_priv(dev) = priv;
 	mutex_init(&priv->mutex);
 
-	error = ps3_open_hv_device(&dev->sbd);
-	if (error) {
-		dev_err(&dev->sbd.core,
-			"%s:%u: ps3_open_hv_device failed %d\n", __func__,
-			__LINE__, error);
-		goto fail_free_priv;
-	}
-
-	error = ps3_sb_event_receive_port_setup(PS3_BINDING_CPU_ANY,
-						&dev->sbd.did,
-						dev->sbd.interrupt_id,
-						&dev->irq);
-	if (error) {
-		dev_err(&dev->sbd.core,
-			"%s:%u: ps3_sb_event_receive_port_setup failed %d\n",
-		       __func__, __LINE__, error);
-		goto fail_close_device;
-	}
-
-	error = request_irq(dev->irq, ps3stor_interrupt, IRQF_DISABLED,
-			    DEVICE_NAME, dev);
-	if (error) {
-		dev_err(&dev->sbd.core, "%s:%u: request_irq failed %d\n",
-			__func__, __LINE__, error);
-		goto fail_sb_event_receive_port_destroy;
-	}
-
-	/* use static buffer, kmalloc cannot allocate 256 KiB */
 	dev->bounce_size = ps3flash_bounce_buffer.size;
 	dev->bounce_buf = ps3flash_bounce_buffer.address;
-	dev->bounce_lpar = ps3_mm_phys_to_lpar(__pa(dev->bounce_buf));
 
-	dev->sbd.d_region = &dev->dma_region;
-	ps3_dma_region_init(&dev->dma_region, &dev->sbd.did, PS3_DMA_64K,
-			    PS3_DMA_OTHER, dev->bounce_buf, dev->bounce_size,
-			    PS3_IOBUS_SB);
-	res = ps3_dma_region_create(&dev->dma_region);
-	if (res) {
-		dev_err(&dev->sbd.core, "%s:%u: cannot create DMA region\n",
-			__func__, __LINE__);
-		error = -ENOMEM;
-		goto fail_free_irq;
-	}
+	error = ps3stor_setup(dev);
+	if (error)
+		goto fail_free_priv;
 
-	dev->bounce_dma = dma_map_single(&dev->sbd.core, dev->bounce_buf,
-					 dev->bounce_size, DMA_BIDIRECTIONAL);
-	if (!dev->bounce_dma) {
-		dev_err(&dev->sbd.core, "%s:%u: map DMA region failed\n",
-			__func__, __LINE__);
-		error = -ENODEV;
-		goto fail_free_dma;
-	}
-
+	ps3flash_misc.parent = &dev->sbd.core;
 	error = misc_register(&ps3flash_misc);
 	if (error) {
 		dev_err(&dev->sbd.core, "%s:%u: misc_register failed %d\n",
 			__func__, __LINE__, error);
-		goto fail_unmap_dma;
+		goto fail_teardown;
 	}
 
 	dev_info(&dev->sbd.core, "%s:%u: registered misc device %d\n",
 		 __func__, __LINE__, ps3flash_misc.minor);
 	return 0;
 
-fail_unmap_dma:
-	dma_unmap_single(&dev->sbd.core, dev->bounce_dma, dev->bounce_size,
-			 DMA_BIDIRECTIONAL);
-fail_free_dma:
-	ps3_dma_region_free(&dev->dma_region);
-fail_free_irq:
-	free_irq(dev->irq, dev);
-fail_sb_event_receive_port_destroy:
-	ps3_sb_event_receive_port_destroy(&dev->sbd.did, dev->sbd.interrupt_id,
-					  dev->irq);
-fail_close_device:
-	ps3_close_hv_device(&dev->sbd);
+fail_teardown:
+	ps3stor_teardown(dev);
 fail_free_priv:
 	kfree(priv);
 fail:
@@ -433,33 +366,11 @@ fail:
 static int ps3flash_remove(struct ps3_system_bus_device *_dev)
 {
 	struct ps3_storage_device *dev = to_ps3_storage_device(&_dev->core);
-	int error;
 
 	misc_deregister(&ps3flash_misc);
-
-	dma_unmap_single(&dev->sbd.core, dev->bounce_dma, dev->bounce_size,
-			 DMA_BIDIRECTIONAL);
-	ps3_dma_region_free(&dev->dma_region);
-
-	free_irq(dev->irq, dev);
-
-	error = ps3_sb_event_receive_port_destroy(&dev->sbd.did,
-						  dev->sbd.interrupt_id,
-						  dev->irq);
-	if (error)
-		dev_err(&dev->sbd.core,
-			"%s:%u: destroy event receive port failed %d\n",
-			__func__, __LINE__, error);
-
-	error = ps3_close_hv_device(&dev->sbd);
-	if (error)
-		dev_err(&dev->sbd.core,
-			"%s:%u: ps3_close_hv_device failed %d\n", __func__,
-			__LINE__, error);
-
+	ps3stor_teardown(dev);
 	kfree(ps3flash_priv(dev));
 	ps3flash_dev = NULL;
-
 	return 0;
 }
 
@@ -467,6 +378,7 @@ static int ps3flash_remove(struct ps3_system_bus_device *_dev)
 static struct ps3_system_bus_driver ps3flash = {
 	.match_id	= PS3_MATCH_ID_STOR_FLASH,
 	.core.name	= DEVICE_NAME,
+	.core.owner	= THIS_MODULE,
 	.probe		= ps3flash_probe,
 	.remove		= ps3flash_remove,
 	.shutdown	= ps3flash_remove,
@@ -475,12 +387,12 @@ static struct ps3_system_bus_driver ps3flash = {
 
 static int __init ps3flash_init(void)
 {
-	return ps3_system_bus_driver_register(&ps3flash, PS3_IOBUS_SB);
+	return ps3_system_bus_driver_register(&ps3flash);
 }
 
 static void __exit ps3flash_exit(void)
 {
-	return ps3_system_bus_driver_unregister(&ps3flash);
+	ps3_system_bus_driver_unregister(&ps3flash);
 }
 
 module_init(ps3flash_init);
@@ -489,3 +401,4 @@ module_exit(ps3flash_exit);
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("PS3 FLASH ROM Storage Driver");
 MODULE_AUTHOR("Sony Corporation");
+MODULE_ALIAS(PS3_MODULE_ALIAS_STOR_FLASH);

@@ -29,9 +29,9 @@
 #include "platform.h"
 
 #if defined(DEBUG)
-#define DBG(fmt...) udbg_printf(fmt)
+#define DBG udbg_printf
 #else
-#define DBG(fmt...) do{if(0)printk(fmt);}while(0)
+#define DBG pr_debug
 #endif
 
 static hpte_t *htab;
@@ -242,7 +242,6 @@ static void ps3_hpte_clear(void)
 	BUG_ON(result);
 
 	ps3_mm_shutdown();
-
 	ps3_mm_vas_destroy();
 
 	DBG(" <- %s:%d\n", __func__, __LINE__);
@@ -281,7 +280,7 @@ void __init ps3_map_htab(void)
 
 	result = lv1_map_htab(0, &htab_addr);
 
-	htab = (hpte_t *)__ioremap(htab_addr, htab_size,
+	htab = (__force hpte_t *)ioremap_flags(htab_addr, htab_size,
 				   pgprot_val(PAGE_READONLY_X));
 
 	DBG("%s:%d: lpar %016lxh, virt %016lxh\n", __func__, __LINE__,

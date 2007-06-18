@@ -24,6 +24,7 @@
 #include <linux/types.h>
 
 struct spu;
+struct spu_context;
 
 /* access to priv1 registers */
 

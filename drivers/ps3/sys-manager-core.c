@@ -17,7 +17,7 @@
  *  along with this program; if not, write to the Free Software
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-#define DEBUG
+
 #include <linux/kernel.h>
 #include <asm/ps3.h>
 
@@ -52,7 +52,7 @@ void ps3_sys_manager_power_off(void)
 
 	printk(KERN_EMERG "System Halted, OK to turn off power\n");
 	local_irq_disable();
-	while(1)
+	while (1)
 		(void)0;
 }
 
@@ -63,6 +63,6 @@ void ps3_sys_manager_restart(void)
 
 	printk(KERN_EMERG "System Halted, OK to turn off power\n");
 	local_irq_disable();
-	while(1)
+	while (1)
 		(void)0;
 }

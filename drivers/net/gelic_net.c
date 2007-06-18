@@ -1,5 +1,5 @@
 /*
- *  PS3 Platfom gelic network driver.
+ *  PS3 gelic network driver.
  *
  * Copyright (C) 2007 Sony Computer Entertainment Inc.
  * Copyright 2007 Sony Corporation
@@ -28,8 +28,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#define DEBUG 1
-#undef GELIC_RING_CHAIN
+#undef DEBUG
 
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -63,11 +62,11 @@ static inline struct device * ctodev(struct gelic_net_card * card)
 }
 static inline unsigned int bus_id(struct gelic_net_card *card)
 {
-	return card->dev->did.bus_id;
+	return card->dev->bus_id;
 }
 static inline unsigned int dev_id(struct gelic_net_card *card)
 {
-	return card->dev->did.dev_id;
+	return card->dev->dev_id;
 }
 
 /* set irq_mask */
@@ -196,13 +195,9 @@ static int gelic_net_init_chain(struct gelic_net_card *card,
 	chain->head = start_descr;
 	chain->tail = start_descr;
 
-
-#ifdef GELIC_RING_CHAIN
-	(descr - 1)->next_descr_addr = start_descr->bus_addr;
-#else
 	/* do not chain last hw descriptor */
 	(descr - 1)->next_descr_addr = 0;
-#endif
+
 	return 0;
 
 iommu_error:
@@ -564,8 +559,7 @@ static int gelic_net_stop(struct net_device *netdev)
 
 	/* disconnect event port */
 	free_irq(card->netdev->irq, card->netdev);
-	ps3_sb_event_receive_port_destroy(&card->dev->did,
-		card->dev->interrupt_id, card->netdev->irq);
+	ps3_sb_event_receive_port_destroy(card->dev, card->netdev->irq);
 	card->netdev->irq = NO_IRQ;
 
 	netif_carrier_off(netdev);
@@ -869,15 +863,11 @@ static int gelic_net_decode_one_descr(struct gelic_net_card *card)
 	enum gelic_net_descr_status status;
 	struct gelic_net_descr_chain *chain = &card->rx_chain;
 	struct gelic_net_descr *descr = chain->tail;
-#ifndef GELIC_RING_CHAIN
 	int dmac_chain_ended;
-#endif
 
 	status = gelic_net_get_descr_status(descr);
-#ifndef GELIC_RING_CHAIN
 	/* is this descriptor terminated with next_descr == NULL? */
 	dmac_chain_ended = descr->dmac_cmd_status & GELIC_NET_DMAC_CMDSTAT_RXDCEIS;
-#endif
 
 	if (status == GELIC_NET_DESCR_CARDOWNED) {
 		return 0;
@@ -907,9 +897,8 @@ static int gelic_net_decode_one_descr(struct gelic_net_card *card)
 	gelic_net_pass_skb_up(descr, card); /* 1: skb_up sccess */
 
 refill:
-#ifndef GELIC_RING_CHAIN
 	descr->next_descr_addr = 0; /* unlink the descr */
-#endif
+
 	/* change the descriptor state: */
 	gelic_net_set_descr_status(descr, GELIC_NET_DESCR_NOT_IN_USE);
 
@@ -922,12 +911,11 @@ refill:
 	chain->tail = descr->next;
 	descr->prev->next_descr_addr = descr->bus_addr;
 
-#ifndef GELIC_RING_CHAIN
 	if (dmac_chain_ended) {
 		gelic_net_enable_rxdmac(card);
 		dev_dbg(ctodev(card), "reenable rx dma\n");
 	}
-#endif
+
 	return 1;
 }
 
@@ -1058,8 +1046,8 @@ static int gelic_net_open_device(struct gelic_net_card *card)
 {
 	int result;
 
-	result = ps3_sb_event_receive_port_setup(PS3_BINDING_CPU_ANY,
-		&card->dev->did, card->dev->interrupt_id, &card->netdev->irq);
+	result = ps3_sb_event_receive_port_setup(card->dev, PS3_BINDING_CPU_ANY,
+		&card->netdev->irq);
 
 	if (result) {
 		dev_info(ctodev(card),
@@ -1081,8 +1069,7 @@ static int gelic_net_open_device(struct gelic_net_card *card)
 	return 0;
 
 fail_request_irq:
-	ps3_sb_event_receive_port_destroy(&card->dev->did,
-		card->dev->interrupt_id, card->netdev->irq);
+	ps3_sb_event_receive_port_destroy(card->dev, card->netdev->irq);
 	card->netdev->irq = NO_IRQ;
 fail_alloc_irq:
 	return result;
@@ -1558,11 +1545,11 @@ static int ps3_gelic_driver_remove (struct ps3_system_bus_device *dev)
 	wait_event(card->waitq,
 		   atomic_read(&card->tx_timeout_task_counter) == 0);
 
-	unregister_netdev(card->netdev);
-	free_netdev(card->netdev);
-
 	lv1_net_set_interrupt_status_indicator(bus_id(card), dev_id(card),
 					       0 , 0);
+
+	unregister_netdev(card->netdev);
+	free_netdev(card->netdev);
 
 	ps3_system_bus_set_driver_data(dev, NULL);
 
@@ -1578,17 +1565,14 @@ static struct ps3_system_bus_driver ps3_gelic_driver = {
 	.probe = ps3_gelic_driver_probe,
 	.remove = ps3_gelic_driver_remove,
 	.shutdown = ps3_gelic_driver_remove,
-	.core = {
-		.owner = THIS_MODULE,
-		.name = "ps3_gelic_driver",
-	},
+	.core.name = "ps3_gelic_driver",
+	.core.owner = THIS_MODULE,
 };
 
 static int __init ps3_gelic_driver_init (void)
 {
 	return firmware_has_feature(FW_FEATURE_PS3_LV1)
-		? ps3_system_bus_driver_register(&ps3_gelic_driver,
-						 PS3_IOBUS_SB)
+		? ps3_system_bus_driver_register(&ps3_gelic_driver)
 		: -ENODEV;
 }
 
@@ -1600,4 +1584,5 @@ static void __exit ps3_gelic_driver_exit (void)
 module_init (ps3_gelic_driver_init);
 module_exit (ps3_gelic_driver_exit);
 
+MODULE_ALIAS(PS3_MODULE_ALIAS_GELIC);
 

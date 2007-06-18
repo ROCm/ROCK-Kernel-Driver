@@ -41,11 +41,13 @@ zliblinuxheader := zlib.h zconf.h zutil.h
 $(addprefix $(obj)/,$(zlib) gunzip_util.o main.o): \
 	$(addprefix $(obj)/,$(zliblinuxheader)) $(addprefix $(obj)/,$(zlibheader))
 
+src-plat-$(CONFIG_PPC_PS3) += ps3-head.S ps3-hvcall.S ps3.c
+
 src-wlib := string.S crt0.S stdio.c main.c flatdevtree.c flatdevtree_misc.c \
 		ns16550.c serial.c simple_alloc.c div64.S util.S \
 		gunzip_util.c elf_util.c $(zlib) devtree.c \
 		44x.c ebony.c mv64x60.c mpsc.c mv64x60_i2c.c
-src-plat := of.c cuboot-83xx.c cuboot-85xx.c holly.c \
+src-plat := $(src-plat-y) of.c cuboot-83xx.c cuboot-85xx.c holly.c \
 		cuboot-ebony.c treeboot-ebony.c prpmc2800.c
 src-boot := $(src-wlib) $(src-plat) empty.c
 
@@ -75,11 +77,11 @@ $(addprefix $(obj)/,$(zliblinuxheader)): $(obj)/%: $(srctree)/include/linux/%
 $(obj)/empty.c:
 	@touch $@
 
-$(obj)/zImage.lds $(obj)/zImage.coff.lds: $(obj)/%: $(srctree)/$(src)/%.S
+$(obj)/zImage.lds $(obj)/zImage.coff.lds $(obj)/zImage.ps3.lds: $(obj)/%: $(srctree)/$(src)/%.S
 	@cp $< $@
 
 clean-files := $(zlib) $(zlibheader) $(zliblinuxheader) \
-		empty.c zImage.coff.lds zImage.lds
+		empty.c zImage zImage.coff.lds zImage.ps3.lds zImage.lds
 
 quiet_cmd_bootcc = BOOTCC  $@
       cmd_bootcc = $(CROSS32CC) -Wp,-MD,$(depfile) $(BOOTCFLAGS) -c -o $@ $<
@@ -102,7 +104,7 @@ hostprogs-y	:= addnote addRamDisk hack-coff mktree
 
 targets		+= $(patsubst $(obj)/%,%,$(obj-boot) wrapper.a)
 extra-y		:= $(obj)/wrapper.a $(obj-plat) $(obj)/empty.o \
-		   $(obj)/zImage.lds $(obj)/zImage.coff.lds
+		   $(obj)/zImage.lds $(obj)/zImage.coff.lds $(obj)/zImage.ps3.lds
 
 wrapper		:=$(srctree)/$(src)/wrapper
 wrapperbits	:= $(extra-y) $(addprefix $(obj)/,addnote hack-coff mktree) \
@@ -119,10 +121,15 @@ CROSSWRAP := -C "$(CROSS_COMPILE)"
 endif
 endif
 
+ifneq ($(KBUILD_VERBOSE),0)
+verbose_shell := -x
+endif
+
 # args (to if_changed): 1 = (this rule), 2 = platform, 3 = dts 4=dtb 5=initrd
 quiet_cmd_wrap	= WRAP    $@
-      cmd_wrap	=$(CONFIG_SHELL) $(wrapper) -c -o $@ -p $2 $(CROSSWRAP) \
-		$(if $3, -s $3)$(if $4, -d $4)$(if $5, -i $5) vmlinux
+      cmd_wrap	=$(CONFIG_SHELL) $(verbose_shell) $(wrapper) -c -o $@ -p $2 \
+		$(CROSSWRAP) $(if $3, -s $3)$(if $4, -d $4)$(if $5, -i $5) \
+		vmlinux
 
 image-$(CONFIG_PPC_PSERIES)		+= zImage.pseries
 image-$(CONFIG_PPC_MAPLE)		+= zImage.pseries
@@ -187,11 +194,12 @@ $(obj)/zImage.%: vmlinux $(wrapperbits)
 $(obj)/zImage.iseries: vmlinux
 	$(STRIP) -s -R .comment $< -o $@
 
-$(obj)/zImage.ps3: vmlinux
-	$(STRIP) -s -R .comment $< -o $@
+$(obj)/zImage.ps3: vmlinux  $(wrapper) $(wrapperbits) $(srctree)/$(src)/dts/ps3.dts
+	$(STRIP) -s -R .comment $< -o vmlinux.strip
+	$(call cmd,wrap,ps3,$(srctree)/$(src)/dts/ps3.dts,,)
 
-$(obj)/zImage.initrd.ps3: vmlinux
-	@echo "  WARNING zImage.initrd.ps3 not supported (yet)"
+$(obj)/zImage.initrd.ps3: vmlinux  $(wrapper) $(wrapperbits) $(srctree)/$(src)/dts/ps3.dts $(obj)/ramdisk.image.gz
+	$(call cmd,wrap,ps3,$(srctree)/$(src)/dts/ps3.dts,,$(obj)/ramdisk.image.gz)
 
 $(obj)/zImage.holly-elf: vmlinux $(wrapperbits)
 	$(call if_changed,wrap,holly,$(obj)/dts/holly.dts,,)
@@ -230,7 +238,7 @@ install: $(CONFIGURE) $(addprefix $(obj)/, $(image-y))
 
 # anything not in $(targets)
 clean-files += $(image-) $(initrd-) zImage zImage.initrd cuImage.* \
-	treeImage.* zImage.dts zImage.dts_initrd
+	treeImage.* zImage.dts zImage.dts_initrd otheros.bld
 
 # clean up files cached by wrapper
 clean-kernel := vmlinux.strip vmlinux.bin

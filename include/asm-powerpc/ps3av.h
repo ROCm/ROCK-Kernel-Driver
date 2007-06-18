@@ -162,6 +162,9 @@
 #define PS3AV_CMD_VIDEO_FMT_X8R8G8B8			0x0000
 /* video_out_format */
 #define PS3AV_CMD_VIDEO_OUT_FORMAT_RGB_12BIT		0x0000
+/* video_cl_cnv */
+#define PS3AV_CMD_VIDEO_CL_CNV_ENABLE_LUT		0x0000
+#define PS3AV_CMD_VIDEO_CL_CNV_DISABLE_LUT		0x0010
 /* video_sync */
 #define PS3AV_CMD_VIDEO_SYNC_VSYNC			0x0001
 #define PS3AV_CMD_VIDEO_SYNC_CSYNC			0x0004
@@ -314,11 +317,14 @@
 #define PS3AV_MODE_MASK				0x000F
 #define PS3AV_MODE_HDCP_OFF			0x1000	/* Retail PS3 product doesn't support this */
 #define PS3AV_MODE_DITHER			0x0800
+#define PS3AV_MODE_COLOR			0x0400
+#define PS3AV_MODE_WHITE			0x0200
 #define PS3AV_MODE_FULL				0x0080
 #define PS3AV_MODE_DVI				0x0040
 #define PS3AV_MODE_RGB				0x0020
 
 
+#ifdef __KERNEL__
 /** command packet structure **/
 struct ps3av_send_hdr {
 	u16 version;
@@ -532,9 +538,9 @@ struct ps3av_pkt_video_mode {
 	u32 video_out_format;	/* in: out format */
 	u32 video_format;	/* in: input frame buffer format */
 	u8 reserved3;
-	u8 reserved4;
+	u8 video_cl_cnv;	/* in: color conversion */
 	u16 video_order;	/* in: input RGB order */
-	u32 reserved5;
+	u32 reserved4;
 };
 
 /* video: format */
@@ -542,7 +548,8 @@ struct ps3av_pkt_video_format {
 	struct ps3av_send_hdr send_hdr;
 	u32 video_head;		/* in: head */
 	u32 video_format;	/* in: frame buffer format */
-	u16 reserved;
+	u8 reserved;
+	u8 video_cl_cnv;	/* in: color conversion */
 	u16 video_order;	/* in: input RGB order */
 };
 
@@ -701,12 +708,6 @@ static inline void ps3av_cmd_av_monitor_info_dump(const struct ps3av_pkt_av_get_
 extern int ps3av_cmd_video_get_monitor_info(struct ps3av_pkt_av_get_monitor_info *,
 					    u32);
 
-struct ps3_vuart_port_device;
-extern int ps3av_vuart_write(struct ps3_vuart_port_device *dev,
-			     const void *buf, unsigned long size);
-extern int ps3av_vuart_read(struct ps3_vuart_port_device *dev, void *buf,
-			    unsigned long size, int timeout);
-
 extern int ps3av_set_video_mode(u32, int);
 extern int ps3av_set_audio_mode(u32, u32, u32, u32, u32);
 extern int ps3av_get_auto_mode(int);
@@ -719,7 +720,9 @@ extern int ps3av_video_mute(int);
 extern int ps3av_audio_mute(int);
 extern int ps3av_dev_open(void);
 extern int ps3av_dev_close(void);
-extern void ps3av_register_flip_ctl(void (*func)(int on));
+extern void ps3av_register_flip_ctl(void (*flip_ctl)(int on, void *data),
+				    void *flip_data);
 extern void ps3av_flip_ctl(int on);
 
+#endif /* __KERNEL__ */
 #endif	/* _ASM_POWERPC_PS3AV_H_ */

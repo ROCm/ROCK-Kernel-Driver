@@ -21,6 +21,10 @@
 
 /*-------------------------------------------------------------------------*/
 
+#ifdef CONFIG_PPC_PS3
+#include <asm/firmware.h>
+#endif
+
 /*
  * EHCI scheduled transaction support:  interrupt, iso, split iso
  * These are called "periodic" transactions in the EHCI spec.
@@ -1168,7 +1172,7 @@ itd_urb_transaction (
 		if (likely (!list_empty(&stream->free_list))) {
 			itd = list_entry (stream->free_list.prev,
 					 struct ehci_itd, itd_list);
-#if defined(CONFIG_PPC_PS3)
+#ifdef CONFIG_PPC_PS3
 			/* Fix for Cell SCC ISO transfer (PS3 Bluetooth). */
 			if (firmware_has_feature(FW_FEATURE_PS3_LV1)
 				&& itd->frame == ((ehci_readl(ehci,
@@ -1797,7 +1801,7 @@ sitd_urb_transaction (
 		if (!list_empty(&stream->free_list)) {
 			sitd = list_entry (stream->free_list.prev,
 					 struct ehci_sitd, sitd_list);
-#if defined(CONFIG_PPC_PS3)
+#ifdef CONFIG_PPC_PS3
 			/* Fix for Cell SCC ISO transfer (PS3 Bluetooth). */
 			if (firmware_has_feature(FW_FEATURE_PS3_LV1)
 				&& sitd->frame == ((ehci_readl(ehci,

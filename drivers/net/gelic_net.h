@@ -120,15 +120,6 @@ enum gelic_net_int1_status {
 #define GELIC_NET_RXCREXERR		0x00008000 /* carrier extention error */
 #define GELIC_NET_RXMLTCST		0x00004000 /* multicast address frame */
 /* bit 13..0 reserved */
-//#define GELIC_NET_IP		29 /* last frame buffer */
-//#define GELIC_NET_RXIPCHKERR              27
-//#define GELIC_NET_RXTCPCHKERR             26
-//#define GELIC_NET_DATA_ERROR_CHK_MASK     (1 << GELIC_NET_RXIPCHKERR | 1 << GELIC_NET_RXTCPCHKERR)
-
-/* ignore ipsec ans multicast */
-/*#define GELIC_NET_DATA_ERROR_MASK         0xfdefbfff */
-/* ignore unmatched sp on sp, drop_packet, multicast address frame*/
-/*#define GELIC_NET_DATA_ERROR_FLG          0x7def8000*/
 #define GELIC_NET_DATA_ERROR_CHK_MASK	(GELIC_NET_RXIPCHKERR | GELIC_NET_RXTCPCHKERR)
 
 
@@ -142,7 +133,7 @@ enum gelic_net_int1_status {
 						      * interrupt status */
 
 #define GELIC_NET_DMAC_CMDSTAT_CHAIN_END  0x00000002 /* RXDCEIS:DMA stopped */
-
+#define GELIC_NET_DMAC_CMDSTAT_NOT_IN_USE 0xb0000000
 #define GELIC_NET_DESCR_IND_PROC_SHIFT    28
 #define GELIC_NET_DESCR_IND_PROC_MASKO    0x0fffffff
 
@@ -156,137 +147,6 @@ enum gelic_net_descr_status {
 	GELIC_NET_DESCR_CARDOWNED           = 0x0a, /* used in rx and tx */
 	GELIC_NET_DESCR_NOT_IN_USE                  /* any other value */
 };
-#define GELIC_NET_DMAC_CMDSTAT_NOT_IN_USE 0xb0000000
-
-struct gelicw_bss {
-	u8 bssid[ETH_ALEN];
-	u8 channel;
-	u8 mode;
-	u8 essid_len;
-	u8 essid[IW_ESSID_MAX_SIZE + 1]; /* null terminated for debug msg */
-
-	u16 capability;
-	u16 beacon_interval;
-
-	u8 rates_len;
-	u8 rates[MAX_RATES_LENGTH];
-	u8 rates_ex_len;
-	u8 rates_ex[MAX_RATES_EX_LENGTH];
-	u8 rssi;
-
-	/* scan results have sec_info instead of rsn_ie or wpa_ie */
-	u16 sec_info;
-};
-
-/* max scan list */
-#define MAX_SCAN_BSS			16
-
-struct gelic_wireless {
-	struct gelic_net_card *card;
-	struct completion cmd_done, rssi_done;
-	struct work_struct work_event, work_start_done;
-	struct delayed_work work_rssi, work_scan_all, work_scan_essid;
-	struct delayed_work work_common, work_encode;
-	struct delayed_work work_start, work_stop, work_roam;
-	wait_queue_head_t waitq_cmd, waitq_scan;
-
-	u64 cmd_tag, cmd_id;
-	u8 cmd_send_flg;
-
-	struct iw_public_data wireless_data;
-	u8 *data_buf; /* data buffer for lv1_net_control */
-
-	u8 wireless; /* wireless support */
-	u8 state;
-	u8 scan_all; /* essid scan or all scan */
-	u8 essid_search; /* essid background scan */
-	u8 is_assoc;
-
-	u16 ch_info; /* supoprted channels */
-	u8 wireless_mode; /* 11b/g */
-	u8 channel; /* current ch */
-	u8 iw_mode; /* INFRA or Ad-hoc */
-	u8 rssi;
-	u8 essid_len;
-	u8 essid[IW_ESSID_MAX_SIZE + 1]; /* null terminated for debug msg */
-	u8 nick[IW_ESSID_MAX_SIZE + 1];
-	u8 bssid[ETH_ALEN];
-
-	u8 key_index;
-	u8 key[WEP_KEYS][IW_ENCODING_TOKEN_MAX]; /* 4 * 64byte */
-	u8 key_len[WEP_KEYS];
-	u8 key_alg; /* key algorithm  */
-	u8 auth_mode; /* authenticaton mode */
-
-	u8 bss_index; /* current bss in bss_list */
-	u8 num_bss_list;
-	u8 bss_key_alg; /* key alg of bss */
-	u8 wap_bssid[ETH_ALEN];
-	unsigned long last_scan; /* last scan time */
-	struct gelicw_bss current_bss;
-	struct gelicw_bss bss_list[MAX_SCAN_BSS];
-};
-
-#define GELIC_NET_DESCR_SIZE              32
-struct gelic_net_descr {
-	/* as defined by the hardware */
-	u32 buf_addr;
-	u32 buf_size;
-	u32 next_descr_addr;
-	u32 dmac_cmd_status;
-	u32 result_size;
-	u32 valid_size;	/* all zeroes for tx */
-	u32 data_status;
-	u32 data_error;	/* all zeroes for tx */
-
-	/* used in the driver */
-	struct sk_buff *skb;
-	dma_addr_t bus_addr;
-	struct gelic_net_descr *next;
-	struct gelic_net_descr *prev;
-	struct vlan_ethhdr vlan;
-} __attribute__((aligned(32)));
-
-struct gelic_net_descr_chain {
-	/* we walk from tail to head */
-	struct gelic_net_descr *head;
-	struct gelic_net_descr *tail;
-};
-
-struct gelic_net_card {
-	struct net_device *netdev;
-	/*
-	 * hypervisor requires irq_status should be
-	 * 8 bytes aligned, but u64 member is
-	 * always disposed in that manner
-	 */
-	u64 irq_status;
-	u64 ghiintmask;
-
-	struct ps3_system_bus_device *dev;
-	u32 vlan_id[GELIC_NET_VLAN_MAX];
-	int vlan_index;
-
-	struct gelic_net_descr_chain tx_chain;
-	struct gelic_net_descr_chain rx_chain;
-	spinlock_t chain_lock;
-
-	struct net_device_stats netdev_stats;
-	int rx_csum;
-	spinlock_t tx_dma_lock;
-	int tx_dma_progress;
-
-	struct work_struct tx_timeout_task;
-	atomic_t tx_timeout_task_counter;
-	wait_queue_head_t waitq;
-
-	struct gelic_net_descr *tx_top, *rx_top;
-#ifdef CONFIG_GELIC_WIRELESS
-	struct gelic_wireless w;
-#endif
-	struct gelic_net_descr descr[0];
-};
-
 /* for lv1_net_control */
 #define GELIC_NET_GET_MAC_ADDRESS               0x0000000000000001
 #define GELIC_NET_GET_ETH_PORT_STATUS           0x0000000000000002
@@ -456,6 +316,138 @@ struct scan_desc {
 struct rssi_desc {
 	u16 rssi; /* max rssi = 100 */
 } __attribute__ ((packed));
+
+
+struct gelicw_bss {
+	u8 bssid[ETH_ALEN];
+	u8 channel;
+	u8 mode;
+	u8 essid_len;
+	u8 essid[IW_ESSID_MAX_SIZE + 1]; /* null terminated for debug msg */
+
+	u16 capability;
+	u16 beacon_interval;
+
+	u8 rates_len;
+	u8 rates[MAX_RATES_LENGTH];
+	u8 rates_ex_len;
+	u8 rates_ex[MAX_RATES_EX_LENGTH];
+	u8 rssi;
+
+	/* scan results have sec_info instead of rsn_ie or wpa_ie */
+	u16 sec_info;
+};
+
+/* max station count of station list which hvc returns */
+#define MAX_SCAN_BSS	(16)
+
+struct gelic_wireless {
+	struct gelic_net_card *card;
+	struct completion cmd_done, rssi_done;
+	struct work_struct work_event, work_start_done;
+	struct delayed_work work_rssi, work_scan_all, work_scan_essid;
+	struct delayed_work work_common, work_encode;
+	struct delayed_work work_start, work_stop, work_roam;
+	wait_queue_head_t waitq_cmd, waitq_scan;
+
+	u64 cmd_tag, cmd_id;
+	u8 cmd_send_flg;
+
+	struct iw_public_data wireless_data;
+	u8 *data_buf; /* data buffer for lv1_net_control */
+
+	u8 wireless; /* wireless support */
+	u8 state;
+	u8 scan_all; /* essid scan or all scan */
+	u8 essid_search; /* essid background scan */
+	u8 is_assoc;
+
+	u16 ch_info; /* supoprted channels */
+	u8 wireless_mode; /* 11b/g */
+	u8 channel; /* current ch */
+	u8 iw_mode; /* INFRA or Ad-hoc */
+	u8 rssi;
+	u8 essid_len;
+	u8 essid[IW_ESSID_MAX_SIZE + 1]; /* null terminated for debug msg */
+	u8 nick[IW_ESSID_MAX_SIZE + 1];
+	u8 bssid[ETH_ALEN];
+
+	u8 key_index;
+	u8 key[WEP_KEYS][IW_ENCODING_TOKEN_MAX]; /* 4 * 64byte */
+	u8 key_len[WEP_KEYS];
+	u8 key_alg; /* key algorithm  */
+	u8 auth_mode; /* authenticaton mode */
+
+	u8 bss_index; /* current bss in bss_list */
+	u8 num_bss_list;
+	u8 bss_key_alg; /* key alg of bss */
+	u8 wap_bssid[ETH_ALEN];
+	unsigned long last_scan; /* last scan time */
+	struct gelicw_bss current_bss;
+	struct gelicw_bss bss_list[MAX_SCAN_BSS];
+};
+
+/* size of hardware part of gelic descriptor */
+#define GELIC_NET_DESCR_SIZE	(32)
+struct gelic_net_descr {
+	/* as defined by the hardware */
+	u32 buf_addr;
+	u32 buf_size;
+	u32 next_descr_addr;
+	u32 dmac_cmd_status;
+	u32 result_size;
+	u32 valid_size;	/* all zeroes for tx */
+	u32 data_status;
+	u32 data_error;	/* all zeroes for tx */
+
+	/* used in the driver */
+	struct sk_buff *skb;
+	dma_addr_t bus_addr;
+	struct gelic_net_descr *next;
+	struct gelic_net_descr *prev;
+	struct vlan_ethhdr vlan;
+} __attribute__((aligned(32)));
+
+struct gelic_net_descr_chain {
+	/* we walk from tail to head */
+	struct gelic_net_descr *head;
+	struct gelic_net_descr *tail;
+};
+
+struct gelic_net_card {
+	struct net_device *netdev;
+	/*
+	 * hypervisor requires irq_status should be
+	 * 8 bytes aligned, but u64 member is
+	 * always disposed in that manner
+	 */
+	u64 irq_status;
+	u64 ghiintmask;
+
+	struct ps3_system_bus_device *dev;
+	u32 vlan_id[GELIC_NET_VLAN_MAX];
+	int vlan_index;
+
+	struct gelic_net_descr_chain tx_chain;
+	struct gelic_net_descr_chain rx_chain;
+	spinlock_t chain_lock;
+
+	struct net_device_stats netdev_stats;
+	int rx_csum;
+	spinlock_t tx_dma_lock;
+	int tx_dma_progress;
+
+	struct work_struct tx_timeout_task;
+	atomic_t tx_timeout_task_counter;
+	wait_queue_head_t waitq;
+
+	struct gelic_net_descr *tx_top, *rx_top;
+#ifdef CONFIG_GELIC_WIRELESS
+	struct gelic_wireless w;
+#endif
+	struct gelic_net_descr descr[0];
+};
+
 
 extern unsigned long p_to_lp(long pa);
 extern int gelicw_setup_netdev(struct net_device *netdev, int wi);

@@ -41,8 +41,4 @@ struct ps3fb_ioctl_res {
 	__u32 num_frames; /* num of frame buffers */
 };
 
-#ifdef __KERNEL__
-
-#endif /* __KERNEL__ */
-
 #endif /* _ASM_POWERPC_PS3FB_H_ */

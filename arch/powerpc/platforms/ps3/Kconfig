@@ -1,5 +1,5 @@
 config PPC_PS3
-	tristate "Sony PS3 (incomplete)"
+	bool "Sony PS3 (incomplete)"
 	depends on PPC_MULTIPLATFORM && PPC64
 	select PPC_CELL
 	select USB_ARCH_HAS_OHCI
@@ -7,6 +7,7 @@ config PPC_PS3
 	select USB_OHCI_BIG_ENDIAN_MMIO
 	select USB_ARCH_HAS_EHCI
 	select USB_EHCI_BIG_ENDIAN_MMIO
+	select MEMORY_HOTPLUG
 	help
 	  This option enables support for the Sony PS3 game console
 	  and other platforms using the PS3 hypervisor.
@@ -90,7 +91,7 @@ config PS3_SYS_MANAGER
 	depends on PPC_PS3
 	tristate "PS3 System Manager driver" if PS3_ADVANCED
 	select PS3_VUART
-	default y
+	default m
 	help
 	  Include support for the PS3 System Manager.
 
@@ -103,9 +104,8 @@ config PS3_STORAGE
 
 config PS3_DISK
 	tristate "PS3 Disk Storage Driver"
-	depends on PPC_PS3
+	depends on PPC_PS3 && BLOCK
 	select PS3_STORAGE
-	default y
 	help
 	  Include support for the PS3 Disk Storage.
 
@@ -114,10 +114,8 @@ config PS3_DISK
 
 config PS3_ROM
 	tristate "PS3 ROM Storage Driver"
-	depends on PPC_PS3
-	select BLK_DEV_SR
+	depends on PPC_PS3 && BLK_DEV_SR
 	select PS3_STORAGE
-	default y
 	help
 	  Include support for the PS3 ROM Storage.
 
@@ -128,7 +126,6 @@ config PS3_FLASH
 	tristate "PS3 FLASH ROM Storage Driver"
 	depends on PPC_PS3
 	select PS3_STORAGE
-	default y
 	help
 	  Include support for the PS3 FLASH ROM Storage.
 

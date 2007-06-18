@@ -18,8 +18,8 @@
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <asm/firmware.h>
 #include <asm/ps3.h>
-#include <asm/lv1call.h>
 
 static int ps3_ohci_hc_reset(struct usb_hcd *hcd)
 {
@@ -85,14 +85,13 @@ static int ps3_ohci_probe(struct ps3_system_bus_device *dev)
 
 	if (usb_disabled()) {
 		result = -ENODEV;
-		BUG();
 		goto fail_start;
 	}
 
 	result = ps3_open_hv_device(dev);
 
 	if (result) {
-		dev_dbg(&dev->core, "%s:%d: lv1_open_device failed: %s\n",
+		dev_dbg(&dev->core, "%s:%d: ps3_open_hv_device failed: %s\n",
 			__func__, __LINE__, ps3_result(result));
 		result = -EPERM;
 		goto fail_open;
@@ -227,13 +226,25 @@ static int ps3_ohci_remove (struct ps3_system_bus_device *dev)
 	return 0;
 }
 
-MODULE_ALIAS("ps3-ohci");
+static int ps3_ohci_driver_register(struct ps3_system_bus_driver *drv)
+{
+	return firmware_has_feature(FW_FEATURE_PS3_LV1)
+		? ps3_system_bus_driver_register(drv)
+		: 0;
+}
+
+static void ps3_ohci_driver_unregister(struct ps3_system_bus_driver *drv)
+{
+	if (firmware_has_feature(FW_FEATURE_PS3_LV1))
+		ps3_system_bus_driver_unregister(drv);
+}
+
+MODULE_ALIAS(PS3_MODULE_ALIAS_OHCI);
 
 static struct ps3_system_bus_driver ps3_ohci_driver = {
+	.core.name = "ps3-ohci-driver",
+	.core.owner = THIS_MODULE,
 	.match_id = PS3_MATCH_ID_OHCI,
-	.core = {
-		.name = "ps3-ohci-driver",
-	},
 	.probe = ps3_ohci_probe,
 	.remove = ps3_ohci_remove,
 	.shutdown = ps3_ohci_remove,

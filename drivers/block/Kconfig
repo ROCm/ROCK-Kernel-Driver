@@ -459,34 +459,6 @@ config CIPHER_TWOFISH
 
 source "drivers/s390/block/Kconfig"
 
-config PS3_STORAGE_OLD
-       tristate "Support PS3 internal HDD/CDROM drives"
-       depends on PPC_PS3 && BLK_DEV_SD && BLK_DEV_SR
-       help
-       This driver provides support for internal HDD/CD-ROM drives
-       controlled under PS3 hypervisor storage system.
-
-config PS3_STORAGE_EXPECTED_NUM_DRIVES
-       int "Number of expected storage drives"
-       depends on PS3_STORAGE_OLD
-       default "3"
-       help
-         This specifies number of expected numbers of internal
-         storage drives.  The PS3 storage driver waits for
-         this number of drives are reported ready by the
-         hypervisor.
-
-config PS3_STORAGE_MAX_SPINUP_WAIT_TIME
-       int "Maximum time of wait time"
-       depends on PS3_STORAGE_OLD
-       default "10"
-       help
-         This specifies maximum time to wait for storage
-         drive readiness.  If only less drives than
-         PS3_STORAGE_EXPECTED_NUM_DRIVES become ready
-         until this time expired,  the PS3 storage driver
-         stop to wait and continue to run with available
-         drives.
 endmenu
 
 endif

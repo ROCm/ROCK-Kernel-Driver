@@ -103,8 +103,8 @@ __secondary_hold_acknowledge:
 
 	. = 0x60
 /*
- * The following code is used on pSeries to hold secondary processors
- * in a spin loop after they have been freed from OpenFirmware, but
+ * The following code is used to hold secondary processors
+ * in a spin loop after they have entered the kernel, but
  * before the bulk of the kernel has been relocated.  This code
  * is relocated to physical address 0x60 before prom_init is run.
  * All of it must fit below the first exception vector at 0x100.
@@ -1695,9 +1695,11 @@ _GLOBAL(__start_initialization_multiplatform)
 2:
 
 	/* Switch off MMU if not already */
-	LOAD_REG_IMMEDIATE(r4, .__after_prom_start - KERNELBASE)
+	LOAD_REG_IMMEDIATE(r4, __mmu_off_return - KERNELBASE)
 	add	r4,r4,r30
 	bl	.__mmu_off
+__mmu_off_return:
+
 	b	.__after_prom_start
 
 _STATIC(__boot_from_prom)

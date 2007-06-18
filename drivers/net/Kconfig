@@ -2273,7 +2273,7 @@ config GELIC_NET
 	  PS3 game console.
 
 	  To compile this driver as a module, choose M here: the
-	  module will be called gelic_net.
+	  module will be called ps3_gelic.
 
 config GELIC_WIRELESS
 	bool "Gelic net Wireless Extension"

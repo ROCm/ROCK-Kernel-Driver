@@ -18,10 +18,9 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-//#define DEBUG
+#undef DEBUG
 
 #include <linux/kernel.h>
-#include <linux/module.h>
 #include <linux/netdevice.h>
 #include <linux/if_vlan.h>
 #include <linux/completion.h>
@@ -30,10 +29,6 @@
 #include <asm/lv1call.h>
 
 #include "gelic_net.h"
-
-MODULE_AUTHOR("SCE Inc.");
-MODULE_DESCRIPTION("Gelic Wireless Extension");
-MODULE_LICENSE("GPL");
 
 static struct iw_handler_def gelicw_handler_def;
 
@@ -68,11 +63,11 @@ static inline struct gelic_wireless *gelicw_priv(struct net_device *netdev)
 }
 static inline unsigned int bus_id(struct gelic_wireless *w)
 {
-	return w->card->dev->did.bus_id;
+	return w->card->dev->bus_id;
 }
 static inline unsigned int dev_id(struct gelic_wireless *w)
 {
-	return w->card->dev->did.dev_id;
+	return w->card->dev->dev_id;
 }
 
 /* control wired or wireless */
@@ -80,8 +75,8 @@ static void gelicw_vlan_mode(struct net_device *netdev, int mode)
 {
 	struct gelic_net_card *card = netdev_priv(netdev);
 
-	if ((mode < GELIC_NET_VLAN_WIRED)
-		|| (mode > GELIC_NET_VLAN_WIRELESS))
+	if ((mode < GELIC_NET_VLAN_WIRED) ||
+	    (mode > GELIC_NET_VLAN_WIRELESS))
 		return;
 
 	card->vlan_index = mode - 1;
@@ -322,9 +317,9 @@ static int gelicw_cmd_common(struct net_device *netdev)
 	lpar = ps3_mm_phys_to_lpar(__pa(w->data_buf));
 	config = (struct common_config *)w->data_buf;
 	config->scan_index = w->bss_index;
-	config->bss_type = (w->iw_mode == IW_MODE_ADHOC) ? \
+	config->bss_type = (w->iw_mode == IW_MODE_ADHOC) ?
 				GELICW_BSS_ADHOC : GELICW_BSS_INFRA;
-	config->auth_method = (w->auth_mode == IW_AUTH_ALG_SHARED_KEY) ? \
+	config->auth_method = (w->auth_mode == IW_AUTH_ALG_SHARED_KEY) ?
 				GELICW_AUTH_SHARED : GELICW_AUTH_OPEN;
 	switch (w->wireless_mode) {
 	case IEEE_B:
@@ -387,8 +382,8 @@ static int gelicw_cmd_encode(struct net_device *netdev)
 
 	lpar = ps3_mm_phys_to_lpar(__pa(w->data_buf));
 
-	if (w->key_alg == IW_ENCODE_ALG_WEP
-		|| w->key_alg == IW_ENCODE_ALG_NONE) {
+	if (w->key_alg == IW_ENCODE_ALG_WEP ||
+	    w->key_alg == IW_ENCODE_ALG_NONE) {
 		/* WEP */
 		config = (struct wep_config *)w->data_buf;
 		memset(config, 0, sizeof(struct wep_config));
@@ -457,7 +452,7 @@ static int gelicw_cmd_encode(struct net_device *netdev)
 			/* 64 hex */
 			for (i = 0; i < 32; i++)
 				wpa_config->psk_material[i] =
-						h2i(key[ 2 * i]) * 16
+						h2i(key[2 * i]) * 16
 						+ h2i(key[2 * i + 1]);
 			wpa_config->psk_type = GELICW_PSK_64HEX;
 		}
@@ -513,9 +508,7 @@ static int gelicw_cmd_get_scan(struct gelic_wireless *w)
 	struct scan_desc *desc;
 	int i, j;
 	u8 *p;
-	struct gelicw_bss *bss;
 
-	lpar = ps3_mm_phys_to_lpar(__pa(w->data_buf));
 
 	/* get scan */
 	dev_dbg(wtodev(w), "GELICW_CMD_GET_SCAN\n");
@@ -531,18 +524,23 @@ static int gelicw_cmd_get_scan(struct gelic_wireless *w)
 	}
 	wait_for_completion_interruptible(&w->cmd_done);
 
+	lpar = ps3_mm_phys_to_lpar(__pa(w->data_buf));
 	status = lv1_net_control(bus_id(w), dev_id(w),
-			GELICW_GET_RES, w->cmd_tag, lpar, GELICW_DATA_BUF_SIZE,
+			GELICW_GET_RES, w->cmd_tag, lpar, PAGE_SIZE,
 			&res, &val);
 	w->cmd_tag = 0;
 	if (status || res) {
-		dev_dbg(wtodev(w), "GELICW_CMD_GET_SCAN res:%d,%ld\n", status, res);
+		dev_dbg(wtodev(w), "GELICW_CMD_GET_SCAN res:%d,%ld\n",
+			status, res);
 		return -EFAULT;
 	}
 
 	desc = (struct scan_desc *)w->data_buf;
-	for (i = 0; i < val/ sizeof(struct scan_desc) ; i++) {
-		bss = &w->bss_list[i];
+	for (i = 0;
+	     i < val / sizeof(struct scan_desc) && i < MAX_SCAN_BSS;
+	     i++) {
+		struct gelicw_bss *bss = &w->bss_list[i];
+
 		bss->rates_len = 0;
 		for (j = 0; j < MAX_RATES_LENGTH; j++)
 			if (desc[i].rate[j])
@@ -564,6 +562,7 @@ static int gelicw_cmd_get_scan(struct gelic_wireless *w)
 		bss->rssi = (u8)desc[i].rssi;
 		bss->capability = desc[i].capability;
 		bss->beacon_interval = desc[i].beacon_period;
+		memset(bss->essid, 0, sizeof(bss->essid));
 		memcpy(bss->essid, desc[i].essid, bss->essid_len);
 		p = (u8 *)&desc[i].bssid;
 		memcpy(bss->bssid, &p[2], ETH_ALEN);/* bssid:64bit in desc */
@@ -571,10 +570,10 @@ static int gelicw_cmd_get_scan(struct gelic_wireless *w)
 	}
 	w->num_bss_list = i;
 
-	if (!i)
-		return -1; /* no ap found */
-	else
+	if (w->num_bss_list)
 		return 0; /* ap found */
+	else
+		return -1; /* no ap found */
 }
 
 /* search bssid in bss list */
@@ -702,11 +701,10 @@ static int gelicw_cmd_set_scan(struct net_device *netdev)
 	lpar = ps3_mm_phys_to_lpar(__pa(w->data_buf));
 
 	/* avoid frequent scanning */
-	if (!w->essid_search /* background scan off */
-	  && w->scan_all
-	  && (jiffies - w->last_scan) < (5 * HZ)) {
+	if (!w->essid_search && /* background scan off */
+	    w->scan_all &&
+	    (time_before64(get_jiffies_64(), w->last_scan + 5 * HZ)))
 		return 0;
-	}
 
 	w->bss_key_alg = IW_ENCODE_ALG_NONE;
 
@@ -717,7 +715,7 @@ static int gelicw_cmd_set_scan(struct net_device *netdev)
 	if (w->scan_all) {
 		/* scan all ch */
 		dev_dbg(ntodev(netdev), "GELICW_CMD_SCAN all\n");
-		w->last_scan = jiffies; /* last scan time */
+		w->last_scan = get_jiffies_64(); /* last scan time */
 		status = lv1_net_control(bus_id(w), dev_id(w),
 				GELICW_SET_CMD, w->cmd_id, 0, 0,
 				&w->cmd_tag, &val);
@@ -760,8 +758,8 @@ static void gelicw_send_common_config(struct net_device *netdev,
 		if (w->state < GELICW_STATE_SCAN_DONE)
 			return;
 
-		if (!(w->cmd_send_flg & GELICW_CMD_SEND_SCAN)
-		    && w->essid_len)
+		if (!(w->cmd_send_flg & GELICW_CMD_SEND_SCAN) &&
+		    w->essid_len)
 			/* scan essid and set other params */
 			schedule_delayed_work(&w->work_scan_essid, 0);
 		else {
@@ -915,10 +913,10 @@ static void gelicw_event(struct work_struct *work)
 		status = lv1_net_control(bus_id(w), dev_id(w),
 				GELICW_GET_EVENT, 0, 0 , 0,
 				&event_type, &val);
-		if (status == GELICW_EVENT_NO_ENTRY) {
+		if (status == GELICW_EVENT_NO_ENTRY)
 			/* got all events */
 			break;
-		} else if (status){
+		else if (status){
 			dev_dbg(ntodev(netdev), "GELICW_GET_EVENT failed:%d\n", status);
 			return;
 		}
@@ -985,10 +983,9 @@ static void gelicw_clear_event(struct net_device *netdev)
 		status = lv1_net_control(bus_id(w), dev_id(w),
 				GELICW_GET_EVENT, 0, 0 , 0,
 				&event_type, &val);
-		if (status) {
-			/* got all events */
-			return;
-		}
+		if (status)
+			return;/* got all events */
+
 		switch(event_type) {
 		case GELICW_EVENT_SCAN_COMPLETED:
 			w->state = GELICW_STATE_SCAN_DONE;
@@ -1044,17 +1041,27 @@ int gelicw_setup_netdev(struct net_device *netdev, int wi)
 
 	if (wi < 0) {
 		/* PS3 low model has no wireless */
-		dev_dbg(ntodev(netdev), "No wireless dvice in this system\n");
+		dev_info(ntodev(netdev), "No wireless dvice in this system\n");
 		w->wireless = 0;
 		return 0;
 	}
-	w->data_buf = kmalloc(GELICW_DATA_BUF_SIZE, GFP_KERNEL);
+	/* version check */
+	if (ps3_compare_firmware_version(1, 6, 0) < 0) {
+		dev_info(ntodev(netdev),
+			 "firmware is too old for wireless.\n");
+		w->wireless = 0;
+		return 0;
+	}
+	/* we need 4K aligned, 16 units of scan_desc sized */
+	BUILD_BUG_ON(PAGE_SIZE < sizeof(struct scan_desc) * MAX_SCAN_BSS);
+	w->data_buf = (u8*)get_zeroed_page(GFP_KERNEL);
 	if (!w->data_buf) {
 		w->wireless = 0;
-		dev_info(ntodev(netdev), "%s:kmalloc failed\n", __func__);
+		dev_info(ntodev(netdev), "%s:get_page failed\n", __func__);
 		return -ENOMEM;
 	}
-	w->wireless = GELICW_WIRELESS_SUPPORTED; /* wireless support */
+
+	w->wireless = GELICW_WIRELESS_SUPPORTED;
 
 	w->ch_info = 0;
 	w->channel = 0;
@@ -1106,9 +1113,8 @@ int gelicw_down(struct net_device *netdev)
 	flush_scheduled_work();
 
 	/* check cmd_tag of CMD_START */
-	if (w->cmd_id == GELICW_CMD_START) {
+	if (w->cmd_id == GELICW_CMD_START)
 		wait_event_interruptible(w->waitq_cmd, !w->cmd_tag);
-	}
 	/* wait scan done */
 	if (w->state == GELICW_STATE_SCANNING) {
 		wait_event_interruptible(w->waitq_scan,
@@ -1142,24 +1148,22 @@ void gelicw_remove(struct net_device *netdev)
 	gelicw_down(netdev);
 	w->wireless = 0;
 	netdev->wireless_handlers = NULL;
-	kfree(w->data_buf);
+	free_page((unsigned long)w->data_buf);
 }
 
 void gelicw_interrupt(struct net_device *netdev, u64 status)
 {
 	struct gelic_wireless *w = gelicw_priv(netdev);
 
-	if (!w->wireless) {
+	if (!w->wireless)
 		return;
-	}
 
 	if (status & GELICW_DEVICE_CMD_COMP) {
 		dev_dbg(ntodev(netdev), "GELICW_DEVICE_CMD_COMP\n");
-		if (w->cmd_id == GELICW_CMD_START) {
+		if (w->cmd_id == GELICW_CMD_START)
 			schedule_work(&w->work_start_done);
-		} else {
+		else
 			complete(&w->cmd_done);
-		}
 	}
 	if (status & GELICW_DEVICE_EVENT_RECV) {
 		dev_dbg(ntodev(netdev), "GELICW_DEVICE_EVENT_RECV\n");
@@ -1197,7 +1201,7 @@ static int gelicw_get_name(struct net_device *netdev,
 	}
 
 	if (w->wireless_mode == IEEE_B ||
-		(w->is_assoc && gelicw_is_ap_11b(&w->current_bss)))
+	    (w->is_assoc && gelicw_is_ap_11b(&w->current_bss)))
 		strcpy(wrqu->name, "IEEE 802.11b");
 	else {
 		switch (w->wireless_mode) {
@@ -1397,18 +1401,18 @@ static int gelicw_set_wap(struct net_device *netdev,
 	if (wrqu->ap_addr.sa_family != ARPHRD_ETHER)
 		return -EINVAL;
 
-	if (!memcmp(any, wrqu->ap_addr.sa_data, ETH_ALEN)
-	    || !memcmp(off, wrqu->ap_addr.sa_data, ETH_ALEN)) {
+	if (!memcmp(any, wrqu->ap_addr.sa_data, ETH_ALEN) ||
+	    !memcmp(off, wrqu->ap_addr.sa_data, ETH_ALEN)) {
 		if (!memcmp(off, w->wap_bssid, ETH_ALEN))
 			return 0; /* ap off, no change */
 		else {
 			memset(w->wap_bssid, 0, ETH_ALEN);
 			/* start scan */
 		}
-	} else if (!memcmp(w->wap_bssid, wrqu->ap_addr.sa_data, ETH_ALEN)) {
+	} else if (!memcmp(w->wap_bssid, wrqu->ap_addr.sa_data, ETH_ALEN))
 		/* no change */
 		return 0;
-	} else if (!memcmp(w->bssid, wrqu->ap_addr.sa_data, ETH_ALEN)){
+	else if (!memcmp(w->bssid, wrqu->ap_addr.sa_data, ETH_ALEN)) {
 		/* current bss */
 		memcpy(w->wap_bssid, wrqu->ap_addr.sa_data, ETH_ALEN);
 		return 0;
@@ -1620,8 +1624,8 @@ static int gelicw_set_essid(struct net_device *netdev,
 		/* check essid */
 		if (length > IW_ESSID_MAX_SIZE)
 			return -EINVAL;
-		if (w->essid_len == length
-		    && !strncmp(w->essid, extra, length)) {
+		if (w->essid_len == length &&
+		    !strncmp(w->essid, extra, length)) {
 			/* same essid */
 			if (w->is_assoc)
 				return 0;
@@ -1708,7 +1712,7 @@ static int gelicw_get_rate(struct net_device *netdev,
 	dev_dbg(ntodev(netdev), "wx:get_rate\n");
 
 	if (w->wireless_mode == IEEE_B ||
-		(w->is_assoc && gelicw_is_ap_11b(&w->current_bss)))
+	    (w->is_assoc && gelicw_is_ap_11b(&w->current_bss)))
 		wrqu->bitrate.value = bitrate_list[GELICW_NUM_11B_BITRATES -1];
 	else
 		wrqu->bitrate.value = bitrate_list[ARRAY_SIZE(bitrate_list) -1];
@@ -1762,8 +1766,8 @@ static int gelicw_set_encode(struct net_device *netdev,
 	dev_dbg(ntodev(netdev), "key %d len:%d alg:%x\n",\
 		key_index, w->key_len[key_index], w->key_alg);
 
-	if (w->state >= GELICW_STATE_SCAN_DONE
-		&& w->cmd_send_flg == 0 && w->essid_len)
+	if (w->state >= GELICW_STATE_SCAN_DONE &&
+	    w->cmd_send_flg == 0 && w->essid_len)
 		/* scan essid and set other params */
 		schedule_delayed_work(&w->work_scan_essid, 0);
 	else
@@ -1856,8 +1860,8 @@ static int gelicw_get_auth(struct net_device *netdev,
 		param->value = w->auth_mode;
 		break;
 	case IW_AUTH_WPA_ENABLED:
-		if ((w->key_alg & IW_ENCODE_ALG_TKIP)
-			|| (w->key_alg & IW_ENCODE_ALG_CCMP))
+		if ((w->key_alg & IW_ENCODE_ALG_TKIP) ||
+		    (w->key_alg & IW_ENCODE_ALG_CCMP))
 			param->value = 1;
 		else
 			param->value = 0;
@@ -1900,10 +1904,10 @@ static int gelicw_set_encodeext(struct net_device *netdev,
 				w->key_len[i] = 0;
 		} else
 			w->key_len[key_index] = 0;
-	} else if (enc->flags & IW_ENCODE_NOKEY) {
+	} else if (enc->flags & IW_ENCODE_NOKEY)
 		/* key not changed */
 		w->key_alg = ext->alg;
-	} else {
+	else {
 		w->key_len[key_index] = ext->key_len;
 		w->key_alg = ext->alg;
 		if (w->key_alg != IW_ENCODE_ALG_NONE && w->key_len[key_index])
@@ -1912,8 +1916,8 @@ static int gelicw_set_encodeext(struct net_device *netdev,
 	dev_dbg(ntodev(netdev), "key %d len:%d alg:%x\n",\
 		key_index, w->key_len[key_index], w->key_alg);
 
-	if (w->state >= GELICW_STATE_SCAN_DONE
-		&& w->cmd_send_flg == 0 && w->essid_len)
+	if (w->state >= GELICW_STATE_SCAN_DONE &&
+	    w->cmd_send_flg == 0 && w->essid_len)
 		/* scan essid and set other params */
 		schedule_delayed_work(&w->work_scan_essid, 0);
 	else
@@ -1991,52 +1995,6 @@ static struct iw_statistics *gelicw_get_wireless_stats(struct net_device *netdev
 /*
  * private handler
  */
-static int gelicw_priv_set_wireless_mode(struct net_device *netdev,
-			   struct iw_request_info *info,
-			   union iwreq_data *wrqu, char *extra)
-{
-	struct gelic_wireless *w = gelicw_priv(netdev);
-	int mode = *(int *)extra;
-
-	dev_dbg(ntodev(netdev), "wx:priv_set_wmode\n");
-	switch (mode) {
-	case IEEE_B: /* 0x02 */
-	case IEEE_G: /* 0x04 */
-	case IEEE_B | IEEE_G:
-		break;
-	default:
-		return -EINVAL;
-	}
-	/* send common config */
-	gelicw_send_common_config(netdev, &w->wireless_mode, (u8)mode);
-
-	return 0;
-}
-
-static int gelicw_priv_get_wireless_mode(struct net_device *netdev,
-			   struct iw_request_info *info,
-			   union iwreq_data *wrqu, char *extra)
-{
-	struct gelic_wireless *w = gelicw_priv(netdev);
-
-	dev_dbg(ntodev(netdev), "wx:priv_get_wmode\n");
-	switch (w->wireless_mode) {
-	case IEEE_B:
-		strncpy(extra, "802.11b (2)", MAX_IW_PRIV_SIZE);
-		break;
-	case IEEE_G:
-		strncpy(extra, "802.11g (4)", MAX_IW_PRIV_SIZE);
-		break;
-	case IEEE_B | IEEE_G:
-	default:
-		strncpy(extra, "802.11bg (6)", MAX_IW_PRIV_SIZE);
-		break;
-	}
-	wrqu->data.length = strlen(extra);
-
-	return 0;
-}
-
 static int gelicw_priv_set_alg_mode(struct net_device *netdev,
 			   struct iw_request_info *info,
 			   union iwreq_data *wrqu, char *extra)
@@ -2086,8 +2044,8 @@ static int gelicw_priv_get_alg_mode(struct net_device *netdev,
 	}
 	p = extra + strlen(extra);
 
-	if (w->key_alg == IW_ENCODE_ALG_TKIP
-		|| w->key_alg == IW_ENCODE_ALG_CCMP) {
+	if (w->key_alg == IW_ENCODE_ALG_TKIP ||
+	    w->key_alg == IW_ENCODE_ALG_CCMP) {
 		if (w->key_len[w->key_index] == 64) /* current key index */
 			strncpy(p, " hex", MAX_IW_PRIV_SIZE);
 		else
@@ -2104,53 +2062,39 @@ static int gelicw_priv_get_alg_mode(struct net_device *netdev,
  */
 static const iw_handler gelicw_handler[] =
 {
-	[IW_IOCTL_IDX(SIOCGIWNAME)]      = (iw_handler) gelicw_get_name,
-	[IW_IOCTL_IDX(SIOCSIWFREQ)]      = (iw_handler) gelicw_set_freq,
-	[IW_IOCTL_IDX(SIOCGIWFREQ)]      = (iw_handler) gelicw_get_freq,
-	[IW_IOCTL_IDX(SIOCSIWMODE)]      = (iw_handler) gelicw_set_mode,
-	[IW_IOCTL_IDX(SIOCGIWMODE)]      = (iw_handler) gelicw_get_mode,
-	[IW_IOCTL_IDX(SIOCGIWRANGE)]     = (iw_handler) gelicw_get_range,
-	[IW_IOCTL_IDX(SIOCSIWAP)]        = (iw_handler) gelicw_set_wap,
-	[IW_IOCTL_IDX(SIOCGIWAP)]        = (iw_handler) gelicw_get_wap,
-	[IW_IOCTL_IDX(SIOCSIWSCAN)]      = (iw_handler) gelicw_set_scan,
-	[IW_IOCTL_IDX(SIOCGIWSCAN)]      = (iw_handler) gelicw_get_scan,
-	[IW_IOCTL_IDX(SIOCSIWESSID)]     = (iw_handler) gelicw_set_essid,
-	[IW_IOCTL_IDX(SIOCGIWESSID)]     = (iw_handler) gelicw_get_essid,
-	[IW_IOCTL_IDX(SIOCSIWNICKN)]     = (iw_handler) gelicw_set_nick,
-	[IW_IOCTL_IDX(SIOCGIWNICKN)]     = (iw_handler) gelicw_get_nick,
-	[IW_IOCTL_IDX(SIOCSIWRATE)]      = (iw_handler) gelicw_set_rate,
-	[IW_IOCTL_IDX(SIOCGIWRATE)]      = (iw_handler) gelicw_get_rate,
-	[IW_IOCTL_IDX(SIOCSIWENCODE)]    = (iw_handler) gelicw_set_encode,
-	[IW_IOCTL_IDX(SIOCGIWENCODE)]    = (iw_handler) gelicw_get_encode,
-	[IW_IOCTL_IDX(SIOCSIWAUTH)]      = (iw_handler) gelicw_set_auth,
-	[IW_IOCTL_IDX(SIOCGIWAUTH)]      = (iw_handler) gelicw_get_auth,
-	[IW_IOCTL_IDX(SIOCSIWENCODEEXT)] = (iw_handler) gelicw_set_encodeext,
-	[IW_IOCTL_IDX(SIOCGIWENCODEEXT)] = (iw_handler) gelicw_get_encodeext,
+	[IW_IOCTL_IDX(SIOCGIWNAME)]      = gelicw_get_name,
+	[IW_IOCTL_IDX(SIOCSIWFREQ)]      = gelicw_set_freq,
+	[IW_IOCTL_IDX(SIOCGIWFREQ)]      = gelicw_get_freq,
+	[IW_IOCTL_IDX(SIOCSIWMODE)]      = gelicw_set_mode,
+	[IW_IOCTL_IDX(SIOCGIWMODE)]      = gelicw_get_mode,
+	[IW_IOCTL_IDX(SIOCGIWRANGE)]     = gelicw_get_range,
+	[IW_IOCTL_IDX(SIOCSIWAP)]        = gelicw_set_wap,
+	[IW_IOCTL_IDX(SIOCGIWAP)]        = gelicw_get_wap,
+	[IW_IOCTL_IDX(SIOCSIWSCAN)]      = gelicw_set_scan,
+	[IW_IOCTL_IDX(SIOCGIWSCAN)]      = gelicw_get_scan,
+	[IW_IOCTL_IDX(SIOCSIWESSID)]     = gelicw_set_essid,
+	[IW_IOCTL_IDX(SIOCGIWESSID)]     = gelicw_get_essid,
+	[IW_IOCTL_IDX(SIOCSIWNICKN)]     = gelicw_set_nick,
+	[IW_IOCTL_IDX(SIOCGIWNICKN)]     = gelicw_get_nick,
+	[IW_IOCTL_IDX(SIOCSIWRATE)]      = gelicw_set_rate,
+	[IW_IOCTL_IDX(SIOCGIWRATE)]      = gelicw_get_rate,
+	[IW_IOCTL_IDX(SIOCSIWENCODE)]    = gelicw_set_encode,
+	[IW_IOCTL_IDX(SIOCGIWENCODE)]    = gelicw_get_encode,
+	[IW_IOCTL_IDX(SIOCSIWAUTH)]      = gelicw_set_auth,
+	[IW_IOCTL_IDX(SIOCGIWAUTH)]      = gelicw_get_auth,
+	[IW_IOCTL_IDX(SIOCSIWENCODEEXT)] = gelicw_set_encodeext,
+	[IW_IOCTL_IDX(SIOCGIWENCODEEXT)] = gelicw_get_encodeext,
 };
 
 /*
  * Private wireless handlers
  */
 enum {
-	GELICW_PRIV_SET_WIRELESS_MODE = SIOCIWFIRSTPRIV,
-	GELICW_PRIV_GET_WIRELESS_MODE,
-	GELICW_PRIV_SET_AUTH,
-	GELICW_PRIV_GET_AUTH,
-	GELICW_PRIV_START,
-	GELICW_PRIV_STOP,
+	GELICW_PRIV_SET_AUTH  = SIOCIWFIRSTPRIV,
+	GELICW_PRIV_GET_AUTH
 };
 
 static struct iw_priv_args gelicw_private_args[] = {
-	{
-	 .cmd = GELICW_PRIV_SET_WIRELESS_MODE,
-	 .set_args = IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-	 .name = "set_wmode"
-	},
-	{
-	 .cmd = GELICW_PRIV_GET_WIRELESS_MODE,
-	 .get_args = IW_PRIV_TYPE_CHAR | IW_PRIV_SIZE_FIXED | MAX_IW_PRIV_SIZE,
-	 .name = "get_wmode"
-	},
 	{
 	 .cmd = GELICW_PRIV_SET_AUTH,
 	 .set_args = IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
@@ -2165,8 +2109,6 @@ static struct iw_priv_args gelicw_private_args[] = {
 
 static const iw_handler gelicw_private_handler[] =
 {
-	gelicw_priv_set_wireless_mode,
-	gelicw_priv_get_wireless_mode,
 	gelicw_priv_set_alg_mode,
 	gelicw_priv_get_alg_mode,
 };
@@ -2181,11 +2123,3 @@ static struct iw_handler_def gelicw_handler_def =
 	.private_args	= (struct iw_priv_args *)gelicw_private_args,
 	.get_wireless_stats = gelicw_get_wireless_stats
 };
-
-EXPORT_SYMBOL_GPL(gelicw_setup_netdev);
-EXPORT_SYMBOL_GPL(gelicw_up);
-EXPORT_SYMBOL_GPL(gelicw_down);
-EXPORT_SYMBOL_GPL(gelicw_remove);
-EXPORT_SYMBOL_GPL(gelicw_interrupt);
-EXPORT_SYMBOL_GPL(gelicw_is_associated);
-

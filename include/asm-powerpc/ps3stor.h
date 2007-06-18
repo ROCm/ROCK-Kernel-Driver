@@ -1,5 +1,5 @@
 /*
- * PS3 Storage Bus
+ * PS3 Storage Devices
  *
  * Copyright (C) 2007 Sony Computer Entertainment Inc.
  * Copyright 2007 Sony Corp.
@@ -40,10 +40,8 @@ struct ps3_storage_device {
 	u64 blk_size;
 
 	u64 tag;
-	int lv1_res;
-	u64 lv1_tag;
 	u64 lv1_status;
-	struct completion irq_done;
+	struct completion done;
 
 	unsigned long bounce_size;
 	void *bounce_buf;
@@ -61,10 +59,12 @@ static inline struct ps3_storage_device *to_ps3_storage_device(struct device *de
 	return container_of(dev, struct ps3_storage_device, sbd.core);
 }
 
-extern int ps3stor_probe_access(struct ps3_storage_device *dev);
-extern irqreturn_t ps3stor_interrupt(int irq, void *data);
+extern int ps3stor_setup(struct ps3_storage_device *dev);
+extern void ps3stor_teardown(struct ps3_storage_device *dev);
 extern u64 ps3stor_read_write_sectors(struct ps3_storage_device *dev, u64 lpar,
 				      u64 start_sector, u64 sectors,
 				      int write);
+extern u64 ps3stor_send_command(struct ps3_storage_device *dev, u64 cmd,
+				u64 arg1, u64 arg2, u64 arg3, u64 arg4);
 
 #endif /* _ASM_POWERPC_PS3STOR_H_ */

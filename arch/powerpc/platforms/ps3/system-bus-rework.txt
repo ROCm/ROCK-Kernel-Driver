@@ -1,4 +1,4 @@
-Status of the system-bus re-work
+* Status of the system-bus re-work
 
 o=working
 x=not working
@@ -6,25 +6,24 @@ NA=no support planned
 				1st	shut	2nd	insmod	rmmod
 				boot	down	boot
 
-CONFIG_USB_EHCI_HCD		o	o	o	o(5)	o
-CONFIG_USB_OHCI_HCD		o	o	o	o(5)	o
-CONFIG_GELIC_NET		o	o	o
-CONFIG_FB_PS3			o	o(2)	o	o	x(6)
+CONFIG_USB_EHCI_HCD		o	o	o	o	o
+CONFIG_USB_OHCI_HCD		o	o	o	o	o
+CONFIG_GELIC_NET		o	o	o	o	o
+CONFIG_FB_PS3			o	o(2)	o	o	x(3)
 CONFIG_SND_PS3			o	o	o	o	o
-CONFIG_PS3_PS3AV		o	o	o	?
-CONFIG_PS3_SYS_MANAGER		o	o	o	o	NA(4)
-CONFIG_PS3_VUART		o	o	o
-CONFIG_PS3_FLASH		o	o	o	o(5)	o
-CONFIG_PS3_DISK			o	o	o	o(5)	o
-CONFIG_PS3_ROM			o	o	o	o(5)	o
-CONFIG_PS3_STORAGE		o	o	o	o	NA(4)
-CONFIG_SPU_FS			o	o	o
-CONFIG_PS3_STORAGE_OLD		o	o	o	NA	NA
+CONFIG_PS3_PS3AV		o	o	o	o	o
+CONFIG_PS3_SYS_MANAGER		o	o	o	o	NA(1)
+CONFIG_PS3_VUART		o	o	o	o	o
+CONFIG_PS3_FLASH		o	o	o	o	o
+CONFIG_PS3_DISK			o	o	o	o	o
+CONFIG_PS3_ROM			o	o	o	o	o
+CONFIG_PS3_STORAGE		o	o	o	o	o
+CONFIG_SPU_FS			o	o	o	o	o
 
 -- commands --
 
 64 bit kexec	o
-32 bit kexec	x(3)
+32 bit kexec	x(4)
 reboot:  	o
 halt		o
 shutdown	o
@@ -33,8 +32,51 @@ power button	o
 
 -- notes --
 
+(1) loaded as 'permanent'.
 (2) fbcon trouble, temp fix: ps3-hack-fbcon-shutdown.diff
-(3) not working, WIP
-(4) loaded as 'permanent'.
-(5) modprobe binding trouble
-(6) need to fix fbcon to support remove
+(3) need to fix fbcon to support remove
+(4) not working, WIP
+
+--------------------------------------------------------------------------------
+* Bus layout
+
+system-bus --+-- sb -------+-- usb0 --+-- ehci0
+             |             |          +-- ohci0
+             |             |
+             |             +-- usb1 --+-- ehci1
+             |             |          +-- ohci1
+             |             |
+             |             +-- gelic
+             |
+             +-- storage --+-- disk
+             |             +-- flash
+             |             +-- rom
+             |
+             +-- ioc0 -----+-- gfx
+             |             +-- sound
+             |
+             +-- vuart ----+-- av_settings
+                           +-- system_manager
+
+
+bus       | bus  | in   |
+name      | num  | repo |
+----------+------+------+---------------------------------------
+sb        | 04h  | yes  |
+storage   | 05h  | yes  |
+ioc0      | 81h  | no   |
+vuart     | 82h  | no   |
+----------+------+------+---------------------------------------
+
+device        | type   | irq  | dma | mmio |
+--------------+--------+------+-----+------+--------------------------
+usb0            sb_04
+usb1            sb_04
+gelic           sb_03
+disk            st_00
+flash           st_0e
+rom             st_05
+gfx
+sound
+av_settings     vu_00
+system_manager  vu_02

@@ -939,7 +939,7 @@ static int __init early_init_dt_scan_memory(unsigned long node,
 				size = 0x80000000ul - base;
 		}
 #endif
-#if defined(CONFIG_PPC_PS3)
+#ifdef CONFIG_PPC_PS3
 	/* temporary hack for the legacy bootloader */
 	if (of_flat_dt_is_compatible(of_get_flat_dt_root(), "PS3PF")) {
 		size = 0x8000000;
@@ -1011,7 +1011,7 @@ static void __init early_reserve_mem(void)
 
 void __init early_init_devtree(void *params)
 {
-	DBG(" -> early_init_devtree()\n");
+	DBG(" -> early_init_devtree(%p)\n", params);
 
 	/* Setup flat device-tree pointer */
 	initial_boot_params = params;

@@ -2338,12 +2338,6 @@ struct tty_driver *console_driver;
 
 #ifdef CONFIG_VT_CONSOLE
 
-void vt_console_stop(void)
-{
-	printable = 0;
-}
-EXPORT_SYMBOL_GPL(vt_console_stop);
-
 /*
  *	Console on virtual terminal
  *
@@ -2987,8 +2981,7 @@ static int con_is_graphics(const struct consw *csw, int first, int last)
 	return retval;
 }
 
-static int unbind_con_driver(const struct consw *csw, int first, int last,
-			     int deflt)
+int unbind_con_driver(const struct consw *csw, int first, int last, int deflt)
 {
 	struct module *owner = csw->owner;
 	const struct consw *defcsw = NULL;

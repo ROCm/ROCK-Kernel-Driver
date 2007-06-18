@@ -18,8 +18,8 @@
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <asm/firmware.h>
 #include <asm/ps3.h>
-#include <asm/lv1call.h>
 
 static int ps3_ehci_hc_reset(struct usb_hcd *hcd)
 {
@@ -223,13 +223,25 @@ static int ps3_ehci_remove(struct ps3_system_bus_device *dev)
 	return 0;
 }
 
-MODULE_ALIAS("ps3-ehci");
+static int ps3_ehci_driver_register(struct ps3_system_bus_driver *drv)
+{
+	return firmware_has_feature(FW_FEATURE_PS3_LV1)
+		? ps3_system_bus_driver_register(drv)
+		: 0;
+}
+
+static void ps3_ehci_driver_unregister(struct ps3_system_bus_driver *drv)
+{
+	if (firmware_has_feature(FW_FEATURE_PS3_LV1))
+		ps3_system_bus_driver_unregister(drv);
+}
+
+MODULE_ALIAS(PS3_MODULE_ALIAS_EHCI);
 
 static struct ps3_system_bus_driver ps3_ehci_driver = {
+	.core.name = "ps3-ehci-driver",
+	.core.owner = THIS_MODULE,
 	.match_id = PS3_MATCH_ID_EHCI,
-	.core = {
-		.name = "ps3-ehci-driver",
-	},
 	.probe = ps3_ehci_probe,
 	.remove = ps3_ehci_remove,
 	.shutdown = ps3_ehci_remove,
