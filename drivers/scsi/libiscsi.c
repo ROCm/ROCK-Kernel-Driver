@@ -175,7 +175,6 @@ static void iscsi_prep_scsi_cmd_pdu(struct iscsi_cmd_task *ctask)
 
 	conn->scsicmd_pdus_cnt++;
 }
-EXPORT_SYMBOL_GPL(iscsi_prep_scsi_cmd_pdu);
 
 /**
  * iscsi_complete_command - return command back to scsi-ml
