@@ -541,7 +541,7 @@ skip:
 
 #endif
 
-static int __init populate_rootfs(void)
+int __init populate_rootfs(void)
 {
 	char *err = unpack_to_rootfs(__initramfs_start,
 			 __initramfs_end - __initramfs_start, 0);
@@ -582,4 +582,6 @@ static int __init populate_rootfs(void)
 #endif
 	return 0;
 }
+#ifndef CONFIG_ACPI_CUSTOM_DSDT_INITRD
 rootfs_initcall(populate_rootfs);
+#endif
