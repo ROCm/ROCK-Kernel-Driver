@@ -154,8 +154,8 @@ static struct dentry *open_xa_dir(const struct inode *inode, int flags)
 
 }
 
-static struct file *open_xattr_file(struct inode *inode,
-                                    const char *name, int flags)
+static struct dentry *xattr_lookup(struct inode *inode, const char *name,
+                                   int flags)
 {
 	struct dentry *xadir, *xafile;
 	int err = 0;
@@ -188,7 +188,18 @@ out:
 	dput(xadir);
 	if (err)
 		return ERR_PTR(err);
-	return dentry_open(xafile, NULL, O_RDWR|O_NOATIME);
+	return xafile;
+}
+
+static struct file *open_xattr_file(struct inode *inode,
+                                    const char *name, int flags)
+{
+	struct dentry *dentry = xattr_lookup(inode, name, flags);
+
+	if (IS_ERR(dentry))
+		return (void *)dentry;
+
+	return dentry_open(dentry, NULL, O_RDWR|O_NOATIME);
 }
 
 /* Internal operations on file data */
@@ -249,19 +260,17 @@ reiserfs_xattr_set_handle(struct reiserfs_transaction_handle *th,
 
 	/* Clearing it out - delete it. */
 	if (!buffer) {
-		struct inode *dir;
+		struct dentry *dentry;
 
-		fp = open_xattr_file(inode, name, XATTR_REPLACE);
-		if (IS_ERR(fp)) {
-			err = PTR_ERR(fp);
+		dentry = xattr_lookup(inode, name, XATTR_REPLACE);
+		if (IS_ERR(dentry)) {
+			err = PTR_ERR(dentry);
 			if (err == -ENODATA)
 				err = 0;
 			return err;
 		}
 
-		dir = fp->f_path.dentry->d_parent->d_inode;
-		err = vfs_unlink(dir, fp->f_dentry, NULL);
-		fput(fp);
+		err = vfs_unlink(dentry->d_parent->d_inode, dentry, NULL);
 		if (!err) {
 			inode->i_ctime = CURRENT_TIME_SEC;
 			mark_inode_dirty(inode);
