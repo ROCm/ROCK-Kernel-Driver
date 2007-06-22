@@ -82,16 +82,20 @@ extern unsigned long empty_zero_page[PAGE_SIZE/sizeof(unsigned long)];
 #ifndef __ASSEMBLY__
 
 #define pte_ERROR(e) \
-	printk("%s:%d: bad pte %p(%016lx).\n", __FILE__, __LINE__, &(e), pte_val(e))
+	printk("%s:%d: bad pte %p(%016lx pfn %010lx).\n", __FILE__, __LINE__, \
+	       &(e), __pte_val(e), pte_pfn(e))
 #define pmd_ERROR(e) \
-	printk("%s:%d: bad pmd %p(%016lx).\n", __FILE__, __LINE__, &(e), pmd_val(e))
+	printk("%s:%d: bad pmd %p(%016lx pfn %010lx).\n", __FILE__, __LINE__, \
+	       &(e), __pmd_val(e), pmd_pfn(e))
 #define pud_ERROR(e) \
-	printk("%s:%d: bad pud %p(%016lx).\n", __FILE__, __LINE__, &(e), pud_val(e))
+	printk("%s:%d: bad pud %p(%016lx pfn %010lx).\n", __FILE__, __LINE__, \
+	       &(e), __pud_val(e), (pud_val(e) & __PHYSICAL_MASK) >> PAGE_SHIFT)
 #define pgd_ERROR(e) \
-	printk("%s:%d: bad pgd %p(%016lx).\n", __FILE__, __LINE__, &(e), pgd_val(e))
+	printk("%s:%d: bad pgd %p(%016lx pfn %010lx).\n", __FILE__, __LINE__, \
+	       &(e), __pgd_val(e), (pgd_val(e) & __PHYSICAL_MASK) >> PAGE_SHIFT)
 
-#define pgd_none(x)	(!pgd_val(x))
-#define pud_none(x)	(!pud_val(x))
+#define pgd_none(x)	(!__pgd_val(x))
+#define pud_none(x)	(!__pud_val(x))
 
 static inline void set_pte(pte_t *dst, pte_t val)
 {
@@ -236,17 +240,17 @@ extern unsigned int __kernel_page_user;
 
 static inline unsigned long pgd_bad(pgd_t pgd)
 {
-	return pgd_val(pgd) & ~(PTE_MASK | _KERNPG_TABLE | _PAGE_USER);
+	return __pgd_val(pgd) & ~(PTE_MASK | _KERNPG_TABLE | _PAGE_USER);
 }
 
 static inline unsigned long pud_bad(pud_t pud)
 {
-	return pud_val(pud) & ~(PTE_MASK | _KERNPG_TABLE | _PAGE_USER);
+	return __pud_val(pud) & ~(PTE_MASK | _KERNPG_TABLE | _PAGE_USER);
 }
 
 static inline unsigned long pmd_bad(pmd_t pmd)
 {
-	return pmd_val(pmd) & ~(PTE_MASK | _KERNPG_TABLE | _PAGE_USER);
+	return __pmd_val(pmd) & ~(PTE_MASK | _KERNPG_TABLE | _PAGE_USER);
 }
 
 #define set_pte_at(_mm,addr,ptep,pteval) do {				\
@@ -321,8 +325,6 @@ static inline pte_t ptep_get_and_clear_full(struct mm_struct *mm, unsigned long 
  * The following only work if pte_present() is true.
  * Undefined behaviour if not..
  */
-#define __pte_val(x)	((x).pte)
-
 #define __LARGE_PTE (_PAGE_PSE|_PAGE_PRESENT)
 static inline int pte_user(pte_t pte)		{ return __pte_val(pte) & _PAGE_USER; }
 static inline int pte_read(pte_t pte)		{ return __pte_val(pte) & _PAGE_USER; }
@@ -373,7 +375,7 @@ static inline void ptep_set_wrprotect(struct mm_struct *mm, unsigned long addr, 
 #define pgprot_noncached(prot)	(__pgprot(pgprot_val(prot) | _PAGE_PCD | _PAGE_PWT))
 
 static inline int pmd_large(pmd_t pte) { 
-	return (pmd_val(pte) & __LARGE_PTE) == __LARGE_PTE; 
+	return (__pmd_val(pte) & __LARGE_PTE) == __LARGE_PTE;
 } 	
 
 
@@ -391,7 +393,7 @@ static inline int pmd_large(pmd_t pte) {
 #define pgd_index(address) (((address) >> PGDIR_SHIFT) & (PTRS_PER_PGD-1))
 #define pgd_offset(mm, addr) ((mm)->pgd + pgd_index(addr))
 #define pgd_offset_k(address) (init_level4_pgt + pgd_index(address))
-#define pgd_present(pgd) (pgd_val(pgd) & _PAGE_PRESENT)
+#define pgd_present(pgd) (__pgd_val(pgd) & _PAGE_PRESENT)
 #define mk_kernel_pgd(address) __pgd((address) | _KERNPG_TABLE)
 
 /* PUD - Level3 access */
@@ -400,7 +402,7 @@ static inline int pmd_large(pmd_t pte) {
 #define pud_page(pud)		(pfn_to_page(pud_val(pud) >> PAGE_SHIFT))
 #define pud_index(address) (((address) >> PUD_SHIFT) & (PTRS_PER_PUD-1))
 #define pud_offset(pgd, address) ((pud_t *) pgd_page_vaddr(*(pgd)) + pud_index(address))
-#define pud_present(pud) (pud_val(pud) & _PAGE_PRESENT)
+#define pud_present(pud) (__pud_val(pud) & _PAGE_PRESENT)
 
 /* PMD  - Level 2 access */
 #define pmd_page_vaddr(pmd) ((unsigned long) __va(pmd_val(pmd) & PTE_MASK))
@@ -409,19 +411,19 @@ static inline int pmd_large(pmd_t pte) {
 #define pmd_index(address) (((address) >> PMD_SHIFT) & (PTRS_PER_PMD-1))
 #define pmd_offset(dir, address) ((pmd_t *) pud_page_vaddr(*(dir)) + \
                                   pmd_index(address))
-#define pmd_none(x)	(!pmd_val(x))
+#define pmd_none(x)	(!__pmd_val(x))
 #if CONFIG_XEN_COMPAT <= 0x030002
 /* pmd_present doesn't just test the _PAGE_PRESENT bit since wr.p.t.
    can temporarily clear it. */
-#define pmd_present(x)	(pmd_val(x))
+#define pmd_present(x)	(__pmd_val(x))
 #else
-#define pmd_present(x)	(pmd_val(x) & _PAGE_PRESENT)
+#define pmd_present(x)	(__pmd_val(x) & _PAGE_PRESENT)
 #endif
 #define pmd_clear(xp)	do { set_pmd(xp, __pmd(0)); } while (0)
 #define pfn_pmd(nr,prot) (__pmd(((nr) << PAGE_SHIFT) | pgprot_val(prot)))
 #define pmd_pfn(x)  ((pmd_val(x) & __PHYSICAL_MASK) >> PAGE_SHIFT)
 
-#define pte_to_pgoff(pte) ((pte_val(pte) & PHYSICAL_PAGE_MASK) >> PAGE_SHIFT)
+#define pte_to_pgoff(pte) ((__pte_val(pte) & PHYSICAL_PAGE_MASK) >> PAGE_SHIFT)
 #define pgoff_to_pte(off) ((pte_t) { ((off) << PAGE_SHIFT) | _PAGE_FILE })
 #define PTE_FILE_MAX_BITS __PHYSICAL_MASK_SHIFT
 
@@ -429,7 +431,7 @@ static inline int pmd_large(pmd_t pte) {
 
 /* page, protection -> pte */
 #define mk_pte(page, pgprot)	pfn_pte(page_to_pfn(page), (pgprot))
-#define mk_pte_huge(entry) (pte_val(entry) |= _PAGE_PRESENT | _PAGE_PSE)
+#define mk_pte_huge(entry) (__pte_val(entry) |= _PAGE_PRESENT | _PAGE_PSE)
  
 /* Change flags of a PTE */
 static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
@@ -485,10 +487,12 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
  * bit at the same time. */
 #define  __HAVE_ARCH_PTEP_SET_ACCESS_FLAGS
 #define ptep_set_access_flags(vma, address, ptep, entry, dirty)		\
-	do {								\
-		if (dirty)						\
-			ptep_establish(vma, address, ptep, entry);	\
-	} while (0)
+({									\
+	int __changed = !pte_same(*(ptep), entry);			\
+	if (__changed && (dirty))					\
+		ptep_establish(vma, address, ptep, entry);		\
+	__changed;							\
+})
 
 #define __HAVE_ARCH_PTEP_CLEAR_DIRTY_FLUSH
 #define ptep_clear_flush_dirty(vma, address, ptep)			\
@@ -497,7 +501,7 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 	int __dirty = pte_dirty(__pte);					\
 	__pte = pte_mkclean(__pte);					\
 	if ((vma)->vm_mm->context.pinned)				\
-		ptep_set_access_flags(vma, address, ptep, __pte, __dirty); \
+		(void)ptep_set_access_flags(vma, address, ptep, __pte, __dirty); \
 	else if (__dirty)						\
 		set_pte(ptep, __pte);					\
 	__dirty;							\
@@ -510,7 +514,7 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 	int __young = pte_young(__pte);					\
 	__pte = pte_mkold(__pte);					\
 	if ((vma)->vm_mm->context.pinned)				\
-		ptep_set_access_flags(vma, address, ptep, __pte, __young); \
+		(void)ptep_set_access_flags(vma, address, ptep, __pte, __young); \
 	else if (__young)						\
 		set_pte(ptep, __pte);					\
 	__young;							\

@@ -605,6 +605,32 @@ static cycle_t xen_clocksource_read(void)
 
 	put_cpu();
 
+#ifdef CONFIG_SMP
+	for (;;) {
+		static cycle_t last_ret;
+#ifndef CONFIG_64BIT
+		cycle_t last = cmpxchg64(&last_ret, 0, 0);
+#else
+		cycle_t last = last_ret;
+#define cmpxchg64 cmpxchg
+#endif
+
+		if ((s64)(ret - last) < 0) {
+			if (last - ret > permitted_clock_jitter
+			    && printk_ratelimit())
+				printk(KERN_WARNING "clocksource/%d: "
+				       "Time went backwards: "
+				       "delta=%Ld shadow=%Lu offset=%Lu\n",
+				       cpu, ret - last,
+				       shadow->system_timestamp,
+				       get_nsec_offset(shadow));
+			ret = last;
+		}
+		if (cmpxchg64(&last_ret, last, ret) == last)
+			break;
+	}
+#endif
+
 	return ret;
 }
 

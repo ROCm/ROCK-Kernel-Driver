@@ -486,7 +486,6 @@ config MICROCODE_OLD_INTERFACE
 
 config X86_MSR
 	tristate "/dev/cpu/*/msr - Model-specific register support"
-	depends on !X86_XEN
 	help
 	  This device gives privileged processes access to the x86
 	  Model-Specific Registers (MSRs).  It is a character device with

@@ -37,6 +37,7 @@
 
 #include <linux/spinlock.h>
 #include <linux/kthread.h>
+#include <linux/freezer.h>
 #include <linux/list.h>
 #include <xen/balloon.h>
 #include <asm/hypervisor.h>
@@ -208,6 +209,9 @@ int blkif_schedule(void *arg)
 		printk(KERN_DEBUG "%s: started\n", current->comm);
 
 	while (!kthread_should_stop()) {
+		if (try_to_freeze())
+			continue;
+
 		wait_event_interruptible(
 			blkif->wq,
 			blkif->waiting_reqs || kthread_should_stop());

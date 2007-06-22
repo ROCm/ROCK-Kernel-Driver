@@ -25,11 +25,8 @@
 
 	.section .bootstrap.text, "ax", @progbits
 	.code64
-#define VIRT_ENTRY_OFFSET 0x0
-.org VIRT_ENTRY_OFFSET
 	.globl startup_64
 startup_64:
-ENTRY(_start)
 	movq $(init_thread_union+THREAD_SIZE-8),%rsp
 
 	/* rsi is pointer to startup info structure.
@@ -164,7 +161,7 @@ ENTRY(empty_zero_page)
 	.ascii	",ELF_PADDR_OFFSET=0x"
 		utoh __START_KERNEL_map
 	.ascii	",VIRT_ENTRY=0x"
-		utoh (__START_KERNEL_map + __PHYSICAL_START + VIRT_ENTRY_OFFSET)
+		utoh (__START_KERNEL_map + __PHYSICAL_START + startup_64 - .bootstrap.text)
 	.ascii	",HYPERCALL_PAGE=0x"
 		utoh (phys_hypercall_page >> PAGE_SHIFT)
 	.ascii  ",FEATURES=writable_page_tables"

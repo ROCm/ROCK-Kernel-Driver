@@ -210,15 +210,16 @@ extern unsigned long pg0[];
 #define pte_present(x)	((x).pte_low & (_PAGE_PRESENT | _PAGE_PROTNONE))
 
 /* To avoid harmful races, pmd_none(x) should check only the lower when PAE */
-#define pmd_none(x)	(!(unsigned long)pmd_val(x))
+#define pmd_none(x)	(!(unsigned long)__pmd_val(x))
 #if CONFIG_XEN_COMPAT <= 0x030002
 /* pmd_present doesn't just test the _PAGE_PRESENT bit since wr.p.t.
    can temporarily clear it. */
-#define pmd_present(x)	(pmd_val(x))
+#define pmd_present(x)	(__pmd_val(x))
+#define pmd_bad(x)	((__pmd_val(x) & (~PAGE_MASK & ~_PAGE_USER & ~_PAGE_PRESENT)) != (_KERNPG_TABLE & ~_PAGE_PRESENT))
 #else
-#define pmd_present(x)	(pmd_val(x) & _PAGE_PRESENT)
+#define pmd_present(x)	(__pmd_val(x) & _PAGE_PRESENT)
+#define pmd_bad(x)	((__pmd_val(x) & (~PAGE_MASK & ~_PAGE_USER)) != _KERNPG_TABLE)
 #endif
-#define pmd_bad(x)	((pmd_val(x) & (~PAGE_MASK & ~_PAGE_USER & ~_PAGE_PRESENT)) != (_KERNPG_TABLE & ~_PAGE_PRESENT))
 
 
 #define pages_to_mb(x) ((x) >> (20-PAGE_SHIFT))
@@ -289,29 +290,33 @@ static inline pte_t xen_local_ptep_get_and_clear(pte_t *ptep, pte_t res)
  */
 #define  __HAVE_ARCH_PTEP_SET_ACCESS_FLAGS
 #define ptep_set_access_flags(vma, address, ptep, entry, dirty)		\
-do {									\
-	if (dirty)							\
+({									\
+	int __changed = !pte_same(*(ptep), entry);			\
+	if (__changed && (dirty))					\
 		ptep_establish(vma, address, ptep, entry);		\
-} while (0)
+	__changed;							\
+})
 
 #define __HAVE_ARCH_PTEP_TEST_AND_CLEAR_DIRTY
 #define ptep_test_and_clear_dirty(vma, addr, ptep) ({			\
-	int ret = 0;							\
-	if (pte_dirty(*ptep))						\
-		ret = test_and_clear_bit(_PAGE_BIT_DIRTY, &ptep->pte_low); \
-	if (ret)							\
-		pte_update_defer(vma->vm_mm, addr, ptep);		\
-	ret;								\
+	int __ret = 0;							\
+	if (pte_dirty(*(ptep)))						\
+		__ret = test_and_clear_bit(_PAGE_BIT_DIRTY,		\
+						&(ptep)->pte_low);	\
+	if (__ret)							\
+		pte_update((vma)->vm_mm, addr, ptep);			\
+	__ret;								\
 })
 
 #define __HAVE_ARCH_PTEP_TEST_AND_CLEAR_YOUNG
 #define ptep_test_and_clear_young(vma, addr, ptep) ({			\
-	int ret = 0;							\
-	if (pte_young(*ptep))						\
-		ret = test_and_clear_bit(_PAGE_BIT_ACCESSED, &ptep->pte_low); \
-	if (ret)							\
-		pte_update_defer(vma->vm_mm, addr, ptep);		\
-	ret;								\
+	int __ret = 0;							\
+	if (pte_young(*(ptep)))						\
+		__ret = test_and_clear_bit(_PAGE_BIT_ACCESSED,		\
+						&(ptep)->pte_low);	\
+	if (__ret)							\
+		pte_update((vma)->vm_mm, addr, ptep);			\
+	__ret;								\
 })
 
 /*
@@ -339,7 +344,7 @@ do {									\
 	int __dirty = pte_dirty(__pte);					\
 	__pte = pte_mkclean(__pte);					\
 	if (test_bit(PG_pinned, &virt_to_page((vma)->vm_mm->pgd)->flags)) \
-		ptep_set_access_flags(vma, address, ptep, __pte, __dirty); \
+		(void)ptep_set_access_flags(vma, address, ptep, __pte, __dirty); \
 	else if (__dirty)						\
 		(ptep)->pte_low = __pte.pte_low;			\
 	__dirty;							\
@@ -352,7 +357,7 @@ do {									\
 	int __young = pte_young(__pte);					\
 	__pte = pte_mkold(__pte);					\
 	if (test_bit(PG_pinned, &virt_to_page((vma)->vm_mm->pgd)->flags)) \
-		ptep_set_access_flags(vma, address, ptep, __pte, __young); \
+		(void)ptep_set_access_flags(vma, address, ptep, __pte, __young); \
 	else if (__young)						\
 		(ptep)->pte_low = __pte.pte_low;			\
 	__young;							\
@@ -439,7 +444,7 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 }
 
 #define pmd_large(pmd) \
-((pmd_val(pmd) & (_PAGE_PSE|_PAGE_PRESENT)) == (_PAGE_PSE|_PAGE_PRESENT))
+((__pmd_val(pmd) & (_PAGE_PSE|_PAGE_PRESENT)) == (_PAGE_PSE|_PAGE_PRESENT))
 
 /*
  * the pgd page can be thought of an array like this: pgd_t[PTRS_PER_PGD]

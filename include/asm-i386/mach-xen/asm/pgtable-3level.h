@@ -9,11 +9,14 @@
  */
 
 #define pte_ERROR(e) \
-	printk("%s:%d: bad pte %p(%08lx%08lx).\n", __FILE__, __LINE__, &(e), (e).pte_high, (e).pte_low)
+	printk("%s:%d: bad pte %p(%016Lx pfn %08lx).\n", __FILE__, __LINE__, \
+	       &(e), __pte_val(e), pte_pfn(e))
 #define pmd_ERROR(e) \
-	printk("%s:%d: bad pmd %p(%016Lx).\n", __FILE__, __LINE__, &(e), pmd_val(e))
+	printk("%s:%d: bad pmd %p(%016Lx pfn %08Lx).\n", __FILE__, __LINE__, \
+	       &(e), __pmd_val(e), (pmd_val(e) & PTE_MASK) >> PAGE_SHIFT)
 #define pgd_ERROR(e) \
-	printk("%s:%d: bad pgd %p(%016Lx).\n", __FILE__, __LINE__, &(e), pgd_val(e))
+	printk("%s:%d: bad pgd %p(%016Lx pfn %08Lx).\n", __FILE__, __LINE__, \
+	       &(e), __pgd_val(e), (pgd_val(e) & PTE_MASK) >> PAGE_SHIFT)
 
 #define pud_none(pud)				0
 #define pud_bad(pud)				0
@@ -24,7 +27,7 @@
  */
 static inline int pte_x(pte_t pte)
 {
-	return !(pte_val(pte) & _PAGE_NX);
+	return !(__pte_val(pte) & _PAGE_NX);
 }
 
 /*
@@ -66,7 +69,7 @@ static inline void xen_set_pte_at(struct mm_struct *mm, unsigned long addr,
 
 static inline void xen_set_pte_atomic(pte_t *ptep, pte_t pte)
 {
-	set_64bit((unsigned long long *)(ptep),pte_val_ma(pte));
+	set_64bit((unsigned long long *)(ptep),__pte_val(pte));
 }
 static inline void xen_set_pmd(pmd_t *pmdp, pmd_t pmd)
 {
@@ -127,7 +130,7 @@ static inline void pud_clear (pud_t * pud) { }
 #ifdef CONFIG_SMP
 static inline pte_t xen_ptep_get_and_clear(pte_t *ptep, pte_t res)
 {
-	uint64_t val = pte_val_ma(res);
+	uint64_t val = __pte_val(res);
 	if (__cmpxchg64(ptep, val, 0) != val) {
 		/* xchg acts as a barrier before the setting of the high bits */
 		res.pte_low = xchg(&ptep->pte_low, 0);

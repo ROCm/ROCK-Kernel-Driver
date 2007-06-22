@@ -95,7 +95,7 @@ PHONY += bzImage bzlilo install archmrproper \
 ifdef CONFIG_XEN
 CPPFLAGS := -Iinclude$(if $(KBUILD_SRC),2)/asm/mach-xen $(CPPFLAGS)
 head-y := arch/x86_64/kernel/head-xen.o arch/x86_64/kernel/head64-xen.o arch/x86_64/kernel/init_task.o
-LDFLAGS_vmlinux := -e _start
+LDFLAGS_vmlinux := -e startup_64
 boot := arch/i386/boot-xen
 .PHONY: vmlinuz
 #Default target when executing "make"

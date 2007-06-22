@@ -718,6 +718,7 @@ static int xenwatch_thread(void *unused)
 	struct list_head *ent;
 	struct xs_stored_msg *msg;
 
+	current->flags |= PF_NOFREEZE;
 	for (;;) {
 		wait_event_interruptible(watch_events_waitq,
 					 !list_empty(&watch_events));
@@ -836,6 +837,7 @@ static int xenbus_thread(void *unused)
 {
 	int err;
 
+	current->flags |= PF_NOFREEZE;
 	for (;;) {
 		err = process_msg();
 		if (err)

@@ -203,6 +203,8 @@ void show_mem(void)
 			if (unlikely(i % MAX_ORDER_NR_PAGES == 0)) {
 				touch_nmi_watchdog();
 			}
+			if (!pfn_valid(pgdat->node_start_pfn + i))
+				continue;
 			page = pfn_to_page(pgdat->node_start_pfn + i);
 			total++;
 			if (PageReserved(page))
@@ -488,18 +490,15 @@ phys_pmd_init(pmd_t *pmd_page, unsigned long address, unsigned long end)
 		pte = alloc_static_page(&pte_phys);
 		pte_save = pte;
 		for (k = 0; k < PTRS_PER_PTE; pte++, k++, address += PTE_SIZE) {
+			unsigned long pteval = address | _PAGE_NX | _KERNPG_TABLE;
+
 			if (address >= (after_bootmem
 			                ? end
-			                : xen_start_info->nr_pages << PAGE_SHIFT)) {
-				__set_pte(pte, __pte(0)); 
-				continue;
-			}
-			if (make_readonly(address)) {
-				__set_pte(pte, 
-					  __pte(address | (_KERNPG_TABLE & ~_PAGE_RW)));
-				continue;
-			}
-			__set_pte(pte, __pte(address | _KERNPG_TABLE));
+			                : xen_start_info->nr_pages << PAGE_SHIFT))
+				pteval = 0;
+			else if (make_readonly(address))
+				pteval &= ~_PAGE_RW;
+			__set_pte(pte, __pte(pteval & __supported_pte_mask));
 		}
 		pte = pte_save;
 		early_make_page_readonly(pte, XENFEAT_writable_page_tables);
@@ -1190,3 +1189,11 @@ int in_gate_area_no_task(unsigned long addr)
 {
 	return (addr >= VSYSCALL_START) && (addr < VSYSCALL_END);
 }
+
+#ifndef CONFIG_XEN
+void *alloc_bootmem_high_node(pg_data_t *pgdat, unsigned long size)
+{
+	return __alloc_bootmem_core(pgdat->bdata, size,
+			SMP_CACHE_BYTES, (4UL*1024*1024*1024), 0);
+}
+#endif

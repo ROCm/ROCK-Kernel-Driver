@@ -76,17 +76,21 @@ typedef struct { unsigned long long pgprot; } pgprot_t;
 #define pgprot_val(x)	((x).pgprot)
 #include <asm/maddr.h>
 
+#define __pgd_val(x) ((x).pgd)
 static inline unsigned long long xen_pgd_val(pgd_t pgd)
 {
-	unsigned long long ret = pgd.pgd;
+	unsigned long long ret = __pgd_val(pgd);
 	if (ret & _PAGE_PRESENT)
 		ret = pte_machine_to_phys(ret);
 	return ret;
 }
 
+#define __pud_val(x) __pgd_val((x).pgd)
+
+#define __pmd_val(x) ((x).pmd)
 static inline unsigned long long xen_pmd_val(pmd_t pmd)
 {
-	unsigned long long ret = pmd.pmd;
+	unsigned long long ret = __pmd_val(pmd);
 #if CONFIG_XEN_COMPAT <= 0x030002
 	if (ret)
 		ret = pte_machine_to_phys(ret) | _PAGE_PRESENT;
@@ -97,13 +101,13 @@ static inline unsigned long long xen_pmd_val(pmd_t pmd)
 	return ret;
 }
 
-static inline unsigned long long pte_val_ma(pte_t pte)
+static inline unsigned long long __pte_val(pte_t pte)
 {
 	return ((unsigned long long)pte.pte_high << 32) | pte.pte_low;
 }
 static inline unsigned long long xen_pte_val(pte_t pte)
 {
-	unsigned long long ret = pte_val_ma(pte);
+	unsigned long long ret = __pte_val(pte);
 	if (pte.pte_low & _PAGE_PRESENT)
 		ret = pte_machine_to_phys(ret);
 	return ret;
@@ -143,9 +147,10 @@ typedef struct { unsigned long pgprot; } pgprot_t;
 #define boot_pte_t pte_t /* or would you rather have a typedef */
 #include <asm/maddr.h>
 
+#define __pgd_val(x) ((x).pgd)
 static inline unsigned long xen_pgd_val(pgd_t pgd)
 {
-	unsigned long ret = pgd.pgd;
+	unsigned long ret = __pgd_val(pgd);
 #if CONFIG_XEN_COMPAT <= 0x030002
 	if (ret)
 		ret = machine_to_phys(ret) | _PAGE_PRESENT;
@@ -156,13 +161,16 @@ static inline unsigned long xen_pgd_val(pgd_t pgd)
 	return ret;
 }
 
-static inline unsigned long pte_val_ma(pte_t pte)
+#define __pud_val(x) __pgd_val((x).pgd)
+#define __pmd_val(x) __pud_val((x).pud)
+
+static inline unsigned long __pte_val(pte_t pte)
 {
 	return pte.pte_low;
 }
 static inline unsigned long xen_pte_val(pte_t pte)
 {
-	unsigned long ret = pte_val_ma(pte);
+	unsigned long ret = __pte_val(pte);
 	if (ret & _PAGE_PRESENT)
 		ret = machine_to_phys(ret);
 	return ret;
