@@ -75,23 +75,27 @@ enum gelic_net_int1_status {
 #define GELIC_NET_RXINT                   (GELIC_NET_RXINT0 | GELIC_NET_RXINT1)
 
  /* RX descriptor data_status bits */
-#define GELIC_NET_RXDMADU		0x80000000 /* destination MAC addr unknown */
-#define GELIC_NET_RXLSTFBF		0x40000000 /* last frame buffer            */
-#define GELIC_NET_RXIPCHK		0x20000000 /* IP checksum performed        */
-#define GELIC_NET_RXTCPCHK		0x10000000 /* TCP/UDP checksup performed   */
-#define GELIC_NET_RXIPSPKT		0x08000000 /* IPsec packet   */
-#define GELIC_NET_RXIPSAHPRT		0x04000000 /* IPsec AH protocol performed */
-#define GELIC_NET_RXIPSESPPRT		0x02000000 /* IPsec ESP protocol performed */
-#define GELIC_NET_RXSESPAH		0x01000000 /* IPsec ESP protocol auth performed */
-#define GELIC_NET_RXWTPKT	        0x00C00000 /*
-						    * wakeup trigger packet
-						    * 01: Magic Packet (TM)
-						    * 10: ARP packet
-						    * 11: Multicast MAC addr
-						    */
-#define GELIC_NET_RXVLNPKT		0x00200000 /* VLAN packet */
+#define GELIC_NET_RXDMADU	0x80000000 /* destination MAC addr unknown */
+#define GELIC_NET_RXLSTFBF	0x40000000 /* last frame buffer            */
+#define GELIC_NET_RXIPCHK	0x20000000 /* IP checksum performed        */
+#define GELIC_NET_RXTCPCHK	0x10000000 /* TCP/UDP checksup performed   */
+#define GELIC_NET_RXIPSPKT	0x08000000 /* IPsec packet   */
+#define GELIC_NET_RXIPSAHPRT	0x04000000 /* IPsec AH protocol performed */
+#define GELIC_NET_RXIPSESPPRT	0x02000000 /* IPsec ESP protocol performed */
+#define GELIC_NET_RXSESPAH	0x01000000 /*
+					    * IPsec ESP protocol auth
+					    * performed
+					    */
+
+#define GELIC_NET_RXWTPKT	0x00C00000 /*
+					    * wakeup trigger packet
+					    * 01: Magic Packet (TM)
+					    * 10: ARP packet
+					    * 11: Multicast MAC addr
+					    */
+#define GELIC_NET_RXVLNPKT	0x00200000 /* VLAN packet */
 /* bit 20..16 reserved */
-#define GELIC_NET_RXRECNUM		0x0000ff00 /* reception receipt number */
+#define GELIC_NET_RXRECNUM	0x0000ff00 /* reception receipt number */
 /* bit 7..0 reserved */
 
 #define GELIC_NET_TXDESC_TAIL		0
@@ -99,28 +103,29 @@ enum gelic_net_int1_status {
 
 /* RX descriptor data_error bits */
 /* bit 31 reserved */
-#define GELIC_NET_RXALNERR		0x40000000 /* alignement error 10/100M */
-#define GELIC_NET_RXOVERERR		0x20000000 /* oversize error */
-#define GELIC_NET_RXRNTERR		0x10000000 /* Runt error */
-#define GELIC_NET_RXIPCHKERR		0x08000000 /* IP checksum  error */
-#define GELIC_NET_RXTCPCHKERR		0x04000000 /* TCP/UDP checksum  error */
-#define GELIC_NET_RXUMCHSP		0x02000000 /* unmatched sp on sp */
-#define GELIC_NET_RXUMCHSPI		0x01000000 /* unmatched SPI on SAD */
-#define GELIC_NET_RXUMCHSAD		0x00800000 /* unmatched SAD */
-#define GELIC_NET_RXIPSAHERR		0x00400000 /* auth error on AH protocol
-						    * processing */
-#define GELIC_NET_RXIPSESPAHERR		0x00200000 /* auth error on ESP protocol
-						    * processing */
-#define GELIC_NET_RXDRPPKT		0x00100000 /* drop packet */
-#define GELIC_NET_RXIPFMTERR		0x00080000 /* IP packet format error */
+#define GELIC_NET_RXALNERR	0x40000000 /* alignement error 10/100M */
+#define GELIC_NET_RXOVERERR	0x20000000 /* oversize error */
+#define GELIC_NET_RXRNTERR	0x10000000 /* Runt error */
+#define GELIC_NET_RXIPCHKERR	0x08000000 /* IP checksum  error */
+#define GELIC_NET_RXTCPCHKERR	0x04000000 /* TCP/UDP checksum  error */
+#define GELIC_NET_RXUMCHSP	0x02000000 /* unmatched sp on sp */
+#define GELIC_NET_RXUMCHSPI	0x01000000 /* unmatched SPI on SAD */
+#define GELIC_NET_RXUMCHSAD	0x00800000 /* unmatched SAD */
+#define GELIC_NET_RXIPSAHERR	0x00400000 /* auth error on AH protocol
+					    * processing */
+#define GELIC_NET_RXIPSESPAHERR	0x00200000 /* auth error on ESP protocol
+					    * processing */
+#define GELIC_NET_RXDRPPKT	0x00100000 /* drop packet */
+#define GELIC_NET_RXIPFMTERR	0x00080000 /* IP packet format error */
 /* bit 18 reserved */
-#define GELIC_NET_RXDATAERR		0x00020000 /* IP packet format error */
-#define GELIC_NET_RXCALERR		0x00010000 /* cariier extension length
-						    * error */
-#define GELIC_NET_RXCREXERR		0x00008000 /* carrier extention error */
-#define GELIC_NET_RXMLTCST		0x00004000 /* multicast address frame */
+#define GELIC_NET_RXDATAERR	0x00020000 /* IP packet format error */
+#define GELIC_NET_RXCALERR	0x00010000 /* cariier extension length
+					    * error */
+#define GELIC_NET_RXCREXERR	0x00008000 /* carrier extention error */
+#define GELIC_NET_RXMLTCST	0x00004000 /* multicast address frame */
 /* bit 13..0 reserved */
-#define GELIC_NET_DATA_ERROR_CHK_MASK	(GELIC_NET_RXIPCHKERR | GELIC_NET_RXTCPCHKERR)
+#define GELIC_NET_DATA_ERROR_CHK_MASK		\
+	(GELIC_NET_RXIPCHKERR | GELIC_NET_RXTCPCHKERR)
 
 
 /* tx descriptor command and status */
@@ -354,7 +359,7 @@ struct gelic_wireless {
 	u8 cmd_send_flg;
 
 	struct iw_public_data wireless_data;
-	u8 *data_buf; /* data buffer for lv1_net_control */
+	void *data_buf; /* data buffer for lv1_net_control */
 
 	u8 wireless; /* wireless support */
 	u8 state;
@@ -430,10 +435,12 @@ struct gelic_net_card {
 
 	struct gelic_net_descr_chain tx_chain;
 	struct gelic_net_descr_chain rx_chain;
+	/* gurad dmac descriptor chain*/
 	spinlock_t chain_lock;
 
 	struct net_device_stats netdev_stats;
 	int rx_csum;
+	/* guard tx_dma_progress */
 	spinlock_t tx_dma_lock;
 	int tx_dma_progress;
 
@@ -457,4 +464,4 @@ extern void gelicw_remove(struct net_device *netdev);
 extern void gelicw_interrupt(struct net_device *netdev, u64 status);
 extern int gelicw_is_associated(struct net_device *netdev);
 
-#endif //_GELIC_NET_H
+#endif /* _GELIC_NET_H */

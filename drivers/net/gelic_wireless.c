@@ -295,7 +295,7 @@ static void gelicw_cmd_rssi(struct net_device *netdev)
 			w->rssi = 0;
 			dev_dbg(ntodev(netdev), "GELICW_CMD_GET_RSSI res:%d,%ld\n", status, res);
 		}
-		rssi = (struct rssi_desc *)w->data_buf;
+		rssi = w->data_buf;
 		w->rssi = rssi->rssi;
 		dev_dbg(ntodev(netdev), "GELICW_CMD_GET_RSSI:%d\n", rssi->rssi);
 	}
@@ -315,7 +315,7 @@ static int gelicw_cmd_common(struct net_device *netdev)
 		return -EIO;
 
 	lpar = ps3_mm_phys_to_lpar(__pa(w->data_buf));
-	config = (struct common_config *)w->data_buf;
+	config = w->data_buf;
 	config->scan_index = w->bss_index;
 	config->bss_type = (w->iw_mode == IW_MODE_ADHOC) ?
 				GELICW_BSS_ADHOC : GELICW_BSS_INFRA;
@@ -385,7 +385,7 @@ static int gelicw_cmd_encode(struct net_device *netdev)
 	if (w->key_alg == IW_ENCODE_ALG_WEP ||
 	    w->key_alg == IW_ENCODE_ALG_NONE) {
 		/* WEP */
-		config = (struct wep_config *)w->data_buf;
+		config = w->data_buf;
 		memset(config, 0, sizeof(struct wep_config));
 
 		/* check key len */
@@ -425,7 +425,7 @@ static int gelicw_cmd_encode(struct net_device *netdev)
 		}
 	} else {
 		/* WPA */
-		wpa_config = (struct wpa_config *)w->data_buf;
+		wpa_config = w->data_buf;
 		memset(wpa_config, 0, sizeof(struct wpa_config));
 
 		switch (w->key_alg) {
@@ -535,7 +535,7 @@ static int gelicw_cmd_get_scan(struct gelic_wireless *w)
 		return -EFAULT;
 	}
 
-	desc = (struct scan_desc *)w->data_buf;
+	desc = w->data_buf;
 	for (i = 0;
 	     i < val / sizeof(struct scan_desc) && i < MAX_SCAN_BSS;
 	     i++) {
@@ -697,7 +697,7 @@ static int gelicw_cmd_set_scan(struct net_device *netdev)
 		w->wireless = GELICW_WIRELESS_ON;
 	}
 
-	p = (u8 *)w->data_buf;
+	p = w->data_buf;
 	lpar = ps3_mm_phys_to_lpar(__pa(w->data_buf));
 
 	/* avoid frequent scanning */
@@ -1054,7 +1054,7 @@ int gelicw_setup_netdev(struct net_device *netdev, int wi)
 	}
 	/* we need 4K aligned, 16 units of scan_desc sized */
 	BUILD_BUG_ON(PAGE_SIZE < sizeof(struct scan_desc) * MAX_SCAN_BSS);
-	w->data_buf = (u8*)get_zeroed_page(GFP_KERNEL);
+	w->data_buf = (void *)get_zeroed_page(GFP_KERNEL);
 	if (!w->data_buf) {
 		w->wireless = 0;
 		dev_info(ntodev(netdev), "%s:get_page failed\n", __func__);

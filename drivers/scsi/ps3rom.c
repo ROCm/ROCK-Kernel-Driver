@@ -1,5 +1,5 @@
 /*
- * PS3 ROM Storage Driver
+ * PS3 BD/DVD/CD-ROM Storage Driver
  *
  * Copyright (C) 2007 Sony Computer Entertainment Inc.
  * Copyright 2007 Sony Corp.
@@ -20,8 +20,6 @@
 
 #include <linux/cdrom.h>
 #include <linux/highmem.h>
-#include <linux/interrupt.h>
-#include <linux/kthread.h>
 
 #include <scsi/scsi.h>
 #include <scsi/scsi_cmnd.h>
@@ -39,14 +37,15 @@
 
 #define PS3ROM_MAX_SECTORS		(BOUNCE_SIZE / CD_FRAMESIZE)
 
-#define LV1_STORAGE_SEND_ATAPI_COMMAND	(1)
-
 
 struct ps3rom_private {
 	struct ps3_storage_device *dev;
-	struct scsi_cmnd *cmd;
+	struct scsi_cmnd *curr_cmd;
 };
 #define ps3rom_priv(dev)	((dev)->sbd.core.driver_data)
+
+
+#define LV1_STORAGE_SEND_ATAPI_COMMAND	(1)
 
 struct lv1_atapi_cmnd_block {
 	u8	pkt[32];	/* packet command block           */
@@ -67,18 +66,16 @@ enum lv1_atapi_proto {
 };
 
 enum lv1_atapi_in_out {
-	DIR_WRITE = 0, /* memory -> device */
-	DIR_READ = 1 /* device -> memory */
+	DIR_WRITE = 0,		/* memory -> device */
+	DIR_READ = 1		/* device -> memory */
 };
 
 
 static int ps3rom_slave_configure(struct scsi_device *scsi_dev)
 {
-	struct ps3rom_private *priv;
-	struct ps3_storage_device *dev;
+	struct ps3rom_private *priv = shost_priv(scsi_dev->host);
+	struct ps3_storage_device *dev = priv->dev;
 
-	priv = (struct ps3rom_private *)scsi_dev->host->hostdata;
-	dev = priv->dev;
 	dev_dbg(&dev->sbd.core, "%s:%u: id %u, lun %u, channel %u\n", __func__,
 		__LINE__, scsi_dev->id, scsi_dev->lun, scsi_dev->channel);
 
@@ -87,6 +84,9 @@ static int ps3rom_slave_configure(struct scsi_device *scsi_dev)
 	 * so we can prohibit MODE_SENSE_6
 	 */
 	scsi_dev->use_10_for_ms = 1;
+
+	/* we don't support {READ,WRITE}_6 */
+	scsi_dev->use_10_for_rw = 1;
 
 	return 0;
 }
@@ -232,17 +232,6 @@ static int ps3rom_atapi_request(struct ps3_storage_device *dev,
 	return 0;
 }
 
-static inline unsigned int srb6_lba(const struct scsi_cmnd *cmd)
-{
-	/* LUN is always zero */
-	return cmd->cmnd[1] << 16 | cmd->cmnd[2] << 8 | cmd->cmnd[3];
-}
-
-static inline unsigned int srb6_len(const struct scsi_cmnd *cmd)
-{
-	return cmd->cmnd[4];
-}
-
 static inline unsigned int srb10_lba(const struct scsi_cmnd *cmd)
 {
 	return cmd->cmnd[2] << 24 | cmd->cmnd[3] << 16 | cmd->cmnd[4] << 8 |
@@ -303,8 +292,8 @@ static int ps3rom_write_request(struct ps3_storage_device *dev,
 static int ps3rom_queuecommand(struct scsi_cmnd *cmd,
 			       void (*done)(struct scsi_cmnd *))
 {
-	struct ps3rom_private *priv;
-	struct ps3_storage_device *dev;
+	struct ps3rom_private *priv = shost_priv(cmd->device->host);
+	struct ps3_storage_device *dev = priv->dev;
 	unsigned char opcode;
 	int res;
 
@@ -312,30 +301,19 @@ static int ps3rom_queuecommand(struct scsi_cmnd *cmd,
 	scsi_print_command(cmd);
 #endif
 
-	priv = (struct ps3rom_private *)cmd->device->host->hostdata;
-	dev = priv->dev;
-	priv->cmd = cmd;
+	priv->curr_cmd = cmd;
 	cmd->scsi_done = done;
 
 	opcode = cmd->cmnd[0];
 	/*
 	 * While we can submit READ/WRITE SCSI commands as ATAPI commands,
-	 * it's recommended to use lv1_storage_{read,write}() instead
+	 * it's recommended for various reasons (performance, error handling,
+	 * ...) to use lv1_storage_{read,write}() instead
 	 */
 	switch (opcode) {
-	case READ_6:
-		res = ps3rom_read_request(dev, cmd, srb6_lba(cmd),
-					  srb6_len(cmd));
-		break;
-
 	case READ_10:
 		res = ps3rom_read_request(dev, cmd, srb10_lba(cmd),
 					  srb10_len(cmd));
-		break;
-
-	case WRITE_6:
-		res = ps3rom_write_request(dev, cmd, srb6_lba(cmd),
-					   srb6_len(cmd));
 		break;
 
 	case WRITE_10:
@@ -353,7 +331,7 @@ static int ps3rom_queuecommand(struct scsi_cmnd *cmd,
 		cmd->result = res;
 		cmd->sense_buffer[0] = 0x70;
 		cmd->sense_buffer[2] = ILLEGAL_REQUEST;
-		priv->cmd = NULL;
+		priv->curr_cmd = NULL;
 		cmd->scsi_done(cmd);
 	}
 
@@ -401,8 +379,8 @@ static irqreturn_t ps3rom_interrupt(int irq, void *data)
 	}
 
 	host = ps3rom_priv(dev);
-	priv = (struct ps3rom_private *)host->hostdata;
-	cmd = priv->cmd;
+	priv = shost_priv(host);
+	cmd = priv->curr_cmd;
 
 	if (!status) {
 		/* OK, completed */
@@ -438,7 +416,7 @@ static irqreturn_t ps3rom_interrupt(int irq, void *data)
 	cmd->result = SAM_STAT_CHECK_CONDITION;
 
 done:
-	priv->cmd = NULL;
+	priv->curr_cmd = NULL;
 	cmd->scsi_done(cmd);
 	return IRQ_HANDLED;
 }
@@ -474,23 +452,12 @@ static int __devinit ps3rom_probe(struct ps3_system_bus_device *_dev)
 
 	dev->bounce_size = BOUNCE_SIZE;
 	dev->bounce_buf = kmalloc(BOUNCE_SIZE, GFP_DMA);
-	if (!dev->bounce_buf) {
+	if (!dev->bounce_buf)
 		return -ENOMEM;
-	}
 
-	error = ps3stor_setup(dev);
+	error = ps3stor_setup(dev, ps3rom_interrupt);
 	if (error)
 		goto fail_free_bounce;
-
-	/* override the interrupt handler */
-	free_irq(dev->irq, dev);
-	error = request_irq(dev->irq, ps3rom_interrupt, IRQF_DISABLED,
-			    dev->sbd.core.driver->name, dev);
-	if (error) {
-		dev_err(&dev->sbd.core, "%s:%u: request_irq failed %d\n",
-			__func__, __LINE__, error);
-		goto fail_teardown;
-	}
 
 	host = scsi_host_alloc(&ps3rom_host_template,
 			       sizeof(struct ps3rom_private));
@@ -500,7 +467,7 @@ static int __devinit ps3rom_probe(struct ps3_system_bus_device *_dev)
 		goto fail_teardown;
 	}
 
-	priv = (struct ps3rom_private *)host->hostdata;
+	priv = shost_priv(host);
 	ps3rom_priv(dev) = host;
 	priv->dev = dev;
 
@@ -521,6 +488,7 @@ static int __devinit ps3rom_probe(struct ps3_system_bus_device *_dev)
 
 fail_host_put:
 	scsi_host_put(host);
+	ps3rom_priv(dev) = NULL;
 fail_teardown:
 	ps3stor_teardown(dev);
 fail_free_bounce:
@@ -535,8 +503,9 @@ static int ps3rom_remove(struct ps3_system_bus_device *_dev)
 
 	scsi_remove_host(host);
 	ps3stor_teardown(dev);
-	kfree(dev->bounce_buf);
 	scsi_host_put(host);
+	ps3rom_priv(dev) = NULL;
+	kfree(dev->bounce_buf);
 	return 0;
 }
 
@@ -563,6 +532,6 @@ module_init(ps3rom_init);
 module_exit(ps3rom_exit);
 
 MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("PS3 ROM Storage Driver");
+MODULE_DESCRIPTION("PS3 BD/DVD/CD-ROM Storage Driver");
 MODULE_AUTHOR("Sony Corporation");
 MODULE_ALIAS(PS3_MODULE_ALIAS_STOR_ROM);

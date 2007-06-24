@@ -2269,18 +2269,19 @@ config GELIC_NET
 	tristate "PS3 Gigabit Ethernet driver"
 	depends on PPC_PS3
 	help
-	  This driver supports the Gigabit Ethernet device on the
-	  PS3 game console.
+	  This driver supports the network device on the PS3 game
+	  console.  This driver has built-in support for Ethernet.
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called ps3_gelic.
 
 config GELIC_WIRELESS
-	bool "Gelic net Wireless Extension"
+	bool "PS3 Wireless support"
 	depends on GELIC_NET
 	select WIRELESS_EXT
 	help
-	  Wireless Extension support for Gelic Gigabit Ethernet driver
+	  This option enables the wireless networking support of
+	  the PS3 network driver.
 
 config GIANFAR
 	tristate "Gianfar Ethernet"

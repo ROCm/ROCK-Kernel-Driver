@@ -27,6 +27,8 @@
  *
  * The bootwraper build script copies the 0x100 bytes at symbol
  * __system_reset_overlay to offset 0x100 of the rom image.
+ *
+ * The PS3 has a single processor with two threads.
  */
 
 	.globl __system_reset_overlay
@@ -53,16 +55,10 @@ __system_reset_overlay:
 	mtctr	r4
 	bctr
 
-	/* Primary waits for __secondary_hold_acknowledge. */
+	/* Primary delays then goes to _zimage_start in wrapper. */
 1:
-	li	r5, 0x10 /* __secondary_hold_acknowledge */
-	or	28, 28, 28 /* db8cyc */
-
-	ld	r4, 0(r5)
-	cmpdi	r4, 0
-	beq	1b
-
-	/* Primary goes to _zimage_start in wrapper. */
+	or	31, 31, 31 /* db16cyc */
+	or	31, 31, 31 /* db16cyc */
 
 	lis	r4, _zimage_start@ha
 	addi	r4, r4, _zimage_start@l

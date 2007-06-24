@@ -149,7 +149,7 @@ ps3)
     lds=$object/zImage.ps3.lds
     gzip=
     ext=bin
-    objflags="-O binary"
+    objflags="-O binary --set-section-flags=.bss=contents,alloc,load,data"
     ksection=.kernel:vmlinux.bin
     isection=.kernel:initrd
     ;;

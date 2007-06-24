@@ -18,11 +18,11 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#include <linux/dma-mapping.h>
-#include <linux/interrupt.h>
+#include <linux/fs.h>
 #include <linux/miscdevice.h>
 #include <linux/uaccess.h>
 
+#include <asm/lv1call.h>
 #include <asm/ps3stor.h>
 
 
@@ -42,12 +42,11 @@ static ssize_t ps3flash_read_write_sectors(struct ps3_storage_device *dev,
 					   u64 lpar, u64 start_sector,
 					   u64 sectors, int write)
 {
-	const char *op = write ? "write" : "read";
 	u64 res = ps3stor_read_write_sectors(dev, lpar, start_sector, sectors,
 					     write);
 	if (res) {
 		dev_err(&dev->sbd.core, "%s:%u: %s failed 0x%lx\n", __func__,
-			__LINE__, op, res);
+			__LINE__, write ? "write" : "read", res);
 		return -EIO;
 	}
 	return sectors;
@@ -279,6 +278,30 @@ fail:
 }
 
 
+static irqreturn_t ps3flash_interrupt(int irq, void *data)
+{
+	struct ps3_storage_device *dev = data;
+	int res;
+	u64 tag, status;
+
+	res = lv1_storage_get_async_status(dev->sbd.dev_id, &tag, &status);
+
+	if (tag != dev->tag)
+		dev_err(&dev->sbd.core,
+			"%s:%u: tag mismatch, got %lx, expected %lx\n",
+			__func__, __LINE__, tag, dev->tag);
+
+	if (res) {
+		dev_err(&dev->sbd.core, "%s:%u: res=%d status=0x%lx\n",
+			__func__, __LINE__, res, status);
+	} else {
+		dev->lv1_status = status;
+		complete(&dev->done);
+	}
+	return IRQ_HANDLED;
+}
+
+
 static const struct file_operations ps3flash_fops = {
 	.owner	= THIS_MODULE,
 	.llseek	= ps3flash_llseek,
@@ -316,7 +339,7 @@ static int __devinit ps3flash_probe(struct ps3_system_bus_device *_dev)
 
 	/* use static buffer, kmalloc cannot allocate 256 KiB */
 	if (!ps3flash_bounce_buffer.address)
-		return -ENOMEM;
+		return -ENODEV;
 
 	if (ps3flash_dev) {
 		dev_err(&dev->sbd.core,
@@ -338,7 +361,7 @@ static int __devinit ps3flash_probe(struct ps3_system_bus_device *_dev)
 	dev->bounce_size = ps3flash_bounce_buffer.size;
 	dev->bounce_buf = ps3flash_bounce_buffer.address;
 
-	error = ps3stor_setup(dev);
+	error = ps3stor_setup(dev, ps3flash_interrupt);
 	if (error)
 		goto fail_free_priv;
 
@@ -358,6 +381,7 @@ fail_teardown:
 	ps3stor_teardown(dev);
 fail_free_priv:
 	kfree(priv);
+	ps3flash_priv(dev) = NULL;
 fail:
 	ps3flash_dev = NULL;
 	return error;
@@ -370,6 +394,7 @@ static int ps3flash_remove(struct ps3_system_bus_device *_dev)
 	misc_deregister(&ps3flash_misc);
 	ps3stor_teardown(dev);
 	kfree(ps3flash_priv(dev));
+	ps3flash_priv(dev) = NULL;
 	ps3flash_dev = NULL;
 	return 0;
 }

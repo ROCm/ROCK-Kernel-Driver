@@ -157,6 +157,18 @@ struct ps3_prealloc ps3flash_bounce_buffer = {
 };
 EXPORT_SYMBOL_GPL(ps3flash_bounce_buffer);
 #define prealloc_ps3flash_bounce_buffer()	prealloc(&ps3flash_bounce_buffer)
+
+static int __init early_parse_ps3flash(char *p)
+{
+	if (!p)
+		return 1;
+
+	if (!strcmp(p, "off"))
+		ps3flash_bounce_buffer.size = 0;
+
+	return 0;
+}
+early_param("ps3flash", early_parse_ps3flash);
 #else
 #define prealloc_ps3flash_bounce_buffer()	do { } while (0)
 #endif

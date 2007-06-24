@@ -19,34 +19,9 @@
  */
 
 #include <linux/dma-mapping.h>
-#include <linux/interrupt.h>
 
 #include <asm/lv1call.h>
 #include <asm/ps3stor.h>
-
-
-static irqreturn_t ps3stor_interrupt(int irq, void *data)
-{
-	struct ps3_storage_device *dev = data;
-	int res;
-	u64 tag, status;
-
-	res = lv1_storage_get_async_status(dev->sbd.dev_id, &tag, &status);
-
-	if (tag != dev->tag)
-		dev_err(&dev->sbd.core,
-			"%s:%u: tag mismatch, got %lx, expected %lx\n",
-			__func__, __LINE__, tag, dev->tag);
-
-	if (res) {
-		dev_err(&dev->sbd.core, "%s:%u: res=%d status=0x%lx\n",
-			__func__, __LINE__, res, status);
-	} else {
-		dev->lv1_status = status;
-		complete(&dev->done);
-	}
-	return IRQ_HANDLED;
-}
 
 
 static int ps3stor_probe_access(struct ps3_storage_device *dev)
@@ -106,10 +81,11 @@ static int ps3stor_probe_access(struct ps3_storage_device *dev)
 /**
  *	ps3stor_setup - Setup a storage device before use
  *	@dev: Pointer to a struct ps3_storage_device
+ *	@handler: Pointer to an interrupt handler
  *
  *	Returns 0 for success, or an error code
  */
-int ps3stor_setup(struct ps3_storage_device *dev)
+int ps3stor_setup(struct ps3_storage_device *dev, irq_handler_t handler)
 {
 	int error, res, alignment;
 	enum ps3_dma_page_size page_size;
@@ -131,7 +107,7 @@ int ps3stor_setup(struct ps3_storage_device *dev)
 		goto fail_close_device;
 	}
 
-	error = request_irq(dev->irq, ps3stor_interrupt, IRQF_DISABLED,
+	error = request_irq(dev->irq, handler, IRQF_DISABLED,
 			    dev->sbd.core.driver->name, dev);
 	if (error) {
 		dev_err(&dev->sbd.core, "%s:%u: request_irq failed %d\n",

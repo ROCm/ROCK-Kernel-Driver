@@ -66,7 +66,10 @@ static void ps3_console_write(const char *buf, int len)
 static void ps3_exit(void)
 {
 	printf("ps3_exit\n");
-	lv1_panic(0); /* zero = no reboot */
+
+	/* lv1_panic will shutdown the lpar. */
+
+	lv1_panic(0); /* zero = do not reboot */
 	while (1);
 }
 
