@@ -1164,6 +1164,13 @@ ENTRY(call_softirq)
 	CFI_ENDPROC
 ENDPROC(call_softirq)
 
+KPROBE_ENTRY(ignore_sysret)
+	CFI_STARTPROC
+	mov $-ENOSYS,%eax
+	sysret
+	CFI_ENDPROC
+ENDPROC(ignore_sysret)
+
 #ifdef	CONFIG_KDB
 
 #ifdef CONFIG_SMP
