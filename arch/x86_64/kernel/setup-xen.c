@@ -71,6 +71,7 @@
 #include <asm/hypervisor.h>
 #include <xen/interface/nmi.h>
 #include <xen/features.h>
+#include <xen/firmware.h>
 #include <xen/xencons.h>
 #define PFN_UP(x)       (((x) + PAGE_SIZE-1) >> PAGE_SHIFT)
 #define PFN_PHYS(x)     ((x) << PAGE_SHIFT)
@@ -225,6 +226,7 @@ struct edd edd;
 #ifdef CONFIG_EDD_MODULE
 EXPORT_SYMBOL(edd);
 #endif
+#ifndef CONFIG_XEN
 /**
  * copy_edd() - Copy the BIOS EDD information
  *              from boot_params into a safe place.
@@ -237,6 +239,7 @@ static inline void copy_edd(void)
      edd.mbr_signature_nr = EDD_MBR_SIG_NR;
      edd.edd_info_nr = EDD_NR;
 }
+#endif
 #else
 static inline void copy_edd(void)
 {
@@ -309,7 +312,7 @@ void __init setup_arch(char **cmdline_p)
 		atomic_notifier_chain_register(&panic_notifier_list, &xen_panic_block);
 	}
 
-	edid_info = EDID_INFO;
+	copy_edid();
 	saved_video_mode = SAVED_VIDEO_MODE;
 	bootloader_type = LOADER_TYPE;
 

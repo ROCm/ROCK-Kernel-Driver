@@ -166,7 +166,7 @@ mtrr_del(int reg, unsigned long base, unsigned long size)
 EXPORT_SYMBOL(mtrr_add);
 EXPORT_SYMBOL(mtrr_del);
 
-void mtrr_bp_init(void)
+__init void mtrr_bp_init(void)
 {
 }
 

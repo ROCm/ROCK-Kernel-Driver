@@ -83,6 +83,13 @@ static unsigned long frame_list[PAGE_SIZE / sizeof(unsigned long)];
 
 /* VM /proc information for memory */
 extern unsigned long totalram_pages;
+#ifdef CONFIG_HIGHMEM
+extern unsigned long totalhigh_pages;
+#define totalhigh_pages(op) (totalhigh_pages op)
+#else
+#undef totalhigh_pages
+#define totalhigh_pages(op)
+#endif
 extern unsigned long num_physpages;
 
 /* List of ballooned pages, threaded through the mem_map array. */
@@ -119,6 +126,7 @@ static void balloon_append(struct page *page)
 	if (PageHighMem(page)) {
 		list_add_tail(PAGE_TO_LIST(page), &ballooned_pages);
 		bs.balloon_high++;
+		totalhigh_pages(--);
 	} else {
 		list_add(PAGE_TO_LIST(page), &ballooned_pages);
 		bs.balloon_low++;
@@ -136,8 +144,10 @@ static struct page *balloon_retrieve(void)
 	page = LIST_TO_PAGE(ballooned_pages.next);
 	UNLIST_PAGE(page);
 
-	if (PageHighMem(page))
+	if (PageHighMem(page)) {
 		bs.balloon_high--;
+		totalhigh_pages(++);
+	}
 	else
 		bs.balloon_low--;
 

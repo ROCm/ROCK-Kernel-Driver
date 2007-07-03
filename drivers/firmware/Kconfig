@@ -8,7 +8,6 @@ menu "Firmware Drivers"
 config EDD
 	tristate "BIOS Enhanced Disk Drive calls determine boot disk"
 	depends on !IA64
-	depends on !XEN
 	help
 	  Say Y or M here if you want to enable BIOS Enhanced Disk Drive
 	  Services real mode BIOS calls to determine which disk

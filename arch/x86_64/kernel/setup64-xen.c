@@ -206,6 +206,8 @@ char boot_exception_stacks[(N_EXCEPTION_STACKS - 1) * EXCEPTION_STKSZ + DEBUG_ST
 __attribute__((section(".bss.page_aligned")));
 #endif
 
+extern asmlinkage void ignore_sysret(void);
+
 /* May not be marked __init: used by software suspend */
 void syscall_init(void)
 {
@@ -217,6 +219,7 @@ void syscall_init(void)
 	 */ 
 	wrmsrl(MSR_STAR,  ((u64)__USER32_CS)<<48  | ((u64)__KERNEL_CS)<<32); 
 	wrmsrl(MSR_LSTAR, system_call); 
+	wrmsrl(MSR_CSTAR, ignore_sysret);
 
 	/* Flags to clear on syscall */
 	wrmsrl(MSR_SYSCALL_MASK, EF_TF|EF_DF|EF_IE|0x3000); 

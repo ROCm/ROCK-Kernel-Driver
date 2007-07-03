@@ -299,7 +299,7 @@ config X86_POPAD_OK
 
 config X86_CMPXCHG64
 	bool
-	depends on X86_PAE
+	depends on X86_PAE || X86_XEN
 	default y
 
 config X86_ALIGNMENT_16
