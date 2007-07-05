@@ -29,14 +29,15 @@
 #include <linux/types.h>
 #include <linux/list.h>
 #include <linux/inet.h>
+#include <linux/file.h>
 #include <linux/blkdev.h>
 #include <linux/crypto.h>
 #include <linux/delay.h>
 #include <linux/kfifo.h>
 #include <linux/scatterlist.h>
-#include <linux/mutex.h>
 #include <net/tcp.h>
 #include <scsi/scsi_cmnd.h>
+#include <scsi/scsi_device.h>
 #include <scsi/scsi_host.h>
 #include <scsi/scsi.h>
 #include <scsi/scsi_transport_iscsi.h>
@@ -47,13 +48,18 @@ MODULE_AUTHOR("Dmitry Yusupov <dmitry_yus@yahoo.com>, "
 	      "Alex Aizman <itn780@yahoo.com>");
 MODULE_DESCRIPTION("iSCSI/TCP data-path");
 MODULE_LICENSE("GPL");
-/* #define DEBUG_TCP */
 #define DEBUG_ASSERT
 
-#ifdef DEBUG_TCP
-#define debug_tcp(fmt...) printk(KERN_INFO "tcp: " fmt)
+#ifdef CONFIG_SCSI_ISCSI_DEBUG
+static int iscsi_tcp_debug = 0;
+#define debug_tcp(fmt...) do { \
+		if (unlikely(iscsi_tcp_debug)) \
+			printk(KERN_INFO "tcp: " fmt); \
+	} while (0)
+
+module_param_named(debug, iscsi_tcp_debug, int, S_IRUGO | S_IWUSR);
 #else
-#define debug_tcp(fmt...)
+#define debug_tcp(fmt...) do { } while (0)
 #endif
 
 #ifndef DEBUG_ASSERT
@@ -66,116 +72,376 @@ MODULE_LICENSE("GPL");
 static unsigned int iscsi_max_lun = 512;
 module_param_named(max_lun, iscsi_max_lun, uint, S_IRUGO);
 
-static inline void
-iscsi_buf_init_iov(struct iscsi_buf *ibuf, char *vbuf, int size)
-{
-	ibuf->sg.page = virt_to_page(vbuf);
-	ibuf->sg.offset = offset_in_page(vbuf);
-	ibuf->sg.length = size;
-	ibuf->sent = 0;
-	ibuf->use_sendmsg = 1;
-}
+static int iscsi_tcp_begin_cmd_rsp(struct iscsi_tcp_conn *, int);
+static int iscsi_tcp_begin_header(struct iscsi_tcp_conn *);
+static int iscsi_tcp_send_hdr_done(struct iscsi_tcp_conn *, struct iscsi_chunk *);
 
+/*
+ * Scatterlist handling: inside the iscsi_chunk, we
+ * remember an index into the scatterlist, and set data/size
+ * to the current scatterlist entry. For highmem pages, we
+ * kmap as needed.
+ *
+ * Note that the page is unmapped when we return from
+ * TCP's data_ready handler, so we may end up mapping and
+ * unmapping the same page repeatedly. The whole reason
+ * for this is that we shouldn't keep the page mapped
+ * outside the softirq.
+ */
+
+/**
+ * iscsi_tcp_chunk_seek_sg - seek to indicated scatterlist entry
+ * @chunk: the buffer object
+ * @idx: index into scatterlist
+ * @offset: byte offset into that sg entry
+ *
+ * This function sets up the chunk so that subsequent
+ * data is copied to the indicated sg entry, at the given
+ * offset.
+ */
 static inline void
-iscsi_buf_init_sg(struct iscsi_buf *ibuf, struct scatterlist *sg)
+iscsi_tcp_chunk_seek_sg(struct iscsi_chunk *chunk,
+			unsigned int idx, unsigned int offset)
 {
-	ibuf->sg.page = sg->page;
-	ibuf->sg.offset = sg->offset;
-	ibuf->sg.length = sg->length;
-	/*
-	 * Fastpath: sg element fits into single page
-	 */
-	if (sg->length + sg->offset <= PAGE_SIZE && !PageSlab(sg->page))
-		ibuf->use_sendmsg = 0;
+	struct scatterlist *sg;
+
+	BUG_ON(chunk->sg == NULL);
+	BUG_ON(chunk->sg_mapped);
+
+	sg = &chunk->sg[idx];
+	chunk->sg_index = idx;
+	chunk->sg_offset = offset;
+	chunk->size = min(sg->length - offset, chunk->total_size);
+
+	if (likely(!PageHighMem(sg->page)))
+		chunk->data = page_address(sg->page) +
+				sg->offset + chunk->sg_offset;
 	else
-		ibuf->use_sendmsg = 1;
-	ibuf->sent = 0;
+		chunk->data = NULL;
 }
 
-static inline int
-iscsi_buf_left(struct iscsi_buf *ibuf)
-{
-	int rc;
-
-	rc = ibuf->sg.length - ibuf->sent;
-	BUG_ON(rc < 0);
-	return rc;
-}
-
+/**
+ * iscsi_tcp_chunk_map - map the current S/G page
+ */
 static inline void
-iscsi_hdr_digest(struct iscsi_conn *conn, struct iscsi_buf *buf,
-		 u8* crc)
+iscsi_tcp_chunk_map(struct iscsi_chunk *chunk)
 {
-	struct iscsi_tcp_conn *tcp_conn = conn->dd_data;
+	struct scatterlist *sg = &chunk->sg[chunk->sg_index];
 
-	crypto_hash_digest(&tcp_conn->tx_hash, &buf->sg, buf->sg.length, crc);
-	buf->sg.length = tcp_conn->hdr_size;
+	BUG_ON(chunk->sg_mapped);
+	BUG_ON(sg->length == 0);
+	chunk->sg_mapped = kmap_atomic(sg->page, KM_SOFTIRQ0);
+	chunk->data = chunk->sg_mapped + sg->offset + chunk->sg_offset;
 }
 
-static inline int
-iscsi_hdr_extract(struct iscsi_tcp_conn *tcp_conn)
+/**
+ * iscsi_tcp_chunk_unmap - unmap the current S/G page
+ */
+static inline void
+iscsi_tcp_chunk_unmap(struct iscsi_chunk *chunk)
 {
-	struct sk_buff *skb = tcp_conn->in.skb;
+	if (unlikely(chunk->sg_mapped)) {
+		kunmap_atomic(chunk->sg_mapped, KM_SOFTIRQ0);
+		chunk->sg_mapped = NULL;
+		chunk->data = NULL;
+	}
+}
 
-	tcp_conn->in.zero_copy_hdr = 0;
+/*
+ * Splice the digest buffer into the buffer
+ */
+static inline void
+iscsi_tcp_chunk_splice_digest(struct iscsi_chunk *chunk, void *digest)
+{
+	chunk->data = digest;
+	chunk->digest_len = ISCSI_DIGEST_SIZE;
+	chunk->total_size += ISCSI_DIGEST_SIZE;
+	chunk->size = ISCSI_DIGEST_SIZE;
+	chunk->copied = 0;
+	chunk->sg = NULL;
+	chunk->sg_index = 0;
+	chunk->hash = NULL;
+}
 
-	if (tcp_conn->in.copy >= tcp_conn->hdr_size &&
-	    tcp_conn->in_progress == IN_PROGRESS_WAIT_HEADER) {
-		/*
-		 * Zero-copy PDU Header: using connection context
-		 * to store header pointer.
-		 */
-		if (skb_shinfo(skb)->frag_list == NULL &&
-		    !skb_shinfo(skb)->nr_frags) {
-			tcp_conn->in.hdr = (struct iscsi_hdr *)
-				((char*)skb->data + tcp_conn->in.offset);
-			tcp_conn->in.zero_copy_hdr = 1;
-		} else {
-			/* ignoring return code since we checked
-			 * in.copy before */
-			skb_copy_bits(skb, tcp_conn->in.offset,
-				&tcp_conn->hdr, tcp_conn->hdr_size);
-			tcp_conn->in.hdr = &tcp_conn->hdr;
-		}
-		tcp_conn->in.offset += tcp_conn->hdr_size;
-		tcp_conn->in.copy -= tcp_conn->hdr_size;
-	} else {
-		int hdr_remains;
-		int copylen;
+/**
+ * iscsi_tcp_chunk_done - check whether the chunk is complete
+ *
+ * Check if we're done receiving this chunk. If the receive
+ * buffer is full but we expect more data, move on to the
+ * next entry in the scatterlist.
+ *
+ * If the amount of data we received isn't a multiple of 4,
+ * we will transparently receive the pad bytes, too.
+ *
+ * This function must be re-entrant.
+ */
+static inline int
+iscsi_tcp_chunk_done(struct iscsi_chunk *chunk)
+{
+	static unsigned char padbuf[ISCSI_PAD_LEN];
+	unsigned int pad;
 
-		/*
-		 * PDU header scattered across SKB's,
-		 * copying it... This'll happen quite rarely.
-		 */
-
-		if (tcp_conn->in_progress == IN_PROGRESS_WAIT_HEADER)
-			tcp_conn->in.hdr_offset = 0;
-
-		hdr_remains = tcp_conn->hdr_size - tcp_conn->in.hdr_offset;
-		BUG_ON(hdr_remains <= 0);
-
-		copylen = min(tcp_conn->in.copy, hdr_remains);
-		skb_copy_bits(skb, tcp_conn->in.offset,
-			(char*)&tcp_conn->hdr + tcp_conn->in.hdr_offset,
-			copylen);
-
-		debug_tcp("PDU gather offset %d bytes %d in.offset %d "
-		       "in.copy %d\n", tcp_conn->in.hdr_offset, copylen,
-		       tcp_conn->in.offset, tcp_conn->in.copy);
-
-		tcp_conn->in.offset += copylen;
-		tcp_conn->in.copy -= copylen;
-		if (copylen < hdr_remains)  {
-			tcp_conn->in_progress = IN_PROGRESS_HEADER_GATHER;
-			tcp_conn->in.hdr_offset += copylen;
-		        return -EAGAIN;
-		}
-		tcp_conn->in.hdr = &tcp_conn->hdr;
-		tcp_conn->discontiguous_hdr_cnt++;
-	        tcp_conn->in_progress = IN_PROGRESS_WAIT_HEADER;
+	if (likely(chunk->copied < chunk->size)) {
+		/* Map scatterlist entry if needed */
+		if (unlikely(chunk->data == NULL && chunk->sg))
+			iscsi_tcp_chunk_map(chunk);
+		return 0;
 	}
 
+	chunk->total_copied += chunk->copied;
+	chunk->copied = 0;
+	chunk->size = 0;
+
+	/* Unmap the current scatterlist page, if there is one. */
+	iscsi_tcp_chunk_unmap(chunk);
+
+	/* Do we have more scatterlist entries? */
+	if (chunk->total_copied < chunk->total_size) {
+		/* Proceed to the next entry in the scatterlist. */
+		iscsi_tcp_chunk_seek_sg(chunk, chunk->sg_index + 1, 0);
+		BUG_ON(chunk->size == 0);
+		return 0;
+	}
+
+	/* Do we need to handle padding? */
+	pad = iscsi_padding(chunk->total_copied);
+	if (pad != 0) {
+		debug_tcp("consume %d pad bytes\n", pad);
+		chunk->total_size += pad;
+		chunk->size = pad;
+		chunk->data = padbuf;
+		return 0;
+	}
+
+	return 1;
+}
+
+/**
+ * iscsi_tcp_xmit_chunk - transmit chunk
+ * @tcp_conn: the iSCSI TCP connection
+ * @chunk: the buffer to transmnit
+ *
+ * This function transmits as much of the buffer as
+ * the network layer will accept, and returns the number of
+ * bytes transmitted.
+ *
+ * If CRC hashing is enabled, the function will compute the
+ * hash as it goes. When the entire chunk has been transmitted,
+ * it will retrieve the hash value and send it as well.
+ */
+static int
+iscsi_tcp_xmit_chunk(struct iscsi_tcp_conn *tcp_conn,
+			struct iscsi_chunk *chunk)
+{
+	struct socket *sk = tcp_conn->sock;
+	unsigned int copied = 0;
+
+again:
+	while (!iscsi_tcp_chunk_done(chunk)) {
+		struct scatterlist *sg = chunk->sg + chunk->sg_index;
+		unsigned int offset, copy;
+		int r, flags = MSG_DONTWAIT;
+
+		offset = chunk->copied;
+		copy = chunk->size - offset;
+
+		if (chunk->total_copied + chunk->size < chunk->total_size)
+			flags |= MSG_MORE;
+
+		if (sg != NULL)
+			offset += chunk->sg_offset + sg->offset;
+
+		/* Use sendpage if we can; else fall back to sendmsg */
+		if (sg && sg->page) {
+			r = tcp_conn->sendpage(sk, sg->page, offset, copy, flags);
+		} else {
+			struct msghdr msg = { .msg_flags = flags };
+			struct kvec iov = {
+				.iov_base = chunk->data + offset,
+				.iov_len = copy
+			};
+
+			r = kernel_sendmsg(sk, &msg, &iov, 1, copy);
+		}
+
+		if (r < 0) {
+			if (copied || r == -EAGAIN)
+				goto out;
+			return r;
+		}
+
+		if (chunk->hash) {
+			struct scatterlist temp;
+
+			if (sg) {
+				temp = *sg;
+				temp.offset = offset;
+				temp.length = r;
+			} else {
+				sg_init_one(&temp, chunk->data + offset, r);
+			}
+			crypto_hash_update(chunk->hash, &temp, r);
+		}
+
+		chunk->copied += r;
+		copied += r;
+	}
+
+	if (chunk->hash) {
+		crypto_hash_final(chunk->hash, chunk->digest);
+		iscsi_tcp_chunk_splice_digest(chunk, chunk->digest);
+		goto again;
+	}
+
+out:
+
+	return copied;
+}
+
+/**
+ * iscsi_tcp_copy_to_chunk - copy data to chunk
+ * @tcp_conn: the iSCSI TCP connection
+ * @chunk: the buffer to copy to
+ * @ptr: data pointer
+ * @len: amount of data available
+ *
+ * This function copies up to @len bytes to the
+ * given buffer, and returns the number of bytes
+ * consumed, which can actually be less than @len.
+ *
+ * If hash digest is enabled, the function will update the
+ * hash while copying.
+ * Combining these two operations doesn't buy us a lot (yet),
+ * but in the future we could implement combined copy+crc,
+ * just way we do for network layer checksums.
+ */
+static int
+iscsi_tcp_recv_chunk(struct iscsi_tcp_conn *tcp_conn,
+		     struct iscsi_chunk *chunk,
+		     const void *ptr, unsigned int len)
+{
+	struct scatterlist sg;
+	unsigned int copy, copied = 0;
+
+again:
+	while (!iscsi_tcp_chunk_done(chunk)) {
+		if (copied == len)
+			goto out;
+
+		copy = min(len - copied, chunk->size - chunk->copied);
+		memcpy(chunk->data + chunk->copied, ptr + copied, copy);
+
+		if (unlikely(chunk->hash)) {
+			sg_init_one(&sg, ptr + copied, copy);
+			crypto_hash_update(chunk->hash, &sg, copy);
+		}
+		chunk->copied += copy;
+		copied += copy;
+	}
+
+	/* Set us up for receiving the digest */
+	if (chunk->hash) {
+		crypto_hash_final(chunk->hash, chunk->digest);
+		iscsi_tcp_chunk_splice_digest(chunk, chunk->recv_digest);
+		goto again;
+	}
+out:
+	return copied;
+}
+
+/*
+ * iscsi_tcp_dgst_header - compute CRC32 over the header
+ */
+static inline void
+iscsi_tcp_dgst_header(struct hash_desc *hash,
+		const void *hdr, size_t hdrlen,
+		unsigned char digest[ISCSI_DIGEST_SIZE])
+{
+	struct scatterlist sg;
+
+	sg_init_one(&sg, hdr, hdrlen);
+	crypto_hash_digest(hash, &sg, hdrlen, digest);
+}
+
+/**
+ * iscsi_tcp_dgst_verify - if CRC32 is used, verify the checksum
+ */
+static inline int
+iscsi_tcp_dgst_verify(struct iscsi_tcp_conn *tcp_conn,
+			struct iscsi_chunk *chunk)
+{
+	if (!chunk->digest_len)
+		return 1;
+
+	if (memcmp(chunk->recv_digest, chunk->digest, chunk->digest_len)) {
+		debug_tcp("digest mismatch\n");
+		return 0;
+	}
+
+	return 1;
+}
+
+/*
+ * Helper function to set up chunk buffer
+ */
+static inline struct iscsi_chunk *
+__iscsi_chunk_init(struct iscsi_chunk *chunk, size_t size,
+			iscsi_chunk_done_fn_t *done,
+			struct hash_desc *hash)
+{
+	memset(chunk, 0, sizeof(*chunk));
+	chunk->total_size = size;
+	chunk->done = done;
+
+	if (hash) {
+		chunk->hash = hash;
+		crypto_hash_init(hash);
+	}
+
+	return chunk;
+}
+
+static inline int
+iscsi_chunk_init_linear(struct iscsi_chunk *chunk,
+			void *data, unsigned int offset, size_t size,
+			iscsi_chunk_done_fn_t *done,
+			struct hash_desc *hash)
+{
+	__iscsi_chunk_init(chunk, size, done, hash);
+	chunk->data = data + offset;
+	chunk->size = size;
 	return 0;
+}
+
+static inline int
+iscsi_chunk_init_sg(struct iscsi_chunk *chunk,
+			struct scatterlist *sg, unsigned int sg_count,
+			unsigned int offset, size_t size,
+			iscsi_chunk_done_fn_t *done,
+			struct hash_desc *hash)
+{
+	unsigned int i;
+	size_t sg_size = 0;
+
+	/* First, make sure the scatterlist is big enough */
+	for (i = 0; i < sg_count; ++i)
+		sg_size += sg[i].length;
+	if (sg_size < offset + size)
+		goto bad_datalen;
+
+	chunk = __iscsi_chunk_init(chunk, size, done, hash);
+	for (i = 0; i < sg_count; ++i) {
+		if (offset < sg[i].length) {
+			chunk->sg = sg;
+			chunk->sg_count = sg_count;
+			iscsi_tcp_chunk_seek_sg(chunk, i, offset);
+			return 0;
+		}
+		offset -= sg[i].length;
+	}
+
+bad_datalen:
+	return ISCSI_ERR_DATALEN;
 }
 
 /*
@@ -186,21 +452,17 @@ iscsi_tcp_cleanup_ctask(struct iscsi_conn *conn, struct iscsi_cmd_task *ctask)
 {
 	struct iscsi_tcp_cmd_task *tcp_ctask = ctask->dd_data;
 	struct iscsi_r2t_info *r2t;
-	struct scsi_cmnd *sc;
 
 	/* flush ctask's r2t queues */
-	while (__kfifo_get(tcp_ctask->r2tqueue, (void*)&r2t, sizeof(void*))) {
-		__kfifo_put(tcp_ctask->r2tpool.queue, (void*)&r2t,
-			    sizeof(void*));
+	while ((r2t = iscsi_r2t_get(tcp_ctask->r2tqueue)) != NULL) {
+		iscsi_r2t_free(&tcp_ctask->r2tpool, r2t);
 		debug_scsi("iscsi_tcp_cleanup_ctask pending r2t dropped\n");
 	}
 
-	sc = ctask->sc;
-	if (unlikely(!sc))
-		return;
-
-	tcp_ctask->xmstate = XMSTATE_IDLE;
-	tcp_ctask->r2t = NULL;
+	if ((r2t = tcp_ctask->r2t) != NULL) {
+		iscsi_r2t_free(&tcp_ctask->r2tpool, r2t);
+		tcp_ctask->r2t = NULL;
+	}
 }
 
 /**
@@ -211,16 +473,14 @@ iscsi_tcp_cleanup_ctask(struct iscsi_conn *conn, struct iscsi_cmd_task *ctask)
 static int
 iscsi_data_rsp(struct iscsi_conn *conn, struct iscsi_cmd_task *ctask)
 {
-	int rc;
 	struct iscsi_tcp_conn *tcp_conn = conn->dd_data;
 	struct iscsi_tcp_cmd_task *tcp_ctask = ctask->dd_data;
 	struct iscsi_data_rsp *rhdr = (struct iscsi_data_rsp *)tcp_conn->in.hdr;
 	struct iscsi_session *session = conn->session;
+	struct scsi_cmnd *sc = ctask->sc;
 	int datasn = be32_to_cpu(rhdr->datasn);
 
-	rc = iscsi_check_assign_cmdsn(session, (struct iscsi_nopin*)rhdr);
-	if (rc)
-		return rc;
+	iscsi_update_cmdsn(session, (struct iscsi_nopin*)rhdr);
 	/*
 	 * setup Data-In byte counter (gets decremented..)
 	 */
@@ -229,34 +489,37 @@ iscsi_data_rsp(struct iscsi_conn *conn, struct iscsi_cmd_task *ctask)
 	if (tcp_conn->in.datalen == 0)
 		return 0;
 
-	if (ctask->datasn != datasn)
+	if (tcp_ctask->exp_datasn != datasn) {
+		debug_tcp("%s: ctask->exp_datasn(%d) != rhdr->datasn(%d)\n",
+		          __FUNCTION__, tcp_ctask->exp_datasn, datasn);
 		return ISCSI_ERR_DATASN;
+	}
 
-	ctask->datasn++;
+	tcp_ctask->exp_datasn++;
 
 	tcp_ctask->data_offset = be32_to_cpu(rhdr->offset);
-	if (tcp_ctask->data_offset + tcp_conn->in.datalen > ctask->total_length)
+	if (tcp_ctask->data_offset + tcp_conn->in.datalen > scsi_bufflen(sc)) {
+		debug_tcp("%s: data_offset(%d) + data_len(%d) > total_length_in(%d)\n",
+		          __FUNCTION__, tcp_ctask->data_offset,
+		          tcp_conn->in.datalen, scsi_bufflen(sc));
 		return ISCSI_ERR_DATA_OFFSET;
+	}
 
 	if (rhdr->flags & ISCSI_FLAG_DATA_STATUS) {
-		struct scsi_cmnd *sc = ctask->sc;
-
+		sc->result = (DID_OK << 16) | rhdr->cmd_status;
 		conn->exp_statsn = be32_to_cpu(rhdr->statsn) + 1;
-		if (rhdr->flags & ISCSI_FLAG_DATA_UNDERFLOW) {
+		if (rhdr->flags & (ISCSI_FLAG_DATA_UNDERFLOW |
+		                   ISCSI_FLAG_DATA_OVERFLOW)) {
 			int res_count = be32_to_cpu(rhdr->residual_count);
 
 			if (res_count > 0 &&
-			    res_count <= sc->request_bufflen) {
-				sc->resid = res_count;
-				sc->result = (DID_OK << 16) | rhdr->cmd_status;
-			} else
+			    (rhdr->flags & ISCSI_FLAG_CMD_OVERFLOW ||
+			     res_count <= scsi_bufflen(sc)))
+				scsi_set_resid(sc, res_count);
+			else
 				sc->result = (DID_BAD_TARGET << 16) |
 					rhdr->cmd_status;
-		} else if (rhdr->flags & ISCSI_FLAG_DATA_OVERFLOW) {
-			sc->resid = be32_to_cpu(rhdr->residual_count);
-			sc->result = (DID_OK << 16) | rhdr->cmd_status;
-		} else
-			sc->result = (DID_OK << 16) | rhdr->cmd_status;
+		}
 	}
 
 	conn->datain_pdus_cnt++;
@@ -264,7 +527,7 @@ iscsi_data_rsp(struct iscsi_conn *conn, struct iscsi_cmd_task *ctask)
 }
 
 /**
- * iscsi_solicit_data_init - initialize first Data-Out
+ * iscsi_next_data_out_prepare - initialize next Data-Out
  * @conn: iscsi connection
  * @ctask: scsi command task
  * @r2t: R2T info
@@ -275,12 +538,17 @@ iscsi_data_rsp(struct iscsi_conn *conn, struct iscsi_cmd_task *ctask)
  *
  *	This function is called with connection lock taken.
  **/
-static void
-iscsi_solicit_data_init(struct iscsi_conn *conn, struct iscsi_cmd_task *ctask,
+static int
+iscsi_next_data_out_prepare(struct iscsi_conn *conn,
+			struct iscsi_cmd_task *ctask,
 			struct iscsi_r2t_info *r2t)
 {
 	struct iscsi_data *hdr;
-	struct scsi_cmnd *sc = ctask->sc;
+	int left = r2t->data_length - r2t->sent;
+
+	BUG_ON(left < 0);
+	if (left == 0)
+		return 0;
 
 	hdr = &r2t->dtask.hdr;
 	memset(hdr, 0, sizeof(struct iscsi_data));
@@ -291,56 +559,18 @@ iscsi_solicit_data_init(struct iscsi_conn *conn, struct iscsi_cmd_task *ctask,
 	memcpy(hdr->lun, ctask->hdr->lun, sizeof(hdr->lun));
 	hdr->itt = ctask->hdr->itt;
 	hdr->exp_statsn = r2t->exp_statsn;
-	hdr->offset = cpu_to_be32(r2t->data_offset);
-	if (r2t->data_length > conn->max_xmit_dlength) {
+	hdr->offset = cpu_to_be32(r2t->data_offset + r2t->sent);
+	if (left > conn->max_xmit_dlength) {
 		hton24(hdr->dlength, conn->max_xmit_dlength);
 		r2t->data_count = conn->max_xmit_dlength;
 		hdr->flags = 0;
 	} else {
-		hton24(hdr->dlength, r2t->data_length);
-		r2t->data_count = r2t->data_length;
+		hton24(hdr->dlength, left);
+		r2t->data_count = left;
 		hdr->flags = ISCSI_FLAG_CMD_FINAL;
 	}
 	conn->dataout_pdus_cnt++;
-
-	r2t->sent = 0;
-
-	iscsi_buf_init_iov(&r2t->headbuf, (char*)hdr,
-			   sizeof(struct iscsi_hdr));
-
-	if (sc->use_sg) {
-		int i, sg_count = 0;
-		struct scatterlist *sg = sc->request_buffer;
-
-		r2t->sg = NULL;
-		for (i = 0; i < sc->use_sg; i++, sg += 1) {
-			/* FIXME: prefetch ? */
-			if (sg_count + sg->length > r2t->data_offset) {
-				int page_offset;
-
-				/* sg page found! */
-
-				/* offset within this page */
-				page_offset = r2t->data_offset - sg_count;
-
-				/* fill in this buffer */
-				iscsi_buf_init_sg(&r2t->sendbuf, sg);
-				r2t->sendbuf.sg.offset += page_offset;
-				r2t->sendbuf.sg.length -= page_offset;
-
-				/* xmit logic will continue with next one */
-				r2t->sg = sg + 1;
-				break;
-			}
-			sg_count += sg->length;
-		}
-		BUG_ON(r2t->sg == NULL);
-	} else {
-		iscsi_buf_init_iov(&r2t->sendbuf,
-			    (char*)sc->request_buffer + r2t->data_offset,
-			    r2t->data_count);
-		r2t->sg = NULL;
-	}
+	return 1;
 }
 
 /**
@@ -357,7 +587,6 @@ iscsi_r2t_rsp(struct iscsi_conn *conn, struct iscsi_cmd_task *ctask)
 	struct iscsi_tcp_conn *tcp_conn = conn->dd_data;
 	struct iscsi_r2t_rsp *rhdr = (struct iscsi_r2t_rsp *)tcp_conn->in.hdr;
 	int r2tsn = be32_to_cpu(rhdr->r2tsn);
-	int rc;
 
 	if (tcp_conn->in.datalen) {
 		printk(KERN_ERR "iscsi_tcp: invalid R2t with datalen %d\n",
@@ -365,17 +594,16 @@ iscsi_r2t_rsp(struct iscsi_conn *conn, struct iscsi_cmd_task *ctask)
 		return ISCSI_ERR_DATALEN;
 	}
 
-	if (tcp_ctask->exp_r2tsn && tcp_ctask->exp_r2tsn != r2tsn)
+	if (tcp_ctask->exp_datasn != r2tsn){
+		debug_tcp("%s: ctask->exp_datasn(%d) != rhdr->r2tsn(%d)\n",
+		          __FUNCTION__, tcp_ctask->exp_datasn, r2tsn);
 		return ISCSI_ERR_R2TSN;
-
-	rc = iscsi_check_assign_cmdsn(session, (struct iscsi_nopin*)rhdr);
-	if (rc)
-		return rc;
-
-	/* FIXME: use R2TSN to detect missing R2T */
+	}
 
 	/* fill-in new R2T associated with the task */
 	spin_lock(&session->lock);
+	iscsi_update_cmdsn(session, (struct iscsi_nopin*)rhdr);
+
 	if (!ctask->sc || ctask->mtask ||
 	     session->state != ISCSI_STATE_LOGGED_IN) {
 		printk(KERN_INFO "iscsi_tcp: dropping R2T itt %d in "
@@ -384,13 +612,14 @@ iscsi_r2t_rsp(struct iscsi_conn *conn, struct iscsi_cmd_task *ctask)
 		return 0;
 	}
 
-	rc = __kfifo_get(tcp_ctask->r2tpool.queue, (void*)&r2t, sizeof(void*));
-	BUG_ON(!rc);
+	r2t = iscsi_r2t_alloc(&tcp_ctask->r2tpool);
+	BUG_ON(r2t == NULL);
 
 	r2t->exp_statsn = rhdr->statsn;
 	r2t->data_length = be32_to_cpu(rhdr->data_length);
 	if (r2t->data_length == 0) {
 		printk(KERN_ERR "iscsi_tcp: invalid R2T with zero data len\n");
+		iscsi_r2t_free(&tcp_ctask->r2tpool, r2t);
 		spin_unlock(&session->lock);
 		return ISCSI_ERR_DATALEN;
 	}
@@ -401,22 +630,23 @@ iscsi_r2t_rsp(struct iscsi_conn *conn, struct iscsi_cmd_task *ctask)
 			    r2t->data_length, session->max_burst);
 
 	r2t->data_offset = be32_to_cpu(rhdr->data_offset);
-	if (r2t->data_offset + r2t->data_length > ctask->total_length) {
-		spin_unlock(&session->lock);
+	if (r2t->data_offset + r2t->data_length > scsi_bufflen(ctask->sc)) {
 		printk(KERN_ERR "iscsi_tcp: invalid R2T with data len %u at "
 		       "offset %u and total length %d\n", r2t->data_length,
-		       r2t->data_offset, ctask->total_length);
+		       r2t->data_offset, scsi_bufflen(ctask->sc));
+		iscsi_r2t_free(&tcp_ctask->r2tpool, r2t);
+		spin_unlock(&session->lock);
 		return ISCSI_ERR_DATALEN;
 	}
 
 	r2t->ttt = rhdr->ttt; /* no flip */
 	r2t->solicit_datasn = 0;
+	r2t->sent = 0;
 
-	iscsi_solicit_data_init(conn, ctask, r2t);
+	iscsi_next_data_out_prepare(conn, ctask, r2t);
 
-	tcp_ctask->exp_r2tsn = r2tsn + 1;
-	__kfifo_put(tcp_ctask->r2tqueue, (void*)&r2t, sizeof(void*));
-	tcp_ctask->xmstate |= XMSTATE_SOL_HDR;
+	tcp_ctask->exp_datasn = r2tsn + 1;
+	iscsi_r2t_put(tcp_ctask->r2tqueue, r2t);
 	list_move_tail(&ctask->running, &conn->xmitqueue);
 
 	scsi_queue_work(session->host, &conn->xmitwork);
@@ -426,16 +656,56 @@ iscsi_r2t_rsp(struct iscsi_conn *conn, struct iscsi_cmd_task *ctask)
 	return 0;
 }
 
+/*
+ * Handle incoming reply to DataIn command
+ */
 static int
-iscsi_tcp_hdr_recv(struct iscsi_conn *conn)
+iscsi_tcp_process_data_in(struct iscsi_tcp_conn *tcp_conn,
+			  struct iscsi_chunk *chunk)
+{
+	struct iscsi_conn *conn = tcp_conn->iscsi_conn;
+	struct iscsi_hdr *hdr = tcp_conn->in.hdr;
+	int	rc;
+
+	if (!iscsi_tcp_dgst_verify(tcp_conn, chunk))
+		return ISCSI_ERR_DATA_DGST;
+
+	/* check for non-exceptional status */
+	if (hdr->flags & ISCSI_FLAG_DATA_STATUS) {
+#ifdef DEBUG_SCSI
+		struct iscsi_cmd_task *ctask;
+
+		ctask = conn->session->cmds[get_itt(hdr->itt)];
+		debug_scsi("done [sc %p res %d itt 0x%x flags 0x%x]\n",
+			   ctask->sc, ctask->sc->result, ctask->itt,
+			   hdr->flags);
+#endif
+		rc = iscsi_complete_pdu(conn, tcp_conn->in.hdr, NULL, 0);
+		if (rc)
+			return rc;
+	}
+
+	return iscsi_tcp_begin_header(tcp_conn);
+}
+
+/**
+ * iscsi_tcp_hdr_dissect - process PDU header
+ * @conn: iSCSI connection
+ * @hdr: PDU header
+ *
+ * This function analyzes the header of the PDU received,
+ * and performs several sanity checks. If the PDU is accompanied
+ * by data, the receive buffer is set up to copy the incoming data
+ * to the correct location.
+ */
+static int
+iscsi_tcp_hdr_dissect(struct iscsi_conn *conn, struct iscsi_hdr *hdr)
 {
 	int rc = 0, opcode, ahslen;
-	struct iscsi_hdr *hdr;
 	struct iscsi_session *session = conn->session;
 	struct iscsi_tcp_conn *tcp_conn = conn->dd_data;
-	uint32_t cdgst, rdgst = 0, itt;
-
-	hdr = tcp_conn->in.hdr;
+	struct iscsi_cmd_task *ctask;
+	uint32_t itt;
 
 	/* verify PDU length */
 	tcp_conn->in.datalen = ntoh24(hdr->dlength);
@@ -444,77 +714,71 @@ iscsi_tcp_hdr_recv(struct iscsi_conn *conn)
 		       tcp_conn->in.datalen, conn->max_recv_dlength);
 		return ISCSI_ERR_DATALEN;
 	}
-	tcp_conn->data_copied = 0;
 
-	/* read AHS */
+	/* Additional header segments. So far, we don't
+	 * process additional headers.
+	 */
 	ahslen = hdr->hlength << 2;
-	tcp_conn->in.offset += ahslen;
-	tcp_conn->in.copy -= ahslen;
-	if (tcp_conn->in.copy < 0) {
-		printk(KERN_ERR "iscsi_tcp: can't handle AHS with length "
-		       "%d bytes\n", ahslen);
-		return ISCSI_ERR_AHSLEN;
-	}
-
-	/* calculate read padding */
-	tcp_conn->in.padding = tcp_conn->in.datalen & (ISCSI_PAD_LEN-1);
-	if (tcp_conn->in.padding) {
-		tcp_conn->in.padding = ISCSI_PAD_LEN - tcp_conn->in.padding;
-		debug_scsi("read padding %d bytes\n", tcp_conn->in.padding);
-	}
-
-	if (conn->hdrdgst_en) {
-		struct scatterlist sg;
-
-		sg_init_one(&sg, (u8 *)hdr,
-			    sizeof(struct iscsi_hdr) + ahslen);
-		crypto_hash_digest(&tcp_conn->rx_hash, &sg, sg.length,
-				   (u8 *)&cdgst);
-		rdgst = *(uint32_t*)((char*)hdr + sizeof(struct iscsi_hdr) +
-				     ahslen);
-		if (cdgst != rdgst) {
-			printk(KERN_ERR "iscsi_tcp: hdrdgst error "
-			       "recv 0x%x calc 0x%x\n", rdgst, cdgst);
-			return ISCSI_ERR_HDR_DGST;
-		}
-	}
 
 	opcode = hdr->opcode & ISCSI_OPCODE_MASK;
 	/* verify itt (itt encoding: age+cid+itt) */
 	rc = iscsi_verify_itt(conn, hdr, &itt);
 	if (rc == ISCSI_ERR_NO_SCSI_CMD) {
+		/* XXX: what does this do? */
 		tcp_conn->in.datalen = 0; /* force drop */
 		return 0;
 	} else if (rc)
 		return rc;
 
-	debug_tcp("opcode 0x%x offset %d copy %d ahslen %d datalen %d\n",
-		  opcode, tcp_conn->in.offset, tcp_conn->in.copy,
-		  ahslen, tcp_conn->in.datalen);
+	debug_tcp("in hdr %s ahslen %d datalen %d\n",
+		  iscsi_opname(opcode), ahslen, tcp_conn->in.datalen);
 
 	switch(opcode) {
 	case ISCSI_OP_SCSI_DATA_IN:
-		tcp_conn->in.ctask = session->cmds[itt];
-		rc = iscsi_data_rsp(conn, tcp_conn->in.ctask);
+		ctask = session->cmds[itt];
+		rc = iscsi_data_rsp(conn, ctask);
 		if (rc)
 			return rc;
+		if (tcp_conn->in.datalen) {
+			struct iscsi_tcp_cmd_task *tcp_ctask = ctask->dd_data;
+			struct hash_desc *rx_hash = NULL;
+
+			/*
+			 * Setup copy of Data-In into the Scsi_Cmnd
+			 * Scatterlist case:
+			 * We set up the iscsi_chunk to point to the next
+			 * scatterlist entry to copy to. As we go along,
+			 * we move on to the next scatterlist entry and
+			 * update the digest per-entry.
+			 */
+			if (conn->datadgst_en)
+				rx_hash = &tcp_conn->rx_hash;
+
+			debug_tcp("iscsi_tcp_begin_data_in(%p, offset=%d, "
+				  "datalen=%d)\n", tcp_conn,
+				  tcp_ctask->data_offset,
+				  tcp_conn->in.datalen);
+			return iscsi_chunk_init_sg(&tcp_conn->in.chunk,
+						scsi_sglist(ctask->sc),
+						scsi_sg_count(ctask->sc),
+						tcp_ctask->data_offset,
+						tcp_conn->in.datalen,
+						iscsi_tcp_process_data_in,
+						rx_hash);
+		}
 		/* fall through */
 	case ISCSI_OP_SCSI_CMD_RSP:
-		tcp_conn->in.ctask = session->cmds[itt];
 		if (tcp_conn->in.datalen)
-			goto copy_hdr;
+			return iscsi_tcp_begin_cmd_rsp(tcp_conn, 1);
 
-		spin_lock(&session->lock);
-		rc = __iscsi_complete_pdu(conn, hdr, NULL, 0);
-		spin_unlock(&session->lock);
+		rc = iscsi_complete_pdu(conn, hdr, NULL, 0);
 		break;
 	case ISCSI_OP_R2T:
-		tcp_conn->in.ctask = session->cmds[itt];
+		ctask = session->cmds[itt];
 		if (ahslen)
 			rc = ISCSI_ERR_AHSLEN;
-		else if (tcp_conn->in.ctask->sc->sc_data_direction ==
-								DMA_TO_DEVICE)
-			rc = iscsi_r2t_rsp(conn, tcp_conn->in.ctask);
+		else if (ctask->sc->sc_data_direction == DMA_TO_DEVICE)
+			rc = iscsi_r2t_rsp(conn, ctask);
 		else
 			rc = ISCSI_ERR_PROTO;
 		break;
@@ -527,8 +791,7 @@ iscsi_tcp_hdr_recv(struct iscsi_conn *conn)
 		 * than 8K, but there are no targets that currently do this.
 		 * For now we fail until we find a vendor that needs it
 		 */
-		if (ISCSI_DEF_MAX_RECV_SEG_LEN <
-		    tcp_conn->in.datalen) {
+		if (ISCSI_DEF_MAX_RECV_SEG_LEN < tcp_conn->in.datalen) {
 			printk(KERN_ERR "iscsi_tcp: received buffer of len %u "
 			      "but conn buffer is only %u (opcode %0x)\n",
 			      tcp_conn->in.datalen,
@@ -537,8 +800,15 @@ iscsi_tcp_hdr_recv(struct iscsi_conn *conn)
 			break;
 		}
 
+		/* If there's data coming in with the response,
+		 * receive it to the connection's buffer.
+		 * During the login negotiation, data digests are
+		 * turned off even if enabled on the connection.
+		 */
 		if (tcp_conn->in.datalen)
-			goto copy_hdr;
+			return iscsi_tcp_begin_cmd_rsp(tcp_conn,
+					opcode != ISCSI_OP_LOGIN_RSP);
+
 	/* fall through */
 	case ISCSI_OP_LOGOUT_RSP:
 	case ISCSI_OP_NOOP_IN:
@@ -550,457 +820,215 @@ iscsi_tcp_hdr_recv(struct iscsi_conn *conn)
 		break;
 	}
 
-	return rc;
-
-copy_hdr:
-	/*
-	 * if we did zero copy for the header but we will need multiple
-	 * skbs to complete the command then we have to copy the header
-	 * for later use
-	 */
-	if (tcp_conn->in.zero_copy_hdr && tcp_conn->in.copy <=
-	   (tcp_conn->in.datalen + tcp_conn->in.padding +
-	    (conn->datadgst_en ? 4 : 0))) {
-		debug_tcp("Copying header for later use. in.copy %d in.datalen"
-			  " %d\n", tcp_conn->in.copy, tcp_conn->in.datalen);
-		memcpy(&tcp_conn->hdr, tcp_conn->in.hdr,
-		       sizeof(struct iscsi_hdr));
-		tcp_conn->in.hdr = &tcp_conn->hdr;
-		tcp_conn->in.zero_copy_hdr = 0;
-	}
-	return 0;
-}
-
-/**
- * iscsi_ctask_copy - copy skb bits to the destanation cmd task
- * @conn: iscsi tcp connection
- * @ctask: scsi command task
- * @buf: buffer to copy to
- * @buf_size: size of buffer
- * @offset: offset within the buffer
- *
- * Notes:
- *	The function calls skb_copy_bits() and updates per-connection and
- *	per-cmd byte counters.
- *
- *	Read counters (in bytes):
- *
- *	conn->in.offset		offset within in progress SKB
- *	conn->in.copy		left to copy from in progress SKB
- *				including padding
- *	conn->in.copied		copied already from in progress SKB
- *	conn->data_copied	copied already from in progress buffer
- *	ctask->sent		total bytes sent up to the MidLayer
- *	ctask->data_count	left to copy from in progress Data-In
- *	buf_left		left to copy from in progress buffer
- **/
-static inline int
-iscsi_ctask_copy(struct iscsi_tcp_conn *tcp_conn, struct iscsi_cmd_task *ctask,
-		void *buf, int buf_size, int offset)
-{
-	struct iscsi_tcp_cmd_task *tcp_ctask = ctask->dd_data;
-	int buf_left = buf_size - (tcp_conn->data_copied + offset);
-	int size = min(tcp_conn->in.copy, buf_left);
-	int rc;
-
-	size = min(size, ctask->data_count);
-
-	debug_tcp("ctask_copy %d bytes at offset %d copied %d\n",
-	       size, tcp_conn->in.offset, tcp_conn->in.copied);
-
-	BUG_ON(size <= 0);
-	BUG_ON(tcp_ctask->sent + size > ctask->total_length);
-
-	rc = skb_copy_bits(tcp_conn->in.skb, tcp_conn->in.offset,
-			   (char*)buf + (offset + tcp_conn->data_copied), size);
-	/* must fit into skb->len */
-	BUG_ON(rc);
-
-	tcp_conn->in.offset += size;
-	tcp_conn->in.copy -= size;
-	tcp_conn->in.copied += size;
-	tcp_conn->data_copied += size;
-	tcp_ctask->sent += size;
-	ctask->data_count -= size;
-
-	BUG_ON(tcp_conn->in.copy < 0);
-	BUG_ON(ctask->data_count < 0);
-
-	if (buf_size != (tcp_conn->data_copied + offset)) {
-		if (!ctask->data_count) {
-			BUG_ON(buf_size - tcp_conn->data_copied < 0);
-			/* done with this PDU */
-			return buf_size - tcp_conn->data_copied;
-		}
-		return -EAGAIN;
-	}
-
-	/* done with this buffer or with both - PDU and buffer */
-	tcp_conn->data_copied = 0;
-	return 0;
-}
-
-/**
- * iscsi_tcp_copy - copy skb bits to the destanation buffer
- * @conn: iscsi tcp connection
- *
- * Notes:
- *	The function calls skb_copy_bits() and updates per-connection
- *	byte counters.
- **/
-static inline int
-iscsi_tcp_copy(struct iscsi_conn *conn, int buf_size)
-{
-	struct iscsi_tcp_conn *tcp_conn = conn->dd_data;
-	int buf_left = buf_size - tcp_conn->data_copied;
-	int size = min(tcp_conn->in.copy, buf_left);
-	int rc;
-
-	debug_tcp("tcp_copy %d bytes at offset %d copied %d\n",
-	       size, tcp_conn->in.offset, tcp_conn->data_copied);
-	BUG_ON(size <= 0);
-
-	rc = skb_copy_bits(tcp_conn->in.skb, tcp_conn->in.offset,
-			   (char*)conn->data + tcp_conn->data_copied, size);
-	BUG_ON(rc);
-
-	tcp_conn->in.offset += size;
-	tcp_conn->in.copy -= size;
-	tcp_conn->in.copied += size;
-	tcp_conn->data_copied += size;
-
-	if (buf_size != tcp_conn->data_copied)
-		return -EAGAIN;
-
-	return 0;
-}
-
-static inline void
-partial_sg_digest_update(struct hash_desc *desc, struct scatterlist *sg,
-			 int offset, int length)
-{
-	struct scatterlist temp;
-
-	memcpy(&temp, sg, sizeof(struct scatterlist));
-	temp.offset = offset;
-	temp.length = length;
-	crypto_hash_update(desc, &temp, length);
-}
-
-static void
-iscsi_recv_digest_update(struct iscsi_tcp_conn *tcp_conn, char* buf, int len)
-{
-	struct scatterlist tmp;
-
-	sg_init_one(&tmp, buf, len);
-	crypto_hash_update(&tcp_conn->rx_hash, &tmp, len);
-}
-
-static int iscsi_scsi_data_in(struct iscsi_conn *conn)
-{
-	struct iscsi_tcp_conn *tcp_conn = conn->dd_data;
-	struct iscsi_cmd_task *ctask = tcp_conn->in.ctask;
-	struct iscsi_tcp_cmd_task *tcp_ctask = ctask->dd_data;
-	struct scsi_cmnd *sc = ctask->sc;
-	struct scatterlist *sg;
-	int i, offset, rc = 0;
-
-	BUG_ON((void*)ctask != sc->SCp.ptr);
-
-	/*
-	 * copying Data-In into the Scsi_Cmnd
-	 */
-	if (!sc->use_sg) {
-		i = ctask->data_count;
-		rc = iscsi_ctask_copy(tcp_conn, ctask, sc->request_buffer,
-				      sc->request_bufflen,
-				      tcp_ctask->data_offset);
-		if (rc == -EAGAIN)
-			return rc;
-		if (conn->datadgst_en)
-			iscsi_recv_digest_update(tcp_conn, sc->request_buffer,
-						 i);
-		rc = 0;
-		goto done;
-	}
-
-	offset = tcp_ctask->data_offset;
-	sg = sc->request_buffer;
-
-	if (tcp_ctask->data_offset)
-		for (i = 0; i < tcp_ctask->sg_count; i++)
-			offset -= sg[i].length;
-	/* we've passed through partial sg*/
-	if (offset < 0)
-		offset = 0;
-
-	for (i = tcp_ctask->sg_count; i < sc->use_sg; i++) {
-		char *dest;
-
-		dest = kmap_atomic(sg[i].page, KM_SOFTIRQ0);
-		rc = iscsi_ctask_copy(tcp_conn, ctask, dest + sg[i].offset,
-				      sg[i].length, offset);
-		kunmap_atomic(dest, KM_SOFTIRQ0);
-		if (rc == -EAGAIN)
-			/* continue with the next SKB/PDU */
-			return rc;
-		if (!rc) {
-			if (conn->datadgst_en) {
-				if (!offset)
-					crypto_hash_update(
-							&tcp_conn->rx_hash,
-							&sg[i], sg[i].length);
-				else
-					partial_sg_digest_update(
-							&tcp_conn->rx_hash,
-							&sg[i],
-							sg[i].offset + offset,
-							sg[i].length - offset);
-			}
-			offset = 0;
-			tcp_ctask->sg_count++;
-		}
-
-		if (!ctask->data_count) {
-			if (rc && conn->datadgst_en)
-				/*
-				 * data-in is complete, but buffer not...
-				 */
-				partial_sg_digest_update(&tcp_conn->rx_hash,
-							 &sg[i],
-							 sg[i].offset,
-							 sg[i].length-rc);
-			rc = 0;
-			break;
-		}
-
-		if (!tcp_conn->in.copy)
-			return -EAGAIN;
-	}
-	BUG_ON(ctask->data_count);
-
-done:
-	/* check for non-exceptional status */
-	if (tcp_conn->in.hdr->flags & ISCSI_FLAG_DATA_STATUS) {
-		debug_scsi("done [sc %lx res %d itt 0x%x flags 0x%x]\n",
-			   (long)sc, sc->result, ctask->itt,
-			   tcp_conn->in.hdr->flags);
-		spin_lock(&conn->session->lock);
-		__iscsi_complete_pdu(conn, tcp_conn->in.hdr, NULL, 0);
-		spin_unlock(&conn->session->lock);
+	if (rc == 0) {
+		/* Anything that comes with data should have
+		 * been handled above. */
+		if (tcp_conn->in.datalen)
+			return ISCSI_ERR_PROTO;
+		rc = iscsi_tcp_begin_header(tcp_conn);
 	}
 
 	return rc;
+}
+
+/**
+ * iscsi_tcp_process_header - process PDU header
+ *
+ * This is the callback invoked when the PDU header has
+ * been received. If the header is followed by additional
+ * header segments, we go back for more data.
+ */
+static int
+iscsi_tcp_process_header(struct iscsi_tcp_conn *tcp_conn,
+			struct iscsi_chunk *chunk)
+{
+	struct iscsi_conn *conn = tcp_conn->iscsi_conn;
+	struct iscsi_hdr *hdr;
+
+	/* Check if there are additional header segments
+	 * *prior* to computing the digest, because we
+	 * may need to go back to the caller for more.
+	 */
+	hdr = (struct iscsi_hdr *) tcp_conn->in.hdr_buf;
+	if (chunk->copied == sizeof(struct iscsi_hdr) && hdr->hlength) {
+		/* Bump the header length - the caller will
+		 * just loop around and get the AHS for us, and
+		 * call again. */
+		unsigned int ahslen = hdr->hlength << 2;
+
+		/* Make sure we don't overflow */
+		if (sizeof(*hdr) + ahslen > sizeof(tcp_conn->in.hdr_buf))
+			return ISCSI_ERR_AHSLEN;
+
+		chunk->total_size += ahslen;
+		chunk->size += ahslen;
+		return 0;
+	}
+
+	/* We're done processing the header. See if we're doing
+	 * header digests; if so, set up the recv_digest buffer
+	 * and go back for more. */
+	if (conn->hdrdgst_en) {
+		if (chunk->digest_len == 0) {
+			iscsi_tcp_chunk_splice_digest(chunk, chunk->recv_digest);
+			return 0;
+		}
+		iscsi_tcp_dgst_header(&tcp_conn->rx_hash,
+				hdr, chunk->total_copied - ISCSI_DIGEST_SIZE,
+				chunk->digest);
+
+		if (!iscsi_tcp_dgst_verify(tcp_conn, chunk)) {
+			/* If we had Fixed Interval Markers,
+			 * we could recover more gracefully. For now,
+			 * just punt the connection. */
+			return ISCSI_ERR_HDR_DGST;
+		}
+	}
+
+	tcp_conn->in.hdr = hdr;
+
+	return iscsi_tcp_hdr_dissect(conn, hdr);
 }
 
 static int
-iscsi_data_recv(struct iscsi_conn *conn)
+iscsi_tcp_begin_header(struct iscsi_tcp_conn *tcp_conn)
 {
-	struct iscsi_tcp_conn *tcp_conn = conn->dd_data;
-	int rc = 0, opcode;
+	struct iscsi_conn *conn = tcp_conn->iscsi_conn;
 
-	opcode = tcp_conn->in.hdr->opcode & ISCSI_OPCODE_MASK;
-	switch (opcode) {
-	case ISCSI_OP_SCSI_DATA_IN:
-		rc = iscsi_scsi_data_in(conn);
-		break;
-	case ISCSI_OP_SCSI_CMD_RSP:
-	case ISCSI_OP_TEXT_RSP:
-	case ISCSI_OP_LOGIN_RSP:
-	case ISCSI_OP_ASYNC_EVENT:
-	case ISCSI_OP_REJECT:
-		/*
-		 * Collect data segment to the connection's data
-		 * placeholder
-		 */
-		if (iscsi_tcp_copy(conn, tcp_conn->in.datalen)) {
-			rc = -EAGAIN;
-			goto exit;
-		}
+	debug_tcp("iscsi_tcp_begin_header(%p%s)\n", tcp_conn,
+			conn->hdrdgst_en? ", digest enabled" : "");
+	return iscsi_chunk_init_linear(&tcp_conn->in.chunk,
+			tcp_conn->in.hdr_buf, 0, sizeof(struct iscsi_hdr),
+			iscsi_tcp_process_header, NULL);
+}
 
-		rc = iscsi_complete_pdu(conn, tcp_conn->in.hdr, conn->data,
-					tcp_conn->in.datalen);
-		if (!rc && conn->datadgst_en && opcode != ISCSI_OP_LOGIN_RSP)
-			iscsi_recv_digest_update(tcp_conn, conn->data,
-			  			tcp_conn->in.datalen);
-		break;
-	default:
-		BUG_ON(1);
-	}
-exit:
-	return rc;
+/*
+ * Handle incoming reply to any other type of command
+ */
+static int
+iscsi_tcp_process_cmd_rsp(struct iscsi_tcp_conn *tcp_conn,
+			struct iscsi_chunk *chunk)
+{
+	struct iscsi_conn *conn = tcp_conn->iscsi_conn;
+	int	rc = 0;
+
+	if (!iscsi_tcp_dgst_verify(tcp_conn, chunk))
+		return ISCSI_ERR_DATA_DGST;
+
+	rc = iscsi_complete_pdu(conn, tcp_conn->in.hdr,
+			conn->data, tcp_conn->in.datalen);
+	if (rc)
+		return rc;
+
+	return iscsi_tcp_begin_header(tcp_conn);
+}
+
+static int
+iscsi_tcp_begin_cmd_rsp(struct iscsi_tcp_conn *tcp_conn, int digest_ok)
+{
+	struct iscsi_conn *conn = tcp_conn->iscsi_conn;
+	struct hash_desc *rx_hash = NULL;
+
+	if (conn->datadgst_en && digest_ok)
+		rx_hash = &tcp_conn->rx_hash;
+
+	return iscsi_chunk_init_linear(&tcp_conn->in.chunk,
+			conn->data, 0, tcp_conn->in.datalen,
+			iscsi_tcp_process_cmd_rsp, rx_hash);
 }
 
 /**
- * iscsi_tcp_data_recv - TCP receive in sendfile fashion
+ * iscsi_rcv - TCP receive in sendfile fashion
  * @rd_desc: read descriptor
  * @skb: socket buffer
  * @offset: offset in skb
  * @len: skb->len - offset
  **/
 static int
-iscsi_tcp_data_recv(read_descriptor_t *rd_desc, struct sk_buff *skb,
+iscsi_rcv(read_descriptor_t *rd_desc, struct sk_buff *skb,
 		unsigned int offset, size_t len)
 {
-	int rc;
 	struct iscsi_conn *conn = rd_desc->arg.data;
 	struct iscsi_tcp_conn *tcp_conn = conn->dd_data;
-	int processed;
-	char pad[ISCSI_PAD_LEN];
-	struct scatterlist sg;
+	struct iscsi_chunk *chunk = &tcp_conn->in.chunk;
+	struct skb_seq_state seq;
+	unsigned int	consumed = 0;
+	int		rc = 0;
 
-	/*
-	 * Save current SKB and its offset in the corresponding
-	 * connection context.
-	 */
-	tcp_conn->in.copy = skb->len - offset;
-	tcp_conn->in.offset = offset;
-	tcp_conn->in.skb = skb;
-	tcp_conn->in.len = tcp_conn->in.copy;
-	BUG_ON(tcp_conn->in.copy <= 0);
-	debug_tcp("in %d bytes\n", tcp_conn->in.copy);
-
-more:
-	tcp_conn->in.copied = 0;
-	rc = 0;
+	debug_tcp("in %d bytes\n", skb->len - offset);
 
 	if (unlikely(conn->suspend_rx)) {
 		debug_tcp("conn %d Rx suspended!\n", conn->id);
 		return 0;
 	}
 
-	if (tcp_conn->in_progress == IN_PROGRESS_WAIT_HEADER ||
-	    tcp_conn->in_progress == IN_PROGRESS_HEADER_GATHER) {
-		rc = iscsi_hdr_extract(tcp_conn);
-		if (rc) {
-		       if (rc == -EAGAIN)
-				goto nomore;
-		       else {
-				iscsi_conn_failure(conn, ISCSI_ERR_CONN_FAILED);
-				return 0;
-		       }
-		}
+	skb_prepare_seq_read(skb, offset, skb->len, &seq);
+	while (1) {
+		unsigned int	avail;
+		const u8	*ptr;
 
-		/*
-		 * Verify and process incoming PDU header.
-		 */
-		rc = iscsi_tcp_hdr_recv(conn);
-		if (!rc && tcp_conn->in.datalen) {
-			if (conn->datadgst_en)
-				crypto_hash_init(&tcp_conn->rx_hash);
-			tcp_conn->in_progress = IN_PROGRESS_DATA_RECV;
-		} else if (rc) {
-			iscsi_conn_failure(conn, rc);
-			return 0;
-		}
-	}
+		avail = skb_seq_read(consumed, &ptr, &seq);
+		if (avail == 0)
+			break;
+		BUG_ON(chunk->copied >= chunk->size);
 
-	if (tcp_conn->in_progress == IN_PROGRESS_DDIGEST_RECV) {
-		uint32_t recv_digest;
+		debug_tcp("skb %p ptr=%p avail=%u\n", skb, ptr, avail);
+		rc = iscsi_tcp_recv_chunk(tcp_conn, chunk, ptr, avail);
+		BUG_ON(rc == 0);
+		consumed += rc;
 
-		debug_tcp("extra data_recv offset %d copy %d\n",
-			  tcp_conn->in.offset, tcp_conn->in.copy);
-		rc = iscsi_tcp_copy(conn, sizeof(uint32_t));
-		if (rc) {
-			if (rc == -EAGAIN)
-				goto again;
-			iscsi_conn_failure(conn, ISCSI_ERR_CONN_FAILED);
-			return 0;
-		}
-
-		memcpy(&recv_digest, conn->data, sizeof(uint32_t));
-		if (recv_digest != tcp_conn->in.datadgst) {
-			debug_tcp("iscsi_tcp: data digest error!"
-				  "0x%x != 0x%x\n", recv_digest,
-				  tcp_conn->in.datadgst);
-			iscsi_conn_failure(conn, ISCSI_ERR_DATA_DGST);
-			return 0;
-		} else {
-			debug_tcp("iscsi_tcp: data digest match!"
-				  "0x%x == 0x%x\n", recv_digest,
-				  tcp_conn->in.datadgst);
-			tcp_conn->in_progress = IN_PROGRESS_WAIT_HEADER;
-		}
-	}
-
-	if (tcp_conn->in_progress == IN_PROGRESS_DATA_RECV &&
-	   tcp_conn->in.copy) {
-
-		debug_tcp("data_recv offset %d copy %d\n",
-		       tcp_conn->in.offset, tcp_conn->in.copy);
-
-		rc = iscsi_data_recv(conn);
-		if (rc) {
-			if (rc == -EAGAIN)
-				goto again;
-			iscsi_conn_failure(conn, ISCSI_ERR_CONN_FAILED);
-			return 0;
-		}
-		tcp_conn->in.copy -= tcp_conn->in.padding;
-		tcp_conn->in.offset += tcp_conn->in.padding;
-		if (conn->datadgst_en) {
-			if (tcp_conn->in.padding) {
-				debug_tcp("padding -> %d\n",
-					  tcp_conn->in.padding);
-				memset(pad, 0, tcp_conn->in.padding);
-				sg_init_one(&sg, pad, tcp_conn->in.padding);
-				crypto_hash_update(&tcp_conn->rx_hash,
-						   &sg, sg.length);
+		if (chunk->copied >= chunk->size) {
+			iscsi_tcp_chunk_unmap(chunk);
+			rc = chunk->done(tcp_conn, chunk);
+			if (rc != 0) {
+				skb_abort_seq_read(&seq);
+				goto error;
 			}
-			crypto_hash_final(&tcp_conn->rx_hash,
-					  (u8 *) &tcp_conn->in.datadgst);
-			debug_tcp("rx digest 0x%x\n", tcp_conn->in.datadgst);
-			tcp_conn->in_progress = IN_PROGRESS_DDIGEST_RECV;
-			tcp_conn->data_copied = 0;
-		} else
-			tcp_conn->in_progress = IN_PROGRESS_WAIT_HEADER;
+
+			/* The done() functions sets up the
+			 * next chunk. */
+		}
 	}
 
-	debug_tcp("f, processed %d from out of %d padding %d\n",
-	       tcp_conn->in.offset - offset, (int)len, tcp_conn->in.padding);
-	BUG_ON(tcp_conn->in.offset - offset > len);
+	/* skb_seq_read should really unmap the last
+	 * fragment when it's done. */
+	skb_abort_seq_read(&seq);
 
-	if (tcp_conn->in.offset - offset != len) {
-		debug_tcp("continue to process %d bytes\n",
-		       (int)len - (tcp_conn->in.offset - offset));
-		goto more;
-	}
+	conn->rxdata_octets += consumed;
+	return consumed;
 
-nomore:
-	processed = tcp_conn->in.offset - offset;
-	BUG_ON(processed == 0);
-	return processed;
-
-again:
-	processed = tcp_conn->in.offset - offset;
-	debug_tcp("c, processed %d from out of %d rd_desc_cnt %d\n",
-	          processed, (int)len, (int)rd_desc->count);
-	BUG_ON(processed == 0);
-	BUG_ON(processed > len);
-
-	conn->rxdata_octets += processed;
-	return processed;
+error:
+	/* Receive error. We could initiate error recovery
+	 * here. */
+	debug_tcp("Error receiving PDU, errno=%d\n", rc);
+	iscsi_conn_failure(conn, ISCSI_ERR_CONN_FAILED);
+	return 0;
 }
 
 static void
 iscsi_tcp_data_ready(struct sock *sk, int flag)
 {
 	struct iscsi_conn *conn = sk->sk_user_data;
+	struct iscsi_tcp_conn *tcp_conn = conn->dd_data;
 	read_descriptor_t rd_desc;
 
 	read_lock(&sk->sk_callback_lock);
 
 	/*
-	 * Use rd_desc to pass 'conn' to iscsi_tcp_data_recv.
+	 * Use rd_desc to pass 'conn' to iscsi_rcv.
 	 * We set count to 1 because we want the network layer to
-	 * hand us all the skbs that are available. iscsi_tcp_data_recv
+	 * hand us all the skbs that are available. iscsi_rcv
 	 * handled pdus that cross buffers or pdus that still need data.
 	 */
 	rd_desc.arg.data = conn;
 	rd_desc.count = 1;
-	tcp_read_sock(sk, &rd_desc, iscsi_tcp_data_recv);
+	tcp_read_sock(sk, &rd_desc, iscsi_rcv);
 
 	read_unlock(&sk->sk_callback_lock);
+
+	/* If we had to (atomically) map a highmem page,
+	 * unmap it now. */
+	iscsi_tcp_chunk_unmap(&tcp_conn->in.chunk);
 }
 
 static void
@@ -1080,192 +1108,192 @@ iscsi_conn_restore_callbacks(struct iscsi_tcp_conn *tcp_conn)
 }
 
 /**
- * iscsi_send - generic send routine
- * @sk: kernel's socket
- * @buf: buffer to write from
- * @size: actual size to write
- * @flags: socket's flags
- */
-static inline int
-iscsi_send(struct iscsi_conn *conn, struct iscsi_buf *buf, int size, int flags)
+ * iscsi_xmit - TCP transmit
+ **/
+static int
+iscsi_xmit(struct iscsi_conn *conn)
 {
 	struct iscsi_tcp_conn *tcp_conn = conn->dd_data;
-	struct socket *sk = tcp_conn->sock;
-	int offset = buf->sg.offset + buf->sent, res;
+	struct iscsi_chunk *chunk = &tcp_conn->out.chunk;
+	unsigned int	consumed = 0, pending;
+	int		rc = 0;
 
-	/*
-	 * if we got use_sg=0 or are sending something we kmallocd
-	 * then we did not have to do kmap (kmap returns page_address)
-	 *
-	 * if we got use_sg > 0, but had to drop down, we do not
-	 * set clustering so this should only happen for that
-	 * slab case.
+	pending = chunk->total_size - chunk->total_copied;
+
+	while (1) {
+		rc = iscsi_tcp_xmit_chunk(tcp_conn, chunk);
+		if (rc < 0)
+			goto error;
+		if (rc == 0)
+			break;
+
+		consumed += rc;
+
+		if (chunk->total_copied >= chunk->total_size) {
+			iscsi_tcp_chunk_unmap(chunk);
+
+			if (chunk->done != NULL) {
+				rc = chunk->done(tcp_conn, chunk);
+				if (rc < 0)
+					goto error;
+			}
+
+			/* The done() callback doesn't necessarily
+			 * have to set up a new chunk. If it doesn't,
+			 * this means we're done sending this PDU.
+			 * Clear the buffer just to be safe. */
+			if (chunk->total_copied >= chunk->total_size) {
+				memset(chunk, 0, sizeof(*chunk));
+				break;
+			}
+
+			pending += chunk->total_size;
+		}
+	}
+
+	debug_tcp("out %d of %d bytes\n", consumed, pending);
+
+	conn->txdata_octets += consumed;
+	return consumed;
+
+error:
+	/* Transmit error. We could initiate error recovery
+	 * here. */
+	debug_tcp("Error sending PDU, errno=%d\n", rc);
+	iscsi_conn_failure(conn, ISCSI_ERR_CONN_FAILED);
+	return rc;
+}
+
+/**
+ * iscsi_tcp_xmit_qlen - return the number of bytes queued for xmit
+ */
+static inline int
+iscsi_tcp_xmit_qlen(struct iscsi_conn *conn)
+{
+	struct iscsi_tcp_conn *tcp_conn = conn->dd_data;
+	struct iscsi_chunk *chunk = &tcp_conn->out.chunk;
+
+	return chunk->total_copied - chunk->total_size;
+}
+
+static inline int
+iscsi_tcp_flush(struct iscsi_conn *conn)
+{
+	int rc;
+
+	while (iscsi_tcp_xmit_qlen(conn)) {
+		rc = iscsi_xmit(conn);
+		if (rc == 0)
+			return -EAGAIN;
+		if (rc < 0)
+			return rc;
+	}
+
+	return 0;
+}
+
+static int
+iscsi_tcp_send_hdr_prepare(struct iscsi_conn *conn,
+		void *hdr, size_t hdrlen)
+{
+	struct iscsi_tcp_conn *tcp_conn = conn->dd_data;
+
+	debug_tcp("%s(%p%s)\n", __FUNCTION__, tcp_conn,
+			conn->hdrdgst_en? ", digest enabled" : "");
+
+	/* Clear the data chunk - needs to be filled in by the
+	 * caller using iscsi_tcp_send_data_prepare() */
+	memset(&tcp_conn->out.data_chunk, 0, sizeof(struct iscsi_chunk));
+
+	/* If header digest is enabled, compute the CRC and
+	 * place the digest into the same buffer. We make
+	 * sure that both iscsi_tcp_ctask and mtask have
+	 * sufficient room.
 	 */
-	if (buf->use_sendmsg)
-		res = sock_no_sendpage(sk, buf->sg.page, offset, size, flags);
-	else
-		res = tcp_conn->sendpage(sk, buf->sg.page, offset, size, flags);
-
-	if (res >= 0) {
-		conn->txdata_octets += res;
-		buf->sent += res;
-		return res;
+	if (conn->c_stage != ISCSI_CONN_INITIAL_STAGE &&
+	    conn->stop_stage != STOP_CONN_RECOVER &&
+	    conn->hdrdgst_en) {
+		iscsi_tcp_dgst_header(&tcp_conn->tx_hash,
+				hdr, hdrlen, hdr + hdrlen);
+		hdrlen += ISCSI_DIGEST_SIZE;
 	}
 
-	tcp_conn->sendpage_failures_cnt++;
-	if (res == -EAGAIN)
-		res = -ENOBUFS;
-	else
-		iscsi_conn_failure(conn, ISCSI_ERR_CONN_FAILED);
-	return res;
+	/* Remember header pointer for later, when we need
+	 * to decide whether there's a payload to go along
+	 * with the header. */
+	tcp_conn->out.hdr = hdr;
+
+	return iscsi_chunk_init_linear(&tcp_conn->out.chunk,
+			hdr, 0, hdrlen,
+			iscsi_tcp_send_hdr_done, NULL);
 }
 
-/**
- * iscsi_sendhdr - send PDU Header via tcp_sendpage()
- * @conn: iscsi connection
- * @buf: buffer to write from
- * @datalen: lenght of data to be sent after the header
- *
- * Notes:
- *	(Tx, Fast Path)
- **/
-static inline int
-iscsi_sendhdr(struct iscsi_conn *conn, struct iscsi_buf *buf, int datalen)
+/*
+ * Prepare the send buffer for the payload data.
+ * Padding and checksumming will all be taken care
+ * of by the iscsi_chunk routines.
+ */
+static int
+iscsi_tcp_send_data_prepare(struct iscsi_conn *conn,
+		struct scatterlist *sg, unsigned int count,
+		unsigned int offset, unsigned int len)
 {
-	int flags = 0; /* MSG_DONTWAIT; */
-	int res, size;
+	struct iscsi_tcp_conn *tcp_conn = conn->dd_data;
+	struct hash_desc *tx_hash = NULL;
+	unsigned int hdr_spec_len;
 
-	size = buf->sg.length - buf->sent;
-	BUG_ON(buf->sent + size > buf->sg.length);
-	if (buf->sent + size != buf->sg.length || datalen)
-		flags |= MSG_MORE;
+	debug_tcp("%s(%p, offset=%d, datalen=%d%s)\n", __FUNCTION__,
+			tcp_conn, offset, len,
+			conn->datadgst_en? ", digest enabled" : "");
 
-	res = iscsi_send(conn, buf, size, flags);
-	debug_tcp("sendhdr %d bytes, sent %d res %d\n", size, buf->sent, res);
-	if (res >= 0) {
-		if (size != res)
-			return -EAGAIN;
-		return 0;
-	}
+	/* Make sure the datalen matches what the caller
+	   said he would send. */
+	hdr_spec_len = ntoh24(tcp_conn->out.hdr->dlength);
+	WARN_ON(iscsi_padded(len) != iscsi_padded(hdr_spec_len));
 
-	return res;
+	if (conn->datadgst_en)
+		tx_hash = &tcp_conn->tx_hash;
+
+	return iscsi_chunk_init_sg(&tcp_conn->out.data_chunk,
+				sg, count, offset, len,
+				NULL, tx_hash);
 }
 
-/**
- * iscsi_sendpage - send one page of iSCSI Data-Out.
- * @conn: iscsi connection
- * @buf: buffer to write from
- * @count: remaining data
- * @sent: number of bytes sent
- *
- * Notes:
- *	(Tx, Fast Path)
- **/
-static inline int
-iscsi_sendpage(struct iscsi_conn *conn, struct iscsi_buf *buf,
-	       int *count, int *sent)
+static int
+iscsi_tcp_send_linear_data_prepare(struct iscsi_conn *conn,
+		void *data, size_t len)
 {
-	int flags = 0; /* MSG_DONTWAIT; */
-	int res, size;
+	struct iscsi_tcp_conn *tcp_conn = conn->dd_data;
+	struct hash_desc *tx_hash = NULL;
+	unsigned int hdr_spec_len;
 
-	size = buf->sg.length - buf->sent;
-	BUG_ON(buf->sent + size > buf->sg.length);
-	if (size > *count)
-		size = *count;
-	if (buf->sent + size != buf->sg.length || *count != size)
-		flags |= MSG_MORE;
+	debug_tcp("%s(%p, datalen=%d%s)\n", __FUNCTION__,
+			tcp_conn, len,
+			conn->datadgst_en? ", digest enabled" : "");
 
-	res = iscsi_send(conn, buf, size, flags);
-	debug_tcp("sendpage: %d bytes, sent %d left %d sent %d res %d\n",
-		  size, buf->sent, *count, *sent, res);
-	if (res >= 0) {
-		*count -= res;
-		*sent += res;
-		if (size != res)
-			return -EAGAIN;
-		return 0;
-	}
+	/* Make sure the datalen matches what the caller
+	   said he would send. */
+	hdr_spec_len = ntoh24(tcp_conn->out.hdr->dlength);
+	WARN_ON(iscsi_padded(len) != iscsi_padded(hdr_spec_len));
 
-	return res;
+	if (conn->datadgst_en)
+		tx_hash = &tcp_conn->tx_hash;
+
+	return iscsi_chunk_init_linear(&tcp_conn->out.data_chunk,
+				data, 0, len, NULL, tx_hash);
 }
 
-static inline void
-iscsi_data_digest_init(struct iscsi_tcp_conn *tcp_conn,
-		      struct iscsi_tcp_cmd_task *tcp_ctask)
+/*
+ * This is called when we're done sending the header.
+ * Simply copy the data_chunk to the send chunk, and return.
+ */
+static int
+iscsi_tcp_send_hdr_done(struct iscsi_tcp_conn *tcp_conn,
+			struct iscsi_chunk *chunk)
 {
-	crypto_hash_init(&tcp_conn->tx_hash);
-	tcp_ctask->digest_count = 4;
-}
-
-/**
- * iscsi_solicit_data_cont - initialize next Data-Out
- * @conn: iscsi connection
- * @ctask: scsi command task
- * @r2t: R2T info
- * @left: bytes left to transfer
- *
- * Notes:
- *	Initialize next Data-Out within this R2T sequence and continue
- *	to process next Scatter-Gather element(if any) of this SCSI command.
- *
- *	Called under connection lock.
- **/
-static void
-iscsi_solicit_data_cont(struct iscsi_conn *conn, struct iscsi_cmd_task *ctask,
-			struct iscsi_r2t_info *r2t, int left)
-{
-	struct iscsi_data *hdr;
-	struct scsi_cmnd *sc = ctask->sc;
-	int new_offset;
-
-	hdr = &r2t->dtask.hdr;
-	memset(hdr, 0, sizeof(struct iscsi_data));
-	hdr->ttt = r2t->ttt;
-	hdr->datasn = cpu_to_be32(r2t->solicit_datasn);
-	r2t->solicit_datasn++;
-	hdr->opcode = ISCSI_OP_SCSI_DATA_OUT;
-	memcpy(hdr->lun, ctask->hdr->lun, sizeof(hdr->lun));
-	hdr->itt = ctask->hdr->itt;
-	hdr->exp_statsn = r2t->exp_statsn;
-	new_offset = r2t->data_offset + r2t->sent;
-	hdr->offset = cpu_to_be32(new_offset);
-	if (left > conn->max_xmit_dlength) {
-		hton24(hdr->dlength, conn->max_xmit_dlength);
-		r2t->data_count = conn->max_xmit_dlength;
-	} else {
-		hton24(hdr->dlength, left);
-		r2t->data_count = left;
-		hdr->flags = ISCSI_FLAG_CMD_FINAL;
-	}
-	conn->dataout_pdus_cnt++;
-
-	iscsi_buf_init_iov(&r2t->headbuf, (char*)hdr,
-			   sizeof(struct iscsi_hdr));
-
-	if (iscsi_buf_left(&r2t->sendbuf))
-		return;
-
-	if (sc->use_sg) {
-		iscsi_buf_init_sg(&r2t->sendbuf, r2t->sg);
-		r2t->sg += 1;
-	} else {
-		iscsi_buf_init_iov(&r2t->sendbuf,
-			    (char*)sc->request_buffer + new_offset,
-			    r2t->data_count);
-		r2t->sg = NULL;
-	}
-}
-
-static void iscsi_set_padding(struct iscsi_tcp_cmd_task *tcp_ctask,
-			      unsigned long len)
-{
-	tcp_ctask->pad_count = len & (ISCSI_PAD_LEN - 1);
-	if (!tcp_ctask->pad_count)
-		return;
-
-	tcp_ctask->pad_count = ISCSI_PAD_LEN - tcp_ctask->pad_count;
-	debug_scsi("write padding %d bytes\n", tcp_ctask->pad_count);
-	tcp_ctask->xmstate |= XMSTATE_W_PAD;
+	tcp_conn->out.chunk = tcp_conn->out.data_chunk;
+	memset(&tcp_conn->out.data_chunk, 0, sizeof(struct iscsi_chunk));
+	return 0;
 }
 
 /**
@@ -1277,41 +1305,12 @@ static void iscsi_set_padding(struct iscsi_tcp_cmd_task *tcp_ctask,
 static void
 iscsi_tcp_cmd_init(struct iscsi_cmd_task *ctask)
 {
-	struct scsi_cmnd *sc = ctask->sc;
 	struct iscsi_tcp_cmd_task *tcp_ctask = ctask->dd_data;
 
 	BUG_ON(__kfifo_len(tcp_ctask->r2tqueue));
-
 	tcp_ctask->sent = 0;
-	tcp_ctask->sg_count = 0;
-
-	if (sc->sc_data_direction == DMA_TO_DEVICE) {
-		tcp_ctask->xmstate = XMSTATE_W_HDR;
-		tcp_ctask->exp_r2tsn = 0;
-		BUG_ON(ctask->total_length == 0);
-
-		if (sc->use_sg) {
-			struct scatterlist *sg = sc->request_buffer;
-
-			iscsi_buf_init_sg(&tcp_ctask->sendbuf, sg);
-			tcp_ctask->sg = sg + 1;
-			tcp_ctask->bad_sg = sg + sc->use_sg;
-		} else {
-			iscsi_buf_init_iov(&tcp_ctask->sendbuf,
-					   sc->request_buffer,
-					   sc->request_bufflen);
-			tcp_ctask->sg = NULL;
-			tcp_ctask->bad_sg = NULL;
-		}
-		debug_scsi("cmd [itt 0x%x total %d imm_data %d "
-			   "unsol count %d, unsol offset %d]\n",
-			   ctask->itt, ctask->total_length, ctask->imm_count,
-			   ctask->unsol_count, ctask->unsol_offset);
-	} else
-		tcp_ctask->xmstate = XMSTATE_R_HDR;
-
-	iscsi_buf_init_iov(&tcp_ctask->headbuf, (char*)ctask->hdr,
-			    sizeof(struct iscsi_hdr));
+	tcp_ctask->exp_datasn = 0;
+	tcp_ctask->pdu_sent = 0;
 }
 
 /**
@@ -1323,426 +1322,168 @@ iscsi_tcp_cmd_init(struct iscsi_cmd_task *ctask)
  *	The function can return -EAGAIN in which case caller must
  *	call it again later, or recover. '0' return code means successful
  *	xmit.
- *
- *	Management xmit state machine consists of two states:
- *		IN_PROGRESS_IMM_HEAD - PDU Header xmit in progress
- *		IN_PROGRESS_IMM_DATA - PDU Data xmit in progress
  **/
 static int
 iscsi_tcp_mtask_xmit(struct iscsi_conn *conn, struct iscsi_mgmt_task *mtask)
 {
 	struct iscsi_tcp_mgmt_task *tcp_mtask = mtask->dd_data;
-	int rc;
+	int rc = 0;
 
-	debug_scsi("mtask deq [cid %d state %x itt 0x%x]\n",
-		conn->id, tcp_mtask->xmstate, mtask->itt);
-
-	if (tcp_mtask->xmstate & XMSTATE_IMM_HDR) {
-		tcp_mtask->xmstate &= ~XMSTATE_IMM_HDR;
-		if (mtask->data_count)
-			tcp_mtask->xmstate |= XMSTATE_IMM_DATA;
-		if (conn->c_stage != ISCSI_CONN_INITIAL_STAGE &&
-		    conn->stop_stage != STOP_CONN_RECOVER &&
-		    conn->hdrdgst_en)
-			iscsi_hdr_digest(conn, &tcp_mtask->headbuf,
-					(u8*)tcp_mtask->hdrext);
-		rc = iscsi_sendhdr(conn, &tcp_mtask->headbuf,
-				   mtask->data_count);
-		if (rc) {
-			tcp_mtask->xmstate |= XMSTATE_IMM_HDR;
-			if (mtask->data_count)
-				tcp_mtask->xmstate &= ~XMSTATE_IMM_DATA;
-			return rc;
-		}
-	}
-
-	if (tcp_mtask->xmstate & XMSTATE_IMM_DATA) {
-		BUG_ON(!mtask->data_count);
-		tcp_mtask->xmstate &= ~XMSTATE_IMM_DATA;
-		/* FIXME: implement.
-		 * Virtual buffer could be spreaded across multiple pages...
-		 */
-		do {
-			int rc;
-
-			rc = iscsi_sendpage(conn, &tcp_mtask->sendbuf,
-					&mtask->data_count, &tcp_mtask->sent);
-			if (rc) {
-				tcp_mtask->xmstate |= XMSTATE_IMM_DATA;
-				return rc;
-			}
-		} while (mtask->data_count);
-	}
-
-	BUG_ON(tcp_mtask->xmstate != XMSTATE_IDLE);
-	if (mtask->hdr->itt == RESERVED_ITT) {
-		struct iscsi_session *session = conn->session;
-
-		spin_lock_bh(&session->lock);
-		list_del(&conn->mtask->running);
-		__kfifo_put(session->mgmtpool.queue, (void*)&conn->mtask,
-			    sizeof(void*));
-		spin_unlock_bh(&session->lock);
-	}
-	return 0;
-}
-
-static inline int
-iscsi_send_read_hdr(struct iscsi_conn *conn,
-		    struct iscsi_tcp_cmd_task *tcp_ctask)
-{
-	int rc;
-
-	tcp_ctask->xmstate &= ~XMSTATE_R_HDR;
-	if (conn->hdrdgst_en)
-		iscsi_hdr_digest(conn, &tcp_ctask->headbuf,
-				 (u8*)tcp_ctask->hdrext);
-	rc = iscsi_sendhdr(conn, &tcp_ctask->headbuf, 0);
-	if (!rc) {
-		BUG_ON(tcp_ctask->xmstate != XMSTATE_IDLE);
-		return 0; /* wait for Data-In */
-	}
-	tcp_ctask->xmstate |= XMSTATE_R_HDR;
-	return rc;
-}
-
-static inline int
-iscsi_send_write_hdr(struct iscsi_conn *conn,
-		     struct iscsi_cmd_task *ctask)
-{
-	struct iscsi_tcp_cmd_task *tcp_ctask = ctask->dd_data;
-	int rc;
-
-	tcp_ctask->xmstate &= ~XMSTATE_W_HDR;
-	if (conn->hdrdgst_en)
-		iscsi_hdr_digest(conn, &tcp_ctask->headbuf,
-				 (u8*)tcp_ctask->hdrext);
-	rc = iscsi_sendhdr(conn, &tcp_ctask->headbuf, ctask->imm_count);
-	if (rc) {
-		tcp_ctask->xmstate |= XMSTATE_W_HDR;
-		return rc;
-	}
-
-	if (ctask->imm_count) {
-		tcp_ctask->xmstate |= XMSTATE_IMM_DATA;
-		iscsi_set_padding(tcp_ctask, ctask->imm_count);
-
-		if (ctask->conn->datadgst_en) {
-			iscsi_data_digest_init(ctask->conn->dd_data, tcp_ctask);
-			tcp_ctask->immdigest = 0;
-		}
-	}
-
-	if (ctask->unsol_count)
-		tcp_ctask->xmstate |= XMSTATE_UNS_HDR | XMSTATE_UNS_INIT;
-	return 0;
-}
-
-static int
-iscsi_send_padding(struct iscsi_conn *conn, struct iscsi_cmd_task *ctask)
-{
-	struct iscsi_tcp_cmd_task *tcp_ctask = ctask->dd_data;
-	struct iscsi_tcp_conn *tcp_conn = conn->dd_data;
-	int sent = 0, rc;
-
-	if (tcp_ctask->xmstate & XMSTATE_W_PAD) {
-		iscsi_buf_init_iov(&tcp_ctask->sendbuf, (char*)&tcp_ctask->pad,
-				   tcp_ctask->pad_count);
-		if (conn->datadgst_en)
-			crypto_hash_update(&tcp_conn->tx_hash,
-					   &tcp_ctask->sendbuf.sg,
-					   tcp_ctask->sendbuf.sg.length);
-	} else if (!(tcp_ctask->xmstate & XMSTATE_W_RESEND_PAD))
-		return 0;
-
-	tcp_ctask->xmstate &= ~XMSTATE_W_PAD;
-	tcp_ctask->xmstate &= ~XMSTATE_W_RESEND_PAD;
-	debug_scsi("sending %d pad bytes for itt 0x%x\n",
-		   tcp_ctask->pad_count, ctask->itt);
-	rc = iscsi_sendpage(conn, &tcp_ctask->sendbuf, &tcp_ctask->pad_count,
-			   &sent);
-	if (rc) {
-		debug_scsi("padding send failed %d\n", rc);
-		tcp_ctask->xmstate |= XMSTATE_W_RESEND_PAD;
-	}
-	return rc;
-}
-
-static int
-iscsi_send_digest(struct iscsi_conn *conn, struct iscsi_cmd_task *ctask,
-			struct iscsi_buf *buf, uint32_t *digest)
-{
-	struct iscsi_tcp_cmd_task *tcp_ctask;
-	struct iscsi_tcp_conn *tcp_conn;
-	int rc, sent = 0;
-
-	if (!conn->datadgst_en)
-		return 0;
-
-	tcp_ctask = ctask->dd_data;
-	tcp_conn = conn->dd_data;
-
-	if (!(tcp_ctask->xmstate & XMSTATE_W_RESEND_DATA_DIGEST)) {
-		crypto_hash_final(&tcp_conn->tx_hash, (u8*)digest);
-		iscsi_buf_init_iov(buf, (char*)digest, 4);
-	}
-	tcp_ctask->xmstate &= ~XMSTATE_W_RESEND_DATA_DIGEST;
-
-	rc = iscsi_sendpage(conn, buf, &tcp_ctask->digest_count, &sent);
-	if (!rc)
-		debug_scsi("sent digest 0x%x for itt 0x%x\n", *digest,
-			  ctask->itt);
-	else {
-		debug_scsi("sending digest 0x%x failed for itt 0x%x!\n",
-			  *digest, ctask->itt);
-		tcp_ctask->xmstate |= XMSTATE_W_RESEND_DATA_DIGEST;
-	}
-	return rc;
-}
-
-static int
-iscsi_send_data(struct iscsi_cmd_task *ctask, struct iscsi_buf *sendbuf,
-		struct scatterlist **sg, int *sent, int *count,
-		struct iscsi_buf *digestbuf, uint32_t *digest)
-{
-	struct iscsi_tcp_cmd_task *tcp_ctask = ctask->dd_data;
-	struct iscsi_conn *conn = ctask->conn;
-	struct iscsi_tcp_conn *tcp_conn = conn->dd_data;
-	int rc, buf_sent, offset;
-
-	while (*count) {
-		buf_sent = 0;
-		offset = sendbuf->sent;
-
-		rc = iscsi_sendpage(conn, sendbuf, count, &buf_sent);
-		*sent = *sent + buf_sent;
-		if (buf_sent && conn->datadgst_en)
-			partial_sg_digest_update(&tcp_conn->tx_hash,
-				&sendbuf->sg, sendbuf->sg.offset + offset,
-				buf_sent);
-		if (!iscsi_buf_left(sendbuf) && *sg != tcp_ctask->bad_sg) {
-			iscsi_buf_init_sg(sendbuf, *sg);
-			*sg = *sg + 1;
-		}
-
-		if (rc)
-			return rc;
-	}
-
-	rc = iscsi_send_padding(conn, ctask);
-	if (rc)
+	/* Flush any pending data first. */
+	if ((rc = iscsi_tcp_flush(conn)) < 0)
 		return rc;
 
-	return iscsi_send_digest(conn, ctask, digestbuf, digest);
-}
+	/* Are we done yet? */
+	if (tcp_mtask->pdu_sent) {
+		if (mtask->hdr->itt == RESERVED_ITT) {
+			struct iscsi_session *session = conn->session;
 
-static int
-iscsi_send_unsol_hdr(struct iscsi_conn *conn, struct iscsi_cmd_task *ctask)
-{
-	struct iscsi_tcp_cmd_task *tcp_ctask = ctask->dd_data;
-	struct iscsi_data_task *dtask;
-	int rc;
-
-	tcp_ctask->xmstate |= XMSTATE_UNS_DATA;
-	if (tcp_ctask->xmstate & XMSTATE_UNS_INIT) {
-		dtask = &tcp_ctask->unsol_dtask;
-
-		iscsi_prep_unsolicit_data_pdu(ctask, &dtask->hdr);
-		iscsi_buf_init_iov(&tcp_ctask->headbuf, (char*)&dtask->hdr,
-				   sizeof(struct iscsi_hdr));
-		if (conn->hdrdgst_en)
-			iscsi_hdr_digest(conn, &tcp_ctask->headbuf,
-					(u8*)dtask->hdrext);
-
-		tcp_ctask->xmstate &= ~XMSTATE_UNS_INIT;
-		iscsi_set_padding(tcp_ctask, ctask->data_count);
-	}
-
-	rc = iscsi_sendhdr(conn, &tcp_ctask->headbuf, ctask->data_count);
-	if (rc) {
-		tcp_ctask->xmstate &= ~XMSTATE_UNS_DATA;
-		tcp_ctask->xmstate |= XMSTATE_UNS_HDR;
-		return rc;
-	}
-
-	if (conn->datadgst_en) {
-		dtask = &tcp_ctask->unsol_dtask;
-		iscsi_data_digest_init(ctask->conn->dd_data, tcp_ctask);
-		dtask->digest = 0;
-	}
-
-	debug_scsi("uns dout [itt 0x%x dlen %d sent %d]\n",
-		   ctask->itt, ctask->unsol_count, tcp_ctask->sent);
-	return 0;
-}
-
-static int
-iscsi_send_unsol_pdu(struct iscsi_conn *conn, struct iscsi_cmd_task *ctask)
-{
-	struct iscsi_tcp_cmd_task *tcp_ctask = ctask->dd_data;
-	int rc;
-
-	if (tcp_ctask->xmstate & XMSTATE_UNS_HDR) {
-		BUG_ON(!ctask->unsol_count);
-		tcp_ctask->xmstate &= ~XMSTATE_UNS_HDR;
-send_hdr:
-		rc = iscsi_send_unsol_hdr(conn, ctask);
-		if (rc)
-			return rc;
-	}
-
-	if (tcp_ctask->xmstate & XMSTATE_UNS_DATA) {
-		struct iscsi_data_task *dtask = &tcp_ctask->unsol_dtask;
-		int start = tcp_ctask->sent;
-
-		rc = iscsi_send_data(ctask, &tcp_ctask->sendbuf, &tcp_ctask->sg,
-				     &tcp_ctask->sent, &ctask->data_count,
-				     &dtask->digestbuf, &dtask->digest);
-		ctask->unsol_count -= tcp_ctask->sent - start;
-		if (rc)
-			return rc;
-		tcp_ctask->xmstate &= ~XMSTATE_UNS_DATA;
-		/*
-		 * Done with the Data-Out. Next, check if we need
-		 * to send another unsolicited Data-Out.
-		 */
-		if (ctask->unsol_count) {
-			debug_scsi("sending more uns\n");
-			tcp_ctask->xmstate |= XMSTATE_UNS_INIT;
-			goto send_hdr;
-		}
-	}
-	return 0;
-}
-
-static int iscsi_send_sol_pdu(struct iscsi_conn *conn,
-			      struct iscsi_cmd_task *ctask)
-{
-	struct iscsi_tcp_cmd_task *tcp_ctask = ctask->dd_data;
-	struct iscsi_session *session = conn->session;
-	struct iscsi_r2t_info *r2t;
-	struct iscsi_data_task *dtask;
-	int left, rc;
-
-	if (tcp_ctask->xmstate & XMSTATE_SOL_HDR) {
-		tcp_ctask->xmstate &= ~XMSTATE_SOL_HDR;
-		tcp_ctask->xmstate |= XMSTATE_SOL_DATA;
-		if (!tcp_ctask->r2t) {
 			spin_lock_bh(&session->lock);
-			__kfifo_get(tcp_ctask->r2tqueue, (void*)&tcp_ctask->r2t,
+			list_del(&conn->mtask->running);
+			__kfifo_put(session->mgmtpool.queue, (void*)&conn->mtask,
 				    sizeof(void*));
 			spin_unlock_bh(&session->lock);
 		}
-send_hdr:
-		r2t = tcp_ctask->r2t;
-		dtask = &r2t->dtask;
-
-		if (conn->hdrdgst_en)
-			iscsi_hdr_digest(conn, &r2t->headbuf,
-					(u8*)dtask->hdrext);
-		rc = iscsi_sendhdr(conn, &r2t->headbuf, r2t->data_count);
-		if (rc) {
-			tcp_ctask->xmstate &= ~XMSTATE_SOL_DATA;
-			tcp_ctask->xmstate |= XMSTATE_SOL_HDR;
-			return rc;
-		}
-
-		if (conn->datadgst_en) {
-			iscsi_data_digest_init(conn->dd_data, tcp_ctask);
-			dtask->digest = 0;
-		}
-
-		iscsi_set_padding(tcp_ctask, r2t->data_count);
-		debug_scsi("sol dout [dsn %d itt 0x%x dlen %d sent %d]\n",
-			r2t->solicit_datasn - 1, ctask->itt, r2t->data_count,
-			r2t->sent);
+		return 0;
 	}
 
-	if (tcp_ctask->xmstate & XMSTATE_SOL_DATA) {
-		r2t = tcp_ctask->r2t;
-		dtask = &r2t->dtask;
+	debug_scsi("mtask deq [cid %d itt 0x%x]\n", conn->id, mtask->itt);
 
-		rc = iscsi_send_data(ctask, &r2t->sendbuf, &r2t->sg,
-				     &r2t->sent, &r2t->data_count,
-				     &dtask->digestbuf, &dtask->digest);
-		if (rc)
-			return rc;
-		tcp_ctask->xmstate &= ~XMSTATE_SOL_DATA;
+	/* Prepare PDU, optionally w/ immediate data */
+	rc = iscsi_tcp_send_hdr_prepare(conn,
+			mtask->hdr, sizeof(*mtask->hdr));
 
-		/*
-		 * Done with this Data-Out. Next, check if we have
-		 * to send another Data-Out for this R2T.
-		 */
-		BUG_ON(r2t->data_length - r2t->sent < 0);
-		left = r2t->data_length - r2t->sent;
-		if (left) {
-			iscsi_solicit_data_cont(conn, ctask, r2t, left);
-			tcp_ctask->xmstate |= XMSTATE_SOL_DATA;
-			tcp_ctask->xmstate &= ~XMSTATE_SOL_HDR;
-			goto send_hdr;
-		}
+	/* If we have immediate data, attach a payload */
+	if (!rc && mtask->data_count)
+		rc = iscsi_tcp_send_linear_data_prepare(conn,
+				mtask->data,
+				mtask->data_count);
 
-		/*
-		 * Done with this R2T. Check if there are more
-		 * outstanding R2Ts ready to be processed.
-		 */
-		spin_lock_bh(&session->lock);
-		tcp_ctask->r2t = NULL;
-		__kfifo_put(tcp_ctask->r2tpool.queue, (void*)&r2t,
-			    sizeof(void*));
-		if (__kfifo_get(tcp_ctask->r2tqueue, (void*)&r2t,
-				sizeof(void*))) {
-			tcp_ctask->r2t = r2t;
-			tcp_ctask->xmstate |= XMSTATE_SOL_DATA;
-			tcp_ctask->xmstate &= ~XMSTATE_SOL_HDR;
-			spin_unlock_bh(&session->lock);
-			goto send_hdr;
-		}
-		spin_unlock_bh(&session->lock);
+	if (rc == 0) {
+		tcp_mtask->pdu_sent = 1;
+		rc = iscsi_tcp_flush(conn);
 	}
-	return 0;
+
+	return rc;
 }
 
+/*
+ * iscsi_tcp_ctask_xmit - xmit normal PDU task
+ * @conn: iscsi connection
+ * @ctask: iscsi command task
+ *
+ * We're expected to return 0 when everything was transmitted succesfully,
+ * -EAGAIN if there's still data in the queue, or != 0 for any other kind
+ * of error.
+ */
 static int
 iscsi_tcp_ctask_xmit(struct iscsi_conn *conn, struct iscsi_cmd_task *ctask)
 {
 	struct iscsi_tcp_cmd_task *tcp_ctask = ctask->dd_data;
+	struct scsi_cmnd *sc = ctask->sc;
 	int rc = 0;
 
-	debug_scsi("ctask deq [cid %d xmstate %x itt 0x%x]\n",
-		conn->id, tcp_ctask->xmstate, ctask->itt);
-
-	/*
-	 * serialize with TMF AbortTask
-	 */
-	if (ctask->mtask)
+again:
+	/* Flush any pending data first. */
+	if ((rc = iscsi_tcp_flush(conn)) < 0)
 		return rc;
 
-	if (tcp_ctask->xmstate & XMSTATE_R_HDR)
-		return iscsi_send_read_hdr(conn, tcp_ctask);
+	BUG_ON(sc == NULL);
 
-	if (tcp_ctask->xmstate & XMSTATE_W_HDR) {
-		rc = iscsi_send_write_hdr(conn, ctask);
-		if (rc)
-			return rc;
+	/* Are we done already? */
+	if (tcp_ctask->pdu_sent &&
+	    (sc->sc_data_direction != DMA_TO_DEVICE || tcp_ctask->sent >= scsi_bufflen(sc)))
+		return 0;
+
+	if (!tcp_ctask->pdu_sent) {
+		/* Prepare PDU, optionally w/ immediate data */
+		debug_scsi("ctask deq [cid %d itt 0x%x imm %d unsol %d]\n",
+				conn->id, ctask->itt, ctask->imm_count,
+				ctask->unsol_count);
+		rc = iscsi_tcp_send_hdr_prepare(conn,
+				ctask->hdr, ctask->hdr_len);
+
+		/* If we have immediate data, attach a payload */
+		if (!rc && ctask->imm_count) {
+			rc = iscsi_tcp_send_data_prepare(conn,
+					scsi_sglist(sc),
+					scsi_sg_count(sc),
+					0, ctask->imm_count);
+			tcp_ctask->sent += ctask->imm_count;
+			ctask->imm_count = 0;
+		}
+		tcp_ctask->pdu_sent = 1;
+	} else
+	if (ctask->unsol_count != 0) {
+		struct iscsi_data *hdr = &tcp_ctask->unsol_dtask.hdr;
+
+		/* Prepare a header for the unsolicited PDU.
+		 * The amount of data we want to send will be
+		 * in ctask->data_count.
+		 * FIXME: return the data count instead.
+		 */
+		iscsi_prep_unsolicit_data_pdu(ctask, hdr);
+
+		debug_tcp("unsol dout [itt 0x%x doff %d dlen %d]\n",
+				ctask->itt, tcp_ctask->sent, ctask->data_count);
+
+		rc = iscsi_tcp_send_hdr_prepare(conn, hdr, sizeof(*hdr));
+		if (!rc && ctask->data_count) {
+			rc = iscsi_tcp_send_data_prepare(conn,
+					scsi_sglist(sc),
+					scsi_sg_count(sc),
+					tcp_ctask->sent, ctask->data_count);
+			tcp_ctask->sent += ctask->data_count;
+			ctask->unsol_count -= ctask->data_count;
+		}
+	} else {
+		struct iscsi_session *session = conn->session;
+		struct iscsi_r2t_info *r2t;
+
+		/* All unsolicited PDUs sent. Check for solicited PDUs.
+		 */
+		spin_lock_bh(&session->lock);
+		if ((r2t = tcp_ctask->r2t) != NULL) {
+			/* Continue with this R2T? */
+			if (!iscsi_next_data_out_prepare(conn, ctask, r2t)) {
+				debug_scsi("  done with r2t %p\n", r2t);
+				iscsi_r2t_free(&tcp_ctask->r2tpool, r2t);
+				tcp_ctask->r2t = r2t = NULL;
+			}
+		}
+
+		if (r2t == NULL) {
+			tcp_ctask->r2t = iscsi_r2t_get(tcp_ctask->r2tqueue);
+			r2t = tcp_ctask->r2t;
+		}
+		spin_unlock_bh(&session->lock);
+
+		/* Waiting for more R2Ts to arrive. */
+		if (r2t == NULL) {
+			debug_tcp("no R2Ts yet\n");
+			return -EAGAIN;
+		}
+
+		debug_scsi("sol dout [dsn %d itt 0x%x doff %d dlen %d]\n",
+			r2t->solicit_datasn - 1, ctask->itt,
+			r2t->data_offset + r2t->sent, r2t->data_count);
+
+		rc = iscsi_tcp_send_hdr_prepare(conn,
+				&r2t->dtask.hdr, sizeof(struct iscsi_hdr));
+
+		if (rc == 0) {
+			rc = iscsi_tcp_send_data_prepare(conn,
+					scsi_sglist(sc),
+					scsi_sg_count(sc),
+					r2t->data_offset + r2t->sent,
+					r2t->data_count);
+			tcp_ctask->sent += r2t->data_count;
+			r2t->sent += r2t->data_count;
+		}
 	}
 
-	if (tcp_ctask->xmstate & XMSTATE_IMM_DATA) {
-		rc = iscsi_send_data(ctask, &tcp_ctask->sendbuf, &tcp_ctask->sg,
-				     &tcp_ctask->sent, &ctask->imm_count,
-				     &tcp_ctask->immbuf, &tcp_ctask->immdigest);
-		if (rc)
-			return rc;
-		tcp_ctask->xmstate &= ~XMSTATE_IMM_DATA;
-	}
-
-	rc = iscsi_send_unsol_pdu(conn, ctask);
-	if (rc)
-		return rc;
-
-	rc = iscsi_send_sol_pdu(conn, ctask);
-	if (rc)
-		return rc;
+	if (rc == 0)
+		goto again;
 
 	return rc;
 }
@@ -1770,7 +1511,6 @@ iscsi_tcp_conn_create(struct iscsi_cls_session *cls_session, uint32_t conn_idx)
 
 	conn->dd_data = tcp_conn;
 	tcp_conn->iscsi_conn = conn;
-	tcp_conn->in_progress = IN_PROGRESS_WAIT_HEADER;
 	/* initial operational parameters */
 	tcp_conn->hdr_size = sizeof(struct iscsi_hdr);
 
@@ -1810,18 +1550,22 @@ tcp_conn_alloc_fail:
 static void
 iscsi_tcp_release_conn(struct iscsi_conn *conn)
 {
+	struct iscsi_session *session = conn->session;
 	struct iscsi_tcp_conn *tcp_conn = conn->dd_data;
+	struct socket *sock = tcp_conn->sock;
 
-	if (!tcp_conn->sock)
+	if (!sock)
 		return;
 
-	sock_hold(tcp_conn->sock->sk);
+	sock_hold(sock->sk);
 	iscsi_conn_restore_callbacks(tcp_conn);
-	sock_put(tcp_conn->sock->sk);
+	sock_put(sock->sk);
 
-	sock_release(tcp_conn->sock);
+	spin_lock_bh(&session->lock);
 	tcp_conn->sock = NULL;
 	conn->recv_lock = NULL;
+	spin_unlock_bh(&session->lock);
+	sockfd_put(sock);
 }
 
 static void
@@ -1852,6 +1596,46 @@ iscsi_tcp_conn_stop(struct iscsi_cls_conn *cls_conn, int flag)
 	tcp_conn->hdr_size = sizeof(struct iscsi_hdr);
 }
 
+static int iscsi_tcp_get_addr(struct iscsi_conn *conn, struct socket *sock,
+			      char *buf, int *port,
+			      int (*getname)(struct socket *, struct sockaddr *,
+					int *addrlen))
+{
+	struct sockaddr_storage *addr;
+	struct sockaddr_in6 *sin6;
+	struct sockaddr_in *sin;
+	int rc = 0, len;
+
+	addr = kmalloc(GFP_KERNEL, sizeof(*addr));
+	if (!addr)
+		return -ENOMEM;
+
+	if (getname(sock, (struct sockaddr *) addr, &len)) {
+		rc = -ENODEV;
+		goto free_addr;
+	}
+
+	switch (addr->ss_family) {
+	case AF_INET:
+		sin = (struct sockaddr_in *)addr;
+		spin_lock_bh(&conn->session->lock);
+		sprintf(buf, NIPQUAD_FMT, NIPQUAD(sin->sin_addr.s_addr));
+		*port = be16_to_cpu(sin->sin_port);
+		spin_unlock_bh(&conn->session->lock);
+		break;
+	case AF_INET6:
+		sin6 = (struct sockaddr_in6 *)addr;
+		spin_lock_bh(&conn->session->lock);
+		sprintf(buf, NIP6_FMT, NIP6(sin6->sin6_addr));
+		*port = be16_to_cpu(sin6->sin6_port);
+		spin_unlock_bh(&conn->session->lock);
+		break;
+	}
+free_addr:
+	kfree(addr);
+	return rc;
+}
+
 static int
 iscsi_tcp_conn_bind(struct iscsi_cls_session *cls_session,
 		    struct iscsi_cls_conn *cls_conn, uint64_t transport_eph,
@@ -1869,10 +1653,24 @@ iscsi_tcp_conn_bind(struct iscsi_cls_session *cls_session,
 		printk(KERN_ERR "iscsi_tcp: sockfd_lookup failed %d\n", err);
 		return -EEXIST;
 	}
+	/*
+	 * copy these values now because if we drop the session
+	 * userspace may still want to query the values since we will
+	 * be using them for the reconnect
+	 */
+	err = iscsi_tcp_get_addr(conn, sock, conn->portal_address,
+				 &conn->portal_port, kernel_getpeername);
+	if (err)
+		goto free_socket;
+
+	err = iscsi_tcp_get_addr(conn, sock, conn->local_address,
+				&conn->local_port, kernel_getsockname);
+	if (err)
+		goto free_socket;
 
 	err = iscsi_conn_bind(cls_session, cls_conn, is_leading);
 	if (err)
-		return err;
+		goto free_socket;
 
 	/* bind iSCSI connection and socket */
 	tcp_conn->sock = sock;
@@ -1895,26 +1693,21 @@ iscsi_tcp_conn_bind(struct iscsi_cls_session *cls_session,
 	/*
 	 * set receive state machine into initial state
 	 */
-	tcp_conn->in_progress = IN_PROGRESS_WAIT_HEADER;
+	iscsi_tcp_begin_header(tcp_conn);
 
 	return 0;
+
+free_socket:
+	sockfd_put(sock);
+	return err;
 }
 
 /* called with host lock */
 static void
-iscsi_tcp_mgmt_init(struct iscsi_conn *conn, struct iscsi_mgmt_task *mtask,
-		    char *data, uint32_t data_size)
+iscsi_tcp_mgmt_init(struct iscsi_conn *conn, struct iscsi_mgmt_task *mtask)
 {
 	struct iscsi_tcp_mgmt_task *tcp_mtask = mtask->dd_data;
-
-	iscsi_buf_init_iov(&tcp_mtask->headbuf, (char*)mtask->hdr,
-			   sizeof(struct iscsi_hdr));
-	tcp_mtask->xmstate = XMSTATE_IMM_HDR;
-	tcp_mtask->sent = 0;
-
-	if (mtask->data_count)
-		iscsi_buf_init_iov(&tcp_mtask->sendbuf, (char*)mtask->data,
-				    mtask->data_count);
+	tcp_mtask->pdu_sent = 0;
 }
 
 static int
@@ -1937,8 +1730,7 @@ iscsi_r2tpool_alloc(struct iscsi_session *session)
 		 */
 
 		/* R2T pool */
-		if (iscsi_pool_init(&tcp_ctask->r2tpool, session->max_r2t * 4,
-				    (void***)&tcp_ctask->r2ts,
+		if (iscsi_pool_init(&tcp_ctask->r2tpool, session->max_r2t * 4, NULL,
 				    sizeof(struct iscsi_r2t_info))) {
 			goto r2t_alloc_fail;
 		}
@@ -1947,8 +1739,7 @@ iscsi_r2tpool_alloc(struct iscsi_session *session)
 		tcp_ctask->r2tqueue = kfifo_alloc(
 		      session->max_r2t * 4 * sizeof(void*), GFP_KERNEL, NULL);
 		if (tcp_ctask->r2tqueue == ERR_PTR(-ENOMEM)) {
-			iscsi_pool_free(&tcp_ctask->r2tpool,
-					(void**)tcp_ctask->r2ts);
+			iscsi_pool_free(&tcp_ctask->r2tpool);
 			goto r2t_alloc_fail;
 		}
 	}
@@ -1961,8 +1752,7 @@ r2t_alloc_fail:
 		struct iscsi_tcp_cmd_task *tcp_ctask = ctask->dd_data;
 
 		kfifo_free(tcp_ctask->r2tqueue);
-		iscsi_pool_free(&tcp_ctask->r2tpool,
-				(void**)tcp_ctask->r2ts);
+		iscsi_pool_free(&tcp_ctask->r2tpool);
 	}
 	return -ENOMEM;
 }
@@ -1977,8 +1767,7 @@ iscsi_r2tpool_free(struct iscsi_session *session)
 		struct iscsi_tcp_cmd_task *tcp_ctask = ctask->dd_data;
 
 		kfifo_free(tcp_ctask->r2tqueue);
-		iscsi_pool_free(&tcp_ctask->r2tpool,
-				(void**)tcp_ctask->r2ts);
+		iscsi_pool_free(&tcp_ctask->r2tpool);
 	}
 }
 
@@ -1996,7 +1785,21 @@ iscsi_conn_set_param(struct iscsi_cls_conn *cls_conn, enum iscsi_param param,
 		iscsi_set_param(cls_conn, param, buf, buflen);
 		tcp_conn->hdr_size = sizeof(struct iscsi_hdr);
 		if (conn->hdrdgst_en)
-			tcp_conn->hdr_size += sizeof(__u32);
+			tcp_conn->hdr_size += ISCSI_DIGEST_SIZE;
+		/* Here's a teeny little hack - if we're expecting
+		 * a header next, make sure we got the digest
+		 * setting right. */
+		if (tcp_conn->in.chunk.done == iscsi_tcp_process_header) {
+			if (tcp_conn->in.chunk.total_copied) {
+				printk(KERN_ERR
+					"iSCSI: Changed HeaderDigest setting "
+					"while receiving a header!\n");
+			} else {
+				/* Restart header reception with the
+				 * updated HeaderDigest setting. */
+				iscsi_tcp_begin_header(tcp_conn);
+			}
+		}
 		break;
 	case ISCSI_PARAM_DATADGST_EN:
 		iscsi_set_param(cls_conn, param, buf, buflen);
@@ -2026,46 +1829,46 @@ iscsi_tcp_conn_get_param(struct iscsi_cls_conn *cls_conn,
 			 enum iscsi_param param, char *buf)
 {
 	struct iscsi_conn *conn = cls_conn->dd_data;
-	struct iscsi_tcp_conn *tcp_conn = conn->dd_data;
-	struct inet_sock *inet;
-	struct ipv6_pinfo *np;
-	struct sock *sk;
 	int len;
 
 	switch(param) {
 	case ISCSI_PARAM_CONN_PORT:
-		mutex_lock(&conn->xmitmutex);
-		if (!tcp_conn->sock) {
-			mutex_unlock(&conn->xmitmutex);
-			return -EINVAL;
-		}
-
-		inet = inet_sk(tcp_conn->sock->sk);
-		len = sprintf(buf, "%hu\n", be16_to_cpu(inet->dport));
-		mutex_unlock(&conn->xmitmutex);
+		spin_lock_bh(&conn->session->lock);
+		len = sprintf(buf, "%hu\n", conn->portal_port);
+		spin_unlock_bh(&conn->session->lock);
 		break;
 	case ISCSI_PARAM_CONN_ADDRESS:
-		mutex_lock(&conn->xmitmutex);
-		if (!tcp_conn->sock) {
-			mutex_unlock(&conn->xmitmutex);
-			return -EINVAL;
-		}
-
-		sk = tcp_conn->sock->sk;
-		if (sk->sk_family == PF_INET) {
-			inet = inet_sk(sk);
-			len = sprintf(buf, NIPQUAD_FMT "\n",
-				      NIPQUAD(inet->daddr));
-		} else {
-			np = inet6_sk(sk);
-			len = sprintf(buf, NIP6_FMT "\n", NIP6(np->daddr));
-		}
-		mutex_unlock(&conn->xmitmutex);
+		spin_lock_bh(&conn->session->lock);
+		len = sprintf(buf, "%s\n", conn->portal_address);
+		spin_unlock_bh(&conn->session->lock);
 		break;
 	default:
 		return iscsi_conn_get_param(cls_conn, param, buf);
 	}
 
+	return len;
+}
+
+static int
+iscsi_tcp_host_get_param(struct Scsi_Host *shost, enum iscsi_host_param param,
+			 char *buf)
+{
+        struct iscsi_session *session = iscsi_hostdata(shost->hostdata);
+	int len;
+
+	switch (param) {
+	case ISCSI_HOST_PARAM_IPADDRESS:
+		spin_lock_bh(&session->lock);
+		if (!session->leadconn)
+			len = -ENODEV;
+		else
+			len = sprintf(buf, "%s\n",
+				     session->leadconn->local_address);
+		spin_unlock_bh(&session->lock);
+		break;
+	default:
+		return iscsi_host_get_param(shost, param, buf);
+	}
 	return len;
 }
 
@@ -2096,6 +1899,7 @@ iscsi_conn_get_stats(struct iscsi_cls_conn *cls_conn, struct iscsi_stats *stats)
 static struct iscsi_cls_session *
 iscsi_tcp_session_create(struct iscsi_transport *iscsit,
 			 struct scsi_transport_template *scsit,
+			 uint16_t cmds_max, uint16_t qdepth,
 			 uint32_t initial_cmdsn, uint32_t *hostno)
 {
 	struct iscsi_cls_session *cls_session;
@@ -2103,7 +1907,7 @@ iscsi_tcp_session_create(struct iscsi_transport *iscsit,
 	uint32_t hn;
 	int cmd_i;
 
-	cls_session = iscsi_session_setup(iscsit, scsit,
+	cls_session = iscsi_session_setup(iscsit, scsit, cmds_max, qdepth,
 					 sizeof(struct iscsi_tcp_cmd_task),
 					 sizeof(struct iscsi_tcp_mgmt_task),
 					 initial_cmdsn, &hn);
@@ -2116,14 +1920,15 @@ iscsi_tcp_session_create(struct iscsi_transport *iscsit,
 		struct iscsi_cmd_task *ctask = session->cmds[cmd_i];
 		struct iscsi_tcp_cmd_task *tcp_ctask = ctask->dd_data;
 
-		ctask->hdr = &tcp_ctask->hdr;
+		ctask->hdr = &tcp_ctask->hdr.cmd_hdr;
+		ctask->hdr_max = sizeof(tcp_ctask->hdr) - ISCSI_DIGEST_SIZE;
 	}
 
 	for (cmd_i = 0; cmd_i < session->mgmtpool_max; cmd_i++) {
 		struct iscsi_mgmt_task *mtask = session->mgmt_cmds[cmd_i];
 		struct iscsi_tcp_mgmt_task *tcp_mtask = mtask->dd_data;
 
-		mtask->hdr = &tcp_mtask->hdr;
+		mtask->hdr = (struct iscsi_hdr *) &tcp_mtask->hdr;
 	}
 
 	if (iscsi_r2tpool_alloc(class_to_transport_session(cls_session)))
@@ -2142,17 +1947,26 @@ static void iscsi_tcp_session_destroy(struct iscsi_cls_session *cls_session)
 	iscsi_session_teardown(cls_session);
 }
 
+static int iscsi_tcp_slave_configure(struct scsi_device *sdev)
+{
+	blk_queue_bounce_limit(sdev->request_queue, BLK_BOUNCE_ANY);
+	blk_queue_dma_alignment(sdev->request_queue, 0);
+	return 0;
+}
+
 static struct scsi_host_template iscsi_sht = {
+	.module			= THIS_MODULE,
 	.name			= "iSCSI Initiator over TCP/IP",
 	.queuecommand           = iscsi_queuecommand,
 	.change_queue_depth	= iscsi_change_queue_depth,
-	.can_queue		= ISCSI_XMIT_CMDS_MAX - 1,
+	.can_queue		= ISCSI_DEF_XMIT_CMDS_MAX - 1,
 	.sg_tablesize		= ISCSI_SG_TABLESIZE,
 	.max_sectors		= 0xFFFF,
 	.cmd_per_lun		= ISCSI_DEF_CMD_PER_LUN,
 	.eh_abort_handler       = iscsi_eh_abort,
 	.eh_host_reset_handler	= iscsi_eh_host_reset,
 	.use_clustering         = DISABLE_CLUSTERING,
+	.slave_configure        = iscsi_tcp_slave_configure,
 	.proc_name		= "iscsi_tcp",
 	.this_id		= -1,
 };
@@ -2179,8 +1993,12 @@ static struct iscsi_transport iscsi_tcp_transport = {
 				  ISCSI_EXP_STATSN |
 				  ISCSI_PERSISTENT_PORT |
 				  ISCSI_PERSISTENT_ADDRESS |
-				  ISCSI_TARGET_NAME |
-				  ISCSI_TPGT,
+				  ISCSI_TARGET_NAME | ISCSI_TPGT |
+				  ISCSI_USERNAME | ISCSI_PASSWORD |
+				  ISCSI_USERNAME_IN | ISCSI_PASSWORD_IN,
+	.host_param_mask	= ISCSI_HOST_HWADDRESS | ISCSI_HOST_IPADDRESS |
+				  ISCSI_HOST_INITIATOR_NAME |
+				  ISCSI_HOST_NETDEV_NAME,
 	.host_template		= &iscsi_sht,
 	.conndata_size		= sizeof(struct iscsi_conn),
 	.max_conn		= 1,
@@ -2197,6 +2015,9 @@ static struct iscsi_transport iscsi_tcp_transport = {
 	.get_session_param	= iscsi_session_get_param,
 	.start_conn		= iscsi_conn_start,
 	.stop_conn		= iscsi_tcp_conn_stop,
+	/* iscsi host params */
+	.get_host_param		= iscsi_tcp_host_get_param,
+	.set_host_param		= iscsi_host_set_param,
 	/* IO */
 	.send_pdu		= iscsi_conn_send_pdu,
 	.get_stats		= iscsi_conn_get_stats,
