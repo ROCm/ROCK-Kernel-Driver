@@ -34,6 +34,7 @@
 #include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/mm.h>
+#include <linux/seqlock.h>
 #include <xen/interface/xen.h>
 #include <xen/gnttab.h>
 #include <asm/pgtable.h>
@@ -42,6 +43,7 @@
 #include <asm/io.h>
 #include <xen/interface/memory.h>
 #include <xen/driver_util.h>
+#include <asm/gnttab_dma.h>
 
 #ifdef HAVE_XEN_PLATFORM_COMPAT_H
 #include <xen/platform-compat.h>
@@ -62,6 +64,8 @@ static DEFINE_SPINLOCK(gnttab_list_lock);
 static struct grant_entry *shared;
 
 static struct gnttab_free_callback *gnttab_free_callback_list;
+
+static DEFINE_SEQLOCK(gnttab_dma_lock);
 
 static int gnttab_expand(unsigned int req_entries);
 
@@ -488,6 +492,126 @@ static int gnttab_map(unsigned int start_idx, unsigned int end_idx)
 	kfree(frames);
 
 	return 0;
+}
+
+static void gnttab_page_free(struct page *page)
+{
+	ClearPageForeign(page);
+	gnttab_reset_grant_page(page);
+	put_page(page);
+}
+
+/*
+ * Must not be called with IRQs off.  This should only be used on the
+ * slow path.
+ *
+ * Copy a foreign granted page to local memory.
+ */
+int gnttab_copy_grant_page(grant_ref_t ref, struct page **pagep)
+{
+	struct gnttab_unmap_and_replace unmap;
+	mmu_update_t mmu;
+	struct page *page;
+	struct page *new_page;
+	void *new_addr;
+	void *addr;
+	paddr_t pfn;
+	maddr_t mfn;
+	maddr_t new_mfn;
+	int err;
+
+	page = *pagep;
+	if (!get_page_unless_zero(page))
+		return -ENOENT;
+
+	err = -ENOMEM;
+	new_page = alloc_page(GFP_ATOMIC | __GFP_NOWARN);
+	if (!new_page)
+		goto out;
+
+	new_addr = page_address(new_page);
+	addr = page_address(page);
+	memcpy(new_addr, addr, PAGE_SIZE);
+
+	pfn = page_to_pfn(page);
+	mfn = pfn_to_mfn(pfn);
+	new_mfn = virt_to_mfn(new_addr);
+
+	write_seqlock(&gnttab_dma_lock);
+
+	/* Make seq visible before checking page_mapped. */
+	smp_mb();
+
+	/* Has the page been DMA-mapped? */
+	if (unlikely(page_mapped(page))) {
+		write_sequnlock(&gnttab_dma_lock);
+		put_page(new_page);
+		err = -EBUSY;
+		goto out;
+	}
+
+	if (!xen_feature(XENFEAT_auto_translated_physmap))
+		set_phys_to_machine(pfn, new_mfn);
+
+	gnttab_set_replace_op(&unmap, (unsigned long)addr,
+			      (unsigned long)new_addr, ref);
+
+	err = HYPERVISOR_grant_table_op(GNTTABOP_unmap_and_replace,
+					&unmap, 1);
+	BUG_ON(err);
+	BUG_ON(unmap.status);
+
+	write_sequnlock(&gnttab_dma_lock);
+
+	if (!xen_feature(XENFEAT_auto_translated_physmap)) {
+		set_phys_to_machine(page_to_pfn(new_page), INVALID_P2M_ENTRY);
+
+		mmu.ptr = (new_mfn << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE;
+		mmu.val = pfn;
+		err = HYPERVISOR_mmu_update(&mmu, 1, NULL, DOMID_SELF);
+		BUG_ON(err);
+	}
+
+	new_page->mapping = page->mapping;
+	new_page->index = page->index;
+	set_bit(PG_foreign, &new_page->flags);
+	*pagep = new_page;
+
+	SetPageForeign(page, gnttab_page_free);
+	page->mapping = NULL;
+
+out:
+	put_page(page);
+	return err;
+}
+EXPORT_SYMBOL(gnttab_copy_grant_page);
+
+/*
+ * Keep track of foreign pages marked as PageForeign so that we don't
+ * return them to the remote domain prematurely.
+ *
+ * PageForeign pages are pinned down by increasing their mapcount.
+ *
+ * All other pages are simply returned as is.
+ */
+void __gnttab_dma_map_page(struct page *page)
+{
+	unsigned int seq;
+
+	if (!is_running_on_xen() || !PageForeign(page))
+		return;
+
+	do {
+		seq = read_seqbegin(&gnttab_dma_lock);
+
+		if (gnttab_dma_local_pfn(page))
+			break;
+
+		atomic_set(&page->_mapcount, 0);
+
+		/* Make _mapcount visible before read_seqretry. */
+		smp_mb();
+	} while (unlikely(read_seqretry(&gnttab_dma_lock, seq)));
 }
 
 int gnttab_resume(void)

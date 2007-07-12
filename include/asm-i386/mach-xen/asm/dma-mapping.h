@@ -23,11 +23,11 @@ address_needs_mapping(struct device *hwdev, dma_addr_t addr)
 }
 
 static inline int
-range_straddles_page_boundary(void *p, size_t size)
+range_straddles_page_boundary(paddr_t p, size_t size)
 {
 	extern unsigned long *contiguous_bitmap;
-	return (((((unsigned long)p & ~PAGE_MASK) + size) > PAGE_SIZE) &&
-		!test_bit(__pa(p) >> PAGE_SHIFT, contiguous_bitmap));
+	return ((((p & ~PAGE_MASK) + size) > PAGE_SIZE) &&
+		!test_bit(p >> PAGE_SHIFT, contiguous_bitmap));
 }
 
 #define dma_alloc_noncoherent(d, s, h, f) dma_alloc_coherent(d, s, h, f)

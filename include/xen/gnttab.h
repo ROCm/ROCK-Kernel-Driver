@@ -39,6 +39,7 @@
 
 #include <asm/hypervisor.h>
 #include <asm/maddr.h> /* maddr_t */
+#include <linux/mm.h>
 #include <xen/interface/grant_table.h>
 #include <xen/features.h>
 
@@ -101,6 +102,18 @@ void gnttab_grant_foreign_access_ref(grant_ref_t ref, domid_t domid,
 void gnttab_grant_foreign_transfer_ref(grant_ref_t, domid_t domid,
 				       unsigned long pfn);
 
+int gnttab_copy_grant_page(grant_ref_t ref, struct page **pagep);
+void __gnttab_dma_map_page(struct page *page);
+static inline void __gnttab_dma_unmap_page(struct page *page)
+{
+}
+
+static inline void gnttab_reset_grant_page(struct page *page)
+{
+	init_page_count(page);
+	reset_page_mapcount(page);
+}
+
 int gnttab_suspend(void);
 int gnttab_resume(void);
 
@@ -133,6 +146,21 @@ gnttab_set_unmap_op(struct gnttab_unmap_grant_ref *unmap, maddr_t addr,
 
 	unmap->handle = handle;
 	unmap->dev_bus_addr = 0;
+}
+
+static inline void
+gnttab_set_replace_op(struct gnttab_unmap_and_replace *unmap, maddr_t addr,
+		      maddr_t new_addr, grant_handle_t handle)
+{
+	if (xen_feature(XENFEAT_auto_translated_physmap)) {
+		unmap->host_addr = __pa(addr);
+		unmap->new_addr = __pa(new_addr);
+	} else {
+		unmap->host_addr = addr;
+		unmap->new_addr = new_addr;
+	}
+
+	unmap->handle = handle;
 }
 
 #endif /* __ASM_GNTTAB_H__ */

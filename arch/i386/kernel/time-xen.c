@@ -118,6 +118,12 @@ static DEFINE_PER_CPU(struct vcpu_runstate_info, runstate);
 /* Must be signed, as it's compared with s64 quantities which can be -ve. */
 #define NS_PER_TICK (1000000000LL/HZ)
 
+static void __clock_was_set(struct work_struct *unused)
+{
+	clock_was_set();
+}
+static DECLARE_WORK(clock_was_set_work, __clock_was_set);
+
 static inline void __normalize_time(time_t *sec, s64 *nsec)
 {
 	while (*nsec >= NSEC_PER_SEC) {
@@ -524,7 +530,8 @@ irqreturn_t timer_interrupt(int irq, void *dev_id)
 
 	if (shadow_tv_version != HYPERVISOR_shared_info->wc_version) {
 		update_wallclock();
-		clock_was_set();
+		if (keventd_up())
+			schedule_work(&clock_was_set_work);
 	}
 
 	write_sequnlock(&xtime_lock);

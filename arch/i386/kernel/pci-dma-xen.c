@@ -16,9 +16,11 @@
 #include <linux/pci.h>
 #include <asm/io.h>
 #include <xen/balloon.h>
+#include <xen/gnttab.h>
 #include <asm/swiotlb.h>
 #include <asm/tlbflush.h>
 #include <asm-i386/mach-xen/asm/swiotlb.h>
+#include <asm-i386/mach-xen/asm/gnttab_dma.h>
 #include <asm/bug.h>
 
 #ifdef __x86_64__
@@ -90,11 +92,14 @@ dma_map_sg(struct device *hwdev, struct scatterlist *sg, int nents,
 	} else {
 		for (i = 0; i < nents; i++ ) {
 			sg[i].dma_address =
-				page_to_bus(sg[i].page) + sg[i].offset;
+				gnttab_dma_map_page(sg[i].page) + sg[i].offset;
 			sg[i].dma_length  = sg[i].length;
 			BUG_ON(!sg[i].page);
 			IOMMU_BUG_ON(address_needs_mapping(
 				hwdev, sg[i].dma_address));
+			IOMMU_BUG_ON(range_straddles_page_boundary(
+				page_to_pseudophys(sg[i].page) + sg[i].offset,
+				sg[i].length));
 		}
 		rc = nents;
 	}
@@ -108,9 +113,15 @@ void
 dma_unmap_sg(struct device *hwdev, struct scatterlist *sg, int nents,
 	     enum dma_data_direction direction)
 {
+	int i;
+
 	BUG_ON(!valid_dma_direction(direction));
 	if (swiotlb)
 		swiotlb_unmap_sg(hwdev, sg, nents, direction);
+	else {
+		for (i = 0; i < nents; i++ )
+			gnttab_dma_unmap_page(sg[i].dma_address);
+	}
 }
 EXPORT_SYMBOL(dma_unmap_sg);
 
@@ -122,12 +133,11 @@ dma_map_page(struct device *dev, struct page *page, unsigned long offset,
 	dma_addr_t dma_addr;
 
 	BUG_ON(!valid_dma_direction(direction));
-
 	if (swiotlb) {
 		dma_addr = swiotlb_map_page(
 			dev, page, offset, size, direction);
 	} else {
-		dma_addr = page_to_bus(page) + offset;
+		dma_addr = gnttab_dma_map_page(page) + offset;
 		IOMMU_BUG_ON(address_needs_mapping(dev, dma_addr));
 	}
 
@@ -142,6 +152,8 @@ dma_unmap_page(struct device *dev, dma_addr_t dma_address, size_t size,
 	BUG_ON(!valid_dma_direction(direction));
 	if (swiotlb)
 		swiotlb_unmap_page(dev, dma_address, size, direction);
+	else
+		gnttab_dma_unmap_page(dma_address);
 }
 EXPORT_SYMBOL(dma_unmap_page);
 #endif /* CONFIG_HIGHMEM */
@@ -351,8 +363,9 @@ dma_map_single(struct device *dev, void *ptr, size_t size,
 	if (swiotlb) {
 		dma = swiotlb_map_single(dev, ptr, size, direction);
 	} else {
-		dma = virt_to_bus(ptr);
-		IOMMU_BUG_ON(range_straddles_page_boundary(ptr, size));
+		dma = gnttab_dma_map_page(virt_to_page(ptr)) +
+		      offset_in_page(ptr);
+		IOMMU_BUG_ON(range_straddles_page_boundary(__pa(ptr), size));
 		IOMMU_BUG_ON(address_needs_mapping(dev, dma));
 	}
 
@@ -368,6 +381,8 @@ dma_unmap_single(struct device *dev, dma_addr_t dma_addr, size_t size,
 	BUG_ON(!valid_dma_direction(direction));
 	if (swiotlb)
 		swiotlb_unmap_single(dev, dma_addr, size, direction);
+	else
+		gnttab_dma_unmap_page(dma_addr);
 }
 EXPORT_SYMBOL(dma_unmap_single);
 

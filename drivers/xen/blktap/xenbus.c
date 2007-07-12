@@ -169,6 +169,8 @@ static int blktap_remove(struct xenbus_device *dev)
 {
 	struct backend_info *be = dev->dev.driver_data;
 
+	if (be->group_added)
+		xentap_sysfs_delif(be->dev);
 	if (be->backend_watch.node) {
 		unregister_xenbus_watch(&be->backend_watch);
 		kfree(be->backend_watch.node);
@@ -181,8 +183,6 @@ static int blktap_remove(struct xenbus_device *dev)
 		tap_blkif_free(be->blkif);
 		be->blkif = NULL;
 	}
-	if (be->group_added)
-		xentap_sysfs_delif(be->dev);
 	kfree(be);
 	dev->dev.driver_data = NULL;
 	return 0;
