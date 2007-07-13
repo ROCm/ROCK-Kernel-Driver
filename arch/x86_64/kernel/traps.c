@@ -549,6 +549,8 @@ void __kprobes die_nmi(char *str, struct pt_regs *regs, int do_panic)
 	 */
 	printk(str, smp_processor_id());
 	show_registers(regs);
+	if (strncmp(str, "NMI Watchdog", 12) == 0)
+		notify_die(DIE_NMIWATCHDOG, "nmi_watchdog", regs, 0, 2, SIGINT);
 	if (kexec_should_crash(current))
 		crash_kexec(regs);
 	if (do_panic || panic_on_oops)

@@ -163,7 +163,7 @@ static char *__env[] = {
  "LINES=24",
  "COLUMNS=80",
  "MDCOUNT=8",			/* lines of md output */
- "BTARGS=5",			/* 5 possible args in bt */
+ "BTARGS=9",			/* 9 possible args in bt */
  KDB_PLATFORM_ENV,
  "DTABCOUNT=30",
  "NOSECT=1",

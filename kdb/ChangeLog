@@ -1,3 +1,39 @@
+2007-07-13 Keith Owens  <kaos@sgi.com>
+
+	* Increase the size of the debug_alloc pool.
+	* Add the caller that obtained each entry in the debug_alloc pool.
+	* Poison entries in the debug_alloc pool.
+	* Track current and maximum usage in debug_alloc pool.
+	* Print the debug_alloc entries that are still in use when kdb exits
+	  (memory leaks).
+	* Increase the default value of BTARGS to 9.
+	* kdb v4.4-2.6.22-common-2.
+
+2007-07-09 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.22-common-1.
+
+2007-07-02 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.22-rc7-common-1.
+
+2007-06-20 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.22-rc5-common-1.
+
+2007-06-15 Keith Owens  <kaos@sgi.com>
+
+	* Do not include asm/kdb.h unless CONFIG_KDB is on.  Dave Jiang.
+	* kdb v4.4-2.6.22-rc4-common-2.
+
+2007-06-08 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.22-rc4-common-1.
+
+2007-05-28 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.22-rc3-common-1.
+
 2007-05-22 Keith Owens  <kaos@sgi.com>
 
 	* kdb v4.4-2.6.22-rc2-common-1.

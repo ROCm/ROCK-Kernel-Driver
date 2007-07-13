@@ -8,7 +8,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (c) 2000-2004 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2007 Silicon Graphics, Inc.  All Rights Reserved.
  * Copyright (C) 2000 Stephane Eranian <eranian@hpl.hp.com>
  */
 
@@ -16,6 +16,7 @@
 #include <linux/sched.h>
 #include <asm/atomic.h>
 
+#ifdef CONFIG_KDB
 /* These are really private, but they must be defined before including
  * asm-$(ARCH)/kdb.h, so make them public and put them here.
  */
@@ -23,6 +24,7 @@ extern int kdb_getuserarea_size(void *, unsigned long, size_t);
 extern int kdb_putuserarea_size(unsigned long, void *, size_t);
 
 #include <asm/kdb.h>
+#endif
 
 #define KDB_MAJOR_VERSION	4
 #define KDB_MINOR_VERSION	4

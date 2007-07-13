@@ -924,6 +924,7 @@ int kdb_putuserarea_size(unsigned long to, void *from, size_t size)
 struct debug_alloc_header {
 	u32 next;	/* offset of next header from start of pool */
 	u32 size;
+	void *caller;
 };
 
 /* The memory returned by this allocator must be aligned, which means so must
@@ -935,9 +936,9 @@ struct debug_alloc_header {
 #define dah_align 8
 #define dah_overhead ALIGN(sizeof(struct debug_alloc_header), dah_align)
 
-static u64 debug_alloc_pool_aligned[64*1024/dah_align];	/* 64K pool */
+static u64 debug_alloc_pool_aligned[128*1024/dah_align];	/* 128K pool */
 static char *debug_alloc_pool = (char *)debug_alloc_pool_aligned;
-static u32 dah_first, dah_first_call = 1;
+static u32 dah_first, dah_first_call = 1, dah_used = 0, dah_used_max = 0;
 
 /* Locking is awkward.  The debug code is called from all contexts, including
  * non maskable interrupts.  A normal spinlock is not safe in NMI context.  Try
@@ -1017,18 +1018,23 @@ void
 		h->next = best->next;
 	} else
 		h_offset = best->next;
+	best->caller = __builtin_return_address(0);
+	dah_used += best->size;
+	dah_used_max = max(dah_used, dah_used_max);
 	if (bestprev)
 		bestprev->next = h_offset;
 	else
 		dah_first = h_offset;
 	p = (char *)best + dah_overhead;
+	memset(p, POISON_INUSE, best->size - 1);
+	*((char *)p + best->size - 1) = POISON_END;
 out:
 	spin_unlock(&dap_lock);
 	return p;
 }
 
 void
-debug_kfree(const void *p)
+debug_kfree(void *p)
 {
 	struct debug_alloc_header *h;
 	unsigned int h_offset;
@@ -1044,6 +1050,10 @@ debug_kfree(const void *p)
 		return;		/* memory leak, cannot be helped */
 	}
 	h = (struct debug_alloc_header *)((char *)p - dah_overhead);
+	memset(p, POISON_FREE, h->size - 1);
+	*((char *)p + h->size - 1) = POISON_END;
+	h->caller = NULL;
+	dah_used -= h->size;
 	h_offset = (char *)h - debug_alloc_pool;
 	if (h_offset < dah_first) {
 		h->next = dah_first;
@@ -1061,6 +1071,8 @@ debug_kfree(const void *p)
 		prev_offset = (char *)prev - debug_alloc_pool;
 		if (prev_offset + dah_overhead + prev->size == h_offset) {
 			prev->size += dah_overhead + h->size;
+			memset(h, POISON_FREE, dah_overhead - 1);
+			*((char *)h + dah_overhead - 1) = POISON_END;
 			h = prev;
 			h_offset = prev_offset;
 		} else {
@@ -1074,6 +1086,8 @@ debug_kfree(const void *p)
 			(debug_alloc_pool + h->next);
 		h->size += dah_overhead + next->size;
 		h->next = next->next;
+		memset(next, POISON_FREE, dah_overhead - 1);
+		*((char *)next + dah_overhead - 1) = POISON_END;
 	}
 	spin_unlock(&dap_lock);
 }
@@ -1081,7 +1095,7 @@ debug_kfree(const void *p)
 void
 debug_kusage(void)
 {
-	struct debug_alloc_header *h;
+	struct debug_alloc_header *h_free, *h_used;
 #ifdef	CONFIG_IA64
 	/* FIXME: using dah for ia64 unwind always results in a memory leak.
 	 * Fix that memory leak first, then set debug_kusage_one_time = 1 for
@@ -1095,9 +1109,9 @@ debug_kusage(void)
 		__release(dap_lock);	/* we never actually got it */
 		return;
 	}
-	h = (struct debug_alloc_header *)(debug_alloc_pool + dah_first);
+	h_free = (struct debug_alloc_header *)(debug_alloc_pool + dah_first);
 	if (dah_first == 0 &&
-	    (h->size == sizeof(debug_alloc_pool_aligned) - dah_overhead ||
+	    (h_free->size == sizeof(debug_alloc_pool_aligned) - dah_overhead ||
 	     dah_first_call))
 		goto out;
 	if (!debug_kusage_one_time)
@@ -1105,10 +1119,24 @@ debug_kusage(void)
 	debug_kusage_one_time = 0;
 	kdb_printf("%s: debug_kmalloc memory leak dah_first %d\n",
 		   __FUNCTION__, dah_first);
+	if (dah_first) {
+		h_used = (struct debug_alloc_header *)debug_alloc_pool;
+		kdb_printf("%s: h_used %p size %d\n", __FUNCTION__, h_used, h_used->size);
+	}
 	do {
-		kdb_printf("%s: h %p size %d\n", __FUNCTION__, h, h->size);
-		h = (struct debug_alloc_header *)(debug_alloc_pool + h->next);
-	} while (h->next);
+		h_used = (struct debug_alloc_header *)
+			  ((char *)h_free + dah_overhead + h_free->size);
+		kdb_printf("%s: h_used %p size %d caller %p\n",
+			   __FUNCTION__, h_used, h_used->size, h_used->caller);
+		h_free = (struct debug_alloc_header *)
+			  (debug_alloc_pool + h_free->next);
+	} while (h_free->next);
+	h_used = (struct debug_alloc_header *)
+		  ((char *)h_free + dah_overhead + h_free->size);
+	if ((char *)h_used - debug_alloc_pool !=
+	    sizeof(debug_alloc_pool_aligned))
+		kdb_printf("%s: h_used %p size %d caller %p\n",
+			   __FUNCTION__, h_used, h_used->size, h_used->caller);
 out:
 	spin_unlock(&dap_lock);
 }

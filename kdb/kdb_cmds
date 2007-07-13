@@ -9,7 +9,7 @@
 
 defcmd archkdb "" "First line arch debugging"
   set BTSYMARG 1
-  set BTARGS 5
+  set BTARGS 9
   pid R
   -archkdbcommon
   -bta
@@ -17,7 +17,7 @@ endefcmd
 
 defcmd archkdbcpu "" "archkdb with only tasks on cpus"
   set BTSYMARG 1
-  set BTARGS 5
+  set BTARGS 9
   pid R
   -archkdbcommon
   -btc

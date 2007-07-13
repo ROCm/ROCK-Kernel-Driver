@@ -456,7 +456,7 @@ extern void kdb_runqueue(unsigned long cpu, kdb_printf_t xxx_printf);
 #define GFP_KDB (in_interrupt() ? GFP_ATOMIC : GFP_KERNEL)
 
 extern void *debug_kmalloc(size_t size, gfp_t flags);
-extern void debug_kfree(const void *);
+extern void debug_kfree(void *);
 extern void debug_kusage(void);
 
 extern void kdba_set_current_task(const struct task_struct *);

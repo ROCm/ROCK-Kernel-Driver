@@ -1,3 +1,28 @@
+2007-07-09 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.22-x86_64-1.
+
+2007-07-02 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.22-rc7-x86_64-1.
+
+2007-06-25 Keith Owens  <kaos@sgi.com>
+
+	* Hook into DIE_NMIWATCHDOG.
+	* kdb v4.4-2.6.22-rc5-x86_64-2.
+
+2007-06-20 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.22-rc5-x86_64-1.
+
+2007-06-08 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.22-rc4-x86_64-1.
+
+2007-05-28 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.22-rc3-x86_64-1.
+
 2007-05-22 Keith Owens  <kaos@sgi.com>
 
 	* Register KDBENTER_VECTOR early on the boot cpu.

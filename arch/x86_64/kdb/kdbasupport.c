@@ -869,6 +869,9 @@ static int kdba_entry( struct notifier_block *b, unsigned long val, void *v)
 		case DIE_DEBUG:
 			ret = kdb(KDB_REASON_DEBUG, err, regs);
 			break;
+		case DIE_NMIWATCHDOG:
+			ret = kdb(KDB_REASON_NMI, err, regs);
+			break;
 		case DIE_INT3:
 			 ret = kdb(KDB_REASON_BREAK, err, regs);
 			// falls thru
