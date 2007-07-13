@@ -20,25 +20,32 @@ static unsigned long seed = 152L;
 static int threads = 1;
 static int call_panic;
 static int call_bug;
-static int call_trap;
+static int trap_null, call_null, jump_null;
+static long trap_read, trap_write, call_bad, jump_bad;
 
 module_param(seed, ulong, 0);
-module_param(call_panic, int, 0);
-module_param(call_bug, int, 0);
-module_param(call_trap, int, 0);
+module_param(call_panic, bool, 0);
+module_param(call_bug, bool, 0);
+module_param(trap_null, bool, 0);
+module_param(trap_read, long, 0);
+module_param(trap_write, long, 0);
+module_param(call_null, bool, 0);
+module_param(call_bad, long, 0);
+module_param(jump_null, bool, 0);
+module_param(jump_bad, long, 0);
 module_param(threads, int, 0);
 MODULE_PARM_DESC(seed, "random seed for memory tests");
 MODULE_PARM_DESC(call_panic, "test option. call panic() and render the system unusable.");
 MODULE_PARM_DESC(call_bug, "test option. call BUG() and render the system unusable.");
-MODULE_PARM_DESC(call_trap, "test option. dereference an invalid pointer to simulate a crash and render the system unusable.");
+MODULE_PARM_DESC(trap_null, "test option. dereference a NULL pointer to simulate a crash and render the system unusable.");
+MODULE_PARM_DESC(trap_read, "test option. read from an invalid address to simulate a crash and render the system unusable.");
+MODULE_PARM_DESC(trap_write, "test option. write to an invalid address to simulate a crash and render the system unusable.");
+MODULE_PARM_DESC(call_null, "test option. call a NULL pointer to simulate a crash and render the system unusable.");
+MODULE_PARM_DESC(call_read, "test option. call an invalid address to simulate a crash and render the system unusable.");
+MODULE_PARM_DESC(jump_null, "test option. jump to a NULL pointer to simulate a crash and render the system unusable.");
+MODULE_PARM_DESC(jump_read, "test option. jump to an invalid address to simulate a crash and render the system unusable.");
 MODULE_PARM_DESC(threads, "number of threads to run");
 MODULE_LICENSE("GPL");
-
-#if BITS_PER_LONG == 64
-#define UNMAPPED_MEM_AREA 0xeeeeeeeeeeeeeeeeUL
-#else
-#define UNMAPPED_MEM_AREA 0xeeeeeeeeUL
-#endif
 
 #define NUM_ALLOC 24
 #define NUM_SIZES 8
@@ -147,11 +154,48 @@ static int __init crasher_init(void)
 		BUG_ON(1);
 		return -EFAULT;
 	}
-	if (call_trap) {
-		char *p = (char *)UNMAPPED_MEM_AREA;
-		printk("dereferencing invalid pointer %p.\n", p);
+
+	if (trap_null) {
+		volatile char *p = NULL;
+		printk("dereferencing NULL pointer.\n");
 		p[0] = '\n';
 		return -EFAULT;
+	}
+	if (trap_read) {
+		const volatile char *p = (char *)trap_read;
+		printk("reading from invalid(?) address %p.\n", p);
+		return p[0] ? -EFAULT : -EACCES;
+	}
+	if (trap_write) {
+		volatile char *p = (char *)trap_write;
+		printk("writing to invalid(?) address %p.\n", p);
+		p[0] = ' ';
+		return -EFAULT;
+	}
+
+	if (call_null) {
+		void(*f)(void) = NULL;
+		printk("calling NULL pointer.\n");
+		f();
+		return -EFAULT;
+	}
+	if (call_bad) {
+		void(*f)(void) = (void(*)(void))call_bad;
+		printk("calling invalid(?) address %p.\n", f);
+		f();
+		return -EFAULT;
+	}
+
+	/* These two depend on the compiler doing tail call optimization. */
+	if (jump_null) {
+		int(*f)(void) = NULL;
+		printk("jumping to NULL.\n");
+		return f();
+	}
+	if (jump_bad) {
+		int(*f)(void) = (int(*)(void))jump_bad;
+		printk("jumping to invalid(?) address %p.\n", f);
+		return f();
 	}
 
 	printk("crasher module (%d threads).  Testing sizes: ", threads);
