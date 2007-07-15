@@ -857,7 +857,7 @@ generic_file_splice_write(struct pipe_inode_info *pipe, struct file *out,
 	ssize_t ret;
 	int err;
 
-	err = should_remove_suid(&out->f_path);
+	err = should_remove_suid(out->f_path.dentry);
 	if (unlikely(err)) {
 		mutex_lock(&inode->i_mutex);
 		err = __remove_suid(&out->f_path, err);

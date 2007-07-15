@@ -17,6 +17,7 @@
 #include <linux/namei.h>
 #include <linux/ctype.h>
 #include <linux/sysctl.h>
+#include <linux/audit.h>
 
 #include "apparmor.h"
 #include "inline.h"
@@ -108,11 +109,9 @@ static int apparmor_ptrace(struct task_struct *parent,
 			   struct task_struct *child)
 {
 	struct aa_task_context *cxt;
-	struct aa_task_context *child_cxt;
-	struct aa_profile *child_profile;
 	int error = 0;
 
-	/**
+	/*
 	 * parent can ptrace child when
 	 * - parent is unconfined
 	 * - parent & child are in the same namespace &&
@@ -123,22 +122,32 @@ static int apparmor_ptrace(struct task_struct *parent,
 
 	rcu_read_lock();
 	cxt = aa_task_context(parent);
-	child_cxt = aa_task_context(child);
-	child_profile = child_cxt ? child_cxt->profile : NULL;
-	if (cxt && (parent->nsproxy != child->nsproxy)) {
-		aa_audit_message(NULL, GFP_ATOMIC, "REJECTING ptrace across "
-				 "namespace of %d by %d",
-				 parent->pid, child->pid);
-		error = -EPERM;
-	} else {
-		error = aa_may_ptrace(cxt, child_profile);
-		if (cxt && PROFILE_COMPLAIN(cxt->profile)) {
-			aa_audit_message(cxt->profile, GFP_ATOMIC,
-					 "LOGPROF-HINT ptrace pid=%d child=%d "
-					 "(%d profile %s active %s)",
-					 current->pid, child->pid, current->pid,
-					 cxt->profile->parent->name,
-					 cxt->profile->name);
+	if (cxt) {
+		if (parent->nsproxy != child->nsproxy) {
+			struct aa_audit sa;
+			memset(&sa, 0, sizeof(sa));
+			sa.operation = "ptrace";
+			sa.gfp_mask = GFP_ATOMIC;
+			sa.parent = parent->pid;
+			sa.task = child->pid;
+			sa.info = "different namespaces";
+			aa_audit_reject(cxt->profile, &sa);
+			error = -EPERM;
+		} else {
+			struct aa_task_context *child_cxt =
+				aa_task_context(child);
+
+			error = aa_may_ptrace(cxt, child_cxt ?
+						   child_cxt->profile : NULL);
+			if (PROFILE_COMPLAIN(cxt->profile)) {
+				struct aa_audit sa;
+				memset(&sa, 0, sizeof(sa));
+				sa.operation = "ptrace";
+				sa.gfp_mask = GFP_ATOMIC;
+				sa.parent = parent->pid;
+				sa.task = child->pid;
+				aa_audit_hint(cxt->profile, &sa);
+			}
 		}
 	}
 	rcu_read_unlock();
@@ -189,7 +198,7 @@ static int apparmor_sysctl(struct ctl_table *table, int op)
 		if (name && name - buffer >= 5) {
 			name -= 5;
 			memcpy(name, "/proc", 5);
-			error = aa_perm_path(profile, name, mask);
+			error = aa_perm_path(profile, "sysctl", name, mask);
 		}
 		free_page((unsigned long)buffer);
 	}
@@ -244,7 +253,8 @@ static int apparmor_inode_mkdir(struct inode *dir, struct dentry *dentry,
 	profile = aa_get_profile(current);
 
 	if (profile)
-		error = aa_perm_dir(profile, dentry, mnt, "mkdir", MAY_WRITE);
+		error = aa_perm_dir(profile, "inode_mkdir", dentry, mnt,
+				    MAY_WRITE);
 
 	aa_put_profile(profile);
 
@@ -264,7 +274,8 @@ static int apparmor_inode_rmdir(struct inode *dir, struct dentry *dentry,
 	profile = aa_get_profile(current);
 
 	if (profile)
-		error = aa_perm_dir(profile, dentry, mnt, "rmdir", MAY_WRITE);
+		error = aa_perm_dir(profile, "inode_rmdir", dentry, mnt,
+				    MAY_WRITE);
 
 	aa_put_profile(profile);
 
@@ -272,8 +283,9 @@ out:
 	return error;
 }
 
-static int aa_permission(struct inode *inode, struct dentry *dentry,
-			 struct vfsmount *mnt, int mask, int check)
+static int aa_permission(struct inode *inode, const char *operation,
+			 struct dentry *dentry, struct vfsmount *mnt,
+			 int mask, int check)
 {
 	int error = 0;
 
@@ -282,7 +294,8 @@ static int aa_permission(struct inode *inode, struct dentry *dentry,
 
 		profile = aa_get_profile(current);
 		if (profile)
-			error = aa_perm(profile, dentry, mnt, mask, check);
+			error = aa_perm(profile, operation, dentry, mnt, mask,
+					check);
 		aa_put_profile(profile);
 	}
 	return error;
@@ -291,7 +304,7 @@ static int aa_permission(struct inode *inode, struct dentry *dentry,
 static int apparmor_inode_create(struct inode *dir, struct dentry *dentry,
 				 struct vfsmount *mnt, int mask)
 {
-	return aa_permission(dir, dentry, mnt, MAY_WRITE, 0);
+	return aa_permission(dir, "inode_create", dentry, mnt, MAY_WRITE, 0);
 }
 
 static int apparmor_inode_link(struct dentry *old_dentry,
@@ -324,19 +337,20 @@ static int apparmor_inode_unlink(struct inode *dir, struct dentry *dentry,
 
 	if (S_ISDIR(dentry->d_inode->i_mode))
 		check |= AA_CHECK_DIR;
-	return aa_permission(dir, dentry, mnt, MAY_WRITE, check);
+	return aa_permission(dir, "inode_unlink", dentry, mnt, MAY_WRITE,
+			     check);
 }
 
 static int apparmor_inode_symlink(struct inode *dir, struct dentry *dentry,
 				  struct vfsmount *mnt, const char *old_name)
 {
-	return aa_permission(dir, dentry, mnt, MAY_WRITE, 0);
+	return aa_permission(dir, "inode_symlink", dentry, mnt, MAY_WRITE, 0);
 }
 
 static int apparmor_inode_mknod(struct inode *dir, struct dentry *dentry,
 				struct vfsmount *mnt, int mode, dev_t dev)
 {
-	return aa_permission(dir, dentry, mnt, MAY_WRITE, 0);
+	return aa_permission(dir, "inode_mknod", dentry, mnt, MAY_WRITE, 0);
 }
 
 static int apparmor_inode_rename(struct inode *old_dir,
@@ -361,12 +375,12 @@ static int apparmor_inode_rename(struct inode *old_dir,
 		if (inode && S_ISDIR(inode->i_mode))
 			check |= AA_CHECK_DIR;
 		if (old_mnt)
-			error = aa_perm(profile, old_dentry, old_mnt,
-					MAY_READ | MAY_WRITE, check);
+			error = aa_perm(profile, "inode_rename", old_dentry,
+					old_mnt, MAY_READ | MAY_WRITE, check);
 
 		if (!error && new_mnt) {
-			error = aa_perm(profile, new_dentry, new_mnt,
-					MAY_WRITE, check);
+			error = aa_perm(profile, "inode_rename", new_dentry,
+					new_mnt, MAY_WRITE, check);
 		}
 	}
 
@@ -389,7 +403,8 @@ static int apparmor_inode_permission(struct inode *inode, int mask,
 		/* allow traverse accesses to directories */
 		mask &= ~MAY_EXEC;
 	}
-	return aa_permission(inode, nd->dentry, nd->mnt, mask, check);
+	return aa_permission(inode, "inode_permission", nd->dentry, nd->mnt,
+			     mask, check);
 }
 
 static int apparmor_inode_setattr(struct dentry *dentry, struct vfsmount *mnt,
@@ -429,7 +444,7 @@ static int aa_xattr_permission(struct dentry *dentry, struct vfsmount *mnt,
 		int check = file ? AA_CHECK_FD : 0;
 
 		if (profile)
-			error = aa_perm_xattr(profile, dentry, mnt, operation,
+			error = aa_perm_xattr(profile, operation, dentry, mnt,
 					      mask, check);
 		aa_put_profile(profile);
 	}
@@ -491,7 +506,8 @@ static int apparmor_file_permission(struct file *file, int mask)
 		if (S_ISDIR(inode->i_mode))
 			check |= AA_CHECK_DIR;
 		mask &= (MAY_READ | MAY_WRITE | MAY_EXEC);
-		error = aa_permission(inode, dentry, mnt, mask, check);
+		error = aa_permission(inode, "file_permission", dentry, mnt,
+				      mask, check);
 	}
 	aa_put_profile(profile);
 
@@ -517,8 +533,8 @@ static void apparmor_file_free_security(struct file *file)
 	aa_put_profile(file_profile);
 }
 
-static inline int aa_mmap(struct file *file, unsigned long prot,
-			  unsigned long flags)
+static inline int aa_mmap(struct file *file, const char *operation,
+			  unsigned long prot, unsigned long flags)
 {
 	struct dentry *dentry;
 	int mask = 0;
@@ -536,20 +552,20 @@ static inline int aa_mmap(struct file *file, unsigned long prot,
 		mask |= AA_EXEC_MMAP;
 
 	dentry = file->f_dentry;
-	return aa_permission(dentry->d_inode, dentry, file->f_vfsmnt, mask,
-			     AA_CHECK_FD);
+	return aa_permission(dentry->d_inode, operation, dentry,
+			     file->f_vfsmnt, mask, AA_CHECK_FD);
 }
 
 static int apparmor_file_mmap(struct file *file, unsigned long reqprot,
 			       unsigned long prot, unsigned long flags)
 {
-	return aa_mmap(file, prot, flags);
+	return aa_mmap(file, "file_mmap", prot, flags);
 }
 
 static int apparmor_file_mprotect(struct vm_area_struct *vma,
 				  unsigned long reqprot, unsigned long prot)
 {
-	return aa_mmap(vma->vm_file, prot,
+	return aa_mmap(vma->vm_file, "file_mprotect", prot,
 		       !(vma->vm_flags & VM_SHARED) ? MAP_PRIVATE : 0);
 }
 
@@ -613,7 +629,11 @@ static int apparmor_setprocattr(struct task_struct *task, char *name,
 		if (current != task)
 			return -EACCES;
 		error = aa_setprocattr_changehat(args);
-	} else if (strcmp(command, "setprofile")) {
+	} else if (strcmp(command, "changeprofile") == 0) {
+		if (current != task)
+			return -EACCES;
+		error = aa_setprocattr_changeprofile(args);
+	} else if (strcmp(command, "setprofile") == 0) {
 		struct aa_profile *profile;
 
 		/* Only an unconfined process with admin capabilities
@@ -625,24 +645,27 @@ static int apparmor_setprocattr(struct task_struct *task, char *name,
 
 		profile = aa_get_profile(current);
 		if (profile) {
+			struct aa_audit sa;
+			memset(&sa, 0, sizeof(sa));
+			sa.operation = "profile_set";
+			sa.gfp_mask = GFP_KERNEL;
+			sa.task = task->pid;
+			sa.info = "from confined process";
+			aa_audit_reject(profile, &sa);
 			aa_put_profile(profile);
-			aa_audit_message(NULL, GFP_KERNEL, "Attempt by "
-					 "confined task %d [user %d] to "
-					 "assign profile to task %d",
-					 current->pid, current->uid,
-					 task->pid);
 			return -EACCES;
 		}
 		error = aa_setprocattr_setprofile(task, args);
 	} else {
-		AA_ERROR("Unknown setprocattr command '%.*s' "
-			"by task %d [user %d] for task %d",
-			size < 16 ? (int)size : 16,
-			command,
-			current->pid,
-			current->uid,
-			task->pid);
-		error = -EINVAL;
+		struct aa_audit sa;
+		memset(&sa, 0, sizeof(sa));
+		sa.operation = "setprocattr";
+		sa.gfp_mask = GFP_KERNEL;
+		sa.info = "invalid command";
+		sa.name = command;
+		sa.task = task->pid;
+		aa_audit_reject(NULL, &sa);
+		return -EINVAL;
 	}
 
 	if (!error)
@@ -700,8 +723,12 @@ struct security_operations apparmor_ops = {
 
 static void info_message(const char *str)
 {
+	struct aa_audit sa;
+	memset(&sa, 0, sizeof(sa));
+	sa.gfp_mask = GFP_KERNEL;
+	sa.info = str;
 	printk(KERN_INFO "AppArmor: %s", str);
-	aa_audit_message(NULL, GFP_KERNEL, "%s", str);
+	aa_audit_message(NULL, &sa, AUDIT_APPARMOR_STATUS);
 }
 
 static int __init apparmor_init(void)
@@ -719,7 +746,7 @@ static int __init apparmor_init(void)
 	}
 
 	if ((error = register_security(&apparmor_ops))) {
-		AA_ERROR("Unable to load AppArmor\n");
+		AA_ERROR("Unable to register AppArmor\n");
 		goto register_security_out;
 	}
 
@@ -766,7 +793,7 @@ static void __exit apparmor_exit(void)
 
 	free_null_complain_profile();
 
-	/**
+	/*
 	 * Delay for an rcu cycle to make sure that all active task
 	 * context readers have finished, and all profiles have been
 	 * freed by their rcu callbacks.

@@ -927,10 +927,12 @@ static int ecryptfs_setattr(struct dentry *dentry, struct iattr *ia)
 		crypt_stat->flags &= ~(ECRYPTFS_ENCRYPTED);
 	else if (!(crypt_stat->flags & ECRYPTFS_POLICY_APPLIED)
 		 || !(crypt_stat->flags & ECRYPTFS_KEY_VALID)) {
+		struct vfsmount *lower_mnt;
 		struct file *lower_file = NULL;
 		struct ecryptfs_mount_crypt_stat *mount_crypt_stat;
 		int lower_flags;
 
+		lower_mnt = ecryptfs_dentry_to_lower_mnt(dentry);
 		lower_flags = O_RDONLY;
 		if ((rc = ecryptfs_open_lower_file(&lower_file, lower_dentry,
 						   lower_mnt, lower_flags))) {

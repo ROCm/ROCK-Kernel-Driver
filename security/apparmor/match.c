@@ -12,6 +12,7 @@
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/errno.h>
+#include "apparmor.h"
 #include "match.h"
 
 static struct table_header *unpack_table(void *blob, size_t bsize)
@@ -168,6 +169,21 @@ int verify_dfa(struct aa_dfa *dfa)
 			goto out;
 		if (CHECK_TABLE(dfa)[i] >= state_count)
 			goto out;
+	}
+
+	/* verify accept permissions */
+	for (i = 0; i < state_count; i++) {
+		int mode = ACCEPT_TABLE(dfa)[i];
+
+		if (mode & ~AA_VALID_PERM_MASK)
+			goto out;
+
+		/* if MAY_EXEC, exactly one exec modifier must be set */
+		if (mode & MAY_EXEC) {
+			mode &= AA_EXEC_MODIFIERS;
+			if (mode & (mode - 1))
+				goto out;
+		}
 	}
 
 	error = 0;

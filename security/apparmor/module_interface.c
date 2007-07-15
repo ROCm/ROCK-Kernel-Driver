@@ -241,11 +241,13 @@ struct aa_dfa *aa_unpack_dfa(struct aa_ext *e)
 /**
  * aa_unpack_profile - unpack a serialized profile
  * @e: serialized data extent information
- * @error: error code returned if unpacking fails
+ * @operation: operation profile is being unpacked for
  */
-static struct aa_profile *aa_unpack_profile(struct aa_ext *e, int depth)
+static struct aa_profile *aa_unpack_profile(struct aa_ext *e,
+					    const char *operation)
 {
 	struct aa_profile *profile = NULL;
+	struct aa_audit sa;
 
 	int error = -EPROTO;
 
@@ -282,30 +284,18 @@ static struct aa_profile *aa_unpack_profile(struct aa_ext *e, int depth)
 		goto fail;
 	}
 
-	/* get optional subprofiles */
-	if (aa_is_nameX(e, AA_LIST, "hats")) {
-		if (depth > 0)
-			goto fail;
-		while (!aa_is_nameX(e, AA_LISTEND, NULL)) {
-			struct aa_profile *subprofile;
-			subprofile = aa_unpack_profile(e, depth + 1);
-			if (IS_ERR(subprofile)) {
-				error = PTR_ERR(subprofile);
-				goto fail;
-			}
-			subprofile->parent = profile;
-			list_add(&subprofile->list, &profile->sub);
-		}
-	}
-
 	if (!aa_is_nameX(e, AA_STRUCTEND, NULL))
 		goto fail;
 
 	return profile;
 
 fail:
-	aa_audit_message(NULL, GFP_KERNEL, "Invalid profile %s",
-			 profile && profile->name ? profile->name : "unknown");
+	memset(&sa, 0, sizeof(sa));
+	sa.operation = operation;
+	sa.gfp_mask = GFP_KERNEL;
+	sa.name = profile && profile->name ? profile->name : "unknown";
+	sa.info = "failed to unpack profile";
+	aa_audit_status(NULL, &sa);
 
 	if (profile)
 		free_aa_profile(profile);
@@ -314,45 +304,33 @@ fail:
 }
 
 /**
- * aa_unpack_profile_wrapper - unpack a serialized base profile
- * @e: serialized data extent information
- *
- * check interface version unpack a profile and all its hats and patch
- * in any extra information that the profile needs.
- */
-static struct aa_profile *aa_unpack_profile_wrapper(struct aa_ext *e)
-{
-	struct aa_profile *profile = aa_unpack_profile(e, 0);
-	if (!IS_ERR(profile) &&
-	    (!list_empty(&profile->sub) || profile->flags.complain)) {
-		int error;
-		if ((error = attach_nullprofile(profile))) {
-			aa_put_profile(profile);
-			return ERR_PTR(error);
-		}
-	}
-
-	return profile;
-}
-
-/**
  * aa_verify_head - unpack serialized stream header
  * @e: serialized data read head
+ * @operation: operation header is being verified for
  *
  * returns error or 0 if header is good
  */
-static int aa_verify_header(struct aa_ext *e)
+static int aa_verify_header(struct aa_ext *e, const char *operation)
 {
 	/* get the interface version */
 	if (!aa_is_u32(e, &e->version, "version")) {
-		aa_audit_message(NULL, GFP_KERNEL, "Interface version missing");
+		struct aa_audit sa;
+		memset(&sa, 0, sizeof(sa));
+		sa.operation = operation;
+		sa.gfp_mask = GFP_KERNEL;
+		sa.info = "invalid profile format";
+		aa_audit_status(NULL, &sa);
 		return -EPROTONOSUPPORT;
 	}
 
 	/* check that the interface version is currently supported */
 	if (e->version != 3) {
-		aa_audit_message(NULL, GFP_KERNEL, "Unsupported interface "
-				 "version (%d)", e->version);
+		struct aa_audit sa;
+		memset(&sa, 0, sizeof(sa));
+		sa.operation = operation;
+		sa.gfp_mask = GFP_KERNEL;
+		sa.info = "unsupported interface version";
+		aa_audit_status(NULL, &sa);
 		return -EPROTONOSUPPORT;
 	}
 	return 0;
@@ -371,11 +349,11 @@ ssize_t aa_add_profile(void *data, size_t size)
 		.end = data + size,
 		.pos = data
 	};
-	ssize_t error = aa_verify_header(&e);
+	ssize_t error = aa_verify_header(&e, "profile_load");
 	if (error)
 		return error;
 
-	profile = aa_unpack_profile_wrapper(&e);
+	profile = aa_unpack_profile(&e, "profile_load");
 	if (IS_ERR(profile))
 		return PTR_ERR(profile);
 
@@ -408,29 +386,13 @@ static inline void task_replace(struct task_struct *task,
 	struct aa_task_context *cxt = aa_task_context(task);
 
 	AA_DEBUG("%s: replacing profile for task %d "
-		 "profile=%s (%p) hat=%s (%p)\n",
+		 "profile=%s (%p)\n",
 		 __FUNCTION__,
 		 cxt->task->pid,
-		 cxt->profile->parent->name, cxt->profile->parent,
 		 cxt->profile->name, cxt->profile);
 
-	if (cxt->profile != cxt->profile->parent) {
-		struct aa_profile *hat;
-
-		/*
-		 * The old profile was in a hat, check to see if the new
-		 * profile has an equivalent hat.
-		 */
-		hat = __aa_find_profile(cxt->profile->name, &new_profile->sub);
-
-		if (!hat)
-			hat = aa_dup_profile(new_profile->null_profile);
-
-		aa_change_task_context(task, new_cxt, hat, cxt->hat_magic);
-		aa_put_profile(hat);
-	} else
-		aa_change_task_context(task, new_cxt, new_profile,
-				       cxt->hat_magic);
+	aa_change_task_context(task, new_cxt, new_profile, cxt->cookie,
+			       cxt->previous_profile);
 }
 
 /**
@@ -451,11 +413,11 @@ ssize_t aa_replace_profile(void *udata, size_t size)
 		.end = udata + size,
 		.pos = udata
 	};
-	ssize_t error = aa_verify_header(&e);
+	ssize_t error = aa_verify_header(&e, "profile_replace");
 	if (error)
 		return error;
 
-	new_profile = aa_unpack_profile_wrapper(&e);
+	new_profile = aa_unpack_profile(&e, "profile_replace");
 	if (IS_ERR(new_profile))
 		return PTR_ERR(new_profile);
 
@@ -564,9 +526,7 @@ struct aa_profile *alloc_aa_profile(void)
 	profile = kzalloc(sizeof(*profile), GFP_KERNEL);
 	AA_DEBUG("%s(%p)\n", __FUNCTION__, profile);
 	if (profile) {
-		profile->parent = profile;
 		INIT_LIST_HEAD(&profile->list);
-		INIT_LIST_HEAD(&profile->sub);
 		kref_init(&profile->count);
 		INIT_LIST_HEAD(&profile->task_contexts);
 		spin_lock_init(&profile->lock);
@@ -586,8 +546,6 @@ struct aa_profile *alloc_aa_profile(void)
  */
 void free_aa_profile(struct aa_profile *profile)
 {
-	struct aa_profile *p, *ptmp;
-
 	AA_DEBUG("%s(%p)\n", __FUNCTION__, profile);
 
 	if (!profile)
@@ -603,18 +561,6 @@ void free_aa_profile(struct aa_profile *profile)
 	}
 
 	aa_match_free(profile->file_rules);
-
-	/*
-	 * Use free_aa_profile instead of aa_put_profile to destroy the
-	 * null_profile, because the null_profile use the same reference
-	 * counting as hats, ie. the count goes to the base profile.
-	 */
-	free_aa_profile(profile->null_profile);
-	list_for_each_entry_safe(p, ptmp, &profile->sub, list) {
-		list_del_init(&p->list);
-		p->parent = p;
-		aa_put_profile(p);
-	}
 
 	if (profile->name) {
 		AA_DEBUG("%s: %s\n", __FUNCTION__, profile->name);
@@ -637,7 +583,7 @@ void aa_unconfine_tasks(struct aa_profile *profile)
 			list_entry(profile->task_contexts.next,
 				   struct aa_task_context, list)->task;
 		task_lock(task);
-		aa_change_task_context(task, NULL, NULL, 0);
+		aa_change_task_context(task, NULL, NULL, 0, NULL);
 		task_unlock(task);
 	}
 }

@@ -198,7 +198,6 @@ int do_truncate(struct dentry *dentry, struct vfsmount *mnt, loff_t length,
 {
 	int err;
 	struct iattr newattrs;
-	struct path path = { .mnt = mnt, .dentry = dentry };
 
 	/* Not pretty: "inode->i_size" shouldn't really be signed. But it is. */
 	if (length < 0)
@@ -212,7 +211,7 @@ int do_truncate(struct dentry *dentry, struct vfsmount *mnt, loff_t length,
 	}
 
 	/* Remove suid/sgid on truncate too */
-	newattrs.ia_valid |= should_remove_suid(&path);
+	newattrs.ia_valid |= should_remove_suid(dentry);
 
 	mutex_lock(&dentry->d_inode->i_mutex);
 	err = notify_change(dentry, mnt, &newattrs);

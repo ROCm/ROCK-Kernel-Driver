@@ -51,9 +51,18 @@ list, and can sleep. This ensures that profile loading/replacement/removal
 won't race with itself. We release the profile_list_lock as soon as
 possible to avoid stalling exec during profile loading/replacement/removal.
 
-lock_dep reports a false 'possible irq lock inversion dependency detected'
-when the profile lock is taken in aa_release.  This is due to that the
-task_lock is often taken inside the profile lock but other kernel code
-takes the task_lock with interrupts enabled.  A deadlock will not actually
-occur because apparmor does not take the task_lock in hard_irq or soft_irq
-context.
+AppArmor uses lock subtyping to avoid false positives from lockdep.  The
+profile lock is often taken nested, but it is guaranteed to be in a lock
+safe order and not the same lock when done, so it is safe.
+
+A third lock type (aa_lock_task_release) is given to the profile lock
+when it is taken in soft irq context during task release (aa_release).
+This is to avoid a false positive between the task lock and the profile
+lock.  In task context the profile lock wraps the task lock with irqs
+off, but the kernel takes the task lock with irqs enabled.  This won't
+result in a deadlock because for a deadlock to occur the kernel must
+take dead task A's lock (irqs on), the rcu callback hook freeing
+dead task A must be run and AppArmor must be changing the profile on
+dead task A.  The kernel should not be taking a dead task's task_lock
+at the same time the task is being freed by task rcu cleanup other wise
+the task would not be out of its quiescent period.

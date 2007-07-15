@@ -1882,9 +1882,9 @@ repeat:
  *	if suid or (sgid and xgrp)
  *		remove privs
  */
-int should_remove_suid(struct path *path)
+int should_remove_suid(struct dentry *dentry)
 {
-	mode_t mode = path->dentry->d_inode->i_mode;
+	mode_t mode = dentry->d_inode->i_mode;
 	int kill = 0;
 
 	/* suid always must be killed */
@@ -1915,7 +1915,7 @@ int __remove_suid(struct path *path, int kill)
 
 int remove_suid(struct path *path)
 {
-	int kill = should_remove_suid(path);
+	int kill = should_remove_suid(path->dentry);
 
 	if (unlikely(kill))
 		return __remove_suid(path, kill);

@@ -29,7 +29,7 @@ static inline struct aa_task_context *aa_task_context(struct task_struct *task)
 static inline struct aa_profile *aa_dup_profile(struct aa_profile *p)
 {
 	if (p)
-		kref_get(&(p->parent->count));
+		kref_get(&(p->count));
 
 	return p;
 }
@@ -41,7 +41,7 @@ static inline struct aa_profile *aa_dup_profile(struct aa_profile *p)
 static inline void aa_put_profile(struct aa_profile *p)
 {
 	if (p)
-		kref_put(&p->parent->count, free_aa_profile_kref);
+		kref_put(&p->count, free_aa_profile_kref);
 }
 
 static inline struct aa_profile *aa_get_profile(struct task_struct *task)
@@ -88,6 +88,7 @@ static inline void aa_free_task_context(struct aa_task_context *cxt)
 {
 	if (cxt) {
 		aa_put_profile(cxt->profile);
+		aa_put_profile(cxt->previous_profile);
 		kfree(cxt);
 	}
 }
@@ -99,12 +100,9 @@ static inline void aa_free_task_context(struct aa_task_context *cxt)
  * While the profile is locked, local interrupts are disabled. This also
  * gives us RCU reader safety.
  */
-static inline void lock_profile(struct aa_profile *profile)
+static inline void lock_profile_nested(struct aa_profile *profile,
+				       enum aa_lock_class lock_class)
 {
-	/* We always lock top-level profiles instead of children. */
-	if (profile)
-		profile = profile->parent;
-
 	/*
 	 * Lock the profile.
 	 *
@@ -112,7 +110,13 @@ static inline void lock_profile(struct aa_profile *profile)
 	 * the task_free_security hook, which may run in RCU context.
 	 */
 	if (profile)
-		spin_lock_irqsave(&profile->lock, profile->int_flags);
+		spin_lock_irqsave_nested(&profile->lock, profile->int_flags,
+					 lock_class);
+}
+
+static inline void lock_profile(struct aa_profile *profile)
+{
+	lock_profile_nested(profile, aa_lock_normal);
 }
 
 /**
@@ -121,10 +125,6 @@ static inline void lock_profile(struct aa_profile *profile)
  */
 static inline void unlock_profile(struct aa_profile *profile)
 {
-	/* We always lock top-level profiles instead of children. */
-	if (profile)
-		profile = profile->parent;
-
 	/* Unlock the profile. */
 	if (profile)
 		spin_unlock_irqrestore(&profile->lock, profile->int_flags);
@@ -143,12 +143,6 @@ static inline void unlock_profile(struct aa_profile *profile)
 static inline void lock_both_profiles(struct aa_profile *profile1,
 				      struct aa_profile *profile2)
 {
-	/* We always lock top-level profiles instead of children. */
-	if (profile1)
-		profile1 = profile1->parent;
-	if (profile2)
-		profile2 = profile2->parent;
-
 	/*
 	 * Lock the two profiles.
 	 *
@@ -161,17 +155,21 @@ static inline void lock_both_profiles(struct aa_profile *profile1,
 	 */
 	if (!profile1 || profile1 == profile2) {
 		if (profile2)
-			spin_lock_irqsave(&profile2->lock, profile2->int_flags);
+			spin_lock_irqsave_nested(&profile2->lock,
+						 profile2->int_flags,
+						 aa_lock_normal);
 	} else if (profile1 > profile2) {
 		/* profile1 cannot be NULL here. */
-		spin_lock_irqsave(&profile1->lock, profile1->int_flags);
+		spin_lock_irqsave_nested(&profile1->lock, profile1->int_flags,
+					 aa_lock_normal);
 		if (profile2)
-			spin_lock(&profile2->lock);
+			spin_lock_nested(&profile2->lock, aa_lock_nested);
 
 	} else {
 		/* profile2 cannot be NULL here. */
-		spin_lock_irqsave(&profile2->lock, profile2->int_flags);
-		spin_lock(&profile1->lock);
+		spin_lock_irqsave_nested(&profile2->lock, profile2->int_flags,
+					 aa_lock_normal);
+		spin_lock_nested(&profile1->lock, aa_lock_nested);
 	}
 }
 
@@ -188,12 +186,6 @@ static inline void lock_both_profiles(struct aa_profile *profile1,
 static inline void unlock_both_profiles(struct aa_profile *profile1,
 				        struct aa_profile *profile2)
 {
-	/* We always lock top-level profiles instead of children. */
-	if (profile1)
-		profile1 = profile1->parent;
-	if (profile2)
-		profile2 = profile2->parent;
-
 	/* Unlock the two profiles. */
 	if (!profile1 || profile1 == profile2) {
 		if (profile2)

@@ -1729,7 +1729,7 @@ extern void clear_inode(struct inode *);
 extern void destroy_inode(struct inode *);
 extern struct inode *new_inode(struct super_block *);
 extern int __remove_suid(struct path *, int);
-extern int should_remove_suid(struct path *);
+extern int should_remove_suid(struct dentry *);
 extern int remove_suid(struct path *);
 
 extern void __insert_inode_hash(struct inode *, unsigned long hashval);

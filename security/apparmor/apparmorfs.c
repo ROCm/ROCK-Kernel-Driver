@@ -20,7 +20,7 @@
 
 static char *aa_simple_write_to_buffer(const char __user *userbuf,
 				       size_t alloc_size, size_t copy_size,
-				       loff_t *pos, const char *msg)
+				       loff_t *pos, const char *operation)
 {
 	struct aa_profile *profile;
 	char *data;
@@ -38,13 +38,13 @@ static char *aa_simple_write_to_buffer(const char __user *userbuf,
 	 */
 	profile = aa_get_profile(current);
 	if (profile) {
-		aa_audit_message(NULL, GFP_KERNEL, "REJECTING access to "
-				 "profile %s (%d profile %s active %s)",
-				 msg, current->pid, profile->parent->name,
-				 profile->name);
+		struct aa_audit sa;
+		memset(&sa, 0, sizeof(sa));
+		sa.operation = operation;
+		sa.gfp_mask = GFP_KERNEL;
+		sa.error_code = -EACCES;
+		data = ERR_PTR(aa_audit_reject(profile, &sa));
 		aa_put_profile(profile);
-
-		data = ERR_PTR(-EPERM);
 		goto out;
 	}
 
@@ -106,7 +106,7 @@ static ssize_t aa_profile_load(struct file *f, const char __user *buf,
 	char *data;
 	ssize_t error;
 
-	data = aa_simple_write_to_buffer(buf, size, size, pos, "load");
+	data = aa_simple_write_to_buffer(buf, size, size, pos, "profile_load");
 
 	error = PTR_ERR(data);
 	if (!IS_ERR(data)) {
@@ -129,7 +129,8 @@ static ssize_t aa_profile_replace(struct file *f, const char __user *buf,
 	char *data;
 	ssize_t error;
 
-	data = aa_simple_write_to_buffer(buf, size, size, pos, "replacement");
+	data = aa_simple_write_to_buffer(buf, size, size, pos,
+					 "profile_replace");
 
 	error = PTR_ERR(data);
 	if (!IS_ERR(data)) {
@@ -156,7 +157,8 @@ static ssize_t aa_profile_remove(struct file *f, const char __user *buf,
 	 * aa_remove_profile needs a null terminated string so 1 extra
 	 * byte is allocated and the copied data is null terminated.
 	 */
-	data = aa_simple_write_to_buffer(buf, size + 1, size, pos, "removal");
+	data = aa_simple_write_to_buffer(buf, size + 1, size, pos,
+					 "profile_remove");
 
 	error = PTR_ERR(data);
 	if (!IS_ERR(data)) {

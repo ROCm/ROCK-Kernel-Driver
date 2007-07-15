@@ -1159,14 +1159,14 @@ out:
 	return ret;
 }
 
-static int ocfs2_prepare_inode_for_write(struct path *path,
+static int ocfs2_prepare_inode_for_write(struct dentry *dentry,
 					 loff_t *ppos,
 					 size_t count,
 					 int appending,
 					 int *direct_io)
 {
 	int ret = 0, meta_level = appending;
-	struct inode *inode = path->dentry->d_inode;
+	struct inode *inode = dentry->d_inode;
 	u32 clusters;
 	loff_t newsize, saved_pos;
 
@@ -1192,7 +1192,7 @@ static int ocfs2_prepare_inode_for_write(struct path *path,
 		 * inode. There's also the dinode i_size state which
 		 * can be lost via setattr during extending writes (we
 		 * set inode->i_size at the end of a write. */
-		if (should_remove_suid(path)) {
+		if (should_remove_suid(dentry)) {
 			if (meta_level == 0) {
 				ocfs2_meta_unlock(inode, meta_level);
 				meta_level = 1;
@@ -1470,7 +1470,7 @@ relock:
 	}
 
 	can_do_direct = direct_io;
-	ret = ocfs2_prepare_inode_for_write(&file->f_path, ppos,
+	ret = ocfs2_prepare_inode_for_write(file->f_path.dentry, ppos,
 					    iocb->ki_left, appending,
 					    &can_do_direct);
 	if (ret < 0) {
@@ -1675,7 +1675,7 @@ static ssize_t ocfs2_file_splice_write(struct pipe_inode_info *pipe,
 		goto out;
 	}
 
-	ret = ocfs2_prepare_inode_for_write(&out->f_path, ppos, len, 0,
+	ret = ocfs2_prepare_inode_for_write(out->f_path.dentry, ppos, len, 0,
 					    NULL);
 	if (ret < 0) {
 		mlog_errno(ret);
