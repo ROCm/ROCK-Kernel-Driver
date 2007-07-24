@@ -262,6 +262,18 @@ config DM_MULTIPATH_EMC
 	---help---
 	  Multipath support for EMC CX/AX series hardware.
 
+config DM_MULTIPATH_RDAC
+	tristate "LSI/Engenio RDAC multipath support (EXPERIMENTAL)"
+	depends on DM_MULTIPATH && BLK_DEV_DM && EXPERIMENTAL
+	---help---
+	  Multipath support for LSI/Engenio RDAC.
+
+config DM_MULTIPATH_HP_SW
+	tristate "HP StorageWorks and FSC FibreCat support"
+	depends on DM_MULTIPATH && BLK_DEV_DM && EXPERIMENTAL
+	---help---
+	  HP StorageWorks and FSC FibreCat support for dm-multipath.
+
 config DM_DELAY
 	tristate "I/O delaying target (EXPERIMENTAL)"
 	depends on BLK_DEV_DM && EXPERIMENTAL
