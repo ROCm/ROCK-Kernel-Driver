@@ -1788,8 +1788,11 @@ qeth_driver_group_store(struct device_driver *ddrv, const char *buf,
 		static const char delim[] = { ',', ',', '\n' };
 		int len;
 
-		if (!(end = strchr(start, delim[i])))
-			return -EINVAL;
+		if (!(end = strchr(start, delim[i]))) {
+			if (i != 2)
+				return -EINVAL;
+			end = buf + count;
+		}
 		len = min_t(ptrdiff_t, BUS_ID_SIZE, end - start);
 		strncpy(bus_ids[i], start, len);
 		bus_ids[i][len] = '\0';

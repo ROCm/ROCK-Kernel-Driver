@@ -592,6 +592,15 @@ static inline int add_probe_files(struct bus_type *bus) { return 0; }
 static inline void remove_probe_files(struct bus_type *bus) {}
 #endif
 
+static ssize_t store_uevent(struct device_driver *drv,
+			    const char *buf, size_t count)
+{
+	if ((count == 3 || count == 4) && strncmp(buf, "add", 3) == 0)
+		kobject_uevent(&drv->kobj, KOBJ_ADD);
+	return count;
+}
+static DRIVER_ATTR(uevent, S_IWUSR, NULL, store_uevent);
+
 /**
  *	bus_add_driver - Add a driver to the bus.
  *	@drv:	driver.
@@ -621,6 +630,11 @@ int bus_add_driver(struct device_driver *drv)
 	klist_add_tail(&drv->knode_bus, &bus->klist_drivers);
 	module_add_driver(drv->owner, drv);
 
+	error = driver_create_file(drv, &driver_attr_uevent);
+	if (error) {
+		printk(KERN_ERR "%s: uevent attr (%s) failed\n",
+			__FUNCTION__, drv->name);
+	}
 	error = driver_add_attrs(bus, drv);
 	if (error) {
 		/* How the hell do we get out of this pickle? Give up */
@@ -658,6 +672,7 @@ void bus_remove_driver(struct device_driver * drv)
 
 	remove_bind_files(drv);
 	driver_remove_attrs(drv->bus, drv);
+	driver_remove_file(drv, &driver_attr_uevent);
 	klist_remove(&drv->knode_bus);
 	pr_debug("bus %s: remove driver %s\n", drv->bus->name, drv->name);
 	driver_detach(drv);

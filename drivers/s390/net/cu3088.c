@@ -76,8 +76,11 @@ group_write(struct device_driver *drv, const char *buf, size_t count)
 		static const char delim[] = {',', '\n'};
 		int len;
 
-		if (!(end = strchr(start, delim[i])))
-			return -EINVAL;
+		if (!(end = strchr(start, delim[i]))) {
+			if (i != 1)
+				return -EINVAL;
+			end = buf + count;
+		}
 		len = min_t(ptrdiff_t, BUS_ID_SIZE, end - start + 1);
 		strlcpy (bus_ids[i], start, len);
 		argv[i] = bus_ids[i];
