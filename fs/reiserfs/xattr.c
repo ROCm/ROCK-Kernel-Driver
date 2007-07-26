@@ -275,6 +275,7 @@ reiserfs_xattr_set_handle(struct reiserfs_transaction_handle *th,
 			inode->i_ctime = CURRENT_TIME_SEC;
 			mark_inode_dirty(inode);
 		}
+		dput(dentry);
 		return err;
 	}
 
