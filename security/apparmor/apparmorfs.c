@@ -89,7 +89,7 @@ static struct file_operations apparmorfs_profiles_fops = {
 static ssize_t aa_matching_read(struct file *file, char __user *buf,
 			       size_t size, loff_t *ppos)
 {
-	const char *matching = "pattern=aadfa";
+	const char *matching = "pattern=aadfa perms=rwxamlz";
 
 	return simple_read_from_buffer(buf, size, ppos, matching,
 				       strlen(matching));

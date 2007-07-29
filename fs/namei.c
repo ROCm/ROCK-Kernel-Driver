@@ -297,7 +297,7 @@ int vfs_permission(struct nameidata *nd, int mask)
 int file_permission(struct file *file, int mask)
 {
 	struct nameidata nd;
-	
+
 	nd.dentry = file->f_path.dentry;
 	nd.mnt = file->f_path.mnt;
 	nd.flags = LOOKUP_ACCESS;

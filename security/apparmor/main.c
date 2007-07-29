@@ -14,6 +14,9 @@
 #include <linux/audit.h>
 #include <linux/mount.h>
 #include <linux/ptrace.h>
+#include <linux/socket.h>
+#include <linux/net.h>
+#include <net/sock.h>
 
 #include "apparmor.h"
 
@@ -76,20 +79,21 @@ static int aa_link_denied(struct aa_profile *profile, const char *link,
 	*request_mask = l_mode | AA_MAY_LINK;
 
 	/* Link always requires 'l' on the link, a subset of the
-	 * target's 'r', 'w', 'x', and 'm' permissions on the link, and
-	 * if the link has 'x', an exact match of all the execute flags
+	 * target's 'r', 'w', 'x', 'a', 'z', and 'm' permissions on the link,
+	 * and if the link has 'x', an exact match of all the execute flags
 	 * ('i', 'u', 'U', 'p', 'P').
 	 */
-#define RWXM (MAY_READ | MAY_WRITE | MAY_EXEC | AA_EXEC_MMAP)
+#define RWXAZM (MAY_READ | MAY_WRITE | MAY_EXEC | MAY_APPEND | AA_MAY_LOCK | \
+		AA_EXEC_MMAP)
 	denied_mask = ~l_mode & AA_MAY_LINK;
-	if (l_mode & RWXM)
+	if (l_mode & RWXAZM)
 		denied_mask |= (l_mode & ~ AA_MAY_LINK) & ~t_mode;
 	else
 		denied_mask |= t_mode | AA_MAY_LINK;
 	if (denied_mask & AA_EXEC_MODIFIERS)
 		denied_mask |= MAY_EXEC;
 
-#undef RWXM
+#undef RWXAZM
 
 	return denied_mask;
 }
@@ -252,6 +256,8 @@ static void aa_audit_file_mask(struct audit_buffer *ab, const char *name,
 		*m++ = 'r';
 	if (mask & MAY_WRITE)
 		*m++ = 'w';
+	else if (mask & MAY_APPEND)
+		*m++ = 'a';
 	if (mask & (MAY_EXEC | AA_EXEC_MODIFIERS)) {
 		if (mask & AA_EXEC_UNSAFE) {
 			if (mask & AA_EXEC_INHERIT)
@@ -273,10 +279,30 @@ static void aa_audit_file_mask(struct audit_buffer *ab, const char *name,
 	}
 	if (mask & AA_MAY_LINK)
 		*m++ = 'l';
+	if (mask & AA_MAY_LOCK)
+		*m++ = 'k';
 	*m++ = '\0';
 
 	audit_log_format(ab, " %s=\"%s\"", name, mask_str);
 }
+
+static const char *address_families[] = {
+#include "af_names.h"
+};
+
+static const char *sock_types[] = {
+	"unknown(0)",
+	"stream",
+	"dgram",
+	"raw",
+	"rdm",
+	"seqpacket",
+	"dccp",
+	"unknown(7)",
+	"unknown(8)",
+	"unknown(9)",
+	"packet",
+};
 
 /**
  * aa_audit - Log an audit event to the audit subsystem
@@ -341,6 +367,24 @@ static int aa_audit_base(struct aa_profile *profile, struct aa_audit *sa,
 	if (sa->name2) {
 		audit_log_format(ab, " name2=");
 		audit_log_untrustedstring(ab, sa->name2);
+	}
+
+	if (sa->family || sa->type) {
+		if (address_families[sa->family])
+			audit_log_format(ab, " family=\"%s\"",
+					 address_families[sa->family]);
+		else
+			audit_log_format(ab, " family=\"unknown(%d)\"",
+					 sa->family);
+
+		if (sock_types[sa->type])
+			audit_log_format(ab, " sock_type=\"%s\"",
+					 sock_types[sa->type]);
+		else
+			audit_log_format(ab, " sock_type=\"unknown(%d)\"",
+					 sa->type);
+
+		audit_log_format(ab, " protocol=%d", sa->protocol);
 	}
 
 	audit_log_format(ab, " pid=%d", current->pid);
@@ -655,6 +699,63 @@ int aa_link(struct aa_profile *profile,
 	return error;
 }
 
+int aa_net_perm(struct aa_profile *profile, char *operation,
+		int family, int type, int protocol)
+{
+	struct aa_audit sa;
+	int error = 0;
+	u16 family_mask;
+
+	if ((family < 0) || (family >= AF_MAX))
+		return -EINVAL;
+
+	if ((type < 0) || (type >= SOCK_MAX))
+		return -EINVAL;
+
+	/* unix domain and netlink sockets are handled by ipc */
+	if (family == AF_UNIX || family == AF_NETLINK)
+		return 0;
+
+	family_mask = profile->network_families[family];
+
+	error = (family_mask & (1 << type)) ? 0 : -EACCES;
+
+	memset(&sa, 0, sizeof(sa));
+	sa.operation = operation;
+	sa.gfp_mask = GFP_KERNEL;
+	sa.family = family;
+	sa.type = type;
+	sa.protocol = protocol;
+	sa.error_code = error;
+
+	error = aa_audit(profile, &sa);
+
+	return error;
+}
+
+int aa_revalidate_sk(struct sock *sk, char *operation)
+{
+	struct aa_profile *profile;
+	int error = 0;
+
+	/* this is some debugging code to flush out the network hooks that
+	   that are called in interrupt context */
+	if (in_interrupt()) {
+		printk("AppArmor Debug: Hook being called from interrupt context\n");
+		dump_stack();
+		return 0;
+	}
+
+	profile = aa_get_profile(current);
+	if (profile)
+		error = aa_net_perm(profile, operation,
+				    sk->sk_family, sk->sk_type,
+				    sk->sk_protocol);
+	aa_put_profile(profile);
+
+	return error;
+}
+
 /*******************************
  * Global task related functions
  *******************************/
@@ -729,7 +830,7 @@ aa_register_find(struct aa_profile *profile, const char *name, int mandatory,
 		sa->denied_mask = MAY_EXEC;
 		if (complain) {
 			aa_audit_hint(profile, sa);
-			profile = aa_dup_profile(null_complain_profile);
+			new_profile = aa_dup_profile(null_complain_profile);
 		} else {
 			aa_audit_reject(profile, sa);
 			return ERR_PTR(-EACCES);  /* was -EPERM */

@@ -16,27 +16,32 @@
 #include <linux/fs.h>
 #include <linux/binfmts.h>
 #include <linux/rcupdate.h>
+#include <linux/socket.h>
+#include <net/sock.h>
 
 /*
- * We use MAY_READ, MAY_WRITE, MAY_EXEC, and the following flags for
- * profile permissions (we don't use MAY_APPEND):
+ * We use MAY_READ, MAY_WRITE, MAY_EXEC, MAY_APPEND and the following flags
+ * for profile permissions
  */
 #define AA_MAY_LINK			0x0010
-#define AA_EXEC_INHERIT			0x0020
-#define AA_EXEC_UNCONFINED		0x0040
-#define AA_EXEC_PROFILE			0x0080
-#define AA_EXEC_MMAP			0x0100
-#define AA_EXEC_UNSAFE			0x0200
-#define AA_CHANGE_PROFILE		0x40000000
+#define AA_MAY_LOCK			0x0020
+#define AA_EXEC_MMAP			0x0040
+
+#define AA_CHANGE_PROFILE		0x04000000
+#define AA_EXEC_INHERIT			0x08000000
+#define AA_EXEC_UNCONFINED		0x10000000
+#define AA_EXEC_PROFILE			0x20000000
+#define AA_EXEC_UNSAFE			0x40000000
 
 #define AA_EXEC_MODIFIERS		(AA_EXEC_INHERIT | \
 					 AA_EXEC_UNCONFINED | \
 					 AA_EXEC_PROFILE)
 
 #define AA_VALID_PERM_MASK		(MAY_READ | MAY_WRITE | MAY_EXEC | \
-					AA_MAY_LINK | AA_EXEC_MODIFIERS | \
-					AA_EXEC_MMAP | AA_EXEC_UNSAFE | \
-					AA_CHANGE_PROFILE)
+					 MAY_APPEND | AA_MAY_LINK | \
+					 AA_MAY_LOCK | \
+					 AA_EXEC_MODIFIERS | AA_EXEC_MMAP | \
+					 AA_EXEC_UNSAFE | AA_CHANGE_PROFILE)
 
 #define AA_SECURE_EXEC_NEEDED		1
 
@@ -111,6 +116,7 @@ struct aa_profile {
 	struct list_head task_contexts;
 	spinlock_t lock;
 	unsigned long int_flags;
+	u16 network_families[AF_MAX];
 };
 
 extern struct list_head profile_list;
@@ -156,6 +162,7 @@ struct aa_audit {
 	int requested_mask, denied_mask;
 	struct iattr *iattr;
 	pid_t task, parent;
+	int family, type, protocol;
 	int error_code;
 };
 
@@ -220,6 +227,9 @@ extern void aa_change_task_context(struct task_struct *task,
 				   struct aa_profile *previous_profile);
 extern int aa_may_ptrace(struct aa_task_context *cxt,
 			 struct aa_profile *tracee);
+extern int aa_net_perm(struct aa_profile *profile, char *operation,
+			int family, int type, int protocol);
+extern int aa_revalidate_sk(struct sock *sk, char *operation);
 
 /* list.c */
 extern void aa_profilelist_release(void);

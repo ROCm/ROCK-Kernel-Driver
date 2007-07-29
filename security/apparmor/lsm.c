@@ -18,6 +18,7 @@
 #include <linux/ctype.h>
 #include <linux/sysctl.h>
 #include <linux/audit.h>
+#include <net/sock.h>
 
 #include "apparmor.h"
 #include "inline.h"
@@ -283,7 +284,7 @@ out:
 	return error;
 }
 
-static int aa_permission(struct inode *inode, const char *operation,
+static int aa_permission(const char *operation, struct inode *inode,
 			 struct dentry *dentry, struct vfsmount *mnt,
 			 int mask, int check)
 {
@@ -301,10 +302,20 @@ static int aa_permission(struct inode *inode, const char *operation,
 	return error;
 }
 
+static inline int aa_mask_permissions(int mask)
+{
+	if (mask & MAY_APPEND)
+		mask &= (MAY_READ | MAY_APPEND | MAY_EXEC);
+	else
+		mask &= (MAY_READ | MAY_WRITE | MAY_EXEC);
+	return mask;
+}
+
 static int apparmor_inode_create(struct inode *dir, struct dentry *dentry,
 				 struct vfsmount *mnt, int mask)
 {
-	return aa_permission(dir, "inode_create", dentry, mnt, MAY_WRITE, 0);
+	/* FIXME: may move to MAY_APPEND later */
+	return aa_permission("inode_create", dir, dentry, mnt, MAY_WRITE, 0);
 }
 
 static int apparmor_inode_link(struct dentry *old_dentry,
@@ -337,20 +348,20 @@ static int apparmor_inode_unlink(struct inode *dir, struct dentry *dentry,
 
 	if (S_ISDIR(dentry->d_inode->i_mode))
 		check |= AA_CHECK_DIR;
-	return aa_permission(dir, "inode_unlink", dentry, mnt, MAY_WRITE,
+	return aa_permission("inode_unlink", dir, dentry, mnt, MAY_WRITE,
 			     check);
 }
 
 static int apparmor_inode_symlink(struct inode *dir, struct dentry *dentry,
 				  struct vfsmount *mnt, const char *old_name)
 {
-	return aa_permission(dir, "inode_symlink", dentry, mnt, MAY_WRITE, 0);
+	return aa_permission("inode_symlink", dir, dentry, mnt, MAY_WRITE, 0);
 }
 
 static int apparmor_inode_mknod(struct inode *dir, struct dentry *dentry,
 				struct vfsmount *mnt, int mode, dev_t dev)
 {
-	return aa_permission(dir, "inode_mknod", dentry, mnt, MAY_WRITE, 0);
+	return aa_permission("inode_mknod", dir, dentry, mnt, MAY_WRITE, 0);
 }
 
 static int apparmor_inode_rename(struct inode *old_dir,
@@ -397,13 +408,13 @@ static int apparmor_inode_permission(struct inode *inode, int mask,
 
 	if (!nd || nd->flags & (LOOKUP_PARENT | LOOKUP_CONTINUE))
 		return 0;
-	mask &= (MAY_READ | MAY_WRITE | MAY_EXEC);
+	mask = aa_mask_permissions(mask);
 	if (S_ISDIR(inode->i_mode)) {
 		check |= AA_CHECK_DIR;
 		/* allow traverse accesses to directories */
 		mask &= ~MAY_EXEC;
 	}
-	return aa_permission(inode, "inode_permission", nd->dentry, nd->mnt,
+	return aa_permission("inode_permission", inode, nd->dentry, nd->mnt,
 			     mask, check);
 }
 
@@ -479,7 +490,7 @@ static int apparmor_inode_removexattr(struct dentry *dentry,
 				   file);
 }
 
-static int apparmor_file_permission(struct file *file, int mask)
+static int aa_file_permission(const char *op, struct file *file, int mask)
 {
 	struct aa_profile *profile;
 	struct aa_profile *file_profile = (struct aa_profile*)file->f_security;
@@ -493,7 +504,7 @@ static int apparmor_file_permission(struct file *file, int mask)
 	 * revalidate the access against the current profile.
 	 */
 	profile = aa_get_profile(current);
-	if (profile && file_profile != profile) {
+	if (profile && (file_profile != profile || mask & AA_MAY_LOCK)) {
 		struct dentry *dentry = file->f_dentry;
 		struct vfsmount *mnt = file->f_vfsmnt;
 		struct inode *inode = dentry->d_inode;
@@ -505,14 +516,26 @@ static int apparmor_file_permission(struct file *file, int mask)
 		 */
 		if (S_ISDIR(inode->i_mode))
 			check |= AA_CHECK_DIR;
-		mask &= (MAY_READ | MAY_WRITE | MAY_EXEC);
-		error = aa_permission(inode, "file_permission", dentry, mnt,
-				      mask, check);
+		error = aa_permission(op, inode, dentry, mnt, mask, check);
 	}
 	aa_put_profile(profile);
 
 out:
 	return error;
+}
+
+static int apparmor_file_permission(struct file *file, int mask)
+{
+	return aa_file_permission("file_permission", file,
+				  aa_mask_permissions(mask));
+}
+
+static inline int apparmor_file_lock (struct file *file, unsigned int cmd)
+{
+	int mask = AA_MAY_LOCK;
+	if (cmd == F_WRLCK)
+		mask |= MAY_WRITE;
+	return aa_file_permission("file_lock", file, mask);
 }
 
 static int apparmor_file_alloc_security(struct file *file)
@@ -552,12 +575,13 @@ static inline int aa_mmap(struct file *file, const char *operation,
 		mask |= AA_EXEC_MMAP;
 
 	dentry = file->f_dentry;
-	return aa_permission(dentry->d_inode, operation, dentry,
+	return aa_permission(operation, dentry->d_inode, dentry,
 			     file->f_vfsmnt, mask, AA_CHECK_FD);
 }
 
 static int apparmor_file_mmap(struct file *file, unsigned long reqprot,
-			       unsigned long prot, unsigned long flags)
+			      unsigned long prot, unsigned long flags,
+			      unsigned long addr, unsigned long addr_only)
 {
 	return aa_mmap(file, "file_mmap", prot, flags);
 }
@@ -580,6 +604,133 @@ static int apparmor_task_alloc_security(struct task_struct *task)
 static void apparmor_task_free_security(struct task_struct *task)
 {
 	aa_release(task);
+}
+
+static int apparmor_socket_create(int family, int type, int protocol, int kern)
+{
+	struct aa_profile *profile;
+	int error = 0;
+
+	if (kern)
+		return 0;
+
+	profile = aa_get_profile(current);
+	if (profile)
+		error = aa_net_perm(profile, "socket_create", family,
+							type, protocol);
+	aa_put_profile(profile);
+
+	return error;
+}
+
+static int apparmor_socket_post_create(struct socket * sock, int family,
+					int type, int protocol, int kern)
+{
+	struct sock *sk = sock->sk;
+
+	if (kern)
+		return 0;
+
+	return aa_revalidate_sk(sk, "socket_post_create");
+}
+
+static int apparmor_socket_bind(struct socket * sock,
+				struct sockaddr * address, int addrlen)
+{
+	struct sock *sk = sock->sk;
+
+	return aa_revalidate_sk(sk, "socket_bind");
+}
+
+static int apparmor_socket_connect(struct socket * sock,
+					struct sockaddr * address, int addrlen)
+{
+	struct sock *sk = sock->sk;
+
+	return aa_revalidate_sk(sk, "socket_connect");
+}
+
+static int apparmor_socket_listen(struct socket * sock, int backlog)
+{
+	struct sock *sk = sock->sk;
+
+	return aa_revalidate_sk(sk, "socket_listen");
+}
+
+static int apparmor_socket_accept(struct socket * sock, struct socket * newsock)
+{
+	struct sock *sk = sock->sk;
+
+	return aa_revalidate_sk(sk, "socket_accept");
+}
+
+static int apparmor_socket_sendmsg(struct socket * sock,
+					struct msghdr * msg, int size)
+{
+	struct sock *sk = sock->sk;
+
+	return aa_revalidate_sk(sk, "socket_sendmsg");
+}
+
+static int apparmor_socket_recvmsg(struct socket * sock,
+				   struct msghdr * msg, int size, int flags)
+{
+	struct sock *sk = sock->sk;
+
+	return aa_revalidate_sk(sk, "socket_recvmsg");
+}
+
+static int apparmor_socket_getsockname(struct socket * sock)
+{
+	struct sock *sk = sock->sk;
+
+	return aa_revalidate_sk(sk, "socket_getsockname");
+}
+
+static int apparmor_socket_getpeername(struct socket * sock)
+{
+	struct sock *sk = sock->sk;
+
+	return aa_revalidate_sk(sk, "socket_getpeername");
+}
+
+static int apparmor_socket_getsockopt(struct socket * sock, int level,
+					int optname)
+{
+	struct sock *sk = sock->sk;
+
+	return aa_revalidate_sk(sk, "socket_getsockopt");
+}
+
+static int apparmor_socket_setsockopt(struct socket * sock, int level,
+					int optname)
+{
+	struct sock *sk = sock->sk;
+
+	return aa_revalidate_sk(sk, "socket_setsockopt");
+}
+
+static int apparmor_socket_shutdown(struct socket * sock, int how)
+{
+	struct sock *sk = sock->sk;
+
+	return aa_revalidate_sk(sk, "socket_shutdown");
+}
+
+static int apparmor_socket_getpeersec_stream(struct socket *sock,
+			char __user *optval, int __user *optlen, unsigned len)
+{
+	struct sock *sk = sock->sk;
+
+	return aa_revalidate_sk(sk, "socket_getpeersec_stream");
+}
+
+static int apparmor_socket_getpeersec_dgram(struct socket *sock,
+					struct sk_buff *skb, u32 *secid)
+{
+	struct sock *sk = sock->sk;
+
+	return aa_revalidate_sk(sk, "socket_getpeersec_dgram");
 }
 
 static int apparmor_getprocattr(struct task_struct *task, char *name,
@@ -682,9 +833,6 @@ struct security_operations apparmor_ops = {
 	.capable =			apparmor_capable,
 	.syslog =			cap_syslog,
 
-	.netlink_send =			cap_netlink_send,
-	.netlink_recv =			cap_netlink_recv,
-
 	.bprm_apply_creds =		cap_bprm_apply_creds,
 	.bprm_set_security =		apparmor_bprm_set_security,
 	.bprm_secureexec =		apparmor_bprm_secureexec,
@@ -711,6 +859,7 @@ struct security_operations apparmor_ops = {
 	.file_free_security =		apparmor_file_free_security,
 	.file_mmap =			apparmor_file_mmap,
 	.file_mprotect =		apparmor_file_mprotect,
+	.file_lock =			apparmor_file_lock,
 
 	.task_alloc_security =		apparmor_task_alloc_security,
 	.task_free_security =		apparmor_task_free_security,
@@ -719,6 +868,22 @@ struct security_operations apparmor_ops = {
 
 	.getprocattr =			apparmor_getprocattr,
 	.setprocattr =			apparmor_setprocattr,
+
+	.socket_create =		apparmor_socket_create,
+	.socket_post_create =		apparmor_socket_post_create,
+	.socket_bind =			apparmor_socket_bind,
+	.socket_connect =		apparmor_socket_connect,
+	.socket_listen =		apparmor_socket_listen,
+	.socket_accept =		apparmor_socket_accept,
+	.socket_sendmsg =		apparmor_socket_sendmsg,
+	.socket_recvmsg =		apparmor_socket_recvmsg,
+	.socket_getsockname =		apparmor_socket_getsockname,
+	.socket_getpeername =		apparmor_socket_getpeername,
+	.socket_getsockopt =		apparmor_socket_getsockopt,
+	.socket_setsockopt =		apparmor_socket_setsockopt,
+	.socket_shutdown =		apparmor_socket_shutdown,
+	.socket_getpeersec_stream =	apparmor_socket_getpeersec_stream,
+	.socket_getpeersec_dgram =	apparmor_socket_getpeersec_dgram,
 };
 
 static void info_message(const char *str)

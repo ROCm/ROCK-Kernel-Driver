@@ -44,6 +44,8 @@ enum aa_code {
 	AA_STRUCTEND,
 	AA_LIST,
 	AA_LISTEND,
+	AA_ARRAY,
+	AA_ARRAYEND,
 };
 
 /*
@@ -142,6 +144,22 @@ fail:
 	return 0;
 }
 
+static int aa_is_u16(struct aa_ext *e, u16 *data, const char *name)
+{
+	void *pos = e->pos;
+	if (aa_is_nameX(e, AA_U16, name)) {
+		if (!aa_inbounds(e, sizeof(u16)))
+			goto fail;
+		if (data)
+			*data = le16_to_cpu(get_unaligned((u16 *)e->pos));
+		e->pos += sizeof(u16);
+		return 1;
+	}
+fail:
+	e->pos = pos;
+	return 0;
+}
+
 static int aa_is_u32(struct aa_ext *e, u32 *data, const char *name)
 {
 	void *pos = e->pos;
@@ -152,6 +170,22 @@ static int aa_is_u32(struct aa_ext *e, u32 *data, const char *name)
 			*data = le32_to_cpu(get_unaligned((u32 *)e->pos));
 		e->pos += sizeof(u32);
 		return 1;
+	}
+fail:
+	e->pos = pos;
+	return 0;
+}
+
+static size_t aa_is_array(struct aa_ext *e, const char *name)
+{
+	void *pos = e->pos;
+	if (aa_is_nameX(e, AA_ARRAY, name)) {
+		int size;
+		if (!aa_inbounds(e, sizeof(u16)))
+			goto fail;
+		size = (int) le16_to_cpu(get_unaligned((u16 *)e->pos));
+		e->pos += sizeof(u16);
+		return size;
 	}
 fail:
 	e->pos = pos;
@@ -248,6 +282,8 @@ static struct aa_profile *aa_unpack_profile(struct aa_ext *e,
 {
 	struct aa_profile *profile = NULL;
 	struct aa_audit sa;
+	size_t size = 0;
+	int i;
 
 	int error = -EPROTO;
 
@@ -275,6 +311,24 @@ static struct aa_profile *aa_unpack_profile(struct aa_ext *e,
 
 	if (!aa_is_u32(e, &(profile->capabilities), NULL))
 		goto fail;
+
+	size = aa_is_array(e, "net_allowed_af");
+	if (size) {
+		if (size > AF_MAX)
+			goto fail;
+
+		for (i = 0; i < size; i++) {
+			if (!aa_is_u16(e, &profile->network_families[i], NULL))
+				goto fail;
+		}
+		if (!aa_is_nameX(e, AA_ARRAYEND, NULL))
+			goto fail;
+		/* allow unix domain and netlink sockets they are handled
+		 * by IPC
+		 */
+	}
+	profile->network_families[AF_UNIX] = 0xffff;
+	profile->network_families[AF_NETLINK] = 0xffff;
 
 	/* get file rules */
 	profile->file_rules = aa_unpack_dfa(e);
