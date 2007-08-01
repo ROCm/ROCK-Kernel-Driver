@@ -275,8 +275,6 @@ static int timekeeping_resume(struct sys_device *dev)
 
 	clocksource_resume();
 
-	clocksource_resume();
-
 	write_seqlock_irqsave(&xtime_lock, flags);
 
 	if (now && (now > timekeeping_suspend_time)) {
