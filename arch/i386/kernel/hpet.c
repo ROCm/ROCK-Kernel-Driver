@@ -125,6 +125,7 @@ static struct clock_event_device hpet_clockevent = {
 	.set_next_event = hpet_next_event,
 	.shift		= 32,
 	.irq		= 0,
+	.rating		= 50,
 };
 
 static void hpet_start_counter(void)
@@ -137,6 +138,12 @@ static void hpet_start_counter(void)
 	hpet_writel(0, HPET_COUNTER + 4);
 	cfg |= HPET_CFG_ENABLE;
 	hpet_writel(cfg, HPET_CFG);
+}
+
+static void hpet_restart_counter(void)
+{
+	ich_force_hpet_resume();
+	hpet_start_counter();
 }
 
 static void hpet_enable_int(void)
@@ -187,6 +194,10 @@ static void hpet_set_mode(enum clock_event_mode mode,
 		cfg &= ~HPET_TN_ENABLE;
 		hpet_writel(cfg, HPET_T0_CFG);
 		break;
+
+	case CLOCK_EVT_MODE_RESUME:
+		hpet_enable_int();
+		break;
 	}
 }
 
@@ -217,6 +228,7 @@ static struct clocksource clocksource_hpet = {
 	.mask		= HPET_MASK,
 	.shift		= HPET_SHIFT,
 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
+	.resume		= hpet_restart_counter,
 };
 
 /*
@@ -227,6 +239,9 @@ int __init hpet_enable(void)
 	unsigned long id;
 	uint64_t hpet_freq;
 	u64 tmp;
+
+	if (hpet_virt_address)
+		return 0;
 
 	if (!is_hpet_capable())
 		return 0;
@@ -291,7 +306,6 @@ int __init hpet_enable(void)
 
 	clocksource_register(&clocksource_hpet);
 
-
 	if (id & HPET_ID_LEGSUP) {
 		hpet_enable_int();
 		hpet_reserve_platform_timers(id);
@@ -312,6 +326,26 @@ out_nohpet:
 	boot_hpet_disable = 1;
 	return 0;
 }
+
+
+static int __init hpet_late_init(void)
+{
+	if (boot_hpet_disable)
+		return -ENODEV;
+
+	if (!hpet_address) {
+		if (!force_hpet_address)
+			return -ENODEV;
+
+		hpet_address = force_hpet_address;
+		hpet_enable();
+		if (!hpet_virt_address)
+			return -ENODEV;
+	}
+
+	return 0;
+}
+module_init(hpet_late_init);
 
 
 #ifdef CONFIG_HPET_EMULATE_RTC
@@ -523,69 +557,4 @@ irqreturn_t hpet_rtc_interrupt(int irq, void *dev_id)
 	}
 	return IRQ_HANDLED;
 }
-#endif
-
-
-/*
- * Suspend/resume part
- */
-
-#ifdef CONFIG_PM
-
-static int hpet_suspend(struct sys_device *sys_device, pm_message_t state)
-{
-	unsigned long cfg = hpet_readl(HPET_CFG);
-
-	cfg &= ~(HPET_CFG_ENABLE|HPET_CFG_LEGACY);
-	hpet_writel(cfg, HPET_CFG);
-
-	return 0;
-}
-
-static int hpet_resume(struct sys_device *sys_device)
-{
-	unsigned int id;
-
-	hpet_start_counter();
-
-	id = hpet_readl(HPET_ID);
-
-	if (id & HPET_ID_LEGSUP)
-		hpet_enable_int();
-
-	return 0;
-}
-
-static struct sysdev_class hpet_class = {
-	set_kset_name("hpet"),
-	.suspend	= hpet_suspend,
-	.resume		= hpet_resume,
-};
-
-static struct sys_device hpet_device = {
-	.id		= 0,
-	.cls		= &hpet_class,
-};
-
-
-static __init int hpet_register_sysfs(void)
-{
-	int err;
-
-	if (!is_hpet_capable())
-		return 0;
-
-	err = sysdev_class_register(&hpet_class);
-
-	if (!err) {
-		err = sysdev_register(&hpet_device);
-		if (err)
-			sysdev_class_unregister(&hpet_class);
-	}
-
-	return err;
-}
-
-device_initcall(hpet_register_sysfs);
-
 #endif

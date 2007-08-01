@@ -89,6 +89,7 @@
 #define HPET_TICK_RATE  (HZ * 100000UL)
 
 extern unsigned long hpet_address;	/* hpet memory map physical address */
+extern unsigned long force_hpet_address;
 extern int is_hpet_enabled(void);
 
 #ifdef CONFIG_X86_64
@@ -101,6 +102,8 @@ extern int hpet_readl(unsigned long a);
 #else
 extern int hpet_enable(void);
 #endif
+
+void ich_force_hpet_resume(void);
 
 #ifdef CONFIG_HPET_EMULATE_RTC
 extern int hpet_mask_rtc_irq_bit(unsigned long bit_mask);
