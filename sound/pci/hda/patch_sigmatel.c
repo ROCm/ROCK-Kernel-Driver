@@ -2228,7 +2228,7 @@ static int patch_stac927x(struct hda_codec *codec)
 
 	spec->multiout.dac_nids = spec->dac_nids;
 	stac92xx_enable_eapd(codec);
-	
+
 	err = stac92xx_parse_auto_config(codec, 0x1e, 0x20);
 	if (!err) {
 		if (spec->board_config < 0) {

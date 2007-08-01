@@ -5444,7 +5444,7 @@ static struct alc_config_preset alc882_presets[] = {
 /*
  * Pin config fixes
  */
-enum { 
+enum {
 	PINFIX_ABIT_AW9D_MAX
 };
 
@@ -8073,7 +8073,7 @@ static int patch_alc262(struct hda_codec *codec)
  */
 #define ALC268_DIGOUT_NID	ALC880_DIGOUT_NID
 #define alc268_modes		alc260_modes
-	
+
 static hda_nid_t alc268_dac_nids[2] = {
 	/* front, hp */
 	0x02, 0x03
@@ -8314,7 +8314,7 @@ static int alc268_auto_create_multi_out_ctls(struct alc_spec *spec,
 
 	nid = cfg->line_out_pins[0];
 	if (nid)
-		alc268_new_analog_output(spec, nid, "Front", 0);	
+		alc268_new_analog_output(spec, nid, "Front", 0);
 
 	nid = cfg->speaker_pins[0];
 	if (nid == 0x1d) {
@@ -8336,7 +8336,7 @@ static int alc268_auto_create_multi_out_ctls(struct alc_spec *spec,
 		if (err < 0)
 			return err;
 	}
-	return 0;	
+	return 0;
 }
 
 /* create playback/capture controls for input pins */
@@ -8357,7 +8357,7 @@ static int alc268_auto_create_analog_input_ctls(struct alc_spec *spec,
 		case 0x1a:
 			idx1 = 2;	/* Line In */
 			break;
-		case 0x1c:	
+		case 0x1c:
 			idx1 = 3;	/* CD */
 			break;
 		default:
@@ -8365,7 +8365,7 @@ static int alc268_auto_create_analog_input_ctls(struct alc_spec *spec,
 		}
 		imux->items[imux->num_items].label = auto_pin_cfg_labels[i];
 		imux->items[imux->num_items].index = idx1;
-		imux->num_items++;	
+		imux->num_items++;
 	}
 	return 0;
 }
@@ -8395,11 +8395,11 @@ static void alc268_auto_init_mono_speaker_out(struct hda_codec *codec)
 	}
 
 	dac_vol1 = dac_vol2 = 0xb000 | 0x40;	/* set max volume  */
-	if (line_nid == 0x14)	
+	if (line_nid == 0x14)
 		dac_vol2 = AMP_OUT_ZERO;
 	else if (line_nid == 0x15)
 		dac_vol1 = AMP_OUT_ZERO;
-	if (hp_nid == 0x14)	
+	if (hp_nid == 0x14)
 		dac_vol2 = AMP_OUT_ZERO;
 	else if (hp_nid == 0x15)
 		dac_vol1 = AMP_OUT_ZERO;
@@ -8573,7 +8573,7 @@ static int patch_alc268(struct hda_codec *codec)
 	codec->patch_ops = alc_patch_ops;
 	if (board_config == ALC268_AUTO)
 		spec->init_hook = alc268_auto_init;
-		
+
 	return 0;
 }
 
