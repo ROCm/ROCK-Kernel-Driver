@@ -30,13 +30,11 @@ static int pio_mask = 1;
  * Provide our own set_mode() as we don't want to change anything that has
  * already been configured..
  */
-static int pata_platform_set_mode(struct ata_port *ap, struct ata_device **unused)
+static int pata_platform_set_mode(struct ata_link *link, struct ata_device **unused)
 {
-	int i;
+	struct ata_device *dev;
 
-	for (i = 0; i < ATA_MAX_DEVICES; i++) {
-		struct ata_device *dev = &ap->device[i];
-
+	ata_link_for_each_dev(dev, link) {
 		if (ata_dev_enabled(dev)) {
 			/* We don't really care */
 			dev->pio_mode = dev->xfer_mode = XFER_PIO_0;
@@ -139,6 +137,7 @@ static int __devinit pata_platform_probe(struct platform_device *pdev)
 	struct resource *io_res, *ctl_res;
 	struct ata_host *host;
 	struct ata_port *ap;
+	struct pata_platform_info *pp_info;
 	unsigned int mmio;
 
 	/*
@@ -208,11 +207,13 @@ static int __devinit pata_platform_probe(struct platform_device *pdev)
 
 	ap->ioaddr.altstatus_addr = ap->ioaddr.ctl_addr;
 
-	pata_platform_setup_port(&ap->ioaddr, pdev->dev.platform_data);
+	pp_info = (struct pata_platform_info *)(pdev->dev.platform_data);
+	pata_platform_setup_port(&ap->ioaddr, pp_info);
 
 	/* activate */
-	return ata_host_activate(host, platform_get_irq(pdev, 0), ata_interrupt,
-				 0, &pata_platform_sht);
+	return ata_host_activate(host, platform_get_irq(pdev, 0),
+				 ata_interrupt, pp_info ? pp_info->irq_flags
+				 : 0, &pata_platform_sht);
 }
 
 /**

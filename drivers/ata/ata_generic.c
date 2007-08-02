@@ -34,7 +34,7 @@
 
 /**
  *	generic_set_mode	-	mode setting
- *	@ap: interface to set up
+ *	@link: link to set up
  *	@unused: returned device on error
  *
  *	Use a non standard set_mode function. We don't want to be tuned.
@@ -43,24 +43,24 @@
  *	and respect them.
  */
 
-static int generic_set_mode(struct ata_port *ap, struct ata_device **unused)
+static int generic_set_mode(struct ata_link *link, struct ata_device **unused)
 {
+	struct ata_port *ap = link->ap;
 	int dma_enabled = 0;
-	int i;
+	struct ata_device *dev;
 
 	/* Bits 5 and 6 indicate if DMA is active on master/slave */
 	if (ap->ioaddr.bmdma_addr)
 		dma_enabled = ioread8(ap->ioaddr.bmdma_addr + ATA_DMA_STATUS);
 
-	for (i = 0; i < ATA_MAX_DEVICES; i++) {
-		struct ata_device *dev = &ap->device[i];
+	ata_link_for_each_dev(dev, link) {
 		if (ata_dev_enabled(dev)) {
 			/* We don't really care */
 			dev->pio_mode = XFER_PIO_0;
 			dev->dma_mode = XFER_MW_DMA_0;
 			/* We do need the right mode information for DMA or PIO
 			   and this comes from the current configuration flags */
-			if (dma_enabled & (1 << (5 + i))) {
+			if (dma_enabled & (1 << (5 + dev->devno))) {
 				ata_id_to_dma_mode(dev, XFER_MW_DMA_0);
 				dev->flags &= ~ATA_DFLAG_PIO;
 			} else {
@@ -143,10 +143,10 @@ static int ata_generic_init_one(struct pci_dev *dev, const struct pci_device_id 
 	u16 command;
 	static const struct ata_port_info info = {
 		.sht = &generic_sht,
-		.flags = ATA_FLAG_SLAVE_POSS | ATA_FLAG_SRST,
+		.flags = ATA_FLAG_SLAVE_POSS,
 		.pio_mask = 0x1f,
 		.mwdma_mask = 0x07,
-		.udma_mask = 0x3f,
+		.udma_mask = ATA_UDMA5,
 		.port_ops = &generic_port_ops
 	};
 	const struct ata_port_info *ppi[] = { &info, NULL };

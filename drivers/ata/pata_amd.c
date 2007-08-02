@@ -119,27 +119,28 @@ static void timing_setup(struct ata_port *ap, struct ata_device *adev, int offse
 }
 
 /**
- *	amd_probe_init		-	perform reset handling
- *	@ap: ATA port
+ *	amd_pre_reset		-	perform reset handling
+ *	@link: ATA link
  *	@deadline: deadline jiffies for the operation
  *
  *	Reset sequence checking enable bits to see which ports are
  *	active.
  */
 
-static int amd_pre_reset(struct ata_port *ap, unsigned long deadline)
+static int amd_pre_reset(struct ata_link *link, unsigned long deadline)
 {
 	static const struct pci_bits amd_enable_bits[] = {
 		{ 0x40, 1, 0x02, 0x02 },
 		{ 0x40, 1, 0x01, 0x01 }
 	};
 
+	struct ata_port *ap = link->ap;
 	struct pci_dev *pdev = to_pci_dev(ap->host->dev);
 
 	if (!pci_test_config_bits(pdev, &amd_enable_bits[ap->port_no]))
 		return -ENOENT;
 
-	return ata_std_prereset(ap, deadline);
+	return ata_std_prereset(link, deadline);
 }
 
 static void amd_error_handler(struct ata_port *ap)
@@ -221,25 +222,26 @@ static void amd133_set_dmamode(struct ata_port *ap, struct ata_device *adev)
 
 /**
  *	nv_probe_init	-	cable detection
- *	@ap: ATA port
+ *	@lin: ATA link
  *
  *	Perform cable detection. The BIOS stores this in PCI config
  *	space for us.
  */
 
-static int nv_pre_reset(struct ata_port *ap, unsigned long deadline)
+static int nv_pre_reset(struct ata_link *link, unsigned long deadline)
 {
 	static const struct pci_bits nv_enable_bits[] = {
 		{ 0x50, 1, 0x02, 0x02 },
 		{ 0x50, 1, 0x01, 0x01 }
 	};
 
+	struct ata_port *ap = link->ap;
 	struct pci_dev *pdev = to_pci_dev(ap->host->dev);
 
 	if (!pci_test_config_bits(pdev, &nv_enable_bits[ap->port_no]))
 		return -ENOENT;
 
-	return ata_std_prereset(ap, deadline);
+	return ata_std_prereset(link, deadline);
 }
 
 static void nv_error_handler(struct ata_port *ap)
@@ -541,7 +543,7 @@ static int amd_init_one(struct pci_dev *pdev, const struct pci_device_id *id)
 	static const struct ata_port_info info[10] = {
 		{	/* 0: AMD 7401 */
 			.sht = &amd_sht,
-			.flags = ATA_FLAG_SLAVE_POSS | ATA_FLAG_SRST,
+			.flags = ATA_FLAG_SLAVE_POSS,
 			.pio_mask = 0x1f,
 			.mwdma_mask = 0x07,	/* No SWDMA */
 			.udma_mask = 0x07,	/* UDMA 33 */
@@ -549,74 +551,74 @@ static int amd_init_one(struct pci_dev *pdev, const struct pci_device_id *id)
 		},
 		{	/* 1: Early AMD7409 - no swdma */
 			.sht = &amd_sht,
-			.flags = ATA_FLAG_SLAVE_POSS | ATA_FLAG_SRST,
+			.flags = ATA_FLAG_SLAVE_POSS,
 			.pio_mask = 0x1f,
 			.mwdma_mask = 0x07,
-			.udma_mask = 0x1f,	/* UDMA 66 */
+			.udma_mask = ATA_UDMA4,	/* UDMA 66 */
 			.port_ops = &amd66_port_ops
 		},
 		{	/* 2: AMD 7409, no swdma errata */
 			.sht = &amd_sht,
-			.flags = ATA_FLAG_SLAVE_POSS | ATA_FLAG_SRST,
+			.flags = ATA_FLAG_SLAVE_POSS,
 			.pio_mask = 0x1f,
 			.mwdma_mask = 0x07,
-			.udma_mask = 0x1f,	/* UDMA 66 */
+			.udma_mask = ATA_UDMA4,	/* UDMA 66 */
 			.port_ops = &amd66_port_ops
 		},
 		{	/* 3: AMD 7411 */
 			.sht = &amd_sht,
-			.flags = ATA_FLAG_SLAVE_POSS | ATA_FLAG_SRST,
+			.flags = ATA_FLAG_SLAVE_POSS,
 			.pio_mask = 0x1f,
 			.mwdma_mask = 0x07,
-			.udma_mask = 0x3f,	/* UDMA 100 */
+			.udma_mask = ATA_UDMA5,	/* UDMA 100 */
 			.port_ops = &amd100_port_ops
 		},
 		{	/* 4: AMD 7441 */
 			.sht = &amd_sht,
-			.flags = ATA_FLAG_SLAVE_POSS | ATA_FLAG_SRST,
+			.flags = ATA_FLAG_SLAVE_POSS,
 			.pio_mask = 0x1f,
 			.mwdma_mask = 0x07,
-			.udma_mask = 0x3f,	/* UDMA 100 */
+			.udma_mask = ATA_UDMA5,	/* UDMA 100 */
 			.port_ops = &amd100_port_ops
 		},
 		{	/* 5: AMD 8111*/
 			.sht = &amd_sht,
-			.flags = ATA_FLAG_SLAVE_POSS | ATA_FLAG_SRST,
+			.flags = ATA_FLAG_SLAVE_POSS,
 			.pio_mask = 0x1f,
 			.mwdma_mask = 0x07,
-			.udma_mask = 0x7f,	/* UDMA 133, no swdma */
+			.udma_mask = ATA_UDMA6,	/* UDMA 133, no swdma */
 			.port_ops = &amd133_port_ops
 		},
 		{	/* 6: AMD 8111 UDMA 100 (Serenade) */
 			.sht = &amd_sht,
-			.flags = ATA_FLAG_SLAVE_POSS | ATA_FLAG_SRST,
+			.flags = ATA_FLAG_SLAVE_POSS,
 			.pio_mask = 0x1f,
 			.mwdma_mask = 0x07,
-			.udma_mask = 0x3f,	/* UDMA 100, no swdma */
+			.udma_mask = ATA_UDMA5,	/* UDMA 100, no swdma */
 			.port_ops = &amd133_port_ops
 		},
 		{	/* 7: Nvidia Nforce */
 			.sht = &amd_sht,
-			.flags = ATA_FLAG_SLAVE_POSS | ATA_FLAG_SRST,
+			.flags = ATA_FLAG_SLAVE_POSS,
 			.pio_mask = 0x1f,
 			.mwdma_mask = 0x07,
-			.udma_mask = 0x3f,	/* UDMA 100 */
+			.udma_mask = ATA_UDMA5,	/* UDMA 100 */
 			.port_ops = &nv100_port_ops
 		},
 		{	/* 8: Nvidia Nforce2 and later */
 			.sht = &amd_sht,
-			.flags = ATA_FLAG_SLAVE_POSS | ATA_FLAG_SRST,
+			.flags = ATA_FLAG_SLAVE_POSS,
 			.pio_mask = 0x1f,
 			.mwdma_mask = 0x07,
-			.udma_mask = 0x7f,	/* UDMA 133, no swdma */
+			.udma_mask = ATA_UDMA6,	/* UDMA 133, no swdma */
 			.port_ops = &nv133_port_ops
 		},
 		{	/* 9: AMD CS5536 (Geode companion) */
 			.sht = &amd_sht,
-			.flags = ATA_FLAG_SLAVE_POSS | ATA_FLAG_SRST,
+			.flags = ATA_FLAG_SLAVE_POSS,
 			.pio_mask = 0x1f,
 			.mwdma_mask = 0x07,
-			.udma_mask = 0x3f,	/* UDMA 100 */
+			.udma_mask = ATA_UDMA5,	/* UDMA 100 */
 			.port_ops = &amd100_port_ops
 		}
 	};

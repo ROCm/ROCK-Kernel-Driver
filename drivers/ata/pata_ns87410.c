@@ -32,14 +32,15 @@
 
 /**
  *	ns87410_pre_reset		-	probe begin
- *	@ap: ATA port
+ *	@link: ATA link
  *	@deadline: deadline jiffies for the operation
  *
  *	Check enabled ports
  */
 
-static int ns87410_pre_reset(struct ata_port *ap, unsigned long deadline)
+static int ns87410_pre_reset(struct ata_link *link, unsigned long deadline)
 {
+	struct ata_port *ap = link->ap;
 	struct pci_dev *pdev = to_pci_dev(ap->host->dev);
 	static const struct pci_bits ns87410_enable_bits[] = {
 		{ 0x43, 1, 0x08, 0x08 },
@@ -49,7 +50,7 @@ static int ns87410_pre_reset(struct ata_port *ap, unsigned long deadline)
 	if (!pci_test_config_bits(pdev, &ns87410_enable_bits[ap->port_no]))
 		return -ENOENT;
 
-	return ata_std_prereset(ap, deadline);
+	return ata_std_prereset(link, deadline);
 }
 
 /**
@@ -193,7 +194,7 @@ static int ns87410_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
 	static const struct ata_port_info info = {
 		.sht = &ns87410_sht,
-		.flags = ATA_FLAG_SLAVE_POSS | ATA_FLAG_SRST,
+		.flags = ATA_FLAG_SLAVE_POSS,
 		.pio_mask = 0x0F,
 		.port_ops = &ns87410_port_ops
 	};

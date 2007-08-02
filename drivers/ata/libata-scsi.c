@@ -755,6 +755,13 @@ static void ata_scsi_sdev_config(struct scsi_device *sdev)
 {
 	sdev->use_10_for_rw = 1;
 	sdev->use_10_for_ms = 1;
+
+	/* Schedule policy is determined by ->qc_defer() callback and
+	 * it needs to see every deferred qc.  Set dev_blocked to 1 to
+	 * prevent SCSI midlayer from automatically deferring
+	 * requests.
+	 */
+	sdev->max_device_blocked = 1;
 }
 
 static void ata_scsi_dev_config(struct scsi_device *sdev,
@@ -943,6 +950,13 @@ static unsigned int ata_scsi_start_stop_xlat(struct ata_queued_cmd *qc)
 		goto invalid_fld;       /* LOEJ bit set not supported */
 	if (((cdb[4] >> 4) & 0xf) != 0)
 		goto invalid_fld;       /* power conditions not supported */
+
+	if (qc->dev->horkage & ATA_HORKAGE_SKIP_PM) {
+		/* the device lacks PM support, finish without doing anything */
+		scmd->result = SAM_STAT_GOOD;
+		return 1;
+	}
+
 	if (cdb[4] & 0x1) {
 		tf->nsect = 1;	/* 1 sector, lba=0 */
 
@@ -1368,14 +1382,14 @@ static void ata_scsi_qc_complete(struct ata_queued_cmd *qc)
 		case ATA_CMD_SET_FEATURES:
 			if ((qc->tf.feature == SETFEATURES_WC_ON) ||
 			    (qc->tf.feature == SETFEATURES_WC_OFF)) {
-				ap->eh_info.action |= ATA_EH_REVALIDATE;
+				ap->link.eh_info.action |= ATA_EH_REVALIDATE;
 				ata_port_schedule_eh(ap);
 			}
 			break;
 
 		case ATA_CMD_INIT_DEV_PARAMS: /* CHS translation changed */
 		case ATA_CMD_SET_MULTI: /* multi_count changed */
-			ap->eh_info.action |= ATA_EH_REVALIDATE;
+			ap->link.eh_info.action |= ATA_EH_REVALIDATE;
 			ata_port_schedule_eh(ap);
 			break;
 		}
@@ -1422,37 +1436,6 @@ static void ata_scsi_qc_complete(struct ata_queued_cmd *qc)
 }
 
 /**
- *	ata_scmd_need_defer - Check whether we need to defer scmd
- *	@dev: ATA device to which the command is addressed
- *	@is_io: Is the command IO (and thus possibly NCQ)?
- *
- *	NCQ and non-NCQ commands cannot run together.  As upper layer
- *	only knows the queue depth, we are responsible for maintaining
- *	exclusion.  This function checks whether a new command can be
- *	issued to @dev.
- *
- *	LOCKING:
- *	spin_lock_irqsave(host lock)
- *
- *	RETURNS:
- *	1 if deferring is needed, 0 otherwise.
- */
-static int ata_scmd_need_defer(struct ata_device *dev, int is_io)
-{
-	struct ata_port *ap = dev->ap;
-	int is_ncq = is_io && ata_ncq_enabled(dev);
-
-	if (is_ncq) {
-		if (!ata_tag_valid(ap->active_tag))
-			return 0;
-	} else {
-		if (!ata_tag_valid(ap->active_tag) && !ap->sactive)
-			return 0;
-	}
-	return 1;
-}
-
-/**
  *	ata_scsi_translate - Translate then issue SCSI command to ATA device
  *	@dev: ATA device to which the command is addressed
  *	@cmd: SCSI command to execute
@@ -1483,13 +1466,11 @@ static int ata_scsi_translate(struct ata_device *dev, struct scsi_cmnd *cmd,
 			      void (*done)(struct scsi_cmnd *),
 			      ata_xlat_func_t xlat_func)
 {
+	struct ata_port *ap = dev->link->ap;
 	struct ata_queued_cmd *qc;
-	int is_io = xlat_func == ata_scsi_rw_xlat;
+	int rc;
 
 	VPRINTK("ENTER\n");
-
-	if (unlikely(ata_scmd_need_defer(dev, is_io)))
-		goto defer;
 
 	qc = ata_scsi_qc_new(dev, cmd, done);
 	if (!qc)
@@ -1518,6 +1499,11 @@ static int ata_scsi_translate(struct ata_device *dev, struct scsi_cmnd *cmd,
 	if (xlat_func(qc))
 		goto early_finish;
 
+	if (ap->ops->qc_defer) {
+		if ((rc = ap->ops->qc_defer(qc)))
+			goto defer;
+	}
+
 	/* select device, send command to hardware */
 	ata_qc_issue(qc);
 
@@ -1539,8 +1525,12 @@ err_mem:
 	return 0;
 
 defer:
+	ata_qc_free(qc);
 	DPRINTK("EXIT - defer\n");
-	return SCSI_MLQUEUE_DEVICE_BUSY;
+	if (rc == ATA_DEFER_LINK)
+		return SCSI_MLQUEUE_DEVICE_BUSY;
+	else
+		return SCSI_MLQUEUE_HOST_BUSY;
 }
 
 /**
@@ -2423,21 +2413,36 @@ static unsigned int atapi_xlat(struct ata_queued_cmd *qc)
 	return 0;
 }
 
-static struct ata_device * ata_find_dev(struct ata_port *ap, int id)
+static struct ata_device * ata_find_dev(struct ata_port *ap, int devno)
 {
-	if (likely(id < ATA_MAX_DEVICES))
-		return &ap->device[id];
+	if (ap->nr_pmp_links == 0) {
+		if (likely(devno < ata_link_max_devices(&ap->link)))
+			return &ap->link.device[devno];
+	} else {
+		if (likely(devno < ap->nr_pmp_links))
+			return &ap->pmp_link[devno].device[0];
+	}
+
 	return NULL;
 }
 
 static struct ata_device * __ata_scsi_find_dev(struct ata_port *ap,
 					const struct scsi_device *scsidev)
 {
-	/* skip commands not addressed to targets we simulate */
-	if (unlikely(scsidev->channel || scsidev->lun))
-		return NULL;
+	int devno;
 
-	return ata_find_dev(ap, scsidev->id);
+	/* skip commands not addressed to targets we simulate */
+	if (ap->nr_pmp_links == 0) {
+		if (unlikely(scsidev->channel || scsidev->lun))
+			return NULL;
+		devno = scsidev->id;
+	} else {
+		if (unlikely(scsidev->id || scsidev->lun))
+			return NULL;
+		devno = scsidev->channel;
+	}
+
+	return ata_find_dev(ap, devno);
 }
 
 /**
@@ -2458,7 +2463,7 @@ static int ata_scsi_dev_enabled(struct ata_device *dev)
 	if (unlikely(!ata_dev_enabled(dev)))
 		return 0;
 
-	if (!atapi_enabled || (dev->ap->flags & ATA_FLAG_NO_ATAPI)) {
+	if (!atapi_enabled || (dev->link->ap->flags & ATA_FLAG_NO_ATAPI)) {
 		if (unlikely(dev->class == ATA_DEV_ATAPI)) {
 			ata_dev_printk(dev, KERN_WARNING,
 				       "WARNING: ATAPI is %s, device ignored.\n",
@@ -2620,7 +2625,7 @@ static unsigned int ata_scsi_pass_thru(struct ata_queued_cmd *qc)
 			ata_dev_printk(dev, KERN_WARNING,
 				       "invalid multi_count %u ignored\n",
 				       multi_count);
-	}	
+	}
 
 	/* READ/WRITE LONG use a non-standard sect_size */
 	qc->sect_size = ATA_SECT_SIZE;
@@ -2928,6 +2933,13 @@ int ata_scsi_add_hosts(struct ata_host *host, struct scsi_host_template *sht)
 		shost->max_channel = 1;
 		shost->max_cmd_len = 16;
 
+		/* Schedule policy is determined by ->qc_defer()
+		 * callback and it needs to see every deferred qc.
+		 * Set host_blocked to 1 to prevent SCSI midlayer from
+		 * automatically deferring requests.
+		 */
+		shost->max_host_blocked = 1;
+
 		rc = scsi_add_host(ap->scsi_host, ap->host->dev);
 		if (rc)
 			goto err_add;
@@ -2947,26 +2959,79 @@ int ata_scsi_add_hosts(struct ata_host *host, struct scsi_host_template *sht)
 	return rc;
 }
 
-void ata_scsi_scan_host(struct ata_port *ap)
+void ata_scsi_scan_host(struct ata_port *ap, int sync)
 {
-	unsigned int i;
+	int tries = 5;
+	struct ata_device *last_failed_dev = NULL;
+	struct ata_link *link;
+	struct ata_device *dev;
 
 	if (ap->flags & ATA_FLAG_DISABLED)
 		return;
 
-	for (i = 0; i < ATA_MAX_DEVICES; i++) {
-		struct ata_device *dev = &ap->device[i];
-		struct scsi_device *sdev;
+ repeat:
+	ata_port_for_each_link(link, ap) {
+		ata_link_for_each_dev(dev, link) {
+			struct scsi_device *sdev;
+			int channel = 0, id = 0;
 
-		if (!ata_dev_enabled(dev) || dev->sdev)
-			continue;
+			if (!ata_dev_enabled(dev) || dev->sdev)
+				continue;
 
-		sdev = __scsi_add_device(ap->scsi_host, 0, i, 0, NULL);
-		if (!IS_ERR(sdev)) {
-			dev->sdev = sdev;
-			scsi_device_put(sdev);
+			if (ata_is_host_link(link))
+				id = dev->devno;
+			else
+				channel = link->pmp;
+
+			sdev = __scsi_add_device(ap->scsi_host, channel, id, 0,
+						 NULL);
+			if (!IS_ERR(sdev)) {
+				dev->sdev = sdev;
+				scsi_device_put(sdev);
+			}
 		}
 	}
+
+	/* If we scanned while EH was in progress or allocation
+	 * failure occurred, scan would have failed silently.  Check
+	 * whether all devices are attached.
+	 */
+	ata_port_for_each_link(link, ap) {
+		ata_link_for_each_dev(dev, link) {
+			if (ata_dev_enabled(dev) && !dev->sdev)
+				goto exit_loop;
+		}
+	}
+ exit_loop:
+	if (!link)
+		return;
+
+	/* we're missing some SCSI devices */
+	if (sync) {
+		/* If caller requested synchrnous scan && we've made
+		 * any progress, sleep briefly and repeat.
+		 */
+		if (dev != last_failed_dev) {
+			msleep(100);
+			last_failed_dev = dev;
+			goto repeat;
+		}
+
+		/* We might be failing to detect boot device, give it
+		 * a few more chances.
+		 */
+		if (--tries) {
+			msleep(100);
+			goto repeat;
+		}
+
+		ata_port_printk(ap, KERN_ERR, "WARNING: synchronous SCSI scan "
+				"failed without making any progress,\n"
+				"                  switching to async\n");
+	}
+
+	queue_delayed_work(ata_aux_wq, &ap->hotplug_task,
+			   round_jiffies_relative(HZ));
 }
 
 /**
@@ -3005,7 +3070,7 @@ int ata_scsi_offline_dev(struct ata_device *dev)
  */
 static void ata_scsi_remove_dev(struct ata_device *dev)
 {
-	struct ata_port *ap = dev->ap;
+	struct ata_port *ap = dev->link->ap;
 	struct scsi_device *sdev;
 	unsigned long flags;
 
@@ -3052,6 +3117,25 @@ static void ata_scsi_remove_dev(struct ata_device *dev)
 	}
 }
 
+static void ata_scsi_handle_link_detach(struct ata_link *link)
+{
+	struct ata_port *ap = link->ap;
+	struct ata_device *dev;
+
+	ata_link_for_each_dev(dev, link) {
+		unsigned long flags;
+
+		if (!(dev->flags & ATA_DFLAG_DETACHED))
+			continue;
+
+		spin_lock_irqsave(ap->lock, flags);
+		dev->flags &= ~ATA_DFLAG_DETACHED;
+		spin_unlock_irqrestore(ap->lock, flags);
+
+		ata_scsi_remove_dev(dev);
+	}
+}
+
 /**
  *	ata_scsi_hotplug - SCSI part of hotplug
  *	@work: Pointer to ATA port to perform SCSI hotplug on
@@ -3077,36 +3161,17 @@ void ata_scsi_hotplug(struct work_struct *work)
 
 	DPRINTK("ENTER\n");
 
-	/* unplug detached devices */
-	for (i = 0; i < ATA_MAX_DEVICES; i++) {
-		struct ata_device *dev = &ap->device[i];
-		unsigned long flags;
-
-		if (!(dev->flags & ATA_DFLAG_DETACHED))
-			continue;
-
-		spin_lock_irqsave(ap->lock, flags);
-		dev->flags &= ~ATA_DFLAG_DETACHED;
-		spin_unlock_irqrestore(ap->lock, flags);
-
-		ata_scsi_remove_dev(dev);
-	}
+	/* Unplug detached devices.  We cannot use link iterator here
+	 * because PMP links have to be scanned even if PMP is
+	 * currently not attached.  Iterate manually.
+	 */
+	ata_scsi_handle_link_detach(&ap->link);
+	if (ap->pmp_link)
+		for (i = 0; i < SATA_PMP_MAX_PORTS; i++)
+			ata_scsi_handle_link_detach(&ap->pmp_link[i]);
 
 	/* scan for new ones */
-	ata_scsi_scan_host(ap);
-
-	/* If we scanned while EH was in progress, scan would have
-	 * failed silently.  Requeue if there are enabled but
-	 * unattached devices.
-	 */
-	for (i = 0; i < ATA_MAX_DEVICES; i++) {
-		struct ata_device *dev = &ap->device[i];
-		if (ata_dev_enabled(dev) && !dev->sdev) {
-			queue_delayed_work(ata_aux_wq, &ap->hotplug_task,
-				round_jiffies_relative(HZ));
-			break;
-		}
-	}
+	ata_scsi_scan_host(ap, 0);
 
 	DPRINTK("EXIT\n");
 }
@@ -3132,27 +3197,42 @@ static int ata_scsi_user_scan(struct Scsi_Host *shost, unsigned int channel,
 {
 	struct ata_port *ap = ata_shost_to_port(shost);
 	unsigned long flags;
-	int rc = 0;
+	int devno, rc = 0;
 
 	if (!ap->ops->error_handler)
 		return -EOPNOTSUPP;
 
-	if ((channel != SCAN_WILD_CARD && channel != 0) ||
-	    (lun != SCAN_WILD_CARD && lun != 0))
+	if (lun != SCAN_WILD_CARD && lun)
 		return -EINVAL;
+
+	if (ap->nr_pmp_links == 0) {
+		if (channel != SCAN_WILD_CARD && channel)
+			return -EINVAL;
+		devno = id;
+	} else {
+		if (id != SCAN_WILD_CARD && id)
+			return -EINVAL;
+		devno = channel;
+	}
 
 	spin_lock_irqsave(ap->lock, flags);
 
-	if (id == SCAN_WILD_CARD) {
-		ap->eh_info.probe_mask |= (1 << ATA_MAX_DEVICES) - 1;
-		ap->eh_info.action |= ATA_EH_SOFTRESET;
+	if (devno == SCAN_WILD_CARD) {
+		struct ata_link *link;
+
+		ata_port_for_each_link(link, ap) {
+			struct ata_eh_info *ehi = &link->eh_info;
+			ehi->probe_mask |= (1 << ata_link_max_devices(link)) - 1;
+			ehi->action |= ATA_EH_SOFTRESET;
+		}
 	} else {
-		struct ata_device *dev = ata_find_dev(ap, id);
+		struct ata_device *dev = ata_find_dev(ap, devno);
 
 		if (dev) {
-			ap->eh_info.probe_mask |= 1 << dev->devno;
-			ap->eh_info.action |= ATA_EH_SOFTRESET;
-			ap->eh_info.flags |= ATA_EHI_RESUME_LINK;
+			struct ata_eh_info *ehi = &dev->link->eh_info;
+			ehi->probe_mask |= 1 << dev->devno;
+			ehi->action |= ATA_EH_SOFTRESET;
+			ehi->flags |= ATA_EHI_RESUME_LINK;
 		} else
 			rc = -EINVAL;
 	}
@@ -3183,24 +3263,26 @@ void ata_scsi_dev_rescan(struct work_struct *work)
 {
 	struct ata_port *ap =
 		container_of(work, struct ata_port, scsi_rescan_task);
+	struct ata_link *link;
+	struct ata_device *dev;
 	unsigned long flags;
-	unsigned int i;
 
 	spin_lock_irqsave(ap->lock, flags);
 
-	for (i = 0; i < ATA_MAX_DEVICES; i++) {
-		struct ata_device *dev = &ap->device[i];
-		struct scsi_device *sdev = dev->sdev;
+	ata_port_for_each_link(link, ap) {
+		ata_link_for_each_dev(dev, link) {
+			struct scsi_device *sdev = dev->sdev;
 
-		if (!ata_dev_enabled(dev) || !sdev)
-			continue;
-		if (scsi_device_get(sdev))
-			continue;
+			if (!ata_dev_enabled(dev) || !sdev)
+				continue;
+			if (scsi_device_get(sdev))
+				continue;
 
-		spin_unlock_irqrestore(ap->lock, flags);
-		scsi_rescan_device(&(sdev->sdev_gendev));
-		scsi_device_put(sdev);
-		spin_lock_irqsave(ap->lock, flags);
+			spin_unlock_irqrestore(ap->lock, flags);
+			scsi_rescan_device(&(sdev->sdev_gendev));
+			scsi_device_put(sdev);
+			spin_lock_irqsave(ap->lock, flags);
+		}
 	}
 
 	spin_unlock_irqrestore(ap->lock, flags);
@@ -3328,7 +3410,7 @@ EXPORT_SYMBOL_GPL(ata_sas_port_destroy);
 int ata_sas_slave_configure(struct scsi_device *sdev, struct ata_port *ap)
 {
 	ata_scsi_sdev_config(sdev);
-	ata_scsi_dev_config(sdev, ap->device);
+	ata_scsi_dev_config(sdev, ap->link.device);
 	return 0;
 }
 EXPORT_SYMBOL_GPL(ata_sas_slave_configure);
@@ -3351,8 +3433,8 @@ int ata_sas_queuecmd(struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *),
 
 	ata_scsi_dump_cdb(ap, cmd);
 
-	if (likely(ata_scsi_dev_enabled(ap->device)))
-		rc = __ata_scsi_queuecmd(cmd, done, ap->device);
+	if (likely(ata_scsi_dev_enabled(ap->link.device)))
+		rc = __ata_scsi_queuecmd(cmd, done, ap->link.device);
 	else {
 		cmd->result = (DID_BAD_TARGET << 16);
 		done(cmd);

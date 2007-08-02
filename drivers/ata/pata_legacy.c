@@ -96,7 +96,7 @@ static int iordy_mask = 0xFFFFFFFF;	/* Use iordy if available */
 
 /**
  *	legacy_set_mode		-	mode setting
- *	@ap: IDE interface
+ *	@link: IDE link
  *	@unused: Device that failed when error is returned
  *
  *	Use a non standard set_mode function. We don't want to be tuned.
@@ -107,12 +107,11 @@ static int iordy_mask = 0xFFFFFFFF;	/* Use iordy if available */
  *	expand on this as per hdparm in the base kernel.
  */
 
-static int legacy_set_mode(struct ata_port *ap, struct ata_device **unused)
+static int legacy_set_mode(struct ata_link *link, struct ata_device **unused)
 {
-	int i;
+	struct ata_device *dev;
 
-	for (i = 0; i < ATA_MAX_DEVICES; i++) {
-		struct ata_device *dev = &ap->device[i];
+	ata_link_for_each_dev(dev, link) {
 		if (ata_dev_enabled(dev)) {
 			ata_dev_printk(dev, KERN_INFO, "configured for PIO\n");
 			dev->pio_mode = XFER_PIO_0;
@@ -256,7 +255,7 @@ static void pdc20230_set_piomode(struct ata_port *ap, struct ata_device *adev)
 
 static void pdc_data_xfer_vlb(struct ata_device *adev, unsigned char *buf, unsigned int buflen, int write_data)
 {
-	struct ata_port *ap = adev->ap;
+	struct ata_port *ap = adev->link->ap;
 	int slop = buflen & 3;
 	unsigned long flags;
 

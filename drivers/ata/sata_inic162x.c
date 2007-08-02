@@ -190,34 +190,34 @@ static void inic_reset_port(void __iomem *port_base)
 	writew(ctl, idma_ctl);
 }
 
-static u32 inic_scr_read(struct ata_port *ap, unsigned sc_reg)
+static int inic_scr_read(struct ata_port *ap, unsigned sc_reg, u32 *val)
 {
-	void __iomem *scr_addr = (void __iomem *)ap->ioaddr.scr_addr;
+	void __iomem *scr_addr = ap->ioaddr.scr_addr;
 	void __iomem *addr;
-	u32 val;
 
 	if (unlikely(sc_reg >= ARRAY_SIZE(scr_map)))
-		return 0xffffffffU;
+		return -EINVAL;
 
 	addr = scr_addr + scr_map[sc_reg] * 4;
-	val = readl(scr_addr + scr_map[sc_reg] * 4);
+	*val = readl(scr_addr + scr_map[sc_reg] * 4);
 
 	/* this controller has stuck DIAG.N, ignore it */
 	if (sc_reg == SCR_ERROR)
-		val &= ~SERR_PHYRDY_CHG;
-	return val;
+		*val &= ~SERR_PHYRDY_CHG;
+	return 0;
 }
 
-static void inic_scr_write(struct ata_port *ap, unsigned sc_reg, u32 val)
+static int inic_scr_write(struct ata_port *ap, unsigned sc_reg, u32 val)
 {
-	void __iomem *scr_addr = (void __iomem *)ap->ioaddr.scr_addr;
+	void __iomem *scr_addr = ap->ioaddr.scr_addr;
 	void __iomem *addr;
 
 	if (unlikely(sc_reg >= ARRAY_SIZE(scr_map)))
-		return;
+		return -EINVAL;
 
 	addr = scr_addr + scr_map[sc_reg] * 4;
 	writel(val, scr_addr + scr_map[sc_reg] * 4);
+	return 0;
 }
 
 /*
@@ -285,7 +285,7 @@ static void inic_irq_clear(struct ata_port *ap)
 static void inic_host_intr(struct ata_port *ap)
 {
 	void __iomem *port_base = inic_port_base(ap);
-	struct ata_eh_info *ehi = &ap->eh_info;
+	struct ata_eh_info *ehi = &ap->link.eh_info;
 	u8 irq_stat;
 
 	/* fetch and clear irq */
@@ -293,7 +293,8 @@ static void inic_host_intr(struct ata_port *ap)
 	writeb(irq_stat, port_base + PORT_IRQ_STAT);
 
 	if (likely(!(irq_stat & PIRQ_ERR))) {
-		struct ata_queued_cmd *qc = ata_qc_from_tag(ap, ap->active_tag);
+		struct ata_queued_cmd *qc =
+			ata_qc_from_tag(ap, ap->link.active_tag);
 
 		if (unlikely(!qc || (qc->tf.flags & ATA_TFLAG_POLLING))) {
 			ata_chk_status(ap);	/* clear ATA interrupt */
@@ -416,12 +417,13 @@ static void inic_thaw(struct ata_port *ap)
  * SRST and SControl hardreset don't give valid signature on this
  * controller.  Only controller specific hardreset mechanism works.
  */
-static int inic_hardreset(struct ata_port *ap, unsigned int *class,
+static int inic_hardreset(struct ata_link *link, unsigned int *class,
 			  unsigned long deadline)
 {
+	struct ata_port *ap = link->ap;
 	void __iomem *port_base = inic_port_base(ap);
 	void __iomem *idma_ctl = port_base + PORT_IDMA_CTL;
-	const unsigned long *timing = sata_ehc_deb_timing(&ap->eh_context);
+	const unsigned long *timing = sata_ehc_deb_timing(&link->eh_context);
 	u16 val;
 	int rc;
 
@@ -434,15 +436,15 @@ static int inic_hardreset(struct ata_port *ap, unsigned int *class,
 	msleep(1);
 	writew(val & ~IDMA_CTL_RST_ATA, idma_ctl);
 
-	rc = sata_phy_resume(ap, timing, deadline);
+	rc = sata_link_resume(link, timing, deadline);
 	if (rc) {
-		ata_port_printk(ap, KERN_WARNING, "failed to resume "
+		ata_link_printk(link, KERN_WARNING, "failed to resume "
 				"link after reset (errno=%d)\n", rc);
 		return rc;
 	}
 
 	*class = ATA_DEV_NONE;
-	if (ata_port_online(ap)) {
+	if (ata_link_online(link)) {
 		struct ata_taskfile tf;
 
 		/* wait a while before checking status */
@@ -451,7 +453,7 @@ static int inic_hardreset(struct ata_port *ap, unsigned int *class,
 		rc = ata_wait_ready(ap, deadline);
 		/* link occupied, -ENODEV too is an error */
 		if (rc) {
-			ata_port_printk(ap, KERN_WARNING, "device not ready "
+			ata_link_printk(link, KERN_WARNING, "device not ready "
 					"after hardreset (errno=%d)\n", rc);
 			return rc;
 		}
@@ -594,7 +596,7 @@ static struct ata_port_info inic_port_info = {
 	.flags			= ATA_FLAG_SATA | ATA_FLAG_PIO_DMA,
 	.pio_mask		= 0x1f,	/* pio0-4 */
 	.mwdma_mask		= 0x07, /* mwdma0-2 */
-	.udma_mask		= 0x7f,	/* udma0-6 */
+	.udma_mask		= ATA_UDMA6,
 	.port_ops		= &inic_port_ops
 };
 

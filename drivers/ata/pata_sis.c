@@ -82,7 +82,7 @@ static int sis_short_ata40(struct pci_dev *dev)
 
 static int sis_old_port_base(struct ata_device *adev)
 {
-	return  0x40 + (4 * adev->ap->port_no) +  (2 * adev->devno);
+	return  0x40 + (4 * adev->link->ap->port_no) +  (2 * adev->devno);
 }
 
 /**
@@ -131,25 +131,29 @@ static int sis_66_cable_detect(struct ata_port *ap)
 
 /**
  *	sis_pre_reset		-	probe begin
- *	@ap: ATA port
+ *	@link: ATA link
  *	@deadline: deadline jiffies for the operation
  *
  *	Set up cable type and use generic probe init
  */
 
-static int sis_pre_reset(struct ata_port *ap, unsigned long deadline)
+static int sis_pre_reset(struct ata_link *link, unsigned long deadline)
 {
 	static const struct pci_bits sis_enable_bits[] = {
 		{ 0x4aU, 1U, 0x02UL, 0x02UL },	/* port 0 */
 		{ 0x4aU, 1U, 0x04UL, 0x04UL },	/* port 1 */
 	};
 
+	struct ata_port *ap = link->ap;
 	struct pci_dev *pdev = to_pci_dev(ap->host->dev);
 
 	if (!pci_test_config_bits(pdev, &sis_enable_bits[ap->port_no]))
 		return -ENOENT;
 
-	return ata_std_prereset(ap, deadline);
+	/* Clear the FIFO settings. We can't enable the FIFO until
+	   we know we are poking at a disk */
+	pci_write_config_byte(pdev, 0x4B, 0);
+	return ata_std_prereset(link, deadline);
 }
 
 
@@ -732,7 +736,7 @@ static const struct ata_port_operations sis_old_ops = {
 
 static const struct ata_port_info sis_info = {
 	.sht		= &sis_sht,
-	.flags		= ATA_FLAG_SLAVE_POSS | ATA_FLAG_SRST,
+	.flags		= ATA_FLAG_SLAVE_POSS,
 	.pio_mask	= 0x1f,	/* pio0-4 */
 	.mwdma_mask	= 0x07,
 	.udma_mask	= 0,
@@ -740,7 +744,7 @@ static const struct ata_port_info sis_info = {
 };
 static const struct ata_port_info sis_info33 = {
 	.sht		= &sis_sht,
-	.flags		= ATA_FLAG_SLAVE_POSS | ATA_FLAG_SRST,
+	.flags		= ATA_FLAG_SLAVE_POSS,
 	.pio_mask	= 0x1f,	/* pio0-4 */
 	.mwdma_mask	= 0x07,
 	.udma_mask	= ATA_UDMA2,	/* UDMA 33 */
@@ -748,28 +752,28 @@ static const struct ata_port_info sis_info33 = {
 };
 static const struct ata_port_info sis_info66 = {
 	.sht		= &sis_sht,
-	.flags		= ATA_FLAG_SLAVE_POSS | ATA_FLAG_SRST,
+	.flags		= ATA_FLAG_SLAVE_POSS,
 	.pio_mask	= 0x1f,	/* pio0-4 */
 	.udma_mask	= ATA_UDMA4,	/* UDMA 66 */
 	.port_ops	= &sis_66_ops,
 };
 static const struct ata_port_info sis_info100 = {
 	.sht		= &sis_sht,
-	.flags		= ATA_FLAG_SLAVE_POSS | ATA_FLAG_SRST,
+	.flags		= ATA_FLAG_SLAVE_POSS,
 	.pio_mask	= 0x1f,	/* pio0-4 */
 	.udma_mask	= ATA_UDMA5,
 	.port_ops	= &sis_100_ops,
 };
 static const struct ata_port_info sis_info100_early = {
 	.sht		= &sis_sht,
-	.flags		= ATA_FLAG_SLAVE_POSS | ATA_FLAG_SRST,
+	.flags		= ATA_FLAG_SLAVE_POSS,
 	.udma_mask	= ATA_UDMA5,
 	.pio_mask	= 0x1f,	/* pio0-4 */
 	.port_ops	= &sis_66_ops,
 };
 static const struct ata_port_info sis_info133 = {
 	.sht		= &sis_sht,
-	.flags		= ATA_FLAG_SLAVE_POSS | ATA_FLAG_SRST,
+	.flags		= ATA_FLAG_SLAVE_POSS,
 	.pio_mask	= 0x1f,	/* pio0-4 */
 	.udma_mask	= ATA_UDMA6,
 	.port_ops	= &sis_133_ops,
@@ -783,7 +787,7 @@ const struct ata_port_info sis_info133_for_sata = {
 };
 static const struct ata_port_info sis_info133_early = {
 	.sht		= &sis_sht,
-	.flags		= ATA_FLAG_SLAVE_POSS | ATA_FLAG_SRST,
+	.flags		= ATA_FLAG_SLAVE_POSS,
 	.pio_mask	= 0x1f,	/* pio0-4 */
 	.udma_mask	= ATA_UDMA6,
 	.port_ops	= &sis_133_early_ops,

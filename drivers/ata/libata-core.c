@@ -59,7 +59,7 @@
 
 #include "libata.h"
 
-#define DRV_VERSION	"2.21"	/* must be exactly four chars */
+#define DRV_VERSION	"3.00"	/* must be exactly four chars */
 
 
 /* debounce timing parameters in msecs { interval, duration, timeout } */
@@ -71,6 +71,7 @@ static unsigned int ata_dev_init_params(struct ata_device *dev,
 					u16 heads, u16 sectors);
 static unsigned int ata_dev_set_xfermode(struct ata_device *dev);
 static void ata_dev_xfermask(struct ata_device *dev);
+static unsigned long ata_dev_blacklisted(const struct ata_device *dev);
 
 unsigned int ata_print_id = 1;
 static struct workqueue_struct *ata_wq;
@@ -110,8 +111,9 @@ MODULE_VERSION(DRV_VERSION);
 /**
  *	ata_tf_to_fis - Convert ATA taskfile to SATA FIS structure
  *	@tf: Taskfile to convert
- *	@fis: Buffer into which data will output
  *	@pmp: Port multiplier port
+ *	@is_cmd: This FIS is for command
+ *	@fis: Buffer into which data will output
  *
  *	Converts a standard ATA taskfile to a Serial ATA
  *	FIS structure (Register - Host to Device).
@@ -119,12 +121,13 @@ MODULE_VERSION(DRV_VERSION);
  *	LOCKING:
  *	Inherited from caller.
  */
-
-void ata_tf_to_fis(const struct ata_taskfile *tf, u8 *fis, u8 pmp)
+void ata_tf_to_fis(const struct ata_taskfile *tf, u8 pmp, int is_cmd, u8 *fis)
 {
-	fis[0] = 0x27;	/* Register - Host to Device FIS */
-	fis[1] = (pmp & 0xf) | (1 << 7); /* Port multiplier number,
-					    bit 7 indicates Command FIS */
+	fis[0] = 0x27;			/* Register - Host to Device FIS */
+	fis[1] = pmp & 0xf;		/* Port multiplier number*/
+	if (is_cmd)
+		fis[1] |= (1 << 7);	/* bit 7 indicates Command FIS */
+
 	fis[2] = tf->command;
 	fis[3] = tf->feature;
 
@@ -232,7 +235,7 @@ static int ata_rwcmd_protocol(struct ata_taskfile *tf, struct ata_device *dev)
 	if (dev->flags & ATA_DFLAG_PIO) {
 		tf->protocol = ATA_PROT_PIO;
 		index = dev->multi_count ? 0 : 8;
-	} else if (lba48 && (dev->ap->flags & ATA_FLAG_PIO_LBA48)) {
+	} else if (lba48 && (dev->link->ap->flags & ATA_FLAG_PIO_LBA48)) {
 		/* Unable to use DMA due to host limitation */
 		tf->protocol = ATA_PROT_PIO;
 		index = dev->multi_count ? 0 : 8;
@@ -601,7 +604,7 @@ static const char *sata_spd_string(unsigned int spd)
 void ata_dev_disable(struct ata_device *dev)
 {
 	if (ata_dev_enabled(dev)) {
-		if (ata_msg_drv(dev->ap))
+		if (ata_msg_drv(dev->link->ap))
 			ata_dev_printk(dev, KERN_WARNING, "disabled\n");
 		ata_down_xfermask_limit(dev, ATA_DNXFER_FORCE_PIO0 |
 					     ATA_DNXFER_QUIET);
@@ -664,27 +667,47 @@ static unsigned int ata_devchk(struct ata_port *ap, unsigned int device)
  *	None.
  *
  *	RETURNS:
- *	Device type, %ATA_DEV_ATA, %ATA_DEV_ATAPI, or %ATA_DEV_UNKNOWN
- *	the event of failure.
+ *	Device type, %ATA_DEV_ATA, %ATA_DEV_ATAPI, %ATA_DEV_PMP or
+ *	%ATA_DEV_UNKNOWN the event of failure.
  */
-
 unsigned int ata_dev_classify(const struct ata_taskfile *tf)
 {
 	/* Apple's open source Darwin code hints that some devices only
 	 * put a proper signature into the LBA mid/high registers,
 	 * So, we only check those.  It's sufficient for uniqueness.
+	 *
+	 * ATA/ATAPI-7 (d1532v1r1: Feb. 19, 2003) specified separate
+	 * signatures for ATA and ATAPI devices attached on SerialATA,
+	 * 0x3c/0xc3 and 0x69/0x96 respectively.  However, SerialATA
+	 * spec has never mentioned about using different signatures
+	 * for ATA/ATAPI devices.  Then, Serial ATA II: Port
+	 * Multiplier specification began to use 0x69/0x96 to identify
+	 * port multpliers and 0x3c/0xc3 to identify SEMB device.
+	 * ATA/ATAPI-7 dropped descriptions about 0x3c/0xc3 and
+	 * 0x69/0x96 shortly and described them as reserved for
+	 * SerialATA.
+	 *
+	 * We follow the current spec and consider that 0x69/0x96
+	 * identifies a port multiplier and 0x3c/0xc3 a SEMB device.
 	 */
-
-	if (((tf->lbam == 0) && (tf->lbah == 0)) ||
-	    ((tf->lbam == 0x3c) && (tf->lbah == 0xc3))) {
+	if ((tf->lbam == 0) && (tf->lbah == 0)) {
 		DPRINTK("found ATA device by sig\n");
 		return ATA_DEV_ATA;
 	}
 
-	if (((tf->lbam == 0x14) && (tf->lbah == 0xeb)) ||
-	    ((tf->lbam == 0x69) && (tf->lbah == 0x96))) {
+	if ((tf->lbam == 0x14) && (tf->lbah == 0xeb)) {
 		DPRINTK("found ATAPI device by sig\n");
 		return ATA_DEV_ATAPI;
+	}
+
+	if ((tf->lbam == 0x69) && (tf->lbah == 0x96)) {
+		DPRINTK("found PMP device by sig\n");
+		return ATA_DEV_PMP;
+	}
+
+	if ((tf->lbam == 0x3c) && (tf->lbah == 0xc3)) {
+		printk("ata: SEMB device ignored\n");
+		return ATA_DEV_SEMB_UNSUP; /* not yet */
 	}
 
 	DPRINTK("unknown device\n");
@@ -732,7 +755,7 @@ ata_dev_try_classify(struct ata_port *ap, unsigned int device, u8 *r_err)
 	/* see if device passed diags: if master then continue and warn later */
 	if (err == 0 && device == 0)
 		/* diagnostic fail : do nothing _YET_ */
-		ap->device[device].horkage |= ATA_HORKAGE_DIAGNOSTIC;
+		ap->link.device[device].horkage |= ATA_HORKAGE_DIAGNOSTIC;
 	else if (err == 1)
 		/* do nothing */ ;
 	else if ((device == 0) && (err == 0x81))
@@ -1147,7 +1170,7 @@ void ata_dev_select(struct ata_port *ap, unsigned int device,
 	ap->ops->dev_select(ap, device);
 
 	if (wait) {
-		if (can_sleep && ap->device[device].class == ATA_DEV_ATAPI)
+		if (can_sleep && ap->link.device[device].class == ATA_DEV_ATAPI)
 			msleep(150);
 		ata_wait_idle(ap);
 	}
@@ -1283,18 +1306,11 @@ static unsigned int ata_id_xfermask(const u16 *id)
 void ata_port_queue_task(struct ata_port *ap, work_func_t fn, void *data,
 			 unsigned long delay)
 {
-	int rc;
-
-	if (ap->pflags & ATA_PFLAG_FLUSH_PORT_TASK)
-		return;
-
 	PREPARE_DELAYED_WORK(&ap->port_task, fn);
 	ap->port_task_data = data;
 
-	rc = queue_delayed_work(ata_wq, &ap->port_task, delay);
-
-	/* rc == 0 means that another user is using port task */
-	WARN_ON(rc == 0);
+	/* may fail if ata_port_flush_task() in progress */
+	queue_delayed_work(ata_wq, &ap->port_task, delay);
 }
 
 /**
@@ -1309,32 +1325,9 @@ void ata_port_queue_task(struct ata_port *ap, work_func_t fn, void *data,
  */
 void ata_port_flush_task(struct ata_port *ap)
 {
-	unsigned long flags;
-
 	DPRINTK("ENTER\n");
 
-	spin_lock_irqsave(ap->lock, flags);
-	ap->pflags |= ATA_PFLAG_FLUSH_PORT_TASK;
-	spin_unlock_irqrestore(ap->lock, flags);
-
-	DPRINTK("flush #1\n");
-	cancel_work_sync(&ap->port_task.work); /* akpm: seems unneeded */
-
-	/*
-	 * At this point, if a task is running, it's guaranteed to see
-	 * the FLUSH flag; thus, it will never queue pio tasks again.
-	 * Cancel and flush.
-	 */
-	if (!cancel_delayed_work(&ap->port_task)) {
-		if (ata_msg_ctl(ap))
-			ata_port_printk(ap, KERN_DEBUG, "%s: flush #2\n",
-					__FUNCTION__);
-		cancel_work_sync(&ap->port_task.work);
-	}
-
-	spin_lock_irqsave(ap->lock, flags);
-	ap->pflags &= ~ATA_PFLAG_FLUSH_PORT_TASK;
-	spin_unlock_irqrestore(ap->lock, flags);
+	cancel_rearming_delayed_work(&ap->port_task);
 
 	if (ata_msg_ctl(ap))
 		ata_port_printk(ap, KERN_DEBUG, "%s: EXIT\n", __FUNCTION__);
@@ -1373,11 +1366,13 @@ unsigned ata_exec_internal_sg(struct ata_device *dev,
 			      int dma_dir, struct scatterlist *sg,
 			      unsigned int n_elem)
 {
-	struct ata_port *ap = dev->ap;
+	struct ata_link *link = dev->link;
+	struct ata_port *ap = link->ap;
 	u8 command = tf->command;
 	struct ata_queued_cmd *qc;
 	unsigned int tag, preempted_tag;
 	u32 preempted_sactive, preempted_qc_active;
+	int preempted_nr_active_links;
 	DECLARE_COMPLETION_ONSTACK(wait);
 	unsigned long flags;
 	unsigned int err_mask;
@@ -1413,12 +1408,14 @@ unsigned ata_exec_internal_sg(struct ata_device *dev,
 	qc->dev = dev;
 	ata_qc_reinit(qc);
 
-	preempted_tag = ap->active_tag;
-	preempted_sactive = ap->sactive;
+	preempted_tag = link->active_tag;
+	preempted_sactive = link->sactive;
 	preempted_qc_active = ap->qc_active;
-	ap->active_tag = ATA_TAG_POISON;
-	ap->sactive = 0;
+	preempted_nr_active_links = ap->nr_active_links;
+	link->active_tag = ATA_TAG_POISON;
+	link->sactive = 0;
 	ap->qc_active = 0;
+	ap->nr_active_links = 0;
 
 	/* prepare & issue qc */
 	qc->tf = *tf;
@@ -1494,9 +1491,10 @@ unsigned ata_exec_internal_sg(struct ata_device *dev,
 	err_mask = qc->err_mask;
 
 	ata_qc_free(qc);
-	ap->active_tag = preempted_tag;
-	ap->sactive = preempted_sactive;
+	link->active_tag = preempted_tag;
+	link->sactive = preempted_sactive;
 	ap->qc_active = preempted_qc_active;
+	ap->nr_active_links = preempted_nr_active_links;
 
 	/* XXX - Some LLDDs (sata_mv) disable port on command failure.
 	 * Until those drivers are fixed, we detect the condition
@@ -1593,7 +1591,7 @@ unsigned int ata_pio_need_iordy(const struct ata_device *adev)
 {
 	/* Controller doesn't support  IORDY. Probably a pointless check
 	   as the caller should know this */
-	if (adev->ap->flags & ATA_FLAG_NO_IORDY)
+	if (adev->link->ap->flags & ATA_FLAG_NO_IORDY)
 		return 0;
 	/* PIO3 and higher it is mandatory */
 	if (adev->pio_mode > XFER_PIO_2)
@@ -1649,7 +1647,7 @@ static u32 ata_pio_mask_no_iordy(const struct ata_device *adev)
 int ata_dev_read_id(struct ata_device *dev, unsigned int *p_class,
 		    unsigned int flags, u16 *id)
 {
-	struct ata_port *ap = dev->ap;
+	struct ata_port *ap = dev->link->ap;
 	unsigned int class = *p_class;
 	struct ata_taskfile tf;
 	unsigned int err_mask = 0;
@@ -1801,20 +1799,21 @@ int ata_dev_read_id(struct ata_device *dev, unsigned int *p_class,
 
 static inline u8 ata_dev_knobble(struct ata_device *dev)
 {
-	return ((dev->ap->cbl == ATA_CBL_SATA) && (!ata_id_is_sata(dev->id)));
+	struct ata_port *ap = dev->link->ap;
+	return ((ap->cbl == ATA_CBL_SATA) && (!ata_id_is_sata(dev->id)));
 }
 
 static void ata_dev_config_ncq(struct ata_device *dev,
 			       char *desc, size_t desc_sz)
 {
-	struct ata_port *ap = dev->ap;
+	struct ata_port *ap = dev->link->ap;
 	int hdepth = 0, ddepth = ata_id_queue_depth(dev->id);
 
 	if (!ata_id_has_ncq(dev->id)) {
 		desc[0] = '\0';
 		return;
 	}
-	if (ata_device_blacklisted(dev) & ATA_HORKAGE_NONCQ) {
+	if (dev->horkage & ATA_HORKAGE_NONCQ) {
 		snprintf(desc, desc_sz, "NCQ (not used)");
 		return;
 	}
@@ -1844,8 +1843,9 @@ static void ata_dev_config_ncq(struct ata_device *dev,
  */
 int ata_dev_configure(struct ata_device *dev)
 {
-	struct ata_port *ap = dev->ap;
-	int print_info = ap->eh_context.i.flags & ATA_EHI_PRINTINFO;
+	struct ata_port *ap = dev->link->ap;
+	struct ata_eh_context *ehc = &dev->link->eh_context;
+	int print_info = ehc->i.flags & ATA_EHI_PRINTINFO;
 	const u16 *id = dev->id;
 	unsigned int xfer_mask;
 	char revbuf[7];		/* XYZ-99\0 */
@@ -1862,15 +1862,13 @@ int ata_dev_configure(struct ata_device *dev)
 	if (ata_msg_probe(ap))
 		ata_dev_printk(dev, KERN_DEBUG, "%s: ENTER\n", __FUNCTION__);
 
-	/* set _SDD */
-	rc = ata_acpi_push_id(dev);
-	if (rc) {
-		ata_dev_printk(dev, KERN_WARNING, "failed to set _SDD(%d)\n",
-			rc);
-	}
+	/* set horkage */
+	dev->horkage |= ata_dev_blacklisted(dev);
 
-	/* retrieve and execute the ATA task file of _GTF */
-	ata_acpi_exec_tfs(ap);
+	/* let ACPI work its magic */
+	rc = ata_acpi_on_devcfg(dev);
+	if (rc)
+		return rc;
 
 	/* print device capabilities */
 	if (ata_msg_probe(ap))
@@ -2042,7 +2040,7 @@ int ata_dev_configure(struct ata_device *dev)
 		dev->max_sectors = ATA_MAX_SECTORS;
 	}
 
-	if (ata_device_blacklisted(dev) & ATA_HORKAGE_MAX_SEC_128)
+	if (dev->horkage & ATA_HORKAGE_MAX_SEC_128)
 		dev->max_sectors = min_t(unsigned int, ATA_MAX_SECTORS_128,
 					 dev->max_sectors);
 
@@ -2130,21 +2128,19 @@ int ata_bus_probe(struct ata_port *ap)
 {
 	unsigned int classes[ATA_MAX_DEVICES];
 	int tries[ATA_MAX_DEVICES];
-	int i, rc;
+	int rc;
 	struct ata_device *dev;
 
 	ata_port_probe(ap);
 
-	for (i = 0; i < ATA_MAX_DEVICES; i++)
-		tries[i] = ATA_PROBE_MAX_TRIES;
+	ata_link_for_each_dev(dev, &ap->link)
+		tries[dev->devno] = ATA_PROBE_MAX_TRIES;
 
  retry:
 	/* reset and determine device classes */
 	ap->ops->phy_reset(ap);
 
-	for (i = 0; i < ATA_MAX_DEVICES; i++) {
-		dev = &ap->device[i];
-
+	ata_link_for_each_dev(dev, &ap->link) {
 		if (!(ap->flags & ATA_FLAG_DISABLED) &&
 		    dev->class != ATA_DEV_UNKNOWN)
 			classes[dev->devno] = dev->class;
@@ -2159,18 +2155,16 @@ int ata_bus_probe(struct ata_port *ap)
 	/* after the reset the device state is PIO 0 and the controller
 	   state is undefined. Record the mode */
 
-	for (i = 0; i < ATA_MAX_DEVICES; i++)
-		ap->device[i].pio_mode = XFER_PIO_0;
+	ata_link_for_each_dev(dev, &ap->link)
+		dev->pio_mode = XFER_PIO_0;
 
 	/* read IDENTIFY page and configure devices. We have to do the identify
 	   specific sequence bass-ackwards so that PDIAG- is released by
 	   the slave device */
 
-	for (i = ATA_MAX_DEVICES - 1; i >=  0; i--) {
-		dev = &ap->device[i];
-
-		if (tries[i])
-			dev->class = classes[i];
+	ata_link_for_each_dev(dev, &ap->link) {
+		if (tries[dev->devno])
+			dev->class = classes[dev->devno];
 
 		if (!ata_dev_enabled(dev))
 			continue;
@@ -2188,25 +2182,24 @@ int ata_bus_probe(struct ata_port *ap)
 	/* After the identify sequence we can now set up the devices. We do
 	   this in the normal order so that the user doesn't get confused */
 
-	for(i = 0; i < ATA_MAX_DEVICES; i++) {
-		dev = &ap->device[i];
+	ata_link_for_each_dev(dev, &ap->link) {
 		if (!ata_dev_enabled(dev))
 			continue;
 
-		ap->eh_context.i.flags |= ATA_EHI_PRINTINFO;
+		ap->link.eh_context.i.flags |= ATA_EHI_PRINTINFO;
 		rc = ata_dev_configure(dev);
-		ap->eh_context.i.flags &= ~ATA_EHI_PRINTINFO;
+		ap->link.eh_context.i.flags &= ~ATA_EHI_PRINTINFO;
 		if (rc)
 			goto fail;
 	}
 
 	/* configure transfer mode */
-	rc = ata_set_mode(ap, &dev);
+	rc = ata_set_mode(&ap->link, &dev);
 	if (rc)
 		goto fail;
 
-	for (i = 0; i < ATA_MAX_DEVICES; i++)
-		if (ata_dev_enabled(&ap->device[i]))
+	ata_link_for_each_dev(dev, &ap->link)
+		if (ata_dev_enabled(dev))
 			return 0;
 
 	/* no device present, disable port */
@@ -2231,7 +2224,7 @@ int ata_bus_probe(struct ata_port *ap)
 			/* This is the last chance, better to slow
 			 * down than lose it.
 			 */
-			sata_down_spd_limit(ap);
+			sata_down_spd_limit(&ap->link);
 			ata_down_xfermask_limit(dev, ATA_DNXFER_PIO);
 		}
 	}
@@ -2260,28 +2253,28 @@ void ata_port_probe(struct ata_port *ap)
 
 /**
  *	sata_print_link_status - Print SATA link status
- *	@ap: SATA port to printk link status about
+ *	@link: SATA link to printk link status about
  *
  *	This function prints link speed and status of a SATA link.
  *
  *	LOCKING:
  *	None.
  */
-void sata_print_link_status(struct ata_port *ap)
+void sata_print_link_status(struct ata_link *link)
 {
 	u32 sstatus, scontrol, tmp;
 
-	if (sata_scr_read(ap, SCR_STATUS, &sstatus))
+	if (sata_scr_read(link, SCR_STATUS, &sstatus))
 		return;
-	sata_scr_read(ap, SCR_CONTROL, &scontrol);
+	sata_scr_read(link, SCR_CONTROL, &scontrol);
 
-	if (ata_port_online(ap)) {
+	if (ata_link_online(link)) {
 		tmp = (sstatus >> 4) & 0xf;
-		ata_port_printk(ap, KERN_INFO,
+		ata_link_printk(link, KERN_INFO,
 				"SATA link up %s (SStatus %X SControl %X)\n",
 				sata_spd_string(tmp), sstatus, scontrol);
 	} else {
-		ata_port_printk(ap, KERN_INFO,
+		ata_link_printk(link, KERN_INFO,
 				"SATA link down (SStatus %X SControl %X)\n",
 				sstatus, scontrol);
 	}
@@ -2301,32 +2294,33 @@ void sata_print_link_status(struct ata_port *ap)
  */
 void __sata_phy_reset(struct ata_port *ap)
 {
-	u32 sstatus;
+	struct ata_link *link = &ap->link;
 	unsigned long timeout = jiffies + (HZ * 5);
+	u32 sstatus;
 
 	if (ap->flags & ATA_FLAG_SATA_RESET) {
 		/* issue phy wake/reset */
-		sata_scr_write_flush(ap, SCR_CONTROL, 0x301);
+		sata_scr_write_flush(link, SCR_CONTROL, 0x301);
 		/* Couldn't find anything in SATA I/II specs, but
 		 * AHCI-1.1 10.4.2 says at least 1 ms. */
 		mdelay(1);
 	}
 	/* phy wake/clear reset */
-	sata_scr_write_flush(ap, SCR_CONTROL, 0x300);
+	sata_scr_write_flush(link, SCR_CONTROL, 0x300);
 
 	/* wait for phy to become ready, if necessary */
 	do {
 		msleep(200);
-		sata_scr_read(ap, SCR_STATUS, &sstatus);
+		sata_scr_read(link, SCR_STATUS, &sstatus);
 		if ((sstatus & 0xf) != 1)
 			break;
 	} while (time_before(jiffies, timeout));
 
 	/* print link status */
-	sata_print_link_status(ap);
+	sata_print_link_status(link);
 
 	/* TODO: phy layer with polling, timeouts, etc. */
-	if (!ata_port_offline(ap))
+	if (!ata_link_offline(link))
 		ata_port_probe(ap);
 	else
 		ata_port_disable(ap);
@@ -2371,8 +2365,8 @@ void sata_phy_reset(struct ata_port *ap)
 
 struct ata_device *ata_dev_pair(struct ata_device *adev)
 {
-	struct ata_port *ap = adev->ap;
-	struct ata_device *pair = &ap->device[1 - adev->devno];
+	struct ata_link *link = adev->link;
+	struct ata_device *pair = &link->device[1 - adev->devno];
 	if (!ata_dev_enabled(pair))
 		return NULL;
 	return pair;
@@ -2393,16 +2387,16 @@ struct ata_device *ata_dev_pair(struct ata_device *adev)
 
 void ata_port_disable(struct ata_port *ap)
 {
-	ap->device[0].class = ATA_DEV_NONE;
-	ap->device[1].class = ATA_DEV_NONE;
+	ap->link.device[0].class = ATA_DEV_NONE;
+	ap->link.device[1].class = ATA_DEV_NONE;
 	ap->flags |= ATA_FLAG_DISABLED;
 }
 
 /**
  *	sata_down_spd_limit - adjust SATA spd limit downward
- *	@ap: Port to adjust SATA spd limit for
+ *	@link: Link to adjust SATA spd limit for
  *
- *	Adjust SATA spd limit of @ap downward.  Note that this
+ *	Adjust SATA spd limit of @link downward.  Note that this
  *	function only adjusts the limit.  The change must be applied
  *	using sata_set_spd().
  *
@@ -2412,45 +2406,59 @@ void ata_port_disable(struct ata_port *ap)
  *	RETURNS:
  *	0 on success, negative errno on failure
  */
-int sata_down_spd_limit(struct ata_port *ap)
+int sata_down_spd_limit(struct ata_link *link)
 {
 	u32 sstatus, spd, mask;
 	int rc, highbit;
 
-	rc = sata_scr_read(ap, SCR_STATUS, &sstatus);
-	if (rc)
-		return rc;
+	if (!sata_scr_valid(link))
+		return -EOPNOTSUPP;
 
-	mask = ap->sata_spd_limit;
+	/* If SCR can be read, use it to determine the current SPD.
+	 * If not, use cached value in link->sata_spd.
+	 */
+	rc = sata_scr_read(link, SCR_STATUS, &sstatus);
+	if (rc == 0)
+		spd = (sstatus >> 4) & 0xf;
+	else
+		spd = link->sata_spd;
+
+	mask = link->sata_spd_limit;
 	if (mask <= 1)
 		return -EINVAL;
+
+	/* unconditionally mask off the highest bit */
 	highbit = fls(mask) - 1;
 	mask &= ~(1 << highbit);
 
-	spd = (sstatus >> 4) & 0xf;
-	if (spd <= 1)
-		return -EINVAL;
-	spd--;
-	mask &= (1 << spd) - 1;
+	/* Mask off all speeds higher than or equal to the current
+	 * one.  Force 1.5Gbps if current SPD is not available.
+	 */
+	if (spd > 1)
+		mask &= (1 << (spd - 1)) - 1;
+	else
+		mask &= 1;
+
+	/* were we already at the bottom? */
 	if (!mask)
 		return -EINVAL;
 
-	ap->sata_spd_limit = mask;
+	link->sata_spd_limit = mask;
 
-	ata_port_printk(ap, KERN_WARNING, "limiting SATA link speed to %s\n",
+	ata_link_printk(link, KERN_WARNING, "limiting SATA link speed to %s\n",
 			sata_spd_string(fls(mask)));
 
 	return 0;
 }
 
-static int __sata_set_spd_needed(struct ata_port *ap, u32 *scontrol)
+static int __sata_set_spd_needed(struct ata_link *link, u32 *scontrol)
 {
 	u32 spd, limit;
 
-	if (ap->sata_spd_limit == UINT_MAX)
+	if (link->sata_spd_limit == UINT_MAX)
 		limit = 0;
 	else
-		limit = fls(ap->sata_spd_limit);
+		limit = fls(link->sata_spd_limit);
 
 	spd = (*scontrol >> 4) & 0xf;
 	*scontrol = (*scontrol & ~0xf0) | ((limit & 0xf) << 4);
@@ -2460,10 +2468,10 @@ static int __sata_set_spd_needed(struct ata_port *ap, u32 *scontrol)
 
 /**
  *	sata_set_spd_needed - is SATA spd configuration needed
- *	@ap: Port in question
+ *	@link: Link in question
  *
  *	Test whether the spd limit in SControl matches
- *	@ap->sata_spd_limit.  This function is used to determine
+ *	@link->sata_spd_limit.  This function is used to determine
  *	whether hardreset is necessary to apply SATA spd
  *	configuration.
  *
@@ -2473,21 +2481,21 @@ static int __sata_set_spd_needed(struct ata_port *ap, u32 *scontrol)
  *	RETURNS:
  *	1 if SATA spd configuration is needed, 0 otherwise.
  */
-int sata_set_spd_needed(struct ata_port *ap)
+int sata_set_spd_needed(struct ata_link *link)
 {
 	u32 scontrol;
 
-	if (sata_scr_read(ap, SCR_CONTROL, &scontrol))
+	if (sata_scr_read(link, SCR_CONTROL, &scontrol))
 		return 0;
 
-	return __sata_set_spd_needed(ap, &scontrol);
+	return __sata_set_spd_needed(link, &scontrol);
 }
 
 /**
  *	sata_set_spd - set SATA spd according to spd limit
- *	@ap: Port to set SATA spd for
+ *	@link: Link to set SATA spd for
  *
- *	Set SATA spd of @ap according to sata_spd_limit.
+ *	Set SATA spd of @link according to sata_spd_limit.
  *
  *	LOCKING:
  *	Inherited from caller.
@@ -2496,18 +2504,18 @@ int sata_set_spd_needed(struct ata_port *ap)
  *	0 if spd doesn't need to be changed, 1 if spd has been
  *	changed.  Negative errno if SCR registers are inaccessible.
  */
-int sata_set_spd(struct ata_port *ap)
+int sata_set_spd(struct ata_link *link)
 {
 	u32 scontrol;
 	int rc;
 
-	if ((rc = sata_scr_read(ap, SCR_CONTROL, &scontrol)))
+	if ((rc = sata_scr_read(link, SCR_CONTROL, &scontrol)))
 		return rc;
 
-	if (!__sata_set_spd_needed(ap, &scontrol))
+	if (!__sata_set_spd_needed(link, &scontrol))
 		return 0;
 
-	if ((rc = sata_scr_write(ap, SCR_CONTROL, scontrol)))
+	if ((rc = sata_scr_write(link, SCR_CONTROL, scontrol)))
 		return rc;
 
 	return 1;
@@ -2762,7 +2770,7 @@ int ata_down_xfermask_limit(struct ata_device *dev, unsigned int sel)
 
 static int ata_dev_set_mode(struct ata_device *dev)
 {
-	struct ata_eh_context *ehc = &dev->ap->eh_context;
+	struct ata_eh_context *ehc = &dev->link->eh_context;
 	unsigned int err_mask;
 	int rc;
 
@@ -2782,7 +2790,7 @@ static int ata_dev_set_mode(struct ata_device *dev)
 	}
 
 	ehc->i.flags |= ATA_EHI_POST_SETMODE;
-	rc = ata_dev_revalidate(dev, 0);
+	rc = ata_dev_revalidate(dev, ATA_DEV_UNKNOWN, 0);
 	ehc->i.flags &= ~ATA_EHI_POST_SETMODE;
 	if (rc)
 		return rc;
@@ -2797,7 +2805,7 @@ static int ata_dev_set_mode(struct ata_device *dev)
 
 /**
  *	ata_do_set_mode - Program timings and issue SET FEATURES - XFER
- *	@ap: port on which timings will be programmed
+ *	@link: link on which timings will be programmed
  *	@r_failed_dev: out paramter for failed device
  *
  *	Standard implementation of the function used to tune and set
@@ -2812,17 +2820,15 @@ static int ata_dev_set_mode(struct ata_device *dev)
  *	0 on success, negative errno otherwise
  */
 
-int ata_do_set_mode(struct ata_port *ap, struct ata_device **r_failed_dev)
+int ata_do_set_mode(struct ata_link *link, struct ata_device **r_failed_dev)
 {
+	struct ata_port *ap = link->ap;
 	struct ata_device *dev;
-	int i, rc = 0, used_dma = 0, found = 0;
-
+	int rc = 0, used_dma = 0, found = 0;
 
 	/* step 1: calculate xfer_mask */
-	for (i = 0; i < ATA_MAX_DEVICES; i++) {
+	ata_link_for_each_dev(dev, link) {
 		unsigned int pio_mask, dma_mask;
-
-		dev = &ap->device[i];
 
 		if (!ata_dev_enabled(dev))
 			continue;
@@ -2842,8 +2848,7 @@ int ata_do_set_mode(struct ata_port *ap, struct ata_device **r_failed_dev)
 		goto out;
 
 	/* step 2: always set host PIO timings */
-	for (i = 0; i < ATA_MAX_DEVICES; i++) {
-		dev = &ap->device[i];
+	ata_link_for_each_dev(dev, link) {
 		if (!ata_dev_enabled(dev))
 			continue;
 
@@ -2860,9 +2865,7 @@ int ata_do_set_mode(struct ata_port *ap, struct ata_device **r_failed_dev)
 	}
 
 	/* step 3: set host DMA timings */
-	for (i = 0; i < ATA_MAX_DEVICES; i++) {
-		dev = &ap->device[i];
-
+	ata_link_for_each_dev(dev, link) {
 		if (!ata_dev_enabled(dev) || !dev->dma_mode)
 			continue;
 
@@ -2873,9 +2876,7 @@ int ata_do_set_mode(struct ata_port *ap, struct ata_device **r_failed_dev)
 	}
 
 	/* step 4: update devices' xfer mode */
-	for (i = 0; i < ATA_MAX_DEVICES; i++) {
-		dev = &ap->device[i];
-
+	ata_link_for_each_dev(dev, link) {
 		/* don't update suspended devices' xfer mode */
 		if (!ata_dev_enabled(dev))
 			continue;
@@ -2899,7 +2900,7 @@ int ata_do_set_mode(struct ata_port *ap, struct ata_device **r_failed_dev)
 
 /**
  *	ata_set_mode - Program timings and issue SET FEATURES - XFER
- *	@ap: port on which timings will be programmed
+ *	@link: link on which timings will be programmed
  *	@r_failed_dev: out paramter for failed device
  *
  *	Set ATA device disk transfer mode (PIO3, UDMA6, etc.).  If
@@ -2912,12 +2913,14 @@ int ata_do_set_mode(struct ata_port *ap, struct ata_device **r_failed_dev)
  *	RETURNS:
  *	0 on success, negative errno otherwise
  */
-int ata_set_mode(struct ata_port *ap, struct ata_device **r_failed_dev)
+int ata_set_mode(struct ata_link *link, struct ata_device **r_failed_dev)
 {
+	struct ata_port *ap = link->ap;
+
 	/* has private set_mode? */
 	if (ap->ops->set_mode)
-		return ap->ops->set_mode(ap, r_failed_dev);
-	return ata_do_set_mode(ap, r_failed_dev);
+		return ap->ops->set_mode(link, r_failed_dev);
+	return ata_do_set_mode(link, r_failed_dev);
 }
 
 /**
@@ -3020,7 +3023,7 @@ int ata_wait_ready(struct ata_port *ap, unsigned long deadline)
 
 		if (!(status & ATA_BUSY))
 			return 0;
-		if (!ata_port_online(ap) && status == 0xff)
+		if (!ata_link_online(&ap->link) && status == 0xff)
 			return -ENODEV;
 		if (time_after(now, deadline))
 			return -EBUSY;
@@ -3155,6 +3158,7 @@ static int ata_bus_softreset(struct ata_port *ap, unsigned int devmask,
 
 void ata_bus_reset(struct ata_port *ap)
 {
+	struct ata_device *device = ap->link.device;
 	struct ata_ioports *ioaddr = &ap->ioaddr;
 	unsigned int slave_possible = ap->flags & ATA_FLAG_SLAVE_POSS;
 	u8 err;
@@ -3190,22 +3194,19 @@ void ata_bus_reset(struct ata_port *ap)
 	/*
 	 * determine by signature whether we have ATA or ATAPI devices
 	 */
-	ap->device[0].class = ata_dev_try_classify(ap, 0, &err);
+	device[0].class = ata_dev_try_classify(ap, 0, &err);
 	if ((slave_possible) && (err != 0x81))
-		ap->device[1].class = ata_dev_try_classify(ap, 1, &err);
-
-	/* re-enable interrupts */
-	ap->ops->irq_on(ap);
+		device[1].class = ata_dev_try_classify(ap, 1, &err);
 
 	/* is double-select really necessary? */
-	if (ap->device[1].class != ATA_DEV_NONE)
+	if (device[1].class != ATA_DEV_NONE)
 		ap->ops->dev_select(ap, 1);
-	if (ap->device[0].class != ATA_DEV_NONE)
+	if (device[0].class != ATA_DEV_NONE)
 		ap->ops->dev_select(ap, 0);
 
 	/* if no devices were detected, disable this port */
-	if ((ap->device[0].class == ATA_DEV_NONE) &&
-	    (ap->device[1].class == ATA_DEV_NONE))
+	if ((device[0].class == ATA_DEV_NONE) &&
+	    (device[1].class == ATA_DEV_NONE))
 		goto err_out;
 
 	if (ap->flags & (ATA_FLAG_SATA_RESET | ATA_FLAG_SRST)) {
@@ -3224,12 +3225,12 @@ err_out:
 }
 
 /**
- *	sata_phy_debounce - debounce SATA phy status
- *	@ap: ATA port to debounce SATA phy status for
+ *	sata_link_debounce - debounce SATA phy status
+ *	@link: ATA link to debounce SATA phy status for
  *	@params: timing parameters { interval, duratinon, timeout } in msec
  *	@deadline: deadline jiffies for the operation
  *
- *	Make sure SStatus of @ap reaches stable state, determined by
+*	Make sure SStatus of @link reaches stable state, determined by
  *	holding the same value where DET is not 1 for @duration polled
  *	every @interval, before @timeout.  Timeout constraints the
  *	beginning of the stable state.  Because DET gets stuck at 1 on
@@ -3245,8 +3246,8 @@ err_out:
  *	RETURNS:
  *	0 on success, -errno on failure.
  */
-int sata_phy_debounce(struct ata_port *ap, const unsigned long *params,
-		      unsigned long deadline)
+int sata_link_debounce(struct ata_link *link, const unsigned long *params,
+		       unsigned long deadline)
 {
 	unsigned long interval_msec = params[0];
 	unsigned long duration = msecs_to_jiffies(params[1]);
@@ -3258,7 +3259,7 @@ int sata_phy_debounce(struct ata_port *ap, const unsigned long *params,
 	if (time_before(t, deadline))
 		deadline = t;
 
-	if ((rc = sata_scr_read(ap, SCR_STATUS, &cur)))
+	if ((rc = sata_scr_read(link, SCR_STATUS, &cur)))
 		return rc;
 	cur &= 0xf;
 
@@ -3267,7 +3268,7 @@ int sata_phy_debounce(struct ata_port *ap, const unsigned long *params,
 
 	while (1) {
 		msleep(interval_msec);
-		if ((rc = sata_scr_read(ap, SCR_STATUS, &cur)))
+		if ((rc = sata_scr_read(link, SCR_STATUS, &cur)))
 			return rc;
 		cur &= 0xf;
 
@@ -3284,19 +3285,21 @@ int sata_phy_debounce(struct ata_port *ap, const unsigned long *params,
 		last = cur;
 		last_jiffies = jiffies;
 
-		/* check deadline */
+		/* Check deadline.  If debouncing failed, return
+		 * -EPIPE to tell upper layer to lower link speed.
+		 */
 		if (time_after(jiffies, deadline))
-			return -EBUSY;
+			return -EPIPE;
 	}
 }
 
 /**
- *	sata_phy_resume - resume SATA phy
- *	@ap: ATA port to resume SATA phy for
+ *	sata_link_resume - resume SATA link
+ *	@link: ATA link to resume SATA
  *	@params: timing parameters { interval, duratinon, timeout } in msec
  *	@deadline: deadline jiffies for the operation
  *
- *	Resume SATA phy of @ap and debounce it.
+ *	Resume SATA phy @link and debounce it.
  *
  *	LOCKING:
  *	Kernel thread context (may sleep)
@@ -3304,18 +3307,18 @@ int sata_phy_debounce(struct ata_port *ap, const unsigned long *params,
  *	RETURNS:
  *	0 on success, -errno on failure.
  */
-int sata_phy_resume(struct ata_port *ap, const unsigned long *params,
-		    unsigned long deadline)
+int sata_link_resume(struct ata_link *link, const unsigned long *params,
+		     unsigned long deadline)
 {
 	u32 scontrol;
 	int rc;
 
-	if ((rc = sata_scr_read(ap, SCR_CONTROL, &scontrol)))
+	if ((rc = sata_scr_read(link, SCR_CONTROL, &scontrol)))
 		return rc;
 
 	scontrol = (scontrol & 0x0f0) | 0x300;
 
-	if ((rc = sata_scr_write(ap, SCR_CONTROL, scontrol)))
+	if ((rc = sata_scr_write(link, SCR_CONTROL, scontrol)))
 		return rc;
 
 	/* Some PHYs react badly if SStatus is pounded immediately
@@ -3323,15 +3326,15 @@ int sata_phy_resume(struct ata_port *ap, const unsigned long *params,
 	 */
 	msleep(200);
 
-	return sata_phy_debounce(ap, params, deadline);
+	return sata_link_debounce(link, params, deadline);
 }
 
 /**
  *	ata_std_prereset - prepare for reset
- *	@ap: ATA port to be reset
+ *	@link: ATA link to be reset
  *	@deadline: deadline jiffies for the operation
  *
- *	@ap is about to be reset.  Initialize it.  Failure from
+ *	@link is about to be reset.  Initialize it.  Failure from
  *	prereset makes libata abort whole reset sequence and give up
  *	that port, so prereset should be best-effort.  It does its
  *	best to prepare for reset sequence but if things go wrong, it
@@ -3343,37 +3346,44 @@ int sata_phy_resume(struct ata_port *ap, const unsigned long *params,
  *	RETURNS:
  *	0 on success, -errno otherwise.
  */
-int ata_std_prereset(struct ata_port *ap, unsigned long deadline)
+int ata_std_prereset(struct ata_link *link, unsigned long deadline)
 {
-	struct ata_eh_context *ehc = &ap->eh_context;
+	struct ata_port *ap = link->ap;
+	struct ata_eh_context *ehc = &link->eh_context;
 	const unsigned long *timing = sata_ehc_deb_timing(ehc);
 	int rc;
 
 	/* handle link resume */
 	if ((ehc->i.flags & ATA_EHI_RESUME_LINK) &&
-	    (ap->flags & ATA_FLAG_HRST_TO_RESUME))
+	    (link->flags & ATA_LFLAG_HRST_TO_RESUME))
+		ehc->i.action |= ATA_EH_HARDRESET;
+
+	/* Some PMPs don't work with only SRST, force hardreset if PMP
+	 * is supported.
+	 */
+	if (ap->flags & ATA_FLAG_PMP)
 		ehc->i.action |= ATA_EH_HARDRESET;
 
 	/* if we're about to do hardreset, nothing more to do */
 	if (ehc->i.action & ATA_EH_HARDRESET)
 		return 0;
 
-	/* if SATA, resume phy */
-	if (ap->cbl == ATA_CBL_SATA) {
-		rc = sata_phy_resume(ap, timing, deadline);
+	/* if SATA, resume link */
+	if (ap->flags & ATA_FLAG_SATA) {
+		rc = sata_link_resume(link, timing, deadline);
 		/* whine about phy resume failure but proceed */
 		if (rc && rc != -EOPNOTSUPP)
-			ata_port_printk(ap, KERN_WARNING, "failed to resume "
+			ata_link_printk(link, KERN_WARNING, "failed to resume "
 					"link for reset (errno=%d)\n", rc);
 	}
 
 	/* Wait for !BSY if the controller can wait for the first D2H
 	 * Reg FIS and we don't know that no device is attached.
 	 */
-	if (!(ap->flags & ATA_FLAG_SKIP_D2H_BSY) && !ata_port_offline(ap)) {
+	if (!(link->flags & ATA_LFLAG_SKIP_D2H_BSY) && !ata_link_offline(link)) {
 		rc = ata_wait_ready(ap, deadline);
 		if (rc && rc != -ENODEV) {
-			ata_port_printk(ap, KERN_WARNING, "device not ready "
+			ata_link_printk(link, KERN_WARNING, "device not ready "
 					"(errno=%d), forcing hardreset\n", rc);
 			ehc->i.action |= ATA_EH_HARDRESET;
 		}
@@ -3384,7 +3394,7 @@ int ata_std_prereset(struct ata_port *ap, unsigned long deadline)
 
 /**
  *	ata_std_softreset - reset host port via ATA SRST
- *	@ap: port to reset
+ *	@link: ATA link to reset
  *	@classes: resulting classes of attached devices
  *	@deadline: deadline jiffies for the operation
  *
@@ -3396,9 +3406,10 @@ int ata_std_prereset(struct ata_port *ap, unsigned long deadline)
  *	RETURNS:
  *	0 on success, -errno otherwise.
  */
-int ata_std_softreset(struct ata_port *ap, unsigned int *classes,
+int ata_std_softreset(struct ata_link *link, unsigned int *classes,
 		      unsigned long deadline)
 {
+	struct ata_port *ap = link->ap;
 	unsigned int slave_possible = ap->flags & ATA_FLAG_SLAVE_POSS;
 	unsigned int devmask = 0;
 	int rc;
@@ -3406,7 +3417,7 @@ int ata_std_softreset(struct ata_port *ap, unsigned int *classes,
 
 	DPRINTK("ENTER\n");
 
-	if (ata_port_offline(ap)) {
+	if (ata_link_offline(link)) {
 		classes[0] = ATA_DEV_NONE;
 		goto out;
 	}
@@ -3424,8 +3435,8 @@ int ata_std_softreset(struct ata_port *ap, unsigned int *classes,
 	DPRINTK("about to softreset, devmask=%x\n", devmask);
 	rc = ata_bus_softreset(ap, devmask, deadline);
 	/* if link is occupied, -ENODEV too is an error */
-	if (rc && (rc != -ENODEV || sata_scr_valid(ap))) {
-		ata_port_printk(ap, KERN_ERR, "SRST failed (errno=%d)\n", rc);
+	if (rc && (rc != -ENODEV || sata_scr_valid(link))) {
+		ata_link_printk(link, KERN_ERR, "SRST failed (errno=%d)\n", rc);
 		return rc;
 	}
 
@@ -3440,12 +3451,12 @@ int ata_std_softreset(struct ata_port *ap, unsigned int *classes,
 }
 
 /**
- *	sata_port_hardreset - reset port via SATA phy reset
- *	@ap: port to reset
+ *	sata_link_hardreset - reset link via SATA phy reset
+ *	@link: link to reset
  *	@timing: timing parameters { interval, duratinon, timeout } in msec
  *	@deadline: deadline jiffies for the operation
  *
- *	SATA phy-reset host port using DET bits of SControl register.
+ *	SATA phy-reset @link using DET bits of SControl register.
  *
  *	LOCKING:
  *	Kernel thread context (may sleep)
@@ -3453,7 +3464,7 @@ int ata_std_softreset(struct ata_port *ap, unsigned int *classes,
  *	RETURNS:
  *	0 on success, -errno otherwise.
  */
-int sata_port_hardreset(struct ata_port *ap, const unsigned long *timing,
+int sata_link_hardreset(struct ata_link *link, const unsigned long *timing,
 			unsigned long deadline)
 {
 	u32 scontrol;
@@ -3461,30 +3472,30 @@ int sata_port_hardreset(struct ata_port *ap, const unsigned long *timing,
 
 	DPRINTK("ENTER\n");
 
-	if (sata_set_spd_needed(ap)) {
+	if (sata_set_spd_needed(link)) {
 		/* SATA spec says nothing about how to reconfigure
 		 * spd.  To be on the safe side, turn off phy during
 		 * reconfiguration.  This works for at least ICH7 AHCI
 		 * and Sil3124.
 		 */
-		if ((rc = sata_scr_read(ap, SCR_CONTROL, &scontrol)))
+		if ((rc = sata_scr_read(link, SCR_CONTROL, &scontrol)))
 			goto out;
 
 		scontrol = (scontrol & 0x0f0) | 0x304;
 
-		if ((rc = sata_scr_write(ap, SCR_CONTROL, scontrol)))
+		if ((rc = sata_scr_write(link, SCR_CONTROL, scontrol)))
 			goto out;
 
-		sata_set_spd(ap);
+		sata_set_spd(link);
 	}
 
 	/* issue phy wake/reset */
-	if ((rc = sata_scr_read(ap, SCR_CONTROL, &scontrol)))
+	if ((rc = sata_scr_read(link, SCR_CONTROL, &scontrol)))
 		goto out;
 
 	scontrol = (scontrol & 0x0f0) | 0x301;
 
-	if ((rc = sata_scr_write_flush(ap, SCR_CONTROL, scontrol)))
+	if ((rc = sata_scr_write_flush(link, SCR_CONTROL, scontrol)))
 		goto out;
 
 	/* Couldn't find anything in SATA I/II specs, but AHCI-1.1
@@ -3492,8 +3503,8 @@ int sata_port_hardreset(struct ata_port *ap, const unsigned long *timing,
 	 */
 	msleep(1);
 
-	/* bring phy back */
-	rc = sata_phy_resume(ap, timing, deadline);
+	/* bring link back */
+	rc = sata_link_resume(link, timing, deadline);
  out:
 	DPRINTK("EXIT, rc=%d\n", rc);
 	return rc;
@@ -3501,7 +3512,7 @@ int sata_port_hardreset(struct ata_port *ap, const unsigned long *timing,
 
 /**
  *	sata_std_hardreset - reset host port via SATA phy reset
- *	@ap: port to reset
+ *	@link: link to reset
  *	@class: resulting class of attached device
  *	@deadline: deadline jiffies for the operation
  *
@@ -3514,24 +3525,25 @@ int sata_port_hardreset(struct ata_port *ap, const unsigned long *timing,
  *	RETURNS:
  *	0 on success, -errno otherwise.
  */
-int sata_std_hardreset(struct ata_port *ap, unsigned int *class,
+int sata_std_hardreset(struct ata_link *link, unsigned int *class,
 		       unsigned long deadline)
 {
-	const unsigned long *timing = sata_ehc_deb_timing(&ap->eh_context);
+	struct ata_port *ap = link->ap;
+	const unsigned long *timing = sata_ehc_deb_timing(&link->eh_context);
 	int rc;
 
 	DPRINTK("ENTER\n");
 
 	/* do hardreset */
-	rc = sata_port_hardreset(ap, timing, deadline);
+	rc = sata_link_hardreset(link, timing, deadline);
 	if (rc) {
-		ata_port_printk(ap, KERN_ERR,
+		ata_link_printk(link, KERN_ERR,
 				"COMRESET failed (errno=%d)\n", rc);
 		return rc;
 	}
 
 	/* TODO: phy layer with polling, timeouts, etc. */
-	if (ata_port_offline(ap)) {
+	if (ata_link_offline(link)) {
 		*class = ATA_DEV_NONE;
 		DPRINTK("EXIT, link offline\n");
 		return 0;
@@ -3540,10 +3552,20 @@ int sata_std_hardreset(struct ata_port *ap, unsigned int *class,
 	/* wait a while before checking status, see SRST for more info */
 	msleep(150);
 
+	/* If PMP is supported, we have to do follow-up SRST.  Note
+	 * that some PMPs don't send D2H Reg FIS after hardreset at
+	 * all if the first port is empty.  Wait for it just for a
+	 * second and request follow-up SRST.
+	 */
+	if (ap->flags & ATA_FLAG_PMP) {
+		ata_wait_ready(ap, jiffies + HZ);
+		return -EAGAIN;
+	}
+
 	rc = ata_wait_ready(ap, deadline);
 	/* link occupied, -ENODEV too is an error */
 	if (rc) {
-		ata_port_printk(ap, KERN_ERR,
+		ata_link_printk(link, KERN_ERR,
 				"COMRESET failed (errno=%d)\n", rc);
 		return rc;
 	}
@@ -3558,7 +3580,7 @@ int sata_std_hardreset(struct ata_port *ap, unsigned int *class,
 
 /**
  *	ata_std_postreset - standard postreset callback
- *	@ap: the target ata_port
+ *	@link: the target ata_link
  *	@classes: classes of attached devices
  *
  *	This function is invoked after a successful reset.  Note that
@@ -3568,22 +3590,19 @@ int sata_std_hardreset(struct ata_port *ap, unsigned int *class,
  *	LOCKING:
  *	Kernel thread context (may sleep)
  */
-void ata_std_postreset(struct ata_port *ap, unsigned int *classes)
+void ata_std_postreset(struct ata_link *link, unsigned int *classes)
 {
+	struct ata_port *ap = link->ap;
 	u32 serror;
 
 	DPRINTK("ENTER\n");
 
 	/* print link status */
-	sata_print_link_status(ap);
+	sata_print_link_status(link);
 
 	/* clear SError */
-	if (sata_scr_read(ap, SCR_ERROR, &serror) == 0)
-		sata_scr_write(ap, SCR_ERROR, serror);
-
-	/* re-enable interrupts */
-	if (!ap->ops->error_handler)
-		ap->ops->irq_on(ap);
+	if (sata_scr_read(link, SCR_ERROR, &serror) == 0)
+		sata_scr_write(link, SCR_ERROR, serror);
 
 	/* is double-select really necessary? */
 	if (classes[0] != ATA_DEV_NONE)
@@ -3670,7 +3689,7 @@ static int ata_dev_same_device(struct ata_device *dev, unsigned int new_class,
 int ata_dev_reread_id(struct ata_device *dev, unsigned int readid_flags)
 {
 	unsigned int class = dev->class;
-	u16 *id = (void *)dev->ap->sector_buf;
+	u16 *id = (void *)dev->link->ap->sector_buf;
 	int rc;
 
 	/* read ID data */
@@ -3689,6 +3708,7 @@ int ata_dev_reread_id(struct ata_device *dev, unsigned int readid_flags)
 /**
  *	ata_dev_revalidate - Revalidate ATA device
  *	@dev: device to revalidate
+ *	@new_class: new class code
  *	@readid_flags: read ID flags
  *
  *	Re-read IDENTIFY page, make sure @dev is still attached to the
@@ -3700,13 +3720,23 @@ int ata_dev_reread_id(struct ata_device *dev, unsigned int readid_flags)
  *	RETURNS:
  *	0 on success, negative errno otherwise
  */
-int ata_dev_revalidate(struct ata_device *dev, unsigned int readid_flags)
+int ata_dev_revalidate(struct ata_device *dev, unsigned int new_class,
+		       unsigned int readid_flags)
 {
 	u64 n_sectors = dev->n_sectors;
 	int rc;
 
 	if (!ata_dev_enabled(dev))
 		return -ENODEV;
+
+	/* fail early if !ATA && !ATAPI to avoid issuing [P]IDENTIFY to PMP */
+	if (ata_class_enabled(new_class) &&
+	    new_class != ATA_DEV_ATA && new_class != ATA_DEV_ATAPI) {
+		ata_dev_printk(dev, KERN_INFO, "class mismatch %u != %u\n",
+			       dev->class, new_class);
+		rc = -ENODEV;
+		goto fail;
+	}
 
 	/* re-read ID */
 	rc = ata_dev_reread_id(dev, readid_flags);
@@ -3774,6 +3804,11 @@ static const struct ata_blacklist_entry ata_device_blacklist [] = {
 	{ "SAMSUNG CD-ROM SN-124","N001",	ATA_HORKAGE_NODMA },
 	{ "Seagate STT20000A", NULL,		ATA_HORKAGE_NODMA },
 	{ "IOMEGA  ZIP 250       ATAPI", NULL,	ATA_HORKAGE_NODMA }, /* temporary fix */
+	{ "IOMEGA  ZIP 250       ATAPI       Floppy",
+				NULL,		ATA_HORKAGE_NODMA },
+	/* Odd clown on sil3726/4726 PMPs */
+	{ "Config  Disk",	NULL,		ATA_HORKAGE_NODMA |
+						ATA_HORKAGE_SKIP_PM },
 
 	/* Weird ATAPI devices */
 	{ "TORiSAN DVD-ROM DRD-N216", NULL,	ATA_HORKAGE_MAX_SEC_128 },
@@ -3787,7 +3822,10 @@ static const struct ata_blacklist_entry ata_device_blacklist [] = {
 	{ "FUJITSU MHT2060BH",	NULL,		ATA_HORKAGE_NONCQ },
 	/* NCQ is broken */
 	{ "Maxtor 6L250S0",     "BANC1G10",     ATA_HORKAGE_NONCQ },
+	{ "Maxtor 6B200M0",	"BANC1BM0",	ATA_HORKAGE_NONCQ },
 	{ "Maxtor 6B200M0",	"BANC1B10",	ATA_HORKAGE_NONCQ },
+	{ "HITACHI HDS7250SASUN500G 0621KTAWSD", "K2AOAJ0AHITACHI",
+	 ATA_HORKAGE_NONCQ },
 	/* NCQ hard hangs device under heavier load, needs hard power cycle */
 	{ "Maxtor 6B250S0",	"BANC1B70",	ATA_HORKAGE_NONCQ },
 	/* Blacklist entries taken from Silicon Image 3124/3132
@@ -3800,6 +3838,8 @@ static const struct ata_blacklist_entry ata_device_blacklist [] = {
 	{ "HTS541612J9SA00",	"SBDIC7JP",	ATA_HORKAGE_NONCQ, },
 	{ "Hitachi HTS541616J9SA00", "SB4OC70P", ATA_HORKAGE_NONCQ, },
 	{ "WDC WD740ADFD-00NLR1", NULL,		ATA_HORKAGE_NONCQ, },
+	{ "FUJITSU MHV2080BH",	"00840028",	ATA_HORKAGE_NONCQ, },
+	{ "ST9160821AS",	"3.CLF",	ATA_HORKAGE_NONCQ, },
 
 	/* Devices with NCQ limits */
 
@@ -3807,7 +3847,7 @@ static const struct ata_blacklist_entry ata_device_blacklist [] = {
 	{ }
 };
 
-unsigned long ata_device_blacklisted(const struct ata_device *dev)
+static unsigned long ata_dev_blacklisted(const struct ata_device *dev)
 {
 	unsigned char model_num[ATA_ID_PROD_LEN + 1];
 	unsigned char model_rev[ATA_ID_FW_REV_LEN + 1];
@@ -3834,10 +3874,10 @@ static int ata_dma_blacklisted(const struct ata_device *dev)
 	 * DMA blacklist those ATAPI devices with CDB-intr (and use PIO)
 	 * if the LLDD handles only interrupts in the HSM_ST_LAST state.
 	 */
-	if ((dev->ap->flags & ATA_FLAG_PIO_POLLING) &&
+	if ((dev->link->ap->flags & ATA_FLAG_PIO_POLLING) &&
 	    (dev->flags & ATA_DFLAG_CDB_INTR))
 		return 1;
-	return (ata_device_blacklisted(dev) & ATA_HORKAGE_NODMA) ? 1 : 0;
+	return (dev->horkage & ATA_HORKAGE_NODMA) ? 1 : 0;
 }
 
 /**
@@ -3854,7 +3894,8 @@ static int ata_dma_blacklisted(const struct ata_device *dev)
  */
 static void ata_dev_xfermask(struct ata_device *dev)
 {
-	struct ata_port *ap = dev->ap;
+	struct ata_link *link = dev->link;
+	struct ata_port *ap = link->ap;
 	struct ata_host *host = ap->host;
 	unsigned long xfer_mask;
 
@@ -4107,6 +4148,68 @@ static void ata_fill_sg(struct ata_queued_cmd *qc)
 }
 
 /**
+ *	ata_fill_sg_dumb - Fill PCI IDE PRD table
+ *	@qc: Metadata associated with taskfile to be transferred
+ *
+ *	Fill PCI IDE PRD (scatter-gather) table with segments
+ *	associated with the current disk command. Perform the fill
+ *	so that we avoid writing any length 64K records for
+ *	controllers that don't follow the spec.
+ *
+ *	LOCKING:
+ *	spin_lock_irqsave(host lock)
+ *
+ */
+static void ata_fill_sg_dumb(struct ata_queued_cmd *qc)
+{
+	struct ata_port *ap = qc->ap;
+	struct scatterlist *sg;
+	unsigned int idx;
+
+	WARN_ON(qc->__sg == NULL);
+	WARN_ON(qc->n_elem == 0 && qc->pad_len == 0);
+
+	idx = 0;
+	ata_for_each_sg(sg, qc) {
+		u32 addr, offset;
+		u32 sg_len, len, blen;
+
+ 		/* determine if physical DMA addr spans 64K boundary.
+		 * Note h/w doesn't support 64-bit, so we unconditionally
+		 * truncate dma_addr_t to u32.
+		 */
+		addr = (u32) sg_dma_address(sg);
+		sg_len = sg_dma_len(sg);
+
+		while (sg_len) {
+			offset = addr & 0xffff;
+			len = sg_len;
+			if ((offset + sg_len) > 0x10000)
+				len = 0x10000 - offset;
+
+			blen = len & 0xffff;
+			ap->prd[idx].addr = cpu_to_le32(addr);
+			if (blen == 0) {
+			   /* Some PATA chipsets like the CS5530 can't
+			      cope with 0x0000 meaning 64K as the spec says */
+				ap->prd[idx].flags_len = cpu_to_le32(0x8000);
+				blen = 0x8000;
+				ap->prd[++idx].addr = cpu_to_le32(addr + 0x8000);
+			}
+			ap->prd[idx].flags_len = cpu_to_le32(blen);
+			VPRINTK("PRD[%u] = (0x%X, 0x%X)\n", idx, addr, len);
+
+			idx++;
+			sg_len -= len;
+			addr += len;
+		}
+	}
+
+	if (idx)
+		ap->prd[idx - 1].flags_len |= cpu_to_le32(ATA_PRD_EOT);
+}
+
+/**
  *	ata_check_atapi_dma - Check whether ATAPI DMA can be supported
  *	@qc: Metadata associated with taskfile to check
  *
@@ -4137,6 +4240,36 @@ int ata_check_atapi_dma(struct ata_queued_cmd *qc)
 }
 
 /**
+ *	ata_std_qc_defer - Check whether a qc needs to be deferred
+ *	@qc: ATA command in question
+ *
+ *	Non-NCQ commands cannot run with any other command, NCQ or
+ *	not.  As upper layer only knows the queue depth, we are
+ *	responsible for maintaining exclusion.  This function checks
+ *	whether a new command @qc can be issued.
+ *
+ *	LOCKING:
+ *	spin_lock_irqsave(host lock)
+ *
+ *	RETURNS:
+ *	ATA_DEFER_* if deferring is needed, 0 otherwise.
+ */
+int ata_std_qc_defer(struct ata_queued_cmd *qc)
+{
+	struct ata_link *link = qc->dev->link;
+
+	if (qc->tf.protocol == ATA_PROT_NCQ) {
+		if (!ata_tag_valid(link->active_tag))
+			return 0;
+	} else {
+		if (!ata_tag_valid(link->active_tag) && !link->sactive)
+			return 0;
+	}
+
+	return ATA_DEFER_LINK;
+}
+
+/**
  *	ata_qc_prep - Prepare taskfile for submission
  *	@qc: Metadata associated with taskfile to be prepared
  *
@@ -4151,6 +4284,23 @@ void ata_qc_prep(struct ata_queued_cmd *qc)
 		return;
 
 	ata_fill_sg(qc);
+}
+
+/**
+ *	ata_dumb_qc_prep - Prepare taskfile for submission
+ *	@qc: Metadata associated with taskfile to be prepared
+ *
+ *	Prepare ATA taskfile for submission.
+ *
+ *	LOCKING:
+ *	spin_lock_irqsave(host lock)
+ */
+void ata_dumb_qc_prep(struct ata_queued_cmd *qc)
+{
+	if (!(qc->flags & ATA_QCFLAG_DMAMAP))
+		return;
+
+	ata_fill_sg_dumb(qc);
 }
 
 void ata_noop_qc_prep(struct ata_queued_cmd *qc) { }
@@ -4395,7 +4545,7 @@ void swap_buf_le16(u16 *buf, unsigned int buf_words)
 void ata_data_xfer(struct ata_device *adev, unsigned char *buf,
 		   unsigned int buflen, int write_data)
 {
-	struct ata_port *ap = adev->ap;
+	struct ata_port *ap = adev->link->ap;
 	unsigned int words = buflen >> 1;
 
 	/* Transfer multiple of 2 bytes */
@@ -5101,7 +5251,7 @@ static struct ata_queued_cmd *ata_qc_new(struct ata_port *ap)
 
 struct ata_queued_cmd *ata_qc_new_init(struct ata_device *dev)
 {
-	struct ata_port *ap = dev->ap;
+	struct ata_port *ap = dev->link->ap;
 	struct ata_queued_cmd *qc;
 
 	qc = ata_qc_new(ap);
@@ -5144,6 +5294,7 @@ void ata_qc_free(struct ata_queued_cmd *qc)
 void __ata_qc_complete(struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
+	struct ata_link *link = qc->dev->link;
 
 	WARN_ON(qc == NULL);	/* ata_qc_from_tag _might_ return NULL */
 	WARN_ON(!(qc->flags & ATA_QCFLAG_ACTIVE));
@@ -5152,10 +5303,19 @@ void __ata_qc_complete(struct ata_queued_cmd *qc)
 		ata_sg_clean(qc);
 
 	/* command should be marked inactive atomically with qc completion */
-	if (qc->tf.protocol == ATA_PROT_NCQ)
-		ap->sactive &= ~(1 << qc->tag);
-	else
-		ap->active_tag = ATA_TAG_POISON;
+	if (qc->tf.protocol == ATA_PROT_NCQ) {
+		link->sactive &= ~(1 << qc->tag);
+		if (!link->sactive)
+			ap->nr_active_links--;
+	} else {
+		link->active_tag = ATA_TAG_POISON;
+		ap->nr_active_links--;
+	}
+
+	/* clear exclusive status */
+	if (unlikely(qc->flags & ATA_QCFLAG_CLEAR_EXCL &&
+		     ap->excl_link == link))
+		ap->excl_link = NULL;
 
 	/* atapi: mark qc as inactive to prevent the interrupt handler
 	 * from completing the command twice later, before the error handler
@@ -5324,19 +5484,25 @@ static inline int ata_should_dma_map(struct ata_queued_cmd *qc)
 void ata_qc_issue(struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
+	struct ata_link *link = qc->dev->link;
 
 	/* Make sure only one non-NCQ command is outstanding.  The
 	 * check is skipped for old EH because it reuses active qc to
 	 * request ATAPI sense.
 	 */
-	WARN_ON(ap->ops->error_handler && ata_tag_valid(ap->active_tag));
+	WARN_ON(ap->ops->error_handler && ata_tag_valid(link->active_tag));
 
 	if (qc->tf.protocol == ATA_PROT_NCQ) {
-		WARN_ON(ap->sactive & (1 << qc->tag));
-		ap->sactive |= 1 << qc->tag;
+		WARN_ON(link->sactive & (1 << qc->tag));
+
+		if (!link->sactive)
+			ap->nr_active_links++;
+		link->sactive |= 1 << qc->tag;
 	} else {
-		WARN_ON(ap->sactive);
-		ap->active_tag = qc->tag;
+		WARN_ON(link->sactive);
+
+		ap->nr_active_links++;
+		link->active_tag = qc->tag;
 	}
 
 	qc->flags |= ATA_QCFLAG_ACTIVE;
@@ -5519,7 +5685,7 @@ unsigned int ata_qc_issue_prot(struct ata_queued_cmd *qc)
 inline unsigned int ata_host_intr (struct ata_port *ap,
 				   struct ata_queued_cmd *qc)
 {
-	struct ata_eh_info *ehi = &ap->eh_info;
+	struct ata_eh_info *ehi = &ap->link.eh_info;
 	u8 status, host_stat = 0;
 
 	VPRINTK("ata%u: protocol %d task_state %d\n",
@@ -5634,7 +5800,7 @@ irqreturn_t ata_interrupt (int irq, void *dev_instance)
 		    !(ap->flags & ATA_FLAG_DISABLED)) {
 			struct ata_queued_cmd *qc;
 
-			qc = ata_qc_from_tag(ap, ap->active_tag);
+			qc = ata_qc_from_tag(ap, ap->link.active_tag);
 			if (qc && (!(qc->tf.flags & ATA_TFLAG_POLLING)) &&
 			    (qc->flags & ATA_QCFLAG_ACTIVE))
 				handled |= ata_host_intr(ap, qc);
@@ -5648,9 +5814,9 @@ irqreturn_t ata_interrupt (int irq, void *dev_instance)
 
 /**
  *	sata_scr_valid - test whether SCRs are accessible
- *	@ap: ATA port to test SCR accessibility for
+ *	@link: ATA link to test SCR accessibility for
  *
- *	Test whether SCRs are accessible for @ap.
+ *	Test whether SCRs are accessible for @link.
  *
  *	LOCKING:
  *	None.
@@ -5658,64 +5824,74 @@ irqreturn_t ata_interrupt (int irq, void *dev_instance)
  *	RETURNS:
  *	1 if SCRs are accessible, 0 otherwise.
  */
-int sata_scr_valid(struct ata_port *ap)
+int sata_scr_valid(struct ata_link *link)
 {
-	return ap->cbl == ATA_CBL_SATA && ap->ops->scr_read;
+	struct ata_port *ap = link->ap;
+
+	return (ap->flags & ATA_FLAG_SATA) && ap->ops->scr_read;
 }
 
 /**
  *	sata_scr_read - read SCR register of the specified port
- *	@ap: ATA port to read SCR for
+ *	@link: ATA link to read SCR for
  *	@reg: SCR to read
  *	@val: Place to store read value
  *
- *	Read SCR register @reg of @ap into *@val.  This function is
- *	guaranteed to succeed if the cable type of the port is SATA
- *	and the port implements ->scr_read.
+ *	Read SCR register @reg of @link into *@val.  This function is
+ *	guaranteed to succeed if @link is ap->link, the cable type of
+ *	the port is SATA and the port implements ->scr_read.
  *
  *	LOCKING:
- *	None.
+ *	None if @link is ap->link.  Kernel thread context otherwise.
  *
  *	RETURNS:
  *	0 on success, negative errno on failure.
  */
-int sata_scr_read(struct ata_port *ap, int reg, u32 *val)
+int sata_scr_read(struct ata_link *link, int reg, u32 *val)
 {
-	if (sata_scr_valid(ap)) {
-		*val = ap->ops->scr_read(ap, reg);
-		return 0;
+	if (ata_is_host_link(link)) {
+		struct ata_port *ap = link->ap;
+
+		if (sata_scr_valid(link))
+			return ap->ops->scr_read(ap, reg, val);
+		return -EOPNOTSUPP;
 	}
-	return -EOPNOTSUPP;
+
+	return sata_pmp_scr_read(link, reg, val);
 }
 
 /**
  *	sata_scr_write - write SCR register of the specified port
- *	@ap: ATA port to write SCR for
+ *	@link: ATA link to write SCR for
  *	@reg: SCR to write
  *	@val: value to write
  *
- *	Write @val to SCR register @reg of @ap.  This function is
- *	guaranteed to succeed if the cable type of the port is SATA
- *	and the port implements ->scr_read.
+ *	Write @val to SCR register @reg of @link.  This function is
+ *	guaranteed to succeed if @link is ap->link, the cable type of
+ *	the port is SATA and the port implements ->scr_read.
  *
  *	LOCKING:
- *	None.
+ *	None if @link is ap->link.  Kernel thread context otherwise.
  *
  *	RETURNS:
  *	0 on success, negative errno on failure.
  */
-int sata_scr_write(struct ata_port *ap, int reg, u32 val)
+int sata_scr_write(struct ata_link *link, int reg, u32 val)
 {
-	if (sata_scr_valid(ap)) {
-		ap->ops->scr_write(ap, reg, val);
-		return 0;
+	if (ata_is_host_link(link)) {
+		struct ata_port *ap = link->ap;
+
+		if (sata_scr_valid(link))
+			return ap->ops->scr_write(ap, reg, val);
+		return -EOPNOTSUPP;
 	}
-	return -EOPNOTSUPP;
+
+	return sata_pmp_scr_write(link, reg, val);
 }
 
 /**
  *	sata_scr_write_flush - write SCR register of the specified port and flush
- *	@ap: ATA port to write SCR for
+ *	@link: ATA link to write SCR for
  *	@reg: SCR to write
  *	@val: value to write
  *
@@ -5723,28 +5899,36 @@ int sata_scr_write(struct ata_port *ap, int reg, u32 val)
  *	function performs flush after writing to the register.
  *
  *	LOCKING:
- *	None.
+ *	None if @link is ap->link.  Kernel thread context otherwise.
  *
  *	RETURNS:
  *	0 on success, negative errno on failure.
  */
-int sata_scr_write_flush(struct ata_port *ap, int reg, u32 val)
+int sata_scr_write_flush(struct ata_link *link, int reg, u32 val)
 {
-	if (sata_scr_valid(ap)) {
-		ap->ops->scr_write(ap, reg, val);
-		ap->ops->scr_read(ap, reg);
-		return 0;
+	if (ata_is_host_link(link)) {
+		struct ata_port *ap = link->ap;
+		int rc;
+
+		if (sata_scr_valid(link)) {
+			rc = ap->ops->scr_write(ap, reg, val);
+			if (rc == 0)
+				rc = ap->ops->scr_read(ap, reg, &val);
+			return rc;
+		}
+		return -EOPNOTSUPP;
 	}
-	return -EOPNOTSUPP;
+
+	return sata_pmp_scr_write(link, reg, val);
 }
 
 /**
- *	ata_port_online - test whether the given port is online
- *	@ap: ATA port to test
+ *	ata_link_online - test whether the given link is online
+ *	@link: ATA link to test
  *
- *	Test whether @ap is online.  Note that this function returns 0
- *	if online status of @ap cannot be obtained, so
- *	ata_port_online(ap) != !ata_port_offline(ap).
+ *	Test whether @link is online.  Note that this function returns
+ *	0 if online status of @link cannot be obtained, so
+ *	ata_link_online(link) != !ata_link_offline(link).
  *
  *	LOCKING:
  *	None.
@@ -5752,22 +5936,23 @@ int sata_scr_write_flush(struct ata_port *ap, int reg, u32 val)
  *	RETURNS:
  *	1 if the port online status is available and online.
  */
-int ata_port_online(struct ata_port *ap)
+int ata_link_online(struct ata_link *link)
 {
 	u32 sstatus;
 
-	if (!sata_scr_read(ap, SCR_STATUS, &sstatus) && (sstatus & 0xf) == 0x3)
+	if (sata_scr_read(link, SCR_STATUS, &sstatus) == 0 &&
+	    (sstatus & 0xf) == 0x3)
 		return 1;
 	return 0;
 }
 
 /**
- *	ata_port_offline - test whether the given port is offline
- *	@ap: ATA port to test
+ *	ata_link_offline - test whether the given link is offline
+ *	@link: ATA link to test
  *
- *	Test whether @ap is offline.  Note that this function returns
- *	0 if offline status of @ap cannot be obtained, so
- *	ata_port_online(ap) != !ata_port_offline(ap).
+ *	Test whether @link is offline.  Note that this function
+ *	returns 0 if offline status of @link cannot be obtained, so
+ *	ata_link_online(link) != !ata_link_offline(link).
  *
  *	LOCKING:
  *	None.
@@ -5775,11 +5960,12 @@ int ata_port_online(struct ata_port *ap)
  *	RETURNS:
  *	1 if the port offline status is available and offline.
  */
-int ata_port_offline(struct ata_port *ap)
+int ata_link_offline(struct ata_link *link)
 {
 	u32 sstatus;
 
-	if (!sata_scr_read(ap, SCR_STATUS, &sstatus) && (sstatus & 0xf) != 0x3)
+	if (sata_scr_read(link, SCR_STATUS, &sstatus) == 0 &&
+	    (sstatus & 0xf) != 0x3)
 		return 1;
 	return 0;
 }
@@ -5816,6 +6002,7 @@ static int ata_host_request_pm(struct ata_host *host, pm_message_t mesg,
 
 	for (i = 0; i < host->n_ports; i++) {
 		struct ata_port *ap = host->ports[i];
+		struct ata_link *link;
 
 		/* Previous resume operation might still be in
 		 * progress.  Wait for PM_PENDING to clear.
@@ -5835,8 +6022,10 @@ static int ata_host_request_pm(struct ata_host *host, pm_message_t mesg,
 		}
 
 		ap->pflags |= ATA_PFLAG_PM_PENDING;
-		ap->eh_info.action |= action;
-		ap->eh_info.flags |= ehi_flags;
+		__ata_port_for_each_link(link, ap) {
+			link->eh_info.action |= action;
+			link->eh_info.flags |= ehi_flags;
+		}
 
 		ata_port_schedule_eh(ap);
 
@@ -5940,11 +6129,13 @@ int ata_port_start(struct ata_port *ap)
  */
 void ata_dev_init(struct ata_device *dev)
 {
-	struct ata_port *ap = dev->ap;
+	struct ata_link *link = dev->link;
+	struct ata_port *ap = link->ap;
 	unsigned long flags;
 
 	/* SATA spd limit is bound to the first device */
-	ap->sata_spd_limit = ap->hw_sata_spd_limit;
+	link->sata_spd_limit = link->hw_sata_spd_limit;
+	link->sata_spd = 0;
 
 	/* High bits of dev->flags are used to record warm plug
 	 * requests which occur asynchronously.  Synchronize using
@@ -5962,6 +6153,70 @@ void ata_dev_init(struct ata_device *dev)
 }
 
 /**
+ *	ata_link_init - Initialize an ata_link structure
+ *	@ap: ATA port link is attached to
+ *	@link: Link structure to initialize
+ *	@pmp: Port multiplier port number
+ *
+ *	Initialize @link.
+ *
+ *	LOCKING:
+ *	Kernel thread context (may sleep)
+ */
+void ata_link_init(struct ata_port *ap, struct ata_link *link, int pmp)
+{
+	int i;
+
+	/* clear everything except for devices */
+	memset(link, 0, offsetof(struct ata_link, device[0]));
+
+	link->ap = ap;
+	link->pmp = pmp;
+	link->active_tag = ATA_TAG_POISON;
+	link->hw_sata_spd_limit = UINT_MAX;
+
+	/* can't use iterator, ap isn't initialized yet */
+	for (i = 0; i < ATA_MAX_DEVICES; i++) {
+		struct ata_device *dev = &link->device[i];
+
+		dev->link = link;
+		dev->devno = dev - link->device;
+		ata_dev_init(dev);
+	}
+}
+
+/**
+ *	sata_link_init_spd - Initialize link->sata_spd_limit
+ *	@link: Link to configure sata_spd_limit for
+ *
+ *	Initialize @link->[hw_]sata_spd_limit to the currently
+ *	configured value.
+ *
+ *	LOCKING:
+ *	Kernel thread context (may sleep).
+ *
+ *	RETURNS:
+ *	0 on success, -errno on failure.
+ */
+int sata_link_init_spd(struct ata_link *link)
+{
+	u32 scontrol, spd;
+	int rc;
+
+	rc = sata_scr_read(link, SCR_CONTROL, &scontrol);
+	if (rc)
+		return rc;
+
+	spd = (scontrol >> 4) & 0xf;
+	if (spd)
+		link->hw_sata_spd_limit &= (1 << spd) - 1;
+
+	link->sata_spd_limit = link->hw_sata_spd_limit;
+
+	return 0;
+}
+
+/**
  *	ata_port_alloc - allocate and initialize basic ATA port resources
  *	@host: ATA host this allocated port belongs to
  *
@@ -5976,7 +6231,6 @@ void ata_dev_init(struct ata_device *dev)
 struct ata_port *ata_port_alloc(struct ata_host *host)
 {
 	struct ata_port *ap;
-	unsigned int i;
 
 	DPRINTK("ENTER\n");
 
@@ -5991,9 +6245,6 @@ struct ata_port *ata_port_alloc(struct ata_host *host)
 	ap->ctl = ATA_DEVCTL_OBS;
 	ap->host = host;
 	ap->dev = host->dev;
-
-	ap->hw_sata_spd_limit = UINT_MAX;
-	ap->active_tag = ATA_TAG_POISON;
 	ap->last_ctl = 0xFF;
 
 #if defined(ATA_VERBOSE_DEBUG)
@@ -6010,15 +6261,13 @@ struct ata_port *ata_port_alloc(struct ata_host *host)
 	INIT_WORK(&ap->scsi_rescan_task, ata_scsi_dev_rescan);
 	INIT_LIST_HEAD(&ap->eh_done_q);
 	init_waitqueue_head(&ap->eh_wait_q);
+	init_timer_deferrable(&ap->fastdrain_timer);
+	ap->fastdrain_timer.function = ata_eh_fastdrain_timerfn;
+	ap->fastdrain_timer.data = (unsigned long)ap;
 
 	ap->cbl = ATA_CBL_NONE;
 
-	for (i = 0; i < ATA_MAX_DEVICES; i++) {
-		struct ata_device *dev = &ap->device[i];
-		dev->ap = ap;
-		dev->devno = i;
-		ata_dev_init(dev);
-	}
+	ata_link_init(ap, &ap->link, 0);
 
 #ifdef ATA_IRQ_TRAP
 	ap->stats.unhandled_irq = 1;
@@ -6054,6 +6303,7 @@ static void ata_host_release(struct device *gendev, void *res)
 		if (ap->scsi_host)
 			scsi_host_put(ap->scsi_host);
 
+		kfree(ap->pmp_link);
 		kfree(ap);
 		host->ports[i] = NULL;
 	}
@@ -6164,6 +6414,7 @@ struct ata_host *ata_host_alloc_pinfo(struct device *dev,
 		ap->mwdma_mask = pi->mwdma_mask;
 		ap->udma_mask = pi->udma_mask;
 		ap->flags |= pi->flags;
+		ap->link.flags |= pi->link_flags;
 		ap->ops = pi->port_ops;
 
 		if (!host->ops && (pi->port_ops != &ata_dummy_port_ops))
@@ -6293,11 +6544,13 @@ int ata_host_register(struct ata_host *host, struct scsi_host_template *sht)
 	if (rc)
 		return rc;
 
+	/* associate with ACPI nodes */
+	ata_acpi_associate(host);
+
 	/* set cable, sata_spd_limit and report */
 	for (i = 0; i < host->n_ports; i++) {
 		struct ata_port *ap = host->ports[i];
 		int irq_line;
-		u32 scontrol;
 		unsigned long xfer_mask;
 
 		/* set SATA cable type if still unset */
@@ -6305,12 +6558,7 @@ int ata_host_register(struct ata_host *host, struct scsi_host_template *sht)
 			ap->cbl = ATA_CBL_SATA;
 
 		/* init sata_spd_limit to the current value */
-		if (sata_scr_read(ap, SCR_CONTROL, &scontrol) == 0) {
-			int spd = (scontrol >> 4) & 0xf;
-			if (spd)
-				ap->hw_sata_spd_limit &= (1 << spd) - 1;
-		}
-		ap->sata_spd_limit = ap->hw_sata_spd_limit;
+		sata_link_init_spd(&ap->link);
 
 		/* report the secondary IRQ for second channel legacy */
 		irq_line = host->irq;
@@ -6324,7 +6572,7 @@ int ata_host_register(struct ata_host *host, struct scsi_host_template *sht)
 		if (!ata_port_is_dummy(ap))
 			ata_port_printk(ap, KERN_INFO, "%cATA max %s cmd 0x%p "
 					"ctl 0x%p bmdma 0x%p irq %d\n",
-					ap->cbl == ATA_CBL_SATA ? 'S' : 'P',
+					(ap->flags & ATA_FLAG_SATA) ? 'S' : 'P',
 					ata_mode_string(xfer_mask),
 					ap->ioaddr.cmd_addr,
 					ap->ioaddr.ctl_addr,
@@ -6342,7 +6590,7 @@ int ata_host_register(struct ata_host *host, struct scsi_host_template *sht)
 
 		/* probe */
 		if (ap->ops->error_handler) {
-			struct ata_eh_info *ehi = &ap->eh_info;
+			struct ata_eh_info *ehi = &ap->link.eh_info;
 			unsigned long flags;
 
 			ata_port_probe(ap);
@@ -6350,7 +6598,8 @@ int ata_host_register(struct ata_host *host, struct scsi_host_template *sht)
 			/* kick EH for boot probing */
 			spin_lock_irqsave(ap->lock, flags);
 
-			ehi->probe_mask = (1 << ATA_MAX_DEVICES) - 1;
+			ehi->probe_mask =
+				(1 << ata_link_max_devices(&ap->link)) - 1;
 			ehi->action |= ATA_EH_SOFTRESET;
 			ehi->flags |= ATA_EHI_NO_AUTOPSY | ATA_EHI_QUIET;
 
@@ -6383,7 +6632,7 @@ int ata_host_register(struct ata_host *host, struct scsi_host_template *sht)
 	for (i = 0; i < host->n_ports; i++) {
 		struct ata_port *ap = host->ports[i];
 
-		ata_scsi_scan_host(ap);
+		ata_scsi_scan_host(ap, 1);
 	}
 
 	return 0;
@@ -6448,7 +6697,8 @@ int ata_host_activate(struct ata_host *host, int irq,
 void ata_port_detach(struct ata_port *ap)
 {
 	unsigned long flags;
-	int i;
+	struct ata_link *link;
+	struct ata_device *dev;
 
 	if (!ap->ops->error_handler)
 		goto skip_eh;
@@ -6465,8 +6715,10 @@ void ata_port_detach(struct ata_port *ap)
 	 */
 	spin_lock_irqsave(ap->lock, flags);
 
-	for (i = 0; i < ATA_MAX_DEVICES; i++)
-		ata_dev_disable(&ap->device[i]);
+	ata_port_for_each_link(link, ap) {
+		ata_link_for_each_dev(dev, link)
+			ata_dev_disable(dev);
+	}
 
 	spin_unlock_irqrestore(ap->lock, flags);
 
@@ -6479,13 +6731,7 @@ void ata_port_detach(struct ata_port *ap)
 	spin_unlock_irqrestore(ap->lock, flags);
 
 	ata_port_wait_eh(ap);
-
-	/* Flush hotplug task.  The sequence is similar to
-	 * ata_port_flush_task().
-	 */
-	cancel_work_sync(&ap->hotplug_task.work); /* akpm: why? */
-	cancel_delayed_work(&ap->hotplug_task);
-	cancel_work_sync(&ap->hotplug_task.work);
+	cancel_rearming_delayed_work(&ap->hotplug_task);
 
  skip_eh:
 	/* remove the associated SCSI host */
@@ -6821,7 +7067,9 @@ EXPORT_SYMBOL_GPL(ata_interrupt);
 EXPORT_SYMBOL_GPL(ata_do_set_mode);
 EXPORT_SYMBOL_GPL(ata_data_xfer);
 EXPORT_SYMBOL_GPL(ata_data_xfer_noirq);
+EXPORT_SYMBOL_GPL(ata_std_qc_defer);
 EXPORT_SYMBOL_GPL(ata_qc_prep);
+EXPORT_SYMBOL_GPL(ata_dumb_qc_prep);
 EXPORT_SYMBOL_GPL(ata_noop_qc_prep);
 EXPORT_SYMBOL_GPL(ata_bmdma_setup);
 EXPORT_SYMBOL_GPL(ata_bmdma_start);
@@ -6836,14 +7084,14 @@ EXPORT_SYMBOL_GPL(ata_bmdma_post_internal_cmd);
 EXPORT_SYMBOL_GPL(ata_port_probe);
 EXPORT_SYMBOL_GPL(ata_dev_disable);
 EXPORT_SYMBOL_GPL(sata_set_spd);
-EXPORT_SYMBOL_GPL(sata_phy_debounce);
-EXPORT_SYMBOL_GPL(sata_phy_resume);
+EXPORT_SYMBOL_GPL(sata_link_debounce);
+EXPORT_SYMBOL_GPL(sata_link_resume);
 EXPORT_SYMBOL_GPL(sata_phy_reset);
 EXPORT_SYMBOL_GPL(__sata_phy_reset);
 EXPORT_SYMBOL_GPL(ata_bus_reset);
 EXPORT_SYMBOL_GPL(ata_std_prereset);
 EXPORT_SYMBOL_GPL(ata_std_softreset);
-EXPORT_SYMBOL_GPL(sata_port_hardreset);
+EXPORT_SYMBOL_GPL(sata_link_hardreset);
 EXPORT_SYMBOL_GPL(sata_std_hardreset);
 EXPORT_SYMBOL_GPL(ata_std_postreset);
 EXPORT_SYMBOL_GPL(ata_dev_classify);
@@ -6864,8 +7112,8 @@ EXPORT_SYMBOL_GPL(sata_scr_valid);
 EXPORT_SYMBOL_GPL(sata_scr_read);
 EXPORT_SYMBOL_GPL(sata_scr_write);
 EXPORT_SYMBOL_GPL(sata_scr_write_flush);
-EXPORT_SYMBOL_GPL(ata_port_online);
-EXPORT_SYMBOL_GPL(ata_port_offline);
+EXPORT_SYMBOL_GPL(ata_link_online);
+EXPORT_SYMBOL_GPL(ata_link_offline);
 #ifdef CONFIG_PM
 EXPORT_SYMBOL_GPL(ata_host_suspend);
 EXPORT_SYMBOL_GPL(ata_host_resume);
@@ -6873,7 +7121,6 @@ EXPORT_SYMBOL_GPL(ata_host_resume);
 EXPORT_SYMBOL_GPL(ata_id_string);
 EXPORT_SYMBOL_GPL(ata_id_c_string);
 EXPORT_SYMBOL_GPL(ata_id_to_dma_mode);
-EXPORT_SYMBOL_GPL(ata_device_blacklisted);
 EXPORT_SYMBOL_GPL(ata_scsi_simulate);
 
 EXPORT_SYMBOL_GPL(ata_pio_need_iordy);
@@ -6882,9 +7129,9 @@ EXPORT_SYMBOL_GPL(ata_timing_merge);
 
 #ifdef CONFIG_PCI
 EXPORT_SYMBOL_GPL(pci_test_config_bits);
-EXPORT_SYMBOL_GPL(ata_pci_init_native_host);
+EXPORT_SYMBOL_GPL(ata_pci_init_sff_host);
 EXPORT_SYMBOL_GPL(ata_pci_init_bmdma);
-EXPORT_SYMBOL_GPL(ata_pci_prepare_native_host);
+EXPORT_SYMBOL_GPL(ata_pci_prepare_sff_host);
 EXPORT_SYMBOL_GPL(ata_pci_init_one);
 EXPORT_SYMBOL_GPL(ata_pci_remove_one);
 #ifdef CONFIG_PM
@@ -6897,10 +7144,24 @@ EXPORT_SYMBOL_GPL(ata_pci_default_filter);
 EXPORT_SYMBOL_GPL(ata_pci_clear_simplex);
 #endif /* CONFIG_PCI */
 
+EXPORT_SYMBOL_GPL(sata_pmp_qc_defer_cmd_switch);
+EXPORT_SYMBOL_GPL(sata_pmp_read_init_tf);
+EXPORT_SYMBOL_GPL(sata_pmp_read_val);
+EXPORT_SYMBOL_GPL(sata_pmp_write_init_tf);
+EXPORT_SYMBOL_GPL(sata_pmp_std_prereset);
+EXPORT_SYMBOL_GPL(sata_pmp_std_hardreset);
+EXPORT_SYMBOL_GPL(sata_pmp_std_postreset);
+EXPORT_SYMBOL_GPL(sata_pmp_do_eh);
+
+EXPORT_SYMBOL_GPL(__ata_ehi_push_desc);
+EXPORT_SYMBOL_GPL(ata_ehi_push_desc);
+EXPORT_SYMBOL_GPL(ata_ehi_clear_desc);
 EXPORT_SYMBOL_GPL(ata_eng_timeout);
 EXPORT_SYMBOL_GPL(ata_port_schedule_eh);
+EXPORT_SYMBOL_GPL(ata_link_abort);
 EXPORT_SYMBOL_GPL(ata_port_abort);
 EXPORT_SYMBOL_GPL(ata_port_freeze);
+EXPORT_SYMBOL_GPL(sata_async_notification);
 EXPORT_SYMBOL_GPL(ata_eh_freeze_port);
 EXPORT_SYMBOL_GPL(ata_eh_thaw_port);
 EXPORT_SYMBOL_GPL(ata_eh_qc_complete);

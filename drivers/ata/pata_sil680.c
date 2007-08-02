@@ -35,6 +35,8 @@
 #define DRV_NAME "pata_sil680"
 #define DRV_VERSION "0.4.6"
 
+#define SIL680_MMIO_BAR		5
+
 /**
  *	sil680_selreg		-	return register base
  *	@hwif: interface
@@ -93,15 +95,16 @@ static int sil680_cable_detect(struct ata_port *ap) {
 
 /**
  *	sil680_bus_reset	-	reset the SIL680 bus
- *	@ap: ATA port to reset
+ *	@link: ATA link to reset
  *	@deadline: deadline jiffies for the operation
  *
  *	Perform the SIL680 housekeeping when doing an ATA bus reset
  */
 
-static int sil680_bus_reset(struct ata_port *ap,unsigned int *classes,
+static int sil680_bus_reset(struct ata_link *link, unsigned int *classes,
 			    unsigned long deadline)
 {
+	struct ata_port *ap = link->ap;
 	struct pci_dev *pdev = to_pci_dev(ap->host->dev);
 	unsigned long addr = sil680_selreg(ap, 0);
 	u8 reset;
@@ -110,7 +113,7 @@ static int sil680_bus_reset(struct ata_port *ap,unsigned int *classes,
 	pci_write_config_byte(pdev, addr, reset | 0x03);
 	udelay(25);
 	pci_write_config_byte(pdev, addr, reset);
-	return ata_std_softreset(ap, classes, deadline);
+	return ata_std_softreset(link, classes, deadline);
 }
 
 static void sil680_error_handler(struct ata_port *ap)
@@ -293,8 +296,8 @@ static u8 sil680_init_chip(struct pci_dev *pdev)
 
 	pci_read_config_byte(pdev, 0x8A, &tmpbyte);
 
-	printk(KERN_INFO "sil680: BA5_EN = %d clock = %02X\n",
-			tmpbyte & 1, tmpbyte & 0x30);
+	dev_dbg(&pdev->dev, "sil680: BA5_EN = %d clock = %02X\n",
+		tmpbyte & 1, tmpbyte & 0x30);
 
 	switch(tmpbyte & 0x30) {
 		case 0x00:
@@ -315,8 +318,8 @@ static u8 sil680_init_chip(struct pci_dev *pdev)
 	}
 
 	pci_read_config_byte(pdev,   0x8A, &tmpbyte);
-	printk(KERN_INFO "sil680: BA5_EN = %d clock = %02X\n",
-			tmpbyte & 1, tmpbyte & 0x30);
+	dev_dbg(&pdev->dev, "sil680: BA5_EN = %d clock = %02X\n",
+		tmpbyte & 1, tmpbyte & 0x30);
 
 	pci_write_config_byte(pdev,  0xA1, 0x72);
 	pci_write_config_word(pdev,  0xA2, 0x328A);
@@ -339,22 +342,23 @@ static u8 sil680_init_chip(struct pci_dev *pdev)
 	return tmpbyte & 0x30;
 }
 
-static int sil680_init_one(struct pci_dev *pdev, const struct pci_device_id *id)
+static int __devinit sil680_init_one(struct pci_dev *pdev,
+				     const struct pci_device_id *id)
 {
 	static const struct ata_port_info info = {
 		.sht = &sil680_sht,
-		.flags = ATA_FLAG_SLAVE_POSS | ATA_FLAG_SRST,
+		.flags = ATA_FLAG_SLAVE_POSS,
 		.pio_mask = 0x1f,
 		.mwdma_mask = 0x07,
-		.udma_mask = 0x7f,
+		.udma_mask = ATA_UDMA6,
 		.port_ops = &sil680_port_ops
 	};
 	static const struct ata_port_info info_slow = {
 		.sht = &sil680_sht,
-		.flags = ATA_FLAG_SLAVE_POSS | ATA_FLAG_SRST,
+		.flags = ATA_FLAG_SLAVE_POSS,
 		.pio_mask = 0x1f,
 		.mwdma_mask = 0x07,
-		.udma_mask = 0x3f,
+		.udma_mask = ATA_UDMA5,
 		.port_ops = &sil680_port_ops
 	};
 	const struct ata_port_info *ppi[] = { &info, NULL };
