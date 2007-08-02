@@ -210,7 +210,7 @@ MODULE_PARM_DESC(workarounds, "Work around device bugs (default = 0"
  * independent of the implementation of the ieee1394 nodemgr, the longer format
  * is recommended for future use.
  */
-static int sbp2_long_sysfs_ieee1394_id;
+static int sbp2_long_sysfs_ieee1394_id = 1;
 module_param_named(long_ieee1394_id, sbp2_long_sysfs_ieee1394_id, bool, 0644);
 MODULE_PARM_DESC(long_ieee1394_id, "8+3+2 bytes format of ieee1394_id in sysfs "
 		 "(default = backwards-compatible = N, SAM-conforming = Y)");
@@ -772,11 +772,6 @@ static struct sbp2_lu *sbp2_alloc_device(struct unit_directory *ud)
 					     &sbp2_physdma_ops,
 					     0x0ULL, 0xfffffffcULL)) {
 			SBP2_ERR("failed to register lower 4GB address range");
-			goto failed_alloc;
-		}
-#else
-		if (dma_set_mask(hi->host->device.parent, DMA_32BIT_MASK)) {
-			SBP2_ERR("failed to set 4GB DMA mask");
 			goto failed_alloc;
 		}
 #endif
