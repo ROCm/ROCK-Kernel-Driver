@@ -106,6 +106,9 @@ int vbd_translate(struct phys_req *req, blkif_t *blkif, int operation)
 	if ((operation != READ) && vbd->readonly)
 		goto out;
 
+	if (vbd->bdev == NULL)
+		goto out;
+
 	if (unlikely((req->sector_number + req->nr_sects) > vbd_sz(vbd)))
 		goto out;
 

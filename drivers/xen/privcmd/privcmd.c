@@ -111,7 +111,7 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 		if (copy_from_user(&msg, p, sizeof(msg)))
 			return -EFAULT;
 
-		down_read(&mm->mmap_sem);
+		down_write(&mm->mmap_sem);
 
 		vma = find_vma(mm, msg.va);
 		rc = -EINVAL;
@@ -153,7 +153,7 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 		rc = 0;
 
 	mmap_out:
-		up_read(&mm->mmap_sem);
+		up_write(&mm->mmap_sem);
 		ret = rc;
 	}
 	break;
@@ -176,14 +176,14 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 		if ((m.num <= 0) || (nr_pages > (LONG_MAX >> PAGE_SHIFT)))
 			return -EINVAL;
 
-		down_read(&mm->mmap_sem);
+		down_write(&mm->mmap_sem);
 
 		vma = find_vma(mm, m.addr);
 		if (!vma ||
 		    (m.addr != vma->vm_start) ||
 		    ((m.addr + (nr_pages << PAGE_SHIFT)) != vma->vm_end) ||
 		    !privcmd_enforce_singleshot_mapping(vma)) {
-			up_read(&mm->mmap_sem);
+			up_write(&mm->mmap_sem);
 			return -EINVAL;
 		}
 
@@ -191,7 +191,7 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 		addr = m.addr;
 		for (i = 0; i < nr_pages; i++, addr += PAGE_SIZE, p++) {
 			if (get_user(mfn, p)) {
-				up_read(&mm->mmap_sem);
+				up_write(&mm->mmap_sem);
 				return -EFAULT;
 			}
 
@@ -202,7 +202,7 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 				put_user(0xF0000000 | mfn, p);
 		}
 
-		up_read(&mm->mmap_sem);
+		up_write(&mm->mmap_sem);
 		ret = 0;
 	}
 	break;

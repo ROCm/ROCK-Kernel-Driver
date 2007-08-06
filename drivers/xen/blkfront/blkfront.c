@@ -354,6 +354,8 @@ static void connect(struct blkfront_info *info)
 	spin_unlock_irq(&blkif_io_lock);
 
 	add_disk(info->gd);
+
+	info->is_ready = 1;
 }
 
 /**
@@ -862,6 +864,13 @@ static void blkif_recover(struct blkfront_info *info)
 	spin_unlock_irq(&blkif_io_lock);
 }
 
+int blkfront_is_ready(struct xenbus_device *dev)
+{
+	struct blkfront_info *info = dev->dev.driver_data;
+
+	return info->is_ready;
+}
+
 
 /* ** Driver Registration ** */
 
@@ -880,6 +889,7 @@ static struct xenbus_driver blkfront = {
 	.remove = blkfront_remove,
 	.resume = blkfront_resume,
 	.otherend_changed = backend_changed,
+	.is_ready = blkfront_is_ready,
 };
 
 

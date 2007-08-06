@@ -28,16 +28,6 @@
 	pr_debug("blkback/xenbus (%s:%d) " fmt ".\n",	\
 		 __FUNCTION__, __LINE__, ##args)
 
-struct backend_info
-{
-	struct xenbus_device *dev;
-	blkif_t *blkif;
-	struct xenbus_watch backend_watch;
-	unsigned major;
-	unsigned minor;
-	char *mode;
-};
-
 static void connect(struct backend_info *);
 static int connect_ring(struct backend_info *);
 static void backend_changed(struct xenbus_watch *, const char **,
@@ -181,6 +171,12 @@ static int blkback_remove(struct xenbus_device *dev)
 		unregister_xenbus_watch(&be->backend_watch);
 		kfree(be->backend_watch.node);
 		be->backend_watch.node = NULL;
+	}
+
+	if (be->backend_cdrom_watch.node) {
+		unregister_xenbus_watch(&be->backend_cdrom_watch);
+		kfree(be->backend_cdrom_watch.node);
+		be->backend_cdrom_watch.node = NULL;
 	}
 
 	if (be->blkif) {
@@ -331,6 +327,9 @@ static void backend_changed(struct xenbus_watch *watch,
 
 		/* We're potentially connected now */
 		update_blkif_status(be->blkif);
+
+		/* Add watch for cdrom media status if necessay */
+		cdrom_add_media_watch(be);
 	}
 }
 

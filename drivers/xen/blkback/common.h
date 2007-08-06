@@ -96,6 +96,17 @@ typedef struct blkif_st {
 	grant_ref_t    shmem_ref;
 } blkif_t;
 
+struct backend_info
+{
+	struct xenbus_device *dev;
+	blkif_t *blkif;
+	struct xenbus_watch backend_watch;
+	struct xenbus_watch backend_cdrom_watch;
+	unsigned major;
+	unsigned minor;
+	char *mode;
+};
+
 blkif_t *blkif_alloc(domid_t domid);
 void blkif_disconnect(blkif_t *blkif);
 void blkif_free(blkif_t *blkif);
@@ -135,5 +146,9 @@ int blkif_schedule(void *arg);
 
 int blkback_barrier(struct xenbus_transaction xbt,
 		    struct backend_info *be, int state);
+
+/* cdrom media change */
+int cdrom_is_type(struct backend_info *be);
+void cdrom_add_media_watch(struct backend_info *be);
 
 #endif /* __BLKIF__BACKEND__COMMON_H__ */

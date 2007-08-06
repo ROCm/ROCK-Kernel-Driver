@@ -111,6 +111,7 @@ struct blkfront_info
 	struct blk_shadow shadow[BLK_RING_SIZE];
 	unsigned long shadow_free;
 	int feature_barrier;
+	int is_ready;
 
 	/**
 	 * The number of people holding this device open.  We won't allow a
