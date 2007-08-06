@@ -388,12 +388,13 @@ static int __init register_tpacpi_subdriver(struct ibm_struct *ibm)
 
 	sprintf(ibm->acpi->driver->name, "%s_%s", IBM_NAME, ibm->name);
 	ibm->acpi->driver->ids = ibm->acpi->hid;
+
 	ibm->acpi->driver->ops.add = &tpacpi_device_add;
 
 	rc = acpi_bus_register_driver(ibm->acpi->driver);
 	if (rc < 0) {
 		printk(IBM_ERR "acpi_bus_register_driver(%s) failed: %d\n",
-		       ibm->acpi->hid, rc);
+		       ibm->name, rc);
 		kfree(ibm->acpi->driver);
 		ibm->acpi->driver = NULL;
 	} else if (!rc)
@@ -1000,8 +1001,13 @@ errexit:
 	return res;
 }
 
+static const struct acpi_device_id ibm_htk_device_ids[] = {
+	{IBM_HKEY_HID, 0},
+	{"", 0},
+};
+
 static struct tp_acpi_drv_struct ibm_hotkey_acpidriver = {
-	.hid = IBM_HKEY_HID,
+	.hid = ibm_htk_device_ids,
 	.notify = hotkey_notify,
 	.handle = &hkey_handle,
 	.type = ACPI_DEVICE_NOTIFY,
@@ -1763,6 +1769,11 @@ IBM_HANDLE(dock, root, "\\_SB.GDCK",	/* X30, X31, X40 */
 /* don't list other alternatives as we install a notify handler on the 570 */
 IBM_HANDLE(pci, root, "\\_SB.PCI");	/* 570 */
 
+static const struct acpi_device_id ibm_pci_device_ids[] = {
+	{IBM_PCI_HID, 0},
+	{"", 0},
+};
+
 static struct tp_acpi_drv_struct ibm_dock_acpidriver[2] = {
 	{
 	 .notify = dock_notify,
@@ -1770,7 +1781,7 @@ static struct tp_acpi_drv_struct ibm_dock_acpidriver[2] = {
 	 .type = ACPI_SYSTEM_NOTIFY,
 	},
 	{
-	 .hid = IBM_PCI_HID,
+	 .hid = ibm_pci_device_ids,
 	 .notify = dock_notify,
 	 .handle = &pci_handle,
 	 .type = ACPI_SYSTEM_NOTIFY,
@@ -1829,7 +1840,8 @@ static int __init dock_init2(struct ibm_init_struct *iibm)
 static void dock_notify(struct ibm_struct *ibm, u32 event)
 {
 	int docked = dock_docked();
-	int pci = ibm->acpi->hid && strstr(ibm->acpi->hid, IBM_PCI_HID);
+	int pci = ibm->acpi->hid && ibm->acpi->device &&
+		acpi_match_device_ids(ibm->acpi->device, ibm_pci_device_ids);
 
 	if (event == 1 && !pci)	/* 570 */
 		acpi_bus_generate_event(ibm->acpi->device, event, 1);	/* button */

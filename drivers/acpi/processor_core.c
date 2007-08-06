@@ -85,10 +85,16 @@ static void acpi_processor_notify(acpi_handle handle, u32 event, void *data);
 static acpi_status acpi_processor_hotadd_init(acpi_handle handle, int *p_cpu);
 static int acpi_processor_handle_eject(struct acpi_processor *pr);
 
+static const struct acpi_device_id processor_device_ids[] = {
+	{ACPI_PROCESSOR_HID, 0},
+	{"", 0},
+};
+MODULE_DEVICE_TABLE(acpi, processor_device_ids);
+
 static struct acpi_driver acpi_processor_driver = {
 	.name = "processor",
 	.class = ACPI_PROCESSOR_CLASS,
-	.ids = ACPI_PROCESSOR_HID,
+	.ids = processor_device_ids,
 	.ops = {
 		.add = acpi_processor_add,
 		.remove = acpi_processor_remove,

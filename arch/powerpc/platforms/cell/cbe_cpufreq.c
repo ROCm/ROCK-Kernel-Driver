@@ -238,7 +238,6 @@ static int cbe_cpufreq_cpu_init(struct cpufreq_policy *policy)
 		pr_debug("%d: %d\n", i, cbe_freqs[i].frequency);
 	}
 
-	policy->governor = CPUFREQ_DEFAULT_GOVERNOR;
 	/* if DEBUG is enabled set_pmode() measures the correct latency of a transition */
 	policy->cpuinfo.transition_latency = 25000;
 
