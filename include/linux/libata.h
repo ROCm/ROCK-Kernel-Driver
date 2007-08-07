@@ -326,6 +326,7 @@ enum {
 	ATA_HORKAGE_NONCQ	= (1 << 2),	/* Don't use NCQ */
 	ATA_HORKAGE_MAX_SEC_128	= (1 << 3),	/* Limit max sects to 128 */
 	ATA_HORKAGE_SKIP_PM	= (1 << 4),	/* Skip PM operations */
+	ATA_HORKAGE_BROKEN_HPA	= (1 << 5),	/* Broken HPA */
 };
 
 enum hsm_task_states {
