@@ -558,9 +558,6 @@ static int gelic_net_stop(struct net_device *netdev)
 {
 	struct gelic_net_card *card = netdev_priv(netdev);
 
-#ifdef CONFIG_GELIC_WIRELESS
-	gelicw_down(netdev);
-#endif
 	netif_poll_disable(netdev);
 	netif_stop_queue(netdev);
 
@@ -1072,9 +1069,6 @@ static irqreturn_t gelic_net_interrupt(int irq, void *ptr)
 		gelic_net_kick_txdma(card, card->tx_chain.tail);
 		spin_unlock_irqrestore(&card->tx_dma_lock, flags);
 	}
-#ifdef CONFIG_GELIC_WIRELESS
-	gelicw_interrupt(netdev, status);
-#endif
 	return IRQ_HANDLED;
 }
 
@@ -1170,17 +1164,12 @@ static int gelic_net_open(struct net_device *netdev)
 
 	card->tx_dma_progress = 0;
 	card->ghiintmask = GELIC_NET_RXINT | GELIC_NET_TXINT;
-#ifdef CONFIG_GELIC_WIRELESS
-	card->ghiintmask |= GELICW_DEVICE_CMD_COMP | GELICW_DEVICE_EVENT_RECV;
-#endif
+
 	gelic_net_set_irq_mask(card, card->ghiintmask);
 	gelic_net_enable_rxdmac(card);
 
 	netif_start_queue(netdev);
 	netif_carrier_on(netdev);
-#ifdef CONFIG_GELIC_WIRELESS
-	gelicw_up(netdev);
-#endif
 
 	return 0;
 
@@ -1258,12 +1247,7 @@ static u32 gelic_net_get_link(struct net_device *netdev)
 		link = 1;
 	else
 		link = 0;
-#ifdef CONFIG_GELIC_WIRELESS
-	/* (v1 & GELIC_NET_LINK_UP) is always 0 in wireless mode */
-	if (gelicw_is_associated(netdev)) {
-		link = 1;
-	}
-#endif
+
 	return link;
 }
 
@@ -1451,12 +1435,7 @@ static int gelic_net_setup_netdev(struct gelic_net_card *card)
 	}
 	if (card->vlan_id[GELIC_NET_VLAN_WIRED - 1])
 		card->vlan_index = GELIC_NET_VLAN_WIRED - 1;
-#ifdef CONFIG_GELIC_WIRELESS
-	card->w.card = card;
-	/* init wireless extension */
-	/* No wireless vlan_index:-1 */
-	gelicw_setup_netdev(netdev, card->vlan_index);
-#endif
+
 	status = register_netdev(netdev);
 	if (status) {
 		dev_err(ctodev(card), "%s:Couldn't register net_device: %d\n",
@@ -1586,9 +1565,6 @@ static int ps3_gelic_driver_remove (struct ps3_system_bus_device *dev)
 {
 	struct gelic_net_card *card = ps3_system_bus_get_driver_data(dev);
 
-#ifdef CONFIG_GELIC_WIRELESS
-	gelicw_remove(card->netdev);
-#endif
 	wait_event(card->waitq,
 		   atomic_read(&card->tx_timeout_task_counter) == 0);
 
