@@ -219,11 +219,12 @@ static void allocate_bitmap_nodes(struct super_block *sb)
 	}
 }
 
-static int set_bit_in_list_bitmap(struct super_block *sb, int block,
+static int set_bit_in_list_bitmap(struct super_block *sb,
+                                  b_blocknr_t block,
 				  struct reiserfs_list_bitmap *jb)
 {
-	int bmap_nr = block / (sb->s_blocksize << 3);
-	int bit_nr = block % (sb->s_blocksize << 3);
+	unsigned int bmap_nr = block / (sb->s_blocksize << 3);
+	unsigned int bit_nr = block % (sb->s_blocksize << 3);
 
 	if (!jb->bitmaps[bmap_nr]) {
 		jb->bitmaps[bmap_nr] = get_bitmap_node(sb);
@@ -239,7 +240,7 @@ static void cleanup_bitmap_list(struct super_block *sb,
 	if (jb->bitmaps == NULL)
 		return;
 
-	for (i = 0; i < SB_BMAP_NR(sb); i++) {
+	for (i = 0; i < reiserfs_bmap_count(sb); i++) {
 		if (jb->bitmaps[i]) {
 			free_bitmap_node(sb, jb->bitmaps[i]);
 			jb->bitmaps[i] = NULL;
@@ -289,7 +290,7 @@ static int free_bitmap_nodes(struct super_block *sb)
 */
 int reiserfs_allocate_list_bitmaps(struct super_block *sb,
 				   struct reiserfs_list_bitmap *jb_array,
-				   int bmap_nr)
+				   unsigned int bmap_nr)
 {
 	int i;
 	int failed = 0;
@@ -483,7 +484,7 @@ static inline struct reiserfs_journal_cnode *get_journal_hash_dev(struct
 **
 */
 int reiserfs_in_journal(struct super_block *sb,
-			int bmap_nr, int bit_nr, int search_all,
+			unsigned int bmap_nr, int bit_nr, int search_all,
 			b_blocknr_t * next_zero_bit)
 {
 	struct reiserfs_journal *journal = SB_JOURNAL(sb);
@@ -986,7 +987,7 @@ static int flush_commit_list(struct super_block *s,
 			     struct reiserfs_journal_list *jl, int flushall)
 {
 	int i;
-	int bn;
+	b_blocknr_t bn;
 	struct buffer_head *tbh = NULL;
 	unsigned long trans_id = jl->j_trans_id;
 	struct reiserfs_journal *journal = SB_JOURNAL(s);
@@ -2284,8 +2285,9 @@ static int journal_read_transaction(struct super_block *sb,
    Right now it is only used from journal code. But later we might use it
    from other places.
    Note: Do not use journal_getblk/sb_getblk functions here! */
-static struct buffer_head *reiserfs_breada(struct block_device *dev, int block,
-					   int bufsize, unsigned int max_block)
+static struct buffer_head *reiserfs_breada(struct block_device *dev,
+                                           b_blocknr_t block, int bufsize,
+                                           b_blocknr_t max_block)
 {
 	struct buffer_head *bhlist[BUFNR];
 	unsigned int blocks = BUFNR;
@@ -2652,7 +2654,7 @@ int journal_init(struct super_block *sb, const char *j_dev_name,
 	journal->j_persistent_trans = 0;
 	if (reiserfs_allocate_list_bitmaps(sb,
 					   journal->j_list_bitmap,
-					   SB_BMAP_NR(sb)))
+					   reiserfs_bmap_count(sb)))
 		goto free_and_return;
 	allocate_bitmap_nodes(sb);
 
@@ -2660,7 +2662,7 @@ int journal_init(struct super_block *sb, const char *j_dev_name,
 	SB_JOURNAL_1st_RESERVED_BLOCK(sb) = (old_format ?
 						 REISERFS_OLD_DISK_OFFSET_IN_BYTES
 						 / sb->s_blocksize +
-						 SB_BMAP_NR(sb) +
+						 reiserfs_bmap_count(sb) +
 						 1 :
 						 REISERFS_DISK_OFFSET_IN_BYTES /
 						 sb->s_blocksize + 2);

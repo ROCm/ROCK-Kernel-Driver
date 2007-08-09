@@ -409,6 +409,7 @@ struct reiserfs_sb_info {
 	char *s_qf_names[MAXQUOTAS];
 	int s_jquota_fmt;
 #endif
+	unsigned int s_bmap_nr;
 };
 
 /* Definitions of reiserfs on-disk properties: */

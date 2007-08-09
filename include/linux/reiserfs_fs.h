@@ -232,6 +232,11 @@ struct reiserfs_super_block {
          ((!is_reiserfs_jr(SB_DISK_SUPER_BLOCK(s)) ? \
          SB_ONDISK_JOURNAL_SIZE(s) + 1 : SB_ONDISK_RESERVED_FOR_JOURNAL(s)))
 
+/* s_bmap_nr is a u16 */
+#define reiserfs_bmap_count(sb)	reiserfs_bmap_nr(SB_BLOCK_COUNT(sb), sb->s_blocksize)
+#define reiserfs_bmap_nr(count, blk_size) ((count - 1) / (blk_size * 8) + 1)
+#define bmap_would_wrap(n)		(n > ((1LL << 16) - 1))
+
 int is_reiserfs_3_5(struct reiserfs_super_block *rs);
 int is_reiserfs_3_6(struct reiserfs_super_block *rs);
 int is_reiserfs_jr(struct reiserfs_super_block *rs);
@@ -1759,8 +1764,8 @@ int journal_end_sync(struct reiserfs_transaction_handle *, struct super_block *,
 int journal_mark_freed(struct reiserfs_transaction_handle *,
 		       struct super_block *, b_blocknr_t blocknr);
 int journal_transaction_should_end(struct reiserfs_transaction_handle *, int);
-int reiserfs_in_journal(struct super_block *sb, int bmap_nr, int bit_nr,
-			int searchall, b_blocknr_t * next);
+int reiserfs_in_journal(struct super_block *sb, unsigned int bmap_nr,
+                        int bit_nr, int searchall, b_blocknr_t * next);
 int journal_begin(struct reiserfs_transaction_handle *,
 		  struct super_block *sb, unsigned long);
 int journal_join_abort(struct reiserfs_transaction_handle *,
@@ -1768,7 +1773,7 @@ int journal_join_abort(struct reiserfs_transaction_handle *,
 void reiserfs_abort_journal(struct super_block *sb, int errno);
 void reiserfs_abort(struct super_block *sb, int errno, const char *fmt, ...);
 int reiserfs_allocate_list_bitmaps(struct super_block *s,
-				   struct reiserfs_list_bitmap *, int);
+				   struct reiserfs_list_bitmap *, unsigned int);
 
 void add_save_link(struct reiserfs_transaction_handle *th,
 		   struct inode *inode, int truncate);
@@ -2076,7 +2081,7 @@ struct buffer_head *get_FEB(struct tree_balance *);
  * arguments, such as node, search path, transaction_handle, etc. */
 struct __reiserfs_blocknr_hint {
 	struct inode *inode;	/* inode passed to allocator, if we allocate unf. nodes */
-	long block;		/* file offset, in blocks */
+	sector_t block;		/* file offset, in blocks */
 	struct in_core_key key;
 	struct treepath *path;	/* search path, used by allocator to deternine search_start by
 				 * various ways */
@@ -2134,7 +2139,8 @@ static inline int reiserfs_new_form_blocknrs(struct tree_balance *tb,
 static inline int reiserfs_new_unf_blocknrs(struct reiserfs_transaction_handle
 					    *th, struct inode *inode,
 					    b_blocknr_t * new_blocknrs,
-					    struct treepath *path, long block)
+					    struct treepath *path,
+					    sector_t block)
 {
 	reiserfs_blocknr_hint_t hint = {
 		.th = th,
@@ -2151,7 +2157,8 @@ static inline int reiserfs_new_unf_blocknrs(struct reiserfs_transaction_handle
 static inline int reiserfs_new_unf_blocknrs2(struct reiserfs_transaction_handle
 					     *th, struct inode *inode,
 					     b_blocknr_t * new_blocknrs,
-					     struct treepath *path, long block)
+					     struct treepath *path,
+					     sector_t block)
 {
 	reiserfs_blocknr_hint_t hint = {
 		.th = th,
