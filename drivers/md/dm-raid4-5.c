@@ -721,7 +721,7 @@ static inline int raid_set_degraded(struct raid_set *rs)
 static INLINE int raid_set_operational(struct raid_set *rs)
 {
 	/* Too many failed devices -> BAD. */
-	return atomic_read(&rs->set.failed_devs) <= 
+	return atomic_read(&rs->set.failed_devs) <=
 	       rs->set.raid_type->parity_devs;
 }
 
@@ -1853,7 +1853,7 @@ static void parity_xor(struct stripe *stripe)
 {
 	struct raid_set *rs = RS(stripe->sc);
 	unsigned chunk_size = rs->set.chunk_size,
-		 io_size = stripe->io.size, 
+		 io_size = stripe->io.size,
 		 xor_size = chunk_size > io_size ? io_size : chunk_size;
 	sector_t off;
 
@@ -2115,7 +2115,7 @@ static void endio(unsigned long error, void *context)
 
 	if (unlikely(error))
 		stripe_error(stripe, page);
-	else 
+	else
 		page_set(page, CLEAN);
 
 	stripe_io_dec(stripe);
@@ -2262,7 +2262,7 @@ static INLINE void _writes_merge(struct stripe *stripe, unsigned p)
 		bio_list_init(write);
 		bio_list_for_each(bio, write_merged)
 			bio_copy_page_list(WRITE, stripe, pl, bio);
-	
+
 		page_set(pl->page, DIRTY);
 	}
 }
@@ -2791,22 +2791,22 @@ static INLINE void do_recovery(struct raid_set *rs)
 
 		{
 			char buf[BDEVNAME_SIZE];
-	
+
 			DMERR("stopping recovery due to "
 			      "ERROR on /dev/%s, stripe at offset %llu",
 			      bdevname(rs->dev[rs->set.ei].dev->bdev, buf),
 			      (unsigned long long) stripe->key);
-	
+
 		}
 
 		/* Make sure, that all quiesced regions get released. */
 		do {
 			if (rec->reg)
 				rh_recovery_end(rec->reg, -EIO);
-	
+
 			rec->reg = rh_recovery_start(rec->rh);
 		} while (rec->reg);
-	
+
 		recover_rh_update(rs, -EIO);
    free:
 		stripe_recover_free(rs);
@@ -3065,7 +3065,7 @@ static void do_raid(struct work_struct *ws)
 	struct raid_set *rs = container_of(ws, struct raid_set, io.dws.work);
 	struct bio_list *ios = &rs->io.work, *ios_in = &rs->io.in;
 	spinlock_t *lock = &rs->io.in_lock;
-	
+
 	/*
 	 * We always need to end io, so that ios
 	 * can get errored in case the set failed

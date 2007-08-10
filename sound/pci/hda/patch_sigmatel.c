@@ -838,7 +838,7 @@ static void stac92xx_set_config_reg(struct hda_codec *codec,
 			    pin_config >> 24);
 	i = snd_hda_codec_read(codec, pin_nid, 0,
 			       AC_VERB_GET_CONFIG_DEFAULT,
-			       0x00);	
+			       0x00);
 	snd_printdd(KERN_INFO "hda_codec: pin nid %2.2x pin config %8.8x\n",
 		    pin_nid, i);
 }
@@ -2252,8 +2252,8 @@ static int patch_stac927x(struct hda_codec *codec)
 	spec->multiout.dac_nids = spec->dac_nids;
 	/* GPIO0 High = Enable EAPD */
 	spec->gpio_mask = spec->gpio_data = 0x00000001;
-	stac92xx_enable_gpio_mask(codec); 
-	
+	stac92xx_enable_gpio_mask(codec);
+
 	err = stac92xx_parse_auto_config(codec, 0x1e, 0x20);
 	if (!err) {
 		if (spec->board_config < 0) {
@@ -2314,7 +2314,7 @@ static int patch_stac9205(struct hda_codec *codec)
 	spec->mixer = stac9205_mixer;
 
 	spec->multiout.dac_nids = spec->dac_nids;
-	
+
 	if (spec->board_config == STAC_M43xx) {
 		/* Enable SPDIF in/out */
 		stac92xx_set_config_reg(codec, 0x1f, 0x01441030);
