@@ -328,11 +328,19 @@ static void hotplug_dock_devices(struct dock_station *ds, u32 event)
 static void dock_event(struct dock_station *ds, u32 event, int num)
 {
 	struct device *dev = &dock_device.dev;
-	/*
-	 * Indicate that the status of the dock station has
-	 * changed.
-	 */
-	kobject_uevent(&dev->kobj, KOBJ_CHANGE);
+	char event_string[13];
+	char *envp[] = { event_string, NULL };
+
+	if (num == UNDOCK_EVENT)
+		sprintf(event_string, "EVENT=undock");
+	else
+		sprintf(event_string, "EVENT=dock");
+
+        /*
+         * Indicate that the status of the dock station has
+         * changed.
+         */
+	kobject_uevent_env(&dev->kobj, KOBJ_CHANGE, envp);
 }
 
 /**
