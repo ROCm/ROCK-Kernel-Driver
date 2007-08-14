@@ -722,6 +722,7 @@ mpc52xx_fec_probe(struct device *dev)
 	/* Hardware init */
 	fec_hw_init(ndev);
 
+	SET_NETDEV_DEV(ndev, &op->dev);
 	/* Register the new network device */
 	ret = register_netdev(ndev);
 	if(ret < 0)
@@ -865,7 +866,6 @@ mpc52xx_fec_exit(void)
 
 
 module_init(mpc52xx_fec_init);
-module_exit(mpc52xx_fec_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Dale Farnsworth");
