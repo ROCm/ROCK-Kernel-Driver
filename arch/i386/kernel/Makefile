@@ -17,6 +17,7 @@ obj-$(CONFIG_MCA)		+= mca.o
 obj-$(CONFIG_X86_MSR)		+= msr.o
 obj-$(CONFIG_X86_CPUID)		+= cpuid.o
 obj-$(CONFIG_MICROCODE)		+= microcode.o
+obj-$(CONFIG_PCI)		+= early-quirks.o
 obj-$(CONFIG_APM)		+= apm.o
 obj-$(CONFIG_X86_SMP)		+= smp.o smpboot.o tsc_sync.o
 obj-$(CONFIG_SMP)		+= smpcommon.o
@@ -91,6 +92,7 @@ $(obj)/vsyscall-syms.o: $(src)/vsyscall.lds \
 
 k8-y                      += ../../x86_64/kernel/k8.o
 stacktrace-y		  += ../../x86_64/kernel/stacktrace.o
+early-quirks-y		  += ../../x86_64/kernel/early-quirks.o
 
 ifdef CONFIG_XEN
 include $(srctree)/scripts/Makefile.xen

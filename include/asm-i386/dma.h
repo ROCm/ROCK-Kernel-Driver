@@ -294,4 +294,6 @@ extern int isa_dma_bridge_buggy;
 #define isa_dma_bridge_buggy 	(0)
 #endif
 
+#define MAX_DMA32_PFN ((4UL*1024*1024*1024) >> PAGE_SHIFT)
+
 #endif /* _ASM_DMA_H */
