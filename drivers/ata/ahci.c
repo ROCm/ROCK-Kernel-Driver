@@ -374,7 +374,7 @@ static const struct ata_port_info ahci_port_info[] = {
 	},
 	/* board_ahci_vt8251 */
 	{
-		AHCI_HFLAGS	(AHCI_HFLAG_NO_NCQ),
+		AHCI_HFLAGS	(AHCI_HFLAG_NO_NCQ | AHCI_HFLAG_NO_PMP),
 		.flags		= AHCI_FLAG_COMMON,
 		.link_flags	= AHCI_LFLAG_COMMON | ATA_LFLAG_HRST_TO_RESUME,
 		.pio_mask	= 0x1f, /* pio0-4 */
