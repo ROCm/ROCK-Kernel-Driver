@@ -297,8 +297,8 @@ static int ps3_storage_wait_for_device(const struct ps3_repository_device *repo)
 		u64 dev_port;
 	} *notify_event;
 
-	pr_debug(" -> %s:%u: bus_id %u, dev_id %u, dev_type %u\n", __func__,
-		 __LINE__, repo->bus_id, repo->dev_id, repo->dev_type);
+	pr_debug(" -> %s:%u: (%u:%u:%u)\n", __func__, __LINE__, repo->bus_id,
+		 repo->dev_id, repo->dev_type);
 
 	buf = kzalloc(512, GFP_KERNEL);
 	if (!buf)
@@ -359,6 +359,11 @@ static int ps3_storage_wait_for_device(const struct ps3_repository_device *repo)
 			break;
 		}
 
+		pr_debug("%s:%d: notify event (%u:%u:%u): event_type 0x%lx, "
+			 "port %lu\n", __func__, __LINE__, repo->bus_index,
+			 repo->dev_index, repo->dev_type,
+			 notify_event->event_type, notify_event->dev_port);
+
 		if (notify_event->event_type != notify_region_probe ||
 		    notify_event->bus_id != repo->bus_id) {
 			pr_debug("%s:%u: bad notify_event: event %lu, "
@@ -370,8 +375,9 @@ static int ps3_storage_wait_for_device(const struct ps3_repository_device *repo)
 
 		if (notify_event->dev_id == repo->dev_id &&
 		    notify_event->dev_type == repo->dev_type) {
-			pr_debug("%s:%u: device ready: dev_id %u\n", __func__,
-				 __LINE__, repo->dev_id);
+			pr_debug("%s:%u: device ready (%u:%u:%u)\n", __func__,
+				 __LINE__, repo->bus_index, repo->dev_index,
+				 repo->dev_type);
 			error = 0;
 			break;
 		}
@@ -412,9 +418,13 @@ static int ps3_setup_storage_dev(const struct ps3_repository_device *repo,
 		return -ENODEV;
 	}
 
-	pr_debug("%s:%u: index %u:%u: port %lu blk_size %lu num_blocks %lu "
+	pr_debug("%s:%u: (%u:%u:%u): port %lu blk_size %lu num_blocks %lu "
 		 "num_regions %u\n", __func__, __LINE__, repo->bus_index,
-		 repo->dev_index, port, blk_size, num_blocks, num_regions);
+		 repo->dev_index, repo->dev_type, port, blk_size, num_blocks,
+		 num_regions);
+
+	if (!num_regions)
+		return -EAGAIN;
 
 	p = kzalloc(sizeof(struct ps3_storage_device) +
 		    num_regions * sizeof(struct ps3_storage_region),
@@ -617,32 +627,28 @@ static int ps3_register_repository_device(
 	case PS3_DEV_TYPE_STOR_DISK:
 		result = ps3_setup_storage_dev(repo, PS3_MATCH_ID_STOR_DISK);
 
-		/* Some devices are not accessable from the Other OS lpar. */
-		if (result == -ENODEV) {
-			result = 0;
-			pr_debug("%s:%u: not accessable\n", __func__,
+		if (result == -EAGAIN)
+			pr_debug("%s:%u: device not ready\n", __func__,
 				 __LINE__);
-		}
-
-		if (result)
+		else if (result)
 			pr_debug("%s:%u ps3_setup_storage_dev failed\n",
 				 __func__, __LINE__);
 		break;
-
 	case PS3_DEV_TYPE_STOR_ROM:
 		result = ps3_setup_storage_dev(repo, PS3_MATCH_ID_STOR_ROM);
-		if (result)
+		if (result == -EAGAIN)
+			pr_debug("%s:%u: device not ready\n", __func__,
+				 __LINE__);
+		else if (result)
 			pr_debug("%s:%u ps3_setup_storage_dev failed\n",
 				 __func__, __LINE__);
 		break;
-
 	case PS3_DEV_TYPE_STOR_FLASH:
 		result = ps3_setup_storage_dev(repo, PS3_MATCH_ID_STOR_FLASH);
 		if (result)
 			pr_debug("%s:%u ps3_setup_storage_dev failed\n",
 				 __func__, __LINE__);
 		break;
-
 	default:
 		result = 0;
 		pr_debug("%s:%u: unsupported dev_type %u\n", __func__, __LINE__,
@@ -656,6 +662,13 @@ static int ps3_register_repository_device(
  * ps3_probe_thread - Background repository probing at system startup.
  *
  * This implementation only supports background probing on a single bus.
+ *
+ * To make this more robust, the probe could cycle through the bus devices
+ * until no changes are found.  The current logic waits on each device until
+ * it finds some regions, then goes to the next device.  This will loop
+ * endlessly on the device if no regions ever appear for that device, and
+ * also will only register the regions found at the time the first region
+ * is found.  Seems to work OK though.
  */
 
 static int ps3_probe_thread(void *data)
@@ -681,11 +694,16 @@ static int ps3_probe_thread(void *data)
 				pr_debug("%s:%u: find device error.\n",
 					__func__, __LINE__);
 			else {
-				pr_debug("%s:%u: found device\n", __func__,
-					__LINE__);
-				ps3_register_repository_device(repo);
-				ps3_repository_bump_device(repo);
+				pr_debug("%s:%u: found device (%u:%u:%u)\n",
+					 __func__, __LINE__, repo->bus_index,
+					 repo->dev_index, repo->dev_type);
+				result = ps3_register_repository_device(repo);
+
 				ms = 250;
+				if (result == -EAGAIN)
+					break;
+
+				ps3_repository_bump_device(repo);
 			}
 		} while (!result);
 
