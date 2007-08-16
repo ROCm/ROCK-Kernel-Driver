@@ -1246,7 +1246,9 @@ static struct usb_driver usblp_driver = {
 	.suspend =	usblp_suspend,
 	.resume =	usblp_resume,
 	.id_table =	usblp_ids,
-	.supports_autosuspend =	1,
+	/* disabled due to little practical signifocance
+	 * and some broken devices */
+	/* .supports_autosuspend =	1, */
 };
 
 static int __init usblp_init(void)
