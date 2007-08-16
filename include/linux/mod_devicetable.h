@@ -159,12 +159,11 @@ struct ap_device_id {
 
 #define AP_DEVICE_ID_MATCH_DEVICE_TYPE		0x01
 
-#define ACPI_ID_LEN	9
-#define FILLUP_LEN     7 /* dirty fix for i386 -> 64bit cross-compilation */
+#define ACPI_ID_LEN	16 /* only 9 bytes needed here, 16 bytes are used */
+			   /* to workaround crosscompile issues */
 
 struct acpi_device_id {
 	__u8 id[ACPI_ID_LEN];
-	__u8 dummy[FILLUP_LEN];
 	kernel_ulong_t driver_data;
 };
 
