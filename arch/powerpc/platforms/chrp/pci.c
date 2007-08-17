@@ -362,6 +362,7 @@ static void chrp_pci_fixup_vt8231_ata(struct pci_dev *viaide)
 
 	pci_read_config_byte(viaide, PCI_CLASS_PROG, &progif);
 	pci_write_config_byte(viaide, PCI_CLASS_PROG, progif & ~0x5);
+	viaide->class &= ~0x5;
 
 	pci_dev_put(viaisa);
 }

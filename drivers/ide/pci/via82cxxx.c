@@ -436,6 +436,13 @@ static void __devinit init_hwif_via82cxxx(ide_hwif_t *hwif)
 	hwif->tuneproc = &via82cxxx_tune_drive;
 	hwif->speedproc = &via_set_drive;
 
+
+#ifdef CONFIG_PPC_CHRP
+	if(machine_is(chrp) && _chrp_type == _CHRP_Pegasos) {
+		hwif->irq = hwif->channel ? 15 : 14;
+	}
+#endif
+
 	for (i = 0; i < 2; i++) {
 		hwif->drives[i].io_32bit = 1;
 		hwif->drives[i].unmask = (vdev->via_config->flags & VIA_NO_UNMASK) ? 0 : 1;
