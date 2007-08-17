@@ -35,11 +35,13 @@
 #include <linux/namei.h>
 #include <linux/quotaops.h>
 #include <linux/seq_file.h>
+#include <linux/nfs4acl.h>
 
 #include <asm/uaccess.h>
 
 #include "xattr.h"
 #include "acl.h"
+#include "nfs4acl.h"
 #include "namei.h"
 
 static int ext3_load_journal(struct super_block *, struct ext3_super_block *,
@@ -452,6 +454,9 @@ static struct inode *ext3_alloc_inode(struct super_block *sb)
 	ei->i_acl = EXT3_ACL_NOT_CACHED;
 	ei->i_default_acl = EXT3_ACL_NOT_CACHED;
 #endif
+#ifdef CONFIG_EXT3_FS_NFS4ACL
+	ei->i_nfs4acl = EXT3_NFS4ACL_NOT_CACHED;
+#endif
 	ei->i_block_alloc_info = NULL;
 	ei->vfs_inode.i_version = 1;
 	return &ei->vfs_inode;
@@ -504,6 +509,13 @@ static void ext3_clear_inode(struct inode *inode)
 			EXT3_I(inode)->i_default_acl != EXT3_ACL_NOT_CACHED) {
 		posix_acl_release(EXT3_I(inode)->i_default_acl);
 		EXT3_I(inode)->i_default_acl = EXT3_ACL_NOT_CACHED;
+	}
+#endif
+#ifdef CONFIG_EXT3_FS_NFS4ACL
+	if (EXT3_I(inode)->i_nfs4acl &&
+			EXT3_I(inode)->i_nfs4acl != EXT3_NFS4ACL_NOT_CACHED) {
+		nfs4acl_release(EXT3_I(inode)->i_nfs4acl);
+		EXT3_I(inode)->i_nfs4acl = EXT3_NFS4ACL_NOT_CACHED;
 	}
 #endif
 	ext3_discard_reservation(inode);

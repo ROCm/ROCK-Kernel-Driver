@@ -96,7 +96,7 @@ nfs4acl_from_xattr(const void *value, size_t size)
 	return acl;
 
 fail_einval:
-	nfs4acl_free(acl);
+	nfs4acl_release(acl);
 	return ERR_PTR(-EINVAL);
 }
 EXPORT_SYMBOL_GPL(nfs4acl_from_xattr);

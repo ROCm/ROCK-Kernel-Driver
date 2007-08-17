@@ -2604,6 +2604,9 @@ void ext3_read_inode(struct inode * inode)
 	ei->i_acl = EXT3_ACL_NOT_CACHED;
 	ei->i_default_acl = EXT3_ACL_NOT_CACHED;
 #endif
+#ifdef CONFIG_EXT3_FS_NFS4ACL
+	ei->i_nfs4acl = EXT3_NFS4ACL_NOT_CACHED;
+#endif
 	ei->i_block_alloc_info = NULL;
 
 	if (__ext3_get_inode_loc(inode, &iloc, 0))

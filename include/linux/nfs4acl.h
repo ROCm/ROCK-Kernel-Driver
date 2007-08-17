@@ -12,6 +12,7 @@ struct nfs4ace {
 };
 
 struct nfs4acl {
+	atomic_t	a_refcount;
 	unsigned int	a_owner_mask;
 	unsigned int	a_group_mask;
 	unsigned int	a_other_mask;
@@ -90,6 +91,27 @@ struct nfs4acl {
 	ACE4_WRITE_OWNER | \
 	ACE4_SYNCHRONIZE )
 
+/*
+ * Duplicate an NFS4ACL handle.
+ */
+static inline struct nfs4acl *
+nfs4acl_dup(struct nfs4acl *acl)
+{
+	if (acl)
+		atomic_inc(&acl->a_refcount);
+	return acl;
+}
+
+/*
+ * Free an NFS4ACL handle
+ */
+static inline void
+nfs4acl_release(struct nfs4acl *acl)
+{
+	if (acl && atomic_dec_and_test(&acl->a_refcount))
+		kfree(acl);
+}
+
 /* Special e_who identifiers: we use these pointer values in comparisons
    instead of strcmp for efficiency. */
 
@@ -158,24 +180,14 @@ nfs4ace_is_deny(const struct nfs4ace *ace)
 	return ace->e_type == ACE4_ACCESS_DENIED_ACE_TYPE;
 }
 
-extern int nfs4ace_dup(struct nfs4ace *, struct nfs4ace *);
-extern void nfs4ace_free(struct nfs4ace *);
-
 extern struct nfs4acl *nfs4acl_alloc(int count);
-extern struct nfs4acl *nfs4acl_clone(struct nfs4acl *acl);
-extern void __nfs4acl_free(struct nfs4acl *);
-
-static inline void
-nfs4acl_free(struct nfs4acl *acl)
-{
-	kfree(acl);
-}
+extern struct nfs4acl *nfs4acl_clone(const struct nfs4acl *acl);
 
 extern int nfs4acl_permission(struct inode *, const struct nfs4acl *, int, int);
-extern int nfs4ace_is_same_who(struct nfs4ace *, struct nfs4ace *);
-extern struct nfs4acl *nfs4acl_inherit(struct nfs4acl *, mode_t, int);
-extern int nfs4acl_masks_to_mode(struct nfs4acl *);
-extern void nfs4acl_chmod(struct nfs4acl *, mode_t);
+extern int nfs4ace_is_same_who(const struct nfs4ace *, const struct nfs4ace *);
+extern struct nfs4acl *nfs4acl_inherit(const struct nfs4acl *, mode_t, int);
+extern int nfs4acl_masks_to_mode(const struct nfs4acl *);
+extern struct nfs4acl *nfs4acl_chmod(struct nfs4acl *, mode_t);
 extern int nfs4acl_apply_masks(struct nfs4acl **acl, int);
 
 #endif /* __NFS4ACL_H */

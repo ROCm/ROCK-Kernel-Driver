@@ -107,6 +107,9 @@ struct ext3_inode_info {
 	struct posix_acl	*i_acl;
 	struct posix_acl	*i_default_acl;
 #endif
+#ifdef CONFIG_EXT3_FS_NFS4ACL
+	struct nfs4acl		*i_nfs4acl;
+#endif
 
 	struct list_head i_orphan;	/* unlinked but open inodes */
 

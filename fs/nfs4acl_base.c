@@ -12,15 +12,14 @@
  * General Public License for more details.
  */
 
+#include <linux/sched.h>
 #include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/nfs4acl.h>
-#include <linux/capability.h>
-#include <linux/sched.h>
 
 MODULE_LICENSE("GPL");
 
-/**
+/*
  * ACL entries that have ACE4_SPECIAL_WHO set in ace->e_flags use the
  * pointer values of these constants in ace->u.e_who to avoid massive
  * amounts of string comparisons.
@@ -46,30 +45,30 @@ nfs4acl_alloc(int count)
 
 	if (acl) {
 		memset(acl, 0, size);
+		atomic_set(&acl->a_refcount, 1);
 		acl->a_count = count;
 	}
 	return acl;
 }
 
-#if 0
 /**
  * nfs4acl_clone  -  create a copy of an acl
  */
 struct nfs4acl *
-nfs4acl_clone(struct nfs4acl *acl)
+nfs4acl_clone(const struct nfs4acl *acl)
 {
-	struct nfs4acl *dup = nfs4acl_alloc(acl->a_count);
+	int count = acl->a_count;
+	size_t size = sizeof(struct nfs4acl) + count * sizeof(struct nfs4ace);
+	struct nfs4acl *dup = kmalloc(size, GFP_KERNEL);
 
-	if (acl) {
-		memcpy(dup, acl, sizeof(struct nfs4acl) +
-		       sizeof(struct nfs4ace) * acl->a_count);
+	if (dup) {
+		memcpy(dup, acl, size);
+		atomic_set(&dup->a_refcount, 1);
 	}
-	return acl;
+	return dup;
 }
-EXPORT_SYMBOL(nfs4acl_clone);
-#endif
 
-/**
+/*
  * The POSIX permissions are supersets of the below mask flags.
  *
  * The ACE4_READ_ATTRIBUTES and ACE4_READ_ACL flags are always granted
@@ -111,7 +110,7 @@ nfs4acl_mask_to_mode(unsigned int mask)
  * Compute the file mode permission bits from the file masks in the acl.
  */
 int
-nfs4acl_masks_to_mode(struct nfs4acl *acl)
+nfs4acl_masks_to_mode(const struct nfs4acl *acl)
 {
 	return nfs4acl_mask_to_mode(acl->a_owner_mask) << 6 |
 	       nfs4acl_mask_to_mode(acl->a_group_mask) << 3 |
@@ -139,14 +138,34 @@ nfs4acl_mode_to_mask(mode_t mode)
  * @mode:	file mode permission bits to apply to the @acl
  *
  * Converts the mask flags corresponding to the owner, group, and other file
- * permissions and updates the file masks in @acl accordingly.
+ * permissions and computes the file masks. Returns @acl if it already has the
+ * appropriate file masks, or updates the flags in a copy of @acl. Takes over
+ * @acl.
  */
-void
+struct nfs4acl *
 nfs4acl_chmod(struct nfs4acl *acl, mode_t mode)
 {
-	acl->a_owner_mask = nfs4acl_mode_to_mask(mode >> 6);
-	acl->a_group_mask = nfs4acl_mode_to_mask(mode >> 3);
-	acl->a_other_mask = nfs4acl_mode_to_mask(mode);
+	unsigned int owner_mask, group_mask, other_mask;
+	struct nfs4acl *clone;
+
+	owner_mask = nfs4acl_mode_to_mask(mode >> 6);
+	group_mask = nfs4acl_mode_to_mask(mode >> 3);
+	other_mask = nfs4acl_mode_to_mask(mode);
+
+	if (acl->a_owner_mask == owner_mask &&
+	    acl->a_group_mask == group_mask &&
+	    acl->a_other_mask == other_mask)
+		return acl;
+
+	clone = nfs4acl_clone(acl);
+	nfs4acl_release(acl);
+	if (!clone)
+		return ERR_PTR(-ENOMEM);
+
+	clone->a_owner_mask = owner_mask;
+	clone->a_group_mask = group_mask;
+	clone->a_other_mask = other_mask;
+	return clone;
 }
 EXPORT_SYMBOL_GPL(nfs4acl_chmod);
 
@@ -342,11 +361,11 @@ capability_check:
 }
 EXPORT_SYMBOL_GPL(nfs4acl_permission);
 
-/**
+/*
  * nfs4ace_is_same_who  -  do both acl entries refer to the same identifier?
  */
 int
-nfs4ace_is_same_who(struct nfs4ace *a, struct nfs4ace *b)
+nfs4ace_is_same_who(const struct nfs4ace *a, const struct nfs4ace *b)
 {
 #define WHO_FLAGS (ACE4_SPECIAL_WHO | ACE4_IDENTIFIER_GROUP)
 	if ((a->e_flags & WHO_FLAGS) != (b->e_flags & WHO_FLAGS))
@@ -453,9 +472,9 @@ nfs4acl_compute_max_masks(struct nfs4acl *acl)
  * set to the create mode.
  */
 struct nfs4acl *
-nfs4acl_inherit(struct nfs4acl *dir_acl, mode_t mode, int write_through)
+nfs4acl_inherit(const struct nfs4acl *dir_acl, mode_t mode, int write_through)
 {
-	struct nfs4ace *dir_ace;
+	const struct nfs4ace *dir_ace;
 	struct nfs4acl *acl;
 	struct nfs4ace *ace;
 	int count = 0;
