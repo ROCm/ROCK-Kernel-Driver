@@ -605,8 +605,10 @@ sg_write(struct file *filp, const char __user *buf, size_t count, loff_t * ppos)
 	 * but is is possible that the app intended SG_DXFER_TO_DEV, because there
 	 * is a non-zero input_size, so emit a warning.
 	 */
-	if (hp->dxfer_direction == SG_DXFER_TO_FROM_DEV)
-		if (printk_ratelimit())
+	if (hp->dxfer_direction == SG_DXFER_TO_FROM_DEV) {
+		static char last_printed[TASK_COMM_LEN];
+
+		if (strcmp(last_printed, current->comm) && printk_ratelimit()) {
 			printk(KERN_WARNING
 			       "sg_write: data in/out %d/%d bytes for SCSI command 0x%x--"
 			       "guessing data in;\n" KERN_WARNING "   "
@@ -614,6 +616,10 @@ sg_write(struct file *filp, const char __user *buf, size_t count, loff_t * ppos)
 			       old_hdr.reply_len - (int)SZ_SG_HEADER,
 			       input_size, (unsigned int) cmnd[0],
 			       current->comm);
+
+			memcpy(last_printed, current->comm, TASK_COMM_LEN);
+		}
+	}
 	k = sg_common_write(sfp, srp, cmnd, sfp->timeout, blocking);
 	return (k < 0) ? k : count;
 }
