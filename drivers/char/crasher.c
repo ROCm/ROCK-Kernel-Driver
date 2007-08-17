@@ -41,9 +41,9 @@ MODULE_PARM_DESC(trap_null, "test option. dereference a NULL pointer to simulate
 MODULE_PARM_DESC(trap_read, "test option. read from an invalid address to simulate a crash and render the system unusable.");
 MODULE_PARM_DESC(trap_write, "test option. write to an invalid address to simulate a crash and render the system unusable.");
 MODULE_PARM_DESC(call_null, "test option. call a NULL pointer to simulate a crash and render the system unusable.");
-MODULE_PARM_DESC(call_read, "test option. call an invalid address to simulate a crash and render the system unusable.");
+MODULE_PARM_DESC(call_bad, "test option. call an invalid address to simulate a crash and render the system unusable.");
 MODULE_PARM_DESC(jump_null, "test option. jump to a NULL pointer to simulate a crash and render the system unusable.");
-MODULE_PARM_DESC(jump_read, "test option. jump to an invalid address to simulate a crash and render the system unusable.");
+MODULE_PARM_DESC(jump_bad, "test option. jump to an invalid address to simulate a crash and render the system unusable.");
 MODULE_PARM_DESC(threads, "number of threads to run");
 MODULE_LICENSE("GPL");
 
