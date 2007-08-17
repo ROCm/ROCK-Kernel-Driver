@@ -23,6 +23,20 @@
 #include "apparmor.h"
 #include "inline.h"
 
+/* point to the apparmor module */
+struct module *aa_module = NULL;
+
+/* secondary ops if apparmor is stacked */
+static struct security_operations *aa_secondary_ops = NULL;
+static DEFINE_MUTEX(aa_secondary_lock);
+
+#define AA_SECONDARY(FN, ARGS...) \
+       ({ \
+               struct security_operations *__f1; \
+               __f1 = rcu_dereference(aa_secondary_ops); \
+               (unlikely(__f1) && __f1->FN) ? __f1->FN(ARGS) : 0; \
+       })
+
 static int param_set_aabool(const char *val, struct kernel_param *kp);
 static int param_get_aabool(char *buffer, struct kernel_param *kp);
 #define param_check_aabool(name, p) __param_check(name, p, int)
@@ -404,18 +418,23 @@ out:
 static int apparmor_inode_permission(struct inode *inode, int mask,
 				     struct nameidata *nd)
 {
-	int check = 0;
+	int check = 0, error = 0;
 
 	if (!nd || nd->flags & (LOOKUP_PARENT | LOOKUP_CONTINUE))
-		return 0;
+		goto out;
 	mask = aa_mask_permissions(mask);
 	if (S_ISDIR(inode->i_mode)) {
 		check |= AA_CHECK_DIR;
 		/* allow traverse accesses to directories */
 		mask &= ~MAY_EXEC;
 	}
-	return aa_permission("inode_permission", inode, nd->dentry, nd->mnt,
-			     mask, check);
+	error = aa_permission("inode_permission", inode, nd->dentry, nd->mnt,
+			      mask, check);
+out:
+	if (!error)
+		error = AA_SECONDARY(inode_permission, inode, mask, nd);
+
+	return error;
 }
 
 static int apparmor_inode_setattr(struct dentry *dentry, struct vfsmount *mnt,
@@ -824,6 +843,75 @@ static int apparmor_setprocattr(struct task_struct *task, char *name,
 	return error;
 }
 
+static void info_message(const char *str, const char *name)
+{
+       struct aa_audit sa;
+       memset(&sa, 0, sizeof(sa));
+       sa.gfp_mask = GFP_KERNEL;
+       sa.name = name;
+       sa.info = str;
+       if (name)
+	       printk(KERN_INFO "AppArmor: %s name=\"%s\"\n", str, name);
+       else
+	       printk(KERN_INFO "AppArmor: %s\n", str);
+       aa_audit_message(NULL, &sa, AUDIT_APPARMOR_STATUS);
+}
+
+int apparmor_register_subsecurity(const char *name,
+                                 struct security_operations *ops)
+{
+       int error = 0;
+
+       if (mutex_lock_interruptible(&aa_secondary_lock))
+               return -ERESTARTSYS;
+
+       /* allow dazuko and capability to stack.  The stacking with
+        * capability is not needed since apparmor already composes
+        * capability using common cap.
+        */
+       if (!aa_secondary_ops && (strcmp(name, "dazuko") == 0 ||
+                                 strcmp(name, "capability") == 0)){
+               /* The apparmor module needs to be pinned while a secondary is
+                * registered
+                */
+               if (try_module_get(aa_module)) {
+                       aa_secondary_ops = ops;
+                       info_message("Registered secondary security module",
+                                    name);
+               } else {
+                       error = -EINVAL;
+               }
+       } else {
+               info_message("Unable to register %s as a secondary security "
+                            "module", name);
+               error = -EPERM;
+       }
+       mutex_unlock(&aa_secondary_lock);
+       return error;
+}
+
+int apparmor_unregister_subsecurity(const char *name,
+                                   struct security_operations *ops)
+{
+       int error = 0;
+
+       if (mutex_lock_interruptible(&aa_secondary_lock))
+               return -ERESTARTSYS;
+
+       if (aa_secondary_ops && aa_secondary_ops == ops) {
+               rcu_assign_pointer(aa_secondary_ops, NULL);
+               synchronize_rcu();
+               module_put(aa_module);
+               info_message("Unregistered secondary security module", name);
+       } else {
+               info_message("Unable to unregister secondary security module",
+                            name);
+               error = -EPERM;
+       }
+       mutex_unlock(&aa_secondary_lock);
+       return error;
+}
+
 struct security_operations apparmor_ops = {
 	.ptrace =			apparmor_ptrace,
 	.capget =			cap_capget,
@@ -869,6 +957,9 @@ struct security_operations apparmor_ops = {
 	.getprocattr =			apparmor_getprocattr,
 	.setprocattr =			apparmor_setprocattr,
 
+	.register_security =            apparmor_register_subsecurity,
+	.unregister_security =          apparmor_unregister_subsecurity,
+
 	.socket_create =		apparmor_socket_create,
 	.socket_post_create =		apparmor_socket_post_create,
 	.socket_bind =			apparmor_socket_bind,
@@ -885,16 +976,6 @@ struct security_operations apparmor_ops = {
 	.socket_getpeersec_stream =	apparmor_socket_getpeersec_stream,
 	.socket_getpeersec_dgram =	apparmor_socket_getpeersec_dgram,
 };
-
-static void info_message(const char *str)
-{
-	struct aa_audit sa;
-	memset(&sa, 0, sizeof(sa));
-	sa.gfp_mask = GFP_KERNEL;
-	sa.info = str;
-	printk(KERN_INFO "AppArmor: %s", str);
-	aa_audit_message(NULL, &sa, AUDIT_APPARMOR_STATUS);
-}
 
 static int __init apparmor_init(void)
 {
@@ -916,9 +997,10 @@ static int __init apparmor_init(void)
 	}
 
 	if (apparmor_complain)
-		info_message("AppArmor initialized: complainmode enabled");
+		info_message("AppArmor initialized: complainmode enabled",
+			     NULL);
 	else
-		info_message("AppArmor initialized");
+		info_message("AppArmor initialized", NULL);
 
 	return error;
 
@@ -969,9 +1051,9 @@ static void __exit apparmor_exit(void)
 	mutex_unlock(&aa_interface_lock);
 
 	if (unregister_security(&apparmor_ops))
-		info_message("Unable to properly unregister AppArmor");
+		info_message("Unable to properly unregister AppArmor", NULL);
 
-	info_message("AppArmor protection removed");
+	info_message("AppArmor protection removed", NULL);
 }
 
 module_init(apparmor_init);
