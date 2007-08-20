@@ -4,7 +4,6 @@ config MAC80211
 	select CRYPTO
 	select CRYPTO_ECB
 	select CRYPTO_ARC4
-	select CRYPTO_AES
 	select CRC32
 	select WIRELESS_EXT
 	select CFG80211

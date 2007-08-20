@@ -45,7 +45,6 @@ config IEEE80211_CRYPT_CCMP
 	tristate "IEEE 802.11i CCMP support"
 	depends on IEEE80211
 	select CRYPTO
-	select CRYPTO_AES
 	---help---
 	Include software based cipher suites in support of IEEE 802.11i
 	(aka TGi, WPA, WPA2, WPA-PSK, etc.) for use with CCMP enabled
