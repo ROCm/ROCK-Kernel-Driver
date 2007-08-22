@@ -675,8 +675,8 @@ static struct of_device_id mpc52xx_ac97_of_match[] = {
 		.compatible	= "mpc5200b-psc-ac97",	/* B only for now */
 	},
 };
-/* Prevent autoload during developpment phase ... */
-/* MODULE_DEVICE_TABLE(of, mpc52xx_ac97_of_match); */
+
+MODULE_DEVICE_TABLE(of, mpc52xx_ac97_of_match);
 
 
 static struct of_platform_driver mpc52xx_ac97_of_driver = {
