@@ -1390,6 +1390,25 @@ config CRAMFS
 
 	  If unsure, say N.
 
+config SQUASHFS
+	tristate "squashfs"
+	depends on BLOCK
+	help
+	  http://squashfs.sourceforge.net/
+
+	  If unsure, submit it to mainline.
+
+config SQUASHFS_FRAGMENT_CACHE_SIZE
+	int "squashfs fragment cache size"
+	range 3 3
+	default 3
+	depends on SQUASHFS
+	help
+	  http://squashfs.sourceforge.net/
+
+	  If unsure, leave the default value: 3
+
+
 config VXFS_FS
 	tristate "FreeVxFS file system support (VERITAS VxFS(TM) compatible)"
 	depends on BLOCK
