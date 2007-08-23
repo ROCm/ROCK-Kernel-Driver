@@ -713,6 +713,9 @@ static const struct ps3av_monitor_quirk {
 		.monitor_name	= "L226WTQ",
 		.clear_60	= PS3AV_RESBIT_1920x1080I |
 				  PS3AV_RESBIT_1920x1080P
+	}, {
+		.monitor_name	= "SyncMaster",
+		.clear_60	= PS3AV_RESBIT_1920x1080I
 	}
 };
 
