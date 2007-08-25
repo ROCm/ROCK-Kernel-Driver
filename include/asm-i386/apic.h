@@ -118,6 +118,8 @@ extern void enable_NMI_through_LVT0 (void * dummy);
 extern int timer_over_8254;
 extern int local_apic_timer_c2_ok;
 
+extern int local_apic_timer_disabled;
+
 #else /* !CONFIG_X86_LOCAL_APIC || CONFIG_XEN */
 
 static inline void lapic_shutdown(void) { }
