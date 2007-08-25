@@ -63,6 +63,7 @@ static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 	u32 l, h;
 	int mbytes = num_physpages >> (20-PAGE_SHIFT);
 	int r;
+	extern int local_apic_timer_disabled;
 
 #ifdef CONFIG_SMP
 	unsigned long long value;
@@ -282,7 +283,7 @@ static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 			num_cache_leaves = 3;
 	}
 
-#ifdef CONFIG_X86_LOCAL_APIC
+#if defined(CONFIG_X86_LOCAL_APIC) && !defined(CONFIG_XEN)
 	if (amd_apic_timer_broken())
 		local_apic_timer_disabled = 1;
 #endif
