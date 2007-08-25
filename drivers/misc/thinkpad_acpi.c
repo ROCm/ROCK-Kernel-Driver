@@ -701,9 +701,19 @@ static int __init thinkpad_acpi_driver_init(struct ibm_init_struct *iibm)
 	printk(IBM_INFO "%s v%s\n", IBM_DESC, IBM_VERSION);
 	printk(IBM_INFO "%s\n", IBM_URL);
 
-	if (ibm_thinkpad_ec_found)
-		printk(IBM_INFO "ThinkPad EC firmware %s\n",
-		       ibm_thinkpad_ec_found);
+	printk(IBM_INFO "ThinkPad BIOS %s, EC %s\n",
+		(thinkpad_id.bios_version_str) ?
+			thinkpad_id.bios_version_str : "unknown",
+		(thinkpad_id.ec_version_str) ?
+			thinkpad_id.ec_version_str : "unknown");
+
+	if (thinkpad_id.vendor && thinkpad_id.model_str)
+		printk(IBM_INFO "%s %s\n",
+			(thinkpad_id.vendor == PCI_VENDOR_ID_IBM) ?
+				"IBM" : ((thinkpad_id.vendor ==
+						PCI_VENDOR_ID_LENOVO) ?
+					"Lenovo" : "Unknown vendor"),
+			thinkpad_id.model_str);
 
 	return 0;
 }
@@ -2424,7 +2434,7 @@ static int __init thermal_init(struct ibm_init_struct *iibm)
 
 	acpi_tmp7 = acpi_evalf(ec_handle, NULL, "TMP7", "qv");
 
-	if (ibm_thinkpad_ec_found && experimental) {
+	if (thinkpad_id.ec_model && experimental) {
 		/*
 		 * Direct EC access mode: sensors at registers
 		 * 0x78-0x7F, 0xC0-0xC7.  Registers return 0x00 for
@@ -2708,10 +2718,14 @@ static struct ibm_struct ecdump_driver_data = {
 
 static struct backlight_device *ibm_backlight_device = NULL;
 
+static struct backlight_device *ibm_backlight_device;
+
 static struct backlight_ops ibm_backlight_data = {
         .get_brightness = brightness_get,
         .update_status  = brightness_update_status,
 };
+
+static struct mutex brightness_mutex;
 
 static int __init brightness_init(struct ibm_init_struct *iibm)
 {
@@ -2719,9 +2733,24 @@ static int __init brightness_init(struct ibm_init_struct *iibm)
 
 	vdbg_printk(TPACPI_DBG_INIT, "initializing brightness subdriver\n");
 
+	mutex_init(&brightness_mutex);
+
+	if (!brightness_mode) {
+		if (thinkpad_id.vendor == PCI_VENDOR_ID_LENOVO)
+			brightness_mode = 2;
+		else
+			brightness_mode = 3;
+
+		dbg_printk(TPACPI_DBG_INIT, "selected brightness_mode=%d\n",
+			brightness_mode);
+	}
+
+	if (brightness_mode > 3)
+		return -EINVAL;
+
 	b = brightness_get(NULL);
 	if (b < 0)
-		return b;
+		return 1;
 
 	ibm_backlight_device = backlight_device_register(
 					TPACPI_BACKLIGHT_DEV_NAME, NULL, NULL,
@@ -2757,34 +2786,76 @@ static int brightness_update_status(struct backlight_device *bd)
 				bd->props.brightness : 0);
 }
 
+/*
+ * ThinkPads can read brightness from two places: EC 0x31, or
+ * CMOS NVRAM byte 0x5E, bits 0-3.
+ */
 static int brightness_get(struct backlight_device *bd)
 {
-	u8 level;
-	if (!acpi_ec_read(brightness_offset, &level))
+	u8 lec = 0, lcmos = 0, level = 0;
+
+	if (brightness_mode & 1) {
+		if (!acpi_ec_read(brightness_offset, &lec))
+			return -EIO;
+		lec &= 7;
+		level = lec;
+	};
+	if (brightness_mode & 2) {
+		lcmos = (nvram_read_byte(TP_NVRAM_ADDR_BRIGHTNESS)
+			 & TP_NVRAM_MASK_LEVEL_BRIGHTNESS)
+			>> TP_NVRAM_POS_LEVEL_BRIGHTNESS;
+		level = lcmos;
+	}
+
+	if (brightness_mode == 3 && lec != lcmos) {
+		printk(IBM_ERR
+			"CMOS NVRAM (%u) and EC (%u) do not agree "
+			"on display brightness level\n",
+			(unsigned int) lcmos,
+			(unsigned int) lec);
 		return -EIO;
-
-	level &= 0x7;
-
+	}
 	return level;
 }
 
 static int brightness_set(int value)
 {
-	int cmos_cmd, inc, i;
-	int current_value = brightness_get(NULL);
+	int cmos_cmd, inc, i, res;
+	int current_value;
 
-	value &= 7;
+	if (value > 7)
+		return -EINVAL;
 
-	cmos_cmd = value > current_value ? TP_CMOS_BRIGHTNESS_UP : TP_CMOS_BRIGHTNESS_DOWN;
-	inc = value > current_value ? 1 : -1;
-	for (i = current_value; i != value; i += inc) {
-		if (issue_thinkpad_cmos_command(cmos_cmd))
-			return -EIO;
-		if (!acpi_ec_write(brightness_offset, i + inc))
-			return -EIO;
+	res = mutex_lock_interruptible(&brightness_mutex);
+	if (res < 0)
+		return res;
+
+	current_value = brightness_get(NULL);
+	if (current_value < 0) {
+		res = current_value;
+		goto errout;
 	}
 
-	return 0;
+	cmos_cmd = value > current_value ?
+			TP_CMOS_BRIGHTNESS_UP :
+			TP_CMOS_BRIGHTNESS_DOWN;
+	inc = value > current_value ? 1 : -1;
+	res = 0;
+	for (i = current_value; i != value; i += inc) {
+		if ((brightness_mode & 2) &&
+		    issue_thinkpad_cmos_command(cmos_cmd)) {
+			res = -EIO;
+			goto errout;
+		}
+		if ((brightness_mode & 1) &&
+		    !acpi_ec_write(brightness_offset, i + inc)) {
+			res = -EIO;
+			goto errout;;
+		}
+	}
+errout:
+	mutex_unlock(&brightness_mutex);
+	return res;
 }
 
 static int brightness_read(char *p)
@@ -3308,20 +3379,19 @@ static int __init fan_init(struct ibm_init_struct *iibm)
 			 * Enable for TP-1Y (T43), TP-78 (R51e),
 			 * TP-76 (R52), TP-70 (T43, R52), which are known
 			 * to be buggy. */
-			if (fan_control_initial_status == 0x07 &&
-			    ibm_thinkpad_ec_found &&
-			    ((ibm_thinkpad_ec_found[0] == '1' &&
-			      ibm_thinkpad_ec_found[1] == 'Y') ||
-			     (ibm_thinkpad_ec_found[0] == '7' &&
-			      (ibm_thinkpad_ec_found[1] == '6' ||
-			       ibm_thinkpad_ec_found[1] == '8' ||
-			       ibm_thinkpad_ec_found[1] == '0'))
-			    )) {
+			if (fan_control_initial_status == 0x07) {
+				switch (thinkpad_id.ec_model) {
+				case 0x5931: /* TP-1Y */
+				case 0x3837: /* TP-78 */
+				case 0x3637: /* TP-76 */
+				case 0x3037: /* TP-70 */
 				printk(IBM_NOTICE
 				       "fan_init: initial fan status is "
 				       "unknown, assuming it is in auto "
 				       "mode\n");
 				tp_features.fan_ctrl_status_undef = 1;
+				;;
+				}
 			}
 		} else {
 			printk(IBM_ERR
@@ -4081,6 +4151,61 @@ static char* __init check_dmi_for_ec(void)
 	return NULL;
 }
 
+/* Probing */
+
+static void __init get_thinkpad_model_data(struct thinkpad_id_data *tp)
+{
+	struct dmi_device *dev = NULL;
+	char ec_fw_string[18];
+
+	if (!tp)
+		return;
+
+	memset(tp, 0, sizeof(*tp));
+
+	if (dmi_name_in_vendors("IBM"))
+		tp->vendor = PCI_VENDOR_ID_IBM;
+	else if (dmi_name_in_vendors("LENOVO"))
+		tp->vendor = PCI_VENDOR_ID_LENOVO;
+	else
+		return;
+
+	tp->bios_version_str = kstrdup(dmi_get_system_info(DMI_BIOS_VERSION),
+					GFP_KERNEL);
+	if (!tp->bios_version_str)
+		return;
+	tp->bios_model = tp->bios_version_str[0]
+			 | (tp->bios_version_str[1] << 8);
+
+	/*
+	 * ThinkPad T23 or newer, A31 or newer, R50e or newer,
+	 * X32 or newer, all Z series;  Some models must have an
+	 * up-to-date BIOS or they will not be detected.
+	 *
+	 * See http://thinkwiki.org/wiki/List_of_DMI_IDs
+	 */
+	while ((dev = dmi_find_device(DMI_DEV_TYPE_OEM_STRING, NULL, dev))) {
+		if (sscanf(dev->name,
+			   "IBM ThinkPad Embedded Controller -[%17c",
+			   ec_fw_string) == 1) {
+			ec_fw_string[sizeof(ec_fw_string) - 1] = 0;
+			ec_fw_string[strcspn(ec_fw_string, " ]")] = 0;
+
+			tp->ec_version_str = kstrdup(ec_fw_string, GFP_KERNEL);
+			tp->ec_model = ec_fw_string[0]
+					| (ec_fw_string[1] << 8);
+			break;
+		}
+	}
+
+	tp->model_str = kstrdup(dmi_get_system_info(DMI_PRODUCT_VERSION),
+					GFP_KERNEL);
+	if (strnicmp(tp->model_str, "ThinkPad", 8) != 0) {
+		kfree(tp->model_str);
+		tp->model_str = NULL;
+	}
+}
+
 static int __init probe_for_thinkpad(void)
 {
 	int is_thinkpad;
@@ -4108,7 +4233,7 @@ static int __init probe_for_thinkpad(void)
 	 * false positives a damn great deal
 	 */
 	if (!is_thinkpad)
-		is_thinkpad = dmi_name_in_vendors("IBM");
+		is_thinkpad = (thinkpad_id.vendor == PCI_VENDOR_ID_IBM);
 
 	if (!is_thinkpad && !force_load)
 		return -ENODEV;
@@ -4251,12 +4376,12 @@ static int __init thinkpad_acpi_module_init(void)
 	int ret, i;
 
 	/* Driver-level probe */
+	get_thinkpad_model_data(&thinkpad_id);
 	ret = probe_for_thinkpad();
 	if (ret)
 		return ret;
 
 	/* Driver initialization */
-	ibm_thinkpad_ec_found = check_dmi_for_ec();
 	IBM_ACPIHANDLE_INIT(ecrd);
 	IBM_ACPIHANDLE_INIT(ecwr);
 
@@ -4274,12 +4399,15 @@ static int __init thinkpad_acpi_module_init(void)
 		thinkpad_acpi_module_exit();
 		return ret;
 	}
+	tp_features.platform_drv_registered = 1;
+
 	ret = tpacpi_create_driver_attributes(&tpacpi_pdriver.driver);
 	if (ret) {
 		printk(IBM_ERR "unable to create sysfs driver attributes\n");
 		thinkpad_acpi_module_exit();
 		return ret;
 	}
+	tp_features.platform_drv_attrs_registered = 1;
 
 
 	/* Device initialization */
@@ -4331,13 +4459,19 @@ static void thinkpad_acpi_module_exit(void)
 	if (tpacpi_pdev)
 		platform_device_unregister(tpacpi_pdev);
 
-	tpacpi_remove_driver_attributes(&tpacpi_pdriver.driver);
-	platform_driver_unregister(&tpacpi_pdriver);
+	if (tp_features.platform_drv_attrs_registered)
+		tpacpi_remove_driver_attributes(&tpacpi_pdriver.driver);
+
+	if (tp_features.platform_drv_registered)
+		platform_driver_unregister(&tpacpi_pdriver);
 
 	if (proc_dir)
 		remove_proc_entry(IBM_PROC_DIR, acpi_root_dir);
 
 	kfree(ibm_thinkpad_ec_found);
+	kfree(thinkpad_id.bios_version_str);
+	kfree(thinkpad_id.ec_version_str);
+	kfree(thinkpad_id.model_str);
 }
 
 module_init(thinkpad_acpi_module_init);
