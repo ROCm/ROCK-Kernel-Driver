@@ -2718,8 +2718,6 @@ static struct ibm_struct ecdump_driver_data = {
 
 static struct backlight_device *ibm_backlight_device = NULL;
 
-static struct backlight_device *ibm_backlight_device;
-
 static struct backlight_ops ibm_backlight_data = {
         .get_brightness = brightness_get,
         .update_status  = brightness_update_status,
