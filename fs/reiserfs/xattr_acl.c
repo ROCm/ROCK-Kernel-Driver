@@ -306,9 +306,6 @@ reiserfs_set_acl(struct reiserfs_transaction_handle *th, struct inode *inode,
 				return error;
 			else {
 				inode->i_mode = mode;
-				/* We don't dirty the inode, since
-				 * reiserfs_xattr_set_handle will do it
-				 * for us. */
 				if (error == 0)
 					acl = NULL;
 			}
@@ -331,6 +328,20 @@ reiserfs_set_acl(struct reiserfs_transaction_handle *th, struct inode *inode,
 	}
 
 	error = reiserfs_xattr_set_handle(th, inode, name, value, size, 0);
+
+	/*
+	 * Ensure that the inode gets dirtied if we're only using
+	 * the mode bits and an old ACL didn't exist. We don't need
+	 * to check if the inode is hashed here since we won't get
+	 * called by reiserfs_inherit_default_acl().
+	 */
+	if (error == -ENODATA) {
+		error = 0;
+		if (type == ACL_TYPE_ACCESS) {
+			inode->i_ctime = CURRENT_TIME_SEC;
+			mark_inode_dirty(inode);
+		}
+	}
 
 	kfree(value);
 
