@@ -78,7 +78,8 @@ static void o2hb_fire_callbacks(struct o2hb_callback *hbcall,
 	list_for_each(iter, &hbcall->list) {
 		f = list_entry(iter, struct o2hb_callback_func, hc_item);
 		mlog(ML_HEARTBEAT, "calling funcs %p\n", f);
-		if (f->hc_res == NULL || f->hc_res == event->hn_res)
+		if (f->hc_res == NULL || event->hn_res == NULL ||
+		    f->hc_res == event->hn_res)
 			(f->hc_func)(node, idx, f->hc_data);
 	}
 }
