@@ -53,12 +53,12 @@
 	/*
 	 * Internal debug flags
 	 */
-#define KDB_DEBUG_FLAG_BT	0x0001		/* Stack traceback debug */
+/*	KDB_DEBUG_FLAG_BT	0x0001		Was Stack traceback debug */
 #define KDB_DEBUG_FLAG_BP	0x0002		/* Breakpoint subsystem debug */
-/*	KDB_DEBUG_FLAG_LBR	0x0004		WAS Print last branch register */
+#define KDB_DEBUG_FLAG_BB_SUMM	0x0004		/* Basic block analysis, summary only */
 #define KDB_DEBUG_FLAG_AR	0x0008		/* Activation record, generic */
 #define KDB_DEBUG_FLAG_ARA	0x0010		/* Activation record, arch specific */
-/*      KDB_DEBUG_FLAG_CALLBACK	0x0020		WAS Event callbacks to kdb */
+#define KDB_DEBUG_FLAG_BB	0x0020		/* All basic block analysis */
 #define KDB_DEBUG_FLAG_STATE	0x0040		/* State flags */
 #define KDB_DEBUG_FLAG_MASK	0xffff		/* All debug flags */
 #define KDB_DEBUG_FLAG_SHIFT	16		/* Shift factor for dbflags */
@@ -264,15 +264,13 @@ struct kdb_stack_info {
 	const char *  id;
 };
 
+typedef struct { DECLARE_BITMAP(bits, KDBA_MAXARGS); } valid_t;
+
 struct kdb_activation_record {
 	struct kdb_stack_info	stack;		/* information about current stack */
-	kdb_machreg_t	start;			/* -> start of activation record */
-	kdb_machreg_t	end;			/* -> end+1 of activation record */
-	kdb_machreg_t	ret;			/* Return address to caller */
-	kdb_machreg_t	oldfp;			/* Frame pointer for caller's frame */
-	kdb_machreg_t	fp;			/* Frame pointer for callee's frame */
 	int		args;			/* number of arguments detected */
 	kdb_machreg_t	arg[KDBA_MAXARGS];	/* -> arguments */
+	valid_t		valid;			/* is argument n valid? */
 };
 #endif
 
@@ -481,5 +479,7 @@ extern int kdba_verify_rw(unsigned long addr, size_t size);
 extern int kdb_wait_for_cpus_secs;
 extern void kdba_cpu_up(void);
 extern char kdb_prompt_str[];
+
+#define	KDB_WORD_SIZE	((int)sizeof(kdb_machreg_t))
 
 #endif	/* !_KDBPRIVATE_H */

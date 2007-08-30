@@ -30,7 +30,6 @@ cflags-y	:=
 cflags-kernel-y	:=
 cflags-$(CONFIG_MK8) += $(call cc-option,-march=k8)
 cflags-$(CONFIG_MPSC) += $(call cc-option,-march=nocona)
-cflags-$(CONFIG_KDB) += $(call cc-option,-fno-optimize-sibling-calls,)
 # gcc doesn't support -march=core2 yet as of gcc 4.3, but I hope it
 # will eventually. Use -mtune=generic as fallback
 cflags-$(CONFIG_MCORE2) += \

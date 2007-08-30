@@ -1,3 +1,13 @@
+2007-07-26 Keith Owens  <kaos@sgi.com>
+
+	* New x86 backtrace code.
+	* kdb v4.4-2.6.22-common-4.
+
+2007-07-17 Keith Owens  <kaos@sgi.com>
+
+	* Make kdb_printf_lock an irq lock to keep lockdep happy.
+	* kdb v4.4-2.6.22-common-3.
+
 2007-07-13 Keith Owens  <kaos@sgi.com>
 
 	* Increase the size of the debug_alloc pool.

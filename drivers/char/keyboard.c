@@ -1141,13 +1141,6 @@ static void kbd_keycode(unsigned int keycode, int down, int hw_raw)
 			if (keycode < BTN_MISC && printk_ratelimit())
 				printk(KERN_WARNING "keyboard.c: can't emulate rawmode for keycode %d\n", keycode);
 
-#ifdef	CONFIG_KDB
-	if (down && !rep && keycode == KEY_PAUSE && kdb_on == 1) {
-		kdb(KDB_REASON_KEYBOARD, 0, get_irq_regs());
-		return;
-	}
-#endif	/* CONFIG_KDB */
-
 #ifdef CONFIG_BOOTSPLASH
 	/* This code has to be redone for some non-x86 platforms */
 	if (down == 1 && (keycode == 0x3c || keycode == 0x01)) {        /* F2 and ESC on PC keyboard */
@@ -1156,6 +1149,13 @@ static void kbd_keycode(unsigned int keycode, int down, int hw_raw)
 			return;
 	}
 #endif
+
+#ifdef	CONFIG_KDB
+	if (down && !rep && keycode == KEY_PAUSE && kdb_on == 1) {
+		kdb(KDB_REASON_KEYBOARD, 0, get_irq_regs());
+		return;
+	}
+#endif	/* CONFIG_KDB */
 
 #ifdef CONFIG_MAGIC_SYSRQ	       /* Handle the SysRq Hack */
 	if (keycode == KEY_SYSRQ && (sysrq_down || (down == 1 && sysrq_alt))) {

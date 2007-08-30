@@ -160,12 +160,14 @@ extern kdb_jmp_buf  *kdbjmpbuf;
 
 struct kdba_running_process {
 	long esp;	/* CONFIG_4KSTACKS may be on a different stack */
+	long eip;	/* eip when esp was set */
 };
 
 static inline
 void kdba_save_running(struct kdba_running_process *k, struct pt_regs *regs)
 {
 	k->esp = current_stack_pointer;
+	__asm__ __volatile__ ( " lea 1f,%%eax; movl %%eax,%0 ; 1: " : "=r"(k->eip) : : "eax" );
 }
 
 static inline
@@ -180,5 +182,8 @@ extern void kdba_get_stack_info_alternate(kdb_machreg_t addr, int cpu,
 extern void kdba_wait_for_cpus(void);
 
 extern fastcall void kdb_interrupt(void);
+
+#define	KDB_INT_REGISTERS	8
+
 
 #endif	/* !_ASM_KDBPRIVATE_H */

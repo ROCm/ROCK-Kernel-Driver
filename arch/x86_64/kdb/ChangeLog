@@ -1,3 +1,8 @@
+2007-07-26 Keith Owens  <kaos@sgi.com>
+
+	* New x86 backtrace code.
+	* kdb v4.4-2.6.22-x86_64-2.
+
 2007-07-09 Keith Owens  <kaos@sgi.com>
 
 	* kdb v4.4-2.6.22-x86_64-1.

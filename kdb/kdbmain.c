@@ -2238,7 +2238,7 @@ kdb_md(int argc, const char **argv)
 {
 	static kdb_machreg_t last_addr;
 	static int last_radix, last_bytesperword, last_repeat;
-	int radix = 16, mdcount = 8, bytesperword = sizeof(kdb_machreg_t), repeat;
+	int radix = 16, mdcount = 8, bytesperword = KDB_WORD_SIZE, repeat;
 	int nosect = 0;
 	char fmtchar, fmtstr[64];
 	kdb_machreg_t addr;
@@ -2341,7 +2341,7 @@ kdb_md(int argc, const char **argv)
 
 	last_radix = radix;
 
-	if (bytesperword > sizeof(kdb_machreg_t))
+	if (bytesperword > KDB_WORD_SIZE)
 		return KDB_BADWIDTH;
 
 	switch (bytesperword) {
@@ -2369,7 +2369,7 @@ kdb_md(int argc, const char **argv)
 		/* Do not save these changes as last_*, they are temporary mds
 		 * overrides.
 		 */
-		bytesperword = sizeof(kdb_machreg_t);
+		bytesperword = KDB_WORD_SIZE;
 		repeat = mdcount;
 		kdbgetintenv("NOSECT", &nosect);
 	}
@@ -2458,7 +2458,7 @@ kdb_mm(int argc, const char **argv)
 	if (nextarg != argc + 1)
 		return KDB_ARGCOUNT;
 
-	width = argv[0][2] ? (argv[0][2] - '0') : (sizeof(kdb_machreg_t));
+	width = argv[0][2] ? (argv[0][2] - '0') : (KDB_WORD_SIZE);
 	if ((diag = kdb_putword(addr, contents, width)))
 		return diag;
 
@@ -3549,8 +3549,8 @@ kdb_per_cpu(int argc, const char **argv)
 	if (argc >=2 && (diag = kdbgetularg(argv[2], &bytesperword)))
 		return diag;
 	if (!bytesperword)
-		bytesperword = sizeof(kdb_machreg_t);
-	else if (bytesperword > sizeof(kdb_machreg_t))
+		bytesperword = KDB_WORD_SIZE;
+	else if (bytesperword > KDB_WORD_SIZE)
 		return KDB_BADWIDTH;
 	sprintf(fmtstr, "%%0%dlx ", (int)(2*bytesperword));
 	if (argc >= 3) {
@@ -3592,7 +3592,7 @@ kdb_per_cpu(int argc, const char **argv)
 #endif	/* CONFIG_SMP */
 		kdb_printf("%5d ", cpu);
 		kdb_md_line(fmtstr, addr,
-			bytesperword == sizeof(kdb_machreg_t),
+			bytesperword == KDB_WORD_SIZE,
 			1, bytesperword, 1, 1, 0);
 	}
 	if (cpus_weight(suppress) == 0)

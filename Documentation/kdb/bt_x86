@@ -1,0 +1,1837 @@
+Copyright Keith Owens, 2007.
+
+How the KDB backtrace for x86 works, how to diagnose problems and submit a bug
+==============================================================================
+
+Unlike ia64, x86 architectures do not mandate unwind information in the kernel.
+gcc will include some unwind information for C functions, but not for assembler
+code.  Attempts have been made to add unwind information to the assembler code
+by hand, with little success.  Eventually Linus rejected the x86 unwind code
+because it was breaking too often and destroying useful debugging data.
+
+Even if the x86 unwinder worked correctly, it would only give an accurate
+backtrace, it would not give function arguments. Needless to say, function
+arguments are what people really want.  To get function arguments requires much
+more support from the compiler than simple unwind data, the compiler has to
+track line by line where each argument is held and make that data available to
+the debugger.  Compiling with gcc -g will provide that information, but the
+resulting kernel is several times larger than normal.
+
+Although the gcc -g data can be stored on another machine, there are constructs
+in the kernel that cannot be tracked by this method.  i386 builds with 4K stacks
+and all x86_64 builds have multiple kernel stacks.  The compiler knows nothing
+about these extra stacks and cannot backtrace through them correctly.  The
+assembler code in arch/{i386,x86_64}/kernel/entry.S is a maze of twisty logic
+paths, some of which eventually jump to common labels.  Describing this twisty
+logic to an unwinder is very difficult, expecially when you try to describe
+where arguments and/or registers are held).
+
+KDB gets an accurate x86 backtrace and extracts the arguments by performing code
+decomposition and analysis at run time.  This avoids the need to bloat the
+running kernel to several times its normal size with gcc -g data.  KDB (unlike
+gdb) also knows about the additional kernel stacks and twisty assembler code
+paths.
+
+The x86 backtrace code for i386 is very similar to the x86_64 code, with 80%
+common code and data.  Most of the differences between the backtrace for the two
+architectures is due to the assembler code and stack handling.  To avoid code
+duplication between KDB patches, the x86 backtrace code is actually stored in
+the kdb common patch, in source kdb/kdba_bt_x86.c.  kdb/Makefile only builds
+kdba_bt_x86.o for i386 or x86_64.  Most of the code reads as if the architecture
+is x86_64, using register names like rsp and rip.  i386 is treated as a subset
+of x86_64, with fewer registers and printing the names as esp and eip.  When
+this documentation refers to rsp and rip, read it as esp and eip for i386.  The
+20% of code and data that is different in held in two large #ifdef sections,
+scan kdba_bt_x86.c for CONFIG_X86_64.  Be careful when changing anything in the
+architecture specific sections, you will need to review the other architecture
+to see if it needs changes as well.
+
+The idea behind the x86 backtrace is to trace one function at a time, which
+gives us the calling function.  Then apply the same algorithm to the calling
+function until you unwind to the first function in the process.  The starting
+point for tracing any process is to extract the current stack pointer and
+current instruction pointer (rsp and rip).  The way that these values are
+extracted varies between running tasks and blocked tasks, the method is
+described later (Process Starting Point) but ignore it for now, just assume that
+we have a starting rsp and rip.
+
+Given the instruction pointer (rip), we identify the start and end of the kernel
+or module function it is in, using the kernel symbol table.  This is easy for C
+code, it is significantly harder for assembler code because of the twisty code
+paths that branch to common labels.  The method of identifying the current
+function is described later (Identifying The Current Function) but ignore it for
+now, just assumes that we have the start and end address of the function plus
+its name.
+
+After the rip has been mapped to a function name with sensible start and end
+addresses, the next step is to analyse the code paths in that function.  KDB
+already has a built in disassembler (copied with slight modifications from
+binutils) which knows how to decode each x86 instruction.  Instead of
+duplicating that logic in kdba_bt_x86, it takes advantage of the fact that you
+can override the disassembler's print function, sending the output line to a
+buffer instead of printing it.  kdba_bt_x86 stills has to decode the buffer but
+that is a lot easier than decoding the x86 instruction set.
+
+The code analysis consists of two main passes.  There are example below of the
+analysis with basic block (bb) debugging activated (Examples of Basic Block
+Debugging Output).
+
+The first pass (bb_pass1) identifies all the basic blocks in the function.  For
+our purposes, a basic block has a single entry point and one or more exit
+points.  The start of the function is the start of basic block 0, all other
+blocks are the target of jump instructions (conditional or unconditional) from
+within the rest of the code.  A block ends with an unconditional jump or with a
+terminating instruction such as ret, iret, sysexit, sysret or ud2a (BUG).  A
+block can also end because the next instruction is the start of a new block
+(target of jmp or jcc), in this case there is an implied drop through from one
+block to the next.
+
+Although a call instruction also transfers control, it returns to the next
+instruction so call is not treated as a transfer.  Instead call is treated as a
+normal instruction with side effects, the scratch registers are cleared after a
+call.
+
+At the end of the first pass over the function we have a directed graph that
+starts at bb[0].  The nodes of the graph (bb_list[]) are the basic blocks with
+their start and end address.  The vertices are the jmp or jcc instructions
+(bb_jmp_list[]) that transfer control between blocks, plus any implied drop
+through transfers between consecutive blocks.  This graph can have cycles, many
+functions have loops in them which transfer control back to earlier in the code
+body.
+
+The second pass (bb_pass2) runs over the directed graph analysing the effect of
+each instruction on the register and memory state.  It is important to
+understand that the analysis in this pass is an abstract one, it does not use
+actual hex values for the register contents, instead it uses symbolic values.
+When the basic block code says that "register rsi contains value rax" it means
+that whatever value was in rax on entry to the function has also been copied to
+register rsi at this point in the logic flow.
+
+At an abstract level, all C functions start with exactly the same state, each
+register contains its own symbolic value (except for the stack pointer, see
+later) with no local stack variables defined yet.  Assembler functions tend to
+have unusual starting points, with some registers and/or memory contents defined
+differently on entry.  For example, ret_from_intr on i386 already has a struct
+pt_regs on its stack, ret_from_intr on x86_64 already has a partial struct
+pt_regs plus another two words stacked on top of it.  The special starting cases
+are listed in the arch specific bb_special_cases[].
+
+Once the input state of bb[0] has been defined (including any special cases),
+bb_pass2_do_changed_blocks() runs over all the nodes in bb_list[].  Each
+instruction in each block is analysed (Tracking the Effects of Instructions) to
+see what effect it has on the abstract register state, the analysis of each
+instruction is done in bb_usage().  An instruction can copy one register to
+another, it can copy a register to stack, move from stack to a register or it
+can invalidate the contents of a register or memory location.  A general rule in
+bb_usage() is that any operation whose results cannot be calculated in terms of
+an original input value gives an undefined result.  Remember that it is the
+abstract value that becomes undefined, moving a constant to a register gives a
+defined value for the view of the program but it is undefined as far as the
+abstract state is concerned.
+
+References to data on the stack are a little awkward because the stack pointer
+frequently changes.  To overcome this, kdba_bt_x86 defines a pseudo register
+called the 'original stack pointer' (osp).  This always represents the stack
+pointer on entry to the function, so on entry rsp contains osp+0x0.  As rsp is
+modified, it still points at osp, but its offset from osp changes.  Copying rsp
+to another register (e.g. mov %rsp,%rbp) copies the osp offset as well.  At the
+point that this function calls the next function down the stack, kdba_bt_x86
+knows the delta from osp to rsp.  Applying that delta to the actual value of the
+stack pointer gives the stack pointer value on input to the current function,
+that location contains the return address so we can go up one stack frame and
+repeat the process.
+
+After doing basic block analysis on the current function, kdba_bt_x86 knows what
+the abstract register and memory state is at the point this function was
+interrupted or it called the next function down the stack, this is the exit
+state.  For an interrupt the actual register values are saved in a struct
+pt_regs, for a call we have unwound from the KDB interrupt back to the called
+function so we have some idea of what the register values are in the called
+function.  The abstract exit state is merged with the known actual register
+values to derive the original stack pointer.  That in turn gives us any
+registers that were saved on stack.  The original stack pointer gives the return
+address from the calling function, go up one stack frame and repeat the
+analysis.
+
+
+Process Starting Point
+======================
+
+All backtrace code needs a starting point which defines at least the stack
+pointer and instruction pointer, it may define other registers as well.  The
+first part of kdba_bt_stack() extracts the starting point.  Processes can be in
+one of three states, running (currently on a cpu), blocked (sleeping or ready to
+run but not currently on a cpu) or unknown.
+
+For running processes, the current rsp and rip are dynamic.  Because KDB stops
+the entire machine by sending an interrupt to the other cpus, KDB can save the
+rsp and rip for each cpu at the point where KDB is entered.  This data is held
+in array kdb_running_process and is stored by kdb_save_running() and the arch
+specific kdba_save_running() functions.  When backtracing a running process, KDB
+uses the data in kdb_running_process as its starting point.
+
+For blocked processes we always have the saved rsp, it is held in the process's
+thread_info.  For i386 blocked processes, thread_info also contains the saved
+rip.  For x86_64 blocked processes, rip is no longer saved in thread_info, it is
+assumed that all blocked processes will resume at assembler label thread_return,
+so that rip is used on x86_64.  See arch specific kdba_bt_stack_rip().
+
+Unknown process state only occurs when the user does 'bt <stack_address>'.
+Unlike other bt commands, 'bt <stack_address>' does not identify any specific
+process, instead it identifies a kernel stack.  <stack_address> must be inside a
+valid kernel stack and must point to a saved rip from a call instruction.
+kdba_bt_x86.c uses the common kdba_get_stack_info() and arch specific
+kdba_get_stack_info_alternate() functions to check that the address falls within
+a valid kernel stack.  If the user gives a stack address that does not point to
+a saved rip from a call instruction then the backtrace will be garbage.
+
+
+Identifying The Current Function
+================================
+
+Given a rip value, KDB uses the kallsyms data to find the start of the function
+(first address <= rip) and the end of the function (next symbol in kallsyms).
+This works for plain C code because gcc only generates one label per function.
+It does not work for assembler code or for assembler code embedded in C
+functions, because the assembler labels appear as global entries in kallsyms.
+For example, arch/i386/kernel/entry.S has function ret_from_exception which
+contains three global labels ret_from_intr, check_userspace and
+resume_userspace.  If rip points to any of those global labels, KDB wants the
+start of the real function, i.e. ret_from_exception.  In addition, if rip points
+to ret_from_exception, KDB wants the end of the function to be after the last
+global label in that function, i.e. after resume_userspace.
+
+The simplest way to handle these unwanted global labels is to list the spurious
+assembler labels, which is done in the arch specific array bb_spurious.  After
+mapping rip to the nearest start and end labels from kallsyms, kdb_bb() works
+backwards until it finds a non-spurious label then works forwards to the next
+non-spurious label.  That gives a real start and end address and a real name for
+the current function.
+
+Note that this algorithm only applies in kdb_bb() when it maps rip to a suitable
+start and end address.  When disassembling the code, you will still see the
+spurious label names, users need to see the extra labels.  ret_from_exception on
+i386 disassembles like this (2.6.22) :-
+
+[0]kdb> id ret_from_exception
+0xc0102554 ret_from_exception:         cli
+0xc0102555 ret_from_intr:         mov    $0xfffff000,%ebp
+0xc010255a ret_from_intr+0x5:     and    %esp,%ebp
+0xc010255c check_userspace:         mov    0x34(%esp),%eax
+0xc0102560 check_userspace+0x4:     mov    0x30(%esp),%al
+0xc0102564 check_userspace+0x8:     and    $0x20003,%eax
+0xc0102569 check_userspace+0xd:     cmp    $0x3,%eax
+0xc010256c check_userspace+0x10:    jb     0xc010258c resume_kernel
+0xc0102572 check_userspace+0x16:    mov    %esi,%esi
+0xc0102574 resume_userspace:         cli
+0xc0102575 resume_userspace+0x1:     mov    0x8(%ebp),%ecx
+0xc0102578 resume_userspace+0x4:     and    $0xfe3e,%ecx
+0xc010257e resume_userspace+0xa:     jne    0xc01026f4 work_pending
+0xc0102584 resume_userspace+0x10:    jmp    0xc01026a7 restore_all
+0xc0102589 resume_userspace+0x15:    lea    0x0(%esi),%esi
+0xc010258c resume_kernel:         cli
+
+For the purposes of kdba_bt_x86.c, any rip from 0xc0102554 to 0xc0102589 needs
+to map to the range 0xc0102554 (start) to 0xc010258c (end) with function name
+ret_from_exception.  Therefore ret_from_intr, check_userspace and
+resume_userspace are listed in bb_spurious[] for i386 so those symbols are
+ignored.  The comments in bb_spurious[] list the function that encloses each
+spurious label, those comments are only for humans, they do not affect the code.
+
+Once rip has been mapped to non-spurious labels, the module name, function name,
+start and end address are stored in variables bb_mod_name, bb_func_name,
+bb_func_start, bb_func_end.  These variables are used throughout kdba_bt_x86.c
+for processing each function in turn.
+
+Watch for changes to assembler code, especially in arch/i386/kernel/entry.S,
+arch/x86_64/kernel/entry.S and arch/x86_64/ia32/ia32entry.S.  When new labels
+are added you may need to adjust bb_spurious[] for that architecture.  Running
+bb_all can help identify assembler labels that have been added or deleted.
+
+
+Tracking the Effects of Instructions
+====================================
+
+bb_pass2_do_changed_blocks() uses the KDB disassembler to decode the x86
+instructions to something a human can read.  bb_dis_pass2() is used as a print
+routine to store data for a single instruction in a buffer then
+bb_parse_buffer() starts the analysis.  Any instruction prefixes like lock or
+rep are stripped out.  The opcode string is isolated then up to 3 operands are
+extracted (imul can have 3 operands), these are src, dst and dst2.  The operand
+is matched against table bb_opcode_usage_all[] which lists all the instructions
+that actually appear in i386 and x86_64 kernels.  A lot of the x86 instrcution
+set is not used by the kernel so instructions such as SSE do not appear in
+bb_opcode_usage_all[].
+
+Each operand is decoded by bb_parse_operand() to see whether it has a segment
+prefix, displacement, base, index or scale.  An indirect call or jmp is
+identified.  Operands consisting only of a register are classified as 'reg'
+type, displacements starting with '$' are immediate values otherwise the operand
+refers to a memory location.  Any base or index register name is mapped to the
+abstract register name that contains it, this takes care of mapping (say) %ah to
+rax.
+
+After decoding the opcode and all its operands, bb_usage() decides what effect
+the instruction will have on the abstract state machine.  Some x86 instructions
+list all the affected registers in their operands and these can be handled as
+generic cases.  Alas many x86 instructions have side effects and change
+registers that are not listed in the operands, these have to be handled as
+special cases.  enum bb_operand_usage lists the generic and special cases.
+
+bb_usage() is basically one huge switch statement over the special values in
+enum bb_operand_usage.  For each special case it tracks the side effects of the
+instruction.  Once all the special cases have been handled and converted to
+generic cases then bb_usage() handles the generic cases.
+
+bb_usage() detects when a register is copied to another register, a register is
+copied to stack or a known stack value is copied to a register and updates the
+state data accordingly.  It is particularly important that all stack pointer
+updates and copies of the stack pointer are tracked, much of the saved state is
+on stack and can be accessed via any register that points to the stack, not just
+via rsp.
+
+i386 built with 4K stacks and all x86_64 builds have multiple kernel stacks.
+bb_usage() knows which instructions or locations are used to switch stacks and
+pretends that these instructions have no effect on the contents of rsp.  The
+higher level backtrace code knows how to handle stack switching, it is too
+complicated for basic block analysis.
+
+
+Transfer of Control Outside the Current Function
+================================================
+
+Ignoring call instructions, most C code does not transfer control outside the
+current function, IOW there are no jump instructions to instructions outside the
+function.  There are a few cases that this can occur for C code, inline
+assembler and tail recursion.
+
+Tail recursion occurs when a function ends by returning the value from a second
+function and that second function has exactly the same arguments and return
+value as the current function.  For example,
+
+    int bar(int i, char *p)
+    {
+        ... do some work and return an int ...
+    }
+
+    int foo(int i, char *p)
+    {
+        return bar(i, p);
+    }
+
+If tail recursion is active (gcc -foptimize-sibling-calls) then instead of foo
+calling bar, bar returning to foo then foo returning to its caller, gcc will end
+foo with a direct jmp to bar.  The source code says that something called foo
+but the stack trace will show bar is active, with no sign of foo on stack.  When
+bar returns it will use the return address from the code that called foo.
+
+bb_transfer() detects an unconditional jmp to code outside the function body and
+assumes that this represents tail recursion.  For tail recursion to work
+correctly, all the preserved registers must contain their original values,
+bb_sanity_check() validates this.  Any deviation from the expected state will
+stop basic block analysis and fall back on the old unreliable backtrace code.
+
+Besides tail recursion in C code, assembler code can jump to labels outside the
+current function.  Unfortunately this occurs all the time in the twisty
+assembler code and, to make things worse, many of these transfers are done with
+non-standard register or memory state.  bb_special_case() and the arch specific
+bb_special_cases[] handle all the known special cases, including what the
+register and/or memory state should be.  Any deviation from the expected state
+will stop basic block analysis and fall back on the old unreliable backtrace
+code.
+
+
+Locating Arguments
+==================
+
+Function arguments can be passed in registers or on stack.  The full ABI for
+passing arguments is described in
+
+  http://www.caldera.com/developers/devspecs/abi386-4.pdf
+  http://www.x86-64.org/documentation/abi.pdf
+
+The short description, ignoring special cases like passing structures by name
+and floating point arguments which tend not to apply to the kernel, is :-
+
+i386.   With -mpregparm=0, all arguments are passed on stack, except for
+        functions defined as FASTCALL, where the first 3 arguments are passed in
+        registers.
+
+        With -mregparm=3, the first 3 arguments are passed in registers except
+        for functions defined as asmlinkage or with variable number of
+        arguments, when arguments are still passed on stack.  -mpregparm=3 used
+        to be a config option, in recent kernels it is the default.
+
+        Arguments defined as long long (64 bit) are passed in two registers or
+        in two locations on stack.  Being passed in two pieces makes a 64 bit
+        argument look like two 32 bit arguments to KDB, it will be printed as
+        two separate arguments.
+
+        When compiled with -mregparm=3, if a 64 bit argument is argument number
+        2 then it will not be split between register and stack, instead it will
+        all be on stack and the third argument register will not be used.  This
+        makes it look like there is an extra argument in the list.  There is
+        nothing that KDB can do to detect these corner cases with 64 bit
+        arguments on i386, which is a pity because they can confuse users.
+
+        The preserved registers are ebx, ebp, esp, esi, edi.  Arguments are
+        passed in eax, edx, ecx.  The return value is in eax.
+
+x86_64. The first 6 arguments are passed in registers, the 7th and later
+        arguments are passed on stack.  Except for functions with a variable
+        number of arguments (e.g. printk) where all arguments are on stack
+        except for rax which contains the number of SSE arguments (always 0 for
+        the kernel).
+
+        The preserved registers are rbx, rbp, rsp, r12, r13, r14, r15.
+        Arguments are passed in rdi, rsi, rdx, rcx, r8, r9.  The return value is
+        in rax.
+
+For both architectures, kdba_bt detects an argument that is passed in a register
+by the fact that the function code reads from that argument type register while
+it contains its original value.  IOW, testing the value of rax, copying rax to
+another register or storing it on stack without first overwriting rax means that
+rax contains a useful input value.  Reading from memory which is above the
+original stack pointer means that there is a argument at that location on
+stack.
+
+There are some functions in the kernel whose definition contains arguments that
+are not actually used.  Typically these functions are instantiations of generic
+function definitions where some, but not all, instantiations use all the
+arguments.  For example, a filesystem function may take flags that are not used
+by this particular filesystem, but the function definition has to match the
+generic filesystem declarations.  If the unused arguments are at the end of the
+list then there is no way of telling from the object code that they exist, the
+function that does not use the trailing aguments will have no code that refers
+to them.  KDB will print a truncated argument list for this case.
+
+If the unused arguments are not at the end of the list then KDB can detect the
+presence of the unused arguments, because there is code that refers to later
+arguments.  KDB will print the unused argument, although gcc may have
+overwritten the register it is in, in which case KDB prints "invalid".
+
+Originally kdba_bt_x86 would detect that there was no reference to arguments in
+registers but there were still references to arguments on stack and assume that
+the function had all its arguments on stack.  Unfortunately this did not work
+with the large number of 'pass through' functions in the kernel.  A 'pass
+through' function is one which calls another function with roughly the same
+argument list and makes no other reference to the register arguments.  For
+example, ipv4_doint_and_flush_strategy() takes 7 arguments, calls
+devinet_conf_sysctl() with those 7 arguments in the same order and has no other
+reference to any of its arguments.
+
+Pass through functions do not touch the arguments that are passed in registers
+because they are already in the right location for the routine about to be
+called, so the pass through function has no code that references the argument
+registers.  No code means that kdba_bt_x86 cannot tell if the function has
+register arguments or not.  The arguments passed on stack must always be copied
+to the new stack frame, even for pass through functions, so the arguments on
+stack can always be detected.
+
+kdba_bt_x86 was changed to assume that if there are any arguments on stack then
+there are always arguments in registers, except for a list of functions that are
+known to be asmlinkage or to have a variable number of arguments.
+bb_assume_pass_through() ignores the known special cases, for other functions
+which have stack arguments but no register arguments it assumes the function is
+pass through and prints a warning about that assumption.
+
+The above heuristics mean that there is one case that kdba_bt_x86 cannot detect:
+pass through functions where all the arguments are in registers.  These have no
+argument references at all in their code, so they are printed with no arguments.
+All they do is call another function so this class of functions never fails, or
+if it does fail then it is due to something that is not argument related.  If
+the failure is further down the call stack then the arguments are printed at the
+next function down the stack, so the user still has the arguments.
+
+This list of limitations on getting the x86 arguments may seem to be a long one,
+but kdba_bt_x86 gives sensible results for most functions.  For kernel
+debugging, any arguments are far better than none at all.
+
+
+Kernel Stack Switching
+======================
+
+Understanding the unusual way that x86 kernel stacks are used is very important
+when diagnosing backtrace problems.  Every process has its own normal kernel
+stack, even processes that run entirely within the kernel such as kthread or the
+per cpu migration processes.  The normal stacks are 4K or 8K on i386 (depending
+on CONFIG_4KSTACKS) and 8K on x86_64.  The normal stacks are global, they are
+not tied to any cpu.
+
+For i386 with 8K stacks there are no other kernel stacks so there is no stack
+switching to worry about.
+
+For i386 with 4K process stacks, each cpu also has a 4K soft irq stack and a 4K
+hard irq stack.  It is possible for a process to be running on its own process
+stack, for the process to be interrupted by a soft irq which is then interrupted
+by a hard irq.  At that point the backtrace is split between the hard irq, the
+soft irq and the normal normal stacks.
+
+On x86_64, each cpu always has stacks for stackfault, doublefault, nmi, debug,
+mce and interrupts.  See Documentation/x86_64/kernel-stacks.
+
+The arch specific kdba_get_stack_info_alternate() function works out which stack
+the backtrace starts on, how big the stack is and how to switch to the next
+stack.  This information is stored in the kdb_activation_record and used by the
+higher level backtrace code to detect a stack switch.
+
+The normal stack has some padding at the end, this reflects the stack pointer
+when the process was created in the kernel.  kdba_bt_x86 cannot backtrace
+through this padding data, mainly because the code that set the nitial stack
+pointer no longer exists after boot.  ARCH_NORMAL_PADDING defines how many words
+to ignore at the end of the normal stack.
+
+
+Debugging KDB
+=============
+
+KDB has conditional debugging print statements scattered throughout the code.
+If KDB is not behaving as expected, you can turn on debugging and rerun the
+command.  Before debugging KDB, set LINES 10000 and capture the output via a
+serial console.  If using minicom, turn on word wrap (control-A W) and capture
+mode (control-A L).  If you are using a serial console via a serial to Ethernet
+interface using ssh or telnet, use the 'script' command to start the session.
+
+The various KDB_DEBUG_FLAG_* flags are listed in include/linux/kdbprivate.h.
+You set debug with 'set KDBDEBUG 0xnn' where nn is the or'd value of the desired
+flags.  'set KDBDEBUG 0' turns off KDB debugging.  When diagnosing x86 backtrace
+problems, the most useful debug flags are
+
+  KDB_DEBUG_FLAG_ARA            0x10    Activation record, arch specific
+  KDB_DEBUG_FLAG_BB_SUMM        0x04    Basic block analysis, summary only
+  KDB_DEBUG_FLAG_BB             0x20    All basic block analysis
+
+ARA prints information about the different kernel stacks as kdba_bt_x86 unwinds
+through the switched kernel stacks.  BB_SUMM prints a summary of the basic block
+analysis for each function, including the abstract exit state and the rollback
+calculations.  BB prints a huge amount of basic block debugging, you probably
+only want to turn this for the full backtrace on as a last resort.
+
+I find 'set KDBDEBUG 0x14' to be best to get an overview of a problem.  It gives
+both the kernel stack information plus the abstract state and actual location of
+data for each function.
+
+Command 'bb1' does a detailed debug session for a single function, bb1 takes a
+single parameter, the address of the exit point from the function, by number,
+not by name.  bb1 turns on KDB_DEBUG_FLAG_BB, does basic block analysis for the
+function that contains the exit point then resets the debug flags to their
+previous value.
+
+Command 'bb_all' runs through every function in the base kernel (not module
+functions) and does a basic block analysis of every function.  It also validates
+the various tables in kdba_bt_x86 where possible.  bb_all is meant for the KDB
+maintainer to check that all the base kernel function pass the sanity checks, it
+can also be used by end users when reporting a bug.  bb_all takes no parameters.
+It prints a '.' for every 100 functions it has analysed and allows for up to 20
+errors before giving up.  The output from bb_all also includes the config
+variables that affect basic block analysis plus any assumptions about 'pass
+through' functions.
+
+
+Submitting a Bug Report Against kdba_bt_x86
+===========================================
+
+Capture the KDB output via a serial console.
+
+set LINES 10000
+set BTSP 1
+set KDBDEBUG 0x14
+Reproduce the problem.
+set KDBDEBUG 0
+bb_all
+
+If you can identify the rip/eip where kdba_bt_x86 gets confused, run bb1 with
+that address.
+
+Find each set of output from kdba_get_stack_info in the trace, extract the last
+two lines and type those lines into KDB.  That will give a hex and symbolic dump
+of the raw kernel stacks.  For example, if the trace data is
+
+kdba_get_stack_info: esp=0xc04fbef8 cpu=0 task=c047b3e0
+kdba_get_stack_info: ar->stack
+    physical_start=0xc04fb000
+    physical_end=0xc04fc000
+    logical_start=0xc04fb038
+    logical_end=0xc04fc000
+    next=0xc04b4f44
+    id=hardirq_ctx
+    set MDCOUNT 1024
+    mds 0xc04fb000
+
+then type the last two lines into KDB.  Repeat this for each stack listed by
+kdba_get_stack_info on the failing backtrace.
+
+Send all the console output to the KDB maintainer.
+
+
+Examples of Basic Block Debugging Output
+========================================
+
+Example of the basic block analysis of fs/namei::getname() on i386.  Kernel
+2.6.22, i386, compiled with frame pointers, gcc 4.1.0.
+
+Basic block debugging is very verbose, so set a high number of output lines.
+You really need a reliable serial console to capture this amount of output.
+
+    [0]kdb> set LINES 10000
+
+A simple disassemble of getname().  This is not required for debugging purposes
+since each instruction is printed as part of basic block debugging, but this can
+be easier to read.
+
+    [0]kdb> id getname
+    0xc015cce8 getname:         push   %ebp
+    0xc015cce9 getname+0x1:     mov    %esp,%ebp
+    0xc015cceb getname+0x3:     push   %edi
+    0xc015ccec getname+0x4:     push   %esi
+    0xc015cced getname+0x5:     push   %ebx
+    0xc015ccee getname+0x6:     sub    $0x4,%esp
+    0xc015ccf1 getname+0x9:     mov    %eax,%edi
+    0xc015ccf3 getname+0xb:     mov    $0xd0,%edx
+    0xc015ccf8 getname+0x10:    mov    0xc04b2120,%eax
+    0xc015ccfd getname+0x15:    call   0xc0153009 kmem_cache_alloc
+    0xc015cd02 getname+0x1a:    mov    %eax,0xfffffff0(%ebp)
+    0xc015cd05 getname+0x1d:    mov    $0xfffffff4,%eax
+    0xc015cd0a getname+0x22:    cmpl   $0x0,0xfffffff0(%ebp)
+    0xc015cd0e getname+0x26:    je     0xc015cd7d getname+0x95
+    0xc015cd10 getname+0x28:    mov    %esp,%eax
+    0xc015cd12 getname+0x2a:    and    $0xfffff000,%eax
+    0xc015cd17 getname+0x2f:    cmpl   $0xffffffff,0x18(%eax)
+    0xc015cd1b getname+0x33:    je     0xc015cd39 getname+0x51
+    0xc015cd1d getname+0x35:    mov    $0xfffffff2,%esi
+    0xc015cd22 getname+0x3a:    cmp    $0xbfffffff,%edi
+    0xc015cd28 getname+0x40:    ja     0xc015cd60 getname+0x78
+    0xc015cd2a getname+0x42:    mov    $0xc0000000,%ebx
+    0xc015cd2f getname+0x47:    sub    %edi,%ebx
+    0xc015cd31 getname+0x49:    cmp    $0xfff,%ebx
+    0xc015cd37 getname+0x4f:    jbe    0xc015cd3e getname+0x56
+    0xc015cd39 getname+0x51:    mov    $0x1000,%ebx
+    0xc015cd3e getname+0x56:    mov    %ebx,%ecx
+    0xc015cd40 getname+0x58:    mov    %edi,%edx
+    0xc015cd42 getname+0x5a:    mov    0xfffffff0(%ebp),%eax
+    0xc015cd45 getname+0x5d:    call   0xc023dbb4 strncpy_from_user
+    0xc015cd4a getname+0x62:    cmp    $0x0,%eax
+    0xc015cd4d getname+0x65:    jle    0xc015cd5a getname+0x72
+    0xc015cd4f getname+0x67:    mov    $0xffffffdc,%esi
+    0xc015cd54 getname+0x6c:    cmp    %ebx,%eax
+    0xc015cd56 getname+0x6e:    jae    0xc015cd60 getname+0x78
+    0xc015cd58 getname+0x70:    jmp    0xc015cd71 getname+0x89
+    0xc015cd5a getname+0x72:    je     0xc015cd76 getname+0x8e
+    0xc015cd5c getname+0x74:    jge    0xc015cd71 getname+0x89
+    0xc015cd5e getname+0x76:    mov    %eax,%esi
+    0xc015cd60 getname+0x78:    mov    0xfffffff0(%ebp),%edx
+    0xc015cd63 getname+0x7b:    mov    0xc04b2120,%eax
+    0xc015cd68 getname+0x80:    call   0xc01521f1 kmem_cache_free
+    0xc015cd6d getname+0x85:    mov    %esi,%eax
+    0xc015cd6f getname+0x87:    jmp    0xc015cd7d getname+0x95
+    0xc015cd71 getname+0x89:    mov    0xfffffff0(%ebp),%eax
+    0xc015cd74 getname+0x8c:    jmp    0xc015cd7d getname+0x95
+    0xc015cd76 getname+0x8e:    mov    $0xfffffffe,%esi
+    0xc015cd7b getname+0x93:    jmp    0xc015cd60 getname+0x78
+    0xc015cd7d getname+0x95:    pop    %edx
+    0xc015cd7e getname+0x96:    pop    %ebx
+    0xc015cd7f getname+0x97:    pop    %esi
+    0xc015cd80 getname+0x98:    pop    %edi
+    0xc015cd81 getname+0x99:    pop    %ebp
+    0xc015cd82 getname+0x9a:    ret
+
+The bb1 command only one argument which must be an address, not a name.  bb1
+turns on full basic block debugging and analyses the function containing the
+supplied address.  Give bb1 the address of the exit point from this function,
+IOW the return address that is stored on stack due to a call from this function
+to the next function down the call stack.  Assume that getname() has called
+kmem_cache_free() and something went wrong in kmem_cache_free() or one of the
+functions that it calls.  The call to kmem_cache_free is at 0xc015cd68 and the
+return address on stack is the instruction after the call, i.e. 0xc015cd6d, so
+
+    [0]kdb> bb1 0xc015cd6d
+    bb_pass1: func_name getname func_start 0xc015cce8 func_end 0xc015cd83
+
+bb_pass1 has identified the function name and its start and end address.  For C
+functions these are just the function start address and the next symbol in
+kallsyms.  For Assembler code there may be spurious labels so the function name
+may not match the label prior to the address given to bb1.  For an example of
+that on i386, find the address of resume_userspace then pass that address to the
+bb1 KDB command.
+
+    bb_pass1: end
+      bb[0] start 0xc015cce8 end 0xc015cd38 drop_through 1
+      bb[1] start 0xc015cd39 end 0xc015cd3d drop_through 1
+      bb[2] start 0xc015cd3e end 0xc015cd58 drop_through 0
+      bb[3] start 0xc015cd5a end 0xc015cd5f drop_through 1
+      bb[4] start 0xc015cd60 end 0xc015cd6f drop_through 0
+      bb[5] start 0xc015cd71 end 0xc015cd74 drop_through 0
+      bb[6] start 0xc015cd76 end 0xc015cd7b drop_through 0
+      bb[7] start 0xc015cd7d end 0xc015cd82 drop_through 0
+      bb_jmp[0] from 0xc015cd0e to 0xc015cd7d drop_through 0
+      bb_jmp[1] from 0xc015cd1b to 0xc015cd39 drop_through 0
+      bb_jmp[2] from 0xc015cd28 to 0xc015cd60 drop_through 0
+      bb_jmp[3] from 0xc015cd37 to 0xc015cd3e drop_through 0
+      bb_jmp[4] from 0xc015cd4d to 0xc015cd5a drop_through 0
+      bb_jmp[5] from 0xc015cd56 to 0xc015cd60 drop_through 0
+      bb_jmp[6] from 0xc015cd58 to 0xc015cd71 drop_through 0
+      bb_jmp[7] from 0xc015cd5a to 0xc015cd76 drop_through 0
+      bb_jmp[8] from 0xc015cd5c to 0xc015cd71 drop_through 0
+      bb_jmp[9] from 0xc015cd6f to 0xc015cd7d drop_through 0
+      bb_jmp[10] from 0xc015cd74 to 0xc015cd7d drop_through 0
+      bb_jmp[11] from 0xc015cd7b to 0xc015cd60 drop_through 0
+      bb_jmp[12] from 0xc015cd38 to 0xc015cd39 drop_through 1
+      bb_jmp[13] from 0xc015cd3d to 0xc015cd3e drop_through 1
+      bb_jmp[14] from 0xc015cd5f to 0xc015cd60 drop_through 1
+
+After analysing the logic flow, we can see that getname() consists of 8 basic
+blocks (nodes in bb_list[]).  5 of these blocks end in unconditional jumps, the
+other 3 drop through to the next block.  There are 15 transfers of control
+(vertices in bb_jmp_list[]).  12 of these transfers are explicit jmp or jcc
+instructions, the other 3 are implicit transfers when dropping through from one
+block to the next.  The node list is sorted by start address, the vertex list is
+not sorted.
+
+Basic block 0 starts at the function start (0xc015cce8) and ends at 0xc015cd38.
+0xc015cd39 is the target of a jump instruction (0xc015cd1b: je 0xc015cd39) so
+0xc015cd39 starts a new block, which means that 0xc015cd38 becomes the end of
+the previous block.  Because bb[0] does not end in an explicit jmp instruction,
+there is a drop through from the end of bb[0] to the start of bb[1], see
+bb_jmp[12].
+
+    bb_pass2: start
+
+To get the most accurate results from pass2, try to scan the directed graph by
+only looking at nodes whose inputs are all defined.  Initially only process
+nodes with no missing inputs.
+
+      bb_pass2_do_changed_blocks: allow_missing 0
+
+      bb[0]
+      bb_reg_state c07282e0
+        rax = rax
+        rbx = rbx
+        rcx = rcx
+        rdx = rdx
+        rdi = rdi
+        rsi = rsi
+        rbp = rbp
+        rsp = osp+0x0
+
+The initial state for bb[0] is the same for all C functions.  Each register
+contains its own abstract value, except for rsp which is defined in terms of the
+original stack pointer (osp).
+
+     '0xc015cce8 getname:         push   %ebp'
+
+The first instruction of getname() saves the frame pointer.
+
+      opcode 'push' matched by 'push', usage 44
+      src  R: %ebp base_rc 8 (rbp)
+
+bb_usage() reports how the instruction was recognised and how its operands were
+decoded.  Although this is i386 (ebp), it is reported as rbp.  Using the x86_64
+names for registers throughout makes it easier to create common code for the two
+architecures.
+
+      rsp osp offset +0x0 -> -0x4
+
+A push instruction decrements rsp by 4 (i386) or 8 (x86_64) bytes.  rsp
+originally contained the original stack pointer (osp), now it contains the
+original stack pointer - 4.
+
+      *(rsp+0x0 osp-0x4) = rbp slot 0
+
+The stack location pointed to by *rsp now contains the original value of rbp.
+Since rsp contains (osp-0x4), *(osp-0x4) contains rbp.  It is slot 0 in the
+memory array associated with the register state.
+
+     '0xc015cce9 getname+0x1:     mov    %esp,%ebp'
+      opcode 'mov' matched by 'mov', usage 36
+      src  R: %esp base_rc 9 (rsp)
+      dst  R: %ebp base_rc 8 (rbp)
+      rbp = rsp (osp-0x4)
+
+Copy esp (rsp) to ebp (rbp).  rsp contained (osp-0x4) so rbp also contains
+(osp-0x4).  Any reference to data via either rbp or rsp will now be tracked as a
+stack location.
+
+     '0xc015cceb getname+0x3:     push   %edi'
+      opcode 'push' matched by 'push', usage 44
+      src  R: %edi base_rc 6 (rdi)
+      rsp osp offset -0x4 -> -0x8
+      *(rsp+0x0 osp-0x8) = rdi slot 1
+     '0xc015ccec getname+0x4:     push   %esi'
+      opcode 'push' matched by 'push', usage 44
+      src  R: %esi base_rc 7 (rsi)
+      rsp osp offset -0x8 -> -0xc
+      *(rsp+0x0 osp-0xc) = rsi slot 2
+     '0xc015cced getname+0x5:     push   %ebx'
+      opcode 'push' matched by 'push', usage 44
+      src  R: %ebx base_rc 3 (rbx)
+      rsp osp offset -0xc -> -0x10
+      *(rsp+0x0 osp-0x10) = rbx slot 3
+
+Push 3 registers to stack.  rsp is adjusted for each push and stack locations
+are assigned to contain the values of edi, esi and ebx.  This sequence is very
+common in i386 C functions.  edi, esi and ebx are preserved registers on i386,
+but gcc wants to use them for scratch space.  The original contents iof these
+registers must be saved on stack and restored before returning to our caller.
+
+     '0xc015ccee getname+0x6:     sub    $0x4,%esp'
+      opcode 'sub' matched by 'sub', usage 51
+      src  I: $0x4
+      dst  R: %esp base_rc 9 (rsp)
+      rsp osp offset -0x10 -> -0x14
+
+Subtract 4 bytes from esp.  This defines the local stack variables.  Sorry,
+names for local stack variables are not available to KDB.
+
+     '0xc015ccf1 getname+0x9:     mov    %eax,%edi'
+      opcode 'mov' matched by 'mov', usage 36
+      src  R: %eax base_rc 2 (rax)
+      dst  R: %edi base_rc 6 (rdi)
+      rdi = rax (rax)
+
+Having saved edi on stack, gcc now overwrites edi with eax.  At this point rax
+still contains its original value, so rdi now contains a copy of rax, as well as
+the original value which is still in rax.  This is a common sequence in C code.
+rax contains argument 0 but it is also a scratch register.  If the code needs to
+use argument 0 later then its value must be saved somewhere before executing any
+instruction that changes rax.  edi is a preserved register so its contents will
+not be changed by any function that we call, or if it is changed then it will be
+restored before returning to this function.
+
+rax is listed in the arch specific bb_param_reg[] list and the code is reading
+from rax while it still contains its original value.  The only way that makes
+any sense is when rax is an input argument to getname().  We note that fact in
+bb_reg_read().
+
+     '0xc015ccf3 getname+0xb:     mov    $0xd0,%edx'
+      opcode 'mov' matched by 'mov', usage 36
+      src  I: $0xd0
+      dst  R: %edx base_rc 5 (rdx)
+      rdx = undefined
+
+Moving an constant value to edx.  Although this is a constant, it does not refer
+to any of the original values that were supplied to this function.  Therefore
+rdx becomes undefined for the purposes of the code analysis.
+
+     '0xc015ccf8 getname+0x10:    mov    0xc04b2120,%eax'
+      opcode 'mov' matched by 'mov', usage 36
+      src  M: 0xc04b2120
+      dst  R: %eax base_rc 2 (rax)
+      rax = undefined
+
+Moving a constant value to eax makes rax undefined.
+
+     '0xc015ccfd getname+0x15:    call   0xc0153009 <kmem_cache_alloc>'
+      opcode 'call' matched by 'call', usage 17
+      src  M: 0xc0153009
+      bb_reg_state c0728658
+        rax = undefined
+        rbx = rbx
+        rcx = rcx
+        rdx = undefined
+        rdi = rax
+        rsi = rsi
+        rbp = osp-0x4
+        rsp = osp-0x14
+        slot 0 offset_address -0x4 rbp
+        slot 1 offset_address -0x8 rdi
+        slot 2 offset_address -0xc rsi
+        slot 3 offset_address -0x10 rbx
+
+Basic block debugging prints the register and memory state when transfering
+control between blocks and when issuing call instructions.  The call state is
+mainly useful when C code calls assembler routines, especially if you are not
+sure what state the assembler code expects.  Not all of our assembler is as well
+documented as it could be :(
+
+      rax = undefined
+      rcx = undefined
+      rdx = undefined
+
+The i386 ABI says that some registers are preserved across calls, see the arch
+specific bb_preserved_reg[] list.  Any registers not in that list automatically
+become undefined after a call instruction.
+
+     '0xc015cd02 getname+0x1a:    mov    %eax,0xfffffff0(%ebp)'
+      opcode 'mov' matched by 'mov', usage 36
+      src  R: %eax base_rc 2 (rax)
+      dst  M: 0xfffffff0(%ebp) base_rc 8 (rbp)
+
+eax is the return value from the call, it is being saved at offset 0xfffffff0
+(-0x10) from ebp.  Since rbp contains (osp-0x4) the return value is being stored
+at (osp-0x14).  This is a stack location but we have no record of any data being
+held at that location, it is part of the local stack variables.
+
+     '0xc015cd05 getname+0x1d:    mov    $0xfffffff4,%eax'
+      opcode 'mov' matched by 'mov', usage 36
+      src  I: $0xfffffff4
+      dst  R: %eax base_rc 2 (rax)
+      rax = undefined
+     '0xc015cd0a getname+0x22:    cmpl   $0x0,0xfffffff0(%ebp)'
+      opcode 'cmpl' matched by 'cmp', usage 3
+      src  I: $0x0
+      dst  M: 0xfffffff0(%ebp) base_rc 8 (rbp)
+     '0xc015cd0e getname+0x26:    je     0xc015cd7d <getname+0x95>'
+      opcode 'je' matched by 'j', usage 28
+      src  M: 0xc015cd7d
+      bb_reg_state c0728658
+        rax = undefined
+        rbx = rbx
+        rcx = undefined
+        rdx = undefined
+        rdi = rax
+        rsi = rsi
+        rbp = osp-0x4
+        rsp = osp-0x14
+        slot 0 offset_address -0x4 rbp
+        slot 1 offset_address -0x8 rdi
+        slot 2 offset_address -0xc rsi
+        slot 3 offset_address -0x10 rbx
+
+Transfer of control, print the register and memory state.
+
+      matched: from 0xc015cd0e to 0xc015cd7d drop_through 0 bb_jmp[0]
+
+Which bb_jmp_list[] entry matches this transfer.
+
+      new state c07286b8
+
+The current abstract register and memory state is cloned at address c07286b8.
+This state becomes one of the inputs to the basic block whose start address is
+0xc015cd7d.
+
+     '0xc015cd10 getname+0x28:    mov    %esp,%eax'
+      opcode 'mov' matched by 'mov', usage 36
+      src  R: %esp base_rc 9 (rsp)
+      dst  R: %eax base_rc 2 (rax)
+      rax = rsp (osp-0x14)
+
+Copy rsp which contains (osp-0x14) to rax.  rax contains a valid stack pointer.
+
+     '0xc015cd12 getname+0x2a:    and    $0xfffff000,%eax'
+      opcode 'and' matched by 'and', usage 11
+      src  I: $0xfffff000
+      dst  R: %eax base_rc 2 (rax)
+      rax = undefined
+
+But not for long.
+
+     '0xc015cd17 getname+0x2f:    cmpl   $0xffffffff,0x18(%eax)'
+      opcode 'cmpl' matched by 'cmp', usage 3
+      src  I: $0xffffffff
+      dst  M: 0x18(%eax) base_rc 2 (rax)
+     '0xc015cd1b getname+0x33:    je     0xc015cd39 <getname+0x51>'
+      opcode 'je' matched by 'j', usage 28
+      src  M: 0xc015cd39
+      bb_reg_state c0728658
+        rax = undefined
+        rbx = rbx
+        rcx = undefined
+        rdx = undefined
+        rdi = rax
+        rsi = rsi
+        rbp = osp-0x4
+        rsp = osp-0x14
+        slot 0 offset_address -0x4 rbp
+        slot 1 offset_address -0x8 rdi
+        slot 2 offset_address -0xc rsi
+        slot 3 offset_address -0x10 rbx
+
+Another transfer of control, print the state.
+
+      matched: from 0xc015cd1b to 0xc015cd39 drop_through 0 bb_jmp[1]
+
+Which bb_jmp_list[] entry was used.
+
+      reuse bb_jmp[0]
+
+To save space, we only clone the state if it is different.  Otherwise we reuse
+the state from another vertex and bump the reference count.
+
+     '0xc015cd1d getname+0x35:    mov    $0xfffffff2,%esi'
+      opcode 'mov' matched by 'mov', usage 36
+      src  I: $0xfffffff2
+      dst  R: %esi base_rc 7 (rsi)
+      rsi = undefined
+
+Using esi as a scratch register, even though the i386 ABi says that esi is a
+preserved register.  Not to worry, the original value of rsi was saved on stack
+on entry and it will be restored before exit.
+
+     '0xc015cd22 getname+0x3a:    cmp    $0xbfffffff,%edi'
+      opcode 'cmp' matched by 'cmp', usage 3
+      src  I: $0xbfffffff
+      dst  R: %edi base_rc 6 (rdi)
+     '0xc015cd28 getname+0x40:    ja     0xc015cd60 <getname+0x78>'
+      opcode 'ja' matched by 'j', usage 28
+      src  M: 0xc015cd60
+      bb_reg_state c0728658
+        rax = undefined
+        rbx = rbx
+        rcx = undefined
+        rdx = undefined
+        rdi = rax
+        rsi = undefined
+        rbp = osp-0x4
+        rsp = osp-0x14
+        slot 0 offset_address -0x4 rbp
+        slot 1 offset_address -0x8 rdi
+        slot 2 offset_address -0xc rsi
+        slot 3 offset_address -0x10 rbx
+      matched: from 0xc015cd28 to 0xc015cd60 drop_through 0 bb_jmp[2]
+      new state c0728710
+
+This state is different from any states already saved, clone to a new entry.
+
+     '0xc015cd2a getname+0x42:    mov    $0xc0000000,%ebx'
+      opcode 'mov' matched by 'mov', usage 36
+      src  I: $0xc0000000
+      dst  R: %ebx base_rc 3 (rbx)
+      rbx = undefined
+     '0xc015cd2f getname+0x47:    sub    %edi,%ebx'
+      opcode 'sub' matched by 'sub', usage 51
+      src  R: %edi base_rc 6 (rdi)
+      dst  R: %ebx base_rc 3 (rbx)
+      rbx = undefined
+     '0xc015cd31 getname+0x49:    cmp    $0xfff,%ebx'
+      opcode 'cmp' matched by 'cmp', usage 3
+      src  I: $0xfff
+      dst  R: %ebx base_rc 3 (rbx)
+     '0xc015cd37 getname+0x4f:    jbe    0xc015cd3e <getname+0x56>'
+      opcode 'jbe' matched by 'j', usage 28
+      src  M: 0xc015cd3e
+      bb_reg_state c0728658
+        rax = undefined
+        rbx = undefined
+        rcx = undefined
+        rdx = undefined
+        rdi = rax
+        rsi = undefined
+        rbp = osp-0x4
+        rsp = osp-0x14
+        slot 0 offset_address -0x4 rbp
+        slot 1 offset_address -0x8 rdi
+        slot 2 offset_address -0xc rsi
+        slot 3 offset_address -0x10 rbx
+      matched: from 0xc015cd37 to 0xc015cd3e drop_through 0 bb_jmp[3]
+      new state c0728768
+
+This state is different from any states already saved, clone to a new entry.
+
+      bb_reg_state c0728658
+        rax = undefined
+        rbx = undefined
+        rcx = undefined
+        rdx = undefined
+        rdi = rax
+        rsi = undefined
+        rbp = osp-0x4
+        rsp = osp-0x14
+        slot 0 offset_address -0x4 rbp
+        slot 1 offset_address -0x8 rdi
+        slot 2 offset_address -0xc rsi
+        slot 3 offset_address -0x10 rbx
+      matched: from 0xc015cd38 to 0xc015cd39 drop_through 1 bb_jmp[12]
+      reuse bb_jmp[3]
+
+Basic block 0 drops through to basic block 1, treat it as an implicit transfer
+of control.  The state is the same as the previous jump instruction so reuse it
+and bump the reference count.
+
+That ends basic block 0, now pick the next block in the list that (a) needs to
+be scanned and (b) has all its input states defined.  In this case bb[1].
+
+      bb[1]
+
+bb[1] starts at 0xc015cd39 and has two paths that transfer control to it.
+bb_jmp[1] from an explicit jump at 0xc015cd1b and a drop through at bb_jmp[12].
+Where there is more than one input state we have to merge them and reconcile the
+final value.
+
+      first state c07286b8
+
+The first input state is stored at c07286b8.  Looking back through the trace we
+find that entry associated with bb_jmp[0], not bb_jmp[1] as expected.  However
+bb_jmp[1] reused the state that was stored for bb_jmp[0] so all is well.
+
+      bb_reg_state c0728658
+        rax = undefined
+        rbx = rbx
+        rcx = undefined
+        rdx = undefined
+        rdi = rax
+        rsi = rsi
+        rbp = osp-0x4
+        rsp = osp-0x14
+        slot 0 offset_address -0x4 rbp
+        slot 1 offset_address -0x8 rdi
+        slot 2 offset_address -0xc rsi
+        slot 3 offset_address -0x10 rbx
+
+The first state for bb[1].
+
+      merging state c0728768
+
+Now merge the second state, which is held at c0728768.
+
+      rbx = undefined
+      rsi = undefined
+
+The two states disagree on the values being tracked in rbx and rsi.  Compiler
+theory 101 says that if two or more paths to a basic block have different values
+for a register then that register cannot be relied on at the start of the block,
+so make it undefined.  The same logic applies to memory locations.
+
+      final state
+      bb_reg_state c0728658
+        rax = undefined
+        rbx = undefined
+        rcx = undefined
+        rdx = undefined
+        rdi = rax
+        rsi = undefined
+        rbp = osp-0x4
+        rsp = osp-0x14
+        slot 0 offset_address -0x4 rbp
+        slot 1 offset_address -0x8 rdi
+        slot 2 offset_address -0xc rsi
+        slot 3 offset_address -0x10 rbx
+
+After merging all the input states, this is the final starting state for bb[1].
+Now track what bb[1] does to the state.
+
+     '0xc015cd39 getname+0x51:    mov    $0x1000,%ebx'
+      opcode 'mov' matched by 'mov', usage 36
+      src  I: $0x1000
+      dst  R: %ebx base_rc 3 (rbx)
+      rbx = undefined
+      bb_reg_state c0728658
+        rax = undefined
+        rbx = undefined
+        rcx = undefined
+        rdx = undefined
+        rdi = rax
+        rsi = undefined
+        rbp = osp-0x4
+        rsp = osp-0x14
+        slot 0 offset_address -0x4 rbp
+        slot 1 offset_address -0x8 rdi
+        slot 2 offset_address -0xc rsi
+        slot 3 offset_address -0x10 rbx
+      matched: from 0xc015cd3d to 0xc015cd3e drop_through 1 bb_jmp[13]
+      reuse bb_jmp[3]
+
+bb[1] is a single instruction which drops through to bb[2].
+
+      bb[2]
+      first state c0728768
+      bb_reg_state c0728658
+        rax = undefined
+        rbx = undefined
+        rcx = undefined
+        rdx = undefined
+        rdi = rax
+        rsi = undefined
+        rbp = osp-0x4
+        rsp = osp-0x14
+        slot 0 offset_address -0x4 rbp
+        slot 1 offset_address -0x8 rdi
+        slot 2 offset_address -0xc rsi
+        slot 3 offset_address -0x10 rbx
+      merging state c0728768
+
+bb[2] has two inputs, both vertices are pointing to input state c0728768.
+Merging an entry with itself has no effect.
+
+     '0xc015cd3e getname+0x56:    mov    %ebx,%ecx'
+      opcode 'mov' matched by 'mov', usage 36
+      src  R: %ebx base_rc 3 (rbx)
+      dst  R: %ecx base_rc 4 (rcx)
+      rcx = rbx (undefined)
+     '0xc015cd40 getname+0x58:    mov    %edi,%edx'
+      opcode 'mov' matched by 'mov', usage 36
+      src  R: %edi base_rc 6 (rdi)
+      dst  R: %edx base_rc 5 (rdx)
+      rdx = rdi (rax)
+     '0xc015cd42 getname+0x5a:    mov    0xfffffff0(%ebp),%eax'
+      opcode 'mov' matched by 'mov', usage 36
+      src  M: 0xfffffff0(%ebp) base_rc 8 (rbp)
+      dst  R: %eax base_rc 2 (rax)
+      rax = *(rbp-0x10) (osp-0x14)  rax = undefined
+     '0xc015cd45 getname+0x5d:    call   0xc023dbb4 <strncpy_from_user>'
+      opcode 'call' matched by 'call', usage 17
+      src  M: 0xc023dbb4
+      bb_reg_state c0728658
+        rax = undefined
+        rbx = undefined
+        rcx = undefined
+        rdx = rax
+        rdi = rax
+        rsi = undefined
+        rbp = osp-0x4
+        rsp = osp-0x14
+        slot 0 offset_address -0x4 rbp
+        slot 1 offset_address -0x8 rdi
+        slot 2 offset_address -0xc rsi
+        slot 3 offset_address -0x10 rbx
+      rax = undefined
+      rcx = undefined
+      rdx = undefined
+     '0xc015cd4a getname+0x62:    cmp    $0x0,%eax'
+      opcode 'cmp' matched by 'cmp', usage 3
+      src  I: $0x0
+      dst  R: %eax base_rc 2 (rax)
+     '0xc015cd4d getname+0x65:    jle    0xc015cd5a <getname+0x72>'
+      opcode 'jle' matched by 'j', usage 28
+      src  M: 0xc015cd5a
+      bb_reg_state c0728658
+        rax = undefined
+        rbx = undefined
+        rcx = undefined
+        rdx = undefined
+        rdi = rax
+        rsi = undefined
+        rbp = osp-0x4
+        rsp = osp-0x14
+        slot 0 offset_address -0x4 rbp
+        slot 1 offset_address -0x8 rdi
+        slot 2 offset_address -0xc rsi
+        slot 3 offset_address -0x10 rbx
+      matched: from 0xc015cd4d to 0xc015cd5a drop_through 0 bb_jmp[4]
+      reuse bb_jmp[3]
+     '0xc015cd4f getname+0x67:    mov    $0xffffffdc,%esi'
+      opcode 'mov' matched by 'mov', usage 36
+      src  I: $0xffffffdc
+      dst  R: %esi base_rc 7 (rsi)
+      rsi = undefined
+     '0xc015cd54 getname+0x6c:    cmp    %ebx,%eax'
+      opcode 'cmp' matched by 'cmp', usage 3
+      src  R: %ebx base_rc 3 (rbx)
+      dst  R: %eax base_rc 2 (rax)
+     '0xc015cd56 getname+0x6e:    jae    0xc015cd60 <getname+0x78>'
+      opcode 'jae' matched by 'j', usage 28
+      src  M: 0xc015cd60
+      bb_reg_state c0728658
+        rax = undefined
+        rbx = undefined
+        rcx = undefined
+        rdx = undefined
+        rdi = rax
+        rsi = undefined
+        rbp = osp-0x4
+        rsp = osp-0x14
+        slot 0 offset_address -0x4 rbp
+        slot 1 offset_address -0x8 rdi
+        slot 2 offset_address -0xc rsi
+        slot 3 offset_address -0x10 rbx
+      matched: from 0xc015cd56 to 0xc015cd60 drop_through 0 bb_jmp[5]
+      reuse bb_jmp[3]
+     '0xc015cd58 getname+0x70:    jmp    0xc015cd71 <getname+0x89>'
+      opcode 'jmp' matched by 'j', usage 28
+      src  M: 0xc015cd71
+      bb_reg_state c0728658
+        rax = undefined
+        rbx = undefined
+        rcx = undefined
+        rdx = undefined
+        rdi = rax
+        rsi = undefined
+        rbp = osp-0x4
+        rsp = osp-0x14
+        slot 0 offset_address -0x4 rbp
+        slot 1 offset_address -0x8 rdi
+        slot 2 offset_address -0xc rsi
+        slot 3 offset_address -0x10 rbx
+      matched: from 0xc015cd58 to 0xc015cd71 drop_through 0 bb_jmp[6]
+      reuse bb_jmp[3]
+
+      bb[3]
+      first state c0728768
+      bb_reg_state c0728658
+        rax = undefined
+        rbx = undefined
+        rcx = undefined
+        rdx = undefined
+        rdi = rax
+        rsi = undefined
+        rbp = osp-0x4
+        rsp = osp-0x14
+        slot 0 offset_address -0x4 rbp
+        slot 1 offset_address -0x8 rdi
+        slot 2 offset_address -0xc rsi
+        slot 3 offset_address -0x10 rbx
+
+bb[3] only has one input, nothing to merge.
+
+     '0xc015cd5a getname+0x72:    je     0xc015cd76 <getname+0x8e>'
+      opcode 'je' matched by 'j', usage 28
+      src  M: 0xc015cd76
+      bb_reg_state c0728658
+        rax = undefined
+        rbx = undefined
+        rcx = undefined
+        rdx = undefined
+        rdi = rax
+        rsi = undefined
+        rbp = osp-0x4
+        rsp = osp-0x14
+        slot 0 offset_address -0x4 rbp
+        slot 1 offset_address -0x8 rdi
+        slot 2 offset_address -0xc rsi
+        slot 3 offset_address -0x10 rbx
+      matched: from 0xc015cd5a to 0xc015cd76 drop_through 0 bb_jmp[7]
+      reuse bb_jmp[3]
+     '0xc015cd5c getname+0x74:    jge    0xc015cd71 <getname+0x89>'
+      opcode 'jge' matched by 'j', usage 28
+      src  M: 0xc015cd71
+      bb_reg_state c0728658
+        rax = undefined
+        rbx = undefined
+        rcx = undefined
+        rdx = undefined
+        rdi = rax
+        rsi = undefined
+        rbp = osp-0x4
+        rsp = osp-0x14
+        slot 0 offset_address -0x4 rbp
+        slot 1 offset_address -0x8 rdi
+        slot 2 offset_address -0xc rsi
+        slot 3 offset_address -0x10 rbx
+      matched: from 0xc015cd5c to 0xc015cd71 drop_through 0 bb_jmp[8]
+      reuse bb_jmp[3]
+     '0xc015cd5e getname+0x76:    mov    %eax,%esi'
+      opcode 'mov' matched by 'mov', usage 36
+      src  R: %eax base_rc 2 (rax)
+      dst  R: %esi base_rc 7 (rsi)
+      rsi = rax (undefined)
+      bb_reg_state c0728658
+        rax = undefined
+        rbx = undefined
+        rcx = undefined
+        rdx = undefined
+        rdi = rax
+        rsi = undefined
+        rbp = osp-0x4
+        rsp = osp-0x14
+        slot 0 offset_address -0x4 rbp
+        slot 1 offset_address -0x8 rdi
+        slot 2 offset_address -0xc rsi
+        slot 3 offset_address -0x10 rbx
+      matched: from 0xc015cd5f to 0xc015cd60 drop_through 1 bb_jmp[14]
+      reuse bb_jmp[3]
+
+      bb[5]
+      first state c0728768
+      bb_reg_state c0728658
+        rax = undefined
+        rbx = undefined
+        rcx = undefined
+        rdx = undefined
+        rdi = rax
+        rsi = undefined
+        rbp = osp-0x4
+        rsp = osp-0x14
+        slot 0 offset_address -0x4 rbp
+        slot 1 offset_address -0x8 rdi
+        slot 2 offset_address -0xc rsi
+        slot 3 offset_address -0x10 rbx
+      merging state c0728768
+     '0xc015cd71 getname+0x89:    mov    0xfffffff0(%ebp),%eax'
+      opcode 'mov' matched by 'mov', usage 36
+      src  M: 0xfffffff0(%ebp) base_rc 8 (rbp)
+      dst  R: %eax base_rc 2 (rax)
+      rax = *(rbp-0x10) (osp-0x14)  rax = undefined
+     '0xc015cd74 getname+0x8c:    jmp    0xc015cd7d <getname+0x95>'
+      opcode 'jmp' matched by 'j', usage 28
+      src  M: 0xc015cd7d
+      bb_reg_state c0728658
+        rax = undefined
+        rbx = undefined
+        rcx = undefined
+        rdx = undefined
+        rdi = rax
+        rsi = undefined
+        rbp = osp-0x4
+        rsp = osp-0x14
+        slot 0 offset_address -0x4 rbp
+        slot 1 offset_address -0x8 rdi
+        slot 2 offset_address -0xc rsi
+        slot 3 offset_address -0x10 rbx
+      matched: from 0xc015cd74 to 0xc015cd7d drop_through 0 bb_jmp[10]
+      reuse bb_jmp[3]
+
+      bb[6]
+      first state c0728768
+      bb_reg_state c0728658
+        rax = undefined
+        rbx = undefined
+        rcx = undefined
+        rdx = undefined
+        rdi = rax
+        rsi = undefined
+        rbp = osp-0x4
+        rsp = osp-0x14
+        slot 0 offset_address -0x4 rbp
+        slot 1 offset_address -0x8 rdi
+        slot 2 offset_address -0xc rsi
+        slot 3 offset_address -0x10 rbx
+     '0xc015cd76 getname+0x8e:    mov    $0xfffffffe,%esi'
+      opcode 'mov' matched by 'mov', usage 36
+      src  I: $0xfffffffe
+      dst  R: %esi base_rc 7 (rsi)
+      rsi = undefined
+     '0xc015cd7b getname+0x93:    jmp    0xc015cd60 <getname+0x78>'
+      opcode 'jmp' matched by 'j', usage 28
+      src  M: 0xc015cd60
+      bb_reg_state c0728658
+        rax = undefined
+        rbx = undefined
+        rcx = undefined
+        rdx = undefined
+        rdi = rax
+        rsi = undefined
+        rbp = osp-0x4
+        rsp = osp-0x14
+        slot 0 offset_address -0x4 rbp
+        slot 1 offset_address -0x8 rdi
+        slot 2 offset_address -0xc rsi
+        slot 3 offset_address -0x10 rbx
+      matched: from 0xc015cd7b to 0xc015cd60 drop_through 0 bb_jmp[11]
+      reuse bb_jmp[3]
+
+      bb[4]
+      first state c0728710
+      bb_reg_state c0728658
+        rax = undefined
+        rbx = rbx
+        rcx = undefined
+        rdx = undefined
+        rdi = rax
+        rsi = undefined
+        rbp = osp-0x4
+        rsp = osp-0x14
+        slot 0 offset_address -0x4 rbp
+        slot 1 offset_address -0x8 rdi
+        slot 2 offset_address -0xc rsi
+        slot 3 offset_address -0x10 rbx
+      merging state c0728768
+      rbx = undefined
+      merging state c0728768
+      merging state c0728768
+
+bb[4] has 4 inputs, 3 of which have the same state.  One one path (state
+c0728710) rbx is defined, on the others (c0728768) rbx is undefined so the final
+state has rbx as undefined.
+
+      final state
+      bb_reg_state c0728658
+        rax = undefined
+        rbx = undefined
+        rcx = undefined
+        rdx = undefined
+        rdi = rax
+        rsi = undefined
+        rbp = osp-0x4
+        rsp = osp-0x14
+        slot 0 offset_address -0x4 rbp
+        slot 1 offset_address -0x8 rdi
+        slot 2 offset_address -0xc rsi
+        slot 3 offset_address -0x10 rbx
+     '0xc015cd60 getname+0x78:    mov    0xfffffff0(%ebp),%edx'
+      opcode 'mov' matched by 'mov', usage 36
+      src  M: 0xfffffff0(%ebp) base_rc 8 (rbp)
+      dst  R: %edx base_rc 5 (rdx)
+      rdx = *(rbp-0x10) (osp-0x14)  rdx = undefined
+     '0xc015cd63 getname+0x7b:    mov    0xc04b2120,%eax'
+      opcode 'mov' matched by 'mov', usage 36
+      src  M: 0xc04b2120
+      dst  R: %eax base_rc 2 (rax)
+      rax = undefined
+     '0xc015cd68 getname+0x80:    call   0xc01521f1 <kmem_cache_free>'
+      opcode 'call' matched by 'call', usage 17
+      src  M: 0xc01521f1
+      bb_reg_state c0728658
+        rax = undefined
+        rbx = undefined
+        rcx = undefined
+        rdx = undefined
+        rdi = rax
+        rsi = undefined
+        rbp = osp-0x4
+        rsp = osp-0x14
+        slot 0 offset_address -0x4 rbp
+        slot 1 offset_address -0x8 rdi
+        slot 2 offset_address -0xc rsi
+        slot 3 offset_address -0x10 rbx
+      rax = undefined
+      rcx = undefined
+      rdx = undefined
+      bb_reg_state c0728658
+        rax = undefined
+        rbx = undefined
+        rcx = undefined
+        rdx = undefined
+        rdi = rax
+        rsi = undefined
+        rbp = osp-0x4
+        rsp = osp-0x14
+        slot 0 offset_address -0x4 rbp
+        slot 1 offset_address -0x8 rdi
+        slot 2 offset_address -0xc rsi
+        slot 3 offset_address -0x10 rbx
+     '0xc015cd6d getname+0x85:    mov    %esi,%eax'
+      opcode 'mov' matched by 'mov', usage 36
+      src  R: %esi base_rc 7 (rsi)
+      dst  R: %eax base_rc 2 (rax)
+      rax = rsi (undefined)
+     '0xc015cd6f getname+0x87:    jmp    0xc015cd7d <getname+0x95>'
+      opcode 'jmp' matched by 'j', usage 28
+      src  M: 0xc015cd7d
+      bb_reg_state c0728658
+        rax = undefined
+        rbx = undefined
+        rcx = undefined
+        rdx = undefined
+        rdi = rax
+        rsi = undefined
+        rbp = osp-0x4
+        rsp = osp-0x14
+        slot 0 offset_address -0x4 rbp
+        slot 1 offset_address -0x8 rdi
+        slot 2 offset_address -0xc rsi
+        slot 3 offset_address -0x10 rbx
+      matched: from 0xc015cd6f to 0xc015cd7d drop_through 0 bb_jmp[9]
+      reuse bb_jmp[3]
+
+      bb[7]
+      first state c07286b8
+      bb_reg_state c0728658
+        rax = undefined
+        rbx = rbx
+        rcx = undefined
+        rdx = undefined
+        rdi = rax
+        rsi = rsi
+        rbp = osp-0x4
+        rsp = osp-0x14
+        slot 0 offset_address -0x4 rbp
+        slot 1 offset_address -0x8 rdi
+        slot 2 offset_address -0xc rsi
+        slot 3 offset_address -0x10 rbx
+      merging state c0728768
+      rbx = undefined
+      rsi = undefined
+      merging state c0728768
+      final state
+      bb_reg_state c0728658
+        rax = undefined
+        rbx = undefined
+        rcx = undefined
+        rdx = undefined
+        rdi = rax
+        rsi = undefined
+        rbp = osp-0x4
+        rsp = osp-0x14
+        slot 0 offset_address -0x4 rbp
+        slot 1 offset_address -0x8 rdi
+        slot 2 offset_address -0xc rsi
+        slot 3 offset_address -0x10 rbx
+     '0xc015cd7d getname+0x95:    pop    %edx'
+      opcode 'pop' matched by 'pop', usage 42
+      src  R: %edx base_rc 5 (rdx)
+      rdx = *(rsp+0x0) (osp-0x14)  rdx = undefined
+      rsp osp offset -0x14 -> -0x10
+
+This instruction is a bit misleading.  It looks like gcc is restoring a value
+from the stack *(osp-0x14) to edx, but we have no record of any useful data
+being stored at osp-0x14.  In fact gcc is just reducing the stack pointer by 4
+bytes to reverse the effect of 0xc015ccee: sub $0x4,%esp, the value popped into
+edx contains nothing useful.  Why gcc does pop instead of add $0x4,%esp is a
+puzzle, probably some micro optimization.
+
+     '0xc015cd7e getname+0x96:    pop    %ebx'
+      opcode 'pop' matched by 'pop', usage 42
+      src  R: %ebx base_rc 3 (rbx)
+      rbx = *(rsp+0x0) (osp-0x10) value rbx
+      rsp osp offset -0x10 -> -0xc
+      delete rbx from osp-0x10 slot 3
+
+This pop is doing something useful.  It is restoring the original value of the
+preserved register ebx from stack, reversing 0xc015cced: push %ebx.  Note that
+incrementing rsp from osp-0x10 to osp-0xc invalidates the data held in memory at
+osp-0x10, so we delete our record of it.
+
+     '0xc015cd7f getname+0x97:    pop    %esi'
+      opcode 'pop' matched by 'pop', usage 42
+      src  R: %esi base_rc 7 (rsi)
+      rsi = *(rsp+0x0) (osp-0xc) value rsi
+      rsp osp offset -0xc -> -0x8
+      delete rsi from osp-0xc slot 2
+     '0xc015cd80 getname+0x98:    pop    %edi'
+      opcode 'pop' matched by 'pop', usage 42
+      src  R: %edi base_rc 6 (rdi)
+      rdi = *(rsp+0x0) (osp-0x8) value rdi
+      rsp osp offset -0x8 -> -0x4
+      delete rdi from osp-0x8 slot 1
+
+Pop the other preserved registers, in reverse order to the push sequence at the
+start.
+
+     '0xc015cd81 getname+0x99:    pop    %ebp'
+      opcode 'pop' matched by 'pop', usage 42
+      src  R: %ebp base_rc 8 (rbp)
+      rbp = *(rsp+0x0) (osp-0x4) value rbp
+      rsp osp offset -0x4 -> +0x0
+      delete rbp from osp-0x4 slot 0
+
+Pop the previous frame pointer.
+
+     '0xc015cd82 getname+0x9a:    ret    '
+      opcode 'ret' matched by 'ret', usage 48
+
+When a ret instruction is executed, all the preserved registers must be back to
+their original value and the stack pointer must contain osp+0.
+bb_sanity_check() will complain and abort the backtrace if this is not true.  No
+complaints here.
+
+    bb_pass2: end bb_reg_params 1 bb_memory_params 0
+
+We identified one argument passed in a register (the read of rax at 0xc015ccf1)
+and no reference to memory locations above the stack frame.  So we have one
+argument being passed in a register and no arguments being passed on stack.
+This matches
+
+  char * getname(const char __user * filename)
+
+    bb_pass2: bb_exit_state at 0xc015cd6d
+      bb_reg_state c07287c0
+        rax = undefined
+        rbx = undefined
+        rcx = undefined
+        rdx = undefined
+        rdi = rax
+        rsi = undefined
+        rbp = osp-0x4
+        rsp = osp-0x14
+        slot 0 offset_address -0x4 rbp
+        slot 1 offset_address -0x8 rdi
+        slot 2 offset_address -0xc rsi
+        slot 3 offset_address -0x10 rbx
+
+We told bb1 that the exit address from this function is 0xc015cd6d.  The
+abstract state at this exit point was saved, it defines how we rollback the
+actual register values from the next function down the stack (kmem_cache_free)
+to get the actual register values on entry to this function (getname).  See
+bb_actual_rollback() which updates bb_actual[].
+
+Looking at the exit state above, we see that rsp contains the abstracte value
+osp-0x14.  It is a given that we have the actual value of rsp after the call
+from getname() to kmem_cache_free(), otherwise we would not have found the
+return address on stack and we would not be analysing getname().  Adding 0x14
+(the delta from osp to rsp) to our current actual rsp gives us the actual value
+of osp on entry to getname().
+
+The main aim of doing all this work is to track the function arguments so we can
+print them if possible.  getname() only has one argument which was passed in
+eax.  According to the abstract exit state, the original value of rax is
+currently in rdi, so by looking at the actual value of rdi from the next stack
+frame down we are able to get the argument to getname().
+
+It is not always possible to get register arguments, gcc will only preserve
+input arguments as long as it needs them so there may be no saved copy of
+arguments that are passed in register.  In this case, bt_print_one() prints
+"invalid".
+
+If basic block analysis detected any arguments were passed on stack, their
+contents can now be extracted based on the known value of the stack pointer.
+bt_print_one() prints the arguments, if BT_ARGS is non-zero then any argument
+that might be a kernel address is printed as a symbol.
+
+Once rsp has been rolled back to osp, we can calculate that actual address of
+the stack locations that contain useful data.  The previous values of rbp, rdi,
+rsi and rbx are then copied from those locations into bb_actual[].  That gives
+the values for those registers at the exit point from the function that called
+getname().  Go up one level and repeat the analysis.
+
+There are two references to rdi in the exit state, which can be confusing.
+
+        rdi = rax
+        slot 1 offset_address -0x8 rdi
+
+The first reference says that "register rdi contains the original value of rax",
+the second reference says that "*(osp-0x8) contains the original value of rdi".
+Do not confuse the two, one is by name, the other is by value.
+
+getname() is a fairly simple function, it has no loops.  __follow_mount is more
+complicated, it has loops as well as BUG() statements.
+
+    [0]kdb> id __follow_mount
+    0xc015be76 __follow_mount:         push   %ebp
+    0xc015be77 __follow_mount+0x1:     mov    %esp,%ebp
+    0xc015be79 __follow_mount+0x3:     push   %edi
+    0xc015be7a __follow_mount+0x4:     push   %esi
+    0xc015be7b __follow_mount+0x5:     push   %ebx
+    0xc015be7c __follow_mount+0x6:     mov    %eax,%esi
+    0xc015be7e __follow_mount+0x8:     xor    %edi,%edi
+    0xc015be80 __follow_mount+0xa:     jmp    0xc015beca __follow_mount+0x54
+    0xc015be82 __follow_mount+0xc:     mov    (%esi),%eax
+    0xc015be84 __follow_mount+0xe:     call   0xc0169664 lookup_mnt
+    0xc015be89 __follow_mount+0x13:    mov    %eax,%ebx
+    0xc015be8b __follow_mount+0x15:    test   %eax,%eax
+    0xc015be8d __follow_mount+0x17:    je     0xc015bed3 __follow_mount+0x5d
+    0xc015be8f __follow_mount+0x19:    mov    0x4(%esi),%eax
+    0xc015be92 __follow_mount+0x1c:    call   0xc0163de2 dput
+    0xc015be97 __follow_mount+0x21:    test   %edi,%edi
+    0xc015be99 __follow_mount+0x23:    je     0xc015bead __follow_mount+0x37
+    0xc015be9b __follow_mount+0x25:    mov    (%esi),%eax
+    0xc015be9d __follow_mount+0x27:    test   %eax,%eax
+    0xc015be9f __follow_mount+0x29:    je     0xc015bead __follow_mount+0x37
+    0xc015bea1 __follow_mount+0x2b:    movl   $0x0,0x64(%eax)
+    0xc015bea8 __follow_mount+0x32:    call   0xc016835b mntput_no_expire
+    0xc015bead __follow_mount+0x37:    mov    %ebx,(%esi)
+    0xc015beaf __follow_mount+0x39:    mov    0x10(%ebx),%eax
+    0xc015beb2 __follow_mount+0x3c:    test   %eax,%eax
+    0xc015beb4 __follow_mount+0x3e:    je     0xc015bec2 __follow_mount+0x4c
+    0xc015beb6 __follow_mount+0x40:    cmpl   $0x0,(%eax)
+    0xc015beb9 __follow_mount+0x43:    jne    0xc015bebf __follow_mount+0x49
+    0xc015bebb __follow_mount+0x45:    ud2a
+    0xc015bebd __follow_mount+0x47:    jmp    0xc015bebd __follow_mount+0x47
+    0xc015bebf __follow_mount+0x49:    lock incl (%eax)
+    0xc015bec2 __follow_mount+0x4c:    mov    %eax,0x4(%esi)
+    0xc015bec5 __follow_mount+0x4f:    mov    $0x1,%edi
+    0xc015beca __follow_mount+0x54:    mov    0x4(%esi),%edx
+    0xc015becd __follow_mount+0x57:    cmpl   $0x0,0x74(%edx)
+    0xc015bed1 __follow_mount+0x5b:    jne    0xc015be82 __follow_mount+0xc
+    0xc015bed3 __follow_mount+0x5d:    mov    %edi,%eax
+    0xc015bed5 __follow_mount+0x5f:    pop    %ebx
+    0xc015bed6 __follow_mount+0x60:    pop    %esi
+    0xc015bed7 __follow_mount+0x61:    pop    %edi
+    0xc015bed8 __follow_mount+0x62:    pop    %ebp
+    0xc015bed9 __follow_mount+0x63:    ret
+
+    [0]kdb> bb1 0xc015bed9
+    bb_pass1: func_name __follow_mount func_start 0xc015be76 func_end 0xc015beda
+    bb_pass1: end
+      bb[0] start 0xc015be76 end 0xc015be80 drop_through 0
+      bb[1] start 0xc015be82 end 0xc015beac drop_through 1
+      bb[2] start 0xc015bead end 0xc015bebb drop_through 0
+
+Note that the ud2a (BUG) instruction at 0xc015bebb ends bb[2].
+
+      bb[3] start 0xc015bebd end 0xc015bebd drop_through 0
+
+bb[3] is peculiar, it is a jmp to itself, nothing else refers to 0xc015bebd and
+you cannot drop through from the previous instruction because ud2a kills the
+kernel.  The i386 and x86_64 BUG() macros contain for(;;) after ud2a, for no
+good reason that I can see (is there old hardware that does not abort on ud2a?).
+ia64 and the generic versions of BUG() do not contain for(;;).  for(;;) after
+ud2a generates a branch to itself than can never be executed.
+
+      bb[4] start 0xc015bebf end 0xc015bec1 drop_through 1
+      bb[5] start 0xc015bec2 end 0xc015bec9 drop_through 1
+      bb[6] start 0xc015beca end 0xc015bed2 drop_through 1
+      bb[7] start 0xc015bed3 end 0xc015bed9 drop_through 0
+      bb_jmp[0] from 0xc015be80 to 0xc015beca drop_through 0
+      bb_jmp[1] from 0xc015be8d to 0xc015bed3 drop_through 0
+      bb_jmp[2] from 0xc015be99 to 0xc015bead drop_through 0
+      bb_jmp[3] from 0xc015be9f to 0xc015bead drop_through 0
+      bb_jmp[4] from 0xc015beb4 to 0xc015bec2 drop_through 0
+      bb_jmp[5] from 0xc015beb9 to 0xc015bebf drop_through 0
+      bb_jmp[6] from 0xc015bebd to 0xc015bebd drop_through 0
+      bb_jmp[7] from 0xc015bed1 to 0xc015be82 drop_through 0
+      bb_jmp[8] from 0xc015beac to 0xc015bead drop_through 1
+      bb_jmp[9] from 0xc015bec1 to 0xc015bec2 drop_through 1
+      bb_jmp[10] from 0xc015bec9 to 0xc015beca drop_through 1
+      bb_jmp[11] from 0xc015bed2 to 0xc015bed3 drop_through 1
+
+Apart from bb[0] and the special case bb[3], all the other blocks are part of a
+cycle.  That cycle goes bb[0] -> bb[6].  bb[6] -> {bb[1], bb[7]}.  bb[1] ->
+{bb[2], bb[7]}.  bb[2] -> {bb[4], bb[5]}.  bb[4] -> bb[5].  bb[5] -> bb[6] and
+back to the start.  bb[7] ends with 'ret', it does not feed into other blocks.
+
+    bb_pass2: start
+
+      bb_pass2_do_changed_blocks: allow_missing 0
+
+      bb[0]
+      [ ... detail snipped ... ]
+      matched: from 0xc015be80 to 0xc015beca drop_through 0 bb_jmp[0]
+      new state c07286d8
+
+      bb_pass2_do_changed_blocks: allow_missing 1
+
+Because of the cycle, only bb[0] can be processed with 0 missing inputs, all the
+other blocks have at least one missing input.  Call bb_pass2_do_changed_blocks()
+again, this time allowing one missing input per blocks.
+
+      bb[6]
+      first state c07286d8
+      [ ... detail snipped ... ]
+      matched: from 0xc015bed2 to 0xc015bed3 drop_through 1 bb_jmp[11]
+      reuse bb_jmp[7]
+
+      bb[7]
+      first state c0728730
+      [ ... detail snipped ... ]
+
+      bb[1]
+      first state c0728730
+      [ ... detail snipped ... ]
+      matched: from 0xc015beac to 0xc015bead drop_through 1 bb_jmp[8]
+      reuse bb_jmp[1]
+
+      bb[2]
+      first state c0728788
+      [ ... detail snipped ... ]
+      merging state c0728788
+      merging state c0728788
+      [ ... detail snipped ... ]
+      matched: from 0xc015beb9 to 0xc015bebf drop_through 0 bb_jmp[5]
+      reuse bb_jmp[1]
+
+      bb[4]
+      first state c0728788
+      [ ... detail snipped ... ]
+      matched: from 0xc015bec1 to 0xc015bec2 drop_through 1 bb_jmp[9]
+      reuse bb_jmp[1]
+
+      bb[5]
+      first state c0728788
+      [ ... detail snipped ... ]
+      merging state c0728788
+      [ ... detail snipped ... ]
+      matched: from 0xc015bec9 to 0xc015beca drop_through 1 bb_jmp[10]
+      reuse bb_jmp[1]
+
+      bb[6]
+      first state c07286d8
+      [ ... detail snipped ... ]
+      merging state c0728788
+      matched: from 0xc015bed2 to 0xc015bed3 drop_through 1 bb_jmp[11]
+      reuse bb_jmp[1]
+
+Note the rescan of bb[6].  The first scan only had one input from bb[0].  After
+traversing the cycle and getting back from bb[5] to bb[6], bb[6] now has more
+inputs so we need to rescan it.  With the additional input, the output state
+from bb[6] has changed since the first scan, which means that every block it
+feeds has to be rescanned.  bb[6] feeds bb[1] and bb[7].
+
+      bb[7]
+      first state c0728788
+      [ ... detail snipped ... ]
+      merging state c0728788
+      [ ... detail snipped ... ]
+
+bb[7] being rescanned, this time it has data for both its inputs.
+
+      bb[1]
+      first state c0728788
+      [ ... detail snipped ... ]
+      matched: from 0xc015beac to 0xc015bead drop_through 1 bb_jmp[8]
+      no state change
+
+bb[1] is being rescanned because the input from bb[6] has changed, however the
+rescan of bb[1] reports 'no state change', the changed input from bb[6] did not
+affect the final output state from bb[1].  Because the output state from bb[1]
+has not changed since the previous scan, there is no need to rescan bb[2], bb[7]
+or bb[4].  Since bb[4] is not being rescanned, there is no need to rescan bb[5]
+or bb[6] and the cycle is closed.

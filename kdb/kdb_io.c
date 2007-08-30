@@ -469,6 +469,7 @@ kdb_printf(const char *fmt, ...)
 	int got_printf_lock = 0;
 	struct console *c = console_drivers;
 	static DEFINE_SPINLOCK(kdb_printf_lock);
+	unsigned long uninitialized_var(flags);
 
 	preempt_disable();
 	/* Serialize kdb_printf if multiple cpus try to write at once.
@@ -477,7 +478,7 @@ kdb_printf(const char *fmt, ...)
 	 */
 	if (!KDB_STATE(PRINTF_LOCK)) {
 		KDB_STATE_SET(PRINTF_LOCK);
-		spin_lock(&kdb_printf_lock);
+		spin_lock_irqsave(&kdb_printf_lock, flags);
 		got_printf_lock = 1;
 		atomic_inc(&kdb_event);
 	} else {
@@ -594,7 +595,7 @@ kdb_printf(const char *fmt, ...)
 	}
 	if (KDB_STATE(PRINTF_LOCK) && got_printf_lock) {
 		got_printf_lock = 0;
-		spin_unlock(&kdb_printf_lock);
+		spin_unlock_irqrestore(&kdb_printf_lock, flags);
 		KDB_STATE_CLEAR(PRINTF_LOCK);
 		atomic_dec(&kdb_event);
 	} else {

@@ -1,4 +1,4 @@
-.TH BT 1 "August 25, 2006"
+.TH BT 1 "July 20, 2007"
 .SH NAME
 bt \- Stack Traceback command
 .SH SYNOPSIS
@@ -21,21 +21,9 @@ the starting context and attempts to provide a complete
 stack traceback for the active thread.   If \fIstack-frame-address\fP
 is supplied, it is assumed to point to the start of a valid
 stack frame and the stack will be traced back from that
-point (e.g. on i386 architecture, \fIstack-frame-address\fP
-should be the stack address of a saved \fB%eip\fP value from a \fBcall\fP
-instruction. on sparc64 architecture, it should be a pointer to a
-saved register window, as is found in the \fB%fp\fP register).
-.P
-If present, a kernel configuration option \fBCONFIG_FRAME_POINTER\fP
-should be enabled so that the compiler will utilize the frame pointer
-register properly to maintain a stack which can be correctly
-analyzed. Some architectures (e.g. sparc64) always use
-\fBCONFIG_FRAME_POINTER\fP, and so the option is not present.
-.P
-The \fBbt\fP command will attempt to analyze the stack without
-frame pointers if the \fBCONFIG_FRAME_POINTER\fP option is not
-enabled, but the analysis is difficult and may not produce
-accurate nor complete results.
+point.
+On x86 architecture, \fIstack-frame-address\fP must be the stack address of a
+saved \fB%eip\fP (\fB%rip\fP for x86_64) value from a \fBcall\fP instruction.
 .P
 The \fBbtp\fP command will analyze the stack for the given
 process identification (see the \fBps\fP command).
@@ -70,8 +58,7 @@ display or update commands.
 For each function, the stack trace prints at least two lines.
 The first line contains four or five fields\ :-
 .IP * 3
-The pointer to the previous stack frame, blank if there is no valid
-frame pointer.
+The pointer to the stack frame.
 .PD 0
 .IP * 3
 The current address within this frame.
@@ -165,21 +152,109 @@ objdump does not assume hex.
 The stack trace values are printed with leading '0x' to make it easy to
 run objdump.
 .SH LIMITATIONS
-If the kernel is compiled without frame pointers, stack tracebacks
-may be incomplete.  The \fBmds %esp\fP (i386) or \fBmds %fp\fP (sparc64)
-command may be useful in attemping to determine the actual stack
-traceback manually.
+Some architectures pass parameters in registers; ia64, x86_64 and i386 (with
+gcc flag -mregparm) fall into this category.
+On these architectures, the compiler may reuse input parameter registers as
+scratch space.
+For example, if a function takes a pointer to a structure and only accesses one
+field in that structure, the compiler may calculate the address of the field by
+adding a value to the input register.
+Once the input register has been updated, it no longer points to the
+start of the structure, but to some field within it.
+This also occurs with array pointers, the compiler may update the input pointer
+directly, leaving it pointing to some element of the array instead of the start
+of the array.
+Always treat parameter values that have been passed in registers with extreme
+suspicion, the compiler may have changed the value.
+The x86 backtrace can generally identify register parameters that are no longer
+valid, it prints them as 'invalid' instead of as a misleading number.
+The ia64 backtrace cannot identify parameter registers that have been
+overwritten.
 .P
-A stack trace can be misleading if any code in a function exit has been
-executed, the stack is partially unwound at that stage.
+x86 architectures do not have full unwind information in the kernel.
+The KDB backtrace on x86 performs code decomposition and analysis to track the
+frames on the call stack (including stack switches) and to locate parameters.
+if this code analysis does not yield a valid result, KDB falls back on the old
+method of scanning the process stack and printing anything that looks like a
+kernel address.
+This old method is unreliable (it produces lots of false positives in the
+trace) and cannot track parameters at all, so no parameters are printed.
+If you get an x86 backtrace that falls back to the old method, read
+Documentation/kdb/bt_x86 and follow the steps listed to get diagnostics and to
+submit a bug report.
 .P
-The \fBbt\fP command may print more arguments for a function
-than that function accepts;  For sparc64, this will always happen
-as the debugger cannot determine the correct number. For i386, this happens
-when the C compiler doesn't immediately pop the arguments off the stack upon
-return from a called function.  When this is this case, these extra
-stack words will be considered additional arguments by the \fBbt\fP
-command.
+There are a lot of functions in the kernel which take some arguments then do
+nothing except call another function with the same initial arguments, sometimes
+adding parameters at the end.  For example\ :-
+.nf
+.na
+.ft CW
+
+int ipv4_doint_and_flush_strategy(ctl_table *table, int __user *name, int nlen,
+				  void __user *oldval, size_t __user *oldlenp,
+				  void __user *newval, size_t newlen)
+{
+	int ret = devinet_conf_sysctl(table, name, nlen, oldval, oldlenp,
+				      newval, newlen);
+
+	if (ret == 1)
+		rt_cache_flush(0);
+
+	return ret;
+}
+.ad b
+.fi
+.P
+ipv4_doint_and_flush_strategy() passes all its parameters directly to
+devinet_conf_sysctl() and makes no other use of those parameters,
+so ipv4_doint_and_flush_strategy is a 'pass through' function.
+The x86_64 calling sequence mandates that the first 6 parameters are passed in
+registers, with other parameters being passed on stack.
+The i386 calling sequence with -mregparm=3 (which is the default since about
+2.6.18) passes the first 3 parameters in registers, with other parameters being
+passed on stack.
+The only exceptions to the above calling sequence are for functions declared as
+asmlinkage or functions with a variable number of parameters (e.g. printk).
+.P
+When a pass through function calls another function, the first 3 (i386) or 6
+(x86) parameters are already in their correct registers so the pass through
+function does not need to access the registers, which means that there are no
+references to these registers in the assembler code for the function.
+Users still want to see those arguments so the x86 backtrace has to assume that
+if\ :-
+.IP * 2
+There are parameters passed on the stack and
+.IP *
+There are no code references to parameters passed in registers and
+.IP *
+The function is not a known asmlinkage or variadic function, then
+there are pass through register arguments.
+.P
+The x86 backtrace will warn you when it makes this assumption, like this\ :-
+.nf
+.na
+.ft CW
+
+  <function_name> has memory parameters but no register parameters.
+  Assuming it is a 'pass through' function that does not refer to its register
+  parameters and setting <n> register parameters
+.ad b
+.fi
+.P
+The above 3 line message is only printed once, any future assumptions will
+print a shorter message.
+.P
+The \fBbt\fP command may print more or less arguments for a function
+than that function accepts.
+For x86, trailing arguments that are passed in but not used by the function
+will not be printed, resulting in fewer arguments than expected.
+For ia64, the hardware does not distinguish between input and local registers,
+some local registers may be printed as function arguments, resulting in more
+arguments than expected.
+.P
+On i386, 64 bit arguments (long long) occupy two adjacent 32 bit fields.
+There is no way for KDB to tell that this has occurred, so 64 bit arguments
+will be printed as two separate 32 bit arguments.
 .SH ENVIRONMENT
 The \fBBTARGS\fP environment variable governs the maximum number
 of arguments that are printed for any single function.
@@ -189,12 +264,16 @@ local registers.
 Use a large value for \fBBTARGS\fP if you want to see the local registers on
 IA64.
 .PP
-If the \fBBTSP\fP environment variable is non-zero then each backtrace frame
-may print an extra line giving information about the stack pointers, this is
-architecture specific.
+If the \fBBTSP\fP environment variable is non-zero then the entire backtrace is
+printed, otherwise only the backtrace to the point of the last interrupt is
+printed.
+Printing the entire backtrace with 'set\ BTSP\ 1' is useful for diagnosing
+problems with the backtrace algorithms.
+In addition, when BTSP is non-zero, each backtrace frame may print extra lines
+giving information about the stack pointers, this is architecture specific.
 .PP
 If the \fBBTSYMARG\fP environment variable is non-zero then any
-arguments that fall within the kernel are converted to symbols.
+arguments that fall within the kernel or modules are converted to symbols.
 .PP
 If the \fBNOSECT\fP environment variable is non-zero then the
 section information is suppressed.
@@ -215,14 +294,22 @@ None.
 .nf
 .na
 .ft CW
-Entering kdb (0xc3cb4000) due to Breakpoint @ 0xc011725d
-Instruction(i) breakpoint #0 at 0xc011725c
-qm_modules+0xd1:   movl   %ebp,%esp
-kdb> bt
-    EBP       EIP         Function(args)
-0xc3cb5f98 0xc011725d  qm_modules+0xd1 (0x80721c0, 0x100, 0xbfff5000)
-                       kernel .text 0xc0100000 0xc011718c 0xc0117264
-0xc3cb5fbc 0xc0117875  sys_query_module+0x1b1 (0x0, 0x1, 0x80721c0, 0x100, 0xbfff5000)
-                       kernel .text 0xc0100000 0xc01176c4 0xc01178e8
-           0xc01095f8  system_call+0x34
-                       kernel .text 0xc0100000 0xc01095c4 0xc01095fc
+[0]kdb> bt
+Stack traceback for pid 2873
+0xc2efc0f0     2873     2836  1    0   R  0xc2efc2a0 *mount
+esp        eip        Function (args)
+0xf65a3c88 0xc0201f9f xfs_mount_validate_sb (0xf68bcb08, 0xf68bcb48, 0x0)
+0xf65a3c94 0xc0202f17 xfs_readsb+0x9d (0xf68bcb08, 0x0)
+0xf65a3cc0 0xc020a72e xfs_mount+0x21d (invalid, 0xf68bc2f0, 0x0)
+0xf65a3cf4 0xc021a84a vfs_mount+0x1a (invalid)
+0xf65a3d04 0xc021a721 xfs_fs_fill_super+0x76 (0xf76b6200, invalid, invalid)
+0xf65a3d78 0xc015ad81 get_sb_bdev+0xd4 (invalid, invalid, invalid, 0xf7257000, 0xc021a6ab, 0xf7594b38)
+  xfs_fs_get_sb has memory parameters but no register parameters.
+  Assuming it is a 'pass through' function that does not refer to its register
+  parameters and setting 3 register parameters
+0xf65a3db4 0xc0219a3a xfs_fs_get_sb+0x21 (invalid, invalid, invalid, 0xf7257000, 0xf7594b38)
+0xf65a3dcc 0xc015a992 vfs_kern_mount+0x41 (0xc04847e0, 0x0, 0xf68e9000, 0xf7257000)
+0xf65a3df0 0xc015aa11 do_kern_mount+0x38 (0xf6818000, 0x0, 0xf68e9000, 0xf7257000)
+0xf65a3e10 0xc016c8b0 do_mount+0x5df (0xf68e9000, 0xf65d6000, 0xf6818000, 0xc0ed0000, 0xf7257000)
+0xf65a3f90 0xc016c996 sys_mount+0x6f (0x8069b50, 0x8069b60, 0x8069b70, 0xc0ed0000, 0x8069ba0)
+0xf65a3fb4 0xc0102646 sysenter_past_esp+0x5f (invalid, invalid, invalid, 0x73, 0x246, 0xbfe52f50)

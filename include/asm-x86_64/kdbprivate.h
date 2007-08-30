@@ -163,6 +163,7 @@ extern kdb_jmp_buf  *kdbjmpbuf;
 
 struct kdba_running_process {
 	long rsp;	/* KDB may be on a different stack */
+	long rip;	/* rip when rsp was set */
 };
 
 register unsigned long current_stack_pointer asm("rsp") __attribute_used__;
@@ -171,6 +172,7 @@ static inline
 void kdba_save_running(struct kdba_running_process *k, struct pt_regs *regs)
 {
 	k->rsp = current_stack_pointer;
+	__asm__ __volatile__ ( " lea 0(%%rip),%%rax; movq %%rax,%0 ; " : "=r"(k->rip) : : "rax" );
 }
 
 static inline
@@ -185,5 +187,7 @@ extern void kdba_get_stack_info_alternate(kdb_machreg_t addr, int cpu,
 extern void kdba_wait_for_cpus(void);
 
 extern asmlinkage void kdb_interrupt(void);
+
+#define	KDB_INT_REGISTERS	16
 
 #endif	/* !_ASM_KDBPRIVATE_H */

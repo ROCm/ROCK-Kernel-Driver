@@ -30,8 +30,10 @@
  *	bta [DRSTCZEUIMA]		All useful processes, optionally filtered by state
  *	btc [<cpu>]			The current process on one cpu, default is all cpus
  *
- * 	address expression refers to a return address on the stack.  It
- *	is expected to be preceeded by a frame pointer.
+ *	bt <address-expression> refers to a address on the stack, that location
+ *	is assumed to contain a return address.
+ *
+ *	btt <address-expression> refers to the address of a struct task.
  *
  * Inputs:
  *	argc	argument count
@@ -43,11 +45,11 @@
  * Locking:
  *	none.
  * Remarks:
- *	Backtrack works best when the code uses frame pointers.  But
- *	even without frame pointers we should get a reasonable trace.
+ *	Backtrack works best when the code uses frame pointers.  But even
+ *	without frame pointers we should get a reasonable trace.
  *
- *	mds comes in handy when examining the stack to do a manual
- *	traceback.
+ *	mds comes in handy when examining the stack to do a manual traceback or
+ *	to get a starting point for bt <address-expression>.
  */
 
 static int
@@ -55,7 +57,6 @@ kdb_bt1(const struct task_struct *p, unsigned long mask, int argcount, int btapr
 {
 	int diag;
 	char buffer[2];
-	/* FIXME: use kdb_verify_area */
 	if (kdb_getarea(buffer[0], (unsigned long)p) ||
 	    kdb_getarea(buffer[0], (unsigned long)(p+1)-1))
 		return KDB_BADADDR;
