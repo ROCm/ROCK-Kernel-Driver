@@ -265,8 +265,6 @@ reiserfs_xattr_set_handle(struct reiserfs_transaction_handle *th,
 		dentry = xattr_lookup(inode, name, XATTR_REPLACE);
 		if (IS_ERR(dentry)) {
 			err = PTR_ERR(dentry);
-			if (err == -ENODATA)
-				err = 0;
 			return err;
 		}
 

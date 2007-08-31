@@ -23,7 +23,6 @@ static int
 user_set(struct inode *inode, const char *name, const void *buffer,
 	 size_t size, int flags)
 {
-
 	if (strlen(name) < sizeof(XATTR_USER_PREFIX))
 		return -EINVAL;
 
