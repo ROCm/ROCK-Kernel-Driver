@@ -186,7 +186,7 @@ int gnttab_end_foreign_access_ref(grant_ref_t ref, int readonly)
 	nflags = shared[ref].flags;
 	do {
 		if ((flags = nflags) & (GTF_reading|GTF_writing)) {
-			printk(KERN_ALERT "WARNING: g.e. still in use!\n");
+			printk(KERN_DEBUG "WARNING: g.e. still in use!\n");
 			return 0;
 		}
 	} while ((nflags = synch_cmpxchg_subword(&shared[ref].flags, flags, 0)) !=
@@ -206,7 +206,7 @@ void gnttab_end_foreign_access(grant_ref_t ref, int readonly,
 	} else {
 		/* XXX This needs to be fixed so that the ref and page are
 		   placed on a list to be freed up later. */
-		printk(KERN_WARNING
+		printk(KERN_DEBUG
 		       "WARNING: leaking g.e. and page still in use!\n");
 	}
 }

@@ -23,7 +23,7 @@
 extern void vide(void);
 __asm__(".align 4\nvide: ret");
 
-#ifdef CONFIG_X86_LOCAL_APIC
+#if defined(CONFIG_X86_LOCAL_APIC) && !defined(CONFIG_XEN)
 #define ENABLE_C1E_MASK         0x18000000
 #define CPUID_PROCESSOR_SIGNATURE       1
 #define CPUID_XFAM              0x0ff00000
@@ -63,7 +63,6 @@ static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 	u32 l, h;
 	int mbytes = num_physpages >> (20-PAGE_SHIFT);
 	int r;
-	extern int local_apic_timer_disabled;
 
 #ifdef CONFIG_SMP
 	unsigned long long value;
@@ -284,8 +283,11 @@ static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 	}
 
 #if defined(CONFIG_X86_LOCAL_APIC) && !defined(CONFIG_XEN)
-	if (amd_apic_timer_broken())
+	if (amd_apic_timer_broken()) {
+		extern int local_apic_timer_disabled;
+
 		local_apic_timer_disabled = 1;
+	}
 #endif
 
 	if (c->x86 == 0x10 && !force_mwait)

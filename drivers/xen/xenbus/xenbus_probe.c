@@ -165,6 +165,30 @@ static int read_backend_details(struct xenbus_device *xendev)
 	return read_otherend_details(xendev, "backend-id", "backend");
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,16)
+static int xenbus_uevent_frontend(struct device *dev, char **envp,
+				  int num_envp, char *buffer, int buffer_size)
+{
+	struct xenbus_device *xdev;
+	int length = 0, i = 0;
+
+	if (dev == NULL)
+		return -ENODEV;
+	xdev = to_xenbus_device(dev);
+	if (xdev == NULL)
+		return -ENODEV;
+
+	/* stuff we want to pass to /sbin/hotplug */
+	add_uevent_var(envp, num_envp, &i, buffer, buffer_size, &length,
+		       "XENBUS_TYPE=%s", xdev->devicetype);
+	add_uevent_var(envp, num_envp, &i, buffer, buffer_size, &length,
+		       "XENBUS_PATH=%s", xdev->nodename);
+	add_uevent_var(envp, num_envp, &i, buffer, buffer_size, &length,
+		       "MODALIAS=xen:%s", xdev->devicetype);
+
+	return 0;
+}
+#endif
 
 /* Bus type for frontend drivers. */
 static struct xen_bus_type xenbus_frontend = {
@@ -179,6 +203,7 @@ static struct xen_bus_type xenbus_frontend = {
 		.probe    = xenbus_dev_probe,
 		.remove   = xenbus_dev_remove,
 		.shutdown = xenbus_dev_shutdown,
+		.uevent   = xenbus_uevent_frontend,
 #endif
 	},
 	.dev = {
@@ -1006,7 +1031,7 @@ static int is_disconnected_device(struct device *dev, void *data)
 		return 0;
 
 	xendrv = to_xenbus_driver(dev->driver);
-	return (xendev->state != XenbusStateConnected ||
+	return (xendev->state < XenbusStateConnected ||
 		(xendrv->is_ready && !xendrv->is_ready(xendev)));
 }
 
@@ -1031,10 +1056,13 @@ static int print_device_status(struct device *dev, void *data)
 		/* Information only: is this too noisy? */
 		printk(KERN_INFO "XENBUS: Device with no driver: %s\n",
 		       xendev->nodename);
-	} else if (xendev->state != XenbusStateConnected) {
+	} else if (xendev->state < XenbusStateConnected) {
+		enum xenbus_state rstate = XenbusStateUnknown;
+		if (xendev->otherend)
+			rstate = xenbus_read_driver_state(xendev->otherend);
 		printk(KERN_WARNING "XENBUS: Timeout connecting "
-		       "to device: %s (state %d)\n",
-		       xendev->nodename, xendev->state);
+		       "to device: %s (local state %d, remote state %d)\n",
+		       xendev->nodename, xendev->state, rstate);
 	}
 
 	return 0;
@@ -1044,7 +1072,7 @@ static int print_device_status(struct device *dev, void *data)
 static int ready_to_wait_for_devices;
 
 /*
- * On a 10 second timeout, wait for all devices currently configured.  We need
+ * On a 5-minute timeout, wait for all devices currently configured.  We need
  * to do this to guarantee that the filesystems and / or network devices
  * needed for boot are available, before we can allow the boot to proceed.
  *
@@ -1059,17 +1087,29 @@ static int ready_to_wait_for_devices;
  */
 static void wait_for_devices(struct xenbus_driver *xendrv)
 {
-	unsigned long timeout = jiffies + 10*HZ;
+	unsigned long start = jiffies;
 	struct device_driver *drv = xendrv ? &xendrv->driver : NULL;
+	unsigned int seconds_waited = 0;
 
 	if (!ready_to_wait_for_devices || !is_running_on_xen())
 		return;
 
 	while (exists_disconnected_device(drv)) {
-		if (time_after(jiffies, timeout))
-			break;
+		if (time_after(jiffies, start + (seconds_waited+5)*HZ)) {
+			if (!seconds_waited)
+				printk(KERN_WARNING "XENBUS: Waiting for "
+				       "devices to initialise: ");
+			seconds_waited += 5;
+			printk("%us...", 300 - seconds_waited);
+			if (seconds_waited == 300)
+				break;
+		}
+
 		schedule_timeout_interruptible(HZ/10);
 	}
+
+	if (seconds_waited)
+		printk("\n");
 
 	bus_for_each_dev(&xenbus_frontend.bus, NULL, drv,
 			 print_device_status);

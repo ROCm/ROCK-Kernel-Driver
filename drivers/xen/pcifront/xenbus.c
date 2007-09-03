@@ -273,6 +273,7 @@ static struct xenbus_device_id xenpci_ids[] = {
 	{"pci"},
 	{{0}},
 };
+MODULE_ALIAS("xen:pci");
 
 static struct xenbus_driver xenbus_pcifront_driver = {
 	.name 			= "pcifront",

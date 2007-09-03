@@ -879,7 +879,7 @@ static struct xenbus_device_id blkfront_ids[] = {
 	{ "vbd" },
 	{ "" }
 };
-
+MODULE_ALIAS("xen:vbd");
 
 static struct xenbus_driver blkfront = {
 	.name = "vbd",

@@ -389,7 +389,7 @@ map_single(struct device *hwdev, struct phys_addr buffer, size_t size, int dir)
 	return dma_addr;
 }
 
-struct phys_addr dma_addr_to_phys_addr(char *dma_addr)
+static struct phys_addr dma_addr_to_phys_addr(char *dma_addr)
 {
 	int index = (dma_addr - iotlb_virt_start) >> IO_TLB_SHIFT;
 	struct phys_addr buffer = io_tlb_orig_addr[index];

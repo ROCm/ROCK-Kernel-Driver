@@ -702,8 +702,11 @@ void vmalloc_sync_all(void)
 	 * problematic: insync can only get set bits added, and updates to
 	 * start are only improving performance (without affecting correctness
 	 * if undone).
+	 * XEN: To work on PAE, we need to iterate over PMDs rather than PGDs.
+	 *      This change works just fine with 2-level paging too.
 	 */
-	static DECLARE_BITMAP(insync, PTRS_PER_PGD);
+#define sync_index(a) ((a) >> PMD_SHIFT)
+	static DECLARE_BITMAP(insync, PTRS_PER_PGD*PTRS_PER_PMD);
 	static unsigned long start = TASK_SIZE;
 	unsigned long address;
 
@@ -711,12 +714,22 @@ void vmalloc_sync_all(void)
 		return;
 
 	BUILD_BUG_ON(TASK_SIZE & ~PGDIR_MASK);
-	for (address = start; address >= TASK_SIZE; address += PGDIR_SIZE) {
-		if (!test_bit(pgd_index(address), insync)) {
+	for (address = start;
+	     address >= TASK_SIZE && address < hypervisor_virt_start;
+	     address += 1UL << PMD_SHIFT) {
+		if (!test_bit(sync_index(address), insync)) {
 			unsigned long flags;
 			struct page *page;
 
 			spin_lock_irqsave(&pgd_lock, flags);
+			/*
+			 * XEN: vmalloc_sync_one() failure path logic assumes
+			 * pgd_list is non-empty.
+			 */
+			if (unlikely(!pgd_list)) {
+				spin_unlock_irqrestore(&pgd_lock, flags);
+				return;
+			}
 			for (page = pgd_list; page; page =
 					(struct page *)page->index)
 				if (!vmalloc_sync_one(page_address(page),
@@ -726,9 +739,9 @@ void vmalloc_sync_all(void)
 				}
 			spin_unlock_irqrestore(&pgd_lock, flags);
 			if (!page)
-				set_bit(pgd_index(address), insync);
+				set_bit(sync_index(address), insync);
 		}
-		if (address == start && test_bit(pgd_index(address), insync))
-			start = address + PGDIR_SIZE;
+		if (address == start && test_bit(sync_index(address), insync))
+			start = address + (1UL << PMD_SHIFT);
 	}
 }

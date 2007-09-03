@@ -1015,15 +1015,16 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (notify)
 		notify_remote_via_irq(np->irq);
 
+	np->stats.tx_bytes += skb->len;
+	np->stats.tx_packets++;
+
+	/* Note: It is not safe to access skb after network_tx_buf_gc()! */
 	network_tx_buf_gc(dev);
 
 	if (!netfront_tx_slot_available(np))
 		netif_stop_queue(dev);
 
 	spin_unlock_irq(&np->tx_lock);
-
-	np->stats.tx_bytes += skb->len;
-	np->stats.tx_packets++;
 
 	return 0;
 
@@ -1510,7 +1511,7 @@ static void netif_release_tx_bufs(struct netfront_info *np)
 	}
 }
 
-static void netif_release_rx_bufs(struct netfront_info *np)
+static void netif_release_rx_bufs_flip(struct netfront_info *np)
 {
 	struct mmu_update      *mmu = np->rx_mmu;
 	struct multicall_entry *mcl = np->rx_mcl;
@@ -1519,11 +1520,6 @@ static void netif_release_rx_bufs(struct netfront_info *np)
 	unsigned long mfn;
 	int xfer = 0, noxfer = 0, unused = 0;
 	int id, ref, rc;
-
-	if (np->copying_receiver) {
-		WPRINTK("%s: fix me for copying receiver.\n", __FUNCTION__);
-		return;
-	}
 
 	skb_queue_head_init(&free_list);
 
@@ -1571,7 +1567,7 @@ static void netif_release_rx_bufs(struct netfront_info *np)
 		xfer++;
 	}
 
-	IPRINTK("%s: %d xfer, %d noxfer, %d unused\n",
+	DPRINTK("%s: %d xfer, %d noxfer, %d unused\n",
 		__FUNCTION__, xfer, noxfer, unused);
 
 	if (xfer) {
@@ -1594,6 +1590,45 @@ static void netif_release_rx_bufs(struct netfront_info *np)
 
 	while ((skb = __skb_dequeue(&free_list)) != NULL)
 		dev_kfree_skb(skb);
+
+	spin_unlock_bh(&np->rx_lock);
+}
+
+static void netif_release_rx_bufs_copy(struct netfront_info *np)
+{
+	struct sk_buff *skb;
+	int i, ref;
+	int busy = 0, inuse = 0;
+
+	spin_lock_bh(&np->rx_lock);
+
+	for (i = 0; i < NET_RX_RING_SIZE; i++) {
+		ref = np->grant_rx_ref[i];
+
+		if (ref == GRANT_INVALID_REF)
+			continue;
+
+		inuse++;
+
+		skb = np->rx_skbs[i];
+
+		if (!gnttab_end_foreign_access_ref(ref, 0))
+		{
+			busy++;
+			continue;
+		}
+
+		gnttab_release_grant_reference(&np->gref_rx_head, ref);
+		np->grant_rx_ref[i] = GRANT_INVALID_REF;
+		add_id_to_freelist(np->rx_skbs, i);
+
+		skb_shinfo(skb)->nr_frags = 0;
+		dev_kfree_skb(skb);
+	}
+
+	if (busy)
+		DPRINTK("%s: Unable to release %d of %d inuse grant references out of %ld total.\n",
+			__FUNCTION__, busy, inuse, NET_RX_RING_SIZE);
 
 	spin_unlock_bh(&np->rx_lock);
 }
@@ -1778,7 +1813,10 @@ static void netif_uninit(struct net_device *dev)
 {
 	struct netfront_info *np = netdev_priv(dev);
 	netif_release_tx_bufs(np);
-	netif_release_rx_bufs(np);
+	if (np->copying_receiver)
+		netif_release_rx_bufs_copy(np);
+	else
+		netif_release_rx_bufs_flip(np);
 	gnttab_free_grant_references(np->gref_tx_head);
 	gnttab_free_grant_references(np->gref_rx_head);
 }
@@ -2067,6 +2105,7 @@ static struct xenbus_device_id netfront_ids[] = {
 	{ "vif" },
 	{ "" }
 };
+MODULE_ALIAS("xen:vif");
 
 
 static struct xenbus_driver netfront = {

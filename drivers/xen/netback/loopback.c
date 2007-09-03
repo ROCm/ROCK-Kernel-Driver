@@ -100,6 +100,10 @@ static int skb_remove_foreign_references(struct sk_buff *skb)
 
 	BUG_ON(skb_shinfo(skb)->frag_list);
 
+	if (skb_cloned(skb) &&
+	    unlikely(pskb_expand_head(skb, 0, 0, GFP_ATOMIC)))
+		return 0;
+
 	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
 		pfn = page_to_pfn(skb_shinfo(skb)->frags[i].page);
 		if (!is_foreign(pfn))
