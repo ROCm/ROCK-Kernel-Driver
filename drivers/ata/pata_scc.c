@@ -740,7 +740,7 @@ static u8 scc_bmdma_status (struct ata_port *ap)
 	void __iomem *mmio = ap->ioaddr.bmdma_addr;
 	u8 host_stat = in_be32(mmio + SCC_DMA_STATUS);
 	u32 int_status = in_be32(mmio + SCC_DMA_INTST);
-	struct ata_queued_cmd *qc = ata_qc_from_tag(ap, ap->active_tag);
+	struct ata_queued_cmd *qc = ata_qc_from_tag(ap, ap->link.active_tag);
 	static int retry = 0;
 
 	/* return if IOS_SS is cleared */
