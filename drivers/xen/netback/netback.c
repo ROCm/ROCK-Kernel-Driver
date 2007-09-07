@@ -46,7 +46,7 @@
 struct netbk_rx_meta {
 	skb_frag_t frag;
 	int id;
-	int copy:1;
+	u8 copy:1;
 };
 
 static void netif_idx_release(u16 pending_idx);
