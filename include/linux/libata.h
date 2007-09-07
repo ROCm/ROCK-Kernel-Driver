@@ -327,6 +327,12 @@ enum {
 	ATA_HORKAGE_MAX_SEC_128	= (1 << 3),	/* Limit max sects to 128 */
 	ATA_HORKAGE_SKIP_PM	= (1 << 4),	/* Skip PM operations */
 	ATA_HORKAGE_BROKEN_HPA	= (1 << 5),	/* Broken HPA */
+
+	/* DMA mask for user DMA control: User visible values do not
+	   renumber */
+	ATA_DMA_MASK_ATA	= (1 << 0),	/* DMA on ATA Disk */
+	ATA_DMA_MASK_ATAPI	= (1 << 1),	/* DMA on ATAPI */
+	ATA_DMA_MASK_CFA	= (1 << 2),	/* DMA on CF Card */
 };
 
 enum hsm_task_states {
@@ -816,7 +822,8 @@ extern void ata_port_queue_task(struct ata_port *ap, work_func_t fn,
 extern u32 ata_wait_register(void __iomem *reg, u32 mask, u32 val,
 			     unsigned long interval_msec,
 			     unsigned long timeout_msec);
-extern unsigned int ata_dev_try_classify(struct ata_port *, unsigned int, u8 *);
+extern unsigned int ata_dev_try_classify(struct ata_device *dev, int present,
+					 u8 *r_err);
 
 /*
  * Default driver ops implementations

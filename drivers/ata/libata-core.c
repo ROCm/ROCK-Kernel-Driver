@@ -86,13 +86,21 @@ int atapi_dmadir = 0;
 module_param(atapi_dmadir, int, 0444);
 MODULE_PARM_DESC(atapi_dmadir, "Enable ATAPI DMADIR bridge support (0=off, 1=on)");
 
+int atapi_passthru16 = 1;
+module_param(atapi_passthru16, int, 0444);
+MODULE_PARM_DESC(atapi_passthru16, "Enable ATA_16 passthru for ATAPI devices; on by default (0=off, 1=on)");
+
 int libata_fua = 0;
 module_param_named(fua, libata_fua, int, 0444);
 MODULE_PARM_DESC(fua, "FUA support (0=off, 1=on)");
 
-static int ata_ignore_hpa = 0;
+static int ata_ignore_hpa = 1;
 module_param_named(ignore_hpa, ata_ignore_hpa, int, 0644);
 MODULE_PARM_DESC(ignore_hpa, "Ignore HPA limit (0=keep BIOS limits, 1=ignore limits, using full disk)");
+
+static int ata_pata_dma = ATA_DMA_MASK_ATA|ATA_DMA_MASK_ATAPI|ATA_DMA_MASK_CFA;
+module_param_named(pata_dma, ata_pata_dma, int, 0644);
+MODULE_PARM_DESC(pata_dma, "Use DMA on PATA devices");
 
 static int ata_probe_timeout = ATA_TMOUT_INTERNAL / HZ;
 module_param(ata_probe_timeout, int, 0444);
@@ -716,8 +724,8 @@ unsigned int ata_dev_classify(const struct ata_taskfile *tf)
 
 /**
  *	ata_dev_try_classify - Parse returned ATA device signature
- *	@ap: ATA channel to examine
- *	@device: Device to examine (starting at zero)
+ *	@dev: ATA device to classify (starting at zero)
+ *	@present: device seems present
  *	@r_err: Value of error register on completion
  *
  *	After an event -- SRST, E.D.D., or SATA COMRESET -- occurs,
@@ -735,15 +743,15 @@ unsigned int ata_dev_classify(const struct ata_taskfile *tf)
  *	RETURNS:
  *	Device type - %ATA_DEV_ATA, %ATA_DEV_ATAPI or %ATA_DEV_NONE.
  */
-
-unsigned int
-ata_dev_try_classify(struct ata_port *ap, unsigned int device, u8 *r_err)
+unsigned int ata_dev_try_classify(struct ata_device *dev, int present,
+				  u8 *r_err)
 {
+	struct ata_port *ap = dev->link->ap;
 	struct ata_taskfile tf;
 	unsigned int class;
 	u8 err;
 
-	ap->ops->dev_select(ap, device);
+	ap->ops->dev_select(ap, dev->devno);
 
 	memset(&tf, 0, sizeof(tf));
 
@@ -753,12 +761,12 @@ ata_dev_try_classify(struct ata_port *ap, unsigned int device, u8 *r_err)
 		*r_err = err;
 
 	/* see if device passed diags: if master then continue and warn later */
-	if (err == 0 && device == 0)
+	if (err == 0 && dev->devno == 0)
 		/* diagnostic fail : do nothing _YET_ */
-		ap->link.device[device].horkage |= ATA_HORKAGE_DIAGNOSTIC;
+		dev->horkage |= ATA_HORKAGE_DIAGNOSTIC;
 	else if (err == 1)
 		/* do nothing */ ;
-	else if ((device == 0) && (err == 0x81))
+	else if ((dev->devno == 0) && (err == 0x81))
 		/* do nothing */ ;
 	else
 		return ATA_DEV_NONE;
@@ -766,10 +774,20 @@ ata_dev_try_classify(struct ata_port *ap, unsigned int device, u8 *r_err)
 	/* determine if device is ATA or ATAPI */
 	class = ata_dev_classify(&tf);
 
-	if (class == ATA_DEV_UNKNOWN)
-		return ATA_DEV_NONE;
-	if ((class == ATA_DEV_ATA) && (ata_chk_status(ap) == 0))
-		return ATA_DEV_NONE;
+	if (class == ATA_DEV_UNKNOWN) {
+		/* If the device failed diagnostic, it's likely to
+		 * have reported incorrect device signature too.
+		 * Assume ATA device if the device seems present but
+		 * device signature is invalid with diagnostic
+		 * failure.
+		 */
+		if (present && (dev->horkage & ATA_HORKAGE_DIAGNOSTIC))
+			class = ATA_DEV_ATA;
+		else
+			class = ATA_DEV_NONE;
+	} else if ((class == ATA_DEV_ATA) && (ata_chk_status(ap) == 0))
+		class = ATA_DEV_NONE;
+
 	return class;
 }
 
@@ -836,6 +854,21 @@ void ata_id_c_string(const u16 *id, unsigned char *s,
 	*p = '\0';
 }
 
+static u64 ata_id_n_sectors(const u16 *id)
+{
+	if (ata_id_has_lba(id)) {
+		if (ata_id_has_lba48(id))
+			return ata_id_u64(id, 100);
+		else
+			return ata_id_u32(id, 60);
+	} else {
+		if (ata_id_current_chs_valid(id))
+			return ata_id_u32(id, 57);
+		else
+			return id[1] * id[3] * id[6];
+	}
+}
+
 static u64 ata_tf_to_lba48(struct ata_taskfile *tf)
 {
 	u64 sectors = 0;
@@ -863,129 +896,106 @@ static u64 ata_tf_to_lba(struct ata_taskfile *tf)
 }
 
 /**
- *	ata_read_native_max_address_ext	-	LBA48 native max query
- *	@dev: Device to query
+ *	ata_read_native_max_address - Read native max address
+ *	@dev: target device
+ *	@max_sectors: out parameter for the result native max address
  *
- *	Perform an LBA48 size query upon the device in question. Return the
- *	actual LBA48 size or zero if the command fails.
+ *	Perform an LBA48 or LBA28 native size query upon the device in
+ *	question.
+ *
+ *	RETURNS:
+ *	0 on success, -EACCES if command is aborted by the drive.
+ *	-EIO on other errors.
  */
-
-static u64 ata_read_native_max_address_ext(struct ata_device *dev)
+static int ata_read_native_max_address(struct ata_device *dev, u64 *max_sectors)
 {
-	unsigned int err;
+	unsigned int err_mask;
 	struct ata_taskfile tf;
+	int lba48 = ata_id_has_lba48(dev->id);
 
 	ata_tf_init(dev, &tf);
 
-	tf.command = ATA_CMD_READ_NATIVE_MAX_EXT;
-	tf.flags |= ATA_TFLAG_DEVICE | ATA_TFLAG_LBA48 | ATA_TFLAG_ISADDR;
-	tf.protocol |= ATA_PROT_NODATA;
-	tf.device |= 0x40;
-
-	err = ata_exec_internal(dev, &tf, NULL, DMA_NONE, NULL, 0);
-	if (err)
-		return 0;
-
-	return ata_tf_to_lba48(&tf);
-}
-
-/**
- *	ata_read_native_max_address	-	LBA28 native max query
- *	@dev: Device to query
- *
- *	Performa an LBA28 size query upon the device in question. Return the
- *	actual LBA28 size or zero if the command fails.
- */
-
-static u64 ata_read_native_max_address(struct ata_device *dev)
-{
-	unsigned int err;
-	struct ata_taskfile tf;
-
-	ata_tf_init(dev, &tf);
-
-	tf.command = ATA_CMD_READ_NATIVE_MAX;
+	/* always clear all address registers */
 	tf.flags |= ATA_TFLAG_DEVICE | ATA_TFLAG_ISADDR;
+
+	if (lba48) {
+		tf.command = ATA_CMD_READ_NATIVE_MAX_EXT;
+		tf.flags |= ATA_TFLAG_LBA48;
+	} else
+		tf.command = ATA_CMD_READ_NATIVE_MAX;
+
 	tf.protocol |= ATA_PROT_NODATA;
-	tf.device |= 0x40;
+	tf.device |= ATA_LBA;
 
-	err = ata_exec_internal(dev, &tf, NULL, DMA_NONE, NULL, 0);
-	if (err)
-		return 0;
+	err_mask = ata_exec_internal(dev, &tf, NULL, DMA_NONE, NULL, 0);
+	if (err_mask) {
+		ata_dev_printk(dev, KERN_WARNING, "failed to read native "
+			       "max address (err_mask=0x%x)\n", err_mask);
+		if (err_mask == AC_ERR_DEV && (tf.feature & ATA_ABORTED))
+			return -EACCES;
+		return -EIO;
+	}
 
-	return ata_tf_to_lba(&tf);
+	if (lba48)
+		*max_sectors = ata_tf_to_lba48(&tf);
+	else
+		*max_sectors = ata_tf_to_lba(&tf);
+
+	return 0;
 }
 
 /**
- *	ata_set_native_max_address_ext	-	LBA48 native max set
- *	@dev: Device to query
+ *	ata_set_max_sectors - Set max sectors
+ *	@dev: target device
  *	@new_sectors: new max sectors value to set for the device
  *
- *	Perform an LBA48 size set max upon the device in question. Return the
- *	actual LBA48 size or zero if the command fails.
+ *	Set max sectors of @dev to @new_sectors.
+ *
+ *	RETURNS:
+ *	0 on success, -EACCES if command is aborted or denied (due to
+ *	previous non-volatile SET_MAX) by the drive.  -EIO on other
+ *	errors.
  */
-
-static u64 ata_set_native_max_address_ext(struct ata_device *dev, u64 new_sectors)
+static int ata_set_max_sectors(struct ata_device *dev, u64 new_sectors)
 {
-	unsigned int err;
+	unsigned int err_mask;
 	struct ata_taskfile tf;
+	int lba48 = ata_id_has_lba48(dev->id);
 
 	new_sectors--;
 
 	ata_tf_init(dev, &tf);
 
-	tf.command = ATA_CMD_SET_MAX_EXT;
-	tf.flags |= ATA_TFLAG_DEVICE | ATA_TFLAG_LBA48 | ATA_TFLAG_ISADDR;
-	tf.protocol |= ATA_PROT_NODATA;
-	tf.device |= 0x40;
-
-	tf.lbal = (new_sectors >> 0) & 0xff;
-	tf.lbam = (new_sectors >> 8) & 0xff;
-	tf.lbah = (new_sectors >> 16) & 0xff;
-
-	tf.hob_lbal = (new_sectors >> 24) & 0xff;
-	tf.hob_lbam = (new_sectors >> 32) & 0xff;
-	tf.hob_lbah = (new_sectors >> 40) & 0xff;
-
-	err = ata_exec_internal(dev, &tf, NULL, DMA_NONE, NULL, 0);
-	if (err)
-		return 0;
-
-	return ata_tf_to_lba48(&tf);
-}
-
-/**
- *	ata_set_native_max_address	-	LBA28 native max set
- *	@dev: Device to query
- *	@new_sectors: new max sectors value to set for the device
- *
- *	Perform an LBA28 size set max upon the device in question. Return the
- *	actual LBA28 size or zero if the command fails.
- */
-
-static u64 ata_set_native_max_address(struct ata_device *dev, u64 new_sectors)
-{
-	unsigned int err;
-	struct ata_taskfile tf;
-
-	new_sectors--;
-
-	ata_tf_init(dev, &tf);
-
-	tf.command = ATA_CMD_SET_MAX;
 	tf.flags |= ATA_TFLAG_DEVICE | ATA_TFLAG_ISADDR;
+
+	if (lba48) {
+		tf.command = ATA_CMD_SET_MAX_EXT;
+		tf.flags |= ATA_TFLAG_LBA48;
+
+		tf.hob_lbal = (new_sectors >> 24) & 0xff;
+		tf.hob_lbam = (new_sectors >> 32) & 0xff;
+		tf.hob_lbah = (new_sectors >> 40) & 0xff;
+	} else
+		tf.command = ATA_CMD_SET_MAX;
+
 	tf.protocol |= ATA_PROT_NODATA;
+	tf.device |= ATA_LBA;
 
 	tf.lbal = (new_sectors >> 0) & 0xff;
 	tf.lbam = (new_sectors >> 8) & 0xff;
 	tf.lbah = (new_sectors >> 16) & 0xff;
-	tf.device |= ((new_sectors >> 24) & 0x0f) | 0x40;
 
-	err = ata_exec_internal(dev, &tf, NULL, DMA_NONE, NULL, 0);
-	if (err)
-		return 0;
+	err_mask = ata_exec_internal(dev, &tf, NULL, DMA_NONE, NULL, 0);
+	if (err_mask) {
+		ata_dev_printk(dev, KERN_WARNING, "failed to set "
+			       "max address (err_mask=0x%x)\n", err_mask);
+		if (err_mask == AC_ERR_DEV &&
+		    (tf.feature & (ATA_ABORTED | ATA_IDNF)))
+			return -EACCES;
+		return -EIO;
+	}
 
-	return ata_tf_to_lba(&tf);
+	return 0;
 }
 
 /**
@@ -995,60 +1005,93 @@ static u64 ata_set_native_max_address(struct ata_device *dev, u64 new_sectors)
  *	Read the size of an LBA28 or LBA48 disk with HPA features and resize
  *	it if required to the full size of the media. The caller must check
  *	the drive has the HPA feature set enabled.
+ *
+ *	RETURNS:
+ *	0 on success, -errno on failure.
  */
-
-static u64 ata_hpa_resize(struct ata_device *dev)
+static int ata_hpa_resize(struct ata_device *dev)
 {
-	u64 sectors = dev->n_sectors;
-	u64 hpa_sectors;
+	struct ata_eh_context *ehc = &dev->link->eh_context;
+	int print_info = ehc->i.flags & ATA_EHI_PRINTINFO;
+	u64 sectors = ata_id_n_sectors(dev->id);
+	u64 native_sectors;
+	int rc;
 
-	if (ata_id_has_lba48(dev->id))
-		hpa_sectors = ata_read_native_max_address_ext(dev);
-	else
-		hpa_sectors = ata_read_native_max_address(dev);
+	/* do we need to do it? */
+	if (dev->class != ATA_DEV_ATA ||
+	    !ata_id_has_lba(dev->id) || !ata_id_hpa_enabled(dev->id) ||
+	    (dev->horkage & ATA_HORKAGE_BROKEN_HPA))
+		return 0;
 
-	if (hpa_sectors > sectors) {
-		ata_dev_printk(dev, KERN_INFO,
-			"Host Protected Area detected:\n"
-			"\tcurrent size: %lld sectors\n"
-			"\tnative size: %lld sectors\n",
-			(long long)sectors, (long long)hpa_sectors);
+	/* read native max address */
+	rc = ata_read_native_max_address(dev, &native_sectors);
+	if (rc) {
+		/* If HPA isn't going to be unlocked, skip HPA
+		 * resizing from the next try.
+		 */
+		if (!ata_ignore_hpa) {
+			ata_dev_printk(dev, KERN_WARNING, "HPA support seems "
+				       "broken, will skip HPA handling\n");
+			dev->horkage |= ATA_HORKAGE_BROKEN_HPA;
 
-		if (ata_ignore_hpa) {
-			if (ata_id_has_lba48(dev->id))
-				hpa_sectors = ata_set_native_max_address_ext(dev, hpa_sectors);
-			else
-				hpa_sectors = ata_set_native_max_address(dev,
-								hpa_sectors);
-
-			if (hpa_sectors) {
-				ata_dev_printk(dev, KERN_INFO, "native size "
-					"increased to %lld sectors\n",
-					(long long)hpa_sectors);
-				return hpa_sectors;
-			}
+			/* we can continue if device aborted the command */
+			if (rc == -EACCES)
+				rc = 0;
 		}
-	} else if (hpa_sectors < sectors)
-		ata_dev_printk(dev, KERN_WARNING, "%s 1: hpa sectors (%lld) "
-			       "is smaller than sectors (%lld)\n", __FUNCTION__,
-			       (long long)hpa_sectors, (long long)sectors);
 
-	return sectors;
-}
-
-static u64 ata_id_n_sectors(const u16 *id)
-{
-	if (ata_id_has_lba(id)) {
-		if (ata_id_has_lba48(id))
-			return ata_id_u64(id, 100);
-		else
-			return ata_id_u32(id, 60);
-	} else {
-		if (ata_id_current_chs_valid(id))
-			return ata_id_u32(id, 57);
-		else
-			return id[1] * id[3] * id[6];
+		return rc;
 	}
+
+	/* nothing to do? */
+	if (native_sectors <= sectors || !ata_ignore_hpa) {
+		if (!print_info || native_sectors == sectors)
+			return 0;
+
+		if (native_sectors > sectors)
+			ata_dev_printk(dev, KERN_INFO,
+				"HPA detected: current %llu, native %llu\n",
+				(unsigned long long)sectors,
+				(unsigned long long)native_sectors);
+		else if (native_sectors < sectors)
+			ata_dev_printk(dev, KERN_WARNING,
+				"native sectors (%llu) is smaller than "
+				"sectors (%llu)\n",
+				(unsigned long long)native_sectors,
+				(unsigned long long)sectors);
+		return 0;
+	}
+
+	/* let's unlock HPA */
+	rc = ata_set_max_sectors(dev, native_sectors);
+	if (rc == -EACCES) {
+		/* if device aborted the command, skip HPA resizing */
+		ata_dev_printk(dev, KERN_WARNING, "device aborted resize "
+			       "(%llu -> %llu), skipping HPA handling\n",
+			       (unsigned long long)sectors,
+			       (unsigned long long)native_sectors);
+		dev->horkage |= ATA_HORKAGE_BROKEN_HPA;
+		return 0;
+	} else if (rc)
+		return rc;
+
+	/* re-read IDENTIFY data */
+	rc = ata_dev_reread_id(dev, 0);
+	if (rc) {
+		ata_dev_printk(dev, KERN_ERR, "failed to re-read IDENTIFY "
+			       "data after HPA resizing\n");
+		return rc;
+	}
+
+	if (print_info) {
+		u64 new_sectors = ata_id_n_sectors(dev->id);
+		ata_dev_printk(dev, KERN_INFO,
+			"HPA unlocked: %llu -> %llu, native %llu\n",
+			(unsigned long long)sectors,
+			(unsigned long long)new_sectors,
+			(unsigned long long)native_sectors);
+	}
+
+	return 0;
 }
 
 /**
@@ -1870,6 +1913,11 @@ int ata_dev_configure(struct ata_device *dev)
 	if (rc)
 		return rc;
 
+	/* massage HPA, do it early as it might change IDENTIFY data */
+	rc = ata_hpa_resize(dev);
+	if (rc)
+		return rc;
+
 	/* print device capabilities */
 	if (ata_msg_probe(ap))
 		ata_dev_printk(dev, KERN_DEBUG,
@@ -1936,10 +1984,6 @@ int ata_dev_configure(struct ata_device *dev)
 				    ata_id_has_flush_ext(id))
 					dev->flags |= ATA_DFLAG_FLUSH_EXT;
 			}
-
-			if (!(dev->horkage & ATA_HORKAGE_BROKEN_HPA) &&
-			    ata_id_has_hpa(id) && ata_id_hpa_enabled(dev->id))
-				dev->n_sectors = ata_hpa_resize(dev);
 
 			/* config NCQ */
 			ata_dev_config_ncq(dev, ncq_desc, sizeof(ncq_desc));
@@ -2830,14 +2874,26 @@ int ata_do_set_mode(struct ata_link *link, struct ata_device **r_failed_dev)
 	/* step 1: calculate xfer_mask */
 	ata_link_for_each_dev(dev, link) {
 		unsigned int pio_mask, dma_mask;
+		unsigned int mode_mask;
 
 		if (!ata_dev_enabled(dev))
 			continue;
 
+		mode_mask = ATA_DMA_MASK_ATA;
+		if (dev->class == ATA_DEV_ATAPI)
+			mode_mask = ATA_DMA_MASK_ATAPI;
+		else if (ata_id_is_cfa(dev->id))
+			mode_mask = ATA_DMA_MASK_CFA;
+
 		ata_dev_xfermask(dev);
 
 		pio_mask = ata_pack_xfermask(dev->pio_mask, 0, 0);
-		dma_mask = ata_pack_xfermask(0, dev->mwdma_mask, dev->udma_mask);
+
+		if ((ata_pata_dma & mode_mask) || ap->cbl == ATA_CBL_SATA)
+			dma_mask = ata_pack_xfermask(0, dev->mwdma_mask, dev->udma_mask);
+		else
+			dma_mask = 0;
+
 		dev->pio_mode = ata_xfer_mask2mode(pio_mask);
 		dev->dma_mode = ata_xfer_mask2mode(dma_mask);
 
@@ -3208,9 +3264,9 @@ void ata_bus_reset(struct ata_port *ap)
 	/*
 	 * determine by signature whether we have ATA or ATAPI devices
 	 */
-	device[0].class = ata_dev_try_classify(ap, 0, &err);
+	device[0].class = ata_dev_try_classify(&device[0], dev0, &err);
 	if ((slave_possible) && (err != 0x81))
-		device[1].class = ata_dev_try_classify(ap, 1, &err);
+		device[1].class = ata_dev_try_classify(&device[1], dev1, &err);
 
 	/* is double-select really necessary? */
 	if (device[1].class != ATA_DEV_NONE)
@@ -3465,9 +3521,11 @@ int ata_std_softreset(struct ata_link *link, unsigned int *classes,
 	}
 
 	/* determine by signature whether we have ATA or ATAPI devices */
-	classes[0] = ata_dev_try_classify(ap, 0, &err);
+	classes[0] = ata_dev_try_classify(&link->device[0],
+					  devmask & (1 << 0), &err);
 	if (slave_possible && err != 0x81)
-		classes[1] = ata_dev_try_classify(ap, 1, &err);
+		classes[1] = ata_dev_try_classify(&link->device[1],
+						  devmask & (1 << 1), &err);
 
  out:
 	DPRINTK("EXIT, classes[0]=%u [1]=%u\n", classes[0], classes[1]);
@@ -3596,7 +3654,7 @@ int sata_std_hardreset(struct ata_link *link, unsigned int *class,
 
 	ap->ops->dev_select(ap, 0);	/* probably unnecessary */
 
-	*class = ata_dev_try_classify(ap, 0, NULL);
+	*class = ata_dev_try_classify(link->device, 1, NULL);
 
 	DPRINTK("EXIT, class=%u\n", *class);
 	return 0;
@@ -3773,12 +3831,17 @@ int ata_dev_revalidate(struct ata_device *dev, unsigned int new_class,
 		goto fail;
 
 	/* verify n_sectors hasn't changed */
-	if (dev->class == ATA_DEV_ATA && dev->n_sectors != n_sectors) {
+	if (dev->class == ATA_DEV_ATA && n_sectors &&
+	    dev->n_sectors != n_sectors) {
 		ata_dev_printk(dev, KERN_INFO, "n_sectors mismatch "
 			       "%llu != %llu\n",
 			       (unsigned long long)n_sectors,
 			       (unsigned long long)dev->n_sectors);
 		rc = -ENODEV;
+
+		/* restore original n_sectors */
+		dev->n_sectors = n_sectors;
+
 		goto fail;
 	}
 
@@ -3864,9 +3927,15 @@ static const struct ata_blacklist_entry ata_device_blacklist [] = {
 	{ "WDC WD740ADFD-00NLR1", NULL,		ATA_HORKAGE_NONCQ, },
 	{ "FUJITSU MHV2080BH",	"00840028",	ATA_HORKAGE_NONCQ, },
 	{ "ST9160821AS",	"3.CLF",	ATA_HORKAGE_NONCQ, },
-	{ "HDS724040KLSA80",	"KFAOA20N",	ATA_HORKAGE_BROKEN_HPA, },
+	{ "SAMSUNG HD401LJ",	"ZZ100-15",	ATA_HORKAGE_NONCQ, },
+	{ "ST3160812AS",	"3.ADJ",	ATA_HORKAGE_NONCQ, },
+	{ "ST980813AS",		"3.ADB",	ATA_HORKAGE_NONCQ, },
 
-	/* Devices with NCQ limits */
+	/* devices which puke on READ_NATIVE_MAX */
+	{ "HDS724040KLSA80",	"KFAOA20N",	ATA_HORKAGE_BROKEN_HPA, },
+	{ "WDC WD3200JD-00KLB0", "WD-WCAMR1130137", ATA_HORKAGE_BROKEN_HPA },
+	{ "WDC WD2500JD-00HBB0", "WD-WMAL71490727", ATA_HORKAGE_BROKEN_HPA },
+	{ "MAXTOR 6L080L4",	"A93.0500",	ATA_HORKAGE_BROKEN_HPA },
 
 	/* End Marker */
 	{ }
@@ -6168,6 +6237,7 @@ void ata_dev_init(struct ata_device *dev)
 	 */
 	spin_lock_irqsave(ap->lock, flags);
 	dev->flags &= ~ATA_DFLAG_INIT_MASK;
+	dev->horkage = 0;
 	spin_unlock_irqrestore(ap->lock, flags);
 
 	memset((void *)dev + ATA_DEVICE_CLEAR_OFFSET, 0,
