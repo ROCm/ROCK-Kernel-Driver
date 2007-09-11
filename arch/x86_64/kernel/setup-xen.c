@@ -534,6 +534,10 @@ void __init setup_arch(char **cmdline_p)
 				virt_to_mfn(pfn_to_mfn_frame_list_list);
 		}
 
+		/* Mark all ISA DMA channels in-use - using them wouldn't work. */
+		for (i = 0; i < MAX_DMA_CHANNELS; ++i)
+			if (i != 4 && request_dma(i, "xen") != 0)
+				BUG();
 	}
 
 #ifdef CONFIG_ACPI

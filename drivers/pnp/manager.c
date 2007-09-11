@@ -168,7 +168,7 @@ static int pnp_assign_irq(struct pnp_dev * dev, struct pnp_irq *rule, int idx)
 	return 0;
 }
 
-static int pnp_assign_dma(struct pnp_dev *dev, struct pnp_dma *rule, int idx)
+static void pnp_assign_dma(struct pnp_dev *dev, struct pnp_dma *rule, int idx)
 {
 	resource_size_t *start, *end;
 	unsigned long *flags;
@@ -179,18 +179,14 @@ static int pnp_assign_dma(struct pnp_dev *dev, struct pnp_dma *rule, int idx)
 		1, 3, 5, 6, 7, 0, 2, 4
 	};
 
-	if (!dev || !rule)
-		return -EINVAL;
-
 	if (idx >= PNP_MAX_DMA) {
 		pnp_err("More than 2 dmas is incompatible with pnp specifications.");
-		/* pretend we were successful so at least the manager won't try again */
-		return 1;
+		return;
 	}
 
 	/* check if this resource has been manually set, if so skip */
 	if (!(dev->res.dma_resource[idx].flags & IORESOURCE_AUTO))
-		return 1;
+		return;
 
 	start = &dev->res.dma_resource[idx].start;
 	end = &dev->res.dma_resource[idx].end;
@@ -200,19 +196,17 @@ static int pnp_assign_dma(struct pnp_dev *dev, struct pnp_dma *rule, int idx)
 	*flags |= rule->flags | IORESOURCE_DMA;
 	*flags &=  ~IORESOURCE_UNSET;
 
-	if (!rule->map) {
-		*flags |= IORESOURCE_DISABLED;
-		return 1; /* skip disabled resource requests */
-	}
-
 	for (i = 0; i < 8; i++) {
 		if(rule->map & (1<<xtab[i])) {
 			*start = *end = xtab[i];
 			if(pnp_check_dma(dev, idx))
-				return 1;
+				return;
 		}
 	}
-	return 0;
+#ifdef MAX_DMA_CHANNELS
+	*start = *end = MAX_DMA_CHANNELS;
+#endif
+	*flags |= IORESOURCE_UNSET | IORESOURCE_DISABLED;
 }
 
 /**
@@ -331,8 +325,7 @@ static int pnp_assign_resources(struct pnp_dev *dev, int depnum)
 			irq = irq->next;
 		}
 		while (dma) {
-			if (!pnp_assign_dma(dev, dma, ndma))
-				goto fail;
+			pnp_assign_dma(dev, dma, ndma);
 			ndma++;
 			dma = dma->next;
 		}
@@ -367,8 +360,7 @@ static int pnp_assign_resources(struct pnp_dev *dev, int depnum)
 			irq = irq->next;
 		}
 		while (dma) {
-			if (!pnp_assign_dma(dev, dma, ndma))
-				goto fail;
+			pnp_assign_dma(dev, dma, ndma);
 			ndma++;
 			dma = dma->next;
 		}

@@ -69,7 +69,7 @@ pci-dma-y			+= ../../i386/kernel/pci-dma-xen.o
 microcode-$(subst m,y,$(CONFIG_MICROCODE))  := ../../i386/kernel/microcode-xen.o
 quirks-y			:= ../../i386/kernel/quirks-xen.o
 
-n-obj-xen := early-quirks.o genapic_flat.o i8237.o i8259.o perfctr-watchdog.o \
+n-obj-xen := early-quirks.o genapic_flat.o i8259.o perfctr-watchdog.o \
 	reboot.o smpboot.o trampoline.o tsc.o tsc_sync.o
 
 include $(srctree)/scripts/Makefile.xen
