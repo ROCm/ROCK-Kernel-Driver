@@ -326,8 +326,10 @@ static int aa_audit_base(struct aa_profile *profile, struct aa_audit *sa,
 		return type == AUDIT_APPARMOR_ALLOWED ? 0 : -ENOMEM;
 	}
 
+	audit_log_format(ab, " type=%d", type);
+
 	if (sa->operation)
-		audit_log_format(ab, "operation=\"%s\"", sa->operation);
+		audit_log_format(ab, " operation=\"%s\"", sa->operation);
 
 	if (sa->info)
 		audit_log_format(ab, " info=\"%s\"", sa->info);
