@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel PRO/1000 Linux driver
-  Copyright(c) 1999 - 2006 Intel Corporation.
+  Copyright(c) 1999 - 2007 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -32,43 +32,9 @@
 #ifndef _E1000_H_
 #define _E1000_H_
 
-#include <linux/stddef.h>
-#include <linux/module.h>
-#include <linux/types.h>
-#include <asm/byteorder.h>
-#include <linux/init.h>
-#include <linux/mm.h>
-#include <linux/errno.h>
-#include <linux/ioport.h>
-#include <linux/pci.h>
-#include <linux/kernel.h>
-#include <linux/netdevice.h>
-#include <linux/etherdevice.h>
-#include <linux/skbuff.h>
-#include <linux/delay.h>
-#include <linux/timer.h>
-#include <linux/slab.h>
-#include <linux/vmalloc.h>
-#include <linux/interrupt.h>
-#include <linux/string.h>
-#include <linux/pagemap.h>
-#include <linux/dma-mapping.h>
-#include <linux/bitops.h>
-#include <asm/io.h>
-#include <asm/irq.h>
-#include <linux/capability.h>
-#include <linux/in.h>
-#include <linux/ip.h>
-#include <linux/ipv6.h>
-#include <linux/tcp.h>
-#include <linux/udp.h>
-#include <net/pkt_sched.h>
-#include <linux/list.h>
-#include <linux/reboot.h>
-#include <net/checksum.h>
-#include <linux/mii.h>
-#include <linux/ethtool.h>
-#include <linux/if_vlan.h>
+#include "kcompat.h"
+
+#include "e1000_api.h"
 
 #define BAR_0		0
 #define BAR_1		1
@@ -79,13 +45,7 @@
 
 struct e1000_adapter;
 
-#include "e1000_hw.h"
-
-#ifdef DBG
-#define E1000_DBG(args...) printk(KERN_DEBUG "e1000: " args)
-#else
 #define E1000_DBG(args...)
-#endif
 
 #define E1000_ERR(args...) printk(KERN_ERR "e1000: " args)
 
@@ -107,6 +67,10 @@ struct e1000_adapter;
 #define E1000_MAX_RXD                      256
 #define E1000_MIN_RXD                       80
 #define E1000_MAX_82544_RXD               4096
+
+#ifdef CONFIG_E1000_MQ
+#define E1000_MAX_TX_QUEUES                  4
+#endif
 
 /* this is the size past which hardware will drop packets when setting LPE=0 */
 #define MAXIMUM_ETHERNET_VLAN_SIZE 1522
@@ -130,9 +94,8 @@ struct e1000_adapter;
 #define E1000_TX_HEAD_ADDR_SHIFT 7
 #define E1000_PBA_TX_MASK 0xFFFF0000
 
-/* Flow Control Watermarks */
-#define E1000_FC_HIGH_DIFF 0x1638  /* High: 5688 bytes below Rx FIFO size */
-#define E1000_FC_LOW_DIFF 0x1640   /* Low:  5696 bytes below Rx FIFO size */
+/* Early Receive defines */
+#define E1000_ERT_2048 0x100
 
 #define E1000_FC_PAUSE_TIME 0x0680 /* 858 usec */
 
@@ -143,7 +106,6 @@ struct e1000_adapter;
 
 #define AUTO_ALL_MODES            0
 #define E1000_EEPROM_82544_APM    0x0004
-#define E1000_EEPROM_ICH8_APME    0x0004
 #define E1000_EEPROM_APME         0x0400
 
 #ifndef E1000_MASTER_SLAVE
@@ -151,9 +113,14 @@ struct e1000_adapter;
 #define E1000_MASTER_SLAVE	e1000_ms_hw_default
 #endif
 
+#ifdef NETIF_F_HW_VLAN_TX
 #define E1000_MNG_VLAN_NONE -1
+#endif
 /* Number of packet split data buffers (not including the header buffer) */
 #define PS_PAGE_BUFFERS MAX_PS_BUFFERS-1
+
+/* only works for sizes that are powers of 2 */
+#define E1000_ROUNDUP(i, size) ((i) = (((i) + (size) - 1) & ~((size) - 1)))
 
 /* wrapper around a pointer to a socket buffer,
  * so a DMA handle can be stored along with the buffer */
@@ -161,13 +128,25 @@ struct e1000_buffer {
 	struct sk_buff *skb;
 	dma_addr_t dma;
 	unsigned long time_stamp;
-	uint16_t length;
-	uint16_t next_to_watch;
+	u16 length;
+	u16 next_to_watch;
 };
 
+struct e1000_rx_buffer {
+	struct sk_buff *skb;
+	dma_addr_t dma;
+	struct page *page;
+};
+	
+#ifdef CONFIG_E1000_MQ
+struct e1000_queue_stats {
+	u64 packets;
+	u64 bytes;
+};
+#endif
 
 struct e1000_ps_page { struct page *ps_page[PS_PAGE_BUFFERS]; };
-struct e1000_ps_page_dma { uint64_t ps_page_dma[PS_PAGE_BUFFERS]; };
+struct e1000_ps_page_dma { u64 ps_page_dma[PS_PAGE_BUFFERS]; };
 
 struct e1000_tx_ring {
 	/* pointer to the descriptor ring memory */
@@ -185,9 +164,16 @@ struct e1000_tx_ring {
 	/* array of buffer information structs */
 	struct e1000_buffer *buffer_info;
 
+#ifdef CONFIG_E1000_MQ
+	/* for tx ring cleanup - needed for multiqueue */
+	spinlock_t tx_queue_lock;
+#endif
 	spinlock_t tx_lock;
-	uint16_t tdh;
-	uint16_t tdt;
+	u16 tdh;
+	u16 tdt;
+#ifdef CONFIG_E1000_MQ
+	struct e1000_queue_stats tx_stats;
+#endif
 	boolean_t last_tx_tso;
 };
 
@@ -205,16 +191,20 @@ struct e1000_rx_ring {
 	/* next descriptor to check for DD status bit */
 	unsigned int next_to_clean;
 	/* array of buffer information structs */
-	struct e1000_buffer *buffer_info;
+	struct e1000_rx_buffer *buffer_info;
 	/* arrays of page information for packet split */
 	struct e1000_ps_page *ps_page;
 	struct e1000_ps_page_dma *ps_page_dma;
+	struct sk_buff *rx_skb_top;
 
 	/* cpu for rx queue */
 	int cpu;
 
-	uint16_t rdh;
-	uint16_t rdt;
+	u16 rdh;
+	u16 rdt;
+#ifdef CONFIG_E1000_MQ
+	struct e1000_queue_stats rx_stats;
+#endif
 };
 
 #define E1000_DESC_UNUSED(R) \
@@ -236,15 +226,17 @@ struct e1000_adapter {
 	struct timer_list tx_fifo_stall_timer;
 	struct timer_list watchdog_timer;
 	struct timer_list phy_info_timer;
+#ifdef NETIF_F_HW_VLAN_TX
 	struct vlan_group *vlgrp;
-	uint16_t mng_vlan_id;
-	uint32_t bd_number;
-	uint32_t rx_buffer_len;
-	uint32_t wol;
-	uint32_t smartspeed;
-	uint32_t en_mng_pt;
-	uint16_t link_speed;
-	uint16_t link_duplex;
+	u16 mng_vlan_id;
+#endif
+	u32 bd_number;
+	u32 rx_buffer_len;
+	u32 wol;
+	u32 smartspeed;
+	u32 en_mng_pt;
+	u16 link_speed;
+	u16 link_duplex;
 	spinlock_t stats_lock;
 #ifdef CONFIG_E1000_NAPI
 	spinlock_t tx_queue_lock;
@@ -255,33 +247,39 @@ struct e1000_adapter {
 	unsigned int total_rx_bytes;
 	unsigned int total_rx_packets;
 	/* Interrupt Throttle Rate */
-	uint32_t itr;
-	uint32_t itr_setting;
-	uint16_t tx_itr;
-	uint16_t rx_itr;
+	u32 itr;
+	u32 itr_setting;
+	u16 tx_itr;
+	u16 rx_itr;
 
 	struct work_struct reset_task;
-	uint8_t fc_autoneg;
+	struct work_struct watchdog_task;
+	u8 fc_autoneg;
 
+#ifdef ETHTOOL_PHYS_ID
 	struct timer_list blink_timer;
 	unsigned long led_status;
+#endif
 
 	/* TX */
 	struct e1000_tx_ring *tx_ring;      /* One per active queue */
+#ifdef CONFIG_E1000_MQ
+	struct e1000_tx_ring **cpu_tx_ring; /* per-cpu */
+#endif
 	unsigned int restart_queue;
 	unsigned long tx_queue_len;
-	uint32_t txd_cmd;
-	uint32_t tx_int_delay;
-	uint32_t tx_abs_int_delay;
-	uint32_t gotcl;
-	uint64_t gotcl_old;
-	uint64_t tpt_old;
-	uint64_t colc_old;
-	uint32_t tx_timeout_count;
-	uint32_t tx_fifo_head;
-	uint32_t tx_head_addr;
-	uint32_t tx_fifo_size;
-	uint8_t  tx_timeout_factor;
+	u32 txd_cmd;
+	u32 tx_int_delay;
+	u32 tx_abs_int_delay;
+	u32 gotcl;
+	u64 gotcl_old;
+	u64 tpt_old;
+	u64 colc_old;
+	u32 tx_timeout_count;
+	u32 tx_fifo_head;
+	u32 tx_head_addr;
+	u32 tx_fifo_size;
+	u8 tx_timeout_factor;
 	atomic_t tx_fifo_stall;
 	boolean_t pcix_82544;
 	boolean_t detect_tx_hung;
@@ -305,17 +303,17 @@ struct e1000_adapter {
 	int num_tx_queues;
 	int num_rx_queues;
 
-	uint64_t hw_csum_err;
-	uint64_t hw_csum_good;
-	uint64_t rx_hdr_split;
-	uint32_t alloc_rx_buff_failed;
-	uint32_t rx_int_delay;
-	uint32_t rx_abs_int_delay;
+	u64 hw_csum_err;
+	u64 hw_csum_good;
+	u64 rx_hdr_split;
+	u32 alloc_rx_buff_failed;
+	u32 rx_int_delay;
+	u32 rx_abs_int_delay;
 	boolean_t rx_csum;
 	unsigned int rx_ps_pages;
-	uint32_t gorcl;
-	uint64_t gorcl_old;
-	uint16_t rx_ps_bsize0;
+	u32 gorcl;
+	u64 gorcl_old;
+	u16 rx_ps_bsize0;
 
 
 	/* OS defined structs */
@@ -329,19 +327,39 @@ struct e1000_adapter {
 	struct e1000_phy_info phy_info;
 	struct e1000_phy_stats phy_stats;
 
-	uint32_t test_icr;
+#ifdef ETHTOOL_TEST
+	u32 test_icr;
 	struct e1000_tx_ring test_tx_ring;
 	struct e1000_rx_ring test_rx_ring;
+#endif
+
 
 	int msg_enable;
-	boolean_t have_msi;
-
 	/* to not mess up cache alignment, always add to the bottom */
-	boolean_t tso_force;
-	boolean_t smart_power_down;	/* phy smart power down */
-	boolean_t quad_port_a;
-	unsigned long flags;
-	uint32_t eeprom_wol;
+	unsigned long state;
+	u32 eeprom_wol;
+
+	u32 *config_space;
+
+	/* hardware capability, feature, and workaround flags */
+	struct {
+		unsigned int has_smbus:1;
+		unsigned int has_manc2h:1;
+#ifdef CONFIG_PCI_MSI
+		unsigned int has_msi:1;
+		unsigned int msi_enabled:1;
+#endif
+		unsigned int has_intr_moderation:1;
+		unsigned int rx_needs_restart:1;
+		unsigned int bad_tx_carrier_stats_fd:1;
+		unsigned int int_assert_auto_mask:1;
+		unsigned int quad_port_a:1;
+		unsigned int smart_power_down:1;
+#ifdef NETIF_F_TSO
+		unsigned int tso_force:1;
+#endif
+	} flags;
+
 };
 
 enum e1000_state_t {
@@ -349,5 +367,4 @@ enum e1000_state_t {
 	__E1000_RESETTING,
 	__E1000_DOWN
 };
-
 #endif /* _E1000_H_ */
