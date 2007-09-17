@@ -74,6 +74,8 @@ struct e1000_hw;
 #define E1000_DEV_ID_82571EB_COPPER           0x105E
 #define E1000_DEV_ID_82571EB_FIBER            0x105F
 #define E1000_DEV_ID_82571EB_SERDES           0x1060
+#define E1000_DEV_ID_82571EB_SERDES_DUAL      0x10D9
+#define E1000_DEV_ID_82571EB_SERDES_QUAD      0x10DA
 #define E1000_DEV_ID_82571EB_QUAD_COPPER      0x10A4
 #define E1000_DEV_ID_82571EB_QUAD_FIBER       0x10A5
 #define E1000_DEV_ID_82571EB_QUAD_COPPER_LP   0x10BC
@@ -363,7 +365,7 @@ struct e1000_data_desc {
 		struct {
 			u8 status;     /* Descriptor status */
 			u8 popts;      /* Packet Options */
-			u16 special;   /* */
+			u16 special;
 		} fields;
 	} upper;
 };
@@ -514,6 +516,7 @@ struct e1000_functions {
 	void      (*mta_set)(struct e1000_hw *, u32);
 	void      (*config_collision_dist)(struct e1000_hw*);
 	void      (*rar_set)(struct e1000_hw*, u8*, u32);
+	s32       (*read_mac_addr)(struct e1000_hw*);
 	s32       (*validate_mdi_setting)(struct e1000_hw*);
 	s32       (*mng_host_if_write)(struct e1000_hw*, u8*, u16, u16, u8*);
 	s32       (*mng_write_cmd_header)(struct e1000_hw *hw,

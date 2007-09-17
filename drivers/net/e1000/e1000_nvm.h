@@ -29,8 +29,6 @@
 #ifndef _E1000_NVM_H_
 #define _E1000_NVM_H_
 
-#include "e1000_api.h"
-
 s32  e1000_acquire_nvm_generic(struct e1000_hw *hw);
 
 s32  e1000_poll_eerd_eewr_done(struct e1000_hw *hw, int ee_reg);

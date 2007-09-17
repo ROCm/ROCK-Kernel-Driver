@@ -233,9 +233,8 @@ struct e1000_option {
 	} arg;
 };
 
-static int __devinit
-e1000_validate_option(int *value, struct e1000_option *opt,
-		struct e1000_adapter *adapter)
+static int __devinit e1000_validate_option(int *value, struct e1000_option *opt,
+                                           struct e1000_adapter *adapter)
 {
 	if (*value == OPTION_UNSET) {
 		*value = opt->def;
@@ -296,9 +295,7 @@ static void e1000_check_copper_options(struct e1000_adapter *adapter);
  * value exists, a default value is used.  The final value is stored
  * in a variable in the adapter structure.
  **/
-
-void __devinit
-e1000_check_options(struct e1000_adapter *adapter)
+void __devinit e1000_check_options(struct e1000_adapter *adapter)
 {
 	struct e1000_hw *hw = &adapter->hw;
 	int bd = adapter->bd_number;
@@ -330,8 +327,8 @@ e1000_check_options(struct e1000_adapter *adapter)
 #endif
 			tx_ring->count = TxDescriptors[bd];
 			e1000_validate_option(&tx_ring->count, &opt, adapter);
-			E1000_ROUNDUP(tx_ring->count,
-						REQ_TX_DESCRIPTOR_MULTIPLE);
+			tx_ring->count = ALIGN(tx_ring->count,
+			                       REQ_TX_DESCRIPTOR_MULTIPLE);
 #ifdef module_param_array
 		} else {
 			tx_ring->count = opt.def;
@@ -359,8 +356,8 @@ e1000_check_options(struct e1000_adapter *adapter)
 #endif
 			rx_ring->count = RxDescriptors[bd];
 			e1000_validate_option(&rx_ring->count, &opt, adapter);
-			E1000_ROUNDUP(rx_ring->count,
-						REQ_RX_DESCRIPTOR_MULTIPLE);
+			rx_ring->count = ALIGN(rx_ring->count,
+			                       REQ_RX_DESCRIPTOR_MULTIPLE);
 #ifdef module_param_array
 		} else {
 			rx_ring->count = opt.def;
@@ -628,9 +625,7 @@ e1000_check_options(struct e1000_adapter *adapter)
  *
  * Handles speed and duplex options on fiber adapters
  **/
-
-static void __devinit
-e1000_check_fiber_options(struct e1000_adapter *adapter)
+static void __devinit e1000_check_fiber_options(struct e1000_adapter *adapter)
 {
 	int bd = adapter->bd_number;
 #ifndef module_param_array
@@ -669,9 +664,7 @@ e1000_check_fiber_options(struct e1000_adapter *adapter)
  *
  * Handles speed and duplex options on copper adapters
  **/
-
-static void __devinit
-e1000_check_copper_options(struct e1000_adapter *adapter)
+static void __devinit e1000_check_copper_options(struct e1000_adapter *adapter)
 {
 	struct e1000_hw *hw = &adapter->hw;
 	int speed, dplx, an;

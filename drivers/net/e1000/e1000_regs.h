@@ -97,13 +97,13 @@
 #define E1000_RXDCTL   0x02828  /* RX Descriptor Control queue 0 - RW */
 #define E1000_RXDCTL1  0x02928  /* RX Descriptor Control queue 1 - RW */
 #define E1000_RADV     0x0282C  /* RX Interrupt Absolute Delay Timer - RW */
-/* Convenience macros
+/*
+ * Convenience macros
  *
  * Note: "_n" is the queue number of the register to be written to.
  *
  * Example usage:
  * E1000_RDBAL_REG(current_rx_queue)
- *
  */
 #define E1000_RDBAL_REG(_n)   (E1000_RDBAL + (_n << 8))
 #define E1000_RDBAH_REG(_n)   (E1000_RDBAH + (_n << 8))

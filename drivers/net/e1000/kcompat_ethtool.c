@@ -953,7 +953,7 @@ int _kc_mii_ethtool_gset(struct mii_if_info *mii, struct ethtool_cmd *ecmd)
 	if (bmcr & BMCR_ANENABLE) {
 		ecmd->advertising |= ADVERTISED_Autoneg;
 		ecmd->autoneg = AUTONEG_ENABLE;
-		
+
 		nego = mii_nway_result(advert & lpa);
 		if (nego == LPA_100FULL || nego == LPA_100HALF)
 			ecmd->speed = SPEED_100;
@@ -994,9 +994,9 @@ int _kc_mii_ethtool_sset(struct mii_if_info *mii, struct ethtool_cmd *ecmd)
 		return -EINVAL;
 	if (ecmd->autoneg != AUTONEG_DISABLE && ecmd->autoneg != AUTONEG_ENABLE)
 		return -EINVAL;
-				  
+
 	/* ignore supported, maxtxpkt, maxrxpkt */
-	
+
 	if (ecmd->autoneg == AUTONEG_ENABLE) {
 		u32 bmcr, advert, tmp;
 
@@ -1021,7 +1021,7 @@ int _kc_mii_ethtool_sset(struct mii_if_info *mii, struct ethtool_cmd *ecmd)
 			mii->mdio_write(dev, mii->phy_id, MII_ADVERTISE, tmp);
 			mii->advertising = tmp;
 		}
-		
+
 		/* turn on autonegotiation, and force a renegotiate */
 		bmcr = mii->mdio_read(dev, mii->phy_id, MII_BMCR);
 		bmcr |= (BMCR_ANENABLE | BMCR_ANRESTART);

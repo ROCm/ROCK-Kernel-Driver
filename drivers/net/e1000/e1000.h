@@ -119,9 +119,6 @@ struct e1000_adapter;
 /* Number of packet split data buffers (not including the header buffer) */
 #define PS_PAGE_BUFFERS MAX_PS_BUFFERS-1
 
-/* only works for sizes that are powers of 2 */
-#define E1000_ROUNDUP(i, size) ((i) = (((i) + (size) - 1) & ~((size) - 1)))
-
 /* wrapper around a pointer to a socket buffer,
  * so a DMA handle can be stored along with the buffer */
 struct e1000_buffer {
@@ -137,7 +134,7 @@ struct e1000_rx_buffer {
 	dma_addr_t dma;
 	struct page *page;
 };
-	
+
 #ifdef CONFIG_E1000_MQ
 struct e1000_queue_stats {
 	u64 packets;
@@ -356,6 +353,10 @@ struct e1000_adapter {
 		unsigned int quad_port_a:1;
 		unsigned int smart_power_down:1;
 #ifdef NETIF_F_TSO
+		unsigned int has_tso:1;
+#ifdef NETIF_F_TSO6
+		unsigned int has_tso6:1;
+#endif
 		unsigned int tso_force:1;
 #endif
 	} flags;

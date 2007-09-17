@@ -29,8 +29,6 @@
 #ifndef _E1000_82541_H_
 #define _E1000_82541_H_
 
-#include "e1000_api.h"
-
 #define NVM_WORD_SIZE_BASE_SHIFT_82541 (NVM_WORD_SIZE_BASE_SHIFT + 1)
 
 #define IGP01E1000_PHY_CHANNEL_NUM                    4

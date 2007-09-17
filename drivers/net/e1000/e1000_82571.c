@@ -31,6 +31,7 @@
  * e1000_82573
  */
 
+#include "e1000_api.h"
 #include "e1000_82571.h"
 
 void e1000_init_function_pointers_82571(struct e1000_hw *hw);
@@ -65,6 +66,7 @@ static void e1000_put_hw_semaphore_82571(struct e1000_hw *hw);
 static void e1000_initialize_hw_bits_82571(struct e1000_hw *hw);
 static s32  e1000_write_nvm_eewr_82571(struct e1000_hw *hw, u16 offset,
                                        u16 words, u16 *data);
+static s32  e1000_read_mac_addr_82571(struct e1000_hw *hw);
 
 struct e1000_dev_spec_82571 {
 	boolean_t laa_is_present;
@@ -76,8 +78,7 @@ struct e1000_dev_spec_82571 {
  *
  *  This is a function pointer entry point called by the api module.
  **/
-static s32
-e1000_init_phy_params_82571(struct e1000_hw *hw)
+static s32 e1000_init_phy_params_82571(struct e1000_hw *hw)
 {
 	struct e1000_phy_info *phy = &hw->phy;
 	struct e1000_functions *func = &hw->func;
@@ -163,8 +164,7 @@ out:
  *
  *  This is a function pointer entry point called by the api module.
  **/
-static s32
-e1000_init_nvm_params_82571(struct e1000_hw *hw)
+static s32 e1000_init_nvm_params_82571(struct e1000_hw *hw)
 {
 	struct e1000_nvm_info *nvm = &hw->nvm;
 	struct e1000_functions *func = &hw->func;
@@ -195,7 +195,8 @@ e1000_init_nvm_params_82571(struct e1000_hw *hw)
 		if (((eecd >> 15) & 0x3) == 0x3) {
 			nvm->type = e1000_nvm_flash_hw;
 			nvm->word_size = 2048;
-			/* Autonomous Flash update bit must be cleared due
+			/*
+			 * Autonomous Flash update bit must be cleared due
 			 * to Flash update issue.
 			 */
 			eecd &= ~E1000_EECD_AUPDEN;
@@ -207,7 +208,8 @@ e1000_init_nvm_params_82571(struct e1000_hw *hw)
 		nvm->type	= e1000_nvm_eeprom_spi;
 		size = (u16)((eecd & E1000_EECD_SIZE_EX_MASK) >>
 		                  E1000_EECD_SIZE_EX_SHIFT);
-		/* Added to a constant, "size" becomes the left-shift value
+		/*
+		 * Added to a constant, "size" becomes the left-shift value
 		 * for setting word_size.
 		 */
 		size += NVM_WORD_SIZE_BASE_SHIFT;
@@ -235,8 +237,7 @@ e1000_init_nvm_params_82571(struct e1000_hw *hw)
  *
  *  This is a function pointer entry point called by the api module.
  **/
-static s32
-e1000_init_mac_params_82571(struct e1000_hw *hw)
+static s32 e1000_init_mac_params_82571(struct e1000_hw *hw)
 {
 	struct e1000_mac_info *mac = &hw->mac;
 	struct e1000_functions *func = &hw->func;
@@ -252,6 +253,8 @@ e1000_init_mac_params_82571(struct e1000_hw *hw)
 		hw->media_type = e1000_media_type_fiber;
 		break;
 	case E1000_DEV_ID_82571EB_SERDES:
+	case E1000_DEV_ID_82571EB_SERDES_DUAL:
+	case E1000_DEV_ID_82571EB_SERDES_QUAD:
 	case E1000_DEV_ID_82572EI_SERDES:
 		hw->media_type = e1000_media_type_internal_serdes;
 		break;
@@ -312,6 +315,8 @@ e1000_init_mac_params_82571(struct e1000_hw *hw)
 	func->clear_vfta = e1000_clear_vfta_82571;
 	/* setting MTA */
 	func->mta_set = e1000_mta_set_generic;
+	/* read mac address */
+	func->read_mac_addr = e1000_read_mac_addr_82571;
 	/* blink LED */
 	func->blink_led = e1000_blink_led_generic;
 	/* setup LED */
@@ -347,8 +352,7 @@ out:
  *  The only function explicitly called by the api module to initialize
  *  all function pointers and parameters.
  **/
-void
-e1000_init_function_pointers_82571(struct e1000_hw *hw)
+void e1000_init_function_pointers_82571(struct e1000_hw *hw)
 {
 	DEBUGFUNC("e1000_init_function_pointers_82571");
 
@@ -364,8 +368,7 @@ e1000_init_function_pointers_82571(struct e1000_hw *hw)
  *  Reads the PHY registers and stores the PHY ID and possibly the PHY
  *  revision in the hardware structure.
  **/
-static s32
-e1000_get_phy_id_82571(struct e1000_hw *hw)
+static s32 e1000_get_phy_id_82571(struct e1000_hw *hw)
 {
 	struct e1000_phy_info *phy = &hw->phy;
 	s32 ret_val = E1000_SUCCESS;
@@ -375,10 +378,12 @@ e1000_get_phy_id_82571(struct e1000_hw *hw)
 	switch (hw->mac.type) {
 	case e1000_82571:
 	case e1000_82572:
-		/* The 82571 firmware may still be configuring the PHY.
+		/*
+		 * The 82571 firmware may still be configuring the PHY.
 		 * In this case, we cannot access the PHY until the
 		 * configuration is done.  So we explicitly set the
-		 * PHY ID. */
+		 * PHY ID.
+		 */
 		phy->id = IGP01E1000_I_PHY_ID;
 		break;
 	case e1000_82573:
@@ -398,8 +403,7 @@ e1000_get_phy_id_82571(struct e1000_hw *hw)
  *
  *  Acquire the HW semaphore to access the PHY or NVM
  **/
-s32
-e1000_get_hw_semaphore_82571(struct e1000_hw *hw)
+s32 e1000_get_hw_semaphore_82571(struct e1000_hw *hw)
 {
 	u32 swsm;
 	s32 ret_val = E1000_SUCCESS;
@@ -438,8 +442,7 @@ out:
  *
  *  Release hardware semaphore used to access the PHY or NVM
  **/
-void
-e1000_put_hw_semaphore_82571(struct e1000_hw *hw)
+void e1000_put_hw_semaphore_82571(struct e1000_hw *hw)
 {
 	u32 swsm;
 
@@ -461,8 +464,7 @@ e1000_put_hw_semaphore_82571(struct e1000_hw *hw)
  *  for EEPROM access grant bit.  If the access grant bit is not set, release
  *  hardware semaphore.
  **/
-static s32
-e1000_acquire_nvm_82571(struct e1000_hw *hw)
+static s32 e1000_acquire_nvm_82571(struct e1000_hw *hw)
 {
 	s32 ret_val;
 
@@ -488,8 +490,7 @@ out:
  *
  *  Stop any current commands to the EEPROM and clear the EEPROM request bit.
  **/
-static void
-e1000_release_nvm_82571(struct e1000_hw *hw)
+static void e1000_release_nvm_82571(struct e1000_hw *hw)
 {
 	DEBUGFUNC("e1000_release_nvm_82571");
 
@@ -509,8 +510,8 @@ e1000_release_nvm_82571(struct e1000_hw *hw)
  *  If e1000_update_nvm_checksum is not called after this function, the
  *  EEPROM will most likley contain an invalid checksum.
  **/
-static s32
-e1000_write_nvm_82571(struct e1000_hw *hw, u16 offset, u16 words, u16 *data)
+static s32 e1000_write_nvm_82571(struct e1000_hw *hw, u16 offset, u16 words,
+                                 u16 *data)
 {
 	s32 ret_val = E1000_SUCCESS;
 
@@ -540,8 +541,7 @@ e1000_write_nvm_82571(struct e1000_hw *hw, u16 offset, u16 words, u16 *data)
  *  up to the checksum.  Then calculates the EEPROM checksum and writes the
  *  value to the EEPROM.
  **/
-static s32
-e1000_update_nvm_checksum_82571(struct e1000_hw *hw)
+static s32 e1000_update_nvm_checksum_82571(struct e1000_hw *hw)
 {
 	u32 eecd;
 	s32 ret_val;
@@ -553,8 +553,10 @@ e1000_update_nvm_checksum_82571(struct e1000_hw *hw)
 	if (ret_val)
 		goto out;
 
-	/* If our nvm is an EEPROM, then we're done
-	 * otherwise, commit the checksum to the flash NVM. */
+	/*
+	 * If our nvm is an EEPROM, then we're done
+	 * otherwise, commit the checksum to the flash NVM.
+	 */
 	if (hw->nvm.type != e1000_nvm_flash_hw)
 		goto out;
 
@@ -572,7 +574,8 @@ e1000_update_nvm_checksum_82571(struct e1000_hw *hw)
 
 	/* Reset the firmware if using STM opcode. */
 	if ((E1000_READ_REG(hw, E1000_FLOP) & 0xFF00) == E1000_STM_OPCODE) {
-		/* The enabling of and the actual reset must be done
+		/*
+		 * The enabling of and the actual reset must be done
 		 * in two write cycles.
 		 */
 		E1000_WRITE_REG(hw, E1000_HICR, E1000_HICR_FW_RESET_ENABLE);
@@ -606,8 +609,7 @@ out:
  *  Calculates the EEPROM checksum by reading/adding each word of the EEPROM
  *  and then verifies that the sum of the EEPROM is equal to 0xBABA.
  **/
-static s32
-e1000_validate_nvm_checksum_82571(struct e1000_hw *hw)
+static s32 e1000_validate_nvm_checksum_82571(struct e1000_hw *hw)
 {
 	DEBUGFUNC("e1000_validate_nvm_checksum_82571");
 
@@ -631,9 +633,8 @@ e1000_validate_nvm_checksum_82571(struct e1000_hw *hw)
  *  If e1000_update_nvm_checksum is not called after this function, the
  *  EEPROM will most likley contain an invalid checksum.
  **/
-static s32
-e1000_write_nvm_eewr_82571(struct e1000_hw *hw, u16 offset, u16 words,
-                           u16 *data)
+static s32 e1000_write_nvm_eewr_82571(struct e1000_hw *hw, u16 offset,
+                                      u16 words, u16 *data)
 {
 	struct e1000_nvm_info *nvm = &hw->nvm;
 	u32 i, eewr = 0;
@@ -641,8 +642,10 @@ e1000_write_nvm_eewr_82571(struct e1000_hw *hw, u16 offset, u16 words,
 
 	DEBUGFUNC("e1000_write_nvm_eewr_82571");
 
-	/* A check for invalid values:  offset too large, too many words,
-	 * and not enough words. */
+	/*
+	 * A check for invalid values:  offset too large, too many words,
+	 * and not enough words.
+	 */
 	if ((offset >= nvm->word_size) || (words > (nvm->word_size - offset)) ||
 	    (words == 0)) {
 		DEBUGOUT("nvm parameter(s) out of bounds\n");
@@ -676,8 +679,7 @@ out:
  *
  *  Reads the management control register for the config done bit to be set.
  **/
-static s32
-e1000_get_cfg_done_82571(struct e1000_hw *hw)
+static s32 e1000_get_cfg_done_82571(struct e1000_hw *hw)
 {
 	s32 timeout = PHY_CFG_TIMEOUT;
 	s32 ret_val = E1000_SUCCESS;
@@ -711,8 +713,7 @@ out:
  *  of either 10 or 10/100 or 10/100/1000 at all duplexes.  This is a function
  *  pointer entry point only called by PHY setup routines.
  **/
-static s32
-e1000_set_d0_lplu_state_82571(struct e1000_hw *hw, boolean_t active)
+static s32 e1000_set_d0_lplu_state_82571(struct e1000_hw *hw, boolean_t active)
 {
 	struct e1000_phy_info *phy = &hw->phy;
 	s32 ret_val;
@@ -747,10 +748,12 @@ e1000_set_d0_lplu_state_82571(struct e1000_hw *hw, boolean_t active)
 		ret_val = e1000_write_phy_reg(hw,
 		                              IGP02E1000_PHY_POWER_MGMT,
 		                              data);
-		/* LPLU and SmartSpeed are mutually exclusive.  LPLU is used
+		/*
+		 * LPLU and SmartSpeed are mutually exclusive.  LPLU is used
 		 * during Dx states where the power conservation is most
 		 * important.  During driver activity we should enable
-		 * SmartSpeed, so performance is maintained. */
+		 * SmartSpeed, so performance is maintained.
+		 */
 		if (phy->smart_speed == e1000_smart_speed_on) {
 			ret_val = e1000_read_phy_reg(hw,
 			                             IGP01E1000_PHY_PORT_CONFIG,
@@ -791,8 +794,7 @@ out:
  *  This resets the hardware into a known state.  This is a
  *  function pointer entry point called by the api module.
  **/
-static s32
-e1000_reset_hw_82571(struct e1000_hw *hw)
+static s32 e1000_reset_hw_82571(struct e1000_hw *hw)
 {
 	u32 ctrl, extcnf_ctrl, ctrl_ext, icr;
 	s32 ret_val;
@@ -800,7 +802,8 @@ e1000_reset_hw_82571(struct e1000_hw *hw)
 
 	DEBUGFUNC("e1000_reset_hw_82571");
 
-	/* Prevent the PCI-E bus from sticking if there is no TLP connection
+	/*
+	 * Prevent the PCI-E bus from sticking if there is no TLP connection
 	 * on the last TLP read/write transaction when MAC is reset.
 	 */
 	ret_val = e1000_disable_pcie_master_generic(hw);
@@ -817,8 +820,10 @@ e1000_reset_hw_82571(struct e1000_hw *hw)
 
 	msec_delay(10);
 
-	/* Must acquire the MDIO ownership before MAC reset.
-	 * Ownership defaults to firmware after a reset. */
+	/*
+	 * Must acquire the MDIO ownership before MAC reset.
+	 * Ownership defaults to firmware after a reset.
+	 */
 	if (hw->mac.type == e1000_82573) {
 		extcnf_ctrl = E1000_READ_REG(hw, E1000_EXTCNF_CTRL);
 		extcnf_ctrl |= E1000_EXTCNF_CTRL_MDIO_SW_OWNERSHIP;
@@ -855,7 +860,8 @@ e1000_reset_hw_82571(struct e1000_hw *hw)
 		/* We don't want to continue accessing MAC registers. */
 		goto out;
 
-	/* Phy configuration from NVM just starts after EECD_AUTO_RD is set.
+	/*
+	 * Phy configuration from NVM just starts after EECD_AUTO_RD is set.
 	 * Need to wait for Phy configuration completion before accessing
 	 * NVM and Phy.
 	 */
@@ -865,6 +871,8 @@ e1000_reset_hw_82571(struct e1000_hw *hw)
 	/* Clear any pending interrupt events. */
 	E1000_WRITE_REG(hw, E1000_IMC, 0xffffffff);
 	icr = E1000_READ_REG(hw, E1000_ICR);
+
+	e1000_check_alt_mac_addr_generic(hw);
 
 out:
 	return ret_val;
@@ -876,8 +884,7 @@ out:
  *
  *  This inits the hardware readying it for operation.
  **/
-static s32
-e1000_init_hw_82571(struct e1000_hw *hw)
+static s32 e1000_init_hw_82571(struct e1000_hw *hw)
 {
 	struct e1000_mac_info *mac = &hw->mac;
 	u32 reg_data;
@@ -892,7 +899,7 @@ e1000_init_hw_82571(struct e1000_hw *hw)
 	ret_val = e1000_id_led_init_generic(hw);
 	if (ret_val) {
 		DEBUGOUT("Error initializing identification LED\n");
-		goto out;
+		/* This is not fatal and we should not stop init due to this */
 	}
 
 	/* Disabling VLAN filtering */
@@ -900,11 +907,12 @@ e1000_init_hw_82571(struct e1000_hw *hw)
 	e1000_clear_vfta(hw);
 
 	/* Setup the receive address. */
-	/* If, however, a locally administered address was assigned to the
+	/*
+	 * If, however, a locally administered address was assigned to the
 	 * 82571, we must reserve a RAR for it to work around an issue where
 	 * resetting one port will reload the MAC on the other port.
 	 */
-	if (e1000_get_laa_state_82571(hw) == TRUE)
+	if (e1000_get_laa_state_82571(hw))
 		rar_count--;
 	e1000_init_rx_addrs_generic(hw, rar_count);
 
@@ -937,14 +945,14 @@ e1000_init_hw_82571(struct e1000_hw *hw)
 		E1000_WRITE_REG(hw, E1000_GCR, reg_data);
 	}
 
-	/* Clear all of the statistics registers (clear on read).  It is
+	/*
+	 * Clear all of the statistics registers (clear on read).  It is
 	 * important that we do this after we have tried to establish link
 	 * because the symbol error count will increment wildly if there
 	 * is no link.
 	 */
 	e1000_clear_hw_cntrs_82571(hw);
 
-out:
 	return ret_val;
 }
 
@@ -954,8 +962,7 @@ out:
  *
  *  Initializes required hardware-dependent bits needed for normal operation.
  **/
-static void
-e1000_initialize_hw_bits_82571(struct e1000_hw *hw)
+static void e1000_initialize_hw_bits_82571(struct e1000_hw *hw)
 {
 	u32 reg;
 
@@ -1030,8 +1037,7 @@ out:
  *  Clears the register array which contains the VLAN filter table by
  *  setting all the values to 0.
  **/
-static void
-e1000_clear_vfta_82571(struct e1000_hw *hw)
+static void e1000_clear_vfta_82571(struct e1000_hw *hw)
 {
 	u32 offset;
 	u32 vfta_value = 0;
@@ -1042,7 +1048,8 @@ e1000_clear_vfta_82571(struct e1000_hw *hw)
 
 	if (hw->mac.type == e1000_82573) {
 		if (hw->mng_cookie.vlan_id != 0) {
-			/* The VFTA is a 4096b bit-field, each identifying
+			/*
+			 * The VFTA is a 4096b bit-field, each identifying
 			 * a single VLAN ID.  The following operations
 			 * determine which 32b entry (i.e. offset) into the
 			 * array we want to set the VLAN ID (i.e. bit) of
@@ -1056,7 +1063,8 @@ e1000_clear_vfta_82571(struct e1000_hw *hw)
 		}
 	}
 	for (offset = 0; offset < E1000_VLAN_FILTER_TBL_SIZE; offset++) {
-		/* If the offset we want to clear is the same offset of the
+		/*
+		 * If the offset we want to clear is the same offset of the
 		 * manageability VLAN ID, then clear all bits except that of
 		 * the manageability unit.
 		 */
@@ -1079,10 +1087,9 @@ e1000_clear_vfta_82571(struct e1000_hw *hw)
  *  The parameter rar_count will usually be hw->mac.rar_entry_count
  *  unless there are workarounds that change this.
  **/
-static void
-e1000_mc_addr_list_update_82571(struct e1000_hw *hw,
-                                u8 *mc_addr_list, u32 mc_addr_count,
-                                u32 rar_used_count, u32 rar_count)
+static void e1000_mc_addr_list_update_82571(struct e1000_hw *hw,
+                                            u8 *mc_addr_list, u32 mc_addr_count,
+                                            u32 rar_used_count, u32 rar_count)
 {
 	DEBUGFUNC("e1000_mc_addr_list_update_82571");
 
@@ -1103,12 +1110,12 @@ e1000_mc_addr_list_update_82571(struct e1000_hw *hw,
  *  should be established.  Assumes the hardware has previously been reset
  *  and the transmitter and receiver are not enabled.
  **/
-static s32
-e1000_setup_link_82571(struct e1000_hw *hw)
+static s32 e1000_setup_link_82571(struct e1000_hw *hw)
 {
 	DEBUGFUNC("e1000_setup_link_82571");
 
-	/* 82573 does not have a word in the NVM to determine
+	/*
+	 * 82573 does not have a word in the NVM to determine
 	 * the default flow control setting, so we explicitly
 	 * set it to full.
 	 */
@@ -1126,8 +1133,7 @@ e1000_setup_link_82571(struct e1000_hw *hw)
  *  for link, once link is established calls to configure collision distance
  *  and flow control are called.
  **/
-static s32
-e1000_setup_copper_link_82571(struct e1000_hw *hw)
+static s32 e1000_setup_copper_link_82571(struct e1000_hw *hw)
 {
 	u32 ctrl, led_ctrl;
 	s32  ret_val;
@@ -1172,15 +1178,15 @@ out:
  *  Configures collision distance and flow control for fiber and serdes links.
  *  Upon successful setup, poll for link.
  **/
-static s32
-e1000_setup_fiber_serdes_link_82571(struct e1000_hw *hw)
+static s32 e1000_setup_fiber_serdes_link_82571(struct e1000_hw *hw)
 {
 	DEBUGFUNC("e1000_setup_fiber_serdes_link_82571");
 
 	switch (hw->mac.type) {
 	case e1000_82571:
 	case e1000_82572:
-		/* If SerDes loopback mode is entered, there is no form
+		/*
+		 * If SerDes loopback mode is entered, there is no form
 		 * of reset to take the adapter out of that mode.  So we
 		 * have to explicitly take the adapter out of loopback
 		 * mode.  This prevents drivers from twidling their thumbs
@@ -1203,8 +1209,7 @@ e1000_setup_fiber_serdes_link_82571(struct e1000_hw *hw)
  *  Read the EEPROM for the current default LED configuration.  If the
  *  LED configuration is not valid, set to a valid LED configuration.
  **/
-static s32
-e1000_valid_led_default_82571(struct e1000_hw *hw, u16 *data)
+static s32 e1000_valid_led_default_82571(struct e1000_hw *hw, u16 *data)
 {
 	s32 ret_val;
 
@@ -1222,7 +1227,6 @@ e1000_valid_led_default_82571(struct e1000_hw *hw, u16 *data)
 	else if (*data == ID_LED_RESERVED_0000 ||
 	         *data == ID_LED_RESERVED_FFFF)
 		*data = ID_LED_DEFAULT;
-
 out:
 	return ret_val;
 }
@@ -1233,8 +1237,7 @@ out:
  *
  *  Retrieve and return the current locally administed address state.
  **/
-boolean_t
-e1000_get_laa_state_82571(struct e1000_hw *hw)
+boolean_t e1000_get_laa_state_82571(struct e1000_hw *hw)
 {
 	struct e1000_dev_spec_82571 *dev_spec;
 	boolean_t state = FALSE;
@@ -1259,8 +1262,7 @@ out:
  *
  *  Enable/Disable the current locally administed address state.
  **/
-void
-e1000_set_laa_state_82571(struct e1000_hw *hw, boolean_t state)
+void e1000_set_laa_state_82571(struct e1000_hw *hw, boolean_t state)
 {
 	struct e1000_dev_spec_82571 *dev_spec;
 
@@ -1274,8 +1276,9 @@ e1000_set_laa_state_82571(struct e1000_hw *hw, boolean_t state)
 	dev_spec->laa_is_present = state;
 
 	/* If workaround is activated... */
-	if (state == TRUE) {
-		/* Hold a copy of the LAA in RAR[14] This is done so that
+	if (state) {
+		/*
+		 * Hold a copy of the LAA in RAR[14] This is done so that
 		 * between the time RAR[0] gets clobbered and the time it
 		 * gets fixed, the actual LAA is in one of the RARs and no
 		 * incoming packets directed to this port are dropped.
@@ -1299,8 +1302,7 @@ out:
  *  the checksum.  Otherwise, if bit 15 is set and the checksum is incorrect,
  *  we need to return bad checksum.
  **/
-static s32
-e1000_fix_nvm_checksum_82571(struct e1000_hw *hw)
+static s32 e1000_fix_nvm_checksum_82571(struct e1000_hw *hw)
 {
 	struct e1000_nvm_info *nvm = &hw->nvm;
 	s32 ret_val = E1000_SUCCESS;
@@ -1311,7 +1313,8 @@ e1000_fix_nvm_checksum_82571(struct e1000_hw *hw)
 	if (nvm->type != e1000_nvm_flash_hw)
 		goto out;
 
-	/* Check bit 4 of word 10h.  If it is 0, firmware is done updating
+	/*
+	 * Check bit 4 of word 10h.  If it is 0, firmware is done updating
 	 * 10h-12h.  Checksum may need to be fixed.
 	 */
 	ret_val = e1000_read_nvm(hw, 0x10, 1, &data);
@@ -1319,7 +1322,8 @@ e1000_fix_nvm_checksum_82571(struct e1000_hw *hw)
 		goto out;
 
 	if (!(data & 0x10)) {
-		/* Read 0x23 and check bit 15.  This bit is a 1
+		/*
+		 * Read 0x23 and check bit 15.  This bit is a 1
 		 * when the checksum has already been fixed.  If
 		 * the checksum is still wrong and this bit is a
 		 * 1, we need to return bad checksum.  Otherwise,
@@ -1344,20 +1348,33 @@ out:
 }
 
 /**
+ *  e1000_read_mac_addr_82571 - Read device MAC address
+ *  @hw: pointer to the HW structure
+ **/
+static s32 e1000_read_mac_addr_82571(struct e1000_hw *hw)
+{
+	s32 ret_val = E1000_SUCCESS;
+
+	DEBUGFUNC("e1000_read_mac_addr_82571");
+	if (e1000_check_alt_mac_addr_generic(hw))
+		ret_val = e1000_read_mac_addr_generic(hw);
+
+	return ret_val;
+}
+
+/**
  *  e1000_clear_hw_cntrs_82571 - Clear device specific hardware counters
  *  @hw: pointer to the HW structure
  *
  *  Clears the hardware counters by reading the counter registers.
  **/
-static void
-e1000_clear_hw_cntrs_82571(struct e1000_hw *hw)
+static void e1000_clear_hw_cntrs_82571(struct e1000_hw *hw)
 {
 	volatile u32 temp;
 
 	DEBUGFUNC("e1000_clear_hw_cntrs_82571");
 
 	e1000_clear_hw_cntrs_base_generic(hw);
-
 	temp = E1000_READ_REG(hw, E1000_PRC64);
 	temp = E1000_READ_REG(hw, E1000_PRC127);
 	temp = E1000_READ_REG(hw, E1000_PRC255);

@@ -55,8 +55,7 @@ static s32  e1000_setup_fiber_serdes_link_82540(struct e1000_hw *hw);
  *
  * This is a function pointer entry point called by the api module.
  **/
-static s32
-e1000_init_phy_params_82540(struct e1000_hw *hw)
+static s32 e1000_init_phy_params_82540(struct e1000_hw *hw)
 {
 	struct e1000_phy_info *phy = &hw->phy;
 	struct e1000_functions *func = &hw->func;
@@ -108,8 +107,7 @@ out:
  *
  * This is a function pointer entry point called by the api module.
  **/
-static s32
-e1000_init_nvm_params_82540(struct e1000_hw *hw)
+static s32 e1000_init_nvm_params_82540(struct e1000_hw *hw)
 {
 	struct e1000_nvm_info *nvm = &hw->nvm;
 	struct e1000_functions *func = &hw->func;
@@ -153,8 +151,7 @@ e1000_init_nvm_params_82540(struct e1000_hw *hw)
  *
  * This is a function pointer entry point called by the api module.
  **/
-static s32
-e1000_init_mac_params_82540(struct e1000_hw *hw)
+static s32 e1000_init_mac_params_82540(struct e1000_hw *hw)
 {
 	struct e1000_mac_info *mac = &hw->mac;
 	struct e1000_functions *func = &hw->func;
@@ -249,8 +246,7 @@ out:
  * The only function explicitly called by the api module to initialize
  * all function pointers and parameters.
  **/
-void
-e1000_init_function_pointers_82540(struct e1000_hw *hw)
+void e1000_init_function_pointers_82540(struct e1000_hw *hw)
 {
 	DEBUGFUNC("e1000_init_function_pointers_82540");
 
@@ -266,8 +262,7 @@ e1000_init_function_pointers_82540(struct e1000_hw *hw)
  *  This resets the hardware into a known state.  This is a
  *  function pointer entry point called by the api module.
  **/
-static s32
-e1000_reset_hw_82540(struct e1000_hw *hw)
+static s32 e1000_reset_hw_82540(struct e1000_hw *hw)
 {
 	u32 ctrl, icr, manc;
 	s32 ret_val = E1000_SUCCESS;
@@ -281,7 +276,8 @@ e1000_reset_hw_82540(struct e1000_hw *hw)
 	E1000_WRITE_REG(hw, E1000_TCTL, E1000_TCTL_PSP);
 	E1000_WRITE_FLUSH(hw);
 
-	/* Delay to allow any outstanding PCI transactions to complete
+	/*
+	 * Delay to allow any outstanding PCI transactions to complete
 	 * before resetting the device.
 	 */
 	msec_delay(10);
@@ -295,7 +291,8 @@ e1000_reset_hw_82540(struct e1000_hw *hw)
 		E1000_WRITE_REG(hw, E1000_CTRL_DUP, ctrl | E1000_CTRL_RST);
 		break;
 	default:
-		/* These controllers can't ack the 64-bit write when
+		/*
+		 * These controllers can't ack the 64-bit write when
 		 * issuing the reset, so we use IO-mapping as a
 		 * workaround to issue the reset.
 		 */
@@ -324,8 +321,7 @@ e1000_reset_hw_82540(struct e1000_hw *hw)
  *  This inits the hardware readying it for operation.  This is a
  *  function pointer entry point called by the api module.
  **/
-static s32
-e1000_init_hw_82540(struct e1000_hw *hw)
+static s32 e1000_init_hw_82540(struct e1000_hw *hw)
 {
 	struct e1000_mac_info *mac = &hw->mac;
 	u32 txdctl, ctrl_ext;
@@ -343,9 +339,9 @@ e1000_init_hw_82540(struct e1000_hw *hw)
 
 	/* Disabling VLAN filtering */
 	DEBUGOUT("Initializing the IEEE VLAN\n");
-	if (mac->type < e1000_82545_rev_3) {
+	if (mac->type < e1000_82545_rev_3)
 		E1000_WRITE_REG(hw, E1000_VET, 0);
-	}
+
 	e1000_clear_vfta(hw);
 
 	/* Setup the receive address. */
@@ -355,7 +351,8 @@ e1000_init_hw_82540(struct e1000_hw *hw)
 	DEBUGOUT("Zeroing the MTA\n");
 	for (i = 0; i < mac->mta_reg_count; i++) {
 		E1000_WRITE_REG_ARRAY(hw, E1000_MTA, i, 0);
-		/* Avoid back to back register writes by adding the register
+		/*
+		 * Avoid back to back register writes by adding the register
 		 * read (flush).  This is to protect against some strange
 		 * bridge configurations that may issue Memory Write Block
 		 * (MWB) to our register space.  The *_rev_3 hardware at
@@ -376,7 +373,8 @@ e1000_init_hw_82540(struct e1000_hw *hw)
 	         E1000_TXDCTL_FULL_TX_DESC_WB;
 	E1000_WRITE_REG(hw, E1000_TXDCTL, txdctl);
 
-	/* Clear all of the statistics registers (clear on read).  It is
+	/*
+	 * Clear all of the statistics registers (clear on read).  It is
 	 * important that we do this after we have tried to establish link
 	 * because the symbol error count will increment wildly if there
 	 * is no link.
@@ -386,8 +384,10 @@ e1000_init_hw_82540(struct e1000_hw *hw)
 	if ((hw->device_id == E1000_DEV_ID_82546GB_QUAD_COPPER) ||
 	    (hw->device_id == E1000_DEV_ID_82546GB_QUAD_COPPER_KSP3)) {
 		ctrl_ext = E1000_READ_REG(hw, E1000_CTRL_EXT);
-		/* Relaxed ordering must be disabled to avoid a parity
-		 * error crash in a PCI slot. */
+		/*
+		 * Relaxed ordering must be disabled to avoid a parity
+		 * error crash in a PCI slot.
+		 */
 		ctrl_ext |= E1000_CTRL_EXT_RO_DIS;
 		E1000_WRITE_REG(hw, E1000_CTRL_EXT, ctrl_ext);
 	}
@@ -406,8 +406,7 @@ out:
  *  not established, we return -E1000_ERR_PHY (-2).  This is a function
  *  pointer entry point called by the api module.
  **/
-static s32
-e1000_setup_copper_link_82540(struct e1000_hw *hw)
+static s32 e1000_setup_copper_link_82540(struct e1000_hw *hw)
 {
 	u32 ctrl;
 	s32 ret_val = E1000_SUCCESS;
@@ -455,8 +454,7 @@ out:
  *  setup, poll for link.  This is a function pointer entry point called by
  *  the api module.
  **/
-static s32
-e1000_setup_fiber_serdes_link_82540(struct e1000_hw *hw)
+static s32 e1000_setup_fiber_serdes_link_82540(struct e1000_hw *hw)
 {
 	struct e1000_mac_info *mac = &hw->mac;
 	s32 ret_val = E1000_SUCCESS;
@@ -467,7 +465,8 @@ e1000_setup_fiber_serdes_link_82540(struct e1000_hw *hw)
 	case e1000_82545_rev_3:
 	case e1000_82546_rev_3:
 		if (hw->media_type == e1000_media_type_internal_serdes) {
-			/* If we're on serdes media, adjust the output
+			/*
+			 * If we're on serdes media, adjust the output
 			 * amplitude to value set in the EEPROM.
 			 */
 			ret_val = e1000_adjust_serdes_amplitude_82540(hw);
@@ -494,8 +493,7 @@ out:
  *
  *  Adjust the SERDES ouput amplitude based on the EEPROM settings.
  **/
-static s32
-e1000_adjust_serdes_amplitude_82540(struct e1000_hw *hw)
+static s32 e1000_adjust_serdes_amplitude_82540(struct e1000_hw *hw)
 {
 	s32 ret_val = E1000_SUCCESS;
 	u16 nvm_data;
@@ -503,9 +501,8 @@ e1000_adjust_serdes_amplitude_82540(struct e1000_hw *hw)
 	DEBUGFUNC("e1000_adjust_serdes_amplitude_82540");
 
 	ret_val = e1000_read_nvm(hw, NVM_SERDES_AMPLITUDE, 1, &nvm_data);
-	if (ret_val) {
+	if (ret_val)
 		goto out;
-	}
 
 	if (nvm_data != NVM_RESERVED_WORD) {
 		/* Adjust serdes output amplitude only. */
@@ -527,8 +524,7 @@ out:
  *
  *  Set the VCO speed to improve Bit Error Rate (BER) performance.
  **/
-static s32
-e1000_set_vco_speed_82540(struct e1000_hw *hw)
+static s32 e1000_set_vco_speed_82540(struct e1000_hw *hw)
 {
 	s32  ret_val = E1000_SUCCESS;
 	u16 default_page = 0;
@@ -588,8 +584,7 @@ out:
  *    1.  Do a PHY soft reset.
  *    2.  Restart auto-negotiation or force link.
  **/
-static s32
-e1000_set_phy_mode_82540(struct e1000_hw *hw)
+static s32 e1000_set_phy_mode_82540(struct e1000_hw *hw)
 {
 	struct e1000_phy_info *phy = &hw->phy;
 	s32 ret_val = E1000_SUCCESS;
@@ -634,8 +629,7 @@ out:
  *
  *  Clears the hardware counters by reading the counter registers.
  **/
-static void
-e1000_clear_hw_cntrs_82540(struct e1000_hw *hw)
+static void e1000_clear_hw_cntrs_82540(struct e1000_hw *hw)
 {
 	volatile u32 temp;
 

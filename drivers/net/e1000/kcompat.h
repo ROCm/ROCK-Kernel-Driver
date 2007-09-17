@@ -64,6 +64,10 @@
 #endif
 #endif
 
+#ifdef _IGB_H_
+#define NAPI
+#endif
+
 #ifdef _IXGB_H_
 #ifdef CONFIG_IXGB_NAPI
 #define NAPI
@@ -642,18 +646,14 @@ extern void _kc_pci_disable_device(struct pci_dev *pdev);
 
 #endif /* 2.4.6 => 2.4.3 */
 
-/*****************************************************************************/
-/* 2.4.9 => 2.4.6 */
-#if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,4,9) )
 #ifndef HAVE_PCI_SET_MWI
 #define pci_set_mwi(X) pci_write_config_word(X, \
-			       PCI_COMMAND, adapter->hw.pci_cmd_word | \
+			       PCI_COMMAND, adapter->hw.bus.pci_cmd_word | \
 			       PCI_COMMAND_INVALIDATE);
 #define pci_clear_mwi(X) pci_write_config_word(X, \
-			       PCI_COMMAND, adapter->hw.pci_cmd_word & \
+			       PCI_COMMAND, adapter->hw.bus.pci_cmd_word & \
 			       ~PCI_COMMAND_INVALIDATE);
 #endif
-#endif /* 2.4.9 => 2.4.6 */
 
 /*****************************************************************************/
 /* 2.4.10 => 2.4.9 */
@@ -902,6 +902,9 @@ static inline int _kc_pci_dma_mapping_error(dma_addr_t dma_addr)
 }
 #endif
 
+#undef ALIGN
+#define ALIGN(x,a) (((x)+(a)-1)&~((a)-1))
+
 #endif /* 2.6.0 => 2.5.28 */
 
 /*****************************************************************************/
@@ -1114,6 +1117,7 @@ static inline int _kc_skb_is_gso(const struct sk_buff *skb)
 #endif /* < 2.6.18 */
 /*****************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19) )
+typedef _Bool bool;
 
 #if ( LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0) )
 #ifndef RHEL_VERSION
@@ -1171,7 +1175,7 @@ static inline int _kc_request_irq(unsigned int irq, new_handler_t handler, unsig
 	\
 	u16 cap_offset = pci_find_capability(pdev, PCI_CAP_ID_EXP); \
 	if (cap_offset) { \
-	if (adapter->config_space == NULL) { \
+	if (adapter->config_space != NULL) { \
 	if (pci_read_config_word(pdev, cap_offset + PCIE_LINK_STATUS, &pcie_link_status)) \
 		size = PCI_CONFIG_SPACE_LEN; \
 	else \
@@ -1204,6 +1208,8 @@ do { \
 #define round_jiffies(x) x
 #endif
 
+#define csum_offset csum
+
 #endif /* < 2.6.20 */
 
 /*****************************************************************************/
@@ -1224,9 +1230,18 @@ do { \
 #define ip_hdr(skb) (skb->nh.iph)
 #define skb_network_offset(skb) (skb->nh.raw - skb->data)
 #define skb_network_header(skb) (skb->nh.raw)
+#define skb_tail_pointer(skb) skb->tail
+#define skb_copy_to_linear_data_offset(skb, offset, from, len) \
+                                 memcpy(skb->data + offset, from, len)
+#define skb_network_header_len(skb) (skb->h.raw - skb->nh.raw)
+#define pci_register_driver pci_module_init
 
 #ifndef alloc_etherdev_mq
 #define alloc_etherdev_mq(_a, _b) alloc_etherdev(_a)
+#endif
+
+#ifndef ETH_FCS_LEN
+#define ETH_FCS_LEN 4
 #endif
 #endif /* < 2.6.22 */
 

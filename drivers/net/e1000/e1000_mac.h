@@ -29,9 +29,8 @@
 #ifndef _E1000_MAC_H_
 #define _E1000_MAC_H_
 
-#include "e1000_api.h"
-
-/* Functions that should not be called directly from drivers but can be used
+/*
+ * Functions that should not be called directly from drivers but can be used
  * by other files in this 'shared code'
  */
 s32  e1000_blink_led_generic(struct e1000_hw *hw);
@@ -75,6 +74,7 @@ void e1000_mta_set_generic(struct e1000_hw *hw, u32 hash_value);
 void e1000_pcix_mmrbc_workaround_generic(struct e1000_hw *hw);
 void e1000_put_hw_semaphore_generic(struct e1000_hw *hw);
 void e1000_rar_set_generic(struct e1000_hw *hw, u8 *addr, u32 index);
+s32  e1000_check_alt_mac_addr_generic(struct e1000_hw *hw);
 void e1000_remove_device_generic(struct e1000_hw *hw);
 void e1000_reset_adaptive_generic(struct e1000_hw *hw);
 void e1000_set_pcie_no_snoop_generic(struct e1000_hw *hw, u32 no_snoop);

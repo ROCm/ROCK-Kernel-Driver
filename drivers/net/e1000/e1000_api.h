@@ -108,7 +108,9 @@ void      e1000_set_kmrn_lock_loss_workaround_ich8lan(struct e1000_hw *hw,
 void      e1000_igp3_phy_powerdown_workaround_ich8lan(struct e1000_hw *hw);
 void      e1000_gig_downshift_workaround_ich8lan(struct e1000_hw *hw);
 
-/* TBI_ACCEPT macro definition:
+
+/*
+ * TBI_ACCEPT macro definition:
  *
  * This macro requires:
  *      adapter = a pointer to struct e1000_hw

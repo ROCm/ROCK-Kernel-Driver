@@ -32,6 +32,7 @@
  * e1000_82547_rev_2
  */
 
+#include "e1000_api.h"
 #include "e1000_82541.h"
 
 void e1000_init_function_pointers_82541(struct e1000_hw *hw);
@@ -56,8 +57,7 @@ static s32  e1000_config_dsp_after_link_change_82541(struct e1000_hw *hw,
                                                      boolean_t link_up);
 static s32  e1000_phy_init_script_82541(struct e1000_hw *hw);
 
-static const
-u16 e1000_igp_cable_length_table[] =
+static const u16 e1000_igp_cable_length_table[] =
     { 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
       5, 10, 10, 10, 10, 10, 10, 10, 20, 20, 20, 20, 20, 25, 25, 25,
       25, 25, 25, 25, 30, 30, 30, 30, 40, 40, 40, 40, 40, 40, 40, 40,
@@ -83,8 +83,7 @@ struct e1000_dev_spec_82541 {
  *
  *  This is a function pointer entry point called by the api module.
  **/
-static s32
-e1000_init_phy_params_82541(struct e1000_hw *hw)
+static s32 e1000_init_phy_params_82541(struct e1000_hw *hw)
 {
 	struct e1000_phy_info *phy = &hw->phy;
 	struct e1000_functions *func = &hw->func;
@@ -128,8 +127,7 @@ out:
  *
  *  This is a function pointer entry point called by the api module.
  **/
-static s32
-e1000_init_nvm_params_82541(struct e1000_hw *hw)
+static s32 e1000_init_nvm_params_82541(struct e1000_hw *hw)
 {
 	struct   e1000_nvm_info *nvm = &hw->nvm;
 	struct e1000_functions *func = &hw->func;
@@ -180,7 +178,8 @@ e1000_init_nvm_params_82541(struct e1000_hw *hw)
 		func->validate_nvm      = e1000_validate_nvm_checksum_generic;
 		func->write_nvm         = e1000_write_nvm_spi;
 
-		/* nvm->word_size must be discovered after the pointers
+		/*
+		 * nvm->word_size must be discovered after the pointers
 		 * are set so we can verify the size from the nvm image
 		 * itself.  Temporarily set it to a dummy value so the
 		 * read will work.
@@ -190,7 +189,8 @@ e1000_init_nvm_params_82541(struct e1000_hw *hw)
 		if (ret_val)
 			goto out;
 		size = (size & NVM_SIZE_MASK) >> NVM_SIZE_SHIFT;
-		/* if size != 0, it can be added to a constant and become
+		/*
+		 * if size != 0, it can be added to a constant and become
 		 * the left-shift value to set the word_size.  Otherwise,
 		 * word_size stays at 64.
 		 */
@@ -226,8 +226,7 @@ out:
  *
  *  This is a function pointer entry point called by the api module.
  **/
-static s32
-e1000_init_mac_params_82541(struct e1000_hw *hw)
+static s32 e1000_init_mac_params_82541(struct e1000_hw *hw)
 {
 	struct e1000_mac_info *mac = &hw->mac;
 	struct e1000_functions *func = &hw->func;
@@ -295,8 +294,7 @@ e1000_init_mac_params_82541(struct e1000_hw *hw)
  *  The only function explicitly called by the api module to initialize
  *  all function pointers and parameters.
  **/
-void
-e1000_init_function_pointers_82541(struct e1000_hw *hw)
+void e1000_init_function_pointers_82541(struct e1000_hw *hw)
 {
 	DEBUGFUNC("e1000_init_function_pointers_82541");
 
@@ -312,8 +310,7 @@ e1000_init_function_pointers_82541(struct e1000_hw *hw)
  *  This resets the hardware into a known state.  This is a
  *  function pointer entry point called by the api module.
  **/
-static s32
-e1000_reset_hw_82541(struct e1000_hw *hw)
+static s32 e1000_reset_hw_82541(struct e1000_hw *hw)
 {
 	u32 ledctl, ctrl, icr, manc;
 
@@ -326,7 +323,8 @@ e1000_reset_hw_82541(struct e1000_hw *hw)
 	E1000_WRITE_REG(hw, E1000_TCTL, E1000_TCTL_PSP);
 	E1000_WRITE_FLUSH(hw);
 
-	/* Delay to allow any outstanding PCI transactions to complete
+	/*
+	 * Delay to allow any outstanding PCI transactions to complete
 	 * before resetting the device.
 	 */
 	msec_delay(10);
@@ -343,7 +341,8 @@ e1000_reset_hw_82541(struct e1000_hw *hw)
 	switch (hw->mac.type) {
 	case e1000_82541:
 	case e1000_82541_rev_2:
-		/* These controllers can't ack the 64-bit write when
+		/*
+		 * These controllers can't ack the 64-bit write when
 		 * issuing the reset, so we use IO-mapping as a
 		 * workaround to issue the reset.
 		 */
@@ -389,8 +388,7 @@ e1000_reset_hw_82541(struct e1000_hw *hw)
  *  This inits the hardware readying it for operation.  This is a
  *  function pointer entry point called by the api module.
  **/
-static s32
-e1000_init_hw_82541(struct e1000_hw *hw)
+static s32 e1000_init_hw_82541(struct e1000_hw *hw)
 {
 	struct e1000_mac_info *mac = &hw->mac;
 	u32 i, txdctl;
@@ -416,7 +414,8 @@ e1000_init_hw_82541(struct e1000_hw *hw)
 	DEBUGOUT("Zeroing the MTA\n");
 	for (i = 0; i < mac->mta_reg_count; i++) {
 		E1000_WRITE_REG_ARRAY(hw, E1000_MTA, i, 0);
-		/* Avoid back to back register writes by adding the register
+		/*
+		 * Avoid back to back register writes by adding the register
 		 * read (flush).  This is to protect against some strange
 		 * bridge configurations that may issue Memory Write Block
 		 * (MWB) to our register space.
@@ -432,7 +431,8 @@ e1000_init_hw_82541(struct e1000_hw *hw)
 	         E1000_TXDCTL_FULL_TX_DESC_WB;
 	E1000_WRITE_REG(hw, E1000_TXDCTL, txdctl);
 
-	/* Clear all of the statistics registers (clear on read).  It is
+	/*
+	 * Clear all of the statistics registers (clear on read).  It is
 	 * important that we do this after we have tried to establish link
 	 * because the symbol error count will increment wildly if there
 	 * is no link.
@@ -452,8 +452,8 @@ out:
  * Retrieve the current speed and duplex configuration.
  * This is a function pointer entry point called by the api module.
  **/
-static s32
-e1000_get_link_up_info_82541(struct e1000_hw *hw, u16 *speed, u16 *duplex)
+static s32 e1000_get_link_up_info_82541(struct e1000_hw *hw, u16 *speed,
+                                        u16 *duplex)
 {
 	struct e1000_phy_info *phy = &hw->phy;
 	s32 ret_val;
@@ -468,7 +468,8 @@ e1000_get_link_up_info_82541(struct e1000_hw *hw, u16 *speed, u16 *duplex)
 	if (!phy->speed_downgraded)
 		goto out;
 
-	/* IGP01 PHY may advertise full duplex operation after speed
+	/*
+	 * IGP01 PHY may advertise full duplex operation after speed
 	 * downgrade even if it is operating at half duplex.
 	 * Here we set the duplex settings to match the duplex in the
 	 * link partner's capabilities.
@@ -477,9 +478,9 @@ e1000_get_link_up_info_82541(struct e1000_hw *hw, u16 *speed, u16 *duplex)
 	if (ret_val)
 		goto out;
 
-	if (!(data & NWAY_ER_LP_NWAY_CAPS))
+	if (!(data & NWAY_ER_LP_NWAY_CAPS)) {
 		*duplex = HALF_DUPLEX;
-	else {
+	} else {
 		ret_val = e1000_read_phy_reg(hw, PHY_LP_ABILITY, &data);
 		if (ret_val)
 			goto out;
@@ -507,8 +508,7 @@ out:
  *  reset and relase the semaphore (if necessary).
  *  This is a function pointer entry point called by the api module.
  **/
-static s32
-e1000_phy_hw_reset_82541(struct e1000_hw *hw)
+static s32 e1000_phy_hw_reset_82541(struct e1000_hw *hw)
 {
 	s32 ret_val;
 	u32 ledctl;
@@ -543,8 +543,7 @@ out:
  *  not established, we return -E1000_ERR_PHY (-2).  This is a function
  *  pointer entry point called by the api module.
  **/
-static s32
-e1000_setup_copper_link_82541(struct e1000_hw *hw)
+static s32 e1000_setup_copper_link_82541(struct e1000_hw *hw)
 {
 	struct e1000_phy_info *phy = &hw->phy;
 	struct e1000_dev_spec_82541 *dev_spec;
@@ -566,8 +565,9 @@ e1000_setup_copper_link_82541(struct e1000_hw *hw)
 	if (hw->mac.type == e1000_82541 || hw->mac.type == e1000_82547) {
 		dev_spec->dsp_config = e1000_dsp_config_disabled;
 		phy->mdix = 1;
-	} else
+	} else {
 		dev_spec->dsp_config = e1000_dsp_config_enabled;
+	}
 
 	ret_val = e1000_copper_link_setup_igp(hw);
 	if (ret_val)
@@ -598,8 +598,7 @@ out:
  *  results in the hw->mac structure. This is a function pointer entry
  *  point called by the api module.
  **/
-static s32
-e1000_check_for_link_82541(struct e1000_hw *hw)
+static s32 e1000_check_for_link_82541(struct e1000_hw *hw)
 {
 	struct e1000_mac_info *mac = &hw->mac;
 	s32 ret_val;
@@ -607,7 +606,8 @@ e1000_check_for_link_82541(struct e1000_hw *hw)
 
 	DEBUGFUNC("e1000_check_for_link_82541");
 
-	/* We only want to go out to the PHY registers to see if Auto-Neg
+	/*
+	 * We only want to go out to the PHY registers to see if Auto-Neg
 	 * has completed and/or if our link status has changed.  The
 	 * get_link_status flag is set upon receiving a Link Status
 	 * Change or Rx Sequence Error interrupt.
@@ -617,7 +617,8 @@ e1000_check_for_link_82541(struct e1000_hw *hw)
 		goto out;
 	}
 
-	/* First we want to see if the MII Status Register reports
+	/*
+	 * First we want to see if the MII Status Register reports
 	 * link.  If so, then we want to get the current speed/duplex
 	 * of the PHY.
 	 */
@@ -632,11 +633,14 @@ e1000_check_for_link_82541(struct e1000_hw *hw)
 
 	mac->get_link_status = FALSE;
 
-	/* Check if there was DownShift, must be checked
-	 * immediately after link-up */
+	/*
+	 * Check if there was DownShift, must be checked
+	 * immediately after link-up
+	 */
 	e1000_check_downshift_generic(hw);
 
-	/* If we are forcing speed/duplex, then we simply return since
+	/*
+	 * If we are forcing speed/duplex, then we simply return since
 	 * we have already determined whether we have link or not.
 	 */
 	if (!mac->autoneg) {
@@ -646,13 +650,15 @@ e1000_check_for_link_82541(struct e1000_hw *hw)
 
 	ret_val = e1000_config_dsp_after_link_change_82541(hw, TRUE);
 
-	/* Auto-Neg is enabled.  Auto Speed Detection takes care
+	/*
+	 * Auto-Neg is enabled.  Auto Speed Detection takes care
 	 * of MAC speed/duplex configuration.  So we only need to
 	 * configure Collision Distance in the MAC.
 	 */
 	e1000_config_collision_dist_generic(hw);
 
-	/* Configure Flow Control now that Auto-Neg has completed.
+	/*
+	 * Configure Flow Control now that Auto-Neg has completed.
 	 * First, we need to restore the desired flow control
 	 * settings because we may have had to re-autoneg with a
 	 * different link partner.
@@ -678,8 +684,8 @@ out:
  *  gigabit link is achieved to improve link quality.
  *  This is a function pointer entry point called by the api module.
  **/
-static s32
-e1000_config_dsp_after_link_change_82541(struct e1000_hw *hw, boolean_t link_up)
+static s32 e1000_config_dsp_after_link_change_82541(struct e1000_hw *hw,
+                                                    boolean_t link_up)
 {
 	struct e1000_phy_info *phy = &hw->phy;
 	struct e1000_dev_spec_82541 *dev_spec;
@@ -771,8 +777,10 @@ e1000_config_dsp_after_link_change_82541(struct e1000_hw *hw, boolean_t link_up)
 		}
 	} else {
 		if (dev_spec->dsp_config == e1000_dsp_config_activated) {
-			/* Save off the current value of register 0x2F5B
-			 * to be restored at the end of the routines. */
+			/*
+			 * Save off the current value of register 0x2F5B
+			 * to be restored at the end of the routines.
+			 */
 			ret_val = e1000_read_phy_reg(hw,
 			                            0x2F5B,
 			                            &phy_saved_data);
@@ -831,8 +839,10 @@ e1000_config_dsp_after_link_change_82541(struct e1000_hw *hw, boolean_t link_up)
 			goto out;
 		}
 
-		/* Save off the current value of register 0x2F5B
-		 * to be restored at the end of the routines. */
+		/*
+		 * Save off the current value of register 0x2F5B
+		 * to be restored at the end of the routines.
+		 */
 		ret_val = e1000_read_phy_reg(hw, 0x2F5B, &phy_saved_data);
 		if (ret_val)
 			goto out;
@@ -889,8 +899,7 @@ out:
  *  for each channel.  This is a function pointer entry point called by the
  *  api module.
  **/
-static s32
-e1000_get_cable_length_igp_82541(struct e1000_hw *hw)
+static s32 e1000_get_cable_length_igp_82541(struct e1000_hw *hw)
 {
 	struct e1000_phy_info *phy = &hw->phy;
 	s32 ret_val = E1000_SUCCESS;
@@ -965,8 +974,7 @@ out:
  *  maintained.  This is a function pointer entry point called by the
  *  api module.
  **/
-static s32
-e1000_set_d3_lplu_state_82541(struct e1000_hw *hw, boolean_t active)
+static s32 e1000_set_d3_lplu_state_82541(struct e1000_hw *hw, boolean_t active)
 {
 	struct e1000_phy_info *phy = &hw->phy;
 	s32 ret_val;
@@ -994,10 +1002,12 @@ e1000_set_d3_lplu_state_82541(struct e1000_hw *hw, boolean_t active)
 		if (ret_val)
 			goto out;
 
-		/* LPLU and SmartSpeed are mutually exclusive.  LPLU is used
+		/*
+		 * LPLU and SmartSpeed are mutually exclusive.  LPLU is used
 		 * during Dx states where the power conservation is most
 		 * important.  During driver activity we should enable
-		 * SmartSpeed, so performance is maintained. */
+		 * SmartSpeed, so performance is maintained.
+		 */
 		if (phy->smart_speed == e1000_smart_speed_on) {
 			ret_val = e1000_read_phy_reg(hw,
 			                            IGP01E1000_PHY_PORT_CONFIG,
@@ -1058,8 +1068,7 @@ out:
  *  of the LED so it can be later restored.  This is a function pointer entry
  *  point called by the api module.
  **/
-static s32
-e1000_setup_led_82541(struct e1000_hw *hw)
+static s32 e1000_setup_led_82541(struct e1000_hw *hw)
 {
 	struct e1000_dev_spec_82541 *dev_spec;
 	s32 ret_val;
@@ -1095,8 +1104,7 @@ out:
  *  to the default value, saved from the EEPROM.  This is a function pointer
  *  entry point called by the api module.
  **/
-static s32
-e1000_cleanup_led_82541(struct e1000_hw *hw)
+static s32 e1000_cleanup_led_82541(struct e1000_hw *hw)
 {
 	struct e1000_dev_spec_82541 *dev_spec;
 	s32 ret_val;
@@ -1123,8 +1131,7 @@ out:
  *
  *  Initializes the IGP PHY.
  **/
-static s32
-e1000_phy_init_script_82541(struct e1000_hw *hw)
+static s32 e1000_phy_init_script_82541(struct e1000_hw *hw)
 {
 	struct e1000_dev_spec_82541 *dev_spec;
 	u32 ret_val;
@@ -1142,8 +1149,10 @@ e1000_phy_init_script_82541(struct e1000_hw *hw)
 	/* Delay after phy reset to enable NVM configuration to load */
 	msec_delay(20);
 
-	/* Save off the current value of register 0x2F5B to be restored at
-	 * the end of this routine. */
+	/*
+	 * Save off the current value of register 0x2F5B to be restored at
+	 * the end of this routine.
+	 */
 	ret_val = e1000_read_phy_reg(hw, 0x2F5B, &phy_saved_data);
 
 	/* Disabled the PHY transmitter */
@@ -1239,8 +1248,7 @@ out:
  *  Allows the driver to enable/disable the PHY init script, if the PHY is an
  *  IGP PHY.  This is a function pointer entry point called by the api module.
  **/
-void
-e1000_init_script_state_82541(struct e1000_hw *hw, boolean_t state)
+void e1000_init_script_state_82541(struct e1000_hw *hw, boolean_t state)
 {
 	struct e1000_dev_spec_82541 *dev_spec;
 
@@ -1253,7 +1261,7 @@ e1000_init_script_state_82541(struct e1000_hw *hw, boolean_t state)
 
 	dev_spec = (struct e1000_dev_spec_82541 *)hw->dev_spec;
 
-	if (dev_spec == NULL) {
+	if (!dev_spec) {
 		DEBUGOUT("dev_spec pointer is set to NULL.\n");
 		goto out;
 	}
@@ -1270,8 +1278,7 @@ out:
  *
  *  Clears the hardware counters by reading the counter registers.
  **/
-static void
-e1000_clear_hw_cntrs_82541(struct e1000_hw *hw)
+static void e1000_clear_hw_cntrs_82541(struct e1000_hw *hw)
 {
 	volatile u32 temp;
 

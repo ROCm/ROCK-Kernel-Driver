@@ -29,8 +29,6 @@
 #ifndef _E1000_82571_H_
 #define _E1000_82571_H_
 
-#include "e1000_api.h"
-
 #define ID_LED_RESERVED_F746 0xF746
 #define ID_LED_DEFAULT_82573 ((ID_LED_DEF1_DEF2 << 12) | \
                               (ID_LED_OFF1_ON2  <<  8) | \
