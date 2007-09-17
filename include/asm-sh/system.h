@@ -11,6 +11,7 @@
 #include <asm/types.h>
 #include <asm/ptrace.h>
 
+#define AT_VECTOR_SIZE_ARCH 1
 /*
  *	switch_to() should switch tasks to task nr n, first
  */
