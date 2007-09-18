@@ -64,7 +64,7 @@ void compat_exit_robust_list(struct task_struct *curr)
 	if (upending)
 		handle_futex_death((void __user *)pending + futex_offset, curr, pip);
 
-	while (entry != (struct robust_list *) &head->list) {
+	while (compat_ptr(uentry) != &head->list) {
 		/*
 		 * A pending lock might already be on the list, so
 		 * dont process it twice:
