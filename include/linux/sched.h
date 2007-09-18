@@ -1,6 +1,7 @@
 #ifndef _LINUX_SCHED_H
 #define _LINUX_SCHED_H
 
+#include <linux/auxvec.h>	/* For AT_VECTOR_SIZE */
 
 /*
  * cloning flags:
@@ -89,11 +90,6 @@ struct exec_domain;
 struct futex_pi_state;
 struct bio;
 
-#include <linux/auxvec.h>
-#ifndef AT_VECTOR_SIZE_ARCH
-#define AT_VECTOR_SIZE_ARCH 0
-#endif
-#define AT_VECTOR_SIZE (AT_VECTOR_SIZE_ARCH + AT_VECTOR_SIZE_BASE + 1)
 /*
  * List of flags we want to share for kernel threads,
  * if only because they are not used by them anyway.

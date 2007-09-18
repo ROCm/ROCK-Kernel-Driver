@@ -2,6 +2,7 @@
 #define _LINUX_ELF_H
 
 #include <linux/types.h>
+#include <linux/auxvec.h>
 #include <linux/elf-em.h>
 #include <asm/elf.h>
 

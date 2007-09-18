@@ -26,8 +26,6 @@
 
 #define AT_SECURE 23   /* secure mode boolean */
 
-#ifdef __KERNEL__
-#define AT_VECTOR_SIZE_BASE  (14 + 2) /* generic entries in auxiliary table. */
-#endif
+#define AT_VECTOR_SIZE  44 /* Size of auxiliary table.  */
 
 #endif /* _LINUX_AUXVEC_H */
