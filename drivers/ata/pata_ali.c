@@ -462,6 +462,7 @@ static void ali_init_chipset(struct pci_dev *pdev)
 	 * The chipset revision selects the driver operations and
 	 * mode data.
 	 */
+	pci_read_config_byte(pdev, PCI_REVISION_ID, &rev);
 
 	if (rev >= 0x20 && rev < 0xC2) {
 		/* 1543-E/F, 1543C-C, 1543C-D, 1543C-E */
