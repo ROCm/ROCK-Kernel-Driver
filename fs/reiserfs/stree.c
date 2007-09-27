@@ -407,24 +407,24 @@ static int is_leaf(char *buf, int blocksize, struct buffer_head *bh)
 
 	blkh = (struct block_head *)buf;
 	if (blkh_level(blkh) != DISK_LEAF_NODE_LEVEL) {
-		reiserfs_error(NULL, "reiserfs-5080",
-		               "this should be caught earlier");
+		reiserfs_warning(NULL, "reiserfs-5080",
+		                 "this should be caught earlier");
 		return 0;
 	}
 
 	nr = blkh_nr_item(blkh);
 	if (nr < 1 || nr > ((blocksize - BLKH_SIZE) / (IH_SIZE + MIN_ITEM_LEN))) {
 		/* item number is too big or too small */
-		reiserfs_error(NULL, "reiserfs-5081",
-		               "nr_item seems wrong: %z", bh);
+		reiserfs_warning(NULL, "reiserfs-5081",
+		                 "nr_item seems wrong: %z", bh);
 		return 0;
 	}
 	ih = (struct item_head *)(buf + BLKH_SIZE) + nr - 1;
 	used_space = BLKH_SIZE + IH_SIZE * nr + (blocksize - ih_location(ih));
 	if (used_space != blocksize - blkh_free_space(blkh)) {
 		/* free space does not match to calculated amount of use space */
-		reiserfs_error(NULL, "reiserfs-5082",
-		               "free space seems wrong: %z", bh);
+		reiserfs_warning(NULL, "reiserfs-5082",
+		                 "free space seems wrong: %z", bh);
 		return 0;
 	}
 	// FIXME: it is_leaf will hit performance too much - we may have
@@ -435,28 +435,28 @@ static int is_leaf(char *buf, int blocksize, struct buffer_head *bh)
 	prev_location = blocksize;
 	for (i = 0; i < nr; i++, ih++) {
 		if (le_ih_k_type(ih) == TYPE_ANY) {
-			reiserfs_error(NULL, "reiserfs-5083",
-			               "wrong item type for item %h",
+			reiserfs_warning(NULL, "reiserfs-5083",
+					 "wrong item type for item %h",
 					 ih);
 			return 0;
 		}
 		if (ih_location(ih) >= blocksize
 		    || ih_location(ih) < IH_SIZE * nr) {
-			reiserfs_error(NULL, "reiserfs-5084",
-			               "item location seems wrong: %h",
+			reiserfs_warning(NULL, "reiserfs-5084",
+					 "item location seems wrong: %h",
 					 ih);
 			return 0;
 		}
 		if (ih_item_len(ih) < 1
 		    || ih_item_len(ih) > MAX_ITEM_LEN(blocksize)) {
-			reiserfs_error(NULL, "reiserfs-5085",
-			               "item length seems wrong: %h",
+			reiserfs_warning(NULL, "reiserfs-5085",
+					 "item length seems wrong: %h",
 					 ih);
 			return 0;
 		}
 		if (prev_location - ih_location(ih) != ih_item_len(ih)) {
-			reiserfs_error(NULL, "reiserfs-5086",
-			               "item location seems wrong "
+			reiserfs_warning(NULL, "reiserfs-5086",
+					 "item location seems wrong "
 					 "(second one): %h", ih);
 			return 0;
 		}
@@ -478,23 +478,23 @@ static int is_internal(char *buf, int blocksize, struct buffer_head *bh)
 	nr = blkh_level(blkh);
 	if (nr <= DISK_LEAF_NODE_LEVEL || nr > MAX_HEIGHT) {
 		/* this level is not possible for internal nodes */
-		reiserfs_error(NULL, "reiserfs-5087",
-		               "this should be caught earlier");
+		reiserfs_warning(NULL, "reiserfs-5087",
+				 "this should be caught earlier");
 		return 0;
 	}
 
 	nr = blkh_nr_item(blkh);
 	if (nr > (blocksize - BLKH_SIZE - DC_SIZE) / (KEY_SIZE + DC_SIZE)) {
 		/* for internal which is not root we might check min number of keys */
-		reiserfs_error(NULL, "reiserfs-5088",
-		               "number of key seems wrong: %z", bh);
+		reiserfs_warning(NULL, "reiserfs-5088",
+				 "number of key seems wrong: %z", bh);
 		return 0;
 	}
 
 	used_space = BLKH_SIZE + KEY_SIZE * nr + DC_SIZE * (nr + 1);
 	if (used_space != blocksize - blkh_free_space(blkh)) {
-		reiserfs_error(NULL, "reiserfs-5089",
-		               "free space seems wrong: %z", bh);
+		reiserfs_warning(NULL, "reiserfs-5089",
+				 "free space seems wrong: %z", bh);
 		return 0;
 	}
 	// one may imagine much more checks
@@ -506,8 +506,8 @@ static int is_internal(char *buf, int blocksize, struct buffer_head *bh)
 static int is_tree_node(struct buffer_head *bh, int level)
 {
 	if (B_LEVEL(bh) != level) {
-		reiserfs_error(NULL, "reiserfs-5090", "node level %d does "
-		               "not match to the expected one %d",
+		reiserfs_warning(NULL, "reiserfs-5090", "node level %d does "
+		                 "not match to the expected one %d",
 				 B_LEVEL(bh), level);
 		return 0;
 	}

@@ -378,6 +378,8 @@ void __reiserfs_error(struct super_block *sb, const char *id,
 {
 	do_reiserfs_warning(fmt);
 
+	BUG_ON(sb == NULL);
+
 	if (reiserfs_error_panic(sb))
 		__reiserfs_panic(sb, id, function, error_buf);
 
