@@ -692,6 +692,12 @@ int inet_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg,
 	return sk->sk_prot->sendmsg(iocb, sk, msg, size);
 }
 
+/* KABI safe workaround for 2.6.22.6 tcp_sendmsg change -jeffm */
+static int inet_tcp_sendmsg(struct kiocb *iocb, struct socket *sock,
+                     struct msghdr *msg, size_t size)
+{
+	return tcp_sendmsg(iocb, sock->sk, msg, size);
+}
 
 static ssize_t inet_sendpage(struct socket *sock, struct page *page, int offset, size_t size, int flags)
 {
@@ -831,7 +837,7 @@ const struct proto_ops inet_stream_ops = {
 	.shutdown	   = inet_shutdown,
 	.setsockopt	   = sock_common_setsockopt,
 	.getsockopt	   = sock_common_getsockopt,
-	.sendmsg	   = tcp_sendmsg,
+	.sendmsg	   = inet_tcp_sendmsg,
 	.recvmsg	   = sock_common_recvmsg,
 	.mmap		   = sock_no_mmap,
 	.sendpage	   = tcp_sendpage,

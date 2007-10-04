@@ -27,7 +27,6 @@
 #include <linux/pci.h>
 #include <linux/slab.h>
 #include <linux/mm.h>
-#include <linux/seq_file.h>
 #include <asm/uaccess.h>
 #include <linux/dma-mapping.h>
 #include <linux/moduleparam.h>
@@ -474,11 +473,28 @@ static void free_all_reserved_pages(void)
 	mutex_unlock(&list_mutex);
 }
 
+/*
+ * exports
+ */
+EXPORT_SYMBOL(snd_dma_alloc_pages);
+EXPORT_SYMBOL(snd_dma_alloc_pages_fallback);
+EXPORT_SYMBOL(snd_dma_free_pages);
+
+EXPORT_SYMBOL(snd_dma_get_reserved_buf);
+EXPORT_SYMBOL(snd_dma_reserve_buf);
+
+EXPORT_SYMBOL(snd_malloc_pages);
+EXPORT_SYMBOL(snd_free_pages);
 
 #ifdef CONFIG_PROC_FS
 /*
  * proc file interface
  */
+/* lmb, 2007-10-02 - reordering the include down here prevents
+ * previously opaque types from being expanded to protect the precious
+ * kABI - gross hack. */
+#include <linux/seq_file.h>
+
 #define SND_MEM_PROC_FILE	"driver/snd-page-alloc"
 static struct proc_dir_entry *snd_mem_proc;
 
@@ -640,17 +656,3 @@ static void __exit snd_mem_exit(void)
 
 module_init(snd_mem_init)
 module_exit(snd_mem_exit)
-
-
-/*
- * exports
- */
-EXPORT_SYMBOL(snd_dma_alloc_pages);
-EXPORT_SYMBOL(snd_dma_alloc_pages_fallback);
-EXPORT_SYMBOL(snd_dma_free_pages);
-
-EXPORT_SYMBOL(snd_dma_get_reserved_buf);
-EXPORT_SYMBOL(snd_dma_reserve_buf);
-
-EXPORT_SYMBOL(snd_malloc_pages);
-EXPORT_SYMBOL(snd_free_pages);
