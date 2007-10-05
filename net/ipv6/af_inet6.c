@@ -472,6 +472,13 @@ int inet6_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 
 EXPORT_SYMBOL(inet6_ioctl);
 
+/* KABI safe workaround for 2.6.22.6 tcp_sendmsg change -bwalle, copied from ipv4 */
+static int inet_tcp_sendmsg(struct kiocb *iocb, struct socket *sock,
+                     struct msghdr *msg, size_t size)
+{
+	return tcp_sendmsg(iocb, sock->sk, msg, size);
+}
+
 const struct proto_ops inet6_stream_ops = {
 	.family		   = PF_INET6,
 	.owner		   = THIS_MODULE,
@@ -487,7 +494,7 @@ const struct proto_ops inet6_stream_ops = {
 	.shutdown	   = inet_shutdown,		/* ok		*/
 	.setsockopt	   = sock_common_setsockopt,	/* ok		*/
 	.getsockopt	   = sock_common_getsockopt,	/* ok		*/
-	.sendmsg	   = tcp_sendmsg,		/* ok		*/
+	.sendmsg	   = inet_tcp_sendmsg,		/* ok		*/
 	.recvmsg	   = sock_common_recvmsg,	/* ok		*/
 	.mmap		   = sock_no_mmap,
 	.sendpage	   = tcp_sendpage,
