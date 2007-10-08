@@ -20,7 +20,9 @@
 #include <asm/idle.h>
 #include <asm/smp.h>
 
+#ifndef CONFIG_XEN
 atomic_t irq_err_count;
+#endif
 
 #ifdef CONFIG_DEBUG_STACKOVERFLOW
 /*
@@ -89,6 +91,7 @@ skip:
 		for_each_online_cpu(j)
 			seq_printf(p, "%10u ", cpu_pda(j)->__nmi_count);
 		seq_putc(p, '\n');
+#ifndef CONFIG_XEN
 #ifdef CONFIG_X86_LOCAL_APIC
 		seq_printf(p, "LOC: ");
 		for_each_online_cpu(j)
@@ -96,6 +99,7 @@ skip:
 		seq_putc(p, '\n');
 #endif
 		seq_printf(p, "ERR: %10u\n", atomic_read(&irq_err_count));
+#endif
 	}
 	return 0;
 }

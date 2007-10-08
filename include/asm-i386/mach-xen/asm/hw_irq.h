@@ -56,9 +56,6 @@ void setup_ioapic_dest(void);
 
 extern unsigned long io_apic_irqs;
 
-extern atomic_t irq_err_count;
-extern atomic_t irq_mis_count;
-
 #define IO_APIC_IRQ(x) (((x) >= 16) || ((1<<(x)) & io_apic_irqs))
 
 #endif /* _ASM_HW_IRQ_H */

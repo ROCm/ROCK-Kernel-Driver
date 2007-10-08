@@ -286,6 +286,7 @@ NORET_TYPE void machine_kexec(struct kimage *image)
  */
 static int __init setup_crashkernel(char *arg)
 {
+#ifndef CONFIG_XEN
 	unsigned long size, base;
 	char *p;
 	if (!arg)
@@ -301,6 +302,10 @@ static int __init setup_crashkernel(char *arg)
 		crashk_res.start = base;
 		crashk_res.end   = base + size - 1;
 	}
+#else
+	printk("Ignoring crashkernel command line, "
+	       "parameter will be supplied by xen\n");
+#endif
 	return 0;
 }
 early_param("crashkernel", setup_crashkernel);

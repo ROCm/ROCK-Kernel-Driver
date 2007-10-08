@@ -62,10 +62,10 @@
 unsigned long io_apic_irqs;
 
 #define clear_IO_APIC() ((void)0)
-#endif /* CONFIG_XEN */
-
+#else
 int (*ioapic_renumber_irq)(int ioapic, int irq);
 atomic_t irq_mis_count;
+#endif /* CONFIG_XEN */
 
 /* Where if anywhere is the i8259 connect in external int mode */
 static struct { int pin, apic; } ioapic_i8259 = { -1, -1 };
@@ -1220,12 +1220,13 @@ static int pin_2_irq(int idx, int apic, int pin)
 				irq += nr_ioapic_registers[i++];
 			irq += pin;
 
+#ifndef CONFIG_XEN
 			/*
 			 * For MPS mode, so far only needed by ES7000 platform
 			 */
 			if (ioapic_renumber_irq)
 				irq = ioapic_renumber_irq(apic, irq);
-
+#endif
 			break;
 		}
 		default:

@@ -243,7 +243,9 @@ EXPORT_SYMBOL(do_softirq);
  * Interrupt statistics:
  */
 
+#ifndef CONFIG_XEN
 atomic_t irq_err_count;
+#endif
 
 /*
  * /proc/interrupts printing:
@@ -289,6 +291,7 @@ skip:
 		for_each_online_cpu(j)
 			seq_printf(p, "%10u ", nmi_count(j));
 		seq_putc(p, '\n');
+#ifndef CONFIG_XEN
 #ifdef CONFIG_X86_LOCAL_APIC
 		seq_printf(p, "LOC: ");
 		for_each_online_cpu(j)
@@ -299,6 +302,7 @@ skip:
 		seq_printf(p, "ERR: %10u\n", atomic_read(&irq_err_count));
 #if defined(CONFIG_X86_IO_APIC)
 		seq_printf(p, "MIS: %10u\n", atomic_read(&irq_mis_count));
+#endif
 #endif
 	}
 	return 0;

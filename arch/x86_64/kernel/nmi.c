@@ -386,7 +386,7 @@ int __kprobes nmi_watchdog_tick(struct pt_regs * regs, unsigned reason)
 	return rc;
 }
 
-#endif
+#endif /* CONFIG_XEN */
 
 asmlinkage __kprobes void do_nmi(struct pt_regs * regs, long error_code)
 {

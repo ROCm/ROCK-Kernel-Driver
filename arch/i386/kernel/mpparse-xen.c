@@ -1095,8 +1095,10 @@ int mp_register_gsi(u32 gsi, int triggering, int polarity)
 
 	ioapic_pin = gsi - mp_ioapic_routing[ioapic].gsi_base;
 
+#ifndef CONFIG_XEN
 	if (ioapic_renumber_irq)
 		gsi = ioapic_renumber_irq(ioapic, gsi);
+#endif
 
 	/* 
 	 * Avoid pin reprogramming.  PRTs typically include entries  

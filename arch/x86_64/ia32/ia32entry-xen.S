@@ -40,19 +40,6 @@
 	movq	%rax,R8(%rsp)
 	.endm
 
-        .macro LOAD_ARGS32 offset
-        movl \offset(%rsp),%r11d
-        movl \offset+8(%rsp),%r10d
-        movl \offset+16(%rsp),%r9d
-        movl \offset+24(%rsp),%r8d
-        movl \offset+40(%rsp),%ecx
-        movl \offset+48(%rsp),%edx
-        movl \offset+56(%rsp),%esi
-        movl \offset+64(%rsp),%edi
-        movl \offset+72(%rsp),%eax
-        .endm
-
-
 #if defined (__XEN_X86_64)
 #include "../kernel/xen_entry.S"
 		
@@ -68,6 +55,18 @@
 #define __sti		sti	
 #endif			
 
+	.macro LOAD_ARGS32 offset
+	movl \offset(%rsp),%r11d
+	movl \offset+8(%rsp),%r10d
+	movl \offset+16(%rsp),%r9d
+	movl \offset+24(%rsp),%r8d
+	movl \offset+40(%rsp),%ecx
+	movl \offset+48(%rsp),%edx
+	movl \offset+56(%rsp),%esi
+	movl \offset+64(%rsp),%edi
+	movl \offset+72(%rsp),%eax
+	.endm
+	
 	.macro CFI_STARTPROC32 simple
 	CFI_STARTPROC	\simple
 	CFI_UNDEFINED	r8
