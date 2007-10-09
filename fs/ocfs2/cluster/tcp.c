@@ -129,7 +129,7 @@ static struct work_struct o2net_listen_work;
 static struct o2hb_callback_func o2net_hb_up, o2net_hb_down;
 #define O2NET_HB_PRI 0x2
 
-static struct blocking_notifier_head o2net_notifier_head;
+static BLOCKING_NOTIFIER_HEAD(o2net_notifier_head);
 
 static struct o2net_handshake *o2net_hand;
 static struct o2net_msg *o2net_keep_req, *o2net_keep_resp;
