@@ -33,6 +33,32 @@ static u32 kexec_pmd1[1024] PAGE_ALIGNED;
 static u32 kexec_pte0[1024] PAGE_ALIGNED;
 static u32 kexec_pte1[1024] PAGE_ALIGNED;
 
+/*
+ * A architecture hook called to validate the
+ * proposed image and prepare the control pages
+ * as needed.  The pages for KEXEC_CONTROL_CODE_SIZE
+ * have been allocated, but the segments have yet
+ * been copied into the kernel.
+ *
+ * Do what every setup is needed on image and the
+ * reboot code buffer to allow us to avoid allocations
+ * later.
+ *
+ * Currently nothing.
+ */
+int machine_kexec_prepare(struct kimage *image)
+{
+	return 0;
+}
+
+/*
+ * Undo anything leftover by machine_kexec_prepare
+ * when an image is freed.
+ */
+void machine_kexec_cleanup(struct kimage *image)
+{
+}
+
 #ifdef CONFIG_XEN
 
 #define __ma(x) (pfn_to_mfn(__pa((x)) >> PAGE_SHIFT) << PAGE_SHIFT)
@@ -66,32 +92,6 @@ void machine_kexec_setup_load_arg(xen_kexec_image_t *xki, struct kimage *image)
 }
 
 #endif /* CONFIG_XEN */
-
-/*
- * A architecture hook called to validate the
- * proposed image and prepare the control pages
- * as needed.  The pages for KEXEC_CONTROL_CODE_SIZE
- * have been allocated, but the segments have yet
- * been copied into the kernel.
- *
- * Do what every setup is needed on image and the
- * reboot code buffer to allow us to avoid allocations
- * later.
- *
- * Currently nothing.
- */
-int machine_kexec_prepare(struct kimage *image)
-{
-	return 0;
-}
-
-/*
- * Undo anything leftover by machine_kexec_prepare
- * when an image is freed.
- */
-void machine_kexec_cleanup(struct kimage *image)
-{
-}
 
 #ifndef CONFIG_XEN
 /*
