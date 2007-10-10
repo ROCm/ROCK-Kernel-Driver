@@ -1243,6 +1243,8 @@ static void piix_iocfg_bit18_quirk(struct pci_dev *pdev)
 				DMI_MATCH(DMI_PRODUCT_NAME, "M570U"),
 			},
 		},
+
+		{ }	/* terminate list */
 	};
 	u32 iocfg;
 
