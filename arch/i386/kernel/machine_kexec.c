@@ -33,30 +33,46 @@ static u32 kexec_pmd1[1024] PAGE_ALIGNED;
 static u32 kexec_pte0[1024] PAGE_ALIGNED;
 static u32 kexec_pte1[1024] PAGE_ALIGNED;
 
-/*
- * A architecture hook called to validate the
- * proposed image and prepare the control pages
- * as needed.  The pages for KEXEC_CONTROL_CODE_SIZE
- * have been allocated, but the segments have yet
- * been copied into the kernel.
- *
- * Do what every setup is needed on image and the
- * reboot code buffer to allow us to avoid allocations
- * later.
- *
- * Currently nothing.
- */
-int machine_kexec_prepare(struct kimage *image)
+static void set_idt(void *newidt, __u16 limit)
 {
-	return 0;
-}
+	struct Xgt_desc_struct curidt;
 
-/*
- * Undo anything leftover by machine_kexec_prepare
- * when an image is freed.
- */
-void machine_kexec_cleanup(struct kimage *image)
+	/* ia32 supports unaliged loads & stores */
+	curidt.size    = limit;
+	curidt.address = (unsigned long)newidt;
+
+	load_idt(&curidt);
+};
+
+
+static void set_gdt(void *newgdt, __u16 limit)
 {
+	struct Xgt_desc_struct curgdt;
+
+	/* ia32 supports unaligned loads & stores */
+	curgdt.size    = limit;
+	curgdt.address = (unsigned long)newgdt;
+
+	load_gdt(&curgdt);
+};
+
+static void load_segments(void)
+{
+#define __STR(X) #X
+#define STR(X) __STR(X)
+
+	__asm__ __volatile__ (
+		"\tljmp $"STR(__KERNEL_CS)",$1f\n"
+		"\t1:\n"
+		"\tmovl $"STR(__KERNEL_DS)",%%eax\n"
+		"\tmovl %%eax,%%ds\n"
+		"\tmovl %%eax,%%es\n"
+		"\tmovl %%eax,%%fs\n"
+		"\tmovl %%eax,%%gs\n"
+		"\tmovl %%eax,%%ss\n"
+		::: "eax", "memory");
+#undef STR
+#undef __STR
 }
 
 #ifdef CONFIG_XEN
@@ -93,6 +109,32 @@ void machine_kexec_setup_load_arg(xen_kexec_image_t *xki, struct kimage *image)
 
 #endif /* CONFIG_XEN */
 
+/*
+ * A architecture hook called to validate the
+ * proposed image and prepare the control pages
+ * as needed.  The pages for KEXEC_CONTROL_CODE_SIZE
+ * have been allocated, but the segments have yet
+ * been copied into the kernel.
+ *
+ * Do what every setup is needed on image and the
+ * reboot code buffer to allow us to avoid allocations
+ * later.
+ *
+ * Currently nothing.
+ */
+int machine_kexec_prepare(struct kimage *image)
+{
+	return 0;
+}
+
+/*
+ * Undo anything leftover by machine_kexec_prepare
+ * when an image is freed.
+ */
+void machine_kexec_cleanup(struct kimage *image)
+{
+}
+
 #ifndef CONFIG_XEN
 /*
  * Do not allocate memory (or fail in any way) in machine_kexec().
@@ -124,6 +166,23 @@ NORET_TYPE void machine_kexec(struct kimage *image)
 	page_list[PA_PTE_1] = __pa(kexec_pte1);
 	page_list[VA_PTE_1] = (unsigned long)kexec_pte1;
 
+	/* The segment registers are funny things, they have both a
+	 * visible and an invisible part.  Whenever the visible part is
+	 * set to a specific selector, the invisible part is loaded
+	 * with from a table in memory.  At no other time is the
+	 * descriptor table in memory accessed.
+	 *
+	 * I take advantage of this here by force loading the
+	 * segments, before I zap the gdt with an invalid value.
+	 */
+	load_segments();
+	/* The gdt & idt are now invalid.
+	 * If you want to load them you must set up your own idt & gdt.
+	 */
+	set_gdt(phys_to_virt(0),0);
+	set_idt(phys_to_virt(0),0);
+
+	/* now call it */
 	relocate_kernel((unsigned long)image->head, (unsigned long)page_list,
 			image->start, cpu_has_pae);
 }
@@ -137,7 +196,6 @@ NORET_TYPE void machine_kexec(struct kimage *image)
  */
 static int __init parse_crashkernel(char *arg)
 {
-#ifndef CONFIG_XEN
 	unsigned long size, base;
 	size = memparse(arg, &arg);
 	if (*arg == '@') {
@@ -148,10 +206,6 @@ static int __init parse_crashkernel(char *arg)
 		crashk_res.start = base;
 		crashk_res.end   = base + size - 1;
 	}
-#else
-	printk("Ignoring crashkernel command line, "
-	       "parameter will be supplied by xen\n");
-#endif
 	return 0;
 }
 early_param("crashkernel", parse_crashkernel);

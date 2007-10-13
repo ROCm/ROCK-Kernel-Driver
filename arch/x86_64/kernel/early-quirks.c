@@ -13,6 +13,9 @@
 #include <linux/acpi.h>
 #include <linux/pci_ids.h>
 #include <asm/pci-direct.h>
+#ifdef CONFIG_IOMMU
+#include <asm/iommu.h>
+#endif
 #include <asm/io_apic.h>
 #include <asm/apic.h>
 #include <asm/dma.h>
@@ -55,14 +58,12 @@ static void __init nvidia_bugs(void)
 
 static void __init ati_bugs(void)
 {
-#ifndef CONFIG_XEN
 #ifdef CONFIG_X86_IO_APIC
 	if (timer_over_8254 == 1) {
 		timer_over_8254 = 0;
 		printk(KERN_INFO
 	 	"ATI board detected. Disabling timer routing over 8254.\n");
 	}
-#endif
 #endif
 }
 

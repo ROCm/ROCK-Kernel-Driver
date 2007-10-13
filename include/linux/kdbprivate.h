@@ -435,7 +435,7 @@ struct kdb_running_process {
 
 extern struct kdb_running_process kdb_running_process[/* NR_CPUS */];
 
-extern void kdb_save_running(struct pt_regs *);
+extern int kdb_save_running(struct pt_regs *, kdb_reason_t, kdb_reason_t, int, kdb_dbtrap_t);
 extern void kdb_unsave_running(struct pt_regs *);
 extern struct task_struct *kdb_curr_task(int);
 

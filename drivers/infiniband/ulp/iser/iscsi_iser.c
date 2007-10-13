@@ -639,7 +639,7 @@ static int __init iser_init(void)
 	ig.desc_cache = kmem_cache_create("iser_descriptors",
 					  sizeof (struct iser_desc),
 					  0, SLAB_HWCACHE_ALIGN,
-					  NULL, NULL);
+					  NULL);
 	if (ig.desc_cache == NULL)
 		return -ENOMEM;
 

@@ -1097,8 +1097,27 @@ struct kdba_main_loop_data {
  *	to put switch_stack on a 16 byte boundary.
  */
 
-static KDBA_UNWIND_HANDLER(do_kdba_main_loop, struct kdba_main_loop_data, data->reason,
-	data->ret = kdb_main_loop(data->reason, data->reason2, data->error, data->db_result, data->regs));
+static void
+do_kdba_main_loop(struct unw_frame_info *info, void *vdata)
+{
+	struct kdba_main_loop_data *data = vdata;
+	struct switch_stack *sw, *prev_sw;
+	struct pt_regs *prev_regs;
+	struct kdb_running_process *krp =
+		kdb_running_process + smp_processor_id();
+	KDB_DEBUG_STATE(__FUNCTION__, data->reason);
+	prev_sw = krp->arch.sw;
+	sw = (struct switch_stack *)(info+1);
+	/* padding from unw_init_running */
+	sw = (struct switch_stack *)(((unsigned long)sw + 15) & ~15);
+	krp->arch.sw = sw;
+	prev_regs = krp->regs;
+	data->ret = kdb_save_running(data->regs, data->reason, data->reason2,
+			data->error, data->db_result);
+	kdb_unsave_running(data->regs);
+	krp->regs = prev_regs;
+	krp->arch.sw = prev_sw;
+}
 
 /*
  * kdba_main_loop

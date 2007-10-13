@@ -58,9 +58,6 @@
 #ifdef CONFIG_IPV6_TUNNEL
 #include <net/ip6_tunnel.h>
 #endif
-#ifdef CONFIG_IPV6_MIP6
-#include <net/mip6.h>
-#endif
 
 #include <asm/uaccess.h>
 #include <asm/system.h>
@@ -472,13 +469,6 @@ int inet6_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 
 EXPORT_SYMBOL(inet6_ioctl);
 
-/* KABI safe workaround for 2.6.22.6 tcp_sendmsg change -bwalle, copied from ipv4 */
-static int inet_tcp_sendmsg(struct kiocb *iocb, struct socket *sock,
-                     struct msghdr *msg, size_t size)
-{
-	return tcp_sendmsg(iocb, sock->sk, msg, size);
-}
-
 const struct proto_ops inet6_stream_ops = {
 	.family		   = PF_INET6,
 	.owner		   = THIS_MODULE,
@@ -494,7 +484,7 @@ const struct proto_ops inet6_stream_ops = {
 	.shutdown	   = inet_shutdown,		/* ok		*/
 	.setsockopt	   = sock_common_setsockopt,	/* ok		*/
 	.getsockopt	   = sock_common_getsockopt,	/* ok		*/
-	.sendmsg	   = inet_tcp_sendmsg,		/* ok		*/
+	.sendmsg	   = tcp_sendmsg,		/* ok		*/
 	.recvmsg	   = sock_common_recvmsg,	/* ok		*/
 	.mmap		   = sock_no_mmap,
 	.sendpage	   = tcp_sendpage,
@@ -860,9 +850,6 @@ static int __init inet6_init(void)
 	ipv6_frag_init();
 	ipv6_nodata_init();
 	ipv6_destopt_init();
-#ifdef CONFIG_IPV6_MIP6
-	mip6_init();
-#endif
 
 	/* Init v6 transport protocols. */
 	udpv6_init();
@@ -928,9 +915,7 @@ static void __exit inet6_exit(void)
 
 	/* Cleanup code parts. */
 	ipv6_packet_cleanup();
-#ifdef CONFIG_IPV6_MIP6
-	mip6_fini();
-#endif
+
 	addrconf_cleanup();
 	ip6_flowlabel_cleanup();
 	ip6_route_cleanup();

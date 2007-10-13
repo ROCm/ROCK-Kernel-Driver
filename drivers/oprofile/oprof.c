@@ -5,10 +5,6 @@
  * @remark Read the file COPYING
  *
  * @author John Levon <levon@movementarian.org>
- *
- * Modified by Aravind Menon for Xen
- * These modifications are:
- * Copyright (C) 2005 Hewlett-Packard Co.
  */
 
 #include <linux/kernel.h>
@@ -23,7 +19,7 @@
 #include "cpu_buffer.h"
 #include "buffer_sync.h"
 #include "oprofile_stats.h"
-
+ 
 struct oprofile_operations oprofile_ops;
 
 unsigned long oprofile_started;
@@ -36,34 +32,6 @@ static DEFINE_MUTEX(start_mutex);
    1 - use the timer int mechanism regardless
  */
 static int timer = 0;
-
-#ifdef CONFIG_XEN
-int oprofile_set_active(int active_domains[], unsigned int adomains)
-{
-	int err;
-
-	if (!oprofile_ops.set_active)
-		return -EINVAL;
-
-       mutex_lock(&start_mutex);
-       err = oprofile_ops.set_active(active_domains, adomains);
-       mutex_unlock(&start_mutex);
-	return err;
-}
-
-int oprofile_set_passive(int passive_domains[], unsigned int pdomains)
-{
-	int err;
-
-	if (!oprofile_ops.set_passive)
-		return -EINVAL;
-
-       mutex_lock(&start_mutex);
-       err = oprofile_ops.set_passive(passive_domains, pdomains);
-       mutex_unlock(&start_mutex);
-	return err;
-}
-#endif
 
 int oprofile_setup(void)
 {
@@ -85,9 +53,24 @@ int oprofile_setup(void)
 	 * us missing task deaths and eventually oopsing
 	 * when trying to process the event buffer.
 	 */
+	if (oprofile_ops.sync_start) {
+		int sync_ret = oprofile_ops.sync_start();
+		switch (sync_ret) {
+		case 0:
+			goto post_sync;
+		case 1:
+			goto do_generic;
+		case -1:
+			goto out3;
+		default:
+			goto out3;
+		}
+	}
+do_generic:
 	if ((err = sync_start()))
 		goto out3;
 
+post_sync:
 	is_setup = 1;
 	mutex_unlock(&start_mutex);
 	return 0;
@@ -150,7 +133,20 @@ out:
 void oprofile_shutdown(void)
 {
 	mutex_lock(&start_mutex);
+	if (oprofile_ops.sync_stop) {
+		int sync_ret = oprofile_ops.sync_stop();
+		switch (sync_ret) {
+		case 0:
+			goto post_sync;
+		case 1:
+			goto do_generic;
+		default:
+			goto post_sync;
+		}
+	}
+do_generic:
 	sync_stop();
+post_sync:
 	if (oprofile_ops.shutdown)
 		oprofile_ops.shutdown();
 	is_setup = 0;

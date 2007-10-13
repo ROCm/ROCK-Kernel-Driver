@@ -208,13 +208,6 @@ static void *i8xx_alloc_pages(void)
 	if (page == NULL)
 		return NULL;
 
-#ifdef CONFIG_XEN
-	if (xen_create_contiguous_region((unsigned long)page_address(page), 2, 32)) {
-		__free_pages(page, 2);
-		return NULL;
-	}
-#endif
-
 	if (change_page_attr(page, 4, PAGE_KERNEL_NOCACHE) < 0) {
 		change_page_attr(page, 4, PAGE_KERNEL);
 		global_flush_tlb();
@@ -223,7 +216,6 @@ static void *i8xx_alloc_pages(void)
 	}
 	global_flush_tlb();
 	get_page(page);
-	SetPageLocked(page);
 	atomic_inc(&agp_bridge->current_memory_agp);
 	return page_address(page);
 }
@@ -238,11 +230,7 @@ static void i8xx_destroy_pages(void *addr)
 	page = virt_to_page(addr);
 	change_page_attr(page, 4, PAGE_KERNEL);
 	global_flush_tlb();
-#ifdef CONFIG_XEN
-	xen_destroy_contiguous_region((unsigned long)page_address(page), 2);
-#endif
 	put_page(page);
-	unlock_page(page);
 	__free_pages(page, 2);
 	atomic_dec(&agp_bridge->current_memory_agp);
 }
@@ -518,7 +506,7 @@ static void intel_i830_init_gtt_entries(void)
 			break;
 		}
 	} else {
-		switch (gmch_ctrl & I830_GMCH_GMS_MASK) {
+		switch (gmch_ctrl & I855_GMCH_GMS_MASK) {
 		case I855_GMCH_GMS_STOLEN_1M:
 			gtt_entries = MB(1) - KB(size);
 			break;
@@ -926,6 +914,7 @@ static int intel_i915_create_gatt_table(struct agp_bridge_data *bridge)
 	struct aper_size_info_fixed *size;
 	int num_entries;
 	u32 temp, temp2;
+	int gtt_map_size = 256 * 1024;
 
 	size = agp_bridge->current_size;
 	page_order = size->page_order;
@@ -935,15 +924,19 @@ static int intel_i915_create_gatt_table(struct agp_bridge_data *bridge)
 	pci_read_config_dword(intel_private.pcidev, I915_MMADDR, &temp);
 	pci_read_config_dword(intel_private.pcidev, I915_PTEADDR,&temp2);
 
-	intel_private.gtt = ioremap(temp2, 256 * 1024);
+	if (IS_G33)
+	    gtt_map_size = 1024 * 1024; /* 1M on G33 */
+	intel_private.gtt = ioremap(temp2, gtt_map_size);
 	if (!intel_private.gtt)
 		return -ENOMEM;
 
 	temp &= 0xfff80000;
 
 	intel_private.registers = ioremap(temp,128 * 4096);
-	if (!intel_private.registers)
+	if (!intel_private.registers) {
+		iounmap(intel_private.gtt);
 		return -ENOMEM;
+	}
 
 	temp = readl(intel_private.registers+I810_PGETBL_CTL) & 0xfffff000;
 	global_cache_flush();	/* FIXME: ? */
@@ -997,13 +990,15 @@ static int intel_i965_create_gatt_table(struct agp_bridge_data *bridge)
        temp &= 0xfff00000;
        intel_private.gtt = ioremap((temp + (512 * 1024)) , 512 * 1024);
 
-       if (!intel_private.gtt)
-               return -ENOMEM;
+	if (!intel_private.gtt)
+		return -ENOMEM;
 
 
        intel_private.registers = ioremap(temp,128 * 4096);
-       if (!intel_private.registers)
-               return -ENOMEM;
+       if (!intel_private.registers) {
+		iounmap(intel_private.gtt);
+		return -ENOMEM;
+	}
 
        temp = readl(intel_private.registers+I810_PGETBL_CTL) & 0xfffff000;
        global_cache_flush();   /* FIXME: ? */

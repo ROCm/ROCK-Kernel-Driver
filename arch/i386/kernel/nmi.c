@@ -30,15 +30,7 @@
 
 #include "mach_traps.h"
 
-#ifdef CONFIG_SYSCTL
 int unknown_nmi_panic;
-static int unknown_nmi_panic_callback(struct pt_regs *regs, int cpu);
-#endif
-
-extern void die_nmi(struct pt_regs *, const char *msg);
-
-#ifndef CONFIG_XEN
-
 int nmi_watchdog_enabled;
 
 static cpumask_t backtrace_mask = CPU_MASK_NONE;
@@ -55,6 +47,9 @@ unsigned int nmi_watchdog = NMI_DEFAULT;
 static unsigned int nmi_hz = HZ;
 
 static DEFINE_PER_CPU(short, wd_enabled);
+
+/* local prototypes */
+static int unknown_nmi_panic_callback(struct pt_regs *regs, int cpu);
 
 static int endflag __initdata = 0;
 
@@ -82,7 +77,7 @@ static int __init check_nmi_watchdog(void)
 	unsigned int *prev_nmi_count;
 	int cpu;
 
-	if ((nmi_watchdog == NMI_NONE) || (nmi_watchdog == NMI_DEFAULT))
+	if ((nmi_watchdog == NMI_NONE) || (nmi_watchdog == NMI_DISABLED))
 		return 0;
 
 	if (!atomic_read(&nmi_active))
@@ -120,12 +115,12 @@ static int __init check_nmi_watchdog(void)
 			atomic_dec(&nmi_active);
 		}
 	}
+	endflag = 1;
 	if (!atomic_read(&nmi_active)) {
 		kfree(prev_nmi_count);
 		atomic_set(&nmi_active, -1);
 		return -1;
 	}
-	endflag = 1;
 	printk("OK.\n");
 
 	/* now that we know it works we can reduce NMI frequency to
@@ -300,7 +295,7 @@ static unsigned int
 	last_irq_sums [NR_CPUS],
 	alert_counter [NR_CPUS];
 
-void touch_nmi_watchdog (void)
+void touch_nmi_watchdog(void)
 {
 	if (nmi_watchdog > 0) {
 		unsigned cpu;
@@ -309,8 +304,10 @@ void touch_nmi_watchdog (void)
 		 * Just reset the alert counters, (other CPUs might be
 		 * spinning on locks we hold):
 		 */
-		for_each_present_cpu (cpu)
-			alert_counter[cpu] = 0;
+		for_each_present_cpu(cpu) {
+			if (alert_counter[cpu])
+				alert_counter[cpu] = 0;
+		}
 	}
 
 	/*
@@ -319,6 +316,8 @@ void touch_nmi_watchdog (void)
 	touch_softlockup_watchdog();
 }
 EXPORT_SYMBOL(touch_nmi_watchdog);
+
+extern void die_nmi(struct pt_regs *, const char *msg);
 
 __kprobes int nmi_watchdog_tick(struct pt_regs * regs, unsigned reason)
 {
@@ -354,7 +353,7 @@ __kprobes int nmi_watchdog_tick(struct pt_regs * regs, unsigned reason)
 	 * Take the local apic timer and PIT/HPET into account. We don't
 	 * know which one is active, when we have highres/dyntick on
 	 */
-	sum = per_cpu(irq_stat, cpu).apic_timer_irqs + kstat_irqs(0);
+	sum = per_cpu(irq_stat, cpu).apic_timer_irqs + kstat_cpu(cpu).irqs[0];
 
 	/* if the none of the timers isn't firing, this cpu isn't doing much */
 	if (!touched && last_irq_sums[cpu] == sum) {
@@ -390,8 +389,6 @@ __kprobes int nmi_watchdog_tick(struct pt_regs * regs, unsigned reason)
 	return rc;
 }
 
-#endif /* CONFIG_XEN */
-
 int do_nmi_callback(struct pt_regs * regs, int cpu)
 {
 #ifdef CONFIG_SYSCTL
@@ -413,7 +410,6 @@ static int unknown_nmi_panic_callback(struct pt_regs *regs, int cpu)
 	return 0;
 }
 
-#ifndef CONFIG_XEN
 /*
  * proc handler for /proc/sys/kernel/nmi
  */
@@ -428,7 +424,7 @@ int proc_nmi_enabled(struct ctl_table *table, int write, struct file *file,
 	if (!!old_state == !!nmi_watchdog_enabled)
 		return 0;
 
-	if (atomic_read(&nmi_active) < 0) {
+	if (atomic_read(&nmi_active) < 0 || nmi_watchdog == NMI_DISABLED) {
 		printk( KERN_WARNING "NMI watchdog is permanently disabled\n");
 		return -EIO;
 	}
@@ -452,11 +448,9 @@ int proc_nmi_enabled(struct ctl_table *table, int write, struct file *file,
 	}
 	return 0;
 }
-#endif
 
 #endif
 
-#ifndef CONFIG_XEN
 void __trigger_all_cpu_backtrace(void)
 {
 	int i;
@@ -472,4 +466,3 @@ void __trigger_all_cpu_backtrace(void)
 
 EXPORT_SYMBOL(nmi_active);
 EXPORT_SYMBOL(nmi_watchdog);
-#endif

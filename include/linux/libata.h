@@ -231,6 +231,8 @@ enum {
 	ATA_HOST_SIMPLEX	= (1 << 0),	/* Host is simplex, one DMA channel per host only */
 	ATA_HOST_STARTED	= (1 << 1),	/* Host started */
 
+	/* bits 24:31 of host->flags are reserved for LLD specific flags */
+
 	/* various lengths of time */
 	ATA_TMOUT_BOOT		= 30 * HZ,	/* heuristic */
 	ATA_TMOUT_BOOT_QUICK	= 7 * HZ,	/* heuristic */
@@ -325,8 +327,8 @@ enum {
 	ATA_HORKAGE_NODMA	= (1 << 1),	/* DMA problems */
 	ATA_HORKAGE_NONCQ	= (1 << 2),	/* Don't use NCQ */
 	ATA_HORKAGE_MAX_SEC_128	= (1 << 3),	/* Limit max sects to 128 */
-	ATA_HORKAGE_SKIP_PM	= (1 << 4),	/* Skip PM operations */
-	ATA_HORKAGE_BROKEN_HPA	= (1 << 5),	/* Broken HPA */
+	ATA_HORKAGE_BROKEN_HPA	= (1 << 4),	/* Broken HPA */
+	ATA_HORKAGE_SKIP_PM	= (1 << 5),	/* Skip PM operations */
 	ATA_HORKAGE_HPA_SIZE	= (1 << 6), 	/* Reports native size off by one */
 
 	/* DMA mask for user DMA control: User visible values do not
@@ -446,6 +448,7 @@ struct ata_queued_cmd {
 	ata_qc_cb_t		complete_fn;
 
 	void			*private_data;
+	void			*lldd_task;
 };
 
 struct ata_port_stats {
@@ -823,8 +826,7 @@ extern void ata_port_queue_task(struct ata_port *ap, work_func_t fn,
 extern u32 ata_wait_register(void __iomem *reg, u32 mask, u32 val,
 			     unsigned long interval_msec,
 			     unsigned long timeout_msec);
-extern unsigned int ata_dev_try_classify(struct ata_device *dev, int present,
-					 u8 *r_err);
+extern unsigned int ata_dev_try_classify(struct ata_port *, unsigned int, u8 *);
 
 /*
  * Default driver ops implementations

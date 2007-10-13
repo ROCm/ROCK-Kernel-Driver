@@ -23,7 +23,7 @@
 extern void vide(void);
 __asm__(".align 4\nvide: ret");
 
-#if defined(CONFIG_X86_LOCAL_APIC) && !defined(CONFIG_XEN)
+#ifdef CONFIG_X86_LOCAL_APIC
 #define ENABLE_C1E_MASK         0x18000000
 #define CPUID_PROCESSOR_SIGNATURE       1
 #define CPUID_XFAM              0x0ff00000
@@ -234,6 +234,9 @@ static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 
 	switch (c->x86) {
 	case 15:
+	/* Use K8 tuning for Fam10h and Fam11h */
+	case 0x10:
+	case 0x11:
 		set_bit(X86_FEATURE_K8, c->x86_capability);
 		break;
 	case 6:
@@ -282,12 +285,9 @@ static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 			num_cache_leaves = 3;
 	}
 
-#if defined(CONFIG_X86_LOCAL_APIC) && !defined(CONFIG_XEN)
-	if (amd_apic_timer_broken()) {
-		extern int local_apic_timer_disabled;
-
+#ifdef CONFIG_X86_LOCAL_APIC
+	if (amd_apic_timer_broken())
 		local_apic_timer_disabled = 1;
-	}
 #endif
 
 	if (c->x86 == 0x10 && !force_mwait)

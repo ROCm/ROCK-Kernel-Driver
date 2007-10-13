@@ -33,17 +33,10 @@
 #include <linux/err.h>
 #include <linux/device.h>
 #include <linux/efi.h>
-
-#if defined(__mc68000__) || defined(CONFIG_APUS)
-#include <asm/setup.h>
-#endif
-
-#include <asm/io.h>
-#include <asm/uaccess.h>
-#include <asm/page.h>
-#include <asm/pgtable.h>
-
 #include <linux/fb.h>
+
+#include <asm/fb.h>
+
 
     /*
      *  Frame buffer device initialization and setup routines
@@ -251,8 +244,17 @@ static void fb_set_logo(struct fb_info *info,
 	u8 xor = (info->fix.visual == FB_VISUAL_MONO01) ? 0xff : 0;
 	u8 fg = 1, d;
 
-	if (fb_get_color_depth(&info->var, &info->fix) == 3)
+	switch (fb_get_color_depth(&info->var, &info->fix)) {
+	case 1:
+		fg = 1;
+		break;
+	case 2:
+		fg = 3;
+		break;
+	default:
 		fg = 7;
+		break;
+	}
 
 	if (info->fix.visual == FB_VISUAL_MONO01 ||
 	    info->fix.visual == FB_VISUAL_MONO10)
@@ -317,13 +319,6 @@ static struct logo_data {
 	int needs_cmapreset;
 	const struct linux_logo *logo;
 } fb_logo __read_mostly;
-
-#define FB_LOGO_EX_NUM_MAX 10
-static struct logo_data_extra {
-	const struct linux_logo *logo;
-	unsigned int n;
-} fb_logo_ex[FB_LOGO_EX_NUM_MAX];
-static unsigned int fb_logo_ex_num;
 
 static void fb_rotate_logo_ud(const u8 *in, u8 *out, u32 width, u32 height)
 {
@@ -418,98 +413,6 @@ static void fb_do_show_logo(struct fb_info *info, struct fb_image *image,
 	}
 }
 
-#ifdef CONFIG_FB
-void fb_append_extra_logo(const struct linux_logo *logo, unsigned int n)
-{
-	if (!n || fb_logo_ex_num == FB_LOGO_EX_NUM_MAX)
-		return;
-
-	fb_logo_ex[fb_logo_ex_num].logo = logo;
-	fb_logo_ex[fb_logo_ex_num].n = n;
-	fb_logo_ex_num++;
-}
-#endif
-
-int fb_prepare_logo(struct fb_info *info, int rotate)
-{
-	int depth = fb_get_color_depth(&info->var, &info->fix);
-	unsigned int yres, height, i;
-
-	memset(&fb_logo, 0, sizeof(struct logo_data));
-
-	if (info->flags & FBINFO_MISC_TILEBLITTING ||
-	    info->flags & FBINFO_MODULE)
-		return 0;
-
-	if (info->fix.visual == FB_VISUAL_DIRECTCOLOR) {
-		depth = info->var.blue.length;
-		if (info->var.red.length < depth)
-			depth = info->var.red.length;
-		if (info->var.green.length < depth)
-			depth = info->var.green.length;
-	}
-
-	if (info->fix.visual == FB_VISUAL_STATIC_PSEUDOCOLOR && depth > 4) {
-		/* assume console colormap */
-		depth = 4;
-	}
-
-	if (depth >= 8) {
-		switch (info->fix.visual) {
-		case FB_VISUAL_TRUECOLOR:
-			fb_logo.needs_truepalette = 1;
-			break;
-		case FB_VISUAL_DIRECTCOLOR:
-			fb_logo.needs_directpalette = 1;
-			fb_logo.needs_cmapreset = 1;
-			break;
-		case FB_VISUAL_PSEUDOCOLOR:
-			fb_logo.needs_cmapreset = 1;
-			break;
-		}
-	}
-
-	/* Return if no suitable logo was found */
-	fb_logo.logo = fb_find_logo(depth);
-
-	if (!fb_logo.logo) {
-		return 0;
-	}
-	
-	if (rotate == FB_ROTATE_UR || rotate == FB_ROTATE_UD)
-		yres = info->var.yres;
-	else
-		yres = info->var.xres;
-
-	if (fb_logo.logo->height > yres) {
-		fb_logo.logo = NULL;
-		return 0;
-	}
-
-	/* What depth we asked for might be different from what we get */
-	if (fb_logo.logo->type == LINUX_LOGO_CLUT224)
-		fb_logo.depth = 8;
-	else if (fb_logo.logo->type == LINUX_LOGO_VGA16)
-		fb_logo.depth = 4;
-	else
-		fb_logo.depth = 1;		
-
-	/* FIXME: logo_ex supports only truecolor fb. */
-	if (info->fix.visual != FB_VISUAL_TRUECOLOR)
-		fb_logo_ex_num = 0;
-
-	height = fb_logo.logo->height;
-	for (i = 0; i < fb_logo_ex_num; i++) {
-		height += fb_logo_ex[i].logo->height;
-		if (height > yres) {
-			height -= fb_logo_ex[i].logo->height;
-			fb_logo_ex_num = i;
-			break;
-		}
-	}
-	return height;
-}
-
 static int fb_show_logo_line(struct fb_info *info, int rotate,
 			     const struct linux_logo *logo, int y,
 			     unsigned int n)
@@ -529,7 +432,7 @@ static int fb_show_logo_line(struct fb_info *info, int rotate,
 	if (fb_logo.needs_cmapreset)
 		fb_set_logocmap(info, logo);
 
-	if (fb_logo.needs_truepalette || 
+	if (fb_logo.needs_truepalette ||
 	    fb_logo.needs_directpalette) {
 		palette = kmalloc(256 * 4, GFP_KERNEL);
 		if (palette == NULL)
@@ -578,17 +481,149 @@ static int fb_show_logo_line(struct fb_info *info, int rotate,
 	return logo->height;
 }
 
+
+#ifdef CONFIG_FB_LOGO_EXTRA
+
+#define FB_LOGO_EX_NUM_MAX 10
+static struct logo_data_extra {
+	const struct linux_logo *logo;
+	unsigned int n;
+} fb_logo_ex[FB_LOGO_EX_NUM_MAX];
+static unsigned int fb_logo_ex_num;
+
+void fb_append_extra_logo(const struct linux_logo *logo, unsigned int n)
+{
+	if (!n || fb_logo_ex_num == FB_LOGO_EX_NUM_MAX)
+		return;
+
+	fb_logo_ex[fb_logo_ex_num].logo = logo;
+	fb_logo_ex[fb_logo_ex_num].n = n;
+	fb_logo_ex_num++;
+}
+
+static int fb_prepare_extra_logos(struct fb_info *info, unsigned int height,
+				  unsigned int yres)
+{
+	unsigned int i;
+
+	/* FIXME: logo_ex supports only truecolor fb. */
+	if (info->fix.visual != FB_VISUAL_TRUECOLOR)
+		fb_logo_ex_num = 0;
+
+	for (i = 0; i < fb_logo_ex_num; i++) {
+		height += fb_logo_ex[i].logo->height;
+		if (height > yres) {
+			height -= fb_logo_ex[i].logo->height;
+			fb_logo_ex_num = i;
+			break;
+		}
+	}
+	return height;
+}
+
+static int fb_show_extra_logos(struct fb_info *info, int y, int rotate)
+{
+	unsigned int i;
+
+	for (i = 0; i < fb_logo_ex_num; i++)
+		y += fb_show_logo_line(info, rotate,
+				       fb_logo_ex[i].logo, y, fb_logo_ex[i].n);
+
+	return y;
+}
+
+#else /* !CONFIG_FB_LOGO_EXTRA */
+
+static inline int fb_prepare_extra_logos(struct fb_info *info,
+					 unsigned int height,
+					 unsigned int yres)
+{
+	return height;
+}
+
+static inline int fb_show_extra_logos(struct fb_info *info, int y, int rotate)
+{
+	return y;
+}
+
+#endif /* CONFIG_FB_LOGO_EXTRA */
+
+
+int fb_prepare_logo(struct fb_info *info, int rotate)
+{
+	int depth = fb_get_color_depth(&info->var, &info->fix);
+	unsigned int yres;
+
+	memset(&fb_logo, 0, sizeof(struct logo_data));
+
+	if (info->flags & FBINFO_MISC_TILEBLITTING ||
+	    info->flags & FBINFO_MODULE)
+		return 0;
+
+	if (info->fix.visual == FB_VISUAL_DIRECTCOLOR) {
+		depth = info->var.blue.length;
+		if (info->var.red.length < depth)
+			depth = info->var.red.length;
+		if (info->var.green.length < depth)
+			depth = info->var.green.length;
+	}
+
+	if (info->fix.visual == FB_VISUAL_STATIC_PSEUDOCOLOR && depth > 4) {
+		/* assume console colormap */
+		depth = 4;
+	}
+
+	/* Return if no suitable logo was found */
+	fb_logo.logo = fb_find_logo(depth);
+
+	if (!fb_logo.logo) {
+		return 0;
+	}
+
+	if (rotate == FB_ROTATE_UR || rotate == FB_ROTATE_UD)
+		yres = info->var.yres;
+	else
+		yres = info->var.xres;
+
+	if (fb_logo.logo->height > yres) {
+		fb_logo.logo = NULL;
+		return 0;
+	}
+
+	/* What depth we asked for might be different from what we get */
+	if (fb_logo.logo->type == LINUX_LOGO_CLUT224)
+		fb_logo.depth = 8;
+	else if (fb_logo.logo->type == LINUX_LOGO_VGA16)
+		fb_logo.depth = 4;
+	else
+		fb_logo.depth = 1;
+
+
+ 	if (fb_logo.depth > 4 && depth > 4) {
+ 		switch (info->fix.visual) {
+ 		case FB_VISUAL_TRUECOLOR:
+ 			fb_logo.needs_truepalette = 1;
+ 			break;
+ 		case FB_VISUAL_DIRECTCOLOR:
+ 			fb_logo.needs_directpalette = 1;
+ 			fb_logo.needs_cmapreset = 1;
+ 			break;
+ 		case FB_VISUAL_PSEUDOCOLOR:
+ 			fb_logo.needs_cmapreset = 1;
+ 			break;
+ 		}
+ 	}
+
+	return fb_prepare_extra_logos(info, fb_logo.logo->height, yres);
+}
+
 int fb_show_logo(struct fb_info *info, int rotate)
 {
-	int y, i;
+	int y;
 
 	y = fb_show_logo_line(info, rotate, fb_logo.logo, 0,
 			      num_online_cpus());
-
-	for (i = 0; i < fb_logo_ex_num; i++) {
-		y += fb_show_logo_line(info, rotate,
-				       fb_logo_ex[i].logo, y, fb_logo_ex[i].n);
-	}
+	y = fb_show_extra_logos(info, y, rotate);
 
 	return y;
 }
@@ -1204,17 +1239,15 @@ fb_compat_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 }
 #endif
 
-static int 
+static int
 fb_mmap(struct file *file, struct vm_area_struct * vma)
 {
 	int fbidx = iminor(file->f_path.dentry->d_inode);
 	struct fb_info *info = registered_fb[fbidx];
 	struct fb_ops *fb = info->fbops;
 	unsigned long off;
-#if !defined(__sparc__) || defined(__sparc_v9__)
 	unsigned long start;
 	u32 len;
-#endif
 
 	if (vma->vm_pgoff > (~0UL >> PAGE_SHIFT))
 		return -EINVAL;
@@ -1229,12 +1262,6 @@ fb_mmap(struct file *file, struct vm_area_struct * vma)
 		return res;
 	}
 
-#if defined(__sparc__) && !defined(__sparc_v9__)
-	/* Should never get here, all fb drivers should have their own
-	   mmap routines */
-	return -EINVAL;
-#else
-	/* !sparc32... */
 	lock_kernel();
 
 	/* frame buffer memory */
@@ -1258,50 +1285,11 @@ fb_mmap(struct file *file, struct vm_area_struct * vma)
 	vma->vm_pgoff = off >> PAGE_SHIFT;
 	/* This is an IO map - tell maydump to skip this VMA */
 	vma->vm_flags |= VM_IO | VM_RESERVED;
-#if defined(__mc68000__)
-#if defined(CONFIG_SUN3)
-	pgprot_val(vma->vm_page_prot) |= SUN3_PAGE_NOCACHE;
-#elif defined(CONFIG_MMU)
-	if (CPU_IS_020_OR_030)
-		pgprot_val(vma->vm_page_prot) |= _PAGE_NOCACHE030;
-	if (CPU_IS_040_OR_060) {
-		pgprot_val(vma->vm_page_prot) &= _CACHEMASK040;
-		/* Use no-cache mode, serialized */
-		pgprot_val(vma->vm_page_prot) |= _PAGE_NOCACHE_S;
-	}
-#endif
-#elif defined(__powerpc__)
-	vma->vm_page_prot = phys_mem_access_prot(file, off >> PAGE_SHIFT,
-						 vma->vm_end - vma->vm_start,
-						 vma->vm_page_prot);
-#elif defined(__alpha__)
-	/* Caching is off in the I/O space quadrant by design.  */
-#elif defined(__i386__) || defined(__x86_64__)
-	if (boot_cpu_data.x86 > 3)
-		pgprot_val(vma->vm_page_prot) |= _PAGE_PCD;
-#elif defined(__mips__) || defined(__sparc_v9__)
-	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
-#elif defined(__hppa__)
-	pgprot_val(vma->vm_page_prot) |= _PAGE_NO_CACHE;
-#elif defined(__arm__) || defined(__sh__) || defined(__m32r__)
-	vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
-#elif defined(__avr32__)
-	vma->vm_page_prot = __pgprot((pgprot_val(vma->vm_page_prot)
-				      & ~_PAGE_CACHABLE)
-				     | (_PAGE_BUFFER | _PAGE_DIRTY));
-#elif defined(__ia64__)
-	if (efi_range_is_wc(vma->vm_start, vma->vm_end - vma->vm_start))
-		vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
-	else
-		vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
-#else
-#warning What do we have to do here??
-#endif
+	fb_pgprotect(file, vma, off);
 	if (io_remap_pfn_range(vma, vma->vm_start, off >> PAGE_SHIFT,
 			     vma->vm_end - vma->vm_start, vma->vm_page_prot))
 		return -EAGAIN;
 	return 0;
-#endif /* !sparc32 */
 }
 
 static int

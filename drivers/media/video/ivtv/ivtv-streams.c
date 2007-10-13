@@ -565,7 +565,7 @@ int ivtv_start_v4l2_encode_stream(struct ivtv_stream *s)
 		/* Initialize Digitizer for Capture */
 		ivtv_vapi(itv, CX2341X_ENC_INITIALIZE_INPUT, 0);
 
-		ivtv_sleep_timeout(HZ / 10, 0);
+		ivtv_msleep_timeout(100, 0);
 	}
 
 	/* begin_capture */
@@ -603,10 +603,6 @@ static int ivtv_setup_v4l2_decode_stream(struct ivtv_stream *s)
 
 	IVTV_DEBUG_INFO("Setting some initial decoder settings\n");
 
-	/* disable VBI signals, if the MPEG stream contains VBI data,
-	   then that data will be processed automatically for you. */
-	ivtv_disable_vbi(itv);
-
 	/* set audio mode to left/stereo  for dual/stereo mode. */
 	ivtv_vapi(itv, CX2341X_DEC_SET_AUDIO_MODE, 2, itv->audio_bilingual_mode, itv->audio_stereo_mode);
 
@@ -639,7 +635,7 @@ static int ivtv_setup_v4l2_decode_stream(struct ivtv_stream *s)
 	}
 	if (ivtv_vapi(itv, CX2341X_DEC_SET_DECODER_SOURCE, 4, datatype,
 			itv->params.width, itv->params.height, itv->params.audio_properties)) {
-		IVTV_DEBUG_WARN("COULDN'T INITIALIZE DECODER SOURCE\n");
+		IVTV_DEBUG_WARN("Couldn't initialize decoder source\n");
 	}
 	return 0;
 }
@@ -781,8 +777,9 @@ int ivtv_stop_v4l2_encode_stream(struct ivtv_stream *s, int gop_end)
 			set_current_state(TASK_INTERRUPTIBLE);
 
 			/* wait 2s for EOS interrupt */
-			while (!test_bit(IVTV_F_I_EOS, &itv->i_flags) && jiffies < then + 2 * HZ) {
-				schedule_timeout(HZ / 100);
+			while (!test_bit(IVTV_F_I_EOS, &itv->i_flags) &&
+				jiffies < then + msecs_to_jiffies (2000)) {
+				schedule_timeout(msecs_to_jiffies(10));
 			}
 
 			/* To convert jiffies to ms, we must multiply by 1000
@@ -807,7 +804,6 @@ int ivtv_stop_v4l2_encode_stream(struct ivtv_stream *s, int gop_end)
 		then = jiffies;
 		/* Make sure DMA is complete */
 		add_wait_queue(&s->waitq, &wait);
-		set_current_state(TASK_INTERRUPTIBLE);
 		do {
 			/* check if DMA is pending */
 			if ((s->type == IVTV_ENC_STREAM_TYPE_MPG) &&	/* MPG Only */
@@ -822,9 +818,8 @@ int ivtv_stop_v4l2_encode_stream(struct ivtv_stream *s, int gop_end)
 			} else if (read_reg(IVTV_REG_DMASTATUS) & 0x02) {
 				break;
 			}
-
-			ivtv_sleep_timeout(HZ / 100, 1);
-		} while (then + HZ * 2 > jiffies);
+		} while (!ivtv_msleep_timeout(10, 1) &&
+			 then + msecs_to_jiffies(2000) > jiffies);
 
 		set_current_state(TASK_RUNNING);
 		remove_wait_queue(&s->waitq, &wait);
@@ -895,7 +890,7 @@ int ivtv_stop_v4l2_decode_stream(struct ivtv_stream *s, int flags, u64 pts)
 					break;
 				tmp = data[3];
 			}
-			if (ivtv_sleep_timeout(HZ/10, 1))
+			if (ivtv_msleep_timeout(100, 1))
 				break;
 		}
 	}
@@ -909,11 +904,6 @@ int ivtv_stop_v4l2_decode_stream(struct ivtv_stream *s, int flags, u64 pts)
 	clear_bit(IVTV_F_S_NEEDS_DATA, &s->s_flags);
 	clear_bit(IVTV_F_S_STREAMING, &s->s_flags);
 	ivtv_flush_queues(s);
-
-	if (!test_bit(IVTV_F_S_PASSTHROUGH, &s->s_flags)) {
-		/* disable VBI on TV-out */
-		ivtv_disable_vbi(itv);
-	}
 
 	/* decrement decoding */
 	atomic_dec(&itv->decoding);

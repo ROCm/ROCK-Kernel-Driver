@@ -21,6 +21,7 @@
  * inode.c
  */
 
+#include <linux/exportfs.h>
 #include <linux/squashfs_fs.h>
 #include <linux/module.h>
 #include <linux/zlib.h>
@@ -2306,8 +2307,7 @@ static int __init init_inodecache(void)
 {
 	squashfs_inode_cachep = kmem_cache_create("squashfs_inode_cache",
 	     sizeof(struct squashfs_inode_info),
-	     0, SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT,
-	     init_once, NULL);
+	     0, SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT, init_once);
 	if (squashfs_inode_cachep == NULL)
 		return -ENOMEM;
 	return 0;

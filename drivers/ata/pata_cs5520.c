@@ -41,7 +41,7 @@
 #include <linux/libata.h>
 
 #define DRV_NAME	"pata_cs5520"
-#define DRV_VERSION	"0.6.5"
+#define DRV_VERSION	"0.6.6"
 
 struct pio_clocks
 {
@@ -275,7 +275,7 @@ static int __devinit cs5520_init_one(struct pci_dev *pdev, const struct pci_devi
 
 	for (i = 0; i < 2; i++) {
 		static const int irq[] = { 14, 15 };
-		struct ata_port *ap = host->ports[0];
+		struct ata_port *ap = host->ports[i];
 
 		if (ata_port_is_dummy(ap))
 			continue;

@@ -42,6 +42,8 @@
 	}									\
 })
 
+static int bb_giveup;
+
 /* Use BBRG_Rxx for both i386 and x86_64.  RAX through R15 must be at the end,
  * starting with RAX.  Some of these codes do not reflect actual registers,
  * such codes are special cases when parsing the record of register changes.
@@ -271,6 +273,17 @@ bb_reg_code_set_value(enum bb_reg_code dst, enum bb_reg_code src);
 
 static const char *bb_mod_name, *bb_func_name;
 
+static int
+bb_noret(const char *name)
+{
+	if (strcmp(name, "panic") == 0 ||
+	    strcmp(name, "do_exit") == 0 ||
+	    strcmp(name, "do_group_exit") == 0 ||
+	    strcmp(name, "complete_and_exit") == 0)
+		return 1;
+	return 0;
+}
+
 /*============================================================================*/
 /*                                                                            */
 /* Most of the basic block code and data is common to x86_64 and i386.  This  */
@@ -488,7 +501,9 @@ static struct bb_name_state bb_special_cases[] = {
 		BB_SKIP(RAX) | BB_SKIP(RCX)),
 	NS_MEM("int_ret_from_sys_call", partial_pt_regs, 0),
 
+#ifdef	CONFIG_PREEMPT
 	NS_MEM("retint_kernel", partial_pt_regs, BB_SKIP(RAX)),
+#endif	/* CONFIG_PREEMPT */
 
 	NS_MEM("retint_careful", partial_pt_regs, BB_SKIP(RAX)),
 
@@ -545,7 +560,7 @@ static struct bb_name_state bb_special_cases[] = {
 
 	NS_REG("copy_user_generic_string",
 		all_regs,
-		0),
+		BB_SKIP(RAX) | BB_SKIP(RCX)),
 
 	NS_REG("iret_label",
 		all_regs,
@@ -594,7 +609,9 @@ static const char *bb_spurious[] = {
 	"bad_iret",
 	"retint_careful",
 	"retint_signal",
+#ifdef	CONFIG_PREEMPT
 	"retint_kernel",
+#endif	/* CONFIG_PREEMPT */
 				/* .macro paranoidexit */
 #ifdef	CONFIG_TRACE_IRQFLAGS
 	"paranoid_exit0",
@@ -628,9 +645,33 @@ static const char *bb_spurious[] = {
 	"ia32_sysret",
 	"ia32_tracesys",
 	"ia32_badsys",
+#ifdef	CONFIG_HIBERNATION
+				/* restore_image */
+	"loop",
+	"done",
+#endif	/* CONFIG_HIBERNATION */
+#ifdef	CONFIG_KPROBES
+				/* jprobe_return */
+	"jprobe_return_end",
+				/* kretprobe_trampoline_holder */
+	"kretprobe_trampoline",
+#endif	/* CONFIG_KPROBES */
+#ifdef	CONFIG_KEXEC
+				/* relocate_kernel */
+	"relocate_new_kernel",
+#endif	/* CONFIG_KEXEC */
+#ifdef	CONFIG_XEN
+				/* arch/i386/xen/xen-asm.S */
+	"xen_irq_enable_direct_end",
+	"xen_irq_disable_direct_end",
+	"xen_save_fl_direct_end",
+	"xen_restore_fl_direct_end",
+	"xen_iret_start_crit",
+	"iret_restore_end",
+	"xen_iret_end_crit",
+	"hyper_iret",
+#endif	/* CONFIG_XEN */
 };
-
-#define	HARDWARE_PUSHED (5 * KDB_WORD_SIZE)
 
 static const char *bb_hardware_handlers[] = {
 	"system_call",
@@ -644,6 +685,30 @@ static const char *bb_hardware_handlers[] = {
 	"machine_check",
 	"kdb_call",
 };
+
+static int
+bb_hardware_pushed_arch(kdb_machreg_t rsp,
+			const struct kdb_activation_record *ar)
+{
+	/* x86_64 interrupt stacks are 16 byte aligned and you must get the
+	 * next rsp from stack, it cannot be statically calculated.  Do not
+	 * include the word at rsp, it is pushed by hardware but is treated as
+	 * a normal software return value.
+	 *
+	 * When an IST switch occurs (e.g. NMI) then the saved rsp points to
+	 * another stack entirely.  Assume that the IST stack is 16 byte
+	 * aligned and just return the size of the hardware data on this stack.
+	 * The stack unwind code will take care of the stack switch.
+	 */
+	kdb_machreg_t saved_rsp = *((kdb_machreg_t *)rsp + 3);
+	int hardware_pushed = saved_rsp - rsp - KDB_WORD_SIZE;
+	if (hardware_pushed < 4 * KDB_WORD_SIZE ||
+	    saved_rsp < ar->stack.logical_start ||
+	    saved_rsp >= ar->stack.logical_end)
+		return 4 * KDB_WORD_SIZE;
+	else
+		return hardware_pushed;
+}
 
 static void
 bb_start_block0(void)
@@ -726,6 +791,14 @@ static const struct bb_mem_contains error_code[] = {
 static const struct bb_mem_contains rbx_pushed[] = {
 	{ 0x0, BBRG_RBX },
 };
+#ifdef	CONFIG_MATH_EMULATION
+static const struct bb_mem_contains mem_fpu_reg_round[] = {
+	{ 0xc, BBRG_RBP },
+	{ 0x8, BBRG_RSI },
+	{ 0x4, BBRG_RDI },
+	{ 0x0, BBRG_RBX },
+};
+#endif	/* CONFIG_MATH_EMULATION */
 
 static const struct bb_reg_contains all_regs[] = {
 	[BBRG_RAX] = { BBRG_RAX, 0 },
@@ -739,6 +812,12 @@ static const struct bb_reg_contains all_regs[] = {
 };
 static const struct bb_reg_contains no_regs[] = {
 };
+#ifdef	CONFIG_MATH_EMULATION
+static const struct bb_reg_contains reg_fpu_reg_round[] = {
+	[BBRG_RBP] = { BBRG_OSP, -0x4 },
+	[BBRG_RSP] = { BBRG_OSP, -0x10 },
+};
+#endif	/* CONFIG_MATH_EMULATION */
 
 static struct bb_name_state bb_special_cases[] = {
 
@@ -832,6 +911,12 @@ static struct bb_name_state bb_special_cases[] = {
 	 *
 	 * NS("__switch_to", no_memory, no_regs, 0, 0, 0),
 	 */
+
+	NS("iret_exc", no_memory, all_regs, 0, 0, 0x20),
+
+#ifdef	CONFIG_MATH_EMULATION
+	NS("fpu_reg_round", mem_fpu_reg_round, reg_fpu_reg_round, 0, 0, 0),
+#endif	/* CONFIG_MATH_EMULATION */
 };
 
 static const char *bb_spurious[] = {
@@ -872,9 +957,165 @@ static const char *bb_spurious[] = {
 	"nmi_stack_fixup",
 	"nmi_debug_stack_check",
 	"nmi_espfix_stack",
+#ifdef	CONFIG_HIBERNATION
+				/* restore_image */
+	"copy_loop",
+	"done",
+#endif	/* CONFIG_HIBERNATION */
+#ifdef	CONFIG_KPROBES
+				/* jprobe_return */
+	"jprobe_return_end",
+#endif	/* CONFIG_KPROBES */
+#ifdef	CONFIG_KEXEC
+				/* relocate_kernel */
+	"relocate_new_kernel",
+#endif	/* CONFIG_KEXEC */
+#ifdef	CONFIG_MATH_EMULATION
+				/* assorted *.S files in arch/i386/math_emu */
+	"Denorm_done",
+	"Denorm_shift_more_than_32",
+	"Denorm_shift_more_than_63",
+	"Denorm_shift_more_than_64",
+	"Do_unmasked_underflow",
+	"Exp_not_underflow",
+	"fpu_Arith_exit",
+	"fpu_reg_round",
+	"fpu_reg_round_signed_special_exit",
+	"fpu_reg_round_special_exit",
+	"L_accum_done",
+	"L_accum_loaded",
+	"L_accum_loop",
+	"L_arg1_larger",
+	"L_bugged",
+	"L_bugged_1",
+	"L_bugged_2",
+	"L_bugged_3",
+	"L_bugged_4",
+	"L_bugged_denorm_486",
+	"L_bugged_round24",
+	"L_bugged_round53",
+	"L_bugged_round64",
+	"LCheck_24_round_up",
+	"LCheck_53_round_up",
+	"LCheck_Round_Overflow",
+	"LCheck_truncate_24",
+	"LCheck_truncate_53",
+	"LCheck_truncate_64",
+	"LDenormal_adj_exponent",
+	"L_deNormalised",
+	"LDo_24_round_up",
+	"LDo_2nd_32_bits",
+	"LDo_2nd_div",
+	"LDo_3rd_32_bits",
+	"LDo_3rd_div",
+	"LDo_53_round_up",
+	"LDo_64_round_up",
+	"L_done",
+	"LDo_truncate_24",
+	"LDown_24",
+	"LDown_53",
+	"LDown_64",
+	"L_entry_bugged",
+	"L_error_exit",
+	"L_exactly_32",
+	"L_exception_exit",
+	"L_exit",
+	"L_exit_nuo_valid",
+	"L_exit_nuo_zero",
+	"L_exit_valid",
+	"L_extent_zero",
+	"LFirst_div_done",
+	"LFirst_div_not_1",
+	"L_Full_Division",
+	"LGreater_Half_24",
+	"LGreater_Half_53",
+	"LGreater_than_1",
+	"LLess_than_1",
+	"L_Make_denorm",
+	"L_more_31_no_low",
+	"L_more_63_no_low",
+	"L_more_than_31",
+	"L_more_than_63",
+	"L_more_than_64",
+	"L_more_than_65",
+	"L_more_than_95",
+	"L_must_be_zero",
+	"L_n_exit",
+	"L_no_adjust",
+	"L_no_bit_lost",
+	"L_no_overflow",
+	"L_no_precision_loss",
+	"L_Normalised",
+	"L_norm_bugged",
+	"L_n_shift_1",
+	"L_nuo_shift_1",
+	"L_overflow",
+	"L_precision_lost_down",
+	"L_precision_lost_up",
+	"LPrevent_2nd_overflow",
+	"LPrevent_3rd_overflow",
+	"LPseudoDenormal",
+	"L_Re_normalise",
+	"LResult_Normalised",
+	"L_round",
+	"LRound_large",
+	"LRound_nearest_24",
+	"LRound_nearest_53",
+	"LRound_nearest_64",
+	"LRound_not_small",
+	"LRound_ovfl",
+	"LRound_precision",
+	"LRound_prep",
+	"L_round_the_result",
+	"LRound_To_24",
+	"LRound_To_53",
+	"LRound_To_64",
+	"LSecond_div_done",
+	"LSecond_div_not_1",
+	"L_shift_1",
+	"L_shift_32",
+	"L_shift_65_nc",
+	"L_shift_done",
+	"Ls_less_than_32",
+	"Ls_more_than_63",
+	"Ls_more_than_95",
+	"L_Store_significand",
+	"L_subtr",
+	"LTest_over",
+	"LTruncate_53",
+	"LTruncate_64",
+	"L_underflow",
+	"L_underflow_to_zero",
+	"LUp_24",
+	"LUp_53",
+	"LUp_64",
+	"L_zero",
+	"Normalise_result",
+	"Signal_underflow",
+	"sqrt_arg_ge_2",
+	"sqrt_get_more_precision",
+	"sqrt_more_prec_large",
+	"sqrt_more_prec_ok",
+	"sqrt_more_prec_small",
+	"sqrt_near_exact",
+	"sqrt_near_exact_large",
+	"sqrt_near_exact_ok",
+	"sqrt_near_exact_small",
+	"sqrt_near_exact_x",
+	"sqrt_prelim_no_adjust",
+	"sqrt_round_result",
+	"sqrt_stage_2_done",
+	"sqrt_stage_2_error",
+	"sqrt_stage_2_finish",
+	"sqrt_stage_2_positive",
+	"sqrt_stage_3_error",
+	"sqrt_stage_3_finished",
+	"sqrt_stage_3_no_error",
+	"sqrt_stage_3_positive",
+	"Unmasked_underflow",
+	"xExp_not_underflow",
+#endif	/* CONFIG_MATH_EMULATION */
 };
-
-#define	HARDWARE_PUSHED (2 * KDB_WORD_SIZE)
 
 static const char *bb_hardware_handlers[] = {
 	"ret_from_exception",
@@ -902,6 +1143,13 @@ static const char *bb_hardware_handlers[] = {
 	"machine_check",
 	"spurious_interrupt_bug",
 };
+
+static int
+bb_hardware_pushed_arch(kdb_machreg_t rsp,
+			const struct kdb_activation_record *ar)
+{
+	return (2 * KDB_WORD_SIZE);
+}
 
 static void
 bb_start_block0(void)
@@ -1147,8 +1395,6 @@ static int bb_max, bb_count;
 static struct bb_jmp *bb_jmp_list;
 static int bb_jmp_max, bb_jmp_count;
 
-static int bb_giveup;
-
 /* Add a new bb entry to the list.  This does an insert sort. */
 
 static struct bb *
@@ -1331,7 +1577,7 @@ bb_dis_pass1(PTR file, const char *fmt, ...)
 	if ((p = strchr(bb_buffer, '\n'))) {
 		*p = '\0';
 		/* ret[q], iret[q], sysexit, sysret, ud2a or jmp[q] end a
-		 * block.
+		 * block.  As does a call to a function marked noret.
 		 */
 		p = bb_buffer;
 		p += strcspn(p, ":");
@@ -1347,6 +1593,17 @@ bb_dis_pass1(PTR file, const char *fmt, ...)
 				if (strncmp(p, "jmp", 3) == 0)
 					bb_pass1_computed_jmp(p);
 				bb_add(0, bb_curr_addr);
+			};
+			if (strncmp(p, "call", 4) == 0) {
+				strsep(&p, " \t");	/* end of opcode */
+				if (p)
+					p += strspn(p, " \t");	/* operand(s) */
+				if (p && strchr(p, '<')) {
+					p = strchr(p, '<') + 1;
+					*strchr(p, '>') = '\0';
+					if (bb_noret(p))
+						bb_add(0, bb_curr_addr);
+				}
 			};
 		}
 		bb_buffer[0] = '\0';
@@ -1383,7 +1640,7 @@ bb_pass1(void)
 {
 	int i;
 	unsigned long addr;
-	struct bb* bb;
+	struct bb *bb;
 	struct bb_jmp *bb_jmp;
 
 	if (KDB_DEBUG(BB) | KDB_DEBUG(BB_SUMM))
@@ -1652,6 +1909,7 @@ bb_opcode_usage_all[] = {
 	{3, BBOU_NOP,     "clc"},
 	{3, BBOU_NOP,     "cld"},
 	{7, BBOU_RS,      "clflush"},
+	{4, BBOU_NOP,     "clgi"},
 	{3, BBOU_NOP,     "cli"},
 	{4, BBOU_CWD,     "cltd"},	/* Intel cdq */
 	{4, BBOU_CBW,     "cltq"},	/* Intel cdqe */
@@ -1672,7 +1930,7 @@ bb_opcode_usage_all[] = {
 	{5, BBOU_NOP,     "finit"},
 	{6, BBOU_RS,      "fistpl"},
 	{4, BBOU_RS,      "fldl"},
-	{5, BBOU_RS,      "fmull"},
+	{4, BBOU_RS,      "fmul"},
 	{6, BBOU_NOP,     "fnclex"},
 	{6, BBOU_NOP,     "fninit"},
 	{6, BBOU_RS,      "fnsave"},
@@ -1688,6 +1946,7 @@ bb_opcode_usage_all[] = {
 	{4, BBOU_IMUL,    "imul"},
 	{3, BBOU_RSWS,    "inc"},
 	{3, BBOU_NOP,     "int"},
+	{7, BBOU_RSRD,    "invlpga"},
 	{6, BBOU_RS,      "invlpg"},
 	{2, BBOU_RSWD,    "in"},
 	{4, BBOU_IRET,    "iret"},
@@ -1727,8 +1986,10 @@ bb_opcode_usage_all[] = {
 	{8, BBOU_RS,      "prefetch"},
 	{5, BBOU_PUSHF,   "pushf"},
 	{4, BBOU_PUSH,    "push"},
+	{3, BBOU_RSRDWD,  "rcl"},
 	{3, BBOU_RSRDWD,  "rcr"},
 	{5, BBOU_RDMSR,   "rdmsr"},
+	{5, BBOU_RDMSR,   "rdpmc"},	/* same side effects as rdmsr */
 	{5, BBOU_RDTSC,   "rdtsc"},
 	{3, BBOU_RET,     "ret"},
 	{3, BBOU_RSRDWD,  "rol"},
@@ -1746,6 +2007,7 @@ bb_opcode_usage_all[] = {
 	{4, BBOU_WS,      "sldt"},
 	{3, BBOU_NOP,     "stc"},
 	{3, BBOU_NOP,     "std"},
+	{4, BBOU_NOP,     "stgi"},
 	{3, BBOU_NOP,     "sti"},
 	{4, BBOU_SCAS,    "stos"},
 	{4, BBOU_WS,      "strl"},
@@ -1756,11 +2018,21 @@ bb_opcode_usage_all[] = {
 	{6, BBOU_SYSRET,  "sysret"},
 	{4, BBOU_NOP,     "test"},
 	{4, BBOU_NOP,     "ud2a"},
+	{7, BBOU_RS,      "vmclear"},
+	{8, BBOU_NOP,     "vmlaunch"},
+	{6, BBOU_RS,      "vmload"},
+	{7, BBOU_RS,      "vmptrld"},
+	{6, BBOU_WD,      "vmread"},	/* vmread src is an encoding, not a register */
+	{8, BBOU_NOP,     "vmresume"},
+	{5, BBOU_RS,      "vmrun"},
+	{6, BBOU_RS,      "vmsave"},
+	{7, BBOU_WD,      "vmwrite"},	/* vmwrite src is an encoding, not a register */
 	{6, BBOU_NOP,     "wbinvd"},
 	{5, BBOU_WRMSR,   "wrmsr"},
 	{4, BBOU_XADD,    "xadd"},
 	{4, BBOU_XCHG,    "xchg"},
 	{3, BBOU_XOR,     "xor"},
+       {10, BBOU_WS,      "xstore-rng"},
 };
 
 /* To speed up searching, index bb_opcode_usage_all by the first letter of each
@@ -2088,7 +2360,7 @@ bb_is_scheduler_address(void)
 static void
 bb_reg_read(enum bb_reg_code reg)
 {
-	int i, o = 0;
+	int i, r = 0;
 	if (!bb_is_int_reg(reg) ||
 	    bb_reg_code_value(reg) != reg)
 		return;
@@ -2096,18 +2368,18 @@ bb_reg_read(enum bb_reg_code reg)
 	     i < min_t(unsigned int, REGPARM, ARRAY_SIZE(bb_param_reg));
 	     ++i) {
 		if (reg == bb_param_reg[i]) {
-			o = i + 1;
+			r = i + 1;
 			break;
 		}
 	}
-	bb_reg_params = max(bb_reg_params, o);
+	bb_reg_params = max(bb_reg_params, r);
 }
 
 static void
 bb_do_reg_state_print(const struct bb_reg_state *s)
 {
 	int i, offset_address, offset_value;
-	struct bb_memory_contains *c;
+	const struct bb_memory_contains *c;
 	enum bb_reg_code value;
 	kdb_printf("  bb_reg_state %p\n", s);
 	for (i = 0; i < ARRAY_SIZE(s->contains); ++i) {
@@ -2335,7 +2607,7 @@ bb_reg_set_memory(enum bb_reg_code dst, enum bb_reg_code src, short offset_addre
 static void
 bb_read_operand(const struct bb_operand *operand)
 {
-	int o = 0;
+	int m = 0;
 	if (operand->base_rc)
 		bb_reg_read(operand->base_rc);
 	if (operand->index_rc)
@@ -2343,9 +2615,9 @@ bb_read_operand(const struct bb_operand *operand)
 	if (bb_is_simple_memory(operand) &&
 	    bb_is_osp_defined(operand->base_rc) &&
 	    bb_decode.match->usage != BBOU_LEA) {
-		o = (bb_reg_code_offset(operand->base_rc) + operand->disp +
+		m = (bb_reg_code_offset(operand->base_rc) + operand->disp +
 		     KDB_WORD_SIZE - 1) / KDB_WORD_SIZE;
-		bb_memory_params = max(bb_memory_params, o);
+		bb_memory_params = max(bb_memory_params, m);
 	}
 }
 
@@ -2480,7 +2752,7 @@ bb_reg_state_size(const struct bb_reg_state *state)
 static void
 bb_reg_state_canonicalize(void)
 {
-	int i, o, changed;
+	int i, order, changed;
 	struct bb_memory_contains *p1, *p2, temp;
 	do {
 		changed = 0;
@@ -2489,17 +2761,17 @@ bb_reg_state_canonicalize(void)
 		     ++i, ++p1) {
 			p2 = p1 + 1;
 			if (p2->value == BBRG_UNDEFINED) {
-				o = 0;
+				order = 0;
 			} else if (p1->value == BBRG_UNDEFINED) {
-				o = 1;
+				order = 1;
 			} else if (p1->offset_address < p2->offset_address) {
-				o = 1;
+				order = 1;
 			} else if (p1->offset_address > p2->offset_address) {
-				o = -1;
+				order = -1;
 			} else {
-				o = 0;
+				order = 0;
 			}
-			if (o > 0) {
+			if (order > 0) {
 				temp = *p2;
 				*p2 = *p1;
 				*p1 = temp;
@@ -2809,6 +3081,11 @@ bb_transfer(bfd_vma from, bfd_vma to, unsigned int drop_through)
 
 /* Isolate the processing for 'mov' so it can be used for 'xadd'/'xchg' as
  * well.
+ *
+ * xadd/xchg expect this function to return BBOU_NOP for special cases,
+ * otherwise it returns BBOU_RSWD.  All special cases must be handled entirely
+ * within this function, including doing bb_read_operand or bb_write_operand
+ * where necessary.
  */
 
 static enum bb_operand_usage
@@ -2828,6 +3105,24 @@ bb_usage_mov(const struct bb_operand *src, const struct bb_operand *dst, int l)
 	    bb_is_int_reg(dst->base_rc) &&
 	    full_register_src &&
 	    full_register_dst) {
+		/* Special case for the code that switches stacks in
+		 * jprobe_return.  That code must modify RSP but it does it in
+		 * a well defined manner.  Do not invalidate RSP.
+		 */
+		if (src->base_rc == BBRG_RBX &&
+		    dst->base_rc == BBRG_RSP &&
+		    strcmp(bb_func_name, "jprobe_return") == 0) {
+			bb_read_operand(src);
+			return BBOU_NOP;
+		}
+		/* math_abort takes the equivalent of a longjmp structure and
+		 * resets the stack.  Ignore this, it leaves RSP well defined.
+		 */
+		if (dst->base_rc == BBRG_RSP &&
+		    strcmp(bb_func_name, "math_abort") == 0) {
+			bb_read_operand(src);
+			return BBOU_NOP;
+		}
 		bb_reg_set_reg(dst->base_rc, src->base_rc);
 		return BBOU_NOP;
 	}
@@ -2869,18 +3164,18 @@ bb_usage_mov(const struct bb_operand *src, const struct bb_operand *dst, int l)
 	    bb_is_int_reg(dst->base_rc) &&
 	    full_register_dst) {
 #ifndef	CONFIG_X86_64
-		/* mov from SYSENTER_stack_esp0+offset to esp to fix up the
+		/* mov from TSS_sysenter_esp0+offset to esp to fix up the
 		 * sysenter stack, it leaves esp well defined.  mov
-		 * SYSENTER_stack_esp0+offset(%esp),%esp is followed by up to 5
+		 * TSS_sysenter_esp0+offset(%esp),%esp is followed by up to 5
 		 * push instructions to mimic the hardware stack push.  If
-		 * SYSENTER_stack_esp0 is offset then only 3 words will be
+		 * TSS_sysenter_esp0 is offset then only 3 words will be
 		 * pushed.
 		 */
 		if (dst->base_rc == BBRG_RSP &&
-		    src->disp >= SYSENTER_stack_esp0 &&
+		    src->disp >= TSS_sysenter_esp0 &&
 		    bb_is_osp_defined(BBRG_RSP)) {
 			int pushes;
-			pushes = src->disp == SYSENTER_stack_esp0 ? 5 : 3;
+			pushes = src->disp == TSS_sysenter_esp0 ? 5 : 3;
 			bb_reg_code_set_offset(BBRG_RSP,
 				bb_reg_code_offset(BBRG_RSP) +
 					pushes * KDB_WORD_SIZE);
@@ -2918,8 +3213,22 @@ bb_usage_mov(const struct bb_operand *src, const struct bb_operand *dst, int l)
 	if (dst->reg &&
 	    dst->base_rc == BBRG_RSP &&
 	    full_register_dst &&
-	    bb_is_scheduler_address())
-		return BBOU_RS;
+	    bb_is_scheduler_address()) {
+		bb_read_operand(src);
+		return BBOU_NOP;
+	}
+	/* Special case for the code that switches stacks in resume from
+	 * hibernation code.  That code must modify RSP but it does it in a
+	 * well defined manner.  Do not invalidate RSP.
+	 */
+	if (src->memory &&
+	    dst->reg &&
+	    dst->base_rc == BBRG_RSP &&
+	    full_register_dst &&
+	    strcmp(bb_func_name, "restore_image") == 0) {
+		bb_read_operand(src);
+		return BBOU_NOP;
+	}
 	return BBOU_RSWD;
 }
 
@@ -2962,7 +3271,11 @@ bb_usage_xadd(const struct bb_operand *src, const struct bb_operand *dst)
 	memset(&tmp, 0, sizeof(tmp));
 	tmp.present = 1;
 	tmp.reg = 1;
-	tmp.base = (char *)bbrg_name[reg];
+	tmp.base = debug_kmalloc(strlen(bbrg_name[reg]) + 2, GFP_ATOMIC);
+	if (tmp.base) {
+		tmp.base[0] = '%';
+		strcpy(tmp.base + 1, bbrg_name[reg]);
+	}
 	tmp.base_rc = reg;
 	bb_read_operand(src);
 	bb_read_operand(dst);
@@ -2973,6 +3286,7 @@ bb_usage_xadd(const struct bb_operand *src, const struct bb_operand *dst)
 	bb_usage_mov(&tmp, dst, sizeof("xadd")-1);
 	KDB_DEBUG_BB("  %s restoring tmp %s\n", __FUNCTION__, bbrg_name[reg]);
 	bb_reg_state->contains[reg - BBRG_RAX] = save_tmp;
+	debug_kfree(tmp.base);
 	return usage;
 }
 
@@ -3013,7 +3327,11 @@ bb_usage_xchg(const struct bb_operand *src, const struct bb_operand *dst)
 	memset(&tmp, 0, sizeof(tmp));
 	tmp.present = 1;
 	tmp.reg = 1;
-	tmp.base = (char *)bbrg_name[reg];
+	tmp.base = debug_kmalloc(strlen(bbrg_name[reg]) + 2, GFP_ATOMIC);
+	if (tmp.base) {
+		tmp.base[0] = '%';
+		strcpy(tmp.base + 1, bbrg_name[reg]);
+	}
 	tmp.base_rc = reg;
 	if (bb_usage_mov(dst, &tmp, sizeof("xchg")-1) == BBOU_NOP)
 		rd = 0;
@@ -3025,6 +3343,7 @@ bb_usage_xchg(const struct bb_operand *src, const struct bb_operand *dst)
 		ws = 0;
 	KDB_DEBUG_BB("  %s restoring tmp %s\n", __FUNCTION__, bbrg_name[reg]);
 	bb_reg_state->contains[reg - BBRG_RAX] = save_tmp;
+	debug_kfree(tmp.base);
 	return rs | rd | ws | wd;
 }
 
@@ -3044,7 +3363,6 @@ preserved:
 		continue;
 	}
 }
-
 
 static void
 bb_pass2_computed_jmp(const struct bb_operand *src)
@@ -3270,6 +3588,16 @@ bb_usage(void)
 				 * GENERIC_NOP7.
 				 */
 				usage = BBOU_NOP;
+			} else if (src->disp == 4096 &&
+				   (src->base_rc == BBRG_R8 ||
+				    src->base_rc == BBRG_RDI) &&
+				   strcmp(bb_func_name, "relocate_kernel") == 0) {
+				/* relocate_kernel: setup a new stack at the
+				 * end of the physical control page, using
+				 * (x86_64) lea 4096(%r8),%rsp or (i386) lea
+				 * 4096(%edi),%esp
+				 */
+				usage = BBOU_NOP;
 			}
 		}
 		break;
@@ -3380,7 +3708,10 @@ bb_usage(void)
 				bb_reg_set_memory(src->base_rc, BBRG_RSP, 0);
 				usage = BBOU_NOP;
 			}
-			bb_adjust_osp(BBRG_RSP, KDB_WORD_SIZE);
+			/* pop %rsp does not adjust rsp */
+			if (!src->reg ||
+			    src->base_rc != BBRG_RSP)
+				bb_adjust_osp(BBRG_RSP, KDB_WORD_SIZE);
 		}
 		break;
 	case BBOU_POPF:
@@ -3442,8 +3773,18 @@ bb_usage(void)
 		usage = BBOU_NOP;
 		break;
 	case BBOU_RET:
-		bb_sanity_check(0);
 		usage = BBOU_NOP;
+		/* Functions that restore state which was saved by another
+		 * function or build new kernel stacks.  We cannot verify what
+		 * is being restored so skip the sanity check.
+		 */
+		if (strcmp(bb_func_name, "restore_image") == 0 ||
+		    strcmp(bb_func_name, "relocate_kernel") == 0 ||
+		    strcmp(bb_func_name, "identity_mapped") == 0 ||
+		    strcmp(bb_func_name, "xen_iret_crit_fixup") == 0 ||
+		    strcmp(bb_func_name, "math_abort") == 0)
+			break;
+		bb_sanity_check(0);
 		break;
 	case BBOU_SAHF:
 		/* Read RAX */
@@ -3494,12 +3835,15 @@ bb_usage(void)
 		 * %esp,%ebx so the later mov %ebx,%esp becomes a NOP and the
 		 * stack remains defined so we can backtrace through do_IRQ's
 		 * stack switch.
+		 *
+		 * Ditto for do_softirq.
 		 */
 		if (src->reg &&
 		    dst->reg &&
 		    src->base_rc == BBRG_RBX &&
 		    dst->base_rc == BBRG_RSP &&
-		    strcmp(bb_func_name, "do_IRQ") == 0) {
+		    (strcmp(bb_func_name, "do_IRQ") == 0 ||
+		     strcmp(bb_func_name, "do_softirq") == 0)) {
 			strcpy(bb_decode.opcode, "mov");
 			usage = bb_usage_mov(dst, src, sizeof("mov")-1);
 		} else {
@@ -3754,8 +4098,11 @@ bb_pass2_start_block(int number)
 				/* Different states for this register from two
 				 * or more inputs, make it undefined.
 				 */
-				if (bb_reg_state->contains[j].value !=
+				if (bb_reg_state->contains[j].value ==
 				    BBRG_UNDEFINED) {
+					KDB_DEBUG_BB("  ignoring %s\n",
+						    bbrg_name[j + BBRG_RAX]);
+				} else {
 					bb_reg_set_undef(BBRG_RAX + j);
 					changed = 1;
 				}
@@ -3846,11 +4193,15 @@ bb_pass2_do_changed_blocks(int allow_missing)
 	unsigned long addr;
 	struct bb_jmp *bb_jmp;
 	KDB_DEBUG_BB("\n  %s: allow_missing %d\n", __FUNCTION__, allow_missing);
-	/* Absolute worst case is we have to iterate over all the basic blocks,
-	 * each iteration losing one register or memory state.  Any more loops
-	 * than that is a bug.
+	/* Absolute worst case is we have to iterate over all the basic blocks
+	 * in an "out of order" state, each iteration losing one register or
+	 * memory state.  Any more loops than that is a bug.  "out of order"
+	 * means that the layout of blocks in memory does not match the logic
+	 * flow through those blocks so (for example) block 27 comes before
+	 * block 2.  To allow for out of order blocks, multiply maxloops by the
+	 * number of blocks.
 	 */
-	maxloops = KDB_INT_REGISTERS + bb_reg_state_max;
+	maxloops = (KDB_INT_REGISTERS + bb_reg_state_max) * bb_count;
 	changed = 1;
 	do {
 		changed = 0;
@@ -3882,8 +4233,15 @@ bb_pass2_do_changed_blocks(int allow_missing)
 				if (bb_giveup)
 					goto done;
 			}
-			if (addr == bb_exit_addr)
-				bb_save_exit_state();
+			if (!bb_exit_state) {
+				/* ATTRIB_NORET functions are a problem with
+				 * the current gcc.  Allow the trailing address
+				 * a bit of leaway.
+				 */
+				if (addr == bb_exit_addr ||
+				    addr == bb_exit_addr + 1)
+					bb_save_exit_state();
+			}
 			if (bb_curr->drop_through)
 				bb_transfer(bb_curr->end,
 					    bb_list[i+1]->start, 1);
@@ -4063,7 +4421,7 @@ bb_actual_rollback(const struct kdb_activation_record *ar)
 	int i, offset_address;
 	struct bb_memory_contains *c;
 	enum bb_reg_code reg;
-	unsigned long address, new_rsp = 0;
+	unsigned long address, osp = 0;
 	struct bb_actual new[ARRAY_SIZE(bb_actual)];
 
 
@@ -4098,11 +4456,11 @@ bb_actual_rollback(const struct kdb_activation_record *ar)
 		}
 	}
 	if (bb_is_osp_defined(i) && bb_actual_valid(i)) {
-		new_rsp = new[BBRG_RSP - BBRG_RAX].value =
-			bb_actual_value(i) - bb_reg_code_offset(i);
+		osp = new[BBRG_RSP - BBRG_RAX].value =
+		      bb_actual_value(i) - bb_reg_code_offset(i);
 		new[BBRG_RSP - BBRG_RAX].valid = 1;
 		if (KDB_DEBUG(BB) | KDB_DEBUG(BB_SUMM))
-			kdb_printf(" -> " kdb_bfd_vma_fmt0 "\n", new_rsp);
+			kdb_printf(" -> osp " kdb_bfd_vma_fmt0 "\n", osp);
 	} else {
 		bb_actual_set_valid(BBRG_RSP, 0);
 		if (KDB_DEBUG(BB) | KDB_DEBUG(BB_SUMM))
@@ -4120,13 +4478,17 @@ bb_actual_rollback(const struct kdb_activation_record *ar)
 		reg = bb_reg_code_value(i);
 		if (bb_is_int_reg(reg)) {
 			new[reg - BBRG_RAX] = bb_actual[i - BBRG_RAX];
-			if (KDB_DEBUG(BB) | KDB_DEBUG(BB_SUMM))
-				kdb_printf("%s: %s is in %s, "
-					    kdb_bfd_vma_fmt0 "\n",
+			if (KDB_DEBUG(BB) | KDB_DEBUG(BB_SUMM)) {
+				kdb_printf("%s: %s is in %s ",
 					    __FUNCTION__,
 					    bbrg_name[reg],
-					    bbrg_name[i],
-					    bb_actual_value(reg));
+					    bbrg_name[i]);
+				if (bb_actual_valid(i))
+					kdb_printf(" -> " kdb_bfd_vma_fmt0 "\n",
+						    bb_actual_value(i));
+				else
+					kdb_printf("(invalid)\n");
+			}
 		}
 	}
 
@@ -4138,7 +4500,7 @@ bb_actual_rollback(const struct kdb_activation_record *ar)
 		reg = c->value;
 		if (!bb_is_int_reg(reg))
 			continue;
-		address = new_rsp + offset_address;
+		address = osp + offset_address;
 		if (address < ar->stack.logical_start ||
 		    address >= ar->stack.logical_end) {
 			new[reg - BBRG_RAX].value = 0;
@@ -4148,12 +4510,17 @@ bb_actual_rollback(const struct kdb_activation_record *ar)
 					   __FUNCTION__,
 					   bbrg_name[reg]);
 		} else {
+			if (KDB_DEBUG(BB) | KDB_DEBUG(BB_SUMM)) {
+				kdb_printf("%s: %s -> *(osp",
+					   __FUNCTION__,
+					   bbrg_name[reg]);
+				KDB_DEBUG_BB_OFFSET_PRINTF(offset_address, "", " ");
+				kdb_printf(kdb_bfd_vma_fmt0, address);
+			}
 			new[reg - BBRG_RAX].value = *(bfd_vma *)address;
 			new[reg - BBRG_RAX].valid = 1;
 			if (KDB_DEBUG(BB) | KDB_DEBUG(BB_SUMM))
-				kdb_printf("%s: %s -> " kdb_bfd_vma_fmt0 "\n",
-					   __FUNCTION__,
-					   bbrg_name[reg],
+				kdb_printf(") = " kdb_bfd_vma_fmt0 "\n",
 					   new[reg - BBRG_RAX].value);
 		}
 	}
@@ -4161,13 +4528,10 @@ bb_actual_rollback(const struct kdb_activation_record *ar)
 	memcpy(bb_actual, new, sizeof(bb_actual));
 }
 
-/* Return the number of bytes pushed on stack by the hardware.  Either 0 or the
- * size of the hardware specific data.
- *
- */
+/* Return true if the current function is an interrupt handler */
 
-static int
-bb_hardware_pushed(kdb_machreg_t rip)
+static bool
+bb_interrupt_handler(kdb_machreg_t rip)
 {
 	unsigned long disp8, disp32, target, addr = (unsigned long)rip;
 	unsigned char code[5];
@@ -4175,7 +4539,7 @@ bb_hardware_pushed(kdb_machreg_t rip)
 
 	for (i = 0; i < ARRAY_SIZE(bb_hardware_handlers); ++i)
 		if (strcmp(bb_func_name, bb_hardware_handlers[i]) == 0)
-			return HARDWARE_PUSHED;
+			return 1;
 
 	/* Given the large number of interrupt handlers, it is easiest to look
 	 * at the next instruction and see if it is a jmp to the common exit
@@ -4190,17 +4554,15 @@ bb_hardware_pushed(kdb_machreg_t rip)
 		if (target == bb_ret_from_intr ||
 		    target == bb_common_interrupt ||
 		    target == bb_error_entry)
-			return HARDWARE_PUSHED;
+			return 1;
 	}
 	if (code[0] == 0xeb) {
 		target = addr + (s8) disp8 + 2;		/* jmp disp8 */
 		if (target == bb_ret_from_intr ||
 		    target == bb_common_interrupt ||
 		    target == bb_error_entry)
-			return HARDWARE_PUSHED;
+			return 1;
 	}
-	if (strcmp(bb_func_name, "kdb_call") == 0)
-		return HARDWARE_PUSHED;
 
 	return 0;
 }
@@ -4317,7 +4679,8 @@ kdb_bb_all(int argc, const char **argv)
 	unsigned long addr;
 	int i, max_errors = 20;
 	struct bb_name_state *r;
-	kdb_printf("%s: conditional build variables:"
+	kdb_printf("%s: build variables:"
+		   " CCVERSION \"" __stringify(CCVERSION) "\""
 #ifdef	CONFIG_X86_64
 		   " CONFIG_X86_64"
 #endif
@@ -4335,6 +4698,24 @@ kdb_bb_all(int argc, const char **argv)
 #endif
 #ifdef	CONFIG_TRACE_IRQFLAGS
 		   " CONFIG_TRACE_IRQFLAGS"
+#endif
+#ifdef	CONFIG_HIBERNATION
+		   " CONFIG_HIBERNATION"
+#endif
+#ifdef	CONFIG_KPROBES
+		   " CONFIG_KPROBES"
+#endif
+#ifdef	CONFIG_KEXEC
+		   " CONFIG_KEXEC"
+#endif
+#ifdef	CONFIG_MATH_EMULATION
+		   " CONFIG_MATH_EMULATION"
+#endif
+#ifdef	CONFIG_XEN
+		   " CONFIG_XEN"
+#endif
+#ifdef	CONFIG_DEBUG_INFO
+		   " CONFIG_DEBUG_INFO"
 #endif
 #ifdef	NO_SIBLINGS
 		   " NO_SIBLINGS"
@@ -4393,8 +4774,10 @@ kdb_bb_all(int argc, const char **argv)
 		    strcmp(symname, "bogus_real_magic") == 0 ||
 		    strcmp(symname, "bogus_64_magic") == 0 ||
 		    strcmp(symname, "no_longmode") == 0 ||
+		    strcmp(symname, "mode_set") == 0 ||
 		    strcmp(symname, "mode_seta") == 0 ||
 		    strcmp(symname, "setbada") == 0 ||
+		    strcmp(symname, "check_vesa") == 0 ||
 		    strcmp(symname, "check_vesaa") == 0 ||
 		    strcmp(symname, "_setbada") == 0 ||
 		    strcmp(symname, "wakeup_stack_begin") == 0 ||
@@ -4403,12 +4786,18 @@ kdb_bb_all(int argc, const char **argv)
 		    strcmp(symname, "acpi_copy_wakeup_routine") == 0 ||
 		    strcmp(symname, "wakeup_end") == 0 ||
 		    strcmp(symname, "do_suspend_lowlevel_s4bios") == 0 ||
-		    strcmp(symname, "do_suspend_lowlevel") == 0)
+		    strcmp(symname, "do_suspend_lowlevel") == 0 ||
+		    strcmp(symname, "wakeup_pmode_return") == 0 ||
+		    strcmp(symname, "restore_registers") == 0)
 			continue;
 		/* __kprobes_text_end contains branches to the middle of code,
 		 * with undefined states.
 		 */
 		if (strcmp(symname, "__kprobes_text_end") == 0)
+			continue;
+		/* Data in the middle of the text segment :( */
+		if (strcmp(symname, "level2_kernel_pgt") == 0 ||
+		    strcmp(symname, "level3_kernel_pgt") == 0)
 			continue;
 		if (bb_spurious_global_label(symname))
 			continue;
@@ -4846,6 +5235,24 @@ kdba_bt_new_stack(struct kdb_activation_record *ar, kdb_machreg_t *rsp,
  *	old_style is 0 then it uses the basic block analysis to get an accurate
  *	backtrace with arguments, otherwise it falls back to the old method of
  *	printing anything on stack that looks like a kernel address.
+ *
+ *	Allowing for the stack data pushed by the hardware is tricky.  We
+ *	deduce the presence of hardware pushed data by looking for interrupt
+ *	handlers, either by name or by the code that they contain.  This
+ *	information must be applied to the next function up the stack, because
+ *	the hardware data is above the saved rip for the interrupted (next)
+ *	function.
+ *
+ *	To make things worse, the amount of data pushed is arch specific and
+ *	may depend on the rsp for the next function, not the current function.
+ *	The number of bytes pushed by hardware cannot be calculated until we
+ *	are actually processing the stack for the interrupted function and have
+ *	its rsp.
+ *
+ *	It is also possible for an interrupt to occur in user space and for the
+ *	interrupt handler to also be interrupted.  Check the code selector
+ *	whenever the previous function is an interrupt handler and stop
+ *	backtracing if the interrupt was not in kernel space.
  */
 
 static int
@@ -4853,9 +5260,11 @@ kdba_bt_stack(kdb_machreg_t addr, int argcount, const struct task_struct *p,
 	       int old_style)
 {
 	struct kdb_activation_record ar;
-	kdb_machreg_t rip = 0, rsp = 0, prev_rsp;
+	kdb_machreg_t rip = 0, rsp = 0, prev_rsp, cs;
 	kdb_symtab_t symtab;
-	int rip_at_rsp = 0, count = 0, btsp = 0, suppress, hardware_pushed = 0;
+	int rip_at_rsp = 0, count = 0, btsp = 0, suppress,
+	    interrupt_handler = 0, prev_interrupt_handler = 0, hardware_pushed,
+	    prev_noret = 0;
 	struct pt_regs *regs = NULL;
 
 	kdbgetintenv("BTSP", &btsp);
@@ -4933,8 +5342,29 @@ kdba_bt_stack(kdb_machreg_t addr, int argcount, const struct task_struct *p,
 	bb_cleanup();
 	/* Run through all the stacks */
 	while (ar.stack.physical_start) {
-		if (rip_at_rsp)
+		if (rip_at_rsp) {
 			rip = *(kdb_machreg_t *)rsp;
+			/* I wish that gcc was fixed to include a nop
+			 * instruction after ATTRIB_NORET functions.  The lack
+			 * of a nop means that the return address points to the
+			 * start of next function, so fudge it to point to one
+			 * byte previous.
+			 *
+			 * No, we cannot just decrement all rip values.
+			 * Sometimes an rip legally points to the start of a
+			 * function, e.g. interrupted code or hand crafted
+			 * assembler.
+			 */
+			if (prev_noret) {
+				kdbnearsym(rip, &symtab);
+				if (rip == symtab.sym_start) {
+					--rip;
+					if (KDB_DEBUG(ARA))
+						kdb_printf("\tprev_noret, " RIP
+							   "=0x%lx\n", rip);
+				}
+			}
+		}
 		kdbnearsym(rip, &symtab);
 		if (old_style) {
 		       	if (__kernel_text_address(rip) && !suppress) {
@@ -4965,10 +5395,32 @@ kdba_bt_stack(kdb_machreg_t addr, int argcount, const struct task_struct *p,
 			kdb_bb(rip);
 			if (bb_giveup)
 				break;
+			prev_interrupt_handler = interrupt_handler;
+			interrupt_handler = bb_interrupt_handler(rip);
 			prev_rsp = rsp;
 			if (rip_at_rsp) {
+				if (prev_interrupt_handler) {
+					cs = *((kdb_machreg_t *)rsp + 1) & 0xffff;
+					hardware_pushed =
+						bb_hardware_pushed_arch(rsp, &ar);
+				} else {
+					cs = __KERNEL_CS;
+					hardware_pushed = 0;
+				}
 				rsp += sizeof(rip) + hardware_pushed;
-				hardware_pushed = 0;
+				if (KDB_DEBUG(ARA))
+					kdb_printf("%s: " RSP " "
+						   kdb_machreg_fmt0
+						   " -> " kdb_machreg_fmt0
+						   " hardware_pushed %d"
+						   " prev_interrupt_handler %d"
+						   " cs 0x%lx\n",
+						   __FUNCTION__,
+						   prev_rsp,
+						   rsp,
+						   hardware_pushed,
+						   prev_interrupt_handler,
+						   cs);
 				if (rsp >= ar.stack.logical_end &&
 				    ar.stack.next) {
 					kdba_bt_new_stack(&ar, &rsp, &count,
@@ -4977,6 +5429,8 @@ kdba_bt_stack(kdb_machreg_t addr, int argcount, const struct task_struct *p,
 					continue;
 				}
 				bb_actual_set_value(BBRG_RSP, rsp);
+			} else {
+				cs = __KERNEL_CS;
 			}
 			rip_at_rsp = 1;
 			bb_actual_rollback(&ar);
@@ -4998,7 +5452,8 @@ kdba_bt_stack(kdb_machreg_t addr, int argcount, const struct task_struct *p,
 				++count;
 			}
 			/* Functions that terminate the backtrace */
-			if (strcmp(bb_func_name, "cpu_idle") == 0)
+			if (strcmp(bb_func_name, "cpu_idle") == 0 ||
+			    strcmp(bb_func_name, "child_rip") == 0)
 				break;
 			if (rsp >= ar.stack.logical_end &&
 			    !ar.stack.next)
@@ -5011,9 +5466,13 @@ kdba_bt_stack(kdb_machreg_t addr, int argcount, const struct task_struct *p,
 				++count;
 				suppress = 0;
 			}
+			if (cs != __KERNEL_CS) {
+				kdb_printf("Reached user space\n");
+				break;
+			}
 			rsp = bb_actual_value(BBRG_RSP);
-			hardware_pushed = bb_hardware_pushed(rip);
 		}
+		prev_noret = bb_noret(bb_func_name);
 		if (count > 200)
 			break;
 	}

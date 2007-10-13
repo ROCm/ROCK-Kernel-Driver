@@ -34,6 +34,7 @@
 #include <linux/efi.h>
 #include <linux/nodemask.h>
 #include <linux/bitops.h>         /* hweight64() */
+#include <linux/crash_dump.h>
 
 #include <asm/delay.h>		/* ia64_get_itc() */
 #include <asm/io.h>
@@ -42,7 +43,6 @@
 #include <asm/system.h>		/* wmb() */
 
 #include <asm/acpi-ext.h>
-#include <linux/crash_dump.h>
 
 extern int swiotlb_late_init_with_default_size (size_t size);
 
@@ -2034,7 +2034,7 @@ sba_init(void)
 	if (!ia64_platform_is("hpzx1") && !ia64_platform_is("hpzx1_swiotlb"))
 		return 0;
 
-#ifdef CONFIG_CRASH_DUMP
+#if defined(CONFIG_IA64_GENERIC) && defined(CONFIG_CRASH_DUMP)
 	/* If we are booting a kdump kernel, the sba_iommu will
 	 * cause devices that were not shutdown properly to MCA
 	 * as soon as they are turned back on.  Our only option for

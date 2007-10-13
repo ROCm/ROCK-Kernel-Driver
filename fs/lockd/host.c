@@ -43,9 +43,8 @@ static struct nsm_handle *	nsm_find(const struct sockaddr_in *sin,
  */
 static struct nlm_host *
 nlm_lookup_host(int server, const struct sockaddr_in *sin,
-					int proto, int version,
-					const char *hostname,
-					int hostname_len)
+		int proto, int version, const char *hostname,
+		int hostname_len, const struct sockaddr_in *ssin)
 {
 	struct hlist_head *chain;
 	struct hlist_node *pos;
@@ -53,7 +52,9 @@ nlm_lookup_host(int server, const struct sockaddr_in *sin,
 	struct nsm_handle *nsm = NULL;
 	int		hash;
 
-	dprintk("lockd: nlm_lookup_host(%u.%u.%u.%u, p=%d, v=%d, my role=%s, name=%.*s)\n",
+	dprintk("lockd: nlm_lookup_host("NIPQUAD_FMT"->"NIPQUAD_FMT
+			", p=%d, v=%d, my role=%s, name=%.*s)\n",
+			NIPQUAD(ssin->sin_addr.s_addr),
 			NIPQUAD(sin->sin_addr.s_addr), proto, version,
 			server? "server" : "client",
 			hostname_len,
@@ -90,6 +91,8 @@ nlm_lookup_host(int server, const struct sockaddr_in *sin,
 			continue;
 		if (host->h_server != server)
 			continue;
+		if (!nlm_cmp_addr(&host->h_saddr, ssin))
+			continue;
 
 		/* Move to head of hash chain. */
 		hlist_del(&host->h_hash);
@@ -117,6 +120,7 @@ nlm_lookup_host(int server, const struct sockaddr_in *sin,
 	host->h_name	   = nsm->sm_name;
 	host->h_addr       = *sin;
 	host->h_addr.sin_port = 0;	/* ouch! */
+	host->h_saddr	   = *ssin;
 	host->h_version    = version;
 	host->h_proto      = proto;
 	host->h_rpcclnt    = NULL;
@@ -160,15 +164,9 @@ nlm_destroy_host(struct nlm_host *host)
 	 */
 	nsm_unmonitor(host);
 
-	if ((clnt = host->h_rpcclnt) != NULL) {
-		if (atomic_read(&clnt->cl_users)) {
-			printk(KERN_WARNING
-				"lockd: active RPC handle\n");
-			clnt->cl_dead = 1;
-		} else {
-			rpc_destroy_client(host->h_rpcclnt);
-		}
-	}
+	clnt = host->h_rpcclnt;
+	if (clnt != NULL)
+		rpc_shutdown_client(clnt);
 	kfree(host);
 }
 
@@ -179,8 +177,10 @@ struct nlm_host *
 nlmclnt_lookup_host(const struct sockaddr_in *sin, int proto, int version,
 			const char *hostname, int hostname_len)
 {
+	struct sockaddr_in ssin = {0};
+
 	return nlm_lookup_host(0, sin, proto, version,
-			       hostname, hostname_len);
+			       hostname, hostname_len, &ssin);
 }
 
 /*
@@ -190,9 +190,12 @@ struct nlm_host *
 nlmsvc_lookup_host(struct svc_rqst *rqstp,
 			const char *hostname, int hostname_len)
 {
+	struct sockaddr_in ssin = {0};
+
+	ssin.sin_addr = rqstp->rq_daddr.addr;
 	return nlm_lookup_host(1, svc_addr_in(rqstp),
 			       rqstp->rq_prot, rqstp->rq_vers,
-			       hostname, hostname_len);
+			       hostname, hostname_len, &ssin);
 }
 
 /*
@@ -203,8 +206,9 @@ nlm_bind_host(struct nlm_host *host)
 {
 	struct rpc_clnt	*clnt;
 
-	dprintk("lockd: nlm_bind_host(%08x)\n",
-			(unsigned)ntohl(host->h_addr.sin_addr.s_addr));
+	dprintk("lockd: nlm_bind_host("NIPQUAD_FMT"->"NIPQUAD_FMT")\n",
+			NIPQUAD(host->h_saddr.sin_addr),
+			NIPQUAD(host->h_addr.sin_addr));
 
 	/* Lock host handle */
 	mutex_lock(&host->h_mutex);
@@ -231,6 +235,7 @@ nlm_bind_host(struct nlm_host *host)
 			.protocol	= host->h_proto,
 			.address	= (struct sockaddr *)&host->h_addr,
 			.addrsize	= sizeof(host->h_addr),
+			.saddress	= (struct sockaddr *)&host->h_saddr,
 			.timeout	= &timeparms,
 			.servername	= host->h_name,
 			.program	= &nlm_program,

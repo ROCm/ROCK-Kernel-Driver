@@ -350,20 +350,19 @@ static void unmap_cmd_data(struct srp_cmd *cmd,
 	}
 }
 
-static int map_sg_list(int num_entries, 
-		       struct scatterlist *sg,
+static int map_sg_list(struct scsi_cmnd *cmd, int nseg,
 		       struct srp_direct_buf *md)
 {
 	int i;
+	struct scatterlist *sg;
 	u64 total_length = 0;
 
-	for (i = 0; i < num_entries; ++i) {
+	scsi_for_each_sg(cmd, sg, nseg, i) {
 		struct srp_direct_buf *descr = md + i;
-		struct scatterlist *sg_entry = &sg[i];
-		descr->va = sg_dma_address(sg_entry);
-		descr->len = sg_dma_len(sg_entry);
+		descr->va = sg_dma_address(sg);
+		descr->len = sg_dma_len(sg);
 		descr->key = 0;
-		total_length += sg_dma_len(sg_entry);
+		total_length += sg_dma_len(sg);
  	}
 	return total_length;
 }
@@ -384,24 +383,22 @@ static int map_sg_data(struct scsi_cmnd *cmd,
 
 	int sg_mapped;
 	u64 total_length = 0;
-	struct scatterlist *sg = cmd->request_buffer;
 	struct srp_direct_buf *data =
 		(struct srp_direct_buf *) srp_cmd->add_data;
 	struct srp_indirect_buf *indirect =
 		(struct srp_indirect_buf *) data;
 
-	sg_mapped = dma_map_sg(dev, sg, cmd->use_sg, DMA_BIDIRECTIONAL);
-
-	if (sg_mapped == 0)
+	sg_mapped = scsi_dma_map(cmd);
+	if (!sg_mapped)
+		return 1;
+	else if (sg_mapped < 0)
 		return 0;
 
 	set_srp_direction(cmd, srp_cmd, sg_mapped);
 
 	/* special case; we can use a single direct descriptor */
 	if (sg_mapped == 1) {
-		data->va = sg_dma_address(&sg[0]);
-		data->len = sg_dma_len(&sg[0]);
-		data->key = 0;
+		map_sg_list(cmd, sg_mapped, data);
 		return 1;
 	}
 
@@ -410,7 +407,7 @@ static int map_sg_data(struct scsi_cmnd *cmd,
 	indirect->table_desc.key = 0;
 
 	if (sg_mapped <= MAX_INDIRECT_BUFS) {
-		total_length = map_sg_list(sg_mapped, sg,
+		total_length = map_sg_list(cmd, sg_mapped,
 					   &indirect->desc_list[0]);
 		indirect->len = total_length;
 		return 1;
@@ -419,7 +416,7 @@ static int map_sg_data(struct scsi_cmnd *cmd,
 	/* get indirect table */
 	if (!evt_struct->ext_list) {
 		evt_struct->ext_list = (struct srp_direct_buf *)
-			dma_alloc_coherent(dev, 
+			dma_alloc_coherent(dev,
 					   SG_ALL * sizeof(struct srp_direct_buf),
 					   &evt_struct->ext_list_token, 0);
 		if (!evt_struct->ext_list) {
@@ -429,47 +426,14 @@ static int map_sg_data(struct scsi_cmnd *cmd,
 		}
 	}
 
-	total_length = map_sg_list(sg_mapped, sg, evt_struct->ext_list);	
+	total_length = map_sg_list(cmd, sg_mapped, evt_struct->ext_list);
 
 	indirect->len = total_length;
 	indirect->table_desc.va = evt_struct->ext_list_token;
 	indirect->table_desc.len = sg_mapped * sizeof(indirect->desc_list[0]);
 	memcpy(indirect->desc_list, evt_struct->ext_list,
 	       MAX_INDIRECT_BUFS * sizeof(struct srp_direct_buf));
-	
  	return 1;
-}
-
-/**
- * map_single_data: - Maps memory and initializes memory decriptor fields
- * @cmd:	struct scsi_cmnd with the memory to be mapped
- * @srp_cmd:	srp_cmd that contains the memory descriptor
- * @dev:	device for which to map dma memory
- *
- * Called by map_data_for_srp_cmd() when building srp cmd from scsi cmd.
- * Returns 1 on success.
-*/
-static int map_single_data(struct scsi_cmnd *cmd,
-			   struct srp_cmd *srp_cmd, struct device *dev)
-{
-	struct srp_direct_buf *data =
-		(struct srp_direct_buf *) srp_cmd->add_data;
-
-	data->va =
-		dma_map_single(dev, cmd->request_buffer,
-			       cmd->request_bufflen,
-			       DMA_BIDIRECTIONAL);
-	if (dma_mapping_error(data->va)) {
-		sdev_printk(KERN_ERR, cmd->device,
-			    "Unable to map request_buffer for command!\n");
-		return 0;
-	}
-	data->len = cmd->request_bufflen;
-	data->key = 0;
-
-	set_srp_direction(cmd, srp_cmd, 1);
-
-	return 1;
 }
 
 /**
@@ -502,11 +466,7 @@ static int map_data_for_srp_cmd(struct scsi_cmnd *cmd,
 		return 0;
 	}
 
-	if (!cmd->request_buffer)
-		return 1;
-	if (cmd->use_sg)
-		return map_sg_data(cmd, evt_struct, srp_cmd, dev);
-	return map_single_data(cmd, srp_cmd, dev);
+	return map_sg_data(cmd, evt_struct, srp_cmd, dev);
 }
 
 /**
@@ -712,9 +672,9 @@ static void handle_cmd_rsp(struct srp_event_struct *evt_struct)
 			       evt_struct->hostdata->dev);
 
 		if (rsp->flags & SRP_RSP_FLAG_DOOVER)
-			cmnd->resid = rsp->data_out_res_cnt;
+			scsi_set_resid(cmnd, rsp->data_out_res_cnt);
 		else if (rsp->flags & SRP_RSP_FLAG_DIOVER)
-			cmnd->resid = rsp->data_in_res_cnt;
+			scsi_set_resid(cmnd, rsp->data_in_res_cnt);
 	}
 
 	if (evt_struct->cmnd_done)
@@ -742,8 +702,7 @@ static int ibmvscsi_queuecommand(struct scsi_cmnd *cmnd,
 	struct srp_cmd *srp_cmd;
 	struct srp_event_struct *evt_struct;
 	struct srp_indirect_buf *indirect;
-	struct ibmvscsi_host_data *hostdata =
-		(struct ibmvscsi_host_data *)&cmnd->device->host->hostdata;
+	struct ibmvscsi_host_data *hostdata = shost_priv(cmnd->device->host);
 	u16 lun = lun_from_dev(cmnd->device);
 	u8 out_fmt, in_fmt;
 
@@ -858,7 +817,7 @@ static void send_mad_adapter_info(struct ibmvscsi_host_data *hostdata)
 	init_event_struct(evt_struct,
 			  adapter_info_rsp,
 			  VIOSRP_MAD_FORMAT,
-			  init_timeout * HZ);
+			  init_timeout);
 	
 	req = &evt_struct->iu.mad.adapter_info;
 	memset(req, 0x00, sizeof(*req));
@@ -953,7 +912,7 @@ static int send_srp_login(struct ibmvscsi_host_data *hostdata)
 	init_event_struct(evt_struct,
 			  login_rsp,
 			  VIOSRP_SRP_FORMAT,
-			  init_timeout * HZ);
+			  init_timeout);
 
 	login = &evt_struct->iu.srp.login_req;
 	memset(login, 0x00, sizeof(struct srp_login_req));
@@ -994,8 +953,7 @@ static void sync_completion(struct srp_event_struct *evt_struct)
  */
 static int ibmvscsi_eh_abort_handler(struct scsi_cmnd *cmd)
 {
-	struct ibmvscsi_host_data *hostdata =
-	    (struct ibmvscsi_host_data *)cmd->device->host->hostdata;
+	struct ibmvscsi_host_data *hostdata = shost_priv(cmd->device->host);
 	struct srp_tsk_mgmt *tsk_mgmt;
 	struct srp_event_struct *evt;
 	struct srp_event_struct *tmp_evt, *found_evt;
@@ -1031,7 +989,7 @@ static int ibmvscsi_eh_abort_handler(struct scsi_cmnd *cmd)
 	init_event_struct(evt,
 			  sync_completion,
 			  VIOSRP_SRP_FORMAT,
-			  init_timeout * HZ);
+			  init_timeout);
 
 	tsk_mgmt = &evt->iu.srp.tsk_mgmt;
 	
@@ -1118,9 +1076,7 @@ static int ibmvscsi_eh_abort_handler(struct scsi_cmnd *cmd)
  */
 static int ibmvscsi_eh_device_reset_handler(struct scsi_cmnd *cmd)
 {
-	struct ibmvscsi_host_data *hostdata =
-	    (struct ibmvscsi_host_data *)cmd->device->host->hostdata;
-
+	struct ibmvscsi_host_data *hostdata = shost_priv(cmd->device->host);
 	struct srp_tsk_mgmt *tsk_mgmt;
 	struct srp_event_struct *evt;
 	struct srp_event_struct *tmp_evt, *pos;
@@ -1140,7 +1096,7 @@ static int ibmvscsi_eh_device_reset_handler(struct scsi_cmnd *cmd)
 	init_event_struct(evt,
 			  sync_completion,
 			  VIOSRP_SRP_FORMAT,
-			  init_timeout * HZ);
+			  init_timeout);
 
 	tsk_mgmt = &evt->iu.srp.tsk_mgmt;
 
@@ -1217,8 +1173,7 @@ static int ibmvscsi_eh_device_reset_handler(struct scsi_cmnd *cmd)
 static int ibmvscsi_eh_host_reset_handler(struct scsi_cmnd *cmd)
 {
 	unsigned long wait_switch = 0;
-	struct ibmvscsi_host_data *hostdata =
-		(struct ibmvscsi_host_data *)cmd->device->host->hostdata;
+	struct ibmvscsi_host_data *hostdata = shost_priv(cmd->device->host);
 
 	dev_err(hostdata->dev, "Resetting connection due to error recovery\n");
 
@@ -1373,7 +1328,7 @@ static int ibmvscsi_do_host_config(struct ibmvscsi_host_data *hostdata,
 	init_event_struct(evt_struct,
 			  sync_completion,
 			  VIOSRP_MAD_FORMAT,
-			  init_timeout * HZ);
+			  init_timeout);
 
 	host_config = &evt_struct->iu.mad.host_config;
 
@@ -1446,8 +1401,7 @@ static int ibmvscsi_change_queue_depth(struct scsi_device *sdev, int qdepth)
 static ssize_t show_host_srp_version(struct class_device *class_dev, char *buf)
 {
 	struct Scsi_Host *shost = class_to_shost(class_dev);
-	struct ibmvscsi_host_data *hostdata =
-	    (struct ibmvscsi_host_data *)shost->hostdata;
+	struct ibmvscsi_host_data *hostdata = shost_priv(shost);
 	int len;
 
 	len = snprintf(buf, PAGE_SIZE, "%s\n",
@@ -1467,8 +1421,7 @@ static ssize_t show_host_partition_name(struct class_device *class_dev,
 					char *buf)
 {
 	struct Scsi_Host *shost = class_to_shost(class_dev);
-	struct ibmvscsi_host_data *hostdata =
-	    (struct ibmvscsi_host_data *)shost->hostdata;
+	struct ibmvscsi_host_data *hostdata = shost_priv(shost);
 	int len;
 
 	len = snprintf(buf, PAGE_SIZE, "%s\n",
@@ -1488,8 +1441,7 @@ static ssize_t show_host_partition_number(struct class_device *class_dev,
 					  char *buf)
 {
 	struct Scsi_Host *shost = class_to_shost(class_dev);
-	struct ibmvscsi_host_data *hostdata =
-	    (struct ibmvscsi_host_data *)shost->hostdata;
+	struct ibmvscsi_host_data *hostdata = shost_priv(shost);
 	int len;
 
 	len = snprintf(buf, PAGE_SIZE, "%d\n",
@@ -1508,8 +1460,7 @@ static struct class_device_attribute ibmvscsi_host_partition_number = {
 static ssize_t show_host_mad_version(struct class_device *class_dev, char *buf)
 {
 	struct Scsi_Host *shost = class_to_shost(class_dev);
-	struct ibmvscsi_host_data *hostdata =
-	    (struct ibmvscsi_host_data *)shost->hostdata;
+	struct ibmvscsi_host_data *hostdata = shost_priv(shost);
 	int len;
 
 	len = snprintf(buf, PAGE_SIZE, "%d\n",
@@ -1528,8 +1479,7 @@ static struct class_device_attribute ibmvscsi_host_mad_version = {
 static ssize_t show_host_os_type(struct class_device *class_dev, char *buf)
 {
 	struct Scsi_Host *shost = class_to_shost(class_dev);
-	struct ibmvscsi_host_data *hostdata =
-	    (struct ibmvscsi_host_data *)shost->hostdata;
+	struct ibmvscsi_host_data *hostdata = shost_priv(shost);
 	int len;
 
 	len = snprintf(buf, PAGE_SIZE, "%d\n", hostdata->madapter_info.os_type);
@@ -1547,8 +1497,7 @@ static struct class_device_attribute ibmvscsi_host_os_type = {
 static ssize_t show_host_config(struct class_device *class_dev, char *buf)
 {
 	struct Scsi_Host *shost = class_to_shost(class_dev);
-	struct ibmvscsi_host_data *hostdata =
-	    (struct ibmvscsi_host_data *)shost->hostdata;
+	struct ibmvscsi_host_data *hostdata = shost_priv(shost);
 
 	/* returns null-terminated host config data */
 	if (ibmvscsi_do_host_config(hostdata, buf, PAGE_SIZE) == 0)
@@ -1616,7 +1565,7 @@ static int ibmvscsi_probe(struct vio_dev *vdev, const struct vio_device_id *id)
 		goto scsi_host_alloc_failed;
 	}
 
-	hostdata = (struct ibmvscsi_host_data *)host->hostdata;
+	hostdata = shost_priv(host);
 	memset(hostdata, 0x00, sizeof(*hostdata));
 	INIT_LIST_HEAD(&hostdata->sent);
 	hostdata->host = host;

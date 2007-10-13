@@ -319,7 +319,7 @@ static void __devinit setup_APIC_timer(void)
 
 #define LAPIC_CAL_LOOPS		(HZ/10)
 
-static __initdata volatile int lapic_cal_loops = -1;
+static __initdata int lapic_cal_loops = -1;
 static __initdata long lapic_cal_t1, lapic_cal_t2;
 static __initdata unsigned long long lapic_cal_tsc1, lapic_cal_tsc2;
 static __initdata unsigned long lapic_cal_pm1, lapic_cal_pm2;
@@ -486,7 +486,7 @@ void __init setup_boot_APIC_clock(void)
 		/* Let the interrupts run */
 		local_irq_enable();
 
-		while(lapic_cal_loops <= LAPIC_CAL_LOOPS)
+		while (lapic_cal_loops <= LAPIC_CAL_LOOPS)
 			cpu_relax();
 
 		local_irq_disable();
@@ -522,6 +522,9 @@ void __init setup_boot_APIC_clock(void)
 		 */
 		if (nmi_watchdog != NMI_IO_APIC)
 			lapic_clockevent.features &= ~CLOCK_EVT_FEAT_DUMMY;
+		else
+			printk(KERN_WARNING "APIC timer registered as dummy,"
+			       " due to nmi_watchdog=1!\n");
 	}
 
 	/* Setup the lapic or request the broadcast */
@@ -1082,7 +1085,7 @@ static int __init detect_init_APIC (void)
 	if (l & MSR_IA32_APICBASE_ENABLE)
 		mp_lapic_addr = l & MSR_IA32_APICBASE_BASE;
 
-	if (nmi_watchdog != NMI_NONE)
+	if (nmi_watchdog != NMI_NONE && nmi_watchdog != NMI_DISABLED)
 		nmi_watchdog = NMI_LOCAL_APIC;
 
 	printk(KERN_INFO "Found and enabled local APIC!\n");

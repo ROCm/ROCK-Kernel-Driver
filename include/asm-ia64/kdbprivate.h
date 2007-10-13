@@ -108,36 +108,6 @@ extern void kdba_unsave_running(struct kdba_running_process *, struct pt_regs *)
 
 #include <linux/interrupt.h>	/* for irqreturn_t */
 
-/* The kdba handlers that sit between wrapper -> unw_init_running -> real
- * function are almost identical.  They differ in the function name, the
- * type of data passed as void* to unw_init_running, the value to print
- * in the debug statement and the invocation of the real function.
- *
- * data_type must be a structure that contains 'struct pt_regs *regs;'.
- */
-
-#define KDBA_UNWIND_HANDLER(name, data_type, debug_value, invoke...)	\
-void name(struct unw_frame_info *info, void *vdata)			\
-{									\
-	data_type *data = vdata;					\
-	struct switch_stack *sw, *prev_sw;				\
-	struct pt_regs *prev_regs;					\
-	struct kdb_running_process *krp =				\
-		kdb_running_process + smp_processor_id();		\
-	KDB_DEBUG_STATE(__FUNCTION__, debug_value);			\
-	prev_sw = krp->arch.sw;						\
-	sw = (struct switch_stack *)(info+1);				\
-	/* padding from unw_init_running */				\
-	sw = (struct switch_stack *)(((unsigned long)sw + 15) & ~15);	\
-	krp->arch.sw = sw;						\
-	prev_regs = krp->regs;						\
-	kdb_save_running(data->regs);					\
-	invoke;								\
-	kdb_unsave_running(data->regs);					\
-	krp->regs = prev_regs;						\
-	krp->arch.sw = prev_sw;						\
-}
-
 enum kdba_serial_console {
 	KDBA_SC_NONE = 0,
 	KDBA_SC_STANDARD,

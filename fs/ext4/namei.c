@@ -1050,6 +1050,11 @@ static struct dentry *ext4_lookup(struct inode * dir, struct dentry *dentry, str
 
 		if (!inode)
 			return ERR_PTR(-EACCES);
+
+		if (is_bad_inode(inode)) {
+			iput(inode);
+			return ERR_PTR(-ENOENT);
+		}
 	}
 	return d_splice_alias(inode, dentry);
 }
@@ -1084,6 +1089,11 @@ struct dentry *ext4_get_parent(struct dentry *child)
 
 	if (!inode)
 		return ERR_PTR(-EACCES);
+
+	if (is_bad_inode(inode)) {
+		iput(inode);
+		return ERR_PTR(-ENOENT);
+	}
 
 	parent = d_alloc_anon(inode);
 	if (!parent) {
@@ -1342,7 +1352,7 @@ static int add_dirent_to_buf(handle_t *handle, struct dentry *dentry,
 	 * happen is that the times are slightly out of date
 	 * and/or different from the directory change time.
 	 */
-	dir->i_mtime = dir->i_ctime = CURRENT_TIME_SEC;
+	dir->i_mtime = dir->i_ctime = ext4_current_time(dir);
 	ext4_update_dx_flag(dir);
 	dir->i_version++;
 	ext4_mark_inode_dirty(handle, dir);
@@ -1676,6 +1686,35 @@ static int ext4_delete_entry (handle_t *handle,
 	return -ENOENT;
 }
 
+/*
+ * DIR_NLINK feature is set if 1) nlinks > EXT4_LINK_MAX or 2) nlinks == 2,
+ * since this indicates that nlinks count was previously 1.
+ */
+static void ext4_inc_count(handle_t *handle, struct inode *inode)
+{
+	inc_nlink(inode);
+	if (is_dx(inode) && inode->i_nlink > 1) {
+		/* limit is 16-bit i_links_count */
+		if (inode->i_nlink >= EXT4_LINK_MAX || inode->i_nlink == 2) {
+			inode->i_nlink = 1;
+			EXT4_SET_RO_COMPAT_FEATURE(inode->i_sb,
+					      EXT4_FEATURE_RO_COMPAT_DIR_NLINK);
+		}
+	}
+}
+
+/*
+ * If a directory had nlink == 1, then we should let it be 1. This indicates
+ * directory has >EXT4_LINK_MAX subdirs.
+ */
+static void ext4_dec_count(handle_t *handle, struct inode *inode)
+{
+	drop_nlink(inode);
+	if (S_ISDIR(inode->i_mode) && inode->i_nlink == 0)
+		inc_nlink(inode);
+}
+
+
 static int ext4_add_nondir(handle_t *handle,
 		struct dentry *dentry, struct inode *inode)
 {
@@ -1772,7 +1811,7 @@ static int ext4_mkdir(struct inode * dir, struct dentry * dentry, int mode)
 	struct ext4_dir_entry_2 * de;
 	int err, retries = 0;
 
-	if (dir->i_nlink >= EXT4_LINK_MAX)
+	if (EXT4_DIR_LINK_MAX(dir))
 		return -EMLINK;
 
 retry:
@@ -1795,7 +1834,7 @@ retry:
 	inode->i_size = EXT4_I(inode)->i_disksize = inode->i_sb->s_blocksize;
 	dir_block = ext4_bread (handle, inode, 0, 1, &err);
 	if (!dir_block) {
-		drop_nlink(inode); /* is this nlink == 0? */
+		ext4_dec_count(handle, inode); /* is this nlink == 0? */
 		ext4_mark_inode_dirty(handle, inode);
 		iput (inode);
 		goto out_stop;
@@ -1827,7 +1866,7 @@ retry:
 		iput (inode);
 		goto out_stop;
 	}
-	inc_nlink(dir);
+	ext4_inc_count(handle, dir);
 	ext4_update_dx_flag(dir);
 	ext4_mark_inode_dirty(handle, dir);
 	d_instantiate(dentry, inode);
@@ -2092,9 +2131,9 @@ static int ext4_rmdir (struct inode * dir, struct dentry *dentry)
 	retval = ext4_delete_entry(handle, dir, de, bh);
 	if (retval)
 		goto end_rmdir;
-	if (inode->i_nlink != 2)
+	if (!EXT4_DIR_LINK_EMPTY(inode))
 		ext4_warning (inode->i_sb, "ext4_rmdir",
-			      "empty directory has nlink!=2 (%d)",
+			      "empty directory has too many links (%d)",
 			      inode->i_nlink);
 	inode->i_version++;
 	clear_nlink(inode);
@@ -2103,9 +2142,9 @@ static int ext4_rmdir (struct inode * dir, struct dentry *dentry)
 	 * recovery. */
 	inode->i_size = 0;
 	ext4_orphan_add(handle, inode);
-	inode->i_ctime = dir->i_ctime = dir->i_mtime = CURRENT_TIME_SEC;
+	inode->i_ctime = dir->i_ctime = dir->i_mtime = ext4_current_time(inode);
 	ext4_mark_inode_dirty(handle, inode);
-	drop_nlink(dir);
+	ext4_dec_count(handle, dir);
 	ext4_update_dx_flag(dir);
 	ext4_mark_inode_dirty(handle, dir);
 
@@ -2153,13 +2192,13 @@ static int ext4_unlink(struct inode * dir, struct dentry *dentry)
 	retval = ext4_delete_entry(handle, dir, de, bh);
 	if (retval)
 		goto end_unlink;
-	dir->i_ctime = dir->i_mtime = CURRENT_TIME_SEC;
+	dir->i_ctime = dir->i_mtime = ext4_current_time(dir);
 	ext4_update_dx_flag(dir);
 	ext4_mark_inode_dirty(handle, dir);
-	drop_nlink(inode);
+	ext4_dec_count(handle, inode);
 	if (!inode->i_nlink)
 		ext4_orphan_add(handle, inode);
-	inode->i_ctime = dir->i_ctime;
+	inode->i_ctime = ext4_current_time(inode);
 	ext4_mark_inode_dirty(handle, inode);
 	retval = 0;
 
@@ -2206,7 +2245,7 @@ retry:
 		err = __page_symlink(inode, symname, l,
 				mapping_gfp_mask(inode->i_mapping) & ~__GFP_FS);
 		if (err) {
-			drop_nlink(inode);
+			ext4_dec_count(handle, inode);
 			ext4_mark_inode_dirty(handle, inode);
 			iput (inode);
 			goto out_stop;
@@ -2232,8 +2271,9 @@ static int ext4_link (struct dentry * old_dentry,
 	struct inode *inode = old_dentry->d_inode;
 	int err, retries = 0;
 
-	if (inode->i_nlink >= EXT4_LINK_MAX)
+	if (EXT4_DIR_LINK_MAX(inode))
 		return -EMLINK;
+
 	/*
 	 * Return -ENOENT if we've raced with unlink and i_nlink is 0.  Doing
 	 * otherwise has the potential to corrupt the orphan inode list.
@@ -2250,8 +2290,8 @@ retry:
 	if (IS_DIRSYNC(dir))
 		handle->h_sync = 1;
 
-	inode->i_ctime = CURRENT_TIME_SEC;
-	inc_nlink(inode);
+	inode->i_ctime = ext4_current_time(inode);
+	ext4_inc_count(handle, inode);
 	atomic_inc(&inode->i_count);
 
 	err = ext4_add_nondir(handle, dentry, inode);
@@ -2352,7 +2392,7 @@ static int ext4_rename (struct inode * old_dir, struct dentry *old_dentry,
 	 * Like most other Unix systems, set the ctime for inodes on a
 	 * rename.
 	 */
-	old_inode->i_ctime = CURRENT_TIME_SEC;
+	old_inode->i_ctime = ext4_current_time(old_inode);
 	ext4_mark_inode_dirty(handle, old_inode);
 
 	/*
@@ -2384,10 +2424,10 @@ static int ext4_rename (struct inode * old_dir, struct dentry *old_dentry,
 	}
 
 	if (new_inode) {
-		drop_nlink(new_inode);
-		new_inode->i_ctime = CURRENT_TIME_SEC;
+		ext4_dec_count(handle, new_inode);
+		new_inode->i_ctime = ext4_current_time(new_inode);
 	}
-	old_dir->i_ctime = old_dir->i_mtime = CURRENT_TIME_SEC;
+	old_dir->i_ctime = old_dir->i_mtime = ext4_current_time(old_dir);
 	ext4_update_dx_flag(old_dir);
 	if (dir_bh) {
 		BUFFER_TRACE(dir_bh, "get_write_access");
@@ -2395,11 +2435,13 @@ static int ext4_rename (struct inode * old_dir, struct dentry *old_dentry,
 		PARENT_INO(dir_bh->b_data) = cpu_to_le32(new_dir->i_ino);
 		BUFFER_TRACE(dir_bh, "call ext4_journal_dirty_metadata");
 		ext4_journal_dirty_metadata(handle, dir_bh);
-		drop_nlink(old_dir);
+		ext4_dec_count(handle, old_dir);
 		if (new_inode) {
-			drop_nlink(new_inode);
+			/* checked empty_dir above, can't have another parent,
+			 * ext3_dec_count() won't work for many-linked dirs */
+			new_inode->i_nlink = 0;
 		} else {
-			inc_nlink(new_dir);
+			ext4_inc_count(handle, new_dir);
 			ext4_update_dx_flag(new_dir);
 			ext4_mark_inode_dirty(handle, new_dir);
 		}

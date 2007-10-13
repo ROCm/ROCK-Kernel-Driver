@@ -109,6 +109,12 @@ extern int mpc_default_type;
 /* 1 if "noapic" boot option passed */
 extern int skip_ioapic_setup;
 
+static inline void disable_ioapic_setup(void)
+{
+	skip_ioapic_setup = 1;
+}
+
+
 /*
  * If we use the IO-APIC for IRQ routing, disable automatic
  * assignment of PCI IRQ's.
@@ -125,10 +131,8 @@ extern int sis_apic_bug; /* dummy */
 
 void enable_NMI_through_LVT0 (void * dummy);
 
-#ifndef CONFIG_XEN
 extern spinlock_t i8259A_lock;
 
 extern int timer_over_8254;
-#endif
 
 #endif

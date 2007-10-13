@@ -809,6 +809,7 @@ static int ps3fbd(void *arg)
 {
 	struct fb_info *info = arg;
 
+	set_freezable();
 	while (!kthread_should_stop()) {
 		try_to_freeze();
 		set_current_state(TASK_INTERRUPTIBLE);
@@ -1068,7 +1069,7 @@ static int __devinit ps3fb_probe(struct ps3_system_bus_device *dev)
 	info->fix.smem_len = ps3fb_videomemory.size - offset;
 	info->pseudo_palette = info->par;
 	info->par = NULL;
-	info->flags = FBINFO_FLAG_DEFAULT;
+	info->flags = FBINFO_DEFAULT | FBINFO_READS_FAST;
 
 	retval = fb_alloc_cmap(&info->cmap, 256, 0);
 	if (retval < 0)

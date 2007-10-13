@@ -36,10 +36,6 @@ cflags-$(CONFIG_MCORE2) += \
 	$(call cc-option,-march=core2,$(call cc-option,-mtune=generic))
 cflags-$(CONFIG_GENERIC_CPU) += $(call cc-option,-mtune=generic)
 
-cppflags-$(CONFIG_XEN) += \
-	-D__XEN_INTERFACE_VERSION__=$(CONFIG_XEN_INTERFACE_VERSION)
-CPPFLAGS += $(cppflags-y)
-
 cflags-y += -m64
 cflags-y += -mno-red-zone
 cflags-y += -mcmodel=kernel
@@ -80,7 +76,8 @@ head-y := arch/x86_64/kernel/head.o arch/x86_64/kernel/head64.o arch/x86_64/kern
 libs-y 					+= arch/x86_64/lib/
 core-y					+= arch/x86_64/kernel/ \
 					   arch/x86_64/mm/ \
-					   arch/x86_64/crypto/
+					   arch/x86_64/crypto/ \
+					   arch/x86_64/vdso/
 core-$(CONFIG_IA32_EMULATION)		+= arch/x86_64/ia32/
 drivers-$(CONFIG_PCI)			+= arch/x86_64/pci/
 drivers-$(CONFIG_OPROFILE)		+= arch/x86_64/oprofile/
@@ -91,21 +88,6 @@ boot := arch/x86_64/boot
 PHONY += bzImage bzlilo install archmrproper \
 	 fdimage fdimage144 fdimage288 isoimage archclean
 
-ifdef CONFIG_XEN
-CPPFLAGS := -Iinclude$(if $(KBUILD_SRC),2)/asm/mach-xen $(CPPFLAGS)
-head-y := arch/x86_64/kernel/head-xen.o arch/x86_64/kernel/head64-xen.o arch/x86_64/kernel/init_task.o
-LDFLAGS_vmlinux := -e startup_64
-boot := arch/i386/boot-xen
-.PHONY: vmlinuz
-#Default target when executing "make"
-all: vmlinuz
-
-vmlinuz: vmlinux
-	$(Q)$(MAKE) $(build)=$(boot) $@
-
-install:
-	$(Q)$(MAKE) $(build)=$(boot) XENGUEST=$(XENGUEST) $@
-else
 #Default target when executing "make"
 all: bzImage
 
@@ -126,7 +108,6 @@ fdimage fdimage144 fdimage288 isoimage: vmlinux
 
 install:
 	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(BOOTIMAGE) $@ 
-endif
 
 archclean:
 	$(Q)$(MAKE) $(clean)=$(boot)

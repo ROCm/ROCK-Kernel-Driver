@@ -40,6 +40,7 @@
 #include <linux/platform_device.h>
 #include <linux/hwmon.h>
 #include <linux/hwmon-sysfs.h>
+#include <linux/input.h>
 #include <asm/uaccess.h>
 
 #include <linux/dmi.h>
@@ -105,9 +106,13 @@ static const char *str_supported(int is_supported);
 #define vdbg_printk(a_dbg_level, format, arg...)
 #endif
 
+/* Input IDs */
+#define TPACPI_HKEY_INPUT_VENDOR	PCI_VENDOR_ID_IBM
+#define TPACPI_HKEY_INPUT_PRODUCT	0x5054 /* "TP" */
+#define TPACPI_HKEY_INPUT_VERSION	0x4101
+
 /* ACPI HIDs */
 #define IBM_HKEY_HID    "IBM0068"
-#define IBM_PCI_HID     "PNP0A03"
 
 /* ACPI helpers */
 static int __must_check acpi_evalf(acpi_handle handle,
@@ -168,6 +173,7 @@ static int parse_strtoul(const char *buf, unsigned long max,
 static struct platform_device *tpacpi_pdev;
 static struct class_device *tpacpi_hwmon;
 static struct platform_driver tpacpi_pdriver;
+static struct input_dev *tpacpi_inputdev;
 static int tpacpi_create_driver_attributes(struct device_driver *drv);
 static void tpacpi_remove_driver_attributes(struct device_driver *drv);
 
@@ -175,6 +181,7 @@ static void tpacpi_remove_driver_attributes(struct device_driver *drv);
 static int experimental;
 static u32 dbg_level;
 static int force_load;
+static unsigned int hotkey_report_mode;
 
 static int thinkpad_acpi_module_init(void);
 static void thinkpad_acpi_module_exit(void);
@@ -202,6 +209,7 @@ struct ibm_struct {
 	int (*read) (char *);
 	int (*write) (char *);
 	void (*exit) (void);
+	void (*resume) (void);
 
 	struct list_head all_drivers;
 
@@ -233,10 +241,12 @@ static struct {
 	u16 bluetooth:1;
 	u16 hotkey:1;
 	u16 hotkey_mask:1;
+	u16 hotkey_wlsw:1;
 	u16 light:1;
 	u16 light_status:1;
 	u16 wan:1;
 	u16 fan_ctrl_status_undef:1;
+	u16 input_device_registered:1;
 	u16 platform_drv_registered:1;
 	u16 platform_drv_attrs_registered:1;
 } tp_features;
@@ -438,14 +448,14 @@ static int fan_write_cmd_watchdog(const char *cmd, int *rc);
  */
 
 static int hotkey_orig_status;
-static int hotkey_orig_mask;
+static u32 hotkey_orig_mask;
 
 static struct mutex hotkey_mutex;
 
 static int hotkey_init(struct ibm_init_struct *iibm);
 static void hotkey_exit(void);
-static int hotkey_get(int *status, int *mask);
-static int hotkey_set(int status, int mask);
+static int hotkey_get(int *status, u32 *mask);
+static int hotkey_set(int status, u32 mask);
 static void hotkey_notify(struct ibm_struct *ibm, u32 event);
 static int hotkey_read(char *p);
 static int hotkey_write(char *buf);

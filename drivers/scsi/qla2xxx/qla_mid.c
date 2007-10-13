@@ -461,7 +461,7 @@ qla24xx_create_vhost(struct fc_vport *fc_vport)
 	atomic_set(&vha->loop_state, LOOP_DOWN);
 	atomic_set(&vha->loop_down_timer, LOOP_DOWN_TIME);
 
- 	qla2x00_start_timer(vha, qla2x00_timer, WATCH_INTERVAL);
+	qla2x00_start_timer(vha, qla2x00_timer, WATCH_INTERVAL);
 
 	host->can_queue = vha->request_q_length + 128;
 	host->this_id = 255;

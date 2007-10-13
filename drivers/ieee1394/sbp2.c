@@ -118,14 +118,13 @@ MODULE_PARM_DESC(max_speed, "Force max speed "
 		 "(3 = 800Mb/s, 2 = 400Mb/s, 1 = 200Mb/s, 0 = 100Mb/s)");
 
 /*
- * Set serialize_io to 1 if you'd like only one scsi command sent
- * down to us at a time (debugging). This might be necessary for very
- * badly behaved sbp2 devices.
+ * Set serialize_io to 0 or N to use dynamically appended lists of command ORBs.
+ * This is and always has been buggy in multiple subtle ways. See above TODOs.
  */
 static int sbp2_serialize_io = 1;
-module_param_named(serialize_io, sbp2_serialize_io, int, 0444);
-MODULE_PARM_DESC(serialize_io, "Serialize I/O coming from scsi drivers "
-		 "(default = 1, faster = 0)");
+module_param_named(serialize_io, sbp2_serialize_io, bool, 0444);
+MODULE_PARM_DESC(serialize_io, "Serialize requests coming from SCSI drivers "
+		 "(default = Y, faster but buggy = N)");
 
 /*
  * Bump up max_sectors if you'd like to support very large sized
@@ -154,9 +153,9 @@ MODULE_PARM_DESC(max_sectors, "Change max sectors per I/O supported "
  * are possible on OXFW911 and newer Oxsemi bridges.
  */
 static int sbp2_exclusive_login = 1;
-module_param_named(exclusive_login, sbp2_exclusive_login, int, 0644);
+module_param_named(exclusive_login, sbp2_exclusive_login, bool, 0644);
 MODULE_PARM_DESC(exclusive_login, "Exclusive login to sbp2 device "
-		 "(default = 1)");
+		 "(default = Y, use N for concurrent initiators)");
 
 /*
  * If any of the following workarounds is required for your device to work,
@@ -514,9 +513,9 @@ static int sbp2util_create_command_orb_pool(struct sbp2_lu *lu)
 	return 0;
 }
 
-static void sbp2util_remove_command_orb_pool(struct sbp2_lu *lu)
+static void sbp2util_remove_command_orb_pool(struct sbp2_lu *lu,
+					     struct hpsb_host *host)
 {
-	struct hpsb_host *host = lu->hi->host;
 	struct list_head *lh, *next;
 	struct sbp2_command_info *cmd;
 	unsigned long flags;
@@ -923,16 +922,16 @@ static void sbp2_remove_device(struct sbp2_lu *lu)
 
 	if (!lu)
 		return;
+	hi = lu->hi;
+	if (!hi)
+		goto no_hi;
 
 	if (lu->shost) {
 		scsi_remove_host(lu->shost);
 		scsi_host_put(lu->shost);
 	}
 	flush_scheduled_work();
-	hi = lu->hi;
-	if (!hi)
-		return;
-	sbp2util_remove_command_orb_pool(lu);
+	sbp2util_remove_command_orb_pool(lu, hi->host);
 
 	list_del(&lu->lu_list);
 
@@ -974,7 +973,7 @@ static void sbp2_remove_device(struct sbp2_lu *lu)
 	lu->ud->device.driver_data = NULL;
 
 	module_put(hi->host->driver->owner);
-
+no_hi:
 	kfree(lu);
 }
 

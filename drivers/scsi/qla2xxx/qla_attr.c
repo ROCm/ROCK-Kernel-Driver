@@ -14,8 +14,9 @@ int qla24xx_vport_disable(struct fc_vport *, bool);
 /* SYSFS attributes --------------------------------------------------------- */
 
 static ssize_t
-qla2x00_sysfs_read_fw_dump(struct kobject *kobj, char *buf, loff_t off,
-    size_t count)
+qla2x00_sysfs_read_fw_dump(struct kobject *kobj,
+			   struct bin_attribute *bin_attr,
+			   char *buf, loff_t off, size_t count)
 {
 	struct scsi_qla_host *ha = to_qla_host(dev_to_shost(container_of(kobj,
 	    struct device, kobj)));
@@ -34,8 +35,9 @@ qla2x00_sysfs_read_fw_dump(struct kobject *kobj, char *buf, loff_t off,
 }
 
 static ssize_t
-qla2x00_sysfs_write_fw_dump(struct kobject *kobj, char *buf, loff_t off,
-    size_t count)
+qla2x00_sysfs_write_fw_dump(struct kobject *kobj,
+			    struct bin_attribute *bin_attr,
+			    char *buf, loff_t off, size_t count)
 {
 	struct scsi_qla_host *ha = to_qla_host(dev_to_shost(container_of(kobj,
 	    struct device, kobj)));
@@ -76,7 +78,6 @@ static struct bin_attribute sysfs_fw_dump_attr = {
 	.attr = {
 		.name = "fw_dump",
 		.mode = S_IRUSR | S_IWUSR,
-		.owner = THIS_MODULE,
 	},
 	.size = 0,
 	.read = qla2x00_sysfs_read_fw_dump,
@@ -84,28 +85,32 @@ static struct bin_attribute sysfs_fw_dump_attr = {
 };
 
 static ssize_t
-qla2x00_sysfs_read_nvram(struct kobject *kobj, char *buf, loff_t off,
-    size_t count)
+qla2x00_sysfs_read_nvram(struct kobject *kobj,
+			 struct bin_attribute *bin_attr,
+			 char *buf, loff_t off, size_t count)
 {
 	struct scsi_qla_host *ha = to_qla_host(dev_to_shost(container_of(kobj,
 	    struct device, kobj)));
-	unsigned long	flags;
+	int		size = ha->nvram_size;
+	char		*nvram_cache = ha->nvram;
 
-	if (!capable(CAP_SYS_ADMIN) || off != 0)
+	if (!capable(CAP_SYS_ADMIN) || off > size || count == 0)
 		return 0;
+	if (off + count > size) {
+		size -= off;
+		count = size;
+	}
 
-	/* Read NVRAM. */
-	spin_lock_irqsave(&ha->hardware_lock, flags);
-	ha->isp_ops.read_nvram(ha, (uint8_t *)buf, ha->nvram_base,
-	    ha->nvram_size);
-	spin_unlock_irqrestore(&ha->hardware_lock, flags);
+	/* Read NVRAM data from cache. */
+	memcpy(buf, &nvram_cache[off], count);
 
-	return ha->nvram_size;
+	return count;
 }
 
 static ssize_t
-qla2x00_sysfs_write_nvram(struct kobject *kobj, char *buf, loff_t off,
-    size_t count)
+qla2x00_sysfs_write_nvram(struct kobject *kobj,
+			  struct bin_attribute *bin_attr,
+			  char *buf, loff_t off, size_t count)
 {
 	struct scsi_qla_host *ha = to_qla_host(dev_to_shost(container_of(kobj,
 	    struct device, kobj)));
@@ -116,7 +121,7 @@ qla2x00_sysfs_write_nvram(struct kobject *kobj, char *buf, loff_t off,
 		return 0;
 
 	/* Checksum NVRAM. */
-	if (IS_QLA24XX(ha) || IS_QLA54XX(ha)) {
+	if (IS_FWI2_CAPABLE(ha)) {
 		uint32_t *iter;
 		uint32_t chksum;
 
@@ -140,7 +145,9 @@ qla2x00_sysfs_write_nvram(struct kobject *kobj, char *buf, loff_t off,
 
 	/* Write NVRAM. */
 	spin_lock_irqsave(&ha->hardware_lock, flags);
-	ha->isp_ops.write_nvram(ha, (uint8_t *)buf, ha->nvram_base, count);
+	ha->isp_ops->write_nvram(ha, (uint8_t *)buf, ha->nvram_base, count);
+	ha->isp_ops->read_nvram(ha, (uint8_t *)&ha->nvram, ha->nvram_base,
+	    count);
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
 	set_bit(ISP_ABORT_NEEDED, &ha->dpc_flags);
@@ -152,7 +159,6 @@ static struct bin_attribute sysfs_nvram_attr = {
 	.attr = {
 		.name = "nvram",
 		.mode = S_IRUSR | S_IWUSR,
-		.owner = THIS_MODULE,
 	},
 	.size = 512,
 	.read = qla2x00_sysfs_read_nvram,
@@ -160,8 +166,9 @@ static struct bin_attribute sysfs_nvram_attr = {
 };
 
 static ssize_t
-qla2x00_sysfs_read_optrom(struct kobject *kobj, char *buf, loff_t off,
-    size_t count)
+qla2x00_sysfs_read_optrom(struct kobject *kobj,
+			  struct bin_attribute *bin_attr,
+			  char *buf, loff_t off, size_t count)
 {
 	struct scsi_qla_host *ha = to_qla_host(dev_to_shost(container_of(kobj,
 	    struct device, kobj)));
@@ -179,8 +186,9 @@ qla2x00_sysfs_read_optrom(struct kobject *kobj, char *buf, loff_t off,
 }
 
 static ssize_t
-qla2x00_sysfs_write_optrom(struct kobject *kobj, char *buf, loff_t off,
-    size_t count)
+qla2x00_sysfs_write_optrom(struct kobject *kobj,
+			   struct bin_attribute *bin_attr,
+			   char *buf, loff_t off, size_t count)
 {
 	struct scsi_qla_host *ha = to_qla_host(dev_to_shost(container_of(kobj,
 	    struct device, kobj)));
@@ -201,16 +209,16 @@ static struct bin_attribute sysfs_optrom_attr = {
 	.attr = {
 		.name = "optrom",
 		.mode = S_IRUSR | S_IWUSR,
-		.owner = THIS_MODULE,
 	},
-	.size = OPTROM_SIZE_24XX,
+	.size = 0,
 	.read = qla2x00_sysfs_read_optrom,
 	.write = qla2x00_sysfs_write_optrom,
 };
 
 static ssize_t
-qla2x00_sysfs_write_optrom_ctl(struct kobject *kobj, char *buf, loff_t off,
-    size_t count)
+qla2x00_sysfs_write_optrom_ctl(struct kobject *kobj,
+			       struct bin_attribute *bin_attr,
+			       char *buf, loff_t off, size_t count)
 {
 	struct scsi_qla_host *ha = to_qla_host(dev_to_shost(container_of(kobj,
 	    struct device, kobj)));
@@ -248,7 +256,7 @@ qla2x00_sysfs_write_optrom_ctl(struct kobject *kobj, char *buf, loff_t off,
 		}
 
 		memset(ha->optrom_buffer, 0, ha->optrom_size);
-		ha->isp_ops.read_optrom(ha, ha->optrom_buffer, 0,
+		ha->isp_ops->read_optrom(ha, ha->optrom_buffer, 0,
 		    ha->optrom_size);
 		break;
 	case 2:
@@ -271,7 +279,7 @@ qla2x00_sysfs_write_optrom_ctl(struct kobject *kobj, char *buf, loff_t off,
 		if (ha->optrom_state != QLA_SWRITING)
 			break;
 
-		ha->isp_ops.write_optrom(ha, ha->optrom_buffer, 0,
+		ha->isp_ops->write_optrom(ha, ha->optrom_buffer, 0,
 		    ha->optrom_size);
 		break;
 	}
@@ -282,34 +290,38 @@ static struct bin_attribute sysfs_optrom_ctl_attr = {
 	.attr = {
 		.name = "optrom_ctl",
 		.mode = S_IWUSR,
-		.owner = THIS_MODULE,
 	},
 	.size = 0,
 	.write = qla2x00_sysfs_write_optrom_ctl,
 };
 
 static ssize_t
-qla2x00_sysfs_read_vpd(struct kobject *kobj, char *buf, loff_t off,
-    size_t count)
+qla2x00_sysfs_read_vpd(struct kobject *kobj,
+		       struct bin_attribute *bin_attr,
+		       char *buf, loff_t off, size_t count)
 {
 	struct scsi_qla_host *ha = to_qla_host(dev_to_shost(container_of(kobj,
 	    struct device, kobj)));
-	unsigned long flags;
+	int           size = ha->vpd_size;
+	char          *vpd_cache = ha->vpd;
 
-	if (!capable(CAP_SYS_ADMIN) || off != 0)
+	if (!capable(CAP_SYS_ADMIN) || off > size || count == 0)
 		return 0;
+	if (off + count > size) {
+		size -= off;
+		count = size;
+	}
 
-	/* Read NVRAM. */
-	spin_lock_irqsave(&ha->hardware_lock, flags);
-	ha->isp_ops.read_nvram(ha, (uint8_t *)buf, ha->vpd_base, ha->vpd_size);
-	spin_unlock_irqrestore(&ha->hardware_lock, flags);
+	/* Read NVRAM data from cache. */
+	memcpy(buf, &vpd_cache[off], count);
 
-	return ha->vpd_size;
+	return count;
 }
 
 static ssize_t
-qla2x00_sysfs_write_vpd(struct kobject *kobj, char *buf, loff_t off,
-    size_t count)
+qla2x00_sysfs_write_vpd(struct kobject *kobj,
+			struct bin_attribute *bin_attr,
+			char *buf, loff_t off, size_t count)
 {
 	struct scsi_qla_host *ha = to_qla_host(dev_to_shost(container_of(kobj,
 	    struct device, kobj)));
@@ -320,7 +332,8 @@ qla2x00_sysfs_write_vpd(struct kobject *kobj, char *buf, loff_t off,
 
 	/* Write NVRAM. */
 	spin_lock_irqsave(&ha->hardware_lock, flags);
-	ha->isp_ops.write_nvram(ha, (uint8_t *)buf, ha->vpd_base, count);
+	ha->isp_ops->write_nvram(ha, (uint8_t *)buf, ha->vpd_base, count);
+	ha->isp_ops->read_nvram(ha, (uint8_t *)ha->vpd, ha->vpd_base, count);
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
 	return count;
@@ -330,7 +343,6 @@ static struct bin_attribute sysfs_vpd_attr = {
 	.attr = {
 		.name = "vpd",
 		.mode = S_IRUSR | S_IWUSR,
-		.owner = THIS_MODULE,
 	},
 	.size = 0,
 	.read = qla2x00_sysfs_read_vpd,
@@ -338,8 +350,9 @@ static struct bin_attribute sysfs_vpd_attr = {
 };
 
 static ssize_t
-qla2x00_sysfs_read_sfp(struct kobject *kobj, char *buf, loff_t off,
-    size_t count)
+qla2x00_sysfs_read_sfp(struct kobject *kobj,
+		       struct bin_attribute *bin_attr,
+		       char *buf, loff_t off, size_t count)
 {
 	struct scsi_qla_host *ha = to_qla_host(dev_to_shost(container_of(kobj,
 	    struct device, kobj)));
@@ -378,7 +391,6 @@ static struct bin_attribute sysfs_sfp_attr = {
 	.attr = {
 		.name = "sfp",
 		.mode = S_IRUSR | S_IWUSR,
-		.owner = THIS_MODULE,
 	},
 	.size = SFP_DEV_SIZE * 2,
 	.read = qla2x00_sysfs_read_sfp,
@@ -406,7 +418,7 @@ qla2x00_alloc_sysfs_attr(scsi_qla_host_t *ha)
 	int ret;
 
 	for (iter = bin_file_entries; iter->name; iter++) {
-		if (iter->is4GBp_only && (!IS_QLA24XX(ha) && !IS_QLA54XX(ha)))
+		if (iter->is4GBp_only && !IS_FWI2_CAPABLE(ha))
 			continue;
 
 		ret = sysfs_create_bin_file(&host->shost_gendev.kobj,
@@ -425,7 +437,7 @@ qla2x00_free_sysfs_attr(scsi_qla_host_t *ha)
 	struct sysfs_entry *iter;
 
 	for (iter = bin_file_entries; iter->name; iter++) {
-		if (iter->is4GBp_only && (!IS_QLA24XX(ha) && !IS_QLA54XX(ha)))
+		if (iter->is4GBp_only && !IS_FWI2_CAPABLE(ha))
 			continue;
 
 		sysfs_remove_bin_file(&host->shost_gendev.kobj,
@@ -433,7 +445,7 @@ qla2x00_free_sysfs_attr(scsi_qla_host_t *ha)
 	}
 
 	if (ha->beacon_blink_led == 1)
-		ha->isp_ops.beacon_off(ha);
+		ha->isp_ops->beacon_off(ha);
 }
 
 /* Scsi_Host attributes. */
@@ -451,7 +463,7 @@ qla2x00_fw_version_show(struct class_device *cdev, char *buf)
 	char fw_str[30];
 
 	return snprintf(buf, PAGE_SIZE, "%s\n",
-	    ha->isp_ops.fw_version_str(ha, fw_str));
+	    ha->isp_ops->fw_version_str(ha, fw_str));
 }
 
 static ssize_t
@@ -503,7 +515,7 @@ qla2x00_pci_info_show(struct class_device *cdev, char *buf)
 	char pci_info[30];
 
 	return snprintf(buf, PAGE_SIZE, "%s\n",
-	    ha->isp_ops.pci_info_str(ha, pci_info));
+	    ha->isp_ops->pci_info_str(ha, pci_info));
 }
 
 static ssize_t
@@ -648,9 +660,9 @@ qla2x00_beacon_store(struct class_device *cdev, const char *buf,
 		return -EINVAL;
 
 	if (val)
-		rval = ha->isp_ops.beacon_on(ha);
+		rval = ha->isp_ops->beacon_on(ha);
 	else
-		rval = ha->isp_ops.beacon_off(ha);
+		rval = ha->isp_ops->beacon_off(ha);
 
 	if (rval != QLA_SUCCESS)
 		count = 0;
@@ -894,7 +906,7 @@ qla2x00_get_fc_host_stats(struct Scsi_Host *shost)
 	pfc_host_stat = &ha->fc_host_stat;
 	memset(pfc_host_stat, -1, sizeof(struct fc_host_statistics));
 
-	if (IS_QLA24XX(ha) || IS_QLA54XX(ha)) {
+	if (IS_FWI2_CAPABLE(ha)) {
 		rval = qla24xx_get_isp_stats(ha, (uint32_t *)&stat_buf,
 		    sizeof(stat_buf) / 4, mb_stat);
 	} else if (atomic_read(&ha->loop_state) == LOOP_READY &&
@@ -1029,7 +1041,7 @@ vport_create_failed_2:
 	kfree(vha->port_name);
 	kfree(vha->node_name);
 	scsi_host_put(vha->host);
-    	return FC_VPORT_FAILED;
+	return FC_VPORT_FAILED;
 }
 
 int

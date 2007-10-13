@@ -43,7 +43,7 @@
 #include <linux/libata.h>
 
 #define DRV_NAME		"pata_scc"
-#define DRV_VERSION		"0.2"
+#define DRV_VERSION		"0.3"
 
 #define PCI_DEVICE_ID_TOSHIBA_SCC_ATA		0x01b4
 
@@ -636,11 +636,9 @@ static int scc_std_softreset (struct ata_port *ap, unsigned int *classes,
 	}
 
 	/* determine by signature whether we have ATA or ATAPI devices */
-	classes[0] = ata_dev_try_classify(&ap->link.device[0],
-					  devmask & (1 << 0), &err);
+	classes[0] = ata_dev_try_classify(ap, 0, &err);
 	if (slave_possible && err != 0x81)
-		classes[1] = ata_dev_try_classify(&ap->link.device[1],
-						  devmask & (1 << 1), &err);
+		classes[1] = ata_dev_try_classify(ap, 1, &err);
 
  out:
 	DPRINTK("EXIT, classes[0]=%u [1]=%u\n", classes[0], classes[1]);

@@ -6,7 +6,9 @@
 # Copyright (c) 1999-2004 Silicon Graphics, Inc.  All Rights Reserved.
 #
 
+CCVERSION	:= $(shell $(CC) -v 2>&1 | sed -ne '$$p')
 obj-y		:= kdb_bt.o kdb_bp.o kdb_id.o kdbsupport.o gen-kdb_cmds.o kdbmain.o kdb_io.o
+CFLAGS_kdbmain.o += -DCCVERSION="$(CCVERSION)"
 
 # The i386 and x86_64 backtrace commands are handled by common code.
 ifdef CONFIG_X86
@@ -22,7 +24,7 @@ ifdef CONFIG_X86
       REGPARM := 0
     endif
   endif
-  CFLAGS_kdba_bt_x86.o += -DREGPARM=$(REGPARM)
+  CFLAGS_kdba_bt_x86.o += -DREGPARM=$(REGPARM) -DCCVERSION="$(CCVERSION)"
 endif
 
 subdir-$(CONFIG_KDB_MODULES) := modules

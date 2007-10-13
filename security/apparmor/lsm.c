@@ -599,7 +599,8 @@ static inline int aa_mmap(struct file *file, const char *operation,
 }
 
 static int apparmor_file_mmap(struct file *file, unsigned long reqprot,
-			      unsigned long prot, unsigned long flags)
+			      unsigned long prot, unsigned long flags,
+			      unsigned long addr, unsigned long addr_only)
 {
 	return aa_mmap(file, "file_mmap", prot, flags);
 }

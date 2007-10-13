@@ -724,8 +724,8 @@ unsigned int ata_dev_classify(const struct ata_taskfile *tf)
 
 /**
  *	ata_dev_try_classify - Parse returned ATA device signature
- *	@dev: ATA device to classify (starting at zero)
- *	@present: device seems present
+ *	@ap: ATA channel to examine
+ *	@device: Device to examine (starting at zero)
  *	@r_err: Value of error register on completion
  *
  *	After an event -- SRST, E.D.D., or SATA COMRESET -- occurs,
@@ -743,15 +743,15 @@ unsigned int ata_dev_classify(const struct ata_taskfile *tf)
  *	RETURNS:
  *	Device type - %ATA_DEV_ATA, %ATA_DEV_ATAPI or %ATA_DEV_NONE.
  */
-unsigned int ata_dev_try_classify(struct ata_device *dev, int present,
-				  u8 *r_err)
+
+unsigned int
+ata_dev_try_classify(struct ata_port *ap, unsigned int device, u8 *r_err)
 {
-	struct ata_port *ap = dev->link->ap;
 	struct ata_taskfile tf;
 	unsigned int class;
 	u8 err;
 
-	ap->ops->dev_select(ap, dev->devno);
+	ap->ops->dev_select(ap, device);
 
 	memset(&tf, 0, sizeof(tf));
 
@@ -761,12 +761,12 @@ unsigned int ata_dev_try_classify(struct ata_device *dev, int present,
 		*r_err = err;
 
 	/* see if device passed diags: if master then continue and warn later */
-	if (err == 0 && dev->devno == 0)
+	if (err == 0 && device == 0)
 		/* diagnostic fail : do nothing _YET_ */
-		dev->horkage |= ATA_HORKAGE_DIAGNOSTIC;
+		ap->link.device[device].horkage |= ATA_HORKAGE_DIAGNOSTIC;
 	else if (err == 1)
 		/* do nothing */ ;
-	else if ((dev->devno == 0) && (err == 0x81))
+	else if ((device == 0) && (err == 0x81))
 		/* do nothing */ ;
 	else
 		return ATA_DEV_NONE;
@@ -774,20 +774,10 @@ unsigned int ata_dev_try_classify(struct ata_device *dev, int present,
 	/* determine if device is ATA or ATAPI */
 	class = ata_dev_classify(&tf);
 
-	if (class == ATA_DEV_UNKNOWN) {
-		/* If the device failed diagnostic, it's likely to
-		 * have reported incorrect device signature too.
-		 * Assume ATA device if the device seems present but
-		 * device signature is invalid with diagnostic
-		 * failure.
-		 */
-		if (present && (dev->horkage & ATA_HORKAGE_DIAGNOSTIC))
-			class = ATA_DEV_ATA;
-		else
-			class = ATA_DEV_NONE;
-	} else if ((class == ATA_DEV_ATA) && (ata_chk_status(ap) == 0))
-		class = ATA_DEV_NONE;
-
+	if (class == ATA_DEV_UNKNOWN)
+		return ATA_DEV_NONE;
+	if ((class == ATA_DEV_ATA) && (ata_chk_status(ap) == 0))
+		return ATA_DEV_NONE;
 	return class;
 }
 
@@ -976,11 +966,8 @@ static int ata_set_max_sectors(struct ata_device *dev, u64 new_sectors)
 		tf.hob_lbal = (new_sectors >> 24) & 0xff;
 		tf.hob_lbam = (new_sectors >> 32) & 0xff;
 		tf.hob_lbah = (new_sectors >> 40) & 0xff;
-	} else {
+	} else
 		tf.command = ATA_CMD_SET_MAX;
-
-		tf.device |= (new_sectors >> 24) & 0xf;
-	}
 
 	tf.protocol |= ATA_PROT_NODATA;
 	tf.device |= ATA_LBA;
@@ -1795,7 +1782,7 @@ int ata_dev_read_id(struct ata_device *dev, unsigned int *p_class,
 		tf.protocol = ATA_PROT_NODATA;
 		tf.flags |= ATA_TFLAG_ISADDR | ATA_TFLAG_DEVICE;
 		err_mask = ata_exec_internal(dev, &tf, NULL, DMA_NONE, NULL, 0);
-		if (err_mask) {
+		if (err_mask && id[2] != 0x738c) {
 			rc = -EIO;
 			reason = "SPINUP failed";
 			goto err_out;
@@ -3268,9 +3255,9 @@ void ata_bus_reset(struct ata_port *ap)
 	/*
 	 * determine by signature whether we have ATA or ATAPI devices
 	 */
-	device[0].class = ata_dev_try_classify(&device[0], dev0, &err);
+	device[0].class = ata_dev_try_classify(ap, 0, &err);
 	if ((slave_possible) && (err != 0x81))
-		device[1].class = ata_dev_try_classify(&device[1], dev1, &err);
+		device[1].class = ata_dev_try_classify(ap, 1, &err);
 
 	/* is double-select really necessary? */
 	if (device[1].class != ATA_DEV_NONE)
@@ -3525,11 +3512,9 @@ int ata_std_softreset(struct ata_link *link, unsigned int *classes,
 	}
 
 	/* determine by signature whether we have ATA or ATAPI devices */
-	classes[0] = ata_dev_try_classify(&link->device[0],
-					  devmask & (1 << 0), &err);
+	classes[0] = ata_dev_try_classify(ap, 0, &err);
 	if (slave_possible && err != 0x81)
-		classes[1] = ata_dev_try_classify(&link->device[1],
-						  devmask & (1 << 1), &err);
+		classes[1] = ata_dev_try_classify(ap, 1, &err);
 
  out:
 	DPRINTK("EXIT, classes[0]=%u [1]=%u\n", classes[0], classes[1]);
@@ -3658,7 +3643,7 @@ int sata_std_hardreset(struct ata_link *link, unsigned int *class,
 
 	ap->ops->dev_select(ap, 0);	/* probably unnecessary */
 
-	*class = ata_dev_try_classify(link->device, 1, NULL);
+	*class = ata_dev_try_classify(ap, 0, NULL);
 
 	DPRINTK("EXIT, class=%u\n", *class);
 	return 0;
@@ -3841,11 +3826,11 @@ int ata_dev_revalidate(struct ata_device *dev, unsigned int new_class,
 			       "%llu != %llu\n",
 			       (unsigned long long)n_sectors,
 			       (unsigned long long)dev->n_sectors);
-		rc = -ENODEV;
 
 		/* restore original n_sectors */
 		dev->n_sectors = n_sectors;
 
+		rc = -ENODEV;
 		goto fail;
 	}
 
@@ -3933,12 +3918,9 @@ static const struct ata_blacklist_entry ata_device_blacklist [] = {
 	{ "Hitachi HTS541616J9SA00", "SB4OC70P", ATA_HORKAGE_NONCQ, },
 	{ "WDC WD740ADFD-00NLR1", NULL,		ATA_HORKAGE_NONCQ, },
 	{ "FUJITSU MHV2080BH",	"00840028",	ATA_HORKAGE_NONCQ, },
-	{ "ST9120822AS",	"3.CLF",	ATA_HORKAGE_NONCQ, },
 	{ "ST9160821AS",	"3.CLF",	ATA_HORKAGE_NONCQ, },
 	{ "ST9160821AS",	"3.ALD",	ATA_HORKAGE_NONCQ, },
 	{ "ST3160812AS",	"3.AD",		ATA_HORKAGE_NONCQ, },
-	{ "ST3160812AS",	"3.ADJ",	ATA_HORKAGE_NONCQ, },
-	{ "ST980813AS",		"3.ADB",	ATA_HORKAGE_NONCQ, },
 	{ "SAMSUNG HD401LJ",	"ZZ100-15",	ATA_HORKAGE_NONCQ, },
 
 	/* devices which puke on READ_NATIVE_MAX */
@@ -4140,6 +4122,11 @@ static unsigned int ata_dev_init_params(struct ata_device *dev,
 	tf.device |= (heads - 1) & 0x0f; /* max head = num. of heads - 1 */
 
 	err_mask = ata_exec_internal(dev, &tf, NULL, DMA_NONE, NULL, 0);
+	/* A clean abort indicates an original or just out of spec drive
+	   and we should continue as we issue the setup based on the
+	   drive reported working geometry */
+	if (err_mask == AC_ERR_DEV && (tf.feature & ATA_ABORTED))
+		err_mask = 0;
 
 	DPRINTK("EXIT, err_mask=%x\n", err_mask);
 	return err_mask;

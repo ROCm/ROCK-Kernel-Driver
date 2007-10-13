@@ -146,6 +146,7 @@ static struct pci_device_id e1000_pci_tbl[] = {
 	INTEL_E1000_ETHERNET_DEVICE(E1000_DEV_ID_ICH9_IFE),
 	INTEL_E1000_ETHERNET_DEVICE(E1000_DEV_ID_ICH9_IFE_G),
 	INTEL_E1000_ETHERNET_DEVICE(E1000_DEV_ID_ICH9_IFE_GT),
+	INTEL_E1000_ETHERNET_DEVICE(E1000_DEV_ID_82571PT_QUAD_COPPER),
 	/* required last entry */
 	{0,}
 };
@@ -1322,6 +1323,7 @@ static int __devinit e1000_probe(struct pci_dev *pdev,
 	case E1000_DEV_ID_82571EB_QUAD_COPPER:
 	case E1000_DEV_ID_82571EB_QUAD_FIBER:
 	case E1000_DEV_ID_82571EB_QUAD_COPPER_LP:
+	case E1000_DEV_ID_82571PT_QUAD_COPPER:
 		/* if quad port adapter, disable WoL on all but port A */
 		if (global_quad_port_a != 0)
 			adapter->eeprom_wol = 0;
@@ -1502,8 +1504,7 @@ static int __devinit e1000_sw_init(struct e1000_adapter *adapter)
 	hw->device_id = pdev->device;
 	hw->subsystem_vendor_id = pdev->subsystem_vendor;
 	hw->subsystem_device_id = pdev->subsystem_device;
-
-	pci_read_config_byte(pdev, PCI_REVISION_ID, &hw->revision_id);
+	hw->revision_id = pdev->revision;
 
 	pci_read_config_word(pdev, PCI_COMMAND, &hw->bus.pci_cmd_word);
 

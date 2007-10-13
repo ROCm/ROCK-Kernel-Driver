@@ -264,6 +264,7 @@ struct acpi_device_wakeup_flags {
 
 struct acpi_device_wakeup_state {
 	u8 enabled:1;
+	u8 active:1;
 };
 
 struct acpi_device_wakeup {
@@ -320,7 +321,7 @@ struct acpi_bus_event {
 };
 
 extern struct kset acpi_subsys;
-
+extern int acpi_bus_generate_netlink_event(const char*, const char*, u8, int);
 /*
  * External Functions
  */
@@ -330,8 +331,13 @@ void acpi_bus_data_handler(acpi_handle handle, u32 function, void *context);
 int acpi_bus_get_status(struct acpi_device *device);
 int acpi_bus_get_power(acpi_handle handle, int *state);
 int acpi_bus_set_power(acpi_handle handle, int state);
-int acpi_bus_generate_event(struct acpi_device *device, u8 type, int data);
+#ifdef CONFIG_ACPI_PROC_EVENT
+int acpi_bus_generate_proc_event(struct acpi_device *device, u8 type, int data);
 int acpi_bus_receive_event(struct acpi_bus_event *event);
+#else
+static inline int acpi_bus_generate_proc_event(struct acpi_device *device, u8 type, int data)
+	{ return 0; }
+#endif
 int acpi_bus_register_driver(struct acpi_driver *driver);
 void acpi_bus_unregister_driver(struct acpi_driver *driver);
 int acpi_bus_add(struct acpi_device **child, struct acpi_device *parent,
@@ -363,6 +369,17 @@ struct device *acpi_get_physical_device(acpi_handle);
 acpi_handle acpi_get_child(acpi_handle, acpi_integer);
 acpi_handle acpi_get_pci_rootbridge_handle(unsigned int, unsigned int);
 #define DEVICE_ACPI_HANDLE(dev) ((acpi_handle)((dev)->archdata.acpi_handle))
+
+#ifdef CONFIG_PM_SLEEP
+int acpi_pm_device_sleep_state(struct device *, int, int *);
+#else /* !CONFIG_PM_SLEEP */
+static inline int acpi_pm_device_sleep_state(struct device *d, int w, int *p)
+{
+	if (p)
+		*p = ACPI_STATE_D0;
+	return ACPI_STATE_D3;
+}
+#endif /* !CONFIG_PM_SLEEP */
 
 #endif				/* CONFIG_ACPI */
 

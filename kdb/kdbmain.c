@@ -2009,9 +2009,10 @@ kdb(kdb_reason_t reason, int error, struct pt_regs *regs)
 	/* Set up a consistent set of process stacks before talking to the user */
 	KDB_DEBUG_STATE("kdb 9", result);
 	result = kdba_main_loop(reason, reason2, error, db_result, regs);
+	reason = reason2;	/* back to original event type */
 
 	KDB_DEBUG_STATE("kdb 10", result);
-	kdba_adjust_ip(reason2, error, regs);
+	kdba_adjust_ip(reason, error, regs);
 	KDB_STATE_CLEAR(LONGJMP);
 	KDB_DEBUG_STATE("kdb 11", result);
 	/* go which requires single-step over a breakpoint must only release
@@ -3479,6 +3480,7 @@ kdb_summary(int argc, const char **argv)
 	kdb_printf("machine    %s\n", init_uts_ns.name.machine);
 	kdb_printf("nodename   %s\n", init_uts_ns.name.nodename);
 	kdb_printf("domainname %s\n", init_uts_ns.name.domainname);
+	kdb_printf("ccversion  %s\n", __stringify(CCVERSION));
 
 	kdb_gmtime(&xtime, &tm);
 	kdb_printf("date       %04d-%02d-%02d %02d:%02d:%02d tz_minuteswest %d\n",

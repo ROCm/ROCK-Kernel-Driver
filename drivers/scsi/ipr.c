@@ -2439,6 +2439,7 @@ restart:
 /**
  * ipr_read_trace - Dump the adapter trace
  * @kobj:		kobject struct
+ * @bin_attr:		bin_attribute struct
  * @buf:		buffer
  * @off:		offset
  * @count:		buffer size
@@ -2446,8 +2447,9 @@ restart:
  * Return value:
  *	number of bytes printed to buffer
  **/
-static ssize_t ipr_read_trace(struct kobject *kobj, char *buf,
-			      loff_t off, size_t count)
+static ssize_t ipr_read_trace(struct kobject *kobj,
+			      struct bin_attribute *bin_attr,
+			      char *buf, loff_t off, size_t count)
 {
 	struct class_device *cdev = container_of(kobj,struct class_device,kobj);
 	struct Scsi_Host *shost = class_to_shost(cdev);
@@ -3140,6 +3142,7 @@ static struct class_device_attribute *ipr_ioa_attrs[] = {
 /**
  * ipr_read_dump - Dump the adapter
  * @kobj:		kobject struct
+ * @bin_attr:		bin_attribute struct
  * @buf:		buffer
  * @off:		offset
  * @count:		buffer size
@@ -3147,8 +3150,9 @@ static struct class_device_attribute *ipr_ioa_attrs[] = {
  * Return value:
  *	number of bytes printed to buffer
  **/
-static ssize_t ipr_read_dump(struct kobject *kobj, char *buf,
-			      loff_t off, size_t count)
+static ssize_t ipr_read_dump(struct kobject *kobj,
+			     struct bin_attribute *bin_attr,
+			     char *buf, loff_t off, size_t count)
 {
 	struct class_device *cdev = container_of(kobj,struct class_device,kobj);
 	struct Scsi_Host *shost = class_to_shost(cdev);
@@ -3301,6 +3305,7 @@ static int ipr_free_dump(struct ipr_ioa_cfg *ioa_cfg)
 /**
  * ipr_write_dump - Setup dump state of adapter
  * @kobj:		kobject struct
+ * @bin_attr:		bin_attribute struct
  * @buf:		buffer
  * @off:		offset
  * @count:		buffer size
@@ -3308,8 +3313,9 @@ static int ipr_free_dump(struct ipr_ioa_cfg *ioa_cfg)
  * Return value:
  *	number of bytes printed to buffer
  **/
-static ssize_t ipr_write_dump(struct kobject *kobj, char *buf,
-			      loff_t off, size_t count)
+static ssize_t ipr_write_dump(struct kobject *kobj,
+			      struct bin_attribute *bin_attr,
+			      char *buf, loff_t off, size_t count)
 {
 	struct class_device *cdev = container_of(kobj,struct class_device,kobj);
 	struct Scsi_Host *shost = class_to_shost(cdev);
@@ -5303,18 +5309,12 @@ static const u16 ipr_blocked_processors[] = {
  **/
 static int ipr_invalid_adapter(struct ipr_ioa_cfg *ioa_cfg)
 {
-	u8 rev_id;
 	int i;
 
-	if (ioa_cfg->type == 0x5702) {
-		if (pci_read_config_byte(ioa_cfg->pdev, PCI_REVISION_ID,
-					 &rev_id) == PCIBIOS_SUCCESSFUL) {
-			if (rev_id < 4) {
-				for (i = 0; i < ARRAY_SIZE(ipr_blocked_processors); i++){
-					if (__is_processor(ipr_blocked_processors[i]))
-						return 1;
-				}
-			}
+	if ((ioa_cfg->type == 0x5702) && (ioa_cfg->pdev->revision < 4)) {
+		for (i = 0; i < ARRAY_SIZE(ipr_blocked_processors); i++){
+			if (__is_processor(ipr_blocked_processors[i]))
+				return 1;
 		}
 	}
 	return 0;
@@ -7471,13 +7471,7 @@ static int __devinit ipr_probe_ioa(struct pci_dev *pdev,
 	else
 		ioa_cfg->transop_timeout = IPR_OPERATIONAL_TIMEOUT;
 
-	rc = pci_read_config_byte(pdev, PCI_REVISION_ID, &ioa_cfg->revid);
-
-	if (rc != PCIBIOS_SUCCESSFUL) {
-		dev_err(&pdev->dev, "Failed to read PCI revision ID\n");
-		rc = -EIO;
-		goto out_scsi_host_put;
-	}
+	ioa_cfg->revid = pdev->revision;
 
 	ipr_regs_pci = pci_resource_start(pdev, 0);
 

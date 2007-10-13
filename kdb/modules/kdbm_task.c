@@ -94,8 +94,8 @@ kdbm_task(int argc, const char **argv)
 	kdb_printf("  need_resched=%d ",
 		test_tsk_thread_flag(tp, TIF_NEED_RESCHED));
 	kdb_printf(
-	    "timestamp=%llu time_slice=%u",
-	    tp->timestamp, tp->time_slice);
+	    "time_slice=%u",
+	    tp->time_slice);
 	kdb_printf(" lock_depth=%d\n", tp->lock_depth);
 
 	kdb_printf(

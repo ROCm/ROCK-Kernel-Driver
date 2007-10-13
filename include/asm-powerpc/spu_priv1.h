@@ -179,6 +179,7 @@ struct spu_management_ops {
 	int (*enumerate_spus)(int (*fn)(void *data));
 	int (*create_spu)(struct spu *spu, void *data);
 	int (*destroy_spu)(struct spu *spu);
+	int (*init_affinity)(void);
 	int (*enable_spu)(struct spu_context *ctx);
 	int (*disable_spu)(struct spu_context *ctx);
 };
@@ -201,6 +202,12 @@ static inline int
 spu_destroy_spu (struct spu *spu)
 {
 	return spu_management_ops->destroy_spu(spu);
+}
+
+static inline int
+spu_init_affinity (void)
+{
+	return spu_management_ops->init_affinity();
 }
 
 static inline int

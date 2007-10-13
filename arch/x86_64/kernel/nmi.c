@@ -28,16 +28,9 @@
 #include <asm/proto.h>
 #include <asm/mce.h>
 
-#ifdef CONFIG_SYSCTL
 int unknown_nmi_panic;
-static int unknown_nmi_panic_callback(struct pt_regs *regs, int cpu);
-#endif
-
-int panic_on_unrecovered_nmi;
-
-#ifndef CONFIG_XEN
-
 int nmi_watchdog_enabled;
+int panic_on_unrecovered_nmi;
 
 static cpumask_t backtrace_mask = CPU_MASK_NONE;
 
@@ -54,6 +47,9 @@ unsigned int nmi_watchdog = NMI_DEFAULT;
 static unsigned int nmi_hz = HZ;
 
 static DEFINE_PER_CPU(short, wd_enabled);
+
+/* local prototypes */
+static int unknown_nmi_panic_callback(struct pt_regs *regs, int cpu);
 
 /* Run after command line and cpu_init init, but before all other checks */
 void nmi_watchdog_default(void)
@@ -89,7 +85,7 @@ int __init check_nmi_watchdog (void)
 	int *counts;
 	int cpu;
 
-	if ((nmi_watchdog == NMI_NONE) || (nmi_watchdog == NMI_DEFAULT))
+	if ((nmi_watchdog == NMI_NONE) || (nmi_watchdog == NMI_DISABLED)) 
 		return 0;
 
 	if (!atomic_read(&nmi_active))
@@ -300,7 +296,7 @@ static DEFINE_PER_CPU(unsigned, last_irq_sum);
 static DEFINE_PER_CPU(local_t, alert_counter);
 static DEFINE_PER_CPU(int, nmi_touch);
 
-void touch_nmi_watchdog (void)
+void touch_nmi_watchdog(void)
 {
 	if (nmi_watchdog > 0) {
 		unsigned cpu;
@@ -310,8 +306,10 @@ void touch_nmi_watchdog (void)
 		 * do it ourselves because the alert count increase is not
 		 * atomic.
 		 */
-		for_each_present_cpu (cpu)
-			per_cpu(nmi_touch, cpu) = 1;
+		for_each_present_cpu(cpu) {
+			if (per_cpu(nmi_touch, cpu) != 1)
+				per_cpu(nmi_touch, cpu) = 1;
+		}
 	}
 
  	touch_softlockup_watchdog();
@@ -386,13 +384,14 @@ int __kprobes nmi_watchdog_tick(struct pt_regs * regs, unsigned reason)
 	return rc;
 }
 
-#endif /* CONFIG_XEN */
+static unsigned ignore_nmis;
 
 asmlinkage __kprobes void do_nmi(struct pt_regs * regs, long error_code)
 {
 	nmi_enter();
 	add_pda(__nmi_count,1);
-	default_do_nmi(regs);
+	if (!ignore_nmis)
+		default_do_nmi(regs);
 	nmi_exit();
 }
 
@@ -403,6 +402,18 @@ int do_nmi_callback(struct pt_regs * regs, int cpu)
 		return unknown_nmi_panic_callback(regs, cpu);
 #endif
 	return 0;
+}
+
+void stop_nmi(void)
+{
+	acpi_nmi_disable();
+	ignore_nmis++;
+}
+
+void restart_nmi(void)
+{
+	ignore_nmis--;
+	acpi_nmi_enable();
 }
 
 #ifdef CONFIG_SYSCTL
@@ -417,7 +428,6 @@ static int unknown_nmi_panic_callback(struct pt_regs *regs, int cpu)
 	return 0;
 }
 
-#ifndef CONFIG_XEN
 /*
  * proc handler for /proc/sys/kernel/nmi
  */
@@ -432,7 +442,7 @@ int proc_nmi_enabled(struct ctl_table *table, int write, struct file *file,
 	if (!!old_state == !!nmi_watchdog_enabled)
 		return 0;
 
-	if (atomic_read(&nmi_active) < 0) {
+	if (atomic_read(&nmi_active) < 0 || nmi_watchdog == NMI_DISABLED) {
 		printk( KERN_WARNING "NMI watchdog is permanently disabled\n");
 		return -EIO;
 	}
@@ -452,11 +462,9 @@ int proc_nmi_enabled(struct ctl_table *table, int write, struct file *file,
 	}
 	return 0;
 }
-#endif
 
 #endif
 
-#ifndef CONFIG_XEN
 void __trigger_all_cpu_backtrace(void)
 {
 	int i;
@@ -473,4 +481,3 @@ void __trigger_all_cpu_backtrace(void)
 EXPORT_SYMBOL(nmi_active);
 EXPORT_SYMBOL(nmi_watchdog);
 EXPORT_SYMBOL(touch_nmi_watchdog);
-#endif /* CONFIG_XEN */

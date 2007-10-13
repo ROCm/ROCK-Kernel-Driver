@@ -40,6 +40,7 @@ obj-$(CONFIG_VM86)		+= vm86.o
 obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
 obj-$(CONFIG_HPET_TIMER) 	+= hpet.o
 obj-$(CONFIG_K8_NB)		+= k8.o
+obj-$(CONFIG_MGEODE_LX)		+= geode.o
 
 obj-$(CONFIG_VMI)		+= vmi.o vmiclock.o
 obj-$(CONFIG_PARAVIRT)		+= paravirt.o
@@ -58,7 +59,7 @@ endif
 # Note: kbuild does not track this dependency due to usage of .incbin
 $(obj)/vsyscall.o: $(obj)/vsyscall-int80.so $(obj)/vsyscall-sysenter.so
 targets += $(foreach F,int80 sysenter,vsyscall-$F.o vsyscall-$F.so)
-targets += $(vsyscall_note) vsyscall.lds
+targets += vsyscall-note.o vsyscall.lds
 
 # The DSO images are built using a special linker script.
 quiet_cmd_syscall = SYSCALL $@
@@ -98,9 +99,10 @@ include $(srctree)/scripts/Makefile.xen
 
 obj-y += fixup.o
 microcode-$(subst m,y,$(CONFIG_MICROCODE)) := microcode-xen.o
-n-obj-xen := i8253.o i8259.o reboot.o smpboot.o trampoline.o tsc.o tsc_sync.o
+n-obj-xen := i8259.o timers/ reboot.o smpboot.o trampoline.o
 
 obj-y := $(call filterxen, $(obj-y), $(n-obj-xen))
 obj-y := $(call cherrypickxen, $(obj-y))
 extra-y := $(call cherrypickxen, $(extra-y))
+%/head-xen.o %/head-xen.s: EXTRA_AFLAGS :=
 endif

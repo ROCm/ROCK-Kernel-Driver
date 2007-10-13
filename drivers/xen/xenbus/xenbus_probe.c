@@ -4,23 +4,23 @@
  * Copyright (C) 2005 Rusty Russell, IBM Corporation
  * Copyright (C) 2005 Mike Wray, Hewlett-Packard
  * Copyright (C) 2005, 2006 XenSource Ltd
- * 
+ *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License version 2
  * as published by the Free Software Foundation; or, when distributed
  * separately from the Linux kernel or incorporated into other
  * software packages, subject to the following license:
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this source file (the "Software"), to deal in the Software without
  * restriction, including without limitation the rights to use, copy, modify,
  * merge, publish, distribute, sublicense, and/or sell copies of the Software,
  * and to permit persons to whom the Software is furnished to do so, subject to
  * the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -32,7 +32,7 @@
 
 #define DPRINTK(fmt, args...)				\
 	pr_debug("xenbus_probe (%s:%d) " fmt ".\n",	\
-		 __FUNCTION__, __LINE__, ##args)
+		 __func__, __LINE__, ##args)
 
 #include <linux/kernel.h>
 #include <linux/err.h>
@@ -43,32 +43,23 @@
 #include <linux/notifier.h>
 #include <linux/kthread.h>
 #include <linux/mutex.h>
+#include <linux/io.h>
 
-#include <asm/io.h>
 #include <asm/page.h>
-#include <asm/maddr.h>
 #include <asm/pgtable.h>
-#include <asm/hypervisor.h>
+#include <asm/xen/hypervisor.h>
 #include <xen/xenbus.h>
-#include <xen/xen_proc.h>
-#include <xen/evtchn.h>
-#include <xen/features.h>
-#include <xen/hvm.h>
+#include <xen/events.h>
+#include <xen/page.h>
 
 #include "xenbus_comms.h"
 #include "xenbus_probe.h"
-
-#ifdef HAVE_XEN_PLATFORM_COMPAT_H
-#include <xen/platform-compat.h>
-#endif
 
 int xen_store_evtchn;
 struct xenstore_domain_interface *xen_store_interface;
 static unsigned long xen_store_mfn;
 
-extern struct mutex xenwatch_mutex;
-
-static ATOMIC_NOTIFIER_HEAD(xenstore_chain);
+static BLOCKING_NOTIFIER_HEAD(xenstore_chain);
 
 static void wait_for_devices(struct xenbus_driver *xendrv);
 
@@ -165,30 +156,6 @@ static int read_backend_details(struct xenbus_device *xendev)
 	return read_otherend_details(xendev, "backend-id", "backend");
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,16)
-static int xenbus_uevent_frontend(struct device *dev, char **envp,
-				  int num_envp, char *buffer, int buffer_size)
-{
-	struct xenbus_device *xdev;
-	int length = 0, i = 0;
-
-	if (dev == NULL)
-		return -ENODEV;
-	xdev = to_xenbus_device(dev);
-	if (xdev == NULL)
-		return -ENODEV;
-
-	/* stuff we want to pass to /sbin/hotplug */
-	add_uevent_var(envp, num_envp, &i, buffer, buffer_size, &length,
-		       "XENBUS_TYPE=%s", xdev->devicetype);
-	add_uevent_var(envp, num_envp, &i, buffer, buffer_size, &length,
-		       "XENBUS_PATH=%s", xdev->nodename);
-	add_uevent_var(envp, num_envp, &i, buffer, buffer_size, &length,
-		       "MODALIAS=xen:%s", xdev->devicetype);
-
-	return 0;
-}
-#endif
 
 /* Bus type for frontend drivers. */
 static struct xen_bus_type xenbus_frontend = {
@@ -199,15 +166,9 @@ static struct xen_bus_type xenbus_frontend = {
 	.bus = {
 		.name     = "xen",
 		.match    = xenbus_match,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,16)
 		.probe    = xenbus_dev_probe,
 		.remove   = xenbus_dev_remove,
 		.shutdown = xenbus_dev_shutdown,
-		.uevent   = xenbus_uevent_frontend,
-#endif
-	},
-	.dev = {
-		.bus_id = "xen",
 	},
 };
 
@@ -224,14 +185,15 @@ static void otherend_changed(struct xenbus_watch *watch,
 	if (!dev->otherend ||
 	    strncmp(dev->otherend, vec[XS_WATCH_PATH],
 		    strlen(dev->otherend))) {
-		DPRINTK("Ignoring watch at %s", vec[XS_WATCH_PATH]);
+		dev_dbg(&dev->dev, "Ignoring watch at %s", vec[XS_WATCH_PATH]);
 		return;
 	}
 
 	state = xenbus_read_driver_state(dev->otherend);
 
-	DPRINTK("state is %d (%s), %s, %s", state, xenbus_strstate(state),
-		dev->otherend_watch.node, vec[XS_WATCH_PATH]);
+	dev_dbg(&dev->dev, "state is %d, (%s), %s, %s",
+		state, xenbus_strstate(state), dev->otherend_watch.node,
+		vec[XS_WATCH_PATH]);
 
 	/*
 	 * Ignore xenbus transitions during shutdown. This prevents us doing
@@ -265,8 +227,8 @@ static int talk_to_otherend(struct xenbus_device *dev)
 
 static int watch_otherend(struct xenbus_device *dev)
 {
-	return xenbus_watch_path2(dev, dev->otherend, "state",
-				  &dev->otherend_watch, otherend_changed);
+	return xenbus_watch_pathfmt(dev, &dev->otherend_watch, otherend_changed,
+				    "%s/%s", dev->otherend, "state");
 }
 
 
@@ -292,9 +254,8 @@ int xenbus_dev_probe(struct device *_dev)
 
 	err = talk_to_otherend(dev);
 	if (err) {
-		printk(KERN_WARNING
-		       "xenbus_probe: talk_to_otherend on %s failed.\n",
-		       dev->nodename);
+		dev_warn(&dev->dev, "talk_to_otherend on %s failed.\n",
+			 dev->nodename);
 		return err;
 	}
 
@@ -304,8 +265,7 @@ int xenbus_dev_probe(struct device *_dev)
 
 	err = watch_otherend(dev);
 	if (err) {
-		printk(KERN_WARNING
-		       "xenbus_probe: watch_otherend on %s failed.\n",
+		dev_warn(&dev->dev, "watch_otherend on %s failed.\n",
 		       dev->nodename);
 		return err;
 	}
@@ -343,50 +303,41 @@ static void xenbus_dev_shutdown(struct device *_dev)
 
 	get_device(&dev->dev);
 	if (dev->state != XenbusStateConnected) {
-		printk("%s: %s: %s != Connected, skipping\n", __FUNCTION__,
+		printk(KERN_INFO "%s: %s: %s != Connected, skipping\n", __func__,
 		       dev->nodename, xenbus_strstate(dev->state));
 		goto out;
 	}
 	xenbus_switch_state(dev, XenbusStateClosing);
 	timeout = wait_for_completion_timeout(&dev->down, timeout);
 	if (!timeout)
-		printk("%s: %s timeout closing device\n", __FUNCTION__, dev->nodename);
+		printk(KERN_INFO "%s: %s timeout closing device\n",
+		       __func__, dev->nodename);
  out:
 	put_device(&dev->dev);
 }
 
 int xenbus_register_driver_common(struct xenbus_driver *drv,
-				  struct xen_bus_type *bus)
+				  struct xen_bus_type *bus,
+				  struct module *owner,
+				  const char *mod_name)
 {
-	int ret;
-
-	if (bus->error)
-		return bus->error;
-
 	drv->driver.name = drv->name;
 	drv->driver.bus = &bus->bus;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,10)
-	drv->driver.owner = drv->owner;
-#endif
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,16)
-	drv->driver.probe = xenbus_dev_probe;
-	drv->driver.remove = xenbus_dev_remove;
-	drv->driver.shutdown = xenbus_dev_shutdown;
-#endif
+	drv->driver.owner = owner;
+	drv->driver.mod_name = mod_name;
 
-	mutex_lock(&xenwatch_mutex);
-	ret = driver_register(&drv->driver);
-	mutex_unlock(&xenwatch_mutex);
-	return ret;
+	return driver_register(&drv->driver);
 }
 
-int xenbus_register_frontend(struct xenbus_driver *drv)
+int __xenbus_register_frontend(struct xenbus_driver *drv,
+			       struct module *owner, const char *mod_name)
 {
 	int ret;
 
 	drv->read_otherend_details = read_backend_details;
 
-	ret = xenbus_register_driver_common(drv, &xenbus_frontend);
+	ret = xenbus_register_driver_common(drv, &xenbus_frontend,
+					    owner, mod_name);
 	if (ret)
 		return ret;
 
@@ -395,7 +346,7 @@ int xenbus_register_frontend(struct xenbus_driver *drv)
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(xenbus_register_frontend);
+EXPORT_SYMBOL_GPL(__xenbus_register_frontend);
 
 void xenbus_unregister_driver(struct xenbus_driver *drv)
 {
@@ -473,20 +424,14 @@ static void xenbus_dev_release(struct device *dev)
 }
 
 static ssize_t xendev_show_nodename(struct device *dev,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,13)
-				    struct device_attribute *attr,
-#endif
-				    char *buf)
+				    struct device_attribute *attr, char *buf)
 {
 	return sprintf(buf, "%s\n", to_xenbus_device(dev)->nodename);
 }
 DEVICE_ATTR(nodename, S_IRUSR | S_IRGRP | S_IROTH, xendev_show_nodename, NULL);
 
 static ssize_t xendev_show_devtype(struct device *dev,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,13)
-				   struct device_attribute *attr,
-#endif
-				   char *buf)
+				   struct device_attribute *attr, char *buf)
 {
 	return sprintf(buf, "%s\n", to_xenbus_device(dev)->devicetype);
 }
@@ -503,9 +448,6 @@ int xenbus_probe_node(struct xen_bus_type *bus,
 	char *tmpstring;
 
 	enum xenbus_state state = xenbus_read_driver_state(nodename);
-
-	if (bus->error)
-		return bus->error;
 
 	if (state != XenbusStateInitialising) {
 		/* Device is not new, so ignore it.  This can happen if a
@@ -531,7 +473,6 @@ int xenbus_probe_node(struct xen_bus_type *bus,
 	xendev->devicetype = tmpstring;
 	init_completion(&xendev->down);
 
-	xendev->dev.parent = &bus->dev;
 	xendev->dev.bus = &bus->bus;
 	xendev->dev.release = xenbus_dev_release;
 
@@ -546,15 +487,16 @@ int xenbus_probe_node(struct xen_bus_type *bus,
 
 	err = device_create_file(&xendev->dev, &dev_attr_nodename);
 	if (err)
-		goto unregister;
+		goto fail_unregister;
+
 	err = device_create_file(&xendev->dev, &dev_attr_devtype);
 	if (err)
-		goto unregister;
+		goto fail_remove_file;
 
 	return 0;
-unregister:
+fail_remove_file:
 	device_remove_file(&xendev->dev, &dev_attr_nodename);
-	device_remove_file(&xendev->dev, &dev_attr_devtype);
+fail_unregister:
 	device_unregister(&xendev->dev);
 fail:
 	kfree(xendev);
@@ -567,7 +509,8 @@ static int xenbus_probe_frontend(const char *type, const char *name)
 	char *nodename;
 	int err;
 
-	nodename = kasprintf(GFP_KERNEL, "%s/%s/%s", xenbus_frontend.root, type, name);
+	nodename = kasprintf(GFP_KERNEL, "%s/%s/%s",
+			     xenbus_frontend.root, type, name);
 	if (!nodename)
 		return -ENOMEM;
 
@@ -603,9 +546,6 @@ int xenbus_probe_devices(struct xen_bus_type *bus)
 	int err = 0;
 	char **dir;
 	unsigned int i, dir_n;
-
-	if (bus->error)
-		return bus->error;
 
 	dir = xenbus_directory(XBT_NIL, bus->root, "", &dir_n);
 	if (IS_ERR(dir))
@@ -643,15 +583,15 @@ static int strsep_len(const char *str, char c, unsigned int len)
 	return (len == 0) ? i : -ERANGE;
 }
 
-void dev_changed(const char *node, struct xen_bus_type *bus)
+void xenbus_dev_changed(const char *node, struct xen_bus_type *bus)
 {
 	int exists, rootlen;
 	struct xenbus_device *dev;
 	char type[BUS_ID_SIZE];
 	const char *p, *root;
 
-	if (bus->error || char_count(node, '/') < 2)
- 		return;
+	if (char_count(node, '/') < 2)
+		return;
 
 	exists = xenbus_exists(XBT_NIL, node, "");
 	if (!exists) {
@@ -685,7 +625,7 @@ static void frontend_changed(struct xenbus_watch *watch,
 {
 	DPRINTK("");
 
-	dev_changed(vec[XS_WATCH_PATH], &xenbus_frontend);
+	xenbus_dev_changed(vec[XS_WATCH_PATH], &xenbus_frontend);
 }
 
 /* We watch for devices appearing and vanishing. */
@@ -761,9 +701,9 @@ static int resume_dev(struct device *dev, void *data)
 
 	if (drv->resume) {
 		err = drv->resume(xdev);
-		if (err) { 
+		if (err) {
 			printk(KERN_WARNING
-			       "xenbus: resume %s failed: %i\n", 
+			       "xenbus: resume %s failed: %i\n",
 			       dev->bus_id, err);
 			return err;
 		}
@@ -784,8 +724,7 @@ void xenbus_suspend(void)
 {
 	DPRINTK("");
 
-	if (!xenbus_frontend.error)
-		bus_for_each_dev(&xenbus_frontend.bus, NULL, NULL, suspend_dev);
+	bus_for_each_dev(&xenbus_frontend.bus, NULL, NULL, suspend_dev);
 	xenbus_backend_suspend(suspend_dev);
 	xs_suspend();
 }
@@ -795,8 +734,7 @@ void xenbus_resume(void)
 {
 	xb_init_comms();
 	xs_resume();
-	if (!xenbus_frontend.error)
-		bus_for_each_dev(&xenbus_frontend.bus, NULL, NULL, resume_dev);
+	bus_for_each_dev(&xenbus_frontend.bus, NULL, NULL, resume_dev);
 	xenbus_backend_resume(resume_dev);
 }
 EXPORT_SYMBOL_GPL(xenbus_resume);
@@ -804,8 +742,7 @@ EXPORT_SYMBOL_GPL(xenbus_resume);
 void xenbus_suspend_cancel(void)
 {
 	xs_suspend_cancel();
-	if (!xenbus_frontend.error)
-		bus_for_each_dev(&xenbus_frontend.bus, NULL, NULL, suspend_cancel_dev);
+	bus_for_each_dev(&xenbus_frontend.bus, NULL, NULL, suspend_cancel_dev);
 	xenbus_backend_resume(suspend_cancel_dev);
 }
 EXPORT_SYMBOL_GPL(xenbus_suspend_cancel);
@@ -821,7 +758,7 @@ int register_xenstore_notifier(struct notifier_block *nb)
 	if (xenstored_ready > 0)
 		ret = nb->notifier_call(nb, 0, NULL);
 	else
-		atomic_notifier_chain_register(&xenstore_chain, nb);
+		blocking_notifier_chain_register(&xenstore_chain, nb);
 
 	return ret;
 }
@@ -829,10 +766,9 @@ EXPORT_SYMBOL_GPL(register_xenstore_notifier);
 
 void unregister_xenstore_notifier(struct notifier_block *nb)
 {
-	atomic_notifier_chain_unregister(&xenstore_chain, nb);
+	blocking_notifier_chain_unregister(&xenstore_chain, nb);
 }
 EXPORT_SYMBOL_GPL(unregister_xenstore_notifier);
-
 
 void xenbus_probe(struct work_struct *unused)
 {
@@ -844,180 +780,71 @@ void xenbus_probe(struct work_struct *unused)
 	xenbus_backend_probe_and_watch();
 
 	/* Notify others that xenstore is up */
-	atomic_notifier_call_chain(&xenstore_chain, 0, NULL);
+	blocking_notifier_call_chain(&xenstore_chain, 0, NULL);
 }
 
-
-#if defined(CONFIG_PROC_FS) && defined(CONFIG_XEN_PRIVILEGED_GUEST)
-static struct file_operations xsd_kva_fops;
-static struct proc_dir_entry *xsd_kva_intf;
-static struct proc_dir_entry *xsd_port_intf;
-
-static int xsd_kva_mmap(struct file *file, struct vm_area_struct *vma)
-{
-	size_t size = vma->vm_end - vma->vm_start;
-
-	if ((size > PAGE_SIZE) || (vma->vm_pgoff != 0))
-		return -EINVAL;
-
-	if (remap_pfn_range(vma, vma->vm_start, mfn_to_pfn(xen_store_mfn),
-			    size, vma->vm_page_prot))
-		return -EAGAIN;
-
-	return 0;
-}
-
-static int xsd_kva_read(char *page, char **start, off_t off,
-			int count, int *eof, void *data)
-{
-	int len;
-
-	len  = sprintf(page, "0x%p", xen_store_interface);
-	*eof = 1;
-	return len;
-}
-
-static int xsd_port_read(char *page, char **start, off_t off,
-			 int count, int *eof, void *data)
-{
-	int len;
-
-	len  = sprintf(page, "%d", xen_store_evtchn);
-	*eof = 1;
-	return len;
-}
-#endif
-
-static int xenbus_probe_init(void)
+static int __init xenbus_probe_init(void)
 {
 	int err = 0;
-	unsigned long page = 0;
 
 	DPRINTK("");
 
+	err = -ENODEV;
 	if (!is_running_on_xen())
-		return -ENODEV;
+		goto out_error;
 
 	/* Register ourselves with the kernel bus subsystem */
-	xenbus_frontend.error = bus_register(&xenbus_frontend.bus);
-	if (xenbus_frontend.error)
-		printk(KERN_WARNING
-		       "XENBUS: Error registering frontend bus: %i\n",
-		       xenbus_frontend.error);
-	xenbus_backend_bus_register();
+	err = bus_register(&xenbus_frontend.bus);
+	if (err)
+		goto out_error;
+
+	err = xenbus_backend_bus_register();
+	if (err)
+		goto out_unreg_front;
 
 	/*
 	 * Domain0 doesn't have a store_evtchn or store_mfn yet.
 	 */
 	if (is_initial_xendomain()) {
-		struct evtchn_alloc_unbound alloc_unbound;
-
-		/* Allocate page. */
-		page = get_zeroed_page(GFP_KERNEL);
-		if (!page)
-			return -ENOMEM;
-
-		xen_store_mfn = xen_start_info->store_mfn =
-			pfn_to_mfn(virt_to_phys((void *)page) >>
-				   PAGE_SHIFT);
-
-		/* Next allocate a local port which xenstored can bind to */
-		alloc_unbound.dom        = DOMID_SELF;
-		alloc_unbound.remote_dom = 0;
-
-		err = HYPERVISOR_event_channel_op(EVTCHNOP_alloc_unbound,
-						  &alloc_unbound);
-		if (err == -ENOSYS)
-			goto err;
-		BUG_ON(err);
-		xen_store_evtchn = xen_start_info->store_evtchn =
-			alloc_unbound.port;
-
-#if defined(CONFIG_PROC_FS) && defined(CONFIG_XEN_PRIVILEGED_GUEST)
-		/* And finally publish the above info in /proc/xen */
-		xsd_kva_intf = create_xen_proc_entry("xsd_kva", 0600);
-		if (xsd_kva_intf) {
-			memcpy(&xsd_kva_fops, xsd_kva_intf->proc_fops,
-			       sizeof(xsd_kva_fops));
-			xsd_kva_fops.mmap = xsd_kva_mmap;
-			xsd_kva_intf->proc_fops = &xsd_kva_fops;
-			xsd_kva_intf->read_proc = xsd_kva_read;
-		}
-		xsd_port_intf = create_xen_proc_entry("xsd_port", 0400);
-		if (xsd_port_intf)
-			xsd_port_intf->read_proc = xsd_port_read;
-#endif
-		xen_store_interface = mfn_to_virt(xen_store_mfn);
+		/* dom0 not yet supported */
 	} else {
 		xenstored_ready = 1;
-#ifdef CONFIG_XEN
 		xen_store_evtchn = xen_start_info->store_evtchn;
 		xen_store_mfn = xen_start_info->store_mfn;
-		xen_store_interface = mfn_to_virt(xen_store_mfn);
-#else
-		xen_store_evtchn = hvm_get_parameter(HVM_PARAM_STORE_EVTCHN);
-		xen_store_mfn = hvm_get_parameter(HVM_PARAM_STORE_PFN);
-		xen_store_interface = ioremap(xen_store_mfn << PAGE_SHIFT,
-					      PAGE_SIZE);
-#endif
 	}
-
-
-	xenbus_dev_init();
+	xen_store_interface = mfn_to_virt(xen_store_mfn);
 
 	/* Initialize the interface to xenstore. */
 	err = xs_init();
 	if (err) {
 		printk(KERN_WARNING
 		       "XENBUS: Error initializing xenstore comms: %i\n", err);
-		goto err;
+		goto out_unreg_back;
 	}
-
-	/* Register ourselves with the kernel device subsystem */
-	if (!xenbus_frontend.error) {
-		xenbus_frontend.error = device_register(&xenbus_frontend.dev);
-		if (xenbus_frontend.error) {
-			bus_unregister(&xenbus_frontend.bus);
-			printk(KERN_WARNING
-			       "XENBUS: Error registering frontend device: %i\n",
-			       xenbus_frontend.error);
-		}
-	}
-	xenbus_backend_device_register();
 
 	if (!is_initial_xendomain())
 		xenbus_probe(NULL);
 
 	return 0;
 
- err:
-	if (page)
-		free_page(page);
+  out_unreg_back:
+	xenbus_backend_bus_unregister();
 
-	/*
-	 * Do not unregister the xenbus front/backend buses here. The buses
-	 * must exist because front/backend drivers will use them when they are
-	 * registered.
-	 */
+  out_unreg_front:
+	bus_unregister(&xenbus_frontend.bus);
 
+  out_error:
 	return err;
 }
 
-#ifdef CONFIG_XEN
 postcore_initcall(xenbus_probe_init);
-MODULE_LICENSE("Dual BSD/GPL");
-#else
-int xenbus_init(void)
-{
-	return xenbus_probe_init();
-}
-#endif
+
+MODULE_LICENSE("GPL");
 
 static int is_disconnected_device(struct device *dev, void *data)
 {
 	struct xenbus_device *xendev = to_xenbus_device(dev);
 	struct device_driver *drv = data;
-	struct xenbus_driver *xendrv;
 
 	/*
 	 * A device with no driver will never connect. We care only about
@@ -1030,15 +857,11 @@ static int is_disconnected_device(struct device *dev, void *data)
 	if (drv && (dev->driver != drv))
 		return 0;
 
-	xendrv = to_xenbus_driver(dev->driver);
-	return (xendev->state < XenbusStateConnected ||
-		(xendrv->is_ready && !xendrv->is_ready(xendev)));
+	return (xendev->state != XenbusStateConnected);
 }
 
 static int exists_disconnected_device(struct device_driver *drv)
 {
-	if (xenbus_frontend.error)
-		return xenbus_frontend.error;
 	return bus_for_each_dev(&xenbus_frontend.bus, NULL, drv,
 				is_disconnected_device);
 }
@@ -1056,13 +879,10 @@ static int print_device_status(struct device *dev, void *data)
 		/* Information only: is this too noisy? */
 		printk(KERN_INFO "XENBUS: Device with no driver: %s\n",
 		       xendev->nodename);
-	} else if (xendev->state < XenbusStateConnected) {
-		enum xenbus_state rstate = XenbusStateUnknown;
-		if (xendev->otherend)
-			rstate = xenbus_read_driver_state(xendev->otherend);
+	} else if (xendev->state != XenbusStateConnected) {
 		printk(KERN_WARNING "XENBUS: Timeout connecting "
-		       "to device: %s (local state %d, remote state %d)\n",
-		       xendev->nodename, xendev->state, rstate);
+		       "to device: %s (state %d)\n",
+		       xendev->nodename, xendev->state);
 	}
 
 	return 0;
@@ -1072,7 +892,7 @@ static int print_device_status(struct device *dev, void *data)
 static int ready_to_wait_for_devices;
 
 /*
- * On a 5-minute timeout, wait for all devices currently configured.  We need
+ * On a 10 second timeout, wait for all devices currently configured.  We need
  * to do this to guarantee that the filesystems and / or network devices
  * needed for boot are available, before we can allow the boot to proceed.
  *
@@ -1087,29 +907,17 @@ static int ready_to_wait_for_devices;
  */
 static void wait_for_devices(struct xenbus_driver *xendrv)
 {
-	unsigned long start = jiffies;
+	unsigned long timeout = jiffies + 10*HZ;
 	struct device_driver *drv = xendrv ? &xendrv->driver : NULL;
-	unsigned int seconds_waited = 0;
 
 	if (!ready_to_wait_for_devices || !is_running_on_xen())
 		return;
 
 	while (exists_disconnected_device(drv)) {
-		if (time_after(jiffies, start + (seconds_waited+5)*HZ)) {
-			if (!seconds_waited)
-				printk(KERN_WARNING "XENBUS: Waiting for "
-				       "devices to initialise: ");
-			seconds_waited += 5;
-			printk("%us...", 300 - seconds_waited);
-			if (seconds_waited == 300)
-				break;
-		}
-
+		if (time_after(jiffies, timeout))
+			break;
 		schedule_timeout_interruptible(HZ/10);
 	}
-
-	if (seconds_waited)
-		printk("\n");
 
 	bus_for_each_dev(&xenbus_frontend.bus, NULL, drv,
 			 print_device_status);
@@ -1118,10 +926,8 @@ static void wait_for_devices(struct xenbus_driver *xendrv)
 #ifndef MODULE
 static int __init boot_wait_for_devices(void)
 {
-	if (!xenbus_frontend.error) {
-		ready_to_wait_for_devices = 1;
-		wait_for_devices(NULL);
-	}
+	ready_to_wait_for_devices = 1;
+	wait_for_devices(NULL);
 	return 0;
 }
 

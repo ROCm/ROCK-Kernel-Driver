@@ -779,23 +779,13 @@ kdb_task_state(const struct task_struct *p, unsigned long mask)
 
 struct kdb_running_process kdb_running_process[NR_CPUS];
 
-/*
- * kdb_save_running
- *
- *	Save the state of a running process.  This is invoked on the current
- *	process on each cpu (assuming the cpu is responding).
- * Inputs:
- *	regs	struct pt_regs for the process
- * Outputs:
- *	Updates kdb_running_process[] for this cpu.
- * Returns:
- *	none.
- * Locking:
- *	none.
+/* Save the state of a running process and invoke kdb_main_loop.  This is
+ * invoked on the current process on each cpu (assuming the cpu is responding).
  */
 
-void
-kdb_save_running(struct pt_regs *regs)
+int
+kdb_save_running(struct pt_regs *regs, kdb_reason_t reason,
+		 kdb_reason_t reason2, int error, kdb_dbtrap_t db_result)
 {
 	struct kdb_running_process *krp = kdb_running_process + smp_processor_id();
 	krp->p = current;
@@ -803,6 +793,7 @@ kdb_save_running(struct pt_regs *regs)
 	krp->seqno = kdb_seqno;
 	krp->irq_depth = hardirq_count() >> HARDIRQ_SHIFT;
 	kdba_save_running(&(krp->arch), regs);
+	return kdb_main_loop(reason, reason2, error, db_result, regs);
 }
 
 /*
@@ -936,7 +927,7 @@ struct debug_alloc_header {
 #define dah_align 8
 #define dah_overhead ALIGN(sizeof(struct debug_alloc_header), dah_align)
 
-static u64 debug_alloc_pool_aligned[128*1024/dah_align];	/* 128K pool */
+static u64 debug_alloc_pool_aligned[256*1024/dah_align];	/* 256K pool */
 static char *debug_alloc_pool = (char *)debug_alloc_pool_aligned;
 static u32 dah_first, dah_first_call = 1, dah_used = 0, dah_used_max = 0;
 

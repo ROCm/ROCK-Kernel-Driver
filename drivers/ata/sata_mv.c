@@ -69,10 +69,11 @@
 #include <linux/device.h>
 #include <scsi/scsi_host.h>
 #include <scsi/scsi_cmnd.h>
+#include <scsi/scsi_device.h>
 #include <linux/libata.h>
 
 #define DRV_NAME	"sata_mv"
-#define DRV_VERSION	"0.81"
+#define DRV_VERSION	"1.01"
 
 enum {
 	/* BAR's are enumerated in terms of pci_resource_start() terms */
@@ -313,7 +314,10 @@ enum {
 #define IS_GEN_IIE(hpriv) ((hpriv)->hp_flags & MV_HP_GEN_IIE)
 
 enum {
-	MV_DMA_BOUNDARY		= 0xffffffffU,
+	/* DMA boundary 0xffff is required by the s/g splitting
+	 * we need on /length/ in mv_fill-sg().
+	 */
+	MV_DMA_BOUNDARY		= 0xffffU,
 
 	/* mask of register bits containing lower 32 bits
 	 * of EDMA request queue DMA address
@@ -417,6 +421,7 @@ static void mv_error_handler(struct ata_port *ap);
 static void mv_post_int_cmd(struct ata_queued_cmd *qc);
 static void mv_eh_freeze(struct ata_port *ap);
 static void mv_eh_thaw(struct ata_port *ap);
+static int mv_slave_config(struct scsi_device *sdev);
 static int mv_init_one(struct pci_dev *pdev, const struct pci_device_id *ent);
 
 static void mv5_phy_errata(struct mv_host_priv *hpriv, void __iomem *mmio,
@@ -448,13 +453,13 @@ static struct scsi_host_template mv5_sht = {
 	.queuecommand		= ata_scsi_queuecmd,
 	.can_queue		= ATA_DEF_QUEUE,
 	.this_id		= ATA_SHT_THIS_ID,
-	.sg_tablesize		= MV_MAX_SG_CT,
+	.sg_tablesize		= MV_MAX_SG_CT / 2,
 	.cmd_per_lun		= ATA_SHT_CMD_PER_LUN,
 	.emulated		= ATA_SHT_EMULATED,
 	.use_clustering		= 1,
 	.proc_name		= DRV_NAME,
 	.dma_boundary		= MV_DMA_BOUNDARY,
-	.slave_configure	= ata_scsi_slave_config,
+	.slave_configure	= mv_slave_config,
 	.slave_destroy		= ata_scsi_slave_destroy,
 	.bios_param		= ata_std_bios_param,
 };
@@ -466,13 +471,13 @@ static struct scsi_host_template mv6_sht = {
 	.queuecommand		= ata_scsi_queuecmd,
 	.can_queue		= ATA_DEF_QUEUE,
 	.this_id		= ATA_SHT_THIS_ID,
-	.sg_tablesize		= MV_MAX_SG_CT,
+	.sg_tablesize		= MV_MAX_SG_CT / 2,
 	.cmd_per_lun		= ATA_SHT_CMD_PER_LUN,
 	.emulated		= ATA_SHT_EMULATED,
 	.use_clustering		= 1,
 	.proc_name		= DRV_NAME,
 	.dma_boundary		= MV_DMA_BOUNDARY,
-	.slave_configure	= ata_scsi_slave_config,
+	.slave_configure	= mv_slave_config,
 	.slave_destroy		= ata_scsi_slave_destroy,
 	.bios_param		= ata_std_bios_param,
 };
@@ -621,6 +626,9 @@ static const struct pci_device_id mv_pci_tbl[] = {
 	{ PCI_VDEVICE(MARVELL, 0x5041), chip_504x },
 	{ PCI_VDEVICE(MARVELL, 0x5080), chip_5080 },
 	{ PCI_VDEVICE(MARVELL, 0x5081), chip_508x },
+	/* RocketRAID 1740/174x have different identifiers */
+	{ PCI_VDEVICE(TTI, 0x1740), chip_508x },
+	{ PCI_VDEVICE(TTI, 0x1742), chip_508x },
 
 	{ PCI_VDEVICE(MARVELL, 0x6040), chip_604x },
 	{ PCI_VDEVICE(MARVELL, 0x6041), chip_604x },
@@ -755,6 +763,17 @@ static inline int mv_get_hc_count(unsigned long port_flags)
 
 static void mv_irq_clear(struct ata_port *ap)
 {
+}
+
+static int mv_slave_config(struct scsi_device *sdev)
+{
+	int rc = ata_scsi_slave_config(sdev);
+	if (rc)
+		return rc;
+
+	blk_queue_max_phys_segments(sdev->request_queue, MV_MAX_SG_CT / 2);
+
+	return 0;	/* scsi layer doesn't check return value, sigh */
 }
 
 static void mv_set_edma_ptrs(void __iomem *port_mmio,
@@ -1124,10 +1143,9 @@ static void mv_port_stop(struct ata_port *ap)
  *      LOCKING:
  *      Inherited from caller.
  */
-static unsigned int mv_fill_sg(struct ata_queued_cmd *qc)
+static void mv_fill_sg(struct ata_queued_cmd *qc)
 {
 	struct mv_port_priv *pp = qc->ap->private_data;
-	unsigned int n_sg = 0;
 	struct scatterlist *sg;
 	struct mv_sg *mv_sg;
 
@@ -1136,18 +1154,27 @@ static unsigned int mv_fill_sg(struct ata_queued_cmd *qc)
 		dma_addr_t addr = sg_dma_address(sg);
 		u32 sg_len = sg_dma_len(sg);
 
-		mv_sg->addr = cpu_to_le32(addr & 0xffffffff);
-		mv_sg->addr_hi = cpu_to_le32((addr >> 16) >> 16);
-		mv_sg->flags_size = cpu_to_le32(sg_len & 0xffff);
+		while (sg_len) {
+			u32 offset = addr & 0xffff;
+			u32 len = sg_len;
 
-		if (ata_sg_is_last(sg, qc))
-			mv_sg->flags_size |= cpu_to_le32(EPRD_FLAG_END_OF_TBL);
+			if ((offset + sg_len > 0x10000))
+				len = 0x10000 - offset;
 
-		mv_sg++;
-		n_sg++;
+			mv_sg->addr = cpu_to_le32(addr & 0xffffffff);
+			mv_sg->addr_hi = cpu_to_le32((addr >> 16) >> 16);
+			mv_sg->flags_size = cpu_to_le32(len & 0xffff);
+
+			sg_len -= len;
+			addr += len;
+
+			if (!sg_len && ata_sg_is_last(sg, qc))
+				mv_sg->flags_size |= cpu_to_le32(EPRD_FLAG_END_OF_TBL);
+
+			mv_sg++;
+		}
+
 	}
-
-	return n_sg;
 }
 
 static inline void mv_crqb_pack_cmd(__le16 *cmdw, u8 data, u8 addr, unsigned last)
@@ -2233,7 +2260,7 @@ comreset_retry:
 	 */
 
 	/* finally, read device signature from TF registers */
-	*class = ata_dev_try_classify(ap->link.device, 1, NULL);
+	*class = ata_dev_try_classify(ap, 0, NULL);
 
 	writelfl(0, port_mmio + EDMA_ERR_IRQ_CAUSE_OFS);
 

@@ -35,12 +35,6 @@ PHDRS {
 SECTIONS
 {
   . = LOAD_OFFSET + LOAD_PHYSICAL_ADDR;
-
-#if defined(CONFIG_XEN) && CONFIG_XEN_COMPAT <= 0x030002
-#undef LOAD_OFFSET
-#define LOAD_OFFSET 0
-#endif
-
   phys_startup_32 = startup_32 - LOAD_OFFSET;
 
   .text.head : AT(ADDR(.text.head) - LOAD_OFFSET) {
@@ -66,7 +60,9 @@ SECTIONS
   	__stop___ex_table = .;
   }
 
-  BUG_TABLE
+  NOTES :text :note
+
+  BUG_TABLE :text
 
   . = ALIGN(4);
   .tracedata : AT(ADDR(.tracedata) - LOAD_OFFSET) {
@@ -94,6 +90,7 @@ SECTIONS
 
   . = ALIGN(4096);
   .data.page_aligned : AT(ADDR(.data.page_aligned) - LOAD_OFFSET) {
+	*(.data.page_aligned)
 	*(.data.idt)
   }
 
@@ -186,6 +183,7 @@ SECTIONS
   .data.percpu  : AT(ADDR(.data.percpu) - LOAD_OFFSET) {
 	__per_cpu_start = .;
 	*(.data.percpu)
+	*(.data.percpu.shared_aligned)
 	__per_cpu_end = .;
   }
   . = ALIGN(4096);
@@ -212,6 +210,4 @@ SECTIONS
   STABS_DEBUG
 
   DWARF_DEBUG
-
-  NOTES
 }

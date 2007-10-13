@@ -3,9 +3,7 @@
 
 #include <linux/pm.h>
 #include <linux/delay.h>
-#ifndef CONFIG_XEN
 #include <asm/fixmap.h>
-#endif
 #include <asm/apicdef.h>
 #include <asm/processor.h>
 #include <asm/system.h>
@@ -35,7 +33,7 @@ extern int apic_verbosity;
 
 extern void generic_apic_probe(void);
 
-#if defined(CONFIG_X86_LOCAL_APIC) && !defined(CONFIG_XEN)
+#ifdef CONFIG_X86_LOCAL_APIC
 
 /*
  * Basic functions accessing APICs.
@@ -113,20 +111,17 @@ extern int APIC_init_uniprocessor (void);
 
 extern void enable_NMI_through_LVT0 (void * dummy);
 
+#ifndef CONFIG_XEN
 #define ARCH_APICTIMER_STOPS_ON_C3	1
+#endif
 
 extern int timer_over_8254;
 extern int local_apic_timer_c2_ok;
 
 extern int local_apic_timer_disabled;
 
-#else /* !CONFIG_X86_LOCAL_APIC || CONFIG_XEN */
-
+#else /* !CONFIG_X86_LOCAL_APIC */
 static inline void lapic_shutdown(void) { }
-
-#ifdef CONFIG_X86_LOCAL_APIC
-extern int APIC_init_uniprocessor (void);
-#endif
 
 #endif /* !CONFIG_X86_LOCAL_APIC */
 

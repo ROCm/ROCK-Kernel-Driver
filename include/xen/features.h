@@ -6,15 +6,18 @@
  * Copyright (c) 2006, Ian Campbell
  */
 
-#ifndef __ASM_XEN_FEATURES_H__
-#define __ASM_XEN_FEATURES_H__
+#ifndef __XEN_FEATURES_H__
+#define __XEN_FEATURES_H__
 
-#include <xen/interface/version.h>
+#include <xen/interface/features.h>
 
-extern void setup_xen_features(void);
+void xen_setup_features(void);
 
 extern u8 xen_features[XENFEAT_NR_SUBMAPS * 32];
 
-#define xen_feature(flag)	(xen_features[flag])
+static inline int xen_feature(int flag)
+{
+	return xen_features[flag];
+}
 
 #endif /* __ASM_XEN_FEATURES_H__ */

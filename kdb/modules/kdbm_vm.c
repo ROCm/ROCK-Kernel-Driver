@@ -201,12 +201,16 @@ kdbm_print_pte(pte_t * pte)
 	kdb_printf("0x%lx (", (unsigned long) pte_val(*pte));
 
 	if (pte_present(*pte)) {
+#ifdef	pte_exec
 		if (pte_exec(*pte))
 			kdb_printf("X");
+#endif
 		if (pte_write(*pte))
 			kdb_printf("W");
+#ifdef	pte_read
 		if (pte_read(*pte))
 			kdb_printf("R");
+#endif
 		if (pte_young(*pte))
 			kdb_printf("A");
 		if (pte_dirty(*pte))
@@ -679,8 +683,8 @@ kdbm_kobject(int argc, const char **argv)
 	kdb_printf(" entry.next = 0x%p entry.prev = 0x%p\n",
 					k.entry.next, k.entry.prev);
 
-	kdb_printf(" parent = 0x%p kset = 0x%p ktype = 0x%p dentry = 0x%p\n",
-					k.parent, k.kset, k.ktype, k.dentry);
+	kdb_printf(" parent = 0x%p kset = 0x%p ktype = 0x%p sd = 0x%p\n",
+					k.parent, k.kset, k.ktype, k.sd);
 
 	return 0;
 }

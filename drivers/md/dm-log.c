@@ -12,7 +12,7 @@
 #include "dm-log.h"
 #include "dm-io.h"
 
-#define DM_MSG_PREFIX "dirty log"
+#define DM_MSG_PREFIX "mirror log"
 
 static LIST_HEAD(_log_types);
 static DEFINE_SPINLOCK(_lock);
@@ -26,7 +26,6 @@ int dm_register_dirty_log_type(struct dirty_log_type *type)
 
 	return 0;
 }
-EXPORT_SYMBOL(dm_register_dirty_log_type);
 
 int dm_unregister_dirty_log_type(struct dirty_log_type *type)
 {
@@ -41,7 +40,6 @@ int dm_unregister_dirty_log_type(struct dirty_log_type *type)
 
 	return 0;
 }
-EXPORT_SYMBOL(dm_unregister_dirty_log_type);
 
 static struct dirty_log_type *get_type(const char *type_name)
 {
@@ -83,7 +81,6 @@ struct dirty_log *dm_create_dirty_log(const char *type_name, struct dm_target *t
 
 	type = get_type(type_name);
 	if (!type) {
-		DMERR("type not found");
 		kfree(log);
 		return NULL;
 	}
@@ -97,7 +94,6 @@ struct dirty_log *dm_create_dirty_log(const char *type_name, struct dm_target *t
 
 	return log;
 }
-EXPORT_SYMBOL(dm_create_dirty_log);
 
 void dm_destroy_dirty_log(struct dirty_log *log)
 {
@@ -105,7 +101,6 @@ void dm_destroy_dirty_log(struct dirty_log *log)
 	put_type(log->type);
 	kfree(log);
 }
-EXPORT_SYMBOL(dm_destroy_dirty_log);
 
 /*-----------------------------------------------------------------
  * Persistent and core logs share a lot of their implementation.
@@ -271,7 +266,7 @@ static int create_log_context(struct dirty_log *log, struct dm_target *ti,
 	int r;
 
 	if (argc < 1 || argc > 2) {
-		DMWARN("wrong number of arguments to dirty log");
+		DMWARN("wrong number of arguments to mirror log");
 		return -EINVAL;
 	}
 
@@ -281,7 +276,7 @@ static int create_log_context(struct dirty_log *log, struct dm_target *ti,
 		else if (!strcmp(argv[1], "nosync"))
 			sync = NOSYNC;
 		else {
-			DMWARN("unrecognised sync argument to dirty log: %s",
+			DMWARN("unrecognised sync argument to mirror log: %s",
 			       argv[1]);
 			return -EINVAL;
 		}
@@ -423,20 +418,17 @@ static int disk_ctr(struct dirty_log *log, struct dm_target *ti,
 	struct dm_dev *dev;
 
 	if (argc < 2 || argc > 3) {
-		DMWARN("wrong number of arguments to disk dirty log");
+		DMWARN("wrong number of arguments to disk mirror log");
 		return -EINVAL;
 	}
 
 	r = dm_get_device(ti, argv[0], 0, 0 /* FIXME */,
 			  FMODE_READ | FMODE_WRITE, &dev);
-	if (r) {
-		DMERR("open log device");
+	if (r)
 		return r;
-	}
 
 	r = create_log_context(log, ti, argc - 1, argv + 1, dev);
 	if (r) {
-		DMERR("create log context");
 		dm_put_device(ti, dev);
 		return r;
 	}
@@ -483,7 +475,7 @@ static int disk_resume(struct dirty_log *log)
 	/* read the disk header */
 	r = read_header(lc);
 	if (r) {
-		DMWARN("%s: Failed to read header on dirty log device",
+		DMWARN("%s: Failed to read header on mirror log device",
 		       lc->log_dev->name);
 		fail_log_device(lc);
 		/*
@@ -521,7 +513,7 @@ static int disk_resume(struct dirty_log *log)
 	/* write the new header */
 	r = write_header(lc);
 	if (r) {
-		DMWARN("%s: Failed to write header on dirty log device",
+		DMWARN("%s: Failed to write header on mirror log device",
 		       lc->log_dev->name);
 		fail_log_device(lc);
 	}
@@ -741,21 +733,7 @@ void dm_dirty_log_exit(void)
 	dm_unregister_dirty_log_type(&_core_type);
 }
 
-/* Module hooks. */
-module_init(dm_dirty_log_init);
-module_exit(dm_dirty_log_exit);
-
-MODULE_DESCRIPTION(DM_NAME " device-mapper dirty log");
-MODULE_AUTHOR("Heinz Mauelshagen <hjm@redhat.de>");
-MODULE_LICENSE("GPL");
-
-/*
- * Overrides for Emacs so that we follow Linus's tabbing style.
- * Emacs will notice this stuff at the end of the file and automatically
- * adjust the settings for this buffer only.  This must remain at the end
- * of the file.
- * ---------------------------------------------------------------------------
- * Local variables:
- * c-file-style: "linux"
- * End:
- */
+EXPORT_SYMBOL(dm_register_dirty_log_type);
+EXPORT_SYMBOL(dm_unregister_dirty_log_type);
+EXPORT_SYMBOL(dm_create_dirty_log);
+EXPORT_SYMBOL(dm_destroy_dirty_log);

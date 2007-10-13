@@ -1005,7 +1005,8 @@ static char prepare_for_delete_or_cut(struct reiserfs_transaction_handle *th, st
 		pos = I_UNFM_NUM(&s_ih);
 
 		while (le_ih_k_offset (&s_ih) + (pos - 1) * blk_size > new_file_length) {
-		    __u32 *unfm, block;
+		    __le32 *unfm;
+		    __u32 block;
 
 		    /* Each unformatted block deletion may involve one additional
 		     * bitmap block into the transaction, thereby the initial
@@ -1015,7 +1016,7 @@ static char prepare_for_delete_or_cut(struct reiserfs_transaction_handle *th, st
 			break;
 		    }
 
-		    unfm = (__u32 *)B_I_PITEM(bh, &s_ih) + pos - 1;
+		    unfm = (__le32 *)B_I_PITEM(bh, &s_ih) + pos - 1;
 		    block = get_block_num(unfm, 0);
 
 		    if (block != 0) {

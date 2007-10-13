@@ -538,6 +538,8 @@ static struct usb_device_id id_table_combined [] = {
 	{ USB_DEVICE(FTDI_VID, FTDI_TERATRONIK_VCP_PID) },
 	{ USB_DEVICE(FTDI_VID, FTDI_TERATRONIK_D2XX_PID) },
 	{ USB_DEVICE(EVOLUTION_VID, EVOLUTION_ER1_PID) },
+	{ USB_DEVICE(EVOLUTION_VID, EVO_HYBRID_PID) },
+	{ USB_DEVICE(EVOLUTION_VID, EVO_RCM4_PID) },
 	{ USB_DEVICE(FTDI_VID, FTDI_ARTEMIS_PID) },
 	{ USB_DEVICE(FTDI_VID, FTDI_ATIK_ATK16_PID) },
 	{ USB_DEVICE(FTDI_VID, FTDI_ATIK_ATK16C_PID) },
@@ -566,6 +568,7 @@ static struct usb_device_id id_table_combined [] = {
 	{ USB_DEVICE(ELEKTOR_VID, ELEKTOR_FT323R_PID) },
 	{ USB_DEVICE(TELLDUS_VID, TELLDUS_TELLSTICK_PID) },
 	{ USB_DEVICE(FTDI_VID, FTDI_MAXSTREAM_PID) },
+	{ USB_DEVICE(TML_VID, TML_USB_SERIAL_PID) },
 	{ USB_DEVICE(OLIMEX_VID, OLIMEX_ARM_USB_OCD_PID),
 		.driver_info = (kernel_ulong_t)&ftdi_olimex_quirk },
 	{ },					/* Optional parameter entry */
@@ -1147,7 +1150,9 @@ static int create_sysfs_attrs(struct usb_serial_port *port)
 		dbg("sysfs attributes for %s", ftdi_chip_name[priv->chip_type]);
 		retval = device_create_file(&port->dev, &dev_attr_event_char);
 		if ((!retval) &&
-		    (priv->chip_type == FT232BM || priv->chip_type == FT2232C)) {
+		    (priv->chip_type == FT232BM ||
+		     priv->chip_type == FT2232C ||
+		     priv->chip_type == FT232RL)) {
 			retval = device_create_file(&port->dev,
 						    &dev_attr_latency_timer);
 		}
@@ -1558,14 +1563,15 @@ static void ftdi_write_bulk_callback (struct urb *urb)
 	struct ftdi_private *priv;
 	int data_offset;       /* will be 1 for the SIO and 0 otherwise */
 	unsigned long countback;
+	int status = urb->status;
 
 	/* free up the transfer buffer, as usb_free_urb() does not do this */
 	kfree (urb->transfer_buffer);
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
-	if (urb->status) {
-		dbg("nonzero write bulk status received: %d", urb->status);
+	if (status) {
+		dbg("nonzero write bulk status received: %d", status);
 		return;
 	}
 
@@ -1641,6 +1647,7 @@ static void ftdi_read_bulk_callback (struct urb *urb)
 	struct ftdi_private *priv;
 	unsigned long countread;
 	unsigned long flags;
+	int status = urb->status;
 
 	if (urb->number_of_packets > 0) {
 		err("%s transfer_buffer_length %d actual_length %d number of packets %d",__FUNCTION__,
@@ -1669,9 +1676,10 @@ static void ftdi_read_bulk_callback (struct urb *urb)
 		err("%s - Not my urb!", __FUNCTION__);
 	}
 
-	if (urb->status) {
+	if (status) {
 		/* This will happen at close every time so it is a dbg not an err */
-		dbg("(this is ok on close) nonzero read bulk status received: %d", urb->status);
+		dbg("(this is ok on close) nonzero read bulk status received: "
+		    "%d", status);
 		return;
 	}
 

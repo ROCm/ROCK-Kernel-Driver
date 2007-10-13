@@ -62,12 +62,12 @@
 
 #include <asm/uaccess.h>
 
-#include "disk_heartbeat.h"
 #include "heartbeat.h"
 #include "tcp.h"
 #include "nodemanager.h"
 #define MLOG_MASK_PREFIX ML_TCP
 #include "masklog.h"
+#include "quorum.h"
 
 #include "tcp_internal.h"
 
@@ -110,6 +110,7 @@
 
 static DEFINE_RWLOCK(o2net_handler_lock);
 static struct rb_root o2net_handler_tree = RB_ROOT;
+
 static struct o2net_node o2net_nodes[O2NM_MAX_NODES];
 
 /* XXX someday we'll need better accounting */
@@ -127,9 +128,7 @@ static struct workqueue_struct *o2net_wq;
 static struct work_struct o2net_listen_work;
 
 static struct o2hb_callback_func o2net_hb_up, o2net_hb_down;
-#define O2NET_HB_PRI 0x2
-
-static BLOCKING_NOTIFIER_HEAD(o2net_notifier_head);
+#define O2NET_HB_PRI 0x1
 
 static struct o2net_handshake *o2net_hand;
 static struct o2net_msg *o2net_keep_req, *o2net_keep_resp;
@@ -262,14 +261,12 @@ out:
 
 static void o2net_complete_nodes_nsw(struct o2net_node *nn)
 {
-	struct list_head *iter, *tmp;
+	struct o2net_status_wait *nsw, *tmp;
 	unsigned int num_kills = 0;
-	struct o2net_status_wait *nsw;
 
 	assert_spin_locked(&nn->nn_lock);
 
-	list_for_each_safe(iter, tmp, &nn->nn_status_list) {
-		nsw = list_entry(iter, struct o2net_status_wait, ns_node_item);
+	list_for_each_entry_safe(nsw, tmp, &nn->nn_status_list, ns_node_item) {
 		o2net_complete_nsw_locked(nn, nsw, O2NET_ERR_DIED, 0);
 		num_kills++;
 	}
@@ -427,7 +424,9 @@ static void o2net_set_nn_state(struct o2net_node *nn,
 		wake_up(&nn->nn_sc_wq);
 
 	if (!was_err && nn->nn_persistent_error) {
-		o2net_notify(O2NET_CONN_ERR, o2net_num_from_nn(nn));
+		o2quo_conn_err(o2net_num_from_nn(nn));
+		queue_delayed_work(o2net_wq, &nn->nn_still_up,
+				   msecs_to_jiffies(O2NET_QUORUM_DELAY_MS));
 	}
 
 	if (was_valid && !valid) {
@@ -437,8 +436,7 @@ static void o2net_set_nn_state(struct o2net_node *nn,
 	}
 
 	if (!was_valid && valid) {
-		o2net_notify(O2NET_CONN_UP, o2net_num_from_nn(nn));
-
+		o2quo_conn_up(o2net_num_from_nn(nn));
 		/* this is a bit of a hack.  we only try reconnecting
 		 * when heartbeating starts until we get a connection.
 		 * if that connection then dies we don't try reconnecting.
@@ -764,13 +762,10 @@ EXPORT_SYMBOL_GPL(o2net_register_handler);
 
 void o2net_unregister_handler_list(struct list_head *list)
 {
-	struct list_head *pos, *n;
-	struct o2net_msg_handler *nmh;
+	struct o2net_msg_handler *nmh, *n;
 
 	write_lock(&o2net_handler_lock);
-	list_for_each_safe(pos, n, list) {
-		nmh = list_entry(pos, struct o2net_msg_handler,
-				 nh_unregister_item);
+	list_for_each_entry_safe(nmh, n, list, nh_unregister_item) {
 		mlog(ML_TCP, "unregistering handler func %p type %u key %08x\n",
 		     nmh->nh_func, nmh->nh_msg_type, nmh->nh_key);
 		rb_erase(&nmh->nh_node, &o2net_handler_tree);
@@ -859,17 +854,25 @@ static void o2net_sendpage(struct o2net_sock_container *sc,
 	struct o2net_node *nn = o2net_nn_from_num(sc->sc_node->nd_num);
 	ssize_t ret;
 
-
-	mutex_lock(&sc->sc_send_lock);
-	ret = sc->sc_sock->ops->sendpage(sc->sc_sock,
-					 virt_to_page(kmalloced_virt),
-					 (long)kmalloced_virt & ~PAGE_MASK,
-					 size, MSG_DONTWAIT);
-	mutex_unlock(&sc->sc_send_lock);
-	if (ret != size) {
+	while (1) {
+		mutex_lock(&sc->sc_send_lock);
+		ret = sc->sc_sock->ops->sendpage(sc->sc_sock,
+						 virt_to_page(kmalloced_virt),
+						 (long)kmalloced_virt & ~PAGE_MASK,
+						 size, MSG_DONTWAIT);
+		mutex_unlock(&sc->sc_send_lock);
+		if (ret == size)
+			break;
+		if (ret == (ssize_t)-EAGAIN) {
+			mlog(0, "sendpage of size %zu to " SC_NODEF_FMT
+			     " returned EAGAIN\n", size, SC_NODEF_ARGS(sc));
+			cond_resched();
+			continue;
+		}
 		mlog(ML_ERROR, "sendpage of size %zu to " SC_NODEF_FMT 
 		     " failed with %zd\n", size, SC_NODEF_ARGS(sc), ret);
 		o2net_ensure_shutdown(nn, sc, 0);
+		break;
 	}
 }
 
@@ -1569,6 +1572,14 @@ static void o2net_connect_expired(struct work_struct *work)
 	spin_unlock(&nn->nn_lock);
 }
 
+static void o2net_still_up(struct work_struct *work)
+{
+	struct o2net_node *nn =
+		container_of(work, struct o2net_node, nn_still_up.work);
+
+	o2quo_hb_still_up(o2net_num_from_nn(nn));
+}
+
 /* ------------------------------------------------------------ */
 
 void o2net_disconnect_node(struct o2nm_node *node)
@@ -1583,6 +1594,7 @@ void o2net_disconnect_node(struct o2nm_node *node)
 	if (o2net_wq) {
 		cancel_delayed_work(&nn->nn_connect_expired);
 		cancel_delayed_work(&nn->nn_connect_work);
+		cancel_delayed_work(&nn->nn_still_up);
 		flush_workqueue(o2net_wq);
 	}
 }
@@ -1590,10 +1602,10 @@ void o2net_disconnect_node(struct o2nm_node *node)
 static void o2net_hb_node_down_cb(struct o2nm_node *node, int node_num,
 				  void *data)
 {
-	if (node_num != o2nm_this_node()) {
-		if (atomic_dec_and_test(&node->nd_count))
-			o2net_disconnect_node(node);
-	}
+	o2quo_hb_down(node_num);
+
+	if (node_num != o2nm_this_node())
+		o2net_disconnect_node(node);
 
 	BUG_ON(atomic_read(&o2net_connected_peers) < 0);
 }
@@ -1603,12 +1615,13 @@ static void o2net_hb_node_up_cb(struct o2nm_node *node, int node_num,
 {
 	struct o2net_node *nn = o2net_nn_from_num(node_num);
 
+	o2quo_hb_up(node_num);
+
 	/* ensure an immediate connect attempt */
 	nn->nn_last_connect_attempt = jiffies -
 		(msecs_to_jiffies(o2net_reconnect_delay(node)) + 1);
 
 	if (node_num != o2nm_this_node()) {
-		atomic_inc(&node->nd_count);
 		/* heartbeat doesn't work unless a local node number is
 		 * configured and doing so brings up the o2net_wq, so we can
 		 * use it.. */
@@ -1628,8 +1641,8 @@ static void o2net_hb_node_up_cb(struct o2nm_node *node, int node_num,
 
 void o2net_unregister_hb_callbacks(void)
 {
-	o2hb_unregister_callback(&o2net_hb_up);
-	o2hb_unregister_callback(&o2net_hb_down);
+	o2hb_unregister_callback(NULL, &o2net_hb_up);
+	o2hb_unregister_callback(NULL, &o2net_hb_down);
 }
 
 int o2net_register_hb_callbacks(void)
@@ -1637,13 +1650,13 @@ int o2net_register_hb_callbacks(void)
 	int ret;
 
 	o2hb_setup_callback(&o2net_hb_down, O2HB_NODE_DOWN_CB,
-			    o2net_hb_node_down_cb, NULL, O2NET_HB_PRI, NULL);
+			    o2net_hb_node_down_cb, NULL, O2NET_HB_PRI);
 	o2hb_setup_callback(&o2net_hb_up, O2HB_NODE_UP_CB,
-			    o2net_hb_node_up_cb, NULL, O2NET_HB_PRI, NULL);
+			    o2net_hb_node_up_cb, NULL, O2NET_HB_PRI);
 
-	ret = o2hb_register_callback(&o2net_hb_up);
+	ret = o2hb_register_callback(NULL, &o2net_hb_up);
 	if (ret == 0)
-		ret = o2hb_register_callback(&o2net_hb_down);
+		ret = o2hb_register_callback(NULL, &o2net_hb_down);
 
 	if (ret)
 		o2net_unregister_hb_callbacks();
@@ -1708,7 +1721,7 @@ static int o2net_accept_one(struct socket *sock)
 
 	/* this happens all the time when the other node sees our heartbeat
 	 * and tries to connect before we see their heartbeat */
-	if (!o2hb_check_node_heartbeating_from_callback(NULL, node->nd_num)) {
+	if (!o2hb_check_node_heartbeating_from_callback(node->nd_num)) {
 		mlog(ML_CONN, "attempt to connect from node '%s' at "
 		     "%u.%u.%u.%u:%d but it isn't heartbeating\n",
 		     node->nd_name, NIPQUAD(sin.sin_addr.s_addr),
@@ -1870,7 +1883,7 @@ int o2net_start_listening(struct o2nm_node *node)
 		destroy_workqueue(o2net_wq);
 		o2net_wq = NULL;
 	} else
-		o2net_notify(O2NET_CONN_UP, node->nd_num);
+		o2quo_conn_up(node->nd_num);
 
 	return ret;
 }
@@ -1907,32 +1920,16 @@ void o2net_stop_listening(struct o2nm_node *node)
 	sock_release(o2net_listen_sock);
 	o2net_listen_sock = NULL;
 
-	o2net_notify(O2NET_CONN_DOWN, node->nd_num);
+	o2quo_conn_err(node->nd_num);
 }
-
-void o2net_register_notifier(struct notifier_block *nb)
-{
-	blocking_notifier_chain_register(&o2net_notifier_head, nb);
-}
-EXPORT_SYMBOL_GPL(o2net_register_notifier);
-
-void o2net_unregister_notifier(struct notifier_block *nb)
-{
-	blocking_notifier_chain_unregister(&o2net_notifier_head, nb);
-}
-EXPORT_SYMBOL_GPL(o2net_unregister_notifier);
-
-void o2net_notify(enum o2net_notifier_type type, u8 node_num)
-{
-	blocking_notifier_call_chain(&o2net_notifier_head, type, &node_num);
-}
-EXPORT_SYMBOL_GPL(o2net_notify);
 
 /* ------------------------------------------------------------ */
 
 int o2net_init(void)
 {
 	unsigned long i;
+
+	o2quo_init();
 
 	o2net_hand = kzalloc(sizeof(struct o2net_handshake), GFP_KERNEL);
 	o2net_keep_req = kzalloc(sizeof(struct o2net_msg), GFP_KERNEL);
@@ -1952,12 +1949,12 @@ int o2net_init(void)
 
 	for (i = 0; i < ARRAY_SIZE(o2net_nodes); i++) {
 		struct o2net_node *nn = o2net_nn_from_num(i);
-		memset(nn, 0, sizeof (*nn));
 
 		spin_lock_init(&nn->nn_lock);
 		INIT_DELAYED_WORK(&nn->nn_connect_work, o2net_start_connect);
 		INIT_DELAYED_WORK(&nn->nn_connect_expired,
 				  o2net_connect_expired);
+		INIT_DELAYED_WORK(&nn->nn_still_up, o2net_still_up);
 		/* until we see hb from a node we'll return einval */
 		nn->nn_persistent_error = -ENOTCONN;
 		init_waitqueue_head(&nn->nn_sc_wq);
@@ -1970,6 +1967,7 @@ int o2net_init(void)
 
 void o2net_exit(void)
 {
+	o2quo_exit();
 	kfree(o2net_hand);
 	kfree(o2net_keep_req);
 	kfree(o2net_keep_resp);

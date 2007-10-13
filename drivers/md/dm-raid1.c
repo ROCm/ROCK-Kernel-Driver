@@ -951,13 +951,12 @@ static struct mirror_set *alloc_context(unsigned int nr_mirrors,
 
 	len = sizeof(*ms) + (sizeof(ms->mirror[0]) * nr_mirrors);
 
-	ms = kmalloc(len, GFP_KERNEL);
+	ms = kzalloc(len, GFP_KERNEL);
 	if (!ms) {
 		ti->error = "Cannot allocate mirror context";
 		return NULL;
 	}
 
-	memset(ms, 0, len);
 	spin_lock_init(&ms->lock);
 
 	ms->ti = ti;
@@ -1371,9 +1370,15 @@ static int __init dm_mirror_init(void)
 {
 	int r;
 
+	r = dm_dirty_log_init();
+	if (r)
+		return r;
+
 	r = dm_register_target(&mirror_target);
-	if (r < 0)
+	if (r < 0) {
 		DMERR("Failed to register mirror target");
+		dm_dirty_log_exit();
+	}
 
 	return r;
 }
@@ -1385,6 +1390,8 @@ static void __exit dm_mirror_exit(void)
 	r = dm_unregister_target(&mirror_target);
 	if (r < 0)
 		DMERR("unregister failed %d", r);
+
+	dm_dirty_log_exit();
 }
 
 /* Module hooks */

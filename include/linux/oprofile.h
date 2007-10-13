@@ -16,10 +16,27 @@
 #include <linux/types.h>
 #include <linux/spinlock.h>
 #include <asm/atomic.h>
-#ifdef CONFIG_XEN
-#include <xen/interface/xenoprof.h>
-#endif
  
+/* Each escaped entry is prefixed by ESCAPE_CODE
+ * then one of the following codes, then the
+ * relevant data.
+ * These #defines live in this file so that arch-specific
+ * buffer sync'ing code can access them.
+ */
+#define ESCAPE_CODE			~0UL
+#define CTX_SWITCH_CODE			1
+#define CPU_SWITCH_CODE			2
+#define COOKIE_SWITCH_CODE		3
+#define KERNEL_ENTER_SWITCH_CODE	4
+#define KERNEL_EXIT_SWITCH_CODE		5
+#define MODULE_LOADED_CODE		6
+#define CTX_TGID_CODE			7
+#define TRACE_BEGIN_CODE		8
+#define TRACE_END_CODE			9
+#define XEN_ENTER_SWITCH_CODE		10
+#define SPU_PROFILING_CODE		11
+#define SPU_CTX_SWITCH_CODE		12
+
 struct super_block;
 struct dentry;
 struct file_operations;
@@ -30,12 +47,6 @@ struct oprofile_operations {
 	/* create any necessary configuration files in the oprofile fs.
 	 * Optional. */
 	int (*create_files)(struct super_block * sb, struct dentry * root);
-#ifdef CONFIG_XEN
-	/* setup active domains with Xen */
-	int (*set_active)(int *active_domains, unsigned int adomains);
-        /* setup passive domains with Xen */
-        int (*set_passive)(int *passive_domains, unsigned int pdomains);
-#endif
 	/* Do any necessary interrupt setup. Optional. */
 	int (*setup)(void);
 	/* Do any necessary interrupt shutdown. Optional. */
@@ -44,6 +55,14 @@ struct oprofile_operations {
 	int (*start)(void);
 	/* Stop delivering interrupts. */
 	void (*stop)(void);
+	/* Arch-specific buffer sync functions.
+	 * Return value = 0:  Success
+	 * Return value = -1: Failure
+	 * Return value = 1:  Run generic sync function
+	 */
+	int (*sync_start)(void);
+	int (*sync_stop)(void);
+
 	/* Initiate a stack backtrace. Optional. */
 	void (*backtrace)(struct pt_regs * const regs, unsigned int depth);
 	/* CPU identification string. */
@@ -63,6 +82,13 @@ int oprofile_arch_init(struct oprofile_operations * ops);
  * One-time exit/cleanup for the arch.
  */
 void oprofile_arch_exit(void);
+
+/**
+ * Add data to the event buffer.
+ * The data passed is free-form, but typically consists of
+ * file offsets, dcookies, context information, and ESCAPE codes.
+ */
+void add_event_entry(unsigned long data);
 
 /**
  * Add a sample. This may be called from any context. Pass
@@ -87,8 +113,6 @@ void oprofile_add_pc(unsigned long pc, int is_kernel, unsigned long event);
 /* add a backtrace entry, to be called from the ->backtrace callback */
 void oprofile_add_trace(unsigned long eip);
 
-/* add a domain switch entry */
-int oprofile_add_domain_switch(int32_t domain_id);
 
 /**
  * Create a file of the given name as a child of the given root, with

@@ -4,23 +4,23 @@
  * Low level code to talks to Xen Store: ringbuffer and event channel.
  *
  * Copyright (C) 2005 Rusty Russell, IBM Corporation
- * 
+ *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License version 2
  * as published by the Free Software Foundation; or, when distributed
  * separately from the Linux kernel or incorporated into other
  * software packages, subject to the following license:
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this source file (the "Software"), to deal in the Software without
  * restriction, including without limitation the rights to use, copy, modify,
  * merge, publish, distribute, sublicense, and/or sell copies of the Software,
  * and to permit persons to whom the Software is furnished to do so, subject to
  * the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -34,22 +34,14 @@
 #include <linux/interrupt.h>
 #include <linux/sched.h>
 #include <linux/err.h>
-#include <linux/ptrace.h>
-#include <xen/evtchn.h>
 #include <xen/xenbus.h>
-
-#include <asm/hypervisor.h>
-
+#include <asm/xen/hypervisor.h>
+#include <xen/events.h>
+#include <xen/page.h>
 #include "xenbus_comms.h"
-
-#ifdef HAVE_XEN_PLATFORM_COMPAT_H
-#include <xen/platform-compat.h>
-#endif
 
 static int xenbus_irq;
 
-extern void xenbus_probe(struct work_struct *);
-extern int xenstored_ready;
 static DECLARE_WORK(probe_work, xenbus_probe);
 
 static DECLARE_WAIT_QUEUE_HEAD(xb_waitq);
@@ -90,6 +82,13 @@ static const void *get_input_chunk(XENSTORE_RING_IDX cons,
 	return buf + MASK_XENSTORE_IDX(cons);
 }
 
+/**
+ * xb_write - low level write
+ * @data: buffer to send
+ * @len: length of buffer
+ *
+ * Returns 0 on success, error otherwise.
+ */
 int xb_write(const void *data, unsigned len)
 {
 	struct xenstore_domain_interface *intf = xen_store_interface;
@@ -198,7 +197,9 @@ int xb_read(void *data, unsigned len)
 	return 0;
 }
 
-/* Set up interrupt handler off store event channel. */
+/**
+ * xb_init_comms - Set up interrupt handler off store event channel.
+ */
 int xb_init_comms(void)
 {
 	struct xenstore_domain_interface *intf = xen_store_interface;
@@ -218,7 +219,7 @@ int xb_init_comms(void)
 	if (xenbus_irq)
 		unbind_from_irqhandler(xenbus_irq, &xb_waitq);
 
-	err = bind_caller_port_to_irqhandler(
+	err = bind_evtchn_to_irqhandler(
 		xen_store_evtchn, wake_waiting,
 		0, "xenbus", &xb_waitq);
 	if (err <= 0) {

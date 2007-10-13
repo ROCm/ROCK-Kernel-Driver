@@ -62,13 +62,13 @@
 		submit ATA packet to hardware
 		hardware executes ATA WRITE command, w/ data in DIMM
 		hardware raises interrupt
-
+	
 	and each READ looks like this:
 
 		submit ATA packet to hardware
 		hardware executes ATA READ command, w/ data in DIMM
 		hardware raises interrupt
-
+	
 		submit HDMA packet to hardware
 		hardware copies data from DIMM to system memory
 		hardware raises interrupt
@@ -92,7 +92,7 @@
 #include "sata_promise.h"
 
 #define DRV_NAME	"sata_sx4"
-#define DRV_VERSION	"0.11"
+#define DRV_VERSION	"0.12"
 
 
 enum {

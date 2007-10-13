@@ -80,7 +80,7 @@ struct mapped_device {
 
 	unsigned long flags;
 
-	request_queue_t *queue;
+	struct request_queue *queue;
 	struct gendisk *disk;
 	char name[16];
 
@@ -161,9 +161,7 @@ static void local_exit(void)
 {
 	kmem_cache_destroy(_tio_cache);
 	kmem_cache_destroy(_io_cache);
-
-	if (unregister_blkdev(_major, _name) < 0)
-		DMERR("unregister_blkdev failed");
+	unregister_blkdev(_major, _name);
 
 	_major = 0;
 
@@ -588,8 +586,8 @@ static void __map_bio(struct dm_target *ti, struct bio *clone,
 		/* the bio has been remapped so dispatch it */
 
 		blk_add_trace_remap(bdev_get_queue(clone->bi_bdev), clone,
-				    tio->io->bio->bi_bdev->bd_dev, sector,
-				    clone->bi_sector);
+				    tio->io->bio->bi_bdev->bd_dev,
+				    clone->bi_sector, sector);
 
 		generic_make_request(clone);
 	} else if (r < 0 || r == DM_MAPIO_REQUEUE) {
@@ -800,7 +798,7 @@ static void __split_bio(struct mapped_device *md, struct bio *bio)
  * The request function that just remaps the bio built up by
  * dm_merge_bvec.
  */
-static int dm_request(request_queue_t *q, struct bio *bio)
+static int dm_request(struct request_queue *q, struct bio *bio)
 {
 	int r;
 	int rw = bio_data_dir(bio);
@@ -852,7 +850,7 @@ static int dm_request(request_queue_t *q, struct bio *bio)
 	return 0;
 }
 
-static int dm_flush_all(request_queue_t *q, struct gendisk *disk,
+static int dm_flush_all(struct request_queue *q, struct gendisk *disk,
 			sector_t *error_sector)
 {
 	struct mapped_device *md = q->queuedata;
@@ -867,7 +865,7 @@ static int dm_flush_all(request_queue_t *q, struct gendisk *disk,
 	return ret;
 }
 
-static void dm_unplug_all(request_queue_t *q)
+static void dm_unplug_all(struct request_queue *q)
 {
 	struct mapped_device *md = q->queuedata;
 	struct dm_table *map = dm_get_table(md);
@@ -1118,7 +1116,7 @@ static void __set_size(struct mapped_device *md, sector_t size)
 
 static int __bind(struct mapped_device *md, struct dm_table *t)
 {
-	request_queue_t *q = md->queue;
+	struct request_queue *q = md->queue;
 	sector_t size;
 
 	size = dm_table_get_size(t);
@@ -1538,7 +1536,6 @@ struct gendisk *dm_disk(struct mapped_device *md)
 {
 	return md->disk;
 }
-EXPORT_SYMBOL_GPL(dm_disk);
 
 int dm_suspended(struct mapped_device *md)
 {

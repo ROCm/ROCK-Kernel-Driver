@@ -197,9 +197,15 @@ static void tdi_reset (struct ehci_hcd *ehci)
 	u32 __iomem	*reg_ptr;
 	u32		tmp;
 
-	reg_ptr = (u32 __iomem *)(((u8 __iomem *)ehci->regs) + 0x68);
+	reg_ptr = (u32 __iomem *)(((u8 __iomem *)ehci->regs) + USBMODE);
 	tmp = ehci_readl(ehci, reg_ptr);
-	tmp |= 0x3;
+	tmp |= USBMODE_CM_HC;
+	/* The default byte access to MMR space is LE after
+	 * controller reset. Set the required endian mode
+	 * for transfer buffers to match the host microprocessor
+	 */
+	if (ehci_big_endian_mmio(ehci))
+		tmp |= USBMODE_BE;
 	ehci_writel(ehci, tmp, reg_ptr);
 }
 
@@ -343,6 +349,8 @@ static void ehci_port_power (struct ehci_hcd *ehci, int is_on)
 				is_on ? SetPortFeature : ClearPortFeature,
 				USB_PORT_FEAT_POWER,
 				port--, NULL, 0);
+	/* Flush those writes */
+	ehci_readl(ehci, &ehci->regs->command);
 	msleep(20);
 }
 
@@ -466,12 +474,12 @@ static int ehci_init(struct usb_hcd *hcd)
 	 * from automatically advancing to the next td after short reads.
 	 */
 	ehci->async->qh_next.qh = NULL;
-	ehci->async->hw_next = QH_NEXT(ehci->async->qh_dma);
-	ehci->async->hw_info1 = cpu_to_le32(QH_HEAD);
-	ehci->async->hw_token = cpu_to_le32(QTD_STS_HALT);
-	ehci->async->hw_qtd_next = EHCI_LIST_END;
+	ehci->async->hw_next = QH_NEXT(ehci, ehci->async->qh_dma);
+	ehci->async->hw_info1 = cpu_to_hc32(ehci, QH_HEAD);
+	ehci->async->hw_token = cpu_to_hc32(ehci, QTD_STS_HALT);
+	ehci->async->hw_qtd_next = EHCI_LIST_END(ehci);
 	ehci->async->qh_state = QH_STATE_LINKED;
-	ehci->async->hw_alt_next = QTD_NEXT(ehci->async->dummy->qtd_dma);
+	ehci->async->hw_alt_next = QTD_NEXT(ehci, ehci->async->dummy->qtd_dma);
 
 	/* clear interrupt enables, set irq latency */
 	if (log2_irq_thresh < 0 || log2_irq_thresh > 6)
@@ -921,7 +929,7 @@ MODULE_LICENSE ("GPL");
 #define	PCI_DRIVER		ehci_pci_driver
 #endif
 
-#ifdef CONFIG_MPC834x
+#ifdef CONFIG_USB_EHCI_FSL
 #include "ehci-fsl.c"
 #define	PLATFORM_DRIVER		ehci_fsl_driver
 #endif
@@ -934,6 +942,11 @@ MODULE_LICENSE ("GPL");
 #ifdef CONFIG_PPC_PS3
 #include "ehci-ps3.c"
 #define	PS3_SYSTEM_BUS_DRIVER	ps3_ehci_driver
+#endif
+
+#ifdef CONFIG_440EPX
+#include "ehci-ppc-soc.c"
+#define	PLATFORM_DRIVER		ehci_ppc_soc_driver
 #endif
 
 #if !defined(PCI_DRIVER) && !defined(PLATFORM_DRIVER) && \

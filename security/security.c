@@ -25,6 +25,7 @@ extern void security_fixup_ops(struct security_operations *ops);
 extern struct security_operations capability_security_ops;
 
 struct security_operations *security_ops;	/* Initialized to NULL */
+unsigned long mmap_min_addr;		/* 0 means no protection */
 
 static inline int verify(struct security_operations *ops)
 {

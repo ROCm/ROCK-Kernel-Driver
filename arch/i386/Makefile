@@ -102,6 +102,9 @@ mflags-$(CONFIG_X86_ES7000)	:= -Iinclude/asm-i386/mach-es7000
 mcore-$(CONFIG_X86_ES7000)	:= mach-default
 core-$(CONFIG_X86_ES7000)	:= arch/i386/mach-es7000/
 
+# Xen paravirtualization support
+core-$(CONFIG_XEN)		+= arch/i386/xen/
+
 # default subarch .h files
 mflags-y += -Iinclude/asm-i386/mach-default
 
@@ -117,6 +120,7 @@ drivers-$(CONFIG_PCI)			+= arch/i386/pci/
 # must be linked after kernel/
 drivers-$(CONFIG_OPROFILE)		+= arch/i386/oprofile/
 drivers-$(CONFIG_PM)			+= arch/i386/power/
+drivers-$(CONFIG_FB)                    += arch/i386/video/
 drivers-$(CONFIG_KDB)			+= arch/i386/kdb/
 
 CFLAGS += $(mflags-y)

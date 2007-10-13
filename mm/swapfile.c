@@ -429,7 +429,7 @@ void free_swap_and_cache(swp_entry_t entry)
 	}
 }
 
-#ifdef CONFIG_SOFTWARE_SUSPEND
+#ifdef CONFIG_HIBERNATION
 /*
  * Find the swap type that corresponds to given device (if any).
  *
@@ -889,7 +889,7 @@ static int try_to_unuse(unsigned int type)
 		/*
 		 * So we could skip searching mms once swap count went
 		 * to 1, we did not mark any present ptes as dirty: must
-		 * mark page dirty so shrink_list will preserve it.
+		 * mark page dirty so shrink_page_list will preserve it.
 		 */
 		SetPageDirty(page);
 		unlock_page(page);
@@ -955,7 +955,7 @@ sector_t map_swap_page(struct swap_info_struct *sis, pgoff_t offset)
 	}
 }
 
-#ifdef CONFIG_SOFTWARE_SUSPEND
+#ifdef CONFIG_HIBERNATION
 /*
  * Get the (PAGE_SIZE) block corresponding to given offset on the swapdev
  * corresponding to given index in swap_info (swap type).
@@ -970,7 +970,7 @@ sector_t swapdev_block(int swap_type, pgoff_t offset)
 	sis = swap_info + swap_type;
 	return (sis->flags & SWP_WRITEOK) ? map_swap_page(sis, offset) : 0;
 }
-#endif /* CONFIG_SOFTWARE_SUSPEND */
+#endif /* CONFIG_HIBERNATION */
 
 /*
  * Free all of a swapdev's extent information

@@ -415,6 +415,11 @@ static int __init ps3_enumerate_spus(int (*fn)(void *data))
 	return num_resource_id;
 }
 
+static int ps3_init_affinity(void)
+{
+	return 0;
+}
+
 static int ps3_enable_spu(struct spu_context *ctx)
 {
 	return -ENOSYS;
@@ -430,6 +435,7 @@ const struct spu_management_ops spu_management_ps3_ops = {
 	.enumerate_spus = ps3_enumerate_spus,
 	.create_spu = ps3_create_spu,
 	.destroy_spu = ps3_destroy_spu,
+	.init_affinity = ps3_init_affinity,
 	.enable_spu = ps3_enable_spu,
 	.disable_spu = ps3_disable_spu,
 };
@@ -512,6 +518,8 @@ static void mfc_sr1_set(struct spu *spu, u64 sr1)
 
 	static const u64 allowed = ~(MFC_STATE1_LOCAL_STORAGE_DECODE_MASK
 		| MFC_STATE1_PROBLEM_STATE_MASK);
+
+	sr1 |= MFC_STATE1_MASTER_RUN_CONTROL_MASK;
 
 	BUG_ON((sr1 & allowed) != (spu_pdata(spu)->cache.sr1 & allowed));
 

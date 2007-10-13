@@ -20,7 +20,7 @@ static __inline__ int irq_canonicalize(int irq)
 	return ((irq == 2) ? 9 : irq);
 }
 
-#if defined(CONFIG_X86_LOCAL_APIC) && !defined(CONFIG_XEN)
+#ifdef CONFIG_X86_LOCAL_APIC
 # define ARCH_HAS_NMI_WATCHDOG		/* See include/linux/nmi.h */
 #endif
 
@@ -41,6 +41,7 @@ extern int irqbalance_disable(char *str);
 extern void fixup_irqs(cpumask_t map);
 #endif
 
+unsigned int do_IRQ(struct pt_regs *regs);
 void init_IRQ(void);
 void __init native_init_IRQ(void);
 

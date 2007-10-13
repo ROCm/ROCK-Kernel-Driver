@@ -1,3 +1,96 @@
+2007-09-26 Jay Lan  <jlan@sgi.com>
+
+	* kdb v4.4-2.6.23-rc8-common-1.
+
+2007-09-21 Jay Lan  <jlan@sgi.com>
+
+	* kdb v4.4-2.6.23-rc7-common-1.
+
+2007-09-12 Jay Lan  <jlan@sgi.com>
+
+	* kdb v4.4-2.6.23-rc6-common-1.
+
+2007-09-06 Jay Lan  <jlan@sgi.com>
+
+	* kdb v4.4-2.6.23-rc5-common-1.
+
+2007-08-30 Keith Owens  <kaos@sgi.com>
+
+	* New i386/x86_64 backtrace requires that kdb_save_running() does not
+	  exit until after kdb_main_loop() has completed.
+	* List more noret functions in i386/x86_64 backtrace code.
+	* Call to a noret function ends a basic block.
+	* After a call to a noret function, eip/rip may be pointing at the next
+	  function or not, depending on function alignment.  Jay Lan.
+	* kdb v4.4-2.6.23-rc4-common-2.
+
+2007-08-30 Jay Lan  <jlan@sgi.com>
+
+	* kdb v4.4-2.6.23-rc4-common-1.
+
+2007-08-28 Keith Owens  <kaos@sgi.com>
+
+	* kdb/kdba_bt_x86.c:
+	*   Handle the variable amount of stack data that is pushed by x86_64
+	*   hardware on an interrupt.
+	*   Add instruction vmsave.
+	*   Handle pop to %rsp.
+	*   Cope with return address for functions defined as ATTRIB_NORET.
+	*   Include CONFIG_DEBUG_INFO in the summary line of bb_all.
+	*   Check for an interrupt that was delivered while user space was in
+	*   control.
+	*   A return to child_rip ends a backtrace.
+	*   Ignore level2_kernel_pgt and level3_kernel_pgt data areas if they
+	*   occur within the text segment.
+	* kdb v4.4-2.6.23-rc3-common-2.
+
+2007-08-24 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.23-rc3-common-1.
+
+2007-08-24 Jay Lan  <jlan@sgi.com>
+
+	* kdb/kdba_bt_x86.c:
+	*   retint_kernel is only defined for CONFIG_PREEMPT.
+	*   Handle assembler code for CONFIG_HIBERNATION=y.
+	*   Handle assembler code for CONFIG_MATH_EMULATION=y.
+	*   Handle assembler code for CONFIG_XEN=y.
+	*   Handle assembler code for CONFIG_KPROBES=y.
+	*   Add CC version to the bb_all header.
+	*   Handle spurious label in jprobe_return.
+	*   Handle stack switch in jprobe_return.
+	*   Prefix register name with '%' in xadd/xchg temporary variable.
+	*   Require bb_usage_mov() to handle all the special cases internally.
+	*   Handle stack manipulation for kexec.
+	*   Handle spurious label in kretprobe_trampoline_holder.
+	*   Add instructions clgi, invlpga, rcl, rdpmc, stgi, vmclear,
+	*   vmlaunch, vmload, vmptrld, vmread, vmresume, vmrun, vmwrite,
+	*   xstore-rng.
+	*   Exclude more 16 bit and/or real mode acpi functions from bb_all.
+	*   Handle assembler stack switching code in i386 do_softirq.
+	* kdb/kdbmain.c:
+	*   Add CC version to the summary output.
+	*   Bump debug_kmalloc pool from 128K to 256K, some of the kernel
+	*   functions have huge numbers of basic blocks and jumps between them.
+	*   Correct reinstallation of breakpoints when exiting KDB.
+	* Keith Owens.
+	* kdb v4.4-2.6.23-rc2-common-2.
+
+2007-08-07 Jay Lan  <jlan@sgi.com>
+
+	* kdb v4.4-2.6.23-rc2-common-1.
+
+2007-08-03 Keith Owens  <kaos@sgi.com>
+
+	* kdba_bt_x86.c: Rename some variables to make the code more readable.
+	  Print more debug information when merging register states and when
+	  calculating the new stack pointer.
+	* kdb v4.4-2.6.23-rc1-common-2.
+
+2007-07-30 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.23-rc1-common-1.
+
 2007-07-26 Keith Owens  <kaos@sgi.com>
 
 	* New x86 backtrace code.

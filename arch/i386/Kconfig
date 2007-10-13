@@ -18,20 +18,22 @@ config GENERIC_TIME
 	bool
 	default y
 
+config GENERIC_CMOS_UPDATE
+	bool
+	default y
+
 config CLOCKSOURCE_WATCHDOG
 	bool
 	default y
-	depends on !X86_XEN
 
 config GENERIC_CLOCKEVENTS
 	bool
 	default y
-	depends on !X86_XEN
 
 config GENERIC_CLOCKEVENTS_BROADCAST
 	bool
 	default y
-	depends on X86_LOCAL_APIC && !X86_XEN
+	depends on X86_LOCAL_APIC
 
 config LOCKDEP_SUPPORT
 	bool
@@ -133,15 +135,6 @@ config X86_PC
 	help
 	  Choose this option if your computer is a standard PC or compatible.
 
-config X86_XEN
-	bool "Xen-compatible"
-	select X86_UP_APIC if !SMP && XEN_PRIVILEGED_GUEST
-	select X86_UP_IOAPIC if !SMP && XEN_PRIVILEGED_GUEST
-	select SWIOTLB
-	help
-	  Choose this option if you plan to run this kernel on top of the
-	  Xen Hypervisor.
-
 config X86_ELAN
 	bool "AMD Elan"
 	help
@@ -224,7 +217,7 @@ endchoice
 config PARAVIRT
 	bool "Paravirtualization support (EXPERIMENTAL)"
 	depends on EXPERIMENTAL
-	depends on !(X86_VISWS || X86_VOYAGER || X86_XEN)
+	depends on !(X86_VISWS || X86_VOYAGER)
 	help
 	  Paravirtualization is a way of running multiple instances of
 	  Linux on the same machine, under a hypervisor.  This option
@@ -232,6 +225,8 @@ config PARAVIRT
 	  under a hypervisor, improving performance significantly.
 	  However, when run without a hypervisor the kernel is
 	  theoretically slower.  If in doubt, say N.
+
+source "arch/i386/xen/Kconfig"
 
 config VMI
 	bool "VMI Paravirt-ops support"
@@ -272,7 +267,6 @@ source "arch/i386/Kconfig.cpu"
 
 config HPET_TIMER
 	bool "HPET Timer Support"
-	depends on !X86_XEN
 	help
 	  This enables the use of the HPET for the kernel's internal timer.
 	  HPET is the next generation timer replacing legacy 8254s.
@@ -323,7 +317,7 @@ source "kernel/Kconfig.preempt"
 
 config X86_UP_APIC
 	bool "Local APIC support on uniprocessors"
-	depends on !SMP && !(X86_VISWS || X86_VOYAGER || X86_GENERICARCH || XEN_UNPRIVILEGED_GUEST)
+	depends on !SMP && !(X86_VISWS || X86_VOYAGER || X86_GENERICARCH)
 	help
 	  A local APIC (Advanced Programmable Interrupt Controller) is an
 	  integrated interrupt controller in the CPU. If you have a single-CPU
@@ -348,12 +342,12 @@ config X86_UP_IOAPIC
 
 config X86_LOCAL_APIC
 	bool
-	depends on X86_UP_APIC || ((X86_VISWS || SMP) && !(X86_VOYAGER || XEN_UNPRIVILEGED_GUEST)) || X86_GENERICARCH
+	depends on X86_UP_APIC || ((X86_VISWS || SMP) && !X86_VOYAGER) || X86_GENERICARCH
 	default y
 
 config X86_IO_APIC
 	bool
-	depends on X86_UP_IOAPIC || (SMP && !(X86_VISWS || X86_VOYAGER || XEN_UNPRIVILEGED_GUEST)) || X86_GENERICARCH
+	depends on X86_UP_IOAPIC || (SMP && !(X86_VISWS || X86_VOYAGER)) || X86_GENERICARCH
 	default y
 
 config X86_VISWS_APIC
@@ -363,7 +357,7 @@ config X86_VISWS_APIC
 
 config X86_MCE
 	bool "Machine Check Exception"
-	depends on !(X86_VOYAGER || X86_XEN)
+	depends on !X86_VOYAGER
 	---help---
 	  Machine Check Exception support allows the processor to notify the
 	  kernel if it detects a problem (e.g. overheating, component failure).
@@ -462,11 +456,9 @@ config X86_REBOOTFIXUPS
 
 config MICROCODE
 	tristate "/dev/cpu/microcode - Intel IA32 CPU microcode support"
-	depends on !XEN_UNPRIVILEGED_GUEST
 	select FW_LOADER
 	---help---
-	  If you say Y here and also to "/dev file system support" in the
-	  'File systems' section, you will be able to update the microcode on
+	  If you say Y here, you will be able to update the microcode on
 	  Intel processors in the IA32 family, e.g. Pentium Pro, Pentium II,
 	  Pentium III, Pentium 4, Xeon etc.  You will obviously need the
 	  actual microcode binary data itself which is not shipped with the
@@ -500,10 +492,6 @@ config X86_CPUID
 	  be executed on a specific processor.  It is a character device
 	  with major 203 and minors 0 to 31 for /dev/cpu/0/cpuid to
 	  /dev/cpu/31/cpuid.
-
-config SWIOTLB
-	bool
-	default n
 
 source "drivers/firmware/Kconfig"
 
@@ -559,6 +547,7 @@ config HIGHMEM4G
 config HIGHMEM64G
 	bool "64GB"
 	depends on !M386 && !M486
+	select X86_PAE
 	help
 	  Select this if you have a 32-bit processor and more than 4
 	  gigabytes of physical RAM.
@@ -588,12 +577,12 @@ choice
 	config VMSPLIT_3G
 		bool "3G/1G user/kernel split"
 	config VMSPLIT_3G_OPT
-		depends on !HIGHMEM
+		depends on !X86_PAE
 		bool "3G/1G user/kernel split (for full 1G low memory)"
 	config VMSPLIT_2G
 		bool "2G/2G user/kernel split"
 	config VMSPLIT_2G_OPT
-		depends on !HIGHMEM
+		depends on !X86_PAE
 		bool "2G/2G user/kernel split (for full 2G low memory)"
 	config VMSPLIT_1G
 		bool "1G/3G user/kernel split"
@@ -613,17 +602,26 @@ config HIGHMEM
 	default y
 
 config X86_PAE
-	bool
-	depends on HIGHMEM64G
-	default y
+	bool "PAE (Physical Address Extension) Support"
+	default n
+	depends on !HIGHMEM4G
 	select RESOURCES_64BIT
+	help
+	  PAE is required for NX support, and furthermore enables
+	  larger swapspace support for non-overcommit purposes. It
+	  has the cost of more pagetable lookup overhead, and also
+	  consumes more pagetable space per process.
 
 # Common NUMA Features
 config NUMA
-	bool "Numa Memory Allocation and Scheduler Support"
-	depends on SMP && HIGHMEM64G && (X86_NUMAQ || (X86_SUMMIT || X86_GENERICARCH) && ACPI)
+	bool "Numa Memory Allocation and Scheduler Support (EXPERIMENTAL)"
+	depends on SMP && HIGHMEM64G && (X86_NUMAQ || (X86_SUMMIT || X86_GENERICARCH) && ACPI) && EXPERIMENTAL
 	default n if X86_PC
 	default y if (X86_NUMAQ || X86_SUMMIT)
+	help
+	  NUMA support for i386. This is currently high experimental
+	  and should be only used for kernel development. It might also
+	  cause boot failures.
 
 comment "NUMA (Summit) requires SMP, 64GB highmem support, ACPI"
 	depends on X86_SUMMIT && (!HIGHMEM64G || !ACPI)
@@ -691,7 +689,6 @@ config HIGHPTE
 
 config MATH_EMULATION
 	bool "Math emulation"
-	depends on !X86_XEN
 	---help---
 	  Linux can emulate a math coprocessor (used for floating point
 	  operations) if you don't have one. 486DX and Pentium processors have
@@ -717,8 +714,6 @@ config MATH_EMULATION
 
 config MTRR
 	bool "MTRR (Memory Type Range Register) support"
-	depends on !XEN_UNPRIVILEGED_GUEST
-	default y if X86_XEN
 	---help---
 	  On Intel P6 family processors (Pentium Pro, Pentium II and later)
 	  the Memory Type Range Registers (MTRRs) may be used to control
@@ -753,7 +748,7 @@ config MTRR
 
 config EFI
 	bool "Boot from EFI support"
-	depends on ACPI && !X86_XEN
+	depends on ACPI
 	default n
 	---help---
 	This enables the kernel to boot on EFI platforms using
@@ -771,7 +766,7 @@ config EFI
 
 config IRQBALANCE
  	bool "Enable kernel irq balancing"
-	depends on SMP && X86_IO_APIC && !X86_XEN
+	depends on SMP && X86_IO_APIC
 	default y
 	help
  	  The default yes will allow the kernel to do irq load balancing.
@@ -805,7 +800,6 @@ source kernel/Kconfig.hz
 
 config KEXEC
 	bool "kexec system call"
-	depends on !XEN_UNPRIVILEGED_GUEST
 	help
 	  kexec is a system call that implements the ability to shutdown your
 	  current kernel, and to start another kernel.  It is like a reboot
@@ -836,6 +830,7 @@ config CRASH_DUMP
 
 config PHYSICAL_START
 	hex "Physical address where the kernel is loaded" if (EMBEDDED || CRASH_DUMP)
+	default "0x1000000" if X86_NUMAQ
 	default "0x100000"
 	help
 	  This gives the physical address where the kernel is loaded.
@@ -877,7 +872,7 @@ config PHYSICAL_START
 
 config RELOCATABLE
 	bool "Build a relocatable kernel(EXPERIMENTAL)"
-	depends on EXPERIMENTAL && !X86_XEN
+	depends on EXPERIMENTAL
 	help
 	  This builds a kernel image that retains relocation information
           so it can be loaded someplace besides the default 1MB.
@@ -938,17 +933,15 @@ config ARCH_ENABLE_MEMORY_HOTPLUG
 	depends on HIGHMEM
 
 menu "Power management options (ACPI, APM)"
-	depends on !(X86_VOYAGER || XEN_UNPRIVILEGED_GUEST)
+	depends on !X86_VOYAGER
 
-if !X86_XEN
 source kernel/power/Kconfig
-endif
 
 source "drivers/acpi/Kconfig"
 
 menuconfig APM
 	tristate "APM (Advanced Power Management) BIOS support"
-	depends on PM && !(X86_VISWS || X86_XEN)
+	depends on PM_SLEEP && !X86_VISWS
 	---help---
 	  APM is a BIOS specification for saving power using several different
 	  techniques. This is mostly useful for battery powered laptops with
@@ -1074,9 +1067,7 @@ config APM_REAL_MODE_POWER_OFF
 
 endif # APM
 
-if !X86_XEN
 source "arch/i386/kernel/cpu/cpufreq/Kconfig"
-endif
 
 endmenu
 
@@ -1086,7 +1077,7 @@ config PCI
 	bool "PCI support" if !X86_VISWS
 	depends on !X86_VOYAGER
 	default y if X86_VISWS
-	select ARCH_SUPPORTS_MSI if (X86_LOCAL_APIC && X86_IO_APIC && !X86_XEN)
+	select ARCH_SUPPORTS_MSI if (X86_LOCAL_APIC && X86_IO_APIC)
 	help
 	  Find out whether you have a PCI motherboard. PCI is the name of a
 	  bus system, i.e. the way the CPU talks to the other stuff inside
@@ -1119,20 +1110,12 @@ choice
 
 config PCI_GOBIOS
 	bool "BIOS"
-	depends on !X86_XEN
 
 config PCI_GOMMCONFIG
 	bool "MMConfig"
 
 config PCI_GODIRECT
 	bool "Direct"
-
-config PCI_GOXEN_FE
-	bool "Xen PCI Frontend"
-	depends on X86_XEN
-	help
-	  The PCI device frontend driver allows the kernel to import arbitrary
-	  PCI devices from a PCI backend to support PCI driver domains.
 
 config PCI_GOANY
 	bool "Any"
@@ -1141,7 +1124,7 @@ endchoice
 
 config PCI_BIOS
 	bool
-	depends on !(X86_VISWS || X86_XEN) && PCI && (PCI_GOBIOS || PCI_GOANY)
+	depends on !X86_VISWS && PCI && (PCI_GOBIOS || PCI_GOANY)
 	default y
 
 config PCI_DIRECT
@@ -1154,18 +1137,6 @@ config PCI_MMCONFIG
 	depends on PCI && ACPI && (PCI_GOMMCONFIG || PCI_GOANY)
 	default y
 
-config XEN_PCIDEV_FRONTEND
-	bool
-	depends on PCI && X86_XEN && (PCI_GOXEN_FE || PCI_GOANY)
-	default y
-
-config XEN_PCIDEV_FE_DEBUG
-	bool "Xen PCI Frontend Debugging"
-	depends on XEN_PCIDEV_FRONTEND
-	default n
-	help
-	  Enables some debug statements within the PCI Frontend.
-
 source "drivers/pci/pcie/Kconfig"
 
 source "drivers/pci/Kconfig"
@@ -1176,7 +1147,7 @@ config ISA_DMA_API
 
 config ISA
 	bool "ISA support"
-	depends on !(X86_VOYAGER || X86_VISWS || X86_XEN)
+	depends on !(X86_VOYAGER || X86_VISWS)
 	help
 	  Find out whether you have ISA slots on your motherboard.  ISA is the
 	  name of a bus system, i.e. the way the CPU talks to the other stuff
@@ -1203,7 +1174,7 @@ config EISA
 source "drivers/eisa/Kconfig"
 
 config MCA
-	bool "MCA support" if !(X86_VISWS || X86_VOYAGER || X86_XEN)
+	bool "MCA support" if !(X86_VISWS || X86_VOYAGER)
 	default y if X86_VOYAGER
 	help
 	  MicroChannel Architecture is found in some IBM PS/2 machines and
@@ -1257,29 +1228,37 @@ source "drivers/Kconfig"
 
 source "fs/Kconfig"
 
-menu "Instrumentation Support"
+menuconfig INSTRUMENTATION
+	bool "Instrumentation Support"
 	depends on EXPERIMENTAL
+	default y
+	---help---
+	  Say Y here to get to see options related to performance measurement,
+	  debugging, and testing. This option alone does not add any kernel code.
+
+	  If you say N, all options in this submenu will be skipped and disabled.
+
+if INSTRUMENTATION
 
 source "arch/i386/oprofile/Kconfig"
 
 config KPROBES
-	bool "Kprobes (EXPERIMENTAL)"
-	depends on KALLSYMS && EXPERIMENTAL && MODULES
+	bool "Kprobes"
+	depends on KALLSYMS && MODULES
 	help
 	  Kprobes allows you to trap at almost any kernel address and
 	  execute a callback function.  register_kprobe() establishes
 	  a probepoint and specifies the callback.  Kprobes is useful
 	  for kernel debugging, non-intrusive instrumentation and testing.
 	  If in doubt, say "N".
-endmenu
+
+endif # INSTRUMENTATION
 
 source "arch/i386/Kconfig.debug"
 
 source "security/Kconfig"
 
 source "crypto/Kconfig"
-
-source "drivers/xen/Kconfig"
 
 source "lib/Kconfig"
 
@@ -1306,7 +1285,7 @@ config X86_SMP
 
 config X86_HT
 	bool
-	depends on SMP && !(X86_VISWS || X86_VOYAGER || X86_XEN)
+	depends on SMP && !(X86_VISWS || X86_VOYAGER)
 	default y
 
 config X86_BIOS_REBOOT
@@ -1317,16 +1296,6 @@ config X86_BIOS_REBOOT
 config X86_TRAMPOLINE
 	bool
 	depends on X86_SMP || (X86_VOYAGER && SMP)
-	default y
-
-config X86_NO_TSS
-	bool
-	depends on X86_XEN
-	default y
-
-config X86_NO_IDT
-	bool
-	depends on X86_XEN
 	default y
 
 config KTIME_SCALAR

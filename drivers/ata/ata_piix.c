@@ -94,7 +94,7 @@
 #include <linux/dmi.h>
 
 #define DRV_NAME	"ata_piix"
-#define DRV_VERSION	"2.11"
+#define DRV_VERSION	"2.12"
 
 enum {
 	PIIX_IOCFG		= 0x54, /* IDE I/O configuration register */
@@ -130,8 +130,8 @@ enum {
 	ich6m_sata_ahci		= 8,
 	ich8_sata_ahci		= 9,
 	piix_pata_mwdma		= 10,	/* PIIX3 MWDMA only */
-	piix_pata_vmw		= 11,	/* PIIX4 for VMware */
-	tolapai_sata_ahci	= 12,
+	tolapai_sata_ahci	= 11,
+	piix_pata_vmw		= 12,	/* PIIX4 for VMware */
 
 	/* constants for mapping table */
 	P0			= 0,  /* port 0 */
@@ -482,15 +482,15 @@ static const struct piix_map_db ich8_map_db = {
 };
 
 static const struct piix_map_db tolapai_map_db = {
-	.mask = 0x3,
-	.port_enable = 0x3,
-	.map = {
-		/* PM   PS   SM   SS       MAP */
-		{  P0,  NA,  P1,  NA }, /* 00b */
-		{  RV,  RV,  RV,  RV }, /* 01b */
-		{  RV,  RV,  RV,  RV }, /* 10b */
-		{  RV,  RV,  RV,  RV },
-	},
+        .mask = 0x3,
+        .port_enable = 0x3,
+        .map = {
+                /* PM   PS   SM   SS       MAP */
+                {  P0,  NA,  P1,  NA }, /* 00b */
+                {  RV,  RV,  RV,  RV }, /* 01b */
+                {  RV,  RV,  RV,  RV }, /* 10b */
+                {  RV,  RV,  RV,  RV },
+        },
 };
 
 static const struct piix_map_db *piix_map_db_table[] = {
@@ -614,17 +614,7 @@ static struct ata_port_info piix_port_info[] = {
 		.port_ops	= &piix_pata_ops,
 	},
 
-	/* piix_pata_vmw: 11:  PIIX4 at 33MHz for VMware */
-	{
-		.sht		= &piix_sht,
-		.flags		= PIIX_PATA_FLAGS,
-		.pio_mask	= 0x1f,	/* pio0-4 */
-		.mwdma_mask	= 0x06, /* mwdma1-2 ?? CHECK 0 should be ok but slow */
-		.udma_mask	= ATA_UDMA_MASK_40C,
-		.port_ops	= &piix_vmw_ops,
-	},
-
-	/* tolapai_sata_ahci: 12: */
+	/* tolapai_sata_ahci: 11: */
 	{
 		.sht		= &piix_sht,
 		.flags		= PIIX_SATA_FLAGS | PIIX_FLAG_SCR |
@@ -633,6 +623,16 @@ static struct ata_port_info piix_port_info[] = {
 		.mwdma_mask	= 0x07, /* mwdma0-2 */
 		.udma_mask	= ATA_UDMA6,
 		.port_ops	= &piix_sata_ops,
+	},
+
+	/* piix_pata_vmw: 11:  PIIX4 at 33MHz for VMware */
+	{
+		.sht		= &piix_sht,
+		.flags		= PIIX_PATA_FLAGS,
+		.pio_mask	= 0x1f,	/* pio0-4 */
+		.mwdma_mask	= 0x06, /* mwdma1-2 ?? CHECK 0 should be ok but slow */
+		.udma_mask	= ATA_UDMA_MASK_40C,
+		.port_ops	= &piix_vmw_ops,
 	},
 };
 
@@ -964,15 +964,17 @@ static void ich_set_dmamode (struct ata_port *ap, struct ata_device *adev)
 	do_pata_set_dmamode(ap, adev, 1);
 }
 
-static u8 piix_vmw_bmdma_status(struct ata_port *ap)
-{
-	return ata_bmdma_status(ap) & ~ATA_DMA_ERR;
-}
-
 #ifdef CONFIG_PM
 static int piix_broken_suspend(void)
 {
 	static struct dmi_system_id sysids[] = {
+		{
+			.ident = "TECRA M3",
+			.matches = {
+				DMI_MATCH(DMI_SYS_VENDOR, "TOSHIBA"),
+				DMI_MATCH(DMI_PRODUCT_NAME, "TECRA M3"),
+			},
+		},
 		{
 			.ident = "TECRA M5",
 			.matches = {
@@ -1092,6 +1094,11 @@ static int piix_pci_device_resume(struct pci_dev *pdev)
 	return rc;
 }
 #endif
+
+static u8 piix_vmw_bmdma_status(struct ata_port *ap)
+{
+	return ata_bmdma_status(ap) & ~ATA_DMA_ERR;
+}
 
 #define AHCI_PCI_BAR 5
 #define AHCI_GLOBAL_CTL 0x04

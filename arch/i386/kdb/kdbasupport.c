@@ -608,8 +608,7 @@ kdba_main_loop(kdb_reason_t reason, kdb_reason_t reason2, int error,
 	       kdb_dbtrap_t db_result, struct pt_regs *regs)
 {
 	int ret;
-	kdb_save_running(regs);
-	ret = kdb_main_loop(reason, reason2, error, db_result, regs);
+	ret = kdb_save_running(regs, reason, reason2, error, db_result);
 	kdb_unsave_running(regs);
 	return ret;
 }
