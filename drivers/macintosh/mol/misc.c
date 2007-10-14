@@ -14,7 +14,6 @@
  *   
  */
 
-#include <asm/ioctl.h>
 #include "archinclude.h"
 #include "mol-ioctl.h"
 #include "mmu.h"

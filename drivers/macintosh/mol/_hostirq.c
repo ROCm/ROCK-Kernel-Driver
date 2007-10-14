@@ -67,7 +67,11 @@ grab_host_irq(kernel_vars_t *kv, int irq)
 		return 0;
 
 	/* request the irq */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 21)
+	ret = request_irq(irq, hostirq_handler, IRQF_DISABLED | IRQF_SHARED, molirqdescstring, kv);
+#else
 	ret = request_irq(irq, hostirq_handler, SA_INTERRUPT | SA_SHIRQ, molirqdescstring, kv);
+#endif
 	if (!ret) {
 //		printk(KERN_INFO "mapped irq line %d\n", irq);
 		set_bit_mol(irq, (char *) kv->mregs.mapped_irqs.irqs);

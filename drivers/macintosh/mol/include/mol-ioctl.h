@@ -17,6 +17,8 @@
 #ifndef _H_MOL_IOCTL
 #define _H_MOL_IOCTL
 
+#include <asm/ioctl.h>
+
 #ifndef __ASSEMBLY__
 #include "mmutypes.h"
 

@@ -17,6 +17,10 @@
 #ifndef _H_PLATFORM
 #define _H_PLATFORM
 
+#ifndef NULL
+#define NULL			0
+#endif /* NULL */
+
 typedef unsigned long long 	ullong;
 typedef long long 		llong;
 

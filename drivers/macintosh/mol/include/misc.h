@@ -17,9 +17,7 @@
 #ifndef _H_MOD
 #define _H_MOD
 
-/*
- *  * Nico
- *  */
+#ifdef __linux__
 
 #include <linux/version.h>
 #include <asm/uaccess.h>
@@ -30,7 +28,7 @@
 #define compat_verify_area(a,b,c)       verify_area(a,b,c)
 #endif
 
-
+#endif /* __linux__ */
 
 extern int 	g_num_sessions;			/* number of active sessions */
 
