@@ -169,10 +169,7 @@ static int scan_bitmap_block(struct reiserfs_transaction_handle *th,
 			return 0;	// No free blocks in this bitmap
 		}
 
-		if (*beg < bi->first_zero_hint)
-			*beg = bi->first_zero_hint;
-
-		/* search for a first zero bit -- beginning of a window */
+		/* search for a first zero bit -- beggining of a window */
 		*beg = reiserfs_find_next_zero_le_bit
 		    ((unsigned long *)(bh->b_data), boundary, *beg);
 
@@ -277,7 +274,7 @@ static inline int block_group_used(struct super_block *s, u32 id)
 	 * to make a better decision. This favors long-term performace gain
 	 * with a better on-disk layout vs. a short term gain of skipping the
 	 * read and potentially having a bad placement. */
-	if (info->first_zero_hint == 0) {
+	if (info->free_count == UINT_MAX) {
 		struct buffer_head *bh = reiserfs_read_bitmap_block(s, bm);
 		brelse(bh);
 	}
@@ -1272,28 +1269,24 @@ void reiserfs_cache_bitmap_metadata(struct super_block *sb,
 {
 	unsigned long *cur = (unsigned long *)(bh->b_data + bh->b_size);
 
-	info->first_zero_hint = 1 << (sb->s_blocksize_bits + 3);
-
-	while (--cur >= (unsigned long *)bh->b_data) {
-		int base = ((char *)cur - bh->b_data) << 3;
-
-		/* 0 and ~0 are special, we can optimize for them */
-		if (*cur == 0) {
-			info->first_zero_hint = base;
-			info->free_count += BITS_PER_LONG;
-		} else if (*cur != ~0L) {       /* A mix, investigate */
-			int b;
-			for (b = BITS_PER_LONG - 1; b >= 0; b--) {
-				if (!reiserfs_test_le_bit(b, cur)) {
-					info->first_zero_hint = base + b;
-					info->free_count++;
-				}
-			}
-		}
-	}
-	if (info->first_zero_hint == 0)
+	/* The first bit must ALWAYS be 1 */
+	if (reiserfs_test_le_bit(0, (unsigned long)bh->b_data))
 		reiserfs_error(sb, "reiserfs-2025", "bitmap block %lu is "
 		               "corrupted: first bit must be 1", bh->b_blocknr);
+
+	info->free_count = 0;
+
+	while (--cur >= (unsigned long *)bh->b_data) {
+		int i;
+
+		/* 0 and ~0 are special, we can optimize for them */
+		if (*cur == 0)
+			info->free_count += BITS_PER_LONG;
+		else if (*cur != ~0L)	/* A mix, investigate */
+			for (i = BITS_PER_LONG - 1; i >= 0; i--)
+				if (!reiserfs_test_le_bit(i, cur))
+					info->free_count++;
+	}
 }
 
 struct buffer_head *reiserfs_read_bitmap_block(struct super_block *sb,
@@ -1323,7 +1316,7 @@ struct buffer_head *reiserfs_read_bitmap_block(struct super_block *sb,
 		BUG_ON(!buffer_uptodate(bh));
 		BUG_ON(atomic_read(&bh->b_count) == 0);
 
-		if (info->first_zero_hint == 0)
+		if (info->free_count == UINT_MAX)
 			reiserfs_cache_bitmap_metadata(sb, bh, info);
 	}
 
