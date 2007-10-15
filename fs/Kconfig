@@ -1379,6 +1379,7 @@ config CRAMFS
 config SQUASHFS
 	tristate "squashfs"
 	depends on BLOCK
+	select ZLIB_INFLATE
 	help
 	  http://squashfs.sourceforge.net/
 
