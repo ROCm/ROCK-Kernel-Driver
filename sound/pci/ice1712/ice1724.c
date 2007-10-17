@@ -341,10 +341,12 @@ static int snd_vt1724_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 
 	what = 0;
 	snd_pcm_group_for_each_entry(s, substream) {
-		const struct vt1724_pcm_reg *reg;
-		reg = s->runtime->private_data;
-		what |= reg->start;
-		snd_pcm_trigger_done(s, substream);
+		if (snd_pcm_substream_chip(s) == ice) {
+			const struct vt1724_pcm_reg *reg;
+			reg = s->runtime->private_data;
+			what |= reg->start;
+			snd_pcm_trigger_done(s, substream);
+		}
 	}
 
 	switch (cmd) {
@@ -1479,15 +1481,7 @@ static struct snd_kcontrol_new snd_vt1724_spdif_maskp __devinitdata =
 	.get =		snd_vt1724_spdif_maskp_get,
 };
 
-static int snd_vt1724_spdif_sw_info(struct snd_kcontrol *kcontrol,
-				    struct snd_ctl_elem_info *uinfo)
-{
-	uinfo->type = SNDRV_CTL_ELEM_TYPE_BOOLEAN;
-	uinfo->count = 1;
-	uinfo->value.integer.min = 0;
-	uinfo->value.integer.max = 1;
-	return 0;
-}
+#define snd_vt1724_spdif_sw_info		snd_ctl_boolean_mono_info
 
 static int snd_vt1724_spdif_sw_get(struct snd_kcontrol *kcontrol,
 				   struct snd_ctl_elem_value *ucontrol)
@@ -1532,15 +1526,7 @@ static struct snd_kcontrol_new snd_vt1724_spdif_switch __devinitdata =
  * GPIO access from extern
  */
 
-int snd_vt1724_gpio_info(struct snd_kcontrol *kcontrol,
-			 struct snd_ctl_elem_info *uinfo)
-{
-	uinfo->type = SNDRV_CTL_ELEM_TYPE_BOOLEAN;
-	uinfo->count = 1;
-	uinfo->value.integer.min = 0;
-	uinfo->value.integer.max = 1;
-	return 0;
-}
+#define snd_vt1724_gpio_info		snd_ctl_boolean_mono_info
 
 int snd_vt1724_gpio_get(struct snd_kcontrol *kcontrol,
 			struct snd_ctl_elem_value *ucontrol)
@@ -1706,15 +1692,7 @@ static struct snd_kcontrol_new snd_vt1724_pro_internal_clock __devinitdata = {
 	.put = snd_vt1724_pro_internal_clock_put
 };
 
-static int snd_vt1724_pro_rate_locking_info(struct snd_kcontrol *kcontrol,
-					    struct snd_ctl_elem_info *uinfo)
-{
-	uinfo->type = SNDRV_CTL_ELEM_TYPE_BOOLEAN;
-	uinfo->count = 1;
-	uinfo->value.integer.min = 0;
-	uinfo->value.integer.max = 1;
-	return 0;
-}
+#define snd_vt1724_pro_rate_locking_info	snd_ctl_boolean_mono_info
 
 static int snd_vt1724_pro_rate_locking_get(struct snd_kcontrol *kcontrol,
 					   struct snd_ctl_elem_value *ucontrol)
@@ -1745,15 +1723,7 @@ static struct snd_kcontrol_new snd_vt1724_pro_rate_locking __devinitdata = {
 	.put = snd_vt1724_pro_rate_locking_put
 };
 
-static int snd_vt1724_pro_rate_reset_info(struct snd_kcontrol *kcontrol,
-					  struct snd_ctl_elem_info *uinfo)
-{
-	uinfo->type = SNDRV_CTL_ELEM_TYPE_BOOLEAN;
-	uinfo->count = 1;
-	uinfo->value.integer.min = 0;
-	uinfo->value.integer.max = 1;
-	return 0;
-}
+#define snd_vt1724_pro_rate_reset_info		snd_ctl_boolean_mono_info
 
 static int snd_vt1724_pro_rate_reset_get(struct snd_kcontrol *kcontrol,
 					 struct snd_ctl_elem_value *ucontrol)
