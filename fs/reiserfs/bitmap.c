@@ -1270,7 +1270,7 @@ void reiserfs_cache_bitmap_metadata(struct super_block *sb,
 	unsigned long *cur = (unsigned long *)(bh->b_data + bh->b_size);
 
 	/* The first bit must ALWAYS be 1 */
-	if (reiserfs_test_le_bit(0, (unsigned long)bh->b_data))
+	if (!reiserfs_test_le_bit(0, (unsigned long *)bh->b_data))
 		reiserfs_error(sb, "reiserfs-2025", "bitmap block %lu is "
 		               "corrupted: first bit must be 1", bh->b_blocknr);
 
@@ -1332,7 +1332,7 @@ int reiserfs_init_bitmap_cache(struct super_block *sb)
 	if (bitmap == NULL)
 		return -ENOMEM;
 
-	memset(bitmap, 0, sizeof (*bitmap) * bmap_nr);
+	memset(bitmap, 0xff, sizeof (*bitmap) * bmap_nr);
 
 	SB_AP_BITMAP(sb) = bitmap;
 
