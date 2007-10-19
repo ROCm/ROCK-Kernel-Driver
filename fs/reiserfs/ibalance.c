@@ -941,7 +941,7 @@ int balance_internal(struct tree_balance *tb,	/* tree_balance structure         
 
 		if (tb->blknum[h] != 1)
 			reiserfs_panic(NULL, "ibalance-3", "One new node "
-			               "required for creating the new root");
+				       "required for creating the new root");
 		/* S[h] = empty buffer from the list FEB. */
 		tbSh = get_FEB(tb);
 		blkh = B_BLK_HEAD(tbSh);

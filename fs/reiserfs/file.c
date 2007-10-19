@@ -413,7 +413,7 @@ static int reiserfs_allocate_blocks_for_region(struct reiserfs_transaction_handl
 								 (char *)zeros);
 				} else {
 					reiserfs_error(inode->i_sb,
-					               "green-9011",
+						       "green-9011",
 						       "Unexpected key type %K",
 						       &key);
 				}
@@ -601,10 +601,10 @@ static int reiserfs_allocate_blocks_for_region(struct reiserfs_transaction_handl
 				   occured, we need to warn user and return error */
 				if (res != -ENOSPC) {
 					reiserfs_error(inode->i_sb,
-					               "green-9009",
-					               "search_by_key (%K) "
-					               "returned %d", &key,
-					               res);
+						       "green-9009",
+						       "search_by_key (%K) "
+						       "returned %d", &key,
+						       res);
 				}
 				res = -EIO;
 				goto error_exit_free_blocks;
@@ -617,7 +617,7 @@ static int reiserfs_allocate_blocks_for_region(struct reiserfs_transaction_handl
 							  curr_block));
 		} else {
 			reiserfs_panic(inode->i_sb, "green-9010",
-			               "unexpected item type for key %K", &key);
+				       "unexpected item type for key %K", &key);
 		}
 	}
 	// the caller is responsible for closing the transaction
@@ -643,14 +643,14 @@ static int reiserfs_allocate_blocks_for_region(struct reiserfs_transaction_handl
 
 		if (!page_buffers(page))
 			reiserfs_panic(inode->i_sb, "green-9005",
-			               "No buffers for prepared page???");
+				       "No buffers for prepared page???");
 
 		/* For each buffer in page */
 		for (bh = head, block_start = 0; bh != head || !block_start;
 		     block_start = block_end, bh = bh->b_this_page) {
 			if (!bh)
 				reiserfs_panic(inode->i_sb, "green-9006",
-				               "Allocated but absent buffer "
+					       "Allocated but absent buffer "
 					       "for a page?");
 			block_end = block_start + inode->i_sb->s_blocksize;
 			if (i == 0 && block_end <= from)
@@ -805,9 +805,8 @@ int reiserfs_commit_page(struct inode *inode, struct page *page,
 				 * of file and any buffer marked BH_New.
 				 */
 				if (reiserfs_file_data_ordered(inode) &&
-				    (new || page->index >= i_size_index)) {
+				    (new || page->index >= i_size_index))
 					reiserfs_add_ordered_list(inode, bh);
-				}
 			}
 		}
 	}
@@ -1093,7 +1092,7 @@ static int reiserfs_prepare_file_region_for_write(struct inode *inode
 		     block_start = block_end, bh = bh->b_this_page) {
 			if (!bh)
 				reiserfs_panic(inode->i_sb, "green-9002",
-				               "Allocated but absent "
+					       "Allocated but absent "
 					       "buffer for a page?");
 			/* Find where this buffer ends */
 			block_end = block_start + inode->i_sb->s_blocksize;
@@ -1181,7 +1180,7 @@ static int reiserfs_prepare_file_region_for_write(struct inode *inode
 
 			if (!bh)
 				reiserfs_panic(inode->i_sb, "green-9002",
-				               "Allocated but absent "
+					       "Allocated but absent "
 					       "buffer for a page?");
 			/* Find where this buffer ends */
 			block_end = block_start + inode->i_sb->s_blocksize;
@@ -1216,7 +1215,7 @@ static int reiserfs_prepare_file_region_for_write(struct inode *inode
 
 			if (!bh)
 				reiserfs_panic(inode->i_sb, "green-9002",
-				               "Allocated but absent "
+					       "Allocated but absent "
 					       "buffer for a page?");
 			/* Find where this buffer ends */
 			block_end = block_start + inode->i_sb->s_blocksize;

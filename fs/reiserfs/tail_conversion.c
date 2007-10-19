@@ -46,11 +46,11 @@ int direct2indirect(struct reiserfs_transaction_handle *th, struct inode *inode,
 	/* Set the key to search for the place for new unfm pointer */
 	make_cpu_key(&end_key, inode, tail_offset, TYPE_INDIRECT, 4);
 
-	// FIXME: we could avoid this
+	/* FIXME: we could avoid this */
 	if (search_for_position_by_key(sb, &end_key, path) == POSITION_FOUND) {
 		reiserfs_error(sb, "PAP-14030",
-		               "pasted or inserted byte exists in "
-		               "the tree %K. Use fsck to repair.", &end_key);
+			       "pasted or inserted byte exists in "
+			       "the tree %K. Use fsck to repair.", &end_key);
 		pathrelse(path);
 		return -EIO;
 	}
@@ -170,8 +170,12 @@ void reiserfs_unmap_buffer(struct buffer_head *bh)
    what we expect from it (number of cut bytes). But when tail remains
    in the unformatted node, we set mode to SKIP_BALANCING and unlock
    inode */
-int indirect2direct(struct reiserfs_transaction_handle *th, struct inode *inode, struct page *page, struct treepath *path,	/* path to the indirect item. */
-		    const struct cpu_key *item_key,	/* Key to look for unformatted node pointer to be cut. */
+int indirect2direct(struct reiserfs_transaction_handle *th,
+		    struct inode *inode, struct page *page,
+		    struct treepath *path,	/* path to the indirect item. */
+		    const struct cpu_key *item_key,	/* Key to look for
+							 * unformatted node
+							 * pointer to be cut. */
 		    loff_t n_new_file_size,	/* New file size. */
 		    char *mode)
 {
@@ -223,7 +227,7 @@ int indirect2direct(struct reiserfs_transaction_handle *th, struct inode *inode,
 		     1) * sb->s_blocksize;
 		if (pos != pos1)
 			reiserfs_panic(sb, "vs-5530", "tail position "
-			               "changed while we were reading it");
+				       "changed while we were reading it");
 #endif
 	}
 
@@ -269,7 +273,7 @@ int indirect2direct(struct reiserfs_transaction_handle *th, struct inode *inode,
 	*mode = M_CUT;
 
 	/* we store position of first direct item in the in-core inode */
-	//mark_file_with_tail (inode, pos1 + 1);
+	/* mark_file_with_tail (inode, pos1 + 1); */
 	REISERFS_I(inode)->i_first_direct_byte = pos1 + 1;
 
 	return block_size - round_tail_len;

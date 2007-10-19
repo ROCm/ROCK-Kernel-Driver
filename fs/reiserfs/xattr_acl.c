@@ -11,7 +11,7 @@
 #include <asm/uaccess.h>
 
 static int reiserfs_set_acl(struct reiserfs_transaction_handle *th,
-                            struct inode *inode, int type,
+			    struct inode *inode, int type,
 			    struct posix_acl *acl);
 
 static int
@@ -42,7 +42,7 @@ xattr_set_acl(struct inode *inode, int type, const void *value, size_t size)
 	 * has been created. */
 
 	jcreate_blocks = reiserfs_xattr_jcreate_nblocks(inode) +
-	                 reiserfs_xattr_nblocks(inode, size) * 2;
+			 reiserfs_xattr_nblocks(inode, size) * 2;
 
 	reiserfs_write_lock(inode->i_sb);
 	error = journal_begin(&th, inode->i_sb, jcreate_blocks);
@@ -189,7 +189,7 @@ static void *posix_acl_to_disk(const struct posix_acl *acl, size_t * size)
 }
 
 static inline void iset_acl(struct inode *inode, struct posix_acl **i_acl,
-                            struct posix_acl *acl)
+			    struct posix_acl *acl)
 {
 	spin_lock(&inode->i_lock);
 	if (*i_acl != ERR_PTR(-ENODATA))
@@ -199,7 +199,7 @@ static inline void iset_acl(struct inode *inode, struct posix_acl **i_acl,
 }
 
 static inline struct posix_acl *iget_acl(struct inode *inode,
-                                         struct posix_acl **i_acl)
+					 struct posix_acl **i_acl)
 {
 	struct posix_acl *acl = ERR_PTR(-ENODATA);
 
@@ -283,7 +283,7 @@ struct posix_acl *reiserfs_get_acl(struct inode *inode, int type)
  */
 static int
 reiserfs_set_acl(struct reiserfs_transaction_handle *th, struct inode *inode,
-                 int type, struct posix_acl *acl)
+		 int type, struct posix_acl *acl)
 {
 	char *name;
 	void *value = NULL;
@@ -355,7 +355,7 @@ reiserfs_set_acl(struct reiserfs_transaction_handle *th, struct inode *inode,
  * inode is new and not released into the wild yet */
 int
 reiserfs_inherit_default_acl(struct reiserfs_transaction_handle *th,
-                             struct inode *dir, struct dentry *dentry,
+			     struct inode *dir, struct dentry *dentry,
 			     struct inode *inode)
 {
 	struct posix_acl *acl;
@@ -393,7 +393,7 @@ reiserfs_inherit_default_acl(struct reiserfs_transaction_handle *th,
 		/* Copy the default ACL to the default ACL of a new directory */
 		if (S_ISDIR(inode->i_mode)) {
 			err = reiserfs_set_acl(th, inode, ACL_TYPE_DEFAULT,
-			                       acl);
+					       acl);
 			if (err)
 				goto cleanup;
 		}
@@ -415,8 +415,8 @@ reiserfs_inherit_default_acl(struct reiserfs_transaction_handle *th,
 			/* If we need an ACL.. */
 			if (need_acl > 0) {
 				err = reiserfs_set_acl(th, inode,
-				                              ACL_TYPE_ACCESS,
-                                                              acl_copy);
+						       ACL_TYPE_ACCESS,
+						       acl_copy);
 				if (err)
 					goto cleanup_copy;
 			}
@@ -501,12 +501,13 @@ int reiserfs_acl_chmod(struct inode *inode)
 	if (!error) {
 		struct reiserfs_transaction_handle th;
 		size_t size = reiserfs_xattr_nblocks(inode,
-		                                     reiserfs_acl_size(clone->a_count));
+					     reiserfs_acl_size(clone->a_count));
 		reiserfs_write_lock(inode->i_sb);
-		error = journal_begin (&th, inode->i_sb, size * 2);
+		error = journal_begin(&th, inode->i_sb, size * 2);
 		if (!error) {
 			int error2;
-			error = reiserfs_set_acl(&th, inode, ACL_TYPE_ACCESS, clone);
+			error = reiserfs_set_acl(&th, inode, ACL_TYPE_ACCESS,
+						 clone);
 			error2 = journal_end(&th, inode->i_sb, size * 2);
 			if (error2)
 				error = error2;
@@ -536,14 +537,14 @@ posix_acl_access_set(struct inode *inode, const char *name,
 }
 
 static size_t posix_acl_access_list(struct inode *inode, char *list,
-                                    size_t list_size, const char *name,
-                                    size_t name_len)
+				    size_t list_size, const char *name,
+				    size_t name_len)
 {
 	const size_t size = sizeof(POSIX_ACL_XATTR_ACCESS);
 	if (!reiserfs_posixacl(inode->i_sb))
 		return 0;
 	if (list && size <= list_size)
-	 	memcpy(list, POSIX_ACL_XATTR_ACCESS, size);
+		memcpy(list, POSIX_ACL_XATTR_ACCESS, size);
 	return size;
 }
 
@@ -573,14 +574,14 @@ posix_acl_default_set(struct inode *inode, const char *name,
 }
 
 static size_t posix_acl_default_list(struct inode *inode, char *list,
-                                     size_t list_size, const char *name,
-                                     size_t name_len)
+				     size_t list_size, const char *name,
+				     size_t name_len)
 {
 	const size_t size = sizeof(POSIX_ACL_XATTR_DEFAULT);
 	if (!reiserfs_posixacl(inode->i_sb))
 		return 0;
 	if (list && size <= list_size)
-	 	memcpy(list, POSIX_ACL_XATTR_DEFAULT, size);
+		memcpy(list, POSIX_ACL_XATTR_DEFAULT, size);
 	return size;
 }
 

@@ -52,11 +52,11 @@ static size_t security_list(struct inode *inode, char *list, size_t list_len,
  * of blocks needed for the transaction. If successful, reiserfs_security
  * must be released using reiserfs_security_free when the caller is done. */
 int reiserfs_security_init(struct inode *dir, struct inode *inode,
-                           struct reiserfs_security_handle *sec)
+			   struct reiserfs_security_handle *sec)
 {
 	int blocks = 0;
 	int error = security_inode_init_security(inode, dir, &sec->name,
-	                                         &sec->value, &sec->length);
+						 &sec->value, &sec->length);
 	if (error) {
 		if (error == -EOPNOTSUPP)
 			error = 0;
@@ -69,7 +69,7 @@ int reiserfs_security_init(struct inode *dir, struct inode *inode,
 
 	if (sec->length) {
 		blocks = reiserfs_xattr_jcreate_nblocks(inode) +
-		         reiserfs_xattr_nblocks(inode, sec->length);
+			 reiserfs_xattr_nblocks(inode, sec->length);
 		/* We don't want to count the directories twice if we have
 		 * a default ACL. */
 		REISERFS_I(inode)->i_flags |= i_has_xattr_dir;
@@ -78,15 +78,15 @@ int reiserfs_security_init(struct inode *dir, struct inode *inode,
 }
 
 int reiserfs_security_write(struct reiserfs_transaction_handle *th,
-                            struct inode *inode,
-                            struct reiserfs_security_handle *sec)
+			    struct inode *inode,
+			    struct reiserfs_security_handle *sec)
 {
 	int error;
 	if (strlen(sec->name) < sizeof(XATTR_SECURITY_PREFIX))
 		return -EINVAL;
 
 	error = reiserfs_xattr_set_handle(th, inode, sec->name, sec->value,
-	                                  sec->length, XATTR_CREATE);
+					  sec->length, XATTR_CREATE);
 	if (error == -ENODATA || error == -EOPNOTSUPP)
 		error = 0;
 
@@ -97,7 +97,8 @@ void reiserfs_security_free(struct reiserfs_security_handle *sec)
 {
 	kfree(sec->name);
 	kfree(sec->value);
-	sec->name = sec->value = NULL;
+	sec->name = NULL;
+	sec->value = NULL;
 }
 
 struct xattr_handler reiserfs_xattr_security_handler = {

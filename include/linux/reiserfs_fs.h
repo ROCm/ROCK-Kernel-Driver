@@ -78,17 +78,20 @@
 #define REISERFS_DEBUG_CODE 5	/* extra messages to help find/debug errors */
 
 void __reiserfs_warning(struct super_block *s, const char *id,
-                        const char *func, const char *fmt, ...);
+			 const char *func, const char *fmt, ...);
 #define reiserfs_warning(s, id, fmt, args...) \
-        __reiserfs_warning(s, id, __FUNCTION__, fmt, ##args)
+	 __reiserfs_warning(s, id, __FUNCTION__, fmt, ##args)
 /* assertions handling */
 
 /** always check a condition and panic if it's false. */
-#define __RASSERT( cond, scond, format, args... )			\
-if( !( cond ) )							\
-  reiserfs_panic( NULL, "assertion failure", "(" #cond ") at "	\
-		  __FILE__ ":%i:%s: " format "\n",		\
-		  __LINE__ , __FUNCTION__ , ##args )
+#define __RASSERT(cond, scond, format, args...)			\
+do { 									\
+	if (!(cond))							\
+		reiserfs_panic(NULL, "assertion failure", "(" #cond ") at " \
+			       __FILE__ ":%i:%s: " format "\n",		\
+			       in_interrupt() ? -1 : current->pid, __LINE__, \
+			       __FUNCTION__ , ##args); \
+} while (0)
 
 #define RASSERT(cond, format, args...) __RASSERT(cond, #cond, format, ##args)
 
@@ -234,11 +237,6 @@ struct reiserfs_super_block {
          ((!is_reiserfs_jr(SB_DISK_SUPER_BLOCK(s)) ? \
          SB_ONDISK_JOURNAL_SIZE(s) + 1 : SB_ONDISK_RESERVED_FOR_JOURNAL(s)))
 
-/* s_bmap_nr is a u16 */
-#define reiserfs_bmap_count(sb)	reiserfs_bmap_nr(SB_BLOCK_COUNT(sb), sb->s_blocksize)
-#define reiserfs_bmap_nr(count, blk_size) ((count - 1) / (blk_size * 8) + 1)
-#define bmap_would_wrap(n)		(n > ((1LL << 16) - 1))
-
 int is_reiserfs_3_5(struct reiserfs_super_block *rs);
 int is_reiserfs_3_6(struct reiserfs_super_block *rs);
 int is_reiserfs_jr(struct reiserfs_super_block *rs);
@@ -289,6 +287,18 @@ static inline struct reiserfs_inode_info *REISERFS_I(const struct inode *inode)
 static inline struct reiserfs_sb_info *REISERFS_SB(const struct super_block *sb)
 {
 	return sb->s_fs_info;
+}
+
+/* Don't trust REISERFS_SB(sb)->s_bmap_nr, it's a u16
+ * which overflows on large file systems. */
+static inline u32 reiserfs_bmap_count(struct super_block *sb)
+{
+	return (SB_BLOCK_COUNT(sb) - 1) / (sb->s_blocksize * 8) + 1;
+}
+
+static inline int bmap_would_wrap(unsigned bmap_nr)
+{
+	return bmap_nr > ((1LL << 16) - 1);
 }
 
 /** this says about version of key of all items (but stat data) the
@@ -682,8 +692,8 @@ static inline void cpu_key_k_offset_dec(struct cpu_key *key)
 #define is_statdata_cpu_ih(ih) (is_statdata_cpu_key (&((ih)->ih_key)))
 
 #define I_K_KEY_IN_ITEM(ih, key, n_blocksize) \
-    ( ! COMP_SHORT_KEYS(ih, key) && \
-          I_OFF_BYTE_IN_ITEM(ih, k_offset (key), n_blocksize) )
+    (!COMP_SHORT_KEYS(ih, key) && \
+	  I_OFF_BYTE_IN_ITEM(ih, k_offset(key), n_blocksize))
 
 /* maximal length of item */
 #define MAX_ITEM_LEN(block_size) (block_size - BLKH_SIZE - IH_SIZE)
@@ -738,25 +748,25 @@ struct block_head {
 #define DISK_LEAF_NODE_LEVEL  1	/* Leaf node level. */
 
 /* Given the buffer head of a formatted node, resolve to the block head of that node. */
-#define B_BLK_HEAD(bh)            ((struct block_head *)((bh)->b_data))
+#define B_BLK_HEAD(bh)			((struct block_head *)((bh)->b_data))
 /* Number of items that are in buffer. */
-#define B_NR_ITEMS(bh)            (blkh_nr_item(B_BLK_HEAD(bh)))
-#define B_LEVEL(bh)               (blkh_level(B_BLK_HEAD(bh)))
-#define B_FREE_SPACE(bh)          (blkh_free_space(B_BLK_HEAD(bh)))
+#define B_NR_ITEMS(bh)			(blkh_nr_item(B_BLK_HEAD(bh)))
+#define B_LEVEL(bh)			(blkh_level(B_BLK_HEAD(bh)))
+#define B_FREE_SPACE(bh)		(blkh_free_space(B_BLK_HEAD(bh)))
 
-#define PUT_B_NR_ITEMS(bh,val)    do { set_blkh_nr_item(B_BLK_HEAD(bh),val); } while (0)
-#define PUT_B_LEVEL(bh,val)       do { set_blkh_level(B_BLK_HEAD(bh),val); } while (0)
-#define PUT_B_FREE_SPACE(bh,val)  do { set_blkh_free_space(B_BLK_HEAD(bh),val); } while (0)
+#define PUT_B_NR_ITEMS(bh, val)		do { set_blkh_nr_item(B_BLK_HEAD(bh), val); } while (0)
+#define PUT_B_LEVEL(bh, val)		do { set_blkh_level(B_BLK_HEAD(bh), val); } while (0)
+#define PUT_B_FREE_SPACE(bh, val)	do { set_blkh_free_space(B_BLK_HEAD(bh), val); } while (0)
 
 /* Get right delimiting key. -- little endian */
-#define B_PRIGHT_DELIM_KEY(bh)   (&(blk_right_delim_key(B_BLK_HEAD(bh))))
+#define B_PRIGHT_DELIM_KEY(bh)		(&(blk_right_delim_key(B_BLK_HEAD(bh))))
 
 /* Does the buffer contain a disk leaf. */
-#define B_IS_ITEMS_LEVEL(bh)     (B_LEVEL(bh) == DISK_LEAF_NODE_LEVEL)
+#define B_IS_ITEMS_LEVEL(bh)		(B_LEVEL(bh) == DISK_LEAF_NODE_LEVEL)
 
 /* Does the buffer contain a disk internal node */
 #define B_IS_KEYS_LEVEL(bh)      (B_LEVEL(bh) > DISK_LEAF_NODE_LEVEL \
-                                            && B_LEVEL(bh) <= MAX_HEIGHT)
+					    && B_LEVEL(bh) <= MAX_HEIGHT)
 
 /***************************************************************************/
 /*                             STAT DATA                                   */
@@ -1106,12 +1116,13 @@ struct disk_child {
 #define put_dc_size(dc_p, val)   do { (dc_p)->dc_size = cpu_to_le16(val); } while(0)
 
 /* Get disk child by buffer header and position in the tree node. */
-#define B_N_CHILD(bh,n_pos)  ((struct disk_child *)\
-((bh)->b_data+BLKH_SIZE+B_NR_ITEMS(bh)*KEY_SIZE+DC_SIZE*(n_pos)))
+#define B_N_CHILD(bh, n_pos)  ((struct disk_child *)\
+((bh)->b_data + BLKH_SIZE + B_NR_ITEMS(bh) * KEY_SIZE + DC_SIZE * (n_pos)))
 
 /* Get disk child number by buffer header and position in the tree node. */
-#define B_N_CHILD_NUM(bh,n_pos) (dc_block_number(B_N_CHILD(bh,n_pos)))
-#define PUT_B_N_CHILD_NUM(bh,n_pos, val) (put_dc_block_number(B_N_CHILD(bh,n_pos), val ))
+#define B_N_CHILD_NUM(bh, n_pos) (dc_block_number(B_N_CHILD(bh, n_pos)))
+#define PUT_B_N_CHILD_NUM(bh, n_pos, val) \
+				(put_dc_block_number(B_N_CHILD(bh, n_pos), val))
 
  /* maximal value of field child_size in structure disk_child */
  /* child size is the combined size of all items and their headers */
@@ -1182,13 +1193,13 @@ struct treepath {
 struct treepath var = {.path_length = ILLEGAL_PATH_ELEMENT_OFFSET, .reada = 0,}
 
 /* Get path element by path and path position. */
-#define PATH_OFFSET_PELEMENT(path,n_offset)  ((path)->path_elements +(n_offset))
+#define PATH_OFFSET_PELEMENT(path, n_offset)  ((path)->path_elements + (n_offset))
 
 /* Get buffer header at the path by path and path position. */
-#define PATH_OFFSET_PBUFFER(path,n_offset)   (PATH_OFFSET_PELEMENT(path,n_offset)->pe_buffer)
+#define PATH_OFFSET_PBUFFER(path, n_offset)   (PATH_OFFSET_PELEMENT(path, n_offset)->pe_buffer)
 
 /* Get position in the element at the path by path and path position. */
-#define PATH_OFFSET_POSITION(path,n_offset) (PATH_OFFSET_PELEMENT(path,n_offset)->pe_position)
+#define PATH_OFFSET_POSITION(path, n_offset) (PATH_OFFSET_PELEMENT(path, n_offset)->pe_position)
 
 #define PATH_PLAST_BUFFER(path) (PATH_OFFSET_PBUFFER((path), (path)->path_length))
 				/* you know, to the person who didn't
@@ -1199,7 +1210,7 @@ struct treepath var = {.path_length = ILLEGAL_PATH_ELEMENT_OFFSET, .reada = 0,}
 				   dumping paths... -Hans */
 #define PATH_LAST_POSITION(path) (PATH_OFFSET_POSITION((path), (path)->path_length))
 
-#define PATH_PITEM_HEAD(path)    B_N_PITEM_HEAD(PATH_PLAST_BUFFER(path),PATH_LAST_POSITION(path))
+#define PATH_PITEM_HEAD(path)    B_N_PITEM_HEAD(PATH_PLAST_BUFFER(path), PATH_LAST_POSITION(path))
 
 /* in do_balance leaf has h == 0 in contrast with path structure,
    where root has level == 0. That is why we need these defines */
@@ -1498,7 +1509,7 @@ extern struct item_operations *item_ops[TYPE_ANY + 1];
 #define COMP_SHORT_KEYS comp_short_keys
 
 /* number of blocks pointed to by the indirect item */
-#define I_UNFM_NUM(ih)	( ih_item_len(ih) / UNFM_P_SIZE )
+#define I_UNFM_NUM(ih)	(ih_item_len(ih) / UNFM_P_SIZE)
 
 /* the used space within the unformatted node corresponding to pos within the item pointed to by ih */
 #define I_POS_UNFM_SIZE(ih,pos,size) (((pos) == I_UNFM_NUM(ih) - 1 ) ? (size) - ih_free_space(ih) : (size))
@@ -1603,8 +1614,8 @@ struct reiserfs_journal_header {
 #define JOURNAL_MAX_TRANS_AGE 30
 #define JOURNAL_PER_BALANCE_CNT (3 * (MAX_HEIGHT-2) + 9)
 #define JOURNAL_BLOCKS_PER_OBJECT(sb)  (JOURNAL_PER_BALANCE_CNT * 3 + \
-                                        2 * (REISERFS_QUOTA_INIT_BLOCKS(sb) + \
-                                             REISERFS_QUOTA_TRANS_BLOCKS(sb)))
+					 2 * (REISERFS_QUOTA_INIT_BLOCKS(sb) + \
+					      REISERFS_QUOTA_TRANS_BLOCKS(sb)))
 
 #ifdef CONFIG_QUOTA
 /* We need to update data and inode (atime) */
@@ -1767,7 +1778,7 @@ int journal_mark_freed(struct reiserfs_transaction_handle *,
 		       struct super_block *, b_blocknr_t blocknr);
 int journal_transaction_should_end(struct reiserfs_transaction_handle *, int);
 int reiserfs_in_journal(struct super_block *sb, unsigned int bmap_nr,
-                        int bit_nr, int searchall, b_blocknr_t * next);
+			 int bit_nr, int searchall, b_blocknr_t *next);
 int journal_begin(struct reiserfs_transaction_handle *,
 		  struct super_block *sb, unsigned long);
 int journal_join_abort(struct reiserfs_transaction_handle *,
@@ -1979,7 +1990,7 @@ int reiserfs_global_version_in_proc(char *buffer, char **start, off_t offset,
 #define PROC_INFO_MAX( sb, field, value ) VOID_V
 #define PROC_INFO_INC( sb, field ) VOID_V
 #define PROC_INFO_ADD( sb, field, val ) VOID_V
-#define PROC_INFO_BH_STAT( sb, bh, n_node_level ) VOID_V
+#define PROC_INFO_BH_STAT(sb, bh, n_node_level) VOID_V
 #endif
 
 /* dir.c */
@@ -2009,13 +2020,14 @@ void unfix_nodes(struct tree_balance *);
 
 /* prints.c */
 void __reiserfs_panic(struct super_block *s, const char *id,
-                      const char *function, const char *fmt, ...)
+		      const char *function, const char *fmt, ...)
     __attribute__ ((noreturn));
 #define reiserfs_panic(s, id, fmt, args...) \
-        __reiserfs_panic(s, id, __FUNCTION__, fmt, ##args)
-void __reiserfs_error(struct super_block *s, const char *id, const char *function, const char *fmt, ...);
+	__reiserfs_panic(s, id, __FUNCTION__, fmt, ##args)
+void __reiserfs_error(struct super_block *s, const char *id,
+		      const char *function, const char *fmt, ...);
 #define reiserfs_error(s, id, fmt, args...) \
-        __reiserfs_error(s, id, __FUNCTION__, fmt, ##args)
+	 __reiserfs_error(s, id, __FUNCTION__, fmt, ##args)
 void reiserfs_info(struct super_block *s, const char *fmt, ...);
 void reiserfs_debug(struct super_block *s, int level, const char *fmt, ...);
 void print_indirect_item(struct buffer_head *bh, int item_num);

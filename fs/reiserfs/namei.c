@@ -121,7 +121,7 @@ int search_by_entry_key(struct super_block *sb, const struct cpu_key *key,
 	case ITEM_NOT_FOUND:
 		if (!PATH_LAST_POSITION(path)) {
 			reiserfs_error(sb, "vs-7000", "search_by_key "
-			               "returned item position == 0");
+				       "returned item position == 0");
 			pathrelse(path);
 			return IO_ERROR;
 		}
@@ -146,7 +146,7 @@ int search_by_entry_key(struct super_block *sb, const struct cpu_key *key,
 	    COMP_SHORT_KEYS(&(de->de_ih->ih_key), key)) {
 		print_block(de->de_bh, 0, -1, -1);
 		reiserfs_panic(sb, "vs-7005", "found item %h is not directory "
-		               "item or does not belong to the same directory "
+			       "item or does not belong to the same directory "
 			       "as key %K", de->de_ih, key);
 	}
 #endif				/* CONFIG_REISERFS_CHECK */
@@ -491,8 +491,8 @@ static int reiserfs_add_entry(struct reiserfs_transaction_handle *th,
 
 		if (retval != NAME_FOUND) {
 			reiserfs_error(dir->i_sb, "zam-7002",
-			               "reiserfs_find_entry() returned "
-			               "unexpected value (%d)", retval);
+				       "reiserfs_find_entry() returned "
+				       "unexpected value (%d)", retval);
 		}
 
 		return -EEXIST;
@@ -504,7 +504,7 @@ static int reiserfs_add_entry(struct reiserfs_transaction_handle *th,
 	if (gen_number > MAX_GENERATION_NUMBER) {
 		/* there is no free generation number */
 		reiserfs_warning(dir->i_sb, "reiserfs-7010",
-		                 "Congratulations! we have got hash function "
+				 "Congratulations! we have got hash function "
 				 "screwed up");
 		if (buffer != small_buf)
 			kfree(buffer);
@@ -889,8 +889,8 @@ static int reiserfs_rmdir(struct inode *dir, struct dentry *dentry)
 
 	if (inode->i_nlink != 2 && inode->i_nlink != 1)
 		reiserfs_error(inode->i_sb, "reiserfs-7040",
-		               "empty directory has nlink != 2 (%d)",
-		               inode->i_nlink);
+			       "empty directory has nlink != 2 (%d)",
+			       inode->i_nlink);
 
 	clear_nlink(inode);
 	inode->i_ctime = dir->i_ctime = dir->i_mtime = CURRENT_TIME_SEC;
@@ -967,7 +967,7 @@ static int reiserfs_unlink(struct inode *dir, struct dentry *dentry)
 
 	if (!inode->i_nlink) {
 		reiserfs_warning(inode->i_sb, "reiserfs-7042",
-		                 "deleting nonexistent file (%lu), %d",
+				 "deleting nonexistent file (%lu), %d",
 				 inode->i_ino, inode->i_nlink);
 		inode->i_nlink = 1;
 	}
@@ -1162,7 +1162,7 @@ static int reiserfs_link(struct dentry *old_dentry, struct inode *dir,
 	return retval;
 }
 
-// de contains information pointing to an entry which
+/* de contains information pointing to an entry which */
 static int de_still_valid(const char *name, int len,
 			  struct reiserfs_dir_entry *de)
 {
@@ -1186,7 +1186,7 @@ static int entry_points_to_object(const char *name, int len,
 	if (inode) {
 		if (!de_visible(de->de_deh + de->de_entry_num))
 			reiserfs_panic(inode->i_sb, "vs-7042",
-			               "entry must be visible");
+				       "entry must be visible");
 		return (de->de_objectid == inode->i_ino) ? 1 : 0;
 	}
 
@@ -1307,7 +1307,7 @@ static int reiserfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	if (retval == -EEXIST) {
 		if (!new_dentry_inode) {
 			reiserfs_panic(old_dir->i_sb, "vs-7050",
-			               "new entry is found, new inode == 0");
+				       "new entry is found, new inode == 0");
 		}
 	} else if (retval) {
 		int err = journal_end(&th, old_dir->i_sb, jbegin_count);
@@ -1465,7 +1465,7 @@ static int reiserfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	}
 
 	if (S_ISDIR(old_inode_mode)) {
-		// adjust ".." of renamed directory
+		/* adjust ".." of renamed directory */
 		set_ino_in_dir_entry(&dot_dot_de, INODE_PKEY(new_dir));
 		journal_mark_dirty(&th, new_dir->i_sb, dot_dot_de.de_bh);
 
@@ -1488,7 +1488,7 @@ static int reiserfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	    (&th, &old_entry_path, &(old_de.de_entry_key), old_dir, NULL,
 	     0) < 0)
 		reiserfs_error(old_dir->i_sb, "vs-7060",
-		               "couldn't not cut old name. Fsck later?");
+			       "couldn't not cut old name. Fsck later?");
 
 	old_dir->i_size -= DEH_SIZE + old_de.de_entrylen;
 

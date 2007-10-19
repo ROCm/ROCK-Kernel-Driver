@@ -265,12 +265,12 @@ static void prepare_error_buf(const char *fmt, va_list args)
 }
 
 void __reiserfs_warning(struct super_block *sb, const char *id,
-                               const char *function, const char *fmt, ...)
+			 const char *function, const char *fmt, ...)
 {
 	do_reiserfs_warning(fmt);
 	if (sb)
-		printk(KERN_WARNING "REISERFS warning (device %s): %s%s%s: %s\n",
-		       sb->s_id, id ? id : "", id ? " " : "",
+		printk(KERN_WARNING "REISERFS warning (device %s): %s%s%s: "
+		       "%s\n", sb->s_id, id ? id : "", id ? " " : "",
 		       function, error_buf);
 	else
 		printk(KERN_WARNING "REISERFS warning: %s%s%s: %s\n",
@@ -357,7 +357,7 @@ extern struct tree_balance *cur_tb;
 #endif
 
 void __reiserfs_panic(struct super_block *sb, const char *id,
-                      const char *function, const char *fmt, ...)
+		      const char *function, const char *fmt, ...)
 {
 	do_reiserfs_warning(fmt);
 
@@ -374,7 +374,7 @@ void __reiserfs_panic(struct super_block *sb, const char *id,
 }
 
 void __reiserfs_error(struct super_block *sb, const char *id,
-                      const char *function, const char *fmt, ...)
+		      const char *function, const char *fmt, ...)
 {
 	do_reiserfs_warning(fmt);
 
@@ -385,10 +385,10 @@ void __reiserfs_error(struct super_block *sb, const char *id,
 
 	if (id && id[0])
 		printk(KERN_CRIT "REISERFS error (device %s): %s %s: %s\n",
-	               sb->s_id, id, function, error_buf);
+		       sb->s_id, id, function, error_buf);
 	else
 		printk(KERN_CRIT "REISERFS error (device %s): %s: %s\n",
-	               sb->s_id, function, error_buf);
+		       sb->s_id, function, error_buf);
 
 	if (sb->s_flags & MS_RDONLY)
 		return;

@@ -169,7 +169,7 @@ static int leaf_copy_boundary_item(struct buffer_info *dest_bi,
 			    && is_indirect_le_ih(ih))
 				if (get_ih_free_space(ih))
 					reiserfs_panic(sb_from_bi(dest_bi),
-					               "vs-10020",
+						       "vs-10020",
 						       "last unformatted node "
 						       "must be filled "
 						       "entirely (%h)", ih);
@@ -624,7 +624,7 @@ static void leaf_define_dest_src_infos(int shift_mode, struct tree_balance *tb,
 
 	default:
 		reiserfs_panic(sb_from_bi(src_bi), "vs-10250",
-		               "shift type is unknown (%d)", shift_mode);
+			       "shift type is unknown (%d)", shift_mode);
 	}
 	RFALSE(src_bi->bi_bh == 0 || dest_bi->bi_bh == 0,
 	       "vs-10260: mode==%d, source (%p) or dest (%p) buffer is initialized incorrectly",
@@ -675,7 +675,7 @@ int leaf_shift_left(struct tree_balance *tb, int shift_num, int shift_bytes)
 			if (tb->tb_mode == M_PASTE || tb->tb_mode == M_INSERT) {
 				print_cur_tb("vs-10275");
 				reiserfs_panic(tb->tb_sb, "vs-10275",
-				               "balance condition corrupted "
+					       "balance condition corrupted "
 					       "(%c)", tb->tb_mode);
 			}
 #endif
@@ -894,7 +894,7 @@ void leaf_paste_in_buffer(struct buffer_info *bi, int affected_item_num,
 			sb = bi->tb->tb_sb;
 		print_cur_tb("10177");
 		reiserfs_panic(sb, "vs-10177",
-		               "zeros_number == %d, paste_size == %d",
+			       "zeros_number == %d, paste_size == %d",
 			       zeros_number, paste_size);
 	}
 #endif				/* CONFIG_REISERFS_CHECK */
@@ -1292,16 +1292,16 @@ void leaf_paste_entries(struct buffer_info *bi,
 
 			if (prev && prev <= deh_location(&(deh[i])))
 				reiserfs_error(sb_from_bi(bi), "vs-10240",
-				               "directory item (%h) "
-				               "corrupted (prev %a, "
-				               "cur(%d) %a)",
-				               ih, deh + i - 1, i, deh + i);
+					       "directory item (%h) "
+					       "corrupted (prev %a, "
+					       "cur(%d) %a)",
+					       ih, deh + i - 1, i, deh + i);
 			if (next && next >= deh_location(&(deh[i])))
 				reiserfs_error(sb_from_bi(bi), "vs-10250",
-				               "directory item (%h) "
-				               "corrupted (cur(%d) %a, "
-				               "next %a)",
-				               ih, i, deh + i, deh + i + 1);
+					       "directory item (%h) "
+					       "corrupted (cur(%d) %a, "
+					       "next %a)",
+					       ih, i, deh + i, deh + i + 1);
 		}
 	}
 #endif

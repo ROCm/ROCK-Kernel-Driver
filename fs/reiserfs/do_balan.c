@@ -154,7 +154,7 @@ static int balance_leaf_when_delete(struct tree_balance *tb, int flag)
 	default:
 		print_cur_tb("12040");
 		reiserfs_panic(tb->tb_sb, "PAP-12040",
-		               "unexpected mode: %s(%d)",
+			       "unexpected mode: %s(%d)",
 			       (flag ==
 				M_PASTE) ? "PASTE" : ((flag ==
 						       M_INSERT) ? "INSERT" :
@@ -722,7 +722,8 @@ static int balance_leaf(struct tree_balance *tb, struct item_head *ih,	/* item h
 				break;
 			default:	/* cases d and t */
 				reiserfs_panic(tb->tb_sb, "PAP-12130",
-				               "lnum > 0: unexpected mode: %s(%d)",
+					       "lnum > 0: unexpected mode: "
+					       " %s(%d)",
 					       (flag ==
 						M_DELETE) ? "DELETE" : ((flag ==
 									 M_CUT)
@@ -1135,7 +1136,7 @@ static int balance_leaf(struct tree_balance *tb, struct item_head *ih,	/* item h
 			break;
 		default:	/* cases d and t */
 			reiserfs_panic(tb->tb_sb, "PAP-12175",
-			               "rnum > 0: unexpected mode: %s(%d)",
+				       "rnum > 0: unexpected mode: %s(%d)",
 				       (flag ==
 					M_DELETE) ? "DELETE" : ((flag ==
 								 M_CUT) ? "CUT"
@@ -1166,7 +1167,7 @@ static int balance_leaf(struct tree_balance *tb, struct item_head *ih,	/* item h
 		if (tb->CFL[0]) {
 			if (!tb->CFR[0])
 				reiserfs_panic(tb->tb_sb, "vs-12195",
-				               "CFR not initialized");
+					       "CFR not initialized");
 			copy_key(B_N_PDELIM_KEY(tb->CFL[0], tb->lkey[0]),
 				 B_N_PDELIM_KEY(tb->CFR[0], tb->rkey[0]));
 			do_balance_mark_internal_dirty(tb, tb->CFL[0], 0);
@@ -1472,8 +1473,10 @@ static int balance_leaf(struct tree_balance *tb, struct item_head *ih,	/* item h
 					    && (pos_in_item != ih_item_len(ih)
 						|| tb->insert_size[0] <= 0))
 						reiserfs_panic(tb->tb_sb,
-						               "PAP-12235",
-							       "pos_in_item must be equal to ih_item_len");
+							       "PAP-12235",
+							       "pos_in_item "
+							       "must be equal "
+							       "to ih_item_len");
 #endif				/* CONFIG_REISERFS_CHECK */
 
 					ret_val =
@@ -1534,7 +1537,7 @@ static int balance_leaf(struct tree_balance *tb, struct item_head *ih,	/* item h
 			break;
 		default:	/* cases d and t */
 			reiserfs_panic(tb->tb_sb, "PAP-12245",
-			               "blknum > 2: unexpected mode: %s(%d)",
+				       "blknum > 2: unexpected mode: %s(%d)",
 				       (flag ==
 					M_DELETE) ? "DELETE" : ((flag ==
 								 M_CUT) ? "CUT"
@@ -1695,8 +1698,8 @@ static int balance_leaf(struct tree_balance *tb, struct item_head *ih,	/* item h
 	if (flag == M_PASTE && tb->insert_size[0]) {
 		print_cur_tb("12290");
 		reiserfs_panic(tb->tb_sb,
-		               "PAP-12290", "insert_size is still not 0 (%d)",
-		               tb->insert_size[0]);
+			       "PAP-12290", "insert_size is still not 0 (%d)",
+			       tb->insert_size[0]);
 	}
 #endif				/* CONFIG_REISERFS_CHECK */
 	return 0;
@@ -1752,14 +1755,15 @@ static void store_thrown(struct tree_balance *tb, struct buffer_head *bh)
 
 	if (buffer_dirty(bh))
 		reiserfs_warning(tb->tb_sb, "reiserfs-12320",
-		                 "called with dirty buffer");
+				 "called with dirty buffer");
 	for (i = 0; i < ARRAY_SIZE(tb->thrown); i++)
 		if (!tb->thrown[i]) {
 			tb->thrown[i] = bh;
 			get_bh(bh);	/* free_thrown puts this */
 			return;
 		}
-	reiserfs_warning(tb->tb_sb, "reiserfs-12321", "too many thrown buffers");
+	reiserfs_warning(tb->tb_sb, "reiserfs-12321",
+			 "too many thrown buffers");
 }
 
 static void free_thrown(struct tree_balance *tb)
@@ -1771,8 +1775,8 @@ static void free_thrown(struct tree_balance *tb)
 			blocknr = tb->thrown[i]->b_blocknr;
 			if (buffer_dirty(tb->thrown[i]))
 				reiserfs_warning(tb->tb_sb, "reiserfs-12322",
-				                 "called with dirty buffer %d",
-				                 blocknr);
+						 "called with dirty buffer %d",
+						 blocknr);
 			brelse(tb->thrown[i]);	/* incremented in store_thrown */
 			reiserfs_free_block(tb->transaction_handle, NULL,
 					    blocknr, 0);
@@ -1870,14 +1874,14 @@ static void check_internal_node(struct super_block *s, struct buffer_head *bh,
 		if (!is_reusable(s, dc_block_number(dc), 1)) {
 			print_cur_tb(mes);
 			reiserfs_panic(s, "PAP-12338",
-			               "invalid child pointer %y in %b",
+				       "invalid child pointer %y in %b",
 				       dc, bh);
 		}
 	}
 }
 
 static int locked_or_not_in_tree(struct tree_balance *tb,
-                                 struct buffer_head *bh, char *which)
+				  struct buffer_head *bh, char *which)
 {
 	if ((!buffer_journal_prepared(bh) && buffer_locked(bh)) ||
 	    !B_IS_IN_TREE(bh)) {
@@ -1893,9 +1897,9 @@ static int check_before_balancing(struct tree_balance *tb)
 
 	if (cur_tb) {
 		reiserfs_panic(tb->tb_sb, "vs-12335", "suspect that schedule "
-		               "occurred based on cur_tb not being null at "
-		               "this point in code. do_balance cannot properly "
-		               "handle schedule occurring while it runs.");
+			       "occurred based on cur_tb not being null at "
+			       "this point in code. do_balance cannot properly "
+			       "handle schedule occurring while it runs.");
 	}
 
 	/* double check that buffers that we will modify are unlocked. (fix_nodes should already have
@@ -1913,7 +1917,7 @@ static int check_before_balancing(struct tree_balance *tb)
 		check_leaf(tb->R[0]);
 	}
 	retval |= locked_or_not_in_tree(tb, PATH_PLAST_BUFFER(tb->tb_path),
-	                                "S[0]");
+					"S[0]");
 	check_leaf(PATH_PLAST_BUFFER(tb->tb_path));
 
 	return retval;
@@ -1928,7 +1932,7 @@ static void check_after_balance_leaf(struct tree_balance *tb)
 			    (tb->FL[0], get_left_neighbor_position(tb, 0)))) {
 			print_cur_tb("12221");
 			reiserfs_panic(tb->tb_sb, "PAP-12355",
-			               "shift to left was incorrect");
+				       "shift to left was incorrect");
 		}
 	}
 	if (tb->rnum[0]) {
@@ -1938,7 +1942,7 @@ static void check_after_balance_leaf(struct tree_balance *tb)
 			    (tb->FR[0], get_right_neighbor_position(tb, 0)))) {
 			print_cur_tb("12222");
 			reiserfs_panic(tb->tb_sb, "PAP-12360",
-			               "shift to right was incorrect");
+				       "shift to right was incorrect");
 		}
 	}
 	if (PATH_H_PBUFFER(tb->tb_path, 1) &&
@@ -2098,12 +2102,13 @@ void do_balance(struct tree_balance *tb,	/* tree_balance structure */
 	tb->need_balance_dirty = 0;
 
 	if (FILESYSTEM_CHANGED_TB(tb)) {
-		reiserfs_panic(tb->tb_sb, "clm-6000", "fs generation has changed");
+		reiserfs_panic(tb->tb_sb, "clm-6000", "fs generation has "
+			       "changed");
 	}
 	/* if we have no real work to do  */
 	if (!tb->insert_size[0]) {
 		reiserfs_warning(tb->tb_sb, "PAP-12350",
-		                 "insert_size == 0, mode == %c", flag);
+				 "insert_size == 0, mode == %c", flag);
 		unfix_nodes(tb);
 		return;
 	}

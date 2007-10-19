@@ -81,8 +81,9 @@ struct xattr_handler *reiserfs_xattr_handlers[] = {
 			(handler) = *(handlers)++)
 
 /* This is the implementation for the xattr plugin infrastructure */
-static inline struct xattr_handler *find_xattr_handler_prefix(struct xattr_handler **handlers,
-                                                       const char *name)
+static inline struct xattr_handler *
+find_xattr_handler_prefix(struct xattr_handler **handlers,
+			   const char *name)
 {
 	struct xattr_handler *xah;
 
@@ -100,7 +101,7 @@ static inline struct xattr_handler *find_xattr_handler_prefix(struct xattr_handl
 #define xattr_may_create(flags)	(!flags || flags & XATTR_CREATE)
 
 static struct dentry *lookup_or_create_dir(struct dentry *parent,
-                                           const char *name, int flags)
+					    const char *name, int flags)
 {
 	struct dentry *dentry;
 	BUG_ON(!parent);
@@ -155,7 +156,7 @@ static struct dentry *open_xa_dir(const struct inode *inode, int flags)
 }
 
 static struct dentry *xattr_lookup(struct inode *inode, const char *name,
-                                   int flags)
+				    int flags)
 {
 	struct dentry *xadir, *xafile;
 	int err = 0;
@@ -178,7 +179,7 @@ static struct dentry *xattr_lookup(struct inode *inode, const char *name,
 		err = -ENODATA;
 		if (xattr_may_create(flags))
 			err = vfs_create(xadir->d_inode, xafile,
-			                 0700|S_IFREG, NULL);
+					 0700|S_IFREG, NULL);
 	}
 
 	if (err)
@@ -192,7 +193,7 @@ out:
 }
 
 static struct file *open_xattr_file(struct inode *inode,
-                                    const char *name, int flags)
+				     const char *name, int flags)
 {
 	struct dentry *dentry = xattr_lookup(inode, name, flags);
 
@@ -241,7 +242,7 @@ static inline __u32 xattr_hash(const char *msg, int len)
  */
 int
 reiserfs_xattr_set_handle(struct reiserfs_transaction_handle *th,
-                          struct inode *inode, const char *name,
+			  struct inode *inode, const char *name,
 			  const void *buffer, size_t buffer_size, int flags)
 {
 	int err = 0;
@@ -347,11 +348,11 @@ reiserfs_xattr_set_handle(struct reiserfs_transaction_handle *th,
 			break;
 	}
 
-      out_filp:
+out_filp:
 	mutex_unlock(&xinode->i_mutex);
 	fput(fp);
 
-      out:
+out:
 
 	/* We can't mark the inode dirty if it's not hashed. This is the case
 	 * when we're inheriting the default ACL. If we dirty it, the inode
@@ -367,7 +368,7 @@ reiserfs_xattr_set_handle(struct reiserfs_transaction_handle *th,
 
 /* We need to start a transaction to maintain lock ordering */
 int reiserfs_xattr_set(struct inode *inode, const char *name,
-                       const void *buffer, size_t buffer_size, int flags)
+		       const void *buffer, size_t buffer_size, int flags)
 {
 
 	struct reiserfs_transaction_handle th;
@@ -385,7 +386,7 @@ int reiserfs_xattr_set(struct inode *inode, const char *name,
 	}
 
 	error = reiserfs_xattr_set_handle(&th, inode, name,
-	                                  buffer, buffer_size, flags);
+					  buffer, buffer_size, flags);
 
 	error2 = journal_end(&th, inode->i_sb, jbegin_count);
 	if (error == 0)
@@ -494,7 +495,7 @@ reiserfs_xattr_get(struct inode *inode, const char *name, void *buffer,
 		goto out_fput;
 	}
 
-      out_fput:
+out_fput:
 	mutex_unlock(&fp->f_path.dentry->d_inode->i_mutex);
 	fput(fp);
 
@@ -518,7 +519,8 @@ static int __restart_transaction_if_needed(struct inode *inode, int chunk)
 
 	/* we cannot restart while nested */
 	if (th->t_refcount > 1) {
-		reiserfs_warning(th->t_super, "jdm-20003", "can't restart nested transaction in %s\n", __FUNCTION__);
+		reiserfs_warning(th->t_super, "jdm-20003", "can't restart "
+				 "nested transaction in %s\n", __FUNCTION__);
 		return 0;
 	}
 
@@ -544,7 +546,7 @@ struct reiserfs_dentry_buf {
 
 static int
 fill_with_dentries(void *buf, const char *name, int namelen, loff_t offset,
-                   u64 ino, unsigned int d_type)
+		    u64 ino, unsigned int d_type)
 {
 	struct reiserfs_dentry_buf *dbuf = buf;
 	struct dentry *dentry;
@@ -552,7 +554,8 @@ fill_with_dentries(void *buf, const char *name, int namelen, loff_t offset,
 	if (dbuf->count == ARRAY_SIZE(dbuf->dentries))
 		return -ENOSPC;
 
-	if (name[0] == '.' && (name[1] == '\0' || (name[1] == '.' && name[2] == '\0')))
+	if (name[0] == '.' && (name[1] == '\0' ||
+			       (name[1] == '.' && name[2] == '\0')))
 		return 0;
 
 	dentry = lookup_one_len(name, dbuf->xadir, namelen);
@@ -571,7 +574,7 @@ fill_with_dentries(void *buf, const char *name, int namelen, loff_t offset,
 typedef int(*xattr_action)(struct dentry *dentry, void *data);
 
 static int reiserfs_for_each_xattr(struct inode *inode, xattr_action action,
-                                   void *data)
+				   void *data)
 {
 	struct file *fp;
 	struct dentry *dir;
@@ -649,12 +652,14 @@ static int delete_one_xattr(struct dentry *dentry, void *data)
 		int err;
 		struct reiserfs_transaction_handle th;
 		int nblocks = JOURNAL_PER_BALANCE_CNT * 2 + 2 +
-		              4 * REISERFS_QUOTA_TRANS_BLOCKS(dir->i_sb);
+			      4 * REISERFS_QUOTA_TRANS_BLOCKS(dir->i_sb);
 
 		BUG_ON(dentry == dentry->d_parent);
 		if (dir == dentry->d_inode) {
-			printk ("dir = %s\n", dentry->d_parent->d_name.name);
-			printk ("dentry = %s\n", dentry->d_name.name);
+			reiserfs_warning(dir->i_sb, "jdm-xattr2",
+					 "dir = %s; dentry = %s\n",
+					 dentry->d_parent->d_name.name,
+					 dentry->d_name.name);
 			return -EBUSY;
 		}
 
@@ -758,7 +763,7 @@ struct listxattr_buf {
 };
 
 static int listxattr_filler(void *buf, const char *name, int namelen,
-                            loff_t offset, u64 ino, unsigned int d_type)
+			    loff_t offset, u64 ino, unsigned int d_type)
 {
 	struct listxattr_buf *b = (struct listxattr_buf *)buf;
 	size_t size;
@@ -766,12 +771,12 @@ static int listxattr_filler(void *buf, const char *name, int namelen,
 	    (namelen != 1 && (name[1] != '.' || namelen != 2))) {
 		struct xattr_handler *handler;
 		handler = find_xattr_handler_prefix(b->inode->i_sb->s_xattr,
-		                                    name);
+						    name);
 		if (!handler)	/* Unsupported xattr name */
 			return 0;
 		if (b->buf) {
 			size = handler->list(b->inode, b->buf + b->pos,
-			                 b->size, name, namelen);
+					 b->size, name, namelen);
 			if (size > b->size)
 				return -ERANGE;
 		} else {
@@ -869,9 +874,9 @@ int reiserfs_xattr_init(struct super_block *s, int mount_flags)
 			/* Old format filesystem, but optional xattrs have
 			 * been enabled. Error out. */
 			reiserfs_warning(s, "jdm-2005",
-			                 "xattrs/ACLs not supported "
-			                 "on pre-v3.6 format filesystems. "
-			                 "Failing mount.");
+					 "xattrs/ACLs not supported "
+					 "on pre-v3.6 format filesystems. "
+					 "Failing mount.");
 			err = -EOPNOTSUPP;
 		}
 		return err;
@@ -886,7 +891,7 @@ int reiserfs_xattr_init(struct super_block *s, int mount_flags)
 			if (!(mount_flags & MS_RDONLY) && !dentry->d_inode) {
 				struct inode *inode = dentry->d_parent->d_inode;
 				mutex_lock_nested(&inode->i_mutex,
-				                  I_MUTEX_XATTR);
+						  I_MUTEX_XATTR);
 				err = inode->i_op->mkdir(inode, dentry, 0700);
 				mutex_unlock(&inode->i_mutex);
 				if (err) {
@@ -896,7 +901,7 @@ int reiserfs_xattr_init(struct super_block *s, int mount_flags)
 
 				if (dentry && dentry->d_inode)
 					reiserfs_info(s, "Created %s - "
-					              "reserved for xattr "
+						      "reserved for xattr "
 						      "storage.\n",
 						      PRIVROOT_NAME);
 			} else if (!dentry->d_inode) {
@@ -915,7 +920,7 @@ int reiserfs_xattr_init(struct super_block *s, int mount_flags)
 			 * created. Not an error -- just no xattrs on the fs. We'll
 			 * check again if we go read-write */
 			reiserfs_warning(s, "jdm-20006",
-			                 "xattrs/ACLs enabled and couldn't "
+					 "xattrs/ACLs enabled and couldn't "
 					 "find/create .reiserfs_priv. "
 					 "Failing mount.");
 			err = -EOPNOTSUPP;

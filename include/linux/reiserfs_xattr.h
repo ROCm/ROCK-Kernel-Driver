@@ -51,16 +51,18 @@ int reiserfs_permission(struct inode *inode, int mask, struct nameidata *nd);
 
 int reiserfs_xattr_get(struct inode *, const char *, void *, size_t);
 int reiserfs_xattr_set(struct inode *, const char *, const void *, size_t, int);
-int reiserfs_xattr_set_handle(struct reiserfs_transaction_handle *,struct inode *, const char *, const void *, size_t, int);
+int reiserfs_xattr_set_handle(struct reiserfs_transaction_handle *,
+			      struct inode *, const char *, const void *,
+			      size_t, int);
 
 extern struct xattr_handler reiserfs_xattr_user_handler;
 extern struct xattr_handler reiserfs_xattr_trusted_handler;
 extern struct xattr_handler reiserfs_xattr_security_handler;
 #ifdef CONFIG_REISERFS_FS_SECURITY
 int reiserfs_security_init(struct inode *dir, struct inode *inode,
-                           struct reiserfs_security_handle *sec);
+			   struct reiserfs_security_handle *sec);
 int reiserfs_security_write(struct reiserfs_transaction_handle *th,
-                            struct inode *inode,
+			    struct inode *inode,
 			    struct reiserfs_security_handle *sec);
 void reiserfs_security_free(struct reiserfs_security_handle *sec);
 #endif
@@ -72,7 +74,15 @@ static inline void reiserfs_mark_inode_private(struct inode *inode)
 }
 
 #define xattr_size(size) ((size) + sizeof (struct reiserfs_xattr_header))
-#define reiserfs_xattr_nblocks(inode, size) (reiserfs_file_data_log(inode) && _ROUND_UP(xattr_size(size), (inode)->i_sb->s_blocksize) >> (inode)->i_sb->s_blocksize_bits)
+static inline loff_t reiserfs_xattr_nblocks(struct inode *inode, loff_t size)
+{
+	loff_t ret = 0;
+	if (reiserfs_file_data_log(inode)) {
+		ret = _ROUND_UP(xattr_size(size), inode->i_sb->s_blocksize);
+		ret >>= inode->i_sb->s_blocksize_bits;
+	}
+	return ret;
+}
 
 /* We may have to create up to 3 objects: xattr root, xattr dir, xattr file.
  * Let's try to be smart about it.
@@ -130,14 +140,15 @@ static inline void reiserfs_init_xattr_rwsem(struct inode *inode)
 
 #ifndef CONFIG_REISERFS_FS_SECURITY
 static inline int reiserfs_security_init(struct inode *dir,
-                                         struct inode *inode,
-                                         struct reiserfs_security_handle *sec)
+					 struct inode *inode,
+					 struct reiserfs_security_handle *sec)
 {
 	return 0;
 }
-static inline int reiserfs_security_write(struct reiserfs_transaction_handle *th,
-                                          struct inode *inode,
-					  struct reiserfs_security_handle *sec)
+static inline int
+reiserfs_security_write(struct reiserfs_transaction_handle *th,
+			struct inode *inode,
+			struct reiserfs_security_handle *sec)
 {
 	return 0;
 }

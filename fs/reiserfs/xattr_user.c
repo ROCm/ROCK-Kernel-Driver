@@ -32,7 +32,7 @@ user_set(struct inode *inode, const char *name, const void *buffer,
 }
 
 static size_t user_list(struct inode *inode, char *list, size_t list_size,
-                        const char *name, size_t name_len)
+			const char *name, size_t name_len)
 {
 	const size_t len = name_len + 1;
 
