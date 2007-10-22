@@ -55,6 +55,7 @@ static struct hda_vendor_id hda_vendor_ids[] = {
 	{ 0x10ec, "Realtek" },
 	{ 0x1057, "Motorola" },
 	{ 0x1106, "VIA" },
+	{ 0x111d, "IDT" },
 	{ 0x11d4, "Analog Devices" },
 	{ 0x13f6, "C-Media" },
 	{ 0x14f1, "Conexant" },
@@ -626,24 +627,19 @@ int __devinit snd_hda_codec_new(struct hda_bus *bus, unsigned int codec_addr,
 		snd_hda_get_codec_name(codec, bus->card->mixername,
 				       sizeof(bus->card->mixername));
 
-#ifdef CONFIG_SND_HDA_GENERIC
 	if (is_generic_config(codec)) {
 		err = snd_hda_parse_generic_codec(codec);
 		goto patched;
 	}
-#endif
 	if (codec->preset && codec->preset->patch) {
 		err = codec->preset->patch(codec);
 		goto patched;
 	}
 
 	/* call the default parser */
-#ifdef CONFIG_SND_HDA_GENERIC
 	err = snd_hda_parse_generic_codec(codec);
-#else
-	printk(KERN_ERR "hda-codec: No codec parser is available\n");
-	err = -ENODEV;
-#endif
+	if (err < 0)
+		printk(KERN_ERR "hda-codec: No codec parser is available\n");
 
  patched:
 	if (err < 0) {
