@@ -122,6 +122,7 @@ void __remove_from_page_cache(struct page *page)
 	__dec_zone_page_state(page, NR_FILE_PAGES);
 	BUG_ON(page_mapped(page));
 }
+EXPORT_SYMBOL_GPL(__remove_from_page_cache);
 
 void remove_from_page_cache(struct page *page)
 {
@@ -133,6 +134,7 @@ void remove_from_page_cache(struct page *page)
 	__remove_from_page_cache(page);
 	write_unlock_irq(&mapping->tree_lock);
 }
+EXPORT_SYMBOL_GPL(remove_from_page_cache);
 
 static int sync_page(void *word)
 {
@@ -720,6 +722,7 @@ unsigned find_get_pages(struct address_space *mapping, pgoff_t start,
 	read_unlock_irq(&mapping->tree_lock);
 	return ret;
 }
+EXPORT_SYMBOL_GPL(add_to_page_cache_lru);
 
 /**
  * find_get_pages_contig - gang contiguous pagecache lookup
@@ -839,6 +842,7 @@ static void shrink_readahead_size_eio(struct file *filp,
 
 	ra->ra_pages /= 4;
 }
+EXPORT_SYMBOL_GPL(find_get_pages);
 
 /**
  * do_generic_mapping_read - generic file read routine
