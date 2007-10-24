@@ -41,15 +41,7 @@
 
 #include "aic7xxx_osm.h"
 #include "aic7xxx_pci.h"
-
-static int	ahc_linux_pci_dev_probe(struct pci_dev *pdev,
-					const struct pci_device_id *ent);
-static int	ahc_linux_pci_reserve_io_region(struct ahc_softc *ahc,
-						u_long *base);
-static int	ahc_linux_pci_reserve_mem_region(struct ahc_softc *ahc,
-						 u_long *bus_addr,
-						 uint8_t __iomem **maddr);
-static void	ahc_linux_pci_dev_remove(struct pci_dev *pdev);
+#include "aic7xxx_inline.h"
 
 /* Define the macro locally since it's different for different class of chips.
 */
@@ -130,12 +122,68 @@ static struct pci_device_id ahc_linux_pci_id_table[] = {
 
 MODULE_DEVICE_TABLE(pci, ahc_linux_pci_id_table);
 
-static struct pci_driver aic7xxx_pci_driver = {
-	.name		= "aic7xxx",
-	.probe		= ahc_linux_pci_dev_probe,
-	.remove		= ahc_linux_pci_dev_remove,
-	.id_table	= ahc_linux_pci_id_table
-};
+#ifdef CONFIG_PM
+static int
+ahc_linux_pci_dev_suspend(struct pci_dev *pdev, pm_message_t mesg)
+{
+	struct ahc_softc *ahc = pci_get_drvdata(pdev);
+
+	ahc_pause_and_flushwork(ahc);
+
+	if (LIST_FIRST(&ahc->pending_scbs) != NULL) {
+		ahc_unpause(ahc);
+		return -EBUSY;
+	}
+
+#ifdef AHC_TARGET_MODE
+	/*
+	 * XXX What about ATIOs that have not yet been serviced?
+	 * Perhaps we should just refuse to be suspended if we
+	 * are acting in a target role.
+	 */
+	if (ahc->pending_device != NULL) {
+		ahc_unpause(ahc);
+		return -EBUSY;
+	}
+#endif
+	ahc_shutdown(ahc);
+
+	pci_save_state(pdev);
+	pci_disable_device(pdev);
+
+	if (mesg.event == PM_EVENT_SUSPEND)
+		pci_set_power_state(pdev, PCI_D3hot);
+
+	return 0;
+}
+
+static int
+ahc_linux_pci_dev_resume(struct pci_dev *pdev)
+{
+	struct ahc_softc *ahc = pci_get_drvdata(pdev);
+	int rc;
+
+	pci_set_power_state(pdev, PCI_D0);
+	pci_restore_state(pdev);
+
+	rc = pci_enable_device(pdev);
+	if (rc) {
+		dev_printk(KERN_ERR, &pdev->dev,
+			   "failed to enable device after resume (%d)\n", rc);
+		return rc;
+	}
+
+	pci_set_master(pdev);
+
+	ahc_pci_resume(ahc);
+
+	ahc_reset(ahc, /*reinit*/TRUE);
+	ahc_intr_enable(ahc, TRUE); 
+	ahc_restart(ahc);
+
+	return rc;
+}
+#endif /* CONFIG_PM */
 
 static void
 ahc_linux_pci_dev_remove(struct pci_dev *pdev)
@@ -144,7 +192,7 @@ ahc_linux_pci_dev_remove(struct pci_dev *pdev)
 	u_long s;
 
 	if (ahc->platform_data && ahc->platform_data->host)
-			scsi_remove_host(ahc->platform_data->host);
+		scsi_remove_host(ahc->platform_data->host);
 
 	ahc_lock(ahc, &s);
 	ahc_intr_enable(ahc, FALSE);
@@ -242,6 +290,17 @@ ahc_linux_pci_dev_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	ahc_linux_register_host(ahc, &aic7xxx_driver_template);
 	return (0);
 }
+
+static struct pci_driver aic7xxx_pci_driver = {
+	.name		= "aic7xxx",
+	.probe		= ahc_linux_pci_dev_probe,
+#ifdef CONFIG_PM
+	.suspend	= ahc_linux_pci_dev_suspend,
+	.resume		= ahc_linux_pci_dev_resume,
+#endif
+	.remove		= ahc_linux_pci_dev_remove,
+	.id_table	= ahc_linux_pci_id_table
+};
 
 int
 ahc_linux_pci_init(void)

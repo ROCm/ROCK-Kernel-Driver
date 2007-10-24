@@ -899,8 +899,6 @@ union ahc_bus_softc {
 
 typedef void (*ahc_bus_intr_t)(struct ahc_softc *);
 typedef int (*ahc_bus_chip_init_t)(struct ahc_softc *);
-typedef int (*ahc_bus_suspend_t)(struct ahc_softc *);
-typedef int (*ahc_bus_resume_t)(struct ahc_softc *);
 typedef void ahc_callback_t (void *);
 
 struct ahc_softc {
@@ -960,16 +958,6 @@ struct ahc_softc {
 	 * after a chip reset.
 	 */
 	ahc_bus_chip_init_t	  bus_chip_init;
-
-	/*
-	 * Bus specific suspend routine.
-	 */
-	ahc_bus_suspend_t	  bus_suspend;
-
-	/*
-	 * Bus specific resume routine.
-	 */
-	ahc_bus_resume_t	  bus_resume;
 
 	/*
 	 * Target mode related state kept on a per enabled lun basis.
@@ -1153,6 +1141,7 @@ struct ahc_pci_identity	*ahc_find_pci_device(ahc_dev_softc_t);
 int			 ahc_pci_config(struct ahc_softc *,
 					struct ahc_pci_identity *);
 int			 ahc_pci_test_register_access(struct ahc_softc *);
+void			 ahc_pci_resume(struct ahc_softc *ahc);
 
 /*************************** EISA/VL Front End ********************************/
 struct aic7770_identity *aic7770_find_device(uint32_t);
@@ -1179,14 +1168,13 @@ int			 ahc_chip_init(struct ahc_softc *ahc);
 int			 ahc_init(struct ahc_softc *ahc);
 void			 ahc_intr_enable(struct ahc_softc *ahc, int enable);
 void			 ahc_pause_and_flushwork(struct ahc_softc *ahc);
-int			 ahc_suspend(struct ahc_softc *ahc); 
-int			 ahc_resume(struct ahc_softc *ahc);
 void			 ahc_set_unit(struct ahc_softc *, int);
 void			 ahc_set_name(struct ahc_softc *, char *);
 void			 ahc_alloc_scbs(struct ahc_softc *ahc);
 void			 ahc_free(struct ahc_softc *ahc);
 int			 ahc_reset(struct ahc_softc *ahc, int reinit);
-void			 ahc_shutdown(void *arg);
+void			 ahc_restart(struct ahc_softc *ahc);
+void			 ahc_shutdown(struct ahc_softc *ahc); 
 
 /*************************** Interrupt Services *******************************/
 void			ahc_clear_intstat(struct ahc_softc *ahc);

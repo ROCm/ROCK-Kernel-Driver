@@ -1003,8 +1003,15 @@ struct ahd_suspend_channel_state {
 	uint8_t	seqctl;
 };
 
+struct ahd_suspend_pci_state {
+	uint32_t  devconfig;
+	uint8_t   command;
+	uint8_t   csize_lattime;
+};
+
 struct ahd_suspend_state {
 	struct	ahd_suspend_channel_state channel[2];
+	struct  ahd_suspend_pci_state pci_state;
 	uint8_t	optionmode;
 	uint8_t	dscommand0;
 	uint8_t	dspcistatus;
@@ -1343,6 +1350,8 @@ struct ahd_softc	*ahd_alloc(void *platform_arg, char *name);
 int			 ahd_softc_init(struct ahd_softc *);
 void			 ahd_controller_info(struct ahd_softc *ahd, char *buf);
 int			 ahd_init(struct ahd_softc *ahd);
+void			 ahd_shutdown(void *arg);
+void			 ahd_restart(struct ahd_softc *ahd);
 int			 ahd_default_config(struct ahd_softc *ahd);
 int			 ahd_parse_vpddata(struct ahd_softc *ahd,
 					   struct vpd_config *vpd);
