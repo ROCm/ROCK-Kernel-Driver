@@ -66,9 +66,7 @@ static const struct e1000_info *e1000_info_tbl[] = {
  **/
 char *e1000e_get_hw_dev_name(struct e1000_hw *hw)
 {
-	struct e1000_adapter *adapter = hw->back;
-	struct net_device *netdev = adapter->netdev;
-	return netdev->name;
+	return hw->adapter->netdev->name;
 }
 #endif
 
@@ -1149,12 +1147,12 @@ static irqreturn_t e1000_intr_msi(int irq, void *data)
 			mod_timer(&adapter->watchdog_timer, jiffies + 1);
 	}
 
-	if (netif_rx_schedule_prep(netdev)) {
+	if (netif_rx_schedule_prep(netdev, &adapter->napi)) {
 		adapter->total_tx_bytes = 0;
 		adapter->total_tx_packets = 0;
 		adapter->total_rx_bytes = 0;
 		adapter->total_rx_packets = 0;
-		__netif_rx_schedule(netdev);
+		__netif_rx_schedule(netdev, &adapter->napi);
 	} else {
 		atomic_dec(&adapter->irq_sem);
 	}
@@ -1212,12 +1210,12 @@ static irqreturn_t e1000_intr(int irq, void *data)
 			mod_timer(&adapter->watchdog_timer, jiffies + 1);
 	}
 
-	if (netif_rx_schedule_prep(netdev)) {
+	if (netif_rx_schedule_prep(netdev, &adapter->napi)) {
 		adapter->total_tx_bytes = 0;
 		adapter->total_tx_packets = 0;
 		adapter->total_rx_bytes = 0;
 		adapter->total_rx_packets = 0;
-		__netif_rx_schedule(netdev);
+		__netif_rx_schedule(netdev, &adapter->napi);
 	} else {
 		atomic_dec(&adapter->irq_sem);
 	}
@@ -1483,7 +1481,6 @@ static void e1000_clean_tx_ring(struct e1000_adapter *adapter)
 
 	tx_ring->next_to_use = 0;
 	tx_ring->next_to_clean = 0;
-	tx_ring->last_tx_tso = 0;
 
 	writel(0, adapter->hw.hw_addr + tx_ring->head);
 	writel(0, adapter->hw.hw_addr + tx_ring->tail);
@@ -1663,10 +1660,10 @@ set_itr_now:
  * e1000_clean - NAPI Rx polling callback
  * @adapter: board private structure
  **/
-static int e1000_clean(struct net_device *poll_dev, int *budget)
+static int e1000_clean(struct napi_struct *napi, int budget)
 {
-	struct e1000_adapter *adapter;
-	int work_to_do = min(*budget, poll_dev->quota);
+	struct e1000_adapter *adapter = container_of(napi, struct e1000_adapter, napi);
+	struct net_device *poll_dev = adapter->netdev;
 	int tx_cleaned = 0, work_done = 0;
 
 	/* Must NOT use netdev_priv macro here. */
@@ -1685,25 +1682,19 @@ static int e1000_clean(struct net_device *poll_dev, int *budget)
 		spin_unlock(&adapter->tx_queue_lock);
 	}
 
-	adapter->clean_rx(adapter, &work_done, work_to_do);
-	*budget -= work_done;
-	poll_dev->quota -= work_done;
+	adapter->clean_rx(adapter, &work_done, budget);
 
 	/* If no Tx and not enough Rx work done, exit the polling mode */
-	if ((!tx_cleaned && (work_done == 0)) ||
+	if ((!tx_cleaned && (work_done < budget)) ||
 	   !netif_running(poll_dev)) {
 quit_polling:
 		if (adapter->itr_setting & 3)
 			e1000_set_itr(adapter);
-		netif_rx_complete(poll_dev);
-		if (test_bit(__E1000_DOWN, &adapter->state))
-			atomic_dec(&adapter->irq_sem);
-		else
-			e1000_irq_enable(adapter);
-		return 0;
+		netif_rx_complete(poll_dev, napi);
+		e1000_irq_enable(adapter);
 	}
 
-	return 1;
+	return work_done;
 }
 
 static void e1000_vlan_rx_add_vid(struct net_device *netdev, u16 vid)
@@ -2010,7 +2001,6 @@ static void e1000_setup_rctl(struct e1000_adapter *adapter)
 		break;
 	}
 
-#ifndef CONFIG_E1000_DISABLE_PACKET_SPLIT
 	/*
 	 * 82571 and greater support packet-split where the protocol
 	 * header is placed in skb->data and the packet data is
@@ -2030,7 +2020,7 @@ static void e1000_setup_rctl(struct e1000_adapter *adapter)
 	pages = PAGE_USE_COUNT(adapter->netdev->mtu);
 	if ((pages <= 3) && (PAGE_SIZE <= 16384) && (rctl & E1000_RCTL_LPE))
 		adapter->rx_ps_pages = pages;
-#endif
+
 	if (adapter->rx_ps_pages) {
 		/* Configure extra packet-split registers */
 		rfctl = er32(RFCTL);
@@ -2441,7 +2431,7 @@ int e1000e_up(struct e1000_adapter *adapter)
 
 	clear_bit(__E1000_DOWN, &adapter->state);
 
-	netif_poll_enable(adapter->netdev);
+	napi_enable(&adapter->napi);
 	e1000_irq_enable(adapter);
 
 	/* fire a link change interrupt to start the watchdog */
@@ -2474,7 +2464,7 @@ void e1000e_down(struct e1000_adapter *adapter)
 	e1e_flush();
 	msleep(10);
 
-	netif_poll_disable(netdev);
+	napi_disable(&adapter->napi);
 	e1000_irq_disable(adapter);
 
 	del_timer_sync(&adapter->watchdog_timer);
@@ -2607,7 +2597,7 @@ static int e1000_open(struct net_device *netdev)
 	/* From here on the code is the same as e1000e_up() */
 	clear_bit(__E1000_DOWN, &adapter->state);
 
-	netif_poll_enable(netdev);
+	napi_enable(&adapter->napi);
 
 	e1000_irq_enable(adapter);
 
@@ -3216,15 +3206,6 @@ static int e1000_tx_map(struct e1000_adapter *adapter,
 	while (len) {
 		buffer_info = &tx_ring->buffer_info[i];
 		size = min(len, max_per_txd);
-		/* Workaround for Controller erratum --
-		 * descriptor for non-tso packet in a linear SKB that follows a
-		 * tso gets written back prematurely before the data is fully
-		 * DMA'd to the controller */
-		if (tx_ring->last_tx_tso && !skb_is_gso(skb)) {
-			tx_ring->last_tx_tso = 0;
-			if (!skb->data_len)
-				size -= 4;
-		}
 
 		/* Workaround for premature desc write-backs
 		 * in TSO mode.  Append 4-byte sentinel desc */
@@ -3443,14 +3424,13 @@ static int e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 	unsigned int max_per_txd = E1000_MAX_PER_TXD;
 	unsigned int max_txd_pwr = E1000_MAX_TXD_PWR;
 	unsigned int tx_flags = 0;
-	unsigned int len = skb->len;
+	unsigned int len = skb->len - skb->data_len;
 	unsigned long irq_flags;
-	unsigned int nr_frags = 0;
-	unsigned int mss = 0;
+	unsigned int nr_frags;
+	unsigned int mss;
 	int count = 0;
 	int tso;
 	unsigned int f;
-	len -= skb->data_len;
 
 	if (test_bit(__E1000_DOWN, &adapter->state)) {
 		dev_kfree_skb_any(skb);
@@ -3478,7 +3458,7 @@ static int e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 		* points to just header, pull a few bytes of payload from
 		* frags into skb->data */
 		hdr_len = skb_transport_offset(skb) + tcp_hdrlen(skb);
-		if (skb->data_len && (hdr_len == (skb->len - skb->data_len))) {
+		if (skb->data_len && (hdr_len == len)) {
 			unsigned int pull_size;
 
 			pull_size = min((unsigned int)4, skb->data_len);
@@ -3496,10 +3476,6 @@ static int e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 	if ((mss) || (skb->ip_summed == CHECKSUM_PARTIAL))
 		count++;
 	count++;
-
-	/* Controller Erratum workaround */
-	if (!skb->data_len && tx_ring->last_tx_tso && !skb_is_gso(skb))
-		count++;
 
 	count += TXD_USE_COUNT(len, max_txd_pwr);
 
@@ -3536,12 +3512,10 @@ static int e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 		return NETDEV_TX_OK;
 	}
 
-	if (tso) {
-		tx_ring->last_tx_tso = 1;
+	if (tso)
 		tx_flags |= E1000_TX_FLAGS_TSO;
-	} else if (e1000_tx_csum(adapter, skb)) {
+	else if (e1000_tx_csum(adapter, skb))
 		tx_flags |= E1000_TX_FLAGS_CSUM;
-	}
 
 	/* Old method was to assume IPv4 packet by default if TSO was enabled.
 	 * 82571 hardware supports TSO capabilities for IPv6 as well...
@@ -3554,7 +3528,7 @@ static int e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 		/* handle pci_map_single() error in e1000_tx_map */
 		dev_kfree_skb_any(skb);
 		spin_unlock_irqrestore(&adapter->tx_queue_lock, irq_flags);
-		return NETDEV_TX_BUSY;
+		return NETDEV_TX_OK;
 	}
 
 	e1000_tx_queue(adapter, tx_flags, count);
@@ -3982,6 +3956,7 @@ static void e1000_print_device_info(struct e1000_adapter *adapter)
 {
 	struct e1000_hw *hw = &adapter->hw;
 	struct net_device *netdev = adapter->netdev;
+	u32 part_num;
 
 	/* print bus type/speed/width info */
 	ndev_info(netdev, "(PCI Express:2.5GB/s:%s) "
@@ -3996,6 +3971,10 @@ static void e1000_print_device_info(struct e1000_adapter *adapter)
 	ndev_info(netdev, "Intel(R) PRO/%s Network Connection\n",
 		  (hw->phy.type == e1000_phy_ife)
 		   ? "10/100" : "1000");
+	e1000e_read_part_num(hw, &part_num);
+	ndev_info(netdev, "MAC: %d, PHY: %d, PBA No: %06x-%03x\n",
+		  hw->mac.type, hw->phy.type,
+		  (part_num >> 8), (part_num & 0xff));
 }
 
 /**
@@ -4058,7 +4037,6 @@ static int __devinit e1000_probe(struct pci_dev *pdev,
 	if (!netdev)
 		goto err_alloc_etherdev;
 
-	SET_MODULE_OWNER(netdev);
 	SET_NETDEV_DEV(netdev, &pdev->dev);
 
 	pci_set_drvdata(pdev, netdev);
@@ -4102,8 +4080,7 @@ static int __devinit e1000_probe(struct pci_dev *pdev,
 	e1000e_set_ethtool_ops(netdev);
 	netdev->tx_timeout		= &e1000_tx_timeout;
 	netdev->watchdog_timeo		= 5 * HZ;
-	netdev->poll			= &e1000_clean;
-	netdev->weight			= 64;
+	netif_napi_add(netdev, &adapter->napi, e1000_clean, 64);
 	netdev->vlan_rx_register	= e1000_vlan_rx_register;
 	netdev->vlan_rx_add_vid		= e1000_vlan_rx_add_vid;
 	netdev->vlan_rx_kill_vid	= e1000_vlan_rx_kill_vid;
@@ -4218,6 +4195,7 @@ static int __devinit e1000_probe(struct pci_dev *pdev,
 
 	/* Initialize link parameters. User can change them with ethtool */
 	adapter->hw.mac.autoneg = 1;
+	adapter->fc_autoneg = 1;
 	adapter->hw.mac.original_fc = e1000_fc_default;
 	adapter->hw.mac.fc = e1000_fc_default;
 	adapter->hw.phy.autoneg_advertised = 0x2f;
@@ -4272,7 +4250,6 @@ static int __devinit e1000_probe(struct pci_dev *pdev,
 	/* tell the stack to leave us alone until e1000_open() is called */
 	netif_carrier_off(netdev);
 	netif_stop_queue(netdev);
-	netif_poll_disable(netdev);
 
 	strcpy(netdev->name, "eth%d");
 	err = register_netdev(netdev);
@@ -4430,9 +4407,10 @@ static struct pci_driver e1000_driver = {
 static int __init e1000_init_module(void)
 {
 	int ret;
-	printk(KERN_INFO "Intel(R) PRO/1000 Network Driver - %s\n",
-	       e1000e_driver_version);
-	printk(KERN_INFO "Copyright (c) 1999-2007 Intel Corporation.\n");
+	printk(KERN_INFO "%s: Intel(R) PRO/1000 Network Driver - %s\n",
+	       e1000e_driver_name, e1000e_driver_version);
+	printk(KERN_INFO "%s: Copyright (c) 1999-2007 Intel Corporation.\n",
+	       e1000e_driver_name);
 	ret = pci_register_driver(&e1000_driver);
 
 	return ret;
