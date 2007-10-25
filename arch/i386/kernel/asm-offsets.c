@@ -17,7 +17,9 @@
 #include <asm/thread_info.h>
 #include <asm/elf.h>
 
+#if defined(CONFIG_XEN) || defined(CONFIG_PARAVIRT_XEN)
 #include <xen/interface/xen.h>
+#endif
 
 #ifdef CONFIG_LGUEST_GUEST
 #include <linux/lguest.h>
@@ -62,6 +64,7 @@ void foo(void)
 	OFFSET(TI_exec_domain, thread_info, exec_domain);
 	OFFSET(TI_flags, thread_info, flags);
 	OFFSET(TI_status, thread_info, status);
+	OFFSET(TI_cpu, thread_info, cpu);
 	OFFSET(TI_preempt_count, thread_info, preempt_count);
 	OFFSET(TI_addr_limit, thread_info, addr_limit);
 	OFFSET(TI_restart_block, thread_info, restart_block);
@@ -119,6 +122,11 @@ void foo(void)
 
 	OFFSET(crypto_tfm_ctx_offset, crypto_tfm, __crt_ctx);
 
+#ifdef CONFIG_XEN
+	BLANK();
+	OFFSET(XEN_START_mfn_list, start_info, mfn_list);
+#endif
+
 #ifdef CONFIG_PARAVIRT
 	BLANK();
 	OFFSET(PARAVIRT_enabled, paravirt_ops, paravirt_enabled);
@@ -129,7 +137,7 @@ void foo(void)
 	OFFSET(PARAVIRT_read_cr0, paravirt_ops, read_cr0);
 #endif
 
-#ifdef CONFIG_XEN
+#ifdef CONFIG_PARAVIRT_XEN
 	BLANK();
 	OFFSET(XEN_vcpu_info_mask, vcpu_info, evtchn_upcall_mask);
 	OFFSET(XEN_vcpu_info_pending, vcpu_info, evtchn_upcall_pending);

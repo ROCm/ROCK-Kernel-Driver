@@ -103,7 +103,7 @@ mcore-$(CONFIG_X86_ES7000)	:= mach-default
 core-$(CONFIG_X86_ES7000)	:= arch/i386/mach-es7000/
 
 # Xen paravirtualization support
-core-$(CONFIG_XEN)		+= arch/i386/xen/
+core-$(CONFIG_PARAVIRT_XEN)	+= arch/i386/xen/
 
 # default subarch .h files
 mflags-y += -Iinclude/asm-i386/mach-default
@@ -128,21 +128,18 @@ AFLAGS += $(mflags-y)
 
 boot := arch/i386/boot
 
-PHONY += zImage bzImage compressed zlilo bzlilo \
+PHONY += zImage bzImage vmlinuz compressed zlilo bzlilo \
          zdisk bzdisk fdimage fdimage144 fdimage288 isoimage install
 
 ifdef CONFIG_XEN
 CPPFLAGS := -Iinclude$(if $(KBUILD_SRC),2)/asm/mach-xen $(CPPFLAGS)
-head-y := arch/i386/kernel/head-xen.o arch/i386/kernel/init_task-xen.o
-boot := arch/i386/boot-xen
-.PHONY: vmlinuz
 all: vmlinuz
 
-vmlinuz: vmlinux
-	$(Q)$(MAKE) $(build)=$(boot) $@
+# KBUILD_IMAGE specifies the target image being built
+KBUILD_IMAGE := $(boot)/vmlinuz
 
-install:
-	$(Q)$(MAKE) $(build)=$(boot) XENGUEST=$(XENGUEST) $@
+vmlinuz: vmlinux
+	$(Q)$(MAKE) $(build)=$(boot) $(KBUILD_IMAGE)
 else
 all: bzImage
 
@@ -163,10 +160,10 @@ zdisk bzdisk: vmlinux
 
 fdimage fdimage144 fdimage288 isoimage: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(KBUILD_IMAGE) $@
+endif
 
 install:
 	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(KBUILD_IMAGE) install
-endif
 
 archclean:
 	$(Q)$(MAKE) $(clean)=arch/i386/boot
@@ -185,4 +182,3 @@ endef
 CLEAN_FILES += arch/$(ARCH)/boot/fdimage \
 	       arch/$(ARCH)/boot/image.iso \
 	       arch/$(ARCH)/boot/mtools.conf
-CLEAN_FILES += vmlinuz vmlinux-stripped

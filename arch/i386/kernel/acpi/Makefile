@@ -5,7 +5,4 @@ ifneq ($(CONFIG_ACPI_PROCESSOR),)
 obj-y				+= cstate.o processor.o
 endif
 
-ifdef CONFIG_XEN
-include $(srctree)/scripts/Makefile.xen
-obj-y := $(call cherrypickxen, $(obj-y), $(src))
-endif
+disabled-obj-$(CONFIG_XEN)	:= cstate.o wakeup.o

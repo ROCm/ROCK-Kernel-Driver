@@ -160,8 +160,13 @@ static inline struct thread_info *current_thread_info(void)
 #define _TIF_ALLWORK_MASK	(0x0000FFFF & ~_TIF_SECCOMP)
 
 /* flags to check in __switch_to() */
+#ifndef CONFIG_XEN
 #define _TIF_WORK_CTXSW_NEXT (_TIF_IO_BITMAP | _TIF_NOTSC | _TIF_DEBUG)
 #define _TIF_WORK_CTXSW_PREV (_TIF_IO_BITMAP | _TIF_NOTSC)
+#else
+#define _TIF_WORK_CTXSW_NEXT (_TIF_NOTSC | _TIF_DEBUG)
+#define _TIF_WORK_CTXSW_PREV (_TIF_NOTSC)
+#endif
 
 /*
  * Thread-synchronous status.

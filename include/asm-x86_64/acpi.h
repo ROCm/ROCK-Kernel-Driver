@@ -117,6 +117,11 @@ extern unsigned long acpi_wakeup_address;
 /* early initialization routine */
 extern void acpi_reserve_bootmem(void);
 
+#ifdef CONFIG_ACPI_PV_SLEEP
+extern int acpi_notify_hypervisor_state(u8 sleep_state,
+	u32 pm1a_cnt, u32 pm1b_cnt);
+#endif /* CONFIG_ACPI_PV_SLEEP */
+
 #else	/* !CONFIG_ACPI */
 
 #define acpi_lapic 0
@@ -133,7 +138,9 @@ extern int acpi_scan_nodes(unsigned long start, unsigned long end);
 extern int acpi_disabled;
 extern int acpi_pci_disabled;
 
+#ifndef CONFIG_XEN
 #define ARCH_HAS_POWER_INIT 1
+#endif
 
 extern int acpi_skip_timer_override;
 extern int acpi_use_timer_override;

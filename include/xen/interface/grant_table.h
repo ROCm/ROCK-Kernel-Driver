@@ -1,9 +1,9 @@
 /******************************************************************************
  * grant_table.h
- *
+ * 
  * Interface for granting foreign access to page frames, and receiving
  * page-ownership transfers.
- *
+ * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
  * deal in the Software without restriction, including without limitation the
@@ -36,10 +36,10 @@
 /* Some rough guidelines on accessing and updating grant-table entries
  * in a concurrency-safe manner. For more information, Linux contains a
  * reference implementation for guest OSes (arch/xen/kernel/grant_table.c).
- *
+ * 
  * NB. WMB is a no-op on current-generation x86 processors. However, a
  *     compiler barrier will still be required.
- *
+ * 
  * Introducing a valid entry into the grant table:
  *  1. Write ent->domid.
  *  2. Write ent->frame:
@@ -48,7 +48,7 @@
  *                           frame, or zero if none.
  *  3. Write memory barrier (WMB).
  *  4. Write ent->flags, inc. valid type.
- *
+ * 
  * Invalidating an unused GTF_permit_access entry:
  *  1. flags = ent->flags.
  *  2. Observe that !(flags & (GTF_reading|GTF_writing)).
@@ -60,7 +60,7 @@
  *  This cannot be done directly. Request assistance from the domain controller
  *  which can set a timeout on the use of a grant entry and take necessary
  *  action. (NB. This is not yet implemented!).
- *
+ * 
  * Invalidating an unused GTF_accept_transfer entry:
  *  1. flags = ent->flags.
  *  2. Observe that !(flags & GTF_transfer_committed). [*]
@@ -78,7 +78,7 @@
  *
  * Changing a GTF_permit_access from writable to read-only:
  *  Use SMP-safe CMPXCHG to set GTF_readonly, while checking !GTF_writing.
- *
+ * 
  * Changing a GTF_permit_access from read-only to writable:
  *  Use SMP-safe bit-setting instruction.
  */
@@ -100,6 +100,7 @@ struct grant_entry {
      */
     uint32_t frame;
 };
+typedef struct grant_entry grant_entry_t;
 
 /*
  * Type of grant entry.
@@ -167,7 +168,7 @@ typedef uint32_t grant_handle_t;
  *  2. If GNTMAP_host_map is specified then a mapping will be added at
  *     either a host virtual address in the current address space, or at
  *     a PTE at the specified machine address.  The type of mapping to
- *     perform is selected through the GNTMAP_contains_pte flag, and the
+ *     perform is selected through the GNTMAP_contains_pte flag, and the 
  *     address is specified in <host_addr>.
  *  3. Mappings should only be destroyed via GNTTABOP_unmap_grant_ref. If a
  *     host mapping is destroyed by other means then it is *NOT* guaranteed
@@ -185,6 +186,8 @@ struct gnttab_map_grant_ref {
     grant_handle_t handle;
     uint64_t dev_bus_addr;
 };
+typedef struct gnttab_map_grant_ref gnttab_map_grant_ref_t;
+DEFINE_XEN_GUEST_HANDLE(gnttab_map_grant_ref_t);
 
 /*
  * GNTTABOP_unmap_grant_ref: Destroy one or more grant-reference mappings
@@ -206,6 +209,8 @@ struct gnttab_unmap_grant_ref {
     /* OUT parameters. */
     int16_t  status;              /* GNTST_* */
 };
+typedef struct gnttab_unmap_grant_ref gnttab_unmap_grant_ref_t;
+DEFINE_XEN_GUEST_HANDLE(gnttab_unmap_grant_ref_t);
 
 /*
  * GNTTABOP_setup_table: Set up a grant table for <dom> comprising at least
@@ -223,8 +228,10 @@ struct gnttab_setup_table {
     uint32_t nr_frames;
     /* OUT parameters. */
     int16_t  status;              /* GNTST_* */
-    ulong *frame_list;
+    XEN_GUEST_HANDLE(ulong) frame_list;
 };
+typedef struct gnttab_setup_table gnttab_setup_table_t;
+DEFINE_XEN_GUEST_HANDLE(gnttab_setup_table_t);
 
 /*
  * GNTTABOP_dump_table: Dump the contents of the grant table to the
@@ -237,24 +244,28 @@ struct gnttab_dump_table {
     /* OUT parameters. */
     int16_t status;               /* GNTST_* */
 };
+typedef struct gnttab_dump_table gnttab_dump_table_t;
+DEFINE_XEN_GUEST_HANDLE(gnttab_dump_table_t);
 
 /*
  * GNTTABOP_transfer_grant_ref: Transfer <frame> to a foreign domain. The
  * foreign domain has previously registered its interest in the transfer via
  * <domid, ref>.
- *
+ * 
  * Note that, even if the transfer fails, the specified page no longer belongs
  * to the calling domain *unless* the error is GNTST_bad_page.
  */
 #define GNTTABOP_transfer                4
 struct gnttab_transfer {
     /* IN parameters. */
-    unsigned long mfn;
+    xen_pfn_t     mfn;
     domid_t       domid;
     grant_ref_t   ref;
     /* OUT parameters. */
     int16_t       status;
 };
+typedef struct gnttab_transfer gnttab_transfer_t;
+DEFINE_XEN_GUEST_HANDLE(gnttab_transfer_t);
 
 
 /*
@@ -281,21 +292,22 @@ struct gnttab_transfer {
 #define GNTCOPY_dest_gref         (1<<_GNTCOPY_dest_gref)
 
 #define GNTTABOP_copy                 5
-struct gnttab_copy {
-	/* IN parameters. */
-	struct {
-		union {
-			grant_ref_t ref;
-			unsigned long   gmfn;
-		} u;
-		domid_t  domid;
-		uint16_t offset;
-	} source, dest;
-	uint16_t      len;
-	uint16_t      flags;          /* GNTCOPY_* */
-	/* OUT parameters. */
-	int16_t       status;
-};
+typedef struct gnttab_copy {
+    /* IN parameters. */
+    struct {
+        union {
+            grant_ref_t ref;
+            xen_pfn_t   gmfn;
+        } u;
+        domid_t  domid;
+        uint16_t offset;
+    } source, dest;
+    uint16_t      len;
+    uint16_t      flags;          /* GNTCOPY_* */
+    /* OUT parameters. */
+    int16_t       status;
+} gnttab_copy_t;
+DEFINE_XEN_GUEST_HANDLE(gnttab_copy_t);
 
 /*
  * GNTTABOP_query_size: Query the current and maximum sizes of the shared
@@ -313,6 +325,31 @@ struct gnttab_query_size {
     uint32_t max_nr_frames;
     int16_t  status;              /* GNTST_* */
 };
+typedef struct gnttab_query_size gnttab_query_size_t;
+DEFINE_XEN_GUEST_HANDLE(gnttab_query_size_t);
+
+/*
+ * GNTTABOP_unmap_and_replace: Destroy one or more grant-reference mappings
+ * tracked by <handle> but atomically replace the page table entry with one
+ * pointing to the machine address under <new_addr>.  <new_addr> will be
+ * redirected to the null entry.
+ * NOTES:
+ *  1. The call may fail in an undefined manner if either mapping is not
+ *     tracked by <handle>.
+ *  2. After executing a batch of unmaps, it is guaranteed that no stale
+ *     mappings will remain in the device or host TLBs.
+ */
+#define GNTTABOP_unmap_and_replace    7
+struct gnttab_unmap_and_replace {
+    /* IN parameters. */
+    uint64_t host_addr;
+    uint64_t new_addr;
+    grant_handle_t handle;
+    /* OUT parameters. */
+    int16_t  status;              /* GNTST_* */
+};
+typedef struct gnttab_unmap_and_replace gnttab_unmap_and_replace_t;
+DEFINE_XEN_GUEST_HANDLE(gnttab_unmap_and_replace_t);
 
 
 /*
@@ -373,3 +410,13 @@ struct gnttab_query_size {
 }
 
 #endif /* __XEN_PUBLIC_GRANT_TABLE_H__ */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

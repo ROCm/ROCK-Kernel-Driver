@@ -120,12 +120,14 @@ void restore_processor_state(void)
 
 void fix_processor_context(void)
 {
+#ifndef CONFIG_X86_NO_TSS    
 	int cpu = smp_processor_id();
 	struct tss_struct *t = &per_cpu(init_tss, cpu);
 
 	set_tss_desc(cpu,t);	/* This just modifies memory; should not be neccessary. But... This is neccessary, because 386 hardware has concept of busy TSS or some similar stupidity. */
 
 	cpu_gdt(cpu)[GDT_ENTRY_TSS].type = 9;
+#endif
 
 	syscall_init();                         /* This sets MSR_*STAR and related */
 	load_TR_desc();				/* This does ltr */

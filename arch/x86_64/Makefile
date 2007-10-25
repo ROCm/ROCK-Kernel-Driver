@@ -36,6 +36,10 @@ cflags-$(CONFIG_MCORE2) += \
 	$(call cc-option,-march=core2,$(call cc-option,-mtune=generic))
 cflags-$(CONFIG_GENERIC_CPU) += $(call cc-option,-mtune=generic)
 
+cppflags-$(CONFIG_XEN) += \
+	-D__XEN_INTERFACE_VERSION__=$(CONFIG_XEN_INTERFACE_VERSION)
+CPPFLAGS += $(cppflags-y)
+
 cflags-y += -m64
 cflags-y += -mno-red-zone
 cflags-y += -mcmodel=kernel
@@ -85,9 +89,21 @@ drivers-$(CONFIG_KDB)			+= arch/x86_64/kdb/
 
 boot := arch/x86_64/boot
 
-PHONY += bzImage bzlilo install archmrproper \
+PHONY += bzImage bzlilo vmlinuz install archmrproper \
 	 fdimage fdimage144 fdimage288 isoimage archclean
 
+ifdef CONFIG_XEN
+CPPFLAGS := -Iinclude$(if $(KBUILD_SRC),2)/asm/mach-xen $(CPPFLAGS)
+LDFLAGS_vmlinux := -e startup_64
+#Default target when executing "make"
+all: vmlinuz
+
+BOOTIMAGE                     := $(boot)/vmlinuz
+KBUILD_IMAGE                  := $(BOOTIMAGE)
+
+vmlinuz: vmlinux
+	$(Q)$(MAKE) $(build)=$(boot) $(BOOTIMAGE)
+else
 #Default target when executing "make"
 all: bzImage
 
@@ -105,6 +121,7 @@ bzdisk: vmlinux
 
 fdimage fdimage144 fdimage288 isoimage: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(BOOTIMAGE) $@
+endif
 
 install:
 	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(BOOTIMAGE) $@ 

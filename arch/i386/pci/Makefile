@@ -16,8 +16,3 @@ pci-$(CONFIG_X86_VISWS)		:= visws.o fixup.o
 pci-$(CONFIG_X86_NUMAQ)		:= numa.o irq.o
 
 obj-y				+= $(pci-y) common.o early.o
-
-ifdef CONFIG_XEN
-include $(srctree)/scripts/Makefile.xen
-obj-y := $(call cherrypickxen, $(obj-y))
-endif

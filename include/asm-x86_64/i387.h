@@ -191,10 +191,15 @@ static inline void kernel_fpu_end(void)
 	preempt_enable();
 }
 
-static inline void save_init_fpu(struct task_struct *tsk)
+static inline void __save_init_fpu(struct task_struct *tsk)
 {
  	__fxsave_clear(tsk);
 	task_thread_info(tsk)->status &= ~TS_USEDFPU;
+}
+
+static inline void save_init_fpu(struct task_struct *tsk)
+{
+	__save_init_fpu(tsk);
 	stts();
 }
 

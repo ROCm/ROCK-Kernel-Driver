@@ -3,7 +3,7 @@
 #
 menuconfig VIRTUALIZATION
 	bool "Virtualization"
-	depends on X86
+	depends on X86 && !XEN
 	default y
 	---help---
 	  Say Y here to get to see options for using your Linux host to run other

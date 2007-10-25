@@ -58,12 +58,14 @@ static void __init nvidia_bugs(void)
 
 static void __init ati_bugs(void)
 {
+#ifndef CONFIG_XEN
 #ifdef CONFIG_X86_IO_APIC
 	if (timer_over_8254 == 1) {
 		timer_over_8254 = 0;
 		printk(KERN_INFO
 	 	"ATI board detected. Disabling timer routing over 8254.\n");
 	}
+#endif
 #endif
 }
 

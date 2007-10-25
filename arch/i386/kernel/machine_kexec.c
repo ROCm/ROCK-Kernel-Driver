@@ -33,48 +33,6 @@ static u32 kexec_pmd1[1024] PAGE_ALIGNED;
 static u32 kexec_pte0[1024] PAGE_ALIGNED;
 static u32 kexec_pte1[1024] PAGE_ALIGNED;
 
-static void set_idt(void *newidt, __u16 limit)
-{
-	struct Xgt_desc_struct curidt;
-
-	/* ia32 supports unaliged loads & stores */
-	curidt.size    = limit;
-	curidt.address = (unsigned long)newidt;
-
-	load_idt(&curidt);
-};
-
-
-static void set_gdt(void *newgdt, __u16 limit)
-{
-	struct Xgt_desc_struct curgdt;
-
-	/* ia32 supports unaligned loads & stores */
-	curgdt.size    = limit;
-	curgdt.address = (unsigned long)newgdt;
-
-	load_gdt(&curgdt);
-};
-
-static void load_segments(void)
-{
-#define __STR(X) #X
-#define STR(X) __STR(X)
-
-	__asm__ __volatile__ (
-		"\tljmp $"STR(__KERNEL_CS)",$1f\n"
-		"\t1:\n"
-		"\tmovl $"STR(__KERNEL_DS)",%%eax\n"
-		"\tmovl %%eax,%%ds\n"
-		"\tmovl %%eax,%%es\n"
-		"\tmovl %%eax,%%fs\n"
-		"\tmovl %%eax,%%gs\n"
-		"\tmovl %%eax,%%ss\n"
-		::: "eax", "memory");
-#undef STR
-#undef __STR
-}
-
 #ifdef CONFIG_XEN
 
 #define __ma(x) (pfn_to_mfn(__pa((x)) >> PAGE_SHIFT) << PAGE_SHIFT)
@@ -166,23 +124,6 @@ NORET_TYPE void machine_kexec(struct kimage *image)
 	page_list[PA_PTE_1] = __pa(kexec_pte1);
 	page_list[VA_PTE_1] = (unsigned long)kexec_pte1;
 
-	/* The segment registers are funny things, they have both a
-	 * visible and an invisible part.  Whenever the visible part is
-	 * set to a specific selector, the invisible part is loaded
-	 * with from a table in memory.  At no other time is the
-	 * descriptor table in memory accessed.
-	 *
-	 * I take advantage of this here by force loading the
-	 * segments, before I zap the gdt with an invalid value.
-	 */
-	load_segments();
-	/* The gdt & idt are now invalid.
-	 * If you want to load them you must set up your own idt & gdt.
-	 */
-	set_gdt(phys_to_virt(0),0);
-	set_idt(phys_to_virt(0),0);
-
-	/* now call it */
 	relocate_kernel((unsigned long)image->head, (unsigned long)page_list,
 			image->start, cpu_has_pae);
 }
@@ -196,6 +137,7 @@ NORET_TYPE void machine_kexec(struct kimage *image)
  */
 static int __init parse_crashkernel(char *arg)
 {
+#ifndef CONFIG_XEN
 	unsigned long size, base;
 	size = memparse(arg, &arg);
 	if (*arg == '@') {
@@ -206,6 +148,10 @@ static int __init parse_crashkernel(char *arg)
 		crashk_res.start = base;
 		crashk_res.end   = base + size - 1;
 	}
+#else
+	printk("Ignoring crashkernel command line, "
+	       "parameter will be supplied by xen\n");
+#endif
 	return 0;
 }
 early_param("crashkernel", parse_crashkernel);

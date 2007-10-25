@@ -47,6 +47,10 @@ static int xfrm4_output_one(struct sk_buff *skb)
 	struct xfrm_state *x = dst->xfrm;
 	int err;
 
+	err = skb_checksum_setup(skb);
+	if (err)
+		goto error_nolock;
+
 	if (skb->ip_summed == CHECKSUM_PARTIAL) {
 		err = skb_checksum_help(skb);
 		if (err)

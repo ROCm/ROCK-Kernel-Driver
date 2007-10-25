@@ -664,6 +664,7 @@ static ctl_table kern_table[] = {
 		.mode           = 0644,
 		.proc_handler   = &proc_dointvec,
 	},
+#ifndef CONFIG_XEN
 	{
 		.ctl_name       = KERN_NMI_WATCHDOG,
 		.procname       = "nmi_watchdog",
@@ -672,6 +673,7 @@ static ctl_table kern_table[] = {
 		.mode           = 0644,
 		.proc_handler   = &proc_nmi_enabled,
 	},
+#endif
 #endif
 #if defined(CONFIG_X86)
 	{
@@ -727,7 +729,7 @@ static ctl_table kern_table[] = {
 		.proc_handler	= &proc_dointvec,
 	},
 #endif
-#if	defined(CONFIG_ACPI_SLEEP) && defined(CONFIG_X86)
+#if defined(CONFIG_ACPI_SLEEP) && defined(CONFIG_X86) && !defined(CONFIG_ACPI_PV_SLEEP)
 	{
 		.ctl_name	= KERN_ACPI_VIDEO_FLAGS,
 		.procname	= "acpi_video_flags",
