@@ -1,28 +1,28 @@
-/* 
+/*
  *   Creation Date: <97/07/26 18:23:02 samuel>
  *   Time-stamp: <2004/02/22 13:12:14 samuel>
- *   
+ *
  *	<emulation.S>
- *	
+ *
  *	Low-level emulation of some privileged instructions
- *   
+ *
  *   Copyright (C) 1997-2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
-	
+
 MACRO_0(INC_NIP, [
 	addi	r6,r6,4
 ])
 
-	
+
 /************************************************************************/
 /*	program exception vector					*/
 /************************************************************************/
-	
+
 	//////////////////////////////////////////////////////////////
 	// exception preamble
 	//	r1		stack (mregs)
@@ -64,7 +64,7 @@ emulate_illegal_instr:
 	oris	r7,r7,0x4			// set bit 13 (privileged instr)
 
 	beq-	cr1,emulate_mfspr		// r3=xMSR, r4=opcode, r5=reg_num
-	b	emulate_mtspr			// must be mtspr	
+	b	emulate_mtspr			// must be mtspr
 1:
 #ifdef EMULATE_603
 	bl	emulate_603_instr
@@ -75,7 +75,7 @@ emulate_illegal_instr:
 /************************************************************************/
 /*	mac exceptions							*/
 /************************************************************************/
-	
+
 	/////////////////////////////////////////////////////////////
 	// mac_trap
 	//
@@ -94,7 +94,7 @@ mac_dec_trap:
 	li	r2,0x900
 	crclr	FBIT_DecINT
 	li	r7,0			// no reason bits
-	b	mac_trap				
+	b	mac_trap
 
 	balign_32
 mac_program_trap:			// the reason bits already in r7 are used
@@ -117,7 +117,7 @@ mac_trap:
 	GET_TICK_CNT(entry,"mac-expception")
 	b	msr_exception_return
 
-rvec_trace_trap:	
+rvec_trace_trap:
 	MAC_EXIT_SAVE( RVEC_TRACE_TRAP )
 
 
@@ -138,7 +138,7 @@ emulate_priv_instr:
 	lwz	r3,xMSR(r1)
 	rlwinm	r5,r4,14,24,28			// r5 = reg_num << 3 (instr. bits 6-10)
 	rlwimi	r2,r4,16,16,21			// r2 = opcode
-	
+
 	GET_TICK_CNT(entry,"get_inst")
 	BUMP("decode_priv_inst")
 
@@ -150,7 +150,7 @@ emulate_priv_instr:
 
 	andi.	r3,r3,MSR_PR			// only emulate in supervisor mode
 	bne-	mac_program_trap
-	
+
 	cmpwi	cr3,r2,OPCODE(31,83)		// mfmsr
 	beq-	cr3,emulate_mfmsr
 
@@ -214,10 +214,10 @@ emulate_603_instr:
 	rlwinm	r7,r7,0,14,10			// clear bit 11-13
 	oris	r7,r7,0x4			// set bit 13
 	b	emulate_priv_instr
-	
+
 #endif /* EMULATE_603 */
 
-			
+
 /************************************************************************/
 /*	mac register access						*/
 /************************************************************************/
@@ -237,7 +237,7 @@ MACRO(STORE_EMUGPR_IM, [sreg,ereg], [
 	mr	rPREFIX[]_ereg, _sreg
 .endif
 ])
-	
+
 	balign_32
 store_gpr_table:
 mFORLOOP([i],0,31,[
@@ -265,7 +265,7 @@ MACRO(EMU_STORE_GPR, [reg, scr], [
 	blrl
 ])
 
-	
+
 
 /************************************************************************/
 /*	instruction emulation						*/
@@ -290,7 +290,7 @@ emulate_mfmsr:
 emulate_mfspr:					// r3 = xMSR
 	BUMP("emulate_mfspr")
 	rlwimi	r4,r4,32-10,21,25		// flip spr
-	rlwinm	r0,r3,32-14,31,31		// r0(bit31) = MSR_PR	
+	rlwinm	r0,r3,32-14,31,31		// r0(bit31) = MSR_PR
 	addi	r3,r1,K_SPR_HOOKS
 	rlwinm	r2,r4,32-4,20,29		// r2 = spr# << 2
 	addi	r4,r1,xSPR_BASE
@@ -308,7 +308,7 @@ emulate_mtspr:					// r3 = xMSR
 	EMU_LOAD_GPR r5, /**/ R2		// value in r0
 	rlwinm	r2,r4,32-4,20,29		// r2 = spr# << 2
 	addi	r4,r1,K_SPR_HOOKS
-	rlwinm	r3,r3,32-14,31,31		// r3(bit31) = MSR_PR	
+	rlwinm	r3,r3,32-14,31,31		// r3(bit31) = MSR_PR
 	lwzx	r4,r2,r4			// hook in r4
 	addi	r5,r2,xSPR_BASE			// r5+r1 points to SPR reg
 	addi	r4,r4,4				// branch to hook +4
@@ -316,7 +316,7 @@ emulate_mtspr:					// r3 = xMSR
 	bne-	mac_program_trap		// privileged exception
 	mtlr	r4				// lsb is discarded...
 	blr					// call hook
-	
+
 
 /********************************************************************/
 	balign_32
@@ -332,7 +332,7 @@ emulate_mtmsr:
 
 	GET_TICK_CNT(entry, "mtmsr")
 	BUMP("emulate_mtmsr")
-		
+
 	beq+	cr1,emulation_done_noinc
 	MAC_EXIT_SAVE( RVEC_MSR_POW )		// POW 1 => doze
 
@@ -351,7 +351,7 @@ emulate_rfi:
 	andc	r5,r3,r4
 	lwz	r6,xSRR0(r1)			// new nip = SRR0
 	or	r0,r0,r5
-		
+
 	bl	msr_altered			// r0,r2-r5, r7 [srr1] updated
 
 	GET_TICK_CNT(entry,"rfi")
@@ -368,7 +368,7 @@ emulate_rfi:
 emulate_tlbli:
 	LOADI	r3,EXTERN(do_tlbli)
 	b	1f
-emulate_tlbld:	
+emulate_tlbld:
 	LOADI	r3,EXTERN(do_tlbld)
 	b	1f
 emulate_tlbie:
@@ -382,7 +382,7 @@ emulate_tlbie:
 emulate_tlbie:
 	b	emulation_done
 #endif /* EMULATE_603 */
-	
+
 /********************************************************************/
 emulate_tlbsync:
 	b	emulation_done
@@ -407,7 +407,7 @@ emulate_mfsr:
 	b	emulation_done
 
 
-			
+
 /************************************************************************/
 /*	SPR - emulation							*/
 /************************************************************************/
@@ -442,19 +442,19 @@ spr_read_write:
 
 /********************************************************************/
 GLOBAL_SYMBOL(r__spr_read_only):
-spr_read_only:	
+spr_read_only:
 	b	simple_mfspr			// allow read
-	b	emulation_done			// ignore write	
+	b	emulation_done			// ignore write
 
-/********************************************************************/	
-GLOBAL_SYMBOL(r__spr_illegal):	
+/********************************************************************/
+GLOBAL_SYMBOL(r__spr_illegal):
 spr_illegal:
 	nop					// spr read entry
 	rlwinm	r7,r7,0,15,10			// clear srr1 bit 11-14
 	oris	r7,r7,0x8			// set bit 12 (privileged instr)
 	b	mac_program_trap
-	
-		
+
+
 /********************************************************************/
 unhandled_spr_read:
 	srwi	r4,r2,2
@@ -492,7 +492,7 @@ spr_sdr1:
 	b	call_kernel_save
 
 
-	
+
 
 /************************************************************************/
 /*	handle MSR changes						*/
@@ -504,7 +504,7 @@ spr_sdr1:
 	//	r6, r7:		nip / srr1
 	//
 	// modifies: r0,r2-r5 (r7 updated)
-	
+
 	balign_16
 msr_exception_return:
 	addi	r3,r1,K_UNMAPPED_SR_BASE		// set unmapped context
@@ -527,7 +527,7 @@ msr_exception_return:
 	stw	r7,K_MSR(r1)
 	b	exception_return
 
-	
+
 	////////////////////////////////////////////////////////////
 	// msr_altered
 	//
@@ -541,8 +541,8 @@ msr_exception_return:
 	// M: r2-r5 (r7 updated).
 	// r0 may _NOT_ be modified
 
-#define MSR_CLEARBITS	(MSR_FP | MSR_FE0 | MSR_FE1 | MSR_BE | MSR_SE)	
-#define MSR_COPYBITS	(MSR_BE | MSR_SE)	
+#define MSR_CLEARBITS	(MSR_FP | MSR_FE0 | MSR_FE1 | MSR_BE | MSR_SE)
+#define MSR_COPYBITS	(MSR_BE | MSR_SE)
 
 	balign_32
 msr_altered:
@@ -577,11 +577,11 @@ dec_test_ret:
 	bt-	FBIT_DbgTrace,1f
 	rlwinm	r2,r0,(21+32-FBIT_Trace),fb_Trace	// MSR_SE[21] -> FBIT_Trace
 	rlwimi	r7,r0,0,(MSR_SE|MSR_BE)			// no debugger; copy MSR_SE and MSR_BE
-1:	
+1:
 	stw	r7,K_MSR(r1)
 	mtcrf	TRACE_CR_FIELD,r2			// set singlestep bits [cr6]
 
-	bne	cr2,1f					// bnelr is slower...	
+	bne	cr2,1f					// bnelr is slower...
 	blr
 1:
 	/* MMU change */
@@ -607,7 +607,7 @@ dec_test_ret:
 test_for_irq:
 	BUMP("test-for-irq")
 	and	r2,r3,r0		// check whether we are turning external interrupts on
-	andi.	r2,r2,MSR_EE		// we need to recheck IRQs in userspace then 
+	andi.	r2,r2,MSR_EE		// we need to recheck IRQs in userspace then
 	beq+	1f
 	lwz	r4,xHOSTIRQ_ACTIVE_CNT(r1)
 	cmpwi	r4,0			// only return if some host irq is up
@@ -617,7 +617,7 @@ test_for_irq:
 1:	andi.	r2,r0,MSR_EE
 	beq	irq_test_ret
 	b	mac_irq_trap
-	
+
 test_for_dec:
 	BUMP("test-for-dec")
 	andi.	r2,r0,MSR_EE
@@ -629,7 +629,7 @@ force_msr_altered:
 	lwz	r0,xMSR(r1)			// r0 = new MSR
 	xori	r3,r0,(MSR_DR|MSR_IR)		// r3 = faked old MSR
 	b	msr_altered			// might throw an exception...
-				
+
 	// msr_altered( kv )
 GLOBAL_SYMBOL(r__msr_altered):
 	lwz	r5,xFLAG_BITS(r3)
@@ -637,13 +637,13 @@ GLOBAL_SYMBOL(r__msr_altered):
 	stw	r5,xFLAG_BITS(r3)
 	blr
 
-	
+
 /************************************************************************/
 /*	initialize special purpose register table			*/
 /************************************************************************/
 
 MACRO(SPR_HOOK,	[spr, hook],	[ LI_PHYS( R8, _hook ) ; stw r8,(((_spr)*4)+K_SPR_HOOKS)(r3) ])
-	
+
 // The LSB of a SPR hook specifies that the SPR is privileged (these bits are
 // set from C-code).
 
@@ -670,24 +670,24 @@ GLOBAL_SYMBOL(r__initialize_spr_table):
 	])
 	blr
 
-		
+
 /************************************************************************/
 /*	initialize msr segment register table				*/
 /************************************************************************/
-	
+
 	/////////////////////////////////////////////////////////////
 	// initialize_sr_offs_table
 	//
 	// Copy sr_offs_table to K_MSR_SR_TABLE
 	// r1 is added to each element
-	
+
 initialize_msr_sr_table:
 	mflr	r8			// Get address of table
 	bl	sr_offs_table
 	mflr	r3
 	mtlr	r8
 
-	li	r5,4*8			// #words in table	
+	li	r5,4*8			// #words in table
 	mtctr	r5
 	addi	r3,r3,-4
 	addi	r4,r1,K_MSR_SR_TABLE-4
@@ -702,7 +702,7 @@ initialize_msr_sr_table:
 sr_offs_table:
 	blrl
 	/*	K_CUR_SR_BASE,		K_SR_DATA_BASE,		K_SR_INST_BASE,		dummy */
-	
+
 	.long	K_UNMAPPED_SR_BASE,	K_UNMAPPED_SR_BASE,	K_UNMAPPED_SR_BASE,	0
 	.long	K_SPLIT_SR_BASE,	K_SV_SR_BASE,		K_UNMAPPED_SR_BASE,	0	/* DR */
 	.long	K_SPLIT_SR_BASE,	K_UNMAPPED_SR_BASE,	K_SV_SR_BASE,		0	/* IR */

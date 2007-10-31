@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <2001/01/27 16:25:14 samuel>
  *   Time-stamp: <2004/03/07 21:58:48 samuel>
- *   
+ *
  *	<traps.S>
- *	
+ *
  *	Exception Vectors
- *   
+ *
  *   Copyright (C) 2000, 2001, 2002, 2003, 2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 #define DBG_TRACE	0	// enable TRACE macro?
@@ -31,13 +31,13 @@
 #include "osi.h"
 #include "kernel_vars.h"
 
-		
+
 /************************************************************************/
 /*	Exception Vector Definitions					*/
 /************************************************************************/
 
 	ACTIONS_SECTION
-GLOBAL_SYMBOL(r__actions_section):	
+GLOBAL_SYMBOL(r__actions_section):
 	ACTIONS_OFFS_SECTION
 GLOBAL_SYMBOL(r__actions_offs_section):
 
@@ -64,7 +64,7 @@ MACRO_0(EXCEPTION_PREAMBLE, [
 	mfsprg_a0 r3			// SPRG0 = r3
 	stw	r5,xGPR1(r1)
 	stw	r3,xGPR3(r1)
-	
+
 	// saved: r0-r7, cr, lr
 	// r1 = stack, cr5-7=flag_bits, r6/r7 = nip/msr
 ])
@@ -101,7 +101,7 @@ MACRO_0(RESTORE_MIDDLE_REGS, [		// reverse save_middle_regs, restores registers
 #define EXCEPTION_SAVE_ALL				\
 	EXCEPTION_PREAMBLE				;\
 	bl save_middle_regs				;
-	
+
 #define VECTOR_KERNEL( v, dummy_name, secint )		\
 	VECTOR( v, dummy_name, secint )			;\
 	EXCEPTION_SAVE_ALL				;\
@@ -137,7 +137,7 @@ MACRO_0(RESTORE_MIDDLE_REGS, [		// reverse save_middle_regs, restores registers
 	//	r6	nip
 	// ret:	r4	opcode
 	//
-	// Modifies: r2,r3. 
+	// Modifies: r2,r3.
 	// Side-effects: Might return from the exception
 
 MACRO(GET_INSTR_OPCODE, [dummy], [
@@ -165,16 +165,16 @@ MACRO(GET_INSTR_OPCODE, [dummy], [
 	tlbie	r6			// flush PTE from ITLB
 #endif
 	b	exception_return
-8:	
+8:
 	mtmsr	r2
 	isync
 
 	lwz     r4,0(r6)		// get opcode
-	
+
 	mtmsr	r3			// restore exception MSR
 	isync
 ])
-	
+
 /************************************************************************/
 /*	Reserved / Kernel Vectors					*/
 /************************************************************************/
@@ -199,7 +199,7 @@ VECTOR_RESERVED( PERFMON_VECTOR, "Performance Monitor Interrupt", secint_bad )
 /************************************************************************/
 /*	DSI Exceptions							*/
 /************************************************************************/
-	
+
 VECTOR( 0x300, "DSI", secint_lr_call )
 	EXCEPTION_PREAMBLE
 	TRACE(0x300, "DSI")
@@ -268,12 +268,12 @@ alignment_cont:
 /************************************************************************/
 
 	// xFPU_STATE has only meaning when FBIT_FPUInUse is not set
-	// 
+	//
 	// FPU_STATE_DIRTY	- fr13 & fpscr are not loaded (everything else is).
 	// FPU_STATE_HALF_SAVED	- fr14-fr31 are loaded.
 	// FPU_STATE_SAVED	- fr14-fr31 are loaded (but also saved in mregs).
 	//
-	// FPU_STATE_DIRTY in the *emulator* means that all floating point 
+	// FPU_STATE_DIRTY in the *emulator* means that all floating point
 	// registers *EXCEPT* fr13 and fpscr are valid.
 	//
 	// Implementation note: When we do not own the fpu, the MSR_FEx bits
@@ -283,7 +283,7 @@ alignment_cont:
 	// is a small violation of the standard but the alternative would be
 	// always loading FPSCR (which requires FPU ownership...)
 	//
-	
+
 VECTOR( 0x800, "FPU Unavailable", secint_lr_call )
 	EXCEPTION_PREAMBLE
 	TRACE(0x800, "FPU Unavailable")
@@ -293,7 +293,7 @@ fpu_cont:
 	andi.	r4,r2,MSR_FP
 	beq-	mac_fpu_unavailable		// mac trap?
 	bt	FBIT_FPUInUse,2f		// FPU ready for use?
-	
+
 	lwz	r3,K_EMULATOR_MSR(r1)		// FPU owned by our userland process?
 	andi.	r4,r3,MSR_FP
 	bne+	1f
@@ -312,7 +312,7 @@ mac_fpu_unavailable:
 	crset	FBIT_FPUInUse			// we own the FPU now
 	cmpwi	r3,FPU_STATE_HALF_SAVED
 	mtfsf	0xff,fr13
-	lfd	fr13,xFPR13(r1)	
+	lfd	fr13,xFPR13(r1)
 	bne	2f
 	xLOAD_LOW_FPU	r1			// load fr0-fr12
 2:
@@ -325,7 +325,7 @@ mac_fpu_unavailable:
 	GET_TICK_CNT(entry,"enable_fpu")
 	b	exception_return
 
-	
+
 /************************************************************************/
 /*	Decrementer Exception						*/
 /************************************************************************/
@@ -339,7 +339,7 @@ mac_fpu_unavailable:
 VECTOR( 0xc00, "System Call", secint_bad )
 	EXCEPTION_PREAMBLE
 	TRACE( 0xc00, "System Call")
-	
+
 	lwz	r3,xGPR3(r1)
 	LOADI	r5,OSI_SC_MAGIC_R3
 	lwz	r4,xGPR4(r1)
@@ -350,7 +350,7 @@ VECTOR( 0xc00, "System Call", secint_bad )
 	beq+	2f
 
 	MAC_TRAP(0xc00)			// r7 reason bits used (zero)
-2:	
+2:
 	MAC_EXIT_SAVE( RVEC_OSI_SYSCALL )
 
 
@@ -378,11 +378,11 @@ altivec_cont:
 	lwz	r4,xNO_ALTIVEC(r1)		// AltiVec support disabled?
 	cmpwi	r4,0
 	bne-	mac_altivec_unavailable
-	
+
 	lwz	r2,xMSR(r1)
 	rlwinm.	r4,r2,0,6,6			// bit 6 = MSR_VEC
 	beq-	mac_altivec_unavailable
-	
+
 	lwz	r3,K_EMULATOR_MSR(r1)
 	rlwinm.	r4,r3,0,6,6			// bit 6 = MSR_VEC
 	bne+	enable_altivec
@@ -390,17 +390,17 @@ altivec_cont:
 
 mac_altivec_unavailable:
 	MAC_EXIT_SAVE( RVEC_ALTIVEC_UNAVAIL_TRAP )
-	
+
 enable_altivec:
 	// We don't need to load any registers since the emulator
 	// won't touch the altivec unit (at least for now).
-	
+
 	lwz	r7,K_MSR(r1)
 	oris	r7,r7,HI(MSR_VEC)
 	stw	r7,K_MSR(r1)
 	b	exception_return
 
-	
+
 VECTOR( 0x1600, "AltiVec Assist", secint_bad )
 	EXCEPTION_SAVE_ALL
 	TRACE(0x1600, "AltiVec Assist")
@@ -412,18 +412,18 @@ VECTOR( 0x1600, "AltiVec Assist", secint_bad )
 /************************************************************************/
 /*	Instruction Breakpoint						*/
 /************************************************************************/
-	
+
 VECTOR( 0x1300, "Instruction Breakpoint", secint_bad )
 	EXCEPTION_SAVE_ALL
 	TRACE(0x1300, "IABR")
-		
+
 	DEBUGGER(0x1300)
 
 
 /************************************************************************/
 /*	RunMode-601 (trace)						*/
 /************************************************************************/
-	
+
 VECTOR( 0x2000, "RunMode-601", secint_bad )
 	b	trace_vector
 
@@ -452,7 +452,7 @@ secint_lr_call:
 	li	r4,0x6666
 	MAC_EXIT( RVEC_INTERNAL_ERROR )
 
-	
+
 /**************************************************************
 *  Includes
 **************************************************************/
@@ -480,7 +480,7 @@ secint_lr_call:
 #include "603.S"
 #endif
 #endif
-	
+
 #ifdef __linux__
 	.text	50
 #endif
@@ -488,7 +488,7 @@ GLOBAL_SYMBOL(r__reloctable_end):
 
 	ACTIONS_OFFS_SECTION
 GLOBAL_SYMBOL(r__actions_offs_section_end):
-		
+
 // The BUMP("counter") macro adds entries to text subsection 90.
 // This adds labels before the counter entries.
 

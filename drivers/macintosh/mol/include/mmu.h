@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <1998-11-11 13:55:49 samuel>
  *   Time-stamp: <2004/02/28 19:20:23 samuel>
- *   
+ *
  *	<mmu.h>
- *	
+ *
  *	MMU related things
- *   
+ *
  *   Copyright (C) 1998-2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 #ifndef _H_MMU

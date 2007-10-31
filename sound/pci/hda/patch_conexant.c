@@ -525,7 +525,7 @@ static void cxt5045_hp_automute(struct hda_codec *codec)
 	spec->hp_present = snd_hda_codec_read(codec, 0x11, 0,
 				     AC_VERB_GET_PIN_SENSE, 0) & 0x80000000;
 
-	bits = (spec->hp_present || !spec->cur_eapd) ? HDA_AMP_MUTE : 0; 
+	bits = (spec->hp_present || !spec->cur_eapd) ? HDA_AMP_MUTE : 0;
 	snd_hda_codec_amp_stereo(codec, 0x10, HDA_OUTPUT, 0,
 				 HDA_AMP_MUTE, bits);
 }

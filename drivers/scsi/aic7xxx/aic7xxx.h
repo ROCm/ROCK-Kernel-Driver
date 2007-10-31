@@ -1174,7 +1174,7 @@ void			 ahc_alloc_scbs(struct ahc_softc *ahc);
 void			 ahc_free(struct ahc_softc *ahc);
 int			 ahc_reset(struct ahc_softc *ahc, int reinit);
 void			 ahc_restart(struct ahc_softc *ahc);
-void			 ahc_shutdown(struct ahc_softc *ahc); 
+void			 ahc_shutdown(struct ahc_softc *ahc);
 
 /*************************** Interrupt Services *******************************/
 void			ahc_clear_intstat(struct ahc_softc *ahc);

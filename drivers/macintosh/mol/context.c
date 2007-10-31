@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <1998-11-20 16:18:20 samuel>
  *   Time-stamp: <2004/02/28 19:16:44 samuel>
- *   
+ *
  *	<context.c>
- *	
+ *
  *	MMU context allocation
- *   
+ *
  *   Copyright (C) 1998-2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 #include "archinclude.h"
@@ -52,7 +52,7 @@ flush_all_PTEs( kernel_vars_t *kv )
 	/* perform a tlbia */
 	for( ea=0; ea <= (0x3f << 12); ea += 0x1000 )
 		__tlbie( ea );
-	
+
 	if( count )
 		printk("%d stale PTEs flushed (something is wrong)\n", count );
 	return count;

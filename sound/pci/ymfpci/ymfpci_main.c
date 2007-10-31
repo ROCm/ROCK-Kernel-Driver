@@ -1553,7 +1553,7 @@ static int snd_ymfpci_put_nativedacvol(struct snd_kcontrol *kcontrol,
 	unsigned int reg2 = YDSXGR_BUF441OUTVOL;
 	int change;
 	unsigned int value, oval;
-	
+
 	value = ucontrol->value.integer.value[0] & 0x3fff;
 	value |= (ucontrol->value.integer.value[1] & 0x3fff) << 16;
 	spin_lock_irq(&chip->reg_lock);

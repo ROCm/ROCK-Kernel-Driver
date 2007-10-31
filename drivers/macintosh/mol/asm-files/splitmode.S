@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <2000/07/11 03:38:32 samuel>
  *   Time-stamp: <2003/08/20 16:37:04 samuel>
- *   
+ *
  *	<splitmode.S>
- *	
+ *
  *	Handles splitmode (MSR_IR != MSR_DR)
- *   
+ *
  *   Copyright (C) 2000, 2001, 2002, 2003, 2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 MACRO(SM_SET_MSR_DR, [scr], [
@@ -55,7 +55,7 @@ MACRO(SPLITMODE_SMP_UNLOCK, [scr1,scr2], [
 	// containing xNIP is set up for instruction access (if xNIP does
 	// not hold nip, an extra ISI exception will occur). The instruction
 	// segment is protected from data access through the use of a DBAT
-	// register. 
+	// register.
 	//
 	// It MUST be safe to call this function even if we are *not* in
 	// splitmode.
@@ -77,7 +77,7 @@ prepare_splitmode:
 	stwu	r5,4(r4)
 	bdnz	1b
 	mtctr	r0				// restore ctr
-	
+
 	// insert instruction mode segment
 	rlwinm	r3,r6,0,0,3
 	stw	r3,K_SPLIT_NIP_SEGMENT(r1)
@@ -87,9 +87,9 @@ prepare_splitmode:
 	addi	r4,r1,K_SPLIT_SR_BASE
 	stwx	r5,r3,r4
 
-	// and protect it with DBAT0. 
+	// and protect it with DBAT0.
 	//
-	// The supervisor valid bit must be cleared 
+	// The supervisor valid bit must be cleared
 	// - we don't want to block get_opcode.
 
 	rlwinm	r3,r6,0,0,3			// segment base
@@ -99,7 +99,7 @@ prepare_splitmode:
 	stw	r4,K_SPLIT_DBAT0L(r1)		// pp=0, wimg=0
 	GET_TICK_CNT(splitmode_prep, "splitmode_prep")
 	b	ret_from_prep_splitmode
-	
+
 
 	///////////////////////////////////////////////////////////////////
 	// split_sr_no_execute
@@ -167,7 +167,7 @@ splitmode_dsi:
 
 	rlwinm	r5,r3,6+5+3,(0x1f<<3)		// r5 = rS << 3
 	EMU_LOAD_GPR r5, /**/ R6		// r0 = value
-	mtlr	r4				// secint handler	
+	mtlr	r4				// secint handler
 	SM_SET_MSR_DR /**/ r5
 
 	rlwinm	r6,r3,6,0x3e			// primary opcode & ~1
@@ -195,7 +195,7 @@ splitm_store_op31:
 	rlwinm	r6,r3,32-1,22,31		// secondary opcode
 	cmpwi	r6,150				// stwcx.
 	beq-	splitm_stwcx
-	cmpwi	r6,1014				// 1014, dcbz	
+	cmpwi	r6,1014				// 1014, dcbz
 	beq-	splitm_dcbz
 	cmpwi	r6,662				// 662, stwbrx
 	beq-	splitm_stwbrx
@@ -248,7 +248,7 @@ splitm_stwcx:
 	rlwimi	r6,r0,0,0,3
 	stw	r6,xCR(r1)
 	b	splitm_done2
-splitm_sth:	
+splitm_sth:
 	sth	r0,0(r2)
 	b	splitm_store_continue
 splitm_stb:
@@ -281,7 +281,7 @@ splitm_icbi:
 splitm_dcbf:
 	dcbf	0,r2
 	b	splitm_done
-splitm_stwbrx:	
+splitm_stwbrx:
 	stwbrx	r0,0,r2
 	b	splitm_done
 
@@ -293,7 +293,7 @@ splitm_load_continue:
 	bf+	5,splitm_done2			// update form?
 	b	1f
 
-splitm_store_continue:	
+splitm_store_continue:
 	SM_CLEAR_MSR_DR /**/ r0
 	BUMP("splitm_store")
 	bf+	5,splitm_done2			// update form?
@@ -303,7 +303,7 @@ splitm_store_continue:
 	b	splitm_done2
 splitm_done:
 	SM_CLEAR_MSR_DR /**/ r0
-splitm_done2:	
+splitm_done2:
 	lwz	r3,K_TMP_SCRATCH0(r1)
 	lwz	r6,xNIP(r1)			// restore NIP
 	mtsrin	r3,r2
@@ -317,7 +317,7 @@ splitm_fallback:
 	stw	r3,xDEBUG1(r1)
 	stw	r6,xDEBUG0(r1)
 	lwz	r6,xNIP(r1)
-	DEBUGGER_SAVE(0x1111)	
+	DEBUGGER_SAVE(0x1111)
 #endif
 	SPLITMODE_SMP_LOCK /**/ r0,r2
 
@@ -335,7 +335,7 @@ splitm_fallback:
 	LOADI	r3,(MSR_EE | MSR_PR | MSR_IR | MSR_SE | MSR_BE)
 	andc	r4,r7,r3			// Clear msr bits (r7=srr1)
 	xGPR_LOAD	R6
-	xGPR_LOAD	R7	
+	xGPR_LOAD	R7
 	mtsrr1	r4
 	xGPR_LOAD_RANGE	R2,R5,r1		// Restore registers (except r1)
 	xGPR_LOAD	R0
@@ -393,26 +393,26 @@ secint_splitm:
 
 1:	lwz	r2,K_TMP_SCRATCH0(r1)		// We might return immediately...
 	mtsrin	r2,r6
-	
+
 	cmpwi	r3,0x600			// ** Alignment **
 	bne	2f
 	bl	save_middle_regs
 	b	alignment_cont
-	
+
 2:	cmpwi	r3,0x800			// ** FPU Unavailable **
 	beq	fpu_cont
 	cmpwi	r3,0xf20			// ** AltiVec Unavailable **
 	beq	altivec_cont
-	
+
 	DEBUGGER_SAVE( 0x5918 )			// ERROR...
 
-				
+
 	////////////////////////////////////////////////////////////////////////
 	// invalidate_splitmode( kernel_vars_t *kv )
 	//
-	// This function must be called whenever the segment registers are 
-	// modified. A flag is set which will force a refresh of the slitmode 
-	// segment registers (at mac context switch in). We could rewrite this 
+	// This function must be called whenever the segment registers are
+	// modified. A flag is set which will force a refresh of the slitmode
+	// segment registers (at mac context switch in). We could rewrite this
 	// in C but it might be better to keep things centralized.
 
 GLOBAL_SYMBOL(r__invalidate_splitmode_sr):

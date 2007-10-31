@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <1998-11-11 11:56:45 samuel>
  *   Time-stamp: <2004/03/13 14:25:26 samuel>
- *   
+ *
  *	<mmu.c>
- *	
+ *
  *	Handles page mappings and the mac MMU
- *   
+ *
  *   Copyright (C) 1998-2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 #include "archinclude.h"
@@ -36,7 +36,7 @@
 /*	init / cleanup							*/
 /************************************************************************/
 
-int 
+int
 init_mmu( kernel_vars_t *kv )
 {
 	int success;
@@ -60,7 +60,7 @@ init_mmu( kernel_vars_t *kv )
 	return 0;
 }
 
-void 
+void
 cleanup_mmu( kernel_vars_t *kv )
 {
 	/* We have to make sure the flush thread are not using the mtable
@@ -107,7 +107,7 @@ clear_vsid_refs( kernel_vars_t *kv )
 }
 
 /*
- * This function is called whenever the mac MMU-registers have 
+ * This function is called whenever the mac MMU-registers have
  * been manipulated externally.
  */
 void
@@ -135,8 +135,8 @@ mmu_altered( kernel_vars_t *kv )
  *
  * ENTRYPOINT!
  */
-void 
-do_flush( ulong context, ulong va, ulong *dummy, int n ) 
+void
+do_flush( ulong context, ulong va, ulong *dummy, int n )
 {
 	int i;
 	kernel_vars_t *kv;
@@ -163,7 +163,7 @@ do_flush( ulong context, ulong va, ulong *dummy, int n )
 /************************************************************************/
 
 int
-dbg_get_PTE( kernel_vars_t *kv, int context, ulong va, mPTE_t *retptr ) 
+dbg_get_PTE( kernel_vars_t *kv, int context, ulong va, mPTE_t *retptr )
 {
 	ulong base, mask;
 	ulong vsid, ptmp, stmp, *pteg, *steg;
@@ -191,7 +191,7 @@ dbg_get_PTE( kernel_vars_t *kv, int context, ulong va, mPTE_t *retptr )
 		printk("get_PTE: no such context: %d\n", context );
 		return 0;
 	}
-	
+
 	/* mask vsid and va */
 	vsid &= 0xffffff;
 	va &= 0x0ffff000;

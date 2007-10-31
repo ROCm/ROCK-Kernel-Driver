@@ -178,7 +178,7 @@ ahc_linux_pci_dev_resume(struct pci_dev *pdev)
 	ahc_pci_resume(ahc);
 
 	ahc_reset(ahc, /*reinit*/TRUE);
-	ahc_intr_enable(ahc, TRUE); 
+	ahc_intr_enable(ahc, TRUE);
 	ahc_restart(ahc);
 
 	return rc;

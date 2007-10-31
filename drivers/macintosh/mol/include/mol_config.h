@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <1999/05/30 15:30:25 samuel>
  *   Time-stamp: <2004/06/05 19:47:33 samuel>
- *   
+ *
  *	<mol_config.h>
- *	
+ *
  *	Header to be included first...
- *   
+ *
  *   Copyright (C) 1999, 2000, 2001, 2002, 2003, 2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 #ifndef _H_MOL_CONFIG

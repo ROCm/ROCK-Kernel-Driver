@@ -1,18 +1,18 @@
-/* 
+/*
  *   Creation Date: <1998-12-02 03:23:31 samuel>
  *   Time-stamp: <2004/03/13 16:57:31 samuel>
- *   
+ *
  *	<mmu_io.c>
- *	
+ *
  *	Translate mac_phys to whatever has been mapped in at
  *	a particular address (linux ram, framebuffer, ROM, etc.)
- *   
+ *
  *   Copyright (C) 1998-2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 #include "archinclude.h"
@@ -28,11 +28,11 @@
 
 /* Block translations are used for ROM, RAM, VRAM and similar things.
  *
- * IO-translations are a different type of mappings. Whenever an IO-area 
- * is accessed, a page fault occurs. If there is a page present (although 
- * r/w prohibited), then the low-level exception handler examines if the 
- * page has a magic signature in the first 8 bytes. If there is a match, 
- * then the page is of the type io_page_t and contains the information 
+ * IO-translations are a different type of mappings. Whenever an IO-area
+ * is accessed, a page fault occurs. If there is a page present (although
+ * r/w prohibited), then the low-level exception handler examines if the
+ * page has a magic signature in the first 8 bytes. If there is a match,
+ * then the page is of the type io_page_t and contains the information
  * necessary to emulate the IO. If no page is present, then the corresponding
  * IO-page is looked up and hashed.
  */
@@ -71,13 +71,13 @@ init_mmu_io( kernel_vars_t *kv )
 	return 0;
 }
 
-void 
+void
 cleanup_mmu_io( kernel_vars_t *kv )
 {
 	DECLARE_IOD;
 	io_page_t *next2, *p2;
 	int i;
-	
+
 	if( !iod )
 		return;
 
@@ -218,7 +218,7 @@ add_block_trans( kernel_vars_t *kv, ulong mbase, char *lvbase, ulong size, int f
 	return bt->id;
 }
 
-static void 
+static void
 remove_block_trans( kernel_vars_t *kv, int id )
 {
 	DECLARE_IOD;
@@ -251,14 +251,14 @@ remove_block_trans( kernel_vars_t *kv, int id )
 /* adds an I/O-translation. It is legal to add the same
  * range multiple times (for instance, to alter usr_data)
  */
-int 
+int
 add_io_trans( kernel_vars_t *kv, ulong mbase, int size, void *usr_data )
 {
 	DECLARE_IOD;
 	io_page_t *ip, **pre_next;
 	ulong mb;
 	int i, num;
-	
+
 	/* align mbase and size to double word boundarys */
 	size += mbase & 7;
 	mbase -= mbase & 7;
@@ -299,7 +299,7 @@ add_io_trans( kernel_vars_t *kv, ulong mbase, int size, void *usr_data )
 	return 0;
 }
 
-int 
+int
 remove_io_trans( kernel_vars_t *kv, ulong mbase, int size )
 {
 	DECLARE_IOD;
@@ -308,14 +308,14 @@ remove_io_trans( kernel_vars_t *kv, ulong mbase, int size )
 	int i, num;
 
 	/* To remove an unused IO-page, we must make sure there are no
-	 * dangling references to it. Hence we must search the PTE hash 
-	 * table and remove all references. We must also issue a 
+	 * dangling references to it. Hence we must search the PTE hash
+	 * table and remove all references. We must also issue a
 	 * tlbia to make sure it is not in the on-chip DTLB/ITLB cashe.
 	 *
-	 * XXX: Instead of seraching the hash, we simply make sure the magic 
-	 * constants are invalid. This is perfectly safe since the exception 
-	 * handler doesn't write to the page in question - and the physical 
-	 * page always exists even if it is allocated by somebody else. 
+	 * XXX: Instead of seraching the hash, we simply make sure the magic
+	 * constants are invalid. This is perfectly safe since the exception
+	 * handler doesn't write to the page in question - and the physical
+	 * page always exists even if it is allocated by somebody else.
 	 * It is better to make sure there are no references of it though.
 	 *
 	 * XXX: This needs to be fixed... commonly, we reallocate
@@ -362,13 +362,13 @@ remove_io_trans( kernel_vars_t *kv, ulong mbase, int size )
 		}
 	}
 	return 0;
-	
+
 }
 
 
-/* Translate a mac-physical address (32 bit, not page-index) 
+/* Translate a mac-physical address (32 bit, not page-index)
  * and fill in rpn (and _possibly_ other fields) of the pte.
- * The WIMG bits are not modified after this call. 
+ * The WIMG bits are not modified after this call.
  * The calling function is not supposed to alter the pte after
  * this function call.
  *
@@ -385,7 +385,7 @@ mphys_to_pte( kernel_vars_t *kv, ulong mphys, ulong *the_pte1, int is_write, pte
 	block_trans_t *p;
 	io_page_t *p2;
 	int pte1 = *the_pte1;
-	
+
 	num_btrans = iod->num_btrans;
 	mphys &= ~0xfff;
 
@@ -410,7 +410,7 @@ mphys_to_pte( kernel_vars_t *kv, ulong mphys, ulong *the_pte1, int is_write, pte
 				pte1 |= tophys_mol(scratch_page);
 			} else
 				pte1 |= (mphys - p->mbase + (ulong)p->lvbase) & PTE1_RPN;
-			
+
 			if( p->flags & MAPPING_FORCE_CACHE ) {
 				/* use write through for now */
 				pte1 |= PTE1_W;
@@ -444,7 +444,7 @@ mphys_to_pte( kernel_vars_t *kv, ulong mphys, ulong *the_pte1, int is_write, pte
 	return 0;
 }
 
-void 
+void
 mmu_add_map( kernel_vars_t *kv, struct mmu_mapping *m )
 {
 	if( m->flags & MAPPING_MREGS ) {
@@ -459,10 +459,10 @@ mmu_add_map( kernel_vars_t *kv, struct mmu_mapping *m )
 			return;
 		}
 	}
-	m->id = add_block_trans( kv, m->mbase, m->lvbase, m->size, m->flags );	
+	m->id = add_block_trans( kv, m->mbase, m->lvbase, m->size, m->flags );
 }
 
-void 
+void
 mmu_remove_map( kernel_vars_t *kv, struct mmu_mapping *m )
 {
 	remove_block_trans( kv, m->id );

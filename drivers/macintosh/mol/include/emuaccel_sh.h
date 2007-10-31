@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <2003/01/25 14:57:36 samuel>
  *   Time-stamp: <2003/01/27 23:11:29 samuel>
- *   
+ *
  *	<emuaccel.h>
- *	
+ *
  *	Acceleration of the emulation of certain privileged instructions
- *   
+ *
  *   Copyright (C) 2003 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 #ifndef _H_EMUACCEL
@@ -30,8 +30,8 @@
 #define EMUACCEL_RFI		(8 << 5)
 #define EMUACCEL_UPDATE_DEC	(9 << 5)		/* update xDEC */
 #define EMUACCEL_MTSR		((10 << 5) | EMUACCEL_HAS_PARAM)
-#define EMUACCEL_NOP		(11 << 5) 
-#define EMUACCEL_MTHID0		(12 << 5) 
+#define EMUACCEL_NOP		(11 << 5)
+#define EMUACCEL_MTHID0		(12 << 5)
 
 #define EMUACCEL_HAS_PARAM	(1 << 10)
 #define EMUACCEL_INST_MASK	0xffe0

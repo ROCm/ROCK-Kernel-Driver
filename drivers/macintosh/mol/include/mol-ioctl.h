@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <2003/08/26 10:53:07 samuel>
  *   Time-stamp: <2004/02/08 20:17:58 samuel>
- *   
+ *
  *	<mol-ioctl.h>
- *	
- *	
- *   
+ *
+ *
+ *
  *   Copyright (C) 2003, 2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   version 2
- *   
+ *
  */
 
 #ifndef _H_MOL_IOCTL
@@ -90,8 +90,8 @@ typedef struct mol_ioctl_pb {
 #define MOL_IOCTL_SPR_CHANGED		_IOWR('M', 35, mol_ioctl_pb_t)	/* void ( void ) */
 #define MOL_IOCTL_IDLE_RECLAIM_MEMORY	_IOWR('M', 36, mol_ioctl_pb_t)	/* void ( void ) */
 #define MOL_IOCTL_MMU_MAP		_IOWR('M', 37, mol_ioctl_pb_t)	/* void ( struct mmu_mapping *m, int add_map ) */
-#define MOL_IOCTL_ADD_IORANGE		_IOWR('M', 39, mol_ioctl_pb_t)	/* void ( ulong mbase, size_t size, io_ops_t *) */ 
-#define MOL_IOCTL_REMOVE_IORANGE	_IOWR('M', 40, mol_ioctl_pb_t)	/* void ( ulong mbase, size_t size ) */ 
+#define MOL_IOCTL_ADD_IORANGE		_IOWR('M', 39, mol_ioctl_pb_t)	/* void ( ulong mbase, size_t size, io_ops_t *) */
+#define MOL_IOCTL_REMOVE_IORANGE	_IOWR('M', 40, mol_ioctl_pb_t)	/* void ( ulong mbase, size_t size ) */
 #define MOL_IOCTL_SETUP_FBACCEL		_IOWR('M', 41, mol_ioctl_pb_t)	/* void * ( char *lvbase, int bytes_per_row, int height ) */
 #define MOL_IOCTL_GET_DIRTY_FBLINES	_IOWR('M', 42, mol_ioctl_pb_t)	/* int ( short *rettable, int table_size_in_bytes ) */
 #define MOL_IOCTL_TRACK_DIRTY_RAM	_IOWR('M', 43, mol_ioctl_pb_t)	/* int ( char *lvbase, size_t size ) */

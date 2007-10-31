@@ -1,13 +1,13 @@
-/* 
+/*
  *   Creation Date: <2004/03/13 13:25:42 samuel>
  *   Time-stamp: <2004/03/13 14:07:11 samuel>
- *   
+ *
  *	<map.h>
- *	
- *	
- *   
+ *
+ *
+ *
  *   Copyright (C) 2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   version 2

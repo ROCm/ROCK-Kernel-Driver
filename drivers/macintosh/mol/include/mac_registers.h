@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <97/06/24 22:25:04 samuel>
  *   Time-stamp: <2004/02/08 20:32:59 samuel>
- *   
+ *
  *	<mac_registers.h>
- *	
- *	
- *   
+ *
+ *
+ *
  *   Copyright (C) 1997-2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 #ifndef _MAC_REGISTERS_H

@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <2001/02/24 14:08:28 samuel>
  *   Time-stamp: <2003/09/03 12:34:20 samuel>
- *   
+ *
  *	<platform.S>
- *	
+ *
  *	Linux Kernel Hooks
- *   
+ *
  *   Copyright (C) 2001, 2002, 2003 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 	////////////////////////////////////////////////////////
@@ -55,7 +55,7 @@ GLOBAL_SYMBOL( r__flush_hash_page_hook ):
 	stw	r6,STACK_V5(r1)
 #else
 	li	r6,1
-#endif	
+#endif
 	bctrl
 
 	lwz	r10,STACK_V1(r1)	// Restore registers
@@ -71,7 +71,7 @@ GLOBAL_SYMBOL( r__flush_hash_page_hook ):
 	mtlr	r0
 	blr
 
-	
+
 /************************************************************************/
 /*	lowmem reallocations						*/
 /************************************************************************/
@@ -118,12 +118,12 @@ RELOC_LOW(xx_tlbie_lowmem)
 RELOC_LOW_END(xx_tlbie_lowmem)
 
 #else
-	
+
 	/* r3=pte_slot, r4=pte0, r5=pte1 */
 RELOC_LOW(xx_store_pte_lowmem)
 	stw	r4,0(r3)		// interrupts are off and we won't take a page fault
 	stw	r5,4(r3)		// so this is safe...
-	blr	
+	blr
 RELOC_LOW_END(xx_store_pte_lowmem)
 
 #endif

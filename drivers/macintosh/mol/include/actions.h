@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <2004/01/31 13:08:42 samuel>
  *   Time-stamp: <2004/03/07 14:25:23 samuel>
- *   
+ *
  *	<actions.h>
- *	
- *	
- *   
+ *
+ *
+ *
  *   Copyright (C) 1999, 2000, 2001, 2002, 2003, 2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   version 2
- *   
+ *
  */
 
 #ifndef _H_ACTIONS
@@ -153,7 +153,7 @@ MACRO(ori_svl, [dreg, sreg, specvariable], [
 	/* syntax: FIX_SPRG2 rN */
 MACRO(fix_sprg2, [reg], [
 	/* only darwin needs this (sprg_a0 holds bits describing the CPU) */
-#ifdef __darwin__	
+#ifdef __darwin__
 	ACTION_13( ACTION_FIX_SPRG2, _reg )
 #endif
 ])

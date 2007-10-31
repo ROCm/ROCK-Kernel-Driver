@@ -1,15 +1,15 @@
-/* 
+/*
  *   Creation Date: <2001/08/02 23:53:57 samuel>
  *   Time-stamp: <2001/08/03 00:30:23 samuel>
- *   
+ *
  *	<weak.h>
- *	
+ *
  *	Support of weak symbols (extract, stolen from glibc)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 #ifndef _H_WEAKSYM

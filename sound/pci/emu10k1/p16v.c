@@ -124,7 +124,7 @@
 
  /* hardware definition */
 static struct snd_pcm_hardware snd_p16v_playback_hw = {
-	.info =			SNDRV_PCM_INFO_MMAP | 
+	.info =			SNDRV_PCM_INFO_MMAP |
 				SNDRV_PCM_INFO_INTERLEAVED |
 				SNDRV_PCM_INFO_BLOCK_TRANSFER |
 				SNDRV_PCM_INFO_RESUME |

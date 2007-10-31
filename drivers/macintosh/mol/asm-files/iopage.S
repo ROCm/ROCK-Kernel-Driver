@@ -1,27 +1,27 @@
-/* 
+/*
  *   Creation Date: <97/07/26 18:23:02 samuel>
  *   Time-stamp: <2002/07/06 12:12:10 samuel>
- *   
+ *
  *	<iopage.S>
- *	
+ *
  *	IO low-level support
- *   
+ *
  *   Copyright (C) 2002 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
-	// NOTE: This function is also called from the splitmode secondary interrupt 
+	// NOTE: This function is also called from the splitmode secondary interrupt
 	// handler (splitmode segment registers are resetup at return).
 
-	
+
 	///////////////////////////////////////////////////////////////////
 	// check_io_page
 	//
-	//	xINST_OPCODE is always valid at this point 
+	//	xINST_OPCODE is always valid at this point
 	//
 	// Examine if the page (which DAR points to) is an I/O page.
 	// Safe to modify: r0,r2-r12
@@ -42,9 +42,9 @@ check_io_page:
 
 	rlwinm	r5,r8,0,0,19			// mask page index
 
-	// XXX: TO BE FIXED. These instruction will _never_ cause an exceptions on a 
-	// single processor system. However, on a SMP machine we *could* receive a 
-	// tlbie invalidate broadcast. Thus we must implement a secondary 
+	// XXX: TO BE FIXED. These instruction will _never_ cause an exceptions on a
+	// single processor system. However, on a SMP machine we *could* receive a
+	// tlbie invalidate broadcast. Thus we must implement a secondary
 	// interrupt handler to cover that case.
 
 	lwz	r2,IOP_MAGIC(r5)
@@ -75,7 +75,7 @@ check_io_page:
 	rlwinm	r7,r8,32-1,21,29		// grain = double word
 	addi	r7,r7,IOP_USR_DATA		// usr_data[ (dar&0xfff) ]
 	lwzx	r5,r9,r7			// r5 = usr_data
-	
+
 	rlwinm.	r2,r10,0,6,6			// was it a write? (r10=DSISR)
 	bne	handle_write
 

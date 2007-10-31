@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <97/07/17 14:26:14 samuel>
  *   Time-stamp: <2003/06/06 19:17:26 samuel>
- *   
+ *
  *	<mmu_contexts.h>
- *	
- *	
- *   
+ *
+ *
+ *
  *   Copyright (C) 1997, 2001, 2002, 2003 Samuel Rydh
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   version 2
- *   
+ *
  */
 
 #ifndef _H_MMU_CONTEXTS

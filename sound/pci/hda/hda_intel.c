@@ -862,7 +862,7 @@ static void azx_init_pci(struct azx *chip)
 	case AZX_DRIVER_ATI:
 		/* For ATI SB450 azalia HD audio, we need to enable snoop */
 		update_pci_byte(chip->pci,
-				ATI_SB450_HDAUDIO_MISC_CNTR2_ADDR, 
+				ATI_SB450_HDAUDIO_MISC_CNTR2_ADDR,
 				0x07, ATI_SB450_HDAUDIO_ENABLE_SNOOP);
 		break;
 	case AZX_DRIVER_NVIDIA:

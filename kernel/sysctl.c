@@ -792,6 +792,16 @@ static ctl_table kern_table[] = {
  * NOTE: do not add new entries to this table unless you have read
  * Documentation/sysctl/ctl_unnumbered.txt
  */
+#ifdef CONFIG_SMP
+	{
+		.ctl_name	= CTL_UNNUMBERED,
+		.procname	= "affinity_load_balancing",
+		.data		= &affinity_load_balancing,
+		.maxlen		= sizeof(affinity_load_balancing),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+#endif
 	{ .ctl_name = 0 }
 };
 
@@ -1251,16 +1261,6 @@ static ctl_table debug_table[] = {
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec
-	},
-#endif
-#ifdef CONFIG_SMP
-	{
-		.ctl_name	= -2,
-		.procname	= "affinity_load_balancing",
-		.data		= &affinity_load_balancing,
-		.maxlen		= sizeof(affinity_load_balancing),
-		.mode		= 0644,
-		.proc_handler	= &proc_dointvec,
 	},
 #endif
 	{ .ctl_name = 0 }

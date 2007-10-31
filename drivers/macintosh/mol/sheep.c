@@ -67,7 +67,7 @@ struct SheepVars {
 	struct sock		*skt;		// Socket for communication with Ethernet card
 	struct sk_buff_head 	queue;		// Receiver packet queue
 	wait_queue_head_t 	wait;		// Wait queue for blocking read operations
-	unsigned long		ipfilter;	// only receive ip packets destined for this address 
+	unsigned long		ipfilter;	// only receive ip packets destined for this address
 	char			fake_addr[6];
 };
 
@@ -108,13 +108,13 @@ addrcmp( const char *a1, const char *a2 )
 
 /* Outgoing packet. Replace the fake enet addr with the real one. */
 static inline void
-cpyaddr( char *d, const char *s ) 
+cpyaddr( char *d, const char *s )
 {
 	*(u32*)d = *(u32*)s;
 	*(u16*)&d[4] = *(u16*)&s[4];
 }
 
-static void 
+static void
 demasquerade( struct sk_buff *skb, struct SheepVars *v )
 {
 	const char *local_addr = v->ether->dev_addr;
@@ -125,7 +125,7 @@ demasquerade( struct sk_buff *skb, struct SheepVars *v )
 	char *p = skb->mac.raw;
 #endif
 	int proto = *(short*)&p[12];
-	
+
 	cpyaddr( &p[6], local_addr );		// Source address
 
 	// Need to fix ARP packets
@@ -171,7 +171,7 @@ demasquerade( struct sk_buff *skb, struct SheepVars *v )
 static int
 sheep_net_receiver( struct sk_buff *skb, struct net_device *dev, struct packet_type *pt, struct net_device *orig_dev )
 #else
-static int 
+static int
 sheep_net_receiver( struct sk_buff *skb, struct net_device *dev, struct packet_type *pt )
 #endif
 {
@@ -179,7 +179,7 @@ sheep_net_receiver( struct sk_buff *skb, struct net_device *dev, struct packet_t
 	const char *laddr = dev->dev_addr;
 	struct sk_buff *skb2;
 	struct SheepVars *v = (struct SheepVars*)pt;
-	
+
 	D(bug("sheep_net: packet received\n"));
 
 	if( skb->pkt_type == PACKET_OUTGOING ) {
@@ -206,7 +206,7 @@ sheep_net_receiver( struct sk_buff *skb, struct net_device *dev, struct packet_t
 		// is this a packet to the local host from MOL?
 		if( !addrcmp((char*)&ETH_HDR(skb)->h_source, v->fake_addr) )
 			goto drop;
-		
+
 		if( !multicast ) {
 			// if the packet is not meant for this host, discard it
 			if( addrcmp((char*)&ETH_HDR(skb)->h_dest, laddr) )
@@ -276,7 +276,7 @@ static struct proto mol_proto =
 #endif
 
 
-static int 
+static int
 sheep_net_open( struct inode *inode, struct file *f )
 {
 	static char fake_addr_[6] = { 0xFE, 0xFD, 0xDE, 0xAD, 0xBE, 0xEF };
@@ -301,7 +301,7 @@ sheep_net_open( struct inode *inode, struct file *f )
 		return -ENOMEM;
 
 	v = (struct SheepVars *) f->private_data;
-	
+
 	memset( v, 0, sizeof(*v) );
 	memcpy( v->fake_addr, fake_addr_, 6 );
 
@@ -311,7 +311,7 @@ sheep_net_open( struct inode *inode, struct file *f )
 }
 
 
-static int 
+static int
 sheep_net_release( struct inode *inode, struct file *f )
 {
 	struct SheepVars *v = (struct SheepVars *)f->private_data;
@@ -354,7 +354,7 @@ memcpy_tov( const struct iovec *iv, const char *buf, int s )
 {
 	while( s > 0 ) {
 		int len = min_t( unsigned int, iv->iov_len, s );
-		
+
 		if( copy_to_user(iv->iov_base, buf, len) )
 			return -EFAULT;
 		s -= len;
@@ -369,7 +369,7 @@ memcpy_fromv( char *buf, const struct iovec *iv, int s )
 {
 	while( s > 0 ) {
 		int len = min_t( unsigned int, iv->iov_len, s );
-		
+
 		if( copy_from_user(buf, iv->iov_base, len) )
 			return -EFAULT;
 		s -= len;
@@ -379,7 +379,7 @@ memcpy_fromv( char *buf, const struct iovec *iv, int s )
 	return 0;
 }
 
-static ssize_t 
+static ssize_t
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,19)
 sheep_net_aio_read(struct kiocb *iocb, const struct iovec *iv, unsigned long count, loff_t pos)
 {
@@ -415,7 +415,7 @@ sheep_net_readv( struct file *f, const struct iovec *iv, unsigned long count, lo
 	return size;
 }
 
-static ssize_t 
+static ssize_t
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,19)
 sheep_net_aio_write(struct kiocb *iocb, const struct iovec *iv, unsigned long count, loff_t off)
 {
@@ -496,7 +496,7 @@ sheep_net_writev( struct file *f, const struct iovec *iv, unsigned long count, l
 	// Outgoing packet (will be seen on the wire)
 	demasquerade( skb, v );
 
-	skb->protocol = PROT_MAGIC;	// Magic value (we can recognize the packet in sheep_net_receiver) 
+	skb->protocol = PROT_MAGIC;	// Magic value (we can recognize the packet in sheep_net_receiver)
 	dev_queue_xmit( skb );
 	return size;
 }
@@ -512,7 +512,7 @@ sheep_net_read( struct file *f, char *buf, size_t count, loff_t *off )
 	return sheep_net_readv( f, &iv, 1, off );
 }
 
-static ssize_t 
+static ssize_t
 sheep_net_write( struct file *f, const char *buf, size_t count, loff_t *off )
 {
 	struct iovec iv;
@@ -535,7 +535,7 @@ sheep_net_poll( struct file *f, struct poll_table_struct *wait )
 	return 0;
 }
 
-static int 
+static int
 sheep_net_ioctl( struct inode *inode, struct file *f, unsigned int code, unsigned long arg )
 {
 	struct SheepVars *v = (struct SheepVars *)f->private_data;
@@ -648,7 +648,7 @@ error:
 		v->ipfilter = arg;
 		return 0;
 	}
-	return -ENOIOCTLCMD;	
+	return -ENOIOCTLCMD;
 }
 
 
@@ -688,13 +688,13 @@ static struct miscdevice sheep_net_device = {
 	.fops		= &sheep_net_fops
 };
 
-int 
+int
 init_module( void )
 {
 	return misc_register( &sheep_net_device );
 }
 
-void 
+void
 cleanup_module( void )
 {
 	(void) misc_deregister( &sheep_net_device );

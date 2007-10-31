@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <2003/03/03 23:19:47 samuel>
  *   Time-stamp: <2004/02/21 16:24:56 samuel>
- *   
+ *
  *	<skiplist.c>
- *	
+ *
  *	Skiplist implementation
- *   
+ *
  *   Copyright (C) 2003, 2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 #include "archinclude.h"
@@ -22,7 +22,7 @@
 
 /*
  *	Skiplist Example:
- *	
+ *
  *	level 0   ->   el1   ->   el2	->   el3   -->   el4   --> null_el
  *	level 1        -->        el2   ->   el3   -->   el4   --> null_el
  *	level 2        -->        el2        -->         el4   --> null_el
@@ -35,7 +35,7 @@
 static unsigned int mol_rand_seed = 152;
 
 static inline int
-_cntlz( int val ) 
+_cntlz( int val )
 {
 	int ret;
 	asm volatile("cntlzw %0,%1" : "=r" (ret) : "r"(val) );
@@ -65,7 +65,7 @@ set_level_next( skiplist_level_t *level, skiplist_el_t *el )
 	level->next = el;
 #ifdef __darwin__
 	level->next_phys = el ? tophys_mol(el) : 0;
-#endif	
+#endif
 }
 
 
@@ -74,7 +74,7 @@ set_level_next( skiplist_level_t *level, skiplist_el_t *el )
 /************************************************************************/
 
 int
-skiplist_prealloc( skiplist_t *sl, char *buf, unsigned int size, 
+skiplist_prealloc( skiplist_t *sl, char *buf, unsigned int size,
 		   skiplist_el_callback callback, void *usr1, void *usr2 )
 {
 	skiplist_el_t *p, *head;
@@ -168,7 +168,7 @@ skiplist_delete( skiplist_t *sl, int key )
 	}
 	if( level < 0 )
 		return NULL;
-	
+
 	/* put on freelist */
 	p = delptr.next;
 	p->key = level;
@@ -209,7 +209,7 @@ skiplist_init( skiplist_t *sl, int datasize )
 	mol_random_entropy();
 
 	memset( sl, 0, sizeof(*sl) );
-	
+
 	sl->nil_el.key = SKIPLIST_END;
 	sl->datasize = datasize;
 

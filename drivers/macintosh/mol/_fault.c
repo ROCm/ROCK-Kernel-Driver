@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <2002/06/08 21:01:54 samuel>
  *   Time-stamp: <2004/02/19 11:54:33 samuel>
- *   
+ *
  *	<fault.c>
- *	
+ *
  *	Linux part
- *   
+ *
  *   Copyright (C) 2002, 2003, 2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 #include "archinclude.h"
@@ -35,7 +35,7 @@ static inline ulong
 fix_pte( ulong *p, ulong set, ulong flags )
 {
 	unsigned long ret, tmp;
-	
+
 	__asm__ __volatile__("\n"
 		"1:	lwarx	%0,0,%3		\n"
 		"	andc.	%1,%5,%0	\n"
@@ -59,7 +59,7 @@ fix_pte( ulong *p, ulong set, ulong flags )
 #define PAGE_BITS_WRITE		(_PAGE_ACCESSED | _PAGE_DIRTY | _PAGE_HASHPTE )
 #define PAGE_BITS_READ		(_PAGE_ACCESSED | _PAGE_HASHPTE )
 
-ulong 
+ulong
 get_phys_page( kernel_vars_t *kv, ulong va, int request_rw )
 {
 	char *lvptr = (char*)va;
@@ -71,7 +71,7 @@ get_phys_page( kernel_vars_t *kv, ulong va, int request_rw )
 	/* pte bits that must be set */
 	flags = request_rw ? (_PAGE_USER | _PAGE_RW | _PAGE_PRESENT)
 		: (_PAGE_USER | _PAGE_PRESENT);
-	
+
 	uptr = ((ulong*)current->thread.pgdir)[va>>22];	/* top 10 bits */
 	ptr = (ulong*)(uptr & ~0xfff);
 	if( !ptr )
@@ -128,11 +128,11 @@ bad_area:
 /*	Debugger functions						*/
 /************************************************************************/
 
-int 
+int
 dbg_get_linux_page( ulong va, dbg_page_info_t *r )
 {
 	ulong val, uptr, *ptr;
-	
+
 	uptr = ((ulong*)current->thread.pgdir)[va>>22];	/* top 10 bits */
 	ptr = (ulong*)(uptr & ~0xfff);
 	if( !ptr )
@@ -143,7 +143,7 @@ dbg_get_linux_page( ulong va, dbg_page_info_t *r )
 	val = ptr[ (va>>12)&0x3ff ];		/* next 10 bits */
 
 	r->phys = val & ~0xfff;
-	r->mflags = 
+	r->mflags =
 		  DBG_TRANSL_PAGE_FLAG( val, _PAGE_PRESENT )
 		| DBG_TRANSL_PAGE_FLAG( val, _PAGE_USER )
 		| DBG_TRANSL_PAGE_FLAG(	val, _PAGE_GUARDED )

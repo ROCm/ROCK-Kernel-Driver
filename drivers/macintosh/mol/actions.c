@@ -1,18 +1,18 @@
-/* 
+/*
  *   Creation Date: <2001/04/07 17:33:52 samuel>
  *   Time-stamp: <2004/03/13 14:17:40 samuel>
- *   
+ *
  *	<actions.c>
- *	
+ *
  *	Handle assambly actions (relocations, exception vector
  *	hooking, lowmem relocations and other stuff)
- *   
+ *
  *   Copyright (C) 2001, 2002, 2003, 2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 #include "archinclude.h"
@@ -78,7 +78,7 @@ lowmem_tophys( void *vaddr ) {
 }
 
 
-static void 
+static void
 lowmem_initialize( void )
 {
 	if( num_cleanup_entries ) {
@@ -102,7 +102,7 @@ lowmem_alloc( int size, cleanup_entry_t **ret_ce )
 	memset( &ce, 0, sizeof(ce) );
 	if( ret_ce )
 		*ret_ce = NULL;
-	
+
 	if( num_cleanup_entries >= MAX_NUM_CLEANUP_HANDLERS ) {
 		printk("MOL: Need more cleanup slots!\n");
 		return NULL;
@@ -130,7 +130,7 @@ lowmem_alloc( int size, cleanup_entry_t **ret_ce )
 		return NULL;
 	}
 	/* printk("lowmem alloc: %08lX\n", pstart ); */
-	
+
 	ce.lowmem_addr = (char*)pstart;
 	ce.alloc_method = 0;
 	ce.alloc_size = size;
@@ -191,9 +191,9 @@ relocate_inst( ulong *opc_ptr, ulong from, ulong to )
 	int offs=-1;
 
 	/* XXX: UNTESTED if target instruction is a branch */
-	
+
 	/* Since we use this on the _first_ instruction of the
-	 * exception vector, it can't touch LR/CR. Thus, we 
+	 * exception vector, it can't touch LR/CR. Thus, we
 	 * only look for unconditional, relative branches.
 	 */
 
@@ -231,13 +231,13 @@ relocate_inst( ulong *opc_ptr, ulong from, ulong to )
 typedef int (*action_func_t)( int action, ulong *target, const int *pb );
 
 static int
-action_li_phys( int action, ulong *target, const int *pb ) 
+action_li_phys( int action, ulong *target, const int *pb )
 {
 	int r = pb[0] & 0x1f;
 	ulong addr = pb[1] + tophys_mol( code_base );
 
 	/* target[0] = addis r,0,addr@h ; target[1] = ori r,r,addr@l */
-	target[0] = (15 << 26) | (r << 21) | (addr >> 16);	
+	target[0] = (15 << 26) | (r << 21) | (addr >> 16);
 	target[1] = (24 << 26) | (r << 21) | (r << 16) | (addr & 0xffff);
 
 	/* printk("ACTION_LI_PHYS %d %08lX\n", dreg, addr ); */
@@ -251,7 +251,7 @@ action_lwz_physaddr_r( int action, ulong *target, const int *pb )
 	int dr = (pb[0] >> 5) & 0x1f;
 	int r = pb[0] & 0x1f;
 	short low = (addr & 0xffff);
-		
+
 	/* target[0] = addis dr,r,addr@h ; target[1] = lwz dr,addr@l(dr) */
 	target[0] = (15 << 26) | (dr << 21) | (r << 16) | ((addr - low) >> 16);
 	target[1] = (32 << 26) | (dr << 21) | (dr << 16) | ((int)low & 0xffff);
@@ -261,11 +261,11 @@ action_lwz_physaddr_r( int action, ulong *target, const int *pb )
 }
 
 static int
-action_specvar( int action, ulong *target, const int *pb ) 
+action_specvar( int action, ulong *target, const int *pb )
 {
 	int r = pb[0] & 0x1f;
 	ulong addr;
-	
+
 	switch( pb[1] ) {
 	case SPECVAR_SESSION_TABLE:
 		addr = tophys_mol(g_sesstab);
@@ -315,7 +315,7 @@ action_reloc_hook( int action, ulong *hookcode, const int *pb )
 	action_pb_t *apb;
 	char *lowmem;
 	int i;
-	
+
 	/* Virtual address of exception vector */
 	vector_virt = lowmem_phys_to_virt(vector);
 
@@ -372,11 +372,11 @@ action_reloc_low( int action, ulong *dummy, const int *pb )
 	int size = pb[0];
 	char **func_ptr = (char**)pb[1];
 	char *lowmem;
-	
+
 	if( !(lowmem=lowmem_alloc(size, NULL)) )
 		return 1;
 	memcpy( lowmem, (char*)&pb[2], size );
-	
+
 	flush_icache_mol( (ulong)lowmem, (ulong)lowmem+size );
 	*func_ptr = lowmem;
 	return 0;
@@ -498,7 +498,7 @@ perform_actions( void )
 {
 	action_pb_t *pb;
 	int action, i;
-	
+
 	if( relocate_code() )
 		return 1;
 	lowmem_initialize();
@@ -511,7 +511,7 @@ perform_actions( void )
 				printk("OFFSET ERROR!\n");
 				goto error;
 			}
-			
+
 			if( !actiontable[action] )
 				goto error;
 			if( (*actiontable[action])(action, target, pb->params) )

@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <2002/01/13 16:35:18 samuel>
  *   Time-stamp: <2004/01/25 17:36:49 samuel>
- *   
+ *
  *	<alloc.h>
- *	
+ *
  *	Memory allocation and mappings
- *   
+ *
  *   Copyright (C) 2002, 2003, 2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   version 2
- *   
+ *
  */
 
 #ifndef _H_ALLOC
@@ -29,8 +29,8 @@
 #endif
 #endif
 
-static inline void *kmalloc_mol( int size ) { 
-	return kmalloc( size, GFP_KERNEL ); 
+static inline void *kmalloc_mol( int size ) {
+	return kmalloc( size, GFP_KERNEL );
 }
 static inline void kfree_mol( void *p ) {
 	kfree( p );

@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <1997/07/02 19:52:18 samuel>
  *   Time-stamp: <2004/04/03 18:29:26 samuel>
- *   
+ *
  *	<extralib.h>
- *	
- *	
- *   
+ *
+ *
+ *
  *   Copyright (C) 2001, 2002, 2003, 2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 #ifndef _H_EXTRALIB

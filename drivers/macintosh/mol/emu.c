@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <1998-11-21 16:07:47 samuel>
  *   Time-stamp: <2004/03/13 14:08:18 samuel>
- *   
+ *
  *	<emu.c>
- *	
+ *
  *	Emulation of some assembly instructions
- *   
+ *
  *   Copyright (C) 1998-2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 #include "archinclude.h"
@@ -32,8 +32,8 @@
 // #define DEBUG
 
 /* If BAT_PERFORMANCE_HACK is defined, PTEs corresponding to a mac bat
- * mapping will not necessary be flushed when the bat registers are 
- * touched. This gives a huge performance gain in MacOS 9.1 (which 
+ * mapping will not necessary be flushed when the bat registers are
+ * touched. This gives a huge performance gain in MacOS 9.1 (which
  * clears the bat registers in the idle loop). Of course, this break
  * compatibility (although most operating systems initializes the
  * BATs once and for all).
@@ -54,7 +54,7 @@ do_mtsdr1( kernel_vars_t *kv, ulong value )
 {
 	ulong mbase, mask;
 	int s;
-	
+
 	MREGS.spr[S_SDR1] = value;
 
 	/* the mask must be a valid one; we hade better make sure we are
@@ -82,9 +82,9 @@ do_mtsdr1( kernel_vars_t *kv, ulong value )
 
 	/* try to allocate the PTE bitfield table (16K/128 MB ram). The worst
 	 * case is 512K which will fail since the kmalloc limit is 128K.
-	 * If the allocation fails, we simply don't use the bitfield table. 
+	 * If the allocation fails, we simply don't use the bitfield table.
 	 */
-	s = (mask+1)/8/8;		
+	s = (mask+1)/8/8;
 	if( MMU.pthash_inuse_bits )
 		kfree_cont_mol( MMU.pthash_inuse_bits );
 	if( !(MMU.pthash_inuse_bits=kmalloc_cont_mol(s)) )
@@ -107,13 +107,13 @@ do_mtsdr1( kernel_vars_t *kv, ulong value )
 /* This function is _very_ slow, since it must destroy a lot of PTEs.
  * Fortunately, BAT-maps are normally static.
  */
-int 
+int
 do_mtbat( kernel_vars_t *kv, int sprnum, ulong value, int force )
 {
 	mac_bat_t *d;
 	int batnum;
 	mBAT *p;
-	
+
 	BUMP(do_mtbat);
 
 	if( !force && MREGS.spr[sprnum] == value )
@@ -127,7 +127,7 @@ do_mtbat( kernel_vars_t *kv, int sprnum, ulong value, int force )
 	batnum = (sprnum - S_IBAT0U) >>1;
 	d = &MMU.bats[batnum];
 
-	/* First we must make sure that all PTEs corresponding to 
+	/* First we must make sure that all PTEs corresponding to
 	 * the old BAT-mapping are purged from the hash table.
 	 */
 	if( BAT_HACK(kv) && d->valid )
@@ -164,7 +164,7 @@ lookup_emuaccel_handler( int emuaccel )
 {
 	extern ulong emuaccel_table[];
 	ulong handler, *p = emuaccel_table;
-	
+
 	for( ; p[0]; p+=3 ) {
 		if( (emuaccel & EMUACCEL_INST_MASK) != p[0] )
 			continue;
@@ -181,11 +181,11 @@ alloc_emuaccel_slot( kernel_vars_t *kv, int emuaccel, int param, int inst_addr )
 	ulong *p = (ulong*)((char*)kv->emuaccel_page + kv->emuaccel_size);
 	ulong handler = lookup_emuaccel_handler( emuaccel );
 	int size, ret;
-	
+
 	size = (emuaccel & EMUACCEL_HAS_PARAM)? 16 : 8;
 	if( !handler || !p || kv->emuaccel_size + size > 0x1000 )
 		return 0;
-	
+
 	ret = kv->emuaccel_mphys + kv->emuaccel_size;
 	p[0] = handler;
 	p[1] = inst_addr + 4;

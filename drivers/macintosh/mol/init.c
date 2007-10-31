@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <2002/01/13 20:45:37 samuel>
  *   Time-stamp: <2004/02/14 14:01:09 samuel>
- *   
+ *
  *	<init.c>
- *	
+ *
  *	Kernel module initialization
- *   
+ *
  *   Copyright (C) 2002, 2003, 2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 #include "archinclude.h"
@@ -44,10 +44,10 @@ common_init( void )
 		cleanup_hash();
 		return 1;
 	}
-	
+
 	memset( g_sesstab, 0, sizeof(*g_sesstab) );
 	init_MUTEX_mol( &g_sesstab->lock );
-	
+
 	if( arch_common_init() ) {
 		free_MUTEX_mol( &g_sesstab->lock );
 		kfree_cont_mol( g_sesstab );
@@ -74,12 +74,12 @@ common_cleanup( void )
 /*	initialize / destroy session					*/
 /************************************************************************/
 
-static int 
+static int
 initialize_session_( uint index )
 {
 	kernel_vars_t *kv;
 	ulong kv_phys;
-	
+
 	if( g_sesstab->magic == 1 )
 		return -EMOLSECURITY;
 
@@ -89,7 +89,7 @@ initialize_session_( uint index )
 
 	if( !g_num_sessions && perform_actions() )
 		return -EMOLGENERAL;
-	
+
 	if( !(kv=alloc_kvar_pages()) )
 		goto error;
 
@@ -122,7 +122,7 @@ initialize_session_( uint index )
 }
 
 int
-initialize_session( uint index ) 
+initialize_session( uint index )
 {
 	int ret;
 	if( index >= MAX_NUM_SESSIONS )
@@ -164,7 +164,7 @@ destroy_session( uint index )
 
 		if( kv->emuaccel_page )
 			free_page_mol( kv->emuaccel_page );
-		
+
 		memset( kv, 0, NUM_KVARS_PAGES * 0x1000 );
 		free_kvar_pages( kv );
 

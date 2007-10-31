@@ -52,13 +52,6 @@ config SND_PS3_DEFAULT_START_DELAY
 	int "Startup delay time in ms"
 	depends on SND_PS3
 	default "2000"
-endmenu
-
-
-# ALSA ppc drivers
-
-menu "ALSA PPC devices"
-	depends on SND!=n && PPC
 
 config SND_PPC_MPC52xx_AC97
 	tristate "Freescale MPC52xx AC97 interface support"
@@ -66,6 +59,6 @@ config SND_PPC_MPC52xx_AC97
 	select SND_AC97_CODEC
 	help
 	  Say Y or M if you want to support any AC97 codec attached to
-	  the Freescqle MPC52xx AC97 interface.
+	  the Freescale MPC52xx AC97 interface.
 
 endmenu

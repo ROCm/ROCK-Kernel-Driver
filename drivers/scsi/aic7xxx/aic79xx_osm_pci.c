@@ -144,7 +144,7 @@ ahd_linux_pci_dev_resume(struct pci_dev *pdev)
 	 * Restart the HBA
 	 */
 	ahd_reset(ahd, /*reinit*/TRUE);
-	ahd_intr_enable(ahd, TRUE); 
+	ahd_intr_enable(ahd, TRUE);
 	ahd_restart(ahd);
 
 	return 0;

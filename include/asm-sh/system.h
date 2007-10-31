@@ -12,10 +12,11 @@
 #include <asm/types.h>
 #include <asm/ptrace.h>
 
+#define AT_VECTOR_SIZE_ARCH 1
+
 struct task_struct *__switch_to(struct task_struct *prev,
 				struct task_struct *next);
 
-#define AT_VECTOR_SIZE_ARCH 1
 /*
  *	switch_to() should switch tasks to task nr n, first
  */

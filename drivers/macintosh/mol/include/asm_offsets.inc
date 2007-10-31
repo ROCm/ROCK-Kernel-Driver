@@ -1,17 +1,17 @@
 /* -*-c-*-
  *   Creation Date: <2001/10/20 17:51:10 samuel>
  *   Time-stamp: <2004/02/21 21:38:27 samuel>
- *   
+ *
  *	<asm_offsets.inc>
- *	
+ *
  *	Extra offsets (included from asm_offsets.c)
- *   
+ *
  *   Copyright (C) 2001, 2002, 2003, 2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 extern void extra( void );
@@ -57,7 +57,7 @@ extra( void )
 #endif
 	DEFINE( SKIPLIST_LEVELSIZE, sizeof(skiplist_level_t) );
 	DEFINE( SKIPLIST_KEY, offsetof(skiplist_el_t, key) );
-	DEFINE( K_VSID_SL_ROOT_ELEM, offsetof(kernel_vars_t, mmu.vsid_sl.root) 
+	DEFINE( K_VSID_SL_ROOT_ELEM, offsetof(kernel_vars_t, mmu.vsid_sl.root)
 				     - offsetof(skiplist_el_t, level));
 	K_DEF( K_VSID_SL_SLEVEL, mmu.vsid_sl.slevel );
 

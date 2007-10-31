@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <2000/09/07 20:36:54 samuel>
  *   Time-stamp: <2004/02/14 14:45:33 samuel>
- *   
+ *
  *	<mmu_tracker.c>
- *	
+ *
  *	Keeps track of dirty RAM pages
- *   
+ *
  *   Copyright (C) 2000, 2001, 2002, 2003, 2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 #include "archinclude.h"
@@ -23,7 +23,7 @@
 typedef struct tracker_data {
 	char 	*table;
 	size_t	table_size;
-	
+
 	int	npages;
 	ulong	lvbase;
 } tracker_data_t;
@@ -59,7 +59,7 @@ track_lvrange( kernel_vars_t *kv )
 {
 	ulong lvbase = MMU.userspace_ram_base;
 	int size = MMU.ram_size;
-	
+
 	DECLARE_TS;
 	if( ts )
 		cleanup_mmu_tracker( kv );
@@ -102,7 +102,7 @@ size_t
 get_track_buffer( kernel_vars_t *kv, char *retbuf )
 {
 	DECLARE_TS;
-	
+
 	if( !ts )
 		return 0;
 	if( !retbuf )

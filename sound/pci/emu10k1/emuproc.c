@@ -254,7 +254,7 @@ static void snd_emu10k1_proc_spdif_read(struct snd_info_entry *entry,
 			snd_emu1010_fpga_read(emu, 0x2a, &value);
 			snd_emu1010_fpga_read(emu, 0x2b, &value2);
 			spin_unlock_irqrestore(&emu->emu_lock, flags);
-			rate = 0x1770000 / (((value << 5) | value2)+1);	
+			rate = 0x1770000 / (((value << 5) | value2)+1);
 			snd_iprintf(buffer, "ADAT Locked : %u\n", rate);
 		} else {
 			snd_iprintf(buffer, "ADAT Unlocked\n");
@@ -267,7 +267,7 @@ static void snd_emu10k1_proc_spdif_read(struct snd_info_entry *entry,
 			snd_emu1010_fpga_read(emu, 0x28, &value);
 			snd_emu1010_fpga_read(emu, 0x29, &value2);
 			spin_unlock_irqrestore(&emu->emu_lock, flags);
-			rate = 0x1770000 / (((value << 5) | value2)+1);	
+			rate = 0x1770000 / (((value << 5) | value2)+1);
 			snd_iprintf(buffer, "SPDIF Locked : %d\n", rate);
 		} else {
 			snd_iprintf(buffer, "SPDIF Unlocked\n");
@@ -586,7 +586,7 @@ int __devinit snd_emu10k1_proc_init(struct snd_emu10k1 * emu)
 	struct snd_info_entry *entry;
 #ifdef CONFIG_SND_DEBUG
 	if (emu->card_capabilities->emu1010) {
-		if (! snd_card_proc_new(emu->card, "emu1010_regs", &entry)) 
+		if (! snd_card_proc_new(emu->card, "emu1010_regs", &entry))
 			snd_info_set_text_ops(entry, emu, snd_emu_proc_emu1010_reg_read);
 	}
 	if (! snd_card_proc_new(emu->card, "io_regs", &entry)) {

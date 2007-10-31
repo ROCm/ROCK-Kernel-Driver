@@ -20,9 +20,9 @@
 #define SECURITY_FRAMEWORK_VERSION	"1.0.0"
 
 /* things that live in dummy.c */
-extern void security_fixup_ops(struct security_operations *ops);
 /* default security ops */
 extern struct security_operations capability_security_ops;
+extern void security_fixup_ops(struct security_operations *ops);
 
 struct security_operations *security_ops;	/* Initialized to NULL */
 unsigned long mmap_min_addr;		/* 0 means no protection */

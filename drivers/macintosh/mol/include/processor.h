@@ -1,16 +1,16 @@
-/* 
+/*
  *   Creation Date: <2000/10/29 01:43:29 samuel>
  *   Time-stamp: <2003/07/27 22:37:49 samuel>
- *   
+ *
  *	<processor.h>
- *	
+ *
  *	Extract from <asm/processor.h>
- *   
- *   
+ *
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 #ifndef _H_PROCESSOR
@@ -149,7 +149,7 @@
 #define S_PTELO		982	/* 7445/7455 */
 #define S_L3PM		983	/* L3 Private Memory Address Control Register */
 #define S_L3ITCR0	984	/* ??? */
-#define S_L3OHCR	1000	/* ??? */ 
+#define S_L3OHCR	1000	/* ??? */
 #define S_L3ITCR1	1001	/* ??? */
 #define S_L3ITCR2	1002	/* ??? */
 #define S_L3ITCR3	1003	/* ??? */

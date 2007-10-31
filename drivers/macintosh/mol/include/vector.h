@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <2003/05/26 00:00:28 samuel>
  *   Time-stamp: <2004/03/07 14:44:50 samuel>
- *   
+ *
  *	<vector.h>
- *	
+ *
  *	Vector hooks
- *   
+ *
  *   Copyright (C) 2003, 2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   version 2
- *   
+ *
  */
 
 #ifndef _H_VECTOR
@@ -25,14 +25,14 @@
 
 #define	PERFMON_VECTOR		0xf00
 
-	
+
 /************************************************************************/
 /*	Vector entry point definitions					*/
 /************************************************************************/
 
 /*
- * This code uses the dynamic linkage/action symbol functionality of 
- * the MOL kernel loader to automatically install the hooks. Refer to 
+ * This code uses the dynamic linkage/action symbol functionality of
+ * the MOL kernel loader to automatically install the hooks. Refer to
  * hook.c for the actual implementation.
  */
 
@@ -157,7 +157,7 @@ mDEFINE(SOFT_VECTOR_ENTRY_603, [v], [
 	mfcr	r3
 	b	soft_603_entry_[]_v
 ])
-	
+
 
 /************************************************************************/
 /*	FUNCTION_HOOK							*/

@@ -100,7 +100,7 @@ int main( void )
 	M_DEF( xDEC, spr[S_DEC]);
 	M_DEF( xDEC_STAMP, dec_stamp);
 	M_DEF( xTIMER_STAMP, timer_stamp);
-	M_DEF( xMSR, msr);	
+	M_DEF( xMSR, msr);
 	M_DEF( xSPR_BASE, spr[0]);
 
 	M_DEF( xHID0, spr[S_HID0]);

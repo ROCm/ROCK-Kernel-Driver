@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <2001/12/29 19:46:46 samuel>
  *   Time-stamp: <2004/02/07 16:51:57 samuel>
- *   
+ *
  *	<platform.h>
- *	
+ *
  *	Misc definitions needed on certain platforms
- *   
+ *
  *   Copyright (C) 2001, 2002, 2003, 2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 #ifndef _H_PLATFORM

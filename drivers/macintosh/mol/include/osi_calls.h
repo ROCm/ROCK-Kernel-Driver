@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <2002/06/16 01:40:57 samuel>
  *   Time-stamp: <2004/02/23 01:04:31 samuel>
- *   
+ *
  *	<osi_calls.h>
- *	
+ *
  *	OSI call inlines
- *   
+ *
  *   Copyright (C) 2002, 2003, 2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 #ifndef _H_OSI_CALLS
@@ -43,7 +43,7 @@
 		register unsigned long dreg(r3);		\
 		register unsigned long dreg(r4);		\
 		register unsigned long dreg(r5)			\
-			,##input_regs ; 
+			,##input_regs ;
 
 #define _oc_syscall( number, extra_ret_regs... )		\
 		__oc_r3 = OSI_SC_MAGIC_R3;			\
@@ -360,14 +360,14 @@ static inline _osi_call1( int, OSI_USleep, OSI_USLEEP, int, usecs );
 /* NVRAM */
 static inline _osi_call0( int, OSI_NVRamSize, OSI_NVRAM_SIZE );
 static inline _osi_call1( int, OSI_ReadNVRamByte, OSI_READ_NVRAM_BYTE, int, offs );
-static inline _osi_call2( int, OSI_WriteNVRamByte, OSI_WRITE_NVRAM_BYTE, int, offs, 
+static inline _osi_call2( int, OSI_WriteNVRamByte, OSI_WRITE_NVRAM_BYTE, int, offs,
 			  unsigned char, ch );
 
 /* keyboard stuff */
 static inline _osi_call0_w1( int, OSI_GetAdbKey2, OSI_GET_ADB_KEY, int *, raw_key );
 static inline _osi_call1( int, OSI_KbdCntrl, OSI_KBD_CNTRL, int, cmd );
 
-static inline int OSI_GetAdbKey( void ) 
+static inline int OSI_GetAdbKey( void )
 	{ int dummy_raw_key; return OSI_GetAdbKey2( &dummy_raw_key ); }
 static inline _osi_call2( int, OSI_MapAdbKey, OSI_MAP_ADB_KEY, int, keycode, int, adbkey )
 static inline _osi_call1( int, OSI_KeycodeToAdb, OSI_KEYCODE_TO_ADB, int, keycode );
@@ -408,12 +408,12 @@ struct ablk_disk_info;
 static inline _osi_call2_w4( int, OSI_ABlkDiskInfo, OSI_ABLK_DISK_INFO, int, channel, int, unit,
 			     struct ablk_disk_info *, retinfo );
 static inline _osi_call1( int, OSI_ABlkKick, OSI_ABLK_KICK, int, channel );
-static inline _osi_call1_w1w1w1( int, OSI_ABlkIRQAck, OSI_ABLK_IRQ_ACK, int, channel, int *, req_count, 
+static inline _osi_call1_w1w1w1( int, OSI_ABlkIRQAck, OSI_ABLK_IRQ_ACK, int, channel, int *, req_count,
 			       int *, active, int *, events );
 static inline _osi_call3( int, OSI_ABlkRingSetup, OSI_ABLK_RING_SETUP, int, channel, int, mphys, int, n_el );
 static inline _osi_call2( int, OSI_ABlkCntrl, OSI_ABLK_CNTRL, int, channel, int, cmd );
 static inline _osi_call3( int, OSI_ABlkCntrl1, OSI_ABLK_CNTRL, int, channel, int, cmd, int, param );
-static inline _osi_call5( int, OSI_ABlkSyncRead, OSI_ABLK_SYNC_READ, int, channel, int, unit, 
+static inline _osi_call5( int, OSI_ABlkSyncRead, OSI_ABLK_SYNC_READ, int, channel, int, unit,
 			  int, blk, ulong, mphys, int, size );
 static inline _osi_call5( int, OSI_ABlkSyncWrite, OSI_ABLK_SYNC_WRITE, int, channel, int, unit,
 			  int, blk, ulong, mphys, int, size );
@@ -424,7 +424,7 @@ static inline _osi_call0( int, OSI_CMountDrvVol, OSI_CMOUNT_DRV_VOL );
 /* enet2 */
 static inline _osi_call0( int, OSI_Enet2Open, OSI_ENET2_OPEN );
 static inline _osi_call0( int, OSI_Enet2Close, OSI_ENET2_CLOSE );
-static inline _osi_call3( int, OSI_Enet2RingSetup, OSI_ENET2_RING_SETUP, int, which_ring, 
+static inline _osi_call3( int, OSI_Enet2RingSetup, OSI_ENET2_RING_SETUP, int, which_ring,
 			  int, ring_mphys, int, n_el );
 static inline _osi_call2( int, OSI_Enet2Cntrl1, OSI_ENET2_CNTRL, int, cmd, int, param );
 static inline _osi_call1( int, OSI_Enet2Cntrl, OSI_ENET2_CNTRL, int, cmd );
@@ -432,7 +432,7 @@ static inline _osi_call0( int, OSI_Enet2Kick, OSI_ENET2_KICK );
 
 static inline _osi_call0_w2( int, OSI_Enet2GetHWAddr__, OSI_ENET2_GET_HWADDR, ulong *, retbuf );
 static inline int OSI_Enet2GetHWAddr( unsigned char *addr ) {
-	int ret; 
+	int ret;
 	ulong buf[2];
 
 	ret = OSI_Enet2GetHWAddr__( buf );

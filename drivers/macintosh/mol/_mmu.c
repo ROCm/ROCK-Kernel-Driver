@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <2002/07/13 13:58:00 samuel>
  *   Time-stamp: <2004/02/14 12:47:09 samuel>
- *   
+ *
  *	<mmu.c>
- *	
- *	
- *   
+ *
+ *
+ *
  *   Copyright (C) 2002, 2003 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 #include "archinclude.h"

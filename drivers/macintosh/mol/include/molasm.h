@@ -2,17 +2,17 @@
  *
  *   Creation Date: <2001/01/28 20:33:22 samuel>
  *   Time-stamp: <2004/01/29 19:29:10 samuel>
- *   
+ *
  *	<molasm.h>
- *	
+ *
  *	Utility assembly macros
- *   
+ *
  *   Copyright (C) 2001, 2002, 2003, 2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 #ifndef _H_MOLASM
@@ -21,7 +21,7 @@
 #define GLOBAL_SYMBOL( sym_name ) \
 GLOBL(sym_name)
 
-	
+
 /************************************************************************/
 /*	SPRG usage							*/
 /************************************************************************/
@@ -72,12 +72,12 @@ MACRO(SET_SESSION_TABLE, [reg], [
 MACRO(xGPR_SAVE, [reg], [
 	stw	rPREFIX[]_reg,(xGPR0 + _reg*4)(r1)
 ])
-		
+
 MACRO(xGPR_LOAD, [reg], [
 	lwz	rPREFIX[]_reg,(xGPR0 + _reg*4)(r1)
 ])
 
-	
+
 /************************************************************************/
 /*	FPU misc							*/
 /************************************************************************/
@@ -126,7 +126,7 @@ MACRO(SAVE_DBATS, [varoffs, scr1], [
 	])
 9:
 ])
-	
+
 MACRO(SAVE_IBATS, [varoffs, scr1], [
 	mFORLOOP([nn],0,7,[
 		mfspr	_scr1, S_IBAT0U + nn
@@ -134,5 +134,5 @@ MACRO(SAVE_IBATS, [varoffs, scr1], [
 	])
 ])
 
-	
+
 #endif   /* _H_MOLASM */
