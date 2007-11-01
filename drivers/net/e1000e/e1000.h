@@ -142,9 +142,18 @@ struct e1000_ring {
 	/* array of buffer information structs */
 	struct e1000_buffer *buffer_info;
 
-	/* arrays of page information for packet split */
-	struct e1000_ps_page *ps_pages;
-	struct sk_buff *rx_skb_top;
+	union {
+		/* for TX */
+		struct {
+			bool last_tx_tso; /* used to mark tso desc.  */
+		};
+		/* for RX */
+		struct {
+			/* arrays of page information for packet split */
+			struct e1000_ps_page *ps_pages;
+			struct sk_buff *rx_skb_top;
+		};
+	};
 
 	struct e1000_queue_stats stats;
 };
@@ -186,8 +195,6 @@ struct e1000_adapter {
 	 */
 	struct e1000_ring *tx_ring /* One per active queue */
 						____cacheline_aligned_in_smp;
-
-	struct napi_struct napi;
 
 	unsigned long tx_queue_len;
 	unsigned int restart_queue;
@@ -359,8 +366,6 @@ extern struct e1000_info e1000_82573_info;
 extern struct e1000_info e1000_ich8_info;
 extern struct e1000_info e1000_ich9_info;
 extern struct e1000_info e1000_es2_info;
-
-extern s32 e1000e_read_part_num(struct e1000_hw *hw, u32 *part_num);
 
 extern s32  e1000e_commit_phy(struct e1000_hw *hw);
 
