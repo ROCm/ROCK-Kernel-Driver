@@ -454,7 +454,7 @@ reiserfs_xattr_get(struct inode *inode, const char *name, void *buffer,
 		page = reiserfs_get_page(xinode, file_pos >> PAGE_CACHE_SHIFT);
 		if (IS_ERR(page)) {
 			err = PTR_ERR(page);
-			goto out_fput;
+			goto out_unlock;
 		}
 
 		lock_page(page);
@@ -473,7 +473,7 @@ reiserfs_xattr_get(struct inode *inode, const char *name, void *buffer,
 						 "associated with %k", name,
 						 INODE_PKEY(inode));
 				err = -EIO;
-				goto out_fput;
+				goto out_unlock;
 			}
 			hash = le32_to_cpu(rxh->h_hash);
 		}
@@ -492,11 +492,12 @@ reiserfs_xattr_get(struct inode *inode, const char *name, void *buffer,
 				 "Invalid hash for xattr (%s) associated "
 				 "with %k", name, INODE_PKEY(inode));
 		err = -EIO;
-		goto out_fput;
+		goto out_unlock;
 	}
 
-out_fput:
+out_unlock:
 	mutex_unlock(&fp->f_path.dentry->d_inode->i_mutex);
+out_fput:
 	fput(fp);
 
       out:
