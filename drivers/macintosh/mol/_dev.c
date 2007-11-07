@@ -85,7 +85,7 @@ find_physical_rom( int *base, int *size )
 	}
 #endif	/* < Linux 2.6.21 */
 	do {
-		if( !(p=(int*)get_property(dn, "reg", &len)) || len != sizeof(int[2]) ) {
+		if( !(p=(int*)of_get_property(dn, "reg", &len)) || len != sizeof(int[2]) ) {
 			of_node_put(dn);
 			return 0;
 		}
