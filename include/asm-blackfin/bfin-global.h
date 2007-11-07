@@ -47,6 +47,8 @@
 
 extern unsigned long get_cclk(void);
 extern unsigned long get_sclk(void);
+extern unsigned long sclk_to_usecs(unsigned long sclk);
+extern unsigned long usecs_to_sclk(unsigned long usecs);
 
 extern void dump_thread(struct pt_regs *regs, struct user *dump);
 extern void dump_bfin_regs(struct pt_regs *fp, void *retaddr);
@@ -78,6 +80,7 @@ extern int atomic_sub32(void);
 extern int atomic_ior32(void);
 extern int atomic_and32(void);
 extern int atomic_xor32(void);
+extern void safe_user_instruction(void);
 extern void sigreturn_stub(void);
 
 extern void *l1_data_A_sram_alloc(size_t);
@@ -105,7 +108,7 @@ extern void led_disp_num(int);
 extern void led_toggle_num(int);
 extern void init_leds(void);
 
-extern char *bfin_board_name __attribute__ ((weak));
+extern const char bfin_board_name[];
 extern unsigned long wall_jiffies;
 extern unsigned long ipdt_table[];
 extern unsigned long dpdt_table[];

@@ -1018,7 +1018,7 @@ kdb_rdmsr(int argc, const char **argv)
 	unsigned long addr;
 	uint32_t l, h;
 	int diag;
-	struct cpuinfo_x86 *c = cpu_data + smp_processor_id();
+	struct cpuinfo_x86 *c = &cpu_data(smp_processor_id());
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
@@ -1046,7 +1046,7 @@ kdb_wrmsr(int argc, const char **argv)
 	unsigned long addr;
 	unsigned long l, h;
 	int diag;
-	struct cpuinfo_x86 *c = cpu_data + smp_processor_id();
+	struct cpuinfo_x86 *c = &cpu_data(smp_processor_id());
 
 	if (argc != 3)
 		return KDB_ARGCOUNT;

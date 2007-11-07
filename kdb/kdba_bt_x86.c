@@ -3164,18 +3164,18 @@ bb_usage_mov(const struct bb_operand *src, const struct bb_operand *dst, int l)
 	    bb_is_int_reg(dst->base_rc) &&
 	    full_register_dst) {
 #ifndef	CONFIG_X86_64
-		/* mov from SYSENTER_stack_esp0+offset to esp to fix up the
+		/* mov from TSS_sysenter_esp0+offset to esp to fix up the
 		 * sysenter stack, it leaves esp well defined.  mov
-		 * SYSENTER_stack_esp0+offset(%esp),%esp is followed by up to 5
+		 * TSS_sysenter_esp0+offset(%esp),%esp is followed by up to 5
 		 * push instructions to mimic the hardware stack push.  If
-		 * SYSENTER_stack_esp0 is offset then only 3 words will be
+		 * TSS_sysenter_esp0 is offset then only 3 words will be
 		 * pushed.
 		 */
 		if (dst->base_rc == BBRG_RSP &&
-		    src->disp >= SYSENTER_stack_esp0 &&
+		    src->disp >= TSS_sysenter_esp0 &&
 		    bb_is_osp_defined(BBRG_RSP)) {
 			int pushes;
-			pushes = src->disp == SYSENTER_stack_esp0 ? 5 : 3;
+			pushes = src->disp == TSS_sysenter_esp0 ? 5 : 3;
 			bb_reg_code_set_offset(BBRG_RSP,
 				bb_reg_code_offset(BBRG_RSP) +
 					pushes * KDB_WORD_SIZE);

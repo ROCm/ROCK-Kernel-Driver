@@ -35,7 +35,6 @@ config PREEMPT_VOLUNTARY
 
 config PREEMPT
 	bool "Preemptible Kernel (Low-Latency Desktop)"
-	depends on !XEN
 	help
 	  This option reduces the latency of the kernel by making
 	  all kernel code (that is not executing in a critical section)
@@ -63,7 +62,4 @@ config PREEMPT_BKL
 
 	  Say Y here if you are building a kernel for a desktop system.
 	  Say N if you are unsure.
-
-config PREEMPT_NOTIFIERS
-	bool
 

@@ -82,7 +82,7 @@ struct SheepVars {
 #ifdef LINUX_26
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,12))
-#define compat_sk_alloc(a,b,c)  sk_alloc( (a), (b), &mol_proto, 1 )
+#define compat_sk_alloc(a,b,c)  sk_alloc( &init_net, (a), (b), &mol_proto)
 #else
 #define compat_sk_alloc(a,b,c)	sk_alloc( (a), (b), (c), NULL )
 #endif
@@ -558,7 +558,7 @@ sheep_net_ioctl( struct inode *inode, struct file *f, unsigned int code, unsigne
 		name[19] = 0;
 
 		// Find card
-		if( !(v->ether=dev_get_by_name(name)) )
+		if( !(v->ether=dev_get_by_name(&init_net, name)) )
 			return -ENODEV;
 
 		// Is it Ethernet?

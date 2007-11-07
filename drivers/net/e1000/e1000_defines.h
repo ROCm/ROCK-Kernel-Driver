@@ -114,6 +114,8 @@
 #define E1000_CTRL_EXT_LINK_MODE_PCIE_SERDES  0x00C00000
 #define E1000_CTRL_EXT_LINK_MODE_PCIX_SERDES  0x00800000
 #define E1000_CTRL_EXT_LINK_MODE_SGMII   0x00800000
+#define E1000_CTRL_EXT_EIAME          0x01000000
+#define E1000_CTRL_EXT_IRCA           0x00000001
 #define E1000_CTRL_EXT_WR_WMARK_MASK  0x03000000
 #define E1000_CTRL_EXT_WR_WMARK_256   0x00000000
 #define E1000_CTRL_EXT_WR_WMARK_320   0x01000000
@@ -126,6 +128,19 @@
 #define E1000_CRTL_EXT_PB_PAREN       0x01000000 /* packet buffer parity error detection enabled */
 #define E1000_CTRL_EXT_DF_PAREN       0x02000000 /* descriptor FIFO parity error detection enable */
 #define E1000_CTRL_EXT_GHOST_PAREN    0x40000000
+#define E1000_CTRL_EXT_PBA_CLR        0x80000000 /* PBA Clear */
+#define E1000_I2CCMD_REG_ADDR_SHIFT   16
+#define E1000_I2CCMD_REG_ADDR         0x00FF0000
+#define E1000_I2CCMD_PHY_ADDR_SHIFT   24
+#define E1000_I2CCMD_PHY_ADDR         0x07000000
+#define E1000_I2CCMD_OPCODE_READ      0x08000000
+#define E1000_I2CCMD_OPCODE_WRITE     0x00000000
+#define E1000_I2CCMD_RESET            0x10000000
+#define E1000_I2CCMD_READY            0x20000000
+#define E1000_I2CCMD_INTERRUPT_ENA    0x40000000
+#define E1000_I2CCMD_ERROR            0x80000000
+#define E1000_MAX_SGMII_PHY_REG_ADDR  255
+#define E1000_I2CCMD_PHY_TIMEOUT      200
 
 /* Receive Decriptor bit definitions */
 #define E1000_RXD_STAT_DD       0x01    /* Descriptor Done */
@@ -136,8 +151,10 @@
 #define E1000_RXD_STAT_TCPCS    0x20    /* TCP xsum calculated */
 #define E1000_RXD_STAT_IPCS     0x40    /* IP xsum calculated */
 #define E1000_RXD_STAT_PIF      0x80    /* passed in-exact filter */
+#define E1000_RXD_STAT_CRCV     0x100   /* Speculative CRC Valid */
 #define E1000_RXD_STAT_IPIDV    0x200   /* IP identification valid */
 #define E1000_RXD_STAT_UDPV     0x400   /* Valid UDP checksum */
+#define E1000_RXD_STAT_DYNINT   0x800   /* Pkt caused INT via DYNINT */
 #define E1000_RXD_STAT_ACK      0x8000  /* ACK Packet indication */
 #define E1000_RXD_ERR_CE        0x01    /* CRC Error */
 #define E1000_RXD_ERR_SE        0x02    /* Symbol Error */
@@ -300,6 +317,8 @@
 #define E1000_SWFW_PHY0_SM  0x2
 #define E1000_SWFW_PHY1_SM  0x4
 
+/* FACTPS Definitions */
+#define E1000_FACTPS_LFS    0x40000000  /* LAN Function Select */
 /* Device Control */
 #define E1000_CTRL_FD       0x00000001  /* Full duplex.0=half; 1=full */
 #define E1000_CTRL_BEM      0x00000002  /* Endian Mode.0=little,1=big */
@@ -337,6 +356,7 @@
 #define E1000_CTRL_VME      0x40000000  /* IEEE VLAN mode enable */
 #define E1000_CTRL_PHY_RST  0x80000000  /* PHY Reset */
 #define E1000_CTRL_SW2FW_INT 0x02000000  /* Initiate an interrupt to manageability engine */
+#define E1000_CTRL_I2C_ENA  0x02000000  /* I2C enable */
 
 /* Bit definitions for the Management Data IO (MDIO) and Management Data
  * Clock (MDC) pins in the Device Control Register.
@@ -349,6 +369,37 @@
 #define E1000_CTRL_MDC            E1000_CTRL_SWDPIN3
 #define E1000_CTRL_PHY_RESET_DIR4 E1000_CTRL_EXT_SDP4_DIR
 #define E1000_CTRL_PHY_RESET4     E1000_CTRL_EXT_SDP4_DATA
+
+#define E1000_CONNSW_ENRGSRC             0x4
+#define E1000_PCS_LCTL_FLV_LINK_UP       1
+#define E1000_PCS_LCTL_FSV_10            0
+#define E1000_PCS_LCTL_FSV_100           2
+#define E1000_PCS_LCTL_FSV_1000          4
+#define E1000_PCS_LCTL_FDV_FULL          8
+#define E1000_PCS_LCTL_FSD               0x10
+#define E1000_PCS_LCTL_FORCE_LINK        0x20
+#define E1000_PCS_LCTL_LOW_LINK_LATCH    0x40
+#define E1000_PCS_LCTL_AN_ENABLE         0x10000
+#define E1000_PCS_LCTL_AN_RESTART        0x20000
+#define E1000_PCS_LCTL_AN_TIMEOUT        0x40000
+#define E1000_PCS_LCTL_AN_SGMII_BYPASS   0x80000
+#define E1000_PCS_LCTL_AN_SGMII_TRIGGER  0x100000
+#define E1000_PCS_LCTL_FAST_LINK_TIMER   0x1000000
+#define E1000_PCS_LCTL_LINK_OK_FIX       0x2000000
+#define E1000_PCS_LCTL_CRS_ON_NI         0x4000000
+#define E1000_ENABLE_SERDES_LOOPBACK     0x0410
+
+#define E1000_PCS_LSTS_LINK_OK           1
+#define E1000_PCS_LSTS_SPEED_10          0
+#define E1000_PCS_LSTS_SPEED_100         2
+#define E1000_PCS_LSTS_SPEED_1000        4
+#define E1000_PCS_LSTS_DUPLEX_FULL       8
+#define E1000_PCS_LSTS_SYNK_OK           0x10
+#define E1000_PCS_LSTS_AN_COMPLETE       0x10000
+#define E1000_PCS_LSTS_AN_PAGE_RX        0x20000
+#define E1000_PCS_LSTS_AN_TIMED_OUT      0x40000
+#define E1000_PCS_LSTS_AN_REMOTE_FAULT   0x80000
+#define E1000_PCS_LSTS_AN_ERROR_RWS      0x100000
 
 /* Device Status */
 #define E1000_STATUS_FD         0x00000001      /* Full duplex.0=half,1=full */
@@ -459,6 +510,7 @@
 /* Transmit Descriptor bit definitions */
 #define E1000_TXD_DTYP_D     0x00100000 /* Data Descriptor */
 #define E1000_TXD_DTYP_C     0x00000000 /* Context Descriptor */
+#define E1000_TXD_POPTS_SHIFT 8         /* POPTS shift */
 #define E1000_TXD_POPTS_IXSM 0x01       /* Insert IP checksum */
 #define E1000_TXD_POPTS_TXSM 0x02       /* Insert TCP/UDP checksum */
 #define E1000_TXD_CMD_EOP    0x01000000 /* End of Packet */
@@ -503,6 +555,7 @@
 #define E1000_RXCSUM_IPOFL     0x00000100   /* IPv4 checksum offload */
 #define E1000_RXCSUM_TUOFL     0x00000200   /* TCP / UDP checksum offload */
 #define E1000_RXCSUM_IPV6OFL   0x00000400   /* IPv6 checksum offload */
+#define E1000_RXCSUM_CRCOFL    0x00000800   /* CRC32 offload enable */
 #define E1000_RXCSUM_IPPCSE    0x00001000   /* IP payload checksum enable */
 #define E1000_RXCSUM_PCSD      0x00002000   /* packet checksum disabled */
 
@@ -630,6 +683,23 @@
 #define E1000_ICR_PHYINT        0x00001000 /* LAN connected device generates an interrupt */
 #define E1000_ICR_EPRST         0x00100000 /* ME handware reset occurs */
 
+/* Extended Interrupt Cause Read */
+#define E1000_EICR_RX_QUEUE0    0x00000001 /* Rx Queue 0 Interrupt */
+#define E1000_EICR_RX_QUEUE1    0x00000002 /* Rx Queue 1 Interrupt */
+#define E1000_EICR_RX_QUEUE2    0x00000004 /* Rx Queue 2 Interrupt */
+#define E1000_EICR_RX_QUEUE3    0x00000008 /* Rx Queue 3 Interrupt */
+#define E1000_EICR_TX_QUEUE0    0x00000100 /* Tx Queue 0 Interrupt */
+#define E1000_EICR_TX_QUEUE1    0x00000200 /* Tx Queue 1 Interrupt */
+#define E1000_EICR_TX_QUEUE2    0x00000400 /* Tx Queue 2 Interrupt */
+#define E1000_EICR_TX_QUEUE3    0x00000800 /* Tx Queue 3 Interrupt */
+#define E1000_EICR_TCP_TIMER    0x40000000 /* TCP Timer */
+#define E1000_EICR_OTHER        0x80000000 /* Interrupt Cause Active */
+/* TCP Timer */
+#define E1000_TCPTIMER_KS       0x00000100 /* KickStart */
+#define E1000_TCPTIMER_COUNT_ENABLE       0x00000200 /* Count Enable */
+#define E1000_TCPTIMER_COUNT_FINISH       0x00000400 /* Count finish */
+#define E1000_TCPTIMER_LOOP     0x00000800 /* Loop */
+
 /*
  * This defines the bits that are set in the Interrupt Mask
  * Set/Read Register.  Each bit is documented below:
@@ -685,6 +755,18 @@
 #define E1000_IMS_PHYINT    E1000_ICR_PHYINT
 #define E1000_IMS_EPRST     E1000_ICR_EPRST
 
+/* Extended Interrupt Mask Set */
+#define E1000_EIMS_RX_QUEUE0    E1000_EICR_RX_QUEUE0 /* Rx Queue 0 Interrupt */
+#define E1000_EIMS_RX_QUEUE1    E1000_EICR_RX_QUEUE1 /* Rx Queue 1 Interrupt */
+#define E1000_EIMS_RX_QUEUE2    E1000_EICR_RX_QUEUE2 /* Rx Queue 2 Interrupt */
+#define E1000_EIMS_RX_QUEUE3    E1000_EICR_RX_QUEUE3 /* Rx Queue 3 Interrupt */
+#define E1000_EIMS_TX_QUEUE0    E1000_EICR_TX_QUEUE0 /* Tx Queue 0 Interrupt */
+#define E1000_EIMS_TX_QUEUE1    E1000_EICR_TX_QUEUE1 /* Tx Queue 1 Interrupt */
+#define E1000_EIMS_TX_QUEUE2    E1000_EICR_TX_QUEUE2 /* Tx Queue 2 Interrupt */
+#define E1000_EIMS_TX_QUEUE3    E1000_EICR_TX_QUEUE3 /* Tx Queue 3 Interrupt */
+#define E1000_EIMS_TCP_TIMER    E1000_EICR_TCP_TIMER /* TCP Timer */
+#define E1000_EIMS_OTHER        E1000_EICR_OTHER   /* Interrupt Cause Active */
+
 /* Interrupt Cause Set */
 #define E1000_ICS_TXDW      E1000_ICR_TXDW      /* Transmit desc written back */
 #define E1000_ICS_TXQE      E1000_ICR_TXQE      /* Transmit Queue empty */
@@ -713,6 +795,18 @@
 #define E1000_ICS_DSW       E1000_ICR_DSW
 #define E1000_ICS_PHYINT    E1000_ICR_PHYINT
 #define E1000_ICS_EPRST     E1000_ICR_EPRST
+
+/* Extended Interrupt Cause Set */
+#define E1000_EICS_RX_QUEUE0    E1000_EICR_RX_QUEUE0 /* Rx Queue 0 Interrupt */
+#define E1000_EICS_RX_QUEUE1    E1000_EICR_RX_QUEUE1 /* Rx Queue 1 Interrupt */
+#define E1000_EICS_RX_QUEUE2    E1000_EICR_RX_QUEUE2 /* Rx Queue 2 Interrupt */
+#define E1000_EICS_RX_QUEUE3    E1000_EICR_RX_QUEUE3 /* Rx Queue 3 Interrupt */
+#define E1000_EICS_TX_QUEUE0    E1000_EICR_TX_QUEUE0 /* Tx Queue 0 Interrupt */
+#define E1000_EICS_TX_QUEUE1    E1000_EICR_TX_QUEUE1 /* Tx Queue 1 Interrupt */
+#define E1000_EICS_TX_QUEUE2    E1000_EICR_TX_QUEUE2 /* Tx Queue 2 Interrupt */
+#define E1000_EICS_TX_QUEUE3    E1000_EICR_TX_QUEUE3 /* Tx Queue 3 Interrupt */
+#define E1000_EICS_TCP_TIMER    E1000_EICR_TCP_TIMER /* TCP Timer */
+#define E1000_EICS_OTHER        E1000_EICR_OTHER   /* Interrupt Cause Active */
 
 /* Transmit Descriptor Control */
 #define E1000_TXDCTL_PTHRESH 0x0000003F /* TXDCTL Prefetch Threshold */
@@ -1291,4 +1385,5 @@
 #define E1000_GEN_CTL_READY             0x80000000
 #define E1000_GEN_CTL_ADDRESS_SHIFT     8
 #define E1000_GEN_POLL_TIMEOUT          640
+
 #endif

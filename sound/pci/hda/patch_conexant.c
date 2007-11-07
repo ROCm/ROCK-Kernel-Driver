@@ -525,7 +525,7 @@ static void cxt5045_hp_automute(struct hda_codec *codec)
 	spec->hp_present = snd_hda_codec_read(codec, 0x11, 0,
 				     AC_VERB_GET_PIN_SENSE, 0) & 0x80000000;
 
-	bits = (spec->hp_present || !spec->cur_eapd) ? HDA_AMP_MUTE : 0;
+	bits = (spec->hp_present || !spec->cur_eapd) ? HDA_AMP_MUTE : 0; 
 	snd_hda_codec_amp_stereo(codec, 0x10, HDA_OUTPUT, 0,
 				 HDA_AMP_MUTE, bits);
 }
@@ -765,7 +765,6 @@ static struct snd_pci_quirk cxt5045_cfg_tbl[] = {
 	SND_PCI_QUIRK(0x103c, 0x30d9, "HP Spartan", CXT5045_LAPTOP),
 	SND_PCI_QUIRK(0x1734, 0x10ad, "Fujitsu Si1520", CXT5045_FUJITSU),
 	SND_PCI_QUIRK(0x1734, 0x10cb, "Fujitsu Si3515", CXT5045_LAPTOP),
-	SND_PCI_QUIRK(0x1734, 0x110e, "Fujitsu V5505", CXT5045_LAPTOP),
 	SND_PCI_QUIRK(0x8086, 0x2111, "Conexant Reference board", CXT5045_LAPTOP),
 	{}
 };

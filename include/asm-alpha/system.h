@@ -48,7 +48,7 @@
 
 #ifndef __ASSEMBLY__
 #include <linux/kernel.h>
-#define AT_VECTOR_SIZE_ARCH 4
+#define AT_VECTOR_SIZE_ARCH 4 /* entries in ARCH_DLINFO */
 
 /*
  * This is the logout header that should be common to all platforms

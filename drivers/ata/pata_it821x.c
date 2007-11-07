@@ -105,7 +105,7 @@ struct it821x_dev
 
 /*
  *	We allow users to force the card into non raid mode without
- *	flashing the alternative BIOS. This is also neccessary right now
+ *	flashing the alternative BIOS. This is also necessary right now
  *	for embedded platforms that cannot run a PC BIOS but are using this
  *	device.
  */
@@ -383,7 +383,7 @@ static void it821x_passthru_bmdma_stop(struct ata_queued_cmd *qc)
  *	@ap: ATA port
  *	@device: Device number (not pointer)
  *
- *	Device selection hook. If neccessary perform clock switching
+ *	Device selection hook. If necessary perform clock switching
  */
 
 static void it821x_passthru_dev_select(struct ata_port *ap,
@@ -563,7 +563,7 @@ static int it821x_port_start(struct ata_port *ap)
 	struct it821x_dev *itdev;
 	u8 conf;
 
-	int ret = ata_port_start(ap);
+	int ret = ata_sff_port_start(ap);
 	if (ret < 0)
 		return ret;
 
@@ -621,7 +621,6 @@ static struct scsi_host_template it821x_sht = {
 
 static struct ata_port_operations it821x_smart_port_ops = {
 	.set_mode	= it821x_smart_set_mode,
-	.port_disable	= ata_port_disable,
 	.tf_load	= ata_tf_load,
 	.tf_read	= ata_tf_read,
 	.mode_filter	= ata_pci_default_filter,
@@ -651,13 +650,11 @@ static struct ata_port_operations it821x_smart_port_ops = {
 	.irq_handler	= ata_interrupt,
 	.irq_clear	= ata_bmdma_irq_clear,
 	.irq_on		= ata_irq_on,
-	.irq_ack	= ata_irq_ack,
 
 	.port_start	= it821x_port_start,
 };
 
 static struct ata_port_operations it821x_passthru_port_ops = {
-	.port_disable	= ata_port_disable,
 	.set_piomode	= it821x_passthru_set_piomode,
 	.set_dmamode	= it821x_passthru_set_dmamode,
 	.mode_filter	= ata_pci_default_filter,
@@ -688,7 +685,6 @@ static struct ata_port_operations it821x_passthru_port_ops = {
 	.irq_clear	= ata_bmdma_irq_clear,
 	.irq_handler	= ata_interrupt,
 	.irq_on		= ata_irq_on,
-	.irq_ack	= ata_irq_ack,
 
 	.port_start	= it821x_port_start,
 };

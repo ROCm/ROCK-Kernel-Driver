@@ -45,7 +45,7 @@ static s32  e1000_led_off_82542(struct e1000_hw *hw);
 static void e1000_clear_hw_cntrs_82542(struct e1000_hw *hw);
 
 struct e1000_dev_spec_82542 {
-	boolean_t dma_fairness;
+	bool dma_fairness;
 };
 
 /**
@@ -110,7 +110,7 @@ static s32 e1000_init_mac_params_82542(struct e1000_hw *hw)
 	DEBUGFUNC("e1000_init_mac_params_82542");
 
 	/* Set media type */
-	hw->media_type = e1000_media_type_fiber;
+	hw->phy.media_type = e1000_media_type_fiber;
 
 	/* Set mta register count */
 	mac->mta_reg_count = 128;
@@ -132,7 +132,7 @@ static s32 e1000_init_mac_params_82542(struct e1000_hw *hw)
 	/* check for link */
 	func->check_for_link = e1000_check_for_fiber_link_generic;
 	/* multicast address update */
-	func->mc_addr_list_update = e1000_mc_addr_list_update_generic;
+	func->update_mc_addr_list = e1000_update_mc_addr_list_generic;
 	/* writing VFTA */
 	func->write_vfta = e1000_write_vfta_generic;
 	/* clearing VFTA */
@@ -340,19 +340,19 @@ static s32 e1000_setup_link_82542(struct e1000_hw *hw)
 	if (ret_val)
 		goto out;
 
-	mac->fc &= ~e1000_fc_tx_pause;
+	hw->fc.type &= ~e1000_fc_tx_pause;
 
 	if (mac->report_tx_early == 1)
-		mac->fc &= ~e1000_fc_rx_pause;
+		hw->fc.type &= ~e1000_fc_rx_pause;
 
 	/*
 	 * We want to save off the original Flow Control configuration just in
 	 * case we get disconnected and then reconnected into a different hub
 	 * or switch with different Flow Control capabilities.
 	 */
-	mac->original_fc = mac->fc;
+	hw->fc.original_type = hw->fc.type;
 
-	DEBUGOUT1("After fix-ups FlowControl is now = %x\n", mac->fc);
+	DEBUGOUT1("After fix-ups FlowControl is now = %x\n", hw->fc.type);
 
 	/* Call the necessary subroutine to configure the link. */
 	ret_val = func->setup_physical_interface(hw);
@@ -371,7 +371,7 @@ static s32 e1000_setup_link_82542(struct e1000_hw *hw)
 	E1000_WRITE_REG(hw, E1000_FCAH, FLOW_CONTROL_ADDRESS_HIGH);
 	E1000_WRITE_REG(hw, E1000_FCT, FLOW_CONTROL_TYPE);
 
-	E1000_WRITE_REG(hw, E1000_FCTTV, mac->fc_pause_time);
+	E1000_WRITE_REG(hw, E1000_FCTTV, hw->fc.pause_time);
 
 	ret_val = e1000_set_fc_watermarks_generic(hw);
 
@@ -443,34 +443,34 @@ u32 e1000_translate_register_82542(u32 reg)
 	case E1000_RDTR:
 		reg = 0x00108;
 		break;
-	case E1000_RDBAL:
+	case E1000_RDBAL(0):
 		reg = 0x00110;
 		break;
-	case E1000_RDBAH:
+	case E1000_RDBAH(0):
 		reg = 0x00114;
 		break;
-	case E1000_RDLEN:
+	case E1000_RDLEN(0):
 		reg = 0x00118;
 		break;
-	case E1000_RDH:
+	case E1000_RDH(0):
 		reg = 0x00120;
 		break;
-	case E1000_RDT:
+	case E1000_RDT(0):
 		reg = 0x00128;
 		break;
-	case E1000_RDBAL1:
+	case E1000_RDBAL(1):
 		reg = 0x00138;
 		break;
-	case E1000_RDBAH1:
+	case E1000_RDBAH(1):
 		reg = 0x0013C;
 		break;
-	case E1000_RDLEN1:
+	case E1000_RDLEN(1):
 		reg = 0x00140;
 		break;
-	case E1000_RDH1:
+	case E1000_RDH(1):
 		reg = 0x00148;
 		break;
-	case E1000_RDT1:
+	case E1000_RDT(1):
 		reg = 0x00150;
 		break;
 	case E1000_FCRTH:
@@ -482,19 +482,19 @@ u32 e1000_translate_register_82542(u32 reg)
 	case E1000_MTA:
 		reg = 0x00200;
 		break;
-	case E1000_TDBAL:
+	case E1000_TDBAL(0):
 		reg = 0x00420;
 		break;
-	case E1000_TDBAH:
+	case E1000_TDBAH(0):
 		reg = 0x00424;
 		break;
-	case E1000_TDLEN:
+	case E1000_TDLEN(0):
 		reg = 0x00428;
 		break;
-	case E1000_TDH:
+	case E1000_TDH(0):
 		reg = 0x00430;
 		break;
-	case E1000_TDT:
+	case E1000_TDT(0):
 		reg = 0x00438;
 		break;
 	case E1000_TIDV:

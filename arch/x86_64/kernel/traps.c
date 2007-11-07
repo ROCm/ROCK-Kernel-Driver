@@ -521,7 +521,6 @@ void __kprobes __die(const char * str, struct pt_regs * regs, long err)
 	printk("DEBUG_PAGEALLOC");
 #endif
 	printk("\n");
-	sysfs_printk_last_file();
 	notify_die(DIE_OOPS, str, regs, err, current->thread.trap_no, SIGSEGV);
 	show_registers(regs);
 	add_taint(TAINT_DIE);
@@ -555,8 +554,6 @@ void __kprobes die_nmi(char *str, struct pt_regs *regs, int do_panic)
 	 */
 	printk(str, smp_processor_id());
 	show_registers(regs);
-	if (strncmp(str, "NMI Watchdog", 12) == 0)
-		notify_die(DIE_NMIWATCHDOG, "nmi_watchdog", regs, 0, 2, SIGINT);
 	if (kexec_should_crash(current))
 		crash_kexec(regs);
 	if (do_panic || panic_on_oops)

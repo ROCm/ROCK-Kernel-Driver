@@ -56,6 +56,7 @@ struct e1000_adapter;
 		__FUNCTION__ , ## args))
 
 #define E1000_MAX_INTR 10
+#define HW_PERF
 
 /* TX/RX descriptor defines */
 #define E1000_DEFAULT_TXD                  256
@@ -65,6 +66,7 @@ struct e1000_adapter;
 
 #define E1000_DEFAULT_RXD                  256
 #define E1000_MAX_RXD                      256
+
 #define E1000_MIN_RXD                       80
 #define E1000_MAX_82544_RXD               4096
 
@@ -251,7 +253,7 @@ struct e1000_adapter {
 
 	struct work_struct reset_task;
 	struct work_struct watchdog_task;
-	u8 fc_autoneg;
+	bool fc_autoneg;
 
 #ifdef ETHTOOL_PHYS_ID
 	struct timer_list blink_timer;
@@ -268,8 +270,8 @@ struct e1000_adapter {
 	u32 txd_cmd;
 	u32 tx_int_delay;
 	u32 tx_abs_int_delay;
-	u32 gotcl;
-	u64 gotcl_old;
+	u32 gotc;
+	u64 gotc_old;
 	u64 tpt_old;
 	u64 colc_old;
 	u32 tx_timeout_count;
@@ -308,15 +310,18 @@ struct e1000_adapter {
 	u32 rx_abs_int_delay;
 	boolean_t rx_csum;
 	unsigned int rx_ps_pages;
-	u32 gorcl;
-	u64 gorcl_old;
+	u32 gorc;
+	u64 gorc_old;
 	u16 rx_ps_bsize0;
+	u32 max_frame_size;
+	u32 min_frame_size;
 
 
 	/* OS defined structs */
 	struct net_device *netdev;
 	struct pci_dev *pdev;
 	struct net_device_stats net_stats;
+	struct napi_struct	napi;
 
 	/* structs defined in e1000_hw.h */
 	struct e1000_hw hw;

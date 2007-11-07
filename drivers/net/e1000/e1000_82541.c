@@ -49,12 +49,12 @@ static s32  e1000_setup_copper_link_82541(struct e1000_hw *hw);
 static s32  e1000_check_for_link_82541(struct e1000_hw *hw);
 static s32  e1000_get_cable_length_igp_82541(struct e1000_hw *hw);
 static s32  e1000_set_d3_lplu_state_82541(struct e1000_hw *hw,
-                                          boolean_t active);
+                                          bool active);
 static s32  e1000_setup_led_82541(struct e1000_hw *hw);
 static s32  e1000_cleanup_led_82541(struct e1000_hw *hw);
 static void e1000_clear_hw_cntrs_82541(struct e1000_hw *hw);
 static s32  e1000_config_dsp_after_link_change_82541(struct e1000_hw *hw,
-                                                     boolean_t link_up);
+                                                     bool link_up);
 static s32  e1000_phy_init_script_82541(struct e1000_hw *hw);
 
 static const u16 e1000_igp_cable_length_table[] =
@@ -74,7 +74,7 @@ struct e1000_dev_spec_82541 {
 	e1000_dsp_config dsp_config;
 	e1000_ffe_config ffe_config;
 	u16 spd_default;
-	boolean_t phy_init_script;
+	bool phy_init_script;
 };
 
 /**
@@ -235,7 +235,7 @@ static s32 e1000_init_mac_params_82541(struct e1000_hw *hw)
 	DEBUGFUNC("e1000_init_mac_params_82541");
 
 	/* Set media type */
-	hw->media_type = e1000_media_type_copper;
+	hw->phy.media_type = e1000_media_type_copper;
 	/* Set mta register count */
 	mac->mta_reg_count = 128;
 	/* Set rar entry count */
@@ -260,7 +260,7 @@ static s32 e1000_init_mac_params_82541(struct e1000_hw *hw)
 	/* link info */
 	func->get_link_up_info = e1000_get_link_up_info_82541;
 	/* multicast address update */
-	func->mc_addr_list_update = e1000_mc_addr_list_update_generic;
+	func->update_mc_addr_list = e1000_update_mc_addr_list_generic;
 	/* writing VFTA */
 	func->write_vfta = e1000_write_vfta_generic;
 	/* clearing VFTA */
@@ -400,7 +400,7 @@ static s32 e1000_init_hw_82541(struct e1000_hw *hw)
 	ret_val = e1000_id_led_init_generic(hw);
 	if (ret_val) {
 		DEBUGOUT("Error initializing identification LED\n");
-		goto out;
+		/* This is not fatal and we should not stop init due to this */
 	}
 
 	/* Disabling VLAN filtering */
@@ -426,10 +426,10 @@ static s32 e1000_init_hw_82541(struct e1000_hw *hw)
 	/* Setup link and flow control */
 	ret_val = e1000_setup_link(hw);
 
-	txdctl = E1000_READ_REG(hw, E1000_TXDCTL);
+	txdctl = E1000_READ_REG(hw, E1000_TXDCTL(0));
 	txdctl = (txdctl & ~E1000_TXDCTL_WTHRESH) |
 	         E1000_TXDCTL_FULL_TX_DESC_WB;
-	E1000_WRITE_REG(hw, E1000_TXDCTL, txdctl);
+	E1000_WRITE_REG(hw, E1000_TXDCTL(0), txdctl);
 
 	/*
 	 * Clear all of the statistics registers (clear on read).  It is
@@ -439,7 +439,6 @@ static s32 e1000_init_hw_82541(struct e1000_hw *hw)
 	 */
 	e1000_clear_hw_cntrs_82541(hw);
 
-out:
 	return ret_val;
 }
 
@@ -602,7 +601,7 @@ static s32 e1000_check_for_link_82541(struct e1000_hw *hw)
 {
 	struct e1000_mac_info *mac = &hw->mac;
 	s32 ret_val;
-	boolean_t link;
+	bool link;
 
 	DEBUGFUNC("e1000_check_for_link_82541");
 
@@ -685,7 +684,7 @@ out:
  *  This is a function pointer entry point called by the api module.
  **/
 static s32 e1000_config_dsp_after_link_change_82541(struct e1000_hw *hw,
-                                                    boolean_t link_up)
+                                                    bool link_up)
 {
 	struct e1000_phy_info *phy = &hw->phy;
 	struct e1000_dev_spec_82541 *dev_spec;
@@ -974,7 +973,7 @@ out:
  *  maintained.  This is a function pointer entry point called by the
  *  api module.
  **/
-static s32 e1000_set_d3_lplu_state_82541(struct e1000_hw *hw, boolean_t active)
+static s32 e1000_set_d3_lplu_state_82541(struct e1000_hw *hw, bool active)
 {
 	struct e1000_phy_info *phy = &hw->phy;
 	s32 ret_val;
@@ -1248,7 +1247,7 @@ out:
  *  Allows the driver to enable/disable the PHY init script, if the PHY is an
  *  IGP PHY.  This is a function pointer entry point called by the api module.
  **/
-void e1000_init_script_state_82541(struct e1000_hw *hw, boolean_t state)
+void e1000_init_script_state_82541(struct e1000_hw *hw, bool state)
 {
 	struct e1000_dev_spec_82541 *dev_spec;
 

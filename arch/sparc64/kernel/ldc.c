@@ -2057,7 +2057,7 @@ static void fill_cookies(struct cookie_state *sp, unsigned long pa,
 
 static int sg_count_one(struct scatterlist *sg)
 {
-	unsigned long base = page_to_pfn(sg->page) << PAGE_SHIFT;
+	unsigned long base = page_to_pfn(sg_page(sg)) << PAGE_SHIFT;
 	long len = sg->length;
 
 	if ((sg->offset | len) & (8UL - 1))
@@ -2121,7 +2121,7 @@ int ldc_map_sg(struct ldc_channel *lp,
 	state.nc = 0;
 
 	for (i = 0; i < num_sg; i++)
-		fill_cookies(&state, page_to_pfn(sg[i].page) << PAGE_SHIFT,
+		fill_cookies(&state, page_to_pfn(sg_page(&sg[i])) << PAGE_SHIFT,
 			     sg[i].offset, sg[i].length);
 
 	return state.nc;

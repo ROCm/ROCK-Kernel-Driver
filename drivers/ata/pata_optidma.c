@@ -368,7 +368,6 @@ static struct scsi_host_template optidma_sht = {
 };
 
 static struct ata_port_operations optidma_port_ops = {
-	.port_disable	= ata_port_disable,
 	.set_piomode	= optidma_set_pio_mode,
 	.set_dmamode	= optidma_set_dma_mode,
 
@@ -398,13 +397,11 @@ static struct ata_port_operations optidma_port_ops = {
 	.irq_handler	= ata_interrupt,
 	.irq_clear	= ata_bmdma_irq_clear,
 	.irq_on		= ata_irq_on,
-	.irq_ack	= ata_irq_ack,
 
-	.port_start	= ata_port_start,
+	.port_start	= ata_sff_port_start,
 };
 
 static struct ata_port_operations optiplus_port_ops = {
-	.port_disable	= ata_port_disable,
 	.set_piomode	= optiplus_set_pio_mode,
 	.set_dmamode	= optiplus_set_dma_mode,
 
@@ -434,9 +431,8 @@ static struct ata_port_operations optiplus_port_ops = {
 	.irq_handler	= ata_interrupt,
 	.irq_clear	= ata_bmdma_irq_clear,
 	.irq_on		= ata_irq_on,
-	.irq_ack	= ata_irq_ack,
 
-	.port_start	= ata_port_start,
+	.port_start	= ata_sff_port_start,
 };
 
 /**
@@ -453,7 +449,7 @@ static int optiplus_with_udma(struct pci_dev *pdev)
 
 	/* Find function 1 */
 	dev1 = pci_get_device(0x1045, 0xC701, NULL);
-	if(dev1 == NULL)
+	if (dev1 == NULL)
 		return 0;
 
 	/* Rev must be >= 0x10 */

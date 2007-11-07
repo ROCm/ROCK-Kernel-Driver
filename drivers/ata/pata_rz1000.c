@@ -73,7 +73,6 @@ static struct scsi_host_template rz1000_sht = {
 static struct ata_port_operations rz1000_port_ops = {
 	.set_mode	= rz1000_set_mode,
 
-	.port_disable	= ata_port_disable,
 	.tf_load	= ata_tf_load,
 	.tf_read	= ata_tf_read,
 	.check_status 	= ata_check_status,
@@ -99,9 +98,8 @@ static struct ata_port_operations rz1000_port_ops = {
 	.irq_handler	= ata_interrupt,
 	.irq_clear	= ata_bmdma_irq_clear,
 	.irq_on		= ata_irq_on,
-	.irq_ack	= ata_irq_ack,
 
-	.port_start	= ata_port_start,
+	.port_start	= ata_sff_port_start,
 };
 
 static int rz1000_fifo_disable(struct pci_dev *pdev)

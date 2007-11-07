@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) by Jaroslav Kysela <perex@suse.cz>
+ *  Copyright (c) by Jaroslav Kysela <perex@perex.cz>
  *  Routines for control of YMF724/740/744/754 chips
  *
  *   This program is free software; you can redistribute it and/or modify
@@ -1553,7 +1553,7 @@ static int snd_ymfpci_put_nativedacvol(struct snd_kcontrol *kcontrol,
 	unsigned int reg2 = YDSXGR_BUF441OUTVOL;
 	int change;
 	unsigned int value, oval;
-
+	
 	value = ucontrol->value.integer.value[0] & 0x3fff;
 	value |= (ucontrol->value.integer.value[1] & 0x3fff) << 16;
 	spin_lock_irq(&chip->reg_lock);

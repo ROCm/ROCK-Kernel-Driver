@@ -95,7 +95,7 @@ static ssize_t modalias_show (struct device *dev, struct device_attribute *attr,
 	int length;
 
 	ofdev = to_of_device(dev);
-	compat = get_property(ofdev->node, "compatible", &cplen);
+	compat = of_get_property(ofdev->node, "compatible", &cplen);
 	if (!compat) compat = "", cplen = 1;
 	length = sprintf (buf, "of:N%sT%s", ofdev->node->name, ofdev->node->type);
 	buf += length;

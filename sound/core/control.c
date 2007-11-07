@@ -1,6 +1,6 @@
 /*
  *  Routines for driver control interface
- *  Copyright (c) by Jaroslav Kysela <perex@suse.cz>
+ *  Copyright (c) by Jaroslav Kysela <perex@perex.cz>
  *
  *
  *   This program is free software; you can redistribute it and/or modify
@@ -93,15 +93,16 @@ static int snd_ctl_open(struct inode *inode, struct file *file)
 
 static void snd_ctl_empty_read_queue(struct snd_ctl_file * ctl)
 {
+	unsigned long flags;
 	struct snd_kctl_event *cread;
 	
-	spin_lock(&ctl->read_lock);
+	spin_lock_irqsave(&ctl->read_lock, flags);
 	while (!list_empty(&ctl->events)) {
 		cread = snd_kctl_event(ctl->events.next);
 		list_del(&cread->list);
 		kfree(cread);
 	}
-	spin_unlock(&ctl->read_lock);
+	spin_unlock_irqrestore(&ctl->read_lock, flags);
 }
 
 static int snd_ctl_release(struct inode *inode, struct file *file)
@@ -716,8 +717,6 @@ int snd_ctl_elem_read(struct snd_card *card, struct snd_ctl_elem_value *control)
 	return result;
 }
 
-EXPORT_SYMBOL(snd_ctl_elem_read);
-
 static int snd_ctl_elem_read_user(struct snd_card *card,
 				  struct snd_ctl_elem_value __user *_control)
 {
@@ -780,8 +779,6 @@ int snd_ctl_elem_write(struct snd_card *card, struct snd_ctl_file *file,
 	up_read(&card->controls_rwsem);
 	return result;
 }
-
-EXPORT_SYMBOL(snd_ctl_elem_write);
 
 static int snd_ctl_elem_write_user(struct snd_ctl_file *file,
 				   struct snd_ctl_elem_value __user *_control)
@@ -1472,6 +1469,22 @@ static int snd_ctl_dev_free(struct snd_device *device)
 }
 
 /*
+ * create control core:
+ * called from init.c
+ */
+int snd_ctl_create(struct snd_card *card)
+{
+	static struct snd_device_ops ops = {
+		.dev_free = snd_ctl_dev_free,
+		.dev_register =	snd_ctl_dev_register,
+		.dev_disconnect = snd_ctl_dev_disconnect,
+	};
+
+	snd_assert(card != NULL, return -ENXIO);
+	return snd_device_new(card, SNDRV_DEV_CONTROL, card, &ops);
+}
+
+/*
  * Frequently used control callbacks
  */
 int snd_ctl_boolean_mono_info(struct snd_kcontrol *kcontrol,
@@ -1497,19 +1510,3 @@ int snd_ctl_boolean_stereo_info(struct snd_kcontrol *kcontrol,
 }
 
 EXPORT_SYMBOL(snd_ctl_boolean_stereo_info);
-
-/*
- * create control core:
- * called from init.c
- */
-int snd_ctl_create(struct snd_card *card)
-{
-	static struct snd_device_ops ops = {
-		.dev_free = snd_ctl_dev_free,
-		.dev_register =	snd_ctl_dev_register,
-		.dev_disconnect = snd_ctl_dev_disconnect,
-	};
-
-	snd_assert(card != NULL, return -ENXIO);
-	return snd_device_new(card, SNDRV_DEV_CONTROL, card, &ops);
-}

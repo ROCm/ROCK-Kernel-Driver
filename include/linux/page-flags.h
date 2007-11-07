@@ -83,17 +83,11 @@
 #define PG_private		11	/* If pagecache, has fs-private data */
 
 #define PG_writeback		12	/* Page is under writeback */
-#ifdef CONFIG_XEN
-/* Cannot alias with PG_owner_priv_1 since bag_page() checks include this bit.
- * Also cannot use PG_arch_1 since that now has a different purpose on x86. */
-#define PG_pinned		13
-#endif
 #define PG_compound		14	/* Part of a compound page */
 #define PG_swapcache		15	/* Swap page: swp_entry_t in private */
 
 #define PG_mappedtodisk		16	/* Has blocks allocated on-disk */
 #define PG_reclaim		17	/* To be reclaimed asap */
-#define PG_foreign		18	/* Page is owned by foreign allocator. */
 #define PG_buddy		19	/* Page is free, on buddy lists */
 
 /* PG_readahead is only used for file reads; PG_reclaim is only for writes */
@@ -101,9 +95,7 @@
 
 /* PG_owner_priv_1 users should have descriptive aliases */
 #define PG_checked		PG_owner_priv_1 /* Used by some filesystems */
-#ifdef CONFIG_PARAVIRT_XEN
 #define PG_pinned		PG_owner_priv_1	/* Xen pinned pagetable */
-#endif
 
 #if (BITS_PER_LONG > 32)
 /*
@@ -267,18 +259,6 @@ static inline void __ClearPageTail(struct page *page)
 #define PageUncached(page)	test_bit(PG_uncached, &(page)->flags)
 #define SetPageUncached(page)	set_bit(PG_uncached, &(page)->flags)
 #define ClearPageUncached(page)	clear_bit(PG_uncached, &(page)->flags)
-
-#define PageForeign(page)	test_bit(PG_foreign, &(page)->flags)
-#define SetPageForeign(page, dtor) do {		\
-	set_bit(PG_foreign, &(page)->flags);	\
-	(page)->index = (long)(dtor);		\
-} while (0)
-#define ClearPageForeign(page) do {		\
-	clear_bit(PG_foreign, &(page)->flags);	\
-	(page)->index = 0;			\
-} while (0)
-#define PageForeignDestructor(page)		\
-	( (void (*) (struct page *)) (page)->index )(page)
 
 struct page;	/* forward declaration */
 

@@ -1157,10 +1157,8 @@ asmlinkage void smp_error_interrupt(void)
 	   6: Received illegal vector
 	   7: Illegal register address
 	*/
-#if 0
 	printk (KERN_DEBUG "APIC error on CPU%d: %02x(%02x)\n",
 		smp_processor_id(), v , v1);
-#endif
 	irq_exit();
 }
 

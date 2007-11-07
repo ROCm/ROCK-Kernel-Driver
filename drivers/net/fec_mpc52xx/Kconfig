@@ -1,5 +1,5 @@
 menu "MPC5200 Networking Options"
-	depends PPC_MPC52xx && NET_ETHERNET
+	depends on PPC_MPC52xx && NET_ETHERNET
 
 config FEC_MPC52xx
 	tristate "FEC Ethernet"

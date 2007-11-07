@@ -105,7 +105,7 @@ out:
  *  Reads the firmware semaphore register and returns true (>0) if
  *  manageability is enabled, else false (0).
  **/
-boolean_t e1000_check_mng_mode_generic(struct e1000_hw *hw)
+bool e1000_check_mng_mode_generic(struct e1000_hw *hw)
 {
 	u32 fwsm;
 
@@ -124,14 +124,14 @@ boolean_t e1000_check_mng_mode_generic(struct e1000_hw *hw)
  *  Enables packet filtering on transmit packets if manageability is enabled
  *  and host interface is enabled.
  **/
-boolean_t e1000_enable_tx_pkt_filtering_generic(struct e1000_hw *hw)
+bool e1000_enable_tx_pkt_filtering_generic(struct e1000_hw *hw)
 {
 	struct e1000_host_mng_dhcp_cookie *hdr = &hw->mng_cookie;
 	u32 *buffer = (u32 *)&hw->mng_cookie;
 	u32 offset;
 	s32 ret_val, hdr_csum, csum;
 	u8 i, len;
-	boolean_t tx_filter = TRUE;
+	bool tx_filter = TRUE;
 
 	DEBUGFUNC("e1000_enable_tx_pkt_filtering_generic");
 
@@ -343,11 +343,11 @@ out:
  *
  *  Verifies the hardware needs to allow ARPs to be processed by the host.
  **/
-boolean_t e1000_enable_mng_pass_thru(struct e1000_hw *hw)
+bool e1000_enable_mng_pass_thru(struct e1000_hw *hw)
 {
 	u32 manc;
 	u32 fwsm, factps;
-	boolean_t ret_val = FALSE;
+	bool ret_val = FALSE;
 
 	DEBUGFUNC("e1000_enable_mng_pass_thru");
 

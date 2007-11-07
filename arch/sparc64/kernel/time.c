@@ -764,9 +764,11 @@ static struct of_device_id clock_match[] = {
 };
 
 static struct of_platform_driver clock_driver = {
-	.name		= "clock",
 	.match_table	= clock_match,
 	.probe		= clock_probe,
+	.driver		= {
+		.name	= "clock",
+	},
 };
 
 static int __init clock_init(void)
@@ -1068,7 +1070,7 @@ static int set_rtc_mmss(unsigned long nowtime)
 	 * Not having a register set can lead to trouble.
 	 * Also starfire doesn't have a tod clock.
 	 */
-	if (!mregs && !dregs & !bregs)
+	if (!mregs && !dregs && !bregs)
 		return -1;
 
 	if (mregs) {

@@ -43,6 +43,17 @@
 #include "aic79xx_inline.h"
 #include "aic79xx_pci.h"
 
+static int	ahd_linux_pci_dev_probe(struct pci_dev *pdev,
+					const struct pci_device_id *ent);
+static int	ahd_linux_pci_reserve_io_regions(struct ahd_softc *ahd,
+						 u_long *base, u_long *base2);
+static int	ahd_linux_pci_reserve_mem_region(struct ahd_softc *ahd,
+						 u_long *bus_addr,
+						 uint8_t __iomem **maddr);
+static int	ahd_linux_pci_dev_suspend(struct pci_dev *pdev, pm_message_t mesg);
+static int	ahd_linux_pci_dev_resume(struct pci_dev *pdev);
+static void	ahd_linux_pci_dev_remove(struct pci_dev *pdev);
+
 /* Define the macro locally since it's different for different class of chips.
  */
 #define ID(x)            \
@@ -74,34 +85,27 @@ static struct pci_device_id ahd_linux_pci_id_table[] = {
 
 MODULE_DEVICE_TABLE(pci, ahd_linux_pci_id_table);
 
+static struct pci_driver aic79xx_pci_driver = {
+	.name		= "aic79xx",
+	.probe		= ahd_linux_pci_dev_probe,
 #ifdef CONFIG_PM
-int
+	.suspend	= ahd_linux_pci_dev_suspend,
+	.resume		= ahd_linux_pci_dev_resume,
+#endif
+	.remove		= ahd_linux_pci_dev_remove,
+	.id_table	= ahd_linux_pci_id_table
+};
+
+static int
 ahd_linux_pci_dev_suspend(struct pci_dev *pdev, pm_message_t mesg)
 {
 	struct ahd_softc *ahd = pci_get_drvdata(pdev);
+	int rc;
 
-	/*
-	 * Shutdown the HBA
-	 */
-	ahd_pause_and_flushwork(ahd);
+	if ((rc = ahd_suspend(ahd)))
+		return rc;
 
-	if (LIST_FIRST(&ahd->pending_scbs) != NULL) {
-		ahd_unpause(ahd);
-		return -EBUSY;
-	}
-
-	ahd_shutdown(ahd);
-
-	/*
-	 * Save chip register configuration data for chip resets
-	 * that occur during runtime and resume events.
-	 */
-	pci_read_config_dword(ahd->dev_softc, DEVCONFIG,
-			      &ahd->suspend_state.pci_state.devconfig);
-	pci_read_config_byte(ahd->dev_softc, PCIR_COMMAND,
-			     &ahd->suspend_state.pci_state.command);
-	pci_read_config_byte(ahd->dev_softc, CSIZE_LATTIME,
-			     &ahd->suspend_state.pci_state.csize_lattime);
+	ahd_pci_suspend(ahd);
 
 	pci_save_state(pdev);
 	pci_disable_device(pdev);
@@ -109,10 +113,10 @@ ahd_linux_pci_dev_suspend(struct pci_dev *pdev, pm_message_t mesg)
 	if (mesg.event == PM_EVENT_SUSPEND)
 		pci_set_power_state(pdev, PCI_D3hot);
 
-	return 0;
+	return rc;
 }
 
-int
+static int
 ahd_linux_pci_dev_resume(struct pci_dev *pdev)
 {
 	struct ahd_softc *ahd = pci_get_drvdata(pdev);
@@ -121,8 +125,7 @@ ahd_linux_pci_dev_resume(struct pci_dev *pdev)
 	pci_set_power_state(pdev, PCI_D0);
 	pci_restore_state(pdev);
 
-	rc = pci_enable_device(pdev);
-	if (rc) {
+	if ((rc = pci_enable_device(pdev))) {
 		dev_printk(KERN_ERR, &pdev->dev,
 			   "failed to enable device after resume (%d)\n", rc);
 		return rc;
@@ -130,26 +133,12 @@ ahd_linux_pci_dev_resume(struct pci_dev *pdev)
 
 	pci_set_master(pdev);
 
-	/*
-	 * Restore additional PCI registers
-	 */
-	pci_write_config_dword(ahd->dev_softc, DEVCONFIG,
-			       ahd->suspend_state.pci_state.devconfig);
-	pci_write_config_byte(ahd->dev_softc, PCIR_COMMAND,
-			      ahd->suspend_state.pci_state.command);
-	pci_write_config_byte(ahd->dev_softc, CSIZE_LATTIME,
-			 ahd->suspend_state.pci_state.csize_lattime);
+	ahd_pci_resume(ahd);
 
-	/*
-	 * Restart the HBA
-	 */
-	ahd_reset(ahd, /*reinit*/TRUE);
-	ahd_intr_enable(ahd, TRUE);
-	ahd_restart(ahd);
+	ahd_resume(ahd);
 
-	return 0;
+	return rc;
 }
-#endif /* CONFIG_PM */
 
 static void
 ahd_linux_pci_dev_remove(struct pci_dev *pdev)
@@ -158,7 +147,7 @@ ahd_linux_pci_dev_remove(struct pci_dev *pdev)
 	u_long s;
 
 	if (ahd->platform_data && ahd->platform_data->host)
-		scsi_remove_host(ahd->platform_data->host);
+			scsi_remove_host(ahd->platform_data->host);
 
 	ahd_lock(ahd, &s);
 	ahd_intr_enable(ahd, FALSE);
@@ -256,17 +245,6 @@ ahd_linux_pci_dev_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	return (0);
 }
 
-static struct pci_driver aic79xx_pci_driver = {
-	.name		= "aic79xx",
-	.probe		= ahd_linux_pci_dev_probe,
-#ifdef CONFIG_PM
-	.suspend	= ahd_linux_pci_dev_suspend,
-	.resume		= ahd_linux_pci_dev_resume,
-#endif
-	.remove		= ahd_linux_pci_dev_remove,
-	.id_table	= ahd_linux_pci_id_table
-};
-
 int
 ahd_linux_pci_init(void)
 {
@@ -348,7 +326,7 @@ ahd_pci_map_registers(struct ahd_softc *ahd)
 	/*
 	 * If its allowed, we prefer memory mapped access.
 	 */
-	pci_read_config_dword(ahd->dev_softc, PCIR_COMMAND, &command);
+	command = ahd_pci_read_config(ahd->dev_softc, PCIR_COMMAND, 4);
 	command &= ~(PCIM_CMD_PORTEN|PCIM_CMD_MEMEN);
 	base = 0;
 	maddr = NULL;
@@ -359,8 +337,8 @@ ahd_pci_map_registers(struct ahd_softc *ahd)
 		ahd->bshs[0].maddr = maddr;
 		ahd->tags[1] = BUS_SPACE_MEMIO;
 		ahd->bshs[1].maddr = maddr + 0x100;
-		pci_write_config_dword(ahd->dev_softc, PCIR_COMMAND,
-				       command | PCIM_CMD_MEMEN);
+		ahd_pci_write_config(ahd->dev_softc, PCIR_COMMAND,
+				     command | PCIM_CMD_MEMEN, 4);
 
 		if (ahd_pci_test_register_access(ahd) != 0) {
 
@@ -404,7 +382,7 @@ ahd_pci_map_registers(struct ahd_softc *ahd)
 			       base, base2);
 		}
 	}
-	pci_write_config_dword(ahd->dev_softc, PCIR_COMMAND, command);
+	ahd_pci_write_config(ahd->dev_softc, PCIR_COMMAND, command, 4);
 	return (error);
 }
 

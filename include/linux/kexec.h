@@ -46,13 +46,6 @@
 			    KEXEC_CORE_NOTE_NAME_BYTES +		\
 			    KEXEC_CORE_NOTE_DESC_BYTES )
 
-#ifndef KEXEC_ARCH_HAS_PAGE_MACROS
-#define kexec_page_to_pfn(page)  page_to_pfn(page)
-#define kexec_pfn_to_page(pfn)   pfn_to_page(pfn)
-#define kexec_virt_to_phys(addr) virt_to_phys(addr)
-#define kexec_phys_to_virt(addr) phys_to_virt(addr)
-#endif
-
 /*
  * This structure is used to hold the arguments that are used when loading
  * kernel binaries.
@@ -113,12 +106,6 @@ struct kimage {
 extern NORET_TYPE void machine_kexec(struct kimage *image) ATTRIB_NORET;
 extern int machine_kexec_prepare(struct kimage *image);
 extern void machine_kexec_cleanup(struct kimage *image);
-#ifdef CONFIG_XEN
-extern int xen_machine_kexec_load(struct kimage *image);
-extern void xen_machine_kexec_unload(struct kimage *image);
-extern void xen_machine_kexec_setup_resources(void);
-extern void xen_machine_kexec_register_resources(struct resource *res);
-#endif
 extern asmlinkage long sys_kexec_load(unsigned long entry,
 					unsigned long nr_segments,
 					struct kexec_segment __user *segments,
@@ -134,12 +121,32 @@ extern struct page *kimage_alloc_control_pages(struct kimage *image,
 extern void crash_kexec(struct pt_regs *);
 int kexec_should_crash(struct task_struct *);
 void crash_save_cpu(struct pt_regs *regs, int cpu);
+void crash_save_vmcoreinfo(void);
+void arch_crash_save_vmcoreinfo(void);
+void vmcoreinfo_append_str(const char *fmt, ...)
+	__attribute__ ((format (printf, 1, 2)));
+unsigned long paddr_vmcoreinfo_note(void);
+
+#define VMCOREINFO_SYMBOL(name) \
+	vmcoreinfo_append_str("SYMBOL(%s)=%lx\n", #name, (unsigned long)&name)
+#define VMCOREINFO_SIZE(name) \
+	vmcoreinfo_append_str("SIZE(%s)=%lu\n", #name, \
+			      (unsigned long)sizeof(struct name))
+#define VMCOREINFO_TYPEDEF_SIZE(name) \
+	vmcoreinfo_append_str("SIZE(%s)=%lu\n", #name, \
+			      (unsigned long)sizeof(name))
+#define VMCOREINFO_OFFSET(name, field) \
+	vmcoreinfo_append_str("OFFSET(%s.%s)=%lu\n", #name, #field, \
+			      (unsigned long)&(((struct name *)0)->field))
+#define VMCOREINFO_LENGTH(name, value) \
+	vmcoreinfo_append_str("LENGTH(%s)=%lu\n", #name, (unsigned long)value)
+#define VMCOREINFO_NUMBER(name) \
+	vmcoreinfo_append_str("NUMBER(%s)=%ld\n", #name, (long)name)
+#define VMCOREINFO_CONFIG(name) \
+	vmcoreinfo_append_str("CONFIG_%s=y\n", #name)
+
 extern struct kimage *kexec_image;
 extern struct kimage *kexec_crash_image;
-
-#ifndef kexec_flush_icache_page
-#define kexec_flush_icache_page(page)
-#endif
 
 #ifndef kexec_flush_icache_page
 #define kexec_flush_icache_page(page)
@@ -165,12 +172,23 @@ extern struct kimage *kexec_crash_image;
 
 #define KEXEC_FLAGS    (KEXEC_ON_CRASH)  /* List of defined/legal kexec flags */
 
+#define VMCOREINFO_BYTES           (4096)
+#define VMCOREINFO_NOTE_NAME       "VMCOREINFO"
+#define VMCOREINFO_NOTE_NAME_BYTES ALIGN(sizeof(VMCOREINFO_NOTE_NAME), 4)
+#define VMCOREINFO_NOTE_SIZE       (KEXEC_NOTE_HEAD_BYTES*2 + VMCOREINFO_BYTES \
+				    + VMCOREINFO_NOTE_NAME_BYTES)
+
 /* Location of a reserved region to hold the crash kernel.
  */
 extern struct resource crashk_res;
 typedef u32 note_buf_t[KEXEC_NOTE_BYTES/4];
 extern note_buf_t *crash_notes;
+extern u32 vmcoreinfo_note[VMCOREINFO_NOTE_SIZE/4];
+extern size_t vmcoreinfo_size;
+extern size_t vmcoreinfo_max_size;
 
+int __init parse_crashkernel(char *cmdline, unsigned long long system_ram,
+		unsigned long long *crash_size, unsigned long long *crash_base);
 
 #else /* !CONFIG_KEXEC */
 struct pt_regs;

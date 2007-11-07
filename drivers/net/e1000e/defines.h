@@ -573,9 +573,11 @@
 /* For checksumming, the sum of all words in the NVM should equal 0xBABA. */
 #define NVM_SUM                    0xBABA
 
-#define NVM_WORD_SIZE_BASE_SHIFT   6
+/* PBA (printed board assembly) number words */
+#define NVM_PBA_OFFSET_0           8
+#define NVM_PBA_OFFSET_1           9
 
-/* NVM Commands - Microwire */
+#define NVM_WORD_SIZE_BASE_SHIFT   6
 
 /* NVM Commands - SPI */
 #define NVM_MAX_RETRY_SPI          5000 /* Max wait of 5ms, for RDY signal */

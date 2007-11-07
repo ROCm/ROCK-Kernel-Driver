@@ -165,14 +165,14 @@ static s32 e1000_init_mac_params_82540(struct e1000_hw *hw)
 	case E1000_DEV_ID_82545GM_FIBER:
 	case E1000_DEV_ID_82546EB_FIBER:
 	case E1000_DEV_ID_82546GB_FIBER:
-		hw->media_type = e1000_media_type_fiber;
+		hw->phy.media_type = e1000_media_type_fiber;
 		break;
 	case E1000_DEV_ID_82545GM_SERDES:
 	case E1000_DEV_ID_82546GB_SERDES:
-		hw->media_type = e1000_media_type_internal_serdes;
+		hw->phy.media_type = e1000_media_type_internal_serdes;
 		break;
 	default:
-		hw->media_type = e1000_media_type_copper;
+		hw->phy.media_type = e1000_media_type_copper;
 		break;
 	}
 
@@ -193,11 +193,11 @@ static s32 e1000_init_mac_params_82540(struct e1000_hw *hw)
 	func->setup_link = e1000_setup_link_generic;
 	/* physical interface setup */
 	func->setup_physical_interface =
-	        (hw->media_type == e1000_media_type_copper)
+	        (hw->phy.media_type == e1000_media_type_copper)
 	                ? e1000_setup_copper_link_82540
 	                : e1000_setup_fiber_serdes_link_82540;
 	/* check for link */
-	switch (hw->media_type) {
+	switch (hw->phy.media_type) {
 	case e1000_media_type_copper:
 		func->check_for_link = e1000_check_for_copper_link_generic;
 		break;
@@ -214,11 +214,11 @@ static s32 e1000_init_mac_params_82540(struct e1000_hw *hw)
 	}
 	/* link info */
 	func->get_link_up_info =
-	        (hw->media_type == e1000_media_type_copper)
+	        (hw->phy.media_type == e1000_media_type_copper)
 	                ? e1000_get_speed_and_duplex_copper_generic
 	                : e1000_get_speed_and_duplex_fiber_serdes_generic;
 	/* multicast address update */
-	func->mc_addr_list_update = e1000_mc_addr_list_update_generic;
+	func->update_mc_addr_list = e1000_update_mc_addr_list_generic;
 	/* writing VFTA */
 	func->write_vfta = e1000_write_vfta_generic;
 	/* clearing VFTA */
@@ -334,7 +334,7 @@ static s32 e1000_init_hw_82540(struct e1000_hw *hw)
 	ret_val = e1000_id_led_init_generic(hw);
 	if (ret_val) {
 		DEBUGOUT("Error initializing identification LED\n");
-		goto out;
+		/* This is not fatal and we should not stop init due to this */
 	}
 
 	/* Disabling VLAN filtering */
@@ -368,10 +368,10 @@ static s32 e1000_init_hw_82540(struct e1000_hw *hw)
 	/* Setup link and flow control */
 	ret_val = e1000_setup_link(hw);
 
-	txdctl = E1000_READ_REG(hw, E1000_TXDCTL);
+	txdctl = E1000_READ_REG(hw, E1000_TXDCTL(0));
 	txdctl = (txdctl & ~E1000_TXDCTL_WTHRESH) |
 	         E1000_TXDCTL_FULL_TX_DESC_WB;
-	E1000_WRITE_REG(hw, E1000_TXDCTL, txdctl);
+	E1000_WRITE_REG(hw, E1000_TXDCTL(0), txdctl);
 
 	/*
 	 * Clear all of the statistics registers (clear on read).  It is
@@ -392,7 +392,6 @@ static s32 e1000_init_hw_82540(struct e1000_hw *hw)
 		E1000_WRITE_REG(hw, E1000_CTRL_EXT, ctrl_ext);
 	}
 
-out:
 	return ret_val;
 }
 
@@ -464,7 +463,7 @@ static s32 e1000_setup_fiber_serdes_link_82540(struct e1000_hw *hw)
 	switch (mac->type) {
 	case e1000_82545_rev_3:
 	case e1000_82546_rev_3:
-		if (hw->media_type == e1000_media_type_internal_serdes) {
+		if (hw->phy.media_type == e1000_media_type_internal_serdes) {
 			/*
 			 * If we're on serdes media, adjust the output
 			 * amplitude to value set in the EEPROM.

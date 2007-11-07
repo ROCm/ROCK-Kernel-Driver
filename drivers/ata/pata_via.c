@@ -129,7 +129,7 @@ static const struct via_isa_bridge {
  *	Cable special cases
  */
 
-static struct dmi_system_id cable_dmi_table[] = {
+static const struct dmi_system_id cable_dmi_table[] = {
 	{
 		.ident = "Acer Ferrari 3400",
 		.matches = {
@@ -176,13 +176,16 @@ static int via_cable_detect(struct ata_port *ap) {
 	if ((config->flags & VIA_UDMA) < VIA_UDMA_66)
 		return ATA_CBL_PATA40;
 	/* UDMA 66 chips have only drive side logic */
-	else if((config->flags & VIA_UDMA) < VIA_UDMA_100)
+	else if ((config->flags & VIA_UDMA) < VIA_UDMA_100)
 		return ATA_CBL_PATA_UNK;
 	/* UDMA 100 or later */
 	pci_read_config_dword(pdev, 0x50, &ata66);
 	/* Check both the drive cable reporting bits, we might not have
 	   two drives */
 	if (ata66 & (0x10100000 >> (16 * ap->port_no)))
+		return ATA_CBL_PATA80;
+	/* Check with ACPI so we can spot BIOS reported SATA bridges */
+	if (ata_acpi_cbl_80wire(ap))
 		return ATA_CBL_PATA80;
 	return ATA_CBL_PATA40;
 }
@@ -345,7 +348,6 @@ static struct scsi_host_template via_sht = {
 };
 
 static struct ata_port_operations via_port_ops = {
-	.port_disable	= ata_port_disable,
 	.set_piomode	= via_set_piomode,
 	.set_dmamode	= via_set_dmamode,
 	.mode_filter	= ata_pci_default_filter,
@@ -375,13 +377,11 @@ static struct ata_port_operations via_port_ops = {
 	.irq_handler	= ata_interrupt,
 	.irq_clear	= ata_bmdma_irq_clear,
 	.irq_on		= ata_irq_on,
-	.irq_ack	= ata_irq_ack,
 
-	.port_start	= ata_port_start,
+	.port_start	= ata_sff_port_start,
 };
 
 static struct ata_port_operations via_port_ops_noirq = {
-	.port_disable	= ata_port_disable,
 	.set_piomode	= via_set_piomode,
 	.set_dmamode	= via_set_dmamode,
 	.mode_filter	= ata_pci_default_filter,
@@ -411,9 +411,8 @@ static struct ata_port_operations via_port_ops_noirq = {
 	.irq_handler	= ata_interrupt,
 	.irq_clear	= ata_bmdma_irq_clear,
 	.irq_on		= ata_irq_on,
-	.irq_ack	= ata_irq_ack,
 
-	.port_start	= ata_port_start,
+	.port_start	= ata_sff_port_start,
 };
 
 /**
@@ -421,7 +420,7 @@ static struct ata_port_operations via_port_ops_noirq = {
  *	@pdev: PCI device
  *	@flags: configuration flags
  *
- *	Set the FIFO properties for this device if neccessary. Used both on
+ *	Set the FIFO properties for this device if necessary. Used both on
  *	set up and on and the resume path
  */
 

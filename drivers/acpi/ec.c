@@ -65,16 +65,18 @@ enum ec_command {
 /* EC events */
 enum ec_event {
 	ACPI_EC_EVENT_OBF_1 = 1,	/* Output buffer full */
-	ACPI_EC_EVENT_IBF_0,	/* Input buffer empty */
+	ACPI_EC_EVENT_IBF_0,		/* Input buffer empty */
 };
 
 #define ACPI_EC_DELAY		500	/* Wait 500ms max. during EC ops */
 #define ACPI_EC_UDELAY_GLK	1000	/* Wait 1ms max. to get global lock */
 
-static enum ec_mode {
-	EC_INTR = 1,		/* Output buffer full */
-	EC_POLL,		/* Input buffer empty */
-} acpi_ec_mode = EC_INTR;
+enum {
+	EC_FLAGS_WAIT_GPE = 0,		/* Don't check status until GPE arrives */
+	EC_FLAGS_QUERY_PENDING,		/* Query is pending */
+	EC_FLAGS_GPE_MODE,		/* Expect GPE to be sent for status change */
+	EC_FLAGS_ONLY_IBF_GPE,		/* Expect GPE only for IBF = 0 event */
+};
 
 static int acpi_ec_remove(struct acpi_device *device, int type);
 static int acpi_ec_start(struct acpi_device *device);
@@ -116,11 +118,11 @@ static struct acpi_ec {
 	unsigned long command_addr;
 	unsigned long data_addr;
 	unsigned long global_lock;
+	unsigned long flags;
 	struct mutex lock;
-	atomic_t query_pending;
-	atomic_t event_count;
 	wait_queue_head_t wait;
 	struct list_head list;
+	u8 handlers_installed;
 } *boot_ec, *first_ec;
 
 /* --------------------------------------------------------------------------
@@ -147,45 +149,54 @@ static inline void acpi_ec_write_data(struct acpi_ec *ec, u8 data)
 	outb(data, ec->data_addr);
 }
 
-static inline int acpi_ec_check_status(struct acpi_ec *ec, enum ec_event event,
-				       unsigned old_count)
+static inline int acpi_ec_check_status(struct acpi_ec *ec, enum ec_event event)
 {
-	u8 status = acpi_ec_read_status(ec);
-	if (old_count == atomic_read(&ec->event_count))
+	if (test_bit(EC_FLAGS_WAIT_GPE, &ec->flags))
 		return 0;
 	if (event == ACPI_EC_EVENT_OBF_1) {
-		if (status & ACPI_EC_FLAG_OBF)
+		if (acpi_ec_read_status(ec) & ACPI_EC_FLAG_OBF)
 			return 1;
 	} else if (event == ACPI_EC_EVENT_IBF_0) {
-		if (!(status & ACPI_EC_FLAG_IBF))
+		if (!(acpi_ec_read_status(ec) & ACPI_EC_FLAG_IBF))
 			return 1;
 	}
 
 	return 0;
 }
 
-static int acpi_ec_wait(struct acpi_ec *ec, enum ec_event event,
-                        unsigned count, int force_poll)
+static int acpi_ec_wait(struct acpi_ec *ec, enum ec_event event, int force_poll)
 {
-	if (unlikely(force_poll) || acpi_ec_mode == EC_POLL) {
-		unsigned long delay = jiffies + msecs_to_jiffies(ACPI_EC_DELAY);
-		while (time_before(jiffies, delay)) {
-			if (acpi_ec_check_status(ec, event, 0))
-				return 0;
+	if (likely(test_bit(EC_FLAGS_GPE_MODE, &ec->flags)) &&
+	    likely(!force_poll)) {
+		if (wait_event_timeout(ec->wait, acpi_ec_check_status(ec, event),
+				       msecs_to_jiffies(ACPI_EC_DELAY)))
+			return 0;
+		clear_bit(EC_FLAGS_WAIT_GPE, &ec->flags);
+		if (acpi_ec_check_status(ec, event)) {
+			if (event == ACPI_EC_EVENT_OBF_1) {
+				/* miss OBF = 1 GPE, don't expect it anymore */
+				printk(KERN_INFO PREFIX "missing OBF_1 confirmation,"
+					"switching to degraded mode.\n");
+				set_bit(EC_FLAGS_ONLY_IBF_GPE, &ec->flags);
+			} else {
+				/* missing GPEs, switch back to poll mode */
+				printk(KERN_INFO PREFIX "missing IBF_1 confirmations,"
+					"switch off interrupt mode.\n");
+				clear_bit(EC_FLAGS_GPE_MODE, &ec->flags);
+			}
+			return 0;
 		}
 	} else {
-		if (wait_event_timeout(ec->wait,
-				       acpi_ec_check_status(ec, event, count),
-				       msecs_to_jiffies(ACPI_EC_DELAY)) ||
-		    acpi_ec_check_status(ec, event, 0)) {
-			return 0;
-		} else {
-			printk(KERN_ERR PREFIX "acpi_ec_wait timeout,"
-			       " status = %d, expect_event = %d\n",
-			       acpi_ec_read_status(ec), event);
+		unsigned long delay = jiffies + msecs_to_jiffies(ACPI_EC_DELAY);
+		clear_bit(EC_FLAGS_WAIT_GPE, &ec->flags);
+		while (time_before(jiffies, delay)) {
+			if (acpi_ec_check_status(ec, event))
+				return 0;
 		}
 	}
-
+	printk(KERN_ERR PREFIX "acpi_ec_wait timeout,"
+			       " status = %d, expect_event = %d\n",
+			       acpi_ec_read_status(ec), event);
 	return -ETIME;
 }
 
@@ -195,39 +206,42 @@ static int acpi_ec_transaction_unlocked(struct acpi_ec *ec, u8 command,
 					int force_poll)
 {
 	int result = 0;
-	unsigned count = atomic_read(&ec->event_count);
+	set_bit(EC_FLAGS_WAIT_GPE, &ec->flags);
 	acpi_ec_write_cmd(ec, command);
 
 	for (; wdata_len > 0; --wdata_len) {
-		result = acpi_ec_wait(ec, ACPI_EC_EVENT_IBF_0, count, force_poll);
+		result = acpi_ec_wait(ec, ACPI_EC_EVENT_IBF_0, force_poll);
 		if (result) {
 			printk(KERN_ERR PREFIX
 			       "write_cmd timeout, command = %d\n", command);
 			goto end;
 		}
-		count = atomic_read(&ec->event_count);
+		set_bit(EC_FLAGS_WAIT_GPE, &ec->flags);
 		acpi_ec_write_data(ec, *(wdata++));
 	}
 
 	if (!rdata_len) {
-		result = acpi_ec_wait(ec, ACPI_EC_EVENT_IBF_0, count, force_poll);
+		result = acpi_ec_wait(ec, ACPI_EC_EVENT_IBF_0, force_poll);
 		if (result) {
 			printk(KERN_ERR PREFIX
 			       "finish-write timeout, command = %d\n", command);
 			goto end;
 		}
-	} else if (command == ACPI_EC_COMMAND_QUERY) {
-		atomic_set(&ec->query_pending, 0);
-	}
+	} else if (command == ACPI_EC_COMMAND_QUERY)
+		clear_bit(EC_FLAGS_QUERY_PENDING, &ec->flags);
 
 	for (; rdata_len > 0; --rdata_len) {
-		result = acpi_ec_wait(ec, ACPI_EC_EVENT_OBF_1, count, force_poll);
+		if (test_bit(EC_FLAGS_ONLY_IBF_GPE, &ec->flags))
+			force_poll = 1;
+		result = acpi_ec_wait(ec, ACPI_EC_EVENT_OBF_1, force_poll);
 		if (result) {
 			printk(KERN_ERR PREFIX "read timeout, command = %d\n",
 			       command);
 			goto end;
 		}
-		count = atomic_read(&ec->event_count);
+		/* Don't expect GPE after last read */
+		if (rdata_len > 1)
+			set_bit(EC_FLAGS_WAIT_GPE, &ec->flags);
 		*(rdata++) = acpi_ec_read_data(ec);
 	}
       end:
@@ -257,10 +271,7 @@ static int acpi_ec_transaction(struct acpi_ec *ec, u8 command,
 		}
 	}
 
-	/* Make sure GPE is enabled before doing transaction */
-	acpi_enable_gpe(NULL, ec->gpe, ACPI_NOT_ISR);
-
-	status = acpi_ec_wait(ec, ACPI_EC_EVENT_IBF_0, 0, 0);
+	status = acpi_ec_wait(ec, ACPI_EC_EVENT_IBF_0, 0);
 	if (status) {
 		printk(KERN_ERR PREFIX
 		       "input buffer is not empty, aborting transaction\n");
@@ -425,7 +436,7 @@ int acpi_ec_add_query_handler(struct acpi_ec *ec, u8 query_bit,
 	handler->func = func;
 	handler->data = data;
 	mutex_lock(&ec->lock);
-	list_add_tail(&handler->node, &ec->list);
+	list_add(&handler->node, &ec->list);
 	mutex_unlock(&ec->lock);
 	return 0;
 }
@@ -434,13 +445,12 @@ EXPORT_SYMBOL_GPL(acpi_ec_add_query_handler);
 
 void acpi_ec_remove_query_handler(struct acpi_ec *ec, u8 query_bit)
 {
-	struct acpi_ec_query_handler *handler;
+	struct acpi_ec_query_handler *handler, *tmp;
 	mutex_lock(&ec->lock);
-	list_for_each_entry(handler, &ec->list, node) {
+	list_for_each_entry_safe(handler, tmp, &ec->list, node) {
 		if (query_bit == handler->query_bit) {
 			list_del(&handler->node);
 			kfree(handler);
-			break;
 		}
 	}
 	mutex_unlock(&ec->lock);
@@ -476,23 +486,24 @@ static void acpi_ec_gpe_query(void *ec_cxt)
 static u32 acpi_ec_gpe_handler(void *data)
 {
 	acpi_status status = AE_OK;
-	u8 value;
 	struct acpi_ec *ec = data;
 
-	atomic_inc(&ec->event_count);
-
-	if (acpi_ec_mode == EC_INTR) {
+	clear_bit(EC_FLAGS_WAIT_GPE, &ec->flags);
+	if (test_bit(EC_FLAGS_GPE_MODE, &ec->flags))
 		wake_up(&ec->wait);
+
+	if (acpi_ec_read_status(ec) & ACPI_EC_FLAG_SCI) {
+		if (!test_and_set_bit(EC_FLAGS_QUERY_PENDING, &ec->flags))
+			status = acpi_os_execute(OSL_EC_BURST_HANDLER,
+				acpi_ec_gpe_query, ec);
+	} else if (unlikely(!test_bit(EC_FLAGS_GPE_MODE, &ec->flags))) {
+		/* this is non-query, must be confirmation */
+		printk(KERN_INFO PREFIX "non-query interrupt received,"
+			" switching to interrupt mode\n");
+		set_bit(EC_FLAGS_GPE_MODE, &ec->flags);
 	}
 
-	value = acpi_ec_read_status(ec);
-	if ((value & ACPI_EC_FLAG_SCI) && !atomic_read(&ec->query_pending)) {
-		atomic_set(&ec->query_pending, 1);
-		status =
-		    acpi_os_execute(OSL_EC_BURST_HANDLER, acpi_ec_gpe_query, ec);
-	}
-
-	return status == AE_OK ?
+	return ACPI_SUCCESS(status) ?
 	    ACPI_INTERRUPT_HANDLED : ACPI_INTERRUPT_NOT_HANDLED;
 }
 
@@ -641,13 +652,10 @@ static struct acpi_ec *make_acpi_ec(void)
 	struct acpi_ec *ec = kzalloc(sizeof(struct acpi_ec), GFP_KERNEL);
 	if (!ec)
 		return NULL;
-
-	atomic_set(&ec->query_pending, 1);
-	atomic_set(&ec->event_count, 1);
+	ec->flags = 1 << EC_FLAGS_QUERY_PENDING;
 	mutex_init(&ec->lock);
 	init_waitqueue_head(&ec->wait);
 	INIT_LIST_HEAD(&ec->list);
-
 	return ec;
 }
 
@@ -680,20 +688,24 @@ ec_parse_device(acpi_handle handle, u32 Level, void *context, void **retval)
 	status = acpi_evaluate_integer(handle, "_GPE", NULL, &ec->gpe);
 	if (ACPI_FAILURE(status))
 		return status;
-
 	/* Find and register all query methods */
 	acpi_walk_namespace(ACPI_TYPE_METHOD, handle, 1,
 			    acpi_ec_register_query_methods, ec, NULL);
-
 	/* Use the global lock for all EC transactions? */
 	acpi_evaluate_integer(handle, "_GLK", NULL, &ec->global_lock);
-
 	ec->handle = handle;
-
-	printk(KERN_INFO PREFIX "GPE = 0x%lx, I/O: command/status = 0x%lx, data = 0x%lx\n",
-			  ec->gpe, ec->command_addr, ec->data_addr);
-
 	return AE_CTRL_TERMINATE;
+}
+
+static void ec_remove_handlers(struct acpi_ec *ec)
+{
+	if (ACPI_FAILURE(acpi_remove_address_space_handler(ec->handle,
+				ACPI_ADR_SPACE_EC, &acpi_ec_space_handler)))
+		printk(KERN_ERR PREFIX "failed to remove space handler\n");
+	if (ACPI_FAILURE(acpi_remove_gpe_handler(NULL, ec->gpe,
+				&acpi_ec_gpe_handler)))
+		printk(KERN_ERR PREFIX "failed to remove gpe handler\n");
+	ec->handlers_installed = 0;
 }
 
 static int acpi_ec_add(struct acpi_device *device)
@@ -702,9 +714,23 @@ static int acpi_ec_add(struct acpi_device *device)
 
 	if (!device)
 		return -EINVAL;
-
 	strcpy(acpi_device_name(device), ACPI_EC_DEVICE_NAME);
 	strcpy(acpi_device_class(device), ACPI_EC_CLASS);
+
+	/* Check for boot EC */
+	if (boot_ec) {
+		if (boot_ec->handle == device->handle) {
+			/* Pre-loaded EC from DSDT, just move pointer */
+			ec = boot_ec;
+			boot_ec = NULL;
+			goto end;
+		} else if (boot_ec->handle == ACPI_ROOT_OBJECT) {
+			/* ECDT-based EC, time to shut it down */
+			ec_remove_handlers(boot_ec);
+			kfree(boot_ec);
+			first_ec = boot_ec = NULL;
+		}
+	}
 
 	ec = make_acpi_ec();
 	if (!ec)
@@ -715,25 +741,16 @@ static int acpi_ec_add(struct acpi_device *device)
 		kfree(ec);
 		return -EINVAL;
 	}
-
-	/* Check if we found the boot EC */
-	if (boot_ec) {
-		if (boot_ec->gpe == ec->gpe) {
-			/* We might have incorrect info for GL at boot time */
-			mutex_lock(&boot_ec->lock);
-			boot_ec->global_lock = ec->global_lock;
-			/* Copy handlers from new ec into boot ec */
-			list_splice(&ec->list, &boot_ec->list);
-			mutex_unlock(&boot_ec->lock);
-			kfree(ec);
-			ec = boot_ec;
-		}
-	} else
-		first_ec = ec;
 	ec->handle = device->handle;
+      end:
+	if (!first_ec)
+		first_ec = ec;
 	acpi_driver_data(device) = ec;
-
 	acpi_ec_add_fs(device);
+	printk(KERN_INFO PREFIX "GPE = 0x%lx, I/O: command/status = 0x%lx, data = 0x%lx\n",
+			  ec->gpe, ec->command_addr, ec->data_addr);
+	printk(KERN_INFO PREFIX "driver started in %s mode\n",
+		(test_bit(EC_FLAGS_GPE_MODE, &ec->flags))?"interrupt":"poll");
 	return 0;
 }
 
@@ -756,10 +773,7 @@ static int acpi_ec_remove(struct acpi_device *device, int type)
 	acpi_driver_data(device) = NULL;
 	if (ec == first_ec)
 		first_ec = NULL;
-
-	/* Don't touch boot EC */
-	if (boot_ec != ec)
-		kfree(ec);
+	kfree(ec);
 	return 0;
 }
 
@@ -789,6 +803,8 @@ ec_parse_io_ports(struct acpi_resource *resource, void *context)
 static int ec_install_handlers(struct acpi_ec *ec)
 {
 	acpi_status status;
+	if (ec->handlers_installed)
+		return 0;
 	status = acpi_install_gpe_handler(NULL, ec->gpe,
 					  ACPI_GPE_EDGE_TRIGGERED,
 					  &acpi_ec_gpe_handler, ec);
@@ -807,6 +823,7 @@ static int ec_install_handlers(struct acpi_ec *ec)
 		return -ENODEV;
 	}
 
+	ec->handlers_installed = 1;
 	return 0;
 }
 
@@ -823,41 +840,22 @@ static int acpi_ec_start(struct acpi_device *device)
 	if (!ec)
 		return -EINVAL;
 
-	/* Boot EC is already working */
-	if (ec != boot_ec)
-		ret = ec_install_handlers(ec);
+	ret = ec_install_handlers(ec);
 
 	/* EC is fully operational, allow queries */
-	atomic_set(&ec->query_pending, 0);
-
+	clear_bit(EC_FLAGS_QUERY_PENDING, &ec->flags);
 	return ret;
 }
 
 static int acpi_ec_stop(struct acpi_device *device, int type)
 {
-	acpi_status status;
 	struct acpi_ec *ec;
-
 	if (!device)
 		return -EINVAL;
-
 	ec = acpi_driver_data(device);
 	if (!ec)
 		return -EINVAL;
-
-	/* Don't touch boot EC */
-	if (ec == boot_ec)
-		return 0;
-
-	status = acpi_remove_address_space_handler(ec->handle,
-						   ACPI_ADR_SPACE_EC,
-						   &acpi_ec_space_handler);
-	if (ACPI_FAILURE(status))
-		return -ENODEV;
-
-	status = acpi_remove_gpe_handler(NULL, ec->gpe, &acpi_ec_gpe_handler);
-	if (ACPI_FAILURE(status))
-		return -ENODEV;
+	ec_remove_handlers(ec);
 
 	return 0;
 }
@@ -877,7 +875,7 @@ int __init acpi_ec_ecdt_probe(void)
 	status = acpi_get_table(ACPI_SIG_ECDT, 1,
 				(struct acpi_table_header **)&ecdt_ptr);
 	if (ACPI_SUCCESS(status)) {
-		printk(KERN_INFO PREFIX "EC description table is found, configuring boot EC\n\n");
+		printk(KERN_INFO PREFIX "EC description table is found, configuring boot EC\n");
 		boot_ec->command_addr = ecdt_ptr->control.address;
 		boot_ec->data_addr = ecdt_ptr->data.address;
 		boot_ec->gpe = ecdt_ptr->gpe;
@@ -899,7 +897,6 @@ int __init acpi_ec_ecdt_probe(void)
       error:
 	kfree(boot_ec);
 	boot_ec = NULL;
-
 	return -ENODEV;
 }
 
@@ -937,20 +934,4 @@ static void __exit acpi_ec_exit(void)
 
 	return;
 }
-#endif				/* 0 */
-
-static int __init acpi_ec_set_intr_mode(char *str)
-{
-	int intr;
-
-	if (!get_option(&str, &intr))
-		return 0;
-
-	acpi_ec_mode = (intr) ? EC_INTR : EC_POLL;
-
-	printk(KERN_NOTICE PREFIX "%s mode.\n", intr ? "interrupt" : "polling");
-
-	return 1;
-}
-
-__setup("ec_intr=", acpi_ec_set_intr_mode);
+#endif	/* 0 */

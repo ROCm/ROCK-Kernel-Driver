@@ -3984,9 +3984,12 @@ ahc_free(struct ahc_softc *ahc)
 }
 
 void
-ahc_shutdown(struct ahc_softc *ahc)
+ahc_shutdown(void *arg)
 {
+	struct	ahc_softc *ahc;
 	int	i;
+
+	ahc = (struct ahc_softc *)arg;
 
 	/* This will reset most registers to 0, but not all */
 	ahc_reset(ahc, /*reinit*/FALSE);
@@ -5073,6 +5076,42 @@ ahc_pause_and_flushwork(struct ahc_softc *ahc)
 	}
 	ahc_platform_flushwork(ahc);
 	ahc->flags &= ~AHC_ALL_INTERRUPTS;
+}
+
+int
+ahc_suspend(struct ahc_softc *ahc)
+{
+
+	ahc_pause_and_flushwork(ahc);
+
+	if (LIST_FIRST(&ahc->pending_scbs) != NULL) {
+		ahc_unpause(ahc);
+		return (EBUSY);
+	}
+
+#ifdef AHC_TARGET_MODE
+	/*
+	 * XXX What about ATIOs that have not yet been serviced?
+	 * Perhaps we should just refuse to be suspended if we
+	 * are acting in a target role.
+	 */
+	if (ahc->pending_device != NULL) {
+		ahc_unpause(ahc);
+		return (EBUSY);
+	}
+#endif
+	ahc_shutdown(ahc);
+	return (0);
+}
+
+int
+ahc_resume(struct ahc_softc *ahc)
+{
+
+	ahc_reset(ahc, /*reinit*/TRUE);
+	ahc_intr_enable(ahc, TRUE); 
+	ahc_restart(ahc);
+	return (0);
 }
 
 /************************** Busy Target Table *********************************/

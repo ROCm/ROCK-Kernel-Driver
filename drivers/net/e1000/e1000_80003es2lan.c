@@ -90,7 +90,7 @@ static s32 e1000_init_phy_params_80003es2lan(struct e1000_hw *hw)
 
 	DEBUGFUNC("e1000_init_phy_params_80003es2lan");
 
-	if (hw->media_type != e1000_media_type_copper) {
+	if (hw->phy.media_type != e1000_media_type_copper) {
 		phy->type        = e1000_phy_none;
 		goto out;
 	}
@@ -201,10 +201,10 @@ static s32 e1000_init_mac_params_80003es2lan(struct e1000_hw *hw)
 	/* Set media type */
 	switch (hw->device_id) {
 	case E1000_DEV_ID_80003ES2LAN_SERDES_DPT:
-		hw->media_type = e1000_media_type_internal_serdes;
+		hw->phy.media_type = e1000_media_type_internal_serdes;
 		break;
 	default:
-		hw->media_type = e1000_media_type_copper;
+		hw->phy.media_type = e1000_media_type_copper;
 		break;
 	}
 
@@ -231,11 +231,11 @@ static s32 e1000_init_mac_params_80003es2lan(struct e1000_hw *hw)
 	func->setup_link = e1000_setup_link_generic;
 	/* physical interface link setup */
 	func->setup_physical_interface =
-	        (hw->media_type == e1000_media_type_copper)
+	        (hw->phy.media_type == e1000_media_type_copper)
 	                ? e1000_setup_copper_link_80003es2lan
 	                : e1000_setup_fiber_serdes_link_generic;
 	/* check for link */
-	switch (hw->media_type) {
+	switch (hw->phy.media_type) {
 	case e1000_media_type_copper:
 		func->check_for_link = e1000_check_for_copper_link_generic;
 		break;
@@ -253,7 +253,7 @@ static s32 e1000_init_mac_params_80003es2lan(struct e1000_hw *hw)
 	/* check management mode */
 	func->check_mng_mode = e1000_check_mng_mode_generic;
 	/* multicast address update */
-	func->mc_addr_list_update = e1000_mc_addr_list_update_generic;
+	func->update_mc_addr_list = e1000_update_mc_addr_list_generic;
 	/* writing VFTA */
 	func->write_vfta = e1000_write_vfta_generic;
 	/* clearing VFTA */
@@ -634,7 +634,7 @@ static s32 e1000_phy_force_speed_duplex_80003es2lan(struct e1000_hw *hw)
 {
 	s32 ret_val;
 	u16 phy_data;
-	boolean_t link;
+	bool link;
 
 	DEBUGFUNC("e1000_phy_force_speed_duplex_80003es2lan");
 
@@ -668,7 +668,7 @@ static s32 e1000_phy_force_speed_duplex_80003es2lan(struct e1000_hw *hw)
 
 	usec_delay(1);
 
-	if (hw->phy.wait_for_link) {
+	if (hw->phy.autoneg_wait_to_complete) {
 		DEBUGOUT("Waiting for forced speed/duplex link "
 		         "on GG82563 phy.\n");
 
@@ -764,7 +764,7 @@ static s32 e1000_get_link_up_info_80003es2lan(struct e1000_hw *hw, u16 *speed,
 
 	DEBUGFUNC("e1000_get_link_up_info_80003es2lan");
 
-	if (hw->media_type == e1000_media_type_copper) {
+	if (hw->phy.media_type == e1000_media_type_copper) {
 		ret_val = e1000_get_speed_and_duplex_copper_generic(hw,
 		                                                    speed,
 		                                                    duplex);
@@ -857,7 +857,7 @@ static s32 e1000_init_hw_80003es2lan(struct e1000_hw *hw)
 	ret_val = e1000_id_led_init_generic(hw);
 	if (ret_val) {
 		DEBUGOUT("Error initializing identification LED\n");
-		goto out;
+		/* This is not fatal and we should not stop init due to this */
 	}
 
 	/* Disabling VLAN filtering */
@@ -876,16 +876,16 @@ static s32 e1000_init_hw_80003es2lan(struct e1000_hw *hw)
 	ret_val = e1000_setup_link(hw);
 
 	/* Set the transmit descriptor write-back policy */
-	reg_data = E1000_READ_REG(hw, E1000_TXDCTL);
+	reg_data = E1000_READ_REG(hw, E1000_TXDCTL(0));
 	reg_data = (reg_data & ~E1000_TXDCTL_WTHRESH) |
 	           E1000_TXDCTL_FULL_TX_DESC_WB | E1000_TXDCTL_COUNT_DESC;
-	E1000_WRITE_REG(hw, E1000_TXDCTL, reg_data);
+	E1000_WRITE_REG(hw, E1000_TXDCTL(0), reg_data);
 
 	/* ...for both queues. */
-	reg_data = E1000_READ_REG(hw, E1000_TXDCTL1);
+	reg_data = E1000_READ_REG(hw, E1000_TXDCTL(1));
 	reg_data = (reg_data & ~E1000_TXDCTL_WTHRESH) |
 	           E1000_TXDCTL_FULL_TX_DESC_WB | E1000_TXDCTL_COUNT_DESC;
-	E1000_WRITE_REG(hw, E1000_TXDCTL1, reg_data);
+	E1000_WRITE_REG(hw, E1000_TXDCTL(1), reg_data);
 
 	/* Enable retransmit on late collisions */
 	reg_data = E1000_READ_REG(hw, E1000_TCTL);
@@ -916,7 +916,6 @@ static s32 e1000_init_hw_80003es2lan(struct e1000_hw *hw)
 	 */
 	e1000_clear_hw_cntrs_80003es2lan(hw);
 
-out:
 	return ret_val;
 }
 
@@ -936,29 +935,29 @@ static void e1000_initialize_hw_bits_80003es2lan(struct e1000_hw *hw)
 		goto out;
 
 	/* Transmit Descriptor Control 0 */
-	reg = E1000_READ_REG(hw, E1000_TXDCTL);
+	reg = E1000_READ_REG(hw, E1000_TXDCTL(0));
 	reg |= (1 << 22);
-	E1000_WRITE_REG(hw, E1000_TXDCTL, reg);
+	E1000_WRITE_REG(hw, E1000_TXDCTL(0), reg);
 
 	/* Transmit Descriptor Control 1 */
-	reg = E1000_READ_REG(hw, E1000_TXDCTL1);
+	reg = E1000_READ_REG(hw, E1000_TXDCTL(1));
 	reg |= (1 << 22);
-	E1000_WRITE_REG(hw, E1000_TXDCTL1, reg);
+	E1000_WRITE_REG(hw, E1000_TXDCTL(1), reg);
 
 	/* Transmit Arbitration Control 0 */
-	reg = E1000_READ_REG(hw, E1000_TARC0);
+	reg = E1000_READ_REG(hw, E1000_TARC(0));
 	reg &= ~(0xF << 27); /* 30:27 */
-	if (hw->media_type != e1000_media_type_copper)
+	if (hw->phy.media_type != e1000_media_type_copper)
 		reg &= ~(1 << 20);
-	E1000_WRITE_REG(hw, E1000_TARC0, reg);
+	E1000_WRITE_REG(hw, E1000_TARC(0), reg);
 
 	/* Transmit Arbitration Control 1 */
-	reg = E1000_READ_REG(hw, E1000_TARC1);
+	reg = E1000_READ_REG(hw, E1000_TARC(1));
 	if (E1000_READ_REG(hw, E1000_TCTL) & E1000_TCTL_MULR)
 		reg &= ~(1 << 28);
 	else
 		reg |= (1 << 28);
-	E1000_WRITE_REG(hw, E1000_TARC1, reg);
+	E1000_WRITE_REG(hw, E1000_TARC(1), reg);
 
 out:
 	return;
@@ -1050,6 +1049,18 @@ static s32 e1000_copper_link_setup_gg82563_80003es2lan(struct e1000_hw *hw)
 	                        E1000_KMRNCTRLSTA_OFFSET_FIFO_CTRL,
 	                        E1000_KMRNCTRLSTA_FIFO_CTRL_RX_BYPASS |
 	                                E1000_KMRNCTRLSTA_FIFO_CTRL_TX_BYPASS);
+	if (ret_val)
+		goto out;
+
+	ret_val = e1000_read_kmrn_reg(hw,
+				      E1000_KMRNCTRLSTA_OFFSET_MAC2PHY_OPMODE,
+				      &data);
+	if (ret_val)
+		goto out;
+	data |= E1000_KMRNCTRLSTA_OPMODE_E_IDLE;
+	ret_val = e1000_write_kmrn_reg(hw,
+				       E1000_KMRNCTRLSTA_OFFSET_MAC2PHY_OPMODE,
+				       data);
 	if (ret_val)
 		goto out;
 

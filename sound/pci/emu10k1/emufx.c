@@ -1568,7 +1568,7 @@ A_OP(icode, &ptr, iMAC0, A_GPR(var), A_GPR(var), A_GPR(vol), A_EXTIN(input))
 		if (emu->card_capabilities->ca0108_chip) {
 			snd_printk("EMU2 inputs on\n");
 			for (z = 0; z < 0x10; z++) {
-				snd_emu10k1_audigy_dsp_convert_32_to_2x16( icode, &ptr, tmp,
+				snd_emu10k1_audigy_dsp_convert_32_to_2x16( icode, &ptr, tmp, 
 									bit_shifter16,
 									A3_EMU32IN(z),
 									A_FXBUS2(z*2) );

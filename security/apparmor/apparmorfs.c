@@ -213,6 +213,7 @@ void destroy_apparmorfs(void)
 int create_apparmorfs(void)
 {
 	int error;
+	extern void apparmor_disable(void);
 
 	if (apparmor_dentry) {
 		AA_ERROR("%s: AppArmor securityfs already exists\n",
@@ -224,7 +225,7 @@ int create_apparmorfs(void)
 	if (IS_ERR(apparmor_dentry)) {
 		error = PTR_ERR(apparmor_dentry);
 		apparmor_dentry = NULL;
- 		goto error;
+		goto error;
 	}
 	error = aafs_create("profiles", 0440, &apparmorfs_profiles_fops);
 	if (error)
@@ -247,6 +248,8 @@ int create_apparmorfs(void)
 error:
 	destroy_apparmorfs();
 	AA_ERROR("Error creating AppArmor securityfs\n");
+	apparmor_disable();
 	return error;
 }
 
+fs_initcall(create_apparmorfs);

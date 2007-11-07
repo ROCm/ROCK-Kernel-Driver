@@ -200,6 +200,7 @@ s32 e1000_set_mac_type(struct e1000_hw *hw)
 	case E1000_DEV_ID_82571EB_SERDES_DUAL:
 	case E1000_DEV_ID_82571EB_SERDES_QUAD:
 	case E1000_DEV_ID_82571EB_QUAD_COPPER:
+	case E1000_DEV_ID_82571PT_QUAD_COPPER:
 	case E1000_DEV_ID_82571EB_QUAD_FIBER:
 	case E1000_DEV_ID_82571EB_QUAD_COPPER_LP:
 		mac->type = e1000_82571;
@@ -258,7 +259,7 @@ s32 e1000_set_mac_type(struct e1000_hw *hw)
  *  This function must be called by a driver in order to use the rest
  *  of the 'shared' code files. Called by drivers only.
  **/
-s32 e1000_setup_init_funcs(struct e1000_hw *hw, boolean_t init_device)
+s32 e1000_setup_init_funcs(struct e1000_hw *hw, bool init_device)
 {
 	s32 ret_val;
 
@@ -414,7 +415,7 @@ void e1000_write_vfta(struct e1000_hw *hw, u32 offset, u32 value)
 }
 
 /**
- *  e1000_mc_addr_list_update - Update Multicast addresses
+ *  e1000_update_mc_addr_list - Update Multicast addresses
  *  @hw: pointer to the HW structure
  *  @mc_addr_list: array of multicast addresses to program
  *  @mc_addr_count: number of multicast addresses to program
@@ -428,12 +429,12 @@ void e1000_write_vfta(struct e1000_hw *hw, u32 offset, u32 value)
  *  exists and all implementations are handled in the generic version of this
  *  function.
  **/
-void e1000_mc_addr_list_update(struct e1000_hw *hw, u8 *mc_addr_list,
+void e1000_update_mc_addr_list(struct e1000_hw *hw, u8 *mc_addr_list,
                                u32 mc_addr_count, u32 rar_used_count,
                                u32 rar_count)
 {
-	if (hw->func.mc_addr_list_update)
-		hw->func.mc_addr_list_update(hw,
+	if (hw->func.update_mc_addr_list)
+		hw->func.update_mc_addr_list(hw,
 		                             mc_addr_list,
 		                             mc_addr_count,
 		                             rar_used_count,
@@ -476,7 +477,7 @@ s32 e1000_check_for_link(struct e1000_hw *hw)
  *  This checks if the adapter has manageability enabled.
  *  This is a function pointer entry point called by drivers.
  **/
-boolean_t e1000_check_mng_mode(struct e1000_hw *hw)
+bool e1000_check_mng_mode(struct e1000_hw *hw)
 {
 	if (hw->func.check_mng_mode)
 		return hw->func.check_mng_mode(hw);
@@ -753,7 +754,7 @@ u32 e1000_hash_mc_addr(struct e1000_hw *hw, u8 *mc_addr)
  *  Currently no func pointer exists and all implementations are handled in the
  *  generic version of this function.
  **/
-boolean_t e1000_enable_tx_pkt_filtering(struct e1000_hw *hw)
+bool e1000_enable_tx_pkt_filtering(struct e1000_hw *hw)
 {
 	return e1000_enable_tx_pkt_filtering_generic(hw);
 }
@@ -984,7 +985,7 @@ s32 e1000_phy_commit(struct e1000_hw *hw)
  *  During driver activity, SmartSpeed should be enabled so performance is
  *  maintained.  This is a function pointer entry point called by drivers.
  **/
-s32 e1000_set_d0_lplu_state(struct e1000_hw *hw, boolean_t active)
+s32 e1000_set_d0_lplu_state(struct e1000_hw *hw, bool active)
 {
 	if (hw->func.set_d0_lplu_state)
 		return hw->func.set_d0_lplu_state(hw, active);
@@ -1006,7 +1007,7 @@ s32 e1000_set_d0_lplu_state(struct e1000_hw *hw, boolean_t active)
  *  During driver activity, SmartSpeed should be enabled so performance is
  *  maintained.  This is a function pointer entry point called by drivers.
  **/
-s32 e1000_set_d3_lplu_state(struct e1000_hw *hw, boolean_t active)
+s32 e1000_set_d3_lplu_state(struct e1000_hw *hw, bool active)
 {
 	if (hw->func.set_d3_lplu_state)
 		return hw->func.set_d3_lplu_state(hw, active);
@@ -1122,4 +1123,19 @@ s32 e1000_write_nvm(struct e1000_hw *hw, u16 offset, u16 words, u16 *data)
 		return hw->func.write_nvm(hw, offset, words, data);
 
 	return E1000_SUCCESS;
+}
+
+/**
+ *  e1000_write_8bit_ctrl_reg - Writes 8bit Control register
+ *  @hw: pointer to the HW structure
+ *  @reg: 32bit register offset
+ *  @offset: the register to write
+ *  @data: the value to write.
+ *
+ *  Writes the PHY register at offset with the value in data.
+ *  This is a function pointer entry point called by drivers.
+ **/
+s32 e1000_write_8bit_ctrl_reg(struct e1000_hw *hw, u32 reg, u32 offset, u8 data)
+{
+	return e1000_write_8bit_ctrl_reg_generic(hw, reg, offset, data);
 }

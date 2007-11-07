@@ -69,7 +69,6 @@ static struct scsi_host_template pata_platform_sht = {
 static struct ata_port_operations pata_platform_port_ops = {
 	.set_mode		= pata_platform_set_mode,
 
-	.port_disable		= ata_port_disable,
 	.tf_load		= ata_tf_load,
 	.tf_read		= ata_tf_read,
 	.check_status		= ata_check_status,
@@ -89,7 +88,6 @@ static struct ata_port_operations pata_platform_port_ops = {
 
 	.irq_clear		= ata_bmdma_irq_clear,
 	.irq_on			= ata_irq_on,
-	.irq_ack		= ata_irq_ack,
 
 	.port_start		= ata_dummy_ret0,
 };
@@ -207,8 +205,12 @@ static int __devinit pata_platform_probe(struct platform_device *pdev)
 
 	ap->ioaddr.altstatus_addr = ap->ioaddr.ctl_addr;
 
-	pp_info = (struct pata_platform_info *)(pdev->dev.platform_data);
+	pp_info = pdev->dev.platform_data;
 	pata_platform_setup_port(&ap->ioaddr, pp_info);
+
+	ata_port_desc(ap, "%s cmd 0x%llx ctl 0x%llx", mmio ? "mmio" : "ioport",
+		      (unsigned long long)io_res->start,
+		      (unsigned long long)ctl_res->start);
 
 	/* activate */
 	return ata_host_activate(host, platform_get_irq(pdev, 0),

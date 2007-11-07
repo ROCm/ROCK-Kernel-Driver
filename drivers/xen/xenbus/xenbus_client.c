@@ -4,23 +4,23 @@
  * frontend or the backend of that driver.
  *
  * Copyright (C) 2005 XenSource Ltd
- * 
+ *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License version 2
  * as published by the Free Software Foundation; or, when distributed
  * separately from the Linux kernel or incorporated into other
  * software packages, subject to the following license:
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this source file (the "Software"), to deal in the Software without
  * restriction, including without limitation the rights to use, copy, modify,
  * merge, publish, distribute, sublicense, and/or sell copies of the Software,
  * and to permit persons to whom the Software is furnished to do so, subject to
  * the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -30,12 +30,6 @@
  * IN THE SOFTWARE.
  */
 
-#if defined(CONFIG_XEN) || defined(MODULE)
-#include <linux/slab.h>
-#include <xen/evtchn.h>
-#include <xen/gnttab.h>
-#include <xen/driver_util.h>
-#else
 #include <linux/types.h>
 #include <linux/vmalloc.h>
 #include <asm/xen/hypervisor.h>
@@ -43,12 +37,7 @@
 #include <xen/interface/event_channel.h>
 #include <xen/events.h>
 #include <xen/grant_table.h>
-#endif
 #include <xen/xenbus.h>
-
-#ifdef HAVE_XEN_PLATFORM_COMPAT_H
-#include <xen/platform-compat.h>
-#endif
 
 const char *xenbus_strstate(enum xenbus_state state)
 {
@@ -102,26 +91,6 @@ int xenbus_watch_path(struct xenbus_device *dev, const char *path,
 EXPORT_SYMBOL_GPL(xenbus_watch_path);
 
 
-#if defined(CONFIG_XEN) || defined(MODULE)
-int xenbus_watch_path2(struct xenbus_device *dev, const char *path,
-		       const char *path2, struct xenbus_watch *watch,
-		       void (*callback)(struct xenbus_watch *,
-					const char **, unsigned int))
-{
-	int err;
-	char *state = kasprintf(GFP_KERNEL, "%s/%s", path, path2);
-	if (!state) {
-		xenbus_dev_fatal(dev, -ENOMEM, "allocating path for watch");
-		return -ENOMEM;
-	}
-	err = xenbus_watch_path(dev, state, watch, callback);
-
-	if (err)
-		kfree(state);
-	return err;
-}
-EXPORT_SYMBOL_GPL(xenbus_watch_path2);
-#else
 /**
  * xenbus_watch_pathfmt - register a watch on a sprintf-formatted path
  * @dev: xenbus device
@@ -162,7 +131,6 @@ int xenbus_watch_pathfmt(struct xenbus_device *dev,
 	return err;
 }
 EXPORT_SYMBOL_GPL(xenbus_watch_pathfmt);
-#endif
 
 
 /**
@@ -233,12 +201,13 @@ static char *error_path(struct xenbus_device *dev)
 }
 
 
-static void _dev_error(struct xenbus_device *dev, int err,
-			const char *fmt, va_list ap)
+static void xenbus_va_dev_error(struct xenbus_device *dev, int err,
+				const char *fmt, va_list ap)
 {
 	int ret;
 	unsigned int len;
-	char *printf_buffer = NULL, *path_buffer = NULL;
+	char *printf_buffer = NULL;
+	char *path_buffer = NULL;
 
 #define PRINTF_BUFFER_SIZE 4096
 	printf_buffer = kmalloc(PRINTF_BUFFER_SIZE, GFP_KERNEL);
@@ -255,24 +224,20 @@ static void _dev_error(struct xenbus_device *dev, int err,
 	path_buffer = error_path(dev);
 
 	if (path_buffer == NULL) {
-		dev_err(&dev->dev,
-		        "xenbus: failed to write error node for %s (%s)\n",
-		        dev->nodename, printf_buffer);
+		dev_err(&dev->dev, "failed to write error node for %s (%s)\n",
+		       dev->nodename, printf_buffer);
 		goto fail;
 	}
 
 	if (xenbus_write(XBT_NIL, path_buffer, "error", printf_buffer) != 0) {
-		dev_err(&dev->dev,
-		        "xenbus: failed to write error node for %s (%s)\n",
-		        dev->nodename, printf_buffer);
+		dev_err(&dev->dev, "failed to write error node for %s (%s)\n",
+		       dev->nodename, printf_buffer);
 		goto fail;
 	}
 
 fail:
-	if (printf_buffer)
-		kfree(printf_buffer);
-	if (path_buffer)
-		kfree(path_buffer);
+	kfree(printf_buffer);
+	kfree(path_buffer);
 }
 
 
@@ -285,17 +250,15 @@ fail:
  * Report the given negative errno into the store, along with the given
  * formatted message.
  */
-void xenbus_dev_error(struct xenbus_device *dev, int err, const char *fmt,
-		      ...)
+void xenbus_dev_error(struct xenbus_device *dev, int err, const char *fmt, ...)
 {
 	va_list ap;
 
 	va_start(ap, fmt);
-	_dev_error(dev, err, fmt, ap);
+	xenbus_va_dev_error(dev, err, fmt, ap);
 	va_end(ap);
 }
 EXPORT_SYMBOL_GPL(xenbus_dev_error);
-
 
 /**
  * xenbus_dev_fatal
@@ -307,25 +270,24 @@ EXPORT_SYMBOL_GPL(xenbus_dev_error);
  * xenbus_switch_state(dev, NULL, XenbusStateClosing) to schedule an orderly
  * closedown of this driver and its peer.
  */
-void xenbus_dev_fatal(struct xenbus_device *dev, int err, const char *fmt,
-		      ...)
+
+void xenbus_dev_fatal(struct xenbus_device *dev, int err, const char *fmt, ...)
 {
 	va_list ap;
 
 	va_start(ap, fmt);
-	_dev_error(dev, err, fmt, ap);
+	xenbus_va_dev_error(dev, err, fmt, ap);
 	va_end(ap);
 
 	xenbus_switch_state(dev, XenbusStateClosing);
 }
 EXPORT_SYMBOL_GPL(xenbus_dev_fatal);
 
-
 /**
  * xenbus_grant_ring
  * @dev: xenbus device
  * @ring_mfn: mfn of ring to grant
- *
+
  * Grant access to the given @ring_mfn to the peer of the given device.  Return
  * 0 on success, or -errno on error.  On error, the device will switch to
  * XenbusStateClosing, and the error will be saved in the store.
@@ -351,7 +313,7 @@ int xenbus_alloc_evtchn(struct xenbus_device *dev, int *port)
 	struct evtchn_alloc_unbound alloc_unbound;
 	int err;
 
-	alloc_unbound.dom        = DOMID_SELF;
+	alloc_unbound.dom = DOMID_SELF;
 	alloc_unbound.remote_dom = dev->otherend_id;
 
 	err = HYPERVISOR_event_channel_op(EVTCHNOP_alloc_unbound,
@@ -366,7 +328,6 @@ int xenbus_alloc_evtchn(struct xenbus_device *dev, int *port)
 EXPORT_SYMBOL_GPL(xenbus_alloc_evtchn);
 
 
-#if 0 /* !defined(CONFIG_XEN) && !defined(MODULE) */
 /**
  * Bind to an existing interdomain event channel in another domain. Returns 0
  * on success and stores the local port in *port. On error, returns -errno,
@@ -392,7 +353,6 @@ int xenbus_bind_evtchn(struct xenbus_device *dev, int remote_port, int *port)
 	return err;
 }
 EXPORT_SYMBOL_GPL(xenbus_bind_evtchn);
-#endif
 
 
 /**
@@ -414,7 +374,6 @@ int xenbus_free_evtchn(struct xenbus_device *dev, int port)
 EXPORT_SYMBOL_GPL(xenbus_free_evtchn);
 
 
-#if 0 /* !defined(CONFIG_XEN) && !defined(MODULE) */
 /**
  * xenbus_map_ring_valloc
  * @dev: xenbus device
@@ -589,7 +548,6 @@ int xenbus_unmap_ring(struct xenbus_device *dev,
 	return op.status;
 }
 EXPORT_SYMBOL_GPL(xenbus_unmap_ring);
-#endif
 
 
 /**

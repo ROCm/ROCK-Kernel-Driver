@@ -37,19 +37,6 @@
 #include <scsi/scsi_transport_iscsi.h>
 #include <scsi/libiscsi.h>
 
-static void fail_command(struct iscsi_conn *conn, struct iscsi_cmd_task *ctask,
-			 int err);
-
-/* Debug flag for libiscsi - needs to be
- * exported so other iscsi modules can make use
- * of the debug_scsi() macro */
-#ifdef CONFIG_SCSI_ISCSI_DEBUG
-int libiscsi_debug = 0;
-EXPORT_SYMBOL_GPL(libiscsi_debug);
-
-module_param_named(debug, libiscsi_debug, int, S_IRUGO | S_IWUSR);
-#endif
-
 struct iscsi_session *
 class_to_transport_session(struct iscsi_cls_session *cls_session)
 {
@@ -135,20 +122,6 @@ void iscsi_prep_unsolicit_data_pdu(struct iscsi_cmd_task *ctask,
 }
 EXPORT_SYMBOL_GPL(iscsi_prep_unsolicit_data_pdu);
 
-static int iscsi_add_hdr(struct iscsi_cmd_task *ctask, unsigned len)
-{
-	unsigned exp_len = ctask->hdr_len + len;
-
-	if (exp_len >= ctask->hdr_max) {
-		WARN_ON(1);
-		return -EINVAL;
-	}
-
-	WARN_ON(len & (ISCSI_PAD_LEN - 1)); /* caller must pad the AHS */
-	ctask->hdr_len = exp_len;
-	return 0;
-}
-
 /**
  * iscsi_prep_scsi_cmd_pdu - prep iscsi scsi cmd pdu
  * @ctask: iscsi cmd task
@@ -156,19 +129,13 @@ static int iscsi_add_hdr(struct iscsi_cmd_task *ctask, unsigned len)
  * Prep basic iSCSI PDU fields for a scsi cmd pdu. The LLD should set
  * fields like dlength or final based on how much data it sends
  */
-static int iscsi_prep_scsi_cmd_pdu(struct iscsi_cmd_task *ctask)
+static void iscsi_prep_scsi_cmd_pdu(struct iscsi_cmd_task *ctask)
 {
 	struct iscsi_conn *conn = ctask->conn;
 	struct iscsi_session *session = conn->session;
 	struct iscsi_cmd *hdr = ctask->hdr;
 	struct scsi_cmnd *sc = ctask->sc;
-	unsigned hdrlength;
-	int rc;
 
-	ctask->hdr_len = 0;
-	rc = iscsi_add_hdr(ctask, sizeof(*hdr));
-	if (rc)
-		return rc;
         hdr->opcode = ISCSI_OP_SCSI_CMD;
         hdr->flags = ISCSI_ATTR_SIMPLE;
         int_to_scsilun(sc->device->lun, (struct scsi_lun *)hdr->lun);
@@ -232,15 +199,6 @@ static int iscsi_prep_scsi_cmd_pdu(struct iscsi_cmd_task *ctask)
 			hdr->flags |= ISCSI_FLAG_CMD_READ;
 	}
 
-	/* calculate size of additional header segments (AHSs) */
-	hdrlength = ctask->hdr_len - sizeof(*hdr);
-
-	WARN_ON(hdrlength & (ISCSI_PAD_LEN-1));
-	hdrlength /= ISCSI_PAD_LEN;
-
-	WARN_ON(hdrlength >= 256);
-	hdr->hlength = hdrlength & 0xFF;
-
 	conn->scsicmd_pdus_cnt++;
 
         debug_scsi("iscsi prep [%s cid %d sc %p cdb 0x%x itt 0x%x len %d "
@@ -248,7 +206,6 @@ static int iscsi_prep_scsi_cmd_pdu(struct iscsi_cmd_task *ctask)
                 sc->sc_data_direction == DMA_TO_DEVICE ? "write" : "read",
 		conn->id, sc, sc->cmnd[0], ctask->itt, scsi_bufflen(sc),
                 session->cmdsn, session->max_cmdsn - session->exp_cmdsn + 1);
-	return 0;
 }
 
 /**
@@ -337,19 +294,17 @@ invalid_datalen:
 	if (sc->sc_data_direction == DMA_TO_DEVICE)
 		goto out;
 
-	if (rhdr->flags & (ISCSI_FLAG_CMD_UNDERFLOW |
-	                   ISCSI_FLAG_CMD_OVERFLOW)) {
+	if (rhdr->flags & ISCSI_FLAG_CMD_UNDERFLOW) {
 		int res_count = be32_to_cpu(rhdr->residual_count);
 
-		if (res_count > 0 &&
-		    (rhdr->flags & ISCSI_FLAG_CMD_OVERFLOW ||
-		     res_count <= scsi_bufflen(sc)))
+		if (res_count > 0 && res_count <= scsi_bufflen(sc))
 			scsi_set_resid(sc, res_count);
 		else
 			sc->result = (DID_BAD_TARGET << 16) | rhdr->cmd_status;
-	} else if (rhdr->flags & (ISCSI_FLAG_CMD_BIDI_UNDERFLOW |
-	                          ISCSI_FLAG_CMD_BIDI_OVERFLOW))
+	} else if (rhdr->flags & ISCSI_FLAG_CMD_BIDI_UNDERFLOW)
 		sc->result = (DID_BAD_TARGET << 16) | rhdr->cmd_status;
+	else if (rhdr->flags & ISCSI_FLAG_CMD_OVERFLOW)
+		scsi_set_resid(sc, be32_to_cpu(rhdr->residual_count));
 
 out:
 	debug_scsi("done [sc %lx res %d itt 0x%x]\n",
@@ -430,8 +385,8 @@ int __iscsi_complete_pdu(struct iscsi_conn *conn, struct iscsi_hdr *hdr,
 	if (itt < session->cmds_max) {
 		ctask = session->cmds[itt];
 
-		debug_scsi("cmdrsp [%s cid %d itt 0x%x len %d]\n",
-			   iscsi_opname(opcode), conn->id, ctask->itt, datalen);
+		debug_scsi("cmdrsp [op 0x%x cid %d itt 0x%x len %d]\n",
+			   opcode, conn->id, ctask->itt, datalen);
 
 		switch(opcode) {
 		case ISCSI_OP_SCSI_CMD_RSP:
@@ -457,8 +412,8 @@ int __iscsi_complete_pdu(struct iscsi_conn *conn, struct iscsi_hdr *hdr,
 		   itt < ISCSI_MGMT_ITT_OFFSET + session->mgmtpool_max) {
 		mtask = session->mgmt_cmds[itt - ISCSI_MGMT_ITT_OFFSET];
 
-		debug_scsi("immrsp [%s cid %d itt 0x%x len %d]\n",
-			   iscsi_opname(opcode), conn->id, mtask->itt, datalen);
+		debug_scsi("immrsp [op 0x%x cid %d itt 0x%x len %d]\n",
+			   opcode, conn->id, mtask->itt, datalen);
 
 		iscsi_update_cmdsn(session, (struct iscsi_nopin*)hdr);
 		switch(opcode) {
@@ -656,8 +611,8 @@ static void iscsi_prep_mtask(struct iscsi_conn *conn,
 	if (session->tt->init_mgmt_task)
 		session->tt->init_mgmt_task(conn, mtask);
 
-	debug_scsi("mgmtpdu [%s hdr->itt 0x%x datalen %d]\n",
-		   iscsi_opname(hdr->opcode), hdr->itt, mtask->data_count);
+	debug_scsi("mgmtpdu [op 0x%x hdr->itt 0x%x datalen %d]\n",
+		   hdr->opcode, hdr->itt, mtask->data_count);
 }
 
 static int iscsi_xmit_mtask(struct iscsi_conn *conn)
@@ -786,11 +741,7 @@ check_mgmt:
 		case ISCSI_TASK_ABORTING:
 			break;
 		case ISCSI_TASK_PENDING:
-			rc = iscsi_prep_scsi_cmd_pdu(conn->ctask);
-			if (rc) {
-				fail_command(conn, conn->ctask, DID_ABORT << 16);
-				goto again;
-			}
+			iscsi_prep_scsi_cmd_pdu(conn->ctask);
 			conn->session->tt->init_cmd_task(conn->ctask);
 			/* fall through */
 		default:
@@ -830,7 +781,7 @@ static void iscsi_xmitworker(struct work_struct *work)
 	 */
 	do {
 		rc = iscsi_data_xmit(conn);
-	} while (rc >= 0);
+	} while (rc >= 0 || rc == -EAGAIN);
 }
 
 enum {
@@ -981,8 +932,6 @@ __iscsi_conn_send_pdu(struct iscsi_conn *conn, struct iscsi_hdr *hdr,
 	} else
 		mtask->data_count = 0;
 
-	debug_scsi("mtask enq [%s cid %d itt 0x%x]\n",
-			iscsi_opname(hdr->opcode), conn->id, mtask->itt);
 	INIT_LIST_HEAD(&mtask->running);
 	memcpy(mtask->hdr, hdr, sizeof(struct iscsi_hdr));
 	__kfifo_put(conn->mgmtqueue, (void*)&mtask, sizeof(void*));
@@ -1336,64 +1285,59 @@ failed_unlocked:
 }
 EXPORT_SYMBOL_GPL(iscsi_eh_abort);
 
-/*
- * Pre-allocate a pool of @max items of @item_size. By default, the pool
- * should be accessed via kfifo_{get,put} on q->queue.
- * Optionally, the caller can obtain the array of object pointers
- * by passing in a non-NULL @items pointer
- */
 int
-iscsi_pool_init(struct iscsi_pool *q, int max, void ***items, int item_size)
+iscsi_pool_init(struct iscsi_queue *q, int max, void ***items, int item_size)
 {
-	int i, num_arrays = 1;
+	int i;
 
-	memset(q, 0, sizeof(*q));
+	*items = kmalloc(max * sizeof(void*), GFP_KERNEL);
+	if (*items == NULL)
+		return -ENOMEM;
 
 	q->max = max;
-
-	/* If the user passed an items pointer, he wants a copy of
-	 * the array. */
-	if (items)
-		num_arrays++;
-	q->pool = kzalloc(num_arrays * max * sizeof(void*), GFP_KERNEL);
-	if (q->pool == NULL)
-		goto enomem;
+	q->pool = kmalloc(max * sizeof(void*), GFP_KERNEL);
+	if (q->pool == NULL) {
+		kfree(*items);
+		return -ENOMEM;
+	}
 
 	q->queue = kfifo_init((void*)q->pool, max * sizeof(void*),
 			      GFP_KERNEL, NULL);
-	if (q->queue == ERR_PTR(-ENOMEM))
-		goto enomem;
+	if (q->queue == ERR_PTR(-ENOMEM)) {
+		kfree(q->pool);
+		kfree(*items);
+		return -ENOMEM;
+	}
 
 	for (i = 0; i < max; i++) {
-		q->pool[i] = kzalloc(item_size, GFP_KERNEL);
+		q->pool[i] = kmalloc(item_size, GFP_KERNEL);
 		if (q->pool[i] == NULL) {
-			q->max = i;
-			goto enomem;
+			int j;
+
+			for (j = 0; j < i; j++)
+				kfree(q->pool[j]);
+
+			kfifo_free(q->queue);
+			kfree(q->pool);
+			kfree(*items);
+			return -ENOMEM;
 		}
+		memset(q->pool[i], 0, item_size);
+		(*items)[i] = q->pool[i];
 		__kfifo_put(q->queue, (void*)&q->pool[i], sizeof(void*));
 	}
-
-	if (items) {
-		*items = q->pool + max;
-		memcpy(*items, q->pool, max * sizeof(void *));
-	}
-
 	return 0;
-
-enomem:
-	iscsi_pool_free(q);
-	return -ENOMEM;
 }
 EXPORT_SYMBOL_GPL(iscsi_pool_init);
 
-void iscsi_pool_free(struct iscsi_pool *q)
+void iscsi_pool_free(struct iscsi_queue *q, void **items)
 {
 	int i;
 
 	for (i = 0; i < q->max; i++)
-		kfree(q->pool[i]);
-	if (q->pool)
-		kfree(q->pool);
+		kfree(items[i]);
+	kfree(q->pool);
+	kfree(items);
 }
 EXPORT_SYMBOL_GPL(iscsi_pool_free);
 
@@ -1538,9 +1482,9 @@ module_put:
 cls_session_fail:
 	scsi_remove_host(shost);
 add_host_fail:
-	iscsi_pool_free(&session->mgmtpool);
+	iscsi_pool_free(&session->mgmtpool, (void**)session->mgmt_cmds);
 mgmtpool_alloc_fail:
-	iscsi_pool_free(&session->cmdpool);
+	iscsi_pool_free(&session->cmdpool, (void**)session->cmds);
 cmdpool_alloc_fail:
 	scsi_host_put(shost);
 	return NULL;
@@ -1563,8 +1507,8 @@ void iscsi_session_teardown(struct iscsi_cls_session *cls_session)
 	iscsi_unblock_session(cls_session);
 	scsi_remove_host(shost);
 
-	iscsi_pool_free(&session->mgmtpool);
-	iscsi_pool_free(&session->cmdpool);
+	iscsi_pool_free(&session->mgmtpool, (void**)session->mgmt_cmds);
+	iscsi_pool_free(&session->cmdpool, (void**)session->cmds);
 
 	kfree(session->password);
 	kfree(session->password_in);
@@ -2193,57 +2137,6 @@ int iscsi_host_set_param(struct Scsi_Host *shost, enum iscsi_host_param param,
 	return 0;
 }
 EXPORT_SYMBOL_GPL(iscsi_host_set_param);
-
-/*
- * Helper function to print the opcode in a human-readable way
- * Not SMP-safe, but who cares - this is for debugging only.
- */
-static char	*iscsi_opcode_names[64] = {
-[ISCSI_OP_NOOP_OUT]		= "noop_out",
-[ISCSI_OP_SCSI_CMD]		= "cmd",
-[ISCSI_OP_SCSI_TMFUNC]		= "tmfunc",
-[ISCSI_OP_LOGIN]		= "login",
-[ISCSI_OP_TEXT]			= "text",
-[ISCSI_OP_SCSI_DATA_OUT]	= "data_out",
-[ISCSI_OP_LOGOUT]		= "logout",
-[ISCSI_OP_SNACK]		= "snack",
-[ISCSI_OP_VENDOR1_CMD]		= "vendor1_cmd",
-[ISCSI_OP_VENDOR2_CMD]		= "vendor2_cmd",
-[ISCSI_OP_VENDOR3_CMD]		= "vendor3_cmd",
-[ISCSI_OP_VENDOR4_CMD]		= "vendor4_cmd",
-[ISCSI_OP_NOOP_IN]		= "noop_in",
-[ISCSI_OP_SCSI_CMD_RSP]		= "cmd_rsp",
-[ISCSI_OP_SCSI_TMFUNC_RSP]	= "tmfunc_rsp",
-[ISCSI_OP_LOGIN_RSP]		= "login_rsp",
-[ISCSI_OP_TEXT_RSP]		= "text_rsp",
-[ISCSI_OP_SCSI_DATA_IN]		= "data_in",
-[ISCSI_OP_LOGOUT_RSP]		= "logout_rsp",
-[ISCSI_OP_R2T]			= "r2t",
-[ISCSI_OP_ASYNC_EVENT]		= "async_event",
-[ISCSI_OP_REJECT]		= "reject",
-};
-
-const char *iscsi_opname(unsigned int opcode)
-{
-	static char	namebuf[128];
-	char		*retry = "", *immediate = "", *name;
-
-	if (opcode & ISCSI_OP_RETRY)
-		retry = ";retry";
-	if (opcode & ISCSI_OP_IMMEDIATE)
-		immediate = ";immediate";
-	name = iscsi_opcode_names[opcode & ISCSI_OPCODE_MASK];
-	if (name != NULL) {
-		snprintf(namebuf, sizeof(namebuf), "%s%s%s",
-			name, retry, immediate);
-	} else {
-		/* Ugh, unknown opcode? */
-		snprintf(namebuf, sizeof(namebuf), "op 0x%x%s%s",
-			opcode, retry, immediate);
-	}
-	return namebuf;
-}
-EXPORT_SYMBOL_GPL(iscsi_opname);
 
 MODULE_AUTHOR("Mike Christie");
 MODULE_DESCRIPTION("iSCSI library functions");

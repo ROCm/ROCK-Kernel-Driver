@@ -209,6 +209,12 @@ static struct ahd_pci_identity ahd_pci_ident_table [] =
 
 static const u_int ahd_num_pci_devs = ARRAY_SIZE(ahd_pci_ident_table);
 		
+#define	DEVCONFIG		0x40
+#define		PCIXINITPAT	0x0000E000ul
+#define			PCIXINIT_PCI33_66	0x0000E000ul
+#define			PCIXINIT_PCIX50_66	0x0000C000ul
+#define			PCIXINIT_PCIX66_100	0x0000A000ul
+#define			PCIXINIT_PCIX100_133	0x00008000ul
 #define	PCI_BUS_MODES_INDEX(devconfig)	\
 	(((devconfig) & PCIXINITPAT) >> 13)
 static const char *pci_bus_modes[] =
@@ -222,6 +228,24 @@ static const char *pci_bus_modes[] =
 	"PCI-X 50-66Mhz",
 	"PCI 33 or 66Mhz"
 };
+
+#define		TESTMODE	0x00000800ul
+#define		IRDY_RST	0x00000200ul
+#define		FRAME_RST	0x00000100ul
+#define		PCI64BIT	0x00000080ul
+#define		MRDCEN		0x00000040ul
+#define		ENDIANSEL	0x00000020ul
+#define		MIXQWENDIANEN	0x00000008ul
+#define		DACEN		0x00000004ul
+#define		STPWLEVEL	0x00000002ul
+#define		QWENDIANSEL	0x00000001ul
+
+#define	DEVCONFIG1		0x44
+#define		PREQDIS		0x01
+
+#define	CSIZE_LATTIME		0x0c
+#define		CACHESIZE	0x000000fful
+#define		LATTIME		0x0000ff00ul
 
 static int	ahd_check_extport(struct ahd_softc *ahd);
 static void	ahd_configure_termination(struct ahd_softc *ahd,
@@ -363,6 +387,33 @@ ahd_pci_config(struct ahd_softc *ahd, struct ahd_pci_identity *entry)
 	if (!error)
 		ahd->init_level++;
 	return error;
+}
+
+void
+ahd_pci_suspend(struct ahd_softc *ahd)
+{
+	/*
+	 * Save chip register configuration data for chip resets
+	 * that occur during runtime and resume events.
+	 */
+	ahd->suspend_state.pci_state.devconfig =
+	    ahd_pci_read_config(ahd->dev_softc, DEVCONFIG, /*bytes*/4);
+	ahd->suspend_state.pci_state.command =
+	    ahd_pci_read_config(ahd->dev_softc, PCIR_COMMAND, /*bytes*/1);
+	ahd->suspend_state.pci_state.csize_lattime =
+	    ahd_pci_read_config(ahd->dev_softc, CSIZE_LATTIME, /*bytes*/1);
+
+}
+
+void
+ahd_pci_resume(struct ahd_softc *ahd)
+{
+	ahd_pci_write_config(ahd->dev_softc, DEVCONFIG,
+			     ahd->suspend_state.pci_state.devconfig, /*bytes*/4);
+	ahd_pci_write_config(ahd->dev_softc, PCIR_COMMAND,
+			     ahd->suspend_state.pci_state.command, /*bytes*/1);
+	ahd_pci_write_config(ahd->dev_softc, CSIZE_LATTIME,
+			     ahd->suspend_state.pci_state.csize_lattime, /*bytes*/1);
 }
 
 /*

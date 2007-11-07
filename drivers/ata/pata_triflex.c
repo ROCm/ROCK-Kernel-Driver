@@ -198,7 +198,6 @@ static struct scsi_host_template triflex_sht = {
 };
 
 static struct ata_port_operations triflex_port_ops = {
-	.port_disable	= ata_port_disable,
 	.set_piomode	= triflex_set_piomode,
 	.mode_filter	= ata_pci_default_filter,
 
@@ -227,9 +226,8 @@ static struct ata_port_operations triflex_port_ops = {
 	.irq_handler	= ata_interrupt,
 	.irq_clear	= ata_bmdma_irq_clear,
 	.irq_on		= ata_irq_on,
-	.irq_ack	= ata_irq_ack,
 
-	.port_start	= ata_port_start,
+	.port_start	= ata_sff_port_start,
 };
 
 static int triflex_init_one(struct pci_dev *dev, const struct pci_device_id *id)

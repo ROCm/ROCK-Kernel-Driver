@@ -19,7 +19,8 @@ static inline int mediated_filesystem(struct inode *inode)
 
 static inline struct aa_task_context *aa_task_context(struct task_struct *task)
 {
-	return rcu_dereference((struct aa_task_context *)task->security);
+	struct aa_task_context *cxt = task->security;
+	return rcu_dereference(cxt);
 }
 
 /**

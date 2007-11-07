@@ -675,9 +675,6 @@ kdbm_kobject(int argc, const char **argv)
 		kdb_printf("\n");
 	}
 
-	if (k.k_name != ((struct kobject *)addr)->name)
-		kdb_printf(" name '%." __stringify(KOBJ_NAME_LEN) "s'\n", k.k_name);
-
 	kdb_printf(" kref.refcount %d'\n", atomic_read(&k.kref.refcount));
 
 	kdb_printf(" entry.next = 0x%p entry.prev = 0x%p\n",
@@ -785,8 +782,8 @@ kdbm_sc(int argc, const char **argv)
 		goto out;
 
 	kdb_printf("scsi_cmnd at 0x%lx\n", addr);
-	kdb_printf("device = 0x%p  next = 0x%p  done = 0x%p\n",
-		   sc->device, sc->list.next, sc->done);
+	kdb_printf("device = 0x%p  next = 0x%p\n",
+		   sc->device, sc->list.next);
 	kdb_printf("serial_number = %ld  retries = %d\n",
 		   sc->serial_number, sc->retries);
 	kdb_printf("cmd_len = %d\n", sc->cmd_len);
@@ -796,12 +793,10 @@ kdbm_sc(int argc, const char **argv)
 		   sc->cmnd[10], sc->cmnd[11]);
 	kdb_printf("request_buffer = 0x%p  request_bufflen = %d\n",
 		   sc->request_buffer, sc->request_bufflen);
-	kdb_printf("use_sg = %d  sglist_len = %d\n",
-		   sc->use_sg, sc->sglist_len);
+	kdb_printf("use_sg = %d\n", sc->use_sg);
 	kdb_printf("underflow = %d transfersize = %d\n",
 		   sc->underflow, sc->transfersize);
-	kdb_printf("tag = %d pid = %ld\n",
-		   sc->tag, sc->pid);
+	kdb_printf("tag = %d\n", sc->tag);
 
 out:
 	if (sc)

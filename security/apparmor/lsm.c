@@ -78,6 +78,17 @@ unsigned int apparmor_path_max = 2 * PATH_MAX;
 module_param_named(path_max, apparmor_path_max, aauint, S_IRUSR | S_IWUSR);
 MODULE_PARM_DESC(apparmor_path_max, "Maximum pathname length allowed");
 
+#ifdef CONFIG_SECURITY_APPARMOR_DISABLE
+#define AA_ENABLED_PERMS 0600
+#else
+#define AA_ENABLED_PERMS 0400
+#endif
+static int param_set_aa_enabled(const char *val, struct kernel_param *kp);
+unsigned int apparmor_enabled = CONFIG_SECURITY_APPARMOR_BOOTPARAM_VALUE;
+module_param_call(enabled, param_set_aa_enabled, param_get_aauint,
+		  &apparmor_enabled, AA_ENABLED_PERMS);
+MODULE_PARM_DESC(apparmor_enabled, "Enable/Disable Apparmor on boot");
+
 static int param_set_aabool(const char *val, struct kernel_param *kp)
 {
 	if (aa_task_context(current))
@@ -958,7 +969,6 @@ struct security_operations apparmor_ops = {
 	.setprocattr =			apparmor_setprocattr,
 
 	.register_security =            apparmor_register_subsecurity,
-	.unregister_security =          apparmor_unregister_subsecurity,
 
 	.socket_create =		apparmor_socket_create,
 	.socket_post_create =		apparmor_socket_post_create,
@@ -977,13 +987,14 @@ struct security_operations apparmor_ops = {
 	.socket_getpeersec_dgram =	apparmor_socket_getpeersec_dgram,
 };
 
+static int apparmor_initialized;
 static int __init apparmor_init(void)
 {
 	int error;
 
-	if ((error = create_apparmorfs())) {
-		AA_ERROR("Unable to activate AppArmor filesystem\n");
-		goto createfs_out;
+	if (!apparmor_enabled) {
+		printk(KERN_INFO "AppArmor:  Disabled at boot.\n");
+		return 0;
 	}
 
 	if ((error = alloc_null_complain_profile())){
@@ -1002,20 +1013,20 @@ static int __init apparmor_init(void)
 	else
 		info_message("AppArmor initialized", NULL);
 
+	apparmor_initialized = 1;
+
 	return error;
 
 register_security_out:
 	free_null_complain_profile();
 
 alloc_out:
-	destroy_apparmorfs();
-
-createfs_out:
 	return error;
 
 }
+security_initcall(apparmor_init);
 
-static void __exit apparmor_exit(void)
+void apparmor_disable(void)
 {
 	/* Remove and release all the profiles on the profile list. */
 	mutex_lock(&aa_interface_lock);
@@ -1050,14 +1061,36 @@ static void __exit apparmor_exit(void)
 	destroy_apparmorfs();
 	mutex_unlock(&aa_interface_lock);
 
-	if (unregister_security(&apparmor_ops))
-		info_message("Unable to properly unregister AppArmor", NULL);
-
 	info_message("AppArmor protection removed", NULL);
 }
 
-module_init(apparmor_init);
-module_exit(apparmor_exit);
+static int param_set_aa_enabled(const char *val, struct kernel_param *kp)
+{
+	char *endp;
+	unsigned long l;
+
+	if (!apparmor_initialized) {
+		apparmor_enabled = 0;
+		return 0;
+	}
+
+	if (aa_task_context(current))
+		return -EPERM;
+
+	if (!apparmor_enabled)
+		return -EINVAL;
+
+	if (!val)
+		return -EINVAL;
+
+	l = simple_strtoul(val, &endp, 0);
+	if (endp == val || l != 0)
+		return -EINVAL;
+
+	apparmor_enabled = 0;
+	apparmor_disable();
+	return 0;
+}
 
 MODULE_DESCRIPTION("AppArmor process confinement");
 MODULE_AUTHOR("Novell/Immunix, http://bugs.opensuse.org");

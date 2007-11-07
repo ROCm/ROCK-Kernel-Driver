@@ -45,7 +45,7 @@
 #include <scsi/scsi_transport.h>
 #include <linux/libata.h>
 #include <linux/hdreg.h>
-#include <asm/uaccess.h>
+#include <linux/uaccess.h>
 
 #include "libata.h"
 
@@ -53,9 +53,9 @@
 
 typedef unsigned int (*ata_xlat_func_t)(struct ata_queued_cmd *qc);
 
-static struct ata_device * __ata_scsi_find_dev(struct ata_port *ap,
+static struct ata_device *__ata_scsi_find_dev(struct ata_port *ap,
 					const struct scsi_device *scsidev);
-static struct ata_device * ata_scsi_find_dev(struct ata_port *ap,
+static struct ata_device *ata_scsi_find_dev(struct ata_port *ap,
 					    const struct scsi_device *scsidev);
 static int ata_scsi_user_scan(struct Scsi_Host *shost, unsigned int channel,
 			      unsigned int id, unsigned int lun);
@@ -71,11 +71,10 @@ static int ata_scsi_user_scan(struct Scsi_Host *shost, unsigned int channel,
 #define ALL_SUB_MPAGES 0xff
 
 
-static const u8 def_rw_recovery_mpage[] = {
+static const u8 def_rw_recovery_mpage[RW_RECOVERY_MPAGE_LEN] = {
 	RW_RECOVERY_MPAGE,
 	RW_RECOVERY_MPAGE_LEN - 2,
-	(1 << 7) |	/* AWRE, sat-r06 say it shall be 0 */
-	    (1 << 6),	/* ARRE (auto read reallocation) */
+	(1 << 7),	/* AWRE */
 	0,		/* read retry count */
 	0, 0, 0, 0,
 	0,		/* write retry count */
@@ -110,6 +109,74 @@ static struct scsi_transport_template ata_scsi_transport_template = {
 	.user_scan		= ata_scsi_user_scan,
 };
 
+
+static const struct {
+	enum link_pm	value;
+	const char	*name;
+} link_pm_policy[] = {
+	{ NOT_AVAILABLE, "max_performance" },
+	{ MIN_POWER, "min_power" },
+	{ MAX_PERFORMANCE, "max_performance" },
+	{ MEDIUM_POWER, "medium_power" },
+};
+
+static const char *ata_scsi_lpm_get(enum link_pm policy)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(link_pm_policy); i++)
+		if (link_pm_policy[i].value == policy)
+			return link_pm_policy[i].name;
+
+	return NULL;
+}
+
+static ssize_t ata_scsi_lpm_put(struct class_device *class_dev,
+	const char *buf, size_t count)
+{
+	struct Scsi_Host *shost = class_to_shost(class_dev);
+	struct ata_port *ap = ata_shost_to_port(shost);
+	enum link_pm policy = 0;
+	int i;
+
+	/*
+	 * we are skipping array location 0 on purpose - this
+	 * is because a value of NOT_AVAILABLE is displayed
+	 * to the user as max_performance, but when the user
+	 * writes "max_performance", they actually want the
+	 * value to match MAX_PERFORMANCE.
+	 */
+	for (i = 1; i < ARRAY_SIZE(link_pm_policy); i++) {
+		const int len = strlen(link_pm_policy[i].name);
+		if (strncmp(link_pm_policy[i].name, buf, len) == 0 &&
+		   buf[len] == '\n') {
+			policy = link_pm_policy[i].value;
+			break;
+		}
+	}
+	if (!policy)
+		return -EINVAL;
+
+	ata_lpm_schedule(ap, policy);
+	return count;
+}
+
+static ssize_t
+ata_scsi_lpm_show(struct class_device *class_dev, char *buf)
+{
+	struct Scsi_Host *shost = class_to_shost(class_dev);
+	struct ata_port *ap = ata_shost_to_port(shost);
+	const char *policy =
+		ata_scsi_lpm_get(ap->pm_policy);
+
+	if (!policy)
+		return -EINVAL;
+
+	return snprintf(buf, 23, "%s\n", policy);
+}
+CLASS_DEVICE_ATTR(link_power_management_policy, S_IRUGO | S_IWUSR,
+		ata_scsi_lpm_show, ata_scsi_lpm_put);
+EXPORT_SYMBOL_GPL(class_device_attr_link_power_management_policy);
 
 static void ata_scsi_invalid_field(struct scsi_cmnd *cmd,
 				   void (*done)(struct scsi_cmnd *))
@@ -229,7 +296,7 @@ int ata_cmd_ioctl(struct scsi_device *scsidev, void __user *arg)
 
 		scsi_cmd[1]  = (4 << 1); /* PIO Data-in */
 		scsi_cmd[2]  = 0x0e;     /* no off.line or cc, read from dev,
-		                            block count in sector count field */
+					    block count in sector count field */
 		data_dir = DMA_FROM_DEVICE;
 	} else {
 		scsi_cmd[1]  = (3 << 1); /* Non-data */
@@ -253,7 +320,7 @@ int ata_cmd_ioctl(struct scsi_device *scsidev, void __user *arg)
 	/* Good values for timeout and retries?  Values below
 	   from scsi_ioctl_send_command() for default case... */
 	cmd_result = scsi_execute(scsidev, scsi_cmd, data_dir, argbuf, argsize,
-	                          sensebuf, (10*HZ), 5, 0);
+				  sensebuf, (10*HZ), 5, 0);
 
 	if (driver_byte(cmd_result) == DRIVER_SENSE) {/* sense data available */
 		u8 *desc = sensebuf + 8;
@@ -264,18 +331,18 @@ int ata_cmd_ioctl(struct scsi_device *scsidev, void __user *arg)
 		if (cmd_result & SAM_STAT_CHECK_CONDITION) {
 			struct scsi_sense_hdr sshdr;
 			scsi_normalize_sense(sensebuf, SCSI_SENSE_BUFFERSIZE,
-			                      &sshdr);
-			if (sshdr.sense_key==0 &&
-			    sshdr.asc==0 && sshdr.ascq==0)
+					     &sshdr);
+			if (sshdr.sense_key == 0 &&
+			    sshdr.asc == 0 && sshdr.ascq == 0)
 				cmd_result &= ~SAM_STAT_CHECK_CONDITION;
 		}
 
 		/* Send userspace a few ATA registers (same as drivers/ide) */
-		if (sensebuf[0] == 0x72 &&     /* format is "descriptor" */
-		    desc[0] == 0x09 ) {        /* code is "ATA Descriptor" */
-			args[0] = desc[13];    /* status */
-			args[1] = desc[3];     /* error */
-			args[2] = desc[5];     /* sector count (0:7) */
+		if (sensebuf[0] == 0x72 &&	/* format is "descriptor" */
+		    desc[0] == 0x09) {		/* code is "ATA Descriptor" */
+			args[0] = desc[13];	/* status */
+			args[1] = desc[3];	/* error */
+			args[2] = desc[5];	/* sector count (0:7) */
 			if (copy_to_user(arg, args, sizeof(args)))
 				rc = -EFAULT;
 		}
@@ -351,8 +418,8 @@ int ata_task_ioctl(struct scsi_device *scsidev, void __user *arg)
 			struct scsi_sense_hdr sshdr;
 			scsi_normalize_sense(sensebuf, SCSI_SENSE_BUFFERSIZE,
 						&sshdr);
-			if (sshdr.sense_key==0 &&
-				sshdr.asc==0 && sshdr.ascq==0)
+			if (sshdr.sense_key == 0 &&
+				sshdr.asc == 0 && sshdr.ascq == 0)
 				cmd_result &= ~SAM_STAT_CHECK_CONDITION;
 		}
 
@@ -450,13 +517,8 @@ static struct ata_queued_cmd *ata_scsi_qc_new(struct ata_device *dev,
 		qc->scsicmd = cmd;
 		qc->scsidone = done;
 
-		if (cmd->use_sg) {
-			qc->__sg = (struct scatterlist *) cmd->request_buffer;
-			qc->n_elem = cmd->use_sg;
-		} else if (cmd->request_bufflen) {
-			qc->__sg = &qc->sgent;
-			qc->n_elem = 1;
-		}
+		qc->__sg = scsi_sglist(cmd);
+		qc->n_elem = scsi_sg_count(cmd);
 	} else {
 		cmd->result = (DID_OK << 16) | (QUEUE_FULL << 1);
 		done(cmd);
@@ -779,6 +841,9 @@ static void ata_scsi_dev_config(struct scsi_device *sdev,
 		blk_queue_max_hw_segments(q, q->max_hw_segments - 1);
 	}
 
+	if (dev->flags & ATA_DFLAG_AN)
+		set_bit(SDEV_EVT_MEDIA_CHANGE, sdev->supported_events);
+
 	if (dev->flags & ATA_DFLAG_NCQ) {
 		int depth;
 
@@ -806,8 +871,6 @@ int ata_scsi_slave_config(struct scsi_device *sdev)
 	struct ata_device *dev = __ata_scsi_find_dev(ap, sdev);
 
 	ata_scsi_sdev_config(sdev);
-
-	blk_queue_max_phys_segments(sdev->request_queue, LIBATA_MAX_PRD);
 
 	sdev->manage_start_stop = 1;
 
@@ -983,7 +1046,7 @@ static unsigned int ata_scsi_start_stop_xlat(struct ata_queued_cmd *qc)
 		if ((qc->dev->flags & ATA_DFLAG_SPUNDOWN) &&
 		    (system_state == SYSTEM_HALT ||
 		     system_state == SYSTEM_POWER_OFF)) {
-			static unsigned long warned = 0;
+			static unsigned long warned;
 
 			if (!test_and_set_bit(0, &warned)) {
 				ata_dev_printk(qc->dev, KERN_WARNING,
@@ -1047,6 +1110,9 @@ static unsigned int ata_scsi_flush_xlat(struct ata_queued_cmd *qc)
 		tf->command = ATA_CMD_FLUSH_EXT;
 	else
 		tf->command = ATA_CMD_FLUSH;
+
+	/* flush is critical for IO integrity, consider it an IO command */
+	qc->flags |= ATA_QCFLAG_IO;
 
 	return 0;
 }
@@ -1371,29 +1437,7 @@ static void ata_scsi_qc_complete(struct ata_queued_cmd *qc)
 	struct ata_port *ap = qc->ap;
 	struct scsi_cmnd *cmd = qc->scsicmd;
 	u8 *cdb = cmd->cmnd;
- 	int need_sense = (qc->err_mask != 0);
-
-	/* We snoop the SET_FEATURES - Write Cache ON/OFF command, and
-	 * schedule EH_REVALIDATE operation to update the IDENTIFY DEVICE
-	 * cache
-	 */
-	if (ap->ops->error_handler && !need_sense) {
-		switch (qc->tf.command) {
-		case ATA_CMD_SET_FEATURES:
-			if ((qc->tf.feature == SETFEATURES_WC_ON) ||
-			    (qc->tf.feature == SETFEATURES_WC_OFF)) {
-				ap->link.eh_info.action |= ATA_EH_REVALIDATE;
-				ata_port_schedule_eh(ap);
-			}
-			break;
-
-		case ATA_CMD_INIT_DEV_PARAMS: /* CHS translation changed */
-		case ATA_CMD_SET_MULTI: /* multi_count changed */
-			ap->link.eh_info.action |= ATA_EH_REVALIDATE;
-			ata_port_schedule_eh(ap);
-			break;
-		}
-	}
+	int need_sense = (qc->err_mask != 0);
 
 	/* For ATA pass thru (SAT) commands, generate a sense block if
 	 * user mandated it or if there's an error.  Note that if we
@@ -1403,7 +1447,7 @@ static void ata_scsi_qc_complete(struct ata_queued_cmd *qc)
 	 * was no error, SK, ASC and ASCQ will all be zero.
 	 */
 	if (((cdb[0] == ATA_16) || (cdb[0] == ATA_12)) &&
- 	    ((cdb[2] & 0x20) || need_sense)) {
+	    ((cdb[2] & 0x20) || need_sense)) {
 		ata_gen_passthru_sense(qc);
 	} else {
 		if (!need_sense) {
@@ -1479,17 +1523,13 @@ static int ata_scsi_translate(struct ata_device *dev, struct scsi_cmnd *cmd,
 	/* data is present; dma-map it */
 	if (cmd->sc_data_direction == DMA_FROM_DEVICE ||
 	    cmd->sc_data_direction == DMA_TO_DEVICE) {
-		if (unlikely(cmd->request_bufflen < 1)) {
+		if (unlikely(scsi_bufflen(cmd) < 1)) {
 			ata_dev_printk(dev, KERN_WARNING,
 				       "WARNING: zero len r/w req\n");
 			goto err_did;
 		}
 
-		if (cmd->use_sg)
-			ata_sg_init(qc, cmd->request_buffer, cmd->use_sg);
-		else
-			ata_sg_init_one(qc, cmd->request_buffer,
-					cmd->request_bufflen);
+		ata_sg_init(qc, scsi_sglist(cmd), scsi_sg_count(cmd));
 
 		qc->dma_dir = cmd->sc_data_direction;
 	}
@@ -1511,7 +1551,7 @@ static int ata_scsi_translate(struct ata_device *dev, struct scsi_cmnd *cmd,
 	return 0;
 
 early_finish:
-        ata_qc_free(qc);
+	ata_qc_free(qc);
 	qc->scsidone(cmd);
 	DPRINTK("EXIT - early finish (good or error)\n");
 	return 0;
@@ -1552,15 +1592,14 @@ static unsigned int ata_scsi_rbuf_get(struct scsi_cmnd *cmd, u8 **buf_out)
 	u8 *buf;
 	unsigned int buflen;
 
-	if (cmd->use_sg) {
-		struct scatterlist *sg;
+	struct scatterlist *sg = scsi_sglist(cmd);
 
-		sg = (struct scatterlist *) cmd->request_buffer;
-		buf = kmap_atomic(sg->page, KM_IRQ0) + sg->offset;
+	if (sg) {
+		buf = kmap_atomic(sg_page(sg), KM_IRQ0) + sg->offset;
 		buflen = sg->length;
 	} else {
-		buf = cmd->request_buffer;
-		buflen = cmd->request_bufflen;
+		buf = NULL;
+		buflen = 0;
 	}
 
 	*buf_out = buf;
@@ -1580,12 +1619,9 @@ static unsigned int ata_scsi_rbuf_get(struct scsi_cmnd *cmd, u8 **buf_out)
 
 static inline void ata_scsi_rbuf_put(struct scsi_cmnd *cmd, u8 *buf)
 {
-	if (cmd->use_sg) {
-		struct scatterlist *sg;
-
-		sg = (struct scatterlist *) cmd->request_buffer;
+	struct scatterlist *sg = scsi_sglist(cmd);
+	if (sg)
 		kunmap_atomic(buf - sg->offset, KM_IRQ0);
-	}
 }
 
 /**
@@ -1605,8 +1641,8 @@ static inline void ata_scsi_rbuf_put(struct scsi_cmnd *cmd, u8 *buf)
  */
 
 void ata_scsi_rbuf_fill(struct ata_scsi_args *args,
-		        unsigned int (*actor) (struct ata_scsi_args *args,
-			     		   u8 *rbuf, unsigned int buflen))
+			unsigned int (*actor) (struct ata_scsi_args *args,
+					       u8 *rbuf, unsigned int buflen))
 {
 	u8 *rbuf;
 	unsigned int buflen, rc;
@@ -1803,6 +1839,62 @@ unsigned int ata_scsiop_inq_83(struct ata_scsi_args *args, u8 *rbuf,
 		num += ATA_ID_SERNO_LEN;
 	}
 	rbuf[3] = num - 4;    /* page len (assume less than 256 bytes) */
+	return 0;
+}
+
+/**
+ *	ata_scsiop_inq_89 - Simulate INQUIRY VPD page 89, ATA info
+ *	@args: device IDENTIFY data / SCSI command of interest.
+ *	@rbuf: Response buffer, to which simulated SCSI cmd output is sent.
+ *	@buflen: Response buffer length.
+ *
+ *	Yields SAT-specified ATA VPD page.
+ *
+ *	LOCKING:
+ *	spin_lock_irqsave(host lock)
+ */
+
+unsigned int ata_scsiop_inq_89(struct ata_scsi_args *args, u8 *rbuf,
+			      unsigned int buflen)
+{
+	u8 pbuf[60];
+	struct ata_taskfile tf;
+	unsigned int i;
+
+	if (!buflen)
+		return 0;
+
+	memset(&pbuf, 0, sizeof(pbuf));
+	memset(&tf, 0, sizeof(tf));
+
+	pbuf[1] = 0x89;			/* our page code */
+	pbuf[2] = (0x238 >> 8);		/* page size fixed at 238h */
+	pbuf[3] = (0x238 & 0xff);
+
+	memcpy(&pbuf[8], "linux   ", 8);
+	memcpy(&pbuf[16], "libata          ", 16);
+	memcpy(&pbuf[32], DRV_VERSION, 4);
+	ata_id_string(args->id, &pbuf[32], ATA_ID_FW_REV, 4);
+
+	/* we don't store the ATA device signature, so we fake it */
+
+	tf.command = ATA_DRDY;		/* really, this is Status reg */
+	tf.lbal = 0x1;
+	tf.nsect = 0x1;
+
+	ata_tf_to_fis(&tf, 0, 1, &pbuf[36]);	/* TODO: PMP? */
+	pbuf[36] = 0x34;		/* force D2H Reg FIS (34h) */
+
+	pbuf[56] = ATA_CMD_ID_ATA;
+
+	i = min(buflen, 60U);
+	memcpy(rbuf, &pbuf[0], i);
+	buflen -= i;
+
+	if (!buflen)
+		return 0;
+
+	memcpy(&rbuf[60], &args->id[0], min(buflen, 512U));
 	return 0;
 }
 
@@ -2099,7 +2191,7 @@ saving_not_supp:
  *	None.
  */
 unsigned int ata_scsiop_read_cap(struct ata_scsi_args *args, u8 *rbuf,
-			        unsigned int buflen)
+				 unsigned int buflen)
 {
 	u64 last_lba = args->dev->n_sectors - 1; /* LBA of the last block */
 
@@ -2263,8 +2355,8 @@ static void atapi_request_sense(struct ata_queued_cmd *qc)
 		qc->tf.feature |= ATAPI_PKT_DMA;
 	} else {
 		qc->tf.protocol = ATA_PROT_ATAPI;
-		qc->tf.lbam = (8 * 1024) & 0xff;
-		qc->tf.lbah = (8 * 1024) >> 8;
+		qc->tf.lbam = SCSI_SENSE_BUFFERSIZE;
+		qc->tf.lbah = 0;
 	}
 	qc->nbytes = SCSI_SENSE_BUFFERSIZE;
 
@@ -2373,6 +2465,7 @@ static unsigned int atapi_xlat(struct ata_queued_cmd *qc)
 	struct ata_device *dev = qc->dev;
 	int using_pio = (dev->flags & ATA_DFLAG_PIO);
 	int nodata = (scmd->sc_data_direction == DMA_NONE);
+	unsigned int nbytes;
 
 	memset(qc->cdb, 0, dev->cdb_len);
 	memcpy(qc->cdb, scmd->cmnd, scmd->cmd_len);
@@ -2386,11 +2479,19 @@ static unsigned int atapi_xlat(struct ata_queued_cmd *qc)
 	}
 
 	qc->tf.command = ATA_CMD_PACKET;
-	qc->nbytes = scmd->request_bufflen;
+	qc->nbytes = scsi_bufflen(scmd);
 
 	/* check whether ATAPI DMA is safe */
 	if (!using_pio && ata_check_atapi_dma(qc))
 		using_pio = 1;
+
+	/* Some controller variants snoop this value for Packet transfers
+	   to do state machine and FIFO management. Thus we want to set it
+	   properly, and for DMA where it is effectively meaningless */
+	nbytes = min(qc->nbytes, (unsigned int)63 * 1024);
+
+	qc->tf.lbam = (nbytes & 0xFF);
+	qc->tf.lbah = (nbytes >> 8);
 
 	if (using_pio || nodata) {
 		/* no data, or PIO data xfer */
@@ -2398,8 +2499,6 @@ static unsigned int atapi_xlat(struct ata_queued_cmd *qc)
 			qc->tf.protocol = ATA_PROT_ATAPI_NODATA;
 		else
 			qc->tf.protocol = ATA_PROT_ATAPI;
-		qc->tf.lbam = (8 * 1024) & 0xff;
-		qc->tf.lbah = (8 * 1024) >> 8;
 	} else {
 		/* DMA data xfer */
 		qc->tf.protocol = ATA_PROT_ATAPI_DMA;
@@ -2410,10 +2509,13 @@ static unsigned int atapi_xlat(struct ata_queued_cmd *qc)
 			qc->tf.feature |= ATAPI_DMADIR;
 	}
 
+
+	/* FIXME: We need to translate 0x05 READ_BLOCK_LIMITS to a MODE_SENSE
+	   as ATAPI tape drives don't get this right otherwise */
 	return 0;
 }
 
-static struct ata_device * ata_find_dev(struct ata_port *ap, int devno)
+static struct ata_device *ata_find_dev(struct ata_port *ap, int devno)
 {
 	if (ap->nr_pmp_links == 0) {
 		if (likely(devno < ata_link_max_devices(&ap->link)))
@@ -2426,8 +2528,8 @@ static struct ata_device * ata_find_dev(struct ata_port *ap, int devno)
 	return NULL;
 }
 
-static struct ata_device * __ata_scsi_find_dev(struct ata_port *ap,
-					const struct scsi_device *scsidev)
+static struct ata_device *__ata_scsi_find_dev(struct ata_port *ap,
+					      const struct scsi_device *scsidev)
 {
 	int devno;
 
@@ -2513,27 +2615,27 @@ static u8
 ata_scsi_map_proto(u8 byte1)
 {
 	switch((byte1 & 0x1e) >> 1) {
-		case 3:		/* Non-data */
-			return ATA_PROT_NODATA;
+	case 3:		/* Non-data */
+		return ATA_PROT_NODATA;
 
-		case 6:		/* DMA */
-		case 10:	/* UDMA Data-in */
-		case 11:	/* UDMA Data-Out */
-			return ATA_PROT_DMA;
+	case 6:		/* DMA */
+	case 10:	/* UDMA Data-in */
+	case 11:	/* UDMA Data-Out */
+		return ATA_PROT_DMA;
 
-		case 4:		/* PIO Data-in */
-		case 5:		/* PIO Data-out */
-			return ATA_PROT_PIO;
+	case 4:		/* PIO Data-in */
+	case 5:		/* PIO Data-out */
+		return ATA_PROT_PIO;
 
-		case 0:		/* Hard Reset */
-		case 1:		/* SRST */
-		case 8:		/* Device Diagnostic */
-		case 9:		/* Device Reset */
-		case 7:		/* DMA Queued */
-		case 12:	/* FPDMA */
-		case 15:	/* Return Response Info */
-		default:	/* Reserved */
-			break;
+	case 0:		/* Hard Reset */
+	case 1:		/* SRST */
+	case 8:		/* Device Diagnostic */
+	case 9:		/* Device Reset */
+	case 7:		/* DMA Queued */
+	case 12:	/* FPDMA */
+	case 15:	/* Return Response Info */
+	default:	/* Reserved */
+		break;
 	}
 
 	return ATA_PROT_UNKNOWN;
@@ -2636,7 +2738,7 @@ static unsigned int ata_scsi_pass_thru(struct ata_queued_cmd *qc)
 	case ATA_CMD_WRITE_LONG_ONCE:
 		if (tf->protocol != ATA_PROT_PIO || tf->nsect != 1)
 			goto invalid_fld;
-		qc->sect_size = scmd->request_bufflen;
+		qc->sect_size = scsi_bufflen(scmd);
 	}
 
 	/*
@@ -2666,10 +2768,10 @@ static unsigned int ata_scsi_pass_thru(struct ata_queued_cmd *qc)
 	 * TODO: find out if we need to do more here to
 	 *       cover scatter/gather case.
 	 */
-	qc->nbytes = scmd->request_bufflen;
+	qc->nbytes = scsi_bufflen(scmd);
 
-	/* request result TF */
-	qc->flags |= ATA_QCFLAG_RESULT_TF;
+	/* request result TF and be quiet about device error */
+	qc->flags |= ATA_QCFLAG_RESULT_TF | ATA_QCFLAG_QUIET;
 
 	return 0;
 
@@ -2860,6 +2962,7 @@ void ata_scsi_simulate(struct ata_device *dev, struct scsi_cmnd *cmd,
 {
 	struct ata_scsi_args args;
 	const u8 *scsicmd = cmd->cmnd;
+	u8 tmp8;
 
 	args.dev = dev;
 	args.id = dev->id;
@@ -2867,66 +2970,94 @@ void ata_scsi_simulate(struct ata_device *dev, struct scsi_cmnd *cmd,
 	args.done = done;
 
 	switch(scsicmd[0]) {
-		/* no-op's, complete with success */
-		case SYNCHRONIZE_CACHE:
-		case REZERO_UNIT:
-		case SEEK_6:
-		case SEEK_10:
-		case TEST_UNIT_READY:
-		case FORMAT_UNIT:		/* FIXME: correct? */
-		case SEND_DIAGNOSTIC:		/* FIXME: correct? */
-			ata_scsi_rbuf_fill(&args, ata_scsiop_noop);
-			break;
+	/* TODO: worth improving? */
+	case FORMAT_UNIT:
+		ata_scsi_invalid_field(cmd, done);
+		break;
 
-		case INQUIRY:
-			if (scsicmd[1] & 2)	           /* is CmdDt set?  */
-				ata_scsi_invalid_field(cmd, done);
-			else if ((scsicmd[1] & 1) == 0)    /* is EVPD clear? */
-				ata_scsi_rbuf_fill(&args, ata_scsiop_inq_std);
-			else if (scsicmd[2] == 0x00)
-				ata_scsi_rbuf_fill(&args, ata_scsiop_inq_00);
-			else if (scsicmd[2] == 0x80)
-				ata_scsi_rbuf_fill(&args, ata_scsiop_inq_80);
-			else if (scsicmd[2] == 0x83)
-				ata_scsi_rbuf_fill(&args, ata_scsiop_inq_83);
-			else
-				ata_scsi_invalid_field(cmd, done);
+	case INQUIRY:
+		if (scsicmd[1] & 2)	           /* is CmdDt set?  */
+			ata_scsi_invalid_field(cmd, done);
+		else if ((scsicmd[1] & 1) == 0)    /* is EVPD clear? */
+			ata_scsi_rbuf_fill(&args, ata_scsiop_inq_std);
+		else switch (scsicmd[2]) {
+		case 0x00:
+			ata_scsi_rbuf_fill(&args, ata_scsiop_inq_00);
 			break;
-
-		case MODE_SENSE:
-		case MODE_SENSE_10:
-			ata_scsi_rbuf_fill(&args, ata_scsiop_mode_sense);
+		case 0x80:
+			ata_scsi_rbuf_fill(&args, ata_scsiop_inq_80);
 			break;
-
-		case MODE_SELECT:	/* unconditionally return */
-		case MODE_SELECT_10:	/* bad-field-in-cdb */
+		case 0x83:
+			ata_scsi_rbuf_fill(&args, ata_scsiop_inq_83);
+			break;
+		case 0x89:
+			ata_scsi_rbuf_fill(&args, ata_scsiop_inq_89);
+			break;
+		default:
 			ata_scsi_invalid_field(cmd, done);
 			break;
+		}
+		break;
 
-		case READ_CAPACITY:
+	case MODE_SENSE:
+	case MODE_SENSE_10:
+		ata_scsi_rbuf_fill(&args, ata_scsiop_mode_sense);
+		break;
+
+	case MODE_SELECT:	/* unconditionally return */
+	case MODE_SELECT_10:	/* bad-field-in-cdb */
+		ata_scsi_invalid_field(cmd, done);
+		break;
+
+	case READ_CAPACITY:
+		ata_scsi_rbuf_fill(&args, ata_scsiop_read_cap);
+		break;
+
+	case SERVICE_ACTION_IN:
+		if ((scsicmd[1] & 0x1f) == SAI_READ_CAPACITY_16)
 			ata_scsi_rbuf_fill(&args, ata_scsiop_read_cap);
-			break;
+		else
+			ata_scsi_invalid_field(cmd, done);
+		break;
 
-		case SERVICE_ACTION_IN:
-			if ((scsicmd[1] & 0x1f) == SAI_READ_CAPACITY_16)
-				ata_scsi_rbuf_fill(&args, ata_scsiop_read_cap);
-			else
-				ata_scsi_invalid_field(cmd, done);
-			break;
+	case REPORT_LUNS:
+		ata_scsi_rbuf_fill(&args, ata_scsiop_report_luns);
+		break;
 
-		case REPORT_LUNS:
-			ata_scsi_rbuf_fill(&args, ata_scsiop_report_luns);
-			break;
+	case REQUEST_SENSE:
+		ata_scsi_set_sense(cmd, 0, 0, 0);
+		cmd->result = (DRIVER_SENSE << 24);
+		done(cmd);
+		break;
 
-		/* mandatory commands we haven't implemented yet */
-		case REQUEST_SENSE:
+	/* if we reach this, then writeback caching is disabled,
+	 * turning this into a no-op.
+	 */
+	case SYNCHRONIZE_CACHE:
+		/* fall through */
 
-		/* all other commands */
-		default:
-			ata_scsi_set_sense(cmd, ILLEGAL_REQUEST, 0x20, 0x0);
-			/* "Invalid command operation code" */
-			done(cmd);
-			break;
+	/* no-op's, complete with success */
+	case REZERO_UNIT:
+	case SEEK_6:
+	case SEEK_10:
+	case TEST_UNIT_READY:
+		ata_scsi_rbuf_fill(&args, ata_scsiop_noop);
+		break;
+
+	case SEND_DIAGNOSTIC:
+		tmp8 = scsicmd[1] & ~(1 << 3);
+		if ((tmp8 == 0x4) && (!scsicmd[3]) && (!scsicmd[4]))
+			ata_scsi_rbuf_fill(&args, ata_scsiop_noop);
+		else
+			ata_scsi_invalid_field(cmd, done);
+		break;
+
+	/* all other commands */
+	default:
+		ata_scsi_set_sense(cmd, ILLEGAL_REQUEST, 0x20, 0x0);
+		/* "Invalid command operation code" */
+		done(cmd);
+		break;
 	}
 }
 
@@ -3154,6 +3285,23 @@ static void ata_scsi_handle_link_detach(struct ata_link *link)
 
 		ata_scsi_remove_dev(dev);
 	}
+}
+
+/**
+ *	ata_scsi_media_change_notify - send media change event
+ *	@dev: Pointer to the disk device with media change event
+ *
+ *	Tell the block layer to send a media change notification
+ *	event.
+ *
+ * 	LOCKING:
+ * 	spin_lock_irqsave(host lock)
+ */
+void ata_scsi_media_change_notify(struct ata_device *dev)
+{
+	if (dev->sdev)
+		sdev_evt_send_simple(dev->sdev, SDEV_EVT_MEDIA_CHANGE,
+				     GFP_ATOMIC);
 }
 
 /**

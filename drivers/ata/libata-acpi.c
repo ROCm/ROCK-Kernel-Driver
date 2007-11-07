@@ -14,6 +14,7 @@
 #include <linux/acpi.h>
 #include <linux/libata.h>
 #include <linux/pci.h>
+#include <scsi/scsi_device.h>
 #include "libata.h"
 
 #include <acpi/acpi_bus.h>
@@ -25,7 +26,7 @@
 #include <acpi/actypes.h>
 
 #define NO_PORT_MULT		0xffff
-#define SATA_ADR(root,pmp)	(((root) << 16) | (pmp))
+#define SATA_ADR(root, pmp)	(((root) << 16) | (pmp))
 
 #define REGS_PER_GTF		7
 struct ata_acpi_gtf {
@@ -95,6 +96,47 @@ static void ata_acpi_associate_ide_port(struct ata_port *ap)
 	}
 }
 
+static void ata_acpi_handle_hotplug(struct ata_port *ap, struct kobject *kobj,
+				    u32 event)
+{
+	char event_string[12];
+	char *envp[] = { event_string, NULL };
+	struct ata_eh_info *ehi = &ap->link.eh_info;
+
+	if (event == 0 || event == 1) {
+	       unsigned long flags;
+	       spin_lock_irqsave(ap->lock, flags);
+	       ata_ehi_clear_desc(ehi);
+	       ata_ehi_push_desc(ehi, "ACPI event");
+	       ata_ehi_hotplugged(ehi);
+	       ata_port_freeze(ap);
+	       spin_unlock_irqrestore(ap->lock, flags);
+	}
+
+	if (kobj) {
+		sprintf(event_string, "BAY_EVENT=%d", event);
+		kobject_uevent_env(kobj, KOBJ_CHANGE, envp);
+	}
+}
+
+static void ata_acpi_dev_notify(acpi_handle handle, u32 event, void *data)
+{
+	struct ata_device *dev = data;
+	struct kobject *kobj = NULL;
+
+	if (dev->sdev)
+		kobj = &dev->sdev->sdev_gendev.kobj;
+
+	ata_acpi_handle_hotplug(dev->link->ap, kobj, event);
+}
+
+static void ata_acpi_ap_notify(acpi_handle handle, u32 event, void *data)
+{
+	struct ata_port *ap = data;
+
+	ata_acpi_handle_hotplug(ap, &ap->dev->kobj, event);
+}
+
 /**
  * ata_acpi_associate - associate ATA host with ACPI objects
  * @host: target ATA host
@@ -110,7 +152,7 @@ static void ata_acpi_associate_ide_port(struct ata_port *ap)
  */
 void ata_acpi_associate(struct ata_host *host)
 {
-	int i;
+	int i, j;
 
 	if (!is_pci_dev(host->dev) || libata_noacpi)
 		return;
@@ -126,6 +168,22 @@ void ata_acpi_associate(struct ata_host *host)
 			ata_acpi_associate_sata_port(ap);
 		else
 			ata_acpi_associate_ide_port(ap);
+
+		if (ap->acpi_handle)
+			acpi_install_notify_handler (ap->acpi_handle,
+						     ACPI_SYSTEM_NOTIFY,
+						     ata_acpi_ap_notify,
+						     ap);
+
+		for (j = 0; j < ata_link_max_devices(&ap->link); j++) {
+			struct ata_device *dev = &ap->link.device[j];
+
+			if (dev->acpi_handle)
+				acpi_install_notify_handler (dev->acpi_handle,
+							     ACPI_SYSTEM_NOTIFY,
+							     ata_acpi_dev_notify,
+							     dev);
+		}
 	}
 }
 
@@ -142,7 +200,7 @@ void ata_acpi_associate(struct ata_host *host)
  * RETURNS:
  * 0 on success, -ENOENT if _GTM doesn't exist, -errno on failure.
  */
-static int ata_acpi_gtm(const struct ata_port *ap, struct ata_acpi_gtm *gtm)
+int ata_acpi_gtm(const struct ata_port *ap, struct ata_acpi_gtm *gtm)
 {
 	struct acpi_buffer output = { .length = ACPI_ALLOCATE_BUFFER };
 	union acpi_object *out_obj;
@@ -186,6 +244,8 @@ static int ata_acpi_gtm(const struct ata_port *ap, struct ata_acpi_gtm *gtm)
 	return rc;
 }
 
+EXPORT_SYMBOL_GPL(ata_acpi_gtm);
+
 /**
  * ata_acpi_stm - execute _STM
  * @ap: target ATA port
@@ -199,7 +259,7 @@ static int ata_acpi_gtm(const struct ata_port *ap, struct ata_acpi_gtm *gtm)
  * RETURNS:
  * 0 on success, -ENOENT if _STM doesn't exist, -errno on failure.
  */
-static int ata_acpi_stm(const struct ata_port *ap, struct ata_acpi_gtm *stm)
+int ata_acpi_stm(const struct ata_port *ap, struct ata_acpi_gtm *stm)
 {
 	acpi_status status;
 	struct acpi_object_list         input;
@@ -230,6 +290,8 @@ static int ata_acpi_stm(const struct ata_port *ap, struct ata_acpi_gtm *stm)
 	}
 	return 0;
 }
+
+EXPORT_SYMBOL_GPL(ata_acpi_stm);
 
 /**
  * ata_dev_get_GTF - get the drive bootup default taskfile settings
@@ -325,6 +387,44 @@ static int ata_dev_get_GTF(struct ata_device *dev, struct ata_acpi_gtf **gtf,
 }
 
 /**
+ * ata_acpi_cbl_80wire		-	Check for 80 wire cable
+ * @ap: Port to check
+ *
+ * Return 1 if the ACPI mode data for this port indicates the BIOS selected
+ * an 80wire mode.
+ */
+
+int ata_acpi_cbl_80wire(struct ata_port *ap)
+{
+	struct ata_acpi_gtm gtm;
+	int valid = 0;
+
+	/* No _GTM data, no information */
+	if (ata_acpi_gtm(ap, &gtm) < 0)
+		return 0;
+
+	/* Split timing, DMA enabled */
+	if ((gtm.flags & 0x11) == 0x11 && gtm.drive[0].dma < 55)
+		valid |= 1;
+	if ((gtm.flags & 0x14) == 0x14 && gtm.drive[1].dma < 55)
+		valid |= 2;
+	/* Shared timing, DMA enabled */
+	if ((gtm.flags & 0x11) == 0x01 && gtm.drive[0].dma < 55)
+		valid |= 1;
+	if ((gtm.flags & 0x14) == 0x04 && gtm.drive[0].dma < 55)
+		valid |= 2;
+
+	/* Drive check */
+	if ((valid & 1) && ata_dev_enabled(&ap->link.device[0]))
+		return 1;
+	if ((valid & 2) && ata_dev_enabled(&ap->link.device[1]))
+		return 1;
+	return 0;
+}
+
+EXPORT_SYMBOL_GPL(ata_acpi_cbl_80wire);
+
+/**
  * taskfile_load_raw - send taskfile registers to host controller
  * @dev: target ATA device
  * @gtf: raw ATA taskfile register set (0x1f1 - 0x1f7)
@@ -378,7 +478,7 @@ static int taskfile_load_raw(struct ata_device *dev,
 			       tf.lbal, tf.lbam, tf.lbah, tf.device);
 
 	rtf = tf;
-	err_mask = ata_exec_internal(dev, &rtf, NULL, DMA_NONE, NULL, 0);
+	err_mask = ata_exec_internal(dev, &rtf, NULL, DMA_NONE, NULL, 0, 0);
 	if (err_mask) {
 		ata_dev_printk(dev, KERN_ERR,
 			"ACPI cmd %02x/%02x:%02x:%02x:%02x:%02x:%02x failed "

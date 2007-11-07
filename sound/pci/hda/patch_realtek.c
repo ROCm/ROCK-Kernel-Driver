@@ -180,7 +180,7 @@ enum {
 	ALC883_LENOVO_101E_2ch,
 	ALC883_LENOVO_NB0763,
 	ALC888_LENOVO_MS7195_DIG,
-	ALC883_HAIER_W66,
+	ALC883_HAIER_W66,		
 	ALC888_6ST_HP,
 	ALC888_3ST_HP,
 	ALC883_AUTO,
@@ -718,7 +718,7 @@ static void alc_subsystem_id(struct hda_codec *codec,
 	if ((ass != codec->bus->pci->subsystem_device) && (ass & 1))
 		goto do_sku;
 
-	/*
+	/*	
 	 * 31~30	: port conetcivity
 	 * 29~21	: reserve
 	 * 20		: PCBEEP input
@@ -776,7 +776,7 @@ do_sku:
 		case 0x10ec0268:
 		case 0x10ec0269:
 		case 0x10ec0862:
-		case 0x10ec0662:
+		case 0x10ec0662:	
 			snd_hda_codec_write(codec, 0x14, 0,
 					    AC_VERB_SET_EAPD_BTLENABLE, 2);
 			snd_hda_codec_write(codec, 0x15, 0,
@@ -806,7 +806,7 @@ do_sku:
 			tmp = snd_hda_codec_read(codec, 0x20, 0,
 						 AC_VERB_GET_PROC_COEF, 0);
 			snd_hda_codec_write(codec, 0x20, 0,
-					    AC_VERB_SET_COEF_INDEX, 7);
+					    AC_VERB_SET_COEF_INDEX, 7);	
 			snd_hda_codec_write(codec, 0x20, 0,
 					    AC_VERB_SET_PROC_COEF,
 					    tmp | 0x2010);
@@ -818,7 +818,7 @@ do_sku:
 			tmp = snd_hda_codec_read(codec, 0x20, 0,
 						 AC_VERB_GET_PROC_COEF, 0);
 			snd_hda_codec_write(codec, 0x20, 0,
-					    AC_VERB_SET_COEF_INDEX, 7);
+					    AC_VERB_SET_COEF_INDEX, 7);	
 			snd_hda_codec_write(codec, 0x20, 0,
 					    AC_VERB_SET_PROC_COEF,
 					    tmp | 0x3000);
@@ -827,7 +827,7 @@ do_sku:
 	default:
 		break;
 	}
-
+	
 	/* is laptop and enable the function "Mute internal speaker
 	 * when the external headphone out jack is plugged"
 	 */
@@ -864,7 +864,7 @@ do_sku:
 			    AC_VERB_SET_UNSOLICITED_ENABLE,
 			    AC_USRSP_EN | ALC880_HP_EVENT);
 	spec->unsol_event = alc_sku_unsol_event;
-	spec->init_hook = alc_sku_automute;
+	spec->init_hook = alc_sku_automute;	
 }
 
 /*
@@ -5544,7 +5544,7 @@ static struct hda_verb alc882_asus_a7m_verbs[] = {
 	{0x15, AC_VERB_SET_PIN_WIDGET_CONTROL, PIN_HP},
 	{0x14, AC_VERB_SET_PIN_WIDGET_CONTROL, PIN_OUT},
 	{0x16, AC_VERB_SET_PIN_WIDGET_CONTROL, PIN_OUT},
-
+        
 	{0x14, AC_VERB_SET_CONNECT_SEL, 0x00}, /* Front */
 	{0x15, AC_VERB_SET_CONNECT_SEL, 0x00}, /* HP */
 	{0x16, AC_VERB_SET_CONNECT_SEL, 0x00}, /* Front */
@@ -5882,7 +5882,7 @@ static struct alc_config_preset alc882_presets[] = {
 		.channel_mode = alc880_threestack_modes,
 		.need_dac_fix = 1,
 		.input_mux = &alc882_capture_source,
-	},
+	},	
 };
 
 
@@ -7004,7 +7004,7 @@ static void alc883_lenovo_101e_unsol_event(struct hda_codec *codec,
 static void alc883_acer_aspire_automute(struct hda_codec *codec)
 {
  	unsigned int present;
-
+ 
  	present = snd_hda_codec_read(codec, 0x14, 0,
 				     AC_VERB_GET_PIN_SENSE, 0) & 0x80000000;
 	snd_hda_codec_amp_stereo(codec, 0x15, HDA_OUTPUT, 0,
@@ -9299,7 +9299,6 @@ static struct alc_config_preset alc268_presets[] = {
 		.num_channel_mode = ARRAY_SIZE(alc268_modes),
 		.channel_mode = alc268_modes,
 		.input_mux = &alc268_capture_source,
-		.input_mux = &alc268_capture_source,
 		.unsol_event = alc268_toshiba_unsol_event,
 		.init_hook = alc268_toshiba_automute,
 	},
@@ -10828,7 +10827,7 @@ static struct snd_kcontrol_new alc861vd_hp_mixer[] = {
 	HDA_CODEC_MUTE("Front Mic Playback Switch", 0x0b, 0x0, HDA_INPUT),
 	HDA_CODEC_VOLUME("ATAPI Mic Playback Volume", 0x0b, 0x1, HDA_INPUT),
 	HDA_CODEC_MUTE("ATAPI Mic Playback Switch", 0x0b, 0x1, HDA_INPUT),
-
+	
 	{ } /* end */
 };
 
@@ -11221,7 +11220,7 @@ static struct alc_config_preset alc861vd_presets[] = {
 		.input_mux = &alc861vd_hp_capture_source,
 		.unsol_event = alc861vd_dallas_unsol_event,
 		.init_hook = alc861vd_dallas_automute,
-	},
+	},		
 };
 
 /*
@@ -12058,7 +12057,6 @@ static const char *alc662_models[ALC662_MODEL_LAST] = {
 	[ALC662_3ST_6ch]	= "3stack-6ch",
 	[ALC662_5ST_DIG]	= "6stack-dig",
 	[ALC662_LENOVO_101E]	= "lenovo-101e",
-	[ALC662_ASUS_EEEPC_P701] = "eeepc-p701",
 	[ALC662_AUTO]		= "auto",
 };
 

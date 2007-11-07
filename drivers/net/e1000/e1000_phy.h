@@ -66,7 +66,7 @@ s32  e1000_phy_setup_autoneg(struct e1000_hw *hw);
 s32  e1000_read_kmrn_reg_generic(struct e1000_hw *hw, u32 offset, u16 *data);
 s32  e1000_read_phy_reg_igp(struct e1000_hw *hw, u32 offset, u16 *data);
 s32  e1000_read_phy_reg_m88(struct e1000_hw *hw, u32 offset, u16 *data);
-s32  e1000_set_d3_lplu_state_generic(struct e1000_hw *hw, boolean_t active);
+s32  e1000_set_d3_lplu_state_generic(struct e1000_hw *hw, bool active);
 s32  e1000_setup_copper_link_generic(struct e1000_hw *hw);
 s32  e1000_wait_autoneg_generic(struct e1000_hw *hw);
 s32  e1000_write_kmrn_reg_generic(struct e1000_hw *hw, u32 offset, u16 data);
@@ -74,7 +74,7 @@ s32  e1000_write_phy_reg_igp(struct e1000_hw *hw, u32 offset, u16 data);
 s32  e1000_write_phy_reg_m88(struct e1000_hw *hw, u32 offset, u16 data);
 s32  e1000_phy_reset_dsp(struct e1000_hw *hw);
 s32  e1000_phy_has_link_generic(struct e1000_hw *hw, u32 iterations,
-                                u32 usec_interval, boolean_t *success);
+                                u32 usec_interval, bool *success);
 s32  e1000_phy_init_script_igp3(struct e1000_hw *hw);
 e1000_phy_type e1000_get_phy_type_from_id(u32 phy_id);
 #define E1000_MAX_PHY_ADDR                4

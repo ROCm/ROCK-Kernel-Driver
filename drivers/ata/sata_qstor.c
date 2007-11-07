@@ -113,7 +113,7 @@ struct qs_port_priv {
 
 static int qs_scr_read(struct ata_port *ap, unsigned int sc_reg, u32 *val);
 static int qs_scr_write(struct ata_port *ap, unsigned int sc_reg, u32 val);
-static int qs_ata_init_one (struct pci_dev *pdev, const struct pci_device_id *ent);
+static int qs_ata_init_one(struct pci_dev *pdev, const struct pci_device_id *ent);
 static int qs_port_start(struct ata_port *ap);
 static void qs_host_stop(struct ata_host *host);
 static void qs_phy_reset(struct ata_port *ap);
@@ -135,7 +135,6 @@ static struct scsi_host_template qs_ata_sht = {
 	.sg_tablesize		= QS_MAX_PRD,
 	.cmd_per_lun		= ATA_SHT_CMD_PER_LUN,
 	.emulated		= ATA_SHT_EMULATED,
-	//FIXME .use_clustering		= ATA_SHT_USE_CLUSTERING,
 	.use_clustering		= ENABLE_CLUSTERING,
 	.proc_name		= DRV_NAME,
 	.dma_boundary		= QS_DMA_BOUNDARY,
@@ -145,7 +144,6 @@ static struct scsi_host_template qs_ata_sht = {
 };
 
 static const struct ata_port_operations qs_ata_ops = {
-	.port_disable		= ata_port_disable,
 	.tf_load		= ata_tf_load,
 	.tf_read		= ata_tf_read,
 	.check_status		= ata_check_status,
@@ -159,7 +157,6 @@ static const struct ata_port_operations qs_ata_ops = {
 	.eng_timeout		= qs_eng_timeout,
 	.irq_clear		= qs_irq_clear,
 	.irq_on			= ata_irq_on,
-	.irq_ack		= ata_irq_ack,
 	.scr_read		= qs_scr_read,
 	.scr_write		= qs_scr_write,
 	.port_start		= qs_port_start,
@@ -637,9 +634,14 @@ static int qs_ata_init_one(struct pci_dev *pdev,
 		return rc;
 
 	for (port_no = 0; port_no < host->n_ports; ++port_no) {
-		void __iomem *chan =
-			host->iomap[QS_MMIO_BAR] + (port_no * 0x4000);
-		qs_ata_setup_port(&host->ports[port_no]->ioaddr, chan);
+		struct ata_port *ap = host->ports[port_no];
+		unsigned int offset = port_no * 0x4000;
+		void __iomem *chan = host->iomap[QS_MMIO_BAR] + offset;
+
+		qs_ata_setup_port(&ap->ioaddr, chan);
+
+		ata_port_pbar_desc(ap, QS_MMIO_BAR, -1, "mmio");
+		ata_port_pbar_desc(ap, QS_MMIO_BAR, offset, "port");
 	}
 
 	/* initialize adapter */

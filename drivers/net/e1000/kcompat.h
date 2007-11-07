@@ -852,6 +852,8 @@ static inline u32 _kc_netif_msg_init(int debug_value, int default_msg_enable_bit
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0) )
 #undef pci_register_driver
 #define pci_register_driver pci_module_init
+#define dev_err(__unused_dev, format, arg...)            \
+	printk(KERN_ERR "%s: " format, pci_name(pdev) , ## arg)
 #endif /* <= 2.5.0 */
 
 /*****************************************************************************/
@@ -1098,6 +1100,10 @@ extern void *_kc_kzalloc(size_t size, int flags);
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 #endif
 
+#ifndef DIV_ROUND_UP
+#define DIV_ROUND_UP(n,d) (((n) + (d) - 1) / (d))
+#endif
+
 #ifndef netdev_alloc_skb
 #define netdev_alloc_skb _kc_netdev_alloc_skb
 extern struct sk_buff *_kc_netdev_alloc_skb(struct net_device *dev,
@@ -1117,13 +1123,27 @@ static inline int _kc_skb_is_gso(const struct sk_buff *skb)
 #endif /* < 2.6.18 */
 /*****************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19) )
+#ifdef GCC_VERSION
+#if ( GCC_VERSION < 3000 )
+#define _Bool u8
+#endif
+#endif
+#undef true
+#undef false
+enum {
+	false = 0,
+	true = 1
+};
 typedef _Bool bool;
 
 #if ( LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0) )
-#ifndef RHEL_VERSION
-#define RHEL_VERSION 0
+#ifndef RHEL_RELEASE_CODE
+#define RHEL_RELEASE_CODE 0
 #endif
-#if (!(( RHEL_VERSION == 4 ) && ( RHEL_UPDATE >= 5 )))
+#ifndef RHEL_RELEASE_VERSION
+#define RHEL_RELEASE_VERSION(a,b) 0
+#endif
+#if (!(( RHEL_RELEASE_CODE > RHEL_RELEASE_VERSION(4,4) ) && ( RHEL_RELEASE_CODE < RHEL_RELEASE_VERSION(5,0) ) || ( RHEL_RELEASE_CODE > RHEL_RELEASE_VERSION(5,0) )))
 typedef irqreturn_t (*irq_handler_t)(int, void*, struct pt_regs *);
 #endif
 typedef irqreturn_t (*new_handler_t)(int, void*);
@@ -1235,6 +1255,7 @@ do { \
                                  memcpy(skb->data + offset, from, len)
 #define skb_network_header_len(skb) (skb->h.raw - skb->nh.raw)
 #define pci_register_driver pci_module_init
+#define skb_mac_header(skb) skb->mac.raw
 
 #ifndef alloc_etherdev_mq
 #define alloc_etherdev_mq(_a, _b) alloc_etherdev(_a)
@@ -1244,6 +1265,11 @@ do { \
 #define ETH_FCS_LEN 4
 #endif
 #endif /* < 2.6.22 */
+
+/*****************************************************************************/
+#if ( LINUX_VERSION_CODE > KERNEL_VERSION(2,6,22) )
+#undef ETHTOOL_GPERMADDR
+#endif /* > 2.6.22 */
 
 #endif /* _KCOMPAT_H_ */
 

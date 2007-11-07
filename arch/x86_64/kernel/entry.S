@@ -1170,30 +1170,3 @@ KPROBE_ENTRY(ignore_sysret)
 	sysret
 	CFI_ENDPROC
 ENDPROC(ignore_sysret)
-
-#ifdef	CONFIG_KDB
-
-#ifdef CONFIG_SMP
-ENTRY(kdb_interrupt)
-	apicinterrupt KDB_VECTOR,smp_kdb_interrupt
-END(kdb_interrupt)
-#endif	/* CONFIG_SMP */
-
-ENTRY(kdb_call)
-	INTR_FRAME
-	cld
-	pushq $-1			# orig_eax
-	CFI_ADJUST_CFA_OFFSET 8
-	SAVE_ALL
-	movq $1,%rdi			# KDB_REASON_ENTER
-	movq $0,%rsi			# error_code
-	movq %rsp,%rdx			# struct pt_regs
-	call kdb
-	RESTORE_ALL
-	addq $8,%rsp			# forget orig_eax
-	CFI_ADJUST_CFA_OFFSET -8
-	iretq
-	CFI_ENDPROC
-END(kdb_call)
-
-#endif	/* CONFIG_KDB */

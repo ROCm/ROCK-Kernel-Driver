@@ -173,6 +173,9 @@ static void atiixp_set_dmamode(struct ata_port *ap, struct ata_device *adev)
  *
  *	When DMA begins we need to ensure that the UDMA control
  *	register for the channel is correctly set.
+ *
+ *	Note: The host lock held by the libata layer protects
+ *	us from two channels both trying to set DMA bits at once
  */
 
 static void atiixp_bmdma_start(struct ata_queued_cmd *qc)
@@ -199,6 +202,9 @@ static void atiixp_bmdma_start(struct ata_queued_cmd *qc)
  *
  *	DMA has completed. Clear the UDMA flag as the next operations will
  *	be PIO ones not UDMA data transfer.
+ *
+ *	Note: The host lock held by the libata layer protects
+ *	us from two channels both trying to set DMA bits at once
  */
 
 static void atiixp_bmdma_stop(struct ata_queued_cmd *qc)
@@ -233,7 +239,6 @@ static struct scsi_host_template atiixp_sht = {
 };
 
 static struct ata_port_operations atiixp_port_ops = {
-	.port_disable	= ata_port_disable,
 	.set_piomode	= atiixp_set_piomode,
 	.set_dmamode	= atiixp_set_dmamode,
 	.mode_filter	= ata_pci_default_filter,
@@ -262,9 +267,8 @@ static struct ata_port_operations atiixp_port_ops = {
 	.irq_handler	= ata_interrupt,
 	.irq_clear	= ata_bmdma_irq_clear,
 	.irq_on		= ata_irq_on,
-	.irq_ack	= ata_irq_ack,
 
-	.port_start	= ata_port_start,
+	.port_start	= ata_sff_port_start,
 };
 
 static int atiixp_init_one(struct pci_dev *dev, const struct pci_device_id *id)

@@ -62,6 +62,7 @@
 #include <linux/init.h>
 #include <linux/times.h>
 
+#include <net/net_namespace.h>
 #include <net/icmp.h>
 #include <net/inet_hashtables.h>
 #include <net/tcp.h>
@@ -857,16 +858,16 @@ int tcp_v4_md5_do_add(struct sock *sk, __be32 addr,
 		      u8 *newkey, u8 newkeylen)
 {
 	/* Add Key to the list */
-	struct tcp4_md5sig_key *key;
+	struct tcp_md5sig_key *key;
 	struct tcp_sock *tp = tcp_sk(sk);
 	struct tcp4_md5sig_key *keys;
 
-	key = (struct tcp4_md5sig_key *)tcp_v4_md5_do_lookup(sk, addr);
+	key = tcp_v4_md5_do_lookup(sk, addr);
 	if (key) {
 		/* Pre-existing entry - just update that one. */
-		kfree(key->base.key);
-		key->base.key = newkey;
-		key->base.keylen = newkeylen;
+		kfree(key->key);
+		key->key = newkey;
+		key->keylen = newkeylen;
 	} else {
 		struct tcp_md5sig_info *md5sig;
 
@@ -1054,6 +1055,9 @@ static int tcp_v4_do_calc_md5_hash(char *md5_hash, struct tcp_md5sig_key *key,
 	bp->pad = 0;
 	bp->protocol = protocol;
 	bp->len = htons(tcplen);
+
+	sg_init_table(sg, 4);
+
 	sg_set_buf(&sg[block++], bp, sizeof(*bp));
 	nbytes += sizeof(*bp);
 
@@ -1078,6 +1082,8 @@ static int tcp_v4_do_calc_md5_hash(char *md5_hash, struct tcp_md5sig_key *key,
 	 */
 	sg_set_buf(&sg[block++], key->key, key->keylen);
 	nbytes += key->keylen;
+
+	sg_mark_end(&sg[block - 1]);
 
 	/* Now store the Hash into the packet */
 	err = crypto_hash_init(desc);
@@ -2249,7 +2255,7 @@ int tcp_proc_register(struct tcp_seq_afinfo *afinfo)
 	afinfo->seq_fops->llseek	= seq_lseek;
 	afinfo->seq_fops->release	= seq_release_private;
 
-	p = proc_net_fops_create(afinfo->name, S_IRUGO, afinfo->seq_fops);
+	p = proc_net_fops_create(&init_net, afinfo->name, S_IRUGO, afinfo->seq_fops);
 	if (p)
 		p->data = afinfo;
 	else
@@ -2261,7 +2267,7 @@ void tcp_proc_unregister(struct tcp_seq_afinfo *afinfo)
 {
 	if (!afinfo)
 		return;
-	proc_net_remove(afinfo->name);
+	proc_net_remove(&init_net, afinfo->name);
 	memset(afinfo->seq_fops, 0, sizeof(*afinfo->seq_fops));
 }
 
@@ -2469,6 +2475,5 @@ EXPORT_SYMBOL(tcp_v4_syn_recv_sock);
 EXPORT_SYMBOL(tcp_proc_register);
 EXPORT_SYMBOL(tcp_proc_unregister);
 #endif
-EXPORT_SYMBOL(sysctl_local_port_range);
 EXPORT_SYMBOL(sysctl_tcp_low_latency);
 

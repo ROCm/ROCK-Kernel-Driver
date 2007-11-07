@@ -255,6 +255,7 @@ static void		ahd_freeze_devq(struct ahd_softc *ahd,
 static void		ahd_handle_scb_status(struct ahd_softc *ahd,
 					      struct scb *scb);
 static struct ahd_phase_table_entry* ahd_lookup_phase_entry(int phase);
+static void		ahd_shutdown(void *arg);
 static void		ahd_update_coalescing_values(struct ahd_softc *ahd,
 						     u_int timer,
 						     u_int maxcmds,
@@ -356,7 +357,7 @@ ahd_complete_scb(struct ahd_softc *ahd, struct scb *scb)
 /*
  * Restart the sequencer program from address zero
  */
-void
+static void
 ahd_restart(struct ahd_softc *ahd)
 {
 
@@ -5455,7 +5456,7 @@ ahd_free(struct ahd_softc *ahd)
 	return;
 }
 
-void
+static void
 ahd_shutdown(void *arg)
 {
 	struct	ahd_softc *ahd;
@@ -7172,6 +7173,29 @@ ahd_pause_and_flushwork(struct ahd_softc *ahd)
 	ahd_flush_qoutfifo(ahd);
 
 	ahd->flags &= ~AHD_ALL_INTERRUPTS;
+}
+
+int
+ahd_suspend(struct ahd_softc *ahd)
+{
+
+	ahd_pause_and_flushwork(ahd);
+
+	if (LIST_FIRST(&ahd->pending_scbs) != NULL) {
+		ahd_unpause(ahd);
+		return (EBUSY);
+	}
+	ahd_shutdown(ahd);
+	return (0);
+}
+
+void
+ahd_resume(struct ahd_softc *ahd)
+{
+
+	ahd_reset(ahd, /*reinit*/TRUE);
+	ahd_intr_enable(ahd, TRUE); 
+	ahd_restart(ahd);
 }
 
 /************************** Busy Target Table *********************************/

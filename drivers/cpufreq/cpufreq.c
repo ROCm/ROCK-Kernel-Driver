@@ -830,7 +830,7 @@ static int cpufreq_add_dev (struct sys_device * sys_dev)
 	/* prepare interface data */
 	policy->kobj.parent = &sys_dev->kobj;
 	policy->kobj.ktype = &ktype_cpufreq;
-	strlcpy(policy->kobj.name, "cpufreq", KOBJ_NAME_LEN);
+	kobject_set_name(&policy->kobj, "cpufreq");
 
 	ret = kobject_register(&policy->kobj);
 	if (ret) {
@@ -1111,12 +1111,7 @@ unsigned int cpufreq_quick_get(unsigned int cpu)
 	unsigned int ret_freq = 0;
 
 	if (policy) {
-		if (unlikely(lock_policy_rwsem_read(cpu)))
-			return ret_freq;
-
 		ret_freq = policy->cur;
-
-		unlock_policy_rwsem_read(cpu);
 		cpufreq_cpu_put(policy);
 	}
 
@@ -1730,7 +1725,7 @@ int cpufreq_update_policy(unsigned int cpu)
 }
 EXPORT_SYMBOL(cpufreq_update_policy);
 
-static int cpufreq_cpu_callback(struct notifier_block *nfb,
+static int __cpuinit cpufreq_cpu_callback(struct notifier_block *nfb,
 					unsigned long action, void *hcpu)
 {
 	unsigned int cpu = (unsigned long)hcpu;

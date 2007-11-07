@@ -47,11 +47,11 @@ static s32  e1000_update_nvm_checksum_82571(struct e1000_hw *hw);
 static s32  e1000_validate_nvm_checksum_82571(struct e1000_hw *hw);
 static s32  e1000_get_cfg_done_82571(struct e1000_hw *hw);
 static s32  e1000_set_d0_lplu_state_82571(struct e1000_hw *hw,
-                                          boolean_t active);
+                                          bool active);
 static s32  e1000_reset_hw_82571(struct e1000_hw *hw);
 static s32  e1000_init_hw_82571(struct e1000_hw *hw);
 static void e1000_clear_vfta_82571(struct e1000_hw *hw);
-static void e1000_mc_addr_list_update_82571(struct e1000_hw *hw,
+static void e1000_update_mc_addr_list_82571(struct e1000_hw *hw,
                                             u8 *mc_addr_list, u32 mc_addr_count,
                                             u32 rar_used_count, u32 rar_count);
 static s32  e1000_setup_link_82571(struct e1000_hw *hw);
@@ -69,7 +69,7 @@ static s32  e1000_write_nvm_eewr_82571(struct e1000_hw *hw, u16 offset,
 static s32  e1000_read_mac_addr_82571(struct e1000_hw *hw);
 
 struct e1000_dev_spec_82571 {
-	boolean_t laa_is_present;
+	bool laa_is_present;
 };
 
 /**
@@ -86,7 +86,7 @@ static s32 e1000_init_phy_params_82571(struct e1000_hw *hw)
 
 	DEBUGFUNC("e1000_init_phy_params_82571");
 
-	if (hw->media_type != e1000_media_type_copper) {
+	if (hw->phy.media_type != e1000_media_type_copper) {
 		phy->type        = e1000_phy_none;
 		goto out;
 	}
@@ -113,6 +113,15 @@ static s32 e1000_init_phy_params_82571(struct e1000_hw *hw)
 		func->get_cable_length   = e1000_get_cable_length_igp_2;
 		func->read_phy_reg       = e1000_read_phy_reg_igp;
 		func->write_phy_reg      = e1000_write_phy_reg_igp;
+
+		/* This uses above function pointers */
+		ret_val = e1000_get_phy_id_82571(hw);
+
+		/* Verify PHY ID */
+		if (phy->id != IGP01E1000_I_PHY_ID) {
+			ret_val = -E1000_ERR_PHY;
+			goto out;
+		}
 		break;
 	case e1000_82573:
 		phy->type                = e1000_phy_m88;
@@ -123,31 +132,17 @@ static s32 e1000_init_phy_params_82571(struct e1000_hw *hw)
 		func->get_cable_length   = e1000_get_cable_length_m88;
 		func->read_phy_reg       = e1000_read_phy_reg_m88;
 		func->write_phy_reg      = e1000_write_phy_reg_m88;
-		break;
-	default:
-		ret_val = -E1000_ERR_PHY;
-		goto out;
-		break;
-	}
 
-	/* This can only be done after all function pointers are setup. */
-	ret_val = e1000_get_phy_id_82571(hw);
+		/* This uses above function pointers */
+		ret_val = e1000_get_phy_id_82571(hw);
 
-	/* Verify phy id */
-	switch (hw->mac.type) {
-	case e1000_82571:
-	case e1000_82572:
-		if (phy->id != IGP01E1000_I_PHY_ID) {
-			ret_val = -E1000_ERR_PHY;
-			goto out;
-		}
-		break;
-	case e1000_82573:
+		/* Verify PHY ID */
 		if (phy->id != M88E1111_I_PHY_ID) {
 			ret_val = -E1000_ERR_PHY;
 			goto out;
 		}
 		break;
+
 	default:
 		ret_val = -E1000_ERR_PHY;
 		goto out;
@@ -250,16 +245,16 @@ static s32 e1000_init_mac_params_82571(struct e1000_hw *hw)
 	case E1000_DEV_ID_82571EB_FIBER:
 	case E1000_DEV_ID_82572EI_FIBER:
 	case E1000_DEV_ID_82571EB_QUAD_FIBER:
-		hw->media_type = e1000_media_type_fiber;
+		hw->phy.media_type = e1000_media_type_fiber;
 		break;
 	case E1000_DEV_ID_82571EB_SERDES:
 	case E1000_DEV_ID_82571EB_SERDES_DUAL:
 	case E1000_DEV_ID_82571EB_SERDES_QUAD:
 	case E1000_DEV_ID_82572EI_SERDES:
-		hw->media_type = e1000_media_type_internal_serdes;
+		hw->phy.media_type = e1000_media_type_internal_serdes;
 		break;
 	default:
-		hw->media_type = e1000_media_type_copper;
+		hw->phy.media_type = e1000_media_type_copper;
 		break;
 	}
 
@@ -286,11 +281,11 @@ static s32 e1000_init_mac_params_82571(struct e1000_hw *hw)
 	func->setup_link = e1000_setup_link_82571;
 	/* physical interface link setup */
 	func->setup_physical_interface =
-	        (hw->media_type == e1000_media_type_copper)
+	        (hw->phy.media_type == e1000_media_type_copper)
 	                ? e1000_setup_copper_link_82571
 	                : e1000_setup_fiber_serdes_link_82571;
 	/* check for link */
-	switch (hw->media_type) {
+	switch (hw->phy.media_type) {
 	case e1000_media_type_copper:
 		func->check_for_link = e1000_check_for_copper_link_generic;
 		break;
@@ -308,7 +303,7 @@ static s32 e1000_init_mac_params_82571(struct e1000_hw *hw)
 	/* check management mode */
 	func->check_mng_mode = e1000_check_mng_mode_generic;
 	/* multicast address update */
-	func->mc_addr_list_update = e1000_mc_addr_list_update_82571;
+	func->update_mc_addr_list = e1000_update_mc_addr_list_82571;
 	/* writing VFTA */
 	func->write_vfta = e1000_write_vfta_generic;
 	/* clearing VFTA */
@@ -332,7 +327,7 @@ static s32 e1000_init_mac_params_82571(struct e1000_hw *hw)
 	func->clear_hw_cntrs = e1000_clear_hw_cntrs_82571;
 	/* link info */
 	func->get_link_up_info =
-	        (hw->media_type == e1000_media_type_copper)
+	        (hw->phy.media_type == e1000_media_type_copper)
 	                ? e1000_get_speed_and_duplex_copper_generic
 	                : e1000_get_speed_and_duplex_fiber_serdes_generic;
 
@@ -713,7 +708,7 @@ out:
  *  of either 10 or 10/100 or 10/100/1000 at all duplexes.  This is a function
  *  pointer entry point only called by PHY setup routines.
  **/
-static s32 e1000_set_d0_lplu_state_82571(struct e1000_hw *hw, boolean_t active)
+static s32 e1000_set_d0_lplu_state_82571(struct e1000_hw *hw, bool active)
 {
 	struct e1000_phy_info *phy = &hw->phy;
 	s32 ret_val;
@@ -872,7 +867,8 @@ static s32 e1000_reset_hw_82571(struct e1000_hw *hw)
 	E1000_WRITE_REG(hw, E1000_IMC, 0xffffffff);
 	icr = E1000_READ_REG(hw, E1000_ICR);
 
-	e1000_check_alt_mac_addr_generic(hw);
+	if (!(e1000_check_alt_mac_addr_generic(hw)))
+		e1000_set_laa_state_82571(hw, TRUE);
 
 out:
 	return ret_val;
@@ -925,19 +921,19 @@ static s32 e1000_init_hw_82571(struct e1000_hw *hw)
 	ret_val = e1000_setup_link(hw);
 
 	/* Set the transmit descriptor write-back policy */
-	reg_data = E1000_READ_REG(hw, E1000_TXDCTL);
+	reg_data = E1000_READ_REG(hw, E1000_TXDCTL(0));
 	reg_data = (reg_data & ~E1000_TXDCTL_WTHRESH) |
 	           E1000_TXDCTL_FULL_TX_DESC_WB |
 	           E1000_TXDCTL_COUNT_DESC;
-	E1000_WRITE_REG(hw, E1000_TXDCTL, reg_data);
+	E1000_WRITE_REG(hw, E1000_TXDCTL(0), reg_data);
 
 	/* ...for both queues. */
 	if (mac->type != e1000_82573) {
-		reg_data = E1000_READ_REG(hw, E1000_TXDCTL1);
+		reg_data = E1000_READ_REG(hw, E1000_TXDCTL(1));
 		reg_data = (reg_data & ~E1000_TXDCTL_WTHRESH) |
 		           E1000_TXDCTL_FULL_TX_DESC_WB |
 		           E1000_TXDCTL_COUNT_DESC;
-		E1000_WRITE_REG(hw, E1000_TXDCTL1, reg_data);
+		E1000_WRITE_REG(hw, E1000_TXDCTL(1), reg_data);
 	} else {
 		e1000_enable_tx_pkt_filtering(hw);
 		reg_data = E1000_READ_REG(hw, E1000_GCR);
@@ -972,17 +968,17 @@ static void e1000_initialize_hw_bits_82571(struct e1000_hw *hw)
 		goto out;
 
 	/* Transmit Descriptor Control 0 */
-	reg = E1000_READ_REG(hw, E1000_TXDCTL);
+	reg = E1000_READ_REG(hw, E1000_TXDCTL(0));
 	reg |= (1 << 22);
-	E1000_WRITE_REG(hw, E1000_TXDCTL, reg);
+	E1000_WRITE_REG(hw, E1000_TXDCTL(0), reg);
 
 	/* Transmit Descriptor Control 1 */
-	reg = E1000_READ_REG(hw, E1000_TXDCTL1);
+	reg = E1000_READ_REG(hw, E1000_TXDCTL(1));
 	reg |= (1 << 22);
-	E1000_WRITE_REG(hw, E1000_TXDCTL1, reg);
+	E1000_WRITE_REG(hw, E1000_TXDCTL(1), reg);
 
 	/* Transmit Arbitration Control 0 */
-	reg = E1000_READ_REG(hw, E1000_TARC0);
+	reg = E1000_READ_REG(hw, E1000_TARC(0));
 	reg &= ~(0xF << 27); /* 30:27 */
 	switch (hw->mac.type) {
 	case e1000_82571:
@@ -992,10 +988,10 @@ static void e1000_initialize_hw_bits_82571(struct e1000_hw *hw)
 	default:
 		break;
 	}
-	E1000_WRITE_REG(hw, E1000_TARC0, reg);
+	E1000_WRITE_REG(hw, E1000_TARC(0), reg);
 
 	/* Transmit Arbitration Control 1 */
-	reg = E1000_READ_REG(hw, E1000_TARC1);
+	reg = E1000_READ_REG(hw, E1000_TARC(1));
 	switch (hw->mac.type) {
 	case e1000_82571:
 	case e1000_82572:
@@ -1005,7 +1001,7 @@ static void e1000_initialize_hw_bits_82571(struct e1000_hw *hw)
 			reg &= ~(1 << 28);
 		else
 			reg |= (1 << 28);
-		E1000_WRITE_REG(hw, E1000_TARC1, reg);
+		E1000_WRITE_REG(hw, E1000_TARC(1), reg);
 		break;
 	default:
 		break;
@@ -1075,7 +1071,7 @@ static void e1000_clear_vfta_82571(struct e1000_hw *hw)
 }
 
 /**
- *  e1000_mc_addr_list_update_82571 - Update Multicast addresses
+ *  e1000_update_mc_addr_list_82571 - Update Multicast addresses
  *  @hw: pointer to the HW structure
  *  @mc_addr_list: array of multicast addresses to program
  *  @mc_addr_count: number of multicast addresses to program
@@ -1087,16 +1083,16 @@ static void e1000_clear_vfta_82571(struct e1000_hw *hw)
  *  The parameter rar_count will usually be hw->mac.rar_entry_count
  *  unless there are workarounds that change this.
  **/
-static void e1000_mc_addr_list_update_82571(struct e1000_hw *hw,
+static void e1000_update_mc_addr_list_82571(struct e1000_hw *hw,
                                             u8 *mc_addr_list, u32 mc_addr_count,
                                             u32 rar_used_count, u32 rar_count)
 {
-	DEBUGFUNC("e1000_mc_addr_list_update_82571");
+	DEBUGFUNC("e1000_update_mc_addr_list_82571");
 
 	if (e1000_get_laa_state_82571(hw))
 		rar_count--;
 
-	e1000_mc_addr_list_update_generic(hw, mc_addr_list, mc_addr_count,
+	e1000_update_mc_addr_list_generic(hw, mc_addr_list, mc_addr_count,
 	                                  rar_used_count, rar_count);
 }
 
@@ -1120,7 +1116,7 @@ static s32 e1000_setup_link_82571(struct e1000_hw *hw)
 	 * set it to full.
 	 */
 	if (hw->mac.type == e1000_82573)
-		hw->mac.fc = e1000_fc_full;
+		hw->fc.type = e1000_fc_full;
 
 	return e1000_setup_link_generic(hw);
 }
@@ -1237,10 +1233,10 @@ out:
  *
  *  Retrieve and return the current locally administed address state.
  **/
-boolean_t e1000_get_laa_state_82571(struct e1000_hw *hw)
+bool e1000_get_laa_state_82571(struct e1000_hw *hw)
 {
 	struct e1000_dev_spec_82571 *dev_spec;
-	boolean_t state = FALSE;
+	bool state = FALSE;
 
 	DEBUGFUNC("e1000_get_laa_state_82571");
 
@@ -1262,7 +1258,7 @@ out:
  *
  *  Enable/Disable the current locally administed address state.
  **/
-void e1000_set_laa_state_82571(struct e1000_hw *hw, boolean_t state)
+void e1000_set_laa_state_82571(struct e1000_hw *hw, bool state)
 {
 	struct e1000_dev_spec_82571 *dev_spec;
 

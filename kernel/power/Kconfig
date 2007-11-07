@@ -44,17 +44,6 @@ config PM_VERBOSE
 	---help---
 	This option enables verbose messages from the Power Management code.
 
-config DISABLE_CONSOLE_SUSPEND
-	bool "Keep console(s) enabled during suspend/resume (DANGEROUS)"
-	depends on PM_DEBUG && PM_SLEEP
-	default n
-	---help---
-	This option turns off the console suspend mechanism that prevents
-	debug messages from reaching the console during the suspend/resume
-	operations.  This may be helpful when debugging device drivers'
-	suspend/resume routines, but may itself lead to problems, for example
-	if netconsole is used.
-
 config PM_TRACE
 	bool "Suspend/resume event tracing"
 	depends on PM_DEBUG && X86 && PM_SLEEP && EXPERIMENTAL
@@ -111,13 +100,13 @@ config SUSPEND
 config HIBERNATION_UP_POSSIBLE
 	bool
 	depends on X86 || PPC64_SWSUSP || PPC32
-	depends on !SMP && !XEN
+	depends on !SMP
 	default y
 
 config HIBERNATION_SMP_POSSIBLE
 	bool
 	depends on (X86 && !X86_VOYAGER) || PPC64_SWSUSP
-	depends on SMP && !XEN
+	depends on SMP
 	default y
 
 config HIBERNATION

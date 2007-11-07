@@ -423,9 +423,6 @@ static int ps3_setup_storage_dev(const struct ps3_repository_device *repo,
 		 repo->dev_index, repo->dev_type, port, blk_size, num_blocks,
 		 num_regions);
 
-	if (!num_regions)
-		return -EAGAIN;
-
 	p = kzalloc(sizeof(struct ps3_storage_device) +
 		    num_regions * sizeof(struct ps3_storage_region),
 		    GFP_KERNEL);
@@ -627,28 +624,32 @@ static int ps3_register_repository_device(
 	case PS3_DEV_TYPE_STOR_DISK:
 		result = ps3_setup_storage_dev(repo, PS3_MATCH_ID_STOR_DISK);
 
-		if (result == -EAGAIN)
-			pr_debug("%s:%u: device not ready\n", __func__,
+		/* Some devices are not accessable from the Other OS lpar. */
+		if (result == -ENODEV) {
+			result = 0;
+			pr_debug("%s:%u: not accessable\n", __func__,
 				 __LINE__);
-		else if (result)
+		}
+
+		if (result)
 			pr_debug("%s:%u ps3_setup_storage_dev failed\n",
 				 __func__, __LINE__);
 		break;
+
 	case PS3_DEV_TYPE_STOR_ROM:
 		result = ps3_setup_storage_dev(repo, PS3_MATCH_ID_STOR_ROM);
-		if (result == -EAGAIN)
-			pr_debug("%s:%u: device not ready\n", __func__,
-				 __LINE__);
-		else if (result)
+		if (result)
 			pr_debug("%s:%u ps3_setup_storage_dev failed\n",
 				 __func__, __LINE__);
 		break;
+
 	case PS3_DEV_TYPE_STOR_FLASH:
 		result = ps3_setup_storage_dev(repo, PS3_MATCH_ID_STOR_FLASH);
 		if (result)
 			pr_debug("%s:%u ps3_setup_storage_dev failed\n",
 				 __func__, __LINE__);
 		break;
+
 	default:
 		result = 0;
 		pr_debug("%s:%u: unsupported dev_type %u\n", __func__, __LINE__,
@@ -662,13 +663,6 @@ static int ps3_register_repository_device(
  * ps3_probe_thread - Background repository probing at system startup.
  *
  * This implementation only supports background probing on a single bus.
- *
- * To make this more robust, the probe could cycle through the bus devices
- * until no changes are found.  The current logic waits on each device until
- * it finds some regions, then goes to the next device.  This will loop
- * endlessly on the device if no regions ever appear for that device, and
- * also will only register the regions found at the time the first region
- * is found.  Seems to work OK though.
  */
 
 static int ps3_probe_thread(void *data)
@@ -697,13 +691,9 @@ static int ps3_probe_thread(void *data)
 				pr_debug("%s:%u: found device (%u:%u:%u)\n",
 					 __func__, __LINE__, repo->bus_index,
 					 repo->dev_index, repo->dev_type);
-				result = ps3_register_repository_device(repo);
-
-				ms = 250;
-				if (result == -EAGAIN)
-					break;
-
+				ps3_register_repository_device(repo);
 				ps3_repository_bump_device(repo);
+				ms = 250;
 			}
 		} while (!result);
 

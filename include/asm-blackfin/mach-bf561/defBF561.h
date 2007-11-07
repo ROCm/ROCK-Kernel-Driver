@@ -55,6 +55,9 @@
 /* For MMR's that are reserved on Core B, set up defines to better integrate with other ports */
 #define SWRST                   SICA_SWRST
 #define SYSCR                   SICA_SYSCR
+#define RESET_DOUBLE            (SWRST_DBL_FAULT_B|SWRST_DBL_FAULT_A)
+#define RESET_WDOG              (SWRST_WDT_B|SWRST_WDT_A)
+#define RESET_SOFTWARE          (SWRST_OCCURRED)
 
 /* System Reset and Interrupt Controller registers for core A (0xFFC0 0100-0xFFC0 01FF) */
 #define SICA_SWRST              0xFFC00100	/* Software Reset register */
@@ -120,6 +123,7 @@
 #define UART_GCTL      	      	0xFFC00424	/* Global Control Register */
 
 /* SPI Controller (0xFFC00500 - 0xFFC005FF) */
+#define SPI0_REGBASE          		0xFFC00500
 #define SPI_CTL               		0xFFC00500	/* SPI Control Register */
 #define SPI_FLG               		0xFFC00504	/* SPI Flag register */
 #define SPI_STAT              		0xFFC00508	/* SPI Status register */

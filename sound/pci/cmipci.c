@@ -255,7 +255,7 @@ MODULE_PARM_DESC(joystick_port, "Joystick port address.");
 #define CM_UPDDMA_2048		0x00000000
 #define CM_UPDDMA_1024		0x00000004
 #define CM_UPDDMA_512		0x00000008
-#define CM_UPDDMA_256		0x0000000C
+#define CM_UPDDMA_256		0x0000000C		
 #define CM_TWAIT_MASK		0x00000003	/* model 037 */
 #define CM_TWAIT1		0x00000002	/* FM i/o cycle, 0: 48, 1: 64 PCICLKs */
 #define CM_TWAIT0		0x00000001	/* i/o cycle, 0: 4, 1: 6 PCICLKs */
@@ -1325,7 +1325,7 @@ static void snd_cmipci_silence_hack(struct cmipci *cm, struct cmipci_pcm *rec)
 		reg = rec->ch ? CM_REG_CH1_FRAME2 : CM_REG_CH0_FRAME2;
 		val = ((PAGE_SIZE / 4) - 1) | (((PAGE_SIZE / 4) / 2 - 1) << 16);
 		snd_cmipci_write(cm, reg, val);
-
+	
 		/* configure for 16 bits, 2 channels, 8 kHz */
 		if (runtime->channels > 2)
 			set_dac_channels(cm, rec, 2);
@@ -1342,7 +1342,7 @@ static void snd_cmipci_silence_hack(struct cmipci *cm, struct cmipci_pcm *rec)
 			val &= ~(CM_CH0_SRATE_96K << (rec->ch * 2));
 		}
 		snd_cmipci_write(cm, CM_REG_CHFORMAT, val);
-
+	
 		/* start stream (we don't need interrupts) */
 		cm->ctrl |= CM_CHEN0 << rec->ch;
 		snd_cmipci_write(cm, CM_REG_FUNCTRL0, cm->ctrl);

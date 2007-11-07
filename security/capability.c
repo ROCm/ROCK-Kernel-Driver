@@ -8,7 +8,6 @@
  *
  */
 
-#include <linux/module.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/security.h>
@@ -22,35 +21,42 @@
 #include <linux/ptrace.h>
 #include <linux/moduleparam.h>
 
-/* Note: Capabilities are default now, even if CONFIG_SECURITY
- * is enabled and no LSM is loaded. (Previously, the dummy
- * functions would have been called in that case which resulted
- * in a slightly unusable system.)
- * The capability LSM may still be compiled and loaded; it won't
- * make a difference though except for slowing down some operations
- * a tiny bit and (more severly) for disallowing loading another LSM.
- * To have it as LSM may still be useful: It could be stacked on top
- * of another LSM (if the other LSM allows this or if the stacker
- * is used).
- * If the capability LSM is loaded, we do NOT register the
- * capability_security_ops but a second structure capability_ops
- * that has identical entries. We need to differentiate
- * between capabilities used as default and used as LSM as in
- * the latter case replacing it by just loading another LSM is
- * not possible.
- */
+static struct security_operations capability_ops = {
+	.ptrace =			cap_ptrace,
+	.capget =			cap_capget,
+	.capset_check =			cap_capset_check,
+	.capset_set =			cap_capset_set,
+	.capable =			cap_capable,
+	.settime =			cap_settime,
+	.netlink_send =			cap_netlink_send,
+	.netlink_recv =			cap_netlink_recv,
 
-/* Struct from commoncaps */
-extern struct security_operations capability_security_ops;
-/* Struct to hold the copy */
-static struct security_operations capability_ops;
+	.bprm_apply_creds =		cap_bprm_apply_creds,
+	.bprm_set_security =		cap_bprm_set_security,
+	.bprm_secureexec =		cap_bprm_secureexec,
+
+	.inode_setxattr =		cap_inode_setxattr,
+	.inode_removexattr =		cap_inode_removexattr,
+	.inode_need_killpriv =		cap_inode_need_killpriv,
+	.inode_killpriv =		cap_inode_killpriv,
+
+	.task_kill =			cap_task_kill,
+	.task_setscheduler =		cap_task_setscheduler,
+	.task_setioprio =		cap_task_setioprio,
+	.task_setnice =			cap_task_setnice,
+	.task_post_setuid =		cap_task_post_setuid,
+	.task_reparent_to_init =	cap_task_reparent_to_init,
+
+	.syslog =                       cap_syslog,
+
+	.vm_enough_memory =             cap_vm_enough_memory,
+};
 
 /* flag to keep track of how we were registered */
 static int secondary;
 
 static int capability_disable;
 module_param_named(disable, capability_disable, int, 0);
-MODULE_PARM_DESC(disable, "To disable capabilities module set disable = 1");
 
 static int __init capability_init (void)
 {
@@ -58,7 +64,6 @@ static int __init capability_init (void)
 		printk(KERN_INFO "Capabilities disabled at initialization\n");
 		return 0;
 	}
-	memcpy(&capability_ops, &capability_security_ops, sizeof(capability_ops));
 	/* register ourselves with the security framework */
 	if (register_security (&capability_ops)) {
 		/* try registering with primary module */
@@ -74,26 +79,4 @@ static int __init capability_init (void)
 	return 0;
 }
 
-static void __exit capability_exit (void)
-{
-	if (capability_disable)
-		return;
-	/* remove ourselves from the security framework */
-	if (secondary) {
-		if (mod_unreg_security (KBUILD_MODNAME, &capability_ops))
-			printk (KERN_INFO "Failure unregistering capabilities "
-				"with primary module.\n");
-		return;
-	}
-
-	if (unregister_security (&capability_ops)) {
-		printk (KERN_INFO
-			"Failure unregistering capabilities with the kernel\n");
-	}
-}
-
 security_initcall (capability_init);
-module_exit (capability_exit);
-
-MODULE_DESCRIPTION("Standard Linux Capabilities Security Module");
-MODULE_LICENSE("GPL");

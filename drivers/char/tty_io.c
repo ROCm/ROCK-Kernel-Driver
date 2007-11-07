@@ -103,6 +103,7 @@
 #include <linux/selection.h>
 
 #include <linux/kmod.h>
+#include <linux/nsproxy.h>
 
 #undef TTY_DEBUG_HANGUP
 
@@ -944,7 +945,7 @@ EXPORT_SYMBOL_GPL(tty_ldisc_deref);
  *	@tty: terminal to activate ldisc on
  *
  *	Set the TTY_LDISC flag when the line discipline can be called
- *	again. Do neccessary wakeups for existing sleepers.
+ *	again. Do necessary wakeups for existing sleepers.
  *
  *	Note: nobody should set this bit except via this function. Clearing
  *	directly is allowed.
@@ -1505,7 +1506,7 @@ EXPORT_SYMBOL(tty_hangup);
  *
  *	The user has asked via system call for the terminal to be hung up.
  *	We do this synchronously so that when the syscall returns the process
- *	is complete. That guarantee is neccessary for security reasons.
+ *	is complete. That guarantee is necessary for security reasons.
  */
 
 void tty_vhangup(struct tty_struct * tty)
@@ -1692,7 +1693,7 @@ EXPORT_SYMBOL(stop_tty);
  *	@tty: tty to start
  *
  *	Start a tty that has been stopped if at all possible. Perform
- *	any neccessary wakeups and propagate the TIOCPKT status. If this
+ *	any necessary wakeups and propagate the TIOCPKT status. If this
  *	is the tty was previous stopped and is being started then the
  *	driver start method is invoked and the line discipline woken.
  *
@@ -2878,7 +2879,7 @@ static int tty_fasync(int fd, struct file * filp, int on)
  *	@tty: tty to fake input into
  *	@p: pointer to character
  *
- *	Fake input to a tty device. Does the neccessary locking and
+ *	Fake input to a tty device. Does the necessary locking and
  *	input management.
  *
  *	FIXME: does not honour flow control ??
@@ -3109,7 +3110,7 @@ static int tiocgpgrp(struct tty_struct *tty, struct tty_struct *real_tty, pid_t 
 	 */
 	if (tty == real_tty && current->signal->tty != real_tty)
 		return -ENOTTY;
-	return put_user(pid_nr(real_tty->pgrp), p);
+	return put_user(pid_vnr(real_tty->pgrp), p);
 }
 
 /**
@@ -3143,7 +3144,7 @@ static int tiocspgrp(struct tty_struct *tty, struct tty_struct *real_tty, pid_t 
 	if (pgrp_nr < 0)
 		return -EINVAL;
 	rcu_read_lock();
-	pgrp = find_pid(pgrp_nr);
+	pgrp = find_vpid(pgrp_nr);
 	retval = -ESRCH;
 	if (!pgrp)
 		goto out_unlock;
@@ -3180,7 +3181,7 @@ static int tiocgsid(struct tty_struct *tty, struct tty_struct *real_tty, pid_t _
 		return -ENOTTY;
 	if (!real_tty->session)
 		return -ENOTTY;
-	return put_user(pid_nr(real_tty->session), p);
+	return put_user(pid_vnr(real_tty->session), p);
 }
 
 /**
@@ -3545,8 +3546,8 @@ void __do_SAK(struct tty_struct *tty)
 	/* Kill the entire session */
 	do_each_pid_task(session, PIDTYPE_SID, p) {
 		printk(KERN_NOTICE "SAK: killed process %d"
-			" (%s): process_session(p)==tty->session\n",
-			p->pid, p->comm);
+			" (%s): task_session_nr(p)==tty->session\n",
+			task_pid_nr(p), p->comm);
 		send_sig(SIGKILL, p, 1);
 	} while_each_pid_task(session, PIDTYPE_SID, p);
 	/* Now kill any processes that happen to have the
@@ -3555,8 +3556,8 @@ void __do_SAK(struct tty_struct *tty)
 	do_each_thread(g, p) {
 		if (p->signal->tty == tty) {
 			printk(KERN_NOTICE "SAK: killed process %d"
-			    " (%s): process_session(p)==tty->session\n",
-			    p->pid, p->comm);
+			    " (%s): task_session_nr(p)==tty->session\n",
+			    task_pid_nr(p), p->comm);
 			send_sig(SIGKILL, p, 1);
 			continue;
 		}
@@ -3576,7 +3577,7 @@ void __do_SAK(struct tty_struct *tty)
 				    filp->private_data == tty) {
 					printk(KERN_NOTICE "SAK: killed process %d"
 					    " (%s): fd#%d opened to the tty\n",
-					    p->pid, p->comm, i);
+					    task_pid_nr(p), p->comm, i);
 					force_sig(SIGKILL, p);
 					break;
 				}

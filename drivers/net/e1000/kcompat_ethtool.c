@@ -776,7 +776,7 @@ out:
 #define ETHTOOL_OPS_COMPAT
 int ethtool_ioctl(struct ifreq *ifr)
 {
-	struct net_device *dev = __dev_get_by_name(ifr->ifr_name);
+	struct net_device *dev = __dev_get_by_name(&init_net, ifr->ifr_name);
 	void *useraddr = (void *) ifr->ifr_data;
 	u32 ethcmd;
 

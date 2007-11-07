@@ -216,6 +216,7 @@ E1000_PARAM(SmartPowerDownEnable, "Enable PHY smart power down");
  */
 E1000_PARAM(KumeranLockLoss, "Enable Kumeran lock loss workaround");
 
+
 struct e1000_option {
 	enum { enable_option, range_option, list_option } type;
 	char *name;
@@ -409,12 +410,12 @@ void __devinit e1000_check_options(struct e1000_adapter *adapter)
 #endif
 			int fc = FlowControl[bd];
 			e1000_validate_option(&fc, &opt, adapter);
-			hw->mac.original_fc = fc;
-			hw->mac.fc = fc;
+			hw->fc.original_type = fc;
+			hw->fc.type = fc;
 #ifdef module_param_array
 		} else {
-			hw->mac.original_fc = opt.def;
-			hw->mac.fc = opt.def;
+			hw->fc.original_type = opt.def;
+			hw->fc.type = opt.def;
 		}
 #endif
 	}
@@ -606,7 +607,7 @@ void __devinit e1000_check_options(struct e1000_adapter *adapter)
 #endif
 	}
 
-	switch (hw->media_type) {
+	switch (hw->phy.media_type) {
 	case e1000_media_type_fiber:
 	case e1000_media_type_internal_serdes:
 		e1000_check_fiber_options(adapter);
@@ -617,6 +618,7 @@ void __devinit e1000_check_options(struct e1000_adapter *adapter)
 	default:
 		BUG();
 	}
+
 }
 
 /**
@@ -799,7 +801,7 @@ static void __devinit e1000_check_copper_options(struct e1000_adapter *adapter)
 
 	switch (speed + dplx) {
 	case 0:
-		hw->mac.autoneg = adapter->fc_autoneg = 1;
+		hw->mac.autoneg = adapter->fc_autoneg = TRUE;
 #ifdef module_param_array
 		if ((num_Speed > bd) && (speed != 0 || dplx != 0))
 #else
@@ -812,7 +814,7 @@ static void __devinit e1000_check_copper_options(struct e1000_adapter *adapter)
 		DPRINTK(PROBE, INFO, "Half Duplex specified without Speed\n");
 		DPRINTK(PROBE, INFO, "Using Autonegotiation at "
 			"Half Duplex only\n");
-		hw->mac.autoneg = adapter->fc_autoneg = 1;
+		hw->mac.autoneg = adapter->fc_autoneg = TRUE;
 		hw->phy.autoneg_advertised = ADVERTISE_10_HALF |
 		                             ADVERTISE_100_HALF;
 		break;
@@ -820,7 +822,7 @@ static void __devinit e1000_check_copper_options(struct e1000_adapter *adapter)
 		DPRINTK(PROBE, INFO, "Full Duplex specified without Speed\n");
 		DPRINTK(PROBE, INFO, "Using Autonegotiation at "
 			"Full Duplex only\n");
-		hw->mac.autoneg = adapter->fc_autoneg = 1;
+		hw->mac.autoneg = adapter->fc_autoneg = TRUE;
 		hw->phy.autoneg_advertised = ADVERTISE_10_FULL |
 		                             ADVERTISE_100_FULL |
 		                             ADVERTISE_1000_FULL;
@@ -829,19 +831,19 @@ static void __devinit e1000_check_copper_options(struct e1000_adapter *adapter)
 		DPRINTK(PROBE, INFO, "10 Mbps Speed specified "
 			"without Duplex\n");
 		DPRINTK(PROBE, INFO, "Using Autonegotiation at 10 Mbps only\n");
-		hw->mac.autoneg = adapter->fc_autoneg = 1;
+		hw->mac.autoneg = adapter->fc_autoneg = TRUE;
 		hw->phy.autoneg_advertised = ADVERTISE_10_HALF |
 		                             ADVERTISE_10_FULL;
 		break;
 	case SPEED_10 + HALF_DUPLEX:
 		DPRINTK(PROBE, INFO, "Forcing to 10 Mbps Half Duplex\n");
-		hw->mac.autoneg = adapter->fc_autoneg = 0;
+		hw->mac.autoneg = adapter->fc_autoneg = FALSE;
 		hw->mac.forced_speed_duplex = ADVERTISE_10_HALF;
 		hw->phy.autoneg_advertised = 0;
 		break;
 	case SPEED_10 + FULL_DUPLEX:
 		DPRINTK(PROBE, INFO, "Forcing to 10 Mbps Full Duplex\n");
-		hw->mac.autoneg = adapter->fc_autoneg = 0;
+		hw->mac.autoneg = adapter->fc_autoneg = FALSE;
 		hw->mac.forced_speed_duplex = ADVERTISE_10_FULL;
 		hw->phy.autoneg_advertised = 0;
 		break;
@@ -850,19 +852,19 @@ static void __devinit e1000_check_copper_options(struct e1000_adapter *adapter)
 			"without Duplex\n");
 		DPRINTK(PROBE, INFO, "Using Autonegotiation at "
 			"100 Mbps only\n");
-		hw->mac.autoneg = adapter->fc_autoneg = 1;
+		hw->mac.autoneg = adapter->fc_autoneg = TRUE;
 		hw->phy.autoneg_advertised = ADVERTISE_100_HALF |
 		                             ADVERTISE_100_FULL;
 		break;
 	case SPEED_100 + HALF_DUPLEX:
 		DPRINTK(PROBE, INFO, "Forcing to 100 Mbps Half Duplex\n");
-		hw->mac.autoneg = adapter->fc_autoneg = 0;
+		hw->mac.autoneg = adapter->fc_autoneg = FALSE;
 		hw->mac.forced_speed_duplex = ADVERTISE_100_HALF;
 		hw->phy.autoneg_advertised = 0;
 		break;
 	case SPEED_100 + FULL_DUPLEX:
 		DPRINTK(PROBE, INFO, "Forcing to 100 Mbps Full Duplex\n");
-		hw->mac.autoneg = adapter->fc_autoneg = 0;
+		hw->mac.autoneg = adapter->fc_autoneg = FALSE;
 		hw->mac.forced_speed_duplex = ADVERTISE_100_FULL;
 		hw->phy.autoneg_advertised = 0;
 		break;
@@ -878,7 +880,7 @@ static void __devinit e1000_check_copper_options(struct e1000_adapter *adapter)
 full_duplex_only:
 		DPRINTK(PROBE, INFO,
 		       "Using Autonegotiation at 1000 Mbps Full Duplex only\n");
-		hw->mac.autoneg = adapter->fc_autoneg = 1;
+		hw->mac.autoneg = adapter->fc_autoneg = TRUE;
 		hw->phy.autoneg_advertised = ADVERTISE_1000_FULL;
 		break;
 	default:
