@@ -6,7 +6,7 @@
 # Copyright (c) 1999-2004 Silicon Graphics, Inc.  All Rights Reserved.
 #
 
-obj-$(CONFIG_KDB)	:= kdba_bp_64.o kdba_id_64.o kdba_io_64.o kdbasupport.o x86_64-dis.o
+obj-$(CONFIG_KDB)	:= kdba_bp_64.o kdba_id_64.o kdba_io_64.o kdbasupport_64.o x86_64-dis.o
 
 override CFLAGS := $(CFLAGS:%-pg=% )
 
