@@ -532,7 +532,7 @@ static struct ctl_table kern_table[] = {
 	},
 #ifdef CONFIG_MODULES
 	{
-		.ctl_name	= KERN_UNSUPPORTED,
+		.ctl_name	= CTL_UNNUMBERED,
 		.procname	= "unsupported",
 		.data		= &unsupported,
 		.maxlen		= sizeof(int),
