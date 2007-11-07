@@ -32,6 +32,7 @@
 #include <linux/vfs.h>
 #include <linux/vmalloc.h>
 #include <linux/smp_lock.h>
+#include <linux/sched.h>
 
 #include "squashfs.h"
 
