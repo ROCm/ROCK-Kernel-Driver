@@ -1,17 +1,17 @@
-/*
+/* 
  *   Creation Date: <97/06/24 22:25:04 samuel>
  *   Time-stamp: <2004/02/08 20:32:59 samuel>
- *
+ *   
  *	<mac_registers.h>
- *
- *
- *
+ *	
+ *	
+ *   
  *   Copyright (C) 1997-2004 Samuel Rydh (samuel@ibrium.se)
- *
+ *   
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *
+ *   
  */
 
 #ifndef _MAC_REGISTERS_H
@@ -111,7 +111,7 @@ typedef struct mac_regs {			/* this struct is page aligned */
 
 #define NUM_MREGS_PAGES		((sizeof(mac_regs_t)+0xfff)/0x1000)
 
-#define	BIT(n)			(1U<<(31-(n)))	/* bit 0 is MSB */
+#define	MOL_BIT(n)			(1U<<(31-(n)))	/* bit 0 is MSB */
 
 #ifndef __KERNEL__
 extern mac_regs_t *mregs;
@@ -152,17 +152,17 @@ extern mac_regs_t *mregs;
 
 
 #ifdef __KERNEL__
-#define fb_DbgTrace		BIT( FBIT_DbgTrace )
-#define fb_Trace		BIT( FBIT_Trace )
-#define fb_PrepareSplitmode	BIT( FBIT_PrepareSplitmode )
-#define fb_InSplitmode		BIT( FBIT_InSplitmode )
-#define fb_LoadSegreg		BIT( FBIT_LoadSegreg )
+#define fb_DbgTrace		MOL_BIT( FBIT_DbgTrace )
+#define fb_Trace		MOL_BIT( FBIT_Trace )
+#define fb_PrepareSplitmode	MOL_BIT( FBIT_PrepareSplitmode )
+#define fb_InSplitmode		MOL_BIT( FBIT_InSplitmode )
+#define fb_LoadSegreg		MOL_BIT( FBIT_LoadSegreg )
 #endif
-#define fb_MsrModified		BIT( FBIT_MsrModified )
-#define fb_RecalcDecInt		BIT( FBIT_RecalcDecInt )
-#define fb_IRQPending		BIT( FBIT_IRQPending )
+#define fb_MsrModified		MOL_BIT( FBIT_MsrModified )
+#define fb_RecalcDecInt		MOL_BIT( FBIT_RecalcDecInt )
+#define fb_IRQPending		MOL_BIT( FBIT_IRQPending )
 #ifdef EMULATE_603
-#define fb_603_AltGPR		BIT( FBIT_603_AltGPR )
+#define fb_603_AltGPR		MOL_BIT( FBIT_603_AltGPR )
 #endif
 
 #endif /* _MAC_REGISTERS_H */

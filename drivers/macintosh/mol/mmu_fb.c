@@ -1,17 +1,17 @@
-/*
+/* 
  *   Creation Date: <1999-12-28 14:03:18 samuel>
  *   Time-stamp: <2004/02/14 14:52:52 samuel>
- *
+ *   
  *	<mmu_fb.c>
- *
+ *	
  *	Offscreen framebuffer acceleration
- *
+ *   
  *   Copyright (C) 2002, 2003, 2004 Samuel Rydh (samuel@ibrium.se)
- *
+ *   
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *
+ *   
  */
 
 #include "archinclude.h"
@@ -107,7 +107,7 @@ setup_fb_acceleration( kernel_vars_t *kv, char *lvbase, int bytes_per_row, int h
 	DECLARE_FB;
 	int i, offs = (ulong)lvbase & 0xfff;
 	line_entry_t *p;
-
+	
 	if( fb )
 		cleanup_mmu_fb( kv );
 	if( !lvbase )
@@ -160,7 +160,7 @@ get_dirty_fb_lines( kernel_vars_t *kv, short *userbuf, int num_bytes )
 				p->slot = NULL;
 				p->dirty = 1;
 				__tlbie( p->ea );
-			} else if( p->slot[1] & BIT(24) ) {  /* C-BIT */
+			} else if( p->slot[1] & MOL_BIT(24) ) {  /* C-BIT */
 				p->dirty = 1;
 				__store_PTE( p->ea, p->slot, p->pte0, p->pte1 );
 				BUMP(fb_ptec_flush);

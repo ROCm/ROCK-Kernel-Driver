@@ -1,16 +1,16 @@
-/*
+/* 
  *   Creation Date: <2000/10/29 01:43:29 samuel>
  *   Time-stamp: <2003/07/27 22:37:49 samuel>
- *
+ *   
  *	<processor.h>
- *
+ *	
  *	Extract from <asm/processor.h>
- *
- *
+ *   
+ *   
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *
+ *   
  */
 
 #ifndef _H_PROCESSOR
@@ -18,16 +18,16 @@
 
 
 #define PTE0_VSID(s)	(((s)>>7) & 0xffffff)
-#define PTE0_V		BIT(0)
-#define PTE0_H		BIT(25)
+#define PTE0_V		MOL_BIT(0)
+#define PTE0_H		MOL_BIT(25)
 #define PTE0_API	0x3f
 
-#define PTE1_R		BIT(23)
-#define PTE1_C		BIT(24)
-#define PTE1_W		BIT(25)
-#define PTE1_I		BIT(26)
-#define PTE1_M		BIT(27)
-#define PTE1_G		BIT(28)
+#define PTE1_R		MOL_BIT(23)
+#define PTE1_C		MOL_BIT(24)
+#define PTE1_W		MOL_BIT(25)
+#define PTE1_I		MOL_BIT(26)
+#define PTE1_M		MOL_BIT(27)
+#define PTE1_G		MOL_BIT(28)
 #ifdef CONFIG_AMIGAONE
 /* Memory coherence locks up A1 compatible systems. */
 #define PTE1_WIMG	(PTE1_W | PTE1_I | PTE1_G)
@@ -37,9 +37,9 @@
 #define PTE1_PP		0x3
 #define PTE1_RPN	(~0xfffUL)
 
-#define VSID_Ks		BIT(1)
-#define VSID_Kp		BIT(2)
-#define VSID_N		BIT(3)
+#define VSID_Ks		MOL_BIT(1)
+#define VSID_Kp		MOL_BIT(2)
+#define VSID_N		MOL_BIT(3)
 
 
 
@@ -149,7 +149,7 @@
 #define S_PTELO		982	/* 7445/7455 */
 #define S_L3PM		983	/* L3 Private Memory Address Control Register */
 #define S_L3ITCR0	984	/* ??? */
-#define S_L3OHCR	1000	/* ??? */
+#define S_L3OHCR	1000	/* ??? */ 
 #define S_L3ITCR1	1001	/* ??? */
 #define S_L3ITCR2	1002	/* ??? */
 #define S_L3ITCR3	1003	/* ??? */
@@ -236,30 +236,30 @@
 #define	HID0_BHT	(1<<2)		/* Branch History Table Enable */
 #define	HID0_BTCD	(1<<1)		/* Branch target cache disable */
 
-#define L2CR_L2E	BIT(0)		/* L2 enable */
-#define L2CR_L2PE	BIT(1)		/* L2 data parity generation and checking */
-#define L2CR_L2SIZ_512K	BIT(2)
-#define L2CR_L2SIZ_256K	BIT(3)
-#define L2CR_L2SIZ_1MB	(BIT(2)|BIT(3))
-#define L2CR_L2CLK_1	BIT(6)		/* L2 clock ration */
-#define L2CR_L2CLK_15	(BIT(6)*2)
-#define L2CR_L2CLK_2	(BIT(6)*4)
-#define L2CR_L2CLK_25	(BIT(6)*5)
-#define L2CR_L2CLK_3	(BIT(6)*6)
+#define L2CR_L2E	MOL_BIT(0)		/* L2 enable */
+#define L2CR_L2PE	MOL_BIT(1)		/* L2 data parity generation and checking */
+#define L2CR_L2SIZ_512K	MOL_BIT(2)
+#define L2CR_L2SIZ_256K	MOL_BIT(3)
+#define L2CR_L2SIZ_1MB	(MOL_BIT(2)|MOL_BIT(3))
+#define L2CR_L2CLK_1	MOL_BIT(6)		/* L2 clock ration */
+#define L2CR_L2CLK_15	(MOL_BIT(6)*2)
+#define L2CR_L2CLK_2	(MOL_BIT(6)*4)
+#define L2CR_L2CLK_25	(MOL_BIT(6)*5)
+#define L2CR_L2CLK_3	(MOL_BIT(6)*6)
 #define L2CR_L2RAM_FT	0		/* flow-through (reg-buf) synchronous SRAM */
-#define L2CR_L2RAM_PB	BIT(7)		/* Piplined (reg-reg) synchronous burst SRAM */
-#define L2CR_L2RAM_PLW	(BIT(7)|BIT(8))	/* Piplined (reg-reg) synchronous late-write */
-#define L2CR_L2DO	BIT(9)		/* L2 data-only */
-#define L2CR_L2I	BIT(10)		/* L2 global invalidate */
-#define L2CR_L2CTL	BIT(11)		/* L2 RAM control (ZZ enable, low-power mode) */
-#define L2CR_L2WT	BIT(12)		/* L2 write-through */
-#define L2CR_L2TS	BIT(13)		/* L2 test support */
+#define L2CR_L2RAM_PB	MOL_BIT(7)		/* Piplined (reg-reg) synchronous burst SRAM */
+#define L2CR_L2RAM_PLW	(MOL_BIT(7)|MOL_BIT(8))	/* Piplined (reg-reg) synchronous late-write */
+#define L2CR_L2DO	MOL_BIT(9)		/* L2 data-only */
+#define L2CR_L2I	MOL_BIT(10)		/* L2 global invalidate */
+#define L2CR_L2CTL	MOL_BIT(11)		/* L2 RAM control (ZZ enable, low-power mode) */
+#define L2CR_L2WT	MOL_BIT(12)		/* L2 write-through */
+#define L2CR_L2TS	MOL_BIT(13)		/* L2 test support */
 #define L2CR_L2OH_05	0		/* L2 output hold 0.5 nS */
-#define L2CR_L2OH_10	BIT(15)		/* L2 output hold 1.0 nS */
-#define L2CR_L2SL	BIT(16)		/* L2 DLL slow (use if bus freq < 150 MHz) */
-#define L2CR_L2DF	BIT(17)		/* L2 differential clock */
-#define L2CR_L2BYP	BIT(18)		/* L2 DLL bypass */
-#define L2CR_L2IP	BIT(31)		/* L2 global invalidate in progress */
+#define L2CR_L2OH_10	MOL_BIT(15)		/* L2 output hold 1.0 nS */
+#define L2CR_L2SL	MOL_BIT(16)		/* L2 DLL slow (use if bus freq < 150 MHz) */
+#define L2CR_L2DF	MOL_BIT(17)		/* L2 differential clock */
+#define L2CR_L2BYP	MOL_BIT(18)		/* L2 DLL bypass */
+#define L2CR_L2IP	MOL_BIT(31)		/* L2 global invalidate in progress */
 
 /* SPR_THRM1 */
 #define THRM1_TIN	(1 << 31)
