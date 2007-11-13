@@ -64,6 +64,20 @@ static struct net *net_alloc(void)
 	return kmem_cache_zalloc(net_cachep, GFP_KERNEL);
 }
 
+static void net_free(struct net *net)
+{
+	if (!net)
+		return;
+
+	if (unlikely(atomic_read(&net->use_count) != 0)) {
+		printk(KERN_EMERG "network namespace not free! Usage: %d\n",
+			atomic_read(&net->use_count));
+		return;
+	}
+
+	kmem_cache_free(net_cachep, net);
+}
+
 struct net *copy_net_ns(unsigned long flags, struct net *old_net)
 {
 	struct net *new_net = NULL;
@@ -98,20 +112,6 @@ out:
 		new_net = ERR_PTR(err);
 	}
 	return new_net;
-}
-
-static void net_free(struct net *net)
-{
-	if (!net)
-		return;
-
-	if (unlikely(atomic_read(&net->use_count) != 0)) {
-		printk(KERN_EMERG "network namespace not free! Usage: %d\n",
-			atomic_read(&net->use_count));
-		return;
-	}
-
-	kmem_cache_free(net_cachep, net);
 }
 
 static void cleanup_net(struct work_struct *work)
@@ -188,6 +188,7 @@ static int __init net_ns_init(void)
 
 pure_initcall(net_ns_init);
 
+#ifdef CONFIG_NET_NS
 static int register_pernet_operations(struct list_head *list,
 				      struct pernet_operations *ops)
 {
@@ -227,6 +228,23 @@ static void unregister_pernet_operations(struct pernet_operations *ops)
 		for_each_net(net)
 			ops->exit(net);
 }
+
+#else
+
+static int register_pernet_operations(struct list_head *list,
+				      struct pernet_operations *ops)
+{
+	if (ops->init == NULL)
+		return 0;
+	return ops->init(&init_net);
+}
+
+static void unregister_pernet_operations(struct pernet_operations *ops)
+{
+	if (ops->exit)
+		ops->exit(&init_net);
+}
+#endif
 
 /**
  *      register_pernet_subsys - register a network namespace subsystem
