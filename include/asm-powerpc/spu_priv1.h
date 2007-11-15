@@ -24,7 +24,6 @@
 #include <linux/types.h>
 
 struct spu;
-struct spu_context;
 
 /* access to priv1 registers */
 
@@ -180,8 +179,6 @@ struct spu_management_ops {
 	int (*create_spu)(struct spu *spu, void *data);
 	int (*destroy_spu)(struct spu *spu);
 	int (*init_affinity)(void);
-	int (*enable_spu)(struct spu_context *ctx);
-	int (*disable_spu)(struct spu_context *ctx);
 };
 
 extern const struct spu_management_ops* spu_management_ops;
@@ -208,18 +205,6 @@ static inline int
 spu_init_affinity (void)
 {
 	return spu_management_ops->init_affinity();
-}
-
-static inline int
-spu_enable_spu (struct spu_context *ctx)
-{
-	return spu_management_ops->enable_spu(ctx);
-}
-
-static inline int
-spu_disable_spu (struct spu_context *ctx)
-{
-	return spu_management_ops->disable_spu(ctx);
 }
 
 /*

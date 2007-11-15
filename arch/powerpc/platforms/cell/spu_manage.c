@@ -35,7 +35,6 @@
 #include <asm/firmware.h>
 #include <asm/prom.h>
 
-#include "spufs/spufs.h"
 #include "interrupt.h"
 
 struct device_node *spu_devnode(struct spu *spu)
@@ -532,23 +531,9 @@ static int __init init_affinity(void)
 	return 0;
 }
 
-static int enable_spu_by_master_run(struct spu_context *ctx)
-{
-	ctx->ops->master_start(ctx);
-	return 0;
-}
-
-static int disable_spu_by_master_run(struct spu_context *ctx)
-{
-	ctx->ops->master_stop(ctx);
-	return 0;
-}
-
 const struct spu_management_ops spu_management_of_ops = {
 	.enumerate_spus = of_enumerate_spus,
 	.create_spu = of_create_spu,
 	.destroy_spu = of_destroy_spu,
 	.init_affinity = init_affinity,
-	.enable_spu = enable_spu_by_master_run,
-	.disable_spu = disable_spu_by_master_run,
 };

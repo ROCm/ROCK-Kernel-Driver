@@ -947,12 +947,6 @@ static int __init early_init_dt_scan_memory(unsigned long node,
 				size = 0x80000000ul - base;
 		}
 #endif
-#ifdef CONFIG_PPC_PS3
-	/* temporary hack for the legacy bootloader */
-	if (of_flat_dt_is_compatible(of_get_flat_dt_root(), "PS3PF")) {
-		size = 0x8000000;
-	}
-#endif
 		lmb_add(base, size);
 	}
 	return 0;

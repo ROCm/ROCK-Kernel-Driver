@@ -28,7 +28,6 @@
 #include <asm/spu_priv1.h>
 #include <asm/lv1call.h>
 
-#include "../cell/spufs/spufs.h"
 #include "platform.h"
 
 /* spu_management_ops */
@@ -420,24 +419,11 @@ static int ps3_init_affinity(void)
 	return 0;
 }
 
-static int ps3_enable_spu(struct spu_context *ctx)
-{
-	return -ENOSYS;
-}
-
-static int ps3_disable_spu(struct spu_context *ctx)
-{
-	ctx->ops->runcntl_stop(ctx);
-	return -ENOSYS;
-}
-
 const struct spu_management_ops spu_management_ps3_ops = {
 	.enumerate_spus = ps3_enumerate_spus,
 	.create_spu = ps3_create_spu,
 	.destroy_spu = ps3_destroy_spu,
 	.init_affinity = ps3_init_affinity,
-	.enable_spu = ps3_enable_spu,
-	.disable_spu = ps3_disable_spu,
 };
 
 /* spu_priv1_ops */

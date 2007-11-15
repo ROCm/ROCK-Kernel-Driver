@@ -333,7 +333,6 @@
 #define PS3AV_MODE_RGB				0x0020
 
 
-#ifdef __KERNEL__
 /** command packet structure **/
 struct ps3av_send_hdr {
 	u16 version;
@@ -725,5 +724,4 @@ extern void ps3av_register_flip_ctl(void (*flip_ctl)(int on, void *data),
 				    void *flip_data);
 extern void ps3av_flip_ctl(int on);
 
-#endif /* __KERNEL__ */
 #endif	/* _ASM_POWERPC_PS3AV_H_ */

@@ -302,7 +302,7 @@ long spufs_run_spu(struct spu_context *ctx, u32 *npc, u32 *event)
 	if (mutex_lock_interruptible(&ctx->run_mutex))
 		return -ERESTARTSYS;
 
-	spu_enable_spu(ctx);
+	ctx->ops->master_start(ctx);
 	ctx->event_return = 0;
 
 	spu_acquire(ctx);
@@ -376,7 +376,7 @@ long spufs_run_spu(struct spu_context *ctx, u32 *npc, u32 *event)
 		ctx->stats.libassist++;
 
 
-	spu_disable_spu(ctx);
+	ctx->ops->master_stop(ctx);
 	ret = spu_run_fini(ctx, npc, &status);
 	spu_yield(ctx);
 

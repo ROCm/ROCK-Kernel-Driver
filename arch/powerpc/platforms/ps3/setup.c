@@ -224,9 +224,7 @@ static int __init ps3_probe(void)
 	DBG(" -> %s:%d\n", __func__, __LINE__);
 
 	dt_root = of_get_flat_dt_root();
-	if (!of_flat_dt_is_compatible(dt_root, "sony,ps3")
-		/* temporary hack for the legacy bootloader */
-		&& !of_flat_dt_is_compatible(dt_root, "PS3PF"))
+	if (!of_flat_dt_is_compatible(dt_root, "sony,ps3"))
 		return 0;
 
 	powerpc_firmware_features |= FW_FEATURE_PS3_POSSIBLE;

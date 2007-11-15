@@ -230,7 +230,6 @@ fi
 
 if [ "$platform" != "miboot" ]; then
     ${CROSS}ld -m elf32ppc -T $lds -o "$ofile" \
-	-Map "$ofile.map" \
 	$platformo $tmp $object/wrapper.a
     rm $tmp
 fi
