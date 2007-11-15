@@ -551,10 +551,6 @@ static inline void iosync(void)
 #define iobarrier_r()  eieio()
 #define iobarrier_w()  eieio()
 
-#if defined(CONFIG_PPC_PMAC) && defined(CONFIG_SERIAL_8250)
-#define NO_PC_LEGACY_SERIAL_8250 1
-extern int do_not_probe_pc_legacy_8250;
-#endif
 
 /*
  * output pause versions need a delay at least for the

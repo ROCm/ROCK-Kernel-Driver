@@ -666,20 +666,6 @@ static void pmac_cpu_die(void)
 
 #endif /* CONFIG_PPC64 */
 
-#ifdef CONFIG_SERIAL_8250
-/*
- * if both serial drivers exists, 8250 will be inited first
- * it claims ttyS0 and pmac_zilog init fails
- */
-int do_not_probe_pc_legacy_8250;
-EXPORT_SYMBOL(do_not_probe_pc_legacy_8250);
-#ifdef CONFIG_SERIAL_PMACZILOG
-static void pmac_pcibios_fixup(void) {
-	do_not_probe_pc_legacy_8250 = 1;
-}
-#endif
-#endif
-
 define_machine(powermac) {
 	.name			= "PowerMac",
 	.probe			= pmac_probe,
@@ -688,9 +674,6 @@ define_machine(powermac) {
 	.show_cpuinfo		= pmac_show_cpuinfo,
 	.init_IRQ		= pmac_pic_init,
 	.get_irq		= NULL,	/* changed later */
-#if defined(CONFIG_SERIAL_8250) && defined(CONFIG_SERIAL_PMACZILOG)
-	.pcibios_fixup		= pmac_pcibios_fixup,
-#endif
 	.pci_irq_fixup		= pmac_pci_irq_fixup,
 	.restart		= pmac_restart,
 	.power_off		= pmac_power_off,
