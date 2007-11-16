@@ -37,8 +37,8 @@ MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
 
 static unsigned int psmouse_max_proto = PSMOUSE_AUTO;
-static int psmouse_set_maxproto(const char *val, struct kernel_param *kp);
-static int psmouse_get_maxproto(char *buffer, struct kernel_param *kp);
+int psmouse_set_maxproto(const char *val, struct kernel_param *kp);
+int psmouse_get_maxproto(char *buffer, struct kernel_param *kp);
 #define param_check_proto_abbrev(name, p)	__param_check(name, p, unsigned int)
 #define param_set_proto_abbrev			psmouse_set_maxproto
 #define param_get_proto_abbrev			psmouse_get_maxproto
