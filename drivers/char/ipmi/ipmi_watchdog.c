@@ -188,7 +188,7 @@ static void ipmi_unregister_watchdog(int ipmi_intf);
    and ready. */
 static int start_now;
 
-static int set_param_int(const char *val, struct kernel_param *kp)
+int set_param_int(const char *val, struct kernel_param *kp)
 {
 	char *endp;
 	int  l;
@@ -207,7 +207,7 @@ static int set_param_int(const char *val, struct kernel_param *kp)
 	return rv;
 }
 
-static int get_param_int(char *buffer, struct kernel_param *kp)
+int get_param_int(char *buffer, struct kernel_param *kp)
 {
 	return sprintf(buffer, "%i", *((int *)kp->arg));
 }
@@ -219,7 +219,7 @@ static int preaction_op(const char *inval, char *outval);
 static int preop_op(const char *inval, char *outval);
 static void check_parms(void);
 
-static int set_param_str(const char *val, struct kernel_param *kp)
+int set_param_str(const char *val, struct kernel_param *kp)
 {
 	action_fn  fn = (action_fn) kp->arg;
 	int        rv = 0;
@@ -243,7 +243,7 @@ static int set_param_str(const char *val, struct kernel_param *kp)
 	return rv;
 }
 
-static int get_param_str(char *buffer, struct kernel_param *kp)
+int get_param_str(char *buffer, struct kernel_param *kp)
 {
 	action_fn fn = (action_fn) kp->arg;
 	int       rv;
@@ -255,7 +255,7 @@ static int get_param_str(char *buffer, struct kernel_param *kp)
 }
 
 
-static int set_param_wdog_ifnum(const char *val, struct kernel_param *kp)
+int set_param_wdog_ifnum(const char *val, struct kernel_param *kp)
 {
 	int rv = param_set_int(val, kp);
 	if (rv)
