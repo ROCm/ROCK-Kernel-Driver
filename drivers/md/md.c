@@ -5866,11 +5866,11 @@ static __exit void md_exit(void)
 subsys_initcall(md_init);
 module_exit(md_exit)
 
-static int get_ro(char *buffer, struct kernel_param *kp)
+int get_ro(char *buffer, struct kernel_param *kp)
 {
 	return sprintf(buffer, "%d", start_readonly);
 }
-static int set_ro(const char *val, struct kernel_param *kp)
+int set_ro(const char *val, struct kernel_param *kp)
 {
 	char *e;
 	int num = simple_strtoul(val, &e, 10);
