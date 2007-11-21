@@ -1,0 +1,865 @@
+2007-11-08 Jay Lan  <jlan@sgi.com>
+
+	* New KDB USB interface,  Aaron Young <ayoung@sgi.com>
+	*  1. This patch allows KDB to work with any Host Contoller driver
+	*     and call the correct HC driver poll routine (as long as the
+	*     HC driver provides a .kdb_poll_char routine via it's
+	*     associated hc_driver struct).
+	*  2. Hotplugged keyboards are now recognized by KDB.
+	*  3. Currently KDB can only make use of 1 USB type keyboard.
+	*     New code can handle up to 8 attached keyboards - input is
+	*     multiplexed from all of them while in kdb.
+	* kdb v4.4-2.6.23-common-2.
+
+2007-10-24 Jay Lan  <jlan@sgi.com>
+
+	* kdb v4.4-2.6.23-i386-1.
+
+2007-09-26 Jay Lan  <jlan@sgi.com>
+
+	* kdb v4.4-2.6.23-rc8-i386-1.
+
+2007-09-21 Jay Lan  <jlan@sgi.com>
+
+	* kdb v4.4-2.6.23-rc7-i386-1.
+
+2007-09-12 Jay Lan  <jlan@sgi.com>
+
+	* kdb v4.4-2.6.23-rc6-i386-1.
+
+2007-09-06 Jay Lan  <jlan@sgi.com>
+
+	* kdb v4.4-2.6.23-rc5-i386-1.
+
+2007-08-30 Keith Owens  <kaos@sgi.com>
+
+	* New i386/x86_64 backtrace requires that kdb_save_running() does not
+	  exit until after kdb_main_loop() has completed.
+	* kdb v4.4-2.6.23-rc4-i386-2.
+
+2007-08-30 Jay Lan  <jlan@sgi.com>
+
+	* kdb v4.4-2.6.23-rc4-i386-1.
+
+2007-08-24 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.23-rc3-i386-1.
+
+2007-08-07 Jay Lan  <jlan@sgi.com>
+
+	* kdb v4.4-2.6.23-rc2-i386-1.
+
+2007-07-31 Keith Owens  <kaos@sgi.com>
+
+	* Delete obsolete kdba_bt.c.
+	* kdb v4.4-2.6.23-rc1-i386-2.
+
+2007-07-30 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.23-rc1-i386-1.
+
+2007-07-26 Keith Owens  <kaos@sgi.com>
+
+	* New x86 backtrace code.
+	* kdb v4.4-2.6.22-i386-2.
+
+2007-07-09 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.22-i386-1.
+
+2007-07-02 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.22-rc7-i386-1.
+
+2007-06-20 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.22-rc5-i386-1.
+
+2007-06-08 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.22-rc4-i386-1.
+
+2007-05-28 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.22-rc3-i386-1.
+
+2007-05-22 Keith Owens  <kaos@sgi.com>
+
+	* Register KDBENTER_VECTOR early on the boot cpu.
+	* kdb v4.4-2.6.22-rc2-i386-2.
+
+2007-05-22 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.22-rc2-i386-1.
+
+2007-05-22 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.22-rc1-i386-1.
+
+2007-05-17 Keith Owens  <kaos@sgi.com>
+
+	* Update dumpregs comments for rdmsr and wrmsr commands.
+	  Bernardo Innocenti.
+	* kdb v4.4-2.6.21-i386-3.
+
+2007-05-15 Keith Owens  <kaos@sgi.com>
+
+	* Change kdba_late_init to kdba_arch_init so KDB_ENTER() can be used
+	  earlier.
+	* kdb v4.4-2.6.21-i386-2.
+
+2007-04-29 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.21-i386-1.
+
+2007-04-16 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.21-rc7-i386-1.
+
+2007-04-10 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.21-rc6-i386-1.
+
+2007-04-02 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.21-rc5-i386-1.
+
+2007-03-19 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.21-rc4-i386-1.
+
+2007-03-14 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.21-rc3-i386-1.
+
+2007-03-14 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.21-rc2-i386-1.
+
+2007-03-01 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.21-rc1-i386-1.
+
+2007-03-01 Keith Owens  <kaos@sgi.com>
+
+	* Remove sparse warnings.
+	* kdb v4.4-2.6.20-i386-3.
+
+2007-02-16 Keith Owens  <kaos@sgi.com>
+
+	* Initialise variable bits of struct disassemble_info each time.
+	* kdb v4.4-2.6.20-i386-2.
+
+2007-02-06 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.20-i386-1.
+
+2007-02-01 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.20-rc7-i386-1.
+
+2007-01-08 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.20-rc4-i386-1.
+
+2007-01-02 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.20-rc3-i386-1.
+
+2006-12-20 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.20-rc1-i386-1.
+
+2006-11-30 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.19-i386-1.
+
+2006-11-27 Keith Owens  <kaos@sgi.com>
+
+	* Only use VT keyboard if the command line allows it and ACPI indicates
+	  that there is an i8042.
+	* kdb v4.4-2.6.19-rc6-i386-2.
+
+2006-11-20 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.19-rc6-i386-1.
+
+2006-11-09 Keith Owens  <kaos@sgi.com>
+
+	* Change kdb() to fastcall.
+	* Add unwind info to kdb_call().  Steve Lord.
+	* Only use VT console if the command line allows it.
+	* kdb v4.4-2.6.19-rc5-i386-2.
+
+2006-11-08 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.19-rc5-i386-1.
+
+2006-11-01 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.19-rc4-i386-1.
+
+2006-10-24 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.19-rc3-i386-1.
+
+2006-10-24 Keith Owens  <kaos@sgi.com>
+
+	* Remove redundant regs and envp parameters.
+	* kdb v4.4-2.6.19-rc2-i386-2.
+
+2006-10-18 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.19-rc2-i386-1.
+
+2006-10-11 Keith Owens  <kaos@sgi.com>
+
+	* Move kdbm_x86.c from the i386 to the common KDB patch.
+	* Make the KDBENTER_VECTOR an interrupt gate instead of a trap gate, it
+	  simplifies the code and disables interrupts on KDBENTER().
+	* Exclude the KDBENTER_VECTOR from irq assignment.
+	* kdb v4.4-2.6.19-rc1-i386-2.
+
+2006-10-09 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.19-rc1-i386-1.
+
+2006-10-06 Keith Owens  <kaos@sgi.com>
+
+	* Remove #include <linux/config.h>
+	* kdb v4.4-2.6.18-i386-2.
+
+2006-09-20 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.18-i386-1.
+
+2006-09-15 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.18-rc7-i386-1.
+
+2006-08-30 Keith Owens  <kaos@sgi.com>
+
+	* Add warning for problems when following alternate stacks.
+	* kdb v4.4-2.6.18-rc5-i386-3.
+
+2006-08-29 Keith Owens  <kaos@sgi.com>
+
+	* Rewrite all backtrace code.
+	* kdb v4.4-2.6.18-rc5-i386-2.
+
+2006-08-28 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.18-rc5-i386-1.
+
+2006-08-08 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.18-rc4-i386-1.
+
+2006-08-04 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.18-rc3-i386-1.
+
+2006-07-18 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.18-rc2-i386-1.
+
+2006-07-12 Keith Owens  <kaos@sgi.com>
+
+	* Remove dead KDB_REASON codes.
+	* sparse cleanups.
+	* kdb v4.4-2.6.18-rc1-i386-2.
+
+2006-07-07 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.18-rc1-i386-1.
+
+2006-07-04 Keith Owens  <kaos@sgi.com>
+
+	* Make KDB rendezvous on i386 a two stage approach.
+	* Clean up generation of KDB interrupt code.
+	* Move smp_kdb_stop() and smp_kdb_interrupt() to kdbasupport.c.
+	* Move setting of interrupt traps to kdbasupport.c.
+	* Remove KDB hooks from arch/i386/kernel smp.c, smpboot.c, i8259.c,
+	  io_apic.c.
+	* Add KDB_REASON_CPU_UP support.
+	* Move per cpu setup to kdba_cpu_up().
+	* Rework support for 4K stacks to make backtrace more accurate.
+	* Add BTSP option to get the full backtrace, including kdb routines.
+	* Delete kdba_enable_mce, architectures now do their own setup.
+	* Delete kdba_enable_lbr, kdba_disable_lbr, kdba_print_lbr,
+	  page_fault_mca.  Only ever implemented on x86, difficult to maintain
+	  and rarely used in the field.
+	* Replace #ifdef KDB_HAVE_LONGJMP with #ifdef kdba_setjmp.
+	* kdb v4.4-2.6.17-i386-2.
+
+2006-06-19 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.17-i386-1.
+
+2006-05-25 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.17-rc5-i386-1.
+
+2006-05-15 Keith Owens  <kaos@sgi.com>
+
+	* Refresh bfd related files from binutils 2.16.91.0.2.
+	* kdb v4.4-2.6.17-rc4-i386-2.
+
+2006-05-12 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.17-rc4-i386-1.
+
+2006-04-28 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.17-rc3-i386-1.
+
+2006-04-22 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.17-rc2-i386-1.
+
+2006-04-11 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.17-rc1-i386-1.
+
+2006-03-30 Keith Owens  <kaos@sgi.com>
+
+	* Change CONFIG_LKCD to CONFIG_LKCD_DUMP.
+	* kdb v4.4-2.6.16-i386-3.
+
+2006-03-24 Keith Owens  <kaos@sgi.com>
+
+	* Define a dummy kdba_wait_for_cpus().
+	* kdb v4.4-2.6.16-i386-2.
+
+2006-03-21 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.16-i386-1.
+
+2006-03-14 Nathan Scott  <nathans@sgi.com>
+
+	* kdb v4.4-2.6.16-rc6-i386-1.
+
+2006-02-28 Nathan Scott  <nathans@sgi.com>
+
+	* kdb v4.4-2.6.16-rc5-i386-1.
+
+2006-02-20 Nathan Scott  <nathans@sgi.com>
+
+	* kdb v4.4-2.6.16-rc4-i386-1.
+
+2006-02-06 Keith Owens  <kaos@sgi.com>
+
+	* Change CONFIG_CRASH_DUMP to CONFIG_LKCD.
+	* kdb v4.4-2.6.16-rc2-i386-2.
+
+2006-02-06 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.16-rc2-i386-1.
+
+2006-01-18 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.16-rc1-i386-1.
+
+2006-01-08 Keith Owens  <kaos@sgi.com>
+
+	* Add DIE_KDEBUG_ENTER and DIE_KDEBUG_LEAVE to notify_die.
+	* kdb v4.4-2.6.15-i386-2.
+
+2006-01-04 Keith Owens  <kaos@sgi.com>
+
+	* Remove some inlines and the last vestige of CONFIG_NUMA_REPLICATE.
+	* Read the keyboard acknowledgment after sending a character.  SuSE
+	  Bugzilla 60240.
+	* kdb v4.4-2.6.15-i386-1.
+
+2005-12-25 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.15-rc7-i386-1.
+
+2005-12-20 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.15-rc6-i386-1.
+
+2005-12-05 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.15-rc5-i386-1.
+
+2005-12-02 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.15-rc4-i386-1.
+
+2005-11-30 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.15-rc3-i386-1.
+
+2005-11-21 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.15-rc2-i386-1.
+
+2005-11-15 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.15-rc1-i386-1.
+
+2005-10-28 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.14-i386-1.
+
+2005-10-21 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.14-rc5-i386-1.
+
+2005-10-11 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.14-rc4-i386-1.
+
+2005-10-04 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.14-rc3-i386-1.
+
+2005-09-21 Keith Owens  <kaos@sgi.com>
+
+	* Support kdb_current_task in register display and modify commands.
+	* kdb v4.4-2.6.14-rc2-i386-1.
+
+2005-09-20 Keith Owens  <kaos@sgi.com>
+
+	* Remove use of __STDC_VERSION__ in ansidecl.h.
+	* kdb v4.4-2.6.14-rc1-i386-1.
+
+2005-08-29 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.13-i386-1.
+
+2005-08-24 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.13-rc7-i386-1.
+
+2005-08-08 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.13-rc6-i386-1.
+
+2005-08-02 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.13-rc5-i386-1.
+
+2005-07-30 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.13-rc4-i386-1.
+
+2005-07-22 Keith Owens  <kaos@sgi.com>
+
+	* Compile fix for kprobes.
+	* kdb v4.4-2.6.13-rc3-i386-2.
+
+2005-07-19 Keith Owens  <kaos@sgi.com>
+
+	* Add support for USB keyboard (OHCI only).  Aaron Young, SGI.
+	* kdb v4.4-2.6.13-rc3-i386-1.
+
+2005-07-08 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.13-rc2-i386-1.
+
+2005-07-01 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.13-rc1-i386-1.
+
+2005-06-19 Keith Owens  <kaos@sgi.com>
+
+	* gcc 4 compile fix, remove extern kdb_hardbreaks.  Steve Lord.
+	* kdb v4.4-2.6.12-i386-2.
+
+2005-06-18 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.12-i386-1.
+
+2005-06-08 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.12-rc6-i386-1.
+
+2005-05-25 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.12-rc5-i386-1.
+
+2005-05-08 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.12-rc4-i386-1.
+
+2005-04-21 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.12-rc3-i386-1.
+
+2005-04-06 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.12-rc2-i386-1.
+
+2005-03-29 Keith Owens  <kaos@sgi.com>
+
+	* Replace __copy_to_user with __copy_to_user_inatomic.
+	* kdb v4.4-2.6.12-rc1-i386-1.
+
+2005-03-08 Keith Owens  <kaos@sgi.com>
+
+	* Coexistence patches for lkcd.
+	* kdb v4.4-2.6.11-i386-2.
+
+2005-03-03 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.11-i386-1.
+
+2005-02-14 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.11-rc4-i386-1.
+
+2005-02-08 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.11-rc3-bk4-i386-1.
+
+2005-02-03 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.11-rc3-i386-1.
+
+2005-01-27 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.11-rc2-i386-1.
+
+2005-01-12 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.11-rc1-i386-1.
+
+2004-12-25 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.10-i386-1.
+
+2004-12-07 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.10-rc3-i386-1.
+
+2004-11-23 Keith Owens  <kaos@sgi.com>
+
+	* Coexist with asmlinkage/fastcall changes.
+	* kdb v4.4-2.6.10-rc2-i386-1.
+
+2004-10-29 Keith Owens  <kaos@sgi.com>
+
+	* Handle change defintions for hard and soft irq context.
+	* Make stack switch in kdb backtrace look more like the oops output.
+	* kdb v4.4-2.6.10-rc1-i386-1.
+
+2004-10-19 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.9-i386-1.
+
+2004-10-12 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.9-rc4-i386-1.
+
+2004-10-01 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.9-rc3-i386-1.
+
+2004-09-30 Keith Owens  <kaos@sgi.com>
+
+	* Add stackdepth command.
+	* Handle backtrace with separate soft and hard irq stacks
+	  (CONFIG_4KSTACKS).
+	* Work around RESTORE_ALL macro, which can only be used once.
+	* Export kdba_dumpregs.  Bryan Cardillo, UPenn.
+	* kdb v4.4-2.6.9-rc2-i386-2.
+
+2004-09-14 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.9-rc2-i386-1.
+
+2004-08-27 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.9-rc1-i386-1.
+
+2004-08-14 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.8-i386-1.
+
+2004-08-12 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.8-rc4-i386-1.
+
+2004-08-04 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.8-rc3-i386-1.
+
+2004-07-18 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.8-rc2-i386-1.
+
+2004-07-12 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.8-rc1-i386-1.
+
+2004-06-16 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.7-i386-1.
+
+2004-06-10 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.7-rc3-i386-1.
+
+2004-06-09 Keith Owens  <kaos@sgi.com>
+
+	* Namespace clean up.  Mark code/variables as static when it is only
+	  used in one file, delete dead code/variables.
+	* kdb v4.4-2.6.7-rc2-i386-3.
+
+2004-06-08 Keith Owens  <kaos@sgi.com>
+
+	* Whitespace clean up, no code changes.
+	* kdb v4.4-2.6.7-rc2-i386-2.
+
+2004-06-07 Keith Owens  <kaos@sgi.com>
+
+	* Force KALLSYMS and KALLSYMS_ALL for CONFIG_KDB.
+	* kdb v4.4-2.6.7-rc2-i386-1.
+
+2004-06-06 Keith Owens  <kaos@sgi.com>
+
+	* Correct Kconfig help text.
+	* Coexist with CONFIG_REGPARM.
+	* Add standard archkdb commands.
+	* Move kdb_{get,put}userarea_size definitions to linux/kdb.h.
+	* kdb v4.4-2.6.6-i386-2.
+
+2004-05-23 Keith Owens  <kaos@sgi.com>
+
+	* Move bfd.h and ansidecl.h from arch/$(ARCH)/kdb to include/asm-$(ARCH).
+	* Update copyright notices.
+	* kdb v4.4-2.6.6-i386-1.
+
+2004-05-10 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.3-2.6.6-i386-1.
+
+2004-05-06 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.3-2.6.6-rc3-i386-1.
+
+2004-05-06 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.3-2.6.6-rc2-i386-1.
+
+2004-04-30 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.3-2.6.6-rc1-i386-1.
+
+2004-04-05 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.3-2.6-5-i386-1.
+
+2004-02-29 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.3-2.6-4-rc1-i386-1.
+
+2004-02-18 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.3-2.6-3-i386-1.
+
+2004-02-17 Keith Owens  <kaos@sgi.com>
+
+	* Pick up changes from Jim Houston for 2.6.
+	* Sync with kdb v4.3-2.4.25-rc1-i386-1.
+	* Adjust for LDT changes in i386 mainline.
+	* Convert longjmp buffers from static to dynamic allocation, for large
+	  cpu counts.
+	* Do not use USB keyboard if it has not been probed.
+	* Do not print section data, 2.6 kallsyms does not support sections :(.
+	* kdb v4.3-2.6-3-rc3-i386-1.
+
+2003-08-29 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.3-2.4.22-i386-1.
+
+2003-08-05 Keith Owens  <kaos@sgi.com>
+
+	* Remove duplicate setting of trap for machine_check.
+	* Only reset keyboard when CONFIG_VT_CONSOLE is defined.
+
+2003-07-27 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.3-2.4.22-pre8-i386-5.
+
+2003-07-20 Keith Owens  <kaos@sgi.com>
+
+	* Remove compile warning on x86 commands.
+	* kdb v4.3-2.4.21-i386-5.
+
+2003-07-08 Keith Owens  <kaos@sgi.com>
+
+	* Add new x86 commands - rdv, gdt, idt, ldt, ldtp, ptex.
+	  Vamsi Krishna S., IBM.
+	* kdb v4.3-2.4.21-i386-4.
+
+2003-07-01 Keith Owens  <kaos@sgi.com>
+
+	* Convert kdba_find_return() to two passes to reduce false positives.
+	* Correct jmp disp8 offset calculation for out of line lock code.
+	* Use NMI for kdb IPI in clustered APIC mode.  Sachin Sant, IBM.
+	* kdb v4.3-2.4.21-i386-3.
+
+2003-06-23 Keith Owens  <kaos@sgi.com>
+
+	* Sync with XFS 2.4.21 tree.
+	* kdb v4.3-2.4.21-i386-2.
+
+2003-06-20 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.3-2.4.21-i386-1.
+
+2003-06-20 Keith Owens  <kaos@sgi.com>
+
+	* Add CONFIG_KDB_CONTINUE_CATASTROPHIC.
+	* Correct KDB_ENTER() definition.
+	* kdb v4.3-2.4.20-i386-1.
+
+2003-05-02 Keith Owens  <kaos@sgi.com>
+
+	* Add kdba_fp_value().
+	* Limit backtrace size to catch loops.
+	* Add read/write access to user pages.  Vamsi Krishna S., IBM
+	* Clean up USB keyboard support.  Steven Dake.
+	* kdb v4.2-2.4.20-i386-1.
+
+2003-04-04 Keith Owens  <kaos@sgi.com>
+
+	* Workarounds for scheduler bugs.
+	* kdb v4.1-2.4.20-i386-1.
+
+2003-03-16 Keith Owens  <kaos@sgi.com>
+
+	* Each cpu saves its state as it enters kdb or before it enters code
+	  which cannot call kdb, converting kdb from a pull to a push model.
+	* Clean up kdb interaction with CONFIG_SERIAL_CONSOLE.
+	* Removal of special cases for i386 backtrace from common code
+	  simplifies the architecture code.
+	* Add command to dump i386 struct pt_regs.
+	* kdb v4.0-2.4.20-i386-1.
+
+2003-02-03 Keith Owens  <kaos@sgi.com>
+
+	* Register kdb commands early.
+	* Handle KDB_ENTER() when kdb=off.
+	* Optimize __kdba_getarea_size when width is a constant.
+	* Decode oops via kallsyms if it is available.
+	* Update copyright notices to 2003.
+	* Handle call *disp32(%reg) in backtrace.
+	* Correct keyboard freeze.  Ashish Kalra.
+	* Add command history and editing.  Sonic Zhang.
+	* kdb_toggleled is conditional on KDB_BLINK_LED.  Bernhard Fischer.
+	* Allow tab on serial line for symbol completion.
+	* Ignore KDB_ENTER() when kdb is already running.
+	* kdb v3.0-2.4.20-i386-1.
+
+2002-11-29 Keith Owens  <kaos@sgi.com>
+
+	* Upgrade to 2.4.20.
+	* kdb v2.5-2.4.20-i386-1.
+
+2002-11-14 Keith Owens  <kaos@sgi.com>
+
+	* Upgrade to 2.4.20-rc1.
+	* kdb v2.5-2.4.20-rc1-i386-1.
+
+2002-11-14 Keith Owens  <kaos@sgi.com>
+
+	* General clean up of handling for breakpoints and single stepping over
+	  software breakpoints.
+	* Accept ff 1x as well as ff dx for call *(%reg) in backtrace.
+	* kdb v2.5-2.4.19-i386-1.
+
+2002-11-01 Keith Owens  <kaos@sgi.com>
+
+	* Prevent SMP IRQ overwriting KDB_ENTER().
+	* kdb v2.4-2.4.19-i386-2.
+
+2002-10-31 Keith Owens  <kaos@sgi.com>
+
+	* Avoid KDB_VECTOR conflict with DUMP_VECTOR.
+	* Remove kdb_eframe_t.
+	* Sanity check if we have pt_regs.
+	* Remove kdba_getcurrentframe().
+	* Reinstate missing nmi_watchdog/kdb hook.
+	* kdb v2.4-2.4.19-i386-1.
+
+2002-10-17 Keith Owens  <kaos@sgi.com>
+
+	* Correct compile with CONFIG_VT_CONSOLE=n.
+	* kdb v2.3-2.4.19-i386-5.
+
+2002-10-04 Keith Owens  <kaos@sgi.com>
+
+	* Add USB keyboard option.
+	* Minimize differences between patches for 2.4 and 2.5 kernels.
+	* kdb v2.3-2.4.19-i386-4.
+
+2002-08-10 Keith Owens  <kaos@sgi.com>
+
+	* Replace kdb_port with kdb_serial to support memory mapped I/O.
+	  Note: This needs kdb v2.3-2.4.19-common-2 or later.
+	* kdb v2.3-2.4.19-i386-3.
+
+2002-08-09 Keith Owens  <kaos@sgi.com>
+
+	* Use -fno-optimize-sibling-calls for kdb if gcc supports it.
+	* .text.lock does not consume an activation frame.
+	* kdb v2.3-2.4.19-i386-2.
+
+2002-08-07 Keith Owens  <kaos@sgi.com>
+
+	* Upgrade to 2.4.19.
+	* Remove individual SGI copyrights, the general SGI copyright applies.
+	* New .text.lock name.  Hugh Dickins.
+	* Set KERNEL_CS in kdba_getcurrentframe.  Hugh Dickins.
+	* Clean up disassembly layout.  Hugh Dickins, Keith Owens.
+	* Replace hard coded stack size with THREAD_SIZE.  Hugh Dickins.
+	* Better stack layout on bt with no frame pointers.  Hugh Dickins.
+	* Make i386 IO breakpoints (bpha <address> IO) work again.
+	  Martin Wilck, Keith Owens.
+	* Remove fixed KDB_MAX_COMMANDS size.
+	* Add set_fs() around __copy_to_user on kernel addresses.
+	  Randolph Chung.
+	* Position i386 for CONFIG_NUMA_REPLICATE.
+	* kdb v2.3-2.4.19-i386-1.
+
+2002-07-09 Keith Owens  <kaos@sgi.com>
+
+	* Upgrade to 2.4.19-rc1.
+
+2002-06-14 Keith Owens  <kaos@sgi.com>
+
+	* Upgrade to 2.4.19-pre10.
+	* kdb v2.1-2.4.19-pre10-i386-1.
+
+2002-04-09 Keith Owens  <kaos@sgi.com>
+
+	* Upgrade to 2.4.19-pre6.
+	* kdb v2.1-2.4.19-pre6-i386-1.
+
+2002-02-26 Keith Owens  <kaos@sgi.com>
+
+	* Upgrade to 2.4.18.
+	* kdb v2.1-2.4.18-i386-1.
+
+2002-01-18 Keith Owens  <kaos@sgi.com>
+
+	* Use new kdb_get/put functions.
+	* Define kdba_{get,put}area_size functions for i386.
+	* Remove over-engineered dblist callback functions.
+	* Correctly handle failing call disp32 in backtrace.
+	* Remove bp_instvalid flag, redundant code.
+	* Remove dead code.
+	* kdb v2.1-2.4.17-i386-1.
+
+2002-01-04 Keith Owens  <kaos@sgi.com>
+
+	* Sync xfs <-> kdb i386 code.
+
+2001-12-22 Keith Owens  <kaos@sgi.com>
+
+	* Split kdb for i386 as kdb v2.0-2.4.17-i386-1.

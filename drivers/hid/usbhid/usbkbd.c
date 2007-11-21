@@ -295,12 +295,15 @@ static int usb_kbd_probe(struct usb_interface *iface,
 			 kbd->new, (maxp > 8 ? 8 : maxp),
 			 usb_kbd_irq, kbd, endpoint->bInterval);
 
-#ifdef	CONFIG_KDB_USB
-	/* Init the KDB structure */
-	kdb_usb_infos.urb = kbd->irq;
-	kdb_usb_infos.buffer = kbd->new;
-	kdb_usb_infos.reset_timer = NULL;
-#endif
+#ifdef CONFIG_KDB_USB
+	/* Attach keyboard to kdb */
+	extern void * usb_hcd_get_kdb_poll_func(struct usb_device *udev);
+
+	kdb_usb_keyboard_attach(kbd->irq, kbd->new,
+				usb_hcd_get_kdb_poll_func(dev));
+
+#endif /* CONFIG_KDB_USB */
+
 	kbd->irq->transfer_dma = kbd->new_dma;
 	kbd->irq->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
 
@@ -337,12 +340,11 @@ static void usb_kbd_disconnect(struct usb_interface *intf)
 	struct usb_kbd *kbd = usb_get_intfdata (intf);
 
 	usb_set_intfdata(intf, NULL);
-#ifdef CONFIG_KDB_USB
-       /* Unlink the KDB USB struct */
-       if (kbd && kbd->irq == kdb_usb_infos.urb)
-               memset(&kdb_usb_infos, 0, sizeof(kdb_usb_infos));
-#endif /* CONFIG_KDB_USB */
 	if (kbd) {
+#ifdef CONFIG_KDB_USB
+	       /* Detach the keyboard from kdb */
+        	kdb_usb_keyboard_detach(kbd->irq);
+#endif /* CONFIG_KDB_USB */
 		usb_kill_urb(kbd->irq);
 		input_unregister_device(kbd->dev);
 		usb_kbd_free_mem(interface_to_usbdev(intf), kbd);

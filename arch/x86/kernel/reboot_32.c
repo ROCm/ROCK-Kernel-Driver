@@ -1,7 +1,7 @@
 #include <linux/mm.h>
-#ifdef	CONFIG_KDB
+#ifdef CONFIG_KDB
 #include <linux/kdb.h>
-#endif	/* CONFIG_KDB */
+#endif /* CONFIG_KDB */
 #include <linux/module.h>
 #include <linux/delay.h>
 #include <linux/init.h>

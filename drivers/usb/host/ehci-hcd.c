@@ -928,6 +928,17 @@ static int ehci_get_frame (struct usb_hcd *hcd)
 		ehci->periodic_size;
 }
 
+#ifdef CONFIG_KDB_USB
+
+int
+ehci_kdb_poll_char(struct urb *urb)
+{
+	/* routine not yet implemented */
+	return -1;
+}
+
+#endif /* CONFIG_KDB_USB */
+
 /*-------------------------------------------------------------------------*/
 
 #define DRIVER_INFO DRIVER_VERSION " " DRIVER_DESC

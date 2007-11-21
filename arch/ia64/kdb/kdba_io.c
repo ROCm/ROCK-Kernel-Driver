@@ -39,9 +39,10 @@
 #endif
 
 #ifdef CONFIG_KDB_USB
-struct kdb_usb_exchange kdb_usb_infos;
 
-EXPORT_SYMBOL(kdb_usb_infos);
+/* support up to 8 USB keyboards (probably excessive, but...) */
+#define KDB_USB_NUM_KEYBOARDS	8
+struct kdb_usb_kbd_info kdb_usb_kbds[KDB_USB_NUM_KEYBOARDS];
 
 static unsigned char kdb_usb_keycode[256] = {
 	  0,  0,  0,  0, 30, 48, 46, 32, 18, 33, 34, 35, 23, 36, 37, 38,
@@ -62,39 +63,122 @@ static unsigned char kdb_usb_keycode[256] = {
 	150,158,159,128,136,177,178,176,142,152,173,140
 };
 
-/* get_usb_char
- * This function drives the UHCI controller,
- * fetch the USB scancode and decode it
+/*
+ * kdb_usb_keyboard_attach()
+ * Attach a USB keyboard to kdb.
  */
-static int get_usb_char(void)
+int
+kdb_usb_keyboard_attach(struct urb *urb, unsigned char *buffer, void *poll_func)
 {
-	static int usb_lock;
+	int	i;
+	int	rc = -1;
+
+	/*
+	 * Search through the array of KDB USB keyboards (kdb_usb_kbds)
+	 * looking for a free index. If found, assign the keyboard to
+	 * the array index.
+	 */
+
+	for (i = 0; i < KDB_USB_NUM_KEYBOARDS; i++) {
+		if (kdb_usb_kbds[i].urb) /* index is already assigned */
+			continue;
+
+		/* found a free array index */
+		kdb_usb_kbds[i].urb = urb;
+		kdb_usb_kbds[i].buffer = buffer;
+		kdb_usb_kbds[i].poll_func = poll_func;
+
+		rc = 0;	/* success */
+
+		break;
+	}
+
+	return rc;
+}
+EXPORT_SYMBOL_GPL (kdb_usb_keyboard_attach);
+
+/*
+ * kdb_usb_keyboard_detach()
+ * Detach a USB keyboard from kdb.
+ */
+int
+kdb_usb_keyboard_detach(struct urb *urb)
+{
+	int	i;
+	int	rc = -1;
+
+	/*
+	 * Search through the array of KDB USB keyboards (kdb_usb_kbds)
+	 * looking for the index with the matching URB. If found,
+	 * clear the array index.
+	 */
+
+	for (i = 0; i < KDB_USB_NUM_KEYBOARDS; i++) {
+		if (kdb_usb_kbds[i].urb != urb)
+			continue;
+
+		/* found it, clear the index */
+		kdb_usb_kbds[i].urb = NULL;
+		kdb_usb_kbds[i].buffer = NULL;
+		kdb_usb_kbds[i].poll_func = NULL;
+		kdb_usb_kbds[i].caps_lock = 0;
+
+		rc = 0;	/* success */
+
+		break;
+	}
+
+	return rc;
+}
+EXPORT_SYMBOL_GPL (kdb_usb_keyboard_detach);
+
+/*
+ * get_usb_char
+ * This function drives the USB attached keyboards.
+ * Fetch the USB scancode and decode it.
+ */
+static int
+get_usb_char(void)
+{
+	int	i;
+	int	ret;
 	unsigned char keycode, spec;
 	extern u_short plain_map[], shift_map[], ctrl_map[];
 
-	/* Is USB initialized ? */
-	if (!kdb_usb_infos.poll_func || !kdb_usb_infos.urb || !kdb_usb_infos.buffer)
-		return -1;
+	/*
+	 * Loop through all the USB keyboard(s) and return
+	 * the first character obtained from them.
+	 */
 
-	/* Transfer char if they are present */
-	(*kdb_usb_infos.poll_func)(kdb_usb_infos.uhci, (struct urb *)kdb_usb_infos.urb);
+	for (i = 0; i < KDB_USB_NUM_KEYBOARDS; i++) {
+		/* skip uninitialized keyboard array entries */
+		if (!kdb_usb_kbds[i].urb || !kdb_usb_kbds[i].buffer ||
+		    !kdb_usb_kbds[i].poll_func)
+			continue;
 
-	spec = kdb_usb_infos.buffer[0];
-	keycode = kdb_usb_infos.buffer[2];
-	kdb_usb_infos.buffer[0] = (char)0;
-	kdb_usb_infos.buffer[2] = (char)0;
+		/* Transfer char */
+		ret = (*kdb_usb_kbds[i].poll_func)(kdb_usb_kbds[i].urb);
+		if (ret == -1) /* error or no characters, try the next kbd */
+			continue;
 
-	if(kdb_usb_infos.buffer[3])
-		return -1;
+		spec = kdb_usb_kbds[i].buffer[0];
+		keycode = kdb_usb_kbds[i].buffer[2];
+		kdb_usb_kbds[i].buffer[0] = (char)0;
+		kdb_usb_kbds[i].buffer[2] = (char)0;
 
-	/* A normal key is pressed, decode it */
-	if(keycode)
-		keycode = kdb_usb_keycode[keycode];
+		if(kdb_usb_kbds[i].buffer[3]) {
+			kdb_usb_kbds[i].buffer[3] = (char)0;
+			continue;
+		}
 
-	/* 2 Keys pressed at one time ? */
-	if (spec && keycode) {
-		switch(spec)
-		{
+		/* A normal key is pressed, decode it */
+		if(keycode)
+			keycode = kdb_usb_keycode[keycode];
+
+		/* 2 Keys pressed at one time ? */
+		if (spec && keycode) {
+			switch(spec)
+			{
 			case 0x2:
 			case 0x20: /* Shift */
 				return shift_map[keycode];
@@ -104,34 +188,35 @@ static int get_usb_char(void)
 			case 0x4:
 			case 0x40: /* Alt */
 				break;
-		}
-	}
-	else {
-		if(keycode) { /* If only one key pressed */
+			}
+		} else if (keycode) { /* If only one key pressed */
 			switch(keycode)
 			{
-				case 0x1C: /* Enter */
-					return 13;
+			case 0x1C: /* Enter */
+				return 13;
 
-				case 0x3A: /* Capslock */
-					usb_lock ? (usb_lock = 0) : (usb_lock = 1);
-					break;
-				case 0x0E: /* Backspace */
-					return 8;
-				case 0x0F: /* TAB */
-					return 9;
-				case 0x77: /* Pause */
-					break ;
-				default:
-					if(!usb_lock) {
-						return plain_map[keycode];
-					}
-					else {
-						return shift_map[keycode];
-					}
+			case 0x3A: /* Capslock */
+				kdb_usb_kbds[i].caps_lock = !(kdb_usb_kbds[i].caps_lock);
+				break;
+			case 0x0E: /* Backspace */
+				return 8;
+			case 0x0F: /* TAB */
+				return 9;
+			case 0x77: /* Pause */
+				break ;
+			default:
+				if(!kdb_usb_kbds[i].caps_lock) {
+					return plain_map[keycode];
+				}
+				else {
+					return shift_map[keycode];
+				}
 			}
 		}
 	}
+
+	/* no chars were returned from any of the USB keyboards */
+
 	return -1;
 }
 #endif	/* CONFIG_KDB_USB */

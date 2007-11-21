@@ -15,13 +15,13 @@ enum die_val {
 	DIE_DIE,
 	DIE_NMIWATCHDOG,
 	DIE_KERNELDEBUG,
+	DIE_KDEBUG_ENTER,
+	DIE_KDEBUG_LEAVE,
 	DIE_TRAP,
 	DIE_GPF,
 	DIE_CALL,
 	DIE_NMI_IPI,
 	DIE_PAGE_FAULT,
-	DIE_KDEBUG_ENTER,
-	DIE_KDEBUG_LEAVE,
 };
 
 extern void printk_address(unsigned long address);

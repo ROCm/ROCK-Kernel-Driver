@@ -675,6 +675,9 @@ kdbm_kobject(int argc, const char **argv)
 		kdb_printf("\n");
 	}
 
+	if (k.k_name != kobject_name((struct kobject *)addr))
+		kdb_printf(" name '%." __stringify(KOBJ_NAME_LEN) "s'\n", k.k_name);
+
 	kdb_printf(" kref.refcount %d'\n", atomic_read(&k.kref.refcount));
 
 	kdb_printf(" entry.next = 0x%p entry.prev = 0x%p\n",

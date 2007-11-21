@@ -210,6 +210,10 @@ struct hc_driver {
 	int		(*start_port_reset)(struct usb_hcd *, unsigned port_num);
 	void		(*hub_irq_enable)(struct usb_hcd *);
 		/* Needed only if port-change IRQs are level-triggered */
+#ifdef CONFIG_KDB_USB
+	/* KDB poll function for this HC */
+	int		(*kdb_poll_char)(struct urb *urb);
+#endif /* CONFIG_KDB_USB */
 };
 
 extern int usb_hcd_link_urb_to_ep(struct usb_hcd *hcd, struct urb *urb);

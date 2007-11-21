@@ -158,8 +158,8 @@ config KDB_CONTINUE_CATASTROPHIC
 	  This integer controls the behaviour of kdb when the kernel gets a
 	  catastrophic error, i.e. for a panic, oops, NMI or other watchdog
 	  tripping.  CONFIG_KDB_CONTINUE_CATASTROPHIC interacts with
-	  /proc/sys/kernel/kdb and CONFIG_DUMP (if your kernel has the LKCD
-	  patch).
+	  /proc/sys/kernel/kdb and CONFIG_LKCD_DUMP (if your kernel has the
+	  LKCD patch).
 	  When KDB is active (/proc/sys/kernel/kdb == 1) and a catastrophic
 	  error occurs, nothing extra happens until you type 'go'.
 	  CONFIG_KDB_CONTINUE_CATASTROPHIC == 0 (default).  The first time
@@ -181,5 +181,13 @@ config KDB_CONTINUE_CATASTROPHIC
 	  reboot.
 	  If you are not sure, say 0.  Read Documentation/kdb/dump.txt before
 	  setting to 2.
+
+config KDB_USB
+	bool "Support for USB Keyboard in KDB (OHCI only)"
+	depends on KDB && USB_OHCI_HCD
+	help
+	  If you want to use kdb from a OHCI USB keyboard then say Y here.  If you
+	  say N then kdb can only be used from a PC (AT) keyboard or a serial
+	  console.
 
 endmenu

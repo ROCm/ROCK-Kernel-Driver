@@ -10,4 +10,4 @@ obj-$(CONFIG_KDB)	:= kdba_bp_32.o kdba_id_32.o kdba_io_32.o kdbasupport_32.o i38
 
 override CFLAGS := $(CFLAGS:%-pg=% )
 
-CFLAGS_kdba_io.o += -I $(TOPDIR)/arch/$(ARCH)/kdb
+CFLAGS_kdba_io_64.o += -I $(TOPDIR)/arch/$(SRCARCH)/kdb

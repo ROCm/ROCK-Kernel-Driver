@@ -426,10 +426,10 @@ void die(const char * str, struct pt_regs * regs, long err)
 	add_taint(TAINT_DIE);
 	__raw_spin_unlock(&die.lock);
 	raw_local_irq_restore(flags);
-#ifdef	CONFIG_KDB
+#ifdef CONFIG_KDB
 	kdb_diemsg = str;
 	kdb(KDB_REASON_OOPS, err, regs);
-#endif	/* CONFIG_KDB */
+#endif /* CONFIG_KDB */
 
 	if (!regs)
 		return;
@@ -815,7 +815,8 @@ void restart_nmi(void)
 fastcall void __kprobes do_int3(struct pt_regs *regs, long error_code)
 {
 	trace_hardirqs_fixup();
-#ifdef	CONFIG_KDB
+
+#ifdef  CONFIG_KDB
 	if (kdb(KDB_REASON_BREAK, error_code, regs))
 		return;
 #endif

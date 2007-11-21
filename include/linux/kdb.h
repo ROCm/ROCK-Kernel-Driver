@@ -140,16 +140,12 @@ extern void smp_kdb_stop(void);
 #endif	/* CONFIG_SMP */
 
 #ifdef CONFIG_KDB_USB
+
 #include <linux/usb.h>
 
-struct kdb_usb_exchange {
-	void *uhci;			/* pointer to the UHCI structure */
-	struct urb *urb;		/* pointer to the URB */
-	unsigned char *buffer;		/* pointer to buffer */
-	void (*poll_func)(void *, struct urb *); /* pointer to the polling function */
-	void (*reset_timer)(void);	/* pointer to the reset timer function */
-};
-extern struct kdb_usb_exchange kdb_usb_infos; /* KDB common structure */
+extern int kdb_usb_keyboard_attach(struct urb *urb, unsigned char *buffer, void *poll_func);
+extern int kdb_usb_keyboard_detach(struct urb *urb);
+
 #endif /* CONFIG_KDB_USB */
 
 static inline

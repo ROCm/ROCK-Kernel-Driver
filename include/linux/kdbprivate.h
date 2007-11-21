@@ -482,4 +482,15 @@ extern char kdb_prompt_str[];
 
 #define	KDB_WORD_SIZE	((int)sizeof(kdb_machreg_t))
 
+#ifdef CONFIG_KDB_USB
+#include <linux/usb.h>
+
+struct kdb_usb_kbd_info {
+	struct urb *urb;		/* pointer to the URB */
+	unsigned char *buffer;		/* pointer to the kbd char buffer */
+	int (*poll_func)(struct urb *urb); /* poll function to retrieve chars */
+	int	caps_lock;	/* state of the caps lock for this keyboard */
+};
+#endif /* CONFIG_KDB_USB */
+
 #endif	/* !_KDBPRIVATE_H */

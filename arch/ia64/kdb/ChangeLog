@@ -1,3 +1,40 @@
+2007-11-13 Jay Lan  <jlan@sgi.com>
+
+	* Back ported "New KDB USB interface" from Aaron Young in
+	  v4.4-2.6.23-ia64-2 to 2.6.24 kdb patchset.
+	* v4.4-2.6.24-rc2-ia64-2.
+
+2007-11-12 Jay Lan  <jlan@sgi.com>
+
+	* kdb v4.4-2.6.24-rc2-ia64-1.
+
+2007-11-09 Jay Lan  <jlan@sgi.com>
+
+	* Rebase to 2.6.24-rc1 kernel
+	*   - merged kdb-v4.4-2.6.23-i386-1 and kdb-v4.4-2.6.23-x86_64-1
+	*     into kdb-v4.4-2.6.24-rc1-x86-1
+	*   - Fields "done", "sglist_len", and "pid" are removed from
+	*     struct scsi_cmnd. Thus, these fields are no longer displayed
+	*     on "sc" command.
+	* kdb v4.4-2.6.24-rc1-ia64-1.
+
+2007-11-08 Jay Lan  <jlan@sgi.com>
+
+	* New KDB USB interface,  Aaron Young <ayoung@sgi.com>
+	*  1. This patch allows KDB to work with any Host Contoller driver
+	*     and call the correct HC driver poll routine (as long as the
+	*     HC driver provides a .kdb_poll_char routine via it's
+	*     associated hc_driver struct).
+	*  2. Hotplugged keyboards are now recognized by KDB.
+	*  3. Currently KDB can only make use of 1 USB type keyboard.
+	*     New code can handle up to 8 attached keyboards - input is
+	*     multiplexed from all of them while in kdb.
+	* kdb v4.4-2.6.23-ia64-2.
+
+2007-10-24 Jay Lan  <jlan@sgi.com>
+
+	* kdb v4.4-2.6.23-ia64-1.
+
 2007-09-26 Jay Lan  <jlan@sgi.com>
 
 	* kdb v4.4-2.6.23-rc8-ia64-1.

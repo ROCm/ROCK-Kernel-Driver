@@ -1219,10 +1219,6 @@ next:
 	}
 	if (vector == current_vector)
 		return -ENOSPC;
-#ifdef	CONFIG_KDB
-	if (vector == KDBENTER_VECTOR)
-		goto next;
-#endif	/* CONFIG_KDB */
 	if (test_and_set_bit(vector, used_vectors))
 		goto next;
 

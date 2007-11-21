@@ -1839,6 +1839,20 @@ usb_hcd_platform_shutdown(struct platform_device* dev)
 }
 EXPORT_SYMBOL (usb_hcd_platform_shutdown);
 
+#ifdef CONFIG_KDB_USB
+void *
+usb_hcd_get_kdb_poll_func(struct usb_device *udev)
+{
+	struct usb_hcd	*hcd = bus_to_hcd(udev->bus);
+
+	if (hcd && hcd->driver)
+		return (void *)(hcd->driver->kdb_poll_char);
+
+	return NULL;
+}
+EXPORT_SYMBOL_GPL (usb_hcd_get_kdb_poll_func);
+#endif /* CONFIG_KDB_USB */
+
 /*-------------------------------------------------------------------------*/
 
 #if defined(CONFIG_USB_MON)

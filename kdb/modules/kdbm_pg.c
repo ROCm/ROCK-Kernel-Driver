@@ -29,7 +29,7 @@ MODULE_LICENSE("GPL");
 static char *pg_flag_vals[] = {
 	"PG_locked", "PG_error", "PG_referenced", "PG_uptodate",
 	"PG_dirty", "PG_lru", "PG_active", "PG_slab",
-	"PG_checked", "PG_arch_1", "PG_reserved", "PG_private",
+	"PG_owner_priv_1", "PG_arch_1", "PG_reserved", "PG_private",
 	"PG_writeback", "?? 13 ??", "PG_compound", "PG_swapcache",
 	"PG_mappedtodisk", "PG_reclaim", "?? 18 ??", "PG_buddy",
 	NULL };
@@ -51,9 +51,9 @@ static char *bio_flag_vals[] = {
 
 /* From include/linux/fs.h */
 static char *inode_flag_vals[] = {
-	"I_DIRTY_SYNC", "I_DIRTY_DATASYNC", "I_DIRTY_PAGES", "I_LOCK",
-	"I_FREEING", "I_CLEAR", "I_NEW", "I_WILL_FREE",
-	NULL };
+	"I_DIRTY_SYNC", "I_DIRTY_DATASYNC", "I_DIRTY_PAGES", "I_NEW",
+	"I_WILL_FREE", "I_FREEING", "I_CLEAR", "I_LOCK",
+	"I_SYNC", NULL };
 
 static char *map_flags(unsigned long flags, char *mapping[])
 {

@@ -965,20 +965,14 @@ static int ohci_restart (struct ohci_hcd *ohci)
 
 #ifdef	CONFIG_KDB_USB
 
-static void
-ohci_kdb_poll (void * __ohci, struct urb *urb)
+int
+ohci_kdb_poll_char(struct urb *urb)
 {
 	struct ohci_hcd *ohci;
 	struct ohci_regs * regs;
 
-	/*
-	 * NOTE - we use the ohci_hcd from the urb rather than the
-	 * __ohci parameter (which is NULL anyway). This ensures
-	 * that we will process the proper controller for the urb.
-	 */
-
-	if (!urb) /* can happen if no keyboard attached */
-		return;
+	if (!urb)	/* should not happen */
+		return -1;
 
 	ohci = (struct ohci_hcd *) hcd_to_ohci(bus_to_hcd(urb->dev->bus));
 	regs = ohci->regs;
@@ -987,23 +981,27 @@ ohci_kdb_poll (void * __ohci, struct urb *urb)
 	if (urb->status != -EINPROGRESS) {
 
 		if (usb_submit_urb (urb, GFP_ATOMIC))
-			return;
+			return -1;
 
 		/* make sure the HC registers are set correctly */
-		writel (OHCI_INTR_WDH, &regs->intrenable);
-		writel (OHCI_INTR_WDH, &regs->intrstatus);
-		writel (OHCI_INTR_MIE, &regs->intrenable);
+		ohci_writel (ohci, OHCI_INTR_WDH, &regs->intrenable);
+		ohci_writel (ohci, OHCI_INTR_WDH, &regs->intrstatus);
+		ohci_writel (ohci, OHCI_INTR_MIE, &regs->intrenable);
 
 		// flush those pci writes
-		(void) readl (&ohci->regs->control);
+		(void) ohci_readl (ohci, &ohci->regs->control);
 	}
 
 	if (ohci->hcca->done_head) {
 		dl_done_list_kdb (ohci, urb);
-		writel (OHCI_INTR_WDH, &regs->intrstatus);
+		ohci_writel (ohci, OHCI_INTR_WDH, &regs->intrstatus);
 		// flush the pci write
-		(void) readl (&ohci->regs->control);
+		(void) ohci_readl (ohci, &ohci->regs->control);
+
+		return 0;
 	}
+
+	return -1;
 }
 
 #endif /* CONFIG_KDB_USB */

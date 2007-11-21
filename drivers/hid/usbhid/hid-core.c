@@ -935,9 +935,12 @@ static void hid_disconnect(struct usb_interface *intf)
 	usbhid = hid->driver_data;
 
 #ifdef CONFIG_KDB_USB
-	/* Unlink the KDB USB struct */
-	if (usbhid->urbin == kdb_usb_infos.urb)
-		memset(&kdb_usb_infos, 0, sizeof(kdb_usb_infos));
+	/*
+	 * If the URB was for a Keyboard, detach it from kdb.
+	 * If the URB was for another type of device, just
+	 * allow kdb_usb_keyboard_detach() to silently fail.
+	 */
+	kdb_usb_keyboard_detach(usbhid->urbin);
 #endif
 
 	spin_lock_irq(&usbhid->inlock);	/* Sync with error handler */
@@ -1036,15 +1039,20 @@ static int hid_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	printk(": USB HID v%x.%02x %s [%s] on %s\n",
 		hid->version >> 8, hid->version & 0xff, c, hid->name, path);
 
-#ifdef	CONFIG_KDB_USB
-	/* Initialization of the KDB structure */
+#ifdef CONFIG_KDB_USB
+	/* Attach USB keyboards to kdb */
 	if (!strcmp(c, "Keyboard")) {
+		int	ret;
 		struct usbhid_device *usbhid = hid->driver_data;
-		kdb_usb_infos.urb = usbhid->urbin;
-		kdb_usb_infos.buffer = usbhid->inbuf;
-		kdb_usb_infos.reset_timer = NULL;
+		extern void * usb_hcd_get_kdb_poll_func(struct usb_device *udev);
+		ret = kdb_usb_keyboard_attach(usbhid->urbin, usbhid->inbuf,
+		    usb_hcd_get_kdb_poll_func(interface_to_usbdev(intf)));
+
+		if (ret == -1)
+			printk(": FAILED to register keyboard (%s) "
+			       "with KDB\n", path);
 	}
-#endif
+#endif /* CONFIG_KDB_USB */
 
 	return 0;
 }
