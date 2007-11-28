@@ -1,7 +1,7 @@
 VERSION = 2
 PATCHLEVEL = 6
 SUBLEVEL = 24
-EXTRAVERSION = -rc3-git1
+EXTRAVERSION = -rc3-git2
 NAME = Arr Matey! A Hairy Bilge Rat!
 
 # *DOCUMENTATION*
