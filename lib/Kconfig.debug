@@ -519,7 +519,7 @@ config FAULT_INJECTION_STACKTRACE_FILTER
 
 config PROVIDE_OHCI1394_DMA_INIT
 	bool "Provide code for enabling DMA over FireWire early on boot"
-	depends on PCI && IEEE1394 && X86
+	depends on PCI && X86
 	help
 	  If you want to debug problems which hang or crash the kernel early
 	  on boot and the crashing machine has a FireWire port, you can use

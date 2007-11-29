@@ -15,7 +15,7 @@
  *
  * To use physical DMA after the initialization of the firewire stack,
  * be sure that the stack enables it and (re-)attach after the bus reset
- * which may be caused by the firewire stack initalisation.
+ * which may be caused by the firewire stack initialization.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -35,6 +35,7 @@
 #include <linux/interrupt.h>	/* for ohci1394.h */
 #include <linux/delay.h>
 #include <linux/pci.h>		/* for PCI defines */
+#include <linux/init_ohci1394_dma.h>
 #include <asm/pci-direct.h>	/* for direct PCI config space access */
 #include <asm/fixmap.h>
 
@@ -92,7 +93,7 @@ static inline void __init init_ohci1394_soft_reset(struct ti_ohci *ohci) {
 	}
 }
 
-/* Basic OHCI-1394 register and port intitalisation */
+/* Basic OHCI-1394 register and port inititalization */
 static inline void __init init_ohci1394_initialize(struct ti_ohci *ohci)
 {
 	quadlet_t bus_options;
@@ -221,7 +222,7 @@ static inline void __init init_ohci1394_reset_and_init_dma(struct ti_ohci *ohci)
 
 /**
  * init_ohci1394_controller - Map the registers of the controller and init DMA
- * This maps the registers of the specified controler and initializes it
+ * This maps the registers of the specified controller and initializes it
  */
 static inline void __init init_ohci1394_controller(int num, int slot, int func)
 {
@@ -282,5 +283,5 @@ static int __init setup_ohci1394_dma(char *opt)
 	return 0;
 }
 
-/* passing ohci1394_dma=early on boot causes early OHCI1394 DMA intialisation */
+/* passing ohci1394_dma=early on boot causes early OHCI1394 DMA initialization */
 early_param("ohci1394_dma", setup_ohci1394_dma);

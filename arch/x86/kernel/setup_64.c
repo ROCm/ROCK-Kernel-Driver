@@ -256,7 +256,7 @@ static void discover_ebda(void)
 }
 
 /*
- * setup_arch - architecture-specific boot-time initialisations
+ * setup_arch - architecture-specific boot-time initializations
  *
  * Note: On x86_64, fixmaps are ready for use even before this is called.
  */
