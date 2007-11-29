@@ -517,31 +517,4 @@ config FAULT_INJECTION_STACKTRACE_FILTER
 	help
 	  Provide stacktrace filter for fault-injection capabilities
 
-config PROVIDE_OHCI1394_DMA_INIT
-	bool "Provide code for enabling DMA over FireWire early on boot"
-	depends on PCI && X86
-	help
-	  If you want to debug problems which hang or crash the kernel early
-	  on boot and the crashing machine has a FireWire port, you can use
-	  this feature to remotely access the memory of the crashed machine
-	  over FireWire. This employs remote DMA as part of the OHCI1394
-	  specification which is now the standard for FireWire controllers.
-
-	  With remote DMA, you can monitor the printk buffer remotely using
-	  firescope and access all memory below 4GB using fireproxy from gdb.
-	  Even controlling a kernel debugger is possible using remote DMA.
-
-	  Usage:
-
-	  If ohci1394_dma=early is used as boot parameter, it will initialize
-	  all OHCI1394 controllers which are found in the PCI config space.
-
-	  As all changes to the FireWire bus such as enabling and disabling
-	  devices cause a bus reset and thereby disable remote DMA for all
-	  devices, be sure to have FireWire enabled on the debug host (and
-	  the cable plugged) before booting the debug target for debugging.
-
-	  This code (~3k) is freed after boot. By then, the firewire stack
-	  in charge of the OHCI-1394 controllers should be used instead.
-
 source "samples/Kconfig"

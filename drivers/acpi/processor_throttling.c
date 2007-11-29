@@ -572,14 +572,12 @@ static int acpi_processor_get_throttling_ptc(struct acpi_processor *pr)
 		return -ENODEV;
 
 	pr->throttling.state = 0;
-	local_irq_disable();
 	value = 0;
 	ret = acpi_read_throttling_status(pr, &value);
 	if (ret >= 0) {
 		state = acpi_get_throttling_state(pr, value);
 		pr->throttling.state = state;
 	}
-	local_irq_enable();
 
 	return 0;
 }

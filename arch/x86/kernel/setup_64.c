@@ -39,7 +39,6 @@
 #include <linux/dmi.h>
 #include <linux/dma-mapping.h>
 #include <linux/ctype.h>
-#include <linux/init_ohci1394_dma.h>
 
 #include <asm/mtrr.h>
 #include <asm/uaccess.h>
@@ -255,11 +254,6 @@ static void discover_ebda(void)
 		ebda_size = 64*1024;
 }
 
-/*
- * setup_arch - architecture-specific boot-time initializations
- *
- * Note: On x86_64, fixmaps are ready for use even before this is called.
- */
 void __init setup_arch(char **cmdline_p)
 {
 	printk(KERN_INFO "Command line: %s\n", boot_command_line);
@@ -298,11 +292,6 @@ void __init setup_arch(char **cmdline_p)
 	*cmdline_p = command_line;
 
 	parse_early_param();
-
-#ifdef CONFIG_PROVIDE_OHCI1394_DMA_INIT
-	if (init_ohci1394_dma_early)
-		init_ohci1394_dma_on_all_controllers();
-#endif
 
 	finish_e820_parsing();
 
