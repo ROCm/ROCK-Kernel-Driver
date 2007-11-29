@@ -715,14 +715,12 @@ static int acpi_processor_set_throttling_ptc(struct acpi_processor *pr,
 	if (state < pr->throttling_platform_limit)
 		return -EPERM;
 
-	local_irq_disable();
 	value = 0;
 	ret = acpi_get_throttling_value(pr, state, &value);
 	if (ret >= 0) {
 		acpi_write_throttling_state(pr, value);
 		pr->throttling.state = state;
 	}
-	local_irq_enable();
 
 	return 0;
 }
