@@ -180,7 +180,7 @@ extern void __chk_io_ptr(const volatile void __iomem *);
  * to the unimplmented __udivdi3 libgcc function will be issued, causing
  * a link error. */
 #ifndef avoid_division
-# define avoid_division(x)
+# define avoid_division(x) do {} while(0)
 #endif
 
 #endif /* __LINUX_COMPILER_H */
