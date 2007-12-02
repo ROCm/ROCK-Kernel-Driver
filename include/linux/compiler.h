@@ -175,4 +175,12 @@ extern void __chk_io_ptr(const volatile void __iomem *);
 #define __cold
 #endif
 
+/* GCC >= 4.3 may choose to replace loops explicitly formed to avoid division
+ * with division. When these are 64-bit divisions on 32-bit systems, a call
+ * to the unimplmented __udivdi3 libgcc function will be issued, causing
+ * a link error. */
+#ifndef avoid_division
+# define avoid_division(x)
+#endif
+
 #endif /* __LINUX_COMPILER_H */

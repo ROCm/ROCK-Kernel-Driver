@@ -41,5 +41,12 @@
    a special section, but I don't see any sense in this right now in
    the kernel context */
 #define __cold			__attribute__((__cold__))
+#endif
 
+#if __GNUC__ == 4 && __GNUC_MINOR__ >= 3
+/* gcc >= 4.3 may choose to replace loops explicitly formed to avoid division
+ * with division. When these are 64-bit divisions on 32-bit systems, a call
+ * to the unimplmented __udivdi3 libgcc function will be issued, causing
+ * a link error. This macro avoids issuing the call. */
+#define avoid_division(x)	asm("" : "r+" ((x)))
 #endif
