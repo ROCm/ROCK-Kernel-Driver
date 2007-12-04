@@ -171,9 +171,9 @@ extern struct timeval ns_to_timeval(const s64 nsec);
  */
 static inline void timespec_add_ns(struct timespec *a, u64 ns)
 {
-	avoid_division(ns);
 	ns += a->tv_nsec;
 	while(unlikely(ns >= NSEC_PER_SEC)) {
+		avoid_division(ns);
 		ns -= NSEC_PER_SEC;
 		a->tv_sec++;
 	}

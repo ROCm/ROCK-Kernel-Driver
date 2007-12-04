@@ -48,5 +48,5 @@
  * with division. When these are 64-bit divisions on 32-bit systems, a call
  * to the unimplmented __udivdi3 libgcc function will be issued, causing
  * a link error. This macro avoids issuing the call. */
-#define avoid_division(x)	asm("" : "r+" ((x)))
+#define avoid_division(x)	asm("" : "+r" ((x)))
 #endif
