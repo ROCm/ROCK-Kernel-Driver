@@ -36,6 +36,7 @@
 #include <linux/err.h>
 #include <linux/init.h>
 #include <linux/mutex.h>
+#include <linux/acpi.h>
 #include <asm/io.h>
 
 static struct platform_device *pdev;
@@ -298,6 +299,10 @@ static int __init smsc47b397_device_add(unsigned short address)
 		.flags	= IORESOURCE_IO,
 	};
 	int err;
+
+	err = acpi_check_resource_conflict(&res);
+	if (err)
+		goto exit;
 
 	pdev = platform_device_alloc(DRVNAME, address);
 	if (!pdev) {
