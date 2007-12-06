@@ -1029,6 +1029,12 @@ static void acpi_device_set_id(struct acpi_device *device,
 	if (hid) {
 		strcpy(device->pnp.hardware_id, hid);
 		device->flags.hardware_id = 1;
+	} else if (cid_add) {
+		/* This device has no hardware id, so add the linux
+		   specific hid as HID not to the list of cids */
+		strcpy(device->pnp.hardware_id, cid_add);
+		device->flags.hardware_id = 1;
+		cid_add = NULL;
 	}
 	if (uid) {
 		strcpy(device->pnp.unique_id, uid);
