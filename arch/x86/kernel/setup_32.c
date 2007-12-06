@@ -643,8 +643,8 @@ void __init setup_arch(char **cmdline_p)
 	 */
 
 #ifdef CONFIG_PROVIDE_OHCI1394_DMA_INIT
-        if (init_ohci1394_dma_early)
-                init_ohci1394_dma_on_all_controllers();
+	if (init_ohci1394_dma_early)
+		init_ohci1394_dma_on_all_controllers();
 #endif
 
 	remapped_pgdat_init();

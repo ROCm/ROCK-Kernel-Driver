@@ -55,7 +55,6 @@ static inline u8 __init get_phy_reg(struct ti_ohci *ohci, u8 addr)
 	for (i = 0; i < OHCI_LOOP_COUNT; i++) {
 		if (reg_read(ohci, OHCI1394_PhyControl) & 0x80000000)
 			break;
-
 		mdelay(1);
 	}
 	r = reg_read(ohci, OHCI1394_PhyControl);
@@ -74,7 +73,6 @@ static inline void __init set_phy_reg(struct ti_ohci *ohci, u8 addr, u8 data)
 		u32 r = reg_read(ohci, OHCI1394_PhyControl);
 		if (!(r & 0x00004000))
 			break;
-
 		mdelay(1);
 	}
 }
@@ -212,8 +210,8 @@ static inline void __init init_ohci1394_reset_and_init_dma(struct ti_ohci *ohci)
 	init_ohci1394_initialize(ohci);
 	/*
 	 * The initialization causes at least one IEEE1394 bus reset. Enabling
-         * physical DMA only works *after* *all* bus resets have calmed down:
-         */
+	 * physical DMA only works *after* *all* bus resets have calmed down:
+	 */
 	init_ohci1394_wait_for_busresets(ohci);
 
 	/* We had to wait and do this now if we want to debug early problems */
@@ -262,7 +260,7 @@ void __init init_ohci1394_dma_on_all_controllers(void)
 				if ((class == 0xffffffff))
 					continue; /* No device at this func */
 
-				if (class >> 16 != PCI_CLASS_SERIAL_FIREWIRE)
+				if (class>>8 != PCI_CLASS_SERIAL_FIREWIRE_OHCI)
 					continue; /* Not an OHCI-1394 device */
 
 				init_ohci1394_controller(num, slot, func);

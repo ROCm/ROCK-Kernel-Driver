@@ -538,10 +538,12 @@ config PROVIDE_OHCI1394_DMA_INIT
 
 	  As all changes to the FireWire bus such as enabling and disabling
 	  devices cause a bus reset and thereby disable remote DMA for all
-	  devices, be sure to have FireWire enabled on the debug host (and
-	  the cable plugged) before booting the debug target for debugging.
+	  devices, be sure to have the cable plugged and FireWire enabled on
+	  the debugging host before booting the debug target for debugging.
 
-	  This code (~3k) is freed after boot. By then, the firewire stack
+	  This code (~1k) is freed after boot. By then, the firewire stack
 	  in charge of the OHCI-1394 controllers should be used instead.
+
+	  See Documentation/debugging-via-ohci1394.txt for more information. 
 
 source "samples/Kconfig"
