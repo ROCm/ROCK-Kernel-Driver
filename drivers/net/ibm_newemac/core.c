@@ -3,6 +3,11 @@
  *
  * Driver for PowerPC 4xx on-chip ethernet controller.
  *
+ * Copyright 2007 Benjamin Herrenschmidt, IBM Corp.
+ *                <benh@kernel.crashing.org>
+ *
+ * Based on the arch/ppc version of the driver:
+ *
  * Copyright (c) 2004, 2005 Zultys Technologies.
  * Eugene Surovegin <eugene.surovegin@zultys.com> or <ebs@ebshome.net>
  *
@@ -402,7 +407,7 @@ static u32 __emac_calc_base_mr1(struct emac_instance *dev, int tx_size, int rx_s
 static u32 __emac4_calc_base_mr1(struct emac_instance *dev, int tx_size, int rx_size)
 {
 	u32 ret = EMAC_MR1_VLE | EMAC_MR1_IST | EMAC4_MR1_TR |
-		EMAC4_MR1_OBCI(dev->opb_bus_freq);
+		EMAC4_MR1_OBCI(dev->opb_bus_freq / 1000000);
 
 	DBG2(dev, "__emac4_calc_base_mr1" NL);
 
@@ -464,26 +469,34 @@ static int emac_configure(struct emac_instance *dev)
 {
 	struct emac_regs __iomem *p = dev->emacp;
 	struct net_device *ndev = dev->ndev;
-	int tx_size, rx_size;
+	int tx_size, rx_size, link = netif_carrier_ok(dev->ndev);
 	u32 r, mr1 = 0;
 
 	DBG(dev, "configure" NL);
 
-	if (emac_reset(dev) < 0)
+	if (!link) {
+		out_be32(&p->mr1, in_be32(&p->mr1)
+			 | EMAC_MR1_FDE | EMAC_MR1_ILE);
+		udelay(100);
+	} else if (emac_reset(dev) < 0)
 		return -ETIMEDOUT;
 
 	if (emac_has_feature(dev, EMAC_FTR_HAS_TAH))
 		tah_reset(dev->tah_dev);
 
-	DBG(dev, " duplex = %d, pause = %d, asym_pause = %d\n",
-	    dev->phy.duplex, dev->phy.pause, dev->phy.asym_pause);
+	DBG(dev, " link = %d duplex = %d, pause = %d, asym_pause = %d\n",
+	    link, dev->phy.duplex, dev->phy.pause, dev->phy.asym_pause);
 
 	/* Default fifo sizes */
 	tx_size = dev->tx_fifo_size;
 	rx_size = dev->rx_fifo_size;
 
+	/* No link, force loopback */
+	if (!link)
+		mr1 = EMAC_MR1_FDE | EMAC_MR1_ILE;
+
 	/* Check for full duplex */
-	if (dev->phy.duplex == DUPLEX_FULL)
+	else if (dev->phy.duplex == DUPLEX_FULL)
 		mr1 |= EMAC_MR1_FDE | EMAC_MR1_MWSW_001;
 
 	/* Adjust fifo sizes, mr1 and timeouts based on link speed */
@@ -703,7 +716,7 @@ static int __emac_mdio_read(struct emac_instance *dev, u8 id, u8 reg)
 		r = EMAC_STACR_BASE(dev->opb_bus_freq);
 	if (emac_has_feature(dev, EMAC_FTR_STACR_OC_INVERT))
 		r |= EMAC_STACR_OC;
-	if (emac_has_feature(dev, EMAC_FTR_HAS_AXON_STACR))
+	if (emac_has_feature(dev, EMAC_FTR_HAS_NEW_STACR))
 		r |= EMACX_STACR_STAC_READ;
 	else
 		r |= EMAC_STACR_STAC_READ;
@@ -775,7 +788,7 @@ static void __emac_mdio_write(struct emac_instance *dev, u8 id, u8 reg,
 		r = EMAC_STACR_BASE(dev->opb_bus_freq);
 	if (emac_has_feature(dev, EMAC_FTR_STACR_OC_INVERT))
 		r |= EMAC_STACR_OC;
-	if (emac_has_feature(dev, EMAC_FTR_HAS_AXON_STACR))
+	if (emac_has_feature(dev, EMAC_FTR_HAS_NEW_STACR))
 		r |= EMACX_STACR_STAC_WRITE;
 	else
 		r |= EMAC_STACR_STAC_WRITE;
@@ -1165,9 +1178,9 @@ static void emac_link_timer(struct work_struct *work)
 		link_poll_interval = PHY_POLL_LINK_ON;
 	} else {
 		if (netif_carrier_ok(dev->ndev)) {
-			emac_reinitialize(dev);
 			netif_carrier_off(dev->ndev);
 			netif_tx_disable(dev->ndev);
+			emac_reinitialize(dev);
 			emac_print_link_status(dev);
 		}
 		link_poll_interval = PHY_POLL_LINK_OFF;
@@ -2434,7 +2447,7 @@ static int __devinit emac_init_config(struct emac_instance *dev)
 	if (emac_read_uint_prop(np, "tah-device", &dev->tah_ph, 0))
 		dev->tah_ph = 0;
 	if (emac_read_uint_prop(np, "tah-channel", &dev->tah_port, 0))
-		dev->tah_ph = 0;
+		dev->tah_port = 0;
 	if (emac_read_uint_prop(np, "mdio-device", &dev->mdio_ph, 0))
 		dev->mdio_ph = 0;
 	if (emac_read_uint_prop(np, "zmii-device", &dev->zmii_ph, 0))
@@ -2472,16 +2485,19 @@ static int __devinit emac_init_config(struct emac_instance *dev)
 	/* Check EMAC version */
 	if (of_device_is_compatible(np, "ibm,emac4"))
 		dev->features |= EMAC_FTR_EMAC4;
-	if (of_device_is_compatible(np, "ibm,emac-axon")
-	    || of_device_is_compatible(np, "ibm,emac-440epx"))
-		dev->features |= EMAC_FTR_HAS_AXON_STACR
-			| EMAC_FTR_STACR_OC_INVERT;
-	if (of_device_is_compatible(np, "ibm,emac-440spe"))
-		dev->features |= EMAC_FTR_STACR_OC_INVERT;
 
-	/* Fixup some feature bits based on the device tree and verify
-	 * we have support for them compiled in
-	 */
+	/* Fixup some feature bits based on the device tree */
+	if (of_get_property(np, "has-inverted-stacr-oc", NULL))
+		dev->features |= EMAC_FTR_STACR_OC_INVERT;
+	if (of_get_property(np, "has-new-stacr-staopc", NULL))
+		dev->features |= EMAC_FTR_HAS_NEW_STACR;
+
+	/* CAB lacks the appropriate properties */
+	if (of_device_is_compatible(np, "ibm,emac-axon"))
+		dev->features |= EMAC_FTR_HAS_NEW_STACR |
+			EMAC_FTR_STACR_OC_INVERT;
+
+	/* Enable TAH/ZMII/RGMII features as found */
 	if (dev->tah_ph != 0) {
 #ifdef CONFIG_IBM_NEW_EMAC_TAH
 		dev->features |= EMAC_FTR_HAS_TAH;
@@ -2538,6 +2554,10 @@ static int __devinit emac_probe(struct of_device *ofdev,
 	struct device_node *np = ofdev->node;
 	struct device_node **blist = NULL;
 	int err, i;
+
+	/* Skip unused/unwired EMACS */
+	if (of_get_property(np, "unused", NULL))
+		return -ENODEV;
 
 	/* Find ourselves in the bootlist if we are there */
 	for (i = 0; i < EMAC_BOOT_LIST_SIZE; i++)
