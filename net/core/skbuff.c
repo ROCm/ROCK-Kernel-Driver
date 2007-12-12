@@ -419,6 +419,10 @@ static struct sk_buff *__skb_clone(struct sk_buff *n, struct sk_buff *skb)
 	n->cloned = 1;
 	n->hdr_len = skb->nohdr ? skb_headroom(skb) : skb->hdr_len;
 	n->nohdr = 0;
+#ifdef CONFIG_XEN
+	C(proto_data_valid);
+	C(proto_csum_blank);
+#endif
 	n->destructor = NULL;
 	C(truesize);
 	atomic_set(&n->users, 1);

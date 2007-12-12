@@ -13,7 +13,7 @@ ELFNOTE_START(Linux, 0, "a")
 	.long LINUX_VERSION_CODE
 ELFNOTE_END
 
-#ifdef CONFIG_XEN
+#if defined(CONFIG_XEN) || defined(CONFIG_PARAVIRT_XEN)
 /*
  * Add a special note telling glibc's dynamic linker a fake hardware
  * flavor that it will use to choose the search path for libraries in the

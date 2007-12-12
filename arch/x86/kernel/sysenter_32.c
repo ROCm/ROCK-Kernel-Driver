@@ -36,6 +36,10 @@ enum {
 #define VDSO_DEFAULT	VDSO_ENABLED
 #endif
 
+#ifdef CONFIG_XEN
+#include <xen/interface/callback.h>
+#endif
+
 /*
  * Should the kernel map a VDSO page into processes and pass its
  * address down to glibc upon exec()?
@@ -174,6 +178,7 @@ static __init void relocate_vdso(Elf32_Ehdr *ehdr)
 
 void enable_sep_cpu(void)
 {
+#ifndef CONFIG_XEN
 	int cpu = get_cpu();
 	struct tss_struct *tss = &per_cpu(init_tss, cpu);
 
@@ -187,7 +192,36 @@ void enable_sep_cpu(void)
 	wrmsr(MSR_IA32_SYSENTER_CS, __KERNEL_CS, 0);
 	wrmsr(MSR_IA32_SYSENTER_ESP, tss->x86_tss.esp1, 0);
 	wrmsr(MSR_IA32_SYSENTER_EIP, (unsigned long) sysenter_entry, 0);
-	put_cpu();	
+#else
+	extern asmlinkage void sysenter_entry_pv(void);
+	static struct callback_register sysenter = {
+		.type = CALLBACKTYPE_sysenter,
+		.address = { __KERNEL_CS, (unsigned long)sysenter_entry_pv },
+	};
+
+	if (!boot_cpu_has(X86_FEATURE_SEP))
+		return;
+
+	get_cpu();
+
+	if (xen_feature(XENFEAT_supervisor_mode_kernel))
+		sysenter.address.eip = (unsigned long)sysenter_entry;
+
+	switch (HYPERVISOR_callback_op(CALLBACKOP_register, &sysenter)) {
+	case 0:
+		break;
+#if CONFIG_XEN_COMPAT < 0x030200
+	case -ENOSYS:
+		sysenter.type = CALLBACKTYPE_sysenter_deprecated;
+		if (HYPERVISOR_callback_op(CALLBACKOP_register, &sysenter) == 0)
+			break;
+#endif
+	default:
+		clear_bit(X86_FEATURE_SEP, boot_cpu_data.x86_capability);
+		break;
+	}
+#endif
+	put_cpu();
 }
 
 static struct vm_area_struct gate_vma;

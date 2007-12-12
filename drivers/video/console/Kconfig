@@ -46,6 +46,7 @@ config VGACON_SOFT_SCROLLBACK_SIZE
 config VIDEO_SELECT
 	bool "Video mode selection support"
 	depends on  X86 && VGA_CONSOLE
+	depends on !XEN
 	---help---
 	  This enables support for text mode selection on kernel startup. If
 	  you want to take advantage of some high-resolution text mode your

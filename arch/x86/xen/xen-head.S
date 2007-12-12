@@ -1,7 +1,7 @@
 /* Xen-specific pieces of head.S, intended to be included in the right
 	place in head.S */
 
-#ifdef CONFIG_XEN
+#ifdef CONFIG_PARAVIRT_XEN
 
 #include <linux/elfnote.h>
 #include <asm/boot.h>
@@ -35,4 +35,4 @@ ENTRY(hypercall_page)
 #endif
 	ELFNOTE(Xen, XEN_ELFNOTE_LOADER,         .asciz "generic")
 
-#endif /*CONFIG_XEN */
+#endif /* CONFIG_PARAVIRT_XEN */

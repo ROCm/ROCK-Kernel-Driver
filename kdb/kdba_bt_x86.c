@@ -3164,6 +3164,9 @@ bb_usage_mov(const struct bb_operand *src, const struct bb_operand *dst, int l)
 	    bb_is_int_reg(dst->base_rc) &&
 	    full_register_dst) {
 #ifndef	CONFIG_X86_64
+#ifndef TSS_sysenter_esp0
+#define TSS_sysenter_esp0 SYSENTER_stack_esp0
+#endif
 		/* mov from TSS_sysenter_esp0+offset to esp to fix up the
 		 * sysenter stack, it leaves esp well defined.  mov
 		 * TSS_sysenter_esp0+offset(%esp),%esp is followed by up to 5

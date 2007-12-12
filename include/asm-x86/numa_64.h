@@ -2,7 +2,11 @@
 #define _ASM_X8664_NUMA_H 1
 
 #include <linux/nodemask.h>
+#ifndef CONFIG_XEN
 #include <asm/apicdef.h>
+#else
+#define MAX_LOCAL_APIC
+#endif
 
 struct bootnode {
 	u64 start,end; 

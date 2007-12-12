@@ -48,6 +48,7 @@ obj-$(CONFIG_PARAVIRT)		+= paravirt_32.o
 obj-y				+= pcspeaker.o
 
 obj-$(CONFIG_SCx200)		+= scx200_32.o
+obj-$(CONFIG_XEN)		+= fixup.o
 
 # vsyscall_32.o contains the vsyscall DSO images as __initdata.
 # We must build both images before we can assemble it.
@@ -84,5 +85,3 @@ SYSCFLAGS_vsyscall-syms.o = -r
 $(obj)/vsyscall-syms.o: $(src)/vsyscall_32.lds \
 			$(obj)/vsyscall-sysenter_32.o $(obj)/vsyscall-note_32.o FORCE
 	$(call if_changed,syscall)
-
-

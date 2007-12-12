@@ -288,7 +288,7 @@ ENTRY(sysenter_entry)
 	CFI_SIGNAL_FRAME
 	CFI_DEF_CFA esp, 0
 	CFI_REGISTER esp, ebp
-	movl TSS_sysenter_esp0(%esp),%esp
+	movl SYSENTER_stack_esp0(%esp),%esp
 sysenter_past_esp:
 	/*
 	 * No need to follow this irqs on/off section: the syscall
@@ -743,7 +743,7 @@ END(device_not_available)
  * that sets up the real kernel stack. Check here, since we can't
  * allow the wrong stack to be used.
  *
- * "TSS_sysenter_esp0+12" is because the NMI/debug handler will have
+ * "SYSENTER_stack_esp0+12" is because the NMI/debug handler will have
  * already pushed 3 words if it hits on the sysenter instruction:
  * eflags, cs and eip.
  *
@@ -755,7 +755,7 @@ END(device_not_available)
 	cmpw $__KERNEL_CS,4(%esp);		\
 	jne ok;					\
 label:						\
-	movl TSS_sysenter_esp0+offset(%esp),%esp;	\
+	movl SYSENTER_stack_esp0+offset(%esp),%esp;	\
 	CFI_DEF_CFA esp, 0;			\
 	CFI_UNDEFINED eip;			\
 	pushfl;					\
@@ -1045,7 +1045,7 @@ ENTRY(kernel_thread_helper)
 	CFI_ENDPROC
 ENDPROC(kernel_thread_helper)
 
-#ifdef CONFIG_XEN
+#ifdef CONFIG_PARAVIRT_XEN
 ENTRY(xen_hypervisor_callback)
 	CFI_STARTPROC
 	pushl $0
@@ -1128,7 +1128,7 @@ ENTRY(xen_failsafe_callback)
 .previous
 ENDPROC(xen_failsafe_callback)
 
-#endif	/* CONFIG_XEN */
+#endif	/* CONFIG_PARAVIRT_XEN */
 
 .section .rodata,"a"
 #include "syscall_table_32.S"

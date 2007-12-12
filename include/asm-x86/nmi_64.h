@@ -43,6 +43,9 @@ extern void die_nmi(char *str, struct pt_regs *regs, int do_panic);
 
 extern int panic_on_timeout;
 extern int unknown_nmi_panic;
+
+#ifndef CONFIG_XEN
+
 extern int nmi_watchdog_enabled;
 
 extern int check_nmi_watchdog(void);
@@ -89,6 +92,9 @@ unsigned lapic_adjust_nmi_hz(unsigned hz);
 int lapic_watchdog_ok(void);
 void disable_lapic_nmi_watchdog(void);
 void enable_lapic_nmi_watchdog(void);
+
+#endif
+
 void stop_nmi(void);
 void restart_nmi(void);
 

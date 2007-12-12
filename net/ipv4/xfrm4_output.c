@@ -53,6 +53,10 @@ static inline int xfrm4_output_one(struct sk_buff *skb)
 			goto error_nolock;
 	}
 
+	err = skb_checksum_setup(skb);
+	if (err)
+		goto error_nolock;
+
 	err = xfrm_output(skb);
 	if (err)
 		goto error_nolock;

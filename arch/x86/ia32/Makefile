@@ -14,11 +14,14 @@ obj-$(CONFIG_IA32_AOUT) += ia32_aout.o
 audit-class-$(CONFIG_AUDIT) := audit.o
 obj-$(CONFIG_IA32_EMULATION) += $(audit-class-y)
 
+syscall32-types-y := sysenter syscall
+syscall32-types-$(subst 1,$(CONFIG_XEN),$(shell expr $(CONFIG_XEN_COMPAT)0 '<' 0x0302000)) += int80
+
 $(obj)/syscall32_syscall.o: \
-	$(foreach F,sysenter syscall,$(obj)/vsyscall-$F.so)
+	$(foreach F,$(syscall32-types-y),$(obj)/vsyscall-$F.so)
 
 # Teach kbuild about targets
-targets := $(foreach F,$(addprefix vsyscall-,sysenter syscall),\
+targets := $(foreach F,$(addprefix vsyscall-,$(syscall32-types-y)),\
 		     $F.o $F.so $F.so.dbg)
 
 # The DSO images are built using a special linker script
@@ -32,12 +35,13 @@ $(obj)/%.so: OBJCOPYFLAGS := -S
 $(obj)/%.so: $(obj)/%.so.dbg FORCE
 	$(call if_changed,objcopy)
 
-$(obj)/vsyscall-sysenter.so.dbg $(obj)/vsyscall-syscall.so.dbg: \
+$(foreach F,$(syscall32-types-y),$(obj)/vsyscall-$F.so.dbg): \
 $(obj)/vsyscall-%.so.dbg: $(src)/vsyscall.lds $(obj)/vsyscall-%.o FORCE
 	$(call if_changed,syscall)
 
 AFLAGS_vsyscall-sysenter.o = -m32 -Wa,-32
 AFLAGS_vsyscall-syscall.o = -m32 -Wa,-32
+AFLAGS_vsyscall-int80.o = -m32 -Wa,-32
 
 vdsos := vdso32-sysenter.so vdso32-syscall.so
 

@@ -2,7 +2,7 @@
 # This Kconfig describes xen options
 #
 
-config XEN
+config PARAVIRT_XEN
 	bool "Xen guest support"
 	select PARAVIRT
 	depends on X86_CMPXCHG && X86_TSC && !NEED_MULTIPLE_NODES && !(X86_VISWS || X86_VOYAGER)

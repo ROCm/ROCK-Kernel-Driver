@@ -91,9 +91,24 @@ drivers-$(CONFIG_KDB)			+= arch/x86/kdb/
 
 boot := arch/x86/boot
 
-PHONY += bzImage bzlilo install archmrproper \
+PHONY += bzImage bzlilo vmlinuz install archmrproper \
 	 fdimage fdimage144 fdimage288 isoimage archclean
 
+ifdef CONFIG_XEN
+KBUILD_CPPFLAGS := -D__XEN_INTERFACE_VERSION__=$(CONFIG_XEN_INTERFACE_VERSION) \
+	-Iinclude$(if $(KBUILD_SRC),2)/asm/mach-xen $(KBUILD_CPPFLAGS)
+LDFLAGS_vmlinux := -e startup_64
+#Default target when executing "make"
+all: vmlinuz
+
+BOOTIMAGE                     := $(boot)/vmlinuz
+KBUILD_IMAGE                  := $(BOOTIMAGE)
+
+vmlinuz: vmlinux
+	$(Q)$(MAKE) $(build)=$(boot) $(BOOTIMAGE)
+	$(Q)mkdir -p $(objtree)/arch/x86_64/boot
+	$(Q)ln -fsn ../../x86/boot/$@ $(objtree)/arch/x86_64/boot/$@
+else
 #Default target when executing "make"
 all: bzImage
 
@@ -113,6 +128,7 @@ bzdisk: vmlinux
 
 fdimage fdimage144 fdimage288 isoimage: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(BOOTIMAGE) $@
+endif
 
 install: vdso_install
 	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(BOOTIMAGE) $@ 

@@ -7,6 +7,11 @@ static __init int add_pcspkr(void)
 	struct platform_device *pd;
 	int ret;
 
+#ifdef CONFIG_XEN
+	if (!is_initial_xendomain())
+		return 0;
+#endif
+
 	pd = platform_device_alloc("pcspkr", -1);
 	if (!pd)
 		return -ENOMEM;
