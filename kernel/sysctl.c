@@ -938,11 +938,11 @@ static struct ctl_table vm_table[] = {
 	},
 	{
 		.ctl_name	= CTL_UNNUMBERED,
-		.procname	= "hugetlb_dynamic_pool",
-		.data		= &hugetlb_dynamic_pool,
-		.maxlen		= sizeof(hugetlb_dynamic_pool),
+		.procname	= "nr_overcommit_hugepages",
+		.data		= &nr_overcommit_huge_pages,
+		.maxlen		= sizeof(nr_overcommit_huge_pages),
 		.mode		= 0644,
-		.proc_handler	= &proc_dointvec,
+		.proc_handler	= &proc_doulongvec_minmax,
 	},
 #endif
 	{

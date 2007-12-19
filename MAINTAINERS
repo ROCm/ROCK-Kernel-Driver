@@ -2489,6 +2489,12 @@ M:	mtk.manpages@gmail.com
 W:	ftp://ftp.kernel.org/pub/linux/docs/manpages
 S:	Maintained
 
+MARVELL LIBERTAS WIRELESS DRIVER
+P:	Dan Williams
+M:	dcbw@redhat.com
+L:	libertas-dev@lists.infradead.org
+S:	Maintained
+
 MARVELL MV643XX ETHERNET DRIVER
 P:	Dale Farnsworth
 M:	dale@farnsworth.org
@@ -2751,8 +2757,10 @@ S:	Maintained
 
 NFS CLIENT
 P:	Trond Myklebust
-M:	trond.myklebust@fys.uio.no
-L:	linux-kernel@vger.kernel.org
+M:	Trond.Myklebust@netapp.com
+L:	linux-nfs@vger.kernel.org
+W:	http://client.linux-nfs.org
+T:	git git://git.linux-nfs.org/pub/linux/nfs-2.6.git
 S:	Maintained
 
 NI5010 NETWORK DRIVER
@@ -3697,11 +3705,6 @@ TASKSTATS STATISTICS INTERFACE
 P:	Shailabh Nagar
 M:	nagar@watson.ibm.com
 L:	linux-kernel@vger.kernel.org
-S:	Maintained
-
-TI PARALLEL LINK CABLE DRIVER
-P:	Romain Lievin
-M:	roms@lpg.ticalc.org
 S:	Maintained
 
 TIPC NETWORK LAYER
