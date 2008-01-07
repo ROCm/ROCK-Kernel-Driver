@@ -132,7 +132,7 @@ enum {
 	ich8_2port_sata,
 	ich8m_apple_sata_ahci,		/* locks up on second port enable */
 	tolapai_sata_ahci,
-	piix_pata_vmw,			/* PIIX4 for VMware */
+	piix_pata_vmw,			/* PIIX4 for VMware, spurious DMA_ERR */
 
 	/* constants for mapping table */
 	P0			= 0,  /* port 0 */
@@ -388,7 +388,6 @@ static const struct ata_port_operations piix_sata_ops = {
 };
 
 static const struct ata_port_operations piix_vmw_ops = {
-//	.port_disable		= ata_port_disable,
 	.set_piomode		= piix_set_piomode,
 	.set_dmamode		= piix_set_dmamode,
 	.mode_filter		= ata_pci_default_filter,
@@ -411,11 +410,11 @@ static const struct ata_port_operations piix_vmw_ops = {
 	.thaw			= ata_bmdma_thaw,
 	.error_handler		= piix_pata_error_handler,
 	.post_internal_cmd	= ata_bmdma_post_internal_cmd,
+	.cable_detect		= ata_cable_40wire,
 
 	.irq_handler		= ata_interrupt,
 	.irq_clear		= ata_bmdma_irq_clear,
 	.irq_on			= ata_irq_on,
-//	.irq_ack		= ata_irq_ack,
 
 	.port_start		= ata_port_start,
 };
@@ -660,7 +659,7 @@ static struct ata_port_info piix_port_info[] = {
 		.port_ops	= &piix_sata_ops,
 	},
 
-	/* piix_pata_vmw: 11:  PIIX4 at 33MHz for VMware */
+	[piix_pata_vmw] =
 	{
 		.sht		= &piix_sht,
 		.flags		= PIIX_PATA_FLAGS,
