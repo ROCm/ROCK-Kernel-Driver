@@ -1860,7 +1860,6 @@ config NE_H8300
 	  controller on the Renesas H8/300 processor.
 
 source "drivers/net/fec_8xx/Kconfig"
-source "drivers/net/fec_mpc52xx/Kconfig"
 source "drivers/net/fs_enet/Kconfig"
 
 endif # NET_ETHERNET

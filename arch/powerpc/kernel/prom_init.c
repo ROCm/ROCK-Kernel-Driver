@@ -1487,6 +1487,34 @@ static void __init prom_find_mmu(void)
 	else if (strncmp(version, "FirmWorks,3.", 12) == 0) {
 		of_workarounds = OF_WA_CLAIM | OF_WA_LONGTRAIL;
 		call_prom("interpret", 1, 1, "dev /memory 0 to allow-reclaim");
+#ifdef CONFIG_PPC_MPC52xx
+	} else if (strcmp(version, "EFIKA5K2") == 0) {
+		call_prom("interpret", 1, 1,
+			" .\" Adding EFIKA5K2 Ethernet PHY\" cr"
+			" s\" /builtin\" find-device"
+			" new-device"
+				" 1 encode-int s\" #address-cells\" property"
+				" 0 encode-int s\" #size-cells\" property"
+				" s\" mdio\" 2dup device-name device-type"
+				" s\" mpc5200b-fec-phy\" encode-string s\" compatible\" property"
+				" 0xf0003000 0x400 reg"
+				" 0x2 encode-int"
+				" 0x5 encode-int encode+"
+				" 0x3 encode-int encode+"
+				" s\" interrupts\" property"
+				" new-device"
+					" s\" ethernet-phy\" 2dup device-name device-type"
+					" 0x10 encode-int s\" reg\" property"
+					" my-self"
+					" ihandle>phandle"
+				" finish-device"
+			" finish-device"
+			" s\" /builtin/ethernet\" find-device"
+				" encode-int"
+				" s\" phy-handle\" property"
+			" device-end"
+			);
+#endif
 	} else
 		return;
 	_prom->memory = call_prom("open", 1, 1, ADDR("/memory"));

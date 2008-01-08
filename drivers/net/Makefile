@@ -215,7 +215,6 @@ obj-$(CONFIG_SMC911X) += smc911x.o
 obj-$(CONFIG_BFIN_MAC) += bfin_mac.o
 obj-$(CONFIG_DM9000) += dm9000.o
 obj-$(CONFIG_FEC_8XX) += fec_8xx/
-obj-$(CONFIG_FEC_MPC52xx) += fec_mpc52xx/
 obj-$(CONFIG_PASEMI_MAC) += pasemi_mac.o
 obj-$(CONFIG_MLX4_CORE) += mlx4/
 
