@@ -1078,6 +1078,18 @@ config SECCOMP
 
 	  If unsure, say Y. Only embedded should say N here.
 
+config SECCOMP_DISABLE_TSC
+	bool "Disable the TSC for seccomp tasks"
+	depends on SECCOMP
+	default n
+	help
+	  This feature mathematically prevents covert channels
+	  for tasks running under SECCOMP. This can generate
+	  a minuscule overhead in the scheduler.
+
+	  If you care most about performance say N. Say Y only if you're
+	  paranoid about covert channels.
+
 config CC_STACKPROTECTOR
 	bool "Enable -fstack-protector buffer overflow detection (EXPERIMENTAL)"
 	depends on X86_64 && EXPERIMENTAL
