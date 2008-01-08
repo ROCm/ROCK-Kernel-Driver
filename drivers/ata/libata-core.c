@@ -119,6 +119,10 @@ int libata_noacpi = 0;
 module_param_named(noacpi, libata_noacpi, int, 0444);
 MODULE_PARM_DESC(noacpi, "Disables the use of ACPI in probe/suspend/resume when set");
 
+int libata_force_cbl = 0;
+module_param_named(force_cbl, libata_force_cbl, int, 0644);
+MODULE_PARM_DESC(force_cbl, "force PATA cable type (0=keep, 40=40c, 80=80c)");
+
 MODULE_AUTHOR("Jeff Garzik");
 MODULE_DESCRIPTION("Library module for ATA devices");
 MODULE_LICENSE("GPL");

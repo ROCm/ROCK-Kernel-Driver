@@ -2288,8 +2288,26 @@ static int ata_eh_revalidate_and_attach(struct ata_link *link,
 
 	/* PDIAG- should have been released, ask cable type if post-reset */
 	if (ata_is_host_link(link) && ap->ops->cable_detect &&
-	    (ehc->i.flags & ATA_EHI_DID_RESET))
+	    (ehc->i.flags & ATA_EHI_DID_RESET)) {
 		ap->cbl = ap->ops->cable_detect(ap);
+
+		if (!(ap->flags & ATA_FLAG_SATA) && libata_force_cbl) {
+			switch (libata_force_cbl) {
+			case 40:
+				ata_port_printk(ap, KERN_INFO, "forcing 40c\n");
+				ap->cbl = ATA_CBL_PATA40;
+				break;
+			case 80:
+				ata_port_printk(ap, KERN_INFO, "forcing 80c\n");
+				ap->cbl = ATA_CBL_PATA80;
+				break;
+			default:
+				ata_port_printk(ap, KERN_WARNING,
+						"invalid force_cbl value %d\n",
+						libata_force_cbl);
+			}
+		}
+	}
 
 	/* Configure new devices forward such that user doesn't see
 	 * device detection messages backwards.
