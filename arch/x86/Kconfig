@@ -334,7 +334,7 @@ endchoice
 config SCHED_NO_NO_OMIT_FRAME_POINTER
 	bool "Single-depth WCHAN output"
 	default y
-	depends on X86_32
+	depends on X86_32 && !STACK_UNWIND
 	help
 	  Calculate simpler /proc/<PID>/wchan values. If this option
 	  is disabled then wchan values will recurse back to the

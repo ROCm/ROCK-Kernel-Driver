@@ -97,6 +97,11 @@ static inline void preempt_conditional_cli(struct pt_regs *regs)
 }
 
 int kstack_depth_to_print = 12;
+#ifdef CONFIG_STACK_UNWIND
+static int call_trace = 1;
+#else
+#define call_trace (-1)
+#endif
 
 #ifdef CONFIG_KALLSYMS
 void printk_address(unsigned long address)
@@ -201,7 +206,31 @@ static unsigned long *in_exception_stack(unsigned cpu, unsigned long stack,
 	return NULL;
 }
 
-#define MSG(txt) ops->warning(data, txt)
+struct ops_and_data {
+	const struct stacktrace_ops *ops;
+	void *data;
+};
+
+static int dump_trace_unwind(struct unwind_frame_info *info, void *context)
+{
+	struct ops_and_data *oad = (struct ops_and_data *)context;
+	int n = 0;
+	unsigned long sp = UNW_SP(info);
+
+	if (arch_unw_user_mode(info))
+		return -1;
+	while (unwind(info) == 0 && UNW_PC(info)) {
+		n++;
+		oad->ops->address(oad->data, UNW_PC(info));
+		if (arch_unw_user_mode(info))
+			break;
+		if ((sp & ~(PAGE_SIZE - 1)) == (UNW_SP(info) & ~(PAGE_SIZE - 1))
+		    && sp > UNW_SP(info))
+			break;
+		sp = UNW_SP(info);
+	}
+	return n;
+}
 
 /*
  * x86-64 can have up to three kernel stacks:
@@ -227,6 +256,39 @@ void dump_trace(struct task_struct *tsk, struct pt_regs *regs,
 
 	if (!tsk)
 		tsk = current;
+
+	if (call_trace >= 0) {
+		int unw_ret = 0;
+		struct unwind_frame_info info;
+		struct ops_and_data oad = { .ops = ops, .data = data };
+
+		if (regs) {
+			if (unwind_init_frame_info(&info, tsk, regs) == 0)
+				unw_ret = dump_trace_unwind(&info, &oad);
+		} else if (tsk == current)
+			unw_ret = unwind_init_running(&info, dump_trace_unwind, &oad);
+		else {
+			if (unwind_init_blocked(&info, tsk) == 0)
+				unw_ret = dump_trace_unwind(&info, &oad);
+		}
+		if (unw_ret > 0) {
+			if (call_trace == 1 && !arch_unw_user_mode(&info)) {
+				ops->warning_symbol(data, "DWARF2 unwinder stuck at %s\n",
+					     UNW_PC(&info));
+				if ((long)UNW_SP(&info) < 0) {
+					ops->warning(data, "Leftover inexact backtrace:\n");
+					stack = (unsigned long *)UNW_SP(&info);
+					if (!stack)
+						return;
+				} else
+					ops->warning(data, "Full inexact backtrace again:\n");
+			} else if (call_trace >= 1)
+				return;
+			else
+				ops->warning(data, "Full inexact backtrace again:\n");
+		} else
+			ops->warning(data, "Inexact backtrace:\n");
+	}
 
 	if (!stack) {
 		unsigned long dummy;
@@ -1171,3 +1233,21 @@ static int __init kstack_setup(char *s)
 	return 0;
 }
 early_param("kstack", kstack_setup);
+
+#ifdef CONFIG_STACK_UNWIND
+static int __init call_trace_setup(char *s)
+{
+	if (!s)
+		return -EINVAL;
+	if (strcmp(s, "old") == 0)
+		call_trace = -1;
+	else if (strcmp(s, "both") == 0)
+		call_trace = 0;
+	else if (strcmp(s, "newfallback") == 0)
+		call_trace = 1;
+	else if (strcmp(s, "new") == 0)
+		call_trace = 2;
+	return 0;
+}
+early_param("call_trace", call_trace_setup);
+#endif

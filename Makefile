@@ -520,6 +520,11 @@ else
 KBUILD_CFLAGS	+= -fomit-frame-pointer
 endif
 
+ifdef CONFIG_UNWIND_INFO
+KBUILD_CFLAGS	+= -fasynchronous-unwind-tables
+LDFLAGS_vmlinux	+= --eh-frame-hdr
+endif
+
 ifdef CONFIG_DEBUG_INFO
 KBUILD_CFLAGS	+= -g
 KBUILD_AFLAGS	+= -gdwarf-2
