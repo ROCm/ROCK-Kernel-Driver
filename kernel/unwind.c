@@ -1077,7 +1077,7 @@ int unwind(struct unwind_frame_info *frame)
 			   && link > UNW_FP(frame) && link < bottom
 # endif
 			   && !(link & (sizeof(link) - 1))
-			   && !probe_kernel_address(UNW_FP(frame) + FRAME_RETADDR_OFFSET)
+			   && !probe_kernel_address(UNW_FP(frame) + FRAME_RETADDR_OFFSET,
 			                            UNW_PC(frame)) {
 				UNW_SP(frame) = UNW_FP(frame) + FRAME_RETADDR_OFFSET
 # if FRAME_RETADDR_OFFSET < 0
