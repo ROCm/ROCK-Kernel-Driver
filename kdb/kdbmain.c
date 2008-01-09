@@ -3918,6 +3918,7 @@ static ctl_table kdb_kern_table[] = {
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= &proc_do_kdb,
+		.strategy	= &sysctl_intvec,
 	},
 	{}
 };

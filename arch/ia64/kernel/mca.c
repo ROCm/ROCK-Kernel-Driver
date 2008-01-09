@@ -76,10 +76,10 @@
 #include <linux/cpumask.h>
 #include <linux/kdebug.h>
 #include <linux/cpu.h>
-#ifdef	CONFIG_KDB
+#ifdef CONFIG_KDB
 #include <linux/kdb.h>
-#include <linux/kdbprivate.h>	/* for switch state wrappers */
-#endif	/* CONFIG_KDB */
+#include <linux/kdbprivate.h>  /* for switch state wrappers */
+#endif /* CONFIG_KDB */
 
 #include <asm/delay.h>
 #include <asm/machvec.h>

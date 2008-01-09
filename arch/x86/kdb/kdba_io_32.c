@@ -20,7 +20,7 @@
 
 #include <linux/kdb.h>
 #include <linux/kdbprivate.h>
-#include "pc_keyb_32.h"
+#include <pc_keyb_32.h>
 
 #ifdef	CONFIG_VT_CONSOLE
 #define KDB_BLINK_LED 1

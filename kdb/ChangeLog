@@ -1,8 +1,31 @@
+2008-01-07 Jay Lan  <jlan@sgi.com>
+
+	* kdb-v4.4-2.6.24-rc7-common-1.
+
+2007-12-21 Jay Lan  <jlan@sgi.com>
+
+	* Renamed kdb/kdba_bt_x86.c to arch/x86/kdba_bt.c. And thus, the x86
+	  backtrace code is now moved into the kdb x86 patch.
+	* kdb v4.4-2.6.24-rc6-common-1.
+
+2007-12-12 Jay Lan  <jlan@sgi.com>
+
+	* kdb v4.4-2.6.24-rc5-common-1.
+
+2007-12-05 Jay Lan  <jlan@sgi.com>
+
+	* Fixed a 'sysctl table check failed' problem.
+	* kdb v4.4-2.6.24-rc4-common-1.
+
+2007-11-26 Jay Lan  <jlan@sgi.com>
+
+	* kdb v4.4-2.6.24-rc3-common-1.
+
 2007-11-13 Jay Lan  <jlan@sgi.com>
 
 	* Back ported "New KDB USB interface" from Aaron Young in
 	  v4.4-2.6.23-common-2 to 2.6.24 kdb patchset.
-	* v4.4-2.6.24-rc2-common-2.
+	* kdb v4.4-2.6.24-rc2-common-2.
 
 2007-11-12 Jay Lan  <jlan@sgi.com>
 

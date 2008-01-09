@@ -8,6 +8,18 @@
 
 obj-$(CONFIG_KDB)	:= kdba_bp_32.o kdba_id_32.o kdba_io_32.o kdbasupport_32.o i386-dis.o
 
+# The i386 and x86_64 backtrace commands are handled by common code.
+obj-y		+= kdba_bt.o
+ifneq (,$(findstring -fno-optimize-sibling-calls,$(KBUILD_CFLAGS)))
+  CFLAGS_kdba_bt.o += -DNO_SIBLINGS
+endif
+REGPARM := $(subst -mregparm=,,$(filter -mregparm=%,$(KBUILD_CFLAGS)))
+ifeq (,$(REGPARM))
+  REGPARM := 3
+endif
+
+CFLAGS_kdba_bt.o += -DREGPARM=$(REGPARM) -DCCVERSION="$(CCVERSION)"
+
 override CFLAGS := $(CFLAGS:%-pg=% )
 
-CFLAGS_kdba_io_64.o += -I $(TOPDIR)/arch/$(SRCARCH)/kdb
+CFLAGS_kdba_io_32.o += -I $(TOPDIR)/arch/$(SRCARCH)/kdb

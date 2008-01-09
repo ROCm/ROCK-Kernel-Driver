@@ -10,23 +10,6 @@ CCVERSION	:= $(shell $(CC) -v 2>&1 | sed -ne '$$p')
 obj-y		:= kdb_bt.o kdb_bp.o kdb_id.o kdbsupport.o gen-kdb_cmds.o kdbmain.o kdb_io.o
 CFLAGS_kdbmain.o += -DCCVERSION="$(CCVERSION)"
 
-# The i386 and x86_64 backtrace commands are handled by common code.
-ifdef CONFIG_X86
-  obj-y		+= kdba_bt_x86.o
-  ifneq (,$(findstring -fno-optimize-sibling-calls,$(CFLAGS)))
-    CFLAGS_kdba_bt_x86.o += -DNO_SIBLINGS
-  endif
-  REGPARM := $(subst -mregparm=,,$(filter -mregparm=%,$(CFLAGS)))
-  ifeq (,$(REGPARM))
-    ifdef CONFIG_X86_64
-      REGPARM := 6
-    else
-      REGPARM := 0
-    endif
-  endif
-  CFLAGS_kdba_bt_x86.o += -DREGPARM=$(REGPARM) -DCCVERSION="$(CCVERSION)"
-endif
-
 subdir-$(CONFIG_KDB_MODULES) := modules
 obj-y += $(addsuffix /built-in.o, $(subdir-y))
 

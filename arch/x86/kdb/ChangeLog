@@ -1,9 +1,36 @@
+2008-01-07 Jay Lan  <jlan@sgi.com>
+
+	* kdb-v4.4-2.6.24-rc7-x86-1.
+
+2007-12-21 Jay Lan  <jlan@sgi.com>
+
+	* Renamed kdb/kdba_bt_x86.c to arch/x86/kdba_bt.c.
+	* Find gcc options 'no-optimize-sibling-calls' & 'regparm' from
+	  $(KBUILD_CFLAGS) in arch/x86/kdb/Makefile_{32,64}. We used to
+	  get them from $(CFLAGS).
+	* Default regparm to 3 on x86_32 if not defined.
+	* kdb v4.4-2.6.24-rc6-x86-1.
+
+2007-12-12 Jay Lan  <jlan@sgi.com>
+
+	* Fixed a Makefile_32 error.
+	* kdb v4.4-2.6.24-rc5-x86-1.
+
+2007-12-05 Jay Lan  <jlan@sgi.com>
+
+	* Fixed a 'sysctl table check failed' problem.
+	* kdb v4.4-2.6.24-rc4-x86-1.
+
+2007-11-26 Jay Lan  <jlan@sgi.com>
+
+	* kdb v4.4-2.6.24-rc3-x86-1.
+
 2007-11-13 Jay Lan  <jlan@sgi.com>
 
 	* Back ported "New KDB USB interface" from Aaron Young in
 	  v4.4-2.6.23-{i386,x86_64}-2 to 2.6.24 kdb patchset.
 	* Fixed a make problem at arch/x86/Makefile_{32,64}.
-	* v4.4-2.6.24-rc2-x86-2.
+	* kdb v4.4-2.6.24-rc2-x86-2.
 
 2007-11-12 Jay Lan  <jlan@sgi.com>
 
