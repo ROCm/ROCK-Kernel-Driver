@@ -523,13 +523,13 @@ static unsigned long read_pointer(const u8 **pLoc,
 		return 0;
 	}
 	ptr.p8 = *pLoc;
-	switch(ptrType & DW_EH_PE_FORM) {
+	switch (ptrType & DW_EH_PE_FORM) {
 	case DW_EH_PE_data2:
 		if (end < (const void *)(ptr.p16u + 1)) {
 			dprintk(1, "Data16 overrun (%p,%p).", ptr.p8, end);
 			return 0;
 		}
-		if(ptrType & DW_EH_PE_signed)
+		if (ptrType & DW_EH_PE_signed)
 			value = get_unaligned(ptr.p16s++);
 		else
 			value = get_unaligned(ptr.p16u++);
@@ -540,7 +540,7 @@ static unsigned long read_pointer(const u8 **pLoc,
 			dprintk(1, "Data32 overrun (%p,%p).", ptr.p8, end);
 			return 0;
 		}
-		if(ptrType & DW_EH_PE_signed)
+		if (ptrType & DW_EH_PE_signed)
 			value = get_unaligned(ptr.p32s++);
 		else
 			value = get_unaligned(ptr.p32u++);
@@ -572,7 +572,7 @@ static unsigned long read_pointer(const u8 **pLoc,
 		        ptrType, ptr.p8, end);
 		return 0;
 	}
-	switch(ptrType & DW_EH_PE_ADJUST) {
+	switch (ptrType & DW_EH_PE_ADJUST) {
 	case DW_EH_PE_abs:
 		break;
 	case DW_EH_PE_pcrel:
@@ -640,7 +640,7 @@ static signed fde_pointer_type(const u32 *cie)
 		while (*++aug) {
 			if (ptr >= end)
 				return -1;
-			switch(*aug) {
+			switch (*aug) {
 			case 'L':
 				++ptr;
 				break;
@@ -700,11 +700,11 @@ static int processCFI(const u8 *start,
 			return result;
 	}
 	for (ptr.p8 = start; result && ptr.p8 < end; ) {
-		switch(*ptr.p8 >> 6) {
+		switch (*ptr.p8 >> 6) {
 			uleb128_t value;
 
 		case 0:
-			switch(*ptr.p8++) {
+			switch (*ptr.p8++) {
 			case DW_CFA_nop:
 				break;
 			case DW_CFA_set_loc:
@@ -836,12 +836,12 @@ static int processCFI(const u8 *start,
 		dprintk(1, "Data underrun (%p,%p).", ptr.p8, end);
 
 	return result
-	   && ptr.p8 == end
-	   && (targetLoc == 0
-	    || (/*todo While in theory this should apply, gcc in practice omits
-	          everything past the function prolog, and hence the location
-	          never reaches the end of the function.
-	        targetLoc < state->loc &&*/ state->label == NULL));
+	       && ptr.p8 == end
+	       && (targetLoc == 0
+	           || (/*todo While in theory this should apply, gcc in practice omits
+	                 everything past the function prolog, and hence the location
+	                 never reaches the end of the function.
+	               targetLoc < state->loc &&*/ state->label == NULL));
 }
 
 /* Unwind to previous to frame.  Returns 0 if successful, negative
@@ -868,7 +868,7 @@ int unwind(struct unwind_frame_info *frame)
 
 		smp_rmb();
 		if (hdr && hdr[0] == 1) {
-			switch(hdr[3] & DW_EH_PE_FORM) {
+			switch (hdr[3] & DW_EH_PE_FORM) {
 			case DW_EH_PE_native: tableSize = sizeof(unsigned long); break;
 			case DW_EH_PE_data2: tableSize = 2; break;
 			case DW_EH_PE_data4: tableSize = 4; break;
@@ -909,30 +909,30 @@ int unwind(struct unwind_frame_info *frame)
 					                           (unsigned long)hdr);
 			}
 		}
-		if(hdr && !fde)
+		if (hdr && !fde)
 			dprintk(3, "Binary lookup for %lx failed.", pc);
 
 		if (fde != NULL) {
 			cie = cie_for_fde(fde, table);
 			ptr = (const u8 *)(fde + 2);
-			if(cie != NULL
-			   && cie != &bad_cie
-			   && cie != &not_fde
-			   && (ptrType = fde_pointer_type(cie)) >= 0
-			   && read_pointer(&ptr,
-			                   (const u8 *)(fde + 1) + *fde,
-			                   ptrType, 0, 0) == startLoc) {
+			if (cie != NULL
+			    && cie != &bad_cie
+			    && cie != &not_fde
+			    && (ptrType = fde_pointer_type(cie)) >= 0
+			    && read_pointer(&ptr,
+			                    (const u8 *)(fde + 1) + *fde,
+			                    ptrType, 0, 0) == startLoc) {
 				if (!(ptrType & DW_EH_PE_indirect))
 					ptrType &= DW_EH_PE_FORM|DW_EH_PE_signed;
 				endLoc = startLoc
 				         + read_pointer(&ptr,
 				                        (const u8 *)(fde + 1) + *fde,
 				                        ptrType, 0, 0);
-				if(pc >= endLoc)
+				if (pc >= endLoc)
 					fde = NULL;
 			} else
 				fde = NULL;
-			if(!fde)
+			if (!fde)
 				dprintk(1, "Binary lookup result for %lx discarded.", pc);
 		}
 		if (fde == NULL) {
@@ -965,7 +965,7 @@ int unwind(struct unwind_frame_info *frame)
 				if (pc >= startLoc && pc < endLoc)
 					break;
 			}
-			if(!fde)
+			if (!fde)
 				dprintk(3, "Linear lookup for %lx failed.", pc);
 		}
 	}
@@ -981,7 +981,7 @@ int unwind(struct unwind_frame_info *frame)
 			/* check if augmentation size is first (and thus present) */
 			if (*ptr == 'z') {
 				while (++ptr < end && *ptr) {
-					switch(*ptr) {
+					switch (*ptr) {
 					/* check for ignorable (or already handled)
 					 * nul-terminated augmentation string */
 					case 'L':
@@ -1000,7 +1000,7 @@ int unwind(struct unwind_frame_info *frame)
 			if (ptr >= end || *ptr)
 				cie = NULL;
 		}
-		if(!cie)
+		if (!cie)
 			dprintk(1, "CIE unusable (%p,%p).", ptr, end);
 		++ptr;
 	}
@@ -1025,12 +1025,12 @@ int unwind(struct unwind_frame_info *frame)
 				ptr += augSize;
 			}
 			if (ptr > end
-			   || retAddrReg >= ARRAY_SIZE(reg_info)
-			   || REG_INVALID(retAddrReg)
-			   || reg_info[retAddrReg].width != sizeof(unsigned long))
+			    || retAddrReg >= ARRAY_SIZE(reg_info)
+			    || REG_INVALID(retAddrReg)
+			    || reg_info[retAddrReg].width != sizeof(unsigned long))
 				cie = NULL;
 		}
-		if(!cie)
+		if (!cie)
 			dprintk(1, "CIE validation failed (%p,%p).", ptr, end);
 	}
 	if (cie != NULL) {
@@ -1045,7 +1045,7 @@ int unwind(struct unwind_frame_info *frame)
 			if ((ptr += augSize) > end)
 				fde = NULL;
 		}
-		if(!fde)
+		if (!fde)
 			dprintk(1, "FDE validation failed (%p,%p).", ptr, end);
 	}
 	if (cie == NULL || fde == NULL) {
@@ -1065,20 +1065,20 @@ int unwind(struct unwind_frame_info *frame)
 		    && UNW_FP(frame) >= UNW_SP(frame)
 		    && bottom > UNW_FP(frame)
 # endif
-		   && !((UNW_SP(frame) | UNW_FP(frame))
-		        & (sizeof(unsigned long) - 1))) {
+		    && !((UNW_SP(frame) | UNW_FP(frame))
+		         & (sizeof(unsigned long) - 1))) {
 			unsigned long link;
 
 			if (!probe_kernel_address(UNW_FP(frame) + FRAME_LINK_OFFSET,
 			                          link)
 # if FRAME_RETADDR_OFFSET < 0
-			   && link > bottom && link < UNW_FP(frame)
+			    && link > bottom && link < UNW_FP(frame)
 # else
-			   && link > UNW_FP(frame) && link < bottom
+			    && link > UNW_FP(frame) && link < bottom
 # endif
-			   && !(link & (sizeof(link) - 1))
-			   && !probe_kernel_address(UNW_FP(frame) + FRAME_RETADDR_OFFSET,
-			                            UNW_PC(frame)) {
+			    && !(link & (sizeof(link) - 1))
+			    && !probe_kernel_address(UNW_FP(frame) + FRAME_RETADDR_OFFSET,
+			                             UNW_PC(frame))) {
 				UNW_SP(frame) = UNW_FP(frame) + FRAME_RETADDR_OFFSET
 # if FRAME_RETADDR_OFFSET < 0
 					-
@@ -1097,19 +1097,19 @@ int unwind(struct unwind_frame_info *frame)
 	memcpy(&state.cfa, &badCFA, sizeof(state.cfa));
 	/* process instructions */
 	if (!processCFI(ptr, end, pc, ptrType, &state)
-	   || state.loc > endLoc
-	   || state.regs[retAddrReg].where == Nowhere
-	   || state.cfa.reg >= ARRAY_SIZE(reg_info)
-	   || reg_info[state.cfa.reg].width != sizeof(unsigned long)
-	   || FRAME_REG(state.cfa.reg, unsigned long) % sizeof(unsigned long)
-	   || state.cfa.offs % sizeof(unsigned long)) {
+	    || state.loc > endLoc
+	    || state.regs[retAddrReg].where == Nowhere
+	    || state.cfa.reg >= ARRAY_SIZE(reg_info)
+	    || reg_info[state.cfa.reg].width != sizeof(unsigned long)
+	    || FRAME_REG(state.cfa.reg, unsigned long) % sizeof(unsigned long)
+	    || state.cfa.offs % sizeof(unsigned long)) {
 		dprintk(1, "Unusable unwind info (%p,%p).", ptr, end);
 		return -EIO;
 	}
 	/* update frame */
 #ifndef CONFIG_AS_CFI_SIGNAL_FRAME
-	if(frame->call_frame
-	   && !UNW_DEFAULT_RA(state.regs[retAddrReg], state.dataAlign))
+	if (frame->call_frame
+	    && !UNW_DEFAULT_RA(state.regs[retAddrReg], state.dataAlign))
 		frame->call_frame = 0;
 #endif
 	cfa = FRAME_REG(state.cfa.reg, unsigned long) + state.cfa.offs;
@@ -1134,18 +1134,18 @@ int unwind(struct unwind_frame_info *frame)
 			        i, state.regs[i].where);
 			return -EIO;
 		}
-		switch(state.regs[i].where) {
+		switch (state.regs[i].where) {
 		default:
 			break;
 		case Register:
 			if (state.regs[i].value >= ARRAY_SIZE(reg_info)
-			   || REG_INVALID(state.regs[i].value)
-			   || reg_info[i].width > reg_info[state.regs[i].value].width) {
+			    || REG_INVALID(state.regs[i].value)
+			    || reg_info[i].width > reg_info[state.regs[i].value].width) {
 				dprintk(1, "Cannot restore register %u from register %lu.",
 				        i, state.regs[i].value);
 				return -EIO;
 			}
-			switch(reg_info[state.regs[i].value].width) {
+			switch (reg_info[state.regs[i].value].width) {
 #define CASE(n) \
 			case sizeof(u##n): \
 				state.regs[i].value = FRAME_REG(state.regs[i].value, \
@@ -1165,16 +1165,16 @@ int unwind(struct unwind_frame_info *frame)
 	for (i = 0; i < ARRAY_SIZE(state.regs); ++i) {
 		if (REG_INVALID(i))
 			continue;
-		switch(state.regs[i].where) {
+		switch (state.regs[i].where) {
 		case Nowhere:
 			if (reg_info[i].width != sizeof(UNW_SP(frame))
-			   || &FRAME_REG(i, __typeof__(UNW_SP(frame)))
-			      != &UNW_SP(frame))
+			    || &FRAME_REG(i, __typeof__(UNW_SP(frame)))
+			       != &UNW_SP(frame))
 				continue;
 			UNW_SP(frame) = cfa;
 			break;
 		case Register:
-			switch(reg_info[i].width) {
+			switch (reg_info[i].width) {
 #define CASE(n) case sizeof(u##n): \
 				FRAME_REG(i, u##n) = state.regs[i].value; \
 				break
@@ -1208,10 +1208,10 @@ int unwind(struct unwind_frame_info *frame)
 					        addr, state.regs[i].value);
 					return -EIO;
 				}
-				switch(reg_info[i].width) {
+				switch (reg_info[i].width) {
 #define CASE(n)			case sizeof(u##n): \
-					if(probe_kernel_address(addr, \
-							        FRAME_REG(i, u##n))) \
+					if (probe_kernel_address(addr, \
+								 FRAME_REG(i, u##n))) \
 						return -EFAULT; \
 					break
 				CASES;
