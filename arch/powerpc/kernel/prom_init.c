@@ -1487,34 +1487,6 @@ static void __init prom_find_mmu(void)
 	else if (strncmp(version, "FirmWorks,3.", 12) == 0) {
 		of_workarounds = OF_WA_CLAIM | OF_WA_LONGTRAIL;
 		call_prom("interpret", 1, 1, "dev /memory 0 to allow-reclaim");
-#ifdef CONFIG_PPC_MPC52xx
-	} else if (strcmp(version, "EFIKA5K2") == 0) {
-		call_prom("interpret", 1, 1,
-			" .\" Adding EFIKA5K2 Ethernet PHY\" cr"
-			" s\" /builtin\" find-device"
-			" new-device"
-				" 1 encode-int s\" #address-cells\" property"
-				" 0 encode-int s\" #size-cells\" property"
-				" s\" mdio\" 2dup device-name device-type"
-				" s\" mpc5200b-fec-phy\" encode-string s\" compatible\" property"
-				" 0xf0003000 0x400 reg"
-				" 0x2 encode-int"
-				" 0x5 encode-int encode+"
-				" 0x3 encode-int encode+"
-				" s\" interrupts\" property"
-				" new-device"
-					" s\" ethernet-phy\" 2dup device-name device-type"
-					" 0x10 encode-int s\" reg\" property"
-					" my-self"
-					" ihandle>phandle"
-				" finish-device"
-			" finish-device"
-			" s\" /builtin/ethernet\" find-device"
-				" encode-int"
-				" s\" phy-handle\" property"
-			" device-end"
-			);
-#endif
 	} else
 		return;
 	_prom->memory = call_prom("open", 1, 1, ADDR("/memory"));
@@ -2251,6 +2223,45 @@ static void __init fixup_device_tree_efika(void)
 			prom_printf("fixup_device_tree_efika: ",
 				"skipped entry %x - setprop error\n", i);
 	}
+
+	/* Make sure ethernet mdio bus node exists */
+	node = call_prom("finddevice", 1, 1, ADDR("/builtin/mdio"));
+	if (!PHANDLE_VALID(node)) {
+		prom_printf("Adding Ethernet MDIO node\n");
+		call_prom("interpret", 1, 1,
+			" s\" /builtin\" find-device"
+			" new-device"
+				" 1 encode-int s\" #address-cells\" property"
+				" 0 encode-int s\" #size-cells\" property"
+				" s\" mdio\" 2dup device-name device-type"
+				" s\" mpc5200b-fec-phy\" encode-string"
+				" s\" compatible\" property"
+				" 0xf0003000 0x400 reg"
+				" 0x2 encode-int"
+				" 0x5 encode-int encode+"
+				" 0x3 encode-int encode+"
+				" s\" interrupts\" property"
+			" finish-device");
+	};
+
+	/* Make sure ethernet phy device node exist */
+	node = call_prom("finddevice", 1, 1, ADDR("/builtin/mdio/ethernet-phy"));
+	if (!PHANDLE_VALID(node)) {
+		prom_printf("Adding Ethernet PHY node\n");
+		call_prom("interpret", 1, 1,
+			" s\" /builtin/mdio\" find-device"
+			" new-device"
+				" s\" ethernet-phy\" device-name"
+				" 0x10 encode-int s\" reg\" property"
+				" my-self"
+				" ihandle>phandle"
+			" finish-device"
+			" s\" /builtin/ethernet\" find-device"
+				" encode-int"
+				" s\" phy-handle\" property"
+			" device-end");
+	}
+
 }
 #else
 #define fixup_device_tree_efika()
