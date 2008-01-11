@@ -83,7 +83,7 @@ static struct notifier_block xen_panic_block = {
 extern char hypercall_page[PAGE_SIZE];
 EXPORT_SYMBOL(hypercall_page);
 
-int disable_pse __devinitdata = 0;
+int disable_pse __cpuinitdata = 0;
 
 /*
  * Machine setup..

@@ -24,22 +24,19 @@ config XEN_PRIVILEGED_GUEST
 	  Support for privileged operation (domain 0)
 
 config XEN_UNPRIVILEGED_GUEST
-	bool
-	default !XEN_PRIVILEGED_GUEST
+	def_bool !XEN_PRIVILEGED_GUEST
 
 config XEN_PRIVCMD
-	bool
+	def_bool y
 	depends on PROC_FS
-	default y
 
 config XEN_XENBUS_DEV
-	bool
+	def_bool y
 	depends on PROC_FS
-	default y
 
 config XEN_BACKEND
         tristate "Backend driver support"
-        default y
+        default XEN_PRIVILEGED_GUEST
         help
           Support for backend device drivers that provide I/O services
           to other virtual machines.
@@ -47,7 +44,7 @@ config XEN_BACKEND
 config XEN_BLKDEV_BACKEND
 	tristate "Block-device backend driver"
         depends on XEN_BACKEND
-	default y
+	default XEN_BACKEND
 	help
 	  The block-device backend driver allows the kernel to export its
 	  block devices to other guests via a high-performance shared-memory
@@ -56,7 +53,7 @@ config XEN_BLKDEV_BACKEND
 config XEN_BLKDEV_TAP
 	tristate "Block-device tap backend driver"
 	depends on XEN_BACKEND
-	default XEN_PRIVILEGED_GUEST
+	default XEN_BACKEND
 	help
 	  The block tap driver is an alternative to the block back driver 
           and allows VM block requests to be redirected to userspace through
@@ -68,7 +65,7 @@ config XEN_BLKDEV_TAP
 config XEN_NETDEV_BACKEND
 	tristate "Network-device backend driver"
         depends on XEN_BACKEND && NET
-	default y
+	default XEN_BACKEND
 	help
 	  The network-device backend driver allows the kernel to export its
 	  network devices to other guests via a high-performance shared-memory
@@ -77,7 +74,6 @@ config XEN_NETDEV_BACKEND
 config XEN_NETDEV_PIPELINED_TRANSMITTER
 	bool "Pipelined transmitter (DANGEROUS)"
 	depends on XEN_NETDEV_BACKEND
-	default n
 	help
 	  If the net backend is a dumb domain, such as a transparent Ethernet
 	  bridge with no local IP interface, it is safe to say Y here to get
@@ -90,7 +86,6 @@ config XEN_NETDEV_PIPELINED_TRANSMITTER
 config XEN_NETDEV_LOOPBACK
 	tristate "Network-device loopback driver"
 	depends on XEN_NETDEV_BACKEND
-	default n
 	help
 	  A two-interface loopback device to emulate a local netfront-netback
 	  connection. If unsure, it is probably safe to say N here.
@@ -98,7 +93,7 @@ config XEN_NETDEV_LOOPBACK
 config XEN_PCIDEV_BACKEND
 	tristate "PCI-device backend driver"
 	depends on PCI && XEN_BACKEND
-	default XEN_PRIVILEGED_GUEST
+	default XEN_BACKEND
 	help
 	  The PCI device backend driver allows the kernel to export arbitrary
 	  PCI devices to other guests. If you select this to be a module, you
@@ -158,18 +153,15 @@ endchoice
 config XEN_PCIDEV_BE_DEBUG
 	bool "PCI Backend Debugging"
 	depends on XEN_PCIDEV_BACKEND
-	default n
 
 config XEN_TPMDEV_BACKEND
 	tristate "TPM-device backend driver"
         depends on XEN_BACKEND
-	default n
 	help
 	  The TPM-device backend driver
 
 config XEN_BLKDEV_FRONTEND
 	tristate "Block-device frontend driver"
-	depends on XEN
 	default y
 	help
 	  The block-device frontend driver allows the kernel to access block
@@ -179,7 +171,7 @@ config XEN_BLKDEV_FRONTEND
 
 config XEN_NETDEV_FRONTEND
 	tristate "Network-device frontend driver"
-	depends on XEN && NET
+	depends on NET
 	default y
 	help
 	  The network-device frontend driver allows the kernel to access
@@ -187,9 +179,16 @@ config XEN_NETDEV_FRONTEND
 	  dedicated device-driver domain, or your master control domain
 	  (domain 0), then you almost certainly want to say Y here.
 
+config XEN_GRANT_DEV
+	tristate "User-space granted page access driver"
+	default XEN_PRIVILEGED_GUEST
+	help
+	  Device for accessing (in user-space) pages that have been granted
+	  by other domains.
+
 config XEN_FRAMEBUFFER
 	tristate "Framebuffer-device frontend driver"
-	depends on XEN && FB
+	depends on FB
 	select FB_CFB_FILLRECT
 	select FB_CFB_COPYAREA
 	select FB_CFB_IMAGEBLIT
@@ -202,7 +201,7 @@ config XEN_FRAMEBUFFER
 
 config XEN_KEYBOARD
 	tristate "Keyboard-device frontend driver"
-	depends on XEN && XEN_FRAMEBUFFER && INPUT
+	depends on XEN_FRAMEBUFFER && INPUT
 	default y
 	help
 	  The keyboard-device frontend driver allows the kernel to create a
@@ -271,31 +270,26 @@ config XEN_COMPAT
 endmenu
 
 config HAVE_IRQ_IGNORE_UNHANDLED
-	bool
-	default y
+	def_bool y
 
 config GENERIC_HARDIRQS_NO__DO_IRQ
 	def_bool y
 
 config NO_IDLE_HZ
-	bool
-	default y
+	def_bool y
 
 config XEN_SMPBOOT
-	bool
-	default y
+	def_bool y
 	depends on SMP && !PPC_XEN
 
 config XEN_BALLOON
-	bool
-	default y
+	def_bool y
 	depends on !PPC_XEN
 
 config XEN_XENCOMM
 	bool
 
 config XEN_DEVMEM
-	bool
-	default y
+	def_bool y
 
 endif

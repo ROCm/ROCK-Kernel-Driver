@@ -45,6 +45,12 @@
 #define WPRINTK(fmt, args...)				\
 	printk(KERN_WARNING "netfront/accel: " fmt, ##args)
 
+static int netfront_remove_accelerator(struct netfront_info *np,
+				       struct xenbus_device *dev);
+static int netfront_load_accelerator(struct netfront_info *np, 
+				     struct xenbus_device *dev, 
+				     const char *frontend);
+
 /*
  * List of all netfront accelerator plugin modules available.  Each
  * list entry is of type struct netfront_accelerator.
@@ -83,6 +89,120 @@ void netif_exit_accel(void)
 
 
 /* 
+ * Watch the configured accelerator and change plugin if it's modified 
+ */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,20)
+static void accel_watch_work(struct work_struct *context)
+#else
+static void accel_watch_work(void *context)
+#endif
+{
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,20)
+	struct netfront_accel_vif_state *vif_state = 
+		container_of(context, struct netfront_accel_vif_state, 
+			     accel_work);
+#else
+        struct netfront_accel_vif_state *vif_state = 
+		(struct netfront_accel_vif_state *)context;
+#endif
+	struct netfront_info *np = vif_state->np;
+	char *accel_frontend;
+	int accel_len, rc = -1;
+
+	mutex_lock(&accelerator_mutex);
+
+	accel_frontend = xenbus_read(XBT_NIL, np->xbdev->otherend, 
+				     "accel-frontend", &accel_len);
+	if (IS_ERR(accel_frontend)) {
+		accel_frontend = NULL;
+		netfront_remove_accelerator(np, np->xbdev);
+	} else {
+		/* If this is the first time, request the accelerator,
+		   otherwise only request one if it has changed */
+		if (vif_state->accel_frontend == NULL) {
+			rc = netfront_load_accelerator(np, np->xbdev, 
+						       accel_frontend);
+		} else {
+			if (strncmp(vif_state->accel_frontend, accel_frontend,
+				    accel_len)) {
+				netfront_remove_accelerator(np, np->xbdev);
+				rc = netfront_load_accelerator(np, np->xbdev, 
+							       accel_frontend);
+			}
+		}
+	}
+
+	/* Get rid of previous state and replace with the new name */
+	if (vif_state->accel_frontend != NULL)
+		kfree(vif_state->accel_frontend);
+	vif_state->accel_frontend = accel_frontend;
+
+	mutex_unlock(&accelerator_mutex);
+
+	if (rc == 0) {
+		DPRINTK("requesting module %s\n", accel_frontend);
+		request_module("%s", accel_frontend);
+		/*
+		 * Module should now call netfront_accelerator_loaded() once
+		 * it's up and running, and we can continue from there 
+		 */
+	}
+}
+
+
+static void accel_watch_changed(struct xenbus_watch *watch,
+				const char **vec, unsigned int len)
+{
+	struct netfront_accel_vif_state *vif_state = 
+		container_of(watch, struct netfront_accel_vif_state,
+			     accel_watch);
+	schedule_work(&vif_state->accel_work);
+}
+
+
+void netfront_accelerator_add_watch(struct netfront_info *np)
+{
+	int err;
+	
+	/* Check we're not trying to overwrite an existing watch */
+	BUG_ON(np->accel_vif_state.accel_watch.node != NULL);
+
+	/* Get a watch on the accelerator plugin */
+	err = xenbus_watch_path2(np->xbdev, np->xbdev->otherend, 
+				 "accel-frontend", 
+				 &np->accel_vif_state.accel_watch,
+				 accel_watch_changed);
+	if (err) {
+		DPRINTK("%s: Failed to register accel watch: %d\n",
+                        __FUNCTION__, err);
+		np->accel_vif_state.accel_watch.node = NULL;
+        }
+}
+
+
+static
+void netfront_accelerator_remove_watch(struct netfront_info *np)
+{
+	struct netfront_accel_vif_state *vif_state = &np->accel_vif_state;
+
+	/* Get rid of watch on accelerator plugin */
+	if (vif_state->accel_watch.node != NULL) {
+		unregister_xenbus_watch(&vif_state->accel_watch);
+		kfree(vif_state->accel_watch.node);
+		vif_state->accel_watch.node = NULL;
+
+		flush_scheduled_work();
+
+		/* Clean up any state left from watch */
+		if (vif_state->accel_frontend != NULL) {
+			kfree(vif_state->accel_frontend);
+			vif_state->accel_frontend = NULL;
+		}
+	}	
+}
+
+
+/* 
  * Initialise the accel_vif_state field in the netfront state
  */ 
 void init_accelerator_vif(struct netfront_info *np,
@@ -93,6 +213,13 @@ void init_accelerator_vif(struct netfront_info *np,
 	/* It's assumed that these things don't change */
 	np->accel_vif_state.np = np;
 	np->accel_vif_state.dev = dev;
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,20)
+	INIT_WORK(&np->accel_vif_state.accel_work, accel_watch_work);
+#else
+	INIT_WORK(&np->accel_vif_state.accel_work, accel_watch_work, 
+		  &np->accel_vif_state);
+#endif
 }
 
 
@@ -146,6 +273,7 @@ static int init_accelerator(const char *frontend,
 {
 	struct netfront_accelerator *accelerator = 
 		kmalloc(sizeof(struct netfront_accelerator), GFP_KERNEL);
+	unsigned long flags;
 	int frontend_len;
 
 	if (!accelerator) {
@@ -167,7 +295,9 @@ static int init_accelerator(const char *frontend,
 
 	accelerator->hooks = hooks;
 
+	spin_lock_irqsave(&accelerators_lock, flags);
 	list_add(&accelerator->link, &accelerators_list);
+	spin_unlock_irqrestore(&accelerators_lock, flags);
 
 	*result = accelerator;
 
@@ -202,6 +332,7 @@ static void accelerator_probe_new_vif(struct netfront_info *np,
 				      struct netfront_accelerator *accelerator)
 {
 	struct netfront_accel_hooks *hooks;
+	unsigned long flags;
 
 	DPRINTK("\n");
 
@@ -211,34 +342,34 @@ static void accelerator_probe_new_vif(struct netfront_info *np,
 	hooks = accelerator->hooks;
 	
 	if (hooks) {
-		hooks->new_device(np->netdev, dev);
-		/* 
-		 * Hooks will get linked into vif_state by a future
-		 * call by the accelerator to netfront_accelerator_ready()
-		 */
+		if (hooks->new_device(np->netdev, dev) == 0) {
+			spin_lock_irqsave
+				(&accelerator->vif_states_lock, flags);
+
+			accelerator_set_vif_state_hooks(&np->accel_vif_state);
+
+			spin_unlock_irqrestore
+				(&accelerator->vif_states_lock, flags);
+		}
 	}
 
 	return;
 }
 
+
 /*  
  * Request that a particular netfront accelerator plugin is loaded.
  * Usually called as a result of the vif configuration specifying
- * which one to use.
+ * which one to use. Must be called with accelerator_mutex held 
  */
-int netfront_load_accelerator(struct netfront_info *np, 
-			      struct xenbus_device *dev, 
-			      const char *frontend)
+static int netfront_load_accelerator(struct netfront_info *np, 
+				     struct xenbus_device *dev, 
+				     const char *frontend)
 {
 	struct netfront_accelerator *accelerator;
 	int rc = 0;
-	unsigned long flags;
 
 	DPRINTK(" %s\n", frontend);
-
-	mutex_lock(&accelerator_mutex);
-
-	spin_lock_irqsave(&accelerators_lock, flags);
 
 	/* 
 	 * Look at list of loaded accelerators to see if the requested
@@ -246,38 +377,18 @@ int netfront_load_accelerator(struct netfront_info *np,
 	 */
 	list_for_each_entry(accelerator, &accelerators_list, link) {
 		if (match_accelerator(frontend, accelerator)) {
-			spin_unlock_irqrestore(&accelerators_lock, flags);
-
 			accelerator_probe_new_vif(np, dev, accelerator);
-
-			mutex_unlock(&accelerator_mutex);
 			return 0;
 		}
 	}
 
 	/* Couldn't find it, so create a new one and load the module */
 	if ((rc = init_accelerator(frontend, &accelerator, NULL)) < 0) {
-		spin_unlock_irqrestore(&accelerators_lock, flags);
-		mutex_unlock(&accelerator_mutex);
 		return rc;
 	}
 
-	spin_unlock_irqrestore(&accelerators_lock, flags);
-
 	/* Include this frontend device on the accelerator's list */
 	add_accelerator_vif(accelerator, np);
-
-	mutex_unlock(&accelerator_mutex);
-
-	DPRINTK("requesting module %s\n", frontend);
-
-	/* load module */
-	request_module("%s", frontend);
-
-	/*
-	 * Module should now call netfront_accelerator_loaded() once
-	 * it's up and running, and we can continue from there 
-	 */
 
 	return rc;
 }
@@ -294,6 +405,7 @@ accelerator_probe_vifs(struct netfront_accelerator *accelerator,
 		       struct netfront_accel_hooks *hooks)
 {
 	struct netfront_accel_vif_state *vif_state, *tmp;
+	unsigned long flags;
 
 	DPRINTK("%p\n", accelerator);
 
@@ -313,13 +425,15 @@ accelerator_probe_vifs(struct netfront_accelerator *accelerator,
 				 link) {
 		struct netfront_info *np = vif_state->np;
 		
-		hooks->new_device(np->netdev, vif_state->dev);
-		
-		/*
-		 * Hooks will get linked into vif_state by a call to
-		 * netfront_accelerator_ready() once accelerator
-		 * plugin is ready for action
-		 */
+		if (hooks->new_device(np->netdev, vif_state->dev) == 0) {
+			spin_lock_irqsave
+				(&accelerator->vif_states_lock, flags);
+
+			accelerator_set_vif_state_hooks(vif_state);
+
+			spin_unlock_irqrestore
+				(&accelerator->vif_states_lock, flags);
+		}
 	}
 }
 
@@ -331,7 +445,6 @@ int netfront_accelerator_loaded(int version, const char *frontend,
 				struct netfront_accel_hooks *hooks)
 {
 	struct netfront_accelerator *accelerator;
-	unsigned long flags;
 
 	if (version != NETFRONT_ACCEL_VERSION) {
 		if (version > NETFRONT_ACCEL_VERSION) {
@@ -350,18 +463,13 @@ int netfront_accelerator_loaded(int version, const char *frontend,
 
 	mutex_lock(&accelerator_mutex);
 
-	spin_lock_irqsave(&accelerators_lock, flags);
-
 	/* 
 	 * Look through list of accelerators to see if it has already
 	 * been requested
 	 */
 	list_for_each_entry(accelerator, &accelerators_list, link) {
 		if (match_accelerator(frontend, accelerator)) {
-			spin_unlock_irqrestore(&accelerators_lock, flags);
-
 			accelerator_probe_vifs(accelerator, hooks);
-
 			goto out;
 		}
 	}
@@ -375,55 +483,11 @@ int netfront_accelerator_loaded(int version, const char *frontend,
 
 	init_accelerator(frontend, &accelerator, hooks);
 
-	spin_unlock_irqrestore(&accelerators_lock, flags);
-
  out:
 	mutex_unlock(&accelerator_mutex);
 	return 0;
 }
 EXPORT_SYMBOL_GPL(netfront_accelerator_loaded);
-
-
-/* 
- * Called by the accelerator module after it has been probed with a
- * network device to say that it is ready to start accelerating
- * traffic on that device
- */
-void netfront_accelerator_ready(const char *frontend,
-				struct xenbus_device *dev)
-{
-	struct netfront_accelerator *accelerator;
-	struct netfront_accel_vif_state *accel_vif_state;
-	unsigned long flags, flags1;
-
-	DPRINTK("%s %p\n", frontend, dev);
-
-	spin_lock_irqsave(&accelerators_lock, flags);
-
-	list_for_each_entry(accelerator, &accelerators_list, link) {
-		if (match_accelerator(frontend, accelerator)) {
-			/* 
-			 * Mutex not held so need vif_states_lock for
-			 * list
-			 */
-			spin_lock_irqsave
-				(&accelerator->vif_states_lock, flags1);
-
-			list_for_each_entry(accel_vif_state,
-					    &accelerator->vif_states, link) {
-				if (accel_vif_state->dev == dev)
-					accelerator_set_vif_state_hooks
-						(accel_vif_state);
-			}
-
-			spin_unlock_irqrestore
-				(&accelerator->vif_states_lock, flags1);
-			break;
-		}
-	}
-	spin_unlock_irqrestore(&accelerators_lock, flags);
-}
-EXPORT_SYMBOL_GPL(netfront_accelerator_ready);
 
 
 /* 
@@ -467,16 +531,21 @@ static void accelerator_remove_hooks(struct netfront_accelerator *accelerator)
 
 		if(vif_state->hooks) {
 			hooks = vif_state->hooks;
-			accelerator_remove_single_hook(accelerator, vif_state);
 			
 			/* Last chance to get statistics from the accelerator */
 			hooks->get_stats(vif_state->np->netdev,
 					 &vif_state->np->stats);
+
+			spin_unlock_irqrestore(&accelerator->vif_states_lock,
+					       flags);
+
+			accelerator_remove_single_hook(accelerator, vif_state);
+
+			accelerator->hooks->remove(vif_state->dev);
+		} else {
+			spin_unlock_irqrestore(&accelerator->vif_states_lock,
+					       flags);
 		}
-
-		spin_unlock_irqrestore(&accelerator->vif_states_lock, flags);
-
-		accelerator->hooks->remove(vif_state->dev);
 	}
 	
 	accelerator->hooks = NULL;
@@ -523,6 +592,12 @@ static int do_remove(struct netfront_info *np, struct xenbus_device *dev,
 	if (np->accel_vif_state.hooks) {
 		hooks = np->accel_vif_state.hooks;
 
+		/* Last chance to get statistics from the accelerator */
+		hooks->get_stats(np->netdev, &np->stats);
+
+		spin_unlock_irqrestore(&accelerator->vif_states_lock, 
+				       *lock_flags);
+
  		/* 
  		 * Try and do the opposite of accelerator_probe_new_vif
  		 * to ensure there's no state pointing back at the 
@@ -531,14 +606,6 @@ static int do_remove(struct netfront_info *np, struct xenbus_device *dev,
 		accelerator_remove_single_hook(accelerator, 
  					       &np->accel_vif_state);
 
-		/* Last chance to get statistics from the accelerator */
-		hooks->get_stats(np->netdev, &np->stats);
-	}
-
-	if (accelerator->hooks) {
-		spin_unlock_irqrestore(&accelerator->vif_states_lock, 
-				       *lock_flags);
-
 		rc = accelerator->hooks->remove(dev);
 
 		spin_lock_irqsave(&accelerator->vif_states_lock, *lock_flags);
@@ -546,21 +613,19 @@ static int do_remove(struct netfront_info *np, struct xenbus_device *dev,
  
  	return rc;
 }
- 
-  
-int netfront_accelerator_call_remove(struct netfront_info *np,
- 				     struct xenbus_device *dev)
+
+
+static int netfront_remove_accelerator(struct netfront_info *np,
+				       struct xenbus_device *dev)
 {
 	struct netfront_accelerator *accelerator;
  	struct netfront_accel_vif_state *tmp_vif_state;
   	unsigned long flags;
 	int rc = 0; 
 
-	mutex_lock(&accelerator_mutex);
-
  	/* Check that we've got a device that was accelerated */
  	if (np->accelerator == NULL)
-		goto out;
+		return rc;
 
 	accelerator = np->accelerator;
 
@@ -579,17 +644,30 @@ int netfront_accelerator_call_remove(struct netfront_info *np,
 	np->accelerator = NULL;
 
 	spin_unlock_irqrestore(&accelerator->vif_states_lock, flags); 
- out:
+
+	return rc;
+}
+
+
+int netfront_accelerator_call_remove(struct netfront_info *np,
+				     struct xenbus_device *dev)
+{
+	int rc;
+	netfront_accelerator_remove_watch(np);
+	mutex_lock(&accelerator_mutex);
+	rc = netfront_remove_accelerator(np, dev);
 	mutex_unlock(&accelerator_mutex);
 	return rc;
 }
-  
+
   
 int netfront_accelerator_suspend(struct netfront_info *np,
  				 struct xenbus_device *dev)
 {
 	unsigned long flags;
 	int rc = 0;
+	
+	netfront_accelerator_remove_watch(np);
 
 	mutex_lock(&accelerator_mutex);
 
@@ -641,6 +719,7 @@ int netfront_accelerator_suspend_cancel(struct netfront_info *np,
  	
  out:
 	mutex_unlock(&accelerator_mutex);
+	netfront_accelerator_add_watch(np);
  	return 0;
 }
  

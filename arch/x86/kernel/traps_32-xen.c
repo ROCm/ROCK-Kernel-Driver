@@ -445,14 +445,13 @@ void die(const char * str, struct pt_regs * regs, long err)
 
 	if (die.lock_owner != raw_smp_processor_id()) {
 		console_verbose();
+		raw_local_irq_save(flags);
 		__raw_spin_lock(&die.lock);
-		raw_local_save_flags(flags);
 		die.lock_owner = smp_processor_id();
 		die.lock_owner_depth = 0;
 		bust_spinlocks(1);
-	}
-	else
-		raw_local_save_flags(flags);
+	} else
+		raw_local_irq_save(flags);
 
 	if (++die.lock_owner_depth < 3) {
 		unsigned long esp;
@@ -1139,7 +1138,7 @@ asmlinkage void math_emulate(long arg)
  * NB. All these are "trap gates" (i.e. events_mask isn't set) except
  * for those that specify <dpl>|4 in the second field.
  */
-static trap_info_t trap_table[] = {
+static __cpuinitdata trap_info_t trap_table[] = {
 	{  0, 0, __KERNEL_CS, (unsigned long)divide_error		},
 	{  1, 0|4, __KERNEL_CS, (unsigned long)debug			},
 	{  3, 3|4, __KERNEL_CS, (unsigned long)int3			},
@@ -1196,7 +1195,7 @@ void __init trap_init(void)
 	cpu_init();
 }
 
-void smp_trap_init(trap_info_t *trap_ctxt)
+void __cpuinit smp_trap_init(trap_info_t *trap_ctxt)
 {
 	trap_info_t *t = trap_table;
 

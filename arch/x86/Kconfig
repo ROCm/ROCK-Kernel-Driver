@@ -572,7 +572,7 @@ config X86_VISWS_APIC
 config X86_XEN_GENAPIC
 	bool
 	depends on X86_64_XEN
-	default XEN_PRIVILEGED_GUEST || SMP
+	default y
 
 config X86_MCE
 	bool "Machine Check Exception"

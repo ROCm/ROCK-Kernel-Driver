@@ -364,7 +364,7 @@ out:
 	return ret;
 }
 
-static void hyper_sysfs_exit(void)
+static void __exit hyper_sysfs_exit(void)
 {
 	xen_properties_destroy();
 	xen_compilation_destroy();

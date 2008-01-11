@@ -150,7 +150,7 @@ struct backend_info {
 	struct netback_accelerator *accelerator;
 };
 
-#define NETBACK_ACCEL_VERSION 0x00010000
+#define NETBACK_ACCEL_VERSION 0x00010001
 
 /* 
  * Connect an accelerator plugin module to netback.  Returns zero on

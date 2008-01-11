@@ -1275,10 +1275,13 @@ void disable_IO_APIC(void)
 static int __init timer_irq_works(void)
 {
 	unsigned long t1 = jiffies;
+	unsigned long flags;
 
+	local_save_flags(flags);
 	local_irq_enable();
 	/* Let ten ticks pass... */
 	mdelay((10 * 1000) / HZ);
+	local_irq_restore(flags);
 
 	/*
 	 * Expect a few ticks at least, to be sure some possible
@@ -1653,6 +1656,9 @@ static inline void check_timer(void)
 {
 	struct irq_cfg *cfg = irq_cfg + 0;
 	int apic1, pin1, apic2, pin2;
+	unsigned long flags;
+
+	local_irq_save(flags);
 
 	/*
 	 * get/set the timer IRQ vector:
@@ -1694,7 +1700,7 @@ static inline void check_timer(void)
 			}
 			if (disable_timer_pin_1 > 0)
 				clear_IO_APIC_pin(0, pin1);
-			return;
+			goto out;
 		}
 		clear_IO_APIC_pin(apic1, pin1);
 		apic_printk(APIC_QUIET,KERN_ERR "..MP-BIOS bug: 8254 timer not "
@@ -1716,7 +1722,7 @@ static inline void check_timer(void)
 			if (nmi_watchdog == NMI_IO_APIC) {
 				setup_nmi();
 			}
-			return;
+			goto out;
 		}
 		/*
 		 * Cleanup, just in case ...
@@ -1739,7 +1745,7 @@ static inline void check_timer(void)
 
 	if (timer_irq_works()) {
 		apic_printk(APIC_VERBOSE," works.\n");
-		return;
+		goto out;
 	}
 	apic_write(APIC_LVT0, APIC_LVT_MASKED | APIC_DM_FIXED | cfg->vector);
 	apic_printk(APIC_VERBOSE," failed.\n");
@@ -1754,10 +1760,12 @@ static inline void check_timer(void)
 
 	if (timer_irq_works()) {
 		apic_printk(APIC_VERBOSE," works.\n");
-		return;
+		goto out;
 	}
 	apic_printk(APIC_VERBOSE," failed :(.\n");
 	panic("IO-APIC + timer doesn't work! Try using the 'noapic' kernel parameter\n");
+out:
+	local_irq_restore(flags);
 }
 
 static int __init notimercheck(char *s)

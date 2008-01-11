@@ -76,12 +76,27 @@ static int match_accelerator(struct xenbus_device *xendev,
 	}
 }
 
+
+static void do_probe(struct backend_info *be, 
+		     struct netback_accelerator *accelerator,
+		     struct xenbus_device *xendev) 
+{
+	be->accelerator = accelerator;
+	atomic_inc(&be->accelerator->use_count);
+	if (be->accelerator->hooks->probe(xendev) != 0) {
+		atomic_dec(&be->accelerator->use_count);
+		module_put(be->accelerator->hooks->owner);
+		be->accelerator = NULL;
+	}
+}
+
+
 /*
- * Notify all suitable backends that a new accelerator is available
- * and connected.  This will also notify the accelerator plugin module
+ * Notify suitable backends that a new accelerator is available and
+ * connected.  This will also notify the accelerator plugin module
  * that it is being used for a device through the probe hook.
  */
-static int netback_accelerator_tell_backend(struct device *dev, void *arg)
+static int netback_accelerator_probe_backend(struct device *dev, void *arg)
 {
 	struct netback_accelerator *accelerator = 
 		(struct netback_accelerator *)arg;
@@ -90,14 +105,37 @@ static int netback_accelerator_tell_backend(struct device *dev, void *arg)
 	if (!strcmp("vif", xendev->devicetype)) {
 		struct backend_info *be = xendev->dev.driver_data;
 
-		if (match_accelerator(xendev, be, accelerator)) {
-			be->accelerator = accelerator;
-			atomic_inc(&be->accelerator->use_count);
-			be->accelerator->hooks->probe(xendev);
+		if (match_accelerator(xendev, be, accelerator) &&
+		    try_module_get(accelerator->hooks->owner)) {
+			do_probe(be, accelerator, xendev);
 		}
 	}
 	return 0;
 }
+
+
+/*
+ * Notify suitable backends that an accelerator is unavailable.
+ */
+static int netback_accelerator_remove_backend(struct device *dev, void *arg)
+{
+	struct xenbus_device *xendev = to_xenbus_device(dev);
+	struct netback_accelerator *accelerator = 
+		(struct netback_accelerator *)arg;
+	
+	if (!strcmp("vif", xendev->devicetype)) {
+		struct backend_info *be = xendev->dev.driver_data;
+
+		if (be->accelerator == accelerator) {
+			be->accelerator->hooks->remove(xendev);
+			atomic_dec(&be->accelerator->use_count);
+			module_put(be->accelerator->hooks->owner);
+			be->accelerator = NULL;
+		}
+	}
+	return 0;
+}
+
 
 
 /*
@@ -133,7 +171,6 @@ int netback_connect_accelerator(unsigned version, int id, const char *eth_name,
 		return -ENOMEM;
 	}
 
-
 	new_accelerator->id = id;
 	
 	eth_name_len = strlen(eth_name)+1;
@@ -152,11 +189,12 @@ int netback_connect_accelerator(unsigned version, int id, const char *eth_name,
 	
 	mutex_lock(&accelerators_mutex);
 	list_add(&new_accelerator->link, &accelerators_list);
-	mutex_unlock(&accelerators_mutex);
 	
 	/* tell existing backends about new plugin */
 	xenbus_for_each_backend(new_accelerator, 
-				netback_accelerator_tell_backend);
+				netback_accelerator_probe_backend);
+
+	mutex_unlock(&accelerators_mutex);
 
 	return 0;
 
@@ -165,31 +203,8 @@ EXPORT_SYMBOL_GPL(netback_connect_accelerator);
 
 
 /* 
- * Remove the link from backend state to a particular accelerator
- */ 
-static int netback_accelerator_cleanup_backend(struct device *dev, void *arg)
-{
-	struct netback_accelerator *accelerator = 
-		(struct netback_accelerator *)arg;
-	struct xenbus_device *xendev = to_xenbus_device(dev);
-
-	if (!strcmp("vif", xendev->devicetype)) {
-		struct backend_info *be = xendev->dev.driver_data;
-		if (be->accelerator == accelerator)
-			be->accelerator = NULL;
-	}
-	return 0;
-}
-
-
-/* 
  * Disconnect an accelerator plugin module that has previously been
  * connected.
- *
- * This should only be allowed when there are no remaining users -
- * i.e. it is not necessary to go through and clear all the hooks, as
- * they should have already been removed.  This is enforced by taking
- * a module reference to the plugin while the interfaces are in use
  */
 void netback_disconnect_accelerator(int id, const char *eth_name)
 {
@@ -197,17 +212,14 @@ void netback_disconnect_accelerator(int id, const char *eth_name)
 
 	mutex_lock(&accelerators_mutex);
 	list_for_each_entry_safe(accelerator, next, &accelerators_list, link) {
-		if (strcmp(eth_name, accelerator->eth_name)) {
+		if (!strcmp(eth_name, accelerator->eth_name)) {
+			xenbus_for_each_backend
+				(accelerator, netback_accelerator_remove_backend);
 			BUG_ON(atomic_read(&accelerator->use_count) != 0);
-			list_del(&accelerator->link);
-			mutex_unlock(&accelerators_mutex);
-
-			xenbus_for_each_backend(accelerator, 
-						netback_accelerator_cleanup_backend);
-				
+			list_del(&accelerator->link);				
 			kfree(accelerator->eth_name);
 			kfree(accelerator);
-			return;
+			break;
 		}
 	}
 	mutex_unlock(&accelerators_mutex);
@@ -228,9 +240,7 @@ void netback_probe_accelerators(struct backend_info *be,
 	list_for_each_entry(accelerator, &accelerators_list, link) { 
 		if (match_accelerator(dev, be, accelerator) &&
 		    try_module_get(accelerator->hooks->owner)) {
-			be->accelerator = accelerator;
-			atomic_inc(&be->accelerator->use_count);
-			be->accelerator->hooks->probe(dev);
+			do_probe(be, accelerator, dev);
 			break;
 		}
 	}
@@ -241,13 +251,15 @@ void netback_probe_accelerators(struct backend_info *be,
 void netback_remove_accelerators(struct backend_info *be,
 				 struct xenbus_device *dev)
 {
+	mutex_lock(&accelerators_mutex);
 	/* Notify the accelerator (if any) of this device's removal */
-	if (be->accelerator) {
+	if (be->accelerator != NULL) {
 		be->accelerator->hooks->remove(dev);
 		atomic_dec(&be->accelerator->use_count);
 		module_put(be->accelerator->hooks->owner);
+		be->accelerator = NULL;
 	}
-	be->accelerator = NULL;
+	mutex_unlock(&accelerators_mutex);
 }
 
 

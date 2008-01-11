@@ -209,6 +209,26 @@ static inline u64 scale_delta(u64 delta, u32 mul_frac, int shift)
 	return product;
 }
 
+static inline u64 get64(volatile u64 *ptr)
+{
+#ifndef CONFIG_64BIT
+	return cmpxchg64(ptr, 0, 0);
+#else
+	return *ptr;
+#define cmpxchg64 cmpxchg
+#endif
+}
+
+static inline u64 get64_local(volatile u64 *ptr)
+{
+#ifndef CONFIG_64BIT
+	return cmpxchg64_local(ptr, 0, 0);
+#else
+	return *ptr;
+#define cmpxchg64_local cmpxchg_local
+#endif
+}
+
 #if 0 /* defined (__i386__) */
 int read_current_timer(unsigned long *timer_val)
 {
@@ -391,7 +411,7 @@ static int set_rtc_mmss(unsigned long nowtime)
 	return retval;
 }
 
-unsigned long long sched_clock(void)
+static unsigned long long local_clock(void)
 {
 	int cpu = get_cpu();
 	struct shadow_time_info *shadow = &per_cpu(shadow_time, cpu);
@@ -410,6 +430,61 @@ unsigned long long sched_clock(void)
 	put_cpu();
 
 	return time;
+}
+
+/*
+ * Runstate accounting
+ */
+static void get_runstate_snapshot(struct vcpu_runstate_info *res)
+{
+	u64 state_time;
+	struct vcpu_runstate_info *state;
+
+	BUG_ON(preemptible());
+
+	state = &__get_cpu_var(runstate);
+
+	do {
+		state_time = get64_local(&state->state_entry_time);
+		*res = *state;
+	} while (get64_local(&state->state_entry_time) != state_time);
+
+	WARN_ON_ONCE(res->state != RUNSTATE_running);
+}
+
+/*
+ * Xen sched_clock implementation.  Returns the number of unstolen
+ * nanoseconds, which is nanoseconds the VCPU spent in RUNNING+BLOCKED
+ * states.
+ */
+unsigned long long sched_clock(void)
+{
+	struct vcpu_runstate_info runstate;
+	cycle_t now;
+	u64 ret;
+	s64 offset;
+
+	/*
+	 * Ideally sched_clock should be called on a per-cpu basis
+	 * anyway, so preempt should already be disabled, but that's
+	 * not current practice at the moment.
+	 */
+	preempt_disable();
+
+	now = local_clock();
+
+	get_runstate_snapshot(&runstate);
+
+	offset = now - runstate.state_entry_time;
+	if (offset < 0)
+		offset = 0;
+
+	ret = offset + runstate.time[RUNSTATE_running]
+	      + runstate.time[RUNSTATE_blocked];
+
+	preempt_enable();
+
+	return ret;
 }
 
 unsigned long profile_pc(struct pt_regs *regs)
@@ -464,10 +539,9 @@ EXPORT_SYMBOL(profile_pc);
 irqreturn_t timer_interrupt(int irq, void *dev_id)
 {
 	s64 delta, delta_cpu, stolen, blocked;
-	u64 sched_time;
 	int i, cpu = smp_processor_id();
 	struct shadow_time_info *shadow = &per_cpu(shadow_time, cpu);
-	struct vcpu_runstate_info *runstate = &per_cpu(runstate, cpu);
+	struct vcpu_runstate_info runstate;
 
 	/* Keep nmi watchdog up to date */
 #ifdef __i386__
@@ -494,20 +568,7 @@ irqreturn_t timer_interrupt(int irq, void *dev_id)
 		delta     -= processed_system_time;
 		delta_cpu -= per_cpu(processed_system_time, cpu);
 
-		/*
-		 * Obtain a consistent snapshot of stolen/blocked cycles. We
-		 * can use state_entry_time to detect if we get preempted here.
-		 */
-		do {
-			sched_time = runstate->state_entry_time;
-			barrier();
-			stolen = runstate->time[RUNSTATE_runnable] +
-				runstate->time[RUNSTATE_offline] -
-				per_cpu(processed_stolen_time, cpu);
-			blocked = runstate->time[RUNSTATE_blocked] -
-				per_cpu(processed_blocked_time, cpu);
-			barrier();
-		} while (sched_time != runstate->state_entry_time);
+		get_runstate_snapshot(&runstate);
 	} while (!time_values_up_to_date(cpu));
 
 	if ((unlikely(delta < -(s64)permitted_clock_jitter) ||
@@ -549,6 +610,9 @@ irqreturn_t timer_interrupt(int irq, void *dev_id)
 	 * HACK: Passing NULL to account_steal_time()
 	 * ensures that the ticks are accounted as stolen.
 	 */
+	stolen = runstate.time[RUNSTATE_runnable]
+		 + runstate.time[RUNSTATE_offline]
+		 - per_cpu(processed_stolen_time, cpu);
 	if ((stolen > 0) && (delta_cpu > 0)) {
 		delta_cpu -= stolen;
 		if (unlikely(delta_cpu < 0))
@@ -564,6 +628,8 @@ irqreturn_t timer_interrupt(int irq, void *dev_id)
 	 * HACK: Passing idle_task to account_steal_time()
 	 * ensures that the ticks are accounted as idle/wait.
 	 */
+	blocked = runstate.time[RUNSTATE_blocked]
+		  - per_cpu(processed_blocked_time, cpu);
 	if ((blocked > 0) && (delta_cpu > 0)) {
 		delta_cpu -= blocked;
 		if (unlikely(delta_cpu < 0))
@@ -610,17 +676,12 @@ EXPORT_SYMBOL_GPL(mark_tsc_unstable);
 
 static cycle_t xen_clocksource_read(void)
 {
-	cycle_t ret = sched_clock();
+	cycle_t ret = local_clock();
 
 #ifdef CONFIG_SMP
 	for (;;) {
 		static cycle_t last_ret;
-#ifndef CONFIG_64BIT
-		cycle_t last = cmpxchg64(&last_ret, 0, 0);
-#else
-		cycle_t last = last_ret;
-#define cmpxchg64 cmpxchg
-#endif
+		cycle_t last = get64(&last_ret);
 
 		if ((s64)(ret - last) < 0) {
 			if (last - ret > permitted_clock_jitter
@@ -887,7 +948,7 @@ void time_resume(void)
 #ifdef CONFIG_SMP
 static char timer_name[NR_CPUS][15];
 
-int local_setup_timer(unsigned int cpu)
+int __cpuinit local_setup_timer(unsigned int cpu)
 {
 	int seq, irq;
 
@@ -918,7 +979,7 @@ int local_setup_timer(unsigned int cpu)
 	return 0;
 }
 
-void local_teardown_timer(unsigned int cpu)
+void __cpuexit local_teardown_timer(unsigned int cpu)
 {
 	BUG_ON(cpu == 0);
 	unbind_from_irqhandler(per_cpu(timer_irq, cpu), NULL);

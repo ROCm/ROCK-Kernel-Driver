@@ -378,6 +378,10 @@ static int talk_to_backend(struct xenbus_device *dev,
 	if (err)
 		goto out;
 
+	/* This will load an accelerator if one is configured when the
+	 * watch fires */
+	netfront_accelerator_add_watch(info);
+
 again:
 	err = xenbus_transaction_start(&xbt);
 	if (err) {
@@ -452,6 +456,7 @@ again:
 	xenbus_transaction_end(xbt, 1);
 	xenbus_dev_fatal(dev, err, "%s", message);
  destroy_ring:
+	netfront_accelerator_call_remove(info, dev);
 	netif_disconnect_backend(info);
  out:
 	return err;
@@ -1742,9 +1747,7 @@ static int network_connect(struct net_device *dev)
 	struct sk_buff *skb;
 	grant_ref_t ref;
 	netif_rx_request_t *req;
-	unsigned int feature_rx_copy, feature_rx_flip, feature_accel;
-	char *accel_frontend;
-	int accel_len;
+	unsigned int feature_rx_copy, feature_rx_flip;
 
 	err = xenbus_scanf(XBT_NIL, np->xbdev->otherend,
 			   "feature-rx-copy", "%u", &feature_rx_copy);
@@ -1754,12 +1757,6 @@ static int network_connect(struct net_device *dev)
 			   "feature-rx-flip", "%u", &feature_rx_flip);
 	if (err != 1)
 		feature_rx_flip = 1;
-
-	feature_accel = 1;
-	accel_frontend = xenbus_read(XBT_NIL, np->xbdev->otherend, 
-				     "accel-frontend", &accel_len);
-	if (IS_ERR(accel_frontend)) 
-		feature_accel = 0;
 
 	/*
 	 * Copy packets on receive path if:
@@ -1772,11 +1769,6 @@ static int network_connect(struct net_device *dev)
 	err = talk_to_backend(np->xbdev, np);
 	if (err)
 		return err;
-
-	if (feature_accel) {
-		netfront_load_accelerator(np, np->xbdev, accel_frontend);
-		kfree(accel_frontend);
-	}
 
 	xennet_set_features(dev);
 

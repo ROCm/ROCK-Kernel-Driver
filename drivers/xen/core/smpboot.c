@@ -59,8 +59,6 @@ static char callfunc_name[NR_CPUS][15];
 
 u8 cpu_2_logical_apicid[NR_CPUS] = { [0 ... NR_CPUS-1] = BAD_APICID };
 
-void *xquad_portio;
-
 DEFINE_PER_CPU(cpumask_t, cpu_sibling_map);
 DEFINE_PER_CPU(cpumask_t, cpu_core_map);
 EXPORT_PER_CPU_SYMBOL(cpu_core_map);
@@ -113,7 +111,7 @@ remove_siblinginfo(int cpu)
 	cpu_data(cpu).booted_cores = 0;
 }
 
-static int xen_smp_intr_init(unsigned int cpu)
+static int __cpuinit xen_smp_intr_init(unsigned int cpu)
 {
 	int rc;
 
@@ -188,9 +186,6 @@ static void __cpuinit cpu_initialize_context(unsigned int cpu)
 {
 	vcpu_guest_context_t ctxt;
 	struct task_struct *idle = idle_task(cpu);
-#ifdef __x86_64__
-	struct desc_ptr *gdt_descr = &cpu_gdt_descr[cpu];
-#endif
 
 	if (cpu_test_and_set(cpu, cpu_initialized_map))
 		return;
@@ -211,10 +206,10 @@ static void __cpuinit cpu_initialize_context(unsigned int cpu)
 	smp_trap_init(ctxt.trap_ctxt);
 
 	ctxt.ldt_ents = 0;
+	ctxt.gdt_ents = GDT_SIZE / 8;
 
 #ifdef __i386__
 	ctxt.gdt_frames[0] = virt_to_mfn(get_cpu_gdt_table(cpu));
-	ctxt.gdt_ents      = GDT_SIZE / 8;
 
 	ctxt.user_regs.cs = __KERNEL_CS;
 	ctxt.user_regs.esp = idle->thread.esp0 - sizeof(struct pt_regs);
@@ -231,8 +226,7 @@ static void __cpuinit cpu_initialize_context(unsigned int cpu)
 
 	ctxt.ctrlreg[3] = xen_pfn_to_cr3(virt_to_mfn(swapper_pg_dir));
 #else /* __x86_64__ */
-	ctxt.gdt_frames[0] = virt_to_mfn(gdt_descr->address);
-	ctxt.gdt_ents      = gdt_descr->size / 8;
+	ctxt.gdt_frames[0] = virt_to_mfn(cpu_gdt_descr[cpu].address);
 
 	ctxt.user_regs.cs = __KERNEL_CS;
 	ctxt.user_regs.esp = idle->thread.rsp0 - sizeof(struct pt_regs);
@@ -311,8 +305,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 		init_gdt(cpu);
 		gdt_addr = get_cpu_gdt_table(cpu);
 #endif
-		make_page_readonly(gdt_addr,
-				   XENFEAT_writable_descriptor_tables);
+		make_page_readonly(gdt_addr, XENFEAT_writable_descriptor_tables);
 
 		cpu_data(cpu) = boot_cpu_data;
 		cpu_data(cpu).apicid = cpu;
@@ -401,18 +394,6 @@ void __cpu_die(unsigned int cpu)
 
 	if (num_online_cpus() == 1)
 		alternatives_smp_switch(0);
-}
-
-#else /* !CONFIG_HOTPLUG_CPU */
-
-int __cpu_disable(void)
-{
-	return -ENOSYS;
-}
-
-void __cpu_die(unsigned int cpu)
-{
-	BUG();
 }
 
 #endif /* CONFIG_HOTPLUG_CPU */

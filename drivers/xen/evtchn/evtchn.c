@@ -544,7 +544,7 @@ static int __init evtchn_init(void)
 	return 0;
 }
 
-static void evtchn_cleanup(void)
+static void __exit evtchn_cleanup(void)
 {
 	misc_deregister(&evtchn_miscdev);
 	unregister_cpu_notifier(&evtchn_cpu_nfb);

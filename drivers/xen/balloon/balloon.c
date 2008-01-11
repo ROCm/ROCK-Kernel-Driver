@@ -578,7 +578,7 @@ static int __init balloon_init(void)
 
 subsys_initcall(balloon_init);
 
-static void balloon_exit(void) 
+static void __exit balloon_exit(void)
 {
     /* XXX - release balloon here */
     return; 

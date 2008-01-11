@@ -125,7 +125,7 @@ void __init setup_per_cpu_areas(void)
 } 
 
 #ifdef CONFIG_XEN
-static noinline void __init_refok switch_pt(int cpu)
+static void __init_refok switch_pt(int cpu)
 {
 	if (cpu == 0)
 		xen_init_pt();

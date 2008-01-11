@@ -392,7 +392,7 @@ struct page *vm_normal_page(struct vm_area_struct *vma, unsigned long addr, pte_
 			return NULL;
 	}
 
-#ifdef CONFIG_XEN
+#if defined(CONFIG_XEN) && defined(CONFIG_X86)
 	/* XEN: Covers user-space grant mappings (even of local pages). */
 	if (unlikely(vma->vm_flags & VM_FOREIGN))
 		return NULL;

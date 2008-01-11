@@ -1160,7 +1160,7 @@ asmlinkage void math_state_restore(void)
  * NB. All these are "interrupt gates" (i.e. events_mask is set) because we
  * specify <dpl>|4 in the second field.
  */
-static trap_info_t trap_table[] = {
+static __cpuinitdata trap_info_t trap_table[] = {
         {  0, 0|4, __KERNEL_CS, (unsigned long)divide_error               },
         {  1, 0|4, __KERNEL_CS, (unsigned long)debug                      },
         {  3, 3|4, __KERNEL_CS, (unsigned long)int3                       },
@@ -1203,7 +1203,7 @@ void __init trap_init(void)
 	cpu_init();
 }
 
-void smp_trap_init(trap_info_t *trap_ctxt)
+void __cpuinit smp_trap_init(trap_info_t *trap_ctxt)
 {
 	trap_info_t *t = trap_table;
 

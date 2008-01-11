@@ -95,7 +95,7 @@ struct netfront_accel_hooks {
 
 /* Version of API/protocol for communication between netfront and
    acceleration plugin supported */
-#define NETFRONT_ACCEL_VERSION 0x00010002
+#define NETFRONT_ACCEL_VERSION 0x00010003
 
 /* 
  * Per-netfront device state for the accelerator.  This is used to
@@ -108,6 +108,13 @@ struct netfront_accel_vif_state {
 	struct xenbus_device *dev;
 	struct netfront_info *np;
 	struct netfront_accel_hooks *hooks;
+
+	/* Watch on the accelerator configuration value */
+	struct xenbus_watch accel_watch;
+	/* Work item to process change in accelerator */
+	struct work_struct accel_work;
+	/* The string from xenbus last time accel_watch fired */
+	char *accel_frontend;
 }; 
 
 /* 
@@ -212,18 +219,6 @@ extern int netfront_accelerator_loaded(int version, const char *frontend,
 				       struct netfront_accel_hooks *hooks);
 
 /* 
- * Called when an accelerator plugin is ready to accelerate a device *
- * that has been passed to it from netfront using the "new_device"
- * hook.
- *
- * frontend: the string describing the accelerator. Must match the
- * one passed to netfront_accelerator_loaded()
- * dev: the xenbus device the plugin was asked to accelerate
- */
-extern void netfront_accelerator_ready(const char *frontend,
-				       struct xenbus_device *dev);
-
-/* 
  * Called by an accelerator plugin module when it is about to unload.
  *
  * frontend: the string describing the accelerator.  Must match the
@@ -237,7 +232,6 @@ extern void netfront_accelerator_stop(const char *frontend);
  * wake, false if still busy 
  */
 extern int netfront_check_queue_ready(struct net_device *net_dev);
-
 
 
 /* Internal-to-netfront Functions */
@@ -269,9 +263,7 @@ extern
 int netfront_accelerator_call_get_stats(struct netfront_info *np,
 					struct net_device *dev);
 extern
-int netfront_load_accelerator(struct netfront_info *np, 
-			      struct xenbus_device *dev, 
-			      const char *frontend);
+void netfront_accelerator_add_watch(struct netfront_info *np);
 
 extern
 void netif_init_accel(void);
