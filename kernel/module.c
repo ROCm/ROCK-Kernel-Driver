@@ -2250,29 +2250,34 @@ static const char *get_ksymbol(struct module *mod,
 /* For kallsyms to ask for address resolution.  NULL means not found.
    We don't lock, as this is used for oops resolution and races are a
    lesser concern. */
+/* FIXME: Risky: returns a pointer into a module w/o lock */
 const char *module_address_lookup(unsigned long addr,
 				  unsigned long *size,
 				  unsigned long *offset,
 				  char **modname)
 {
 	struct module *mod;
+	const char *ret = NULL;
 
+	preempt_disable();
 	list_for_each_entry(mod, &modules, list) {
 		if (within(addr, mod->module_init, mod->init_size)
 		    || within(addr, mod->module_core, mod->core_size)) {
 			if (modname)
 				*modname = mod->name;
-			return get_ksymbol(mod, addr, size, offset);
+			ret = get_ksymbol(mod, addr, size, offset);
+			break;
 		}
 	}
-	return NULL;
+	preempt_enable();
+	return ret;
 }
 
 int lookup_module_symbol_name(unsigned long addr, char *symname)
 {
 	struct module *mod;
 
-	mutex_lock(&module_mutex);
+	preempt_disable();
 	list_for_each_entry(mod, &modules, list) {
 		if (within(addr, mod->module_init, mod->init_size) ||
 		    within(addr, mod->module_core, mod->core_size)) {
@@ -2282,12 +2287,12 @@ int lookup_module_symbol_name(unsigned long addr, char *symname)
 			if (!sym)
 				goto out;
 			strlcpy(symname, sym, KSYM_NAME_LEN);
-			mutex_unlock(&module_mutex);
+			preempt_enable();
 			return 0;
 		}
 	}
 out:
-	mutex_unlock(&module_mutex);
+	preempt_enable();
 	return -ERANGE;
 }
 
@@ -2296,7 +2301,7 @@ int lookup_module_symbol_attrs(unsigned long addr, unsigned long *size,
 {
 	struct module *mod;
 
-	mutex_lock(&module_mutex);
+	preempt_disable();
 	list_for_each_entry(mod, &modules, list) {
 		if (within(addr, mod->module_init, mod->init_size) ||
 		    within(addr, mod->module_core, mod->core_size)) {
@@ -2309,12 +2314,12 @@ int lookup_module_symbol_attrs(unsigned long addr, unsigned long *size,
 				strlcpy(modname, mod->name, MODULE_NAME_LEN);
 			if (name)
 				strlcpy(name, sym, KSYM_NAME_LEN);
-			mutex_unlock(&module_mutex);
+			preempt_enable();
 			return 0;
 		}
 	}
 out:
-	mutex_unlock(&module_mutex);
+	preempt_enable();
 	return -ERANGE;
 }
 
@@ -2327,14 +2332,8 @@ int module_get_kallsym(unsigned int symnum, unsigned long *value, char *type,
 			char *name, char *module_name, int *exported)
 {
 	struct module *mod;
-#ifdef	CONFIG_KDB
-	int get_lock = !KDB_IS_RUNNING();
-#else
-#define	get_lock 1
-#endif
 
-	if (get_lock)
-		mutex_lock(&module_mutex);
+	preempt_disable();
 	list_for_each_entry(mod, &modules, list) {
 		if (symnum < mod->num_symtab) {
 			*value = mod->symtab[symnum].st_value;
@@ -2343,14 +2342,12 @@ int module_get_kallsym(unsigned int symnum, unsigned long *value, char *type,
 				KSYM_NAME_LEN);
 			strlcpy(module_name, mod->name, MODULE_NAME_LEN);
 			*exported = is_exported(name, mod);
-			if (get_lock)
-				mutex_unlock(&module_mutex);
+			preempt_enable();
 			return 0;
 		}
 		symnum -= mod->num_symtab;
 	}
-	if (get_lock)
-		mutex_unlock(&module_mutex);
+	preempt_enable();
 	return -ERANGE;
 }
 
@@ -2373,6 +2370,7 @@ unsigned long module_kallsyms_lookup_name(const char *name)
 	unsigned long ret = 0;
 
 	/* Don't lock: we're in enough trouble already. */
+	preempt_disable();
 	if ((colon = strchr(name, ':')) != NULL) {
 		*colon = '\0';
 		if ((mod = find_module(name)) != NULL)
@@ -2383,6 +2381,7 @@ unsigned long module_kallsyms_lookup_name(const char *name)
 			if ((ret = mod_find_symname(mod, name)) != 0)
 				break;
 	}
+	preempt_enable();
 	return ret;
 }
 #endif /* CONFIG_KALLSYMS */
