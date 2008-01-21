@@ -209,6 +209,14 @@ static int __init efika_probe(void)
 	return 1;
 }
 
+/*
+ * Per default, input/output-device points to the keyboard/screen
+ * If no card is installed, the built-in serial port is used as a fallback.
+ * But unfortunately, the firmware does not connect /chosen/{stdin,stdout}
+ * the the built-in serial node. Instead, a /failsafe node is created.
+ * More advanced hardware configurations cant be detected,
+ * boot with console=xyz123 to point the kernel to the correct device
+ */
 static void __init efika_init_early(void)
 {
 #ifdef CONFIG_SERIAL_MPC52xx
