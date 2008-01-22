@@ -87,14 +87,12 @@ static int of_platform_device_resume(struct device * dev)
 
 int of_bus_type_init(struct bus_type *bus, const char *name)
 {
-	extern struct device_attribute of_platform_device_attrs[];
 	bus->name = name;
 	bus->match = of_platform_bus_match;
 	bus->probe = of_platform_device_probe;
 	bus->remove = of_platform_device_remove;
 	bus->suspend = of_platform_device_suspend;
 	bus->resume = of_platform_device_resume;
-	bus->dev_attrs = of_platform_device_attrs;
 	return bus_register(bus);
 }
 
