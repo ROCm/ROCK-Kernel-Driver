@@ -41,6 +41,7 @@
 #include <acpi/acpi_drivers.h>
 #include <acpi/acpi_numa.h>
 #include <asm/acpi.h>
+#include <linux/dmi.h>
 
 
 #ifdef CONFIG_ACPI
@@ -193,7 +194,9 @@ extern int ec_transaction(u8 command,
 #endif /*CONFIG_ACPI_EC*/
 
 extern int acpi_blacklisted(void);
-extern void acpi_bios_year(char *s);
+#ifdef CONFIG_DMI
+extern void acpi_dmi_osi_linux(int enable, const struct dmi_system_id *d);
+#endif
 
 #ifdef CONFIG_ACPI_NUMA
 int acpi_get_pxm(acpi_handle handle);
@@ -251,5 +254,5 @@ static inline int acpi_check_mem_region(resource_size_t start,
 	return 0;
 }
 
-#endif	/* CONFIG_ACPI */
+#endif	/* !CONFIG_ACPI */
 #endif	/*_LINUX_ACPI_H*/
