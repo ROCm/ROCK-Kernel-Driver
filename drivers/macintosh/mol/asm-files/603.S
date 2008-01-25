@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <2001/06/15 20:10:49 samuel>
  *   Time-stamp: <2001/06/16 15:35:22 samuel>
- *   
+ *
  *	<603.S>
- *	
+ *
  *	603 MMU support
- *   
+ *
  *   Copyright (C) 2001 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 #define P603_USE_G_BIT
@@ -21,11 +21,11 @@
 /* NOTE: The 603 vectors are called with ctr saved in r0.
  * Secondary interrupts are not detected automatically.
  */
-	
+
 /************************************************************************/
 /*	Instruction TLB Miss (603 specific vector)			*/
 /************************************************************************/
-	
+
 VECTOR_603( 0x1000, "Instruction TLB Miss - 603" )
 //	mfctr   r0				// Need to save this - CTR can't be touched!
 	mfspr   r2,HASH1			// Get PTE pointer
@@ -64,11 +64,11 @@ VECTOR_603( 0x1000, "Instruction TLB Miss - 603" )
 	ori     r3,r3,0x40			// Set secondary hash
 	b       00b				// Try lookup again
 
-	
+
 /************************************************************************/
 /*	Data Store TLB Miss (603 specific vector)			*/
 /************************************************************************/
-	
+
 VECTOR_603( 0x1200, "Data Store TLB Miss - 603" )
 //	mfctr	r0				// Need to save this - CTR can't be touched!
 	mfspr	r2,HASH1			// Get PTE pointer
@@ -85,14 +85,14 @@ VECTOR_603( 0x1200, "Data Store TLB Miss - 603" )
 	andi.	r3,r1,0x80			// Check the C-bit
 	beq	CheckProt_603
 16:
-#endif	
+#endif
 20:	mtctr	r0				// Restore CTR
 	mfspr	r3,SRR1				// Need to restore CR0
 	mtcrf	0x80,r3
 	mfspr	r0,DMISS			// Set to update TLB
 	mtspr	RPA,r1
 	tlbld	r0
-	rfi					// All done  
+	rfi					// All done
 
 	// Secondary hash
 30:	andi.	r1,r3,0x40			// Already doing secondary hash?
@@ -121,11 +121,11 @@ CheckProt_603:
 	b	16b				// and back we go
 #endif
 
-	
+
 /************************************************************************/
 /*	Data Load TLB Miss (603 specific vector)			*/
 /************************************************************************/
-		
+
 VECTOR_603( 0x1100, "Data Load TLB Miss - 603" )
 //	mfctr	r0				// Need to save this - CTR can't be touched!
 	mfspr	r2,HASH1			// Get PTE pointer
@@ -152,7 +152,7 @@ VECTOR_603( 0x1100, "Data Load TLB Miss - 603" )
 	tlbld	r0
 #endif
 	rfi					// All done
-	
+
 // Secondary hash
 30:	andi.	r1,r3,0x40			// Already doing secondary hash?
 	bne	DoDSI_603			// Yes - item not in hash table
@@ -188,11 +188,11 @@ DoISI_603_G:
 	b	40b
 #endif
 
-	
+
 /************************************************************************/
 /*	Synthesize a DSI exception					*/
 /************************************************************************/
-	
+
 DoDSI_603:
 	mfspr	r3,SRR1
 	rlwinm	r1,r3,9,6,6     		// Get load/store bit

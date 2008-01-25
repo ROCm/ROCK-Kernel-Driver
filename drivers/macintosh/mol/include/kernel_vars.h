@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <97/07/14 15:53:06 samuel>
  *   Time-stamp: <2004/02/21 21:37:37 samuel>
- *   
+ *
  *	<kernel_vars.h>
- *	
+ *
  *	Variables used by the kernel
- *   
+ *
  *   Copyright (C) 1997-2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 #ifndef H_KERNEL_VARS
@@ -64,7 +64,7 @@ typedef struct {
 	struct vsid_ent *unmapped_vsid[16];	/* entries might be NULL, linux_vsid_sv used */
 
 	ulong		emulator_sr[16];	/* segment registers used by the userspace process */
-	
+
 	ulong		user_sr[16];		/* segment registers for MSR=user */
 	ulong		sv_sr[16];		/* segment registers for MSR=sv */
 	ulong		unmapped_sr[16];	/* segment registers for unmapped mode */
@@ -74,7 +74,7 @@ typedef struct {
 	ulong		sr_inst;		/* (physical) pointer to us user_sr or sv_sr */
 	ulong		sr_data;		/* (physical) pointer to us user_sr or sv_sr */
 
-	ulong		illegal_sr;		/* used for the lazy segment register impl. */ 
+	ulong		illegal_sr;		/* used for the lazy segment register impl. */
 
 	ppc_bat_t	split_dbat0;		/* loaded to DBAT0 (used in splitmode) */
 	ppc_bat_t	transl_dbat0;		/* DBAT0 mapping the framebuffer */
@@ -103,7 +103,7 @@ typedef struct {
 	int		first_mol_context;	/* first context number this session may use */
 	int		last_mol_context;	/* last context number this session may use */
 
-	ulong		pthash_sr;		/* segment register corresponding to */ 
+	ulong		pthash_sr;		/* segment register corresponding to */
 	ulong		pthash_ea_base;		/* pthash_ea_base */
 	void		*pthash_inuse_bits;	/* bitvector (one bit per PTE) */
 	ulong		pthash_inuse_bits_ph;	/* physical base address */
@@ -191,7 +191,7 @@ typedef struct kernel_vars {
 	void			*kcall_routine;
 	int			kcall_args[3];
 	char			*mregs_virtual;		/* mregs address used by client */
-	
+
 #endif
 
 #ifdef PERFORMANCE_INFO

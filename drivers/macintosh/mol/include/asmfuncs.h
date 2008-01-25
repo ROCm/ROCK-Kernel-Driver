@@ -1,23 +1,23 @@
-/* 
+/*
  *   Creation Date: <1999/09/26 01:02:58 samuel>
  *   Time-stamp: <2003/07/27 19:20:24 samuel>
- *   
+ *
  *	<asmfuncs.h>
- *	
+ *
  *	Exports from <base.S>
- *   
+ *
  *   Copyright (C) 1999, 2000, 2001, 2002, 2003, 2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 #ifndef _H_ASMFUNCS
 #define _H_ASMFUNCS
 
-#include "kernel_vars.h" 
+#include "kernel_vars.h"
 #include "tlbie.h"
 
 
@@ -26,7 +26,7 @@ extern int reloc_virt_offs;
 #define reloc_ptr( v )  ((ulong)(v) + (ulong)reloc_virt_offs)
 
 
-/* The code in base.o (all low-level assembly) are copied to a physically 
+/* The code in base.o (all low-level assembly) are copied to a physically
  * continuous memory area. The following inline functions maps function calls
  * to the relocated area.
  */

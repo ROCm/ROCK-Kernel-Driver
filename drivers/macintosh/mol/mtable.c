@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <2002/05/26 14:46:42 samuel>
  *   Time-stamp: <2004/02/28 19:33:21 samuel>
- *   
+ *
  *	<mtable.c>
- *	
+ *
  *	Keeps track of all PTEs MOL uses.
- *   
+ *
  *   Copyright (C) 2002, 2003, 2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 #ifdef UL_DEBUG
@@ -29,11 +29,11 @@
 
 /* #define DEBUG */
 
-/* 
+/*
  * Implementation notes:
  *
  * - It is assumed bit the ITLB/DTLB is addressed by ea bits 14-19.
- * This holds true for all CPUs at the moment (603, 604, 750, 7400, 
+ * This holds true for all CPUs at the moment (603, 604, 750, 7400,
  * 7410, 7450) except the 601 (which uses bits 13-19).
  */
 
@@ -54,11 +54,11 @@ struct pterec {
 #define PENT_INDEX_MASK	0x003fffff		/* PTE index (there can be at most 2^22 PTEs) */
 #define PENT_CMP_MASK	(PENT_TOPEA_MASK | PENT_SV_BIT)
 
-/* The index below corresponds to bit 15-19 of the ea. Bit 14 of the ea 
+/* The index below corresponds to bit 15-19 of the ea. Bit 14 of the ea
  * is stored in the pent field. Thus bits 14-19 of the ea can hence always
- * be reconstructed (this struct is always properly aligned). Note that the 
- * pelist forms a ring (this is the reason why ea_next must be 
- * the first element in the pterec struct). 
+ * be reconstructed (this struct is always properly aligned). Note that the
+ * pelist forms a ring (this is the reason why ea_next must be
+ * the first element in the pterec struct).
  */
 
 typedef struct {
@@ -157,7 +157,7 @@ flush_vsid_ea_( vsid_info_t *vi, vsid_ent_t *r, ulong ea )
 			worked = 1;
 			/* unlink ea */
 			*pp = pr->ea_next;
-			
+
 			/* unlink it from lv ring (unless it is the lv-head) */
 			if( pent & PENT_LV_HEAD ) {
 				pr->pent = PENT_UNUSED | PENT_LV_HEAD;
@@ -189,7 +189,7 @@ flush_vsid_ea_( vsid_info_t *vi, vsid_ent_t *r, ulong ea )
 		}
 		pr = next;
 	} while( !(pent & PENT_EA_LAST) );
-	
+
 	if( worked )
 		__tlbie( ea );
 }
@@ -279,7 +279,7 @@ flush_lvptr_( vsid_info_t *vi, ulong lvptr )
 			last = last->lv_next;
 			pent_flush_unlink_ea( last );
 		} while( last->lv_next != head );
-		
+
 		last->lv_next = vi->free_pents;
 		vi->free_pents = first;
 	}
@@ -295,7 +295,7 @@ flush_lvptr_( vsid_info_t *vi, ulong lvptr )
 void
 flush_lvptr( kernel_vars_t *kv, ulong lvptr )
 {
-	vsid_info_t *vi = MMU.vsid_info;	
+	vsid_info_t *vi = MMU.vsid_info;
 	LOCK;
 	if( (char*)lvptr == MMU.lvptr_reservation )
 		MMU.lvptr_reservation_lost = 1;
@@ -383,7 +383,7 @@ flush_vsid( vsid_info_t *vi, vsid_ent_t *r )
 		pent_table_t *t = r->lev2[i];
 		r->lev2[i] = NULL;
 
-		/* XXX: The lev2 table _should_ be empty but we 
+		/* XXX: The lev2 table _should_ be empty but we
 		 * might want to verify this...
 		 */
 		if( t ) {
@@ -425,7 +425,7 @@ static void
 do_kfree( vsid_info_t *vi, int what )
 {
 	alloc_ent_t *p, **mp = &vi->allocations;
-	
+
 	while( *mp ) {
 		p = *mp;
 		if( p->what == what || what == ALLOC_CONT_ANY ) {
@@ -468,7 +468,7 @@ get_free_pent( vsid_info_t *vi, pte_lvrange_t *lvrange, char *lvptr )
 			pent = PENT_LV_HEAD;
 		} else {
 			/* alloc new entry */
-			pr = vi->free_pents;		
+			pr = vi->free_pents;
 			vi->free_pents = pr->lv_next;
 
 			/* add to lv ring (after the head element) */
@@ -482,7 +482,7 @@ get_free_pent( vsid_info_t *vi, pte_lvrange_t *lvrange, char *lvptr )
 
 		pr->lv_next = NULL;
 	}
-	
+
 	/* allocate pterec_t and insert into the lv ring */
 	pr->pent = pent;
 	return pr;
@@ -494,7 +494,7 @@ lev2_alloc( vsid_info_t *vi )
 	const int m = sizeof(pent_table_t) - 1;
 	pent_table_t *t;
 	int i, n = CHUNK_SIZE/sizeof(pent_table_t);
-	
+
 	//BUMP( lev2_alloc );
 
 	if( !(t=do_chunk_kmalloc(vi, ALLOC_CONT_LEV2)) )
@@ -512,7 +512,7 @@ lev2_alloc( vsid_info_t *vi )
 	LOCK;
 	t[i].pelist[0] = (void*)vi->free_pent_tables;
 	vi->free_pent_tables = &t[0];
-	UNLOCK;       
+	UNLOCK;
 	return 0;
 }
 
@@ -528,7 +528,7 @@ pent_alloc( vsid_info_t *vi )
 	if( !(pr=do_chunk_kmalloc(vi, ALLOC_CONT_PENT)) )
 		return 1;
 	memset( pr, 0, CHUNK_SIZE );
-	
+
 	for( i=0; i<n-1; i++ )
 		pr[i].lv_next = &pr[i+1];
 	LOCK;
@@ -543,7 +543,7 @@ pent_alloc( vsid_info_t *vi )
  * memory). It ensures the next pte_inserted call will succeed.
  */
 int
-mtable_memory_check( kernel_vars_t *kv ) 
+mtable_memory_check( kernel_vars_t *kv )
 {
 	vsid_info_t *vi = MMU.vsid_info;
 
@@ -555,7 +555,7 @@ mtable_memory_check( kernel_vars_t *kv )
 		lev2_alloc(vi);
 	if( !vi->free_pents )
 		pent_alloc(vi);
-	
+
 	if( !vi->free_pents || !vi->free_pent_tables ) {
 		clear_all_vsids( kv );
 		return 1;
@@ -569,7 +569,7 @@ mtable_memory_check( kernel_vars_t *kv )
 /************************************************************************/
 
 static inline void
-relink_lv( vsid_info_t *vi, pterec_t *pr, pte_lvrange_t *lvrange, char *lvptr ) 
+relink_lv( vsid_info_t *vi, pterec_t *pr, pte_lvrange_t *lvrange, char *lvptr )
 {
 	int ind = (((int)lvptr - lvrange->base) >> 12);
 	pterec_t *pnew, *p, *lv_head = &lvrange->pents[ind];
@@ -580,13 +580,13 @@ relink_lv( vsid_info_t *vi, pterec_t *pr, pte_lvrange_t *lvrange, char *lvptr )
 		lv_head->lv_next = pr;
 		return;
 	}
-	
+
 	if( pr->pent & PENT_LV_HEAD ) {
 		if( pr == lv_head ) {
 			//printk("lvptr is head (correct lv ring)\n");
 			return;
 		}
-		
+
 		/* unlink from ea ring and add new pent */
 		for( p=pr->ea_next; p->ea_next != pr ; p=p->ea_next )
 				;
@@ -623,7 +623,7 @@ relink_lv( vsid_info_t *vi, pterec_t *pr, pte_lvrange_t *lvrange, char *lvptr )
 
 /* Note: If lvrange is NULL then lvptr should be ignored */
 void
-pte_inserted( kernel_vars_t *kv, ulong ea, char *lvptr, pte_lvrange_t *lvrange, 
+pte_inserted( kernel_vars_t *kv, ulong ea, char *lvptr, pte_lvrange_t *lvrange,
 	      ulong *pte, vsid_ent_t *r, int segreg )
 {
 	vsid_info_t *vi = MMU.vsid_info;
@@ -631,7 +631,7 @@ pte_inserted( kernel_vars_t *kv, ulong ea, char *lvptr, pte_lvrange_t *lvrange,
 	uint pent, pent_cmp;
 	pterec_t *pr, **pp;
 	pent_table_t **tt;
-	
+
 	LOCK;
 	if( lvrange && MMU.lvptr_reservation_lost ) {
 		printk("mtable: lvptr reservation lost %08x\n", (int)lvptr );
@@ -648,7 +648,7 @@ pte_inserted( kernel_vars_t *kv, ulong ea, char *lvptr, pte_lvrange_t *lvrange,
 
 	if( !*tt )
 		*tt = get_free_lev2(vi);
-	
+
 	pp = &(**tt).pelist[ pl_ind ];
 	if( (pr=*pp) ) {
 		do {
@@ -729,7 +729,7 @@ alloc_vsid_ent( kernel_vars_t *kv, int mac_vsid )
 	return (vsid_ent_t*)skiplist_insert( &MMU.vsid_sl, mac_vsid );
 }
 
-/* flushes all vsids (including the fake no-MMU vsids) */ 
+/* flushes all vsids (including the fake no-MMU vsids) */
 void
 clear_all_vsids( kernel_vars_t *kv )
 {
@@ -853,7 +853,7 @@ register_lvrange( kernel_vars_t *kv, char *lvbase, int size )
 	if( !(lvr=kmalloc_mol(sizeof(pte_lvrange_t))) )
 		return NULL;
 	memset( lvr, 0, sizeof(pte_lvrange_t) );
-	
+
 	if( !(lvr->pents=vmalloc_mol(s)) ) {
 		kfree_mol( lvr );
 		return NULL;
@@ -914,7 +914,7 @@ int
 init_mtable( kernel_vars_t *kv )
 {
 	vsid_info_t *vi = kmalloc_mol( sizeof(vsid_info_t) );
-	
+
 	MMU.vsid_info = vi;
 	if( !vi )
 		return 1;
@@ -937,7 +937,7 @@ void
 cleanup_mtable( kernel_vars_t *kv )
 {
 	vsid_info_t *vi = MMU.vsid_info;
-	
+
 	if( vi ) {
 		while( vi->lvrange_head ) {
 			printk("Bug: lvrange unreleased!\n");

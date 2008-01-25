@@ -1,27 +1,27 @@
-/* 
+/*
  *   Creation Date: <2001/01/30 00:22:35 samuel>
  *   Time-stamp: <2004/03/07 13:33:39 samuel>
- *   
+ *
  *	<entry.S>
- *	
+ *
  *	Emulator/mac switching
- *   
+ *
  *   Copyright (C) 2001, 2002, 2003, 2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
-/* Short note about DEC. Due to the kernel implementation of the DEC 
- * exception handler (and get_time_of_day) in the 2.3/2.4 kernel, we 
- * must try to maintain coherency between DEC and TB. In any case, 
- * we must NEVER let DEC tick faster than TB, or get_time_of_day will 
- * occasionally return bogus values (the result is usually 
+/* Short note about DEC. Due to the kernel implementation of the DEC
+ * exception handler (and get_time_of_day) in the 2.3/2.4 kernel, we
+ * must try to maintain coherency between DEC and TB. In any case,
+ * we must NEVER let DEC tick faster than TB, or get_time_of_day will
+ * occasionally return bogus values (the result is usually
  * misbehaving X).
  */
-	
+
 /************************************************************************/
 /*	Mac Entry							*/
 /************************************************************************/
@@ -64,7 +64,7 @@ mac_entry_initialize:
 	SAVE_SEGMENT_REGS r3, /**/ r4,r5
 	SAVE_IBATS K_IBAT0U_SAVE, /**/ r3	// And save linux BAT registers
 	SAVE_DBATS K_DBAT0U_SAVE, /**/ r3
-	
+
 	bl	initialize_msr_sr_table
 
 	addi	r3,r1,K_EMULATOR_SR
@@ -73,10 +73,10 @@ mac_entry_initialize:
 	li	r3,RVEC_EXIT
 	b	exit_
 
-		
+
 	////////////////////////////////////////////////////////////////////
 	// mac_entry [ENTRYPOINT]
-	// 
+	//
 	//	sprg1		userspace stack
 	//	r4		MOL_ENTRY_R4_MAGIC
 	//	r5		magic
@@ -114,11 +114,11 @@ mac_entry:
 
 	// =====================================================================
 	//  entrypoint
-	// =====================================================================	
+	// =====================================================================
 
 	__ZERO_TICK_CNT(entry)
 	TRACE(0x1111, "mac_entry")
-		
+
 	// Save emulator registers (r1,msr) and restore flag bits
 	mfsprg_a1 r3
 	lwz	r4,xFLAG_BITS(r1)
@@ -129,20 +129,20 @@ mac_entry:
 
 	// Setup mac-environment
 
-	btl	FBIT_RecalcDecInt, recalc_int_stamp	// M: r0,r2-r5	
+	btl	FBIT_RecalcDecInt, recalc_int_stamp	// M: r0,r2-r5
 	bl	set_mac_context			// M: r0,r2-r12,XER
 	bl	set_mol_dec			// M: r0,r2-r5
 
 	crset	FBIT_LoadSegreg			// Load segment registers below
-	
-	RESTORE_MIDDLE_REGS			// Loads r6,r7 (nip/msr) r8-r12, ctr, xer, 
+
+	RESTORE_MIDDLE_REGS			// Loads r6,r7 (nip/msr) r8-r12, ctr, xer,
 
 	rlwinm	r7,r7,0,~MSR_VEC		// We always clear MSR_VEC (MSR_FP should be off already)
 	stw	r7,K_MSR(r1)			// (enabling MSR_VEC is relatively cheap)
 	btl-	FBIT_MsrModified,msr_altered_entry
-	
+
 	GET_TICK_CNT(entry, "mac_entry")
-	
+
 	bt-	FBIT_DecINT,test_for_dec_int	// check for DEC interrupts
 	b	exception_return
 
@@ -151,20 +151,20 @@ test_for_dec_int:
 	rlwinm.	r3,r3,0,MSR_EE			// MSR_EE is set?
 	bne	mac_dec_trap			// if so take a DEC interrupt
 	b	exception_return
-	
+
 msr_altered_entry:
 	crclr	FBIT_MsrModified
 	b	force_msr_altered
-	
-	
+
+
 	/////////////////////////////////////////////////////////////
 	// All paths back to mac-mode goes through one of these
 	// functions.
-	//	
+	//
 	// 	emulation_done
 	//	emulation_done_noinc
 	//	exception_return
-	
+
 	balign_32
 emulation_done:
 	addi	r6,r6,4				// increase NIP
@@ -193,13 +193,13 @@ exception_return:
 	lwz	r1,xGPR1(r1)
 	rfi
 
-	
+
 /************************************************************************/
 /*	Exit Mac-Mode Paths						*/
 /************************************************************************/
 
 	// THESE ARE _ALL_ THE POSSIBLE EXIT PATHS. KEEP IT THAT WAY
-	// OR HAVE A *VERY GOOD* REASON TO INTRODUCE A NEW ONE.	
+	// OR HAVE A *VERY GOOD* REASON TO INTRODUCE A NEW ONE.
 
 	/////////////////////////////////////////////////////////
 	// giveup_fpu
@@ -210,14 +210,14 @@ exception_return:
 	//	IMPORTANT: Call this function only if FBIT_FPUInUse is set
 	//
 	//	modifies: r7,r8 (turns on MSR_FP if FP is set in K_MSR)
-	
+
 giveup_fpu:
 	li	r8,MSR_FP | MSR_FE0 | MSR_FE1
 	lwz	r7,K_MSR(r1)
 	andc	r8,r7,r8			// Clear MSR_FEx bits
 	stw	r8,K_MSR(r1)
-	
-	mfmsr	r7				// Temporary enable FPU in order to 
+
+	mfmsr	r7				// Temporary enable FPU in order to
 	ori	r8,r7,MSR_FP			// save fpscr and fpr13
 	mtmsr	r8
 	isync
@@ -237,7 +237,7 @@ giveup_fpu:
 	// PREPARE_ERET
 	//
 	// M: r0,r2, r9-r11
-	
+
 MACRO(PREP_ERET,[nip_variable], [
 	btl	FBIT_MolDecLoaded, set_kernel_dec	// M: r0,r2,r9-r11
 
@@ -246,7 +246,7 @@ MACRO(PREP_ERET,[nip_variable], [
 	lwz	r11,K_EMULATOR_MSR(r1)
 	mtsrr0	r10
 	lwz	r2,K_EMULATOR_TOC(r1)
-	stw	r9,xFLAG_BITS(r1)	
+	stw	r9,xFLAG_BITS(r1)
 	mtsrr1	r11
 ])
 
@@ -256,7 +256,7 @@ MACRO(PREP_ERET,[nip_variable], [
 	//
 	// On stack:		nip, ctr, lr, xer, r0-r12
 	// In registers:	r13-r31
-	
+
 mac_exit:
 	TRACE(0x2220, "mac_exit")
 	bl	set_emulator_context		// M: r0,r2,r7-r11,XER
@@ -266,7 +266,7 @@ exit_:
 	lwz	r1,K_EMULATOR_STACK(r1)
 	rfi
 
-		
+
 	////////////////////////////////////////////////////////
 	// take_exception (take a linux exception)
 	//
@@ -275,7 +275,7 @@ exit_:
 
 take_exception:
 	TRACE(0x2221, "take_exception")
-	
+
 	mflr	r12
 	bl	set_emulator_context		// M: r0,r2,r7-r11,XER
 
@@ -283,7 +283,7 @@ take_exception:
 	GET_TICK_CNT(entry, "take_exception")
 	lwz	r1,K_EMULATOR_STACK(r1)
 	mtlr	r12
-	li	r3,RVEC_NOP	
+	li	r3,RVEC_NOP
 	blr
 
 
@@ -302,13 +302,13 @@ call_kernel:
 	bl	set_emulator_context		// M: r0,r2,r7-r11,XER
 
 	TRACE(0x2222, "call_kernel")
-		
+
 	lwz	r8,K_KERNEL_VARS(r1)		// r8 = kvars (lvptr)
 	PREP_ERET K_EMULATOR_KCALL_NIP		// M: r0,r2,r9-r11
 	GET_TICK_CNT(entry, "call_kernel_save")
 	lwz	r1,K_EMULATOR_STACK(r1)
 	ba	0x2f00				// MOL trampoline
-#endif	
+#endif
 
 /************************************************************************/
 /*	Set Mac/Emulator Context					*/
@@ -326,7 +326,7 @@ call_kernel:
 set_mac_context:
 	// Save and setup SPRG2 (magic) and SPRG3 (mol stack)
 	mfsprg_a2 r6
-	mfsprg_a3 r7	
+	mfsprg_a3 r7
 	stw	r6,K_EMULATOR_SPRG2(r1)
 	stw	r7,K_EMULATOR_SPRG3(r1)
 	li	r2,MOL_SPRG2_MAGIC
@@ -345,11 +345,11 @@ set_mac_context:
 #ifdef __darwin__
 	lwz	r4,K_MOL_SDR1(r1)
 	mtsdr1	r4
-#endif	
+#endif
 	blr
 
-		
-	///////////////////////////////////////////////////////////////	
+
+	///////////////////////////////////////////////////////////////
 	// set_emulator_context [r0,r2,r7-r11,cr, --->XER<---]
 	//
 	// - load segr 0-15 with emulator context
@@ -358,7 +358,7 @@ set_mac_context:
 
 set_emulator_context:
 	lwz	r0,K_EMULATOR_SPRG2(r1)
-	lwz	r2,K_EMULATOR_SPRG3(r1)	
+	lwz	r2,K_EMULATOR_SPRG3(r1)
 	mtsprg_a2 r0
 	mtsprg_a3 r2
 
@@ -391,7 +391,7 @@ set_emulator_context:
 	lwz	r2,K_OS_SDR1(r1)
 	mtsdr1	r2
 	fix_sprg2 /**/ R2			// must not modify sprg2 (i.e. sprg_a0) under OSX 10.3
-#endif	
+#endif
 	blr
 
 
@@ -399,7 +399,7 @@ set_emulator_context:
 /*	Reload Segment Registers					*/
 /************************************************************************/
 
-	////////////////////////////////////////////////////////////// 
+	//////////////////////////////////////////////////////////////
 	// reload_sr
 	//
 	//	r6 = mac-nip
@@ -408,7 +408,7 @@ set_emulator_context:
 	// - reloads DBAT0 (used for splitmode)
 	//
 	// Modifies: r3-r5
-	
+
 reload_sr:
 	bt	FBIT_InSplitmode,prepare_splitmode		// M: r0,r3-r5, r6=mac-nip
 
@@ -418,7 +418,7 @@ reload_sr:
 	mtspr	DBAT0L,r3
 	mtcrf	MMU_CR_FIELD,r5		// clear FBIT_LoadSegreg (and splitmode stuff)
 	mtspr	DBAT0U,r4
-1:	
+1:
 	lwz	r4,K_CUR_SR_BASE(r1)
 	LOAD_SEGMENT_REGS r4, /**/ r3,r5
 	blr

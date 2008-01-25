@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <1999/02/22 23:22:17 samuel>
  *   Time-stamp: <2003/06/02 16:17:36 samuel>
- *   
+ *
  *	<prom.h>
- *	
+ *
  *	OF device tree structs
- *   
+ *
  *   Copyright (C) 1999, 2000, 2002, 2003 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 #ifndef _H_PROM

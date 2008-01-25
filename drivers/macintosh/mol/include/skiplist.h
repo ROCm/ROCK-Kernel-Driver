@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <2003/03/03 22:59:04 samuel>
  *   Time-stamp: <2004/02/21 12:17:38 samuel>
- *   
+ *
  *	<skiplist.h>
- *	
+ *
  *	Skiplist implementation
- *   
+ *
  *   Copyright (C) 2003, 2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 #ifndef _H_SKIPLIST
@@ -39,7 +39,7 @@ typedef struct {
 	int			nel;
 	int			slevel;			/* start level */
 	int			datasize;		/* size of data (stored before each key) */
-	
+
 	skiplist_level_t	root[SKIPLIST_MAX_HEIGHT];
 	skiplist_el_t		nil_el;
 
@@ -47,7 +47,7 @@ typedef struct {
 } skiplist_t;
 
 static inline int
-skiplist_getnext( skiplist_t *sl, skiplist_iter_t *iterator, char **data ) 
+skiplist_getnext( skiplist_t *sl, skiplist_iter_t *iterator, char **data )
 {
 	skiplist_el_t *el = *iterator;
 	*data = (char*)el - sl->datasize;

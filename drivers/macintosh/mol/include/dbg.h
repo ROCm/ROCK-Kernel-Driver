@@ -1,13 +1,13 @@
-/* 
+/*
  *   Creation Date: <2004/04/10 22:14:43 samuel>
  *   Time-stamp: <2004/04/10 22:26:24 samuel>
- *   
+ *
  *	<dbg.h>
- *	
- *	
- *   
+ *
+ *
+ *
  *   Copyright (C) 2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   version 2

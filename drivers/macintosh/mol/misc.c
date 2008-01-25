@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <2003/06/06 20:00:52 samuel>
  *   Time-stamp: <2004/03/06 13:54:26 samuel>
- *   
+ *
  *	<misc.c>
- *	
+ *
  *	Miscellaneous
- *   
+ *
  *   Copyright (C) 2003, 2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   version 2
- *   
+ *
  */
 
 #include "archinclude.h"
@@ -65,7 +65,7 @@ get_performance_info( kernel_vars_t *kv, uint ind, perf_ctr_t *r )
 		name = p->name;
 		r->ctr = *p->ctrptr;
 	}
-	
+
 	if( (len=strlen(name)+1) > sizeof(r->name) )
 		len = sizeof(r->name);
 	memcpy( r->name, name, len );
@@ -75,13 +75,13 @@ get_performance_info( kernel_vars_t *kv, uint ind, perf_ctr_t *r )
 #else /* PERFORMANCE_INFO */
 
 static void
-clear_performance_info( kernel_vars_t *kv ) 
+clear_performance_info( kernel_vars_t *kv )
 {
 }
 
 static int
 get_performance_info( kernel_vars_t *kv, uint ind, perf_ctr_t *r )
-{ 
+{
 	return 1;
 }
 
@@ -94,10 +94,10 @@ get_performance_info( kernel_vars_t *kv, uint ind, perf_ctr_t *r )
 /************************************************************************/
 
 int
-do_debugger_op( kernel_vars_t *kv, dbg_op_params_t *pb ) 
+do_debugger_op( kernel_vars_t *kv, dbg_op_params_t *pb )
 {
 	int ret = 0;
-	
+
 	switch( pb->operation ) {
 	case DBG_OP_EMULATE_TLBIE:
 		flush_ea_range( kv, (pb->ea & ~0xf0000000), 0x1000 );
@@ -117,7 +117,7 @@ do_debugger_op( kernel_vars_t *kv, dbg_op_params_t *pb )
 		kv->mregs.flag_bits |= (pb->param & BREAK_SINGLE_STEP)? fb_DbgTrace : 0;
 		msr_altered( kv );
 		break;
-		
+
 	case DBG_OP_TRANSLATE_EA:
 		/* param == is_data_access */
 		ret = dbg_translate_ea( kv, pb->context, pb->ea, &pb->ret.phys, pb->param );
@@ -166,18 +166,18 @@ tune_spr( kernel_vars_t *kv, uint spr, int action )
 		break;
 	}
 	if( newhook )
-		hook = (hook & 1) | tophys_mol( (char*)reloc_ptr(newhook) ); 
+		hook = (hook & 1) | tophys_mol( (char*)reloc_ptr(newhook) );
 	kv->_bp.spr_hooks[spr] = hook;
 }
 
 /* return value: <0: system error, >=0: ret value */
 int
-handle_ioctl( kernel_vars_t *kv, int cmd, int arg1, int arg2, int arg3 ) 
+handle_ioctl( kernel_vars_t *kv, int cmd, int arg1, int arg2, int arg3 )
 {
 	struct mmu_mapping map;
 	perf_ctr_t pctr;
 	int ret = 0;
-	
+
 	switch( cmd ) {
 	case MOL_IOCTL_GET_SESSION_MAGIC:
 		ret = get_session_magic( arg1 );
@@ -218,7 +218,7 @@ handle_ioctl( kernel_vars_t *kv, int cmd, int arg1, int arg2, int arg3 )
 			break;
 		if( arg2 )
 			mmu_add_map( kv, &map );
-		else 
+		else
 			mmu_remove_map( kv, &map );
 		if( copy_to_user_mol((struct mmu_mapping*)arg1, &map, sizeof(map)) )
 			ret = -EFAULT_MOL;

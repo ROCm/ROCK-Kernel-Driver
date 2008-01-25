@@ -1,25 +1,25 @@
-/*   -*- asm -*- 
+/*   -*- asm -*-
  *
  *   Creation Date: <2001/02/03 19:38:07 samuel>
  *   Time-stamp: <2004/02/22 15:36:20 samuel>
- *   
+ *
  *	<asmdefs.h>
- *	
+ *
  *	Common assembly definitions
- *   
+ *
  *   Copyright (C) 2001, 2002, 2003, 2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 #ifndef _H_ASMDEFS
 #define _H_ASMDEFS
 
 #include "asm.m4"
-	
+
 #ifndef __ASSEMBLY__
 #error	This file is only to be included from assembler code!
 #endif
@@ -49,7 +49,7 @@
 #ifdef __darwin__
 #define STACK_LR_OFFSET		8		/* 4 is the CR offset */
 #endif
-	
+
 /************************************************************************/
 /*	Register name prefix						*/
 /************************************************************************/
@@ -82,7 +82,7 @@ mFORLOOP([i],0,31,[define(fr[]i,f[]i)])
 #define balign_8	.balign 8,0
 #define balign_16	.balign 16,0
 #define balign_32	.balign 32,0
-#endif	
+#endif
 
 MACRO(LOADVAR, [dreg, variable], [
 	lis	_dreg,HA(_variable)
@@ -97,13 +97,13 @@ MACRO(LOADI, [dreg, addr], [
 MACRO(LOAD_GPR_RANGE, [start, endx, offs, base], [
 	mFORLOOP([i],0,31,[ .if (i >= _start) & (i <= _endx)
 		lwz rPREFIX[]i,_offs+i[]*4(_base)
-	.endif 
+	.endif
 ])])
 
 MACRO(STORE_GPR_RANGE, [start, endx, offs, base], [
 	 mFORLOOP([i],0,31,[ .if (i >= _start) & (i <= _endx)
 		stw rPREFIX[]i,_offs+i[]*4(_base)
-	.endif 
+	.endif
 ])])
 
 MACRO(LOAD_FPR_RANGE, [start, endx, offs, base], [
@@ -115,7 +115,7 @@ MACRO(LOAD_FPR_RANGE, [start, endx, offs, base], [
 MACRO(STORE_FPR_RANGE, [start, endx, offs, base], [
 	mFORLOOP([i],0,31,[ .if (i >= _start) & (i <= _endx)
 		stfd fPREFIX[]i,_offs+i[]*8(_base)
-	.endif 
+	.endif
 ])])
 
 /************************************************************************/
@@ -131,7 +131,7 @@ MACRO(xFPR_LOAD_RANGE, [from, to, mbase], [
 MACRO(xFPR_SAVE_RANGE, [from, to, mbase], [
 	STORE_FPR_RANGE _from,_to,xFPR_BASE,_mbase
 ])
-	// The low half of the fpu is fr0-fr12. I.e. the FPU registers 
+	// The low half of the fpu is fr0-fr12. I.e. the FPU registers
 	// that might be overwritten when a function call is taken
 	// (fr13 and fpscr are treated specially).
 
@@ -155,7 +155,7 @@ MACRO(xSAVE_TOPHALF_FPU, [mbase], [
 ])
 MACRO(xSAVE_FULL_FPU, [mbase], [
 	xSAVE_LOW_FPU _mbase
-	xSAVE_TOPHALF_FPU _mbase	
+	xSAVE_TOPHALF_FPU _mbase
 ])
 
 
@@ -182,7 +182,7 @@ define(vPREFIX,[])
 
 #ifndef HAVE_ALTIVEC
 #define VEC_OPCODE( op1,op2,A,B,C ) \
-	.long	(((op1) << (32-6)) | (op2) | ((A) << (32-11)) | ((B) << (32-16)) | ((C) << (32-21))) ;	
+	.long	(((op1) << (32-6)) | (op2) | ((A) << (32-11)) | ((B) << (32-16)) | ((C) << (32-21))) ;
 
 #define __stvx( vS,rA,rB )	VEC_OPCODE( 31,0x1ce,vS,rA,rB )
 #define __lvx( vD,rA,rB )	VEC_OPCODE( 31,0xce, vD,rA,rB )
@@ -234,7 +234,7 @@ MACRO(xVEC_LOAD, [mbase, scr], [
 	lwz	_scr,xVRSAVE(_mbase)
 	mtspr	S_VRSAVE,_scr
 ])
-	
+
 /************************************************************************/
 /*	Instructions							*/
 /************************************************************************/
@@ -286,7 +286,7 @@ MACRO(mfsprg3, [reg], [mfspr _reg,SPRG3] )
 #define		so	3	/* Summary Overflow */
 #define		un	3	/* Unordered (after floating point) */
 #endif
-	
+
 /* FPU register names (to be used as macro arguments) */
 #define	FR0	0
 #define	FR1	1
@@ -354,7 +354,7 @@ MACRO(mfsprg3, [reg], [mfspr _reg,SPRG3] )
 #define	R29	29
 #define	R30	30
 #define	R31	31
-		
+
 #ifndef __darwin__
 
 /* GPR register names, rN -> N, frN -> N, vN -> N */
@@ -377,7 +377,7 @@ MACRO(ori_, [reg1, reg2, value], [
 		oris _reg1, _reg2, (_value) >> 16
 	.endif
 ])
-	
+
 /************************************************************************/
 /*	MISC								*/
 /************************************************************************/
@@ -389,7 +389,7 @@ MACRO(ori_, [reg1, reg2, value], [
 /* an underscore is needed on Darwin */
 #define GLOBL( name )		.globl _##name ; name: ; _##name
 #define EXTERN( name )		_##name
-#endif	
+#endif
 
 #define	MOL_BIT(n)		(1<<(31-(n)))
 

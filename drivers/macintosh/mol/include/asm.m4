@@ -1,24 +1,24 @@
 /*  -*- asm -*-
  *   Creation Date: <2001/12/30 20:08:53 samuel>
  *   Time-stamp: <2002/01/14 00:48:09 samuel>
- *   
+ *
  *	<asm.m4>
- *	
+ *
  *	m4 initialization (m4 is used as an assembly preprocessor)
- *   
+ *
  *   Copyright (C) 2001, 2002, 2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 /* This end-of-quote matches the start-of-quote in mol_config.h */
 ]]]]]
 divert(-1)
 changequote([,])
-	
+
 dnl m4 macros to avoid in header files (we can not rename these)
 dnl ==========================================================
 dnl  shift, eval, expr, decr, incr, ifelse, popdef, pushdef
@@ -27,9 +27,9 @@ dnl  shift, eval, expr, decr, incr, ifelse, popdef, pushdef
 dnl **************************************************************
 dnl * Rename to reduce namespace conflicts
 dnl **************************************************************
-	
+
 dnl *** Changing the name of built-in macros using defn does not always work ***
-	
+
 undefine([changecom])
 undefine([changequote])
 dnl undefine([decr])
@@ -106,9 +106,9 @@ define([MACRO], [
 ])
 #else
 define([MACRO], [
-	.macro [$1] 
+	.macro [$1]
 	pushdef([_n],0)
-	mFOREACH([i],[$2],[ pushdef(_[]i,[$[]]_n) define([_n],incr(_n)) ]) 
+	mFOREACH([i],[$2],[ pushdef(_[]i,[$[]]_n) define([_n],incr(_n)) ])
 	$3
 	.endmacro
 	mFOREACH([i],[$2],[ popdef(_[]i) ])

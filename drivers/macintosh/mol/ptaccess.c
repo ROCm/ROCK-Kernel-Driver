@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <2001/03/25 18:04:45 samuel>
  *   Time-stamp: <2002/08/03 17:43:10 samuel>
- *   
+ *
  *	<ptaccess.c>
- *	
+ *
  *	Handle stores to the (emulated) page table
- *   
+ *
  *   Copyright (C) 2001, 2002 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 #include "archinclude.h"
@@ -27,7 +27,7 @@ extern int do_intercept_tlbie_block( kernel_vars_t *kv, ulong pteoffs, ulong len
 #define	MMU	(kv->mmu)
 #define	MREGS	(kv->mregs)
 
-int 
+int
 do_intercept_tlbie( kernel_vars_t *kv, ulong pte0, ulong pte1, ulong pteoffs )
 {
 	int vsid = (pte0 >> 7) & VSID_MASK;
@@ -37,7 +37,7 @@ do_intercept_tlbie( kernel_vars_t *kv, ulong pte0, ulong pte1, ulong pteoffs )
 
 	if( MMU.pthash_inuse_bits )
 		clear_bit_mol( pteoffs >> 3, MMU.pthash_inuse_bits );
-	
+
 	v = (pteoffs >> 6);
 	if( pte0 & MOL_BIT(25) )	/* secondary hash? */
 		v = ~v;
@@ -73,7 +73,7 @@ do_intercept_tlbie_block( kernel_vars_t *kv, ulong pteoffs, ulong length )
 			pte0 = *((unsigned int *) (MMU.hash_base + pteoffs));
 			pte1 = *((unsigned int *) (MMU.hash_base + pteoffs + 4));
 			do_intercept_tlbie(kv, pte0, pte1, pteoffs);
-		} 
+		}
 
 		pteoffs += 8;
 	}
@@ -91,7 +91,7 @@ do_tlbli( kernel_vars_t *kv, ulong ea )
 {
 	int ind = (ea >> 12) & 0x1f;
 	mPTE_t *p;
-	
+
 	//printk("do_tlbli %08lX : %08lX %08lX\n", ea, MREGS.spr[S_ICMP], MREGS.spr[S_RPA] );
 	if( MREGS.spr[S_SRR1] & MOL_BIT(14) )
 		ind += 32;

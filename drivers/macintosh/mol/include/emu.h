@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <2003/01/26 00:45:55 samuel>
  *   Time-stamp: <2003/01/27 01:26:25 samuel>
- *   
+ *
  *	<emu.h>
- *	
+ *
  *	Emulation of some assembly functions
- *   
+ *
  *   Copyright (C) 1998, 2000, 2001, 2002, 2003 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 #ifndef _H_EMU

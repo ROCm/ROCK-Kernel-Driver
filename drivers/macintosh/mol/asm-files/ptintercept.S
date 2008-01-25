@@ -1,22 +1,22 @@
-/* 
+/*
  *   Creation Date: <2001/03/17 18:00:05 samuel>
  *   Time-stamp: <2003/05/26 00:08:48 samuel>
- *   
+ *
  *	<ptintercept.S>
- *	
+ *
  *	Handles writes to the (mac) hash table
- *   
+ *
  *   Copyright (C) 2001, 2002, 2003, 2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 //////////////////////////////////////////////////////////////////////
 // Implementing the tlbie instruction properly is tricky.
-// The tlbie is supposed to invalidate an equivalence 
+// The tlbie is supposed to invalidate an equivalence
 // class of PTEs and this does not map well to the huge TLB
 // MOL uses (the linux PTE hash, a lot bigger than the 2x64
 // table found in most CPUs).
@@ -47,9 +47,9 @@ secint_pt_store:
 	mfdar	r2
 	lwz	r4,K_TMP_SCRATCH0(r1)		// in splitmode (might be
 	mtsrin	r4,r2				// the instrucion sr)
-1:	
+1:
 	lwz	r6,xNIP(r1)			// restore NIP & MSR
-	lwz	r7,K_MSR(r1)	
+	lwz	r7,K_MSR(r1)
 	cmpwi	r3,0x300
 	beq	1f
 	cmpwi	r3,0x600			// Alignment
@@ -59,12 +59,12 @@ secint_pt_store:
 	b	dsi_cont
 2:	bl	save_middle_regs
 	b	alignment_cont
-		
+
 	////////////////////////////////////////////////////////////////////////
 	// check_pthash_hit
-	// 
+	//
 	// m: r0,r2-r5, cr
-	
+
 check_pthash_hit:
 	mfdsisr	r3
 	rlwinm.	r4,r3,0,4,4			// Is this a protection violation?
@@ -82,7 +82,7 @@ check_pthash_hit:
 	lwz	r5,K_SR_DATA(r1)		// Correct context for EA?
 	rlwinm	r3,r2,4+2,26,29			// #sr << 2
 	lwz	r4,K_TLBHASH_SR(r1)
-	lwzx	r3,r3,r5	
+	lwzx	r3,r3,r5
 	cmpw	r3,r4
 	bnelr-
 
@@ -90,15 +90,15 @@ check_pthash_hit:
 	// Handle page table write,  r2=dar, r4=segreg
 	/////////////////////////////////////////////////
 
-	bf+	FBIT_InSplitmode,1f	
+	bf+	FBIT_InSplitmode,1f
 	mfsrin	r3,r2				// save old segment register
 	stw	r3,K_TMP_SCRATCH0(r1)		// in splitmode (might be
 	mtsrin	r4,r2				// the instrucion sr)
-1:	
+1:
 	lwz	r3,xINST_OPCODE(r1)
 	LI_PHYS( R4,secint_pt_store )		// r4 = secondary exception handler
 	stw	r6,xNIP(r1)
-	
+
 	// r2 = dar, r3 = opcode
 	rlwinm	r0,r3,6,0x3e			// primary opcode & ~1
 	rlwinm	r5,r3,6+5+3,(0x1f<<3)		// r5 = rS << 3
@@ -136,7 +136,7 @@ do_opcode_31:
 	cmpwi	r0,727				// stfdx / stfdxu
 	beq-	do_stfd
 	cmpwi	r0,663				// stfsx / stfsxu
-	beq-	do_stfs			
+	beq-	do_stfs
 	crclr	5
 	rlwinm	r0,r3,32-1,22,31		// unmasked secondary opcode
 	cmpwi	r0,470				// dcbi
@@ -185,7 +185,7 @@ do_stwcx:
 	rlwimi	r6,r0,0,0,3
 	stw	r6,xCR(r1)
 	b	st_continue_2
-do_sth:	
+do_sth:
 	EMU_LOAD_GPR r5, /**/ R6		// r0 = value
 	mtlr	r4
 	SET_MSR_DR /**/ r6
@@ -235,7 +235,7 @@ st_continue_2:
 	and.	r6,r6,r3
 	GET_TICK_CNT(entry,"ptintercept-1")
 	bne-	pt_intercept
-1:	
+1:
 	BUMP("pt_intercept_not_taken")
 	// return from exception [r2=dar]
 	lwz	r6,xNIP(r1)			// restore r6

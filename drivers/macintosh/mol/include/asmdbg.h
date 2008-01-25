@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <2004/01/29 20:12:41 samuel>
  *   Time-stamp: <2004/03/06 13:17:36 samuel>
- *   
+ *
  *	<asmdbg.h>
- *	
+ *
  *	debug support
- *   
+ *
  *   Copyright (C) 2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   version 2
- *   
+ *
  */
 
 #ifndef _H_ASMDBG
@@ -24,7 +24,7 @@
 
 #ifdef PERFORMANCE_INFO
 	define([_bump_ind_], 0)
-		
+
 #define __BUMP( str )						\
 	.text	92						;\
 debug_str_[]_bump_ind_:						;\
@@ -45,7 +45,7 @@ debug_str_[]_bump_ind_:						;\
 
 
 	define([_tick_ind_], 0)
-	
+
 #define __ZERO_TICK_CNT(cntr)					\
 	ifdef([##cntr##_ind_],[],[				\
 	  define([##cntr##_ind_], _tick_ind_)			\
@@ -58,7 +58,7 @@ debug_str_[]_bump_ind_:						;\
 	mftb	r3						;\
 	stw	r3,(K_ASM_TICK_STAMPS + 4*cntr##_ind_)(r1)	;\
 	lwz	r3,xDEBUG_SCR1(r1)
-	
+
 #define __GET_TICK_CNT(cntr, name) \
 	.text	92						;\
 debug_str_[]_bump_ind_:						;\
@@ -136,7 +136,7 @@ MACRO(PERF_MONITOR_SETUP, [scr], [
 MACRO(PERF_MONITOR_SETUP, [scr], [])
 #endif
 
-	
+
 /************************************************************************/
 /*	debug								*/
 /************************************************************************/
@@ -147,7 +147,7 @@ MACRO(STOP_EMULATION, [val], [
 	stw	r3,xKERNEL_DBG_STOP(r1)
 	li	r3,1
 	stw	r3,xINTERRUPT(r1)
-	lwz	r3,xDEBUG_SCR1(r1)	
+	lwz	r3,xDEBUG_SCR1(r1)
 ])
 
 MACRO(DEBUG_TRACE, [num, dummy], [
@@ -174,7 +174,7 @@ MACRO(TRACE_VAL, [val, dummy], [
 	addi	r30,r30,1
 	rlwinm	r30,r30,0,24,31			// 256 entries
 	stw	r30,xDEBUG_TRACE(r1)
-	lwz	r29,xDEBUG_SCR2(r1)	
+	lwz	r29,xDEBUG_SCR2(r1)
 	lwz	r30,xDEBUG_SCR1(r1)
 #endif
 ])

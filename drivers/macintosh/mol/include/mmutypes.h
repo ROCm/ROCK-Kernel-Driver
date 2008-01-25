@@ -1,19 +1,19 @@
-/* 
+/*
  *   Creation Date: <2002/01/13 13:53:14 samuel>
  *   Time-stamp: <2002/01/27 19:56:11 samuel>
- *   
+ *
  *	<mmutypes.h>
- *	
+ *
  *	MMU definitions
- *   
+ *
  *   Most of these declarations originate from the Linux Kernel
  *
  *   Copyright (C) 2002 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 #ifndef _H_MMUTYPES

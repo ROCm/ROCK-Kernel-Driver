@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <1998-10-31 03:11:06 samuel>
  *   Time-stamp: <2004/03/13 16:44:58 samuel>
- *   
+ *
  *	<mmu_mappings.h>
- *	
+ *
  *	Mappings mac physical <-> linux virtual
- *   
+ *
  *   Copyright (C) 1998-2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 #ifndef _H_MMU_MAPPINGS

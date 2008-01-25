@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <2004/01/25 17:00:12 samuel>
  *   Time-stamp: <2004/01/29 22:32:30 samuel>
- *   
+ *
  *	<atomic.h>
- *	
- *	
- *   
+ *
+ *
+ *
  *   Copyright (C) 2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   version 2
- *   
+ *
  */
 
 #ifndef _H_ATOMIC

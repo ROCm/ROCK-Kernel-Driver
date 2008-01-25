@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <97/06/16 18:02:12 samuel>
  *   Time-stamp: <2004/03/13 14:03:30 samuel>
- *   
+ *
  *	<misc.h>
- *	
- *	
- *   
+ *
+ *
+ *
  *   Copyright (C) 1997-2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 #ifndef _H_MOD
@@ -73,7 +73,7 @@ set_bit_mol( int nr, char *addr )
 	*p |= mask;
 }
 
-static inline void 
+static inline void
 clear_bit_mol( int nr, char *addr )
 {
 	ulong mask = 1 << (nr & 0x1f);
@@ -81,7 +81,7 @@ clear_bit_mol( int nr, char *addr )
 	*p &= ~mask;
 }
 
-static inline int 
+static inline int
 check_bit_mol( int nr, char *addr )
 {
 	ulong mask = 1 << (nr & 0x1f);

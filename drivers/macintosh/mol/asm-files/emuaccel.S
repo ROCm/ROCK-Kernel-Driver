@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <2003/01/24 13:54:52 samuel>
  *   Time-stamp: <2003/08/14 03:12:00 samuel>
- *   
+ *
  *	<emuaccel.S>
- *	
+ *
  *	Emulation acceleration
- *   
+ *
  *   Copyright (C) 2003, 2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 #include "emuaccel_sh.h"
@@ -21,7 +21,7 @@
 	//	r2	= emuaccel_slot
 	//	r6,r7	= nip(return address)/mregs
 	//
-	
+
 	balign_8
 emuaccel_mtmsr_rNN:
 mFORLOOP([i],0,31,[
@@ -110,7 +110,7 @@ emuaccel_update_dec:
 	lwz	r4,xDEC_STAMP(r1)
 	mftb	r3
 	sub	r0,r4,r3
-	stw	r0,xDEC(r1)	
+	stw	r0,xDEC(r1)
 	b	emulation_done_noinc
 
 	balign_8
@@ -124,7 +124,7 @@ emuaccel_mtsr:
 /************************************************************************/
 /*	implementation							*/
 /************************************************************************/
-	
+
 emulate_mtsrr0_accel:
 	stw	r0,xSRR0(r1)
 	b	emulation_done_noinc
@@ -143,10 +143,10 @@ emulate_mtsprg2_accel:
 emulate_mtsprg3_accel:
 	stw	r0,xSPRG3(r1)
 	b	emulation_done_noinc
-emulate_mthid0_accel:	
+emulate_mthid0_accel:
 	stw	r0,xHID0(r1)
 	b	emulation_done_noinc
-	
+
 	balign_32
 emulate_mtmsr_accel:
 	lwz	r3,xMSR(r1)			// r3 = old MSR
@@ -159,11 +159,11 @@ emulate_mtmsr_accel:
 	MAC_EXIT_SAVE( RVEC_MSR_POW )		// doze
 
 
-	
+
 /************************************************************************/
 /*	setup								*/
 /************************************************************************/
-	
+
 #define EMUACCEL_REL(s)			s - emuaccel_table
 
 #ifdef __linux__

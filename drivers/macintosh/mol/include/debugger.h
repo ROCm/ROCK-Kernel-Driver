@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <1999/02/22 22:46:22 samuel>
  *   Time-stamp: <2003/07/27 14:42:05 samuel>
- *   
+ *
  *	<debugger.h>
- *	
+ *
  *	World interface of the debugger
- *   
+ *
  *   Copyright (C) 1999, 2000, 2001, 2002, 2003, 2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 #ifndef _H_DEBUGGER
@@ -40,7 +40,7 @@ extern int	debugger_in_68k_mode( void );
 extern void	debugger_nub_poll( void );
 
 /* debug actions */
-enum{  
+enum{
 	kDbgNOP=0, kDbgGo, kDbgGoRFI, kDbgStep, kDbgExit, kDbgStop, kDbgGoUser
 };
 

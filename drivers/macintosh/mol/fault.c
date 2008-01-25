@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <2002/06/08 20:53:20 samuel>
  *   Time-stamp: <2004/02/22 13:07:50 samuel>
- *   
+ *
  *	<fault.c>
- *	
+ *
  *	Page fault handler
- *   
+ *
  *   Copyright (C) 2002, 2003, 2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 #include "archinclude.h"
@@ -49,7 +49,7 @@ typedef struct {
 	ulong		ea;
 	ulong		*sr_base;
 	struct vsid_ent	**vsid_eptr;	/* pointer to MMU.vsid or MMU.unmapped_vsid */
-	
+
 	/* filled in by lookup_mphys */
 	mPTE_t		*mpte;		/* lvptr to mac-pte (if != NULL) */
 	ulong		mphys_page;	/* ea of mphys page */
@@ -89,10 +89,10 @@ DEBUG_print_inserted_pte( ulong *slot, ulong pte0, ulong pte1, ulong ea )
 
 	printk("[%p] ", slot );
 	printk("RPN %08X  API %08X  EA %08lX  ", pte.rpn << 12, pte.api<<12, ea );
-	printk("%c%c %c%c; PP %d\n", 
-	       pte.h ? 'H' : 'h', 
-	       pte.v ? 'V' : 'v', 
-	       pte.r ? 'R' : 'r', 
+	printk("%c%c %c%c; PP %d\n",
+	       pte.h ? 'H' : 'h',
+	       pte.v ? 'V' : 'v',
+	       pte.r ? 'R' : 'r',
 	       pte.c ? 'C' : 'c', pte.pp );
 #endif
 }
@@ -174,7 +174,7 @@ lookup_mac_pte( kernel_vars_t *kv, ulong vsid, ulong ea )
 	for( i=0; i<8; i++, p+=2 )
 		if( cmp == *p )
 			return (mPTE_t*)p;
-				
+
 	/* look in secondary PTEG */
 	p = (ulong*)( (ulong)MMU.hash_base + (pteg ^ (mask << 6)) );
 	cmp |= MOL_BIT(25);
@@ -185,7 +185,7 @@ lookup_mac_pte( kernel_vars_t *kv, ulong vsid, ulong ea )
 	return NULL;
 }
 
-static int 
+static int
 lookup_mphys( kernel_vars_t *kv, fault_param_t *pb, const int ebits )
 {
 	ulong ea = (pb->ea & ~0xfff);
@@ -221,7 +221,7 @@ lookup_mphys( kernel_vars_t *kv, fault_param_t *pb, const int ebits )
 		pb->key = 0;
 		return 0;
 	}
-	
+
 	/* BAT translation? 0-3 = IBATs, 4-7 = DBATs. Separated I/D BATS, hace 3/8/99 */
 	bp = is_dsi(ebits) ? &MMU.bats[4] : &MMU.bats[0];
 	for( i=0; i<4; i++, bp++ ) {
@@ -287,7 +287,7 @@ find_pte_slot( ulong ea, ulong *pte0, int pte_present, int *pte_replaced )
 	primary = (ulong*)((ulong)ptehash.base + pteg);
 
 	pteg = pteg ^ ptehash.pteg_mask;
-	secondary = (ulong*)((ulong)ptehash.base + pteg);	
+	secondary = (ulong*)((ulong)ptehash.base + pteg);
 
 	if( pte_present ) {
 		*pte_replaced = 1;
@@ -297,7 +297,7 @@ find_pte_slot( ulong ea, ulong *pte0, int pte_present, int *pte_replaced )
 		for( i=0; i<8; i++, p+=2 )
 			if( cmp == *p )
 				return p;
-     
+
 		/* look in secondary PTEG */
 		p = secondary;
 		cmp |= MOL_BIT(25);
@@ -311,7 +311,7 @@ find_pte_slot( ulong ea, ulong *pte0, int pte_present, int *pte_replaced )
 		 */
 	}
 	*pte_replaced = 0;
-	
+
 	/* free slot in primary PTEG? */
 	for( p=primary, i=0; i<8; i++, p+=2 )
 		if( !(*p & MOL_BIT(0)) )
@@ -323,7 +323,7 @@ find_pte_slot( ulong ea, ulong *pte0, int pte_present, int *pte_replaced )
 			*pte0 |= PTE0_H;
 			return p;
 		}
-	
+
 	/* steal a primary PTEG slot */
 	grab_add = (grab_add+1) & 0x7;
 
@@ -331,7 +331,7 @@ find_pte_slot( ulong ea, ulong *pte0, int pte_present, int *pte_replaced )
 	return (ulong*)((ulong)primary + grab_add * sizeof(ulong[2]));
 }
 
-static inline int 
+static inline int
 insert_pte( kernel_vars_t *kv, fault_param_t *pb, const int ebits )
 {
 	ulong ea=pb->ea, mphys=pb->mphys_page;
@@ -433,14 +433,14 @@ page_fault( kernel_vars_t *kv, fault_param_t *pb, const int ebits )
 		return ret;
 	}
 
-	/* printk("MPHYS_PAGE: %08lX, pp %d, key %d, wimg %d, mpte %p\n", 
+	/* printk("MPHYS_PAGE: %08lX, pp %d, key %d, wimg %d, mpte %p\n",
 		   pb->mphys_page, (pb->pte1 & 3), pb->key, ((pb->pte1 >> 3) & 0xf), pb->mpte ); */
 
 	/* check privileges */
 	ind = (is_write(ebits) ? 8:0) | (pb->pte1 & PTE1_PP) | (pb->key?4:0);
 	if( priv_viol_table[ind] ) {
 		/* r/w bit + priv. violation */
-		int sbits = EBIT_PROT_VIOL | (ebits & EBIT_IS_WRITE);	
+		int sbits = EBIT_PROT_VIOL | (ebits & EBIT_IS_WRITE);
 		BUMP(mac_priv_violation);
 		RVEC_RETURN_2( &MREGS, is_dsi(ebits) ? RVEC_DSI_TRAP : RVEC_ISI_TRAP, pb->ea, sbits );
 	}
@@ -476,7 +476,7 @@ page_fault( kernel_vars_t *kv, fault_param_t *pb, const int ebits )
 /*	VSID allocation (the normal VSID lookup occurs in vsid.S)	*/
 /************************************************************************/
 
-static void 
+static void
 fix_sr( kernel_vars_t *kv, int sr, int mapped )
 {
 	int macvsid = mapped ? (MREGS.segr[sr] & VSID_MASK) : VSID_MASK + 1 + sr;
@@ -508,12 +508,12 @@ fix_sr( kernel_vars_t *kv, int sr, int mapped )
 extern int dsi_exception( kernel_vars_t *kv, ulong dar, ulong dsisr );
 extern int isi_exception( kernel_vars_t *kv, ulong nip, ulong srr1 );
 
-int 
+int
 dsi_exception( kernel_vars_t *kv, ulong dar, ulong dsisr )
 {
 	int ebits, topind = dar >> 28;
 	fault_param_t pb;
-	
+
 	/* printk("DSI: EA %08lX, DSISR %08lX\n", dar, dsisr ); */
 	if( dsisr & 0x84500000 )	/* 0,5,9,11 */
 		RVEC_RETURN_2( &MREGS, RVEC_UNUSUAL_DSISR_BITS, dar, dsisr );
@@ -569,7 +569,7 @@ isi_exception( kernel_vars_t *kv, ulong nip, ulong srr1 )
 /*	debugger functions						*/
 /************************************************************************/
 
-int 
+int
 dbg_translate_ea( kernel_vars_t *kv, int context, ulong va, int *ret_mphys, int data_access )
 {
 	int ebits = data_access ? EBIT_IS_DSI : 0;

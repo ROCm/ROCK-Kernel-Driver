@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <97/05/26 02:10:43 samuel>
  *   Time-stamp: <2004/03/13 14:14:20 samuel>
- *   
+ *
  *	<misc.c>
- *	
+ *
  *	Kernel interface
- *   
+ *
  *   Copyright (C) 1997-2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 #include "archinclude.h"
@@ -102,7 +102,7 @@ mol_trampoline_vector( struct pt_regs *r )
 }
 
 static trampoline_t
-set_trampoline( trampoline_t tramp ) 
+set_trampoline( trampoline_t tramp )
 {
 	trampoline_t old;
 #ifdef LINUX_26
@@ -134,14 +134,14 @@ set_trampoline( trampoline_t tramp )
 }
 
 int
-arch_common_init( void ) 
+arch_common_init( void )
 {
 	old_trampoline = set_trampoline( mol_trampoline_vector );
 	return !old_trampoline;
 }
 
 void
-arch_common_cleanup( void ) 
+arch_common_cleanup( void )
 {
 	set_trampoline( old_trampoline );
 }

@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <2004/02/14 11:42:19 samuel>
  *   Time-stamp: <2004/03/13 14:25:00 samuel>
- *   
+ *
  *	<hash.c>
- *	
+ *
  *	CPU PTE hash handling
- *   
+ *
  *   Copyright (C) 2003, 2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 #include "archinclude.h"
@@ -41,10 +41,10 @@ static struct {
 static int
 create_pte_hash( void )
 {
-	ulong size = 1024*128;		/* 128K is the kmalloc limit */ 
+	ulong size = 1024*128;		/* 128K is the kmalloc limit */
 	ulong sdr1, mask, base, physbase;
 	char *p;
-	
+
 	if( !(p=kmalloc_cont_mol(size)) )
 		return 1;
 	memset( p, 0, size );
@@ -93,7 +93,7 @@ init_hash( void )
 		create_pte_hash();
 		sdr1 = ptehash.sdr1;
 	}
-	
+
 	if( !sdr1 )
 		return 1;
 
@@ -106,7 +106,7 @@ init_hash( void )
 		hs.hash_mapped = 1;
 		ptehash.base = map_hw_hash( ptehash.physbase, ptehash.pte_mask + 8 );
 	}
-	
+
 	return !ptehash.base;
 }
 

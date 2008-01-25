@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <2002/01/12 22:11:51 samuel>
  *   Time-stamp: <2004/04/10 22:27:41 samuel>
- *   
+ *
  *	<archinclude.h>
- *	
- *	
- *   
+ *
+ *
+ *
  *   Copyright (C) 2002, 2003, 2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 #ifndef _H_ARCHINCLUDE

@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <2001/04/01 00:44:40 samuel>
  *   Time-stamp: <2003/01/27 02:42:03 samuel>
- *   
+ *
  *	<performance.h>
- *	
+ *
  *	performance counters
- *   
+ *
  *   Copyright (C) 2001, 2002 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 #ifndef _H_PERFORMANCE
@@ -48,7 +48,7 @@ extern perf_info_t g_perf_info_table[];
 		asm volatile( "mftb %0" : "=r" (c->stamp) : );	\
 	}							\
 } while(0)
-	
+
 #define TICK_CNTR_POP( kv, name ) do {				\
 	int ind = (kv)->num_acntrs;				\
 	ulong now, ticks;					\

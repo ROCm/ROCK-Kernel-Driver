@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <2003/03/06 22:03:59 samuel>
  *   Time-stamp: <2004/02/21 16:30:45 samuel>
- *   
+ *
  *	<vsid.S>
- *	
+ *
  *	VSID lookup (skiplist search)
- *   
+ *
  *   Copyright (C) 2003, 2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 #include "mtable.h"
@@ -42,7 +42,7 @@ emulate_mtsr:
 	rlwinm	r0,r0,0,8,31			// mask VSID
 
 	/******* vsid lookup (skiplist search)  *******/
-	
+
 	lwz	r2,K_VSID_SL_SLEVEL(r1)		// n = search level (0..15)
 	rlwinm	r2,r2,SLEVEL_SHIFT,0,29		// n *= 4 (or n *= 8 on darwin)
 
@@ -56,7 +56,7 @@ emulate_mtsr:
 	cmpw	cr1,r4,r0
 	bge-	cr1,3f
 	b	1b
-3:	
+3:
 	addi	r2,r2,-SKIPLIST_LEVELSIZE	// r2 -= 4|8
 	beq-	cr1,vsid_found			// jump if key matches
 	cmpwi	r2,0
@@ -75,10 +75,10 @@ emulate_mtsr:
 	sub	r5,r8,r1			// r5 = VSID offset
 	lwz	r0,K_CUR_SR_BASE(r1)		// r0 = cur_sr_table
 	b	6f
-	
+
 	/******* vsid found *******/
 vsid_found:
-	
+
 	BUMP("vsid_found")
 	// match, r3 points to the skiplist element
 	addi	r4,r3,-SIZEOF_VSID_ENT		// sizeof(vsid_ent_t)
@@ -101,7 +101,7 @@ vsid_found:
 	and	r6,r3,r6			// Kp == 0 case
 	crmove	FBIT_PrepareSplitmode, FBIT_InSplitmode
 	andc	r9,r2,r4			// Ks == 1 case
-	or	r6,r6,r0			
+	or	r6,r6,r0
 	lwz	r0,K_CUR_SR_BASE(r1)		// r0 = cur_sr_table
 	and	r4,r3,r4			// Ks == 0 case
 	stw	r6,K_SV_SR_BASE(r8)		// sv_sr set

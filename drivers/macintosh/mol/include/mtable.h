@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <2002/05/26 15:52:50 samuel>
  *   Time-stamp: <2004/02/21 16:18:11 samuel>
- *   
+ *
  *	<mtable.h>
- *	
+ *
  *	Keeps track of the PTEs
- *   
+ *
  *   Copyright (C) 2002, 2003, 2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 #ifndef _H_MTABLE
@@ -31,7 +31,7 @@ extern void		free_lvrange( kernel_vars_t *kv, pte_lvrange_t *pte_range );
 extern vsid_ent_t	*vsid_get_user_sv( kernel_vars_t *kv, int mac_vsid, ulong *user_sr, ulong *sv_sr );
 
 extern int 		mtable_memory_check( kernel_vars_t *kv );
-extern void		pte_inserted( kernel_vars_t *kv, ulong ea, char *lvptr, 
+extern void		pte_inserted( kernel_vars_t *kv, ulong ea, char *lvptr,
 				      pte_lvrange_t *lvrange, ulong *pte, vsid_ent_t *r,
 				      int segreg );
 

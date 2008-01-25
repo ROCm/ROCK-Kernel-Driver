@@ -1,19 +1,19 @@
-/* 
+/*
  *   Creation Date: <1999/03/18 03:19:43 samuel>
  *   Time-stamp: <2003/12/26 16:58:19 samuel>
- *   
+ *
  *	<os_interface.h>
- *	
+ *
  *	This file includes definitions for drivers
  *	running in the "emulated" OS. (Mainly the 'sc'
  *	mechanism of communicating)
- *   
+ *
  *   Copyright (C) 1999, 2000, 2001, 2002, 2003 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 #ifndef _H_OSI

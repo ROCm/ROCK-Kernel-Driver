@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <2001/01/26 21:33:45 samuel>
  *   Time-stamp: <2004/02/08 20:08:20 samuel>
- *   
+ *
  *	<return_vectors.h>
- *	
+ *
  *	Possible mac-return vectors (see mainloop.S)
- *   
+ *
  *   Copyright (C) 2000, 2001, 2002, 2003, 2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation
- *   
+ *
  */
 
 #ifndef _H_RVEC

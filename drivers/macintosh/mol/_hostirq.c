@@ -1,14 +1,14 @@
-/* 
+/*
  *	<hostirq.c>
- *	
+ *
  *	host IRQ handling (for pciproxied devices)
- *   
+ *
  *   Copyright (C) 2005 Mattias Nissler <mattias.nissler@gmx.de>
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   version 2
- *   
+ *
  */
 #include <linux/version.h>
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2, 5, 0)
@@ -50,7 +50,7 @@ hostirq_handler(int irq, void *pkv, struct pt_regs *regs)
 		si.si_code = irq;
 		send_sig_info(SIGHUP, &si, kv->main_thread);
 	}
-	
+
 	return IRQ_HANDLED;
 }
 

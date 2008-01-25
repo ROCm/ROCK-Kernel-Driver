@@ -1,17 +1,17 @@
-/* 
+/*
  *   Creation Date: <2003/08/20 17:31:44 samuel>
  *   Time-stamp: <2004/02/14 14:43:13 samuel>
- *   
+ *
  *	<dev.c>
- *	
+ *
  *	misc device
- *   
+ *
  *   Copyright (C) 2003, 2004 Samuel Rydh (samuel@ibrium.se)
- *   
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   version 2
- *   
+ *
  */
 
 #include "archinclude.h"
@@ -44,7 +44,7 @@ static int opencnt;
 /************************************************************************/
 /*	misc								*/
 /************************************************************************/
-		
+
 #ifdef CONFIG_SMP
 #define HAS_SMP		1
 
@@ -73,7 +73,7 @@ find_physical_rom( int *base, int *size )
 	struct device_node *dn;
 	int len, *p;
 	int by_type = 0;
-	
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,21)
 	if( !(dn=find_devices("boot-rom")) && !(dn=find_type_devices("rom")) )
 		return 0;
@@ -98,7 +98,7 @@ find_physical_rom( int *base, int *size )
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,21)
 		dn = dn->next;
 #else
-		dn = by_type ? of_find_node_by_type(dn, "rom") : 
+		dn = by_type ? of_find_node_by_type(dn, "rom") :
 			of_find_node_by_name(dn, "boot-rom");
 #endif	/* < Linux 2.6.21 */
 	} while( dn );
@@ -107,7 +107,7 @@ find_physical_rom( int *base, int *size )
 }
 
 static int
-get_info( mol_kmod_info_t *user_retinfo, int size ) 
+get_info( mol_kmod_info_t *user_retinfo, int size )
 {
 	mol_kmod_info_t info;
 
@@ -120,7 +120,7 @@ get_info( mol_kmod_info_t *user_retinfo, int size )
 
 	if( (uint)size > sizeof(info) )
 		size = sizeof(info);
-	
+
 	if( copy_to_user(user_retinfo, &info, size) )
 		return -EFAULT;
 	return 0;
@@ -212,7 +212,7 @@ arch_handle_ioctl( kernel_vars_t *kv, int cmd, int p1, int p2, int p3 )
 	case MOL_IOCTL_DEBUGGER_OP:
 		ret = debugger_op( kv, (dbg_op_params_t*)p1 );
 		break;
-		
+
 	case MOL_IOCTL_GRAB_IRQ:
 		ret = grab_host_irq(kv, p1);
 		break;
@@ -261,7 +261,7 @@ mol_open( struct inode *inode, struct file *file )
 
 	if( !(file->f_mode & FMODE_READ) )
 		return -EPERM;
-	
+
 	down( &initmutex );
 	if( !opencnt++ ) {
 		if( common_init() ) {
@@ -279,7 +279,7 @@ static int
 mol_release( struct inode *inode, struct file *file )
 {
 	kernel_vars_t *kv = (kernel_vars_t*)file->private_data;
-	
+
 	down( &initmutex );
 	if( kv )
 		destroy_session( kv->session_index );
@@ -297,7 +297,7 @@ mol_ioctl( struct inode *inode, struct file *file, unsigned int cmd, unsigned lo
 	kernel_vars_t *kv;
 	int ret;
 	uint session;
-	
+
 	/* fast path */
 	if( cmd == MOL_IOCTL_SMP_SEND_IPI ) {
 		send_ipi();
