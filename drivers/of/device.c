@@ -77,7 +77,7 @@ void of_dev_put(struct of_device *dev)
 }
 EXPORT_SYMBOL(of_dev_put);
 
-static ssize_t dev_show_devspec(struct device *dev,
+static ssize_t devspec_show(struct device *dev,
 				struct device_attribute *attr, char *buf)
 {
 	struct of_device *ofdev;
@@ -86,20 +86,23 @@ static ssize_t dev_show_devspec(struct device *dev,
 	return sprintf(buf, "%s", ofdev->node->full_name);
 }
 
-static ssize_t dev_show_modalias(struct device *dev,
+static ssize_t modalias_show(struct device *dev,
 				struct device_attribute *attr, char *buf)
 {
 	struct of_device *ofdev = to_of_device(dev);
 	ssize_t len = 0;
 
-	len = of_device_get_modalias(ofdev, buf, PAGE_SIZE);
+	len = of_device_get_modalias(ofdev, buf, PAGE_SIZE - 2);
 	buf[len] = '\n';
 	buf[len+1] = 0;
 	return len+1;
 }
 
-static DEVICE_ATTR(devspec, S_IRUGO, dev_show_devspec, NULL);
-static DEVICE_ATTR(modalias, S_IRUGO, dev_show_modalias, NULL);
+struct device_attribute of_platform_device_attrs[] = {
+	__ATTR_RO(devspec),
+	__ATTR_RO(modalias),
+	__ATTR_NULL
+};
 
 /**
  * of_release_dev - free an of device structure when all users of it are finished.
@@ -120,31 +123,13 @@ EXPORT_SYMBOL(of_release_dev);
 
 int of_device_register(struct of_device *ofdev)
 {
-	int rc;
-
 	BUG_ON(ofdev->node == NULL);
-
-	rc = device_register(&ofdev->dev);
-	if (rc)
-		return rc;
-
-	rc = device_create_file(&ofdev->dev, &dev_attr_devspec);
-	if (rc) {
-		device_unregister(&ofdev->dev);
-		return rc;
-	}
-	rc = device_create_file(&ofdev->dev, &dev_attr_modalias);
-	if (rc)
-		device_unregister(&ofdev->dev);
-
-	return rc;
+	return device_register(&ofdev->dev);
 }
 EXPORT_SYMBOL(of_device_register);
 
 void of_device_unregister(struct of_device *ofdev)
 {
-	device_remove_file(&ofdev->dev, &dev_attr_devspec);
-	device_remove_file(&ofdev->dev, &dev_attr_modalias);
 	device_unregister(&ofdev->dev);
 }
 EXPORT_SYMBOL(of_device_unregister);
