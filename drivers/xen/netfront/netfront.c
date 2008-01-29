@@ -475,7 +475,7 @@ static int setup_device(struct xenbus_device *dev, struct netfront_info *info)
 	info->tx.sring = NULL;
 	info->irq = 0;
 
-	txs = (struct netif_tx_sring *)get_zeroed_page(GFP_KERNEL);
+	txs = (struct netif_tx_sring *)get_zeroed_page(GFP_KERNEL|__GFP_HIGH);
 	if (!txs) {
 		err = -ENOMEM;
 		xenbus_dev_fatal(dev, err, "allocating tx ring page");
@@ -491,7 +491,7 @@ static int setup_device(struct xenbus_device *dev, struct netfront_info *info)
 	}
 	info->tx_ring_ref = err;
 
-	rxs = (struct netif_rx_sring *)get_zeroed_page(GFP_KERNEL);
+	rxs = (struct netif_rx_sring *)get_zeroed_page(GFP_KERNEL|__GFP_HIGH);
 	if (!rxs) {
 		err = -ENOMEM;
 		xenbus_dev_fatal(dev, err, "allocating rx ring page");
@@ -840,11 +840,14 @@ no_skb:
 
 			/* Zap PTEs and give away pages in one big
 			 * multicall. */
-			(void)HYPERVISOR_multicall(np->rx_mcl, i+1);
+			if (unlikely(HYPERVISOR_multicall(np->rx_mcl, i+1)))
+				BUG();
 
 			/* Check return status of HYPERVISOR_memory_op(). */
 			if (unlikely(np->rx_mcl[i].result != i))
 				panic("Unable to reduce memory reservation\n");
+			while (i--)
+				BUG_ON(np->rx_mcl[i].result);
 		} else {
 			if (HYPERVISOR_memory_op(XENMEM_decrease_reservation,
 						 &reservation) != i)
@@ -1446,8 +1449,10 @@ err:
 			mcl->args[1] = pages_flipped;
 			mcl->args[2] = 0;
 			mcl->args[3] = DOMID_SELF;
-			(void)HYPERVISOR_multicall(np->rx_mcl,
-						   pages_flipped + 1);
+			err = HYPERVISOR_multicall_check(np->rx_mcl,
+							 pages_flipped + 1,
+							 NULL);
+			BUG_ON(err);
 		}
 	}
 

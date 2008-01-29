@@ -60,8 +60,8 @@ EXPORT_SYMBOL(machine_power_off);
 static void pre_suspend(void)
 {
 	HYPERVISOR_shared_info = (shared_info_t *)empty_zero_page;
-	HYPERVISOR_update_va_mapping(fix_to_virt(FIX_SHARED_INFO),
-				     __pte_ma(0), 0);
+	WARN_ON(HYPERVISOR_update_va_mapping(fix_to_virt(FIX_SHARED_INFO),
+					     __pte_ma(0), 0));
 
 	xen_start_info->store_mfn = mfn_to_pfn(xen_start_info->store_mfn);
 	xen_start_info->console.domU.mfn =
@@ -88,8 +88,10 @@ static void post_suspend(int suspend_cancelled)
 	}
 
 	shinfo_mfn = xen_start_info->shared_info >> PAGE_SHIFT;
-	HYPERVISOR_update_va_mapping(fix_to_virt(FIX_SHARED_INFO),
-				     pfn_pte_ma(shinfo_mfn, PAGE_KERNEL), 0);
+	if (HYPERVISOR_update_va_mapping(fix_to_virt(FIX_SHARED_INFO),
+					 pfn_pte_ma(shinfo_mfn, PAGE_KERNEL),
+					 0))
+		BUG();
 	HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
 
 	memset(empty_zero_page, 0, PAGE_SIZE);

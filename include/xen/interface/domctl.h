@@ -37,7 +37,7 @@
 #define XEN_DOMCTL_INTERFACE_VERSION 0x00000005
 
 struct xenctl_cpumap {
-    XEN_GUEST_HANDLE_64(uint8_t) bitmap;
+    XEN_GUEST_HANDLE_64(uint8) bitmap;
     uint32_t nr_cpus;
 };
 
@@ -115,7 +115,7 @@ struct xen_domctl_getmemlist {
     uint64_aligned_t max_pfns;
     /* Start index in guest's page list. */
     uint64_aligned_t start_pfn;
-    XEN_GUEST_HANDLE_64(uint64_t) buffer;
+    XEN_GUEST_HANDLE_64(uint64) buffer;
     /* OUT variables. */
     uint64_aligned_t num_pfns;
 };
@@ -152,7 +152,7 @@ struct xen_domctl_getpageframeinfo2 {
     /* IN variables. */
     uint64_aligned_t num;
     /* IN/OUT variables. */
-    XEN_GUEST_HANDLE_64(uint32_t) array;
+    XEN_GUEST_HANDLE_64(uint32) array;
 };
 typedef struct xen_domctl_getpageframeinfo2 xen_domctl_getpageframeinfo2_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_getpageframeinfo2_t);
@@ -226,7 +226,7 @@ struct xen_domctl_shadow_op {
     uint32_t       mb;       /* Shadow memory allocation in MB */
 
     /* OP_PEEK / OP_CLEAN */
-    XEN_GUEST_HANDLE_64(uint8_t) dirty_bitmap;
+    XEN_GUEST_HANDLE_64(uint8) dirty_bitmap;
     uint64_aligned_t pages; /* Size of buffer. Updated with actual size. */
     struct xen_domctl_shadow_op_stats stats;
 };
@@ -398,10 +398,9 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_settimeoffset_t);
 #define XEN_DOMCTL_sethvmcontext     34
 typedef struct xen_domctl_hvmcontext {
     uint32_t size; /* IN/OUT: size of buffer / bytes filled */
-    XEN_GUEST_HANDLE_64(uint8_t) buffer; /* IN/OUT: data, or call
-                                          * gethvmcontext with NULL
-                                          * buffer to get size
-                                          * req'd */
+    XEN_GUEST_HANDLE_64(uint8) buffer; /* IN/OUT: data, or call
+                                        * gethvmcontext with NULL
+                                        * buffer to get size req'd */
 } xen_domctl_hvmcontext_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_hvmcontext_t);
 
@@ -435,9 +434,8 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_sendtrigger_t);
 
 
 /* Assign PCI device to HVM guest. Sets up IOMMU structures. */
-#define XEN_DOMCTL_assign_device     37
-#define DPCI_ADD_MAPPING         1
-#define DPCI_REMOVE_MAPPING      0 
+#define XEN_DOMCTL_assign_device      37
+#define XEN_DOMCTL_test_assign_device 45
 struct xen_domctl_assign_device {
     uint32_t  machine_bdf;   /* machine PCI ID of assigned device */
 };
@@ -473,6 +471,8 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_bind_pt_irq_t);
 
 /* Bind machine I/O address range -> HVM address range. */
 #define XEN_DOMCTL_memory_mapping    39
+#define DPCI_ADD_MAPPING         1
+#define DPCI_REMOVE_MAPPING      0
 struct xen_domctl_memory_mapping {
     uint64_aligned_t first_gfn; /* first page (hvm guest phys page) in range */
     uint64_aligned_t first_mfn; /* first page (machine page) in range */
@@ -544,8 +544,11 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_ext_vcpucontext_t);
  */
 #define XEN_DOMCTL_set_opt_feature    44
 struct xen_domctl_set_opt_feature {
-#ifdef __ia64__
+#if defined(__ia64__)
     struct xen_ia64_opt_feature optf;
+#else
+    /* Make struct non-empty: do not depend on this field name! */
+    uint64_t dummy;
 #endif
 };
 typedef struct xen_domctl_set_opt_feature xen_domctl_set_opt_feature_t;

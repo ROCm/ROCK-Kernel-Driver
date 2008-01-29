@@ -81,7 +81,8 @@ asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int turn_on)
 
 		set_xen_guest_handle(set_iobitmap.bitmap, (char *)bitmap);
 		set_iobitmap.nr_ports = IO_BITMAP_BITS;
-		HYPERVISOR_physdev_op(PHYSDEVOP_set_iobitmap, &set_iobitmap);
+		WARN_ON(HYPERVISOR_physdev_op(PHYSDEVOP_set_iobitmap,
+					      &set_iobitmap));
 	}
 
 	set_bitmap(t->io_bitmap_ptr, from, num, !turn_on);

@@ -96,7 +96,7 @@ void xen_l4_entry_update(pgd_t *ptr, pgd_t val); /* x86_64 only */
 void xen_pgd_pin(unsigned long ptr);
 void xen_pgd_unpin(unsigned long ptr);
 
-void xen_set_ldt(unsigned long ptr, unsigned long bytes);
+void xen_set_ldt(const void *ptr, unsigned int ents);
 
 #ifdef CONFIG_SMP
 #include <linux/cpumask.h>
@@ -166,7 +166,7 @@ HYPERVISOR_block(
 	return rc;
 }
 
-static inline int
+static inline void __noreturn
 HYPERVISOR_shutdown(
 	unsigned int reason)
 {
@@ -174,17 +174,16 @@ HYPERVISOR_shutdown(
 		.reason = reason
 	};
 
-	int rc = HYPERVISOR_sched_op(SCHEDOP_shutdown, &sched_shutdown);
-
+	VOID(HYPERVISOR_sched_op(SCHEDOP_shutdown, &sched_shutdown));
 #if CONFIG_XEN_COMPAT <= 0x030002
-	if (rc == -ENOSYS)
-		rc = HYPERVISOR_sched_op_compat(SCHEDOP_shutdown, reason);
+	VOID(HYPERVISOR_sched_op_compat(SCHEDOP_shutdown, reason));
 #endif
-
-	return rc;
+	/* Don't recurse needlessly. */
+	BUG_ON(reason != SHUTDOWN_crash);
+	for(;;);
 }
 
-static inline int
+static inline int __must_check
 HYPERVISOR_poll(
 	evtchn_port_t *ports, unsigned int nr_ports, u64 timeout)
 {

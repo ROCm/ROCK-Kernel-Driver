@@ -127,6 +127,7 @@ int tpmif_map(tpmif_t *tpmif, unsigned long shared_page, unsigned int evtchn)
 	}
 
 	tpmif->tx = (tpmif_tx_interface_t *)tpmif->tx_area->addr;
+	memset(tpmif->tx, 0, PAGE_SIZE);
 
 	err = bind_interdomain_evtchn_to_irqhandler(
 		tpmif->domid, evtchn, tpmif_be_int, 0, tpmif->devname, tpmif);

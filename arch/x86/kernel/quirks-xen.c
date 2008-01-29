@@ -29,11 +29,12 @@ static void __devinit quirk_intel_irqbalance(struct pci_dev *dev)
 
 	if (!(word & (1 << 13))) {
 		struct xen_platform_op op;
+
 		printk(KERN_INFO "Intel E7520/7320/7525 detected. "
 			"Disabling irq balancing and affinity\n");
 		op.cmd = XENPF_platform_quirk;
 		op.u.platform_quirk.quirk_id = QUIRK_NOIRQBALANCING;
-		(void)HYPERVISOR_platform_op(&op);
+		WARN_ON(HYPERVISOR_platform_op(&op));
 	}
 
 	/* put back the original value for config space*/

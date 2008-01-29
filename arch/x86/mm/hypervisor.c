@@ -182,12 +182,12 @@ void xen_pgd_unpin(unsigned long ptr)
 	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
 
-void xen_set_ldt(unsigned long ptr, unsigned long len)
+void xen_set_ldt(const void *ptr, unsigned int ents)
 {
 	struct mmuext_op op;
 	op.cmd = MMUEXT_SET_LDT;
-	op.arg1.linear_addr = ptr;
-	op.arg2.nr_ents     = len;
+	op.arg1.linear_addr = (unsigned long)ptr;
+	op.arg2.nr_ents     = ents;
 	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
 
@@ -250,9 +250,9 @@ int xen_create_contiguous_region(
 	unsigned long vstart, unsigned int order, unsigned int address_bits)
 {
 	unsigned long *in_frames = discontig_frames, out_frame;
-	unsigned long  frame, i, flags;
-	long           rc;
-	int            success;
+	unsigned long  frame, flags;
+	unsigned int   i;
+	int            rc, success;
 	struct xen_memory_exchange exchange = {
 		.in = {
 			.nr_extents   = 1UL << order,
@@ -286,7 +286,7 @@ int xen_create_contiguous_region(
 	balloon_lock(flags);
 
 	/* 1. Zap current PTEs, remembering MFNs. */
-	for (i = 0; i < (1UL<<order); i++) {
+	for (i = 0; i < (1U<<order); i++) {
 		in_frames[i] = pfn_to_mfn((__pa(vstart) >> PAGE_SHIFT) + i);
 		MULTI_update_va_mapping(cr_mcl + i, vstart + (i*PAGE_SIZE),
 					__pte_ma(0), 0);
@@ -312,7 +312,7 @@ int xen_create_contiguous_region(
 						&exchange.out) == 1);
 		if (!success) {
 			/* Couldn't get special memory: fall back to normal. */
-			for (i = 0; i < (1UL<<order); i++)
+			for (i = 0; i < (1U<<order); i++)
 				in_frames[i] = (__pa(vstart)>>PAGE_SHIFT) + i;
 			if (HYPERVISOR_memory_op(XENMEM_populate_physmap,
 						 &exchange.in) != (1UL<<order))
@@ -322,7 +322,7 @@ int xen_create_contiguous_region(
 #endif
 
 	/* 3. Map the new extent in place of old pages. */
-	for (i = 0; i < (1UL<<order); i++) {
+	for (i = 0; i < (1U<<order); i++) {
 		frame = success ? (out_frame + i) : in_frames[i];
 		MULTI_update_va_mapping(cr_mcl + i, vstart + (i*PAGE_SIZE),
 					pfn_pte_ma(frame, PAGE_KERNEL), 0);
@@ -348,9 +348,9 @@ EXPORT_SYMBOL_GPL(xen_create_contiguous_region);
 void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 {
 	unsigned long *out_frames = discontig_frames, in_frame;
-	unsigned long  frame, i, flags;
-	long           rc;
-	int            success;
+	unsigned long  frame, flags;
+	unsigned int   i;
+	int            rc, success;
 	struct xen_memory_exchange exchange = {
 		.in = {
 			.nr_extents   = 1,
@@ -384,7 +384,7 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 	in_frame = pfn_to_mfn(__pa(vstart) >> PAGE_SHIFT);
 
 	/* 2. Zap current PTEs. */
-	for (i = 0; i < (1UL<<order); i++) {
+	for (i = 0; i < (1U<<order); i++) {
 		MULTI_update_va_mapping(cr_mcl + i, vstart + (i*PAGE_SIZE),
 					__pte_ma(0), 0);
 		set_phys_to_machine((__pa(vstart)>>PAGE_SHIFT)+i,
@@ -413,7 +413,7 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 #endif
 
 	/* 4. Map new pages in place of old pages. */
-	for (i = 0; i < (1UL<<order); i++) {
+	for (i = 0; i < (1U<<order); i++) {
 		frame = success ? out_frames[i] : (in_frame + i);
 		MULTI_update_va_mapping(cr_mcl + i, vstart + (i*PAGE_SIZE),
 					pfn_pte_ma(frame, PAGE_KERNEL), 0);
@@ -433,7 +433,7 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 		exchange.in.extent_order = 0;
 		set_xen_guest_handle(exchange.in.extent_start, &in_frame);
 
-		for (i = 0; i < (1UL<<order); i++) {
+		for (i = 0; i < (1U<<order); i++) {
 			struct page *page = alloc_page(__GFP_HIGHMEM);
 			unsigned long pfn;
 			mmu_update_t mmu;
@@ -514,7 +514,8 @@ int xen_limit_pages_to_max_mfn(
 	unsigned long *in_frames = discontig_frames, *out_frames = limited_frames;
 	void *v;
 	struct page *page;
-	int i, nr_mcl, rc, success;
+	unsigned int i, nr_mcl;
+	int rc, success;
 
 	struct xen_memory_exchange exchange = {
 		.in = {
@@ -558,7 +559,7 @@ int xen_limit_pages_to_max_mfn(
 	balloon_lock(flags);
 
 	/* 1. Zap current PTEs (if any), remembering MFNs. */
-	for (i = 0, nr_mcl = 0; i < (1UL<<order); i++) {
+	for (i = 0, nr_mcl = 0; i < (1U<<order); i++) {
 		page = &pages[i];
 
 		out_frames[i] = page_to_pfn(page);
@@ -591,7 +592,7 @@ int xen_limit_pages_to_max_mfn(
 #endif
 
 	/* 3. Map the new pages in place of old pages. */
-	for (i = 0, nr_mcl = 0; i < (1UL<<order); i++) {
+	for (i = 0, nr_mcl = 0; i < (1U<<order); i++) {
 		unsigned long pfn;
 		page = &pages[i];
 		pfn = page_to_pfn(page);
@@ -626,3 +627,41 @@ int write_ldt_entry(void *ldt, int entry, __u32 entry_a, __u32 entry_b)
 		mach_lp, (u64)entry_a | ((u64)entry_b<<32));
 }
 #endif
+
+#define MAX_BATCHED_FULL_PTES 32
+
+int xen_change_pte_range(struct mm_struct *mm, pmd_t *pmd,
+			 unsigned long addr, unsigned long end, pgprot_t newprot,
+			 int dirty_accountable)
+{
+	int rc = 0, i = 0;
+	mmu_update_t u[MAX_BATCHED_FULL_PTES];
+	pte_t *pte;
+	spinlock_t *ptl;
+
+	if (!xen_feature(XENFEAT_mmu_pt_update_preserve_ad))
+		return 0;
+
+	pte = pte_offset_map_lock(mm, pmd, addr, &ptl);
+	do {
+		if (pte_present(*pte)) {
+			pte_t ptent = pte_modify(*pte, newprot);
+
+			if (dirty_accountable && pte_dirty(ptent))
+				ptent = pte_mkwrite(ptent);
+			u[i].ptr = virt_to_machine(pte) | MMU_PT_UPDATE_PRESERVE_AD;
+			u[i].val = __pte_val(ptent);
+			if (++i == MAX_BATCHED_FULL_PTES) {
+				if ((rc = HYPERVISOR_mmu_update(
+					&u[0], i, NULL, DOMID_SELF)) != 0)
+					break;
+				i = 0;
+			}
+		}
+	} while (pte++, addr += PAGE_SIZE, addr != end);
+	if (i)
+		rc = HYPERVISOR_mmu_update( &u[0], i, NULL, DOMID_SELF);
+	pte_unmap_unlock(pte - 1, ptl);
+	BUG_ON(rc && rc != -ENOSYS);
+	return !rc;
+}

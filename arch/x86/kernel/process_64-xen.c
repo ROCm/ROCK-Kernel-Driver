@@ -145,7 +145,7 @@ static inline void play_dead(void)
 	local_irq_disable();
 	cpu_clear(smp_processor_id(), cpu_initialized);
 	preempt_enable_no_resched();
-	HYPERVISOR_vcpu_op(VCPUOP_down, smp_processor_id(), NULL);
+	VOID(HYPERVISOR_vcpu_op(VCPUOP_down, smp_processor_id(), NULL));
 	cpu_bringup();
 }
 #else
@@ -199,6 +199,10 @@ void cpu_idle (void)
 	}
 }
 
+static void do_nothing(void *unused)
+{
+}
+
 void cpu_idle_wait(void)
 {
 	unsigned int cpu, this_cpu = get_cpu();
@@ -224,6 +228,13 @@ void cpu_idle_wait(void)
 				cpu_clear(cpu, map);
 		}
 		cpus_and(map, map, cpu_online_map);
+		/*
+		 * We waited 1 sec, if a CPU still did not call idle
+		 * it may be because it is in idle and not waking up
+		 * because it has nothing to do.
+		 * Give all the remaining CPUS a kick.
+		 */
+		smp_call_function_mask(map, do_nothing, 0, 0);
 	} while (!cpus_empty(map));
 
 	set_cpus_allowed(current, tmp);
@@ -338,7 +349,8 @@ void exit_thread(void)
 		put_cpu();
 #endif
 #ifdef CONFIG_XEN
-		HYPERVISOR_physdev_op(PHYSDEVOP_set_iobitmap, &iobmp_op);
+		WARN_ON(HYPERVISOR_physdev_op(PHYSDEVOP_set_iobitmap,
+					      &iobmp_op));
 #endif
 		t->io_bitmap_max = 0;
 	}
@@ -346,7 +358,7 @@ void exit_thread(void)
 
 void load_gs_index(unsigned gs)
 {
-	HYPERVISOR_set_segment_base(SEGBASE_GS_USER_SEL, gs);
+	WARN_ON(HYPERVISOR_set_segment_base(SEGBASE_GS_USER_SEL, gs));
 }
 
 void flush_thread(void)
@@ -597,7 +609,10 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 		mcl++;
 	}
 
-	(void)HYPERVISOR_multicall(_mcl, mcl - _mcl);
+	BUG_ON(mcl > _mcl + ARRAY_SIZE(_mcl));
+	if (unlikely(HYPERVISOR_multicall_check(_mcl, mcl - _mcl, NULL)))
+		BUG();
+
 	/* 
 	 * Switch DS and ES.
 	 * This won't pick up thread selector changes, but I guess that is ok.
@@ -615,13 +630,13 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 		loadsegment(fs, next->fsindex);
 
 	if (next->fs)
-		HYPERVISOR_set_segment_base(SEGBASE_FS, next->fs); 
+		WARN_ON(HYPERVISOR_set_segment_base(SEGBASE_FS, next->fs));
 	
 	if (unlikely(next->gsindex))
 		load_gs_index(next->gsindex);
 
 	if (next->gs)
-		HYPERVISOR_set_segment_base(SEGBASE_GS_USER, next->gs); 
+		WARN_ON(HYPERVISOR_set_segment_base(SEGBASE_GS_USER, next->gs));
 
 	/* 
 	 * Switch the PDA context.

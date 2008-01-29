@@ -641,7 +641,8 @@ static void __init extend_init_mapping(unsigned long tables_space)
 
 	/* Kill mapping of low 1MB. */
 	while (va < (unsigned long)&_text) {
-		HYPERVISOR_update_va_mapping(va, __pte_ma(0), 0);
+		if (HYPERVISOR_update_va_mapping(va, __pte_ma(0), 0))
+			BUG();
 		va += PAGE_SIZE;
 	}
 
@@ -674,7 +675,8 @@ static void __init extend_init_mapping(unsigned long tables_space)
 		pmd = (pmd_t *)&page[pmd_index(va)];
 		if (pmd_none(*pmd))
 			break;
-		HYPERVISOR_update_va_mapping(va, __pte_ma(0), 0);
+		if (HYPERVISOR_update_va_mapping(va, __pte_ma(0), 0))
+			BUG();
 		va += PAGE_SIZE;
 	}
 }
@@ -727,8 +729,8 @@ static void __init xen_finish_init_mapping(void)
 	start = PAGE_ALIGN((unsigned long)_end);
 	end   = __START_KERNEL_map + (table_end << PAGE_SHIFT);
 	for (; start < end; start += PAGE_SIZE)
-		WARN_ON(HYPERVISOR_update_va_mapping(
-			start, __pte_ma(0), 0));
+		if (HYPERVISOR_update_va_mapping(start, __pte_ma(0), 0))
+			BUG();
 
 	/* Allocate pte's for initial fixmaps from 'start_pfn' allocator. */
 	table_end = ~0UL;

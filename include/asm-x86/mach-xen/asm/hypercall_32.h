@@ -40,16 +40,13 @@
 # error "please don't include this file directly"
 #endif
 
-#define __STR(x) #x
-#define STR(x) __STR(x)
-
 #ifdef CONFIG_XEN
 #define HYPERCALL_STR(name)					\
-	"call hypercall_page + ("STR(__HYPERVISOR_##name)" * 32)"
+	"call hypercall_page + ("__stringify(__HYPERVISOR_##name)" * 32)"
 #else
 #define HYPERCALL_STR(name)					\
-	"mov "__stringify(hypercall_stubs)",%%eax; "		\
-	"add $("STR(__HYPERVISOR_##name)" * 32),%%eax; "	\
+	"mov hypercall_stubs,%%eax; "				\
+	"add $("__stringify(__HYPERVISOR_##name)" * 32),%%eax; "\
 	"call *%%eax"
 #endif
 
@@ -126,42 +123,44 @@
 	(type)__res;						\
 })
 
-static inline int
+static inline int __must_check
 HYPERVISOR_set_trap_table(
-	trap_info_t *table)
+	const trap_info_t *table)
 {
 	return _hypercall1(int, set_trap_table, table);
 }
 
-static inline int
+static inline int __must_check
 HYPERVISOR_mmu_update(
-	mmu_update_t *req, int count, int *success_count, domid_t domid)
+	mmu_update_t *req, unsigned int count, unsigned int *success_count,
+	domid_t domid)
 {
 	return _hypercall4(int, mmu_update, req, count, success_count, domid);
 }
 
-static inline int
+static inline int __must_check
 HYPERVISOR_mmuext_op(
-	struct mmuext_op *op, int count, int *success_count, domid_t domid)
+	struct mmuext_op *op, unsigned int count, unsigned int *success_count,
+	domid_t domid)
 {
 	return _hypercall4(int, mmuext_op, op, count, success_count, domid);
 }
 
-static inline int
+static inline int __must_check
 HYPERVISOR_set_gdt(
-	unsigned long *frame_list, int entries)
+	unsigned long *frame_list, unsigned int entries)
 {
 	return _hypercall2(int, set_gdt, frame_list, entries);
 }
 
-static inline int
+static inline int __must_check
 HYPERVISOR_stack_switch(
 	unsigned long ss, unsigned long esp)
 {
 	return _hypercall2(int, stack_switch, ss, esp);
 }
 
-static inline int
+static inline int __must_check
 HYPERVISOR_set_callbacks(
 	unsigned long event_selector, unsigned long event_address,
 	unsigned long failsafe_selector, unsigned long failsafe_address)
@@ -178,21 +177,21 @@ HYPERVISOR_fpu_taskswitch(
 	return _hypercall1(int, fpu_taskswitch, set);
 }
 
-static inline int
+static inline int __must_check
 HYPERVISOR_sched_op_compat(
 	int cmd, unsigned long arg)
 {
 	return _hypercall2(int, sched_op_compat, cmd, arg);
 }
 
-static inline int
+static inline int __must_check
 HYPERVISOR_sched_op(
 	int cmd, void *arg)
 {
 	return _hypercall2(int, sched_op, cmd, arg);
 }
 
-static inline long
+static inline long __must_check
 HYPERVISOR_set_timer_op(
 	u64 timeout)
 {
@@ -201,7 +200,7 @@ HYPERVISOR_set_timer_op(
 	return _hypercall2(long, set_timer_op, timeout_lo, timeout_hi);
 }
 
-static inline int
+static inline int __must_check
 HYPERVISOR_platform_op(
 	struct xen_platform_op *platform_op)
 {
@@ -209,42 +208,42 @@ HYPERVISOR_platform_op(
 	return _hypercall1(int, platform_op, platform_op);
 }
 
-static inline int
+static inline int __must_check
 HYPERVISOR_set_debugreg(
-	int reg, unsigned long value)
+	unsigned int reg, unsigned long value)
 {
 	return _hypercall2(int, set_debugreg, reg, value);
 }
 
-static inline unsigned long
+static inline unsigned long __must_check
 HYPERVISOR_get_debugreg(
-	int reg)
+	unsigned int reg)
 {
 	return _hypercall1(unsigned long, get_debugreg, reg);
 }
 
-static inline int
+static inline int __must_check
 HYPERVISOR_update_descriptor(
 	u64 ma, u64 desc)
 {
 	return _hypercall4(int, update_descriptor, ma, ma>>32, desc, desc>>32);
 }
 
-static inline int
+static inline int __must_check
 HYPERVISOR_memory_op(
 	unsigned int cmd, void *arg)
 {
 	return _hypercall2(int, memory_op, cmd, arg);
 }
 
-static inline int
+static inline int __must_check
 HYPERVISOR_multicall(
-	multicall_entry_t *call_list, int nr_calls)
+	multicall_entry_t *call_list, unsigned int nr_calls)
 {
 	return _hypercall2(int, multicall, call_list, nr_calls);
 }
 
-static inline int
+static inline int __must_check
 HYPERVISOR_update_va_mapping(
 	unsigned long va, pte_t new_val, unsigned long flags)
 {
@@ -256,7 +255,7 @@ HYPERVISOR_update_va_mapping(
 			   new_val.pte_low, pte_hi, flags);
 }
 
-static inline int
+static inline int __must_check
 HYPERVISOR_event_channel_op(
 	int cmd, void *arg)
 {
@@ -275,28 +274,28 @@ HYPERVISOR_event_channel_op(
 	return rc;
 }
 
-static inline int
+static inline int __must_check
 HYPERVISOR_acm_op(
 	int cmd, void *arg)
 {
 	return _hypercall2(int, acm_op, cmd, arg);
 }
 
-static inline int
+static inline int __must_check
 HYPERVISOR_xen_version(
 	int cmd, void *arg)
 {
 	return _hypercall2(int, xen_version, cmd, arg);
 }
 
-static inline int
+static inline int __must_check
 HYPERVISOR_console_io(
-	int cmd, int count, char *str)
+	int cmd, unsigned int count, char *str)
 {
 	return _hypercall3(int, console_io, cmd, count, str);
 }
 
-static inline int
+static inline int __must_check
 HYPERVISOR_physdev_op(
 	int cmd, void *arg)
 {
@@ -315,14 +314,14 @@ HYPERVISOR_physdev_op(
 	return rc;
 }
 
-static inline int
+static inline int __must_check
 HYPERVISOR_grant_table_op(
 	unsigned int cmd, void *uop, unsigned int count)
 {
 	return _hypercall3(int, grant_table_op, cmd, uop, count);
 }
 
-static inline int
+static inline int __must_check
 HYPERVISOR_update_va_mapping_otherdomain(
 	unsigned long va, pte_t new_val, unsigned long flags, domid_t domid)
 {
@@ -334,21 +333,21 @@ HYPERVISOR_update_va_mapping_otherdomain(
 			   new_val.pte_low, pte_hi, flags, domid);
 }
 
-static inline int
+static inline int __must_check
 HYPERVISOR_vm_assist(
 	unsigned int cmd, unsigned int type)
 {
 	return _hypercall2(int, vm_assist, cmd, type);
 }
 
-static inline int
+static inline int __must_check
 HYPERVISOR_vcpu_op(
-	int cmd, int vcpuid, void *extra_args)
+	int cmd, unsigned int vcpuid, void *extra_args)
 {
 	return _hypercall3(int, vcpu_op, cmd, vcpuid, extra_args);
 }
 
-static inline int
+static inline int __must_check
 HYPERVISOR_suspend(
 	unsigned long srec)
 {
@@ -368,35 +367,39 @@ HYPERVISOR_suspend(
 	return rc;
 }
 
+#if CONFIG_XEN_COMPAT <= 0x030002
 static inline int
 HYPERVISOR_nmi_op(
 	unsigned long op, void *arg)
 {
 	return _hypercall2(int, nmi_op, op, arg);
 }
+#endif
 
-static inline unsigned long
+#ifndef CONFIG_XEN
+static inline unsigned long __must_check
 HYPERVISOR_hvm_op(
     int op, void *arg)
 {
     return _hypercall2(unsigned long, hvm_op, op, arg);
 }
+#endif
 
-static inline int
+static inline int __must_check
 HYPERVISOR_callback_op(
-	int cmd, void *arg)
+	int cmd, const void *arg)
 {
 	return _hypercall2(int, callback_op, cmd, arg);
 }
 
-static inline int
+static inline int __must_check
 HYPERVISOR_xenoprof_op(
 	int op, void *arg)
 {
 	return _hypercall2(int, xenoprof_op, op, arg);
 }
 
-static inline int
+static inline int __must_check
 HYPERVISOR_kexec_op(
 	unsigned long op, void *args)
 {

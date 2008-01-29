@@ -346,8 +346,8 @@ void __init setup_arch(char **cmdline_p)
 
 	copy_edid();
 
-	HYPERVISOR_vm_assist(VMASST_CMD_enable,
-			     VMASST_TYPE_writable_pagetables);
+	WARN_ON(HYPERVISOR_vm_assist(VMASST_CMD_enable,
+				     VMASST_TYPE_writable_pagetables));
 
 	ARCH_SETUP
 #else
@@ -684,7 +684,7 @@ void __init setup_arch(char **cmdline_p)
 		struct physdev_set_iopl set_iopl;
 
 		set_iopl.iopl = 1;
-		HYPERVISOR_physdev_op(PHYSDEVOP_set_iopl, &set_iopl);
+		WARN_ON(HYPERVISOR_physdev_op(PHYSDEVOP_set_iopl, &set_iopl));
 
 		if (is_initial_xendomain()) {
 #ifdef CONFIG_VT

@@ -155,7 +155,7 @@ void xen_machine_kexec_unload(struct kimage *image)
 
 	memset(&xkl, 0, sizeof(xkl));
 	xkl.type = image->type;
-	HYPERVISOR_kexec_op(KEXEC_CMD_kexec_unload, &xkl);
+	WARN_ON(HYPERVISOR_kexec_op(KEXEC_CMD_kexec_unload, &xkl));
 }
 
 /*
@@ -172,7 +172,7 @@ NORET_TYPE void machine_kexec(struct kimage *image)
 
 	memset(&xke, 0, sizeof(xke));
 	xke.type = image->type;
-	HYPERVISOR_kexec_op(KEXEC_CMD_kexec, &xke);
+	VOID(HYPERVISOR_kexec_op(KEXEC_CMD_kexec, &xke));
 	panic("KEXEC_CMD_kexec hypercall should not return\n");
 }
 

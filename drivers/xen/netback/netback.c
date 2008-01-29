@@ -142,14 +142,16 @@ static int check_mfn(int nr)
 		.extent_order = 0,
 		.domid        = DOMID_SELF
 	};
+	int rc;
 
 	if (likely(alloc_index >= nr))
 		return 0;
 
 	set_xen_guest_handle(reservation.extent_start, mfn_list + alloc_index);
 	reservation.nr_extents = MAX_MFN_ALLOC - alloc_index;
-	alloc_index += HYPERVISOR_memory_op(XENMEM_increase_reservation,
-					    &reservation);
+	rc = HYPERVISOR_memory_op(XENMEM_increase_reservation, &reservation);
+	if (likely(rc > 0))
+		alloc_index += rc;
 
 	return alloc_index >= nr ? 0 : -ENOMEM;
 }
@@ -349,7 +351,7 @@ int xen_network_done(void)
 
 struct netrx_pending_operations {
 	unsigned trans_prod, trans_cons;
-	unsigned mmu_prod, mmu_cons;
+	unsigned mmu_prod, mmu_mcl;
 	unsigned mcl_prod, mcl_cons;
 	unsigned copy_prod, copy_cons;
 	unsigned meta_prod, meta_cons;
@@ -605,8 +607,12 @@ static void net_rx_action(unsigned long unused)
 			break;
 	}
 
-	if (npo.mcl_prod &&
-	    !xen_feature(XENFEAT_auto_translated_physmap)) {
+	BUG_ON(npo.meta_prod > ARRAY_SIZE(meta));
+
+	npo.mmu_mcl = npo.mcl_prod;
+	if (npo.mcl_prod) {
+		BUG_ON(!xen_feature(XENFEAT_auto_translated_physmap));
+		BUG_ON(npo.mmu_prod > ARRAY_SIZE(rx_mmu));
 		mcl = npo.mcl + npo.mcl_prod++;
 
 		BUG_ON(mcl[-1].op != __HYPERVISOR_update_va_mapping);
@@ -620,6 +626,7 @@ static void net_rx_action(unsigned long unused)
 	}
 
 	if (npo.trans_prod) {
+		BUG_ON(npo.trans_prod > ARRAY_SIZE(grant_trans_op));
 		mcl = npo.mcl + npo.mcl_prod++;
 		mcl->op = __HYPERVISOR_grant_table_op;
 		mcl->args[0] = GNTTABOP_transfer;
@@ -628,6 +635,7 @@ static void net_rx_action(unsigned long unused)
 	}
 
 	if (npo.copy_prod) {
+		BUG_ON(npo.copy_prod > ARRAY_SIZE(grant_copy_op));
 		mcl = npo.mcl + npo.mcl_prod++;
 		mcl->op = __HYPERVISOR_grant_table_op;
 		mcl->args[0] = GNTTABOP_copy;
@@ -639,14 +647,12 @@ static void net_rx_action(unsigned long unused)
 	if (!npo.mcl_prod)
 		return;
 
-	BUG_ON(npo.copy_prod > NET_RX_RING_SIZE);
-	BUG_ON(npo.mmu_prod > NET_RX_RING_SIZE);
-	BUG_ON(npo.trans_prod > NET_RX_RING_SIZE);
-	BUG_ON(npo.mcl_prod > NET_RX_RING_SIZE+3);
-	BUG_ON(npo.meta_prod > NET_RX_RING_SIZE);
+	BUG_ON(npo.mcl_prod > ARRAY_SIZE(rx_mcl));
 
 	ret = HYPERVISOR_multicall(npo.mcl, npo.mcl_prod);
 	BUG_ON(ret != 0);
+	/* The mmu_machphys_update() must not fail. */
+	BUG_ON(npo.mmu_mcl && npo.mcl[npo.mmu_mcl].result != 0);
 
 	while ((skb = __skb_dequeue(&rxq)) != NULL) {
 		nr_frags = *(int *)skb->cb;

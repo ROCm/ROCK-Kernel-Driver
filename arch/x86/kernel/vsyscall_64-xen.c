@@ -301,7 +301,10 @@ static void __cpuinit vsyscall_set_cpu(int cpu)
 	d |= cpu;
 	d |= (node & 0xf) << 12;
 	d |= (node >> 4) << 48;
-	HYPERVISOR_update_descriptor(virt_to_machine(&cpu_gdt(cpu)[GDT_ENTRY_PER_CPU]), d);
+	if (HYPERVISOR_update_descriptor(virt_to_machine(cpu_gdt(cpu)
+							 + GDT_ENTRY_PER_CPU),
+					 d))
+		BUG();
 }
 
 static void __cpuinit cpu_vsyscall_init(void *arg)

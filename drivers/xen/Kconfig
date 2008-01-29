@@ -6,9 +6,6 @@ mainmenu "Xen Configuration"
 
 config XEN
 	bool
-	default y if X86_XEN || X86_64_XEN
-	help
-	  This is the Linux Xen port.
 
 if XEN
 config XEN_INTERFACE_VERSION
@@ -19,7 +16,6 @@ menu "XEN"
 
 config XEN_PRIVILEGED_GUEST
 	bool "Privileged Guest (domain 0)"
-	default n
 	help
 	  Support for privileged operation (domain 0)
 

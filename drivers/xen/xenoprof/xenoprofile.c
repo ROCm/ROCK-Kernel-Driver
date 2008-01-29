@@ -198,11 +198,9 @@ static irqreturn_t
 xenoprof_ovf_interrupt(int irq, void * dev_id)
 {
 	struct xenoprof_buf * buf;
-	int cpu;
 	static unsigned long flag;
 
-	cpu = smp_processor_id();
-	buf = xenoprof_buf[cpu];
+	buf = xenoprof_buf[smp_processor_id()];
 
 	xenoprof_add_pc(buf, 0);
 
@@ -218,7 +216,7 @@ xenoprof_ovf_interrupt(int irq, void * dev_id)
 
 static void unbind_virq(void)
 {
-	int i;
+	unsigned int i;
 
 	for_each_online_cpu(i) {
 		if (ovf_irq[i] >= 0) {
@@ -231,7 +229,8 @@ static void unbind_virq(void)
 
 static int bind_virq(void)
 {
-	int i, result;
+	unsigned int i;
+	int result;
 
 	for_each_online_cpu(i) {
 		result = bind_virq_to_irqhandler(VIRQ_XENOPROF,
@@ -347,10 +346,11 @@ static void xenoprof_shutdown(void)
 {
 	xenoprof_enabled = 0;
 
-	HYPERVISOR_xenoprof_op(XENOPROF_disable_virq, NULL);
+	WARN_ON(HYPERVISOR_xenoprof_op(XENOPROF_disable_virq, NULL));
 
 	if (xenoprof_is_primary) {
-		HYPERVISOR_xenoprof_op(XENOPROF_release_counters, NULL);
+		WARN_ON(HYPERVISOR_xenoprof_op(XENOPROF_release_counters,
+					       NULL));
 		active_defined = 0;
 	}
 
@@ -377,7 +377,7 @@ static int xenoprof_start(void)
 static void xenoprof_stop(void)
 {
 	if (xenoprof_is_primary)
-		HYPERVISOR_xenoprof_op(XENOPROF_stop, NULL);
+		WARN_ON(HYPERVISOR_xenoprof_op(XENOPROF_stop, NULL));
 	xenoprof_arch_stop();
 }
 
@@ -420,7 +420,8 @@ static int xenoprof_set_active(int * active_domains,
 
 out:
 	if (ret)
-		HYPERVISOR_xenoprof_op(XENOPROF_reset_active_list, NULL);
+		WARN_ON(HYPERVISOR_xenoprof_op(XENOPROF_reset_active_list,
+					       NULL));
 	active_defined = !ret;
 	return ret;
 }
@@ -429,7 +430,7 @@ static int xenoprof_set_passive(int * p_domains,
                                 unsigned int pdoms)
 {
 	int ret;
-	int i, j;
+	unsigned int i, j;
 	struct xenoprof_buf *buf;
 
 	if (!xenoprof_is_primary)
@@ -503,7 +504,8 @@ static int using_xenoprof;
 int __init xenoprofile_init(struct oprofile_operations * ops)
 {
 	struct xenoprof_init init;
-	int ret, i;
+	unsigned int i;
+	int ret;
 
 	ret = HYPERVISOR_xenoprof_op(XENOPROF_init, &init);
 	if (!ret) {
@@ -539,6 +541,6 @@ void xenoprofile_exit(void)
 	xenoprof_arch_unmap_shared_buffer(&shared_buffer);
 	if (xenoprof_is_primary) {
 		unmap_passive_list();
-		HYPERVISOR_xenoprof_op(XENOPROF_shutdown, NULL);
+		WARN_ON(HYPERVISOR_xenoprof_op(XENOPROF_shutdown, NULL));
         }
 }

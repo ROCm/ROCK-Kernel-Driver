@@ -52,8 +52,8 @@ void xenoprof_arch_counter(void)
 		counter.kernel    = (uint32_t)counter_config[i].kernel;
 		counter.user      = (uint32_t)counter_config[i].user;
 		counter.unit_mask = (uint64_t)counter_config[i].unit_mask;
-		HYPERVISOR_xenoprof_op(XENOPROF_counter, 
-				       &counter);
+		WARN_ON(HYPERVISOR_xenoprof_op(XENOPROF_counter,
+					       &counter));
 	}
 }
 

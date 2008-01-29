@@ -284,8 +284,10 @@ struct thread_struct {
 
 #define get_debugreg(var, register)				\
 	var = HYPERVISOR_get_debugreg(register)
-#define set_debugreg(value, register)			\
-	HYPERVISOR_set_debugreg(register, value)
+#define set_debugreg(value, register) do {			\
+	if (HYPERVISOR_set_debugreg(register, value))		\
+		BUG();						\
+} while (0)
 
 struct task_struct;
 struct mm_struct;

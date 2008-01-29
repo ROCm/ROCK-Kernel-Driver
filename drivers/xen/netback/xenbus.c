@@ -217,10 +217,6 @@ static void frontend_changed(struct xenbus_device *dev,
 		if (dev->state == XenbusStateClosed) {
 			printk(KERN_INFO "%s: %s: prepare for reconnect\n",
 			       __FUNCTION__, dev->nodename);
-			if (be->netif) {
-				netif_disconnect(be->netif);
-				be->netif = NULL;
-			}
 			xenbus_switch_state(dev, XenbusStateInitWait);
 		}
 		break;
@@ -235,6 +231,10 @@ static void frontend_changed(struct xenbus_device *dev,
 		break;
 
 	case XenbusStateClosing:
+		if (be->netif) {
+			netif_disconnect(be->netif);
+			be->netif = NULL;
+		}
 		xenbus_switch_state(dev, XenbusStateClosing);
 		break;
 

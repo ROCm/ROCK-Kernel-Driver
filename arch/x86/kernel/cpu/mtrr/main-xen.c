@@ -18,7 +18,8 @@ void generic_get_mtrr(unsigned int reg, unsigned long *base,
 
 	op.cmd = XENPF_read_memtype;
 	op.u.read_memtype.reg = reg;
-	(void)HYPERVISOR_platform_op(&op);
+	if (unlikely(HYPERVISOR_platform_op(&op)))
+		memset(&op.u.read_memtype, 0, sizeof(op.u.read_memtype));
 
 	*size = op.u.read_memtype.nr_mfns;
 	*base = op.u.read_memtype.mfn;

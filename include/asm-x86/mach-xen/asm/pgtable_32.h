@@ -482,8 +482,10 @@ extern pte_t *lookup_address(unsigned long address);
 #endif
 
 /* Clear a kernel PTE and flush it from the TLB */
-#define kpte_clear_flush(ptep, vaddr) \
-	HYPERVISOR_update_va_mapping(vaddr, __pte(0), UVMF_INVLPG)
+#define kpte_clear_flush(ptep, vaddr) do { \
+	if (HYPERVISOR_update_va_mapping(vaddr, __pte(0), UVMF_INVLPG)) \
+		BUG(); \
+} while (0)
 
 /*
  * The i386 doesn't have any external MMU info: the kernel page
@@ -536,6 +538,13 @@ int create_lookup_pte_addr(struct mm_struct *mm,
 int touch_pte_range(struct mm_struct *mm,
                     unsigned long address,
                     unsigned long size);
+
+int xen_change_pte_range(struct mm_struct *mm, pmd_t *pmd,
+		unsigned long addr, unsigned long end, pgprot_t newprot,
+		int dirty_accountable);
+
+#define arch_change_pte_range(mm, pmd, addr, end, newprot, dirty_accountable) \
+	xen_change_pte_range(mm, pmd, addr, end, newprot, dirty_accountable)
 
 #define io_remap_pfn_range(vma,from,pfn,size,prot) \
 direct_remap_pfn_range(vma,from,pfn,size,prot,DOMID_IO)

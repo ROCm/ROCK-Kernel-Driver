@@ -615,6 +615,7 @@ static int tpm_xmit(struct tpm_private *tp,
 		tx = &tp->tx->ring[i].req;
 		tx->addr = virt_to_machine(txb->data);
 		tx->size = txb->len;
+		tx->unused = 0;
 
 		DPRINTK("First 4 characters sent by TPM-FE are "
 			"0x%02x 0x%02x 0x%02x 0x%02x\n",

@@ -45,7 +45,8 @@
 #if __XEN_INTERFACE_VERSION__ >= 0x00030205
 #define XEN_GUEST_HANDLE_00030205(type) XEN_GUEST_HANDLE(type)
 #else
-#define XEN_GUEST_HANDLE_00030205(type) type *
+#define void_t void
+#define XEN_GUEST_HANDLE_00030205(type) type##_t *
 #endif
 
 #endif /* __XEN_PUBLIC_XEN_COMPAT_H__ */

@@ -516,8 +516,10 @@ static inline void native_load_esp0(struct tss_struct *tss, struct thread_struct
 	}
 }
 #else
-#define xen_load_esp0(tss, thread) \
-	HYPERVISOR_stack_switch(__KERNEL_DS, (thread)->esp0)
+#define xen_load_esp0(tss, thread) do { \
+	if (HYPERVISOR_stack_switch(__KERNEL_DS, (thread)->esp0)) \
+		BUG(); \
+} while (0)
 #endif
 
 
@@ -528,7 +530,7 @@ static inline unsigned long xen_get_debugreg(int regno)
 
 static inline void xen_set_debugreg(int regno, unsigned long value)
 {
-	HYPERVISOR_set_debugreg(regno, value);
+	WARN_ON(HYPERVISOR_set_debugreg(regno, value));
 }
 
 /*
@@ -540,7 +542,7 @@ static inline void xen_set_iopl_mask(unsigned mask)
 
 	/* Force the change at ring 0. */
 	set_iopl.iopl = (mask == 0) ? 1 : (mask >> 12) & 3;
-	HYPERVISOR_physdev_op(PHYSDEVOP_set_iopl, &set_iopl);
+	WARN_ON(HYPERVISOR_physdev_op(PHYSDEVOP_set_iopl, &set_iopl));
 }
 
 

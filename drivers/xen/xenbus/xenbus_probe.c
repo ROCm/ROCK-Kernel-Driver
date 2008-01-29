@@ -53,7 +53,9 @@
 #include <xen/xen_proc.h>
 #include <xen/evtchn.h>
 #include <xen/features.h>
+#ifdef MODULE
 #include <xen/hvm.h>
+#endif
 #else
 #include <asm/xen/hypervisor.h>
 #include <xen/xenbus.h>

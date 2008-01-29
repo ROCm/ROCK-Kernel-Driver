@@ -215,7 +215,7 @@ static inline void exit_idle(void) {}
  */
 void force_evtchn_callback(void)
 {
-	(void)HYPERVISOR_xen_version(0, NULL);
+	VOID(HYPERVISOR_xen_version(0, NULL));
 }
 /* Not a GPL symbol: used in ubiquitous macros, so too restrictive. */
 EXPORT_SYMBOL(force_evtchn_callback);
@@ -230,7 +230,8 @@ asmlinkage void evtchn_do_upcall(struct pt_regs *regs)
 	unsigned long       l1, l2;
 	unsigned long       masked_l1, masked_l2;
 	unsigned int        l1i, l2i, port, count;
-	int                 irq, cpu = smp_processor_id();
+	int                 irq;
+	unsigned int        cpu = smp_processor_id();
 	shared_info_t      *s = HYPERVISOR_shared_info;
 	vcpu_info_t        *vcpu_info = &s->vcpu_info[cpu];
 
@@ -466,7 +467,8 @@ static int bind_ipi_to_irq(unsigned int ipi, unsigned int cpu)
 static void unbind_from_irq(unsigned int irq)
 {
 	struct evtchn_close close;
-	int cpu, evtchn = evtchn_from_irq(irq);
+	unsigned int cpu;
+	int evtchn = evtchn_from_irq(irq);
 
 	spin_lock(&irq_mapping_update_lock);
 
@@ -739,14 +741,15 @@ static inline void pirq_unmask_notify(int pirq)
 {
 	struct physdev_eoi eoi = { .irq = pirq };
 	if (unlikely(test_bit(pirq, pirq_needs_eoi)))
-		(void)HYPERVISOR_physdev_op(PHYSDEVOP_eoi, &eoi);
+		VOID(HYPERVISOR_physdev_op(PHYSDEVOP_eoi, &eoi));
 }
 
 static inline void pirq_query_unmask(int pirq)
 {
 	struct physdev_irq_status_query irq_status;
 	irq_status.irq = pirq;
-	(void)HYPERVISOR_physdev_op(PHYSDEVOP_irq_status_query, &irq_status);
+	if (HYPERVISOR_physdev_op(PHYSDEVOP_irq_status_query, &irq_status))
+		irq_status.flags = 0;
 	clear_bit(pirq, pirq_needs_eoi);
 	if (irq_status.flags & XENIRQSTAT_needs_eoi)
 		set_bit(pirq, pirq_needs_eoi);
@@ -866,7 +869,8 @@ int irq_ignore_unhandled(unsigned int irq)
 	if (!is_running_on_xen())
 		return 0;
 
-	(void)HYPERVISOR_physdev_op(PHYSDEVOP_irq_status_query, &irq_status);
+	if (HYPERVISOR_physdev_op(PHYSDEVOP_irq_status_query, &irq_status))
+		return 0;
 	return !!(irq_status.flags & XENIRQSTAT_shared);
 }
 
@@ -903,7 +907,7 @@ void unmask_evtchn(int port)
 	/* Slow path (hypercall) if this is a non-local port. */
 	if (unlikely(cpu != cpu_from_evtchn(port))) {
 		struct evtchn_unmask unmask = { .port = port };
-		(void)HYPERVISOR_event_channel_op(EVTCHNOP_unmask, &unmask);
+		VOID(HYPERVISOR_event_channel_op(EVTCHNOP_unmask, &unmask));
 		return;
 	}
 
@@ -927,7 +931,7 @@ void disable_all_local_evtchn(void)
 			synch_set_bit(i, &s->evtchn_mask[0]);
 }
 
-static void restore_cpu_virqs(int cpu)
+static void restore_cpu_virqs(unsigned int cpu)
 {
 	struct evtchn_bind_virq bind_virq;
 	int virq, irq, evtchn;
@@ -956,7 +960,7 @@ static void restore_cpu_virqs(int cpu)
 	}
 }
 
-static void restore_cpu_ipis(int cpu)
+static void restore_cpu_ipis(unsigned int cpu)
 {
 	struct evtchn_bind_ipi bind_ipi;
 	int ipi, irq, evtchn;
@@ -987,7 +991,7 @@ static void restore_cpu_ipis(int cpu)
 
 void irq_resume(void)
 {
-	int cpu, pirq, irq, evtchn;
+	unsigned int cpu, pirq, irq, evtchn;
 
 	init_evtchn_cpu_bindings();
 
@@ -1014,7 +1018,7 @@ void irq_resume(void)
 
 void __init xen_init_IRQ(void)
 {
-	int i;
+	unsigned int i;
 
 	init_evtchn_cpu_bindings();
 

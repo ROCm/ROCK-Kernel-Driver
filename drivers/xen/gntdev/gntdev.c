@@ -215,6 +215,8 @@ static int add_grant_reference(struct file *flip,
 	}
 
 	slot_index = private_data->free_list[--private_data->free_list_size];
+	private_data->free_list[private_data->free_list_size]
+		= GNTDEV_FREE_LIST_INVALID;
 
 	/* Copy the grant information into file's private data. */
 	private_data->grants[slot_index].state = GNTDEV_SLOT_NOT_YET_MAPPED;
@@ -271,13 +273,19 @@ static void compress_free_list(struct file *flip)
 {
 	gntdev_file_private_data_t *private_data 
 		= (gntdev_file_private_data_t *) flip->private_data;
-	int i, j = 0, old_size;
+	int i, j = 0, old_size, slot_index;
 	
 	old_size = private_data->free_list_size;
 	for (i = 0; i < old_size; ++i) {
 		if (private_data->free_list[i] != GNTDEV_FREE_LIST_INVALID) {
-			private_data->free_list[j] = 
-				private_data->free_list[i];
+			if (i > j) {
+				slot_index = private_data->free_list[i];
+				private_data->free_list[j] = slot_index;
+				private_data->grants[slot_index].u
+					.free_list_index = j;
+				private_data->free_list[i] 
+					= GNTDEV_FREE_LIST_INVALID;
+			}
 			++j;
 		} else {
 			--private_data->free_list_size;
@@ -909,7 +917,6 @@ static long gntdev_ioctl(struct file *flip,
 				start_index + i;
 			++private_data->free_list_size;
 		}
-		compress_free_list(flip);
 
 	unmap_out:
 		up_write(&private_data->grants_sem);

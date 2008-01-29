@@ -219,7 +219,7 @@ static int setup_blkring(struct xenbus_device *dev,
 
 	info->ring_ref = GRANT_INVALID_REF;
 
-	sring = (blkif_sring_t *)__get_free_page(GFP_KERNEL);
+	sring = (blkif_sring_t *)__get_free_page(GFP_KERNEL|__GFP_HIGH);
 	if (!sring) {
 		xenbus_dev_fatal(dev, -ENOMEM, "allocating shared ring");
 		return -ENOMEM;

@@ -32,7 +32,7 @@ static void vcpu_hotplug(unsigned int cpu)
 	if ((cpu >= NR_CPUS) || !cpu_possible(cpu))
 		return;
 
-	sprintf(dir, "cpu/%d", cpu);
+	sprintf(dir, "cpu/%u", cpu);
 	err = xenbus_scanf(XBT_NIL, dir, "availability", "%s", state);
 	if (err != 1) {
 		printk(KERN_ERR "XENBUS: Unable to read cpu state\n");
@@ -54,12 +54,12 @@ static void vcpu_hotplug(unsigned int cpu)
 static void handle_vcpu_hotplug_event(
 	struct xenbus_watch *watch, const char **vec, unsigned int len)
 {
-	int cpu;
+	unsigned int cpu;
 	char *cpustr;
 	const char *node = vec[XS_WATCH_PATH];
 
 	if ((cpustr = strstr(node, "cpu/")) != NULL) {
-		sscanf(cpustr, "cpu/%d", &cpu);
+		sscanf(cpustr, "cpu/%u", &cpu);
 		vcpu_hotplug(cpu);
 	}
 }
@@ -67,7 +67,7 @@ static void handle_vcpu_hotplug_event(
 static int smpboot_cpu_notify(struct notifier_block *notifier,
 			      unsigned long action, void *hcpu)
 {
-	int cpu = (long)hcpu;
+	unsigned int cpu = (long)hcpu;
 
 	/*
 	 * We do this in a callback notifier rather than __cpu_disable()
@@ -83,7 +83,7 @@ static int smpboot_cpu_notify(struct notifier_block *notifier,
 static int setup_cpu_watcher(struct notifier_block *notifier,
 			      unsigned long event, void *data)
 {
-	int i;
+	unsigned int i;
 
 	static struct xenbus_watch cpu_watch = {
 		.node = "cpu",
@@ -121,7 +121,8 @@ arch_initcall(setup_vcpu_hotplug_event);
 
 int smp_suspend(void)
 {
-	int cpu, err;
+	unsigned int cpu;
+	int err;
 
 	for_each_online_cpu(cpu) {
 		if (cpu == 0)
@@ -141,7 +142,7 @@ int smp_suspend(void)
 
 void smp_resume(void)
 {
-	int cpu;
+	unsigned int cpu;
 
 	for_each_possible_cpu(cpu)
 		vcpu_hotplug(cpu);

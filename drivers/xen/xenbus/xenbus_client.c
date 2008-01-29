@@ -109,7 +109,7 @@ int xenbus_watch_path2(struct xenbus_device *dev, const char *path,
 					const char **, unsigned int))
 {
 	int err;
-	char *state = kasprintf(GFP_KERNEL, "%s/%s", path, path2);
+	char *state = kasprintf(GFP_KERNEL|__GFP_HIGH, "%s/%s", path, path2);
 	if (!state) {
 		xenbus_dev_fatal(dev, -ENOMEM, "allocating path for watch");
 		return -ENOMEM;

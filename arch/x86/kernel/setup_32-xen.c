@@ -598,9 +598,10 @@ void __init setup_arch(char **cmdline_p)
 		atomic_notifier_chain_register(&panic_notifier_list, &xen_panic_block);
 	}
 
-	HYPERVISOR_vm_assist(VMASST_CMD_enable, VMASST_TYPE_4gb_segments);
-	HYPERVISOR_vm_assist(VMASST_CMD_enable,
-			     VMASST_TYPE_writable_pagetables);
+	WARN_ON(HYPERVISOR_vm_assist(VMASST_CMD_enable,
+				     VMASST_TYPE_4gb_segments));
+	WARN_ON(HYPERVISOR_vm_assist(VMASST_CMD_enable,
+				     VMASST_TYPE_writable_pagetables));
 
 	memcpy(&boot_cpu_data, &new_cpu_data, sizeof(new_cpu_data));
 	early_cpu_init();
@@ -828,7 +829,7 @@ void __init setup_arch(char **cmdline_p)
 		efi_map_memmap();
 
 	set_iopl.iopl = 1;
-	HYPERVISOR_physdev_op(PHYSDEVOP_set_iopl, &set_iopl);
+	WARN_ON(HYPERVISOR_physdev_op(PHYSDEVOP_set_iopl, &set_iopl));
 
 #ifdef CONFIG_ACPI
 	if (!is_initial_xendomain()) {

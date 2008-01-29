@@ -140,7 +140,7 @@ static inline void play_dead(void)
 	local_irq_disable();
 	cpu_clear(smp_processor_id(), cpu_initialized);
 	preempt_enable_no_resched();
-	HYPERVISOR_vcpu_op(VCPUOP_down, smp_processor_id(), NULL);
+	VOID(HYPERVISOR_vcpu_op(VCPUOP_down, smp_processor_id(), NULL));
 	cpu_bringup();
 }
 #else
@@ -188,6 +188,10 @@ void cpu_idle(void)
 	}
 }
 
+static void do_nothing(void *unused)
+{
+}
+
 void cpu_idle_wait(void)
 {
 	unsigned int cpu, this_cpu = get_cpu();
@@ -212,6 +216,13 @@ void cpu_idle_wait(void)
 				cpu_clear(cpu, map);
 		}
 		cpus_and(map, map, cpu_online_map);
+		/*
+		 * We waited 1 sec, if a CPU still did not call idle
+		 * it may be because it is in idle and not waking up
+		 * because it has nothing to do.
+		 * Give all the remaining CPUS a kick.
+		 */
+		smp_call_function_mask(map, do_nothing, 0, 0);
 	} while (!cpus_empty(map));
 
 	set_cpus_allowed(current, tmp);
@@ -345,7 +356,8 @@ void exit_thread(void)
 		struct thread_struct *t = &tsk->thread;
 		struct physdev_set_iobitmap set_iobitmap;
 		memset(&set_iobitmap, 0, sizeof(set_iobitmap));
-		HYPERVISOR_physdev_op(PHYSDEVOP_set_iobitmap, &set_iobitmap);
+		WARN_ON(HYPERVISOR_physdev_op(PHYSDEVOP_set_iobitmap,
+					      &set_iobitmap));
 		kfree(t->io_bitmap_ptr);
 		t->io_bitmap_ptr = NULL;
 		clear_thread_flag(TIF_IO_BITMAP);
@@ -513,6 +525,7 @@ void hard_disable_TSC(void)
 }
 void disable_TSC(void)
 {
+#ifdef CONFIG_SECCOMP_DISABLE_TSC
 	preempt_disable();
 	if (!test_and_set_thread_flag(TIF_NOTSC))
 		/*
@@ -521,6 +534,7 @@ void disable_TSC(void)
 		 */
 		hard_disable_TSC();
 	preempt_enable();
+#endif
 }
 void hard_enable_TSC(void)
 {
@@ -657,7 +671,9 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 		mcl++;
 	}
 
-	(void)HYPERVISOR_multicall(_mcl, mcl - _mcl);
+	BUG_ON(mcl > _mcl + ARRAY_SIZE(_mcl));
+	if (unlikely(HYPERVISOR_multicall_check(_mcl, mcl - _mcl, NULL)))
+		BUG();
 
 	/* we're going to use this soon, after a few expensive things */
 	if (next_p->fpu_counter > 5)

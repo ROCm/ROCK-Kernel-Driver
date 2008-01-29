@@ -301,7 +301,7 @@ static void update_wallclock(void)
  * Reads a consistent set of time-base values from Xen, into a shadow data
  * area.
  */
-static void get_time_values_from_xen(int cpu)
+static void get_time_values_from_xen(unsigned int cpu)
 {
 	struct vcpu_time_info   *src;
 	struct shadow_time_info *dst;
@@ -322,7 +322,7 @@ static void get_time_values_from_xen(int cpu)
 	dst->tsc_to_usec_mul = dst->tsc_to_nsec_mul / 1000;
 }
 
-static inline int time_values_up_to_date(int cpu)
+static inline int time_values_up_to_date(unsigned int cpu)
 {
 	struct vcpu_time_info   *src;
 	struct shadow_time_info *dst;
@@ -384,7 +384,7 @@ static void sync_xen_wallclock(unsigned long dummy)
 	op.u.settime.secs        = sec;
 	op.u.settime.nsecs       = nsec;
 	op.u.settime.system_time = processed_system_time;
-	HYPERVISOR_platform_op(&op);
+	WARN_ON(HYPERVISOR_platform_op(&op));
 
 	update_wallclock();
 
@@ -413,7 +413,7 @@ static int set_rtc_mmss(unsigned long nowtime)
 
 static unsigned long long local_clock(void)
 {
-	int cpu = get_cpu();
+	unsigned int cpu = get_cpu();
 	struct shadow_time_info *shadow = &per_cpu(shadow_time, cpu);
 	u64 time;
 	u32 local_time_version;
@@ -539,7 +539,7 @@ EXPORT_SYMBOL(profile_pc);
 irqreturn_t timer_interrupt(int irq, void *dev_id)
 {
 	s64 delta, delta_cpu, stolen, blocked;
-	int i, cpu = smp_processor_id();
+	unsigned int i, cpu = smp_processor_id();
 	struct shadow_time_info *shadow = &per_cpu(shadow_time, cpu);
 	struct vcpu_runstate_info runstate;
 
@@ -574,7 +574,7 @@ irqreturn_t timer_interrupt(int irq, void *dev_id)
 	if ((unlikely(delta < -(s64)permitted_clock_jitter) ||
 	     unlikely(delta_cpu < -(s64)permitted_clock_jitter))
 	    && printk_ratelimit()) {
-		printk("Timer ISR/%d: Time went backwards: "
+		printk("Timer ISR/%u: Time went backwards: "
 		       "delta=%lld delta_cpu=%lld shadow=%lld "
 		       "off=%lld processed=%lld cpu_processed=%lld\n",
 		       cpu, delta, delta_cpu, shadow->system_timestamp,
@@ -717,7 +717,7 @@ static struct clocksource clocksource_xen = {
 	.flags			= CLOCK_SOURCE_IS_CONTINUOUS,
 };
 
-static void init_missing_ticks_accounting(int cpu)
+static void init_missing_ticks_accounting(unsigned int cpu)
 {
 	struct vcpu_register_runstate_memory_area area;
 	struct vcpu_runstate_info *runstate = &per_cpu(runstate, cpu);
@@ -814,8 +814,16 @@ void __init time_init(void)
 	printk(KERN_INFO "Xen reported: %u.%03u MHz processor.\n",
 	       cpu_khz / 1000, cpu_khz % 1000);
 
-	HYPERVISOR_vcpu_op(VCPUOP_set_periodic_timer, 0,
-			   &xen_set_periodic_tick);
+	switch (HYPERVISOR_vcpu_op(VCPUOP_set_periodic_timer, 0,
+				   &xen_set_periodic_tick)) {
+	case 0:
+#if CONFIG_XEN_COMPAT <= 0x030004
+	case -ENOSYS:
+#endif
+		break;
+	default:
+		BUG();
+	}
 
 	get_time_values_from_xen(0);
 
@@ -920,7 +928,7 @@ EXPORT_SYMBOL(xen_safe_halt);
 void xen_halt(void)
 {
 	if (irqs_disabled())
-		HYPERVISOR_vcpu_op(VCPUOP_down, smp_processor_id(), NULL);
+		VOID(HYPERVISOR_vcpu_op(VCPUOP_down, smp_processor_id(), NULL));
 }
 EXPORT_SYMBOL(xen_halt);
 
@@ -932,8 +940,16 @@ void time_resume(void)
 	init_cpu_khz();
 
 	for_each_online_cpu(cpu) {
-		HYPERVISOR_vcpu_op(VCPUOP_set_periodic_timer, cpu,
-				   &xen_set_periodic_tick);
+		switch (HYPERVISOR_vcpu_op(VCPUOP_set_periodic_timer, cpu,
+					   &xen_set_periodic_tick)) {
+		case 0:
+#if CONFIG_XEN_COMPAT <= 0x030004
+		case -ENOSYS:
+#endif
+			break;
+		default:
+			BUG();
+		}
 		get_time_values_from_xen(cpu);
 		per_cpu(processed_system_time, cpu) =
 			per_cpu(shadow_time, 0).system_timestamp;
@@ -954,8 +970,16 @@ int __cpuinit local_setup_timer(unsigned int cpu)
 
 	BUG_ON(cpu == 0);
 
-	HYPERVISOR_vcpu_op(VCPUOP_set_periodic_timer, cpu,
-			   &xen_set_periodic_tick);
+	switch (HYPERVISOR_vcpu_op(VCPUOP_set_periodic_timer, cpu,
+			   &xen_set_periodic_tick)) {
+	case 0:
+#if CONFIG_XEN_COMPAT <= 0x030004
+	case -ENOSYS:
+#endif
+		break;
+	default:
+		BUG();
+	}
 
 	do {
 		seq = read_seqbegin(&xtime_lock);
@@ -965,7 +989,7 @@ int __cpuinit local_setup_timer(unsigned int cpu)
 		init_missing_ticks_accounting(cpu);
 	} while (read_seqretry(&xtime_lock, seq));
 
-	sprintf(timer_name[cpu], "timer%d", cpu);
+	sprintf(timer_name[cpu], "timer%u", cpu);
 	irq = bind_virq_to_irqhandler(VIRQ_TIMER,
 				      cpu,
 				      timer_interrupt,
@@ -1003,7 +1027,7 @@ static int time_cpufreq_notifier(struct notifier_block *nb, unsigned long val,
 	op.u.change_freq.flags = 0;
 	op.u.change_freq.cpu = freq->cpu;
 	op.u.change_freq.freq = (u64)freq->new * 1000;
-	HYPERVISOR_platform_op(&op);
+	WARN_ON(HYPERVISOR_platform_op(&op));
 
 	return 0;
 }

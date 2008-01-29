@@ -154,7 +154,7 @@ static inline void io_apic_write(unsigned int apic, unsigned int reg, unsigned i
 	apic_op.apic_physbase = mp_ioapics[apic].mpc_apicaddr;
 	apic_op.reg = reg;
 	apic_op.value = value;
-	HYPERVISOR_physdev_op(PHYSDEVOP_apic_write, &apic_op);
+	WARN_ON(HYPERVISOR_physdev_op(PHYSDEVOP_apic_write, &apic_op));
 #endif
 }
 
@@ -2221,13 +2221,9 @@ static inline void __init check_timer(void)
 {
 	int apic1, pin1, apic2, pin2;
 	int vector;
-	unsigned int ver;
 	unsigned long flags;
 
 	local_irq_save(flags);
-
-	ver = apic_read(APIC_LVR);
-	ver = GET_APIC_VERSION(ver);
 
 	/*
 	 * get/set the timer IRQ vector:
@@ -2241,15 +2237,11 @@ static inline void __init check_timer(void)
 	 * mode for the 8259A whenever interrupts are routed
 	 * through I/O APICs.  Also IRQ0 has to be enabled in
 	 * the 8259A which implies the virtual wire has to be
-	 * disabled in the local APIC.  Finally timer interrupts
-	 * need to be acknowledged manually in the 8259A for
-	 * timer_interrupt() and for the i82489DX when using
-	 * the NMI watchdog.
+	 * disabled in the local APIC.
 	 */
 	apic_write_around(APIC_LVT0, APIC_LVT_MASKED | APIC_DM_EXTINT);
 	init_8259A(1);
-	timer_ack = !cpu_has_tsc;
-	timer_ack |= (nmi_watchdog == NMI_IO_APIC && !APIC_INTEGRATED(ver));
+	timer_ack = 1;
 	if (timer_over_8254 > 0)
 		enable_8259A_irq(0);
 
@@ -2425,7 +2417,7 @@ static int __init io_apic_bug_finalize(void)
 		struct xen_platform_op op = { .cmd = XENPF_platform_quirk };
 		op.u.platform_quirk.quirk_id = sis_apic_bug ?
 			QUIRK_IOAPIC_BAD_REGSEL : QUIRK_IOAPIC_GOOD_REGSEL;
-		HYPERVISOR_platform_op(&op);
+		VOID(HYPERVISOR_platform_op(&op));
 	}
 	return 0;
 }

@@ -533,6 +533,13 @@ int touch_pte_range(struct mm_struct *mm,
                     unsigned long address,
                     unsigned long size);
 
+int xen_change_pte_range(struct mm_struct *mm, pmd_t *pmd,
+		unsigned long addr, unsigned long end, pgprot_t newprot,
+		int dirty_accountable);
+
+#define arch_change_pte_range(mm, pmd, addr, end, newprot, dirty_accountable) \
+	xen_change_pte_range(mm, pmd, addr, end, newprot, dirty_accountable)
+
 pte_t *lookup_address(unsigned long addr);
 
 #define io_remap_pfn_range(vma, vaddr, pfn, size, prot)		\

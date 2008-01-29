@@ -88,7 +88,7 @@ void __init smp_alloc_memory(void)
 }
 
 static inline void
-set_cpu_sibling_map(int cpu)
+set_cpu_sibling_map(unsigned int cpu)
 {
 	cpu_data(cpu).phys_proc_id = cpu;
 	cpu_data(cpu).cpu_core_id  = 0;
@@ -100,7 +100,7 @@ set_cpu_sibling_map(int cpu)
 }
 
 static void
-remove_siblinginfo(int cpu)
+remove_siblinginfo(unsigned int cpu)
 {
 	cpu_data(cpu).phys_proc_id = BAD_APICID;
 	cpu_data(cpu).cpu_core_id  = BAD_APICID;
@@ -117,7 +117,7 @@ static int __cpuinit xen_smp_intr_init(unsigned int cpu)
 
 	per_cpu(resched_irq, cpu) = per_cpu(callfunc_irq, cpu) = -1;
 
-	sprintf(resched_name[cpu], "resched%d", cpu);
+	sprintf(resched_name[cpu], "resched%u", cpu);
 	rc = bind_ipi_to_irqhandler(RESCHEDULE_VECTOR,
 				    cpu,
 				    smp_reschedule_interrupt,
@@ -128,7 +128,7 @@ static int __cpuinit xen_smp_intr_init(unsigned int cpu)
 		goto fail;
 	per_cpu(resched_irq, cpu) = rc;
 
-	sprintf(callfunc_name[cpu], "callfunc%d", cpu);
+	sprintf(callfunc_name[cpu], "callfunc%u", cpu);
 	rc = bind_ipi_to_irqhandler(CALL_FUNCTION_VECTOR,
 				    cpu,
 				    smp_call_function_interrupt,
@@ -248,7 +248,7 @@ static void __cpuinit cpu_initialize_context(unsigned int cpu)
 
 void __init smp_prepare_cpus(unsigned int max_cpus)
 {
-	int cpu;
+	unsigned int cpu;
 	struct task_struct *idle;
 #ifdef __x86_64__
 	struct desc_ptr *gdt_descr;
@@ -369,7 +369,7 @@ core_initcall(initialize_cpu_present_map);
 int __cpu_disable(void)
 {
 	cpumask_t map = cpu_online_map;
-	int cpu = smp_processor_id();
+	unsigned int cpu = smp_processor_id();
 
 	if (cpu == 0)
 		return -EBUSY;

@@ -52,7 +52,6 @@
 #include <xen/xen_proc.h>
 #include <xen/evtchn.h>
 #include <xen/features.h>
-#include <xen/hvm.h>
 
 #include "xenbus_comms.h"
 #include "xenbus_probe.h"

@@ -161,7 +161,7 @@ static inline void io_apic_write(unsigned int apic, unsigned int reg, unsigned i
 	apic_op.apic_physbase = mp_ioapics[apic].mpc_apicaddr;
 	apic_op.reg = reg;
 	apic_op.value = value;
-	HYPERVISOR_physdev_op(PHYSDEVOP_apic_write, &apic_op);
+	WARN_ON(HYPERVISOR_physdev_op(PHYSDEVOP_apic_write, &apic_op));
 #endif
 }
 

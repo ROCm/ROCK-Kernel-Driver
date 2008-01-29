@@ -60,7 +60,8 @@ asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int turn_on)
 
 		set_xen_guest_handle(set_iobitmap.bitmap, (char *)bitmap);
 		set_iobitmap.nr_ports = IO_BITMAP_BITS;
-		HYPERVISOR_physdev_op(PHYSDEVOP_set_iobitmap, &set_iobitmap);
+		WARN_ON(HYPERVISOR_physdev_op(PHYSDEVOP_set_iobitmap,
+					      &set_iobitmap));
 	}
 
 	set_bitmap(t->io_bitmap_ptr, from, num, !turn_on);
@@ -92,7 +93,7 @@ asmlinkage long sys_iopl(unsigned int new_iopl, struct pt_regs *regs)
 
 	/* Force the change at ring 0. */
 	set_iopl.iopl = (new_iopl == 0) ? 1 : new_iopl;
-	HYPERVISOR_physdev_op(PHYSDEVOP_set_iopl, &set_iopl);
+	WARN_ON(HYPERVISOR_physdev_op(PHYSDEVOP_set_iopl, &set_iopl));
 
 	return 0;
 }

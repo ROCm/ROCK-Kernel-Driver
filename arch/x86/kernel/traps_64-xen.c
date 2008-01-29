@@ -702,6 +702,7 @@ asmlinkage void do_##name(struct pt_regs * regs, long error_code) \
 	info.si_errno = 0; \
 	info.si_code = sicode; \
 	info.si_addr = (void __user *)siaddr; \
+	trace_hardirqs_fixup(); \
 	if (notify_die(DIE_TRAP, str, regs, error_code, trapnr, signr) \
 							== NOTIFY_STOP) \
 		return; \
@@ -1192,10 +1193,8 @@ void __init trap_init(void)
         int ret;
 
         ret = HYPERVISOR_set_trap_table(trap_table);
-        
         if (ret) 
-                printk("HYPERVISOR_set_trap_table faild: error %d\n",
-                       ret);
+		printk("HYPERVISOR_set_trap_table failed: error %d\n", ret);
 
 	/*
 	 * Should be a barrier for any external CPU state.
@@ -1205,7 +1204,7 @@ void __init trap_init(void)
 
 void __cpuinit smp_trap_init(trap_info_t *trap_ctxt)
 {
-	trap_info_t *t = trap_table;
+	const trap_info_t *t = trap_table;
 
 	for (t = trap_table; t->address; t++) {
 		trap_ctxt[t->vector].flags = t->flags;

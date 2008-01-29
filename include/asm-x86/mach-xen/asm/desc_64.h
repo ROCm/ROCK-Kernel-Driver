@@ -30,7 +30,7 @@ static inline void clear_LDT(void)
 	 * it slows down context switching. Noone uses it anyway.
 	 */
 	cpu = cpu;              /* XXX avoid compiler warning */
-	xen_set_ldt(0UL, 0);
+	xen_set_ldt(NULL, 0);
 	put_cpu();
 }
 
@@ -195,7 +195,9 @@ static inline void load_TLS(struct thread_struct *t, unsigned int cpu)
 	u64 *gdt = (u64 *)(cpu_gdt(cpu) + GDT_ENTRY_TLS_MIN);
 
 	for (i = 0; i < GDT_ENTRY_TLS_ENTRIES; i++)
-		HYPERVISOR_update_descriptor(virt_to_machine(&gdt[i]), t->tls_array[i]);
+		if (HYPERVISOR_update_descriptor(virt_to_machine(&gdt[i]),
+						 t->tls_array[i]))
+			BUG();
 } 
 
 /*
@@ -209,7 +211,7 @@ static inline void load_LDT_nolock (mm_context_t *pc, int cpu)
 	if (likely(!count))
 		segments = NULL;
 
-	xen_set_ldt((unsigned long)segments, count);
+	xen_set_ldt(segments, count);
 }
 
 static inline void load_LDT(mm_context_t *pc)

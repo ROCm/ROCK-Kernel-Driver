@@ -87,11 +87,11 @@ core_initcall(init_syscall32);
 /* May not be __init: called during resume */
 void syscall32_cpu_init(void)
 {
-	static struct callback_register cstar = {
+	static const struct callback_register cstar = {
 		.type = CALLBACKTYPE_syscall32,
 		.address = (unsigned long)ia32_cstar_target
 	};
-	static struct callback_register sysenter = {
+	static const struct callback_register sysenter = {
 		.type = CALLBACKTYPE_sysenter,
 		.address = (unsigned long)ia32_sysenter_target
 	};

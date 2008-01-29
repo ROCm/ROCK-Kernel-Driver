@@ -140,7 +140,7 @@ static inline void native_load_tls(struct thread_struct *t, unsigned int cpu)
 }
 #else
 #define load_TLS(t, cpu) xen_load_tls(t, cpu)
-#define set_ldt(addr, entries) xen_set_ldt((unsigned long)(addr), entries)
+#define set_ldt xen_set_ldt
 
 extern int write_ldt_entry(void *ldt, int entry, __u32 entry_a, __u32 entry_b);
 extern int write_gdt_entry(void *gdt, int entry, __u32 entry_a, __u32 entry_b);
@@ -148,11 +148,12 @@ extern int write_gdt_entry(void *gdt, int entry, __u32 entry_a, __u32 entry_b);
 static inline void xen_load_tls(struct thread_struct *t, unsigned int cpu)
 {
 	unsigned int i;
-	struct desc_struct *gdt = get_cpu_gdt_table(cpu);
+	struct desc_struct *gdt = get_cpu_gdt_table(cpu) + GDT_ENTRY_TLS_MIN;
 
 	for (i = 0; i < GDT_ENTRY_TLS_ENTRIES; i++)
-		HYPERVISOR_update_descriptor(virt_to_machine(&gdt[GDT_ENTRY_TLS_MIN + i]),
-					     *(u64 *)&t->tls_array[i]);
+		if (HYPERVISOR_update_descriptor(virt_to_machine(&gdt[i]),
+						 *(u64 *)&t->tls_array[i]))
+			BUG();
 }
 #endif
 

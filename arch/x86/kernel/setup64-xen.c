@@ -176,7 +176,9 @@ void pda_init(int cpu)
 	wrmsrl(MSR_GS_BASE, pda);
 	mb();
 #else
-	HYPERVISOR_set_segment_base(SEGBASE_GS_KERNEL, (unsigned long)pda);
+	if (HYPERVISOR_set_segment_base(SEGBASE_GS_KERNEL,
+					(unsigned long)pda))
+		BUG();
 #endif
 	pda->cpunumber = cpu; 
 	pda->irqcount = -1;
@@ -228,7 +230,7 @@ void syscall_init(void)
 	syscall32_cpu_init ();
 #else
 	{
-		static struct callback_register cstar = {
+		static const struct callback_register cstar = {
 			.type = CALLBACKTYPE_syscall32,
 			.address = (unsigned long)ignore_sysret
 		};
