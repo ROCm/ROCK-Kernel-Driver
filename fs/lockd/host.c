@@ -19,11 +19,12 @@
 
 
 #define NLMDBG_FACILITY		NLMDBG_HOSTCACHE
+#define NLM_HOST_MAX		64
 #define NLM_HOST_NRHASH		32
 #define NLM_ADDRHASH(addr)	(ntohl(addr) & (NLM_HOST_NRHASH-1))
 #define NLM_HOST_REBIND		(60 * HZ)
-#define NLM_HOST_EXPIRE		((nrhosts > nlm_max_hosts)? 300 * HZ : 120 * HZ)
-#define NLM_HOST_COLLECT	((nrhosts > nlm_max_hosts)? 120 * HZ :  60 * HZ)
+#define NLM_HOST_EXPIRE		((nrhosts > NLM_HOST_MAX)? 300 * HZ : 120 * HZ)
+#define NLM_HOST_COLLECT	((nrhosts > NLM_HOST_MAX)? 120 * HZ :  60 * HZ)
 
 static struct hlist_head	nlm_hosts[NLM_HOST_NRHASH];
 static unsigned long		next_gc;
@@ -140,7 +141,7 @@ nlm_lookup_host(int server, const struct sockaddr_in *sin,
 	INIT_LIST_HEAD(&host->h_granted);
 	INIT_LIST_HEAD(&host->h_reclaim);
 
-	if (++nrhosts > nlm_max_hosts)
+	if (++nrhosts > NLM_HOST_MAX)
 		next_gc = 0;
 
 out:
