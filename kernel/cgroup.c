@@ -2611,7 +2611,7 @@ int cgroup_clone(struct task_struct *tsk, struct cgroup_subsys *subsys)
 	}
 
 	/* Create the cgroup directory, which also creates the cgroup */
-	ret = vfs_mkdir(inode, dentry, S_IFDIR | 0755);
+	ret = vfs_mkdir(inode, dentry, NULL, S_IFDIR | 0755);
 	child = __d_cgrp(dentry);
 	dput(dentry);
 	if (ret) {
