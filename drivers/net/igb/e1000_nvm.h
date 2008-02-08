@@ -28,13 +28,13 @@
 #ifndef _E1000_NVM_H_
 #define _E1000_NVM_H_
 
-s32  e1000_acquire_nvm(struct e1000_hw *hw);
-void e1000_release_nvm(struct e1000_hw *hw);
-s32  e1000_read_mac_addr(struct e1000_hw *hw);
-s32  e1000_read_part_num(struct e1000_hw *hw, u32 *part_num);
-s32  e1000_read_nvm_eerd(struct e1000_hw *hw, u16 offset, u16 words, u16 *data);
-s32  e1000_write_nvm_spi(struct e1000_hw *hw, u16 offset, u16 words, u16 *data);
-s32  e1000_validate_nvm_checksum(struct e1000_hw *hw);
-s32  e1000_update_nvm_checksum(struct e1000_hw *hw);
+s32  igb_acquire_nvm(struct e1000_hw *hw);
+void igb_release_nvm(struct e1000_hw *hw);
+s32  igb_read_mac_addr(struct e1000_hw *hw);
+s32  igb_read_part_num(struct e1000_hw *hw, u32 *part_num);
+s32  igb_read_nvm_eerd(struct e1000_hw *hw, u16 offset, u16 words, u16 *data);
+s32  igb_write_nvm_spi(struct e1000_hw *hw, u16 offset, u16 words, u16 *data);
+s32  igb_validate_nvm_checksum(struct e1000_hw *hw);
+s32  igb_update_nvm_checksum(struct e1000_hw *hw);
 
 #endif

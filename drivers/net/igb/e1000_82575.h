@@ -30,54 +30,6 @@
 
 #define E1000_RAR_ENTRIES_82575   16
 
-struct e1000_adv_data_desc {
-	u64 buffer_addr;    /* Address of the descriptor's data buffer */
-	union {
-		u32 data;
-		struct {
-			u32 datalen :16; /* Data buffer length */
-			u32 rsvd    :4;
-			u32 dtyp    :4;  /* Descriptor type */
-			u32 dcmd    :8;  /* Descriptor command */
-		} config;
-	} lower;
-	union {
-		u32 data;
-		struct {
-			u32 status  :4;  /* Descriptor status */
-			u32 idx     :4;
-			u32 popts   :6;  /* Packet Options */
-			u32 paylen  :18; /* Payload length */
-		} options;
-	} upper;
-};
-
-
-struct e1000_adv_context_desc {
-	union {
-		u32 ip_config;
-		struct {
-			u32 iplen    :9;
-			u32 maclen   :7;
-			u32 vlan_tag :16;
-		} fields;
-	} ip_setup;
-	u32 seq_num;
-	union {
-		u64 l4_config;
-		struct {
-			u32 mkrloc :9;
-			u32 tucmd  :11;
-			u32 dtyp   :4;
-			u32 adv    :8;
-			u32 rsvd   :4;
-			u32 idx    :4;
-			u32 l4len  :8;
-			u32 mss    :16;
-		} fields;
-	} l4_setup;
-};
-
 /* SRRCTL bit definitions */
 #define E1000_SRRCTL_BSIZEPKT_SHIFT                     10 /* Shift _right_ */
 #define E1000_SRRCTL_BSIZEHDRSIZE_SHIFT                 2  /* Shift _left_ */

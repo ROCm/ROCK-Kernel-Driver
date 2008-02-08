@@ -258,20 +258,13 @@
 
 #define E1000_REGISTER(a, reg) reg
 
-#define E1000_WRITE_REG(a, reg, value) ( \
-    writel((value), ((a)->hw_addr + E1000_REGISTER(a, reg))))
+#define wr32(reg, value) (writel(value, hw->hw_addr + reg))
+#define rd32(reg) (readl(hw->hw_addr + reg))
+#define wrfl() ((void)rd32(E1000_STATUS))
 
-#define E1000_READ_REG(a, reg) (readl((a)->hw_addr + E1000_REGISTER(a, reg)))
-
-#define E1000_WRITE_REG_ARRAY(a, reg, offset, value) ( \
-    writel((value), ((a)->hw_addr + E1000_REGISTER(a, reg) + ((offset) << 2))))
-
-#define E1000_READ_REG_ARRAY(a, reg, offset) ( \
-    readl((a)->hw_addr + E1000_REGISTER(a, reg) + ((offset) << 2)))
-
-#define E1000_READ_REG_ARRAY_DWORD E1000_READ_REG_ARRAY
-#define E1000_WRITE_REG_ARRAY_DWORD E1000_WRITE_REG_ARRAY
-
-#define E1000_WRITE_FLUSH(a) E1000_READ_REG(a, E1000_STATUS)
+#define array_wr32(reg, offset, value) \
+	(writel(value, hw->hw_addr + reg + ((offset) << 2)))
+#define array_rd32(reg, offset) \
+	(readl(hw->hw_addr + reg + ((offset) << 2)))
 
 #endif

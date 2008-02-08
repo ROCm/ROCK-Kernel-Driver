@@ -149,7 +149,7 @@ static int igb_get_settings(struct net_device *netdev, struct ethtool_cmd *ecmd)
 
 	ecmd->transceiver = XCVR_INTERNAL;
 
-	if (E1000_READ_REG(&adapter->hw, E1000_STATUS) & E1000_STATUS_LU) {
+	if (rd32(E1000_STATUS) & E1000_STATUS_LU) {
 
 		adapter->hw.mac.ops.get_speed_and_duplex(hw,
 					&adapter->link_speed,
@@ -180,7 +180,7 @@ static int igb_set_settings(struct net_device *netdev, struct ethtool_cmd *ecmd)
 
 	/* When SoL/IDER sessions are active, autoneg/speed/duplex
 	 * cannot be changed */
-	if (e1000_check_reset_block(hw)) {
+	if (igb_check_reset_block(hw)) {
 		dev_err(&adapter->pdev->dev, "Cannot change link "
 			"characteristics when SoL/IDER is active.\n");
 		return -EINVAL;
@@ -268,7 +268,7 @@ static int igb_set_pauseparam(struct net_device *netdev,
 			igb_reset(adapter);
 	} else
 		retval = ((hw->phy.media_type == e1000_media_type_fiber) ?
-			  e1000_setup_link(hw) : e1000_force_mac_fc(hw));
+			  igb_setup_link(hw) : igb_force_mac_fc(hw));
 
 	clear_bit(__IGB_RESETTING, &adapter->state);
 	return retval;
@@ -353,74 +353,74 @@ static void igb_get_regs(struct net_device *netdev,
 	regs->version = (1 << 24) | (hw->revision_id << 16) | hw->device_id;
 
 	/* General Registers */
-	regs_buff[0] = E1000_READ_REG(hw, E1000_CTRL);
-	regs_buff[1] = E1000_READ_REG(hw, E1000_STATUS);
-	regs_buff[2] = E1000_READ_REG(hw, E1000_CTRL_EXT);
-	regs_buff[3] = E1000_READ_REG(hw, E1000_MDIC);
-	regs_buff[4] = E1000_READ_REG(hw, E1000_SCTL);
-	regs_buff[5] = E1000_READ_REG(hw, E1000_CONNSW);
-	regs_buff[6] = E1000_READ_REG(hw, E1000_VET);
-	regs_buff[7] = E1000_READ_REG(hw, E1000_LEDCTL);
-	regs_buff[8] = E1000_READ_REG(hw, E1000_PBA);
-	regs_buff[9] = E1000_READ_REG(hw, E1000_PBS);
-	regs_buff[10] = E1000_READ_REG(hw, E1000_FRTIMER);
-	regs_buff[11] = E1000_READ_REG(hw, E1000_TCPTIMER);
+	regs_buff[0] = rd32(E1000_CTRL);
+	regs_buff[1] = rd32(E1000_STATUS);
+	regs_buff[2] = rd32(E1000_CTRL_EXT);
+	regs_buff[3] = rd32(E1000_MDIC);
+	regs_buff[4] = rd32(E1000_SCTL);
+	regs_buff[5] = rd32(E1000_CONNSW);
+	regs_buff[6] = rd32(E1000_VET);
+	regs_buff[7] = rd32(E1000_LEDCTL);
+	regs_buff[8] = rd32(E1000_PBA);
+	regs_buff[9] = rd32(E1000_PBS);
+	regs_buff[10] = rd32(E1000_FRTIMER);
+	regs_buff[11] = rd32(E1000_TCPTIMER);
 
 	/* NVM Register */
-	regs_buff[12] = E1000_READ_REG(hw, E1000_EECD);
+	regs_buff[12] = rd32(E1000_EECD);
 
 	/* Interrupt */
-	regs_buff[13] = E1000_READ_REG(hw, E1000_EICR);
-	regs_buff[14] = E1000_READ_REG(hw, E1000_EICS);
-	regs_buff[15] = E1000_READ_REG(hw, E1000_EIMS);
-	regs_buff[16] = E1000_READ_REG(hw, E1000_EIMC);
-	regs_buff[17] = E1000_READ_REG(hw, E1000_EIAC);
-	regs_buff[18] = E1000_READ_REG(hw, E1000_EIAM);
-	regs_buff[19] = E1000_READ_REG(hw, E1000_ICR);
-	regs_buff[20] = E1000_READ_REG(hw, E1000_ICS);
-	regs_buff[21] = E1000_READ_REG(hw, E1000_IMS);
-	regs_buff[22] = E1000_READ_REG(hw, E1000_IMC);
-	regs_buff[23] = E1000_READ_REG(hw, E1000_IAC);
-	regs_buff[24] = E1000_READ_REG(hw, E1000_IAM);
-	regs_buff[25] = E1000_READ_REG(hw, E1000_IMIRVP);
+	regs_buff[13] = rd32(E1000_EICR);
+	regs_buff[14] = rd32(E1000_EICS);
+	regs_buff[15] = rd32(E1000_EIMS);
+	regs_buff[16] = rd32(E1000_EIMC);
+	regs_buff[17] = rd32(E1000_EIAC);
+	regs_buff[18] = rd32(E1000_EIAM);
+	regs_buff[19] = rd32(E1000_ICR);
+	regs_buff[20] = rd32(E1000_ICS);
+	regs_buff[21] = rd32(E1000_IMS);
+	regs_buff[22] = rd32(E1000_IMC);
+	regs_buff[23] = rd32(E1000_IAC);
+	regs_buff[24] = rd32(E1000_IAM);
+	regs_buff[25] = rd32(E1000_IMIRVP);
 
 	/* Flow Control */
-	regs_buff[26] = E1000_READ_REG(hw, E1000_FCAL);
-	regs_buff[27] = E1000_READ_REG(hw, E1000_FCAH);
-	regs_buff[28] = E1000_READ_REG(hw, E1000_FCTTV);
-	regs_buff[29] = E1000_READ_REG(hw, E1000_FCRTL);
-	regs_buff[30] = E1000_READ_REG(hw, E1000_FCRTH);
-	regs_buff[31] = E1000_READ_REG(hw, E1000_FCRTV);
+	regs_buff[26] = rd32(E1000_FCAL);
+	regs_buff[27] = rd32(E1000_FCAH);
+	regs_buff[28] = rd32(E1000_FCTTV);
+	regs_buff[29] = rd32(E1000_FCRTL);
+	regs_buff[30] = rd32(E1000_FCRTH);
+	regs_buff[31] = rd32(E1000_FCRTV);
 
 	/* Receive */
-	regs_buff[32] = E1000_READ_REG(hw, E1000_RCTL);
-	regs_buff[33] = E1000_READ_REG(hw, E1000_RXCSUM);
-	regs_buff[34] = E1000_READ_REG(hw, E1000_RLPML);
-	regs_buff[35] = E1000_READ_REG(hw, E1000_RFCTL);
-	regs_buff[36] = E1000_READ_REG(hw, E1000_MRQC);
-	regs_buff[37] = E1000_READ_REG(hw, E1000_VMD_CTL);
+	regs_buff[32] = rd32(E1000_RCTL);
+	regs_buff[33] = rd32(E1000_RXCSUM);
+	regs_buff[34] = rd32(E1000_RLPML);
+	regs_buff[35] = rd32(E1000_RFCTL);
+	regs_buff[36] = rd32(E1000_MRQC);
+	regs_buff[37] = rd32(E1000_VMD_CTL);
 
 	/* Transmit */
-	regs_buff[38] = E1000_READ_REG(hw, E1000_TCTL);
-	regs_buff[39] = E1000_READ_REG(hw, E1000_TCTL_EXT);
-	regs_buff[40] = E1000_READ_REG(hw, E1000_TIPG);
-	regs_buff[41] = E1000_READ_REG(hw, E1000_DTXCTL);
+	regs_buff[38] = rd32(E1000_TCTL);
+	regs_buff[39] = rd32(E1000_TCTL_EXT);
+	regs_buff[40] = rd32(E1000_TIPG);
+	regs_buff[41] = rd32(E1000_DTXCTL);
 
 	/* Wake Up */
-	regs_buff[42] = E1000_READ_REG(hw, E1000_WUC);
-	regs_buff[43] = E1000_READ_REG(hw, E1000_WUFC);
-	regs_buff[44] = E1000_READ_REG(hw, E1000_WUS);
-	regs_buff[45] = E1000_READ_REG(hw, E1000_IPAV);
-	regs_buff[46] = E1000_READ_REG(hw, E1000_WUPL);
+	regs_buff[42] = rd32(E1000_WUC);
+	regs_buff[43] = rd32(E1000_WUFC);
+	regs_buff[44] = rd32(E1000_WUS);
+	regs_buff[45] = rd32(E1000_IPAV);
+	regs_buff[46] = rd32(E1000_WUPL);
 
 	/* MAC */
-	regs_buff[47] = E1000_READ_REG(hw, E1000_PCS_CFG0);
-	regs_buff[48] = E1000_READ_REG(hw, E1000_PCS_LCTL);
-	regs_buff[49] = E1000_READ_REG(hw, E1000_PCS_LSTAT);
-	regs_buff[50] = E1000_READ_REG(hw, E1000_PCS_ANADV);
-	regs_buff[51] = E1000_READ_REG(hw, E1000_PCS_LPAB);
-	regs_buff[52] = E1000_READ_REG(hw, E1000_PCS_NPTX);
-	regs_buff[53] = E1000_READ_REG(hw, E1000_PCS_LPABNP);
+	regs_buff[47] = rd32(E1000_PCS_CFG0);
+	regs_buff[48] = rd32(E1000_PCS_LCTL);
+	regs_buff[49] = rd32(E1000_PCS_LSTAT);
+	regs_buff[50] = rd32(E1000_PCS_ANADV);
+	regs_buff[51] = rd32(E1000_PCS_LPAB);
+	regs_buff[52] = rd32(E1000_PCS_NPTX);
+	regs_buff[53] = rd32(E1000_PCS_LPABNP);
 
 	/* Statistics */
 	regs_buff[54] = adapter->stats.crcerrs;
@@ -497,69 +497,69 @@ static void igb_get_regs(struct net_device *netdev,
 	#define E1000_FFLT_REG(_i)    (0x05F00 + ((_i) * 8))
 
 	for (i = 0; i < 4; i++)
-		regs_buff[121 + i] = E1000_READ_REG(hw, E1000_SRRCTL(i));
+		regs_buff[121 + i] = rd32(E1000_SRRCTL(i));
 	for (i = 0; i < 4; i++)
-		regs_buff[125 + i] = E1000_READ_REG(hw, E1000_PSRTYPE_REG(i));
+		regs_buff[125 + i] = rd32(E1000_PSRTYPE_REG(i));
 	for (i = 0; i < 4; i++)
-		regs_buff[129 + i] = E1000_READ_REG(hw, E1000_RDBAL(i));
+		regs_buff[129 + i] = rd32(E1000_RDBAL(i));
 	for (i = 0; i < 4; i++)
-		regs_buff[133 + i] = E1000_READ_REG(hw, E1000_RDBAH(i));
+		regs_buff[133 + i] = rd32(E1000_RDBAH(i));
 	for (i = 0; i < 4; i++)
-		regs_buff[137 + i] = E1000_READ_REG(hw, E1000_RDLEN(i));
+		regs_buff[137 + i] = rd32(E1000_RDLEN(i));
 	for (i = 0; i < 4; i++)
-		regs_buff[141 + i] = E1000_READ_REG(hw, E1000_RDH(i));
+		regs_buff[141 + i] = rd32(E1000_RDH(i));
 	for (i = 0; i < 4; i++)
-		regs_buff[145 + i] = E1000_READ_REG(hw, E1000_RDT(i));
+		regs_buff[145 + i] = rd32(E1000_RDT(i));
 	for (i = 0; i < 4; i++)
-		regs_buff[149 + i] = E1000_READ_REG(hw, E1000_RXDCTL(i));
+		regs_buff[149 + i] = rd32(E1000_RXDCTL(i));
 
 	for (i = 0; i < 10; i++)
-		regs_buff[153 + i] = E1000_READ_REG(hw, E1000_EITR(i));
+		regs_buff[153 + i] = rd32(E1000_EITR(i));
 	for (i = 0; i < 8; i++)
-		regs_buff[163 + i] = E1000_READ_REG(hw, E1000_IMIR(i));
+		regs_buff[163 + i] = rd32(E1000_IMIR(i));
 	for (i = 0; i < 8; i++)
-		regs_buff[171 + i] = E1000_READ_REG(hw, E1000_IMIREXT(i));
+		regs_buff[171 + i] = rd32(E1000_IMIREXT(i));
 	for (i = 0; i < 16; i++)
-		regs_buff[179 + i] = E1000_READ_REG(hw, E1000_RAL(i));
+		regs_buff[179 + i] = rd32(E1000_RAL(i));
 	for (i = 0; i < 16; i++)
-		regs_buff[195 + i] = E1000_READ_REG(hw, E1000_RAH(i));
+		regs_buff[195 + i] = rd32(E1000_RAH(i));
 
 	for (i = 0; i < 4; i++)
-		regs_buff[211 + i] = E1000_READ_REG(hw, E1000_TDBAL(i));
+		regs_buff[211 + i] = rd32(E1000_TDBAL(i));
 	for (i = 0; i < 4; i++)
-		regs_buff[215 + i] = E1000_READ_REG(hw, E1000_TDBAH(i));
+		regs_buff[215 + i] = rd32(E1000_TDBAH(i));
 	for (i = 0; i < 4; i++)
-		regs_buff[219 + i] = E1000_READ_REG(hw, E1000_TDLEN(i));
+		regs_buff[219 + i] = rd32(E1000_TDLEN(i));
 	for (i = 0; i < 4; i++)
-		regs_buff[223 + i] = E1000_READ_REG(hw, E1000_TDH(i));
+		regs_buff[223 + i] = rd32(E1000_TDH(i));
 	for (i = 0; i < 4; i++)
-		regs_buff[227 + i] = E1000_READ_REG(hw, E1000_TDT(i));
+		regs_buff[227 + i] = rd32(E1000_TDT(i));
 	for (i = 0; i < 4; i++)
-		regs_buff[231 + i] = E1000_READ_REG(hw, E1000_TXDCTL(i));
+		regs_buff[231 + i] = rd32(E1000_TXDCTL(i));
 	for (i = 0; i < 4; i++)
-		regs_buff[235 + i] = E1000_READ_REG(hw, E1000_TDWBAL(i));
+		regs_buff[235 + i] = rd32(E1000_TDWBAL(i));
 	for (i = 0; i < 4; i++)
-		regs_buff[239 + i] = E1000_READ_REG(hw, E1000_TDWBAH(i));
+		regs_buff[239 + i] = rd32(E1000_TDWBAH(i));
 	for (i = 0; i < 4; i++)
-		regs_buff[243 + i] = E1000_READ_REG(hw, E1000_DCA_TXCTRL(i));
+		regs_buff[243 + i] = rd32(E1000_DCA_TXCTRL(i));
 
 	for (i = 0; i < 4; i++)
-		regs_buff[247 + i] = E1000_READ_REG(hw, E1000_IP4AT_REG(i));
+		regs_buff[247 + i] = rd32(E1000_IP4AT_REG(i));
 	for (i = 0; i < 4; i++)
-		regs_buff[251 + i] = E1000_READ_REG(hw, E1000_IP6AT_REG(i));
+		regs_buff[251 + i] = rd32(E1000_IP6AT_REG(i));
 	for (i = 0; i < 32; i++)
-		regs_buff[255 + i] = E1000_READ_REG(hw, E1000_WUPM_REG(i));
+		regs_buff[255 + i] = rd32(E1000_WUPM_REG(i));
 	for (i = 0; i < 128; i++)
-		regs_buff[287 + i] = E1000_READ_REG(hw, E1000_FFMT_REG(i));
+		regs_buff[287 + i] = rd32(E1000_FFMT_REG(i));
 	for (i = 0; i < 128; i++)
-		regs_buff[415 + i] = E1000_READ_REG(hw, E1000_FFVT_REG(i));
+		regs_buff[415 + i] = rd32(E1000_FFVT_REG(i));
 	for (i = 0; i < 4; i++)
-		regs_buff[543 + i] = E1000_READ_REG(hw, E1000_FFLT_REG(i));
+		regs_buff[543 + i] = rd32(E1000_FFLT_REG(i));
 
-	regs_buff[547] = E1000_READ_REG(hw, E1000_TDFH);
-	regs_buff[548] = E1000_READ_REG(hw, E1000_TDFT);
-	regs_buff[549] = E1000_READ_REG(hw, E1000_TDFHS);
-	regs_buff[550] = E1000_READ_REG(hw, E1000_TDFPC);
+	regs_buff[547] = rd32(E1000_TDFH);
+	regs_buff[548] = rd32(E1000_TDFT);
+	regs_buff[549] = rd32(E1000_TDFHS);
+	regs_buff[550] = rd32(E1000_TDFPC);
 
 }
 
@@ -671,7 +671,7 @@ static int igb_set_eeprom(struct net_device *netdev,
 	/* Update the checksum over the first part of the EEPROM if needed
 	 * and flush shadow RAM for 82573 controllers */
 	if ((ret_val == 0) && ((first_word <= NVM_CHECKSUM_REG)))
-		e1000_update_nvm_checksum(hw);
+		igb_update_nvm_checksum(hw);
 
 	kfree(eeprom_buff);
 	return ret_val;
@@ -933,6 +933,7 @@ static bool reg_set_and_check(struct igb_adapter *adapter, u64 *data,
 
 static int igb_reg_test(struct igb_adapter *adapter, u64 *data)
 {
+	struct e1000_hw *hw = &adapter->hw;
 	struct igb_reg_test *test;
 	u32 value, before, after;
 	u32 i, toggle;
@@ -945,10 +946,10 @@ static int igb_reg_test(struct igb_adapter *adapter, u64 *data)
 	 * tests.  Some bits are read-only, some toggle, and some
 	 * are writable on newer MACs.
 	 */
-	before = E1000_READ_REG(&adapter->hw, E1000_STATUS);
-	value = (E1000_READ_REG(&adapter->hw, E1000_STATUS) & toggle);
-	E1000_WRITE_REG(&adapter->hw, E1000_STATUS, toggle);
-	after = E1000_READ_REG(&adapter->hw, E1000_STATUS) & toggle;
+	before = rd32(E1000_STATUS);
+	value = (rd32(E1000_STATUS) & toggle);
+	wr32(E1000_STATUS, toggle);
+	after = rd32(E1000_STATUS) & toggle;
 	if (value != after) {
 		dev_err(&adapter->pdev->dev, "failed STATUS register test "
 			"got: 0x%08X expected: 0x%08X\n", after, value);
@@ -956,7 +957,7 @@ static int igb_reg_test(struct igb_adapter *adapter, u64 *data)
 		return 1;
 	}
 	/* restore previous status */
-	E1000_WRITE_REG(&adapter->hw, E1000_STATUS, before);
+	wr32(E1000_STATUS, before);
 
 	/* Perform the remainder of the register test, looping through
 	 * the test table until we either fail or reach the null entry.
@@ -1031,14 +1032,16 @@ static irqreturn_t igb_test_intr(int irq, void *data)
 {
 	struct net_device *netdev = (struct net_device *) data;
 	struct igb_adapter *adapter = netdev_priv(netdev);
+	struct e1000_hw *hw = &adapter->hw;
 
-	adapter->test_icr |= E1000_READ_REG(&adapter->hw, E1000_ICR);
+	adapter->test_icr |= rd32(E1000_ICR);
 
 	return IRQ_HANDLED;
 }
 
 static int igb_intr_test(struct igb_adapter *adapter, u64 *data)
 {
+	struct e1000_hw *hw = &adapter->hw;
 	struct net_device *netdev = adapter->netdev;
 	u32 mask, i = 0, shared_int = true;
 	u32 irq = adapter->pdev->irq;
@@ -1067,7 +1070,7 @@ static int igb_intr_test(struct igb_adapter *adapter, u64 *data)
 		(shared_int ? "shared" : "unshared"));
 
 	/* Disable all the interrupts */
-	E1000_WRITE_REG(&adapter->hw, E1000_IMC, 0xFFFFFFFF);
+	wr32(E1000_IMC, 0xFFFFFFFF);
 	msleep(10);
 
 	/* Test each interrupt */
@@ -1083,10 +1086,8 @@ static int igb_intr_test(struct igb_adapter *adapter, u64 *data)
 			 * test failed.
 			 */
 			adapter->test_icr = 0;
-			E1000_WRITE_REG(&adapter->hw, E1000_IMC,
-					~mask & 0x00007FFF);
-			E1000_WRITE_REG(&adapter->hw, E1000_ICS,
-					~mask & 0x00007FFF);
+			wr32(E1000_IMC, ~mask & 0x00007FFF);
+			wr32(E1000_ICS, ~mask & 0x00007FFF);
 			msleep(10);
 
 			if (adapter->test_icr & mask) {
@@ -1102,8 +1103,8 @@ static int igb_intr_test(struct igb_adapter *adapter, u64 *data)
 		 * test failed.
 		 */
 		adapter->test_icr = 0;
-		E1000_WRITE_REG(&adapter->hw, E1000_IMS, mask);
-		E1000_WRITE_REG(&adapter->hw, E1000_ICS, mask);
+		wr32(E1000_IMS, mask);
+		wr32(E1000_ICS, mask);
 		msleep(10);
 
 		if (!(adapter->test_icr & mask)) {
@@ -1119,10 +1120,8 @@ static int igb_intr_test(struct igb_adapter *adapter, u64 *data)
 			 * test failed.
 			 */
 			adapter->test_icr = 0;
-			E1000_WRITE_REG(&adapter->hw, E1000_IMC,
-					~mask & 0x00007FFF);
-			E1000_WRITE_REG(&adapter->hw, E1000_ICS,
-					~mask & 0x00007FFF);
+			wr32(E1000_IMC, ~mask & 0x00007FFF);
+			wr32(E1000_ICS, ~mask & 0x00007FFF);
 			msleep(10);
 
 			if (adapter->test_icr) {
@@ -1133,7 +1132,7 @@ static int igb_intr_test(struct igb_adapter *adapter, u64 *data)
 	}
 
 	/* Disable all the interrupts */
-	E1000_WRITE_REG(&adapter->hw, E1000_IMC, 0xFFFFFFFF);
+	wr32(E1000_IMC, 0xFFFFFFFF);
 	msleep(10);
 
 	/* Unhook test interrupt handler */
@@ -1193,6 +1192,7 @@ static void igb_free_desc_rings(struct igb_adapter *adapter)
 
 static int igb_setup_desc_rings(struct igb_adapter *adapter)
 {
+	struct e1000_hw *hw = &adapter->hw;
 	struct igb_ring *tx_ring = &adapter->test_tx_ring;
 	struct igb_ring *rx_ring = &adapter->test_rx_ring;
 	struct pci_dev *pdev = adapter->pdev;
@@ -1222,15 +1222,14 @@ static int igb_setup_desc_rings(struct igb_adapter *adapter)
 	}
 	tx_ring->next_to_use = tx_ring->next_to_clean = 0;
 
-	E1000_WRITE_REG(&adapter->hw, E1000_TDBAL(0),
+	wr32(E1000_TDBAL(0),
 			((u64) tx_ring->dma & 0x00000000FFFFFFFF));
-	E1000_WRITE_REG(&adapter->hw, E1000_TDBAH(0),
-			((u64) tx_ring->dma >> 32));
-	E1000_WRITE_REG(&adapter->hw, E1000_TDLEN(0),
+	wr32(E1000_TDBAH(0), ((u64) tx_ring->dma >> 32));
+	wr32(E1000_TDLEN(0),
 			tx_ring->count * sizeof(struct e1000_tx_desc));
-	E1000_WRITE_REG(&adapter->hw, E1000_TDH(0), 0);
-	E1000_WRITE_REG(&adapter->hw, E1000_TDT(0), 0);
-	E1000_WRITE_REG(&adapter->hw, E1000_TCTL,
+	wr32(E1000_TDH(0), 0);
+	wr32(E1000_TDT(0), 0);
+	wr32(E1000_TCTL,
 			E1000_TCTL_PSP | E1000_TCTL_EN |
 			E1000_COLLISION_THRESHOLD << E1000_CT_SHIFT |
 			E1000_COLLISION_DISTANCE << E1000_COLD_SHIFT);
@@ -1281,20 +1280,20 @@ static int igb_setup_desc_rings(struct igb_adapter *adapter)
 	}
 	rx_ring->next_to_use = rx_ring->next_to_clean = 0;
 
-	rctl = E1000_READ_REG(&adapter->hw, E1000_RCTL);
-	E1000_WRITE_REG(&adapter->hw, E1000_RCTL, rctl & ~E1000_RCTL_EN);
-	E1000_WRITE_REG(&adapter->hw, E1000_RDBAL(0),
+	rctl = rd32(E1000_RCTL);
+	wr32(E1000_RCTL, rctl & ~E1000_RCTL_EN);
+	wr32(E1000_RDBAL(0),
 			((u64) rx_ring->dma & 0xFFFFFFFF));
-	E1000_WRITE_REG(&adapter->hw, E1000_RDBAH(0),
+	wr32(E1000_RDBAH(0),
 			((u64) rx_ring->dma >> 32));
-	E1000_WRITE_REG(&adapter->hw, E1000_RDLEN(0), rx_ring->size);
-	E1000_WRITE_REG(&adapter->hw, E1000_RDH(0), 0);
-	E1000_WRITE_REG(&adapter->hw, E1000_RDT(0), 0);
+	wr32(E1000_RDLEN(0), rx_ring->size);
+	wr32(E1000_RDH(0), 0);
+	wr32(E1000_RDT(0), 0);
 	rctl = E1000_RCTL_EN | E1000_RCTL_BAM | E1000_RCTL_SZ_2048 |
 		E1000_RCTL_LBM_NO | E1000_RCTL_RDMTS_HALF |
 		(adapter->hw.mac.mc_filter_type << E1000_RCTL_MO_SHIFT);
-	E1000_WRITE_REG(&adapter->hw, E1000_RCTL, rctl);
-	E1000_WRITE_REG(&adapter->hw, E1000_SRRCTL(0), 0);
+	wr32(E1000_RCTL, rctl);
+	wr32(E1000_SRRCTL(0), 0);
 
 	for (i = 0; i < rx_ring->count; i++) {
 		struct e1000_rx_desc *rx_desc = E1000_RX_DESC(*rx_ring, i);
@@ -1350,13 +1349,13 @@ static int igb_integrated_phy_loopback(struct igb_adapter *adapter)
 		hw->phy.ops.write_phy_reg(hw, PHY_CONTROL, 0x8140);
 	}
 
-	ctrl_reg = E1000_READ_REG(hw, E1000_CTRL);
+	ctrl_reg = rd32(E1000_CTRL);
 
 	/* force 1000, set loopback */
 	hw->phy.ops.write_phy_reg(hw, PHY_CONTROL, 0x4140);
 
 	/* Now set up the MAC to the same speed/duplex as the PHY. */
-	ctrl_reg = E1000_READ_REG(hw, E1000_CTRL);
+	ctrl_reg = rd32(E1000_CTRL);
 	ctrl_reg &= ~E1000_CTRL_SPD_SEL; /* Clear the speed sel bits */
 	ctrl_reg |= (E1000_CTRL_FRCSPD | /* Set the Force Speed Bit */
 		     E1000_CTRL_FRCDPX | /* Set the Force Duplex Bit */
@@ -1369,12 +1368,12 @@ static int igb_integrated_phy_loopback(struct igb_adapter *adapter)
 	else {
 		/* Set the ILOS bit on the fiber Nic if half duplex link is
 		 * detected. */
-		stat_reg = E1000_READ_REG(hw, E1000_STATUS);
+		stat_reg = rd32(E1000_STATUS);
 		if ((stat_reg & E1000_STATUS_FD) == 0)
 			ctrl_reg |= (E1000_CTRL_ILOS | E1000_CTRL_SLU);
 	}
 
-	E1000_WRITE_REG(hw, E1000_CTRL, ctrl_reg);
+	wr32(E1000_CTRL, ctrl_reg);
 
 	/* Disable the receiver on the PHY so when a cable is plugged in, the
 	 * PHY does not begin to autoneg when a cable is reconnected to the NIC.
@@ -1399,9 +1398,9 @@ static int igb_setup_loopback_test(struct igb_adapter *adapter)
 
 	if (hw->phy.media_type == e1000_media_type_fiber ||
 	    hw->phy.media_type == e1000_media_type_internal_serdes) {
-		rctl = E1000_READ_REG(hw, E1000_RCTL);
+		rctl = rd32(E1000_RCTL);
 		rctl |= E1000_RCTL_LBM_TCVR;
-		E1000_WRITE_REG(hw, E1000_RCTL, rctl);
+		wr32(E1000_RCTL, rctl);
 		return 0;
 	} else if (hw->phy.media_type == e1000_media_type_copper) {
 		return igb_set_phy_loopback(adapter);
@@ -1416,16 +1415,16 @@ static void igb_loopback_cleanup(struct igb_adapter *adapter)
 	u32 rctl;
 	u16 phy_reg;
 
-	rctl = E1000_READ_REG(hw, E1000_RCTL);
+	rctl = rd32(E1000_RCTL);
 	rctl &= ~(E1000_RCTL_LBM_TCVR | E1000_RCTL_LBM_MAC);
-	E1000_WRITE_REG(hw, E1000_RCTL, rctl);
+	wr32(E1000_RCTL, rctl);
 
 	hw->mac.autoneg = true;
 	hw->phy.ops.read_phy_reg(hw, PHY_CONTROL, &phy_reg);
 	if (phy_reg & MII_CR_LOOPBACK) {
 		phy_reg &= ~MII_CR_LOOPBACK;
 		hw->phy.ops.write_phy_reg(hw, PHY_CONTROL, phy_reg);
-		e1000_phy_sw_reset(hw);
+		igb_phy_sw_reset(hw);
 	}
 }
 
@@ -1451,6 +1450,7 @@ static int igb_check_lbtest_frame(struct sk_buff *skb, unsigned int frame_size)
 
 static int igb_run_loopback_test(struct igb_adapter *adapter)
 {
+	struct e1000_hw *hw = &adapter->hw;
 	struct igb_ring *tx_ring = &adapter->test_tx_ring;
 	struct igb_ring *rx_ring = &adapter->test_rx_ring;
 	struct pci_dev *pdev = adapter->pdev;
@@ -1458,7 +1458,7 @@ static int igb_run_loopback_test(struct igb_adapter *adapter)
 	int ret_val = 0;
 	unsigned long time;
 
-	E1000_WRITE_REG(&adapter->hw, E1000_RDT(0), rx_ring->count - 1);
+	wr32(E1000_RDT(0), rx_ring->count - 1);
 
 	/* Calculate the loop count based on the largest descriptor ring
 	 * The idea is to wrap the largest ring a number of times using 64
@@ -1483,7 +1483,7 @@ static int igb_run_loopback_test(struct igb_adapter *adapter)
 			if (k == tx_ring->count)
 				k = 0;
 		}
-		E1000_WRITE_REG(&adapter->hw, E1000_TDT(0), k);
+		wr32(E1000_TDT(0), k);
 		msleep(200);
 		time = jiffies; /* set the start time for the receive */
 		good_cnt = 0;
@@ -1521,7 +1521,7 @@ static int igb_loopback_test(struct igb_adapter *adapter, u64 *data)
 {
 	/* PHY loopback cannot be performed if SoL/IDER
 	 * sessions are active */
-	if (e1000_check_reset_block(&adapter->hw)) {
+	if (igb_check_reset_block(&adapter->hw)) {
 		dev_err(&adapter->pdev->dev,
 			"Cannot do PHY loopback test "
 			"when SoL/IDER is active.\n");
@@ -1545,27 +1545,28 @@ out:
 
 static int igb_link_test(struct igb_adapter *adapter, u64 *data)
 {
+	struct e1000_hw *hw = &adapter->hw;
 	*data = 0;
-	if (adapter->hw.phy.media_type == e1000_media_type_internal_serdes) {
+	if (hw->phy.media_type == e1000_media_type_internal_serdes) {
 		int i = 0;
-		adapter->hw.mac.serdes_has_link = false;
+		hw->mac.serdes_has_link = false;
 
 		/* On some blade server designs, link establishment
 		 * could take as long as 2-3 minutes */
 		do {
-			adapter->hw.mac.ops.check_for_link(&adapter->hw);
-			if (adapter->hw.mac.serdes_has_link)
+			hw->mac.ops.check_for_link(&adapter->hw);
+			if (hw->mac.serdes_has_link)
 				return *data;
 			msleep(20);
 		} while (i++ < 3750);
 
 		*data = 1;
 	} else {
-		adapter->hw.mac.ops.check_for_link(&adapter->hw);
-		if (adapter->hw.mac.autoneg)
+		hw->mac.ops.check_for_link(&adapter->hw);
+		if (hw->mac.autoneg)
 			msleep(4000);
 
-		if (!(E1000_READ_REG(&adapter->hw, E1000_STATUS) &
+		if (!(rd32(E1000_STATUS) &
 		      E1000_STATUS_LU))
 			*data = 1;
 	}
@@ -1660,7 +1661,7 @@ static int igb_wol_exclusion(struct igb_adapter *adapter,
 		break;
 	case E1000_DEV_ID_82575EB_FIBER_SERDES:
 		/* Wake events not supported on port B */
-		if (E1000_READ_REG(hw, E1000_STATUS) & E1000_STATUS_FUNC_1) {
+		if (rd32(E1000_STATUS) & E1000_STATUS_FUNC_1) {
 			wol->supported = 0;
 			break;
 		}
@@ -1671,7 +1672,7 @@ static int igb_wol_exclusion(struct igb_adapter *adapter,
 		/* dual port cards only support WoL on port A from now on
 		 * unless it was enabled in the eeprom for port B
 		 * so exclude FUNC_1 ports from having WoL enabled */
-		if (E1000_READ_REG(hw, E1000_STATUS) & E1000_STATUS_FUNC_1 &&
+		if (rd32(E1000_STATUS) & E1000_STATUS_FUNC_1 &&
 		    !adapter->eeprom_wol) {
 			wol->supported = 0;
 			break;
@@ -1759,12 +1760,12 @@ static int igb_phys_id(struct net_device *netdev, u32 data)
 	if (!data || data > (u32)(MAX_SCHEDULE_TIMEOUT / HZ))
 		data = (u32)(MAX_SCHEDULE_TIMEOUT / HZ);
 
-	e1000_blink_led(hw);
+	igb_blink_led(hw);
 	msleep_interruptible(data * 1000);
 
-	e1000_led_off(hw);
+	igb_led_off(hw);
 	clear_bit(IGB_LED_ON, &adapter->led_status);
-	e1000_cleanup_led(hw);
+	igb_cleanup_led(hw);
 
 	return 0;
 }
