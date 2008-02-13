@@ -357,7 +357,7 @@ int __o2hb_active_resources(void)
 {
 	return !list_empty(&o2hb_all_regions);
 }
-EXPORT_SYMBOL_GPL(o2hb_active_resources);
+EXPORT_SYMBOL_GPL(__o2hb_active_resources);
 
 void o2hb_for_each_resource(o2hb_action_fn func, void *data)
 {
