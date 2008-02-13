@@ -570,6 +570,9 @@ static int ocfs2_fill_super(struct super_block *sb, void *data, int silent)
 		goto read_super_error;
 	}
 
+#if 0
+	/* We do this in the DLM as well. If it fails there, we still fail
+	 * the mount. -jeffm */
 	/* for now we only have one cluster/node, make sure we see it
 	 * in the heartbeat universe */
 	if (parsed_options.mount_opt & OCFS2_MOUNT_HB_LOCAL) {
@@ -578,6 +581,7 @@ static int ocfs2_fill_super(struct super_block *sb, void *data, int silent)
 			goto read_super_error;
 		}
 	}
+#endif
 
 	/* probe for superblock */
 	status = ocfs2_sb_probe(sb, &bh, &sector_size);

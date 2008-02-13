@@ -686,7 +686,7 @@ static int dlm_query_join_handler(struct o2net_msg *msg, u32 len, void *data,
 	 * to back off and try again.  This gives heartbeat a chance
 	 * to catch up.
 	 */
-	if (!o2hb_check_node_heartbeating(query->node_idx)) {
+	if (!o2hb_check_node_heartbeating(query->domain, query->node_idx)) {
 		mlog(0, "node %u is not in our live map yet\n",
 		     query->node_idx);
 
@@ -1048,7 +1048,8 @@ static int dlm_try_to_join_domain(struct dlm_ctxt *dlm)
 	/* group sem locking should work for us here -- we're already
 	 * registered for heartbeat events so filling this should be
 	 * atomic wrt getting those handlers called. */
-	o2hb_fill_node_map(dlm->live_nodes_map, sizeof(dlm->live_nodes_map));
+	o2hb_fill_node_map(dlm->name, dlm->live_nodes_map,
+	                   sizeof(dlm->live_nodes_map));
 
 	spin_lock(&dlm->spinlock);
 	memcpy(ctxt->live_map, dlm->live_nodes_map, sizeof(ctxt->live_map));
@@ -1128,8 +1129,8 @@ bail:
 
 static void dlm_unregister_domain_handlers(struct dlm_ctxt *dlm)
 {
-	o2hb_unregister_callback(NULL, &dlm->dlm_hb_up);
-	o2hb_unregister_callback(NULL, &dlm->dlm_hb_down);
+	o2hb_unregister_callback(&dlm->dlm_hb_up);
+	o2hb_unregister_callback(&dlm->dlm_hb_down);
 	o2net_unregister_handler_list(&dlm->dlm_domain_handlers);
 }
 
@@ -1465,7 +1466,7 @@ struct dlm_ctxt * dlm_register_domain(const char *domain,
 		goto leave;
 	}
 
-	if (!o2hb_check_local_node_heartbeating()) {
+	if (!o2hb_check_local_node_heartbeating(domain)) {
 		mlog(ML_ERROR, "the local node has not been configured, or is "
 		     "not heartbeating\n");
 		ret = -EPROTO;
