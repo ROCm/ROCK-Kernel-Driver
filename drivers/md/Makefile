@@ -6,7 +6,8 @@ dm-mod-objs	:= dm.o dm-table.o dm-target.o dm-linear.o dm-stripe.o \
 		   dm-ioctl.o dm-io.o kcopyd.o
 dm-multipath-objs := dm-hw-handler.o dm-path-selector.o dm-mpath.o
 dm-snapshot-objs := dm-snap.o dm-exception-store.o
-dm-mirror-objs	:= dm-log.o dm-raid1.o
+dm-mirror-objs	:= dm-raid1.o
+dm-replicator-objs := dm-repl.o
 dm-rdac-objs	:= dm-mpath-rdac.o
 dm-hp-sw-objs	:= dm-mpath-hp-sw.o
 md-mod-objs     := md.o bitmap.o
@@ -39,9 +40,10 @@ obj-$(CONFIG_DM_MULTIPATH_EMC)	+= dm-emc.o
 obj-$(CONFIG_DM_MULTIPATH_HP)	+= dm-hp-sw.o
 obj-$(CONFIG_DM_MULTIPATH_RDAC)	+= dm-rdac.o
 obj-$(CONFIG_DM_SNAPSHOT)	+= dm-snapshot.o
-obj-$(CONFIG_DM_MIRROR)		+= dm-mirror.o
+obj-$(CONFIG_DM_MIRROR)		+= dm-mirror.o dm-log.o
 obj-$(CONFIG_DM_ZERO)		+= dm-zero.o
-
+obj-$(CONFIG_DM_RAID45)		+= dm-raid4-5.o dm-log.o dm-mem-cache.o \
+				   dm-region_hash.o dm-message.o
 quiet_cmd_unroll = UNROLL  $@
       cmd_unroll = $(PERL) $(srctree)/$(src)/unroll.pl $(UNROLL) \
                    < $< > $@ || ( rm -f $@ && exit 1 )
