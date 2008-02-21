@@ -121,7 +121,7 @@ int xen_limit_pages_to_max_mfn(
 u64 jiffies_to_st(unsigned long jiffies);
 
 #ifdef CONFIG_XEN_SCRUB_PAGES
-#define scrub_pages(_p,_n) memset((void *)(_p), 0, (_n) << PAGE_SHIFT)
+void scrub_pages(void *, unsigned int);
 #else
 #define scrub_pages(_p,_n) ((void)0)
 #endif
@@ -136,7 +136,12 @@ u64 jiffies_to_st(unsigned long jiffies);
 #define MULTI_UVMDOMID_INDEX 4
 #endif
 
+#ifdef CONFIG_XEN
 #define is_running_on_xen() 1
+#else
+extern char *hypercall_stubs;
+#define is_running_on_xen() (!!hypercall_stubs)
+#endif
 
 static inline int
 HYPERVISOR_yield(

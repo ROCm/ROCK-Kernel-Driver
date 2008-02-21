@@ -105,7 +105,7 @@ static struct timer_list balloon_timer;
 /* When ballooning out (allocating memory to return to Xen) we don't really 
    want the kernel to try too hard since that can trigger the oom killer. */
 #define GFP_BALLOON \
-	(GFP_HIGHUSER | __GFP_NOWARN | __GFP_NORETRY | __GFP_NOMEMALLOC)
+	(GFP_HIGHUSER|__GFP_NOWARN|__GFP_NORETRY|__GFP_NOMEMALLOC|__GFP_COLD)
 
 #define PAGE_TO_LIST(p) (&(p)->lru)
 #define LIST_TO_PAGE(l) list_entry((l), struct page, lru)
@@ -169,6 +169,17 @@ static struct page *balloon_next_page(struct page *page)
 	if (next == &ballooned_pages)
 		return NULL;
 	return LIST_TO_PAGE(next);
+}
+
+static inline void balloon_free_page(struct page *page)
+{
+#ifndef MODULE
+	if (put_page_testzero(page))
+		free_cold_page(page);
+#else
+	/* free_cold_page() is not being exported. */
+	__free_page(page);
+#endif
 }
 
 static void balloon_alarm(unsigned long unused)
@@ -288,7 +299,7 @@ static int increase_reservation(unsigned long nr_pages)
 		/* Relinquish the page back to the allocator. */
 		ClearPageReserved(page);
 		init_page_count(page);
-		__free_page(page);
+		balloon_free_page(page);
 	}
 
 	bs.current_pages += nr_pages;
@@ -617,7 +628,8 @@ static int dealloc_pte_fn(
 
 struct page **alloc_empty_pages_and_pagevec(int nr_pages)
 {
-	unsigned long vaddr, flags;
+	unsigned long flags;
+	void *v;
 	struct page *page, **pagevec;
 	int i, ret;
 
@@ -626,13 +638,12 @@ struct page **alloc_empty_pages_and_pagevec(int nr_pages)
 		return NULL;
 
 	for (i = 0; i < nr_pages; i++) {
-		page = pagevec[i] = alloc_page(GFP_KERNEL);
+		page = pagevec[i] = alloc_page(GFP_KERNEL|__GFP_COLD);
 		if (page == NULL)
 			goto err;
 
-		vaddr = (unsigned long)page_address(page);
-
-		scrub_pages(vaddr, 1);
+		v = page_address(page);
+		scrub_pages(v, 1);
 
 		balloon_lock(flags);
 
@@ -650,8 +661,9 @@ struct page **alloc_empty_pages_and_pagevec(int nr_pages)
 				ret = 0; /* success */
 		} else {
 #ifdef CONFIG_XEN
-			ret = apply_to_page_range(&init_mm, vaddr, PAGE_SIZE,
-						  dealloc_pte_fn, NULL);
+			ret = apply_to_page_range(&init_mm, (unsigned long)v,
+						  PAGE_SIZE, dealloc_pte_fn,
+						  NULL);
 #else
 			/* Cannot handle non-auto translate mode. */
 			ret = 1;
@@ -660,7 +672,7 @@ struct page **alloc_empty_pages_and_pagevec(int nr_pages)
 
 		if (ret != 0) {
 			balloon_unlock(flags);
-			__free_page(page);
+			balloon_free_page(page);
 			goto err;
 		}
 

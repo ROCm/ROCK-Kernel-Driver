@@ -184,11 +184,17 @@ static void __cpuinit cpu_bringup_and_idle(void)
 
 static void __cpuinit cpu_initialize_context(unsigned int cpu)
 {
-	vcpu_guest_context_t ctxt;
+	/* vcpu_guest_context_t is too large to allocate on the stack.
+	 * Hence we allocate statically and protect it with a lock */
+	static vcpu_guest_context_t ctxt;
+	static DEFINE_SPINLOCK(ctxt_lock);
+
 	struct task_struct *idle = idle_task(cpu);
 
 	if (cpu_test_and_set(cpu, cpu_initialized_map))
 		return;
+
+	spin_lock(&ctxt_lock);
 
 	memset(&ctxt, 0, sizeof(ctxt));
 
@@ -243,7 +249,10 @@ static void __cpuinit cpu_initialize_context(unsigned int cpu)
 	ctxt.gs_base_kernel = (unsigned long)(cpu_pda(cpu));
 #endif
 
-	BUG_ON(HYPERVISOR_vcpu_op(VCPUOP_initialise, cpu, &ctxt));
+	if (HYPERVISOR_vcpu_op(VCPUOP_initialise, cpu, &ctxt))
+		BUG();
+
+	spin_unlock(&ctxt_lock);
 }
 
 void __init smp_prepare_cpus(unsigned int max_cpus)

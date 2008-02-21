@@ -114,7 +114,7 @@ void set_pmd_pfn(unsigned long vaddr, unsigned long pfn, pgprot_t flags)
 	__flush_tlb_one(vaddr);
 }
 
-static int fixmaps = 0;
+static int fixmaps;
 unsigned long hypervisor_virt_start = HYPERVISOR_VIRT_START;
 unsigned long __FIXADDR_TOP = (HYPERVISOR_VIRT_START - PAGE_SIZE);
 EXPORT_SYMBOL(__FIXADDR_TOP);
@@ -249,6 +249,7 @@ static void pgd_ctor(void *pgd)
 {
 	unsigned long flags;
 
+	/* !PAE, no pagetable sharing */
 	memset(pgd, 0, USER_PTRS_PER_PGD*sizeof(pgd_t));
 
 	spin_lock_irqsave(&pgd_lock, flags);
@@ -275,7 +276,6 @@ static void pgd_ctor(void *pgd)
 		clone_pgd_range((pgd_t *)pgd + USER_PTRS_PER_PGD,
 				swapper_pg_dir + USER_PTRS_PER_PGD,
 				KERNEL_PGD_PTRS);
-#ifndef CONFIG_XEN
 	} else {
 		unsigned long flags;
 
@@ -283,7 +283,6 @@ static void pgd_ctor(void *pgd)
 		spin_lock_irqsave(&pgd_lock, flags);
 		pgd_list_add(pgd);
 		spin_unlock_irqrestore(&pgd_lock, flags);
-#endif
 	}
 }
 #endif	/* PTRS_PER_PMD */
@@ -398,11 +397,9 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
 
 	/* Copy kernel pmd contents and write-protect the new pmds. */
 	for (i = USER_PTRS_PER_PGD; i < PTRS_PER_PGD; i++) {
-		unsigned long v = (unsigned long)i << PGDIR_SHIFT;
-		pgd_t *kpgd = pgd_offset_k(v);
-		pud_t *kpud = pud_offset(kpgd, v);
-		pmd_t *kpmd = pmd_offset(kpud, v);
-		memcpy(pmds[i], kpmd, PAGE_SIZE);
+		memcpy(pmds[i],
+		       (void *)pgd_page_vaddr(swapper_pg_dir[i]),
+		       sizeof(pmd_t) * PTRS_PER_PMD);
 		make_lowmem_page_readonly(
 			pmds[i], XENFEAT_writable_page_tables);
 	}
@@ -410,9 +407,6 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
 	/* It is safe to poke machine addresses of pmds under the pmd_lock. */
 	for (i = 0; i < PTRS_PER_PGD; i++)
 		set_pgd(&pgd[i], __pgd(1 + __pa(pmds[i])));
-
-	/* Ensure this pgd gets picked up and pinned on save/restore. */
-	pgd_list_add(pgd);
 
 	spin_unlock_irqrestore(&pgd_lock, flags);
 
@@ -456,13 +450,6 @@ void pgd_free(pgd_t *pgd)
 
 	/* in the PAE case user pgd entries are overwritten before usage */
 	if (PTRS_PER_PMD > 1) {
-		if (!SHARED_KERNEL_PMD) {
-			unsigned long flags;
-			spin_lock_irqsave(&pgd_lock, flags);
-			pgd_list_del(pgd);
-			spin_unlock_irqrestore(&pgd_lock, flags);
-		}
-
 		for (i = 0; i < UNSHARED_PTRS_PER_PGD; ++i) {
 			pgd_t pgdent = pgd[i];
 			void* pmd = (void *)__va(pgd_val(pgdent)-1);

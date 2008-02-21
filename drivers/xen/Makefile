@@ -20,3 +20,6 @@ obj-$(CONFIG_XEN_FRAMEBUFFER)		+= fbfront/
 obj-$(CONFIG_XEN_KEYBOARD)		+= fbfront/
 obj-$(CONFIG_XEN_PRIVCMD)	+= privcmd/
 obj-$(CONFIG_XEN_GRANT_DEV)	+= gntdev/
+obj-$(CONFIG_XEN_NETDEV_ACCEL_SFC_UTIL)		+= sfc_netutil/
+obj-$(CONFIG_XEN_NETDEV_ACCEL_SFC_FRONTEND)	+= sfc_netfront/
+obj-$(CONFIG_XEN_NETDEV_ACCEL_SFC_BACKEND)	+= sfc_netback/

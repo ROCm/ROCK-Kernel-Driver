@@ -336,7 +336,7 @@ static void xen_network_done_notify(void)
 	static struct net_device *eth0_dev = NULL;
 	if (unlikely(eth0_dev == NULL))
 		eth0_dev = __dev_get_by_name(&init_net, "eth0");
-	netif_rx_schedule(eth0_dev);
+	netif_rx_schedule(eth0_dev, ???);
 }
 /* 
  * Add following to poll() function in NAPI driver (Tigon3 is example):
@@ -611,7 +611,7 @@ static void net_rx_action(unsigned long unused)
 
 	npo.mmu_mcl = npo.mcl_prod;
 	if (npo.mcl_prod) {
-		BUG_ON(!xen_feature(XENFEAT_auto_translated_physmap));
+		BUG_ON(xen_feature(XENFEAT_auto_translated_physmap));
 		BUG_ON(npo.mmu_prod > ARRAY_SIZE(rx_mmu));
 		mcl = npo.mcl + npo.mcl_prod++;
 

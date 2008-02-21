@@ -3,3 +3,5 @@ include ${srctree}/arch/x86/lib/Makefile_32
 else
 include ${srctree}/arch/x86/lib/Makefile_64
 endif
+
+lib-$(CONFIG_XEN_SCRUB_PAGES) += scrub.o

@@ -56,40 +56,43 @@
 
 #define _hypercall0(type, name)			\
 ({						\
-	long __res;				\
+	type __res;				\
 	asm volatile (				\
 		HYPERCALL_STR(name)		\
 		: "=a" (__res)			\
 		:				\
 		: "memory" );			\
-	(type)__res;				\
+	__res;					\
 })
 
 #define _hypercall1(type, name, a1)				\
 ({								\
-	long __res, __ign1;					\
+	type __res;						\
+	long __ign1;						\
 	asm volatile (						\
 		HYPERCALL_STR(name)				\
 		: "=a" (__res), "=D" (__ign1)			\
 		: "1" ((long)(a1))				\
 		: "memory" );					\
-	(type)__res;						\
+	__res;							\
 })
 
 #define _hypercall2(type, name, a1, a2)				\
 ({								\
-	long __res, __ign1, __ign2;				\
+	type __res;						\
+	long __ign1, __ign2;					\
 	asm volatile (						\
 		HYPERCALL_STR(name)				\
 		: "=a" (__res), "=D" (__ign1), "=S" (__ign2)	\
 		: "1" ((long)(a1)), "2" ((long)(a2))		\
 		: "memory" );					\
-	(type)__res;						\
+	__res;							\
 })
 
 #define _hypercall3(type, name, a1, a2, a3)			\
 ({								\
-	long __res, __ign1, __ign2, __ign3;			\
+	type __res;						\
+	long __ign1, __ign2, __ign3;				\
 	asm volatile (						\
 		HYPERCALL_STR(name)				\
 		: "=a" (__res), "=D" (__ign1), "=S" (__ign2), 	\
@@ -97,36 +100,38 @@
 		: "1" ((long)(a1)), "2" ((long)(a2)),		\
 		"3" ((long)(a3))				\
 		: "memory" );					\
-	(type)__res;						\
+	__res;							\
 })
 
 #define _hypercall4(type, name, a1, a2, a3, a4)			\
 ({								\
-	long __res, __ign1, __ign2, __ign3;			\
+	type __res;						\
+	long __ign1, __ign2, __ign3;				\
+	register long __arg4 asm("r10") = (long)(a4);		\
 	asm volatile (						\
-		"movq %7,%%r10; "				\
 		HYPERCALL_STR(name)				\
 		: "=a" (__res), "=D" (__ign1), "=S" (__ign2),	\
-		"=d" (__ign3)					\
+		  "=d" (__ign3), "+r" (__arg4)			\
 		: "1" ((long)(a1)), "2" ((long)(a2)),		\
-		"3" ((long)(a3)), "g" ((long)(a4))		\
-		: "memory", "r10" );				\
-	(type)__res;						\
+		  "3" ((long)(a3))				\
+		: "memory" );					\
+	__res;							\
 })
 
 #define _hypercall5(type, name, a1, a2, a3, a4, a5)		\
 ({								\
-	long __res, __ign1, __ign2, __ign3;			\
+	type __res;						\
+	long __ign1, __ign2, __ign3;				\
+	register long __arg4 asm("r10") = (long)(a4);		\
+	register long __arg5 asm("r8") = (long)(a5);		\
 	asm volatile (						\
-		"movq %7,%%r10; movq %8,%%r8; "			\
 		HYPERCALL_STR(name)				\
 		: "=a" (__res), "=D" (__ign1), "=S" (__ign2),	\
-		"=d" (__ign3)					\
+		  "=d" (__ign3), "+r" (__arg4), "+r" (__arg5)	\
 		: "1" ((long)(a1)), "2" ((long)(a2)),		\
-		"3" ((long)(a3)), "g" ((long)(a4)),		\
-		"g" ((long)(a5))				\
-		: "memory", "r10", "r8" );			\
-	(type)__res;						\
+		  "3" ((long)(a3))				\
+		: "memory" );					\
+	__res;							\
 })
 
 static inline int __must_check

@@ -30,6 +30,9 @@ config XEN_XENBUS_DEV
 	def_bool y
 	depends on PROC_FS
 
+config XEN_NETDEV_ACCEL_SFC_UTIL
+	tristate
+
 config XEN_BACKEND
         tristate "Backend driver support"
         default XEN_PRIVILEGED_GUEST
@@ -78,6 +81,12 @@ config XEN_NETDEV_PIPELINED_TRANSMITTER
 	  like reassembling packets to perform firewall filtering; or if you
 	  are unsure; or if you experience network hangs when this option is
 	  enabled; then you must say N here.
+
+config XEN_NETDEV_ACCEL_SFC_BACKEND
+	tristate "Network-device backend driver acceleration for Solarflare NICs"
+	depends on SFC && SFC_RESOURCE && XEN_NETDEV_BACKEND
+	select XEN_NETDEV_ACCEL_SFC_UTIL
+	default m
 
 config XEN_NETDEV_LOOPBACK
 	tristate "Network-device loopback driver"
@@ -174,6 +183,12 @@ config XEN_NETDEV_FRONTEND
 	  network interfaces within another guest OS. Unless you are building a
 	  dedicated device-driver domain, or your master control domain
 	  (domain 0), then you almost certainly want to say Y here.
+
+config XEN_NETDEV_ACCEL_SFC_FRONTEND
+	tristate "Network-device frontend driver acceleration for Solarflare NICs"
+	depends on XEN_NETDEV_FRONTEND
+	select XEN_NETDEV_ACCEL_SFC_UTIL
+	default XEN_NETDEV_FRONTEND
 
 config XEN_GRANT_DEV
 	tristate "User-space granted page access driver"

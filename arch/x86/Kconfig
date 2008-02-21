@@ -678,7 +678,7 @@ config I8K
 
 config X86_REBOOTFIXUPS
 	bool "Enable X86 board specific fixups for reboot"
-	depends on X86_32 && X86
+	depends on X86_32 && !X86_XEN
 	default n
 	---help---
 	  This enables chipset and/or board specific fixups to be done

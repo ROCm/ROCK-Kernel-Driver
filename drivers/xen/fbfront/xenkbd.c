@@ -53,7 +53,7 @@ static irqreturn_t input_handler(int rq, void *dev_id)
 	__u32 cons, prod;
 
 	prod = page->in_prod;
-	if (prod == page->out_cons)
+	if (prod == page->in_cons)
 		return IRQ_HANDLED;
 	rmb();			/* ensure we see ring contents up to prod */
 	for (cons = page->in_cons; cons != prod; cons++) {
@@ -193,6 +193,8 @@ static int xenkbd_resume(struct xenbus_device *dev)
 	struct xenkbd_info *info = dev->dev.driver_data;
 
 	xenkbd_disconnect_backend(info);
+	info->page->in_cons = info->page->in_prod = 0;
+	info->page->out_cons = info->page->out_prod = 0;
 	return xenkbd_connect_backend(dev, info);
 }
 

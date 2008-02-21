@@ -405,7 +405,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 
 	/* Check that number of segments is sane. */
 	nseg = req->nr_segments;
-	if (unlikely(nseg == 0) || 
+	if (unlikely(nseg == 0 && operation != WRITE_BARRIER) || 
 	    unlikely(nseg > BLKIF_MAX_SEGMENTS_PER_REQUEST)) {
 		DPRINTK("Bad number of segments in request (%d)\n", nseg);
 		goto fail_response;
@@ -498,6 +498,18 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 		preq.sector_number += seg[i].nsec;
 	}
 
+	if (!bio) {
+		BUG_ON(operation != WRITE_BARRIER);
+		bio = biolist[nbio++] = bio_alloc(GFP_KERNEL, 0);
+		if (unlikely(bio == NULL))
+			goto fail_put_bio;
+
+		bio->bi_bdev    = preq.bdev;
+		bio->bi_private = pending_req;
+		bio->bi_end_io  = end_block_io_op;
+		bio->bi_sector  = -1;
+	}
+
 	plug_queue(blkif, bio);
 	atomic_set(&pending_req->pendcnt, nbio);
 	blkif_get(blkif);
@@ -507,7 +519,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 
 	if (operation == READ)
 		blkif->st_rd_sect += preq.nr_sects;
-	else if (operation == WRITE)
+	else if (operation == WRITE || operation == WRITE_BARRIER)
 		blkif->st_wr_sect += preq.nr_sects;
 
 	return;

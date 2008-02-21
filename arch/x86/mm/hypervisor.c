@@ -281,7 +281,7 @@ int xen_create_contiguous_region(
 	set_xen_guest_handle(exchange.in.extent_start, in_frames);
 	set_xen_guest_handle(exchange.out.extent_start, &out_frame);
 
-	scrub_pages(vstart, 1 << order);
+	scrub_pages((void *)vstart, 1 << order);
 
 	balloon_lock(flags);
 
@@ -374,7 +374,7 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 	set_xen_guest_handle(exchange.in.extent_start, &in_frame);
 	set_xen_guest_handle(exchange.out.extent_start, out_frames);
 
-	scrub_pages(vstart, 1 << order);
+	scrub_pages((void *)vstart, 1 << order);
 
 	balloon_lock(flags);
 
@@ -434,7 +434,7 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 		set_xen_guest_handle(exchange.in.extent_start, &in_frame);
 
 		for (i = 0; i < (1U<<order); i++) {
-			struct page *page = alloc_page(__GFP_HIGHMEM);
+			struct page *page = alloc_page(__GFP_HIGHMEM|__GFP_COLD);
 			unsigned long pfn;
 			mmu_update_t mmu;
 			unsigned int j = 0;
@@ -512,19 +512,17 @@ int xen_limit_pages_to_max_mfn(
 {
 	unsigned long flags, frame;
 	unsigned long *in_frames = discontig_frames, *out_frames = limited_frames;
-	void *v;
 	struct page *page;
-	unsigned int i, nr_mcl;
+	unsigned int i, n, nr_mcl;
 	int rc, success;
+	DECLARE_BITMAP(limit_map, 1 << MAX_CONTIG_ORDER);
 
 	struct xen_memory_exchange exchange = {
 		.in = {
-			.nr_extents   = 1UL << order,
 			.extent_order = 0,
 			.domid        = DOMID_SELF
 		},
 		.out = {
-			.nr_extents   = 1UL << order,
 			.extent_order = 0,
 			.address_bits = address_bits,
 			.domid        = DOMID_SELF
@@ -537,80 +535,98 @@ int xen_limit_pages_to_max_mfn(
 	if (unlikely(order > MAX_CONTIG_ORDER))
 		return -ENOMEM;
 
+	bitmap_zero(limit_map, 1U << order);
 	set_xen_guest_handle(exchange.in.extent_start, in_frames);
 	set_xen_guest_handle(exchange.out.extent_start, out_frames);
 
 	/* 0. Scrub the pages. */
-	for ( i = 0 ; i < 1UL<<order ; i++ ) {
+	for (i = 0, n = 0; i < 1U<<order ; i++) {
 		page = &pages[i];
+		if (!(pfn_to_mfn(page_to_pfn(page)) >> (address_bits - PAGE_SHIFT)))
+			continue;
+		__set_bit(i, limit_map);
 
-		if (!PageHighMem(page)) {
-			v = page_address(page);
-			scrub_pages(v, 1);
-		} else {
-			v = kmap(page);
-			scrub_pages(v, 1);
+		if (!PageHighMem(page))
+			scrub_pages(page_address(page), 1);
+#ifdef CONFIG_XEN_SCRUB_PAGES
+		else {
+			scrub_pages(kmap(page), 1);
 			kunmap(page);
+			++n;
 		}
+#endif
 	}
+	if (bitmap_empty(limit_map, 1U << order))
+		return 0;
 
-	kmap_flush_unused();
+	if (n)
+		kmap_flush_unused();
 
 	balloon_lock(flags);
 
 	/* 1. Zap current PTEs (if any), remembering MFNs. */
-	for (i = 0, nr_mcl = 0; i < (1U<<order); i++) {
+	for (i = 0, n = 0, nr_mcl = 0; i < (1U<<order); i++) {
+		if(!test_bit(i, limit_map))
+			continue;
 		page = &pages[i];
 
-		out_frames[i] = page_to_pfn(page);
-		in_frames[i] = pfn_to_mfn(out_frames[i]);
+		out_frames[n] = page_to_pfn(page);
+		in_frames[n] = pfn_to_mfn(out_frames[n]);
 
 		if (!PageHighMem(page))
 			MULTI_update_va_mapping(cr_mcl + nr_mcl++,
 						(unsigned long)page_address(page),
 						__pte_ma(0), 0);
 
-		set_phys_to_machine(out_frames[i], INVALID_P2M_ENTRY);
+		set_phys_to_machine(out_frames[n], INVALID_P2M_ENTRY);
+		++n;
 	}
-	if (HYPERVISOR_multicall_check(cr_mcl, nr_mcl, NULL))
+	if (nr_mcl && HYPERVISOR_multicall_check(cr_mcl, nr_mcl, NULL))
 		BUG();
 
 	/* 2. Get new memory below the required limit. */
+	exchange.in.nr_extents = n;
+	exchange.out.nr_extents = n;
 	rc = HYPERVISOR_memory_op(XENMEM_exchange, &exchange);
-	success = (exchange.nr_exchanged == (1UL << order));
+	success = (exchange.nr_exchanged == n);
 	BUG_ON(!success && ((exchange.nr_exchanged != 0) || (rc == 0)));
 	BUG_ON(success && (rc != 0));
 #if CONFIG_XEN_COMPAT <= 0x030002
 	if (unlikely(rc == -ENOSYS)) {
 		/* Compatibility when XENMEM_exchange is unsupported. */
 		if (HYPERVISOR_memory_op(XENMEM_decrease_reservation,
-					 &exchange.in) != (1UL << order))
+					 &exchange.in) != n)
 			BUG();
-		success = (HYPERVISOR_memory_op(XENMEM_populate_physmap,
-						&exchange.out) != (1UL <<order));
+		if (HYPERVISOR_memory_op(XENMEM_populate_physmap,
+					 &exchange.out) != n)
+			BUG();
+		success = 1;
 	}
 #endif
 
 	/* 3. Map the new pages in place of old pages. */
-	for (i = 0, nr_mcl = 0; i < (1U<<order); i++) {
-		unsigned long pfn;
+	for (i = 0, n = 0, nr_mcl = 0; i < (1U<<order); i++) {
+		if(!test_bit(i, limit_map))
+			continue;
 		page = &pages[i];
-		pfn = page_to_pfn(page);
 
-		frame = success ? out_frames[i] : in_frames[i];
+		frame = success ? out_frames[n] : in_frames[n];
 
 		if (!PageHighMem(page))
 			MULTI_update_va_mapping(cr_mcl + nr_mcl++,
 						(unsigned long)page_address(page),
 						pfn_pte_ma(frame, PAGE_KERNEL), 0);
 
-		set_phys_to_machine(pfn, frame);
+		set_phys_to_machine(page_to_pfn(page), frame);
+		++n;
 	}
-	cr_mcl[nr_mcl - 1].args[MULTI_UVMFLAGS_INDEX] = order
-						        ? UVMF_TLB_FLUSH|UVMF_ALL
-						        : UVMF_INVLPG|UVMF_ALL;
-	if (HYPERVISOR_multicall_check(cr_mcl, nr_mcl, NULL))
-		BUG();
+	if (nr_mcl) {
+		cr_mcl[nr_mcl - 1].args[MULTI_UVMFLAGS_INDEX] = order
+							        ? UVMF_TLB_FLUSH|UVMF_ALL
+							        : UVMF_INVLPG|UVMF_ALL;
+		if (HYPERVISOR_multicall_check(cr_mcl, nr_mcl, NULL))
+			BUG();
+	}
 
 	balloon_unlock(flags);
 
@@ -649,7 +665,9 @@ int xen_change_pte_range(struct mm_struct *mm, pmd_t *pmd,
 
 			if (dirty_accountable && pte_dirty(ptent))
 				ptent = pte_mkwrite(ptent);
-			u[i].ptr = virt_to_machine(pte) | MMU_PT_UPDATE_PRESERVE_AD;
+			u[i].ptr = (__pmd_val(*pmd) & PHYSICAL_PAGE_MASK)
+				   | ((unsigned long)pte & ~PAGE_MASK)
+				   | MMU_PT_UPDATE_PRESERVE_AD;
 			u[i].val = __pte_val(ptent);
 			if (++i == MAX_BATCHED_FULL_PTES) {
 				if ((rc = HYPERVISOR_mmu_update(

@@ -446,6 +446,9 @@ int netfront_accelerator_loaded(int version, const char *frontend,
 {
 	struct netfront_accelerator *accelerator;
 
+	if (is_initial_xendomain())
+		return -EINVAL;
+
 	if (version != NETFRONT_ACCEL_VERSION) {
 		if (version > NETFRONT_ACCEL_VERSION) {
 			/* Caller has higher version number, leave it
@@ -693,32 +696,11 @@ int netfront_accelerator_suspend(struct netfront_info *np,
 int netfront_accelerator_suspend_cancel(struct netfront_info *np,
  					struct xenbus_device *dev)
 {
- 	struct netfront_accel_vif_state *accel_vif_state = NULL;
- 
-	mutex_lock(&accelerator_mutex);
-
- 	/* Check that we've got a device that was accelerated */
- 	if (np->accelerator == NULL)
-		goto out;
-
- 	/* Find the vif_state from the accelerator's list */
- 	list_for_each_entry(accel_vif_state, &np->accelerator->vif_states,
- 			    link) {
- 		if (accel_vif_state->dev == dev) {
- 			BUG_ON(accel_vif_state != &np->accel_vif_state);
- 
- 			/*
- 			 * Kick things off again to restore
- 			 * acceleration as it was before suspend 
- 			 */
- 			accelerator_probe_new_vif(np, dev, np->accelerator);
- 
-			break;
- 		}
- 	}
- 	
- out:
-	mutex_unlock(&accelerator_mutex);
+	/* 
+	 * Setting the watch will cause it to fire and probe the
+	 * accelerator, so no need to call accelerator_probe_new_vif()
+	 * directly here
+	 */
 	netfront_accelerator_add_watch(np);
  	return 0;
 }
