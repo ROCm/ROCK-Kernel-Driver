@@ -444,6 +444,228 @@ halt:
 	return count;
 }
 
+#ifdef CONFIG_KDB_USB
+/*
+ * This routine is basically a copy of qh_completions() for use by KDB.
+ * It is modified to only work on qtds which are associated
+ * with 'kdburb'. Also, there are some fixups related to locking.
+ */
+unsigned
+qh_completions_kdb(struct ehci_hcd *ehci, struct ehci_qh *qh, struct urb *kdburb)
+{
+	struct ehci_qtd		*last = NULL, *end = qh->dummy;
+	struct list_head	*entry, *tmp;
+	int			last_status = -EINPROGRESS;
+	int			stopped;
+	unsigned		count = 0;
+	int			do_status = 0;
+	u8			state;
+	u32			halt = HALT_BIT(ehci);
+
+        /* verify params are valid */
+        if (!qh || !kdburb)
+                return 0;
+
+	if (unlikely (list_empty (&qh->qtd_list)))
+		return count;
+
+	/* completions (or tasks on other cpus) must never clobber HALT
+	 * till we've gone through and cleaned everything up, even when
+	 * they add urbs to this qh's queue or mark them for unlinking.
+	 *
+	 * NOTE:  unlinking expects to be done in queue order.
+	 */
+	state = qh->qh_state;
+	qh->qh_state = QH_STATE_COMPLETING;
+	stopped = (state == QH_STATE_IDLE);
+
+	/* remove de-activated QTDs from front of queue.
+	 * after faults (including short reads), cleanup this urb
+	 * then let the queue advance.
+	 * if queue is stopped, handles unlinks.
+	 */
+	list_for_each_safe (entry, tmp, &qh->qtd_list) {
+		struct ehci_qtd	*qtd;
+		struct urb	*urb;
+		u32		token = 0;
+		int		qtd_status;
+
+		qtd = list_entry (entry, struct ehci_qtd, qtd_list);
+		urb = qtd->urb;
+
+                if (urb != kdburb)
+                        continue;
+
+		/* clean up any state from previous QTD ...*/
+		if (last) {
+			if (likely (last->urb != urb)) {
+				/*
+				 * Lock hackery here...
+				 * ehci_urb_done() makes the assumption
+				 * that it's called with ehci->lock held.
+				 * So, lock it if it isn't already.
+				 */
+				if (!spin_is_locked(&ehci->lock))
+					spin_lock(&ehci->lock);
+
+				ehci_urb_done(ehci, last->urb, last_status);
+
+                                /*
+                                 * ehci_urb_done() releases and reacquires
+				 * ehci->lock, so release it here.
+                                 */
+                                if (spin_is_locked(&ehci->lock))
+                                        spin_unlock (&ehci->lock);
+
+				count++;
+			}
+			ehci_qtd_free (ehci, last);
+			last = NULL;
+			last_status = -EINPROGRESS;
+		}
+
+		/* ignore urbs submitted during completions we reported */
+		if (qtd == end)
+			break;
+
+		/* hardware copies qtd out of qh overlay */
+		rmb ();
+		token = hc32_to_cpu(ehci, qtd->hw_token);
+
+		/* always clean up qtds the hc de-activated */
+		if ((token & QTD_STS_ACTIVE) == 0) {
+
+			if ((token & QTD_STS_HALT) != 0) {
+				stopped = 1;
+
+			/* magic dummy for some short reads; qh won't advance.
+			 * that silicon quirk can kick in with this dummy too.
+			 */
+			} else if (IS_SHORT_READ (token)
+					&& !(qtd->hw_alt_next
+						& EHCI_LIST_END(ehci))) {
+				stopped = 1;
+				goto halt;
+			}
+
+		/* stop scanning when we reach qtds the hc is using */
+		} else if (likely (!stopped
+				&& HC_IS_RUNNING (ehci_to_hcd(ehci)->state))) {
+			break;
+
+		} else {
+			stopped = 1;
+
+			if (unlikely (!HC_IS_RUNNING (ehci_to_hcd(ehci)->state)))
+				last_status = -ESHUTDOWN;
+
+			/* ignore active urbs unless some previous qtd
+			 * for the urb faulted (including short read) or
+			 * its urb was canceled.  we may patch qh or qtds.
+			 */
+			if (likely(last_status == -EINPROGRESS &&
+					!urb->unlinked))
+				continue;
+
+			/* issue status after short control reads */
+			if (unlikely (do_status != 0)
+					&& QTD_PID (token) == 0 /* OUT */) {
+				do_status = 0;
+				continue;
+			}
+
+			/* token in overlay may be most current */
+			if (state == QH_STATE_IDLE
+					&& cpu_to_hc32(ehci, qtd->qtd_dma)
+						== qh->hw_current)
+				token = hc32_to_cpu(ehci, qh->hw_token);
+
+			/* force halt for unlinked or blocked qh, so we'll
+			 * patch the qh later and so that completions can't
+			 * activate it while we "know" it's stopped.
+			 */
+			if ((halt & qh->hw_token) == 0) {
+halt:
+				qh->hw_token |= halt;
+				wmb ();
+			}
+		}
+
+		/* remove it from the queue */
+		qtd_status = qtd_copy_status(ehci, urb, qtd->length, token);
+		if (unlikely(qtd_status == -EREMOTEIO)) {
+			do_status = (!urb->unlinked &&
+					usb_pipecontrol(urb->pipe));
+			qtd_status = 0;
+		}
+		if (likely(last_status == -EINPROGRESS))
+			last_status = qtd_status;
+
+		if (stopped && qtd->qtd_list.prev != &qh->qtd_list) {
+			last = list_entry (qtd->qtd_list.prev,
+					struct ehci_qtd, qtd_list);
+			last->hw_next = qtd->hw_next;
+		}
+		list_del (&qtd->qtd_list);
+		last = qtd;
+	}
+
+	/* last urb's completion might still need calling */
+	if (likely (last != NULL)) {
+		/*
+		 * Lock hackery here...
+		 * ehci_urb_done() makes the assumption
+		 * that it's called with ehci->lock held.
+		 * So, lock it if it isn't already.
+		 */
+		if (!spin_is_locked(&ehci->lock))
+			spin_lock(&ehci->lock);
+
+		ehci_urb_done(ehci, last->urb, last_status);
+
+		/*
+		 * ehci_urb_done() releases and reacquires
+		 * ehci->lock, so release it here.
+		 */
+                if (spin_is_locked(&ehci->lock))
+                	spin_unlock (&ehci->lock);
+
+		count++;
+		ehci_qtd_free (ehci, last);
+	}
+
+	/* restore original state; caller must unlink or relink */
+	qh->qh_state = state;
+
+	/* be sure the hardware's done with the qh before refreshing
+	 * it after fault cleanup, or recovering from silicon wrongly
+	 * overlaying the dummy qtd (which reduces DMA chatter).
+	 */
+	if (stopped != 0 || qh->hw_qtd_next == EHCI_LIST_END(ehci)) {
+		switch (state) {
+		case QH_STATE_IDLE:
+			qh_refresh(ehci, qh);
+			break;
+		case QH_STATE_LINKED:
+			/* should be rare for periodic transfers,
+			 * except maybe high bandwidth ...
+			 */
+			if ((cpu_to_hc32(ehci, QH_SMASK)
+					& qh->hw_info2) != 0) {
+				intr_deschedule (ehci, qh);
+				(void) qh_schedule (ehci, qh);
+			} else
+				unlink_async (ehci, qh);
+			break;
+		/* otherwise, unlink already started */
+		}
+	}
+
+	return count;
+}
+
+#endif /* CONFIG_KDB_USB */
+
 /*-------------------------------------------------------------------------*/
 
 // high bandwidth multiplier, as encoded in highspeed endpoint descriptors

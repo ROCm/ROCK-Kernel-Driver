@@ -659,4 +659,18 @@ kdb_io_init(void)
 	return;
 }
 
+#ifdef CONFIG_KDB_USB
+
+int kdb_no_usb = 0;
+
+static int __init opt_kdbnousb(char *str)
+{
+	kdb_no_usb = 1;
+	return 0;
+}
+
+early_param("kdbnousb", opt_kdbnousb);
+
+#endif
+
 EXPORT_SYMBOL(kdb_read);

@@ -25,7 +25,7 @@ static char *kdba_rwtypes[] = { "Instruction(Register)", "Data Write",
  * breakpoint registers.
  */
 
-kdbhard_bp_t	kdb_hardbreaks[KDB_MAXHARDBPT];
+static kdbhard_bp_t kdb_hardbreaks[KDB_MAXHARDBPT];
 
 /*
  * kdba_db_trap
@@ -69,8 +69,8 @@ kdbhard_bp_t	kdb_hardbreaks[KDB_MAXHARDBPT];
 kdb_dbtrap_t
 kdba_db_trap(struct pt_regs *regs, int error_unused)
 {
-	kdb_machreg_t  dr6;
-	kdb_machreg_t  dr7;
+	kdb_machreg_t dr6;
+	kdb_machreg_t dr7;
 	int rw, reg;
 	int i;
 	kdb_dbtrap_t rv = KDB_DB_BPT;
@@ -219,6 +219,7 @@ handle:
 			kdb_printf("%s breakpoint #%d at " kdb_bfd_vma_fmt "\n",
 				  kdba_rwtypes[rw],
 				  i, bp->bp_addr);
+
 			/*
 			 * For an instruction breakpoint, disassemble
 			 * the current instruction.
@@ -290,6 +291,7 @@ kdba_bp_trap(struct pt_regs *regs, int error_unused)
 
 	if (KDB_NULL_REGS(regs))
 		return KDB_DB_NOBPT;
+
 	/*
 	 * Determine which breakpoint was encountered.
 	 */
@@ -350,7 +352,6 @@ kdba_bp_trap(struct pt_regs *regs, int error_unused)
 static void
 kdba_handle_bp(struct pt_regs *regs, kdb_bp_t *bp)
 {
-
 	if (KDB_NULL_REGS(regs))
 		return;
 
@@ -472,9 +473,9 @@ kdba_printbp(kdb_bp_t *bp)
 int
 kdba_parsebp(int argc, const char **argv, int *nextargp, kdb_bp_t *bp)
 {
-	int		nextarg = *nextargp;
-	int		diag;
-	kdbhard_bp_t 	*bph = &bp->bp_template;
+	int nextarg = *nextargp;
+	int diag;
+	kdbhard_bp_t *bph = &bp->bp_template;
 
 	bph->bph_mode = 0;		/* Default to instruction breakpoint */
 	bph->bph_length = 0;		/* Length must be zero for insn bp */

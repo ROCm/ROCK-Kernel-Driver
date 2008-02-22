@@ -20,7 +20,7 @@
 
 #include <linux/kdb.h>
 #include <linux/kdbprivate.h>
-#include <pc_keyb_64.h>
+#include <pc_keyb.h>
 
 #ifdef	CONFIG_VT_CONSOLE
 #define KDB_BLINK_LED 1
@@ -33,6 +33,8 @@
 /* support up to 8 USB keyboards (probably excessive, but...) */
 #define KDB_USB_NUM_KEYBOARDS   8
 struct kdb_usb_kbd_info kdb_usb_kbds[KDB_USB_NUM_KEYBOARDS];
+
+extern int kdb_no_usb;
 
 static unsigned char kdb_usb_keycode[256] = {
 	  0,  0,  0,  0, 30, 48, 46, 32, 18, 33, 34, 35, 23, 36, 37, 38,
@@ -62,6 +64,9 @@ kdb_usb_keyboard_attach(struct urb *urb, unsigned char *buffer, void *poll_func)
 {
         int     i;
         int     rc = -1;
+
+        if (kdb_no_usb)
+                return 0;
 
         /*
          * Search through the array of KDB USB keyboards (kdb_usb_kbds)
@@ -96,6 +101,9 @@ kdb_usb_keyboard_detach(struct urb *urb)
 {
         int     i;
         int     rc = -1;
+
+        if (kdb_no_usb)
+                return 0;
 
         /*
          * Search through the array of KDB USB keyboards (kdb_usb_kbds)
@@ -135,6 +143,9 @@ get_usb_char(void)
         unsigned char keycode, spec;
         extern u_short plain_map[], shift_map[], ctrl_map[];
 
+        if (kdb_no_usb)
+                return -1;
+
         /*
          * Loop through all the USB keyboard(s) and return
          * the first character obtained from them.
@@ -148,7 +159,13 @@ get_usb_char(void)
 
                 /* Transfer char */
                 ret = (*kdb_usb_kbds[i].poll_func)(kdb_usb_kbds[i].urb);
-                if (ret == -1) /* error or no characters, try the next kbd */
+                if (ret == -EBUSY && kdb_usb_kbds[i].poll_ret != -EBUSY)
+                        kdb_printf("NOTICE: USB HD driver BUSY. "
+                            "USB keyboard has been disabled.\n");
+
+                kdb_usb_kbds[i].poll_ret = ret;
+
+                if (ret < 0) /* error or no characters, try the next kbd */
                         continue;
 
                 spec = kdb_usb_kbds[i].buffer[0];

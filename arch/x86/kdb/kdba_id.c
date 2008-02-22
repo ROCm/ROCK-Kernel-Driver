@@ -162,9 +162,10 @@ kdba_dis_getmem(bfd_vma addr, bfd_byte *buf, unsigned int length, disassemble_in
 int
 kdba_id_parsemode(const char *mode, disassemble_info *dip)
 {
-
 	if (mode) {
-		if (strcmp(mode, "x86") == 0) {
+		if (strcmp(mode, "x86_64") == 0) {
+			dip->mach = bfd_mach_x86_64;
+		} else if (strcmp(mode, "x86") == 0) {
 			dip->mach = bfd_mach_i386_i386;
 		} else if (strcmp(mode, "8086") == 0) {
 			dip->mach = bfd_mach_i386_i8086;
@@ -248,7 +249,12 @@ kdba_id_init(disassemble_info *dip)
 
 	dip->flavour                = bfd_target_elf_flavour;
 	dip->arch		    = bfd_arch_i386;
+#ifdef CONFIG_X86_64
+	dip->mach		    = bfd_mach_x86_64;
+#endif
+#ifdef CONFIG_X86_32
 	dip->mach		    = bfd_mach_i386_i386;
+#endif
 	dip->endian	    	    = BFD_ENDIAN_LITTLE;
 
 	dip->display_endian         = BFD_ENDIAN_LITTLE;

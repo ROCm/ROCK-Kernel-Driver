@@ -47,8 +47,6 @@ typedef struct _kdbhard_bp {
 	unsigned int	bph_length:2;	/* 0=1, 1=2, 2=BAD, 3=4 (bytes) */
 } kdbhard_bp_t;
 
-extern kdbhard_bp_t	kdb_hardbreaks[/* KDB_MAXHARDBPT */];
-
 #define IA32_BREAKPOINT_INSTRUCTION	0xcc
 
 #define DR6_BT  0x00008000

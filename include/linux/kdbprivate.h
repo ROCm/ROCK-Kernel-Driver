@@ -489,6 +489,7 @@ struct kdb_usb_kbd_info {
 	struct urb *urb;		/* pointer to the URB */
 	unsigned char *buffer;		/* pointer to the kbd char buffer */
 	int (*poll_func)(struct urb *urb); /* poll function to retrieve chars */
+	int	poll_ret;	/* return val from poll_func */
 	int	caps_lock;	/* state of the caps lock for this keyboard */
 };
 #endif /* CONFIG_KDB_USB */

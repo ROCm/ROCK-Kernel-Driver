@@ -1,3 +1,30 @@
+2008-02-01 Jay Lan  <jlan@sgi.com>
+
+	* Backed out USB UHCI support since it caused dropped characters and
+          broke OHCI.
+	* Restored "archkdbcommon" commands for x86. It was lost at the x86
+	  merge.
+	* Detecting if the HC was "busy", Aaron Young <ayoung@sgi.com>
+	* kdb-v4.4-2.6.24-ia64-2.
+
+2008-01-29 Jay Lan  <jlan@sgi.com>
+
+	* kdb-v4.4-2.6.24-ia64-1.
+
+2008-01-22 Jay Lan  <jlan@sgi.com>
+
+	* USB UHCI kdb support, Konstantin Baydarov <kbaidarov@ru.mvista.com>
+	* kdb-v4.4-2.6.24-rc8-ia64-3.
+
+2008-01-18 Jay Lan  <jlan@sgi.com>
+
+	* USB EHCI kdb support,  Aaron Young <ayoung@sgi.com>
+	* kdb-v4.4-2.6.24-rc8-ia64-2.
+
+2008-01-18 Jay Lan  <jlan@sgi.com>
+
+	* kdb-v4.4-2.6.24-rc8-ia64-1.
+
 2008-01-07 Jay Lan  <jlan@sgi.com>
 
 	* kdb-v4.4-2.6.24-rc7-ia64-1.
