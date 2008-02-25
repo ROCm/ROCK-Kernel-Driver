@@ -36,7 +36,6 @@
 
 #include "squashfs.h"
 
-static void vfs_read_inode(struct inode *i);
 static struct dentry *squashfs_get_parent(struct dentry *child);
 static int squashfs_read_inode(struct inode *i, squashfs_inode_t inode);
 static int squashfs_statfs(struct dentry *, struct kstatfs *);
@@ -83,7 +82,6 @@ static struct super_operations squashfs_export_super_ops = {
 	.destroy_inode = squashfs_destroy_inode,
 	.statfs = squashfs_statfs,
 	.put_super = squashfs_put_super,
-	.read_inode = vfs_read_inode
 };
 
 static struct export_operations squashfs_export_ops = {
@@ -633,26 +631,26 @@ out:
 	return SQUASHFS_INVALID_BLK;
 }
 
-
-static void vfs_read_inode(struct inode *i)
-{
-	struct squashfs_sb_info *msblk = i->i_sb->s_fs_info;
-	squashfs_inode_t inode = squashfs_inode_lookup(i->i_sb, i->i_ino);
-
-	TRACE("Entered vfs_read_inode\n");
-
-	if(inode != SQUASHFS_INVALID_BLK)
-		(msblk->read_inode)(i, inode);
-}
-
-
 static struct dentry *squashfs_get_parent(struct dentry *child)
 {
+	struct squashfs_sb_info *msblk = child->d_sb->s_fs_info;
 	struct inode *i = child->d_inode;
-	struct inode *parent = iget(i->i_sb, SQUASHFS_I(i)->u.s2.parent_inode);
+	struct inode *parent;
 	struct dentry *rv;
 
 	TRACE("Entered squashfs_get_parent\n");
+
+	parent = iget_locked(i->i_sb, SQUASHFS_I(i)->u.s2.parent_inode);
+	if (parent && (parent->i_state & I_NEW)) {
+		int err = -EIO;
+		squashfs_inode_t inode = squashfs_inode_lookup(parent->i_sb,
+							       parent->i_ino);
+		if(inode != SQUASHFS_INVALID_BLK)
+			err = (msblk->read_inode)(i, inode);
+		unlock_new_inode(i);
+		if (err)
+			return ERR_PTR(err);
+	}
 
 	if(parent == NULL) {
 		rv = ERR_PTR(-EACCES);
@@ -984,14 +982,14 @@ static int squashfs_read_inode(struct inode *i, squashfs_inode_t inode)
 			goto failed_read1;
 	}
 
-	return 1;
+	return 0;
 
 failed_read:
 	ERROR("Unable to read inode [%llx:%x]\n", block, offset);
 
 failed_read1:
 	make_bad_inode(i);
-	return 0;
+	return -EIO;
 }
 
 
@@ -1288,7 +1286,7 @@ static int squashfs_fill_super(struct super_block *s, void *data, int silent)
 
 allocate_root:
 	root = new_inode(s);
-	if ((msblk->read_inode)(root, sblk->root_inode) == 0)
+	if ((msblk->read_inode)(root, sblk->root_inode))
 		goto failed_mount;
 	insert_inode_hash(root);
 

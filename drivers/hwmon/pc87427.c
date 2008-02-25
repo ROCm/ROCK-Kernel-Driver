@@ -35,6 +35,10 @@
 #include <linux/acpi.h>
 #include <asm/io.h>
 
+static unsigned short force_id;
+module_param(force_id, ushort, 0);
+MODULE_PARM_DESC(force_id, "Override the detected device ID");
+
 static struct platform_device *pdev;
 
 #define DRVNAME "pc87427"
@@ -560,7 +564,7 @@ static int __init pc87427_find(int sioaddr, unsigned short *address)
 	int i, err = 0;
 
 	/* Identify device */
-	val = superio_inb(sioaddr, SIOREG_DEVID);
+	val = force_id ? force_id : superio_inb(sioaddr, SIOREG_DEVID);
 	if (val != 0xf2) {	/* PC87427 */
 		err = -ENODEV;
 		goto exit;

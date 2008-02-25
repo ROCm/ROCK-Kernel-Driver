@@ -101,7 +101,7 @@ nfsd_cross_mnt(struct svc_rqst *rqstp, struct dentry **dpp,
 {
 	struct svc_export *exp = *expp, *exp2 = NULL;
 	struct dentry *dentry = *dpp;
-	struct vfsmount *mnt = mntget(exp->ex_mnt);
+	struct vfsmount *mnt = mntget(exp->ex_path.mnt);
 	struct dentry *mounts = dget(dentry);
 	int err = 0;
 
@@ -132,7 +132,7 @@ out:
 
 __be32
 nfsd_lookup_dentry(struct svc_rqst *rqstp, struct svc_fh *fhp,
-		   const char *name, int len,
+		   const char *name, unsigned int len,
 		   struct svc_export **exp_ret, struct dentry **dentry_ret)
 {
 	struct svc_export	*exp;
@@ -156,15 +156,15 @@ nfsd_lookup_dentry(struct svc_rqst *rqstp, struct svc_fh *fhp,
 	if (isdotent(name, len)) {
 		if (len==1)
 			dentry = dget(dparent);
-		else if (dparent != exp->ex_dentry) {
+		else if (dparent != exp->ex_path.dentry)
 			dentry = dget_parent(dparent);
-		} else  if (!EX_NOHIDE(exp))
+		else if (!EX_NOHIDE(exp))
 			dentry = dget(dparent); /* .. == . just like at / */
 		else {
 			/* checking mountpoint crossing is very different when stepping up */
 			struct svc_export *exp2 = NULL;
 			struct dentry *dp;
-			struct vfsmount *mnt = mntget(exp->ex_mnt);
+			struct vfsmount *mnt = mntget(exp->ex_path.mnt);
 			dentry = dget(dparent);
 			while(dentry == mnt->mnt_root && follow_up(&mnt, &dentry))
 				;
@@ -226,7 +226,7 @@ out_nfserr:
  */
 __be32
 nfsd_lookup(struct svc_rqst *rqstp, struct svc_fh *fhp, const char *name,
-					int len, struct svc_fh *resfh)
+				unsigned int len, struct svc_fh *resfh)
 {
 	struct svc_export	*exp;
 	struct dentry		*dentry;
@@ -388,7 +388,7 @@ nfsd_setattr(struct svc_rqst *rqstp, struct svc_fh *fhp, struct iattr *iap,
 	err = nfserr_notsync;
 	if (!check_guard || guardtime == inode->i_ctime.tv_sec) {
 		fh_lock(fhp);
-		host_err = notify_change(dentry, fhp->fh_export->ex_mnt, iap);
+		host_err = notify_change(dentry, fhp->fh_export->ex_path.mnt, iap);
 		err = nfserrno(host_err);
 		fh_unlock(fhp);
 	}
@@ -471,7 +471,7 @@ nfsd4_set_nfs4_acl(struct svc_rqst *rqstp, struct svc_fh *fhp,
 		return error;
 
 	dentry = fhp->fh_dentry;
-	mnt = fhp->fh_export->ex_mnt;
+	mnt = fhp->fh_export->ex_path.mnt;
 	inode = dentry->d_inode;
 	if (S_ISDIR(inode->i_mode))
 		flags = NFS4_ACL_DIR;
@@ -728,7 +728,8 @@ nfsd_open(struct svc_rqst *rqstp, struct svc_fh *fhp, int type,
 
 		DQUOT_INIT(inode);
 	}
-	*filp = dentry_open(dget(dentry), mntget(fhp->fh_export->ex_mnt), flags);
+	*filp = dentry_open(dget(dentry), mntget(fhp->fh_export->ex_path.mnt),
+				flags);
 	if (IS_ERR(*filp))
 		host_err = PTR_ERR(*filp);
 out_nfserr:
@@ -1015,7 +1016,7 @@ nfsd_vfs_write(struct svc_rqst *rqstp, struct svc_fh *fhp, struct file *file,
 
 	/* clear setuid/setgid flag after write */
 	if (host_err >= 0 && (inode->i_mode & (S_ISUID | S_ISGID)))
-		kill_suid(dentry, exp->ex_mnt);
+		kill_suid(dentry, exp->ex_path.mnt);
 
 	if (host_err >= 0 && stable) {
 		static ino_t	last_ino;
@@ -1158,6 +1159,26 @@ nfsd_commit(struct svc_rqst *rqstp, struct svc_fh *fhp,
 }
 #endif /* CONFIG_NFSD_V3 */
 
+__be32
+nfsd_create_setattr(struct svc_rqst *rqstp, struct svc_fh *resfhp,
+			struct iattr *iap)
+{
+	/*
+	 * Mode has already been set earlier in create:
+	 */
+	iap->ia_valid &= ~ATTR_MODE;
+	/*
+	 * Setting uid/gid works only for root.  Irix appears to
+	 * send along the gid on create when it tries to implement
+	 * setgid directories via NFS:
+	 */
+	if (current->fsuid != 0)
+		iap->ia_valid &= ~(ATTR_UID|ATTR_GID);
+	if (iap->ia_valid)
+		return nfsd_setattr(rqstp, resfhp, iap, 0, (time_t)0);
+	return 0;
+}
+
 /*
  * Create a file (regular, directory, device, fifo); UNIX sockets 
  * not yet implemented.
@@ -1175,6 +1196,7 @@ nfsd_create(struct svc_rqst *rqstp, struct svc_fh *fhp,
 	struct svc_export *exp;
 	struct inode	*dirp;
 	__be32		err;
+	__be32		err2;
 	int		host_err;
 
 	err = nfserr_perm;
@@ -1245,13 +1267,13 @@ nfsd_create(struct svc_rqst *rqstp, struct svc_fh *fhp,
 		host_err = vfs_create(dirp, dchild, iap->ia_mode, NULL);
 		break;
 	case S_IFDIR:
-		host_err = vfs_mkdir(dirp, dchild, exp->ex_mnt, iap->ia_mode);
+		host_err = vfs_mkdir(dirp, dchild, exp->ex_path.mnt, iap->ia_mode);
 		break;
 	case S_IFCHR:
 	case S_IFBLK:
 	case S_IFIFO:
 	case S_IFSOCK:
-		host_err = vfs_mknod(dirp, dchild, exp->ex_mnt, iap->ia_mode,
+		host_err = vfs_mknod(dirp, dchild, exp->ex_path.mnt, iap->ia_mode,
 				     rdev);
 		break;
 	default:
@@ -1267,16 +1289,9 @@ nfsd_create(struct svc_rqst *rqstp, struct svc_fh *fhp,
 	}
 
 
-	/* Set file attributes. Mode has already been set and
-	 * setting uid/gid works only for root. Irix appears to
-	 * send along the gid when it tries to implement setgid
-	 * directories via NFS.
-	 */
-	if ((iap->ia_valid &= ~(ATTR_UID|ATTR_GID|ATTR_MODE)) != 0) {
-		__be32 err2 = nfsd_setattr(rqstp, resfhp, iap, 0, (time_t)0);
-		if (err2)
-			err = err2;
-	}
+	err2 = nfsd_create_setattr(rqstp, resfhp, iap);
+	if (err2)
+		err = err2;
 	/*
 	 * Update the file handle to get the new inode info.
 	 */
@@ -1305,6 +1320,7 @@ nfsd_create_v3(struct svc_rqst *rqstp, struct svc_fh *fhp,
 	struct dentry	*dentry, *dchild = NULL;
 	struct inode	*dirp;
 	__be32		err;
+	__be32		err2;
 	int		host_err;
 	__u32		v_mtime=0, v_atime=0;
 
@@ -1409,16 +1425,10 @@ nfsd_create_v3(struct svc_rqst *rqstp, struct svc_fh *fhp,
 		iap->ia_atime.tv_nsec = 0;
 	}
 
-	/* Set file attributes.
-	 * Irix appears to send along the gid when it tries to
-	 * implement setgid directories via NFS. Clear out all that cruft.
-	 */
  set_attr:
-	if ((iap->ia_valid &= ~(ATTR_UID|ATTR_GID|ATTR_MODE)) != 0) {
- 		__be32 err2 = nfsd_setattr(rqstp, resfhp, iap, 0, (time_t)0);
-		if (err2)
-			err = err2;
-	}
+	err2 = nfsd_create_setattr(rqstp, resfhp, iap);
+	if (err2)
+		err = err2;
 
 	/*
 	 * Update the filehandle to get the new inode info.
@@ -1463,7 +1473,7 @@ nfsd_readlink(struct svc_rqst *rqstp, struct svc_fh *fhp, char *buf, int *lenp)
 	if (!inode->i_op || !inode->i_op->readlink)
 		goto out;
 
-	touch_atime(fhp->fh_export->ex_mnt, dentry);
+	touch_atime(fhp->fh_export->ex_path.mnt, dentry);
 	/* N.B. Why does this call need a get_fs()??
 	 * Remove the set_fs and watch the fireworks:-) --okir
 	 */
@@ -1532,11 +1542,11 @@ nfsd_symlink(struct svc_rqst *rqstp, struct svc_fh *fhp,
 			strncpy(path_alloced, path, plen);
 			path_alloced[plen] = 0;
 			host_err = vfs_symlink(dentry->d_inode, dnew,
-					       exp->ex_mnt, path_alloced, mode);
+					       exp->ex_path.mnt, path_alloced, mode);
 			kfree(path_alloced);
 		}
 	} else
-		host_err = vfs_symlink(dentry->d_inode, dnew, exp->ex_mnt, path,
+		host_err = vfs_symlink(dentry->d_inode, dnew, exp->ex_path.mnt, path,
 				       mode);
 
 	if (!host_err) {
@@ -1596,8 +1606,8 @@ nfsd_link(struct svc_rqst *rqstp, struct svc_fh *ffhp,
 	dold = tfhp->fh_dentry;
 	dest = dold->d_inode;
 
-	host_err = vfs_link(dold, tfhp->fh_export->ex_mnt, dirp,
-			    dnew, ffhp->fh_export->ex_mnt);
+	host_err = vfs_link(dold, tfhp->fh_export->ex_path.mnt, dirp,
+			    dnew, ffhp->fh_export->ex_path.mnt);
 	if (!host_err) {
 		if (EX_ISSYNC(ffhp->fh_export)) {
 			err = nfserrno(nfsd_sync_dir(ddir));
@@ -1690,8 +1700,8 @@ nfsd_rename(struct svc_rqst *rqstp, struct svc_fh *ffhp, char *fname, int flen,
 			host_err = -EPERM;
 	} else
 #endif
-	host_err = vfs_rename(fdir, odentry, ffhp->fh_export->ex_mnt,
-			      tdir, ndentry, tfhp->fh_export->ex_mnt);
+	host_err = vfs_rename(fdir, odentry, ffhp->fh_export->ex_path.mnt,
+			      tdir, ndentry, tfhp->fh_export->ex_path.mnt);
 	if (!host_err && EX_ISSYNC(tfhp->fh_export)) {
 		host_err = nfsd_sync_dir(tdentry);
 		if (!host_err)
@@ -1765,9 +1775,9 @@ nfsd_unlink(struct svc_rqst *rqstp, struct svc_fh *fhp, int type,
 			host_err = -EPERM;
 		} else
 #endif
-		host_err = vfs_unlink(dirp, rdentry, exp->ex_mnt);
+		host_err = vfs_unlink(dirp, rdentry, exp->ex_path.mnt);
 	} else { /* It's RMDIR */
-		host_err = vfs_rmdir(dirp, rdentry, exp->ex_mnt);
+		host_err = vfs_rmdir(dirp, rdentry, exp->ex_path.mnt);
 	}
 
 	dput(rdentry);
@@ -2003,7 +2013,7 @@ nfsd_get_posix_acl(struct svc_fh *fhp, int type)
 		return ERR_PTR(-EOPNOTSUPP);
 	}
 
-	size = nfsd_getxattr(fhp->fh_dentry, fhp->fh_export->ex_mnt, name,
+	size = nfsd_getxattr(fhp->fh_dentry, fhp->fh_export->ex_path.mnt, name,
 			     &value);
 	if (size < 0)
 		return ERR_PTR(size);
@@ -2049,7 +2059,7 @@ nfsd_set_posix_acl(struct svc_fh *fhp, int type, struct posix_acl *acl)
 	} else
 		size = 0;
 
-	mnt = fhp->fh_export->ex_mnt;
+	mnt = fhp->fh_export->ex_path.mnt;
 	if (size)
 		error = vfs_setxattr(fhp->fh_dentry, mnt, name, value, size, 0,
 				     NULL);

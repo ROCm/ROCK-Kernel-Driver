@@ -10,6 +10,7 @@
 #include <linux/rcupdate.h>
 
 struct nameidata;
+struct path;
 struct vfsmount;
 
 /*
@@ -300,10 +301,10 @@ extern int d_validate(struct dentry *, struct dentry *);
  */
 extern char *dynamic_dname(struct dentry *, char *, int, const char *, ...);
 
-extern char *__d_path(struct dentry *, struct vfsmount *, struct dentry *,
-		      struct vfsmount *, char *, int, int);
-extern char * d_path(struct dentry *, struct vfsmount *, char *, int);
-  
+extern char *__d_path(struct dentry *, struct vfsmount *, struct path *,
+		      char *, int, int);
+extern char *d_path(struct path *, char *, int);
+
 /* Allocation counts.. */
 
 /**

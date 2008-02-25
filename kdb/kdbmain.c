@@ -1728,7 +1728,7 @@ kdb_check_i8042(void)
  *	  release all the cpus at once.
  */
 
-fastcall int
+int
 kdb(kdb_reason_t reason, int error, struct pt_regs *regs)
 {
 	kdb_intstate_t int_state;	/* Interrupt state */

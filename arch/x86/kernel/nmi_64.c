@@ -26,16 +26,9 @@
 #include <asm/proto.h>
 #include <asm/mce.h>
 
-#ifdef CONFIG_SYSCTL
 int unknown_nmi_panic;
-static int unknown_nmi_panic_callback(struct pt_regs *regs, int cpu);
-#endif
-
-int panic_on_unrecovered_nmi;
-
-#ifndef CONFIG_XEN
-
 int nmi_watchdog_enabled;
+int panic_on_unrecovered_nmi;
 
 static cpumask_t backtrace_mask = CPU_MASK_NONE;
 
@@ -46,7 +39,7 @@ static cpumask_t backtrace_mask = CPU_MASK_NONE;
  *  0: the lapic NMI watchdog is disabled, but can be enabled
  */
 atomic_t nmi_active = ATOMIC_INIT(0);		/* oprofile uses this */
-int panic_on_timeout;
+static int panic_on_timeout;
 
 unsigned int nmi_watchdog = NMI_DEFAULT;
 static unsigned int nmi_hz = HZ;
@@ -82,22 +75,22 @@ static __init void nmi_cpu_busy(void *data)
 }
 #endif
 
-int __init check_nmi_watchdog (void)
+int __init check_nmi_watchdog(void)
 {
-	int *counts;
+	int *prev_nmi_count;
 	int cpu;
 
-	if ((nmi_watchdog == NMI_NONE) || (nmi_watchdog == NMI_DISABLED)) 
+	if ((nmi_watchdog == NMI_NONE) || (nmi_watchdog == NMI_DISABLED))
 		return 0;
 
 	if (!atomic_read(&nmi_active))
 		return 0;
 
-	counts = kmalloc(NR_CPUS * sizeof(int), GFP_KERNEL);
-	if (!counts)
+	prev_nmi_count = kmalloc(NR_CPUS * sizeof(int), GFP_KERNEL);
+	if (!prev_nmi_count)
 		return -1;
 
-	printk(KERN_INFO "testing NMI watchdog ... ");
+	printk(KERN_INFO "Testing NMI watchdog ... ");
 
 #ifdef CONFIG_SMP
 	if (nmi_watchdog == NMI_LOCAL_APIC)
@@ -105,30 +98,29 @@ int __init check_nmi_watchdog (void)
 #endif
 
 	for (cpu = 0; cpu < NR_CPUS; cpu++)
-		counts[cpu] = cpu_pda(cpu)->__nmi_count;
+		prev_nmi_count[cpu] = cpu_pda(cpu)->__nmi_count;
 	local_irq_enable();
 	mdelay((20*1000)/nmi_hz); // wait 20 ticks
 
 	for_each_online_cpu(cpu) {
 		if (!per_cpu(wd_enabled, cpu))
 			continue;
-		if (cpu_pda(cpu)->__nmi_count - counts[cpu] <= 5) {
+		if (cpu_pda(cpu)->__nmi_count - prev_nmi_count[cpu] <= 5) {
 			printk(KERN_WARNING "WARNING: CPU#%d: NMI "
 			       "appears to be stuck (%d->%d)!\n",
-			       cpu,
-			       counts[cpu],
-			       cpu_pda(cpu)->__nmi_count);
+				cpu,
+				prev_nmi_count[cpu],
+				cpu_pda(cpu)->__nmi_count);
 			per_cpu(wd_enabled, cpu) = 0;
 			atomic_dec(&nmi_active);
 		}
 	}
+	endflag = 1;
 	if (!atomic_read(&nmi_active)) {
-		kfree(counts);
+		kfree(prev_nmi_count);
 		atomic_set(&nmi_active, -1);
-		endflag = 1;
 		return -1;
 	}
-	endflag = 1;
 	printk("OK.\n");
 
 	/* now that we know it works we can reduce NMI frequency to
@@ -136,11 +128,11 @@ int __init check_nmi_watchdog (void)
 	if (nmi_watchdog == NMI_LOCAL_APIC)
 		nmi_hz = lapic_adjust_nmi_hz(1);
 
-	kfree(counts);
+	kfree(prev_nmi_count);
 	return 0;
 }
 
-int __init setup_nmi_watchdog(char *str)
+static int __init setup_nmi_watchdog(char *str)
 {
 	int nmi;
 
@@ -163,34 +155,6 @@ int __init setup_nmi_watchdog(char *str)
 
 __setup("nmi_watchdog=", setup_nmi_watchdog);
 
-
-static void __acpi_nmi_disable(void *__unused)
-{
-	apic_write(APIC_LVT0, APIC_DM_NMI | APIC_LVT_MASKED);
-}
-
-/*
- * Disable timer based NMIs on all CPUs:
- */
-void acpi_nmi_disable(void)
-{
-	if (atomic_read(&nmi_active) && nmi_watchdog == NMI_IO_APIC)
-		on_each_cpu(__acpi_nmi_disable, NULL, 0, 1);
-}
-
-static void __acpi_nmi_enable(void *__unused)
-{
-	apic_write(APIC_LVT0, APIC_DM_NMI);
-}
-
-/*
- * Enable timer based NMIs on all CPUs:
- */
-void acpi_nmi_enable(void)
-{
-	if (atomic_read(&nmi_active) && nmi_watchdog == NMI_IO_APIC)
-		on_each_cpu(__acpi_nmi_enable, NULL, 0, 1);
-}
 #ifdef CONFIG_PM
 
 static int nmi_pm_active; /* nmi_active before suspend */
@@ -215,13 +179,13 @@ static int lapic_nmi_resume(struct sys_device *dev)
 }
 
 static struct sysdev_class nmi_sysclass = {
-	set_kset_name("lapic_nmi"),
+	.name		= "lapic_nmi",
 	.resume		= lapic_nmi_resume,
 	.suspend	= lapic_nmi_suspend,
 };
 
 static struct sys_device device_lapic_nmi = {
-	.id		= 0,
+	.id	= 0,
 	.cls	= &nmi_sysclass,
 };
 
@@ -235,7 +199,7 @@ static int __init init_lapic_nmi_sysfs(void)
 	if (nmi_watchdog != NMI_LOCAL_APIC)
 		return 0;
 
-	if ( atomic_read(&nmi_active) < 0 )
+	if (atomic_read(&nmi_active) < 0)
 		return 0;
 
 	error = sysdev_class_register(&nmi_sysclass);
@@ -248,9 +212,37 @@ late_initcall(init_lapic_nmi_sysfs);
 
 #endif	/* CONFIG_PM */
 
+static void __acpi_nmi_enable(void *__unused)
+{
+	apic_write(APIC_LVT0, APIC_DM_NMI);
+}
+
+/*
+ * Enable timer based NMIs on all CPUs:
+ */
+void acpi_nmi_enable(void)
+{
+	if (atomic_read(&nmi_active) && nmi_watchdog == NMI_IO_APIC)
+		on_each_cpu(__acpi_nmi_enable, NULL, 0, 1);
+}
+
+static void __acpi_nmi_disable(void *__unused)
+{
+	apic_write(APIC_LVT0, APIC_DM_NMI | APIC_LVT_MASKED);
+}
+
+/*
+ * Disable timer based NMIs on all CPUs:
+ */
+void acpi_nmi_disable(void)
+{
+	if (atomic_read(&nmi_active) && nmi_watchdog == NMI_IO_APIC)
+		on_each_cpu(__acpi_nmi_disable, NULL, 0, 1);
+}
+
 void setup_apic_nmi_watchdog(void *unused)
 {
-	if (__get_cpu_var(wd_enabled) == 1)
+	if (__get_cpu_var(wd_enabled))
 		return;
 
 	/* cheap hack to support suspend/resume */
@@ -315,8 +307,9 @@ void touch_nmi_watchdog(void)
 		}
 	}
 
- 	touch_softlockup_watchdog();
+	touch_softlockup_watchdog();
 }
+EXPORT_SYMBOL(touch_nmi_watchdog);
 
 int __kprobes nmi_watchdog_tick(struct pt_regs * regs, unsigned reason)
 {
@@ -387,8 +380,6 @@ int __kprobes nmi_watchdog_tick(struct pt_regs * regs, unsigned reason)
 	return rc;
 }
 
-#endif /* CONFIG_XEN */
-
 static unsigned ignore_nmis;
 
 asmlinkage __kprobes void do_nmi(struct pt_regs * regs, long error_code)
@@ -398,15 +389,6 @@ asmlinkage __kprobes void do_nmi(struct pt_regs * regs, long error_code)
 	if (!ignore_nmis)
 		default_do_nmi(regs);
 	nmi_exit();
-}
-
-int do_nmi_callback(struct pt_regs * regs, int cpu)
-{
-#ifdef CONFIG_SYSCTL
-	if (unknown_nmi_panic)
-		return unknown_nmi_panic_callback(regs, cpu);
-#endif
-	return 0;
 }
 
 void stop_nmi(void)
@@ -433,7 +415,6 @@ static int unknown_nmi_panic_callback(struct pt_regs *regs, int cpu)
 	return 0;
 }
 
-#ifndef CONFIG_XEN
 /*
  * proc handler for /proc/sys/kernel/nmi
  */
@@ -468,11 +449,18 @@ int proc_nmi_enabled(struct ctl_table *table, int write, struct file *file,
 	}
 	return 0;
 }
-#endif
 
 #endif
 
-#ifndef CONFIG_XEN
+int do_nmi_callback(struct pt_regs *regs, int cpu)
+{
+#ifdef CONFIG_SYSCTL
+	if (unknown_nmi_panic)
+		return unknown_nmi_panic_callback(regs, cpu);
+#endif
+	return 0;
+}
+
 void __trigger_all_cpu_backtrace(void)
 {
 	int i;
@@ -488,5 +476,3 @@ void __trigger_all_cpu_backtrace(void)
 
 EXPORT_SYMBOL(nmi_active);
 EXPORT_SYMBOL(nmi_watchdog);
-EXPORT_SYMBOL(touch_nmi_watchdog);
-#endif /* CONFIG_XEN */

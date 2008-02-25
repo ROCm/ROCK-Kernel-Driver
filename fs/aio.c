@@ -36,11 +36,6 @@
 #include <asm/uaccess.h>
 #include <asm/mmu_context.h>
 
-#ifdef CONFIG_EPOLL
-#include <linux/poll.h>
-#include <linux/anon_inodes.h>
-#endif
-
 #if DEBUG > 1
 #define dprintk		printk
 #else
@@ -322,7 +317,7 @@ out:
 /* wait_on_sync_kiocb:
  *	Waits on the given sync kiocb to complete.
  */
-ssize_t fastcall wait_on_sync_kiocb(struct kiocb *iocb)
+ssize_t wait_on_sync_kiocb(struct kiocb *iocb)
 {
 	while (iocb->ki_users) {
 		set_current_state(TASK_UNINTERRUPTIBLE);
@@ -341,7 +336,7 @@ ssize_t fastcall wait_on_sync_kiocb(struct kiocb *iocb)
  * go away, they will call put_ioctx and release any pinned memory
  * associated with the request (held via struct page * references).
  */
-void fastcall exit_aio(struct mm_struct *mm)
+void exit_aio(struct mm_struct *mm)
 {
 	struct kioctx *ctx = mm->ioctx_list;
 	mm->ioctx_list = NULL;
@@ -370,7 +365,7 @@ void fastcall exit_aio(struct mm_struct *mm)
  *	Called when the last user of an aio context has gone away,
  *	and the struct needs to be freed.
  */
-void fastcall __put_ioctx(struct kioctx *ctx)
+void __put_ioctx(struct kioctx *ctx)
 {
 	unsigned nr_events = ctx->max_reqs;
 
@@ -402,8 +397,7 @@ void fastcall __put_ioctx(struct kioctx *ctx)
  * This prevents races between the aio code path referencing the
  * req (after submitting it) and aio_complete() freeing the req.
  */
-static struct kiocb *FASTCALL(__aio_get_req(struct kioctx *ctx));
-static struct kiocb fastcall *__aio_get_req(struct kioctx *ctx)
+static struct kiocb *__aio_get_req(struct kioctx *ctx)
 {
 	struct kiocb *req = NULL;
 	struct aio_ring *ring;
@@ -538,7 +532,7 @@ static int __aio_put_req(struct kioctx *ctx, struct kiocb *req)
  *	Returns true if this put was the last user of the kiocb,
  *	false if the request is still in use.
  */
-int fastcall aio_put_req(struct kiocb *req)
+int aio_put_req(struct kiocb *req)
 {
 	struct kioctx *ctx = req->ki_ctx;
 	int ret;
@@ -898,7 +892,7 @@ static void try_queue_kicked_iocb(struct kiocb *iocb)
  *      The retry is usually executed by aio workqueue
  *      threads (See aio_kick_handler).
  */
-void fastcall kick_iocb(struct kiocb *iocb)
+void kick_iocb(struct kiocb *iocb)
 {
 	/* sync iocbs are easy: they can only ever be executing from a 
 	 * single context. */
@@ -917,7 +911,7 @@ EXPORT_SYMBOL(kick_iocb);
  *	Returns true if this is the last user of the request.  The 
  *	only other user of the request can be the cancellation code.
  */
-int fastcall aio_complete(struct kiocb *iocb, long res, long res2)
+int aio_complete(struct kiocb *iocb, long res, long res2)
 {
 	struct kioctx	*ctx = iocb->ki_ctx;
 	struct aio_ring_info	*info;
@@ -1005,11 +999,6 @@ put_rq:
 	if (waitqueue_active(&ctx->wait))
 		wake_up(&ctx->wait);
 
-#ifdef CONFIG_EPOLL
-	if (ctx->file && waitqueue_active(&ctx->poll_wait))
-		wake_up(&ctx->poll_wait);
-#endif
-
 	spin_unlock_irqrestore(&ctx->ctx_lock, flags);
 	return ret;
 }
@@ -1017,8 +1006,6 @@ put_rq:
 /* aio_read_evt
  *	Pull an event off of the ioctx's event ring.  Returns the number of 
  *	events fetched (0 or 1 ;-)
- *	If ent parameter is 0, just returns the number of events that would
- *	be fetched.
  *	FIXME: make this use cmpxchg.
  *	TODO: make the ringbuffer user mmap()able (requires FIXME).
  */
@@ -1041,18 +1028,13 @@ static int aio_read_evt(struct kioctx *ioctx, struct io_event *ent)
 
 	head = ring->head % info->nr;
 	if (head != ring->tail) {
-		if (ent) { /* event requested */
-			struct io_event *evp =
-				aio_ring_event(info, head, KM_USER1);
-			*ent = *evp;
-			head = (head + 1) % info->nr;
-			/* finish reading the event before updatng the head */
-			smp_mb();
-			ring->head = head;
-			ret = 1;
-			put_aio_ring_event(evp, KM_USER1);
-		} else /* only need to know availability */
-			ret = 1;
+		struct io_event *evp = aio_ring_event(info, head, KM_USER1);
+		*ent = *evp;
+		head = (head + 1) % info->nr;
+		smp_mb(); /* finish reading the event before updatng the head */
+		ring->head = head;
+		ret = 1;
+		put_aio_ring_event(evp, KM_USER1);
 	}
 	spin_unlock(&info->ring_lock);
 
@@ -1240,78 +1222,8 @@ static void io_destroy(struct kioctx *ioctx)
 
 	aio_cancel_all(ioctx);
 	wait_for_all_aios(ioctx);
-#ifdef CONFIG_EPOLL
-	/* forget the poll file, but it's up to the user to close it */
-	if (ioctx->file) {
-		ioctx->file->private_data = 0;
-		ioctx->file = 0;
-	}
-#endif
 	put_ioctx(ioctx);	/* once for the lookup */
 }
-
-#ifdef CONFIG_EPOLL
-
-static int aio_queue_fd_close(struct inode *inode, struct file *file)
-{
-	struct kioctx *ioctx = file->private_data;
-	if (ioctx) {
-		file->private_data = 0;
-		spin_lock_irq(&ioctx->ctx_lock);
-		ioctx->file = 0;
-		spin_unlock_irq(&ioctx->ctx_lock);
-	}
-	return 0;
-}
-
-static unsigned int aio_queue_fd_poll(struct file *file, poll_table *wait)
-{	unsigned int pollflags = 0;
-	struct kioctx *ioctx = file->private_data;
-
-	if (ioctx) {
-
-		spin_lock_irq(&ioctx->ctx_lock);
-		/* Insert inside our poll wait queue */
-		poll_wait(file, &ioctx->poll_wait, wait);
-
-		/* Check our condition */
-		if (aio_read_evt(ioctx, 0))
-			pollflags = POLLIN | POLLRDNORM;
-		spin_unlock_irq(&ioctx->ctx_lock);
-	}
-
-	return pollflags;
-}
-
-static const struct file_operations aioq_fops = {
-	.release	= aio_queue_fd_close,
-	.poll		= aio_queue_fd_poll
-};
-
-/* make_aio_fd:
- *  Create a file descriptor that can be used to poll the event queue.
- *  Based on the excellent epoll code.
- */
-
-static int make_aio_fd(struct kioctx *ioctx)
-{
-	int error, fd;
-	struct inode *inode;
-	struct file *file;
-
-	error = anon_inode_getfd(&fd, &inode, &file, "[aioq]",
-				 &aioq_fops, ioctx);
-	if (error)
-		return error;
-
-	/* associate the file with the IO context */
-	file->private_data = ioctx;
-	ioctx->file = file;
-	init_waitqueue_head(&ioctx->poll_wait);
-	return fd;
-}
-#endif
-
 
 /* sys_io_setup:
  *	Create an aio_context capable of receiving at least nr_events.
@@ -1325,30 +1237,18 @@ static int make_aio_fd(struct kioctx *ioctx)
  *	resources are available.  May fail with -EFAULT if an invalid
  *	pointer is passed for ctxp.  Will fail with -ENOSYS if not
  *	implemented.
- *
- *	To request a selectable fd, the user context has to be initialized
- *	to 1, instead of 0, and the return value is the fd.
- *	This keeps the system call compatible, since a non-zero value
- *	was not allowed so far.
  */
 asmlinkage long sys_io_setup(unsigned nr_events, aio_context_t __user *ctxp)
 {
 	struct kioctx *ioctx = NULL;
 	unsigned long ctx;
 	long ret;
-	int make_fd = 0;
 
 	ret = get_user(ctx, ctxp);
 	if (unlikely(ret))
 		goto out;
 
 	ret = -EINVAL;
-#ifdef CONFIG_EPOLL
-	if (ctx == 1) {
-		make_fd = 1;
-		ctx = 0;
-	}
-#endif
 	if (unlikely(ctx || nr_events == 0)) {
 		pr_debug("EINVAL: io_setup: ctx %lu nr_events %u\n",
 		         ctx, nr_events);
@@ -1359,12 +1259,8 @@ asmlinkage long sys_io_setup(unsigned nr_events, aio_context_t __user *ctxp)
 	ret = PTR_ERR(ioctx);
 	if (!IS_ERR(ioctx)) {
 		ret = put_user(ioctx->user_id, ctxp);
-#ifdef CONFIG_EPOLL
-		if (make_fd && ret >= 0)
-			ret = make_aio_fd(ioctx);
-#endif
-		if (ret >= 0)
-			return ret;
+		if (!ret)
+			return 0;
 
 		get_ioctx(ioctx); /* io_destroy() expects us to hold a ref */
 		io_destroy(ioctx);
@@ -1433,6 +1329,10 @@ static ssize_t aio_rw_vect_retry(struct kiocb *iocb)
 		opcode = IOCB_CMD_PWRITEV;
 	}
 
+	/* This matches the pread()/pwrite() logic */
+	if (iocb->ki_pos < 0)
+		return -EINVAL;
+
 	do {
 		ret = rw_op(iocb, &iocb->ki_iovec[iocb->ki_cur_seg],
 			    iocb->ki_nr_segs - iocb->ki_cur_seg,
@@ -1449,6 +1349,13 @@ static ssize_t aio_rw_vect_retry(struct kiocb *iocb)
 	/* This means we must have transferred all that we could */
 	/* No need to retry anymore */
 	if ((ret == 0) || (iocb->ki_left == 0))
+		ret = iocb->ki_nbytes - iocb->ki_left;
+
+	/* If we managed to write some out we return that, rather than
+	 * the eventual error. */
+	if (opcode == IOCB_CMD_PWRITEV
+	    && ret < 0 && ret != -EIOCBQUEUED && ret != -EIOCBRETRY
+	    && iocb->ki_nbytes - iocb->ki_left)
 		ret = iocb->ki_nbytes - iocb->ki_left;
 
 	return ret;
@@ -1626,7 +1533,7 @@ static int aio_wake_function(wait_queue_t *wait, unsigned mode,
 	return 1;
 }
 
-int fastcall io_submit_one(struct kioctx *ctx, struct iocb __user *user_iocb,
+int io_submit_one(struct kioctx *ctx, struct iocb __user *user_iocb,
 			 struct iocb *iocb)
 {
 	struct kiocb *req;

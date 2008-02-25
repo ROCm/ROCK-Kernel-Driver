@@ -24,14 +24,14 @@ struct unwind_frame_info
 
 #include <asm/vsyscall.h>
 
-#define UNW_PC(frame)        (frame)->regs.rip
-#define UNW_SP(frame)        (frame)->regs.rsp
+#define UNW_PC(frame)        (frame)->regs.ip
+#define UNW_SP(frame)        (frame)->regs.sp
 #ifdef CONFIG_FRAME_POINTER
-#define UNW_FP(frame)        (frame)->regs.rbp
+#define UNW_FP(frame)        (frame)->regs.bp
 #define FRAME_RETADDR_OFFSET 8
 #define FRAME_LINK_OFFSET    0
-#define STACK_BOTTOM(tsk)    (((tsk)->thread.rsp0 - 1) & ~(THREAD_SIZE - 1))
-#define STACK_TOP(tsk)       ((tsk)->thread.rsp0)
+#define STACK_BOTTOM(tsk)    (((tsk)->thread.sp0 - 1) & ~(THREAD_SIZE - 1))
+#define TSK_STACK_TOP(tsk)       ((tsk)->thread.sp0)
 #endif
 /* Might need to account for the special exception and interrupt handling
    stacks here, since normally
@@ -43,14 +43,14 @@ struct unwind_frame_info
 #define STACK_LIMIT(ptr)     (((ptr) - 1) & ~(THREAD_SIZE - 1))
 
 #define UNW_REGISTER_INFO \
-	PTREGS_INFO(rax), \
-	PTREGS_INFO(rdx), \
-	PTREGS_INFO(rcx), \
-	PTREGS_INFO(rbx), \
-	PTREGS_INFO(rsi), \
-	PTREGS_INFO(rdi), \
-	PTREGS_INFO(rbp), \
-	PTREGS_INFO(rsp), \
+	PTREGS_INFO(ax), \
+	PTREGS_INFO(dx), \
+	PTREGS_INFO(cx), \
+	PTREGS_INFO(bx), \
+	PTREGS_INFO(si), \
+	PTREGS_INFO(di), \
+	PTREGS_INFO(bp), \
+	PTREGS_INFO(sp), \
 	PTREGS_INFO(r8), \
 	PTREGS_INFO(r9), \
 	PTREGS_INFO(r10), \
@@ -59,35 +59,35 @@ struct unwind_frame_info
 	PTREGS_INFO(r13), \
 	PTREGS_INFO(r14), \
 	PTREGS_INFO(r15), \
-	PTREGS_INFO(rip)
+	PTREGS_INFO(ip)
 
 #else
 
 #include <asm/fixmap.h>
 
-#define UNW_PC(frame)        (frame)->regs.eip
-#define UNW_SP(frame)        (frame)->regs.esp
+#define UNW_PC(frame)        (frame)->regs.ip
+#define UNW_SP(frame)        (frame)->regs.sp
 #ifdef CONFIG_FRAME_POINTER
-#define UNW_FP(frame)        (frame)->regs.ebp
+#define UNW_FP(frame)        (frame)->regs.bp
 #define FRAME_RETADDR_OFFSET 4
 #define FRAME_LINK_OFFSET    0
-#define STACK_BOTTOM(tsk)    STACK_LIMIT((tsk)->thread.esp0)
-#define STACK_TOP(tsk)       ((tsk)->thread.esp0)
+#define STACK_BOTTOM(tsk)    STACK_LIMIT((tsk)->thread.sp0)
+#define TSK_STACK_TOP(tsk)       ((tsk)->thread.sp0)
 #else
 #define UNW_FP(frame) ((void)(frame), 0UL)
 #endif
 #define STACK_LIMIT(ptr)     (((ptr) - 1) & ~(THREAD_SIZE - 1))
 
 #define UNW_REGISTER_INFO \
-	PTREGS_INFO(eax), \
-	PTREGS_INFO(ecx), \
-	PTREGS_INFO(edx), \
-	PTREGS_INFO(ebx), \
-	PTREGS_INFO(esp), \
-	PTREGS_INFO(ebp), \
-	PTREGS_INFO(esi), \
-	PTREGS_INFO(edi), \
-	PTREGS_INFO(eip)
+	PTREGS_INFO(ax), \
+	PTREGS_INFO(cx), \
+	PTREGS_INFO(dx), \
+	PTREGS_INFO(bx), \
+	PTREGS_INFO(sp), \
+	PTREGS_INFO(bp), \
+	PTREGS_INFO(si), \
+	PTREGS_INFO(di), \
+	PTREGS_INFO(ip)
 
 #endif
 
@@ -104,9 +104,9 @@ static inline void arch_unw_init_frame_info(struct unwind_frame_info *info,
 	if (user_mode_vm(regs))
 		info->regs = *regs;
 	else {
-		memcpy(&info->regs, regs, offsetof(struct pt_regs, esp));
-		info->regs.esp = (unsigned long)&regs->esp;
-		info->regs.xss = __KERNEL_DS;
+		memcpy(&info->regs, regs, offsetof(struct pt_regs, sp));
+		info->regs.sp = (unsigned long)&regs->sp;
+		info->regs.ss = __KERNEL_DS;
 	}
 #endif
 }
@@ -117,20 +117,20 @@ static inline void arch_unw_init_blocked(struct unwind_frame_info *info)
 	extern const char thread_return[];
 
 	memset(&info->regs, 0, sizeof(info->regs));
-	info->regs.rip = (unsigned long)thread_return;
+	info->regs.ip = (unsigned long)thread_return;
 	info->regs.cs = __KERNEL_CS;
-	probe_kernel_address(info->task->thread.rsp, info->regs.rbp);
-	info->regs.rsp = info->task->thread.rsp;
+	probe_kernel_address(info->task->thread.sp, info->regs.bp);
+	info->regs.sp = info->task->thread.sp;
 	info->regs.ss = __KERNEL_DS;
 #else
 	memset(&info->regs, 0, sizeof(info->regs));
-	info->regs.eip = info->task->thread.eip;
-	info->regs.xcs = __KERNEL_CS;
-	probe_kernel_address(info->task->thread.esp, info->regs.ebp);
-	info->regs.esp = info->task->thread.esp;
-	info->regs.xss = __KERNEL_DS;
-	info->regs.xds = __USER_DS;
-	info->regs.xes = __USER_DS;
+	info->regs.ip = info->task->thread.ip;
+	info->regs.cs = __KERNEL_CS;
+	probe_kernel_address(info->task->thread.sp, info->regs.bp);
+	info->regs.sp = info->task->thread.sp;
+	info->regs.ss = __KERNEL_DS;
+	info->regs.ds = __USER_DS;
+	info->regs.es = __USER_DS;
 #endif
 }
 
@@ -144,15 +144,15 @@ static inline int arch_unw_user_mode(/*const*/ struct unwind_frame_info *info)
 {
 #ifdef CONFIG_X86_64
 	return user_mode(&info->regs)
-	       || (long)info->regs.rip >= 0
-	       || (info->regs.rip >= VSYSCALL_START && info->regs.rip < VSYSCALL_END)
-	       || (long)info->regs.rsp >= 0;
+	       || (long)info->regs.ip >= 0
+	       || (info->regs.ip >= VSYSCALL_START && info->regs.ip < VSYSCALL_END)
+	       || (long)info->regs.sp >= 0;
 #else
 	return user_mode_vm(&info->regs)
-	       || info->regs.eip < PAGE_OFFSET
-	       || (info->regs.eip >= __fix_to_virt(FIX_VDSO)
-	           && info->regs.eip < __fix_to_virt(FIX_VDSO) + PAGE_SIZE)
-	       || info->regs.esp < PAGE_OFFSET;
+	       || info->regs.ip < PAGE_OFFSET
+	       || (info->regs.ip >= __fix_to_virt(FIX_VDSO)
+	           && info->regs.ip < __fix_to_virt(FIX_VDSO) + PAGE_SIZE)
+	       || info->regs.sp < PAGE_OFFSET;
 #endif
 }
 

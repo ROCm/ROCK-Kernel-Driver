@@ -52,7 +52,7 @@
 4484:.balign 4				;	\
 .popsection				;
 
-#define ELFNOTE(name, type, desc...)		\
+#define ELFNOTE(name, type, desc)		\
 	ELFNOTE_START(name, type, "")		\
 		desc			;	\
 	ELFNOTE_END
@@ -76,7 +76,7 @@
 		typeof(desc) _desc					\
 			     __attribute__((aligned(sizeof(Elf##size##_Word)))); \
 	} _ELFNOTE_PASTE(_note_, unique)				\
-		__attribute_used__					\
+		__used							\
 		__attribute__((section(".note." name),			\
 			       aligned(sizeof(Elf##size##_Word)),	\
 			       unused)) = {				\

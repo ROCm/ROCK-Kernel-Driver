@@ -309,7 +309,8 @@ static struct aa_profile *aa_unpack_profile(struct aa_ext *e,
 	if (!aa_is_nameX(e, AA_STRUCTEND, NULL))
 		goto fail;
 
-	if (!aa_is_u32(e, &(profile->capabilities), NULL))
+	/* XXX: This supports only the low order capabilities. -jeffm */
+	if (!aa_is_u32(e, &(profile->capabilities.cap[0]), NULL))
 		goto fail;
 
 	size = aa_is_array(e, "net_allowed_af");

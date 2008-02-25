@@ -18,14 +18,10 @@
 #include <asm/bootparam.h>
 #include <asm/elf.h>
 
-#if defined(CONFIG_XEN) || defined(CONFIG_PARAVIRT_XEN)
 #include <xen/interface/xen.h>
-#endif
 
-#ifdef CONFIG_LGUEST_GUEST
 #include <linux/lguest.h>
 #include "../../../drivers/lguest/lg.h"
-#endif
 
 #define DEFINE(sym, val) \
         asm volatile("\n->" #sym " %0 " #val : : "i" (val))
@@ -40,15 +36,15 @@ void foo(void);
 
 void foo(void)
 {
-	OFFSET(SIGCONTEXT_eax, sigcontext, eax);
-	OFFSET(SIGCONTEXT_ebx, sigcontext, ebx);
-	OFFSET(SIGCONTEXT_ecx, sigcontext, ecx);
-	OFFSET(SIGCONTEXT_edx, sigcontext, edx);
-	OFFSET(SIGCONTEXT_esi, sigcontext, esi);
-	OFFSET(SIGCONTEXT_edi, sigcontext, edi);
-	OFFSET(SIGCONTEXT_ebp, sigcontext, ebp);
-	OFFSET(SIGCONTEXT_esp, sigcontext, esp);
-	OFFSET(SIGCONTEXT_eip, sigcontext, eip);
+	OFFSET(IA32_SIGCONTEXT_ax, sigcontext, ax);
+	OFFSET(IA32_SIGCONTEXT_bx, sigcontext, bx);
+	OFFSET(IA32_SIGCONTEXT_cx, sigcontext, cx);
+	OFFSET(IA32_SIGCONTEXT_dx, sigcontext, dx);
+	OFFSET(IA32_SIGCONTEXT_si, sigcontext, si);
+	OFFSET(IA32_SIGCONTEXT_di, sigcontext, di);
+	OFFSET(IA32_SIGCONTEXT_bp, sigcontext, bp);
+	OFFSET(IA32_SIGCONTEXT_sp, sigcontext, sp);
+	OFFSET(IA32_SIGCONTEXT_ip, sigcontext, ip);
 	BLANK();
 
 	OFFSET(CPUINFO_x86, cpuinfo_x86, x86);
@@ -65,7 +61,6 @@ void foo(void)
 	OFFSET(TI_exec_domain, thread_info, exec_domain);
 	OFFSET(TI_flags, thread_info, flags);
 	OFFSET(TI_status, thread_info, status);
-	OFFSET(TI_cpu, thread_info, cpu);
 	OFFSET(TI_preempt_count, thread_info, preempt_count);
 	OFFSET(TI_addr_limit, thread_info, addr_limit);
 	OFFSET(TI_restart_block, thread_info, restart_block);
@@ -73,45 +68,39 @@ void foo(void)
 	OFFSET(TI_cpu, thread_info, cpu);
 	BLANK();
 
-	OFFSET(GDS_size, Xgt_desc_struct, size);
-	OFFSET(GDS_address, Xgt_desc_struct, address);
-	OFFSET(GDS_pad, Xgt_desc_struct, pad);
+	OFFSET(GDS_size, desc_ptr, size);
+	OFFSET(GDS_address, desc_ptr, address);
 	BLANK();
 
-	OFFSET(PT_EBX, pt_regs, ebx);
-	OFFSET(PT_ECX, pt_regs, ecx);
-	OFFSET(PT_EDX, pt_regs, edx);
-	OFFSET(PT_ESI, pt_regs, esi);
-	OFFSET(PT_EDI, pt_regs, edi);
-	OFFSET(PT_EBP, pt_regs, ebp);
-	OFFSET(PT_EAX, pt_regs, eax);
-	OFFSET(PT_DS,  pt_regs, xds);
-	OFFSET(PT_ES,  pt_regs, xes);
-	OFFSET(PT_FS,  pt_regs, xfs);
-	OFFSET(PT_ORIG_EAX, pt_regs, orig_eax);
-	OFFSET(PT_EIP, pt_regs, eip);
-	OFFSET(PT_CS,  pt_regs, xcs);
-	OFFSET(PT_EFLAGS, pt_regs, eflags);
-	OFFSET(PT_OLDESP, pt_regs, esp);
-	OFFSET(PT_OLDSS,  pt_regs, xss);
+	OFFSET(PT_EBX, pt_regs, bx);
+	OFFSET(PT_ECX, pt_regs, cx);
+	OFFSET(PT_EDX, pt_regs, dx);
+	OFFSET(PT_ESI, pt_regs, si);
+	OFFSET(PT_EDI, pt_regs, di);
+	OFFSET(PT_EBP, pt_regs, bp);
+	OFFSET(PT_EAX, pt_regs, ax);
+	OFFSET(PT_DS,  pt_regs, ds);
+	OFFSET(PT_ES,  pt_regs, es);
+	OFFSET(PT_FS,  pt_regs, fs);
+	OFFSET(PT_ORIG_EAX, pt_regs, orig_ax);
+	OFFSET(PT_EIP, pt_regs, ip);
+	OFFSET(PT_CS,  pt_regs, cs);
+	OFFSET(PT_EFLAGS, pt_regs, flags);
+	OFFSET(PT_OLDESP, pt_regs, sp);
+	OFFSET(PT_OLDSS,  pt_regs, ss);
 	BLANK();
 
 	OFFSET(EXEC_DOMAIN_handler, exec_domain, handler);
-	OFFSET(RT_SIGFRAME_sigcontext, rt_sigframe, uc.uc_mcontext);
+	OFFSET(IA32_RT_SIGFRAME_sigcontext, rt_sigframe, uc.uc_mcontext);
 	BLANK();
 
 	OFFSET(pbe_address, pbe, address);
 	OFFSET(pbe_orig_address, pbe, orig_address);
 	OFFSET(pbe_next, pbe, next);
 
-#ifndef CONFIG_X86_NO_TSS
-	/* Offset from the sysenter stack to tss.esp0 */
-	DEFINE(SYSENTER_stack_esp0, offsetof(struct tss_struct, x86_tss.esp0) -
+	/* Offset from the sysenter stack to tss.sp0 */
+	DEFINE(TSS_sysenter_sp0, offsetof(struct tss_struct, x86_tss.sp0) -
 		 sizeof(struct tss_struct));
-#else
-	/* sysenter stack points directly to esp0 */
-	DEFINE(SYSENTER_stack_esp0, 0);
-#endif
 
 	DEFINE(PAGE_SIZE_asm, PAGE_SIZE);
 	DEFINE(PAGE_SHIFT_asm, PAGE_SHIFT);
@@ -119,14 +108,7 @@ void foo(void)
 	DEFINE(PTRS_PER_PMD, PTRS_PER_PMD);
 	DEFINE(PTRS_PER_PGD, PTRS_PER_PGD);
 
-	DEFINE(VDSO_PRELINK_asm, VDSO_PRELINK);
-
 	OFFSET(crypto_tfm_ctx_offset, crypto_tfm, __crt_ctx);
-
-#ifdef CONFIG_XEN
-	BLANK();
-	OFFSET(XEN_START_mfn_list, start_info, mfn_list);
-#endif
 
 #ifdef CONFIG_PARAVIRT
 	BLANK();
@@ -136,11 +118,11 @@ void foo(void)
 	OFFSET(PV_IRQ_irq_disable, pv_irq_ops, irq_disable);
 	OFFSET(PV_IRQ_irq_enable, pv_irq_ops, irq_enable);
 	OFFSET(PV_CPU_iret, pv_cpu_ops, iret);
-	OFFSET(PV_CPU_irq_enable_sysexit, pv_cpu_ops, irq_enable_sysexit);
+	OFFSET(PV_CPU_irq_enable_syscall_ret, pv_cpu_ops, irq_enable_syscall_ret);
 	OFFSET(PV_CPU_read_cr0, pv_cpu_ops, read_cr0);
 #endif
 
-#ifdef CONFIG_PARAVIRT_XEN
+#ifdef CONFIG_XEN
 	BLANK();
 	OFFSET(XEN_vcpu_info_mask, vcpu_info, evtchn_upcall_mask);
 	OFFSET(XEN_vcpu_info_pending, vcpu_info, evtchn_upcall_pending);
@@ -150,6 +132,10 @@ void foo(void)
 	BLANK();
 	OFFSET(LGUEST_DATA_irq_enabled, lguest_data, irq_enabled);
 	OFFSET(LGUEST_DATA_pgdir, lguest_data, pgdir);
+#endif
+
+#ifdef CONFIG_LGUEST_MODULE
+	BLANK();
 	OFFSET(LGUEST_PAGES_host_gdt_desc, lguest_pages, state.host_gdt_desc);
 	OFFSET(LGUEST_PAGES_host_idt_desc, lguest_pages, state.host_idt_desc);
 	OFFSET(LGUEST_PAGES_host_cr3, lguest_pages, state.host_cr3);

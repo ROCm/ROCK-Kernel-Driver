@@ -95,7 +95,7 @@ kdbm_task(int argc, const char **argv)
 		test_tsk_thread_flag(tp, TIF_NEED_RESCHED));
 	kdb_printf(
 	    "time_slice=%u",
-	    tp->time_slice);
+	    tp->rt.time_slice);
 	kdb_printf(" lock_depth=%d\n", tp->lock_depth);
 
 	kdb_printf(

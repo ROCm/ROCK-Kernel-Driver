@@ -20,6 +20,7 @@
 #include <linux/kexec.h>
 #include <linux/debug_locks.h>
 #include <linux/random.h>
+#include <linux/kallsyms.h>
 
 int panic_on_oops;
 int tainted;
@@ -174,7 +175,7 @@ const char *print_tainted(void)
 {
 	static char buf[20];
 	if (tainted) {
-		snprintf(buf, sizeof(buf), "Tainted: %c%c%c%c%c%c%c%c%c",
+		snprintf(buf, sizeof(buf), "Tainted: %c%c%c%c%c%c%c%c%c%c",
 			tainted & TAINT_PROPRIETARY_MODULE ? 'P' : 'G',
 			tainted & TAINT_FORCED_MODULE ? 'F' : ' ',
 			tainted & TAINT_UNSAFE_SMP ? 'S' : ' ',
@@ -183,6 +184,7 @@ const char *print_tainted(void)
 			tainted & TAINT_BAD_PAGE ? 'B' : ' ',
 			tainted & TAINT_USER ? 'U' : ' ',
 			tainted & TAINT_DIE ? 'D' : ' ',
+			tainted & TAINT_OVERRIDDEN_ACPI_TABLE ? 'A' : ' ',
 			tainted & TAINT_NO_SUPPORT ? 'N' :
 				(tainted & TAINT_EXTERNAL_SUPPORT ? 'X' : ' '));
 	}
@@ -296,6 +298,13 @@ static int init_oops_id(void)
 }
 late_initcall(init_oops_id);
 
+static void print_oops_end_marker(void)
+{
+	init_oops_id();
+	printk(KERN_WARNING "---[ end trace %016llx ]---\n",
+		(unsigned long long)oops_id);
+}
+
 /*
  * Called when the architecture exits its oops handler, after printing
  * everything.
@@ -303,10 +312,25 @@ late_initcall(init_oops_id);
 void oops_exit(void)
 {
 	do_oops_enter_exit();
-	init_oops_id();
-	printk(KERN_WARNING "---[ end trace %016llx ]---\n",
-		(unsigned long long)oops_id);
+	print_oops_end_marker();
 }
+
+#ifdef WANT_WARN_ON_SLOWPATH
+void warn_on_slowpath(const char *file, int line)
+{
+	char function[KSYM_SYMBOL_LEN];
+	unsigned long caller = (unsigned long) __builtin_return_address(0);
+	sprint_symbol(function, caller);
+
+	printk(KERN_WARNING "------------[ cut here ]------------\n");
+	printk(KERN_WARNING "WARNING: at %s:%d %s()\n", file,
+		line, function);
+	print_modules();
+	dump_stack();
+	print_oops_end_marker();
+}
+EXPORT_SYMBOL(warn_on_slowpath);
+#endif
 
 #ifdef CONFIG_CC_STACKPROTECTOR
 /*

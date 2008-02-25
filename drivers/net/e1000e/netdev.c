@@ -91,7 +91,7 @@ static int e1000_desc_unused(struct e1000_ring *ring)
 static void e1000_receive_skb(struct e1000_adapter *adapter,
 			      struct net_device *netdev,
 			      struct sk_buff *skb,
-			      u8 status, u16 vlan)
+			      u8 status, __le16 vlan)
 {
 	skb->protocol = eth_type_trans(skb, netdev);
 
@@ -142,8 +142,8 @@ static void e1000_rx_checksum(struct e1000_adapter *adapter, u32 status_err,
 		/* Hardware complements the payload checksum, so we undo it
 		 * and then put the value in host order for further stack use.
 		 */
-		csum = ntohl(csum ^ 0xFFFF);
-		skb->csum = csum;
+		__sum16 sum = (__force __sum16)htons(csum);
+		skb->csum = csum_unfold(~sum);
 		skb->ip_summed = CHECKSUM_COMPLETE;
 	}
 	adapter->hw_csum_good++;
@@ -248,7 +248,7 @@ static void e1000_alloc_rx_buffers_ps(struct e1000_adapter *adapter,
 			ps_page = &buffer_info->ps_pages[j];
 			if (j >= adapter->rx_ps_pages) {
 				/* all unused desc entries get hw null ptr */
-				rx_desc->read.buffer_addr[j+1] = ~0;
+				rx_desc->read.buffer_addr[j+1] = ~cpu_to_le64(0);
 				continue;
 			}
 			if (!ps_page->page) {
@@ -458,6 +458,8 @@ next_desc:
 
 	adapter->total_rx_packets += total_rx_packets;
 	adapter->total_rx_bytes += total_rx_bytes;
+	adapter->net_stats.rx_packets += total_rx_packets;
+	adapter->net_stats.rx_bytes += total_rx_bytes;
 	return cleaned;
 }
 
@@ -593,6 +595,8 @@ static bool e1000_clean_tx_irq(struct e1000_adapter *adapter)
 	}
 	adapter->total_tx_bytes += total_tx_bytes;
 	adapter->total_tx_packets += total_tx_packets;
+	adapter->net_stats.tx_packets += total_tx_packets;
+	adapter->net_stats.tx_bytes += total_tx_bytes;
 	return cleaned;
 }
 
@@ -755,6 +759,8 @@ next_desc:
 
 	adapter->total_rx_packets += total_rx_packets;
 	adapter->total_rx_bytes += total_rx_bytes;
+	adapter->net_stats.rx_packets += total_rx_packets;
+	adapter->net_stats.rx_bytes += total_rx_bytes;
 	return cleaned;
 }
 
@@ -935,27 +941,25 @@ static irqreturn_t e1000_intr(int irq, void *data)
 static int e1000_request_irq(struct e1000_adapter *adapter)
 {
 	struct net_device *netdev = adapter->netdev;
-	void (*handler) = &e1000_intr;
+	irq_handler_t handler = e1000_intr;
 	int irq_flags = IRQF_SHARED;
 	int err;
 
-	err = pci_enable_msi(adapter->pdev);
-	if (err) {
-		ndev_warn(netdev,
-		 "Unable to allocate MSI interrupt Error: %d\n", err);
-	} else {
+	if (!pci_enable_msi(adapter->pdev)) {
 		adapter->flags |= FLAG_MSI_ENABLED;
-		handler = &e1000_intr_msi;
+		handler = e1000_intr_msi;
 		irq_flags = 0;
 	}
 
 	err = request_irq(adapter->pdev->irq, handler, irq_flags, netdev->name,
 			  netdev);
 	if (err) {
+		ndev_err(netdev,
+		       "Unable to allocate %s interrupt (return: %d)\n",
+			adapter->flags & FLAG_MSI_ENABLED ? "MSI":"INTx",
+			err);
 		if (adapter->flags & FLAG_MSI_ENABLED)
 			pci_disable_msi(adapter->pdev);
-		ndev_err(netdev,
-		       "Unable to allocate interrupt Error: %d\n", err);
 	}
 
 	return err;
@@ -1048,23 +1052,6 @@ static void e1000_release_hw_control(struct e1000_adapter *adapter)
 		ctrl_ext = er32(CTRL_EXT);
 		ew32(CTRL_EXT,
 				ctrl_ext & ~E1000_CTRL_EXT_DRV_LOAD);
-	}
-}
-
-static void e1000_release_manageability(struct e1000_adapter *adapter)
-{
-	if (adapter->flags & FLAG_MNG_PT_ENABLED) {
-		struct e1000_hw *hw = &adapter->hw;
-
-		u32 manc = er32(MANC);
-
-		/* re-enable hardware interception of ARP */
-		manc |= E1000_MANC_ARP_EN;
-		manc &= ~E1000_MANC_EN_MNG2HOST;
-
-		/* don't explicitly have to mess with MANC2H since
-		 * MANC has an enable disable that gates MANC2H */
-		ew32(MANC, manc);
 	}
 }
 
@@ -1557,9 +1544,6 @@ static void e1000_init_manageability(struct e1000_adapter *adapter)
 
 	manc = er32(MANC);
 
-	/* disable hardware interception of ARP */
-	manc &= ~(E1000_MANC_ARP_EN);
-
 	/* enable receiving management packets to the host. this will probably
 	 * generate destination unreachable messages from the host OS, but
 	 * the packets will be handled on SMBUS */
@@ -1686,6 +1670,9 @@ static void e1000_setup_rctl(struct e1000_adapter *adapter)
 	else
 		rctl |= E1000_RCTL_LPE;
 
+	/* Enable hardware CRC frame stripping */
+	rctl |= E1000_RCTL_SECRC;
+
 	/* Setup buffer sizes */
 	rctl &= ~E1000_RCTL_SZ_4096;
 	rctl |= E1000_RCTL_BSEX;
@@ -1751,9 +1738,6 @@ static void e1000_setup_rctl(struct e1000_adapter *adapter)
 
 		/* Enable Packet split descriptors */
 		rctl |= E1000_RCTL_DTYP_PS;
-		
-		/* Enable hardware CRC frame stripping */
-		rctl |= E1000_RCTL_SECRC;
 
 		psrctl |= adapter->rx_ps_bsize0 >>
 			E1000_PSRCTL_BSIZE0_SHIFT;
@@ -2004,7 +1988,7 @@ static void e1000_power_down_phy(struct e1000_adapter *adapter)
 	u16 mii_reg;
 
 	/* WoL is enabled */
-	if (!adapter->wol)
+	if (adapter->wol)
 		return;
 
 	/* non-copper PHY? */
@@ -2136,8 +2120,6 @@ void e1000e_reset(struct e1000_adapter *adapter)
 		phy_data &= ~IGP02E1000_PM_SPD;
 		e1e_wphy(hw, IGP02E1000_PHY_POWER_MGMT, phy_data);
 	}
-
-	e1000_release_manageability(adapter);
 }
 
 int e1000e_up(struct e1000_adapter *adapter)
@@ -2535,10 +2517,6 @@ void e1000e_update_stats(struct e1000_adapter *adapter)
 	}
 
 	/* Fill out the OS statistics structure */
-	adapter->net_stats.rx_packets = adapter->stats.gprc;
-	adapter->net_stats.tx_packets = adapter->stats.gptc;
-	adapter->net_stats.rx_bytes = adapter->stats.gorcl;
-	adapter->net_stats.tx_bytes = adapter->stats.gotcl;
 	adapter->net_stats.multicast = adapter->stats.mprc;
 	adapter->net_stats.collisions = adapter->stats.colc;
 
@@ -3487,8 +3465,6 @@ static int e1000_suspend(struct pci_dev *pdev, pm_message_t state)
 		pci_enable_wake(pdev, PCI_D3cold, 0);
 	}
 
-	e1000_release_manageability(adapter);
-
 	/* make sure adapter isn't asleep if manageability is enabled */
 	if (adapter->flags & FLAG_MNG_PT_ENABLED) {
 		pci_enable_wake(pdev, PCI_D3hot, 1);
@@ -3509,6 +3485,33 @@ static int e1000_suspend(struct pci_dev *pdev, pm_message_t state)
 	return 0;
 }
 
+static void e1000e_disable_l1aspm(struct pci_dev *pdev)
+{
+	int pos;
+	u32 cap;
+	u16 val;
+
+	/*
+	 * 82573 workaround - disable L1 ASPM on mobile chipsets
+	 *
+	 * L1 ASPM on various mobile (ich7) chipsets do not behave properly
+	 * resulting in lost data or garbage information on the pci-e link
+	 * level. This could result in (false) bad EEPROM checksum errors,
+	 * long ping times (up to 2s) or even a system freeze/hang.
+	 *
+	 * Unfortunately this feature saves about 1W power consumption when
+	 * active.
+	 */
+	pos = pci_find_capability(pdev, PCI_CAP_ID_EXP);
+	pci_read_config_dword(pdev, pos + PCI_EXP_LNKCAP, &cap);
+	pci_read_config_word(pdev, pos + PCI_EXP_LNKCTL, &val);
+	if (val & 0x2) {
+		dev_warn(&pdev->dev, "Disabling L1 ASPM\n");
+		val &= ~0x2;
+		pci_write_config_word(pdev, pos + PCI_EXP_LNKCTL, val);
+	}
+}
+
 #ifdef CONFIG_PM
 static int e1000_resume(struct pci_dev *pdev)
 {
@@ -3519,6 +3522,7 @@ static int e1000_resume(struct pci_dev *pdev)
 
 	pci_set_power_state(pdev, PCI_D0);
 	pci_restore_state(pdev);
+	e1000e_disable_l1aspm(pdev);
 	err = pci_enable_device(pdev);
 	if (err) {
 		dev_err(&pdev->dev,
@@ -3619,6 +3623,7 @@ static pci_ers_result_t e1000_io_slot_reset(struct pci_dev *pdev)
 	struct e1000_adapter *adapter = netdev_priv(netdev);
 	struct e1000_hw *hw = &adapter->hw;
 
+	e1000e_disable_l1aspm(pdev);
 	if (pci_enable_device(pdev)) {
 		dev_err(&pdev->dev,
 			"Cannot re-enable PCI device after reset.\n");
@@ -3720,6 +3725,7 @@ static int __devinit e1000_probe(struct pci_dev *pdev,
 	u16 eeprom_data = 0;
 	u16 eeprom_apme_mask = E1000_EEPROM_APME;
 
+	e1000e_disable_l1aspm(pdev);
 	err = pci_enable_device(pdev);
 	if (err)
 		return err;
@@ -4024,8 +4030,6 @@ static void __devexit e1000_remove(struct pci_dev *pdev)
 
 	flush_scheduled_work();
 
-	e1000_release_manageability(adapter);
-
 	/* Release control of h/w to f/w.  If f/w is AMT enabled, this
 	 * would have already happened in close and is redundant. */
 	e1000_release_hw_control(adapter);
@@ -4056,16 +4060,15 @@ static struct pci_error_handlers e1000_err_handler = {
 };
 
 static struct pci_device_id e1000_pci_tbl[] = {
-	/*
-	 * Support for 82571/2/3, es2lan and ich8 will be phased in
-	 * stepwise.
-
 	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_82571EB_COPPER), board_82571 },
 	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_82571EB_FIBER), board_82571 },
 	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_82571EB_QUAD_COPPER), board_82571 },
 	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_82571EB_QUAD_COPPER_LP), board_82571 },
 	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_82571EB_QUAD_FIBER), board_82571 },
 	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_82571EB_SERDES), board_82571 },
+	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_82571EB_SERDES_DUAL), board_82571 },
+	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_82571EB_SERDES_QUAD), board_82571 },
+	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_82571PT_QUAD_COPPER), board_82571 },
 	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_82572EI), board_82572 },
 	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_82572EI_COPPER), board_82572 },
 	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_82572EI_FIBER), board_82572 },
@@ -4088,8 +4091,6 @@ static struct pci_device_id e1000_pci_tbl[] = {
 	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_ICH8_IGP_C), board_ich8lan },
 	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_ICH8_IGP_M), board_ich8lan },
 	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_ICH8_IGP_M_AMT), board_ich8lan },
-	*/
-
 	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_ICH9_IFE), board_ich9lan },
 	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_ICH9_IFE_G), board_ich9lan },
 	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_ICH9_IFE_GT), board_ich9lan },

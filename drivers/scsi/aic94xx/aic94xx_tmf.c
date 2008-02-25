@@ -151,8 +151,6 @@ static int asd_clear_nexus_I_T(struct domain_device *dev)
 	CLEAR_NEXUS_PRE;
 	scb->clear_nexus.nexus = NEXUS_I_T;
 	scb->clear_nexus.flags = SEND_Q | EXEC_Q | NOTINQ;
-	if (dev->tproto)
-		scb->clear_nexus.flags |= SUSPEND_TX;
 	scb->clear_nexus.conn_handle = cpu_to_le16((u16)(unsigned long)
 						   dev->lldd_dev);
 	CLEAR_NEXUS_POST;
@@ -169,8 +167,6 @@ static int asd_clear_nexus_I_T_L(struct domain_device *dev, u8 *lun)
 	CLEAR_NEXUS_PRE;
 	scb->clear_nexus.nexus = NEXUS_I_T_L;
 	scb->clear_nexus.flags = SEND_Q | EXEC_Q | NOTINQ;
-	if (dev->tproto)
-		scb->clear_nexus.flags |= SUSPEND_TX;
 	memcpy(scb->clear_nexus.ssp_task.lun, lun, 8);
 	scb->clear_nexus.conn_handle = cpu_to_le16((u16)(unsigned long)
 						   dev->lldd_dev);
@@ -369,24 +365,24 @@ int asd_abort_task(struct sas_task *task)
 		return -ENOMEM;
 	scb = ascb->scb;
 
-	scb->header.opcode = ABORT_TASK;
+	scb->header.opcode = SCB_ABORT_TASK;
 
 	switch (task->task_proto) {
-	case SATA_PROTO:
-	case SAS_PROTO_STP:
+	case SAS_PROTOCOL_SATA:
+	case SAS_PROTOCOL_STP:
 		scb->abort_task.proto_conn_rate = (1 << 5); /* STP */
 		break;
-	case SAS_PROTO_SSP:
+	case SAS_PROTOCOL_SSP:
 		scb->abort_task.proto_conn_rate  = (1 << 4); /* SSP */
 		scb->abort_task.proto_conn_rate |= task->dev->linkrate;
 		break;
-	case SAS_PROTO_SMP:
+	case SAS_PROTOCOL_SMP:
 		break;
 	default:
 		break;
 	}
 
-	if (task->task_proto == SAS_PROTO_SSP) {
+	if (task->task_proto == SAS_PROTOCOL_SSP) {
 		scb->abort_task.ssp_frame.frame_type = SSP_TASK;
 		memcpy(scb->abort_task.ssp_frame.hashed_dest_addr,
 		       task->dev->hashed_sas_addr, HASHED_SAS_ADDR_SIZE);
@@ -512,7 +508,7 @@ static int asd_initiate_ssp_tmf(struct domain_device *dev, u8 *lun,
 	int res = 1;
 	struct scb *scb;
 
-	if (!(dev->tproto & SAS_PROTO_SSP))
+	if (!(dev->tproto & SAS_PROTOCOL_SSP))
 		return TMF_RESP_FUNC_ESUPP;
 
 	ascb = asd_ascb_alloc_list(asd_ha, &res, GFP_KERNEL);

@@ -46,6 +46,7 @@ struct xattr_handler {
 		   size_t size, int flags);
 };
 
+ssize_t xattr_getsecurity(struct inode *, const char *, void *, size_t);
 ssize_t vfs_getxattr(struct dentry *, struct vfsmount *, char *, void *,
 		     size_t, struct file *);
 ssize_t vfs_listxattr(struct dentry *d, struct vfsmount *, char *list,

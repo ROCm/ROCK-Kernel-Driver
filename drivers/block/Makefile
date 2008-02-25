@@ -11,7 +11,7 @@ obj-$(CONFIG_AMIGA_FLOPPY)	+= amiflop.o
 obj-$(CONFIG_PS3_DISK)		+= ps3disk.o
 obj-$(CONFIG_ATARI_FLOPPY)	+= ataflop.o
 obj-$(CONFIG_AMIGA_Z2RAM)	+= z2ram.o
-obj-$(CONFIG_BLK_DEV_RAM)	+= rd.o
+obj-$(CONFIG_BLK_DEV_RAM)	+= brd.o
 obj-$(CONFIG_BLK_DEV_LOOP)	+= loop.o
 obj-$(CONFIG_BLK_DEV_PS2)	+= ps2esdi.o
 obj-$(CONFIG_BLK_DEV_XD)	+= xd.o
@@ -31,5 +31,5 @@ obj-$(CONFIG_VIODASD)		+= viodasd.o
 obj-$(CONFIG_BLK_DEV_SX8)	+= sx8.o
 obj-$(CONFIG_BLK_DEV_UB)	+= ub.o
 
-obj-$(CONFIG_XEN_BLKFRONT)	+= xen-blkfront.o
+obj-$(CONFIG_XEN_BLKDEV_FRONTEND)	+= xen-blkfront.o
 obj-$(CONFIG_CIPHER_TWOFISH)	+= loop_fish2.o

@@ -1,6 +1,5 @@
 config CPU_FREQ
 	bool "CPU Frequency scaling"
-	depends on !XEN
 	help
 	  CPU Frequency scaling allows you to change the clock speed of 
 	  CPUs on the fly. This is a nice method to save power, because 
@@ -9,9 +8,6 @@ config CPU_FREQ
 	  Note that this driver doesn't automatically change the CPU
 	  clock speed, you need to either enable a dynamic cpufreq governor
 	  (see below) after boot, or use a userspace tool.
-
-	  To compile this driver as a module, choose M here: the
-	  module will be called cpufreq.
 
 	  For details, take a look at <file:Documentation/cpu-freq>.
 

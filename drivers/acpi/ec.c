@@ -573,7 +573,7 @@ acpi_ec_space_handler(u32 function, acpi_physical_address address,
 		      void *handler_context, void *region_context)
 {
 	struct acpi_ec *ec = handler_context;
-	int result = 0, i = 0;
+	int result = 0, i;
 	u8 temp = 0;
 
 	if ((address > 0xFF) || !value || !handler_context)
@@ -585,7 +585,18 @@ acpi_ec_space_handler(u32 function, acpi_physical_address address,
 	if (bits != 8 && acpi_strict)
 		return AE_BAD_PARAMETER;
 
-	while (bits - i > 0) {
+	acpi_ec_burst_enable(ec);
+
+	if (function == ACPI_READ) {
+		result = acpi_ec_read(ec, address, &temp);
+		*value = temp;
+	} else {
+		temp = 0xff & (*value);
+		result = acpi_ec_write(ec, address, temp);
+	}
+
+	for (i = 8; unlikely(bits - i > 0); i += 8) {
+		++address;
 		if (function == ACPI_READ) {
 			result = acpi_ec_read(ec, address, &temp);
 			(*value) |= ((acpi_integer)temp) << i;
@@ -593,9 +604,9 @@ acpi_ec_space_handler(u32 function, acpi_physical_address address,
 			temp = 0xff & ((*value) >> i);
 			result = acpi_ec_write(ec, address, temp);
 		}
-		i += 8;
-		++address;
 	}
+
+	acpi_ec_burst_disable(ec);
 
 	switch (result) {
 	case -EINVAL:
@@ -932,7 +943,11 @@ int __init acpi_ec_ecdt_probe(void)
 		boot_ec->command_addr = ecdt_ptr->control.address;
 		boot_ec->data_addr = ecdt_ptr->data.address;
 		boot_ec->gpe = ecdt_ptr->gpe;
-		boot_ec->handle = ACPI_ROOT_OBJECT;
+		if (ACPI_FAILURE(acpi_get_handle(NULL, ecdt_ptr->id,
+				&boot_ec->handle))) {
+			pr_info("Failed to locate handle for boot EC\n");
+			boot_ec->handle = ACPI_ROOT_OBJECT;
+		}
 	} else {
 		/* This workaround is needed only on some broken machines,
 		 * which require early EC, but fail to provide ECDT */

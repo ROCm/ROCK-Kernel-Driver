@@ -618,9 +618,9 @@ static void __init inherit_prom_mappings(void)
 	read_obp_translations();
 
 	/* Now fixup OBP's idea about where we really are mapped. */
-	prom_printf("Remapping the kernel... ");
+	printk("Remapping the kernel... ");
 	remap_kernel();
-	prom_printf("done.\n");
+	printk("done.\n");
 }
 
 void prom_world(int enter)
@@ -739,11 +739,6 @@ static unsigned long __init choose_bootmap_pfn(unsigned long start_pfn,
 	avoid_end = PAGE_ALIGN(initrd_end);
 #endif
 
-#ifdef CONFIG_DEBUG_BOOTMEM
-	prom_printf("choose_bootmap_pfn: kern[%lx:%lx] avoid[%lx:%lx]\n",
-		    kern_base, PAGE_ALIGN(kern_base + kern_size),
-		    avoid_start, avoid_end);
-#endif
 	for (i = 0; i < pavail_ents; i++) {
 		unsigned long start, end;
 
@@ -777,10 +772,6 @@ static unsigned long __init choose_bootmap_pfn(unsigned long start_pfn,
 			}
 
 			/* OK, it doesn't overlap anything, use it.  */
-#ifdef CONFIG_DEBUG_BOOTMEM
-			prom_printf("choose_bootmap_pfn: Using %lx [%lx]\n",
-				    start >> PAGE_SHIFT, start);
-#endif
 			return start >> PAGE_SHIFT;
 		}
 	}
@@ -920,10 +911,6 @@ static unsigned long __init bootmem_init(unsigned long *pages_avail,
 	unsigned long bootmap_pfn, bytes_avail, size;
 	int i;
 
-#ifdef CONFIG_DEBUG_BOOTMEM
-	prom_printf("bootmem_init: Scan pavail, ");
-#endif
-
 	bytes_avail = 0UL;
 	for (i = 0; i < pavail_ents; i++) {
 		end_of_phys_memory = pavail[i].phys_addr +
@@ -970,44 +957,28 @@ static unsigned long __init bootmem_init(unsigned long *pages_avail,
 
 	bootmap_pfn = choose_bootmap_pfn(min_low_pfn, end_pfn);
 
-#ifdef CONFIG_DEBUG_BOOTMEM
-	prom_printf("init_bootmem(min[%lx], bootmap[%lx], max[%lx])\n",
-		    min_low_pfn, bootmap_pfn, max_low_pfn);
-#endif
 	bootmap_size = init_bootmem_node(NODE_DATA(0), bootmap_pfn,
 					 min_low_pfn, end_pfn);
 
 	/* Now register the available physical memory with the
 	 * allocator.
 	 */
-	for (i = 0; i < pavail_ents; i++) {
-#ifdef CONFIG_DEBUG_BOOTMEM
-		prom_printf("free_bootmem(pavail:%d): base[%lx] size[%lx]\n",
-			    i, pavail[i].phys_addr, pavail[i].reg_size);
-#endif
+	for (i = 0; i < pavail_ents; i++)
 		free_bootmem(pavail[i].phys_addr, pavail[i].reg_size);
-	}
 
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (initrd_start) {
 		size = initrd_end - initrd_start;
 
 		/* Reserve the initrd image area. */
-#ifdef CONFIG_DEBUG_BOOTMEM
-		prom_printf("reserve_bootmem(initrd): base[%llx] size[%lx]\n",
-			initrd_start, initrd_end);
-#endif
-		reserve_bootmem(initrd_start, size);
+		reserve_bootmem(initrd_start, size, BOOTMEM_DEFAULT);
 
 		initrd_start += PAGE_OFFSET;
 		initrd_end += PAGE_OFFSET;
 	}
 #endif
 	/* Reserve the kernel text/data/bss. */
-#ifdef CONFIG_DEBUG_BOOTMEM
-	prom_printf("reserve_bootmem(kernel): base[%lx] size[%lx]\n", kern_base, kern_size);
-#endif
-	reserve_bootmem(kern_base, kern_size);
+	reserve_bootmem(kern_base, kern_size, BOOTMEM_DEFAULT);
 	*pages_avail -= PAGE_ALIGN(kern_size) >> PAGE_SHIFT;
 
 	/* Add back in the initmem pages. */
@@ -1020,21 +991,13 @@ static unsigned long __init bootmem_init(unsigned long *pages_avail,
 	 * in free_all_bootmem.
 	 */
 	size = bootmap_size;
-#ifdef CONFIG_DEBUG_BOOTMEM
-	prom_printf("reserve_bootmem(bootmap): base[%lx] size[%lx]\n",
-		    (bootmap_pfn << PAGE_SHIFT), size);
-#endif
-	reserve_bootmem((bootmap_pfn << PAGE_SHIFT), size);
+	reserve_bootmem((bootmap_pfn << PAGE_SHIFT), size, BOOTMEM_DEFAULT);
 
 	for (i = 0; i < pavail_ents; i++) {
 		unsigned long start_pfn, end_pfn;
 
 		start_pfn = pavail[i].phys_addr >> PAGE_SHIFT;
 		end_pfn = (start_pfn + (pavail[i].reg_size >> PAGE_SHIFT));
-#ifdef CONFIG_DEBUG_BOOTMEM
-		prom_printf("memory_present(0, %lx, %lx)\n",
-			    start_pfn, end_pfn);
-#endif
 		memory_present(0, start_pfn, end_pfn);
 	}
 
@@ -1328,6 +1291,11 @@ pgd_t swapper_pg_dir[2048];
 static void sun4u_pgprot_init(void);
 static void sun4v_pgprot_init(void);
 
+/* Dummy function */
+void __init setup_per_cpu_areas(void)
+{
+}
+
 void __init paging_init(void)
 {
 	unsigned long end_pfn, pages_avail, shift, phys_base;
@@ -1446,7 +1414,7 @@ void __init paging_init(void)
 				    zholes_size);
 	}
 
-	prom_printf("Booting Linux...\n");
+	printk("Booting Linux...\n");
 
 	central_probe();
 	cpu_probe();
@@ -1484,7 +1452,7 @@ static void __init taint_real_pages(void)
 					goto do_next_page;
 				}
 			}
-			reserve_bootmem(old_start, PAGE_SIZE);
+			reserve_bootmem(old_start, PAGE_SIZE, BOOTMEM_DEFAULT);
 
 		do_next_page:
 			old_start += PAGE_SIZE;
@@ -1543,10 +1511,6 @@ void __init mem_init(void)
 	taint_real_pages();
 
 	high_memory = __va(last_valid_pfn << PAGE_SHIFT);
-
-#ifdef CONFIG_DEBUG_BOOTMEM
-	prom_printf("mem_init: Calling free_all_bootmem().\n");
-#endif
 
 	/* We subtract one to account for the mem_map_zero page
 	 * allocated below.

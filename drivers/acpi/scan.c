@@ -59,7 +59,7 @@ static int create_modalias(struct acpi_device *acpi_dev, char *modalias,
 			count = snprintf(&modalias[len], size, "%s:",
 					 cid_list->id[i].value);
 			if (count < 0 || count >= size) {
-				printk(KERN_ERR "acpi: %s cid[%i] exceeds event buffer size",
+				printk(KERN_ERR PREFIX "%s cid[%i] exceeds event buffer size",
 				       acpi_dev->pnp.device_name, i);
 				break;
 			}
@@ -453,7 +453,7 @@ static int acpi_device_register(struct acpi_device *device,
 	device->dev.release = &acpi_device_release;
 	result = device_add(&device->dev);
 	if(result) {
-		printk("Error adding device %s", device->dev.bus_id);
+		printk(KERN_ERR PREFIX "Error adding device %s", device->dev.bus_id);
 		goto end;
 	}
 
@@ -830,7 +830,7 @@ static int acpi_bus_get_flags(struct acpi_device *device)
 	if (ACPI_SUCCESS(status))
 		device->flags.wake_capable = 1;
 
-	/* TBD: Peformance management */
+	/* TBD: Performance management */
 
 	return 0;
 }
@@ -966,7 +966,7 @@ static void acpi_device_set_id(struct acpi_device *device,
 	case ACPI_BUS_TYPE_DEVICE:
 		status = acpi_get_object_info(handle, &buffer);
 		if (ACPI_FAILURE(status)) {
-			printk("%s: Error reading device info\n", __FUNCTION__);
+			printk(KERN_ERR PREFIX "%s: Error reading device info\n", __FUNCTION__);
 			return;
 		}
 
@@ -1029,12 +1029,6 @@ static void acpi_device_set_id(struct acpi_device *device,
 	if (hid) {
 		strcpy(device->pnp.hardware_id, hid);
 		device->flags.hardware_id = 1;
-	} else if (cid_add) {
-		/* This device has no hardware id, so add the linux
-		   specific hid as HID not to the list of cids */
-		strcpy(device->pnp.hardware_id, cid_add);
-		device->flags.hardware_id = 1;
-		cid_add = NULL;
 	}
 	if (uid) {
 		strcpy(device->pnp.unique_id, uid);
@@ -1069,7 +1063,8 @@ static void acpi_device_set_id(struct acpi_device *device,
 				count = cid_list->count;
 			}
 			if (cid_add) {
-				strncpy(list->id[count].value, cid_add, ACPI_MAX_CID_LENGTH);
+				strncpy(list->id[count].value, cid_add,
+					ACPI_MAX_CID_LENGTH);
 				count++;
 				device->flags.compatible_ids = 1;
 			}
@@ -1077,7 +1072,7 @@ static void acpi_device_set_id(struct acpi_device *device,
 			list->count = count;
 			device->pnp.cid_list = list;
 		} else
-			printk(KERN_ERR "Memory allocation error\n");
+			printk(KERN_ERR PREFIX "Memory allocation error\n");
 	}
 
 	kfree(buffer.pointer);
@@ -1101,7 +1096,7 @@ static int acpi_device_set_context(struct acpi_device *device, int type)
 					  acpi_bus_data_handler, device);
 
 		if (ACPI_FAILURE(status)) {
-			printk("Error attaching device data\n");
+			printk(KERN_ERR PREFIX "Error attaching device data\n");
 			result = -ENODEV;
 		}
 	}
@@ -1133,7 +1128,7 @@ static int acpi_bus_remove(struct acpi_device *dev, int rmdevice)
 
 static int
 acpi_is_child_device(struct acpi_device *device,
-			int (*matcher)(struct acpi_device*))
+			int (*matcher)(struct acpi_device *))
 {
 	int result = -ENODEV;
 
@@ -1201,7 +1196,7 @@ acpi_add_single_object(struct acpi_device **child,
 			goto end;
 		}
 		if (!device->status.present) {
-                	/* Bay and dock should be handled even if absent */
+			/* Bay and dock should be handled even if absent */
 			if (!ACPI_SUCCESS(
 			     acpi_is_child_device(device, acpi_bay_match)) &&
 			    !ACPI_SUCCESS(

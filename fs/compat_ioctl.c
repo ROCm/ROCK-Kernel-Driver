@@ -78,7 +78,6 @@
 #include <linux/mii.h>
 #include <linux/if_bonding.h>
 #include <linux/watchdog.h>
-#include <linux/dm-ioctl.h>
 
 #include <linux/soundcard.h>
 #include <linux/lp.h>
@@ -113,13 +112,6 @@
 
 #ifdef CONFIG_SPARC
 #include <asm/fbio.h>
-#endif
-
-#ifdef CONFIG_XEN
-#include <xen/interface/xen.h>
-#include <xen/public/evtchn.h>
-#include <xen/public/privcmd.h>
-#include <xen/compat_ioctl.h>
 #endif
 
 static int do_ioctl32_pointer(unsigned int fd, unsigned int cmd,
@@ -1383,7 +1375,7 @@ static int do_atm_ioctl(unsigned int fd, unsigned int cmd32, unsigned long arg)
         return -EINVAL;
 }
 
-static __attribute_used__ int 
+static __used int
 ret_einval(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
 	return -EINVAL;
@@ -2001,39 +1993,6 @@ COMPATIBLE_IOCTL(STOP_ARRAY_RO)
 COMPATIBLE_IOCTL(RESTART_ARRAY_RW)
 COMPATIBLE_IOCTL(GET_BITMAP_FILE)
 ULONG_IOCTL(SET_BITMAP_FILE)
-/* DM */
-COMPATIBLE_IOCTL(DM_VERSION_32)
-COMPATIBLE_IOCTL(DM_REMOVE_ALL_32)
-COMPATIBLE_IOCTL(DM_LIST_DEVICES_32)
-COMPATIBLE_IOCTL(DM_DEV_CREATE_32)
-COMPATIBLE_IOCTL(DM_DEV_REMOVE_32)
-COMPATIBLE_IOCTL(DM_DEV_RENAME_32)
-COMPATIBLE_IOCTL(DM_DEV_SUSPEND_32)
-COMPATIBLE_IOCTL(DM_DEV_STATUS_32)
-COMPATIBLE_IOCTL(DM_DEV_WAIT_32)
-COMPATIBLE_IOCTL(DM_TABLE_LOAD_32)
-COMPATIBLE_IOCTL(DM_TABLE_CLEAR_32)
-COMPATIBLE_IOCTL(DM_TABLE_DEPS_32)
-COMPATIBLE_IOCTL(DM_TABLE_STATUS_32)
-COMPATIBLE_IOCTL(DM_LIST_VERSIONS_32)
-COMPATIBLE_IOCTL(DM_TARGET_MSG_32)
-COMPATIBLE_IOCTL(DM_DEV_SET_GEOMETRY_32)
-COMPATIBLE_IOCTL(DM_VERSION)
-COMPATIBLE_IOCTL(DM_REMOVE_ALL)
-COMPATIBLE_IOCTL(DM_LIST_DEVICES)
-COMPATIBLE_IOCTL(DM_DEV_CREATE)
-COMPATIBLE_IOCTL(DM_DEV_REMOVE)
-COMPATIBLE_IOCTL(DM_DEV_RENAME)
-COMPATIBLE_IOCTL(DM_DEV_SUSPEND)
-COMPATIBLE_IOCTL(DM_DEV_STATUS)
-COMPATIBLE_IOCTL(DM_DEV_WAIT)
-COMPATIBLE_IOCTL(DM_TABLE_LOAD)
-COMPATIBLE_IOCTL(DM_TABLE_CLEAR)
-COMPATIBLE_IOCTL(DM_TABLE_DEPS)
-COMPATIBLE_IOCTL(DM_TABLE_STATUS)
-COMPATIBLE_IOCTL(DM_LIST_VERSIONS)
-COMPATIBLE_IOCTL(DM_TARGET_MSG)
-COMPATIBLE_IOCTL(DM_DEV_SET_GEOMETRY)
 /* Big K */
 COMPATIBLE_IOCTL(PIO_FONT)
 COMPATIBLE_IOCTL(GIO_FONT)
@@ -2875,18 +2834,6 @@ IGNORE_IOCTL(FBIOGETCMAP32)
 IGNORE_IOCTL(FBIOSCURSOR32)
 IGNORE_IOCTL(FBIOGCURSOR32)
 #endif
-
-#ifdef CONFIG_XEN
-HANDLE_IOCTL(IOCTL_PRIVCMD_MMAP_32, privcmd_ioctl_32)
-HANDLE_IOCTL(IOCTL_PRIVCMD_MMAPBATCH_32, privcmd_ioctl_32)
-COMPATIBLE_IOCTL(IOCTL_PRIVCMD_HYPERCALL)
-COMPATIBLE_IOCTL(IOCTL_EVTCHN_BIND_VIRQ)
-COMPATIBLE_IOCTL(IOCTL_EVTCHN_BIND_INTERDOMAIN)
-COMPATIBLE_IOCTL(IOCTL_EVTCHN_BIND_UNBOUND_PORT)
-COMPATIBLE_IOCTL(IOCTL_EVTCHN_UNBIND)
-COMPATIBLE_IOCTL(IOCTL_EVTCHN_NOTIFY)
-COMPATIBLE_IOCTL(IOCTL_EVTCHN_RESET)
-#endif
 };
 
 #define IOCTL_HASHSIZE 256
@@ -2907,7 +2854,7 @@ static void compat_ioctl_error(struct file *filp, unsigned int fd,
 	/* find the name of the device. */
 	path = (char *)__get_free_page(GFP_KERNEL);
 	if (path) {
-		fn = d_path(filp->f_path.dentry, filp->f_path.mnt, path, PAGE_SIZE);
+		fn = d_path(&filp->f_path, path, PAGE_SIZE);
 		if (IS_ERR(fn))
 			fn = "?";
 	}
@@ -3006,7 +2953,7 @@ asmlinkage long compat_sys_ioctl(unsigned int fd, unsigned int cmd,
 	}
 
  do_ioctl:
-	error = vfs_ioctl(filp, fd, cmd, arg);
+	error = do_vfs_ioctl(filp, fd, cmd, arg);
  out_fput:
 	fput_light(filp, fput_needed);
  out:

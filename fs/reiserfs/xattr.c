@@ -163,7 +163,7 @@ static struct dentry *xattr_lookup(struct inode *inode, const char *name,
 
 	xadir = open_xa_dir(inode, flags);
 	if (IS_ERR(xadir))
-		return ERR_PTR(PTR_ERR(xadir));
+		return ERR_CAST(xadir);
 
 	mutex_lock_nested(&xadir->d_inode->i_mutex, I_MUTEX_XATTR);
 	xafile = lookup_one_len(name, xadir, strlen(name));

@@ -80,7 +80,7 @@ static void bit_clear(struct vc_data *vc, struct fb_info *info, int sy,
 		return;
 	}
 #endif
-	region.color = attr_bgcol_ec(bgshift, vc);
+	region.color = attr_bgcol_ec(bgshift, vc, info);
 	region.dx = sx * vc->vc_font.width;
 	region.dy = sy * vc->vc_font.height;
 	region.width = width * vc->vc_font.width;
@@ -244,7 +244,7 @@ static void bit_clear_margins(struct vc_data *vc, struct fb_info *info,
 	}
 #endif
 
-	region.color = attr_bgcol_ec(bgshift, vc);
+	region.color = attr_bgcol_ec(bgshift, vc, info);
 	region.rop = ROP_COPY;
 
 	if (rw && !bottom_only) {

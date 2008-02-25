@@ -133,7 +133,7 @@ static void del_nbp(struct net_bridge_port *p)
 	struct net_bridge *br = p->br;
 	struct net_device *dev = p->dev;
 
-	sysfs_remove_link(&br->ifobj, dev->name);
+	sysfs_remove_link(br->ifobj, dev->name);
 
 	dev_set_promiscuity(dev, -1);
 
@@ -257,12 +257,6 @@ static struct net_bridge_port *new_nbp(struct net_bridge *br,
 	br_init_port(p);
 	p->state = BR_STATE_DISABLED;
 	br_stp_port_timer_init(p);
-
-	kobject_init(&p->kobj);
-	kobject_set_name(&p->kobj, SYSFS_BRIDGE_PORT_ATTR);
-	p->kobj.ktype = &brport_ktype;
-	p->kobj.parent = &(dev->dev.kobj);
-	p->kobj.kset = NULL;
 
 	return p;
 }
@@ -388,7 +382,8 @@ int br_add_if(struct net_bridge *br, struct net_device *dev)
 	if (IS_ERR(p))
 		return PTR_ERR(p);
 
-	err = kobject_add(&p->kobj);
+	err = kobject_init_and_add(&p->kobj, &brport_ktype, &(dev->dev.kobj),
+				   SYSFS_BRIDGE_PORT_ATTR);
 	if (err)
 		goto err0;
 
@@ -425,6 +420,7 @@ err2:
 	br_fdb_delete_by_port(br, p, 1);
 err1:
 	kobject_del(&p->kobj);
+	return err;
 err0:
 	kobject_put(&p->kobj);
 	return err;

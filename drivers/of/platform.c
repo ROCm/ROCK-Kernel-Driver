@@ -87,6 +87,15 @@ static int of_platform_device_resume(struct device * dev)
 	return error;
 }
 
+static void of_platform_device_shutdown(struct device *dev)
+{
+	struct of_device *of_dev = to_of_device(dev);
+	struct of_platform_driver *drv = to_of_platform_driver(dev->driver);
+
+	if (dev->driver && drv->shutdown)
+		drv->shutdown(of_dev);
+}
+
 int of_bus_type_init(struct bus_type *bus, const char *name)
 {
 	bus->name = name;
@@ -95,6 +104,7 @@ int of_bus_type_init(struct bus_type *bus, const char *name)
 	bus->remove = of_platform_device_remove;
 	bus->suspend = of_platform_device_suspend;
 	bus->resume = of_platform_device_resume;
+	bus->shutdown = of_platform_device_shutdown;
 	bus->dev_attrs = of_platform_device_attrs;
 	return bus_register(bus);
 }

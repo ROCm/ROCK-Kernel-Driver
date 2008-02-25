@@ -164,7 +164,7 @@ struct kdba_running_process {
 	long rip;	/* rip when rsp was set */
 };
 
-register unsigned long current_stack_pointer asm("rsp") __attribute_used__;
+register unsigned long current_stack_pointer asm("rsp") __used;
 
 static inline
 void kdba_save_running(struct kdba_running_process *k, struct pt_regs *regs)

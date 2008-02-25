@@ -260,24 +260,24 @@ static struct kdbregs {
 	char   *reg_name;
 	size_t	reg_offset;
 } kdbreglist[] = {
-	{ "eax",	offsetof(struct pt_regs, eax) },
-	{ "ebx",	offsetof(struct pt_regs, ebx) },
-	{ "ecx",	offsetof(struct pt_regs, ecx) },
-	{ "edx",	offsetof(struct pt_regs, edx) },
+	{ "eax",	offsetof(struct pt_regs, ax) },
+	{ "ebx",	offsetof(struct pt_regs, bx) },
+	{ "ecx",	offsetof(struct pt_regs, cx) },
+	{ "edx",	offsetof(struct pt_regs, dx) },
 
-	{ "esi",	offsetof(struct pt_regs, esi) },
-	{ "edi",	offsetof(struct pt_regs, edi) },
-	{ "esp",	offsetof(struct pt_regs, esp) },
-	{ "eip",	offsetof(struct pt_regs, eip) },
+	{ "esi",	offsetof(struct pt_regs, si) },
+	{ "edi",	offsetof(struct pt_regs, di) },
+	{ "esp",	offsetof(struct pt_regs, sp) },
+	{ "eip",	offsetof(struct pt_regs, ip) },
 
-	{ "ebp",	offsetof(struct pt_regs, ebp) },
-	{ "xss", 	offsetof(struct pt_regs, xss) },
-	{ "xcs",	offsetof(struct pt_regs, xcs) },
-	{ "eflags", 	offsetof(struct pt_regs, eflags) },
+	{ "ebp",	offsetof(struct pt_regs, bp) },
+	{ "xss", 	offsetof(struct pt_regs, ss) },
+	{ "xcs",	offsetof(struct pt_regs, cs) },
+	{ "eflags", 	offsetof(struct pt_regs, flags) },
 
-	{ "xds", 	offsetof(struct pt_regs, xds) },
-	{ "xes", 	offsetof(struct pt_regs, xes) },
-	{ "origeax",	offsetof(struct pt_regs, orig_eax) },
+	{ "xds", 	offsetof(struct pt_regs, ds) },
+	{ "xes", 	offsetof(struct pt_regs, es) },
+	{ "origeax",	offsetof(struct pt_regs, orig_ax) },
 
 };
 
@@ -317,7 +317,7 @@ kdba_getregcontents(const char *regname,
 		/* User registers:  %%e[a-c]x, etc */
 		regname++;
 		regs = (struct pt_regs *)
-			(kdb_current_task->thread.esp0 - sizeof(struct pt_regs));
+			(kdb_current_task->thread.sp0 - sizeof(struct pt_regs));
 	}
 
 	for (i=0; i<ndbreglist; i++) {
@@ -345,7 +345,7 @@ kdba_getregcontents(const char *regname,
 
 	if (strcmp(regname, "kesp") == 0) {
 		*contents = (unsigned long)regs + sizeof(struct pt_regs);
-		if ((regs->xcs & 0xffff) == __KERNEL_CS) {
+		if ((regs->cs & 0xffff) == __KERNEL_CS) {
 			/* esp and ss are not on stack */
 			*contents -= 2*4;
 		}
@@ -361,7 +361,7 @@ kdba_getregcontents(const char *regname,
 
 	if ((i < nkdbreglist)
 	 && (strlen(kdbreglist[i].reg_name) == strlen(regname))) {
-		if ((regs->xcs & 0xffff) == __KERNEL_CS) {
+		if ((regs->cs & 0xffff) == __KERNEL_CS) {
 			/* No cpl switch, esp and ss are not on stack */
 			if (strcmp(kdbreglist[i].reg_name, "esp") == 0) {
 				*contents = (kdb_machreg_t)regs +
@@ -417,7 +417,7 @@ kdba_setregcontents(const char *regname,
 	if (regname[0] == '%') {
 		regname++;
 		regs = (struct pt_regs *)
-			(kdb_current_task->thread.esp0 - sizeof(struct pt_regs));
+			(kdb_current_task->thread.sp0 - sizeof(struct pt_regs));
 	}
 
 	for (i=0; i<ndbreglist; i++) {
@@ -496,7 +496,7 @@ kdba_dumpregs(struct pt_regs *regs,
 	 && (type[0] == 'u')) {
 		type = NULL;
 		regs = (struct pt_regs *)
-			(kdb_current_task->thread.esp0 - sizeof(struct pt_regs));
+			(kdb_current_task->thread.sp0 - sizeof(struct pt_regs));
 	}
 
 	if (type == NULL) {
@@ -561,7 +561,7 @@ EXPORT_SYMBOL(kdba_dumpregs);
 kdb_machreg_t
 kdba_getpc(struct pt_regs *regs)
 {
-	return regs ? regs->eip : 0;
+	return regs ? regs->ip : 0;
 }
 
 int
@@ -569,7 +569,7 @@ kdba_setpc(struct pt_regs *regs, kdb_machreg_t newpc)
 {
 	if (KDB_NULL_REGS(regs))
 		return KDB_BADREG;
-	regs->eip = newpc;
+	regs->ip = newpc;
 	KDB_STATE_SET(IP_ADJUSTED);
 	return 0;
 }
@@ -636,11 +636,11 @@ kdba_setsinglestep(struct pt_regs *regs)
 {
 	if (KDB_NULL_REGS(regs))
 		return;
-	if (regs->eflags & EF_IE)
+	if (regs->flags & EF_IE)
 		KDB_STATE_SET(A_IF);
 	else
 		KDB_STATE_CLEAR(A_IF);
-	regs->eflags = (regs->eflags | EF_TF) & ~EF_IE;
+	regs->flags = (regs->flags | EF_TF) & ~EF_IE;
 }
 
 void
@@ -649,9 +649,9 @@ kdba_clearsinglestep(struct pt_regs *regs)
 	if (KDB_NULL_REGS(regs))
 		return;
 	if (KDB_STATE(A_IF))
-		regs->eflags |= EF_IE;
+		regs->flags |= EF_IE;
 	else
-		regs->eflags &= ~EF_IE;
+		regs->flags &= ~EF_IE;
 }
 
 int asmlinkage
@@ -749,21 +749,21 @@ kdba_pt_regs(int argc, const char **argv)
 
 	p = (struct pt_regs *) addr;
 	kdb_printf("struct pt_regs 0x%p-0x%p\n", p, (unsigned char *)p + sizeof(*p) - 1);
-	kdb_print_nameval("ebx", p->ebx);
-	kdb_print_nameval("ecx", p->ecx);
-	kdb_print_nameval("edx", p->edx);
-	kdb_print_nameval("esi", p->esi);
-	kdb_print_nameval("edi", p->edi);
-	kdb_print_nameval("ebp", p->ebp);
-	kdb_print_nameval("eax", p->eax);
-	kdb_printf(fmt, "xds", p->xds);
-	kdb_printf(fmt, "xes", p->xes);
-	kdb_print_nameval("orig_eax", p->orig_eax);
-	kdb_print_nameval("eip", p->eip);
-	kdb_printf(fmt, "xcs", p->xcs);
-	kdb_printf(fmt, "eflags", p->eflags);
-	kdb_printf(fmt, "esp", p->esp);
-	kdb_printf(fmt, "xss", p->xss);
+	kdb_print_nameval("ebx", p->bx);
+	kdb_print_nameval("ecx", p->cx);
+	kdb_print_nameval("edx", p->dx);
+	kdb_print_nameval("esi", p->si);
+	kdb_print_nameval("edi", p->di);
+	kdb_print_nameval("ebp", p->bp);
+	kdb_print_nameval("eax", p->ax);
+	kdb_printf(fmt, "xds", p->ds);
+	kdb_printf(fmt, "xes", p->es);
+	kdb_print_nameval("orig_eax", p->orig_ax);
+	kdb_print_nameval("eip", p->ip);
+	kdb_printf(fmt, "xcs", p->cs);
+	kdb_printf(fmt, "eflags", p->flags);
+	kdb_printf(fmt, "esp", p->sp);
+	kdb_printf(fmt, "xss", p->ss);
 	return 0;
 }
 
@@ -859,7 +859,7 @@ kdba_stackdepth(int argc, const char **argv)
 	kdb_do_each_thread(g, p) {
 		if (kdb_task_has_cpu(p))
 			continue;
-		esp = p->thread.esp;
+		esp = p->thread.sp;
 		used = sizeof(*tinfo) + THREAD_SIZE - (esp & (THREAD_SIZE-1));
 		over = used >= threshold;
 		if (over)

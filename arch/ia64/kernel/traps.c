@@ -38,7 +38,7 @@ trap_init (void)
 		fpswa_interface = __va(ia64_boot_param->fpswa);
 }
 
-void
+int
 die (const char *str, struct pt_regs *regs, long err)
 {
 	static struct {
@@ -65,8 +65,11 @@ die (const char *str, struct pt_regs *regs, long err)
 	if (++die.lock_owner_depth < 3) {
 		printk("%s[%d]: %s %ld [%d]\n",
 		current->comm, task_pid_nr(current), str, err, ++die_counter);
-		(void) notify_die(DIE_OOPS, (char *)str, regs, err, 255, SIGSEGV);
-		show_regs(regs);
+		if (notify_die(DIE_OOPS, str, regs, err, 255, SIGSEGV)
+	            != NOTIFY_STOP)
+			show_regs(regs);
+		else
+			regs = NULL;
   	} else
 		printk(KERN_ERR "Recursive die() failure, output suppressed\n");
 
@@ -74,6 +77,9 @@ die (const char *str, struct pt_regs *regs, long err)
 	die.lock_owner = -1;
 	add_taint(TAINT_DIE);
 	spin_unlock_irq(&die.lock);
+
+	if (!regs)
+		return 1;
 
 #ifdef	CONFIG_KDB
 	(void)kdb(KDB_REASON_OOPS, err, regs);
@@ -83,13 +89,15 @@ die (const char *str, struct pt_regs *regs, long err)
 		panic("Fatal exception");
 
   	do_exit(SIGSEGV);
+	return 0;
 }
 
-void
+int
 die_if_kernel (char *str, struct pt_regs *regs, long err)
 {
 	if (!user_mode(regs))
-		die(str, regs, err);
+		return die(str, regs, err);
+	return 0;
 }
 
 void
@@ -109,7 +117,8 @@ __kprobes ia64_bad_break (unsigned long break_num, struct pt_regs *regs)
 		if (notify_die(DIE_BREAK, "break 0", regs, break_num, TRAP_BRKPT, SIGTRAP)
 			       	== NOTIFY_STOP)
 			return;
-		die_if_kernel("bugcheck!", regs, break_num);
+		if (die_if_kernel("bugcheck!", regs, break_num))
+			return;
 		sig = SIGILL; code = ILL_ILLOPC;
 		break;
 
@@ -162,8 +171,9 @@ __kprobes ia64_bad_break (unsigned long break_num, struct pt_regs *regs)
 		break;
 
 	      default:
-		if (break_num < 0x40000 || break_num > 0x100000)
-			die_if_kernel("Bad break", regs, break_num);
+		if ((break_num < 0x40000 || break_num > 0x100000)
+		    && die_if_kernel("Bad break", regs, break_num))
+			return;
 
 		if (break_num < 0x80000) {
 			sig = SIGILL; code = __ILL_BREAK;
@@ -420,14 +430,15 @@ ia64_illegal_op_fault (unsigned long ec, long arg1, long arg2, long arg3,
 #endif
 
 	sprintf(buf, "IA-64 Illegal operation fault");
-	die_if_kernel(buf, &regs, 0);
+	rv.fkt = 0;
+	if (die_if_kernel(buf, &regs, 0))
+		return rv;
 
 	memset(&si, 0, sizeof(si));
 	si.si_signo = SIGILL;
 	si.si_code = ILL_ILLOPC;
 	si.si_addr = (void __user *) (regs.cr_iip + ia64_psr(&regs)->ri);
 	force_sig_info(SIGILL, &si, current);
-	rv.fkt = 0;
 	return rv;
 }
 
@@ -666,6 +677,6 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 		sprintf(buf, "Fault %lu", vector);
 		break;
 	}
-	die_if_kernel(buf, &regs, error);
-	force_sig(SIGILL, current);
+	if (!die_if_kernel(buf, &regs, error))
+		force_sig(SIGILL, current);
 }

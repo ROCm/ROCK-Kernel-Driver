@@ -3,6 +3,7 @@
 #
 
 obj-y			:= intel_cacheinfo.o addon_cpuid_features.o
+obj-y			+= feature_names.o
 
 obj-$(CONFIG_X86_32)	+= common.o proc.o bugs.o
 obj-$(CONFIG_X86_32)	+= amd.o
@@ -17,6 +18,4 @@ obj-$(CONFIG_X86_MCE)	+= mcheck/
 obj-$(CONFIG_MTRR)	+= mtrr/
 obj-$(CONFIG_CPU_FREQ)	+= cpufreq/
 
-ifneq ($(CONFIG_XEN),y)
 obj-$(CONFIG_X86_LOCAL_APIC) += perfctr-watchdog.o
-endif

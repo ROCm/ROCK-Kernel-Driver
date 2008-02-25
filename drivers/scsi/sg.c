@@ -48,6 +48,7 @@ static int sg_version_num = 30534;	/* 2 digits for each component */
 #include <linux/blkdev.h>
 #include <linux/delay.h>
 #include <linux/scatterlist.h>
+#include <linux/blktrace_api.h>
 
 #include "scsi.h"
 #include <scsi/scsi_dbg.h>
@@ -603,9 +604,8 @@ sg_write(struct file *filp, const char __user *buf, size_t count, loff_t * ppos)
 	 * is a non-zero input_size, so emit a warning.
 	 */
 	if (hp->dxfer_direction == SG_DXFER_TO_FROM_DEV) {
-		static char last_printed[TASK_COMM_LEN];
-
-		if (strcmp(last_printed, current->comm) && printk_ratelimit()) {
+		static char cmd[TASK_COMM_LEN];
+		if (strcmp(current->comm, cmd) && printk_ratelimit()) {
 			printk(KERN_WARNING
 			       "sg_write: data in/out %d/%d bytes for SCSI command 0x%x--"
 			       "guessing data in;\n" KERN_WARNING "   "
@@ -613,8 +613,7 @@ sg_write(struct file *filp, const char __user *buf, size_t count, loff_t * ppos)
 			       old_hdr.reply_len - (int)SZ_SG_HEADER,
 			       input_size, (unsigned int) cmnd[0],
 			       current->comm);
-
-			memcpy(last_printed, current->comm, TASK_COMM_LEN);
+			strcpy(cmd, current->comm);
 		}
 	}
 	k = sg_common_write(sfp, srp, cmnd, sfp->timeout, blocking);
@@ -1069,6 +1068,17 @@ sg_ioctl(struct inode *inode, struct file *filp,
 	case BLKSECTGET:
 		return put_user(sdp->device->request_queue->max_sectors * 512,
 				ip);
+	case BLKTRACESETUP:
+		return blk_trace_setup(sdp->device->request_queue,
+				       sdp->disk->disk_name,
+				       sdp->device->sdev_gendev.devt,
+				       (char *)arg);
+	case BLKTRACESTART:
+		return blk_trace_startstop(sdp->device->request_queue, 1);
+	case BLKTRACESTOP:
+		return blk_trace_startstop(sdp->device->request_queue, 0);
+	case BLKTRACETEARDOWN:
+		return blk_trace_remove(sdp->device->request_queue);
 	default:
 		if (read_only)
 			return -EPERM;	/* don't know so take safe approach */
@@ -1150,23 +1160,22 @@ sg_fasync(int fd, struct file *filp, int mode)
 	return (retval < 0) ? retval : 0;
 }
 
-static struct page *
-sg_vma_nopage(struct vm_area_struct *vma, unsigned long addr, int *type)
+static int
+sg_vma_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 {
 	Sg_fd *sfp;
-	struct page *page = NOPAGE_SIGBUS;
 	unsigned long offset, len, sa;
 	Sg_scatter_hold *rsv_schp;
 	struct scatterlist *sg;
 	int k;
 
 	if ((NULL == vma) || (!(sfp = (Sg_fd *) vma->vm_private_data)))
-		return page;
+		return VM_FAULT_SIGBUS;
 	rsv_schp = &sfp->reserve;
-	offset = addr - vma->vm_start;
+	offset = vmf->pgoff << PAGE_SHIFT;
 	if (offset >= rsv_schp->bufflen)
-		return page;
-	SCSI_LOG_TIMEOUT(3, printk("sg_vma_nopage: offset=%lu, scatg=%d\n",
+		return VM_FAULT_SIGBUS;
+	SCSI_LOG_TIMEOUT(3, printk("sg_vma_fault: offset=%lu, scatg=%d\n",
 				   offset, rsv_schp->k_use_sg));
 	sg = rsv_schp->buffer;
 	sa = vma->vm_start;
@@ -1175,21 +1184,21 @@ sg_vma_nopage(struct vm_area_struct *vma, unsigned long addr, int *type)
 		len = vma->vm_end - sa;
 		len = (len < sg->length) ? len : sg->length;
 		if (offset < len) {
+			struct page *page;
 			page = virt_to_page(page_address(sg_page(sg)) + offset);
 			get_page(page);	/* increment page count */
-			break;
+			vmf->page = page;
+			return 0; /* success */
 		}
 		sa += len;
 		offset -= len;
 	}
 
-	if (type)
-		*type = VM_FAULT_MINOR;
-	return page;
+	return VM_FAULT_SIGBUS;
 }
 
 static struct vm_operations_struct sg_mmap_vm_ops = {
-	.nopage = sg_vma_nopage,
+	.fault = sg_vma_fault,
 };
 
 static int
@@ -1424,7 +1433,6 @@ sg_add(struct class_device *cl_dev, struct class_interface *cl_intf)
 		goto out;
 	}
 
-	class_set_devdata(cl_dev, sdp);
 	error = cdev_add(cdev, MKDEV(SCSI_GENERIC_MAJOR, sdp->index), 1);
 	if (error)
 		goto cdev_add_err;
@@ -1437,11 +1445,14 @@ sg_add(struct class_device *cl_dev, struct class_interface *cl_intf)
 				MKDEV(SCSI_GENERIC_MAJOR, sdp->index),
 				cl_dev->dev, "%s",
 				disk->disk_name);
-		if (IS_ERR(sg_class_member))
-			printk(KERN_WARNING "sg_add: "
-				"class_device_create failed\n");
+		if (IS_ERR(sg_class_member)) {
+			printk(KERN_ERR "sg_add: "
+			       "class_device_create failed\n");
+			error = PTR_ERR(sg_class_member);
+			goto cdev_add_err;
+		}
 		class_set_devdata(sg_class_member, sdp);
-		error = sysfs_create_link(&scsidp->sdev_gendev.kobj, 
+		error = sysfs_create_link(&scsidp->sdev_gendev.kobj,
 					  &sg_class_member->kobj, "generic");
 		if (error)
 			printk(KERN_ERR "sg_add: unable to make symlink "
@@ -1452,6 +1463,8 @@ sg_add(struct class_device *cl_dev, struct class_interface *cl_intf)
 	sdev_printk(KERN_NOTICE, scsidp,
 		    "Attached scsi generic sg%d type %d\n", sdp->index,
 		    scsidp->type);
+
+	class_set_devdata(cl_dev, sdp);
 
 	return 0;
 
@@ -2527,7 +2540,7 @@ sg_idr_max_id(int id, void *p, void *data)
 static int
 sg_last_dev(void)
 {
-	int k = 0;
+	int k = -1;
 	unsigned long iflags;
 
 	read_lock_irqsave(&sg_index_lock, iflags);

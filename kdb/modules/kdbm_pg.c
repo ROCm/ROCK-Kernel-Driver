@@ -189,6 +189,7 @@ static char *page_flags(unsigned long flags)
 static int
 kdbm_page(int argc, const char **argv)
 {
+#ifndef CONFIG_NEED_MULTIPLE_NODES
 	struct page page;
 	unsigned long addr;
 	long offset = 0;
@@ -225,7 +226,8 @@ kdbm_page(int argc, const char **argv)
 		kdb_printf("  buffers 0x%p\n", page_buffers(&page));
 	else
 		kdb_printf("  private 0x%lx\n", page_private(&page));
-
+#endif
+	kdb_printf("Unimplemented with CONFIG_NEED_MULTIPLE_NODES enabled\n");
 	return 0;
 }
 #endif /* CONFIG_DISCONTIGMEM */
@@ -545,6 +547,7 @@ out:
 static int
 kdbm_memmap(int argc, const char **argv)
 {
+#ifndef CONFIG_NEED_MULTIPLE_NODES
 	struct page page;
 	int i, page_count;
 	int slab_count = 0;
@@ -600,6 +603,10 @@ kdbm_memmap(int argc, const char **argv)
 			i, page_counts[i]);
 	}
 	kdb_printf("  high page count:  %6d\n", page_counts[8]);
+#else
+	kdb_printf("Unimplemented with CONFIG_NEED_MULTIPLE_NODES enabled\n");
+#endif
+
 	return 0;
 }
 #endif /* CONFIG_X86 && !CONFIG_X86_64 */

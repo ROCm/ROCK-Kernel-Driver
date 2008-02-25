@@ -36,6 +36,8 @@
 #include <linux/skbuff.h>
 #include <linux/ethtool.h>
 #include <linux/if_ether.h>
+#include <linux/tcp.h>
+#include <linux/udp.h>
 #include <linux/moduleparam.h>
 #include <linux/mm.h>
 #include <net/ip.h>
@@ -752,6 +754,45 @@ static RING_IDX xennet_fill_frags(struct netfront_info *np,
 	return cons;
 }
 
+static int skb_checksum_setup(struct sk_buff *skb)
+{
+	struct iphdr *iph;
+	unsigned char *th;
+	int err = -EPROTO;
+
+	if (skb->protocol != htons(ETH_P_IP))
+		goto out;
+
+	iph = (void *)skb->data;
+	th = skb->data + 4 * iph->ihl;
+	if (th >= skb_tail_pointer(skb))
+		goto out;
+
+	skb->csum_start = th - skb->head;
+	switch (iph->protocol) {
+	case IPPROTO_TCP:
+		skb->csum_offset = offsetof(struct tcphdr, check);
+		break;
+	case IPPROTO_UDP:
+		skb->csum_offset = offsetof(struct udphdr, check);
+		break;
+	default:
+		if (net_ratelimit())
+			printk(KERN_ERR "Attempting to checksum a non-"
+			       "TCP/UDP packet, dropping a protocol"
+			       " %d packet", iph->protocol);
+		goto out;
+	}
+
+	if ((th + skb->csum_offset + 2) > skb_tail_pointer(skb))
+		goto out;
+
+	err = 0;
+
+out:
+	return err;
+}
+
 static int handle_incoming_queue(struct net_device *dev,
 				 struct sk_buff_head *rxq)
 {
@@ -1032,7 +1073,7 @@ static void xennet_release_rx_bufs(struct netfront_info *np)
 		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
 			/* Do all the remapping work and M2P updates. */
 			MULTI_mmu_update(mcl, np->rx_mmu, mmu - np->rx_mmu,
-					 0, DOMID_SELF);
+					 NULL, DOMID_SELF);
 			mcl++;
 			HYPERVISOR_multicall(np->rx_mcl, mcl - np->rx_mcl);
 		}
@@ -1734,6 +1775,7 @@ static int __devexit xennet_remove(struct xenbus_device *dev)
 
 static struct xenbus_driver netfront = {
 	.name = "vif",
+	.owner = THIS_MODULE,
 	.ids = netfront_ids,
 	.probe = netfront_probe,
 	.remove = __devexit_p(xennet_remove),

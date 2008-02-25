@@ -5,7 +5,7 @@
   Transmission (TX/RX) related functions.
 
   Copyright (C) 2005 Martin Langer <martin-langer@gmx.de>
-  Copyright (C) 2005 Stefano Brivio <st3@riseup.net>
+  Copyright (C) 2005 Stefano Brivio <stefano.brivio@polimi.it>
   Copyright (C) 2005, 2006 Michael Buesch <mb@bu3sch.de>
   Copyright (C) 2005 Danny van Dyk <kugelfang@gentoo.org>
   Copyright (C) 2005 Andreas Jaggi <andreas.jaggi@waterwave.ch>
@@ -223,7 +223,7 @@ static int generate_txhdr_fw3(struct b43legacy_wldev *dev,
 	} else {
 		int fbrate_base100kbps = B43legacy_RATE_TO_100KBPS(rate_fb);
 		txhdr->dur_fb = ieee80211_generic_frame_duration(dev->wl->hw,
-							 dev->wl->if_id,
+							 txctl->vif,
 							 fragment_len,
 							 fbrate_base100kbps);
 	}
@@ -297,6 +297,8 @@ static int generate_txhdr_fw3(struct b43legacy_wldev *dev,
 		mac_ctl |= B43legacy_TX4_MAC_STMSDU;
 	if (rate_fb_ofdm)
 		mac_ctl |= B43legacy_TX4_MAC_FALLBACKOFDM;
+	if (txctl->flags & IEEE80211_TXCTL_LONG_RETRY_LIMIT)
+		mac_ctl |= B43legacy_TX4_MAC_LONGFRAME;
 
 	/* Generate the RTS or CTS-to-self frame */
 	if ((txctl->flags & IEEE80211_TXCTL_USE_RTS_CTS) ||
@@ -317,7 +319,7 @@ static int generate_txhdr_fw3(struct b43legacy_wldev *dev,
 
 		if (txctl->flags & IEEE80211_TXCTL_USE_CTS_PROTECT) {
 			ieee80211_ctstoself_get(dev->wl->hw,
-						dev->wl->if_id,
+						txctl->vif,
 						fragment_data,
 						fragment_len, txctl,
 						(struct ieee80211_cts *)
@@ -326,7 +328,7 @@ static int generate_txhdr_fw3(struct b43legacy_wldev *dev,
 			len = sizeof(struct ieee80211_cts);
 		} else {
 			ieee80211_rts_get(dev->wl->hw,
-					  dev->wl->if_id,
+					  txctl->vif,
 					  fragment_data, fragment_len, txctl,
 					  (struct ieee80211_rts *)
 					  (txhdr->rts_frame));
@@ -342,7 +344,6 @@ static int generate_txhdr_fw3(struct b43legacy_wldev *dev,
 					    len, rts_rate_fb);
 		hdr = (struct ieee80211_hdr *)(&txhdr->rts_frame);
 		txhdr->rts_dur_fb = hdr->duration_id;
-		mac_ctl |= B43legacy_TX4_MAC_LONGFRAME;
 	}
 
 	/* Magic cookie */
@@ -387,7 +388,7 @@ static s8 b43legacy_rssi_postprocess(struct b43legacy_wldev *dev,
 			else
 				tmp -= 3;
 		} else {
-			if (dev->dev->bus->sprom.r1.boardflags_lo
+			if (dev->dev->bus->sprom.boardflags_lo
 			    & B43legacy_BFL_RSSI) {
 				if (in_rssi > 63)
 					in_rssi = 63;
@@ -540,7 +541,24 @@ void b43legacy_rx(struct b43legacy_wldev *dev,
 	else
 		status.rate = b43legacy_plcp_get_bitrate_cck(plcp);
 	status.antenna = !!(phystat0 & B43legacy_RX_PHYST0_ANT);
-	status.mactime = mactime;
+
+	/*
+	 * If monitors are present get full 64-bit timestamp. This
+	 * code assumes we get to process the packet within 16 bits
+	 * of timestamp, i.e. about 65 milliseconds after the PHY
+	 * received the first symbol.
+	 */
+	if (dev->wl->radiotap_enabled) {
+		u16 low_mactime_now;
+
+		b43legacy_tsf_read(dev, &status.mactime);
+		low_mactime_now = status.mactime;
+		status.mactime = status.mactime & ~0xFFFFULL;
+		status.mactime += mactime;
+		if (low_mactime_now <= mactime)
+			status.mactime -= 0x10000;
+		status.flag |= RX_FLAG_TSFT;
+	}
 
 	chanid = (chanstat & B43legacy_RX_CHAN_ID) >>
 		  B43legacy_RX_CHAN_ID_SHIFT;

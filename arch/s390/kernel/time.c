@@ -744,7 +744,6 @@ static void etr_adjust_time(unsigned long long clock, unsigned long long delay)
 	}
 }
 
-#ifdef CONFIG_SMP
 static void etr_sync_cpu_start(void *dummy)
 {
 	int *in_sync = dummy;
@@ -777,7 +776,6 @@ static void etr_sync_cpu_start(void *dummy)
 static void etr_sync_cpu_end(void *dummy)
 {
 }
-#endif /* CONFIG_SMP */
 
 /*
  * Sync the TOD clock using the port refered to by aibp. This port
@@ -1145,7 +1143,7 @@ static void etr_work_fn(struct work_struct *work)
  * Sysfs interface functions
  */
 static struct sysdev_class etr_sysclass = {
-	set_kset_name("etr")
+	.name	= "etr",
 };
 
 static struct sys_device etr_port0_dev = {

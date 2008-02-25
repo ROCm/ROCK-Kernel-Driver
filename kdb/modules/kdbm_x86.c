@@ -38,7 +38,7 @@ MODULE_LICENSE("GPL");
 #define	MOVLQ "movq"
 
 typedef struct desc_struct kdb_desc_t;
-typedef struct gate_struct kdb_gate_desc_t;
+typedef struct gate_struct64 kdb_gate_desc_t;
 
 #define KDB_SYS_DESC_OFFSET(d) ((unsigned long)d->offset_high << 32 | d->offset_middle << 16 | d->offset_low)
 #define KDB_SYS_DESC_CALLG_COUNT(d) 0
@@ -110,7 +110,7 @@ static unsigned long kdb_seg_desc_base(kdb_desc_t *d)
 	case KDB_SYS_DESC_TYPE_TSS:
 	case KDB_SYS_DESC_TYPE_TSSB:
 	case KDB_SYS_DESC_TYPE_LDT:
-		base += (unsigned long)(((struct ldttss_desc *)d)->base3) << 32;
+		base += (unsigned long)(((struct ldttss_desc64 *)d)->base3) << 32;
 		break;
 	}
 #endif
@@ -314,33 +314,33 @@ static void display_tss(struct tss_struct *t)
 #ifdef	CONFIG_X86_64
 	int i;
 	kdb_printf("    rsp0 = 0x%016Lx,  rsp1 = 0x%016Lx\n",
-		   t->rsp0, t->rsp1);
-	kdb_printf("    rsp2 = 0x%016Lx\n", t->rsp2);
-	for (i = 0; i < ARRAY_SIZE(t->ist); ++i)
+		   t->x86_tss.sp0, t->x86_tss.sp1);
+	kdb_printf("    rsp2 = 0x%016Lx\n", t->x86_tss.sp2);
+	for (i = 0; i < ARRAY_SIZE(t->x86_tss.ist); ++i)
 		kdb_printf("    ist[%d] = 0x%016Lx\n",
-			  i, t->ist[i]);
-	kdb_printf("   iomap = 0x%04x\n", t->io_bitmap_base);
+			  i, t->x86_tss.ist[i]);
+	kdb_printf("   iomap = 0x%04x\n", t->x86_tss.io_bitmap_base);
 #else	/* !CONFIG_X86_64 */
 	kdb_printf("    cs = %04x,  eip = " kdb_machreg_fmt0 "\n",
-		   t->x86_tss.es, t->x86_tss.eip);
+		   t->x86_tss.es, t->x86_tss.ip);
 	kdb_printf("    ss = %04x,  esp = " kdb_machreg_fmt0 "\n",
-		   t->x86_tss.ss, t->x86_tss.esp);
+		   t->x86_tss.ss, t->x86_tss.sp);
 	kdb_printf("   ss0 = %04x, esp0 = " kdb_machreg_fmt0 "\n",
-		   t->x86_tss.ss0, t->x86_tss.esp0);
+		   t->x86_tss.ss0, t->x86_tss.sp0);
 	kdb_printf("   ss1 = %04x, esp1 = " kdb_machreg_fmt0 "\n",
-		   t->x86_tss.ss1, t->x86_tss.esp1);
+		   t->x86_tss.ss1, t->x86_tss.sp1);
 	kdb_printf("   ss2 = %04x, esp2 = " kdb_machreg_fmt0 "\n",
-		   t->x86_tss.ss2, t->x86_tss.esp2);
+		   t->x86_tss.ss2, t->x86_tss.sp2);
 	kdb_printf("   ldt = %04x, cr3 = " kdb_machreg_fmt0 "\n",
 		   t->x86_tss.ldt, t->x86_tss.__cr3);
 	kdb_printf("    ds = %04x, es = %04x fs = %04x gs = %04x\n",
 			t->x86_tss.ds, t->x86_tss.es, t->x86_tss.fs, t->x86_tss.gs);
 	kdb_printf("   eax = " kdb_machreg_fmt0 ", ebx = " kdb_machreg_fmt0
 		   " ecx = " kdb_machreg_fmt0 " edx = " kdb_machreg_fmt0 "\n",
-		   t->x86_tss.eax, t->x86_tss.ebx, t->x86_tss.ecx, t->x86_tss.edx);
+		   t->x86_tss.ax, t->x86_tss.bx, t->x86_tss.cx, t->x86_tss.dx);
 	kdb_printf("   esi = " kdb_machreg_fmt0 ", edi = " kdb_machreg_fmt0
 		   " ebp = " kdb_machreg_fmt0 "\n",
-		   t->x86_tss.esi, t->x86_tss.edi, t->x86_tss.ebp);
+		   t->x86_tss.si, t->x86_tss.di, t->x86_tss.bp);
 	kdb_printf("   trace = %d, iomap = 0x%04x\n", t->x86_tss.trace, t->x86_tss.io_bitmap_base);
 #endif	/* CONFIG_X86_64 */
 }
@@ -713,8 +713,6 @@ kdb_idt(int argc, const char **argv)
 	return 0;
 }
 
-#define _PAGE_PSE 0x080
-
 #if 0
 static int
 get_pagetables(unsigned long addr, pgd_t **pgdir, pmd_t **pgmiddle, pte_t **pte)
@@ -997,7 +995,7 @@ kdb_rdv(int argc, const char **argv)
 	struct pt_regs *regs = get_irq_regs();
 	kdba_dumpregs(regs, NULL, NULL);
 	kdb_printf("\n");
-	display_eflags(regs->eflags);
+	display_eflags(regs->flags);
 	kdb_printf("\n");
 	display_gdtr();
 	display_idtr();

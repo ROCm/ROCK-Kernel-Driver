@@ -107,7 +107,7 @@ kdba_db_trap(struct pt_regs *regs, int error_unused)
 						kdb_printf("kdba_installbp\n");
 					kdba_installbp(regs, bp);
 					if (!KDB_STATE(DOING_SS)) {
-						regs->eflags &= ~EF_TF;
+						regs->flags &= ~EF_TF;
 						return(KDB_DB_SSBPT);
 					}
 					break;
@@ -117,7 +117,7 @@ kdba_db_trap(struct pt_regs *regs, int error_unused)
 				kdb_printf("kdb: Unable to find delayed breakpoint\n");
 			}
 			if (!KDB_STATE(DOING_SS)) {
-				regs->eflags &= ~EF_TF;
+				regs->flags &= ~EF_TF;
 				return(KDB_DB_NOBPT);
 			}
 			/* FALLTHROUGH */
@@ -138,8 +138,8 @@ kdba_db_trap(struct pt_regs *regs, int error_unused)
 		if (KDB_STATE(DOING_SSB)) {
 			unsigned char instruction[2];
 
-			kdb_id1(regs->eip);
-			if (kdb_getarea(instruction, regs->eip) ||
+			kdb_id1(regs->ip);
+			if (kdb_getarea(instruction, regs->ip) ||
 			    (instruction[0]&0xf0) == 0xe0 ||	/* short disp jumps */
 			    (instruction[0]&0xf0) == 0x70 ||	/* Misc. jumps */
 			    instruction[0]        == 0xc2 ||	/* ret */
@@ -161,13 +161,13 @@ kdba_db_trap(struct pt_regs *regs, int error_unused)
 			 * Print current insn
 			 */
 			kdb_printf("SS trap at ");
-			kdb_symbol_print(regs->eip, NULL, KDB_SP_DEFAULT|KDB_SP_NEWLINE);
-			kdb_id1(regs->eip);
+			kdb_symbol_print(regs->ip, NULL, KDB_SP_DEFAULT|KDB_SP_NEWLINE);
+			kdb_id1(regs->ip);
 			KDB_STATE_CLEAR(DOING_SS);
 		}
 
 		if (rv != KDB_DB_SSB)
-			regs->eflags &= ~EF_TF;
+			regs->flags &= ~EF_TF;
 	}
 
 	if (dr6 & DR6_B0) {
@@ -203,7 +203,7 @@ handle:
 	/*
 	 * Set Resume Flag
 	 */
-	regs->eflags |= EF_RF;
+	regs->flags |= EF_RF;
 
 	/*
 	 * Determine which breakpoint was encountered.
@@ -225,7 +225,7 @@ handle:
 			 * the current instruction.
 			 */
 			if (rw == 0) {
-				kdb_id1(regs->eip);
+				kdb_id1(regs->ip);
 			}
 
 			goto handled;
@@ -233,7 +233,7 @@ handle:
 	}
 
 unknown:
-	regs->eflags |= EF_RF;	/* Supress further faults */
+	regs->flags |= EF_RF;	/* Supress further faults */
 	rv = KDB_DB_NOBPT;	/* Cause kdb() to return */
 
 handled:
@@ -298,7 +298,7 @@ kdba_bp_trap(struct pt_regs *regs, int error_unused)
 	if (KDB_DEBUG(BP))
 		kdb_printf("kdba_bp_trap: eip=0x%lx (not adjusted) "
 			   "eflags=0x%lx regs=0x%p esp=0x%lx\n",
-			   regs->eip, regs->eflags, regs, regs->esp);
+			   regs->ip, regs->flags, regs, regs->sp);
 
 	rv = KDB_DB_NOBPT;	/* Cause kdb() to return */
 
@@ -307,12 +307,12 @@ kdba_bp_trap(struct pt_regs *regs, int error_unused)
 			continue;
 		if (!bp->bp_global && bp->bp_cpu != smp_processor_id())
 			continue;
-		 if ((void *)bp->bp_addr == (void *)(regs->eip - bp->bp_adjust)) {
+		 if ((void *)bp->bp_addr == (void *)(regs->ip - bp->bp_adjust)) {
 			/* Hit this breakpoint.  */
-			regs->eip -= bp->bp_adjust;
+			regs->ip -= bp->bp_adjust;
 			kdb_printf("Instruction(i) breakpoint #%d at 0x%lx (adjusted)\n",
-				  i, regs->eip);
-			kdb_id1(regs->eip);
+				  i, regs->ip);
+			kdb_id1(regs->ip);
 			rv = KDB_DB_BPT;
 			bp->bp_delay = 1;
 			/* SSBPT is set when the kernel debugger must single
@@ -356,7 +356,7 @@ kdba_handle_bp(struct pt_regs *regs, kdb_bp_t *bp)
 		return;
 
 	if (KDB_DEBUG(BP))
-		kdb_printf("regs->eip = 0x%lx\n", regs->eip);
+		kdb_printf("regs->ip = 0x%lx\n", regs->ip);
 
 	/*
 	 * Setup single step

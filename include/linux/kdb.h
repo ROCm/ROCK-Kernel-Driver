@@ -115,7 +115,7 @@ typedef enum {
 } kdb_reason_t;
 
 #ifdef	CONFIG_KDB
-extern fastcall int kdb(kdb_reason_t, int, struct pt_regs *);
+extern int kdb(kdb_reason_t, int, struct pt_regs *);
 #else
 #define kdb(reason,error_code,frame) (0)
 #endif

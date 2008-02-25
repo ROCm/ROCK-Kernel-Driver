@@ -1036,6 +1036,10 @@ loop_set_status(struct loop_device *lo, const struct loop_info64 *info)
 	lo->transfer = xfer->transfer;
 	lo->ioctl = xfer->ioctl;
 
+	if ((lo->lo_flags & LO_FLAGS_AUTOCLEAR) !=
+	     (info->lo_flags & LO_FLAGS_AUTOCLEAR))
+		lo->lo_flags ^= LO_FLAGS_AUTOCLEAR;
+
 	lo->lo_encrypt_key_size = info->lo_encrypt_key_size;
 	lo->lo_init[0] = info->lo_init[0];
 	lo->lo_init[1] = info->lo_init[1];
@@ -1394,6 +1398,10 @@ static int lo_release(struct inode *inode, struct file *file)
 
 	mutex_lock(&lo->lo_ctl_mutex);
 	--lo->lo_refcnt;
+
+	if ((lo->lo_flags & LO_FLAGS_AUTOCLEAR) && !lo->lo_refcnt)
+		loop_clr_fd(lo, inode->i_bdev);
+
 	mutex_unlock(&lo->lo_ctl_mutex);
 
 	return 0;

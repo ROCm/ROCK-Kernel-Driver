@@ -1338,7 +1338,7 @@ void aa_change_task_context(struct task_struct *task,
 	if (new_cxt) {
 		/* clear the caps_logged cache, so that new profile/hat has
 		 * chance to emit its own set of cap messages */
-		new_cxt->caps_logged = CAP_EMPTY_SET;
+		new_cxt->caps_logged = __cap_empty_set;
 		new_cxt->cookie = cookie;
 		new_cxt->task = task;
 		new_cxt->profile = aa_dup_profile(profile);

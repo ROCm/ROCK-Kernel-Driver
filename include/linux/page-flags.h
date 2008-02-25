@@ -83,17 +83,11 @@
 #define PG_private		11	/* If pagecache, has fs-private data */
 
 #define PG_writeback		12	/* Page is under writeback */
-#ifdef CONFIG_XEN
-/* Cannot alias with PG_owner_priv_1 since bag_page() checks include this bit.
- * Also cannot use PG_arch_1 since that now has a different purpose on x86. */
-#define PG_pinned		13
-#endif
 #define PG_compound		14	/* Part of a compound page */
 #define PG_swapcache		15	/* Swap page: swp_entry_t in private */
 
 #define PG_mappedtodisk		16	/* Has blocks allocated on-disk */
 #define PG_reclaim		17	/* To be reclaimed asap */
-#define PG_foreign		18	/* Page is owned by foreign allocator. */
 #define PG_buddy		19	/* Page is free, on buddy lists */
 
 /* PG_readahead is only used for file reads; PG_reclaim is only for writes */
@@ -101,9 +95,7 @@
 
 /* PG_owner_priv_1 users should have descriptive aliases */
 #define PG_checked		PG_owner_priv_1 /* Used by some filesystems */
-#ifdef CONFIG_PARAVIRT_XEN
 #define PG_pinned		PG_owner_priv_1	/* Xen pinned pagetable */
-#endif
 
 #if (BITS_PER_LONG > 32)
 /*
@@ -139,16 +131,52 @@
 #define ClearPageReferenced(page)	clear_bit(PG_referenced, &(page)->flags)
 #define TestClearPageReferenced(page) test_and_clear_bit(PG_referenced, &(page)->flags)
 
-#define PageUptodate(page)	test_bit(PG_uptodate, &(page)->flags)
+static inline int PageUptodate(struct page *page)
+{
+	int ret = test_bit(PG_uptodate, &(page)->flags);
+
+	/*
+	 * Must ensure that the data we read out of the page is loaded
+	 * _after_ we've loaded page->flags to check for PageUptodate.
+	 * We can skip the barrier if the page is not uptodate, because
+	 * we wouldn't be reading anything from it.
+	 *
+	 * See SetPageUptodate() for the other side of the story.
+	 */
+	if (ret)
+		smp_rmb();
+
+	return ret;
+}
+
+static inline void __SetPageUptodate(struct page *page)
+{
+	smp_wmb();
+	__set_bit(PG_uptodate, &(page)->flags);
 #ifdef CONFIG_S390
+	page_clear_dirty(page);
+#endif
+}
+
 static inline void SetPageUptodate(struct page *page)
 {
+#ifdef CONFIG_S390
 	if (!test_and_set_bit(PG_uptodate, &page->flags))
 		page_clear_dirty(page);
-}
 #else
-#define SetPageUptodate(page)	set_bit(PG_uptodate, &(page)->flags)
+	/*
+	 * Memory barrier must be issued before setting the PG_uptodate bit,
+	 * so that all previous stores issued in order to bring the page
+	 * uptodate are actually visible before PageUptodate becomes true.
+	 *
+	 * s390 doesn't need an explicit smp_wmb here because the test and
+	 * set bit already provides full barriers.
+	 */
+	smp_wmb();
+	set_bit(PG_uptodate, &(page)->flags);
 #endif
+}
+
 #define ClearPageUptodate(page)	clear_bit(PG_uptodate, &(page)->flags)
 
 #define PageDirty(page)		test_bit(PG_dirty, &(page)->flags)
@@ -238,7 +266,7 @@ static inline void SetPageUptodate(struct page *page)
 
 #define PG_head_tail_mask ((1L << PG_compound) | (1L << PG_reclaim))
 
-#define PageTail(page)	((page->flags & PG_head_tail_mask) \
+#define PageTail(page)	(((page)->flags & PG_head_tail_mask)	\
 				== PG_head_tail_mask)
 
 static inline void __SetPageTail(struct page *page)
@@ -251,7 +279,7 @@ static inline void __ClearPageTail(struct page *page)
 	page->flags &= ~PG_head_tail_mask;
 }
 
-#define PageHead(page)	((page->flags & PG_head_tail_mask) \
+#define PageHead(page)	(((page)->flags & PG_head_tail_mask)	\
 				== (1L << PG_compound))
 #define __SetPageHead(page)	__SetPageCompound(page)
 #define __ClearPageHead(page)	__ClearPageCompound(page)
@@ -267,18 +295,6 @@ static inline void __ClearPageTail(struct page *page)
 #define PageUncached(page)	test_bit(PG_uncached, &(page)->flags)
 #define SetPageUncached(page)	set_bit(PG_uncached, &(page)->flags)
 #define ClearPageUncached(page)	clear_bit(PG_uncached, &(page)->flags)
-
-#define PageForeign(page)	test_bit(PG_foreign, &(page)->flags)
-#define SetPageForeign(page, dtor) do {		\
-	set_bit(PG_foreign, &(page)->flags);	\
-	(page)->index = (long)(dtor);		\
-} while (0)
-#define ClearPageForeign(page) do {		\
-	clear_bit(PG_foreign, &(page)->flags);	\
-	(page)->index = 0;			\
-} while (0)
-#define PageForeignDestructor(page)		\
-	( (void (*) (struct page *)) (page)->index )(page)
 
 struct page;	/* forward declaration */
 

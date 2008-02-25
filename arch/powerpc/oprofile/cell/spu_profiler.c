@@ -16,6 +16,7 @@
 #include <linux/smp.h>
 #include <linux/slab.h>
 #include <asm/cell-pmu.h>
+#include <asm/time.h>
 #include "pr_util.h"
 
 #define TRACE_ARRAY_SIZE 1024

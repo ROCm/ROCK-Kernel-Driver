@@ -181,7 +181,7 @@ void splash_clear(struct splash_data *sd, struct vc_data *vc, struct fb_info *in
 			int sx, int height, int width)
 {
 	int bgshift = (vc->vc_hi_font_mask) ? 13 : 12;
-	int bg_color = attr_bgcol_ec(bgshift, vc);
+	int bg_color = attr_bgcol_ec(bgshift, vc, info);
 	int transparent = sd->splash_color == bg_color;
 	u32 bgx;
 	u8 *dst;

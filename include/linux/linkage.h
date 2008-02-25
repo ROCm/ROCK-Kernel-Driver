@@ -13,6 +13,10 @@
 #define asmlinkage CPP_ASMLINKAGE
 #endif
 
+#ifndef asmregparm
+# define asmregparm
+#endif
+
 #ifndef prevent_tail_call
 # define prevent_tail_call(ret) do { } while (0)
 #endif
@@ -53,6 +57,10 @@
   .size name, .-name
 #endif
 
+/* If symbol 'name' is treated as a subroutine (gets called, and returns)
+ * then please use ENDPROC to mark 'name' as STT_FUNC for the benefit of
+ * static analysis tools such as stack depth analyzer.
+ */
 #ifndef ENDPROC
 #define ENDPROC(name) \
   .type name, @function; \
@@ -64,10 +72,5 @@
 #define NORET_TYPE    /**/
 #define ATTRIB_NORET  __attribute__((noreturn))
 #define NORET_AND     noreturn,
-
-#ifndef FASTCALL
-#define FASTCALL(x)	x
-#define fastcall
-#endif
 
 #endif

@@ -1054,7 +1054,7 @@ int unwind(struct unwind_frame_info *frame)
 
 		if ((UNW_SP(frame) | UNW_FP(frame)) % sizeof(unsigned long))
 			return -EPERM;
-		top = STACK_TOP(frame->task);
+		top = TSK_STACK_TOP(frame->task);
 		bottom = STACK_BOTTOM(frame->task);
 # if FRAME_RETADDR_OFFSET < 0
 		if (UNW_SP(frame) < top

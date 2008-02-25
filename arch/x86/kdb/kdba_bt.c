@@ -3164,10 +3164,7 @@ bb_usage_mov(const struct bb_operand *src, const struct bb_operand *dst, int l)
 	    bb_is_int_reg(dst->base_rc) &&
 	    full_register_dst) {
 #ifndef	CONFIG_X86_64
-#ifndef TSS_sysenter_esp0
-#define TSS_sysenter_esp0 SYSENTER_stack_esp0
-#endif
-		/* mov from TSS_sysenter_esp0+offset to esp to fix up the
+		/* mov from TSS_sysenter_sp0+offset to esp to fix up the
 		 * sysenter stack, it leaves esp well defined.  mov
 		 * TSS_sysenter_esp0+offset(%esp),%esp is followed by up to 5
 		 * push instructions to mimic the hardware stack push.  If
@@ -3175,10 +3172,10 @@ bb_usage_mov(const struct bb_operand *src, const struct bb_operand *dst, int l)
 		 * pushed.
 		 */
 		if (dst->base_rc == BBRG_RSP &&
-		    src->disp >= TSS_sysenter_esp0 &&
+		    src->disp >= TSS_sysenter_sp0 &&
 		    bb_is_osp_defined(BBRG_RSP)) {
 			int pushes;
-			pushes = src->disp == TSS_sysenter_esp0 ? 5 : 3;
+			pushes = src->disp == TSS_sysenter_sp0 ? 5 : 3;
 			bb_reg_code_set_offset(BBRG_RSP,
 				bb_reg_code_offset(BBRG_RSP) +
 					pushes * KDB_WORD_SIZE);
@@ -5024,7 +5021,7 @@ kdba_get_stack_info_alternate(kdb_machreg_t addr, int cpu,
 static kdb_machreg_t
 kdba_bt_stack_rip(const struct task_struct *p)
 {
-	return p->thread.eip;
+	return p->thread.ip;
 }
 
 #endif	/* CONFIG_X86_64 */
@@ -5321,7 +5318,7 @@ kdba_bt_stack(kdb_machreg_t addr, int argcount, const struct task_struct *p,
 			 * what it contains differs between i386 and x86_64.
 			 */
 			rip = kdba_bt_stack_rip(p);
-			rsp = p->thread.ARCH_RSP;
+			rsp = p->thread.sp;
 			suppress = 0;
 			kdba_get_stack_info(rsp, -1, &ar, p);
 		}

@@ -181,7 +181,7 @@ extern void kdba_get_stack_info_alternate(kdb_machreg_t addr, int cpu,
 
 extern void kdba_wait_for_cpus(void);
 
-extern fastcall void kdb_interrupt(void);
+extern void kdb_interrupt(void);
 
 #define	KDB_INT_REGISTERS	8
 

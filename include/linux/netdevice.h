@@ -322,7 +322,7 @@ enum
 	NAPI_STATE_DISABLE,	/* Disable pending */
 };
 
-extern void FASTCALL(__napi_schedule(struct napi_struct *n));
+extern void __napi_schedule(struct napi_struct *n);
 
 static inline int napi_disable_pending(struct napi_struct *n)
 {
@@ -604,6 +604,10 @@ struct net_device
 
 	unsigned char		broadcast[MAX_ADDR_LEN];	/* hw bcast add	*/
 
+	/* ingress path synchronizer */
+	spinlock_t		ingress_lock;
+	struct Qdisc		*qdisc_ingress;
+
 /*
  * Cache line mostly used on queue transmit path (qdisc)
  */
@@ -616,10 +620,6 @@ struct net_device
 
 	/* Partially transmitted GSO packet. */
 	struct sk_buff		*gso_skb;
-
-	/* ingress path synchronizer */
-	spinlock_t		ingress_lock;
-	struct Qdisc		*qdisc_ingress;
 
 /*
  * One part is mostly used on xmit path (device)
@@ -1414,12 +1414,16 @@ extern void		dev_set_rx_mode(struct net_device *dev);
 extern void		__dev_set_rx_mode(struct net_device *dev);
 extern int		dev_unicast_delete(struct net_device *dev, void *addr, int alen);
 extern int		dev_unicast_add(struct net_device *dev, void *addr, int alen);
+extern int		dev_unicast_sync(struct net_device *to, struct net_device *from);
+extern void		dev_unicast_unsync(struct net_device *to, struct net_device *from);
 extern int 		dev_mc_delete(struct net_device *dev, void *addr, int alen, int all);
 extern int		dev_mc_add(struct net_device *dev, void *addr, int alen, int newonly);
 extern int		dev_mc_sync(struct net_device *to, struct net_device *from);
 extern void		dev_mc_unsync(struct net_device *to, struct net_device *from);
 extern int 		__dev_addr_delete(struct dev_addr_list **list, int *count, void *addr, int alen, int all);
 extern int		__dev_addr_add(struct dev_addr_list **list, int *count, void *addr, int alen, int newonly);
+extern int		__dev_addr_sync(struct dev_addr_list **to, int *to_count, struct dev_addr_list **from, int *from_count);
+extern void		__dev_addr_unsync(struct dev_addr_list **to, int *to_count, struct dev_addr_list **from, int *from_count);
 extern void		dev_set_promiscuity(struct net_device *dev, int inc);
 extern void		dev_set_allmulti(struct net_device *dev, int inc);
 extern void		netdev_state_change(struct net_device *dev);

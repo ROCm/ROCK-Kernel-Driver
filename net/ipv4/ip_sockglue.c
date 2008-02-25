@@ -514,11 +514,6 @@ static int do_ip_setsockopt(struct sock *sk, int level,
 			val &= ~3;
 			val |= inet->tos & 3;
 		}
-		if (IPTOS_PREC(val) >= IPTOS_PREC_CRITIC_ECP &&
-		    !capable(CAP_NET_ADMIN)) {
-			err = -EPERM;
-			break;
-		}
 		if (inet->tos != val) {
 			inet->tos = val;
 			sk->sk_priority = rt_tos2priority(val);
@@ -594,7 +589,7 @@ static int do_ip_setsockopt(struct sock *sk, int level,
 				err = 0;
 				break;
 			}
-			dev = ip_dev_find(mreq.imr_address.s_addr);
+			dev = ip_dev_find(&init_net, mreq.imr_address.s_addr);
 			if (dev) {
 				mreq.imr_ifindex = dev->ifindex;
 				dev_put(dev);

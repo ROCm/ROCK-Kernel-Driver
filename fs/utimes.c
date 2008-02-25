@@ -6,6 +6,7 @@
 #include <linux/sched.h>
 #include <linux/stat.h>
 #include <linux/utime.h>
+#include <linux/syscalls.h>
 #include <asm/uaccess.h>
 #include <asm/unistd.h>
 
@@ -83,8 +84,8 @@ long do_utimes(int dfd, char __user *filename, struct timespec *times, int flags
 		if (error)
 			goto out;
 
-		path.dentry = nd.dentry;
-		path.mnt = nd.mnt;
+		path.dentry = nd.path.dentry;
+		path.mnt = nd.path.mnt;
 	}
 
 	inode = path.dentry->d_inode;
@@ -138,7 +139,7 @@ dput_and_out:
 	if (f)
 		fput(f);
 	else
-		path_release(&nd);
+		path_put(&nd.path);
 out:
 	return error;
 }

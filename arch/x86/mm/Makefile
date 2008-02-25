@@ -3,5 +3,3 @@ include ${srctree}/arch/x86/mm/Makefile_32
 else
 include ${srctree}/arch/x86/mm/Makefile_64
 endif
-
-obj-$(CONFIG_XEN) += hypervisor.o

@@ -31,7 +31,7 @@ extern unsigned int o2hb_dead_threshold;
 /* number of changes to be seen as live */
 #define O2HB_LIVE_THRESHOLD	   2
 /* number of equal samples to be seen as dead */
-#define O2HB_DEFAULT_DEAD_THRESHOLD	   7
+#define O2HB_DEFAULT_DEAD_THRESHOLD	   31
 /* Otherwise MAX_WRITE_TIMEOUT will be zero... */
 #define O2HB_MIN_DEAD_THRESHOLD	  2
 #define O2HB_MAX_WRITE_TIMEOUT_MS (O2HB_REGION_TIMEOUT_MS * (o2hb_dead_threshold - 1))

@@ -17,8 +17,6 @@
 
 #include "pci.h"
 
-extern int pci_mem_align;
-
 /**
  * pci_bus_alloc_resource - allocate a resource from a parent bus
  * @bus: PCI bus
@@ -45,13 +43,6 @@ pci_bus_alloc_resource(struct pci_bus *bus, struct resource *res,
 	int i, ret = -ENOMEM;
 
 	type_mask |= IORESOURCE_IO | IORESOURCE_MEM;
-
-#ifdef CONFIG_XEN
-	/* If the boot parameter 'pci-mem-align' was specified then we need to 
-	   align the memory addresses, at page size alignment. */
-	if (pci_mem_align && (align < (PAGE_SIZE-1)))
-		align = PAGE_SIZE - 1;
-#endif
 
 	for (i = 0; i < PCI_BUS_NUM_RESOURCES; i++) {
 		struct resource *r = bus->resource[i];
@@ -117,6 +108,7 @@ int pci_bus_add_device(struct pci_dev *dev)
 void pci_bus_add_devices(struct pci_bus *bus)
 {
 	struct pci_dev *dev;
+	struct pci_bus *child_bus;
 	int retval;
 
 	list_for_each_entry(dev, &bus->devices, bus_list) {
@@ -147,11 +139,19 @@ void pci_bus_add_devices(struct pci_bus *bus)
 			       up_write(&pci_bus_sem);
 			}
 			pci_bus_add_devices(dev->subordinate);
-			retval = sysfs_create_link(&dev->subordinate->class_dev.kobj,
-						   &dev->dev.kobj, "bridge");
+
+			/* register the bus with sysfs as the parent is now
+			 * properly registered. */
+			child_bus = dev->subordinate;
+			child_bus->dev.parent = child_bus->bridge;
+			retval = device_register(&child_bus->dev);
+			if (!retval)
+				retval = device_create_file(&child_bus->dev,
+							&dev_attr_cpuaffinity);
 			if (retval)
-				dev_err(&dev->dev, "Error creating sysfs "
-					"bridge symlink, continuing...\n");
+				dev_err(&dev->dev, "Error registering pci_bus"
+					" device bridge symlink,"
+					" continuing...\n");
 		}
 	}
 }
@@ -213,7 +213,6 @@ void pci_walk_bus(struct pci_bus *top, void (*cb)(struct pci_dev *, void *),
 	}
 	up_read(&pci_bus_sem);
 }
-EXPORT_SYMBOL_GPL(pci_walk_bus);
 
 EXPORT_SYMBOL(pci_bus_alloc_resource);
 EXPORT_SYMBOL_GPL(pci_bus_add_device);

@@ -15,7 +15,6 @@ static struct files_struct init_files = INIT_FILES;
 static struct signal_struct init_signals = INIT_SIGNALS(init_signals);
 static struct sighand_struct init_sighand = INIT_SIGHAND(init_sighand);
 struct mm_struct init_mm = INIT_MM(init_mm);
-EXPORT_SYMBOL(init_mm);
 
 /*
  * Initial thread structure.
@@ -36,7 +35,6 @@ union thread_union init_thread_union
 struct task_struct init_task = INIT_TASK(init_task);
 EXPORT_SYMBOL(init_task);
 
-
 /*
  * per-CPU TSS segments. Threads are completely 'soft' on Linux,
  * no more per-task TSS's. The TSS size is kept cacheline-aligned
@@ -45,3 +43,4 @@ EXPORT_SYMBOL(init_task);
  * on exact cacheline boundaries, to eliminate cacheline ping-pong.
  */
 DEFINE_PER_CPU_SHARED_ALIGNED(struct tss_struct, init_tss) = INIT_TSS;
+

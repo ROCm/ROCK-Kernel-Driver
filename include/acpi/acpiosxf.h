@@ -95,10 +95,6 @@ acpi_status
 acpi_os_table_override(struct acpi_table_header *existing_table,
 		       struct acpi_table_header **new_table);
 
-#ifdef CONFIG_ACPI_CUSTOM_DSDT_INITRD
-extern int acpi_must_unregister_table;
-#endif
-
 /*
  * Spinlock primitives
  */
@@ -185,6 +181,9 @@ acpi_os_install_interrupt_handler(u32 gsi,
 acpi_status
 acpi_os_remove_interrupt_handler(u32 gsi, acpi_osd_handler service_routine);
 
+void acpi_os_gpe_count(u32 gpe_number);
+void acpi_os_fixed_event_count(u32 fixed_event_number);
+
 /*
  * Threads and Scheduling
  */
@@ -223,7 +222,7 @@ acpi_os_write_memory(acpi_physical_address address, u32 value, u32 width);
  */
 acpi_status
 acpi_os_read_pci_configuration(struct acpi_pci_id *pci_id,
-			       u32 reg, void *value, u32 width);
+			       u32 reg, u32 *value, u32 width);
 
 acpi_status
 acpi_os_write_pci_configuration(struct acpi_pci_id *pci_id,

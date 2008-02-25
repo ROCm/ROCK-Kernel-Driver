@@ -70,10 +70,6 @@ EXPORT_SYMBOL(acpi_in_debugger);
 extern char line_buf[80];
 #endif				/*ENABLE_DEBUGGER */
 
-#ifdef CONFIG_ACPI_CUSTOM_DSDT_INITRD
-int acpi_must_unregister_table = FALSE;
-#endif
-
 static unsigned int acpi_irq_irq;
 static acpi_osd_handler acpi_irq_handler;
 static void *acpi_irq_context;
@@ -94,6 +90,10 @@ static DEFINE_SPINLOCK(acpi_res_lock);
 
 #define	OSI_STRING_LENGTH_MAX 64	/* arbitrary */
 static char osi_additional_string[OSI_STRING_LENGTH_MAX];
+
+#ifdef CONFIG_ACPI_CUSTOM_DSDT_INITRD
+static int acpi_no_initrd_override;
+#endif
 
 /*
  * "Ode to _OSI(Linux)"
@@ -200,15 +200,6 @@ acpi_status __init acpi_os_initialize(void)
 
 acpi_status acpi_os_initialize1(void)
 {
-	/*
-	 * Initialize PCI configuration space access, as we'll need to access
-	 * it while walking the namespace (bus 0 and root bridges w/ _BBNs).
-	 */
-	if (!raw_pci_ops) {
-		printk(KERN_ERR PREFIX
-		       "Access to PCI configuration space unavailable\n");
-		return AE_NULL_ENTRY;
-	}
 	kacpid_wq = create_singlethread_workqueue("kacpid");
 	kacpi_notify_wq = create_singlethread_workqueue("kacpi_notify");
 	BUG_ON(!kacpid_wq);
@@ -236,8 +227,6 @@ void acpi_os_printf(const char *fmt, ...)
 	acpi_os_vprintf(fmt, args);
 	va_end(args);
 }
-
-EXPORT_SYMBOL(acpi_os_printf);
 
 void acpi_os_vprintf(const char *fmt, va_list args)
 {
@@ -268,14 +257,15 @@ acpi_physical_address __init acpi_os_get_root_pointer(void)
 			       "System description tables not found\n");
 			return 0;
 		}
-	} else
-		return acpi_find_rsdp();
+	} else {
+		acpi_physical_address pa = 0;
+
+		acpi_find_root_pointer(&pa);
+		return pa;
+	}
 }
 
-void __iomem *
-#ifdef CONFIG_XEN
-__init_refok
-#endif
+void __iomem *__init_refok
 acpi_os_map_memory(acpi_physical_address phys, acpi_size size)
 {
 	if (phys > ULONG_MAX) {
@@ -335,108 +325,62 @@ acpi_os_predefined_override(const struct acpi_predefined_names *init_val,
 }
 
 #ifdef CONFIG_ACPI_CUSTOM_DSDT_INITRD
-#define MAX_DS_SDTS 10
-static struct acpi_table_header *ds_sdt_buffers[MAX_DS_SDTS];
-static unsigned int tables_loaded = 0;
+static struct acpi_table_header *acpi_find_dsdt_initrd(void)
+{
+	struct file *firmware_file;
+	mm_segment_t oldfs;
+	unsigned long len, len2;
+	struct acpi_table_header *dsdt_buffer, *ret = NULL;
+	struct kstat stat;
+	char *ramfs_dsdt_name = "/DSDT.aml";
 
-void acpi_load_override_tables(void){
-	struct file         *firmware_file;
-	mm_segment_t        oldfs;
-	unsigned long       len, len2;
-	struct kstat        stat;
-	unsigned int        x, y;
-	char *ramfs_ds_sdt_names[MAX_DS_SDTS] = {
-		"/DSDT.aml",
-		"/SSDT.aml",
-		"/SSDT1.aml",
-		"/SSDT2.aml",
-		"/SSDT3.aml",
-		"/SSDT4.aml",
-		"/SSDT5.aml",
-		"/SSDT6.aml",
-		"/SSDT7.aml",
-		"/SSDT8.aml",
-	};
+	printk(KERN_INFO PREFIX "Checking initramfs for custom DSDT\n");
+
 	/*
 	 * Never do this at home, only the user-space is allowed to open a file.
-	 * The clean way would be to use the firmware loader. But this code must be run
-	 * before there is any userspace available. So we need a static/init firmware
-	 * infrastructure, which doesn't exist yet...
+	 * The clean way would be to use the firmware loader.
+	 * But this code must be run before there is any userspace available.
+	 * A static/init firmware infrastructure doesn't exist yet...
 	 */
-	for (x = 0; x < MAX_DS_SDTS; x++){
-		if (vfs_stat(ramfs_ds_sdt_names[x], &stat) < 0) {
-			continue;
-		}
-		len = stat.size;
-		/* check especially against empty files */
-		if (len <= 4) {
-			printk("error file %s is too small, only %lu bytes.\n",
-			       ramfs_ds_sdt_names[x], len);
-			continue;
-		}
+	if (vfs_stat(ramfs_dsdt_name, &stat) < 0)
+		return ret;
 
-		ds_sdt_buffers[x] = kmalloc(len, GFP_KERNEL);
-		if (!ds_sdt_buffers[x]) {
-			printk("error when allocating %lu bytes of memory.\n",
-			       len);
-			/* better free all tables again */
-			for (y = 0; y < x; y++){
-				if (ds_sdt_buffers[y])
-					kfree(ds_sdt_buffers[x]);
-			}
-			acpi_must_unregister_table = FALSE;
-			return;
-		}
-
-		firmware_file = filp_open(ramfs_ds_sdt_names[x], O_RDONLY, 0);
-		if (IS_ERR(firmware_file)) {
-			printk("error, could not open file %s.\n",
-			       ramfs_ds_sdt_names[x]);
-			kfree(ds_sdt_buffers[x]);
-			continue;
-		}
-
-		oldfs = get_fs();
-		set_fs(KERNEL_DS);
-		len2 = vfs_read(firmware_file,
-				(char __user *)ds_sdt_buffers[x],
-				len,
-				&firmware_file->f_pos);
-		set_fs(oldfs);
-		filp_close(firmware_file, NULL);
-		if (len2 < len) {
-			printk("error trying to read %lu bytes from %s.\n",
-			       len, ramfs_ds_sdt_names[x]);
-			kfree(ds_sdt_buffers[x]);
-			continue;
-		}
-		printk(PREFIX "successfully read %lu bytes from file %s\n",
-		       len, ramfs_ds_sdt_names[x]);
+	len = stat.size;
+	/* check especially against empty files */
+	if (len <= 4) {
+		printk(KERN_ERR PREFIX "Failed: DSDT only %lu bytes.\n", len);
+		return ret;
 	}
-}
 
-struct acpi_table_header * acpi_find_dsdt_initrd(struct acpi_table_header * t)
-{
-	struct acpi_table_header	*ret = NULL;
-	unsigned int                     x;
-	for (x = 0; x < MAX_DS_SDTS; x++){
-		if (ds_sdt_buffers[x]){
-			if (!memcmp(ds_sdt_buffers[x]->signature,
-				    t->signature, 4) &&
-			    !memcmp(ds_sdt_buffers[x]->oem_table_id,
-				    t->oem_table_id, 8)){
-				ret = ds_sdt_buffers[x];
-				printk(PREFIX "Override [%4.4s-%8.8s]"
-				       " from initramfs -"
-				       " tainting kernel\n",
-				       t->signature,
-				       t->oem_table_id);
-				add_taint(TAINT_NO_SUPPORT);
-				acpi_must_unregister_table = TRUE;
-				break;
-			}
-		}
+	firmware_file = filp_open(ramfs_dsdt_name, O_RDONLY, 0);
+	if (IS_ERR(firmware_file)) {
+		printk(KERN_ERR PREFIX "Failed to open %s.\n", ramfs_dsdt_name);
+		return ret;
 	}
+
+	dsdt_buffer = kmalloc(len, GFP_ATOMIC);
+	if (!dsdt_buffer) {
+		printk(KERN_ERR PREFIX "Failed to allocate %lu bytes.\n", len);
+		goto err;
+	}
+
+	oldfs = get_fs();
+	set_fs(KERNEL_DS);
+	len2 = vfs_read(firmware_file, (char __user *)dsdt_buffer, len,
+		&firmware_file->f_pos);
+	set_fs(oldfs);
+	if (len2 < len) {
+		printk(KERN_ERR PREFIX "Failed to read %lu bytes from %s.\n",
+			len, ramfs_dsdt_name);
+		ACPI_FREE(dsdt_buffer);
+		goto err;
+	}
+
+	printk(KERN_INFO PREFIX "Found %lu byte DSDT in %s.\n",
+			len, ramfs_dsdt_name);
+	ret = dsdt_buffer;
+err:
+	filp_close(firmware_file, NULL);
 	return ret;
 }
 #endif
@@ -455,21 +399,45 @@ acpi_os_table_override(struct acpi_table_header * existing_table,
 		*new_table = (struct acpi_table_header *)AmlCode;
 #endif
 #ifdef CONFIG_ACPI_CUSTOM_DSDT_INITRD
-	if (!tables_loaded){
-		acpi_load_override_tables();
-		tables_loaded = 1;
-	}
-	if (!strncmp(existing_table->signature, "DSDT", 4) ||
-	    !strncmp(existing_table->signature, "SSDT", 4)){
-		*new_table = acpi_find_dsdt_initrd(existing_table);
+	if ((strncmp(existing_table->signature, "DSDT", 4) == 0) &&
+	    !acpi_no_initrd_override) {
+		struct acpi_table_header *initrd_table;
+
+		initrd_table = acpi_find_dsdt_initrd();
+		if (initrd_table)
+			*new_table = initrd_table;
 	}
 #endif
+	if (*new_table != NULL) {
+		printk(KERN_WARNING PREFIX "Override [%4.4s-%8.8s], "
+			   "this is unsafe: tainting kernel\n",
+		       existing_table->signature,
+		       existing_table->oem_table_id);
+		add_taint(TAINT_OVERRIDDEN_ACPI_TABLE);
+	}
 	return AE_OK;
 }
 
+#ifdef CONFIG_ACPI_CUSTOM_DSDT_INITRD
+static int __init acpi_no_initrd_override_setup(char *s)
+{
+	acpi_no_initrd_override = 1;
+	return 1;
+}
+__setup("acpi_no_initrd_override", acpi_no_initrd_override_setup);
+#endif
+
 static irqreturn_t acpi_irq(int irq, void *dev_id)
 {
-	return (*acpi_irq_handler) (acpi_irq_context) ? IRQ_HANDLED : IRQ_NONE;
+	u32 handled;
+
+	handled = (*acpi_irq_handler) (acpi_irq_context);
+
+	if (handled) {
+		acpi_irq_handled++;
+		return IRQ_HANDLED;
+	} else
+		return IRQ_NONE;
 }
 
 acpi_status
@@ -477,6 +445,8 @@ acpi_os_install_interrupt_handler(u32 gsi, acpi_osd_handler handler,
 				  void *context)
 {
 	unsigned int irq;
+
+	acpi_irq_stats_init();
 
 	/*
 	 * Ignore the GSI from the core, and use the value in our copy of the
@@ -521,8 +491,6 @@ void acpi_os_sleep(acpi_integer ms)
 	schedule_timeout_interruptible(msecs_to_jiffies(ms));
 }
 
-EXPORT_SYMBOL(acpi_os_sleep);
-
 void acpi_os_stall(u32 us)
 {
 	while (us) {
@@ -535,8 +503,6 @@ void acpi_os_stall(u32 us)
 		us -= delay;
 	}
 }
-
-EXPORT_SYMBOL(acpi_os_stall);
 
 /*
  * Support ACPI 3.0 AML Timer operand
@@ -657,7 +623,7 @@ acpi_os_write_memory(acpi_physical_address phys_addr, u32 value, u32 width)
 
 acpi_status
 acpi_os_read_pci_configuration(struct acpi_pci_id * pci_id, u32 reg,
-			       void *value, u32 width)
+			       u32 *value, u32 width)
 {
 	int result, size;
 
@@ -678,16 +644,12 @@ acpi_os_read_pci_configuration(struct acpi_pci_id * pci_id, u32 reg,
 		return AE_ERROR;
 	}
 
-	BUG_ON(!raw_pci_ops);
-
-	result = raw_pci_ops->read(pci_id->segment, pci_id->bus,
-				   PCI_DEVFN(pci_id->device, pci_id->function),
-				   reg, size, value);
+	result = raw_pci_read(pci_id->segment, pci_id->bus,
+				PCI_DEVFN(pci_id->device, pci_id->function),
+				reg, size, value);
 
 	return (result ? AE_ERROR : AE_OK);
 }
-
-EXPORT_SYMBOL(acpi_os_read_pci_configuration);
 
 acpi_status
 acpi_os_write_pci_configuration(struct acpi_pci_id * pci_id, u32 reg,
@@ -709,11 +671,9 @@ acpi_os_write_pci_configuration(struct acpi_pci_id * pci_id, u32 reg,
 		return AE_ERROR;
 	}
 
-	BUG_ON(!raw_pci_ops);
-
-	result = raw_pci_ops->write(pci_id->segment, pci_id->bus,
-				    PCI_DEVFN(pci_id->device, pci_id->function),
-				    reg, size, value);
+	result = raw_pci_write(pci_id->segment, pci_id->bus,
+				PCI_DEVFN(pci_id->device, pci_id->function),
+				reg, size, value);
 
 	return (result ? AE_ERROR : AE_OK);
 }
@@ -729,7 +689,6 @@ static void acpi_os_derive_pci_id_2(acpi_handle rhandle,	/* upper bound  */
 	acpi_status status;
 	unsigned long temp;
 	acpi_object_type type;
-	u8 tu8;
 
 	acpi_get_parent(chandle, &handle);
 	if (handle != rhandle) {
@@ -744,6 +703,7 @@ static void acpi_os_derive_pci_id_2(acpi_handle rhandle,	/* upper bound  */
 		    acpi_evaluate_integer(handle, METHOD_NAME__ADR, NULL,
 					  &temp);
 		if (ACPI_SUCCESS(status)) {
+			u32 val;
 			pci_id->device = ACPI_HIWORD(ACPI_LODWORD(temp));
 			pci_id->function = ACPI_LOWORD(ACPI_LODWORD(temp));
 
@@ -752,24 +712,24 @@ static void acpi_os_derive_pci_id_2(acpi_handle rhandle,	/* upper bound  */
 
 			/* any nicer way to get bus number of bridge ? */
 			status =
-			    acpi_os_read_pci_configuration(pci_id, 0x0e, &tu8,
+			    acpi_os_read_pci_configuration(pci_id, 0x0e, &val,
 							   8);
 			if (ACPI_SUCCESS(status)
-			    && ((tu8 & 0x7f) == 1 || (tu8 & 0x7f) == 2)) {
+			    && ((val & 0x7f) == 1 || (val & 0x7f) == 2)) {
 				status =
 				    acpi_os_read_pci_configuration(pci_id, 0x18,
-								   &tu8, 8);
+								   &val, 8);
 				if (!ACPI_SUCCESS(status)) {
 					/* Certainly broken...  FIX ME */
 					return;
 				}
 				*is_bridge = 1;
-				pci_id->bus = tu8;
+				pci_id->bus = val;
 				status =
 				    acpi_os_read_pci_configuration(pci_id, 0x19,
-								   &tu8, 8);
+								   &val, 8);
 				if (ACPI_SUCCESS(status)) {
-					*bus_number = tu8;
+					*bus_number = val;
 				}
 			} else
 				*is_bridge = 0;
@@ -798,25 +758,6 @@ static void acpi_os_execute_deferred(struct work_struct *work)
 	dpc->function(dpc->context);
 	kfree(dpc);
 
-	/* Yield cpu to notify thread */
-	cond_resched();
-
-	return;
-}
-
-static void acpi_os_execute_notify(struct work_struct *work)
-{
-	struct acpi_os_dpc *dpc = container_of(work, struct acpi_os_dpc, work);
-
-	if (!dpc) {
-		printk(KERN_ERR PREFIX "Invalid (NULL) context\n");
-		return;
-	}
-
-	dpc->function(dpc->context);
-
-	kfree(dpc);
-
 	return;
 }
 
@@ -840,7 +781,7 @@ acpi_status acpi_os_execute(acpi_execute_type type,
 {
 	acpi_status status = AE_OK;
 	struct acpi_os_dpc *dpc;
-
+	struct workqueue_struct *queue;
 	ACPI_DEBUG_PRINT((ACPI_DB_EXEC,
 			  "Scheduling function [%p(%p)] for deferred execution.\n",
 			  function, context));
@@ -864,20 +805,13 @@ acpi_status acpi_os_execute(acpi_execute_type type,
 	dpc->function = function;
 	dpc->context = context;
 
-	if (type == OSL_NOTIFY_HANDLER) {
-		INIT_WORK(&dpc->work, acpi_os_execute_notify);
-		if (!queue_work(kacpi_notify_wq, &dpc->work)) {
-			status = AE_ERROR;
-			kfree(dpc);
-		}
-	} else {
-		INIT_WORK(&dpc->work, acpi_os_execute_deferred);
-		if (!queue_work(kacpid_wq, &dpc->work)) {
-			ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
-				  "Call to queue_work() failed.\n"));
-			status = AE_ERROR;
-			kfree(dpc);
-		}
+	INIT_WORK(&dpc->work, acpi_os_execute_deferred);
+	queue = (type == OSL_NOTIFY_HANDLER) ? kacpi_notify_wq : kacpid_wq;
+	if (!queue_work(queue, &dpc->work)) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
+			  "Call to queue_work() failed.\n"));
+		status = AE_ERROR;
+		kfree(dpc);
 	}
 	return_ACPI_STATUS(status);
 }
@@ -930,8 +864,6 @@ acpi_os_create_semaphore(u32 max_units, u32 initial_units, acpi_handle * handle)
 	return AE_OK;
 }
 
-EXPORT_SYMBOL(acpi_os_create_semaphore);
-
 /*
  * TODO: A better way to delete semaphores?  Linux doesn't have a
  * 'delete_semaphore()' function -- may result in an invalid
@@ -954,8 +886,6 @@ acpi_status acpi_os_delete_semaphore(acpi_handle handle)
 
 	return AE_OK;
 }
-
-EXPORT_SYMBOL(acpi_os_delete_semaphore);
 
 /*
  * TODO: The kernel doesn't have a 'down_timeout' function -- had to
@@ -1049,8 +979,6 @@ acpi_status acpi_os_wait_semaphore(acpi_handle handle, u32 units, u16 timeout)
 	return status;
 }
 
-EXPORT_SYMBOL(acpi_os_wait_semaphore);
-
 /*
  * TODO: Support for units > 1?
  */
@@ -1072,8 +1000,6 @@ acpi_status acpi_os_signal_semaphore(acpi_handle handle, u32 units)
 
 	return AE_OK;
 }
-
-EXPORT_SYMBOL(acpi_os_signal_semaphore);
 
 #ifdef ACPI_FUTURE_USAGE
 u32 acpi_os_get_line(char *buffer)
@@ -1117,8 +1043,6 @@ acpi_status acpi_os_signal(u32 function, void *info)
 
 	return AE_OK;
 }
-
-EXPORT_SYMBOL(acpi_os_signal);
 
 static int __init acpi_os_name_setup(char *str)
 {
@@ -1185,7 +1109,7 @@ void __init acpi_dmi_osi_linux(int enable, const struct dmi_system_id *d)
  * string starting with '!' disables that string
  * otherwise string is added to list, augmenting built-in strings
  */
-static int __init acpi_osi_setup(char *str)
+int __init acpi_osi_setup(char *str)
 {
 	if (str == NULL || *str == '\0') {
 		printk(KERN_INFO PREFIX "_OSI method disabled\n");
@@ -1313,7 +1237,7 @@ int acpi_check_resource_conflict(struct resource *res)
 
 	if (clash) {
 		if (acpi_enforce_resources != ENFORCE_RESOURCES_NO) {
-			printk("%sACPI: %s resource %s [0x%llx-0x%llx]"
+			printk(KERN_INFO "%sACPI: %s resource %s [0x%llx-0x%llx]"
 			       " conflicts with ACPI region %s"
 			       " [0x%llx-0x%llx]\n",
 			       acpi_enforce_resources == ENFORCE_RESOURCES_LAX

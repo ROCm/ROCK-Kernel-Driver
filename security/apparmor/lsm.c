@@ -439,7 +439,7 @@ static int apparmor_inode_permission(struct inode *inode, int mask,
 		/* allow traverse accesses to directories */
 		mask &= ~MAY_EXEC;
 	}
-	error = aa_permission("inode_permission", inode, nd->dentry, nd->mnt,
+	error = aa_permission("inode_permission", inode, nd->path.dentry, nd->path.mnt,
 			      mask, check);
 out:
 	if (!error)

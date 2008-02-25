@@ -24,7 +24,7 @@
 extern void vide(void);
 __asm__(".align 4\nvide: ret");
 
-#if defined(CONFIG_X86_LOCAL_APIC) && !defined(CONFIG_XEN)
+#ifdef CONFIG_X86_LOCAL_APIC
 #define ENABLE_C1E_MASK         0x18000000
 #define CPUID_PROCESSOR_SIGNATURE       1
 #define CPUID_XFAM              0x0ff00000
@@ -63,6 +63,15 @@ static __cpuinit int amd_apic_timer_broken(void)
 
 int force_mwait __cpuinitdata;
 
+void __cpuinit early_init_amd(struct cpuinfo_x86 *c)
+{
+	if (cpuid_eax(0x80000000) >= 0x80000007) {
+		c->x86_power = cpuid_edx(0x80000007);
+		if (c->x86_power & (1<<8))
+			set_bit(X86_FEATURE_CONSTANT_TSC, c->x86_capability);
+	}
+}
+
 static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 {
 	u32 l, h;
@@ -84,6 +93,8 @@ static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 		wrmsrl(MSR_K7_HWCR, value);
 	}
 #endif
+
+	early_init_amd(c);
 
 	/*
 	 *	FIXME: We should handle the K5 here. Set up the write
@@ -257,12 +268,6 @@ static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 		c->x86_max_cores = (cpuid_ecx(0x80000008) & 0xff) + 1;
 	}
 
-	if (cpuid_eax(0x80000000) >= 0x80000007) {
-		c->x86_power = cpuid_edx(0x80000007);
-		if (c->x86_power & (1<<8))
-			set_bit(X86_FEATURE_CONSTANT_TSC, c->x86_capability);
-	}
-
 #ifdef CONFIG_X86_HT
 	/*
 	 * On a AMD multi core setup the lower bits of the APIC id
@@ -290,17 +295,17 @@ static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 			num_cache_leaves = 3;
 	}
 
-#if defined(CONFIG_X86_LOCAL_APIC) && !defined(CONFIG_XEN)
+#ifdef CONFIG_X86_LOCAL_APIC
 	if (amd_apic_timer_broken())
 		local_apic_timer_disabled = 1;
 #endif
 
-	if (c->x86 == 0x10 && !force_mwait)
-		clear_bit(X86_FEATURE_MWAIT, c->x86_capability);
-
 	/* K6s reports MCEs but don't actually have all the MSRs */
 	if (c->x86 < 6)
 		clear_bit(X86_FEATURE_MCE, c->x86_capability);
+
+	if (cpu_has_xmm2)
+		set_bit(X86_FEATURE_MFENCE_RDTSC, c->x86_capability);
 }
 
 static unsigned int __cpuinit amd_size_cache(struct cpuinfo_x86 * c, unsigned int size)
