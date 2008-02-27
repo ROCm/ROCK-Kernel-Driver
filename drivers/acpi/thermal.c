@@ -702,14 +702,8 @@ static void acpi_thermal_active(struct acpi_thermal *tz)
 			if (active->temperature > maxtemp)
 				tz->state.active_index = i;
 			maxtemp = active->temperature;
-/*
-  Allways try to enable fan, to workaround unsynchronized fans on resume
-  and possibly breaking away fans on high ACPI processing (probably due
-  locking/thread problems)
-
 			if (active->flags.enabled)
 				continue;
-*/
 			for (j = 0; j < active->devices.count; j++) {
 				result =
 				    acpi_bus_set_power(active->devices.
