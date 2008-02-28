@@ -484,7 +484,6 @@ config SBUS
 
 config FSL_SOC
 	bool
-	select FIXED_PHY
 
 config FSL_PCI
  	bool
