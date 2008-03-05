@@ -36,8 +36,6 @@
 #include <asm/uaccess.h>
 
 extern void jprobe_inst_return(void);
-/* ia64 doesn't need this, but the symbol is exported */
-void jprobe_return(void) {}
 
 DEFINE_PER_CPU(struct kprobe *, current_kprobe) = NULL;
 DEFINE_PER_CPU(struct kprobe_ctlblk, kprobe_ctlblk);
@@ -1001,6 +999,11 @@ int __kprobes setjmp_pre_handler(struct kprobe *p, struct pt_regs *regs)
 	regs->b0 = ((struct fnptr *)(jprobe_inst_return))->ip;
 
 	return 1;
+}
+
+/* ia64 does not need this */
+void __kprobes jprobe_return(void)
+{
 }
 
 int __kprobes longjmp_break_handler(struct kprobe *p, struct pt_regs *regs)
