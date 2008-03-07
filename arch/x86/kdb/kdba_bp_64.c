@@ -107,7 +107,7 @@ kdba_db_trap(struct pt_regs *regs, int error_unused)
 						kdb_printf("kdba_installbp\n");
 					kdba_installbp(regs, bp);
 					if (!KDB_STATE(DOING_SS)) {
-						regs->flags &= ~EF_TF;
+						regs->flags &= ~X86_EFLAGS_TF;
 						return(KDB_DB_SSBPT);
 					}
 					break;
@@ -117,7 +117,7 @@ kdba_db_trap(struct pt_regs *regs, int error_unused)
 				kdb_printf("kdb: Unable to find delayed breakpoint\n");
 			}
 			if (!KDB_STATE(DOING_SS)) {
-				regs->flags &= ~EF_TF;
+				regs->flags &= ~X86_EFLAGS_TF;
 				return(KDB_DB_NOBPT);
 			}
 			/* FALLTHROUGH */
@@ -167,7 +167,7 @@ kdba_db_trap(struct pt_regs *regs, int error_unused)
 		}
 
 		if (rv != KDB_DB_SSB)
-			regs->flags &= ~EF_TF;
+			regs->flags &= ~X86_EFLAGS_TF;
 	}
 
 	if (dr6 & DR6_B0) {
@@ -203,7 +203,7 @@ handle:
 	/*
 	 * Set Resume Flag
 	 */
-	regs->flags |= EF_RF;
+	regs->flags |= X86_EFLAGS_RF;
 
 	/*
 	 * Determine which breakpoint was encountered.
@@ -233,7 +233,7 @@ handle:
 	}
 
 unknown:
-	regs->flags |= EF_RF;	/* Supress further faults */
+	regs->flags |= X86_EFLAGS_RF;	/* Supress further faults */
 	rv = KDB_DB_NOBPT;	/* Cause kdb() to return */
 
 handled:
@@ -278,7 +278,7 @@ handled:
  *	breakpoint (bc).  This code recognises a breakpoint even when
  *	disabled but not when it has been cleared.
  *
- *	WARNING: This routine resets the rip.  It should be called
+ *	WARNING: This routine resets the ip.  It should be called
  *		 once per breakpoint and the result cached.
  */
 
@@ -296,8 +296,8 @@ kdba_bp_trap(struct pt_regs *regs, int error_unused)
 	 * Determine which breakpoint was encountered.
 	 */
 	if (KDB_DEBUG(BP))
-		kdb_printf("kdba_bp_trap: rip=0x%lx (not adjusted) "
-			   "eflags=0x%lx ef=0x%p rsp=0x%lx\n",
+		kdb_printf("kdba_bp_trap: ip=0x%lx (not adjusted) "
+			   "flags=0x%lx ef=0x%p sp=0x%lx\n",
 			   regs->ip, regs->flags, regs, regs->sp);
 
 	rv = KDB_DB_NOBPT;	/* Cause kdb() to return */

@@ -278,7 +278,7 @@ handled:
  *	breakpoint (bc).  This code recognises a breakpoint even when
  *	disabled but not when it has been cleared.
  *
- *	WARNING: This routine resets the eip.  It should be called
+ *	WARNING: This routine resets the ip.  It should be called
  *		 once per breakpoint and the result cached.
  */
 
@@ -296,8 +296,8 @@ kdba_bp_trap(struct pt_regs *regs, int error_unused)
 	 * Determine which breakpoint was encountered.
 	 */
 	if (KDB_DEBUG(BP))
-		kdb_printf("kdba_bp_trap: eip=0x%lx (not adjusted) "
-			   "eflags=0x%lx regs=0x%p esp=0x%lx\n",
+		kdb_printf("kdba_bp_trap: ip=0x%lx (not adjusted) "
+			   "flags=0x%lx regs=0x%p sp=0x%lx\n",
 			   regs->ip, regs->flags, regs, regs->sp);
 
 	rv = KDB_DB_NOBPT;	/* Cause kdb() to return */

@@ -253,31 +253,31 @@ kdba_removedbreg(kdb_bp_t *bp)
  * 	None.
  * Remarks:
  * 	If kdb was entered via an interrupt from the kernel itself then
- *	ss and esp are *not* on the stack.
+ *	ss and sp are *not* on the stack.
  */
 
 static struct kdbregs {
 	char   *reg_name;
 	size_t	reg_offset;
 } kdbreglist[] = {
-	{ "eax",	offsetof(struct pt_regs, ax) },
-	{ "ebx",	offsetof(struct pt_regs, bx) },
-	{ "ecx",	offsetof(struct pt_regs, cx) },
-	{ "edx",	offsetof(struct pt_regs, dx) },
+	{ "ax",		offsetof(struct pt_regs, ax) },
+	{ "bx",		offsetof(struct pt_regs, bx) },
+	{ "cx",		offsetof(struct pt_regs, cx) },
+	{ "dx",		offsetof(struct pt_regs, dx) },
 
-	{ "esi",	offsetof(struct pt_regs, si) },
-	{ "edi",	offsetof(struct pt_regs, di) },
-	{ "esp",	offsetof(struct pt_regs, sp) },
-	{ "eip",	offsetof(struct pt_regs, ip) },
+	{ "si",		offsetof(struct pt_regs, si) },
+	{ "di",		offsetof(struct pt_regs, di) },
+	{ "sp",		offsetof(struct pt_regs, sp) },
+	{ "ip",		offsetof(struct pt_regs, ip) },
 
-	{ "ebp",	offsetof(struct pt_regs, bp) },
-	{ "xss", 	offsetof(struct pt_regs, ss) },
-	{ "xcs",	offsetof(struct pt_regs, cs) },
-	{ "eflags", 	offsetof(struct pt_regs, flags) },
+	{ "bp",		offsetof(struct pt_regs, bp) },
+	{ "ss", 	offsetof(struct pt_regs, ss) },
+	{ "cs",		offsetof(struct pt_regs, cs) },
+	{ "flags", 	offsetof(struct pt_regs, flags) },
 
-	{ "xds", 	offsetof(struct pt_regs, ds) },
-	{ "xes", 	offsetof(struct pt_regs, es) },
-	{ "origeax",	offsetof(struct pt_regs, orig_ax) },
+	{ "ds", 	offsetof(struct pt_regs, ds) },
+	{ "es", 	offsetof(struct pt_regs, es) },
+	{ "origax",	offsetof(struct pt_regs, orig_ax) },
 
 };
 
@@ -346,7 +346,7 @@ kdba_getregcontents(const char *regname,
 	if (strcmp(regname, "kesp") == 0) {
 		*contents = (unsigned long)regs + sizeof(struct pt_regs);
 		if ((regs->cs & 0xffff) == __KERNEL_CS) {
-			/* esp and ss are not on stack */
+			/* sp and ss are not on stack */
 			*contents -= 2*4;
 		}
 		return 0;
@@ -362,8 +362,8 @@ kdba_getregcontents(const char *regname,
 	if ((i < nkdbreglist)
 	 && (strlen(kdbreglist[i].reg_name) == strlen(regname))) {
 		if ((regs->cs & 0xffff) == __KERNEL_CS) {
-			/* No cpl switch, esp and ss are not on stack */
-			if (strcmp(kdbreglist[i].reg_name, "esp") == 0) {
+			/* No cpl switch, sp and ss are not on stack */
+			if (strcmp(kdbreglist[i].reg_name, "sp") == 0) {
 				*contents = (kdb_machreg_t)regs +
 					sizeof(struct pt_regs) - 2*4;
 				return(0);
@@ -596,7 +596,7 @@ kdba_setpc(struct pt_regs *regs, kdb_machreg_t newpc)
  *	0	KDB was invoked for an event which it wasn't responsible
  *	1	KDB handled the event for which it was invoked.
  * Outputs:
- *	Sets eip and esp in current->thread.
+ *	Sets ip and sp in current->thread.
  * Locking:
  *	None.
  * Remarks:
@@ -749,21 +749,21 @@ kdba_pt_regs(int argc, const char **argv)
 
 	p = (struct pt_regs *) addr;
 	kdb_printf("struct pt_regs 0x%p-0x%p\n", p, (unsigned char *)p + sizeof(*p) - 1);
-	kdb_print_nameval("ebx", p->bx);
-	kdb_print_nameval("ecx", p->cx);
-	kdb_print_nameval("edx", p->dx);
-	kdb_print_nameval("esi", p->si);
-	kdb_print_nameval("edi", p->di);
-	kdb_print_nameval("ebp", p->bp);
-	kdb_print_nameval("eax", p->ax);
-	kdb_printf(fmt, "xds", p->ds);
-	kdb_printf(fmt, "xes", p->es);
-	kdb_print_nameval("orig_eax", p->orig_ax);
-	kdb_print_nameval("eip", p->ip);
-	kdb_printf(fmt, "xcs", p->cs);
-	kdb_printf(fmt, "eflags", p->flags);
-	kdb_printf(fmt, "esp", p->sp);
-	kdb_printf(fmt, "xss", p->ss);
+	kdb_print_nameval("bx", p->bx);
+	kdb_print_nameval("cx", p->cx);
+	kdb_print_nameval("dx", p->dx);
+	kdb_print_nameval("si", p->si);
+	kdb_print_nameval("di", p->di);
+	kdb_print_nameval("bp", p->bp);
+	kdb_print_nameval("ax", p->ax);
+	kdb_printf(fmt, "ds", p->ds);
+	kdb_printf(fmt, "es", p->es);
+	kdb_print_nameval("orig_ax", p->orig_ax);
+	kdb_print_nameval("ip", p->ip);
+	kdb_printf(fmt, "cs", p->cs);
+	kdb_printf(fmt, "flags", p->flags);
+	kdb_printf(fmt, "sp", p->sp);
+	kdb_printf(fmt, "ss", p->ss);
 	return 0;
 }
 
@@ -787,27 +787,27 @@ kdba_pt_regs(int argc, const char **argv)
  */
 
 static void
-kdba_stackdepth1(struct task_struct *p, unsigned long esp)
+kdba_stackdepth1(struct task_struct *p, unsigned long sp)
 {
 	struct thread_info *tinfo;
 	int used;
 	const char *type;
 	kdb_ps1(p);
 	do {
-		tinfo = (struct thread_info *)(esp & -THREAD_SIZE);
-		used = sizeof(*tinfo) + THREAD_SIZE - (esp & (THREAD_SIZE-1));
+		tinfo = (struct thread_info *)(sp & -THREAD_SIZE);
+		used = sizeof(*tinfo) + THREAD_SIZE - (sp & (THREAD_SIZE-1));
 		type = NULL;
 		if (kdb_task_has_cpu(p)) {
 			struct kdb_activation_record ar;
 			memset(&ar, 0, sizeof(ar));
-			kdba_get_stack_info_alternate(esp, -1, &ar);
+			kdba_get_stack_info_alternate(sp, -1, &ar);
 			type = ar.stack.id;
 		}
 		if (!type)
 			type = "process";
-		kdb_printf("  %s stack %p esp %lx used %d\n", type, tinfo, esp, used);
-		esp = tinfo->previous_esp;
-	} while (esp);
+		kdb_printf("  %s stack %p sp %lx used %d\n", type, tinfo, sp, used);
+		sp = tinfo->previous_esp;
+	} while (sp);
 }
 
 static int

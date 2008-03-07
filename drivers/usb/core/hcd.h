@@ -216,7 +216,7 @@ struct hc_driver {
 	void	(*relinquish_port)(struct usb_hcd *, int);
 #ifdef CONFIG_KDB_USB
 	/* KDB poll function for this HC */
-	int		(*kdb_poll_char)(struct urb *urb);
+	int	(*kdb_poll_char)(struct urb *urb);
 #endif /* CONFIG_KDB_USB */
 };
 

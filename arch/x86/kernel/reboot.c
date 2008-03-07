@@ -1,12 +1,12 @@
-#ifdef CONFIG_KDB
-#include <linux/kdb.h>
-#endif /* CONFIG_KDB */
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/reboot.h>
 #include <linux/init.h>
 #include <linux/pm.h>
 #include <linux/efi.h>
+#ifdef CONFIG_KDB
+#include <linux/kdb.h>
+#endif /* CONFIG_KDB */
 #include <acpi/reboot.h>
 #include <asm/io.h>
 #include <asm/apic.h>
@@ -402,17 +402,17 @@ static void native_machine_shutdown(void)
 	/* Make certain I only run on the appropriate processor */
 	set_cpus_allowed(current, cpumask_of_cpu(reboot_cpu_id));
 
-	/* O.K Now that I'm on the appropriate processor,
-	 * stop all of the others.
-	 */
-#ifdef	CONFIG_KDB
+#if defined(CONFIG_X86_32) && defined(CONFIG_KDB)
 	/*
 	 * If this restart is occuring while kdb is running (e.g. reboot
 	 * command), the other CPU's are already stopped.  Don't try to
 	 * stop them yet again.
 	 */
 	if (!KDB_IS_RUNNING())
-#endif	/* CONFIG_KDB */
+#endif	/* defined(CONFIG_X86_32) && defined(CONFIG_KDB) */
+	/* O.K Now that I'm on the appropriate processor,
+	 * stop all of the others.
+	 */
 	smp_send_stop();
 #endif
 

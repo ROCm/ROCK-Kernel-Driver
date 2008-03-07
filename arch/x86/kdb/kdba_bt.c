@@ -3163,12 +3163,12 @@ bb_usage_mov(const struct bb_operand *src, const struct bb_operand *dst, int l)
 	    dst->reg &&
 	    bb_is_int_reg(dst->base_rc) &&
 	    full_register_dst) {
-#ifndef	CONFIG_X86_64
+#ifdef	CONFIG_X86_32
 		/* mov from TSS_sysenter_sp0+offset to esp to fix up the
 		 * sysenter stack, it leaves esp well defined.  mov
-		 * TSS_sysenter_esp0+offset(%esp),%esp is followed by up to 5
+		 * TSS_ysenter_sp0+offset(%esp),%esp is followed by up to 5
 		 * push instructions to mimic the hardware stack push.  If
-		 * TSS_sysenter_esp0 is offset then only 3 words will be
+		 * TSS_sysenter_sp0 is offset then only 3 words will be
 		 * pushed.
 		 */
 		if (dst->base_rc == BBRG_RSP &&
@@ -3185,7 +3185,7 @@ bb_usage_mov(const struct bb_operand *src, const struct bb_operand *dst, int l)
 			       "\n");
 			return BBOU_NOP;
 		}
-#endif	/* !CONFIG_X86_64 */
+#endif	/* CONFIG_X86_32 */
 		bb_read_operand(src);
 		bb_reg_set_memory(dst->base_rc, src->base_rc, src->disp);
 		return BBOU_NOP;

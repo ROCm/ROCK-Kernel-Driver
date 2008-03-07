@@ -237,7 +237,7 @@ kdba_putdr(int regnum, kdb_machreg_t contents)
  *	   &regs	 - Prints address of exception frame
  *	   krsp		 - Prints kernel stack pointer at time of fault
  *	   crsp		 - Prints current kernel stack pointer, inside kdb
- *	   cflags	 - Prints current flags, inside kdb
+ *	   ceflags	 - Prints current flags, inside kdb
  *	   %<regname>	 - Uses the value of the registers at the
  *			   last time the user process entered kernel
  *			   mode, instead of the registers at the time
@@ -255,7 +255,7 @@ kdba_putdr(int regnum, kdb_machreg_t contents)
  * 	None.
  * Remarks:
  * 	If kdb was entered via an interrupt from the kernel itself then
- *	ss and rsp are *not* on the stack.
+ *	ss and sp are *not* on the stack.
  */
 
 static struct kdbregs {
@@ -266,22 +266,22 @@ static struct kdbregs {
 	{ "r14",	offsetof(struct pt_regs, r14) },
 	{ "r13",	offsetof(struct pt_regs, r13) },
 	{ "r12",	offsetof(struct pt_regs, r12) },
-	{ "bp",	offsetof(struct pt_regs, bp) },
-	{ "rbx",	offsetof(struct pt_regs, bx) },
+	{ "bp",		offsetof(struct pt_regs, bp) },
+	{ "bx",		offsetof(struct pt_regs, bx) },
 	{ "r11",	offsetof(struct pt_regs, r11) },
 	{ "r10",	offsetof(struct pt_regs, r10) },
 	{ "r9",		offsetof(struct pt_regs, r9) },
 	{ "r8",		offsetof(struct pt_regs, r8) },
-	{ "rax",	offsetof(struct pt_regs, ax) },
-	{ "rcx",	offsetof(struct pt_regs, cx) },
-	{ "rdx",	offsetof(struct pt_regs, dx) },
-	{ "rsi",	offsetof(struct pt_regs, si) },
-	{ "rdi",	offsetof(struct pt_regs, di) },
-	{ "orig_rax",	offsetof(struct pt_regs, orig_ax) },
-	{ "rip",	offsetof(struct pt_regs, ip) },
+	{ "ax",		offsetof(struct pt_regs, ax) },
+	{ "cx",		offsetof(struct pt_regs, cx) },
+	{ "dx",		offsetof(struct pt_regs, dx) },
+	{ "si",		offsetof(struct pt_regs, si) },
+	{ "di",		offsetof(struct pt_regs, di) },
+	{ "orig_ax",	offsetof(struct pt_regs, orig_ax) },
+	{ "ip",		offsetof(struct pt_regs, ip) },
 	{ "cs",		offsetof(struct pt_regs, cs) },
 	{ "flags", 	offsetof(struct pt_regs, flags) },
-	{ "rsp",	offsetof(struct pt_regs, sp) },
+	{ "sp",		offsetof(struct pt_regs, sp) },
 	{ "ss",		offsetof(struct pt_regs, ss) },
 };
 
@@ -313,7 +313,7 @@ kdba_getregcontents(const char *regname,
 	if (strcmp(regname, "krsp") == 0) {
 		*contents = (unsigned long)regs + sizeof(struct pt_regs);
 		if ((regs->cs & 0xffff) == __KERNEL_CS) {
-			/* rsp and ss are not on stack */
+			/* sp and ss are not on stack */
 			*contents -= 2*4;
 		}
 		return 0;
@@ -324,7 +324,7 @@ kdba_getregcontents(const char *regname,
 		return 0;
 	}
 
-	if (strcmp(regname, "cflags") == 0) {
+	if (strcmp(regname, "ceflags") == 0) {
 		unsigned long flags;
 		local_save_flags(flags);
 		*contents = flags;
@@ -348,8 +348,8 @@ kdba_getregcontents(const char *regname,
 	if ((i < nkdbreglist)
 	 && (strlen(kdbreglist[i].reg_name) == strlen(regname))) {
 		if ((regs->cs & 0xffff) == __KERNEL_CS) {
-			/* No cpl switch, rsp is not on stack */
-			if (strcmp(kdbreglist[i].reg_name, "rsp") == 0) {
+			/* No cpl switch, sp is not on stack */
+			if (strcmp(kdbreglist[i].reg_name, "sp") == 0) {
 				*contents = (kdb_machreg_t)regs +
 					sizeof(struct pt_regs) - 2*8;
 				return(0);
@@ -586,7 +586,7 @@ kdba_setpc(struct pt_regs *regs, kdb_machreg_t newpc)
  *	0	KDB was invoked for an event which it wasn't responsible
  *	1	KDB handled the event for which it was invoked.
  * Outputs:
- *	Sets rip and rsp in current->thread.
+ *	Sets ip and sp in current->thread.
  * Locking:
  *	None.
  * Remarks:
@@ -600,7 +600,7 @@ kdba_main_loop(kdb_reason_t reason, kdb_reason_t reason2, int error,
 	int ret;
 
 	if (regs)
-		kdba_getregcontents("rsp", regs, &(current->thread.sp));
+		kdba_getregcontents("sp", regs, &(current->thread.sp));
 	ret = kdb_save_running(regs, reason, reason2, error, db_result);
 	kdb_unsave_running(regs);
 	return ret;
@@ -628,11 +628,11 @@ kdba_setsinglestep(struct pt_regs *regs)
 {
 	if (KDB_NULL_REGS(regs))
 		return;
-	if (regs->flags & EF_IE)
+	if (regs->flags & X86_EFLAGS_IF)
 		KDB_STATE_SET(A_IF);
 	else
 		KDB_STATE_CLEAR(A_IF);
-	regs->flags = (regs->flags | EF_TF) & ~EF_IE;
+	regs->flags = (regs->flags | X86_EFLAGS_TF) & ~X86_EFLAGS_IF;
 }
 
 void
@@ -641,9 +641,9 @@ kdba_clearsinglestep(struct pt_regs *regs)
 	if (KDB_NULL_REGS(regs))
 		return;
 	if (KDB_STATE(A_IF))
-		regs->flags |= EF_IE;
+		regs->flags |= X86_EFLAGS_IF;
 	else
-		regs->flags &= ~EF_IE;
+		regs->flags &= ~X86_EFLAGS_IF;
 }
 
 int asmlinkage
@@ -667,7 +667,7 @@ kdba_setjmp(kdb_jmp_buf *jb)
 #else	 /* !CONFIG_FRAME_POINTER */
 	__asm__ __volatile__
 		("movq %%rbx, (0*8)(%%rdi);"
-		"movq %%bp, (1*8)(%%rdi);"
+		"movq %%rbp, (1*8)(%%rdi);"
 		"movq %%r12, (2*8)(%%rdi);"
 		"movq %%r13, (3*8)(%%rdi);"
 		"movq %%r14, (4*8)(%%rdi);"
@@ -741,7 +741,7 @@ kdba_pt_regs(int argc, const char **argv)
 	if (first_time) {
 		first_time = 0;
 		kdb_printf("\n+++ Warning: x86_64 pt_regs are not always "
-			   "completely defined, r15-rbx may be invalid\n\n");
+			   "completely defined, r15-bx may be invalid\n\n");
 	}
 	kdb_printf("struct pt_regs 0x%p-0x%p\n", p, (unsigned char *)p + sizeof(*p) - 1);
 	kdb_print_nameval("r15", p->r15);
@@ -749,21 +749,21 @@ kdba_pt_regs(int argc, const char **argv)
 	kdb_print_nameval("r13", p->r13);
 	kdb_print_nameval("r12", p->r12);
 	kdb_print_nameval("bp", p->bp);
-	kdb_print_nameval("rbx", p->bx);
+	kdb_print_nameval("bx", p->bx);
 	kdb_print_nameval("r11", p->r11);
 	kdb_print_nameval("r10", p->r10);
 	kdb_print_nameval("r9", p->r9);
 	kdb_print_nameval("r8", p->r8);
-	kdb_print_nameval("rax", p->ax);
-	kdb_print_nameval("rcx", p->cx);
-	kdb_print_nameval("rdx", p->dx);
-	kdb_print_nameval("rsi", p->si);
-	kdb_print_nameval("rdi", p->di);
-	kdb_print_nameval("orig_rax", p->orig_ax);
-	kdb_print_nameval("rip", p->ip);
+	kdb_print_nameval("ax", p->ax);
+	kdb_print_nameval("cx", p->cx);
+	kdb_print_nameval("dx", p->dx);
+	kdb_print_nameval("si", p->si);
+	kdb_print_nameval("di", p->di);
+	kdb_print_nameval("orig_ax", p->orig_ax);
+	kdb_print_nameval("ip", p->ip);
 	kdb_printf(fmt, "cs", p->cs);
 	kdb_printf(fmt, "flags", p->flags);
-	kdb_printf(fmt, "rsp", p->sp);
+	kdb_printf(fmt, "sp", p->sp);
 	kdb_printf(fmt, "ss", p->ss);
 	return 0;
 }

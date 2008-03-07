@@ -675,6 +675,9 @@ kdbm_kobject(int argc, const char **argv)
 		kdb_printf("\n");
 	}
 
+	if (k.name != kobject_name((struct kobject *)addr))
+		kdb_printf(" name '%." __stringify(KOBJ_NAME_LEN) "s'\n", k.name);
+
 	kdb_printf(" kref.refcount %d'\n", atomic_read(&k.kref.refcount));
 
 	kdb_printf(" entry.next = 0x%p entry.prev = 0x%p\n",
@@ -748,8 +751,8 @@ kdbm_sd(int argc, const char **argv)
 		   sd->siblings.next, sd->siblings.prev, sd->host);
 	kdb_printf("device_busy = %d   current_cmnd 0x%p\n",
 		   sd->device_busy, sd->current_cmnd);
-	kdb_printf("id/lun/chan = [%d/%d/%d]  device_blocked = %d\n",
-		   sd->id, sd->lun, sd->channel, sd->device_blocked);
+	kdb_printf("id/lun/chan = [%d/%d/%d]  single_lun = %d  device_blocked = %d\n",
+		   sd->id, sd->lun, sd->channel, sd->sdev_target->single_lun, sd->device_blocked);
 	kdb_printf("queue_depth = %d current_tag = %d  scsi_level = %d\n",
 		   sd->queue_depth, sd->current_tag, sd->scsi_level);
 	kdb_printf("%8.8s %16.16s %4.4s\n", sd->vendor, sd->model, sd->rev);
@@ -791,11 +794,9 @@ kdbm_sc(int argc, const char **argv)
 		   sc->cmnd[0], sc->cmnd[1], sc->cmnd[2], sc->cmnd[3], sc->cmnd[4],
 		   sc->cmnd[5], sc->cmnd[6], sc->cmnd[7], sc->cmnd[8], sc->cmnd[9],
 		   sc->cmnd[10], sc->cmnd[11]);
-#if 0
 	kdb_printf("request_buffer = 0x%p  request_bufflen = %d\n",
-		   sc->request_buffer, sc->request_bufflen);
-	kdb_printf("use_sg = %d\n", sc->use_sg);
-#endif
+		   scsi_sglist(sc), scsi_bufflen(sc));
+	kdb_printf("use_sg = %d\n", scsi_sg_count(sc));
 	kdb_printf("underflow = %d transfersize = %d\n",
 		   sc->underflow, sc->transfersize);
 	kdb_printf("tag = %d\n", sc->tag);

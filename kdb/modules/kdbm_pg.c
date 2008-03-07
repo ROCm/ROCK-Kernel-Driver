@@ -24,7 +24,7 @@ MODULE_LICENSE("GPL");
 
 /* Standard Linux page stuff */
 
-#ifndef CONFIG_DISCONTIGMEM
+#if !defined(CONFIG_DISCONTIGMEM) && !defined(CONFIG_NUMA)
 /* From include/linux/page-flags.h */
 static char *pg_flag_vals[] = {
 	"PG_locked", "PG_error", "PG_referenced", "PG_uptodate",
@@ -40,7 +40,7 @@ static char *bh_state_vals[] = {
 	"Uptodate", "Dirty", "Lock", "Req",
 	"Uptodate_Lock", "Mapped", "New", "Async_read",
 	"Async_write", "Delay", "Boundary", "Write_EIO",
-	"Ordered", "Eopnotsupp", "Unwritten", "Private",
+	"Ordered", "Eopnotsupp", "Unwritten", "Priavate",
 	NULL };
 
 /* From include/linux/bio.h */
@@ -180,7 +180,7 @@ kdbm_bio(int argc, const char **argv)
 	return 0;
 }
 
-#ifndef CONFIG_DISCONTIGMEM
+#if !defined(CONFIG_DISCONTIGMEM) && !defined(CONFIG_NUMA)
 static char *page_flags(unsigned long flags)
 {
 	return(map_flags(flags, pg_flag_vals));
@@ -189,7 +189,6 @@ static char *page_flags(unsigned long flags)
 static int
 kdbm_page(int argc, const char **argv)
 {
-#ifndef CONFIG_NEED_MULTIPLE_NODES
 	struct page page;
 	unsigned long addr;
 	long offset = 0;
@@ -226,11 +225,10 @@ kdbm_page(int argc, const char **argv)
 		kdb_printf("  buffers 0x%p\n", page_buffers(&page));
 	else
 		kdb_printf("  private 0x%lx\n", page_private(&page));
-#endif
-	kdb_printf("Unimplemented with CONFIG_NEED_MULTIPLE_NODES enabled\n");
+
 	return 0;
 }
-#endif /* CONFIG_DISCONTIGMEM */
+#endif /* !CONFIG_DISCONTIGMEM && !NUMA */
 
 static unsigned long
 print_request(unsigned long addr)
@@ -539,15 +537,13 @@ out:
 }
 
 
-
-#if defined(CONFIG_X86) && !defined(CONFIG_X86_64)
+#if !defined(CONFIG_DISCONTIGMEM) && !defined(CONFIG_NUMA)
 /* According to Steve Lord, this code is ix86 specific.  Patches to extend it to
  * other architectures will be greatefully accepted.
  */
 static int
 kdbm_memmap(int argc, const char **argv)
 {
-#ifndef CONFIG_NEED_MULTIPLE_NODES
 	struct page page;
 	int i, page_count;
 	int slab_count = 0;
@@ -603,17 +599,13 @@ kdbm_memmap(int argc, const char **argv)
 			i, page_counts[i]);
 	}
 	kdb_printf("  high page count:  %6d\n", page_counts[8]);
-#else
-	kdb_printf("Unimplemented with CONFIG_NEED_MULTIPLE_NODES enabled\n");
-#endif
-
 	return 0;
 }
-#endif /* CONFIG_X86 && !CONFIG_X86_64 */
+#endif /* !CONFIG_DISCONTIGMEM && !NUMA */
 
 static int __init kdbm_pg_init(void)
 {
-#ifndef CONFIG_DISCONTIGMEM
+#if !defined(CONFIG_DISCONTIGMEM) && !defined(CONFIG_NUMA)
 	kdb_register("page", kdbm_page, "<vaddr>", "Display page", 0);
 #endif
 	kdb_register("inode", kdbm_inode, "<vaddr>", "Display inode", 0);
@@ -623,7 +615,7 @@ static int __init kdbm_pg_init(void)
 	kdb_register("inode_pages", kdbm_inode_pages, "<inode *>", "Display pages in an inode", 0);
 	kdb_register("req", kdbm_request, "<vaddr>", "dump request struct", 0);
 	kdb_register("rqueue", kdbm_rqueue, "<vaddr>", "dump request queue", 0);
-#if defined(CONFIG_X86) && !defined(CONFIG_X86_64)
+#if !defined(CONFIG_DISCONTIGMEM) && !defined(CONFIG_NUMA)
 	kdb_register("memmap", kdbm_memmap, "", "page table summary", 0);
 #endif
 
@@ -633,7 +625,7 @@ static int __init kdbm_pg_init(void)
 
 static void __exit kdbm_pg_exit(void)
 {
-#ifndef CONFIG_DISCONTIGMEM
+#if !defined(CONFIG_DISCONTIGMEM) && !defined(CONFIG_NUMA)
 	kdb_unregister("page");
 #endif
 	kdb_unregister("inode");
@@ -643,7 +635,7 @@ static void __exit kdbm_pg_exit(void)
 	kdb_unregister("inode_pages");
 	kdb_unregister("req");
 	kdb_unregister("rqueue");
-#if defined(CONFIG_X86) && !defined(CONFIG_X86_64)
+#if !defined(CONFIG_DISCONTIGMEM) && !defined(CONFIG_NUMA)
 	kdb_unregister("memmap");
 #endif
 }

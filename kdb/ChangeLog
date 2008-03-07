@@ -1,3 +1,16 @@
+2008-03-03 Jay Lan  <jlan@sgi.com>
+
+	* kdb-v4.4-2.6.25-rc3-common-1.
+
+2008-02-26 Jay Lan  <jlan@sgi.com>
+
+	* remove 'fastcall' from kdb code.
+	* kdb-v4.4-2.6.25-rc2-common-1.
+
+2008-02-19 Jay Lan  <jlan@sgi.com>
+
+	* kdb-v4.4-2.6.25-rc1-common-1.
+
 2008-02-06 Jay Lan  <jlan@sgi.com>
 
 	* Backed out USB UHCI support since it caused dropped characters and

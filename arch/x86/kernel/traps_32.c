@@ -654,7 +654,7 @@ void do_##name(struct pt_regs * regs, long error_code) \
 }
 
 DO_VM86_ERROR_INFO( 0, SIGFPE,  "divide error", divide_error, FPE_INTDIV, regs->ip)
-#if	!defined(CONFIG_KPROBES) && !defined(CONFIG_KDB)
+#if 	!defined(CONFIG_KPROBES) && !defined(CONFIG_KDB)
 DO_VM86_ERROR( 3, SIGTRAP, "int3", int3)
 #endif
 DO_VM86_ERROR( 4, SIGSEGV, "overflow", overflow)

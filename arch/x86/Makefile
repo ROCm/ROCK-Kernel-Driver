@@ -199,7 +199,9 @@ drivers-$(CONFIG_PM) += arch/x86/power/
 ifeq ($(CONFIG_X86_32),y)
 drivers-$(CONFIG_FB) += arch/x86/video/
 endif
-drivers-$(CONFIG_KDB)			+= arch/x86/kdb/
+
+# KDB support
+drivers-$(CONFIG_KDB) += arch/x86/kdb/
 
 ####
 # boot loader support. Several targets are kept for legacy purposes

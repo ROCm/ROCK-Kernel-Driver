@@ -1,3 +1,18 @@
+2008-03-03 Jay Lan  <jlan@sgi.com>
+
+	* kdb-v4.4-2.6.25-rc3-x86-1.
+
+2008-02-26 Jay Lan  <jlan@sgi.com>
+
+	* remove 'fastcall' from kdb code.
+	* Known problem: backtrace for i386 is broken since 2.6.25-rc1.
+	* kdb-v4.4-2.6.25-rc2-x86-1.
+
+2008-02-19 Jay Lan  <jlan@sgi.com>
+
+	* Known problem: backtrace for i386 is broken.
+	* kdb-v4.4-2.6.25-rc1-x86-1.
+
 2008-02-01 Jay Lan  <jlan@sgi.com>
 
 	* Backed out USB UHCI support since it caused dropped characters and

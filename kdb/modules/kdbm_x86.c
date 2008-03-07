@@ -313,33 +313,33 @@ static void display_tss(struct tss_struct *t)
 {
 #ifdef	CONFIG_X86_64
 	int i;
-	kdb_printf("    rsp0 = 0x%016Lx,  rsp1 = 0x%016Lx\n",
+	kdb_printf("    sp0 = 0x%016Lx,  sp1 = 0x%016Lx\n",
 		   t->x86_tss.sp0, t->x86_tss.sp1);
-	kdb_printf("    rsp2 = 0x%016Lx\n", t->x86_tss.sp2);
+	kdb_printf("    sp2 = 0x%016Lx\n", t->x86_tss.sp2);
 	for (i = 0; i < ARRAY_SIZE(t->x86_tss.ist); ++i)
 		kdb_printf("    ist[%d] = 0x%016Lx\n",
 			  i, t->x86_tss.ist[i]);
 	kdb_printf("   iomap = 0x%04x\n", t->x86_tss.io_bitmap_base);
 #else	/* !CONFIG_X86_64 */
-	kdb_printf("    cs = %04x,  eip = " kdb_machreg_fmt0 "\n",
+	kdb_printf("    cs = %04x,  ip = " kdb_machreg_fmt0 "\n",
 		   t->x86_tss.es, t->x86_tss.ip);
-	kdb_printf("    ss = %04x,  esp = " kdb_machreg_fmt0 "\n",
+	kdb_printf("    ss = %04x,  sp = " kdb_machreg_fmt0 "\n",
 		   t->x86_tss.ss, t->x86_tss.sp);
-	kdb_printf("   ss0 = %04x, esp0 = " kdb_machreg_fmt0 "\n",
+	kdb_printf("   ss0 = %04x, sp0 = " kdb_machreg_fmt0 "\n",
 		   t->x86_tss.ss0, t->x86_tss.sp0);
-	kdb_printf("   ss1 = %04x, esp1 = " kdb_machreg_fmt0 "\n",
+	kdb_printf("   ss1 = %04x, sp1 = " kdb_machreg_fmt0 "\n",
 		   t->x86_tss.ss1, t->x86_tss.sp1);
-	kdb_printf("   ss2 = %04x, esp2 = " kdb_machreg_fmt0 "\n",
+	kdb_printf("   ss2 = %04x, sp2 = " kdb_machreg_fmt0 "\n",
 		   t->x86_tss.ss2, t->x86_tss.sp2);
 	kdb_printf("   ldt = %04x, cr3 = " kdb_machreg_fmt0 "\n",
 		   t->x86_tss.ldt, t->x86_tss.__cr3);
 	kdb_printf("    ds = %04x, es = %04x fs = %04x gs = %04x\n",
 			t->x86_tss.ds, t->x86_tss.es, t->x86_tss.fs, t->x86_tss.gs);
-	kdb_printf("   eax = " kdb_machreg_fmt0 ", ebx = " kdb_machreg_fmt0
-		   " ecx = " kdb_machreg_fmt0 " edx = " kdb_machreg_fmt0 "\n",
+	kdb_printf("   ax = " kdb_machreg_fmt0 ", bx = " kdb_machreg_fmt0
+		   " cx = " kdb_machreg_fmt0 " dx = " kdb_machreg_fmt0 "\n",
 		   t->x86_tss.ax, t->x86_tss.bx, t->x86_tss.cx, t->x86_tss.dx);
-	kdb_printf("   esi = " kdb_machreg_fmt0 ", edi = " kdb_machreg_fmt0
-		   " ebp = " kdb_machreg_fmt0 "\n",
+	kdb_printf("   si = " kdb_machreg_fmt0 ", di = " kdb_machreg_fmt0
+		   " bp = " kdb_machreg_fmt0 "\n",
 		   t->x86_tss.si, t->x86_tss.di, t->x86_tss.bp);
 	kdb_printf("   trace = %d, iomap = 0x%04x\n", t->x86_tss.trace, t->x86_tss.io_bitmap_base);
 #endif	/* CONFIG_X86_64 */
