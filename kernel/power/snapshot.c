@@ -447,7 +447,7 @@ static void memory_bm_free(struct memory_bitmap *bm, int clear_nosave_free)
  *	of @bm->cur_zone_bm are updated.
  */
 
-static void memory_bm_find_bit(struct memory_bitmap *bm, unsigned long pfn,
+static int memory_bm_find_bit(struct memory_bitmap *bm, unsigned long pfn,
 				void **addr, unsigned int *bit_nr)
 {
 	struct zone_bitmap *zone_bm;
@@ -461,7 +461,8 @@ static void memory_bm_find_bit(struct memory_bitmap *bm, unsigned long pfn,
 		while (pfn < zone_bm->start_pfn || pfn >= zone_bm->end_pfn) {
 			zone_bm = zone_bm->next;
 
-			BUG_ON(!zone_bm);
+			if (!zone_bm)
+				return -EFAULT;
 		}
 		bm->cur.zone_bm = zone_bm;
 	}
@@ -479,23 +480,40 @@ static void memory_bm_find_bit(struct memory_bitmap *bm, unsigned long pfn,
 	pfn -= bb->start_pfn;
 	*bit_nr = pfn % BM_BITS_PER_CHUNK;
 	*addr = bb->data + pfn / BM_BITS_PER_CHUNK;
+	return 0;
 }
 
 static void memory_bm_set_bit(struct memory_bitmap *bm, unsigned long pfn)
 {
 	void *addr;
 	unsigned int bit;
+	int error;
 
-	memory_bm_find_bit(bm, pfn, &addr, &bit);
+	error = memory_bm_find_bit(bm, pfn, &addr, &bit);
+	BUG_ON(error);
 	set_bit(bit, addr);
+}
+
+static int mem_bm_set_bit_check(struct memory_bitmap *bm, unsigned long pfn)
+{
+	void *addr;
+	unsigned int bit;
+	int error;
+
+	error = memory_bm_find_bit(bm, pfn, &addr, &bit);
+	if (!error)
+		set_bit(bit, addr);
+	return error;
 }
 
 static void memory_bm_clear_bit(struct memory_bitmap *bm, unsigned long pfn)
 {
 	void *addr;
 	unsigned int bit;
+	int error;
 
-	memory_bm_find_bit(bm, pfn, &addr, &bit);
+	error = memory_bm_find_bit(bm, pfn, &addr, &bit);
+	BUG_ON(error);
 	clear_bit(bit, addr);
 }
 
@@ -503,8 +521,10 @@ static int memory_bm_test_bit(struct memory_bitmap *bm, unsigned long pfn)
 {
 	void *addr;
 	unsigned int bit;
+	int error;
 
-	memory_bm_find_bit(bm, pfn, &addr, &bit);
+	error = memory_bm_find_bit(bm, pfn, &addr, &bit);
+	BUG_ON(error);
 	return test_bit(bit, addr);
 }
 
@@ -708,9 +728,13 @@ static void mark_nosave_pages(struct memory_bitmap *bm)
 				region->start_pfn << PAGE_SHIFT,
 				region->end_pfn << PAGE_SHIFT);
 
-		for (pfn = region->start_pfn; pfn < region->end_pfn; pfn++)
-			if (pfn_valid(pfn))
-				memory_bm_set_bit(bm, pfn);
+		for (pfn = region->start_pfn; pfn < region->end_pfn; pfn++) {
+			if (!pfn_valid(pfn))
+				continue;
+			if (mem_bm_set_bit_check(bm, pfn))
+				printk(KERN_ERR	"PM: Invalid page: %016lx\n",
+					pfn << PAGE_SHIFT);
+		}
 	}
 }
 
