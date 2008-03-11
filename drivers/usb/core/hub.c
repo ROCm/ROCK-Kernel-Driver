@@ -31,12 +31,6 @@
 #include "hcd.h"
 #include "hub.h"
 
-#ifdef	CONFIG_USB_PERSIST
-#define	USB_PERSIST	1
-#else
-#define	USB_PERSIST	0
-#endif
-
 /* if we are in debug mode, always announce new devices */
 #ifdef DEBUG
 #ifndef CONFIG_USB_ANNOUNCE_NEW_DEVICES
@@ -334,6 +328,27 @@ static int get_port_status(struct usb_device *hdev, int port1,
 	return status;
 }
 
+static int hub_port_status(struct usb_hub *hub, int port1,
+		u16 *status, u16 *change)
+{
+	int ret;
+
+	mutex_lock(&hub->status_mutex);
+	ret = get_port_status(hub->hdev, port1, &hub->status->port);
+	if (ret < 4) {
+		dev_err(hub->intfdev,
+			"%s failed (err = %d)\n", __func__, ret);
+		if (ret >= 0)
+			ret = -EIO;
+	} else {
+		*status = le16_to_cpu(hub->status->port.wPortStatus);
+		*change = le16_to_cpu(hub->status->port.wPortChange);
+		ret = 0;
+	}
+	mutex_unlock(&hub->status_mutex);
+	return ret;
+}
+
 static void kick_khubd(struct usb_hub *hub)
 {
 	unsigned long	flags;
@@ -611,9 +626,8 @@ static void hub_port_logical_disconnect(struct usb_hub *hub, int port1)
 }
 
 /* caller has locked the hub device */
-static int hub_pre_reset(struct usb_interface *intf)
+static void hub_stop(struct usb_hub *hub)
 {
-	struct usb_hub *hub = usb_get_intfdata(intf);
 	struct usb_device *hdev = hub->hdev;
 	int i;
 
@@ -623,6 +637,89 @@ static int hub_pre_reset(struct usb_interface *intf)
 			usb_disconnect(&hdev->children[i]);
 	}
 	hub_quiesce(hub);
+}
+
+#define HUB_RESET		1
+#define HUB_RESUME		2
+#define HUB_RESET_RESUME	3
+
+#ifdef CONFIG_PM
+
+static void hub_restart(struct usb_hub *hub, int type)
+{
+	struct usb_device *hdev = hub->hdev;
+	int port1;
+
+	/* Check each of the children to see if they require
+	 * USB-PERSIST handling or disconnection.  Also check
+	 * each unoccupied port to make sure it is still disabled.
+	 */
+	for (port1 = 1; port1 <= hdev->maxchild; ++port1) {
+		struct usb_device *udev = hdev->children[port1-1];
+		int status = 0;
+		u16 portstatus, portchange;
+
+		if (!udev || udev->state == USB_STATE_NOTATTACHED) {
+			if (type != HUB_RESET) {
+				status = hub_port_status(hub, port1,
+						&portstatus, &portchange);
+				if (status == 0 && (portstatus &
+						USB_PORT_STAT_ENABLE))
+					clear_port_feature(hdev, port1,
+							USB_PORT_FEAT_ENABLE);
+			}
+			continue;
+		}
+
+		/* Was the power session lost while we were suspended? */
+		switch (type) {
+		case HUB_RESET_RESUME:
+			portstatus = 0;
+			portchange = USB_PORT_STAT_C_CONNECTION;
+			break;
+
+		case HUB_RESET:
+		case HUB_RESUME:
+			status = hub_port_status(hub, port1,
+					&portstatus, &portchange);
+			break;
+		}
+
+		/* For "USB_PERSIST"-enabled children we must
+		 * mark the child device for reset-resume and
+		 * turn off the various status changes to prevent
+		 * khubd from disconnecting it later.
+		 */
+		if (udev->persist_enabled && status == 0 &&
+				!(portstatus & USB_PORT_STAT_ENABLE)) {
+			if (portchange & USB_PORT_STAT_C_ENABLE)
+				clear_port_feature(hub->hdev, port1,
+						USB_PORT_FEAT_C_ENABLE);
+			if (portchange & USB_PORT_STAT_C_CONNECTION)
+				clear_port_feature(hub->hdev, port1,
+						USB_PORT_FEAT_C_CONNECTION);
+			udev->reset_resume = 1;
+		}
+
+		/* Otherwise for a reset_resume we must disconnect the child,
+		 * but as we may not lock the child device here
+		 * we have to do a "logical" disconnect.
+		 */
+		else if (type == HUB_RESET_RESUME)
+			hub_port_logical_disconnect(hub, port1);
+	}
+
+	hub_activate(hub);
+}
+
+#endif	/* CONFIG_PM */
+
+/* caller has locked the hub device */
+static int hub_pre_reset(struct usb_interface *intf)
+{
+	struct usb_hub *hub = usb_get_intfdata(intf);
+
+	hub_stop(hub);
 	return 0;
 }
 
@@ -911,7 +1008,7 @@ static void hub_disconnect(struct usb_interface *intf)
 
 	/* Disconnect all children and quiesce the hub */
 	hub->error = 0;
-	hub_pre_reset(intf);
+	hub_stop(hub);
 
 	usb_set_intfdata (intf, NULL);
 
@@ -1511,28 +1608,6 @@ out_authorized:
 }
 
 
-static int hub_port_status(struct usb_hub *hub, int port1,
-			       u16 *status, u16 *change)
-{
-	int ret;
-
-	mutex_lock(&hub->status_mutex);
-	ret = get_port_status(hub->hdev, port1, &hub->status->port);
-	if (ret < 4) {
-		dev_err (hub->intfdev,
-			"%s failed (err = %d)\n", __FUNCTION__, ret);
-		if (ret >= 0)
-			ret = -EIO;
-	} else {
-		*status = le16_to_cpu(hub->status->port.wPortStatus);
-		*change = le16_to_cpu(hub->status->port.wPortChange); 
-		ret = 0;
-	}
-	mutex_unlock(&hub->status_mutex);
-	return ret;
-}
-
-
 /* Returns 1 if @hub is a WUSB root hub, 0 otherwise */
 static unsigned hub_is_wusb(struct usb_hub *hub)
 {
@@ -1843,9 +1918,8 @@ static int finish_port_resume(struct usb_device *udev)
  * the host and the device is the same as it was when the device
  * suspended.
  *
- * If CONFIG_USB_PERSIST and @udev->reset_resume are both set then this
- * routine won't check that the port is still enabled.  Furthermore,
- * if @udev->reset_resume is set then finish_port_resume() above will
+ * If @udev->reset_resume is set then this routine won't check that the
+ * port is still enabled.  Furthermore, finish_port_resume() above will
  * reset @udev.  The end result is that a broken power session can be
  * recovered and @udev will appear to persist across a loss of VBUS power.
  *
@@ -1857,8 +1931,8 @@ static int finish_port_resume(struct usb_device *udev)
  * to it will be lost.  Using the USB_PERSIST facility, the device can be
  * made to appear as if it had not disconnected.
  *
- * This facility is inherently dangerous.  Although usb_reset_device()
- * makes every effort to insure that the same device is present after the
+ * This facility can be dangerous.  Although usb_reset_device() makes
+ * every effort to insure that the same device is present after the
  * reset as before, it cannot provide a 100% guarantee.  Furthermore it's
  * quite possible for a device to remain unaltered but its media to be
  * changed.  If the user replaces a flash memory card while the system is
@@ -1903,7 +1977,7 @@ int usb_port_resume(struct usb_device *udev)
 		status = hub_port_status(hub, port1, &portstatus, &portchange);
 
  SuspendCleared:
-		if (USB_PERSIST && udev->reset_resume)
+		if (udev->reset_resume)
 			want_flags = USB_PORT_STAT_POWER
 					| USB_PORT_STAT_CONNECTION;
 		else
@@ -2010,49 +2084,20 @@ static int hub_suspend(struct usb_interface *intf, pm_message_t msg)
 
 static int hub_resume(struct usb_interface *intf)
 {
-	struct usb_hub		*hub = usb_get_intfdata (intf);
+	struct usb_hub *hub = usb_get_intfdata(intf);
 
-	dev_dbg(&intf->dev, "%s\n", __FUNCTION__);
-
-	/* tell khubd to look for changes on this hub */
-	hub_activate(hub);
+	dev_dbg(&intf->dev, "%s\n", __func__);
+	hub_restart(hub, HUB_RESUME);
 	return 0;
 }
 
 static int hub_reset_resume(struct usb_interface *intf)
 {
 	struct usb_hub *hub = usb_get_intfdata(intf);
-	struct usb_device *hdev = hub->hdev;
-	int port1;
 
+	dev_dbg(&intf->dev, "%s\n", __func__);
 	hub_power_on(hub);
-
-	for (port1 = 1; port1 <= hdev->maxchild; ++port1) {
-		struct usb_device *child = hdev->children[port1-1];
-
-		if (child) {
-
-			/* For "USB_PERSIST"-enabled children we must
-			 * mark the child device for reset-resume and
-			 * turn off the connect-change status to prevent
-			 * khubd from disconnecting it later.
-			 */
-			if (USB_PERSIST && child->persist_enabled) {
-				child->reset_resume = 1;
-				clear_port_feature(hdev, port1,
-						USB_PORT_FEAT_C_CONNECTION);
-
-			/* Otherwise we must disconnect the child,
-			 * but as we may not lock the child device here
-			 * we have to do a "logical" disconnect.
-			 */
-			} else {
-				hub_port_logical_disconnect(hub, port1);
-			}
-		}
-	}
-
-	hub_activate(hub);
+	hub_restart(hub, HUB_RESET_RESUME);
 	return 0;
 }
 
@@ -2062,10 +2107,10 @@ static int hub_reset_resume(struct usb_interface *intf)
  *
  * The USB host controller driver calls this function when its root hub
  * is resumed and Vbus power has been interrupted or the controller
- * has been reset.  The routine marks @rhdev as having lost power.  When
- * the hub driver is resumed it will take notice; if CONFIG_USB_PERSIST
- * is enabled then it will carry out power-session recovery, otherwise
- * it will disconnect all the child devices.
+ * has been reset.  The routine marks @rhdev as having lost power.
+ * When the hub driver is resumed it will take notice and carry out
+ * power-session recovery for all the "USB-PERSIST"-enabled child devices;
+ * the others will be disconnected.
  */
 void usb_root_hub_lost_power(struct usb_device *rhdev)
 {
@@ -2727,7 +2772,7 @@ static void hub_events(void)
 		/* If the hub has died, clean up after it */
 		if (hdev->state == USB_STATE_NOTATTACHED) {
 			hub->error = -ENODEV;
-			hub_pre_reset(intf);
+			hub_stop(hub);
 			goto loop;
 		}
 
@@ -2891,7 +2936,13 @@ loop:
 
 static int hub_thread(void *__unused)
 {
+	/* khubd needs to be freezable to avoid intefering with USB-PERSIST
+	 * port handover.  Otherwise it might see that a full-speed device
+	 * was gone before the EHCI controller had handed its port over to
+	 * the companion full-speed controller.
+	 */
 	set_freezable();
+
 	do {
 		hub_events();
 		wait_event_freezable(khubd_wait,
@@ -2960,16 +3011,36 @@ void usb_hub_cleanup(void)
 	usb_deregister(&hub_driver);
 } /* usb_hub_cleanup() */
 
-static int config_descriptors_changed(struct usb_device *udev)
+static int descriptors_changed(struct usb_device *udev,
+		struct usb_device_descriptor *old_device_descriptor)
 {
-	unsigned			index;
-	unsigned			len = 0;
-	struct usb_config_descriptor	*buf;
+	int		changed = 0;
+	unsigned	index;
+	unsigned	serial_len = 0;
+	unsigned	len;
+	unsigned	old_length;
+	int		length;
+	char		*buf;
 
+	if (memcmp(&udev->descriptor, old_device_descriptor,
+			sizeof(*old_device_descriptor)) != 0)
+		return 1;
+
+	/* Since the idVendor, idProduct, and bcdDevice values in the
+	 * device descriptor haven't changed, we will assume the
+	 * Manufacturer and Product strings haven't changed either.
+	 * But the SerialNumber string could be different (e.g., a
+	 * different flash card of the same brand).
+	 */
+	if (udev->serial)
+		serial_len = strlen(udev->serial) + 1;
+
+	len = serial_len;
 	for (index = 0; index < udev->descriptor.bNumConfigurations; index++) {
-		if (len < le16_to_cpu(udev->config[index].desc.wTotalLength))
-			len = le16_to_cpu(udev->config[index].desc.wTotalLength);
+		old_length = le16_to_cpu(udev->config[index].desc.wTotalLength);
+		len = max(len, old_length);
 	}
+
 	buf = kmalloc(len, GFP_NOIO);
 	if (buf == NULL) {
 		dev_err(&udev->dev, "no mem to re-read configs after reset\n");
@@ -2977,25 +3048,41 @@ static int config_descriptors_changed(struct usb_device *udev)
 		return 1;
 	}
 	for (index = 0; index < udev->descriptor.bNumConfigurations; index++) {
-		int length;
-		int old_length = le16_to_cpu(udev->config[index].desc.wTotalLength);
-
+		old_length = le16_to_cpu(udev->config[index].desc.wTotalLength);
 		length = usb_get_descriptor(udev, USB_DT_CONFIG, index, buf,
 				old_length);
-		if (length < old_length) {
+		if (length != old_length) {
 			dev_dbg(&udev->dev, "config index %d, error %d\n",
 					index, length);
+			changed = 1;
 			break;
 		}
 		if (memcmp (buf, udev->rawdescriptors[index], old_length)
 				!= 0) {
 			dev_dbg(&udev->dev, "config index %d changed (#%d)\n",
-				index, buf->bConfigurationValue);
+				index,
+				((struct usb_config_descriptor *) buf)->
+					bConfigurationValue);
+			changed = 1;
 			break;
 		}
 	}
+
+	if (!changed && serial_len) {
+		length = usb_string(udev, udev->descriptor.iSerialNumber,
+				buf, serial_len);
+		if (length + 1 != serial_len) {
+			dev_dbg(&udev->dev, "serial string error %d\n",
+					length);
+			changed = 1;
+		} else if (memcmp(buf, udev->serial, length) != 0) {
+			dev_dbg(&udev->dev, "serial string changed\n");
+			changed = 1;
+		}
+	}
+
 	kfree(buf);
-	return index != udev->descriptor.bNumConfigurations;
+	return changed;
 }
 
 /**
@@ -3068,8 +3155,7 @@ int usb_reset_device(struct usb_device *udev)
 		goto re_enumerate;
  
 	/* Device might have changed firmware (DFU or similar) */
-	if (memcmp(&udev->descriptor, &descriptor, sizeof descriptor)
-			|| config_descriptors_changed (udev)) {
+	if (descriptors_changed(udev, &descriptor)) {
 		dev_info(&udev->dev, "device firmware changed\n");
 		udev->descriptor = descriptor;	/* for disconnect() calls */
 		goto re_enumerate;
