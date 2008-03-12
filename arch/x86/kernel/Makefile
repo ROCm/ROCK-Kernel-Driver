@@ -86,14 +86,24 @@ endif
 obj-$(CONFIG_SCx200)		+= scx200.o
 scx200-y			+= scx200_32.o
 
+obj-$(CONFIG_X86_XEN)		+= fixup.o
+
 ###
 # 64 bit specific files
 ifeq ($(CONFIG_X86_64),y)
-        obj-y				+= genapic_64.o genapic_flat_64.o
+        obj-$(CONFIG_X86_LOCAL_APIC)	+= genapic_64.o genapic_flat_64.o
+        obj-$(CONFIG_X86_XEN_GENAPIC)	+= genapic_64.o genapic_xen_64.o
         obj-$(CONFIG_X86_PM_TIMER)	+= pmtimer_64.o
         obj-$(CONFIG_AUDIT)		+= audit_64.o
 
         obj-$(CONFIG_GART_IOMMU)	+= pci-gart_64.o aperture_64.o
         obj-$(CONFIG_CALGARY_IOMMU)	+= pci-calgary_64.o tce_64.o
         obj-$(CONFIG_SWIOTLB)		+= pci-swiotlb_64.o
+
+	apic_64-$(CONFIG_XEN)		+= apic_32.o
+	time_64-$(CONFIG_XEN)		+= time_32.o
+	pci-dma_64-$(CONFIG_XEN)	+= pci-dma_32.o
 endif
+
+disabled-obj-$(CONFIG_XEN) := early-quirks.o genapic_flat_$(BITS).o hpet.o i8253.o \
+	i8259_$(BITS).o reboot.o smpboot_$(BITS).o tsc_$(BITS).o tsc_sync.o

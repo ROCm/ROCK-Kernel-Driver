@@ -170,9 +170,14 @@ static inline struct thread_info *current_thread_info(void)
 #define _TIF_ALLWORK_MASK	(0x0000FFFF & ~_TIF_SECCOMP)
 
 /* flags to check in __switch_to() */
+#ifndef CONFIG_XEN
 #define _TIF_WORK_CTXSW \
     (_TIF_IO_BITMAP | _TIF_NOTSC | _TIF_DEBUGCTLMSR | \
      _TIF_DS_AREA_MSR | _TIF_BTS_TRACE_TS)
+#else
+#define _TIF_WORK_CTXSW (_TIF_NOTSC \
+     /*todo | _TIF_DEBUGCTLMSR | _TIF_DS_AREA_MSR | _TIF_BTS_TRACE_TS*/)
+#endif
 #define _TIF_WORK_CTXSW_PREV _TIF_WORK_CTXSW
 #define _TIF_WORK_CTXSW_NEXT (_TIF_WORK_CTXSW | _TIF_DEBUG)
 

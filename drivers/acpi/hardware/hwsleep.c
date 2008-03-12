@@ -252,7 +252,9 @@ acpi_status asmlinkage acpi_enter_sleep_state(u8 sleep_state)
 	u32 PM1Bcontrol;
 	struct acpi_bit_register_info *sleep_type_reg_info;
 	struct acpi_bit_register_info *sleep_enable_reg_info;
+#ifndef CONFIG_ACPI_PV_SLEEP
 	u32 in_value;
+#endif
 	struct acpi_object_list arg_list;
 	union acpi_object arg;
 	acpi_status status;
@@ -362,6 +364,7 @@ acpi_status asmlinkage acpi_enter_sleep_state(u8 sleep_state)
 
 	ACPI_FLUSH_CPU_CACHE();
 
+#ifndef CONFIG_ACPI_PV_SLEEP
 	status = acpi_hw_register_write(ACPI_REGISTER_PM1A_CONTROL,
 					PM1Acontrol);
 	if (ACPI_FAILURE(status)) {
@@ -410,6 +413,15 @@ acpi_status asmlinkage acpi_enter_sleep_state(u8 sleep_state)
 	} while (!in_value);
 
 	return_ACPI_STATUS(AE_OK);
+#else
+	/* PV ACPI just need check hypercall return value */
+	status = acpi_notify_hypervisor_state(sleep_state,
+			PM1Acontrol, PM1Bcontrol);
+	if (ACPI_FAILURE(status))
+		return_ACPI_STATUS(status);
+	else
+		return_ACPI_STATUS(AE_OK);
+#endif
 }
 
 ACPI_EXPORT_SYMBOL(acpi_enter_sleep_state)
@@ -426,6 +438,7 @@ ACPI_EXPORT_SYMBOL(acpi_enter_sleep_state)
  *              THIS FUNCTION MUST BE CALLED WITH INTERRUPTS DISABLED
  *
  ******************************************************************************/
+#ifndef CONFIG_ACPI_PV_SLEEP
 acpi_status asmlinkage acpi_enter_sleep_state_s4bios(void)
 {
 	u32 in_value;
@@ -475,6 +488,7 @@ acpi_status asmlinkage acpi_enter_sleep_state_s4bios(void)
 }
 
 ACPI_EXPORT_SYMBOL(acpi_enter_sleep_state_s4bios)
+#endif
 
 /*******************************************************************************
  *

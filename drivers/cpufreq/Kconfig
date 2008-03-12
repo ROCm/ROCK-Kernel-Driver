@@ -1,5 +1,6 @@
 config CPU_FREQ
 	bool "CPU Frequency scaling"
+	depends on !XEN
 	help
 	  CPU Frequency scaling allows you to change the clock speed of 
 	  CPUs on the fly. This is a nice method to save power, because 

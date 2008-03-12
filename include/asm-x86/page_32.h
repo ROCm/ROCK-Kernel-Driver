@@ -14,7 +14,11 @@
 #define __PAGE_OFFSET		_AC(CONFIG_PAGE_OFFSET, UL)
 
 #ifdef CONFIG_X86_PAE
+#ifndef CONFIG_XEN
 #define __PHYSICAL_MASK_SHIFT	36
+#else
+#define __PHYSICAL_MASK_SHIFT	40
+#endif
 #define __VIRTUAL_MASK_SHIFT	32
 #define PAGETABLE_LEVELS	3
 
