@@ -2389,6 +2389,8 @@ static struct net_device *gelic_wl_alloc(struct gelic_card *card)
 	if (!netdev)
 		return NULL;
 
+	strcpy(netdev->name, "wlan%d");
+
 	port = netdev_priv(netdev);
 	port->netdev = netdev;
 	port->card = card;
