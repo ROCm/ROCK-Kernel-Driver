@@ -253,6 +253,11 @@ config X86_XEN
 	  Choose this option if you plan to run this kernel on top of the
 	  Xen Hypervisor.
 
+config QUICKLIST
+	bool
+	depends on X86_XEN
+	default y
+
 config X86_ELAN
 	bool "AMD Elan"
 	depends on X86_32
