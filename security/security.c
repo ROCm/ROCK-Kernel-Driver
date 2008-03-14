@@ -409,6 +409,7 @@ int security_inode_mknod(struct inode *dir, struct dentry *dentry,
 		return 0;
 	return security_ops->inode_mknod(dir, dentry, mnt, mode, dev);
 }
+EXPORT_SYMBOL_GPL(security_inode_permission);
 
 int security_inode_rename(struct inode *old_dir, struct dentry *old_dentry,
 			  struct vfsmount *old_mnt, struct inode *new_dir,
