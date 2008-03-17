@@ -590,14 +590,15 @@ void mark_tsc_unstable(char *reason)
 }
 EXPORT_SYMBOL_GPL(mark_tsc_unstable);
 
+static cycle_t cs_last;
+
 static cycle_t xen_clocksource_read(void)
 {
 	cycle_t ret = local_clock();
 
 #ifdef CONFIG_SMP
 	for (;;) {
-		static cycle_t last_ret;
-		cycle_t last = get64(&last_ret);
+		cycle_t last = get64(&cs_last);
 
 		if ((s64)(ret - last) < 0) {
 			if (last - ret > permitted_clock_jitter
@@ -615,12 +616,20 @@ static cycle_t xen_clocksource_read(void)
 			}
 			ret = last;
 		}
-		if (cmpxchg64(&last_ret, last, ret) == last)
+		if (cmpxchg64(&cs_last, last, ret) == last)
 			break;
 	}
 #endif
 
 	return ret;
+}
+
+static void xen_clocksource_resume(void)
+{
+	extern void time_resume(void);
+
+	time_resume();
+	cs_last = local_clock();
 }
 
 static struct clocksource clocksource_xen = {
@@ -631,6 +640,7 @@ static struct clocksource clocksource_xen = {
 	.mult			= 1 << XEN_SHIFT,		/* time directly in nanoseconds */
 	.shift			= XEN_SHIFT,
 	.flags			= CLOCK_SOURCE_IS_CONTINUOUS,
+	.resume			= xen_clocksource_resume,
 };
 
 static void init_missing_ticks_accounting(unsigned int cpu)
@@ -656,35 +666,6 @@ void xen_update_persistent_clock(void)
 {
 	mod_timer(&sync_xen_wallclock_timer, jiffies + 1);
 }
-
-static int timer_resume(struct sys_device *dev)
-{
-	extern void time_resume(void);
-	time_resume();
-	return 0;
-}
-
-static struct sysdev_class timer_sysclass = {
-	.name   = "timer",
-	.resume = timer_resume,
-};
-
-
-/* XXX this driverfs stuff should probably go elsewhere later -john */
-static struct sys_device device_timer = {
-	.id	= 0,
-	.cls	= &timer_sysclass,
-};
-
-static int time_init_device(void)
-{
-	int error = sysdev_class_register(&timer_sysclass);
-	if (!error)
-		error = sysdev_register(&device_timer);
-	return error;
-}
-
-device_initcall(time_init_device);
 
 extern void (*late_time_init)(void);
 

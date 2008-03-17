@@ -321,12 +321,9 @@ map_single(struct device *hwdev, struct phys_addr buffer, size_t size, int dir)
 
 	mask = dma_get_seg_boundary(hwdev);
 	offset_slots = -IO_TLB_SEGSIZE;
-	max_slots = (mask + 1) >> IO_TLB_SHIFT;
-	if (!max_slots) {
-		if (mask + 1)
-			return NULL;
-		max_slots = 1UL << (BITS_PER_LONG - IO_TLB_SHIFT);
-	}
+	max_slots = mask + 1
+		    ? ALIGN(mask + 1, 1 << IO_TLB_SHIFT) >> IO_TLB_SHIFT
+		    : 1UL << (BITS_PER_LONG - IO_TLB_SHIFT);
 
 	/*
 	 * For mappings greater than a page, we limit the stride (and

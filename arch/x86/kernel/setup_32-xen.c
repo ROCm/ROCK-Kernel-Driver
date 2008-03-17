@@ -84,10 +84,6 @@ static struct notifier_block xen_panic_block = {
 
 extern char hypercall_page[PAGE_SIZE];
 EXPORT_SYMBOL(hypercall_page);
-unsigned long *machine_to_phys_mapping = (void *)MACH2PHYS_VIRT_START;
-EXPORT_SYMBOL(machine_to_phys_mapping);
-unsigned int machine_to_phys_order;
-EXPORT_SYMBOL(machine_to_phys_order);
 
 /*
  * Machine setup..
@@ -744,8 +740,6 @@ void __init setup_arch(char **cmdline_p)
 {
 	int i, j, k, fpp;
 	struct physdev_set_iopl set_iopl;
-	struct xen_machphys_mapping mapping;
-	unsigned long machine_to_phys_nr_ents;
 	unsigned long max_low_pfn;
 	unsigned long p2m_pages;
 
@@ -759,29 +753,14 @@ void __init setup_arch(char **cmdline_p)
 		atomic_notifier_chain_register(&panic_notifier_list, &xen_panic_block);
 	}
 
-	xen_setup_features();
-
 	WARN_ON(HYPERVISOR_vm_assist(VMASST_CMD_enable,
 				     VMASST_TYPE_4gb_segments));
 	WARN_ON(HYPERVISOR_vm_assist(VMASST_CMD_enable,
 				     VMASST_TYPE_writable_pagetables));
 
 	memcpy(&boot_cpu_data, &new_cpu_data, sizeof(new_cpu_data));
+	pre_setup_arch_hook();
 	early_cpu_init();
-
-	init_mm.pgd = swapper_pg_dir = (pgd_t *)xen_start_info->pt_base;
-
-	if (!xen_feature(XENFEAT_auto_translated_physmap))
-		phys_to_machine_mapping =
-			(unsigned long *)xen_start_info->mfn_list;
-
-	if (HYPERVISOR_memory_op(XENMEM_machphys_mapping, &mapping) == 0) {
-		machine_to_phys_mapping = (unsigned long *)mapping.v_start;
-		machine_to_phys_nr_ents = mapping.max_mfn + 1;
-	} else
-		machine_to_phys_nr_ents = MACH2PHYS_NR_ENTRIES;
-	machine_to_phys_order = fls(machine_to_phys_nr_ents - 1);
-
 	early_ioremap_init();
 #ifdef CONFIG_SMP
 	prefill_possible_map();

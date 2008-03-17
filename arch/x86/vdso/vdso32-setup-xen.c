@@ -256,10 +256,10 @@ static const struct callback_register cstar = {
 	.address = { __KERNEL_CS, (unsigned long)ia32pv_cstar_target },
 };
 
-void enable_sep_cpu(void)
+void __cpuinit enable_sep_cpu(void)
 {
 	extern asmlinkage void ia32pv_sysenter_target(void);
-	static struct callback_register sysenter = {
+	static struct callback_register __cpuinitdata sysenter = {
 		.type = CALLBACKTYPE_sysenter,
 		.address = { __KERNEL_CS, (unsigned long)ia32pv_sysenter_target },
 	};
@@ -267,7 +267,6 @@ void enable_sep_cpu(void)
 	if (boot_cpu_has(X86_FEATURE_SYSCALL)) {
 		if (HYPERVISOR_callback_op(CALLBACKOP_register, &cstar) != 0)
 			BUG();
-		put_cpu();
 		return;
 	}
 
@@ -276,8 +275,6 @@ void enable_sep_cpu(void)
 
 	if (xen_feature(XENFEAT_supervisor_mode_kernel))
 		sysenter.address.eip = (unsigned long)ia32_sysenter_target;
-
-	get_cpu();
 
 	switch (HYPERVISOR_callback_op(CALLBACKOP_register, &sysenter)) {
 	case 0:
@@ -289,10 +286,9 @@ void enable_sep_cpu(void)
 			break;
 #endif
 	default:
-		clear_cpu_cap(&boot_cpu_data, X86_FEATURE_SEP);
+		setup_clear_cpu_cap(X86_FEATURE_SEP);
 		break;
 	}
-	put_cpu();
 }
 
 static struct vm_area_struct gate_vma;
@@ -357,8 +353,10 @@ int __init sysenter_setup(void)
 	} else
 #elif defined(CONFIG_X86_32)
 	if (boot_cpu_has(X86_FEATURE_SYSCALL)
-	    && HYPERVISOR_callback_op(CALLBACKOP_register, &cstar) != 0)
-		clear_cpu_cap(&boot_cpu_data, X86_FEATURE_SYSCALL);
+	    && (boot_cpu_data.x86_vendor != X86_VENDOR_AMD
+		|| HYPERVISOR_callback_op(CALLBACKOP_register, &cstar) != 0))
+		setup_clear_cpu_cap(X86_FEATURE_SYSCALL);
+	barrier(); /* until clear_bit()'s constraints are correct ... */
 	if (boot_cpu_has(X86_FEATURE_SYSCALL)) {
 		extern const char vdso32_syscall_start, vdso32_syscall_end;
 

@@ -339,14 +339,18 @@ static void pgd_mop_up_pmds(struct mm_struct *mm, pgd_t *pgdp)
 
 pgd_t *pgd_alloc(struct mm_struct *mm)
 {
-	pgd_t *pgd = quicklist_alloc(0, GFP_KERNEL, pgd_ctor);
+	pgd_t *pgd = (pgd_t *)__get_free_page(GFP_KERNEL | __GFP_ZERO);
 
 	pgd_test_and_unpin(pgd);
 
-	mm->pgd = pgd;		/* so that alloc_pd can use it */
+	/* so that alloc_pd can use it */
+	mm->pgd = pgd;
+	if (pgd)
+		pgd_ctor(pgd);
 
 	if (pgd && !pgd_prepopulate_pmd(mm, pgd)) {
-		quicklist_free(0, pgd_dtor, pgd);
+		pgd_dtor(pgd);
+		free_page((unsigned long)pgd);
 		pgd = NULL;
 	}
 
@@ -369,12 +373,8 @@ void pgd_free(struct mm_struct *mm, pgd_t *pgd)
 		xen_destroy_contiguous_region((unsigned long)pgd, 0);
 
 	pgd_mop_up_pmds(mm, pgd);
-	quicklist_free(0, pgd_dtor, pgd);
-}
-
-void check_pgt_cache(void)
-{
-	quicklist_trim(0, pgd_dtor, 25, 16);
+	pgd_dtor(pgd);
+	free_page((unsigned long)pgd);
 }
 
 void __pte_free_tlb(struct mmu_gather *tlb, struct page *pte)

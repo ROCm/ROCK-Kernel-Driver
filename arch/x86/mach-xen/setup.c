@@ -88,10 +88,41 @@ extern void hypervisor_callback(void);
 extern void failsafe_callback(void);
 extern void nmi(void);
 
+unsigned long *machine_to_phys_mapping = (void *)MACH2PHYS_VIRT_START;
+EXPORT_SYMBOL(machine_to_phys_mapping);
+unsigned int machine_to_phys_order;
+EXPORT_SYMBOL(machine_to_phys_order);
+
+void __init pre_setup_arch_hook(void)
+{
+	struct xen_machphys_mapping mapping;
+	unsigned long machine_to_phys_nr_ents;
+	struct xen_platform_parameters pp;
+
+	init_mm.pgd = swapper_pg_dir = (pgd_t *)xen_start_info->pt_base;
+
+	xen_setup_features();
+
+	if (HYPERVISOR_xen_version(XENVER_platform_parameters, &pp) == 0) {
+		hypervisor_virt_start = pp.virt_start;
+		reserve_top_address(0UL - pp.virt_start);
+	}
+
+	if (HYPERVISOR_memory_op(XENMEM_machphys_mapping, &mapping) == 0) {
+		machine_to_phys_mapping = (unsigned long *)mapping.v_start;
+		machine_to_phys_nr_ents = mapping.max_mfn + 1;
+	} else
+		machine_to_phys_nr_ents = MACH2PHYS_NR_ENTRIES;
+	machine_to_phys_order = fls(machine_to_phys_nr_ents - 1);
+
+	if (!xen_feature(XENFEAT_auto_translated_physmap))
+		phys_to_machine_mapping =
+			(unsigned long *)xen_start_info->mfn_list;
+}
+
 void __init machine_specific_arch_setup(void)
 {
 	int ret;
-	struct xen_platform_parameters pp;
 	static struct callback_register __initdata event = {
 		.type = CALLBACKTYPE_event,
 		.address = { __KERNEL_CS, (unsigned long)hypervisor_callback },
@@ -126,11 +157,6 @@ void __init machine_specific_arch_setup(void)
 		HYPERVISOR_nmi_op(XENNMI_register_callback, &cb);
 	}
 #endif
-
-	if (HYPERVISOR_xen_version(XENVER_platform_parameters, &pp) == 0) {
-		hypervisor_virt_start = pp.virt_start;
-		reserve_top_address(0UL - pp.virt_start);
-	}
 
 	/* Do an early initialization of the fixmap area */
 	{

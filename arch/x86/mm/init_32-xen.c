@@ -632,11 +632,6 @@ void __init mem_init(void)
 		BUG();
 	}
 #endif
-
-	printk("vmalloc area: %lx-%lx, maxmem %lx\n",
-	       VMALLOC_START, VMALLOC_END, MAXMEM);
-	BUG_ON(VMALLOC_START > VMALLOC_END);
-
 	/* this will put all low memory onto the freelists */
 	totalram_pages += free_all_bootmem();
 	/* XEN: init and count low-mem pages outside initial allocation. */

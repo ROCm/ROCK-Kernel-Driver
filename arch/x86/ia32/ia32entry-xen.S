@@ -14,7 +14,6 @@
 #include <asm/segment.h>
 #include <asm/irqflags.h>
 #include <linux/linkage.h>
-#include <xen/interface/arch-x86_64.h>
 
 #define IA32_NR_syscalls ((ia32_syscall_end - ia32_sys_call_table)/8)
 

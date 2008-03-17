@@ -314,6 +314,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 		if (HYPERVISOR_vcpu_op(VCPUOP_get_physid, cpu, &cpu_id) == 0)
 			apicid = xen_vcpu_physid_to_x86_apicid(cpu_id.phys_id);
 		cpu_data(cpu) = boot_cpu_data;
+		cpu_data(cpu).cpu_index = cpu;
 		cpu_data(cpu).apicid = apicid;
 
 		cpu_2_logical_apicid[cpu] = apicid;
