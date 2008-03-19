@@ -728,13 +728,16 @@ static void mark_nosave_pages(struct memory_bitmap *bm)
 				region->start_pfn << PAGE_SHIFT,
 				region->end_pfn << PAGE_SHIFT);
 
-		for (pfn = region->start_pfn; pfn < region->end_pfn; pfn++) {
-			if (!pfn_valid(pfn))
-				continue;
-			if (mem_bm_set_bit_check(bm, pfn))
-				printk(KERN_ERR	"PM: Invalid page: %016lx\n",
-					pfn << PAGE_SHIFT);
-		}
+		for (pfn = region->start_pfn; pfn < region->end_pfn; pfn++)
+			if (pfn_valid(pfn)) {
+				/*
+				 * It is safe to ignore the result of
+				 * mem_bm_set_bit_check() here, since we won't
+				 * touch the PFNs for which the error is
+				 * returned anyway.
+				 */
+				mem_bm_set_bit_check(bm, pfn);
+			}
 	}
 }
 
