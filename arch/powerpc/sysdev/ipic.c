@@ -10,8 +10,6 @@
  * Free Software Foundation;  either version 2 of the  License, or (at your
  * option) any later version.
  */
-#define olh(fmt,args ...) \
-		printk(KERN_DEBUG "%s(%u) %s(%u):c%u,j%lu " fmt "\n",__FUNCTION__,__LINE__,current->comm,current->pid,smp_processor_id(),jiffies,##args)
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/errno.h>
@@ -727,10 +725,9 @@ struct ipic * __init ipic_init(struct device_node *node, unsigned int flags)
 	struct resource res;
 	u32 temp = 0, ret;
 
-	olh("");
 	ipic = alloc_bootmem(sizeof(struct ipic));
 	if (ipic == NULL)
-		goto out;
+		return NULL;
 
 	memset(ipic, 0, sizeof(struct ipic));
 
@@ -739,13 +736,13 @@ struct ipic * __init ipic_init(struct device_node *node, unsigned int flags)
 				       &ipic_host_ops, 0);
 	if (ipic->irqhost == NULL) {
 		of_node_put(node);
-		goto out;
+		return NULL;
 	}
 
 	ret = of_address_to_resource(node, 0, &res);
 	if (ret) {
 		of_node_put(node);
-		goto out;
+		return NULL;
 	}
 
 	ipic->regs = ioremap(res.start, res.end - res.start + 1);
@@ -795,9 +792,6 @@ struct ipic * __init ipic_init(struct device_node *node, unsigned int flags)
 			primary_ipic->regs);
 
 	return ipic;
-out:
-	olh("primary_ipic %p", primary_ipic);
-	return NULL;
 }
 
 int ipic_set_priority(unsigned int virq, unsigned int priority)
@@ -912,8 +906,7 @@ static int __init init_ipic_sysfs(void)
 {
 	int rc;
 
-	olh("primary_ipic %p", primary_ipic);
-	if (!primary_ipic || !primary_ipic->regs)
+	if (!primary_ipic->regs)
 		return -ENODEV;
 	printk(KERN_DEBUG "Registering ipic with sysfs...\n");
 
