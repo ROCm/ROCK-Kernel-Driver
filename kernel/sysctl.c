@@ -1497,7 +1497,7 @@ char *sysctl_pathname(struct ctl_table *table, char *buffer, int buflen)
 
 	return buffer;
 }
-EXPORT_SYMBOL(sysctl_pathname);
+EXPORT_SYMBOL_GPL(sysctl_pathname);
 
 #ifdef CONFIG_SYSCTL_SYSCALL
 int do_sysctl(int __user *name, int nlen, void __user *oldval, size_t __user *oldlenp,

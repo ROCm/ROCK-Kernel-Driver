@@ -740,4 +740,4 @@ out_enomem:
 	*acl = x.acl;
 	return -ENOMEM;
 }
-EXPORT_SYMBOL(nfs4acl_apply_masks);
+EXPORT_SYMBOL_GPL(nfs4acl_apply_masks);

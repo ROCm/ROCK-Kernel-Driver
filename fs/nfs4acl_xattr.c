@@ -114,7 +114,7 @@ nfs4acl_xattr_size(const struct nfs4acl *acl)
 	}
 	return size;
 }
-EXPORT_SYMBOL(nfs4acl_xattr_size);
+EXPORT_SYMBOL_GPL(nfs4acl_xattr_size);
 
 void
 nfs4acl_to_xattr(const struct nfs4acl *acl, void *buffer)

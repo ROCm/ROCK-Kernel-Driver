@@ -488,7 +488,7 @@ generic_sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)
 	spin_unlock(&inode_lock);
 	return;		/* Leave any unwritten inodes on s_io */
 }
-EXPORT_SYMBOL(generic_sync_sb_inodes);
+EXPORT_SYMBOL_GPL(generic_sync_sb_inodes);
 
 static void
 sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)

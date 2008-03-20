@@ -1945,4 +1945,4 @@ char *d_namespace_path(struct dentry *dentry, struct vfsmount *vfsmnt,
 		*--res = '.';
 	return res;
 }
-EXPORT_SYMBOL(d_namespace_path);
+EXPORT_SYMBOL_GPL(d_namespace_path);

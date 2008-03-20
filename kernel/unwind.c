@@ -1241,7 +1241,7 @@ int unwind(struct unwind_frame_info *frame)
 #undef CASES
 #undef FRAME_REG
 }
-EXPORT_SYMBOL(unwind);
+EXPORT_SYMBOL_GPL(unwind);
 
 int unwind_init_frame_info(struct unwind_frame_info *info,
                            struct task_struct *tsk,
@@ -1253,7 +1253,7 @@ int unwind_init_frame_info(struct unwind_frame_info *info,
 
 	return 0;
 }
-EXPORT_SYMBOL(unwind_init_frame_info);
+EXPORT_SYMBOL_GPL(unwind_init_frame_info);
 
 /*
  * Prepare to unwind a blocked task.
@@ -1267,7 +1267,7 @@ int unwind_init_blocked(struct unwind_frame_info *info,
 
 	return 0;
 }
-EXPORT_SYMBOL(unwind_init_blocked);
+EXPORT_SYMBOL_GPL(unwind_init_blocked);
 
 /*
  * Prepare to unwind the currently running thread.
@@ -1282,7 +1282,7 @@ int unwind_init_running(struct unwind_frame_info *info,
 
 	return arch_unwind_init_running(info, callback, arg);
 }
-EXPORT_SYMBOL(unwind_init_running);
+EXPORT_SYMBOL_GPL(unwind_init_running);
 
 /*
  * Unwind until the return pointer is in user-land (or until an error
@@ -1300,4 +1300,4 @@ int unwind_to_user(struct unwind_frame_info *info)
 
 	return 0;
 }
-EXPORT_SYMBOL(unwind_to_user);
+EXPORT_SYMBOL_GPL(unwind_to_user);
