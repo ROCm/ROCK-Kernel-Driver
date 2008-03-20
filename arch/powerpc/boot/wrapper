@@ -29,12 +29,6 @@ if [ "$V" = 1 ]; then
     set -x
 fi
 
-function mkimage() {
-	# EFIKA enables MPC52xx support
-	# EFIKA can boot the plain zImage, uboot is not required
-	return 0
-}
-
 # defaults
 kernel=
 ofile=zImage
