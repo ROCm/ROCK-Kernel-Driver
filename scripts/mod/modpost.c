@@ -2083,7 +2083,6 @@ int main(int argc, char **argv)
 	int opt;
 	int err;
 
-	while ((opt = getopt(argc, argv, "i:I:cmsSo:awM:K:")) != -1) {
 	while ((opt = getopt(argc, argv, "i:I:cmsSo:awM:K:N:")) != -1) {
 		switch (opt) {
 		case 'i':
