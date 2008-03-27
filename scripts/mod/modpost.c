@@ -2079,11 +2079,12 @@ int main(int argc, char **argv)
 	char *dump_write = NULL;
 	char *markers_read = NULL;
 	char *markers_write = NULL;
-	int opt;
 	const char *supported = NULL;
+	int opt;
 	int err;
 
-	while ((opt = getopt(argc, argv, "i:I:msSo:awM:K:N:")) != -1) {
+	while ((opt = getopt(argc, argv, "i:I:cmsSo:awM:K:")) != -1) {
+	while ((opt = getopt(argc, argv, "i:I:cmsSo:awM:K:N:")) != -1) {
 		switch (opt) {
 		case 'i':
 			kernel_read = optarg;
@@ -2091,6 +2092,9 @@ int main(int argc, char **argv)
 		case 'I':
 			module_read = optarg;
 			external_module = 1;
+			break;
+		case 'c':
+			cross_build = 1;
 			break;
 		case 'm':
 			modversions = 1;

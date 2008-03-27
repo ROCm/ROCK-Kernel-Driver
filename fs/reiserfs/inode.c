@@ -736,7 +736,7 @@ int reiserfs_get_block(struct inode *inode, sector_t block,
 			}
 			set_buffer_new(bh_result);
 			if (buffer_dirty(bh_result)
-			    && reiserfs_file_data_ordered(inode))
+			    && reiserfs_data_ordered(inode->i_sb))
 				reiserfs_add_ordered_list(inode, bh_result);
 			put_block_num(item, pos_in_item, allocated_block_nr);
 			unfm_ptr = allocated_block_nr;
@@ -1130,6 +1130,7 @@ static void init_inode(struct inode *inode, struct treepath *path)
 	mutex_init(&(REISERFS_I(inode)->i_mmap));
 	reiserfs_init_acl_access(inode);
 	reiserfs_init_acl_default(inode);
+	reiserfs_init_xattr_rwsem(inode);
 
 	if (stat_data_v1(ih)) {
 		struct stat_data_v1 *sd =
@@ -1752,8 +1753,7 @@ int reiserfs_new_inode(struct reiserfs_transaction_handle *th,
 		       /* 0 for regular, EMTRY_DIR_SIZE for dirs,
 		          strlen (symname) for symlinks) */
 		       loff_t i_size, struct dentry *dentry,
-		       struct inode *inode,
-		       struct reiserfs_security_handle *security)
+		       struct inode *inode)
 {
 	struct super_block *sb;
 	INITIALIZE_PATH(path_to_key);
@@ -1826,6 +1826,7 @@ int reiserfs_new_inode(struct reiserfs_transaction_handle *th,
 	mutex_init(&(REISERFS_I(inode)->i_mmap));
 	reiserfs_init_acl_access(inode);
 	reiserfs_init_acl_default(inode);
+	reiserfs_init_xattr_rwsem(inode);
 
 	if (old_format_only(sb))
 		make_le_item_head(&ih, NULL, KEY_FORMAT_3_5, SD_OFFSET,
@@ -1915,8 +1916,9 @@ int reiserfs_new_inode(struct reiserfs_transaction_handle *th,
 		goto out_inserted_sd;
 	}
 
+	/* XXX CHECK THIS */
 	if (reiserfs_posixacl(inode->i_sb)) {
-		retval = reiserfs_inherit_default_acl(th, dir, dentry, inode);
+		retval = reiserfs_inherit_default_acl(dir, dentry, inode);
 		if (retval) {
 			err = retval;
 			reiserfs_check_path(&path_to_key);
@@ -1929,19 +1931,6 @@ int reiserfs_new_inode(struct reiserfs_transaction_handle *th,
 				 "but vfs thinks they are!");
 	} else if (is_reiserfs_priv_object(dir)) {
 		reiserfs_mark_inode_private(inode);
-	}
-
-	if (security->name) {
-		retval = reiserfs_security_write(th, inode, security);
-		if (retval) {
-			err = retval;
-			reiserfs_check_path(&path_to_key);
-			retval = journal_end(th, th->t_super,
-					     th->t_blocks_allocated);
-			if (retval)
-				err = retval;
-			goto out_inserted_sd;
-		}
 	}
 
 	insert_inode_hash(inode);
@@ -1971,7 +1960,19 @@ int reiserfs_new_inode(struct reiserfs_transaction_handle *th,
       out_inserted_sd:
 	inode->i_nlink = 0;
 	th->t_trans_id = 0;	/* so the caller can't use this handle later */
-	iput(inode);
+
+	/* If we were inheriting an ACL, we need to release the lock so that
+	 * iput doesn't deadlock in reiserfs_delete_xattrs. The locking
+	 * code really needs to be reworked, but this will take care of it
+	 * for now. -jeffm */
+#ifdef CONFIG_REISERFS_FS_POSIX_ACL
+	if (REISERFS_I(dir)->i_acl_default && !IS_ERR(REISERFS_I(dir)->i_acl_default)) {
+		reiserfs_write_unlock_xattrs(dir->i_sb);
+		iput(inode);
+		reiserfs_write_lock_xattrs(dir->i_sb);
+	} else
+#endif
+		iput(inode);
 	return err;
 }
 

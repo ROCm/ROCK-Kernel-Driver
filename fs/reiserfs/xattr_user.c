@@ -6,6 +6,10 @@
 #include <linux/reiserfs_xattr.h>
 #include <asm/uaccess.h>
 
+#ifdef CONFIG_REISERFS_FS_POSIX_ACL
+# include <linux/reiserfs_acl.h>
+#endif
+
 #define XATTR_USER_PREFIX "user."
 
 static int
@@ -23,6 +27,7 @@ static int
 user_set(struct inode *inode, const char *name, const void *buffer,
 	 size_t size, int flags)
 {
+
 	if (strlen(name) < sizeof(XATTR_USER_PREFIX))
 		return -EINVAL;
 
@@ -31,23 +36,33 @@ user_set(struct inode *inode, const char *name, const void *buffer,
 	return reiserfs_xattr_set(inode, name, buffer, size, flags);
 }
 
-static size_t user_list(struct inode *inode, char *list, size_t list_size,
-			const char *name, size_t name_len)
+static int user_del(struct inode *inode, const char *name)
 {
-	const size_t len = name_len + 1;
+	if (strlen(name) < sizeof(XATTR_USER_PREFIX))
+		return -EINVAL;
 
 	if (!reiserfs_xattrs_user(inode->i_sb))
+		return -EOPNOTSUPP;
+	return 0;
+}
+
+static int
+user_list(struct inode *inode, const char *name, int namelen, char *out)
+{
+	int len = namelen;
+	if (!reiserfs_xattrs_user(inode->i_sb))
 		return 0;
-	if (list && len <= list_size) {
-		memcpy(list, name, name_len);
-		list[name_len] = '\0';
-	}
+
+	if (out)
+		memcpy(out, name, len);
+
 	return len;
 }
 
-struct xattr_handler reiserfs_xattr_user_handler = {
+struct reiserfs_xattr_handler user_handler = {
 	.prefix = XATTR_USER_PREFIX,
 	.get = user_get,
 	.set = user_set,
+	.del = user_del,
 	.list = user_list,
 };

@@ -199,9 +199,10 @@ int reiserfs_commit_page(struct inode *inode, struct page *page,
 				/* do data=ordered on any page past the end
 				 * of file and any buffer marked BH_New.
 				 */
-				if (reiserfs_file_data_ordered(inode) &&
-				    (new || page->index >= i_size_index))
+				if (reiserfs_data_ordered(inode->i_sb) &&
+				    (new || page->index >= i_size_index)) {
 					reiserfs_add_ordered_list(inode, bh);
+				}
 			}
 		}
 	}
