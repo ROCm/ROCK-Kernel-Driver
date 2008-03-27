@@ -1606,10 +1606,6 @@ static int reiserfs_fill_super(struct super_block *s, void *data, int silent)
 	REISERFS_SB(s)->s_alloc_options.preallocmin = 0;
 	/* Preallocate by 16 blocks (17-1) at once */
 	REISERFS_SB(s)->s_alloc_options.preallocsize = 17;
-#ifdef CONFIG_REISERFS_FS_XATTR
-	/* Initialize the rwsem for xattr dir */
-	init_rwsem(&REISERFS_SB(s)->xattr_dir_sem);
-#endif
 	/* setup default block allocator options */
 	reiserfs_init_alloc_options(s);
 
@@ -2194,9 +2190,6 @@ static int __init init_reiserfs_fs(void)
 		return ret;
 	}
 
-	if ((ret = reiserfs_xattr_register_handlers()))
-		goto failed_reiserfs_xattr_register_handlers;
-
 	reiserfs_proc_info_global_init();
 	reiserfs_proc_register_global("version",
 				      reiserfs_global_version_in_proc);
@@ -2207,9 +2200,6 @@ static int __init init_reiserfs_fs(void)
 		return 0;
 	}
 
-	reiserfs_xattr_unregister_handlers();
-
-      failed_reiserfs_xattr_register_handlers:
 	reiserfs_proc_unregister_global("version");
 	reiserfs_proc_info_global_done();
 	destroy_inodecache();
@@ -2219,7 +2209,6 @@ static int __init init_reiserfs_fs(void)
 
 static void __exit exit_reiserfs_fs(void)
 {
-	reiserfs_xattr_unregister_handlers();
 	reiserfs_proc_unregister_global("version");
 	reiserfs_proc_info_global_done();
 	unregister_filesystem(&reiserfs_fs_type);

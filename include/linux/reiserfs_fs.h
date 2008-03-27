@@ -82,7 +82,7 @@ struct fid;
 void __reiserfs_warning(struct super_block *s, const char *id,
 			 const char *func, const char *fmt, ...);
 #define reiserfs_warning(s, id, fmt, args...) \
-	 __reiserfs_warning(s, id, __FUNCTION__, fmt, ##args)
+	 __reiserfs_warning(s, id, __func__, fmt, ##args)
 /* assertions handling */
 
 /** always check a condition and panic if it's false. */
@@ -1619,6 +1619,10 @@ struct reiserfs_journal_header {
 #define JOURNAL_MAX_COMMIT_AGE 30
 #define JOURNAL_MAX_TRANS_AGE 30
 #define JOURNAL_PER_BALANCE_CNT (3 * (MAX_HEIGHT-2) + 9)
+#define JOURNAL_BLOCKS_PER_OBJECT(sb)  (JOURNAL_PER_BALANCE_CNT * 3 + \
+					 2 * (REISERFS_QUOTA_INIT_BLOCKS(sb) + \
+					      REISERFS_QUOTA_TRANS_BLOCKS(sb)))
+
 #ifdef CONFIG_QUOTA
 /* We need to update data and inode (atime) */
 #define REISERFS_QUOTA_TRANS_BLOCKS(s) (REISERFS_SB(s)->s_mount_opt & (1<<REISERFS_QUOTA) ? 2 : 0)
@@ -1719,6 +1723,14 @@ static inline int reiserfs_file_data_log(struct inode *inode)
 {
 	if (reiserfs_data_log(inode->i_sb) ||
 	    (REISERFS_I(inode)->i_flags & i_data_log))
+		return 1;
+	return 0;
+}
+
+static inline int reiserfs_file_data_ordered(struct inode *inode)
+{
+	if (reiserfs_data_ordered(inode->i_sb) ||
+	    (REISERFS_I(inode)->i_flags & i_data_ordered))
 		return 1;
 	return 0;
 }
@@ -1915,10 +1927,12 @@ void make_le_item_head(struct item_head *ih, const struct cpu_key *key,
 		       loff_t offset, int type, int length, int entry_count);
 struct inode *reiserfs_iget(struct super_block *s, const struct cpu_key *key);
 
+struct reiserfs_security_handle;
 int reiserfs_new_inode(struct reiserfs_transaction_handle *th,
 		       struct inode *dir, int mode,
 		       const char *symname, loff_t i_size,
-		       struct dentry *dentry, struct inode *inode);
+		       struct dentry *dentry, struct inode *inode,
+		       struct reiserfs_security_handle *security);
 
 void reiserfs_update_sd_size(struct reiserfs_transaction_handle *th,
 			     struct inode *inode, loff_t size);
@@ -2226,8 +2240,5 @@ long reiserfs_compat_ioctl(struct file *filp,
    would evolve into real per-fs locks */
 #define reiserfs_write_lock( sb ) lock_kernel()
 #define reiserfs_write_unlock( sb ) unlock_kernel()
-
-/* xattr stuff */
-#define REISERFS_XATTR_DIR_SEM(s) (REISERFS_SB(s)->xattr_dir_sem)
 
 #endif				/* _LINUX_REISER_FS_H */

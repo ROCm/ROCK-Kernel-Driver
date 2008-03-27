@@ -2633,7 +2633,7 @@ static int journal_init_dev(struct super_block *super,
 	if (!IS_ERR(journal->j_dev_file)) {
 		struct inode *jdev_inode = journal->j_dev_file->f_mapping->host;
 		if (!S_ISBLK(jdev_inode->i_mode)) {
-			reiserfs_warning(super, "reiserfs-459", "'%s' is "
+			reiserfs_warning(super, "journal_init_dev: '%s' is "
 					 "not a block device", jdev_name);
 			result = -ENOTBLK;
 			release_journal_dev(super, journal);
@@ -2648,7 +2648,8 @@ static int journal_init_dev(struct super_block *super,
 	} else {
 		result = PTR_ERR(journal->j_dev_file);
 		journal->j_dev_file = NULL;
-		reiserfs_warning(super, "reiserfs-460", "Cannot open '%s': %i",
+		reiserfs_warning(super,
+				 "journal_init_dev: Cannot open '%s': %i",
 				 jdev_name, result);
 	}
 	return result;
@@ -2682,14 +2683,14 @@ static int check_advise_trans_params(struct super_block *sb,
 		    journal->j_trans_max < JOURNAL_TRANS_MIN_DEFAULT / ratio ||
 		    SB_ONDISK_JOURNAL_SIZE(sb) / journal->j_trans_max <
 		    JOURNAL_MIN_RATIO) {
-		        reiserfs_warning(sb, "sh-462",
+			reiserfs_warning(sb, "sh-462",
 					 "bad transaction max size (%u). "
 					 "FSCK?", journal->j_trans_max);
 			return 1;
 		}
 		if (journal->j_max_batch != (journal->j_trans_max) *
 		        JOURNAL_MAX_BATCH_DEFAULT/JOURNAL_TRANS_MAX_DEFAULT) {
-		        reiserfs_warning(sb, "sh-463",
+			reiserfs_warning(sb, "sh-463",
 					 "bad transaction max batch (%u). "
 					 "FSCK?", journal->j_max_batch);
 			return 1;
@@ -2699,9 +2700,9 @@ static int check_advise_trans_params(struct super_block *sb,
                    The file system was created by old version
 		   of mkreiserfs, so some fields contain zeros,
 		   and we need to advise proper values for them */
-	        if (sb->s_blocksize != REISERFS_STANDARD_BLKSIZE) {
-	                reiserfs_warning(sb, "sh-464", "bad blocksize (%u)",
-				         sb->s_blocksize);
+		if (sb->s_blocksize != REISERFS_STANDARD_BLKSIZE) {
+			reiserfs_warning(sb, "sh-464", "bad blocksize (%u)",
+					 sb->s_blocksize);
 			return 1;
 		}
 		journal->j_trans_max = JOURNAL_TRANS_MAX_DEFAULT;
@@ -3732,7 +3733,7 @@ int journal_mark_freed(struct reiserfs_transaction_handle *th,
 				set_bit(BLOCK_FREED, &cn->state);
 				if (cn->bh) {
 					if (!cleaned) {
-						/* remove_from_transaction will brelse the buffer if it was
+						/* remove_from_transaction will brelse the buffer if it was 
 						 ** in the current trans
 						 */
 						clear_buffer_journal_dirty(cn->
@@ -3745,8 +3746,8 @@ int journal_mark_freed(struct reiserfs_transaction_handle *th,
 						if (atomic_read
 						    (&(cn->bh->b_count)) < 0) {
 							reiserfs_warning(sb,
-									 "journal-2138",
-									 "cn->bh->b_count < 0");
+								 "journal-2138",
+								 "cn->bh->b_count < 0");
 						}
 					}
 					if (cn->jlist) {	/* since we are clearing the bh, we MUST dec nonzerolen */

@@ -1473,10 +1473,10 @@ static int balance_leaf(struct tree_balance *tb, struct item_head *ih,	/* item h
 					    && (pos_in_item != ih_item_len(ih)
 						|| tb->insert_size[0] <= 0))
 						reiserfs_panic(tb->tb_sb,
-							       "PAP-12235",
-							       "pos_in_item "
-							       "must be equal "
-							       "to ih_item_len");
+							     "PAP-12235",
+							     "pos_in_item "
+							     "must be equal "
+							     "to ih_item_len");
 #endif				/* CONFIG_REISERFS_CHECK */
 
 					ret_val =
@@ -1682,10 +1682,11 @@ static int balance_leaf(struct tree_balance *tb, struct item_head *ih,	/* item h
 							print_cur_tb("12285");
 							reiserfs_panic(tb->
 								       tb_sb,
-								       "PAP-12285", "insert_size must be 0 (%d)",
-								       tb->
-								       insert_size
-								       [0]);
+							    "PAP-12285",
+							    "insert_size "
+							    "must be 0 "
+							    "(%d)",
+							    tb->insert_size[0]);
 						}
 					}
 #endif				/* CONFIG_REISERFS_CHECK */
