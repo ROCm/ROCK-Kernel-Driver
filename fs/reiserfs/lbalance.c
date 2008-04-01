@@ -626,7 +626,7 @@ static void leaf_define_dest_src_infos(int shift_mode, struct tree_balance *tb,
 		reiserfs_panic(sb_from_bi(src_bi), "vs-10250",
 			       "shift type is unknown (%d)", shift_mode);
 	}
-	RFALSE(src_bi->bi_bh == 0 || dest_bi->bi_bh == 0,
+	RFALSE(!src_bi->bi_bh || !dest_bi->bi_bh,
 	       "vs-10260: mode==%d, source (%p) or dest (%p) buffer is initialized incorrectly",
 	       shift_mode, src_bi->bi_bh, dest_bi->bi_bh);
 }
