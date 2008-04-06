@@ -554,13 +554,26 @@ fill_with_dentries(void *buf, const char *name, int namelen, loff_t offset,
 	if (IS_ERR(dentry)) {
 		return PTR_ERR(dentry);
 	} else if (!dentry->d_inode) {
-		/* This should never happen */
+		/* A directory entry exists, but no file? */
+		reiserfs_error(dentry->d_sb, "xattr-20003",
+			       "Corrupted directory: xattr %s listed but "
+			       "not found for file %s.\n",
+			       dentry->d_name.name, dbuf->xadir->d_name.name);
 		dput(dentry);
-		return -ENODATA;
+		return -EIO;
 	}
 
 	dbuf->dentries[dbuf->count++] = dentry;
 	return 0;
+}
+
+static void
+cleanup_dentry_buf(struct reiserfs_dentry_buf *buf)
+{
+	int i;
+	for (i = 0; i < buf->count; i++)
+		if (buf->dentries[i])
+			dput(buf->dentries[i]);
 }
 
 typedef int(*xattr_action)(struct dentry *dentry, void *data);
@@ -569,12 +582,11 @@ static int reiserfs_for_each_xattr(struct inode *inode, xattr_action action,
 				   void *data)
 {
 	struct dentry *root, *dir;
-	int i, err = -ENODATA;
+	int i, err = 0;
+	loff_t pos = 0;
 	struct reiserfs_dentry_buf buf = {
 		.count = 0,
 	};
-
-	struct file *file;
 
 	/* Skip out, an xattr has no xattrs associated with it */
 	if (is_reiserfs_priv_object(inode) ||
@@ -585,10 +597,8 @@ static int reiserfs_for_each_xattr(struct inode *inode, xattr_action action,
 
 	/* root becomes locked */
 	root = open_xa_root(inode->i_sb, XATTR_REPLACE);
-	if (IS_ERR(root)) {
-		err = PTR_ERR(root);
-		goto out;
-	}
+	if (IS_ERR(root))
+		return PTR_ERR(root);
 
 	/* dir becomes locked */
 	dir = __open_xa_dir(inode, root, XATTR_REPLACE);
@@ -597,17 +607,8 @@ static int reiserfs_for_each_xattr(struct inode *inode, xattr_action action,
 		goto out_unlock;
 	}
 
-	file = get_empty_filp();
-	if (!file) {
-		dput(dir);
-		err = -ENOMEM;
-		goto out_unlock;
-	}
-
-	/* This and ->f_pos are all reiserfs_readdir needs */
-	file->f_path.dentry = dir;
 	buf.xadir = dir;
-	err = reiserfs_readdir(file, &buf, fill_with_dentries);
+	err = reiserfs_readdir_dentry(dir, &buf, fill_with_dentries, &pos);
 	while ((err == 0 || err == -ENOSPC) && buf.count) {
 		err = 0;
 
@@ -620,34 +621,27 @@ static int reiserfs_for_each_xattr(struct inode *inode, xattr_action action,
 
 			dput(dentry);
 			buf.dentries[i] = NULL;
-
-			if (lerr)
-				err = lerr;
+			err = lerr ?: err;
 		}
 		buf.count = 0;
 		if (err == 0)
-			err = reiserfs_readdir(file, &buf, fill_with_dentries);
+			err = reiserfs_readdir_dentry(dir, &buf,
+						      fill_with_dentries, &pos);
 	}
 	mutex_unlock(&dir->d_inode->i_mutex);
 
-	for (i = 0; i < buf.count; i++)
-		if (buf.dentries[i])
-			dput(buf.dentries[i]);
+	/* Clean up after a failed readdir */
+	cleanup_dentry_buf(&buf);
 
 	/* root is still locked, so operations on dir are protected */
 	if (!err)
 		err = action(dir, data);
 
-	fput(file);
+	dput(dir);
 
 out_unlock:
 	mutex_unlock(&root->d_inode->i_mutex);
 	dput(root);
-
-out:
-	if (err == -ENODATA)
-		err = 0;
-
 	return err;
 }
 
@@ -657,9 +651,9 @@ static int delete_one_xattr(struct dentry *dentry, void *data)
 
 	/* This is the xattr dir, handle specially. */
 	if (S_ISDIR(dentry->d_inode->i_mode))
-		return vfs_rmdir(dir, dentry, NULL);
+		return vfs_rmdir(dir, dentry);
 
-	return vfs_unlink(dir, dentry, NULL);
+	return vfs_unlink(dir, dentry);
 }
 
 static int chown_one_xattr(struct dentry *dentry, void *data)
@@ -793,7 +787,7 @@ ssize_t reiserfs_listxattr(struct dentry * dentry, char *buffer, size_t size)
 {
 	struct dentry *dir;
 	int err = 0;
-	struct file *file;
+	loff_t pos = 0;
 	struct listxattr_buf buf = {
 		.inode = dentry->d_inode,
 		.buf = buffer,
@@ -815,17 +809,7 @@ ssize_t reiserfs_listxattr(struct dentry * dentry, char *buffer, size_t size)
 		goto out;
 	}
 
-	file = get_empty_filp();
-	if (!file) {
-		err = -ENOMEM;
-		goto out_dir;
-	}
-
-	/* This and ->f_pos are all reiserfs_readdir needs */
-	file->f_path.dentry = dget(dir);
-	err = reiserfs_readdir(file, &buf, listxattr_filler);
-
-	fput(file);
+	err = reiserfs_readdir_dentry(dir, &buf, listxattr_filler, &pos);
 	if (err)
 		goto out_dir;
 
