@@ -651,9 +651,9 @@ static int delete_one_xattr(struct dentry *dentry, void *data)
 
 	/* This is the xattr dir, handle specially. */
 	if (S_ISDIR(dentry->d_inode->i_mode))
-		return vfs_rmdir(dir, dentry);
+		return vfs_rmdir(dir, dentry, NULL);
 
-	return vfs_unlink(dir, dentry);
+	return vfs_unlink(dir, dentry, NULL);
 }
 
 static int chown_one_xattr(struct dentry *dentry, void *data)
