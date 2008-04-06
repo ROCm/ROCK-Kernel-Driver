@@ -12,7 +12,6 @@
 
 extern const struct reiserfs_key MIN_KEY;
 
-static int reiserfs_readdir(struct file *, void *, filldir_t);
 static int reiserfs_dir_fsync(struct file *filp, struct dentry *dentry,
 			      int datasync);
 
@@ -42,7 +41,7 @@ static int reiserfs_dir_fsync(struct file *filp, struct dentry *dentry,
 #define store_ih(where,what) copy_item_head (where, what)
 
 //
-static int reiserfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
+int reiserfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 {
 	struct inode *inode = filp->f_path.dentry->d_inode;
 	struct cpu_key pos_key;	/* key of current position in the directory (key of directory entry) */

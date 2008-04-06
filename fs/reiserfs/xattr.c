@@ -211,21 +211,6 @@ out:
 	return xafile;
 }
 
-static int xattr_readdir(struct dentry *dentry, void *buf, filldir_t filler)
-{
-	struct file *fp;
-	int err;
-
-	fp = dentry_open(dentry, NULL, O_RDONLY|O_NOATIME|O_DIRECTORY);
-	if (IS_ERR(fp))
-		return PTR_ERR(fp);
-
-	err = fp->f_op->readdir(fp, buf, filler);
-
-	fput(fp);
-	return err;
-}
-
 /* Internal operations on file data */
 static inline void reiserfs_put_page(struct page *page)
 {
@@ -589,6 +574,8 @@ static int reiserfs_for_each_xattr(struct inode *inode, xattr_action action,
 		.count = 0,
 	};
 
+	struct file *file;
+
 	/* Skip out, an xattr has no xattrs associated with it */
 	if (is_reiserfs_priv_object(inode) ||
 	    get_inode_sd_version(inode) == STAT_DATA_V1 ||
@@ -610,8 +597,17 @@ static int reiserfs_for_each_xattr(struct inode *inode, xattr_action action,
 		goto out_unlock;
 	}
 
+	file = get_empty_filp();
+	if (!file) {
+		dput(dir);
+		err = -ENOMEM;
+		goto out_unlock;
+	}
+
+	/* This and ->f_pos are all reiserfs_readdir needs */
+	file->f_path.dentry = dir;
 	buf.xadir = dir;
-	err = xattr_readdir(dir, &buf, fill_with_dentries);
+	err = reiserfs_readdir(file, &buf, fill_with_dentries);
 	while ((err == 0 || err == -ENOSPC) && buf.count) {
 		err = 0;
 
@@ -630,7 +626,7 @@ static int reiserfs_for_each_xattr(struct inode *inode, xattr_action action,
 		}
 		buf.count = 0;
 		if (err == 0)
-			err = xattr_readdir(dir, &buf, fill_with_dentries);
+			err = reiserfs_readdir(file, &buf, fill_with_dentries);
 	}
 	mutex_unlock(&dir->d_inode->i_mutex);
 
@@ -638,10 +634,11 @@ static int reiserfs_for_each_xattr(struct inode *inode, xattr_action action,
 		if (buf.dentries[i])
 			dput(buf.dentries[i]);
 
+	/* root is still locked, so operations on dir are protected */
 	if (!err)
 		err = action(dir, data);
 
-	dput(dir);
+	fput(file);
 
 out_unlock:
 	mutex_unlock(&root->d_inode->i_mutex);
@@ -651,13 +648,9 @@ out:
 	if (err == -ENODATA)
 		err = 0;
 
-	if (err)
-		reiserfs_warning(inode->i_sb, "jdm-20005",
-				 "Couldn't chown all xattrs (%d)\n", err);
 	return err;
 }
 
-/* dir->i_mutex is locked */
 static int delete_one_xattr(struct dentry *dentry, void *data)
 {
 	struct inode *dir = dentry->d_parent->d_inode;
@@ -669,21 +662,34 @@ static int delete_one_xattr(struct dentry *dentry, void *data)
 	return vfs_unlink(dir, dentry, NULL);
 }
 
-/* dir->i_mutex is locked */
 static int chown_one_xattr(struct dentry *dentry, void *data)
 {
 	struct iattr *attrs = data;
-	return notify_change(dentry, NULL, attrs);
+	int error;
+	if (S_ISDIR(dentry->d_inode->i_mode))
+		mutex_lock_nested(&dentry->d_inode->i_mutex, I_MUTEX_XATTR);
+	error = notify_change(dentry, NULL, attrs);
+	if (S_ISDIR(dentry->d_inode->i_mode))
+		mutex_unlock(&dentry->d_inode->i_mutex);
+	return error;
 }
 
 int reiserfs_delete_xattrs(struct inode *inode)
 {
-	return reiserfs_for_each_xattr(inode, delete_one_xattr, NULL);
+	int err = reiserfs_for_each_xattr(inode, delete_one_xattr, NULL);
+	if (err)
+		reiserfs_warning(inode->i_sb, "jdm-20004",
+				 "Couldn't delete all xattrs (%d)\n", err);
+	return err;
 }
 
 int reiserfs_chown_xattrs(struct inode *inode, struct iattr *attrs)
 {
-	return reiserfs_for_each_xattr(inode, chown_one_xattr, attrs);
+	int err = reiserfs_for_each_xattr(inode, chown_one_xattr, attrs);
+	if (err)
+		reiserfs_warning(inode->i_sb, "jdm-20005",
+				 "Couldn't chown all xattrs (%d)\n", err);
+	return err;
 }
 
 /* Actual operations that are exported to VFS-land */
@@ -787,6 +793,7 @@ ssize_t reiserfs_listxattr(struct dentry * dentry, char *buffer, size_t size)
 {
 	struct dentry *dir;
 	int err = 0;
+	struct file *file;
 	struct listxattr_buf buf = {
 		.inode = dentry->d_inode,
 		.buf = buffer,
@@ -808,7 +815,17 @@ ssize_t reiserfs_listxattr(struct dentry * dentry, char *buffer, size_t size)
 		goto out;
 	}
 
-	err = xattr_readdir(dir, &buf, listxattr_filler);
+	file = get_empty_filp();
+	if (!file) {
+		err = -ENOMEM;
+		goto out_dir;
+	}
+
+	/* This and ->f_pos are all reiserfs_readdir needs */
+	file->f_path.dentry = dget(dir);
+	err = reiserfs_readdir(file, &buf, listxattr_filler);
+
+	fput(file);
 	if (err)
 		goto out_dir;
 
