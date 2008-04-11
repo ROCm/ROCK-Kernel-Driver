@@ -336,7 +336,7 @@ asmlinkage long sys_ftruncate(unsigned int fd, unsigned long length)
 {
 	long ret = do_sys_ftruncate(fd, length, 1);
 	/* avoid REGPARM breakage on x86: */
-	prevent_tail_call(ret);
+	asmlinkage_protect(2, ret, fd, length);
 	return ret;
 }
 
@@ -351,7 +351,7 @@ asmlinkage long sys_ftruncate64(unsigned int fd, loff_t length)
 {
 	long ret = do_sys_ftruncate(fd, length, 0);
 	/* avoid REGPARM breakage on x86: */
-	prevent_tail_call(ret);
+	asmlinkage_protect(2, ret, fd, length);
 	return ret;
 }
 #endif
@@ -1074,7 +1074,7 @@ asmlinkage long sys_open(const char __user *filename, int flags, int mode)
 
 	ret = do_sys_open(AT_FDCWD, filename, flags, mode);
 	/* avoid REGPARM breakage on x86: */
-	prevent_tail_call(ret);
+	asmlinkage_protect(3, ret, filename, flags, mode);
 	return ret;
 }
 
@@ -1088,7 +1088,7 @@ asmlinkage long sys_openat(int dfd, const char __user *filename, int flags,
 
 	ret = do_sys_open(dfd, filename, flags, mode);
 	/* avoid REGPARM breakage on x86: */
-	prevent_tail_call(ret);
+	asmlinkage_protect(4, ret, dfd, filename, flags, mode);
 	return ret;
 }
 

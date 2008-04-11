@@ -1611,7 +1611,7 @@ asmlinkage long sys_waitid(int which, pid_t upid,
 	put_pid(pid);
 
 	/* avoid REGPARM breakage on x86: */
-	prevent_tail_call(ret);
+	asmlinkage_protect(5, ret, which, upid, infop, options, ru);
 	return ret;
 }
 
@@ -1643,7 +1643,7 @@ asmlinkage long sys_wait4(pid_t upid, int __user *stat_addr,
 	put_pid(pid);
 
 	/* avoid REGPARM breakage on x86: */
-	prevent_tail_call(ret);
+	asmlinkage_protect(4, ret, upid, stat_addr, options, ru);
 	return ret;
 }
 
