@@ -597,8 +597,10 @@ static int reiserfs_for_each_xattr(struct inode *inode, xattr_action action,
 
 	/* root becomes locked */
 	root = open_xa_root(inode->i_sb, XATTR_REPLACE);
-	if (IS_ERR(root))
-		return PTR_ERR(root);
+	if (IS_ERR(root)) {
+		err = PTR_ERR(root);
+		goto out;
+	}
 
 	/* dir becomes locked */
 	dir = __open_xa_dir(inode, root, XATTR_REPLACE);
@@ -642,6 +644,10 @@ static int reiserfs_for_each_xattr(struct inode *inode, xattr_action action,
 out_unlock:
 	mutex_unlock(&root->d_inode->i_mutex);
 	dput(root);
+out:
+	/* -ENODATA isn't an error */
+	if (err == -ENODATA)
+		err = 0;
 	return err;
 }
 
