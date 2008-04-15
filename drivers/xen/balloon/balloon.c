@@ -197,11 +197,10 @@ static unsigned long current_target(void)
 
 static unsigned long minimum_target(void)
 {
-	unsigned long min_pages;
-	unsigned long curr_pages = current_target();
 #ifndef CONFIG_XEN
-#define max_pfn totalram_pages
-#endif
+	return 0;
+#else
+	unsigned long min_pages, curr_pages = current_target();
 
 #define MB2PAGES(mb) ((mb) << (20 - PAGE_SHIFT))
 	/* Simple continuous piecewiese linear function:
@@ -227,8 +226,8 @@ static unsigned long minimum_target(void)
 #undef MB2PAGES
 
 	/* Don't enforce growth */
-	return min_pages < curr_pages ? min_pages : curr_pages;
-#undef max_pfn
+	return min(min_pages, curr_pages);
+#endif
 }
 
 static int increase_reservation(unsigned long nr_pages)
@@ -419,20 +418,9 @@ static void balloon_process(struct work_struct *unused)
 /* Resets the Xen limit, sets new target, and kicks off processing. */
 void balloon_set_new_target(unsigned long target)
 {
-	/* First make sure that we are not lowering the value below the
-	 * "minimum".
-	 */
-	unsigned long min_pages = minimum_target();
-
-	if (target < min_pages)
-		target = min_pages;
-
-	printk(KERN_INFO "Setting mem allocation to %lu kiB\n",
-	       PAGES2KB(target));
-
 	/* No need for lock. Not read-modify-write updates. */
 	bs.hard_limit   = ~0UL;
-	bs.target_pages = target;
+	bs.target_pages = max(target, minimum_target());
 	schedule_work(&balloon_worker);
 }
 

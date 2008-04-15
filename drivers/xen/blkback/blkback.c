@@ -175,8 +175,8 @@ static void fast_flush_area(pending_req_t *req)
 		handle = pending_handle(req, i);
 		if (handle == BLKBACK_INVALID_HANDLE)
 			continue;
-		gnttab_set_unmap_op(&unmap[i], vaddr(req, i), GNTMAP_host_map,
-				    handle);
+		gnttab_set_unmap_op(&unmap[invcount], vaddr(req, i),
+				    GNTMAP_host_map, handle);
 		pending_handle(req, i) = BLKBACK_INVALID_HANDLE;
 		invcount++;
 	}

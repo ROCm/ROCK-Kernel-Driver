@@ -197,8 +197,13 @@ int netback_accel_fwd_add(const __u8 *mac, void *context, void *fwd_priv)
 	index = rc;
 
 	/* Shouldn't already be in the table */
-	BUG_ON(cuckoo_hash_lookup(&fwd_set->fwd_hash_table,
-				  (cuckoo_hash_key *)(&key), &rc) != 0);
+	if (cuckoo_hash_lookup(&fwd_set->fwd_hash_table,
+			       (cuckoo_hash_key *)(&key), &rc) != 0) {
+		spin_unlock_irqrestore(&fwd_set->fwd_lock, flags);
+		EPRINTK("MAC address " MAC_FMT " already accelerated.\n",
+			MAC_ARG(mac));
+		return -EEXIST;
+	}
 
 	if ((rc = cuckoo_hash_add(&fwd_set->fwd_hash_table,
 				  (cuckoo_hash_key *)(&key), index, 1)) == 0) {

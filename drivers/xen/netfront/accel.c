@@ -71,7 +71,7 @@ void netif_init_accel(void)
 	INIT_LIST_HEAD(&accelerators_list);
 	spin_lock_init(&accelerators_lock);
 
-	accel_watch_workqueue = create_workqueue("accel_watch");
+	accel_watch_workqueue = create_workqueue("net_accel");
 }
 
 void netif_exit_accel(void)

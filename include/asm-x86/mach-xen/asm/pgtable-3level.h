@@ -140,8 +140,10 @@ static inline int pte_none(pte_t pte)
 			 ((_pte).pte_high << (32-PAGE_SHIFT)))
 #define pte_mfn(_pte) ((_pte).pte_low & _PAGE_PRESENT ? \
 	__pte_mfn(_pte) : pfn_to_mfn(__pte_mfn(_pte)))
-#define pte_pfn(_pte) ((_pte).pte_low & _PAGE_PRESENT ? \
-	mfn_to_local_pfn(__pte_mfn(_pte)) : __pte_mfn(_pte))
+#define pte_pfn(_pte) ((_pte).pte_low & _PAGE_IO ? max_mapnr :	\
+		       (_pte).pte_low & _PAGE_PRESENT ?		\
+		       mfn_to_local_pfn(__pte_mfn(_pte)) :	\
+		       __pte_mfn(_pte))
 
 /*
  * Bits 0, 6 and 7 are taken in the low part of the pte,

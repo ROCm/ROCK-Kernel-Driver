@@ -77,6 +77,39 @@ do {							\
 	}						\
 } while (0)
 
+static int check_pages_physically_contiguous(unsigned long pfn, 
+					     unsigned int offset,
+					     size_t length)
+{
+	unsigned long next_mfn;
+	int i;
+	int nr_pages;
+	
+	next_mfn = pfn_to_mfn(pfn);
+	nr_pages = (offset + length + PAGE_SIZE-1) >> PAGE_SHIFT;
+	
+	for (i = 1; i < nr_pages; i++) {
+		if (pfn_to_mfn(++pfn) != ++next_mfn) 
+			return 0;
+	}
+	return 1;
+}
+
+int range_straddles_page_boundary(paddr_t p, size_t size)
+{
+	extern unsigned long *contiguous_bitmap;
+	unsigned long pfn = p >> PAGE_SHIFT;
+	unsigned int offset = p & ~PAGE_MASK;
+
+	if (offset + size <= PAGE_SIZE)
+		return 0;
+	if (test_bit(pfn, contiguous_bitmap))
+		return 0;
+	if (check_pages_physically_contiguous(pfn, offset, size))
+		return 0;
+	return 1;
+}
+
 int
 dma_map_sg(struct device *hwdev, struct scatterlist *sgl, int nents,
 	   enum dma_data_direction direction)
@@ -407,3 +440,23 @@ dma_sync_single_for_device(struct device *dev, dma_addr_t dma_handle, size_t siz
 		swiotlb_sync_single_for_device(dev, dma_handle, size, direction);
 }
 EXPORT_SYMBOL(dma_sync_single_for_device);
+
+void
+dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg, int nelems,
+		    enum dma_data_direction direction)
+{
+	if (swiotlb)
+		swiotlb_sync_sg_for_cpu(dev,sg,nelems,direction);
+	flush_write_buffers();
+}
+EXPORT_SYMBOL(dma_sync_sg_for_cpu);
+
+void
+dma_sync_sg_for_device(struct device *dev, struct scatterlist *sg, int nelems,
+		    enum dma_data_direction direction)
+{
+	if (swiotlb)
+		swiotlb_sync_sg_for_device(dev,sg,nelems,direction);
+	flush_write_buffers();
+}
+EXPORT_SYMBOL(dma_sync_sg_for_device);

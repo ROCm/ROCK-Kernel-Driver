@@ -347,7 +347,6 @@ static int pciback_reconfigure(struct pciback_device *pdev)
 			substate = XenbusStateUnknown;
 
 		switch (substate) {
-		/* case XenbusStateUnknown: */
 		case XenbusStateInitialising:
 			dev_dbg(&pdev->xdev->dev, "Attaching dev-%d ...\n", i);
 
@@ -381,17 +380,22 @@ static int pciback_reconfigure(struct pciback_device *pdev)
 			if (err)
 				goto out;
 
-			/* TODO: if we are to support multiple pci roots
-			 * (CONFIG_XEN_PCIDEV_BACKEND_PASS), publish newly
-			 * added root here.
-			 */
+			/* Publish pci roots. */
+			err = pciback_publish_pci_roots(pdev, pciback_publish_pci_root);
+			if (err) {
+				xenbus_dev_fatal(pdev->xdev, err,
+						 "Error while publish PCI root"
+						 "buses for frontend");
+				goto out;
+			}
 
 			err = xenbus_printf(XBT_NIL, pdev->xdev->nodename,
 					    state_str, "%d",
 					    XenbusStateInitialised);
 			if (err) {
 				xenbus_dev_fatal(pdev->xdev, err,
-						 "Error switching substate of " 						 "dev-%d\n", i);
+						 "Error switching substate of "
+						 "dev-%d\n", i);
 				goto out;
 			}	
 			break;
@@ -429,10 +433,11 @@ static int pciback_reconfigure(struct pciback_device *pdev)
 			if(err)
 				goto out;
 
-			/* TODO: if we are to support multiple pci roots
-			 * (CONFIG_XEN_PCIDEV_BACKEND_PASS), remove unnecessary
-			 * root here.
+			/* TODO: If at some point we implement support for pci
+			 * root hot-remove on pcifront side, we'll need to
+			 * remove unnecessary xenstore nodes of pci roots here.
 			 */
+
 			break;
 
 		default:

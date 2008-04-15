@@ -366,10 +366,14 @@ static int talk_to_backend(struct xenbus_device *dev,
 	struct xenbus_transaction xbt;
 	int err;
 
-	err = xen_net_read_mac(dev, info->mac);
-	if (err) {
-		xenbus_dev_fatal(dev, err, "parsing %s/mac", dev->nodename);
-		goto out;
+	/* Read mac only in the first setup. */
+	if (!is_valid_ether_addr(info->mac)) {
+		err = xen_net_read_mac(dev, info->mac);
+		if (err) {
+			xenbus_dev_fatal(dev, err, "parsing %s/mac",
+					 dev->nodename);
+			goto out;
+		}
 	}
 
 	/* Create shared ring, alloc event channel. */
@@ -1027,6 +1031,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	np->stats.tx_bytes += skb->len;
 	np->stats.tx_packets++;
+	dev->trans_start = jiffies;
 
 	/* Note: It is not safe to access skb after network_tx_buf_gc()! */
 	network_tx_buf_gc(dev);
@@ -1059,6 +1064,7 @@ static irqreturn_t netif_int(int irq, void *dev_id)
 			netfront_accelerator_call_stop_napi_irq(np, dev);
 
 			netif_rx_schedule(dev, &np->napi);
+			dev->last_rx = jiffies;
 		}
 	}
 
@@ -1684,6 +1690,23 @@ static struct net_device_stats *network_get_stats(struct net_device *dev)
 	return &np->stats;
 }
 
+static int xennet_set_mac_address(struct net_device *dev, void *p)
+{
+	struct netfront_info *np = netdev_priv(dev);
+	struct sockaddr *addr = p;
+
+	if (netif_running(dev))
+		return -EBUSY;
+
+	if (!is_valid_ether_addr(addr->sa_data))
+		return -EADDRNOTAVAIL;
+
+	memcpy(dev->dev_addr, addr->sa_data, dev->addr_len);
+	memcpy(np->mac, addr->sa_data, ETH_ALEN);
+
+	return 0;
+}
+
 static int xennet_change_mtu(struct net_device *dev, int mtu)
 {
 	int max = xennet_can_sg(dev) ? 65535 - ETH_HLEN : ETH_DATA_LEN;
@@ -2065,6 +2088,7 @@ static struct net_device * __devinit create_netdev(struct xenbus_device *dev)
 	netif_napi_add(netdev, &np->napi, netif_poll, 64);
 	netdev->set_multicast_list = network_set_multicast_list;
 	netdev->uninit          = netif_uninit;
+	netdev->set_mac_address	= xennet_set_mac_address;
 	netdev->change_mtu	= xennet_change_mtu;
 	netdev->features        = NETIF_F_IP_CSUM;
 

@@ -92,25 +92,4 @@ static int __init acpi_sleep_setup(char *str)
 }
 
 __setup("acpi_sleep=", acpi_sleep_setup);
-
-#else /* CONFIG_ACPI_PV_SLEEP */
-#include <asm/hypervisor.h>
-#include <xen/interface/platform.h>
-int acpi_notify_hypervisor_state(u8 sleep_state,
-	u32 pm1a_cnt, u32 pm1b_cnt)
-{
-	struct xen_platform_op op = {
-		.cmd = XENPF_enter_acpi_sleep,
-		.interface_version = XENPF_INTERFACE_VERSION,
-		.u = {
-			.enter_acpi_sleep = {
-				.pm1a_cnt_val = (u16)pm1a_cnt,
-				.pm1b_cnt_val = (u16)pm1b_cnt,
-				.sleep_state = sleep_state,
-			},
-		},
-	};
-
-	return HYPERVISOR_platform_op(&op);
-}
 #endif /* CONFIG_ACPI_PV_SLEEP */

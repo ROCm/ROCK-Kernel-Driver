@@ -103,6 +103,10 @@ static ssize_t uuid_show(struct hyp_sysfs_attr *attr, char *buffer)
 {
 	char *vm, *val;
 	int ret;
+	extern int xenstored_ready;
+
+	if (!xenstored_ready)
+		return -EBUSY;
 
 	vm = xenbus_read(XBT_NIL, "vm", "", NULL);
 	if (IS_ERR(vm))

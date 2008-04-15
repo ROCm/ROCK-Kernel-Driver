@@ -191,8 +191,10 @@ static inline unsigned long pmd_bad(pmd_t pmd)
 #define __pte_mfn(_pte) (((_pte).pte & PTE_MASK) >> PAGE_SHIFT)
 #define pte_mfn(_pte) ((_pte).pte & _PAGE_PRESENT ? \
 	__pte_mfn(_pte) : pfn_to_mfn(__pte_mfn(_pte)))
-#define pte_pfn(_pte) ((_pte).pte & _PAGE_PRESENT ? \
-	mfn_to_local_pfn(__pte_mfn(_pte)) : __pte_mfn(_pte))
+#define pte_pfn(_pte) ((_pte).pte & _PAGE_IO ? max_mapnr :	\
+		       (_pte).pte & _PAGE_PRESENT ?		\
+		       mfn_to_local_pfn(__pte_mfn(_pte)) :	\
+		       __pte_mfn(_pte))
 
 #define pte_page(x)	pfn_to_page(pte_pfn(x))
 

@@ -1066,7 +1066,7 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 			if (map[offset] != NULL) {
 			        if (pages) {
 			                struct page *page = map[offset];
-
+					
 					pages[i] = page;
 					get_page(page);
 				}

@@ -297,6 +297,16 @@ static void xenkbd_backend_changed(struct xenbus_device *dev,
 		 */
 		if (dev->state != XenbusStateConnected)
 			goto InitWait; /* no InitWait seen yet, fudge it */
+
+		/* Set input abs params to match backend screen res */
+		if (xenbus_scanf(XBT_NIL, info->xbdev->otherend,
+				   "width", "%d", &val) > 0 )
+			input_set_abs_params(info->ptr, ABS_X, 0, val, 0, 0);
+
+		if (xenbus_scanf(XBT_NIL, info->xbdev->otherend,
+				   "height", "%d", &val) > 0 )
+			input_set_abs_params(info->ptr, ABS_Y, 0, val, 0, 0);
+
 		break;
 
 	case XenbusStateClosing:

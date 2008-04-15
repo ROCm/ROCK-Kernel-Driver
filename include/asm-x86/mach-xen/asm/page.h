@@ -12,11 +12,13 @@
 
 /*
  * Need to repeat this here in order to not include pgtable.h (which in turn
- * depends on definitions made here), but to be able to use the symbolic
+ * depends on definitions made here), but to be able to use the symbolics
  * below. The preprocessor will warn if the two definitions aren't identical.
  */
 #define _PAGE_BIT_PRESENT	0
 #define _PAGE_PRESENT		(_AC(1, L)<<_PAGE_BIT_PRESENT)
+#define _PAGE_BIT_IO		9
+#define _PAGE_IO		(_AC(1, L)<<_PAGE_BIT_IO)
 
 #define PHYSICAL_PAGE_MASK	(~(_AT(phys_addr_t, PAGE_SIZE) - 1) & __PHYSICAL_MASK)
 #define PTE_MASK		_AT(pteval_t, PHYSICAL_PAGE_MASK)
@@ -60,13 +62,13 @@ extern int page_is_ram(unsigned long pagenr);
 
 struct page;
 
-static void inline clear_user_page(void *page, unsigned long vaddr,
+static inline void clear_user_page(void *page, unsigned long vaddr,
 				struct page *pg)
 {
 	clear_page(page);
 }
 
-static void inline copy_user_page(void *to, void *from, unsigned long vaddr,
+static inline void copy_user_page(void *to, void *from, unsigned long vaddr,
 				struct page *topage)
 {
 	copy_page(to, from);
@@ -174,7 +176,7 @@ static inline pmdval_t xen_pmd_val(pmd_t pmd)
 #define __pte_ma(x) ((pte_t) { .pte = (x) } )
 static inline pte_t xen_make_pte(unsigned long long val)
 {
-	if (val & _PAGE_PRESENT)
+	if ((val & (_PAGE_PRESENT|_PAGE_IO)) == _PAGE_PRESENT)
 		val = pte_phys_to_machine(val);
 	return (pte_t) { .pte = val };
 }
@@ -183,7 +185,7 @@ static inline pte_t xen_make_pte(unsigned long long val)
 static inline pteval_t xen_pte_val(pte_t pte)
 {
 	pteval_t ret = __pte_val(pte);
-	if (pte.pte_low & _PAGE_PRESENT)
+	if ((pte.pte_low & (_PAGE_PRESENT|_PAGE_IO)) == _PAGE_PRESENT)
 		ret = pte_machine_to_phys(ret);
 	return ret;
 }

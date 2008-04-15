@@ -22,13 +22,7 @@ address_needs_mapping(struct device *hwdev, dma_addr_t addr)
 	return (addr & ~mask) != 0;
 }
 
-static inline int
-range_straddles_page_boundary(paddr_t p, size_t size)
-{
-	extern unsigned long *contiguous_bitmap;
-	return ((((p & ~PAGE_MASK) + size) > PAGE_SIZE) &&
-		!test_bit(p >> PAGE_SHIFT, contiguous_bitmap));
-}
+extern int range_straddles_page_boundary(paddr_t p, size_t size);
 
 #define dma_alloc_noncoherent(d, s, h, f) dma_alloc_coherent(d, s, h, f)
 #define dma_free_noncoherent(d, s, v, h) dma_free_coherent(d, s, v, h)
@@ -90,23 +84,13 @@ dma_sync_single_range_for_device(struct device *dev, dma_addr_t dma_handle,
 	dma_sync_single_for_device(dev, dma_handle+offset, size, direction);
 }
 
-static inline void
+extern void
 dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg, int nelems,
-		    enum dma_data_direction direction)
-{
-	if (swiotlb)
-		swiotlb_sync_sg_for_cpu(dev,sg,nelems,direction);
-	flush_write_buffers();
-}
+		    enum dma_data_direction direction);
 
-static inline void
+extern void
 dma_sync_sg_for_device(struct device *dev, struct scatterlist *sg, int nelems,
-		    enum dma_data_direction direction)
-{
-	if (swiotlb)
-		swiotlb_sync_sg_for_device(dev,sg,nelems,direction);
-	flush_write_buffers();
-}
+		    enum dma_data_direction direction);
 
 extern int
 dma_mapping_error(dma_addr_t dma_addr);

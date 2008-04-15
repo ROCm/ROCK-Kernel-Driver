@@ -40,7 +40,7 @@
 #include <xen/platform-compat.h>
 #endif
 
-#define BALLOON_CLASS_NAME "memory"
+#define BALLOON_CLASS_NAME "xen_memory"
 
 #define BALLOON_SHOW(name, format, args...)			\
 	static ssize_t show_##name(struct sys_device *dev,	\

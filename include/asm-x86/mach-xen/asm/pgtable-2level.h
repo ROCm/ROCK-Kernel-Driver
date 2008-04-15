@@ -47,8 +47,10 @@ static inline pte_t xen_ptep_get_and_clear(pte_t *xp, pte_t res)
 #define __pte_mfn(_pte) ((_pte).pte_low >> PAGE_SHIFT)
 #define pte_mfn(_pte) ((_pte).pte_low & _PAGE_PRESENT ? \
 	__pte_mfn(_pte) : pfn_to_mfn(__pte_mfn(_pte)))
-#define pte_pfn(_pte) ((_pte).pte_low & _PAGE_PRESENT ? \
-	mfn_to_local_pfn(__pte_mfn(_pte)) : __pte_mfn(_pte))
+#define pte_pfn(_pte) ((_pte).pte_low & _PAGE_IO ? max_mapnr :	\
+		       (_pte).pte_low & _PAGE_PRESENT ?		\
+		       mfn_to_local_pfn(__pte_mfn(_pte)) :	\
+		       __pte_mfn(_pte))
 
 #define pte_page(_pte) pfn_to_page(pte_pfn(_pte))
 #define pte_none(x) (!(x).pte_low)

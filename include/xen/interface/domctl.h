@@ -53,6 +53,9 @@ struct xen_domctl_createdomain {
  /* Is this an HVM guest (as opposed to a PV guest)? */
 #define _XEN_DOMCTL_CDF_hvm_guest 0
 #define XEN_DOMCTL_CDF_hvm_guest  (1U<<_XEN_DOMCTL_CDF_hvm_guest)
+ /* Use hardware-assisted paging if available? */
+#define _XEN_DOMCTL_CDF_hap       1
+#define XEN_DOMCTL_CDF_hap        (1U<<_XEN_DOMCTL_CDF_hap)
     uint32_t flags;
 };
 typedef struct xen_domctl_createdomain xen_domctl_createdomain_t;
@@ -373,6 +376,8 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_hypercall_init_t);
 #define XEN_DOMAINSETUP_hvm_guest  (1UL<<_XEN_DOMAINSETUP_hvm_guest)
 #define _XEN_DOMAINSETUP_query 1 /* Get parameters (for save)  */
 #define XEN_DOMAINSETUP_query  (1UL<<_XEN_DOMAINSETUP_query)
+#define _XEN_DOMAINSETUP_sioemu_guest 2
+#define XEN_DOMAINSETUP_sioemu_guest  (1UL<<_XEN_DOMAINSETUP_sioemu_guest)
 typedef struct xen_domctl_arch_setup {
     uint64_aligned_t flags;  /* XEN_DOMAINSETUP_* */
 #ifdef __ia64__
@@ -436,6 +441,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_sendtrigger_t);
 /* Assign PCI device to HVM guest. Sets up IOMMU structures. */
 #define XEN_DOMCTL_assign_device      37
 #define XEN_DOMCTL_test_assign_device 45
+#define XEN_DOMCTL_deassign_device 47
 struct xen_domctl_assign_device {
     uint32_t  machine_bdf;   /* machine PCI ID of assigned device */
 };
@@ -445,6 +451,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_assign_device_t);
 
 /* Pass-through interrupts: bind real irq -> hvm devfn. */
 #define XEN_DOMCTL_bind_pt_irq       38
+#define XEN_DOMCTL_unbind_pt_irq     48
 typedef enum pt_irq_type_e {
     PT_IRQ_TYPE_PCI,
     PT_IRQ_TYPE_ISA
@@ -554,6 +561,17 @@ struct xen_domctl_set_opt_feature {
 typedef struct xen_domctl_set_opt_feature xen_domctl_set_opt_feature_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_set_opt_feature_t);
 
+/*
+ * Set the target domain for a domain
+ */
+#define XEN_DOMCTL_set_target    46
+struct xen_domctl_set_target {
+    domid_t target;
+};
+typedef struct xen_domctl_set_target xen_domctl_set_target_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_set_target_t);
+
+
 struct xen_domctl {
     uint32_t cmd;
     uint32_t interface_version; /* XEN_DOMCTL_INTERFACE_VERSION */
@@ -590,6 +608,7 @@ struct xen_domctl {
         struct xen_domctl_pin_mem_cacheattr pin_mem_cacheattr;
         struct xen_domctl_ext_vcpucontext   ext_vcpucontext;
         struct xen_domctl_set_opt_feature   set_opt_feature;
+        struct xen_domctl_set_target        set_target;
         uint8_t                             pad[128];
     } u;
 };

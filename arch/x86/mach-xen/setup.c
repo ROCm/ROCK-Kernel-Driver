@@ -2,6 +2,7 @@
  *	Machine specific setup for generic
  */
 
+#include <linux/mm.h>
 #include <linux/smp.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>

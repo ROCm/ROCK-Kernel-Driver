@@ -43,7 +43,8 @@ MODULE_LICENSE("GPL");
 MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
 
-#define MAX_GRANTS 128
+#define MAX_GRANTS_LIMIT   1024
+#define DEFAULT_MAX_GRANTS 128
 
 /* A slot can be in one of three states:
  *
@@ -90,7 +91,8 @@ typedef struct gntdev_grant_info {
 typedef struct gntdev_file_private_data {
   
 	/* Array of grant information. */
-	gntdev_grant_info_t grants[MAX_GRANTS];
+	gntdev_grant_info_t *grants;
+	uint32_t grants_size;
 
 	/* Read/write semaphore used to protect the grants array. */
 	struct rw_semaphore grants_sem;
@@ -102,7 +104,7 @@ typedef struct gntdev_file_private_data {
 	 * been compressed. However, this is not visible across invocations of
 	 * the device.
 	 */
-	int32_t free_list[MAX_GRANTS];
+	int32_t *free_list;
 	
 	/* The number of free slots in the grants array. */
 	uint32_t free_list_size;
@@ -314,7 +316,7 @@ static int find_contiguous_free_range(struct file *flip,
 
 	/* First search from the start_index to the end of the array. */
 	range_length = 0;
-	for (i = start_index; i < MAX_GRANTS; ++i) {
+	for (i = start_index; i < private_data->grants_size; ++i) {
 		if (private_data->grants[i].state == GNTDEV_SLOT_INVALID) {
 			if (range_length == 0) {
 				range_start = i;
@@ -341,6 +343,50 @@ static int find_contiguous_free_range(struct file *flip,
 	}
 	
 	return -ENOMEM;
+}
+
+static int init_private_data(gntdev_file_private_data_t *priv,
+			     uint32_t max_grants)
+{
+	int i;
+
+	/* Allocate space for the kernel-mapping of granted pages. */
+	priv->foreign_pages = 
+		alloc_empty_pages_and_pagevec(max_grants);
+	if (!priv->foreign_pages)
+		goto nomem_out;
+
+	/* Allocate the grant list and free-list. */
+	priv->grants = kmalloc(max_grants * sizeof(gntdev_grant_info_t),
+			       GFP_KERNEL);
+	if (!priv->grants)
+		goto nomem_out2;
+	priv->free_list = kmalloc(max_grants * sizeof(int32_t), GFP_KERNEL);
+	if (!priv->free_list)
+		goto nomem_out3;
+
+	/* Initialise the free-list, which contains all slots at first. */
+	for (i = 0; i < max_grants; ++i) {
+		priv->free_list[max_grants - i - 1] = i;
+		priv->grants[i].state = GNTDEV_SLOT_INVALID;
+		priv->grants[i].u.free_list_index = max_grants - i - 1;
+	}
+	priv->grants_size = max_grants;
+	priv->free_list_size = max_grants;
+	priv->next_fit_index = 0;
+
+	up_write(&priv->grants_sem);
+	up_write(&priv->free_list_sem);
+
+	return 0;
+
+nomem_out3:
+	kfree(priv->grants);
+nomem_out2:
+	free_empty_pages_and_pagevec(priv->foreign_pages, max_grants);
+nomem_out:
+	return -ENOMEM;
+
 }
 
 /* Interface functions. */
@@ -400,7 +446,6 @@ static void __exit gntdev_exit(void)
 static int gntdev_open(struct inode *inode, struct file *flip)
 {
 	gntdev_file_private_data_t *private_data;
-	int i;
 
 	try_module_get(THIS_MODULE);
 
@@ -409,21 +454,10 @@ static int gntdev_open(struct inode *inode, struct file *flip)
 	if (!private_data)
 		goto nomem_out;
 
-	/* Allocate space for the kernel-mapping of granted pages. */
-	private_data->foreign_pages = 
-		alloc_empty_pages_and_pagevec(MAX_GRANTS);
-	if (!private_data->foreign_pages)
-		goto nomem_out2;
-
-	/* Initialise the free-list, which contains all slots at first.
-	 */
-	for (i = 0; i < MAX_GRANTS; ++i) {
-		private_data->free_list[MAX_GRANTS - i - 1] = i;
-		private_data->grants[i].state = GNTDEV_SLOT_INVALID;
-		private_data->grants[i].u.free_list_index = MAX_GRANTS - i - 1;
-	}
-	private_data->free_list_size = MAX_GRANTS;
-	private_data->next_fit_index = 0;
+	/* These will be lazily initialised by init_private_data. */
+	private_data->grants = NULL;
+	private_data->free_list = NULL;
+	private_data->foreign_pages = NULL;
 
 	init_rwsem(&private_data->grants_sem);
 	init_rwsem(&private_data->free_list_sem);
@@ -432,8 +466,6 @@ static int gntdev_open(struct inode *inode, struct file *flip)
 
 	return 0;
 
-nomem_out2:
-	kfree(private_data);
 nomem_out:
 	return -ENOMEM;
 }
@@ -445,10 +477,14 @@ static int gntdev_release(struct inode *inode, struct file *flip)
 	if (flip->private_data) {
 		gntdev_file_private_data_t *private_data = 
 			(gntdev_file_private_data_t *) flip->private_data;
-		if (private_data->foreign_pages) {
+		if (private_data->foreign_pages)
 			free_empty_pages_and_pagevec
-				(private_data->foreign_pages, MAX_GRANTS);
-		}
+				(private_data->foreign_pages,
+				 private_data->grants_size);
+		if (private_data->grants) 
+			kfree(private_data->grants);
+		if (private_data->free_list)
+			kfree(private_data->free_list);
 		kfree(private_data);
 	}
 	module_put(THIS_MODULE);
@@ -479,7 +515,17 @@ static int gntdev_mmap (struct file *flip, struct vm_area_struct *vma)
 		return -EINVAL;
 	}
 
-	if (unlikely((size <= 0) || (size + slot_index) > MAX_GRANTS)) {
+	/* Test to make sure that the grants array has been initialised. */
+	down_read(&private_data->grants_sem);
+	if (unlikely(!private_data->grants)) {
+		up_read(&private_data->grants_sem);
+		printk(KERN_ERR "Attempted to mmap before ioctl.\n");
+		return -EINVAL;
+	}
+	up_read(&private_data->grants_sem);
+
+	if (unlikely((size <= 0) || 
+		     (size + slot_index) > private_data->grants_size)) {
 		printk(KERN_ERR "Invalid number of pages or offset"
 		       "(num_pages = %d, first_slot = %ld).\n",
 		       size, slot_index);
@@ -509,7 +555,7 @@ static int gntdev_mmap (struct file *flip, struct vm_area_struct *vma)
     
 	/* The VM area contains pages from another VM. */
 	vma->vm_flags |= VM_FOREIGN;
-	vma->vm_private_data = kzalloc(size * sizeof(struct page_struct *), 
+	vma->vm_private_data = kzalloc(size * sizeof(struct page *),
 				       GFP_KERNEL);
 	if (vma->vm_private_data == NULL) {
 		printk(KERN_ERR "Couldn't allocate mapping structure for VM "
@@ -790,6 +836,33 @@ static long gntdev_ioctl(struct file *flip,
 	gntdev_file_private_data_t *private_data = 
 		(gntdev_file_private_data_t *) flip->private_data;
 
+	/* On the first invocation, we will lazily initialise the grant array
+	 * and free-list.
+	 */
+	if (unlikely(!private_data->grants) 
+	    && likely(cmd != IOCTL_GNTDEV_SET_MAX_GRANTS)) {
+		down_write(&private_data->grants_sem);
+		
+		if (unlikely(private_data->grants)) {
+			up_write(&private_data->grants_sem);
+			goto private_data_initialised;
+		}
+		
+		/* Just use the default. Setting to a non-default is handled
+		 * in the ioctl switch.
+		 */
+		rc = init_private_data(private_data, DEFAULT_MAX_GRANTS);
+		
+		up_write(&private_data->grants_sem);
+
+		if (rc) {
+			printk (KERN_ERR "Initialising gntdev private data "
+				"failed.\n");
+			return rc;
+		}
+	}
+	    
+private_data_initialised:
 	switch (cmd) {
 	case IOCTL_GNTDEV_MAP_GRANT_REF:
 	{
@@ -971,6 +1044,30 @@ static long gntdev_ioctl(struct file *flip,
 	get_offset_unlock_out:
 		up_read(&current->mm->mmap_sem);
 	get_offset_out:
+		return rc;
+	}
+	case IOCTL_GNTDEV_SET_MAX_GRANTS:
+	{
+		struct ioctl_gntdev_set_max_grants op;
+		if ((rc = copy_from_user(&op, 
+					 (void __user *) arg, 
+					 sizeof(op)))) {
+			rc = -EFAULT;
+			goto set_max_out;
+		}
+		down_write(&private_data->grants_sem);
+		if (private_data->grants) {
+			rc = -EBUSY;
+			goto set_max_unlock_out;
+		}
+		if (op.count > MAX_GRANTS_LIMIT) {
+			rc = -EINVAL;
+			goto set_max_unlock_out;
+		}						 
+		rc = init_private_data(private_data, op.count);
+	set_max_unlock_out:
+		up_write(&private_data->grants_sem);
+	set_max_out:
 		return rc;
 	}
 	default:

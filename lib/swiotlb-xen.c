@@ -30,7 +30,6 @@
 #include <asm/gnttab_dma.h>
 
 int swiotlb;
-EXPORT_SYMBOL(swiotlb);
 
 #define OFFSET(val,align) ((unsigned long)((val) & ( (align) - 1)))
 

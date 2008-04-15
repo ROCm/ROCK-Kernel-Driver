@@ -349,6 +349,7 @@ static long evtchn_ioctl(struct file *file,
 
 		port_user[unbind.port] = NULL;
 		mask_evtchn(unbind.port);
+		rebind_evtchn_to_cpu(unbind.port, 0);
 
 		spin_unlock_irq(&port_user_lock);
 
@@ -458,6 +459,7 @@ static int evtchn_release(struct inode *inode, struct file *filp)
 
 		port_user[i] = NULL;
 		mask_evtchn(i);
+		rebind_evtchn_to_cpu(i, 0);
 
 		close.port = i;
 		ret = HYPERVISOR_event_channel_op(EVTCHNOP_close, &close);

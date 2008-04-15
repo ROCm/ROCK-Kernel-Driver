@@ -47,6 +47,8 @@ int pciback_add_pci_dev(struct pciback_device *pdev, struct pci_dev *dev,
 	struct passthrough_dev_data *dev_data = pdev->pci_dev_data;
 	struct pci_dev_entry *dev_entry;
 	unsigned long flags;
+	unsigned int domain, bus, devfn;
+	int err;
 
 	dev_entry = kmalloc(sizeof(*dev_entry), GFP_KERNEL);
 	if (!dev_entry)
@@ -57,9 +59,13 @@ int pciback_add_pci_dev(struct pciback_device *pdev, struct pci_dev *dev,
 	list_add_tail(&dev_entry->list, &dev_data->dev_list);
 	spin_unlock_irqrestore(&dev_data->lock, flags);
 
-	/* TODO: Publish virtual domain:bus:slot.func here. */
+	/* Publish this device. */
+	domain = (unsigned int)pci_domain_nr(dev->bus);
+	bus = (unsigned int)dev->bus->number;
+	devfn = dev->devfn;
+	err = publish_cb(pdev, domain, bus, devfn, devid);
 
-	return 0;
+	return err;
 }
 
 void pciback_release_pci_dev(struct pciback_device *pdev, struct pci_dev *dev)

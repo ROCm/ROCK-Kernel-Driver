@@ -632,6 +632,7 @@ void __init e820_register_memory(void)
 		if (start < last)
 			last = start;
 	}
+#undef e820
 
 	/*
 	 * See how much we want to round up: start off with
@@ -646,8 +647,6 @@ void __init e820_register_memory(void)
 	printk("Allocating PCI resources starting at %08lx (gap: %08lx:%08lx)\n",
 		pci_mem_start, gapstart, gapsize);
 }
-
-#undef e820
 
 void __init print_memory_map(char *who)
 {
@@ -834,6 +833,33 @@ static int __init parse_memmap(char *arg)
 early_param("memmap", parse_memmap);
 
 #ifndef CONFIG_XEN
+void __init update_memory_range(u64 start, u64 size, unsigned old_type,
+				unsigned new_type)
+{
+	int i;
+
+	BUG_ON(old_type == new_type);
+
+	for (i = 0; i < e820.nr_map; i++) {
+		struct e820entry *ei = &e820.map[i];
+		u64 final_start, final_end;
+		if (ei->type != old_type)
+			continue;
+		/* totally covered? */
+		if (ei->addr >= start && ei->size <= size) {
+			ei->type = new_type;
+			continue;
+		}
+		/* partially covered */
+		final_start = max(start, ei->addr);
+		final_end = min(start + size, ei->addr + ei->size);
+		if (final_start >= final_end)
+			continue;
+		add_memory_region(final_start, final_end - final_start,
+					 new_type);
+	}
+}
+
 void __init update_e820(void)
 {
 	u8 nr_map;

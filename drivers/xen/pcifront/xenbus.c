@@ -123,7 +123,7 @@ static int pcifront_publish_info(struct pcifront_device *pdev)
 	return err;
 }
 
-static int pcifront_try_connect(struct pcifront_device *pdev)
+static int __devinit pcifront_try_connect(struct pcifront_device *pdev)
 {
 	int err = -EFAULT;
 	int i, num_roots, len;
@@ -214,7 +214,7 @@ static int pcifront_try_disconnect(struct pcifront_device *pdev)
 	return err;
 }
 
-static int pcifront_attach_devices(struct pcifront_device *pdev)
+static int __devinit pcifront_attach_devices(struct pcifront_device *pdev)
 {
 	int err = -EFAULT;
 	int i, num_roots, len;
@@ -277,7 +277,7 @@ static int pcifront_attach_devices(struct pcifront_device *pdev)
 
 static int pcifront_detach_devices(struct pcifront_device *pdev)
 {
-	int err;
+	int err = 0;
 	int i, num_devs;
 	unsigned int domain, bus, slot, func;
 	struct pci_bus *pci_bus;
@@ -328,7 +328,7 @@ static int pcifront_detach_devices(struct pcifront_device *pdev)
 			if (err >= 0)
 				err = -EINVAL;
 			xenbus_dev_fatal(pdev->xdev, err,
-				 	 "Error reading PCI root %d", i);
+				 	 "Error reading PCI device %d", i);
 			goto out;
 		}
 
@@ -360,8 +360,8 @@ static int pcifront_detach_devices(struct pcifront_device *pdev)
 	return err;
 }
 
-static void pcifront_backend_changed(struct xenbus_device *xdev,
-				     enum xenbus_state be_state)
+static void __init_refok pcifront_backend_changed(struct xenbus_device *xdev,
+						  enum xenbus_state be_state)
 {
 	struct pcifront_device *pdev = xdev->dev.driver_data;
 

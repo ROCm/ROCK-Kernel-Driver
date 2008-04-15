@@ -305,16 +305,17 @@ static inline void __ClearPageTail(struct page *page)
 #define ClearPageUncached(page)	clear_bit(PG_uncached, &(page)->flags)
 
 #define PageForeign(page)	test_bit(PG_foreign, &(page)->flags)
-#define SetPageForeign(page, dtor) do {		\
-	set_bit(PG_foreign, &(page)->flags);	\
-	(page)->index = (long)(dtor);		\
+#define SetPageForeign(_page, dtor) do {		\
+	set_bit(PG_foreign, &(_page)->flags);		\
+	BUG_ON((dtor) == (void (*)(struct page *))0);	\
+	(_page)->index = (long)(dtor);			\
 } while (0)
-#define ClearPageForeign(page) do {		\
-	clear_bit(PG_foreign, &(page)->flags);	\
-	(page)->index = 0;			\
+#define ClearPageForeign(page) do {			\
+	clear_bit(PG_foreign, &(page)->flags);		\
+	(page)->index = 0;				\
 } while (0)
-#define PageForeignDestructor(page)		\
-	( (void (*) (struct page *)) (page)->index )(page)
+#define PageForeignDestructor(_page)			\
+	((void (*)(struct page *))(_page)->index)(_page)
 
 struct page;	/* forward declaration */
 

@@ -295,8 +295,8 @@ static void pcifront_claim_resource(struct pci_dev *dev, void *data)
 	}
 }
 
-int pcifront_scan_root(struct pcifront_device *pdev,
-		       unsigned int domain, unsigned int bus)
+int __devinit pcifront_scan_root(struct pcifront_device *pdev,
+				 unsigned int domain, unsigned int bus)
 {
 	struct pci_bus *b;
 	struct pcifront_sd *sd = NULL;
@@ -353,8 +353,8 @@ int pcifront_scan_root(struct pcifront_device *pdev,
 	return err;
 }
 
-int pcifront_rescan_root(struct pcifront_device *pdev,
-			 unsigned int domain, unsigned int bus)
+int __devinit pcifront_rescan_root(struct pcifront_device *pdev,
+				   unsigned int domain, unsigned int bus)
 {
 	struct pci_bus *b;
 	struct pci_dev *d;

@@ -685,7 +685,7 @@ static int blktap_mmap(struct file *filp, struct vm_area_struct *vma)
 
 	/* Mark this VM as containing foreign pages, and set up mappings. */
 	map = kzalloc(((vma->vm_end - vma->vm_start) >> PAGE_SHIFT)
-		      * sizeof(struct page_struct*),
+		      * sizeof(struct page *),
 		      GFP_KERNEL);
 	if (map == NULL) {
 		WPRINTK("Couldn't alloc VM_FOREIGN map.\n");

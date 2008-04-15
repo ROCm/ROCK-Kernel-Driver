@@ -40,6 +40,7 @@
 #include <linux/clocksource.h>
 #include <linux/sysdev.h>
 
+#include <asm/delay.h>
 #include <asm/time.h>
 
 #include <xen/evtchn.h>

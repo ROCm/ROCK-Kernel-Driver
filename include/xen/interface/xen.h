@@ -265,7 +265,11 @@ struct mmuext_op {
         /* SET_LDT */
         unsigned int nr_ents;
         /* TLB_FLUSH_MULTI, INVLPG_MULTI */
-        XEN_GUEST_HANDLE_00030205(void) vcpumask;
+#if __XEN_INTERFACE_VERSION__ >= 0x00030205
+        XEN_GUEST_HANDLE(void) vcpumask;
+#else
+        void *vcpumask;
+#endif
     } arg2;
 };
 DEFINE_XEN_GUEST_HANDLE_STRUCT(mmuext_op);
