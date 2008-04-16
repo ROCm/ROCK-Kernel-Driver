@@ -1064,21 +1064,22 @@ static int fuse_dir_fsync(struct file *file, struct dentry *de, int datasync)
 	return file ? fuse_fsync_common(file, de, datasync, 1) : 0;
 }
 
-static bool update_mtime(unsigned ivalid)
+static bool update_mtime(unsigned ivalid, bool have_file)
 {
 	/* Always update if mtime is explicitly set  */
 	if (ivalid & ATTR_MTIME_SET)
 		return true;
 
 	/* If it's an open(O_TRUNC) or an ftruncate(), don't update */
-	if ((ivalid & ATTR_SIZE) && (ivalid & (ATTR_OPEN | ATTR_FILE)))
+	if ((ivalid & ATTR_SIZE) && ((ivalid & ATTR_OPEN) || have_file))
 		return false;
 
 	/* In all other cases update */
 	return true;
 }
 
-static void iattr_to_fattr(struct iattr *iattr, struct fuse_setattr_in *arg)
+static void iattr_to_fattr(struct iattr *iattr, struct fuse_setattr_in *arg,
+			   bool have_file)
 {
 	unsigned ivalid = iattr->ia_valid;
 
@@ -1097,7 +1098,7 @@ static void iattr_to_fattr(struct iattr *iattr, struct fuse_setattr_in *arg)
 		if (!(ivalid & ATTR_ATIME_SET))
 			arg->valid |= FATTR_ATIME_NOW;
 	}
-	if ((ivalid & ATTR_MTIME) && update_mtime(ivalid)) {
+	if ((ivalid & ATTR_MTIME) && update_mtime(ivalid, have_file)) {
 		arg->valid |= FATTR_MTIME;
 		arg->mtime = iattr->ia_mtime.tv_sec;
 		arg->mtimensec = iattr->ia_mtime.tv_nsec;
@@ -1114,8 +1115,8 @@ static void iattr_to_fattr(struct iattr *iattr, struct fuse_setattr_in *arg)
  * vmtruncate() doesn't allow for this case, so do the rlimit checking
  * and the actual truncation by hand.
  */
-static int fuse_do_setattr(struct dentry *entry, struct iattr *attr,
-			   struct file *file)
+int fuse_do_setattr(struct dentry *entry, struct iattr *attr,
+		    struct file *file)
 {
 	struct inode *inode = entry->d_inode;
 	struct fuse_conn *fc = get_fuse_conn(inode);
@@ -1153,7 +1154,7 @@ static int fuse_do_setattr(struct dentry *entry, struct iattr *attr,
 
 	memset(&inarg, 0, sizeof(inarg));
 	memset(&outarg, 0, sizeof(outarg));
-	iattr_to_fattr(attr, &inarg);
+	iattr_to_fattr(attr, &inarg, file != NULL);
 	if (file) {
 		struct fuse_file *ff = file->private_data;
 		inarg.valid |= FATTR_FH;
@@ -1195,10 +1196,7 @@ static int fuse_do_setattr(struct dentry *entry, struct iattr *attr,
 
 static int fuse_setattr(struct dentry *entry, struct iattr *attr)
 {
-	if (attr->ia_valid & ATTR_FILE)
-		return fuse_do_setattr(entry, attr, attr->ia_file);
-	else
-		return fuse_do_setattr(entry, attr, NULL);
+	return fuse_do_setattr(entry, attr, NULL);
 }
 
 static int fuse_getattr(struct vfsmount *mnt, struct dentry *entry,

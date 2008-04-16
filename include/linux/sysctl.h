@@ -979,7 +979,7 @@ extern int proc_doulongvec_minmax(struct ctl_table *, int, struct file *,
 extern int proc_doulongvec_ms_jiffies_minmax(struct ctl_table *table, int,
 				      struct file *, void __user *, size_t *, loff_t *);
 
-extern char *sysctl_pathname(struct ctl_table *, char *, int);
+extern char *sysctl_pathname(ctl_table *, char *, int);
 
 extern int do_sysctl (int __user *name, int nlen,
 		      void __user *oldval, size_t __user *oldlenp,

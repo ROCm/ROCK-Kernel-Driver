@@ -353,16 +353,6 @@ struct iattr {
 	struct timespec	ia_atime;
 	struct timespec	ia_mtime;
 	struct timespec	ia_ctime;
-
-	/*
-	 * Not an attribute, but an auxilary info for filesystems wanting to
-	 * implement an ftruncate() like method.  NOTE: filesystem should
-	 * check for (ia_valid & ATTR_FILE), and not for (ia_file != NULL).
-	 *
-	 * The LSM hooks also use this to distinguish operations on a file
-	 * descriptors from operations on pathnames.
-	 */
-	struct file	*ia_file;
 };
 
 /*
@@ -1199,6 +1189,7 @@ struct file_operations {
 	ssize_t (*splice_write)(struct pipe_inode_info *, struct file *, loff_t *, size_t, unsigned int);
 	ssize_t (*splice_read)(struct file *, loff_t *, struct pipe_inode_info *, size_t, unsigned int);
 	int (*setlease)(struct file *, long, struct file_lock **);
+	int (*fsetattr)(struct file *, struct iattr *);
 };
 
 struct inode_operations {
@@ -1721,6 +1712,7 @@ extern int do_remount_sb(struct super_block *sb, int flags,
 extern sector_t bmap(struct inode *, sector_t);
 #endif
 extern int notify_change(struct dentry *, struct vfsmount *, struct iattr *);
+extern int fnotify_change(struct dentry *, struct vfsmount *, struct iattr *, struct file *);
 extern int permission(struct inode *, int, struct nameidata *);
 extern int generic_permission(struct inode *, int,
 		int (*check_acl)(struct inode *, int));

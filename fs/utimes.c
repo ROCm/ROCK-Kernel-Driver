@@ -133,7 +133,7 @@ long do_utimes(int dfd, char __user *filename, struct timespec *times, int flags
 		}
 	}
 	mutex_lock(&inode->i_mutex);
-	error = notify_change(path.dentry, path.mnt, &newattrs);
+	error = fnotify_change(path.dentry, path.mnt, &newattrs, f);
 	mutex_unlock(&inode->i_mutex);
 dput_and_out:
 	if (f)

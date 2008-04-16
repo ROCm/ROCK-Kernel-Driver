@@ -1856,31 +1856,26 @@ void __put_mnt_ns(struct mnt_namespace *ns)
 char *d_namespace_path(struct dentry *dentry, struct vfsmount *vfsmnt,
 		       char *buf, int buflen)
 {
-	struct path root, ns_root = {};
+	struct path root, ns_root = { };
 	char *res;
 
 	read_lock(&current->fs->lock);
 	root = current->fs->root;
 	path_get(&current->fs->root);
-	ns_root.dentry = root.dentry;
-	/* ns_root.mnt = root.mnt - jeffm not sure about this */
 	read_unlock(&current->fs->lock);
 	spin_lock(&vfsmount_lock);
-	if (root.mnt->mnt_ns) {
+	if (root.mnt)
 		ns_root.mnt = mntget(root.mnt->mnt_ns->root);
+	if (ns_root.mnt)
 		ns_root.dentry = dget(ns_root.mnt->mnt_root);
-	}
 	spin_unlock(&vfsmount_lock);
-	/* Why aren't we taking the dcache_lock here?? -jeffm */
 	res = __d_path(dentry, vfsmnt, &ns_root, buf, buflen, 1);
-	if (root.mnt->mnt_ns) {
-		dput(ns_root.dentry);
-		mntput(ns_root.mnt);
-	}
 	path_put(&root);
+	path_put(&ns_root);
+
 	/* Prevent empty path for lazily unmounted filesystems. */
 	if (!IS_ERR(res) && *res == '\0')
 		*--res = '.';
 	return res;
 }
-EXPORT_SYMBOL_GPL(d_namespace_path);
+EXPORT_SYMBOL(d_namespace_path);

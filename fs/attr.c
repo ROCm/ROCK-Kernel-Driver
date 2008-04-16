@@ -100,8 +100,8 @@ int inode_setattr(struct inode * inode, struct iattr * attr)
 }
 EXPORT_SYMBOL(inode_setattr);
 
-int notify_change(struct dentry *dentry, struct vfsmount *mnt,
-		  struct iattr *attr)
+int fnotify_change(struct dentry *dentry, struct vfsmount *mnt,
+		   struct iattr *attr, struct file *file)
 {
 	struct inode *inode = dentry->d_inode;
 	mode_t mode = inode->i_mode;
@@ -160,8 +160,12 @@ int notify_change(struct dentry *dentry, struct vfsmount *mnt,
 
 	if (inode->i_op && inode->i_op->setattr) {
 		error = security_inode_setattr(dentry, mnt, attr);
-		if (!error)
-			error = inode->i_op->setattr(dentry, attr);
+		if (!error) {
+			if (file && file->f_op && file->f_op->fsetattr)
+				error = file->f_op->fsetattr(file, attr);
+			else
+				error = inode->i_op->setattr(dentry, attr);
+		}
 	} else {
 		error = inode_change_ok(inode, attr);
 		if (!error)
@@ -182,6 +186,12 @@ int notify_change(struct dentry *dentry, struct vfsmount *mnt,
 		fsnotify_change(dentry, ia_valid);
 
 	return error;
+}
+
+int notify_change(struct dentry *dentry, struct vfsmount *mnt,
+		  struct iattr *attr)
+{
+	return fnotify_change(dentry, mnt, attr, NULL);
 }
 
 EXPORT_SYMBOL(notify_change);

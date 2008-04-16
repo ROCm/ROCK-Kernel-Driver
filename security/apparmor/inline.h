@@ -12,6 +12,8 @@
 
 #include <linux/sched.h>
 
+#include "match.h"
+
 static inline int mediated_filesystem(struct inode *inode)
 {
 	return !(inode->i_sb->s_flags & MS_NOUSER);
@@ -19,8 +21,33 @@ static inline int mediated_filesystem(struct inode *inode)
 
 static inline struct aa_task_context *aa_task_context(struct task_struct *task)
 {
-	struct aa_task_context *cxt = task->security;
-	return rcu_dereference(cxt);
+	return (struct aa_task_context *) rcu_dereference(task->security);
+}
+
+static inline struct aa_namespace *aa_get_namespace(struct aa_namespace *ns)
+{
+	if (ns)
+		kref_get(&(ns->count));
+
+	return ns;
+}
+
+static inline void aa_put_namespace(struct aa_namespace *ns)
+{
+	if (ns)
+		kref_put(&ns->count, free_aa_namespace_kref);
+}
+
+
+static inline struct aa_namespace *aa_find_namespace(const char *name)
+{
+	struct aa_namespace *ns = NULL;
+
+	read_lock(&profile_ns_list_lock);
+	ns = aa_get_namespace(__aa_find_namespace(name, &profile_ns_list));
+	read_unlock(&profile_ns_list_lock);
+
+	return ns;
 }
 
 /**
@@ -61,13 +88,14 @@ static inline struct aa_profile *aa_get_profile(struct task_struct *task)
 	return profile;
 }
 
-static inline struct aa_profile *aa_find_profile(const char *name)
+static inline struct aa_profile *aa_find_profile(struct aa_namespace *ns,
+						 const char *name)
 {
 	struct aa_profile *profile = NULL;
 
-	read_lock(&profile_list_lock);
-	profile = aa_dup_profile(__aa_find_profile(name, &profile_list));
-	read_unlock(&profile_list_lock);
+	read_lock(&ns->lock);
+	profile = aa_dup_profile(__aa_find_profile(name, &ns->profiles));
+	read_unlock(&ns->lock);
 
 	return profile;
 }
@@ -204,9 +232,19 @@ static inline void unlock_both_profiles(struct aa_profile *profile1,
 	}
 }
 
-static inline unsigned int aa_match(struct aa_dfa *dfa, const char *pathname)
+static inline unsigned int aa_match(struct aa_dfa *dfa, const char *pathname,
+				    int *audit_mask)
 {
-	        return dfa ? aa_dfa_match(dfa, pathname) : 0;
+	if (dfa)
+		return aa_dfa_match(dfa, pathname, audit_mask);
+	if (audit_mask)
+		*audit_mask = 0;
+	return 0;
+}
+
+static inline int dfa_audit_mask(struct aa_dfa *dfa, unsigned int state)
+{
+	return 	ACCEPT_TABLE2(dfa)[state];
 }
 
 #endif /* __INLINE_H__ */

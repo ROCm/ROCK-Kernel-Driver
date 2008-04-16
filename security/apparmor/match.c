@@ -14,6 +14,7 @@
 #include <linux/errno.h>
 #include "apparmor.h"
 #include "match.h"
+#include "inline.h"
 
 static struct table_header *unpack_table(void *blob, size_t bsize)
 {
@@ -83,6 +84,7 @@ int unpack_dfa(struct aa_dfa *dfa, void *blob, size_t size)
 
 		switch(table->td_id) {
 		case YYTD_ID_ACCEPT:
+		case YYTD_ID_ACCEPT2:
 		case YYTD_ID_BASE:
 			dfa->tables[table->td_id - 1] = table;
 			if (table->td_flags != YYTD_DATA32)
@@ -134,7 +136,8 @@ int verify_dfa(struct aa_dfa *dfa)
 	int error = -EPROTO;
 
 	/* check that required tables exist */
-	if (!(dfa->tables[YYTD_ID_ACCEPT -1 ] &&
+	if (!(dfa->tables[YYTD_ID_ACCEPT - 1] &&
+	      dfa->tables[YYTD_ID_ACCEPT2 - 1] &&
 	      dfa->tables[YYTD_ID_DEF - 1] &&
 	      dfa->tables[YYTD_ID_BASE - 1] &&
 	      dfa->tables[YYTD_ID_NXT - 1] &&
@@ -144,7 +147,8 @@ int verify_dfa(struct aa_dfa *dfa)
 	/* accept.size == default.size == base.size */
 	state_count = dfa->tables[YYTD_ID_BASE - 1]->td_lolen;
 	if (!(state_count == dfa->tables[YYTD_ID_DEF - 1]->td_lolen &&
-	      state_count == dfa->tables[YYTD_ID_ACCEPT - 1]->td_lolen))
+	      state_count == dfa->tables[YYTD_ID_ACCEPT - 1]->td_lolen &&
+	      state_count == dfa->tables[YYTD_ID_ACCEPT2 - 1]->td_lolen))
 		goto out;
 
 	/* next.size == chk.size */
@@ -177,13 +181,14 @@ int verify_dfa(struct aa_dfa *dfa)
 
 		if (mode & ~AA_VALID_PERM_MASK)
 			goto out;
+		if (ACCEPT_TABLE2(dfa)[i] & ~AA_VALID_PERM2_MASK)
+			goto out;
 
-		/* if MAY_EXEC, exactly one exec modifier must be set */
-		if (mode & MAY_EXEC) {
-			mode &= AA_EXEC_MODIFIERS;
-			if (mode & (mode - 1))
-				goto out;
-		}
+		/* if any exec modifier is set MAY_EXEC must be set */
+		if ((mode & AA_USER_EXEC_TYPE) && !(mode & AA_USER_EXEC))
+			goto out;
+		if ((mode & AA_OTHER_EXEC_TYPE) && !(mode & AA_OTHER_EXEC))
+			goto out;
 	}
 
 	error = 0;
@@ -208,22 +213,76 @@ void aa_match_free(struct aa_dfa *dfa)
 }
 
 /**
- * aa_dfa_match - match @path against @dfa starting in @state
- * @dfa: the dfa to match @path against
- * @state: the state to start matching in
- * @path: the path to match against the dfa
+ * aa_dfa_next_state_len - traverse @dfa to find state @str stops at
+ * @dfa: the dfa to match @str against
+ * @start: the state of the dfa to start matching in
+ * @str: the string of bytes to match against the dfa
+ * @len: length of the string of bytes to match
  *
- * aa_dfa_match will match the full path length and return the state it
- * finished matching in. The final state is used to look up the accepting
- * label.
+ * aa_dfa_next_state will match @str against the dfa and return the state it
+ * finished matching in. The final state can be used to look up the accepting
+ * label, or as the start state of a continuing match.
+ *
+ * aa_dfa_next_state could be implement using this function by doing
+ * return aa_dfa_next_state_len(dfa, start, str, strlen(str));
+ * but that would require traversing the string twice and be slightly
+ * slower.
  */
-unsigned int aa_dfa_match(struct aa_dfa *dfa, const char *str)
+unsigned int aa_dfa_next_state_len(struct aa_dfa *dfa, unsigned int start,
+				   const char *str, int len)
 {
 	u16 *def = DEFAULT_TABLE(dfa);
 	u32 *base = BASE_TABLE(dfa);
 	u16 *next = NEXT_TABLE(dfa);
 	u16 *check = CHECK_TABLE(dfa);
-	unsigned int state = 1, pos;
+	unsigned int state = start, pos;
+
+	if (state == 0)
+		return 0;
+
+	/* current state is <state>, matching character *str */
+	if (dfa->tables[YYTD_ID_EC - 1]) {
+		u8 *equiv = EQUIV_TABLE(dfa);
+		for (; len; len--) {
+			pos = base[state] + equiv[(u8)*str++];
+			if (check[pos] == state)
+				state = next[pos];
+			else
+				state = def[state];
+		}
+	} else {
+		for (; len; len--) {
+			pos = base[state] + (u8)*str++;
+			if (check[pos] == state)
+				state = next[pos];
+			else
+				state = def[state];
+		}
+	}
+	return state;
+}
+
+/**
+ * aa_dfa_next_state - traverse @dfa to find state @str stops at
+ * @dfa: the dfa to match @str against
+ * @start: the state of the dfa to start matching in
+ * @str: the null terminated string of bytes to match against the dfa
+ *
+ * aa_dfa_next_state will match @str against the dfa and return the state it
+ * finished matching in. The final state can be used to look up the accepting
+ * label, or as the start state of a continuing match.
+ */
+unsigned int aa_dfa_next_state(struct aa_dfa *dfa, unsigned int start,
+			       const char *str)
+{
+	u16 *def = DEFAULT_TABLE(dfa);
+	u32 *base = BASE_TABLE(dfa);
+	u16 *next = NEXT_TABLE(dfa);
+	u16 *check = CHECK_TABLE(dfa);
+	unsigned int state = start, pos;
+
+	if (state == 0)
+		return 0;
 
 	/* current state is <state>, matching character *str */
 	if (dfa->tables[YYTD_ID_EC - 1]) {
@@ -244,5 +303,62 @@ unsigned int aa_dfa_match(struct aa_dfa *dfa, const char *str)
 				state = def[state];
 		}
 	}
+	return state;
+}
+
+/**
+ * aa_dfa_null_transition - step to next state after null character
+ * @dfa: the dfa to match against
+ * @start: the state of the dfa to start matching in
+ *
+ * aa_dfa_null_transition transitions to the next state after a null
+ * character which is not used in standard matching and is only
+ * used to seperate pairs.
+ */
+unsigned int aa_dfa_null_transition(struct aa_dfa *dfa, unsigned int start)
+{
+	return aa_dfa_next_state_len(dfa, start, "", 1);
+}
+
+/**
+ * aa_dfa_match - find accept perm for @str in @dfa
+ * @dfa: the dfa to match @str against
+ * @str: the string to match against the dfa
+ * @audit_mask: the audit_mask for the final state
+ *
+ * aa_dfa_match will match @str and return the accept perms for the
+ * final state.
+ */
+unsigned int aa_dfa_match(struct aa_dfa *dfa, const char *str, int *audit_mask)
+{
+	int state = aa_dfa_next_state(dfa, DFA_START, str);
+	if (audit_mask)
+		*audit_mask = dfa_audit_mask(dfa, state);
 	return ACCEPT_TABLE(dfa)[state];
 }
+
+/**
+ * aa_match_state - find accept perm and state for @str in @dfa
+ * @dfa: the dfa to match @str against
+ * @start: the state to start the match from
+ * @str: the string to match against the dfa
+ * @final: the state that the match finished in
+ *
+ * aa_match_state will match @str and return the accept perms, and @final
+ * state, the match occured in.
+ */
+unsigned int aa_match_state(struct aa_dfa *dfa, unsigned int start,
+			    const char *str, unsigned int *final)
+{
+	unsigned int state;
+	if (dfa) {
+		state = aa_dfa_next_state(dfa, start, str);
+		if (final)
+			*final = state;
+		return ACCEPT_TABLE(dfa)[state];
+	}
+	if (final)
+		*final = 0;
+	return 0;
+}
+

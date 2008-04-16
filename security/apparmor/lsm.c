@@ -23,6 +23,9 @@
 #include "apparmor.h"
 #include "inline.h"
 
+/* Flag indicating whether initialization completed */
+int apparmor_initialized = 0;
+
 /* point to the apparmor module */
 struct module *aa_module = NULL;
 
@@ -78,6 +81,7 @@ unsigned int apparmor_path_max = 2 * PATH_MAX;
 module_param_named(path_max, apparmor_path_max, aauint, S_IRUSR | S_IWUSR);
 MODULE_PARM_DESC(apparmor_path_max, "Maximum pathname length allowed");
 
+/* Boot time disable flag */
 #ifdef CONFIG_SECURITY_APPARMOR_DISABLE
 #define AA_ENABLED_PERMS 0600
 #else
@@ -88,6 +92,13 @@ unsigned int apparmor_enabled = CONFIG_SECURITY_APPARMOR_BOOTPARAM_VALUE;
 module_param_call(enabled, param_set_aa_enabled, param_get_aauint,
 		  &apparmor_enabled, AA_ENABLED_PERMS);
 MODULE_PARM_DESC(apparmor_enabled, "Enable/Disable Apparmor on boot");
+
+static int __init apparmor_enabled_setup(char *str)
+{
+	apparmor_enabled = simple_strtol(str, NULL, 0);
+	return 1;
+}
+__setup("apparmor=", apparmor_enabled_setup);
 
 static int param_set_aabool(const char *val, struct kernel_param *kp)
 {
@@ -115,6 +126,35 @@ static int param_get_aauint(char *buffer, struct kernel_param *kp)
 	if (aa_task_context(current))
 		return -EPERM;
 	return param_get_uint(buffer, kp);
+}
+
+/* allow run time disabling of apparmor */
+static int param_set_aa_enabled(const char *val, struct kernel_param *kp)
+{
+	char *endp;
+	unsigned long l;
+
+	if (!apparmor_initialized) {
+		apparmor_enabled = 0;
+		return 0;
+	}
+
+	if (aa_task_context(current))
+		return -EPERM;
+
+	if (!apparmor_enabled)
+		return -EINVAL;
+
+	if (!val)
+		return -EINVAL;
+
+	l = simple_strtoul(val, &endp, 0);
+	if (endp == val || l != 0)
+		return -EINVAL;
+
+	apparmor_enabled = 0;
+	apparmor_disable();
+	return 0;
 }
 
 static int aa_reject_syscall(struct task_struct *task, gfp_t flags,
@@ -184,19 +224,16 @@ static int apparmor_ptrace(struct task_struct *parent,
 static int apparmor_capable(struct task_struct *task, int cap)
 {
 	int error;
+	struct aa_task_context *cxt;
 
 	/* cap_capable returns 0 on success, else -EPERM */
 	error = cap_capable(task, cap);
 
-	if (!error) {
-		struct aa_task_context *cxt;
-
-		rcu_read_lock();
-		cxt = aa_task_context(task);
-		if (cxt)
-			error = aa_capability(cxt, cap);
-		rcu_read_unlock();
-	}
+	rcu_read_lock();
+	cxt = aa_task_context(task);
+	if (cxt && (!error || cap_raised(cxt->profile->set_caps, cap)))
+		error = aa_capability(cxt, cap);
+	rcu_read_unlock();
 
 	return error;
 }
@@ -224,12 +261,13 @@ static int apparmor_sysctl(struct ctl_table *table, int op)
 		if (name && name - buffer >= 5) {
 			name -= 5;
 			memcpy(name, "/proc", 5);
-			error = aa_perm_path(profile, "sysctl", name, mask);
+			error = aa_perm_path(profile, "sysctl", name, mask, 0);
 		}
 		free_page((unsigned long)buffer);
 	}
 
 out:
+	aa_put_profile(profile);
 	return error;
 }
 
@@ -339,8 +377,7 @@ static inline int aa_mask_permissions(int mask)
 static int apparmor_inode_create(struct inode *dir, struct dentry *dentry,
 				 struct vfsmount *mnt, int mask)
 {
-	/* FIXME: may move to MAY_APPEND later */
-	return aa_permission("inode_create", dir, dentry, mnt, MAY_WRITE, 0);
+	return aa_permission("inode_create", dir, dentry, mnt, MAY_APPEND, 0);
 }
 
 static int apparmor_inode_link(struct dentry *old_dentry,
@@ -439,8 +476,10 @@ static int apparmor_inode_permission(struct inode *inode, int mask,
 		/* allow traverse accesses to directories */
 		mask &= ~MAY_EXEC;
 	}
-	error = aa_permission("inode_permission", inode, nd->path.dentry, nd->path.mnt,
+	error = aa_permission("inode_permission", inode, nd->path.dentry,
+			      nd->path.mnt,
 			      mask, check);
+
 out:
 	if (!error)
 		error = AA_SECONDARY(inode_permission, inode, mask, nd);
@@ -613,6 +652,16 @@ static int apparmor_file_mmap(struct file *file, unsigned long reqprot,
 			      unsigned long prot, unsigned long flags,
 			      unsigned long addr, unsigned long addr_only)
 {
+	if ((addr < mmap_min_addr) && !capable(CAP_SYS_RAWIO)) {
+		struct aa_profile *profile = aa_get_profile(current);
+		if (profile)
+			/* future control check here */
+			return -EACCES;
+		else
+			return -EACCES;
+		aa_put_profile(profile);
+	}
+
 	return aa_mmap(file, "file_mmap", prot, flags);
 }
 
@@ -653,7 +702,7 @@ static int apparmor_socket_create(int family, int type, int protocol, int kern)
 	return error;
 }
 
-static int apparmor_socket_post_create(struct socket * sock, int family,
+static int apparmor_socket_post_create(struct socket *sock, int family,
 					int type, int protocol, int kern)
 {
 	struct sock *sk = sock->sk;
@@ -664,67 +713,67 @@ static int apparmor_socket_post_create(struct socket * sock, int family,
 	return aa_revalidate_sk(sk, "socket_post_create");
 }
 
-static int apparmor_socket_bind(struct socket * sock,
-				struct sockaddr * address, int addrlen)
+static int apparmor_socket_bind(struct socket *sock,
+				struct sockaddr *address, int addrlen)
 {
 	struct sock *sk = sock->sk;
 
 	return aa_revalidate_sk(sk, "socket_bind");
 }
 
-static int apparmor_socket_connect(struct socket * sock,
-					struct sockaddr * address, int addrlen)
+static int apparmor_socket_connect(struct socket *sock,
+					struct sockaddr *address, int addrlen)
 {
 	struct sock *sk = sock->sk;
 
 	return aa_revalidate_sk(sk, "socket_connect");
 }
 
-static int apparmor_socket_listen(struct socket * sock, int backlog)
+static int apparmor_socket_listen(struct socket *sock, int backlog)
 {
 	struct sock *sk = sock->sk;
 
 	return aa_revalidate_sk(sk, "socket_listen");
 }
 
-static int apparmor_socket_accept(struct socket * sock, struct socket * newsock)
+static int apparmor_socket_accept(struct socket *sock, struct socket *newsock)
 {
 	struct sock *sk = sock->sk;
 
 	return aa_revalidate_sk(sk, "socket_accept");
 }
 
-static int apparmor_socket_sendmsg(struct socket * sock,
-					struct msghdr * msg, int size)
+static int apparmor_socket_sendmsg(struct socket *sock,
+					struct msghdr *msg, int size)
 {
 	struct sock *sk = sock->sk;
 
 	return aa_revalidate_sk(sk, "socket_sendmsg");
 }
 
-static int apparmor_socket_recvmsg(struct socket * sock,
-				   struct msghdr * msg, int size, int flags)
+static int apparmor_socket_recvmsg(struct socket *sock,
+				   struct msghdr *msg, int size, int flags)
 {
 	struct sock *sk = sock->sk;
 
 	return aa_revalidate_sk(sk, "socket_recvmsg");
 }
 
-static int apparmor_socket_getsockname(struct socket * sock)
+static int apparmor_socket_getsockname(struct socket *sock)
 {
 	struct sock *sk = sock->sk;
 
 	return aa_revalidate_sk(sk, "socket_getsockname");
 }
 
-static int apparmor_socket_getpeername(struct socket * sock)
+static int apparmor_socket_getpeername(struct socket *sock)
 {
 	struct sock *sk = sock->sk;
 
 	return aa_revalidate_sk(sk, "socket_getpeername");
 }
 
-static int apparmor_socket_getsockopt(struct socket * sock, int level,
+static int apparmor_socket_getsockopt(struct socket *sock, int level,
 					int optname)
 {
 	struct sock *sk = sock->sk;
@@ -732,7 +781,7 @@ static int apparmor_socket_getsockopt(struct socket * sock, int level,
 	return aa_revalidate_sk(sk, "socket_getsockopt");
 }
 
-static int apparmor_socket_setsockopt(struct socket * sock, int level,
+static int apparmor_socket_setsockopt(struct socket *sock, int level,
 					int optname)
 {
 	struct sock *sk = sock->sk;
@@ -740,27 +789,11 @@ static int apparmor_socket_setsockopt(struct socket * sock, int level,
 	return aa_revalidate_sk(sk, "socket_setsockopt");
 }
 
-static int apparmor_socket_shutdown(struct socket * sock, int how)
+static int apparmor_socket_shutdown(struct socket *sock, int how)
 {
 	struct sock *sk = sock->sk;
 
 	return aa_revalidate_sk(sk, "socket_shutdown");
-}
-
-static int apparmor_socket_getpeersec_stream(struct socket *sock,
-			char __user *optval, int __user *optlen, unsigned len)
-{
-	struct sock *sk = sock->sk;
-
-	return aa_revalidate_sk(sk, "socket_getpeersec_stream");
-}
-
-static int apparmor_socket_getpeersec_dgram(struct socket *sock,
-					struct sk_buff *skb, u32 *secid)
-{
-	struct sock *sk = sock->sk;
-
-	return aa_revalidate_sk(sk, "socket_getpeersec_dgram");
 }
 
 static int apparmor_getprocattr(struct task_struct *task, char *name,
@@ -854,18 +887,19 @@ static int apparmor_setprocattr(struct task_struct *task, char *name,
 	return error;
 }
 
-static void info_message(const char *str, const char *name)
+static int apparmor_task_setrlimit(unsigned int resource,
+				   struct rlimit *new_rlim)
 {
-       struct aa_audit sa;
-       memset(&sa, 0, sizeof(sa));
-       sa.gfp_mask = GFP_KERNEL;
-       sa.name = name;
-       sa.info = str;
-       if (name)
-	       printk(KERN_INFO "AppArmor: %s name=\"%s\"\n", str, name);
-       else
-	       printk(KERN_INFO "AppArmor: %s\n", str);
-       aa_audit_message(NULL, &sa, AUDIT_APPARMOR_STATUS);
+	struct aa_profile *profile;
+	int error = 0;
+
+	profile = aa_get_profile(current);
+	if (profile) {
+		error = aa_task_setrlimit(profile, resource, new_rlim);
+	}
+	aa_put_profile(profile);
+
+	return error;
 }
 
 int apparmor_register_subsecurity(const char *name,
@@ -964,6 +998,7 @@ struct security_operations apparmor_ops = {
 	.task_free_security =		apparmor_task_free_security,
 	.task_post_setuid =		cap_task_post_setuid,
 	.task_reparent_to_init =	cap_task_reparent_to_init,
+	.task_setrlimit =		apparmor_task_setrlimit,
 
 	.getprocattr =			apparmor_getprocattr,
 	.setprocattr =			apparmor_setprocattr,
@@ -983,73 +1018,75 @@ struct security_operations apparmor_ops = {
 	.socket_getsockopt =		apparmor_socket_getsockopt,
 	.socket_setsockopt =		apparmor_socket_setsockopt,
 	.socket_shutdown =		apparmor_socket_shutdown,
-	.socket_getpeersec_stream =	apparmor_socket_getpeersec_stream,
-	.socket_getpeersec_dgram =	apparmor_socket_getpeersec_dgram,
 };
 
-static int apparmor_initialized;
+void info_message(const char *str, const char *name)
+{
+	struct aa_audit sa;
+	memset(&sa, 0, sizeof(sa));
+	sa.gfp_mask = GFP_KERNEL;
+	sa.info = str;
+	sa.name = name;
+	printk(KERN_INFO "AppArmor: %s %s\n", str, name);
+	if (audit_enabled)
+		aa_audit_message(NULL, &sa, AUDIT_APPARMOR_STATUS);
+}
+
 static int __init apparmor_init(void)
 {
 	int error;
 
 	if (!apparmor_enabled) {
-		printk(KERN_INFO "AppArmor:  Disabled at boot.\n");
+		info_message("AppArmor disabled by boottime parameter", "");
 		return 0;
 	}
 
-	if ((error = alloc_null_complain_profile())){
-		AA_ERROR("Unable to allocate null complain profile\n");
+	if ((error = create_apparmorfs())) {
+		AA_ERROR("Unable to activate AppArmor filesystem\n");
+		goto createfs_out;
+	}
+
+	if ((error = alloc_default_namespace())){
+		AA_ERROR("Unable to allocate default profile namespace\n");
 		goto alloc_out;
 	}
 
-	if ((error = register_security(&apparmor_ops))) {
+ 	if ((error = register_security(&apparmor_ops))) {
 		AA_ERROR("Unable to register AppArmor\n");
 		goto register_security_out;
 	}
 
+	/* Report that AppArmor successfully initialized */
+	apparmor_initialized = 1;
 	if (apparmor_complain)
 		info_message("AppArmor initialized: complainmode enabled",
 			     NULL);
 	else
 		info_message("AppArmor initialized", NULL);
 
-	apparmor_initialized = 1;
-
 	return error;
 
 register_security_out:
-	free_null_complain_profile();
+	free_default_namespace();
 
 alloc_out:
+ 	destroy_apparmorfs();
+
+createfs_out:
 	return error;
 
 }
+
 security_initcall(apparmor_init);
 
 void apparmor_disable(void)
 {
 	/* Remove and release all the profiles on the profile list. */
 	mutex_lock(&aa_interface_lock);
-	write_lock(&profile_list_lock);
-	while (!list_empty(&profile_list)) {
-		struct aa_profile *profile =
-			list_entry(profile_list.next, struct aa_profile, list);
-
-		/* Remove the profile from each task context it is on. */
-		lock_profile(profile);
-		profile->isstale = 1;
-		aa_unconfine_tasks(profile);
-		unlock_profile(profile);
-
-		/* Release the profile itself. */
-		list_del_init(&profile->list);
-		aa_put_profile(profile);
-	}
-	write_unlock(&profile_list_lock);
+	aa_profile_ns_list_release();
 
 	/* FIXME: cleanup profiles references on files */
-
-	free_null_complain_profile();
+	free_default_namespace();
 
 	/*
 	 * Delay for an rcu cycle to make sure that all active task
@@ -1061,35 +1098,9 @@ void apparmor_disable(void)
 	destroy_apparmorfs();
 	mutex_unlock(&aa_interface_lock);
 
+	apparmor_initialized = 0;
+
 	info_message("AppArmor protection removed", NULL);
-}
-
-static int param_set_aa_enabled(const char *val, struct kernel_param *kp)
-{
-	char *endp;
-	unsigned long l;
-
-	if (!apparmor_initialized) {
-		apparmor_enabled = 0;
-		return 0;
-	}
-
-	if (aa_task_context(current))
-		return -EPERM;
-
-	if (!apparmor_enabled)
-		return -EINVAL;
-
-	if (!val)
-		return -EINVAL;
-
-	l = simple_strtoul(val, &endp, 0);
-	if (endp == val || l != 0)
-		return -EINVAL;
-
-	apparmor_enabled = 0;
-	apparmor_disable();
-	return 0;
 }
 
 MODULE_DESCRIPTION("AppArmor process confinement");

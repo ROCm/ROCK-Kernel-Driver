@@ -36,6 +36,7 @@ const struct file_operations afs_file_operations = {
 	.fsync		= afs_fsync,
 	.lock		= afs_lock,
 	.flock		= afs_flock,
+	.fsetattr	= afs_fsetattr,
 };
 
 const struct inode_operations afs_file_inode_operations = {

@@ -909,6 +909,11 @@ static sector_t fuse_bmap(struct address_space *mapping, sector_t block)
 	return err ? 0 : outarg.block;
 }
 
+static int fuse_fsetattr(struct file *file, struct iattr *attr)
+{
+	return fuse_do_setattr(file->f_path.dentry, attr, file);
+}
+
 static const struct file_operations fuse_file_operations = {
 	.llseek		= generic_file_llseek,
 	.read		= do_sync_read,
@@ -922,6 +927,7 @@ static const struct file_operations fuse_file_operations = {
 	.fsync		= fuse_fsync,
 	.lock		= fuse_file_lock,
 	.flock		= fuse_file_flock,
+	.fsetattr	= fuse_fsetattr,
 	.splice_read	= generic_file_splice_read,
 };
 
@@ -935,6 +941,7 @@ static const struct file_operations fuse_direct_io_file_operations = {
 	.fsync		= fuse_fsync,
 	.lock		= fuse_file_lock,
 	.flock		= fuse_file_flock,
+	.fsetattr	= fuse_fsetattr,
 	/* no mmap and splice_read */
 };
 

@@ -1760,6 +1760,7 @@ shouldnt_be_hashed:
  * then if @fail_deleted is true, ERR_PTR(-ENOENT) is returned. Otherwise,
  * the string " (deleted)" is appended. Note that this is ambiguous.
  *
+ * Returns the buffer or an error code if the path was too long.
  * If @dentry is not connected to @root, the path returned will be relative
  * (i.e., it will not start with a slash).
  *
@@ -1788,6 +1789,7 @@ char *__d_path(struct dentry *dentry, struct vfsmount *vfsmnt,
 		buffer -= 10;
 		memcpy(buffer, " (deleted)", 10);
 	}
+
 	while (dentry != root->dentry || vfsmnt != root->mnt) {
 		struct dentry * parent;
 
@@ -1858,9 +1860,10 @@ Elong:
 	goto out;
 }
 
-static char *__connect_d_path(char *path, char *buffer)
+static char *__connect_d_path(char *path, char *buffer, struct dentry *dentry)
 {
-	if (!IS_ERR(path) && *path != '/') {
+	if (!IS_ERR(path) && *path != '/' &&
+	    !(dentry->d_sb->s_flags & MS_NOUSER)) {
 		/* Pretend that disconnected paths are hanging off the root. */
 		if (path == buffer)
 			path = ERR_PTR(-ENAMETOOLONG);
@@ -1903,7 +1906,7 @@ char *d_path(struct path *path, char *buf, int buflen)
 	path_get(&current->fs->root);
 	read_unlock(&current->fs->lock);
 	res = __d_path(path->dentry, path->mnt, &root, buf, buflen, 0);
-	res = __connect_d_path(res, buf);
+	res = __connect_d_path(res, buf, path->dentry);
 	path_put(&root);
 	return res;
 }
@@ -1964,7 +1967,7 @@ asmlinkage long sys_getcwd(char __user *buf, unsigned long size)
 	read_unlock(&current->fs->lock);
 
 	cwd = __d_path(pwd.dentry, pwd.mnt, &root, page, PAGE_SIZE, 1);
-	cwd = __connect_d_path(cwd, page);
+	cwd = __connect_d_path(cwd, page, pwd.dentry);
 	error = PTR_ERR(cwd);
 	if (IS_ERR(cwd))
 		goto out;

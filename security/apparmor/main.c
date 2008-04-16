@@ -29,31 +29,339 @@ static const char *capability_names[] = {
 #include "capability_names.h"
 };
 
-/* NULL complain profile
- *
- * Used when in complain mode, to emit Permitting messages for non-existant
- * profiles and hats.  This is necessary because of selective mode, in which
- * case we need a complain null_profile and enforce null_profile
- *
- * The null_complain_profile cannot be statically allocated, because it
- * can be associated to files which keep their reference even if apparmor is
- * unloaded
+struct aa_namespace *default_namespace;
+
+static int aa_inode_mode(struct inode *inode)
+{
+	/* if the inode doesn't exist the user is creating it */
+	if (!inode || current->fsuid == inode->i_uid)
+		return AA_USER_SHIFT;
+	return AA_OTHER_SHIFT;
+}
+
+int alloc_default_namespace(void)
+{
+	struct aa_namespace *ns;
+	char *name = kstrdup("default", GFP_KERNEL);
+	if (!name)
+		return -ENOMEM;
+	ns = alloc_aa_namespace(name);
+	if (!ns) {
+		kfree(name);
+		return -ENOMEM;
+	}
+
+	write_lock(&profile_ns_list_lock);
+	default_namespace = ns;
+	aa_get_namespace(ns);
+	list_add(&ns->list, &profile_ns_list);
+	write_unlock(&profile_ns_list_lock);
+
+	return 0;
+}
+
+void free_default_namespace(void)
+{
+	write_lock(&profile_ns_list_lock);
+	list_del_init(&default_namespace->list);
+	write_unlock(&profile_ns_list_lock);
+	aa_put_namespace(default_namespace);
+	default_namespace = NULL;
+}
+
+static void aa_audit_file_sub_mask(struct audit_buffer *ab, char *buffer,
+				   int mask)
+{
+	const char unsafex[] = "upcn";
+	const char safex[] = "UPCN";
+	char *m = buffer;
+
+	if (mask & AA_EXEC_MMAP)
+		*m++ = 'm';
+	if (mask & MAY_READ)
+		*m++ = 'r';
+	if (mask & MAY_WRITE)
+		*m++ = 'w';
+	else if (mask & MAY_APPEND)
+		*m++ = 'a';
+	if (mask & MAY_EXEC) {
+		int index = AA_EXEC_INDEX(mask);
+		/* all indexes > 4 are also named transitions */
+		if (index > 4)
+			index = 4;
+		if (index > 0) {
+			if (mask & AA_EXEC_UNSAFE)
+				*m++ = unsafex[index - 1];
+			else
+				*m++ = safex[index - 1];
+		}
+		if (mask & AA_EXEC_INHERIT)
+			*m++ = 'i';
+		*m++ = 'x';
+	}
+	if (mask & AA_MAY_LINK)
+		*m++ = 'l';
+	if (mask & AA_MAY_LOCK)
+		*m++ = 'k';
+	*m++ = '\0';
+}
+
+static void aa_audit_file_mask(struct audit_buffer *ab, const char *name,
+			       int mask)
+{
+	char user[10], other[10];
+
+	aa_audit_file_sub_mask(ab, user,
+			       (mask & AA_USER_PERMS) >> AA_USER_SHIFT);
+	aa_audit_file_sub_mask(ab, other,
+			       (mask & AA_OTHER_PERMS) >> AA_OTHER_SHIFT);
+
+	audit_log_format(ab, " %s=\"%s::%s\"", name, user, other);
+}
+
+static const char *address_families[] = {
+#include "af_names.h"
+};
+
+static const char *sock_types[] = {
+	"unknown(0)",
+	"stream",
+	"dgram",
+	"raw",
+	"rdm",
+	"seqpacket",
+	"dccp",
+	"unknown(7)",
+	"unknown(8)",
+	"unknown(9)",
+	"packet",
+};
+
+/**
+ * aa_audit - Log an audit event to the audit subsystem
+ * @profile: profile to check against
+ * @sa: audit event
+ * @audit_cxt: audit context to log message to
+ * @type: audit event number
  */
-struct aa_profile *null_complain_profile;
+static int aa_audit_base(struct aa_profile *profile, struct aa_audit *sa,
+			 struct audit_context *audit_cxt, int type)
+{
+	struct audit_buffer *ab = NULL;
+
+	ab = audit_log_start(audit_cxt, sa->gfp_mask, type);
+
+	if (!ab) {
+		AA_ERROR("Unable to log event (%d) to audit subsys\n",
+			 type);
+		 /* don't fail operations in complain mode even if logging
+		  * fails */
+		return type == AUDIT_APPARMOR_ALLOWED ? 0 : -ENOMEM;
+	}
+
+	if (sa->operation)
+		audit_log_format(ab, "operation=\"%s\"", sa->operation);
+
+	if (sa->info) {
+		audit_log_format(ab, " info=\"%s\"", sa->info);
+		if (sa->error_code)
+			audit_log_format(ab, " error=%d", sa->error_code);
+	}
+
+	if (sa->request_mask)
+		aa_audit_file_mask(ab, "requested_mask", sa->request_mask);
+
+	if (sa->denied_mask)
+		aa_audit_file_mask(ab, "denied_mask", sa->denied_mask);
+
+	if (sa->request_mask)
+		audit_log_format(ab, " fsuid=%d", current->fsuid);
+
+	if (sa->rlimit)
+		audit_log_format(ab, " rlimit=%d", sa->rlimit - 1);
+
+	if (sa->iattr) {
+		struct iattr *iattr = sa->iattr;
+
+		audit_log_format(ab, " attribute=\"%s%s%s%s%s%s%s\"",
+			iattr->ia_valid & ATTR_MODE ? "mode," : "",
+			iattr->ia_valid & ATTR_UID ? "uid," : "",
+			iattr->ia_valid & ATTR_GID ? "gid," : "",
+			iattr->ia_valid & ATTR_SIZE ? "size," : "",
+			iattr->ia_valid & (ATTR_ATIME | ATTR_ATIME_SET) ?
+				"atime," : "",
+			iattr->ia_valid & (ATTR_MTIME | ATTR_MTIME_SET) ?
+				"mtime," : "",
+			iattr->ia_valid & ATTR_CTIME ? "ctime," : "");
+	}
+
+	if (sa->task)
+		audit_log_format(ab, " task=%d", sa->task);
+
+	if (sa->parent)
+		audit_log_format(ab, " parent=%d", sa->parent);
+
+	if (sa->name) {
+		audit_log_format(ab, " name=");
+		audit_log_untrustedstring(ab, sa->name);
+	}
+
+	if (sa->name2) {
+		audit_log_format(ab, " name2=");
+		audit_log_untrustedstring(ab, sa->name2);
+	}
+
+	if (sa->family || sa->type) {
+		if (address_families[sa->family])
+			audit_log_format(ab, " family=\"%s\"",
+					 address_families[sa->family]);
+		else
+			audit_log_format(ab, " family=\"unknown(%d)\"",
+					 sa->family);
+
+		if (sock_types[sa->type])
+			audit_log_format(ab, " sock_type=\"%s\"",
+					 sock_types[sa->type]);
+		else
+			audit_log_format(ab, " sock_type=\"unknown(%d)\"",
+					 sa->type);
+
+		audit_log_format(ab, " protocol=%d", sa->protocol);
+	}
+
+        audit_log_format(ab, " pid=%d", current->pid);
+
+	if (profile) {
+		audit_log_format(ab, " profile=");
+		audit_log_untrustedstring(ab, profile->name);
+
+		if (profile->ns != default_namespace) {
+			audit_log_format(ab, " namespace=");
+			audit_log_untrustedstring(ab, profile->ns->name);
+		}
+	}
+
+	audit_log_end(ab);
+
+	return type == AUDIT_APPARMOR_ALLOWED ? 0 : sa->error_code;
+}
+
+/**
+ * aa_audit_syscallreject - Log a syscall rejection to the audit subsystem
+ * @profile: profile to check against
+ * @gfp: memory allocation flags
+ * @msg: string describing syscall being rejected
+ */
+int aa_audit_syscallreject(struct aa_profile *profile, gfp_t gfp,
+			   const char *msg)
+{
+	struct aa_audit sa;
+	memset(&sa, 0, sizeof(sa));
+	sa.operation = "syscall";
+	sa.name = msg;
+	sa.gfp_mask = gfp;
+	sa.error_code = -EPERM;
+
+	return aa_audit_base(profile, &sa, current->audit_context,
+			     AUDIT_APPARMOR_DENIED);
+}
+
+int aa_audit_message(struct aa_profile *profile, struct aa_audit *sa,
+		      int type)
+{
+	struct audit_context *audit_cxt;
+
+	audit_cxt = apparmor_logsyscall ? current->audit_context : NULL;
+	return aa_audit_base(profile, sa, audit_cxt, type);
+}
+
+void aa_audit_hint(struct aa_profile *profile, struct aa_audit *sa)
+{
+	aa_audit_message(profile, sa, AUDIT_APPARMOR_HINT);
+}
+
+void aa_audit_status(struct aa_profile *profile, struct aa_audit *sa)
+{
+	aa_audit_message(profile, sa, AUDIT_APPARMOR_STATUS);
+}
+
+int aa_audit_reject(struct aa_profile *profile, struct aa_audit *sa)
+{
+	return aa_audit_message(profile, sa, AUDIT_APPARMOR_DENIED);
+}
+
+/**
+ * aa_audit - Log an audit event to the audit subsystem
+ * @profile: profile to check against
+ * @sa: audit event
+ */
+int aa_audit(struct aa_profile *profile, struct aa_audit *sa)
+{
+	int type = AUDIT_APPARMOR_DENIED;
+	struct audit_context *audit_cxt;
+
+	if (likely(!sa->error_code))
+		type = AUDIT_APPARMOR_AUDIT;
+	else if (PROFILE_COMPLAIN(profile))
+		type = AUDIT_APPARMOR_ALLOWED;
+
+	audit_cxt = apparmor_logsyscall ? current->audit_context : NULL;
+	return aa_audit_base(profile, sa, audit_cxt, type);
+}
+
+static int aa_audit_file(struct aa_profile *profile, struct aa_audit *sa)
+{
+	if (likely(!sa->error_code)) {
+		int mask = sa->audit_mask & AUDIT_FILE_MASK;
+
+		if (unlikely(PROFILE_AUDIT(profile)))
+			mask |= AUDIT_FILE_MASK;
+
+		if (likely(!(sa->request_mask & mask)))
+			return 0;
+
+		/* mask off perms that are not being force audited */
+		sa->request_mask &= mask | ALL_AA_EXEC_TYPE;
+	} else {
+		int mask = AUDIT_QUIET_MASK(sa->audit_mask);
+
+		if (!(sa->denied_mask & ~mask))
+			return sa->error_code;
+
+		/* mask off perms whose denial is being silenced */
+		sa->denied_mask &= (~mask) | ALL_AA_EXEC_TYPE;
+	}
+
+	return aa_audit(profile, sa);
+}
+
+static int aa_audit_caps(struct aa_profile *profile, struct aa_audit *sa,
+			 int cap)
+{
+	if (likely(!sa->error_code)) {
+		if (likely(!PROFILE_AUDIT(profile) &&
+			   !cap_raised(profile->audit_caps, cap)))
+			return 0;
+	}
+
+	/* quieting of capabilities is handled the caps_logged cache */
+	return aa_audit(profile, sa);
+}
 
 /**
  * aa_file_denied - check for @mask access on a file
  * @profile: profile to check against
  * @name: pathname of file
  * @mask: permission mask requested for file
+ * @audit_mask: return audit mask for the match
  *
  * Return %0 on success, or else the permissions in @mask that the
  * profile denies.
  */
 static int aa_file_denied(struct aa_profile *profile, const char *name,
-			  int mask)
+			  int mask, int *audit_mask)
 {
-	return (mask & ~aa_match(profile->file_rules, name));
+	return (mask & ~aa_match(profile->file_rules, name, audit_mask));
 }
 
 /**
@@ -61,39 +369,80 @@ static int aa_file_denied(struct aa_profile *profile, const char *name,
  * @profile: profile to check against
  * @link: pathname of link being created
  * @target: pathname of target to be linked to
+ * @target_mode: UGO shift for target inode
  * @request_mask: the permissions subset valid only if link succeeds
+ * @audit_mask: return the audit_mask for the link permission
  * Return %0 on success, or else the permissions that the profile denies.
  */
 static int aa_link_denied(struct aa_profile *profile, const char *link,
-			  const char *target, int *request_mask)
+			  const char *target, int target_mode,
+			  int *request_mask, int *audit_mask)
 {
-	int l_mode, t_mode, denied_mask;
+	unsigned int state;
+	int l_mode, t_mode, l_x, t_x, denied_mask = 0;
+	int link_mask = AA_MAY_LINK << target_mode;
 
-	l_mode = aa_match(profile->file_rules, link);
-	t_mode = aa_match(profile->file_rules, target);
+	*request_mask = link_mask;
 
-	/* Ignore valid-profile-transition flags. */
-	l_mode &= ~AA_CHANGE_PROFILE;
-	t_mode &= ~AA_CHANGE_PROFILE;
+	l_mode = aa_match_state(profile->file_rules, DFA_START, link, &state);
 
-	*request_mask = l_mode | AA_MAY_LINK;
+	if (l_mode & link_mask) {
+		int mode;
+		/* test to see if target can be paired with link */
+		state = aa_dfa_null_transition(profile->file_rules, state);
+		mode = aa_match_state(profile->file_rules, state, target,
+				      &state);
 
-	/* Link always requires 'l' on the link, a subset of the
-	 * target's 'r', 'w', 'x', 'a', 'z', and 'm' permissions on the link,
-	 * and if the link has 'x', an exact match of all the execute flags
-	 * ('i', 'u', 'U', 'p', 'P').
+		if (!(mode & link_mask))
+			denied_mask |= link_mask;
+
+		*audit_mask = dfa_audit_mask(profile->file_rules, state);
+
+		/* return if link subset test is not required */
+		if (!(mode & (AA_LINK_SUBSET_TEST << target_mode)))
+			return denied_mask;
+	}
+
+	/* Do link perm subset test requiring permission on link are a
+	 * subset of the permissions on target.
+	 * If a subset test is required a permission subset test of the
+	 * perms for the link are done against the user::other of the
+	 * target's 'r', 'w', 'x', 'a', 'k', and 'm' permissions.
+	 *
+	 * If the link has 'x', an exact match of all the execute flags
+	 * must match.
+ 	 */
+	denied_mask |= ~l_mode & link_mask;
+
+	t_mode = aa_match(profile->file_rules, target, NULL);
+
+	l_x = l_mode & (ALL_AA_EXEC_TYPE | AA_EXEC_BITS);
+	t_x = t_mode & (ALL_AA_EXEC_TYPE | AA_EXEC_BITS);
+
+	/* For actual subset test ignore valid-profile-transition flags,
+	 * and link bits
 	 */
-#define RWXAZM (MAY_READ | MAY_WRITE | MAY_EXEC | MAY_APPEND | AA_MAY_LOCK | \
-		AA_EXEC_MMAP)
-	denied_mask = ~l_mode & AA_MAY_LINK;
-	if (l_mode & RWXAZM)
-		denied_mask |= (l_mode & ~ AA_MAY_LINK) & ~t_mode;
-	else
-		denied_mask |= t_mode | AA_MAY_LINK;
-	if (denied_mask & AA_EXEC_MODIFIERS)
-		denied_mask |= MAY_EXEC;
+	l_mode &= AA_FILE_PERMS & ~AA_LINK_BITS;
+	t_mode &= AA_FILE_PERMS & ~AA_LINK_BITS;
 
-#undef RWXAZM
+	*request_mask = l_mode | link_mask;
+
+	if (l_mode) {
+		int x = l_x | (t_x & ALL_AA_EXEC_UNSAFE);
+		denied_mask |= l_mode & ~t_mode;
+		/* mask off x modes not used by link */
+
+		/* handle exec subset
+		 * - link safe exec issubset of unsafe exec
+		 * - no link x perm is subset of target having x perm
+		 */
+		if ((l_mode & AA_USER_EXEC) &&
+		    (x & AA_USER_EXEC_TYPE) != (t_x & AA_USER_EXEC_TYPE))
+			denied_mask = AA_USER_EXEC | (l_x & AA_USER_EXEC_TYPE);
+		if ((l_mode & AA_OTHER_EXEC) &&
+		    (x & AA_OTHER_EXEC_TYPE) != (t_x & AA_OTHER_EXEC_TYPE))
+			denied_mask = AA_OTHER_EXEC | (l_x & AA_OTHER_EXEC_TYPE);
+	}
 
 	return denied_mask;
 }
@@ -157,6 +506,13 @@ static char *aa_get_name(struct dentry *dentry, struct vfsmount *mnt,
 	}
 }
 
+static char *new_compound_name(const char *n1, const char *n2)
+{
+	char *name = kmalloc(strlen(n1) + strlen(n2) + 3, GFP_KERNEL);
+	if (name)
+		sprintf(name, "%s//%s", n1, n2);
+	return name;
+}
 static inline void aa_put_name_buffer(char *buffer)
 {
 	kfree(buffer);
@@ -183,7 +539,7 @@ static int aa_perm_dentry(struct aa_profile *profile, struct dentry *dentry,
 	char *buffer = NULL;
 
 	sa->name = aa_get_name(dentry, mnt, &buffer, check);
-
+	sa->request_mask <<= aa_inode_mode(dentry->d_inode);
 	if (IS_ERR(sa->name)) {
 		/*
 		 * deleted files are given a pass on permission checks when
@@ -191,282 +547,29 @@ static int aa_perm_dentry(struct aa_profile *profile, struct dentry *dentry,
 		 */
 		if (PTR_ERR(sa->name) == -ENOENT && (check & AA_CHECK_FD))
 			sa->denied_mask = 0;
-		else
-			sa->denied_mask = PTR_ERR(sa->name);
+		else {
+			sa->denied_mask = sa->request_mask;
+			sa->error_code = PTR_ERR(sa->name);
+			if (sa->error_code == -ENOENT)
+				sa->info = "Failed name resolution - object not a valid entry";
+			else if (sa->error_code == -ENAMETOOLONG)
+				sa->info = "Failed name resolution - name too long";
+			else
+				sa->info = "Failed name resolution";
+		}
 		sa->name = NULL;
 	} else
 		sa->denied_mask = aa_file_denied(profile, sa->name,
-						 sa->requested_mask);
+						 sa->request_mask,
+						 &sa->audit_mask);
 
 	if (!sa->denied_mask)
 		sa->error_code = 0;
 
-	error = aa_audit(profile, sa);
+	error = aa_audit_file(profile, sa);
 	aa_put_name_buffer(buffer);
 
 	return error;
-}
-
-/**
- * alloc_null_complain_profile - Allocate the global null_complain_profile.
- *
- * Return %0 (success) or error (-%ENOMEM)
- */
-int alloc_null_complain_profile(void)
-{
-	null_complain_profile = alloc_aa_profile();
-	if (!null_complain_profile)
-		goto fail;
-
-	null_complain_profile->name =
-		kstrdup("null-complain-profile", GFP_KERNEL);
-
-	if (!null_complain_profile->name)
-		goto fail;
-
-	null_complain_profile->flags.complain = 1;
-
-	return 0;
-
-fail:
-	/* free_aa_profile is safe for freeing partially constructed objects */
-	free_aa_profile(null_complain_profile);
-	null_complain_profile = NULL;
-
-	return -ENOMEM;
-}
-
-/**
- * free_null_complain_profile - Free null profiles
- */
-void free_null_complain_profile(void)
-{
-	aa_put_profile(null_complain_profile);
-	null_complain_profile = NULL;
-}
-
-static void aa_audit_file_mask(struct audit_buffer *ab, const char *name,
-			       int mask)
-{
-	char mask_str[10], *m = mask_str;
-
-	if (mask & AA_EXEC_MMAP)
-		*m++ = 'm';
-	if (mask & MAY_READ)
-		*m++ = 'r';
-	if (mask & MAY_WRITE)
-		*m++ = 'w';
-	else if (mask & MAY_APPEND)
-		*m++ = 'a';
-	if (mask & (MAY_EXEC | AA_EXEC_MODIFIERS)) {
-		if (mask & AA_EXEC_UNSAFE) {
-			if (mask & AA_EXEC_INHERIT)
-				*m++ = 'i';
-			if (mask & AA_EXEC_UNCONFINED)
-				*m++ = 'u';
-			if (mask & AA_EXEC_PROFILE)
-				*m++ = 'p';
-		} else {
-			if (mask & AA_EXEC_INHERIT)
-				*m++ = 'I';
-			if (mask & AA_EXEC_UNCONFINED)
-				*m++ = 'U';
-			if (mask & AA_EXEC_PROFILE)
-				*m++ = 'P';
-		}
-		if (mask & MAY_EXEC)
-			*m++ = 'x';
-	}
-	if (mask & AA_MAY_LINK)
-		*m++ = 'l';
-	if (mask & AA_MAY_LOCK)
-		*m++ = 'k';
-	*m++ = '\0';
-
-	audit_log_format(ab, " %s=\"%s\"", name, mask_str);
-}
-
-static const char *address_families[] = {
-#include "af_names.h"
-};
-
-static const char *sock_types[] = {
-	"unknown(0)",
-	"stream",
-	"dgram",
-	"raw",
-	"rdm",
-	"seqpacket",
-	"dccp",
-	"unknown(7)",
-	"unknown(8)",
-	"unknown(9)",
-	"packet",
-};
-
-/**
- * aa_audit - Log an audit event to the audit subsystem
- * @profile: profile to check against
- * @sa: audit event
- * @audit_cxt: audit context to log message to
- * @type: audit event number
- */
-static int aa_audit_base(struct aa_profile *profile, struct aa_audit *sa,
-			 struct audit_context *audit_cxt, int type)
-{
-	struct audit_buffer *ab = NULL;
-
-	ab = audit_log_start(audit_cxt, sa->gfp_mask, type);
-
-	if (!ab) {
-		AA_ERROR("Unable to log event (%d) to audit subsys\n",
-			 type);
-		 /* don't fail operations in complain mode even if logging
-		  * fails */
-		return type == AUDIT_APPARMOR_ALLOWED ? 0 : -ENOMEM;
-	}
-
-	audit_log_format(ab, " type=%d", type);
-
-	if (sa->operation)
-		audit_log_format(ab, " operation=\"%s\"", sa->operation);
-
-	if (sa->info)
-		audit_log_format(ab, " info=\"%s\"", sa->info);
-
-	if (sa->requested_mask)
-		aa_audit_file_mask(ab, "requested_mask", sa->requested_mask);
-
-	if (sa->denied_mask)
-		aa_audit_file_mask(ab, "denied_mask", sa->denied_mask);
-
-	if (sa->iattr) {
-		struct iattr *iattr = sa->iattr;
-
-		audit_log_format(ab, " attribute=\"%s%s%s%s%s%s%s\"",
-			iattr->ia_valid & ATTR_MODE ? "mode," : "",
-			iattr->ia_valid & ATTR_UID ? "uid," : "",
-			iattr->ia_valid & ATTR_GID ? "gid," : "",
-			iattr->ia_valid & ATTR_SIZE ? "size," : "",
-			iattr->ia_valid & (ATTR_ATIME | ATTR_ATIME_SET) ?
-				"atime," : "",
-			iattr->ia_valid & (ATTR_MTIME | ATTR_MTIME_SET) ?
-				"mtime," : "",
-			iattr->ia_valid & ATTR_CTIME ? "ctime," : "");
-	}
-
-	if (sa->task)
-		audit_log_format(ab, " task=%d", sa->task);
-
-	if (sa->parent)
-		audit_log_format(ab, " parent=%d", sa->parent);
-
-	if (sa->name) {
-		audit_log_format(ab, " name=");
-		audit_log_untrustedstring(ab, sa->name);
-	}
-
-	if (sa->name2) {
-		audit_log_format(ab, " name2=");
-		audit_log_untrustedstring(ab, sa->name2);
-	}
-
-	if (sa->family || sa->type) {
-		if (address_families[sa->family])
-			audit_log_format(ab, " family=\"%s\"",
-					 address_families[sa->family]);
-		else
-			audit_log_format(ab, " family=\"unknown(%d)\"",
-					 sa->family);
-
-		if (sock_types[sa->type])
-			audit_log_format(ab, " sock_type=\"%s\"",
-					 sock_types[sa->type]);
-		else
-			audit_log_format(ab, " sock_type=\"unknown(%d)\"",
-					 sa->type);
-
-		audit_log_format(ab, " protocol=%d", sa->protocol);
-	}
-
-	audit_log_format(ab, " pid=%d", current->pid);
-
-	if (profile) {
-		audit_log_format(ab, " profile=");
-		audit_log_untrustedstring(ab, profile->name);
-	}
-
-	audit_log_end(ab);
-
-	return type == AUDIT_APPARMOR_ALLOWED ? 0 : sa->error_code;
-}
-
-/**
- * aa_audit_syscallreject - Log a syscall rejection to the audit subsystem
- * @profile: profile to check against
- * @gfp: memory allocation flags
- * @msg: string describing syscall being rejected
- */
-int aa_audit_syscallreject(struct aa_profile *profile, gfp_t gfp,
-			   const char *msg)
-{
-	struct aa_audit sa;
-	memset(&sa, 0, sizeof(sa));
-	sa.operation = "syscall";
-	sa.name = msg;
-	sa.gfp_mask = gfp;
-	sa.error_code = -EPERM;
-
-	return aa_audit_base(profile, &sa, current->audit_context,
-			     AUDIT_APPARMOR_DENIED);
-}
-
-int aa_audit_message(struct aa_profile *profile, struct aa_audit *sa,
-		      int type)
-{
-	struct audit_context *audit_cxt;
-
-	audit_cxt = apparmor_logsyscall ? current->audit_context : NULL;
-	return aa_audit_base(profile, sa, audit_cxt, type);
-}
-
-void aa_audit_hint(struct aa_profile *profile, struct aa_audit *sa)
-{
-	aa_audit_message(profile, sa, AUDIT_APPARMOR_HINT);
-}
-
-void aa_audit_status(struct aa_profile *profile, struct aa_audit *sa)
-{
-	aa_audit_message(profile, sa, AUDIT_APPARMOR_STATUS);
-}
-
-int aa_audit_reject(struct aa_profile *profile, struct aa_audit *sa)
-{
-	return aa_audit_message(profile, sa, AUDIT_APPARMOR_DENIED);
-}
-
-/**
- * aa_audit - Log an audit event to the audit subsystem
- * @profile: profile to check against
- * @sa: audit event
- */
-int aa_audit(struct aa_profile *profile, struct aa_audit *sa)
-{
-	int type = AUDIT_APPARMOR_DENIED;
-	struct audit_context *audit_cxt;
-
-	if (likely(!sa->error_code)) {
-		if (likely(!PROFILE_AUDIT(profile)))
-			/* nothing to log */
-			return 0;
-		else
-			type = AUDIT_APPARMOR_AUDIT;
-	} else if (PROFILE_COMPLAIN(profile)) {
-		type = AUDIT_APPARMOR_ALLOWED;
-	}
-
-	audit_cxt = apparmor_logsyscall ? current->audit_context : NULL;
-	return aa_audit_base(profile, sa, audit_cxt, type);
 }
 
 /**
@@ -487,7 +590,7 @@ int aa_attr(struct aa_profile *profile, struct dentry *dentry,
 	sa.operation = "setattr";
 	sa.gfp_mask = GFP_KERNEL;
 	sa.iattr = iattr;
-	sa.requested_mask = MAY_WRITE;
+	sa.request_mask = MAY_WRITE;
 	sa.error_code = -EACCES;
 
 	check = 0;
@@ -521,7 +624,7 @@ int aa_perm_xattr(struct aa_profile *profile, const char *operation,
 	memset(&sa, 0, sizeof(sa));
 	sa.operation = operation;
 	sa.gfp_mask = GFP_KERNEL;
-	sa.requested_mask = mask;
+	sa.request_mask = mask;
 	sa.error_code = -EACCES;
 
 	if (inode && S_ISDIR(inode->i_mode))
@@ -555,7 +658,7 @@ int aa_perm(struct aa_profile *profile, const char *operation,
 	memset(&sa, 0, sizeof(sa));
 	sa.operation = operation;
 	sa.gfp_mask = GFP_KERNEL;
-	sa.requested_mask = mask;
+	sa.request_mask = mask;
 	sa.error_code = -EACCES;
 
 	error = aa_perm_dentry(profile, dentry, mnt, &sa, check);
@@ -584,27 +687,32 @@ int aa_perm_dir(struct aa_profile *profile, const char *operation,
 	memset(&sa, 0, sizeof(sa));
 	sa.operation = operation;
 	sa.gfp_mask = GFP_KERNEL;
-	sa.requested_mask = mask;
+	sa.request_mask = mask;
 	sa.error_code = -EACCES;
 
 	return aa_perm_dentry(profile, dentry, mnt, &sa, AA_CHECK_DIR);
 }
 
 int aa_perm_path(struct aa_profile *profile, const char *operation,
-		 const char *name, int mask)
+		 const char *name, int mask, uid_t uid)
 {
 	struct aa_audit sa;
 
 	memset(&sa, 0, sizeof(sa));
 	sa.operation = operation;
 	sa.gfp_mask = GFP_KERNEL;
-	sa.requested_mask = mask;
+	sa.request_mask = mask;
 	sa.name = name;
+	if (current->fsuid == uid)
+		sa.request_mask = mask << AA_USER_SHIFT;
+	else
+		sa.request_mask = mask << AA_OTHER_SHIFT;
 
-	sa.denied_mask = aa_file_denied(profile, name, mask);
+	sa.denied_mask = aa_file_denied(profile, name, sa.request_mask,
+					&sa.audit_mask) ;
 	sa.error_code = sa.denied_mask ? -EACCES : 0;
 
-	return aa_audit(profile, &sa);
+	return aa_audit_file(profile, &sa);
 }
 
 /**
@@ -640,7 +748,7 @@ int aa_capability(struct aa_task_context *cxt, int cap)
 	sa.name = capability_names[cap];
 	sa.error_code = error;
 
-	error = aa_audit(cxt->profile, &sa);
+	error = aa_audit_caps(cxt->profile, &sa, cap);
 
 	return error;
 }
@@ -667,15 +775,15 @@ int aa_link(struct aa_profile *profile,
 	    struct dentry *link, struct vfsmount *link_mnt,
 	    struct dentry *target, struct vfsmount *target_mnt)
 {
-	int error, check = 0;
+	int error;
 	struct aa_audit sa;
 	char *buffer = NULL, *buffer2 = NULL;
 
 	memset(&sa, 0, sizeof(sa));
 	sa.operation = "inode_link";
 	sa.gfp_mask = GFP_KERNEL;
-	sa.name = aa_get_name(link, link_mnt, &buffer, check);
-	sa.name2 = aa_get_name(target, target_mnt, &buffer2, check);
+	sa.name = aa_get_name(link, link_mnt, &buffer, 0);
+	sa.name2 = aa_get_name(target, target_mnt, &buffer2, 0);
 
 	if (IS_ERR(sa.name)) {
 		sa.error_code = PTR_ERR(sa.name);
@@ -687,13 +795,14 @@ int aa_link(struct aa_profile *profile,
 	}
 
 	if (sa.name && sa.name2) {
-		sa.requested_mask = AA_MAY_LINK;
 		sa.denied_mask = aa_link_denied(profile, sa.name, sa.name2,
-						&sa.requested_mask);
+						aa_inode_mode(target->d_inode),
+						&sa.request_mask,
+						&sa.audit_mask);
 		sa.error_code = sa.denied_mask ? -EACCES : 0;
 	}
 
-	error = aa_audit(profile, &sa);
+	error = aa_audit_file(profile, &sa);
 
 	aa_put_name_buffer(buffer);
 	aa_put_name_buffer(buffer2);
@@ -706,7 +815,7 @@ int aa_net_perm(struct aa_profile *profile, char *operation,
 {
 	struct aa_audit sa;
 	int error = 0;
-	u16 family_mask;
+	u16 family_mask, audit_mask, quiet_mask;
 
 	if ((family < 0) || (family >= AF_MAX))
 		return -EINVAL;
@@ -719,6 +828,8 @@ int aa_net_perm(struct aa_profile *profile, char *operation,
 		return 0;
 
 	family_mask = profile->network_families[family];
+	audit_mask = profile->audit_network[family];
+	quiet_mask = profile->quiet_network[family];
 
 	error = (family_mask & (1 << type)) ? 0 : -EACCES;
 
@@ -729,6 +840,13 @@ int aa_net_perm(struct aa_profile *profile, char *operation,
 	sa.type = type;
 	sa.protocol = protocol;
 	sa.error_code = error;
+
+	if (likely(!error)) {
+		if (!PROFILE_AUDIT(profile) && !(family_mask & audit_mask))
+			return 0;
+	} else if (!((1 << type) & ~quiet_mask)) {
+		return error;
+	}
 
 	error = aa_audit(profile, &sa);
 
@@ -757,6 +875,79 @@ int aa_revalidate_sk(struct sock *sk, char *operation)
 
 	return error;
 }
+/**
+ * aa_task_setrlimit - test permission to set an rlimit
+ * @profile - profile confining the task
+ * @resource - the resource being set
+ * @new_rlim - the new resource limit
+ *
+ * Control raising the processes hard limit.
+ */
+int aa_task_setrlimit(struct aa_profile *profile, unsigned int resource,
+		      struct rlimit *new_rlim)
+{
+	struct aa_audit sa;
+	int error = 0;
+
+	memset(&sa, 0, sizeof(sa));
+	sa.operation = "setrlimit";
+	sa.gfp_mask = GFP_KERNEL;
+	sa.rlimit = resource + 1;
+
+	if (profile->rlimits.mask & (1 << resource) &&
+	    new_rlim->rlim_max > profile->rlimits.limits[resource].rlim_max) {
+		sa.error_code = -EACCES;
+
+		error = aa_audit(profile, &sa);
+	}
+
+	return error;
+}
+
+static int aa_rlimit_nproc(struct aa_profile *profile) {
+	if (profile && (profile->rlimits.mask & (1 << RLIMIT_NPROC)) &&
+	    profile->task_count >= profile->rlimits.limits[RLIMIT_NPROC].rlim_max)
+		return -EAGAIN;
+	return 0;
+}
+
+void aa_set_rlimits(struct task_struct *task, struct aa_profile *profile)
+{
+	int i, mask;
+
+	if (!profile)
+		return;
+
+	if (!profile->rlimits.mask)
+		return;
+
+	task_lock(task->group_leader);
+	mask = 1;
+	for (i = 0; i < RLIM_NLIMITS; i++, mask <<= 1) {
+		struct rlimit new_rlim, *old_rlim;
+
+		/* check to see if NPROC which is per profile and handled
+		 * in clone/exec or whether this is a limit to be set
+		 * can't set cpu limit either right now
+		 */
+		if (i == RLIMIT_NPROC || i == RLIMIT_CPU)
+			continue;
+
+		old_rlim = task->signal->rlim + i;
+		new_rlim = *old_rlim;
+
+		if (mask & profile->rlimits.mask &&
+		    profile->rlimits.limits[i].rlim_max < new_rlim.rlim_max) {
+			new_rlim.rlim_max = profile->rlimits.limits[i].rlim_max;
+			/* soft limit should not exceed hard limit */
+			if (new_rlim.rlim_cur > new_rlim.rlim_max)
+				new_rlim.rlim_cur = new_rlim.rlim_max;
+		}
+
+		*old_rlim = new_rlim;
+	}
+	task_unlock(task->group_leader);
+}
 
 /*******************************
  * Global task related functions
@@ -770,6 +961,7 @@ int aa_revalidate_sk(struct sock *sk, char *operation)
  */
 int aa_clone(struct task_struct *child)
 {
+	struct aa_audit sa;
 	struct aa_task_context *cxt, *child_cxt;
 	struct aa_profile *profile;
 
@@ -778,6 +970,11 @@ int aa_clone(struct task_struct *child)
 	child_cxt = aa_alloc_task_context(GFP_KERNEL);
 	if (!child_cxt)
 		return -ENOMEM;
+
+	memset(&sa, 0, sizeof(sa));
+	sa.operation = "clone";
+	sa.task = child->pid;
+	sa.gfp_mask = GFP_KERNEL;
 
 repeat:
 	profile = aa_get_profile(current);
@@ -795,18 +992,22 @@ repeat:
 			goto repeat;
 		}
 
+		if (aa_rlimit_nproc(profile)) {
+			sa.info = "rlimit nproc limit exceeded";
+			unlock_profile(profile);
+			aa_audit_reject(profile, &sa);
+			aa_put_profile(profile);
+			return -EAGAIN;
+		}
+
 		/* No need to grab the child's task lock here. */
 		aa_change_task_context(child, child_cxt, profile,
 				       cxt->cookie, cxt->previous_profile);
+
 		unlock_profile(profile);
 
 		if (APPARMOR_COMPLAIN(child_cxt) &&
-		    profile == null_complain_profile) {
-			struct aa_audit sa;
-			memset(&sa, 0, sizeof(sa));
-			sa.operation = "clone";
-			sa.gfp_mask = GFP_KERNEL;
-			sa.task = child->pid;
+		    profile == profile->ns->null_complain_profile) {
 			aa_audit_hint(profile, &sa);
 		}
 		aa_put_profile(profile);
@@ -817,34 +1018,126 @@ repeat:
 }
 
 static struct aa_profile *
-aa_register_find(struct aa_profile *profile, const char *name, int mandatory,
-		 int complain, struct aa_audit *sa)
+aa_register_find(struct aa_profile *profile, const char* ns_name,
+		 const char *name, int mandatory, int complain,
+		 struct aa_audit *sa)
 {
+	struct aa_namespace *ns;
 	struct aa_profile *new_profile;
+	int ns_ref = 0;
+
+	if (profile)
+		ns = profile->ns;
+	else
+		ns = default_namespace;
+
+	if (ns_name) {
+		/* locate the profile namespace */
+		ns = aa_find_namespace(ns_name);
+		if (!ns) {
+			if (mandatory) {
+				sa->info = "profile namespace not found";
+				sa->denied_mask = sa->request_mask;
+				sa->error_code = -ENOENT;
+				return ERR_PTR(-ENOENT);
+			} else {
+				return NULL;
+			}
+		}
+		ns_ref++;
+	}
 
 	/* Locate new profile */
-	new_profile = aa_find_profile(name);
+	new_profile = aa_find_profile(ns, name);
+
 	if (new_profile) {
 		AA_DEBUG("%s: setting profile %s\n",
 			 __FUNCTION__, new_profile->name);
 	} else if (mandatory && profile) {
 		sa->info = "mandatory profile missing";
-		sa->denied_mask = MAY_EXEC;
+		sa->denied_mask = sa->request_mask;	/* shifted MAY_EXEC */
 		if (complain) {
 			aa_audit_hint(profile, sa);
-			new_profile = aa_dup_profile(null_complain_profile);
+			new_profile =
+			    aa_dup_profile(profile->ns->null_complain_profile);
 		} else {
-			aa_audit_reject(profile, sa);
-			return ERR_PTR(-EACCES);  /* was -EPERM */
+			sa->error_code = -EACCES;
+			if (ns_ref)
+				aa_put_namespace(ns);
+			return ERR_PTR(-EACCES);
 		}
 	} else {
 		/* Only way we can get into this code is if task
-		 * is unconfined.
+		 * is unconfined, pix, nix.
 		 */
 		AA_DEBUG("%s: No profile found for exec image '%s'\n",
 			 __FUNCTION__,
 			 name);
 	}
+	if (ns_ref)
+		aa_put_namespace(ns);
+	return new_profile;
+}
+
+static struct aa_profile *
+aa_x_to_profile(struct aa_profile *profile, const char *filename, int xmode,
+		struct aa_audit *sa, char **child)
+{
+	struct aa_profile *new_profile = NULL;
+	int ix = xmode & AA_EXEC_INHERIT;
+	int complain = PROFILE_COMPLAIN(profile);
+	int index;
+
+	*child = NULL;
+	switch (xmode & AA_EXEC_MODIFIERS) {
+	case 0:
+		/* only valid with ix flag */
+		ix = 1;
+		break;
+	case AA_EXEC_UNCONFINED:
+		/* only valid without ix flag */
+		ix = 0;
+		break;
+	case AA_EXEC_PROFILE:
+		new_profile = aa_register_find(profile, NULL, filename, !ix,
+					       complain, sa);
+		break;
+	case AA_EXEC_CHILD:
+		*child = new_compound_name(profile->name, filename);
+		sa->name2 = *child;
+		if (!*child) {
+			sa->info = "Failed name resolution - exec failed";
+			sa->error_code = -ENOMEM;
+			new_profile = ERR_PTR(-ENOMEM);
+		} else {
+			new_profile = aa_register_find(profile, NULL, *child,
+						       !ix, complain, sa);
+		}
+		break;
+	default:
+		/* all other indexes are named transitions */
+		index = AA_EXEC_INDEX(xmode);
+		if (index - 4 > profile->exec_table_size) {
+			sa->info = "invalid named transition - exec failed";
+			sa->error_code = -EACCES;
+			new_profile = ERR_PTR(-EACCES);
+		} else {
+			char *ns_name = NULL;
+			char *name = profile->exec_table[index - 4];
+			if (*name == ':') {
+				ns_name = name + 1;
+				name = ns_name + strlen(ns_name) + 1;
+			}
+			sa->name2 = name;
+			sa->name3 = ns_name;
+			new_profile =
+				aa_register_find(profile, ns_name, name,
+						 !ix, complain, sa);
+		}
+	}
+	if (IS_ERR(new_profile))
+		/* all these failures must be audited - no quieting */
+		return ERR_PTR(aa_audit_reject(profile, sa));
 	return new_profile;
 }
 
@@ -858,80 +1151,76 @@ aa_register_find(struct aa_profile *profile, const char *name, int mandatory,
 int aa_register(struct linux_binprm *bprm)
 {
 	const char *filename;
-	char  *buffer = NULL;
+	char  *buffer = NULL, *child = NULL;
 	struct file *filp = bprm->file;
 	struct aa_profile *profile, *old_profile, *new_profile = NULL;
-	int exec_mode = AA_EXEC_UNSAFE, complain = 0;
+	int exec_mode, complain = 0, shift;
 	struct aa_audit sa;
 
 	AA_DEBUG("%s\n", __FUNCTION__);
 
-	filename = aa_get_name(filp->f_dentry, filp->f_vfsmnt, &buffer, 0);
-	if (IS_ERR(filename)) {
-		AA_ERROR("%s: Failed to get filename", __FUNCTION__);
-		return -ENOENT;
-	}
+	profile = aa_get_profile(current);
 
+	shift = aa_inode_mode(filp->f_dentry->d_inode);
 	memset(&sa, 0, sizeof(sa));
 	sa.operation = "exec";
 	sa.gfp_mask = GFP_KERNEL;
+	sa.request_mask = MAY_EXEC << shift;
+
+	filename = aa_get_name(filp->f_dentry, filp->f_vfsmnt, &buffer, 0);
+	if (IS_ERR(filename)) {
+		if (profile) {
+			sa.info = "Failed name resolution - exec failed";
+			sa.error_code = PTR_ERR(filename);
+			aa_audit_file(profile, &sa);
+			return sa.error_code;
+		} else
+			return 0;
+	}
 	sa.name = filename;
-	sa.requested_mask = MAY_EXEC;
+
+	exec_mode = AA_EXEC_UNSAFE << shift;
 
 repeat:
-	profile = aa_get_profile(current);
 	if (profile) {
 		complain = PROFILE_COMPLAIN(profile);
 
 		/* Confined task, determine what mode inherit, unconfined or
 		 * mandatory to load new profile
 		 */
-		exec_mode = aa_match(profile->file_rules, filename);
+		exec_mode = aa_match(profile->file_rules, filename,
+				     &sa.audit_mask);
 
-		if (exec_mode & (MAY_EXEC | AA_EXEC_MODIFIERS)) {
-			switch (exec_mode & (MAY_EXEC | AA_EXEC_MODIFIERS)) {
-			case MAY_EXEC | AA_EXEC_INHERIT:
-				AA_DEBUG("%s: INHERIT %s\n",
-					 __FUNCTION__,
-					 filename);
-				/* nothing to be done here */
+
+		if (exec_mode & sa.request_mask) {
+			int xm = exec_mode >> shift;
+			new_profile = aa_x_to_profile(profile, filename,
+						      xm, &sa, &child);
+
+			if (!new_profile && (xm & AA_EXEC_INHERIT))
+				/* (p|c|n|)ix - don't change profile */
 				goto cleanup;
+			/* error case caught below */
 
-			case MAY_EXEC | AA_EXEC_UNCONFINED:
-				AA_DEBUG("%s: UNCONFINED %s\n",
-					 __FUNCTION__,
-					 filename);
-
-				/* detach current profile */
-				new_profile = NULL;
-				break;
-
-			case MAY_EXEC | AA_EXEC_PROFILE:
-				AA_DEBUG("%s: PROFILE %s\n",
-					 __FUNCTION__,
-					 filename);
-				new_profile = aa_register_find(profile,
-							       filename,
-							       1, complain,
-							       &sa);
-				break;
-			}
-
+		} else if (sa.request_mask & AUDIT_QUIET_MASK(sa.audit_mask)) {
+			/* quiet failed exit */
+			new_profile = ERR_PTR(-EACCES);
 		} else if (complain) {
 			/* There was no entry in calling profile
 			 * describing mode to execute image in.
 			 * Drop into null-profile (disabling secure exec).
 			 */
-			new_profile = aa_dup_profile(null_complain_profile);
-			exec_mode |= AA_EXEC_UNSAFE;
+			new_profile =
+			    aa_dup_profile(profile->ns->null_complain_profile);
+			exec_mode |= AA_EXEC_UNSAFE << shift;
 		} else {
-			sa.denied_mask = MAY_EXEC;
-			aa_audit_reject(profile, &sa);
-			new_profile = ERR_PTR(-EPERM);
+			sa.denied_mask = sa.request_mask;
+			sa.error_code = -EACCES;
+			new_profile = ERR_PTR(aa_audit_file(profile, &sa));
 		}
 	} else {
 		/* Unconfined task, load profile if it exists */
-		new_profile = aa_register_find(NULL, filename, 0, 0, &sa);
+		new_profile = aa_register_find(NULL, NULL, filename, 0, 0, &sa);
 		if (new_profile == NULL)
 			goto cleanup;
 	}
@@ -943,12 +1232,18 @@ repeat:
 	if (IS_ERR(old_profile)) {
 		aa_put_profile(new_profile);
 		aa_put_profile(profile);
-		if (PTR_ERR(old_profile) == -ESTALE)
+		if (PTR_ERR(old_profile) == -ESTALE) {
+			profile = aa_get_profile(current);
 			goto repeat;
+		}
 		if (PTR_ERR(old_profile) == -EPERM) {
-			sa.denied_mask = MAY_EXEC;
+			sa.denied_mask = sa.request_mask;
 			sa.info = "unable to set profile due to ptrace";
 			sa.task = current->parent->pid;
+			aa_audit_reject(profile, &sa);
+		}
+		if (PTR_ERR(old_profile) == -EAGAIN) {
+			sa.info = "rlimit nproc limit exceeded";
 			aa_audit_reject(profile, &sa);
 		}
 		new_profile = old_profile;
@@ -966,7 +1261,7 @@ repeat:
 	 * Cases 2 and 3 are marked as requiring secure exec
 	 * (unless policy specified "unsafe exec")
 	 */
-	if (!(exec_mode & AA_EXEC_UNSAFE)) {
+	if (!(exec_mode & (AA_EXEC_UNSAFE << shift))) {
 		unsigned long bprm_flags;
 
 		bprm_flags = AA_SECURE_EXEC_NEEDED;
@@ -974,13 +1269,16 @@ repeat:
 			((unsigned long)bprm->security | bprm_flags);
 	}
 
-	if (complain && new_profile == null_complain_profile) {
-		sa.requested_mask = 0;
+	if (complain && new_profile &&
+	    new_profile == new_profile->ns->null_complain_profile) {
+		sa.request_mask = 0;
 		sa.name = NULL;
 		sa.info = "set profile";
 		aa_audit_hint(new_profile, &sa);
 	}
+
 cleanup:
+	aa_put_name_buffer(child);
 	aa_put_name_buffer(buffer);
 	if (IS_ERR(new_profile))
 		return PTR_ERR(new_profile);
@@ -1034,7 +1332,8 @@ repeat:
 	}
 }
 
-static int do_change_profile(struct aa_profile *expected, const char *name,
+static int do_change_profile(struct aa_profile *expected,
+			     struct aa_namespace *ns, const char *name,
 			     u64 cookie, int restore, struct aa_audit *sa)
 {
 	struct aa_profile *new_profile = NULL, *old_profile = NULL,
@@ -1048,11 +1347,11 @@ static int do_change_profile(struct aa_profile *expected, const char *name,
 	if (!new_cxt)
 		return -ENOMEM;
 
-	new_profile = aa_find_profile(name);
+	new_profile = aa_find_profile(ns, name);
 	if (!new_profile && !restore) {
 		if (!PROFILE_COMPLAIN(expected))
 			return -ENOENT;
-		new_profile = aa_dup_profile(null_complain_profile);
+		new_profile = aa_dup_profile(ns->null_complain_profile);
 	}
 
 	cxt = lock_task_and_profiles(current, new_profile);
@@ -1087,7 +1386,13 @@ static int do_change_profile(struct aa_profile *expected, const char *name,
 		goto out;
 	}
 
-	if (new_profile == null_complain_profile)
+	if ((error = aa_rlimit_nproc(new_profile))) {
+		sa->info = "rlimit nproc limit exceeded";
+		aa_audit_reject(cxt->profile, sa);
+		goto out;
+	}
+
+	if (new_profile == ns->null_complain_profile)
 		aa_audit_hint(cxt->profile, sa);
 
 	if (APPARMOR_AUDIT(cxt))
@@ -1110,22 +1415,25 @@ out:
 }
 
 /**
- * aa_change_profile - change profile to/from previous stored profile
+ * aa_change_profile - perform a one-way profile transition
+ * @ns_name: name of the profile namespace to change to
  * @name: name of profile to change to
- * @cookie: magic value to validate the profile change
- *
- * Change to new profile @name, and store the @cookie in the current task
- * context.  If the new @name is %NULL and the @cookie matches that
- * stored in the current task context, return to the previous profile.
+ * Change to new profile @name.  Unlike with hats, there is no way
+ * to change back.
  *
  * Returns %0 on success, error otherwise.
  */
-int aa_change_profile(const char *name, u64 cookie)
+int aa_change_profile(const char *ns_name, const char *name)
 {
 	struct aa_task_context *cxt;
-	struct aa_profile *profile, *previous_profile;
+	struct aa_profile *profile = NULL;
+	struct aa_namespace *ns = NULL;
 	struct aa_audit sa;
-	int error = 0;
+	unsigned int state;
+	int error = -EINVAL;
+
+	if (!name)
+		return -EINVAL;
 
 	memset(&sa, 0, sizeof(sa));
 	sa.gfp_mask = GFP_ATOMIC;
@@ -1134,29 +1442,41 @@ int aa_change_profile(const char *name, u64 cookie)
 repeat:
 	task_lock(current);
 	cxt = aa_task_context(current);
-	if (!cxt) {
-		task_unlock(current);
-		return -EPERM;
-	}
-	profile = aa_dup_profile(cxt->profile);
-	previous_profile = aa_dup_profile(cxt->previous_profile);
+	if (cxt)
+		profile = aa_dup_profile(cxt->profile);
 	task_unlock(current);
 
-	if (name) {
-		if (profile != null_complain_profile &&
-		    !(aa_match(profile->file_rules, name) &
-		      AA_CHANGE_PROFILE)) {
-			/* no permission to transition to profile @name */
-			aa_put_profile(profile);
-			return -EACCES;
-		}
-		error = do_change_profile(profile, name, cookie, 0, &sa);
-	} else if (previous_profile)
-		error = do_change_profile(profile, previous_profile->name,
-					  cookie, 1, &sa);
-	/* else ignore restores when there is no saved profile */
+	if (ns_name)
+		ns = aa_find_namespace(ns_name);
+	else if (profile)
+		ns = aa_get_namespace(profile->ns);
+	else
+		ns = aa_get_namespace(default_namespace);
 
-	aa_put_profile(previous_profile);
+	if (!ns) {
+		aa_put_profile(profile);
+		return -ENOENT;
+	}
+
+	if (!profile || PROFILE_COMPLAIN(profile) ||
+	    (ns == profile->ns &&
+	     (aa_match(profile->file_rules, name, NULL) & AA_CHANGE_PROFILE)))
+		error = do_change_profile(profile, ns, name, 0, 0, &sa);
+	else {
+		/* check for a rule with a namespace prepended */
+		aa_match_state(profile->file_rules, DFA_START, ns->name,
+			       &state);
+		state = aa_dfa_null_transition(profile->file_rules, state);
+		if ((aa_match_state(profile->file_rules, state, name, NULL) &
+		      AA_CHANGE_PROFILE))
+			error = do_change_profile(profile, ns, name, 0, 0,
+						  &sa);
+		else
+			/* no permission to transition to profile @name */
+			error = -EACCES;
+	}
+
+	aa_put_namespace(ns);
 	aa_put_profile(profile);
 	if (error == -ESTALE)
 		goto repeat;
@@ -1199,23 +1519,32 @@ repeat:
 
 	if (hat_name) {
 		char *name, *profile_name;
+		if (!PROFILE_COMPLAIN(profile) &&
+		    !(aa_match(profile->file_rules, hat_name, NULL)
+		      & AA_CHANGE_HAT)) {
+			/* missing permission to change_hat is treated the
+			 * same as a failed hat search */
+			error = -ENOENT;
+			goto out;
+		}
+
 		if (previous_profile)
 			profile_name = previous_profile->name;
 		else
 			profile_name = profile->name;
 
-		name = kmalloc(strlen(hat_name) + 3 + strlen(profile_name),
-			       GFP_KERNEL);
+		name = new_compound_name(profile_name, hat_name);
 		if (!name) {
 			error = -ENOMEM;
 			goto out;
 		}
-		sprintf(name, "%s//%s", profile_name, hat_name);
-		error = do_change_profile(profile, name, cookie, 0, &sa);
-		kfree(name);
+		error = do_change_profile(profile, profile->ns, name, cookie,
+					  0, &sa);
+		aa_put_name_buffer(name);
 	} else if (previous_profile)
-		error = do_change_profile(profile, previous_profile->name,
-					  cookie, 1, &sa);
+		error = do_change_profile(profile, profile->ns,
+					  previous_profile->name, cookie, 1,
+					  &sa);
 	/* else ignore restores when there is no saved profile */
 
 out:
@@ -1249,17 +1578,18 @@ struct aa_profile *__aa_replace_profile(struct task_struct *task,
 
 	cxt = lock_task_and_profiles(task, profile);
 	if (unlikely(profile && profile->isstale)) {
-		task_unlock(task);
-		unlock_both_profiles(profile, cxt ? cxt->profile : NULL);
-		aa_free_task_context(new_cxt);
-		return ERR_PTR(-ESTALE);
+		old_profile = ERR_PTR(-ESTALE);
+		goto error;
 	}
 
 	if ((current->ptrace & PT_PTRACED) && aa_may_ptrace(cxt, profile)) {
-		task_unlock(task);
-		unlock_both_profiles(profile, cxt ? cxt->profile : NULL);
-		aa_free_task_context(new_cxt);
-		return ERR_PTR(-EPERM);
+		old_profile = ERR_PTR(-EPERM);
+		goto error;
+	}
+
+	if (aa_rlimit_nproc(profile)) {
+		old_profile = ERR_PTR(-EAGAIN);
+		goto error;
 	}
 
 	if (cxt)
@@ -1267,7 +1597,14 @@ struct aa_profile *__aa_replace_profile(struct task_struct *task,
 	aa_change_task_context(task, new_cxt, profile, 0, NULL);
 
 	task_unlock(task);
+	aa_set_rlimits(task, profile);
 	unlock_both_profiles(profile, old_profile);
+	return old_profile;
+
+error:
+	task_unlock(task);
+	unlock_both_profiles(profile, cxt ? cxt->profile : NULL);
+	aa_free_task_context(new_cxt);
 	return old_profile;
 }
 
@@ -1333,15 +1670,19 @@ void aa_change_task_context(struct task_struct *task,
 
 	if (old_cxt) {
 		list_del_init(&old_cxt->list);
+		old_cxt->profile->task_count--;
 		call_rcu(&old_cxt->rcu, free_aa_task_context_rcu_callback);
 	}
 	if (new_cxt) {
-		/* clear the caps_logged cache, so that new profile/hat has
-		 * chance to emit its own set of cap messages */
-		new_cxt->caps_logged = __cap_empty_set;
+		/* set the caps_logged cache to the quiet_caps mask
+		 * this has the effect of quieting caps that are not
+		 * supposed to be logged
+		 */
+		new_cxt->caps_logged = profile->quiet_caps;
 		new_cxt->cookie = cookie;
 		new_cxt->task = task;
 		new_cxt->profile = aa_dup_profile(profile);
+		profile->task_count++;
 		new_cxt->previous_profile = aa_dup_profile(previous_profile);
 		list_move(&new_cxt->list, &profile->task_contexts);
 	}

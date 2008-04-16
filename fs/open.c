@@ -206,16 +206,15 @@ int do_truncate(struct dentry *dentry, struct vfsmount *mnt, loff_t length,
 
 	newattrs.ia_size = length;
 	newattrs.ia_valid = ATTR_SIZE | time_attrs;
-	if (filp) {
-		newattrs.ia_file = filp;
+
+	if (filp)
 		newattrs.ia_valid |= ATTR_FILE;
-	}
 
 	/* Remove suid/sgid on truncate too */
 	newattrs.ia_valid |= should_remove_suid(dentry);
 
 	mutex_lock(&dentry->d_inode->i_mutex);
-	err = notify_change(dentry, mnt, &newattrs);
+	err = fnotify_change(dentry, mnt, &newattrs, filp);
 	mutex_unlock(&dentry->d_inode->i_mutex);
 	return err;
 }
@@ -515,7 +514,7 @@ asmlinkage long sys_fchdir(unsigned int fd)
 		goto out_putf;
 
 	nd.path = file->f_path;
-	error = vfs_permission(&nd, MAY_EXEC);
+	error = file_permission(file, MAY_EXEC);
 	if (!error)
 		set_fs_pwd(current->fs, &file->f_path);
 out_putf:
@@ -577,10 +576,8 @@ asmlinkage long sys_fchmod(unsigned int fd, mode_t mode)
 	if (mode == (mode_t) -1)
 		mode = inode->i_mode;
 	newattrs.ia_mode = (mode & S_IALLUGO) | (inode->i_mode & ~S_IALLUGO);
-	newattrs.ia_valid = ATTR_MODE | ATTR_CTIME;
-	newattrs.ia_valid |= ATTR_FILE;
-	newattrs.ia_file = file;
-	err = notify_change(dentry, file->f_path.mnt, &newattrs);
+	newattrs.ia_valid = ATTR_MODE | ATTR_CTIME | ATTR_FILE;
+	err = fnotify_change(dentry, file->f_path.mnt, &newattrs, file);
 	mutex_unlock(&inode->i_mutex);
 
 out_putf:
@@ -659,12 +656,11 @@ static int chown_common(struct dentry * dentry, struct vfsmount *mnt,
 	if (!S_ISDIR(inode->i_mode))
 		newattrs.ia_valid |=
 			ATTR_KILL_SUID | ATTR_KILL_SGID | ATTR_KILL_PRIV;
-	if (file) {
-		newattrs.ia_file = file;
+	if (file)
 		newattrs.ia_valid |= ATTR_FILE;
-	}
+
 	mutex_lock(&inode->i_mutex);
-	error = notify_change(dentry, mnt, &newattrs);
+	error = fnotify_change(dentry, mnt, &newattrs, file);
 	mutex_unlock(&inode->i_mutex);
 out:
 	return error;

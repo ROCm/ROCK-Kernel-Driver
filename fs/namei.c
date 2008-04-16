@@ -315,8 +315,7 @@ int file_permission(struct file *file, int mask)
 {
 	struct nameidata nd;
 
-	nd.path.dentry = file->f_path.dentry;
-	nd.path.mnt = file->f_path.mnt;
+	nd.path = file->f_path;
 	nd.flags = LOOKUP_ACCESS;
 
 	return permission(nd.path.dentry->d_inode, mask, &nd);
@@ -1167,7 +1166,7 @@ static int do_path_lookup(int dfd, const char *name,
 		if (!S_ISDIR(nd->path.dentry->d_inode->i_mode))
 			goto fput_fail;
 
-		retval = vfs_permission(nd, MAY_EXEC);
+		retval = file_permission(file, MAY_EXEC);
 		if (retval)
 			goto fput_fail;
 
@@ -1477,10 +1476,6 @@ static int may_delete(struct inode *dir,struct dentry *victim,int isdir)
 	BUG_ON(victim->d_parent->d_inode != dir);
 	audit_inode_child(victim->d_name.name, victim, dir);
 
-#if 0
-	if (nd)
-		nd->flags |= LOOKUP_CONTINUE;
-#endif
 	error = permission(dir,MAY_WRITE | MAY_EXEC, NULL);
 	if (error)
 		return error;
@@ -1983,12 +1978,12 @@ asmlinkage long sys_mknodat(int dfd, const char __user *filename, int mode,
 			error = vfs_create(nd.path.dentry->d_inode,dentry,mode,&nd);
 			break;
 		case S_IFCHR: case S_IFBLK:
-			error = vfs_mknod(nd.path.dentry->d_inode, dentry, nd.path.mnt,
-					  mode, new_decode_dev(dev));
+			error = vfs_mknod(nd.path.dentry->d_inode, dentry,
+					  nd.path.mnt, mode, new_decode_dev(dev));
 			break;
 		case S_IFIFO: case S_IFSOCK:
-			error = vfs_mknod(nd.path.dentry->d_inode, dentry, nd.path.mnt,
-					  mode, 0);
+			error = vfs_mknod(nd.path.dentry->d_inode, dentry,
+					  nd.path.mnt, mode, 0);
 			break;
 		case S_IFDIR:
 			error = -EPERM;

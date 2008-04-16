@@ -1273,8 +1273,8 @@ nfsd_create(struct svc_rqst *rqstp, struct svc_fh *fhp,
 	case S_IFBLK:
 	case S_IFIFO:
 	case S_IFSOCK:
-		host_err = vfs_mknod(dirp, dchild, exp->ex_path.mnt, iap->ia_mode,
-				     rdev);
+		host_err = vfs_mknod(dirp, dchild, exp->ex_path.mnt,
+				     iap->ia_mode, rdev);
 		break;
 	default:
 	        printk("nfsd: bad file type %o in nfsd_create\n", type);
@@ -1546,8 +1546,8 @@ nfsd_symlink(struct svc_rqst *rqstp, struct svc_fh *fhp,
 			kfree(path_alloced);
 		}
 	} else
-		host_err = vfs_symlink(dentry->d_inode, dnew, exp->ex_path.mnt, path,
-				       mode);
+		host_err = vfs_symlink(dentry->d_inode, dnew, exp->ex_path.mnt,
+				       path, mode);
 
 	if (!host_err) {
 		if (EX_ISSYNC(exp))

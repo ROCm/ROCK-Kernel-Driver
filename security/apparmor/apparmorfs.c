@@ -89,7 +89,7 @@ static struct file_operations apparmorfs_profiles_fops = {
 static ssize_t aa_matching_read(struct file *file, char __user *buf,
 			       size_t size, loff_t *ppos)
 {
-	const char *matching = "pattern=aadfa perms=rwxamlz";
+	const char *matching = "pattern=aadfa audit perms=rwxamlk/ user::other";
 
 	return simple_read_from_buffer(buf, size, ppos, matching,
 				       strlen(matching));
@@ -97,6 +97,22 @@ static ssize_t aa_matching_read(struct file *file, char __user *buf,
 
 static struct file_operations apparmorfs_matching_fops = {
 	.read = 	aa_matching_read,
+};
+
+/* apparmor/features */
+static ssize_t aa_features_read(struct file *file, char __user *buf,
+				size_t size, loff_t *ppos)
+{
+	const char *features = "file=3.0 capability=2.0 network=1.0 "
+			       "change_hat=1.4 change_profile=1.0 "
+			       "aanamespaces=1.0 rlimit=1.0";
+
+	return simple_read_from_buffer(buf, size, ppos, features,
+				       strlen(features));
+}
+
+static struct file_operations apparmorfs_features_fops = {
+	.read = 	aa_features_read,
 };
 
 /* apparmor/.load */
@@ -204,6 +220,7 @@ void destroy_apparmorfs(void)
 		aafs_remove(".replace");
 		aafs_remove(".load");
 		aafs_remove("matching");
+		aafs_remove("features");
 		aafs_remove("profiles");
 		securityfs_remove(apparmor_dentry);
 		apparmor_dentry = NULL;
@@ -213,7 +230,9 @@ void destroy_apparmorfs(void)
 int create_apparmorfs(void)
 {
 	int error;
-	extern void apparmor_disable(void);
+
+	if (!apparmor_initialized)
+		return 0;
 
 	if (apparmor_dentry) {
 		AA_ERROR("%s: AppArmor securityfs already exists\n",
@@ -225,12 +244,15 @@ int create_apparmorfs(void)
 	if (IS_ERR(apparmor_dentry)) {
 		error = PTR_ERR(apparmor_dentry);
 		apparmor_dentry = NULL;
-		goto error;
+ 		goto error;
 	}
 	error = aafs_create("profiles", 0440, &apparmorfs_profiles_fops);
 	if (error)
 		goto error;
 	error = aafs_create("matching", 0444, &apparmorfs_matching_fops);
+	if (error)
+		goto error;
+	error = aafs_create("features", 0444, &apparmorfs_features_fops);
 	if (error)
 		goto error;
 	error = aafs_create(".load", 0640, &apparmorfs_profile_load);
@@ -243,6 +265,8 @@ int create_apparmorfs(void)
 	if (error)
 		goto error;
 
+	/* Report that AppArmor fs is enabled */
+	info_message("AppArmor Filesystem Enabled", "");
 	return 0;
 
 error:
@@ -253,3 +277,4 @@ error:
 }
 
 fs_initcall(create_apparmorfs);
+
