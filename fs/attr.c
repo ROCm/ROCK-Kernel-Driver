@@ -187,6 +187,7 @@ int fnotify_change(struct dentry *dentry, struct vfsmount *mnt,
 
 	return error;
 }
+EXPORT_SYMBOL_GPL(fnotify_change);
 
 int notify_change(struct dentry *dentry, struct vfsmount *mnt,
 		  struct iattr *attr)
