@@ -1755,6 +1755,7 @@ shouldnt_be_hashed:
  * @buffer: buffer to return value in
  * @buflen: buffer length
  * @fail_deleted: what to return for deleted files
+ * @disconnect: don't return a path starting with / when disconnected
  *
  * Convert a dentry into an ASCII path name. If the entry has been deleted,
  * then if @fail_deleted is true, ERR_PTR(-ENOENT) is returned. Otherwise,
@@ -1768,7 +1769,7 @@ shouldnt_be_hashed:
  */
 char *__d_path(struct dentry *dentry, struct vfsmount *vfsmnt,
 	       struct path *root, char *buffer, int buflen,
-	       int fail_deleted)
+	       int fail_deleted, int disconnect)
 {
 	int namelen, is_slash, vfsmount_locked = 0;
 
@@ -1833,7 +1834,7 @@ global_root:
 	 */
 	namelen = dentry->d_name.len;
 	is_slash = (namelen == 1 && *dentry->d_name.name == '/');
-	if (is_slash || (dentry->d_sb->s_flags & MS_NOUSER)) {
+	if (disconnect && (is_slash || (dentry->d_sb->s_flags & MS_NOUSER))) {
 		/*
 		 * Make sure we won't return a pathname starting with '/'.
 		 *
@@ -1848,6 +1849,8 @@ global_root:
 		}
 		if (is_slash)
 			goto out;
+	} else if (is_slash && *buffer == '/') {
+		goto out;
 	}
 	if (buflen < namelen)
 		goto Elong;
@@ -1858,19 +1861,6 @@ global_root:
 Elong:
 	buffer = ERR_PTR(-ENAMETOOLONG);
 	goto out;
-}
-
-static char *__connect_d_path(char *path, char *buffer, struct dentry *dentry)
-{
-	if (!IS_ERR(path) && *path != '/' &&
-	    !(dentry->d_sb->s_flags & MS_NOUSER)) {
-		/* Pretend that disconnected paths are hanging off the root. */
-		if (path == buffer)
-			path = ERR_PTR(-ENAMETOOLONG);
-		else
-			*--path = '/';
-	}
-	return path;
 }
 
 /**
@@ -1905,8 +1895,7 @@ char *d_path(struct path *path, char *buf, int buflen)
 	root = current->fs->root;
 	path_get(&current->fs->root);
 	read_unlock(&current->fs->lock);
-	res = __d_path(path->dentry, path->mnt, &root, buf, buflen, 0);
-	res = __connect_d_path(res, buf, path->dentry);
+	res = __d_path(path->dentry, path->mnt, &root, buf, buflen, 0, 0);
 	path_put(&root);
 	return res;
 }
@@ -1966,8 +1955,7 @@ asmlinkage long sys_getcwd(char __user *buf, unsigned long size)
 	path_get(&current->fs->root);
 	read_unlock(&current->fs->lock);
 
-	cwd = __d_path(pwd.dentry, pwd.mnt, &root, page, PAGE_SIZE, 1);
-	cwd = __connect_d_path(cwd, page, pwd.dentry);
+	cwd = __d_path(pwd.dentry, pwd.mnt, &root, page, PAGE_SIZE, 1, 0);
 	error = PTR_ERR(cwd);
 	if (IS_ERR(cwd))
 		goto out;
