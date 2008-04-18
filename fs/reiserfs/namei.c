@@ -358,9 +358,10 @@ static struct dentry *reiserfs_lookup(struct inode *dir, struct dentry *dentry,
 			return ERR_PTR(-EACCES);
 		}
 
-		/* Propogate the priv_object flag so we know we're in the priv tree */
-		if (is_reiserfs_priv_object(dir))
-			reiserfs_mark_inode_private(inode);
+		/* Propogate the private flag so we know we're
+		 * in the priv tree */
+		if (IS_PRIVATE(dir))
+			inode->i_flags |= S_PRIVATE;
 	}
 	reiserfs_write_unlock(dir->i_sb);
 	if (retval == IO_ERROR) {
@@ -591,6 +592,7 @@ static int new_inode_init(struct inode *inode, struct inode *dir, int mode)
 	} else {
 		inode->i_gid = current->fsgid;
 	}
+
 	DQUOT_INIT(inode);
 	return 0;
 }

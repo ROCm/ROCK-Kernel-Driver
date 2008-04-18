@@ -92,7 +92,7 @@ do {									\
 		reiserfs_panic(NULL, "assertion failure", "(" #cond ") at " \
 			       __FILE__ ":%i:%s: " format "\n",		\
 			       in_interrupt() ? -1 : task_pid_nr(current), \
-			       __LINE__, __FUNCTION__ , ##args);	\
+			       __LINE__, __func__ , ##args);		\
 } while (0)
 
 #define RASSERT(cond, format, args...) __RASSERT(cond, #cond, format, ##args)
@@ -1727,14 +1727,6 @@ static inline int reiserfs_file_data_log(struct inode *inode)
 	return 0;
 }
 
-static inline int reiserfs_file_data_ordered(struct inode *inode)
-{
-	if (reiserfs_data_ordered(inode->i_sb) ||
-	    (REISERFS_I(inode)->i_flags & i_data_ordered))
-		return 1;
-	return 0;
-}
-
 static inline int reiserfs_transaction_running(struct super_block *s)
 {
 	struct reiserfs_transaction_handle *th = current->journal_info;
@@ -2024,11 +2016,11 @@ void __reiserfs_panic(struct super_block *s, const char *id,
 		      const char *function, const char *fmt, ...)
     __attribute__ ((noreturn));
 #define reiserfs_panic(s, id, fmt, args...) \
-	__reiserfs_panic(s, id, __FUNCTION__, fmt, ##args)
+	__reiserfs_panic(s, id, __func__, fmt, ##args)
 void __reiserfs_error(struct super_block *s, const char *id,
 		      const char *function, const char *fmt, ...);
 #define reiserfs_error(s, id, fmt, args...) \
-	 __reiserfs_error(s, id, __FUNCTION__, fmt, ##args)
+	 __reiserfs_error(s, id, __func__, fmt, ##args)
 void reiserfs_info(struct super_block *s, const char *fmt, ...);
 void reiserfs_debug(struct super_block *s, int level, const char *fmt, ...);
 void print_indirect_item(struct buffer_head *bh, int item_num);

@@ -736,7 +736,7 @@ int reiserfs_get_block(struct inode *inode, sector_t block,
 			}
 			set_buffer_new(bh_result);
 			if (buffer_dirty(bh_result)
-			    && reiserfs_file_data_ordered(inode))
+			    && reiserfs_data_ordered(inode->i_sb))
 				reiserfs_add_ordered_list(inode, bh_result);
 			put_block_num(item, pos_in_item, allocated_block_nr);
 			unfm_ptr = allocated_block_nr;
@@ -1122,16 +1122,6 @@ static void init_inode(struct inode *inode, struct treepath *path)
 
 	copy_key(INODE_PKEY(inode), &(ih->ih_key));
 
-	INIT_LIST_HEAD(&(REISERFS_I(inode)->i_prealloc_list));
-	REISERFS_I(inode)->i_flags = 0;
-	REISERFS_I(inode)->i_prealloc_block = 0;
-	REISERFS_I(inode)->i_prealloc_count = 0;
-	REISERFS_I(inode)->i_trans_id = 0;
-	REISERFS_I(inode)->i_jl = NULL;
-	mutex_init(&(REISERFS_I(inode)->i_mmap));
-	reiserfs_init_acl_access(inode);
-	reiserfs_init_acl_default(inode);
-
 	if (stat_data_v1(ih)) {
 		struct stat_data_v1 *sd =
 		    (struct stat_data_v1 *)B_I_PITEM(bh, ih);
@@ -1147,9 +1137,6 @@ static void init_inode(struct inode *inode, struct treepath *path)
 		inode->i_atime.tv_sec = sd_v1_atime(sd);
 		inode->i_mtime.tv_sec = sd_v1_mtime(sd);
 		inode->i_ctime.tv_sec = sd_v1_ctime(sd);
-		inode->i_atime.tv_nsec = 0;
-		inode->i_ctime.tv_nsec = 0;
-		inode->i_mtime.tv_nsec = 0;
 
 		inode->i_blocks = sd_v1_blocks(sd);
 		inode->i_generation = le32_to_cpu(INODE_PKEY(inode)->k_dir_id);
@@ -1192,9 +1179,6 @@ static void init_inode(struct inode *inode, struct treepath *path)
 		inode->i_mtime.tv_sec = sd_v2_mtime(sd);
 		inode->i_atime.tv_sec = sd_v2_atime(sd);
 		inode->i_ctime.tv_sec = sd_v2_ctime(sd);
-		inode->i_ctime.tv_nsec = 0;
-		inode->i_mtime.tv_nsec = 0;
-		inode->i_atime.tv_nsec = 0;
 		inode->i_blocks = sd_v2_blocks(sd);
 		rdev = sd_v2_rdev(sd);
 		if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode))
@@ -1816,17 +1800,9 @@ int reiserfs_new_inode(struct reiserfs_transaction_handle *th,
 	    U32_MAX /*NO_BYTES_IN_DIRECT_ITEM */ ;
 
 	INIT_LIST_HEAD(&(REISERFS_I(inode)->i_prealloc_list));
-	REISERFS_I(inode)->i_flags = 0;
-	REISERFS_I(inode)->i_prealloc_block = 0;
-	REISERFS_I(inode)->i_prealloc_count = 0;
-	REISERFS_I(inode)->i_trans_id = 0;
-	REISERFS_I(inode)->i_jl = NULL;
 	REISERFS_I(inode)->i_attrs =
 	    REISERFS_I(dir)->i_attrs & REISERFS_INHERIT_MASK;
 	sd_attrs_to_i_attrs(REISERFS_I(inode)->i_attrs, inode);
-	mutex_init(&(REISERFS_I(inode)->i_mmap));
-	reiserfs_init_acl_access(inode);
-	reiserfs_init_acl_default(inode);
 
 	if (old_format_only(sb))
 		make_le_item_head(&ih, NULL, KEY_FORMAT_3_5, SD_OFFSET,
@@ -1928,9 +1904,8 @@ int reiserfs_new_inode(struct reiserfs_transaction_handle *th,
 		reiserfs_warning(inode->i_sb, "jdm-13090",
 				 "ACLs aren't enabled in the fs, "
 				 "but vfs thinks they are!");
-	} else if (is_reiserfs_priv_object(dir)) {
-		reiserfs_mark_inode_private(inode);
-	}
+	} else if (IS_PRIVATE(dir))
+		inode->i_flags |= S_PRIVATE;
 
 	if (security->name) {
 		retval = reiserfs_security_write(th, inode, security);

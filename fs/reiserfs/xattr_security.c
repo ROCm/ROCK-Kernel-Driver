@@ -13,7 +13,7 @@ security_get(struct inode *inode, const char *name, void *buffer, size_t size)
 	if (strlen(name) < sizeof(XATTR_SECURITY_PREFIX))
 		return -EINVAL;
 
-	if (is_reiserfs_priv_object(inode))
+	if (IS_PRIVATE(inode))
 		return -EPERM;
 
 	return reiserfs_xattr_get(inode, name, buffer, size);
@@ -26,7 +26,7 @@ security_set(struct inode *inode, const char *name, const void *buffer,
 	if (strlen(name) < sizeof(XATTR_SECURITY_PREFIX))
 		return -EINVAL;
 
-	if (is_reiserfs_priv_object(inode))
+	if (IS_PRIVATE(inode))
 		return -EPERM;
 
 	return reiserfs_xattr_set(inode, name, buffer, size, flags);
@@ -37,7 +37,7 @@ static size_t security_list(struct inode *inode, char *list, size_t list_len,
 {
 	const size_t len = namelen + 1;
 
-	if (is_reiserfs_priv_object(inode))
+	if (IS_PRIVATE(inode))
 		return 0;
 
 	if (list && len <= list_len) {
