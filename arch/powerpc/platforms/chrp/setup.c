@@ -302,7 +302,7 @@ static void chrp_init_early(void)
 	if (!property)
 		goto out_put;
 	if (!strcmp(property, "failsafe") || !strcmp(property, "serial"))
-		add_preferred_console("ttyS", 0, NULL);
+		add_preferred_console("ttyS", 0, "115200");
 out_put:
 	of_node_put(node);
 }
