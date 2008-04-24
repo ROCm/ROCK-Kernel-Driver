@@ -54,7 +54,7 @@ static ssize_t devspec_show(struct device *dev,
 	struct of_device *ofdev;
 
 	ofdev = to_of_device(dev);
-	return sprintf(buf, "%s", ofdev->node->full_name);
+	return sprintf(buf, "%s\n", ofdev->node->full_name);
 }
 
 static ssize_t modalias_show(struct device *dev,
