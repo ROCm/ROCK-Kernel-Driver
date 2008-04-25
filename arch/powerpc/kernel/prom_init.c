@@ -2219,6 +2219,7 @@ static void __init fixup_device_tree_efika_add_phy(void)
 
 static void __init fixup_device_tree_efika(void)
 {
+	int sound_cell[1] = { 1 };
 	int sound_irq[3] = { 2, 2, 0 };
 	int bcomm_irq[3*16] = { 3,0,0, 3,1,0, 3,2,0, 3,3,0,
 				3,4,0, 3,5,0, 3,6,0, 3,7,0,
@@ -2266,6 +2267,8 @@ static void __init fixup_device_tree_efika(void)
 			prom_printf("Adding sound interrupts property\n");
 			prom_setprop(node, "/builtin/sound", "interrupts",
 				     sound_irq, sizeof(sound_irq));
+			prom_setprop(node, "/builtin/sound", "cell-index",
+				     sound_cell, sizeof(sound_cell));
 		}
 	}
 
