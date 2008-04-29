@@ -667,7 +667,6 @@ enum inode_i_mutex_lock_class
 	I_MUTEX_PARENT,
 	I_MUTEX_CHILD,
 	I_MUTEX_XATTR,
-	I_MUTEX_XATTR_CHILD,
 	I_MUTEX_QUOTA
 };
 

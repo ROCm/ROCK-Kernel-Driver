@@ -592,7 +592,6 @@ static int new_inode_init(struct inode *inode, struct inode *dir, int mode)
 	} else {
 		inode->i_gid = current->fsgid;
 	}
-
 	DQUOT_INIT(inode);
 	return 0;
 }
