@@ -3855,18 +3855,13 @@ int Novfs_i_setattr(struct dentry *dentry, struct iattr *attr)
 					    ~(ATTR_FILE | ATTR_SIZE);
 					attr = &mattr;
 					ia_valid = attr->ia_valid;
-
-					retVal =
-					    Novfs_Truncate_File_Ex(attr->
-								   ia_file->
-								   private_data,
-								   attr->
-								   ia_size,
-								   session);
+#if 0	// thanks to vfs changes in our tree...
+					retVal = Novfs_Truncate_File_Ex(attr->ia_file->private_data, attr->ia_size, session);
 					if (!retVal) {
 						inode->i_size = attr->ia_size;
 						((struct inode_data *)inode->FSPRIVATE)->Flags |= UPDATE_INODE;
 					}
+#endif
 				}
 
 				if (ia_valid

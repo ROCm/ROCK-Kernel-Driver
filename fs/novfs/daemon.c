@@ -22,7 +22,7 @@
 #include <linux/poll.h>
 #include <linux/pagemap.h>
 #include <linux/smp_lock.h>
-#include <linux/semaphore.h>
+#include <asm/semaphore.h>
 #include <asm/uaccess.h>
 #include <asm/atomic.h>
 #include <linux/time.h>
@@ -2320,7 +2320,7 @@ int local_unlink(const char *pathname)
 					if (inode) {
 						atomic_inc(&inode->i_count);
 					}
-					error = vfs_unlink(nd.path.dentry->d_inode, dentry);
+					error = vfs_unlink(nd.path.dentry->d_inode, dentry, nd.path.mnt);
 					DbgPrint
 					    ("local_unlink: vfs_unlink %d\n",
 					     error);
