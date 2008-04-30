@@ -2165,6 +2165,15 @@ config 9P_FS
 
 	  If unsure, say N.
 
+config NOVFS
+	tristate "Novell Netware Filesystem support (novfs) (EXPERIMENTAL)"
+	depends on INET && EXPERIMENTAL
+	help
+	  If you say Y here, you will get an experimental Novell Netware
+	  filesystem driver.
+
+	  If unsure, say N.
+
 endif # NETWORK_FILESYSTEMS
 
 if BLOCK

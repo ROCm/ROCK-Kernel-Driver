@@ -1,0 +1,19 @@
+#
+# Makefile for the Novell NetWare Client for Linux filesystem.
+#
+
+NOVFS_VFS_MAJOR = 2
+NOVFS_VFS_MINOR = 0
+NOVFS_VFS_SUB = 0
+NOVFS_VFS_RELEASE = 440
+
+EXTRA_CFLAGS += -DNOVFS_VFS_MAJOR=$(NOVFS_VFS_MAJOR)
+EXTRA_CFLAGS += -DNOVFS_VFS_MINOR=$(NOVFS_VFS_MINOR)
+EXTRA_CFLAGS += -DNOVFS_VFS_SUB=$(NOVFS_VFS_SUB)
+EXTRA_CFLAGS += -DNOVFS_VFS_PATCH=$(NOVFS_VFS_PATCH)
+EXTRA_CFLAGS += -DNOVFS_VFS_RELEASE=$(NOVFS_VFS_RELEASE)
+
+obj-$(CONFIG_NOVFS) += novfs.o
+
+novfs-objs := inode.o proc.o profile.o daemon.o file.o scope.o nwcapi.o
+

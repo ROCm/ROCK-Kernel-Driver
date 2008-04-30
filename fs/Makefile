@@ -123,4 +123,5 @@ obj-$(CONFIG_HPPFS)		+= hppfs/
 obj-$(CONFIG_DEBUG_FS)		+= debugfs/
 obj-$(CONFIG_OCFS2_FS)		+= ocfs2/
 obj-$(CONFIG_GFS2_FS)           += gfs2/
-obj-$(CONFIG_SQUASHFS)          += squashfs/
+obj-$(CONFIG_NOVFS)		+= novfs/
+obj-$(CONFIG_SQUASHFS)		+= squashfs/
