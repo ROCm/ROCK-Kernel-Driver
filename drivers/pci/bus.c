@@ -47,7 +47,7 @@ pci_bus_alloc_resource(struct pci_bus *bus, struct resource *res,
 	type_mask |= IORESOURCE_IO | IORESOURCE_MEM;
 
 #ifdef CONFIG_XEN
-	/* If the boot parameter 'pci-mem-align' was specified then we need to 
+	/* If the boot parameter 'pci-mem-align' was specified then we need to
 	   align the memory addresses, at page size alignment. */
 	if (pci_mem_align && (align < (PAGE_SIZE-1)))
 		align = PAGE_SIZE - 1;

@@ -78,6 +78,11 @@ static int modparam_nohwcrypt;
 module_param_named(nohwcrypt, modparam_nohwcrypt, int, 0444);
 MODULE_PARM_DESC(nohwcrypt, "Disable hardware encryption.");
 
+static int modparam_btcoex = 1;
+module_param_named(btcoex, modparam_btcoex, int, 0444);
+MODULE_PARM_DESC(btcoex, "Enable Bluetooth coexistance (default on)");
+
+
 static const struct ssb_device_id b43_ssb_tbl[] = {
 	SSB_DEVICE(SSB_VENDOR_BROADCOM, SSB_DEV_80211, 5),
 	SSB_DEVICE(SSB_VENDOR_BROADCOM, SSB_DEV_80211, 6),
@@ -3339,6 +3344,8 @@ static void b43_bluetooth_coext_enable(struct b43_wldev *dev)
 	struct ssb_sprom *sprom = &dev->dev->bus->sprom;
 	u32 hf;
 
+	if (!modparam_btcoex)
+		return;
 	if (!(sprom->boardflags_lo & B43_BFL_BTCOEXIST))
 		return;
 	if (dev->phy.type != B43_PHYTYPE_B && !dev->phy.gmode)
@@ -3350,11 +3357,13 @@ static void b43_bluetooth_coext_enable(struct b43_wldev *dev)
 	else
 		hf |= B43_HF_BTCOEX;
 	b43_hf_write(dev, hf);
-	//TODO
 }
 
 static void b43_bluetooth_coext_disable(struct b43_wldev *dev)
-{				//TODO
+{
+	if (!modparam_btcoex)
+		return;
+	//TODO
 }
 
 static void b43_imcfglo_timeouts_workaround(struct b43_wldev *dev)
@@ -4000,8 +4009,16 @@ static int b43_one_core_attach(struct ssb_device *dev, struct b43_wl *wl)
 	return err;
 }
 
+#define IS_PDEV(pdev, _vendor, _device, _subvendor, _subdevice)		( \
+	(pdev->vendor == PCI_VENDOR_ID_##_vendor) &&			\
+	(pdev->device == _device) &&					\
+	(pdev->subsystem_vendor == PCI_VENDOR_ID_##_subvendor) &&	\
+	(pdev->subsystem_device == _subdevice)				)
+
 static void b43_sprom_fixup(struct ssb_bus *bus)
 {
+	struct pci_dev *pdev;
+
 	/* boardflags workarounds */
 	if (bus->boardinfo.vendor == SSB_BOARDVENDOR_DELL &&
 	    bus->chip_id == 0x4301 && bus->boardinfo.rev == 0x74)
@@ -4009,6 +4026,13 @@ static void b43_sprom_fixup(struct ssb_bus *bus)
 	if (bus->boardinfo.vendor == PCI_VENDOR_ID_APPLE &&
 	    bus->boardinfo.type == 0x4E && bus->boardinfo.rev > 0x40)
 		bus->sprom.boardflags_lo |= B43_BFL_PACTRL;
+	if (bus->bustype == SSB_BUSTYPE_PCI) {
+		pdev = bus->host_pci;
+		if (IS_PDEV(pdev, BROADCOM, 0x4318, ASUSTEK, 0x100F) ||
+		    IS_PDEV(pdev, BROADCOM, 0x4320, LINKSYS, 0x0015) ||
+		    IS_PDEV(pdev, BROADCOM, 0x4320, LINKSYS, 0x0013))
+			bus->sprom.boardflags_lo &= ~B43_BFL_BTCOEXIST;
+	}
 }
 
 static void b43_wireless_exit(struct ssb_device *dev, struct b43_wl *wl)
