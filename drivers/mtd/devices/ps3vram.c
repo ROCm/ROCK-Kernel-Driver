@@ -4,7 +4,7 @@
  * Copyright (c) 2007-2008 Jim Paris <jim@jtan.com>
  * Added support RSX DMA Vivien Chappelier <vivien.chappelier@free.fr>
  */
-#define DEBUG
+#undef DEBUG
 
 #include <linux/io.h>
 #include <linux/init.h>
