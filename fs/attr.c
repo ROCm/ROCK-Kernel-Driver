@@ -163,8 +163,19 @@ int fnotify_change(struct dentry *dentry, struct vfsmount *mnt,
 		if (!error) {
 			if (file && file->f_op && file->f_op->fsetattr)
 				error = file->f_op->fsetattr(file, attr);
-			else
+			else {
+				/* External file system still expect to be
+				 * passed a file pointer via ia_file and
+				 * have it announced via ATTR_FILE. This
+				 * just makes it so they don't need to
+				 * change their API just for us. External
+				 * callers will have set these themselves. */
+				if (file) {
+					attr->ia_valid |= ATTR_FILE;
+					attr->ia_file = file;
+				}
 				error = inode->i_op->setattr(dentry, attr);
+			}
 		}
 	} else {
 		error = inode_change_ok(inode, attr);

@@ -353,6 +353,17 @@ struct iattr {
 	struct timespec	ia_atime;
 	struct timespec	ia_mtime;
 	struct timespec	ia_ctime;
+
+	/*
+	 * Not an attribute, but an auxilary info for filesystems wanting to
+	 * implement an ftruncate() like method.  NOTE: filesystem should
+	 * check for (ia_valid & ATTR_FILE), and not for (ia_file != NULL).
+	 *
+	 * NOTE: With patches.apparmor/fsetattr.diff applied, this is
+	 * for compatibility with external file system modules only. There
+	 * should not be any in-kernel users left.
+	 */
+	struct file	*ia_file;
 };
 
 /*
