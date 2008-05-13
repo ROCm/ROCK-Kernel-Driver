@@ -336,6 +336,9 @@ void do_rt_sigreturn(struct pt_regs *regs)
 	regs->tpc = tpc;
 	regs->tnpc = tnpc;
 
+	/* Prevent syscall restart.  */
+	pt_regs_clear_syscall(regs);
+
 	sigdelsetmask(&set, ~_BLOCKABLE);
 	spin_lock_irq(&current->sighand->siglock);
 	current->blocked = set;
@@ -377,16 +380,29 @@ save_fpu_state(struct pt_regs *regs, __siginfo_fpu_t __user *fpu)
 
 static inline void __user *get_sigframe(struct k_sigaction *ka, struct pt_regs *regs, unsigned long framesize)
 {
-	unsigned long sp;
+	unsigned long sp = regs->u_regs[UREG_FP] + STACK_BIAS;
 
-	sp = regs->u_regs[UREG_FP] + STACK_BIAS;
+	/*
+	 * If we are on the alternate signal stack and would overflow it, don't.
+	 * Return an always-bogus address instead so we will die with SIGSEGV.
+	 */
+	if (on_sig_stack(sp) && !likely(on_sig_stack(sp - framesize)))
+		return (void __user *) -1L;
 
 	/* This is the X/Open sanctioned signal stack switching.  */
 	if (ka->sa.sa_flags & SA_ONSTACK) {
-		if (!on_sig_stack(sp) &&
-		    !((current->sas_ss_sp + current->sas_ss_size) & 7))
+		if (sas_ss_flags(sp) == 0)
 			sp = current->sas_ss_sp + current->sas_ss_size;
 	}
+
+	/* Always align the stack frame.  This handles two cases.  First,
+	 * sigaltstack need not be mindful of platform specific stack
+	 * alignment.  Second, if we took this signal because the stack
+	 * is not aligned properly, we'd like to take the signal cleanly
+	 * and report that.
+	 */
+	sp &= ~7UL;
+
 	return (void __user *)(sp - framesize);
 }
 
@@ -487,7 +503,7 @@ static inline void handle_signal(unsigned long signr, struct k_sigaction *ka,
 }
 
 static inline void syscall_restart(unsigned long orig_i0, struct pt_regs *regs,
-				     struct sigaction *sa)
+				   struct sigaction *sa)
 {
 	switch (regs->u_regs[UREG_I0]) {
 	case ERESTART_RESTARTBLOCK:
@@ -511,16 +527,19 @@ static inline void syscall_restart(unsigned long orig_i0, struct pt_regs *regs,
  * want to handle. Thus you cannot kill init even with a SIGKILL even by
  * mistake.
  */
-static void do_signal(struct pt_regs *regs, unsigned long orig_i0, int restart_syscall)
+static void do_signal(struct pt_regs *regs, unsigned long orig_i0, int __ignored)
 {
-	siginfo_t info;
-	struct signal_deliver_cookie cookie;
 	struct k_sigaction ka;
-	int signr;
+	int restart_syscall;
 	sigset_t *oldset;
+	siginfo_t info;
+	int signr;
 	
-	cookie.restart_syscall = restart_syscall;
-	cookie.orig_i0 = orig_i0;
+ 	if (pt_regs_is_syscall(regs) &&
+ 	    (regs->tstate & (TSTATE_XCARRY | TSTATE_ICARRY))) {
+ 		restart_syscall = 1;
+ 	} else
+ 		restart_syscall = 0;
 
 	if (test_thread_flag(TIF_RESTORE_SIGMASK))
 		oldset = &current->saved_sigmask;
@@ -530,16 +549,24 @@ static void do_signal(struct pt_regs *regs, unsigned long orig_i0, int restart_s
 #ifdef CONFIG_SPARC32_COMPAT
 	if (test_thread_flag(TIF_32BIT)) {
 		extern void do_signal32(sigset_t *, struct pt_regs *,
-					unsigned long, int);
-		do_signal32(oldset, regs, orig_i0,
-			    cookie.restart_syscall);
+					int restart_syscall,
+					unsigned long orig_i0);
+		do_signal32(oldset, regs, restart_syscall, orig_i0);
 		return;
 	}
 #endif	
 
-	signr = get_signal_to_deliver(&info, &ka, regs, &cookie);
+	signr = get_signal_to_deliver(&info, &ka, regs, NULL);
+
+	/* If the debugger messes with the program counter, it clears
+	 * the software "in syscall" bit, directing us to not perform
+	 * a syscall restart.
+	 */
+	if (restart_syscall && !pt_regs_is_syscall(regs))
+		restart_syscall = 0;
+
 	if (signr > 0) {
-		if (cookie.restart_syscall)
+		if (restart_syscall)
 			syscall_restart(orig_i0, regs, &ka.sa);
 		handle_signal(signr, &ka, &info, oldset, regs);
 
@@ -552,16 +579,16 @@ static void do_signal(struct pt_regs *regs, unsigned long orig_i0, int restart_s
 			clear_thread_flag(TIF_RESTORE_SIGMASK);
 		return;
 	}
-	if (cookie.restart_syscall &&
+	if (restart_syscall &&
 	    (regs->u_regs[UREG_I0] == ERESTARTNOHAND ||
 	     regs->u_regs[UREG_I0] == ERESTARTSYS ||
 	     regs->u_regs[UREG_I0] == ERESTARTNOINTR)) {
 		/* replay the system call when we are done */
-		regs->u_regs[UREG_I0] = cookie.orig_i0;
+		regs->u_regs[UREG_I0] = orig_i0;
 		regs->tpc -= 4;
 		regs->tnpc -= 4;
 	}
-	if (cookie.restart_syscall &&
+	if (restart_syscall &&
 	    regs->u_regs[UREG_I0] == ERESTART_RESTARTBLOCK) {
 		regs->u_regs[UREG_G1] = __NR_restart_syscall;
 		regs->tpc -= 4;
@@ -582,27 +609,4 @@ void do_notify_resume(struct pt_regs *regs, unsigned long orig_i0, int restart_s
 {
 	if (thread_info_flags & (_TIF_SIGPENDING | _TIF_RESTORE_SIGMASK))
 		do_signal(regs, orig_i0, restart_syscall);
-}
-
-void ptrace_signal_deliver(struct pt_regs *regs, void *cookie)
-{
-	struct signal_deliver_cookie *cp = cookie;
-
-	if (cp->restart_syscall &&
-	    (regs->u_regs[UREG_I0] == ERESTARTNOHAND ||
-	     regs->u_regs[UREG_I0] == ERESTARTSYS ||
-	     regs->u_regs[UREG_I0] == ERESTARTNOINTR)) {
-		/* replay the system call when we are done */
-		regs->u_regs[UREG_I0] = cp->orig_i0;
-		regs->tpc -= 4;
-		regs->tnpc -= 4;
-		cp->restart_syscall = 0;
-	}
-	if (cp->restart_syscall &&
-	    regs->u_regs[UREG_I0] == ERESTART_RESTARTBLOCK) {
-		regs->u_regs[UREG_G1] = __NR_restart_syscall;
-		regs->tpc -= 4;
-		regs->tnpc -= 4;
-		cp->restart_syscall = 0;
-	}
 }

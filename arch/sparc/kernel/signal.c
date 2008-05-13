@@ -178,6 +178,9 @@ static inline void do_new_sigreturn (struct pt_regs *regs)
 	regs->psr = (up_psr & ~(PSR_ICC | PSR_EF))
 		  | (regs->psr & (PSR_ICC | PSR_EF));
 
+	/* Prevent syscall restart.  */
+	pt_regs_clear_syscall(regs);
+
 	err |= __get_user(fpu_save, &sf->fpu_save);
 
 	if (fpu_save)
@@ -299,6 +302,9 @@ asmlinkage void do_rt_sigreturn(struct pt_regs *regs)
 
 	regs->psr = (regs->psr & ~PSR_ICC) | (psr & PSR_ICC);
 
+	/* Prevent syscall restart.  */
+	pt_regs_clear_syscall(regs);
+
 	err |= __get_user(fpu_save, &sf->fpu_save);
 
 	if (fpu_save)
@@ -345,15 +351,29 @@ static inline int invalid_frame_pointer(void __user *fp, int fplen)
 
 static inline void __user *get_sigframe(struct sigaction *sa, struct pt_regs *regs, unsigned long framesize)
 {
-	unsigned long sp;
+	unsigned long sp = regs->u_regs[UREG_FP];
 
-	sp = regs->u_regs[UREG_FP];
+	/*
+	 * If we are on the alternate signal stack and would overflow it, don't.
+	 * Return an always-bogus address instead so we will die with SIGSEGV.
+	 */
+	if (on_sig_stack(sp) && !likely(on_sig_stack(sp - framesize)))
+		return (void __user *) -1L;
 
 	/* This is the X/Open sanctioned signal stack switching.  */
 	if (sa->sa_flags & SA_ONSTACK) {
-		if (!on_sig_stack(sp) && !((current->sas_ss_sp + current->sas_ss_size) & 7))
+		if (sas_ss_flags(sp) == 0)
 			sp = current->sas_ss_sp + current->sas_ss_size;
 	}
+
+	/* Always align the stack frame.  This handles two cases.  First,
+	 * sigaltstack need not be mindful of platform specific stack
+	 * alignment.  Second, if we took this signal because the stack
+	 * is not aligned properly, we'd like to take the signal cleanly
+	 * and report that.
+	 */
+	sp &= ~7UL;
+
 	return (void __user *)(sp - framesize);
 }
 
@@ -994,13 +1014,13 @@ static inline void syscall_restart(unsigned long orig_i0, struct pt_regs *regs,
  * want to handle. Thus you cannot kill init even with a SIGKILL even by
  * mistake.
  */
-asmlinkage void do_signal(struct pt_regs * regs, unsigned long orig_i0, int restart_syscall)
+asmlinkage void do_signal(struct pt_regs * regs, unsigned long orig_i0)
 {
-	siginfo_t info;
-	struct sparc_deliver_cookie cookie;
 	struct k_sigaction ka;
-	int signr;
+	int restart_syscall;
 	sigset_t *oldset;
+	siginfo_t info;
+	int signr;
 
 	/*
 	 * XXX Disable svr4 signal handling until solaris emulation works.
@@ -1013,18 +1033,28 @@ asmlinkage void do_signal(struct pt_regs * regs, unsigned long orig_i0, int rest
 	int svr4_signal = current->personality == PER_SVR4;
 #endif
 
-	cookie.restart_syscall = restart_syscall;
-	cookie.orig_i0 = orig_i0;
+ 	if (pt_regs_is_syscall(regs) && (regs->psr & PSR_C))
+ 		restart_syscall = 1;
+ 	else
+ 		restart_syscall = 0;
 
 	if (test_thread_flag(TIF_RESTORE_SIGMASK))
 		oldset = &current->saved_sigmask;
 	else
 		oldset = &current->blocked;
 
-	signr = get_signal_to_deliver(&info, &ka, regs, &cookie);
+ 	signr = get_signal_to_deliver(&info, &ka, regs, NULL);
+
+ 	/* If the debugger messes with the program counter, it clears
+ 	 * the software "in syscall" bit, directing us to not perform
+ 	 * a syscall restart.
+ 	 */
+ 	if (restart_syscall && !pt_regs_is_syscall(regs))
+ 		restart_syscall = 0;
+
 	if (signr > 0) {
-		if (cookie.restart_syscall)
-			syscall_restart(cookie.orig_i0, regs, &ka.sa);
+		if (restart_syscall)
+			syscall_restart(orig_i0, regs, &ka.sa);
 		handle_signal(signr, &ka, &info, oldset,
 			      regs, svr4_signal);
 		/* a signal was successfully delivered; the saved
@@ -1036,16 +1066,16 @@ asmlinkage void do_signal(struct pt_regs * regs, unsigned long orig_i0, int rest
 			clear_thread_flag(TIF_RESTORE_SIGMASK);
 		return;
 	}
-	if (cookie.restart_syscall &&
+	if (restart_syscall &&
 	    (regs->u_regs[UREG_I0] == ERESTARTNOHAND ||
 	     regs->u_regs[UREG_I0] == ERESTARTSYS ||
 	     regs->u_regs[UREG_I0] == ERESTARTNOINTR)) {
 		/* replay the system call when we are done */
-		regs->u_regs[UREG_I0] = cookie.orig_i0;
+		regs->u_regs[UREG_I0] = orig_i0;
 		regs->pc -= 4;
 		regs->npc -= 4;
 	}
-	if (cookie.restart_syscall &&
+	if (restart_syscall &&
 	    regs->u_regs[UREG_I0] == ERESTART_RESTARTBLOCK) {
 		regs->u_regs[UREG_G1] = __NR_restart_syscall;
 		regs->pc -= 4;
@@ -1096,28 +1126,4 @@ do_sys_sigstack(struct sigstack __user *ssptr, struct sigstack __user *ossptr,
 	ret = 0;
 out:
 	return ret;
-}
-
-void ptrace_signal_deliver(struct pt_regs *regs, void *cookie)
-{
-	struct sparc_deliver_cookie *cp = cookie;
-
-	if (cp->restart_syscall &&
-	    (regs->u_regs[UREG_I0] == ERESTARTNOHAND ||
-	     regs->u_regs[UREG_I0] == ERESTARTSYS ||
-	     regs->u_regs[UREG_I0] == ERESTARTNOINTR)) {
-		/* replay the system call when we are done */
-		regs->u_regs[UREG_I0] = cp->orig_i0;
-		regs->pc -= 4;
-		regs->npc -= 4;
-		cp->restart_syscall = 0;
-	}
-
-	if (cp->restart_syscall &&
-	    regs->u_regs[UREG_I0] == ERESTART_RESTARTBLOCK) {
-		regs->u_regs[UREG_G1] = __NR_restart_syscall;
-		regs->pc -= 4;
-		regs->npc -= 4;
-		cp->restart_syscall = 0;
-	}
 }
