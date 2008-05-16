@@ -814,7 +814,7 @@ static int recover_dev(struct atp *dev)
 	if (dev->open && usb_submit_urb(dev->urb, GFP_NOIO))
 		return -EIO;
 
-	return 0;	
+	return 0;
 }
 
 static int atp_pre_reset(struct usb_interface *iface)
