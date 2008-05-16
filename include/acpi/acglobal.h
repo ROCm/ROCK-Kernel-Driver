@@ -236,6 +236,7 @@ ACPI_EXTERN u8 acpi_gbl_system_awake_and_running;
 
 extern u8 acpi_gbl_shutdown;
 extern u32 acpi_gbl_startup_flags;
+extern int acpi_gbl_force_rsdt;
 extern const char *acpi_gbl_sleep_state_names[ACPI_S_STATE_COUNT];
 extern const char *acpi_gbl_highest_dstate_names[4];
 extern const struct acpi_opcode_info acpi_gbl_aml_op_info[AML_NUM_OPCODES];

@@ -76,6 +76,7 @@ u8 acpi_gbl_method_executing = FALSE;
 /* System flags */
 
 u32 acpi_gbl_startup_flags = 0;
+int acpi_gbl_force_rsdt = 0;
 
 /* System starts uninitialized */
 
