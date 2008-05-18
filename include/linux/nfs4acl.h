@@ -16,7 +16,8 @@ struct nfs4acl {
 	unsigned int	a_owner_mask;
 	unsigned int	a_group_mask;
 	unsigned int	a_other_mask;
-	unsigned int	a_count;
+	unsigned short	a_count;
+	unsigned short	a_flags;
 	struct nfs4ace	a_entries[0];
 };
 
@@ -29,6 +30,18 @@ struct nfs4acl {
 	for (_ace = _acl->a_entries + _acl->a_count - 1; \
 	     _ace != _acl->a_entries - 1; \
 	     _ace--)
+
+/* a_flags values */
+#define ACL4_AUTO_INHERIT		0x01
+#define ACL4_PROTECTED			0x02
+#define ACL4_DEFAULTED			0x04
+#define ACL4_WRITE_THROUGH		0x40
+
+#define ACL4_VALID_FLAGS ( \
+	ACL4_AUTO_INHERIT | \
+	ACL4_PROTECTED | \
+	ACL4_DEFAULTED | \
+	ACL4_WRITE_THROUGH )
 
 /* e_type values */
 #define ACE4_ACCESS_ALLOWED_ACE_TYPE	0x0000
@@ -44,14 +57,16 @@ struct nfs4acl {
 /*#define ACE4_SUCCESSFUL_ACCESS_ACE_FLAG	0x0010*/
 /*#define ACE4_FAILED_ACCESS_ACE_FLAG	0x0020*/
 #define ACE4_IDENTIFIER_GROUP		0x0040
-#define ACE4_SPECIAL_WHO		0x4000  /* in-kernel only */
+#define ACE4_INHERITED_ACE		0x0080
+#define ACE4_SPECIAL_WHO		0x4000  /* in-memory representation only */
 
 #define ACE4_VALID_FLAGS ( \
 	ACE4_FILE_INHERIT_ACE | \
 	ACE4_DIRECTORY_INHERIT_ACE | \
 	ACE4_NO_PROPAGATE_INHERIT_ACE | \
 	ACE4_INHERIT_ONLY_ACE | \
-	ACE4_IDENTIFIER_GROUP )
+	ACE4_IDENTIFIER_GROUP | \
+	ACE4_INHERITED_ACE )
 
 /* e_mask bitflags */
 #define ACE4_READ_DATA			0x00000001
@@ -73,12 +88,9 @@ struct nfs4acl {
 #define ACE4_SYNCHRONIZE		0x00100000
 
 #define ACE4_VALID_MASK ( \
-	ACE4_READ_DATA | \
-	ACE4_LIST_DIRECTORY | \
-	ACE4_WRITE_DATA | \
-	ACE4_ADD_FILE | \
-	ACE4_APPEND_DATA | \
-	ACE4_ADD_SUBDIRECTORY | \
+	ACE4_READ_DATA | ACE4_LIST_DIRECTORY | \
+	ACE4_WRITE_DATA | ACE4_ADD_FILE | \
+	ACE4_APPEND_DATA | ACE4_ADD_SUBDIRECTORY | \
 	ACE4_READ_NAMED_ATTRS | \
 	ACE4_WRITE_NAMED_ATTRS | \
 	ACE4_EXECUTE | \
@@ -91,11 +103,15 @@ struct nfs4acl {
 	ACE4_WRITE_OWNER | \
 	ACE4_SYNCHRONIZE )
 
+#define ACE4_POSIX_ALWAYS_ALLOWED ( \
+	ACE4_SYNCHRONIZE | \
+	ACE4_READ_ATTRIBUTES | \
+	ACE4_READ_ACL )
 /*
  * Duplicate an NFS4ACL handle.
  */
 static inline struct nfs4acl *
-nfs4acl_dup(struct nfs4acl *acl)
+nfs4acl_get(struct nfs4acl *acl)
 {
 	if (acl)
 		atomic_inc(&acl->a_refcount);
@@ -106,7 +122,7 @@ nfs4acl_dup(struct nfs4acl *acl)
  * Free an NFS4ACL handle
  */
 static inline void
-nfs4acl_release(struct nfs4acl *acl)
+nfs4acl_put(struct nfs4acl *acl)
 {
 	if (acl && atomic_dec_and_test(&acl->a_refcount))
 		kfree(acl);
@@ -115,9 +131,21 @@ nfs4acl_release(struct nfs4acl *acl)
 /* Special e_who identifiers: we use these pointer values in comparisons
    instead of strcmp for efficiency. */
 
-extern const char *nfs4ace_owner_who;
-extern const char *nfs4ace_group_who;
-extern const char *nfs4ace_everyone_who;
+extern const char nfs4ace_owner_who[];
+extern const char nfs4ace_group_who[];
+extern const char nfs4ace_everyone_who[];
+
+static inline int
+nfs4acl_is_auto_inherit(const struct nfs4acl *acl)
+{
+	return acl->a_flags & ACL4_AUTO_INHERIT;
+}
+
+static inline int
+nfs4acl_is_protected(const struct nfs4acl *acl)
+{
+	return acl->a_flags & ACL4_PROTECTED;
+}
 
 static inline int
 nfs4ace_is_owner(const struct nfs4ace *ace)
@@ -183,11 +211,15 @@ nfs4ace_is_deny(const struct nfs4ace *ace)
 extern struct nfs4acl *nfs4acl_alloc(int count);
 extern struct nfs4acl *nfs4acl_clone(const struct nfs4acl *acl);
 
-extern int nfs4acl_permission(struct inode *, const struct nfs4acl *, int, int);
+extern unsigned int nfs4acl_want_to_mask(int want);
+extern int nfs4acl_permission(struct inode *, const struct nfs4acl *, unsigned int);
+extern int nfs4acl_generic_permission(struct inode *, unsigned int);
 extern int nfs4ace_is_same_who(const struct nfs4ace *, const struct nfs4ace *);
-extern struct nfs4acl *nfs4acl_inherit(const struct nfs4acl *, mode_t, int);
+extern int nfs4ace_set_who(struct nfs4ace *ace, const char *who);
+extern struct nfs4acl *nfs4acl_inherit(const struct nfs4acl *, mode_t);
 extern int nfs4acl_masks_to_mode(const struct nfs4acl *);
 extern struct nfs4acl *nfs4acl_chmod(struct nfs4acl *, mode_t);
-extern int nfs4acl_apply_masks(struct nfs4acl **acl, int);
+extern int nfs4acl_apply_masks(struct nfs4acl **acl);
+extern int nfs4acl_write_through(struct nfs4acl **acl);
 
 #endif /* __NFS4ACL_H */

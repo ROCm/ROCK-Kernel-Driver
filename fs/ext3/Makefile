@@ -2,8 +2,6 @@
 # Makefile for the linux ext3-filesystem routines.
 #
 
-EXTRA_CFLAGS := -DNFS4ACL_DEBUG
-
 obj-$(CONFIG_EXT3_FS) += ext3.o
 
 ext3-y	:= balloc.o bitmap.o dir.o file.o fsync.o ialloc.o inode.o \

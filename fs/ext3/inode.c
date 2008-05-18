@@ -2978,6 +2978,61 @@ int ext3_write_inode(struct inode *inode, int wait)
 	return ext3_force_commit(inode->i_sb);
 }
 
+static int ext3_inode_change_ok(struct inode *inode, struct iattr *attr)
+{
+	unsigned int ia_valid = attr->ia_valid;
+
+	if (!test_opt(inode->i_sb, NFS4ACL))
+		return inode_change_ok(inode, attr);
+
+	/* If force is set do it anyway. */
+	if (ia_valid & ATTR_FORCE)
+		return 0;
+
+	/* Make sure a caller can chown. */
+	if ((ia_valid & ATTR_UID) &&
+	    (current->fsuid != inode->i_uid ||
+	     attr->ia_uid != inode->i_uid) &&
+	    (current->fsuid != attr->ia_uid ||
+	     ext3_nfs4acl_permission(inode, ACE4_WRITE_OWNER)) &&
+	    !capable(CAP_CHOWN))
+		goto error;
+
+	/* Make sure caller can chgrp. */
+	if ((ia_valid & ATTR_GID)) {
+		int in_group = in_group_p(attr->ia_gid);
+		if ((current->fsuid != inode->i_uid ||
+		    (!in_group && attr->ia_gid != inode->i_gid)) &&
+		    (!in_group ||
+		     ext3_nfs4acl_permission(inode, ACE4_WRITE_OWNER)) &&
+		    !capable(CAP_CHOWN))
+			goto error;
+	}
+
+	/* Make sure a caller can chmod. */
+	if (ia_valid & ATTR_MODE) {
+		if (current->fsuid != inode->i_uid &&
+		    ext3_nfs4acl_permission(inode, ACE4_WRITE_ACL) &&
+		    !capable(CAP_FOWNER))
+			goto error;
+		/* Also check the setgid bit! */
+		if (!in_group_p((ia_valid & ATTR_GID) ? attr->ia_gid :
+				inode->i_gid) && !capable(CAP_FSETID))
+			attr->ia_mode &= ~S_ISGID;
+	}
+
+	/* Check for setting the inode time. */
+	if (ia_valid & (ATTR_MTIME_SET | ATTR_ATIME_SET)) {
+		if (current->fsuid != inode->i_uid &&
+		    ext3_nfs4acl_permission(inode, ACE4_WRITE_ATTRIBUTES) &&
+		    !capable(CAP_FOWNER))
+			goto error;
+	}
+	return 0;
+error:
+	return -EPERM;
+}
+
 /*
  * ext3_setattr()
  *
@@ -3001,7 +3056,7 @@ int ext3_setattr(struct dentry *dentry, struct iattr *attr)
 	int error, rc = 0;
 	const unsigned int ia_valid = attr->ia_valid;
 
-	error = inode_change_ok(inode, attr);
+	error = ext3_inode_change_ok(inode, attr);
 	if (error)
 		return error;
 

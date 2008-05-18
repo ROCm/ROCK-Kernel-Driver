@@ -26,6 +26,7 @@
 #include "namei.h"
 #include "xattr.h"
 #include "acl.h"
+#include "nfs4acl.h"
 
 /*
  * Called when an inode is released. Note that this is different
@@ -135,5 +136,7 @@ const struct inode_operations ext3_file_inode_operations = {
 	.removexattr	= generic_removexattr,
 #endif
 	.permission	= ext3_permission,
+	.may_create	= ext3_may_create,
+	.may_delete	= ext3_may_delete,
 };
 

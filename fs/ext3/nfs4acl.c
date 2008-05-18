@@ -16,8 +16,8 @@
 #include <linux/fs.h>
 #include <linux/ext3_jbd.h>
 #include <linux/ext3_fs.h>
-#include <linux/nfs4acl.h>
 #include <linux/nfs4acl_xattr.h>
+#include "namei.h"
 #include "xattr.h"
 #include "nfs4acl.h"
 
@@ -29,7 +29,7 @@ ext3_iget_nfs4acl(struct inode *inode)
 
 	spin_lock(&inode->i_lock);
 	if (ei->i_nfs4acl != EXT3_NFS4ACL_NOT_CACHED)
-		acl = nfs4acl_dup(ei->i_nfs4acl);
+		acl = nfs4acl_get(ei->i_nfs4acl);
 	spin_unlock(&inode->i_lock);
 
 	return acl;
@@ -42,8 +42,8 @@ ext3_iset_nfs4acl(struct inode *inode, struct nfs4acl *acl)
 
 	spin_lock(&inode->i_lock);
 	if (ei->i_nfs4acl != EXT3_NFS4ACL_NOT_CACHED)
-		nfs4acl_release(ei->i_nfs4acl);
-	ei->i_nfs4acl = nfs4acl_dup(acl);
+		nfs4acl_put(ei->i_nfs4acl);
+	ei->i_nfs4acl = nfs4acl_get(acl);
 	spin_unlock(&inode->i_lock);
 }
 
@@ -113,7 +113,7 @@ ext3_set_nfs4acl(handle_t *handle, struct inode *inode, struct nfs4acl *acl)
 }
 
 int
-ext3_nfs4acl_permission(struct inode *inode, int want)
+ext3_nfs4acl_permission(struct inode *inode, unsigned int mask)
 {
 	struct nfs4acl *acl;
 	int retval;
@@ -122,41 +122,83 @@ ext3_nfs4acl_permission(struct inode *inode, int want)
 
 	acl = ext3_get_nfs4acl(inode);
 	if (!acl)
-		retval = generic_permission(inode, want, NULL);
+		retval = nfs4acl_generic_permission(inode, mask);
 	else if (IS_ERR(acl))
 		retval = PTR_ERR(acl);
 	else {
-		retval = nfs4acl_permission(inode, acl, want,
-					    test_opt(inode->i_sb, NFS4ACL_MAX));
-		nfs4acl_release(acl);
+		retval = nfs4acl_permission(inode, acl, mask);
+		nfs4acl_put(acl);
 	}
 
 	return retval;
 }
 
+int ext3_may_create(struct inode *dir, int isdir)
+{
+	int error;
+
+	if (test_opt(dir->i_sb, NFS4ACL)) {
+		unsigned int mask = (isdir ? ACE4_ADD_SUBDIRECTORY : ACE4_ADD_FILE) |
+				    ACE4_EXECUTE;
+
+		error = ext3_nfs4acl_permission(dir, mask);
+	} else
+		error = ext3_permission(dir,  MAY_WRITE | MAY_EXEC, NULL);
+
+	return error;
+}
+
+static int check_sticky(struct inode *dir, struct inode *inode)
+{
+	if (!(dir->i_mode & S_ISVTX))
+		return 0;
+	if (inode->i_uid == current->fsuid)
+		return 0;
+	if (dir->i_uid == current->fsuid)
+		return 0;
+	return !capable(CAP_FOWNER);
+}
+
+int ext3_may_delete(struct inode *dir, struct inode *inode)
+{
+	int error;
+
+	if (test_opt(inode->i_sb, NFS4ACL)) {
+		error = ext3_nfs4acl_permission(dir, ACE4_DELETE_CHILD | ACE4_EXECUTE);
+		if (!error && check_sticky(dir, inode))
+			error = -EPERM;
+		if (error && !ext3_nfs4acl_permission(inode, ACE4_DELETE))
+			error = 0;
+	} else {
+		error = ext3_permission(dir, MAY_WRITE | MAY_EXEC, NULL);
+		if (!error && check_sticky(dir, inode))
+			error = -EPERM;
+	}
+
+	return error;
+}
+
 int
 ext3_nfs4acl_init(handle_t *handle, struct inode *inode, struct inode *dir)
 {
-	struct nfs4acl *dir_acl, *acl;
+	struct nfs4acl *dir_acl = NULL, *acl;
 	int retval;
 
-	BUG_ON(!test_opt(inode->i_sb, NFS4ACL));
-
-	dir_acl = ext3_get_nfs4acl(dir);
+	if (!S_ISLNK(inode->i_mode))
+		dir_acl = ext3_get_nfs4acl(dir);
 	if (!dir_acl || IS_ERR(dir_acl)) {
 		inode->i_mode &= ~current->fs->umask;
 		return PTR_ERR(dir_acl);
 	}
-	acl = nfs4acl_inherit(dir_acl, inode->i_mode,
-			      test_opt(inode->i_sb, NFS4ACL_MAX));
-	nfs4acl_release(dir_acl);
+	acl = nfs4acl_inherit(dir_acl, inode->i_mode);
+	nfs4acl_put(dir_acl);
 
 	retval = PTR_ERR(acl);
 	if (acl && !IS_ERR(acl)) {
 		retval = ext3_set_nfs4acl(handle, inode, acl);
 		inode->i_mode = (inode->i_mode & ~S_IRWXUGO) |
 				nfs4acl_masks_to_mode(acl);
-		nfs4acl_release(acl);
+		nfs4acl_put(acl);
 	}
 	return retval;
 }
@@ -167,8 +209,8 @@ ext3_nfs4acl_chmod(struct inode *inode)
 	struct nfs4acl *acl;
 	int retval;
 
-	BUG_ON(!test_opt(inode->i_sb, NFS4ACL));
-
+	if (S_ISLNK(inode->i_mode))
+		return -EOPNOTSUPP;
 	acl = ext3_get_nfs4acl(inode);
 	if (!acl || IS_ERR(acl))
 		return PTR_ERR(acl);
@@ -176,7 +218,7 @@ ext3_nfs4acl_chmod(struct inode *inode)
 	if (IS_ERR(acl))
 		return PTR_ERR(acl);
 	retval = ext3_set_nfs4acl(NULL, inode, acl);
-	nfs4acl_release(acl);
+	nfs4acl_put(acl);
 
 	return retval;
 }
@@ -217,7 +259,7 @@ ext3_xattr_get_nfs4acl(struct inode *inode, const char *name, void *buffer,
 			return -ERANGE;
 		nfs4acl_to_xattr(acl, buffer);
 	}
-	nfs4acl_release(acl);
+	nfs4acl_put(acl);
 
 	return size;
 }
@@ -257,9 +299,9 @@ ext3_xattr_get_masked_nfs4acl(struct inode *inode, const char *name,
 	kfree(xattr);
 	if (IS_ERR(acl))
 		return PTR_ERR(acl);
-	retval = nfs4acl_apply_masks(&acl, test_opt(inode->i_sb, NFS4ACL_MAX));
+	retval = nfs4acl_apply_masks(&acl);
 	if (retval) {
-		nfs4acl_release(acl);
+		nfs4acl_put(acl);
 		return retval;
 	}
 	size = nfs4acl_xattr_size(acl);
@@ -268,26 +310,10 @@ ext3_xattr_get_masked_nfs4acl(struct inode *inode, const char *name,
 			return -ERANGE;
 		nfs4acl_to_xattr(acl, buffer);
 	}
-	nfs4acl_release(acl);
+	nfs4acl_put(acl);
 	return size;
 }
 #endif
-
-static int
-ext3_set_mode(struct inode *inode, int mode)
-{
-	handle_t *handle;
-	int retval;
-
-	handle = ext3_journal_start(inode, EXT3_DATA_TRANS_BLOCKS(inode->i_sb));
-	retval = PTR_ERR(handle);
-	if (!IS_ERR(handle)) {
-		inode->i_mode = mode;
-		retval = ext3_mark_inode_dirty(handle, inode);
-		ext3_journal_stop(handle);
-	}
-	return retval;
-}
 
 static int
 ext3_xattr_set_nfs4acl(struct inode *inode, const char *name,
@@ -297,31 +323,33 @@ ext3_xattr_set_nfs4acl(struct inode *inode, const char *name,
 	struct nfs4acl *acl = NULL;
 	int retval, retries = 0;
 
-	if (!test_opt(inode->i_sb, NFS4ACL))
+	if (S_ISLNK(inode->i_mode) || !test_opt(inode->i_sb, NFS4ACL))
 		return -EOPNOTSUPP;
 	if (strcmp(name, "") != 0)
 		return -EINVAL;
+	if (current->fsuid != inode->i_uid &&
+	    ext3_nfs4acl_permission(inode, ACE4_WRITE_ACL) &&
+	    !capable(CAP_FOWNER))
+		return -EPERM;
 	if (value) {
 		acl = nfs4acl_from_xattr(value, size);
 		if (IS_ERR(acl))
 			return PTR_ERR(acl);
 
-		retval = ext3_set_mode(inode, (inode->i_mode & ~S_IRWXUGO) |
-					      nfs4acl_masks_to_mode(acl));
-		if (retval)
-			goto out;
-	} else
-		acl = NULL;
+		inode->i_mode &= ~S_IRWXUGO;
+		inode->i_mode |= nfs4acl_masks_to_mode(acl);
+	}
+
 retry:
 	handle = ext3_journal_start(inode, EXT3_DATA_TRANS_BLOCKS(inode->i_sb));
 	if (IS_ERR(handle))
 		return PTR_ERR(handle);
+	ext3_mark_inode_dirty(handle, inode);
 	retval = ext3_set_nfs4acl(handle, inode, acl);
 	ext3_journal_stop(handle);
 	if (retval == ENOSPC && ext3_should_retry_alloc(inode->i_sb, &retries))
 		goto retry;
-out:
-	nfs4acl_release(acl);
+	nfs4acl_put(acl);
 	return retval;
 }
 

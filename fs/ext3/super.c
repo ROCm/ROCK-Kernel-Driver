@@ -36,8 +36,8 @@
 #include <linux/namei.h>
 #include <linux/quotaops.h>
 #include <linux/seq_file.h>
-#include <linux/log2.h>
 #include <linux/nfs4acl.h>
+#include <linux/log2.h>
 
 #include <asm/uaccess.h>
 
@@ -524,7 +524,7 @@ static void ext3_clear_inode(struct inode *inode)
 #ifdef CONFIG_EXT3_FS_NFS4ACL
 	if (EXT3_I(inode)->i_nfs4acl &&
 			EXT3_I(inode)->i_nfs4acl != EXT3_NFS4ACL_NOT_CACHED) {
-		nfs4acl_release(EXT3_I(inode)->i_nfs4acl);
+		nfs4acl_put(EXT3_I(inode)->i_nfs4acl);
 		EXT3_I(inode)->i_nfs4acl = EXT3_NFS4ACL_NOT_CACHED;
 	}
 #endif
@@ -952,12 +952,6 @@ static int parse_options (char *options, struct super_block *sb,
 			if (match_string(&args[0], "nfs4")) {
 				clear_opt(sbi->s_mount_opt, POSIX_ACL);
 				set_opt(sbi->s_mount_opt, NFS4ACL);
-				clear_opt(sbi->s_mount_opt, NFS4ACL_MAX);
-			} else
-			if (match_string(&args[0], "nfs4+max")) {
-				clear_opt(sbi->s_mount_opt, POSIX_ACL);
-				set_opt(sbi->s_mount_opt, NFS4ACL);
-				set_opt(sbi->s_mount_opt, NFS4ACL_MAX);
 			} else
 #endif
 			{
@@ -1630,7 +1624,7 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 	if (sbi->s_mount_opt & EXT3_MOUNT_POSIX_ACL)
 		sb->s_flags |= MS_POSIXACL;
 	if (sbi->s_mount_opt & EXT3_MOUNT_NFS4ACL)
-		sb->s_flags |= MS_POSIXACL;
+		sb->s_flags |= MS_POSIXACL | MS_WITHAPPEND;
 
 	if (le32_to_cpu(es->s_rev_level) == EXT3_GOOD_OLD_REV &&
 	    (EXT3_HAS_COMPAT_FEATURE(sb, ~0U) ||

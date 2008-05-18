@@ -31,7 +31,7 @@ nfs4acl_from_xattr(const void *value, size_t size)
 
 	if (size < sizeof(struct nfs4acl_xattr) ||
 	    xattr_acl->a_version != ACL4_XATTR_VERSION ||
-	    xattr_acl->a_flags != 0)
+	    (xattr_acl->a_flags & ~ACL4_VALID_FLAGS))
 		return ERR_PTR(-EINVAL);
 
 	count = be16_to_cpu(xattr_acl->a_count);
@@ -42,6 +42,7 @@ nfs4acl_from_xattr(const void *value, size_t size)
 	if (!acl)
 		return ERR_PTR(-ENOMEM);
 
+	acl->a_flags = xattr_acl->a_flags;
 	acl->a_owner_mask = be32_to_cpu(xattr_acl->a_owner_mask);
 	if (acl->a_owner_mask & ~ACE4_VALID_MASK)
 		goto fail_einval;
@@ -78,16 +79,7 @@ nfs4acl_from_xattr(const void *value, size_t size)
 		if (who == end) {
 			if (ace->u.e_id == -1)
 				goto fail_einval;  /* uid/gid needed */
-		} else if (!strcmp(who, nfs4ace_owner_who)) {
-			ace->e_flags |= ACE4_SPECIAL_WHO;
-			ace->u.e_who = nfs4ace_owner_who;
-		} else if (!strcmp(who, nfs4ace_group_who)) {
-			ace->e_flags |= ACE4_SPECIAL_WHO;
-			ace->u.e_who = nfs4ace_group_who;
-		} else if (!strcmp(who, nfs4ace_everyone_who)) {
-			ace->e_flags |= ACE4_SPECIAL_WHO;
-			ace->u.e_who = nfs4ace_everyone_who;
-		} else
+		} else if (nfs4ace_set_who(ace, who))
 			goto fail_einval;
 
 		xattr_ace = (void *)who + ALIGN(end - who + 1, 4);
@@ -96,7 +88,7 @@ nfs4acl_from_xattr(const void *value, size_t size)
 	return acl;
 
 fail_einval:
-	nfs4acl_release(acl);
+	nfs4acl_put(acl);
 	return ERR_PTR(-EINVAL);
 }
 EXPORT_SYMBOL_GPL(nfs4acl_from_xattr);
@@ -124,7 +116,7 @@ nfs4acl_to_xattr(const struct nfs4acl *acl, void *buffer)
 	const struct nfs4ace *ace;
 
 	xattr_acl->a_version = ACL4_XATTR_VERSION;
-	xattr_acl->a_flags = 0;
+	xattr_acl->a_flags = acl->a_flags;
 	xattr_acl->a_count = cpu_to_be16(acl->a_count);
 
 	xattr_acl->a_owner_mask = cpu_to_be32(acl->a_owner_mask);

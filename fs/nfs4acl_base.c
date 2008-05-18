@@ -25,9 +25,9 @@ MODULE_LICENSE("GPL");
  * amounts of string comparisons.
  */
 
-const char *nfs4ace_owner_who	 = "OWNER@";
-const char *nfs4ace_group_who	 = "GROUP@";
-const char *nfs4ace_everyone_who = "EVERYONE@";
+const char nfs4ace_owner_who[]	  = "OWNER@";
+const char nfs4ace_group_who[]	  = "GROUP@";
+const char nfs4ace_everyone_who[] = "EVERYONE@";
 
 EXPORT_SYMBOL_GPL(nfs4ace_owner_who);
 EXPORT_SYMBOL_GPL(nfs4ace_group_who);
@@ -50,6 +50,7 @@ nfs4acl_alloc(int count)
 	}
 	return acl;
 }
+EXPORT_SYMBOL_GPL(nfs4acl_alloc);
 
 /**
  * nfs4acl_clone  -  create a copy of an acl
@@ -76,29 +77,25 @@ nfs4acl_clone(const struct nfs4acl *acl)
  * make sure that we do not mask them if they are set, so that users who
  * rely on these flags won't get confused.
  */
-#define ACE4_GENERIC_READ ( \
-	ACE4_READ_DATA)
-#define ACE4_GENERIC_WRITE ( \
-	ACE4_WRITE_DATA | \
-	ACE4_APPEND_DATA | \
-	ACE4_DELETE_CHILD)
-#define ACE4_GENERIC_EXEC ( \
+#define ACE4_POSIX_MODE_READ ( \
+	ACE4_READ_DATA | ACE4_LIST_DIRECTORY )
+#define ACE4_POSIX_MODE_WRITE ( \
+	ACE4_WRITE_DATA | ACE4_ADD_FILE | \
+	ACE4_APPEND_DATA | ACE4_ADD_SUBDIRECTORY | \
+	ACE4_DELETE_CHILD )
+#define ACE4_POSIX_MODE_EXEC ( \
 	ACE4_EXECUTE)
-#define ACE4_ALWAYS_ALLOWED ( \
-	ACE4_SYNCHRONIZE | \
-	ACE4_READ_ATTRIBUTES | \
-	ACE4_READ_ACL )
 
 static int
 nfs4acl_mask_to_mode(unsigned int mask)
 {
 	int mode = 0;
 
-	if (mask & ACE4_GENERIC_READ)
+	if (mask & ACE4_POSIX_MODE_READ)
 		mode |= MAY_READ;
-	if (mask & ACE4_GENERIC_WRITE)
+	if (mask & ACE4_POSIX_MODE_WRITE)
 		mode |= MAY_WRITE;
-	if (mask & ACE4_GENERIC_EXEC)
+	if (mask & ACE4_POSIX_MODE_EXEC)
 		mode |= MAY_EXEC;
 
 	return mode;
@@ -121,14 +118,14 @@ EXPORT_SYMBOL_GPL(nfs4acl_masks_to_mode);
 static unsigned int
 nfs4acl_mode_to_mask(mode_t mode)
 {
-	unsigned int mask = 0;
+	unsigned int mask = ACE4_POSIX_ALWAYS_ALLOWED;
 
 	if (mode & MAY_READ)
-		mask |= ACE4_ALWAYS_ALLOWED | ACE4_GENERIC_READ;
+		mask |= ACE4_POSIX_MODE_READ;
 	if (mode & MAY_WRITE)
-		mask |= ACE4_ALWAYS_ALLOWED | ACE4_GENERIC_WRITE;
+		mask |= ACE4_POSIX_MODE_WRITE;
 	if (mode & MAY_EXEC)
-		mask |= ACE4_ALWAYS_ALLOWED | ACE4_GENERIC_EXEC;
+		mask |= ACE4_POSIX_MODE_EXEC;
 
 	return mask;
 }
@@ -154,17 +151,25 @@ nfs4acl_chmod(struct nfs4acl *acl, mode_t mode)
 
 	if (acl->a_owner_mask == owner_mask &&
 	    acl->a_group_mask == group_mask &&
-	    acl->a_other_mask == other_mask)
+	    acl->a_other_mask == other_mask &&
+	    (!nfs4acl_is_auto_inherit(acl) || nfs4acl_is_protected(acl)))
 		return acl;
 
 	clone = nfs4acl_clone(acl);
-	nfs4acl_release(acl);
+	nfs4acl_put(acl);
 	if (!clone)
 		return ERR_PTR(-ENOMEM);
 
 	clone->a_owner_mask = owner_mask;
 	clone->a_group_mask = group_mask;
 	clone->a_other_mask = other_mask;
+	if (nfs4acl_is_auto_inherit(clone))
+		clone->a_flags |= ACL4_PROTECTED;
+
+	if (nfs4acl_write_through(&clone)) {
+		nfs4acl_put(clone);
+		clone = ERR_PTR(-ENOMEM);
+	}
 	return clone;
 }
 EXPORT_SYMBOL_GPL(nfs4acl_chmod);
@@ -172,71 +177,99 @@ EXPORT_SYMBOL_GPL(nfs4acl_chmod);
 /**
  * nfs4acl_want_to_mask  - convert permission want argument to a mask
  * @want:	@want argument of the permission inode operation
+ *
+ * When checking for append, @want is (MAY_WRITE | MAY_APPEND).
  */
-static unsigned int
+unsigned int
 nfs4acl_want_to_mask(int want)
 {
 	unsigned int mask = 0;
 
 	if (want & MAY_READ)
 		mask |= ACE4_READ_DATA;
-	if (want & MAY_WRITE)
+	if (want & MAY_APPEND)
+		mask |= ACE4_APPEND_DATA;
+	else if (want & MAY_WRITE)
 		mask |= ACE4_WRITE_DATA;
 	if (want & MAY_EXEC)
 		mask |= ACE4_EXECUTE;
 
 	return mask;
 }
+EXPORT_SYMBOL_GPL(nfs4acl_want_to_mask);
 
 /**
- * __nfs4acl_permission  -  permission check algorithm without masking
- * @inode:	inode to check permissions for
- * @acl:	nfs4 acl if the inode
- * @mask:	requested mask flags
- * @in_group_class: returns if the process matches a group class acl entry
+ * nfs4acl_capability_check  -  check for capabilities overriding read/write access
+ * @inode:	inode to check
+ * @mask:	requested access (ACE4_* bitmask)
  *
- * Checks if the current process is granted @mask flags in @acl. The
- * @inode determines the file type, current owner and owning group.
- *
- * In addition to checking permissions, this function checks if the
- * process matches a group class acl entry even after the result of the
- * permission check has been determined: for non-owners, this property
- * determines which file mask applies to the acl.
+ * Capabilities other than CAP_DAC_OVERRIDE and CAP_DAC_READ_SEARCH must be checked
+ * separately.
  */
-static int
-__nfs4acl_permission(struct inode *inode, const struct nfs4acl *acl,
-		     unsigned int mask, int *in_group_class)
+static inline int nfs4acl_capability_check(struct inode *inode, unsigned int mask)
+{
+	/*
+	 * Read/write DACs are always overridable.
+	 * Executable DACs are overridable if at least one exec bit is set.
+	 */
+	if (!(mask & (ACE4_WRITE_ACL | ACE4_WRITE_OWNER)) &&
+	    (!(mask & ACE4_EXECUTE) ||
+	    (inode->i_mode & S_IXUGO) || S_ISDIR(inode->i_mode)))
+		if (capable(CAP_DAC_OVERRIDE))
+			return 0;
+
+	/*
+	 * Searching includes executable on directories, else just read.
+	 */
+	if (!(mask & ~(ACE4_READ_DATA | ACE4_EXECUTE)) &&
+	    (S_ISDIR(inode->i_mode) || !(mask & ACE4_EXECUTE)))
+		if (capable(CAP_DAC_READ_SEARCH))
+			return 0;
+
+	return -EACCES;
+}
+
+/**
+ * nfs4acl_permission  -  permission check algorithm with masking
+ * @inode:	inode to check
+ * @acl:	nfs4 acl of the inode
+ * @mask:	requested access (ACE4_* bitmask)
+ *
+ * Checks if the current process is granted @mask flags in @acl. With
+ * write-through, the OWNER@ is always granted the owner file mask, the
+ * GROUP@ is always granted the group file mask, and EVERYONE@ is always
+ * granted the other file mask. Otherwise, processes are only granted
+ * @mask flags which they are granted in the @acl as well as in their
+ * file mask.
+ */
+int nfs4acl_permission(struct inode *inode, const struct nfs4acl *acl,
+		       unsigned int mask)
 {
 	const struct nfs4ace *ace;
-	int retval = -EACCES;
+	unsigned int file_mask, requested = mask, denied = 0;
+	int in_owning_group = in_group_p(inode->i_gid);
+	int owner_or_group_class = in_owning_group;
+
+	/*
+	 * A process is in the
+	 *   - owner file class if it owns the file, in the
+	 *   - group file class if it is in the file's owning group or
+	 *     it matches any of the user or group entries, and in the
+	 *   - other file class otherwise.
+	 */
 
 	nfs4acl_for_each_entry(ace, acl) {
 		unsigned int ace_mask = ace->e_mask;
 
 		if (nfs4ace_is_inherit_only(ace))
 			continue;
-
-		/**
-		 * Check if the ACE matches the process. Remember when a
-		 * group class ACE matches the process.
-		 *
-		 * For ACEs other than OWNER@ and EVERYONE@, we apply the
-		 * file group mask: this would not strictly be necessary for
-		 * access checking, but it saves us from allowing accesses
-		 * that the ACL that nfs4acl_apply_masks() would deny:
-		 * otherwise, ACLs like 'group@:rw::allow' with mode 0600
-		 * would allow processes that match the owner and the
-		 * owning group rw access. This scenario cannot be expressed
-		 * as an ACL.
-		 */
 		if (nfs4ace_is_owner(ace)) {
 			if (current->fsuid != inode->i_uid)
 				continue;
+			goto is_owner;
 		} else if (nfs4ace_is_group(ace)) {
-			if (!in_group_p(inode->i_gid))
+			if (!in_owning_group)
 				continue;
-			ace_mask &= acl->a_group_mask;
-			*in_group_class = 1;
 		} else if (nfs4ace_is_unix_id(ace)) {
 			if (ace->e_flags & ACE4_IDENTIFIER_GROUP) {
 				if (!in_group_p(ace->u.e_id))
@@ -245,121 +278,82 @@ __nfs4acl_permission(struct inode *inode, const struct nfs4acl *acl,
 				if (current->fsuid != ace->u.e_id)
 					continue;
 			}
+		} else
+			goto is_everyone;
+
+		/*
+		 * Apply the group file mask to entries other than OWNER@ and
+		 * EVERYONE@. This is not required for correct access checking
+		 * but ensures that we grant the same permissions as the acl
+		 * computed by nfs4acl_apply_masks().
+		 *
+		 * For example, without this restriction, 'group@:rw::allow'
+		 * with mode 0600 would grant rw access to owner processes
+		 * which are also in the owning group. This cannot be expressed
+		 * in an acl.
+		 */
+		if (nfs4ace_is_allow(ace))
 			ace_mask &= acl->a_group_mask;
-			*in_group_class = 1;
-		} else if (!nfs4ace_is_everyone(ace))
-			continue;
 
+	    is_owner:
+		/* The process is in the owner or group file class. */
+		owner_or_group_class = 1;
+
+	    is_everyone:
 		/* Check which mask flags the ACE allows or denies. */
-		if (nfs4ace_is_allow(ace)) {
-			if (!S_ISDIR(inode->i_mode)) {
-				/* Everybody who is allowed ACE4_WRITE_DATA is
-				   also allowed ACE4_APPEND_DATA. */
-				if (ace_mask & ACE4_WRITE_DATA)
-					ace_mask |= ACE4_APPEND_DATA;
-			}
-			mask &= ~ace_mask;
-			if (mask == 0) {
-				retval = 0;
-				goto check_remaining_aces;
-			}
-		} else if (nfs4ace_is_deny(ace)) {
-			unsigned int ace_mask = ace->e_mask;
+		if (nfs4ace_is_deny(ace))
+			denied |= ace_mask & mask;
+		mask &= ~ace_mask;
 
-			if (!S_ISDIR(inode->i_mode)) {
-				/* Everybody who is denied ACE4_APPEND_DATA is
-				   also denied ACE4_WRITE_DATA. */
-				if (ace_mask & ACE4_APPEND_DATA)
-					ace_mask |= ACE4_WRITE_DATA;
-			}
-			if (mask & ace_mask)
-				goto check_remaining_aces;
-		}
+		/* Keep going until we know which file class the process is in. */
+		if (!mask && owner_or_group_class)
+			break;
 	}
-	return retval;
-
-check_remaining_aces:
-	/* Check if any of the remaining group class ACEs match the process. */
-	for (ace++; ace != acl->a_entries + acl->a_count; ace++) {
-		if (nfs4ace_is_group(ace)) {
-			if (in_group_p(inode->i_gid))
-				*in_group_class = 1;
-		} else if (nfs4ace_is_unix_id(ace)) {
-			if (ace->e_flags & ACE4_IDENTIFIER_GROUP) {
-				if (in_group_p(ace->u.e_id))
-					*in_group_class = 1;
-			} else {
-				if (current->fsuid == ace->u.e_id)
-					*in_group_class = 1;
-			}
-		}
-	}
-	return retval;
-}
-
-/**
- * nfs4acl_permission  -  permission check algorithm with masking
- * @inode:	inode to check permissions for
- * @acl:	nfs4 acl if the inode
- * @want:	requested access (permission want argument)
- * @write_through: assume that the masks "writes through" to the acl
- *
- * Checks if the current process is granted @mask flags in @acl. If
- * @write_through is true, then the OWNER@ is always granted the owner
- * mask, the GROUP@ is always granted the group mask, and EVERYONE@ is
- * always granted the other mask. Otherwise, the OWNER@, GROUP@, and
- * EVERYONE@ are only granted mask flags which they are granted both in
- * the @acl and in the file mask that applies to the process (which
- * depends on which file class the process is in).
- */
-int
-nfs4acl_permission(struct inode *inode, const struct nfs4acl *acl, int want,
-		   int write_through)
-{
-	unsigned int mask = nfs4acl_want_to_mask(want);
-	int in_group_class = 0, retval;
-
-	retval = __nfs4acl_permission(inode, acl, mask, &in_group_class);
-	if (write_through) {
-		if (current->fsuid == inode->i_uid ||
-		    in_group_p(inode->i_gid) ||
-		    !in_group_class)
-			retval = 0;  /* only check the mask */
-	}
-	if (retval)
-		goto capability_check;
-	if (current->fsuid == inode->i_uid) {
-		if (mask & ~acl->a_owner_mask)
-			goto capability_check;
-	} else if (in_group_p(inode->i_gid) || in_group_class) {
-		if (mask & ~acl->a_group_mask)
-			goto capability_check;
-	} else {
-		if (mask & ~acl->a_other_mask)
-			goto capability_check;
-	}
-	return 0;
-
-capability_check:
-	/*
-	 * Read/write DACs are always overridable.
-	 * Executable DACs are overridable if at least one exec bit is set.
-	 */
-	if (!(want & MAY_EXEC) ||
-	    (inode->i_mode & S_IXUGO) || S_ISDIR(inode->i_mode))
-		if (capable(CAP_DAC_OVERRIDE))
-			return 0;
+	denied |= mask;
 
 	/*
-	 * Searching includes executable on directories, else just read.
+	 * Figure out which file mask applies.
+	 * Clear write-through if the process is in the file group class but
+	 * not in the owning group, and so the denied permissions apply.
 	 */
-	if (want == MAY_READ || (S_ISDIR(inode->i_mode) && !(want & MAY_WRITE)))
-		if (capable(CAP_DAC_READ_SEARCH))
-			return 0;
-	return -EACCES;
+	if (current->fsuid == inode->i_uid)
+		file_mask = acl->a_owner_mask;
+	else if (in_owning_group || owner_or_group_class)
+		file_mask = acl->a_group_mask;
+	else
+		file_mask = acl->a_other_mask;
 
+	denied |= requested & ~file_mask;
+	if (!denied)
+		return 0;
+	return nfs4acl_capability_check(inode, requested);
 }
 EXPORT_SYMBOL_GPL(nfs4acl_permission);
+
+/**
+ * nfs4acl_generic_permission  -  permission check algorithm without explicit acl
+ * @inode:	inode to check permissions for
+ * @mask:	requested access (ACE4_* bitmask)
+ *
+ * The file mode of a file without ACL corresponds to an ACL with a single
+ * "EVERYONE:~0::ALLOW" entry, with file masks that correspond to the file mode
+ * permissions. Instead of constructing a temporary ACL and applying
+ * nfs4acl_permission() to it, compute the identical result directly from the file
+ * mode.
+ */
+int nfs4acl_generic_permission(struct inode *inode, unsigned int mask)
+{
+	int mode = inode->i_mode;
+
+	if (current->fsuid == inode->i_uid)
+		mode >>= 6;
+	else if (in_group_p(inode->i_gid))
+		mode >>= 3;
+	if (!(mask & ~nfs4acl_mode_to_mask(mode)))
+		return 0;
+	return nfs4acl_capability_check(inode, mask);
+}
+EXPORT_SYMBOL_GPL(nfs4acl_generic_permission);
 
 /*
  * nfs4ace_is_same_who  -  do both acl entries refer to the same identifier?
@@ -376,6 +370,30 @@ nfs4ace_is_same_who(const struct nfs4ace *a, const struct nfs4ace *b)
 		return a->u.e_id == b->u.e_id;
 #undef WHO_FLAGS
 }
+
+/**
+ * nfs4acl_set_who  -  set a special who value
+ * @ace:	acl entry
+ * @who:	who value to use
+ */
+int
+nfs4ace_set_who(struct nfs4ace *ace, const char *who)
+{
+	if (!strcmp(who, nfs4ace_owner_who))
+		who = nfs4ace_owner_who;
+	else if (!strcmp(who, nfs4ace_group_who))
+		who = nfs4ace_group_who;
+	else if (!strcmp(who, nfs4ace_everyone_who))
+		who = nfs4ace_everyone_who;
+	else
+		return -EINVAL;
+
+	ace->u.e_who = who;
+	ace->e_flags |= ACE4_SPECIAL_WHO;
+	ace->e_flags &= ~ACE4_IDENTIFIER_GROUP;
+	return 0;
+}
+EXPORT_SYMBOL_GPL(nfs4ace_set_who);
 
 /**
  * nfs4acl_allowed_to_who  -  mask flags allowed to a specific who value
@@ -460,19 +478,18 @@ nfs4acl_compute_max_masks(struct nfs4acl *acl)
  * nfs4acl_inherit  -  compute the acl a new file will inherit
  * @dir_acl:	acl of the containing direcory
  * @mode:	file type and create mode of the new file
- * @write_through: assume that the mode "writes through" to the acl
  *
  * Given the containing directory's acl, this function will compute the
  * acl that new files in that directory will inherit, or %NULL if
  * @dir_acl does not contain acl entries inheritable by this file.
  *
- * Without @write_through, the file masks in the returned acl are set to
+ * Without write-through, the file masks in the returned acl are set to
  * the intersection of the create mode and the maximum permissions
- * allowed to each file class. With @write_through, the file masks are
+ * allowed to each file class. With write-through, the file masks are
  * set to the create mode.
  */
 struct nfs4acl *
-nfs4acl_inherit(const struct nfs4acl *dir_acl, mode_t mode, int write_through)
+nfs4acl_inherit(const struct nfs4acl *dir_acl, mode_t mode)
 {
 	const struct nfs4ace *dir_ace;
 	struct nfs4acl *acl;
@@ -525,7 +542,7 @@ nfs4acl_inherit(const struct nfs4acl *dir_acl, mode_t mode, int write_through)
 
 	/* The maximum max flags that the owner, group, and other classes
 	   are allowed. */
-	if (write_through) {
+	if (dir_acl->a_flags & ACL4_WRITE_THROUGH) {
 		acl->a_owner_mask = ACE4_VALID_MASK;
 		acl->a_group_mask = ACE4_VALID_MASK;
 		acl->a_other_mask = ACE4_VALID_MASK;
@@ -538,6 +555,18 @@ nfs4acl_inherit(const struct nfs4acl *dir_acl, mode_t mode, int write_through)
 	acl->a_owner_mask &= nfs4acl_mode_to_mask(mode >> 6);
 	acl->a_group_mask &= nfs4acl_mode_to_mask(mode >> 3);
 	acl->a_other_mask &= nfs4acl_mode_to_mask(mode);
+
+	if (nfs4acl_write_through(&acl)) {
+		nfs4acl_put(acl);
+		return ERR_PTR(-ENOMEM);
+	}
+
+	acl->a_flags = (dir_acl->a_flags & ~ACL4_PROTECTED);
+	if (nfs4acl_is_auto_inherit(acl)) {
+		nfs4acl_for_each_entry(ace, acl)
+			ace->e_flags |= ACE4_INHERITED_ACE;
+		acl->a_flags |= ACL4_PROTECTED;
+	}
 
 	return acl;
 }

@@ -2401,7 +2401,7 @@ int ext3_permission(struct inode *inode, int mask, struct nameidata *nd)
 {
 #ifdef CONFIG_EXT3_FS_NFS4ACL
 	if (test_opt(inode->i_sb, NFS4ACL))
-		return ext3_nfs4acl_permission(inode, mask);
+		return ext3_nfs4acl_permission(inode, nfs4acl_want_to_mask(mask));
 	else
 #endif
         return generic_permission(inode, mask, ext3_check_acl);
@@ -2428,6 +2428,8 @@ const struct inode_operations ext3_dir_inode_operations = {
 	.removexattr	= generic_removexattr,
 #endif
 	.permission	= ext3_permission,
+	.may_create	= ext3_may_create,
+	.may_delete	= ext3_may_delete,
 };
 
 const struct inode_operations ext3_special_inode_operations = {
@@ -2439,4 +2441,6 @@ const struct inode_operations ext3_special_inode_operations = {
 	.removexattr	= generic_removexattr,
 #endif
 	.permission	= ext3_permission,
+	.may_create	= ext3_may_create,
+	.may_delete	= ext3_may_delete,
 };

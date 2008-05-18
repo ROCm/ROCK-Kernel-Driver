@@ -259,8 +259,10 @@ int permission(struct inode *inode, int mask, struct nameidata *nd)
 			return -EACCES;
 	}
 
+	submask = mask;
 	/* Ordinary permission routines do not understand MAY_APPEND. */
-	submask = mask & ~MAY_APPEND;
+	if (!IS_WITHAPPEND(inode))
+		submask &= ~MAY_APPEND;
 	if (inode->i_op && inode->i_op->permission) {
 		retval = inode->i_op->permission(inode, submask, nd);
 		if (!retval) {
@@ -1476,13 +1478,24 @@ static int may_delete(struct inode *dir,struct dentry *victim,int isdir)
 	BUG_ON(victim->d_parent->d_inode != dir);
 	audit_inode_child(victim->d_name.name, victim, dir);
 
-	error = permission(dir,MAY_WRITE | MAY_EXEC, NULL);
+	if (dir->i_op->may_delete) {
+		if (IS_RDONLY(dir))
+			return -EROFS;
+		if (IS_IMMUTABLE(dir))
+			return -EACCES;
+		error = dir->i_op->may_delete(dir, victim->d_inode);
+		if (!error)
+			error = security_inode_permission(dir, MAY_WRITE | MAY_EXEC, NULL);
+	} else {
+		error = permission(dir, MAY_WRITE | MAY_EXEC, NULL);
+		if (!error && check_sticky(dir, victim->d_inode))
+			error = -EPERM;
+	}
 	if (error)
 		return error;
 	if (IS_APPEND(dir))
 		return -EPERM;
-	if (check_sticky(dir, victim->d_inode)||IS_APPEND(victim->d_inode)||
-	    IS_IMMUTABLE(victim->d_inode))
+	if (IS_APPEND(victim->d_inode) || IS_IMMUTABLE(victim->d_inode))
 		return -EPERM;
 	if (isdir) {
 		if (!S_ISDIR(victim->d_inode->i_mode))
@@ -1507,15 +1520,29 @@ static int may_delete(struct inode *dir,struct dentry *victim,int isdir)
  *  4. We can't do it if dir is immutable (done in permission())
  */
 static inline int may_create(struct inode *dir, struct dentry *child,
-			     struct nameidata *nd)
+			     struct nameidata *nd, int isdir)
 {
+	int error;
+
 	if (child->d_inode)
 		return -EEXIST;
 	if (IS_DEADDIR(dir))
 		return -ENOENT;
+
 	if (nd)
 		nd->flags |= LOOKUP_CONTINUE;
-	return permission(dir,MAY_WRITE | MAY_EXEC, nd);
+	if (dir->i_op->may_create) {
+		if (IS_RDONLY(dir))
+			return -EROFS;
+		if (IS_IMMUTABLE(dir))
+			return -EACCES;
+		error = dir->i_op->may_create(dir, isdir);
+		if (!error)
+			error = security_inode_permission(dir, MAY_WRITE | MAY_EXEC, nd);
+	} else
+		error = permission(dir, MAY_WRITE | MAY_EXEC, nd);
+
+	return error;
 }
 
 /* 
@@ -1581,7 +1608,7 @@ void unlock_rename(struct dentry *p1, struct dentry *p2)
 int vfs_create(struct inode *dir, struct dentry *dentry, int mode,
 		struct nameidata *nd)
 {
-	int error = may_create(dir, dentry, nd);
+	int error = may_create(dir, dentry, nd, 0);
 
 	if (error)
 		return error;
@@ -1932,7 +1959,7 @@ EXPORT_SYMBOL_GPL(lookup_create);
 int vfs_mknod(struct inode *dir, struct dentry *dentry, struct vfsmount *mnt,
 	      int mode, dev_t dev)
 {
-	int error = may_create(dir, dentry, NULL);
+	int error = may_create(dir, dentry, NULL, 0);
 
 	if (error)
 		return error;
@@ -2013,7 +2040,7 @@ asmlinkage long sys_mknod(const char __user *filename, int mode, unsigned dev)
 int vfs_mkdir(struct inode *dir, struct dentry *dentry, struct vfsmount *mnt,
 	      int mode)
 {
-	int error = may_create(dir, dentry, NULL);
+	int error = may_create(dir, dentry, NULL, 1);
 
 	if (error)
 		return error;
@@ -2282,7 +2309,7 @@ asmlinkage long sys_unlink(const char __user *pathname)
 int vfs_symlink(struct inode *dir, struct dentry *dentry, struct vfsmount *mnt,
 		const char *oldname, int mode)
 {
-	int error = may_create(dir, dentry, NULL);
+	int error = may_create(dir, dentry, NULL, 0);
 
 	if (error)
 		return error;
@@ -2352,7 +2379,7 @@ int vfs_link(struct dentry *old_dentry, struct vfsmount *old_mnt, struct inode *
 	if (!inode)
 		return -ENOENT;
 
-	error = may_create(dir, new_dentry, NULL);
+	error = may_create(dir, new_dentry, NULL, S_ISDIR(inode->i_mode));
 	if (error)
 		return error;
 
@@ -2566,7 +2593,7 @@ int vfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 		return error;
 
 	if (!new_dentry->d_inode)
-		error = may_create(new_dir, new_dentry, NULL);
+		error = may_create(new_dir, new_dentry, NULL, is_dir);
 	else
 		error = may_delete(new_dir, new_dentry, is_dir);
 	if (error)

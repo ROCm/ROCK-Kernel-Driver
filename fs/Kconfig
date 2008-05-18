@@ -129,8 +129,7 @@ config EXT3_FS_NFS4ACL
 	depends on EXT3_FS_XATTR && EXPERIMENTAL
 	select FS_NFS4ACL
 	help
-	  Allow to use NFSv4 ACLs instead of POSIX ACLs. This may become
-	  useful for filesystems exported over NFSv4 or Samba.
+	  Allow to use NFSv4 ACLs instead of POSIX ACLs.
 
 config EXT3_FS_SECURITY
 	bool "Ext3 Security Labels"
