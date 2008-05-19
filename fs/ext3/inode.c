@@ -2978,6 +2978,7 @@ int ext3_write_inode(struct inode *inode, int wait)
 	return ext3_force_commit(inode->i_sb);
 }
 
+#ifdef CONFIG_EXT3_FS_NFS4ACL
 static int ext3_inode_change_ok(struct inode *inode, struct iattr *attr)
 {
 	unsigned int ia_valid = attr->ia_valid;
@@ -3032,6 +3033,9 @@ static int ext3_inode_change_ok(struct inode *inode, struct iattr *attr)
 error:
 	return -EPERM;
 }
+#else
+# define ext3_inode_change_ok inode_change_ok
+#endif
 
 /*
  * ext3_setattr()
