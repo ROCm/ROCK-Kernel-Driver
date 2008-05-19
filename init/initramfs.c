@@ -6,6 +6,9 @@
 #include <linux/delay.h>
 #include <linux/string.h>
 #include <linux/syscalls.h>
+#ifdef CONFIG_ACPI_CUSTOM_DSDT_INITRD
+#include <acpi/acpi.h>
+#endif
 
 static __initdata char *message;
 static void __init error(char *x)
@@ -90,6 +93,12 @@ static __initdata unsigned long body_len, name_len;
 static __initdata uid_t uid;
 static __initdata gid_t gid;
 static __initdata unsigned rdev;
+#ifdef CONFIG_ACPI_CUSTOM_DSDT_INITRD
+static __initdata char *file_looked_for;
+static __initdata struct acpi_table_header *file_mem;
+#else
+const char *file_looked_for = NULL;
+#endif
 
 static void __init parse_header(char *s)
 {
@@ -123,6 +132,7 @@ static __initdata enum state {
 	SkipIt,
 	GotName,
 	CopyFile,
+	CopyFileMem,
 	GotSymlink,
 	Reset
 } state, next_state;
@@ -267,6 +277,9 @@ static int __init do_name(void)
 		free_hash();
 		return 0;
 	}
+	if (file_looked_for && S_ISREG(mode) &&
+		(strcmp(collected, file_looked_for) == 0))
+		state = CopyFileMem;
 	if (dry_run)
 		return 0;
 	clean_path(collected, mode);
@@ -298,6 +311,40 @@ static int __init do_name(void)
 	}
 	return 0;
 }
+
+#ifdef CONFIG_ACPI_CUSTOM_DSDT_INITRD
+static int __init do_copy_mem(void)
+{
+	static void *file_current; /* current position in the memory */
+	if (file_mem == NULL) {
+		if (body_len < 4) { /* check especially against empty files */
+			error("file is less than 4 bytes");
+			return 1;
+		}
+		file_mem = kmalloc(body_len, GFP_ATOMIC);
+		if (!file_mem) {
+			error("failed to allocate enough memory");
+			return 1;
+		}
+		file_current = file_mem;
+	}
+	if (count >= body_len) {
+		memcpy(file_current, victim, body_len);
+		eat(body_len);
+		file_looked_for = NULL; /* don't find files with same name */
+		state = SkipIt;
+		return 0;
+	} else {
+		memcpy(file_current, victim, count);
+		file_current += count;
+		body_len -= count;
+		eat(count);
+		return 1;
+	}
+}
+#else
+#define do_copy_mem NULL
+#endif
 
 static int __init do_copy(void)
 {
@@ -333,6 +380,7 @@ static __initdata int (*actions[])(void) = {
 	[SkipIt]	= do_skip,
 	[GotName]	= do_name,
 	[CopyFile]	= do_copy,
+	[CopyFileMem]	= do_copy_mem,
 	[GotSymlink]	= do_symlink,
 	[Reset]		= do_reset,
 };
@@ -578,3 +626,31 @@ static int __init populate_rootfs(void)
 	return 0;
 }
 rootfs_initcall(populate_rootfs);
+
+#ifdef CONFIG_ACPI_CUSTOM_DSDT_INITRD
+struct acpi_table_header *acpi_find_dsdt_initrd(void)
+{
+	char *err, *ramfs_dsdt_name = "DSDT.aml";
+
+	printk(KERN_INFO "ACPI: Checking initramfs for custom DSDT\n");
+	file_mem = NULL;
+	file_looked_for = ramfs_dsdt_name;
+	err = unpack_to_rootfs((char *)initrd_start,
+			initrd_end - initrd_start, 1);
+	file_looked_for = NULL;
+
+	if (err) {
+		/*
+		 * Even if reading the DSDT file was successful,
+		 * we give up if the initramfs cannot be entirely read.
+		 */
+		kfree(file_mem);
+		printk(KERN_ERR "ACPI: Aborded because %s.\n", err);
+		return NULL;
+	}
+	if (file_mem)
+		printk(KERN_INFO "ACPI: Found DSDT in %s.\n", ramfs_dsdt_name);
+
+	return file_mem;
+}
+#endif
