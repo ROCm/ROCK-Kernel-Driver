@@ -283,7 +283,7 @@ static void __init check_multiple_madt(void)
 	return;
 }
 
-static struct dmi_system_id acpi_rsdt_dmi_table[] = {
+static struct dmi_system_id __initdata acpi_rsdt_dmi_table[] = {
 	{
 	    .ident = "ThinkPad ", /* R40e, broken C-states */
 	    .matches = {
@@ -303,6 +303,7 @@ static struct dmi_system_id acpi_rsdt_dmi_table[] = {
 		DMI_MATCH(DMI_BIOS_VENDOR, "IBM"),
 		DMI_MATCH(DMI_BIOS_VERSION, "1RET")},
 	},
+	{}
 };
 
 static int __init acpi_force_rsdt(char *opt)
