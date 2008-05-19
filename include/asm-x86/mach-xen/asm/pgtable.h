@@ -389,7 +389,7 @@ static inline pte_t ptep_get_and_clear(struct mm_struct *mm, unsigned long addr,
 		pte_t __res = *__ptep;				\
 		if (!mm_is_pinned(mm))				\
 			__xen_pte_clear(__ptep);		\
-		else						\
+		else if (!pte_none(__res))			\
 			xen_l1_entry_update(__ptep, __pte(0));	\
 		__res;						\
 	 }) :							\

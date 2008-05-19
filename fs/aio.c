@@ -1330,7 +1330,6 @@ static int make_aio_fd(struct kioctx *ioctx)
 }
 #endif
 
-
 /* sys_io_setup:
  *	Create an aio_context capable of receiving at least nr_events.
  *	ctxp must not point to an aio_context that already exists, and

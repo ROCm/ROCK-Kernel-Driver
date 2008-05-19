@@ -101,13 +101,10 @@ void __meminit early_make_page_readonly(void *va, unsigned int feature)
 	pte_t pte, *ptep;
 	unsigned long *page = (unsigned long *) init_level4_pgt;
 
+	BUG_ON(after_bootmem);
+
 	if (xen_feature(feature))
 		return;
-
-	if (after_bootmem) {
-		make_page_readonly(va, feature);
-		return;
-	}
 
 	addr = (unsigned long) page[pgd_index(_va)];
 	addr_to_page(addr, page);
@@ -446,11 +443,6 @@ static __meminit void *alloc_static_page(unsigned long *phys)
 
 #define PTE_SIZE PAGE_SIZE
 
-static inline void __set_pte(pte_t *dst, pte_t val)
-{
-	*dst = val;
-}
-
 static inline int __meminit make_readonly(unsigned long paddr)
 {
 	extern char __vsyscall_0;
@@ -545,13 +537,8 @@ phys_pmd_init(pmd_t *pmd_page, unsigned long address, unsigned long end)
 		pte_t *pte, *pte_save;
 		int k;
 
-		if (address >= end) {
-			if (!after_bootmem) {
-				for (; i < PTRS_PER_PMD; i++, pmd++)
-					set_pmd(pmd, __pmd(0));
-			}
+		if (address >= end)
 			break;
-		}
 
 		if (__pmd_val(*pmd)) {
 			address += PMD_SIZE;
@@ -569,11 +556,15 @@ phys_pmd_init(pmd_t *pmd_page, unsigned long address, unsigned long end)
 				pteval = 0;
 			else if (make_readonly(address))
 				pteval &= ~_PAGE_RW;
-			__set_pte(pte, __pte(pteval & __supported_pte_mask));
+			set_pte(pte, __pte(pteval & __supported_pte_mask));
 		}
-		pte = pte_save;
-		early_make_page_readonly(pte, XENFEAT_writable_page_tables);
-		set_pmd(pmd, __pmd(pte_phys | _KERNPG_TABLE));
+		if (!after_bootmem) {
+			early_make_page_readonly(pte_save, XENFEAT_writable_page_tables);
+			*pmd = __pmd(pte_phys | _KERNPG_TABLE);
+		} else {
+			make_page_readonly(pte_save, XENFEAT_writable_page_tables);
+			set_pmd(pmd, __pmd(pte_phys | _KERNPG_TABLE));
+		}
 	}
 }
 
@@ -606,12 +597,13 @@ phys_pud_init(pud_t *pud_page, unsigned long addr, unsigned long end)
 		}
 
 		pmd = alloc_static_page(&pmd_phys);
-		early_make_page_readonly(pmd, XENFEAT_writable_page_tables);
 
 		spin_lock(&init_mm.page_table_lock);
-		set_pud(pud, __pud(pmd_phys | _KERNPG_TABLE));
+		*pud = __pud(pmd_phys | _KERNPG_TABLE);
 		phys_pmd_init(pmd, addr, end);
 		spin_unlock(&init_mm.page_table_lock);
+
+		early_make_page_readonly(pmd, XENFEAT_writable_page_tables);
 	}
 	__flush_tlb_all();
 }
@@ -863,20 +855,18 @@ void __init_refok init_memory_mapping(unsigned long start, unsigned long end)
 		unsigned long pud_phys;
 		pud_t *pud;
 
-		if (after_bootmem) {
+		if (after_bootmem)
 			pud = pud_offset(pgd, start & PGDIR_MASK);
-			make_page_readonly(pud, XENFEAT_writable_page_tables);
-			pud_phys = __pa(pud);
-		} else {
+		else
 			pud = alloc_static_page(&pud_phys);
-			early_make_page_readonly(pud, XENFEAT_writable_page_tables);
-		}
 		next = start + PGDIR_SIZE;
 		if (next > end)
 			next = end;
 		phys_pud_init(pud, __pa(start), __pa(next));
-		if (!after_bootmem)
+		if (!after_bootmem) {
+			early_make_page_readonly(pud, XENFEAT_writable_page_tables);
 			set_pgd(pgd_offset_k(start), mk_kernel_pgd(pud_phys));
+		}
 	}
 
 	if (!after_bootmem) {

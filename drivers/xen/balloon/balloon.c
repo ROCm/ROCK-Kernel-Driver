@@ -198,8 +198,8 @@ static unsigned long current_target(void)
 static unsigned long minimum_target(void)
 {
 #ifndef CONFIG_XEN
-	return 0;
-#else
+#define max_pfn num_physpages
+#endif
 	unsigned long min_pages, curr_pages = current_target();
 
 #define MB2PAGES(mb) ((mb) << (20 - PAGE_SHIFT))
@@ -227,7 +227,7 @@ static unsigned long minimum_target(void)
 
 	/* Don't enforce growth */
 	return min(min_pages, curr_pages);
-#endif
+#undef max_pfn
 }
 
 static int increase_reservation(unsigned long nr_pages)

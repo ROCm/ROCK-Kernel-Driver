@@ -357,6 +357,9 @@ static void xenbus_dev_shutdown(struct device *_dev)
 
 	DPRINTK("%s", dev->nodename);
 
+	if (is_initial_xendomain())
+		return;
+
 	get_device(&dev->dev);
 	if (dev->state != XenbusStateConnected) {
 		dev_info(&dev->dev, "%s: %s: %s != Connected, skipping\n", __FUNCTION__,

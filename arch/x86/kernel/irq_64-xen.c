@@ -108,7 +108,7 @@ skip:
 		for_each_online_cpu(j)
 			seq_printf(p, "%10u ", cpu_pda(j)->__nmi_count);
 		seq_printf(p, "  Non-maskable interrupts\n");
-#if defined(CONFIG_X86_LOCAL_APIC) && !defined(CONFIG_XEN)
+#ifndef CONFIG_XEN
 		seq_printf(p, "LOC: ");
 		for_each_online_cpu(j)
 			seq_printf(p, "%10u ", cpu_pda(j)->apic_timer_irqs);
@@ -141,12 +141,10 @@ skip:
 		seq_printf(p, "  Threshold APIC interrupts\n");
 #endif
 #ifndef CONFIG_XEN
-#ifdef CONFIG_X86_LOCAL_APIC
 		seq_printf(p, "SPU: ");
 		for_each_online_cpu(j)
 			seq_printf(p, "%10u ", cpu_pda(j)->irq_spurious_count);
 		seq_printf(p, "  Spurious interrupts\n");
-#endif
 		seq_printf(p, "ERR: %10u\n", atomic_read(&irq_err_count));
 #endif
 	}

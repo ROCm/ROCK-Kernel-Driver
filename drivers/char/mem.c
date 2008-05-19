@@ -300,6 +300,9 @@ static int mmap_mem(struct file * file, struct vm_area_struct * vma)
 static int mmap_kmem(struct file * file, struct vm_area_struct * vma)
 {
 	unsigned long pfn;
+#ifdef CONFIG_XEN
+	unsigned long i, count;
+#endif
 
 	/* Turn a kernel-virtual address into a physical page frame */
 	pfn = __pa((u64)vma->vm_pgoff << PAGE_SHIFT) >> PAGE_SHIFT;
@@ -313,6 +316,13 @@ static int mmap_kmem(struct file * file, struct vm_area_struct * vma)
 	 */
 	if (!pfn_valid(pfn))
 		return -EIO;
+
+#ifdef CONFIG_XEN
+	count = (vma->vm_end - vma->vm_start) >> PAGE_SHIFT;
+	for (i = 0; i < count; i++)
+		if ((pfn + i) != mfn_to_local_pfn(pfn_to_mfn(pfn + i)))
+			return -EIO;
+#endif
 
 	vma->vm_pgoff = pfn;
 	return mmap_mem(file, vma);

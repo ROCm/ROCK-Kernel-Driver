@@ -53,17 +53,15 @@ static int cdrom_xenstore_write_media_present(struct backend_info *be)
 	struct xenbus_device *dev = be->dev;
 	struct xenbus_transaction xbt;
 	int err;
-    int media_present;
-
-	DPRINTK(" ");
+	int media_present;
 
 	err = xenbus_scanf(XBT_NIL, dev->nodename, MEDIA_PRESENT, "%d",
 			   &media_present);
-	if ( 0 < err) {
+	if (0 < err) {
 		DPRINTK("already written err%d", err);
 		return(0);
 	}
-    media_present = 1;
+	media_present = 1;
 
 again:
 	err = xenbus_transaction_start(&xbt);
@@ -83,22 +81,20 @@ again:
 		goto again;
 	if (err)
 		xenbus_dev_fatal(dev, err, "ending transaction");
-    return(0);
+	return 0;
  abort:
 	xenbus_transaction_end(xbt, 1);
-    return(-1);
+	return -1;
 }
 
 /**
  *
  */
-int cdrom_is_type(struct backend_info *be)
+static int cdrom_is_type(struct backend_info *be)
 {
-    DPRINTK( "type:%x", be->blkif->vbd.type );
-    if ( be->blkif->vbd.type & VDISK_CDROM && be->blkif->vbd.type & GENHD_FL_REMOVABLE){
-	    return(1);
-	}
-	return(0);
+	DPRINTK("type:%x", be->blkif->vbd.type );
+	return (be->blkif->vbd.type & VDISK_CDROM)
+	       && (be->blkif->vbd.type & GENHD_FL_REMOVABLE);
 }
 
 /**
@@ -109,17 +105,17 @@ void cdrom_add_media_watch(struct backend_info *be)
 	struct xenbus_device *dev = be->dev;
 	int err;
 
-    DPRINTK( "nodename:%s", dev->nodename);
-    if (cdrom_is_type(be)) {
-        DPRINTK("is a cdrom");
-        if ( cdrom_xenstore_write_media_present(be) == 0 ) {
-            DPRINTK( "xenstore wrote OK");
-	        err = xenbus_watch_path2(dev, dev->nodename, MEDIA_PRESENT,
-		        &be->backend_cdrom_watch, cdrom_media_changed);
-		    if (err) {
-			    DPRINTK( "media_present watch add failed" );
-		    }
-        }
+	DPRINTK("nodename:%s", dev->nodename);
+	if (cdrom_is_type(be)) {
+		DPRINTK("is a cdrom");
+		if ( cdrom_xenstore_write_media_present(be) == 0 ) {
+			DPRINTK( "xenstore wrote OK");
+			err = xenbus_watch_path2(dev, dev->nodename, MEDIA_PRESENT,
+						 &be->backend_cdrom_watch,
+						 cdrom_media_changed);
+			if (err)
+				DPRINTK( "media_present watch add failed" );
+		}
 	}
 }
 
@@ -127,7 +123,7 @@ void cdrom_add_media_watch(struct backend_info *be)
  * Callback received when the "media_present" xenstore node is changed
  */
 static void cdrom_media_changed(struct xenbus_watch *watch,
-			    const char **vec, unsigned int len)
+				const char **vec, unsigned int len)
 {
 	int err;
 	unsigned media_present;
@@ -135,9 +131,7 @@ static void cdrom_media_changed(struct xenbus_watch *watch,
 		= container_of(watch, struct backend_info, backend_cdrom_watch);
 	struct xenbus_device *dev = be->dev;
 
-	DPRINTK(" ");
-
-    if ( !(cdrom_is_type(be))) {
+	if (!cdrom_is_type(be)) {
 		DPRINTK("callback not for a cdrom" );
 		return;
 	}
@@ -149,21 +143,20 @@ static void cdrom_media_changed(struct xenbus_watch *watch,
 		return;
 	}
 
-	if (media_present == 0) {
-	    vbd_free(&be->blkif->vbd);
-	}
+	if (media_present == 0)
+		vbd_free(&be->blkif->vbd);
 	else {
 		char *p = strrchr(dev->otherend, '/') + 1;
 		long handle = simple_strtoul(p, NULL, 0);
 
-        if (be->blkif->vbd.bdev == NULL) {
-		    err = vbd_create(be->blkif, handle, be->major, be->minor,
-				     (NULL == strchr(be->mode, 'w')));
-		    if (err) {
-			    be->major = be->minor = 0;
-			    xenbus_dev_fatal(dev, err, "creating vbd structure");
-			    return;
-		    }
+		if (!be->blkif->vbd.bdev) {
+			err = vbd_create(be->blkif, handle, be->major, be->minor,
+					 !strchr(be->mode, 'w'), 1);
+			if (err) {
+				be->major = be->minor = 0;
+				xenbus_dev_fatal(dev, err, "creating vbd structure");
+				return;
+			}
 		}
 	}
 }

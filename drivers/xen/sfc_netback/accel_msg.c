@@ -61,7 +61,7 @@ static void netback_accel_msg_tx_localmac(struct netback_accel *bend,
 
 	BUG_ON(bend == NULL || mac == NULL);
 
-	VPRINTK("Sending local mac message: " %s "\n", print_mac(buf, mac));
+	VPRINTK("Sending local mac message: %s\n", print_mac(buf, mac));
 	
 	msg = net_accel_msg_start_send(bend->shared_page, &bend->to_domU,
 				       &lock_state);

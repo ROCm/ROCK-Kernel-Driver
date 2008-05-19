@@ -680,7 +680,7 @@ static void setup_cpu0_timer_irq(void)
 			VIRQ_TIMER,
 			0,
 			timer_interrupt,
-			IRQF_DISABLED,
+			IRQF_DISABLED|IRQF_NOBALANCING,
 			"timer0",
 			NULL);
 	BUG_ON(per_cpu(timer_irq, 0) < 0);
@@ -875,7 +875,7 @@ int __cpuinit local_setup_timer(unsigned int cpu)
 	irq = bind_virq_to_irqhandler(VIRQ_TIMER,
 				      cpu,
 				      timer_interrupt,
-				      IRQF_DISABLED,
+				      IRQF_DISABLED|IRQF_NOBALANCING,
 				      timer_name[cpu],
 				      NULL);
 	if (irq < 0)

@@ -643,7 +643,7 @@ netfront_accel_vi_tx_post(netfront_accel_vnic *vnic, struct sk_buff *skb)
 	if (!try_fastpath) {
 		DECLARE_MAC_BUF(buf);
 
-		VPRINTK("try fast path false for mac: " %s "\n",
+		VPRINTK("try fast path false for mac: %s\n",
 			print_mac(buf, skb->data));
 		
 		return NETFRONT_ACCEL_STATUS_CANT;
@@ -772,7 +772,7 @@ static void  netfront_accel_vi_rx_complete(netfront_accel_vnic *vnic,
 		u16 port;
 		DECLARE_MAC_BUF(buf);
 
-		DPRINTK("%s: saw wrong MAC address " %s "\n",
+		DPRINTK("%s: saw wrong MAC address %s\n",
 			__FUNCTION__, print_mac(buf, skb->data));
 
 		if (ip->protocol == IPPROTO_TCP) {

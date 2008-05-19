@@ -51,7 +51,7 @@ unsigned long vbd_secsize(struct vbd *vbd)
 }
 
 int vbd_create(blkif_t *blkif, blkif_vdev_t handle, unsigned major,
-	       unsigned minor, int readonly)
+	       unsigned minor, int readonly, int cdrom)
 {
 	struct vbd *vbd;
 	struct block_device *bdev;
@@ -81,7 +81,7 @@ int vbd_create(blkif_t *blkif, blkif_vdev_t handle, unsigned major,
 		return -ENOENT;
 	}
 
-	if (vbd->bdev->bd_disk->flags & GENHD_FL_CD)
+	if (vbd->bdev->bd_disk->flags & GENHD_FL_CD || cdrom)
 		vbd->type |= VDISK_CDROM;
 	if (vbd->bdev->bd_disk->flags & GENHD_FL_REMOVABLE)
 		vbd->type |= VDISK_REMOVABLE;

@@ -132,8 +132,6 @@ e820_any_mapped(unsigned long start, unsigned long end, unsigned type)
 	for (i = 0; i < e820.nr_map; i++) {
 		struct e820entry *ei = &e820.map[i];
 #else
-	extern struct e820map machine_e820;
-
 	if (!is_initial_xendomain())
 		return 0;
 	for (i = 0; i < machine_e820.nr_map; i++) {
@@ -680,6 +678,21 @@ static int __init copy_e820_map(struct e820entry *biosmap, int nr_map)
 
 		add_memory_region(start, size, type);
 	} while (biosmap++, --nr_map);
+
+#ifdef CONFIG_XEN
+	if (is_initial_xendomain()) {
+		struct xen_memory_map memmap;
+
+		memmap.nr_entries = E820MAX;
+		set_xen_guest_handle(memmap.buffer, machine_e820.map);
+
+		if (HYPERVISOR_memory_op(XENMEM_machine_memory_map, &memmap))
+			BUG();
+		machine_e820.nr_map = memmap.nr_entries;
+	} else
+		machine_e820 = e820;
+#endif
+
 	return 0;
 }
 

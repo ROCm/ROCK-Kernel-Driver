@@ -267,6 +267,8 @@ static void backend_changed(struct xenbus_watch *watch,
 	struct backend_info *be
 		= container_of(watch, struct backend_info, backend_watch);
 	struct xenbus_device *dev = be->dev;
+	int cdrom = 0;
+	char *device_type;
 
 	DPRINTK("");
 
@@ -300,6 +302,12 @@ static void backend_changed(struct xenbus_watch *watch,
 		return;
 	}
 
+	device_type = xenbus_read(XBT_NIL, dev->otherend, "device-type", NULL);
+	if (!IS_ERR(device_type)) {
+		cdrom = strcmp(device_type, "cdrom") == 0;
+		kfree(device_type);
+	}
+
 	if (be->major == 0 && be->minor == 0) {
 		/* Front end dir is a number, which is used as the handle. */
 
@@ -310,7 +318,7 @@ static void backend_changed(struct xenbus_watch *watch,
 		be->minor = minor;
 
 		err = vbd_create(be->blkif, handle, major, minor,
-				 (NULL == strchr(be->mode, 'w')));
+				 (NULL == strchr(be->mode, 'w')), cdrom);
 		if (err) {
 			be->major = be->minor = 0;
 			xenbus_dev_fatal(dev, err, "creating vbd structure");
@@ -456,6 +464,7 @@ again:
  abort:
 	xenbus_transaction_end(xbt, 1);
 }
+
 
 static int connect_ring(struct backend_info *be)
 {

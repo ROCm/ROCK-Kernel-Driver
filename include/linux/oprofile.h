@@ -19,7 +19,7 @@
 #ifdef CONFIG_XEN
 #include <xen/interface/xenoprof.h>
 #endif
-
+ 
 /* Each escaped entry is prefixed by ESCAPE_CODE
  * then one of the following codes, then the
  * relevant data.

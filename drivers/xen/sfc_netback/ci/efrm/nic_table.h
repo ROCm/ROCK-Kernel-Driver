@@ -62,21 +62,21 @@ struct efrm_nic_table {
 };
 
 /* Resource driver structures used by other drivers as well */
-extern struct efrm_nic_table efrm_nic_table;
+extern struct efrm_nic_table *efrm_nic_tablep;
 
 static inline void efrm_nic_table_hold(void)
 {
-	atomic_inc(&efrm_nic_table.ref_count);
+	atomic_inc(&efrm_nic_tablep->ref_count);
 }
 
 static inline void efrm_nic_table_rele(void)
 {
-	atomic_dec(&efrm_nic_table.ref_count);
+	atomic_dec(&efrm_nic_tablep->ref_count);
 }
 
 static inline int efrm_nic_table_held(void)
 {
-	return (atomic_read(&efrm_nic_table.ref_count) != 0);
+	return (atomic_read(&efrm_nic_tablep->ref_count) != 0);
 }
 
 /* Run code block _x multiple times with variable nic set to each
@@ -86,13 +86,13 @@ static inline int efrm_nic_table_held(void)
 	for ((_nic_i) = (efrm_nic_table_hold(), 0);			\
 	     (_nic_i) < EFHW_MAX_NR_DEVS || (efrm_nic_table_rele(), 0);	\
 	     (_nic_i)++)						\
-		if (((_nic) = efrm_nic_table.nic[_nic_i]))
+		if (((_nic) = efrm_nic_tablep->nic[_nic_i]))
 
 #define EFRM_FOR_EACH_NIC_IN_SET(_set, _i, _nic)			\
 	for ((_i) = (efrm_nic_table_hold(), 0);				\
 	     (_i) < EFHW_MAX_NR_DEVS || (efrm_nic_table_rele(), 0);	\
 	     ++(_i))							\
-		if (((_nic) = efrm_nic_table.nic[_i]) &&		\
+		if (((_nic) = efrm_nic_tablep->nic[_i]) &&		\
 		    efrm_nic_set_read((_set), (_i)))
 
 #endif /* __CI_EFRM_NIC_TABLE_H__ */

@@ -121,7 +121,7 @@ static int __cpuinit xen_smp_intr_init(unsigned int cpu)
 	rc = bind_ipi_to_irqhandler(RESCHEDULE_VECTOR,
 				    cpu,
 				    smp_reschedule_interrupt,
-				    IRQF_DISABLED,
+				    IRQF_DISABLED|IRQF_NOBALANCING,
 				    resched_name[cpu],
 				    NULL);
 	if (rc < 0)
@@ -132,7 +132,7 @@ static int __cpuinit xen_smp_intr_init(unsigned int cpu)
 	rc = bind_ipi_to_irqhandler(CALL_FUNCTION_VECTOR,
 				    cpu,
 				    smp_call_function_interrupt,
-				    IRQF_DISABLED,
+				    IRQF_DISABLED|IRQF_NOBALANCING,
 				    callfunc_name[cpu],
 				    NULL);
 	if (rc < 0)

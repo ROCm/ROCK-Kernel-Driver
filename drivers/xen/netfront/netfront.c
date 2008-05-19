@@ -2200,9 +2200,6 @@ static int __init netif_init(void)
 		MODPARM_rx_flip = 1; /* Default is to flip. */
 #endif
 
-	if (is_initial_xendomain())
-		return 0;
-
 	netif_init_accel();
 
 	IPRINTK("Initialising virtual ethernet driver.\n");
@@ -2218,9 +2215,6 @@ module_init(netif_init);
 
 static void __exit netif_exit(void)
 {
-	if (is_initial_xendomain())
-		return;
-
 #ifdef CONFIG_INET
 	unregister_inetaddr_notifier(&notifier_inetdev);
 #endif

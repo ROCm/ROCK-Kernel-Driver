@@ -173,7 +173,7 @@ static int efx_device_to_efab_nic_index(struct efx_dl_device *efx_dl_dev)
 	int i;
 
 	for (i = 0; i < EFHW_MAX_NR_DEVS; i++) {
-		struct efhw_nic *nic = efrm_nic_table.nic[i];
+		struct efhw_nic *nic = efrm_nic_tablep->nic[i];
 
 		/*
 		 * It's possible for the nic structure to have not

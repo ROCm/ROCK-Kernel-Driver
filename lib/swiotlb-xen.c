@@ -229,8 +229,8 @@ swiotlb_init_with_default_size(size_t default_size)
 void __init
 swiotlb_init(void)
 {
-	long ram_end;
-	size_t defsz = 64 * (1 << 20); /* 64MB default size */
+	unsigned long ram_end;
+	size_t defsz = 64 << 20; /* 64MB default size */
 
 	if (swiotlb_force == 1) {
 		swiotlb = 1;
@@ -239,8 +239,12 @@ swiotlb_init(void)
 		   is_initial_xendomain()) {
 		/* Domain 0 always has a swiotlb. */
 		ram_end = HYPERVISOR_memory_op(XENMEM_maximum_ram_page, NULL);
-		if (ram_end <= 0x7ffff)
-			defsz = 2 * (1 << 20); /* 2MB on <2GB on systems. */
+		if (ram_end <= 0x1ffff)
+			defsz = 2 << 20; /* 2MB on <512MB systems. */
+		else if (ram_end <= 0x3ffff)
+			defsz = 4 << 20; /* 4MB on <1GB systems. */
+		else if (ram_end <= 0x7ffff)
+			defsz = 8 << 20; /* 8MB on <2GB systems. */
 		swiotlb = 1;
 	}
 

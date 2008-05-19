@@ -290,7 +290,6 @@ extern void hrtick_resched(void);
 extern void sched_show_task(struct task_struct *p);
 
 #ifdef CONFIG_DETECT_SOFTLOCKUP
-extern unsigned long softlockup_get_next_event(void);
 extern void softlockup_tick(void);
 extern void spawn_softlockup_task(void);
 extern void touch_softlockup_watchdog(void);
@@ -300,10 +299,6 @@ extern unsigned long sysctl_hung_task_check_count;
 extern unsigned long sysctl_hung_task_timeout_secs;
 extern unsigned long sysctl_hung_task_warnings;
 #else
-static inline unsigned long softlockup_get_next_event(void)
-{
-	return MAX_JIFFY_OFFSET;
-}
 static inline void softlockup_tick(void)
 {
 }

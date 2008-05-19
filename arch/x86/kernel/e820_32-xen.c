@@ -507,6 +507,21 @@ int __init copy_e820_map(struct e820entry * biosmap, int nr_map)
 #endif
 		add_memory_region(start, size, type);
 	} while (biosmap++,--nr_map);
+
+#ifdef CONFIG_XEN
+	if (is_initial_xendomain()) {
+		struct xen_memory_map memmap;
+
+		memmap.nr_entries = E820MAX;
+		set_xen_guest_handle(memmap.buffer, machine_e820.map);
+
+		if (HYPERVISOR_memory_op(XENMEM_machine_memory_map, &memmap))
+			BUG();
+		machine_e820.nr_map = memmap.nr_entries;
+	} else
+		machine_e820 = e820;
+#endif
+
 	return 0;
 }
 

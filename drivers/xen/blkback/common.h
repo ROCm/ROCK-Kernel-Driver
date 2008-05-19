@@ -121,7 +121,7 @@ int blkif_map(blkif_t *blkif, unsigned long shared_page, unsigned int evtchn);
 
 /* Create a vbd. */
 int vbd_create(blkif_t *blkif, blkif_vdev_t vdevice, unsigned major,
-	       unsigned minor, int readonly);
+	       unsigned minor, int readonly, int cdrom);
 void vbd_free(struct vbd *vbd);
 
 unsigned long long vbd_size(struct vbd *vbd);
@@ -148,7 +148,6 @@ int blkback_barrier(struct xenbus_transaction xbt,
 		    struct backend_info *be, int state);
 
 /* cdrom media change */
-int cdrom_is_type(struct backend_info *be);
 void cdrom_add_media_watch(struct backend_info *be);
 
 #endif /* __BLKIF__BACKEND__COMMON_H__ */

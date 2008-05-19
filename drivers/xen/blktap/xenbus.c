@@ -402,6 +402,7 @@ static void connect(struct backend_info *be)
 	return;
 }
 
+
 static int connect_ring(struct backend_info *be)
 {
 	struct xenbus_device *dev = be->dev;

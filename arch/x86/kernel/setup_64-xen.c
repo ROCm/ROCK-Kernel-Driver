@@ -641,19 +641,9 @@ void __init setup_arch(char **cmdline_p)
 	 * We trust e820 completely. No explicit ROM probing in memory.
 	 */
 #ifdef CONFIG_XEN
-	if (is_initial_xendomain()) {
-		struct xen_memory_map memmap;
-
-		memmap.nr_entries = E820MAX;
-		set_xen_guest_handle(memmap.buffer, machine_e820.map);
-
-		if (HYPERVISOR_memory_op(XENMEM_machine_memory_map, &memmap))
-			BUG();
-		machine_e820.nr_map = memmap.nr_entries;
-
+	if (is_initial_xendomain())
 		e820_reserve_resources(machine_e820.map, machine_e820.nr_map,
 				       &code_resource, &data_resource, &bss_resource);
-	}
 #else
 	e820_reserve_resources(e820.map, e820.nr_map,
 			       &code_resource, &data_resource, &bss_resource);
