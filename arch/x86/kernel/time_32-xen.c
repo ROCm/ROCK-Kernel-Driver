@@ -314,7 +314,8 @@ static void sync_xen_wallclock(unsigned long dummy)
 	s64 nsec;
 	struct xen_platform_op op;
 
-	if (!ntp_synced() || independent_wallclock || !is_initial_xendomain())
+	BUG_ON(!is_initial_xendomain());
+	if (!ntp_synced() || independent_wallclock)
 		return;
 
 	write_seqlock_irq(&xtime_lock);
@@ -663,9 +664,32 @@ static void init_missing_ticks_accounting(unsigned int cpu)
 		runstate->time[RUNSTATE_offline];
 }
 
-void xen_update_persistent_clock(void)
+unsigned long xen_read_persistent_clock(void)
 {
+	const shared_info_t *s = HYPERVISOR_shared_info;
+	u32 version, sec, nsec;
+	u64 delta;
+
+	do {
+		version = s->wc_version;
+		rmb();
+		sec     = s->wc_sec;
+		nsec    = s->wc_nsec;
+		rmb();
+	} while ((s->wc_version & 1) | (version ^ s->wc_version));
+
+	delta = local_clock() + (u64)sec * NSEC_PER_SEC + nsec;
+	do_div(delta, NSEC_PER_SEC);
+
+	return delta;
+}
+
+int xen_update_persistent_clock(void)
+{
+	if (!is_initial_xendomain())
+		return -1;
 	mod_timer(&sync_xen_wallclock_timer, jiffies + 1);
+	return 0;
 }
 
 extern void (*late_time_init)(void);

@@ -172,12 +172,6 @@ static int set_rtc_mmss(unsigned long nowtime)
 	int retval;
 	unsigned long flags;
 
-#ifdef CONFIG_XEN
-	extern int xen_independent_wallclock(void);
-	if (xen_independent_wallclock() || !is_initial_xendomain())
-		return 0;
-#endif
-
 	spin_lock_irqsave(&rtc_lock, flags);
 	retval = set_wallclock(nowtime);
 	spin_unlock_irqrestore(&rtc_lock, flags);
@@ -190,6 +184,10 @@ unsigned long read_persistent_clock(void)
 {
 	unsigned long retval, flags;
 
+#ifdef CONFIG_XEN
+	if (!is_initial_xendomain())
+		return xen_read_persistent_clock();
+#endif
 	spin_lock_irqsave(&rtc_lock, flags);
 	retval = get_wallclock();
 	spin_unlock_irqrestore(&rtc_lock, flags);
@@ -200,8 +198,8 @@ unsigned long read_persistent_clock(void)
 int update_persistent_clock(struct timespec now)
 {
 #ifdef CONFIG_XEN
-	extern void xen_update_persistent_clock(void);
-	xen_update_persistent_clock();
+	if (xen_update_persistent_clock() < 0 || xen_independent_wallclock())
+		return 0;
 #endif
 	return set_rtc_mmss(now.tv_sec);
 }
