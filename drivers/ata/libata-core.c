@@ -2313,6 +2313,13 @@ int ata_dev_configure(struct ata_device *dev)
 	dev->horkage |= ata_dev_blacklisted(dev);
 	ata_force_horkage(dev);
 
+	if (dev->horkage & ATA_HORKAGE_DISABLE) {
+		ata_dev_printk(dev, KERN_INFO,
+			       "unsupported device, disabling\n");
+		ata_dev_disable(dev);
+		return 0;
+	}
+
 	/* let ACPI work its magic */
 	rc = ata_acpi_on_devcfg(dev);
 	if (rc)
@@ -4443,8 +4450,7 @@ static const struct ata_blacklist_entry ata_device_blacklist [] = {
 	{ "SAMSUNG CD-ROM SN-124", "N001",	ATA_HORKAGE_NODMA },
 	{ "Seagate STT20000A", NULL,		ATA_HORKAGE_NODMA },
 	/* Odd clown on sil3726/4726 PMPs */
-	{ "Config  Disk",	NULL,		ATA_HORKAGE_NODMA |
-						ATA_HORKAGE_SKIP_PM },
+	{ "Config  Disk",	NULL,		ATA_HORKAGE_DISABLE },
 
 	/* Weird ATAPI devices */
 	{ "TORiSAN DVD-ROM DRD-N216", NULL,	ATA_HORKAGE_MAX_SEC_128 },
@@ -7206,7 +7212,7 @@ int ata_host_register(struct ata_host *host, struct scsi_host_template *sht)
 
 			ehi->probe_mask =
 				(1 << ata_link_max_devices(&ap->link)) - 1;
-			ehi->action |= ATA_EH_SOFTRESET;
+			ehi->action |= ATA_EH_SOFTRESET | ATA_EH_LPM;
 			ehi->flags |= ATA_EHI_NO_AUTOPSY | ATA_EHI_QUIET;
 
 			ap->pflags &= ~ATA_PFLAG_INITIALIZING;
@@ -7239,7 +7245,6 @@ int ata_host_register(struct ata_host *host, struct scsi_host_template *sht)
 		struct ata_port *ap = host->ports[i];
 
 		ata_scsi_scan_host(ap, 1);
-		ata_lpm_schedule(ap, ap->pm_policy);
 	}
 
 	return 0;
