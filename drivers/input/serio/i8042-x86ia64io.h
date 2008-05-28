@@ -287,7 +287,16 @@ static struct dmi_system_id __initdata i8042_dmi_nomux_table[] = {
 	{ }
 };
 
-
+static struct dmi_system_id __initdata i8042_dmi_nopnp_table[] = {
+	{
+		.ident = "Intel MBO Desktop D845PESV",
+		.matches = {
+			DMI_MATCH(DMI_BOARD_NAME, "D845PESV"),
+			DMI_MATCH(DMI_BOARD_VENDOR, "Intel Corporation"),
+		},
+	},
+	{ }
+};
 
 #endif
 
@@ -569,6 +578,10 @@ static int __init i8042_platform_init(void)
 	i8042_kbd_irq = I8042_MAP_IRQ(1);
 	i8042_aux_irq = I8042_MAP_IRQ(12);
 
+#if defined(__i386__) || defined(__x86_64__)
+	if (dmi_check_system(i8042_dmi_nopnp_table))
+		i8042_nopnp = 1;
+#endif
 	retval = i8042_pnp_init();
 	if (retval)
 		return retval;
@@ -583,6 +596,7 @@ static int __init i8042_platform_init(void)
 
 	if (dmi_check_system(i8042_dmi_nomux_table))
 		i8042_nomux = 1;
+
 #endif
 
 #ifdef CONFIG_X86
