@@ -1139,17 +1139,18 @@ static int use_preallocated_list_if_available(reiserfs_blocknr_hint_t * hint,
 					      int amount_needed)
 {
 	struct inode *inode = hint->inode;
+	struct reiserfs_inode_info *ei = REISERFS_I(inode);
 
-	if (REISERFS_I(inode)->i_prealloc_count > 0) {
+	if (ei->i_prealloc_count > 0) {
 		while (amount_needed) {
 
-			*new_blocknrs++ = REISERFS_I(inode)->i_prealloc_block++;
-			REISERFS_I(inode)->i_prealloc_count--;
+			*new_blocknrs++ = ei->i_prealloc_block++;
+			ei->i_prealloc_count--;
 
 			amount_needed--;
 
-			if (REISERFS_I(inode)->i_prealloc_count <= 0) {
-				list_del(&REISERFS_I(inode)->i_prealloc_list);
+			if (ei->i_prealloc_count <= 0) {
+				list_del_init(&ei->i_prealloc_list);
 				break;
 			}
 		}
