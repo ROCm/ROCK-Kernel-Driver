@@ -260,7 +260,7 @@ static u32 e1000_hash_mc_addr(struct e1000_hw *hw, u8 *mc_addr)
 }
 
 /**
- *  e1000e_mc_addr_list_update_generic - Update Multicast addresses
+ *  e1000e_update_mc_addr_list_generic - Update Multicast addresses
  *  @hw: pointer to the HW structure
  *  @mc_addr_list: array of multicast addresses to program
  *  @mc_addr_count: number of multicast addresses to program
@@ -272,9 +272,9 @@ static u32 e1000_hash_mc_addr(struct e1000_hw *hw, u8 *mc_addr)
  *  The parameter rar_count will usually be hw->mac.rar_entry_count
  *  unless there are workarounds that change this.
  **/
-void e1000e_mc_addr_list_update_generic(struct e1000_hw *hw,
-				       u8 *mc_addr_list, u32 mc_addr_count,
-				       u32 rar_used_count, u32 rar_count)
+void e1000e_update_mc_addr_list_generic(struct e1000_hw *hw,
+					u8 *mc_addr_list, u32 mc_addr_count,
+					u32 rar_used_count, u32 rar_count)
 {
 	u32 hash_value;
 	u32 i;
@@ -585,7 +585,6 @@ s32 e1000e_check_for_serdes_link(struct e1000_hw *hw)
  **/
 static s32 e1000_set_default_fc_generic(struct e1000_hw *hw)
 {
-	struct e1000_mac_info *mac = &hw->mac;
 	s32 ret_val;
 	u16 nvm_data;
 
@@ -605,12 +604,12 @@ static s32 e1000_set_default_fc_generic(struct e1000_hw *hw)
 	}
 
 	if ((nvm_data & NVM_WORD0F_PAUSE_MASK) == 0)
-		mac->fc = e1000_fc_none;
+		hw->fc.type = e1000_fc_none;
 	else if ((nvm_data & NVM_WORD0F_PAUSE_MASK) ==
 		 NVM_WORD0F_ASM_DIR)
-		mac->fc = e1000_fc_tx_pause;
+		hw->fc.type = e1000_fc_tx_pause;
 	else
-		mac->fc = e1000_fc_full;
+		hw->fc.type = e1000_fc_full;
 
 	return 0;
 }
@@ -640,7 +639,7 @@ s32 e1000e_setup_link(struct e1000_hw *hw)
 	 * If flow control is set to default, set flow control based on
 	 * the EEPROM flow control settings.
 	 */
-	if (mac->fc == e1000_fc_default) {
+	if (hw->fc.type == e1000_fc_default) {
 		ret_val = e1000_set_default_fc_generic(hw);
 		if (ret_val)
 			return ret_val;
@@ -650,9 +649,9 @@ s32 e1000e_setup_link(struct e1000_hw *hw)
 	 * in case we get disconnected and then reconnected into a different
 	 * hub or switch with different Flow Control capabilities.
 	 */
-	mac->original_fc = mac->fc;
+	hw->fc.original_type = hw->fc.type;
 
-	hw_dbg(hw, "After fix-ups FlowControl is now = %x\n", mac->fc);
+	hw_dbg(hw, "After fix-ups FlowControl is now = %x\n", hw->fc.type);
 
 	/* Call the necessary media_type subroutine to configure the link. */
 	ret_val = mac->ops.setup_physical_interface(hw);
@@ -669,7 +668,7 @@ s32 e1000e_setup_link(struct e1000_hw *hw)
 	ew32(FCAH, FLOW_CONTROL_ADDRESS_HIGH);
 	ew32(FCAL, FLOW_CONTROL_ADDRESS_LOW);
 
-	ew32(FCTTV, mac->fc_pause_time);
+	ew32(FCTTV, hw->fc.pause_time);
 
 	return e1000e_set_fc_watermarks(hw);
 }
@@ -702,7 +701,7 @@ static s32 e1000_commit_fc_settings_generic(struct e1000_hw *hw)
 	 *	  do not support receiving pause frames).
 	 *      3:  Both Rx and TX flow control (symmetric) are enabled.
 	 */
-	switch (mac->fc) {
+	switch (hw->fc.type) {
 	case e1000_fc_none:
 		/* Flow control completely disabled by a software over-ride. */
 		txcw = (E1000_TXCW_ANE | E1000_TXCW_FD);
@@ -827,7 +826,7 @@ s32 e1000e_setup_fiber_serdes_link(struct e1000_hw *hw)
 	 * detect a signal.  If we have a signal, then poll for a "Link-Up"
 	 * indication.
 	 */
-	if (hw->media_type == e1000_media_type_internal_serdes ||
+	if (hw->phy.media_type == e1000_media_type_internal_serdes ||
 	    (er32(CTRL) & E1000_CTRL_SWDPIN1)) {
 		ret_val = e1000_poll_fiber_serdes_link_generic(hw);
 	} else {
@@ -868,7 +867,6 @@ void e1000e_config_collision_dist(struct e1000_hw *hw)
  **/
 s32 e1000e_set_fc_watermarks(struct e1000_hw *hw)
 {
-	struct e1000_mac_info *mac = &hw->mac;
 	u32 fcrtl = 0, fcrth = 0;
 
 	/* Set the flow control receive threshold registers.  Normally,
@@ -877,14 +875,14 @@ s32 e1000e_set_fc_watermarks(struct e1000_hw *hw)
 	 * ability to transmit pause frames is not enabled, then these
 	 * registers will be set to 0.
 	 */
-	if (mac->fc & e1000_fc_tx_pause) {
+	if (hw->fc.type & e1000_fc_tx_pause) {
 		/* We need to set up the Receive Threshold high and low water
 		 * marks as well as (optionally) enabling the transmission of
 		 * XON frames.
 		 */
-		fcrtl = mac->fc_low_water;
+		fcrtl = hw->fc.low_water;
 		fcrtl |= E1000_FCRTL_XONE;
-		fcrth = mac->fc_high_water;
+		fcrth = hw->fc.high_water;
 	}
 	ew32(FCRTL, fcrtl);
 	ew32(FCRTH, fcrth);
@@ -904,7 +902,6 @@ s32 e1000e_set_fc_watermarks(struct e1000_hw *hw)
  **/
 s32 e1000e_force_mac_fc(struct e1000_hw *hw)
 {
-	struct e1000_mac_info *mac = &hw->mac;
 	u32 ctrl;
 
 	ctrl = er32(CTRL);
@@ -915,7 +912,7 @@ s32 e1000e_force_mac_fc(struct e1000_hw *hw)
 	 * receive flow control.
 	 *
 	 * The "Case" statement below enables/disable flow control
-	 * according to the "mac->fc" parameter.
+	 * according to the "hw->fc.type" parameter.
 	 *
 	 * The possible values of the "fc" parameter are:
 	 *      0:  Flow control is completely disabled
@@ -926,9 +923,9 @@ s32 e1000e_force_mac_fc(struct e1000_hw *hw)
 	 *      3:  Both Rx and TX flow control (symmetric) is enabled.
 	 *  other:  No other values should be possible at this point.
 	 */
-	hw_dbg(hw, "mac->fc = %u\n", mac->fc);
+	hw_dbg(hw, "hw->fc.type = %u\n", hw->fc.type);
 
-	switch (mac->fc) {
+	switch (hw->fc.type) {
 	case e1000_fc_none:
 		ctrl &= (~(E1000_CTRL_TFCE | E1000_CTRL_RFCE));
 		break;
@@ -975,11 +972,11 @@ s32 e1000e_config_fc_after_link_up(struct e1000_hw *hw)
 	 * configuration of the MAC to match the "fc" parameter.
 	 */
 	if (mac->autoneg_failed) {
-		if (hw->media_type == e1000_media_type_fiber ||
-		    hw->media_type == e1000_media_type_internal_serdes)
+		if (hw->phy.media_type == e1000_media_type_fiber ||
+		    hw->phy.media_type == e1000_media_type_internal_serdes)
 			ret_val = e1000e_force_mac_fc(hw);
 	} else {
-		if (hw->media_type == e1000_media_type_copper)
+		if (hw->phy.media_type == e1000_media_type_copper)
 			ret_val = e1000e_force_mac_fc(hw);
 	}
 
@@ -993,7 +990,7 @@ s32 e1000e_config_fc_after_link_up(struct e1000_hw *hw)
 	 * has completed, and if so, how the PHY and link partner has
 	 * flow control configured.
 	 */
-	if ((hw->media_type == e1000_media_type_copper) && mac->autoneg) {
+	if ((hw->phy.media_type == e1000_media_type_copper) && mac->autoneg) {
 		/* Read the MII Status Register and check to see if AutoNeg
 		 * has completed.  We read this twice because this reg has
 		 * some "sticky" (latched) bits.
@@ -1066,11 +1063,11 @@ s32 e1000e_config_fc_after_link_up(struct e1000_hw *hw)
 			 * ONLY. Hence, we must now check to see if we need to
 			 * turn OFF  the TRANSMISSION of PAUSE frames.
 			 */
-			if (mac->original_fc == e1000_fc_full) {
-				mac->fc = e1000_fc_full;
+			if (hw->fc.original_type == e1000_fc_full) {
+				hw->fc.type = e1000_fc_full;
 				hw_dbg(hw, "Flow Control = FULL.\r\n");
 			} else {
-				mac->fc = e1000_fc_rx_pause;
+				hw->fc.type = e1000_fc_rx_pause;
 				hw_dbg(hw, "Flow Control = "
 					 "RX PAUSE frames only.\r\n");
 			}
@@ -1087,8 +1084,8 @@ s32 e1000e_config_fc_after_link_up(struct e1000_hw *hw)
 			  (mii_nway_adv_reg & NWAY_AR_ASM_DIR) &&
 			  (mii_nway_lp_ability_reg & NWAY_LPAR_PAUSE) &&
 			  (mii_nway_lp_ability_reg & NWAY_LPAR_ASM_DIR)) {
-			mac->fc = e1000_fc_tx_pause;
-			hw_dbg(hw, "Flow Control = TX PAUSE frames only.\r\n");
+			hw->fc.type = e1000_fc_tx_pause;
+			hw_dbg(hw, "Flow Control = Tx PAUSE frames only.\r\n");
 		}
 		/* For transmitting PAUSE frames ONLY.
 		 *
@@ -1102,14 +1099,14 @@ s32 e1000e_config_fc_after_link_up(struct e1000_hw *hw)
 			 (mii_nway_adv_reg & NWAY_AR_ASM_DIR) &&
 			 !(mii_nway_lp_ability_reg & NWAY_LPAR_PAUSE) &&
 			 (mii_nway_lp_ability_reg & NWAY_LPAR_ASM_DIR)) {
-			mac->fc = e1000_fc_rx_pause;
-			hw_dbg(hw, "Flow Control = RX PAUSE frames only.\r\n");
+			hw->fc.type = e1000_fc_rx_pause;
+			hw_dbg(hw, "Flow Control = Rx PAUSE frames only.\r\n");
 		} else {
 			/*
 			 * Per the IEEE spec, at this point flow control
 			 * should be disabled.
 			 */
-			mac->fc = e1000_fc_none;
+			hw->fc.type = e1000_fc_none;
 			hw_dbg(hw, "Flow Control = NONE.\r\n");
 		}
 
@@ -1124,7 +1121,7 @@ s32 e1000e_config_fc_after_link_up(struct e1000_hw *hw)
 		}
 
 		if (duplex == HALF_DUPLEX)
-			mac->fc = e1000_fc_none;
+			hw->fc.type = e1000_fc_none;
 
 		/* Now we call a subroutine to actually force the MAC
 		 * controller to use the correct flow control settings.
@@ -1393,7 +1390,7 @@ s32 e1000e_blink_led(struct e1000_hw *hw)
 	u32 ledctl_blink = 0;
 	u32 i;
 
-	if (hw->media_type == e1000_media_type_fiber) {
+	if (hw->phy.media_type == e1000_media_type_fiber) {
 		/* always blink LED0 for PCI-E fiber */
 		ledctl_blink = E1000_LEDCTL_LED0_BLINK |
 		     (E1000_LEDCTL_MODE_LED_ON << E1000_LEDCTL_LED0_MODE_SHIFT);
@@ -1423,7 +1420,7 @@ s32 e1000e_led_on_generic(struct e1000_hw *hw)
 {
 	u32 ctrl;
 
-	switch (hw->media_type) {
+	switch (hw->phy.media_type) {
 	case e1000_media_type_fiber:
 		ctrl = er32(CTRL);
 		ctrl &= ~E1000_CTRL_SWDPIN0;
@@ -1450,7 +1447,7 @@ s32 e1000e_led_off_generic(struct e1000_hw *hw)
 {
 	u32 ctrl;
 
-	switch (hw->media_type) {
+	switch (hw->phy.media_type) {
 	case e1000_media_type_fiber:
 		ctrl = er32(CTRL);
 		ctrl |= E1000_CTRL_SWDPIN0;
@@ -1848,62 +1845,6 @@ static s32 e1000_ready_nvm_eeprom(struct e1000_hw *hw)
 		}
 	}
 
-	return 0;
-}
-
-/**
- *  e1000e_read_nvm_spi - Reads EEPROM using SPI
- *  @hw: pointer to the HW structure
- *  @offset: offset of word in the EEPROM to read
- *  @words: number of words to read
- *  @data: word read from the EEPROM
- *
- *  Reads a 16 bit word from the EEPROM.
- **/
-s32 e1000e_read_nvm_spi(struct e1000_hw *hw, u16 offset, u16 words, u16 *data)
-{
-	struct e1000_nvm_info *nvm = &hw->nvm;
-	u32 i = 0;
-	s32 ret_val;
-	u16 word_in;
-	u8 read_opcode = NVM_READ_OPCODE_SPI;
-
-	/* A check for invalid values:  offset too large, too many words,
-	 * and not enough words. */
-	if ((offset >= nvm->word_size) || (words > (nvm->word_size - offset)) ||
-	    (words == 0)) {
-		hw_dbg(hw, "nvm parameter(s) out of bounds\n");
-		return -E1000_ERR_NVM;
-	}
-
-	ret_val = nvm->ops.acquire_nvm(hw);
-	if (ret_val)
-		return ret_val;
-
-	ret_val = e1000_ready_nvm_eeprom(hw);
-	if (ret_val) {
-		nvm->ops.release_nvm(hw);
-		return ret_val;
-	}
-
-	e1000_standby_nvm(hw);
-
-	if ((nvm->address_bits == 8) && (offset >= 128))
-		read_opcode |= NVM_A8_OPCODE_SPI;
-
-	/* Send the READ command (opcode + addr) */
-	e1000_shift_out_eec_bits(hw, read_opcode, nvm->opcode_bits);
-	e1000_shift_out_eec_bits(hw, (u16)(offset*2), nvm->address_bits);
-
-	/* Read the data.  SPI NVMs increment the address with each byte
-	 * read and will roll over if reading beyond the end.  This allows
-	 * us to read the whole NVM from any offset */
-	for (i = 0; i < words; i++) {
-		word_in = e1000_shift_in_eec_bits(hw, 16);
-		data[i] = (word_in >> 8) | (word_in << 8);
-	}
-
-	nvm->ops.release_nvm(hw);
 	return 0;
 }
 
@@ -2481,7 +2422,7 @@ bool e1000e_enable_mng_pass_thru(struct e1000_hw *hw)
 	return ret_val;
 }
 
-s32 e1000e_read_part_num(struct e1000_hw *hw, u32 *part_num)
+s32 e1000e_read_pba_num(struct e1000_hw *hw, u32 *pba_num)
 {
 	s32 ret_val;
 	u16 nvm_data;
@@ -2491,14 +2432,14 @@ s32 e1000e_read_part_num(struct e1000_hw *hw, u32 *part_num)
 		hw_dbg(hw, "NVM Read Error\n");
 		return ret_val;
 	}
-	*part_num = (u32)(nvm_data << 16);
+	*pba_num = (u32)(nvm_data << 16);
 
 	ret_val = e1000_read_nvm(hw, NVM_PBA_OFFSET_1, 1, &nvm_data);
 	if (ret_val) {
 		hw_dbg(hw, "NVM Read Error\n");
 		return ret_val;
 	}
-	*part_num |= nvm_data;
+	*pba_num |= nvm_data;
 
 	return 0;
 }

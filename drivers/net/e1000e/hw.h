@@ -93,6 +93,8 @@ enum e1e_registers {
 	E1000_RDH      = 0x02810, /* RX Descriptor Head - RW */
 	E1000_RDT      = 0x02818, /* RX Descriptor Tail - RW */
 	E1000_RDTR     = 0x02820, /* RX Delay Timer - RW */
+	E1000_RXDCTL_BASE = 0x02828, /* Rx Descriptor Control - RW */
+#define E1000_RXDCTL(_n)   (E1000_RXDCTL_BASE + (_n << 8))
 	E1000_RADV     = 0x0282C, /* RX Interrupt Absolute Delay Timer - RW */
 
 /* Convenience macros
@@ -111,11 +113,11 @@ enum e1e_registers {
 	E1000_TDH      = 0x03810, /* TX Descriptor Head - RW */
 	E1000_TDT      = 0x03818, /* TX Descriptor Tail - RW */
 	E1000_TIDV     = 0x03820, /* TX Interrupt Delay Value - RW */
-	E1000_TXDCTL   = 0x03828, /* TX Descriptor Control - RW */
-	E1000_TADV     = 0x0382C, /* TX Interrupt Absolute Delay Val - RW */
-	E1000_TARC0    = 0x03840, /* TX Arbitration Count (0) */
-	E1000_TXDCTL1  = 0x03928, /* TX Descriptor Control (1) - RW */
-	E1000_TARC1    = 0x03940, /* TX Arbitration Count (1) */
+	E1000_TXDCTL_BASE = 0x03828, /* Tx Descriptor Control - RW */
+#define E1000_TXDCTL(_n)   (E1000_TXDCTL_BASE + (_n << 8))
+	E1000_TADV     = 0x0382C, /* Tx Interrupt Absolute Delay Val - RW */
+	E1000_TARC_BASE = 0x03840, /* Tx Arbitration Count (0) */
+#define E1000_TARC(_n)   (E1000_TARC_BASE + (_n << 8))
 	E1000_CRCERRS  = 0x04000, /* CRC Error Count - R/clr */
 	E1000_ALGNERRC = 0x04004, /* Alignment Error Count - R/clr */
 	E1000_SYMERRS  = 0x04008, /* Symbol Error Count - R/clr */
@@ -214,6 +216,21 @@ enum e1e_registers {
 #define IGP01E1000_PHY_LINK_HEALTH	0x13 /* PHY Link Health */
 #define IGP02E1000_PHY_POWER_MGMT	0x19 /* Power Management */
 #define IGP01E1000_PHY_PAGE_SELECT	0x1F /* Page Select */
+#define BM_PHY_PAGE_SELECT		22   /* Page Select for BM */
+#define IGP_PAGE_SHIFT			5
+#define PHY_REG_MASK			0x1F
+
+#define BM_WUC_PAGE			800
+#define BM_WUC_ADDRESS_OPCODE		0x11
+#define BM_WUC_DATA_OPCODE		0x12
+#define BM_WUC_ENABLE_PAGE		769
+#define BM_WUC_ENABLE_REG		17
+#define BM_WUC_ENABLE_BIT		(1 << 2)
+#define BM_WUC_HOST_WU_BIT		(1 << 4)
+
+#define BM_WUC	PHY_REG(BM_WUC_PAGE, 1)
+#define BM_WUFC PHY_REG(BM_WUC_PAGE, 2)
+#define BM_WUS	PHY_REG(BM_WUC_PAGE, 3)
 
 #define IGP01E1000_PHY_PCS_INIT_REG	0x00B4
 #define IGP01E1000_PHY_POLARITY_MASK	0x0078
@@ -329,10 +346,16 @@ enum e1e_registers {
 #define E1000_DEV_ID_ICH8_IFE_G			0x10C5
 #define E1000_DEV_ID_ICH8_IGP_M			0x104D
 #define E1000_DEV_ID_ICH9_IGP_AMT		0x10BD
+#define E1000_DEV_ID_ICH9_IGP_M_AMT		0x10F5
+#define E1000_DEV_ID_ICH9_IGP_M			0x10BF
+#define E1000_DEV_ID_ICH9_IGP_M_V		0x10CB
 #define E1000_DEV_ID_ICH9_IGP_C			0x294C
 #define E1000_DEV_ID_ICH9_IFE			0x10C0
 #define E1000_DEV_ID_ICH9_IFE_GT		0x10C3
 #define E1000_DEV_ID_ICH9_IFE_G			0x10C2
+#define E1000_DEV_ID_ICH10_R_BM_LM		0x10CC
+#define E1000_DEV_ID_ICH10_R_BM_LF		0x10CD
+#define E1000_DEV_ID_ICH10_R_BM_V		0x10CE
 
 #define E1000_FUNC_1 1
 
@@ -376,6 +399,7 @@ enum e1000_phy_type {
 	e1000_phy_gg82563,
 	e1000_phy_igp_3,
 	e1000_phy_ife,
+	e1000_phy_bm,
 };
 
 enum e1000_bus_width {
@@ -400,7 +424,7 @@ enum e1000_rev_polarity{
 	e1000_rev_polarity_undefined = 0xFF
 };
 
-enum e1000_fc_mode {
+enum e1000_fc_type {
 	e1000_fc_none = 0,
 	e1000_fc_rx_pause,
 	e1000_fc_tx_pause,
@@ -590,10 +614,8 @@ struct e1000_hw_stats {
 	u64 bprc;
 	u64 mprc;
 	u64 gptc;
-	u64 gorcl;
-	u64 gorch;
-	u64 gotcl;
-	u64 gotch;
+	u64 gorc;
+	u64 gotc;
 	u64 rnbc;
 	u64 ruc;
 	u64 rfc;
@@ -602,10 +624,8 @@ struct e1000_hw_stats {
 	u64 mgprc;
 	u64 mgpdc;
 	u64 mgptc;
-	u64 torl;
-	u64 torh;
-	u64 totl;
-	u64 toth;
+	u64 tor;
+	u64 tot;
 	u64 tpr;
 	u64 tpt;
 	u64 ptc64;
@@ -685,8 +705,7 @@ struct e1000_mac_operations {
 	s32  (*get_link_up_info)(struct e1000_hw *, u16 *, u16 *);
 	s32  (*led_on)(struct e1000_hw *);
 	s32  (*led_off)(struct e1000_hw *);
-	void (*mc_addr_list_update)(struct e1000_hw *, u8 *, u32, u32,
-					 u32);
+	void (*update_mc_addr_list)(struct e1000_hw *, u8 *, u32, u32, u32);
 	s32  (*reset_hw)(struct e1000_hw *);
 	s32  (*init_hw)(struct e1000_hw *);
 	s32  (*setup_link)(struct e1000_hw *);
@@ -728,16 +747,12 @@ struct e1000_mac_info {
 	u8 perm_addr[6];
 
 	enum e1000_mac_type type;
-	enum e1000_fc_mode  fc;
-	enum e1000_fc_mode  original_fc;
 
 	u32 collision_delta;
 	u32 ledctl_default;
 	u32 ledctl_mode1;
 	u32 ledctl_mode2;
-	u32 max_frame_size;
 	u32 mc_filter_type;
-	u32 min_frame_size;
 	u32 tx_packet_delta;
 	u32 txcw;
 
@@ -748,9 +763,6 @@ struct e1000_mac_info {
 	u16 ifs_step_size;
 	u16 mta_reg_count;
 	u16 rar_entry_count;
-	u16 fc_high_water;
-	u16 fc_low_water;
-	u16 fc_pause_time;
 
 	u8  forced_speed_duplex;
 
@@ -780,6 +792,8 @@ struct e1000_phy_info {
 	u32 reset_delay_us; /* in usec */
 	u32 revision;
 
+	enum e1000_media_type media_type;
+
 	u16 autoneg_advertised;
 	u16 autoneg_mask;
 	u16 cable_length;
@@ -792,7 +806,7 @@ struct e1000_phy_info {
 	bool is_mdix;
 	bool polarity_correction;
 	bool speed_downgraded;
-	bool wait_for_link;
+	bool autoneg_wait_to_complete;
 };
 
 struct e1000_nvm_info {
@@ -815,6 +829,16 @@ struct e1000_bus_info {
 	enum e1000_bus_width width;
 
 	u16 func;
+};
+
+struct e1000_fc_info {
+	u32 high_water;          /* Flow control high-water mark */
+	u32 low_water;           /* Flow control low-water mark */
+	u16 pause_time;          /* Flow control pause timer */
+	bool send_xon;           /* Flow control send XON */
+	bool strict_ieee;        /* Strict IEEE mode */
+	enum e1000_fc_type type; /* Type of flow control */
+	enum e1000_fc_type original_type;
 };
 
 struct e1000_dev_spec_82571 {
@@ -841,6 +865,7 @@ struct e1000_hw {
 	u8 __iomem *flash_address;
 
 	struct e1000_mac_info  mac;
+	struct e1000_fc_info   fc;
 	struct e1000_phy_info  phy;
 	struct e1000_nvm_info  nvm;
 	struct e1000_bus_info  bus;
@@ -850,8 +875,6 @@ struct e1000_hw {
 		struct e1000_dev_spec_82571	e82571;
 		struct e1000_dev_spec_ich8lan	ich8lan;
 	} dev_spec;
-
-	enum e1000_media_type media_type;
 };
 
 #ifdef DEBUG

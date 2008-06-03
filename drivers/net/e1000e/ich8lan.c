@@ -38,6 +38,12 @@
  * 82566DM Gigabit Network Connection
  * 82566MC Gigabit Network Connection
  * 82566MM Gigabit Network Connection
+ * 82567LM Gigabit Network Connection
+ * 82567LF Gigabit Network Connection
+ * 82567LM-2 Gigabit Network Connection
+ * 82567LF-2 Gigabit Network Connection
+ * 82567V-2 Gigabit Network Connection
+ * 82562GT-3 10/100 Network Connection
  */
 
 #include <linux/netdevice.h>
@@ -198,6 +204,19 @@ static s32 e1000_init_phy_params_ich8lan(struct e1000_hw *hw)
 	phy->addr			= 1;
 	phy->reset_delay_us		= 100;
 
+	/*
+	 * We may need to do this twice - once for IGP and if that fails,
+	 * we'll set BM func pointers and try again
+	 */
+	ret_val = e1000e_determine_phy_address(hw);
+	if (ret_val) {
+		hw->phy.ops.write_phy_reg = e1000e_write_phy_reg_bm;
+		hw->phy.ops.read_phy_reg  = e1000e_read_phy_reg_bm;
+		ret_val = e1000e_determine_phy_address(hw);
+		if (ret_val)
+			return ret_val;
+	}
+
 	phy->id = 0;
 	while ((e1000_phy_unknown == e1000e_get_phy_type_from_id(phy->id)) &&
 	       (i++ < 100)) {
@@ -218,6 +237,13 @@ static s32 e1000_init_phy_params_ich8lan(struct e1000_hw *hw)
 	case IFE_C_E_PHY_ID:
 		phy->type = e1000_phy_ife;
 		phy->autoneg_mask = E1000_ALL_NOT_GIG;
+		break;
+	case BME1000_E_PHY_ID:
+		phy->type = e1000_phy_bm;
+		phy->autoneg_mask = AUTONEG_ADVERTISE_SPEED_DEFAULT;
+		hw->phy.ops.read_phy_reg = e1000e_read_phy_reg_bm;
+		hw->phy.ops.write_phy_reg = e1000e_write_phy_reg_bm;
+		hw->phy.ops.commit_phy = e1000e_phy_sw_reset;
 		break;
 	default:
 		return -E1000_ERR_PHY;
@@ -295,7 +321,7 @@ static s32 e1000_init_mac_params_ich8lan(struct e1000_adapter *adapter)
 	struct e1000_mac_info *mac = &hw->mac;
 
 	/* Set media type function pointer */
-	hw->media_type = e1000_media_type_copper;
+	hw->phy.media_type = e1000_media_type_copper;
 
 	/* Set mta register count */
 	mac->mta_reg_count = 32;
@@ -313,7 +339,7 @@ static s32 e1000_init_mac_params_ich8lan(struct e1000_adapter *adapter)
 	return 0;
 }
 
-static s32 e1000_get_invariants_ich8lan(struct e1000_adapter *adapter)
+static s32 e1000_get_variants_ich8lan(struct e1000_adapter *adapter)
 {
 	struct e1000_hw *hw = &adapter->hw;
 	s32 rc;
@@ -450,7 +476,7 @@ static s32 e1000_phy_force_speed_duplex_ich8lan(struct e1000_hw *hw)
 
 	udelay(1);
 
-	if (phy->wait_for_link) {
+	if (phy->autoneg_wait_to_complete) {
 		hw_dbg(hw, "Waiting for forced speed/duplex link on IFE phy.\n");
 
 		ret_val = e1000e_phy_has_link_generic(hw,
@@ -658,6 +684,7 @@ static s32 e1000_get_phy_info_ich8lan(struct e1000_hw *hw)
 		return e1000_get_phy_info_ife_ich8lan(hw);
 		break;
 	case e1000_phy_igp_3:
+	case e1000_phy_bm:
 		return e1000e_get_phy_info_igp(hw);
 		break;
 	default:
@@ -722,7 +749,7 @@ static s32 e1000_set_d0_lplu_state_ich8lan(struct e1000_hw *hw, bool active)
 	s32 ret_val = 0;
 	u16 data;
 
-	if (phy->type != e1000_phy_igp_3)
+	if (phy->type == e1000_phy_ife)
 		return ret_val;
 
 	phy_ctrl = er32(PHY_CTRL);
@@ -1711,18 +1738,18 @@ static s32 e1000_init_hw_ich8lan(struct e1000_hw *hw)
 	ret_val = e1000_setup_link_ich8lan(hw);
 
 	/* Set the transmit descriptor write-back policy for both queues */
-	txdctl = er32(TXDCTL);
+	txdctl = er32(TXDCTL(0));
 	txdctl = (txdctl & ~E1000_TXDCTL_WTHRESH) |
 		 E1000_TXDCTL_FULL_TX_DESC_WB;
 	txdctl = (txdctl & ~E1000_TXDCTL_PTHRESH) |
 		 E1000_TXDCTL_MAX_TX_DESC_PREFETCH;
-	ew32(TXDCTL, txdctl);
-	txdctl = er32(TXDCTL1);
+	ew32(TXDCTL(0), txdctl);
+	txdctl = er32(TXDCTL(1));
 	txdctl = (txdctl & ~E1000_TXDCTL_WTHRESH) |
 		 E1000_TXDCTL_FULL_TX_DESC_WB;
 	txdctl = (txdctl & ~E1000_TXDCTL_PTHRESH) |
 		 E1000_TXDCTL_MAX_TX_DESC_PREFETCH;
-	ew32(TXDCTL1, txdctl);
+	ew32(TXDCTL(1), txdctl);
 
 	/* ICH8 has opposite polarity of no_snoop bits.
 	 * By default, we should use snoop behavior. */
@@ -1762,30 +1789,30 @@ static void e1000_initialize_hw_bits_ich8lan(struct e1000_hw *hw)
 	ew32(CTRL_EXT, reg);
 
 	/* Transmit Descriptor Control 0 */
-	reg = er32(TXDCTL);
+	reg = er32(TXDCTL(0));
 	reg |= (1 << 22);
-	ew32(TXDCTL, reg);
+	ew32(TXDCTL(0), reg);
 
 	/* Transmit Descriptor Control 1 */
-	reg = er32(TXDCTL1);
+	reg = er32(TXDCTL(1));
 	reg |= (1 << 22);
-	ew32(TXDCTL1, reg);
+	ew32(TXDCTL(1), reg);
 
 	/* Transmit Arbitration Control 0 */
-	reg = er32(TARC0);
+	reg = er32(TARC(0));
 	if (hw->mac.type == e1000_ich8lan)
 		reg |= (1 << 28) | (1 << 29);
 	reg |= (1 << 23) | (1 << 24) | (1 << 26) | (1 << 27);
-	ew32(TARC0, reg);
+	ew32(TARC(0), reg);
 
 	/* Transmit Arbitration Control 1 */
-	reg = er32(TARC1);
+	reg = er32(TARC(1));
 	if (er32(TCTL) & E1000_TCTL_MULR)
 		reg &= ~(1 << 28);
 	else
 		reg |= (1 << 28);
 	reg |= (1 << 24) | (1 << 26) | (1 << 30);
-	ew32(TARC1, reg);
+	ew32(TARC(1), reg);
 
 	/* Device Status */
 	if (hw->mac.type == e1000_ich8lan) {
@@ -1807,7 +1834,6 @@ static void e1000_initialize_hw_bits_ich8lan(struct e1000_hw *hw)
  **/
 static s32 e1000_setup_link_ich8lan(struct e1000_hw *hw)
 {
-	struct e1000_mac_info *mac = &hw->mac;
 	s32 ret_val;
 
 	if (e1000_check_reset_block(hw))
@@ -1817,19 +1843,19 @@ static s32 e1000_setup_link_ich8lan(struct e1000_hw *hw)
 	 * the default flow control setting, so we explicitly
 	 * set it to full.
 	 */
-	if (mac->fc == e1000_fc_default)
-		mac->fc = e1000_fc_full;
+	if (hw->fc.type == e1000_fc_default)
+		hw->fc.type = e1000_fc_full;
 
-	mac->original_fc = mac->fc;
+	hw->fc.original_type = hw->fc.type;
 
-	hw_dbg(hw, "After fix-ups FlowControl is now = %x\n", mac->fc);
+	hw_dbg(hw, "After fix-ups FlowControl is now = %x\n", hw->fc.type);
 
 	/* Continue to configure the copper link. */
 	ret_val = e1000_setup_copper_link_ich8lan(hw);
 	if (ret_val)
 		return ret_val;
 
-	ew32(FCTTV, mac->fc_pause_time);
+	ew32(FCTTV, hw->fc.pause_time);
 
 	return e1000e_set_fc_watermarks(hw);
 }
@@ -1871,8 +1897,35 @@ static s32 e1000_setup_copper_link_ich8lan(struct e1000_hw *hw)
 		ret_val = e1000e_copper_link_setup_igp(hw);
 		if (ret_val)
 			return ret_val;
+	} else if (hw->phy.type == e1000_phy_bm) {
+		ret_val = e1000e_copper_link_setup_m88(hw);
+		if (ret_val)
+			return ret_val;
 	}
 
+	if (hw->phy.type == e1000_phy_ife) {
+		ret_val = e1e_rphy(hw, IFE_PHY_MDIX_CONTROL, &reg_data);
+		if (ret_val)
+			return ret_val;
+
+		reg_data &= ~IFE_PMC_AUTO_MDIX;
+
+		switch (hw->phy.mdix) {
+		case 1:
+			reg_data &= ~IFE_PMC_FORCE_MDIX;
+			break;
+		case 2:
+			reg_data |= IFE_PMC_FORCE_MDIX;
+			break;
+		case 0:
+		default:
+			reg_data |= IFE_PMC_AUTO_MDIX;
+			break;
+		}
+		ret_val = e1e_wphy(hw, IFE_PHY_MDIX_CONTROL, reg_data);
+		if (ret_val)
+			return ret_val;
+	}
 	return e1000e_setup_copper_link(hw);
 }
 
@@ -2074,6 +2127,31 @@ void e1000e_gig_downshift_workaround_ich8lan(struct e1000_hw *hw)
 }
 
 /**
+ *  e1000e_disable_gig_wol_ich8lan - disable gig during WoL
+ *  @hw: pointer to the HW structure
+ *
+ *  During S0 to Sx transition, it is possible the link remains at gig
+ *  instead of negotiating to a lower speed.  Before going to Sx, set
+ *  'LPLU Enabled' and 'Gig Disable' to force link speed negotiation
+ *  to a lower speed.
+ *
+ *  Should only be called for ICH9 devices.
+ **/
+void e1000e_disable_gig_wol_ich8lan(struct e1000_hw *hw)
+{
+	u32 phy_ctrl;
+
+	if (hw->mac.type == e1000_ich9lan) {
+		phy_ctrl = er32(PHY_CTRL);
+		phy_ctrl |= E1000_PHY_CTRL_D0A_LPLU |
+		            E1000_PHY_CTRL_GBE_DISABLE;
+		ew32(PHY_CTRL, phy_ctrl);
+	}
+
+	return;
+}
+
+/**
  *  e1000_cleanup_led_ich8lan - Restore the default LED operation
  *  @hw: pointer to the HW structure
  *
@@ -2158,7 +2236,7 @@ static struct e1000_mac_operations ich8_mac_ops = {
 	.get_link_up_info	= e1000_get_link_up_info_ich8lan,
 	.led_on			= e1000_led_on_ich8lan,
 	.led_off		= e1000_led_off_ich8lan,
-	.mc_addr_list_update	= e1000e_mc_addr_list_update_generic,
+	.update_mc_addr_list	= e1000e_update_mc_addr_list_generic,
 	.reset_hw		= e1000_reset_hw_ich8lan,
 	.init_hw		= e1000_init_hw_ich8lan,
 	.setup_link		= e1000_setup_link_ich8lan,
@@ -2194,13 +2272,14 @@ static struct e1000_nvm_operations ich8_nvm_ops = {
 struct e1000_info e1000_ich8_info = {
 	.mac			= e1000_ich8lan,
 	.flags			= FLAG_HAS_WOL
+				  | FLAG_IS_ICH
 				  | FLAG_RX_CSUM_ENABLED
 				  | FLAG_HAS_CTRLEXT_ON_LOAD
 				  | FLAG_HAS_AMT
 				  | FLAG_HAS_FLASH
 				  | FLAG_APME_IN_WUC,
 	.pba			= 8,
-	.get_invariants		= e1000_get_invariants_ich8lan,
+	.get_variants		= e1000_get_variants_ich8lan,
 	.mac_ops		= &ich8_mac_ops,
 	.phy_ops		= &ich8_phy_ops,
 	.nvm_ops		= &ich8_nvm_ops,
@@ -2209,6 +2288,7 @@ struct e1000_info e1000_ich8_info = {
 struct e1000_info e1000_ich9_info = {
 	.mac			= e1000_ich9lan,
 	.flags			= FLAG_HAS_JUMBO_FRAMES
+				  | FLAG_IS_ICH
 				  | FLAG_HAS_WOL
 				  | FLAG_RX_CSUM_ENABLED
 				  | FLAG_HAS_CTRLEXT_ON_LOAD
@@ -2217,7 +2297,7 @@ struct e1000_info e1000_ich9_info = {
 				  | FLAG_HAS_FLASH
 				  | FLAG_APME_IN_WUC,
 	.pba			= 10,
-	.get_invariants		= e1000_get_invariants_ich8lan,
+	.get_variants		= e1000_get_variants_ich8lan,
 	.mac_ops		= &ich8_mac_ops,
 	.phy_ops		= &ich8_phy_ops,
 	.nvm_ops		= &ich8_nvm_ops,
