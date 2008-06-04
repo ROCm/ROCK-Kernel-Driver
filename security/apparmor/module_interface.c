@@ -319,6 +319,7 @@ static int aa_unpack_exec_table(struct aa_ext *e, struct aa_profile *profile)
 			goto fail;
 		if (!aa_is_nameX(e, AA_STRUCTEND, NULL))
 			goto fail;
+		profile->exec_table_size = size;
 	}
 	return 1;
 
