@@ -146,7 +146,6 @@ static void ata_acpi_detach_device(struct ata_port *ap, struct ata_device *dev)
 				tdev->flags |= ATA_DFLAG_DETACH;
 	}
 
-	ata_port_freeze(ap);
 	ata_port_schedule_eh(ap);
 }
 
