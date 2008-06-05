@@ -219,7 +219,7 @@ static void pgd_ctor(void *p)
 	}
 
 	/* list required to sync kernel mapping updates */
-	if (!SHARED_KERNEL_PMD)
+	if (PAGETABLE_LEVELS == 2)
 		pgd_list_add(pgd);
 
 	spin_unlock_irqrestore(&pgd_lock, flags);
@@ -229,12 +229,11 @@ static void pgd_dtor(void *pgd)
 {
 	unsigned long flags; /* can be called from interrupt context */
 
-	if (SHARED_KERNEL_PMD)
-		return;
-
-	spin_lock_irqsave(&pgd_lock, flags);
-	pgd_list_del(pgd);
-	spin_unlock_irqrestore(&pgd_lock, flags);
+	if (!SHARED_KERNEL_PMD) {
+		spin_lock_irqsave(&pgd_lock, flags);
+		pgd_list_del(pgd);
+		spin_unlock_irqrestore(&pgd_lock, flags);
+	}
 
 	pgd_test_and_unpin(pgd);
 }
@@ -311,15 +310,20 @@ out_oom:
  	for (addr = i = 0; i < UNSHARED_PTRS_PER_PGD;
 	     i++, pud++, addr += PUD_SIZE) {
 		if (i >= USER_PTRS_PER_PGD) {
-			memcpy(pmds[i], (pmd_t *)pgd_page_vaddr(swapper_pg_dir[i]),
+			memcpy(pmds[i],
+			       (pmd_t *)pgd_page_vaddr(swapper_pg_dir[i]),
 			       sizeof(pmd_t) * PTRS_PER_PMD);
 			make_lowmem_page_readonly(
 				pmds[i], XENFEAT_writable_page_tables);
 		}
 
-		/* It is safe to poke machine addresses of pmds under the pmd_lock. */
+		/* It is safe to poke machine addresses of pmds under the pgd_lock. */
 		pud_populate(mm, pud, pmds[i]);
 	}
+
+	/* List required to sync kernel mapping updates and
+	 * to pin/unpin on save/restore. */
+	pgd_list_add(pgd);
 
 	spin_unlock_irqrestore(&pgd_lock, flags);
 
@@ -349,7 +353,6 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
 		pgd_ctor(pgd);
 
 	if (pgd && !pgd_prepopulate_pmd(mm, pgd)) {
-		pgd_dtor(pgd);
 		free_page((unsigned long)pgd);
 		pgd = NULL;
 	}
@@ -367,13 +370,12 @@ void pgd_free(struct mm_struct *mm, pgd_t *pgd)
 	 *  2. The machine addresses in PGD entries will not become invalid
 	 *     due to a concurrent save/restore.
 	 */
-	pgd_test_and_unpin(pgd);
+	pgd_dtor(pgd);
 
 	if (PTRS_PER_PMD > 1 && !xen_feature(XENFEAT_pae_pgdir_above_4gb))
 		xen_destroy_contiguous_region((unsigned long)pgd, 0);
 
 	pgd_mop_up_pmds(mm, pgd);
-	pgd_dtor(pgd);
 	free_page((unsigned long)pgd);
 }
 

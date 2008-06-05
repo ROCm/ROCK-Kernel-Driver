@@ -626,6 +626,7 @@ static int network_open(struct net_device *dev)
 	struct netfront_info *np = netdev_priv(dev);
 
 	memset(&np->stats, 0, sizeof(np->stats));
+	napi_enable(&np->napi);
 
 	spin_lock_bh(&np->rx_lock);
 	if (netfront_carrier_ok(np)) {
@@ -851,8 +852,8 @@ no_skb:
 			/* Check return status of HYPERVISOR_memory_op(). */
 			if (unlikely(np->rx_mcl[i].result != i))
 				panic("Unable to reduce memory reservation\n");
-			while (i--)
-				BUG_ON(np->rx_mcl[i].result);
+			while (nr_flips--)
+				BUG_ON(np->rx_mcl[nr_flips].result);
 		} else {
 			if (HYPERVISOR_memory_op(XENMEM_decrease_reservation,
 						 &reservation) != i)
@@ -1678,6 +1679,7 @@ static int network_close(struct net_device *dev)
 {
 	struct netfront_info *np = netdev_priv(dev);
 	netif_stop_queue(np->netdev);
+	napi_disable(&np->napi);
 	return 0;
 }
 

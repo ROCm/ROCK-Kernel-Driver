@@ -231,7 +231,7 @@ void fixup_irqs(cpumask_t map)
 		spin_unlock(&irq_desc[irq].lock);
 
 		if (break_affinity && set_affinity)
-			printk("Broke affinity for irq %i\n", irq);
+			/*printk("Broke affinity for irq %i\n", irq)*/;
 		else if (!set_affinity)
 			printk("Cannot set affinity for irq %i\n", irq);
 	}

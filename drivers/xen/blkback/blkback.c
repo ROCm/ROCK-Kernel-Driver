@@ -343,6 +343,9 @@ static int do_block_io_op(blkif_t *blkif)
 		}
 		blk_rings->common.req_cons = ++rc; /* before make_response() */
 
+		/* Apply all sanity checks to /private copy/ of request. */
+		barrier();
+
 		switch (req.operation) {
 		case BLKIF_OP_READ:
 			blkif->st_rd_req++;
