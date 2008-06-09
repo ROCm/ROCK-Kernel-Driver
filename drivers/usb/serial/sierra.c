@@ -1,7 +1,7 @@
 /*
   USB Driver for Sierra Wireless
 
-  Copyright (C) 2006, 2007, 2008  Kevin Lloyd <linux@sierrawireless.com>
+  Copyright (C) 2006, 2007, 2008  Kevin Lloyd <klloyd@sierrawireless.com>
 
   IMPORTANT DISCLAIMER: This driver is not commercially supported by
   Sierra Wireless. Use at your own risk.
@@ -14,8 +14,8 @@
   Whom based his on the Keyspan driver by Hugh Blemings <hugh@blemings.org>
 */
 
-#define DRIVER_VERSION "v.1.2.8"
-#define DRIVER_AUTHOR "Kevin Lloyd <linux@sierrawireless.com>"
+#define DRIVER_VERSION "v.1.2.9c"
+#define DRIVER_AUTHOR "Kevin Lloyd <klloyd@sierrawireless.com>"
 #define DRIVER_DESC "USB Driver for Sierra Wireless USB modems"
 
 #include <linux/kernel.h>
@@ -31,7 +31,6 @@
 #define SWIMS_USB_REQUEST_SetPower	0x00
 #define SWIMS_USB_REQUEST_SetNmea	0x07
 #define SWIMS_USB_REQUEST_SetMode	0x0B
-#define SWIMS_USB_REQUEST_TYPE_VSC_SET	0x40
 #define SWIMS_SET_MODE_Modem		0x0001
 
 /* per port private data */
@@ -55,7 +54,7 @@ static int sierra_set_power_state(struct usb_device *udev, __u16 swiState)
 	dev_dbg(&udev->dev, "%s", "SET POWER STATE\n");
 	result = usb_control_msg(udev, usb_sndctrlpipe(udev, 0),
 			SWIMS_USB_REQUEST_SetPower,	/* __u8 request      */
-			SWIMS_USB_REQUEST_TYPE_VSC_SET,	/* __u8 request type */
+			USB_TYPE_VENDOR,		/* __u8 request type */
 			swiState,			/* __u16 value       */
 			0,				/* __u16 index       */
 			NULL,				/* void *data        */
@@ -70,7 +69,7 @@ static int sierra_set_ms_mode(struct usb_device *udev, __u16 eSWocMode)
 	dev_dbg(&udev->dev, "%s", "DEVICE MODE SWITCH\n");
 	result = usb_control_msg(udev, usb_sndctrlpipe(udev, 0),
 			SWIMS_USB_REQUEST_SetMode,	/* __u8 request      */
-			SWIMS_USB_REQUEST_TYPE_VSC_SET,	/* __u8 request type */
+			USB_TYPE_VENDOR,		/* __u8 request type */
 			eSWocMode,			/* __u16 value       */
 			0x0000,				/* __u16 index       */
 			NULL,				/* void *data        */
@@ -85,7 +84,7 @@ static int sierra_vsc_set_nmea(struct usb_device *udev, __u16 enable)
 	dev_dbg(&udev->dev, "%s", "NMEA Enable sent\n");
 	result = usb_control_msg(udev, usb_sndctrlpipe(udev, 0),
 			SWIMS_USB_REQUEST_SetNmea,	/* __u8 request      */
-			SWIMS_USB_REQUEST_TYPE_VSC_SET,	/* __u8 request type */
+			USB_TYPE_VENDOR,		/* __u8 request type */
 			enable,				/* __u16 value       */
 			0x0000,				/* __u16 index       */
 			NULL,				/* void *data        */
@@ -109,6 +108,26 @@ static int sierra_calc_num_ports(struct usb_serial *serial)
 	return result;
 }
 
+static int sierra_calc_interface(struct usb_serial *serial)
+{
+		int interface;
+		struct usb_interface *p_interface;
+		struct usb_host_interface *p_host_interface;
+
+		/* Get the interface structure pointer from the serial struct */
+		p_interface = serial->interface;
+
+		/* Get a pointer to the host interface structure */
+		p_host_interface = p_interface->cur_altsetting;
+
+		/* read the interface descriptor for this active altsetting
+		 * to find out the interface number we are on
+		*/
+		interface = p_host_interface->desc.bInterfaceNumber;
+
+		return interface;
+}
+
 static int sierra_probe(struct usb_serial *serial,
 			const struct usb_device_id *id)
 {
@@ -123,6 +142,22 @@ static int sierra_probe(struct usb_serial *serial,
 
 	ifnum = serial->interface->cur_altsetting->desc.bInterfaceNumber;
 	udev = serial->dev;
+
+		/* Figure out the interface number from the serial structure */
+		ifnum = sierra_calc_interface(serial);
+
+		/*
+		 * If this interface supports more than 1 alternate
+		 * select the 2nd one
+		 */
+		if (serial->interface->num_altsetting == 2) {
+			dev_dbg(&udev->dev,
+				"Selecting alt setting for interface %d\n",
+				ifnum);
+
+			/* We know the alternate setting is 1 for the MC8785 */
+			usb_set_interface(udev, ifnum, 1);
+		}
 
 	/* Check if in installer mode */
 	if (truinstall && id->driver_info == DEVICE_INSTALLER) {
@@ -156,7 +191,7 @@ static struct usb_device_id id_table [] = {
 	{ USB_DEVICE(0x1199, 0x0019) },	/* Sierra Wireless AirCard 595 */
 	{ USB_DEVICE(0x1199, 0x0021) },	/* Sierra Wireless AirCard 597E */
 	{ USB_DEVICE(0x1199, 0x0120) },	/* Sierra Wireless USB Dongle 595U */
-	{ USB_DEVICE(0x1199, 0x0023) },	/* Sierra Wireless AirCard */
+	{ USB_DEVICE_AND_INTERFACE_INFO(0x1199, 0x0023, 0xFF, 0xFF, 0xFF) }, /* Sierra Wireless C597 */
 
 	{ USB_DEVICE(0x1199, 0x6802) },	/* Sierra Wireless MC8755 */
 	{ USB_DEVICE(0x1199, 0x6804) },	/* Sierra Wireless MC8755 */
@@ -166,14 +201,18 @@ static struct usb_device_id id_table [] = {
 	{ USB_DEVICE(0x1199, 0x6815) },	/* Sierra Wireless MC8775 */
 	{ USB_DEVICE(0x03f0, 0x1e1d) },	/* HP hs2300 a.k.a MC8775 */
 	{ USB_DEVICE(0x1199, 0x6820) },	/* Sierra Wireless AirCard 875 */
+	{ USB_DEVICE(0x1199, 0x6821) },	/* Sierra Wireless AirCard 875U */
 	{ USB_DEVICE(0x1199, 0x6832) },	/* Sierra Wireless MC8780*/
 	{ USB_DEVICE(0x1199, 0x6833) },	/* Sierra Wireless MC8781*/
+	{ USB_DEVICE(0x1199, 0x683B), .driver_info = DEVICE_1_PORT },	/* Sierra Wireless MC8785 Composite*/
 	{ USB_DEVICE(0x1199, 0x6850) },	/* Sierra Wireless AirCard 880 */
 	{ USB_DEVICE(0x1199, 0x6851) },	/* Sierra Wireless AirCard 881 */
 	{ USB_DEVICE(0x1199, 0x6852) },	/* Sierra Wireless AirCard 880 E */
 	{ USB_DEVICE(0x1199, 0x6853) },	/* Sierra Wireless AirCard 881 E */
 	{ USB_DEVICE(0x1199, 0x6855) },	/* Sierra Wireless AirCard 880 U */
 	{ USB_DEVICE(0x1199, 0x6856) },	/* Sierra Wireless AirCard 881 U */
+	{ USB_DEVICE(0x1199, 0x6859), .driver_info = DEVICE_1_PORT },	/* Sierra Wireless AirCard 885 E */
+	{ USB_DEVICE(0x1199, 0x685A), .driver_info = DEVICE_1_PORT },	/* Sierra Wireless AirCard 885 E */
 
 	{ USB_DEVICE(0x1199, 0x6468) }, /* Sierra Wireless MP3G - EVDO */
 	{ USB_DEVICE(0x1199, 0x6469) }, /* Sierra Wireless MP3G - UMTS/HSPA */
