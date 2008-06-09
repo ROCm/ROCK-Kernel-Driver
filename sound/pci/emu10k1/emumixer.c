@@ -1581,7 +1581,7 @@ static int snd_emu10k1_shared_spdif_get(struct snd_kcontrol *kcontrol,
 	if (emu->card_capabilities->invert_shared_spdif)
 		ucontrol->value.integer.value[0] =
 			!ucontrol->value.integer.value[0];
-		
+
 	return 0;
 }
 
