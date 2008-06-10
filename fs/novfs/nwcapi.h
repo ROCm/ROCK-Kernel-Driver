@@ -109,14 +109,14 @@
 
 #define IOC_XPLAT    0x4a540002
 
-typedef struct _XPLAT_ {
+struct novfs_xplat {
 	int xfunction;
 	unsigned long reqLen;
 	void *reqData;
 	unsigned long repLen;
 	void *repData;
 
-} XPLAT, *PXPLAT;
+};
 
 #if 0
 N_EXTERN_LIBRARY(NWRCODE)
@@ -326,66 +326,30 @@ N_EXTERN_LIBRARY(NWRCODE)
 
 //===[ Type definitions ]==================================================
 
-//
-// Connection Handle returned from all OpenConnByXXXX calls
-//
-
-typedef u32 NW_CONN_HANDLE, *PNW_CONN_HANDLE;
-
-//
-// Authentication Id returned from the NwcCreateAuthenticationId call
-//
-
-typedef u32 AUTHEN_ID, *PAUTHEN_ID;
 
 //
 // Structure for defining what a transport
 // address looks like
 //
 
-typedef struct tagNwcTranAddr {
+struct nwc_tran_addr {
 	u32 uTransportType;
 	u32 uAddressLength;
 	unsigned char *puAddress;
+};
 
-} NwcTranAddr, *PNwcTranAddr;
 
-//
-// Structure for defining what a new transport
-// address looks like
-//
-
-typedef struct tagNwcTranAddrEx {
-	u32 uTransportType;
-	u32 uAddressLength;
-	unsigned char buBuffer[MAX_ADDRESS_LENGTH];
-
-} NwcTranAddrEx, *PNwcTranAddrEx;
-
-typedef struct tagNwcReferral {
-	u32 uAddrCnt;
-	PNwcTranAddrEx pAddrs;
-
-} NwcReferral, *PNwcReferral;
-
-typedef struct tagNwcServerVersion {
-	u32 uMajorVersion;
-	u16 uMinorVersion;
-	u16 uRevision;
-
-} NwcServerVersion, *PNwcServerVersion;
-
-typedef struct tagNwcConnString {
+struct nwc_conn_string {
 	char *pString;
 	u32 uStringType;
 	u32 uNameFormatType;
 
-} NwcConnString, *PNwcConnString;
+};
 
 //#if defined(NTYPES_H)
 //typedef NWCString    NwcString, *PNwcString;
 //#else
-typedef struct tagNwcString {
+struct nwc_string {
 	u32 DataType;
 	u32 BuffSize;
 	u32 DataLen;
@@ -393,36 +357,18 @@ typedef struct tagNwcString {
 	u32 CodePage;
 	u32 CountryCode;
 
-} NwcString, *PNwcString;
+};
 //#endif
-
-//
-// Structure used in NDS Resolve name
-//
-
-#define  RESOLVE_INFO_SVC_V1_00     0x00FE0001
-
-typedef struct tagNwcResolveInfo {
-	u32 uResolveInfoVersion;
-	u32 luFlags;
-	u32 luReqFlags;
-	u32 luReqScope;
-	u32 luResolveType;
-	u32 luRepFlags;
-	u32 luResolvedOffset;
-	u32 luDerefNameLen;
-	u16 *pDerefName;
-} NwcResolveInfo, *PNwcResolveInfo;
 
 //
 // Definition of a fragment for the Raw NCP requests
 //
 
-typedef struct tagNwcFrag {
+struct nwc_frag {
 	void *pData;
 	u32 uLength;
 
-} NwcFrag, *PNwcFrag;
+};
 
 //
 // Current connection information available for
@@ -432,62 +378,6 @@ typedef struct tagNwcFrag {
 #define NW_INFO_BUFFER_SIZE   NW_MAX_TREE_NAME_LEN + \
                               NW_MAX_TREE_NAME_LEN + \
                               NW_MAX_SERVICE_TYPE_LEN
-
-typedef struct tagNwcConnInfo {
-	u32 uInfoVersion;
-	u32 uAuthenticationState;
-	u32 uBroadcastState;
-	u32 uConnectionReference;
-	u32 TreeNameOffset;
-	u32 uSecurityState;
-	u32 uConnectionNumber;
-	u32 uUserId;
-	u32 ServerNameOffset;
-	u32 uNdsState;
-	u32 uMaxPacketSize;
-	u32 uLicenseState;
-	u32 uPublicState;
-	u32 bcastState;
-	u32 ServiceTypeOffset;
-	u32 uDistance;
-	u32 uAuthId;
-	u32 uDisconnected;
-	NwcServerVersion serverVersion;
-	NwcTranAddrEx tranAddress;
-	unsigned char buBuffer[NW_INFO_BUFFER_SIZE];
-
-} NwcConnInfo, *PNwcConnInfo;
-
-//
-// Get Browse Connection References
-//
-
-typedef struct _GetBrowseConnectionsRec {
-
-	u32 recordSize;
-	u32 numConnectionsReturned;
-	u32 numConnectionsAvailable;
-	u32 connReferences[1];
-
-} GetBrowseConnectionRec, *PGetBrowseConnectionRec;
-
-//++=======================================================================
-//  API Name:        NwcClearBroadcastMessage
-//
-//  Arguments In:    NONE
-//
-//  Arguments Out:   NONE
-//
-//  Returns:         STATUS_SUCCESS
-//
-//  Abstract:        This API is clears the broadcast message buffer.
-//
-//  Notes:
-//
-//  Environment:     PASSIVE_LEVEL, LINUX
-//
-//=======================================================================--
-
 //++=======================================================================
 //  API Name:        NwcCloseConn
 //
@@ -514,10 +404,10 @@ typedef struct _GetBrowseConnectionsRec {
 //
 //=======================================================================--
 
-typedef struct tagNwcCloseConn {
-	NW_CONN_HANDLE ConnHandle;
+struct nwc_close_conn {
+	u32 ConnHandle;
 
-} NwcCloseConn, *PNwcCloseConn;
+};
 
 //++=======================================================================
 //  API Name:        NwcConvertLocalFileHandle
@@ -548,11 +438,11 @@ typedef struct tagNwcCloseConn {
 //
 //=======================================================================--
 
-typedef struct tagNwcConvertLocalHandle {
+struct nwc_convert_local_handle {
 	u32 uConnReference;
 	unsigned char NetWareHandle[6];
 
-} NwcConvertLocalHandle, *PNwcConvertLocalHandle;
+};
 
 //++=======================================================================
 //  API Name:        NwcConvertNetWareHandle
@@ -592,121 +482,13 @@ typedef struct tagNwcConvertLocalHandle {
 //  Environment:     PASSIVE_LEVEL, LINUX
 //
 //=======================================================================--
-typedef struct tagNwcConvertNetWareHandle {
-	NW_CONN_HANDLE ConnHandle;
+struct nwc_convert_netware_handle {
+	u32 ConnHandle;
 	u32 uAccessMode;
 	unsigned char NetWareHandle[6];
 	u32 uFileSize;
-} NwcConvertNetWareHandle, *PNwcConvertNetWareHandle;
+};
 
-//++=======================================================================
-//  API Name:        NwcFragmentRequest
-//
-//  Arguments In:    ConnHandle
-//                      The connection handle the request is being
-//                      directed to.
-//
-//                   uFunction
-//                      The NCP function to be called, should be 104
-//                      for NDS fragger/defragger requests.
-//
-//                   uSubFunction
-//                      The NCP subfunction to be called, should be
-//                      2 for NDS fragger/defragger requests.
-//
-//                   uVerb
-//                      The actual operation to be completed on the
-//                      server backend.
-//
-//                   flags
-//                      Currently not implemented.  Reserved for
-//                      future use.
-//
-//                   uNumRequestFrags
-//                      The number of fragments that the request packet
-//                      has been broken into.
-//
-//                   pRequestFrags
-//                      List of fragments that make up the request packet.
-//                      Each fragment includes the length of the fragment
-//                      data and a pointer to the data.
-//
-//                   uNumReplyFrags
-//                      The number of fragments the reply packet has been
-//                      broken into.
-//
-//  Arguments Out:   pReplyFrags
-//                      List of fragments that make up the reply packet.
-//                      Each fragment includes the length of the fragment
-//                      data and a pointer to the data.
-//
-//                   uActualReplyLength
-//                      Total size of the reply packet after any header
-//                      and tail information is removed.
-//
-//  Returns:         STATUS_SUCCESS
-//                   NWE_ACCESS_VIOLATION
-//                   NWE_CONN_INVALID
-//
-//  Abstract:        API for sending large NCP/NDS packets that are
-//                   larger than the max MTU size for the underlying
-//                   network.
-//
-//  Notes:
-//
-//  Environment:     PASSIVE_LEVEL, LINUX
-//
-//=======================================================================--
-typedef struct tagNwcFragmentRequest {
-	NW_CONN_HANDLE ConnHandle;
-	u32 uFunction;
-	u32 uSubFunction;
-	u32 uVerb;
-	u32 flags;
-	u32 uNumRequestFrags;
-	PNwcFrag pRequestFrags;
-	u32 uNumReplyFrags;
-	PNwcFrag pReplyFrags;
-	u32 uActualReplyLength;
-} NwcFragmentRequest, *PNwcFragmentRequest;
-
-//++=======================================================================
-//  API Name:        NwcGetBroadcastMessage
-//
-//  Arguments In:    uMessageFlags - Not currently used.
-//
-//                   uConnReference - connection reference for
-//                   pending message.
-//
-//                   messageLen - length of message buffer.
-//
-//                   message - message buffer
-//
-//  Arguments Out:   messageLen - length of the message
-//
-//  Returns:         STATUS_SUCCESS
-//                   NWE_ACCESS_VIOLATION
-//                   NWE_NO_MORE_ENTRIES
-//
-//  Abstract:        This API is used for notifying a caller of pending
-//                   broadcast messages on the server.
-//
-//  Notes:
-//
-//  Environment:     PASSIVE_LEVEL, LINUX
-//
-//=======================================================================--
-
-/* jlt
-typedef  struct   tagNwcGetBroadcastMessage
-{
-   u32               uMessageFlags;
-   u32               uConnReference;
-   u32               messageLen;
-   unsigned char                message[255];
-
-} NwcGetBroadcastMessage, *PNwcGetBroadcastMessage;
-*/
 
 //++=======================================================================
 //  API Name:        NwcGetConnInfo
@@ -746,13 +528,13 @@ typedef  struct   tagNwcGetBroadcastMessage
 //
 //=======================================================================--
 
-typedef struct tagNwcGetConnInfo {
-	NW_CONN_HANDLE ConnHandle;
+struct nwc_get_conn_info {
+	u32 ConnHandle;
 	u32 uInfoLevel;
 	u32 uInfoLength;
 	void *pConnInfo;
 
-} NwcGetConnInfo, *PNwcGetConnInfo;
+};
 
 //++=======================================================================
 //  API Name:        NwcGetDefaultNameContext
@@ -785,14 +567,14 @@ typedef struct tagNwcGetConnInfo {
 //
 //=======================================================================--
 
-typedef struct tagNwcGetDefaultNameContext {
+struct nwc_get_def_name_ctx {
 	u32 uTreeLength;
 	unsigned char *pDsTreeName;
 	u32 uNameLength;
 // unsigned short *pNameContext;
 	unsigned char *pNameContext;
 
-} NwcGetDefaultNameContext, *PNwcGetDefaultNameContext;
+};
 
 //++=======================================================================
 //  API Name:        NwcGetTreeMonitoredConnReference
@@ -817,86 +599,12 @@ typedef struct tagNwcGetDefaultNameContext {
 //
 //=======================================================================--
 
-typedef struct tagNwcGetTreeMonitoredConnRef {
-	PNwcString pTreeName;
+struct nwc_get_tree_monitored_conn_ref {
+	struct nwc_string *pTreeName;
 	u32 uConnReference;
 
-} NwcGetTreeMonitoredConnRef, *PNwcGetTreeMonitoredConnRef;
+};
 
-//++=======================================================================
-//  API Name:        NwcGetNumberConns
-//
-//  Arguments In:    NONE
-//
-//  Arguments Out:   uMaxConns - The maximum number of connections
-//                   supported by the redirector.  -1 for dynamic.
-//
-//                   uPublicConns - The current number of public
-//                   connections.
-//
-//                   uTasksPrivateConns - The current number of private
-//                   connections that are owned by the calling process.
-//
-//                   uOtherPrivateConns - The current number of private
-//                   connections that are not owned by the calling
-//                   process.
-//
-//  Returns:         STATUS_SUCCESS
-//                   NWE_ACCESS_VIOLATION
-//                   NWE_RESOURCE_LOCK
-//
-//  Abstract:        This API returns the current number of connections
-//                   as well as the maximum number of supported
-//                   connections.  If the requester/redirector supports
-//                   a dynamic connection table, -1 will be returned
-//                   in the uMaxConns field.
-//
-//  Notes:
-//
-//  Environment:     PASSIVE_LEVEL, LINUX
-//
-//=======================================================================--
-
-typedef struct tagNwcGetNumberConns {
-	u32 uMaxConns;
-	u32 uPublicConns;
-	u32 uTasksPrivateConns;
-	u32 uOtherPrivateConns;
-
-} NwcGetNumberConns, *PNwcGetNumberConns;
-
-//++=======================================================================
-//  API Name:        NwcGetPreferredServer
-//
-//  Arguments In:    uServerNameLength - On input, this is the length
-//                   in bytes of the server buffer.  On output, this is
-//                   the actual length of the server name string in bytes.
-//
-//  Arguments Out:   pServerName - The buffer to copy the preferred server
-//                   name into.
-//
-//  Returns:         STATUS_SUCCESS
-//                   NWE_ACCESS_VIOLATION
-//                   NWE_BUFFER_OVERFLOW
-//                   NWE_OBJECT_NOT_FOUND
-//                   NWE_PARAM_INVALID
-//                   NWE_RESOURCE_LOCK
-//
-//  Abstract:        This API returns the configured preferred bindery
-//                   server previously set either by configuration or
-//                   by calling NwcSetPreferredServer.
-//
-//  Notes:
-//
-//  Environment:     PASSIVE_LEVEL, LINUX
-//
-//=======================================================================--
-
-typedef struct tagNwcGetPreferredServer {
-	u32 uServerNameLength;
-	char *pServerName;
-
-} NwcGetPreferredServer, *PNwcGetPreferredServer;
 
 //++=======================================================================
 //  API Name:        NwcGetPreferredDsTree
@@ -923,63 +631,10 @@ typedef struct tagNwcGetPreferredServer {
 //  Environment:     PASSIVE_LEVEL, LINUX
 //
 //=======================================================================--
-typedef struct tagNwcGetPreferredDsTree {
+struct nwc_get_pref_ds_tree {
 	u32 uTreeLength;
 	unsigned char *pDsTreeName;
-} NwcGetPreferredDsTree, *PNwcGetPreferredDsTree;
-
-//++=======================================================================
-//  API Name:        NwcGetPrimaryConnection
-//
-//  Arguments In:    NONE
-//
-//  Arguments Out:   uConnReference - Reference to the primary connection.
-//
-//  Returns:         STATUS_SUCCESS
-//                   NWE_ACCESS_VIOLATION
-//                   NWE_CONN_PRIMARY_NOT_SET
-//
-//  Abstract:        This API returns the reference to the current primary
-//                   connection in the redirector.
-//
-//  Notes:
-//
-//  Environment:     PASSIVE_LEVEL, LINUX
-//
-//=======================================================================--
-
-typedef struct tagNwcGetPrimaryConnection {
-	u32 uConnReference;
-
-} NwcGetPrimaryConnection, *PNwcGetPrimaryConnection;
-
-//++=======================================================================
-//  API Name:        NwcGetRequesterVersion
-//
-//  Arguments In:    NONE
-//
-//  Arguments Out:   uMajorVersion
-//                   uMinorVersion
-//                   uRevision
-//
-//  Returns:         STATUS_SUCCESS
-//                   NWE_ACCESS_VIOLATION
-//
-//  Abstract:        This API returns the major version, minor version and
-//                   revision of the requester/redirector.
-//
-//  Notes:
-//
-//  Environment:     PASSIVE_LEVEL, LINUX
-//
-//=======================================================================--
-
-typedef struct tagNwcGetRequesterVersion {
-	u32 uMajorVersion;
-	u32 uMinorVersion;
-	u32 uRevision;
-
-} NwcGetRequesterVersion, *PNwcGetRequesterVersion;
+};
 
 //++=======================================================================
 //  API Name:        NwcLicenseConn
@@ -1007,115 +662,10 @@ typedef struct tagNwcGetRequesterVersion {
 //
 //=======================================================================--
 
-typedef struct tagNwcLicenseConn {
-	NW_CONN_HANDLE ConnHandle;
+struct nwc_license_conn {
+	u32 ConnHandle;
+};
 
-} NwcLicenseConn, *PNwcLicenseConn;
-
-//++=======================================================================
-//  API Name:        NwcMakeConnPermanent
-//
-//  Arguments In:    ConnHandle - An open connection handle associated
-//                   with the connection to be made permanent.
-//
-//  Arguments Out:   NONE
-//
-//  Returns:         NWE_ACCESS_VIOLATION
-//                   NWE_CONN_INVALID
-//                   NWE_INVALID_OWNER
-//
-//  Abstract:        This API is used to keep the connection from being
-//                   destroyed until a NwcSysCloseConn request is made
-//                   on the connection.  This allows the connection to
-//                   remain after all processes that have the
-//                   connection open terminate.
-//
-//  Notes:
-//
-//  Environment:     PASSIVE_LEVEL, LINUX
-//
-//=======================================================================--
-
-typedef struct tagNwcMakeConnPermanent {
-	NW_CONN_HANDLE ConnHandle;
-
-} NwcMakeConnPermanent, *PNwcMakeConnPermanent;
-
-//++=======================================================================
-//  API Name:        NwcMapDrive
-//
-//  Arguments In:    ConnHandle - The connection handle of the server
-//                   to where the drive is to be mapped.
-//
-//                   LocalUID - Local user ID
-//
-//                   LocalPathLen - Length of local/link directory path string,
-//                   including nul terminator.
-//
-//                   LocalPathOffset - Offset of local directory path that will
-//                   be mapped to NetWare directory path.
-//
-//                   NetWarePathLen - Offset of NetWare directory path,
-//                   including nul terminator.
-//
-//                   NetWarePathOffset - Offset of NetWare directory path in
-//                   structure.
-//
-//  Arguments Out:   NONE
-//
-//  Returns:         STATUS_SUCCESS
-//                   NWE_ACCESS_VIOLATION
-//                   NWE_CONN_INVALID
-//                   NWE_INSUFFICIENT_RESOURCES
-//                   NWE_STRING_TRANSLATION
-//
-//  Abstract:        This API maps the target drive to the specified
-//                   directory.
-//
-//  Notes:
-//
-//  Environment:     PASSIVE_LEVEL, LINUX
-//
-//=======================================================================--
-
-typedef struct tagNwcMapDrive {
-	NW_CONN_HANDLE ConnHandle;
-	u32 LocalUID;
-	u32 LinkPathLen;
-	u32 LinkPathOffset;
-	u32 DestPathLen;
-	u32 DestPathOffset;
-
-} NwcMapDrive, *PNwcMapDrive;
-
-//++=======================================================================
-//  API Name:        NwcUnmapDrive
-//
-//  Arguments In:    LinkPathLen - Length of local/link path string,
-//                   including nul terminator.
-//
-//                   LinkPath - Local/link path in structure
-//                   to be unmapped
-//
-//  Arguments Out:   NONE
-//
-//  Returns:         STATUS_SUCCESS
-//                   NWE_ACCESS_VIOLATION
-//                   NWE_PARAM_INVALID
-//
-//  Abstract:        This API deletes a network drive mapping.
-//
-//  Notes:
-//
-//  Environment:     PASSIVE_LEVEL, LINUX
-//
-//=======================================================================--
-
-typedef struct tagNwcUnmapDrive {
-	u32 LinkPathLen;
-	unsigned char LinkPath[1];
-
-} NwcUnmapDrive, *PNwcUnmapDrive;
 
 //++=======================================================================
 //  API Name:        NWCGetMappedDrives
@@ -1136,26 +686,11 @@ typedef struct tagNwcUnmapDrive {
 //
 //=======================================================================--
 
-typedef struct tagNwcMapDriveElem {
-	u32 ElemLen;		// Lenght of drive element
-	u32 ConnRefernce;	// Connection reference
-	u32 LinkPathLen;	// Local/link dir path, length includes nul
-	unsigned char LinkPath[1];	// LinkPath[LinkPathLen]
-// u32               DirPathLen;       // NetWare dir path, length includes nul (vol:path)
-// unsigned char                DirPath[DirPathLen]; // NetWarePath[DirPathLen]
-} NwcMapDriveElem, *PNwcMapDriveElem;
-
-typedef struct tagNwcMapDriveBuff {
-	u32 MapCount;		// Number of mapped drives
-	NwcMapDriveElem MapDriveElem[1];	// MapDriveElem[MapCount]
-
-} NwcMapDriveBuff, *PNwcMapDriveBuff;
-
-typedef struct tagNwcGetMappedDrives {
+struct nwc_get_mapped_drives {
 	u32 MapBuffLen;		// Buffer length (actual buffer size returned)
-	PNwcMapDriveBuff MapBuffer;	// Pointer to map buffer
+	struct nwc_mapped_drive_buf *MapBuffer;	// Pointer to map buffer
 
-} NwcGetMappedDrives, *PNwcGetMappedDrives;
+};
 
 //++=======================================================================
 //  API Name:        NwcGetMountPath
@@ -1178,39 +713,11 @@ typedef struct tagNwcGetMappedDrives {
 //
 //=======================================================================--
 
-typedef struct tagNwcGetMountPath {
+struct nwc_get_mount_path {
 	u32 MountPathLen;
 	unsigned char *pMountPath;
 
-} NwcGetMountPath, *PNwcGetMountPath;
-
-//++=======================================================================
-//  API Name:        NwcMonitorConn
-//
-//  Arguments In:    ConnHandle - The handle associated with the connection
-//                   that is to be marked as the monitored connection.
-//
-//  Arguments Out:   NONE
-//
-//  Returns:         STATUS_SUCCESS
-//                   NWE_ACCESS_VIOLATION
-//                   NWE_RESOURCE_LOCK
-//                   NWE_CONN_INVALID
-//
-//
-//  Abstract:        This call marks the connection associated with the
-//                   connection handle as monitored.
-//
-//  Notes:
-//
-//  Environment:     PASSIVE_LEVEL, LINUX
-//
-//=======================================================================--
-
-typedef struct tagNwcMonitorConn {
-	NW_CONN_HANDLE ConnHandle;
-
-} NwcMonitorConn, *PNwcMonitorConn;
+};
 
 //++=======================================================================
 //  API Name:        NwcOpenConnByAddr
@@ -1244,13 +751,13 @@ typedef struct tagNwcMonitorConn {
 //
 //=======================================================================--
 
-typedef struct tagNwcOpenConnByAddr {
+struct nwc_open_conn_by_addr {
 	char *pServiceType;
 	u32 uConnFlags;
-	PNwcTranAddr pTranAddr;
-	NW_CONN_HANDLE ConnHandle;
+	struct nwc_tran_addr *pTranAddr;
+	u32 ConnHandle;
 
-} NwcOpenConnByAddr, *PNwcOpenConnByAddr;
+};
 
 //++=======================================================================
 //  API Name:        NwcOpenConnByName
@@ -1304,15 +811,15 @@ typedef struct tagNwcOpenConnByAddr {
 //
 //=======================================================================--
 
-typedef struct tagNwcOpenConnByName {
-	NW_CONN_HANDLE ConnHandle;
-	PNwcConnString pName;
+struct nwc_open_conn_by_name {
+	u32 ConnHandle;
+	struct nwc_conn_string *pName;
 	char *pServiceType;
 	u32 uConnFlags;
 	u32 uTranType;
-	NW_CONN_HANDLE RetConnHandle;
+	u32 RetConnHandle;
 
-} NwcOpenConnByName, *PNwcOpenConnByName;
+};
 
 //++=======================================================================
 //  API Name:        NwcOpenConnByReference
@@ -1346,12 +853,12 @@ typedef struct tagNwcOpenConnByName {
 //
 //=======================================================================--
 
-typedef struct tagNwcOpenConnByReference {
+struct nwc_open_conn_by_ref {
 	u32 uConnReference;
 	u32 uConnFlags;
-	NW_CONN_HANDLE ConnHandle;
+	u32 ConnHandle;
 
-} NwcOpenConnByReference, *PNwcOpenConnByReference;
+};
 
 //++=======================================================================
 //  API Name:        NwcRawRequest
@@ -1390,55 +897,16 @@ typedef struct tagNwcOpenConnByReference {
 //
 //=======================================================================--
 
-typedef struct tagNwcRequest {
-	NW_CONN_HANDLE ConnHandle;
+struct nwc_request {
+	u32 ConnHandle;
 	u32 uFunction;
 	u32 uNumRequestFrags;
-	PNwcFrag pRequestFrags;
+	struct nwc_frag *pRequestFrags;
 	u32 uNumReplyFrags;
-	PNwcFrag pReplyFrags;
+	struct nwc_frag *pReplyFrags;
 	u32 uActualReplyLength;
 
-} NwcRequest, *PNwcRequest;
-
-//++=======================================================================
-//  API Name:        NwcRawRequestAll
-//
-//  Arguments In:    uFunction - The NCP function that is being called.
-//
-//                   uNumRequestFrags - The number of fragments that the
-//                   request packet has been broken into.
-//
-//                   pRequestFrags - List of fragments that make up the
-//                   request packet.  Each fragment includes the length
-//                   of the fragment data and a pointer to the data.
-//
-//  Arguments Out:   NONE
-//
-//  Returns:         STATUS_SUCCESS
-//                   NWE_ACCESS_VIOLATION
-//                   NWE_CONN_INVALID
-//
-//  Abstract:        API for sending the given NCP request to all valid
-//                   connections.  If there is a private connection that
-//                   is not owned by the caller of this function, that
-//                   connection will not be included.  Also, if the
-//                   caller has both a private and a public connection
-//                   to the same server, only the private connection
-//                   will receive the request.
-//
-//  Notes:
-//
-//  Environment:     PASSIVE_LEVEL, LINUX
-//
-//=======================================================================--
-
-typedef struct tagNwcRequestAll {
-	u32 uFunction;
-	u32 uNumRequestFrags;
-	PNwcFrag pRequestFrags;
-
-} NwcRequestAll, *PNwcRequestAll;
+};
 
 //++=======================================================================
 //  API Name:        NwcScanConnInfo
@@ -1544,7 +1012,7 @@ typedef struct tagNwcRequestAll {
 //
 //=======================================================================--
 
-typedef struct tagNwcScanConnInfo {
+struct nwc_scan_conn_info {
 	u32 uScanIndex;
 	u32 uScanInfoLevel;
 	u32 uScanInfoLen;
@@ -1555,7 +1023,7 @@ typedef struct tagNwcScanConnInfo {
 	u32 uConnectionReference;
 	void *pReturnConnInfo;
 
-} NwcScanConnInfo, *PNwcScanConnInfo;
+};
 
 //++=======================================================================
 //  API Name:        NwcSetConnInfo
@@ -1589,13 +1057,13 @@ typedef struct tagNwcScanConnInfo {
 //
 //=======================================================================--
 
-typedef struct tagNwcSetConnInfo {
-	NW_CONN_HANDLE ConnHandle;
+struct nwc_set_conn_info {
+	u32 ConnHandle;
 	u32 uInfoLevel;
 	u32 uInfoLength;
 	void *pConnInfo;
 
-} NwcSetConnInfo, *PNwcSetConnInfo;
+};
 
 //++=======================================================================
 //  API Name:        NwcSetDefaultNameContext
@@ -1626,14 +1094,14 @@ typedef struct tagNwcSetConnInfo {
 //
 //=======================================================================--
 
-typedef struct tagNwcSetDefaultNameContext {
+struct nwc_set_def_name_ctx {
 	u32 uTreeLength;
 	unsigned char *pDsTreeName;
 	u32 uNameLength;
 // unsined short *pNameContext;
 	unsigned char *pNameContext;
 
-} NwcSetDefaultNameContext, *PNwcSetDefaultNameContext;
+};
 
 //++=======================================================================
 //  API Name:        NwcSetPreferredDsTree
@@ -1658,41 +1126,11 @@ typedef struct tagNwcSetDefaultNameContext {
 //
 //=======================================================================--
 
-typedef struct tagNwcSetPreferredDsTree {
+struct nwc_set_pref_ds_tree {
 	u32 uTreeLength;
 	unsigned char *pDsTreeName;
 
-} NwcSetPreferredDsTree, *PNwcSetPreferredDsTree;
-
-//++=======================================================================
-//  API Name:        NwcSetPreferredServer
-//
-//  Arguments In:    uServerNameLength - The length in bytes of the
-//                   preferred server string.
-//
-//                   pServerName - a pointer to an ASCIIZ string of the
-//                   preferred bindery server.
-//
-//  Arguments Out:   NONE
-//
-//  Returns:         STATUS_SUCCESS
-//                   NWE_ACCESS_VIOLATION
-//                   NWE_INSUFFICIENT_RESOURCES
-//                   NWE_RESOURCE_LOCK
-//
-//  Abstract:        This API sets the preferred server name.
-//
-//  Notes:
-//
-//  Environment:     PASSIVE_LEVEL, LINUX
-//
-//=======================================================================--
-
-typedef struct tagNwcSetPreferredServer {
-	u32 uServerNameLength;
-	char *pServerName;
-
-} NwcSetPreferredServer, *PNwcSetPreferredServer;
+};
 
 //++=======================================================================
 //  API Name:        NwcSetPrimaryConnection
@@ -1716,69 +1154,11 @@ typedef struct tagNwcSetPreferredServer {
 //
 //=======================================================================--
 
-typedef struct tagNwcSetPrimaryConnection {
-	NW_CONN_HANDLE ConnHandle;
+struct nwc_set_primary_conn {
+	u32 ConnHandle;
 
-} NwcSetPrimaryConnection, *PNwcSetPrimaryConnection;
+};
 
-//++=======================================================================
-//  API Name:        NwcSysCloseConn
-//
-//  Arguments In:    ConnHandle - The handle to a connection that is
-//                   to be destroyed.
-//
-//  Arguments Out:   NONE
-//
-//  Returns:         STATUS_SUCCESS
-//                   NWE_ACCESS_VIOLATION
-//                   NWE_CONN_INVALID
-//
-//  Abstract:        This API is similiar to the NwcCloseConn API, except
-//                   that it forces all handles to the connection closed
-//                   and destroys the service connection.  This is a system
-//                   level request that will cause all processes that are
-//                   accessing this connection to lose access to the
-//                   resources associated to the connection.
-//
-//  Notes:
-//
-//  Environment:     PASSIVE_LEVEL, LINUX
-//
-//=======================================================================--
-
-typedef struct tagNwcSysCloseConn {
-	NW_CONN_HANDLE ConnHandle;
-
-} NwcSysCloseConn, *PNwcSysCloseConn;
-
-//++=======================================================================
-//  API Name:        NwcUnlicenseConn
-//
-//  Arguments In:    ConnHandle - Open connection handle that will be
-//                   accessing the connection in an unlicensed manner.
-//
-//  Arguments Out:   NONE
-//
-//  Returns:         STATUS_SUCCESS
-//                   NWE_ACCESS_VIOLATION
-//                   NWE_CONN_INVALID
-//                   NWE_HANDLE_ALREADY_UNLICENSED
-//
-//  Abstract:        This API is used to change the state of a connection
-//                   handle from licensed to unlicensed.  If all handles
-//                   to the connection have been changed to the unlicensed
-//                   state, the unlicensed NCP is sent to the server.
-//
-//  Notes:
-//
-//  Environment:     PASSIVE_LEVEL, LINUX
-//
-//=======================================================================--
-
-typedef struct tagNwcUnlicenseConn {
-	NW_CONN_HANDLE ConnHandle;
-
-} NwcUnlicenseConn, *PNwcUnlicenseConn;
 
 //++=======================================================================
 //  API Name:        NwcQueryFeature
@@ -1801,10 +1181,10 @@ typedef struct tagNwcUnlicenseConn {
 //
 //=======================================================================--
 
-typedef struct tagNwcQueryFeature {
+struct nwc_query_feature {
 	u32 Feature;
 
-} NwcQueryFeature, *PNwcQueryFeature;
+};
 
 //++=======================================================================
 //  API Name:        NWCChangePassword
@@ -1824,16 +1204,16 @@ typedef struct tagNwcQueryFeature {
 //
 //=======================================================================--
 
-typedef struct tagNwcChangeKey {
-	PNwcString pDomainName;
+struct nwc_change_key {
+	struct nwc_string *pDomainName;
 	u32 AuthType;
-	PNwcString pObjectName;
+	struct nwc_string *pObjectName;
 	u32 NameType;
 	u16 ObjectType;
-	PNwcString pVerifyPassword;
-	PNwcString pNewPassword;
+	struct nwc_string *pVerifyPassword;
+	struct nwc_string *pNewPassword;
 
-} NwcChangeKey, *PNwcChangeKey;
+};
 
 //++=======================================================================
 //  API Name:        NWCEnumerateIdentities            `
@@ -1853,17 +1233,17 @@ typedef struct tagNwcChangeKey {
 //
 //=======================================================================--
 
-typedef struct tagNwcEnumerateIdentities {
+struct nwc_enum_ids {
 	u32 Iterator;
-	PNwcString pDomainName;
+	struct nwc_string *pDomainName;
 	u32 AuthType;
-	PNwcString pObjectName;
+	struct nwc_string *pObjectName;
 	u32 NameType;
 	u16 ObjectType;
 	u32 IdentityFlags;
-	AUTHEN_ID AuthenticationId;
+	u32 AuthenticationId;
 
-} NwcEnumerateIdentities, *PNwcEnumerateIdentities;
+};
 
 //++=======================================================================
 //  API Name:        NWCGetIdentityInfo
@@ -1883,16 +1263,16 @@ typedef struct tagNwcEnumerateIdentities {
 //
 //=======================================================================--
 
-typedef struct tagNwcGetIdentityInfo {
-	AUTHEN_ID AuthenticationId;
-	PNwcString pDomainName;
+struct nwc_get_id_info {
+	u32 AuthenticationId;
+	struct nwc_string *pDomainName;
 	u32 AuthType;
-	PNwcString pObjectName;
+	struct nwc_string *pObjectName;
 	u32 NameType;
 	u16 ObjectType;
 	u32 IdentityFlags;
 
-} NwcGetIdentityInfo, *PNwcGetIdentityInfo;
+};
 
 //++=======================================================================
 //  API Name:        NWCLoginIdentity
@@ -1912,41 +1292,18 @@ typedef struct tagNwcGetIdentityInfo {
 //
 //=======================================================================--
 
-typedef struct tagNwcLoginIdentity {
-	PNwcString pDomainName;
+struct nwc_login_id {
+	struct nwc_string *pDomainName;
 	u32 AuthType;
-	PNwcString pObjectName;
+	struct nwc_string *pObjectName;
 	u32 NameType;
 	u16 ObjectType;
 	u32 IdentityFlags;
-	PNwcString pPassword;
-	AUTHEN_ID AuthenticationId;
+	struct nwc_string *pPassword;
+	u32 AuthenticationId;
 
-} NwcLoginIdentity, *PNwcLoginIdentity;
+};
 
-//++=======================================================================
-//  API Name:        NWCLogoutIdentity
-////
-
-//  Arguments In:
-//
-//  Arguments Out:
-//
-//  Returns:         STATUS_SUCCESS
-//                   NWE_ACCESS_VIOLATION
-//
-//  Abstract:
-//
-//  Notes:
-//
-//  Environment:     PASSIVE_LEVEL, LINUX
-//
-//=======================================================================--
-
-typedef struct tagNwcLogoutIdentity {
-	AUTHEN_ID AuthenticationId;
-
-} NwcLogoutIdentity, *PNwcLogoutIdentity;
 
 //++=======================================================================
 //  API Name:        NWCSetPassword
@@ -1966,14 +1323,14 @@ typedef struct tagNwcLogoutIdentity {
 //
 //=======================================================================--
 
-typedef struct tagNwcSetKey {
-	NW_CONN_HANDLE ConnHandle;
-	AUTHEN_ID AuthenticationId;
-	PNwcString pObjectName;
+struct nwc_set_key {
+	u32 ConnHandle;
+	u32 AuthenticationId;
+	struct nwc_string *pObjectName;
 	u16 ObjectType;
-	PNwcString pNewPassword;
+	struct nwc_string *pNewPassword;
 
-} NwcSetKey, *PNwcSetKey;
+};
 
 //++=======================================================================
 //  API Name:        NWCVerifyPassword
@@ -1993,15 +1350,15 @@ typedef struct tagNwcSetKey {
 //
 //++=======================================================================
 
-typedef struct tagNwcVerifyKey {
-	PNwcString pDomainName;
+struct nwc_verify_key {
+	struct nwc_string *pDomainName;
 	u32 AuthType;
-	PNwcString pObjectName;
+	struct nwc_string *pObjectName;
 	u32 NameType;
 	u16 ObjectType;
-	PNwcString pVerifyPassword;
+	struct nwc_string *pVerifyPassword;
 
-} NwcVerifyKey, *PNwcVerifyKey;
+};
 
 //++=======================================================================
 //  API Name:        NwcAuthenticateWithId
@@ -2026,188 +1383,34 @@ typedef struct tagNwcVerifyKey {
 //
 //=======================================================================--
 
-typedef struct tagNwcAuthenticateWithId {
-	NW_CONN_HANDLE ConnHandle;
-	AUTHEN_ID AuthenticationId;
+struct nwc_auth_with_id {
+	u32 ConnHandle;
+	u32 AuthenticationId;
 
-} NwcAuthenticateWithId, *PNwcAuthenticateWithId;
+};
 
-//++=======================================================================
-//  API Name:        NwcUnauthenticate
-//
-//  Arguments In:    ConnHandle - The connection to unauthenticate.
-//
-//  Arguments Out:   NONE
-//
-//  Returns:         STATUS_SUCCESS
-//                   NWE_ACCESS_VIOLATION
-//                   NWE_CONN_INVALID
-//                   NWE_INVALID_OWNER
-//                   NWE_RESOURCE_LOCK
-//
-//  Abstract:        This API removes the authentication for the specified
-//                   connection.
-//
-//  Notes:
-//
-//  Environment:     PASSIVE_LEVEL, LINUX
-//
-//=======================================================================--
 
-typedef struct tagNwcUnauthenticate {
-	NW_CONN_HANDLE ConnHandle;
-	AUTHEN_ID AuthenticationId;
-
-} NwcUnauthenticate, *PNwcUnauthenticate;
-
-//++=======================================================================
-//  API Name:        NwcGetCfgNameServiceProviders
-//
-//  Arguments In:
-//
-//  Arguments Out:
-//
-//  Returns:         STATUS_SUCCESS
-//                   NWE_ACCESS_VIOLATION
-//
-//  Abstract:
-//
-//  Notes:
-//
-//  Environment:     PASSIVE_LEVEL, LINUX
-//
-//=======================================================================--
-
-typedef struct {
-	u32 providerCount;
-	u32 providers[MAX_NAME_SERVICE_PROVIDERS];
-
-} NwcGetCfgNameServiceProviders, *PNwcGetCfgNameServiceProviders;
-
-//++=======================================================================
-//  API Name:        NwcNdsResolveNameToId
-//
-//  Arguments In:    connHandle
-//                      Specifies connection to use to resolve name with.
-//
-//                   pName
-//                      Points to the name of the NDS entry to resolve.
-//
-//                   uReqTranType
-//                      Specifies the preferred or required transport to
-//                      be used.
-//
-//                   pResolveInfo
-//                      Points to the NwcNdsResolveInfo structure
-//                      containing information on how the entry is to be
-//                      resolved.
-//
-//  Arguments Out:   pResolveInfo
-//                      Points to the NwcNdsResolveInfo structure
-//                      containing return information on the resolved
-//                      entry.
-//
-//                   pluEntryId
-//                      Points to the resolved name's entry ID.
-//
-//                   pReferral
-//                      Points to the NwcReferral structure which describes
-//                      network addresses that can be used to locate other
-//                      NDS partitions that contain the entry name.
-//
-//  Returns:         STATUS_SUCCESS
-//                   NWE_CONN_INVALID,
-//                   NWE_BUFFER_OVERFLOW,
-//                   NWE_TRAN_INVALID_TYPE,
-//                   NWE_ACCESS_VIOLATION,
-//                   NWE_UNSUPPORTED_TRAN_TYPE,
-//                   Nds error code
-//
-//  Abstract:        This API resolves a NDS entry name.
-//
-//  Notes:
-//
-//  Environment:     PASSIVE_LEVEL, LINUX
-//
-//=======================================================================--
-
-typedef struct tagNwcNdsResolveNameToId {
-	NW_CONN_HANDLE connHandle;
-	PNwcString pName;
-	u32 uReqTranType;
-	PNwcResolveInfo pResolveInfo;
-	u32 entryId;
-	PNwcReferral pReferral;
-
-} NwcNdsResolveNameToId, *PNwcNdsResolveNameToId;
-
-//++=======================================================================
-//  API Name:        NwcOrderedRequest
-//
-//  Arguments In:    uFunction - The NCP function that is being called.
-//
-//                   uNumRequestFrags - The number of fragments that the
-//                   request packet has been broken into.
-//
-//                   pRequestFrags - List of fragments that make up the
-//                   request packet.  Each fragment includes the length
-//                   of the fragment data and a pointer to the data.
-//
-//                   uInverseReqCode - The NCP function that will be called
-//                   if the request fails.
-//
-//                   uNumInverseFrags - The number of fragments the inverse
-//                   request packet has been broken into.
-//
-//                   pReplyFrags - List of fragments that make up the
-//                   inverse request packet.  Each fragment includes the length
-//                   of the fragment data and a pointer to the data.
-//
-//  Returns:         STATUS_SUCCESS
-//                   NWE_ACCESS_VIOLATION
-//                   NWE_CONN_INVALID
-//
-//  Abstract:        API for sending raw NCP packets directly to a server.
-//
-//  Notes:
-//
-//  Environment:     PASSIVE_LEVEL, LINUX
-//
-//=======================================================================--
-
-typedef struct tagNwcOrderedRequest {
-	u32 uReqCode;
-	u32 uNumRequestFrags;
-	PNwcFrag pRequestFrags;
-	u32 uInverseReqCode;
-	u32 uNumInverseFrags;
-	PNwcFrag pInverseFrags;
-
-} NwcOrderedRequest, *PNwcOrderedRequest;
-
-#if 1				//sgled
-typedef struct tagNwcUnmapDriveEx {
+struct nwc_unmap_drive_ex {
 //         unsigned long      connHdl;
 	unsigned int linkLen;
 	char linkData[1];
 
-} NwcUnmapDriveEx, *PNwcUnmapDriveEx;
+};
 
-typedef struct tagNwcMapDriveEx {
-	NW_CONN_HANDLE ConnHandle;
+struct nwc_map_drive_ex {
+	u32 ConnHandle;
 	unsigned int localUid;
 	unsigned int linkOffsetLength;
 	unsigned int linkOffset;
 	unsigned int dirPathOffsetLength;
 	unsigned int dirPathOffset;
-} NwcMapDriveEx, *PNwcMapDriveEx;
+};
 
-typedef struct tagNwcGetBroadcastNotification {
+struct nwc_get_bcast_notification {
 	u32 uMessageFlags;
 	u32 uConnReference;
 	u32 messageLen;
 	char message[1];
-} NwcGetBroadcastNotification, *PNwcGetBroadcastNotification;
+};
 
-#endif
 #endif /* __NWCLNX_H__ */
