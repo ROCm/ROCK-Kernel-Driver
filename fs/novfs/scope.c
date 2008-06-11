@@ -33,40 +33,55 @@
 #define CLEANUP_INTERVAL      10
 #define MAX_USERNAME_LENGTH   32
 
+struct scope_list {
+	struct list_head entry;
+	struct schandle ScopeId;
+	struct schandle SessionId;
+	pid_t ScopePid;
+	struct task_struct *ScopeTask;
+	unsigned int ScopeHash;
+	uid_t ScopeUid;
+	u64 ScopeUSize;
+	u64 ScopeUFree;
+	u64 ScopeUTEnties;
+	u64 ScopeUAEnties;
+	int ScopeUserNameLength;
+	unsigned char ScopeUserName[MAX_USERNAME_LENGTH];
+};
 
 static struct list_head Scope_List;
 static struct semaphore Scope_Lock;
 static struct semaphore Scope_Thread_Delay;
-static int Scope_Thread_Terminate = 0;
+static int Scope_Thread_Terminate;
 static struct timer_list Scope_Timer;
 static unsigned int Scope_Hash_Val = 1;
 
-static struct novfs_scope_list *Scope_Search4Scope(struct novfs_schandle Id,
-		int Session, int Locked)
+static struct scope_list *Scope_Search4Scope(struct schandle *Id, bool Session,
+					     bool Locked)
 {
-	struct novfs_scope_list *scope, *rscope = NULL;
-	struct novfs_schandle cur_scope;
+	struct scope_list *scope;
+	struct scope_list *rscope = NULL;
+	struct schandle *cur_scope;
 	struct list_head *sl;
 	int offset;
 
-	DbgPrint("Scope_Search4Scope: 0x%p:%p 0x%x 0x%x\n", Id.hTypeId, Id.hId,
-		 Session, Locked);
+	DbgPrint("Scope_Search4Scope: 0x%p:%p 0x%x 0x%x\n",
+		 Id->hTypeId, Id->hId, Session, Locked);
 
 	if (Session)
-		offset = offsetof(struct novfs_scope_list, SessionId);
+		offset = offsetof(struct scope_list, SessionId);
 	else
-		offset = offsetof(struct novfs_scope_list, ScopeId);
+		offset = offsetof(struct scope_list, ScopeId);
 
-	if (!Locked) {
+	if (!Locked)
 		down(&Scope_Lock);
-	}
 
 	sl = Scope_List.next;
 	DbgPrint("Scope_Search4Scope: 0x%p\n", sl);
 	while (sl != &Scope_List) {
-		scope = list_entry(sl, struct novfs_scope_list, ScopeList);
+		scope = list_entry(sl, struct scope_list, entry);
 
-		cur_scope = *(struct novfs_schandle *) ((char *)scope + offset);
+		cur_scope = (session_t *) ((char *)scope + offset);
 		if (SC_EQUAL(Id, cur_scope)) {
 			rscope = scope;
 			break;
@@ -75,19 +90,19 @@ static struct novfs_scope_list *Scope_Search4Scope(struct novfs_schandle Id,
 		sl = sl->next;
 	}
 
-	if (!Locked) {
+	if (!Locked)
 		up(&Scope_Lock);
-	}
 
 	DbgPrint("Scope_Search4Scope: return 0x%p\n", rscope);
-	return (rscope);
+	return rscope;
 }
 
-static struct novfs_scope_list *Scope_Find_Scope(int Create)
+static struct scope_list *Scope_Find_Scope(bool Create)
 {
-	struct novfs_scope_list *scope = NULL, *pscope = NULL;
+	struct scope_list *scope = NULL;
+	struct scope_list *pscope = NULL;
 	struct task_struct *task;
-	struct novfs_schandle scopeId;
+	struct schandle scopeId;
 	int addscope = 0;
 
 	task = current;
@@ -95,94 +110,84 @@ static struct novfs_scope_list *Scope_Find_Scope(int Create)
 	DbgPrint("Scope_Find_Scope: %d %d %d %d\n", task->uid, task->euid,
 		 task->suid, task->fsuid);
 
-	//scopeId = task->euid;
+	/* scopeId = task->euid; */
 	UID_TO_SCHANDLE(scopeId, task->euid);
 
-	scope = Scope_Search4Scope(scopeId, 0, 0);
+	scope = Scope_Search4Scope(&scopeId, 0, 0);
+	if (scope || (!Create))
+		return scope;
 
-	if (!scope && Create) {
-		scope = kmalloc(sizeof(*pscope), GFP_KERNEL);
-		if (scope) {
-			scope->ScopeId = scopeId;
-			SC_INITIALIZE(scope->SessionId);
-			scope->ScopePid = task->pid;
-			scope->ScopeTask = task;
-			scope->ScopeHash = 0;
-			scope->ScopeUid = task->euid;
-			scope->ScopeUserName[0] = '\0';
+	scope = kmalloc(sizeof(*pscope), GFP_KERNEL);
+	if (!scope)
+		return NULL;
+	scope->ScopeId = scopeId;
+	SC_INITIALIZE(scope->SessionId);
+	scope->ScopePid = task->pid;
+	scope->ScopeTask = task;
+	scope->ScopeHash = 0;
+	scope->ScopeUid = task->euid;
+	scope->ScopeUserName[0] = '\0';
 
-			if (!novfs_daemon_create_sessionId(&scope->SessionId)) {
-				DbgPrint("Scope_Find_Scope2: %d %d %d %d\n",
-					 task->uid, task->euid, task->suid,
-					 task->fsuid);
-				memset(scope->ScopeUserName, 0,
-				       sizeof(scope->ScopeUserName));
-				scope->ScopeUserNameLength = 0;
-				novfs_daemon_getpwuid(task->euid,
-						sizeof(scope->ScopeUserName),
-						scope->ScopeUserName);
-				scope->ScopeUserNameLength =
-				    strlen(scope->ScopeUserName);
-				addscope = 1;
-			}
-
-			scope->ScopeHash = Scope_Hash_Val++;
-			DbgPrint("Scope_Find_Scope: Adding 0x%p\n"
-				 "   ScopeId:             0x%p:%p\n"
-				 "   SessionId:           0x%p:%p\n"
-				 "   ScopePid:            %d\n"
-				 "   ScopeTask:           0x%p\n"
-				 "   ScopeHash:           %u\n"
-				 "   ScopeUid:            %u\n"
-				 "   ScopeUserNameLength: %u\n"
-				 "   ScopeUserName:       %s\n",
-				 scope,
-				 scope->ScopeId.hTypeId, scope->ScopeId.hId,
-				 scope->SessionId.hTypeId, scope->SessionId.hId,
-				 scope->ScopePid,
-				 scope->ScopeTask,
-				 scope->ScopeHash,
-				 scope->ScopeUid,
-				 scope->ScopeUserNameLength,
-				 scope->ScopeUserName);
-
-			if (SC_PRESENT(scope->SessionId)) {
-				down(&Scope_Lock);
-				pscope =
-				    Scope_Search4Scope(scopeId, 0, 1);
-
-				if (!pscope) {
-					list_add(&scope->ScopeList,
-						 &Scope_List);
-				}
-				up(&Scope_Lock);
-
-				if (pscope) {
-					printk
-					    ("<6>Scope_Find_Scope scope not added because it was already there...\n");
-					novfs_daemon_destroy_sessionId(scope->
-								SessionId);
-					kfree(scope);
-					scope = pscope;
-					addscope = 0;
-				}
-			} else {
-				kfree(scope);
-				scope = NULL;
-			}
-		}
-
-		if (addscope) {
-			novfs_add_to_root(scope->ScopeUserName);
-		}
+	if (!Daemon_CreateSessionId(&scope->SessionId)) {
+		DbgPrint("Scope_Find_Scope2: %d %d %d %d\n", task->uid,
+			 task->euid, task->suid, task->fsuid);
+		memset(scope->ScopeUserName, 0, sizeof(scope->ScopeUserName));
+		scope->ScopeUserNameLength = 0;
+		Daemon_getpwuid(task->euid, sizeof(scope->ScopeUserName),
+				scope->ScopeUserName);
+		scope->ScopeUserNameLength = strlen(scope->ScopeUserName);
+		addscope = 1;
 	}
 
-	return (scope);
+	scope->ScopeHash = Scope_Hash_Val++;
+	DbgPrint("Scope_Find_Scope: Adding 0x%p\n"
+		 "   ScopeId:             0x%p:%p\n"
+		 "   SessionId:           0x%p:%p\n"
+		 "   ScopePid:            %d\n"
+		 "   ScopeTask:           0x%p\n"
+		 "   ScopeHash:           %u\n"
+		 "   ScopeUid:            %u\n"
+		 "   ScopeUserNameLength: %u\n"
+		 "   ScopeUserName:       %s\n",
+		 scope,
+		 scope->ScopeId.hTypeId, scope->ScopeId.hId,
+		 scope->SessionId.hTypeId, scope->SessionId.hId,
+		 scope->ScopePid,
+		 scope->ScopeTask,
+		 scope->ScopeHash,
+		 scope->ScopeUid,
+		 scope->ScopeUserNameLength,
+		 scope->ScopeUserName);
+
+	if (SC_PRESENT(scope->SessionId)) {
+		down(&Scope_Lock);
+		pscope = Scope_Search4Scope(&scopeId, 0, 1);
+		if (!pscope)
+			list_add(&scope->entry, &Scope_List);
+		up(&Scope_Lock);
+
+		if (pscope) {
+			printk(KERN_ERR "Scope_Find_Scope scope not added "
+			       "because it was already there...\n");
+			Daemon_DestroySessionId(&scope->SessionId);
+			kfree(scope);
+			scope = pscope;
+			addscope = 0;
+		}
+	} else {
+		kfree(scope);
+		scope = NULL;
+	}
+
+	if (addscope)
+		Novfs_Add_to_Root(scope->ScopeUserName);
+
+	return scope;
 }
 
-static int Scope_Validate_Scope(struct novfs_scope_list *Scope)
+static int Scope_Validate_Scope(struct scope_list *Scope)
 {
-	struct novfs_scope_list *s;
+	struct scope_list *s;
 	struct list_head *sl;
 	int retVal = 0;
 
@@ -192,7 +197,7 @@ static int Scope_Validate_Scope(struct novfs_scope_list *Scope)
 
 	sl = Scope_List.next;
 	while (sl != &Scope_List) {
-		s = list_entry(sl, struct novfs_scope_list, ScopeList);
+		s = list_entry(sl, struct scope_list, entry);
 
 		if (s == Scope) {
 			retVal = 1;
@@ -204,24 +209,28 @@ static int Scope_Validate_Scope(struct novfs_scope_list *Scope)
 
 	up(&Scope_Lock);
 
-	return (retVal);
+	return retVal;
 }
 
-uid_t novfs_scope_get_uid(struct novfs_scope_list *scope)
+/* FIXME void stuff */
+uid_t Scope_Get_Uid(void *foo)
 {
+	struct scope_list *scope = foo;
 	uid_t uid = 0;
+
 	if (!scope)
 		scope = Scope_Find_Scope(1);
 
 	if (scope && Scope_Validate_Scope(scope))
 		uid = scope->ScopeUid;
+
 	return uid;
 }
 
-char *novfs_scope_get_username(void)
+char *Scope_Get_UserName(void)
 {
 	char *name = NULL;
-	struct novfs_scope_list *Scope;
+	struct scope_list *Scope;
 
 	Scope = Scope_Find_Scope(1);
 
@@ -231,10 +240,12 @@ char *novfs_scope_get_username(void)
 	return name;
 }
 
-struct novfs_schandle novfs_scope_get_sessionId(struct novfs_scope_list
-		*Scope)
+/* FIXME the void * needs to get fixed... */
+session_t Scope_Get_SessionId(void *foo)
 {
-	struct novfs_schandle sessionId;
+	session_t sessionId;
+	struct scope_list *Scope = foo;
+
 	DbgPrint("Scope_Get_SessionId: 0x%p\n", Scope);
 	SC_INITIALIZE(sessionId);
 	if (!Scope)
@@ -242,43 +253,43 @@ struct novfs_schandle novfs_scope_get_sessionId(struct novfs_scope_list
 
 	if (Scope && Scope_Validate_Scope(Scope))
 		sessionId = Scope->SessionId;
+
 	DbgPrint("Scope_Get_SessionId: return 0x%p:%p\n", sessionId.hTypeId,
 		 sessionId.hId);
-	return (sessionId);
+	return sessionId;
 }
 
-struct novfs_scope_list *novfs_get_scope_from_name(struct qstr * Name)
+struct scope_list *Scope_Get_ScopefromName(struct qstr *name)
 {
-	struct novfs_scope_list *scope, *rscope = NULL;
+	struct scope_list *scope;
+	struct scope_list *rscope = NULL;
 	struct list_head *sl;
 
-	DbgPrint("Scope_Get_ScopefromName: %.*s\n", Name->len, Name->name);
+	DbgPrint("Scope_Get_ScopefromName: %.*s\n", name->len, name->name);
 
 	down(&Scope_Lock);
 
 	sl = Scope_List.next;
 	while (sl != &Scope_List) {
-		scope = list_entry(sl, struct novfs_scope_list, ScopeList);
+		scope = list_entry(sl, struct scope_list, entry);
 
-		if ((Name->len == scope->ScopeUserNameLength) &&
-		    (0 == strncmp(scope->ScopeUserName, Name->name, Name->len)))
-		{
+		if ((name->len == scope->ScopeUserNameLength) &&
+		    (strncmp(scope->ScopeUserName, name->name, name->len) == 0)) {
 			rscope = scope;
 			break;
 		}
-
 		sl = sl->next;
 	}
 
 	up(&Scope_Lock);
 
-	return (rscope);
+	return rscope;
 }
 
-int novfs_scope_set_userspace(uint64_t * TotalSize, uint64_t * Free,
-			uint64_t * TotalEnties, uint64_t * FreeEnties)
+int Scope_Set_UserSpace(u64 *TotalSize, u64 *Free,
+			u64 *TotalEnties, u64 *FreeEnties)
 {
-	struct novfs_scope_list *scope;
+	struct scope_list *scope;
 	int retVal = 0;
 
 	scope = Scope_Find_Scope(1);
@@ -294,24 +305,24 @@ int novfs_scope_set_userspace(uint64_t * TotalSize, uint64_t * Free,
 			scope->ScopeUAEnties = *FreeEnties;
 	}
 
-	return (retVal);
+	return retVal;
 }
 
-int novfs_scope_get_userspace(uint64_t * TotalSize, uint64_t * Free,
-			uint64_t * TotalEnties, uint64_t * FreeEnties)
+int Scope_Get_UserSpace(u64 *TotalSize, u64 *Free,
+			u64 *TotalEnties, u64 *FreeEnties)
 {
-	struct novfs_scope_list *scope;
+	struct scope_list *scope;
 	int retVal = 0;
 
-	uint64_t td, fd, te, fe;
+	u64 td, fd, te, fe;
 
 	scope = Scope_Find_Scope(1);
 
 	td = fd = te = fe = 0;
 	if (scope) {
 
-		retVal =
-		    novfs_daemon_get_userspace(scope->SessionId, &td, &fd, &te, &fe);
+		retVal = Daemon_Get_UserSpace(&scope->SessionId,
+					      &td, &fd, &te, &fe);
 
 		scope->ScopeUSize = td;
 		scope->ScopeUFree = fd;
@@ -328,18 +339,18 @@ int novfs_scope_get_userspace(uint64_t * TotalSize, uint64_t * Free,
 	if (FreeEnties)
 		*FreeEnties = fe;
 
-	return (retVal);
+	return retVal;
 }
 
-struct novfs_scope_list *novfs_get_scope(struct dentry * Dentry)
+struct scope_list *Scope_Get_ScopefromPath(struct dentry *dentry)
 {
-	struct novfs_scope_list *scope = NULL;
+	struct scope_list *scope = NULL;
 	char *buf, *path, *cp;
 	struct qstr name;
 
-	buf = (char *)kmalloc(PATH_LENGTH_BUFFER, GFP_KERNEL);
+	buf = kmalloc(PATH_LENGTH_BUFFER, GFP_KERNEL);
 	if (buf) {
-		path = novfs_scope_dget_path(Dentry, buf, PATH_LENGTH_BUFFER, 0);
+		path = Scope_dget_path(dentry, buf, PATH_LENGTH_BUFFER, 0);
 		if (path) {
 			DbgPrint("Scope_Get_ScopefromPath: %s\n", path);
 
@@ -355,30 +366,29 @@ struct novfs_scope_list *novfs_get_scope(struct dentry * Dentry)
 				name.hash = 0;
 				name.len = (int)(cp - path);
 				name.name = path;
-				scope = novfs_get_scope_from_name(&name);
+				scope = Scope_Get_ScopefromName(&name);
 			}
 		}
 		kfree(buf);
 	}
 
-	return (scope);
+	return scope;
 }
 
-static char *add_to_list(char *Name, char *List, char *EndOfList)
+static char *add_to_list(char *name, char *list, char *endoflist)
 {
-	while (*Name && (List < EndOfList)) {
-		*List++ = *Name++;
-	}
+	while (*name && (list < endoflist))
+		*list++ = *name++;
 
-	if (List < EndOfList) {
-		*List++ = '\0';
-	}
-	return (List);
+	if (list < endoflist)
+		*list++ = '\0';
+
+	return list;
 }
 
-char *novfs_get_scopeusers(void)
+char *Scope_Get_ScopeUsers(void)
 {
-	struct novfs_scope_list *scope;
+	struct scope_list *scope;
 	struct list_head *sl;
 	int asize = 8 * MAX_USERNAME_LENGTH;
 	char *list, *cp, *ep;
@@ -403,7 +413,7 @@ char *novfs_get_scopeusers(void)
 
 			sl = Scope_List.next;
 			while ((sl != &Scope_List) && (cp < ep)) {
-				scope = list_entry(sl, struct novfs_scope_list, ScopeList);
+				scope = list_entry(sl, struct scope_list, entry);
 
 				DbgPrint("Scope_Get_ScopeUsers found 0x%p %s\n",
 					 scope, scope->ScopeUserName);
@@ -419,7 +429,6 @@ char *novfs_get_scopeusers(void)
 				*cp++ = '\0';
 				asize = 0;
 			} else {	/* Allocation was to small, up size */
-
 				asize *= 4;
 				kfree(list);
 				list = NULL;
@@ -428,12 +437,12 @@ char *novfs_get_scopeusers(void)
 
 			break;
 		}
-	} while (!list);	/* List was to small try again */
+	} while (!list);	/* list was to small try again */
 
-	return (list);
+	return list;
 }
 
-void *novfs_scope_lookup(void)
+void *Scope_Lookup(void)
 {
 	return Scope_Find_Scope(1);
 }
@@ -445,7 +454,8 @@ static void Scope_Timer_Function(unsigned long context)
 
 static int Scope_Cleanup_Thread(void *Args)
 {
-	struct novfs_scope_list *scope, *rscope;
+	struct scope_list *scope;
+	struct scope_list *rscope;
 	struct list_head *sl, cleanup;
 	struct task_struct *task;
 
@@ -458,9 +468,8 @@ static int Scope_Cleanup_Thread(void *Args)
 
 	while (0 == Scope_Thread_Terminate) {
 		DbgPrint("Scope_Cleanup_Thread: looping\n");
-		if (Scope_Thread_Terminate) {
+		if (Scope_Thread_Terminate)
 			break;
-		}
 
 		/*
 		 * Check scope list for any terminated processes
@@ -471,7 +480,7 @@ static int Scope_Cleanup_Thread(void *Args)
 		INIT_LIST_HEAD(&cleanup);
 
 		while (sl != &Scope_List) {
-			scope = list_entry(sl, struct novfs_scope_list, ScopeList);
+			scope = list_entry(sl, struct scope_list, entry);
 			sl = sl->next;
 
 			rscope = NULL;
@@ -486,7 +495,7 @@ static int Scope_Cleanup_Thread(void *Args)
 			rcu_read_unlock();
 
 			if (!rscope) {
-				list_move(&scope->ScopeList, &cleanup);
+				list_move(&scope->entry, &cleanup);
 				DbgPrint("Scope_Cleanup_Thread: Scope=0x%p\n",
 					 rscope);
 			}
@@ -496,7 +505,7 @@ static int Scope_Cleanup_Thread(void *Args)
 
 		sl = cleanup.next;
 		while (sl != &cleanup) {
-			scope = list_entry(sl, struct novfs_scope_list, ScopeList);
+			scope = list_entry(sl, struct scope_list, entry);
 			sl = sl->next;
 
 			DbgPrint("Scope_Cleanup_Thread: Removing 0x%p\n"
@@ -514,9 +523,9 @@ static int Scope_Cleanup_Thread(void *Args)
 				 scope->ScopeTask,
 				 scope->ScopeHash,
 				 scope->ScopeUid, scope->ScopeUserName);
-			if (!Scope_Search4Scope(scope->SessionId, 1, 0)) {
-				novfs_remove_from_root(scope->ScopeUserName);
-				novfs_daemon_destroy_sessionId(scope->SessionId);
+			if (!Scope_Search4Scope(&scope->SessionId, 1, 0)) {
+				Novfs_Remove_from_Root(scope->ScopeUserName);
+				Daemon_DestroySessionId(&scope->SessionId);
 			}
 			kfree(scope);
 		}
@@ -527,21 +536,21 @@ static int Scope_Cleanup_Thread(void *Args)
 		add_timer(&Scope_Timer);
 		DbgPrint("Scope_Cleanup_Thread: sleeping\n");
 
-		if (down_interruptible(&Scope_Thread_Delay)) {
+		if (down_interruptible(&Scope_Thread_Delay))
 			break;
-		}
+
 		del_timer(&Scope_Timer);
 	}
 	Scope_Thread_Terminate = 0;
 
 	printk(KERN_INFO "Scope_Cleanup_Thread: Exit\n");
 	DbgPrint("Scope_Cleanup_Thread: Exit\n");
-	return (0);
+	return 0;
 }
 
-void novfs_scope_cleanup(void)
+void Scope_Cleanup(void)
 {
-	struct novfs_scope_list *scope;
+	struct scope_list *scope;
 	struct list_head *sl;
 
 	DbgPrint("Scope_Cleanup:\n");
@@ -554,10 +563,10 @@ void novfs_scope_cleanup(void)
 	sl = Scope_List.next;
 
 	while (sl != &Scope_List) {
-		scope = list_entry(sl, struct novfs_scope_list, ScopeList);
+		scope = list_entry(sl, struct scope_list, entry);
 		sl = sl->next;
 
-		list_del(&scope->ScopeList);
+		list_del(&scope->entry);
 
 		DbgPrint("Scope_Cleanup: Removing 0x%p\n"
 			 "   ScopeId:       0x%p:%p\n"
@@ -574,9 +583,9 @@ void novfs_scope_cleanup(void)
 			 scope->ScopeTask,
 			 scope->ScopeHash,
 			 scope->ScopeUid, scope->ScopeUserName);
-		if (!Scope_Search4Scope(scope->SessionId, 1, 1)) {
-			novfs_remove_from_root(scope->ScopeUserName);
-			novfs_daemon_destroy_sessionId(scope->SessionId);
+		if (!Scope_Search4Scope(&scope->SessionId, 1, 1)) {
+			Novfs_Remove_from_Root(scope->ScopeUserName);
+			Daemon_DestroySessionId(&scope->SessionId);
 		}
 		kfree(scope);
 	}
@@ -586,13 +595,19 @@ void novfs_scope_cleanup(void)
 }
 
 /*
- *  Walks the dentry chain building a path.
+ *  Arguments:   struct dentry *dentry - starting entry
+ *               char *Buf - pointer to memory buffer
+ *               unsigned int Buflen - size of memory buffer
+ *
+ *  Returns:     pointer to path.
+ *
+ *  Abstract:    Walks the dentry chain building a path.
  */
-char *novfs_scope_dget_path(struct dentry *Dentry, char *Buf, unsigned int Buflen,
+char *Scope_dget_path(struct dentry *dentry, char *Buf, unsigned int Buflen,
 		int Flags)
 {
 	char *retval = &Buf[Buflen];
-	struct dentry *p = Dentry;
+	struct dentry *p = dentry;
 	int len;
 
 	*(--retval) = '\0';
@@ -612,9 +627,8 @@ char *novfs_scope_dget_path(struct dentry *Dentry, char *Buf, unsigned int Bufle
 		}
 	} while (!IS_ROOT(p));
 
-	if (IS_ROOT(Dentry)) {
+	if (IS_ROOT(dentry))
 		retval++;
-	}
 
 	if (Flags) {
 		len = strlen(p->d_sb->s_type->name);
@@ -627,18 +641,19 @@ char *novfs_scope_dget_path(struct dentry *Dentry, char *Buf, unsigned int Bufle
 		}
 	}
 
-	return (retval);
+	return retval;
 }
 
-void novfs_scope_init(void)
+void Scope_Init(void)
 {
 	INIT_LIST_HEAD(&Scope_List);
 	init_MUTEX(&Scope_Lock);
 	init_MUTEX_LOCKED(&Scope_Thread_Delay);
+
 	kthread_run(Scope_Cleanup_Thread, NULL, "novfs_ST");
 }
 
-void novfs_scope_exit(void)
+void Scope_Uninit(void)
 {
 	unsigned long expires = jiffies + HZ * SHUTDOWN_INTERVAL;
 
@@ -651,6 +666,7 @@ void novfs_scope_exit(void)
 	mb();
 	while (Scope_Thread_Terminate && (jiffies < expires))
 		yield();
+
 	/* down(&Scope_Thread_Delay); */
 	printk(KERN_INFO "Scope_Uninit: Exit\n");
 
