@@ -3,7 +3,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (c) 2006, 2007 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2006, 2007-2008 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * Common code for doing accurate backtraces on i386 and x86_64, including
  * printing the values of arguments.
@@ -562,7 +562,7 @@ static struct bb_name_state bb_special_cases[] = {
 		all_regs,
 		BB_SKIP(RAX) | BB_SKIP(RCX)),
 
-	NS_REG("iret_label",
+	NS_REG("irq_return",
 		all_regs,
 		0),
 
@@ -605,7 +605,7 @@ static const char *bb_spurious[] = {
 	"retint_swapgs",
 	"retint_restore_args",
 	"restore_args",
-	"iret_label",
+	"irq_return",
 	"bad_iret",
 	"retint_careful",
 	"retint_signal",
@@ -869,7 +869,7 @@ static struct bb_name_state bb_special_cases[] = {
 		no_memory, no_regs, 0, 0, 0),
 	NS_MEM("resume_userspace", full_pt_regs, 0),
 
-	NS_MEM_FROM("syscall_badsys", "sysenter_entry",
+	NS_MEM_FROM("syscall_badsys", "ia32_sysenter_target",
 		full_pt_regs, BB_SKIP(RBP)),
 	NS_MEM("syscall_badsys", full_pt_regs, 0),
 
@@ -881,13 +881,13 @@ static struct bb_name_state bb_special_cases[] = {
 		full_pt_regs, BB_SKIP(RAX)),
 	NS_MEM("syscall_exit", full_pt_regs, 0),
 
-	NS_MEM_FROM("syscall_exit_work", "sysenter_entry",
+	NS_MEM_FROM("syscall_exit_work", "ia32_sysenter_target",
 		full_pt_regs, BB_SKIP(RAX) | BB_SKIP(RBP)),
 	NS_MEM_FROM("syscall_exit_work", "system_call",
 		full_pt_regs, BB_SKIP(RAX)),
 	NS_MEM("syscall_exit_work", full_pt_regs, 0),
 
-	NS_MEM_FROM("syscall_trace_entry", "sysenter_entry",
+	NS_MEM_FROM("syscall_trace_entry", "ia32_sysenter_target",
 		full_pt_regs, BB_SKIP(RBP)),
 	NS_MEM_FROM("syscall_trace_entry", "system_call",
 		full_pt_regs, BB_SKIP(RAX)),
@@ -928,7 +928,7 @@ static const char *bb_spurious[] = {
 #ifdef	CONFIG_PREEMPT
 	"need_resched",
 #endif	/* CONFIG_PREEMPT */
-				/* sysenter_entry */
+				/* ia32_sysenter_target */
 	"sysenter_past_esp",
 				/* system_call */
 	"no_singlestep",
@@ -2933,11 +2933,13 @@ bb_sanity_check(int type)
 		/* type == 1 is sysret/sysexit, ignore RSP */
 		if (type && expect == BBRG_RSP)
 			continue;
-#ifndef	CONFIG_X86_64
 		/* type == 1 is sysret/sysexit, ignore RBP for i386 */
+		/* We used to have "#ifndef CONFIG_X86_64" for the type=1 RBP
+		 * test; however, x86_64 can run ia32 compatible mode and
+		 * hit this problem. Perform the following test anyway!
+		 */
 		if (type && expect == BBRG_RBP)
 			continue;
-#endif	/* !CONFIG_X86_64 */
 		/* RSP should contain OSP+0.  Except for ptregscall_common and
 		 * ia32_ptregs_common, they get a partial pt_regs, fudge the
 		 * stack to make it a full pt_regs then reverse the effect on
@@ -3164,9 +3166,6 @@ bb_usage_mov(const struct bb_operand *src, const struct bb_operand *dst, int l)
 	    bb_is_int_reg(dst->base_rc) &&
 	    full_register_dst) {
 #ifdef	CONFIG_X86_32
-#ifndef TSS_sysenter_sp0
-#define TSS_sysenter_sp0 SYSENTER_stack_sp0
-#endif
 		/* mov from TSS_sysenter_sp0+offset to esp to fix up the
 		 * sysenter stack, it leaves esp well defined.  mov
 		 * TSS_ysenter_sp0+offset(%esp),%esp is followed by up to 5
@@ -4738,7 +4737,6 @@ kdb_bb_all(int argc, const char **argv)
 				   __FUNCTION__, bb_spurious[i]);
 	}
 	while ((symname = kdb_walk_kallsyms(&pos))) {
-		++pos;
 		if (strcmp(symname, "_stext") == 0 ||
 		    strcmp(symname, "stext") == 0)
 			break;
@@ -4846,14 +4844,14 @@ kdb_bb_all(int argc, const char **argv)
 /* Make sure you update the correct section of this ifdef.                    */
 /*                                                                            */
 /*============================================================================*/
+#define XCS "cs"
+#define RSP "sp"
+#define RIP "ip"
+#define ARCH_RSP sp
+#define ARCH_RIP ip
 
 #ifdef	CONFIG_X86_64
 
-#define XCS "cs"
-#define RSP "rsp"
-#define RIP "rip"
-#define ARCH_RSP rsp
-#define ARCH_RIP rip
 #define ARCH_NORMAL_PADDING (16 * 8)
 
 /* x86_64 has multiple alternate stacks, with different sizes and different
@@ -4967,11 +4965,6 @@ kdba_bt_stack_rip(const struct task_struct *p)
 
 #else	/* !CONFIG_X86_64 */
 
-#define XCS "xcs"
-#define RSP "esp"
-#define RIP "eip"
-#define ARCH_RSP esp
-#define ARCH_RIP eip
 #define ARCH_NORMAL_PADDING (19 * 4)
 
 #ifdef	CONFIG_4KSTACKS

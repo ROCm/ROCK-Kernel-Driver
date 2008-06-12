@@ -230,22 +230,9 @@ struct inic_port_priv {
 };
 
 static struct scsi_host_template inic_sht = {
-	.module			= THIS_MODULE,
-	.name			= DRV_NAME,
-	.ioctl			= ata_scsi_ioctl,
-	.queuecommand		= ata_scsi_queuecmd,
-	.can_queue		= ATA_DEF_QUEUE,
-	.this_id		= ATA_SHT_THIS_ID,
-	.sg_tablesize		= LIBATA_MAX_PRD, /* maybe it can be larger? */
-	.cmd_per_lun		= ATA_SHT_CMD_PER_LUN,
-	.emulated		= ATA_SHT_EMULATED,
-	.use_clustering		= ATA_SHT_USE_CLUSTERING,
-	.proc_name		= DRV_NAME,
-	.dma_boundary		= INIC_DMA_BOUNDARY,
-	.dma_boundary		= ATA_DMA_BOUNDARY,
-	.slave_configure	= ata_scsi_slave_config,
-	.slave_destroy		= ata_scsi_slave_destroy,
-	.bios_param		= ata_std_bios_param,
+	ATA_BASE_SHT(DRV_NAME),
+	.sg_tablesize	= LIBATA_MAX_PRD,	/* maybe it can be larger? */
+	.dma_boundary	= INIC_DMA_BOUNDARY,
 };
 
 static const int scr_map[] = {
@@ -573,11 +560,26 @@ static void inic_tf_read(struct ata_port *ap, struct ata_taskfile *tf)
 	tf->command	= readb(port_base + PORT_TF_COMMAND);
 }
 
-static u8 inic_check_status(struct ata_port *ap)
+static bool inic_qc_fill_rtf(struct ata_queued_cmd *qc)
 {
-	void __iomem *port_base = inic_port_base(ap);
+	struct ata_taskfile *rtf = &qc->result_tf;
+	struct ata_taskfile tf;
 
-	return readb(port_base + PORT_TF_COMMAND);
+	/* FIXME: Except for status and error, result TF access
+	 * doesn't work.  I tried reading from BAR0/2, CPB and BAR5.
+	 * None works regardless of which command interface is used.
+	 * For now return true iff status indicates device error.
+	 * This means that we're reporting bogus sector for RW
+	 * failures.  Eeekk....
+	 */
+	inic_tf_read(qc->ap, &tf);
+
+	if (!(tf.command & ATA_ERR))
+		return false;
+
+	rtf->command = tf.command;
+	rtf->feature = tf.feature;
+	return true;
 }
 
 static void inic_freeze(struct ata_port *ap)
@@ -594,6 +596,13 @@ static void inic_thaw(struct ata_port *ap)
 
 	writeb(0xff, port_base + PORT_IRQ_STAT);
 	writeb(PIRQ_MASK_DEFAULT, port_base + PORT_IRQ_MASK);
+}
+
+static int inic_check_ready(struct ata_link *link)
+{
+	void __iomem *port_base = inic_port_base(link->ap);
+
+	return ata_check_ready(readb(port_base + PORT_TF_COMMAND));
 }
 
 /*
@@ -628,10 +637,8 @@ static int inic_hardreset(struct ata_link *link, unsigned int *class,
 	if (ata_link_online(link)) {
 		struct ata_taskfile tf;
 
-		/* wait a while before checking status */
-		ata_wait_after_reset(ap, deadline);
-
-		rc = ata_wait_ready(ap, deadline);
+		/* wait for link to become ready */
+		rc = ata_wait_after_reset(link, deadline, inic_check_ready);
 		/* link occupied, -ENODEV too is an error */
 		if (rc) {
 			ata_link_printk(link, KERN_WARNING, "device not ready "
@@ -641,8 +648,6 @@ static int inic_hardreset(struct ata_link *link, unsigned int *class,
 
 		inic_tf_read(ap, &tf);
 		*class = ata_dev_classify(&tf);
-		if (*class == ATA_DEV_UNKNOWN)
-			*class = ATA_DEV_ATA;
 	}
 
 	return 0;
@@ -653,9 +658,7 @@ static void inic_error_handler(struct ata_port *ap)
 	void __iomem *port_base = inic_port_base(ap);
 
 	inic_reset_port(port_base);
-
-	ata_do_eh(ap, ata_std_prereset, NULL, inic_hardreset,
-		  ata_std_postreset);
+	ata_std_error_handler(ap);
 }
 
 static void inic_post_internal_cmd(struct ata_queued_cmd *qc)
@@ -717,24 +720,17 @@ static int inic_port_start(struct ata_port *ap)
 	return 0;
 }
 
-static void inic_irq_clear(struct ata_port *ap)
-{
-	/* nada */
-}
-
 static struct ata_port_operations inic_port_ops = {
-	.check_status		= inic_check_status,
-	.tf_read		= inic_tf_read,
-	.dev_select		= ata_noop_dev_select,
+	.inherits		= &sata_port_ops,
 
 	.check_atapi_dma	= inic_check_atapi_dma,
 	.qc_prep		= inic_qc_prep,
 	.qc_issue		= inic_qc_issue,
-
-	.irq_clear		= inic_irq_clear,
+	.qc_fill_rtf		= inic_qc_fill_rtf,
 
 	.freeze			= inic_freeze,
 	.thaw			= inic_thaw,
+	.hardreset		= inic_hardreset,
 	.error_handler		= inic_error_handler,
 	.post_internal_cmd	= inic_post_internal_cmd,
 
@@ -858,17 +854,6 @@ static int inic_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	for (i = 0; i < NR_PORTS; i++) {
 		struct ata_port *ap = host->ports[i];
-		void __iomem *port_base = inic_port_base(ap);
-		struct ata_ioports *ioaddr = &ap->ioaddr;
-
-		ioaddr->cmd_addr = port_base + PORT_TF_COMMAND;
-		ioaddr->error_addr = port_base + PORT_TF_FEATURE;
-		ioaddr->feature_addr = port_base + PORT_TF_FEATURE;
-		ioaddr->nsect_addr = port_base + PORT_TF_NSECT;
-		ioaddr->lbal_addr = port_base + PORT_TF_LBAL;
-		ioaddr->lbam_addr = port_base + PORT_TF_LBAM;
-		ioaddr->lbah_addr = port_base + PORT_TF_LBAH;
-		ioaddr->device_addr = port_base + PORT_TF_DEVICE;
 
 		ata_port_pbar_desc(ap, mmio_bar, -1, "mmio");
 		ata_port_pbar_desc(ap, mmio_bar, i * PORT_SIZE, "port");

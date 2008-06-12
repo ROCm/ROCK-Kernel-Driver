@@ -1,4 +1,5 @@
-/* -*- mode: c; c-basic-offset: 8; -*- * vim: noexpandtab sw=8 ts=8 sts=0:
+/* -*- mode: c; c-basic-offset: 8; -*-
+ * vim: noexpandtab sw=8 ts=8 sts=0:
  *
  * sys.c
  *
@@ -30,7 +31,6 @@
 #include <linux/fs.h>
 
 #include "ocfs2_nodemanager.h"
-#include "heartbeat.h"
 #include "masklog.h"
 #include "sys.h"
 
@@ -43,26 +43,8 @@ static ssize_t version_show(struct kobject *kobj, struct kobj_attribute *attr,
 static struct kobj_attribute attr_version =
 	__ATTR(interface_revision, S_IFREG | S_IRUGO, version_show, NULL);
 
-static ssize_t heartbeat_mode_show(struct kobject *kobj,
-				   struct kobj_attribute *attr, char *buf)
-{
-	return snprintf(buf, PAGE_SIZE, "%s\n", o2hb_heartbeat_mode());
-}
-
-static ssize_t heartbeat_mode_store(struct kobject *kobj,
-				    struct kobj_attribute *attr,
-				    const char *buffer, size_t count)
-{
-	return o2hb_set_heartbeat_mode(buffer, count);
-}
-
-static struct kobj_attribute attr_heartbeat_mode =
-	__ATTR(heartbeat_mode, S_IFREG | S_IRUGO | S_IWUSR,
-                 heartbeat_mode_show, heartbeat_mode_store);
-
 static struct attribute *o2cb_attrs[] = {
 	&attr_version.attr,
-	&attr_heartbeat_mode.attr,
 	NULL,
 };
 
@@ -75,6 +57,7 @@ static struct kset *o2cb_kset;
 void o2cb_sys_shutdown(void)
 {
 	mlog_sys_shutdown();
+	sysfs_remove_link(NULL, "o2cb");
 	kset_unregister(o2cb_kset);
 }
 
@@ -82,9 +65,17 @@ int o2cb_sys_init(void)
 {
 	int ret;
 
-	o2cb_kset = kset_create_and_add("o2cb", NULL, NULL);
+	o2cb_kset = kset_create_and_add("o2cb", NULL, fs_kobj);
 	if (!o2cb_kset)
 		return -ENOMEM;
+
+	/*
+	 * Create this symlink for backwards compatibility with old
+	 * versions of ocfs2-tools which look for things in /sys/o2cb.
+	 */
+	ret = sysfs_create_link(NULL, &o2cb_kset->kobj, "o2cb");
+	if (ret)
+		goto error;
 
 	ret = sysfs_create_group(&o2cb_kset->kobj, &o2cb_attr_group);
 	if (ret)

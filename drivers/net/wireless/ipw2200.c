@@ -4495,9 +4495,9 @@ static void ipw_rx_notification(struct ipw_priv *priv,
 								       priv->
 								       essid_len),
 							  print_mac(mac, priv->bssid),
-							  ntohs(auth->status),
+							  le16_to_cpu(auth->status),
 							  ipw_get_status_code
-							  (ntohs
+							  (le16_to_cpu
 							   (auth->status)));
 
 						priv->status &=
@@ -4532,9 +4532,9 @@ static void ipw_rx_notification(struct ipw_priv *priv,
 							  IPW_DL_STATE |
 							  IPW_DL_ASSOC,
 							  "association failed (0x%04X): %s\n",
-							  ntohs(resp->status),
+							  le16_to_cpu(resp->status),
 							  ipw_get_status_code
-							  (ntohs
+							  (le16_to_cpu
 							   (resp->status)));
 					}
 
@@ -4591,8 +4591,8 @@ static void ipw_rx_notification(struct ipw_priv *priv,
 					IPW_DEBUG(IPW_DL_NOTIF | IPW_DL_STATE |
 						  IPW_DL_ASSOC,
 						  "authentication failed (0x%04X): %s\n",
-						  ntohs(auth->status),
-						  ipw_get_status_code(ntohs
+						  le16_to_cpu(auth->status),
+						  ipw_get_status_code(le16_to_cpu
 								      (auth->
 								       status)));
 				}
@@ -7558,8 +7558,31 @@ static int ipw_associate(void *data)
 	    priv->ieee->iw_mode == IW_MODE_ADHOC &&
 	    priv->config & CFG_ADHOC_CREATE &&
 	    priv->config & CFG_STATIC_ESSID &&
-	    priv->config & CFG_STATIC_CHANNEL &&
-	    !list_empty(&priv->ieee->network_free_list)) {
+	    priv->config & CFG_STATIC_CHANNEL) {
+		/* Use oldest network if the free list is empty */
+		if (list_empty(&priv->ieee->network_free_list)) {
+			struct ieee80211_network *oldest = NULL;
+			struct ieee80211_network *target;
+			DECLARE_MAC_BUF(mac);
+
+			list_for_each_entry(target, &priv->ieee->network_list, list) {
+				if ((oldest == NULL) ||
+				    (target->last_scanned < oldest->last_scanned))
+					oldest = target;
+			}
+
+			/* If there are no more slots, expire the oldest */
+			list_del(&oldest->list);
+			target = oldest;
+			IPW_DEBUG_ASSOC("Expired '%s' (%s) from "
+					"network list.\n",
+					escape_essid(target->ssid,
+						     target->ssid_len),
+					print_mac(mac, target->bssid));
+			list_add_tail(&target->list,
+				      &priv->ieee->network_free_list);
+		}
+
 		element = priv->ieee->network_free_list.next;
 		network = list_entry(element, struct ieee80211_network, list);
 		ipw_adhoc_create(priv, network);
@@ -10350,9 +10373,7 @@ static int ipw_tx_skb(struct ipw_priv *priv, struct ieee80211_txb *txb,
 					 remaining_bytes,
 					 PCI_DMA_TODEVICE));
 
-			tfd->u.data.num_chunks =
-			    cpu_to_le32(le32_to_cpu(tfd->u.data.num_chunks) +
-					1);
+			le32_add_cpu(&tfd->u.data.num_chunks, 1);
 		}
 	}
 
@@ -11586,6 +11607,7 @@ static int ipw_prom_alloc(struct ipw_priv *priv)
 	priv->prom_net_dev->hard_start_xmit = ipw_prom_hard_start_xmit;
 
 	priv->prom_priv->ieee->iw_mode = IW_MODE_MONITOR;
+	SET_NETDEV_DEV(priv->prom_net_dev, &priv->pci_dev->dev);
 
 	rc = register_netdev(priv->prom_net_dev);
 	if (rc) {

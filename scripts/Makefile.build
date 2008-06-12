@@ -27,12 +27,12 @@ ccflags-y  :=
 cppflags-y :=
 ldflags-y  :=
 
-# Read .config if it exist, otherwise ignore
+# Read auto.conf if it exists, otherwise ignore
 -include include/config/auto.conf
 
 include scripts/Kbuild.include
 
-# For backward compatibility check that these variables does not change
+# For backward compatibility check that these variables do not change
 save-cflags := $(CFLAGS)
 
 # The filename Kbuild has precedence over Makefile
@@ -55,7 +55,7 @@ hostprogs-y += $(host-progs)
 endif
 endif
 
-# Do not include host rules unles needed
+# Do not include host rules unless needed
 ifneq ($(hostprogs-y)$(hostprogs-m),)
 include scripts/Makefile.host
 endif
@@ -71,20 +71,6 @@ endif
 
 ifndef obj
 $(warning kbuild: Makefile.build is included improperly)
-endif
-
-ifeq ($(CONFIG_XEN),y)
-$(objtree)/scripts/Makefile.xen: $(srctree)/scripts/Makefile.xen.awk $(srctree)/scripts/Makefile.build
-	@echo '  Updating $@'
-	$(if $(shell echo a | $(AWK) '{ print gensub(/a/, "AA", "g"); }'),\
-        ,$(error 'Your awk program does not define gensub.  Use gawk or another awk with gensub'))
-	@$(AWK) -f $< $(filter-out $<,$^) >$@
-
-xen-src-single-used-m	:= $(patsubst $(srctree)/%,%,$(wildcard $(addprefix $(srctree)/,$(single-used-m:.o=-xen.c))))
-xen-single-used-m	:= $(xen-src-single-used-m:-xen.c=.o)
-single-used-m		:= $(filter-out $(xen-single-used-m),$(single-used-m))
-
--include $(objtree)/scripts/Makefile.xen
 endif
 
 # ===========================================================================

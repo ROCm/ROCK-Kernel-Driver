@@ -3,12 +3,12 @@
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
@@ -43,7 +43,7 @@ extern struct xencomm_handle *__xencomm_map_no_alloc(void *ptr,
 #define XENCOMM_MINI_ALIGNED(xc_desc, n)				\
 	struct xencomm_mini xc_desc ## _base[(n)]			\
 	__attribute__((__aligned__(sizeof(struct xencomm_mini))));	\
-	struct xencomm_mini* xc_desc = &xc_desc ## _base[0];
+	struct xencomm_mini *xc_desc = &xc_desc ## _base[0];
 #else
 /*
  * gcc bug workaround:
@@ -54,15 +54,15 @@ extern struct xencomm_handle *__xencomm_map_no_alloc(void *ptr,
 #define XENCOMM_MINI_ALIGNED(xc_desc, n)				\
 	unsigned char xc_desc ## _base[((n) + 1 ) *			\
 				       sizeof(struct xencomm_mini)];	\
-	struct xencomm_mini *xc_desc = (struct xencomm_mini*)		\
+	struct xencomm_mini *xc_desc = (struct xencomm_mini *)		\
 		((unsigned long)xc_desc ## _base +			\
 		 (sizeof(struct xencomm_mini) -				\
 		  ((unsigned long)xc_desc ## _base) %			\
 		  sizeof(struct xencomm_mini)));
 #endif
 #define xencomm_map_no_alloc(ptr, bytes)			\
-	({XENCOMM_MINI_ALIGNED(xc_desc, 1);			\
-		__xencomm_map_no_alloc(ptr, bytes, xc_desc);})
+	({ XENCOMM_MINI_ALIGNED(xc_desc, 1);			\
+		__xencomm_map_no_alloc(ptr, bytes, xc_desc); })
 
 /* provided by architecture code: */
 extern unsigned long xencomm_vtop(unsigned long vaddr);

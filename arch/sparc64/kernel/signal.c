@@ -1,4 +1,4 @@
-/*  $Id: signal.c,v 1.60 2002/02/09 19:49:31 davem Exp $
+/*
  *  arch/sparc64/kernel/signal.c
  *
  *  Copyright (C) 1991, 1992  Linus Torvalds
@@ -8,7 +8,7 @@
  *  Copyright (C) 1997,1998 Jakub Jelinek   (jj@sunsite.mff.cuni.cz)
  */
 
-#ifdef CONFIG_SPARC32_COMPAT
+#ifdef CONFIG_COMPAT
 #include <linux/compat.h>	/* for compat_old_sigset_t */
 #endif
 #include <linux/sched.h>
@@ -25,7 +25,6 @@
 
 #include <asm/uaccess.h>
 #include <asm/ptrace.h>
-#include <asm/svr4.h>
 #include <asm/pgtable.h>
 #include <asm/fpumacro.h>
 #include <asm/uctx.h>
@@ -237,9 +236,6 @@ struct rt_signal_frame {
 	__siginfo_fpu_t		fpu_state;
 };
 
-/* Align macros */
-#define RT_ALIGNEDSZ  (((sizeof(struct rt_signal_frame) + 7) & (~7)))
-
 static long _sigpause_common(old_sigset_t set)
 {
 	set &= _BLOCKABLE;
@@ -251,7 +247,9 @@ static long _sigpause_common(old_sigset_t set)
 
 	current->state = TASK_INTERRUPTIBLE;
 	schedule();
-	set_thread_flag(TIF_RESTORE_SIGMASK);
+
+	set_restore_sigmask();
+
 	return -ERESTARTNOHAND;
 }
 
@@ -417,7 +415,7 @@ setup_rt_frame(struct k_sigaction *ka, struct pt_regs *regs,
 	synchronize_user_stack();
 	save_and_clear_fpu();
 	
-	sigframe_size = RT_ALIGNEDSZ;
+	sigframe_size = sizeof(struct rt_signal_frame);
 	if (!(current_thread_info()->fpsaved[0] & FPRS_FEF))
 		sigframe_size -= sizeof(__siginfo_fpu_t);
 
@@ -527,7 +525,7 @@ static inline void syscall_restart(unsigned long orig_i0, struct pt_regs *regs,
  * want to handle. Thus you cannot kill init even with a SIGKILL even by
  * mistake.
  */
-static void do_signal(struct pt_regs *regs, unsigned long orig_i0, int __ignored)
+static void do_signal(struct pt_regs *regs, unsigned long orig_i0)
 {
 	struct k_sigaction ka;
 	int restart_syscall;
@@ -535,18 +533,18 @@ static void do_signal(struct pt_regs *regs, unsigned long orig_i0, int __ignored
 	siginfo_t info;
 	int signr;
 	
- 	if (pt_regs_is_syscall(regs) &&
- 	    (regs->tstate & (TSTATE_XCARRY | TSTATE_ICARRY))) {
- 		restart_syscall = 1;
- 	} else
- 		restart_syscall = 0;
+	if (pt_regs_is_syscall(regs) &&
+	    (regs->tstate & (TSTATE_XCARRY | TSTATE_ICARRY))) {
+		restart_syscall = 1;
+	} else
+		restart_syscall = 0;
 
-	if (test_thread_flag(TIF_RESTORE_SIGMASK))
+	if (current_thread_info()->status & TS_RESTORE_SIGMASK)
 		oldset = &current->saved_sigmask;
 	else
 		oldset = &current->blocked;
 
-#ifdef CONFIG_SPARC32_COMPAT
+#ifdef CONFIG_COMPAT
 	if (test_thread_flag(TIF_32BIT)) {
 		extern void do_signal32(sigset_t *, struct pt_regs *,
 					int restart_syscall,
@@ -570,13 +568,12 @@ static void do_signal(struct pt_regs *regs, unsigned long orig_i0, int __ignored
 			syscall_restart(orig_i0, regs, &ka.sa);
 		handle_signal(signr, &ka, &info, oldset, regs);
 
-		/* a signal was successfully delivered; the saved
+		/* A signal was successfully delivered; the saved
 		 * sigmask will have been stored in the signal frame,
 		 * and will be restored by sigreturn, so we can simply
-		 * clear the TIF_RESTORE_SIGMASK flag.
+		 * clear the TS_RESTORE_SIGMASK flag.
 		 */
-		if (test_thread_flag(TIF_RESTORE_SIGMASK))
-			clear_thread_flag(TIF_RESTORE_SIGMASK);
+		current_thread_info()->status &= ~TS_RESTORE_SIGMASK;
 		return;
 	}
 	if (restart_syscall &&
@@ -595,18 +592,17 @@ static void do_signal(struct pt_regs *regs, unsigned long orig_i0, int __ignored
 		regs->tnpc -= 4;
 	}
 
-	/* if there's no signal to deliver, we just put the saved sigmask
+	/* If there's no signal to deliver, we just put the saved sigmask
 	 * back
 	 */
-	if (test_thread_flag(TIF_RESTORE_SIGMASK)) {
-		clear_thread_flag(TIF_RESTORE_SIGMASK);
+	if (current_thread_info()->status & TS_RESTORE_SIGMASK) {
+		current_thread_info()->status &= ~TS_RESTORE_SIGMASK;
 		sigprocmask(SIG_SETMASK, &current->saved_sigmask, NULL);
 	}
 }
 
-void do_notify_resume(struct pt_regs *regs, unsigned long orig_i0, int restart_syscall,
-		      unsigned long thread_info_flags)
+void do_notify_resume(struct pt_regs *regs, unsigned long orig_i0, unsigned long thread_info_flags)
 {
-	if (thread_info_flags & (_TIF_SIGPENDING | _TIF_RESTORE_SIGMASK))
-		do_signal(regs, orig_i0, restart_syscall);
+	if (thread_info_flags & _TIF_SIGPENDING)
+		do_signal(regs, orig_i0);
 }

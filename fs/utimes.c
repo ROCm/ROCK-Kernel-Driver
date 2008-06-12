@@ -2,6 +2,7 @@
 #include <linux/file.h>
 #include <linux/fs.h>
 #include <linux/linkage.h>
+#include <linux/mount.h>
 #include <linux/namei.h>
 #include <linux/sched.h>
 #include <linux/stat.h>
@@ -60,10 +61,11 @@ long do_utimes(int dfd, char __user *filename, struct timespec *times, int flags
 {
 	int error;
 	struct nameidata nd;
-	struct path path;
+	struct dentry *dentry;
 	struct inode *inode;
 	struct iattr newattrs;
 	struct file *f = NULL;
+	struct vfsmount *mnt;
 
 	error = -EINVAL;
 	if (times && (!nsec_valid(times[0].tv_nsec) ||
@@ -83,20 +85,21 @@ long do_utimes(int dfd, char __user *filename, struct timespec *times, int flags
 		f = fget(dfd);
 		if (!f)
 			goto out;
-		path = f->f_path;
+		dentry = f->f_path.dentry;
+		mnt = f->f_path.mnt;
 	} else {
 		error = __user_walk_fd(dfd, filename, (flags & AT_SYMLINK_NOFOLLOW) ? 0 : LOOKUP_FOLLOW, &nd);
 		if (error)
 			goto out;
 
-		path.dentry = nd.path.dentry;
-		path.mnt = nd.path.mnt;
+		dentry = nd.path.dentry;
+		mnt = nd.path.mnt;
 	}
 
-	inode = path.dentry->d_inode;
+	inode = dentry->d_inode;
 
-	error = -EROFS;
-	if (IS_RDONLY(inode))
+	error = mnt_want_write(mnt);
+	if (error)
 		goto dput_and_out;
 
 	/* Don't worry, the checks are done in inode_change_ok() */
@@ -104,7 +107,7 @@ long do_utimes(int dfd, char __user *filename, struct timespec *times, int flags
 	if (times) {
 		error = -EPERM;
                 if (IS_APPEND(inode) || IS_IMMUTABLE(inode))
-                        goto dput_and_out;
+			goto mnt_drop_write_and_out;
 
 		if (times[0].tv_nsec == UTIME_OMIT)
 			newattrs.ia_valid &= ~ATTR_ATIME;
@@ -132,22 +135,24 @@ long do_utimes(int dfd, char __user *filename, struct timespec *times, int flags
 		       nsec_special(times[1].tv_nsec))) {
 		error = -EACCES;
                 if (IS_IMMUTABLE(inode))
-                        goto dput_and_out;
+			goto mnt_drop_write_and_out;
 
 		if (!is_owner_or_cap(inode)) {
 			if (f) {
 				if (!(f->f_mode & FMODE_WRITE))
-					goto dput_and_out;
+					goto mnt_drop_write_and_out;
 			} else {
 				error = vfs_permission(&nd, MAY_WRITE);
 				if (error)
-					goto dput_and_out;
+					goto mnt_drop_write_and_out;
 			}
 		}
 	}
 	mutex_lock(&inode->i_mutex);
-	error = fnotify_change(path.dentry, path.mnt, &newattrs, f);
+	error = fnotify_change(dentry, mnt, &newattrs, f);
 	mutex_unlock(&inode->i_mutex);
+mnt_drop_write_and_out:
+	mnt_drop_write(mnt);
 dput_and_out:
 	if (f)
 		fput(f);

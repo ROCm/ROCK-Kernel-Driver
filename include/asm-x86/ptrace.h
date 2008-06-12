@@ -59,23 +59,23 @@ struct pt_regs {
 #else /* __KERNEL__ */
 
 struct pt_regs {
-	long bx;
-	long cx;
-	long dx;
-	long si;
-	long di;
-	long bp;
-	long ax;
-	int  ds;
-	int  es;
-	int  fs;
+	unsigned long bx;
+	unsigned long cx;
+	unsigned long dx;
+	unsigned long si;
+	unsigned long di;
+	unsigned long bp;
+	unsigned long ax;
+	unsigned long ds;
+	unsigned long es;
+	unsigned long fs;
 	/* int  gs; */
-	long orig_ax;
-	long ip;
-	int  cs;
-	long flags;
-	long sp;
-	int  ss;
+	unsigned long orig_ax;
+	unsigned long ip;
+	unsigned long cs;
+	unsigned long flags;
+	unsigned long sp;
+	unsigned long ss;
 };
 
 #include <asm/vm86.h>
@@ -163,12 +163,16 @@ extern unsigned long
 convert_ip_to_linear(struct task_struct *child, struct pt_regs *regs);
 
 #ifdef CONFIG_X86_32
-extern void send_sigtrap(struct task_struct *tsk, struct pt_regs *regs, int error_code);
+extern void send_sigtrap(struct task_struct *tsk, struct pt_regs *regs,
+			 int error_code);
 #else
 void signal_fault(struct pt_regs *regs, void __user *frame, char *where);
 #endif
 
-#define regs_return_value(regs) ((regs)->ax)
+static inline unsigned long regs_return_value(struct pt_regs *regs)
+{
+	return regs->ax;
+}
 
 /*
  * user_mode_vm(regs) determines whether a register set came from user mode.
@@ -189,8 +193,8 @@ static inline int user_mode(struct pt_regs *regs)
 static inline int user_mode_vm(struct pt_regs *regs)
 {
 #ifdef CONFIG_X86_32
-	return ((regs->cs & SEGMENT_RPL_MASK) |
-		(regs->flags & VM_MASK)) >= USER_RPL;
+	return ((regs->cs & SEGMENT_RPL_MASK) | (regs->flags & X86_VM_MASK)) >=
+		USER_RPL;
 #else
 	return user_mode(regs);
 #endif
@@ -199,7 +203,7 @@ static inline int user_mode_vm(struct pt_regs *regs)
 static inline int v8086_mode(struct pt_regs *regs)
 {
 #ifdef CONFIG_X86_32
-	return (regs->flags & VM_MASK);
+	return (regs->flags & X86_VM_MASK);
 #else
 	return 0;	/* No V86 mode support in long mode */
 #endif
@@ -238,9 +242,7 @@ extern void user_enable_single_step(struct task_struct *);
 extern void user_disable_single_step(struct task_struct *);
 
 extern void user_enable_block_step(struct task_struct *);
-#if defined(CONFIG_XEN)
-#define arch_has_block_step()	(0)
-#elif defined(CONFIG_X86_DEBUGCTLMSR)
+#ifdef CONFIG_X86_DEBUGCTLMSR
 #define arch_has_block_step()	(1)
 #else
 #define arch_has_block_step()	(boot_cpu_data.x86 >= 6)
@@ -251,6 +253,8 @@ extern int do_get_thread_area(struct task_struct *p, int idx,
 			      struct user_desc __user *info);
 extern int do_set_thread_area(struct task_struct *p, int idx,
 			      struct user_desc __user *info, int can_allocate);
+
+#define __ARCH_WANT_COMPAT_SYS_PTRACE
 
 #endif /* __KERNEL__ */
 

@@ -48,7 +48,6 @@
 #include <net/checksum.h>
 #include <linux/smp_lock.h>
 #include <linux/stat.h>
-#include <asm/semaphore.h>
 #include <linux/quotaops.h>
 
 #define PRIVROOT_NAME ".reiserfs_priv"

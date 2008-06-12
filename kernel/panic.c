@@ -165,6 +165,8 @@ EXPORT_SYMBOL(panic);
  *  'M' - System experienced a machine check exception.
  *  'B' - System has hit bad_page.
  *  'U' - Userspace-defined naughtiness.
+ *  'A' - ACPI table overridden.
+ *  'W' - Taint on warning.
  *  'N' - Unsuported modules loaded.
  *  'X' - Modules with external support loaded.
  *
@@ -175,7 +177,7 @@ const char *print_tainted(void)
 {
 	static char buf[20];
 	if (tainted) {
-		snprintf(buf, sizeof(buf), "Tainted: %c%c%c%c%c%c%c%c%c%c",
+		snprintf(buf, sizeof(buf), "Tainted: %c%c%c%c%c%c%c%c%c%c%c",
 			tainted & TAINT_PROPRIETARY_MODULE ? 'P' : 'G',
 			tainted & TAINT_FORCED_MODULE ? 'F' : ' ',
 			tainted & TAINT_UNSAFE_SMP ? 'S' : ' ',
@@ -185,6 +187,7 @@ const char *print_tainted(void)
 			tainted & TAINT_USER ? 'U' : ' ',
 			tainted & TAINT_DIE ? 'D' : ' ',
 			tainted & TAINT_OVERRIDDEN_ACPI_TABLE ? 'A' : ' ',
+			tainted & TAINT_WARN ? 'W' : ' ',
 			tainted & TAINT_NO_SUPPORT ? 'N' :
 				(tainted & TAINT_EXTERNAL_SUPPORT ? 'X' : ' '));
 	}
@@ -328,6 +331,7 @@ void warn_on_slowpath(const char *file, int line)
 	print_modules();
 	dump_stack();
 	print_oops_end_marker();
+	add_taint(TAINT_WARN);
 }
 EXPORT_SYMBOL(warn_on_slowpath);
 #endif

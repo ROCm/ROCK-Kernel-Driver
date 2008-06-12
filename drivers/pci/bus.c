@@ -17,8 +17,6 @@
 
 #include "pci.h"
 
-extern int pci_mem_align;
-
 /**
  * pci_bus_alloc_resource - allocate a resource from a parent bus
  * @bus: PCI bus
@@ -45,13 +43,6 @@ pci_bus_alloc_resource(struct pci_bus *bus, struct resource *res,
 	int i, ret = -ENOMEM;
 
 	type_mask |= IORESOURCE_IO | IORESOURCE_MEM;
-
-#ifdef CONFIG_XEN
-	/* If the boot parameter 'pci-mem-align' was specified then we need to 
-	   align the memory addresses, at page size alignment. */
-	if (pci_mem_align && (align < (PAGE_SIZE-1)))
-		align = PAGE_SIZE - 1;
-#endif
 
 	for (i = 0; i < PCI_BUS_NUM_RESOURCES; i++) {
 		struct resource *r = bus->resource[i];
@@ -93,10 +84,7 @@ int pci_bus_add_device(struct pci_dev *dev)
 	if (retval)
 		return retval;
 
-	down_write(&pci_bus_sem);
-	list_add_tail(&dev->global_list, &pci_devices);
-	up_write(&pci_bus_sem);
-
+	dev->is_added = 1;
 	pci_proc_attach_device(dev);
 	pci_create_sysfs_dev_files(dev);
 	return 0;
@@ -121,11 +109,8 @@ void pci_bus_add_devices(struct pci_bus *bus)
 	int retval;
 
 	list_for_each_entry(dev, &bus->devices, bus_list) {
-		/*
-		 * Skip already-present devices (which are on the
-		 * global device list.)
-		 */
-		if (!list_empty(&dev->global_list))
+		/* Skip already-added devices */
+		if (dev->is_added)
 			continue;
 		retval = pci_bus_add_device(dev);
 		if (retval)
@@ -133,8 +118,7 @@ void pci_bus_add_devices(struct pci_bus *bus)
 	}
 
 	list_for_each_entry(dev, &bus->devices, bus_list) {
-
-		BUG_ON(list_empty(&dev->global_list));
+		BUG_ON(!dev->is_added);
 
 		/*
 		 * If there is an unattached subordinate bus, attach

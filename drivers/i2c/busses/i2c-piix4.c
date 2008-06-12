@@ -38,7 +38,6 @@
 #include <linux/ioport.h>
 #include <linux/i2c.h>
 #include <linux/init.h>
-#include <linux/apm_bios.h>
 #include <linux/dmi.h>
 #include <linux/acpi.h>
 #include <asm/io.h>
@@ -106,6 +105,7 @@ MODULE_PARM_DESC(force_addr,
 static int piix4_transaction(void);
 
 static unsigned short piix4_smba;
+static int srvrworks_csb5_delay;
 static struct pci_driver piix4_driver;
 static struct i2c_adapter piix4_adapter;
 
@@ -143,6 +143,10 @@ static int __devinit piix4_setup(struct pci_dev *PIIX4_dev,
 	unsigned char temp;
 
 	dev_info(&PIIX4_dev->dev, "Found %s device\n", pci_name(PIIX4_dev));
+
+	if ((PIIX4_dev->vendor == PCI_VENDOR_ID_SERVERWORKS) &&
+	    (PIIX4_dev->device == PCI_DEVICE_ID_SERVERWORKS_CSB5))
+		srvrworks_csb5_delay = 1;
 
 	/* On some motherboards, it was reported that accessing the SMBus
 	   caused severe hardware problems */
@@ -255,7 +259,7 @@ static int piix4_transaction(void)
 			dev_err(&piix4_adapter.dev, "Failed! (%02x)\n", temp);
 			return -1;
 		} else {
-			dev_dbg(&piix4_adapter.dev, "Successfull!\n");
+			dev_dbg(&piix4_adapter.dev, "Successful!\n");
 		}
 	}
 
@@ -263,10 +267,14 @@ static int piix4_transaction(void)
 	outb_p(inb(SMBHSTCNT) | 0x040, SMBHSTCNT);
 
 	/* We will always wait for a fraction of a second! (See PIIX4 docs errata) */
-	do {
+	if (srvrworks_csb5_delay) /* Extra delay for SERVERWORKS_CSB5 */
+		msleep(2);
+	else
 		msleep(1);
-		temp = inb_p(SMBHSTSTS);
-	} while ((temp & 0x01) && (timeout++ < MAX_TIMEOUT));
+
+	while ((timeout++ < MAX_TIMEOUT) &&
+	       ((temp = inb_p(SMBHSTSTS)) & 0x01))
+		msleep(1);
 
 	/* If the SMBus is still busy, we give up */
 	if (timeout >= MAX_TIMEOUT) {
@@ -375,12 +383,7 @@ static s32 piix4_access(struct i2c_adapter * adap, u16 addr,
 
 
 	switch (size) {
-	case PIIX4_BYTE:	/* Where is the result put? I assume here it is in
-				   SMBHSTDAT0 but it might just as well be in the
-				   SMBHSTCMD. No clue in the docs */
-
-		data->byte = inb_p(SMBHSTDAT0);
-		break;
+	case PIIX4_BYTE:
 	case PIIX4_BYTE_DATA:
 		data->byte = inb_p(SMBHSTDAT0);
 		break;

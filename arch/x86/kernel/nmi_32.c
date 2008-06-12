@@ -22,16 +22,15 @@
 #include <linux/cpumask.h>
 #include <linux/kernel_stat.h>
 #include <linux/kdebug.h>
+#include <linux/slab.h>
 
 #include <asm/smp.h>
 #include <asm/nmi.h>
+#include <asm/timer.h>
 
 #include "mach_traps.h"
 
-extern void die_nmi(struct pt_regs *, const char *msg);
-
-#ifndef CONFIG_XEN
-
+int unknown_nmi_panic;
 int nmi_watchdog_enabled;
 
 static cpumask_t backtrace_mask = CPU_MASK_NONE;
@@ -70,7 +69,7 @@ static __init void nmi_cpu_busy(void *data)
 }
 #endif
 
-static int __init check_nmi_watchdog(void)
+int __init check_nmi_watchdog(void)
 {
 	unsigned int *prev_nmi_count;
 	int cpu;
@@ -83,7 +82,7 @@ static int __init check_nmi_watchdog(void)
 
 	prev_nmi_count = kmalloc(NR_CPUS * sizeof(int), GFP_KERNEL);
 	if (!prev_nmi_count)
-		return -1;
+		goto error;
 
 	printk(KERN_INFO "Testing NMI watchdog ... ");
 
@@ -120,7 +119,7 @@ static int __init check_nmi_watchdog(void)
 	if (!atomic_read(&nmi_active)) {
 		kfree(prev_nmi_count);
 		atomic_set(&nmi_active, -1);
-		return -1;
+		goto error;
 	}
 	printk("OK.\n");
 
@@ -131,9 +130,11 @@ static int __init check_nmi_watchdog(void)
 
 	kfree(prev_nmi_count);
 	return 0;
+error:
+	timer_ack = !cpu_has_tsc;
+
+	return -1;
 }
-/* This needs to happen later in boot so counters are working */
-late_initcall(check_nmi_watchdog);
 
 static int __init setup_nmi_watchdog(char *str)
 {
@@ -318,7 +319,10 @@ void touch_nmi_watchdog(void)
 }
 EXPORT_SYMBOL(touch_nmi_watchdog);
 
-__kprobes int nmi_watchdog_tick(struct pt_regs * regs, unsigned reason)
+extern void die_nmi(struct pt_regs *, const char *msg);
+
+notrace __kprobes int
+nmi_watchdog_tick(struct pt_regs *regs, unsigned reason)
 {
 
 	/*
@@ -389,11 +393,7 @@ __kprobes int nmi_watchdog_tick(struct pt_regs * regs, unsigned reason)
 	return rc;
 }
 
-#endif /* CONFIG_XEN */
-
 #ifdef CONFIG_SYSCTL
-
-int unknown_nmi_panic;
 
 static int unknown_nmi_panic_callback(struct pt_regs *regs, int cpu)
 {
@@ -405,7 +405,6 @@ static int unknown_nmi_panic_callback(struct pt_regs *regs, int cpu)
 	return 0;
 }
 
-#ifndef CONFIG_XEN
 /*
  * proc handler for /proc/sys/kernel/nmi
  */
@@ -444,7 +443,6 @@ int proc_nmi_enabled(struct ctl_table *table, int write, struct file *file,
 	}
 	return 0;
 }
-#endif
 
 #endif
 
@@ -457,7 +455,6 @@ int do_nmi_callback(struct pt_regs *regs, int cpu)
 	return 0;
 }
 
-#ifndef CONFIG_XEN
 void __trigger_all_cpu_backtrace(void)
 {
 	int i;
@@ -473,4 +470,3 @@ void __trigger_all_cpu_backtrace(void)
 
 EXPORT_SYMBOL(nmi_active);
 EXPORT_SYMBOL(nmi_watchdog);
-#endif

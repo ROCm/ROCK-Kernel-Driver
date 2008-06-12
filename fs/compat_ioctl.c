@@ -114,13 +114,6 @@
 #include <asm/fbio.h>
 #endif
 
-#ifdef CONFIG_XEN
-#include <xen/interface/xen.h>
-#include <xen/public/evtchn.h>
-#include <xen/public/privcmd.h>
-#include <xen/compat_ioctl.h>
-#endif
-
 static int do_ioctl32_pointer(unsigned int fd, unsigned int cmd,
 			      unsigned long arg, struct file *f)
 {
@@ -1053,14 +1046,14 @@ static int vt_check(struct file *file)
 	struct inode *inode = file->f_path.dentry->d_inode;
 	struct vc_data *vc;
 	
-	if (file->f_op->ioctl != tty_ioctl)
+	if (file->f_op->unlocked_ioctl != tty_ioctl)
 		return -EINVAL;
 	                
 	tty = (struct tty_struct *)file->private_data;
 	if (tty_paranoia_check(tty, inode, "tty_ioctl"))
 		return -EINVAL;
 	                                                
-	if (tty->driver->ioctl != vt_ioctl)
+	if (tty->ops->ioctl != vt_ioctl)
 		return -EINVAL;
 
 	vc = (struct vc_data *)tty->driver_data;
@@ -2840,18 +2833,6 @@ IGNORE_IOCTL(FBIOPUTCMAP32)
 IGNORE_IOCTL(FBIOGETCMAP32)
 IGNORE_IOCTL(FBIOSCURSOR32)
 IGNORE_IOCTL(FBIOGCURSOR32)
-#endif
-
-#ifdef CONFIG_XEN
-HANDLE_IOCTL(IOCTL_PRIVCMD_MMAP_32, privcmd_ioctl_32)
-HANDLE_IOCTL(IOCTL_PRIVCMD_MMAPBATCH_32, privcmd_ioctl_32)
-COMPATIBLE_IOCTL(IOCTL_PRIVCMD_HYPERCALL)
-COMPATIBLE_IOCTL(IOCTL_EVTCHN_BIND_VIRQ)
-COMPATIBLE_IOCTL(IOCTL_EVTCHN_BIND_INTERDOMAIN)
-COMPATIBLE_IOCTL(IOCTL_EVTCHN_BIND_UNBOUND_PORT)
-COMPATIBLE_IOCTL(IOCTL_EVTCHN_UNBIND)
-COMPATIBLE_IOCTL(IOCTL_EVTCHN_NOTIFY)
-COMPATIBLE_IOCTL(IOCTL_EVTCHN_RESET)
 #endif
 };
 

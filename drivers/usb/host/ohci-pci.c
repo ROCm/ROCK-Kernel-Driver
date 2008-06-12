@@ -311,9 +311,8 @@ static const struct hc_driver ohci_pci_hc_driver = {
 	.shutdown =		ohci_shutdown,
 
 #ifdef	CONFIG_PM
-	/* these suspend/resume entries are for upstream PCI glue ONLY */
-	.suspend =		ohci_pci_suspend,
-	.resume =		ohci_pci_resume,
+	.pci_suspend =		ohci_pci_suspend,
+	.pci_resume =		ohci_pci_resume,
 #endif
 
 	/*
@@ -333,7 +332,6 @@ static const struct hc_driver ohci_pci_hc_driver = {
 	 */
 	.hub_status_data =	ohci_hub_status_data,
 	.hub_control =		ohci_hub_control,
-	.hub_irq_enable =	ohci_rhsc_enable,
 #ifdef	CONFIG_PM
 	.bus_suspend =		ohci_bus_suspend,
 	.bus_resume =		ohci_bus_resume,

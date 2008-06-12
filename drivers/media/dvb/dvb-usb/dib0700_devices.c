@@ -111,8 +111,8 @@ static int bristol_tuner_attach(struct dvb_usb_adapter *adap)
 	struct i2c_adapter *tun_i2c = dib3000mc_get_tuner_i2c_master(adap->fe, 1);
 	s8 a;
 	int if1=1220;
-	if (adap->dev->udev->descriptor.idVendor  == USB_VID_HAUPPAUGE &&
-		adap->dev->udev->descriptor.idProduct == USB_PID_HAUPPAUGE_NOVA_T_500_2) {
+	if (adap->dev->udev->descriptor.idVendor  == cpu_to_le16(USB_VID_HAUPPAUGE) &&
+		adap->dev->udev->descriptor.idProduct == cpu_to_le16(USB_PID_HAUPPAUGE_NOVA_T_500_2)) {
 		if (!eeprom_read(prim_i2c,0x59 + adap->id,&a)) if1=1220+a;
 	}
 	return dvb_attach(mt2060_attach,adap->fe, tun_i2c,&bristol_mt2060_config[adap->id],
@@ -299,7 +299,7 @@ static int stk7700d_tuner_attach(struct dvb_usb_adapter *adap)
 }
 
 /* STK7700-PH: Digital/Analog Hybrid Tuner, e.h. Cinergy HT USB HE */
-struct dibx000_agc_config xc3028_agc_config = {
+static struct dibx000_agc_config xc3028_agc_config = {
 	BAND_VHF | BAND_UHF,       /* band_caps */
 
 	/* P_agc_use_sd_mod1=0, P_agc_use_sd_mod2=0, P_agc_freq_pwm_div=0,
@@ -342,7 +342,7 @@ struct dibx000_agc_config xc3028_agc_config = {
 };
 
 /* PLL Configuration for COFDM BW_MHz = 8.00 with external clock = 30.00 */
-struct dibx000_bandwidth_config xc3028_bw_config = {
+static struct dibx000_bandwidth_config xc3028_bw_config = {
 	60000, 30000, /* internal, sampling */
 	1, 8, 3, 1, 0, /* pll_cfg: prediv, ratio, range, reset, bypass */
 	0, 0, 1, 1, 0, /* misc: refdiv, bypclk_div, IO_CLK_en_core, ADClkSrc,
@@ -402,8 +402,8 @@ static int stk7700ph_frontend_attach(struct dvb_usb_adapter *adap)
 {
 	struct usb_device_descriptor *desc = &adap->dev->udev->descriptor;
 
-	if (desc->idVendor  == USB_VID_PINNACLE &&
-	    desc->idProduct == USB_PID_PINNACLE_EXPRESSCARD_320CX)
+	if (desc->idVendor  == cpu_to_le16(USB_VID_PINNACLE) &&
+	    desc->idProduct == cpu_to_le16(USB_PID_PINNACLE_EXPRESSCARD_320CX))
 	dib0700_set_gpio(adap->dev, GPIO6, GPIO_OUT, 0);
 	else
 	dib0700_set_gpio(adap->dev, GPIO6, GPIO_OUT, 1);
@@ -445,6 +445,9 @@ static int stk7700ph_tuner_attach(struct dvb_usb_adapter *adap)
 
 static u8 rc_request[] = { REQUEST_POLL_RC, 0 };
 
+/* Number of keypresses to ignore before start repeating */
+#define RC_REPEAT_DELAY 2
+
 static int dib0700_rc_query(struct dvb_usb_device *d, u32 *event, int *state)
 {
 	u8 key[4];
@@ -458,18 +461,67 @@ static int dib0700_rc_query(struct dvb_usb_device *d, u32 *event, int *state)
 		err("RC Query Failed");
 		return -1;
 	}
+
+	/* losing half of KEY_0 events from Philipps rc5 remotes.. */
 	if (key[0]==0 && key[1]==0 && key[2]==0 && key[3]==0) return 0;
-	if (key[3-1]!=st->rc_toggle) {
+
+	/* info("%d: %2X %2X %2X %2X",dvb_usb_dib0700_ir_proto,(int)key[3-2],(int)key[3-3],(int)key[3-1],(int)key[3]);  */
+
+	dib0700_rc_setup(d); /* reset ir sensor data to prevent false events */
+
+	switch (dvb_usb_dib0700_ir_proto) {
+	case 0: {
+		/* NEC protocol sends repeat code as 0 0 0 FF */
+		if ((key[3-2] == 0x00) && (key[3-3] == 0x00) &&
+		    (key[3] == 0xFF)) {
+			st->rc_counter++;
+			if (st->rc_counter > RC_REPEAT_DELAY) {
+				*event = d->last_event;
+				*state = REMOTE_KEY_PRESSED;
+				st->rc_counter = RC_REPEAT_DELAY;
+			}
+			return 0;
+		}
 		for (i=0;i<d->props.rc_key_map_size; i++) {
 			if (keymap[i].custom == key[3-2] && keymap[i].data == key[3-3]) {
+				st->rc_counter = 0;
 				*event = keymap[i].event;
 				*state = REMOTE_KEY_PRESSED;
-				st->rc_toggle=key[3-1];
+				d->last_event = keymap[i].event;
 				return 0;
 			}
 		}
-		err("Unknown remote controller key : %2X %2X",(int)key[3-2],(int)key[3-3]);
+		break;
 	}
+	default: {
+		/* RC-5 protocol changes toggle bit on new keypress */
+		for (i = 0; i < d->props.rc_key_map_size; i++) {
+			if (keymap[i].custom == key[3-2] && keymap[i].data == key[3-3]) {
+				if (d->last_event == keymap[i].event &&
+					key[3-1] == st->rc_toggle) {
+					st->rc_counter++;
+					/* prevents unwanted double hits */
+					if (st->rc_counter > RC_REPEAT_DELAY) {
+						*event = d->last_event;
+						*state = REMOTE_KEY_PRESSED;
+						st->rc_counter = RC_REPEAT_DELAY;
+					}
+
+					return 0;
+				}
+				st->rc_counter = 0;
+				*event = keymap[i].event;
+				*state = REMOTE_KEY_PRESSED;
+				st->rc_toggle = key[3-1];
+				d->last_event = keymap[i].event;
+				return 0;
+			}
+		}
+		break;
+	}
+	}
+	err("Unknown remote controller key: %2X %2X %2X %2X", (int) key[3-2], (int) key[3-3], (int) key[3-1], (int) key[3]);
+	d->last_event = 0;
 	return 0;
 }
 
@@ -793,8 +845,8 @@ static int stk7700p_tuner_attach(struct dvb_usb_adapter *adap)
 	struct i2c_adapter *tun_i2c;
 	s8 a;
 	int if1=1220;
-	if (adap->dev->udev->descriptor.idVendor  == USB_VID_HAUPPAUGE &&
-		adap->dev->udev->descriptor.idProduct == USB_PID_HAUPPAUGE_NOVA_T_STICK) {
+	if (adap->dev->udev->descriptor.idVendor  == cpu_to_le16(USB_VID_HAUPPAUGE) &&
+		adap->dev->udev->descriptor.idProduct == cpu_to_le16(USB_PID_HAUPPAUGE_NOVA_T_STICK)) {
 		if (!eeprom_read(prim_i2c,0x58,&a)) if1=1220+a;
 	}
 	if (st->is_dib7000pc)
@@ -938,11 +990,12 @@ static struct dib7000p_config dib7070p_dib7000p_config = {
 /* STK7070P */
 static int stk7070p_frontend_attach(struct dvb_usb_adapter *adap)
 {
-	if (adap->dev->udev->descriptor.idVendor  == USB_VID_PINNACLE &&
-	adap->dev->udev->descriptor.idProduct == USB_PID_PINNACLE_PCTV72E)
-	dib0700_set_gpio(adap->dev, GPIO6, GPIO_OUT, 0);
+	struct usb_device_descriptor *p = &adap->dev->udev->descriptor;
+	if (p->idVendor  == cpu_to_le16(USB_VID_PINNACLE) &&
+	    p->idProduct == cpu_to_le16(USB_PID_PINNACLE_PCTV72E))
+		dib0700_set_gpio(adap->dev, GPIO6, GPIO_OUT, 0);
 	else
-	dib0700_set_gpio(adap->dev, GPIO6, GPIO_OUT, 1);
+		dib0700_set_gpio(adap->dev, GPIO6, GPIO_OUT, 1);
 	msleep(10);
 	dib0700_set_gpio(adap->dev, GPIO9, GPIO_OUT, 1);
 	dib0700_set_gpio(adap->dev, GPIO4, GPIO_OUT, 1);
@@ -1062,6 +1115,8 @@ struct usb_device_id dib0700_usb_id_table[] = {
 /* 30 */{ USB_DEVICE(USB_VID_PINNACLE,	USB_PID_PINNACLE_PCTV73E) },
 	{ USB_DEVICE(USB_VID_YUAN,	USB_PID_YUAN_EC372S) },
 	{ USB_DEVICE(USB_VID_TERRATEC,	USB_PID_TERRATEC_CINERGY_HT_EXPRESS) },
+	{ USB_DEVICE(USB_VID_TERRATEC,	USB_PID_TERRATEC_CINERGY_T_XXS) },
+	{ USB_DEVICE(USB_VID_LEADTEK,   USB_PID_WINFAST_DTV_DONGLE_STK7700P_2) },
 	{ 0 }		/* Terminating entry */
 };
 MODULE_DEVICE_TABLE(usb, dib0700_usb_id_table);
@@ -1126,7 +1181,7 @@ struct dvb_usb_device_properties dib0700_devices[] = {
 				{ NULL },
 			},
 			{   "Leadtek Winfast DTV Dongle (STK7700P based)",
-				{ &dib0700_usb_id_table[8], NULL },
+				{ &dib0700_usb_id_table[8], &dib0700_usb_id_table[34] },
 				{ NULL },
 			},
 			{   "AVerMedia AVerTV DVB-T Express",
@@ -1251,7 +1306,7 @@ struct dvb_usb_device_properties dib0700_devices[] = {
 			},
 		},
 
-		.num_device_descs = 8,
+		.num_device_descs = 9,
 		.devices = {
 			{   "DiBcom STK7070P reference design",
 				{ &dib0700_usb_id_table[15], NULL },
@@ -1283,6 +1338,10 @@ struct dvb_usb_device_properties dib0700_devices[] = {
 			},
 			{   "Pinnacle PCTV 73e",
 				{ &dib0700_usb_id_table[30], NULL },
+				{ NULL },
+			},
+			{   "Terratec Cinergy T USB XXS",
+				{ &dib0700_usb_id_table[33], NULL },
 				{ NULL },
 			},
 		},

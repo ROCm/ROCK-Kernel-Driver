@@ -1,4 +1,3 @@
-/* $Id: mman.h,v 1.2 2000/03/15 02:44:26 davem Exp $ */
 #ifndef __SPARC64_MMAN_H__
 #define __SPARC64_MMAN_H__
 
@@ -21,19 +20,6 @@
 
 #define MAP_POPULATE	0x8000		/* populate (prefault) pagetables */
 #define MAP_NONBLOCK	0x10000		/* do not block on IO */
-
-/* XXX Need to add flags to SunOS's mctl, mlockall, and madvise system
- * XXX calls.
- */
-
-/* SunOS sys_mctl() stuff... */
-#define MC_SYNC         1  /* Sync pages in memory with storage (usu. a file) */
-#define MC_LOCK         2  /* Lock pages into core ram, do not allow swapping of them */
-#define MC_UNLOCK       3  /* Unlock pages locked via previous mctl() with MC_LOCK arg */
-#define MC_LOCKAS       5  /* Lock an entire address space of the calling process */
-#define MC_UNLOCKAS     6  /* Unlock entire address space of calling process */
-
-#define MADV_FREE	0x5		/* (Solaris) contents can be freed */
 
 #ifdef __KERNEL__
 #ifndef __ASSEMBLY__

@@ -333,7 +333,6 @@
 
 #include <linux/module.h>
 
-#include <linux/version.h>
 #include <linux/types.h>
 #include <linux/string.h>
 #include <linux/errno.h>
@@ -365,10 +364,6 @@
 
 #if defined(CONFIG_IA64_GENERIC) || defined(CONFIG_IA64_SGI_SN2)
 #include <asm/sn/io.h>
-#endif
-
-#if LINUX_VERSION_CODE < 0x020600
-#error "Kernels older than 2.6.0 are no longer supported"
 #endif
 
 
@@ -2816,7 +2811,7 @@ qla1280_64bit_start_scsi(struct scsi_qla_host *ha, struct srb * sp)
 
 	/* Check for room in outstanding command list. */
 	for (cnt = 0; cnt < MAX_OUTSTANDING_COMMANDS &&
-		     ha->outstanding_cmds[cnt] != 0; cnt++);
+		     ha->outstanding_cmds[cnt] != NULL; cnt++);
 
 	if (cnt >= MAX_OUTSTANDING_COMMANDS) {
 		status = 1;
@@ -2863,7 +2858,7 @@ qla1280_64bit_start_scsi(struct scsi_qla_host *ha, struct srb * sp)
 
 	/* Load SCSI command packet. */
 	pkt->cdb_len = cpu_to_le16(CMD_CDBLEN(cmd));
-	memcpy(pkt->scsi_cdb, &(CMD_CDBP(cmd)), CMD_CDBLEN(cmd));
+	memcpy(pkt->scsi_cdb, CMD_CDBP(cmd), CMD_CDBLEN(cmd));
 	/* dprintk(1, "Build packet for command[0]=0x%x\n",pkt->scsi_cdb[0]); */
 
 	/* Set transfer direction. */
@@ -3132,7 +3127,7 @@ qla1280_32bit_start_scsi(struct scsi_qla_host *ha, struct srb * sp)
 
 	/* Load SCSI command packet. */
 	pkt->cdb_len = cpu_to_le16(CMD_CDBLEN(cmd));
-	memcpy(pkt->scsi_cdb, &(CMD_CDBP(cmd)), CMD_CDBLEN(cmd));
+	memcpy(pkt->scsi_cdb, CMD_CDBP(cmd), CMD_CDBLEN(cmd));
 
 	/*dprintk(1, "Build packet for command[0]=0x%x\n",pkt->scsi_cdb[0]); */
 	/* Set transfer direction. */

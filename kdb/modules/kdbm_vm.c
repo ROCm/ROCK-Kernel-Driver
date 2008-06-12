@@ -18,6 +18,7 @@
 
 #include <scsi.h>
 #include <scsi/scsi_host.h>
+#include <asm/pgtable.h>
 
 MODULE_AUTHOR("SGI");
 MODULE_DESCRIPTION("Debug VM information");
@@ -92,7 +93,6 @@ kdbm_print_vm(struct vm_area_struct *vp, unsigned long addr, int verbose_flg)
 	if (vp->vm_ops != NULL) {
 		kdb_printf("vm_ops->open = 0x%p\n", vp->vm_ops->open);
 		kdb_printf("vm_ops->close = 0x%p\n", vp->vm_ops->close);
-		kdb_printf("vm_ops->nopage = 0x%p\n", vp->vm_ops->nopage);
 #ifdef HAVE_VMOP_MPROTECT
 		kdb_printf("vm_ops->mprotect = 0x%p\n", vp->vm_ops->mprotect);
 #endif

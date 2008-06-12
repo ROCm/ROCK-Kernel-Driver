@@ -182,7 +182,7 @@ void note_interrupt(unsigned int irq, struct irq_desc *desc,
 		 */
 		if (time_after(jiffies, desc->last_unhandled + HZ/10))
 			desc->irqs_unhandled = 1;
-		else if (!irq_ignore_unhandled(irq))
+		else
 			desc->irqs_unhandled++;
 		desc->last_unhandled = jiffies;
 		if (unlikely(action_ret != IRQ_NONE))
@@ -209,8 +209,8 @@ void note_interrupt(unsigned int irq, struct irq_desc *desc,
 		 * Now kill the IRQ
 		 */
 		printk(KERN_EMERG "Disabling IRQ #%d\n", irq);
-		desc->status |= IRQ_DISABLED;
-		desc->depth = 1;
+		desc->status |= IRQ_DISABLED | IRQ_SPURIOUS_DISABLED;
+		desc->depth++;
 		desc->chip->disable(irq);
 	}
 	desc->irqs_unhandled = 0;

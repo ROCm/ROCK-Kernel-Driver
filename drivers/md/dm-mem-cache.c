@@ -13,7 +13,7 @@
 #define	DM_MEM_CACHE_VERSION	"0.2"
 
 #include "dm.h"
-#include "dm-io.h"
+#include <linux/dm-io.h>
 #include "dm-mem-cache.h"
 
 struct dm_mem_cache_client {
@@ -280,24 +280,13 @@ void dm_mem_cache_free(struct dm_mem_cache_client *cl,
 	mempool_free(obj, cl->objs_pool);
 }
 
-EXPORT_SYMBOL_GPL(dm_mem_cache_client_create);
-EXPORT_SYMBOL_GPL(dm_mem_cache_client_destroy);
-EXPORT_SYMBOL_GPL(dm_mem_cache_alloc);
-EXPORT_SYMBOL_GPL(dm_mem_cache_free);
-EXPORT_SYMBOL_GPL(dm_mem_cache_grow);
-EXPORT_SYMBOL_GPL(dm_mem_cache_shrink);
+EXPORT_SYMBOL(dm_mem_cache_client_create);
+EXPORT_SYMBOL(dm_mem_cache_client_destroy);
+EXPORT_SYMBOL(dm_mem_cache_alloc);
+EXPORT_SYMBOL(dm_mem_cache_free);
+EXPORT_SYMBOL(dm_mem_cache_grow);
+EXPORT_SYMBOL(dm_mem_cache_shrink);
 
 MODULE_DESCRIPTION(DM_NAME " dm memory cache");
 MODULE_AUTHOR("Heinz Mauelshagen <hjm@redhat.de>");
 MODULE_LICENSE("GPL");
-
-/*
- * Overrides for Emacs so that we follow Linus's tabbing style.
- * Emacs will notice this stuff at the end of the file and automatically
- * adjust the settings for this buffer only.  This must remain at the end
- * of the file.
- * ---------------------------------------------------------------------------
- * Local variables:
- * c-file-style: "linux"
- * End:
- */

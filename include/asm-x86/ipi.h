@@ -1,8 +1,6 @@
 #ifndef __ASM_IPI_H
 #define __ASM_IPI_H
 
-#ifndef CONFIG_XEN
-
 /*
  * Copyright 2004 James Cleverdon, IBM.
  * Subject to the GNU Public License, v.2
@@ -29,7 +27,8 @@
  * We use 'broadcast', CPU->CPU IPIs and self-IPIs too.
  */
 
-static inline unsigned int __prepare_ICR (unsigned int shortcut, int vector, unsigned int dest)
+static inline unsigned int __prepare_ICR(unsigned int shortcut, int vector,
+					 unsigned int dest)
 {
 	unsigned int icr = shortcut | dest;
 
@@ -44,12 +43,13 @@ static inline unsigned int __prepare_ICR (unsigned int shortcut, int vector, uns
 	return icr;
 }
 
-static inline int __prepare_ICR2 (unsigned int mask)
+static inline int __prepare_ICR2(unsigned int mask)
 {
 	return SET_APIC_DEST_FIELD(mask);
 }
 
-static inline void __send_IPI_shortcut(unsigned int shortcut, int vector, unsigned int dest)
+static inline void __send_IPI_shortcut(unsigned int shortcut, int vector,
+				       unsigned int dest)
 {
 	/*
 	 * Subtle. In the case of the 'never do double writes' workaround
@@ -80,7 +80,8 @@ static inline void __send_IPI_shortcut(unsigned int shortcut, int vector, unsign
  * This is used to send an IPI with no shorthand notation (the destination is
  * specified in bits 56 to 63 of the ICR).
  */
-static inline void __send_IPI_dest_field(unsigned int mask, int vector, unsigned int dest)
+static inline void __send_IPI_dest_field(unsigned int mask, int vector,
+					 unsigned int dest)
 {
 	unsigned long cfg;
 
@@ -126,7 +127,5 @@ static inline void send_IPI_mask_sequence(cpumask_t mask, int vector)
 	}
 	local_irq_restore(flags);
 }
-
-#endif /* CONFIG_XEN */
 
 #endif /* __ASM_IPI_H */

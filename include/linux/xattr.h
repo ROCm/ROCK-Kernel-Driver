@@ -47,13 +47,15 @@ struct xattr_handler {
 };
 
 ssize_t xattr_getsecurity(struct inode *, const char *, void *, size_t);
-ssize_t vfs_getxattr(struct dentry *, struct vfsmount *, char *, void *,
+ssize_t vfs_getxattr(struct dentry *, struct vfsmount *, const char *, void *,
 		     size_t, struct file *);
 ssize_t vfs_listxattr(struct dentry *d, struct vfsmount *, char *list,
 		      size_t size, struct file *);
-int vfs_setxattr(struct dentry *, struct vfsmount *, char *, void *, size_t,
-		 int, struct file *);
-int vfs_removexattr(struct dentry *, struct vfsmount *, char *, struct file *);
+int vfs_setxattr(struct dentry *, struct vfsmount *, const char *,
+		  const void *, size_t, int, struct file *);
+int vfs_removexattr(struct dentry *, struct vfsmount *, const char *,
+		     struct file *);
+int vfs_removexattr(struct dentry *, struct vfsmount *, const char *, struct file *);
 
 ssize_t generic_getxattr(struct dentry *dentry, const char *name, void *buffer, size_t size);
 ssize_t generic_listxattr(struct dentry *dentry, char *buffer, size_t buffer_size);

@@ -1,3 +1,35 @@
+2008-06-06 Jay Lan  <jlan@sgi.com>
+
+	* kdb-v4.4-2.6.26-rc5-common-1.
+
+2008-06-05 Jay Lan  <jlan@sgi.com>
+
+	* fixed 'rq/rqa' command runs off the end of runqueue's rt.active
+          priority bitmap array, Lachlan McIlroy <lachlan@sgi.com>, also
+	  someone who sent me a similar patch earlier but i forgot his name.
+	* kdb-v4.4-2.6.26-rc4-common-2.
+
+2008-05-30 Jay Lan  <jlan@sgi.com>
+
+	* kdb-v4.4-2.6.26-rc4-common-1.
+
+2008-05-20 Jay Lan  <jlan@sgi.com>
+
+	* kdb-v4.4-2.6.26-rc3-common-1.
+
+2008-05-13 Jay Lan  <jlan@sgi.com>
+
+	* XPC support is removed from KDB due to XPC changes in 2.6.26-rc1.
+	* kdb-v4.4-2.6.26-rc1-common-1.
+
+2008-04-17 Jay Lan  <jlan@sgi.com>
+
+	* kdb-v4.4-2.6.25-common-1.
+
+2008-03-16 Jay Lan  <jlan@sgi.com>
+
+	* kdb-v4.4-2.6.25-rc6-common-1.
+
 2008-03-03 Jay Lan  <jlan@sgi.com>
 
 	* kdb-v4.4-2.6.25-rc3-common-1.

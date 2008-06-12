@@ -50,13 +50,6 @@ struct o2net_msg
 	__u8  buf[0];
 };
 
-enum o2net_notifier_type {
-	O2NET_CONN_UP,
-	O2NET_CONN_DOWN,
-	O2NET_CONN_ERR,
-	O2NET_MAX_NOTIFIER,
-};
-
 typedef int (o2net_msg_handler_func)(struct o2net_msg *msg, u32 len, void *data,
 				     void **ret_data);
 typedef void (o2net_post_msg_handler_func)(int status, void *data,
@@ -121,11 +114,39 @@ void o2net_stop_listening(struct o2nm_node *node);
 void o2net_disconnect_node(struct o2nm_node *node);
 int o2net_num_connected_peers(void);
 
-void o2net_register_notifier(struct notifier_block *nb);
-void o2net_unregister_notifier(struct notifier_block *nb);
-void o2net_notify(enum o2net_notifier_type type, u8 node_num);
-
 int o2net_init(void);
 void o2net_exit(void);
+
+struct o2net_send_tracking;
+struct o2net_sock_container;
+
+#ifdef CONFIG_DEBUG_FS
+int o2net_debugfs_init(void);
+void o2net_debugfs_exit(void);
+void o2net_debug_add_nst(struct o2net_send_tracking *nst);
+void o2net_debug_del_nst(struct o2net_send_tracking *nst);
+void o2net_debug_add_sc(struct o2net_sock_container *sc);
+void o2net_debug_del_sc(struct o2net_sock_container *sc);
+#else
+static inline int o2net_debugfs_init(void)
+{
+	return 0;
+}
+static inline void o2net_debugfs_exit(void)
+{
+}
+static inline void o2net_debug_add_nst(struct o2net_send_tracking *nst)
+{
+}
+static inline void o2net_debug_del_nst(struct o2net_send_tracking *nst)
+{
+}
+static inline void o2net_debug_add_sc(struct o2net_sock_container *sc)
+{
+}
+static inline void o2net_debug_del_sc(struct o2net_sock_container *sc)
+{
+}
+#endif	/* CONFIG_DEBUG_FS */
 
 #endif /* O2CLUSTER_TCP_H */

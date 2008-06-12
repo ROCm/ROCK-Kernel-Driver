@@ -55,7 +55,6 @@
 #include <asm/types.h>
 #include <asm/uaccess.h>
 #include <asm/fpumacro.h>
-#include <asm/semaphore.h>
 #include <asm/mmu_context.h>
 #include <asm/compat_signal.h>
 
@@ -236,13 +235,6 @@ asmlinkage long sys32_getegid16(void)
 }
 
 /* 32-bit timeval and related flotsam.  */
-
-static long get_tv32(struct timeval *o, struct compat_timeval __user *i)
-{
-	return (!access_ok(VERIFY_READ, i, sizeof(*i)) ||
-		(__get_user(o->tv_sec, &i->tv_sec) |
-		 __get_user(o->tv_usec, &i->tv_usec)));
-}
 
 static inline long put_tv32(struct compat_timeval __user *o, struct timeval *i)
 {
@@ -555,10 +547,8 @@ asmlinkage long compat_sys_sigaction(int sig, struct old_sigaction32 __user *act
         struct k_sigaction new_ka, old_ka;
         int ret;
 
-	if (sig < 0) {
-		set_thread_flag(TIF_NEWSIGNALS);
-		sig = -sig;
-	}
+	WARN_ON_ONCE(sig >= 0);
+	sig = -sig;
 
         if (act) {
 		compat_old_sigset_t mask;
@@ -601,11 +591,6 @@ asmlinkage long compat_sys_rt_sigaction(int sig,
         /* XXX: Don't preclude handling different sized sigset_t's.  */
         if (sigsetsize != sizeof(compat_sigset_t))
                 return -EINVAL;
-
-	/* All tasks which use RT signals (effectively) use
-	 * new style signals.
-	 */
-	set_thread_flag(TIF_NEWSIGNALS);
 
         if (act) {
 		u32 u_handler, u_restorer;
@@ -763,30 +748,6 @@ asmlinkage long sys32_settimeofday(struct compat_timeval __user *tv,
 	}
 
 	return do_sys_settimeofday(tv ? &kts : NULL, tz ? &ktz : NULL);
-}
-
-asmlinkage long sys32_utimes(char __user *filename,
-			     struct compat_timeval __user *tvs)
-{
-	struct timespec tv[2];
-
-	if (tvs) {
-		struct timeval ktvs[2];
-		if (get_tv32(&ktvs[0], tvs) ||
-		    get_tv32(&ktvs[1], 1+tvs))
-			return -EFAULT;
-
-		if (ktvs[0].tv_usec < 0 || ktvs[0].tv_usec >= 1000000 ||
-		    ktvs[1].tv_usec < 0 || ktvs[1].tv_usec >= 1000000)
-			return -EINVAL;
-
-		tv[0].tv_sec = ktvs[0].tv_sec;
-		tv[0].tv_nsec = 1000 * ktvs[0].tv_usec;
-		tv[1].tv_sec = ktvs[1].tv_sec;
-		tv[1].tv_nsec = 1000 * ktvs[1].tv_usec;
-	}
-
-	return do_utimes(AT_FDCWD, filename, tvs ? tv : NULL, 0);
 }
 
 /* These are here just in case some old sparc32 binary calls it. */

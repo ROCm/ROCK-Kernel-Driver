@@ -10,20 +10,13 @@
 #include <linux/errno.h> 
 #include <linux/hardirq.h>
 #include <linux/suspend.h>
+#include <linux/kbuild.h>
 #include <asm/pda.h>
 #include <asm/processor.h>
 #include <asm/segment.h>
 #include <asm/thread_info.h>
 #include <asm/ia32.h>
 #include <asm/bootparam.h>
-
-#define DEFINE(sym, val) \
-        asm volatile("\n->" #sym " %0 " #val : : "i" (val))
-
-#define BLANK() asm volatile("\n->" : : )
-
-#define OFFSET(sym, str, mem) \
-	DEFINE(sym, offsetof(struct str, mem))
 
 #define __NO_STUBS 1
 #undef __SYSCALL
@@ -124,10 +117,8 @@ int main(void)
 	ENTRY(cr8);
 	BLANK();
 #undef ENTRY
-#ifndef CONFIG_X86_NO_TSS
 	DEFINE(TSS_ist, offsetof(struct tss_struct, x86_tss.ist));
 	BLANK();
-#endif
 	DEFINE(crypto_tfm_ctx_offset, offsetof(struct crypto_tfm, __crt_ctx));
 	BLANK();
 	DEFINE(__NR_syscall_max, sizeof(syscalls) - 1);

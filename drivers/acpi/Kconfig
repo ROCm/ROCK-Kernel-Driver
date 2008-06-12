@@ -140,6 +140,7 @@ config ACPI_VIDEO
 	tristate "Video"
 	depends on X86 && BACKLIGHT_CLASS_DEVICE && VIDEO_OUTPUT_CONTROL
 	depends on INPUT
+	select THERMAL
 	help
 	  This driver implement the ACPI Extensions For Display Adapters
 	  for integrated graphics devices on motherboard, as specified in
@@ -151,6 +152,7 @@ config ACPI_VIDEO
 
 config ACPI_FAN
 	tristate "Fan"
+	select THERMAL
 	default y
 	help
 	  This driver adds support for ACPI fan devices, allowing user-mode 
@@ -172,6 +174,7 @@ config ACPI_BAY
 
 config ACPI_PROCESSOR
 	tristate "Processor"
+	select THERMAL
 	default y
 	help
 	  This driver installs ACPI as the idle handler for Linux, and uses
@@ -360,7 +363,6 @@ config ACPI_SYSTEM
 config X86_PM_TIMER
 	bool "Power Management Timer Support" if EMBEDDED
 	depends on X86
-	depends on !XEN
 	default y
 	help
 	  The Power Management Timer is available on all ACPI-capable,
@@ -414,8 +416,4 @@ config ACPI_SBS
 	  This driver adds support for the Smart Battery System, another
 	  type of access to battery information, found on some laptops.
 
-config ACPI_PV_SLEEP
-	bool
-	depends on X86 && XEN && ACPI_SLEEP
-	default y
 endif	# ACPI

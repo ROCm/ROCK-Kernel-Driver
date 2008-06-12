@@ -69,7 +69,6 @@ enum
 	CTL_BUS=8,		/* Busses */
 	CTL_ABI=9,		/* Binary emulation */
 	CTL_CPU=10,		/* CPU stuff (speed scaling, etc) */
-	CTL_XEN=123,		/* Xen info and control */
 	CTL_ARLAN=254,		/* arlan wireless driver */
 	CTL_S390DBF=5677,	/* s390 debug */
 	CTL_SUNRPC=7249,	/* sunrpc debug */
@@ -947,11 +946,14 @@ enum
 /* For the /proc/sys support */
 struct ctl_table;
 struct nsproxy;
+struct ctl_table_root;
+
 extern struct ctl_table_header *sysctl_head_next(struct ctl_table_header *prev);
 extern struct ctl_table_header *__sysctl_head_next(struct nsproxy *namespaces,
 						struct ctl_table_header *prev);
 extern void sysctl_head_finish(struct ctl_table_header *prev);
-extern int sysctl_perm(struct ctl_table *table, int op);
+extern int sysctl_perm(struct ctl_table_root *root,
+		struct ctl_table *table, int op);
 
 typedef struct ctl_table ctl_table;
 
@@ -984,11 +986,6 @@ extern char *sysctl_pathname(ctl_table *, char *, int);
 extern int do_sysctl (int __user *name, int nlen,
 		      void __user *oldval, size_t __user *oldlenp,
 		      void __user *newval, size_t newlen);
-
-extern int do_sysctl_strategy (struct ctl_table *table,
-			       int __user *name, int nlen,
-			       void __user *oldval, size_t __user *oldlenp,
-			       void __user *newval, size_t newlen);
 
 extern ctl_handler sysctl_data;
 extern ctl_handler sysctl_string;
@@ -1058,6 +1055,8 @@ struct ctl_table_root {
 	struct list_head header_list;
 	struct list_head *(*lookup)(struct ctl_table_root *root,
 					   struct nsproxy *namespaces);
+	int (*permissions)(struct ctl_table_root *root,
+			struct nsproxy *namespaces, struct ctl_table *table);
 };
 
 /* struct ctl_table_header is used to maintain dynamic lists of
@@ -1088,8 +1087,6 @@ struct ctl_table_header *register_sysctl_paths(const struct ctl_path *path,
 
 void unregister_sysctl_table(struct ctl_table_header * table);
 int sysctl_check_table(struct nsproxy *namespaces, struct ctl_table *table);
-
-#else /* __KERNEL__ */
 
 #endif /* __KERNEL__ */
 

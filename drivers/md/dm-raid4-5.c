@@ -44,8 +44,8 @@ static const char *version = "v0.2427";
 
 #include "dm.h"
 #include "dm-bio-list.h"
-#include "dm-io.h"
-#include "dm-log.h"
+#include <linux/dm-io.h>
+#include <linux/dm-dirty-log.h>
 #include "dm-mem-cache.h"
 #include "dm-message.h"
 #include "dm-region_hash.h"
@@ -442,7 +442,7 @@ struct raid_set {
 
 	/* Recovery parameters. */
 	struct recover {
-		struct dirty_log *dl;	/* Dirty log. */
+		struct dm_dirty_log *dl;	/* Dirty log. */
 		void *rh;	/* Region hash. */
 
 		region_t nr_regions;
@@ -1211,20 +1211,29 @@ static void stripe_unlock(struct raid_set *rs, struct stripe *stripe)
 }
 
 /*
- * Stripe cache functions
+ * Stripe cache functions.
  */
 /*
- * Invalidate all page lists pages of a stripe
+ * Invalidate all page lists pages of a stripe.
  *
- * I only keep state for the whole list in the first page
+ * I only keep state for the whole list in the first page.
  */
 static INLINE void
 stripe_pages_invalidate(struct stripe *stripe)
 {
 	unsigned p = RS(stripe->sc)->set.raid_devs;
 
-	while (p--)
-		PAGE(stripe, p)->flags = 0;
+	while (p--) {
+		struct page *page = PAGE(stripe, p);
+
+		ProhibitPageIO(page);
+		ClearPageChecked(page);
+		ClearPageDirty(page);
+		ClearPageError(page);
+		ClearPageLocked(page);
+		ClearPagePrivate(page);
+		ClearPageUptodate(page);
+	}
 }
 
 /* Prepare stripe for (re)use. */
@@ -2155,7 +2164,7 @@ static void page_list_rw(struct stripe *stripe, unsigned p)
 	struct page_list *pl = obj->pl;
 	struct page *page = pl->page;
 	struct raid_dev *dev = rs->dev + p;
-	struct io_region io = {
+	struct dm_io_region io = {
 		.bdev = dev->dev->bdev,
 		.sector = stripe->key,
 		.count = stripe->io.size,
@@ -3259,7 +3268,7 @@ context_alloc(struct raid_set **raid_set, struct raid_type *raid_type,
 	size_t len;
 	sector_t region_size, ti_len;
 	struct raid_set *rs = NULL;
-	struct dirty_log *dl;
+	struct dm_dirty_log *dl;
 
 	/*
 	 * Create the dirty log
@@ -3271,7 +3280,7 @@ context_alloc(struct raid_set **raid_set, struct raid_type *raid_type,
 	 */
 	ti_len = ti->len;
 	ti->len = sectors_per_dev;
-	dl = dm_create_dirty_log(argv[0], ti, dl_parms, argv + 2);
+	dl = dm_dirty_log_create(argv[0], ti, dl_parms, argv + 2);
 	ti->len = ti_len;
 	if (!dl)
 		goto bad_dirty_log;
@@ -3357,7 +3366,7 @@ context_alloc(struct raid_set **raid_set, struct raid_type *raid_type,
 
 	/* REMOVEME: statistics. */
 	stats_reset(rs);
-	SetRSDevelStats(rs);	/* Enable development status. */
+	ClearRSDevelStats(rs);	/* Disnable development status. */
 
 	*raid_set = rs;
 	return 0;
@@ -3367,23 +3376,23 @@ context_alloc(struct raid_set **raid_set, struct raid_type *raid_type,
 
 
    bad_chunk_size:
-	dm_destroy_dirty_log(dl);
+	dm_dirty_log_destroy(dl);
 	TI_ERR("Chunk size larger than region size");
 
    bad_recover_io_size:
-	dm_destroy_dirty_log(dl);
+	dm_dirty_log_destroy(dl);
 	TI_ERR("Recover stripe io size larger than region size");
 
    bad_array:
-	dm_destroy_dirty_log(dl);
+	dm_dirty_log_destroy(dl);
 	TI_ERR("Arry too big");
 
    bad_alloc:
-	dm_destroy_dirty_log(dl);
+	dm_dirty_log_destroy(dl);
 	TI_ERR_RET("Cannot allocate raid context", -ENOMEM);
 
    bad_rh:
-	dm_destroy_dirty_log(dl);
+	dm_dirty_log_destroy(dl);
 	ti->error = DM_MSG_PREFIX "Error creating dirty region hash";
 	goto free_rs;
 
@@ -3944,7 +3953,7 @@ static int raid_map(struct dm_target *ti, struct bio *bio,
 static void raid_postsuspend(struct dm_target *ti)
 {
 	struct raid_set *rs = ti->private;
-	struct dirty_log *dl = rs->recover.dl;
+	struct dm_dirty_log *dl = rs->recover.dl;
 
 	SetRSSuspended(rs);
 
@@ -3964,7 +3973,7 @@ static void raid_postsuspend(struct dm_target *ti)
 static void raid_resume(struct dm_target *ti)
 {
 	struct raid_set *rs = ti->private;
-	struct dirty_log *dl = rs->recover.dl;
+	struct dm_dirty_log *dl = rs->recover.dl;
 
 	if (dl->type->resume && dl->type->resume(dl))
 		/* Resume dirty log. */
@@ -4062,8 +4071,9 @@ raid_status(struct dm_target *ti, status_type_t type,
 			DMEMIT("%s ",
 			       format_dev_t(buf, rs->dev[i].dev->bdev->bd_dev));
 
+		DMEMIT("1 ");
 		for (i = 0; i < rs->set.raid_devs; i++) {
-			DMEMIT("%c ",
+			DMEMIT("%c",
 			       dev_operational(rs, i) ? 'A' : 'D');
 
 			if (rs->set.raid_type->level == raid4 &&
@@ -4378,7 +4388,7 @@ static struct target_type raid_target = {
 	.message = raid_message,
 };
 
-static void init_exit(int r, const char *bad_msg, const char *good_msg)
+static void init_exit(const char *bad_msg, const char *good_msg, int r)
 {
 	if (r)
 		DMERR("Failed to %sregister target [%d]", bad_msg, r);
@@ -4391,7 +4401,7 @@ static int __init dm_raid_init(void)
 	int r;
 
 	r = dm_register_target(&raid_target);
-	init_exit(r, "", "initialized");
+	init_exit("", "initialized", r);
 	return r;
 }
 
@@ -4400,7 +4410,7 @@ static void __exit dm_raid_exit(void)
 	int r;
 
 	r = dm_unregister_target(&raid_target);
-	init_exit(r, "un", "exit");
+	init_exit("un", "exit", r);
 }
 
 /* Module hooks. */
@@ -4410,14 +4420,3 @@ module_exit(dm_raid_exit);
 MODULE_DESCRIPTION(DM_NAME " raid4/5 target");
 MODULE_AUTHOR("Heinz Mauelshagen <hjm@redhat.com>");
 MODULE_LICENSE("GPL");
-
-/*
- * Overrides for Emacs so that we follow Linus's tabbing style.
- * Emacs will notice this stuff at the end of the file and automatically
- * adjust the settings for this buffer only.  This must remain at the end
- * of the file.
- * ---------------------------------------------------------------------------
- * Local variables:
- * c-file-style: "linux"
- * End:
- */

@@ -367,13 +367,12 @@ static void acpi_processor_idle(void)
 
 	cx = pr->power.state;
 	if (!cx || acpi_idle_suspend) {
-		if (pm_idle_save)
-			pm_idle_save();
-		else
+		if (pm_idle_save) {
+			pm_idle_save(); /* enables IRQs */
+		} else {
 			acpi_safe_halt();
-
-		if (irqs_disabled())
 			local_irq_enable();
+		}
 
 		return;
 	}
@@ -469,10 +468,12 @@ static void acpi_processor_idle(void)
 		 * Use the appropriate idle routine, the one that would
 		 * be used without acpi C-states.
 		 */
-		if (pm_idle_save)
-			pm_idle_save();
-		else
+		if (pm_idle_save) {
+			pm_idle_save(); /* enables IRQs */
+		} else {
 			acpi_safe_halt();
+			local_irq_enable();
+		}
 
 		/*
 		 * TBD: Can't get time duration while in C1, as resumes
@@ -483,8 +484,6 @@ static void acpi_processor_idle(void)
 		 *       skew otherwise.
 		 */
 		sleep_ticks = 0xFFFFFFFF;
-		if (irqs_disabled())
-			local_irq_enable();
 
 		break;
 
@@ -1236,6 +1235,7 @@ static int acpi_processor_power_open_fs(struct inode *inode, struct file *file)
 }
 
 static const struct file_operations acpi_processor_power_fops = {
+	.owner = THIS_MODULE,
 	.open = acpi_processor_power_open_fs,
 	.read = seq_read,
 	.llseek = seq_lseek,
@@ -1248,6 +1248,8 @@ int acpi_processor_cst_has_changed(struct acpi_processor *pr)
 {
 	int result = 0;
 
+	if (boot_option_idle_override)
+		return 0;
 
 	if (!pr)
 		return -EINVAL;
@@ -1687,6 +1689,9 @@ int acpi_processor_cst_has_changed(struct acpi_processor *pr)
 {
 	int ret;
 
+	if (boot_option_idle_override)
+		return 0;
+
 	if (!pr)
 		return -EINVAL;
 
@@ -1717,6 +1722,8 @@ int __cpuinit acpi_processor_power_init(struct acpi_processor *pr,
 	struct proc_dir_entry *entry = NULL;
 	unsigned int i;
 
+	if (boot_option_idle_override)
+		return 0;
 
 	if (!first_run) {
 		dmi_check_system(processor_power_dmi_table);
@@ -1752,7 +1759,7 @@ int __cpuinit acpi_processor_power_init(struct acpi_processor *pr,
 	 * Note that we use previously set idle handler will be used on
 	 * platforms that only support C1.
 	 */
-	if ((pr->flags.power) && (!boot_option_idle_override)) {
+	if (pr->flags.power) {
 #ifdef CONFIG_CPU_IDLE
 		acpi_processor_setup_cpuidle(pr);
 		pr->power.dev.cpu = pr->id;
@@ -1776,24 +1783,23 @@ int __cpuinit acpi_processor_power_init(struct acpi_processor *pr,
 	}
 
 	/* 'power' [R] */
-	entry = create_proc_entry(ACPI_PROCESSOR_FILE_POWER,
-				  S_IRUGO, acpi_device_dir(device));
+	entry = proc_create_data(ACPI_PROCESSOR_FILE_POWER,
+				 S_IRUGO, acpi_device_dir(device),
+				 &acpi_processor_power_fops,
+				 acpi_driver_data(device));
 	if (!entry)
 		return -EIO;
-	else {
-		entry->proc_fops = &acpi_processor_power_fops;
-		entry->data = acpi_driver_data(device);
-		entry->owner = THIS_MODULE;
-	}
-
 	return 0;
 }
 
 int acpi_processor_power_exit(struct acpi_processor *pr,
 			      struct acpi_device *device)
 {
+	if (boot_option_idle_override)
+		return 0;
+
 #ifdef CONFIG_CPU_IDLE
-	if ((pr->flags.power) && (!boot_option_idle_override))
+	if (pr->flags.power)
 		cpuidle_unregister_device(&pr->power.dev);
 #endif
 	pr->flags.power_setup_done = 0;

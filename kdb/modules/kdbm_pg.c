@@ -30,8 +30,16 @@ static char *pg_flag_vals[] = {
 	"PG_locked", "PG_error", "PG_referenced", "PG_uptodate",
 	"PG_dirty", "PG_lru", "PG_active", "PG_slab",
 	"PG_owner_priv_1", "PG_arch_1", "PG_reserved", "PG_private",
-	"PG_writeback", "?? 13 ??", "PG_compound", "PG_swapcache",
-	"PG_mappedtodisk", "PG_reclaim", "?? 18 ??", "PG_buddy",
+	"PG_writeback",
+#ifdef CONFIG_PAGEFLAGS_EXTENDED
+	"PG_head", "PG_tail",
+#else
+	"PG_compound",
+#endif
+	"PG_swapcache", "PG_mappedtodisk", "PG_reclaim", "PG_buddy",
+#ifdef CONFIG_IA64_UNCACHED_ALLOCATOR
+	"PG_uncached",
+#endif
 	NULL };
 #endif
 
@@ -40,7 +48,7 @@ static char *bh_state_vals[] = {
 	"Uptodate", "Dirty", "Lock", "Req",
 	"Uptodate_Lock", "Mapped", "New", "Async_read",
 	"Async_write", "Delay", "Boundary", "Write_EIO",
-	"Ordered", "Eopnotsupp", "Unwritten", "Priavate",
+	"Ordered", "Eopnotsupp", "Unwritten", "PriavateStart",
 	NULL };
 
 /* From include/linux/bio.h */

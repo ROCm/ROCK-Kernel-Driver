@@ -1,4 +1,4 @@
-/* $Id: etrap.S,v 1.46 2002/02/09 19:49:30 davem Exp $
+/*
  * etrap.S: Preparing for entry into the kernel on Sparc V9.
  *
  * Copyright (C) 1996, 1997 David S. Miller (davem@caip.rutgers.edu)
@@ -54,7 +54,11 @@ etrap_syscall:	TRAP_LOAD_THREAD_REG(%g6, %g1)
 		stx	%g3, [%g2 + STACKFRAME_SZ + PT_V9_TPC]
 		rd	%y, %g3
 		stx	%g1, [%g2 + STACKFRAME_SZ + PT_V9_TNPC]
+		rdpr	%tt, %g1
 		st	%g3, [%g2 + STACKFRAME_SZ + PT_V9_Y]
+		sethi	%hi(PT_REGS_MAGIC), %g3
+		or	%g3, %g1, %g1
+		st	%g1, [%g2 + STACKFRAME_SZ + PT_V9_MAGIC]
 
 		rdpr	%cansave, %g1
 		brnz,pt %g1, etrap_save

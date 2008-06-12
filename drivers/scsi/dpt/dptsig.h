@@ -33,11 +33,7 @@
 /* to make sure we are talking the same size under all OS's     */
 typedef unsigned char sigBYTE;
 typedef unsigned short sigWORD;
-#if (defined(_MULTI_DATAMODEL) && defined(sun) && !defined(_ILP32))
-typedef uint32_t sigLONG;
-#else
-typedef unsigned long sigLONG;
-#endif
+typedef unsigned int sigINT;
 
 /*
  * use sigWORDLittleEndian for:
@@ -96,6 +92,7 @@ typedef unsigned long sigLONG;
 #define PROC_POWERPC    0x04    /* IBM Power PC */
 #define PROC_i960       0x05    /* Intel i960 */
 #define PROC_ULTRASPARC 0x06    /* SPARC processor */
+#define PROC_IA64	0x07    /* IA64 processor */
 
 /* Specific Minimim Processor - sigBYTE dsProcessor;    FLAG BITS */
 /* ------------------------------------------------------------------ */
@@ -300,7 +297,7 @@ typedef struct dpt_sig {
     sigBYTE dsFiletype;          /* type of file */
     sigBYTE dsFiletypeFlags;     /* flags to specify load type, etc. */
     sigBYTE dsOEM;               /* OEM file was created for */
-    sigLONG dsOS;                /* which Operating systems */
+    sigINT  dsOS;                /* which Operating systems */
     sigWORD dsCapabilities;      /* RAID levels, etc. */
     sigWORD dsDeviceSupp;        /* Types of SCSI devices supported */
     sigWORD dsAdapterSupp;       /* DPT adapter families supported */

@@ -1,3 +1,28 @@
+2008-06-06 Jay Lan  <jlan@sgi.com>
+
+	* kdb-v4.4-2.6.26-rc5-ia64-1.
+
+2008-05-30 Jay Lan  <jlan@sgi.com>
+
+	* kdb-v4.4-2.6.26-rc4-ia64-1.
+
+2008-05-20 Jay Lan  <jlan@sgi.com>
+
+	* kdb-v4.4-2.6.26-rc3-ia64-1.
+
+2008-05-13 Jay Lan  <jlan@sgi.com>
+
+	* XPC support removed from KDB due to XPC changes to 2.6.26-rc1.
+        * kdb-v4.4-2.6.26-rc1-ia64-1.
+
+2008-04-17 Jay Lan  <jlan@sgi.com>
+
+	* kdb-v4.4-2.6.25-ia64-1.
+
+2008-03-16 Jay Lan  <jlan@sgi.com>
+
+	* kdb-v4.4-2.6.25-rc6-ia64-1.
+
 2008-03-03 Jay Lan  <jlan@sgi.com>
 
 	* kdb-v4.4-2.6.25-rc3-ia64-1.

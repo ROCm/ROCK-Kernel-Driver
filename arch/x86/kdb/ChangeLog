@@ -1,5 +1,62 @@
+2008-06-06 Jay Lan  <jlan@sgi.com>
+
+	* kdb-v4.4-2.6.26-rc5-x86-1.
+
+2008-05-30 Jay Lan  <jlan@sgi.com>
+
+	* kdb-v4.4-2.6.26-rc4-x86-1.
+
+2008-05-20 Jay Lan  <jlan@sgi.com>
+
+	* Merged <asm-x86/kdb_32.h> and <asm-x86/kdb_64.h> to <asm-x86/kdb.h>.
+	* Merged <asm-x86/kdbprivate_32.h> and <asm-x86/kdbprivate_64.h> to
+	  <asm-x86/kdbprivate.h>.
+	* kdb-v4.4-2.6.26-rc3-x86-1.
+
+2008-05-15 Jay Lan  <jlan@sgi.com>
+
+	* Fixed the i386 backtrace problem where KDB failed to find stacks
+	  in the kernel space.
+	* kdb-v4.4-2.6.26-rc1-x86-3.
+
+2008-05-14 Jay Lan  <jlan@sgi.com>
+
+	* Fixed a bug that bb_all scans only odd number entries of kallsyms.
+	* kdb-v4.4-2.6.26-rc1-x86-2.
+
+2008-05-13 Jay Lan  <jlan@sgi.com>
+
+	* Known problem: backtrace for i386 is broken since 2.6.25-rc1.
+	* kdb-v4.4-2.6.26-rc1-x86-1.
+
+2008-05-13 Jay Lan  <jlan@sgi.com>
+
+	* Known problem: backtrace for i386 is broken since 2.6.25-rc1.
+	* Fixed a couple of x86_64 problems:
+	  - "iret_label" are replaced by "irq_return".
+	  - bb1 failure on ia32_sysenter_target() & ia32_cstar_target()
+	* kdb-v4.4-2.6.25-x86-2.
+
+2008-04-17 Jay Lan  <jlan@sgi.com>
+
+	* Known problem: backtrace for i386 is broken since 2.6.25-rc1.
+	* kdb-v4.4-2.6.25-x86-1.
+
+2008-03-19 Jay Lan  <jlan@sgi.com>
+
+	* i386: systenter_entry was replaced with ia32_sysenter_target since
+	  2.6.25-rc1, Jay Lan <jlan@sgi.com>
+	* Known problem: backtrace for i386 is broken since 2.6.25-rc1.
+	* kdb-v4.4-2.6.25-rc6-x86-2.
+
+2008-03-16 Jay Lan  <jlan@sgi.com>
+
+	* Known problem: backtrace for i386 is broken since 2.6.25-rc1.
+	* kdb-v4.4-2.6.25-rc6-x86-1.
+
 2008-03-03 Jay Lan  <jlan@sgi.com>
 
+	* Known problem: backtrace for i386 is broken since 2.6.25-rc1.
 	* kdb-v4.4-2.6.25-rc3-x86-1.
 
 2008-02-26 Jay Lan  <jlan@sgi.com>

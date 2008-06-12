@@ -9,7 +9,7 @@
 #define DM_RH_H
 
 #include "dm.h"
-#include "dm-log.h"
+#include <linux/dm-dirty-log.h>
 #include "dm-bio-list.h"
 
 /*-----------------------------------------------------------------
@@ -53,7 +53,7 @@ int rh_init(void **rh,
 	    void *dispatch_context,
 	    void (*wake)(void *wake_context),
 	    void *wake_context,
-	    struct dirty_log *log, uint32_t region_size, region_t nr_regions);
+	    struct dm_dirty_log *log, uint32_t region_size, region_t nr_regions);
 void rh_exit(void *rh);
 
 int rh_state(void *rh, region_t region, int may_block);
@@ -73,14 +73,3 @@ void rh_stop_recovery(void *rh);
 void rh_start_recovery(void *rh);
 
 #endif
-
-/*
- * Overrides for Emacs so that we follow Linus's tabbing style.
- * Emacs will notice this stuff at the end of the file and automatically
- * adjust the settings for this buffer only.  This must remain at the end
- * of the file.
- * ---------------------------------------------------------------------------
- * Local variables:
- * c-file-style: "linux"
- * End:
- */

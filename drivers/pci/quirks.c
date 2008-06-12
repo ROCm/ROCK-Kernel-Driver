@@ -24,42 +24,6 @@
 #include <linux/kallsyms.h>
 #include "pci.h"
 
-#ifdef CONFIG_XEN
-/* A global flag which signals if we should page-align PCI mem windows. */
-int pci_mem_align = 0;
-
-static int __init set_pci_mem_align(char *str)
-{
-	pci_mem_align = 1;
-	return 1;
-}
-__setup("pci-mem-align", set_pci_mem_align);
-
-/* This quirk function enables us to force all memory resources which are 
- * assigned to PCI devices, to be page-aligned.
- */
-static void __devinit quirk_align_mem_resources(struct pci_dev *dev)
-{
-	int i;
-	struct resource *r;
-	resource_size_t old_start;
-
-	if (!pci_mem_align)
-		return;
-
-	for (i=0; i < DEVICE_COUNT_RESOURCE; i++) {
-		r = &dev->resource[i];
-		if ((r == NULL) || !(r->flags & IORESOURCE_MEM))
-			continue;
-
-		old_start = r->start;
-		r->start = (r->start + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
-		r->end = r->end - (old_start - r->start);
-	}
-}
-DECLARE_PCI_FIXUP_HEADER(PCI_ANY_ID, PCI_ANY_ID, quirk_align_mem_resources);
-#endif
-
 /* The Mellanox Tavor device gives false positive parity errors
  * Mark this device with a broken_parity_status, to allow
  * PCI scanning code to "skip" this now blacklisted device.
@@ -1538,9 +1502,8 @@ static void pci_do_fixups(struct pci_dev *dev, struct pci_fixup *f, struct pci_f
 		if ((f->vendor == dev->vendor || f->vendor == (u16) PCI_ANY_ID) &&
  		    (f->device == dev->device || f->device == (u16) PCI_ANY_ID)) {
 #ifdef DEBUG
-			dev_dbg(&dev->dev, "calling quirk 0x%p", f->hook);
-			print_fn_descriptor_symbol(": %s()\n",
-				(unsigned long) f->hook);
+			dev_dbg(&dev->dev, "calling ");
+			print_fn_descriptor_symbol("%s\n", f->hook);
 #endif
 			f->hook(dev);
 		}
@@ -1684,13 +1647,24 @@ static void __devinit quirk_via_cx700_pci_parking_caching(struct pci_dev *dev)
 			/* Turn off PCI Bus Parking */
 			pci_write_config_byte(dev, 0x76, b ^ 0x40);
 
+			dev_info(&dev->dev,
+				"Disabling VIA CX700 PCI parking\n");
+		}
+	}
+
+	if (pci_read_config_byte(dev, 0x72, &b) == 0) {
+		if (b != 0) {
 			/* Turn off PCI Master read caching */
 			pci_write_config_byte(dev, 0x72, 0x0);
+
+			/* Set PCI Master Bus time-out to "1x16 PCLK" */
 			pci_write_config_byte(dev, 0x75, 0x1);
+
+			/* Disable "Read FIFO Timer" */
 			pci_write_config_byte(dev, 0x77, 0x0);
 
 			dev_info(&dev->dev,
-				"Disabling VIA CX700 PCI parking/caching\n");
+				"Disabling VIA CX700 PCI caching\n");
 		}
 	}
 }
@@ -1851,6 +1825,7 @@ static void __devinit nv_msi_ht_cap_quirk(struct pci_dev *dev)
 	}
 }
 DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_NVIDIA, PCI_ANY_ID, nv_msi_ht_cap_quirk);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_AL, PCI_ANY_ID, nv_msi_ht_cap_quirk);
 
 static void __devinit quirk_msi_intx_disable_bug(struct pci_dev *dev)
 {

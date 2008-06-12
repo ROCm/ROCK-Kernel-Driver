@@ -2468,7 +2468,7 @@ static int snd_intel8x0_free(struct intel8x0 *chip)
 		pci_write_config_dword(chip->pci, 0x4c, val);
 	}
 	/* --- */
-	synchronize_irq(chip->irq);
+
       __hw_end:
 	if (chip->irq >= 0)
 		free_irq(chip->irq, chip);
@@ -2517,7 +2517,6 @@ static int intel8x0_suspend(struct pci_dev *pci, pm_message_t state)
 		chip->sdm_saved = igetbyte(chip, ICHREG(SDM));
 
 	if (chip->irq >= 0) {
-		synchronize_irq(chip->irq);
 		free_irq(chip->irq, chip);
 		chip->irq = -1;
 	}
@@ -2670,7 +2669,7 @@ static void __devinit intel8x0_measure_ac97_clock(struct intel8x0 *chip)
 	t = stop_time.tv_sec - start_time.tv_sec;
 	t *= 1000000;
 	t += stop_time.tv_usec - start_time.tv_usec;
-	printk(KERN_INFO "%s: measured %lu usecs\n", __FUNCTION__, t);
+	printk(KERN_INFO "%s: measured %lu usecs\n", __func__, t);
 	if (t == 0) {
 		snd_printk(KERN_ERR "?? calculation error..\n");
 		return;

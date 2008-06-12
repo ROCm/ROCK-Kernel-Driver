@@ -10,21 +10,51 @@
 #define __XEN_PUBLIC_ARCH_X86_32_H__
 
 #ifdef __XEN__
-#define __DEFINE_XEN_GUEST_HANDLE(name, type) \
+#define __DEFINE_GUEST_HANDLE(name, type) \
     typedef struct { type *p; } __guest_handle_ ## name
 #else
-#define __DEFINE_XEN_GUEST_HANDLE(name, type) \
+#define __DEFINE_GUEST_HANDLE(name, type) \
     typedef type * __guest_handle_ ## name
 #endif
 
-#define DEFINE_XEN_GUEST_HANDLE_STRUCT(name) \
-	__DEFINE_XEN_GUEST_HANDLE(name, struct name)
-#define DEFINE_XEN_GUEST_HANDLE(name) __DEFINE_XEN_GUEST_HANDLE(name, name)
-#define XEN_GUEST_HANDLE(name)        __guest_handle_ ## name
+#define DEFINE_GUEST_HANDLE_STRUCT(name) \
+	__DEFINE_GUEST_HANDLE(name, struct name)
+#define DEFINE_GUEST_HANDLE(name) __DEFINE_GUEST_HANDLE(name, name)
+#define GUEST_HANDLE(name)        __guest_handle_ ## name
+
+#ifdef __XEN__
+#if defined(__i386__)
+#define set_xen_guest_handle(hnd, val)			\
+	do {						\
+		if (sizeof(hnd) == 8)			\
+			*(uint64_t *)&(hnd) = 0;	\
+		(hnd).p = val;				\
+	} while (0)
+#elif defined(__x86_64__)
+#define set_xen_guest_handle(hnd, val)	do { (hnd).p = val; } while (0)
+#endif
+#else
+#if defined(__i386__)
+#define set_xen_guest_handle(hnd, val)			\
+	do {						\
+		if (sizeof(hnd) == 8)			\
+			*(uint64_t *)&(hnd) = 0;	\
+		(hnd) = val;				\
+	} while (0)
+#elif defined(__x86_64__)
+#define set_xen_guest_handle(hnd, val)	do { (hnd) = val; } while (0)
+#endif
+#endif
 
 #ifndef __ASSEMBLY__
-typedef unsigned long xen_pfn_t;
-typedef unsigned long xen_ulong_t;
+/* Guest handles for primitive C types. */
+__DEFINE_GUEST_HANDLE(uchar, unsigned char);
+__DEFINE_GUEST_HANDLE(uint,  unsigned int);
+__DEFINE_GUEST_HANDLE(ulong, unsigned long);
+DEFINE_GUEST_HANDLE(char);
+DEFINE_GUEST_HANDLE(int);
+DEFINE_GUEST_HANDLE(long);
+DEFINE_GUEST_HANDLE(void);
 #endif
 
 /*
@@ -99,7 +129,7 @@ struct trap_info {
     uint16_t      cs;      /* code selector                                 */
     unsigned long address; /* code offset                                   */
 };
-DEFINE_XEN_GUEST_HANDLE_STRUCT(trap_info);
+DEFINE_GUEST_HANDLE_STRUCT(trap_info);
 
 struct cpu_user_regs {
     uint32_t ebx;
@@ -123,7 +153,7 @@ struct cpu_user_regs {
     uint16_t fs, _pad4;
     uint16_t gs, _pad5;
 };
-DEFINE_XEN_GUEST_HANDLE_STRUCT(cpu_user_regs);
+DEFINE_GUEST_HANDLE_STRUCT(cpu_user_regs);
 
 typedef uint64_t tsc_timestamp_t; /* RDTSC timestamp */
 
@@ -151,7 +181,7 @@ struct vcpu_guest_context {
     unsigned long failsafe_callback_eip;
     unsigned long vm_assist;                /* VMASST_TYPE_* bitmap */
 };
-DEFINE_XEN_GUEST_HANDLE_STRUCT(vcpu_guest_context);
+DEFINE_GUEST_HANDLE_STRUCT(vcpu_guest_context);
 
 struct arch_shared_info {
     unsigned long max_pfn;                  /* max pfn that appears in table */
@@ -165,6 +195,10 @@ struct arch_vcpu_info {
     unsigned long pad[5]; /* sizeof(struct vcpu_info) == 64 */
 };
 
+struct xen_callback {
+	unsigned long cs;
+	unsigned long eip;
+};
 #endif /* !__ASSEMBLY__ */
 
 /*

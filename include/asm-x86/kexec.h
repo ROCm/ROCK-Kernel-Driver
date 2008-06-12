@@ -94,10 +94,9 @@ static inline void crash_fixup_ss_esp(struct pt_regs *newregs,
 {
 #ifdef CONFIG_X86_32
 	newregs->sp = (unsigned long)&(oldregs->sp);
-	__asm__ __volatile__(
-			"xorl %%eax, %%eax\n\t"
-			"movw %%ss, %%ax\n\t"
-			:"=a"(newregs->ss));
+	asm volatile("xorl %%eax, %%eax\n\t"
+		     "movw %%ss, %%ax\n\t"
+		     :"=a"(newregs->ss));
 #endif
 }
 
@@ -114,39 +113,39 @@ static inline void crash_setup_regs(struct pt_regs *newregs,
 		crash_fixup_ss_esp(newregs, oldregs);
 	} else {
 #ifdef CONFIG_X86_32
-		__asm__ __volatile__("movl %%ebx,%0" : "=m"(newregs->bx));
-		__asm__ __volatile__("movl %%ecx,%0" : "=m"(newregs->cx));
-		__asm__ __volatile__("movl %%edx,%0" : "=m"(newregs->dx));
-		__asm__ __volatile__("movl %%esi,%0" : "=m"(newregs->si));
-		__asm__ __volatile__("movl %%edi,%0" : "=m"(newregs->di));
-		__asm__ __volatile__("movl %%ebp,%0" : "=m"(newregs->bp));
-		__asm__ __volatile__("movl %%eax,%0" : "=m"(newregs->ax));
-		__asm__ __volatile__("movl %%esp,%0" : "=m"(newregs->sp));
-		__asm__ __volatile__("movl %%ss, %%eax;" :"=a"(newregs->ss));
-		__asm__ __volatile__("movl %%cs, %%eax;" :"=a"(newregs->cs));
-		__asm__ __volatile__("movl %%ds, %%eax;" :"=a"(newregs->ds));
-		__asm__ __volatile__("movl %%es, %%eax;" :"=a"(newregs->es));
-		__asm__ __volatile__("pushfl; popl %0" :"=m"(newregs->flags));
+		asm volatile("movl %%ebx,%0" : "=m"(newregs->bx));
+		asm volatile("movl %%ecx,%0" : "=m"(newregs->cx));
+		asm volatile("movl %%edx,%0" : "=m"(newregs->dx));
+		asm volatile("movl %%esi,%0" : "=m"(newregs->si));
+		asm volatile("movl %%edi,%0" : "=m"(newregs->di));
+		asm volatile("movl %%ebp,%0" : "=m"(newregs->bp));
+		asm volatile("movl %%eax,%0" : "=m"(newregs->ax));
+		asm volatile("movl %%esp,%0" : "=m"(newregs->sp));
+		asm volatile("movl %%ss, %%eax;" :"=a"(newregs->ss));
+		asm volatile("movl %%cs, %%eax;" :"=a"(newregs->cs));
+		asm volatile("movl %%ds, %%eax;" :"=a"(newregs->ds));
+		asm volatile("movl %%es, %%eax;" :"=a"(newregs->es));
+		asm volatile("pushfl; popl %0" :"=m"(newregs->flags));
 #else
-		__asm__ __volatile__("movq %%rbx,%0" : "=m"(newregs->bx));
-		__asm__ __volatile__("movq %%rcx,%0" : "=m"(newregs->cx));
-		__asm__ __volatile__("movq %%rdx,%0" : "=m"(newregs->dx));
-		__asm__ __volatile__("movq %%rsi,%0" : "=m"(newregs->si));
-		__asm__ __volatile__("movq %%rdi,%0" : "=m"(newregs->di));
-		__asm__ __volatile__("movq %%rbp,%0" : "=m"(newregs->bp));
-		__asm__ __volatile__("movq %%rax,%0" : "=m"(newregs->ax));
-		__asm__ __volatile__("movq %%rsp,%0" : "=m"(newregs->sp));
-		__asm__ __volatile__("movq %%r8,%0" : "=m"(newregs->r8));
-		__asm__ __volatile__("movq %%r9,%0" : "=m"(newregs->r9));
-		__asm__ __volatile__("movq %%r10,%0" : "=m"(newregs->r10));
-		__asm__ __volatile__("movq %%r11,%0" : "=m"(newregs->r11));
-		__asm__ __volatile__("movq %%r12,%0" : "=m"(newregs->r12));
-		__asm__ __volatile__("movq %%r13,%0" : "=m"(newregs->r13));
-		__asm__ __volatile__("movq %%r14,%0" : "=m"(newregs->r14));
-		__asm__ __volatile__("movq %%r15,%0" : "=m"(newregs->r15));
-		__asm__ __volatile__("movl %%ss, %%eax;" :"=a"(newregs->ss));
-		__asm__ __volatile__("movl %%cs, %%eax;" :"=a"(newregs->cs));
-		__asm__ __volatile__("pushfq; popq %0" :"=m"(newregs->flags));
+		asm volatile("movq %%rbx,%0" : "=m"(newregs->bx));
+		asm volatile("movq %%rcx,%0" : "=m"(newregs->cx));
+		asm volatile("movq %%rdx,%0" : "=m"(newregs->dx));
+		asm volatile("movq %%rsi,%0" : "=m"(newregs->si));
+		asm volatile("movq %%rdi,%0" : "=m"(newregs->di));
+		asm volatile("movq %%rbp,%0" : "=m"(newregs->bp));
+		asm volatile("movq %%rax,%0" : "=m"(newregs->ax));
+		asm volatile("movq %%rsp,%0" : "=m"(newregs->sp));
+		asm volatile("movq %%r8,%0" : "=m"(newregs->r8));
+		asm volatile("movq %%r9,%0" : "=m"(newregs->r9));
+		asm volatile("movq %%r10,%0" : "=m"(newregs->r10));
+		asm volatile("movq %%r11,%0" : "=m"(newregs->r11));
+		asm volatile("movq %%r12,%0" : "=m"(newregs->r12));
+		asm volatile("movq %%r13,%0" : "=m"(newregs->r13));
+		asm volatile("movq %%r14,%0" : "=m"(newregs->r14));
+		asm volatile("movq %%r15,%0" : "=m"(newregs->r15));
+		asm volatile("movl %%ss, %%eax;" :"=a"(newregs->ss));
+		asm volatile("movl %%cs, %%eax;" :"=a"(newregs->cs));
+		asm volatile("pushfq; popq %0" :"=m"(newregs->flags));
 #endif
 		newregs->ip = (unsigned long)current_text_addr();
 	}
@@ -163,19 +162,6 @@ NORET_TYPE void
 relocate_kernel(unsigned long indirection_page,
 		unsigned long page_list,
 		unsigned long start_address) ATTRIB_NORET;
-#endif
-
-/* Under Xen we need to work with machine addresses. These macros give the
- * machine address of a certain page to the generic kexec code instead of
- * the pseudo physical address which would be given by the default macros.
- */
-
-#ifdef CONFIG_XEN
-#define KEXEC_ARCH_HAS_PAGE_MACROS
-#define kexec_page_to_pfn(page)  pfn_to_mfn(page_to_pfn(page))
-#define kexec_pfn_to_page(pfn)   pfn_to_page(mfn_to_pfn(pfn))
-#define kexec_virt_to_phys(addr) virt_to_machine(addr)
-#define kexec_phys_to_virt(addr) phys_to_virt(machine_to_phys(addr))
 #endif
 
 #endif /* __ASSEMBLY__ */

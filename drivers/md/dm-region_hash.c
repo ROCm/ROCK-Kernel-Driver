@@ -6,7 +6,7 @@
  */
 
 #include "dm.h"
-#include "dm-log.h"
+#include <linux/dm-dirty-log.h>
 #include "dm-region_hash.h"
 
 #include <linux/ctype.h>
@@ -77,7 +77,7 @@ struct region_hash {
 	unsigned int region_shift;
 
 	/* holds persistent region state */
-	struct dirty_log *log;
+	struct dm_dirty_log *log;
 
 	/* hash table */
 	rwlock_t hash_lock;
@@ -171,7 +171,7 @@ int rh_init(void **region_hash,
 	    void *dispatch_context,
             void (*wake)(void *wake_context),
 	    void *wake_context,
-	    struct dirty_log *log, uint32_t region_size, region_t nr_regions)
+	    struct dm_dirty_log *log, uint32_t region_size, region_t nr_regions)
 {
 	unsigned int nr_buckets, max_buckets;
 	unsigned hash_primes[] = {
@@ -258,7 +258,7 @@ void rh_exit(void *v)
 		}
 	}
 
-	dm_destroy_dirty_log(rh->log);
+	dm_dirty_log_destroy(rh->log);
 
 	if (rh->region_pool)
 		mempool_destroy(rh->region_pool);
@@ -615,40 +615,29 @@ void rh_start_recovery(void *v)
 	rh->wake(rh->wake_context);
 }
 
-EXPORT_SYMBOL_GPL(rh_bio_to_region);
-EXPORT_SYMBOL_GPL(rh_sector_to_region);
-EXPORT_SYMBOL_GPL(rh_region_to_sector);
-EXPORT_SYMBOL_GPL(rh_init);
-EXPORT_SYMBOL_GPL(rh_exit);
-EXPORT_SYMBOL_GPL(rh_state);
-EXPORT_SYMBOL_GPL(rh_update_states);
-EXPORT_SYMBOL_GPL(rh_flush);
-EXPORT_SYMBOL_GPL(rh_inc);
-EXPORT_SYMBOL_GPL(rh_inc_pending);
-EXPORT_SYMBOL_GPL(rh_dec);
-EXPORT_SYMBOL_GPL(rh_delay);
-EXPORT_SYMBOL_GPL(rh_delay_by_region);
-EXPORT_SYMBOL_GPL(rh_recovery_prepare);
-EXPORT_SYMBOL_GPL(rh_recovery_start);
-EXPORT_SYMBOL_GPL(rh_recovery_end);
-EXPORT_SYMBOL_GPL(rh_stop_recovery);
-EXPORT_SYMBOL_GPL(rh_start_recovery);
-EXPORT_SYMBOL_GPL(rh_reg_get_context);
-EXPORT_SYMBOL_GPL(rh_reg_set_context);
-EXPORT_SYMBOL_GPL(rh_get_region_key);
-EXPORT_SYMBOL_GPL(rh_get_region_size);
+EXPORT_SYMBOL(rh_bio_to_region);
+EXPORT_SYMBOL(rh_sector_to_region);
+EXPORT_SYMBOL(rh_region_to_sector);
+EXPORT_SYMBOL(rh_init);
+EXPORT_SYMBOL(rh_exit);
+EXPORT_SYMBOL(rh_state);
+EXPORT_SYMBOL(rh_update_states);
+EXPORT_SYMBOL(rh_flush);
+EXPORT_SYMBOL(rh_inc);
+EXPORT_SYMBOL(rh_inc_pending);
+EXPORT_SYMBOL(rh_dec);
+EXPORT_SYMBOL(rh_delay);
+EXPORT_SYMBOL(rh_delay_by_region);
+EXPORT_SYMBOL(rh_recovery_prepare);
+EXPORT_SYMBOL(rh_recovery_start);
+EXPORT_SYMBOL(rh_recovery_end);
+EXPORT_SYMBOL(rh_stop_recovery);
+EXPORT_SYMBOL(rh_start_recovery);
+EXPORT_SYMBOL(rh_reg_get_context);
+EXPORT_SYMBOL(rh_reg_set_context);
+EXPORT_SYMBOL(rh_get_region_key);
+EXPORT_SYMBOL(rh_get_region_size);
 
 MODULE_DESCRIPTION(DM_NAME " region hash");
 MODULE_AUTHOR("Heinz Mauelshagen <hjm@redhat.de>");
 MODULE_LICENSE("GPL");
-
-/*
- * Overrides for Emacs so that we follow Linus's tabbing style.
- * Emacs will notice this stuff at the end of the file and automatically
- * adjust the settings for this buffer only.  This must remain at the end
- * of the file.
- * ---------------------------------------------------------------------------
- * Local variables:
- * c-file-style: "linux"
- * End:
- */

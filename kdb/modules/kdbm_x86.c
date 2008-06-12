@@ -46,7 +46,6 @@ typedef struct gate_struct64 kdb_gate_desc_t;
 #else	/* !CONFIG_X86_64 */
 
 #define KDB_X86_64 0
-#define desc_ptr Xgt_desc_struct
 #define	MOVLQ "movl"
 
 /* i386 has no detailed mapping for the 8 byte segment descriptor, copy the

@@ -117,7 +117,10 @@ acpi_get_sysname(void)
 	if (!strcmp(hdr->oem_id, "HP")) {
 		return "hpzx1";
 	} else if (!strcmp(hdr->oem_id, "SGI")) {
-		return "sn2";
+		if (!strcmp(hdr->oem_table_id + 4, "UV"))
+			return "uv";
+		else
+			return "sn2";
 	}
 
 	return "dig";
@@ -130,6 +133,8 @@ acpi_get_sysname(void)
 	return "hpzx1_swiotlb";
 # elif defined (CONFIG_IA64_SGI_SN2)
 	return "sn2";
+# elif defined (CONFIG_IA64_SGI_UV)
+	return "uv";
 # elif defined (CONFIG_IA64_DIG)
 	return "dig";
 # else
@@ -423,6 +428,7 @@ static u32 __devinitdata pxm_flag[PXM_FLAG_LEN];
 #define pxm_bit_set(bit)	(set_bit(bit,(void *)pxm_flag))
 #define pxm_bit_test(bit)	(test_bit(bit,(void *)pxm_flag))
 static struct acpi_table_slit __initdata *slit_table;
+cpumask_t early_cpu_possible_map = CPU_MASK_NONE;
 
 static int get_processor_proximity_domain(struct acpi_srat_cpu_affinity *pa)
 {
@@ -482,6 +488,7 @@ acpi_numa_processor_affinity_init(struct acpi_srat_cpu_affinity *pa)
 	    (pa->apic_id << 8) | (pa->local_sapic_eid);
 	/* nid should be overridden as logical node id later */
 	node_cpuid[srat_num_cpus].nid = pxm;
+	cpu_set(srat_num_cpus, early_cpu_possible_map);
 	srat_num_cpus++;
 }
 
@@ -559,7 +566,7 @@ void __init acpi_numa_arch_fixup(void)
 	}
 
 	/* set logical node id in cpu structure */
-	for (i = 0; i < srat_num_cpus; i++)
+	for_each_possible_early_cpu(i)
 		node_cpuid[i].nid = pxm_to_node(node_cpuid[i].nid);
 
 	printk(KERN_INFO "Number of logical nodes in system = %d\n",
@@ -618,6 +625,9 @@ int acpi_register_gsi(u32 gsi, int triggering, int polarity)
 void acpi_unregister_gsi(u32 gsi)
 {
 	if (acpi_irq_model == ACPI_IRQ_MODEL_PLATFORM)
+		return;
+
+	if (has_8259 && gsi < 16)
 		return;
 
 	iosapic_unregister_intr(gsi);
@@ -964,7 +974,7 @@ acpi_map_iosapics (void)
 fs_initcall(acpi_map_iosapics);
 #endif				/* CONFIG_ACPI_NUMA */
 
-int acpi_register_ioapic(acpi_handle handle, u64 phys_addr, u32 gsi_base)
+int __ref acpi_register_ioapic(acpi_handle handle, u64 phys_addr, u32 gsi_base)
 {
 	int err;
 

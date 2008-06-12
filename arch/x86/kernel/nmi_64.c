@@ -26,11 +26,11 @@
 #include <asm/proto.h>
 #include <asm/mce.h>
 
-int panic_on_unrecovered_nmi;
+#include <mach_traps.h>
 
-#ifndef CONFIG_XEN
-
+int unknown_nmi_panic;
 int nmi_watchdog_enabled;
+int panic_on_unrecovered_nmi;
 
 static cpumask_t backtrace_mask = CPU_MASK_NONE;
 
@@ -313,7 +313,8 @@ void touch_nmi_watchdog(void)
 }
 EXPORT_SYMBOL(touch_nmi_watchdog);
 
-int __kprobes nmi_watchdog_tick(struct pt_regs * regs, unsigned reason)
+notrace __kprobes int
+nmi_watchdog_tick(struct pt_regs *regs, unsigned reason)
 {
 	int sum;
 	int touched = 0;
@@ -382,11 +383,10 @@ int __kprobes nmi_watchdog_tick(struct pt_regs * regs, unsigned reason)
 	return rc;
 }
 
-#endif /* CONFIG_XEN */
-
 static unsigned ignore_nmis;
 
-asmlinkage __kprobes void do_nmi(struct pt_regs * regs, long error_code)
+asmlinkage notrace __kprobes void
+do_nmi(struct pt_regs *regs, long error_code)
 {
 	nmi_enter();
 	add_pda(__nmi_count,1);
@@ -409,8 +409,6 @@ void restart_nmi(void)
 
 #ifdef CONFIG_SYSCTL
 
-int unknown_nmi_panic;
-
 static int unknown_nmi_panic_callback(struct pt_regs *regs, int cpu)
 {
 	unsigned char reason = get_nmi_reason();
@@ -421,7 +419,6 @@ static int unknown_nmi_panic_callback(struct pt_regs *regs, int cpu)
 	return 0;
 }
 
-#ifndef CONFIG_XEN
 /*
  * proc handler for /proc/sys/kernel/nmi
  */
@@ -456,7 +453,6 @@ int proc_nmi_enabled(struct ctl_table *table, int write, struct file *file,
 	}
 	return 0;
 }
-#endif
 
 #endif
 
@@ -469,7 +465,6 @@ int do_nmi_callback(struct pt_regs *regs, int cpu)
 	return 0;
 }
 
-#ifndef CONFIG_XEN
 void __trigger_all_cpu_backtrace(void)
 {
 	int i;
@@ -485,4 +480,3 @@ void __trigger_all_cpu_backtrace(void)
 
 EXPORT_SYMBOL(nmi_active);
 EXPORT_SYMBOL(nmi_watchdog);
-#endif

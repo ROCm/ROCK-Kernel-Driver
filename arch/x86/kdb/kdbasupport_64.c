@@ -24,7 +24,6 @@
 #include <asm/processor.h>
 #include <asm/msr.h>
 #include <asm/uaccess.h>
-#include <asm/mach_apic.h>
 #include <asm/hw_irq.h>
 #include <asm/desc.h>
 
@@ -825,7 +824,7 @@ kdba_cpu_pda(int argc, const char **argv)
 			kdb_printf(fmtd, "irqcount", c->irqcount);
 			kdb_printf(fmtd, "cpunumber", c->cpunumber);
 			kdb_printf(fmtp, "irqstackptr", c->irqstackptr);
-			kdb_printf(fmtd, "nodenumber", c->nodenumber);
+			kdb_printf(fmtp, "nodenumber", cpu_to_node(cpu));
 			kdb_printf(fmtd, "__softirq_pending", c->__softirq_pending);
 			kdb_printf(fmtd, "__nmi_count", c->__nmi_count);
 			kdb_printf(fmtd, "mmu_state", c->mmu_state);
@@ -971,6 +970,8 @@ kdba_set_current_task(const struct task_struct *p)
 }
 
 #ifdef	CONFIG_SMP
+
+#include <mach_ipi.h>
 
 /* When first entering KDB, try a normal IPI.  That reduces backtrace problems
  * on the other cpus.

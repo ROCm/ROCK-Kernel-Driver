@@ -294,7 +294,7 @@ static int apparmor_bprm_secureexec(struct linux_binprm *bprm)
 	return ret;
 }
 
-static int apparmor_sb_mount(char *dev_name, struct nameidata *nd, char *type,
+static int apparmor_sb_mount(char *dev_name, struct path *path, char *type,
 			      unsigned long flags, void *data)
 {
 	return aa_reject_syscall(current, GFP_KERNEL, "mount");
@@ -533,14 +533,14 @@ static int aa_xattr_permission(struct dentry *dentry, struct vfsmount *mnt,
 }
 
 static int apparmor_inode_setxattr(struct dentry *dentry, struct vfsmount *mnt,
-				   char *name, void *value, size_t size,
-				   int flags, struct file *file)
+				   const char *name, const void *value,
+				   size_t size, int flags, struct file *file)
 {
 	return aa_xattr_permission(dentry, mnt, "xattr set", MAY_WRITE, file);
 }
 
 static int apparmor_inode_getxattr(struct dentry *dentry, struct vfsmount *mnt,
-				   char *name, struct file *file)
+				   const char *name, struct file *file)
 {
 	return aa_xattr_permission(dentry, mnt, "xattr get", MAY_READ, file);
 }
@@ -552,7 +552,7 @@ static int apparmor_inode_listxattr(struct dentry *dentry, struct vfsmount *mnt,
 }
 
 static int apparmor_inode_removexattr(struct dentry *dentry,
-				      struct vfsmount *mnt, char *name,
+				      struct vfsmount *mnt, const char *name,
 				      struct file *file)
 {
 	return aa_xattr_permission(dentry, mnt, "xattr remove", MAY_WRITE,

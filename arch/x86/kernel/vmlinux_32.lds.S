@@ -29,12 +29,6 @@ PHDRS {
 SECTIONS
 {
   . = LOAD_OFFSET + LOAD_PHYSICAL_ADDR;
-
-#if defined(CONFIG_XEN) && CONFIG_XEN_COMPAT <= 0x030002
-#undef LOAD_OFFSET
-#define LOAD_OFFSET 0
-#endif
-
   phys_startup_32 = startup_32 - LOAD_OFFSET;
 
   .text.head : AT(ADDR(.text.head) - LOAD_OFFSET) {
@@ -154,6 +148,11 @@ SECTIONS
   	__con_initcall_start = .;
 	*(.con_initcall.init)
   	__con_initcall_end = .;
+  }
+  .x86cpuvendor.init : AT(ADDR(.x86cpuvendor.init) - LOAD_OFFSET) {
+	__x86cpuvendor_start = .;
+	*(.x86cpuvendor.init)
+	__x86cpuvendor_end = .;
   }
   SECURITY_INIT
   . = ALIGN(4);

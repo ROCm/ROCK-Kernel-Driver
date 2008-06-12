@@ -16,7 +16,8 @@
 #define DM_MSG_PREFIX	"dm_message"
 
 /* Basename of a path. */
-static char *basename(char *s)
+static inline char *
+basename(char *s)
 {
 	char *p = strrchr(s, '/');
 
@@ -24,7 +25,8 @@ static char *basename(char *s)
 }
 
 /* Get an argument depending on type. */
-static void message_arguments(struct dm_msg *msg, int argc, char **argv)
+static void
+message_arguments(struct dm_msg *msg, int argc, char **argv)
 {
 
 	if (argc) {
@@ -102,7 +104,8 @@ message_options_parse(struct dm_msg *msg, int argc, char **argv)
 	}
 }
 
-static void print_ret(const char *caller, unsigned long ret)
+static inline void
+print_ret(const char *caller, unsigned long ret)
 {
 	struct {
 		unsigned long err;
@@ -123,8 +126,9 @@ static void print_ret(const char *caller, unsigned long ret)
 }
 
 /* Parse a message action. */
-int dm_message_parse(const char *caller, struct dm_msg *msg, void *context,
-		     int argc, char **argv)
+int
+dm_message_parse(const char *caller, struct dm_msg *msg, void *context,
+		 int argc, char **argv)
 {
 	int hit = 0;
 	size_t l1 = strlen(*argv), l_hit = 0;
@@ -174,14 +178,3 @@ EXPORT_SYMBOL(dm_message_parse);
 MODULE_DESCRIPTION(DM_NAME " device-mapper target message parser");
 MODULE_AUTHOR("Heinz Mauelshagen <hjm@redhat.com>");
 MODULE_LICENSE("GPL");
-
-/*
- * Overrides for Emacs so that we follow Linus's tabbing style.
- * Emacs will notice this stuff at the end of the file and automatically
- * adjust the settings for this buffer only.  This must remain at the end
- * of the file.
- * ---------------------------------------------------------------------------
- * Local variables:
- * c-file-style: "linux"
- * End:
- */

@@ -3,16 +3,12 @@
 
 #include <linux/pm.h>
 #include <linux/delay.h>
-#ifndef CONFIG_XEN
 #include <asm/fixmap.h>
-#endif
 #include <asm/apicdef.h>
 #include <asm/processor.h>
 #include <asm/system.h>
 
-#ifndef CONFIG_XEN
 #define ARCH_APICTIMER_STOPS_ON_C3	1
-#endif
 
 #define Dprintk(x...)
 
@@ -40,7 +36,6 @@ extern void generic_apic_probe(void);
 #ifdef CONFIG_X86_LOCAL_APIC
 
 extern int apic_verbosity;
-#ifndef CONFIG_XEN
 extern int timer_over_8254;
 extern int local_apic_timer_c2_ok;
 extern int local_apic_timer_disabled;
@@ -49,7 +44,6 @@ extern int apic_runs_main_timer;
 extern int ioapic_force;
 extern int disable_apic;
 extern int disable_apic_timer;
-extern unsigned boot_cpu_id;
 
 /*
  * Basic functions accessing APICs.
@@ -64,6 +58,8 @@ extern unsigned boot_cpu_id;
 #define setup_secondary_clock setup_secondary_APIC_clock
 #endif
 
+extern int is_vsmp_box(void);
+
 static inline void native_apic_write(unsigned long reg, u32 v)
 {
 	*((volatile u32 *)(APIC_BASE + reg)) = v;
@@ -71,7 +67,7 @@ static inline void native_apic_write(unsigned long reg, u32 v)
 
 static inline void native_apic_write_atomic(unsigned long reg, u32 v)
 {
-	(void) xchg((u32*)(APIC_BASE + reg), v);
+	(void)xchg((u32 *)(APIC_BASE + reg), v);
 }
 
 static inline u32 native_apic_read(unsigned long reg)
@@ -105,7 +101,6 @@ static inline void ack_APIC_irq(void)
 	/* Docs say use 0 for future compatibility */
 	apic_write_around(APIC_EOI, 0);
 }
-#endif
 
 extern int lapic_get_maxlvt(void);
 extern void clear_local_APIC(void);
@@ -129,7 +124,7 @@ extern void enable_NMI_through_LVT0(void);
  * On 32bit this is mach-xxx local
  */
 #ifdef CONFIG_X86_64
-extern void setup_apic_routing(void);
+extern void early_init_lapic_mapping(void);
 #endif
 
 extern u8 setup_APIC_eilvt_mce(u8 vector, u8 msg_type, u8 mask);

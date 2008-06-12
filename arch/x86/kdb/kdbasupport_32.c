@@ -843,7 +843,7 @@ kdba_stackdepth(int argc, const char **argv)
 		if (!cpu_online(cpu))
 			continue;
 		p = krp->p;
-		esp = krp->arch.esp;
+		esp = krp->arch.sp;
 		over = 0;
 		do {
 			tinfo = (struct thread_info *)(esp & -THREAD_SIZE);
@@ -853,7 +853,7 @@ kdba_stackdepth(int argc, const char **argv)
 			esp = tinfo->previous_esp;
 		} while (esp);
 		if (over)
-			kdba_stackdepth1(p, krp->arch.esp);
+			kdba_stackdepth1(p, krp->arch.sp);
 	}
 	/* Now the tasks that are not on cpus */
 	kdb_do_each_thread(g, p) {
