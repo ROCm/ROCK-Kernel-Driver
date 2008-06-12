@@ -53,8 +53,6 @@ static unsigned char mpc52xx_map_senses[4] = {
 	IRQ_TYPE_LEVEL_LOW,
 };
 
-#undef pr_debug
-#define pr_debug(x,y ...) do { mb(); eieio(); isync(); udelay(42); } while(0)
 /*
  *
 */
