@@ -80,7 +80,7 @@ static dpt_sig_S DPTI_sig = {
 #ifdef __i386__
 	PROC_INTEL, PROC_386 | PROC_486 | PROC_PENTIUM | PROC_SEXIUM,
 #elif defined(__ia64__)
-	PROC_IA64, PROC_IA64,
+	PROC_INTEL, PROC_IA64,
 #elif defined(__sparc__)
 	PROC_ULTRASPARC, PROC_ULTRASPARC,
 #elif defined(__alpha__)
