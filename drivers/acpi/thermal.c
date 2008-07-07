@@ -452,18 +452,16 @@ static int acpi_thermal_trips_update(struct acpi_thermal *tz, int flag)
 		memset(&devices, 0, sizeof(struct acpi_handle_list));
 		status = acpi_evaluate_reference(tz->device->handle, "_PSL",
 							NULL, &devices);
-		if (ACPI_SUCCESS(status)) {
-			tz->trips.passive.flags.valid = 1;
-			if (memcmp(&tz->trips.passive.devices, &devices,
-				   sizeof(struct acpi_handle_list))) {
-				memcpy(&tz->trips.passive.devices, &devices,
-				       sizeof(struct acpi_handle_list));
-				ACPI_THERMAL_TRIPS_EXCEPTION(flag, "device");
-			}
-		} else {
+		if (ACPI_FAILURE(status))
 			tz->trips.passive.flags.valid = 0;
-			ACPI_EXCEPTION((AE_INFO, status, "Invalid passiv trip"
-					" point\n"));
+		else
+			tz->trips.passive.flags.valid = 1;
+
+		if (memcmp(&tz->trips.passive.devices, &devices,
+				sizeof(struct acpi_handle_list))) {
+			memcpy(&tz->trips.passive.devices, &devices,
+				sizeof(struct acpi_handle_list));
+			ACPI_THERMAL_TRIPS_EXCEPTION(flag, "device");
 		}
 	}
 	if ((flag & ACPI_TRIPS_PASSIVE) || (flag & ACPI_TRIPS_DEVICES)) {
