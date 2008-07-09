@@ -270,6 +270,21 @@ config NF_CONNTRACK_TFTP
 
 	  To compile it as a module, choose M here.  If unsure, say N.
 
+config NF_CONNTRACK_SLP
+	tristate "SLP protocol support"
+	depends on NF_CONNTRACK
+	depends on NETFILTER_ADVANCED
+	help
+	  SLP queries are sometimes sent as broadcast messages from an
+	  unprivileged port and responded to with unicast messages to the
+	  same port. This make them hard to firewall properly because connection
+	  tracking doesn't deal with broadcasts. This helper tracks locally
+	  originating broadcast SLP queries and the corresponding
+	  responses. It relies on correct IP address configuration, specifically
+	  netmask and broadcast address.
+
+	  To compile it as a module, choose M here.  If unsure, say N.
+
 config NF_CT_NETLINK
 	tristate 'Connection tracking netlink interface'
 	depends on NF_CONNTRACK
