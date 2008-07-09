@@ -405,9 +405,7 @@ int seq_path_root(struct seq_file *m, struct path *path, struct path *root,
 		char *s = m->buf + m->count;
 		char *p;
 
-		spin_lock(&dcache_lock);
-		p = __d_path(path, root, s, m->size - m->count, 0, 0);
-		spin_unlock(&dcache_lock);
+		p = __d_path(path, root, s, m->size - m->count, 0);
 		err = PTR_ERR(p);
 		if (!IS_ERR(p)) {
 			s = mangle_path(s, p, esc);

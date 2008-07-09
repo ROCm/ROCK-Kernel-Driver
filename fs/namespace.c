@@ -2369,7 +2369,8 @@ char *d_namespace_path(struct dentry *dentry, struct vfsmount *vfsmnt,
 	if (ns_root.mnt)
 		ns_root.dentry = dget(ns_root.mnt->mnt_root);
 	spin_unlock(&vfsmount_lock);
-	res = __d_path(&path, &ns_root, buf, buflen, 1, 1);
+	res = __d_path(&path, &ns_root, buf, buflen,
+		       D_PATH_FAIL_DELETED | D_PATH_DISCONNECT);
 	path_put(&root);
 	path_put(&ns_root);
 
@@ -2378,3 +2379,4 @@ char *d_namespace_path(struct dentry *dentry, struct vfsmount *vfsmnt,
 		*--res = '.';
 	return res;
 }
+EXPORT_SYMBOL(d_namespace_path);

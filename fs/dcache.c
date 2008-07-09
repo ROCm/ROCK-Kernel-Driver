@@ -17,6 +17,7 @@
 #include <linux/syscalls.h>
 #include <linux/string.h>
 #include <linux/mm.h>
+#include <linux/fdtable.h>
 #include <linux/fs.h>
 #include <linux/fsnotify.h>
 #include <linux/slab.h>
@@ -106,9 +107,10 @@ static void dentry_lru_remove(struct dentry *dentry)
 /*
  * Release the dentry's inode, using the filesystem
  * d_iput() operation if defined.
- * Called with dcache_lock and per dentry lock held, drops both.
  */
 static void dentry_iput(struct dentry * dentry)
+	__releases(dentry->d_lock)
+	__releases(dcache_lock)
 {
 	struct inode *inode = dentry->d_inode;
 	if (inode) {
@@ -132,12 +134,13 @@ static void dentry_iput(struct dentry * dentry)
  * d_kill - kill dentry and return parent
  * @dentry: dentry to kill
  *
- * Called with dcache_lock and d_lock, releases both.  The dentry must
- * already be unhashed and removed from the LRU.
+ * The dentry must already be unhashed and removed from the LRU.
  *
  * If this is the root of the dentry tree, return NULL.
  */
 static struct dentry *d_kill(struct dentry *dentry)
+	__releases(dentry->d_lock)
+	__releases(dcache_lock)
 {
 	struct dentry *parent;
 
@@ -383,11 +386,11 @@ restart:
  * Try to prune ancestors as well.  This is necessary to prevent
  * quadratic behavior of shrink_dcache_parent(), but is also expected
  * to be beneficial in reducing dentry cache fragmentation.
- *
- * Called with dcache_lock, drops it and then regains.
- * Called with dentry->d_lock held, drops it.
  */
 static void prune_one_dentry(struct dentry * dentry)
+	__releases(dentry->d_lock)
+	__releases(dcache_lock)
+	__acquires(dcache_lock)
 {
 	__d_drop(dentry);
 	dentry = d_kill(dentry);
@@ -1604,10 +1607,9 @@ static int d_isparent(struct dentry *p1, struct dentry *p2)
  *
  * Note: If ever the locking in lock_rename() changes, then please
  * remember to update this too...
- *
- * On return, dcache_lock will have been unlocked.
  */
 static struct dentry *__d_unalias(struct dentry *dentry, struct dentry *alias)
+	__releases(dcache_lock)
 {
 	struct mutex *m1 = NULL, *m2 = NULL;
 	struct dentry *ret;
@@ -1743,11 +1745,9 @@ out_nolock:
 shouldnt_be_hashed:
 	spin_unlock(&dcache_lock);
 	BUG();
-	goto shouldnt_be_hashed;
 }
 
-static int prepend(char **buffer, int *buflen, const char *str,
-			  int namelen)
+static int prepend(char **buffer, int *buflen, const char *str, int namelen)
 {
 	*buflen -= namelen;
 	if (*buflen < 0)
@@ -1757,82 +1757,78 @@ static int prepend(char **buffer, int *buflen, const char *str,
 	return 0;
 }
 
+static int prepend_name(char **buffer, int *buflen, struct qstr *name)
+{
+	return prepend(buffer, buflen, name->name, name->len);
+}
+
 /**
  * __d_path - return the path of a dentry
  * @path: the dentry/vfsmount to report
  * @root: root vfsmnt/dentry (may be modified by this function)
  * @buffer: buffer to return value in
  * @buflen: buffer length
- * @fail_deleted: what to return for deleted files
- * @disconnect: don't return a path starting with / when disconnected
+ * @flags: flags controling behavior of d_path
  *
  * Convert a dentry into an ASCII path name. If the entry has been deleted,
- * then if @fail_deleted is true, ERR_PTR(-ENOENT) is returned. Otherwise,
- * the string " (deleted)" is appended. Note that this is ambiguous.
- *
- * Returns the buffer or an error code if the path was too long.
+ * then if @flags has D_PATH_FAIL_DELETED set, ERR_PTR(-ENOENT) is returned.
+ * Otherwise, the string " (deleted)" is appended. Note that this is ambiguous.
  *
  * If path is not reachable from the supplied root, then the value of
- * root is changed (without modifying refcounts). The path returned in this
+ * root is changed (without modifying refcounts).  The path returned in this
  * case will be relative (i.e., it will not start with a slash).
+ *
+ * Returns the buffer or an error code if the path was too long.
  */
 char *__d_path(const struct path *path, struct path *root,
-	       char *buffer, int buflen, int fail_deleted, int disconnect)
+	       char *buffer, int buflen, int flags)
 {
 	struct dentry *dentry = path->dentry;
 	struct vfsmount *vfsmnt = path->mnt;
-	char * end = buffer+buflen;
-	int is_slash, vfsmount_locked = 0;
+	const unsigned char *name;
+	int namelen;
 
-	if (buflen < 2)
-		return ERR_PTR(-ENAMETOOLONG);
-	buffer += --buflen;
-	*buffer = '\0';
+	buffer += buflen;
+	prepend(&buffer, &buflen, "\0", 1);
 
-	prepend(&end, &buflen, "\0", 1);
+	spin_lock(&vfsmount_lock);
 	spin_lock(&dcache_lock);
 	if (!IS_ROOT(dentry) && d_unhashed(dentry)) {
-		if (fail_deleted) {
+		if (flags & D_PATH_FAIL_DELETED) {
 			buffer = ERR_PTR(-ENOENT);
 			goto out;
 		}
-		if (prepend(&end, &buflen, " (deleted)", 10) != 0)
+		if (prepend(&buffer, &buflen, " (deleted)", 10) != 0)
 			goto Elong;
 	}
+	if (buflen < 1)
+		goto Elong;
 
 	while (dentry != root->dentry || vfsmnt != root->mnt) {
 		struct dentry * parent;
 
 		if (dentry == vfsmnt->mnt_root || IS_ROOT(dentry)) {
-			if (!vfsmount_locked) {
-				spin_lock(&vfsmount_lock);
-				vfsmount_locked = 1;
-			}
-			if (vfsmnt->mnt_parent == vfsmnt)
+			if (vfsmnt->mnt_parent == vfsmnt) {
 				goto global_root;
+			}
 			dentry = vfsmnt->mnt_mountpoint;
 			vfsmnt = vfsmnt->mnt_parent;
 			continue;
 		}
 		parent = dentry->d_parent;
 		prefetch(parent);
-		if ((prepend(&end, &buflen, dentry->d_name.name,
-				dentry->d_name.len) != 0) ||
-		    (prepend(&end, &buflen, "/", 1) != 0))
+		if ((prepend_name(&buffer, &buflen, &dentry->d_name) != 0) ||
+		    (prepend(&buffer, &buflen, "/", 1) != 0))
 			goto Elong;
 		dentry = parent;
 	}
-
-	if (buflen < 1)
+	/* Get '/' right. */
+	if (*buffer != '/' && prepend(&buffer, &buflen, "/", 1))
 		goto Elong;
-	/* Get '/' right */
-	buffer = end-1;
-	*buffer = '/';
 
 out:
-	if (vfsmount_locked)
-		spin_unlock(&vfsmount_lock);
 	spin_unlock(&dcache_lock);
+	spin_unlock(&vfsmount_lock);
 	return buffer;
 
 global_root:
@@ -1841,27 +1837,24 @@ global_root:
 	 * either hit a root dentry, a lazily unmounted dentry, an
 	 * unconnected dentry, or the file is on a pseudo filesystem.
 	 */
-	is_slash = (dentry->d_name.len == 1 && *dentry->d_name.name == '/');
-	if (disconnect && (is_slash || (dentry->d_sb->s_flags & MS_NOUSER))) {
-		/*
-		 * Make sure we won't return a pathname starting with '/'.
-		 *
-		 * Historically, we also glue together the root dentry and
-		 * remaining name for pseudo filesystems like pipefs, which
-		 * have the MS_NOUSER flag set. This results in pathnames
-		 * like "pipe:[439336]".
-		 */
-		if (*buffer == '/') {
-			buffer++;
-			buflen++;
-		}
-		if (is_slash)
-			goto out;
-	} else if (is_slash && *buffer == '/') {
-		goto out;
+        namelen = dentry->d_name.len;
+	name = dentry->d_name.name;
+
+	/*
+	 * If this is a root dentry, then overwrite the slash.  This
+	 * will also DTRT with pseudo filesystems which have root
+	 * dentries named "foo:".
+	 */
+	if (IS_ROOT(dentry) && *buffer == '/') {
+		buffer++;
+		buflen++;
 	}
-	if (prepend(&buffer, &buflen, dentry->d_name.name,
-		    dentry->d_name.len) != 0)
+	if ((flags & D_PATH_DISCONNECT) && *name == '/') {
+		/* Make sure we won't return a pathname starting with '/' */
+		name++;
+		namelen--;
+	}
+	if (prepend(&buffer, &buflen, name, namelen))
 		goto Elong;
 	root->mnt = vfsmnt;
 	root->dentry = dentry;
@@ -1883,9 +1876,9 @@ Elong:
  *
  * Returns the buffer or an error code if the path was too long.
  *
- * "buflen" should be positive. Caller holds the dcache_lock.
+ * "buflen" should be positive.
  */
-char *d_path(struct path *path, char *buf, int buflen)
+char *d_path(const struct path *path, char *buf, int buflen)
 {
 	char *res;
 	struct path root;
@@ -1906,7 +1899,7 @@ char *d_path(struct path *path, char *buf, int buflen)
 	path_get(&root);
 	read_unlock(&current->fs->lock);
 	tmp = root;
-	res = __d_path(path, &tmp, buf, buflen, 0, 0);
+	res = __d_path(path, &tmp, buf, buflen, 0);
 	path_put(&root);
 	return res;
 }
@@ -1951,16 +1944,11 @@ char *dentry_path(struct dentry *dentry, char *buf, int buflen)
 	retval = end-1;
 	*retval = '/';
 
-	for (;;) {
-		struct dentry *parent;
-		if (IS_ROOT(dentry))
-			break;
+	while (!IS_ROOT(dentry)) {
+		struct dentry *parent = dentry->d_parent;
 
-		parent = dentry->d_parent;
 		prefetch(parent);
-
-		if ((prepend(&end, &buflen, dentry->d_name.name,
-				dentry->d_name.len) != 0) ||
+		if ((prepend_name(&end, &buflen, &dentry->d_name) != 0) ||
 		    (prepend(&end, &buflen, "/", 1) != 0))
 			goto Elong;
 
@@ -2008,7 +1996,7 @@ asmlinkage long sys_getcwd(char __user *buf, unsigned long size)
 	path_get(&root);
 	read_unlock(&current->fs->lock);
 
-	cwd = __d_path(&pwd, &root, page, PAGE_SIZE, 1, 0);
+	cwd = __d_path(&pwd, &root, page, PAGE_SIZE, 0);
 	error = PTR_ERR(cwd);
 	if (IS_ERR(cwd))
 		goto out;

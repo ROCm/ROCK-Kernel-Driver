@@ -297,11 +297,13 @@ extern int d_validate(struct dentry *, struct dentry *);
 /*
  * helper function for dentry_operations.d_dname() members
  */
+#define D_PATH_FAIL_DELETED 1
+#define D_PATH_DISCONNECT   2
 extern char *dynamic_dname(struct dentry *, char *, int, const char *, ...);
 
-extern char *__d_path(const struct path *path, struct path *root, char *,
-		      int, int, int);
-extern char *d_path(struct path *, char *, int);
+extern char *__d_path(const struct path *path, struct path *root, char *, int,
+		      int);
+extern char *d_path(const struct path *, char *, int);
 extern char *dentry_path(struct dentry *, char *, int);
 
 /* Allocation counts.. */
