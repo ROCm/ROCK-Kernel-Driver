@@ -47,8 +47,6 @@ void reiserfs_delete_inode(struct inode *inode)
 
 		reiserfs_discard_prealloc(&th, inode);
 
-		reiserfs_discard_prealloc(&th, inode);
-
 		err = reiserfs_delete_object(&th, inode);
 
 		/* Do quota update inside a transaction for journaled quotas. We must do that
