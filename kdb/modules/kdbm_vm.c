@@ -609,8 +609,7 @@ kdbm_fl(int argc, const char **argv)
 
 	kdb_printf(" file_lock_operations");
 	if (fl.fl_ops)
-		kdb_printf("\n   fl_insert = 0x%p fl_remove = 0x%p fl_copy_lock = 0x%p fl_release_private = 0x%p\n",
-			fl.fl_ops->fl_insert, fl.fl_ops->fl_remove,
+		kdb_printf("\n   fl_copy_lock = 0x%p fl_release_private = 0x%p\n",
 			fl.fl_ops->fl_copy_lock, fl.fl_ops->fl_release_private);
 	else
 		kdb_printf("   empty\n");
