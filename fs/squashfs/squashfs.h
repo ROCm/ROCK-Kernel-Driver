@@ -2,7 +2,7 @@
  * Squashfs - a compressed read only filesystem for Linux
  *
  * Copyright (c) 2002, 2003, 2004, 2005, 2006, 2007
- * Phillip Lougher <phillip@lougher.org.uk>
+ * Phillip Lougher <phillip@lougher.demon.co.uk>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -50,7 +50,7 @@ static inline struct squashfs_inode_info *SQUASHFS_I(struct inode *inode)
 extern unsigned int squashfs_read_data(struct super_block *s, char *buffer,
 				long long index, unsigned int length,
 				long long *next_index, int srclength);
-extern int squashfs_get_cached_block(struct super_block *s, char *buffer,
+extern int squashfs_get_cached_block(struct super_block *s, void *buffer,
 				long long block, unsigned int offset,
 				int length, long long *next_block,
 				unsigned int *next_offset);
@@ -62,7 +62,6 @@ extern struct squashfs_fragment_cache *get_cached_fragment(struct super_block
 extern struct inode *squashfs_iget(struct super_block *s, squashfs_inode_t inode, unsigned int inode_number);
 extern const struct address_space_operations squashfs_symlink_aops;
 extern const struct address_space_operations squashfs_aops;
-extern const struct address_space_operations squashfs_aops_4K;
 extern struct inode_operations squashfs_dir_inode_ops;
 #else
 #define SQSH_EXTERN static

@@ -2,7 +2,7 @@
  * Squashfs - a compressed read only filesystem for Linux
  *
  * Copyright (c) 2002, 2003, 2004, 2005, 2006, 2007
- * Phillip Lougher <phillip@lougher.org.uk>
+ * Phillip Lougher <phillip@lougher.demon.co.uk>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -148,14 +148,15 @@ static int squashfs_read_inode_2(struct inode *i, squashfs_inode_t inode)
 	unsigned int block = SQUASHFS_INODE_BLK(inode) +
 		sblk->inode_table_start;
 	unsigned int offset = SQUASHFS_INODE_OFFSET(inode);
-	unsigned int ino = i->i_ino;
+	unsigned int ino = SQUASHFS_MK_VFS_INODE(block -
+		sblk->inode_table_start, offset);
 	long long next_block;
 	unsigned int next_offset;
 	union squashfs_inode_header_2 id, sid;
 	struct squashfs_base_inode_header_2 *inodeb = &id.base,
 					  *sinodeb = &sid.base;
 
-	TRACE("Entered squashfs_iget\n");
+	TRACE("Entered squashfs_read_inode_2\n");
 
 	if (msblk->swap) {
 		if (!squashfs_get_cached_block(s, (char *) sinodeb, block,
@@ -212,10 +213,7 @@ static int squashfs_read_inode_2(struct inode *i, squashfs_inode_t inode)
 			SQUASHFS_I(i)->start_block = inodep->start_block;
 			SQUASHFS_I(i)->u.s1.block_list_start = next_block;
 			SQUASHFS_I(i)->offset = next_offset;
-			if (sblk->block_size > 4096)
-				i->i_data.a_ops = &squashfs_aops;
-			else
-				i->i_data.a_ops = &squashfs_aops_4K;
+			i->i_data.a_ops = &squashfs_aops;
 
 			TRACE("File inode %x:%x, start_block %x, "
 					"block_list_start %llx, offset %x\n",

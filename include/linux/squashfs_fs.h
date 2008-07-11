@@ -5,7 +5,7 @@
  * Squashfs
  *
  * Copyright (c) 2002, 2003, 2004, 2005, 2006, 2007
- * Phillip Lougher <phillip@lougher.org.uk>
+ * Phillip Lougher <phillip@lougher.demon.co.uk>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -28,16 +28,9 @@
 #define CONFIG_SQUASHFS_2_0_COMPATIBILITY
 #endif
 
-#ifdef	CONFIG_SQUASHFS_VMALLOC
-#define SQUASHFS_ALLOC(a)		vmalloc(a)
-#define SQUASHFS_FREE(a)		vfree(a)
-#else
-#define SQUASHFS_ALLOC(a)		kmalloc(a, GFP_KERNEL)
-#define SQUASHFS_FREE(a)		kfree(a)
-#endif
 #define SQUASHFS_CACHED_FRAGMENTS	CONFIG_SQUASHFS_FRAGMENT_CACHE_SIZE
 #define SQUASHFS_MAJOR			3
-#define SQUASHFS_MINOR			0
+#define SQUASHFS_MINOR			1
 #define SQUASHFS_MAGIC			0x73717368
 #define SQUASHFS_MAGIC_SWAP		0x68737173
 #define SQUASHFS_START			0
@@ -47,10 +40,10 @@
 #define SQUASHFS_METADATA_LOG		13
 
 /* default size of data blocks */
-#define SQUASHFS_FILE_SIZE		65536
-#define SQUASHFS_FILE_LOG		16
+#define SQUASHFS_FILE_SIZE		131072
+#define SQUASHFS_FILE_LOG		17
 
-#define SQUASHFS_FILE_MAX_SIZE		65536
+#define SQUASHFS_FILE_MAX_SIZE		1048576
 
 /* Max number of uids and gids */
 #define SQUASHFS_UIDS			256
@@ -131,9 +124,8 @@
 
 #define SQUASHFS_COMPRESSED_BIT_BLOCK		(1 << 24)
 
-#define SQUASHFS_COMPRESSED_SIZE_BLOCK(B)	(((B) & \
-	~SQUASHFS_COMPRESSED_BIT_BLOCK) ? (B) & \
-	~SQUASHFS_COMPRESSED_BIT_BLOCK : SQUASHFS_COMPRESSED_BIT_BLOCK)
+#define SQUASHFS_COMPRESSED_SIZE_BLOCK(B)	((B) & \
+	~SQUASHFS_COMPRESSED_BIT_BLOCK)
 
 #define SQUASHFS_COMPRESSED_BLOCK(B)	(!((B) & SQUASHFS_COMPRESSED_BIT_BLOCK))
 
@@ -628,6 +620,15 @@ struct squashfs_dir_inode_header_1 {
 	unsigned int		mtime;
 	unsigned int		start_block:24;
 } __attribute__  ((packed));
+
+union squashfs_inode_header_1 {
+	struct squashfs_base_inode_header_1	base;
+	struct squashfs_dev_inode_header_1	dev;
+	struct squashfs_symlink_inode_header_1	symlink;
+	struct squashfs_reg_inode_header_1	reg;
+	struct squashfs_dir_inode_header_1	dir;
+	struct squashfs_ipc_inode_header_1	ipc;
+};
 
 #define SQUASHFS_SWAP_BASE_INODE_CORE_1(s, d, n) \
 	SQUASHFS_MEMSET(s, d, n);\
