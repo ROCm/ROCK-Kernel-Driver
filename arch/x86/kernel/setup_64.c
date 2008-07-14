@@ -444,6 +444,12 @@ void __init setup_arch(char **cmdline_p)
 	contig_initmem_init(0, end_pfn);
 #endif
 
+	/*
+	 * dma32_reserve_bootmem() allocates bootmem which may conflict
+	 * with the crashkernel command line, so do that before
+	 */
+	reserve_crashkernel();
+
 	dma32_reserve_bootmem();
 
 #ifdef CONFIG_ACPI_SLEEP
@@ -484,7 +490,6 @@ void __init setup_arch(char **cmdline_p)
 		}
 	}
 #endif
-	reserve_crashkernel();
 
 	reserve_ibft_region();
 
