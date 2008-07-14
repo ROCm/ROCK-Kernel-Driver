@@ -126,11 +126,7 @@
 
 #pragma pack(push, 1)
 
-#ifndef NWHANDLE
-typedef void *NWHANDLE;
-#endif
-
-/*typedef struct _ncl_string
+/*struct _ncl_string
 {
 	unsigned int  	type;
 	unsigned char 	*buffer;
@@ -138,206 +134,127 @@ typedef void *NWHANDLE;
 
 } NclString, *PNclString;
 */
-typedef struct _ncl_string {
+struct ncl_string {
 	unsigned int type;
 	unsigned char *buffer;
 	u32 len;
+};
 
-} NclString, *PNclString;
-
-typedef struct _nwd_string {
+struct nwd_string {
 	unsigned int type;
 	unsigned int len;
 	unsigned int boffset;
+};
 
-} NwdString, *PNwdString;
-
-typedef struct _COMMAND_REQUEST_HEADER {
+struct novfs_command_request_header {
 	unsigned int CommandType;
 	unsigned long SequenceNumber;
-	struct schandle SessionId;
-} COMMAND_REQUEST_HEADER, *PCOMMAND_REQUEST_HEADER;
+	struct novfs_schandle SessionId;
 
-typedef struct _COMMAND_REPLY_HEADER {
+};
+
+struct novfs_command_reply_header {
 	unsigned long Sequence_Number;
 	unsigned int ErrorCode;
 
-} COMMAND_REPLY_HEADER, *PCOMMAND_REPLY_HEADER;
+};
 
-typedef struct _CLOSE_REQUEST {
-	COMMAND_REQUEST_HEADER Command;
-	NWHANDLE FileHandle;
-} CLOSE_REQUEST, *PCLOSE_REQUEST;
 
-typedef struct _CLOSE_REPLY {
-	COMMAND_REPLY_HEADER Reply;
-} CLOSE_REPLY, *PCLOSE_REPLY;
-
-typedef struct _DELETE_FILE_REQUEST {
-	COMMAND_REQUEST_HEADER Command;
+struct novfs_delete_file_request {
+	struct novfs_command_request_header Command;
 	unsigned int isDirectory;
 	unsigned int pathlength;
 	unsigned char path[1];
-} DELETE_FILE_REQUEST, *PDELETE_FILE_REQUEST;
+};
 
-typedef struct _DELETE_FILE_REPLY {
-	COMMAND_REPLY_HEADER Reply;
-} DELETE_FILE_REPLY, *PDELETE_FILE_REPLY;
+struct novfs_delete_file_reply {
+	struct novfs_command_reply_header Reply;
+};
 
-typedef struct _FLUSH_REQUEST {
-	COMMAND_REQUEST_HEADER Command;
-	NWHANDLE FileHandle;
-} FLUSH_REQUEST, *PFLUSH_REQUEST;
+struct novfs_get_connected_server_list {
+	struct novfs_command_request_header Command;
+};
 
-typedef struct _FLUSH_REPLY {
-	COMMAND_REPLY_HEADER Reply;
-} FLUSH_REPLY, *PFLUSH_REPLY;
-
-typedef struct _GET_FILEINFO_REQUEST {
-	COMMAND_REQUEST_HEADER Command;
-	NWHANDLE FileHandle;
-} GET_FILEINFO_REQUEST, *PGET_FILEINFO_REQUEST;
-
-typedef struct _GET_FILEINFO_REPLY {
-	COMMAND_REPLY_HEADER Reply;
-} GET_FILEINFO_REPLY, *PGET_FILEINFO_REPLY;
-
-typedef struct _GET_CONNECTED_SERVER_LIST_REQUEST {
-	COMMAND_REQUEST_HEADER Command;
-} GET_CONNECTED_SERVER_LIST_REQUEST, *PGET_CONNECTED_SERVER_LIST_REQUEST;
-
-typedef struct _GET_CONNECTED_SERVER_LIST_REPLY {
-	COMMAND_REPLY_HEADER Reply;
+struct novfs_get_connected_server_list_reply {
+	struct novfs_command_reply_header Reply;
 	unsigned char List[1];
-} GET_CONNECTED_SERVER_LIST_REPLY, *PGET_CONNECTED_SERVER_LIST_REPLY;
+};
 
-typedef struct _GET_CONNECTED_SERVER_LIST_REQUEST_EX {
-	COMMAND_REQUEST_HEADER Command;
-} GET_CONNECTED_SERVER_LIST_REQUEST_EX, *PGET_CONNECTED_SERVER_LIST_REQUEST_EX;
+struct novfs_get_connected_server_list_request_ex {
+	struct novfs_command_request_header Command;
+};
 
-typedef struct _GET_CONNECTED_SERVER_LIST_REPLY_EX {
-	COMMAND_REPLY_HEADER Reply;
+struct novfs_get_connected_server_list_reply_ex {
+
+	struct novfs_command_reply_header Reply;
 	unsigned int bufferLen;
 	unsigned char List[1];
 
-} GET_CONNECTED_SERVER_LIST_REPLY_EX, *PGET_CONNECTED_SERVER_LIST_REPLY_EX;
+};
 
-typedef struct _GET_SERVER_VOLUME_LIST_REQUEST {
-	COMMAND_REQUEST_HEADER Command;
+struct novfs_get_server_volume_list {
+	struct novfs_command_request_header Command;
 	unsigned int Length;
 	unsigned char Name[1];
-} GET_SERVER_VOLUME_LIST_REQUEST, *PGET_SERVER_VOLUME_LIST_REQUEST;
+};
 
-typedef struct _GET_SERVER_VOLUME_LIST_REPLY {
-	COMMAND_REPLY_HEADER Reply;
+struct novfs_get_server_volume_list_reply {
+	struct novfs_command_reply_header Reply;
 	unsigned char List[1];
-} GET_SERVER_VOLUME_LIST_REPLY, *PGET_SERVER_VOLUME_LIST_REPLY;
+};
 
-typedef struct _OPEN_CONNECTION_BY_ADDR_REQUEST {
-	COMMAND_REQUEST_HEADER Command;
-	unsigned int address;
-
-} OPEN_CONNECTION_BY_ADDR_REQUEST, *POPEN_CONNECTION_BY_ADDR_REQUEST;
-
-typedef struct _OPEN_CONNECTION_BY_ADDR_REPLY {
-	COMMAND_REPLY_HEADER Reply;
-	unsigned char serverName[64];
-	unsigned char treeName[64];
-	NWHANDLE connHandle;
-
-} OPEN_CONNECTION_BY_ADDR_REPLY, *POPEN_CONNECTION_BY_ADDR_REPLY;
-
-typedef struct _OPEN_CONNECTION_BY_NAME_REQUEST {
-	COMMAND_REQUEST_HEADER Command;
-	unsigned int NameLen;
-	unsigned char Name[1];
-
-} OPEN_CONNECTION_BY_NAME_REQUEST, *POPEN_CONNECTION_BY_NAME_REQUEST;
-
-typedef struct _OPEN_CONNECTION_BY_NAME_REPLY {
-	COMMAND_REPLY_HEADER Reply;
-	unsigned char treeName[64];
-	NWHANDLE connHandle;
-
-} OPEN_CONNECTION_BY_NAME_REPLY, *POPEN_CONNECTION_BY_NAME_REPLY;
-
-/*
-typedef struct _LOGIN_IDENTITY_REQUEST
-{
-	COMMAND_REQUEST_HEADER Command;
-	unsigned int			treeFlags;
-	unsigned char			treeName[64];
-	unsigned int			serverFlags;
-	unsigned char			serverName[64];
-	unsigned int			userFlags;
-	unsigned char			userName[512];
-	unsigned int			passwordFlags;
-	unsigned char			password[128];
-
-} LOGIN_IDENTITY_REQUEST, *PLOGIN_IDENTITY_REQUEST;
-
-typedef struct _LOGIN_IDENTITY_REPLY
-{
-	COMMAND_REPLY_HEADER Reply;
-	unsigned char			serverName[64];
-	unsigned char			treeName[64];
-	NWHANDLE					connHandle;
-
-} LOGIN_IDENTITY_REPLY, *PLOGIN_IDENTITY_REPLY;
-*/
-
-typedef struct _VERIFY_FILE_REQUEST {
-	COMMAND_REQUEST_HEADER Command;
+struct novfs_verify_file_request {
+	struct novfs_command_request_header Command;
 	unsigned int pathLen;
 	unsigned char path[1];
 
-} VERIFY_FILE_REQUEST, *PVERIFY_FILE_REQUEST;
+};
 
-typedef struct _VERIFY_FILE_REPLY {
-	COMMAND_REPLY_HEADER Reply;
+struct novfs_verify_file_reply {
+	struct novfs_command_reply_header Reply;
 	unsigned int lastAccessTime;
 	unsigned int modifyTime;
 	unsigned int createTime;
 	unsigned long long fileSize;
 	unsigned int fileMode;
 
-} VERIFY_FILE_REPLY, *PVERIFY_FILE_REPLY;
+};
 
-typedef struct _BEGIN_ENUMERATE_DIRECTORY_REQUEST {
-	COMMAND_REQUEST_HEADER Command;
+struct novfs_begin_enumerate_directory_request {
+	struct novfs_command_request_header Command;
 	unsigned int pathLen;
 	unsigned char path[1];
 
-} BEGIN_ENUMERATE_DIRECTORY_REQUEST, *PBEGIN_ENUMERATE_DIRECTORY_REQUEST;
+};
 
-typedef struct _BEGIN_ENUMERATE_DIRECTORY_REPLY {
-	COMMAND_REPLY_HEADER Reply;
-	HANDLE enumerateHandle;
+struct novfs_begin_enumerate_directory_reply {
+	struct novfs_command_reply_header Reply;
+	void *enumerateHandle;
 
-} BEGIN_ENUMERATE_DIRECTORY_REPLY, *PBEGIN_ENUMERATE_DIRECTORY_REPLY;
+};
 
-typedef struct _END_ENUMERATE_DIRECTORY_REQUEST {
-	COMMAND_REQUEST_HEADER Command;
-	HANDLE enumerateHandle;
+struct novfs_end_enumerate_directory_request {
+	struct novfs_command_request_header Command;
+	void *enumerateHandle;
 
-} END_ENUMERATE_DIRECTORY_REQUEST, *PEND_ENUMERATE_DIRECTORY_REQUEST;
+};
 
-typedef struct _END_ENUMERATE_DIRECTORY_REPLY {
-	COMMAND_REPLY_HEADER Reply;
+struct novfs_end_enumerate_directory_reply {
+	struct novfs_command_reply_header Reply;
 
-} END_ENUMERATE_DIRECTORY_REPLY, *PEND_ENUMERATE_DIRECTORY_REPLY;
+};
 
-typedef struct _ENUMERATE_DIRECTORY_REQUEST {
-	COMMAND_REQUEST_HEADER Command;
-	HANDLE enumerateHandle;
+struct novfs_enumerate_directory_request {
+	struct novfs_command_request_header Command;
+	void *enumerateHandle;
 	unsigned int pathLen;
 	unsigned char path[1];
 
-} ENUMERATE_DIRECTORY_REQUEST, *PENUMERATE_DIRECTORY_REQUEST;
+};
 
-typedef struct _ENUMERATE_DIRECTORY_REPLY {
-	COMMAND_REPLY_HEADER Reply;
-	HANDLE enumerateHandle;
+struct novfs_enumerate_directory_reply {
+	struct novfs_command_reply_header Reply;
+	void *enumerateHandle;
 	unsigned int lastAccessTime;
 	unsigned int modifyTime;
 	unsigned int createTime;
@@ -346,17 +263,17 @@ typedef struct _ENUMERATE_DIRECTORY_REPLY {
 	unsigned int nameLen;
 	unsigned char name[1];
 
-} ENUMERATE_DIRECTORY_REPLY, *PENUMERATE_DIRECTORY_REPLY;
+};
 
-typedef struct _ENUMERATE_DIRECTORY_EX_REQUEST {
-	COMMAND_REQUEST_HEADER Command;
-	HANDLE enumerateHandle;
+struct novfs_enumerate_directory_ex_request {
+	struct novfs_command_request_header Command;
+	void *enumerateHandle;
 	unsigned int pathLen;
 	unsigned char path[1];
 
-} ENUMERATE_DIRECTORY_EX_REQUEST, *PENUMERATE_DIRECTORY_EX_REQUEST;
+};
 
-typedef struct _ENUMERATE_DIRECTORY_EX_DATA {
+struct novfs_enumerate_directory_ex_data {
 	unsigned int length;
 	unsigned int lastAccessTime;
 	unsigned int modifyTime;
@@ -366,143 +283,130 @@ typedef struct _ENUMERATE_DIRECTORY_EX_DATA {
 	unsigned int nameLen;
 	unsigned char name[1];
 
-} ENUMERATE_DIRECTORY_EX_DATA, *PENUMERATE_DIRECTORY_EX_DATA;
+};
 
-typedef struct _ENUMERATE_DIRECTORY_EX_REPLY {
-	COMMAND_REPLY_HEADER Reply;
-	HANDLE enumerateHandle;
+struct novfs_enumerate_directory_ex_reply {
+	struct novfs_command_reply_header Reply;
+	void *enumerateHandle;
 	unsigned int enumCount;
 
-} ENUMERATE_DIRECTORY_EX_REPLY, *PENUMERATE_DIRECTORY_EX_REPLY;
+};
 
-typedef struct _OPEN_FILE_REQUEST {
-	COMMAND_REQUEST_HEADER Command;
+struct novfs_open_file_request {
+	struct novfs_command_request_header Command;
 	unsigned int access;	/* File Access */
 	unsigned int mode;	/* Sharing Mode */
 	unsigned int disp;	/* Create Disposition */
 	unsigned int pathLen;
 	unsigned char path[1];
 
-} OPEN_FILE_REQUEST, *POPEN_FILE_REQUEST;
+};
 
-typedef struct _OPEN_FILE_REPLY {
-	COMMAND_REPLY_HEADER Reply;
-	HANDLE handle;
+struct novfs_open_file_reply {
+	struct novfs_command_reply_header Reply;
+	void *handle;
 	unsigned int lastAccessTime;
 	unsigned int modifyTime;
 	unsigned int createTime;
 	unsigned int attributes;
 	loff_t size;
 
-} OPEN_FILE_REPLY, *POPEN_FILE_REPLY;
+};
 
-typedef struct _CREATE_FILE_REQUEST {
+struct novfs_create_file_request {
 
-	COMMAND_REQUEST_HEADER Command;
+	struct novfs_command_request_header Command;
 	unsigned int pathlength;
 	unsigned char path[1];
 
-} CREATE_FILE_REQUEST, *PCREATE_FILE_REQUEST;
+};
 
-typedef struct _CREATE_FILE_REPLY {
-	COMMAND_REPLY_HEADER Reply;
+struct novfs_create_file_reply {
+	struct novfs_command_reply_header Reply;
 
-} CREATE_FILE_REPLY, *PCREATE_FILE_REPLY;
+};
 
-typedef struct _CLOSE_FILE_REQUEST {
-	COMMAND_REQUEST_HEADER Command;
-	HANDLE handle;
+struct novfs_close_file_request {
+	struct novfs_command_request_header Command;
+	void *handle;
 
-} CLOSE_FILE_REQUEST, *PCLOSE_FILE_REQUEST;
+};
 
-typedef struct _CLOSE_FILE_REPLY {
-	COMMAND_REPLY_HEADER Reply;
+struct novfs_close_file_reply {
+	struct novfs_command_reply_header Reply;
 
-} CLOSE_FILE_REPLY, *PCLOSE_FILE_REPLY;
+};
 
-typedef struct _READ_FILE_REQUEST {
-	COMMAND_REQUEST_HEADER Command;
-	HANDLE handle;
+struct novfs_read_file_request {
+	struct novfs_command_request_header Command;
+	void *handle;
 	loff_t offset;
 	size_t len;
 
-} READ_FILE_REQUEST, *PREAD_FILE_REQUEST;
+};
 
-typedef struct _READ_FILE_REPLY {
-	COMMAND_REPLY_HEADER Reply;
+struct novfs_read_file_reply {
+	struct novfs_command_reply_header Reply;
 	unsigned long long bytesRead;
 	unsigned char data[1];
 
-} READ_FILE_REPLY, *PREAD_FILE_REPLY;
+};
 
-typedef struct _WRITE_FILE_REQUEST {
-	COMMAND_REQUEST_HEADER Command;
-	HANDLE handle;
+struct novfs_write_file_request {
+	struct novfs_command_request_header Command;
+	void *handle;
 	loff_t offset;
 	size_t len;
 	unsigned char data[1];
 
-} WRITE_FILE_REQUEST, *PWRITE_FILE_REQUEST;
+};
 
-typedef struct _WRITE_FILE_REPLY {
-	COMMAND_REPLY_HEADER Reply;
+struct novfs_write_file_reply {
+	struct novfs_command_reply_header Reply;
 	unsigned long long bytesWritten;
-} WRITE_FILE_REPLY, *PWRITE_FILE_REPLY;
+};
 
-typedef struct _READ_STREAM_REQUEST {
-	COMMAND_REQUEST_HEADER Command;
-	HANDLE connection;
+struct novfs_read_stream_request {
+	struct novfs_command_request_header Command;
+	void *connection;
 	unsigned char handle[6];
 	loff_t offset;
 	size_t len;
-} READ_STREAM_REQUEST, *PREAD_STREAM_REQUEST;
+};
 
-typedef struct _READ_STREAM_REPLY {
-	COMMAND_REPLY_HEADER Reply;
+struct novfs_read_stream_reply {
+	struct novfs_command_reply_header Reply;
 	size_t bytesRead;
 	unsigned char data[1];
-} READ_STREAM_REPLY, *PREAD_STREAM_REPLY;
+};
 
-typedef struct _WRITE_STREAM_REQUEST {
-	COMMAND_REQUEST_HEADER Command;
-	HANDLE connection;
+struct novfs_write_stream_request {
+	struct novfs_command_request_header Command;
+	void *connection;
 	unsigned char handle[6];
 	loff_t offset;
 	size_t len;
 	unsigned char data[1];
-} WRITE_STREAM_REQUEST, *PWRITE_STREAM_REQUEST;
+};
 
-typedef struct _WRITE_STREAM_REPLY {
-	COMMAND_REPLY_HEADER Reply;
+struct novfs_write_stream_reply {
+	struct novfs_command_reply_header Reply;
 	size_t bytesWritten;
-} WRITE_STREAM_REPLY, *PWRITE_STREAM_REPLY;
+};
 
-typedef struct _CLOSE_STREAM_REQUEST {
-	COMMAND_REQUEST_HEADER Command;
-	HANDLE connection;
+struct novfs_close_stream_request {
+	struct novfs_command_request_header Command;
+	void *connection;
 	unsigned char handle[6];
-} CLOSE_STREAM_REQUEST, *PCLOSE_STREAM_REQUEST;
+};
 
-typedef struct _CLOSE_STREAM_REPLY {
-	COMMAND_REPLY_HEADER Reply;
+struct novfs_close_stream_reply {
+	struct novfs_command_reply_header Reply;
 
-} CLOSE_STREAM_REPLY, *PCLOSE_STREAM_REPLY;
+};
 
-typedef struct _CREATE_DIRECTORY_REQUEST {
-
-	COMMAND_REQUEST_HEADER Command;
-	unsigned int pathlength;
-	unsigned char path[1];
-
-} CREATE_DIRECTORY_REQUEST, *PCREATE_DIRECTORY_REQUEST;
-
-typedef struct _CREATE_DIRECTORY_REPLY {
-	COMMAND_REPLY_HEADER Reply;
-
-} CREATE_DIRECTORY_REPLY, *PCREATE_DIRECTORY_REPLY;
-
-typedef struct _LOGIN_USER_REQUEST {
-	COMMAND_REQUEST_HEADER Command;
+struct novfs_login_user_request {
+	struct novfs_command_request_header Command;
 	unsigned int srvNameType;
 	unsigned int serverLength;
 	unsigned int serverOffset;
@@ -513,46 +417,47 @@ typedef struct _LOGIN_USER_REQUEST {
 	unsigned int passwordLength;
 	unsigned int passwordOffset;
 
-} LOGIN_USER_REQUEST, *PLOGIN_USER_REQUEST;
+};
 
-typedef struct _LOGIN_USER_REPLY {
-	COMMAND_REPLY_HEADER Reply;
+struct novfs_login_user_reply {
+	struct novfs_command_reply_header Reply;
 	unsigned int connectionHandle;
-	HANDLE loginIdentity;
+	void *loginIdentity;
 
-} LOGIN_USER_REPLY, *PLOGIN_USER_REPLY;
+};
 
-typedef struct _LOGOUT_REQUEST {
-	COMMAND_REQUEST_HEADER Command;
+struct novfs_logout_request {
+	struct novfs_command_request_header Command;
 	unsigned int length;
 	unsigned char Name[1];
 
-} LOGOUT_REQUEST, *PLOGOUT_REQUEST;
+};
 
-typedef struct _LOGOUT_REPLY {
-	COMMAND_REPLY_HEADER Reply;
+struct novfs_logout_reply {
+	struct novfs_command_reply_header Reply;
 
-} LOGOUT_REPLY, *PLOGOUT_REPLY;
+};
 
-typedef struct _CREATE_CONTEXT_REQUEST {
-	COMMAND_REQUEST_HEADER Command;
+struct novfs_create_context_request {
+	struct novfs_command_request_header Command;
 
-} CREATE_CONTEXT_REQUEST, *PCREATE_CONTEXT_REQUEST;
+};
 
-typedef struct _CREATE_CONTEXT_REPLY {
-	COMMAND_REPLY_HEADER Reply;
-	struct schandle SessionId;
-} CREATE_CONTEXT_REPLY, *PCREATE_CONTEXT_REPLY;
+struct novfs_create_context_reply {
+	struct novfs_command_reply_header Reply;
+	struct novfs_schandle SessionId;
 
-typedef struct _DESTROY_CONTEXT_REQUEST {
-	COMMAND_REQUEST_HEADER Command;
+};
 
-} DESTROY_CONTEXT_REQUEST, *PDESTROY_CONTEXT_REQUEST;
+struct novfs_destroy_context_request {
+	struct novfs_command_request_header Command;
 
-typedef struct _DESTROY_CONTEXT_REPLY {
-	COMMAND_REPLY_HEADER Reply;
+};
 
-} DESTROY_CONTEXT_REPLY, *PDESTROY_CONTEXT_REPLY;
+struct novfs_destroy_context_reply {
+	struct novfs_command_reply_header Reply;
+
+};
 
 /*
  * Attribute flags.  These should be or-ed together to figure out what
@@ -572,7 +477,7 @@ typedef struct _DESTROY_CONTEXT_REPLY {
 #define ATTR_ATTR_FLAG	1024
 #endif
 
-typedef struct _LNX_FILE_INFO {
+struct novfs_lnx_file_info {
 	unsigned int ia_valid;
 	unsigned int ia_mode;
 	uid_t ia_uid;
@@ -582,126 +487,124 @@ typedef struct _LNX_FILE_INFO {
 	time_t ia_mtime;
 	time_t ia_ctime;
 	unsigned int ia_attr_flags;
+};
 
-} LX_FILE_INFO, *PLX_FILE_INFO;
-
-typedef struct _SET_FILE_INFO_REQUEST {
-	COMMAND_REQUEST_HEADER Command;
-	LX_FILE_INFO fileInfo;
+struct novfs_set_file_info_request {
+	struct novfs_command_request_header Command;
+	struct novfs_lnx_file_info fileInfo;
 	unsigned int pathlength;
 	char path[1];
+};
 
-} SET_FILE_INFO_REQUEST, *PSET_FILE_INFO_REQUEST;
+struct novfs_set_file_info_reply {
+	struct novfs_command_reply_header Reply;
 
-typedef struct _SET_FILE_INFO_REPLY {
-	COMMAND_REPLY_HEADER Reply;
+};
 
-} SET_FILE_INFO_REPLY, *PSET_FILE_INFO_REPLY;
-
-typedef struct _TRUNCATE_FILE_REQUEST {
-	COMMAND_REQUEST_HEADER Command;
+struct novfs_truncate_file_request {
+	struct novfs_command_request_header Command;
 	unsigned int pathLen;
 	char path[1];
 
-} TRUNCATE_FILE_REQUEST, *PTRUNCATE_FILE_REQUEST;
+};
 
-typedef struct _TRUNCATE_FILE_REPLY {
-	COMMAND_REPLY_HEADER Reply;
+struct novfs_truncate_file_reply {
+	struct novfs_command_reply_header Reply;
 
-} TRUNCATE_FILE_REPLY, *PTRUNCATE_FILE_REPLY;
+};
 
-typedef struct _GETPWUID_REQUEST {
-	COMMAND_REQUEST_HEADER Command;
+struct novfs_getpwuid_request {
+	struct novfs_command_request_header Command;
 	unsigned int uid;
-} GETPWUID_REQUEST, *PGETPWUID_REQUEST;
+};
 
-typedef struct _GETPWUID_REPLY {
-	COMMAND_REPLY_HEADER Reply;
+struct novfs_getpwuid_reply {
+	struct novfs_command_reply_header Reply;
 	unsigned char UserName[1];
-} GETPWUID_REPLY, *PGETPWUID_REPLY;
+};
 
-typedef struct _GET_VERSION_REQUEST {
-	COMMAND_REQUEST_HEADER Command;
-} GET_VERSION_REQUEST, *PGET_VERSION_REQUEST;
+struct novfs_get_version_request {
+	struct novfs_command_request_header Command;
+};
 
-typedef struct _GET_VERSION_REPLY {
-	COMMAND_REPLY_HEADER Reply;
+struct novfs_get_version_reply {
+	struct novfs_command_reply_header Reply;
 	unsigned char Version[1];
-} GET_VERSION_REPLY, *PGET_VERSION_REPLY;
+};
 
-typedef struct _SET_MOUNT_PATH {
-	COMMAND_REQUEST_HEADER Command;
+struct novfs_set_mount_path {
+	struct novfs_command_request_header Command;
 	unsigned int PathLength;
 	unsigned char Path[1];
-} SET_MOUNT_PATH_REQUEST, *PSET_MOUNT_PATH_REQUEST;
+};
 
-typedef struct _SET_MOUNT_PATH_REPLY {
-	COMMAND_REPLY_HEADER Reply;
-} SET_MOUNT_PATH, *PSET_MOUNT_PATH_REPLY;
+struct novfs_set_mount_path_reply {
+	struct novfs_command_reply_header Reply;
+};
 
-typedef struct _GET_USER_SPACE {
-	COMMAND_REQUEST_HEADER Command;
-} GET_USER_SPACE_REQUEST, *PGET_USER_SPACE_REQUEST;
+struct novfs_get_user_space {
+	struct novfs_command_request_header Command;
+};
 
-typedef struct _GET_USER_SPACE_REPLY {
-	COMMAND_REPLY_HEADER Reply;
+struct novfs_get_user_space_reply {
+	struct novfs_command_reply_header Reply;
 	uint64_t TotalSpace;
 	uint64_t FreeSpace;
 	uint64_t TotalEnties;
 	uint64_t FreeEnties;
-} GET_USER_SPACE_REPLY, *PGET_USER_SPACE_REPLY;
+};
 
-typedef struct _XPLAT_CALL_REQUEST {
-	COMMAND_REQUEST_HEADER Command;
+struct novfs_xplat_call_request {
+	struct novfs_command_request_header Command;
 	unsigned int NwcCommand;
 	unsigned long dataLen;
 	unsigned char data[1];
 
-} XPLAT_CALL_REQUEST, *PXPLAT_CALL_REQUEST;
+};
 
-typedef struct _XPLAT_CALL_REPLY {
-	COMMAND_REPLY_HEADER Reply;
+struct novfs_xplat_call_reply {
+	struct novfs_command_reply_header Reply;
 	unsigned long dataLen;
 	unsigned char data[1];
 
-} XPLAT_CALL_REPLY, *PXPLAT_CALL_REPLY;
+};
 
 /* XPlat NWC structures used by the daemon */
 
-typedef struct _NWD_OPEN_CONN_BY_NAME {
-	HANDLE ConnHandle;
+struct nwd_open_conn_by_name {
+	void *ConnHandle;
 	unsigned int nameLen;
 	unsigned int oName;	/* Ofset to the Name */
 	unsigned int serviceLen;
 	unsigned int oServiceType;	/* Offset to service Type; */
 	unsigned int uConnFlags;
 	unsigned int uTranType;
-	HANDLE newConnHandle;
+	void *newConnHandle;
 
-} NwdCOpenConnByName, *PNwdCOpenConnByName;
+};
 
-typedef struct _NWD_TRAN_ADDR {
+struct nwd_tran_addr {
 	unsigned int uTransportType;
 	unsigned int uAddressLength;
 	unsigned int oAddress;
 
-} NwdCTranAddr, *PNwdCTranAddr;
+};
 
-typedef struct _NWD_OPEN_CONN_BY_ADDR {
-	HANDLE ConnHandle;
+struct nwd_open_conn_by_addr {
+	void *ConnHandle;
 	unsigned int oServiceType;
 	unsigned int uConnFlags;
-	NwdCTranAddr TranAddr;
+	struct nwd_tran_addr TranAddr;
 
-} NwdCOpenConnByAddr, *PNwdCOpenConnByAddr;
+};
 
-typedef struct _NWD_CLOSE_CONN {
-	HANDLE ConnHandle;
+struct nwd_close_conn {
+	void *ConnHandle;
 
-} NwdCCloseConn, *PNwdCCloseConn;
+};
 
-typedef struct _NWD_NCP_REQ {
-	HANDLE ConnHandle;
+struct nwd_ncp_req {
+	void *ConnHandle;
 	unsigned int replyLen;
 	unsigned int requestLen;
 	unsigned int function;
@@ -710,48 +613,37 @@ typedef struct _NWD_NCP_REQ {
 	unsigned int flags;
 	unsigned char data[1];
 
-} NwdCNCPReq, *PNwdCNCPReq;
+};
 
-typedef struct _NWD_NCP_REP {
+struct nwd_ncp_rep {
 	unsigned int replyLen;
 	unsigned char data[1];
 
-} NwdCNCPRep, *PNwdCNCPRep;
+};
 
-typedef struct _NWC_AUTH_WID {
-	HANDLE ConnHandle;
+struct nwc_auth_wid {
+	void *ConnHandle;
 	u32 AuthenticationId;
 
-} NwdCAuthenticateWithId, *PNwdCAuthenticateWithId;
+};
 
-typedef struct _NWC_AUTHENTICATE {
-	HANDLE ConnHandle;
-	unsigned int uAuthenticationType;
-	unsigned int userNameOffset;
-	unsigned int passwordOffset;
-	unsigned int MaxInfoLength;
-	unsigned int InfoLength;
-	unsigned int authenInfoOffset;
-
-} NwdCAuthenticate, *PNwdCAuthenticate;
-
-typedef struct _NWC_UNAUTHENTICATE {
-	HANDLE ConnHandle;
+struct nwc_unauthenticate {
+	void *ConnHandle;
 	unsigned int AuthenticationId;
 
-} NwdCUnauthenticate, *PNwdCUnauthenticate;
+};
 
-typedef struct _NWC_LISC_ID {
-	HANDLE ConnHandle;
+struct nwc_lisc_id {
+	void *ConnHandle;
 
-} NwdCLicenseConn, *PNwdCLicenseConn;
+};
 
-typedef struct _NWC_UNLIC_CONN {
-	HANDLE ConnHandle;
+struct nwc_unlic_conn {
+	void *ConnHandle;
 
-} NwdCUnlicenseConn, *PNwdCUnlicenseConn;
+};
 
-typedef struct _NWC_GET_IDENT_INFO {
+struct nwd_get_id_info {
 	u32 AuthenticationId;
 	unsigned int AuthType;
 	unsigned int NameType;
@@ -762,44 +654,44 @@ typedef struct _NWC_GET_IDENT_INFO {
 	unsigned int objectLen;
 	unsigned int pObjectNameOffset;
 
-} NwdCGetIdentityInfo, *PNwdCGetIdentityInfo;
+};
 
-typedef struct _NWC_LO_ID {
+struct nwc_lo_id {
 	u32 AuthenticationId;
 
-} NwdCLogoutIdentity, *PNwdCLogoutIdentity;
+};
 
-typedef struct _RENAME_FILE_REQUEST {
-	COMMAND_REQUEST_HEADER Command;
+struct novfs_rename_file_request {
+	struct novfs_command_request_header Command;
 	int directoryFlag;
 	unsigned int newnameLen;
 	unsigned char newname[256];
 	unsigned int oldnameLen;
 	unsigned char oldname[256];
-} RENAME_FILE_REQUEST, *PRENAME_FILE_REQUEST;
+};
 
-typedef struct _RENAME_FILE_REPLY {
-	COMMAND_REPLY_HEADER Reply;
+struct novfs_rename_file_reply {
+	struct novfs_command_reply_header Reply;
 
-} RENAME_FILE_REPLY, *PRENAME_FILE_REPLY;
+};
 
-typedef struct __NwdServerVersion {
+struct nwd_server_version {
 	unsigned int uMajorVersion;
 	unsigned short int uMinorVersion;
 	unsigned short int uRevision;
+};
 
-} NwdServerVersion, *PNwdServerVersion;
 
 #define	MAX_ADDRESS_LENGTH	32
 
-typedef struct tagNwdTranAddrEx {
+struct tagNwdTranAddrEx {
 	unsigned int uTransportType;
 	unsigned int uAddressLength;
 	unsigned char Buffer[MAX_ADDRESS_LENGTH];
 
-} NwdTranAddr, *PNwdTranAddr;
+};
 
-typedef struct __NWD_CONN_INFO {
+struct __NWD_CONN_INFO {
 	unsigned int uInfoVersion;
 	unsigned int uAuthenticationState;
 	unsigned int uBroadcastState;
@@ -819,33 +711,31 @@ typedef struct __NWD_CONN_INFO {
 	unsigned int uDistance;
 	u32 uAuthId;
 	unsigned int uDisconnected;
-	NwdServerVersion ServerVersion;
-	NwdTranAddr TranAddress;
+	struct nwd_server_version ServerVersion;
+	struct nwd_tran_addr TranAddress;
+};
 
-} NwdConnInfo, *PNwdConnInfo;
-
-typedef struct _nwd_conn_info {
-	HANDLE ConnHandle;
+struct nwd_conn_info {
+	void *ConnHandle;
 	unsigned int uInfoLevel;
 	unsigned int uInfoLength;
+};
 
-} NwdCGetConnInfo, *PNwdCGetConnInfo;
-
-typedef struct nwd_open_conn_by_Ref {
-	HANDLE uConnReference;
+struct nwd_open_conn_by_ref {
+	void *uConnReference;
 	unsigned int uConnFlags;
-	HANDLE ConnHandle;
+	void *ConnHandle;
 
-} NwdCOpenConnByRef, *PNwdCOpenConnByRef;
+};
 
-typedef struct nwd_get_reqversion {
+struct nwd_get_reqversion {
 	unsigned int uMajorVersion;
 	unsigned int uMinorVersion;
 	unsigned int uRevision;
 
-} NwdCGetRequesterVersion, *PNwdCGetRequesterVersion;
+};
 
-typedef struct _nwc_scan_conn_info {
+struct nwd_scan_conn_info {
 	unsigned int uScanIndex;
 	unsigned int uScanInfoLevel;
 	unsigned int uScanInfoLen;
@@ -856,43 +746,43 @@ typedef struct _nwc_scan_conn_info {
 	unsigned int uConnectionReference;
 	unsigned int uReturnConnInfoOffset;
 
-} NwdCScanConnInfo, *PNwdCScanConnInfo;
+};
 
-typedef struct nwc_get_pref_ds_tree {
+struct nwd_get_pref_ds_tree {
 	unsigned int uTreeLength;
 	unsigned int DsTreeNameOffset;
 
-} NwdCGetPreferredDsTree, *PNwdCGetPreferredDsTree;
+};
 
-typedef struct nwc_set_pref_ds_tree {
+struct nwd_set_pref_ds_tree {
 	unsigned int uTreeLength;
 	unsigned int DsTreeNameOffset;
 
-} NwdCSetPreferredDsTree, *PNwdCSetPreferredDsTree;
+};
 
-typedef struct nwc_set_def_name_ctx {
+struct nwd_set_def_name_ctx {
 	unsigned int uTreeLength;
 	unsigned int TreeOffset;
 	unsigned int uNameLength;
 	unsigned int NameContextOffset;
 
-} NwdCSetDefaultNameContext, *PNwdCSetDefaultNameContext;
+};
 
-typedef struct nwc_get_def_name_ctx {
+struct nwd_get_def_name_ctx {
 	unsigned int uTreeLength;
 	unsigned int TreeOffset;
 	unsigned int uNameLength;
 	unsigned int NameContextOffset;
 
-} NwdCGetDefaultNameContext, *PNwdCGetDefaultNameContext;
+};
 
-typedef struct _nwc_get_treemonitored_connref {
-	NwdString TreeName;
-	HANDLE uConnReference;
+struct nwd_get_tree_monitored_conn_ref {
+	struct nwd_string TreeName;
+	void *uConnReference;
 
-} NwdCGetTreeMonitoredConnRef, *PNwdCGetTreeMonitoredConnRef;
+};
 
-typedef struct _nwc_enumerate_identities {
+struct nwd_enum_ids {
 	unsigned int Iterator;
 	unsigned int domainNameLen;
 	unsigned int domainNameOffset;
@@ -904,9 +794,9 @@ typedef struct _nwc_enumerate_identities {
 	unsigned int IdentityFlags;
 	u32 AuthenticationId;
 
-} NwdCDEnumerateIdentities, *PNwdCEnumerateIdentities;
+};
 
-typedef struct nwd_change_key {
+struct nwd_change_key {
 	unsigned int domainNameOffset;
 	unsigned int domainNameLen;
 	unsigned int AuthType;
@@ -919,82 +809,43 @@ typedef struct nwd_change_key {
 	unsigned int newPasswordOffset;
 	unsigned int newPasswordLen;
 
-} NwdCChangeKey, *PNwdCChangeKey;
+};
 
-typedef struct _nwd_get_primary_conn {
-	HANDLE uConnReference;
+struct nwd_set_primary_conn {
+	void *ConnHandle;
 
-} NwdCGetPrimaryConnection, *PNwdCGetPrimaryConnection;
+};
 
-typedef struct _nwd_set_primary_conn {
-	HANDLE ConnHandle;
-
-} NwdCSetPrimaryConnection, *PNwdCSetPrimaryConnection;
-
-typedef struct _nwd_map_drive_ex {
-	u32 ConnHandle;
-	u32 localUid;
-	u32 linkOffsetLength;
-	u32 linkOffset;
-	u32 dirPathOffsetLength;
-	u32 dirPathOffset;
-
-} NwdCMapDriveEx, *PNwdCMapDriveEx;
-
-typedef struct _nwd_unmap_drive_ex {
-	unsigned int linkLen;
-	char linkPath[1];
-
-} NwdCUnmapDriveEx, *PNwdCUnmapDriveEx;
-
-typedef struct _nwd_enum_links {
-	unsigned int totalLen;
-	unsigned int linkCount;
-
-} NwdCEnumLinks, *PNwdCEnumLinks;
-
-typedef struct nwd_getbroadcastnotification {
+struct nwd_get_bcast_notification {
 	unsigned int uMessageFlags;
-	HANDLE uConnReference;
+	void *uConnReference;
 	unsigned int messageLen;
 	char message[1];
 
-} NwdCGetBroadcastNotification, *PNwdCGetBroadcastNotification;
+};
 
-typedef struct _enum_entry {
-	unsigned int entryLen;
-	u32 connHdl;
-	char data[0];
-} NwdCEnumEntry, *PNwdCEnumEntry;
-
-typedef struct _nwd_set_conn_info {
-	HANDLE ConnHandle;
+struct nwd_set_conn_info {
+	void *ConnHandle;
 	unsigned int uInfoLevel;
 	unsigned int uInfoLength;
 	unsigned int offsetConnInfo;
 
-} NwdCSetConnInfo, *PNwdCSetConnInfo;
+};
 
-typedef struct _len_string {
-	u32 stLen;
-	char string[1];
-
-} LString, *PLString;
-
-typedef struct _DEBUG_REQUEST {
-	COMMAND_REQUEST_HEADER Command;
+struct novfs_debug_request {
+	struct novfs_command_request_header Command;
 	int cmdlen;
 	char dbgcmd[1];
 
-} DEBUG_REQUEST, *PDEBUG_REQUEST;
+};
 
-typedef struct _DEBUG_REPLY {
-	COMMAND_REPLY_HEADER Reply;
+struct novfs_debug_reply {
+	struct novfs_command_reply_header Reply;
 
-} DEBUG_REPLY, *PDEBUG_REPLY;
+};
 
-typedef struct _Nwd_Set_Key {
-	HANDLE ConnHandle;
+struct nwd_set_key {
+	void *ConnHandle;
 	unsigned int AuthenticationId;
 	unsigned int objectNameLen;
 	unsigned int objectNameOffset;
@@ -1002,9 +853,9 @@ typedef struct _Nwd_Set_Key {
 	unsigned int newPasswordLen;
 	unsigned int newPasswordOffset;
 
-} NwdCSetKey, *PNwdCSetKey;
+};
 
-typedef struct _Nwd_Verify_Key {
+struct nwd_verify_key {
 	unsigned int AuthType;
 	unsigned int NameType;
 	unsigned short int ObjectType;
@@ -1015,43 +866,43 @@ typedef struct _Nwd_Verify_Key {
 	unsigned int verifyPasswordLen;
 	unsigned int verifyPasswordOffset;
 
-} NwdCVerifyKey, *PNwdCVerifyKey;
+};
 
-typedef struct _GET_CACHE_FLAG {
-	COMMAND_REQUEST_HEADER Command;
+struct novfs_get_cache_flag {
+	struct novfs_command_request_header Command;
 	int pathLen;
 	unsigned char path[0];
 
-} GET_CACHE_FLAG_REQUEST, *PGET_CACHE_FLAG_REQUEST;
+};
 
-typedef struct _GET_CACHE_FLAG_REPLY {
-	COMMAND_REPLY_HEADER Reply;
+struct novfs_get_cache_flag_reply {
+	struct novfs_command_reply_header Reply;
 	int CacheFlag;
 
-} GET_CACHE_FLAG_REPLY, *PGET_CACHE_FLAG_REPLY;
+};
 
-typedef struct _XA_LIST_REPLY {
-	COMMAND_REPLY_HEADER Reply;
+struct novfs_xa_list_reply {
+	struct novfs_command_reply_header Reply;
 	unsigned char *pData;
 
-} XA_LIST_REPLY, *PXA_LIST_REPLY;
+};
 
-typedef struct _XA_GET_REQUEST {
-	COMMAND_REQUEST_HEADER Command;
+struct novfs_xa_get_request {
+	struct novfs_command_request_header Command;
 	unsigned int pathLen;
 	unsigned int nameLen;
 	unsigned char data[1];	//hold path, attribute name
 
-} XA_GET_REQUEST, *PXA_GET_REQUEST;
+};
 
-typedef struct _XA_GET_REPLY {
-	COMMAND_REPLY_HEADER Reply;
+struct novfs_xa_get_reply {
+	struct novfs_command_reply_header Reply;
 	unsigned char *pData;
 
-} XA_GET_REPLY, *PXA_GET_REPLY;
+};
 
-typedef struct _XA_SET_REQUEST {
-	COMMAND_REQUEST_HEADER Command;
+struct novfs_xa_set_request {
+	struct novfs_command_request_header Command;
 	unsigned int TtlWriteDataSize;
 	unsigned int WritePosition;
 	int flags;
@@ -1060,27 +911,44 @@ typedef struct _XA_SET_REQUEST {
 	unsigned int valueLen;
 	unsigned char data[1];	//hold path, attribute name, value data
 
-} XA_SET_REQUEST, *PXA_SET_REQUEST;
+};
 
-typedef struct _XA_SET_REPLY {
-	COMMAND_REPLY_HEADER Reply;
+struct novfs_xa_set_reply {
+	struct novfs_command_reply_header Reply;
 	unsigned char *pData;
 
-} XA_SET_REPLY, *PXA_SET_REPLY;
+};
 
-typedef struct _SET_FILE_LOCK_REQUEST {
-	COMMAND_REQUEST_HEADER Command;
-	HANDLE handle;
+struct novfs_set_file_lock_request {
+	struct novfs_command_request_header Command;
+	void *handle;
 	unsigned char fl_type;
 	loff_t fl_start;
 	loff_t fl_len;
 
-} SET_FILE_LOCK_REQUEST, *PSET_FILE_LOCK_REQUEST;
+};
 
-typedef struct _SET_FILE_LOCK_REPLY {
-	COMMAND_REPLY_HEADER Reply;
+struct novfs_set_file_lock_reply {
+	struct novfs_command_reply_header Reply;
 
-} SET_FILE_LOCK_REPLY, *PSET_FILE_LOCK_REPLY;
+};
+
+
+struct novfs_scope_list{
+	struct list_head ScopeList;
+	struct novfs_schandle ScopeId;
+	struct novfs_schandle SessionId;
+	pid_t ScopePid;
+	struct task_struct *ScopeTask;
+	unsigned int ScopeHash;
+	uid_t ScopeUid;
+	uint64_t ScopeUSize;
+	uint64_t ScopeUFree;
+	uint64_t ScopeUTEnties;
+	uint64_t ScopeUAEnties;
+	int ScopeUserNameLength;
+	unsigned char ScopeUserName[32];
+};
 
 #pragma pack(pop)
 

@@ -16,7 +16,6 @@
 #include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/slab.h>
-#include <linux/string.h>
 #include <linux/list.h>
 #include <linux/timer.h>
 #include <linux/poll.h>
@@ -44,14 +43,13 @@
 #define DH_TYPE_STREAM       1
 #define DH_TYPE_CONNECTION   2
 
-/*===[ Type definitions ]=================================================*/
-typedef struct _DAEMON_QUEUE {
+struct daemon_queue {
 	struct list_head list;	/* Must be first entry */
 	spinlock_t lock;	/* Used to control access to list */
 	struct semaphore semaphore;	/* Used to signal when data is available */
-} daemon_queue_t;
+};
 
-typedef struct _DAEMON_COMMAND {
+struct daemon_cmd {
 	struct list_head list;	/* Must be first entry */
 	atomic_t reference;
 	unsigned int status;
@@ -65,61 +63,44 @@ typedef struct _DAEMON_COMMAND {
 	int datalen;
 	void *reply;
 	unsigned long replen;
-} daemon_command_t;
+};
 
-typedef struct _DAEMON_HANDLE_ {
+struct daemon_handle {
 	struct list_head list;
 	rwlock_t lock;
-	session_t session;
-} daemon_handle_t;
+	struct novfs_schandle session;
+};
 
-typedef struct _DAEMON_RESOURCE_ {
+struct daemon_resource {
 	struct list_head list;
 	int type;
-	HANDLE connection;
+	void *connection;
 	unsigned char handle[6];
 	mode_t mode;
 	loff_t size;
-} daemon_resource_t;
+};
 
-typedef struct _DRIVE_MAP_ {
+struct drive_map {
 	struct list_head list;	/* Must be first item */
-	session_t session;
+	struct novfs_schandle session;
 	unsigned long hash;
 	int namelen;
 	char name[1];
-} drive_map_t;
+};
 
-/*===[ Function prototypes ]==============================================*/
-int Daemon_Close_Control(struct inode *Inode, struct file *File);
-int Daemon_Library_close(struct inode *inode, struct file *file);
-int Daemon_Library_open(struct inode *inode, struct file *file);
-loff_t Daemon_Library_llseek(struct file *file, loff_t offset, int origin);
-int Daemon_Open_Control(struct inode *Inode, struct file *File);
-uint Daemon_Poll(struct file *file, struct poll_table_struct *poll_table);
-int Daemon_Remove_Resource(daemon_handle_t * DHandle, int Type, HANDLE CHandle,
-			   unsigned long FHandle);
+static void Queue_get(struct daemon_cmd * Que);
+static void Queue_put(struct daemon_cmd * Que);
+static void RemoveDriveMaps(void);
+static int NwdConvertLocalHandle(struct novfs_xplat *pdata, struct daemon_handle * DHandle);
+static int NwdConvertNetwareHandle(struct novfs_xplat *pdata, struct daemon_handle * DHandle);
+static int set_map_drive(struct novfs_xplat *pdata, struct novfs_schandle Session);
+static int unmap_drive(struct novfs_xplat *pdata, struct novfs_schandle Session);
+static int NwdGetMountPath(struct novfs_xplat *pdata);
+static int local_unlink(const char *pathname);
 
-int Daemon_SetMountPoint(char *Path);
-void Daemon_Timer(unsigned long data);
-int Daemon_getpwuid(uid_t uid, int unamelen, char *uname);
-int Queue_Daemon_Command(void *request, unsigned long reqlen, void *data, int dlen,
-			 void **reply, unsigned long * replen, int interruptible);
-void Queue_get(daemon_command_t * que);
-void Queue_put(daemon_command_t * que);
-void Uninit_Daemon_Queue(void);
-daemon_command_t *find_queue(unsigned long sequence);
-daemon_command_t *get_next_queue(int Set_Queue_Waiting);
-int NwdConvertNetwareHandle(PXPLAT pdata, daemon_handle_t * DHandle);
-int NwdConvertLocalHandle(PXPLAT pdata, daemon_handle_t * DHandle);
-int NwdGetMountPath(PXPLAT pdata);
-static int NwdSetMapDrive(PXPLAT pdata, session_t Session);
-static int NwdUnMapDrive(PXPLAT pdata, session_t Session);
-void RemoveDriveMaps(void);
-int local_unlink(const char *pathname);
 
 /*===[ Global variables ]=================================================*/
-static daemon_queue_t Daemon_Queue;
+static struct daemon_queue Daemon_Queue;
 
 static DECLARE_WAIT_QUEUE_HEAD(Read_waitqueue);
 
@@ -131,51 +112,24 @@ static unsigned long Daemon_Command_Timeout = TIMEOUT_VALUE;
 static DECLARE_MUTEX(DriveMapLock);
 static LIST_HEAD(DriveMapList);
 
-int MaxIoSize = PAGE_SIZE;
+int novfs_max_iosize = PAGE_SIZE;
 
-void Init_Daemon_Queue(void)
+void novfs_daemon_queue_init()
 {
 	INIT_LIST_HEAD(&Daemon_Queue.list);
 	spin_lock_init(&Daemon_Queue.lock);
 	init_MUTEX_LOCKED(&Daemon_Queue.semaphore);
 }
 
-/*++======================================================================*/
-void Uninit_Daemon_Queue(void)
-/*
- *
- *  Arguments:
- *
- *  Returns:
- *
- *  Abstract:
- *
- *  Notes:
- *
- *  Environment:
- *
- *========================================================================*/
+void novfs_daemon_queue_exit(void)
 {
 	/* Does nothing for now but we maybe should clear the queue. */
 }
 
 /*++======================================================================*/
-void Daemon_Timer(unsigned long data)
-/*
- *
- *  Arguments:
- *
- *  Returns:
- *
- *  Abstract:
- *
- *  Notes:
- *
- *  Environment:
- *
- *========================================================================*/
+static void novfs_daemon_timer(unsigned long data)
 {
-	daemon_command_t *que = (daemon_command_t *) data;
+	struct daemon_cmd *que = (struct daemon_cmd *) data;
 
 	if (QUEUE_ACKED != que->status) {
 		que->status = QUEUE_TIMEOUT;
@@ -183,14 +137,14 @@ void Daemon_Timer(unsigned long data)
 	up(&que->semaphore);
 }
 
-int Queue_Daemon_Command(void *request, unsigned long reqlen, void *data, int dlen,
+/*++======================================================================*/
+int Queue_Daemon_Command(void *request,
+			 unsigned long reqlen,
+			 void *data,
+			 int dlen,
 			 void **reply, unsigned long * replen, int interruptible)
-/*
- *  Arguments:     void *request - pointer to the request that is to be sent.  Needs to be kernel memory.
- *                 int reqlen - length of the request.
- *========================================================================*/
 {
-	daemon_command_t *que;
+	struct daemon_cmd *que;
 	int retCode = 0;
 	uint64_t ts1, ts2;
 
@@ -201,6 +155,7 @@ int Queue_Daemon_Command(void *request, unsigned long reqlen, void *data, int dl
 	if (atomic_read(&Daemon_Open_Count)) {
 
 		que = kmalloc(sizeof(*que), GFP_KERNEL);
+
 		DbgPrint("Queue_Daemon_Command: que=0x%p\n", que);
 		if (que) {
 			atomic_set(&que->reference, 0);
@@ -211,7 +166,7 @@ int Queue_Daemon_Command(void *request, unsigned long reqlen, void *data, int dl
 
 			que->sequence = atomic_inc_return(&Sequence);
 
-			((PCOMMAND_REQUEST_HEADER) request)->SequenceNumber =
+			((struct novfs_command_request_header *) request)->SequenceNumber =
 			    que->sequence;
 
 			/*
@@ -220,7 +175,7 @@ int Queue_Daemon_Command(void *request, unsigned long reqlen, void *data, int dl
 			init_timer(&que->timer);
 			que->timer.expires = jiffies + (HZ * Daemon_Command_Timeout);
 			que->timer.data = (unsigned long) que;
-			que->timer.function = Daemon_Timer;
+			que->timer.function = novfs_daemon_timer;
 			add_timer(&que->timer);
 
 			/*
@@ -317,41 +272,13 @@ int Queue_Daemon_Command(void *request, unsigned long reqlen, void *data, int dl
 	return (retCode);
 }
 
-/*++======================================================================*/
-void Queue_get(daemon_command_t * Que)
-/*
- *
- *  Arguments:
- *
- *  Returns:
- *
- *  Abstract:
- *
- *  Notes:
- *
- *  Environment:
- *
- *========================================================================*/
+static void Queue_get(struct daemon_cmd * Que)
 {
 	DbgPrint("Queue_get: que=0x%p %d\n", Que, atomic_read(&Que->reference));
 	atomic_inc(&Que->reference);
 }
 
-/*++======================================================================*/
-void Queue_put(daemon_command_t * Que)
-/*
- *
- *  Arguments:
- *
- *  Returns:
- *
- *  Abstract:
- *
- *  Notes:
- *
- *  Environment:
- *
- *========================================================================*/
+static void Queue_put(struct daemon_cmd * Que)
 {
 
 	DbgPrint("Queue_put: que=0x%p %d\n", Que, atomic_read(&Que->reference));
@@ -373,35 +300,21 @@ void Queue_put(daemon_command_t * Que)
 	}
 }
 
-/*++======================================================================*/
-daemon_command_t *get_next_queue(int Set_Queue_Waiting)
-/*
- *
- *  Arguments:
- *
- *  Returns:
- *
- *  Abstract:
- *
- *  Notes:
- *
- *  Environment:
- *
- *========================================================================*/
+struct daemon_cmd *get_next_queue(int Set_Queue_Waiting)
 {
-	daemon_command_t *que;
+	struct daemon_cmd *que;
 
 	DbgPrint("get_next_queue: que=0x%p\n", Daemon_Queue.list.next);
 
 	spin_lock(&Daemon_Queue.lock);
-	que = (daemon_command_t *) Daemon_Queue.list.next;
+	que = (struct daemon_cmd *) Daemon_Queue.list.next;
 
-	while (que && (que != (daemon_command_t *) & Daemon_Queue.list.next)
+	while (que && (que != (struct daemon_cmd *) & Daemon_Queue.list.next)
 	       && (que->status != QUEUE_SENDING)) {
-		que = (daemon_command_t *) que->list.next;
+		que = (struct daemon_cmd *) que->list.next;
 	}
 
-	if ((NULL == que) || (que == (daemon_command_t *) & Daemon_Queue.list)
+	if ((NULL == que) || (que == (struct daemon_cmd *) & Daemon_Queue.list)
 	    || (que->status != QUEUE_SENDING)) {
 		que = NULL;
 	} else if (Set_Queue_Waiting) {
@@ -418,36 +331,22 @@ daemon_command_t *get_next_queue(int Set_Queue_Waiting)
 	return (que);
 }
 
-/*++======================================================================*/
-daemon_command_t *find_queue(unsigned long sequence)
-/*
- *
- *  Arguments:
- *
- *  Returns:
- *
- *  Abstract:
- *
- *  Notes:
- *
- *  Environment:
- *
- *========================================================================*/
+static struct daemon_cmd *find_queue(unsigned long sequence)
 {
-	daemon_command_t *que;
+	struct daemon_cmd *que;
 
 	DbgPrint("find_queue: 0x%x\n", sequence);
 
 	spin_lock(&Daemon_Queue.lock);
-	que = (daemon_command_t *) Daemon_Queue.list.next;
+	que = (struct daemon_cmd *) Daemon_Queue.list.next;
 
-	while (que && (que != (daemon_command_t *) & Daemon_Queue.list.next)
+	while (que && (que != (struct daemon_cmd *) & Daemon_Queue.list.next)
 	       && (que->sequence != sequence)) {
-		que = (daemon_command_t *) que->list.next;
+		que = (struct daemon_cmd *) que->list.next;
 	}
 
 	if ((NULL == que)
-	    || (que == (daemon_command_t *) & Daemon_Queue.list.next)
+	    || (que == (struct daemon_cmd *) & Daemon_Queue.list.next)
 	    || (que->sequence != sequence)) {
 		que = NULL;
 	}
@@ -462,21 +361,7 @@ daemon_command_t *find_queue(unsigned long sequence)
 	return (que);
 }
 
-/*++======================================================================*/
-int Daemon_Open_Control(struct inode *Inode, struct file *File)
-/*
- *
- *  Arguments:
- *
- *  Returns:
- *
- *  Abstract:
- *
- *  Notes:
- *
- *  Environment:
- *
- *========================================================================*/
+int novfs_daemon_open_control(struct inode *Inode, struct file *File)
 {
 	DbgPrint("Daemon_Open_Control: pid=%d Count=%d\n", current->pid,
 		 atomic_read(&Daemon_Open_Count));
@@ -485,23 +370,9 @@ int Daemon_Open_Control(struct inode *Inode, struct file *File)
 	return (0);
 }
 
-/*++======================================================================*/
-int Daemon_Close_Control(struct inode *Inode, struct file *File)
-/*
- *
- *  Arguments:
- *
- *  Returns:
- *
- *  Abstract:
- *
- *  Notes:
- *
- *  Environment:
- *
- *========================================================================*/
+int novfs_daemon_close_control(struct inode *Inode, struct file *File)
 {
-	daemon_command_t *que;
+	struct daemon_cmd *que;
 
 	DbgPrint("Daemon_Close_Control: pid=%d Count=%d\n", current->pid,
 		 atomic_read(&Daemon_Open_Count));
@@ -512,39 +383,39 @@ int Daemon_Close_Control(struct inode *Inode, struct file *File)
 		 */
 
 		spin_lock(&Daemon_Queue.lock);
-		que = (daemon_command_t *) Daemon_Queue.list.next;
+		que = (struct daemon_cmd *) Daemon_Queue.list.next;
 
 		while (que
-		       && (que != (daemon_command_t *) & Daemon_Queue.list.next)
+		       && (que != (struct daemon_cmd *) & Daemon_Queue.list.next)
 		       && (que->status != QUEUE_DONE)) {
 			que->status = QUEUE_TIMEOUT;
 			up(&que->semaphore);
 
-			que = (daemon_command_t *) que->list.next;
+			que = (struct daemon_cmd *) que->list.next;
 		}
 		spin_unlock(&Daemon_Queue.lock);
 
 		RemoveDriveMaps();
 
-		Scope_Cleanup();
+		novfs_scope_cleanup();
 	}
 
 	return (0);
 }
 
-ssize_t Daemon_Send_Command(struct file *file, char __user *buf, size_t len, loff_t * off)
+ssize_t novfs_daemon_cmd_send(struct file * file, char *buf, size_t len, loff_t * off)
 {
-	daemon_command_t *que;
+	struct daemon_cmd *que;
 	size_t retValue = 0;
 	int Finished = 0;
-	struct data_list *dlist;
+	struct novfs_data_list *dlist;
 	int i, dcnt, bcnt, ccnt, error;
 	char *vadr;
 	unsigned long cpylen;
 
 	DbgPrint("Daemon_Send_Command: %u %lld\n", len, *off);
-	if (len > MaxIoSize) {
-		MaxIoSize = len;
+	if (len > novfs_max_iosize) {
+		novfs_max_iosize = len;
 	}
 
 	while (!Finished) {
@@ -556,9 +427,9 @@ ssize_t Daemon_Send_Command(struct file *file, char __user *buf, size_t len, lof
 				retValue = len;
 			}
 			if (retValue > 0x80)
-				mydump(0x80, que->request);
+				novfs_dump(0x80, que->request);
 			else
-				mydump(retValue, que->request);
+				novfs_dump(retValue, que->request);
 
 			cpylen = copy_to_user(buf, que->request, retValue);
 			if (que->datalen && (retValue < len)) {
@@ -599,10 +470,10 @@ ssize_t Daemon_Send_Command(struct file *file, char __user *buf, size_t len, lof
 							    ("Daemon_Send_Command: Copy %d from 0x%p to 0x%p.\n",
 							     bcnt, vadr, buf);
 							if (bcnt > 0x80)
-								mydump(0x80,
+								novfs_dump(0x80,
 								       vadr);
 							else
-								mydump(bcnt,
+								novfs_dump(bcnt,
 								       vadr);
 
 							if (km_adr) {
@@ -646,14 +517,14 @@ ssize_t Daemon_Send_Command(struct file *file, char __user *buf, size_t len, lof
 	return (retValue);
 }
 
-ssize_t Daemon_Receive_Reply(struct file *file, const char __user *buf, size_t nbytes, loff_t *ppos)
+ssize_t novfs_daemon_recv_reply(struct file *file, const char *buf, size_t nbytes, loff_t * ppos)
 {
-	daemon_command_t *que;
+	struct daemon_cmd *que;
 	size_t retValue = 0;
 	void *reply;
 	unsigned long sequence, cpylen;
 
-	struct data_list *dlist;
+	struct novfs_data_list *dlist;
 	char *vadr;
 	int i;
 
@@ -727,9 +598,9 @@ ssize_t Daemon_Receive_Reply(struct file *file, const char __user *buf, size_t n
 								   thiscopy);
 
 						if (thiscopy > 0x80)
-							mydump(0x80, vadr);
+							novfs_dump(0x80, vadr);
 						else
-							mydump(thiscopy, vadr);
+							novfs_dump(thiscopy, vadr);
 
 						if (km_adr) {
 							kunmap(dlist->page);
@@ -743,17 +614,20 @@ ssize_t Daemon_Receive_Reply(struct file *file, const char __user *buf, size_t n
 				que->replen = retValue;
 			} else {
 				reply = kmalloc(nbytes, GFP_KERNEL);
-				DbgPrint("Daemon_Receive_Reply: reply=0x%p\n", reply);
+				DbgPrint("Daemon_Receive_Reply: reply=0x%p\n",
+					 reply);
 				if (reply) {
 					retValue = nbytes;
 					que->reply = reply;
 					que->replen = nbytes;
 
-					retValue -= copy_from_user(reply, buf, retValue);
+					retValue -=
+					    copy_from_user(reply, buf,
+							   retValue);
 					if (retValue > 0x80)
-						mydump(0x80, reply);
+						novfs_dump(0x80, reply);
 					else
-						mydump(retValue, reply);
+						novfs_dump(retValue, reply);
 
 				} else {
 					retValue = -ENOMEM;
@@ -775,10 +649,11 @@ ssize_t Daemon_Receive_Reply(struct file *file, const char __user *buf, size_t n
 	return (retValue);
 }
 
-int do_login(NclString *Server, NclString *Username, NclString *Password, HANDLE *lgnId, struct schandle *Session)
+int novfs_do_login(struct ncl_string *Server, struct ncl_string *Username,
+struct ncl_string *Password, void **lgnId, struct novfs_schandle *Session)
 {
-	PLOGIN_USER_REQUEST cmd;
-	PLOGIN_USER_REPLY reply;
+	struct novfs_login_user_request *cmd;
+	struct novfs_login_user_reply *reply;
 	unsigned long replylen = 0;
 	int retCode, cmdlen, datalen;
 	unsigned char *data;
@@ -812,8 +687,8 @@ int do_login(NclString *Server, NclString *Username, NclString *Password, HANDLE
 	memcpy(data, Password->buffer, Password->len);
 	data += Password->len;
 
-	retCode = Queue_Daemon_Command(cmd, cmdlen, NULL, 0, (void *)&reply,
-				 &replylen, INTERRUPTIBLE);
+	retCode =	Queue_Daemon_Command(cmd, cmdlen, NULL, 0, (void *)&reply,
+								&replylen, INTERRUPTIBLE);
 	if (reply) {
 		if (reply->Reply.ErrorCode) {
 			retCode = reply->Reply.ErrorCode;
@@ -827,18 +702,18 @@ int do_login(NclString *Server, NclString *Username, NclString *Password, HANDLE
 	}
 	memset(cmd, 0, cmdlen);
 	kfree(cmd);
-	return retCode;
+	return (retCode);
 
 }
 
-int do_logout(struct qstr *Server, struct schandle *Session)
+int novfs_daemon_logout(struct qstr *Server, struct novfs_schandle *Session)
 {
-	PLOGOUT_REQUEST cmd;
-	PLOGOUT_REPLY reply;
+	struct novfs_logout_request *cmd;
+	struct novfs_logout_reply *reply;
 	unsigned long replylen = 0;
 	int retCode, cmdlen;
 
-	cmdlen = offsetof(LOGOUT_REQUEST, Name) + Server->len;
+	cmdlen = offsetof(struct novfs_logout_request, Name) + Server->len;
 	cmd = kmalloc(cmdlen, GFP_KERNEL);
 	if (!cmd)
 		return -ENOMEM;
@@ -849,7 +724,8 @@ int do_logout(struct qstr *Server, struct schandle *Session)
 	cmd->length = Server->len;
 	memcpy(cmd->Name, Server->name, Server->len);
 
-	retCode = Queue_Daemon_Command(cmd, cmdlen, NULL, 0, (void *)&reply, &replylen, INTERRUPTIBLE);
+	retCode =
+		Queue_Daemon_Command(cmd, cmdlen, NULL, 0, (void *)&reply, &replylen, INTERRUPTIBLE);
 	if (reply) {
 		if (reply->Reply.ErrorCode) {
 			retCode = -EIO;
@@ -861,24 +737,10 @@ int do_logout(struct qstr *Server, struct schandle *Session)
 
 }
 
-/*++======================================================================*/
-int Daemon_getpwuid(uid_t uid, int unamelen, char *uname)
-/*
- *
- *  Arguments:
- *
- *  Returns:
- *
- *  Abstract:
- *
- *  Notes:
- *
- *  Environment:
- *
- *========================================================================*/
+int novfs_daemon_getpwuid(uid_t uid, int unamelen, char *uname)
 {
-	GETPWUID_REQUEST cmd;
-	PGETPWUID_REPLY reply;
+	struct novfs_getpwuid_request cmd;
+	struct novfs_getpwuid_reply *reply;
 	unsigned long replylen = 0;
 	int retCode;
 
@@ -896,7 +758,9 @@ int Daemon_getpwuid(uid_t uid, int unamelen, char *uname)
 		} else {
 			retCode = 0;
 			memset(uname, 0, unamelen);
-			replylen = replylen - offsetof(GETPWUID_REPLY, UserName);
+			replylen =
+			    replylen - offsetof(struct
+					    novfs_getpwuid_reply, UserName);
 			if (replylen) {
 				if (replylen > unamelen) {
 					retCode = -EINVAL;
@@ -911,24 +775,10 @@ int Daemon_getpwuid(uid_t uid, int unamelen, char *uname)
 
 }
 
-/*++======================================================================*/
-int Daemon_getversion(char *Buf, int length)
-/*
- *
- *  Arguments:
- *
- *  Returns:
- *
- *  Abstract:
- *
- *  Notes:
- *
- *  Environment:
- *
- *========================================================================*/
+int novfs_daemon_getversion(char *Buf, int length)
 {
-	GET_VERSION_REQUEST cmd;
-	PGET_VERSION_REPLY reply;
+	struct novfs_get_version_request cmd;
+	struct novfs_get_version_reply *reply;
 	unsigned long replylen = 0;
 	int retVal = 0;
 
@@ -942,7 +792,9 @@ int Daemon_getversion(char *Buf, int length)
 		if (reply->Reply.ErrorCode) {
 			retVal = -EIO;
 		} else {
-			retVal = replylen - offsetof(GET_VERSION_REPLY, Version);
+			retVal =
+			    replylen - offsetof(struct
+					    novfs_get_version_reply, Version);
 			if (retVal < length) {
 				memcpy(Buf, reply->Version, retVal);
 				Buf[retVal] = '\0';
@@ -954,13 +806,13 @@ int Daemon_getversion(char *Buf, int length)
 
 }
 
-static int daemon_login(struct login *Login, struct schandle *Session)
+static int daemon_login(struct novfs_login *Login, struct novfs_schandle *Session)
 {
 	int retCode = -ENOMEM;
-	struct login lLogin;
-	NclString server;
-	NclString username;
-	NclString password;
+	struct novfs_login lLogin;
+	struct ncl_string server;
+	struct ncl_string username;
+	struct ncl_string password;
 
 	if (!copy_from_user(&lLogin, Login, sizeof(lLogin))) {
 		server.buffer = kmalloc(lLogin.Server.length, GFP_KERNEL);
@@ -968,29 +820,29 @@ static int daemon_login(struct login *Login, struct schandle *Session)
 			server.len = lLogin.Server.length;
 			server.type = NWC_STRING_TYPE_ASCII;
 			if (!copy_from_user((void *)server.buffer, lLogin.Server.data, server.len)) {
-				username.buffer = kmalloc(lLogin.UserName.length, GFP_KERNEL);
+				username.buffer =	kmalloc(lLogin.UserName.length,	GFP_KERNEL);
 				if (username.buffer) {
 					username.len = lLogin.UserName.length;
 					username.type = NWC_STRING_TYPE_ASCII;
 					if (!copy_from_user((void *)username.buffer, lLogin.UserName.data, username.len)) {
-						password.buffer = kmalloc(lLogin.Password.length, GFP_KERNEL);
-						if (password.buffer) {
+						password.buffer =	kmalloc(lLogin.Password.length,	GFP_KERNEL);
+						if (password.buffer)
+						{
 							password.len = lLogin.Password.length;
 							password.type = NWC_STRING_TYPE_ASCII;
 							if (!copy_from_user((void *)password.buffer, lLogin.Password.data, password.len)) {
-								retCode = do_login (&server, &username, &password, NULL, Session);
+								retCode = novfs_do_login (&server, &username, &password, NULL, Session);
 								if (!retCode) {
-									char *name;
-									name = Scope_Get_UserName();
-									if (name)
-										Novfs_Add_to_Root(name);
+									char *username;
+									username = novfs_scope_get_username();
+									if (username) {
+										novfs_add_to_root(username);
+									}
 								}
 							}
-							memset(password.buffer, 0, password.len);
 							kfree(password.buffer);
 						}
 					}
-					memset(username.buffer, 0, username.len);
 					kfree(username.buffer);
 				}
 			}
@@ -1001,32 +853,30 @@ static int daemon_login(struct login *Login, struct schandle *Session)
 	return (retCode);
 }
 
-static int daemon_logout(struct logout *Logout, struct schandle *Session)
+static int daemon_logout(struct novfs_logout *Logout, struct novfs_schandle *Session)
 {
-	struct logout lLogout;
+	struct novfs_logout lLogout;
 	struct qstr server;
-	int retCode = -ENOMEM;
+	int retCode = 0;
 
 	if (copy_from_user(&lLogout, Logout, sizeof(lLogout)))
 		return -EFAULT;
-
 	server.name = kmalloc(lLogout.Server.length, GFP_KERNEL);
 	if (!server.name)
 		return -ENOMEM;
 	server.len = lLogout.Server.length;
 	if (copy_from_user((void *)server.name, lLogout.Server.data, server.len))
 		goto exit;
-
-	retCode = do_logout(&server, Session);
+	retCode = novfs_daemon_logout(&server, Session);
 exit:
 	kfree(server.name);
-	return retCode;
+	return (retCode);
 }
 
-int Daemon_CreateSessionId(struct schandle *SessionId)
+int novfs_daemon_create_sessionId(struct novfs_schandle * SessionId)
 {
-	CREATE_CONTEXT_REQUEST cmd;
-	PCREATE_CONTEXT_REPLY reply;
+	struct novfs_create_context_request cmd;
+	struct novfs_create_context_reply *reply;
 	unsigned long replylen = 0;
 	int retCode = 0;
 
@@ -1041,7 +891,7 @@ int Daemon_CreateSessionId(struct schandle *SessionId)
 				 &replylen, INTERRUPTIBLE);
 	if (reply) {
 		if (!reply->Reply.ErrorCode
-		    && replylen > sizeof(COMMAND_REPLY_HEADER)) {
+		    && replylen > sizeof(struct novfs_command_reply_header)) {
 			*SessionId = reply->SessionId;
 			retCode = 0;
 		} else {
@@ -1055,26 +905,26 @@ int Daemon_CreateSessionId(struct schandle *SessionId)
 	return (retCode);
 }
 
-int Daemon_DestroySessionId(struct schandle *SessionId)
+int novfs_daemon_destroy_sessionId(struct novfs_schandle SessionId)
 {
-	DESTROY_CONTEXT_REQUEST cmd;
-	PDESTROY_CONTEXT_REPLY reply;
+	struct novfs_destroy_context_request cmd;
+	struct novfs_destroy_context_reply *reply;
 	unsigned long replylen = 0;
 	int retCode = 0;
 
-	DbgPrint("Daemon_DestroySessionId: 0x%p:%p\n",
-		 SessionId->hTypeId, SessionId->hId);
+	DbgPrint("Daemon_DestroySessionId: 0x%p:%p\n", SessionId.hTypeId,
+		 SessionId.hId);
 
 	cmd.Command.CommandType = VFS_COMMAND_DESTROY_CONTEXT;
 	cmd.Command.SequenceNumber = 0;
-	memcpy(&cmd.Command.SessionId, SessionId, sizeof (*SessionId));
+	cmd.Command.SessionId = SessionId;
 
 	retCode =
 	    Queue_Daemon_Command(&cmd, sizeof(cmd), NULL, 0, (void *)&reply,
 				 &replylen, INTERRUPTIBLE);
 	if (reply) {
 		if (!reply->Reply.ErrorCode) {
-			drive_map_t *dm;
+			struct drive_map *dm;
 			struct list_head *list;
 
 			retCode = 0;
@@ -1085,11 +935,8 @@ int Daemon_DestroySessionId(struct schandle *SessionId)
 			 */
 			down(&DriveMapLock);
 			list_for_each(list, &DriveMapList) {
-				struct schandle *temp;
-
-				dm = list_entry(list, drive_map_t, list);
-				temp = &dm->session;
-				if (SC_EQUAL(SessionId, temp)) {
+				dm = list_entry(list, struct drive_map, list);
+				if (SC_EQUAL(SessionId, dm->session)) {
 					local_unlink(dm->name);
 					list = list->prev;
 					list_del(&dm->list);
@@ -1107,21 +954,21 @@ int Daemon_DestroySessionId(struct schandle *SessionId)
 	return (retCode);
 }
 
-int Daemon_Get_UserSpace(struct schandle *SessionId, uint64_t * TotalSize,
+int novfs_daemon_get_userspace(struct novfs_schandle SessionId, uint64_t * TotalSize,
 			 uint64_t * Free, uint64_t * TotalEnties,
 			 uint64_t * FreeEnties)
 {
-	GET_USER_SPACE_REQUEST cmd;
-	PGET_USER_SPACE_REPLY reply;
+	struct novfs_get_user_space cmd;
+	struct novfs_get_user_space_reply *reply;
 	unsigned long replylen = 0;
 	int retCode = 0;
 
-	DbgPrint("Daemon_Get_UserSpace: 0x%p:%p\n",
-		 SessionId->hTypeId, SessionId->hId);
+	DbgPrint("Daemon_Get_UserSpace: 0x%p:%p\n", SessionId.hTypeId,
+		 SessionId.hId);
 
 	cmd.Command.CommandType = VFS_COMMAND_GET_USER_SPACE;
 	cmd.Command.SequenceNumber = 0;
-	memcpy(&cmd.Command.SessionId, SessionId, sizeof (*SessionId));
+	cmd.Command.SessionId = SessionId;
 
 	retCode =
 	    Queue_Daemon_Command(&cmd, sizeof(cmd), NULL, 0, (void *)&reply,
@@ -1151,36 +998,22 @@ int Daemon_Get_UserSpace(struct schandle *SessionId, uint64_t * TotalSize,
 	return (retCode);
 }
 
-/*++======================================================================*/
-int Daemon_SetMountPoint(char *Path)
-/*
- *
- *  Arguments:
- *
- *  Returns:
- *
- *  Abstract:
- *
- *  Notes:
- *
- *  Environment:
- *
- *========================================================================*/
+int novfs_daemon_set_mnt_point(char *Path)
 {
-	PSET_MOUNT_PATH_REQUEST cmd;
-	PSET_MOUNT_PATH_REPLY reply;
+	struct novfs_set_mount_path *cmd;
+	struct novfs_set_mount_path_reply *reply;
 	unsigned long replylen, cmdlen;
 	int retCode = -ENOMEM;
 
 	DbgPrint("Daemon_SetMountPoint: %s\n", Path);
 
 	replylen = strlen(Path);
-	cmdlen = sizeof(SET_MOUNT_PATH_REQUEST) + replylen;
+
+	cmdlen = sizeof(struct novfs_set_mount_path) + replylen;
 
 	cmd = kmalloc(cmdlen, GFP_KERNEL);
 	if (!cmd)
 		return -ENOMEM;
-
 	cmd->Command.CommandType = VFS_COMMAND_SET_MOUNT_PATH;
 	cmd->Command.SequenceNumber = 0;
 	SC_INITIALIZE(cmd->Command.SessionId);
@@ -1190,7 +1023,9 @@ int Daemon_SetMountPoint(char *Path)
 
 	replylen = 0;
 
-	retCode = Queue_Daemon_Command(cmd, cmdlen, NULL, 0, (void *)&reply, &replylen, INTERRUPTIBLE);
+	retCode =
+		Queue_Daemon_Command(cmd, cmdlen, NULL, 0, (void *)&reply,
+				&replylen, INTERRUPTIBLE);
 	if (reply) {
 		if (!reply->Reply.ErrorCode) {
 			retCode = 0;
@@ -1203,27 +1038,13 @@ int Daemon_SetMountPoint(char *Path)
 	return retCode;
 }
 
-/*++======================================================================*/
-int Daemon_SendDebugCmd(char *Command)
-/*
- *
- *  Arguments:
- *
- *  Returns:
- *
- *  Abstract:
- *
- *  Notes:
- *
- *  Environment:
- *
- *========================================================================*/
+int novfs_daemon_debug_cmd_send(char *Command)
 {
-	DEBUG_REQUEST cmd;
-	PDEBUG_REPLY reply;
-	DEBUG_REPLY lreply;
+	struct novfs_debug_request cmd;
+	struct novfs_debug_reply *reply;
+	struct novfs_debug_reply lreply;
 	unsigned long replylen, cmdlen;
-	struct data_list dlist[2];
+	struct novfs_data_list dlist[2];
 
 	int retCode = -ENOMEM;
 
@@ -1239,7 +1060,7 @@ int Daemon_SendDebugCmd(char *Command)
 	dlist[1].len = sizeof(lreply);
 	dlist[1].rwflag = DLWRITE;
 
-	cmdlen = offsetof(DEBUG_REQUEST, dbgcmd);
+	cmdlen = offsetof(struct novfs_debug_request, dbgcmd);
 
 	cmd.Command.CommandType = VFS_COMMAND_DBG;
 	cmd.Command.SequenceNumber = 0;
@@ -1248,7 +1069,9 @@ int Daemon_SendDebugCmd(char *Command)
 
 	replylen = 0;
 
-	retCode = Queue_Daemon_Command(&cmd, cmdlen, dlist, 2, (void *)&reply, &replylen, INTERRUPTIBLE);
+	retCode =
+	    Queue_Daemon_Command(&cmd, cmdlen, dlist, 2, (void *)&reply,
+				 &replylen, INTERRUPTIBLE);
 	if (reply) {
 		kfree(reply);
 	}
@@ -1259,21 +1082,20 @@ int Daemon_SendDebugCmd(char *Command)
 	return (retCode);
 }
 
-int Daemon_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
+int novfs_daemon_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
 {
 	int retCode = -ENOSYS;
 	unsigned long cpylen;
-	struct schandle session_id;
-
-	session_id = Scope_Get_SessionId(NULL);
+	struct novfs_schandle session_id;
+	session_id = novfs_scope_get_sessionId(NULL);
 
 	switch (cmd) {
 	case IOC_LOGIN:
-		retCode = daemon_login((struct login *)arg, &session_id);
+		retCode = daemon_login((struct novfs_login *) arg, &session_id);
 		break;
 
 	case IOC_LOGOUT:
-		retCode = daemon_logout((struct logout *) arg, &session_id);
+		retCode = daemon_logout((struct novfs_logout *)arg, &session_id);
 		break;
 	case IOC_DEBUGPRINT:
 		{
@@ -1302,7 +1124,7 @@ int Daemon_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsig
 
 	case IOC_XPLAT:
 		{
-			XPLAT data;
+			struct novfs_xplat data;
 
 			cpylen =
 			    copy_from_user(&data, (void *)arg, sizeof(data));
@@ -1324,23 +1146,29 @@ int Daemon_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsig
 	return (retCode);
 }
 
-int Daemon_Added_Resource(daemon_handle_t *DHandle, int Type, HANDLE CHandle, unsigned char *FHandle, unsigned long Mode, unsigned long Size)
+static int daemon_added_resource(struct daemon_handle * DHandle, int Type, void *CHandle,
+			  unsigned char * FHandle, unsigned long Mode, u_long Size)
 {
-	daemon_resource_t *resource;
+	struct daemon_resource *resource;
 
 	if (FHandle)
-		DbgPrint("Daemon_Added_Resource: DHandle=0x%p Type=%d CHandle=0x%p FHandle=0x%x Mode=0x%x Size=%d\n", DHandle, Type, CHandle, *(u32 *) & FHandle[2], Mode, Size);
+		DbgPrint
+		    ("Daemon_Added_Resource: DHandle=0x%p Type=%d CHandle=0x%p FHandle=0x%x Mode=0x%x Size=%d\n",
+		     DHandle, Type, CHandle, *(u32 *) & FHandle[2], Mode, Size);
 	else
-		DbgPrint("Daemon_Added_Resource: DHandle=0x%p Type=%d CHandle=0x%p\n", DHandle, Type, CHandle);
+		DbgPrint
+		    ("Daemon_Added_Resource: DHandle=0x%p Type=%d CHandle=0x%p\n",
+		     DHandle, Type, CHandle);
 
-	resource = kmalloc(sizeof(daemon_resource_t), GFP_KERNEL);
+	resource = kmalloc(sizeof(struct daemon_resource), GFP_KERNEL);
 	if (!resource)
 		return -ENOMEM;
 
 	resource->type = Type;
 	resource->connection = CHandle;
 	if (FHandle)
-		memcpy(resource->handle, FHandle, sizeof(resource->handle));
+		memcpy(resource->handle, FHandle,
+				sizeof(resource->handle));
 	else
 		memset(resource->handle, 0, sizeof(resource->handle));
 	resource->mode = Mode;
@@ -1348,29 +1176,15 @@ int Daemon_Added_Resource(daemon_handle_t *DHandle, int Type, HANDLE CHandle, un
 	write_lock(&DHandle->lock);
 	list_add(&resource->list, &DHandle->list);
 	write_unlock(&DHandle->lock);
-	DbgPrint("Daemon_Added_Resource: Adding resource=0x%p\n", resource);
-
+	DbgPrint("Daemon_Added_Resource: Adding resource=0x%p\n",
+			resource);
 	return 0;
 }
 
-/*++======================================================================*/
-int Daemon_Remove_Resource(daemon_handle_t * DHandle, int Type, HANDLE CHandle,
+static int daemon_remove_resource(struct daemon_handle * DHandle, int Type, void *CHandle,
 			   unsigned long FHandle)
-/*
- *
- *  Arguments:
- *
- *  Returns:
- *
- *  Abstract:
- *
- *  Notes:
- *
- *  Environment:
- *
- *========================================================================*/
 {
-	daemon_resource_t *resource;
+	struct daemon_resource *resource;
 	struct list_head *l;
 	int retVal = -ENOMEM;
 
@@ -1381,7 +1195,7 @@ int Daemon_Remove_Resource(daemon_handle_t * DHandle, int Type, HANDLE CHandle,
 	write_lock(&DHandle->lock);
 
 	list_for_each(l, &DHandle->list) {
-		resource = list_entry(l, daemon_resource_t, list);
+		resource = list_entry(l, struct daemon_resource, list);
 
 		if ((Type == resource->type) &&
 		    (resource->connection == CHandle)) {
@@ -1400,76 +1214,59 @@ int Daemon_Remove_Resource(daemon_handle_t * DHandle, int Type, HANDLE CHandle,
 	return (retVal);
 }
 
-int Daemon_Library_open(struct inode *inode, struct file *file)
+int novfs_daemon_lib_open(struct inode *inode, struct file *file)
 {
-	daemon_handle_t *dh;
+	struct daemon_handle *dh;
 
 	DbgPrint("Daemon_Library_open: inode=0x%p file=0x%p\n", inode, file);
-
-	dh = kmalloc(sizeof(daemon_handle_t), GFP_KERNEL);
+	dh = kmalloc(sizeof(struct daemon_handle), GFP_KERNEL);
 	if (!dh)
 		return -ENOMEM;
-
 	file->private_data = dh;
 	INIT_LIST_HEAD(&dh->list);
 	rwlock_init(&dh->lock);
-	dh->session = Scope_Get_SessionId(NULL);
-
+	dh->session = novfs_scope_get_sessionId(NULL);
 	return 0;
 }
 
-/*++======================================================================*/
-int Daemon_Library_close(struct inode *inode, struct file *file)
-/*
- *
- *  Arguments:
- *
- *  Returns:
- *
- *  Abstract:
- *
- *  Notes:
- *
- *  Environment:
- *
- *========================================================================*/
+int novfs_daemon_lib_close(struct inode *inode, struct file *file)
 {
-	daemon_handle_t *dh;
-	daemon_resource_t *resource;
+	struct daemon_handle *dh;
+	struct daemon_resource *resource;
 	struct list_head *l;
 
-	char commanddata[sizeof(XPLAT_CALL_REQUEST) + sizeof(NwdCCloseConn)];
-	PXPLAT_CALL_REQUEST cmd;
-	PXPLAT_CALL_REPLY reply;
-	PNwdCCloseConn nwdClose;
+	char commanddata[sizeof(struct novfs_xplat_call_request) + sizeof(struct nwd_close_conn)];
+	struct novfs_xplat_call_request *cmd;
+	struct xplat_call_reply *reply;
+	struct nwd_close_conn *nwdClose;
 	unsigned long cmdlen, replylen;
 
 	DbgPrint("Daemon_Library_close: inode=0x%p file=0x%p\n", inode, file);
 	if (file->private_data) {
-		dh = (daemon_handle_t *) file->private_data;
+		dh = (struct daemon_handle *) file->private_data;
 
 		list_for_each(l, &dh->list) {
-			resource = list_entry(l, daemon_resource_t, list);
+			resource = list_entry(l, struct daemon_resource, list);
 
 			if (DH_TYPE_STREAM == resource->type) {
-				Novfs_Close_Stream(resource->connection,
+				novfs_close_stream(resource->connection,
 						   resource->handle,
 						   dh->session);
 			} else if (DH_TYPE_CONNECTION == resource->type) {
-				cmd = (PXPLAT_CALL_REQUEST) commanddata;
+				cmd = (struct novfs_xplat_call_request *) commanddata;
 				cmdlen =
-				    offsetof(XPLAT_CALL_REQUEST,
-					     data) + sizeof(NwdCCloseConn);
+				    offsetof(struct novfs_xplat_call_request,
+					     data) + sizeof(struct nwd_close_conn);
 				cmd->Command.CommandType =
 				    VFS_COMMAND_XPLAT_CALL;
 				cmd->Command.SequenceNumber = 0;
 				cmd->Command.SessionId = dh->session;
 				cmd->NwcCommand = NWC_CLOSE_CONN;
 
-				cmd->dataLen = sizeof(NwdCCloseConn);
-				nwdClose = (PNwdCCloseConn) cmd->data;
+				cmd->dataLen = sizeof(struct nwd_close_conn);
+				nwdClose = (struct nwd_close_conn *) cmd->data;
 				nwdClose->ConnHandle =
-				    (HANDLE) resource->connection;
+				    (void *) resource->connection;
 
 				Queue_Daemon_Command((void *)cmd, cmdlen, NULL,
 						     0, (void **)&reply,
@@ -1488,10 +1285,11 @@ int Daemon_Library_close(struct inode *inode, struct file *file)
 	return (0);
 }
 
-ssize_t Daemon_Library_read(struct file *file, char __user *buf, size_t len, loff_t *off)
+ssize_t novfs_daemon_lib_read(struct file * file, char *buf, size_t len,
+			    loff_t * off)
 {
-	daemon_handle_t *dh;
-	daemon_resource_t *resource;
+	struct daemon_handle *dh;
+	struct daemon_resource *resource;
 
 	size_t thisread, totalread = 0;
 	loff_t offset = *off;
@@ -1504,12 +1302,12 @@ ssize_t Daemon_Library_read(struct file *file, char __user *buf, size_t len, lof
 		read_lock(&dh->lock);
 		if (&dh->list != dh->list.next) {
 			resource =
-			    list_entry(dh->list.next, daemon_resource_t, list);
+			    list_entry(dh->list.next, struct daemon_resource, list);
 
 			if (DH_TYPE_STREAM == resource->type) {
 				while (len > 0 && (offset < resource->size)) {
 					thisread = len;
-					if (Novfs_Read_Stream
+					if (novfs_read_stream
 					    (resource->connection,
 					     resource->handle, buf, &thisread,
 					     &offset, 1, dh->session)
@@ -1530,10 +1328,11 @@ ssize_t Daemon_Library_read(struct file *file, char __user *buf, size_t len, lof
 	return (totalread);
 }
 
-ssize_t Daemon_Library_write(struct file *file, const char __user *buf, size_t len, loff_t *off)
+ssize_t novfs_daemon_lib_write(struct file * file, const char *buf, size_t len,
+			     loff_t * off)
 {
-	daemon_handle_t *dh;
-	daemon_resource_t *resource;
+	struct daemon_handle *dh;
+	struct daemon_resource *resource;
 
 	size_t thiswrite, totalwrite = -EINVAL;
 	loff_t offset = *off;
@@ -1547,14 +1346,14 @@ ssize_t Daemon_Library_write(struct file *file, const char __user *buf, size_t l
 		write_lock(&dh->lock);
 		if (&dh->list != dh->list.next) {
 			resource =
-			    list_entry(dh->list.next, daemon_resource_t, list);
+			    list_entry(dh->list.next, struct daemon_resource, list);
 
 			if ((DH_TYPE_STREAM == resource->type) && (len >= 0)) {
 				totalwrite = 0;
 				do {
 					thiswrite = len;
 					status =
-					    Novfs_Write_Stream(resource->
+					    novfs_write_stream(resource->
 							       connection,
 							       resource->handle,
 							       (void *)buf,
@@ -1590,24 +1389,10 @@ ssize_t Daemon_Library_write(struct file *file, const char __user *buf, size_t l
 	return (totalwrite);
 }
 
-/*++======================================================================*/
-loff_t Daemon_Library_llseek(struct file * file, loff_t offset, int origin)
-/*
- *
- *  Arguments:
- *
- *  Returns:
- *
- *  Abstract:
- *
- *  Notes:
- *
- *  Environment:
- *
- *========================================================================*/
+loff_t novfs_daemon_lib_llseek(struct file * file, loff_t offset, int origin)
 {
-	daemon_handle_t *dh;
-	daemon_resource_t *resource;
+	struct daemon_handle *dh;
+	struct daemon_resource *resource;
 
 	loff_t retVal = -EINVAL;
 
@@ -1619,7 +1404,7 @@ loff_t Daemon_Library_llseek(struct file * file, loff_t offset, int origin)
 		read_lock(&dh->lock);
 		if (&dh->list != dh->list.next) {
 			resource =
-			    list_entry(dh->list.next, daemon_resource_t, list);
+			    list_entry(dh->list.next, struct daemon_resource, list);
 
 			if (DH_TYPE_STREAM == resource->type) {
 				switch (origin) {
@@ -1646,11 +1431,11 @@ loff_t Daemon_Library_llseek(struct file * file, loff_t offset, int origin)
 	return retVal;
 }
 
-int Daemon_Library_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
+int novfs_daemon_lib_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
 {
 	int retCode = -ENOSYS;
-	daemon_handle_t *dh;
-	HANDLE handle = NULL;
+	struct daemon_handle *dh;
+	void *handle = NULL;
 	unsigned long cpylen;
 
 	dh = file->private_data;
@@ -1662,11 +1447,11 @@ int Daemon_Library_ioctl(struct inode *inode, struct file *file, unsigned int cm
 
 		switch (cmd) {
 		case IOC_LOGIN:
-			retCode = daemon_login((struct login *)arg, &dh->session);
+			retCode = daemon_login((struct novfs_login *)arg, &dh->session);
 			break;
 
 		case IOC_LOGOUT:
-			retCode = daemon_logout((struct logout *)arg, &dh->session);
+			retCode = daemon_logout((struct novfs_logout *)arg, &dh->session);
 			break;
 
 		case IOC_DEBUGPRINT:
@@ -1681,10 +1466,14 @@ int Daemon_Library_ioctl(struct inode *inode, struct file *file, unsigned int cm
 				    copy_from_user(&io, (void *)arg,
 						   sizeof(io));
 				if (io.length) {
-					buf = kmalloc(io.length + 1, GFP_KERNEL);
+					buf =
+					    kmalloc(io.length + 1,
+							 GFP_KERNEL);
 					if (buf) {
 						buf[0] = 0;
-						cpylen = copy_from_user(buf, io.data, io.length);
+						cpylen =
+						    copy_from_user(buf, io.data,
+								   io.length);
 						buf[io.length] = '\0';
 						DbgPrint("%s", buf);
 						kfree(buf);
@@ -1696,7 +1485,7 @@ int Daemon_Library_ioctl(struct inode *inode, struct file *file, unsigned int cm
 
 		case IOC_XPLAT:
 			{
-				XPLAT data;
+				struct novfs_xplat data;
 
 				cpylen =
 				    copy_from_user(&data, (void *)arg,
@@ -1707,61 +1496,79 @@ int Daemon_Library_ioctl(struct inode *inode, struct file *file, unsigned int cm
 
 				switch (data.xfunction) {
 				case NWC_OPEN_CONN_BY_NAME:
-					DbgPrint("[VFS XPLAT] Call NwOpenConnByName\n");
-					retCode = NwOpenConnByName(&data, &handle, dh->session);
+					DbgPrint
+					    ("[VFS XPLAT] Call NwOpenConnByName\n");
+					retCode =
+					    novfs_open_conn_by_name(&data,
+						    &handle, dh->session);
 					if (!retCode)
-						Daemon_Added_Resource(dh, DH_TYPE_CONNECTION, handle, NULL, 0, 0);
+						daemon_added_resource(dh,
+								      DH_TYPE_CONNECTION,handle, 0, 0, 0);
 					break;
 
 				case NWC_OPEN_CONN_BY_ADDRESS:
-					DbgPrint("[VFS XPLAT] Call NwOpenConnByAddress\n");
-					retCode = NwOpenConnByAddr(&data, &handle, dh->session);
+					DbgPrint
+					    ("[VFS XPLAT] Call NwOpenConnByAddress\n");
+					retCode =
+					    novfs_open_conn_by_addr(&data, &handle,
+							     dh->session);
 					if (!retCode)
-						Daemon_Added_Resource(dh, DH_TYPE_CONNECTION, handle, NULL, 0, 0);
+						daemon_added_resource(dh,
+								      DH_TYPE_CONNECTION,
+								      handle, 0,
+								      0, 0);
 					break;
 
 				case NWC_OPEN_CONN_BY_REFERENCE:
-					DbgPrint("[VFS XPLAT] Call NwOpenConnByReference\n");
-					retCode = NwOpenConnByRef(&data, &handle, dh->session);
+
+					DbgPrint
+					    ("[VFS XPLAT] Call NwOpenConnByReference\n");
+					retCode =
+					    novfs_open_conn_by_ref(&data, &handle,
+							    dh->session);
 					if (!retCode)
-						Daemon_Added_Resource(dh,
+						daemon_added_resource(dh,
 								      DH_TYPE_CONNECTION,
-								      handle, NULL,
+								      handle, 0,
 								      0, 0);
 					break;
 
 				case NWC_SYS_CLOSE_CONN:
 					DbgPrint("[VFS XPLAT] Call NwSysCloseConn\n");
-					retCode = NwSysConnClose(&data, (unsigned long *)&handle, dh->session);
-					Daemon_Remove_Resource(dh, DH_TYPE_CONNECTION, handle, 0);
+					retCode =
+						novfs_sys_conn_close(&data, (unsigned long *)&handle, dh->session);
+					daemon_remove_resource(dh, DH_TYPE_CONNECTION, handle, 0);
 					break;
 
 				case NWC_CLOSE_CONN:
 					DbgPrint
 					    ("[VFS XPLAT] Call NwCloseConn\n");
 					retCode =
-					    NwConnClose(&data, &handle,
+					    novfs_conn_close(&data, &handle,
 							dh->session);
-					Daemon_Remove_Resource(dh,
+					daemon_remove_resource(dh,
 							       DH_TYPE_CONNECTION,
 							       handle, 0);
 					break;
 
 				case NWC_LOGIN_IDENTITY:
-					DbgPrint("[VFS XPLAT] Call NwLoginIdentity\n");
-					retCode = NwLoginIdentity(&data, &dh->session);
+					DbgPrint
+					    ("[VFS XPLAT] Call NwLoginIdentity\n");
+					retCode =
+					    novfs_login_id(&data, dh->session);
 					break;
 
 				case NWC_RAW_NCP_REQUEST:
-					DbgPrint("[VFS XPLAT] Send Raw NCP Request\n");
-					retCode = NwRawSend(&data, dh->session);
+					DbgPrint
+					    ("[VFS XPLAT] Send Raw NCP Request\n");
+					retCode = novfs_raw_send(&data, dh->session);
 					break;
 
 				case NWC_AUTHENTICATE_CONN_WITH_ID:
 					DbgPrint
 					    ("[VFS XPLAT] Authenticate Conn With ID\n");
 					retCode =
-					    NwAuthConnWithId(&data,
+					    novfs_auth_conn(&data,
 							     dh->session);
 					break;
 
@@ -1769,21 +1576,21 @@ int Daemon_Library_ioctl(struct inode *inode, struct file *file, unsigned int cm
 					DbgPrint
 					    ("[VFS XPLAT] UnAuthenticate Conn With ID\n");
 					retCode =
-					    NwUnAuthenticate(&data,
+					    novfs_unauthenticate(&data,
 							     dh->session);
 					break;
 
 				case NWC_LICENSE_CONN:
 					DbgPrint("Call NwLicenseConn\n");
 					retCode =
-					    NwLicenseConn(&data, dh->session);
+					    novfs_license_conn(&data, dh->session);
 					break;
 
 				case NWC_LOGOUT_IDENTITY:
 					DbgPrint
 					    ("[VFS XPLAT] Call NwLogoutIdentity\n");
 					retCode =
-					    NwLogoutIdentity(&data,
+					    novfs_logout_id(&data,
 							     dh->session);
 					break;
 
@@ -1791,35 +1598,35 @@ int Daemon_Library_ioctl(struct inode *inode, struct file *file, unsigned int cm
 					DbgPrint
 					    ("[VFS XPLAT] Call NwUnlicense\n");
 					retCode =
-					    NwUnlicenseConn(&data, dh->session);
+					    novfs_unlicense_conn(&data, dh->session);
 					break;
 
 				case NWC_GET_CONN_INFO:
 					DbgPrint
 					    ("[VFS XPLAT] Call NwGetConnInfo\n");
 					retCode =
-					    NwGetConnInfo(&data, dh->session);
+					    novfs_get_conn_info(&data, dh->session);
 					break;
 
 				case NWC_SET_CONN_INFO:
 					DbgPrint
 					    ("[VFS XPLAT] Call NwGetConnInfo\n");
 					retCode =
-					    NwSetConnInfo(&data, dh->session);
+					    novfs_set_conn_info(&data, dh->session);
 					break;
 
 				case NWC_SCAN_CONN_INFO:
 					DbgPrint
 					    ("[VFS XPLAT] Call NwScanConnInfo\n");
 					retCode =
-					    NwScanConnInfo(&data, dh->session);
+					    novfs_scan_conn_info(&data, dh->session);
 					break;
 
 				case NWC_GET_IDENTITY_INFO:
 					DbgPrint
 					    ("[VFS XPLAT] Call NwGetIdentityInfo\n");
 					retCode =
-					    NwGetIdentityInfo(&data,
+					    novfs_get_id_info(&data,
 							      dh->session);
 					break;
 
@@ -1827,7 +1634,7 @@ int Daemon_Library_ioctl(struct inode *inode, struct file *file, unsigned int cm
 					DbgPrint
 					    ("[VFS XPLAT] Call NwGetDaemonVersion\n");
 					retCode =
-					    NwGetDaemonVersion(&data,
+					    novfs_get_daemon_ver(&data,
 							       dh->session);
 					break;
 
@@ -1835,7 +1642,7 @@ int Daemon_Library_ioctl(struct inode *inode, struct file *file, unsigned int cm
 					DbgPrint
 					    ("[VFS XPLAT] Call NwcGetPreferredDsTree\n");
 					retCode =
-					    NwcGetPreferredDSTree(&data,
+					    novfs_get_preferred_DS_tree(&data,
 								  dh->session);
 					break;
 
@@ -1843,7 +1650,7 @@ int Daemon_Library_ioctl(struct inode *inode, struct file *file, unsigned int cm
 					DbgPrint
 					    ("[VFS XPLAT] Call NwcSetPreferredDsTree\n");
 					retCode =
-					    NwcSetPreferredDSTree(&data,
+					    novfs_set_preferred_DS_tree(&data,
 								  dh->session);
 					break;
 
@@ -1851,7 +1658,7 @@ int Daemon_Library_ioctl(struct inode *inode, struct file *file, unsigned int cm
 					DbgPrint
 					    ("[VFS XPLAT] Call NwcGetDefaultNameContext\n");
 					retCode =
-					    NwcGetDefaultNameCtx(&data,
+					    novfs_get_default_ctx(&data,
 								 dh->session);
 					break;
 
@@ -1859,7 +1666,7 @@ int Daemon_Library_ioctl(struct inode *inode, struct file *file, unsigned int cm
 					DbgPrint
 					    ("[VFS XPLAT] Call NwcSetDefaultNameContext\n");
 					retCode =
-					    NwcSetDefaultNameCtx(&data,
+					    novfs_set_default_ctx(&data,
 								 dh->session);
 					break;
 
@@ -1867,14 +1674,14 @@ int Daemon_Library_ioctl(struct inode *inode, struct file *file, unsigned int cm
 					DbgPrint
 					    ("[VFS XPLAT] Call NwQueryFeature\n");
 					retCode =
-					    NwQueryFeature(&data, dh->session);
+					    novfs_query_feature(&data, dh->session);
 					break;
 
 				case NWC_GET_TREE_MONITORED_CONN_REF:
 					DbgPrint
 					    ("[VFS XPLAT] Call NwcGetTreeMonitoredConn\n");
 					retCode =
-					    NwcGetTreeMonitoredConn(&data,
+					    novfs_get_tree_monitored_conn(&data,
 								    dh->
 								    session);
 					break;
@@ -1883,7 +1690,7 @@ int Daemon_Library_ioctl(struct inode *inode, struct file *file, unsigned int cm
 					DbgPrint
 					    ("[VFS XPLAT] Call NwcEnumerateIdentities\n");
 					retCode =
-					    NwcEnumIdentities(&data,
+					    novfs_enum_ids(&data,
 							      dh->session);
 					break;
 
@@ -1891,7 +1698,7 @@ int Daemon_Library_ioctl(struct inode *inode, struct file *file, unsigned int cm
 					DbgPrint
 					    ("[VFS XPLAT] Call NwcChangeAuthKey\n");
 					retCode =
-					    NwcChangeAuthKey(&data,
+					    novfs_change_auth_key(&data,
 							     dh->session);
 					break;
 
@@ -1913,7 +1720,7 @@ int Daemon_Library_ioctl(struct inode *inode, struct file *file, unsigned int cm
 					DbgPrint
 					    ("[VFS XPLAT] Call NwcSetPrimaryConn\n");
 					retCode =
-					    NwcSetPrimaryConn(&data,
+					    novfs_set_pri_conn(&data,
 							      dh->session);
 					break;
 
@@ -1921,26 +1728,29 @@ int Daemon_Library_ioctl(struct inode *inode, struct file *file, unsigned int cm
 					DbgPrint
 					    ("[VFS XPLAT] Call NwcGetPrimaryConn\n");
 					retCode =
-					    NwcGetPrimaryConn(&data,
+					    novfs_get_pri_conn(&data,
 							      dh->session);
 					break;
 
 				case NWC_MAP_DRIVE:
-					DbgPrint("[VFS XPLAT] Call NwcMapDrive\n");
-					retCode = NwdSetMapDrive(&data, dh->session);
+					DbgPrint
+					    ("[VFS XPLAT] Call NwcMapDrive\n");
+					retCode =
+					    set_map_drive(&data, dh->session);
 					break;
 
 				case NWC_UNMAP_DRIVE:
 					DbgPrint
 					    ("[VFS XPLAT] Call NwcUnMapDrive\n");
-					retCode = NwdUnMapDrive(&data, dh->session);
+					retCode =
+					    unmap_drive(&data, dh->session);
 					break;
 
 				case NWC_ENUMERATE_DRIVES:
 					DbgPrint
 					    ("[VFS XPLAT] Call NwcEnumerateDrives\n");
 					retCode =
-					    NwcEnumerateDrives(&data,
+					    novfs_enum_drives(&data,
 							       dh->session);
 					break;
 
@@ -1954,21 +1764,21 @@ int Daemon_Library_ioctl(struct inode *inode, struct file *file, unsigned int cm
 					DbgPrint
 					    ("[VSF XPLAT Call NwdGetBroadcastMessage\n");
 					retCode =
-					    NwcGetBroadcastMessage(&data,
+					    novfs_get_bcast_msg(&data,
 								   dh->session);
 					break;
 
 				case NWC_SET_KEY:
 					DbgPrint("[VSF XPLAT Call NwdSetKey\n");
 					retCode =
-					    NwdSetKeyValue(&data, dh->session);
+					    novfs_set_key_value(&data, dh->session);
 					break;
 
 				case NWC_VERIFY_KEY:
 					DbgPrint
 					    ("[VSF XPLAT Call NwdVerifyKey\n");
 					retCode =
-					    NwdVerifyKeyValue(&data,
+					    novfs_verify_key_value(&data,
 							      dh->session);
 					break;
 
@@ -1991,9 +1801,10 @@ int Daemon_Library_ioctl(struct inode *inode, struct file *file, unsigned int cm
 	return (retCode);
 }
 
-unsigned int Daemon_Poll(struct file *file, struct poll_table_struct *poll_table)
+unsigned int novfs_daemon_poll(struct file *file,
+			 struct poll_table_struct *poll_table)
 {
-	daemon_command_t *que;
+	struct daemon_cmd *que;
 	unsigned int mask = POLLOUT | POLLWRNORM;
 
 	que = get_next_queue(0);
@@ -2002,43 +1813,32 @@ unsigned int Daemon_Poll(struct file *file, struct poll_table_struct *poll_table
 	return mask;
 }
 
-int NwdConvertNetwareHandle(PXPLAT pdata, daemon_handle_t *DHandle)
+static int NwdConvertNetwareHandle(struct novfs_xplat *pdata, struct daemon_handle * DHandle)
 {
 	int retVal;
-	NwcConvertNetWareHandle nh;
+	struct nwc_convert_netware_handle nh;
 	unsigned long cpylen;
 
 	DbgPrint("NwdConvertNetwareHandle: DHandle=0x%p\n", DHandle);
 
-	cpylen = copy_from_user(&nh, pdata->reqData, sizeof(NwcConvertNetWareHandle));
+	cpylen =
+	    copy_from_user(&nh, pdata->reqData,
+			   sizeof(struct nwc_convert_netware_handle));
 
-	retVal = Daemon_Added_Resource(DHandle, DH_TYPE_STREAM,
-				       Uint32toHandle(nh.ConnHandle),
-				       nh.NetWareHandle, nh.uAccessMode,
-				       nh.uFileSize);
+	retVal =
+	    daemon_added_resource(DHandle, DH_TYPE_STREAM,
+				  Uint32toHandle(nh.ConnHandle),
+				  nh.NetWareHandle, nh.uAccessMode,
+				  nh.uFileSize);
 
-	return retVal;
+	return (retVal);
 }
 
-/*++======================================================================*/
-int NwdConvertLocalHandle(PXPLAT pdata, daemon_handle_t * DHandle)
-/*
- *
- *  Arguments:
- *
- *  Returns:
- *
- *  Abstract:
- *
- *  Notes:
- *
- *  Environment:
- *
- *========================================================================*/
+static int NwdConvertLocalHandle(struct novfs_xplat *pdata, struct daemon_handle * DHandle)
 {
 	int retVal = NWE_REQUESTER_FAILURE;
-	daemon_resource_t *resource;
-	NwcConvertLocalHandle lh;
+	struct daemon_resource *resource;
+	struct nwc_convert_local_handle lh;
 	struct list_head *l;
 	unsigned long cpylen;
 
@@ -2047,7 +1847,7 @@ int NwdConvertLocalHandle(PXPLAT pdata, daemon_handle_t * DHandle)
 	read_lock(&DHandle->lock);
 
 	list_for_each(l, &DHandle->list) {
-		resource = list_entry(l, daemon_resource_t, list);
+		resource = list_entry(l, struct daemon_resource, list);
 
 		if (DH_TYPE_STREAM == resource->type) {
 			lh.uConnReference =
@@ -2055,10 +1855,10 @@ int NwdConvertLocalHandle(PXPLAT pdata, daemon_handle_t * DHandle)
 
 //sgled         memcpy(lh.NwWareHandle, resource->handle, sizeof(resource->handle));
 			memcpy(lh.NetWareHandle, resource->handle, sizeof(resource->handle));	//sgled
-			if (pdata->repLen >= sizeof(NwcConvertLocalHandle)) {
+			if (pdata->repLen >= sizeof(struct nwc_convert_local_handle)) {
 				cpylen =
 				    copy_to_user(pdata->repData, &lh,
-						 sizeof(NwcConvertLocalHandle));
+						 sizeof(struct nwc_convert_local_handle));
 				retVal = 0;
 			} else {
 				retVal = NWE_BUFFER_OVERFLOW;
@@ -2072,39 +1872,25 @@ int NwdConvertLocalHandle(PXPLAT pdata, daemon_handle_t * DHandle)
 	return (retVal);
 }
 
-/*++======================================================================*/
-int NwdGetMountPath(PXPLAT pdata)
-/*
- *
- *  Arguments:
- *
- *  Returns:
- *
- *  Abstract:
- *
- *  Notes:
- *
- *  Environment:
- *
- *========================================================================*/
+static int NwdGetMountPath(struct novfs_xplat *pdata)
 {
 	int retVal = NWE_REQUESTER_FAILURE;
 	int len;
 	unsigned long cpylen;
-	NwcGetMountPath mp;
+	struct nwc_get_mount_path mp;
 
 	cpylen = copy_from_user(&mp, pdata->reqData, pdata->reqLen);
 
-	if (Novfs_CurrentMount) {
+	if (novfs_current_mnt) {
 
-		len = strlen(Novfs_CurrentMount) + 1;
+		len = strlen(novfs_current_mnt) + 1;
 		if ((len > mp.MountPathLen) && mp.pMountPath) {
 			retVal = NWE_BUFFER_OVERFLOW;
 		} else {
 			if (mp.pMountPath) {
 				cpylen =
 				    copy_to_user(mp.pMountPath,
-						 Novfs_CurrentMount, len);
+						 novfs_current_mnt, len);
 			}
 			retVal = 0;
 		}
@@ -2119,52 +1905,55 @@ int NwdGetMountPath(PXPLAT pdata)
 	return (retVal);
 }
 
-static int NwdSetMapDrive(PXPLAT pdata, session_t Session)
+static int set_map_drive(struct novfs_xplat *pdata, struct novfs_schandle Session)
 {
 	int retVal;
-	NwcMapDriveEx symInfo;
+	unsigned long cpylen;
+	struct nwc_map_drive_ex symInfo;
 	char *path;
-	drive_map_t *drivemap, *dm;
+	struct drive_map *drivemap, *dm;
 	struct list_head *list;
 
-	retVal = NwcSetMapDrive(pdata, Session);
+	retVal = novfs_set_map_drive(pdata, Session);
 	if (retVal)
 		return retVal;
-
 	if (copy_from_user(&symInfo, pdata->reqData, sizeof(symInfo)))
 		return -EFAULT;
-
-	drivemap = kmalloc(sizeof(drive_map_t) + symInfo.linkOffsetLength, GFP_KERNEL);
+	drivemap =
+		kmalloc(sizeof(struct drive_map) + symInfo.linkOffsetLength,
+				GFP_KERNEL);
 	if (!drivemap)
 		return -ENOMEM;
 
 	path = (char *)pdata->reqData;
 	path += symInfo.linkOffset;
-	if (copy_from_user(drivemap->name, path, symInfo.linkOffsetLength)) {
-		kfree(drivemap);
-		return -EFAULT;
-	}
+	cpylen =
+		copy_from_user(drivemap->name, path,
+				symInfo.linkOffsetLength);
 
 	drivemap->session = Session;
-	drivemap->hash = full_name_hash(drivemap->name, symInfo.linkOffsetLength - 1);
+	drivemap->hash =
+		full_name_hash(drivemap->name,
+				symInfo.linkOffsetLength - 1);
 	drivemap->namelen = symInfo.linkOffsetLength - 1;
-	DbgPrint("NwdSetMapDrive: hash=0x%x path=%s\n", drivemap->hash, drivemap->name);
+	DbgPrint("NwdSetMapDrive: hash=0x%x path=%s\n",
+			drivemap->hash, drivemap->name);
 
-	dm = (drive_map_t *) & DriveMapList.next;
+	dm = (struct drive_map *) & DriveMapList.next;
 
 	down(&DriveMapLock);
 
 	list_for_each(list, &DriveMapList) {
-		dm = list_entry(list, drive_map_t, list);
+		dm = list_entry(list, struct drive_map, list);
 		DbgPrint("NwdSetMapDrive: dm=0x%p\n"
-			 "   hash:    0x%x\n"
-			 "   namelen: %d\n"
-			 "   name:    %s\n",
-			 dm, dm->hash, dm->namelen, dm->name);
+				"   hash:    0x%x\n"
+				"   namelen: %d\n"
+				"   name:    %s\n",
+				dm, dm->hash, dm->namelen, dm->name);
 
 		if (drivemap->hash == dm->hash) {
 			if (0 ==
-			    strcmp(dm->name, drivemap->name)) {
+					strcmp(dm->name, drivemap->name)) {
 				dm = NULL;
 				break;
 			}
@@ -2174,59 +1963,57 @@ static int NwdSetMapDrive(PXPLAT pdata, session_t Session)
 	}
 
 	if (dm) {
-		if ((dm == (drive_map_t *) & DriveMapList) ||
-		    (dm->hash < drivemap->hash)) {
+		if ((dm == (struct drive_map *) & DriveMapList) ||
+				(dm->hash < drivemap->hash)) {
 			list_add(&drivemap->list, &dm->list);
 		} else {
 			list_add_tail(&drivemap->list,
-				      &dm->list);
+					&dm->list);
 		}
-	} else {
-		kfree(drivemap);
 	}
+	kfree(drivemap);
 	up(&DriveMapLock);
-
 	return (retVal);
 }
 
-static int NwdUnMapDrive(PXPLAT pdata, session_t Session)
+static int unmap_drive(struct novfs_xplat *pdata, struct novfs_schandle Session)
 {
 	int retVal = NWE_REQUESTER_FAILURE;
-	NwcUnmapDriveEx symInfo;
+	struct nwc_unmap_drive_ex symInfo;
 	char *path;
-	drive_map_t *dm;
+	struct drive_map *dm;
 	struct list_head *list;
 	unsigned long hash;
 
-	retVal = NwcUnMapDrive(pdata, Session);
+
+	retVal = novfs_unmap_drive(pdata, Session);
 	if (retVal)
 		return retVal;
-
 	if (copy_from_user(&symInfo, pdata->reqData, sizeof(symInfo)))
 		return -EFAULT;
 
 	path = kmalloc(symInfo.linkLen, GFP_KERNEL);
 	if (!path)
 		return -ENOMEM;
-
-	if (copy_from_user(path, ((NwcUnmapDriveEx *)pdata->reqData)->linkData, symInfo.linkLen)) {
+	if (copy_from_user(path,((struct nwc_unmap_drive_ex *) pdata->reqData)->linkData, symInfo.linkLen)) {
 		kfree(path);
 		return -EFAULT;
 	}
 
 	hash = full_name_hash(path, symInfo.linkLen - 1);
-	DbgPrint("NwdUnMapDrive: hash=0x%x path=%s\n", hash, path);
+	DbgPrint("NwdUnMapDrive: hash=0x%x path=%s\n", hash,
+			path);
 
 	dm = NULL;
 
 	down(&DriveMapLock);
 
 	list_for_each(list, &DriveMapList) {
-		dm = list_entry(list, drive_map_t, list);
+		dm = list_entry(list, struct drive_map, list);
 		DbgPrint("NwdUnMapDrive: dm=0x%p %s\n"
-			 "   hash:    0x%x\n"
-			 "   namelen: %d\n",
-			 dm, dm->name, dm->hash, dm->namelen);
+				"   hash:    0x%x\n"
+				"   namelen: %d\n",
+				dm, dm->name, dm->hash, dm->namelen);
 
 		if (hash == dm->hash) {
 			if (0 == strcmp(dm->name, path)) {
@@ -2240,40 +2027,25 @@ static int NwdUnMapDrive(PXPLAT pdata, session_t Session)
 
 	if (dm) {
 		DbgPrint("NwdUnMapDrive: Remove dm=0x%p %s\n"
-			 "   hash:    0x%x\n"
-			 "   namelen: %d\n",
-			 dm, dm->name, dm->hash, dm->namelen);
+				"   hash:    0x%x\n"
+				"   namelen: %d\n",
+				dm, dm->name, dm->hash, dm->namelen);
 		list_del(&dm->list);
 		kfree(dm);
 	}
 
 	up(&DriveMapLock);
-
-	return retVal;
+	return (retVal);
 }
 
-/*++======================================================================*/
-void RemoveDriveMaps(void)
-/*
- *
- *  Arguments:
- *
- *  Returns:
- *
- *  Abstract:
- *
- *  Notes:
- *
- *  Environment:
- *
- *========================================================================*/
+static void RemoveDriveMaps(void)
 {
-	drive_map_t *dm;
+	struct drive_map *dm;
 	struct list_head *list;
 
 	down(&DriveMapLock);
 	list_for_each(list, &DriveMapList) {
-		dm = list_entry(list, drive_map_t, list);
+		dm = list_entry(list, struct drive_map, list);
 
 		DbgPrint("RemoveDriveMap: dm=0x%p\n"
 			 "   hash:    0x%x\n"
@@ -2288,9 +2060,7 @@ void RemoveDriveMaps(void)
 	up(&DriveMapLock);
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,15)
-/*++======================================================================*/
-int local_unlink(const char *pathname)
+static int local_unlink(const char *pathname)
 {
 	int error;
 	struct dentry *dentry;
@@ -2341,60 +2111,3 @@ int local_unlink(const char *pathname)
 	return error;
 }
 
-#else
-/*++======================================================================*/
-int local_unlink(const char *pathname)
-{
-	int error;
-	struct dentry *dentry;
-	struct nameidata nd;
-	struct inode *inode = NULL;
-
-	DbgPrint("local_unlink: %s\n", pathname);
-	error = path_lookup(pathname, LOOKUP_PARENT, &nd);
-	DbgPrint("local_unlink: path_lookup %d\n", error);
-	if (!error) {
-		error = -EISDIR;
-		if (nd.last_type == LAST_NORM) {
-			down(&nd.dentry->d_inode->i_sem);
-			dentry =
-			    lookup_one_len(&nd.last, nd.dentry,
-					   sizeof(nd.last));
-			DbgPrint("local_unlink: lookup_hash 0x%p\n", dentry);
-
-			error = PTR_ERR(dentry);
-			if (!IS_ERR(dentry)) {
-				if (nd.last.name[nd.last.len]) {
-					error =
-					    !dentry->
-					    d_inode ? -ENOENT : S_ISDIR(dentry->
-									d_inode->
-									i_mode)
-					    ? -EISDIR : -ENOTDIR;
-				} else {
-					inode = dentry->d_inode;
-					if (inode) {
-						atomic_inc(&inode->i_count);
-					}
-					error =
-					    vfs_unlink(nd.dentry->d_inode,
-						       dentry);
-					DbgPrint
-					    ("local_unlink: vfs_unlink %d\n",
-					     error);
-				}
-				dput(dentry);
-			}
-			up(&nd.dentry->d_inode->i_sem);
-		}
-		path_release(&nd);
-	}
-
-	if (inode) {
-		iput(inode);	/* truncate the inode here */
-	}
-
-	DbgPrint("local_unlink: error=%d\n", error);
-	return error;
-}
-#endif

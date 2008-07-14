@@ -20,37 +20,31 @@
 
 #include <linux/version.h>
 #include <linux/namei.h>
-#include <linux/string.h>
 
 #include "nwcapi.h"
 
-typedef void *HANDLE;
 
-struct schandle {
-	void *hTypeId;
-	void *hId;
+#ifndef  XTIER_SCHANDLE
+struct novfs_schandle {
+	void * hTypeId;
+	void * hId;
+
 };
-
-static inline void copy_schandle(struct schandle *dest, struct schandle *source)
-{
-	memcpy(dest, source, sizeof(struct schandle));
-}
-#define copy_session_id	copy_schandle
-
-typedef struct schandle session_t;
 
 #include "commands.h"
 
 #define SC_PRESENT(X)		((X.hTypeId != NULL) || (X.hId != NULL)) ? 1 : 0
-#define SC_EQUAL(X, Y)		((X->hTypeId == Y->hTypeId) && (X->hId == Y->hId)) ? 1 : 0
+#define SC_EQUAL(X, Y)		((X.hTypeId == Y.hTypeId) && (X.hId == Y.hId)) ? 1 : 0
 #define SC_INITIALIZE(X)	{X.hTypeId = X.hId = NULL;}
 
 #define UID_TO_SCHANDLE(hSC, uid)	\
 		{ \
 			hSC.hTypeId = NULL; \
-			hSC.hId = (HANDLE)(unsigned long)(uid); \
+			hSC.hId = (void *)(unsigned long)(uid); \
 		}
 
+#define XTIER_SCHANDLE
+#endif
 
 
 /*===[ Manifest constants ]===============================================*/
@@ -71,16 +65,6 @@ typedef struct schandle session_t;
 #define IOC_SESSION		0x4a540003
 #define IOC_DEBUGPRINT		0x4a540004
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,15)
-#define D_CHILD d_u.d_child
-#define AS_TREE_LOCK(l)   read_lock_irq(l)
-#define AS_TREE_UNLOCK(l) read_unlock_irq(l)
-#else
-#define D_CHILD d_child
-#define AS_TREE_LOCK(l)   spin_lock_irq(l)
-#define AS_TREE_UNLOCK(l) spin_unlock_irq(l)
-#endif
-
 /*
  * NetWare file attributes
  */
@@ -96,7 +80,7 @@ typedef struct schandle session_t;
 #define NW_ATTRIBUTE_SHAREABLE		0x80
 
 /*
- * Define READ/WRITE flag for struct data_list
+ * Define READ/WRITE flag for DATA_LIST
  */
 #define DLREAD		0
 #define DLWRITE		1
@@ -156,7 +140,8 @@ typedef struct schandle session_t;
          DEFINE_TO_STR(NOVFS_VFS_RELEASE) \
          "\0"
 
-struct entry_info {
+/*===[ Type definitions ]=================================================*/
+struct novfs_entry_info {
 	int type;
 	umode_t mode;
 	uid_t uid;
@@ -174,17 +159,17 @@ struct novfs_string {
 	unsigned char *data;
 };
 
-struct login {
+struct novfs_login {
 	struct novfs_string Server;
 	struct novfs_string UserName;
 	struct novfs_string Password;
 };
 
-struct logout {
+struct novfs_logout {
 	struct novfs_string Server;
 };
 
-struct dir_cache {
+struct novfs_dir_cache {
 	struct list_head list;
 	int flags;
 	u64 jiffies;
@@ -199,7 +184,7 @@ struct dir_cache {
 	char name[1];
 };
 
-struct data_list {
+struct novfs_data_list {
 	void *page;
 	void *offset;
 	int len;
@@ -209,227 +194,256 @@ struct data_list {
 
 extern char *ctime_r(time_t * clock, char *buf);
 
-static inline u32 HandletoUint32(HANDLE h)
 /*
- *
- *  Arguments:   HANDLE h - handle value
- *
- *  Returns:     u32 - u32 value
- *
- *  Abstract:    Converts a HANDLE to a u32 type.
- *
- *  Notes:
- *
- *  Environment:
- *
- *========================================================================*/
+ *  Converts a HANDLE to a u32 type.
+ */
+static inline u32 HandletoUint32(void * h)
 {
 	return (u32) ((unsigned long) h);
 }
 
-/*++======================================================================*/
-static inline HANDLE Uint32toHandle(u32 ui32)
 /*
- *
- *  Arguments:   u32 ui32
- *
- *  Returns:     HANDLE - Handle type.
- *
- *  Abstract:    Converts a u32 to a HANDLE type.
- *
- *  Notes:
- *
- *  Environment:
- *
- *========================================================================*/
+ * Converts a u32 to a HANDLE type.
+ */
+static inline void *Uint32toHandle(u32 ui32)
 {
-	return ((HANDLE) (unsigned long) ui32);
+	return ((void *) (unsigned long) ui32);
 }
 
 /* Global variables */
 
-extern int Novfs_Version_Major;
-extern int Novfs_Version_Minor;
-extern int Novfs_Version_Sub;
-extern int Novfs_Version_Release;
-extern struct dentry *Novfs_root;
-extern struct proc_dir_entry *Novfs_Procfs_dir;
-extern unsigned long File_update_timeout;
-extern int PageCache;
-extern char *Novfs_CurrentMount;
-extern struct dentry_operations Novfs_dentry_operations;
-extern int MaxIoSize;
+extern struct dentry *novfs_root;
+extern struct proc_dir_entry *novfs_procfs_dir;
+extern unsigned long novfs_update_timeout;
+extern int novfs_page_cache;
+extern char *novfs_current_mnt;
+extern int novfs_max_iosize;
 
 
 /* Global functions */
-extern int Novfs_Remove_from_Root(char *);
-extern void Novfs_dump_inode(void *pf);
+extern int novfs_remove_from_root(char *);
+extern void novfs_dump_inode(void *pf);
 
-extern void mydump(int size, void *dumpptr);
+extern void novfs_dump(int size, void *dumpptr);
 
 extern int Queue_Daemon_Command(void *request, unsigned long reqlen, void *data,
 				int dlen, void **reply, unsigned long * replen,
 				int interruptible);
+extern int novfs_do_login(struct ncl_string * Server, struct ncl_string* Username, struct ncl_string * Password, void **lgnId, struct novfs_schandle *Session);
 
-extern int Init_Procfs_Interface(void);
-extern void Uninit_Procfs_Interface(void);
+extern int novfs_proc_init(void);
+extern void novfs_proc_exit(void);
 
 /*
  * daemon.c functions
  */
-extern void Init_Daemon_Queue(void);
-extern void Uninit_Daemon_Queue(void);
-extern int do_login(NclString * Server, NclString * Username, NclString * Password, HANDLE * lgnId, struct schandle *Session);
-extern int do_logout(struct qstr *Server, struct schandle *Session);
-extern int Daemon_SetMountPoint(char *Path);
-extern int Daemon_CreateSessionId(struct schandle *SessionId);
-extern int Daemon_DestroySessionId(struct schandle *SessionId);
-extern int Daemon_getpwuid(uid_t uid, int unamelen, char *uname);
-extern int Daemon_Get_UserSpace(struct schandle *session_id, u64 *TotalSize,
-				u64 *TotalFree, u64 *TotalDirectoryEnties,
-				u64 *FreeDirectoryEnties);
-extern int Daemon_SendDebugCmd(char *Command);
-extern ssize_t Daemon_Receive_Reply(struct file *file, const char __user *buf, size_t nbytes, loff_t *ppos);
-extern ssize_t Daemon_Send_Command(struct file *file, char __user *buf, size_t len, loff_t *off);
-extern int Daemon_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg);
-extern int Daemon_Library_close(struct inode *inode, struct file *file);
-extern int Daemon_Library_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg);
-extern int Daemon_Library_open(struct inode *inode, struct file *file);
-extern ssize_t Daemon_Library_write(struct file *file, const char __user *buf, size_t len, loff_t * off);
-extern ssize_t Daemon_Library_read(struct file *file, char __user *buf, size_t len, loff_t * off);
-extern loff_t Daemon_Library_llseek(struct file *file, loff_t offset, int origin);
-extern int Daemon_Open_Control(struct inode *Inode, struct file *File);
-extern int Daemon_Close_Control(struct inode *Inode, struct file *File);
-extern int Daemon_getversion(char *Buf, int Length);
+extern void novfs_daemon_queue_init(void);
+extern void novfs_daemon_queue_exit(void);
+extern int novfs_daemon_logout(struct qstr *Server, struct novfs_schandle *Session);
+extern int novfs_daemon_set_mnt_point(char *Path);
+extern int novfs_daemon_create_sessionId(struct novfs_schandle * SessionId);
+extern int novfs_daemon_destroy_sessionId(struct novfs_schandle SessionId);
+extern int novfs_daemon_getpwuid(uid_t uid, int unamelen, char *uname);
+extern int novfs_daemon_get_userspace(struct novfs_schandle SessionId,
+		uint64_t * TotalSize, uint64_t * TotalFree,
+		uint64_t * TotalDirectoryEnties,
+		uint64_t * FreeDirectoryEnties);
+extern int novfs_daemon_debug_cmd_send(char *Command);
+extern ssize_t novfs_daemon_recv_reply(struct file *file,
+		const char *buf, size_t nbytes, loff_t * ppos);
+extern ssize_t novfs_daemon_cmd_send(struct file *file, char *buf,
+		size_t len, loff_t * off);
+extern int novfs_daemon_ioctl(struct inode *inode, struct file *file,
+		unsigned int cmd, unsigned long arg);
+extern int novfs_daemon_lib_close(struct inode *inode, struct file *file);
+extern int novfs_daemon_lib_ioctl(struct inode *inode, struct file *file,
+		unsigned int cmd, unsigned long arg);
+extern int novfs_daemon_lib_open(struct inode *inode, struct file *file);
+extern ssize_t novfs_daemon_lib_read(struct file *file, char *buf,
+		size_t len, loff_t * off);
+extern ssize_t novfs_daemon_lib_write(struct file *file, const char *buf,
+		size_t len, loff_t * off);
+extern loff_t novfs_daemon_lib_llseek(struct file *file, loff_t offset,
+		int origin);
+extern int novfs_daemon_open_control(struct inode *Inode, struct file *File);
+extern int novfs_daemon_close_control(struct inode *Inode, struct file *File);
+extern int novfs_daemon_getversion(char *Buf, int Length);
 
 
 /*
  * file.c functions
  */
-extern int Novfs_get_alltrees(struct dentry *parent);
-extern int Novfs_Get_Connected_Server_List(unsigned char **ServerList, struct schandle *SessionId);
-extern int Novfs_Get_Server_Volume_List(struct qstr *Server, unsigned char **VolumeList, struct schandle *SessionId);
-extern int Novfs_Get_File_Info(unsigned char *Path, struct entry_info *Info, struct schandle *SessionId);
-extern int Novfs_GetX_File_Info(char *Path, const char *Name, char *buffer, ssize_t buffer_size, ssize_t *dataLen, struct schandle *SessionId);
-extern int Novfs_ListX_File_Info(char *Path, char *buffer, ssize_t buffer_size, ssize_t * dataLen, struct schandle *SessionId);
-extern int Novfs_SetX_File_Info(char *Path, const char *Name, const void *Value,
+extern int novfs_verify_file(struct qstr *Path, struct novfs_schandle SessionId);
+extern int novfs_get_alltrees(struct dentry *parent);
+extern int novfs_get_servers(unsigned char **ServerList,
+		struct novfs_schandle SessionId);
+extern int novfs_get_vols(struct qstr *Server,
+		unsigned char **VolumeList, struct novfs_schandle SessionId);
+extern int novfs_get_file_info(unsigned char *Path,
+		struct novfs_entry_info *Info, struct novfs_schandle SessionId);
+extern int novfs_getx_file_info(char *Path, const char *Name,
+		char *buffer, ssize_t buffer_size, ssize_t *dataLen,
+		struct novfs_schandle SessionId);
+extern int novfs_listx_file_info(char *Path, char *buffer,
+		ssize_t buffer_size, ssize_t *dataLen,
+		struct novfs_schandle SessionId);
+extern int novfs_setx_file_info(char *Path, const char *Name, const void *Value,
 				unsigned long valueLen,
 				unsigned long *bytesWritten, int flags,
-				struct schandle *SessionId);
+				struct novfs_schandle SessionId);
 
-extern int Novfs_Get_Directory_ListEx(unsigned char *Path, HANDLE *EnumHandle,
-				      int *Count, struct entry_info **Info,
-				      struct schandle *SessionId);
-extern int Novfs_Open_File(unsigned char *Path, int Flags, struct entry_info *info,
-			   HANDLE * Handle, session_t SessionId);
-extern int Novfs_Create(unsigned char *Path, int DirectoryFlag,
-			session_t SessionId);
-extern int Novfs_Close_File(HANDLE Handle, session_t SessionId);
-extern int Novfs_Read_File(HANDLE Handle, unsigned char *Buffer, size_t * Bytes,
-			   loff_t * Offset, session_t SessionId);
-extern int Novfs_Read_Pages(HANDLE Handle, struct data_list *dlist, int DList_Cnt,
+extern int novfs_get_dir_listex(unsigned char *Path, void **EnumHandle,
+	int *Count, struct novfs_entry_info **Info,
+	struct novfs_schandle SessionId);
+extern int novfs_open_file(unsigned char *Path, int Flags,
+		struct novfs_entry_info * Info, void **Handle,
+		struct novfs_schandle SessionId);
+extern int novfs_create(unsigned char *Path, int DirectoryFlag,
+			struct novfs_schandle SessionId);
+extern int novfs_close_file(void * Handle, struct novfs_schandle SessionId);
+extern int novfs_read_file(void * Handle, unsigned char *Buffer,
+		size_t * Bytes, loff_t * Offset,
+		struct novfs_schandle SessionId);
+extern int novfs_read_pages(void * Handle, struct novfs_data_list *DList,
+		int DList_Cnt, size_t * Bytes, loff_t * Offset,
+			    struct novfs_schandle SessionId);
+extern int novfs_write_file(void * Handle, unsigned char *Buffer,
 			    size_t * Bytes, loff_t * Offset,
-			    session_t SessionId);
-extern int Novfs_Write_File(HANDLE Handle, unsigned char *Buffer,
-			    size_t * Bytes, loff_t * Offset,
-			    session_t SessionId);
-extern int Novfs_Write_Page(HANDLE Handle, struct page *Page,
-			    session_t SessionId);
-extern int Novfs_Write_Pages(HANDLE Handle, struct data_list *dlist, int DList_Cnt,
-			     size_t Bytes, loff_t Offset, session_t SessionId);
-extern int Novfs_Delete(unsigned char *Path, int DirectoryFlag,
-			session_t SessionId);
-extern int Novfs_Truncate_File(unsigned char *Path, int PathLen,
-			       session_t SessionId);
-extern int Novfs_Truncate_File_Ex(HANDLE Handle, loff_t Offset,
-				  session_t SessionId);
-extern int Novfs_Rename_File(int DirectoryFlag, unsigned char *OldName,
+			    struct novfs_schandle SessionId);
+extern int novfs_write_page(void * Handle, struct page *Page,
+			    struct novfs_schandle SessionId);
+extern int novfs_write_pages(void * Handle, struct novfs_data_list *DList,
+		int DList_Cnt, size_t Bytes, loff_t Offset,
+		struct novfs_schandle SessionId);
+extern int novfs_delete(unsigned char *Path, int DirectoryFlag,
+			struct novfs_schandle SessionId);
+extern int novfs_trunc(unsigned char *Path, int PathLen,
+		       struct novfs_schandle SessionId);
+extern int novfs_trunc_ex(void * Handle, loff_t Offset,
+				  struct novfs_schandle SessionId);
+extern int novfs_rename_file(int DirectoryFlag, unsigned char *OldName,
 			     int OldLen, unsigned char *NewName, int NewLen,
-			     session_t SessionId);
-extern int Novfs_Set_Attr(unsigned char *Path, struct iattr *Attr,
-			  session_t SessionId);
-extern int Novfs_Get_File_Cache_Flag(unsigned char * Path, session_t SessionId);
-extern int Novfs_Set_File_Lock(session_t SessionId, HANDLE fhandle,
+			     struct novfs_schandle SessionId);
+extern int novfs_set_attr(unsigned char *Path, struct iattr *Attr,
+			  struct novfs_schandle SessionId);
+extern int novfs_get_file_cache_flag(unsigned char * Path,
+		struct novfs_schandle SessionId);
+extern int novfs_set_file_lock(struct novfs_schandle SessionId, void * fhandle,
 			       unsigned char fl_type, loff_t fl_start,
 			       loff_t len);
 
-extern struct inode *Novfs_get_inode(struct super_block *sb, int mode, int dev, uid_t uid, ino_t ino, struct qstr *name);
-extern int Novfs_Read_Stream(HANDLE ConnHandle, unsigned char * Handle,
+extern struct inode *novfs_get_inode(struct super_block *sb, int mode,
+		int dev, uid_t uid, ino_t ino, struct qstr *name);
+extern int novfs_read_stream(void * ConnHandle, unsigned char * Handle,
 			     unsigned char * Buffer, size_t * Bytes, loff_t * Offset,
-			     int User, session_t SessionId);
-extern int Novfs_Write_Stream(HANDLE ConnHandle, unsigned char * Handle,
+			     int User, struct novfs_schandle SessionId);
+extern int novfs_write_stream(void * ConnHandle, unsigned char * Handle,
 			      unsigned char * Buffer, size_t * Bytes, loff_t * Offset,
-			      session_t SessionId);
-extern int Novfs_Close_Stream(HANDLE ConnHandle, unsigned char * Handle,
-			      session_t SessionId);
+			      struct novfs_schandle SessionId);
+extern int novfs_close_stream(void * ConnHandle, unsigned char * Handle,
+			      struct novfs_schandle SessionId);
 
-extern int Novfs_Add_to_Root(char *);
+extern int novfs_add_to_root(char *);
 
 
 /*
  * scope.c functions
  */
-extern void Scope_Init(void);
-extern void Scope_Uninit(void);
-extern void *Scope_Lookup(void);
-extern uid_t Scope_Get_Uid(void *);
-extern session_t Scope_Get_SessionId(void *Scope);
-//extern session_t Scope_Get_SessionId(PSCOPE_LIST Scope);
-extern char *Scope_Get_ScopeUsers(void);
-extern int Scope_Set_UserSpace(u64 *TotalSize, u64 *Free,
-			       u64 *TotalEnties, u64 *FreeEnties);
-extern int Scope_Get_UserSpace(u64 *TotalSize, u64 *Free,
-			       u64 *TotalEnties, u64 *FreeEnties);
-extern char *Scope_dget_path(struct dentry *Dentry, char *Buf,
+extern void novfs_scope_init(void);
+extern void novfs_scope_exit(void);
+extern void *novfs_scope_lookup(void);
+extern uid_t novfs_scope_get_uid(struct novfs_scope_list *);
+extern struct novfs_schandle novfs_scope_get_sessionId(struct
+		novfs_scope_list *);
+extern char *novfs_get_scopeusers(void);
+extern int novfs_scope_set_userspace(uint64_t * TotalSize, uint64_t * Free,
+			       uint64_t * TotalEnties, uint64_t * FreeEnties);
+extern int novfs_scope_get_userspace(uint64_t * TotalSize, uint64_t * Free,
+			       uint64_t * TotalEnties, uint64_t * FreeEnties);
+extern char *novfs_scope_dget_path(struct dentry *Dentry, char *Buf,
 			     unsigned int Buflen, int Flags);
-extern char *Scope_Get_UserName(void);
-extern void Scope_Cleanup(void);
+extern void novfs_scope_cleanup(void);
+extern struct novfs_scope_list *novfs_get_scope_from_name(struct qstr *);
+extern struct novfs_scope_list *novfs_get_scope(struct dentry *);
+extern char *novfs_scope_get_username(void);
 
 /*
  * profile.c functions
  */
 extern u64 get_nanosecond_time(void);
-static inline void *Novfs_Malloc(size_t size, int flags) { return kmalloc(size, flags); }
 extern int DbgPrint(char *Fmt, ...);
-extern int init_profile(void);
-extern void uninit_profile(void);
+extern void novfs_profile_init(void);
+extern void novfs_profile_exit(void);
 
 /*
  * nwcapi.c functions
  */
-extern int NwAuthConnWithId(PXPLAT pdata, session_t Session);
-extern int NwConnClose(PXPLAT pdata, HANDLE * Handle, session_t Session);
-extern int NwGetConnInfo(PXPLAT pdata, session_t Session);
-extern int NwSetConnInfo(PXPLAT pdata, session_t Session);
-extern int NwGetDaemonVersion(PXPLAT pdata, session_t Session);
-extern int NwGetIdentityInfo(PXPLAT pdata, session_t Session);
-extern int NwLicenseConn(PXPLAT pdata, session_t Session);
-extern int NwLoginIdentity(PXPLAT pdata, struct schandle *Session);
-extern int NwLogoutIdentity(PXPLAT pdata, session_t Session);
-extern int NwOpenConnByAddr(PXPLAT pdata, HANDLE * Handle, session_t Session);
-extern int NwOpenConnByName(PXPLAT pdata, HANDLE * Handle, session_t Session);
-extern int NwOpenConnByRef(PXPLAT pdata, HANDLE * Handle, session_t Session);
-extern int NwQueryFeature(PXPLAT pdata, session_t Session);
-extern int NwRawSend(PXPLAT pdata, session_t Session);
-extern int NwScanConnInfo(PXPLAT pdata, session_t Session);
-extern int NwSysConnClose(PXPLAT pdata, unsigned long * Handle, session_t Session);
-extern int NwUnAuthenticate(PXPLAT pdata, session_t Session);
-extern int NwUnlicenseConn(PXPLAT pdata, session_t Session);
-extern int NwcChangeAuthKey(PXPLAT pdata, session_t Session);
-extern int NwcEnumIdentities(PXPLAT pdata, session_t Session);
-extern int NwcGetDefaultNameCtx(PXPLAT pdata, session_t Session);
-extern int NwcGetPreferredDSTree(PXPLAT pdata, session_t Session);
-extern int NwcGetTreeMonitoredConn(PXPLAT pdata, session_t Session);
-extern int NwcSetDefaultNameCtx(PXPLAT pdata, session_t Session);
-extern int NwcSetPreferredDSTree(PXPLAT pdata, session_t Session);
-extern int NwcSetPrimaryConn(PXPLAT pdata, session_t Session);
-extern int NwcGetPrimaryConn(PXPLAT pdata, session_t Session);
-extern int NwcSetMapDrive(PXPLAT pdata, session_t Session);
-extern int NwcUnMapDrive(PXPLAT pdata, session_t Session);
-extern int NwcEnumerateDrives(PXPLAT pdata, session_t Session);
-extern int NwcGetBroadcastMessage(PXPLAT pdata, session_t Session);
-extern int NwdSetKeyValue(PXPLAT pdata, session_t Session);
-extern int NwdVerifyKeyValue(PXPLAT pdata, session_t Session);
+extern int novfs_auth_conn(struct novfs_xplat *pdata,
+		struct novfs_schandle Session);
+extern int novfs_conn_close(struct novfs_xplat *pdata,
+		void **Handle, struct novfs_schandle Session);
+extern int novfs_get_conn_info(struct novfs_xplat *pdata,
+		struct novfs_schandle Session);
+extern int novfs_set_conn_info(struct novfs_xplat *pdata,
+		struct novfs_schandle Session);
+extern int novfs_get_daemon_ver(struct novfs_xplat *pdata,
+		struct novfs_schandle Session);
+extern int novfs_get_id_info(struct novfs_xplat *pdata,
+		struct novfs_schandle Session);
+extern int novfs_license_conn(struct novfs_xplat *pdata,
+		struct novfs_schandle Session);
+extern int novfs_login_id(struct novfs_xplat *pdata,
+		struct novfs_schandle Session);
+extern int novfs_logout_id(struct novfs_xplat *pdata,
+		struct novfs_schandle Session);
+extern int novfs_open_conn_by_addr(struct novfs_xplat *pdata,
+		void **Handle, struct novfs_schandle Session);
+extern int novfs_open_conn_by_name(struct novfs_xplat *pdata,
+		void **Handle, struct novfs_schandle Session);
+extern int novfs_open_conn_by_ref(struct novfs_xplat *pdata,
+		void **Handle, struct novfs_schandle Session);
+extern int novfs_query_feature(struct novfs_xplat *pdata,
+		struct novfs_schandle Session);
+extern int novfs_raw_send(struct novfs_xplat *pdata,
+		struct novfs_schandle Session);
+extern int novfs_scan_conn_info(struct novfs_xplat *pdata,
+		struct novfs_schandle Session);
+extern int novfs_sys_conn_close(struct novfs_xplat *pdata,
+		unsigned long *Handle, struct novfs_schandle Session);
+extern int novfs_unauthenticate(struct novfs_xplat *pdata,
+		struct novfs_schandle Session);
+extern int novfs_unlicense_conn(struct novfs_xplat *pdata,
+		struct novfs_schandle Session);
+extern int novfs_change_auth_key(struct novfs_xplat *pdata,
+		struct novfs_schandle Session);
+extern int novfs_enum_ids(struct novfs_xplat *pdata,
+		struct novfs_schandle Session);
+extern int novfs_get_default_ctx(struct novfs_xplat *pdata,
+		struct novfs_schandle Session);
+extern int novfs_get_preferred_DS_tree(struct novfs_xplat *pdata,
+		struct novfs_schandle Session);
+extern int novfs_get_tree_monitored_conn(struct novfs_xplat *pdata,
+		struct novfs_schandle Session);
+extern int novfs_set_default_ctx(struct novfs_xplat *pdata,
+		struct novfs_schandle Session);
+extern int novfs_set_preferred_DS_tree(struct novfs_xplat *pdata,
+		struct novfs_schandle Session);
+extern int novfs_set_pri_conn(struct novfs_xplat *pdata,
+		struct novfs_schandle Session);
+extern int novfs_get_pri_conn(struct novfs_xplat *pdata,
+		struct novfs_schandle Session);
+extern int novfs_set_map_drive(struct novfs_xplat *pdata,
+		struct novfs_schandle Session);
+extern int novfs_unmap_drive(struct novfs_xplat *pdata,
+		struct novfs_schandle Session);
+extern int novfs_enum_drives(struct novfs_xplat *pdata,
+		struct novfs_schandle Session);
+extern int novfs_get_bcast_msg(struct novfs_xplat *pdata,
+		struct novfs_schandle Session);
+extern int novfs_set_key_value(struct novfs_xplat *pdata,
+		struct novfs_schandle Session);
+extern int novfs_verify_key_value(struct novfs_xplat *pdata,
+		struct novfs_schandle Session);
 
 
 #endif	/* __NOVFS_H */
