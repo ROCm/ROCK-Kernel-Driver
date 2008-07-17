@@ -622,7 +622,7 @@ config HVC_BEAT
 
 config HVC_XEN
 	bool "Xen Hypervisor Console support"
-	depends on XEN
+	depends on PARAVIRT_XEN
 	select HVC_DRIVER
 	default y
 	help

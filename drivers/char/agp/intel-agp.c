@@ -245,6 +245,13 @@ static void *i8xx_alloc_pages(void)
 	if (page == NULL)
 		return NULL;
 
+#ifdef CONFIG_XEN
+	if (xen_create_contiguous_region((unsigned long)page_address(page), 2, 32)) {
+		__free_pages(page, 2);
+		return NULL;
+	}
+#endif
+
 	if (set_pages_uc(page, 4) < 0) {
 		set_pages_wb(page, 4);
 		__free_pages(page, 2);
@@ -264,6 +271,9 @@ static void i8xx_destroy_pages(void *addr)
 
 	page = virt_to_page(addr);
 	set_pages_wb(page, 4);
+#ifdef CONFIG_XEN
+	xen_destroy_contiguous_region((unsigned long)page_address(page), 2);
+#endif
 	put_page(page);
 	__free_pages(page, 2);
 	atomic_dec(&agp_bridge->current_memory_agp);

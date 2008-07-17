@@ -1,0 +1,185 @@
+#include <linux/sched.h>
+#include <linux/kernel.h>
+#include <linux/errno.h>
+#include <linux/mm.h>
+#include <linux/nmi.h>
+#include <linux/swap.h>
+#include <linux/smp.h>
+#include <linux/highmem.h>
+#include <linux/slab.h>
+#include <linux/pagemap.h>
+#include <linux/spinlock.h>
+#include <linux/module.h>
+#include <linux/quicklist.h>
+
+#include <asm/system.h>
+#include <asm/pgtable.h>
+#include <asm/pgalloc.h>
+#include <asm/fixmap.h>
+#include <asm/e820.h>
+#include <asm/tlb.h>
+#include <asm/tlbflush.h>
+#include <asm/io.h>
+#include <asm/mmu_context.h>
+
+#include <xen/features.h>
+#include <asm/hypervisor.h>
+
+void show_mem(void)
+{
+	int total = 0, reserved = 0;
+	int shared = 0, cached = 0;
+	int highmem = 0;
+	struct page *page;
+	pg_data_t *pgdat;
+	unsigned long i;
+	unsigned long flags;
+
+	printk(KERN_INFO "Mem-info:\n");
+	show_free_areas();
+	for_each_online_pgdat(pgdat) {
+		pgdat_resize_lock(pgdat, &flags);
+		for (i = 0; i < pgdat->node_spanned_pages; ++i) {
+			if (unlikely(i % MAX_ORDER_NR_PAGES == 0))
+				touch_nmi_watchdog();
+			page = pgdat_page_nr(pgdat, i);
+			total++;
+			if (PageHighMem(page))
+				highmem++;
+			if (PageReserved(page))
+				reserved++;
+			else if (PageSwapCache(page))
+				cached++;
+			else if (page_count(page))
+				shared += page_count(page) - 1;
+		}
+		pgdat_resize_unlock(pgdat, &flags);
+	}
+	printk(KERN_INFO "%d pages of RAM\n", total);
+	printk(KERN_INFO "%d pages of HIGHMEM\n", highmem);
+	printk(KERN_INFO "%d reserved pages\n", reserved);
+	printk(KERN_INFO "%d pages shared\n", shared);
+	printk(KERN_INFO "%d pages swap cached\n", cached);
+
+	printk(KERN_INFO "%lu pages dirty\n", global_page_state(NR_FILE_DIRTY));
+	printk(KERN_INFO "%lu pages writeback\n",
+					global_page_state(NR_WRITEBACK));
+	printk(KERN_INFO "%lu pages mapped\n", global_page_state(NR_FILE_MAPPED));
+	printk(KERN_INFO "%lu pages slab\n",
+		global_page_state(NR_SLAB_RECLAIMABLE) +
+		global_page_state(NR_SLAB_UNRECLAIMABLE));
+	printk(KERN_INFO "%lu pages pagetables\n",
+					global_page_state(NR_PAGETABLE));
+}
+
+/*
+ * Associate a large virtual page frame with a given physical page frame 
+ * and protection flags for that frame. pfn is for the base of the page,
+ * vaddr is what the page gets mapped to - both must be properly aligned. 
+ * The pmd must already be instantiated. Assumes PAE mode.
+ */ 
+void set_pmd_pfn(unsigned long vaddr, unsigned long pfn, pgprot_t flags)
+{
+	pgd_t *pgd;
+	pud_t *pud;
+	pmd_t *pmd;
+
+	if (vaddr & (PMD_SIZE-1)) {		/* vaddr is misaligned */
+		printk(KERN_WARNING "set_pmd_pfn: vaddr misaligned\n");
+		return; /* BUG(); */
+	}
+	if (pfn & (PTRS_PER_PTE-1)) {		/* pfn is misaligned */
+		printk(KERN_WARNING "set_pmd_pfn: pfn misaligned\n");
+		return; /* BUG(); */
+	}
+	pgd = swapper_pg_dir + pgd_index(vaddr);
+	if (pgd_none(*pgd)) {
+		printk(KERN_WARNING "set_pmd_pfn: pgd_none\n");
+		return; /* BUG(); */
+	}
+	pud = pud_offset(pgd, vaddr);
+	pmd = pmd_offset(pud, vaddr);
+	set_pmd(pmd, pfn_pmd(pfn, flags));
+	/*
+	 * It's enough to flush this one mapping.
+	 * (PGE mappings get flushed as well)
+	 */
+	__flush_tlb_one(vaddr);
+}
+
+static int fixmaps;
+unsigned long hypervisor_virt_start = HYPERVISOR_VIRT_START;
+unsigned long __FIXADDR_TOP = (HYPERVISOR_VIRT_START - PAGE_SIZE);
+EXPORT_SYMBOL(__FIXADDR_TOP);
+
+void __set_fixmap (enum fixed_addresses idx, maddr_t phys, pgprot_t flags)
+{
+	unsigned long address = __fix_to_virt(idx);
+	pte_t pte;
+
+	if (idx >= __end_of_fixed_addresses) {
+		BUG();
+		return;
+	}
+	switch (idx) {
+	case FIX_WP_TEST:
+	case FIX_VDSO:
+		pte = pfn_pte(phys >> PAGE_SHIFT, flags);
+		break;
+	default:
+		pte = pfn_pte_ma(phys >> PAGE_SHIFT, flags);
+		break;
+	}
+	if (HYPERVISOR_update_va_mapping(address, pte,
+					 UVMF_INVLPG|UVMF_ALL))
+		BUG();
+	fixmaps++;
+}
+
+/**
+ * reserve_top_address - reserves a hole in the top of kernel address space
+ * @reserve - size of hole to reserve
+ *
+ * Can be used to relocate the fixmap area and poke a hole in the top
+ * of kernel address space to make room for a hypervisor.
+ */
+void __init reserve_top_address(unsigned long reserve)
+{
+	BUG_ON(fixmaps > 0);
+	printk(KERN_INFO "Reserving virtual address space above 0x%08x\n",
+	       (int)-reserve);
+	__FIXADDR_TOP = -reserve - PAGE_SIZE;
+	__VMALLOC_RESERVE += reserve;
+}
+
+void make_lowmem_page_readonly(void *va, unsigned int feature)
+{
+	pte_t *pte;
+	unsigned int level;
+	int rc;
+
+	if (xen_feature(feature))
+		return;
+
+	pte = lookup_address((unsigned long)va, &level);
+	BUG_ON(!pte || level != PG_LEVEL_4K || !pte_present(*pte));
+	rc = HYPERVISOR_update_va_mapping(
+		(unsigned long)va, pte_wrprotect(*pte), 0);
+	BUG_ON(rc);
+}
+
+void make_lowmem_page_writable(void *va, unsigned int feature)
+{
+	pte_t *pte;
+	unsigned int level;
+	int rc;
+
+	if (xen_feature(feature))
+		return;
+
+	pte = lookup_address((unsigned long)va, &level);
+	BUG_ON(!pte || level != PG_LEVEL_4K || !pte_present(*pte));
+	rc = HYPERVISOR_update_va_mapping(
+		(unsigned long)va, pte_mkwrite(*pte), 0);
+	BUG_ON(rc);
+}

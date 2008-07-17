@@ -3,12 +3,16 @@
 
 #include <linux/pm.h>
 #include <linux/delay.h>
+#ifndef CONFIG_XEN
 #include <asm/fixmap.h>
+#endif
 #include <asm/apicdef.h>
 #include <asm/processor.h>
 #include <asm/system.h>
 
+#ifndef CONFIG_XEN
 #define ARCH_APICTIMER_STOPS_ON_C3	1
+#endif
 
 #define Dprintk(x...)
 
@@ -36,6 +40,7 @@ extern void generic_apic_probe(void);
 #ifdef CONFIG_X86_LOCAL_APIC
 
 extern int apic_verbosity;
+#ifndef CONFIG_XEN
 extern int timer_over_8254;
 extern int local_apic_timer_c2_ok;
 extern int local_apic_timer_disabled;
@@ -101,6 +106,7 @@ static inline void ack_APIC_irq(void)
 	/* Docs say use 0 for future compatibility */
 	apic_write_around(APIC_EOI, 0);
 }
+#endif
 
 extern int lapic_get_maxlvt(void);
 extern void clear_local_APIC(void);

@@ -29,7 +29,10 @@
 
 #include "mach_traps.h"
 
-int unknown_nmi_panic;
+extern void die_nmi(struct pt_regs *, const char *msg);
+
+#ifndef CONFIG_XEN
+
 int nmi_watchdog_enabled;
 
 static cpumask_t backtrace_mask = CPU_MASK_NONE;
@@ -314,8 +317,6 @@ void touch_nmi_watchdog(void)
 }
 EXPORT_SYMBOL(touch_nmi_watchdog);
 
-extern void die_nmi(struct pt_regs *, const char *msg);
-
 notrace __kprobes int
 nmi_watchdog_tick(struct pt_regs *regs, unsigned reason)
 {
@@ -388,7 +389,11 @@ nmi_watchdog_tick(struct pt_regs *regs, unsigned reason)
 	return rc;
 }
 
+#endif /* CONFIG_XEN */
+
 #ifdef CONFIG_SYSCTL
+
+int unknown_nmi_panic;
 
 static int unknown_nmi_panic_callback(struct pt_regs *regs, int cpu)
 {
@@ -400,6 +405,7 @@ static int unknown_nmi_panic_callback(struct pt_regs *regs, int cpu)
 	return 0;
 }
 
+#ifndef CONFIG_XEN
 /*
  * proc handler for /proc/sys/kernel/nmi
  */
@@ -438,6 +444,7 @@ int proc_nmi_enabled(struct ctl_table *table, int write, struct file *file,
 	}
 	return 0;
 }
+#endif
 
 #endif
 
@@ -450,6 +457,7 @@ int do_nmi_callback(struct pt_regs *regs, int cpu)
 	return 0;
 }
 
+#ifndef CONFIG_XEN
 void __trigger_all_cpu_backtrace(void)
 {
 	int i;
@@ -465,3 +473,4 @@ void __trigger_all_cpu_backtrace(void)
 
 EXPORT_SYMBOL(nmi_active);
 EXPORT_SYMBOL(nmi_watchdog);
+#endif

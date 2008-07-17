@@ -84,8 +84,10 @@
 struct callback_register {
     uint16_t type;
     uint16_t flags;
-    struct xen_callback address;
+    xen_callback_t address;
 };
+typedef struct callback_register callback_register_t;
+DEFINE_XEN_GUEST_HANDLE(callback_register_t);
 
 /*
  * Unregister a callback.
@@ -98,5 +100,22 @@ struct callback_unregister {
     uint16_t type;
     uint16_t _unused;
 };
+typedef struct callback_unregister callback_unregister_t;
+DEFINE_XEN_GUEST_HANDLE(callback_unregister_t);
+
+#if __XEN_INTERFACE_VERSION__ < 0x00030207
+#undef CALLBACKTYPE_sysenter
+#define CALLBACKTYPE_sysenter CALLBACKTYPE_sysenter_deprecated
+#endif
 
 #endif /* __XEN_PUBLIC_CALLBACK_H__ */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

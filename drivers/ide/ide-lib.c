@@ -328,6 +328,7 @@ void ide_toggle_bounce(ide_drive_t *drive, int on)
 {
 	u64 addr = BLK_BOUNCE_HIGH;	/* dma64_addr_t */
 
+#ifndef CONFIG_XEN
 	if (!PCI_DMA_BUS_IS_PHYS) {
 		addr = BLK_BOUNCE_ANY;
 	} else if (on && drive->media == ide_disk) {
@@ -336,6 +337,16 @@ void ide_toggle_bounce(ide_drive_t *drive, int on)
 		if (dev && dev->dma_mask)
 			addr = *dev->dma_mask;
 	}
+#else
+	if (on && drive->media == ide_disk) {
+		struct device *dev = drive->hwif->dev;
+
+		if (!PCI_DMA_BUS_IS_PHYS)
+			addr = BLK_BOUNCE_ANY;
+		else if (dev && dev->dma_mask)
+			addr = *dev->dma_mask;
+	}
+#endif
 
 	if (drive->queue)
 		blk_queue_bounce_limit(drive->queue, addr);

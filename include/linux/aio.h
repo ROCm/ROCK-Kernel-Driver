@@ -200,6 +200,11 @@ struct kioctx {
 	struct aio_ring_info	ring_info;
 
 	struct delayed_work	wq;
+#ifdef CONFIG_EPOLL
+	// poll integration
+	wait_queue_head_t       poll_wait;
+	struct file		*file;
+#endif
 };
 
 /* prototypes */

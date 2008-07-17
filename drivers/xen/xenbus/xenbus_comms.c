@@ -35,13 +35,25 @@
 #include <linux/sched.h>
 #include <linux/err.h>
 #include <xen/xenbus.h>
+#if defined(CONFIG_XEN) || defined(MODULE)
+#include <xen/evtchn.h>
+#include <asm/hypervisor.h>
+#else
 #include <asm/xen/hypervisor.h>
 #include <xen/events.h>
 #include <xen/page.h>
+#endif
+
 #include "xenbus_comms.h"
+
+#ifdef HAVE_XEN_PLATFORM_COMPAT_H
+#include <xen/platform-compat.h>
+#endif
 
 static int xenbus_irq;
 
+extern void xenbus_probe(struct work_struct *);
+extern int xenstored_ready;
 static DECLARE_WORK(probe_work, xenbus_probe);
 
 static DECLARE_WAIT_QUEUE_HEAD(xb_waitq);
@@ -219,7 +231,11 @@ int xb_init_comms(void)
 	if (xenbus_irq)
 		unbind_from_irqhandler(xenbus_irq, &xb_waitq);
 
+#if defined(CONFIG_XEN) || defined(MODULE)
+	err = bind_caller_port_to_irqhandler(
+#else
 	err = bind_evtchn_to_irqhandler(
+#endif
 		xen_store_evtchn, wake_waiting,
 		0, "xenbus", &xb_waitq);
 	if (err <= 0) {

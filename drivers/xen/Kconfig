@@ -1,6 +1,297 @@
+#
+# This Kconfig describe xen options
+#
+
+config XEN
+	bool
+
+if XEN
+config XEN_INTERFACE_VERSION
+	hex
+	default 0x00030207
+
+menu "XEN"
+
+config XEN_PRIVILEGED_GUEST
+	bool "Privileged Guest (domain 0)"
+	help
+	  Support for privileged operation (domain 0)
+
+config XEN_UNPRIVILEGED_GUEST
+	def_bool !XEN_PRIVILEGED_GUEST
+
+config XEN_PRIVCMD
+	def_bool y
+	depends on PROC_FS
+
+config XEN_XENBUS_DEV
+	def_bool y
+	depends on PROC_FS
+
+config XEN_NETDEV_ACCEL_SFC_UTIL
+    	depends on X86
+	tristate
+
+config XEN_BACKEND
+        tristate "Backend driver support"
+        default XEN_PRIVILEGED_GUEST
+        help
+          Support for backend device drivers that provide I/O services
+          to other virtual machines.
+
+config XEN_BLKDEV_BACKEND
+	tristate "Block-device backend driver"
+        depends on XEN_BACKEND
+	default XEN_BACKEND
+	help
+	  The block-device backend driver allows the kernel to export its
+	  block devices to other guests via a high-performance shared-memory
+	  interface.
+
+config XEN_BLKDEV_TAP
+	tristate "Block-device tap backend driver"
+	depends on XEN_BACKEND
+	default XEN_BACKEND
+	help
+	  The block tap driver is an alternative to the block back driver
+          and allows VM block requests to be redirected to userspace through
+          a device interface.  The tap allows user-space development of
+          high-performance block backends, where disk images may be implemented
+          as files, in memory, or on other hosts across the network.  This
+	  driver can safely coexist with the existing blockback driver.
+
+config XEN_NETDEV_BACKEND
+	tristate "Network-device backend driver"
+        depends on XEN_BACKEND && NET
+	default XEN_BACKEND
+	help
+	  The network-device backend driver allows the kernel to export its
+	  network devices to other guests via a high-performance shared-memory
+	  interface.
+
+config XEN_NETDEV_PIPELINED_TRANSMITTER
+	bool "Pipelined transmitter (DANGEROUS)"
+	depends on XEN_NETDEV_BACKEND
+	help
+	  If the net backend is a dumb domain, such as a transparent Ethernet
+	  bridge with no local IP interface, it is safe to say Y here to get
+	  slightly lower network overhead.
+	  If the backend has a local IP interface; or may be doing smart things
+	  like reassembling packets to perform firewall filtering; or if you
+	  are unsure; or if you experience network hangs when this option is
+	  enabled; then you must say N here.
+
+config XEN_NETDEV_ACCEL_SFC_BACKEND
+	tristate "Network-device backend driver acceleration for Solarflare NICs"
+	depends on XEN_NETDEV_BACKEND && SFC && SFC_RESOURCE && X86
+	select XEN_NETDEV_ACCEL_SFC_UTIL
+	default m
+
+config XEN_NETDEV_LOOPBACK
+	tristate "Network-device loopback driver"
+	depends on XEN_NETDEV_BACKEND
+	help
+	  A two-interface loopback device to emulate a local netfront-netback
+	  connection. If unsure, it is probably safe to say N here.
+
+config XEN_PCIDEV_BACKEND
+	tristate "PCI-device backend driver"
+	depends on PCI && XEN_BACKEND
+	default XEN_BACKEND
+	help
+	  The PCI device backend driver allows the kernel to export arbitrary
+	  PCI devices to other guests. If you select this to be a module, you
+	  will need to make sure no other driver has bound to the device(s)
+	  you want to make visible to other guests.
+
+choice
+	prompt "PCI Backend Mode"
+	depends on XEN_PCIDEV_BACKEND
+	default XEN_PCIDEV_BACKEND_VPCI if !IA64
+	default XEN_PCIDEV_BACKEND_CONTROLLER if IA64
+
+config XEN_PCIDEV_BACKEND_VPCI
+	bool "Virtual PCI"
+	---help---
+	  This PCI Backend hides the true PCI topology and makes the frontend
+	  think there is a single PCI bus with only the exported devices on it.
+	  For example, a device at 03:05.0 will be re-assigned to 00:00.0. A
+	  second device at 02:1a.1 will be re-assigned to 00:01.1.
+
+config XEN_PCIDEV_BACKEND_PASS
+	bool "Passthrough"
+	---help---
+	  This PCI Backend provides a real view of the PCI topology to the
+	  frontend (for example, a device at 06:01.b will still appear at
+	  06:01.b to the frontend). This is similar to how Xen 2.0.x exposed
+	  PCI devices to its driver domains. This may be required for drivers
+	  which depend on finding their hardward in certain bus/slot
+	  locations.
+
+config XEN_PCIDEV_BACKEND_SLOT
+	bool "Slot"
+	---help---
+	  This PCI Backend hides the true PCI topology and makes the frontend
+	  think there is a single PCI bus with only the exported devices on it.
+	  Contrary to the virtual PCI backend, a function becomes a new slot.
+	  For example, a device at 03:05.2 will be re-assigned to 00:00.0. A
+	  second device at 02:1a.1 will be re-assigned to 00:01.0.
+
+config XEN_PCIDEV_BACKEND_CONTROLLER
+	bool "Controller"
+	depends on IA64
+	---help---
+	  This PCI backend virtualizes the PCI bus topology by providing a
+	  virtual bus per PCI root device.  Devices which are physically under
+	  the same root bus will appear on the same virtual bus.  For systems
+	  with complex I/O addressing, this is the only backend which supports
+	  extended I/O port spaces and MMIO translation offsets.  This backend
+	  also supports slot virtualization.  For example, a device at
+	  0000:01:02.1 will be re-assigned to 0000:00:00.0.  A second device
+	  at 0000:02:05.0 (behind a P2P bridge on bus 0000:01) will be
+	  re-assigned to 0000:00:01.0.  A third device at 0000:16:05.0 (under
+	  a different PCI root bus) will be re-assigned to 0000:01:00.0.
+
+endchoice
+
+config XEN_PCIDEV_BE_DEBUG
+	bool "PCI Backend Debugging"
+	depends on XEN_PCIDEV_BACKEND
+
+config XEN_TPMDEV_BACKEND
+	tristate "TPM-device backend driver"
+        depends on XEN_BACKEND
+	help
+	  The TPM-device backend driver
+
+config XEN_BLKDEV_FRONTEND
+	tristate "Block-device frontend driver"
+	default y
+	help
+	  The block-device frontend driver allows the kernel to access block
+	  devices mounted within another guest OS. Unless you are building a
+	  dedicated device-driver domain, or your master control domain
+	  (domain 0), then you almost certainly want to say Y here.
+
+config XEN_NETDEV_FRONTEND
+	tristate "Network-device frontend driver"
+	depends on NET
+	default y
+	help
+	  The network-device frontend driver allows the kernel to access
+	  network interfaces within another guest OS. Unless you are building a
+	  dedicated device-driver domain, or your master control domain
+	  (domain 0), then you almost certainly want to say Y here.
+
+config XEN_NETDEV_ACCEL_SFC_FRONTEND
+	tristate "Network-device frontend driver acceleration for Solarflare NICs"
+	depends on XEN_NETDEV_FRONTEND && X86
+	select XEN_NETDEV_ACCEL_SFC_UTIL
+	default m
+
+config XEN_GRANT_DEV
+	tristate "User-space granted page access driver"
+	default XEN_PRIVILEGED_GUEST
+	help
+	  Device for accessing (in user-space) pages that have been granted
+	  by other domains.
+
+config XEN_FRAMEBUFFER
+	tristate "Framebuffer-device frontend driver"
+	depends on FB
+	select FB_CFB_FILLRECT
+	select FB_CFB_COPYAREA
+	select FB_CFB_IMAGEBLIT
+	default y
+	help
+	  The framebuffer-device frontend drivers allows the kernel to create a
+	  virtual framebuffer.  This framebuffer can be viewed in another
+	  domain.  Unless this domain has access to a real video card, you
+	  probably want to say Y here.
+
+config XEN_KEYBOARD
+	tristate "Keyboard-device frontend driver"
+	depends on XEN_FRAMEBUFFER && INPUT
+	default y
+	help
+	  The keyboard-device frontend driver allows the kernel to create a
+	  virtual keyboard.  This keyboard can then be driven by another
+	  domain.  If you've said Y to CONFIG_XEN_FRAMEBUFFER, you probably
+	  want to say Y here.
+
+config XEN_CONSOLE
+	bool "Xen virtual console"
+	default y
+	help
+	  The Xen virtual console is ...
+
+config XEN_DISABLE_SERIAL
+	bool "Disable serial port drivers"
+	default y
+	help
+	  Disable serial port drivers, allowing the Xen console driver
+	  to provide a serial console at ttyS0.
+
+config XEN_SYSFS
+	tristate "Export Xen attributes in sysfs"
+	depends on SYSFS
+	select SYS_HYPERVISOR
+	default y
+	help
+	  Xen hypervisor attributes will show up under /sys/hypervisor/.
+
+choice
+	prompt "Xen version compatibility"
+	default XEN_COMPAT_030002_AND_LATER
+
+	config XEN_COMPAT_030002_AND_LATER
+		bool "3.0.2 and later"
+
+	config XEN_COMPAT_030004_AND_LATER
+		bool "3.0.4 and later"
+
+	config XEN_COMPAT_030100_AND_LATER
+		bool "3.1.0 and later"
+
+	config XEN_COMPAT_LATEST_ONLY
+		bool "no compatibility code"
+
+endchoice
+
+config XEN_COMPAT
+	hex
+	default 0xffffff if XEN_COMPAT_LATEST_ONLY
+	default 0x030100 if XEN_COMPAT_030100_AND_LATER
+	default 0x030004 if XEN_COMPAT_030004_AND_LATER
+	default 0x030002 if XEN_COMPAT_030002_AND_LATER
+	default 0
+
+endmenu
+
+config HAVE_IRQ_IGNORE_UNHANDLED
+	def_bool y
+
+config GENERIC_HARDIRQS_NO__DO_IRQ
+	def_bool y
+
+config NO_IDLE_HZ
+	def_bool y
+
+config XEN_SMPBOOT
+	def_bool y
+	depends on SMP && !PPC_XEN
+
+config XEN_XENCOMM
+	bool
+
+config XEN_DEVMEM
+	def_bool y
+
+endif
+
 config XEN_BALLOON
-	bool "Xen memory balloon driver"
-	depends on XEN
+	bool "Xen memory balloon driver" if PARAVIRT_XEN
+	depends on (XEN && !PPC_XEN) || PARAVIRT_XEN
 	default y
 	help
 	  The balloon driver allows the Xen domain to request more memory from
@@ -8,12 +299,14 @@ config XEN_BALLOON
 	  return unneeded memory to the system.
 
 config XEN_SCRUB_PAGES
-	bool "Scrub pages before returning them to system"
-	depends on XEN_BALLOON
+	bool "Scrub memory before freeing it to Xen"
+	depends on XEN || XEN_BALLOON
 	default y
 	help
-	  Scrub pages before returning them to the system for reuse by
-	  other domains.  This makes sure that any confidential data
-	  is not accidentally visible to other domains.  Is it more
-	  secure, but slightly less efficient.
+	  Erase memory contents before freeing it back to Xen's global
+	  pool. This ensures that any secrets contained within that
+	  memory (e.g., private keys) cannot be found by other guests that
+	  may be running on the machine. Most people will want to say Y here.
+	  If security is not a concern then you may increase performance by
+	  saying N.
 	  If in doubt, say yes.

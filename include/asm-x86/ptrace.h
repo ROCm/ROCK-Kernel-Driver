@@ -242,7 +242,9 @@ extern void user_enable_single_step(struct task_struct *);
 extern void user_disable_single_step(struct task_struct *);
 
 extern void user_enable_block_step(struct task_struct *);
-#ifdef CONFIG_X86_DEBUGCTLMSR
+#if defined(CONFIG_XEN)
+#define arch_has_block_step()	(0)
+#elif defined(CONFIG_X86_DEBUGCTLMSR)
 #define arch_has_block_step()	(1)
 #else
 #define arch_has_block_step()	(boot_cpu_data.x86 >= 6)

@@ -981,7 +981,6 @@ static struct xenbus_device_id blkfront_ids[] = {
 
 static struct xenbus_driver blkfront = {
 	.name = "vbd",
-	.owner = THIS_MODULE,
 	.ids = blkfront_ids,
 	.probe = blkfront_probe,
 	.remove = blkfront_remove,

@@ -15,3 +15,5 @@ obj-$(CONFIG_NUMA)		+= numa_64.o
 obj-$(CONFIG_K8_NUMA)		+= k8topology_64.o
 obj-$(CONFIG_ACPI_NUMA)		+= srat_64.o
 endif
+
+obj-$(CONFIG_XEN)		+= hypervisor.o

@@ -24,3 +24,5 @@ else
         lib-y += memmove_64.o memset_64.o
         lib-y += copy_user_64.o rwlock_64.o copy_user_nocache_64.o
 endif
+
+lib-$(CONFIG_XEN_SCRUB_PAGES) += scrub.o

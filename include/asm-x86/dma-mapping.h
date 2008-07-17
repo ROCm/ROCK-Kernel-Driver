@@ -187,8 +187,13 @@ static inline dma_addr_t dma_map_page(struct device *dev, struct page *page,
 				      int direction)
 {
 	BUG_ON(!valid_dma_direction(direction));
+#ifndef CONFIG_XEN
 	return dma_ops->map_single(dev, page_to_phys(page)+offset,
 				   size, direction);
+#else
+	return dma_ops->map_single(dev, page_to_pseudophys(page)+offset,
+				   size, direction);
+#endif
 }
 
 static inline void dma_unmap_page(struct device *dev, dma_addr_t addr,

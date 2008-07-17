@@ -6,6 +6,10 @@
  *
  * @author John Levon <levon@movementarian.org>
  *
+ * Modified by Aravind Menon for Xen
+ * These modifications are:
+ * Copyright (C) 2005 Hewlett-Packard Co.
+ *
  * Each CPU has a local buffer that stores PC value/event
  * pairs. We also log context switches when we notice them.
  * Eventually each CPU's buffer is processed into the global
@@ -34,6 +38,12 @@ static void wq_sync_buffer(struct work_struct *work);
 #define DEFAULT_TIMER_EXPIRE (HZ / 10)
 static int work_enabled;
 
+#ifndef CONFIG_XEN
+#define current_domain COORDINATOR_DOMAIN
+#else
+static int32_t current_domain = COORDINATOR_DOMAIN;
+#endif
+
 void free_cpu_buffers(void)
 {
 	int i;
@@ -57,7 +67,7 @@ int alloc_cpu_buffers(void)
 			goto fail;
  
 		b->last_task = NULL;
-		b->last_is_kernel = -1;
+		b->last_cpu_mode = -1;
 		b->tracing = 0;
 		b->buffer_size = buffer_size;
 		b->tail_pos = 0;
@@ -115,7 +125,7 @@ void cpu_buffer_reset(struct oprofile_cpu_buffer * cpu_buf)
 	 * collected will populate the buffer with proper
 	 * values to initialize the buffer
 	 */
-	cpu_buf->last_is_kernel = -1;
+	cpu_buf->last_cpu_mode = -1;
 	cpu_buf->last_task = NULL;
 }
 
@@ -165,13 +175,13 @@ add_code(struct oprofile_cpu_buffer * buffer, unsigned long value)
  * because of the head/tail separation of the writer and reader
  * of the CPU buffer.
  *
- * is_kernel is needed because on some architectures you cannot
+ * cpu_mode is needed because on some architectures you cannot
  * tell if you are in kernel or user space simply by looking at
- * pc. We tag this in the buffer by generating kernel enter/exit
- * events whenever is_kernel changes
+ * pc. We tag this in the buffer by generating kernel/user (and xen)
+ *  enter events whenever cpu_mode changes
  */
 static int log_sample(struct oprofile_cpu_buffer * cpu_buf, unsigned long pc,
-		      int is_kernel, unsigned long event)
+		      int cpu_mode, unsigned long event)
 {
 	struct task_struct * task;
 
@@ -187,18 +197,18 @@ static int log_sample(struct oprofile_cpu_buffer * cpu_buf, unsigned long pc,
 		return 0;
 	}
 
-	is_kernel = !!is_kernel;
-
 	task = current;
 
 	/* notice a switch from user->kernel or vice versa */
-	if (cpu_buf->last_is_kernel != is_kernel) {
-		cpu_buf->last_is_kernel = is_kernel;
-		add_code(cpu_buf, is_kernel);
+	if (cpu_buf->last_cpu_mode != cpu_mode) {
+		cpu_buf->last_cpu_mode = cpu_mode;
+		add_code(cpu_buf, cpu_mode);
 	}
-
+	
 	/* notice a task switch */
-	if (cpu_buf->last_task != task) {
+	/* if not processing other domain samples */
+	if ((cpu_buf->last_task != task) &&
+	    (current_domain == COORDINATOR_DOMAIN)) {
 		cpu_buf->last_task = task;
 		add_code(cpu_buf, (unsigned long)task);
 	}
@@ -281,6 +291,27 @@ void oprofile_add_trace(unsigned long pc)
 
 	add_sample(cpu_buf, pc, 0);
 }
+
+#ifdef CONFIG_XEN
+int oprofile_add_domain_switch(int32_t domain_id)
+{
+	struct oprofile_cpu_buffer *cpu_buf = &__get_cpu_var(cpu_buffer);
+
+	/* should have space for switching into and out of domain 
+	   (2 slots each) plus one sample and one cpu mode switch */
+	if (((nr_available_slots(cpu_buf) < 6) && 
+	     (domain_id != COORDINATOR_DOMAIN)) ||
+	    (nr_available_slots(cpu_buf) < 2))
+		return 0;
+
+	add_code(cpu_buf, CPU_DOMAIN_SWITCH);
+	add_sample(cpu_buf, domain_id, 0);
+
+	current_domain = domain_id;
+
+	return 1;
+}
+#endif
 
 /*
  * This serves to avoid cpu buffer overflow, and makes sure

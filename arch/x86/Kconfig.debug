@@ -93,7 +93,7 @@ config DEBUG_RODATA
 
 config DIRECT_GBPAGES
 	bool "Enable gbpages-mapped kernel pagetables"
-	depends on DEBUG_KERNEL && EXPERIMENTAL && X86_64
+	depends on DEBUG_KERNEL && EXPERIMENTAL && X86_64 && !XEN
 	help
 	  Enable gigabyte pages support (if the CPU supports it). This can
 	  improve the kernel's performance a tiny bit by reducing TLB
@@ -141,7 +141,7 @@ config X86_MPPARSE
 config DOUBLEFAULT
 	default y
 	bool "Enable doublefault exception handler" if EMBEDDED
-	depends on X86_32
+	depends on X86_32 && !X86_NO_TSS
 	help
 	  This option allows trapping of rare doublefault exceptions that
 	  would otherwise cause a system to silently reboot. Disabling this
@@ -274,7 +274,7 @@ config OPTIMIZE_INLINING
 
 config KDB
 	bool "Built-in Kernel Debugger support"
-	depends on DEBUG_KERNEL
+	depends on DEBUG_KERNEL && !XEN
 	select KALLSYMS
 	select KALLSYMS_ALL
 	help

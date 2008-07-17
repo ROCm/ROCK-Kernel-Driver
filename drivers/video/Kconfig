@@ -1583,7 +1583,7 @@ config FB_CYBLA
 	tristate "Cyberblade/i1 support"
 	depends on FB && PCI && X86_32 && !64BIT
 	select FB_CFB_IMAGEBLIT
-	select VIDEO_SELECT
+	select VIDEO_SELECT if !XEN
 	---help---
 	  This driver is supposed to support the Trident Cyberblade/i1
 	  graphics core integrated in the VIA VT8601A North Bridge,
@@ -1976,7 +1976,7 @@ config FB_VIRTUAL
 
 config XEN_FBDEV_FRONTEND
 	tristate "Xen virtual frame buffer support"
-	depends on FB && XEN
+	depends on FB && PARAVIRT_XEN
 	select FB_SYS_FILLRECT
 	select FB_SYS_COPYAREA
 	select FB_SYS_IMAGEBLIT

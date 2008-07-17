@@ -5,8 +5,6 @@
 #include <asm/irq.h>
 #include <asm/io.h>
 
-#ifdef ARCH_HAS_NMI_WATCHDOG
-
 /**
  * do_nmi_callback
  *
@@ -44,9 +42,10 @@ extern void nmi_watchdog_default(void);
 #define nmi_watchdog_default() do {} while (0)
 #endif
 
+#ifdef ARCH_HAS_NMI_WATCHDOG
+
 extern int check_nmi_watchdog(void);
 extern int nmi_watchdog_enabled;
-extern int unknown_nmi_panic;
 extern int avail_to_resrv_perfctr_nmi_bit(unsigned int);
 extern int avail_to_resrv_perfctr_nmi(unsigned int);
 extern int reserve_perfctr_nmi(unsigned int);
@@ -78,8 +77,6 @@ extern int unknown_nmi_panic;
 void __trigger_all_cpu_backtrace(void);
 #define trigger_all_cpu_backtrace() __trigger_all_cpu_backtrace()
 
-#endif
-
 void lapic_watchdog_stop(void);
 int lapic_watchdog_init(unsigned nmi_hz);
 int lapic_wd_event(unsigned nmi_hz);
@@ -87,7 +84,12 @@ unsigned lapic_adjust_nmi_hz(unsigned hz);
 int lapic_watchdog_ok(void);
 void disable_lapic_nmi_watchdog(void);
 void enable_lapic_nmi_watchdog(void);
+
+#endif
+
 void stop_nmi(void);
 void restart_nmi(void);
+
+extern int unknown_nmi_panic;
 
 #endif

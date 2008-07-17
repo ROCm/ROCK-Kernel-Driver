@@ -88,7 +88,7 @@ int acpi_sci_override_gsi __initdata;
 int acpi_skip_timer_override __initdata;
 int acpi_use_timer_override __initdata;
 
-#ifdef CONFIG_X86_LOCAL_APIC
+#if defined(CONFIG_X86_LOCAL_APIC) && !defined(CONFIG_XEN)
 static u64 acpi_lapic_addr __initdata = APIC_DEFAULT_PHYS_BASE;
 #endif
 
@@ -106,7 +106,7 @@ static u64 acpi_lapic_addr __initdata = APIC_DEFAULT_PHYS_BASE;
  */
 enum acpi_irq_model_id acpi_irq_model = ACPI_IRQ_MODEL_PIC;
 
-#ifdef	CONFIG_X86_64
+#if defined(CONFIG_X86_64) && !defined(CONFIG_XEN)
 
 /* rely on all ACPI tables being in the direct mapping */
 char *__init __acpi_map_table(unsigned long phys_addr, unsigned long size)
@@ -139,8 +139,13 @@ char *__init __acpi_map_table(unsigned long phys, unsigned long size)
 	unsigned long base, offset, mapped_size;
 	int idx;
 
+#ifndef CONFIG_XEN
 	if (phys + size < 8 * 1024 * 1024)
 		return __va(phys);
+#else
+	if (phys + size <= (NR_FIX_ISAMAPS << PAGE_SHIFT))
+		return isa_bus_to_virt(phys);
+#endif
 
 	offset = phys & (PAGE_SIZE - 1);
 	mapped_size = PAGE_SIZE - offset;
@@ -228,12 +233,14 @@ static int __init acpi_parse_madt(struct acpi_table_header *table)
 		return -ENODEV;
 	}
 
+#ifndef CONFIG_XEN
 	if (madt->address) {
 		acpi_lapic_addr = (u64) madt->address;
 
 		printk(KERN_DEBUG PREFIX "Local APIC address 0x%08x\n",
 		       madt->address);
 	}
+#endif
 
 	acpi_madt_oem_check(madt->header.oem_id, madt->header.oem_table_id);
 
@@ -242,19 +249,23 @@ static int __init acpi_parse_madt(struct acpi_table_header *table)
 
 static void __cpuinit acpi_register_lapic(int id, u8 enabled)
 {
+#ifndef CONFIG_XEN
 	unsigned int ver = 0;
+#endif
 
 	if (!enabled) {
 		++disabled_cpus;
 		return;
 	}
 
+#ifndef CONFIG_XEN
 #ifdef CONFIG_X86_32
 	if (boot_cpu_physical_apicid != -1U)
 		ver = apic_version[boot_cpu_physical_apicid];
 #endif
 
 	generic_processor_info(id, ver);
+#endif
 }
 
 static int __init
@@ -304,6 +315,7 @@ static int __init
 acpi_parse_lapic_addr_ovr(struct acpi_subtable_header * header,
 			  const unsigned long end)
 {
+#ifndef CONFIG_XEN
 	struct acpi_madt_local_apic_override *lapic_addr_ovr = NULL;
 
 	lapic_addr_ovr = (struct acpi_madt_local_apic_override *)header;
@@ -312,6 +324,7 @@ acpi_parse_lapic_addr_ovr(struct acpi_subtable_header * header,
 		return -EINVAL;
 
 	acpi_lapic_addr = lapic_addr_ovr->address;
+#endif
 
 	return 0;
 }
@@ -769,6 +782,7 @@ static int __init acpi_parse_fadt(struct acpi_table_header *table)
  * returns 0 on success, < 0 on error
  */
 
+#ifndef CONFIG_XEN
 static void __init acpi_register_lapic_address(unsigned long address)
 {
 	mp_lapic_addr = address;
@@ -782,6 +796,9 @@ static void __init acpi_register_lapic_address(unsigned long address)
 #endif
 	}
 }
+#else
+#define acpi_register_lapic_address(address)
+#endif
 
 static int __init early_acpi_parse_madt_lapic_addr_ovr(void)
 {

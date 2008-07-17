@@ -81,7 +81,7 @@ static int xfrm4_output_finish(struct sk_buff *skb)
 #endif
 
 	skb->protocol = htons(ETH_P_IP);
-	return xfrm_output(skb);
+	return skb_checksum_setup(skb) ?: xfrm_output(skb);
 }
 
 int xfrm4_output(struct sk_buff *skb)

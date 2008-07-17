@@ -3,6 +3,24 @@
  *
  * Unified block-device I/O interface for Xen guest OSes.
  *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ *
  * Copyright (c) 2003-2004, Keir Fraser
  */
 
@@ -24,8 +42,10 @@
  * rsp_event appropriately (e.g., using RING_FINAL_CHECK_FOR_RESPONSES()).
  */
 
-typedef uint16_t blkif_vdev_t;
-typedef uint64_t blkif_sector_t;
+#ifndef blkif_vdev_t
+#define blkif_vdev_t   uint16_t
+#endif
+#define blkif_sector_t uint64_t
 
 /*
  * REQUEST CODES.
@@ -34,7 +54,7 @@ typedef uint64_t blkif_sector_t;
 #define BLKIF_OP_WRITE             1
 /*
  * Recognised only if "feature-barrier" is present in backend xenbus info.
- * The "feature_barrier" node contains a boolean indicating whether barrier
+ * The "feature-barrier" node contains a boolean indicating whether barrier
  * requests are likely to succeed or fail. Either way, a barrier request
  * may fail at any time with BLKIF_RSP_EOPNOTSUPP if it is unsupported by
  * the underlying block-device hardware. The boolean simply indicates whether
@@ -43,33 +63,50 @@ typedef uint64_t blkif_sector_t;
  * create the "feature-barrier" node!
  */
 #define BLKIF_OP_WRITE_BARRIER     2
+/*
+ * Recognised if "feature-flush-cache" is present in backend xenbus
+ * info.  A flush will ask the underlying storage hardware to flush its
+ * non-volatile caches as appropriate.  The "feature-flush-cache" node
+ * contains a boolean indicating whether flush requests are likely to
+ * succeed or fail. Either way, a flush request may fail at any time
+ * with BLKIF_RSP_EOPNOTSUPP if it is unsupported by the underlying
+ * block-device hardware. The boolean simply indicates whether or not it
+ * is worthwhile for the frontend to attempt flushes.  If a backend does
+ * not recognise BLKIF_OP_WRITE_FLUSH_CACHE, it should *not* create the
+ * "feature-flush-cache" node!
+ */
+#define BLKIF_OP_FLUSH_DISKCACHE   3
 
 /*
  * Maximum scatter/gather segments per request.
- * This is carefully chosen so that sizeof(struct blkif_ring) <= PAGE_SIZE.
+ * This is carefully chosen so that sizeof(blkif_ring_t) <= PAGE_SIZE.
  * NB. This could be 12 if the ring indexes weren't stored in the same page.
  */
 #define BLKIF_MAX_SEGMENTS_PER_REQUEST 11
 
-struct blkif_request {
-	uint8_t        operation;    /* BLKIF_OP_???                         */
-	uint8_t        nr_segments;  /* number of segments                   */
-	blkif_vdev_t   handle;       /* only for read/write requests         */
-	uint64_t       id;           /* private guest value, echoed in resp  */
-	blkif_sector_t sector_number;/* start sector idx on disk (r/w only)  */
-	struct blkif_request_segment {
-		grant_ref_t gref;        /* reference to I/O buffer frame        */
-		/* @first_sect: first sector in frame to transfer (inclusive).   */
-		/* @last_sect: last sector in frame to transfer (inclusive).     */
-		uint8_t     first_sect, last_sect;
-	} seg[BLKIF_MAX_SEGMENTS_PER_REQUEST];
+struct blkif_request_segment {
+    grant_ref_t gref;        /* reference to I/O buffer frame        */
+    /* @first_sect: first sector in frame to transfer (inclusive).   */
+    /* @last_sect: last sector in frame to transfer (inclusive).     */
+    uint8_t     first_sect, last_sect;
 };
 
-struct blkif_response {
-	uint64_t        id;              /* copied from request */
-	uint8_t         operation;       /* copied from request */
-	int16_t         status;          /* BLKIF_RSP_???       */
+struct blkif_request {
+    uint8_t        operation;    /* BLKIF_OP_???                         */
+    uint8_t        nr_segments;  /* number of segments                   */
+    blkif_vdev_t   handle;       /* only for read/write requests         */
+    uint64_t       id;           /* private guest value, echoed in resp  */
+    blkif_sector_t sector_number;/* start sector idx on disk (r/w only)  */
+    struct blkif_request_segment seg[BLKIF_MAX_SEGMENTS_PER_REQUEST];
 };
+typedef struct blkif_request blkif_request_t;
+
+struct blkif_response {
+    uint64_t        id;              /* copied from request */
+    uint8_t         operation;       /* copied from request */
+    int16_t         status;          /* BLKIF_RSP_???       */
+};
+typedef struct blkif_response blkif_response_t;
 
 /*
  * STATUS RETURN CODES.
@@ -92,3 +129,13 @@ DEFINE_RING_TYPES(blkif, struct blkif_request, struct blkif_response);
 #define VDISK_READONLY     0x4
 
 #endif /* __XEN_PUBLIC_IO_BLKIF_H__ */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

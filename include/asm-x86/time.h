@@ -56,4 +56,10 @@ static inline int native_set_wallclock(unsigned long nowtime)
 
 #endif /* CONFIG_PARAVIRT */
 
+#ifdef CONFIG_XEN
+extern int xen_independent_wallclock(void);
+extern unsigned long xen_read_persistent_clock(void);
+extern int xen_update_persistent_clock(void);
+#endif
+
 #endif

@@ -363,6 +363,7 @@ config ACPI_SYSTEM
 config X86_PM_TIMER
 	bool "Power Management Timer Support" if EMBEDDED
 	depends on X86
+	depends on !XEN
 	default y
 	help
 	  The Power Management Timer is available on all ACPI-capable,
@@ -416,4 +417,8 @@ config ACPI_SBS
 	  This driver adds support for the Smart Battery System, another
 	  type of access to battery information, found on some laptops.
 
+config ACPI_PV_SLEEP
+	bool
+	depends on X86 && XEN && ACPI_SLEEP
+	default y
 endif	# ACPI

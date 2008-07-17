@@ -354,7 +354,12 @@ pci_find_parent_resource(const struct pci_dev *dev, struct resource *res)
  * Restore the BAR values for a given device, so as to make it
  * accessible by its driver.
  */
+#ifndef CONFIG_XEN
 static void
+#else
+EXPORT_SYMBOL_GPL(pci_restore_bars);
+void
+#endif
 pci_restore_bars(struct pci_dev *dev)
 {
 	int i, numres;

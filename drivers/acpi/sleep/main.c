@@ -31,6 +31,7 @@ static u32 acpi_target_sleep_state = ACPI_STATE_S0;
 static int acpi_sleep_prepare(u32 acpi_state)
 {
 #ifdef CONFIG_ACPI_SLEEP
+#ifndef CONFIG_ACPI_PV_SLEEP
 	/* do we have a wakeup address for S2 and S3? */
 	if (acpi_state == ACPI_STATE_S3) {
 		if (!acpi_wakeup_address) {
@@ -40,6 +41,7 @@ static int acpi_sleep_prepare(u32 acpi_state)
 				(acpi_physical_address)acpi_wakeup_address);
 
 	}
+#endif
 	ACPI_FLUSH_CPU_CACHE();
 	acpi_enable_wakeup_device_prep(acpi_state);
 #endif
@@ -136,7 +138,14 @@ static int acpi_suspend_enter(suspend_state_t pm_state)
 		break;
 
 	case ACPI_STATE_S3:
+#ifdef CONFIG_ACPI_PV_SLEEP
+		/* Hyperviosr will save and restore CPU context
+		 * and then we can skip low level housekeeping here.
+		 */
+		acpi_enter_sleep_state(acpi_state);
+#else
 		do_suspend_lowlevel();
+#endif
 		break;
 	}
 
@@ -186,7 +195,7 @@ static void acpi_suspend_finish(void)
 
 	acpi_target_sleep_state = ACPI_STATE_S0;
 
-#ifdef CONFIG_X86
+#if defined(CONFIG_X86) && !defined(CONFIG_ACPI_PV_SLEEP)
 	if (init_8259A_after_S1) {
 		printk("Broken toshiba laptop -> kicking interrupts\n");
 		init_8259A(0);

@@ -99,6 +99,10 @@ static inline void ptep_set_wrprotect(struct mm_struct *mm, unsigned long addres
 }
 #endif
 
+#ifndef arch_change_pte_range
+#define arch_change_pte_range(mm, pmd, addr, end, newprot, dirty_accountable) 0
+#endif
+
 #ifndef __HAVE_ARCH_PTE_SAME
 #define pte_same(A,B)	(pte_val(A) == pte_val(B))
 #endif

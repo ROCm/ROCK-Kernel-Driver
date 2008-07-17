@@ -93,6 +93,8 @@ static inline void change_pmd_range(struct mm_struct *mm, pud_t *pud,
 		next = pmd_addr_end(addr, end);
 		if (pmd_none_or_clear_bad(pmd))
 			continue;
+		if (arch_change_pte_range(mm, pmd, addr, next, newprot, dirty_accountable))
+			continue;
 		change_pte_range(mm, pmd, addr, next, newprot, dirty_accountable);
 	} while (pmd++, addr = next, addr != end);
 }

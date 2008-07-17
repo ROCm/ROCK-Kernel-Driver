@@ -17,6 +17,8 @@
 
 #include "pci.h"
 
+extern int pci_mem_align;
+
 /**
  * pci_bus_alloc_resource - allocate a resource from a parent bus
  * @bus: PCI bus
@@ -43,6 +45,13 @@ pci_bus_alloc_resource(struct pci_bus *bus, struct resource *res,
 	int i, ret = -ENOMEM;
 
 	type_mask |= IORESOURCE_IO | IORESOURCE_MEM;
+
+#ifdef CONFIG_XEN
+	/* If the boot parameter 'pci-mem-align' was specified then we need to 
+	   align the memory addresses, at page size alignment. */
+	if (pci_mem_align && (align < (PAGE_SIZE-1)))
+		align = PAGE_SIZE - 1;
+#endif
 
 	for (i = 0; i < PCI_BUS_NUM_RESOURCES; i++) {
 		struct resource *r = bus->resource[i];

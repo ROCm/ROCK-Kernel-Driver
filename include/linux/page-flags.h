@@ -96,6 +96,13 @@ enum pageflags {
 #ifdef CONFIG_IA64_UNCACHED_ALLOCATOR
 	PG_uncached,		/* Page has been mapped as uncached */
 #endif
+#ifdef CONFIG_XEN
+	PG_foreign,		/* Page is owned by foreign allocator. */
+	PG_pinned,		/* Cannot alias with PG_owner_priv_1 since
+				 * bad_page() checks include this bit.
+				 * Should not use PG_arch_1 as that may have
+				 * a different purpose elsewhere. */
+#endif
 	__NR_PAGEFLAGS
 };
 
@@ -156,7 +163,11 @@ PAGEFLAG(LRU, lru) __CLEARPAGEFLAG(LRU, lru)
 PAGEFLAG(Active, active) __CLEARPAGEFLAG(Active, active)
 __PAGEFLAG(Slab, slab)
 PAGEFLAG(Checked, owner_priv_1)		/* Used by some filesystems */
+#ifdef CONFIG_PARAVIRT_XEN
 PAGEFLAG(Pinned, owner_priv_1) TESTSCFLAG(Pinned, owner_priv_1) /* Xen */
+#elif defined(CONFIG_XEN)
+PAGEFLAG(Pinned, owner_priv_1) TESTSCFLAG(Pinned, pinned)
+#endif
 PAGEFLAG(Reserved, reserved) __CLEARPAGEFLAG(Reserved, reserved)
 PAGEFLAG(Private, private) __CLEARPAGEFLAG(Private, private)
 	__SETPAGEFLAG(Private, private)
@@ -243,6 +254,19 @@ static inline void SetPageUptodate(struct page *page)
 
 CLEARPAGEFLAG(Uptodate, uptodate)
 
+#define PageForeign(page)	test_bit(PG_foreign, &(page)->flags)
+#define SetPageForeign(_page, dtor) do {		\
+	set_bit(PG_foreign, &(_page)->flags);		\
+	BUG_ON((dtor) == (void (*)(struct page *))0);	\
+	(_page)->index = (long)(dtor);			\
+} while (0)
+#define ClearPageForeign(page) do {			\
+	clear_bit(PG_foreign, &(page)->flags);		\
+	(page)->index = 0;				\
+} while (0)
+#define PageForeignDestructor(_page)			\
+	((void (*)(struct page *))(_page)->index)(_page)
+
 extern void cancel_dirty_page(struct page *page, unsigned int account_size);
 
 int test_clear_page_writeback(struct page *page);
@@ -307,8 +331,16 @@ static inline void __ClearPageTail(struct page *page)
 
 #endif /* !PAGEFLAGS_EXTENDED */
 
+#if !defined(CONFIG_XEN)
+# define PAGE_FLAGS_XEN 0
+#elif defined(CONFIG_X86)
+# define PAGE_FLAGS_XEN ((1 << PG_pinned) | (1 << PG_foreign))
+#else
+# define PAGE_FLAGS_XEN (1 << PG_foreign)
+#endif
+
 #define PAGE_FLAGS	(1 << PG_lru   | 1 << PG_private   | 1 << PG_locked | \
-			 1 << PG_buddy | 1 << PG_writeback | \
+			 1 << PG_buddy | 1 << PG_writeback | PAGE_FLAGS_XEN | \
 			 1 << PG_slab  | 1 << PG_swapcache | 1 << PG_active)
 
 /*

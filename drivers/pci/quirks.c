@@ -24,6 +24,42 @@
 #include <linux/kallsyms.h>
 #include "pci.h"
 
+#ifdef CONFIG_XEN
+/* A global flag which signals if we should page-align PCI mem windows. */
+int pci_mem_align = 0;
+
+static int __init set_pci_mem_align(char *str)
+{
+	pci_mem_align = 1;
+	return 1;
+}
+__setup("pci-mem-align", set_pci_mem_align);
+
+/* This quirk function enables us to force all memory resources which are 
+ * assigned to PCI devices, to be page-aligned.
+ */
+static void __devinit quirk_align_mem_resources(struct pci_dev *dev)
+{
+	int i;
+	struct resource *r;
+	resource_size_t old_start;
+
+	if (!pci_mem_align)
+		return;
+
+	for (i=0; i < DEVICE_COUNT_RESOURCE; i++) {
+		r = &dev->resource[i];
+		if ((r == NULL) || !(r->flags & IORESOURCE_MEM))
+			continue;
+
+		old_start = r->start;
+		r->start = (r->start + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
+		r->end = r->end - (old_start - r->start);
+	}
+}
+DECLARE_PCI_FIXUP_HEADER(PCI_ANY_ID, PCI_ANY_ID, quirk_align_mem_resources);
+#endif
+
 /* The Mellanox Tavor device gives false positive parity errors
  * Mark this device with a broken_parity_status, to allow
  * PCI scanning code to "skip" this now blacklisted device.

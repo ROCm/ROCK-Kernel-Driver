@@ -65,6 +65,9 @@ obj-$(VDSO32-y)			+= vdso32-syms.lds
 vdso32.so-$(CONFIG_X86_32)	+= int80
 vdso32.so-$(CONFIG_COMPAT)	+= syscall
 vdso32.so-$(VDSO32-y)		+= sysenter
+xen-vdso32-$(subst 1,$(CONFIG_COMPAT),$(shell expr $(CONFIG_XEN_COMPAT)0 '<' 0x0302000)) += int80
+xen-vdso32-$(CONFIG_X86_32)	+= syscall
+vdso32.so-$(CONFIG_XEN)		+= $(xen-vdso32-y)
 
 vdso32-images			= $(vdso32.so-y:%=vdso32-%.so)
 
