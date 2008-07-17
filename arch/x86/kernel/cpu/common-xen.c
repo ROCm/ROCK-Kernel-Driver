@@ -728,7 +728,7 @@ void __cpuinit cpu_init(void)
 	mxcsr_feature_mask_init();
 }
 
-#ifdef CONFIG_HOTPLUG_CPU
+#if defined(CONFIG_HOTPLUG_CPU) && !defined(CONFIG_XEN)
 void __cpuinit cpu_uninit(void)
 {
 	int cpu = raw_smp_processor_id();
