@@ -1147,7 +1147,7 @@ config SECCOMP
 
 config SECCOMP_DISABLE_TSC
 	bool "Disable the TSC for seccomp tasks"
-	depends on SECCOMP && X86_32
+	depends on SECCOMP
 	default n
 	help
 	  This feature mathematically prevents covert channels

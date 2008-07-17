@@ -277,6 +277,7 @@ static int __init raw_init(void)
 	raw_devices = vmalloc(sizeof(struct raw_device_data) * max_raw_minors);
 	if (!raw_devices) {
 		printk(KERN_ERR "Not enough memory for raw device structures\n");
+		ret = -ENOMEM;
 		goto error;
 	}
 	memset(raw_devices, 0, sizeof(struct raw_device_data) * max_raw_minors);
