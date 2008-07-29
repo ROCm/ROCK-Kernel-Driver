@@ -305,7 +305,8 @@ static int bay_add(acpi_handle handle, int id)
 	status = acpi_install_notify_handler(handle, ACPI_SYSTEM_NOTIFY,
 			bay_notify, new_bay);
 	if (ACPI_FAILURE(status)) {
-		printk(KERN_INFO PREFIX "Error installing bay notify handler\n");
+		ACPI_EXCEPTION((AE_INFO, status,
+				"Error installing bay notify handler\n"));
 		platform_device_unregister(new_bay->pdev);
 		goto bay_add_err;
 	}

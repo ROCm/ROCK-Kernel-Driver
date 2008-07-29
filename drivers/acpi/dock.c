@@ -415,8 +415,8 @@ static void handle_dock(struct dock_station *ds, int dock)
 	arg.integer.value = dock;
 	status = acpi_evaluate_object(ds->handle, "_DCK", &arg_list, &buffer);
 	if (ACPI_FAILURE(status))
-		printk(KERN_ERR PREFIX "%s - failed to execute _DCK\n",
-			 (char *)name_buffer.pointer);
+		ACPI_EXCEPTION((AE_INFO, status, "%s - failed to execute"
+				" _DCK\n", (char *)name_buffer.pointer));
 	kfree(buffer.pointer);
 	kfree(name_buffer.pointer);
 }
@@ -829,7 +829,8 @@ static int dock_add(acpi_handle handle)
 					     dock_notify, dock_station);
 
 	if (ACPI_FAILURE(status)) {
-		printk(KERN_ERR PREFIX "Error installing notify handler\n");
+		ACPI_EXCEPTION((AE_INFO, status, "Error installing notify"
+				" handler\n"));
 		ret = -ENODEV;
 		goto dock_add_err;
 	}
@@ -872,7 +873,8 @@ static int dock_remove(void)
 					    ACPI_SYSTEM_NOTIFY,
 					    dock_notify);
 	if (ACPI_FAILURE(status))
-		printk(KERN_ERR "Error removing notify handler\n");
+		ACPI_EXCEPTION((AE_INFO, status,
+				"Error removing notify handler\n"));
 
 	/* cleanup sysfs */
 	device_remove_file(&dock_device->dev, &dev_attr_docked);

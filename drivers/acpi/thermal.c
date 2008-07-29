@@ -42,6 +42,7 @@
 #include <linux/kmod.h>
 #include <linux/seq_file.h>
 #include <linux/reboot.h>
+#include <linux/dmi.h>
 #include <asm/uaccess.h>
 #include <linux/thermal.h>
 #include <acpi/acpi_bus.h>
@@ -1588,6 +1589,66 @@ static int acpi_thermal_get_info(struct acpi_thermal *tz)
 	return 0;
 }
 
+static struct dmi_system_id thermal_psv_dmi_table[] = {
+	{
+		.ident = "IBM ThinkPad T41",
+		.matches = {
+			DMI_MATCH(DMI_BIOS_VENDOR,"IBM"),
+			DMI_MATCH(DMI_PRODUCT_VERSION,"ThinkPad T41"),
+		},
+	},
+	{
+		.ident = "IBM ThinkPad T42",
+		.matches = {
+			DMI_MATCH(DMI_BIOS_VENDOR,"IBM"),
+			DMI_MATCH(DMI_PRODUCT_VERSION,"ThinkPad T42"),
+		},
+	},
+	{
+		.ident = "IBM ThinkPad T43",
+		.matches = {
+			DMI_MATCH(DMI_BIOS_VENDOR,"IBM"),
+			DMI_MATCH(DMI_PRODUCT_VERSION,"ThinkPad T43"),
+		},
+	},
+	{
+		.ident = "IBM ThinkPad T41p",
+		.matches = {
+			DMI_MATCH(DMI_BIOS_VENDOR,"IBM"),
+			DMI_MATCH(DMI_PRODUCT_VERSION,"ThinkPad T41p"),
+		},
+	},
+	{
+		.ident = "IBM ThinkPad T42p",
+		.matches = {
+			DMI_MATCH(DMI_BIOS_VENDOR,"IBM"),
+			DMI_MATCH(DMI_PRODUCT_VERSION,"ThinkPad T42p"),
+		},
+	},
+	{
+		.ident = "IBM ThinkPad T43p",
+		.matches = {
+			DMI_MATCH(DMI_BIOS_VENDOR,"IBM"),
+			DMI_MATCH(DMI_PRODUCT_VERSION,"ThinkPad T43p"),
+		},
+	},
+	{
+		.ident = "IBM ThinkPad R40",
+		.matches = {
+			DMI_MATCH(DMI_BIOS_VENDOR,"IBM"),
+			DMI_MATCH(DMI_PRODUCT_VERSION,"ThinkPad R40"),
+		},
+	},
+	{
+		.ident = "IBM ThinkPad R50p",
+		.matches = {
+			DMI_MATCH(DMI_BIOS_VENDOR,"IBM"),
+			DMI_MATCH(DMI_PRODUCT_VERSION,"ThinkPad R50p"),
+		},
+	},
+	{},
+};
+
 static int acpi_thermal_add(struct acpi_device *device)
 {
 	int result = 0;
@@ -1617,6 +1678,18 @@ static int acpi_thermal_add(struct acpi_device *device)
 	result = acpi_thermal_register_thermal_zone(tz);
 	if (result)
 		goto free_memory;
+
+	if (dmi_check_system(thermal_psv_dmi_table)) {
+		if (tz->trips.passive.flags.valid &&
+		    tz->trips.passive.temperature > CELSIUS_TO_KELVIN(85)) {
+			printk (KERN_INFO "Adjust passive trip point from %lu"
+				" to %lu\n",
+				KELVIN_TO_CELSIUS(tz->trips.passive.temperature),
+				KELVIN_TO_CELSIUS(tz->trips.passive.temperature - 150));
+			tz->trips.passive.temperature -= 150;
+			acpi_thermal_set_polling(tz, 5);
+		}
+	}
 
 	result = acpi_thermal_add_fs(device);
 	if (result)
