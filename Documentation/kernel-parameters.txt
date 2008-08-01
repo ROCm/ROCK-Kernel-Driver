@@ -1493,6 +1493,17 @@ and is between 256 and 4096 characters. It is defined in the file
 		nomsi		[MSI] If the PCI_MSI kernel config parameter is
 				enabled, this kernel boot option can be used to
 				disable the use of MSI interrupts system-wide.
+		noioapicquirk	[APIC] Disable all boot interrupt quirks.
+				Safety option to keep boot IRQs enabled. This
+				should never be necessary.
+		ioapicreroute	[APIC] Enable rerouting of boot IRQs to the
+				primary IO-APIC for bridges that cannot disable
+				boot IRQs. This fixes a source of spurious IRQs
+				when the system masks IRQs.
+		noioapicreroute	[APIC] Disable workaround that uses the
+				boot IRQ equivalent of an IRQ that connects to
+				a chipset where boot IRQs cannot be disabled.
+				The opposite of ioapicreroute.
 		biosirq		[X86-32] Use PCI BIOS calls to get the interrupt
 				routing table. These calls are known to be buggy
 				on several machines and they hang the machine

@@ -1399,6 +1399,171 @@ DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL,	0x2609, quirk_intel_pcie_pm);
 DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL,	0x260a, quirk_intel_pcie_pm);
 DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL,	0x260b, quirk_intel_pcie_pm);
 
+#ifdef CONFIG_X86_IO_APIC
+/*
+ * Boot interrupts on some chipsets cannot be turned off. For these chipsets,
+ * remap the original interrupt in the linux kernel to the boot interrupt, so
+ * that a PCI device's interrupt handler is installed on the boot interrupt
+ * line instead.
+ */
+static void quirk_reroute_to_boot_interrupts_intel(struct pci_dev *dev)
+{
+	if (noioapicquirk || noioapicreroute)
+		return;
+
+	dev->irq_reroute_variant = INTEL_IRQ_REROUTE_VARIANT;
+
+	printk(KERN_INFO "PCI quirk: reroute interrupts for 0x%04x:0x%04x\n",
+			dev->vendor, dev->device);
+	return;
+}
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_80333_0,	quirk_reroute_to_boot_interrupts_intel);
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_80333_1,	quirk_reroute_to_boot_interrupts_intel);
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_ESB2_0,	quirk_reroute_to_boot_interrupts_intel);
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_PXH_0,	quirk_reroute_to_boot_interrupts_intel);
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_PXH_1,	quirk_reroute_to_boot_interrupts_intel);
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_PXHV,	quirk_reroute_to_boot_interrupts_intel);
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_80332_0,	quirk_reroute_to_boot_interrupts_intel);
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_80332_1,	quirk_reroute_to_boot_interrupts_intel);
+
+/*
+ * On some chipsets we can disable the generation of legacy INTx boot
+ * interrupts.
+ */
+
+/*
+ * IO-APIC1 on 6300ESB generates boot interrupts, see intel order no
+ * 300641-004US, section 5.7.3.
+ */
+#define INTEL_6300_IOAPIC_ABAR		0x40
+#define INTEL_6300_DISABLE_BOOT_IRQ	(1<<14)
+
+static void quirk_disable_intel_boot_interrupt(struct pci_dev *dev)
+{
+	u16 pci_config_word;
+
+	if (noioapicquirk)
+		return;
+
+	pci_read_config_word(dev, INTEL_6300_IOAPIC_ABAR, &pci_config_word);
+	pci_config_word |= INTEL_6300_DISABLE_BOOT_IRQ;
+	pci_write_config_word(dev, INTEL_6300_IOAPIC_ABAR, pci_config_word);
+
+	printk(KERN_INFO "disabled boot interrupt on device 0x%04x:0x%04x\n",
+		dev->vendor, dev->device);
+}
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL,   PCI_DEVICE_ID_INTEL_ESB_10, 	quirk_disable_intel_boot_interrupt);
+
+/*
+ * disable boot interrupts on HT-1000
+ */
+#define BC_HT1000_FEATURE_REG		0x64
+#define BC_HT1000_PIC_REGS_ENABLE	(1<<0)
+#define BC_HT1000_MAP_IDX		0xC00
+#define BC_HT1000_MAP_DATA		0xC01
+
+static void quirk_disable_broadcom_boot_interrupt(struct pci_dev *dev)
+{
+	u32 pci_config_dword;
+	u8 irq;
+
+	if (noioapicquirk)
+		return;
+
+	pci_read_config_dword(dev, BC_HT1000_FEATURE_REG, &pci_config_dword);
+	pci_write_config_dword(dev, BC_HT1000_FEATURE_REG, pci_config_dword |
+			BC_HT1000_PIC_REGS_ENABLE);
+
+	for (irq = 0x10; irq < 0x10 + 32; irq++) {
+		outb(irq, BC_HT1000_MAP_IDX);
+		outb(0x00, BC_HT1000_MAP_DATA);
+	}
+
+	pci_write_config_dword(dev, BC_HT1000_FEATURE_REG, pci_config_dword);
+
+	printk(KERN_INFO "disabled boot interrupts on PCI device"
+			"0x%04x:0x%04x\n", dev->vendor, dev->device);
+}
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_SERVERWORKS,   PCI_DEVICE_ID_SERVERWORKS_HT1000SB, 	quirk_disable_broadcom_boot_interrupt);
+
+/*
+ * disable boot interrupts on AMD and ATI chipsets
+ */
+#define AMD_813X_MISC			0x40
+#define AMD_813X_NOIOAMODE		1
+
+static void quirk_disable_amd_813x_boot_interrupt(struct pci_dev *dev)
+{
+	u32 pci_config_dword;
+
+	if (noioapicquirk)
+		return;
+
+	pci_read_config_dword(dev, AMD_813X_MISC, &pci_config_dword);
+	pci_config_dword |= AMD_813X_NOIOAMODE;
+	pci_write_config_dword(dev, AMD_813X_MISC, pci_config_dword);
+
+	printk(KERN_INFO "disabled boot interrupts on PCI device "
+			"0x%04x:0x%04x\n", dev->vendor, dev->device);
+}
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_AMD,   PCI_DEVICE_ID_AMD_8131_BRIDGE, 	quirk_disable_amd_813x_boot_interrupt);
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_AMD,   PCI_DEVICE_ID_AMD_8132_BRIDGE, 	quirk_disable_amd_813x_boot_interrupt);
+
+#define AMD_8111_PCI_IRQ_ROUTING	0x56
+
+static void quirk_disable_amd_8111_boot_interrupt(struct pci_dev *dev)
+{
+	u16 pci_config_word;
+
+	if (noioapicquirk)
+		return;
+
+	pci_read_config_word(dev, AMD_8111_PCI_IRQ_ROUTING, &pci_config_word);
+	if (!pci_config_word) {
+		printk(KERN_INFO "boot interrupts on PCI device 0x%04x:0x%04x "
+				"already disabled\n",
+				dev->vendor, dev->device);
+		return;
+	}
+	pci_write_config_word(dev, AMD_8111_PCI_IRQ_ROUTING, 0);
+	printk(KERN_INFO "disabled boot interrupts on PCI device "
+			"0x%04x:0x%04x\n", dev->vendor, dev->device);
+}
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_AMD,   PCI_DEVICE_ID_AMD_8111_SMBUS, 	quirk_disable_amd_8111_boot_interrupt);
+
+/*
+ * disable PCI boot interrupt mapping to PIC / first IO-APIC on SB700S
+ */
+#define AMD_SB700S_MAP_REG		0x64
+#define AMD_SB700S_MAP_ENABLE		(1<<0)
+#define AMD_SB700S_IRQ_IDX		0xC00
+#define AMD_SB700S_IRQ_DATA		0xC01
+
+static void quirk_disable_amd_sb700s_boot_interrupt(struct pci_dev *dev)
+{
+	u32 pci_config_dword;
+	int i, irqs[] = {0x0, 0x1, 0x2, 0x3, 0x4, 0x9, 0xa, 0xb, 0xc};
+
+	if (noioapicquirk)
+		return;
+
+	pci_read_config_dword(dev, AMD_SB700S_MAP_REG, &pci_config_dword);
+	pci_write_config_dword(dev, AMD_SB700S_MAP_REG, pci_config_dword |
+			AMD_SB700S_MAP_ENABLE);
+
+	for (i = 0; i < ARRAY_SIZE(irqs); i++) {
+		outb(irqs[i], AMD_SB700S_IRQ_IDX);
+		outb(0x00, AMD_SB700S_IRQ_DATA);
+	}
+
+	pci_write_config_dword(dev, AMD_SB700S_MAP_REG, pci_config_dword);
+
+	printk(KERN_INFO "disabled boot interrupts on PCI device "
+			"0x%04x:0x%04x\n", dev->vendor, dev->device);
+}
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_ATI,   PCI_DEVICE_ID_ATI_SBX00_SMBUS, 	quirk_disable_amd_sb700s_boot_interrupt);
+#endif /* CONFIG_X86_IO_APIC */
+
 /*
  * Toshiba TC86C001 IDE controller reports the standard 8-byte BAR0 size
  * but the PIO transfers won't work if BAR0 falls at the odd 8 bytes.

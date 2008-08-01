@@ -137,8 +137,18 @@ extern int sis_apic_bug;
 /* 1 if "noapic" boot option passed */
 extern int skip_ioapic_setup;
 
+/* 1 if "noapic" boot option passed */
+extern int noioapicquirk;
+
+/* -1 if "noapic" boot option passed */
+extern int noioapicreroute;
+
 static inline void disable_ioapic_setup(void)
 {
+#ifdef CONFIG_PCI
+	noioapicquirk = 1;
+	noioapicreroute = -1;
+#endif
 	skip_ioapic_setup = 1;
 }
 

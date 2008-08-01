@@ -18,6 +18,9 @@ struct pci_sysdata {
 #endif
 };
 
+extern int noioapicquirk;
+extern int noioapicreroute;
+
 /* scan a bus after allocating a pci_sysdata for it */
 extern struct pci_bus *pci_scan_bus_on_node(int busno, struct pci_ops *ops,
 					    int node);
