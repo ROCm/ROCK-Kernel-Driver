@@ -21,6 +21,8 @@
 #include <asm/gart.h>
 #endif
 
+extern int hpet_rework;
+
 static void __init fix_hypertransport_config(int num, int slot, int func)
 {
 	u32 htcfg;
@@ -109,6 +111,16 @@ static void __init ati_bugs(int num, int slot, int func)
 #endif
 }
 
+static void __init amd_sb700_hpet(int num, int slot, int func)
+{
+	int rev;
+	rev = read_pci_config_byte(num, slot, func, 0x08);
+	if (rev <= 0x3a && rev >=0x30) {
+		hpet_rework = 1;
+		printk(KERN_INFO "SB700 rev 0x3a under detected!\n");
+	}
+}
+
 #define QFLAG_APPLY_ONCE 	0x1
 #define QFLAG_APPLIED		0x2
 #define QFLAG_DONE		(QFLAG_APPLY_ONCE|QFLAG_APPLIED)
@@ -130,6 +142,8 @@ static struct chipset early_qrk[] __initdata = {
 	  PCI_CLASS_BRIDGE_PCI, PCI_ANY_ID, QFLAG_APPLY_ONCE, ati_bugs },
 	{ PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_K8_NB,
 	  PCI_CLASS_BRIDGE_HOST, PCI_ANY_ID, 0, fix_hypertransport_config },
+	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_SBX00_SMBUS,
+	  PCI_CLASS_SERIAL_SMBUS, PCI_ANY_ID, 0, amd_sb700_hpet },
 	{}
 };
 

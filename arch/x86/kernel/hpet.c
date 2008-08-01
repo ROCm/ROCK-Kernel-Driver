@@ -23,6 +23,9 @@
  * HPET address is set in acpi/boot.c, when an ACPI entry exists
  */
 unsigned long hpet_address;
+
+int hpet_rework __initdata = 0;
+
 static void __iomem *hpet_virt_address;
 
 unsigned long hpet_readl(unsigned long a)
@@ -388,6 +391,11 @@ int __init hpet_enable(void)
 	 * Read the period and check for a sane value:
 	 */
 	hpet_period = hpet_readl(HPET_PERIOD);
+
+	if (hpet_rework) {
+		int timeout = 1000;
+		while (0xffffffff == hpet_readl(HPET_CFG) && timeout-- != 0);
+	}
 	if (hpet_period < HPET_MIN_PERIOD || hpet_period > HPET_MAX_PERIOD)
 		goto out_nohpet;
 
