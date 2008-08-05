@@ -576,7 +576,7 @@ static inline void put_journal_list(struct super_block *s,
 				    struct reiserfs_journal_list *jl)
 {
 	if (jl->j_refcount < 1) {
-		reiserfs_panic(s, "journal-2", "trans id %lu, refcount at %d",
+		reiserfs_panic(s, "journal-2", "trans id %u, refcount at %d",
 			       jl->j_trans_id, jl->j_refcount);
 	}
 	if (--jl->j_refcount == 0)
@@ -601,7 +601,7 @@ static void cleanup_freed_for_journal_list(struct super_block *sb,
 }
 
 static int journal_list_still_alive(struct super_block *s,
-				    unsigned long trans_id)
+				    unsigned int trans_id)
 {
 	struct reiserfs_journal *journal = SB_JOURNAL(s);
 	struct list_head *entry = &journal->j_journal_list;
@@ -935,9 +935,9 @@ static int flush_older_commits(struct super_block *s,
 	struct reiserfs_journal_list *other_jl;
 	struct reiserfs_journal_list *first_jl;
 	struct list_head *entry;
-	unsigned long trans_id = jl->j_trans_id;
-	unsigned long other_trans_id;
-	unsigned long first_trans_id;
+	unsigned int trans_id = jl->j_trans_id;
+	unsigned int other_trans_id;
+	unsigned int first_trans_id;
 
       find_first:
 	/*
@@ -1016,7 +1016,7 @@ static int flush_commit_list(struct super_block *s,
 	int i;
 	b_blocknr_t bn;
 	struct buffer_head *tbh = NULL;
-	unsigned long trans_id = jl->j_trans_id;
+	unsigned int trans_id = jl->j_trans_id;
 	struct reiserfs_journal *journal = SB_JOURNAL(s);
 	int barrier = 0;
 	int retval = 0;
@@ -1278,7 +1278,7 @@ static void remove_all_from_journal_list(struct super_block *sb,
 */
 static int _update_journal_header_block(struct super_block *sb,
 					unsigned long offset,
-					unsigned long trans_id)
+					unsigned int trans_id)
 {
 	struct reiserfs_journal_header *jh;
 	struct reiserfs_journal *journal = SB_JOURNAL(sb);
@@ -1332,7 +1332,7 @@ static int _update_journal_header_block(struct super_block *sb,
 
 static int update_journal_header_block(struct super_block *sb,
 				       unsigned long offset,
-				       unsigned long trans_id)
+				       unsigned int trans_id)
 {
 	return _update_journal_header_block(sb, offset, trans_id);
 }
@@ -1347,7 +1347,7 @@ static int flush_older_journal_lists(struct super_block *sb,
 	struct list_head *entry;
 	struct reiserfs_journal_list *other_jl;
 	struct reiserfs_journal *journal = SB_JOURNAL(sb);
-	unsigned long trans_id = jl->j_trans_id;
+	unsigned int trans_id = jl->j_trans_id;
 
 	/* we know we are the only ones flushing things, no extra race
 	 * protection is required.
@@ -1759,13 +1759,13 @@ static int dirty_one_transaction(struct super_block *s,
 static int kupdate_transactions(struct super_block *s,
 				struct reiserfs_journal_list *jl,
 				struct reiserfs_journal_list **next_jl,
-				unsigned long *next_trans_id,
+				unsigned int *next_trans_id,
 				int num_blocks, int num_trans)
 {
 	int ret = 0;
 	int written = 0;
 	int transactions_flushed = 0;
-	unsigned long orig_trans_id = jl->j_trans_id;
+	unsigned int orig_trans_id = jl->j_trans_id;
 	struct buffer_chunk chunk;
 	struct list_head *entry;
 	struct reiserfs_journal *journal = SB_JOURNAL(s);
@@ -1834,7 +1834,7 @@ static int flush_used_journal_lists(struct super_block *s,
 	int limit = 256;
 	struct reiserfs_journal_list *tjl;
 	struct reiserfs_journal_list *flush_jl;
-	unsigned long trans_id;
+	unsigned int trans_id;
 	struct reiserfs_journal *journal = SB_JOURNAL(s);
 
 	flush_jl = tjl = jl;
@@ -2024,7 +2024,7 @@ static int journal_compare_desc_commit(struct super_block *sb,
 */
 static int journal_transaction_is_valid(struct super_block *sb,
 					struct buffer_head *d_bh,
-					unsigned long *oldest_invalid_trans_id,
+					unsigned int *oldest_invalid_trans_id,
 					unsigned long *newest_mount_id)
 {
 	struct reiserfs_journal_desc *desc;
@@ -2126,18 +2126,18 @@ static void brelse_array(struct buffer_head **heads, int num)
 static int journal_read_transaction(struct super_block *sb,
 				    unsigned long cur_dblock,
 				    unsigned long oldest_start,
-				    unsigned long oldest_trans_id,
+				    unsigned int oldest_trans_id,
 				    unsigned long newest_mount_id)
 {
 	struct reiserfs_journal *journal = SB_JOURNAL(sb);
 	struct reiserfs_journal_desc *desc;
 	struct reiserfs_journal_commit *commit;
-	unsigned long trans_id = 0;
+	unsigned int trans_id = 0;
 	struct buffer_head *c_bh;
 	struct buffer_head *d_bh;
 	struct buffer_head **log_blocks = NULL;
 	struct buffer_head **real_blocks = NULL;
-	unsigned long trans_offset;
+	unsigned int trans_offset;
 	int i;
 	int trans_half;
 
@@ -2363,8 +2363,8 @@ static int journal_read(struct super_block *sb)
 {
 	struct reiserfs_journal *journal = SB_JOURNAL(sb);
 	struct reiserfs_journal_desc *desc;
-	unsigned long oldest_trans_id = 0;
-	unsigned long oldest_invalid_trans_id = 0;
+	unsigned int oldest_trans_id = 0;
+	unsigned int oldest_invalid_trans_id = 0;
 	time_t start;
 	unsigned long oldest_start = 0;
 	unsigned long cur_dblock = 0;
@@ -2976,7 +2976,7 @@ static void wake_queued_writers(struct super_block *s)
 		wake_up(&journal->j_join_wait);
 }
 
-static void let_transaction_grow(struct super_block *sb, unsigned long trans_id)
+static void let_transaction_grow(struct super_block *sb, unsigned int trans_id)
 {
 	struct reiserfs_journal *journal = SB_JOURNAL(sb);
 	unsigned long bcount = journal->j_bcount;
@@ -3007,7 +3007,7 @@ static int do_journal_begin_r(struct reiserfs_transaction_handle *th,
 			      int join)
 {
 	time_t now = get_seconds();
-	int old_trans_id;
+	unsigned int old_trans_id;
 	struct reiserfs_journal *journal = SB_JOURNAL(sb);
 	struct reiserfs_transaction_handle myth;
 	int sched_count = 0;
@@ -3833,7 +3833,7 @@ static int __commit_trans_jl(struct inode *inode, unsigned long id,
 
 int reiserfs_commit_for_inode(struct inode *inode)
 {
-	unsigned long id = REISERFS_I(inode)->i_trans_id;
+	unsigned int id = REISERFS_I(inode)->i_trans_id;
 	struct reiserfs_journal_list *jl = REISERFS_I(inode)->i_jl;
 
 	/* for the whole inode, assume unset id means it was
@@ -3947,7 +3947,7 @@ static int do_journal_end(struct reiserfs_transaction_handle *th,
 	struct reiserfs_journal_list *jl, *temp_jl;
 	struct list_head *entry, *safe;
 	unsigned long jindex;
-	unsigned long commit_trans_id;
+	unsigned int commit_trans_id;
 	int trans_half;
 
 	BUG_ON(th->t_refcount > 1);
