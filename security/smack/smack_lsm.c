@@ -412,8 +412,9 @@ static int smack_inode_init_security(struct inode *inode, struct inode *dir,
  *
  * Returns 0 if access is permitted, an error code otherwise
  */
-static int smack_inode_link(struct dentry *old_dentry, struct inode *dir,
-			    struct dentry *new_dentry)
+static int smack_inode_link(struct dentry *old_dentry, struct vfsmount *old_mnt,
+			    struct inode *dir,
+			    struct dentry *new_dentry, struct vfsmount *new_mnt)
 {
 	int rc;
 	char *isp;
@@ -433,11 +434,13 @@ static int smack_inode_link(struct dentry *old_dentry, struct inode *dir,
  * smack_inode_unlink - Smack check on inode deletion
  * @dir: containing directory object
  * @dentry: file to unlink
+ * @mnt: vfsmount of file to unlink
  *
  * Returns 0 if current can write the containing directory
  * and the object, error code otherwise
  */
-static int smack_inode_unlink(struct inode *dir, struct dentry *dentry)
+static int smack_inode_unlink(struct inode *dir, struct dentry *dentry,
+			      struct vfsmount *mnt)
 {
 	struct inode *ip = dentry->d_inode;
 	int rc;
@@ -459,11 +462,13 @@ static int smack_inode_unlink(struct inode *dir, struct dentry *dentry)
  * smack_inode_rmdir - Smack check on directory deletion
  * @dir: containing directory object
  * @dentry: directory to unlink
+ * @mnt: vfsmount @dentry to unlink
  *
  * Returns 0 if current can write the containing directory
  * and the directory, error code otherwise
  */
-static int smack_inode_rmdir(struct inode *dir, struct dentry *dentry)
+static int smack_inode_rmdir(struct inode *dir, struct dentry *dentry,
+			     struct vfsmount *mnt)
 {
 	int rc;
 
@@ -484,8 +489,10 @@ static int smack_inode_rmdir(struct inode *dir, struct dentry *dentry)
  * smack_inode_rename - Smack check on rename
  * @old_inode: the old directory
  * @old_dentry: unused
+ * @old_mnt: unused
  * @new_inode: the new directory
  * @new_dentry: unused
+ * @new_mnt: unused
  *
  * Read and write access is required on both the old and
  * new directories.
@@ -494,8 +501,10 @@ static int smack_inode_rmdir(struct inode *dir, struct dentry *dentry)
  */
 static int smack_inode_rename(struct inode *old_inode,
 			      struct dentry *old_dentry,
+			      struct vfsmount *old_mnt,
 			      struct inode *new_inode,
-			      struct dentry *new_dentry)
+			      struct dentry *new_dentry,
+			      struct vfsmount *new_mnt)
 {
 	int rc;
 	char *isp;
@@ -540,7 +549,8 @@ static int smack_inode_permission(struct inode *inode, int mask,
  *
  * Returns 0 if access is permitted, an error code otherwise
  */
-static int smack_inode_setattr(struct dentry *dentry, struct iattr *iattr)
+static int smack_inode_setattr(struct dentry *dentry, struct vfsmount *mnt,
+			       struct iattr *iattr)
 {
 	/*
 	 * Need to allow for clearing the setuid bit.
@@ -566,17 +576,20 @@ static int smack_inode_getattr(struct vfsmount *mnt, struct dentry *dentry)
 /**
  * smack_inode_setxattr - Smack check for setting xattrs
  * @dentry: the object
+ * @mnt: unused
  * @name: name of the attribute
  * @value: unused
  * @size: unused
  * @flags: unused
+ * @file: unused
  *
  * This protects the Smack attribute explicitly.
  *
  * Returns 0 if access is permitted, an error code otherwise
  */
-static int smack_inode_setxattr(struct dentry *dentry, const char *name,
-				const void *value, size_t size, int flags)
+static int smack_inode_setxattr(struct dentry *dentry, struct vfsmount *mnt,
+				const char *name, const void *value,
+				size_t size, int flags, struct file *file)
 {
 	int rc = 0;
 
@@ -586,7 +599,8 @@ static int smack_inode_setxattr(struct dentry *dentry, const char *name,
 		if (!capable(CAP_MAC_ADMIN))
 			rc = -EPERM;
 	} else
-		rc = cap_inode_setxattr(dentry, name, value, size, flags);
+		rc = cap_inode_setxattr(dentry, mnt, name, value, size, flags,
+					file);
 
 	if (rc == 0)
 		rc = smk_curacc(smk_of_inode(dentry->d_inode), MAY_WRITE);
@@ -597,6 +611,7 @@ static int smack_inode_setxattr(struct dentry *dentry, const char *name,
 /**
  * smack_inode_post_setxattr - Apply the Smack update approved above
  * @dentry: object
+ * @mnt: unused
  * @name: attribute name
  * @value: attribute value
  * @size: attribute size
@@ -605,7 +620,8 @@ static int smack_inode_setxattr(struct dentry *dentry, const char *name,
  * Set the pointer in the inode blob to the entry found
  * in the master label list.
  */
-static void smack_inode_post_setxattr(struct dentry *dentry, const char *name,
+static void smack_inode_post_setxattr(struct dentry *dentry,
+				      struct vfsmount *mnt, const char *name,
 				      const void *value, size_t size, int flags)
 {
 	struct inode_smack *isp;
@@ -638,11 +654,14 @@ static void smack_inode_post_setxattr(struct dentry *dentry, const char *name,
 /*
  * smack_inode_getxattr - Smack check on getxattr
  * @dentry: the object
+ * @mnt: unused
  * @name: unused
+ * @file: unused
  *
  * Returns 0 if access is permitted, an error code otherwise
  */
-static int smack_inode_getxattr(struct dentry *dentry, const char *name)
+static int smack_inode_getxattr(struct dentry *dentry, struct vfsmount *mnt,
+				const char *name, struct file *file)
 {
 	return smk_curacc(smk_of_inode(dentry->d_inode), MAY_READ);
 }
@@ -650,13 +669,16 @@ static int smack_inode_getxattr(struct dentry *dentry, const char *name)
 /*
  * smack_inode_removexattr - Smack check on removexattr
  * @dentry: the object
+ * @mnt: unused
  * @name: name of the attribute
+ * @file: unused
  *
  * Removing the Smack attribute requires CAP_MAC_ADMIN
  *
  * Returns 0 if access is permitted, an error code otherwise
  */
-static int smack_inode_removexattr(struct dentry *dentry, const char *name)
+static int smack_inode_removexattr(struct dentry *dentry, struct vfsmount *mnt,
+				   const char *name, struct file *file)
 {
 	int rc = 0;
 
@@ -666,7 +688,7 @@ static int smack_inode_removexattr(struct dentry *dentry, const char *name)
 		if (!capable(CAP_MAC_ADMIN))
 			rc = -EPERM;
 	} else
-		rc = cap_inode_removexattr(dentry, name);
+		rc = cap_inode_removexattr(dentry, mnt, name, file);
 
 	if (rc == 0)
 		rc = smk_curacc(smk_of_inode(dentry->d_inode), MAY_WRITE);

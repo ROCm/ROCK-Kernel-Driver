@@ -444,14 +444,14 @@ static inline void security_free_mnt_opts(struct security_mnt_opts *opts)
  *	inode.
  * @inode_setxattr:
  *	Check permission before setting the extended attributes
- *	@value identified by @name for @dentry and @mnt.
+ * 	@value identified by @name for @dentry and @mnt.
  *	Return 0 if permission is granted.
  * @inode_post_setxattr:
  *	Update inode security field after successful setxattr operation.
- *	@value identified by @name for @dentry and @mnt.
+ * 	@value identified by @name for @dentry and @mnt.
  * @inode_getxattr:
  *	Check permission before obtaining the extended attributes
- *	identified by @name for @dentry and @mnt.
+ * 	identified by @name for @dentry and @mnt.
  *	Return 0 if permission is granted.
  * @inode_listxattr:
  *	Check permission before obtaining the list of extended attribute
@@ -1396,8 +1396,8 @@ struct security_operations {
 	int (*inode_getattr) (struct vfsmount *mnt, struct dentry *dentry);
 	void (*inode_delete) (struct inode *inode);
 	int (*inode_setxattr) (struct dentry *dentry, struct vfsmount *mnt,
-			       const char *name, const void *value,
-			       size_t size, int flags, struct file *file);
+			       const char *name, const void *value, size_t size,
+			       int flags, struct file *file);
 	void (*inode_post_setxattr) (struct dentry *dentry,
 				     struct vfsmount *mnt,
 				     const char *name, const void *value,
@@ -1681,8 +1681,8 @@ int security_inode_setattr(struct dentry *dentry, struct vfsmount *mnt,
 int security_inode_getattr(struct vfsmount *mnt, struct dentry *dentry);
 void security_inode_delete(struct inode *inode);
 int security_inode_setxattr(struct dentry *dentry, struct vfsmount *mnt,
-			    const char *name, const void *value, size_t size,
-			    int flags, struct file *file);
+			    const char *name, const void *value,
+			    size_t size, int flags, struct file *file);
 void security_inode_post_setxattr(struct dentry *dentry, struct vfsmount *mnt,
 				  const char *name, const void *value,
 				  size_t size, int flags);
@@ -2015,17 +2015,17 @@ static inline int security_inode_create(struct inode *dir,
 }
 
 static inline int security_inode_link(struct dentry *old_dentry,
-				       struct vfsmount *old_mnt,
-				       struct inode *dir,
-				       struct dentry *new_dentry,
-				       struct vfsmount *new_mnt)
+				      struct vfsmount *old_mnt,
+				      struct inode *dir,
+				      struct dentry *new_dentry,
+				      struct vfsmount *new_mnt)
 {
 	return 0;
 }
 
 static inline int security_inode_unlink(struct inode *dir,
-					 struct dentry *dentry,
-					 struct vfsmount *mnt)
+					struct dentry *dentry,
+					struct vfsmount *mnt)
 {
 	return 0;
 }
@@ -2047,8 +2047,8 @@ static inline int security_inode_mkdir(struct inode *dir,
 }
 
 static inline int security_inode_rmdir(struct inode *dir,
-					struct dentry *dentry,
-					struct vfsmount *mnt)
+				       struct dentry *dentry,
+				       struct vfsmount *mnt)
 {
 	return 0;
 }
@@ -2090,8 +2090,8 @@ static inline int security_inode_permission(struct inode *inode, int mask,
 }
 
 static inline int security_inode_setattr(struct dentry *dentry,
-					  struct vfsmount *mnt,
-					  struct iattr *attr)
+					 struct vfsmount *mnt,
+					 struct iattr *attr)
 {
 	return 0;
 }
@@ -2115,15 +2115,16 @@ static inline int security_inode_setxattr(struct dentry *dentry,
 }
 
 static inline void security_inode_post_setxattr(struct dentry *dentry,
-						 struct vfsmount *mnt,
-						 const char *name,
-						 const void *value, size_t size,
-						 int flags)
+						struct vfsmount *mnt,
+						const char *name,
+						const void *value,
+						size_t size, int flags)
 { }
 
 static inline int security_inode_getxattr(struct dentry *dentry,
-			struct vfsmount *mnt, const char *name,
-			struct file *file)
+					  struct vfsmount *mnt,
+					  const char *name,
+					  struct file *file)
 {
 	return 0;
 }
@@ -2136,8 +2137,9 @@ static inline int security_inode_listxattr(struct dentry *dentry,
 }
 
 static inline int security_inode_removexattr(struct dentry *dentry,
-			struct vfsmount *mnt, const char *name,
-			struct file *file)
+					     struct vfsmount *mnt,
+					     const char *name,
+					     struct file *file)
 {
 	return cap_inode_removexattr(dentry, mnt, name, file);
 }

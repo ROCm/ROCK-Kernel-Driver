@@ -502,8 +502,8 @@ void security_inode_delete(struct inode *inode)
 }
 
 int security_inode_setxattr(struct dentry *dentry, struct vfsmount *mnt,
-			    const char *name, const void *value,
-			    size_t size, int flags, struct file *file)
+			    const char *name, const void *value, size_t size,
+			    int flags, struct file *file)
 {
 	if (unlikely(IS_PRIVATE(dentry->d_inode)))
 		return 0;
@@ -518,7 +518,7 @@ void security_inode_post_setxattr(struct dentry *dentry, struct vfsmount *mnt,
 	if (unlikely(IS_PRIVATE(dentry->d_inode)))
 		return;
 	security_ops->inode_post_setxattr(dentry, mnt, name, value, size,
-					 flags);
+					  flags);
 }
 
 int security_inode_getxattr(struct dentry *dentry, struct vfsmount *mnt,

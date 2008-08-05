@@ -2355,7 +2355,7 @@ void __put_mnt_ns(struct mnt_namespace *ns)
 char *d_namespace_path(struct dentry *dentry, struct vfsmount *vfsmnt,
 		       char *buf, int buflen)
 {
-	struct path root, ns_root = { };
+	struct path root, tmp, ns_root = { };
 	struct path path = { .mnt = vfsmnt, .dentry = dentry };
 	char *res;
 
@@ -2369,7 +2369,8 @@ char *d_namespace_path(struct dentry *dentry, struct vfsmount *vfsmnt,
 	if (ns_root.mnt)
 		ns_root.dentry = dget(ns_root.mnt->mnt_root);
 	spin_unlock(&vfsmount_lock);
-	res = __d_path(&path, &ns_root, buf, buflen,
+	tmp = ns_root;
+	res = __d_path(&path, &tmp, buf, buflen,
 		       D_PATH_FAIL_DELETED | D_PATH_DISCONNECT);
 	path_put(&root);
 	path_put(&ns_root);

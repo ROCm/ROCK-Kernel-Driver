@@ -2547,7 +2547,7 @@ static int selinux_inode_mknod(struct inode *dir, struct dentry *dentry,
 static int selinux_inode_rename(struct inode *old_inode,
 				struct dentry *old_dentry,
 				struct vfsmount *old_mnt,
-                               struct inode *new_inode,
+                                struct inode *new_inode,
 				struct dentry *new_dentry,
 				struct vfsmount *new_mnt)
 {
@@ -2682,8 +2682,7 @@ static int selinux_inode_setxattr(struct dentry *dentry, struct vfsmount *mnt,
 }
 
 static void selinux_inode_post_setxattr(struct dentry *dentry,
-					struct vfsmount *mnt,
-					const char *name,
+					struct vfsmount *mnt, const char *name,
                                         const void *value, size_t size,
 					int flags)
 {
@@ -2709,20 +2708,20 @@ static void selinux_inode_post_setxattr(struct dentry *dentry,
 }
 
 static int selinux_inode_getxattr(struct dentry *dentry, struct vfsmount *mnt,
-				   const char *name, struct file *file)
+				  const char *name, struct file *file)
 {
 	return dentry_has_perm(current, NULL, dentry, FILE__GETATTR);
 }
 
 static int selinux_inode_listxattr(struct dentry *dentry, struct vfsmount *mnt,
-				    struct file *file)
+				   struct file *file)
 {
 	return dentry_has_perm(current, NULL, dentry, FILE__GETATTR);
 }
 
 static int selinux_inode_removexattr(struct dentry *dentry,
-				      struct vfsmount *mnt, const char *name,
-				      struct file *file)
+				     struct vfsmount *mnt, const char *name,
+				     struct file *file)
 {
 	if (strcmp(name, XATTR_NAME_SELINUX))
 		return selinux_inode_setotherxattr(dentry, name);

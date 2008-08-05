@@ -1983,7 +1983,7 @@ Elong:
 asmlinkage long sys_getcwd(char __user *buf, unsigned long size)
 {
 	int error, len;
-	struct path pwd, root;
+	struct path pwd, root, tmp;
 	char *page = (char *) __get_free_page(GFP_USER), *cwd;
 
 	if (!page)
@@ -1996,10 +1996,12 @@ asmlinkage long sys_getcwd(char __user *buf, unsigned long size)
 	path_get(&root);
 	read_unlock(&current->fs->lock);
 
-	cwd = __d_path(&pwd, &root, page, PAGE_SIZE, 0);
-	error = PTR_ERR(cwd);
-	if (IS_ERR(cwd))
-		goto out;
+	tmp = root;
+	cwd = __d_path(&pwd, &tmp, page, PAGE_SIZE, D_PATH_FAIL_DELETED);
+	if (IS_ERR(cwd)) {
+		error = PTR_ERR(cwd);
+ 		goto out;
+	}
 
 	error = -ERANGE;
 	len = PAGE_SIZE + page - cwd;

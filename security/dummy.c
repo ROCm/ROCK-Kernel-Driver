@@ -374,9 +374,9 @@ static void dummy_inode_delete (struct inode *ino)
 	return;
 }
 
-static int dummy_inode_setxattr(struct dentry *dentry, struct vfsmount *mnt,
-				const char *name, const void *value,
-				size_t size, int flags, struct file *file)
+static int dummy_inode_setxattr (struct dentry *dentry, struct vfsmount *mnt,
+				 const char *name, const void *value,
+				 size_t size, int flags, struct file *file)
 {
 	if (!strncmp(name, XATTR_SECURITY_PREFIX,
 		     sizeof(XATTR_SECURITY_PREFIX) - 1) &&
@@ -385,16 +385,15 @@ static int dummy_inode_setxattr(struct dentry *dentry, struct vfsmount *mnt,
 	return 0;
 }
 
-static void dummy_inode_post_setxattr(struct dentry *dentry,
+static void dummy_inode_post_setxattr (struct dentry *dentry,
 				       struct vfsmount *mnt, const char *name,
 				       const void *value, size_t size,
 				       int flags)
 {
 }
 
-static int dummy_inode_getxattr (struct dentry *dentry,
-			         struct vfsmount *mnt, const char *name,
-				 struct file *file)
+static int dummy_inode_getxattr (struct dentry *dentry, struct vfsmount *mnt,
+				 const char *name, struct file *file)
 {
 	return 0;
 }
