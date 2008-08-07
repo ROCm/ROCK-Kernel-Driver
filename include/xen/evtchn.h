@@ -129,11 +129,32 @@ static inline void notify_remote_via_evtchn(int port)
 	VOID(HYPERVISOR_event_channel_op(EVTCHNOP_send, &send));
 }
 
+/* Clear an irq's pending state, in preparation for polling on it. */
+void xen_clear_irq_pending(int irq);
+
+/* Poll waiting for an irq to become pending.  In the usual case, the
+   irq will be disabled so it won't deliver an interrupt. */
+void xen_poll_irq(int irq);
+
 /*
  * Use these to access the event channel underlying the IRQ handle returned
  * by bind_*_to_irqhandler().
  */
 void notify_remote_via_irq(int irq);
 int irq_to_evtchn_port(int irq);
+
+#define PIRQ_SET_MAPPING 0x0
+#define PIRQ_CLEAR_MAPPING 0x1
+#define PIRQ_GET_MAPPING 0x3
+int pirq_mapstatus(int pirq, int action);
+int set_pirq_hw_action(int pirq, int (*action)(int pirq, int action));
+int clear_pirq_hw_action(int pirq);
+
+#define PIRQ_STARTUP 1
+#define PIRQ_SHUTDOWN 2
+#define PIRQ_ENABLE 3
+#define PIRQ_DISABLE 4
+#define PIRQ_END 5
+#define PIRQ_ACK 6
 
 #endif /* __ASM_EVTCHN_H__ */

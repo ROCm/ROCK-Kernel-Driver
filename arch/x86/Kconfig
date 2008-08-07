@@ -258,6 +258,7 @@ config X86_XEN
 	bool "Xen-compatible"
 	depends on X86_32
 	select XEN
+	select X86_PAE
 	select X86_UP_APIC if !SMP && XEN_PRIVILEGED_GUEST
 	select X86_UP_IOAPIC if !SMP && XEN_PRIVILEGED_GUEST
 	select SWIOTLB
@@ -1562,7 +1563,7 @@ config PCI
 	bool "PCI support" if !X86_VISWS && !X86_VSMP
 	depends on !X86_VOYAGER
 	default y
-	select ARCH_SUPPORTS_MSI if (X86_LOCAL_APIC && X86_IO_APIC && !XEN)
+	select ARCH_SUPPORTS_MSI if (X86_LOCAL_APIC && X86_IO_APIC)
 	help
 	  Find out whether you have a PCI motherboard. PCI is the name of a
 	  bus system, i.e. the way the CPU talks to the other stuff inside
@@ -1657,6 +1658,7 @@ config XEN_PCIDEV_FE_DEBUG
 config DMAR
 	bool "Support for DMA Remapping Devices (EXPERIMENTAL)"
 	depends on X86_64 && PCI_MSI && ACPI && EXPERIMENTAL
+	depends on !XEN
 	help
 	  DMA remapping (DMAR) devices support enables independent address
 	  translations for Direct Memory Access (DMA) from devices.

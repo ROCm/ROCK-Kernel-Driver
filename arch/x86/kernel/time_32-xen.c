@@ -94,13 +94,21 @@ static void __clock_was_set(struct work_struct *unused)
 }
 static DECLARE_WORK(clock_was_set_work, __clock_was_set);
 
+/*
+ * GCC 4.3 can turn loops over an induction variable into division. We do
+ * not support arbitrary 64-bit division, and so must break the induction.
+ */
+#define clobber_induction_variable(v) asm ( "" : "+r" (v) )
+
 static inline void __normalize_time(time_t *sec, s64 *nsec)
 {
 	while (*nsec >= NSEC_PER_SEC) {
+		clobber_induction_variable(*nsec);
 		(*nsec) -= NSEC_PER_SEC;
 		(*sec)++;
 	}
 	while (*nsec < 0) {
+		clobber_induction_variable(*nsec);
 		(*nsec) += NSEC_PER_SEC;
 		(*sec)--;
 	}
@@ -803,7 +811,7 @@ static void stop_hz_timer(void)
 		j = jiffies + 1;
 	}
 
-	singleshot.timeout_abs_ns = jiffies_to_st(j);
+	singleshot.timeout_abs_ns = jiffies_to_st(j) + NS_PER_TICK/2;
 	singleshot.flags = 0;
 	rc = HYPERVISOR_vcpu_op(VCPUOP_set_singleshot_timer, cpu, &singleshot);
 #if CONFIG_XEN_COMPAT <= 0x030004

@@ -148,7 +148,7 @@ static void unplug_queue(blkif_t *blkif)
 		return;
 	if (blkif->plug->unplug_fn)
 		blkif->plug->unplug_fn(blkif->plug);
-	kobject_get(&blkif->plug->kobj);
+	kobject_put(&blkif->plug->kobj);
 	blkif->plug = NULL;
 }
 
@@ -342,6 +342,9 @@ static int do_block_io_op(blkif_t *blkif)
 			BUG();
 		}
 		blk_rings->common.req_cons = ++rc; /* before make_response() */
+
+		/* Apply all sanity checks to /private copy/ of request. */
+		barrier();
 
 		switch (req.operation) {
 		case BLKIF_OP_READ:

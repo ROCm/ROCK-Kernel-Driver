@@ -2515,7 +2515,7 @@ void destroy_irq(unsigned int irq)
 /*
  * MSI message composition
  */
-#ifdef CONFIG_PCI_MSI
+#if defined(CONFIG_PCI_MSI) && !defined(CONFIG_XEN)
 static int msi_compose_msg(struct pci_dev *pdev, unsigned int irq, struct msi_msg *msg)
 {
 	int vector;

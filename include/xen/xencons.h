@@ -5,7 +5,7 @@
 struct dom0_vga_console_info;
 void dom0_init_screen_info(const struct dom0_vga_console_info *, size_t);
 #else
-#define dom0_init_screen_info(info) ((void)(info))
+#define dom0_init_screen_info(info, size) ((void)(info), (void)(size))
 #endif
 
 #ifdef CONFIG_XEN_CONSOLE

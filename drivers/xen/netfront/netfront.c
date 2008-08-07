@@ -478,7 +478,7 @@ static int setup_device(struct xenbus_device *dev, struct netfront_info *info)
 	info->tx.sring = NULL;
 	info->irq = 0;
 
-	txs = (struct netif_tx_sring *)get_zeroed_page(GFP_KERNEL|__GFP_HIGH);
+	txs = (struct netif_tx_sring *)get_zeroed_page(GFP_NOIO | __GFP_HIGH);
 	if (!txs) {
 		err = -ENOMEM;
 		xenbus_dev_fatal(dev, err, "allocating tx ring page");
@@ -494,7 +494,7 @@ static int setup_device(struct xenbus_device *dev, struct netfront_info *info)
 	}
 	info->tx_ring_ref = err;
 
-	rxs = (struct netif_rx_sring *)get_zeroed_page(GFP_KERNEL|__GFP_HIGH);
+	rxs = (struct netif_rx_sring *)get_zeroed_page(GFP_NOIO | __GFP_HIGH);
 	if (!rxs) {
 		err = -ENOMEM;
 		xenbus_dev_fatal(dev, err, "allocating rx ring page");
@@ -1662,7 +1662,6 @@ static void netif_release_rx_bufs_copy(struct netfront_info *np)
 		np->grant_rx_ref[i] = GRANT_INVALID_REF;
 		add_id_to_freelist(np->rx_skbs, i);
 
-		skb_shinfo(skb)->nr_frags = 0;
 		dev_kfree_skb(skb);
 	}
 

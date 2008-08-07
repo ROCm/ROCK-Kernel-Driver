@@ -277,6 +277,122 @@ struct pci_ops pcifront_bus_ops = {
 	.write = pcifront_bus_write,
 };
 
+#ifdef CONFIG_PCI_MSI
+int pci_frontend_enable_msix(struct pci_dev *dev,
+		struct msix_entry *entries,
+		int nvec)
+{
+	int err;
+	int i;
+	struct xen_pci_op op = {
+		.cmd    = XEN_PCI_OP_enable_msix,
+		.domain = pci_domain_nr(dev->bus),
+		.bus = dev->bus->number,
+		.devfn = dev->devfn,
+		.value = nvec,
+	};
+	struct pcifront_sd *sd = dev->bus->sysdata;
+	struct pcifront_device *pdev = pcifront_get_pdev(sd);
+
+	if (nvec > SH_INFO_MAX_VEC) {
+		printk("too much vector for pci frontend%x\n", nvec);
+		return -EINVAL;
+	}
+
+	for (i = 0; i < nvec; i++) {
+		op.msix_entries[i].entry = entries[i].entry;
+		op.msix_entries[i].vector = entries[i].vector;
+	}
+
+	err = do_pci_op(pdev, &op);
+
+	if (!err) {
+		if (!op.value) {
+			/* we get the result */
+			for ( i = 0; i < nvec; i++)
+				entries[i].vector = op.msix_entries[i].vector;
+			return 0;
+		}
+		else {
+            printk("enable msix get value %x\n", op.value);
+			return op.value;
+		}
+	}
+	else {
+        printk("enable msix get err %x\n", err);
+		return err;
+	}
+}
+
+void pci_frontend_disable_msix(struct pci_dev* dev)
+{
+	int err;
+	struct xen_pci_op op = {
+		.cmd    = XEN_PCI_OP_disable_msix,
+		.domain = pci_domain_nr(dev->bus),
+		.bus = dev->bus->number,
+		.devfn = dev->devfn,
+	};
+	struct pcifront_sd *sd = dev->bus->sysdata;
+	struct pcifront_device *pdev = pcifront_get_pdev(sd);
+
+	err = do_pci_op(pdev, &op);
+
+	/* What should do for error ? */
+	if (err)
+		printk("pci_disable_msix get err %x\n", err);
+}
+
+int pci_frontend_enable_msi(struct pci_dev *dev)
+{
+	int err;
+	struct xen_pci_op op = {
+		.cmd    = XEN_PCI_OP_enable_msi,
+		.domain = pci_domain_nr(dev->bus),
+		.bus = dev->bus->number,
+		.devfn = dev->devfn,
+	};
+	struct pcifront_sd *sd = dev->bus->sysdata;
+	struct pcifront_device *pdev = pcifront_get_pdev(sd);
+
+	err = do_pci_op(pdev, &op);
+	if (likely(!err)) {
+		dev->irq = op.value;
+	}
+	else {
+		printk("pci frontend enable msi failed for dev %x:%x \n",
+				op.bus, op.devfn);
+		err = -EINVAL;
+	}
+	return err;
+}
+
+void pci_frontend_disable_msi(struct pci_dev* dev)
+{
+	int err;
+	struct xen_pci_op op = {
+		.cmd    = XEN_PCI_OP_disable_msi,
+		.domain = pci_domain_nr(dev->bus),
+		.bus = dev->bus->number,
+		.devfn = dev->devfn,
+	};
+	struct pcifront_sd *sd = dev->bus->sysdata;
+	struct pcifront_device *pdev = pcifront_get_pdev(sd);
+
+	err = do_pci_op(pdev, &op);
+	if (err == XEN_PCI_ERR_dev_not_found) {
+		/* XXX No response from backend, what shall we do? */
+		printk("get no response from backend for disable MSI\n");
+		return;
+	}
+	if (likely(!err))
+		dev->irq = op.value;
+	else
+		/* how can pciback notify us fail? */
+		printk("get fake response frombackend \n");
+}
+#endif /* CONFIG_PCI_MSI */
+
 /* Claim resources for the PCI frontend as-is, backend won't allow changes */
 static void pcifront_claim_resource(struct pci_dev *dev, void *data)
 {

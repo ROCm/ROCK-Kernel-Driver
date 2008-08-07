@@ -43,6 +43,11 @@
 #define BLKIF_MAJOR(dev) ((dev)>>8)
 #define BLKIF_MINOR(dev) ((dev) & 0xff)
 
+#define EXT_SHIFT 28
+#define EXTENDED (1<<EXT_SHIFT)
+#define VDEV_IS_EXTENDED(dev) ((dev)&(EXTENDED))
+#define BLKIF_MINOR_EXT(dev) ((dev)&(~EXTENDED))
+
 /*
  * For convenience we distinguish between ide, scsi and 'other' (i.e.,
  * potentially combinations of the two) in the naming scheme and in a few other
@@ -51,7 +56,7 @@
 
 #define NUM_IDE_MAJORS 10
 #define NUM_SCSI_MAJORS 17
-#define NUM_VBD_MAJORS 1
+#define NUM_VBD_MAJORS 2
 
 static struct xlbd_type_info xlbd_ide_type = {
 	.partn_shift = 6,
@@ -74,6 +79,13 @@ static struct xlbd_type_info xlbd_vbd_type = {
 	.diskname = "xvd",
 };
 
+static struct xlbd_type_info xlbd_vbd_type_ext = {
+	.partn_shift = 8,
+	.disks_per_major = 256,
+	.devname = "xvd",
+	.diskname = "xvd",
+};
+
 static struct xlbd_major_info *major_info[NUM_IDE_MAJORS + NUM_SCSI_MAJORS +
 					 NUM_VBD_MAJORS];
 
@@ -84,10 +96,6 @@ static struct xlbd_major_info *major_info[NUM_IDE_MAJORS + NUM_SCSI_MAJORS +
 #define XLBD_MAJOR_IDE_RANGE	XLBD_MAJOR_IDE_START ... XLBD_MAJOR_SCSI_START - 1
 #define XLBD_MAJOR_SCSI_RANGE	XLBD_MAJOR_SCSI_START ... XLBD_MAJOR_VBD_START - 1
 #define XLBD_MAJOR_VBD_RANGE	XLBD_MAJOR_VBD_START ... XLBD_MAJOR_VBD_START + NUM_VBD_MAJORS - 1
-
-/* Information about our VBDs. */
-#define MAX_VBDS 64
-static LIST_HEAD(vbds_list);
 
 static struct block_device_operations xlvbd_block_fops =
 {
@@ -106,12 +114,14 @@ static struct xlbd_major_info *
 xlbd_alloc_major_info(int major, int minor, int index)
 {
 	struct xlbd_major_info *ptr;
+	int do_register;
 
 	ptr = kzalloc(sizeof(struct xlbd_major_info), GFP_KERNEL);
 	if (ptr == NULL)
 		return NULL;
 
 	ptr->major = major;
+	do_register = 1;
 
 	switch (index) {
 	case XLBD_MAJOR_IDE_RANGE:
@@ -123,29 +133,39 @@ xlbd_alloc_major_info(int major, int minor, int index)
 		ptr->index = index - XLBD_MAJOR_SCSI_START;
 		break;
 	case XLBD_MAJOR_VBD_RANGE:
-		ptr->type = &xlbd_vbd_type;
-		ptr->index = index - XLBD_MAJOR_VBD_START;
+		ptr->index = 0;
+		if ((index - XLBD_MAJOR_VBD_START) == 0)
+			ptr->type = &xlbd_vbd_type;
+		else
+			ptr->type = &xlbd_vbd_type_ext;
+
+		/* 
+		 * if someone already registered block major 202,
+		 * don't try to register it again
+		 */
+		if (major_info[XLBD_MAJOR_VBD_START] != NULL)
+			do_register = 0;
 		break;
 	}
 
-	if (register_blkdev(ptr->major, ptr->type->devname)) {
-		kfree(ptr);
-		return NULL;
+	if (do_register) {
+		if (register_blkdev(ptr->major, ptr->type->devname)) {
+			kfree(ptr);
+			return NULL;
+		}
+
+		printk("xen-vbd: registered block device major %i\n", ptr->major);
 	}
 
-	printk("xen-vbd: registered block device major %i\n", ptr->major);
 	major_info[index] = ptr;
 	return ptr;
 }
 
 static struct xlbd_major_info *
-xlbd_get_major_info(int vdevice)
+xlbd_get_major_info(int major, int minor, int vdevice)
 {
 	struct xlbd_major_info *mi;
-	int major, minor, index;
-
-	major = BLKIF_MAJOR(vdevice);
-	minor = BLKIF_MINOR(vdevice);
+	int index;
 
 	switch (major) {
 	case IDE0_MAJOR: index = 0; break;
@@ -166,7 +186,12 @@ xlbd_get_major_info(int vdevice)
                 index = 18 + major - SCSI_DISK8_MAJOR;
                 break;
         case SCSI_CDROM_MAJOR: index = 26; break;
-        default: index = 27; break;
+        default:
+		if (!VDEV_IS_EXTENDED(vdevice))
+			index = 27;
+		else
+			index = 28;
+		break;
 	}
 
 	mi = ((major_info[index] != NULL) ? major_info[index] :
@@ -225,18 +250,33 @@ int
 xlvbd_add(blkif_sector_t capacity, int vdevice, u16 vdisk_info,
 	  u16 sector_size, struct blkfront_info *info)
 {
-	int minor = BLKIF_MINOR(vdevice);
+	int major, minor;
 	struct gendisk *gd;
 	struct xlbd_major_info *mi;
 	int nr_minors = 1;
 	int err = -ENODEV;
 	unsigned int offset;
 
+	if ((vdevice>>EXT_SHIFT) > 1) {
+		/* this is above the extended range; something is wrong */
+		printk(KERN_WARNING "blkfront: vdevice 0x%x is above the extended range; ignoring\n", vdevice);
+		return -ENODEV;
+	}
+
+	if (!VDEV_IS_EXTENDED(vdevice)) {
+		major = BLKIF_MAJOR(vdevice);
+		minor = BLKIF_MINOR(vdevice);
+	}
+	else {
+		major = 202;
+		minor = BLKIF_MINOR_EXT(vdevice);
+	}
+
 	BUG_ON(info->gd != NULL);
 	BUG_ON(info->mi != NULL);
 	BUG_ON(info->rq != NULL);
 
-	mi = xlbd_get_major_info(vdevice);
+	mi = xlbd_get_major_info(major, minor, vdevice);
 	if (mi == NULL)
 		goto out;
 	info->mi = mi;
@@ -353,3 +393,48 @@ xlvbd_barrier(struct blkfront_info *info)
 	return -ENOSYS;
 }
 #endif
+
+#ifdef CONFIG_SYSFS
+static ssize_t show_media(struct device *dev,
+		                  struct device_attribute *attr, char *buf)
+{
+	struct xenbus_device *xendev = to_xenbus_device(dev);
+	struct blkfront_info *info = xendev->dev.driver_data;
+
+	if (info->gd->flags & GENHD_FL_CD)
+		return sprintf(buf, "cdrom\n");
+	return sprintf(buf, "disk\n");
+}
+
+static struct device_attribute xlvbd_attrs[] = {
+	__ATTR(media, S_IRUGO, show_media, NULL),
+};
+
+int xlvbd_sysfs_addif(struct blkfront_info *info)
+{
+	int i;
+	int error = 0;
+
+	for (i = 0; i < ARRAY_SIZE(xlvbd_attrs); i++) {
+		error = device_create_file(info->gd->driverfs_dev,
+				&xlvbd_attrs[i]);
+		if (error)
+			goto fail;
+	}
+	return 0;
+
+fail:
+	while (--i >= 0)
+		device_remove_file(info->gd->driverfs_dev, &xlvbd_attrs[i]);
+	return error;
+}
+
+void xlvbd_sysfs_delif(struct blkfront_info *info)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(xlvbd_attrs); i++)
+		device_remove_file(info->gd->driverfs_dev, &xlvbd_attrs[i]);
+}
+
+#endif /* CONFIG_SYSFS */

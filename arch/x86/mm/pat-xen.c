@@ -477,7 +477,7 @@ int free_memtype(u64 start, u64 end)
  * - Else use UC_MINUS memtype (for backward compatibility with existing
  *   X drivers.
  */
-pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
+pgprot_t phys_mem_access_prot(struct file *file, unsigned long mfn,
 				unsigned long size, pgprot_t vma_prot)
 {
 	return vma_prot;
@@ -485,39 +485,39 @@ pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
 
 #ifdef CONFIG_NONPROMISC_DEVMEM
 /* This check is done in drivers/char/mem.c in case of NONPROMISC_DEVMEM*/
-static inline int range_is_allowed(unsigned long pfn, unsigned long size)
+static inline int range_is_allowed(unsigned long mfn, unsigned long size)
 {
 	return 1;
 }
 #else
-static inline int range_is_allowed(unsigned long pfn, unsigned long size)
+static inline int range_is_allowed(unsigned long mfn, unsigned long size)
 {
-	u64 from = ((u64)pfn) << PAGE_SHIFT;
+	u64 from = ((u64)mfn) << PAGE_SHIFT;
 	u64 to = from + size;
 	u64 cursor = from;
 
 	while (cursor < to) {
-		if (!devmem_is_allowed(pfn)) {
+		if (!devmem_is_allowed(mfn)) {
 			printk(KERN_INFO
 		"Program %s tried to access /dev/mem between %Lx->%Lx.\n",
 				current->comm, from, to);
 			return 0;
 		}
 		cursor += PAGE_SIZE;
-		pfn++;
+		mfn++;
 	}
 	return 1;
 }
 #endif /* CONFIG_NONPROMISC_DEVMEM */
 
-int phys_mem_access_prot_allowed(struct file *file, unsigned long pfn,
+int phys_mem_access_prot_allowed(struct file *file, unsigned long mfn,
 				unsigned long size, pgprot_t *vma_prot)
 {
-	u64 offset = ((u64) pfn) << PAGE_SHIFT;
-	unsigned long flags = _PAGE_CACHE_UC_MINUS;
+	u64 addr = (u64)mfn << PAGE_SHIFT;
+	unsigned long sz, flags = _PAGE_CACHE_UC_MINUS;
 	int retval;
 
-	if (!range_is_allowed(pfn, size))
+	if (!range_is_allowed(mfn, size))
 		return 0;
 
 	if (file->f_flags & O_SYNC) {
@@ -553,23 +553,28 @@ int phys_mem_access_prot_allowed(struct file *file, unsigned long pfn,
 	 * - Inherit from confliting mappings otherwise
 	 */
 	if (flags != _PAGE_CACHE_UC_MINUS) {
-		retval = reserve_memtype(offset, offset + size, flags, NULL);
+		retval = reserve_memtype(addr, addr + size, flags, NULL);
 	} else {
-		retval = reserve_memtype(offset, offset + size, -1, &flags);
+		retval = reserve_memtype(addr, addr + size, -1, &flags);
 	}
 
 	if (retval < 0)
 		return 0;
 
-	if (pfn <= max_pfn_mapped &&
-            ioremap_change_attr((unsigned long)__va(offset), size, flags) < 0) {
-		free_memtype(offset, offset + size);
-		printk(KERN_INFO
-		"%s:%d /dev/mem ioremap_change_attr failed %s for %Lx-%Lx\n",
-			current->comm, current->pid,
-			cattr_name(flags),
-			offset, (unsigned long long)(offset + size));
-		return 0;
+	for (sz = 0; sz < size; ++mfn, sz += PAGE_SIZE) {
+		unsigned long pfn = mfn_to_local_pfn(mfn);
+
+		if (pfn <= max_pfn_mapped &&
+		    ioremap_change_attr((unsigned long)__va(pfn << PAGE_SHIFT),
+					PAGE_SIZE, flags) < 0) {
+			free_memtype(addr, addr + size);
+			printk(KERN_INFO
+			"%s:%d /dev/mem ioremap_change_attr failed %s for %Lx-%Lx\n",
+				current->comm, current->pid,
+				cattr_name(flags),
+				addr, addr + size);
+			return 0;
+		}
 	}
 
 	*vma_prot = __pgprot((pgprot_val(*vma_prot) & ~_PAGE_CACHE_MASK) |
@@ -577,9 +582,9 @@ int phys_mem_access_prot_allowed(struct file *file, unsigned long pfn,
 	return 1;
 }
 
-void map_devmem(unsigned long pfn, unsigned long size, pgprot_t vma_prot)
+void map_devmem(unsigned long mfn, unsigned long size, pgprot_t vma_prot)
 {
-	u64 addr = (u64)pfn << PAGE_SHIFT;
+	u64 addr = (u64)mfn << PAGE_SHIFT;
 	unsigned long flags;
 	unsigned long want_flags = (pgprot_val(vma_prot) & _PAGE_CACHE_MASK);
 
@@ -594,9 +599,9 @@ void map_devmem(unsigned long pfn, unsigned long size, pgprot_t vma_prot)
 	}
 }
 
-void unmap_devmem(unsigned long pfn, unsigned long size, pgprot_t vma_prot)
+void unmap_devmem(unsigned long mfn, unsigned long size, pgprot_t vma_prot)
 {
-	u64 addr = (u64)pfn << PAGE_SHIFT;
+	u64 addr = (u64)mfn << PAGE_SHIFT;
 
 	free_memtype(addr, addr + size);
 }

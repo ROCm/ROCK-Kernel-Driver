@@ -84,6 +84,7 @@ void evtchn_device_upcall(int port)
 	if ((u = port_user[port]) != NULL) {
 		if ((u->ring_prod - u->ring_cons) < EVTCHN_RING_SIZE) {
 			u->ring[EVTCHN_RING_MASK(u->ring_prod)] = port;
+			wmb(); /* Ensure ring contents visible */
 			if (u->ring_cons == u->ring_prod++) {
 				wake_up_interruptible(&u->evtchn_wait);
 				kill_fasync(&u->evtchn_async_queue,
@@ -180,6 +181,7 @@ static ssize_t evtchn_read(struct file *file, char __user *buf,
 	}
 
 	rc = -EFAULT;
+	rmb(); /* Ensure that we see the port before we copy it. */
 	if (copy_to_user(buf, &u->ring[EVTCHN_RING_MASK(c)], bytes1) ||
 	    ((bytes2 != 0) &&
 	     copy_to_user(&buf[bytes1], &u->ring[0], bytes2)))

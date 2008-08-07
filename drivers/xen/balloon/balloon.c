@@ -227,7 +227,9 @@ static unsigned long minimum_target(void)
 
 	/* Don't enforce growth */
 	return min(min_pages, curr_pages);
+#ifndef CONFIG_XEN
 #undef max_pfn
+#endif
 }
 
 static int increase_reservation(unsigned long nr_pages)

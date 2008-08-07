@@ -15,6 +15,7 @@
 #include <xen/features.h>
 #include <xen/hypervisor_sysfs.h>
 #include <xen/xenbus.h>
+#include <xen/interface/kexec.h>
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Mike D. Day <ncmike@us.ibm.com>");
@@ -329,6 +330,34 @@ static void xen_properties_destroy(void)
 	sysfs_remove_group(hypervisor_kobj, &xen_properties_group);
 }
 
+#ifdef CONFIG_KEXEC
+
+static ssize_t vmcoreinfo_show(struct hyp_sysfs_attr *attr, char *page)
+{
+	return sprintf(page, "%lx %zx\n",
+		paddr_vmcoreinfo_xen, vmcoreinfo_size_xen);
+}
+
+HYPERVISOR_ATTR_RO(vmcoreinfo);
+
+static int __init xen_sysfs_vmcoreinfo_init(void)
+{
+	return sysfs_create_file(&hypervisor_subsys.kobj,
+				 &vmcoreinfo_attr.attr);
+}
+
+static void xen_sysfs_vmcoreinfo_destroy(void)
+{
+	sysfs_remove_file(&hypervisor_subsys.kobj, &vmcoreinfo_attr.attr);
+}
+
+#else
+
+#define xen_sysfs_vmcoreinfo_init()	0
+#define xen_sysfs_vmcoreinfo_destroy()	((void)0)
+
+#endif
+
 static int __init hyper_sysfs_init(void)
 {
 	int ret;
@@ -349,9 +378,14 @@ static int __init hyper_sysfs_init(void)
 	if (ret)
 		goto uuid_out;
 	ret = xen_properties_init();
+	if (ret)
+		goto prop_out;
+	ret = xen_sysfs_vmcoreinfo_init();
 	if (!ret)
 		goto out;
 
+	xen_properties_destroy();
+prop_out:
 	xen_sysfs_uuid_destroy();
 uuid_out:
 	xen_compilation_destroy();
@@ -365,6 +399,7 @@ out:
 
 static void __exit hyper_sysfs_exit(void)
 {
+	xen_sysfs_vmcoreinfo_destroy();
 	xen_properties_destroy();
 	xen_compilation_destroy();
 	xen_sysfs_uuid_destroy();

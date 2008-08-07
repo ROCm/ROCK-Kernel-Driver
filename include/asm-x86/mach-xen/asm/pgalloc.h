@@ -26,7 +26,6 @@ pmd_t *early_get_pmd(unsigned long va);
 /*
  * Allocate and free page tables.
  */
-extern void pgd_test_and_unpin(pgd_t *);
 extern pgd_t *pgd_alloc(struct mm_struct *);
 extern void pgd_free(struct mm_struct *mm, pgd_t *pgd);
 

@@ -93,5 +93,19 @@ void pciback_do_op(struct work_struct *work);
 int pciback_xenbus_register(void);
 void pciback_xenbus_unregister(void);
 
+#ifdef CONFIG_PCI_MSI
+int pciback_enable_msi(struct pciback_device *pdev,
+                       struct pci_dev *dev, struct xen_pci_op *op);
+
+int pciback_disable_msi(struct pciback_device *pdev,
+                         struct pci_dev *dev, struct xen_pci_op *op);
+
+
+int pciback_enable_msix(struct pciback_device *pdev,
+                        struct pci_dev *dev, struct xen_pci_op *op);
+
+int pciback_disable_msix(struct pciback_device *pdev,
+                        struct pci_dev *dev, struct xen_pci_op *op);
+#endif
 extern int verbose_request;
 #endif

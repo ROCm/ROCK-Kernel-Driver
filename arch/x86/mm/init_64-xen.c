@@ -227,6 +227,7 @@ set_pte_phys(unsigned long vaddr, unsigned long phys, pgprot_t prot, int user_mo
 	if (pgd_none(*pgd)) {
 		printk(KERN_ERR
 			"PGD FIXMAP MISSING, it should be setup in head.S!\n");
+		return;
 	}
 	pud = (user_mode ? pud_offset_u(vaddr) : pud_offset(pgd, vaddr));
 	if (pud_none(*pud)) {
@@ -281,6 +282,7 @@ set_pte_phys_ma(unsigned long vaddr, unsigned long phys, pgprot_t prot)
 	if (pgd_none(*pgd)) {
 		printk(KERN_ERR
 			"PGD FIXMAP MISSING, it should be setup in head.S!\n");
+		return;
 	}
 	pud = pud_offset(pgd, vaddr);
 	if (pud_none(*pud)) {
@@ -306,9 +308,11 @@ set_pte_phys_ma(unsigned long vaddr, unsigned long phys, pgprot_t prot)
 
 	pte = pte_offset_kernel(pmd, vaddr);
 	if (!pte_none(*pte) && __pte_val(new_pte) &&
+#ifdef CONFIG_ACPI
 	    /* __acpi_map_table() fails to properly call clear_fixmap() */
 	    (vaddr < __fix_to_virt(FIX_ACPI_END) ||
 	     vaddr > __fix_to_virt(FIX_ACPI_BEGIN)) &&
+#endif
 	    __pte_val(*pte) != (__pte_val(new_pte) & __supported_pte_mask))
 		pte_ERROR(*pte);
 	set_pte(pte, new_pte);

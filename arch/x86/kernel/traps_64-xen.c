@@ -665,7 +665,7 @@ void die(const char * str, struct pt_regs * regs, long err)
 	oops_end(flags, regs, SIGSEGV);
 }
 
-#ifdef CONFIG_X86_LOCAL_APIC
+#ifdef CONFIG_SYSCTL
 notrace __kprobes void
 die_nmi(char *str, struct pt_regs *regs, int do_panic)
 {

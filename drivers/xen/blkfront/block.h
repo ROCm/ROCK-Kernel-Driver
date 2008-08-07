@@ -139,4 +139,19 @@ int xlvbd_add(blkif_sector_t capacity, int device,
 void xlvbd_del(struct blkfront_info *info);
 int xlvbd_barrier(struct blkfront_info *info);
 
+#ifdef CONFIG_SYSFS
+int xlvbd_sysfs_addif(struct blkfront_info *info);
+void xlvbd_sysfs_delif(struct blkfront_info *info);
+#else
+static inline int xlvbd_sysfs_addif(struct blkfront_info *info)
+{
+	return 0;
+}
+
+static inline void xlvbd_sysfs_delif(struct blkfront_info *info)
+{
+	;
+}
+#endif
+
 #endif /* __XEN_DRIVERS_BLOCK_H__ */

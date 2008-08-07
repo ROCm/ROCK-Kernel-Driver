@@ -42,21 +42,34 @@ static struct pciback_device *alloc_pdev(struct xenbus_device *xdev)
 	return pdev;
 }
 
-static void free_pdev(struct pciback_device *pdev)
+static void pciback_disconnect(struct pciback_device *pdev)
 {
-	if (pdev->be_watching)
-		unregister_xenbus_watch(&pdev->be_watch);
+	spin_lock(&pdev->dev_lock);
 
 	/* Ensure the guest can't trigger our handler before removing devices */
-	if (pdev->evtchn_irq != INVALID_EVTCHN_IRQ)
+	if (pdev->evtchn_irq != INVALID_EVTCHN_IRQ) {
 		unbind_from_irqhandler(pdev->evtchn_irq, pdev);
+		pdev->evtchn_irq = INVALID_EVTCHN_IRQ;
+	}
 
 	/* If the driver domain started an op, make sure we complete it or
 	 * delete it before releasing the shared memory */
 	flush_scheduled_work();
 
-	if (pdev->sh_info)
+	if (pdev->sh_info != NULL) {
 		xenbus_unmap_ring_vfree(pdev->xdev, pdev->sh_area);
+		pdev->sh_info = NULL;
+	}
+
+	spin_unlock(&pdev->dev_lock);
+}
+
+static void free_pdev(struct pciback_device *pdev)
+{
+	if (pdev->be_watching)
+		unregister_xenbus_watch(&pdev->be_watch);
+
+	pciback_disconnect(pdev);
 
 	pciback_release_devices(pdev);
 
@@ -470,16 +483,6 @@ static void pciback_frontend_changed(struct xenbus_device *xdev,
 		pciback_attach(pdev);
 		break;
 
-	case XenbusStateClosing:
-		xenbus_switch_state(xdev, XenbusStateClosed);
-		break;
-
-	case XenbusStateUnknown:
-	case XenbusStateClosed:
-		dev_dbg(&xdev->dev, "frontend is gone! unregister device\n");
-		device_unregister(&xdev->dev);
-		break;
-
 	case XenbusStateReconfiguring:
 		pciback_reconfigure(pdev);
 		break;
@@ -489,6 +492,22 @@ static void pciback_frontend_changed(struct xenbus_device *xdev,
 		 * Then switch to connected state.
 		 */
 		xenbus_switch_state(xdev, XenbusStateConnected);
+		break;
+
+	case XenbusStateClosing:
+		pciback_disconnect(pdev);
+		xenbus_switch_state(xdev, XenbusStateClosing);
+		break;
+
+	case XenbusStateClosed:
+		pciback_disconnect(pdev);
+		xenbus_switch_state(xdev, XenbusStateClosed);
+		if (xenbus_dev_is_online(xdev))
+			break;
+		/* fall through if not online */
+	case XenbusStateUnknown:
+		dev_dbg(&xdev->dev, "frontend is gone! unregister device\n");
+		device_unregister(&xdev->dev);
 		break;
 
 	default:

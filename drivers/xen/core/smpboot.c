@@ -57,12 +57,10 @@ static DEFINE_PER_CPU(int, callfunc_irq);
 static char resched_name[NR_CPUS][15];
 static char callfunc_name[NR_CPUS][15];
 
-#ifdef CONFIG_X86_32
-u8 cpu_2_logical_apicid[NR_CPUS] = { [0 ... NR_CPUS-1] = BAD_APICID };
-#define set_cpu_to_apicid(cpu, apicid) \
-	(per_cpu(x86_cpu_to_apicid, cpu) = cpu_2_logical_apicid[cpu] = (apicid))
-#else
+#ifdef CONFIG_X86_LOCAL_APIC
 #define set_cpu_to_apicid(cpu, apicid) (per_cpu(x86_cpu_to_apicid, cpu) = (apicid))
+#else
+#define set_cpu_to_apicid(cpu, apicid)
 #endif
 
 DEFINE_PER_CPU(cpumask_t, cpu_sibling_map);
@@ -140,6 +138,10 @@ static int __cpuinit xen_smp_intr_init(unsigned int cpu)
 		goto fail;
 	per_cpu(callfunc_irq, cpu) = rc;
 
+	rc = xen_spinlock_init(cpu);
+	if (rc < 0)
+		goto fail;
+
 	if ((cpu != 0) && ((rc = local_setup_timer(cpu)) != 0))
 		goto fail;
 
@@ -150,6 +152,7 @@ static int __cpuinit xen_smp_intr_init(unsigned int cpu)
 		unbind_from_irqhandler(per_cpu(resched_irq, cpu), NULL);
 	if (per_cpu(callfunc_irq, cpu) >= 0)
 		unbind_from_irqhandler(per_cpu(callfunc_irq, cpu), NULL);
+	xen_spinlock_cleanup(cpu);
 	return rc;
 }
 
@@ -161,6 +164,7 @@ static void __cpuexit xen_smp_intr_exit(unsigned int cpu)
 
 	unbind_from_irqhandler(per_cpu(resched_irq, cpu), NULL);
 	unbind_from_irqhandler(per_cpu(callfunc_irq, cpu), NULL);
+	xen_spinlock_cleanup(cpu);
 }
 #endif
 

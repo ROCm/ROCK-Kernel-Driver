@@ -291,9 +291,9 @@ static char *join(const char *dir, const char *name)
 	char *buffer;
 
 	if (strlen(name) == 0)
-		buffer = kasprintf(GFP_KERNEL|__GFP_HIGH, "%s", dir);
+		buffer = kasprintf(GFP_NOIO | __GFP_HIGH, "%s", dir);
 	else
-		buffer = kasprintf(GFP_KERNEL|__GFP_HIGH, "%s/%s", dir, name);
+		buffer = kasprintf(GFP_NOIO | __GFP_HIGH, "%s/%s", dir, name);
 	return (!buffer) ? ERR_PTR(-ENOMEM) : buffer;
 }
 
@@ -302,10 +302,10 @@ static char **split(char *strings, unsigned int len, unsigned int *num)
 	char *p, **ret;
 
 	/* Count the strings. */
-	*num = count_strings(strings, len);
+	*num = count_strings(strings, len) + 1;
 
 	/* Transfer to one big alloc for easy freeing. */
-	ret = kmalloc(*num * sizeof(char *) + len, GFP_KERNEL|__GFP_HIGH);
+	ret = kmalloc(*num * sizeof(char *) + len, GFP_NOIO | __GFP_HIGH);
 	if (!ret) {
 		kfree(strings);
 		return ERR_PTR(-ENOMEM);
@@ -316,6 +316,7 @@ static char **split(char *strings, unsigned int len, unsigned int *num)
 	strings = (char *)&ret[*num];
 	for (p = strings, *num = 0; p < strings + len; p += strlen(p) + 1)
 		ret[(*num)++] = p;
+	ret[*num] = strings + len;
 
 	return ret;
 }
@@ -506,7 +507,7 @@ int xenbus_printf(struct xenbus_transaction t,
 #define PRINTF_BUFFER_SIZE 4096
 	char *printf_buffer;
 
-	printf_buffer = kmalloc(PRINTF_BUFFER_SIZE, GFP_KERNEL|__GFP_HIGH);
+	printf_buffer = kmalloc(PRINTF_BUFFER_SIZE, GFP_NOIO | __GFP_HIGH);
 	if (printf_buffer == NULL)
 		return -ENOMEM;
 
@@ -806,7 +807,7 @@ static int process_msg(void)
 	}
 
 
-	msg = kmalloc(sizeof(*msg), GFP_KERNEL|__GFP_HIGH);
+	msg = kmalloc(sizeof(*msg), GFP_NOIO | __GFP_HIGH);
 	if (msg == NULL) {
 		err = -ENOMEM;
 		goto out;
@@ -818,7 +819,7 @@ static int process_msg(void)
 		goto out;
 	}
 
-	body = kmalloc(msg->hdr.len + 1, GFP_KERNEL|__GFP_HIGH);
+	body = kmalloc(msg->hdr.len + 1, GFP_NOIO | __GFP_HIGH);
 	if (body == NULL) {
 		kfree(msg);
 		err = -ENOMEM;

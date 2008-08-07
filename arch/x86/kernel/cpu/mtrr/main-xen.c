@@ -177,6 +177,9 @@ u8 mtrr_type_lookup(u64 start, u64 end)
 	u8 prev_match, curr_match;
 	struct xen_platform_op op;
 
+	if (!is_initial_xendomain())
+		return MTRR_TYPE_WRBACK;
+
 	if (!num_var_ranges)
 		return 0xFF;
 

@@ -82,7 +82,8 @@
 
 #define RESCHEDULE_VECTOR	0
 #define CALL_FUNCTION_VECTOR	1
-#define NR_IPIS			2
+#define SPIN_UNLOCK_VECTOR	2
+#define NR_IPIS			3
 
 /*
  * The maximum number of vectors supported by i386 processors

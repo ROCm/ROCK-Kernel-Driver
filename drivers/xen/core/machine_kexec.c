@@ -19,6 +19,9 @@ static int __initdata xen_max_nr_phys_cpus;
 static struct resource xen_hypervisor_res;
 static struct resource *xen_phys_cpus;
 
+size_t vmcoreinfo_size_xen;
+unsigned long paddr_vmcoreinfo_xen;
+
 void __init xen_machine_kexec_setup_resources(void)
 {
 	xen_kexec_range_t range;
@@ -101,6 +104,18 @@ void __init xen_machine_kexec_setup_resources(void)
 	if (range.size) {
 		crashk_res.start = range.start;
 		crashk_res.end = range.start + range.size - 1;
+	}
+
+	/* get physical address of vmcoreinfo */
+	memset(&range, 0, sizeof(range));
+	range.range = KEXEC_RANGE_MA_VMCOREINFO;
+
+	if (HYPERVISOR_kexec_op(KEXEC_CMD_kexec_get_range, &range))
+		return;
+
+	if (range.size) {
+		paddr_vmcoreinfo_xen = range.start;
+		vmcoreinfo_size_xen = range.size;
 	}
 
 	if (machine_kexec_setup_resources(&xen_hypervisor_res, xen_phys_cpus,

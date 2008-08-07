@@ -543,8 +543,14 @@ struct task_struct * __switch_to(struct task_struct *prev_p, struct task_struct 
 #ifndef CONFIG_X86_NO_TSS
 	struct tss_struct *tss = &per_cpu(init_tss, cpu);
 #endif
+#if CONFIG_XEN_COMPAT > 0x030002
 	struct physdev_set_iopl iopl_op;
 	struct physdev_set_iobitmap iobmp_op;
+#else
+	struct physdev_op _pdo[2], *pdo = _pdo;
+#define iopl_op pdo->u.set_iopl
+#define iobmp_op pdo->u.set_iobitmap
+#endif
 	multicall_entry_t _mcl[8], *mcl = _mcl;
 
 	/* XEN NOTE: FS/GS saved in switch_mm(), not here. */
@@ -592,9 +598,15 @@ struct task_struct * __switch_to(struct task_struct *prev_p, struct task_struct 
 
 	if (unlikely(prev->iopl != next->iopl)) {
 		iopl_op.iopl = (next->iopl == 0) ? 1 : (next->iopl >> 12) & 3;
+#if CONFIG_XEN_COMPAT > 0x030002
 		mcl->op      = __HYPERVISOR_physdev_op;
 		mcl->args[0] = PHYSDEVOP_set_iopl;
 		mcl->args[1] = (unsigned long)&iopl_op;
+#else
+		mcl->op      = __HYPERVISOR_physdev_op_compat;
+		pdo->cmd     = PHYSDEVOP_set_iopl;
+		mcl->args[0] = (unsigned long)pdo++;
+#endif
 		mcl++;
 	}
 
@@ -602,12 +614,21 @@ struct task_struct * __switch_to(struct task_struct *prev_p, struct task_struct 
 		set_xen_guest_handle(iobmp_op.bitmap,
 				     (char *)next->io_bitmap_ptr);
 		iobmp_op.nr_ports = next->io_bitmap_ptr ? IO_BITMAP_BITS : 0;
+#if CONFIG_XEN_COMPAT > 0x030002
 		mcl->op      = __HYPERVISOR_physdev_op;
 		mcl->args[0] = PHYSDEVOP_set_iobitmap;
 		mcl->args[1] = (unsigned long)&iobmp_op;
+#else
+		mcl->op      = __HYPERVISOR_physdev_op_compat;
+		pdo->cmd     = PHYSDEVOP_set_iobitmap;
+		mcl->args[0] = (unsigned long)pdo++;
+#endif
 		mcl++;
 	}
 
+#if CONFIG_XEN_COMPAT <= 0x030002
+	BUG_ON(pdo > _pdo + ARRAY_SIZE(_pdo));
+#endif
 	BUG_ON(mcl > _mcl + ARRAY_SIZE(_mcl));
 	if (unlikely(HYPERVISOR_multicall_check(_mcl, mcl - _mcl, NULL)))
 		BUG();

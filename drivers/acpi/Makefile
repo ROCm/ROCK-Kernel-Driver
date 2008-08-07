@@ -34,6 +34,9 @@ processor-objs	+= processor_core.o processor_throttling.o \
 ifdef CONFIG_CPU_FREQ
 processor-objs	+= processor_perflib.o
 endif
+ifdef CONFIG_PROCESSOR_EXTERNAL_CONTROL
+processor-objs	+= processor_perflib.o processor_extcntl.o
+endif
 
 obj-y				+= sleep/
 obj-y				+= bus.o glue.o

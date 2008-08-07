@@ -198,9 +198,6 @@ static inline void exit_idle(void) {}
 	(regs)->orig_ax = ~(irq);	\
 	do_IRQ((regs));			\
 } while (0)
-#elif defined (__powerpc__)
-#define do_IRQ(irq, regs)	__do_IRQ(irq, regs)
-static inline void exit_idle(void) {}
 #endif
 
 /* Xen will never allocate port zero for any purpose. */
@@ -244,7 +241,7 @@ asmlinkage void evtchn_do_upcall(struct pt_regs *regs)
 
 #ifndef CONFIG_X86 /* No need for a barrier -- XCHG is a barrier on x86. */
 		/* Clear master flag /before/ clearing selector flag. */
-		rmb();
+		wmb();
 #endif
 		l1 = xchg(&vcpu_info->evtchn_pending_sel, 0);
 
@@ -927,6 +924,27 @@ void disable_all_local_evtchn(void)
 	for (i = 0; i < NR_EVENT_CHANNELS; ++i)
 		if (cpu_from_evtchn(i) == cpu)
 			synch_set_bit(i, &s->evtchn_mask[0]);
+}
+
+/* Clear an irq's pending state, in preparation for polling on it. */
+void xen_clear_irq_pending(int irq)
+{
+	int evtchn = evtchn_from_irq(irq);
+
+	if (VALID_EVTCHN(evtchn))
+		clear_evtchn(evtchn);
+}
+
+/* Poll waiting for an irq to become pending.  In the usual case, the
+   irq will be disabled so it won't deliver an interrupt. */
+void xen_poll_irq(int irq)
+{
+	evtchn_port_t evtchn = evtchn_from_irq(irq);
+
+	if (VALID_EVTCHN(evtchn)
+	    && HYPERVISOR_poll(&evtchn, 1,
+			       jiffies ^ (1UL << (BITS_PER_LONG - 1))))
+		BUG();
 }
 
 static void restore_cpu_virqs(unsigned int cpu)

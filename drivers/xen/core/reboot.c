@@ -8,6 +8,7 @@
 #include <linux/sysrq.h>
 #include <asm/hypervisor.h>
 #include <xen/xenbus.h>
+#include <xen/evtchn.h>
 #include <linux/kmod.h>
 #include <linux/slab.h>
 #include <linux/workqueue.h>
@@ -28,13 +29,18 @@ MODULE_LICENSE("Dual BSD/GPL");
 /* Ignore multiple shutdown requests. */
 static int shutting_down = SHUTDOWN_INVALID;
 
+/* Was last suspend request cancelled? */
+static int suspend_cancelled;
+
 /* Can we leave APs online when we suspend? */
 static int fast_suspend;
 
 static void __shutdown_handler(struct work_struct *unused);
 static DECLARE_DELAYED_WORK(shutdown_work, __shutdown_handler);
 
-int __xen_suspend(int fast_suspend, void (*resume_notifier)(void));
+static int setup_suspend_evtchn(void);
+
+int __xen_suspend(int fast_suspend, void (*resume_notifier)(int));
 
 static int shutdown_process(void *__unused)
 {
@@ -63,10 +69,11 @@ static int shutdown_process(void *__unused)
 	return 0;
 }
 
-static void xen_resume_notifier(void)
+static void xen_resume_notifier(int _suspend_cancelled)
 {
 	int old_state = xchg(&shutting_down, SHUTDOWN_RESUMING);
 	BUG_ON(old_state != SHUTDOWN_SUSPEND);
+	suspend_cancelled = _suspend_cancelled;
 }
 
 static int xen_suspend(void *__unused)
@@ -86,6 +93,8 @@ static int xen_suspend(void *__unused)
 			printk(KERN_ERR "Xen suspend failed (%d)\n", err);
 			goto fail;
 		}
+		if (!suspend_cancelled)
+			setup_suspend_evtchn();
 		old_state = cmpxchg(
 			&shutting_down, SHUTDOWN_RESUMING, SHUTDOWN_INVALID);
 	} while (old_state == SHUTDOWN_SUSPEND);
@@ -109,6 +118,31 @@ static int xen_suspend(void *__unused)
 	return 0;
 }
 
+static void switch_shutdown_state(int new_state)
+{
+	int prev_state, old_state = SHUTDOWN_INVALID;
+
+	/* We only drive shutdown_state into an active state. */
+	if (new_state == SHUTDOWN_INVALID)
+		return;
+
+	do {
+		/* We drop this transition if already in an active state. */
+		if ((old_state != SHUTDOWN_INVALID) &&
+		    (old_state != SHUTDOWN_RESUMING))
+			return;
+		/* Attempt to transition. */
+		prev_state = old_state;
+		old_state = cmpxchg(&shutting_down, old_state, new_state);
+	} while (old_state != prev_state);
+
+	/* Either we kick off the work, or we leave it to xen_suspend(). */
+	if (old_state == SHUTDOWN_INVALID)
+		schedule_delayed_work(&shutdown_work, 0);
+	else
+		BUG_ON(old_state != SHUTDOWN_RESUMING);
+}
+
 static void __shutdown_handler(struct work_struct *unused)
 {
 	int err;
@@ -130,7 +164,7 @@ static void shutdown_handler(struct xenbus_watch *watch,
 	extern void ctrl_alt_del(void);
 	char *str;
 	struct xenbus_transaction xbt;
-	int err, old_state, new_state = SHUTDOWN_INVALID;
+	int err, new_state = SHUTDOWN_INVALID;
 
 	if ((shutting_down != SHUTDOWN_INVALID) &&
 	    (shutting_down != SHUTDOWN_RESUMING))
@@ -167,13 +201,7 @@ static void shutdown_handler(struct xenbus_watch *watch,
 	else
 		printk("Ignoring shutdown request: %s\n", str);
 
-	if (new_state != SHUTDOWN_INVALID) {
-		old_state = xchg(&shutting_down, new_state);
-		if (old_state == SHUTDOWN_INVALID)
-			schedule_delayed_work(&shutdown_work, 0);
-		else
-			BUG_ON(old_state != SHUTDOWN_RESUMING);
-	}
+	switch_shutdown_state(new_state);
 
 	kfree(str);
 }
@@ -219,6 +247,34 @@ static struct xenbus_watch sysrq_watch = {
 	.callback = sysrq_handler
 };
 
+static irqreturn_t suspend_int(int irq, void* dev_id)
+{
+	switch_shutdown_state(SHUTDOWN_SUSPEND);
+	return IRQ_HANDLED;
+}
+
+static int setup_suspend_evtchn(void)
+{
+	static int irq;
+	int port;
+	char portstr[16];
+
+	if (irq > 0)
+		unbind_from_irqhandler(irq, NULL);
+
+	irq = bind_listening_port_to_irqhandler(0, suspend_int, 0, "suspend",
+						NULL);
+	if (irq <= 0)
+		return -1;
+
+	port = irq_to_evtchn_port(irq);
+	printk(KERN_INFO "suspend: event channel %d\n", port);
+	sprintf(portstr, "%d", port);
+	xenbus_write(XBT_NIL, "device/suspend", "event-channel", portstr);
+
+	return 0;
+}
+
 static int setup_shutdown_watcher(void)
 {
 	int err;
@@ -236,6 +292,13 @@ static int setup_shutdown_watcher(void)
 	err = register_xenbus_watch(&sysrq_watch);
 	if (err) {
 		printk(KERN_ERR "Failed to set sysrq watcher\n");
+		return err;
+	}
+
+	/* suspend event channel */
+	err = setup_suspend_evtchn();
+	if (err) {
+		printk(KERN_ERR "Failed to register suspend event channel\n");
 		return err;
 	}
 

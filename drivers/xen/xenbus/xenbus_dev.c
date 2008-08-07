@@ -169,14 +169,16 @@ static void watch_fired(struct xenbus_watch *watch,
             container_of(watch, struct watch_adapter, watch);
 	struct xsd_sockmsg hdr;
 	const char *path, *token;
-	int path_len, tok_len, body_len;
+	int path_len, tok_len, body_len, data_len = 0;
 
 	path = vec[XS_WATCH_PATH];
 	token = adap->token;
 
 	path_len = strlen(path) + 1;
 	tok_len = strlen(token) + 1;
-	body_len = path_len + tok_len;
+	if (len > 2)
+		data_len = vec[len] - vec[2] + 1;
+	body_len = path_len + tok_len + data_len;
 
 	hdr.type = XS_WATCH_EVENT;
 	hdr.len = body_len;
@@ -185,6 +187,8 @@ static void watch_fired(struct xenbus_watch *watch,
 	queue_reply(adap->dev_data, (char *)&hdr, sizeof(hdr));
 	queue_reply(adap->dev_data, (char *)path, path_len);
 	queue_reply(adap->dev_data, (char *)token, tok_len);
+	if (len > 2)
+		queue_reply(adap->dev_data, (char *)vec[2], data_len);
 	mutex_unlock(&adap->dev_data->reply_mutex);
 }
 

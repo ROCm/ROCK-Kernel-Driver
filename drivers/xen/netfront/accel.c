@@ -709,8 +709,9 @@ int netfront_accelerator_suspend_cancel(struct netfront_info *np,
 	 * accelerator, so no need to call accelerator_probe_new_vif()
 	 * directly here
 	 */
-	netfront_accelerator_add_watch(np);
- 	return 0;
+	if (dev->state == XenbusStateConnected)
+		netfront_accelerator_add_watch(np);
+	return 0;
 }
  
  

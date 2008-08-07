@@ -138,6 +138,10 @@ typedef struct xen_kexec_load {
                                      * the ia64_boot_param */
 #define KEXEC_RANGE_MA_EFI_MEMMAP 5 /* machine address and size of
                                      * of the EFI Memory Map */
+#define KEXEC_RANGE_MA_VMCOREINFO 6 /* machine address and size of vmcoreinfo */
+
+extern size_t vmcoreinfo_size_xen;
+extern unsigned long paddr_vmcoreinfo_xen;
 
 /*
  * Find the address and size of certain memory areas

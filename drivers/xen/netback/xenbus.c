@@ -40,6 +40,7 @@ static int netback_remove(struct xenbus_device *dev)
 	netback_remove_accelerators(be, dev);
 
 	if (be->netif) {
+		kobject_uevent(&dev->dev.kobj, KOBJ_OFFLINE);
 		netif_disconnect(be->netif);
 		be->netif = NULL;
 	}
@@ -232,6 +233,7 @@ static void frontend_changed(struct xenbus_device *dev,
 
 	case XenbusStateClosing:
 		if (be->netif) {
+			kobject_uevent(&dev->dev.kobj, KOBJ_OFFLINE);
 			netif_disconnect(be->netif);
 			be->netif = NULL;
 		}
@@ -244,8 +246,6 @@ static void frontend_changed(struct xenbus_device *dev,
 			break;
 		/* fall through if not online */
 	case XenbusStateUnknown:
-		if (be->netif != NULL)
-			kobject_uevent(&dev->dev.kobj, KOBJ_OFFLINE);
 		device_unregister(&dev->dev);
 		break;
 

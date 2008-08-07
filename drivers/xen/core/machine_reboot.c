@@ -131,7 +131,7 @@ static void post_suspend(int suspend_cancelled)
 
 struct suspend {
 	int fast_suspend;
-	void (*resume_notifier)(void);
+	void (*resume_notifier)(int);
 };
 
 static int take_machine_down(void *_suspend)
@@ -173,7 +173,7 @@ static int take_machine_down(void *_suspend)
 	 */
 	suspend_cancelled = HYPERVISOR_suspend(virt_to_mfn(xen_start_info));
 
-	suspend->resume_notifier();
+	suspend->resume_notifier(suspend_cancelled);
 	post_suspend(suspend_cancelled);
 	gnttab_resume();
 	if (!suspend_cancelled) {
@@ -202,7 +202,7 @@ static int take_machine_down(void *_suspend)
 	return suspend_cancelled;
 }
 
-int __xen_suspend(int fast_suspend, void (*resume_notifier)(void))
+int __xen_suspend(int fast_suspend, void (*resume_notifier)(int))
 {
 	int err, suspend_cancelled;
 	struct suspend suspend;

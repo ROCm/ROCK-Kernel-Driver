@@ -38,8 +38,6 @@
 #include "arch-x86/xen.h"
 #elif defined(__ia64__)
 #include "arch-ia64.h"
-#elif defined(__powerpc__)
-#include "arch-powerpc.h"
 #else
 #error "Unsupported architecture"
 #endif
@@ -577,6 +575,7 @@ typedef struct start_info start_info_t;
 /* These flags are passed in the 'flags' field of start_info_t. */
 #define SIF_PRIVILEGED    (1<<0)  /* Is the domain privileged? */
 #define SIF_INITDOMAIN    (1<<1)  /* Is this the initial control domain? */
+#define SIF_PM_MASK       (0xFF<<8) /* reserve 1 byte for xen-pm options */
 
 typedef struct dom0_vga_console_info {
     uint8_t video_type; /* DOM0_VGA_CONSOLE_??? */

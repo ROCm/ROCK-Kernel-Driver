@@ -107,6 +107,7 @@ ifeq ($(CONFIG_X86_64),y)
 
         obj-$(CONFIG_PCI_MMCONFIG)	+= mmconf-fam10h_64.o
 
+	obj-$(CONFIG_XEN)		+= nmi_64.o
 	apic_64-$(CONFIG_XEN)		+= apic_32.o
 	time_64-$(CONFIG_XEN)		+= time_32.o
 endif

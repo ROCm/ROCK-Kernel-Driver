@@ -164,6 +164,14 @@ config XEN_TPMDEV_BACKEND
 	help
 	  The TPM-device backend driver
 
+config XEN_SCSI_BACKEND
+	tristate "SCSI backend driver"
+	depends on SCSI && XEN_BACKEND
+	default m
+	help
+	  The SCSI backend driver allows the kernel to export its SCSI Devices
+	  to other guests via a high-performance shared-memory interface.
+
 config XEN_BLKDEV_FRONTEND
 	tristate "Block-device frontend driver"
 	default y
@@ -188,6 +196,14 @@ config XEN_NETDEV_ACCEL_SFC_FRONTEND
 	depends on XEN_NETDEV_FRONTEND && X86
 	select XEN_NETDEV_ACCEL_SFC_UTIL
 	default m
+
+config XEN_SCSI_FRONTEND
+	tristate "SCSI frontend driver"
+	depends on SCSI
+	default m
+	help
+	  The SCSI frontend driver allows the kernel to access SCSI Devices
+	  within another guest OS.
 
 config XEN_GRANT_DEV
 	tristate "User-space granted page access driver"

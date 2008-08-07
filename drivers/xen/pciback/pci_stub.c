@@ -805,6 +805,23 @@ static ssize_t permissive_show(struct device_driver *drv, char *buf)
 
 DRIVER_ATTR(permissive, S_IRUSR | S_IWUSR, permissive_show, permissive_add);
 
+#ifdef CONFIG_PCI_MSI
+
+int pciback_get_owner(struct pci_dev *dev)
+{
+	struct pcistub_device *psdev;
+
+	psdev = pcistub_device_find(pci_domain_nr(dev->bus), dev->bus->number,
+			PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn));
+	/* XXX will other domain has pciback support ??? */
+	if (!psdev || !psdev->pdev) {
+		printk(KERN_WARNING "no ownder\n");
+		return -1;
+	}
+	return psdev->pdev->xdev->otherend_id;
+}
+#endif
+
 static void pcistub_exit(void)
 {
 	driver_remove_file(&pciback_pci_driver.driver, &driver_attr_new_slot);
@@ -815,6 +832,7 @@ static void pcistub_exit(void)
 	driver_remove_file(&pciback_pci_driver.driver, &driver_attr_permissive);
 
 	pci_unregister_driver(&pciback_pci_driver);
+	WARN_ON(unregister_msi_get_owner(pciback_get_owner));
 }
 
 static int __init pcistub_init(void)
@@ -872,6 +890,8 @@ static int __init pcistub_init(void)
 		err = driver_create_file(&pciback_pci_driver.driver,
 					 &driver_attr_permissive);
 
+	if (!err)
+		err = register_msi_get_owner(pciback_get_owner);
 	if (err)
 		pcistub_exit();
 

@@ -93,6 +93,11 @@ typedef struct domid_translate {
 	unsigned short busid;
 } domid_translate_t ;
 
+typedef struct domid_translate_ext {
+	unsigned short domid;
+	u32 busid;
+} domid_translate_ext_t ;
+
 /*Data struct associated with each of the tapdisk devices*/
 typedef struct tap_blkif {
 	struct vm_area_struct *vma;   /*Shared memory area                   */
@@ -111,7 +116,7 @@ typedef struct tap_blkif {
 	unsigned long *idx_map;       /*Record the user ring id to kern 
 					[req id, idx] tuple                  */
 	blkif_t *blkif;               /*Associate blkif with tapdev          */
-	struct domid_translate trans; /*Translation from domid to bus.       */
+	struct domid_translate_ext trans; /*Translation from domid to bus.   */
 } tap_blkif_t;
 
 static struct tap_blkif *tapfds[MAX_TAP_DEV];
@@ -214,6 +219,7 @@ static int blktap_major;
 #define BLKTAP_IOCTL_MAJOR	     7
 #define BLKTAP_QUERY_ALLOC_REQS      8
 #define BLKTAP_IOCTL_FREEINTF        9
+#define BLKTAP_IOCTL_NEWINTF_EXT     50
 #define BLKTAP_IOCTL_PRINT_IDXS      100  
 
 /* blktap switching modes: (Set with BLKTAP_IOCTL_SETMODE)             */
@@ -506,6 +512,13 @@ void signal_tapdisk(int idx)
 	tap_blkif_t *info;
 	struct task_struct *ptask;
 
+	/*
+	 * if the userland tools set things up wrong, this could be negative;
+	 * just don't try to signal in this case
+	 */
+	if (idx < 0)
+		return;
+
 	info = tapfds[idx];
 	if ((idx < 0) || (idx > MAX_TAP_DEV) || !info)
 		return;
@@ -773,6 +786,26 @@ static int blktap_ioctl(struct inode *inode, struct file *filp,
 		}
 		info->trans.domid = tr->domid;
 		info->trans.busid = tr->busid;
+		return info->minor;
+	}
+	case BLKTAP_IOCTL_NEWINTF_EXT:
+	{
+		void __user *udata = (void __user *) arg;
+		domid_translate_ext_t tr;
+
+		if (copy_from_user(&tr, udata, sizeof(domid_translate_ext_t)))
+			return -EFAULT;
+
+		DPRINTK("NEWINTF_EXT Req for domid %d and bus id %d\n", 
+		       tr.domid, tr.busid);
+		info = get_next_free_dev();
+		if (!info) {
+			WPRINTK("Error initialising /dev/xen/blktap - "
+				"No more devices\n");
+			return -1;
+		}
+		info->trans.domid = tr.domid;
+		info->trans.busid = tr.busid;
 		return info->minor;
 	}
 	case BLKTAP_IOCTL_FREEINTF:
@@ -1261,6 +1294,9 @@ static int do_block_io_op(blkif_t *blkif)
 			BUG();
 		}
 		blk_rings->common.req_cons = ++rc; /* before make_response() */
+
+		/* Apply all sanity checks to /private copy/ of request. */
+		barrier();
 
 		switch (req.operation) {
 		case BLKIF_OP_READ:

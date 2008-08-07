@@ -166,7 +166,7 @@ PAGEFLAG(Checked, owner_priv_1)		/* Used by some filesystems */
 #ifdef CONFIG_PARAVIRT_XEN
 PAGEFLAG(Pinned, owner_priv_1) TESTSCFLAG(Pinned, owner_priv_1) /* Xen */
 #elif defined(CONFIG_XEN)
-PAGEFLAG(Pinned, owner_priv_1) TESTSCFLAG(Pinned, pinned)
+PAGEFLAG(Pinned, pinned) TESTSCFLAG(Pinned, pinned)
 #endif
 PAGEFLAG(Reserved, reserved) __CLEARPAGEFLAG(Reserved, reserved)
 PAGEFLAG(Private, private) __CLEARPAGEFLAG(Private, private)
@@ -254,18 +254,25 @@ static inline void SetPageUptodate(struct page *page)
 
 CLEARPAGEFLAG(Uptodate, uptodate)
 
-#define PageForeign(page)	test_bit(PG_foreign, &(page)->flags)
-#define SetPageForeign(_page, dtor) do {		\
-	set_bit(PG_foreign, &(_page)->flags);		\
-	BUG_ON((dtor) == (void (*)(struct page *))0);	\
-	(_page)->index = (long)(dtor);			\
-} while (0)
-#define ClearPageForeign(page) do {			\
-	clear_bit(PG_foreign, &(page)->flags);		\
-	(page)->index = 0;				\
-} while (0)
-#define PageForeignDestructor(_page)			\
-	((void (*)(struct page *))(_page)->index)(_page)
+#ifdef CONFIG_XEN
+TESTPAGEFLAG(Foreign, foreign)
+static inline void SetPageForeign(struct page *page,
+				  void (*dtor)(struct page *))
+{
+	BUG_ON(!dtor);
+	set_bit(PG_foreign, &page->flags);
+	page->index = (long)dtor;
+}
+static inline void ClearPageForeign(struct page *page)
+{
+	clear_bit(PG_foreign, &page->flags);
+	page->index = 0;
+}
+static inline void PageForeignDestructor(struct page *page)
+{
+	((void (*)(struct page *))page->index)(page);
+}
+#endif
 
 extern void cancel_dirty_page(struct page *page, unsigned int account_size);
 

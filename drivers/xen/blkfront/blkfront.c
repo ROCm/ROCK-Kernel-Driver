@@ -92,8 +92,13 @@ static int blkfront_probe(struct xenbus_device *dev,
 	err = xenbus_scanf(XBT_NIL, dev->nodename,
 			   "virtual-device", "%i", &vdevice);
 	if (err != 1) {
-		xenbus_dev_fatal(dev, err, "reading virtual-device");
-		return err;
+		/* go looking in the extended area instead */
+		err = xenbus_scanf(XBT_NIL, dev->nodename, "virtual-device-ext",
+			"%i", &vdevice);
+		if (err != 1) {
+			xenbus_dev_fatal(dev, err, "reading virtual-device");
+			return err;
+		}
 	}
 
 	info = kzalloc(sizeof(*info), GFP_KERNEL);
@@ -219,7 +224,7 @@ static int setup_blkring(struct xenbus_device *dev,
 
 	info->ring_ref = GRANT_INVALID_REF;
 
-	sring = (blkif_sring_t *)__get_free_page(GFP_KERNEL|__GFP_HIGH);
+	sring = (blkif_sring_t *)__get_free_page(GFP_NOIO | __GFP_HIGH);
 	if (!sring) {
 		xenbus_dev_fatal(dev, -ENOMEM, "allocating shared ring");
 		return -ENOMEM;
@@ -347,6 +352,13 @@ static void connect(struct blkfront_info *info)
 		return;
 	}
 
+	err = xlvbd_sysfs_addif(info);
+	if (err) {
+		xenbus_dev_fatal(info->xbdev, err, "xlvbd_sysfs_addif at %s",
+				 info->xbdev->otherend);
+		return;
+	}
+
 	(void)xenbus_switch_state(info->xbdev, XenbusStateConnected);
 
 	/* Kick pending requests. */
@@ -385,6 +397,8 @@ static void blkfront_closing(struct xenbus_device *dev)
 
 	/* Flush gnttab callback work. Must be done with no locks held. */
 	flush_scheduled_work();
+
+	xlvbd_sysfs_delif(info);
 
 	xlvbd_del(info);
 
@@ -811,7 +825,7 @@ static void blkif_recover(struct blkfront_info *info)
 	int j;
 
 	/* Stage 1: Make a safe copy of the shadow state. */
-	copy = kmalloc(sizeof(info->shadow), GFP_KERNEL | __GFP_NOFAIL | __GFP_HIGH);
+	copy = kmalloc(sizeof(info->shadow), GFP_NOIO | __GFP_NOFAIL | __GFP_HIGH);
 	memcpy(copy, info->shadow, sizeof(info->shadow));
 
 	/* Stage 2: Set up free list. */

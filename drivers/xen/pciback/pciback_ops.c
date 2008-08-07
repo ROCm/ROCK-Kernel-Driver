@@ -61,15 +61,37 @@ void pciback_do_op(struct work_struct *work)
 
 	if (dev == NULL)
 		op->err = XEN_PCI_ERR_dev_not_found;
-	else if (op->cmd == XEN_PCI_OP_conf_read)
-		op->err = pciback_config_read(dev, op->offset, op->size,
-					      &op->value);
-	else if (op->cmd == XEN_PCI_OP_conf_write)
-		op->err = pciback_config_write(dev, op->offset, op->size,
-					       op->value);
 	else
-		op->err = XEN_PCI_ERR_not_implemented;
-
+	{
+		switch (op->cmd)
+		{
+			case XEN_PCI_OP_conf_read:
+				op->err = pciback_config_read(dev,
+					  op->offset, op->size, &op->value);
+				break;
+			case XEN_PCI_OP_conf_write:
+				op->err = pciback_config_write(dev,
+					  op->offset, op->size,	op->value);
+				break;
+#ifdef CONFIG_PCI_MSI
+			case XEN_PCI_OP_enable_msi:
+				op->err = pciback_enable_msi(pdev, dev, op);
+				break;
+			case XEN_PCI_OP_disable_msi:
+				op->err = pciback_disable_msi(pdev, dev, op);
+				break;
+			case XEN_PCI_OP_enable_msix:
+				op->err = pciback_enable_msix(pdev, dev, op);
+				break;
+			case XEN_PCI_OP_disable_msix:
+				op->err = pciback_disable_msix(pdev, dev, op);
+				break;
+#endif
+			default:
+				op->err = XEN_PCI_ERR_not_implemented;
+				break;
+		}
+	}
 	/* Tell the driver domain that we're done. */ 
 	wmb();
 	clear_bit(_XEN_PCIF_active, (unsigned long *)&pdev->sh_info->flags);

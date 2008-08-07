@@ -375,9 +375,6 @@ static int init_private_data(gntdev_file_private_data_t *priv,
 	priv->free_list_size = max_grants;
 	priv->next_fit_index = 0;
 
-	up_write(&priv->grants_sem);
-	up_write(&priv->free_list_sem);
-
 	return 0;
 
 nomem_out3:
