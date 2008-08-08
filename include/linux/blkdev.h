@@ -409,6 +409,7 @@ struct request_queue
 #define QUEUE_FLAG_ELVSWITCH	8	/* don't use elevator, just do FIFO */
 #define QUEUE_FLAG_BIDI		9	/* queue supports bidi requests */
 #define QUEUE_FLAG_NOMERGES    10	/* disable merge attempts */
+#define QUEUE_FLAG_BUSY	       11	/* device/host under queue is busy */
 
 static inline int queue_is_locked(struct request_queue *q)
 {
@@ -489,6 +490,9 @@ enum {
 #define blk_queue_stopped(q)	test_bit(QUEUE_FLAG_STOPPED, &(q)->queue_flags)
 #define blk_queue_nomerges(q)	test_bit(QUEUE_FLAG_NOMERGES, &(q)->queue_flags)
 #define blk_queue_flushing(q)	((q)->ordseq)
+#define blk_lld_busy(q)		test_bit(QUEUE_FLAG_BUSY, &(q)->queue_flags)
+#define blk_set_lld_busy(q)	set_bit(QUEUE_FLAG_BUSY, &(q)->queue_flags)
+#define blk_clear_lld_busy(q)	clear_bit(QUEUE_FLAG_BUSY, &(q)->queue_flags)
 
 #define blk_fs_request(rq)	((rq)->cmd_type == REQ_TYPE_FS)
 #define blk_pc_request(rq)	((rq)->cmd_type == REQ_TYPE_BLOCK_PC)
@@ -627,6 +631,7 @@ extern void blk_end_sync_rq(struct request *rq, int error);
 extern struct request *blk_get_request(struct request_queue *, int, gfp_t);
 extern void blk_insert_request(struct request_queue *, struct request *, int, void *);
 extern void blk_requeue_request(struct request_queue *, struct request *);
+extern void blk_submit_request(struct request_queue *q, struct request *rq);
 extern void blk_plug_device(struct request_queue *);
 extern int blk_remove_plug(struct request_queue *);
 extern void blk_recount_segments(struct request_queue *, struct bio *);
@@ -719,6 +724,8 @@ extern int blk_end_request_callback(struct request *rq, int error,
 				unsigned int nr_bytes,
 				int (drv_callback)(struct request *));
 extern void blk_complete_request(struct request *);
+extern void blk_update_request(struct request *rq, int error,
+			       unsigned int nr_bytes);
 
 /*
  * blk_end_request() takes bytes instead of sectors as a complete size.

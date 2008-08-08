@@ -108,6 +108,8 @@ static void combine_restrictions_low(struct io_restrictions *lhs,
 	lhs->bounce_pfn = min_not_zero(lhs->bounce_pfn, rhs->bounce_pfn);
 
 	lhs->no_cluster |= rhs->no_cluster;
+
+	lhs->no_request_stacking |= rhs->no_request_stacking;
 }
 
 /*
@@ -454,6 +456,12 @@ static int __table_get_device(struct dm_table *t, struct dm_target *ti,
 			return r;
 	}
 
+	r = dm_init_md(t->md);
+	if (r) {
+		DMWARN("Cannot initialize device %s, error %d", path, r);
+		return r;
+	}
+
 	dd = find_device(&t->devices, dev);
 	if (!dd) {
 		dd = kmalloc(sizeof(*dd), GFP_KERNEL);
@@ -506,14 +514,13 @@ void dm_set_device_limits(struct dm_target *ti, struct block_device *bdev)
 	rs->max_sectors =
 		min_not_zero(rs->max_sectors, q->max_sectors);
 
-	/* FIXME: Device-Mapper on top of RAID-0 breaks because DM
-	 *        currently doesn't honor MD's merge_bvec_fn routine.
-	 *        In this case, we'll force DM to use PAGE_SIZE or
-	 *        smaller I/O, just to be safe. A better fix is in the
-	 *        works, but add this for the time being so it will at
-	 *        least operate correctly.
+	/*
+	 * Check if merge fn is supported.
+	 * If not we'll force DM to use PAGE_SIZE or
+	 * smaller I/O, just to be safe.
 	 */
-	if (q->merge_bvec_fn)
+
+	if (q->merge_bvec_fn && !ti->type->merge)
 		rs->max_sectors =
 			min_not_zero(rs->max_sectors,
 				     (unsigned int) (PAGE_SIZE >> 9));
@@ -540,6 +547,9 @@ void dm_set_device_limits(struct dm_target *ti, struct block_device *bdev)
 	rs->bounce_pfn = min_not_zero(rs->bounce_pfn, q->bounce_pfn);
 
 	rs->no_cluster |= !test_bit(QUEUE_FLAG_CLUSTER, &q->queue_flags);
+
+	if (!q->request_fn)
+		rs->no_request_stacking = 1;
 }
 EXPORT_SYMBOL_GPL(dm_set_device_limits);
 
@@ -666,8 +676,12 @@ int dm_split_args(int *argc, char ***argvp, char *input)
 	return 0;
 }
 
-static void check_for_valid_limits(struct io_restrictions *rs)
+static int check_for_valid_limits(struct io_restrictions *rs,
+				  struct mapped_device *md)
 {
+	int r = 0;
+	struct dm_table *t;
+
 	if (!rs->max_sectors)
 		rs->max_sectors = SAFE_MAX_SECTORS;
 	if (!rs->max_hw_sectors)
@@ -684,6 +698,39 @@ static void check_for_valid_limits(struct io_restrictions *rs)
 		rs->seg_boundary_mask = -1;
 	if (!rs->bounce_pfn)
 		rs->bounce_pfn = -1;
+
+	if (!dm_request_based(md))
+		return 0;
+
+	/* Allows to load only request stackable tables */
+	if (rs->no_request_stacking) {
+		DMERR("table load rejected: including non-request-stackable "
+		      "devices");
+		return -EINVAL;
+	}
+
+	t = dm_get_table(md);
+
+	/* Initial table loading must be allowed */
+	if (!t)
+		return 0;
+
+	if ((rs->max_sectors < t->limits.max_sectors) ||
+	    (rs->max_hw_sectors < t->limits.max_hw_sectors) ||
+	    (rs->max_phys_segments < t->limits.max_phys_segments) ||
+	    (rs->max_hw_segments < t->limits.max_hw_segments) ||
+	    (rs->hardsect_size > t->limits.hardsect_size) ||
+	    (rs->max_segment_size < t->limits.max_segment_size) ||
+	    (rs->seg_boundary_mask < t->limits.seg_boundary_mask) ||
+	    (rs->bounce_pfn < t->limits.bounce_pfn) ||
+	    (rs->no_cluster && !t->limits.no_cluster)) {
+		DMERR("table load rejected: shrinking current restriction");
+		r = -EINVAL;
+	}
+
+	dm_table_put(t);
+
+	return r;
 }
 
 int dm_table_add_target(struct dm_table *t, const char *type,
@@ -749,6 +796,16 @@ int dm_table_add_target(struct dm_table *t, const char *type,
 	return r;
 }
 
+void dm_table_set_request_based(struct dm_table *t)
+{
+	dm_set_request_based(t->md);
+}
+
+int dm_table_request_based(struct dm_table *t)
+{
+	return dm_request_based(t->md);
+}
+
 static int setup_indexes(struct dm_table *t)
 {
 	int i;
@@ -783,7 +840,9 @@ int dm_table_complete(struct dm_table *t)
 	int r = 0;
 	unsigned int leaf_nodes;
 
-	check_for_valid_limits(&t->limits);
+	r = check_for_valid_limits(&t->limits, t->md);
+	if (r)
+		return r;
 
 	/* how many indexes will the btree have ? */
 	leaf_nodes = dm_div_up(t->num_targets, KEYS_PER_NODE);
@@ -996,3 +1055,5 @@ EXPORT_SYMBOL(dm_table_get_md);
 EXPORT_SYMBOL(dm_table_put);
 EXPORT_SYMBOL(dm_table_get);
 EXPORT_SYMBOL(dm_table_unplug_all);
+EXPORT_SYMBOL(dm_table_request_based);
+EXPORT_SYMBOL(dm_table_set_request_based);

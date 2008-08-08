@@ -547,7 +547,7 @@ struct Scsi_Host {
 	unsigned int host_failed;	   /* commands that failed. */
 	unsigned int host_eh_scheduled;    /* EH scheduled without command */
     
-	unsigned short host_no;  /* Used for IOCTL_GET_IDLUN, /proc/scsi et al. */
+	unsigned int host_no;  /* Used for IOCTL_GET_IDLUN, /proc/scsi et al. */
 	int resetting; /* if set, it means that last_reset is a valid value */
 	unsigned long last_reset;
 
@@ -623,7 +623,7 @@ struct Scsi_Host {
 	/*
 	 * Optional work queue to be utilized by the transport
 	 */
-	char work_q_name[KOBJ_NAME_LEN];
+	char work_q_name[20];
 	struct workqueue_struct *work_q;
 
 	/*

@@ -1460,8 +1460,13 @@ static void scsi_request_fn(struct request_queue *q)
 		 * accept it.
 		 */
 		req = elv_next_request(q);
-		if (!req || !scsi_dev_queue_ready(q, sdev))
+		if (!req)
 			break;
+
+		if (!scsi_dev_queue_ready(q, sdev)) {
+			blk_set_lld_busy(q);
+			break;
+		}
 
 		if (unlikely(!scsi_device_online(sdev))) {
 			sdev_printk(KERN_ERR, sdev,
@@ -1518,6 +1523,8 @@ static void scsi_request_fn(struct request_queue *q)
 		rtn = scsi_dispatch_cmd(cmd);
 		spin_lock_irq(q->queue_lock);
 		if(rtn) {
+			blk_set_lld_busy(q);
+
 			/* we're refusing the command; because of
 			 * the way locks get dropped, we need to 
 			 * check here if plugging is required */
@@ -1526,6 +1533,7 @@ static void scsi_request_fn(struct request_queue *q)
 
 			break;
 		}
+		blk_clear_lld_busy(q);
 	}
 
 	goto out;
@@ -1542,6 +1550,7 @@ static void scsi_request_fn(struct request_queue *q)
 	 * later time.
 	 */
 	spin_lock_irq(q->queue_lock);
+	blk_set_lld_busy(q);
 	blk_requeue_request(q, req);
 	sdev->device_busy--;
 	if(sdev->device_busy == 0)

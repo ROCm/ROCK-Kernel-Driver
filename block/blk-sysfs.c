@@ -326,6 +326,7 @@ int blk_register_queue(struct gendisk *disk)
 
 	return 0;
 }
+EXPORT_SYMBOL_GPL(blk_register_queue);
 
 void blk_unregister_queue(struct gendisk *disk)
 {

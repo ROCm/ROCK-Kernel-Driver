@@ -1499,6 +1499,71 @@ void submit_bio(int rw, struct bio *bio)
 }
 EXPORT_SYMBOL(submit_bio);
 
+/*
+ * Check a request for queue limits
+ */
+static int check_queue_limit(struct request_queue *q, struct request *rq)
+{
+	if (rq->nr_sectors > q->max_sectors ||
+	    rq->data_len >> 9 > q->max_hw_sectors) {
+		printk(KERN_ERR "%s: over max size limit.\n", __func__);
+		return 1;
+	}
+
+	/*
+	 * queue's settings related to segment counting like q->bounce_pfn
+	 * may differ from that of other stacking queues.
+	 * Recalculate it to check the request correctly on this queue's
+	 * limitation.
+	 */
+	blk_recalc_rq_segments(rq);
+	if (rq->nr_phys_segments > q->max_phys_segments ||
+	    rq->nr_hw_segments > q->max_hw_segments) {
+		printk(KERN_ERR "%s: over max segments limit.\n", __func__);
+		return 1;
+	}
+
+	return 0;
+}
+
+/**
+ * blk_submit_request - Helper for stacking drivers to submit the request
+ * @q:  the queue to submit the request
+ * @rq: the request being queued
+ **/
+void blk_submit_request(struct request_queue *q, struct request *rq)
+{
+	unsigned long flags;
+
+	if (check_queue_limit(q, rq))
+		goto end_io;
+
+#ifdef CONFIG_FAIL_MAKE_REQUEST
+	if (rq->rq_disk && rq->rq_disk->flags & GENHD_FL_FAIL &&
+	    should_fail(&fail_make_request, blk_rq_bytes(rq)))
+		goto end_io;
+#endif
+
+	spin_lock_irqsave(q->queue_lock, flags);
+
+	/*
+	 * Submitting request must be dequeued before calling this function
+	 * because it will be linked to another request_queue
+	 */
+	BUG_ON(blk_queued_rq(rq));
+
+	drive_stat_acct(rq, 1);
+	__elv_add_request(q, rq, ELEVATOR_INSERT_BACK, 0);
+
+	spin_unlock_irqrestore(q->queue_lock, flags);
+
+	return;
+
+end_io:
+	blk_end_request(rq, -EIO, blk_rq_bytes(rq));
+}
+EXPORT_SYMBOL_GPL(blk_submit_request);
+
 /**
  * __end_that_request_first - end I/O on a request
  * @req:      the request being processed
@@ -1845,6 +1910,22 @@ void end_request(struct request *req, int uptodate)
 }
 EXPORT_SYMBOL(end_request);
 
+static int end_that_request_data(struct request *rq, int error,
+				 unsigned int nr_bytes, unsigned int bidi_bytes)
+{
+	if (blk_fs_request(rq) || blk_pc_request(rq)) {
+		if (__end_that_request_first(rq, error, nr_bytes))
+			return 1;
+
+		/* Bidi request must be completed as a whole */
+		if (blk_bidi_rq(rq) &&
+		    __end_that_request_first(rq->next_rq, error, bidi_bytes))
+			return 1;
+	}
+
+	return 0;
+}
+
 /**
  * blk_end_io - Generic end_io function to complete a request.
  * @rq:           the request being processed
@@ -1871,15 +1952,8 @@ static int blk_end_io(struct request *rq, int error, unsigned int nr_bytes,
 	struct request_queue *q = rq->q;
 	unsigned long flags = 0UL;
 
-	if (blk_fs_request(rq) || blk_pc_request(rq)) {
-		if (__end_that_request_first(rq, error, nr_bytes))
-			return 1;
-
-		/* Bidi request must be completed as a whole */
-		if (blk_bidi_rq(rq) &&
-		    __end_that_request_first(rq->next_rq, error, bidi_bytes))
-			return 1;
-	}
+	if (end_that_request_data(rq, error, nr_bytes, bidi_bytes))
+		return 1;
 
 	/* Special feature for tricky drivers */
 	if (drv_callback && drv_callback(rq))
@@ -1962,6 +2036,38 @@ int blk_end_bidi_request(struct request *rq, int error, unsigned int nr_bytes,
 	return blk_end_io(rq, error, nr_bytes, bidi_bytes, NULL);
 }
 EXPORT_SYMBOL_GPL(blk_end_bidi_request);
+
+/**
+ * blk_update_request - Special helper function for request stacking drivers
+ * @rq:           the request being processed
+ * @error:        0 for success, < 0 for error
+ * @nr_bytes:     number of bytes to complete @rq
+ *
+ * Description:
+ *     Ends I/O on a number of bytes attached to @rq, but doesn't complete
+ *     the request structure even if @rq doesn't have leftover.
+ *     If @rq has leftover, sets it up for the next range of segments.
+ *
+ *     This special helper function is only for request stacking drivers
+ *     (e.g. request-based dm) so that they can handle partial completion.
+ *     Actual device drivers should use blk_end_request instead.
+ **/
+void blk_update_request(struct request *rq, int error, unsigned int nr_bytes)
+{
+	if (!end_that_request_data(rq, error, nr_bytes, 0)) {
+		/*
+		 * All bios in the request have been completed.
+		 * Then, members of the request are not updated.
+		 * Update those members to avoid double charge of diskstat
+		 * when the stacking driver calls blk_end_request()
+		 * to complete the request actually.
+		 */
+		rq->nr_sectors = rq->hard_nr_sectors = 0;
+		rq->current_nr_sectors = rq->hard_cur_sectors = 0;
+		rq->nr_phys_segments = rq->nr_hw_segments = 0;
+	}
+}
+EXPORT_SYMBOL_GPL(blk_update_request);
 
 /**
  * blk_end_request_callback - Special helper function for tricky drivers
