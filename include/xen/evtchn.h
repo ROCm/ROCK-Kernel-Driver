@@ -123,6 +123,18 @@ static inline void clear_evtchn(int port)
 	synch_clear_bit(port, s->evtchn_pending);
 }
 
+static inline void set_evtchn(int port)
+{
+	shared_info_t *s = HYPERVISOR_shared_info;
+	synch_set_bit(port, s->evtchn_pending);
+}
+
+static inline int test_evtchn(int port)
+{
+	shared_info_t *s = HYPERVISOR_shared_info;
+	return synch_test_bit(port, s->evtchn_pending);
+}
+
 static inline void notify_remote_via_evtchn(int port)
 {
 	struct evtchn_send send = { .port = port };
@@ -131,6 +143,12 @@ static inline void notify_remote_via_evtchn(int port)
 
 /* Clear an irq's pending state, in preparation for polling on it. */
 void xen_clear_irq_pending(int irq);
+
+/* Set an irq's pending state, to avoid blocking on it. */
+void xen_set_irq_pending(int irq);
+
+/* Test an irq's pending state. */
+int xen_test_irq_pending(int irq);
 
 /* Poll waiting for an irq to become pending.  In the usual case, the
    irq will be disabled so it won't deliver an interrupt. */

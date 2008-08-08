@@ -674,7 +674,7 @@ static int __cpuinit acpi_processor_start(struct acpi_device *device)
 	/* _PDC call should be done before doing anything else (if reqd.). */
 	arch_acpi_processor_init_pdc(pr);
 	acpi_processor_set_pdc(pr);
-#if defined(CONFIG_CPU_FREQ) || defined(PROCESSOR_EXTERNAL_CONTROL)
+#if defined(CONFIG_CPU_FREQ) || defined(CONFIG_PROCESSOR_EXTERNAL_CONTROL)
 	acpi_processor_ppc_has_changed(pr);
 #endif
 	acpi_processor_get_throttling_info(pr);

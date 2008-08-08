@@ -22,6 +22,7 @@ struct spinning {
 	unsigned int ticket;
 };
 static DEFINE_PER_CPU(struct spinning, spinning);
+static DEFINE_PER_CPU(struct spinning, spinning_bh);
 static DEFINE_PER_CPU(struct spinning, spinning_irq);
 
 int __cpuinit xen_spinlock_init(unsigned int cpu)
@@ -54,34 +55,54 @@ void __cpuinit xen_spinlock_cleanup(unsigned int cpu)
 int xen_spin_wait(raw_spinlock_t *lock, unsigned int token)
 {
 	struct spinning *spinning;
-	int rc, irq = __get_cpu_var(spinlock_irq);
+	int rc = 0, irq = __get_cpu_var(spinlock_irq);
 
-	/* if kicker interrupt not initialized yet, just spin */
+	/* If kicker interrupt not initialized yet, just spin. */
 	if (irq < 0)
 		return 0;
+
+	token >>= TICKET_SHIFT;
 
 	/* announce we're spinning */
 	spinning = &__get_cpu_var(spinning);
 	if (spinning->lock) {
-		BUG_ON(!raw_irqs_disabled());
-		spinning = &__get_cpu_var(spinning_irq);
+		BUG_ON(spinning->lock == lock);
+		if(raw_irqs_disabled()) {
+			BUG_ON(__get_cpu_var(spinning_bh).lock == lock);
+			spinning = &__get_cpu_var(spinning_irq);
+		} else {
+			BUG_ON(!in_softirq());
+			spinning = &__get_cpu_var(spinning_bh);
+		}
 		BUG_ON(spinning->lock);
 	}
-	spinning->ticket = token >> TICKET_SHIFT;
+	spinning->ticket = token;
 	smp_wmb();
 	spinning->lock = lock;
 
 	/* clear pending */
 	xen_clear_irq_pending(irq);
 
-	/* check again make sure it didn't become free while
-	   we weren't looking  */
-	rc = __raw_spin_trylock(lock);
-	if (!rc) {
+	do {
+		/* Check again to make sure it didn't become free while
+		 * we weren't looking. */
+		if ((lock->slock & ((1U << TICKET_SHIFT) - 1)) == token) {
+			/* If we interrupted another spinlock while it was
+			 * blocking, make sure it doesn't block (again)
+			 * without rechecking the lock. */
+			if (spinning != &__get_cpu_var(spinning))
+				xen_set_irq_pending(irq);
+			rc = 1;
+			break;
+		}
+
 		/* block until irq becomes pending */
 		xen_poll_irq(irq);
-		kstat_this_cpu.irqs[irq]++;
-	}
+	} while (!xen_test_irq_pending(irq));
+
+	/* Leave the irq pending so that any interrupted blocker will
+	 * re-check. */
+	kstat_this_cpu.irqs[irq] += !rc;
 
 	/* announce we're done */
 	spinning->lock = NULL;
@@ -116,6 +137,9 @@ void xen_spin_kick(raw_spinlock_t *lock, unsigned int token)
 	token &= (1U << TICKET_SHIFT) - 1;
 	for_each_online_cpu(cpu) {
 		if (spinning(&per_cpu(spinning, cpu), cpu, lock, token))
+			return;
+		if (in_interrupt()
+		    && spinning(&per_cpu(spinning_bh, cpu), cpu, lock, token))
 			return;
 		if (raw_irqs_disabled()
 		    && spinning(&per_cpu(spinning_irq, cpu), cpu, lock, token))

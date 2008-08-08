@@ -935,6 +935,23 @@ void xen_clear_irq_pending(int irq)
 		clear_evtchn(evtchn);
 }
 
+/* Set an irq's pending state, to avoid blocking on it. */
+void xen_set_irq_pending(int irq)
+{
+	int evtchn = evtchn_from_irq(irq);
+
+	if (VALID_EVTCHN(evtchn))
+		set_evtchn(evtchn);
+}
+
+/* Test an irq's pending state. */
+int xen_test_irq_pending(int irq)
+{
+	int evtchn = evtchn_from_irq(irq);
+
+	return VALID_EVTCHN(evtchn) && test_evtchn(evtchn);
+}
+
 /* Poll waiting for an irq to become pending.  In the usual case, the
    irq will be disabled so it won't deliver an interrupt. */
 void xen_poll_irq(int irq)
