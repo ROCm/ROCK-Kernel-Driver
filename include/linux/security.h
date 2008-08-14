@@ -2246,6 +2246,11 @@ static inline int security_dentry_open(struct file *file)
 	return 0;
 }
 
+static inline int security_path_permission(struct path *path, int mask)
+{
+	return 0;
+}
+
 static inline int security_task_create(unsigned long clone_flags)
 {
 	return 0;
