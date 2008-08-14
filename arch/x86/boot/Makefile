@@ -25,7 +25,7 @@ SVGA_MODE := -DSVGA_MODE=NORMAL_VGA
 
 #RAMDISK := -DRAMDISK=512
 
-targets		:= vmlinux.bin setup.bin setup.elf zImage bzImage vmlinuz vmlinux-stripped
+targets		:= vmlinux.bin setup.bin setup.elf zImage bzImage
 subdir-		:= compressed
 
 setup-y		+= a20.o cmdline.o copy.o cpu.o cpucheck.o edd.o
@@ -189,14 +189,6 @@ zlilo: $(BOOTIMAGE)
 	cat $(BOOTIMAGE) > $(INSTALL_PATH)/vmlinuz
 	cp System.map $(INSTALL_PATH)/
 	if [ -x /sbin/lilo ]; then /sbin/lilo; else /etc/lilo/install; fi
-
-$(obj)/vmlinuz: $(obj)/vmlinux-stripped FORCE
-	$(call if_changed,gzip)
-	@echo 'Kernel: $@ is ready' ' (#'`cat .version`')'
-
-$(obj)/vmlinux-stripped: OBJCOPYFLAGS := -g --strip-unneeded
-$(obj)/vmlinux-stripped: vmlinux FORCE
-	$(call if_changed,objcopy)
 
 install:
 	sh $(srctree)/$(src)/install.sh $(KERNELRELEASE) $(BOOTIMAGE) System.map "$(INSTALL_PATH)"

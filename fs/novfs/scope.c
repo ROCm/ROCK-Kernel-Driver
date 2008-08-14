@@ -23,7 +23,7 @@
 #include <linux/slab.h>
 #include <linux/synclink.h>
 #include <linux/smp_lock.h>
-#include <asm/semaphore.h>
+#include <linux/semaphore.h>
 #include <linux/security.h>
 #include <linux/syscalls.h>
 

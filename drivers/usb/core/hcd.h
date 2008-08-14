@@ -21,6 +21,8 @@
 
 #include <linux/rwsem.h>
 
+#define MAX_TOPO_LEVEL		6
+
 /* This file contains declarations of usbcore internals that are mostly
  * used or exposed by Host Controller Drivers.
  */
@@ -217,10 +219,6 @@ struct hc_driver {
 	void	(*relinquish_port)(struct usb_hcd *, int);
 		/* has a port been handed over to a companion? */
 	int	(*port_handed_over)(struct usb_hcd *, int);
-#ifdef CONFIG_KDB_USB
-	/* KDB poll function for this HC */
-	int	(*kdb_poll_char)(struct urb *urb);
-#endif /* CONFIG_KDB_USB */
 };
 
 extern int usb_hcd_link_urb_to_ep(struct usb_hcd *hcd, struct urb *urb);
@@ -239,7 +237,7 @@ extern void usb_hcd_disable_endpoint(struct usb_device *udev,
 extern int usb_hcd_get_frame_number(struct usb_device *udev);
 
 extern struct usb_hcd *usb_create_hcd(const struct hc_driver *driver,
-		struct device *dev, char *bus_name);
+		struct device *dev, const char *bus_name);
 extern struct usb_hcd *usb_get_hcd(struct usb_hcd *hcd);
 extern void usb_put_hcd(struct usb_hcd *hcd);
 extern int usb_add_hcd(struct usb_hcd *hcd,

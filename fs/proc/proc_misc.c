@@ -123,6 +123,11 @@ static int uptime_read_proc(char *page, char **start, off_t off,
 	return proc_calc_metrics(page, start, off, count, eof, len);
 }
 
+int __attribute__((weak)) arch_report_meminfo(char *page)
+{
+	return 0;
+}
+
 static int meminfo_read_proc(char *page, char **start, off_t off,
 				 int count, int *eof, void *data)
 {
@@ -221,125 +226,12 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 
 		len += hugetlb_report_meminfo(page + len);
 
+	len += arch_report_meminfo(page + len);
+
 	return proc_calc_metrics(page, start, off, count, eof, len);
 #undef K
 }
 
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#include <linux/kdbprivate.h>
-/* Like meminfo_read_proc() but without the locks and using kdb_printf() */
-void
-kdb_meminfo_read_proc(void)
-{
-	struct sysinfo i;
-	unsigned long committed;
-	unsigned long allowed;
-	struct vmalloc_info vmi;
-	long cached;
-
-/*
- * display in kilobytes.
- */
-#define K(x) ((x) << (PAGE_SHIFT - 10))
-	si_meminfo(&i);
-	kdb_si_swapinfo(&i);
-	committed = atomic_read(&vm_committed_space);
-	allowed = ((totalram_pages - hugetlb_total_pages())
-		* sysctl_overcommit_ratio / 100) + total_swap_pages;
-
-	cached = global_page_state(NR_FILE_PAGES) -
-			total_swapcache_pages - i.bufferram;
-	if (cached < 0)
-		cached = 0;
-
-	get_vmalloc_info(&vmi);
-
-	kdb_printf(
-		"MemTotal:     %8lu kB\n"
-		"MemFree:      %8lu kB\n"
-		"Buffers:      %8lu kB\n",
-		K(i.totalram),
-		K(i.freeram),
-		K(i.bufferram)
-		);
-	kdb_printf(
-		"Cached:       %8lu kB\n"
-		"SwapCached:   %8lu kB\n"
-		"Active:       %8lu kB\n"
-		"Inactive:     %8lu kB\n",
-		K(cached),
-		K(total_swapcache_pages),
-		K(global_page_state(NR_ACTIVE)),
-		K(global_page_state(NR_INACTIVE))
-		);
-#ifdef CONFIG_HIGHMEM
-	kdb_printf(
-		"HighTotal:    %8lu kB\n"
-		"HighFree:     %8lu kB\n"
-		"LowTotal:     %8lu kB\n"
-		"LowFree:      %8lu kB\n",
-		K(i.totalhigh),
-		K(i.freehigh),
-		K(i.totalram-i.totalhigh),
-		K(i.freeram-i.freehigh)
-		);
-#endif
-	kdb_printf(
-		"SwapTotal:    %8lu kB\n"
-		"SwapFree:     %8lu kB\n"
-		"Dirty:        %8lu kB\n",
-		K(i.totalswap),
-		K(i.freeswap),
-		K(global_page_state(NR_FILE_DIRTY))
-		);
-	kdb_printf(
-		"Writeback:    %8lu kB\n"
-		"AnonPages:    %8lu kB\n"
-		"Mapped:       %8lu kB\n",
-		K(global_page_state(NR_WRITEBACK)),
-		K(global_page_state(NR_ANON_PAGES)),
-		K(global_page_state(NR_FILE_MAPPED))
-		);
-	kdb_printf(
-		"Slab:         %8lu kB\n"
-		"SReclaimable: %8lu kB\n"
-		"SUnreclaim:   %8lu kB\n",
-		K(global_page_state(NR_SLAB_RECLAIMABLE) +
-				global_page_state(NR_SLAB_UNRECLAIMABLE)),
-		K(global_page_state(NR_SLAB_RECLAIMABLE)),
-		K(global_page_state(NR_SLAB_UNRECLAIMABLE))
-		);
-	kdb_printf(
-		"PageTables:   %8lu kB\n"
-		"NFS_Unstable: %8lu kB\n"
-		"Bounce:       %8lu kB\n",
-		K(global_page_state(NR_PAGETABLE)),
-		K(global_page_state(NR_UNSTABLE_NFS)),
-		K(global_page_state(NR_BOUNCE))
-		);
-	kdb_printf(
-		"CommitLimit:  %8lu kB\n"
-		"Committed_AS: %8lu kB\n"
-		"VmallocTotal: %8lu kB\n",
-		K(allowed),
-		K(committed),
-		(unsigned long)VMALLOC_TOTAL >> 10
-		);
-	kdb_printf(
-		"VmallocUsed:  %8lu kB\n"
-		"VmallocChunk: %8lu kB\n",
-		vmi.used >> 10,
-		vmi.largest_chunk >> 10
-		);
-
-#ifdef	CONFIG_HUGETLBFS
-	kdb_hugetlb_report_meminfo();
-#endif
-}
-#endif	/* CONFIG_KDB */
-
-extern const struct seq_operations fragmentation_op;
 static int fragmentation_open(struct inode *inode, struct file *file)
 {
 	(void)inode;
@@ -353,7 +245,6 @@ static const struct file_operations fragmentation_file_operations = {
 	.release	= seq_release,
 };
 
-extern const struct seq_operations pagetypeinfo_op;
 static int pagetypeinfo_open(struct inode *inode, struct file *file)
 {
 	return seq_open(file, &pagetypeinfo_op);
@@ -366,7 +257,6 @@ static const struct file_operations pagetypeinfo_file_ops = {
 	.release	= seq_release,
 };
 
-extern const struct seq_operations zoneinfo_op;
 static int zoneinfo_open(struct inode *inode, struct file *file)
 {
 	return seq_open(file, &zoneinfo_op);
@@ -463,7 +353,6 @@ static const struct file_operations proc_devinfo_operations = {
 	.release	= seq_release,
 };
 
-extern const struct seq_operations vmstat_op;
 static int vmstat_open(struct inode *inode, struct file *file)
 {
 	return seq_open(file, &vmstat_op);
@@ -575,15 +464,33 @@ static const struct file_operations proc_slabstats_operations = {
 #ifdef CONFIG_MMU
 static int vmalloc_open(struct inode *inode, struct file *file)
 {
-	return seq_open(file, &vmalloc_op);
+	unsigned int *ptr = NULL;
+	int ret;
+
+	if (NUMA_BUILD)
+		ptr = kmalloc(nr_node_ids * sizeof(unsigned int), GFP_KERNEL);
+	ret = seq_open(file, &vmalloc_op);
+	if (!ret) {
+		struct seq_file *m = file->private_data;
+		m->private = ptr;
+	} else
+		kfree(ptr);
+	return ret;
 }
 
 static const struct file_operations proc_vmalloc_operations = {
 	.open		= vmalloc_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
-	.release	= seq_release,
+	.release	= seq_release_private,
 };
+#endif
+
+#ifndef arch_irq_stat_cpu
+#define arch_irq_stat_cpu(cpu) 0
+#endif
+#ifndef arch_irq_stat
+#define arch_irq_stat() 0
 #endif
 
 static int show_stat(struct seq_file *p, void *v)
@@ -623,7 +530,9 @@ static int show_stat(struct seq_file *p, void *v)
 			sum += temp;
 			per_irq_sum[j] += temp;
 		}
+		sum += arch_irq_stat_cpu(i);
 	}
+	sum += arch_irq_stat();
 
 	seq_printf(p, "cpu  %llu %llu %llu %llu %llu %llu %llu %llu %llu\n",
 		(unsigned long long)cputime64_to_clock_t(user),

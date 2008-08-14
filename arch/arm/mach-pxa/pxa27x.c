@@ -18,16 +18,17 @@
 #include <linux/platform_device.h>
 #include <linux/sysdev.h>
 
-#include <asm/hardware.h>
+#include <mach/hardware.h>
 #include <asm/irq.h>
-#include <asm/arch/irqs.h>
-#include <asm/arch/pxa-regs.h>
-#include <asm/arch/pxa2xx-regs.h>
-#include <asm/arch/mfp-pxa27x.h>
-#include <asm/arch/ohci.h>
-#include <asm/arch/pm.h>
-#include <asm/arch/dma.h>
-#include <asm/arch/i2c.h>
+#include <mach/irqs.h>
+#include <mach/pxa-regs.h>
+#include <mach/pxa2xx-regs.h>
+#include <mach/mfp-pxa27x.h>
+#include <mach/reset.h>
+#include <mach/ohci.h>
+#include <mach/pm.h>
+#include <mach/dma.h>
+#include <mach/i2c.h>
 
 #include "generic.h"
 #include "devices.h"
@@ -146,7 +147,7 @@ static struct clk pxa27x_clks[] = {
 
 	INIT_CKEN("I2SCLK",  I2S,  14682000, 0, &pxa_device_i2s.dev),
 	INIT_CKEN("I2CCLK",  I2C,  32842000, 0, &pxa_device_i2c.dev),
-	INIT_CKEN("UDCCLK",  USB,  48000000, 5, &pxa_device_udc.dev),
+	INIT_CKEN("UDCCLK",  USB,  48000000, 5, &pxa27x_device_udc.dev),
 	INIT_CKEN("MMCCLK",  MMC,  19500000, 0, &pxa_device_mci.dev),
 	INIT_CKEN("FICPCLK", FICP, 48000000, 0, &pxa_device_ficp.dev),
 
@@ -157,12 +158,13 @@ static struct clk pxa27x_clks[] = {
 	INIT_CKEN("SSPCLK", SSP1, 13000000, 0, &pxa27x_device_ssp1.dev),
 	INIT_CKEN("SSPCLK", SSP2, 13000000, 0, &pxa27x_device_ssp2.dev),
 	INIT_CKEN("SSPCLK", SSP3, 13000000, 0, &pxa27x_device_ssp3.dev),
+	INIT_CKEN("PWMCLK", PWM0, 13000000, 0, &pxa27x_device_pwm0.dev),
+	INIT_CKEN("PWMCLK", PWM1, 13000000, 0, &pxa27x_device_pwm1.dev),
 
 	INIT_CKEN("AC97CLK",     AC97,     24576000, 0, NULL),
 	INIT_CKEN("AC97CONFCLK", AC97CONF, 24576000, 0, NULL),
 
 	/*
-	INIT_CKEN("PWMCLK",  PWM0, 13000000, 0, NULL),
 	INIT_CKEN("MSLCLK",  MSL,  48000000, 0, NULL),
 	INIT_CKEN("USIMCLK", USIM, 48000000, 0, NULL),
 	INIT_CKEN("MSTKCLK", MEMSTK, 19500000, 0, NULL),
@@ -349,11 +351,14 @@ struct platform_device pxa27x_device_i2c_power = {
 
 void __init pxa_set_i2c_power_info(struct i2c_pxa_platform_data *info)
 {
+	local_irq_disable();
+	PCFR |= PCFR_PI2CEN;
+	local_irq_enable();
 	pxa27x_device_i2c_power.dev.platform_data = info;
 }
 
 static struct platform_device *devices[] __initdata = {
-	&pxa_device_udc,
+	&pxa27x_device_udc,
 	&pxa_device_ffuart,
 	&pxa_device_btuart,
 	&pxa_device_stuart,
@@ -363,6 +368,8 @@ static struct platform_device *devices[] __initdata = {
 	&pxa27x_device_ssp1,
 	&pxa27x_device_ssp2,
 	&pxa27x_device_ssp3,
+	&pxa27x_device_pwm0,
+	&pxa27x_device_pwm1,
 };
 
 static struct sys_device pxa27x_sysdev[] = {
@@ -378,6 +385,9 @@ static int __init pxa27x_init(void)
 	int i, ret = 0;
 
 	if (cpu_is_pxa27x()) {
+
+		reset_status = RCSR;
+
 		clks_register(pxa27x_clks, ARRAY_SIZE(pxa27x_clks));
 
 		if ((ret = pxa_init_dma(32)))

@@ -1,4 +1,4 @@
-/* linux/include/asm-arm/arch-s3c2410/regs-timer.h
+/* arch/arm/mach-s3c2410/include/mach/regs-timer.h
  *
  * Copyright (c) 2003 Simtec Electronics <linux@simtec.co.uk>
  *		      http://www.simtec.co.uk/products/SWLINUX/
@@ -64,6 +64,15 @@
 #define S3C2410_TCFG1_MUX0_DIV16  (3<<0)
 #define S3C2410_TCFG1_MUX0_TCLK0  (4<<0)
 #define S3C2410_TCFG1_MUX0_MASK	  (15<<0)
+
+#define S3C2410_TCFG1_MUX_DIV2	  (0<<0)
+#define S3C2410_TCFG1_MUX_DIV4	  (1<<0)
+#define S3C2410_TCFG1_MUX_DIV8	  (2<<0)
+#define S3C2410_TCFG1_MUX_DIV16   (3<<0)
+#define S3C2410_TCFG1_MUX_TCLK    (4<<0)
+#define S3C2410_TCFG1_MUX_MASK	  (15<<0)
+
+#define S3C2410_TCFG1_SHIFT(x)	  ((x) * 4)
 
 /* for each timer, we have an count buffer, an compare buffer and
  * an observation buffer

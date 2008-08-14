@@ -56,6 +56,12 @@ static void init_intel_pdc(struct acpi_processor *pr, struct cpuinfo_x86 *c)
 	if (cpu_has(c, X86_FEATURE_ACPI))
 		buf[2] |= ACPI_PDC_T_FFH;
 
+	/*
+	 * If mwait/monitor is unsupported, C2/C3_FFH will be disabled
+	 */
+	if (!cpu_has(c, X86_FEATURE_MWAIT))
+		buf[2] &= ~(ACPI_PDC_C_C2C3_FFH);
+
 	obj->type = ACPI_TYPE_BUFFER;
 	obj->buffer.length = 12;
 	obj->buffer.pointer = (u8 *) buf;
@@ -69,18 +75,7 @@ static void init_intel_pdc(struct acpi_processor *pr, struct cpuinfo_x86 *c)
 /* Initialize _PDC data based on the CPU vendor */
 void arch_acpi_processor_init_pdc(struct acpi_processor *pr)
 {
-#ifdef CONFIG_XEN
-	/*
-	 * As a work-around, just use cpu0's cpuinfo for all processors.
-	 * Further work is required to expose xen hypervisor interface of
-	 * getting physical cpuinfo to dom0 kernel and then
-	 * arch_acpi_processor_init_pdc can set _PDC parameters according
-	 * to Xen's phys information.
-	 */
-	struct cpuinfo_x86 *c = &boot_cpu_data;
-#else
 	struct cpuinfo_x86 *c = &cpu_data(pr->id);
-#endif
 
 	pr->pdc = NULL;
 	if (c->x86_vendor == X86_VENDOR_INTEL)

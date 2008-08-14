@@ -100,7 +100,6 @@ struct grant_entry {
      */
     uint32_t frame;
 };
-typedef struct grant_entry grant_entry_t;
 
 /*
  * Type of grant entry.
@@ -119,7 +118,6 @@ typedef struct grant_entry grant_entry_t;
  *  GTF_readonly: Restrict @domid to read-only mappings and accesses. [GST]
  *  GTF_reading: Grant entry is currently mapped for reading by @domid. [XEN]
  *  GTF_writing: Grant entry is currently mapped for writing by @domid. [XEN]
- *  GTF_PAT, GTF_PWT, GTF_PCD: (x86) cache attribute flags for the grant [GST]
  */
 #define _GTF_readonly       (2)
 #define GTF_readonly        (1U<<_GTF_readonly)
@@ -127,12 +125,6 @@ typedef struct grant_entry grant_entry_t;
 #define GTF_reading         (1U<<_GTF_reading)
 #define _GTF_writing        (4)
 #define GTF_writing         (1U<<_GTF_writing)
-#define _GTF_PWT            (5)
-#define GTF_PWT             (1U<<_GTF_PWT)
-#define _GTF_PCD            (6)
-#define GTF_PCD             (1U<<_GTF_PCD)
-#define _GTF_PAT            (7)
-#define GTF_PAT             (1U<<_GTF_PAT)
 
 /*
  * Subflags for GTF_accept_transfer:
@@ -193,9 +185,7 @@ struct gnttab_map_grant_ref {
     grant_handle_t handle;
     uint64_t dev_bus_addr;
 };
-DEFINE_XEN_GUEST_HANDLE_STRUCT(gnttab_map_grant_ref);
-typedef struct gnttab_map_grant_ref gnttab_map_grant_ref_t;
-DEFINE_XEN_GUEST_HANDLE(gnttab_map_grant_ref_t);
+DEFINE_GUEST_HANDLE_STRUCT(gnttab_map_grant_ref);
 
 /*
  * GNTTABOP_unmap_grant_ref: Destroy one or more grant-reference mappings
@@ -217,9 +207,7 @@ struct gnttab_unmap_grant_ref {
     /* OUT parameters. */
     int16_t  status;              /* GNTST_* */
 };
-DEFINE_XEN_GUEST_HANDLE_STRUCT(gnttab_unmap_grant_ref);
-typedef struct gnttab_unmap_grant_ref gnttab_unmap_grant_ref_t;
-DEFINE_XEN_GUEST_HANDLE(gnttab_unmap_grant_ref_t);
+DEFINE_GUEST_HANDLE_STRUCT(gnttab_unmap_grant_ref);
 
 /*
  * GNTTABOP_setup_table: Set up a grant table for <dom> comprising at least
@@ -237,11 +225,9 @@ struct gnttab_setup_table {
     uint32_t nr_frames;
     /* OUT parameters. */
     int16_t  status;              /* GNTST_* */
-    XEN_GUEST_HANDLE(ulong) frame_list;
+    GUEST_HANDLE(ulong) frame_list;
 };
-DEFINE_XEN_GUEST_HANDLE_STRUCT(gnttab_setup_table);
-typedef struct gnttab_setup_table gnttab_setup_table_t;
-DEFINE_XEN_GUEST_HANDLE(gnttab_setup_table_t);
+DEFINE_GUEST_HANDLE_STRUCT(gnttab_setup_table);
 
 /*
  * GNTTABOP_dump_table: Dump the contents of the grant table to the
@@ -254,9 +240,7 @@ struct gnttab_dump_table {
     /* OUT parameters. */
     int16_t status;               /* GNTST_* */
 };
-DEFINE_XEN_GUEST_HANDLE_STRUCT(gnttab_dump_table);
-typedef struct gnttab_dump_table gnttab_dump_table_t;
-DEFINE_XEN_GUEST_HANDLE(gnttab_dump_table_t);
+DEFINE_GUEST_HANDLE_STRUCT(gnttab_dump_table);
 
 /*
  * GNTTABOP_transfer_grant_ref: Transfer <frame> to a foreign domain. The
@@ -269,16 +253,13 @@ DEFINE_XEN_GUEST_HANDLE(gnttab_dump_table_t);
 #define GNTTABOP_transfer                4
 struct gnttab_transfer {
     /* IN parameters. */
-    xen_pfn_t     mfn;
+    unsigned long mfn;
     domid_t       domid;
     grant_ref_t   ref;
     /* OUT parameters. */
     int16_t       status;
 };
-DEFINE_XEN_GUEST_HANDLE_STRUCT(gnttab_transfer);
-typedef struct gnttab_transfer gnttab_transfer_t;
-DEFINE_XEN_GUEST_HANDLE(gnttab_transfer_t);
-
+DEFINE_GUEST_HANDLE_STRUCT(gnttab_transfer);
 
 /*
  * GNTTABOP_copy: Hypervisor based copy
@@ -304,23 +285,22 @@ DEFINE_XEN_GUEST_HANDLE(gnttab_transfer_t);
 #define GNTCOPY_dest_gref         (1<<_GNTCOPY_dest_gref)
 
 #define GNTTABOP_copy                 5
-typedef struct gnttab_copy {
-    /* IN parameters. */
-    struct {
-        union {
-            grant_ref_t ref;
-            xen_pfn_t   gmfn;
-        } u;
-        domid_t  domid;
-        uint16_t offset;
-    } source, dest;
-    uint16_t      len;
-    uint16_t      flags;          /* GNTCOPY_* */
-    /* OUT parameters. */
-    int16_t       status;
-} gnttab_copy_t;
-DEFINE_XEN_GUEST_HANDLE_STRUCT(gnttab_copy);
-DEFINE_XEN_GUEST_HANDLE(gnttab_copy_t);
+struct gnttab_copy {
+	/* IN parameters. */
+	struct {
+		union {
+			grant_ref_t ref;
+			unsigned long   gmfn;
+		} u;
+		domid_t  domid;
+		uint16_t offset;
+	} source, dest;
+	uint16_t      len;
+	uint16_t      flags;          /* GNTCOPY_* */
+	/* OUT parameters. */
+	int16_t       status;
+};
+DEFINE_GUEST_HANDLE_STRUCT(gnttab_copy);
 
 /*
  * GNTTABOP_query_size: Query the current and maximum sizes of the shared
@@ -338,33 +318,7 @@ struct gnttab_query_size {
     uint32_t max_nr_frames;
     int16_t  status;              /* GNTST_* */
 };
-DEFINE_XEN_GUEST_HANDLE_STRUCT(gnttab_query_size);
-typedef struct gnttab_query_size gnttab_query_size_t;
-DEFINE_XEN_GUEST_HANDLE(gnttab_query_size_t);
-
-/*
- * GNTTABOP_unmap_and_replace: Destroy one or more grant-reference mappings
- * tracked by <handle> but atomically replace the page table entry with one
- * pointing to the machine address under <new_addr>.  <new_addr> will be
- * redirected to the null entry.
- * NOTES:
- *  1. The call may fail in an undefined manner if either mapping is not
- *     tracked by <handle>.
- *  2. After executing a batch of unmaps, it is guaranteed that no stale
- *     mappings will remain in the device or host TLBs.
- */
-#define GNTTABOP_unmap_and_replace    7
-struct gnttab_unmap_and_replace {
-    /* IN parameters. */
-    uint64_t host_addr;
-    uint64_t new_addr;
-    grant_handle_t handle;
-    /* OUT parameters. */
-    int16_t  status;              /* GNTST_* */
-};
-typedef struct gnttab_unmap_and_replace gnttab_unmap_and_replace_t;
-DEFINE_XEN_GUEST_HANDLE(gnttab_unmap_and_replace_t);
-
+DEFINE_GUEST_HANDLE_STRUCT(gnttab_query_size);
 
 /*
  * Bitfield values for update_pin_status.flags.
@@ -407,8 +361,7 @@ DEFINE_XEN_GUEST_HANDLE(gnttab_unmap_and_replace_t);
 #define GNTST_no_device_space  (-7) /* Out of space in I/O MMU.              */
 #define GNTST_permission_denied (-8) /* Not enough privilege for operation.  */
 #define GNTST_bad_page         (-9) /* Specified page was invalid for op.    */
-#define GNTST_bad_copy_arg    (-10) /* copy arguments cross page boundary.   */
-#define GNTST_address_too_big (-11) /* transfer page address too large.      */
+#define GNTST_bad_copy_arg    (-10) /* copy arguments cross page boundary */
 
 #define GNTTABOP_error_msgs {                   \
     "okay",                                     \
@@ -421,18 +374,7 @@ DEFINE_XEN_GUEST_HANDLE(gnttab_unmap_and_replace_t);
     "no spare translation slot in the I/O MMU", \
     "permission denied",                        \
     "bad page",                                 \
-    "copy arguments cross page boundary",       \
-    "page address size too large"               \
+    "copy arguments cross page boundary"        \
 }
 
 #endif /* __XEN_PUBLIC_GRANT_TABLE_H__ */
-
-/*
- * Local variables:
- * mode: C
- * c-set-style: "BSD"
- * c-basic-offset: 4
- * tab-width: 4
- * indent-tabs-mode: nil
- * End:
- */

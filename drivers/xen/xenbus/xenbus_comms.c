@@ -35,25 +35,13 @@
 #include <linux/sched.h>
 #include <linux/err.h>
 #include <xen/xenbus.h>
-#if defined(CONFIG_XEN) || defined(MODULE)
-#include <xen/evtchn.h>
-#include <asm/hypervisor.h>
-#else
 #include <asm/xen/hypervisor.h>
 #include <xen/events.h>
 #include <xen/page.h>
-#endif
-
 #include "xenbus_comms.h"
-
-#ifdef HAVE_XEN_PLATFORM_COMPAT_H
-#include <xen/platform-compat.h>
-#endif
 
 static int xenbus_irq;
 
-extern void xenbus_probe(struct work_struct *);
-extern int xenstored_ready;
 static DECLARE_WORK(probe_work, xenbus_probe);
 
 static DECLARE_WAIT_QUEUE_HEAD(xb_waitq);
@@ -215,7 +203,6 @@ int xb_read(void *data, unsigned len)
 int xb_init_comms(void)
 {
 	struct xenstore_domain_interface *intf = xen_store_interface;
-	int err;
 
 	if (intf->req_prod != intf->req_cons)
 		printk(KERN_ERR "XENBUS request ring is not quiescent "
@@ -228,22 +215,20 @@ int xb_init_comms(void)
 		intf->rsp_cons = intf->rsp_prod;
 	}
 
-	if (xenbus_irq)
-		unbind_from_irqhandler(xenbus_irq, &xb_waitq);
+	if (xenbus_irq) {
+		/* Already have an irq; assume we're resuming */
+		rebind_evtchn_irq(xen_store_evtchn, xenbus_irq);
+	} else {
+		int err;
+		err = bind_evtchn_to_irqhandler(xen_store_evtchn, wake_waiting,
+						0, "xenbus", &xb_waitq);
+		if (err <= 0) {
+			printk(KERN_ERR "XENBUS request irq failed %i\n", err);
+			return err;
+		}
 
-#if defined(CONFIG_XEN) || defined(MODULE)
-	err = bind_caller_port_to_irqhandler(
-#else
-	err = bind_evtchn_to_irqhandler(
-#endif
-		xen_store_evtchn, wake_waiting,
-		0, "xenbus", &xb_waitq);
-	if (err <= 0) {
-		printk(KERN_ERR "XENBUS request irq failed %i\n", err);
-		return err;
+		xenbus_irq = err;
 	}
-
-	xenbus_irq = err;
 
 	return 0;
 }

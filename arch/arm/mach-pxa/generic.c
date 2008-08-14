@@ -20,14 +20,24 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 
-#include <asm/hardware.h>
+#include <mach/hardware.h>
 #include <asm/system.h>
 #include <asm/pgtable.h>
 #include <asm/mach/map.h>
 
-#include <asm/arch/pxa-regs.h>
+#include <mach/pxa-regs.h>
+#include <mach/reset.h>
 
 #include "generic.h"
+
+void clear_reset_status(unsigned int mask)
+{
+	if (cpu_is_pxa2xx())
+		pxa2xx_clear_reset_status(mask);
+
+	if (cpu_is_pxa3xx())
+		pxa3xx_clear_reset_status(mask);
+}
 
 /*
  * Get the clock frequency as reflected by CCCR and the turbo flag.
@@ -58,23 +68,6 @@ unsigned int get_memclk_frequency_10khz(void)
 		return pxa3xx_get_memclk_frequency_10khz();
 }
 EXPORT_SYMBOL(get_memclk_frequency_10khz);
-
-/*
- * Routine to safely enable or disable a clock in the CKEN
- */
-void __pxa_set_cken(int clock, int enable)
-{
-	unsigned long flags;
-	local_irq_save(flags);
-
-	if (enable)
-		CKEN |= (1 << clock);
-	else
-		CKEN &= ~(1 << clock);
-
-	local_irq_restore(flags);
-}
-EXPORT_SYMBOL(__pxa_set_cken);
 
 /*
  * Intel PXA2xx internal register mapping.

@@ -16,10 +16,7 @@
 #include <asm/dma.h>
 #include <asm/io_apic.h>
 #include <asm/apic.h>
-
-#ifdef CONFIG_GART_IOMMU
-#include <asm/gart.h>
-#endif
+#include <asm/iommu.h>
 
 extern int hpet_rework;
 
@@ -52,7 +49,7 @@ static void __init fix_hypertransport_config(int num, int slot, int func)
 static void __init via_bugs(int  num, int slot, int func)
 {
 #ifdef CONFIG_GART_IOMMU
-	if ((end_pfn > MAX_DMA32_PFN ||  force_iommu) &&
+	if ((max_pfn > MAX_DMA32_PFN ||  force_iommu) &&
 	    !gart_iommu_aperture_allowed) {
 		printk(KERN_INFO
 		       "Looks like a VIA chipset. Disabling IOMMU."
@@ -100,17 +97,6 @@ static void __init nvidia_bugs(int num, int slot, int func)
 
 }
 
-static void __init ati_bugs(int num, int slot, int func)
-{
-#ifdef CONFIG_X86_IO_APIC
-	if (timer_over_8254 == 1) {
-		timer_over_8254 = 0;
-		printk(KERN_INFO
-		"ATI board detected. Disabling timer routing over 8254.\n");
-	}
-#endif
-}
-
 static void __init amd_sb700_hpet(int num, int slot, int func)
 {
 	int rev;
@@ -138,8 +124,6 @@ static struct chipset early_qrk[] __initdata = {
 	  PCI_CLASS_BRIDGE_PCI, PCI_ANY_ID, QFLAG_APPLY_ONCE, nvidia_bugs },
 	{ PCI_VENDOR_ID_VIA, PCI_ANY_ID,
 	  PCI_CLASS_BRIDGE_PCI, PCI_ANY_ID, QFLAG_APPLY_ONCE, via_bugs },
-	{ PCI_VENDOR_ID_ATI, PCI_ANY_ID,
-	  PCI_CLASS_BRIDGE_PCI, PCI_ANY_ID, QFLAG_APPLY_ONCE, ati_bugs },
 	{ PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_K8_NB,
 	  PCI_CLASS_BRIDGE_HOST, PCI_ANY_ID, 0, fix_hypertransport_config },
 	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_SBX00_SMBUS,
@@ -147,7 +131,18 @@ static struct chipset early_qrk[] __initdata = {
 	{}
 };
 
-static void __init check_dev_quirk(int num, int slot, int func)
+/**
+ * check_dev_quirk - apply early quirks to a given PCI device
+ * @num: bus number
+ * @slot: slot number
+ * @func: PCI function
+ *
+ * Check the vendor & device ID against the early quirks table.
+ *
+ * If the device is single function, let early_quirks() know so we don't
+ * poke at this device again.
+ */
+static int __init check_dev_quirk(int num, int slot, int func)
 {
 	u16 class;
 	u16 vendor;
@@ -158,7 +153,7 @@ static void __init check_dev_quirk(int num, int slot, int func)
 	class = read_pci_config_16(num, slot, func, PCI_CLASS_DEVICE);
 
 	if (class == 0xffff)
-		return;
+		return -1; /* no class, treat as single function */
 
 	vendor = read_pci_config_16(num, slot, func, PCI_VENDOR_ID);
 
@@ -181,7 +176,9 @@ static void __init check_dev_quirk(int num, int slot, int func)
 	type = read_pci_config_byte(num, slot, func,
 				    PCI_HEADER_TYPE);
 	if (!(type & 0x80))
-		return;
+		return -1;
+
+	return 0;
 }
 
 void __init early_quirks(void)
@@ -194,6 +191,9 @@ void __init early_quirks(void)
 	/* Poor man's PCI discovery */
 	for (num = 0; num < 32; num++)
 		for (slot = 0; slot < 32; slot++)
-			for (func = 0; func < 8; func++)
-				check_dev_quirk(num, slot, func);
+			for (func = 0; func < 8; func++) {
+				/* Only probe function 0 on single fn devices */
+				if (check_dev_quirk(num, slot, func))
+					break;
+			}
 }

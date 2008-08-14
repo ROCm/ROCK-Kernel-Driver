@@ -1,5 +1,6 @@
 /*
  *  Copyright (C) 1991, 1992  Linus Torvalds
+ *  Copyright (C) 2000, 2001, 2002 Andi Kleen, SuSE Labs
  *
  *  Pentium III FXSR, SSE support
  *	Gareth Hughes <gareth@valinux.com>, May 2000
@@ -45,10 +46,6 @@
 #include <linux/edac.h>
 #endif
 
-#ifdef CONFIG_KDB
-#include <linux/kdb.h>
-#endif /* CONFIG_KDB */
-
 #include <asm/arch_hooks.h>
 #include <asm/stacktrace.h>
 #include <asm/processor.h>
@@ -61,10 +58,9 @@
 #include <asm/nmi.h>
 #include <asm/smp.h>
 #include <asm/io.h>
+#include <asm/traps.h>
 
 #include "mach_traps.h"
-
-int panic_on_unrecovered_nmi;
 
 DECLARE_BITMAP(used_vectors, NR_VECTORS);
 EXPORT_SYMBOL_GPL(used_vectors);
@@ -82,44 +78,22 @@ char ignore_fpu_irq;
 gate_desc idt_table[256]
 	__attribute__((__section__(".data.idt"))) = { { { { 0, 0 } } }, };
 
-asmlinkage void divide_error(void);
-asmlinkage void debug(void);
-asmlinkage void nmi(void);
-asmlinkage void int3(void);
-asmlinkage void overflow(void);
-asmlinkage void bounds(void);
-asmlinkage void invalid_op(void);
-asmlinkage void device_not_available(void);
-asmlinkage void coprocessor_segment_overrun(void);
-asmlinkage void invalid_TSS(void);
-asmlinkage void segment_not_present(void);
-asmlinkage void stack_segment(void);
-asmlinkage void general_protection(void);
-asmlinkage void page_fault(void);
-asmlinkage void coprocessor_error(void);
-asmlinkage void simd_coprocessor_error(void);
-asmlinkage void alignment_check(void);
-asmlinkage void spurious_interrupt_bug(void);
-asmlinkage void machine_check(void);
-
+int panic_on_unrecovered_nmi;
 int kstack_depth_to_print = 24;
 static unsigned int code_bytes = 64;
-#ifdef CONFIG_STACK_UNWIND
-static int call_trace = 1;
-#else
-#define call_trace (-1)
-#endif
+static int ignore_nmis;
+static int die_counter;
 
 void printk_address(unsigned long address, int reliable)
 {
 #ifdef CONFIG_KALLSYMS
-	char namebuf[KSYM_NAME_LEN];
 	unsigned long offset = 0;
 	unsigned long symsize;
 	const char *symname;
-	char reliab[4] = "";
-	char *delim = ":";
 	char *modname;
+	char *delim = ":";
+	char namebuf[KSYM_NAME_LEN];
+	char reliab[4] = "";
 
 	symname = kallsyms_lookup(address, &symsize, &offset,
 					&modname, namebuf);
@@ -139,22 +113,23 @@ void printk_address(unsigned long address, int reliable)
 #endif
 }
 
-static inline int valid_stack_ptr(struct thread_info *tinfo, void *p, unsigned size)
+static inline int valid_stack_ptr(struct thread_info *tinfo,
+			void *p, unsigned int size)
 {
-	return	p > (void *)tinfo &&
-		p <= (void *)tinfo + THREAD_SIZE - size;
+	void *t = tinfo;
+	return	p > t && p <= t + THREAD_SIZE - size;
 }
 
 /* The form of the top of the frame on the stack */
 struct stack_frame {
-	struct stack_frame	*next_frame;
-	unsigned long		return_address;
+	struct stack_frame *next_frame;
+	unsigned long return_address;
 };
 
 static inline unsigned long
 print_context_stack(struct thread_info *tinfo,
-		    unsigned long *stack, unsigned long bp,
-		    const struct stacktrace_ops *ops, void *data)
+		unsigned long *stack, unsigned long bp,
+		const struct stacktrace_ops *ops, void *data)
 {
 	struct stack_frame *frame = (struct stack_frame *)bp;
 
@@ -176,33 +151,6 @@ print_context_stack(struct thread_info *tinfo,
 	return bp;
 }
 
-struct ops_and_data {
-	const struct stacktrace_ops *ops;
-	void *data;
-};
-
-static asmlinkage int
-dump_trace_unwind(struct unwind_frame_info *info, void *data)
-{
-	struct ops_and_data *oad = (struct ops_and_data *)data;
-	int n = 0;
-	unsigned long sp = UNW_SP(info);
-
-	if (arch_unw_user_mode(info))
-		return -1;
-	while (unwind(info) == 0 && UNW_PC(info)) {
-		n++;
-		oad->ops->address(oad->data, UNW_PC(info), 1);
-		if (arch_unw_user_mode(info))
-			break;
-		if ((sp & ~(PAGE_SIZE - 1)) == (UNW_SP(info) & ~(PAGE_SIZE - 1))
-		    && sp > UNW_SP(info))
-			break;
-		sp = UNW_SP(info);
-	}
-	return n;
-}
-
 void dump_trace(struct task_struct *task, struct pt_regs *regs,
 		unsigned long *stack, unsigned long bp,
 		const struct stacktrace_ops *ops, void *data)
@@ -210,43 +158,8 @@ void dump_trace(struct task_struct *task, struct pt_regs *regs,
 	if (!task)
 		task = current;
 
-	if (call_trace >= 0) {
-		int unw_ret = 0;
-		struct unwind_frame_info info;
-		struct ops_and_data oad = { .ops = ops, .data = data };
-
-		if (regs) {
-			if (unwind_init_frame_info(&info, task, regs) == 0)
-				unw_ret = dump_trace_unwind(&info, &oad);
-		} else if (task == current)
-			unw_ret = unwind_init_running(&info, dump_trace_unwind, &oad);
-		else {
-			if (unwind_init_blocked(&info, task) == 0)
-				unw_ret = dump_trace_unwind(&info, &oad);
-		}
-		if (unw_ret > 0) {
-			if (call_trace == 1 && !arch_unw_user_mode(&info)) {
-				ops->warning_symbol(data, "DWARF2 unwinder stuck at %s\n",
-					     UNW_PC(&info));
-				if (UNW_SP(&info) >= PAGE_OFFSET) {
-					ops->warning(data, "Leftover inexact backtrace:\n");
-					stack = (void *)UNW_SP(&info);
-					if (!stack)
-						return;
-					bp = UNW_FP(&info);
-				} else
-					ops->warning(data, "Full inexact backtrace again:\n");
-			} else if (call_trace >= 1)
-				return;
-			else
-				ops->warning(data, "Full inexact backtrace again:\n");
-		} else
-			ops->warning(data, "Inexact backtrace:\n");
-	}
-
 	if (!stack) {
 		unsigned long dummy;
-
 		stack = &dummy;
 		if (task != current)
 			stack = (unsigned long *)task->thread.sp;
@@ -264,7 +177,7 @@ void dump_trace(struct task_struct *task, struct pt_regs *regs,
 	}
 #endif
 
-	while (1) {
+	for (;;) {
 		struct thread_info *context;
 
 		context = (struct thread_info *)
@@ -316,15 +229,15 @@ static void print_trace_address(void *data, unsigned long addr, int reliable)
 }
 
 static const struct stacktrace_ops print_trace_ops = {
-	.warning		= print_trace_warning,
-	.warning_symbol		= print_trace_warning_symbol,
-	.stack			= print_trace_stack,
-	.address		= print_trace_address,
+	.warning = print_trace_warning,
+	.warning_symbol = print_trace_warning_symbol,
+	.stack = print_trace_stack,
+	.address = print_trace_address,
 };
 
 static void
 show_trace_log_lvl(struct task_struct *task, struct pt_regs *regs,
-		   unsigned long *stack, unsigned long bp, char *log_lvl)
+		unsigned long *stack, unsigned long bp, char *log_lvl)
 {
 	dump_trace(task, regs, stack, bp, &print_trace_ops, log_lvl);
 	printk("%s =======================\n", log_lvl);
@@ -419,15 +332,14 @@ void show_registers(struct pt_regs *regs)
 		printk(KERN_EMERG "Code: ");
 
 		ip = (u8 *)regs->ip - code_prologue;
-		if (ip < (u8 *)PAGE_OFFSET ||
-			probe_kernel_address(ip, c)) {
+		if (ip < (u8 *)PAGE_OFFSET || probe_kernel_address(ip, c)) {
 			/* try starting at EIP */
 			ip = (u8 *)regs->ip;
 			code_len = code_len - code_prologue + 1;
 		}
 		for (i = 0; i < code_len; i++, ip++) {
 			if (ip < (u8 *)PAGE_OFFSET ||
-				probe_kernel_address(ip, c)) {
+					probe_kernel_address(ip, c)) {
 				printk(" Bad EIP value.");
 				break;
 			}
@@ -452,7 +364,53 @@ int is_valid_bugaddr(unsigned long ip)
 	return ud2 == 0x0b0f;
 }
 
-static int die_counter;
+static raw_spinlock_t die_lock = __RAW_SPIN_LOCK_UNLOCKED;
+static int die_owner = -1;
+static unsigned int die_nest_count;
+
+unsigned __kprobes long oops_begin(void)
+{
+	unsigned long flags;
+
+	oops_enter();
+
+	if (die_owner != raw_smp_processor_id()) {
+		console_verbose();
+		raw_local_irq_save(flags);
+		__raw_spin_lock(&die_lock);
+		die_owner = smp_processor_id();
+		die_nest_count = 0;
+		bust_spinlocks(1);
+	} else {
+		raw_local_irq_save(flags);
+	}
+	die_nest_count++;
+	return flags;
+}
+
+void __kprobes oops_end(unsigned long flags, struct pt_regs *regs, int signr)
+{
+	bust_spinlocks(0);
+	die_owner = -1;
+	add_taint(TAINT_DIE);
+	__raw_spin_unlock(&die_lock);
+	raw_local_irq_restore(flags);
+
+	if (!regs)
+		return;
+
+	if (kexec_should_crash(current))
+		crash_kexec(regs);
+
+	if (in_interrupt())
+		panic("Fatal exception in interrupt");
+
+	if (panic_on_oops)
+		panic("Fatal exception");
+
+	oops_exit();
+	do_exit(signr);
+}
 
 int __kprobes __die(const char *str, struct pt_regs *regs, long err)
 {
@@ -473,24 +431,21 @@ int __kprobes __die(const char *str, struct pt_regs *regs, long err)
 
 	sysfs_printk_last_file();
 	if (notify_die(DIE_OOPS, str, regs, err,
-			current->thread.trap_no, SIGSEGV) != NOTIFY_STOP) {
+			current->thread.trap_no, SIGSEGV) == NOTIFY_STOP)
+		return 1;
 
-		show_registers(regs);
-		/* Executive summary in case the oops scrolled away */
-		sp = (unsigned long) (&regs->sp);
-		savesegment(ss, ss);
-		if (user_mode(regs)) {
-			sp = regs->sp;
-			ss = regs->ss & 0xffff;
-		}
-		printk(KERN_EMERG "EIP: [<%08lx>] ", regs->ip);
-		print_symbol("%s", regs->ip);
-		printk(" SS:ESP %04x:%08lx\n", ss, sp);
-
-		return 0;
+	show_registers(regs);
+	/* Executive summary in case the oops scrolled away */
+	sp = (unsigned long) (&regs->sp);
+	savesegment(ss, ss);
+	if (user_mode(regs)) {
+		sp = regs->sp;
+		ss = regs->ss & 0xffff;
 	}
-
-	return 1;
+	printk(KERN_EMERG "EIP: [<%08lx>] ", regs->ip);
+	print_symbol("%s", regs->ip);
+	printk(" SS:ESP %04x:%08lx\n", ss, sp);
+	return 0;
 }
 
 /*
@@ -499,31 +454,9 @@ int __kprobes __die(const char *str, struct pt_regs *regs, long err)
  */
 void die(const char *str, struct pt_regs *regs, long err)
 {
-	static struct {
-		raw_spinlock_t lock;
-		u32 lock_owner;
-		int lock_owner_depth;
-	} die = {
-		.lock =			__RAW_SPIN_LOCK_UNLOCKED,
-		.lock_owner =		-1,
-		.lock_owner_depth =	0
-	};
-	unsigned long flags;
+	unsigned long flags = oops_begin();
 
-	oops_enter();
-
-	if (die.lock_owner != raw_smp_processor_id()) {
-		console_verbose();
-		raw_local_irq_save(flags);
-		__raw_spin_lock(&die.lock);
-		die.lock_owner = smp_processor_id();
-		die.lock_owner_depth = 0;
-		bust_spinlocks(1);
-	} else {
-		raw_local_irq_save(flags);
-	}
-
-	if (++die.lock_owner_depth < 3) {
+	if (die_nest_count < 3) {
 		report_bug(regs->ip, regs);
 
 		if (__die(str, regs, err))
@@ -532,30 +465,7 @@ void die(const char *str, struct pt_regs *regs, long err)
 		printk(KERN_EMERG "Recursive die() failure, output suppressed\n");
 	}
 
-	bust_spinlocks(0);
-	die.lock_owner = -1;
-	add_taint(TAINT_DIE);
-	__raw_spin_unlock(&die.lock);
-	raw_local_irq_restore(flags);
-#ifdef CONFIG_KDB
-	kdb_diemsg = str;
-	kdb(KDB_REASON_OOPS, err, regs);
-#endif /* CONFIG_KDB */
-
-	if (!regs)
-		return;
-
-	if (kexec_should_crash(current))
-		crash_kexec(regs);
-
-	if (in_interrupt())
-		panic("Fatal exception in interrupt");
-
-	if (panic_on_oops)
-		panic("Fatal exception");
-
-	oops_exit();
-	do_exit(SIGSEGV);
+	oops_end(flags, regs, SIGSEGV);
 }
 
 static inline void
@@ -619,7 +529,7 @@ void do_##name(struct pt_regs *regs, long error_code)			\
 {									\
 	trace_hardirqs_fixup();						\
 	if (notify_die(DIE_TRAP, str, regs, error_code, trapnr, signr)	\
-						== NOTIFY_STOP)		\
+							== NOTIFY_STOP)	\
 		return;							\
 	do_trap(trapnr, signr, str, 0, regs, error_code, NULL);		\
 }
@@ -635,7 +545,7 @@ void do_##name(struct pt_regs *regs, long error_code)			\
 	info.si_code = sicode;						\
 	info.si_addr = (void __user *)siaddr;				\
 	if (notify_die(DIE_TRAP, str, regs, error_code, trapnr, signr)	\
-						== NOTIFY_STOP)		\
+							== NOTIFY_STOP)	\
 		return;							\
 	do_trap(trapnr, signr, str, 0, regs, error_code, &info);	\
 }
@@ -644,7 +554,7 @@ void do_##name(struct pt_regs *regs, long error_code)			\
 void do_##name(struct pt_regs *regs, long error_code)			\
 {									\
 	if (notify_die(DIE_TRAP, str, regs, error_code, trapnr, signr)	\
-						== NOTIFY_STOP)		\
+							== NOTIFY_STOP)	\
 		return;							\
 	do_trap(trapnr, signr, str, 1, regs, error_code, NULL);		\
 }
@@ -659,27 +569,29 @@ void do_##name(struct pt_regs *regs, long error_code)			\
 	info.si_addr = (void __user *)siaddr;				\
 	trace_hardirqs_fixup();						\
 	if (notify_die(DIE_TRAP, str, regs, error_code, trapnr, signr)	\
-						== NOTIFY_STOP)		\
+							== NOTIFY_STOP)	\
 		return;							\
 	do_trap(trapnr, signr, str, 1, regs, error_code, &info);	\
 }
 
-DO_VM86_ERROR_INFO(0, SIGFPE,  "divide error", divide_error, FPE_INTDIV, regs->ip)
-#if	!defined(CONFIG_KPROBES) && !defined(CONFIG_KDB)
+DO_VM86_ERROR_INFO(0, SIGFPE, "divide error", divide_error, FPE_INTDIV, regs->ip)
+#ifndef CONFIG_KPROBES
 DO_VM86_ERROR(3, SIGTRAP, "int3", int3)
 #endif
 DO_VM86_ERROR(4, SIGSEGV, "overflow", overflow)
 DO_VM86_ERROR(5, SIGSEGV, "bounds", bounds)
-DO_ERROR_INFO(6, SIGILL,  "invalid opcode", invalid_op, ILL_ILLOPN, regs->ip, 0)
-DO_ERROR(9, SIGFPE,  "coprocessor segment overrun", coprocessor_segment_overrun)
+DO_ERROR_INFO(6, SIGILL, "invalid opcode", invalid_op, ILL_ILLOPN, regs->ip, 0)
+DO_ERROR(9, SIGFPE, "coprocessor segment overrun", coprocessor_segment_overrun)
 DO_ERROR(10, SIGSEGV, "invalid TSS", invalid_TSS)
-DO_ERROR(11, SIGBUS,  "segment not present", segment_not_present)
-DO_ERROR(12, SIGBUS,  "stack segment", stack_segment)
+DO_ERROR(11, SIGBUS, "segment not present", segment_not_present)
+DO_ERROR(12, SIGBUS, "stack segment", stack_segment)
 DO_ERROR_INFO(17, SIGBUS, "alignment check", alignment_check, BUS_ADRALN, 0, 0)
 DO_ERROR_INFO(32, SIGILL, "iret exception", iret_error, ILL_BADSTK, 0, 1)
 
-void __kprobes do_general_protection(struct pt_regs *regs, long error_code)
+void __kprobes
+do_general_protection(struct pt_regs *regs, long error_code)
 {
+	struct task_struct *tsk;
 	struct thread_struct *thread;
 	struct tss_struct *tss;
 	int cpu;
@@ -720,23 +632,24 @@ void __kprobes do_general_protection(struct pt_regs *regs, long error_code)
 	if (regs->flags & X86_VM_MASK)
 		goto gp_in_vm86;
 
+	tsk = current;
 	if (!user_mode(regs))
 		goto gp_in_kernel;
 
-	current->thread.error_code = error_code;
-	current->thread.trap_no = 13;
+	tsk->thread.error_code = error_code;
+	tsk->thread.trap_no = 13;
 
-	if (show_unhandled_signals && unhandled_signal(current, SIGSEGV) &&
-	    printk_ratelimit()) {
+	if (show_unhandled_signals && unhandled_signal(tsk, SIGSEGV) &&
+			printk_ratelimit()) {
 		printk(KERN_INFO
-		    "%s[%d] general protection ip:%lx sp:%lx error:%lx",
-		    current->comm, task_pid_nr(current),
-		    regs->ip, regs->sp, error_code);
+			"%s[%d] general protection ip:%lx sp:%lx error:%lx",
+			tsk->comm, task_pid_nr(tsk),
+			regs->ip, regs->sp, error_code);
 		print_vma_addr(" in ", regs->ip);
 		printk("\n");
 	}
 
-	force_sig(SIGSEGV, current);
+	force_sig(SIGSEGV, tsk);
 	return;
 
 gp_in_vm86:
@@ -745,14 +658,15 @@ gp_in_vm86:
 	return;
 
 gp_in_kernel:
-	if (!fixup_exception(regs)) {
-		current->thread.error_code = error_code;
-		current->thread.trap_no = 13;
-		if (notify_die(DIE_GPF, "general protection fault", regs,
+	if (fixup_exception(regs))
+		return;
+
+	tsk->thread.error_code = error_code;
+	tsk->thread.trap_no = 13;
+	if (notify_die(DIE_GPF, "general protection fault", regs,
 				error_code, 13, SIGSEGV) == NOTIFY_STOP)
-			return;
-		die("general protection fault", regs, error_code);
-	}
+		return;
+	die("general protection fault", regs, error_code);
 }
 
 static notrace __kprobes void
@@ -804,10 +718,6 @@ io_check_error(unsigned char reason, struct pt_regs *regs)
 static notrace __kprobes void
 unknown_nmi_error(unsigned char reason, struct pt_regs *regs)
 {
-#ifdef CONFIG_KDB
-	(void)kdb(KDB_REASON_NMI, reason, regs);
-#endif /* CONFIG_KDB */
-
 	if (notify_die(DIE_NMIUNKNOWN, "nmi", regs, reason, 2, SIGINT) == NOTIFY_STOP)
 		return;
 #ifdef CONFIG_MCA
@@ -833,9 +743,9 @@ unknown_nmi_error(unsigned char reason, struct pt_regs *regs)
 
 static DEFINE_SPINLOCK(nmi_print_lock);
 
-void notrace __kprobes die_nmi(struct pt_regs *regs, const char *msg)
+void notrace __kprobes die_nmi(char *str, struct pt_regs *regs, int do_panic)
 {
-	if (notify_die(DIE_NMIWATCHDOG, msg, regs, 0, 2, SIGINT) == NOTIFY_STOP)
+	if (notify_die(DIE_NMIWATCHDOG, str, regs, 0, 2, SIGINT) == NOTIFY_STOP)
 		return;
 
 	spin_lock(&nmi_print_lock);
@@ -844,13 +754,12 @@ void notrace __kprobes die_nmi(struct pt_regs *regs, const char *msg)
 	* to get a message out:
 	*/
 	bust_spinlocks(1);
-	printk(KERN_EMERG "%s", msg);
+	printk(KERN_EMERG "%s", str);
 	printk(" on CPU%d, ip %08lx, registers:\n",
 		smp_processor_id(), regs->ip);
 	show_registers(regs);
-#ifdef	CONFIG_KDB
-	kdb(KDB_REASON_NMI, 0, regs);
-#endif	/* CONFIG_KDB */
+	if (do_panic)
+		panic("Non maskable interrupt");
 	console_silent();
 	spin_unlock(&nmi_print_lock);
 	bust_spinlocks(0);
@@ -870,24 +779,17 @@ void notrace __kprobes die_nmi(struct pt_regs *regs, const char *msg)
 static notrace __kprobes void default_do_nmi(struct pt_regs *regs)
 {
 	unsigned char reason = 0;
+	int cpu;
 
-	/* Only the BSP gets external NMIs from the system: */
-	if (!smp_processor_id())
+	cpu = smp_processor_id();
+
+	/* Only the BSP gets external NMIs from the system. */
+	if (!cpu)
 		reason = get_nmi_reason();
-
-#if defined(CONFIG_SMP) && defined(CONFIG_KDB)
-	/*
-	 * Call the kernel debugger to see if this NMI is due
-	 * to an KDB requested IPI.  If so, kdb will handle it.
-	 */
-	if (kdb_ipi(regs, NULL)) {
-		return;
-	}
-#endif /* defined(CONFIG_SMP) && defined(CONFIG_KDB) */
 
 	if (!(reason & 0xc0)) {
 		if (notify_die(DIE_NMI_IPI, "nmi_ipi", regs, reason, 2, SIGINT)
-							== NOTIFY_STOP)
+								== NOTIFY_STOP)
 			return;
 #ifdef CONFIG_X86_LOCAL_APIC
 		/*
@@ -896,7 +798,7 @@ static notrace __kprobes void default_do_nmi(struct pt_regs *regs)
 		 */
 		if (nmi_watchdog_tick(regs, reason))
 			return;
-		if (!do_nmi_callback(regs, smp_processor_id()))
+		if (!do_nmi_callback(regs, cpu))
 			unknown_nmi_error(reason, regs);
 #else
 		unknown_nmi_error(reason, regs);
@@ -906,6 +808,8 @@ static notrace __kprobes void default_do_nmi(struct pt_regs *regs)
 	}
 	if (notify_die(DIE_NMI, "nmi", regs, reason, 2, SIGINT) == NOTIFY_STOP)
 		return;
+
+	/* AK: following checks seem to be broken on modern chipsets. FIXME */
 	if (reason & 0x80)
 		mem_parity_error(reason, regs);
 	if (reason & 0x40)
@@ -916,8 +820,6 @@ static notrace __kprobes void default_do_nmi(struct pt_regs *regs)
 	 */
 	reassert_nmi();
 }
-
-static int ignore_nmis;
 
 notrace __kprobes void do_nmi(struct pt_regs *regs, long error_code)
 {
@@ -952,10 +854,6 @@ void __kprobes do_int3(struct pt_regs *regs, long error_code)
 {
 	trace_hardirqs_fixup();
 
-#ifdef  CONFIG_KDB
-	if (kdb(KDB_REASON_BREAK, error_code, regs))
-		return;
-#endif
 	if (notify_die(DIE_INT3, "int3", regs, error_code, 3, SIGTRAP)
 			== NOTIFY_STOP)
 		return;
@@ -1006,13 +904,8 @@ void __kprobes do_debug(struct pt_regs *regs, long error_code)
 	clear_tsk_thread_flag(tsk, TIF_DEBUGCTLMSR);
 	tsk->thread.debugctlmsr = 0;
 
-#ifdef	CONFIG_KDB
-	if (kdb(KDB_REASON_DEBUG, error_code, regs))
-		return;
-#endif	/* CONFIG_KDB */
-
 	if (notify_die(DIE_DEBUG, "debug", regs, condition, error_code,
-					SIGTRAP) == NOTIFY_STOP)
+						SIGTRAP) == NOTIFY_STOP)
 		return;
 	/* It's safe to allow irq's after DR6 has been saved */
 	if (regs->flags & X86_EFLAGS_IF)
@@ -1065,16 +958,6 @@ clear_TF_reenable:
 	return;
 }
 
-#if	defined(CONFIG_KDB) && !defined(CONFIG_KPROBES)
-void do_int3(struct pt_regs * regs, long error_code)
-{
-	if (kdb(KDB_REASON_BREAK, error_code, regs))
-		return;
-	do_trap(3, SIGTRAP, "int3", 1, regs, error_code, NULL);
-}
-#endif	/* CONFIG_KDB && !CONFIG_KPROBES */
-
-
 /*
  * Note that we play around with the 'TS' bit in an attempt to get
  * the correct behaviour even in the presence of the asynchronous
@@ -1083,9 +966,8 @@ void do_int3(struct pt_regs * regs, long error_code)
 void math_error(void __user *ip)
 {
 	struct task_struct *task;
-	unsigned short cwd;
-	unsigned short swd;
 	siginfo_t info;
+	unsigned short cwd, swd;
 
 	/*
 	 * Save the info for the exception handler and clear the error.
@@ -1104,7 +986,7 @@ void math_error(void __user *ip)
 	 * C1 reg you need in case of a stack fault, 0x040 is the stack
 	 * fault bit.  We should only be taking one exception at a time,
 	 * so if this combination doesn't produce any single exception,
-	 * then we have a bad program that isn't syncronizing its FPU usage
+	 * then we have a bad program that isn't synchronizing its FPU usage
 	 * and it will suffer the consequences since we won't be able to
 	 * fully reproduce the context of the exception
 	 */
@@ -1113,7 +995,7 @@ void math_error(void __user *ip)
 	switch (swd & ~cwd & 0x3f) {
 	case 0x000: /* No unmasked exception */
 		return;
-	default:    /* Multiple exceptions */
+	default: /* Multiple exceptions */
 		break;
 	case 0x001: /* Invalid Op */
 		/*
@@ -1149,8 +1031,8 @@ void do_coprocessor_error(struct pt_regs *regs, long error_code)
 static void simd_math_error(void __user *ip)
 {
 	struct task_struct *task;
-	unsigned short mxcsr;
 	siginfo_t info;
+	unsigned short mxcsr;
 
 	/*
 	 * Save the info for the exception handler and clear the error.
@@ -1226,7 +1108,7 @@ void do_spurious_interrupt_bug(struct pt_regs *regs, long error_code)
 
 unsigned long patch_espfix_desc(unsigned long uesp, unsigned long kesp)
 {
-	struct desc_struct *gdt = __get_cpu_var(gdt_page).gdt;
+	struct desc_struct *gdt = get_cpu_gdt_table(smp_processor_id());
 	unsigned long base = (kesp - uesp) & -THREAD_SIZE;
 	unsigned long new_kesp = kesp - base;
 	unsigned long lim_pages = (new_kesp | (THREAD_SIZE - 1)) >> PAGE_SHIFT;
@@ -1305,19 +1187,16 @@ void __init trap_init(void)
 	early_iounmap(p, 4);
 #endif
 
-#ifdef CONFIG_X86_LOCAL_APIC
-	init_apic_mappings();
-#endif
-	set_trap_gate(0,  &divide_error);
-	set_intr_gate(1,  &debug);
-	set_intr_gate(2,  &nmi);
-	set_system_intr_gate(3, &int3); /* int3/4 can be called from all */
-	set_system_gate(4, &overflow);
-	set_trap_gate(5,  &bounds);
-	set_trap_gate(6,  &invalid_op);
-	set_trap_gate(7,  &device_not_available);
-	set_task_gate(8,  GDT_ENTRY_DOUBLEFAULT_TSS);
-	set_trap_gate(9,  &coprocessor_segment_overrun);
+	set_trap_gate(0, &divide_error);
+	set_intr_gate(1, &debug);
+	set_intr_gate(2, &nmi);
+	set_system_intr_gate(3, &int3); /* int3 can be called from all */
+	set_system_gate(4, &overflow); /* int4 can be called from all */
+	set_trap_gate(5, &bounds);
+	set_trap_gate(6, &invalid_op);
+	set_trap_gate(7, &device_not_available);
+	set_task_gate(8, GDT_ENTRY_DOUBLEFAULT_TSS);
+	set_trap_gate(9, &coprocessor_segment_overrun);
 	set_trap_gate(10, &invalid_TSS);
 	set_trap_gate(11, &segment_not_present);
 	set_trap_gate(12, &stack_segment);
@@ -1377,19 +1256,3 @@ static int __init code_bytes_setup(char *s)
 	return 1;
 }
 __setup("code_bytes=", code_bytes_setup);
-
-#ifdef CONFIG_STACK_UNWIND
-static int __init call_trace_setup(char *s)
-{
-	if (strcmp(s, "old") == 0)
-		call_trace = -1;
-	else if (strcmp(s, "both") == 0)
-		call_trace = 0;
-	else if (strcmp(s, "newfallback") == 0)
-		call_trace = 1;
-	else if (strcmp(s, "new") == 2)
-		call_trace = 2;
-	return 1;
-}
-__setup("call_trace=", call_trace_setup);
-#endif

@@ -1230,7 +1230,7 @@ stripe_pages_invalidate(struct stripe *stripe)
 		ClearPageChecked(page);
 		ClearPageDirty(page);
 		ClearPageError(page);
-		ClearPageLocked(page);
+		clear_page_locked(page);
 		ClearPagePrivate(page);
 		ClearPageUptodate(page);
 	}
@@ -2115,7 +2115,7 @@ static void endio(unsigned long error, void *context)
 	else
 		page_set(page, CLEAN);
 
-	ClearPageLocked(page);
+	clear_page_locked(page);
 	stripe_io_dec(stripe);
 
 	/* Add stripe to endio list and wake daemon. */
@@ -2195,7 +2195,7 @@ static void page_list_rw(struct stripe *stripe, unsigned p)
 	atomic_inc(rs->stats + (PageDirty(page) ? S_DM_IO_WRITE: S_DM_IO_READ));
 
 	ClearPageError(page);
-	SetPageLocked(page);
+	set_page_locked(page);
 	io_dev_queued(dev);
 	BUG_ON(dm_io(&control, 1, &io, NULL));
 }

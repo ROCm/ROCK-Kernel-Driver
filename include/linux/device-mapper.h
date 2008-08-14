@@ -17,7 +17,6 @@ struct dm_table;
 struct dm_dev;
 struct mapped_device;
 struct bio_vec;
-struct bvec_merge_data;
 
 typedef enum { STATUSTYPE_INFO, STATUSTYPE_TABLE } status_type_t;
 

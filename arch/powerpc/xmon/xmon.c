@@ -54,7 +54,7 @@
 #define skipbl	xmon_skipbl
 
 #ifdef CONFIG_SMP
-cpumask_t cpus_in_xmon = CPU_MASK_NONE;
+static cpumask_t cpus_in_xmon = CPU_MASK_NONE;
 static unsigned long xmon_taken = 1;
 static int xmon_owner;
 static int xmon_gate;
@@ -155,7 +155,7 @@ static int do_spu_cmd(void);
 static void dump_tlb_44x(void);
 #endif
 
-int xmon_no_auto_backtrace;
+static int xmon_no_auto_backtrace;
 
 extern void xmon_enter(void);
 extern void xmon_leave(void);
@@ -328,6 +328,11 @@ static void get_output_lock(void)
 static void release_output_lock(void)
 {
 	xmon_speaker = 0;
+}
+
+int cpus_are_in_xmon(void)
+{
+	return !cpus_empty(cpus_in_xmon);
 }
 #endif
 
@@ -595,7 +600,7 @@ static int xmon_iabr_match(struct pt_regs *regs)
 {
 	if ((regs->msr & (MSR_IR|MSR_PR|MSR_SF)) != (MSR_IR|MSR_SF))
 		return 0;
-	if (iabr == 0)
+	if (iabr == NULL)
 		return 0;
 	xmon_core(regs, 0);
 	return 1;
@@ -1147,7 +1152,7 @@ bpt_cmds(void)
 		} else {
 			/* assume a breakpoint address */
 			bp = at_breakpoint(a);
-			if (bp == 0) {
+			if (bp == NULL) {
 				printf("No breakpoint at %x\n", a);
 				break;
 			}
@@ -1375,7 +1380,7 @@ static void print_bug_trap(struct pt_regs *regs)
 #endif
 }
 
-void excprint(struct pt_regs *fp)
+static void excprint(struct pt_regs *fp)
 {
 	unsigned long trap;
 
@@ -1413,7 +1418,7 @@ void excprint(struct pt_regs *fp)
 		print_bug_trap(fp);
 }
 
-void prregs(struct pt_regs *fp)
+static void prregs(struct pt_regs *fp)
 {
 	int n, trap;
 	unsigned long base;
@@ -1468,7 +1473,7 @@ void prregs(struct pt_regs *fp)
 		printf("dar = "REG"   dsisr = %.8lx\n", fp->dar, fp->dsisr);
 }
 
-void cacheflush(void)
+static void cacheflush(void)
 {
 	int cmd;
 	unsigned long nflush;
@@ -1500,7 +1505,7 @@ void cacheflush(void)
 	catch_memory_errors = 0;
 }
 
-unsigned long
+static unsigned long
 read_spr(int n)
 {
 	unsigned int instrs[2];
@@ -1538,7 +1543,7 @@ read_spr(int n)
 	return ret;
 }
 
-void
+static void
 write_spr(int n, unsigned long val)
 {
 	unsigned int instrs[2];
@@ -1576,7 +1581,7 @@ static unsigned long regno;
 extern char exc_prolog;
 extern char dec_exc;
 
-void super_regs(void)
+static void super_regs(void)
 {
 	int cmd;
 	unsigned long val;
@@ -1634,7 +1639,7 @@ void super_regs(void)
 /*
  * Stuff for reading and writing memory safely
  */
-int
+static int
 mread(unsigned long adrs, void *buf, int size)
 {
 	volatile int n;
@@ -1671,7 +1676,7 @@ mread(unsigned long adrs, void *buf, int size)
 	return n;
 }
 
-int
+static int
 mwrite(unsigned long adrs, void *buf, int size)
 {
 	volatile int n;
@@ -1736,7 +1741,7 @@ static int handle_fault(struct pt_regs *regs)
 
 #define SWAP(a, b, t)	((t) = (a), (a) = (b), (b) = (t))
 
-void
+static void
 byterev(unsigned char *val, int size)
 {
 	int t;
@@ -1798,7 +1803,7 @@ static char *memex_subcmd_help_string =
     "  x        exit this mode\n"
     "";
 
-void
+static void
 memex(void)
 {
 	int cmd, inc, i, nslash;
@@ -1949,7 +1954,7 @@ memex(void)
 	}
 }
 
-int
+static int
 bsesc(void)
 {
 	int c;
@@ -1989,7 +1994,7 @@ static void xmon_rawdump (unsigned long adrs, long ndump)
 #define isxdigit(c)	(('0' <= (c) && (c) <= '9') \
 			 || ('a' <= (c) && (c) <= 'f') \
 			 || ('A' <= (c) && (c) <= 'F'))
-void
+static void
 dump(void)
 {
 	int c;
@@ -2027,7 +2032,7 @@ dump(void)
 	}
 }
 
-void
+static void
 prdump(unsigned long adrs, long ndump)
 {
 	long n, m, c, r, nr;
@@ -2071,7 +2076,7 @@ prdump(unsigned long adrs, long ndump)
 
 typedef int (*instruction_dump_func)(unsigned long inst, unsigned long addr);
 
-int
+static int
 generic_inst_dump(unsigned long adr, long count, int praddr,
 			instruction_dump_func dump_func)
 {
@@ -2109,7 +2114,7 @@ generic_inst_dump(unsigned long adr, long count, int praddr,
 	return adr - first_adr;
 }
 
-int
+static int
 ppc_inst_dump(unsigned long adr, long count, int praddr)
 {
 	return generic_inst_dump(adr, count, praddr, print_insn_powerpc);
@@ -2131,7 +2136,7 @@ static unsigned long mval;		/* byte value to set memory to */
 static unsigned long mcount;		/* # bytes to affect */
 static unsigned long mdiffs;		/* max # differences to print */
 
-void
+static void
 memops(int cmd)
 {
 	scanhex((void *)&mdest);
@@ -2157,7 +2162,7 @@ memops(int cmd)
 	}
 }
 
-void
+static void
 memdiffs(unsigned char *p1, unsigned char *p2, unsigned nb, unsigned maxpr)
 {
 	unsigned n, prt;
@@ -2175,7 +2180,7 @@ memdiffs(unsigned char *p1, unsigned char *p2, unsigned nb, unsigned maxpr)
 static unsigned mend;
 static unsigned mask;
 
-void
+static void
 memlocate(void)
 {
 	unsigned a, n;
@@ -2208,7 +2213,7 @@ memlocate(void)
 static unsigned long mskip = 0x1000;
 static unsigned long mlim = 0xffffffff;
 
-void
+static void
 memzcan(void)
 {
 	unsigned char v;
@@ -2235,7 +2240,7 @@ memzcan(void)
 		printf("%.8x\n", a - mskip);
 }
 
-void proccall(void)
+static void proccall(void)
 {
 	unsigned long args[8];
 	unsigned long ret;
@@ -2393,7 +2398,7 @@ scanhex(unsigned long *vp)
 	return 1;
 }
 
-void
+static void
 scannl(void)
 {
 	int c;
@@ -2404,7 +2409,7 @@ scannl(void)
 		c = inchar();
 }
 
-int hexdigit(int c)
+static int hexdigit(int c)
 {
 	if( '0' <= c && c <= '9' )
 		return c - '0';
@@ -2435,13 +2440,13 @@ getstring(char *s, int size)
 static char line[256];
 static char *lineptr;
 
-void
+static void
 flush_input(void)
 {
 	lineptr = NULL;
 }
 
-int
+static int
 inchar(void)
 {
 	if (lineptr == NULL || *lineptr == 0) {
@@ -2454,7 +2459,7 @@ inchar(void)
 	return *lineptr++;
 }
 
-void
+static void
 take_input(char *str)
 {
 	lineptr = str;
@@ -2675,7 +2680,8 @@ static void dump_tlb_44x(void)
 	}
 }
 #endif /* CONFIG_44x */
-void xmon_init(int enable)
+
+static void xmon_init(int enable)
 {
 #ifdef CONFIG_PPC_ISERIES
 	if (firmware_has_feature(FW_FEATURE_ISERIES))

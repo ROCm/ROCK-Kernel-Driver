@@ -109,6 +109,8 @@ struct console {
 	struct	 console *next;
 };
 
+extern int console_set_on_cmdline;
+
 extern int add_preferred_console(char *name, int idx, char *options);
 extern int update_console_cmdline(char *name, int idx, char *name_new, int idx_new, char *options);
 extern void register_console(struct console *);
@@ -141,12 +143,7 @@ void vcs_remove_sysfs(struct tty_struct *tty);
 
 /* Some debug stub to catch some of the obvious races in the VT code */
 #if 1
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#define WARN_CONSOLE_UNLOCKED()	WARN_ON(!is_console_locked() && !oops_in_progress && !atomic_read(&kdb_event))
-#else	/* !CONFIG_KDB */
 #define WARN_CONSOLE_UNLOCKED()	WARN_ON(!is_console_locked() && !oops_in_progress)
-#endif	/* CONFIG_KDB */
 #else
 #define WARN_CONSOLE_UNLOCKED()
 #endif

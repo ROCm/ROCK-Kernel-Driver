@@ -11,6 +11,8 @@
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/numa.h>
+#include <linux/ftrace.h>
+
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
@@ -20,10 +22,7 @@
 #include <asm/cpufeature.h>
 #include <asm/desc.h>
 #include <asm/system.h>
-
-#ifdef CONFIG_XEN
-#include <xen/interface/kexec.h>
-#endif
+#include <asm/cacheflush.h>
 
 #define PAGE_ALIGNED __attribute__ ((__aligned__(PAGE_SIZE)))
 static u32 kexec_pgd[1024] PAGE_ALIGNED;
@@ -34,54 +33,47 @@ static u32 kexec_pmd1[1024] PAGE_ALIGNED;
 static u32 kexec_pte0[1024] PAGE_ALIGNED;
 static u32 kexec_pte1[1024] PAGE_ALIGNED;
 
-#ifdef CONFIG_XEN
-
-#define __ma(x) (pfn_to_mfn(__pa((x)) >> PAGE_SHIFT) << PAGE_SHIFT)
-
-#if PAGES_NR > KEXEC_XEN_NO_PAGES
-#error PAGES_NR is greater than KEXEC_XEN_NO_PAGES - Xen support will break
-#endif
-
-#if PA_CONTROL_PAGE != 0
-#error PA_CONTROL_PAGE is non zero - Xen support will break
-#endif
-
-void machine_kexec_setup_load_arg(xen_kexec_image_t *xki, struct kimage *image)
+static void set_idt(void *newidt, __u16 limit)
 {
-	void *control_page;
+	struct desc_ptr curidt;
 
-	memset(xki->page_list, 0, sizeof(xki->page_list));
+	/* ia32 supports unaliged loads & stores */
+	curidt.size    = limit;
+	curidt.address = (unsigned long)newidt;
 
-	control_page = page_address(image->control_code_page);
-	memcpy(control_page, relocate_kernel, PAGE_SIZE);
-
-	xki->page_list[PA_CONTROL_PAGE] = __ma(control_page);
-	xki->page_list[PA_PGD] = __ma(kexec_pgd);
-#ifdef CONFIG_X86_PAE
-	xki->page_list[PA_PMD_0] = __ma(kexec_pmd0);
-	xki->page_list[PA_PMD_1] = __ma(kexec_pmd1);
-#endif
-	xki->page_list[PA_PTE_0] = __ma(kexec_pte0);
-	xki->page_list[PA_PTE_1] = __ma(kexec_pte1);
-
+	load_idt(&curidt);
 }
 
-int __init machine_kexec_setup_resources(struct resource *hypervisor,
-					 struct resource *phys_cpus,
-					 int nr_phys_cpus)
+
+static void set_gdt(void *newgdt, __u16 limit)
 {
-	int k;
+	struct desc_ptr curgdt;
 
-	/* The per-cpu crash note resources belong to the hypervisor resource */
-	for (k = 0; k < nr_phys_cpus; k++)
-		request_resource(hypervisor, phys_cpus + k);
+	/* ia32 supports unaligned loads & stores */
+	curgdt.size    = limit;
+	curgdt.address = (unsigned long)newgdt;
 
-	return 0;
+	load_gdt(&curgdt);
 }
 
-void machine_kexec_register_resources(struct resource *res) { ; }
+static void load_segments(void)
+{
+#define __STR(X) #X
+#define STR(X) __STR(X)
 
-#endif /* CONFIG_XEN */
+	__asm__ __volatile__ (
+		"\tljmp $"STR(__KERNEL_CS)",$1f\n"
+		"\t1:\n"
+		"\tmovl $"STR(__KERNEL_DS)",%%eax\n"
+		"\tmovl %%eax,%%ds\n"
+		"\tmovl %%eax,%%es\n"
+		"\tmovl %%eax,%%fs\n"
+		"\tmovl %%eax,%%gs\n"
+		"\tmovl %%eax,%%ss\n"
+		::: "eax", "memory");
+#undef STR
+#undef __STR
+}
 
 /*
  * A architecture hook called to validate the
@@ -94,10 +86,12 @@ void machine_kexec_register_resources(struct resource *res) { ; }
  * reboot code buffer to allow us to avoid allocations
  * later.
  *
- * Currently nothing.
+ * Make control page executable.
  */
 int machine_kexec_prepare(struct kimage *image)
 {
+	if (nx_enabled)
+		set_pages_x(image->control_code_page, 1);
 	return 0;
 }
 
@@ -107,26 +101,48 @@ int machine_kexec_prepare(struct kimage *image)
  */
 void machine_kexec_cleanup(struct kimage *image)
 {
+	if (nx_enabled)
+		set_pages_nx(image->control_code_page, 1);
 }
 
-#ifndef CONFIG_XEN
 /*
  * Do not allocate memory (or fail in any way) in machine_kexec().
  * We are past the point of no return, committed to rebooting now.
  */
-NORET_TYPE void machine_kexec(struct kimage *image)
+void machine_kexec(struct kimage *image)
 {
 	unsigned long page_list[PAGES_NR];
 	void *control_page;
+	asmlinkage unsigned long
+		(*relocate_kernel_ptr)(unsigned long indirection_page,
+				       unsigned long control_page,
+				       unsigned long start_address,
+				       unsigned int has_pae,
+				       unsigned int preserve_context);
+
+	tracer_disable();
 
 	/* Interrupts aren't acceptable while we reboot */
 	local_irq_disable();
 
-	control_page = page_address(image->control_code_page);
-	memcpy(control_page, relocate_kernel, PAGE_SIZE);
+	if (image->preserve_context) {
+#ifdef CONFIG_X86_IO_APIC
+		/* We need to put APICs in legacy mode so that we can
+		 * get timer interrupts in second kernel. kexec/kdump
+		 * paths already have calls to disable_IO_APIC() in
+		 * one form or other. kexec jump path also need
+		 * one.
+		 */
+		disable_IO_APIC();
+#endif
+	}
 
+	control_page = page_address(image->control_code_page);
+	memcpy(control_page, relocate_kernel, PAGE_SIZE/2);
+
+	relocate_kernel_ptr = control_page;
 	page_list[PA_CONTROL_PAGE] = __pa(control_page);
-	page_list[VA_CONTROL_PAGE] = (unsigned long)relocate_kernel;
+	page_list[VA_CONTROL_PAGE] = (unsigned long)control_page;
 	page_list[PA_PGD] = __pa(kexec_pgd);
 	page_list[VA_PGD] = (unsigned long)kexec_pgd;
 #ifdef CONFIG_X86_PAE
@@ -139,11 +155,30 @@ NORET_TYPE void machine_kexec(struct kimage *image)
 	page_list[VA_PTE_0] = (unsigned long)kexec_pte0;
 	page_list[PA_PTE_1] = __pa(kexec_pte1);
 	page_list[VA_PTE_1] = (unsigned long)kexec_pte1;
+	page_list[PA_SWAP_PAGE] = (page_to_pfn(image->swap_page) << PAGE_SHIFT);
 
-	relocate_kernel((unsigned long)image->head, (unsigned long)page_list,
-			image->start, cpu_has_pae);
+	/* The segment registers are funny things, they have both a
+	 * visible and an invisible part.  Whenever the visible part is
+	 * set to a specific selector, the invisible part is loaded
+	 * with from a table in memory.  At no other time is the
+	 * descriptor table in memory accessed.
+	 *
+	 * I take advantage of this here by force loading the
+	 * segments, before I zap the gdt with an invalid value.
+	 */
+	load_segments();
+	/* The gdt & idt are now invalid.
+	 * If you want to load them you must set up your own idt & gdt.
+	 */
+	set_gdt(phys_to_virt(0),0);
+	set_idt(phys_to_virt(0),0);
+
+	/* now call it */
+	image->start = relocate_kernel_ptr((unsigned long)image->head,
+					   (unsigned long)page_list,
+					   image->start, cpu_has_pae,
+					   image->preserve_context);
 }
-#endif
 
 void arch_crash_save_vmcoreinfo(void)
 {

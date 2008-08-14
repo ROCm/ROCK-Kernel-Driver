@@ -27,7 +27,7 @@
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
 
-#include <asm/arch/dma.h>
+#include <mach/dma.h>
 #include "omap-pcm.h"
 
 static const struct snd_pcm_hardware omap_pcm_hardware = {
@@ -316,7 +316,7 @@ static void omap_pcm_free_dma_buffers(struct snd_pcm *pcm)
 	}
 }
 
-int omap_pcm_new(struct snd_card *card, struct snd_soc_codec_dai *dai,
+int omap_pcm_new(struct snd_card *card, struct snd_soc_dai *dai,
 		 struct snd_pcm *pcm)
 {
 	int ret = 0;

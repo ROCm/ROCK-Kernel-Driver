@@ -64,7 +64,13 @@ static DEFINE_MUTEX(performance_mutex);
  * policy is adjusted accordingly.
  */
 
-static unsigned int ignore_ppc = 0;
+/* ignore_ppc:
+ * -1 -> cpufreq low level drivers not initialized -> _PSS, etc. not called yet
+ *       ignore _PPC
+ *  0 -> cpufreq low level drivers initialized -> consider _PPC values
+ *  1 -> ignore _PPC totally -> forced by user through boot param
+ */
+static unsigned int ignore_ppc = -1;
 module_param(ignore_ppc, uint, 0644);
 MODULE_PARM_DESC(ignore_ppc, "If the frequency of your machine gets wrongly" \
 		 "limited by BIOS, this should help");
@@ -72,9 +78,8 @@ MODULE_PARM_DESC(ignore_ppc, "If the frequency of your machine gets wrongly" \
 #define PPC_REGISTERED   1
 #define PPC_IN_USE       2
 
-static int acpi_processor_ppc_status = 0;
+static int acpi_processor_ppc_status;
 
-#ifdef CONFIG_CPU_FREQ
 static int acpi_processor_ppc_notifier(struct notifier_block *nb,
 				       unsigned long event, void *data)
 {
@@ -82,15 +87,20 @@ static int acpi_processor_ppc_notifier(struct notifier_block *nb,
 	struct acpi_processor *pr;
 	unsigned int ppc = 0;
 
+	if (event == CPUFREQ_START && ignore_ppc <= 0) {
+		ignore_ppc = 0;
+		return 0;
+	}
+
 	if (ignore_ppc)
+		return 0;
+
+	if (event != CPUFREQ_INCOMPATIBLE)
 		return 0;
 
 	mutex_lock(&performance_mutex);
 
-	if (event != CPUFREQ_INCOMPATIBLE)
-		goto out;
-
-	pr = processors[policy->cpu];
+	pr = per_cpu(processors, policy->cpu);
 	if (!pr || !pr->performance)
 		goto out;
 
@@ -112,7 +122,6 @@ static int acpi_processor_ppc_notifier(struct notifier_block *nb,
 static struct notifier_block acpi_ppc_notifier_block = {
 	.notifier_call = acpi_processor_ppc_notifier,
 };
-#endif	/* CONFIG_CPU_FREQ */
 
 static int acpi_processor_get_platform_limit(struct acpi_processor *pr)
 {
@@ -157,15 +166,9 @@ int acpi_processor_ppc_has_changed(struct acpi_processor *pr)
 	if (ret < 0)
 		return (ret);
 	else
-#ifdef CONFIG_CPU_FREQ
 		return cpufreq_update_policy(pr->id);
-#elif CONFIG_PROCESSOR_EXTERNAL_CONTROL
-		return processor_notify_external(pr,
-				PROCESSOR_PM_CHANGE, PM_TYPE_PERF);
-#endif
 }
 
-#ifdef CONFIG_CPU_FREQ
 void acpi_processor_ppc_init(void)
 {
 	if (!cpufreq_register_notifier
@@ -184,7 +187,6 @@ void acpi_processor_ppc_exit(void)
 
 	acpi_processor_ppc_status &= ~PPC_REGISTERED;
 }
-#endif	/* CONFIG_CPU_FREQ */
 
 static int acpi_processor_get_performance_control(struct acpi_processor *pr)
 {
@@ -326,10 +328,7 @@ static int acpi_processor_get_performance_states(struct acpi_processor *pr)
 	return result;
 }
 
-#ifndef CONFIG_PROCESSOR_EXTERNAL_CONTROL
-static
-#endif
-int acpi_processor_get_performance_info(struct acpi_processor *pr)
+static int acpi_processor_get_performance_info(struct acpi_processor *pr)
 {
 	int result = 0;
 	acpi_status status = AE_OK;
@@ -357,7 +356,6 @@ int acpi_processor_get_performance_info(struct acpi_processor *pr)
 	return 0;
 }
 
-#ifdef CONFIG_CPU_FREQ
 int acpi_processor_notify_smm(struct module *calling_module)
 {
 	acpi_status status;
@@ -418,7 +416,6 @@ int acpi_processor_notify_smm(struct module *calling_module)
 }
 
 EXPORT_SYMBOL(acpi_processor_notify_smm);
-#endif	/* CONFIG_CPU_FREQ */
 
 #ifdef CONFIG_X86_ACPI_CPUFREQ_PROC_INTF
 /* /proc/acpi/processor/../performance interface (DEPRECATED) */
@@ -510,10 +507,7 @@ static void acpi_cpufreq_remove_file(struct acpi_processor *pr)
 }
 #endif				/* CONFIG_X86_ACPI_CPUFREQ_PROC_INTF */
 
-#ifndef CONFIG_PROCESSOR_EXTERNAL_CONTROL
-static
-#endif
-int acpi_processor_get_psd(struct acpi_processor *pr)
+static int acpi_processor_get_psd(struct acpi_processor	*pr)
 {
 	int result = 0;
 	acpi_status status = AE_OK;
@@ -589,7 +583,7 @@ int acpi_processor_preregister_performance(
 
 	/* Call _PSD for all CPUs */
 	for_each_possible_cpu(i) {
-		pr = processors[i];
+		pr = per_cpu(processors, i);
 		if (!pr) {
 			/* Look only at processors in ACPI namespace */
 			continue;
@@ -620,7 +614,7 @@ int acpi_processor_preregister_performance(
 	 * domain info.
 	 */
 	for_each_possible_cpu(i) {
-		pr = processors[i];
+		pr = per_cpu(processors, i);
 		if (!pr)
 			continue;
 
@@ -641,7 +635,7 @@ int acpi_processor_preregister_performance(
 
 	cpus_clear(covered_cpus);
 	for_each_possible_cpu(i) {
-		pr = processors[i];
+		pr = per_cpu(processors, i);
 		if (!pr)
 			continue;
 
@@ -668,7 +662,7 @@ int acpi_processor_preregister_performance(
 			if (i == j)
 				continue;
 
-			match_pr = processors[j];
+			match_pr = per_cpu(processors, j);
 			if (!match_pr)
 				continue;
 
@@ -697,7 +691,7 @@ int acpi_processor_preregister_performance(
 			if (i == j)
 				continue;
 
-			match_pr = processors[j];
+			match_pr = per_cpu(processors, j);
 			if (!match_pr)
 				continue;
 
@@ -714,7 +708,7 @@ int acpi_processor_preregister_performance(
 
 err_ret:
 	for_each_possible_cpu(i) {
-		pr = processors[i];
+		pr = per_cpu(processors, i);
 		if (!pr || !pr->performance)
 			continue;
 
@@ -745,7 +739,7 @@ acpi_processor_register_performance(struct acpi_processor_performance
 
 	mutex_lock(&performance_mutex);
 
-	pr = processors[cpu];
+	pr = per_cpu(processors, cpu);
 	if (!pr) {
 		mutex_unlock(&performance_mutex);
 		return -ENODEV;
@@ -783,7 +777,7 @@ acpi_processor_unregister_performance(struct acpi_processor_performance
 
 	mutex_lock(&performance_mutex);
 
-	pr = processors[cpu];
+	pr = per_cpu(processors, cpu);
 	if (!pr) {
 		mutex_unlock(&performance_mutex);
 		return;

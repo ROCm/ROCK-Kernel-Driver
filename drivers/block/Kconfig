@@ -423,9 +423,9 @@ config XILINX_SYSACE
 	help
 	  Include support for the Xilinx SystemACE CompactFlash interface
 
-config XEN_BLKFRONT
+config XEN_BLKDEV_FRONTEND
 	tristate "Xen virtual block device support"
-	depends on PARAVIRT_XEN
+	depends on XEN
 	default y
 	help
 	  This driver implements the front-end of the Xen virtual
@@ -438,5 +438,17 @@ config VIRTIO_BLK
 	---help---
 	  This is the virtual block driver for virtio.  It can be used with
           lguest or QEMU based VMMs (like KVM or Xen).  Say Y or M.
+
+config BLK_DEV_HD
+	bool "Very old hard disk (MFM/RLL/IDE) driver"
+	depends on HAVE_IDE
+	depends on !ARM || ARCH_RPC || ARCH_SHARK || BROKEN
+	help
+	  This is a very old hard disk driver that lacks the enhanced
+	  functionality of the newer ones.
+
+	  It is required for systems with ancient MFM/RLL/ESDI drives.
+
+	  If unsure, say N.
 
 endif # BLK_DEV

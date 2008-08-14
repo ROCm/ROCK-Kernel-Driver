@@ -91,19 +91,44 @@ void aa_profile_ns_list_release(void)
 	write_unlock(&profile_ns_list_lock);
 }
 
-static void *p_start(struct seq_file *f, loff_t *pos)
+
+static struct aa_profile *next_profile(struct aa_profile *profile)
 {
+	struct aa_profile *next = profile;
 	struct aa_namespace *ns;
-	struct aa_profile *profile;
-	loff_t l = *pos;
-	read_lock(&profile_ns_list_lock);
-	if (l--)
-		return NULL;
-	list_for_each_entry(ns, &profile_ns_list, list) {
+
+	list_for_each_entry_continue(next, &profile->ns->profiles, list)
+		return next;
+
+	ns = profile->ns;
+	read_unlock(&ns->lock);
+	list_for_each_entry_continue(ns, &profile_ns_list, list) {
 		read_lock(&ns->lock);
 		list_for_each_entry(profile, &ns->profiles, list)
 			return profile;
 		read_unlock(&ns->lock);
+	}
+	return NULL;
+}
+
+static void *p_start(struct seq_file *f, loff_t *pos)
+{
+	struct aa_namespace *ns;
+	loff_t l = *pos;
+
+	read_lock(&profile_ns_list_lock);
+	if (!list_empty(&profile_ns_list)) {
+		struct aa_profile *profile = NULL;
+		ns = list_first_entry(&profile_ns_list, typeof(*ns), list);
+		read_lock(&ns->lock);
+		if (!list_empty(&ns->profiles))
+			profile = list_first_entry(&ns->profiles,
+						   typeof(*profile), list);
+		else
+			read_unlock(&ns->lock);
+		for ( ; profile && l > 0; l--)
+			profile = next_profile(profile);
+		return profile;
 	}
 	return NULL;
 }
@@ -111,33 +136,26 @@ static void *p_start(struct seq_file *f, loff_t *pos)
 static void *p_next(struct seq_file *f, void *p, loff_t *pos)
 {
 	struct aa_profile *profile = (struct aa_profile *) p;
-	struct list_head *lh = profile->list.next;
-	struct aa_namespace *ns;
-	(*pos)++;
-	if (lh != &profile->ns->profiles)
-		return list_entry(lh, struct aa_profile, list);
 
-	lh = profile->ns->list.next;
-	read_unlock(&profile->ns->lock);
-	while (lh != &profile_ns_list) {
-		ns = list_entry(lh, struct aa_namespace, list);
-		read_lock(&ns->lock);
-		list_for_each_entry(profile, &ns->profiles, list)
-			return profile;
-		read_unlock(&ns->lock);
-		lh = ns->list.next;
-	}
-	return NULL;
+	(*pos)++;
+	profile = next_profile(profile);
+
+	return profile;
 }
 
-static void p_stop(struct seq_file *f, void *v)
+static void p_stop(struct seq_file *f, void *p)
 {
+	struct aa_profile *profile = (struct aa_profile *) p;
+
+	if (profile)
+		read_unlock(&profile->ns->lock);
 	read_unlock(&profile_ns_list_lock);
 }
 
-static int seq_show_profile(struct seq_file *f, void *v)
+static int seq_show_profile(struct seq_file *f, void *p)
 {
-	struct aa_profile *profile = (struct aa_profile *)v;
+	struct aa_profile *profile = (struct aa_profile *)p;
+
 	if (profile->ns == default_namespace)
 	    seq_printf(f, "%s (%s)\n", profile->name,
 		       PROFILE_COMPLAIN(profile) ? "complain" : "enforce");

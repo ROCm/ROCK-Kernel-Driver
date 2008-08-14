@@ -18,7 +18,7 @@
 
 #include <video/atmel_lcdc.h>
 
-#include <asm/hardware.h>
+#include <mach/hardware.h>
 #include <asm/setup.h>
 #include <asm/mach-types.h>
 #include <asm/irq.h>
@@ -27,9 +27,9 @@
 #include <asm/mach/map.h>
 #include <asm/mach/irq.h>
 
-#include <asm/arch/board.h>
-#include <asm/arch/gpio.h>
-#include <asm/arch/at91sam9_smc.h>
+#include <mach/board.h>
+#include <mach/gpio.h>
+#include <mach/at91sam9_smc.h>
 
 #include "generic.h"
 
@@ -53,6 +53,14 @@ static void __init ek_init_irq(void)
 {
 	at91sam9rl_init_interrupts(NULL);
 }
+
+
+/*
+ * USB HS Device port
+ */
+static struct usba_platform_data __initdata ek_usba_udc_data = {
+	.vbus_pin	= AT91_PIN_PA8,
+};
 
 
 /*
@@ -88,7 +96,7 @@ static struct mtd_partition * __init nand_partitions(int size, int *num_partitio
 	return ek_nand_partition;
 }
 
-static struct at91_nand_data __initdata ek_nand_data = {
+static struct atmel_nand_data __initdata ek_nand_data = {
 	.ale		= 21,
 	.cle		= 22,
 //	.det_pin	= ... not connected
@@ -175,6 +183,8 @@ static void __init ek_board_init(void)
 {
 	/* Serial */
 	at91_add_device_serial();
+	/* USB HS */
+	at91_add_device_usba(&ek_usba_udc_data);
 	/* I2C */
 	at91_add_device_i2c(NULL, 0);
 	/* NAND */

@@ -1334,7 +1334,8 @@ repeat:
 
 static int do_change_profile(struct aa_profile *expected,
 			     struct aa_namespace *ns, const char *name,
-			     u64 cookie, int restore, struct aa_audit *sa)
+			     u64 cookie, int restore, int hat,
+			     struct aa_audit *sa)
 {
 	struct aa_profile *new_profile = NULL, *old_profile = NULL,
 		*previous_profile = NULL;
@@ -1349,9 +1350,15 @@ static int do_change_profile(struct aa_profile *expected,
 
 	new_profile = aa_find_profile(ns, name);
 	if (!new_profile && !restore) {
-		if (!PROFILE_COMPLAIN(expected))
+		if (!PROFILE_COMPLAIN(expected)) {
+			aa_free_task_context(new_cxt);
 			return -ENOENT;
+		}
 		new_profile = aa_dup_profile(ns->null_complain_profile);
+	} else if (new_profile && hat && !PROFILE_IS_HAT(new_profile)) {
+		aa_free_task_context(new_cxt);
+		aa_put_profile(new_profile);
+		return error;
 	}
 
 	cxt = lock_task_and_profiles(current, new_profile);
@@ -1461,7 +1468,7 @@ repeat:
 	if (!profile || PROFILE_COMPLAIN(profile) ||
 	    (ns == profile->ns &&
 	     (aa_match(profile->file_rules, name, NULL) & AA_CHANGE_PROFILE)))
-		error = do_change_profile(profile, ns, name, 0, 0, &sa);
+		error = do_change_profile(profile, ns, name, 0, 0, 0, &sa);
 	else {
 		/* check for a rule with a namespace prepended */
 		aa_match_state(profile->file_rules, DFA_START, ns->name,
@@ -1469,7 +1476,7 @@ repeat:
 		state = aa_dfa_null_transition(profile->file_rules, state);
 		if ((aa_match_state(profile->file_rules, state, name, NULL) &
 		      AA_CHANGE_PROFILE))
-			error = do_change_profile(profile, ns, name, 0, 0,
+			error = do_change_profile(profile, ns, name, 0, 0, 0,
 						  &sa);
 		else
 			/* no permission to transition to profile @name */
@@ -1519,14 +1526,6 @@ repeat:
 
 	if (hat_name) {
 		char *name, *profile_name;
-		if (!PROFILE_COMPLAIN(profile) &&
-		    !(aa_match(profile->file_rules, hat_name, NULL)
-		      & AA_CHANGE_HAT)) {
-			/* missing permission to change_hat is treated the
-			 * same as a failed hat search */
-			error = -ENOENT;
-			goto out;
-		}
 
 		if (previous_profile)
 			profile_name = previous_profile->name;
@@ -1539,11 +1538,11 @@ repeat:
 			goto out;
 		}
 		error = do_change_profile(profile, profile->ns, name, cookie,
-					  0, &sa);
+					  0, 1, &sa);
 		aa_put_name_buffer(name);
 	} else if (previous_profile)
 		error = do_change_profile(profile, profile->ns,
-					  previous_profile->name, cookie, 1,
+					  previous_profile->name, cookie, 1, 0,
 					  &sa);
 	/* else ignore restores when there is no saved profile */
 

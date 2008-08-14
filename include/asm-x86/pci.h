@@ -18,6 +18,7 @@ struct pci_sysdata {
 #endif
 };
 
+extern int pci_routeirq;
 extern int noioapicquirk;
 extern int noioapicreroute;
 

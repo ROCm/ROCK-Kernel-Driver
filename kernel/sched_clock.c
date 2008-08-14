@@ -3,6 +3,9 @@
  *
  *  Copyright (C) 2008 Red Hat, Inc., Peter Zijlstra <pzijlstr@redhat.com>
  *
+ *  Updates and enhancements:
+ *    Copyright (C) 2008 Red Hat, Inc. Steven Rostedt <srostedt@redhat.com>
+ *
  * Based on code by:
  *   Ingo Molnar <mingo@redhat.com>
  *   Guillaume Chazarain <guichaz@gmail.com>
@@ -29,6 +32,17 @@
 #include <linux/ktime.h>
 #include <linux/module.h>
 
+/*
+ * Scheduler clock - returns current time in nanosec units.
+ * This is default implementation.
+ * Architectures and sub-architectures can override this.
+ */
+unsigned long long __attribute__((weak)) sched_clock(void)
+{
+	return (unsigned long long)jiffies * (NSEC_PER_SEC / HZ);
+}
+
+static __read_mostly int sched_clock_running;
 
 #ifdef CONFIG_HAVE_UNSTABLE_SCHED_CLOCK
 
@@ -40,8 +54,7 @@ struct sched_clock_data {
 	 */
 	raw_spinlock_t		lock;
 
-	unsigned long		prev_jiffies;
-	u64			prev_raw;
+	unsigned long		tick_jiffies;
 	u64			tick_raw;
 	u64			tick_gtod;
 	u64			clock;
@@ -59,8 +72,6 @@ static inline struct sched_clock_data *cpu_sdc(int cpu)
 	return &per_cpu(sched_clock_data, cpu);
 }
 
-static __read_mostly int sched_clock_running;
-
 void sched_clock_init(void)
 {
 	u64 ktime_now = ktime_to_ns(ktime_get());
@@ -71,8 +82,7 @@ void sched_clock_init(void)
 		struct sched_clock_data *scd = cpu_sdc(cpu);
 
 		scd->lock = (raw_spinlock_t)__RAW_SPIN_LOCK_UNLOCKED;
-		scd->prev_jiffies = now_jiffies;
-		scd->prev_raw = 0;
+		scd->tick_jiffies = now_jiffies;
 		scd->tick_raw = 0;
 		scd->tick_gtod = ktime_now;
 		scd->clock = ktime_now;
@@ -87,13 +97,13 @@ void sched_clock_init(void)
  *  - filter out backward motion
  *  - use jiffies to generate a min,max window to clip the raw values
  */
-static void __update_sched_clock(struct sched_clock_data *scd, u64 now)
+static u64 __update_sched_clock(struct sched_clock_data *scd, u64 now)
 {
 	unsigned long now_jiffies = jiffies;
-	long delta_jiffies = now_jiffies - scd->prev_jiffies;
+	long delta_jiffies = now_jiffies - scd->tick_jiffies;
 	u64 clock = scd->clock;
 	u64 min_clock, max_clock;
-	s64 delta = now - scd->prev_raw;
+	s64 delta = now - scd->tick_raw;
 
 	WARN_ON_ONCE(!irqs_disabled());
 	min_clock = scd->tick_gtod + delta_jiffies * TICK_NSEC;
@@ -118,9 +128,10 @@ static void __update_sched_clock(struct sched_clock_data *scd, u64 now)
 	if (unlikely(clock < min_clock))
 		clock = min_clock;
 
-	scd->prev_raw = now;
-	scd->prev_jiffies = now_jiffies;
+	scd->tick_jiffies = now_jiffies;
 	scd->clock = clock;
+
+	return clock;
 }
 
 static void lock_double_clock(struct sched_clock_data *data1,
@@ -138,7 +149,7 @@ static void lock_double_clock(struct sched_clock_data *data1,
 u64 sched_clock_cpu(int cpu)
 {
 	struct sched_clock_data *scd = cpu_sdc(cpu);
-	u64 now, clock;
+	u64 now, clock, this_clock, remote_clock;
 
 	if (unlikely(!sched_clock_running))
 		return 0ull;
@@ -147,29 +158,35 @@ u64 sched_clock_cpu(int cpu)
 	now = sched_clock();
 
 	if (cpu != raw_smp_processor_id()) {
-		/*
-		 * in order to update a remote cpu's clock based on our
-		 * unstable raw time rebase it against:
-		 *   tick_raw		(offset between raw counters)
-		 *   tick_gotd          (tick offset between cpus)
-		 */
 		struct sched_clock_data *my_scd = this_scd();
 
 		lock_double_clock(scd, my_scd);
 
-		now -= my_scd->tick_raw;
-		now += scd->tick_raw;
+		this_clock = __update_sched_clock(my_scd, now);
+		remote_clock = scd->clock;
 
-		now -= my_scd->tick_gtod;
-		now += scd->tick_gtod;
+		/*
+		 * Use the opportunity that we have both locks
+		 * taken to couple the two clocks: we take the
+		 * larger time as the latest time for both
+		 * runqueues. (this creates monotonic movement)
+		 */
+		if (likely(remote_clock < this_clock)) {
+			clock = this_clock;
+			scd->clock = clock;
+		} else {
+			/*
+			 * Should be rare, but possible:
+			 */
+			clock = remote_clock;
+			my_scd->clock = remote_clock;
+		}
 
 		__raw_spin_unlock(&my_scd->lock);
 	} else {
 		__raw_spin_lock(&scd->lock);
+		clock = __update_sched_clock(scd, now);
 	}
-
-	__update_sched_clock(scd, now);
-	clock = scd->clock;
 
 	__raw_spin_unlock(&scd->lock);
 
@@ -186,8 +203,8 @@ void sched_clock_tick(void)
 
 	WARN_ON_ONCE(!irqs_disabled());
 
-	now = sched_clock();
 	now_gtod = ktime_to_ns(ktime_get());
+	now = sched_clock();
 
 	__raw_spin_lock(&scd->lock);
 	__update_sched_clock(scd, now);
@@ -216,7 +233,6 @@ EXPORT_SYMBOL_GPL(sched_clock_idle_sleep_event);
 void sched_clock_idle_wakeup_event(u64 delta_ns)
 {
 	struct sched_clock_data *scd = this_scd();
-	u64 now = sched_clock();
 
 	/*
 	 * Override the previous timestamp and ignore all
@@ -225,7 +241,6 @@ void sched_clock_idle_wakeup_event(u64 delta_ns)
 	 * rq clock:
 	 */
 	__raw_spin_lock(&scd->lock);
-	scd->prev_raw = now;
 	scd->clock += delta_ns;
 	__raw_spin_unlock(&scd->lock);
 
@@ -233,14 +248,32 @@ void sched_clock_idle_wakeup_event(u64 delta_ns)
 }
 EXPORT_SYMBOL_GPL(sched_clock_idle_wakeup_event);
 
+#else /* CONFIG_HAVE_UNSTABLE_SCHED_CLOCK */
+
+void sched_clock_init(void)
+{
+	sched_clock_running = 1;
+}
+
+u64 sched_clock_cpu(int cpu)
+{
+	if (unlikely(!sched_clock_running))
+		return 0;
+
+	return sched_clock();
+}
+
 #endif
 
-/*
- * Scheduler clock - returns current time in nanosec units.
- * This is default implementation.
- * Architectures and sub-architectures can override this.
- */
-unsigned long long __attribute__((weak)) sched_clock(void)
+unsigned long long cpu_clock(int cpu)
 {
-	return (unsigned long long)jiffies * (NSEC_PER_SEC / HZ);
+	unsigned long long clock;
+	unsigned long flags;
+
+	local_irq_save(flags);
+	clock = sched_clock_cpu(cpu);
+	local_irq_restore(flags);
+
+	return clock;
 }
+EXPORT_SYMBOL_GPL(cpu_clock);

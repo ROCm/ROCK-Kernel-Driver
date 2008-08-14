@@ -84,6 +84,9 @@ static DECLARE_WAIT_QUEUE_HEAD(module_wq);
 
 static BLOCKING_NOTIFIER_HEAD(module_notify_list);
 
+/* Bounds of module allocation, for speeding __module_text_address */
+static unsigned long module_addr_min = -1UL, module_addr_max = 0;
+
 int register_module_notifier(struct notifier_block * nb)
 {
 	return blocking_notifier_chain_register(&module_notify_list, nb);
@@ -148,17 +151,19 @@ extern const struct kernel_symbol __start___ksymtab_gpl[];
 extern const struct kernel_symbol __stop___ksymtab_gpl[];
 extern const struct kernel_symbol __start___ksymtab_gpl_future[];
 extern const struct kernel_symbol __stop___ksymtab_gpl_future[];
-extern const struct kernel_symbol __start___ksymtab_unused[];
-extern const struct kernel_symbol __stop___ksymtab_unused[];
-extern const struct kernel_symbol __start___ksymtab_unused_gpl[];
-extern const struct kernel_symbol __stop___ksymtab_unused_gpl[];
 extern const struct kernel_symbol __start___ksymtab_gpl_future[];
 extern const struct kernel_symbol __stop___ksymtab_gpl_future[];
 extern const unsigned long __start___kcrctab[];
 extern const unsigned long __start___kcrctab_gpl[];
 extern const unsigned long __start___kcrctab_gpl_future[];
+#ifdef CONFIG_UNUSED_SYMBOLS
+extern const struct kernel_symbol __start___ksymtab_unused[];
+extern const struct kernel_symbol __stop___ksymtab_unused[];
+extern const struct kernel_symbol __start___ksymtab_unused_gpl[];
+extern const struct kernel_symbol __stop___ksymtab_unused_gpl[];
 extern const unsigned long __start___kcrctab_unused[];
 extern const unsigned long __start___kcrctab_unused_gpl[];
+#endif
 
 #ifndef CONFIG_MODVERSIONS
 #define symversion(base, idx) NULL
@@ -166,28 +171,132 @@ extern const unsigned long __start___kcrctab_unused_gpl[];
 #define symversion(base, idx) ((base != NULL) ? ((base) + (idx)) : NULL)
 #endif
 
-/* lookup symbol in given range of kernel_symbols */
-static const struct kernel_symbol *lookup_symbol(const char *name,
-	const struct kernel_symbol *start,
-	const struct kernel_symbol *stop)
+struct symsearch {
+	const struct kernel_symbol *start, *stop;
+	const unsigned long *crcs;
+	enum {
+		NOT_GPL_ONLY,
+		GPL_ONLY,
+		WILL_BE_GPL_ONLY,
+	} licence;
+	bool unused;
+};
+
+static bool each_symbol_in_section(const struct symsearch *arr,
+				   unsigned int arrsize,
+				   struct module *owner,
+				   bool (*fn)(const struct symsearch *syms,
+					      struct module *owner,
+					      unsigned int symnum, void *data),
+				   void *data)
 {
-	const struct kernel_symbol *ks = start;
-	for (; ks < stop; ks++)
-		if (strcmp(ks->name, name) == 0)
-			return ks;
-	return NULL;
+	unsigned int i, j;
+
+	for (j = 0; j < arrsize; j++) {
+		for (i = 0; i < arr[j].stop - arr[j].start; i++)
+			if (fn(&arr[j], owner, i, data))
+				return true;
+	}
+
+	return false;
 }
 
-static bool always_ok(bool gplok, bool warn, const char *name)
+/* Returns true as soon as fn returns true, otherwise false. */
+static bool each_symbol(bool (*fn)(const struct symsearch *arr,
+				   struct module *owner,
+				   unsigned int symnum, void *data),
+			void *data)
 {
-	return true;
+	struct module *mod;
+	const struct symsearch arr[] = {
+		{ __start___ksymtab, __stop___ksymtab, __start___kcrctab,
+		  NOT_GPL_ONLY, false },
+		{ __start___ksymtab_gpl, __stop___ksymtab_gpl,
+		  __start___kcrctab_gpl,
+		  GPL_ONLY, false },
+		{ __start___ksymtab_gpl_future, __stop___ksymtab_gpl_future,
+		  __start___kcrctab_gpl_future,
+		  WILL_BE_GPL_ONLY, false },
+#ifdef CONFIG_UNUSED_SYMBOLS
+		{ __start___ksymtab_unused, __stop___ksymtab_unused,
+		  __start___kcrctab_unused,
+		  NOT_GPL_ONLY, true },
+		{ __start___ksymtab_unused_gpl, __stop___ksymtab_unused_gpl,
+		  __start___kcrctab_unused_gpl,
+		  GPL_ONLY, true },
+#endif
+	};
+
+	if (each_symbol_in_section(arr, ARRAY_SIZE(arr), NULL, fn, data))
+		return true;
+
+	list_for_each_entry(mod, &modules, list) {
+		struct symsearch arr[] = {
+			{ mod->syms, mod->syms + mod->num_syms, mod->crcs,
+			  NOT_GPL_ONLY, false },
+			{ mod->gpl_syms, mod->gpl_syms + mod->num_gpl_syms,
+			  mod->gpl_crcs,
+			  GPL_ONLY, false },
+			{ mod->gpl_future_syms,
+			  mod->gpl_future_syms + mod->num_gpl_future_syms,
+			  mod->gpl_future_crcs,
+			  WILL_BE_GPL_ONLY, false },
+#ifdef CONFIG_UNUSED_SYMBOLS
+			{ mod->unused_syms,
+			  mod->unused_syms + mod->num_unused_syms,
+			  mod->unused_crcs,
+			  NOT_GPL_ONLY, true },
+			{ mod->unused_gpl_syms,
+			  mod->unused_gpl_syms + mod->num_unused_gpl_syms,
+			  mod->unused_gpl_crcs,
+			  GPL_ONLY, true },
+#endif
+		};
+
+		if (each_symbol_in_section(arr, ARRAY_SIZE(arr), mod, fn, data))
+			return true;
+	}
+	return false;
 }
 
-static bool printk_unused_warning(bool gplok, bool warn, const char *name)
+struct find_symbol_arg {
+	/* Input */
+	const char *name;
+	bool gplok;
+	bool warn;
+
+	/* Output */
+	struct module *owner;
+	const unsigned long *crc;
+	unsigned long value;
+};
+
+static bool find_symbol_in_section(const struct symsearch *syms,
+				   struct module *owner,
+				   unsigned int symnum, void *data)
 {
-	if (warn) {
+	struct find_symbol_arg *fsa = data;
+
+	if (strcmp(syms->start[symnum].name, fsa->name) != 0)
+		return false;
+
+	if (!fsa->gplok) {
+		if (syms->licence == GPL_ONLY)
+			return false;
+		if (syms->licence == WILL_BE_GPL_ONLY && fsa->warn) {
+			printk(KERN_WARNING "Symbol %s is being used "
+			       "by a non-GPL module, which will not "
+			       "be allowed in the future\n", fsa->name);
+			printk(KERN_WARNING "Please see the file "
+			       "Documentation/feature-removal-schedule.txt "
+			       "in the kernel source tree for more details.\n");
+		}
+	}
+
+#ifdef CONFIG_UNUSED_SYMBOLS
+	if (syms->unused && fsa->warn) {
 		printk(KERN_WARNING "Symbol %s is marked as UNUSED, "
-		       "however this module is using it.\n", name);
+		       "however this module is using it.\n", fsa->name);
 		printk(KERN_WARNING
 		       "This symbol will go away in the future.\n");
 		printk(KERN_WARNING
@@ -196,62 +305,12 @@ static bool printk_unused_warning(bool gplok, bool warn, const char *name)
 		       "mailinglist together with submitting your code for "
 		       "inclusion.\n");
 	}
+#endif
+
+	fsa->owner = owner;
+	fsa->crc = symversion(syms->crcs, symnum);
+	fsa->value = syms->start[symnum].value;
 	return true;
-}
-
-static bool gpl_only_unused_warning(bool gplok, bool warn, const char *name)
-{
-	if (!gplok)
-		return false;
-	return printk_unused_warning(gplok, warn, name);
-}
-
-static bool gpl_only(bool gplok, bool warn, const char *name)
-{
-	return gplok;
-}
-
-static bool warn_if_not_gpl(bool gplok, bool warn, const char *name)
-{
-	if (!gplok && warn) {
-		printk(KERN_WARNING "Symbol %s is being used "
-		       "by a non-GPL module, which will not "
-		       "be allowed in the future\n", name);
-		printk(KERN_WARNING "Please see the file "
-		       "Documentation/feature-removal-schedule.txt "
-		       "in the kernel source tree for more details.\n");
-	}
-	return true;
-}
-
-struct symsearch {
-	const struct kernel_symbol *start, *stop;
-	const unsigned long *crcs;
-	bool (*check)(bool gplok, bool warn, const char *name);
-};
-
-/* Look through this array of symbol tables for a symbol match which
- * passes the check function. */
-static const struct kernel_symbol *search_symarrays(const struct symsearch *arr,
-						    unsigned int num,
-						    const char *name,
-						    bool gplok,
-						    bool warn,
-						    const unsigned long **crc)
-{
-	unsigned int i;
-	const struct kernel_symbol *ks;
-
-	for (i = 0; i < num; i++) {
-		ks = lookup_symbol(name, arr[i].start, arr[i].stop);
-		if (!ks || !arr[i].check(gplok, warn, name))
-			continue;
-
-		if (crc)
-			*crc = symversion(arr[i].crcs, ks - arr[i].start);
-		return ks;
-	}
-	return NULL;
 }
 
 /* Find a symbol, return value, (optional) crc and (optional) module
@@ -262,54 +321,18 @@ static unsigned long find_symbol(const char *name,
 				 bool gplok,
 				 bool warn)
 {
-	struct module *mod;
-	const struct kernel_symbol *ks;
-	const struct symsearch arr[] = {
-		{ __start___ksymtab, __stop___ksymtab, __start___kcrctab,
-		  always_ok },
-		{ __start___ksymtab_gpl, __stop___ksymtab_gpl,
-		  __start___kcrctab_gpl, gpl_only },
-		{ __start___ksymtab_gpl_future, __stop___ksymtab_gpl_future,
-		  __start___kcrctab_gpl_future, warn_if_not_gpl },
-		{ __start___ksymtab_unused, __stop___ksymtab_unused,
-		  __start___kcrctab_unused, printk_unused_warning },
-		{ __start___ksymtab_unused_gpl, __stop___ksymtab_unused_gpl,
-		  __start___kcrctab_unused_gpl, gpl_only_unused_warning },
-	};
+	struct find_symbol_arg fsa;
 
-	/* Core kernel first. */
-	ks = search_symarrays(arr, ARRAY_SIZE(arr), name, gplok, warn, crc);
-	if (ks) {
+	fsa.name = name;
+	fsa.gplok = gplok;
+	fsa.warn = warn;
+
+	if (each_symbol(find_symbol_in_section, &fsa)) {
 		if (owner)
-			*owner = NULL;
-		return ks->value;
-	}
-
-	/* Now try modules. */
-	list_for_each_entry(mod, &modules, list) {
-		struct symsearch arr[] = {
-			{ mod->syms, mod->syms + mod->num_syms, mod->crcs,
-			  always_ok },
-			{ mod->gpl_syms, mod->gpl_syms + mod->num_gpl_syms,
-			  mod->gpl_crcs, gpl_only },
-			{ mod->gpl_future_syms,
-			  mod->gpl_future_syms + mod->num_gpl_future_syms,
-			  mod->gpl_future_crcs, warn_if_not_gpl },
-			{ mod->unused_syms,
-			  mod->unused_syms + mod->num_unused_syms,
-			  mod->unused_crcs, printk_unused_warning },
-			{ mod->unused_gpl_syms,
-			  mod->unused_gpl_syms + mod->num_unused_gpl_syms,
-			  mod->unused_gpl_crcs, gpl_only_unused_warning },
-		};
-
-		ks = search_symarrays(arr, ARRAY_SIZE(arr),
-				      name, gplok, warn, crc);
-		if (ks) {
-			if (owner)
-				*owner = mod;
-			return ks->value;
-		}
+			*owner = fsa.owner;
+		if (crc)
+			*crc = fsa.crc;
+		return fsa.value;
 	}
 
 	DEBUGP("Failed to find symbol %s\n", name);
@@ -653,8 +676,8 @@ static int __try_stop_module(void *_sref)
 {
 	struct stopref *sref = _sref;
 
-	/* If it's not unused, quit unless we are told to block. */
-	if ((sref->flags & O_NONBLOCK) && module_refcount(sref->mod) != 0) {
+	/* If it's not unused, quit unless we're forcing. */
+	if (module_refcount(sref->mod) != 0) {
 		if (!(*sref->forced = try_force_unload(sref->flags)))
 			return -EWOULDBLOCK;
 	}
@@ -666,9 +689,16 @@ static int __try_stop_module(void *_sref)
 
 static int try_stop_module(struct module *mod, int flags, int *forced)
 {
-	struct stopref sref = { mod, flags, forced };
+	if (flags & O_NONBLOCK) {
+		struct stopref sref = { mod, flags, forced };
 
-	return stop_machine_run(__try_stop_module, &sref, NR_CPUS);
+		return stop_machine(__try_stop_module, &sref, NULL);
+	} else {
+		/* We don't need to stop the machine for this. */
+		mod->state = MODULE_STATE_GOING;
+		synchronize_sched();
+		return 0;
+	}
 }
 
 unsigned int module_refcount(struct module *mod)
@@ -1400,7 +1430,7 @@ static int __unlink_module(void *_mod)
 static void free_module(struct module *mod)
 {
 	/* Delete from various lists */
-	stop_machine_run(__unlink_module, mod, NR_CPUS);
+	stop_machine(__unlink_module, mod, NULL);
 	remove_notes_attrs(mod);
 	remove_sect_attrs(mod);
 	mod_kobject_remove(mod);
@@ -1459,8 +1489,10 @@ static int verify_export_symbols(struct module *mod)
 		{ mod->syms, mod->num_syms },
 		{ mod->gpl_syms, mod->num_gpl_syms },
 		{ mod->gpl_future_syms, mod->num_gpl_future_syms },
+#ifdef CONFIG_UNUSED_SYMBOLS
 		{ mod->unused_syms, mod->num_unused_syms },
 		{ mod->unused_gpl_syms, mod->num_unused_gpl_syms },
+#endif
 	};
 
 	for (i = 0; i < ARRAY_SIZE(arr); i++) {
@@ -1540,7 +1572,7 @@ static int simplify_symbols(Elf_Shdr *sechdrs,
 }
 
 /* Update size with this section: return offset. */
-static long get_offset(unsigned long *size, Elf_Shdr *sechdr)
+static long get_offset(unsigned int *size, Elf_Shdr *sechdr)
 {
 	long ret;
 
@@ -1673,6 +1705,19 @@ static void setup_modinfo(struct module *mod, Elf_Shdr *sechdrs,
 }
 
 #ifdef CONFIG_KALLSYMS
+
+/* lookup symbol in given range of kernel_symbols */
+static const struct kernel_symbol *lookup_symbol(const char *name,
+	const struct kernel_symbol *start,
+	const struct kernel_symbol *stop)
+{
+	const struct kernel_symbol *ks = start;
+	for (; ks < stop; ks++)
+		if (strcmp(ks->name, name) == 0)
+			return ks;
+	return NULL;
+}
+
 static int is_exported(const char *name, const struct module *mod)
 {
 	if (!mod && lookup_symbol(name, __start___ksymtab, __stop___ksymtab))
@@ -1752,6 +1797,20 @@ static inline void add_kallsyms(struct module *mod,
 }
 #endif /* CONFIG_KALLSYMS */
 
+static void *module_alloc_update_bounds(unsigned long size)
+{
+	void *ret = module_alloc(size);
+
+	if (ret) {
+		/* Update module bounds. */
+		if ((unsigned long)ret < module_addr_min)
+			module_addr_min = (unsigned long)ret;
+		if ((unsigned long)ret + size > module_addr_max)
+			module_addr_max = (unsigned long)ret + size;
+	}
+	return ret;
+}
+
 /* Allocate and load the module: note that size of section 0 is always
    zero, and we rely on this for optional sections. */
 static struct module *load_module(void __user *umod,
@@ -1778,10 +1837,12 @@ static struct module *load_module(void __user *umod,
 	unsigned int gplfutureindex;
 	unsigned int gplfuturecrcindex;
 	unsigned int unwindex = 0;
+#ifdef CONFIG_UNUSED_SYMBOLS
 	unsigned int unusedindex;
 	unsigned int unusedcrcindex;
 	unsigned int unusedgplindex;
 	unsigned int unusedgplcrcindex;
+#endif
 	unsigned int markersindex;
 	unsigned int markersstringsindex;
 	struct module *mod;
@@ -1864,13 +1925,15 @@ static struct module *load_module(void __user *umod,
 	exportindex = find_sec(hdr, sechdrs, secstrings, "__ksymtab");
 	gplindex = find_sec(hdr, sechdrs, secstrings, "__ksymtab_gpl");
 	gplfutureindex = find_sec(hdr, sechdrs, secstrings, "__ksymtab_gpl_future");
-	unusedindex = find_sec(hdr, sechdrs, secstrings, "__ksymtab_unused");
-	unusedgplindex = find_sec(hdr, sechdrs, secstrings, "__ksymtab_unused_gpl");
 	crcindex = find_sec(hdr, sechdrs, secstrings, "__kcrctab");
 	gplcrcindex = find_sec(hdr, sechdrs, secstrings, "__kcrctab_gpl");
 	gplfuturecrcindex = find_sec(hdr, sechdrs, secstrings, "__kcrctab_gpl_future");
+#ifdef CONFIG_UNUSED_SYMBOLS
+	unusedindex = find_sec(hdr, sechdrs, secstrings, "__ksymtab_unused");
+	unusedgplindex = find_sec(hdr, sechdrs, secstrings, "__ksymtab_unused_gpl");
 	unusedcrcindex = find_sec(hdr, sechdrs, secstrings, "__kcrctab_unused");
 	unusedgplcrcindex = find_sec(hdr, sechdrs, secstrings, "__kcrctab_unused_gpl");
+#endif
 	setupindex = find_sec(hdr, sechdrs, secstrings, "__param");
 	exindex = find_sec(hdr, sechdrs, secstrings, "__ex_table");
 	obsparmindex = find_sec(hdr, sechdrs, secstrings, "__obsparm");
@@ -1971,7 +2034,7 @@ static struct module *load_module(void __user *umod,
 	layout_sections(mod, hdr, sechdrs, secstrings);
 
 	/* Do the allocs. */
-	ptr = module_alloc(mod->core_size);
+	ptr = module_alloc_update_bounds(mod->core_size);
 	if (!ptr) {
 		err = -ENOMEM;
 		goto free_percpu;
@@ -1979,7 +2042,7 @@ static struct module *load_module(void __user *umod,
 	memset(ptr, 0, mod->core_size);
 	mod->module_core = ptr;
 
-	ptr = module_alloc(mod->init_size);
+	ptr = module_alloc_update_bounds(mod->init_size);
 	if (!ptr && mod->init_size) {
 		err = -ENOMEM;
 		goto free_core;
@@ -2054,14 +2117,15 @@ static struct module *load_module(void __user *umod,
 		mod->gpl_crcs = (void *)sechdrs[gplcrcindex].sh_addr;
 	mod->num_gpl_future_syms = sechdrs[gplfutureindex].sh_size /
 					sizeof(*mod->gpl_future_syms);
-	mod->num_unused_syms = sechdrs[unusedindex].sh_size /
-					sizeof(*mod->unused_syms);
-	mod->num_unused_gpl_syms = sechdrs[unusedgplindex].sh_size /
-					sizeof(*mod->unused_gpl_syms);
 	mod->gpl_future_syms = (void *)sechdrs[gplfutureindex].sh_addr;
 	if (gplfuturecrcindex)
 		mod->gpl_future_crcs = (void *)sechdrs[gplfuturecrcindex].sh_addr;
 
+#ifdef CONFIG_UNUSED_SYMBOLS
+	mod->num_unused_syms = sechdrs[unusedindex].sh_size /
+					sizeof(*mod->unused_syms);
+	mod->num_unused_gpl_syms = sechdrs[unusedgplindex].sh_size /
+					sizeof(*mod->unused_gpl_syms);
 	mod->unused_syms = (void *)sechdrs[unusedindex].sh_addr;
 	if (unusedcrcindex)
 		mod->unused_crcs = (void *)sechdrs[unusedcrcindex].sh_addr;
@@ -2069,13 +2133,17 @@ static struct module *load_module(void __user *umod,
 	if (unusedgplcrcindex)
 		mod->unused_gpl_crcs
 			= (void *)sechdrs[unusedgplcrcindex].sh_addr;
+#endif
 
 #ifdef CONFIG_MODVERSIONS
-	if ((mod->num_syms && !crcindex) ||
-	    (mod->num_gpl_syms && !gplcrcindex) ||
-	    (mod->num_gpl_future_syms && !gplfuturecrcindex) ||
-	    (mod->num_unused_syms && !unusedcrcindex) ||
-	    (mod->num_unused_gpl_syms && !unusedgplcrcindex)) {
+	if ((mod->num_syms && !crcindex)
+	    || (mod->num_gpl_syms && !gplcrcindex)
+	    || (mod->num_gpl_future_syms && !gplfuturecrcindex)
+#ifdef CONFIG_UNUSED_SYMBOLS
+	    || (mod->num_unused_syms && !unusedcrcindex)
+	    || (mod->num_unused_gpl_syms && !unusedgplcrcindex)
+#endif
+		) {
 		printk(KERN_WARNING "%s: No versions for exported symbols.\n", mod->name);
 		err = try_to_force_load(mod, "nocrc");
 		if (err)
@@ -2165,7 +2233,7 @@ static struct module *load_module(void __user *umod,
 	/* Now sew it into the lists so we can get lockdep and oops
          * info during argument parsing.  Noone should access us, since
          * strong_try_module_get() will fail. */
-	stop_machine_run(__link_module, mod, NR_CPUS);
+	stop_machine(__link_module, mod, NULL);
 
 	/* Size of section 0 is 0, so this works well if no params */
 	err = parse_args(mod->name, mod->args,
@@ -2199,7 +2267,7 @@ static struct module *load_module(void __user *umod,
 	return mod;
 
  unlink:
-	stop_machine_run(__unlink_module, mod, NR_CPUS);
+	stop_machine(__unlink_module, mod, NULL);
 	module_arch_cleanup(mod);
  cleanup:
 	kobject_del(&mod->mkobj.kobj);
@@ -2256,7 +2324,7 @@ sys_init_module(void __user *umod,
 
 	/* Start the module */
 	if (mod->init != NULL)
-		ret = mod->init();
+		ret = do_one_initcall(mod->init);
 	if (ret < 0) {
 		/* Init routine failed: abort.  Try to protect us from
                    buggy refcounters. */
@@ -2437,23 +2505,12 @@ out:
 	return -ERANGE;
 }
 
-#ifdef CONFIG_KDB
-#include <linux/kdb.h>
-struct list_head *kdb_modules = &modules;	/* kdb needs the list of modules */
-#endif /* CONFIG_KDB */
-
 int module_get_kallsym(unsigned int symnum, unsigned long *value, char *type,
 			char *name, char *module_name, int *exported)
 {
 	struct module *mod;
-#ifdef CONFIG_KDB
-	int get_lock = !KDB_IS_RUNNING();
-#else
-#define	get_lock 1
-#endif
 
-	if (get_lock)
-		preempt_disable();
+	preempt_disable();
 	list_for_each_entry(mod, &modules, list) {
 		if (symnum < mod->num_symtab) {
 			*value = mod->symtab[symnum].st_value;
@@ -2462,14 +2519,12 @@ int module_get_kallsym(unsigned int symnum, unsigned long *value, char *type,
 				KSYM_NAME_LEN);
 			strlcpy(module_name, mod->name, MODULE_NAME_LEN);
 			*exported = is_exported(name, mod);
-			if (get_lock)
-				preempt_enable();
+			preempt_enable();
 			return 0;
 		}
 		symnum -= mod->num_symtab;
 	}
-	if (get_lock)
-		preempt_enable();
+	preempt_enable();
 	return -ERANGE;
 }
 
@@ -2561,7 +2616,7 @@ static int m_show(struct seq_file *m, void *p)
 	struct module *mod = list_entry(p, struct module, list);
 	char buf[8];
 
-	seq_printf(m, "%s %lu",
+	seq_printf(m, "%s %u",
 		   mod->name, mod->init_size + mod->core_size);
 	print_unload_info(m, mod);
 
@@ -2643,6 +2698,9 @@ int is_module_address(unsigned long addr)
 struct module *__module_text_address(unsigned long addr)
 {
 	struct module *mod;
+
+	if (addr < module_addr_min || addr > module_addr_max)
+		return NULL;
 
 	list_for_each_entry(mod, &modules, list)
 		if (within(addr, mod->module_init, mod->init_text_size)

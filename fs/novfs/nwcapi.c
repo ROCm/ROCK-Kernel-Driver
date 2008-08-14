@@ -19,7 +19,7 @@
 #include <linux/list.h>
 #include <linux/timer.h>
 #include <linux/poll.h>
-#include <asm/semaphore.h>
+#include <linux/semaphore.h>
 #include <asm/uaccess.h>
 
 #include "nwcapi.h"

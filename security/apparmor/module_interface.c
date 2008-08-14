@@ -341,7 +341,7 @@ int aa_unpack_rlimits(struct aa_ext *e, struct aa_profile *profile)
 		profile->rlimits.mask = tmp;
 
 		size = aa_is_array(e, NULL);
-		if (size != RLIM_NLIMITS)
+		if (size > RLIM_NLIMITS)
 			goto fail;
 		for (i = 0; i < size; i++) {
 			u64 tmp = 0;
@@ -386,7 +386,7 @@ static struct aa_profile *aa_unpack_profile(struct aa_ext *e,
 	/* per profile debug flags (complain, audit) */
 	if (!aa_is_nameX(e, AA_STRUCT, "flags"))
 		goto fail;
-	if (!aa_is_u32(e, NULL, NULL))
+	if (!aa_is_u32(e, &(profile->flags.hat), NULL))
 		goto fail;
 	if (!aa_is_u32(e, &(profile->flags.complain), NULL))
 		goto fail;

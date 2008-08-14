@@ -4,8 +4,9 @@
 
 obj-$(CONFIG_SMP) := msr-on-cpu.o
 
-lib-y := delay_$(BITS).o
-lib-y += usercopy_$(BITS).o getuser_$(BITS).o putuser_$(BITS).o
+lib-y := delay.o
+lib-y += thunk_$(BITS).o
+lib-y += usercopy_$(BITS).o getuser.o putuser.o
 lib-y += memcpy_$(BITS).o
 
 ifeq ($(CONFIG_X86_32),y)
@@ -24,5 +25,3 @@ else
         lib-y += memmove_64.o memset_64.o
         lib-y += copy_user_64.o rwlock_64.o copy_user_nocache_64.o
 endif
-
-lib-$(CONFIG_XEN_SCRUB_PAGES) += scrub.o

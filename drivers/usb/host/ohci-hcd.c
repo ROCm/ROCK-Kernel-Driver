@@ -963,73 +963,6 @@ static int ohci_restart (struct ohci_hcd *ohci)
 
 /*-------------------------------------------------------------------------*/
 
-#ifdef	CONFIG_KDB_USB
-
-int
-ohci_kdb_poll_char(struct urb *urb)
-{
-	struct ohci_hcd *ohci;
-	struct ohci_regs * regs;
-
-        /* just to make sure */
-        if (!urb || !urb->dev || !urb->dev->bus)
-                return -1;
-
-	ohci = (struct ohci_hcd *) hcd_to_ohci(bus_to_hcd(urb->dev->bus));
-
-        /* make sure */
-        if (!ohci)
-                return -1;
-
-        if (!HC_IS_RUNNING (ohci_to_hcd(ohci)->state))
-                return -1;
-
-	/*
-	 * If ohci->lock is held coming into this routine, it could
-	 * mean KDB was entered while the HC driver was in the midst
-	 * of processing URBs. Therefore it could be dangerous to
-	 * processes URBs from this poll routine. And, we can't wait on
-	 * the lock since we are in KDB and kernel threads (including the
-	 * one holding the lock) are suspended.
-	 * So, we punt and return an error. Keyboards attached to this
-	 * HC will not be useable from KDB at this time.
-	 */
-	if (spin_is_locked(&ohci->lock))
-		return -EBUSY;
-
-	regs = ohci->regs;
-
-	/* if the urb is not currently in progress resubmit it */
-	if (urb->status != -EINPROGRESS) {
-
-		if (usb_submit_urb (urb, GFP_ATOMIC))
-			return -1;
-
-		/* make sure the HC registers are set correctly */
-		ohci_writel (ohci, OHCI_INTR_WDH, &regs->intrenable);
-		ohci_writel (ohci, OHCI_INTR_WDH, &regs->intrstatus);
-		ohci_writel (ohci, OHCI_INTR_MIE, &regs->intrenable);
-
-		// flush those pci writes
-		(void) ohci_readl (ohci, &ohci->regs->control);
-	}
-
-	if (ohci->hcca->done_head) {
-		dl_done_list_kdb (ohci, urb);
-		ohci_writel (ohci, OHCI_INTR_WDH, &regs->intrstatus);
-		// flush the pci write
-		(void) ohci_readl (ohci, &ohci->regs->control);
-
-		return 0;
-	}
-
-	return -1;
-}
-
-#endif /* CONFIG_KDB_USB */
-
-/*-------------------------------------------------------------------------*/
-
 #define DRIVER_INFO DRIVER_VERSION " " DRIVER_DESC
 
 MODULE_AUTHOR (DRIVER_AUTHOR);
@@ -1041,7 +974,7 @@ MODULE_LICENSE ("GPL");
 #define PCI_DRIVER		ohci_pci_driver
 #endif
 
-#ifdef CONFIG_SA1111
+#if defined(CONFIG_ARCH_SA1100) && defined(CONFIG_SA1111)
 #include "ohci-sa1111.c"
 #define SA1111_DRIVER		ohci_hcd_sa1111_driver
 #endif

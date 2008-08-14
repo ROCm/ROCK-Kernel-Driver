@@ -12,8 +12,6 @@
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
- *  $Id: 8250.c,v 1.90 2002/07/28 10:03:27 rmk Exp $
- *
  * A note about mapbase / membase
  *
  *  mapbase is the physical address of the IO port.
@@ -45,21 +43,6 @@
 #include <asm/irq.h>
 
 #include "8250.h"
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-/*
- * kdb_serial_line records the serial line number of the first serial console.
- * NOTE: The kernel ignores characters on the serial line unless a user space
- * program has opened the line first.  To enter kdb before user space has opened
- * the serial line, you can use the 'kdb=early' flag to lilo and set the
- * appropriate breakpoints.
- */
-
-static int  kdb_serial_line = -1;
-static const char *kdb_serial_ptr = kdb_serial_str;
-#else
-#define KDB_8250() 0
-#endif	/* CONFIG_KDB */
 
 /*
  * Configuration:
@@ -1304,27 +1287,24 @@ static void serial8250_enable_ms(struct uart_port *port)
 static void
 receive_chars(struct uart_8250_port *up, unsigned int *status)
 {
-	struct tty_struct *tty = up->port.info->tty;
+	struct tty_struct *tty = up->port.info->port.tty;
 	unsigned char ch, lsr = *status;
 	int max_count = 256;
 	char flag;
 
 	do {
-		ch = serial_inp(up, UART_RX);
-#ifdef	CONFIG_KDB
-		if ((up->port.line == kdb_serial_line) && kdb_on == 1) {
-		    if (ch == *kdb_serial_ptr) {
-			if (!(*++kdb_serial_ptr)) {
-			    atomic_inc(&kdb_8250);
-			    kdb(KDB_REASON_KEYBOARD, 0, get_irq_regs());
-			    atomic_dec(&kdb_8250);
-			    kdb_serial_ptr = kdb_serial_str;
-			    break;
-			}
-		    } else
-			kdb_serial_ptr = kdb_serial_str;
-		}
-#endif	/* CONFIG_KDB */
+		if (likely(lsr & UART_LSR_DR))
+			ch = serial_inp(up, UART_RX);
+		else
+			/*
+			 * Intel 82571 has a Serial Over Lan device that will
+			 * set UART_LSR_BI without setting UART_LSR_DR when
+			 * it receives a break. To avoid reading from the
+			 * receive buffer without UART_LSR_DR bit set, we
+			 * just force the read character to be 0
+			 */
+			ch = 0;
+
 		flag = TTY_NORMAL;
 		up->port.icount.rx++;
 
@@ -1373,7 +1353,7 @@ receive_chars(struct uart_8250_port *up, unsigned int *status)
 
 ignore_char:
 		lsr = serial_inp(up, UART_LSR);
-	} while ((lsr & UART_LSR_DR) && (max_count-- > 0));
+	} while ((lsr & (UART_LSR_DR | UART_LSR_BI)) && (max_count-- > 0));
 	spin_unlock(&up->port.lock);
 	tty_flip_buffer_push(tty);
 	spin_lock(&up->port.lock);
@@ -1456,7 +1436,7 @@ serial8250_handle_port(struct uart_8250_port *up)
 
 	DEBUG_INTR("status = %x...", status);
 
-	if (status & UART_LSR_DR)
+	if (status & (UART_LSR_DR | UART_LSR_BI))
 		receive_chars(up, &status);
 	check_modem_status(up);
 	if (status & UART_LSR_THRE)
@@ -1906,6 +1886,8 @@ static int serial8250_startup(struct uart_port *port)
 		 * allow register changes to become visible.
 		 */
 		spin_lock_irqsave(&up->port.lock, flags);
+		if (up->port.flags & UPF_SHARE_IRQ)
+			disable_irq_nosync(up->port.irq);
 
 		wait_for_xmitr(up, UART_LSR_THRE);
 		serial_out_sync(up, UART_IER, UART_IER_THRI);
@@ -1917,6 +1899,8 @@ static int serial8250_startup(struct uart_port *port)
 		iir = serial_in(up, UART_IIR);
 		serial_out(up, UART_IER, 0);
 
+		if (up->port.flags & UPF_SHARE_IRQ)
+			enable_irq(up->port.irq);
 		spin_unlock_irqrestore(&up->port.lock, flags);
 
 		/*
@@ -2569,7 +2553,7 @@ serial8250_console_write(struct console *co, const char *s, unsigned int count)
 	if (up->port.sysrq) {
 		/* serial8250_handle_port() already took the lock */
 		locked = 0;
-	} else if (oops_in_progress || KDB_8250()) {
+	} else if (oops_in_progress) {
 		locked = spin_trylock(&up->port.lock);
 	} else
 		spin_lock(&up->port.lock);
@@ -2626,30 +2610,6 @@ static int __init serial8250_console_setup(struct console *co, char *options)
 	port = &serial8250_ports[co->index].port;
 	if (!port->iobase && !port->membase)
 		return -ENODEV;
-
-#ifdef	CONFIG_KDB
-	/*
-	 * Remember the line number of the first serial
-	 * console.  We'll make this the kdb serial console too.
-	 */
-	if (co && kdb_serial_line == -1) {
-		kdb_serial_line = co->index;
-		kdb_serial.io_type = port->iotype;
-		switch (port->iotype) {
-		case SERIAL_IO_MEM:
-#ifdef  SERIAL_IO_MEM32
-		case SERIAL_IO_MEM32:
-#endif
-			kdb_serial.iobase = (unsigned long)(port->membase);
-			kdb_serial.ioreg_shift = port->regshift;
-			break;
-		default:
-			kdb_serial.iobase = port->iobase;
-			kdb_serial.ioreg_shift = 0;
-			break;
-		}
-	}
-#endif	/* CONFIG_KDB */
 
 	if (options)
 		uart_parse_options(options, &baud, &parity, &bits, &flow);
@@ -2987,7 +2947,7 @@ static int __init serial8250_init(void)
 	if (nr_uarts > UART_NR)
 		nr_uarts = UART_NR;
 
-	printk(KERN_INFO "Serial: 8250/16550 driver $Revision: 1.90 $ "
+	printk(KERN_INFO "Serial: 8250/16550 driver"
 		"%d ports, IRQ sharing %sabled\n", nr_uarts,
 		share_irqs ? "en" : "dis");
 
@@ -3048,7 +3008,7 @@ EXPORT_SYMBOL(serial8250_suspend_port);
 EXPORT_SYMBOL(serial8250_resume_port);
 
 MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("Generic 8250/16x50 serial driver $Revision: 1.90 $");
+MODULE_DESCRIPTION("Generic 8250/16x50 serial driver");
 
 module_param(share_irqs, uint, 0644);
 MODULE_PARM_DESC(share_irqs, "Share IRQs with other non-8250/16x50 devices"

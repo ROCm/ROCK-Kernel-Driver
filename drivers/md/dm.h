@@ -110,8 +110,6 @@ int dm_lock_for_deletion(struct mapped_device *md);
 
 void dm_kobject_uevent(struct mapped_device *md);
 
-#define blk_queue_merge_bvec(a,b) do { } while(0)
-
 int dm_kcopyd_init(void);
 void dm_kcopyd_exit(void);
 

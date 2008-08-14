@@ -20,13 +20,14 @@
 
 #include <asm/irq.h>
 #include <asm/mach-types.h>
-#include <asm/hardware.h>
+#include <mach/hardware.h>
 #include <asm/hardware/scoop.h>
 
-#include <asm/arch/sharpsl.h>
-#include <asm/arch/spitz.h>
-#include <asm/arch/pxa-regs.h>
-#include <asm/arch/pxa2xx-gpio.h>
+#include <mach/sharpsl.h>
+#include <mach/spitz.h>
+#include <mach/pxa-regs.h>
+#include <mach/pxa2xx-regs.h>
+#include <mach/pxa2xx-gpio.h>
 #include "sharpsl.h"
 
 #define SHARPSL_CHARGE_ON_VOLT         0x99  /* 2.9V */
@@ -207,7 +208,9 @@ struct sharpsl_charger_machinfo spitz_pm_machinfo = {
 	.read_devdata     = spitzpm_read_devdata,
 	.charger_wakeup   = spitz_charger_wakeup,
 	.should_wakeup    = spitz_should_wakeup,
+#ifdef CONFIG_BACKLIGHT_CORGI
         .backlight_limit  = corgibl_limit_intensity,
+#endif
 	.charge_on_volt	  = SHARPSL_CHARGE_ON_VOLT,
 	.charge_on_temp	  = SHARPSL_CHARGE_ON_TEMP,
 	.charge_acin_high = SHARPSL_CHARGE_ON_ACIN_HIGH,
@@ -228,6 +231,10 @@ static struct platform_device *spitzpm_device;
 static int __devinit spitzpm_init(void)
 {
 	int ret;
+
+	if (!machine_is_spitz() && !machine_is_akita()
+			&& !machine_is_borzoi())
+		return -ENODEV;
 
 	spitzpm_device = platform_device_alloc("sharpsl-pm", -1);
 	if (!spitzpm_device)

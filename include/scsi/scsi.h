@@ -429,6 +429,22 @@ struct scsi_lun {
 #define driver_byte(result) (((result) >> 24) & 0xff)
 #define suggestion(result)  (driver_byte(result) & SUGGEST_MASK)
 
+static inline void set_msg_byte(struct scsi_cmnd *cmd, char status)
+{
+	cmd->result |= status << 8;
+}
+
+static inline void set_host_byte(struct scsi_cmnd *cmd, char status)
+{
+	cmd->result |= status << 16;
+}
+
+static inline void set_driver_byte(struct scsi_cmnd *cmd, char status)
+{
+	cmd->result |= status << 24;
+}
+
+
 #define sense_class(sense)  (((sense) >> 4) & 0x7)
 #define sense_error(sense)  ((sense) & 0xf)
 #define sense_valid(sense)  ((sense) & 0x80);

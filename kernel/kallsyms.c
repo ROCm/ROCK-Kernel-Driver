@@ -176,7 +176,7 @@ static unsigned long get_symbol_pos(unsigned long addr,
 	high = kallsyms_num_syms;
 
 	while (high - low > 1) {
-		mid = (low + high) / 2;
+		mid = low + (high - low) / 2;
 		if (kallsyms_addresses[mid] <= addr)
 			low = mid;
 		else
@@ -479,25 +479,3 @@ __initcall(kallsyms_init);
 
 EXPORT_SYMBOL(__print_symbol);
 EXPORT_SYMBOL_GPL(sprint_symbol);
-
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#include <linux/kdbprivate.h>
-
-const char *kdb_walk_kallsyms(loff_t *pos)
-{
-	static struct kallsym_iter kdb_walk_kallsyms_iter;
-	if (*pos == 0) {
-		memset(&kdb_walk_kallsyms_iter, 0, sizeof(kdb_walk_kallsyms_iter));
-		reset_iter(&kdb_walk_kallsyms_iter, 0);
-	}
-	while (1) {
-		if (!update_iter(&kdb_walk_kallsyms_iter, *pos))
-			return NULL;
-		++*pos;
-		/* Some debugging symbols have no name.  Ignore them. */
-		if (kdb_walk_kallsyms_iter.name[0])
-			return kdb_walk_kallsyms_iter.name;
-	}
-}
-#endif	/* CONFIG_KDB */

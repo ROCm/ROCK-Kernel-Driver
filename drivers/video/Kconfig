@@ -7,7 +7,7 @@ menu "Graphics support"
 
 source "drivers/char/agp/Kconfig"
 
-source "drivers/char/drm/Kconfig"
+source "drivers/gpu/drm/Kconfig"
 
 config VGASTATE
        tristate
@@ -1583,7 +1583,7 @@ config FB_CYBLA
 	tristate "Cyberblade/i1 support"
 	depends on FB && PCI && X86_32 && !64BIT
 	select FB_CFB_IMAGEBLIT
-	select VIDEO_SELECT if !XEN
+	select VIDEO_SELECT
 	---help---
 	  This driver is supposed to support the Trident Cyberblade/i1
 	  graphics core integrated in the VIA VT8601A North Bridge,
@@ -1657,6 +1657,32 @@ config FB_PM3
 	  chipset, used in Formac ProFormance III, 3DLabs Oxygen VX1 &
 	  similar boards, 3DLabs Permedia3 Create!, Appian Jeronimo 2000
 	  and maybe other boards.
+
+config FB_CARMINE
+	tristate "Fujitsu carmine frame buffer support"
+	depends on FB && PCI
+	select FB_CFB_FILLRECT
+	select FB_CFB_COPYAREA
+	select FB_CFB_IMAGEBLIT
+	help
+	  This is the frame buffer device driver for the Fujitsu Carmine chip.
+	  The driver provides two independent frame buffer devices.
+
+choice
+	depends on FB_CARMINE
+	prompt "DRAM timing"
+	default FB_CARMINE_DRAM_EVAL
+
+config FB_CARMINE_DRAM_EVAL
+	bool "Eval board timings"
+	help
+	  Use timings which work on the eval card.
+
+config CARMINE_DRAM_CUSTOM
+	bool "Custom board timings"
+	help
+	  Use custom board timings.
+endchoice
 
 config FB_AU1100
 	bool "Au1100 LCD Driver"
@@ -1840,6 +1866,16 @@ config FB_W100
 
 	  If unsure, say N.
 
+config FB_SH_MOBILE_LCDC
+	tristate "SuperH Mobile LCDC framebuffer support"
+	depends on FB && SUPERH
+	select FB_CFB_FILLRECT
+	select FB_CFB_COPYAREA
+	select FB_CFB_IMAGEBLIT
+	default m
+	---help---
+	  Frame buffer driver for the on-chip SH-Mobile LCD controller.
+
 config FB_S3C2410
 	tristate "S3C2410 LCD framebuffer support"
 	depends on FB && ARCH_S3C2410
@@ -1951,6 +1987,23 @@ config FB_AM200EPD
          This enables support for the Metronome display controller used on
          the E-Ink AM-200 EPD devkit.
 
+config FB_COBALT
+	tristate "Cobalt server LCD frame buffer support"
+	depends on FB && MIPS_COBALT
+
+config FB_SH7760
+       bool "SH7760/SH7763 LCDC support"
+       depends on FB && (CPU_SUBTYPE_SH7760 || CPU_SUBTYPE_SH7763)
+       select FB_CFB_FILLRECT
+       select FB_CFB_COPYAREA
+       select FB_CFB_IMAGEBLIT
+       help
+         Support for the SH7760/SH7763 integrated (D)STN/TFT LCD Controller.
+         Supports display resolutions up to 1024x1024 pixel, grayscale and
+         color operation, with depths ranging from 1 bpp to 8 bpp monochrome
+         and 8, 15 or 16 bpp color; 90 degrees clockwise display rotation for
+         panels <= 320 pixel horizontal resolution.
+
 config FB_VIRTUAL
 	tristate "Virtual Frame Buffer support (ONLY FOR TESTING!)"
 	depends on FB
@@ -1976,7 +2029,7 @@ config FB_VIRTUAL
 
 config XEN_FBDEV_FRONTEND
 	tristate "Xen virtual frame buffer support"
-	depends on FB && PARAVIRT_XEN
+	depends on FB && XEN
 	select FB_SYS_FILLRECT
 	select FB_SYS_COPYAREA
 	select FB_SYS_IMAGEBLIT

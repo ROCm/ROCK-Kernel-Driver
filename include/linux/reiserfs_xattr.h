@@ -49,7 +49,7 @@ int reiserfs_setxattr(struct dentry *dentry, const char *name,
 		      const void *value, size_t size, int flags);
 ssize_t reiserfs_listxattr(struct dentry *dentry, char *buffer, size_t size);
 int reiserfs_removexattr(struct dentry *dentry, const char *name);
-int reiserfs_permission(struct inode *inode, int mask, struct nameidata *nd);
+int reiserfs_permission(struct inode *inode, int mask);
 
 int reiserfs_xattr_get(struct inode *, const char *, void *, size_t);
 int reiserfs_xattr_set(struct inode *, const char *, const void *, size_t, int);

@@ -439,13 +439,12 @@ __writeback_single_inode(struct inode *inode, struct writeback_control *wbc)
  * on the writer throttling path, and we get decent balancing between many
  * throttled threads: we don't want them all piling up on inode_sync_wait.
  */
-void
-generic_sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)
+void generic_sync_sb_inodes(struct super_block *sb,
+				struct writeback_control *wbc)
 {
 	const unsigned long start = jiffies;	/* livelock avoidance */
 
 	spin_lock(&inode_lock);
-
 	if (!wbc->for_kupdate || list_empty(&sb->s_io))
 		queue_io(sb, wbc->older_than_this);
 
@@ -529,8 +528,8 @@ generic_sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)
 }
 EXPORT_SYMBOL_GPL(generic_sync_sb_inodes);
 
-static void
-sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)
+static void sync_sb_inodes(struct super_block *sb,
+				struct writeback_control *wbc)
 {
 	if (sb->s_op->sync_inodes)
 		sb->s_op->sync_inodes(sb, wbc);

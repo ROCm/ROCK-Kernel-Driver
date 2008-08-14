@@ -17,8 +17,7 @@
 #ifndef LINUX_PCI_H
 #define LINUX_PCI_H
 
-/* Include the pci register defines */
-#include <linux/pci_regs.h>
+#include <linux/pci_regs.h>	/* The pci register defines */
 
 /*
  * The PCI interface treats multi-function devices as independent
@@ -49,11 +48,21 @@
 #include <linux/list.h>
 #include <linux/compiler.h>
 #include <linux/errno.h>
+#include <linux/kobject.h>
 #include <asm/atomic.h>
 #include <linux/device.h>
 
 /* Include the ID list */
 #include <linux/pci_ids.h>
+
+/* pci_slot represents a physical slot */
+struct pci_slot {
+	struct pci_bus *bus;		/* The bus this slot is on */
+	struct list_head list;		/* node in list of slots on this bus */
+	struct hotplug_slot *hotplug;	/* Hotplug info (migrate over time) */
+	unsigned char number;		/* PCI_SLOT(pci_dev->devfn) */
+	struct kobject kobj;
+};
 
 /* File state for mmap()s on /proc/bus/pci/X/Y */
 enum pci_mmap_state {
@@ -115,6 +124,8 @@ enum pci_dev_flags {
 	 * generation too.
 	 */
 	PCI_DEV_FLAGS_MSI_INTX_DISABLE_BUG = (__force pci_dev_flags_t) 1,
+	/* Device configuration is irrevocably lost if disabled into D3 */
+	PCI_DEV_FLAGS_NO_D3 = (__force pci_dev_flags_t) 2,
 };
 
 enum pci_irq_reroute_variant {
@@ -147,6 +158,7 @@ struct pci_dev {
 
 	void		*sysdata;	/* hook for sys-specific extension */
 	struct proc_dir_entry *procent;	/* device entry in /proc/bus/pci */
+	struct pci_slot	*slot;		/* Physical slot this device is in */
 
 	unsigned int	devfn;		/* encoded device & function index */
 	unsigned short	vendor;
@@ -172,6 +184,13 @@ struct pci_dev {
 	pci_power_t     current_state;  /* Current operating state. In ACPI-speak,
 					   this is D0-D3, D0 being fully functional,
 					   and D3 being off. */
+	int		pm_cap;		/* PM capability offset in the
+					   configuration space */
+	unsigned int	pme_support:5;	/* Bitmask of states from which PME#
+					   can be generated */
+	unsigned int	d1_support:1;	/* Low power state D1 is supported */
+	unsigned int	d2_support:1;	/* Low power state D2 is supported */
+	unsigned int	no_d1d2:1;	/* Only allow D0 and D3 */
 
 #ifdef CONFIG_PCIEASPM
 	struct pcie_link_state	*link_state;	/* ASPM link state. */
@@ -187,9 +206,6 @@ struct pci_dev {
 	 * directly, use the values stored here. They might be different!
 	 */
 	unsigned int	irq;
-#ifdef CONFIG_XEN
-	unsigned int    irq_old;
-#endif
 	struct resource resource[DEVICE_COUNT_RESOURCE]; /* I/O and memory regions + expansion ROMs */
 
 	/* These fields are used by common fixups */
@@ -199,7 +215,6 @@ struct pci_dev {
 	unsigned int	is_added:1;
 	unsigned int	is_busmaster:1; /* device is busmaster */
 	unsigned int	no_msi:1;	/* device may not use msi */
-	unsigned int	no_d1d2:1;   /* only allow d0 or d3 */
 	unsigned int	block_ucfg_access:1;	/* userspace config space access is blocked */
 	unsigned int	broken_parity_status:1;	/* Device generates false positive parity */
 	unsigned int	irq_reroute_variant:2;	/* device needs IRQ rerouting variant */
@@ -276,6 +291,7 @@ struct pci_bus {
 	struct list_head children;	/* list of child buses */
 	struct list_head devices;	/* list of devices on this bus */
 	struct pci_dev	*self;		/* bridge device as seen by parent */
+	struct list_head slots;		/* list of slots on this bus */
 	struct resource	*resource[PCI_BUS_NUM_RESOURCES];
 					/* address space routed to this bus */
 
@@ -337,7 +353,7 @@ struct pci_bus_region {
 struct pci_dynids {
 	spinlock_t lock;            /* protects list, index */
 	struct list_head list;      /* for IDs added at runtime */
-	unsigned int use_driver_data:1; /* pci_driver->driver_data is used */
+	unsigned int use_driver_data:1; /* pci_device_id->driver_data is used */
 };
 
 /* ---------------------------------------------------------------- */
@@ -399,7 +415,7 @@ struct pci_driver {
 	int  (*resume_early) (struct pci_dev *dev);
 	int  (*resume) (struct pci_dev *dev);	                /* Device woken up */
 	void (*shutdown) (struct pci_dev *dev);
-
+	struct pm_ext_ops *pm;
 	struct pci_error_handlers *err_handler;
 	struct device_driver	driver;
 	struct pci_dynids dynids;
@@ -498,6 +514,10 @@ struct pci_bus *pci_create_bus(struct device *parent, int bus,
 			       struct pci_ops *ops, void *sysdata);
 struct pci_bus *pci_add_new_bus(struct pci_bus *parent, struct pci_dev *dev,
 				int busnr);
+struct pci_slot *pci_create_slot(struct pci_bus *parent, int slot_nr,
+				 const char *name);
+void pci_destroy_slot(struct pci_slot *slot);
+void pci_update_slot_number(struct pci_slot *slot, int slot_nr);
 int pci_scan_slot(struct pci_bus *bus, int devfn);
 struct pci_dev *pci_scan_single_device(struct pci_bus *bus, int devfn);
 void pci_device_add(struct pci_dev *dev, struct pci_bus *bus);
@@ -615,9 +635,6 @@ int pcie_set_readrq(struct pci_dev *dev, int rq);
 void pci_update_resource(struct pci_dev *dev, struct resource *res, int resno);
 int __must_check pci_assign_resource(struct pci_dev *dev, int i);
 int pci_select_bars(struct pci_dev *dev, unsigned long flags);
-#ifdef CONFIG_XEN
-void pci_restore_bars(struct pci_dev *);
-#endif
 
 /* ROM control related routines */
 void __iomem __must_check *pci_map_rom(struct pci_dev *pdev, size_t *size);
@@ -629,7 +646,12 @@ int pci_save_state(struct pci_dev *dev);
 int pci_restore_state(struct pci_dev *dev);
 int pci_set_power_state(struct pci_dev *dev, pci_power_t state);
 pci_power_t pci_choose_state(struct pci_dev *dev, pm_message_t state);
+bool pci_pme_capable(struct pci_dev *dev, pci_power_t state);
+void pci_pme_active(struct pci_dev *dev, bool enable);
 int pci_enable_wake(struct pci_dev *dev, pci_power_t state, int enable);
+pci_power_t pci_target_state(struct pci_dev *dev);
+int pci_prepare_to_sleep(struct pci_dev *dev);
+int pci_back_from_sleep(struct pci_dev *dev);
 
 /* Functions for PCI Hotplug drivers to use */
 int pci_bus_find_capability(struct pci_bus *bus, unsigned int devfn, int cap);
@@ -665,10 +687,12 @@ void pci_enable_bridges(struct pci_bus *bus);
 /* Proper probing supporting hot-pluggable devices */
 int __must_check __pci_register_driver(struct pci_driver *, struct module *,
 				       const char *mod_name);
-static inline int __must_check pci_register_driver(struct pci_driver *driver)
-{
-	return __pci_register_driver(driver, THIS_MODULE, KBUILD_MODNAME);
-}
+
+/*
+ * pci_register_driver must be a macro so that KBUILD_MODNAME can be expanded
+ */
+#define pci_register_driver(driver)		\
+	__pci_register_driver(driver, THIS_MODULE, KBUILD_MODNAME)
 
 void pci_unregister_driver(struct pci_driver *dev);
 void pci_remove_behind_bridge(struct pci_dev *dev);
@@ -737,10 +761,6 @@ static inline void msi_remove_pci_irq_vectors(struct pci_dev *dev)
 
 static inline void pci_restore_msi_state(struct pci_dev *dev)
 { }
-#ifdef CONFIG_XEN
-#define register_msi_get_owner(func) 0
-#define unregister_msi_get_owner(func) 0
-#endif
 #else
 extern int pci_enable_msi(struct pci_dev *dev);
 extern void pci_msi_shutdown(struct pci_dev *dev);
@@ -751,10 +771,6 @@ extern void pci_msix_shutdown(struct pci_dev *dev);
 extern void pci_disable_msix(struct pci_dev *dev);
 extern void msi_remove_pci_irq_vectors(struct pci_dev *dev);
 extern void pci_restore_msi_state(struct pci_dev *dev);
-#ifdef CONFIG_XEN
-extern int register_msi_get_owner(int (*func)(struct pci_dev *dev));
-extern int unregister_msi_get_owner(int (*func)(struct pci_dev *dev));
-#endif
 #endif
 
 #ifdef CONFIG_HT_IRQ
@@ -855,6 +871,11 @@ static inline void pci_disable_device(struct pci_dev *dev)
 { }
 
 static inline int pci_set_dma_mask(struct pci_dev *dev, u64 mask)
+{
+	return -EIO;
+}
+
+static inline int pci_set_consistent_dma_mask(struct pci_dev *dev, u64 mask)
 {
 	return -EIO;
 }
@@ -997,9 +1018,9 @@ static inline void pci_set_drvdata(struct pci_dev *pdev, void *data)
 /* If you want to know what to call your pci_dev, ask this function.
  * Again, it's a wrapper around the generic device.
  */
-static inline char *pci_name(struct pci_dev *pdev)
+static inline const char *pci_name(struct pci_dev *pdev)
 {
-	return pdev->dev.bus_id;
+	return dev_name(&pdev->dev);
 }
 
 
@@ -1034,7 +1055,9 @@ enum pci_fixup_pass {
 	pci_fixup_header,	/* After reading configuration header */
 	pci_fixup_final,	/* Final phase of device fixups */
 	pci_fixup_enable,	/* pci_enable_device() time */
-	pci_fixup_resume,	/* pci_enable_device() time */
+	pci_fixup_resume,	/* pci_device_resume() */
+	pci_fixup_suspend,	/* pci_device_suspend */
+	pci_fixup_resume_early, /* pci_device_resume_early() */
 };
 
 /* Anonymous variables would be nice... */
@@ -1056,6 +1079,12 @@ enum pci_fixup_pass {
 #define DECLARE_PCI_FIXUP_RESUME(vendor, device, hook)			\
 	DECLARE_PCI_FIXUP_SECTION(.pci_fixup_resume,			\
 			resume##vendor##device##hook, vendor, device, hook)
+#define DECLARE_PCI_FIXUP_RESUME_EARLY(vendor, device, hook)		\
+	DECLARE_PCI_FIXUP_SECTION(.pci_fixup_resume_early,		\
+			resume_early##vendor##device##hook, vendor, device, hook)
+#define DECLARE_PCI_FIXUP_SUSPEND(vendor, device, hook)			\
+	DECLARE_PCI_FIXUP_SECTION(.pci_fixup_suspend,			\
+			suspend##vendor##device##hook, vendor, device, hook)
 
 
 void pci_fixup_device(enum pci_fixup_pass pass, struct pci_dev *dev);
@@ -1080,7 +1109,10 @@ extern int pci_pci_problems;
 extern unsigned long pci_cardbus_io_size;
 extern unsigned long pci_cardbus_mem_size;
 
-extern int pcibios_add_platform_entries(struct pci_dev *dev);
+int pcibios_add_platform_entries(struct pci_dev *dev);
+void pcibios_disable_device(struct pci_dev *dev);
+int pcibios_set_pcie_reset_state(struct pci_dev *dev,
+				 enum pcie_reset_state state);
 
 #ifdef CONFIG_PCI_MMCONFIG
 extern void __init pci_mmcfg_early_init(void);

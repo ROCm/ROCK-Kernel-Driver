@@ -37,6 +37,7 @@
 #include <asm/timer.h>
 #include <asm/vmi_time.h>
 #include <asm/kmap_types.h>
+#include <asm/setup.h>
 
 /* Convenient for calling VMI functions indirectly in the ROM */
 typedef u32 __attribute__((regparm(1))) (VROMFUNC)(void);
@@ -151,7 +152,7 @@ static unsigned vmi_patch(u8 type, u16 clobbers, void *insns,
 					      insns, ip);
 		case PARAVIRT_PATCH(pv_cpu_ops.iret):
 			return patch_internal(VMI_CALL_IRET, len, insns, ip);
-		case PARAVIRT_PATCH(pv_cpu_ops.irq_enable_syscall_ret):
+		case PARAVIRT_PATCH(pv_cpu_ops.irq_enable_sysexit):
 			return patch_internal(VMI_CALL_SYSEXIT, len, insns, ip);
 		default:
 			break;
@@ -683,7 +684,7 @@ void vmi_bringup(void)
 {
  	/* We must establish the lowmem mapping for MMU ops to work */
 	if (vmi_ops.set_linear_mapping)
-		vmi_ops.set_linear_mapping(0, (void *)__PAGE_OFFSET, max_low_pfn, 0);
+		vmi_ops.set_linear_mapping(0, (void *)__PAGE_OFFSET, MAXMEM_PFN, 0);
 }
 
 /*
@@ -896,7 +897,7 @@ static inline int __init activate_vmi(void)
 	 * the backend.  They are performance critical anyway, so requiring
 	 * a patch is not a big problem.
 	 */
-	pv_cpu_ops.irq_enable_syscall_ret = (void *)0xfeedbab0;
+	pv_cpu_ops.irq_enable_sysexit = (void *)0xfeedbab0;
 	pv_cpu_ops.iret = (void *)0xbadbab0;
 
 #ifdef CONFIG_SMP
@@ -906,7 +907,6 @@ static inline int __init activate_vmi(void)
 #ifdef CONFIG_X86_LOCAL_APIC
 	para_fill(pv_apic_ops.apic_read, APICRead);
 	para_fill(pv_apic_ops.apic_write, APICWrite);
-	para_fill(pv_apic_ops.apic_write_atomic, APICWrite);
 #endif
 
 	/*
@@ -932,7 +932,7 @@ static inline int __init activate_vmi(void)
 		pv_apic_ops.setup_secondary_clock = vmi_time_ap_init;
 #endif
 		pv_time_ops.sched_clock = vmi_sched_clock;
- 		pv_time_ops.get_cpu_khz = vmi_cpu_khz;
+		pv_time_ops.get_tsc_khz = vmi_tsc_khz;
 
 		/* We have true wallclock functions; disable CMOS clock sync */
 		no_sync_cmos_clock = 1;

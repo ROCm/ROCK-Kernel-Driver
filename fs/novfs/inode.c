@@ -2014,7 +2014,7 @@ int novfs_a_writepages(struct address_space *mapping,
 				memset(pages, 0,
 				       sizeof(struct page *) * max_page_lookup);
 
-				read_lock_irq(&mapping->tree_lock);
+				spin_lock_irq(&mapping->tree_lock);
 
 				/*
 				 * Need to ask for one less then max_page_lookup or we
@@ -2048,7 +2048,7 @@ int novfs_a_writepages(struct address_space *mapping,
 					page_cache_get(pages[i]);
 				}
 
-				read_unlock_irq(&mapping->tree_lock);
+				spin_unlock_irq(&mapping->tree_lock);
 
 				if (nr_pages) {
 					index = pages[nr_pages - 1]->index + 1;

@@ -143,7 +143,7 @@ int ext3_may_create(struct inode *dir, int isdir)
 
 		error = ext3_nfs4acl_permission(dir, mask);
 	} else
-		error = ext3_permission(dir,  MAY_WRITE | MAY_EXEC, NULL);
+		error = ext3_permission(dir,  MAY_WRITE | MAY_EXEC);
 
 	return error;
 }
@@ -170,7 +170,7 @@ int ext3_may_delete(struct inode *dir, struct inode *inode)
 		if (error && !ext3_nfs4acl_permission(inode, ACE4_DELETE))
 			error = 0;
 	} else {
-		error = ext3_permission(dir, MAY_WRITE | MAY_EXEC, NULL);
+		error = ext3_permission(dir, MAY_WRITE | MAY_EXEC);
 		if (!error && check_sticky(dir, inode))
 			error = -EPERM;
 	}

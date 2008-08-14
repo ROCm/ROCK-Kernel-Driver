@@ -36,7 +36,7 @@
 
 #include <linux/spinlock.h>
 
-#ifndef CONFIG_PARAVIRT_XEN
+#if 0
 /*
  * Inform the balloon driver that it should allow some slop for device-driver
  * memory activities.
@@ -46,10 +46,6 @@ void balloon_update_driver_allowance(long delta);
 /* Allocate/free a set of empty pages in low memory (i.e., no RAM mapped). */
 struct page **alloc_empty_pages_and_pagevec(int nr_pages);
 void free_empty_pages_and_pagevec(struct page **pagevec, int nr_pages);
-
-/* Free an empty page range (not allocated through
-   alloc_empty_pages_and_pagevec), adding to the balloon. */
-void free_empty_pages(struct page **pagevec, int nr_pages);
 
 void balloon_release_driver_page(struct page *page);
 

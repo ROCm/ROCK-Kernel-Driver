@@ -19,15 +19,15 @@
 #include <linux/platform_device.h>
 #include <linux/clk.h>
 
-#include <asm/hardware.h>
+#include <mach/hardware.h>
 #include <asm/io.h>
 #include <asm/mach-types.h>
 
-#include <asm/arch/mux.h>
-#include <asm/arch/irqs.h>
-#include <asm/arch/gpio.h>
-#include <asm/arch/fpga.h>
-#include <asm/arch/usb.h>
+#include <mach/mux.h>
+#include <mach/irqs.h>
+#include <mach/gpio.h>
+#include <mach/fpga.h>
+#include <mach/usb.h>
 
 
 /* OMAP-1510 OHCI has its own MMU for DMA */
@@ -169,13 +169,16 @@ static void start_hnp(struct ohci_hcd *ohci)
 {
 	const unsigned	port = ohci_to_hcd(ohci)->self.otg_port - 1;
 	unsigned long	flags;
+	u32 l;
 
 	otg_start_hnp(ohci->transceiver);
 
 	local_irq_save(flags);
 	ohci->transceiver->state = OTG_STATE_A_SUSPEND;
 	writel (RH_PS_PSS, &ohci->regs->roothub.portstatus [port]);
-	OTG_CTRL_REG &= ~OTG_A_BUSREQ;
+	l = omap_readl(OTG_CTRL);
+	l &= ~OTG_A_BUSREQ;
+	omap_writel(l, OTG_CTRL);
 	local_irq_restore(flags);
 }
 
@@ -326,7 +329,7 @@ static int usb_hcd_omap_probe (const struct hc_driver *driver,
 	}
 
 
-	hcd = usb_create_hcd (driver, &pdev->dev, pdev->dev.bus_id);
+	hcd = usb_create_hcd (driver, &pdev->dev, dev_name(&pdev->dev));
 	if (!hcd) {
 		retval = -ENOMEM;
 		goto err0;

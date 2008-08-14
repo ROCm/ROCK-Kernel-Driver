@@ -14,6 +14,7 @@
 #include <linux/module.h>
 #include <linux/seq_file.h>
 #include <asm/uaccess.h>
+#include <linux/namei.h>
 
 #include "apparmor.h"
 #include "inline.h"
@@ -104,7 +105,7 @@ static ssize_t aa_features_read(struct file *file, char __user *buf,
 				size_t size, loff_t *ppos)
 {
 	const char *features = "file=3.0 capability=2.0 network=1.0 "
-			       "change_hat=1.4 change_profile=1.0 "
+			       "change_hat=1.5 change_profile=1.0 "
 			       "aanamespaces=1.0 rlimit=1.0";
 
 	return simple_read_from_buffer(buf, size, ppos, features,
@@ -266,7 +267,7 @@ int create_apparmorfs(void)
 		goto error;
 
 	/* Report that AppArmor fs is enabled */
-	info_message("AppArmor Filesystem Enabled", "");
+	info_message("AppArmor Filesystem Enabled");
 	return 0;
 
 error:

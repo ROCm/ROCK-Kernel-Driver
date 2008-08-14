@@ -1,8 +1,6 @@
 #ifndef __ASM_IPI_H
 #define __ASM_IPI_H
 
-#ifndef CONFIG_XEN
-
 /*
  * Copyright 2004 James Cleverdon, IBM.
  * Subject to the GNU Public License, v.2
@@ -22,6 +20,7 @@
 
 #include <asm/hw_irq.h>
 #include <asm/apic.h>
+#include <asm/smp.h>
 
 /*
  * the following functions deal with sending IPIs between CPUs.
@@ -123,13 +122,11 @@ static inline void send_IPI_mask_sequence(cpumask_t mask, int vector)
 	 * - mbligh
 	 */
 	local_irq_save(flags);
-	for_each_cpu_mask(query_cpu, mask) {
+	for_each_cpu_mask_nr(query_cpu, mask) {
 		__send_IPI_dest_field(per_cpu(x86_cpu_to_apicid, query_cpu),
 				      vector, APIC_DEST_PHYSICAL);
 	}
 	local_irq_restore(flags);
 }
-
-#endif /* CONFIG_XEN */
 
 #endif /* __ASM_IPI_H */

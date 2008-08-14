@@ -2186,7 +2186,7 @@ static void squashfs_destroy_inode(struct inode *inode)
 }
 
 
-static void init_once(struct kmem_cache *cachep, void *foo)
+static void init_once(void *foo)
 {
 	struct squashfs_inode_info *ei = foo;
 

@@ -36,6 +36,8 @@
 #include <linux/skbuff.h>
 #include <linux/ethtool.h>
 #include <linux/if_ether.h>
+#include <linux/tcp.h>
+#include <linux/udp.h>
 #include <linux/moduleparam.h>
 #include <linux/mm.h>
 #include <net/ip.h>
@@ -90,7 +92,7 @@ struct netfront_info {
 	 */
 	union skb_entry {
 		struct sk_buff *skb;
-		unsigned link;
+		unsigned long link;
 	} tx_skbs[NET_TX_RING_SIZE];
 	grant_ref_t gref_tx_head;
 	grant_ref_t grant_tx_ref[NET_TX_RING_SIZE];
@@ -123,6 +125,17 @@ struct netfront_rx_info {
 	struct xen_netif_extra_info extras[XEN_NETIF_EXTRA_TYPE_MAX - 1];
 };
 
+static void skb_entry_set_link(union skb_entry *list, unsigned short id)
+{
+	list->link = id;
+}
+
+static int skb_entry_is_link(const union skb_entry *list)
+{
+	BUILD_BUG_ON(sizeof(list->skb) != sizeof(list->link));
+	return ((unsigned long)list->skb < PAGE_OFFSET);
+}
+
 /*
  * Access macros for acquiring freeing slots in tx_skbs[].
  */
@@ -130,7 +143,7 @@ struct netfront_rx_info {
 static void add_id_to_freelist(unsigned *head, union skb_entry *list,
 			       unsigned short id)
 {
-	list[id].link = *head;
+	skb_entry_set_link(&list[id], *head);
 	*head = id;
 }
 
@@ -316,7 +329,7 @@ static int xennet_open(struct net_device *dev)
 	}
 	spin_unlock_bh(&np->rx_lock);
 
-	xennet_maybe_wake_tx(dev);
+	netif_start_queue(dev);
 
 	return 0;
 }
@@ -752,6 +765,45 @@ static RING_IDX xennet_fill_frags(struct netfront_info *np,
 	return cons;
 }
 
+static int skb_checksum_setup(struct sk_buff *skb)
+{
+	struct iphdr *iph;
+	unsigned char *th;
+	int err = -EPROTO;
+
+	if (skb->protocol != htons(ETH_P_IP))
+		goto out;
+
+	iph = (void *)skb->data;
+	th = skb->data + 4 * iph->ihl;
+	if (th >= skb_tail_pointer(skb))
+		goto out;
+
+	skb->csum_start = th - skb->head;
+	switch (iph->protocol) {
+	case IPPROTO_TCP:
+		skb->csum_offset = offsetof(struct tcphdr, check);
+		break;
+	case IPPROTO_UDP:
+		skb->csum_offset = offsetof(struct udphdr, check);
+		break;
+	default:
+		if (net_ratelimit())
+			printk(KERN_ERR "Attempting to checksum a non-"
+			       "TCP/UDP packet, dropping a protocol"
+			       " %d packet", iph->protocol);
+		goto out;
+	}
+
+	if ((th + skb->csum_offset + 2) > skb_tail_pointer(skb))
+		goto out;
+
+	err = 0;
+
+out:
+	return err;
+}
+
 static int handle_incoming_queue(struct net_device *dev,
 				 struct sk_buff_head *rxq)
 {
@@ -952,7 +1004,7 @@ static void xennet_release_tx_bufs(struct netfront_info *np)
 
 	for (i = 0; i < NET_TX_RING_SIZE; i++) {
 		/* Skip over entries which are actually freelist references */
-		if ((unsigned long)np->tx_skbs[i].skb < PAGE_OFFSET)
+		if (skb_entry_is_link(&np->tx_skbs[i]))
 			continue;
 
 		skb = np->tx_skbs[i].skb;
@@ -1082,7 +1134,7 @@ static struct net_device * __devinit xennet_create_dev(struct xenbus_device *dev
 	/* Initialise tx_skbs as a free chain containing every entry. */
 	np->tx_skb_freelist = 0;
 	for (i = 0; i < NET_TX_RING_SIZE; i++) {
-		np->tx_skbs[i].link = i+1;
+		skb_entry_set_link(&np->tx_skbs[i], i+1);
 		np->grant_tx_ref[i] = GRANT_INVALID_REF;
 	}
 
@@ -1283,7 +1335,7 @@ static int setup_netfront(struct xenbus_device *dev, struct netfront_info *info)
 		goto fail;
 	}
 
-	txs = (struct xen_netif_tx_sring *)get_zeroed_page(GFP_KERNEL);
+	txs = (struct xen_netif_tx_sring *)get_zeroed_page(GFP_NOIO | __GFP_HIGH);
 	if (!txs) {
 		err = -ENOMEM;
 		xenbus_dev_fatal(dev, err, "allocating tx ring page");
@@ -1299,7 +1351,7 @@ static int setup_netfront(struct xenbus_device *dev, struct netfront_info *info)
 	}
 
 	info->tx_ring_ref = err;
-	rxs = (struct xen_netif_rx_sring *)get_zeroed_page(GFP_KERNEL);
+	rxs = (struct xen_netif_rx_sring *)get_zeroed_page(GFP_NOIO | __GFP_HIGH);
 	if (!rxs) {
 		err = -ENOMEM;
 		xenbus_dev_fatal(dev, err, "allocating rx ring page");
@@ -1732,6 +1784,7 @@ static int __devexit xennet_remove(struct xenbus_device *dev)
 
 static struct xenbus_driver netfront = {
 	.name = "vif",
+	.owner = THIS_MODULE,
 	.ids = netfront_ids,
 	.probe = netfront_probe,
 	.remove = __devexit_p(xennet_remove),

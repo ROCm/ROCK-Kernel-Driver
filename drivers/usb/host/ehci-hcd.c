@@ -84,7 +84,7 @@ static const char	hcd_name [] = "ehci_hcd";
 #define EHCI_IAA_MSECS		10		/* arbitrary */
 #define EHCI_IO_JIFFIES		(HZ/10)		/* io watchdog > irq_thresh */
 #define EHCI_ASYNC_JIFFIES	(HZ/20)		/* async idle timeout */
-#define EHCI_SHRINK_JIFFIES	(HZ/200)	/* async qh unlink delay */
+#define EHCI_SHRINK_FRAMES	5		/* async qh unlink delay */
 
 /* Initial IRQ latency:  faster than hw default */
 static int log2_irq_thresh = 0;		// 0 to 6
@@ -985,48 +985,6 @@ static int ehci_get_frame (struct usb_hcd *hcd)
 	return (ehci_readl(ehci, &ehci->regs->frame_index) >> 3) %
 		ehci->periodic_size;
 }
-
-#ifdef CONFIG_KDB_USB
-
-int
-ehci_kdb_poll_char(struct urb *urb)
-{
-        struct ehci_hcd *ehci;
-
-        /* just to make sure */
-        if (!urb || !urb->dev || !urb->dev->bus)
-                return -1;
-
-        ehci = (struct ehci_hcd *) hcd_to_ehci(bus_to_hcd(urb->dev->bus));
-
-        /* make sure */
-        if (!ehci)
-                return -1;
-
-        if (!HC_IS_RUNNING (ehci_to_hcd(ehci)->state))
-                return -1;
-
-	/*
-	 * If ehci->lock is held coming into this routine, it could
-	 * mean KDB was entered while the HC driver was in the midst
-	 * of processing URBs. Therefore it could be dangerous to
-	 * processes URBs from this poll routine. And, we can't wait on
-	 * the lock since we are in KDB and kernel threads (including the
-	 * one holding the lock) are suspended.
-	 * So, we punt and return an error. Keyboards attached to this
-	 * HC will not be useable from KDB at this time.
-	 */
-	if (spin_is_locked(&ehci->lock))
-		return -EBUSY;
-
-	/* processes the URB */
-        if (qh_completions_kdb(ehci, urb->hcpriv, urb))
-                return 0;
-
-        return -1;
-}
-
-#endif /* CONFIG_KDB_USB */
 
 /*-------------------------------------------------------------------------*/
 

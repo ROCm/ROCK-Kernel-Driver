@@ -21,7 +21,7 @@
 #include <linux/poll.h>
 #include <linux/pagemap.h>
 #include <linux/smp_lock.h>
-#include <asm/semaphore.h>
+#include <linux/semaphore.h>
 #include <asm/uaccess.h>
 #include <asm/atomic.h>
 #include <linux/time.h>

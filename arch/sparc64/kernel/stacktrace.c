@@ -1,6 +1,7 @@
 #include <linux/sched.h>
 #include <linux/stacktrace.h>
 #include <linux/thread_info.h>
+#include <linux/module.h>
 #include <asm/ptrace.h>
 #include <asm/stacktrace.h>
 
@@ -25,13 +26,15 @@ void save_stack_trace(struct stack_trace *trace)
 
 		/* Bogus frame pointer? */
 		if (fp < (thread_base + sizeof(struct thread_info)) ||
-		    fp >= (thread_base + THREAD_SIZE))
+		    fp > (thread_base + THREAD_SIZE - sizeof(struct sparc_stackf)))
 			break;
 
 		sf = (struct sparc_stackf *) fp;
 		regs = (struct pt_regs *) (sf + 1);
 
-		if ((regs->magic & ~0x1ff) == PT_REGS_MAGIC) {
+		if (((unsigned long)regs <=
+		     (thread_base + THREAD_SIZE - sizeof(*regs))) &&
+		    (regs->magic & ~0x1ff) == PT_REGS_MAGIC) {
 			if (!(regs->tstate & TSTATE_PRIV))
 				break;
 			pc = regs->tpc;
@@ -47,3 +50,4 @@ void save_stack_trace(struct stack_trace *trace)
 			trace->entries[trace->nr_entries++] = pc;
 	} while (trace->nr_entries < trace->max_entries);
 }
+EXPORT_SYMBOL_GPL(save_stack_trace);

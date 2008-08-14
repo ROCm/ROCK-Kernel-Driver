@@ -1,5 +1,5 @@
 /*
- *  linux/include/asm-arm/arch-ebsa285/time.h
+ *  arch/arm/mach-footbridge/include/mach/time.h
  *
  *  Copyright (C) 1998 Russell King.
  *  Copyright (C) 1998 Phil Blundell
@@ -23,7 +23,7 @@
 #include <linux/mc146818rtc.h>
 #include <linux/bcd.h>
 
-#include <asm/hardware.h>
+#include <mach/hardware.h>
 #include <asm/io.h>
 
 #include <asm/mach/time.h>
@@ -115,8 +115,7 @@ static int set_isa_cmos_time(void)
 
 void __init isa_rtc_init(void)
 {
-	if (machine_is_co285() ||
-	    machine_is_personal_server())
+	if (machine_is_personal_server())
 		/*
 		 * Add-in 21285s shouldn't access the RTC
 		 */

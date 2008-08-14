@@ -22,7 +22,6 @@
 #include <linux/init.h>
 #include <linux/smp_lock.h>
 #include <linux/initrd.h>
-#include <linux/hdreg.h>
 #include <linux/bootmem.h>
 #include <linux/tty.h>
 #include <linux/gfp.h>
@@ -31,6 +30,7 @@
 #include <linux/kernel_stat.h>
 #include <linux/start_kernel.h>
 #include <linux/security.h>
+#include <linux/smp.h>
 #include <linux/workqueue.h>
 #include <linux/profile.h>
 #include <linux/rcupdate.h>
@@ -71,10 +71,6 @@
 #include <asm/smp.h>
 #endif
 
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#endif	/* CONFIG_KDB */
-
 /*
  * This is one of the first .c files built. Error out early if we have compiler
  * trouble.
@@ -90,8 +86,6 @@ extern void init_IRQ(void);
 extern void fork_init(unsigned long);
 extern void mca_init(void);
 extern void sbus_init(void);
-extern void pidhash_init(void);
-extern void pidmap_init(void);
 extern void prio_tree_init(void);
 extern void radix_tree_init(void);
 extern void free_initmem(void);
@@ -198,26 +192,6 @@ char * envp_init[MAX_INIT_ENVS+2] = { "HOME=/", "TERM=linux", NULL, };
 static const char *panic_later, *panic_param;
 
 extern struct obs_kernel_param __setup_start[], __setup_end[];
-
-#ifdef	CONFIG_KDB
-static int __init kdb_setup(char *str)
-{
-	if (strcmp(str, "on") == 0) {
-		kdb_on = 1;
-	} else if (strcmp(str, "on-nokey") == 0) {
-		kdb_on = 2;
-	} else if (strcmp(str, "off") == 0) {
-		kdb_on = 0;
-	} else if (strcmp(str, "early") == 0) {
-		kdb_on = 1;
-		kdb_flags |= KDB_FLAG_EARLYKDB;
-	} else
-		printk("kdb flag %s not recognised\n", str);
-	return 0;
-}
-
-__setup("kdb=", kdb_setup);
-#endif	/* CONFIG_KDB */
 
 static int __init obsolete_checksetup(char *line)
 {
@@ -438,6 +412,13 @@ static void __init smp_init(void)
 {
 	unsigned int cpu;
 
+	/*
+	 * Set up the current CPU as possible to migrate to.
+	 * The other ones will be done by cpu_up/cpu_down()
+	 */
+	cpu = smp_processor_id();
+	cpu_set(cpu, cpu_active_map);
+
 	/* FIXME: This should be done in userspace --RR */
 	for_each_present_cpu(cpu) {
 		if (num_online_cpus() >= setup_max_cpus)
@@ -653,9 +634,11 @@ asmlinkage void __init start_kernel(void)
 
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (initrd_start && !initrd_below_start_ok &&
-			initrd_start < min_low_pfn << PAGE_SHIFT) {
+	    page_to_pfn(virt_to_page((void *)initrd_start)) < min_low_pfn) {
 		printk(KERN_CRIT "initrd overwritten (0x%08lx < 0x%08lx) - "
-		    "disabling it.\n",initrd_start,min_low_pfn << PAGE_SHIFT);
+		    "disabling it.\n",
+		    page_to_pfn(virt_to_page((void *)initrd_start)),
+		    min_low_pfn);
 		initrd_start = 0;
 	}
 #endif
@@ -676,14 +659,6 @@ asmlinkage void __init start_kernel(void)
 	pgtable_cache_init();
 	prio_tree_init();
 	anon_vma_init();
-
-#ifdef	CONFIG_KDB
-	kdb_init();
-	if (KDB_FLAG(EARLYKDB)) {
-		KDB_ENTER();
-	}
-#endif	/* CONFIG_KDB */
-
 #ifdef CONFIG_X86
 	if (efi_enabled)
 		efi_enter_virtual_mode();
@@ -716,7 +691,7 @@ asmlinkage void __init start_kernel(void)
 	rest_init();
 }
 
-static int __initdata initcall_debug;
+static int initcall_debug;
 
 static int __init initcall_debug_setup(char *str)
 {
@@ -725,7 +700,7 @@ static int __init initcall_debug_setup(char *str)
 }
 __setup("initcall_debug", initcall_debug_setup);
 
-static void __init do_one_initcall(initcall_t fn)
+int do_one_initcall(initcall_t fn)
 {
 	int count = preempt_count();
 	ktime_t t0, t1, delta;
@@ -765,16 +740,18 @@ static void __init do_one_initcall(initcall_t fn)
 		print_fn_descriptor_symbol(KERN_WARNING "initcall %s", fn);
 		printk(" returned with %s\n", msgbuf);
 	}
+
+	return result;
 }
 
 
-extern initcall_t __initcall_start[], __initcall_end[];
+extern initcall_t __initcall_start[], __initcall_end[], __early_initcall_end[];
 
 static void __init do_initcalls(void)
 {
 	initcall_t *call;
 
-	for (call = __initcall_start; call < __initcall_end; call++)
+	for (call = __early_initcall_end; call < __initcall_end; call++)
 		do_one_initcall(*call);
 
 	/* Make sure there is no pending stuff from the initcall sequence */
@@ -790,6 +767,7 @@ static void __init do_initcalls(void)
  */
 static void __init do_basic_setup(void)
 {
+	rcu_init_sched(); /* needed by module_init stage. */
 	/* drivers will send hotplug events */
 	init_workqueues();
 	usermodehelper_init();
@@ -798,23 +776,12 @@ static void __init do_basic_setup(void)
 	do_initcalls();
 }
 
-static int __initdata nosoftlockup;
-
-static int __init nosoftlockup_setup(char *str)
-{
-	nosoftlockup = 1;
-	return 1;
-}
-__setup("nosoftlockup", nosoftlockup_setup);
-
 static void __init do_pre_smp_initcalls(void)
 {
-	extern int spawn_ksoftirqd(void);
+	initcall_t *call;
 
-	migration_init();
-	spawn_ksoftirqd();
-	if (!nosoftlockup)
-		spawn_softlockup_task();
+	for (call = __initcall_start; call < __early_initcall_end; call++)
+		do_one_initcall(*call);
 }
 
 static void run_init_process(char *init_filename)

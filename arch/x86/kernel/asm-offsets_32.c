@@ -19,14 +19,10 @@
 #include <asm/bootparam.h>
 #include <asm/elf.h>
 
-#if defined(CONFIG_XEN) || defined(CONFIG_PARAVIRT_XEN)
 #include <xen/interface/xen.h>
-#endif
 
-#ifdef CONFIG_LGUEST_GUEST
 #include <linux/lguest.h>
 #include "../../../drivers/lguest/lg.h"
-#endif
 
 /* workaround for a warning with -Wmissing-prototypes */
 void foo(void);
@@ -58,7 +54,6 @@ void foo(void)
 	OFFSET(TI_exec_domain, thread_info, exec_domain);
 	OFFSET(TI_flags, thread_info, flags);
 	OFFSET(TI_status, thread_info, status);
-	OFFSET(TI_cpu, thread_info, cpu);
 	OFFSET(TI_preempt_count, thread_info, preempt_count);
 	OFFSET(TI_addr_limit, thread_info, addr_limit);
 	OFFSET(TI_restart_block, thread_info, restart_block);
@@ -96,14 +91,9 @@ void foo(void)
 	OFFSET(pbe_orig_address, pbe, orig_address);
 	OFFSET(pbe_next, pbe, next);
 
-#ifndef CONFIG_X86_NO_TSS
 	/* Offset from the sysenter stack to tss.sp0 */
-	DEFINE(SYSENTER_stack_sp0, offsetof(struct tss_struct, x86_tss.sp0) -
+	DEFINE(TSS_sysenter_sp0, offsetof(struct tss_struct, x86_tss.sp0) -
 		 sizeof(struct tss_struct));
-#else
-	/* sysenter stack points directly to sp0 */
-	DEFINE(SYSENTER_stack_sp0, 0);
-#endif
 
 	DEFINE(PAGE_SIZE_asm, PAGE_SIZE);
 	DEFINE(PAGE_SHIFT_asm, PAGE_SHIFT);
@@ -113,11 +103,6 @@ void foo(void)
 
 	OFFSET(crypto_tfm_ctx_offset, crypto_tfm, __crt_ctx);
 
-#ifdef CONFIG_XEN
-	BLANK();
-	OFFSET(XEN_START_mfn_list, start_info, mfn_list);
-#endif
-
 #ifdef CONFIG_PARAVIRT
 	BLANK();
 	OFFSET(PARAVIRT_enabled, pv_info, paravirt_enabled);
@@ -126,11 +111,11 @@ void foo(void)
 	OFFSET(PV_IRQ_irq_disable, pv_irq_ops, irq_disable);
 	OFFSET(PV_IRQ_irq_enable, pv_irq_ops, irq_enable);
 	OFFSET(PV_CPU_iret, pv_cpu_ops, iret);
-	OFFSET(PV_CPU_irq_enable_syscall_ret, pv_cpu_ops, irq_enable_syscall_ret);
+	OFFSET(PV_CPU_irq_enable_sysexit, pv_cpu_ops, irq_enable_sysexit);
 	OFFSET(PV_CPU_read_cr0, pv_cpu_ops, read_cr0);
 #endif
 
-#ifdef CONFIG_PARAVIRT_XEN
+#ifdef CONFIG_XEN
 	BLANK();
 	OFFSET(XEN_vcpu_info_mask, vcpu_info, evtchn_upcall_mask);
 	OFFSET(XEN_vcpu_info_pending, vcpu_info, evtchn_upcall_pending);

@@ -96,14 +96,22 @@ enum pageflags {
 #ifdef CONFIG_IA64_UNCACHED_ALLOCATOR
 	PG_uncached,		/* Page has been mapped as uncached */
 #endif
-#ifdef CONFIG_XEN
-	PG_foreign,		/* Page is owned by foreign allocator. */
-	PG_pinned,		/* Cannot alias with PG_owner_priv_1 since
-				 * bad_page() checks include this bit.
-				 * Should not use PG_arch_1 as that may have
-				 * a different purpose elsewhere. */
-#endif
-	__NR_PAGEFLAGS
+	__NR_PAGEFLAGS,
+
+	/* Filesystems */
+	PG_checked = PG_owner_priv_1,
+
+	/* XEN */
+	PG_pinned = PG_owner_priv_1,
+	PG_savepinned = PG_dirty,
+
+	/* SLOB */
+	PG_slob_page = PG_active,
+	PG_slob_free = PG_private,
+
+	/* SLUB */
+	PG_slub_frozen = PG_active,
+	PG_slub_debug = PG_error,
 };
 
 #ifndef __GENERATING_BOUNDS_H
@@ -155,22 +163,25 @@ static inline int Page##uname(struct page *page) 			\
 
 struct page;	/* forward declaration */
 
-PAGEFLAG(Locked, locked) TESTSCFLAG(Locked, locked)
+TESTPAGEFLAG(Locked, locked)
 PAGEFLAG(Error, error)
 PAGEFLAG(Referenced, referenced) TESTCLEARFLAG(Referenced, referenced)
 PAGEFLAG(Dirty, dirty) TESTSCFLAG(Dirty, dirty) __CLEARPAGEFLAG(Dirty, dirty)
 PAGEFLAG(LRU, lru) __CLEARPAGEFLAG(LRU, lru)
 PAGEFLAG(Active, active) __CLEARPAGEFLAG(Active, active)
 __PAGEFLAG(Slab, slab)
-PAGEFLAG(Checked, owner_priv_1)		/* Used by some filesystems */
-#ifdef CONFIG_PARAVIRT_XEN
-PAGEFLAG(Pinned, owner_priv_1) TESTSCFLAG(Pinned, owner_priv_1) /* Xen */
-#elif defined(CONFIG_XEN)
-PAGEFLAG(Pinned, pinned) TESTSCFLAG(Pinned, pinned)
-#endif
+PAGEFLAG(Checked, checked)		/* Used by some filesystems */
+PAGEFLAG(Pinned, pinned) TESTSCFLAG(Pinned, pinned)	/* Xen */
+PAGEFLAG(SavePinned, savepinned);			/* Xen */
 PAGEFLAG(Reserved, reserved) __CLEARPAGEFLAG(Reserved, reserved)
 PAGEFLAG(Private, private) __CLEARPAGEFLAG(Private, private)
 	__SETPAGEFLAG(Private, private)
+
+__PAGEFLAG(SlobPage, slob_page)
+__PAGEFLAG(SlobFree, slob_free)
+
+__PAGEFLAG(SlubFrozen, slub_frozen)
+__PAGEFLAG(SlubDebug, slub_debug)
 
 /*
  * Only test-and-set exist for PG_writeback.  The unconditional operators are
@@ -228,9 +239,6 @@ static inline void __SetPageUptodate(struct page *page)
 {
 	smp_wmb();
 	__set_bit(PG_uptodate, &(page)->flags);
-#ifdef CONFIG_S390
-	page_clear_dirty(page);
-#endif
 }
 
 static inline void SetPageUptodate(struct page *page)
@@ -253,26 +261,6 @@ static inline void SetPageUptodate(struct page *page)
 }
 
 CLEARPAGEFLAG(Uptodate, uptodate)
-
-#ifdef CONFIG_XEN
-TESTPAGEFLAG(Foreign, foreign)
-static inline void SetPageForeign(struct page *page,
-				  void (*dtor)(struct page *))
-{
-	BUG_ON(!dtor);
-	set_bit(PG_foreign, &page->flags);
-	page->index = (long)dtor;
-}
-static inline void ClearPageForeign(struct page *page)
-{
-	clear_bit(PG_foreign, &page->flags);
-	page->index = 0;
-}
-static inline void PageForeignDestructor(struct page *page)
-{
-	((void (*)(struct page *))page->index)(page);
-}
-#endif
 
 extern void cancel_dirty_page(struct page *page, unsigned int account_size);
 
@@ -338,16 +326,8 @@ static inline void __ClearPageTail(struct page *page)
 
 #endif /* !PAGEFLAGS_EXTENDED */
 
-#if !defined(CONFIG_XEN)
-# define PAGE_FLAGS_XEN 0
-#elif defined(CONFIG_X86)
-# define PAGE_FLAGS_XEN ((1 << PG_pinned) | (1 << PG_foreign))
-#else
-# define PAGE_FLAGS_XEN (1 << PG_foreign)
-#endif
-
 #define PAGE_FLAGS	(1 << PG_lru   | 1 << PG_private   | 1 << PG_locked | \
-			 1 << PG_buddy | 1 << PG_writeback | PAGE_FLAGS_XEN | \
+			 1 << PG_buddy | 1 << PG_writeback | \
 			 1 << PG_slab  | 1 << PG_swapcache | 1 << PG_active)
 
 /*

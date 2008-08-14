@@ -900,14 +900,14 @@ static int register_root_hub(struct usb_hcd *hcd)
 	if (retval != sizeof usb_dev->descriptor) {
 		mutex_unlock(&usb_bus_list_lock);
 		dev_dbg (parent_dev, "can't read %s device descriptor %d\n",
-				usb_dev->dev.bus_id, retval);
+				dev_name(&usb_dev->dev), retval);
 		return (retval < 0) ? retval : -EMSGSIZE;
 	}
 
 	retval = usb_new_device (usb_dev);
 	if (retval) {
 		dev_err (parent_dev, "can't register root hub for %s, %d\n",
-				usb_dev->dev.bus_id, retval);
+				dev_name(&usb_dev->dev), retval);
 	}
 	mutex_unlock(&usb_bus_list_lock);
 
@@ -1764,7 +1764,7 @@ EXPORT_SYMBOL_GPL (usb_hc_died);
  * If memory is unavailable, returns NULL.
  */
 struct usb_hcd *usb_create_hcd (const struct hc_driver *driver,
-		struct device *dev, char *bus_name)
+		struct device *dev, const char *bus_name)
 {
 	struct usb_hcd *hcd;
 
@@ -2001,20 +2001,6 @@ usb_hcd_platform_shutdown(struct platform_device* dev)
 		hcd->driver->shutdown(hcd);
 }
 EXPORT_SYMBOL_GPL(usb_hcd_platform_shutdown);
-
-#ifdef CONFIG_KDB_USB
-void *
-usb_hcd_get_kdb_poll_func(struct usb_device *udev)
-{
-	struct usb_hcd	*hcd = bus_to_hcd(udev->bus);
-
-	if (hcd && hcd->driver)
-		return (void *)(hcd->driver->kdb_poll_char);
-
-	return NULL;
-}
-EXPORT_SYMBOL_GPL (usb_hcd_get_kdb_poll_func);
-#endif /* CONFIG_KDB_USB */
 
 /*-------------------------------------------------------------------------*/
 

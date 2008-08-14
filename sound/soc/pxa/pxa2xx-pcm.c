@@ -22,9 +22,9 @@
 #include <sound/soc.h>
 
 #include <asm/dma.h>
-#include <asm/hardware.h>
-#include <asm/arch/pxa-regs.h>
-#include <asm/arch/audio.h>
+#include <mach/hardware.h>
+#include <mach/pxa-regs.h>
+#include <mach/audio.h>
 
 #include "pxa2xx-pcm.h"
 
@@ -330,7 +330,7 @@ static void pxa2xx_pcm_free_dma_buffers(struct snd_pcm *pcm)
 
 static u64 pxa2xx_pcm_dmamask = DMA_32BIT_MASK;
 
-int pxa2xx_pcm_new(struct snd_card *card, struct snd_soc_codec_dai *dai,
+int pxa2xx_pcm_new(struct snd_card *card, struct snd_soc_dai *dai,
 	struct snd_pcm *pcm)
 {
 	int ret = 0;

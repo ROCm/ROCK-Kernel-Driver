@@ -124,6 +124,9 @@ extern unsigned int apparmor_path_max;
 	(apparmor_audit == 1 || \
 	 ((_cxt) && (_cxt)->profile && (_cxt)->profile->flags.audit))
 
+#define PROFILE_IS_HAT(_profile) \
+	((_profile) && (_profile)->flags.hat)
+
 /*
  * DEBUG remains global (no per profile flag) since it is mostly used in sysctl
  * which is not related to profile accesses.
@@ -211,6 +214,7 @@ struct aa_profile {
 	char **exec_table;
 	struct aa_dfa *file_rules;
 	struct {
+		int hat;
 		int complain;
 		int audit;
 	} flags;
@@ -350,7 +354,7 @@ extern void aa_set_rlimits(struct task_struct *task, struct aa_profile *profile)
 
 /* lsm.c */
 extern int apparmor_initialized;
-extern void info_message(const char *str, const char *name);
+extern void info_message(const char *str);
 extern void apparmor_disable(void);
 
 /* list.c */

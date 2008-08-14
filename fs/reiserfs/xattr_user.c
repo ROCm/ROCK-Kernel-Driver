@@ -6,8 +6,6 @@
 #include <linux/reiserfs_xattr.h>
 #include <asm/uaccess.h>
 
-#define XATTR_USER_PREFIX "user."
-
 static int
 user_get(struct inode *inode, const char *name, void *buffer, size_t size)
 {
