@@ -314,7 +314,7 @@ static int month_days[12] = {
 /*
  * This only works for the Gregorian calendar - i.e. after 1752 (in the UK)
  */
-static void GregorianDay(struct local_rtc_time *tm)
+static void NovfsGregorianDay(struct local_rtc_time *tm)
 {
 	int leapsToDate;
 	int lastYear;
@@ -384,7 +384,7 @@ static void private_to_tm(int tim, struct local_rtc_time *tm)
 	/*
 	 * Determine the day of week
 	 */
-	GregorianDay(tm);
+	NovfsGregorianDay(tm);
 }
 
 char *ctime_r(time_t * clock, char *buf)
