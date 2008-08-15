@@ -920,6 +920,7 @@ static int ipic_suspend(struct sys_device *sdev, pm_message_t state)
 	ipic_saved_state.sermr = ipic_read(ipic->regs, IPIC_SERMR);
 	ipic_saved_state.sercr = ipic_read(ipic->regs, IPIC_SERCR);
 
+#ifdef CONFIG_PPC_83xx
 	if (fsl_deep_sleep()) {
 		/* In deep sleep, make sure there can be no
 		 * pending interrupts, as this can cause
@@ -930,6 +931,7 @@ static int ipic_suspend(struct sys_device *sdev, pm_message_t state)
 		ipic_write(ipic->regs, IPIC_SEMSR, 0);
 		ipic_write(ipic->regs, IPIC_SERMR, 0);
 	}
+#endif
 
 	return 0;
 }
