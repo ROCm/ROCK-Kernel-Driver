@@ -21,6 +21,9 @@
 #include <linux/debug_locks.h>
 #include <linux/random.h>
 #include <linux/kallsyms.h>
+#ifdef CONFIG_KDB_KDUMP
+#include <linux/kdb.h>
+#endif
 
 int panic_on_oops;
 int tainted;
@@ -82,6 +85,11 @@ NORET_TYPE void panic(const char * fmt, ...)
 	printk(KERN_EMERG "Kernel panic - not syncing: %s\n",buf);
 	bust_spinlocks(0);
 
+#ifdef CONFIG_KDB_KDUMP
+	if (kdb_kdump_state == KDB_KDUMP_RESET) {
+		(void)kdb(KDB_REASON_OOPS, 999, get_irq_regs());
+	}
+#endif
 	/*
 	 * If we have crashed and we have a crash kernel loaded let it handle
 	 * everything else.

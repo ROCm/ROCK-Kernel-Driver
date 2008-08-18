@@ -18,6 +18,10 @@
 #error "This file is PCI bus glue.  CONFIG_PCI must be defined."
 #endif
 
+#ifdef CONFIG_KDB_USB
+#include <linux/kdb.h>
+#endif
+
 /*-------------------------------------------------------------------------*/
 
 static int broken_suspend(struct usb_hcd *hcd)
@@ -235,6 +239,7 @@ static int __devinit ohci_pci_start (struct usb_hcd *hcd)
 		ohci_err (ohci, "can't start\n");
 		ohci_stop (hcd);
 	}
+
 	return ret;
 }
 
@@ -333,6 +338,9 @@ static const struct hc_driver ohci_pci_hc_driver = {
 	.bus_resume =		ohci_bus_resume,
 #endif
 	.start_port_reset =	ohci_start_port_reset,
+#ifdef CONFIG_KDB_USB
+	.kdb_poll_char =	ohci_kdb_poll_char,
+#endif
 };
 
 /*-------------------------------------------------------------------------*/

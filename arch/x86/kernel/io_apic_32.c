@@ -33,6 +33,10 @@
 #include <linux/sysdev.h>
 #include <linux/pci.h>
 #include <linux/msi.h>
+
+#ifdef	CONFIG_KDB
+#include <linux/kdb.h>
+#endif	/* CONFIG_KDB */
 #include <linux/htirq.h>
 #include <linux/freezer.h>
 #include <linux/kthread.h>
@@ -1189,6 +1193,10 @@ next:
 		return -ENOSPC;
 	if (test_and_set_bit(vector, used_vectors))
 		goto next;
+#ifdef CONFIG_KDB
+	if (vector == KDBENTER_VECTOR)
+		goto next;
+#endif
 
 	current_vector = vector;
 	current_offset = offset;

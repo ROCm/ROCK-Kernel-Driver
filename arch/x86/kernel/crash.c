@@ -35,13 +35,38 @@ static int crashing_cpu;
 #if defined(CONFIG_SMP) && defined(CONFIG_X86_LOCAL_APIC)
 static atomic_t waiting_for_crash_ipi;
 
+#ifdef CONFIG_KDB_KDUMP
+void halt_current_cpu(struct pt_regs *regs)
+{
+#ifdef CONFIG_X86_32
+	struct pt_regs fixed_regs;
+#endif
+	local_irq_disable();
+#ifdef CONFIG_X86_32
+	if (!user_mode_vm(regs)) {
+		crash_fixup_ss_esp(&fixed_regs, regs);
+		regs = &fixed_regs;
+	}
+#endif
+	crash_save_cpu(regs, raw_smp_processor_id());
+	disable_local_APIC();
+	atomic_dec(&waiting_for_crash_ipi);
+	/* Assume hlt works */
+	halt();
+	for(;;)
+		cpu_relax();
+}
+#endif /* CONFIG_KDB_KDUMP */
+
 static int crash_nmi_callback(struct notifier_block *self,
 			unsigned long val, void *data)
 {
 	struct pt_regs *regs;
+#ifndef CONFIG_KDB_KDUMP
 #ifdef CONFIG_X86_32
 	struct pt_regs fixed_regs;
 #endif
+#endif /* !CONFIG_KDB_KDUMP */
 	int cpu;
 
 	if (val != DIE_NMI_IPI)
@@ -56,6 +81,9 @@ static int crash_nmi_callback(struct notifier_block *self,
 	 */
 	if (cpu == crashing_cpu)
 		return NOTIFY_STOP;
+#ifdef CONFIG_KDB_KDUMP
+	halt_current_cpu(regs);
+#else
 	local_irq_disable();
 
 #ifdef CONFIG_X86_32
@@ -71,6 +99,7 @@ static int crash_nmi_callback(struct notifier_block *self,
 	halt();
 	for (;;)
 		cpu_relax();
+#endif /* !CONFIG_KDB_KDUMP */
 
 	return 1;
 }
@@ -87,6 +116,43 @@ static struct notifier_block crash_nmi_nb = {
 	.notifier_call = crash_nmi_callback,
 };
 
+#ifdef CONFIG_KDB_KDUMP
+static void wait_other_cpus(void)
+{
+	unsigned long msecs;
+
+	msecs = 1000; /* Wait at most a second for the other cpus to stop */
+	while ((atomic_read(&waiting_for_crash_ipi) > 0) && msecs) {
+		udelay(1000);
+	msecs--;
+	}
+}
+
+static void nmi_shootdown_cpus_init(void)
+{
+	atomic_set(&waiting_for_crash_ipi, num_online_cpus() - 1);
+}
+
+static void nmi_shootdown_cpus(void)
+{
+	nmi_shootdown_cpus_init();
+
+	/* Would it be better to replace the trap vector here? */
+	if (register_die_notifier(&crash_nmi_nb))
+		return;		/* return what? */
+	/* Ensure the new callback function is set before sending
+	 * out the NMI
+	 */
+	wmb();
+
+	smp_send_nmi_allbutself();
+
+	wait_other_cpus();
+	/* Leave the nmi callback set */
+
+	disable_local_APIC();
+}
+#else
 static void nmi_shootdown_cpus(void)
 {
 	unsigned long msecs;
@@ -111,12 +177,22 @@ static void nmi_shootdown_cpus(void)
 	/* Leave the nmi callback set */
 	disable_local_APIC();
 }
-#else
+#endif /* !CONFIG_KDB_KDUMP */
+
+#else /* defined(CONFIG_SMP) && defined(CONFIG_X86_LOCAL_APIC) */
+
 static void nmi_shootdown_cpus(void)
 {
 	/* There are no cpus to shootdown */
 }
-#endif
+
+#ifdef CONFIG_KDB_KDUMP
+static void nmi_shootdown_cpus_init(void) {};
+static void wait_other_cpus() {}
+static void halt_current_cpu(struct pt_regs *regs) {};
+#endif /* CONFIG_KDB_KDUMP */
+
+#endif /* defined(CONFIG_SMP) && defined(CONFIG_X86_LOCAL_APIC) */
 
 void native_machine_crash_shutdown(struct pt_regs *regs)
 {
@@ -143,3 +219,33 @@ void native_machine_crash_shutdown(struct pt_regs *regs)
 #endif
 	crash_save_cpu(regs, safe_smp_processor_id());
 }
+
+#ifdef CONFIG_KDB_KDUMP
+void machine_crash_shutdown_begin(void)
+{
+	local_irq_disable();
+
+	/* Make a note of crashing cpu. Will be used in NMI callback.*/
+	crashing_cpu = safe_smp_processor_id();
+#ifndef CONFIG_XEN
+	nmi_shootdown_cpus_init();
+#endif /* CONFIG_XEN */
+}
+
+void machine_crash_shutdown_end(struct pt_regs *regs)
+{
+#ifndef CONFIG_XEN
+	wait_other_cpus();
+
+	local_irq_disable();
+	lapic_shutdown();
+#if defined(CONFIG_X86_IO_APIC)
+	disable_IO_APIC();
+#endif
+#ifdef CONFIG_HPET_TIMER
+	hpet_disable();
+#endif
+#endif /* CONFIG_XEN */
+	crash_save_cpu(regs,safe_smp_processor_id());
+}
+#endif /* CONFIG_KDB_KDUMP */

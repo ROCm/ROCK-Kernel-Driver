@@ -986,6 +986,48 @@ static int ehci_get_frame (struct usb_hcd *hcd)
 		ehci->periodic_size;
 }
 
+#ifdef CONFIG_KDB_USB
+
+int
+ehci_kdb_poll_char(struct urb *urb)
+{
+        struct ehci_hcd *ehci;
+
+        /* just to make sure */
+        if (!urb || !urb->dev || !urb->dev->bus)
+                return -1;
+
+        ehci = (struct ehci_hcd *) hcd_to_ehci(bus_to_hcd(urb->dev->bus));
+
+        /* make sure */
+        if (!ehci)
+                return -1;
+
+        if (!HC_IS_RUNNING (ehci_to_hcd(ehci)->state))
+                return -1;
+
+	/*
+	 * If ehci->lock is held coming into this routine, it could
+	 * mean KDB was entered while the HC driver was in the midst
+	 * of processing URBs. Therefore it could be dangerous to
+	 * processes URBs from this poll routine. And, we can't wait on
+	 * the lock since we are in KDB and kernel threads (including the
+	 * one holding the lock) are suspended.
+	 * So, we punt and return an error. Keyboards attached to this
+	 * HC will not be useable from KDB at this time.
+	 */
+	if (spin_is_locked(&ehci->lock))
+		return -EBUSY;
+
+	/* processes the URB */
+        if (qh_completions_kdb(ehci, urb->hcpriv, urb))
+                return 0;
+
+        return -1;
+}
+
+#endif /* CONFIG_KDB_USB */
+
 /*-------------------------------------------------------------------------*/
 
 #define DRIVER_INFO DRIVER_VERSION " " DRIVER_DESC

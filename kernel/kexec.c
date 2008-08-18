@@ -37,6 +37,12 @@
 #include <asm/system.h>
 #include <asm/sections.h>
 
+#ifdef CONFIG_KDB_KDUMP
+#include <linux/module.h>
+#include <linux/device.h>
+#include <linux/kdb.h>
+#endif
+
 /* Per cpu memory for storing cpu states in case of system crash. */
 note_buf_t* crash_notes;
 
@@ -1065,7 +1071,6 @@ void crash_kexec(struct pt_regs *regs)
 {
 	int locked;
 
-
 	/* Take the kexec_lock here to prevent sys_kexec_load
 	 * running on one cpu from replacing the crash kernel
 	 * we are using after a panic on a different cpu.
@@ -1078,15 +1083,26 @@ void crash_kexec(struct pt_regs *regs)
 	if (!locked) {
 		if (kexec_crash_image) {
 			struct pt_regs fixed_regs;
+
 			crash_setup_regs(&fixed_regs, regs);
 			crash_save_vmcoreinfo();
+			/*
+			 * If we enabled KDB, we don't want to automatically
+			 * perform a kdump since KDB will be responsible for
+			 * executing kdb through a special 'kdump' command.
+			 */
+#ifdef CONFIG_KDB_KDUMP
+			kdba_kdump_prepare(&fixed_regs);
+#else
 			machine_crash_shutdown(&fixed_regs);
+#endif
 			machine_kexec(kexec_crash_image);
 		}
 		locked = xchg(&kexec_lock, 0);
 		BUG_ON(!locked);
 	}
 }
+
 
 static u32 *append_elf_note(u32 *buf, char *name, unsigned type, void *data,
 			    size_t data_len)

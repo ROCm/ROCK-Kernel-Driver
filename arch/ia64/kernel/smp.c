@@ -36,6 +36,11 @@
 #include <asm/current.h>
 #include <asm/delay.h>
 #include <asm/machvec.h>
+
+#ifdef	CONFIG_KDB
+#include <linux/kdb.h>
+#endif	/* CONFIG_KDB */
+
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/page.h>
@@ -64,6 +69,9 @@ static DEFINE_PER_CPU(unsigned int, shadow_flush_counts[NR_CPUS]) ____cacheline_
 #define IPI_CPU_STOP		1
 #define IPI_CALL_FUNC_SINGLE	2
 #define IPI_KDUMP_CPU_STOP	3
+#ifdef CONFIG_KDB
+#define IPI_KDB_INTERRUPT	4
+#endif /* CONFIG_KDB */
 
 /* This needs to be cacheline aligned because it is written to by *other* CPUs.  */
 static DEFINE_PER_CPU_SHARED_ALIGNED(u64, ipi_operation);
@@ -122,6 +130,12 @@ handle_IPI (int irq, void *dev_id)
 #ifdef CONFIG_KEXEC
 			case IPI_KDUMP_CPU_STOP:
 				unw_init_running(kdump_cpu_freeze, NULL);
+				break;
+#endif
+#ifdef CONFIG_KDB
+			case IPI_KDB_INTERRUPT:
+				if (!kdb_ipi(get_irq_regs(), NULL))
+					printk(KERN_ERR "kdb_ipi() rejected IPI_KDB_INTERRUPT\n");
 				break;
 #endif
 			default:
@@ -335,3 +349,12 @@ setup_profiling_timer (unsigned int multiplier)
 {
 	return -EINVAL;
 }
+
+#if defined(CONFIG_KDB)
+void
+smp_kdb_stop(void)
+{
+	if (!KDB_FLAG(NOIPI))
+		send_IPI_allbutself(IPI_KDB_INTERRUPT);
+}
+#endif	/* CONFIG_KDB */

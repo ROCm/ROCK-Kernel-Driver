@@ -2505,12 +2505,23 @@ out:
 	return -ERANGE;
 }
 
+#ifdef CONFIG_KDB
+#include <linux/kdb.h>
+struct list_head *kdb_modules = &modules;	/* kdb needs the list of modules */
+#endif /* CONFIG_KDB */
+
 int module_get_kallsym(unsigned int symnum, unsigned long *value, char *type,
 			char *name, char *module_name, int *exported)
 {
 	struct module *mod;
+#ifdef CONFIG_KDB
+	int get_lock = !KDB_IS_RUNNING();
+#else
+#define	get_lock 1
+#endif
 
-	preempt_disable();
+	if (get_lock)
+		preempt_disable();
 	list_for_each_entry(mod, &modules, list) {
 		if (symnum < mod->num_symtab) {
 			*value = mod->symtab[symnum].st_value;
@@ -2519,12 +2530,14 @@ int module_get_kallsym(unsigned int symnum, unsigned long *value, char *type,
 				KSYM_NAME_LEN);
 			strlcpy(module_name, mod->name, MODULE_NAME_LEN);
 			*exported = is_exported(name, mod);
-			preempt_enable();
+			if (get_lock)
+				preempt_enable();
 			return 0;
 		}
 		symnum -= mod->num_symtab;
 	}
-	preempt_enable();
+	if (get_lock)
+		preempt_enable();
 	return -ERANGE;
 }
 

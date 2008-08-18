@@ -44,6 +44,10 @@
 #define DRIVER_DESC "USB HID core driver"
 #define DRIVER_LICENSE "GPL"
 
+#ifdef	CONFIG_KDB_USB
+#include <linux/kdb.h>
+#endif
+
 static char *hid_types[] = {"Device", "Pointer", "Mouse", "Device", "Joystick",
 				"Gamepad", "Keyboard", "Keypad", "Multi-Axis Controller"};
 /*
@@ -940,6 +944,15 @@ static void hid_disconnect(struct usb_interface *intf)
 
 	usbhid = hid->driver_data;
 
+#ifdef CONFIG_KDB_USB
+	/*
+	 * If the URB was for a Keyboard, detach it from kdb.
+	 * If the URB was for another type of device, just
+	 * allow kdb_usb_keyboard_detach() to silently fail.
+	 */
+	kdb_usb_keyboard_detach(usbhid->urbin);
+#endif
+
 	spin_lock_irq(&usbhid->inlock);	/* Sync with error handler */
 	usb_set_intfdata(intf, NULL);
 	set_bit(HID_DISCONNECTED, &usbhid->iofl);
@@ -1036,6 +1049,21 @@ static int hid_probe(struct usb_interface *intf, const struct usb_device_id *id)
 
 	printk(": USB HID v%x.%02x %s [%s] on %s\n",
 		hid->version >> 8, hid->version & 0xff, c, hid->name, path);
+
+#ifdef CONFIG_KDB_USB
+	/* Attach USB keyboards to kdb */
+	if (!strcmp(c, "Keyboard")) {
+		int	ret;
+		struct usbhid_device *usbhid = hid->driver_data;
+		extern void * usb_hcd_get_kdb_poll_func(struct usb_device *udev);
+		ret = kdb_usb_keyboard_attach(usbhid->urbin, usbhid->inbuf,
+		    usb_hcd_get_kdb_poll_func(interface_to_usbdev(intf)));
+
+		if (ret == -1)
+			printk(": FAILED to register keyboard (%s) "
+			       "with KDB\n", path);
+	}
+#endif /* CONFIG_KDB_USB */
 
 	return 0;
 }

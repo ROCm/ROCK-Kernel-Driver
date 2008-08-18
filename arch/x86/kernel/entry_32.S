@@ -1015,6 +1015,26 @@ ENTRY(alignment_check)
 	CFI_ENDPROC
 END(alignment_check)
 
+#ifdef	CONFIG_KDB
+
+ENTRY(kdb_call)
+	RING0_INT_FRAME
+	pushl %eax              # save orig EAX
+	CFI_ADJUST_CFA_OFFSET 4
+	SAVE_ALL
+	movl %esp,%ecx          # struct pt_regs
+	movl $0,%edx            # error_code
+	movl $1,%eax            # KDB_REASON_ENTER
+	call  kdb
+	jmp restore_all
+	CFI_ENDPROC
+
+#ifdef	CONFIG_SMP
+BUILD_INTERRUPT(kdb_interrupt,KDB_VECTOR)
+#endif	/* CONFIG_SMP */
+
+#endif	/* CONFIG_KDB */
+
 ENTRY(divide_error)
 	RING0_INT_FRAME
 	pushl $0			# no error code

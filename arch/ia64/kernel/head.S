@@ -259,8 +259,13 @@ start_ap:
 	/*
 	 * Switch into virtual mode:
 	 */
+#ifdef CONFIG_KDB_HARDWARE_BREAKPOINTS
+#define IA64_PSR_KDB_FLAGS IA64_PSR_DB
+#else
+#define IA64_PSR_KDB_FLAGS 0
+#endif
 	movl r16=(IA64_PSR_IT|IA64_PSR_IC|IA64_PSR_DT|IA64_PSR_RT|IA64_PSR_DFH|IA64_PSR_BN \
-		  |IA64_PSR_DI)
+		  |IA64_PSR_DI|IA64_PSR_KDB_FLAGS)
 	;;
 	mov cr.ipsr=r16
 	movl r17=1f

@@ -41,6 +41,10 @@
 #include <linux/bug.h>
 #include <linux/sched.h>
 
+#ifdef CONFIG_KDB
+#include <linux/kdb.h>
+#endif
+
 extern const struct bug_entry __start___bug_table[], __stop___bug_table[];
 
 #ifdef CONFIG_MODULES
@@ -161,6 +165,10 @@ enum bug_trap_type report_bug(unsigned long bugaddr, struct pt_regs *regs)
 		printk(KERN_CRIT "Kernel BUG at %p "
 		       "[verbose debug info unavailable]\n",
 		       (void *)bugaddr);
+
+#ifdef CONFIG_KDB
+	kdb(KDB_REASON_ENTER, 0, regs);
+#endif
 
 	return BUG_TRAP_TYPE_BUG;
 }

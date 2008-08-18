@@ -30,6 +30,9 @@
 #include <linux/init.h>
 #include <linux/usb/input.h>
 #include <linux/hid.h>
+#ifdef	CONFIG_KDB_USB
+#include <linux/kdb.h>
+#endif
 
 /*
  * Version Information
@@ -289,6 +292,16 @@ static int usb_kbd_probe(struct usb_interface *iface,
 	usb_fill_int_urb(kbd->irq, dev, pipe,
 			 kbd->new, (maxp > 8 ? 8 : maxp),
 			 usb_kbd_irq, kbd, endpoint->bInterval);
+
+#ifdef CONFIG_KDB_USB
+	/* Attach keyboard to kdb */
+	extern void * usb_hcd_get_kdb_poll_func(struct usb_device *udev);
+
+	kdb_usb_keyboard_attach(kbd->irq, kbd->new,
+				usb_hcd_get_kdb_poll_func(dev));
+
+#endif /* CONFIG_KDB_USB */
+
 	kbd->irq->transfer_dma = kbd->new_dma;
 	kbd->irq->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
 
@@ -326,6 +339,10 @@ static void usb_kbd_disconnect(struct usb_interface *intf)
 
 	usb_set_intfdata(intf, NULL);
 	if (kbd) {
+#ifdef CONFIG_KDB_USB
+	       /* Detach the keyboard from kdb */
+        	kdb_usb_keyboard_detach(kbd->irq);
+#endif /* CONFIG_KDB_USB */
 		usb_kill_urb(kbd->irq);
 		input_unregister_device(kbd->dev);
 		usb_kbd_free_mem(interface_to_usbdev(intf), kbd);

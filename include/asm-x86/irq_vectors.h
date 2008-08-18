@@ -16,6 +16,7 @@
 #else
 # define IA32_SYSCALL_VECTOR	0x80
 #endif
+#define KDBENTER_VECTOR 	0x81
 
 /*
  * Reserve the lowest usable priority level 0x20 - 0x2f for triggering
@@ -65,6 +66,7 @@
 # define RESCHEDULE_VECTOR		0xfc
 # define CALL_FUNCTION_VECTOR		0xfb
 # define CALL_FUNCTION_SINGLE_VECTOR	0xfa
+#define	KDB_VECTOR			0xf9
 # define THERMAL_APIC_VECTOR		0xf0
 
 #else
@@ -76,6 +78,7 @@
 #define CALL_FUNCTION_SINGLE_VECTOR	0xfb
 #define THERMAL_APIC_VECTOR		0xfa
 #define THRESHOLD_APIC_VECTOR		0xf9
+#define	KDB_VECTOR			0xf8
 #define INVALIDATE_TLB_VECTOR_END	0xf7
 #define INVALIDATE_TLB_VECTOR_START	0xf0	/* f0-f7 used for TLB flush */
 

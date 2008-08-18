@@ -22,6 +22,10 @@
 #error "This file is PCI bus glue.  CONFIG_PCI must be defined."
 #endif
 
+#ifdef CONFIG_KDB_USB
+#include <linux/kdb.h>
+#endif
+
 /*-------------------------------------------------------------------------*/
 
 /* called after powerup, by probe or system-pm "wakeup" */
@@ -380,6 +384,10 @@ static const struct hc_driver ehci_pci_hc_driver = {
 	.bus_resume =		ehci_bus_resume,
 	.relinquish_port =	ehci_relinquish_port,
 	.port_handed_over =	ehci_port_handed_over,
+
+#ifdef CONFIG_KDB_USB
+	.kdb_poll_char = 	ehci_kdb_poll_char,
+#endif
 };
 
 /*-------------------------------------------------------------------------*/

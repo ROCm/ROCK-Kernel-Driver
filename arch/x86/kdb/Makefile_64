@@ -1,0 +1,25 @@
+#
+# This file is subject to the terms and conditions of the GNU General Public
+# License.  See the file "COPYING" in the main directory of this archive
+# for more details.
+#
+# Copyright (c) 1999-2004 Silicon Graphics, Inc.  All Rights Reserved.
+#
+
+obj-$(CONFIG_KDB)	:= kdba_bp_64.o kdbasupport_64.o x86_64-dis.o
+
+# The i386 and x86_64 backtrace commands are handled by common code.
+obj-y		+= kdba_bt.o kdba_io.o kdba_id.o kdba_support.o
+ifneq (,$(findstring -fno-optimize-sibling-calls,$(KBUILD_CFLAGS)))
+  CFLAGS_kdba_bt.o += -DNO_SIBLINGS
+endif
+REGPARM := $(subst -mregparm=,,$(filter -mregparm=%,$(KBUILD_CFLAGS)))
+ifeq (,$(REGPARM))
+  REGPARM := 6
+endif
+
+CFLAGS_kdba_bt.o += -DREGPARM=$(REGPARM) -DCCVERSION="$(CCVERSION)"
+
+override CFLAGS := $(CFLAGS:%-pg=% )
+
+CFLAGS_kdba_io.o += -I $(TOPDIR)/arch/$(SRCARCH)/kdb
