@@ -26,7 +26,6 @@
 #include <asm/ps3.h>
 #include <asm/lv1call.h>
 #include <asm/cell-pmu.h>
-#include <asm/time.h>
 
 
 /* BOOKMARK tag macros */
