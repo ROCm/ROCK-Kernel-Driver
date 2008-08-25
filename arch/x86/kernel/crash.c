@@ -29,6 +29,7 @@
 
 #include <mach_ipi.h>
 
+#ifndef CONFIG_XEN
 /* This keeps a track of which one is crashing cpu. */
 static int crashing_cpu;
 
@@ -193,6 +194,7 @@ static void halt_current_cpu(struct pt_regs *regs) {};
 #endif /* CONFIG_KDB_KDUMP */
 
 #endif /* defined(CONFIG_SMP) && defined(CONFIG_X86_LOCAL_APIC) */
+#endif /* CONFIG_XEN */
 
 void native_machine_crash_shutdown(struct pt_regs *regs)
 {
@@ -207,6 +209,7 @@ void native_machine_crash_shutdown(struct pt_regs *regs)
 	/* The kernel is broken so disable interrupts */
 	local_irq_disable();
 
+#ifndef CONFIG_XEN
 	/* Make a note of crashing cpu. Will be used in NMI callback.*/
 	crashing_cpu = safe_smp_processor_id();
 	nmi_shootdown_cpus();
@@ -214,6 +217,7 @@ void native_machine_crash_shutdown(struct pt_regs *regs)
 #if defined(CONFIG_X86_IO_APIC)
 	disable_IO_APIC();
 #endif
+#endif /* CONFIG_XEN */
 #ifdef CONFIG_HPET_TIMER
 	hpet_disable();
 #endif

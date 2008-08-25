@@ -96,14 +96,23 @@ enum pageflags {
 #ifdef CONFIG_IA64_UNCACHED_ALLOCATOR
 	PG_uncached,		/* Page has been mapped as uncached */
 #endif
+#ifdef CONFIG_XEN
+	PG_foreign,		/* Page is owned by foreign allocator. */
+	PG_pinned,		/* Cannot alias with PG_owner_priv_1 since
+				 * bad_page() checks include this bit.
+				 * Should not use PG_arch_1 as that may have
+				 * a different purpose elsewhere. */
+#endif
 	__NR_PAGEFLAGS,
 
 	/* Filesystems */
 	PG_checked = PG_owner_priv_1,
 
+#ifdef CONFIG_PARAVIRT_XEN
 	/* XEN */
 	PG_pinned = PG_owner_priv_1,
 	PG_savepinned = PG_dirty,
+#endif
 
 	/* SLOB */
 	PG_slob_page = PG_active,
@@ -171,8 +180,12 @@ PAGEFLAG(LRU, lru) __CLEARPAGEFLAG(LRU, lru)
 PAGEFLAG(Active, active) __CLEARPAGEFLAG(Active, active)
 __PAGEFLAG(Slab, slab)
 PAGEFLAG(Checked, checked)		/* Used by some filesystems */
+#if defined(CONFIG_XEN) || defined(CONFIG_PARAVIRT_XEN)
 PAGEFLAG(Pinned, pinned) TESTSCFLAG(Pinned, pinned)	/* Xen */
+#endif
+#ifdef CONFIG_PARAVIRT_XEN
 PAGEFLAG(SavePinned, savepinned);			/* Xen */
+#endif
 PAGEFLAG(Reserved, reserved) __CLEARPAGEFLAG(Reserved, reserved)
 PAGEFLAG(Private, private) __CLEARPAGEFLAG(Private, private)
 	__SETPAGEFLAG(Private, private)
@@ -262,6 +275,26 @@ static inline void SetPageUptodate(struct page *page)
 
 CLEARPAGEFLAG(Uptodate, uptodate)
 
+#ifdef CONFIG_XEN
+TESTPAGEFLAG(Foreign, foreign)
+static inline void SetPageForeign(struct page *page,
+				  void (*dtor)(struct page *))
+{
+	BUG_ON(!dtor);
+	set_bit(PG_foreign, &page->flags);
+	page->index = (long)dtor;
+}
+static inline void ClearPageForeign(struct page *page)
+{
+	clear_bit(PG_foreign, &page->flags);
+	page->index = 0;
+}
+static inline void PageForeignDestructor(struct page *page)
+{
+	((void (*)(struct page *))page->index)(page);
+}
+#endif
+
 extern void cancel_dirty_page(struct page *page, unsigned int account_size);
 
 int test_clear_page_writeback(struct page *page);
@@ -326,8 +359,16 @@ static inline void __ClearPageTail(struct page *page)
 
 #endif /* !PAGEFLAGS_EXTENDED */
 
+#if !defined(CONFIG_XEN)
+# define PAGE_FLAGS_XEN 0
+#elif defined(CONFIG_X86)
+# define PAGE_FLAGS_XEN ((1 << PG_pinned) | (1 << PG_foreign))
+#else
+# define PAGE_FLAGS_XEN (1 << PG_foreign)
+#endif
+
 #define PAGE_FLAGS	(1 << PG_lru   | 1 << PG_private   | 1 << PG_locked | \
-			 1 << PG_buddy | 1 << PG_writeback | \
+			 1 << PG_buddy | 1 << PG_writeback | PAGE_FLAGS_XEN | \
 			 1 << PG_slab  | 1 << PG_swapcache | 1 << PG_active)
 
 /*

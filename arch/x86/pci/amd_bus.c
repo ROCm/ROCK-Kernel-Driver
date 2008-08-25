@@ -575,10 +575,22 @@ static void enable_pci_io_ecs_per_cpu(void *unused)
 
 static int __init enable_pci_io_ecs(void)
 {
+#ifdef CONFIG_XEN
+	if (!is_initial_xendomain())
+		return 0;
+#endif
 	/* assume all cpus from fam10h have IO ECS */
         if (boot_cpu_data.x86 < 0x10)
 		return 0;
 	on_each_cpu(enable_pci_io_ecs_per_cpu, NULL, 1);
+#ifdef CONFIG_XEN
+	{
+		u64 reg;
+		rdmsrl(MSR_AMD64_NB_CFG, reg);
+		if (!(reg & ENABLE_CF8_EXT_CFG))
+			return 0;
+	}
+#endif
 	pci_probe |= PCI_HAS_IO_ECS;
 	return 0;
 }

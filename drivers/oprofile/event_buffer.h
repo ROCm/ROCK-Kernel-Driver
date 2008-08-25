@@ -23,6 +23,9 @@ void wake_up_buffer_waiter(void);
 #define INVALID_COOKIE ~0UL
 #define NO_COOKIE 0UL
 
+/* Constant used to refer to coordinator domain (Xen) */
+#define COORDINATOR_DOMAIN -1
+
 extern const struct file_operations event_buffer_fops;
  
 /* mutex between sync_cpu_buffers() and the

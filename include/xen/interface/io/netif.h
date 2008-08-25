@@ -3,6 +3,24 @@
  *
  * Unified network-device I/O interface for Xen guest OSes.
  *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ *
  * Copyright (c) 2003-2004, Keir Fraser
  */
 
@@ -47,18 +65,21 @@
 #define _NETTXF_extra_info     (3)
 #define  NETTXF_extra_info     (1U<<_NETTXF_extra_info)
 
-struct xen_netif_tx_request {
+struct netif_tx_request {
     grant_ref_t gref;      /* Reference to buffer page */
     uint16_t offset;       /* Offset within buffer page */
     uint16_t flags;        /* NETTXF_* */
     uint16_t id;           /* Echoed in response message. */
     uint16_t size;         /* Packet size in bytes.       */
 };
+typedef struct netif_tx_request netif_tx_request_t;
 
 /* Types of netif_extra_info descriptors. */
-#define XEN_NETIF_EXTRA_TYPE_NONE  (0)  /* Never used - invalid */
-#define XEN_NETIF_EXTRA_TYPE_GSO   (1)  /* u.gso */
-#define XEN_NETIF_EXTRA_TYPE_MAX   (2)
+#define XEN_NETIF_EXTRA_TYPE_NONE      (0)  /* Never used - invalid */
+#define XEN_NETIF_EXTRA_TYPE_GSO       (1)  /* u.gso */
+#define XEN_NETIF_EXTRA_TYPE_MCAST_ADD (2)  /* u.mcast */
+#define XEN_NETIF_EXTRA_TYPE_MCAST_DEL (3)  /* u.mcast */
+#define XEN_NETIF_EXTRA_TYPE_MAX       (4)
 
 /* netif_extra_info flags. */
 #define _XEN_NETIF_EXTRA_FLAG_MORE (0)
@@ -71,49 +92,68 @@ struct xen_netif_tx_request {
  * This structure needs to fit within both netif_tx_request and
  * netif_rx_response for compatibility.
  */
-struct xen_netif_extra_info {
-	uint8_t type;  /* XEN_NETIF_EXTRA_TYPE_* */
-	uint8_t flags; /* XEN_NETIF_EXTRA_FLAG_* */
+struct netif_extra_info {
+    uint8_t type;  /* XEN_NETIF_EXTRA_TYPE_* */
+    uint8_t flags; /* XEN_NETIF_EXTRA_FLAG_* */
 
-	union {
-		struct {
-			/*
-			 * Maximum payload size of each segment. For
-			 * example, for TCP this is just the path MSS.
-			 */
-			uint16_t size;
+    union {
+        /*
+         * XEN_NETIF_EXTRA_TYPE_GSO:
+         */
+        struct {
+            /*
+             * Maximum payload size of each segment. For example, for TCP this
+             * is just the path MSS.
+             */
+            uint16_t size;
 
-			/*
-			 * GSO type. This determines the protocol of
-			 * the packet and any extra features required
-			 * to segment the packet properly.
-			 */
-			uint8_t type; /* XEN_NETIF_GSO_TYPE_* */
+            /*
+             * GSO type. This determines the protocol of the packet and any
+             * extra features required to segment the packet properly.
+             */
+            uint8_t type; /* XEN_NETIF_GSO_TYPE_* */
 
-			/* Future expansion. */
-			uint8_t pad;
+            /* Future expansion. */
+            uint8_t pad;
 
-			/*
-			 * GSO features. This specifies any extra GSO
-			 * features required to process this packet,
-			 * such as ECN support for TCPv4.
-			 */
-			uint16_t features; /* XEN_NETIF_GSO_FEAT_* */
-		} gso;
+            /*
+             * GSO features. This specifies any extra GSO features required
+             * to process this packet, such as ECN support for TCPv4.
+             */
+            uint16_t features; /* XEN_NETIF_GSO_FEAT_* */
+        } gso;
 
-		uint16_t pad[3];
-	} u;
+        /*
+         * XEN_NETIF_EXTRA_TYPE_MCAST_{ADD,DEL}:
+         * Backend advertises availability via 'feature-multicast-control'
+         * xenbus node containing value '1'.
+         * Frontend requests this feature by advertising
+         * 'request-multicast-control' xenbus node containing value '1'.
+         * If multicast control is requested then multicast flooding is
+         * disabled and the frontend must explicitly register its interest
+         * in multicast groups using dummy transmit requests containing
+         * MCAST_{ADD,DEL} extra-info fragments.
+         */
+        struct {
+            uint8_t addr[6]; /* Address to add/remove. */
+        } mcast;
+
+        uint16_t pad[3];
+    } u;
 };
+typedef struct netif_extra_info netif_extra_info_t;
 
-struct xen_netif_tx_response {
-	uint16_t id;
-	int16_t  status;       /* NETIF_RSP_* */
+struct netif_tx_response {
+    uint16_t id;
+    int16_t  status;       /* NETIF_RSP_* */
 };
+typedef struct netif_tx_response netif_tx_response_t;
 
-struct xen_netif_rx_request {
-	uint16_t    id;        /* Echoed in response message.        */
-	grant_ref_t gref;      /* Reference to incoming granted frame */
+struct netif_rx_request {
+    uint16_t    id;        /* Echoed in response message.        */
+    grant_ref_t gref;      /* Reference to incoming granted frame */
 };
+typedef struct netif_rx_request netif_rx_request_t;
 
 /* Packet data has been validated against protocol checksum. */
 #define _NETRXF_data_validated (0)
@@ -131,23 +171,34 @@ struct xen_netif_rx_request {
 #define _NETRXF_extra_info     (3)
 #define  NETRXF_extra_info     (1U<<_NETRXF_extra_info)
 
-struct xen_netif_rx_response {
+struct netif_rx_response {
     uint16_t id;
     uint16_t offset;       /* Offset in page of start of received packet  */
     uint16_t flags;        /* NETRXF_* */
     int16_t  status;       /* -ve: BLKIF_RSP_* ; +ve: Rx'ed pkt size. */
 };
+typedef struct netif_rx_response netif_rx_response_t;
 
 /*
  * Generate netif ring structures and types.
  */
 
+#if defined(CONFIG_XEN) || defined(HAVE_XEN_PLATFORM_COMPAT_H)
+DEFINE_RING_TYPES(netif_tx, struct netif_tx_request, struct netif_tx_response);
+DEFINE_RING_TYPES(netif_rx, struct netif_rx_request, struct netif_rx_response);
+#else
+#define xen_netif_tx_request netif_tx_request
+#define xen_netif_rx_request netif_rx_request
+#define xen_netif_tx_response netif_tx_response
+#define xen_netif_rx_response netif_rx_response
 DEFINE_RING_TYPES(xen_netif_tx,
 		  struct xen_netif_tx_request,
 		  struct xen_netif_tx_response);
 DEFINE_RING_TYPES(xen_netif_rx,
 		  struct xen_netif_rx_request,
 		  struct xen_netif_rx_response);
+#define xen_netif_extra_info netif_extra_info
+#endif
 
 #define NETIF_RSP_DROPPED         -2
 #define NETIF_RSP_ERROR           -1
@@ -156,3 +207,13 @@ DEFINE_RING_TYPES(xen_netif_rx,
 #define NETIF_RSP_NULL             1
 
 #endif
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

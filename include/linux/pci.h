@@ -206,6 +206,9 @@ struct pci_dev {
 	 * directly, use the values stored here. They might be different!
 	 */
 	unsigned int	irq;
+#ifdef CONFIG_XEN
+	unsigned int    irq_old;
+#endif
 	struct resource resource[DEVICE_COUNT_RESOURCE]; /* I/O and memory regions + expansion ROMs */
 
 	/* These fields are used by common fixups */
@@ -635,6 +638,9 @@ int pcie_set_readrq(struct pci_dev *dev, int rq);
 void pci_update_resource(struct pci_dev *dev, struct resource *res, int resno);
 int __must_check pci_assign_resource(struct pci_dev *dev, int i);
 int pci_select_bars(struct pci_dev *dev, unsigned long flags);
+#ifdef CONFIG_XEN
+void pci_restore_bars(struct pci_dev *);
+#endif
 
 /* ROM control related routines */
 void __iomem __must_check *pci_map_rom(struct pci_dev *pdev, size_t *size);
@@ -761,6 +767,10 @@ static inline void msi_remove_pci_irq_vectors(struct pci_dev *dev)
 
 static inline void pci_restore_msi_state(struct pci_dev *dev)
 { }
+#ifdef CONFIG_XEN
+#define register_msi_get_owner(func) 0
+#define unregister_msi_get_owner(func) 0
+#endif
 #else
 extern int pci_enable_msi(struct pci_dev *dev);
 extern void pci_msi_shutdown(struct pci_dev *dev);
@@ -771,6 +781,10 @@ extern void pci_msix_shutdown(struct pci_dev *dev);
 extern void pci_disable_msix(struct pci_dev *dev);
 extern void msi_remove_pci_irq_vectors(struct pci_dev *dev);
 extern void pci_restore_msi_state(struct pci_dev *dev);
+#ifdef CONFIG_XEN
+extern int register_msi_get_owner(int (*func)(struct pci_dev *dev));
+extern int unregister_msi_get_owner(int (*func)(struct pci_dev *dev));
+#endif
 #endif
 
 #ifdef CONFIG_HT_IRQ

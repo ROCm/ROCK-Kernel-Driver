@@ -115,6 +115,10 @@ mcore-y  := arch/x86/mach-default/
 mflags-$(CONFIG_X86_VOYAGER)	:= -Iinclude/asm-x86/mach-voyager
 mcore-$(CONFIG_X86_VOYAGER)	:= arch/x86/mach-voyager/
 
+# Xen subarch support
+mflags-$(CONFIG_XEN)		:= -Iinclude/asm-x86/mach-xen
+mcore-$(CONFIG_XEN)		:= arch/x86/mach-xen/
+
 # generic subarchitecture
 mflags-$(CONFIG_X86_GENERICARCH):= -Iinclude/asm-x86/mach-generic
 fcore-$(CONFIG_X86_GENERICARCH)	+= arch/x86/mach-generic/
@@ -124,8 +128,10 @@ mcore-$(CONFIG_X86_GENERICARCH)	:= arch/x86/mach-default/
 mflags-y += -Iinclude/asm-x86/mach-default
 
 # 64 bit does not support subarch support - clear sub arch variables
+ifneq ($(CONFIG_XEN),y)
 fcore-$(CONFIG_X86_64)  :=
 mcore-$(CONFIG_X86_64)  :=
+endif
 
 KBUILD_CFLAGS += $(mflags-y)
 KBUILD_AFLAGS += $(mflags-y)
@@ -144,7 +150,7 @@ libs-y  += arch/x86/lib/
 core-y += $(fcore-y)
 
 # Xen paravirtualization support
-core-$(CONFIG_XEN) += arch/x86/xen/
+core-$(CONFIG_PARAVIRT_XEN) += arch/x86/xen/
 
 # lguest paravirtualization support
 core-$(CONFIG_LGUEST_GUEST) += arch/x86/lguest/
@@ -181,9 +187,28 @@ drivers-$(CONFIG_KDB) += arch/x86/kdb/
 
 boot := arch/x86/boot
 
-PHONY += zImage bzImage compressed zlilo bzlilo \
+PHONY += zImage bzImage vmlinuz compressed zlilo bzlilo \
          zdisk bzdisk fdimage fdimage144 fdimage288 isoimage install
 
+ifdef CONFIG_XEN
+KBUILD_CPPFLAGS := -D__XEN_INTERFACE_VERSION__=$(CONFIG_XEN_INTERFACE_VERSION) \
+	-Iinclude$(if $(KBUILD_SRC),2)/asm/mach-xen $(KBUILD_CPPFLAGS)
+
+ifdef CONFIG_X86_64
+LDFLAGS_vmlinux := -e startup_64
+endif
+
+# Default kernel to build
+all: vmlinuz
+
+# KBUILD_IMAGE specifies the target image being built
+KBUILD_IMAGE := $(boot)/vmlinuz
+
+vmlinuz: vmlinux
+	$(Q)$(MAKE) $(build)=$(boot) $(KBUILD_IMAGE)
+	$(Q)mkdir -p $(objtree)/arch/$(UTS_MACHINE)/boot
+	$(Q)ln -fsn ../../x86/boot/$@ $(objtree)/arch/$(UTS_MACHINE)/boot/$@
+else
 # Default kernel to build
 all: bzImage
 
@@ -206,6 +231,7 @@ zdisk bzdisk: vmlinux
 
 fdimage fdimage144 fdimage288 isoimage: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(KBUILD_IMAGE) $@
+endif
 
 install:
 	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(KBUILD_IMAGE) install

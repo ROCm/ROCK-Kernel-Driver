@@ -80,6 +80,7 @@ MODULE_PARM_DESC(ignore_ppc, "If the frequency of your machine gets wrongly" \
 
 static int acpi_processor_ppc_status;
 
+#ifdef CONFIG_CPU_FREQ
 static int acpi_processor_ppc_notifier(struct notifier_block *nb,
 				       unsigned long event, void *data)
 {
@@ -122,6 +123,7 @@ static int acpi_processor_ppc_notifier(struct notifier_block *nb,
 static struct notifier_block acpi_ppc_notifier_block = {
 	.notifier_call = acpi_processor_ppc_notifier,
 };
+#endif	/* CONFIG_CPU_FREQ */
 
 static int acpi_processor_get_platform_limit(struct acpi_processor *pr)
 {
@@ -166,9 +168,15 @@ int acpi_processor_ppc_has_changed(struct acpi_processor *pr)
 	if (ret < 0)
 		return (ret);
 	else
+#ifdef CONFIG_CPU_FREQ
 		return cpufreq_update_policy(pr->id);
+#elif CONFIG_PROCESSOR_EXTERNAL_CONTROL
+		return processor_notify_external(pr,
+				PROCESSOR_PM_CHANGE, PM_TYPE_PERF);
+#endif
 }
 
+#ifdef CONFIG_CPU_FREQ
 void acpi_processor_ppc_init(void)
 {
 	if (!cpufreq_register_notifier
@@ -187,6 +195,7 @@ void acpi_processor_ppc_exit(void)
 
 	acpi_processor_ppc_status &= ~PPC_REGISTERED;
 }
+#endif	/* CONFIG_CPU_FREQ */
 
 static int acpi_processor_get_performance_control(struct acpi_processor *pr)
 {
@@ -328,7 +337,10 @@ static int acpi_processor_get_performance_states(struct acpi_processor *pr)
 	return result;
 }
 
-static int acpi_processor_get_performance_info(struct acpi_processor *pr)
+#ifndef CONFIG_PROCESSOR_EXTERNAL_CONTROL
+static
+#endif
+int acpi_processor_get_performance_info(struct acpi_processor *pr)
 {
 	int result = 0;
 	acpi_status status = AE_OK;
@@ -356,6 +368,7 @@ static int acpi_processor_get_performance_info(struct acpi_processor *pr)
 	return 0;
 }
 
+#ifdef CONFIG_CPU_FREQ
 int acpi_processor_notify_smm(struct module *calling_module)
 {
 	acpi_status status;
@@ -416,6 +429,7 @@ int acpi_processor_notify_smm(struct module *calling_module)
 }
 
 EXPORT_SYMBOL(acpi_processor_notify_smm);
+#endif	/* CONFIG_CPU_FREQ */
 
 #ifdef CONFIG_X86_ACPI_CPUFREQ_PROC_INTF
 /* /proc/acpi/processor/../performance interface (DEPRECATED) */
@@ -507,7 +521,10 @@ static void acpi_cpufreq_remove_file(struct acpi_processor *pr)
 }
 #endif				/* CONFIG_X86_ACPI_CPUFREQ_PROC_INTF */
 
-static int acpi_processor_get_psd(struct acpi_processor	*pr)
+#ifndef CONFIG_PROCESSOR_EXTERNAL_CONTROL
+static
+#endif
+int acpi_processor_get_psd(struct acpi_processor *pr)
 {
 	int result = 0;
 	acpi_status status = AE_OK;

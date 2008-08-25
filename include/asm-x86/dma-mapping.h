@@ -74,7 +74,7 @@ static inline struct dma_mapping_ops *get_dma_ops(struct device *dev)
 /* Make sure we keep the same behaviour */
 static inline int dma_mapping_error(struct device *dev, dma_addr_t dma_addr)
 {
-#ifdef CONFIG_X86_32
+#if defined(CONFIG_X86_32) && !defined(CONFIG_XEN)
 	return 0;
 #else
 	struct dma_mapping_ops *ops = get_dma_ops(dev);
@@ -223,8 +223,13 @@ static inline dma_addr_t dma_map_page(struct device *dev, struct page *page,
 	struct dma_mapping_ops *ops = get_dma_ops(dev);
 
 	BUG_ON(!valid_dma_direction(direction));
+#ifndef CONFIG_XEN
 	return ops->map_single(dev, page_to_phys(page) + offset,
 			       size, direction);
+#else
+	return ops->map_single(dev, page_to_pseudophys(page) + offset,
+			       size, direction);
+#endif
 }
 
 static inline void dma_unmap_page(struct device *dev, dma_addr_t addr,

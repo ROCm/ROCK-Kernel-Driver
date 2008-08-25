@@ -27,7 +27,9 @@
 #include <linux/kdebug.h>
 #include <linux/smp.h>
 
+#ifdef ARCH_HAS_NMI_WATCHDOG
 #include <asm/i8259.h>
+#endif
 #include <asm/io_apic.h>
 #include <asm/smp.h>
 #include <asm/nmi.h>
@@ -39,6 +41,9 @@
 #include <mach_traps.h>
 
 int unknown_nmi_panic;
+
+#ifdef ARCH_HAS_NMI_WATCHDOG
+
 int nmi_watchdog_enabled;
 
 static cpumask_t backtrace_mask = CPU_MASK_NONE;
@@ -446,6 +451,8 @@ nmi_watchdog_tick(struct pt_regs *regs, unsigned reason)
 	return rc;
 }
 
+#endif /* ARCH_HAS_NMI_WATCHDOG */
+
 #ifdef CONFIG_SYSCTL
 
 static int __init setup_unknown_nmi_panic(char *str)
@@ -465,6 +472,7 @@ static int unknown_nmi_panic_callback(struct pt_regs *regs, int cpu)
 	return 0;
 }
 
+#ifdef ARCH_HAS_NMI_WATCHDOG
 /*
  * proc handler for /proc/sys/kernel/nmi
  */
@@ -497,6 +505,7 @@ int proc_nmi_enabled(struct ctl_table *table, int write, struct file *file,
 	}
 	return 0;
 }
+#endif
 
 #endif /* CONFIG_SYSCTL */
 
@@ -509,6 +518,7 @@ int do_nmi_callback(struct pt_regs *regs, int cpu)
 	return 0;
 }
 
+#ifdef ARCH_HAS_NMI_WATCHDOG
 void __trigger_all_cpu_backtrace(void)
 {
 	int i;
@@ -521,3 +531,4 @@ void __trigger_all_cpu_backtrace(void)
 		mdelay(1);
 	}
 }
+#endif

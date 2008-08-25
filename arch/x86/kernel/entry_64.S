@@ -1401,7 +1401,7 @@ ENTRY(arch_unwind_init_running)
 ENDPROC(arch_unwind_init_running)
 #endif
 
-#ifdef CONFIG_XEN
+#ifdef CONFIG_PARAVIRT_XEN
 ENTRY(xen_hypervisor_callback)
 	zeroentry xen_do_hypervisor_callback
 END(xen_hypervisor_callback)
@@ -1499,7 +1499,7 @@ ENTRY(xen_failsafe_callback)
 	CFI_ENDPROC
 END(xen_failsafe_callback)
 
-#endif /* CONFIG_XEN */
+#endif /* CONFIG_PARAVIRT_XEN */
 
 #ifdef	CONFIG_KDB
 

@@ -193,6 +193,7 @@ static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 		fam10h_check_enable_mmcfg();
 	}
 
+#ifndef CONFIG_XEN
 	if (c == &boot_cpu_data && c->x86 >= 0xf && c->x86 <= 0x11) {
 		unsigned long long tseg;
 
@@ -211,6 +212,7 @@ static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 			set_memory_4k((unsigned long)__va(tseg), 1);
 		}
 	}
+#endif
 }
 
 static struct cpu_dev amd_cpu_dev __cpuinitdata = {

@@ -23,6 +23,9 @@ asmlinkage void spurious_interrupt_bug(void);
 #ifdef CONFIG_X86_MCE
 asmlinkage void machine_check(void);
 #endif /* CONFIG_X86_MCE */
+#ifdef CONFIG_X86_XEN
+asmlinkage void fixup_4gb_segment(void);
+#endif
 
 void do_divide_error(struct pt_regs *, long);
 void do_overflow(struct pt_regs *, long);
@@ -48,6 +51,9 @@ void math_error(void __user *);
 void do_coprocessor_error(struct pt_regs *, long);
 void do_simd_coprocessor_error(struct pt_regs *, long);
 void do_spurious_interrupt_bug(struct pt_regs *, long);
+#ifdef CONFIG_XEN
+void do_fixup_4gb_segment(struct pt_regs *, long);
+#endif
 unsigned long patch_espfix_desc(unsigned long, unsigned long);
 asmlinkage void math_emulate(long);
 

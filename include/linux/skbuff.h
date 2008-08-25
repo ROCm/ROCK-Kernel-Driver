@@ -217,6 +217,8 @@ typedef unsigned char *sk_buff_data_t;
  *	@local_df: allow local fragmentation
  *	@cloned: Head may be cloned (check refcnt to be sure)
  *	@nohdr: Payload reference only, must not modify header
+ *	@proto_data_valid: Protocol data validated since arriving at localhost
+ *	@proto_csum_blank: Protocol csum must be added before leaving localhost
  *	@pkt_type: Packet class
  *	@fclone: skbuff clone status
  *	@ip_summed: Driver fed us an IP checksum
@@ -320,7 +322,11 @@ struct sk_buff {
 #if defined(CONFIG_MAC80211) || defined(CONFIG_MAC80211_MODULE)
 	__u8			do_not_encrypt:1;
 #endif
-	/* 0/13/14 bit hole */
+#ifdef CONFIG_XEN
+	__u8			proto_data_valid:1,
+				proto_csum_blank:1;
+#endif
+	/* 0/11/13/14 bit hole */
 
 #ifdef CONFIG_NET_DMA
 	dma_cookie_t		dma_cookie;
@@ -1721,5 +1727,12 @@ static inline void skb_forward_csum(struct sk_buff *skb)
 }
 
 bool skb_partial_csum_set(struct sk_buff *skb, u16 start, u16 off);
+
+#if defined(CONFIG_XEN) || defined(CONFIG_PARAVIRT_XEN)
+int skb_checksum_setup(struct sk_buff *skb);
+#else
+static inline int skb_checksum_setup(struct sk_buff *skb) { return 0; }
+#endif
+
 #endif	/* __KERNEL__ */
 #endif	/* _LINUX_SKBUFF_H */

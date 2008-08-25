@@ -264,7 +264,7 @@ HYPERVISOR_fpu_taskswitch(int set)
 static inline int
 HYPERVISOR_sched_op(int cmd, void *arg)
 {
-	return _hypercall2(int, sched_op_new, cmd, arg);
+	return _hypercall2(int, sched_op, cmd, arg);
 }
 
 static inline long
