@@ -967,7 +967,7 @@ static void __init set_osi_linux(unsigned int enable)
 	if (osi_linux.enable != enable) {
 		osi_linux.enable = enable;
 		printk(KERN_NOTICE PREFIX "%sed _OSI(Linux)\n",
-			enable ? "Add": "Delete");
+			enable ? "Add": "Delet");
 	}
 	return;
 }
@@ -996,17 +996,6 @@ void __init acpi_dmi_osi_linux(int enable, const struct dmi_system_id *d)
 	return;
 }
 
-static void __init acpi_osi_windows_false(void) {
-
-	acpi_osi_invalidate("Windows 2000");
-	acpi_osi_invalidate("Windows 2001");
-	acpi_osi_invalidate("Windows 2001 SP1");
-	acpi_osi_invalidate("Windows 2001 SP2");
-	acpi_osi_invalidate("Windows 2001.1");
-	acpi_osi_invalidate("Windows 2001.1 SP1");
-	acpi_osi_invalidate("Windows 2006");
-}
-
 /*
  * Modify the list of "OS Interfaces" reported to BIOS via _OSI
  *
@@ -1019,8 +1008,6 @@ int __init acpi_osi_setup(char *str)
 	if (str == NULL || *str == '\0') {
 		printk(KERN_INFO PREFIX "_OSI method disabled\n");
 		acpi_gbl_create_osi_method = FALSE;
-	} else if (strcmp("windows_false", str)) {
-		acpi_osi_windows_false();
 	} else if (!strcmp("!Linux", str)) {
 		acpi_cmdline_osi_linux(0);	/* !enable */
 	} else if (*str == '!') {
