@@ -158,7 +158,7 @@ static int aa_reject_syscall(struct task_struct *task, gfp_t flags,
 }
 
 static int apparmor_ptrace(struct task_struct *parent,
-			   struct task_struct *child, unsigned int mode)
+			   struct task_struct *child)
 {
 	struct aa_task_context *cxt;
 	int error = 0;
@@ -205,6 +205,18 @@ static int apparmor_ptrace(struct task_struct *parent,
 	rcu_read_unlock();
 
 	return error;
+}
+
+static int apparmor_ptrace_may_access(struct task_struct *child,
+				      unsigned int mode)
+{
+	return apparmor_ptrace(child->parent, child);
+}
+
+
+static int apparmor_ptrace_traceme(struct task_struct *parent)
+{
+	return apparmor_ptrace(parent, current);
 }
 
 static int apparmor_capable(struct task_struct *task, int cap)
@@ -899,7 +911,8 @@ static int apparmor_task_setrlimit(unsigned int resource,
 }
 
 struct security_operations apparmor_ops = {
-	.ptrace =			apparmor_ptrace,
+	.ptrace_may_access =		apparmor_ptrace_may_access,
+	.ptrace_traceme =		apparmor_ptrace_traceme,
 	.capget =			cap_capget,
 	.capset_check =			cap_capset_check,
 	.capset_set =			cap_capset_set,

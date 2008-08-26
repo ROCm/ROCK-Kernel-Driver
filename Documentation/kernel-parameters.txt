@@ -200,6 +200,19 @@ and is between 256 and 4096 characters. It is defined in the file
 			that require a timer override, but don't have
 			HPET
 
+	acpi_backlight=	[HW,ACPI]
+			acpi_backlight=vendor
+			acpi_backlight=video
+			If set to vendor, it enforces the use of a
+			vendor specific ACPI driver for backlight switching
+			(e.g. thinkpad_acpi, sony_acpi, etc.) instead
+			of the video.ko driver.
+
+	acpi_display_output=	[HW,ACPI]
+			acpi_display_output=vendor
+			acpi_display_output=video
+			See above.
+
 	acpi.debug_layer=	[HW,ACPI]
 			Format: <int>
 			Each bit of the <int> indicates an ACPI debug layer,
@@ -372,6 +385,8 @@ and is between 256 and 4096 characters. It is defined in the file
 			Values larger than 10 seconds (10000) are changed to
 			no delay (0).
 			Format: integer
+
+	bootmem_debug	[KNL] Enable bootmem allocator debug messages.
 
 	bttv.card=	[HW,V4L] bttv (bt848 + bt878 based grabber cards)
 	bttv.radio=	Most important insmod options are available as
