@@ -3347,7 +3347,7 @@ context_alloc(struct raid_set **raid_set, struct raid_type *raid_type,
 	init_waitqueue_head(&rs->io.suspendq);	/* Suspend waiters (dm-io). */
 
 	rs->recover.nr_regions = dm_sector_div_up(sectors_per_dev, region_size);
-	r = rh_init(&rs->recover.rh, 1, dispatch_delayed_bios, rs,
+	r = region_hash_init(&rs->recover.rh, 1, dispatch_delayed_bios, rs,
 		    wake_do_raid, rs, dl, region_size,
 		    rs->recover.nr_regions);
 	if (r)

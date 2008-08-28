@@ -164,7 +164,7 @@ static void region_free(void *element, void *pool_data)
 }
 
 #define MIN_REGIONS 64
-int rh_init(void **region_hash,
+int region_hash_init(void **region_hash,
 	    unsigned int max_recovery,
 
             void (*dispatch)(void *dispatch_context, struct bio_list *bios),
@@ -618,7 +618,7 @@ void rh_start_recovery(void *v)
 EXPORT_SYMBOL(rh_bio_to_region);
 EXPORT_SYMBOL(rh_sector_to_region);
 EXPORT_SYMBOL(rh_region_to_sector);
-EXPORT_SYMBOL(rh_init);
+EXPORT_SYMBOL(region_hash_init);
 EXPORT_SYMBOL(rh_exit);
 EXPORT_SYMBOL(rh_state);
 EXPORT_SYMBOL(rh_update_states);

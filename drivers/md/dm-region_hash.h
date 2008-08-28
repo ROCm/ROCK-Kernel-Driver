@@ -47,7 +47,7 @@ void rh_reg_set_context(void *reg, void *context);
 region_t rh_get_region_size(void *rh);
 sector_t rh_get_region_key(void *reg);
 
-int rh_init(void **rh,
+int region_hash_init(void **rh,
 	    unsigned int max_recovery,
 	    void (*dispatch)(void *dispatch_context, struct bio_list *bios),
 	    void *dispatch_context,
