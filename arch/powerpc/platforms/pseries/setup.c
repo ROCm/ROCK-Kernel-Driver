@@ -71,10 +71,7 @@
 int CMO_PrPSP = -1;
 int CMO_SecPSP = -1;
 unsigned long CMO_PageSize = (ASM_CONST(1) << IOMMU_PAGE_SHIFT);
-
-/* This shouldn't be exported, but it's accessors are static inlines.
- * I'm hoping to see a better fix come from upstream. -jeffm */
-EXPORT_SYMBOL_GPL(CMO_PageSize);
+EXPORT_SYMBOL(CMO_PageSize);
 
 int fwnmi_active;  /* TRUE if an FWNMI handler is present */
 

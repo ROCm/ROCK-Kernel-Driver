@@ -192,6 +192,9 @@ static struct quirk_entry *quirks;
 
 static void set_quirks(void)
 {
+	if (!interface)
+		return;
+
 	if (quirks->mailled)
 		interface->capability |= ACER_CAP_MAILLED;
 
@@ -1236,6 +1239,8 @@ static int __init acer_wmi_init(void)
 				"load\n");
 		return -ENODEV;
 	}
+
+	set_quirks();
 
 	if (!acpi_video_backlight_support() && has_cap(ACER_CAP_BRIGHTNESS)) {
 		interface->capability &= ~ACER_CAP_BRIGHTNESS;
