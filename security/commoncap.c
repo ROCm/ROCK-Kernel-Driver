@@ -27,6 +27,10 @@
 #include <linux/prctl.h>
 #include <linux/securebits.h>
 
+#ifndef CONFIG_SECURITY_FILE_CAPABILITIES
+static const int file_caps_enabled;
+#endif
+
 int cap_netlink_send(struct sock *sk, struct sk_buff *skb)
 {
 	NETLINK_CB(skb).eff_cap = current->cap_effective;
@@ -278,6 +282,11 @@ static int get_file_caps(struct linux_binprm *bprm)
 	int rc = 0;
 	struct vfs_cap_data vcaps;
 	struct inode *inode;
+
+	if (!file_caps_enabled) {
+		bprm_clear_caps(bprm);
+		return 0;
+	}
 
 	if (bprm->file->f_vfsmnt->mnt_flags & MNT_NOSUID) {
 		bprm_clear_caps(bprm);

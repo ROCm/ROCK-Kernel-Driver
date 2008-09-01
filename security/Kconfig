@@ -75,12 +75,15 @@ config SECURITY_NETWORK_XFRM
 
 config SECURITY_FILE_CAPABILITIES
 	bool "File POSIX Capabilities"
-	default n
+	default y
 	help
 	  This enables filesystem capabilities, allowing you to give
 	  binaries a subset of root's powers without using setuid 0.
 
-	  If in doubt, answer N.
+	  You can still boot with the no_file_caps option to disable
+	  file capabilities.
+
+	  If in doubt, answer Y.
 
 config SECURITY_ROOTPLUG
 	bool "Root Plug Support"
