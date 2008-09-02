@@ -448,6 +448,16 @@ struct xen_domctl_assign_device {
 typedef struct xen_domctl_assign_device xen_domctl_assign_device_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_assign_device_t);
 
+/* Retrieve sibling devices infomation of machine_bdf */
+#define XEN_DOMCTL_get_device_group 50
+struct xen_domctl_get_device_group {
+    uint32_t  machine_bdf;      /* IN */
+    uint32_t  max_sdevs;        /* IN */
+    uint32_t  num_sdevs;        /* OUT */
+    XEN_GUEST_HANDLE_64(uint32)  sdev_array;   /* OUT */
+};
+typedef struct xen_domctl_get_device_group xen_domctl_get_device_group_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_get_device_group_t);
 
 /* Pass-through interrupts: bind real irq -> hvm devfn. */
 #define XEN_DOMCTL_bind_pt_irq       38
@@ -590,6 +600,21 @@ typedef struct xen_domctl_cpuid xen_domctl_cpuid_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_cpuid_t);
 #endif
 
+#define XEN_DOMCTL_subscribe          29
+struct xen_domctl_subscribe {
+    uint32_t port; /* IN */
+};
+typedef struct xen_domctl_subscribe xen_domctl_subscribe_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_subscribe_t);
+
+/*
+ * Define the maximum machine address size which should be allocated
+ * to a guest.
+ */
+#define XEN_DOMCTL_set_machine_address_size  51
+#define XEN_DOMCTL_get_machine_address_size  52
+
+
 struct xen_domctl {
     uint32_t cmd;
     uint32_t interface_version; /* XEN_DOMCTL_INTERFACE_VERSION */
@@ -619,6 +644,7 @@ struct xen_domctl {
         struct xen_domctl_hvmcontext        hvmcontext;
         struct xen_domctl_address_size      address_size;
         struct xen_domctl_sendtrigger       sendtrigger;
+        struct xen_domctl_get_device_group  get_device_group;
         struct xen_domctl_assign_device     assign_device;
         struct xen_domctl_bind_pt_irq       bind_pt_irq;
         struct xen_domctl_memory_mapping    memory_mapping;
@@ -627,6 +653,7 @@ struct xen_domctl {
         struct xen_domctl_ext_vcpucontext   ext_vcpucontext;
         struct xen_domctl_set_opt_feature   set_opt_feature;
         struct xen_domctl_set_target        set_target;
+        struct xen_domctl_subscribe         subscribe;
 #if defined(__i386__) || defined(__x86_64__)
         struct xen_domctl_cpuid             cpuid;
 #endif

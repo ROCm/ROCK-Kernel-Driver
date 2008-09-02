@@ -226,6 +226,8 @@ static void frontend_changed(struct xenbus_device *dev,
 		break;
 
 	case XenbusStateConnected:
+		if (dev->state == XenbusStateConnected)
+			break;
 		backend_create_netif(be);
 		if (be->netif)
 			connect(be);

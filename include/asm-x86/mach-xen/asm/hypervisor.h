@@ -35,7 +35,6 @@
 
 #include <linux/types.h>
 #include <linux/kernel.h>
-#include <linux/version.h>
 #include <linux/errno.h>
 #include <xen/interface/xen.h>
 #include <xen/interface/platform.h>

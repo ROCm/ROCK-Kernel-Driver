@@ -141,10 +141,12 @@ EXPORT_SYMBOL(xen_start_info);
 #define ARCH_SETUP
 #endif
 
+#ifndef CONFIG_XEN
 #ifndef CONFIG_DEBUG_BOOT_PARAMS
 struct boot_params __initdata boot_params;
 #else
 struct boot_params boot_params;
+#endif
 #endif
 
 /*
@@ -691,14 +693,6 @@ void __init setup_arch(char **cmdline_p)
 	early_cpu_init();
 	early_ioremap_init();
 
-#if defined(CONFIG_VMI) && defined(CONFIG_X86_32)
-	/*
-	 * Must be before kernel pagetables are setup
-	 * or fixmap area is touched.
-	 */
-	vmi_init();
-#endif
-
 #ifndef CONFIG_XEN
 	ROOT_DEV = old_decode_dev(boot_params.hdr.root_dev);
 	screen_info = boot_params.screen_info;
@@ -765,8 +759,10 @@ void __init setup_arch(char **cmdline_p)
 
 	copy_edd();
 
+#ifndef CONFIG_XEN
 	if (!boot_params.hdr.root_flags)
 		root_mountflags &= ~MS_RDONLY;
+#endif
 	init_mm.start_code = (unsigned long) _text;
 	init_mm.end_code = (unsigned long) _etext;
 	init_mm.end_data = (unsigned long) _edata;
@@ -792,6 +788,14 @@ void __init setup_arch(char **cmdline_p)
 	*cmdline_p = command_line;
 
 	parse_early_param();
+
+#if defined(CONFIG_VMI) && defined(CONFIG_X86_32)
+	/*
+	 * Must be before kernel pagetables are setup
+	 * or fixmap area is touched.
+	 */
+	vmi_init();
+#endif
 
 	/* after early param, so could get panic from serial */
 	reserve_early_setup_data();

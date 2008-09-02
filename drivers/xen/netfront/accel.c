@@ -28,6 +28,7 @@
  * IN THE SOFTWARE.
  */
 
+#include <linux/version.h>
 #include <linux/netdevice.h>
 #include <linux/skbuff.h>
 #include <linux/list.h>

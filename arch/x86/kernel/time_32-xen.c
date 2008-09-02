@@ -277,21 +277,28 @@ static void get_time_values_from_xen(unsigned int cpu)
 {
 	struct vcpu_time_info   *src;
 	struct shadow_time_info *dst;
+	unsigned long flags;
+	u32 pre_version, post_version;
 
 	src = &vcpu_info(cpu)->time;
 	dst = &per_cpu(shadow_time, cpu);
 
+	local_irq_save(flags);
+
 	do {
-		dst->version = src->version;
+		pre_version = dst->version = src->version;
 		rmb();
 		dst->tsc_timestamp     = src->tsc_timestamp;
 		dst->system_timestamp  = src->system_time;
 		dst->tsc_to_nsec_mul   = src->tsc_to_system_mul;
 		dst->tsc_shift         = src->tsc_shift;
 		rmb();
-	} while ((src->version & 1) | (dst->version ^ src->version));
+		post_version = src->version;
+	} while ((pre_version & 1) | (pre_version ^ post_version));
 
 	dst->tsc_to_usec_mul = dst->tsc_to_nsec_mul / 1000;
+
+	local_irq_restore(flags);
 }
 
 static inline int time_values_up_to_date(unsigned int cpu)

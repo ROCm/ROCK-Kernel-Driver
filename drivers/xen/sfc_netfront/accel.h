@@ -35,6 +35,7 @@
 #include <xen/evtchn.h>
 
 #include <linux/kernel.h>
+#include <linux/version.h>
 #include <linux/list.h>
 
 enum netfront_accel_post_status {

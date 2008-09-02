@@ -36,6 +36,7 @@
 		 __FUNCTION__, __LINE__, ##args)
 
 #include <linux/kernel.h>
+#include <linux/version.h>
 #include <linux/err.h>
 #include <linux/string.h>
 #include <linux/ctype.h>

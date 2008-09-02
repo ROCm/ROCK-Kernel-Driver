@@ -25,6 +25,7 @@
 #ifndef NETBACK_ACCEL_H
 #define NETBACK_ACCEL_H
 
+#include <linux/version.h>
 #include <linux/slab.h>
 #include <linux/ip.h>
 #include <linux/tcp.h>

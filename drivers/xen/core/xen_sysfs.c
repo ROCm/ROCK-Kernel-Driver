@@ -334,6 +334,9 @@ static void xen_properties_destroy(void)
 
 static ssize_t vmcoreinfo_show(struct hyp_sysfs_attr *attr, char *page)
 {
+	extern size_t vmcoreinfo_size_xen;
+	extern unsigned long paddr_vmcoreinfo_xen;
+
 	return sprintf(page, "%lx %zx\n",
 		paddr_vmcoreinfo_xen, vmcoreinfo_size_xen);
 }

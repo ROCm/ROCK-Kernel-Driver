@@ -813,11 +813,10 @@ int pciback_get_owner(struct pci_dev *dev)
 
 	psdev = pcistub_device_find(pci_domain_nr(dev->bus), dev->bus->number,
 			PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn));
-	/* XXX will other domain has pciback support ??? */
-	if (!psdev || !psdev->pdev) {
-		printk(KERN_WARNING "no ownder\n");
+
+	if (!psdev || !psdev->pdev)
 		return -1;
-	}
+
 	return psdev->pdev->xdev->otherend_id;
 }
 #endif

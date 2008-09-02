@@ -241,11 +241,27 @@ static int msi_unmap_pirq(struct pci_dev *dev, int pirq)
 	return 0;
 }
 
+static u64 find_table_base(struct pci_dev *dev, int pos)
+{
+	u8 bar;
+	u32 reg;
+	unsigned long flags;
+
+ 	pci_read_config_dword(dev, msix_table_offset_reg(pos), &reg);
+	bar = reg & PCI_MSIX_FLAGS_BIRMASK;
+
+	flags = pci_resource_flags(dev, bar);
+	if (flags & (IORESOURCE_DISABLED | IORESOURCE_UNSET | IORESOURCE_BUSY))
+		return 0;
+
+	return pci_resource_start(dev, bar);
+}
+
 /*
  * Protected by msi_lock
  */
 static int msi_map_pirq_to_vector(struct pci_dev *dev, int pirq,
-                                  int entry_nr, int msi)
+				  int entry_nr, u64 table_base)
 {
 	struct physdev_map_pirq map_irq;
 	int rc;
@@ -257,10 +273,10 @@ static int msi_map_pirq_to_vector(struct pci_dev *dev, int pirq,
 	map_irq.type = MAP_PIRQ_TYPE_MSI;
 	map_irq.index = -1;
 	map_irq.pirq = pirq;
-    map_irq.msi_info.bus = dev->bus->number;
-    map_irq.msi_info.devfn = dev->devfn;
-	map_irq.msi_info.entry_nr = entry_nr;
-    map_irq.msi_info.msi = msi;
+	map_irq.bus = dev->bus->number;
+	map_irq.devfn = dev->devfn;
+	map_irq.entry_nr = entry_nr;
+	map_irq.table_base = table_base;
 
 	if ((rc = HYPERVISOR_physdev_op(PHYSDEVOP_map_pirq, &map_irq)))
 		printk(KERN_WARNING "map irq failed\n");
@@ -271,9 +287,9 @@ static int msi_map_pirq_to_vector(struct pci_dev *dev, int pirq,
 	return map_irq.pirq;
 }
 
-static int msi_map_vector(struct pci_dev *dev, int entry_nr, int msi)
+static int msi_map_vector(struct pci_dev *dev, int entry_nr, u64 table_base)
 {
-	return msi_map_pirq_to_vector(dev, -1, entry_nr, msi);
+	return msi_map_pirq_to_vector(dev, -1, entry_nr, table_base);
 }
 
 static void pci_intx_for_msi(struct pci_dev *dev, int enable)
@@ -289,7 +305,7 @@ static void __pci_restore_msi_state(struct pci_dev *dev)
 	if (!dev->msi_enabled)
 		return;
 
-	pirq = msi_map_pirq_to_vector(dev, dev->irq, 0, 1);
+	pirq = msi_map_pirq_to_vector(dev, dev->irq, 0, 0);
 	if (pirq < 0)
 		return;
 
@@ -299,20 +315,29 @@ static void __pci_restore_msi_state(struct pci_dev *dev)
 
 static void __pci_restore_msix_state(struct pci_dev *dev)
 {
+	int pos;
 	unsigned long flags;
+	u64 table_base;
 	struct msi_dev_list *msi_dev_entry;
 	struct msi_pirq_entry *pirq_entry, *tmp;
+
+	pos = pci_find_capability(dev, PCI_CAP_ID_MSIX);
+	if (pos <= 0)
+		return;
 
 	if (!dev->msix_enabled)
 		return;
 
 	msi_dev_entry = get_msi_dev_pirq_list(dev);
+	table_base = find_table_base(dev, pos);
+	if (!table_base)
+		return;
 
 	spin_lock_irqsave(&msi_dev_entry->pirq_list_lock, flags);
 	list_for_each_entry_safe(pirq_entry, tmp,
 				 &msi_dev_entry->pirq_list_head, list) {
 		int rc = msi_map_pirq_to_vector(dev, pirq_entry->pirq,
-						pirq_entry->entry_nr, 0);
+						pirq_entry->entry_nr, table_base);
 		if (rc < 0)
 			printk(KERN_WARNING
 			       "%s: re-mapping irq #%d (pirq%d) failed: %d\n",
@@ -348,10 +373,10 @@ static int msi_capability_init(struct pci_dev *dev)
 
 	msi_set_enable(dev, 0);	/* Ensure msi is disabled as I set it up */
 
-   	pos = pci_find_capability(dev, PCI_CAP_ID_MSI);
+	pos = pci_find_capability(dev, PCI_CAP_ID_MSI);
 	pci_read_config_word(dev, msi_control_reg(pos), &control);
 
-	pirq = msi_map_vector(dev, 0, 1);
+	pirq = msi_map_vector(dev, 0, 0);
 	if (pirq < 0)
 		return -EBUSY;
 
@@ -377,7 +402,8 @@ static int msi_capability_init(struct pci_dev *dev)
 static int msix_capability_init(struct pci_dev *dev,
 				struct msix_entry *entries, int nvec)
 {
-	int pirq, i, j, mapped;
+	u64 table_base;
+	int pirq, i, j, mapped, pos;
 	struct msi_dev_list *msi_dev_entry = get_msi_dev_pirq_list(dev);
 	struct msi_pirq_entry *pirq_entry;
 
@@ -385,6 +411,11 @@ static int msix_capability_init(struct pci_dev *dev,
 		return -ENOMEM;
 
 	msix_set_enable(dev, 0);/* Ensure msix is disabled as I set it up */
+
+	pos = pci_find_capability(dev, PCI_CAP_ID_MSIX);
+	table_base = find_table_base(dev, pos);
+	if (!table_base)
+		return -ENODEV;
 
 	/* MSI-X Table Initialization */
 	for (i = 0; i < nvec; i++) {
@@ -402,7 +433,7 @@ static int msix_capability_init(struct pci_dev *dev,
 		}
 		if (mapped)
 			continue;
-		pirq = msi_map_vector(dev, entries[i].entry, 0);
+		pirq = msi_map_vector(dev, entries[i].entry, table_base);
 		if (pirq < 0)
 			break;
 		attach_pirq_entry(pirq, entries[i].entry, msi_dev_entry);
