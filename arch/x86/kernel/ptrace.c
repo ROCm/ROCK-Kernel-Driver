@@ -20,7 +20,6 @@
 #include <linux/audit.h>
 #include <linux/seccomp.h>
 #include <linux/signal.h>
-#include <linux/unistd.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -1378,21 +1377,6 @@ void send_sigtrap(struct task_struct *tsk, struct pt_regs *regs, int error_code)
 
 static void syscall_trace(struct pt_regs *regs)
 {
-	if ((current->ptrace & PT_SELF) &&
-	    (regs->orig_ax != __NR_ptrace) &&
-	    (regs->orig_ax != __NR_rt_sigreturn)) {
-		if (!entryexit) {
-			struct siginfo info;
-
-			memset(&info, 0, sizeof(struct siginfo));
-			info.si_signo = SIGSYS;
-			info.si_code = SYS_SYSCALL;
-			info.si_addr = (void *) regs->orig_ax;
-			send_sig_info(SIGSYS, &info, current);
-		}
-		return 1; /* Skip system call, deliver signal. */
-	}
-
 	if (!(current->ptrace & PT_PTRACED))
 		return;
 
@@ -1448,19 +1432,6 @@ asmregparm long syscall_trace_enter(struct pt_regs *regs)
 	if (unlikely(test_thread_flag(TIF_SYSCALL_EMU)))
 		ret = -1L;
 
-	if ((current->ptrace & PT_SELF)
-		&& (regs->orig_rax != __NR_rt_sigreturn)) {
-		struct siginfo info;
-
-		memset(&info, 0, sizeof(struct siginfo));
-		info.si_signo = SIGSYS;
-		info.si_code = SYS_SYSCALL;
-		info.si_addr = (void *) regs->orig_rax;
-		send_sig_info(SIGSYS, &info, current);
-		regs->rax = -1 ;
-		return; /* Skip system call, deliver signal. */
-	}
-
 	if (ret || test_thread_flag(TIF_SYSCALL_TRACE))
 		syscall_trace(regs);
 
@@ -1484,20 +1455,6 @@ asmregparm long syscall_trace_enter(struct pt_regs *regs)
 
 asmregparm void syscall_trace_leave(struct pt_regs *regs)
 {
-	if ((current->ptrace & PT_SELF)
-	        && (regs->orig_rax != __NR_ptrace)
-		&& (regs->orig_rax != __NR_rt_sigreturn)) {
-		struct siginfo info;
-
-		memset(&info, 0, sizeof(struct siginfo));
-		info.si_signo = SIGSYS;
-		info.si_code = SYS_SYSCALL;
-		info.si_addr = (void *) regs->orig_rax;
-		send_sig_info(SIGSYS, &info, current);
-		regs->rax = -1 ;
-		return; /* Skip system call. */
-	}
-
 	if (unlikely(current->audit_context))
 		audit_syscall_exit(AUDITSC_RESULT(regs->ax), regs->ax);
 

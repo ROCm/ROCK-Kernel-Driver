@@ -94,11 +94,6 @@ sys_sigaction(int sig, const struct old_sigaction __user *act,
 		__put_user(old_ka.sa.sa_mask.sig[0], &oact->sa_mask);
 	}
 
-	if (current->ptrace & PT_SELF) {
-		clear_thread_flag(TIF_SYSCALL_TRACE);
-		current->ptrace &= ~PT_SELF;
-	}
-
 	return ret;
 }
 
