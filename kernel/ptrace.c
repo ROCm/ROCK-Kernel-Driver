@@ -561,6 +561,23 @@ asmlinkage long sys_ptrace(long request, long pid, long addr, long data)
 		goto out;
 	}
 
+	if (request == PTRACE_SELF_ON) {
+		task_lock(current);
+		set_thread_flag(TIF_SYSCALL_TRACE);
+		current->ptrace |= PT_SELF;
+		task_unlock(current);
+		ret = 0;
+		goto out;
+	}
+	if (request == PTRACE_SELF_OFF) {
+		task_lock(current);
+		clear_thread_flag(TIF_SYSCALL_TRACE);
+		current->ptrace &= ~PT_SELF;
+		task_unlock(current);
+		ret = 0;
+		goto out;
+	}
+
 	child = ptrace_get_task_struct(pid);
 	if (IS_ERR(child)) {
 		ret = PTR_ERR(child);
