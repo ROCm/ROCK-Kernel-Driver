@@ -78,8 +78,8 @@
 #define CALL_FUNCTION_SINGLE_VECTOR	0xfb
 #define THERMAL_APIC_VECTOR		0xfa
 #define THRESHOLD_APIC_VECTOR		0xf9
-#define	KDB_VECTOR		/* NEEDS FIXING: 0xf8 */
 #define UV_BAU_MESSAGE			0xf8
+#define	KDB_VECTOR			0xf8    /* can be overloaded */
 #define INVALIDATE_TLB_VECTOR_END	0xf7
 #define INVALIDATE_TLB_VECTOR_START	0xf0	/* f0-f7 used for TLB flush */
 

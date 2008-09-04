@@ -1715,11 +1715,7 @@ kdba_kdump_prepare(struct pt_regs *fixed_regs)
 
 void kdba_kdump_shutdown_slave(struct pt_regs *regs)
 {
-	/* When we entered via KDB_REASON_OOPS, we are not handled by
-	 * kdump_init_notifier.
-	 */
-	if (kdb_kdump_state != KDB_KDUMP_RESET &&
-	    kdb_kdump_reason == KDB_REASON_OOPS) {
+	if (kdb_kdump_state != KDB_KDUMP_RESET) {
 		unw_init_running(kdump_cpu_freeze, NULL);
 	}
 }

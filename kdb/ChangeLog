@@ -1,3 +1,14 @@
+2008-08-19 Jay Lan  <jlan@sgi.com>
+
+	* kdb-v4.4-2.6.27-rc3-common-1.
+
+2008-08-15 Jay Lan  <jlan@sgi.com>
+
+	* mm_online_pgdat_export_symbol, Jay Lan <jlan@sgi.com>
+	  - Fix compilation error by exporting first_online_pgdat &
+	    next_online_pgdat for 'pgdat' command.
+	* kdb-v4.4-2.6.27-rc2-common-2.1.
+
 2008-08-14 Jay Lan  <jlan@sgi.com>
 
 	* Support 'kdump' command to take a kdump vmcore from KDB,

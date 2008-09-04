@@ -1,3 +1,13 @@
+2008-08-19 Jay Lan  <jlan@sgi.com>
+
+	* kdb-v4.4-2.6.27-rc3-ia64-1.
+
+2008-08-15 Jay Lan  <jlan@sgi.com>
+
+	* Fix a problem that slave cpus panic'ed during NMI.
+	  Jay Lan <jlan@sgi.com>
+	* kdb-v4.4-2.6.27-rc2-ia64-2.1.
+
 2008-08-14 Jay Lan  <jlan@sgi.com>
 
 	* Support 'kdump' command to take a kdump vmcore from KDB,
