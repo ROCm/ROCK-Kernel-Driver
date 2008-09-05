@@ -1301,6 +1301,7 @@ struct task_struct {
 	int latency_record_count;
 	struct latency_record latency_record[LT_SAVECOUNT];
 #endif
+	u64	instrumentation;
 };
 
 /*

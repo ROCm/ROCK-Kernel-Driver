@@ -568,6 +568,9 @@ struct zfcp_adapter {
 	struct fsf_qtcb_bottom_port *stats_reset_data;
 	unsigned long		stats_reset;
 	struct work_struct	scan_work;
+	atomic_t		qdio_outb_full;	   /* queue full incidents */
+	atomic_t		out_of_mem;
+	atomic_t		out_of_order;
 };
 
 struct zfcp_port {
@@ -638,6 +641,8 @@ struct zfcp_fsf_req {
 	unsigned long long     issued;         /* request sent time (STCK) */
 	struct zfcp_unit       *unit;
 	void			(*handler)(struct zfcp_fsf_req *);
+	u16			qdio_outb_usage;/* usage of outbound queue */
+	u16			qdio_inb_usage;	/* usage of inbound queue */
 };
 
 /* driver data */

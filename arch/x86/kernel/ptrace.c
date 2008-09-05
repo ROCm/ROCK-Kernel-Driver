@@ -1429,6 +1429,17 @@ asmregparm long syscall_trace_enter(struct pt_regs *regs)
 	/* do the secure computing check first */
 	secure_computing(regs->orig_ax);
 
+	if (is_self_ptracing(regs->orig_ax)) {
+		struct siginfo info;
+
+		memset(&info, 0, sizeof(struct siginfo));
+		info.si_signo = SIGSYS;
+		info.si_code = SYS_SYSCALL;
+		info.si_addr = (void *) regs->orig_ax;
+		send_sig_info(SIGSYS, &info, current);
+		return -1L; /* Skip system call, deliver signal. */
+	}
+
 	if (unlikely(test_thread_flag(TIF_SYSCALL_EMU)))
 		ret = -1L;
 
@@ -1455,6 +1466,9 @@ asmregparm long syscall_trace_enter(struct pt_regs *regs)
 
 asmregparm void syscall_trace_leave(struct pt_regs *regs)
 {
+	if (is_self_ptracing(regs->orig_ax)) {
+		return;
+	}
 	if (unlikely(current->audit_context))
 		audit_syscall_exit(AUDITSC_RESULT(regs->ax), regs->ax);
 

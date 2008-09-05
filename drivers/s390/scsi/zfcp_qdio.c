@@ -115,6 +115,7 @@ static void zfcp_qdio_reqid_check(struct zfcp_adapter *adapter,
 	spin_unlock_irqrestore(&adapter->req_list_lock, flags);
 
 	fsf_req->sbal_response = sbal_idx;
+	fsf_req->qdio_inb_usage = atomic_read(&adapter->resp_q.count);
 	zfcp_fsf_req_complete(fsf_req);
 }
 
@@ -282,6 +283,7 @@ static int zfcp_qdio_fill_sbals(struct zfcp_fsf_req *fsf_req,
 	     addr += length, remaining -= length) {
 		sbale = zfcp_qdio_sbale_next(fsf_req, sbtype);
 		if (!sbale) {
+			atomic_inc(&fsf_req->adapter->qdio_outb_full);
 			zfcp_qdio_undo_sbals(fsf_req);
 			return -EINVAL;
 		}

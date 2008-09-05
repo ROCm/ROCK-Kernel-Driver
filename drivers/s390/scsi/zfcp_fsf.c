@@ -6,6 +6,7 @@
  * Copyright IBM Corporation 2002, 2008
  */
 
+#include <linux/blktrace_api.h>
 #include "zfcp_ext.h"
 
 static void zfcp_fsf_request_timeout_handler(unsigned long data)
@@ -717,6 +718,14 @@ static int zfcp_fsf_sbal_check(struct zfcp_qdio_queue *queue)
 	return 0;
 }
 
+static int zfcp_fsf_sbal_available(struct zfcp_adapter *adapter)
+{
+	unsigned int count = atomic_read(&adapter->req_q.count);
+	if (!count)
+		atomic_inc(&adapter->qdio_outb_full);
+	return count > 0;
+}
+
 static int zfcp_fsf_req_sbal_get(struct zfcp_adapter *adapter)
 {
 	long ret;
@@ -727,6 +736,8 @@ static int zfcp_fsf_req_sbal_get(struct zfcp_adapter *adapter)
 					zfcp_fsf_sbal_check(req_q), 5 * HZ);
 	if (ret > 0)
 		return 0;
+	if (!ret)
+		atomic_inc(&adapter->qdio_outb_full);
 
 	spin_lock(&req_q->lock);
 	return -EIO;
@@ -776,7 +787,7 @@ static struct zfcp_fsf_req *zfcp_fsf_req_create(struct zfcp_adapter *adapter,
 		req = zfcp_fsf_alloc_qtcb(pool);
 
 	if (unlikely(!req))
-		return ERR_PTR(-EIO);
+		return ERR_PTR(-ENOMEM);
 
 	if (adapter->req_no == 0)
 		adapter->req_no++;
@@ -834,6 +845,7 @@ static int zfcp_fsf_req_send(struct zfcp_fsf_req *req)
 	list_add_tail(&req->list, &adapter->req_list[idx]);
 	spin_unlock(&adapter->req_list_lock);
 
+	req->qdio_outb_usage = atomic_read(&req_q->count);
 	req->issued = get_clock();
 	if (zfcp_qdio_send(req)) {
 		/* Queues are down..... */
@@ -984,7 +996,7 @@ struct zfcp_fsf_req *zfcp_fsf_abort_fcp_command(unsigned long old_req_id,
 	struct zfcp_fsf_req *req = NULL;
 
 	spin_lock(&adapter->req_q.lock);
-	if (!atomic_read(&adapter->req_q.count))
+	if (!zfcp_fsf_sbal_available(adapter))
 		goto out;
 	req = zfcp_fsf_req_create(adapter, FSF_QTCB_ABORT_FCP_CMND,
 				  req_flags, adapter->pool.fsf_req_abort);
@@ -1219,7 +1231,7 @@ int zfcp_fsf_send_els(struct zfcp_send_els *els)
 		return -EBUSY;
 
 	spin_lock(&adapter->req_q.lock);
-	if (!atomic_read(&adapter->req_q.count))
+	if (!zfcp_fsf_sbal_available(adapter))
 		goto out;
 	req = zfcp_fsf_req_create(adapter, FSF_QTCB_SEND_ELS,
 				  ZFCP_REQ_AUTO_CLEANUP, NULL);
@@ -1264,7 +1276,7 @@ int zfcp_fsf_exchange_config_data(struct zfcp_erp_action *erp_action)
 	int retval = -EIO;
 
 	spin_lock(&adapter->req_q.lock);
-	if (!atomic_read(&adapter->req_q.count))
+	if (!zfcp_fsf_sbal_available(adapter))
 		goto out;
 	req = zfcp_fsf_req_create(adapter,
 				  FSF_QTCB_EXCHANGE_CONFIG_DATA,
@@ -1360,7 +1372,7 @@ int zfcp_fsf_exchange_port_data(struct zfcp_erp_action *erp_action)
 		return -EOPNOTSUPP;
 
 	spin_lock(&adapter->req_q.lock);
-	if (!atomic_read(&adapter->req_q.count))
+	if (!zfcp_fsf_sbal_available(adapter))
 		goto out;
 	req = zfcp_fsf_req_create(adapter, FSF_QTCB_EXCHANGE_PORT_DATA,
 				  ZFCP_REQ_AUTO_CLEANUP,
@@ -1406,7 +1418,7 @@ int zfcp_fsf_exchange_port_data_sync(struct zfcp_adapter *adapter,
 		return -EOPNOTSUPP;
 
 	spin_lock(&adapter->req_q.lock);
-	if (!atomic_read(&adapter->req_q.count))
+	if (!zfcp_fsf_sbal_available(adapter))
 		goto out;
 
 	req = zfcp_fsf_req_create(adapter, FSF_QTCB_EXCHANGE_PORT_DATA, 0,
@@ -2036,6 +2048,35 @@ static void zfcp_fsf_req_latency(struct zfcp_fsf_req *req)
 	spin_unlock_irqrestore(&unit->latencies.lock, flags);
 }
 
+#ifdef CONFIG_BLK_DEV_IO_TRACE
+static void zfcp_fsf_trace_latency(struct zfcp_fsf_req *fsf_req)
+{
+	struct fsf_qual_latency_info *lat_inf;
+	struct scsi_cmnd *scsi_cmnd = (struct scsi_cmnd *)fsf_req->data;
+	struct request *req = scsi_cmnd->request;
+	struct zfcp_blk_drv_data trace;
+	int ticks = fsf_req->adapter->timer_ticks;
+
+	trace.flags = 0;
+	trace.magic = cpu_to_be32(ZFCP_BLK_DRV_DATA_MAGIC);
+	if (fsf_req->adapter->adapter_features & FSF_FEATURE_MEASUREMENT_DATA) {
+		trace.flags |= cpu_to_be16(ZFCP_BLK_LAT_VALID);
+		lat_inf = &fsf_req->qtcb->prefix.prot_status_qual.latency_info;
+		trace.channel_lat = cpu_to_be64(lat_inf->channel_lat * ticks);
+		trace.fabric_lat = cpu_to_be64(lat_inf->fabric_lat * ticks);
+	}
+	if (fsf_req->status & ZFCP_STATUS_FSFREQ_ERROR)
+		trace.flags |= cpu_to_be16(ZFCP_BLK_REQ_ERROR);
+	trace.retries = cpu_to_be16(scsi_cmnd->retries);
+	trace.inb_usage = cpu_to_be16(fsf_req->qdio_inb_usage);
+	trace.outb_usage = cpu_to_be16(fsf_req->qdio_outb_usage);
+
+	blk_add_driver_data(req->q, req, &trace, sizeof(trace));
+}
+#else
+#define zfcp_fsf_trace_latency(fsf_req)	do { } while (0)
+#endif
+
 static void zfcp_fsf_send_fcp_command_task_handler(struct zfcp_fsf_req *req)
 {
 	struct scsi_cmnd *scpnt = req->data;
@@ -2067,6 +2108,8 @@ static void zfcp_fsf_send_fcp_command_task_handler(struct zfcp_fsf_req *req)
 
 	if (req->adapter->adapter_features & FSF_FEATURE_MEASUREMENT_DATA)
 		zfcp_fsf_req_latency(req);
+
+	zfcp_fsf_trace_latency(req);
 
 	if (unlikely(fcp_rsp_iu->validity.bits.fcp_rsp_len_valid)) {
 		if (fcp_rsp_info[3] == RSP_CODE_GOOD)
@@ -2224,12 +2267,14 @@ int zfcp_fsf_send_fcp_command_task(struct zfcp_adapter *adapter,
 		return -EBUSY;
 
 	spin_lock(&adapter->req_q.lock);
-	if (!atomic_read(&adapter->req_q.count))
+	if (!zfcp_fsf_sbal_available(adapter))
 		goto out;
 	req = zfcp_fsf_req_create(adapter, FSF_QTCB_FCP_CMND, req_flags,
 				  adapter->pool.fsf_req_scsi);
 	if (unlikely(IS_ERR(req))) {
 		retval = PTR_ERR(req);
+		if (retval == -ENOMEM)
+			atomic_inc(&adapter->out_of_mem);
 		goto out;
 	}
 
@@ -2347,7 +2392,7 @@ struct zfcp_fsf_req *zfcp_fsf_send_fcp_ctm(struct zfcp_adapter *adapter,
 		return NULL;
 
 	spin_lock(&adapter->req_q.lock);
-	if (!atomic_read(&adapter->req_q.count))
+	if (!zfcp_fsf_sbal_available(adapter))
 		goto out;
 	req = zfcp_fsf_req_create(adapter, FSF_QTCB_FCP_CMND, req_flags,
 				  adapter->pool.fsf_req_scsi);

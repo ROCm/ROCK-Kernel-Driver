@@ -224,6 +224,12 @@ typedef struct siginfo {
 #define NSIGPOLL	6
 
 /*
+ * SIGSYS si_codes
+ */
+#define SYS_SYSCALL    (__SI_FAULT|1)  /* system call notification */
+#define NSIGSYS        1
+
+/*
  * sigevent definitions
  * 
  * It seems likely that SIGEV_THREAD will have to be handled from 

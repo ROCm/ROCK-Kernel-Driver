@@ -27,6 +27,10 @@
 #define PTRACE_GETSIGINFO	0x4202
 #define PTRACE_SETSIGINFO	0x4203
 
+/* PTRACE SELF requests					*/
+#define PTRACE_SELF_ON		0x4281
+#define PTRACE_SELF_OFF		0x4282
+
 /* options set using PTRACE_SETOPTIONS */
 #define PTRACE_O_TRACESYSGOOD	0x00000001
 #define PTRACE_O_TRACEFORK	0x00000002
@@ -78,7 +82,21 @@
 
 #include <linux/compiler.h>		/* For unlikely.  */
 #include <linux/sched.h>		/* For struct task_struct.  */
+#include <linux/unistd.h>		/* For syscall definitions  */
 
+#define PTS_INSTRUMENTED	0x00000001
+#define PTS_SELF	0x00000002
+
+static inline int is_self_ptracing(unsigned long syscall)
+{
+	if (!(current->instrumentation & PTS_SELF))
+		return 0;
+	if (syscall == __NR_rt_sigreturn)
+		return 0;
+	if (syscall == __NR_ptrace)
+		return 0;
+	return 1;
+}
 
 extern long arch_ptrace(struct task_struct *child, long request, long addr, long data);
 extern struct task_struct *ptrace_get_task_struct(pid_t pid);

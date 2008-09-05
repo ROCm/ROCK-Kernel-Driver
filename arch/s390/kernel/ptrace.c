@@ -619,6 +619,22 @@ syscall_trace(struct pt_regs *regs, int entryexit)
 
 	if (!test_thread_flag(TIF_SYSCALL_TRACE))
 		goto out;
+
+	if (is_self_ptracing(regs->gprs[2])) {
+		if (!entryexit) {
+			struct siginfo info;
+
+			memset(&info, 0, sizeof(struct siginfo));
+			info.si_signo = SIGSYS;
+			info.si_code = SYS_SYSCALL;
+			info.si_errno = regs->gprs[2];
+			info.si_addr = (void *)regs->orig_gpr2;
+			send_sig_info(SIGSYS, &info, current);
+			regs->gprs[2] = -1;
+		}
+		return;
+	}
+
 	if (!(current->ptrace & PT_PTRACED))
 		goto out;
 	ptrace_notify(SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD)

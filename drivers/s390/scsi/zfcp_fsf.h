@@ -514,4 +514,17 @@ struct fsf_qtcb {
 	u8 log[FSF_QTCB_LOG_SIZE];
 } __attribute__ ((packed));
 
+struct zfcp_blk_drv_data {
+#define ZFCP_BLK_DRV_DATA_MAGIC			0x1
+	u32 magic;
+#define ZFCP_BLK_LAT_VALID			0x1
+#define ZFCP_BLK_REQ_ERROR			0x2
+	u16 flags;
+	u16 retries;
+	u16 inb_usage;
+	u16 outb_usage;
+	u64 channel_lat;
+	u64 fabric_lat;
+} __attribute__ ((packed));
+
 #endif				/* FSF_H */

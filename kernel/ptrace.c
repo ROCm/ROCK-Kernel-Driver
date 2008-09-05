@@ -554,6 +554,38 @@ asmlinkage long sys_ptrace(long request, long pid, long addr, long data)
 	 * This lock_kernel fixes a subtle race with suid exec
 	 */
 	lock_kernel();
+	if (request == PTRACE_SELF_ON) {
+		task_lock(current);
+		if (current->ptrace) {
+			task_unlock(current);
+			ret = -EPERM;
+			goto out;
+		}
+		set_thread_flag(TIF_SYSCALL_TRACE);
+		current->instrumentation |= PTS_INSTRUMENTED|PTS_SELF;
+		task_unlock(current);
+		ret = 0;
+		goto out;
+	}
+	if (request == PTRACE_SELF_OFF) {
+		task_lock(current);
+		if (current->ptrace) {
+			task_unlock(current);
+			ret = -EPERM;
+			goto out;
+		}
+		clear_thread_flag(TIF_SYSCALL_TRACE);
+		current->instrumentation &= ~PTS_SELF;
+		task_unlock(current);
+		ret = 0;
+		goto out;
+	}
+
+	if (current->instrumentation) {
+		ret = -EPERM;
+		goto out;
+	}
+
 	if (request == PTRACE_TRACEME) {
 		ret = ptrace_traceme();
 		if (!ret)

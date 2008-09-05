@@ -568,6 +568,11 @@ handle_signal(unsigned long sig, siginfo_t *info, struct k_sigaction *ka,
 	recalc_sigpending();
 	spin_unlock_irq(&current->sighand->siglock);
 
+	if (current->instrumentation & PTS_SELF) {
+		clear_thread_flag(TIF_SYSCALL_TRACE);
+		current->instrumentation &= ~PTS_SELF;
+	}
+
 	return 0;
 }
 
