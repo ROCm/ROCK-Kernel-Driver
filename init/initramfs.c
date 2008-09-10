@@ -610,7 +610,7 @@ static int __init populate_rootfs(void)
 rootfs_initcall(populate_rootfs);
 
 #ifdef CONFIG_ACPI_CUSTOM_DSDT_INITRD
-struct acpi_table_header *acpi_find_dsdt_initrd(void)
+struct acpi_table_header * __init acpi_find_dsdt_initrd(void)
 {
 	char *err, *ramfs_dsdt_name = "DSDT.aml";
 
