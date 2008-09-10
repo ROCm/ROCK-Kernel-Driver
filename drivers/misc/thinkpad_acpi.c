@@ -240,6 +240,7 @@ static struct {
 	u32 light_status:1;
 	u32 bright_16levels:1;
 	u32 bright_acpimode:1;
+	u32 bright_igdmode:1;
 	u32 wan:1;
 	u32 fan_ctrl_status_undef:1;
 	u32 input_device_registered:1;
@@ -2353,6 +2354,9 @@ err_exit:
 	return (res < 0)? res : 1;
 }
 
+static struct backlight_device *ibm_backlight_device;
+static int brightness_update_status(struct backlight_device *bd);
+
 static void hotkey_notify(struct ibm_struct *ibm, u32 event)
 {
 	u32 hkey;
@@ -2391,6 +2395,28 @@ static void hotkey_notify(struct ibm_struct *ibm, u32 event)
 		case 1:
 			/* 0x1000-0x1FFF: key presses */
 			scancode = hkey & 0xfff;
+			if (tp_features.bright_igdmode) {
+				/* ToDo:
+				 * Is there an already defined key?
+				 */
+				if (hkey == 0x1011) {
+					if (ibm_backlight_device->
+					    props.brightness > 0) {
+						ibm_backlight_device->
+							props.brightness--;
+					}
+				} else if (hkey == 0x1010) {
+					if (ibm_backlight_device->
+					    props.brightness <
+					    ibm_backlight_device->
+					    props.max_brightness) {
+						ibm_backlight_device->
+							props.brightness++;
+					}
+				}
+				brightness_update_status(ibm_backlight_device);
+			}
+
 			if (scancode > 0 && scancode < 0x21) {
 				scancode--;
 				if (!(hotkey_source_mask & (1 << scancode))) {
@@ -4770,7 +4796,6 @@ enum {
 	TP_EC_BACKLIGHT_MAPSW = 0x20,
 };
 
-static struct backlight_device *ibm_backlight_device;
 static int brightness_mode;
 static unsigned int brightness_enable = 2; /* 2 = auto, 0 = no, 1 = yes */
 
@@ -4909,7 +4934,7 @@ static struct backlight_ops ibm_backlight_data = {
 static int __init brightness_init(struct ibm_init_struct *iibm)
 {
 	int b;
-
+	long acpi_video_support;
 	vdbg_printk(TPACPI_DBG_INIT, "initializing brightness subdriver\n");
 
 	mutex_init(&brightness_mutex);
@@ -4921,8 +4946,9 @@ static int __init brightness_init(struct ibm_init_struct *iibm)
 	 */
 	b = tpacpi_check_std_acpi_brightness_support();
 	if (b > 0) {
-
-		if (acpi_video_backlight_support()) {
+		acpi_video_support = acpi_video_backlight_support();
+		if (acpi_video_support &&
+		    !(acpi_video_support & ACPI_VIDEO_IGD)) {
 			if (brightness_enable > 1) {
 				printk(TPACPI_NOTICE
 				       "Standard ACPI backlight interface "
@@ -4939,6 +4965,12 @@ static int __init brightness_init(struct ibm_init_struct *iibm)
 				       "Standard ACPI backlight interface not "
 				       "available, thinkpad_acpi driver "
 				       "will take over control\n");
+			}
+			if (acpi_video_support & ACPI_VIDEO_IGD) {
+				printk(TPACPI_NOTICE, "IGD device"
+				       " detected - take over backlight"
+				       " switching\n");
+				tp_features.bright_igdmode = 1;
 			}
 		}
 	}

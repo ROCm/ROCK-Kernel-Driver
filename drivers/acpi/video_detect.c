@@ -99,6 +99,21 @@ long acpi_is_video_device(struct acpi_device *device)
 				    ACPI_UINT32_MAX, acpi_backlight_cap_match,
 				    &video_caps, NULL);
 
+	/* IGD detection is not perfect. It should use the same method as done
+	 * to identify an IGD device in the dri parts or video.ko
+	 */
+
+	/*
+	 * ThinkPads do need the IGD implementation, we detect ThinkPad IGD
+	 * devices here and specially workaround it in thinkpad_acpi as the
+	 * IGD parts are too experimental yet
+	*/
+	if (dmi_name_in_vendors("LENOVO") &&
+	    ACPI_SUCCESS(acpi_get_handle(device->handle, "DRDY", &h_dummy))) {
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Found IGD device\n"));
+		video_caps |= ACPI_VIDEO_IGD;
+	}
+
 	return video_caps;
 }
 EXPORT_SYMBOL(acpi_is_video_device);
