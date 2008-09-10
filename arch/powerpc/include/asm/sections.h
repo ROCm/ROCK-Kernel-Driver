@@ -16,6 +16,11 @@ static inline int in_kernel_text(unsigned long addr)
 	return 0;
 }
 
+#ifdef CONFIG_MODULES
+#undef dereference_function_descriptor
+void *dereference_function_descriptor(void *);
+#endif
+
 #endif
 
 #endif /* __KERNEL__ */
