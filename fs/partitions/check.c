@@ -485,6 +485,8 @@ int rescan_partitions(struct gendisk *disk, struct block_device *bdev)
 		delete_partition(disk, p);
 	if (disk->fops->revalidate_disk)
 		disk->fops->revalidate_disk(disk);
+	if (disk->flags & GENHD_FL_NO_PARTITION_SCAN)
+		return 0;
 	if (!get_capacity(disk) || !(state = check_partition(disk, bdev)))
 		return 0;
 	if (IS_ERR(state))	/* I/O error reading the partition table */

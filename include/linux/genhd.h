@@ -109,6 +109,7 @@ struct hd_struct {
 #define GENHD_FL_UP				16
 #define GENHD_FL_SUPPRESS_PARTITION_INFO	32
 #define GENHD_FL_FAIL				64
+#define GENHD_FL_NO_PARTITION_SCAN		128
 
 struct gendisk {
 	int major;			/* major number of driver */
