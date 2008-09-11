@@ -901,9 +901,11 @@ static struct proc_dir_entry *proc_jbd2_stats;
 
 static void jbd2_stats_proc_init(journal_t *journal)
 {
-	char name[BDEVNAME_SIZE];
+	char dname[BDEVNAME_SIZE];
+	char name[NAME_MAX];
 
-	bdevname(journal->j_dev, name);
+	bdevname(journal->j_dev, dname);
+	snprintf(name, NAME_MAX, "%s-%lu", dname, journal->j_inode->i_ino);
 	journal->j_proc_entry = proc_mkdir(name, proc_jbd2_stats);
 	if (journal->j_proc_entry) {
 		proc_create_data("history", S_IRUGO, journal->j_proc_entry,
@@ -915,9 +917,11 @@ static void jbd2_stats_proc_init(journal_t *journal)
 
 static void jbd2_stats_proc_exit(journal_t *journal)
 {
-	char name[BDEVNAME_SIZE];
+	char dname[BDEVNAME_SIZE];
+	char name[NAME_MAX];
 
-	bdevname(journal->j_dev, name);
+	bdevname(journal->j_dev, dname);
+	snprintf(name, NAME_MAX, "%s-%lu", dname, journal->j_inode->i_ino);
 	remove_proc_entry("info", journal->j_proc_entry);
 	remove_proc_entry("history", journal->j_proc_entry);
 	remove_proc_entry(name, proc_jbd2_stats);
