@@ -132,7 +132,7 @@ unsigned ext4_init_block_bitmap(struct super_block *sb, struct buffer_head *bh,
 		 */
 		group_blocks = ext4_blocks_count(sbi->s_es) -
 			le32_to_cpu(sbi->s_es->s_first_data_block) -
-			(EXT4_BLOCKS_PER_GROUP(sb) * (sbi->s_groups_count -1));
+			(EXT4_BLOCKS_PER_GROUP(sb) * (sbi->s_groups_count - 1));
 	} else {
 		group_blocks = EXT4_BLOCKS_PER_GROUP(sb);
 	}
@@ -200,20 +200,20 @@ unsigned ext4_init_block_bitmap(struct super_block *sb, struct buffer_head *bh,
  * @bh:			pointer to the buffer head to store the block
  *			group descriptor
  */
-struct ext4_group_desc * ext4_get_group_desc(struct super_block * sb,
+struct ext4_group_desc * ext4_get_group_desc(struct super_block *sb,
 					     ext4_group_t block_group,
-					     struct buffer_head ** bh)
+					     struct buffer_head **bh)
 {
 	unsigned long group_desc;
 	unsigned long offset;
-	struct ext4_group_desc * desc;
+	struct ext4_group_desc *desc;
 	struct ext4_sb_info *sbi = EXT4_SB(sb);
 
 	if (block_group >= sbi->s_groups_count) {
-		ext4_error (sb, "ext4_get_group_desc",
-			    "block_group >= groups_count - "
-			    "block_group = %lu, groups_count = %lu",
-			    block_group, sbi->s_groups_count);
+		ext4_error(sb, "ext4_get_group_desc",
+			   "block_group >= groups_count - "
+			   "block_group = %lu, groups_count = %lu",
+			   block_group, sbi->s_groups_count);
 
 		return NULL;
 	}
@@ -222,10 +222,10 @@ struct ext4_group_desc * ext4_get_group_desc(struct super_block * sb,
 	group_desc = block_group >> EXT4_DESC_PER_BLOCK_BITS(sb);
 	offset = block_group & (EXT4_DESC_PER_BLOCK(sb) - 1);
 	if (!sbi->s_group_desc[group_desc]) {
-		ext4_error (sb, "ext4_get_group_desc",
-			    "Group descriptor not loaded - "
-			    "block_group = %lu, group_desc = %lu, desc = %lu",
-			     block_group, group_desc, offset);
+		ext4_error(sb, "ext4_get_group_desc",
+			   "Group descriptor not loaded - "
+			   "block_group = %lu, group_desc = %lu, desc = %lu",
+			   block_group, group_desc, offset);
 		return NULL;
 	}
 
@@ -302,8 +302,8 @@ err_out:
 struct buffer_head *
 ext4_read_block_bitmap(struct super_block *sb, ext4_group_t block_group)
 {
-	struct ext4_group_desc * desc;
-	struct buffer_head * bh = NULL;
+	struct ext4_group_desc *desc;
+	struct buffer_head *bh = NULL;
 	ext4_fsblk_t bitmap_blk;
 
 	desc = ext4_get_group_desc(sb, block_group, NULL);
@@ -379,26 +379,28 @@ restart:
 	bad = 0;
 	prev = NULL;
 
-	printk("Block Allocation Reservation Windows Map (%s):\n", fn);
+	printk(KERN_DEBUG "Block Allocation Reservation "
+	       "Windows Map (%s):\n", fn);
 	while (n) {
 		rsv = rb_entry(n, struct ext4_reserve_window_node, rsv_node);
 		if (verbose)
-			printk("reservation window 0x%p "
+			printk(KERN_DEBUG "reservation window 0x%p "
 			       "start:  %llu, end:  %llu\n",
 			       rsv, rsv->rsv_start, rsv->rsv_end);
 		if (rsv->rsv_start && rsv->rsv_start >= rsv->rsv_end) {
-			printk("Bad reservation %p (start >= end)\n",
+			printk(KERN_DEBUG "Bad reservation %p (start >= end)\n",
 			       rsv);
 			bad = 1;
 		}
 		if (prev && prev->rsv_end >= rsv->rsv_start) {
-			printk("Bad reservation %p (prev->end >= start)\n",
-			       rsv);
+			printk(KERN_DEBUG "Bad reservation %p "
+			       "(prev->end >= start)\n", rsv);
 			bad = 1;
 		}
 		if (bad) {
 			if (!verbose) {
-				printk("Restarting reservation walk in verbose mode\n");
+				printk(KERN_DEBUG "Restarting reservation "
+				       "walk in verbose mode\n");
 				verbose = 1;
 				goto restart;
 			}
@@ -406,7 +408,7 @@ restart:
 		n = rb_next(n);
 		prev = rsv;
 	}
-	printk("Window map complete.\n");
+	printk(KERN_DEBUG "Window map complete.\n");
 	BUG_ON(bad);
 }
 #define rsv_window_dump(root, verbose) \
@@ -504,8 +506,8 @@ void ext4_rsv_window_add(struct super_block *sb,
 	struct rb_node *node = &rsv->rsv_node;
 	ext4_fsblk_t start = rsv->rsv_start;
 
-	struct rb_node ** p = &root->rb_node;
-	struct rb_node * parent = NULL;
+	struct rb_node **p = &root->rb_node;
+	struct rb_node *parent = NULL;
 	struct ext4_reserve_window_node *this;
 
 	while (*p)
@@ -659,8 +661,8 @@ void ext4_free_blocks_sb(handle_t *handle, struct super_block *sb,
 	ext4_grpblk_t bit;
 	unsigned long i;
 	unsigned long overflow;
-	struct ext4_group_desc * desc;
-	struct ext4_super_block * es;
+	struct ext4_group_desc *desc;
+	struct ext4_super_block *es;
 	struct ext4_sb_info *sbi;
 	int err = 0, ret;
 	ext4_grpblk_t group_freed;
@@ -671,13 +673,13 @@ void ext4_free_blocks_sb(handle_t *handle, struct super_block *sb,
 	if (block < le32_to_cpu(es->s_first_data_block) ||
 	    block + count < block ||
 	    block + count > ext4_blocks_count(es)) {
-		ext4_error (sb, "ext4_free_blocks",
-			    "Freeing blocks not in datazone - "
-			    "block = %llu, count = %lu", block, count);
+		ext4_error(sb, "ext4_free_blocks",
+			   "Freeing blocks not in datazone - "
+			   "block = %llu, count = %lu", block, count);
 		goto error_return;
 	}
 
-	ext4_debug ("freeing block(s) %llu-%llu\n", block, block + count - 1);
+	ext4_debug("freeing block(s) %llu-%llu\n", block, block + count - 1);
 
 do_more:
 	overflow = 0;
@@ -694,7 +696,7 @@ do_more:
 	bitmap_bh = ext4_read_block_bitmap(sb, block_group);
 	if (!bitmap_bh)
 		goto error_return;
-	desc = ext4_get_group_desc (sb, block_group, &gd_bh);
+	desc = ext4_get_group_desc(sb, block_group, &gd_bh);
 	if (!desc)
 		goto error_return;
 
@@ -703,10 +705,10 @@ do_more:
 	    in_range(block, ext4_inode_table(sb, desc), sbi->s_itb_per_group) ||
 	    in_range(block + count - 1, ext4_inode_table(sb, desc),
 		     sbi->s_itb_per_group)) {
-		ext4_error (sb, "ext4_free_blocks",
-			    "Freeing blocks in system zones - "
-			    "Block = %llu, count = %lu",
-			    block, count);
+		ext4_error(sb, "ext4_free_blocks",
+			   "Freeing blocks in system zones - "
+			   "Block = %llu, count = %lu",
+			   block, count);
 		goto error_return;
 	}
 
@@ -848,7 +850,7 @@ void ext4_free_blocks(handle_t *handle, struct inode *inode,
 			ext4_fsblk_t block, unsigned long count,
 			int metadata)
 {
-	struct super_block * sb;
+	struct super_block *sb;
 	unsigned long dquot_freed_blocks;
 
 	/* this isn't the right place to decide whether block is metadata
@@ -1017,7 +1019,7 @@ claim_block(spinlock_t *lock, ext4_grpblk_t block, struct buffer_head *bh)
 	if (ext4_set_bit_atomic(lock, block, bh->b_data))
 		return 0;
 	jbd_lock_bh_state(bh);
-	if (jh->b_committed_data && ext4_test_bit(block,jh->b_committed_data)) {
+	if (jh->b_committed_data && ext4_test_bit(block, jh->b_committed_data)) {
 		ext4_clear_bit_atomic(lock, block, bh->b_data);
 		ret = 0;
 	} else {
@@ -1168,7 +1170,7 @@ fail_access:
 static int find_next_reservable_window(
 				struct ext4_reserve_window_node *search_head,
 				struct ext4_reserve_window_node *my_rsv,
-				struct super_block * sb,
+				struct super_block *sb,
 				ext4_fsblk_t start_block,
 				ext4_fsblk_t last_block)
 {
@@ -1202,7 +1204,7 @@ static int find_next_reservable_window(
 
 		prev = rsv;
 		next = rb_next(&rsv->rsv_node);
-		rsv = rb_entry(next,struct ext4_reserve_window_node,rsv_node);
+		rsv = rb_entry(next, struct ext4_reserve_window_node, rsv_node);
 
 		/*
 		 * Reached the last reservation, we can just append to the
@@ -1340,7 +1342,7 @@ static int alloc_new_reservation(struct ext4_reserve_window_node *my_rsv,
 			size = size * 2;
 			if (size > EXT4_MAX_RESERVE_BLOCKS)
 				size = EXT4_MAX_RESERVE_BLOCKS;
-			my_rsv->rsv_goal_size= size;
+			my_rsv->rsv_goal_size = size;
 		}
 	}
 
@@ -1489,7 +1491,7 @@ static ext4_grpblk_t
 ext4_try_to_allocate_with_rsv(struct super_block *sb, handle_t *handle,
 			ext4_group_t group, struct buffer_head *bitmap_bh,
 			ext4_grpblk_t grp_goal,
-			struct ext4_reserve_window_node * my_rsv,
+			struct ext4_reserve_window_node *my_rsv,
 			unsigned long *count, int *errp)
 {
 	ext4_fsblk_t group_first_block, group_last_block;
@@ -1517,7 +1519,7 @@ ext4_try_to_allocate_with_rsv(struct super_block *sb, handle_t *handle,
 	 * or the file is not a regular file
 	 * or last attempt to allocate a block with reservation turned on failed
 	 */
-	if (my_rsv == NULL ) {
+	if (my_rsv == NULL) {
 		ret = ext4_try_to_allocate(sb, handle, group, bitmap_bh,
 						grp_goal, count, NULL);
 		goto out;
@@ -1600,6 +1602,44 @@ out:
 	return ret;
 }
 
+int ext4_claim_free_blocks(struct ext4_sb_info *sbi,
+						s64 nblocks)
+{
+	s64 free_blocks, dirty_blocks;
+	s64 root_blocks = 0;
+	struct percpu_counter *fbc = &sbi->s_freeblocks_counter;
+	struct percpu_counter *dbc = &sbi->s_dirtyblocks_counter;
+
+	free_blocks  = percpu_counter_read_positive(fbc);
+	dirty_blocks = percpu_counter_read_positive(dbc);
+
+	if (!capable(CAP_SYS_RESOURCE) &&
+		sbi->s_resuid != current->fsuid &&
+		(sbi->s_resgid == 0 || !in_group_p(sbi->s_resgid)))
+		root_blocks = ext4_r_blocks_count(sbi->s_es);
+
+	if (free_blocks - (nblocks + root_blocks + dirty_blocks) <
+						EXT4_FREEBLOCKS_WATERMARK) {
+		free_blocks  = percpu_counter_sum(fbc);
+		dirty_blocks = percpu_counter_sum(dbc);
+		if (dirty_blocks < 0) {
+			printk(KERN_CRIT "Dirty block accounting "
+					"went wrong %lld\n",
+					dirty_blocks);
+		}
+	}
+	/* Check whether we have space after
+	 * accounting for current dirty blocks
+	 */
+	if (free_blocks < ((root_blocks + nblocks) + dirty_blocks))
+		/* we don't have free space */
+		return -ENOSPC;
+
+	/* Add the blocks to nblocks */
+	percpu_counter_add(dbc, nblocks);
+	return 0;
+}
+
 /**
  * ext4_has_free_blocks()
  * @sbi:	in-core super block structure.
@@ -1610,29 +1650,34 @@ out:
  * On success, return nblocks
  */
 ext4_fsblk_t ext4_has_free_blocks(struct ext4_sb_info *sbi,
-						ext4_fsblk_t nblocks)
+						s64 nblocks)
 {
-	ext4_fsblk_t free_blocks;
-	ext4_fsblk_t root_blocks = 0;
+	s64 free_blocks, dirty_blocks;
+	s64 root_blocks = 0;
+	struct percpu_counter *fbc = &sbi->s_freeblocks_counter;
+	struct percpu_counter *dbc = &sbi->s_dirtyblocks_counter;
 
-	free_blocks = percpu_counter_read_positive(&sbi->s_freeblocks_counter);
+	free_blocks  = percpu_counter_read_positive(fbc);
+	dirty_blocks = percpu_counter_read_positive(dbc);
 
 	if (!capable(CAP_SYS_RESOURCE) &&
 		sbi->s_resuid != current->fsuid &&
 		(sbi->s_resgid == 0 || !in_group_p(sbi->s_resgid)))
 		root_blocks = ext4_r_blocks_count(sbi->s_es);
-#ifdef CONFIG_SMP
-	if (free_blocks - root_blocks < FBC_BATCH)
-		free_blocks =
-			percpu_counter_sum_and_set(&sbi->s_freeblocks_counter);
-#endif
-	if (free_blocks <= root_blocks)
+
+	if (free_blocks - (nblocks + root_blocks + dirty_blocks) <
+						EXT4_FREEBLOCKS_WATERMARK) {
+		free_blocks  = percpu_counter_sum(fbc);
+		dirty_blocks = percpu_counter_sum(dbc);
+	}
+	if (free_blocks <= (root_blocks + dirty_blocks))
 		/* we don't have free space */
 		return 0;
-	if (free_blocks - root_blocks < nblocks)
-		return free_blocks - root_blocks;
+
+	if (free_blocks - (root_blocks + dirty_blocks) < nblocks)
+		return free_blocks - (root_blocks + dirty_blocks);
 	return nblocks;
- }
+}
 
 
 /**
@@ -1702,7 +1747,7 @@ ext4_fsblk_t ext4_old_new_blocks(handle_t *handle, struct inode *inode,
 	sb = inode->i_sb;
 	if (!sb) {
 		*errp = -ENODEV;
-		printk("ext4_new_block: nonexistent device");
+		printk(KERN_ERR "ext4_new_block: nonexistent superblock");
 		return 0;
 	}
 
@@ -1711,14 +1756,17 @@ ext4_fsblk_t ext4_old_new_blocks(handle_t *handle, struct inode *inode,
 		/*
 		 * With delalloc we already reserved the blocks
 		 */
-		*count = ext4_has_free_blocks(sbi, *count);
+		while (*count && ext4_claim_free_blocks(sbi, *count)) {
+			/* let others to free the space */
+			yield();
+			*count = *count >> 1;
+		}
+		if (!*count) {
+			*errp = -ENOSPC;
+			return 0;	/*return with ENOSPC error */
+		}
+		num = *count;
 	}
-	if (*count == 0) {
-		*errp = -ENOSPC;
-		return 0;	/*return with ENOSPC error */
-	}
-	num = *count;
-
 	/*
 	 * Check quota for allocation of this block.
 	 */
@@ -1756,15 +1804,17 @@ retry_alloc:
 		goto io_error;
 
 	free_blocks = le16_to_cpu(gdp->bg_free_blocks_count);
-	/*
-	 * if there is not enough free blocks to make a new resevation
-	 * turn off reservation for this allocation
-	 */
-	if (my_rsv && (free_blocks < windowsz)
-		&& (rsv_is_empty(&my_rsv->rsv_window)))
-		my_rsv = NULL;
 
 	if (free_blocks > 0) {
+		/*
+		 * try to allocate with group target block
+		 * in the goal group. If we have low free_blocks
+		 * count turn off reservation
+		 */
+		if (my_rsv && (free_blocks < windowsz)
+			&& (rsv_is_empty(&my_rsv->rsv_window)))
+			my_rsv = NULL;
+
 		bitmap_bh = ext4_read_block_bitmap(sb, group_no);
 		if (!bitmap_bh)
 			goto io_error;
@@ -1797,7 +1847,7 @@ retry_alloc:
 		 * free blocks is less than half of the reservation
 		 * window size.
 		 */
-		if (free_blocks <= (windowsz/2))
+		if (my_rsv && (free_blocks <= (windowsz/2)))
 			continue;
 
 		brelse(bitmap_bh);
@@ -1884,8 +1934,8 @@ allocated:
 		for (i = 0; i < num; i++) {
 			if (ext4_test_bit(grp_alloc_blk+i,
 					bh2jh(bitmap_bh)->b_committed_data)) {
-				printk("%s: block was unexpectedly set in "
-					"b_committed_data\n", __func__);
+				printk(KERN_ERR "%s: block was unexpectedly "
+				       "set in b_committed_data\n", __func__);
 			}
 		}
 	}
@@ -1913,9 +1963,11 @@ allocated:
 	le16_add_cpu(&gdp->bg_free_blocks_count, -num);
 	gdp->bg_checksum = ext4_group_desc_csum(sbi, group_no, gdp);
 	spin_unlock(sb_bgl_lock(sbi, group_no));
-	if (!EXT4_I(inode)->i_delalloc_reserved_flag)
-		percpu_counter_sub(&sbi->s_freeblocks_counter, num);
-
+	percpu_counter_sub(&sbi->s_freeblocks_counter, num);
+	/*
+	 * Now reduce the dirty block count also. Should not go negative
+	 */
+	percpu_counter_sub(&sbi->s_dirtyblocks_counter, num);
 	if (sbi->s_log_groups_per_flex) {
 		ext4_group_t flex_group = ext4_flex_group(sbi, group_no);
 		spin_lock(sb_bgl_lock(sbi, flex_group));
@@ -2008,7 +2060,7 @@ ext4_fsblk_t ext4_new_meta_blocks(handle_t *handle, struct inode *inode,
 	/*
 	 * Account for the allocated meta blocks
 	 */
-	if (!(*errp)) {
+	if (!(*errp) && EXT4_I(inode)->i_delalloc_reserved_flag) {
 		spin_lock(&EXT4_I(inode)->i_block_reservation_lock);
 		EXT4_I(inode)->i_allocated_meta_blocks += *count;
 		spin_unlock(&EXT4_I(inode)->i_block_reservation_lock);
@@ -2093,10 +2145,9 @@ ext4_fsblk_t ext4_count_free_blocks(struct super_block *sb)
 		bitmap_count += x;
 	}
 	brelse(bitmap_bh);
-	printk("ext4_count_free_blocks: stored = %llu"
-		", computed = %llu, %llu\n",
-		ext4_free_blocks_count(es),
-		desc_count, bitmap_count);
+	printk(KERN_DEBUG "ext4_count_free_blocks: stored = %llu"
+		", computed = %llu, %llu\n", ext4_free_blocks_count(es),
+	       desc_count, bitmap_count);
 	return bitmap_count;
 #else
 	desc_count = 0;
@@ -2183,7 +2234,7 @@ unsigned long ext4_bg_num_gdb(struct super_block *sb, ext4_group_t group)
 
 	if (!EXT4_HAS_INCOMPAT_FEATURE(sb,EXT4_FEATURE_INCOMPAT_META_BG) ||
 			metagroup < first_meta_bg)
-		return ext4_bg_num_gdb_nometa(sb,group);
+		return ext4_bg_num_gdb_nometa(sb, group);
 
 	return ext4_bg_num_gdb_meta(sb,group);
 
