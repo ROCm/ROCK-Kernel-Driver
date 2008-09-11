@@ -60,6 +60,7 @@
 #include "symlink.h"
 #include "sysfile.h"
 #include "uptodate.h"
+#include "xattr.h"
 
 #include "buffer_head_io.h"
 
@@ -1598,10 +1599,10 @@ static int ocfs2_symlink(struct inode *dir,
 		u32 offset = 0;
 
 		inode->i_op = &ocfs2_symlink_inode_operations;
-		status = ocfs2_do_extend_allocation(osb, inode, &offset, 1, 0,
-						    new_fe_bh,
-						    handle, data_ac, NULL,
-						    NULL);
+		status = ocfs2_add_inode_data(osb, inode, &offset, 1, 0,
+					      new_fe_bh,
+					      handle, data_ac, NULL,
+					      NULL);
 		if (status < 0) {
 			if (status != -ENOSPC && status != -EINTR) {
 				mlog(ML_ERROR,
@@ -1918,4 +1919,8 @@ const struct inode_operations ocfs2_dir_iops = {
 	.setattr	= ocfs2_setattr,
 	.getattr	= ocfs2_getattr,
 	.permission	= ocfs2_permission,
+	.setxattr	= generic_setxattr,
+	.getxattr	= generic_getxattr,
+	.listxattr	= ocfs2_listxattr,
+	.removexattr	= generic_removexattr,
 };

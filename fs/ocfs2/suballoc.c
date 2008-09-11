@@ -493,9 +493,9 @@ bail:
 	return status;
 }
 
-int ocfs2_reserve_new_metadata(struct ocfs2_super *osb,
-			       struct ocfs2_dinode *fe,
-			       struct ocfs2_alloc_context **ac)
+int ocfs2_reserve_new_metadata_blocks(struct ocfs2_super *osb,
+				      int blocks,
+				      struct ocfs2_alloc_context **ac)
 {
 	int status;
 	u32 slot;
@@ -507,7 +507,7 @@ int ocfs2_reserve_new_metadata(struct ocfs2_super *osb,
 		goto bail;
 	}
 
-	(*ac)->ac_bits_wanted = ocfs2_extend_meta_needed(fe);
+	(*ac)->ac_bits_wanted = blocks;
 	(*ac)->ac_which = OCFS2_AC_USE_META;
 	slot = osb->slot_num;
 	(*ac)->ac_group_search = ocfs2_block_group_search;
@@ -530,6 +530,15 @@ bail:
 
 	mlog_exit(status);
 	return status;
+}
+
+int ocfs2_reserve_new_metadata(struct ocfs2_super *osb,
+			       struct ocfs2_extent_list *root_el,
+			       struct ocfs2_alloc_context **ac)
+{
+	return ocfs2_reserve_new_metadata_blocks(osb,
+					ocfs2_extend_meta_needed(root_el),
+					ac);
 }
 
 static int ocfs2_steal_inode_from_other_nodes(struct ocfs2_super *osb,
@@ -1890,4 +1899,85 @@ static inline void ocfs2_debug_suballoc_inode(struct ocfs2_dinode *fe)
 		printk("fe->id2.i_chain.cl_recs[%d].c_blkno: %llu\n", i,
 		       (unsigned long long)fe->id2.i_chain.cl_recs[i].c_blkno);
 	}
+}
+
+/*
+ * For a given allocation, determine which allocators will need to be
+ * accessed, and lock them, reserving the appropriate number of bits.
+ *
+ * Sparse file systems call this from ocfs2_write_begin_nolock()
+ * and ocfs2_allocate_unwritten_extents().
+ *
+ * File systems which don't support holes call this from
+ * ocfs2_extend_allocation().
+ */
+int ocfs2_lock_allocators(struct inode *inode,
+			  struct ocfs2_extent_tree *et,
+			  u32 clusters_to_add, u32 extents_to_split,
+			  struct ocfs2_alloc_context **data_ac,
+			  struct ocfs2_alloc_context **meta_ac)
+{
+	int ret = 0, num_free_extents;
+	unsigned int max_recs_needed = clusters_to_add + 2 * extents_to_split;
+	struct ocfs2_super *osb = OCFS2_SB(inode->i_sb);
+
+	*meta_ac = NULL;
+	if (data_ac)
+		*data_ac = NULL;
+
+	BUG_ON(clusters_to_add != 0 && data_ac == NULL);
+
+	num_free_extents = ocfs2_num_free_extents(osb, inode, et);
+	if (num_free_extents < 0) {
+		ret = num_free_extents;
+		mlog_errno(ret);
+		goto out;
+	}
+
+	/*
+	 * Sparse allocation file systems need to be more conservative
+	 * with reserving room for expansion - the actual allocation
+	 * happens while we've got a journal handle open so re-taking
+	 * a cluster lock (because we ran out of room for another
+	 * extent) will violate ordering rules.
+	 *
+	 * Most of the time we'll only be seeing this 1 cluster at a time
+	 * anyway.
+	 *
+	 * Always lock for any unwritten extents - we might want to
+	 * add blocks during a split.
+	 */
+	if (!num_free_extents ||
+	    (ocfs2_sparse_alloc(osb) && num_free_extents < max_recs_needed)) {
+		ret = ocfs2_reserve_new_metadata(osb, et->et_root_el, meta_ac);
+		if (ret < 0) {
+			if (ret != -ENOSPC)
+				mlog_errno(ret);
+			goto out;
+		}
+	}
+
+	if (clusters_to_add == 0)
+		goto out;
+
+	ret = ocfs2_reserve_clusters(osb, clusters_to_add, data_ac);
+	if (ret < 0) {
+		if (ret != -ENOSPC)
+			mlog_errno(ret);
+		goto out;
+	}
+
+out:
+	if (ret) {
+		if (*meta_ac) {
+			ocfs2_free_alloc_context(*meta_ac);
+			*meta_ac = NULL;
+		}
+
+		/*
+		 * We cannot have an error and a non null *data_ac.
+		 */
+	}
+
+	return ret;
 }

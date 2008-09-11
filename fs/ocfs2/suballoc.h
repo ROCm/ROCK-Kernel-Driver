@@ -59,9 +59,17 @@ static inline int ocfs2_alloc_context_bits_left(struct ocfs2_alloc_context *ac)
 	return ac->ac_bits_wanted - ac->ac_bits_given;
 }
 
+/*
+ * Please note that the caller must make sure that root_el is the root
+ * of extent tree. So for an inode, it should be &fe->id2.i_list. Otherwise
+ * the result may be wrong.
+ */
 int ocfs2_reserve_new_metadata(struct ocfs2_super *osb,
-			       struct ocfs2_dinode *fe,
+			       struct ocfs2_extent_list *root_el,
 			       struct ocfs2_alloc_context **ac);
+int ocfs2_reserve_new_metadata_blocks(struct ocfs2_super *osb,
+				      int blocks,
+				      struct ocfs2_alloc_context **ac);
 int ocfs2_reserve_new_inode(struct ocfs2_super *osb,
 			    struct ocfs2_alloc_context **ac);
 int ocfs2_reserve_clusters(struct ocfs2_super *osb,
@@ -156,4 +164,8 @@ u64 ocfs2_which_cluster_group(struct inode *inode, u32 cluster);
 int ocfs2_check_group_descriptor(struct super_block *sb,
 				 struct ocfs2_dinode *di,
 				 struct ocfs2_group_desc *gd);
+int ocfs2_lock_allocators(struct inode *inode, struct ocfs2_extent_tree *et,
+			  u32 clusters_to_add, u32 extents_to_split,
+			  struct ocfs2_alloc_context **data_ac,
+			  struct ocfs2_alloc_context **meta_ac);
 #endif /* _CHAINALLOC_H_ */

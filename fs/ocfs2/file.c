@@ -55,6 +55,7 @@
 #include "mmap.h"
 #include "suballoc.h"
 #include "super.h"
+#include "xattr.h"
 
 #include "buffer_head_io.h"
 
@@ -488,7 +489,7 @@ bail:
 }
 
 /*
- * extend allocation only here.
+ * extend file allocation only here.
  * we'll update all the disk stuff, and oip->alloc_size
  *
  * expect stuff to be locked, a transaction started and enough data /
@@ -497,189 +498,25 @@ bail:
  * Will return -EAGAIN, and a reason if a restart is needed.
  * If passed in, *reason will always be set, even in error.
  */
-int ocfs2_do_extend_allocation(struct ocfs2_super *osb,
-			       struct inode *inode,
-			       u32 *logical_offset,
-			       u32 clusters_to_add,
-			       int mark_unwritten,
-			       struct buffer_head *fe_bh,
-			       handle_t *handle,
-			       struct ocfs2_alloc_context *data_ac,
-			       struct ocfs2_alloc_context *meta_ac,
-			       enum ocfs2_alloc_restarted *reason_ret)
+int ocfs2_add_inode_data(struct ocfs2_super *osb,
+			 struct inode *inode,
+			 u32 *logical_offset,
+			 u32 clusters_to_add,
+			 int mark_unwritten,
+			 struct buffer_head *fe_bh,
+			 handle_t *handle,
+			 struct ocfs2_alloc_context *data_ac,
+			 struct ocfs2_alloc_context *meta_ac,
+			 enum ocfs2_alloc_restarted *reason_ret)
 {
-	int status = 0;
-	int free_extents;
-	struct ocfs2_dinode *fe = (struct ocfs2_dinode *) fe_bh->b_data;
-	enum ocfs2_alloc_restarted reason = RESTART_NONE;
-	u32 bit_off, num_bits;
-	u64 block;
-	u8 flags = 0;
+	int ret;
+	struct ocfs2_extent_tree et;
 
-	BUG_ON(!clusters_to_add);
-
-	if (mark_unwritten)
-		flags = OCFS2_EXT_UNWRITTEN;
-
-	free_extents = ocfs2_num_free_extents(osb, inode, fe);
-	if (free_extents < 0) {
-		status = free_extents;
-		mlog_errno(status);
-		goto leave;
-	}
-
-	/* there are two cases which could cause us to EAGAIN in the
-	 * we-need-more-metadata case:
-	 * 1) we haven't reserved *any*
-	 * 2) we are so fragmented, we've needed to add metadata too
-	 *    many times. */
-	if (!free_extents && !meta_ac) {
-		mlog(0, "we haven't reserved any metadata!\n");
-		status = -EAGAIN;
-		reason = RESTART_META;
-		goto leave;
-	} else if ((!free_extents)
-		   && (ocfs2_alloc_context_bits_left(meta_ac)
-		       < ocfs2_extend_meta_needed(fe))) {
-		mlog(0, "filesystem is really fragmented...\n");
-		status = -EAGAIN;
-		reason = RESTART_META;
-		goto leave;
-	}
-
-	status = __ocfs2_claim_clusters(osb, handle, data_ac, 1,
-					clusters_to_add, &bit_off, &num_bits);
-	if (status < 0) {
-		if (status != -ENOSPC)
-			mlog_errno(status);
-		goto leave;
-	}
-
-	BUG_ON(num_bits > clusters_to_add);
-
-	/* reserve our write early -- insert_extent may update the inode */
-	status = ocfs2_journal_access(handle, inode, fe_bh,
-				      OCFS2_JOURNAL_ACCESS_WRITE);
-	if (status < 0) {
-		mlog_errno(status);
-		goto leave;
-	}
-
-	block = ocfs2_clusters_to_blocks(osb->sb, bit_off);
-	mlog(0, "Allocating %u clusters at block %u for inode %llu\n",
-	     num_bits, bit_off, (unsigned long long)OCFS2_I(inode)->ip_blkno);
-	status = ocfs2_insert_extent(osb, handle, inode, fe_bh,
-				     *logical_offset, block, num_bits,
-				     flags, meta_ac);
-	if (status < 0) {
-		mlog_errno(status);
-		goto leave;
-	}
-
-	status = ocfs2_journal_dirty(handle, fe_bh);
-	if (status < 0) {
-		mlog_errno(status);
-		goto leave;
-	}
-
-	clusters_to_add -= num_bits;
-	*logical_offset += num_bits;
-
-	if (clusters_to_add) {
-		mlog(0, "need to alloc once more, clusters = %u, wanted = "
-		     "%u\n", fe->i_clusters, clusters_to_add);
-		status = -EAGAIN;
-		reason = RESTART_TRANS;
-	}
-
-leave:
-	mlog_exit(status);
-	if (reason_ret)
-		*reason_ret = reason;
-	return status;
-}
-
-/*
- * For a given allocation, determine which allocators will need to be
- * accessed, and lock them, reserving the appropriate number of bits.
- *
- * Sparse file systems call this from ocfs2_write_begin_nolock()
- * and ocfs2_allocate_unwritten_extents().
- *
- * File systems which don't support holes call this from
- * ocfs2_extend_allocation().
- */
-int ocfs2_lock_allocators(struct inode *inode, struct ocfs2_dinode *di,
-			  u32 clusters_to_add, u32 extents_to_split,
-			  struct ocfs2_alloc_context **data_ac,
-			  struct ocfs2_alloc_context **meta_ac)
-{
-	int ret = 0, num_free_extents;
-	unsigned int max_recs_needed = clusters_to_add + 2 * extents_to_split;
-	struct ocfs2_super *osb = OCFS2_SB(inode->i_sb);
-
-	*meta_ac = NULL;
-	if (data_ac)
-		*data_ac = NULL;
-
-	BUG_ON(clusters_to_add != 0 && data_ac == NULL);
-
-	mlog(0, "extend inode %llu, i_size = %lld, di->i_clusters = %u, "
-	     "clusters_to_add = %u, extents_to_split = %u\n",
-	     (unsigned long long)OCFS2_I(inode)->ip_blkno, (long long)i_size_read(inode),
-	     le32_to_cpu(di->i_clusters), clusters_to_add, extents_to_split);
-
-	num_free_extents = ocfs2_num_free_extents(osb, inode, di);
-	if (num_free_extents < 0) {
-		ret = num_free_extents;
-		mlog_errno(ret);
-		goto out;
-	}
-
-	/*
-	 * Sparse allocation file systems need to be more conservative
-	 * with reserving room for expansion - the actual allocation
-	 * happens while we've got a journal handle open so re-taking
-	 * a cluster lock (because we ran out of room for another
-	 * extent) will violate ordering rules.
-	 *
-	 * Most of the time we'll only be seeing this 1 cluster at a time
-	 * anyway.
-	 *
-	 * Always lock for any unwritten extents - we might want to
-	 * add blocks during a split.
-	 */
-	if (!num_free_extents ||
-	    (ocfs2_sparse_alloc(osb) && num_free_extents < max_recs_needed)) {
-		ret = ocfs2_reserve_new_metadata(osb, di, meta_ac);
-		if (ret < 0) {
-			if (ret != -ENOSPC)
-				mlog_errno(ret);
-			goto out;
-		}
-	}
-
-	if (clusters_to_add == 0)
-		goto out;
-
-	ret = ocfs2_reserve_clusters(osb, clusters_to_add, data_ac);
-	if (ret < 0) {
-		if (ret != -ENOSPC)
-			mlog_errno(ret);
-		goto out;
-	}
-
-out:
-	if (ret) {
-		if (*meta_ac) {
-			ocfs2_free_alloc_context(*meta_ac);
-			*meta_ac = NULL;
-		}
-
-		/*
-		 * We cannot have an error and a non null *data_ac.
-		 */
-	}
+	ocfs2_init_dinode_extent_tree(&et, inode, fe_bh);
+	ret = ocfs2_add_clusters_in_btree(osb, inode, logical_offset,
+					   clusters_to_add, mark_unwritten,
+					   &et, handle,
+					   data_ac, meta_ac, reason_ret);
 
 	return ret;
 }
@@ -698,6 +535,7 @@ static int __ocfs2_extend_allocation(struct inode *inode, u32 logical_start,
 	struct ocfs2_alloc_context *meta_ac = NULL;
 	enum ocfs2_alloc_restarted why;
 	struct ocfs2_super *osb = OCFS2_SB(inode->i_sb);
+	struct ocfs2_extent_tree et;
 
 	mlog_entry("(clusters_to_add = %u)\n", clusters_to_add);
 
@@ -724,14 +562,21 @@ static int __ocfs2_extend_allocation(struct inode *inode, u32 logical_start,
 restart_all:
 	BUG_ON(le32_to_cpu(fe->i_clusters) != OCFS2_I(inode)->ip_clusters);
 
-	status = ocfs2_lock_allocators(inode, fe, clusters_to_add, 0, &data_ac,
-				       &meta_ac);
+	mlog(0, "extend inode %llu, i_size = %lld, di->i_clusters = %u, "
+	     "clusters_to_add = %u\n",
+	     (unsigned long long)OCFS2_I(inode)->ip_blkno,
+	     (long long)i_size_read(inode), le32_to_cpu(fe->i_clusters),
+	     clusters_to_add);
+	ocfs2_init_dinode_extent_tree(&et, inode, bh);
+	status = ocfs2_lock_allocators(inode, &et, clusters_to_add, 0,
+				       &data_ac, &meta_ac);
 	if (status) {
 		mlog_errno(status);
 		goto leave;
 	}
 
-	credits = ocfs2_calc_extend_credits(osb->sb, fe, clusters_to_add);
+	credits = ocfs2_calc_extend_credits(osb->sb, &fe->id2.i_list,
+					    clusters_to_add);
 	handle = ocfs2_start_trans(osb, credits);
 	if (IS_ERR(handle)) {
 		status = PTR_ERR(handle);
@@ -753,16 +598,16 @@ restarted_transaction:
 
 	prev_clusters = OCFS2_I(inode)->ip_clusters;
 
-	status = ocfs2_do_extend_allocation(osb,
-					    inode,
-					    &logical_start,
-					    clusters_to_add,
-					    mark_unwritten,
-					    bh,
-					    handle,
-					    data_ac,
-					    meta_ac,
-					    &why);
+	status = ocfs2_add_inode_data(osb,
+				      inode,
+				      &logical_start,
+				      clusters_to_add,
+				      mark_unwritten,
+				      bh,
+				      handle,
+				      data_ac,
+				      meta_ac,
+				      &why);
 	if ((status < 0) && (status != -EAGAIN)) {
 		if (status != -ENOSPC)
 			mlog_errno(status);
@@ -789,7 +634,7 @@ restarted_transaction:
 			mlog(0, "restarting transaction.\n");
 			/* TODO: This can be more intelligent. */
 			credits = ocfs2_calc_extend_credits(osb->sb,
-							    fe,
+							    &fe->id2.i_list,
 							    clusters_to_add);
 			status = ocfs2_extend_trans(handle, credits);
 			if (status < 0) {
@@ -1394,8 +1239,11 @@ static int __ocfs2_remove_inode_range(struct inode *inode,
 	handle_t *handle;
 	struct ocfs2_alloc_context *meta_ac = NULL;
 	struct ocfs2_dinode *di = (struct ocfs2_dinode *)di_bh->b_data;
+	struct ocfs2_extent_tree et;
 
-	ret = ocfs2_lock_allocators(inode, di, 0, 1, NULL, &meta_ac);
+	ocfs2_init_dinode_extent_tree(&et, inode, di_bh);
+
+	ret = ocfs2_lock_allocators(inode, &et, 0, 1, NULL, &meta_ac);
 	if (ret) {
 		mlog_errno(ret);
 		return ret;
@@ -1425,7 +1273,7 @@ static int __ocfs2_remove_inode_range(struct inode *inode,
 		goto out;
 	}
 
-	ret = ocfs2_remove_extent(inode, di_bh, cpos, len, handle, meta_ac,
+	ret = ocfs2_remove_extent(inode, &et, cpos, len, handle, meta_ac,
 				  dealloc);
 	if (ret) {
 		mlog_errno(ret);
@@ -2227,6 +2075,10 @@ const struct inode_operations ocfs2_file_iops = {
 	.setattr	= ocfs2_setattr,
 	.getattr	= ocfs2_getattr,
 	.permission	= ocfs2_permission,
+	.setxattr	= generic_setxattr,
+	.getxattr	= generic_getxattr,
+	.listxattr	= ocfs2_listxattr,
+	.removexattr	= generic_removexattr,
 	.fallocate	= ocfs2_fallocate,
 };
 

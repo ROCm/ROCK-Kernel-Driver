@@ -64,6 +64,7 @@
 #include "sysfile.h"
 #include "uptodate.h"
 #include "ver.h"
+#include "xattr.h"
 
 #include "buffer_head_io.h"
 
@@ -154,6 +155,8 @@ enum {
 	Opt_localalloc,
 	Opt_localflocks,
 	Opt_stack,
+	Opt_user_xattr,
+	Opt_nouser_xattr,
 	Opt_err,
 };
 
@@ -173,6 +176,8 @@ static match_table_t tokens = {
 	{Opt_localalloc, "localalloc=%d"},
 	{Opt_localflocks, "localflocks"},
 	{Opt_stack, "cluster_stack=%s"},
+	{Opt_user_xattr, "user_xattr"},
+	{Opt_nouser_xattr, "nouser_xattr"},
 	{Opt_err, NULL}
 };
 
@@ -847,6 +852,12 @@ static int ocfs2_parse_options(struct super_block *sb,
 		case Opt_data_writeback:
 			mopt->mount_opt |= OCFS2_MOUNT_DATA_WRITEBACK;
 			break;
+		case Opt_user_xattr:
+			mopt->mount_opt &= ~OCFS2_MOUNT_NOUSERXATTR;
+			break;
+		case Opt_nouser_xattr:
+			mopt->mount_opt |= OCFS2_MOUNT_NOUSERXATTR;
+			break;
 		case Opt_atime_quantum:
 			if (match_int(&args[0], &option)) {
 				status = 0;
@@ -979,6 +990,11 @@ static int ocfs2_show_options(struct seq_file *s, struct vfsmount *mnt)
 	if (osb->osb_cluster_stack[0])
 		seq_printf(s, ",cluster_stack=%.*s", OCFS2_STACK_LABEL_LEN,
 			   osb->osb_cluster_stack);
+
+	if (opts & OCFS2_MOUNT_NOUSERXATTR)
+		seq_printf(s, ",nouser_xattr");
+	else
+		seq_printf(s, ",user_xattr");
 
 	return 0;
 }
@@ -1132,6 +1148,7 @@ static void ocfs2_inode_init_once(void *data)
 	oi->ip_dir_start_lookup = 0;
 
 	init_rwsem(&oi->ip_alloc_sem);
+	init_rwsem(&oi->ip_xattr_sem);
 	mutex_init(&oi->ip_io_mutex);
 
 	oi->ip_blkno = 0ULL;
@@ -1375,6 +1392,7 @@ static int ocfs2_initialize_super(struct super_block *sb,
 	sb->s_fs_info = osb;
 	sb->s_op = &ocfs2_sops;
 	sb->s_export_op = &ocfs2_export_ops;
+	sb->s_xattr = ocfs2_xattr_handlers;
 	sb->s_time_gran = 1;
 	sb->s_flags |= MS_NOATIME;
 	/* this is needed to support O_LARGEFILE */
@@ -1420,6 +1438,9 @@ static int ocfs2_initialize_super(struct super_block *sb,
 	osb->s_atime_quantum = OCFS2_DEFAULT_ATIME_QUANTUM;
 
 	osb->slot_num = OCFS2_INVALID_SLOT;
+
+	osb->s_xattr_inline_size = le16_to_cpu(
+					di->id2.i_super.s_xattr_inline_size);
 
 	osb->local_alloc_state = OCFS2_LA_UNUSED;
 	osb->local_alloc_bh = NULL;
@@ -1568,6 +1589,7 @@ static int ocfs2_initialize_super(struct super_block *sb,
 	osb->first_cluster_group_blkno =
 		le64_to_cpu(di->id2.i_super.s_first_cluster_group);
 	osb->fs_generation = le32_to_cpu(di->i_fs_generation);
+	osb->uuid_hash = le32_to_cpu(di->id2.i_super.s_uuid_hash);
 	mlog(0, "vol_label: %s\n", osb->vol_label);
 	mlog(0, "uuid: %s\n", osb->uuid_str);
 	mlog(0, "root_blkno=%llu, system_dir_blkno=%llu\n",

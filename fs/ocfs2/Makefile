@@ -34,7 +34,10 @@ ocfs2-objs := \
 	symlink.o 		\
 	sysfile.o 		\
 	uptodate.o		\
-	ver.o
+	ver.o			\
+	xattr.o			\
+	xattr_user.o		\
+	xattr_trusted.o
 
 ocfs2_stackglue-objs := stackglue.o
 ocfs2_stack_o2cb-objs := stack_o2cb.o

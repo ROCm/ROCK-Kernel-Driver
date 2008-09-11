@@ -1242,6 +1242,7 @@ static int ocfs2_write_cluster(struct address_space *mapping,
 	int ret, i, new, should_zero = 0;
 	u64 v_blkno, p_blkno;
 	struct inode *inode = mapping->host;
+	struct ocfs2_extent_tree et;
 
 	new = phys == 0 ? 1 : 0;
 	if (new || unwritten)
@@ -1255,10 +1256,10 @@ static int ocfs2_write_cluster(struct address_space *mapping,
 		 * any additional semaphores or cluster locks.
 		 */
 		tmp_pos = cpos;
-		ret = ocfs2_do_extend_allocation(OCFS2_SB(inode->i_sb), inode,
-						 &tmp_pos, 1, 0, wc->w_di_bh,
-						 wc->w_handle, data_ac,
-						 meta_ac, NULL);
+		ret = ocfs2_add_inode_data(OCFS2_SB(inode->i_sb), inode,
+					   &tmp_pos, 1, 0, wc->w_di_bh,
+					   wc->w_handle, data_ac,
+					   meta_ac, NULL);
 		/*
 		 * This shouldn't happen because we must have already
 		 * calculated the correct meta data allocation required. The
@@ -1276,7 +1277,8 @@ static int ocfs2_write_cluster(struct address_space *mapping,
 			goto out;
 		}
 	} else if (unwritten) {
-		ret = ocfs2_mark_extent_written(inode, wc->w_di_bh,
+		ocfs2_init_dinode_extent_tree(&et, inode, wc->w_di_bh);
+		ret = ocfs2_mark_extent_written(inode, &et,
 						wc->w_handle, cpos, 1, phys,
 						meta_ac, &wc->w_dealloc);
 		if (ret < 0) {
@@ -1665,6 +1667,7 @@ int ocfs2_write_begin_nolock(struct address_space *mapping,
 	struct ocfs2_alloc_context *data_ac = NULL;
 	struct ocfs2_alloc_context *meta_ac = NULL;
 	handle_t *handle;
+	struct ocfs2_extent_tree et;
 
 	ret = ocfs2_alloc_write_ctxt(&wc, osb, pos, len, di_bh);
 	if (ret) {
@@ -1712,14 +1715,23 @@ int ocfs2_write_begin_nolock(struct address_space *mapping,
 		 * ocfs2_lock_allocators(). It greatly over-estimates
 		 * the work to be done.
 		 */
-		ret = ocfs2_lock_allocators(inode, di, clusters_to_alloc,
-					    extents_to_split, &data_ac, &meta_ac);
+		mlog(0, "extend inode %llu, i_size = %lld, di->i_clusters = %u,"
+		     " clusters_to_add = %u, extents_to_split = %u\n",
+		     (unsigned long long)OCFS2_I(inode)->ip_blkno,
+		     (long long)i_size_read(inode), le32_to_cpu(di->i_clusters),
+		     clusters_to_alloc, extents_to_split);
+
+		ocfs2_init_dinode_extent_tree(&et, inode, wc->w_di_bh);
+		ret = ocfs2_lock_allocators(inode, &et,
+					    clusters_to_alloc, extents_to_split,
+					    &data_ac, &meta_ac);
 		if (ret) {
 			mlog_errno(ret);
 			goto out;
 		}
 
-		credits = ocfs2_calc_extend_credits(inode->i_sb, di,
+		credits = ocfs2_calc_extend_credits(inode->i_sb,
+						    &di->id2.i_list,
 						    clusters_to_alloc);
 
 	}
