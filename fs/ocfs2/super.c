@@ -157,6 +157,7 @@ enum {
 	Opt_stack,
 	Opt_user_xattr,
 	Opt_nouser_xattr,
+	Opt_inode64,
 	Opt_err,
 };
 
@@ -178,6 +179,7 @@ static match_table_t tokens = {
 	{Opt_stack, "cluster_stack=%s"},
 	{Opt_user_xattr, "user_xattr"},
 	{Opt_nouser_xattr, "nouser_xattr"},
+	{Opt_inode64, "inode64"},
 	{Opt_err, NULL}
 };
 
@@ -210,10 +212,11 @@ static int ocfs2_sync_fs(struct super_block *sb, int wait)
 		ocfs2_schedule_truncate_log_flush(osb, 0);
 	}
 
-	if (journal_start_commit(OCFS2_SB(sb)->journal->j_journal, &target)) {
+	if (jbd2_journal_start_commit(OCFS2_SB(sb)->journal->j_journal,
+				      &target)) {
 		if (wait)
-			log_wait_commit(OCFS2_SB(sb)->journal->j_journal,
-					target);
+			jbd2_log_wait_commit(OCFS2_SB(sb)->journal->j_journal,
+					     target);
 	}
 	return 0;
 }
@@ -330,6 +333,7 @@ static struct inode *ocfs2_alloc_inode(struct super_block *sb)
 	if (!oi)
 		return NULL;
 
+	jbd2_journal_init_jbd_inode(&oi->ip_jinode, &oi->vfs_inode);
 	return &oi->vfs_inode;
 }
 
@@ -408,6 +412,15 @@ static int ocfs2_remount(struct super_block *sb, int *flags, char *data)
 	    (parsed_options.mount_opt & OCFS2_MOUNT_DATA_WRITEBACK)) {
 		ret = -EINVAL;
 		mlog(ML_ERROR, "Cannot change data mode on remount\n");
+		goto out;
+	}
+
+	/* Probably don't want this on remount; it might
+	 * mess with other nodes */
+	if (!(osb->s_mount_opt & OCFS2_MOUNT_INODE64) &&
+	    (parsed_options.mount_opt & OCFS2_MOUNT_INODE64)) {
+		ret = -EINVAL;
+		mlog(ML_ERROR, "Cannot enable inode64 on remount\n");
 		goto out;
 	}
 
@@ -884,7 +897,7 @@ static int ocfs2_parse_options(struct super_block *sb,
 			if (option < 0)
 				return 0;
 			if (option == 0)
-				option = JBD_DEFAULT_MAX_COMMIT_AGE;
+				option = JBD2_DEFAULT_MAX_COMMIT_AGE;
 			mopt->commit_interval = HZ * option;
 			break;
 		case Opt_localalloc:
@@ -928,6 +941,9 @@ static int ocfs2_parse_options(struct super_block *sb,
 			memcpy(mopt->cluster_stack, args[0].from,
 			       OCFS2_STACK_LABEL_LEN);
 			mopt->cluster_stack[OCFS2_STACK_LABEL_LEN] = '\0';
+			break;
+		case Opt_inode64:
+			mopt->mount_opt |= OCFS2_MOUNT_INODE64;
 			break;
 		default:
 			mlog(ML_ERROR,
@@ -995,6 +1011,9 @@ static int ocfs2_show_options(struct seq_file *s, struct vfsmount *mnt)
 		seq_printf(s, ",nouser_xattr");
 	else
 		seq_printf(s, ",user_xattr");
+
+	if (opts & OCFS2_MOUNT_INODE64)
+		seq_printf(s, ",inode64");
 
 	return 0;
 }
