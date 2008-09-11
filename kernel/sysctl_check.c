@@ -105,6 +105,7 @@ static const struct trans_ctl_table trans_kern_table[] = {
 	{ KERN_MAX_LOCK_DEPTH,		"max_lock_depth" },
 	{ KERN_NMI_WATCHDOG,		"nmi_watchdog" },
 	{ KERN_PANIC_ON_NMI,		"panic_on_unrecovered_nmi" },
+	{ KERN_KDB,			"kdb" },
 	{ KERN_SETUID_DUMPABLE,		"suid_dumpable" },
 	{}
 };

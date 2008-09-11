@@ -21,6 +21,10 @@
 #include <linux/pci.h>
 #include <linux/io.h>
 
+#ifdef CONFIG_KDB_USB
+#include <linux/kdb.h>
+#endif
+
 
 /* constants used to work around PM-related transfer
  * glitches in some AMD 700 series southbridges
@@ -39,10 +43,6 @@
 static struct pci_dev *amd_smbus_dev;
 static struct pci_dev *amd_hb_dev;
 static int amd_ohci_iso_count;
-
-#ifdef CONFIG_KDB_USB
-#include <linux/kdb.h>
-#endif
 
 /*-------------------------------------------------------------------------*/
 

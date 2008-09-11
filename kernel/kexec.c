@@ -1135,7 +1135,6 @@ void crash_kexec(struct pt_regs *regs)
 	}
 }
 
-
 static u32 *append_elf_note(u32 *buf, char *name, unsigned type, void *data,
 			    size_t data_len)
 {
