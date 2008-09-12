@@ -37,6 +37,8 @@
 
 #include <asm/uaccess.h>
 
+#include "blk.h"
+
 static DEFINE_SPINLOCK(elv_list_lock);
 static LIST_HEAD(elv_list);
 
@@ -302,6 +304,9 @@ static void elv_activate_rq(struct request_queue *q, struct request *rq)
 
 	if (e->ops->elevator_activate_req_fn)
 		e->ops->elevator_activate_req_fn(q, rq);
+
+	if (q->rq_timed_out_fn)
+		blk_add_timer(rq);
 }
 
 static void elv_deactivate_rq(struct request_queue *q, struct request *rq)
@@ -310,6 +315,9 @@ static void elv_deactivate_rq(struct request_queue *q, struct request *rq)
 
 	if (e->ops->elevator_deactivate_req_fn)
 		e->ops->elevator_deactivate_req_fn(q, rq);
+
+	if (q->rq_timed_out_fn)
+		blk_delete_timer(rq);
 }
 
 static inline void __elv_rqhash_del(struct request *rq)

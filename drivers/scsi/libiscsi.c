@@ -1194,15 +1194,13 @@ int iscsi_queuecommand(struct scsi_cmnd *sc, void (*done)(struct scsi_cmnd *))
 		switch (session->state) {
 		case ISCSI_STATE_IN_RECOVERY:
 			reason = FAILURE_SESSION_IN_RECOVERY;
-			sc->result = DID_IMM_RETRY << 16;
-			break;
+			goto reject;
 		case ISCSI_STATE_LOGGING_OUT:
 			reason = FAILURE_SESSION_LOGGING_OUT;
-			sc->result = DID_IMM_RETRY << 16;
-			break;
+			goto reject;
 		case ISCSI_STATE_RECOVERY_FAILED:
 			reason = FAILURE_SESSION_RECOVERY_TIMEOUT;
-			sc->result = DID_NO_CONNECT << 16;
+			sc->result = DID_TRANSPORT_FAILFAST << 16;
 			break;
 		case ISCSI_STATE_TERMINATE:
 			reason = FAILURE_SESSION_TERMINATE;
@@ -1267,7 +1265,7 @@ reject:
 	spin_unlock(&session->lock);
 	debug_scsi("cmd 0x%x rejected (%d)\n", sc->cmnd[0], reason);
 	spin_lock(host->host_lock);
-	return SCSI_MLQUEUE_HOST_BUSY;
+	return SCSI_MLQUEUE_TARGET_BUSY;
 
 fault:
 	spin_unlock(&session->lock);
@@ -1476,12 +1474,12 @@ static void iscsi_start_tx(struct iscsi_conn *conn)
 		scsi_queue_work(conn->session->host, &conn->xmitwork);
 }
 
-static enum scsi_eh_timer_return iscsi_eh_cmd_timed_out(struct scsi_cmnd *scmd)
+static enum blk_eh_timer_return iscsi_eh_cmd_timed_out(struct scsi_cmnd *scmd)
 {
 	struct iscsi_cls_session *cls_session;
 	struct iscsi_session *session;
 	struct iscsi_conn *conn;
-	enum scsi_eh_timer_return rc = EH_NOT_HANDLED;
+	enum blk_eh_timer_return rc = BLK_EH_NOT_HANDLED;
 
 	cls_session = starget_to_session(scsi_target(scmd->device));
 	session = cls_session->dd_data;
@@ -1494,14 +1492,14 @@ static enum scsi_eh_timer_return iscsi_eh_cmd_timed_out(struct scsi_cmnd *scmd)
 		 * We are probably in the middle of iscsi recovery so let
 		 * that complete and handle the error.
 		 */
-		rc = EH_RESET_TIMER;
+		rc = BLK_EH_RESET_TIMER;
 		goto done;
 	}
 
 	conn = session->leadconn;
 	if (!conn) {
 		/* In the middle of shuting down */
-		rc = EH_RESET_TIMER;
+		rc = BLK_EH_RESET_TIMER;
 		goto done;
 	}
 
@@ -1513,20 +1511,21 @@ static enum scsi_eh_timer_return iscsi_eh_cmd_timed_out(struct scsi_cmnd *scmd)
 	 */
 	if (time_before_eq(conn->last_recv + (conn->recv_timeout * HZ) +
 			    (conn->ping_timeout * HZ), jiffies))
-		rc = EH_RESET_TIMER;
+		rc = BLK_EH_RESET_TIMER;
 	/*
 	 * if we are about to check the transport then give the command
 	 * more time
 	 */
 	if (time_before_eq(conn->last_recv + (conn->recv_timeout * HZ),
 			   jiffies))
-		rc = EH_RESET_TIMER;
+		rc = BLK_EH_RESET_TIMER;
 	/* if in the middle of checking the transport then give us more time */
 	if (conn->ping_task)
-		rc = EH_RESET_TIMER;
+		rc = BLK_EH_RESET_TIMER;
 done:
 	spin_unlock(&session->lock);
-	debug_scsi("return %s\n", rc == EH_RESET_TIMER ? "timer reset" : "nh");
+	debug_scsi("return %s\n", rc == BLK_EH_RESET_TIMER ?
+					"timer reset" : "nh");
 	return rc;
 }
 
@@ -2334,8 +2333,10 @@ static void iscsi_start_session_recovery(struct iscsi_session *session,
 	 * flush queues.
 	 */
 	spin_lock_bh(&session->lock);
-	fail_all_commands(conn, -1,
-			STOP_CONN_RECOVER ? DID_BUS_BUSY : DID_ERROR);
+	if (STOP_CONN_RECOVER)
+		fail_all_commands(conn, -1, DID_TRANSPORT_DISRUPTED);
+	else
+		fail_all_commands(conn, -1, DID_ERROR);
 	flush_control_queues(session, conn);
 	spin_unlock_bh(&session->lock);
 	mutex_unlock(&session->eh_mutex);

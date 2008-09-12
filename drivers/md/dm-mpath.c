@@ -921,7 +921,7 @@ static int multipath_map_bio(struct dm_target *ti, struct bio *bio,
 	dm_bio_record(&mpio->details, bio);
 
 	map_context->ptr = mpio;
-	bio->bi_rw |= (1 << BIO_RW_FAILFAST);
+	bio->bi_rw |= (1 << BIO_RW_FAILFAST_TRANSPORT);
 	r = map_bio(m, bio, mpio, 0);
 	if (r < 0 || r == DM_MAPIO_REQUEUE)
 		mempool_free(mpio, m->mpio_pool);
@@ -943,7 +943,7 @@ static int multipath_map_req(struct dm_target *ti, struct request *clone,
 	memset(mpio, 0, sizeof(*mpio));
 
 	map_context->ptr = mpio;
-	clone->cmd_flags |= REQ_FAILFAST;
+	clone->cmd_flags |= REQ_FAILFAST_TRANSPORT;
 
 	r = map_req(m, clone, mpio, 0);
 	if (r < 0 || r == DM_MAPIO_REQUEUE)

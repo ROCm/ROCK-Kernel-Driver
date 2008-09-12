@@ -1005,7 +1005,6 @@ qla2x00_terminate_rport_io(struct fc_rport *rport)
 	}
 
 	qla2x00_abort_fcport_cmds(fcport);
-	scsi_target_unblock(&rport->dev);
 }
 
 static int
