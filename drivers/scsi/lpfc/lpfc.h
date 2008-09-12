@@ -34,7 +34,14 @@ struct lpfc_sli2_slim;
 #define LPFC_IOCB_LIST_CNT	2250	/* list of IOCBs for fast-path usage. */
 #define LPFC_Q_RAMP_UP_INTERVAL 120     /* lun q_depth ramp up interval */
 #define LPFC_VNAME_LEN		100	/* vport symbolic name length */
+#define LPFC_TGTQ_INTERVAL	40000	/* Min amount of time between tgt
+					   queue depth change in millisecs */
+#define LPFC_TGTQ_RAMPUP_PCENT	5	/* Target queue rampup in percentage */
+#define LPFC_MIN_TGT_QDEPTH	100
+#define LPFC_MAX_TGT_QDEPTH	0xFFFF
 
+#define  LPFC_MAX_BUCKET_COUNT 20	/* Maximum no. of buckets for stat data
+					   collection. */
 /*
  * Following time intervals are used of adjusting SCSI device
  * queue depths when there are driver resource error or Firmware
@@ -49,6 +56,9 @@ struct lpfc_sli2_slim;
 #define LPFC_HB_MBOX_INTERVAL   5	/* Heart beat interval in seconds. */
 #define LPFC_HB_MBOX_TIMEOUT    30	/* Heart beat timeout  in seconds. */
 
+/* Error Attention event polling interval */
+#define LPFC_ERATT_POLL_INTERVAL	5 /* EATT poll interval in seconds */
+
 /* Define macros for 64 bit support */
 #define putPaddrLow(addr)    ((uint32_t) (0xffffffff & (u64)(addr)))
 #define putPaddrHigh(addr)   ((uint32_t) (0xffffffff & (((u64)(addr))>>32)))
@@ -59,6 +69,9 @@ struct lpfc_sli2_slim;
 #define FC_MAX_ADPTMSG		64
 
 #define MAX_HBAEVT	32
+
+/* Number of MSI-X vectors the driver uses */
+#define LPFC_MSIX_VECTORS	2
 
 /* lpfc wait event data ready flag */
 #define LPFC_DATA_READY		(1<<0)
@@ -204,17 +217,80 @@ struct lpfc_stats {
 	uint32_t fcpLocalErr;
 };
 
+struct lpfc_dmabufext {
+	struct lpfc_dmabuf dma;
+	uint32_t size;
+	uint32_t flag;
+};
+
 enum sysfs_mbox_state {
 	SMBOX_IDLE,
 	SMBOX_WRITING,
-	SMBOX_READING
+	SMBOX_WRITING_MBEXT,
+	SMBOX_READING_MBEXT,
+	SMBOX_READING,
+	SMBOX_WRITING_BUFF,
+	SMBOX_READING_BUFF
+};
+
+struct lpfc_sysfs_mbox_data {
+	MAILBOX_t mbox;
+	uint32_t  mboffset;
+	uint32_t  in_ext_wlen;
+	uint32_t  out_ext_wlen;
 };
 
 struct lpfc_sysfs_mbox {
+	struct lpfc_sysfs_mbox_data mbox_data;
 	enum sysfs_mbox_state state;
 	size_t                offset;
 	struct lpfcMboxq *    mbox;
+	/* process id of the mgmt application */
+	pid_t		      pid;
+	struct list_head      list;
+	uint8_t *             mbext;
+	uint32_t              extoff;
+	struct lpfc_dmabuf *  txmit_buff;
+	struct lpfc_dmabuf *  rcv_buff;
 };
+#define MENLO_DID 0x0000FC0E
+
+enum sysfs_menlo_state {
+	SMENLO_IDLE,
+	SMENLO_WRITING,
+	SMENLO_WRITING_MBEXT,
+	SMENLO_READING
+};
+
+struct lpfc_sysfs_menlo_hdr {
+	uint32_t cmd;
+	uint32_t cmdsize;
+	uint32_t rspsize;
+};
+
+struct lpfc_menlo_genreq64 {
+	size_t				offset;
+	struct lpfc_iocbq		*cmdiocbq;
+	struct lpfc_iocbq		*rspiocbq;
+	struct lpfc_dmabuf		*bmp;
+	struct lpfc_dmabufext		*indmp;
+	struct ulp_bde64		*cmdbpl;
+	struct lpfc_dmabufext		*outdmp;
+	uint32_t			timeout;
+	struct list_head		inhead;
+	struct list_head		outhead;
+};
+
+struct lpfc_sysfs_menlo {
+	enum sysfs_menlo_state		state;
+	/* process id of the mgmt application */
+	struct lpfc_sysfs_menlo_hdr	cmdhdr;
+	struct lpfc_menlo_genreq64	cr;
+	struct lpfc_menlo_genreq64	cx;
+	pid_t				pid;
+	struct list_head		list;
+};
+
 
 struct lpfc_hba;
 
@@ -246,6 +322,52 @@ enum hba_state {
 				       * CLEAR_LA */
 	LPFC_HBA_READY       =  32,
 	LPFC_HBA_ERROR       =  -1
+};
+
+enum auth_state {
+	LPFC_AUTH_UNKNOWN		=  0,
+	LPFC_AUTH_SUCCESS		=  1,
+	LPFC_AUTH_FAIL			=  2,
+};
+enum auth_msg_state {
+	LPFC_AUTH_NONE			=  0,
+	LPFC_AUTH_REJECT		=  1,	/* Sent a Reject */
+	LPFC_AUTH_NEGOTIATE		=  2,	/* Auth Negotiate */
+	LPFC_DHCHAP_CHALLENGE		=  3,	/* Challenge */
+	LPFC_DHCHAP_REPLY		=  4,	/* Reply */
+	LPFC_DHCHAP_SUCCESS_REPLY	=  5,	/* Success with Reply */
+	LPFC_DHCHAP_SUCCESS		=  6,	/* Success */
+	LPFC_AUTH_DONE			=  7,
+};
+
+struct lpfc_auth {
+	uint8_t auth_mode;
+	uint8_t bidirectional;
+	uint8_t hash_priority[4];
+	uint32_t hash_len;
+	uint8_t dh_group_priority[8];
+	uint32_t dh_group_len;
+	uint32_t reauth_interval;
+
+	uint8_t security_active;
+	enum auth_state auth_state;
+	enum auth_msg_state auth_msg_state;
+	uint32_t trans_id;              /* current transaction id. Can be set
+					   by incomming transactions as well */
+	uint32_t group_id;
+	uint32_t hash_id;
+	uint32_t direction;
+#define AUTH_DIRECTION_NONE	0
+#define AUTH_DIRECTION_REMOTE	0x1
+#define AUTH_DIRECTION_LOCAL	0x2
+#define AUTH_DIRECTION_BIDI	(AUTH_DIRECTION_LOCAL|AUTH_DIRECTION_REMOTE)
+
+	uint8_t *challenge;
+	uint32_t challenge_len;
+	uint8_t *dh_pub_key;
+	uint32_t dh_pub_key_len;
+
+	unsigned long last_auth;
 };
 
 struct lpfc_vport {
@@ -343,6 +465,14 @@ struct lpfc_vport {
 #define FC_UNLOADING		0x2	/* HBA in process of unloading drvr */
 	char  *vname;		        /* Application assigned name */
 
+	/* Fields used for accessing auth service */
+	struct lpfc_auth auth;
+	uint32_t sc_tran_id;
+	struct list_head sc_response_wait_queue;
+	struct list_head sc_users;
+	struct work_struct sc_online_work;
+	struct work_struct sc_offline_work;
+
 	/* Vport Config Parameters */
 	uint32_t cfg_scan_down;
 	uint32_t cfg_lun_queue_depth;
@@ -357,6 +487,8 @@ struct lpfc_vport {
 	uint32_t cfg_log_verbose;
 	uint32_t cfg_max_luns;
 	uint32_t cfg_enable_da_id;
+	uint32_t cfg_max_scsicmpl_time;
+	uint32_t cfg_enable_auth;
 
 	uint32_t dev_loss_tmo_changed;
 
@@ -369,6 +501,8 @@ struct lpfc_vport {
 	struct lpfc_debugfs_trc *disc_trc;
 	atomic_t disc_trc_cnt;
 #endif
+	uint8_t stat_data_enabled;
+	uint8_t stat_data_blocked;
 };
 
 struct hbq_s {
@@ -407,10 +541,11 @@ struct lpfc_hba {
 	struct lpfc_sli sli;
 	uint32_t sli_rev;		/* SLI2 or SLI3 */
 	uint32_t sli3_options;		/* Mask of enabled SLI3 options */
-#define LPFC_SLI3_ENABLED	 0x01
-#define LPFC_SLI3_HBQ_ENABLED	 0x02
-#define LPFC_SLI3_NPIV_ENABLED	 0x04
-#define LPFC_SLI3_VPORT_TEARDOWN 0x08
+#define LPFC_SLI3_HBQ_ENABLED		0x01
+#define LPFC_SLI3_NPIV_ENABLED		0x02
+#define LPFC_SLI3_VPORT_TEARDOWN	0x04
+#define LPFC_SLI3_CRP_ENABLED		0x08
+#define LPFC_SLI3_INB_ENABLED		0x10
 	uint32_t iocb_cmd_size;
 	uint32_t iocb_rsp_size;
 
@@ -422,10 +557,21 @@ struct lpfc_hba {
 #define LS_NPIV_FAB_SUPPORTED 0x2	/* Fabric supports NPIV */
 #define LS_IGNORE_ERATT       0x4	/* intr handler should ignore ERATT */
 
-	struct lpfc_sli2_slim *slim2p;
-	struct lpfc_dmabuf hbqslimp;
+	uint32_t hba_flag;	/* hba generic flags */
+#define HBA_ERATT_HANDLED	0x1 /* This flag is set when eratt handled */
 
-	dma_addr_t slim2p_mapping;
+	struct lpfc_dmabuf slim2p;
+
+	MAILBOX_t *mbox;
+	uint32_t *mbox_ext;
+	uint32_t *inb_ha_copy;
+	uint32_t *inb_counter;
+	uint32_t inb_last_counter;
+	uint32_t ha_copy;
+	struct _PCB *pcb;
+	struct _IOCB *IOCBs;
+
+	struct lpfc_dmabuf hbqslimp;
 
 	uint16_t pci_cfg_value;
 
@@ -492,7 +638,7 @@ struct lpfc_hba {
 
 	wait_queue_head_t    work_waitq;
 	struct task_struct   *worker_thread;
-	long data_flags;
+	unsigned long data_flags;
 
 	uint32_t hbq_in_use;		/* HBQs in use flag */
 	struct list_head hbqbuf_in_list;  /* in-fly hbq buffer list */
@@ -514,6 +660,7 @@ struct lpfc_hba {
 	void __iomem *HCregaddr;	/* virtual address for host ctl reg */
 
 	struct lpfc_hgp __iomem *host_gp; /* Host side get/put pointers */
+	struct lpfc_pgp   *port_gp;
 	uint32_t __iomem  *hbq_put;     /* Address in SLIM to HBQ put ptrs */
 	uint32_t          *hbq_get;     /* Host mem address of HBQ get ptrs */
 
@@ -536,6 +683,7 @@ struct lpfc_hba {
 	uint8_t soft_wwn_enable;
 
 	struct timer_list fcp_poll_timer;
+	struct timer_list eratt_poll;
 
 	/*
 	 * stat  counters
@@ -544,7 +692,9 @@ struct lpfc_hba {
 	uint64_t fc4OutputRequests;
 	uint64_t fc4ControlRequests;
 
-	struct lpfc_sysfs_mbox sysfs_mbox;
+	/* List of mailbox commands issued through sysfs */
+	struct list_head sysfs_mbox_list;
+	struct list_head sysfs_menlo_list;
 
 	/* fastpath list. */
 	spinlock_t scsi_buf_list_lock;
@@ -565,12 +715,14 @@ struct lpfc_hba {
 
 	struct fc_host_statistics link_stats;
 	enum intr_type_t intr_type;
-	struct msix_entry msix_entries[1];
+	struct msix_entry msix_entries[LPFC_MSIX_VECTORS];
+	struct lpfcdfc_host *dfc_host;
 
 	struct list_head port_list;
 	struct lpfc_vport *pport;	/* physical lpfc_vport pointer */
 	uint16_t max_vpi;		/* Maximum virtual nports */
-#define LPFC_MAX_VPI 0xFFFF		/* Max number of VPI supported */
+#define LPFC_MAX_VPI	0xFFFF		/* Max number of VPI supported */
+#define LPFC_INTR_VPI	100		/* Intermediate VPI supported */
 	unsigned long *vpi_bmask;	/* vpi allocation table */
 
 	/* Data structure used by fabric iocb scheduler */
@@ -605,6 +757,7 @@ struct lpfc_hba {
 	unsigned long last_completion_time;
 	struct timer_list hb_tmofunc;
 	uint8_t hb_outstanding;
+	enum hba_temp_state over_temp_state;
 	/* ndlp reference management */
 	spinlock_t ndlp_lock;
 	/*
@@ -613,7 +766,19 @@ struct lpfc_hba {
 	 */
 #define QUE_BUFTAG_BIT  (1<<31)
 	uint32_t buffer_tag_count;
-	enum hba_temp_state over_temp_state;
+	int wait_4_mlo_maint_flg;
+	wait_queue_head_t wait_4_mlo_m_q;
+	/* data structure used for latency data collection */
+#define LPFC_NO_BUCKET	   0
+#define LPFC_LINEAR_BUCKET 1
+#define LPFC_POWER2_BUCKET 2
+	uint8_t  bucket_type;
+	uint32_t bucket_base;
+	uint32_t bucket_step;
+
+/* Maximum number of events that can be outstanding at any time*/
+#define LPFC_MAX_EVT_COUNT 512
+	atomic_t fast_event_count;
 };
 
 static inline struct Scsi_Host *
@@ -650,15 +815,25 @@ lpfc_worker_wake_up(struct lpfc_hba *phba)
 	return;
 }
 
-#define FC_REG_DUMP_EVENT		0x10	/* Register for Dump events */
-#define FC_REG_TEMPERATURE_EVENT	0x20    /* Register for temperature
-						   event */
+static inline void
+lpfc_sli_read_hs(struct lpfc_hba *phba)
+{
+	/*
+	 * There was a link/board error. Read the status register to retrieve
+	 * the error event and process it.
+	 */
+	phba->sli.slistat.err_attn_event++;
 
-struct temp_event {
-	uint32_t event_type;
-	uint32_t event_code;
-	uint32_t data;
-};
-#define LPFC_CRIT_TEMP		0x1
-#define LPFC_THRESHOLD_TEMP	0x2
-#define LPFC_NORMAL_TEMP	0x3
+	/* Save status info */
+	phba->work_hs = readl(phba->HSregaddr);
+	phba->work_status[0] = readl(phba->MBslimaddr + 0xa8);
+	phba->work_status[1] = readl(phba->MBslimaddr + 0xac);
+
+	/* Clear chip Host Attention error bit */
+	writel(HA_ERATT, phba->HAregaddr);
+	readl(phba->HAregaddr); /* flush */
+	phba->pport->stopped = 1;
+
+	return;
+}
+

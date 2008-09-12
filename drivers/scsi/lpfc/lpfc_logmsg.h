@@ -32,6 +32,7 @@
 #define LOG_FCP_ERROR                 0x1000	/* log errors, not underruns */
 #define LOG_LIBDFC                    0x2000	/* Libdfc events */
 #define LOG_VPORT                     0x4000	/* NPIV events */
+#define LOG_SECURITY                  0x8000    /* FC Security */
 #define LOG_ALL_MSG                   0xffff	/* LOG all messages */
 
 #define lpfc_printf_vlog(vport, level, mask, fmt, arg...) \
