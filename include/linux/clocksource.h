@@ -236,4 +236,9 @@ static inline void update_vsyscall_tz(void)
 }
 #endif
 
+#ifdef CONFIG_CLOCKSOURCE_WATCHDOG
+/* typically blinks "heartbeat" LED */
+extern void (*display_heartbeat)(void);
+#endif
+
 #endif /* _LINUX_CLOCKSOURCE_H */

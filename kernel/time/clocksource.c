@@ -76,6 +76,9 @@ static DEFINE_SPINLOCK(watchdog_lock);
 static cycle_t watchdog_last;
 static unsigned long watchdog_resumed;
 
+/* arch specific heartbeat display */
+void (*display_heartbeat)(void);
+
 /*
  * Interval: 0.5sec Threshold: 0.0625s
  */
@@ -140,12 +143,17 @@ static void clocksource_watchdog(unsigned long data)
 		}
 	}
 
+	/* If arch has a heartbeat display, then poke it */
+	if (display_heartbeat)
+		display_heartbeat();
+
 	if (!list_empty(&watchdog_list)) {
 		/*
 		 * Cycle through CPUs to check if the CPUs stay
 		 * synchronized to each other.
 		 */
-		int next_cpu = next_cpu_nr(raw_smp_processor_id(), cpu_online_map);
+		int next_cpu = next_cpu_nr(raw_smp_processor_id(),
+					   cpu_online_map);
 
 		if (next_cpu >= nr_cpu_ids)
 			next_cpu = first_cpu(cpu_online_map);

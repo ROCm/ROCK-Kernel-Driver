@@ -10,6 +10,7 @@
 
 #include <linux/kernel.h>
 #include <linux/threads.h>
+#include <linux/clocksource.h>
 #include <linux/cpumask.h>
 #include <linux/string.h>
 #include <linux/kernel.h>
@@ -18,6 +19,7 @@
 #include <linux/sched.h>
 #include <linux/bootmem.h>
 #include <linux/module.h>
+#include <asm/idle.h>
 #include <asm/smp.h>
 #include <asm/ipi.h>
 #include <asm/genapic.h>
@@ -28,6 +30,8 @@
 
 DEFINE_PER_CPU(struct uv_hub_info_s, __uv_hub_info);
 EXPORT_PER_CPU_SYMBOL_GPL(__uv_hub_info);
+
+static __init void uv_start_system(void);
 
 struct uv_blade_info *uv_blade_info;
 EXPORT_SYMBOL_GPL(uv_blade_info);
@@ -293,6 +297,25 @@ static __init void uv_rtc_init(void)
 		sn_rtc_cycles_per_second = ticks_per_sec;
 }
 
+#ifdef CONFIG_CLOCKSOURCE_WATCHDOG
+static void uv_display_heartbeat(void)
+{
+	int cpu;
+
+	uv_hub_info->led_heartbeat_count = nr_cpu_ids;
+
+	for_each_online_cpu(cpu) {
+		struct uv_hub_info_s *hub = uv_cpu_hub_info(cpu);
+
+		if (hub->led_heartbeat_count > 0) {
+			uv_set_led_bits_on(cpu, LED_CPU_BLINK,
+						LED_CPU_HEARTBEAT);
+			--hub->led_heartbeat_count;
+		}
+	}
+}
+#endif
+
 static bool uv_system_inited;
 
 void __init uv_system_init(void)
@@ -371,6 +394,9 @@ void __init uv_system_init(void)
 		uv_cpu_hub_info(cpu)->gnode_upper = gnode_upper;
 		uv_cpu_hub_info(cpu)->global_mmr_base = mmr_base;
 		uv_cpu_hub_info(cpu)->coherency_domain_number = 0;/* ZZZ */
+		uv_cpu_hub_info(cpu)->led_offset = LED_LOCAL_MMR_BASE + lcpu;
+		uv_cpu_hub_info(cpu)->led_state = 0;
+		uv_cpu_hub_info(cpu)->led_heartbeat_count = nr_cpu_ids;
 		uv_node_to_blade[nid] = blade;
 		uv_cpu_to_blade[cpu] = blade;
 		max_pnode = max(pnode, max_pnode);
@@ -386,6 +412,17 @@ void __init uv_system_init(void)
 	map_config_high(max_pnode);
 	map_mmioh_high(max_pnode);
 	uv_system_inited = true;
+
+	/* enable post-smp_cpus_done processing */
+	smp_cpus_done_system = uv_start_system;
+
+#ifdef CONFIG_CLOCKSOURCE_WATCHDOG
+	/* enable heartbeat display callback */
+	display_heartbeat = uv_display_heartbeat;
+#else
+	printk(KERN_NOTICE "UV: CLOCKSOURCE_WATCHDOG not configured, "
+			   "LED Heartbeat NOT enabled\n");
+#endif
 }
 
 /*
@@ -400,4 +437,38 @@ void __cpuinit uv_cpu_init(void)
 
 	if (get_uv_system_type() == UV_NON_UNIQUE_APIC)
 		set_x2apic_extra_bits(uv_hub_info->pnode);
+}
+/*
+ * Illuminate "activity" LED when CPU is going "active",
+ * extinguish when going "idle".
+ */
+static int uv_idle(struct notifier_block *nfb, unsigned long action, void *junk)
+{
+	if (action == IDLE_START)
+		uv_set_led_bits(0, LED_CPU_ACTIVITY);
+
+	else if (action == IDLE_END)
+		uv_set_led_bits(LED_CPU_ACTIVITY, LED_CPU_ACTIVITY);
+
+	return NOTIFY_OK;
+}
+
+static struct notifier_block uv_idle_notifier = {
+	.notifier_call = uv_idle,
+};
+/*
+ * Initialize idle led callback function
+ */
+static __init void uv_init_led_idle_display(void)
+{
+	/* initialize timer for activity monitor */
+	idle_notifier_register(&uv_idle_notifier);
+}
+
+/*
+ * Initialize subsystems that need to start after the system is up
+ */
+static __init void uv_start_system(void)
+{
+	uv_init_led_idle_display();
 }
