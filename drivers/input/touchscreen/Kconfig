@@ -91,6 +91,18 @@ config TOUCHSCREEN_ELO
 	  To compile this driver as a module, choose M here: the
 	  module will be called elo.
 
+config TOUCHSCREEN_ELOUSB
+       tristate "Elo USB touchscreens"
+       select USB
+       help
+         Say Y here if you have an Elo USB touchscreen connected to
+         your system.
+
+         If unsure, say N.
+
+         To compile this driver as a module, choose M here: the
+         module will be called elousb.
+
 config TOUCHSCREEN_MTOUCH
 	tristate "MicroTouch serial touchscreens"
 	select SERIO
