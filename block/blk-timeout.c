@@ -38,7 +38,7 @@ int blk_delete_timer(struct request *req)
 
 	return 1;
 }
-EXPORT_SYMBOL_GPL(blk_delete_request);
+EXPORT_SYMBOL_GPL(blk_delete_timer);
 
 static void blk_rq_timed_out(struct request *req)
 {
