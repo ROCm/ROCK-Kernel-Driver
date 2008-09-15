@@ -348,7 +348,7 @@ static int scsifront_queuecommand(struct scsi_cmnd *sc,
 		memset(ring_req->cmnd, 0, VSCSIIF_MAX_COMMAND_SIZE);
 
 	ring_req->sc_data_direction   = (uint8_t)sc->sc_data_direction;
-	ring_req->timeout_per_command = (sc->timeout_per_command / HZ);
+	ring_req->timeout_per_command = (sc->request->timeout / HZ);
 
 	info->shadow[rqid].req_scsi_cmnd     = (unsigned long)sc;
 	info->shadow[rqid].sc_data_direction = sc->sc_data_direction;
@@ -418,7 +418,7 @@ static int scsifront_dev_reset_handler(struct scsi_cmnd *sc)
 		memset(ring_req->cmnd, 0, VSCSIIF_MAX_COMMAND_SIZE);
 
 	ring_req->sc_data_direction   = (uint8_t)sc->sc_data_direction;
-	ring_req->timeout_per_command = (sc->timeout_per_command / HZ);
+	ring_req->timeout_per_command = (sc->request->timeout / HZ);
 	ring_req->nr_segments         = 0;
 
 	scsifront_do_request(info);	
