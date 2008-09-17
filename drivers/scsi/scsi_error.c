@@ -331,7 +331,7 @@ static int scsi_check_sense(struct scsi_cmnd *scmd)
 
 	case HARDWARE_ERROR:
 		if (scmd->device->retry_hwerror)
-			return NEEDS_RETRY;
+			return ADD_TO_MLQUEUE;
 		else
 			return SUCCESS;
 
