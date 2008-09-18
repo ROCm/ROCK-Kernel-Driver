@@ -694,15 +694,13 @@ config FAULT_INJECTION_STACKTRACE_FILTER
 	depends on FAULT_INJECTION_DEBUG_FS && STACKTRACE_SUPPORT
 	depends on !X86_64
 	select STACKTRACE
-	select FRAME_POINTER if !PPC && !X86
-	select UNWIND_INFO if X86 && !FRAME_POINTER
+	select FRAME_POINTER if !PPC
 	help
 	  Provide stacktrace filter for fault-injection capabilities
 
 config LATENCYTOP
 	bool "Latency measuring infrastructure"
-	select FRAME_POINTER if !MIPS && !PPC && !X86
-	select UNWIND_INFO if X86 && !FRAME_POINTER
+	select FRAME_POINTER if !MIPS && !PPC
 	select KALLSYMS
 	select KALLSYMS_ALL
 	select STACKTRACE

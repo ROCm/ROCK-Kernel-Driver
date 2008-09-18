@@ -18,8 +18,7 @@ config TRACING
 config FTRACE
 	bool "Kernel Function Tracer"
 	depends on HAVE_FTRACE
-	select FRAME_POINTER if !X86
-	select UNWIND_INFO if X86 && !FRAME_POINTER
+	select FRAME_POINTER
 	select TRACING
 	select CONTEXT_SWITCH_TRACER
 	help
