@@ -42,6 +42,9 @@
 #include <linux/workqueue.h>
 
 #include <net/net_namespace.h>
+#ifdef CONFIG_DCBNL
+#include <net/dcbnl.h>
+#endif
 
 struct vlan_group;
 struct ethtool_ops;
@@ -749,6 +752,11 @@ struct net_device
 	/* for setting kernel sock attribute on TCP connection setup */
 #define GSO_MAX_SIZE		65536
 	unsigned int		gso_max_size;
+
+#ifdef CONFIG_DCBNL
+	/* Data Center Bridging netlink ops */
+	struct dcbnl_rtnl_ops *dcbnl_ops;
+#endif
 };
 #define to_net_dev(d) container_of(d, struct net_device, dev)
 
