@@ -2730,9 +2730,9 @@ array_state_store(mddev_t *mddev, const char *buf, size_t len)
 		break;
 	case read_auto:
 		if (mddev->pers) {
-			if (mddev->ro != 1)
+			if (mddev->ro == 0)
 				err = do_md_stop(mddev, 1, 0);
-			else
+			else if (mddev->ro == 1)
 				err = restart_array(mddev);
 			if (err == 0) {
 				mddev->ro = 2;
@@ -2948,7 +2948,13 @@ metadata_store(mddev_t *mddev, const char *buf, size_t len)
 {
 	int major, minor;
 	char *e;
-	if (!list_empty(&mddev->disks))
+	/* Changing the details of 'external' metadata is
+	 * always permitted.  Otherwise there must be
+	 * no devices attached to the array.
+	 */
+	if (mddev->external && strncmp(buf, "external:", 9) == 0)
+		;
+	else if (!list_empty(&mddev->disks))
 		return -EBUSY;
 
 	if (cmd_match(buf, "none")) {
