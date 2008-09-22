@@ -711,7 +711,7 @@ static void acpi_video_device_find_cap(struct acpi_video_device *device)
 {
 	acpi_handle h_dummy1;
 	u32 max_level = 0;
-
+	unsigned long acpi_video_support;
 
 	memset(&device->cap, 0, sizeof(device->cap));
 
@@ -739,8 +739,19 @@ static void acpi_video_device_find_cap(struct acpi_video_device *device)
 		device->cap._DSS = 1;
 	}
 
-	if (acpi_video_backlight_support())
-		max_level = acpi_video_init_brightness(device);
+	acpi_video_support = acpi_video_backlight_support();
+	if (acpi_video_support) {
+		/*
+		 * Ugly SLE11 hack to let thinkpad_acpi handle brightness on
+		 * ThinkPad IGD devices
+		 */
+		if (dmi_name_in_vendors("LENOVO") &&
+		    (acpi_video_support & ACPI_VIDEO_IGD))
+			brightness_switch_enabled = 0;
+		else
+			max_level = acpi_video_init_brightness(device);
+	} else
+		  brightness_switch_enabled = 0;
 
 	if (device->cap._BCL && device->cap._BCM && max_level > 0) {
 		int result;
