@@ -2,6 +2,8 @@
 #define _ASM_POWERPC_SECTIONS_H
 #ifdef __KERNEL__
 
+#include <linux/elf.h>
+#include <linux/uaccess.h>
 #include <asm-generic/sections.h>
 
 #ifdef __powerpc64__
@@ -16,10 +18,16 @@ static inline int in_kernel_text(unsigned long addr)
 	return 0;
 }
 
-#ifdef CONFIG_MODULES
 #undef dereference_function_descriptor
-void *dereference_function_descriptor(void *);
-#endif
+static inline void *dereference_function_descriptor(void *ptr)
+{
+	struct ppc64_opd_entry *desc = ptr;
+	void *p;
+
+	if (!probe_kernel_address(&desc->funcaddr, p))
+		ptr = p;
+	return ptr;
+}
 
 #endif
 
