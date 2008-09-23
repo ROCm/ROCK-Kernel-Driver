@@ -96,15 +96,15 @@ endef
 
 # We use internal kbuild rules to avoid the "is up to date" message from make
 arch/$(SRCARCH)/kernel/nr-irqs.s: $(srctree)/arch/$(SRCARCH)/kernel/nr-irqs.c \
-				$(wildcard $(srctree)/include/asm-ia64/*/irq.h)
+				$(wildcard $(srctree)/arch/ia64/include/asm/*/irq.h)
 	$(Q)mkdir -p $(dir $@)
 	$(call if_changed_dep,cc_s_c)
 
-include/asm-ia64/nr-irqs.h: arch/$(SRCARCH)/kernel/nr-irqs.s
+arch/ia64/include/asm/nr-irqs.h: arch/$(SRCARCH)/kernel/nr-irqs.s
 	$(Q)mkdir -p $(dir $@)
 	$(call cmd,nr_irqs)
 
-clean-files += $(objtree)/include/asm-ia64/nr-irqs.h
+clean-files += $(objtree)/arch/ia64/include/asm/nr-irqs.h
 
 #
 # native ivt.S and entry.S

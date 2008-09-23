@@ -980,8 +980,10 @@ define check-symlink
 	set -e;                                                            \
 	if [ -L include/asm ]; then                                        \
 		asmlink=`readlink include/asm | cut -d '-' -f 2`;          \
-		if [ "$$asmlink" != "$(SRCARCH)" ]; then                   \
-			echo "ERROR: the symlink $@ points to asm-$$asmlink but asm-$(SRCARCH) was expected"; \
+		archlink=`readlink include/asm | cut -d '/' -f 3`;         \
+		if [ "$$asmlink" != "$(SRCARCH)" -a			   \
+		     "$$archlink" != "$(SRCARCH)" ]; then                  \
+			echo "ERROR: the symlink $@ points to asm-$$asmlink but asm-$(SRCARCH) or ../arch/$(SRCARCH)/include/asm was expected"; \
 			echo "       set ARCH or save .config and run 'make mrproper' to fix it";             \
 			exit 1;                                            \
 		fi;                                                        \
@@ -992,12 +994,17 @@ endef
 # not exist so the test in chack-symlink works and we have a
 # directory for generated filesas used by some architectures.
 define create-symlink
-	if [ ! -L include/asm ]; then                                      \
-			echo '  SYMLINK $@ -> include/asm-$(SRCARCH)';     \
-			if [ ! -d include/asm-$(SRCARCH) ]; then           \
-				mkdir -p include/asm-$(SRCARCH);           \
-			fi;                                                \
-			ln -fsn asm-$(SRCARCH) $@;                         \
+	if [ ! -L include/asm ]; then					    \
+		if [ -d arch/$(SRCARCH)/include/asm ]; then		    \
+			echo '  SYMLINK $@ -> arch/$(SRCARCH)/include/asm'; \
+			ln -fsn ../arch/$(SRCARCH)/include/asm $@;	    \
+		else							    \
+			echo '  SYMLINK $@ -> include/asm-$(SRCARCH)';	    \
+			if [ ! -d include/asm-$(SRCARCH) ]; then	    \
+				mkdir -p include/asm-$(SRCARCH);	    \
+			fi;						    \
+			ln -fsn asm-$(SRCARCH) $@;			    \
+		fi;							    \
 	fi
 endef
 
