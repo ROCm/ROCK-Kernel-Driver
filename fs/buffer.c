@@ -3338,11 +3338,23 @@ void __init buffer_init(void)
 				SLAB_MEM_SPREAD),
 				init_buffer_head);
 
+#ifdef CONFIG_PAGE_STATES
+	/*
+	 * If volatile page cache is enabled we want to get as many
+	 * pages into volatile state as possible. Pages with private
+	 * information cannot be made stable. Set max_buffer_heads
+	 * to zero to make shrink_active_list to release the private
+	 * information when moving page from the active to the inactive
+	 * list.
+	 */
+	max_buffer_heads = 0;
+#else
 	/*
 	 * Limit the bh occupancy to 10% of ZONE_NORMAL
 	 */
 	nrpages = (nr_free_buffer_pages() * 10) / 100;
 	max_buffer_heads = nrpages * (PAGE_SIZE / sizeof(struct buffer_head));
+#endif
 	hotcpu_notifier(buffer_cpu_notify, 0);
 }
 

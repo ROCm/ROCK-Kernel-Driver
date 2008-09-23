@@ -39,6 +39,7 @@
 #include <linux/freezer.h>
 #include <linux/memcontrol.h>
 #include <linux/delayacct.h>
+#include <linux/page-states.h>
 
 #include <asm/tlbflush.h>
 #include <asm/div64.h>
@@ -503,6 +504,9 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 
 		sc->nr_scanned++;
 
+		if (unlikely(PageDiscarded(page)))
+			goto free_it;
+
 		if (!sc->may_swap && page_mapped(page))
 			goto keep_locked;
 
@@ -925,13 +929,20 @@ static unsigned long shrink_inactive_list(unsigned long max_scan,
 		 */
 		while (!list_empty(&page_list)) {
 			page = lru_to_page(&page_list);
-			VM_BUG_ON(PageLRU(page));
-			SetPageLRU(page);
 			list_del(&page->lru);
-			if (PageActive(page))
-				add_page_to_active_list(zone, page);
-			else
-				add_page_to_inactive_list(zone, page);
+			/*
+			 * Only readd the page to lru list if it has not
+			 * been discarded.
+			 */
+			if (likely(!PageDiscarded(page))) {
+				VM_BUG_ON(PageLRU(page));
+				SetPageLRU(page);
+				if (PageActive(page))
+					add_page_to_active_list(zone, page);
+				else
+					add_page_to_inactive_list(zone, page);
+			} else
+				ClearPageActive(page);
 			if (!pagevec_add(&pvec, page)) {
 				spin_unlock_irq(&zone->lru_lock);
 				__pagevec_release(&pvec);
@@ -1144,14 +1155,23 @@ static void shrink_active_list(unsigned long nr_pages, struct zone *zone,
 	while (!list_empty(&l_inactive)) {
 		page = lru_to_page(&l_inactive);
 		prefetchw_prev_lru_page(page, &l_inactive, flags);
-		VM_BUG_ON(PageLRU(page));
-		SetPageLRU(page);
-		VM_BUG_ON(!PageActive(page));
-		ClearPageActive(page);
+		/*
+		 * Only readd the page to lru list if it has not
+		 * been discarded.
+		 */
+		if (likely(!PageDiscarded(page))) {
+			VM_BUG_ON(PageLRU(page));
+			SetPageLRU(page);
+			VM_BUG_ON(!PageActive(page));
+			ClearPageActive(page);
+			list_move(&page->lru, &zone->inactive_list);
+			mem_cgroup_move_lists(page, false);
+			pgmoved++;
+		} else {
+			ClearPageActive(page);
+			list_del(&page->lru);
+		}
 
-		list_move(&page->lru, &zone->inactive_list);
-		mem_cgroup_move_lists(page, false);
-		pgmoved++;
 		if (!pagevec_add(&pvec, page)) {
 			__mod_zone_page_state(zone, NR_INACTIVE, pgmoved);
 			spin_unlock_irq(&zone->lru_lock);
@@ -1159,6 +1179,7 @@ static void shrink_active_list(unsigned long nr_pages, struct zone *zone,
 			pgmoved = 0;
 			if (buffer_heads_over_limit)
 				pagevec_strip(&pvec);
+			pagevec_make_volatile(&pvec);
 			__pagevec_release(&pvec);
 			spin_lock_irq(&zone->lru_lock);
 		}
@@ -1168,6 +1189,7 @@ static void shrink_active_list(unsigned long nr_pages, struct zone *zone,
 	if (buffer_heads_over_limit) {
 		spin_unlock_irq(&zone->lru_lock);
 		pagevec_strip(&pvec);
+		pagevec_make_volatile(&pvec);
 		spin_lock_irq(&zone->lru_lock);
 	}
 
@@ -1175,13 +1197,22 @@ static void shrink_active_list(unsigned long nr_pages, struct zone *zone,
 	while (!list_empty(&l_active)) {
 		page = lru_to_page(&l_active);
 		prefetchw_prev_lru_page(page, &l_active, flags);
-		VM_BUG_ON(PageLRU(page));
-		SetPageLRU(page);
-		VM_BUG_ON(!PageActive(page));
+		/*
+		 * Only readd the page to lru list if it has not
+		 * been discarded.
+		 */
+		if (likely(!PageDiscarded(page))) {
+			VM_BUG_ON(PageLRU(page));
+			SetPageLRU(page);
+			VM_BUG_ON(!PageActive(page));
+			list_move(&page->lru, &zone->active_list);
+			mem_cgroup_move_lists(page, true);
+			pgmoved++;
+		} else {
+			ClearPageActive(page);
+			list_del(&page->lru);
+		}
 
-		list_move(&page->lru, &zone->active_list);
-		mem_cgroup_move_lists(page, true);
-		pgmoved++;
 		if (!pagevec_add(&pvec, page)) {
 			__mod_zone_page_state(zone, NR_ACTIVE, pgmoved);
 			pgmoved = 0;

@@ -16,6 +16,7 @@
 #include <linux/module.h>
 #include <linux/syscalls.h>
 #include <linux/mmu_notifier.h>
+#include <linux/page-states.h>
 
 #include <asm/mmu_context.h>
 #include <asm/cacheflush.h>

@@ -125,6 +125,9 @@ enum pageflags {
 
 #ifndef __GENERATING_BOUNDS_H
 
+#define PG_discarded		20	/* Page discarded by the hypervisor. */
+#define PG_writable		21	/* Page is mapped writable. */
+
 /*
  * Macros to create function definitions for page flags
  */
@@ -169,6 +172,22 @@ static inline int Page##uname(struct page *page) 			\
 
 #define TESTSCFLAG(uname, lname)					\
 	TESTSETFLAG(uname, lname) TESTCLEARFLAG(uname, lname)
+
+#ifdef CONFIG_PAGE_STATES
+#define PageDiscarded(page)	test_bit(PG_discarded, &(page)->flags)
+#define ClearPageDiscarded(page) clear_bit(PG_discarded, &(page)->flags)
+#define TestSetPageDiscarded(page) \
+		test_and_set_bit(PG_discarded, &(page)->flags)
+#else
+#define PageDiscarded(page)		0
+#define ClearPageDiscarded(page)	do { } while (0)
+#define TestSetPageDiscarded(page)	0
+#endif
+
+#define PageWritable(page) test_bit(PG_writable, &(page)->flags)
+#define TestSetPageWritable(page) \
+		test_and_set_bit(PG_writable, &(page)->flags)
+#define ClearPageWritable(page) clear_bit(PG_writable, &(page)->flags)
 
 struct page;	/* forward declaration */
 
@@ -375,7 +394,8 @@ static inline void __ClearPageTail(struct page *page)
  * Flags checked in bad_page().  Pages on the free list should not have
  * these flags set.  It they are, there is a problem.
  */
-#define PAGE_FLAGS_CLEAR_WHEN_BAD (PAGE_FLAGS | 1 << PG_reclaim | 1 << PG_dirty)
+#define PAGE_FLAGS_CLEAR_WHEN_BAD (PAGE_FLAGS | 1 << PG_reclaim | \
+				   1 << PG_dirty | 1 << PG_discarded )
 
 /*
  * Flags checked when a page is freed.  Pages being freed should not have

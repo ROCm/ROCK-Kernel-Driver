@@ -13,6 +13,7 @@
 #include <linux/gfp.h>
 #include <linux/bitops.h>
 #include <linux/hardirq.h> /* for in_interrupt() */
+#include <linux/page-states.h>
 
 /*
  * Bits in mapping->flags.  The lower __GFP_BITS_SHIFT bits are the page
@@ -61,7 +62,18 @@ static inline void mapping_set_gfp_mask(struct address_space *m, gfp_t mask)
 #define PAGE_CACHE_ALIGN(addr)	(((addr)+PAGE_CACHE_SIZE-1)&PAGE_CACHE_MASK)
 
 #define page_cache_get(page)		get_page(page)
+#ifdef CONFIG_PAGE_STATES
+extern struct page * find_get_page_nodiscard(struct address_space *mapping,
+					     unsigned long index);
+extern struct page * find_lock_page_nodiscard(struct address_space *mapping,
+					      unsigned long index);
+#define page_cache_release(page)	put_page_check(page)
+#else
+#define find_get_page_nodiscard(mapping, index) find_get_page(mapping, index)
+#define find_lock_page_nodiscard(mapping, index) find_lock_page(mapping, index)
 #define page_cache_release(page)	put_page(page)
+#endif
+#define page_cache_release_nocheck(page)	put_page(page)
 void release_pages(struct page **pages, int nr, int cold);
 
 /*
@@ -407,6 +419,7 @@ int add_to_page_cache_lru(struct page *page, struct address_space *mapping,
 				pgoff_t index, gfp_t gfp_mask);
 extern void remove_from_page_cache(struct page *page);
 extern void __remove_from_page_cache(struct page *page);
+extern void __remove_from_page_cache_nocheck(struct page *page);
 
 /*
  * Like add_to_page_cache_locked, but used to add newly allocated pages:

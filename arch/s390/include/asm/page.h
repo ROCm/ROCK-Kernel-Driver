@@ -125,17 +125,6 @@ page_get_storage_key(unsigned long addr)
 	return skey;
 }
 
-#ifdef CONFIG_PAGE_STATES
-
-struct page;
-void arch_free_page(struct page *page, int order);
-void arch_alloc_page(struct page *page, int order);
-
-#define HAVE_ARCH_FREE_PAGE
-#define HAVE_ARCH_ALLOC_PAGE
-
-#endif
-
 #endif /* !__ASSEMBLY__ */
 
 #define __PAGE_OFFSET           0x0UL

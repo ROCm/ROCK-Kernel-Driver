@@ -32,6 +32,7 @@
 #include <linux/clocksource.h>
 #include <linux/clockchips.h>
 #include <linux/bootmem.h>
+#include <linux/page-states.h>
 #include <asm/uaccess.h>
 #include <asm/delay.h>
 #include <asm/s390_ext.h>
@@ -169,6 +170,9 @@ void init_cpu_timer(void)
 
 static void clock_comparator_interrupt(__u16 code)
 {
+#ifdef CONFIG_PAGE_STATES
+	page_shrink_discard_list();
+#endif
 }
 
 static void etr_timing_alert(struct etr_irq_parm *);
@@ -257,6 +261,10 @@ void __init time_init(void)
 
 #ifdef CONFIG_VIRT_TIMER
 	vtime_init();
+#endif
+
+#ifdef CONFIG_PAGE_STATES
+	page_discard_init();
 #endif
 }
 

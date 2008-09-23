@@ -52,6 +52,7 @@
 #include <linux/writeback.h>
 #include <linux/memcontrol.h>
 #include <linux/mmu_notifier.h>
+#include <linux/page-states.h>
 
 #include <asm/pgalloc.h>
 #include <asm/uaccess.h>
@@ -557,6 +558,8 @@ copy_one_pte(struct mm_struct *dst_mm, struct mm_struct *src_mm,
 
 	page = vm_normal_page(vma, addr, pte);
 	if (page) {
+		if (unlikely(PageDiscarded(page)))
+			goto out_discard_pte;
 		get_page(page);
 		page_dup_rmap(page, vma, addr);
 		rss[!!PageAnon(page)]++;
@@ -564,6 +567,32 @@ copy_one_pte(struct mm_struct *dst_mm, struct mm_struct *src_mm,
 
 out_set_pte:
 	set_pte_at(dst_mm, addr, dst_pte, pte);
+	return;
+
+out_discard_pte:
+	/*
+	 * If the page referred by the pte has the PG_discarded bit set,
+	 * copy_one_pte is racing with page_discard. The pte may not be
+	 * copied or we can end up with a pte pointing to a page not
+	 * in page cache anymore. Do what try_to_unmap_one would do
+	 * if the copy_one_pte had taken place before page_discard.
+	 */
+	if (PageAnon(page)) {
+		swp_entry_t entry = { .val = page_private(page) };
+		swap_duplicate(entry);
+		if (list_empty(&dst_mm->mmlist)) {
+			spin_lock(&mmlist_lock);
+			if (list_empty(&dst_mm->mmlist))
+				list_add(&dst_mm->mmlist, &init_mm.mmlist);
+			spin_unlock(&mmlist_lock);
+		}
+		pte = swp_entry_to_pte(entry);
+		set_pte_at(dst_mm, addr, dst_pte, pte);
+	} else if (page->index != linear_page_index(vma, addr))
+		/* If nonlinear, store the file page offset in the pte. */
+		set_pte_at(dst_mm, addr, dst_pte, pgoff_to_pte(page->index));
+	else
+		pte_clear(dst_mm, addr, dst_pte);
 }
 
 static int copy_pte_range(struct mm_struct *dst_mm, struct mm_struct *src_mm,
@@ -1097,6 +1126,20 @@ struct page *follow_page(struct vm_area_struct *vma, unsigned long address,
 
 	if (flags & FOLL_GET)
 		get_page(page);
+
+	if ((flags & FOLL_GET) || (vma->vm_flags & VM_LOCKED)) {
+		/*
+		 * The page is made stable if a reference is acquired or
+		 * the vm area is locked.
+		 * If the caller does not get a reference it implies that
+		 * the caller can deal with page faults in case the page
+		 * is swapped out. In this case the caller can deal with
+		 * discard faults as well.
+		 */
+		if (unlikely(!page_make_stable(page)))
+			goto out_discard;
+	}
+
 	if (flags & FOLL_TOUCH) {
 		if ((flags & FOLL_WRITE) &&
 		    !pte_dirty(pte) && !PageDirty(page))
@@ -1129,6 +1172,11 @@ no_page_table:
 		BUG_ON(flags & FOLL_WRITE);
 	}
 	return page;
+
+out_discard:
+	pte_unmap_unlock(ptep, ptl);
+	page_discard(page);
+	return NULL;
 }
 
 /* Can we do the FOLL_ANON optimization? */
@@ -1872,6 +1920,11 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct *vma,
 		dirty_page = old_page;
 		get_page(dirty_page);
 		reuse = 1;
+		/*
+		 * dirty_page will be set dirty, so it needs to be stable.
+		 */
+		if (unlikely(!page_make_stable(dirty_page)))
+			goto discard;
 	}
 
 	if (reuse) {
@@ -1889,6 +1942,12 @@ reuse:
 	 * Ok, we need to copy. Oh, well..
 	 */
 	page_cache_get(old_page);
+	/*
+	 * To copy the content of old_page it needs to be stable.
+	 * page_cache_release on old_page will make it volatile again.
+	 */
+	if (unlikely(!page_make_stable(old_page)))
+		goto discard;
 gotten:
 	pte_unmap_unlock(page_table, ptl);
 
@@ -1919,6 +1978,7 @@ gotten:
 		flush_cache_page(vma, address, pte_pfn(orig_pte));
 		entry = mk_pte(new_page, vma->vm_page_prot);
 		entry = maybe_mkwrite(pte_mkdirty(entry), vma);
+		page_check_writable(new_page, entry, 2);
 		/*
 		 * Clear the pte entry and flush it first, before updating the
 		 * pte with the new entry. This will avoid a race condition
@@ -1996,6 +2056,10 @@ oom:
 unwritable_page:
 	page_cache_release(old_page);
 	return VM_FAULT_SIGBUS;
+discard:
+	pte_unmap_unlock(page_table, ptl);
+	page_discard(old_page);
+	return VM_FAULT_MINOR;
 }
 
 /*
@@ -2342,7 +2406,7 @@ static int do_swap_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	 * Back out if somebody else already faulted in this pte.
 	 */
 	page_table = pte_offset_map_lock(mm, pmd, address, &ptl);
-	if (unlikely(!pte_same(*page_table, orig_pte)))
+	if (unlikely(!pte_same(*page_table, orig_pte) || PageDiscarded(page)))
 		goto out_nomap;
 
 	if (unlikely(!PageUptodate(page))) {
@@ -2360,6 +2424,7 @@ static int do_swap_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	}
 
 	flush_icache_page(vma, page);
+	page_check_writable(page, pte, 2);
 	set_pte_at(mm, address, page_table, pte);
 	page_add_anon_rmap(page, vma, address);
 
@@ -2417,6 +2482,7 @@ static int do_anonymous_page(struct mm_struct *mm, struct vm_area_struct *vma,
 
 	entry = mk_pte(page, vma->vm_page_prot);
 	entry = maybe_mkwrite(pte_mkdirty(entry), vma);
+	page_check_writable(page, entry, 2);
 
 	page_table = pte_offset_map_lock(mm, pmd, address, &ptl);
 	if (!pte_none(*page_table))
@@ -2473,6 +2539,7 @@ static int __do_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 	vmf.flags = flags;
 	vmf.page = NULL;
 
+retry:
 	ret = vma->vm_ops->fault(vma, &vmf);
 	if (unlikely(ret & (VM_FAULT_ERROR | VM_FAULT_NOPAGE)))
 		return ret;
@@ -2496,6 +2563,11 @@ static int __do_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 			if (unlikely(anon_vma_prepare(vma))) {
 				ret = VM_FAULT_OOM;
 				goto out;
+			}
+			if (unlikely(!page_make_stable(vmf.page))) {
+				unlock_page(vmf.page);
+				page_discard(vmf.page);
+				goto retry;
 			}
 			page = alloc_page_vma(GFP_HIGHUSER_MOVABLE,
 						vma, address);
@@ -2555,11 +2627,12 @@ static int __do_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 	 * handle that later.
 	 */
 	/* Only go through if we didn't race with anybody else... */
-	if (likely(pte_same(*page_table, orig_pte))) {
+	if (likely(pte_same(*page_table, orig_pte) && !PageDiscarded(page))) {
 		flush_icache_page(vma, page);
 		entry = mk_pte(page, vma->vm_page_prot);
 		if (flags & FAULT_FLAG_WRITE)
 			entry = maybe_mkwrite(pte_mkdirty(entry), vma);
+		page_check_writable(page, entry, 2);
 		set_pte_at(mm, address, page_table, entry);
 		if (anon) {
                         inc_mm_counter(mm, anon_rss);

@@ -32,6 +32,7 @@
 #include <linux/capability.h>
 #include <linux/syscalls.h>
 #include <linux/memcontrol.h>
+#include <linux/page-states.h>
 
 #include <asm/pgtable.h>
 #include <asm/tlbflush.h>
@@ -375,9 +376,11 @@ int remove_exclusive_swap_page(struct page *page)
 		/* Recheck the page count with the swapcache lock held.. */
 		spin_lock_irq(&swapper_space.tree_lock);
 		if ((page_count(page) == 2) && !PageWriteback(page)) {
-			__delete_from_swap_cache(page);
-			SetPageDirty(page);
-			retval = 1;
+			if (likely(page_make_stable(page))) {
+				__delete_from_swap_cache(page);
+				SetPageDirty(page);
+				retval = 1;
+			}
 		}
 		spin_unlock_irq(&swapper_space.tree_lock);
 	}
@@ -406,7 +409,13 @@ void free_swap_and_cache(swp_entry_t entry)
 	p = swap_info_get(entry);
 	if (p) {
 		if (swap_entry_free(p, swp_offset(entry)) == 1) {
-			page = find_get_page(&swapper_space, entry.val);
+			/*
+			 * Use find_get_page_nodiscard to avoid the deadlock
+			 * on the swap_lock and the page table lock if the
+			 * page has been discarded.
+			 */
+			page = find_get_page_nodiscard(&swapper_space,
+						       entry.val);
 			if (page && unlikely(!trylock_page(page))) {
 				page_cache_release(page);
 				page = NULL;
@@ -423,8 +432,17 @@ void free_swap_and_cache(swp_entry_t entry)
 		/* Also recheck PageSwapCache after page is locked (above) */
 		if (PageSwapCache(page) && !PageWriteback(page) &&
 					(one_user || vm_swap_full())) {
-			delete_from_swap_cache(page);
-			SetPageDirty(page);
+			/*
+			 * To be able to reload the page from swap the
+			 * swap slot may not be freed. The caller of
+			 * free_swap_and_cache holds a page table lock
+			 * for this page. The discarded page can not be
+			 * removed here.
+			 */
+			if (likely(page_make_stable(page))) {
+				delete_from_swap_cache(page);
+				SetPageDirty(page);
+			}
 		}
 		unlock_page(page);
 		page_cache_release(page);

@@ -611,4 +611,5 @@ void __init pfault_irq_init(void)
 	unregister_early_external_interrupt(0x2603, pfault_interrupt,
 					    &ext_int_pfault);
 }
+
 #endif

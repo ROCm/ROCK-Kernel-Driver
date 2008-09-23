@@ -543,6 +543,9 @@ struct address_space {
 	unsigned long		flags;		/* error bits/gfp mask */
 	struct backing_dev_info *backing_dev_info; /* device readahead, etc */
 	spinlock_t		private_lock;	/* for use by the address_space */
+#ifdef CONFIG_PAGE_STATES
+	unsigned int		mlocked;	/* set if VM_LOCKED vmas present */
+#endif
 	struct list_head	private_list;	/* ditto */
 	struct address_space	*assoc_mapping;	/* ditto */
 } __attribute__((aligned(sizeof(long))));
@@ -551,6 +554,13 @@ struct address_space {
 	 * must be enforced here for CRIS, to let the least signficant bit
 	 * of struct page's "mapping" pointer be used for PAGE_MAPPING_ANON.
 	 */
+
+static inline void mapping_set_mlocked(struct address_space *mapping)
+{
+#ifdef CONFIG_PAGE_STATES
+	mapping->mlocked = 1;
+#endif
+}
 
 struct block_device {
 	dev_t			bd_dev;  /* not a kdev_t - it's a search key */

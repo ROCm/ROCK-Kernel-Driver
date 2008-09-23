@@ -50,6 +50,7 @@
 #include <linux/kallsyms.h>
 #include <linux/memcontrol.h>
 #include <linux/mmu_notifier.h>
+#include <linux/page-states.h>
 
 #include <asm/tlbflush.h>
 
@@ -252,13 +253,25 @@ pte_t *page_check_address(struct page *page, struct mm_struct *mm,
 		return NULL;
 
 	pte = pte_offset_map(pmd, address);
+	ptl = pte_lockptr(mm, pmd);
 	/* Make a quick check before getting the lock */
+#ifndef CONFIG_PAGE_STATES
+	/*
+	 * If the page table lock for this pte is taken we have to
+	 * assume that someone might be mapping the page. To solve
+	 * the race of a page discard vs. mapping the page we have
+	 * to serialize the two operations by taking the lock,
+	 * otherwise we end up with a pte for a page that has been
+	 * removed from page cache by the discard fault handler.
+	 * So for CONFIG_PAGE_STATES=yes the !pte_present optimization
+	 * need to be deactivated.
+	 */
 	if (!sync && !pte_present(*pte)) {
 		pte_unmap(pte);
 		return NULL;
 	}
+#endif
 
-	ptl = pte_lockptr(mm, pmd);
 	spin_lock(ptl);
 	if (pte_present(*pte) && page_to_pfn(page) == pte_pfn(*pte)) {
 		*ptlp = ptl;
@@ -671,6 +684,15 @@ void page_remove_rmap(struct page *page, struct vm_area_struct *vma)
 		 */
 		if ((!PageAnon(page) || PageSwapCache(page)) &&
 		    page_test_dirty(page)) {
+			int stable = page_make_stable(page);
+			VM_BUG_ON(!stable);
+			/*
+			 * We decremented the mapcount so we now have an
+			 * extra reference for the page. That prevents
+			 * page_make_volatile from making the page
+			 * volatile again while the dirty bit is in
+			 * transit.
+			 */
 			page_clear_dirty(page);
 			set_page_dirty(page);
 		}
@@ -678,6 +700,7 @@ void page_remove_rmap(struct page *page, struct vm_area_struct *vma)
 		mem_cgroup_uncharge_page(page);
 		__dec_zone_page_state(page,
 			PageAnon(page) ? NR_ANON_PAGES : NR_FILE_MAPPED);
+		page_reset_writable(page);
 		/*
 		 * It would be tidy to reset the PageAnon mapping here,
 		 * but that might overwrite a racing page_add_anon_rmap
@@ -695,18 +718,13 @@ void page_remove_rmap(struct page *page, struct vm_area_struct *vma)
  * repeatedly from either try_to_unmap_anon or try_to_unmap_file.
  */
 static int try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
-				int migration)
+				unsigned long address, int migration)
 {
 	struct mm_struct *mm = vma->vm_mm;
-	unsigned long address;
 	pte_t *pte;
 	pte_t pteval;
 	spinlock_t *ptl;
 	int ret = SWAP_AGAIN;
-
-	address = vma_address(page, vma);
-	if (address == -EFAULT)
-		goto out;
 
 	pte = page_check_address(page, mm, address, &ptl, 0);
 	if (!pte)
@@ -719,8 +737,17 @@ static int try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
 	 */
 	if (!migration && ((vma->vm_flags & VM_LOCKED) ||
 			(ptep_clear_flush_young_notify(vma, address, pte)))) {
-		ret = SWAP_FAIL;
-		goto out_unmap;
+		/*
+		 * Check for discarded pages. This can happen if there have
+		 * been discarded pages before a vma gets mlocked. The code
+		 * in make_pages_present will force all discarded pages out
+		 * and reload them. That happens after the VM_LOCKED bit
+		 * has been set.
+		 */
+		if (likely(!PageDiscarded(page))) {
+			ret = SWAP_FAIL;
+			goto out_unmap;
+		}
 	}
 
 	/* Nuke the page table entry. */
@@ -772,11 +799,17 @@ static int try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
 		set_pte_at(mm, address, pte, swp_entry_to_pte(entry));
 	} else
 #endif
+	{
+#ifdef CONFIG_PAGE_STATES
+		/* If nonlinear, store the file page offset in the pte. */
+		if (page->index != linear_page_index(vma, address))
+			set_pte_at(mm, address, pte, pgoff_to_pte(page->index));
+#endif
 		dec_mm_counter(mm, file_rss);
-
+	}
 
 	page_remove_rmap(page, vma);
-	page_cache_release(page);
+	page_cache_release_nocheck(page);
 
 out_unmap:
 	pte_unmap_unlock(pte, ptl);
@@ -877,6 +910,7 @@ static int try_to_unmap_anon(struct page *page, int migration)
 {
 	struct anon_vma *anon_vma;
 	struct vm_area_struct *vma;
+	unsigned long address;
 	int ret = SWAP_AGAIN;
 
 	anon_vma = page_lock_anon_vma(page);
@@ -884,7 +918,10 @@ static int try_to_unmap_anon(struct page *page, int migration)
 		return ret;
 
 	list_for_each_entry(vma, &anon_vma->head, anon_vma_node) {
-		ret = try_to_unmap_one(page, vma, migration);
+		address = vma_address(page, vma);
+		if (address == -EFAULT)
+			continue;
+		ret = try_to_unmap_one(page, vma, address, migration);
 		if (ret == SWAP_FAIL || !page_mapped(page))
 			break;
 	}
@@ -910,6 +947,7 @@ static int try_to_unmap_file(struct page *page, int migration)
 	struct vm_area_struct *vma;
 	struct prio_tree_iter iter;
 	int ret = SWAP_AGAIN;
+	unsigned long address;
 	unsigned long cursor;
 	unsigned long max_nl_cursor = 0;
 	unsigned long max_nl_size = 0;
@@ -917,7 +955,10 @@ static int try_to_unmap_file(struct page *page, int migration)
 
 	spin_lock(&mapping->i_mmap_lock);
 	vma_prio_tree_foreach(vma, &iter, &mapping->i_mmap, pgoff, pgoff) {
-		ret = try_to_unmap_one(page, vma, migration);
+		address = vma_address(page, vma);
+		if (address == -EFAULT)
+			continue;
+		ret = try_to_unmap_one(page, vma, address, migration);
 		if (ret == SWAP_FAIL || !page_mapped(page))
 			goto out;
 	}
@@ -1019,3 +1060,96 @@ int try_to_unmap(struct page *page, int migration)
 	return ret;
 }
 
+#ifdef CONFIG_PAGE_STATES
+
+/**
+ * page_unmap_file - removes all mappings of a file page
+ *
+ * @page: the page which mapping in the vma should be struck down
+ *
+ * the caller needs to hold page lock
+ */
+static void page_unmap_file(struct page* page)
+{
+	struct address_space *mapping = page_mapping(page);
+	pgoff_t pgoff = page->index << (PAGE_CACHE_SHIFT - PAGE_SHIFT);
+	struct vm_area_struct *vma;
+	struct prio_tree_iter iter;
+	unsigned long address;
+	int rc;
+
+	spin_lock(&mapping->i_mmap_lock);
+	vma_prio_tree_foreach(vma, &iter, &mapping->i_mmap, pgoff, pgoff) {
+		address = vma_address(page, vma);
+		if (address == -EFAULT)
+			continue;
+		rc = try_to_unmap_one(page, vma, address, 0);
+		VM_BUG_ON(rc == SWAP_FAIL);
+	}
+
+	if (list_empty(&mapping->i_mmap_nonlinear))
+		goto out;
+
+	/*
+	 * Remove the non-linear mappings of the page. This is
+	 * awfully slow, but we have to find that discarded page..
+	 */
+	list_for_each_entry(vma, &mapping->i_mmap_nonlinear,
+			    shared.vm_set.list) {
+		address = vma->vm_start;
+		while (address < vma->vm_end) {
+			rc = try_to_unmap_one(page, vma, address, 0);
+			VM_BUG_ON(rc == SWAP_FAIL);
+			address += PAGE_SIZE;
+		}
+	}
+
+out:
+	spin_unlock(&mapping->i_mmap_lock);
+}
+
+/**
+ * page_unmap_anon - removes all mappings of an anonymous page
+ *
+ * @page: the page which mapping in the vma should be struck down
+ *
+ * the caller needs to hold page lock
+ */
+static void page_unmap_anon(struct page* page)
+{
+	struct anon_vma *anon_vma;
+	struct vm_area_struct *vma;
+	unsigned long address;
+	int rc;
+
+	anon_vma = page_lock_anon_vma(page);
+	if (!anon_vma)
+		return;
+	list_for_each_entry(vma, &anon_vma->head, anon_vma_node) {
+		address = vma_address(page, vma);
+		if (address == -EFAULT)
+			continue;
+		rc = try_to_unmap_one(page, vma, address, 0);
+		VM_BUG_ON(rc == SWAP_FAIL);
+	}
+	page_unlock_anon_vma(anon_vma);
+}
+
+/**
+ * page_unmap_all - removes all mappings of a page
+ *
+ * @page: the page which mapping in the vma should be struck down
+ *
+ * the caller needs to hold page lock
+ */
+void page_unmap_all(struct page *page)
+{
+	VM_BUG_ON(!PageLocked(page) || PageReserved(page));
+
+	if (PageAnon(page))
+		page_unmap_anon(page);
+	else
+		page_unmap_file(page);
+}
+
+#endif

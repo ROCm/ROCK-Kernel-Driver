@@ -33,6 +33,7 @@
 #include <linux/cpuset.h>
 #include <linux/hardirq.h> /* for BUG_ON(!in_atomic()) only */
 #include <linux/memcontrol.h>
+#include <linux/page-states.h>
 #include "internal.h"
 
 /*
@@ -111,7 +112,7 @@
  * sure the page is locked and that nobody else uses it - or that usage
  * is safe.  The caller must hold the mapping's tree_lock.
  */
-void __remove_from_page_cache(struct page *page)
+void inline __remove_from_page_cache_nocheck(struct page *page)
 {
 	struct address_space *mapping = page->mapping;
 
@@ -135,6 +136,28 @@ void __remove_from_page_cache(struct page *page)
 	}
 }
 EXPORT_SYMBOL_GPL(__remove_from_page_cache);
+
+void __remove_from_page_cache(struct page *page)
+{
+	/*
+	 * Check if the discard fault handler already removed
+	 * the page from the page cache. If not set the discard
+	 * bit in the page flags to prevent double page free if
+	 * a discard fault is racing with normal page free.
+	 */
+	if (TestSetPageDiscarded(page))
+		return;
+
+	__remove_from_page_cache_nocheck(page);
+
+	/*
+	 * Check the hardware page state and clear the discard
+	 * bit in the page flags only if the page is not
+	 * discarded.
+	 */
+	if (!page_discarded(page))
+		ClearPageDiscarded(page);
+}
 
 void remove_from_page_cache(struct page *page)
 {
@@ -519,6 +542,66 @@ static int __sleep_on_page_lock(void *word)
 	return 0;
 }
 
+#ifdef CONFIG_PAGE_STATES
+
+struct page * find_get_page_nodiscard(struct address_space *mapping,
+				      unsigned long offset)
+{
+	void **pagep;
+	struct page *page;
+
+	rcu_read_lock();
+repeat:
+	page = NULL;
+	pagep = radix_tree_lookup_slot(&mapping->page_tree, offset);
+	if (pagep) {
+		page = radix_tree_deref_slot(pagep);
+		if (unlikely(!page || page == RADIX_TREE_RETRY))
+			goto repeat;
+
+		if (!page_cache_get_speculative(page))
+			goto repeat;
+
+		/*
+		 * Has the page moved?
+		 * This is part of the lockless pagecache protocol. See
+		 * include/linux/pagemap.h for details.
+		 */
+		if (unlikely(page != *pagep)) {
+			page_cache_release(page);
+			goto repeat;
+		}
+	}
+	rcu_read_unlock();
+
+	return page;
+}
+
+EXPORT_SYMBOL(find_get_page_nodiscard);
+
+struct page *find_lock_page_nodiscard(struct address_space *mapping,
+				      unsigned long offset)
+{
+	struct page *page;
+
+repeat:
+	page = find_get_page_nodiscard(mapping, offset);
+	if (page) {
+		lock_page(page);
+		/* Has the page been truncated? */
+		if (unlikely(page->mapping != mapping)) {
+			unlock_page(page);
+			page_cache_release(page);
+			goto repeat;
+		}
+		VM_BUG_ON(page->index != offset);
+	}
+	return page;
+}
+EXPORT_SYMBOL(find_lock_page_nodiscard);
+
+#endif
+
 /*
  * In order to wait for pages to become available there must be
  * waitqueues associated with pages. By using a hash table of
@@ -571,6 +654,7 @@ void unlock_page(struct page *page)
 	if (!test_and_clear_bit(PG_locked, &page->flags))
 		BUG();
 	smp_mb__after_clear_bit(); 
+	page_make_volatile(page, 1);
 	wake_up_page(page, PG_locked);
 }
 EXPORT_SYMBOL(unlock_page);
@@ -669,6 +753,15 @@ repeat:
 	}
 	rcu_read_unlock();
 
+	if (page && unlikely(!page_make_stable(page))) {
+		/*
+		 * The page has been discarded by the host. Run the
+		 * discard handler and return NULL.
+		 */
+		page_discard(page);
+		page = NULL;
+	}
+
 	return page;
 }
 EXPORT_SYMBOL(find_get_page);
@@ -766,6 +859,7 @@ unsigned find_get_pages(struct address_space *mapping, pgoff_t start,
 	unsigned int ret;
 	unsigned int nr_found;
 
+from_scratch:
 	rcu_read_lock();
 restart:
 	nr_found = radix_tree_gang_lookup_slot(&mapping->page_tree,
@@ -795,6 +889,19 @@ repeat:
 
 		pages[ret] = page;
 		ret++;
+
+		if (likely(page_make_stable(page)))
+			continue;
+		/*
+		 * Make stable failed, we discard the page and retry the
+		 * whole operation.
+		 */
+		ret--;
+		rcu_read_unlock();
+		page_discard(page);
+		while (ret--)
+			page_cache_release(pages[ret]);
+		goto from_scratch;
 	}
 	rcu_read_unlock();
 	return ret;
@@ -820,6 +927,7 @@ unsigned find_get_pages_contig(struct address_space *mapping, pgoff_t index,
 	unsigned int ret;
 	unsigned int nr_found;
 
+from_scratch:
 	rcu_read_lock();
 restart:
 	nr_found = radix_tree_gang_lookup_slot(&mapping->page_tree,
@@ -853,6 +961,19 @@ repeat:
 		pages[ret] = page;
 		ret++;
 		index++;
+
+		if (likely(page_make_stable(page)))
+			continue;
+		/*
+		 * Make stable failed, we discard the page and retry the
+		 * whole operation.
+		 */
+		ret--;
+		rcu_read_unlock();
+		page_discard(page);
+		while (ret--)
+			page_cache_release(pages[ret]);
+		goto from_scratch;
 	}
 	rcu_read_unlock();
 	return ret;
@@ -877,6 +998,7 @@ unsigned find_get_pages_tag(struct address_space *mapping, pgoff_t *index,
 	unsigned int ret;
 	unsigned int nr_found;
 
+from_scratch:
 	rcu_read_lock();
 restart:
 	nr_found = radix_tree_gang_lookup_tag_slot(&mapping->page_tree,
@@ -906,6 +1028,19 @@ repeat:
 
 		pages[ret] = page;
 		ret++;
+
+		if (likely(page_make_stable(page)))
+			continue;
+		/*
+		 * Make stable failed, we discard the page and retry the
+		 * whole operation.
+		 */
+		ret--;
+		rcu_read_unlock();
+		page_discard(page);
+		while (ret--)
+			page_cache_release(pages[ret]);
+		goto from_scratch;
 	}
 	rcu_read_unlock();
 
@@ -1448,7 +1583,7 @@ int filemap_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	 * Do we have something in the page cache already?
 	 */
 retry_find:
-	page = find_lock_page(mapping, vmf->pgoff);
+	page = find_lock_page_nodiscard(mapping, vmf->pgoff);
 	/*
 	 * For sequential accesses, we use the generic readahead logic.
 	 */
@@ -1456,7 +1591,7 @@ retry_find:
 		if (!page) {
 			page_cache_sync_readahead(mapping, ra, file,
 							   vmf->pgoff, 1);
-			page = find_lock_page(mapping, vmf->pgoff);
+			page = find_lock_page_nodiscard(mapping, vmf->pgoff);
 			if (!page)
 				goto no_cached_page;
 		}
@@ -1495,7 +1630,7 @@ retry_find:
 				start = vmf->pgoff - ra_pages / 2;
 			do_page_cache_readahead(mapping, file, start, ra_pages);
 		}
-		page = find_lock_page(mapping, vmf->pgoff);
+		page = find_lock_page_nodiscard(mapping, vmf->pgoff);
 		if (!page)
 			goto no_cached_page;
 	}

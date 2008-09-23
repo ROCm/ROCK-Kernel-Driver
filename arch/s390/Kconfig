@@ -459,11 +459,7 @@ config CMM_IUCV
 	  the cooperative memory management.
 
 config PAGE_STATES
-	bool "Unused page notification"
-	help
-	  This enables the notification of unused pages to the
-	  hypervisor. The ESSA instruction is used to do the states
-	  changes between a page that has content and the unused state.
+	bool "Enable support for guest page hinting."
 
 config VIRT_TIMER
 	bool "Virtual CPU timer support"

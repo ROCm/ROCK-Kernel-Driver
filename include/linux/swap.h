@@ -226,6 +226,7 @@ extern void show_swap_cache_info(void);
 extern int add_to_swap(struct page *, gfp_t);
 extern int add_to_swap_cache(struct page *, swp_entry_t, gfp_t);
 extern void __delete_from_swap_cache(struct page *);
+extern void __delete_from_swap_cache_nocheck(struct page *);
 extern void delete_from_swap_cache(struct page *);
 extern void free_page_and_swap_cache(struct page *);
 extern void free_pages_and_swap_cache(struct page **, int);
@@ -284,7 +285,7 @@ static inline void disable_swap_token(void)
 /* only sparc can not include linux/pagemap.h in this file
  * so leave page_cache_release and release_pages undeclared... */
 #define free_page_and_swap_cache(page) \
-	page_cache_release(page)
+	page_cache_release_nocheck(page)
 #define free_pages_and_swap_cache(pages, nr) \
 	release_pages((pages), (nr), 0);
 
@@ -325,6 +326,10 @@ static inline int add_to_swap_cache(struct page *page, swp_entry_t entry,
 }
 
 static inline void __delete_from_swap_cache(struct page *page)
+{
+}
+
+static inline void __delete_from_swap_cache_nocheck(struct page *page)
 {
 }
 

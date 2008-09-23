@@ -22,6 +22,7 @@
 #include <linux/swap.h>
 #include <linux/swapops.h>
 #include <linux/mmu_notifier.h>
+#include <linux/page-states.h>
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
 #include <asm/cacheflush.h>
@@ -57,6 +58,7 @@ static void change_pte_range(struct mm_struct *mm, pmd_t *pmd,
 			 */
 			if (dirty_accountable && pte_dirty(ptent))
 				ptent = pte_mkwrite(ptent);
+			page_check_writable(pte_page(ptent), ptent, 1);
 
 			ptep_modify_prot_commit(mm, addr, pte, ptent);
 #ifdef CONFIG_MIGRATION

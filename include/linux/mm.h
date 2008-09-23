@@ -323,6 +323,7 @@ static inline void init_page_count(struct page *page)
 }
 
 void put_page(struct page *page);
+void put_page_check(struct page *page);
 void put_pages_list(struct list_head *pages);
 
 void split_page(struct page *page, unsigned int order);

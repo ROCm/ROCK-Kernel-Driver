@@ -46,6 +46,7 @@
 #include <linux/page-isolation.h>
 #include <linux/memcontrol.h>
 #include <linux/debugobjects.h>
+#include <linux/page-states.h>
 
 #include <asm/tlbflush.h>
 #include <asm/div64.h>
@@ -521,6 +522,7 @@ static void __free_pages_ok(struct page *page, unsigned int order)
 		reserved += free_pages_check(page + i);
 	if (reserved)
 		return;
+	page_set_unused(page, order);
 
 	if (!PageHighMem(page)) {
 		debug_check_no_locks_freed(page_address(page),PAGE_SIZE<<order);
@@ -617,7 +619,8 @@ static int prep_new_page(struct page *page, int order, gfp_t gfp_flags)
 
 	page->flags &= ~(1 << PG_uptodate | 1 << PG_error | 1 << PG_reclaim |
 			1 << PG_referenced | 1 << PG_arch_1 |
-			1 << PG_owner_priv_1 | 1 << PG_mappedtodisk);
+			1 << PG_owner_priv_1 | 1 << PG_mappedtodisk |
+			1 << PG_writable);
 	set_page_private(page, 0);
 	set_page_refcounted(page);
 
@@ -977,6 +980,11 @@ static void free_hot_cold_page(struct page *page, int cold)
 	struct per_cpu_pages *pcp;
 	unsigned long flags;
 
+	if (unlikely(PageDiscarded(page))) {
+		if (page_free_discarded(page))
+			return;
+	}
+
 #ifdef CONFIG_XEN
 	if (PageForeign(page)) {
 		PageForeignDestructor(page);
@@ -987,6 +995,7 @@ static void free_hot_cold_page(struct page *page, int cold)
 		page->mapping = NULL;
 	if (free_pages_check(page))
 		return;
+	page_set_unused(page, 0);
 
 	if (!PageHighMem(page)) {
 		debug_check_no_locks_freed(page_address(page), PAGE_SIZE);
@@ -1102,6 +1111,7 @@ again:
 	put_cpu();
 
 	VM_BUG_ON(bad_range(zone, page));
+	page_set_stable(page, order);
 	if (prep_new_page(page, order, gfp_flags))
 		goto again;
 	return page;
@@ -1699,6 +1709,8 @@ void __pagevec_free(struct pagevec *pvec)
 
 void __free_pages(struct page *page, unsigned int order)
 {
+	if (page_count(page) > 1)
+		page_make_volatile(page, 2);
 	if (put_page_testzero(page)) {
 		if (order == 0)
 			free_hot_page(page);

@@ -30,6 +30,7 @@
 #include <linux/notifier.h>
 #include <linux/backing-dev.h>
 #include <linux/memcontrol.h>
+#include <linux/page-states.h>
 
 /* How many pages do we try to swap or page in/out together? */
 int page_cluster;
@@ -76,6 +77,16 @@ void put_page(struct page *page)
 		__page_cache_release(page);
 }
 EXPORT_SYMBOL(put_page);
+
+#ifdef CONFIG_PAGE_STATES
+void put_page_check(struct page *page)
+{
+	if (page_count(page) > 1)
+		page_make_volatile(page, 2);
+	put_page(page);
+}
+EXPORT_SYMBOL(put_page_check);
+#endif
 
 /**
  * put_pages_list() - release a list of pages
@@ -369,6 +380,8 @@ void __pagevec_release_nonlru(struct pagevec *pvec)
 		struct page *page = pvec->pages[i];
 
 		VM_BUG_ON(PageLRU(page));
+		if (page_count(page) > 1)
+			page_make_volatile(page, 2);
 		if (put_page_testzero(page))
 			pagevec_add(&pages_to_free, page);
 	}
@@ -398,6 +411,7 @@ void __pagevec_lru_add(struct pagevec *pvec)
 		VM_BUG_ON(PageLRU(page));
 		SetPageLRU(page);
 		add_page_to_inactive_list(zone, page);
+		page_make_volatile(page, 2);
 	}
 	if (zone)
 		spin_unlock_irq(&zone->lru_lock);
