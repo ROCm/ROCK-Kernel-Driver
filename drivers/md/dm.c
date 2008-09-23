@@ -1795,7 +1795,8 @@ static void free_dev(struct mapped_device *md)
 		mempool_destroy(md->io_pool);
 	if (md->bs)
 		bioset_free(md->bs);
-	del_gendisk(md->disk);
+	if (test_bit(DMF_INITIALIZED, &md->flags))
+		del_gendisk(md->disk);
 	free_minor(minor);
 
 	spin_lock(&_minor_lock);
