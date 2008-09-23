@@ -66,13 +66,27 @@ enum {
 	IRQT_VIRQ,
 	IRQT_IPI,
 	IRQT_LOCAL_PORT,
-	IRQT_CALLER_PORT
+	IRQT_CALLER_PORT,
+	_IRQT_COUNT
 };
+
+#define _IRQT_BITS 4
+#define _EVTCHN_BITS 12
+#define _INDEX_BITS (32 - _IRQT_BITS - _EVTCHN_BITS)
 
 /* Constructor for packed IRQ information. */
 static inline u32 mk_irq_info(u32 type, u32 index, u32 evtchn)
 {
-	return ((type << 24) | (index << 16) | evtchn);
+	BUILD_BUG_ON(_IRQT_COUNT > (1U << _IRQT_BITS));
+
+	BUILD_BUG_ON(NR_PIRQS > (1U << _INDEX_BITS));
+	BUILD_BUG_ON(NR_VIRQS > (1U << _INDEX_BITS));
+	BUILD_BUG_ON(NR_IPIS > (1U << _INDEX_BITS));
+	BUG_ON(index >> _INDEX_BITS);
+
+	BUILD_BUG_ON(NR_EVENT_CHANNELS > (1U << _EVTCHN_BITS));
+
+	return ((type << (32 - _IRQT_BITS)) | (index << _EVTCHN_BITS) | evtchn);
 }
 
 /* Convenient shorthand for packed representation of an unbound IRQ. */
@@ -84,17 +98,17 @@ static inline u32 mk_irq_info(u32 type, u32 index, u32 evtchn)
 
 static inline unsigned int evtchn_from_irq(int irq)
 {
-	return (u16)(irq_info[irq]);
+	return irq_info[irq] & ((1U << _EVTCHN_BITS) - 1);
 }
 
 static inline unsigned int index_from_irq(int irq)
 {
-	return (u8)(irq_info[irq] >> 16);
+	return (irq_info[irq] >> _EVTCHN_BITS) & ((1U << _INDEX_BITS) - 1);
 }
 
 static inline unsigned int type_from_irq(int irq)
 {
-	return (u8)(irq_info[irq] >> 24);
+	return irq_info[irq] >> (32 - _IRQT_BITS);
 }
 
 /* IRQ <-> VIRQ mapping. */
@@ -732,6 +746,60 @@ static struct irq_chip dynirq_chip = {
 	.retrigger = resend_irq_on_evtchn,
 };
 
+void evtchn_register_pirq(int irq)
+{
+	irq_info[irq] = mk_irq_info(IRQT_PIRQ, irq, 0);
+}
+
+#ifndef CONFIG_X86_IO_APIC
+#undef IO_APIC_IRQ
+#define IO_APIC_IRQ(irq) ((irq) >= pirq_to_irq(16))
+#endif
+
+int evtchn_map_pirq(int irq, int xen_pirq)
+{
+	if (irq < 0) {
+		static DEFINE_SPINLOCK(irq_alloc_lock);
+
+		irq = pirq_to_irq(NR_PIRQS - 1);
+		spin_lock(&irq_alloc_lock);
+		do {
+			if (!IO_APIC_IRQ(irq))
+				continue;
+			if (!index_from_irq(irq)) {
+				BUG_ON(type_from_irq(irq) != IRQT_UNBOUND);
+				irq_info[irq] = mk_irq_info(IRQT_PIRQ,
+							    xen_pirq, 0);
+				break;
+			}
+		} while (--irq);
+		spin_unlock(&irq_alloc_lock);
+		if (irq < pirq_to_irq(16))
+			return -ENOSPC;
+	} else if (!xen_pirq) {
+		if (unlikely(type_from_irq(irq) != IRQT_PIRQ))
+			return -EINVAL;
+		irq_info[irq] = IRQ_UNBOUND;
+		return 0;
+	} else if (type_from_irq(irq) != IRQT_PIRQ
+		   || index_from_irq(irq) != xen_pirq) {
+		printk(KERN_ERR "IRQ#%d is already mapped to %d:%u - "
+				"cannot map to PIRQ#%u\n",
+		       irq, type_from_irq(irq), index_from_irq(irq), xen_pirq);
+		return -EINVAL;
+	}
+	return index_from_irq(irq) ? irq : -EINVAL;
+}
+
+int evtchn_get_xen_pirq(int irq)
+{
+	if (!IO_APIC_IRQ(irq))
+		return irq;
+	if (unlikely(type_from_irq(irq) != IRQT_PIRQ))
+		return 0;
+	return index_from_irq(irq);
+}
+
 static inline void pirq_unmask_notify(int pirq)
 {
 	struct physdev_eoi eoi = { .irq = pirq };
@@ -764,7 +832,7 @@ static unsigned int startup_pirq(unsigned int irq)
 	if (VALID_EVTCHN(evtchn))
 		goto out;
 
-	bind_pirq.pirq  = irq;
+	bind_pirq.pirq = evtchn_get_xen_pirq(irq);
 	/* NB. We are happy to share unless we are probing. */
 	bind_pirq.flags = probing_irq(irq) ? 0 : BIND_PIRQ__WILL_SHARE;
 	if (HYPERVISOR_event_channel_op(EVTCHNOP_bind_pirq, &bind_pirq) != 0) {
@@ -779,7 +847,7 @@ static unsigned int startup_pirq(unsigned int irq)
 
 	evtchn_to_irq[evtchn] = irq;
 	bind_evtchn_to_cpu(evtchn, 0);
-	irq_info[irq] = mk_irq_info(IRQT_PIRQ, irq, evtchn);
+	irq_info[irq] = mk_irq_info(IRQT_PIRQ, bind_pirq.pirq, evtchn);
 
  out:
 	unmask_evtchn(evtchn);
@@ -804,7 +872,7 @@ static void shutdown_pirq(unsigned int irq)
 
 	bind_evtchn_to_cpu(evtchn, 0);
 	evtchn_to_irq[evtchn] = -1;
-	irq_info[irq] = IRQ_UNBOUND;
+	irq_info[irq] = mk_irq_info(IRQT_PIRQ, index_from_irq(irq), 0);
 }
 
 static void unmask_pirq(unsigned int irq)
@@ -959,8 +1027,7 @@ void xen_poll_irq(int irq)
 	evtchn_port_t evtchn = evtchn_from_irq(irq);
 
 	if (VALID_EVTCHN(evtchn)
-	    && HYPERVISOR_poll(&evtchn, 1,
-			       jiffies ^ (1UL << (BITS_PER_LONG - 1))))
+	    && HYPERVISOR_poll_no_timeout(&evtchn, 1))
 		BUG();
 }
 
@@ -1038,7 +1105,7 @@ void irq_resume(void)
 
 	/* No IRQ <-> event-channel mappings. */
 	for (irq = 0; irq < NR_IRQS; irq++)
-		irq_info[irq] &= ~0xFFFF; /* zap event-channel binding */
+		irq_info[irq] &= ~((1U << _EVTCHN_BITS) - 1);
 	for (evtchn = 0; evtchn < NR_EVENT_CHANNELS; evtchn++)
 		evtchn_to_irq[evtchn] = -1;
 

@@ -142,6 +142,8 @@ void xen_spin_kick(raw_spinlock_t *lock, unsigned int token)
 
 	token &= (1U << TICKET_SHIFT) - 1;
 	for_each_online_cpu(cpu) {
+		if (cpu == raw_smp_processor_id())
+			continue;
 		if (spinning(&per_cpu(spinning, cpu), cpu, lock, token))
 			return;
 		if (in_interrupt()

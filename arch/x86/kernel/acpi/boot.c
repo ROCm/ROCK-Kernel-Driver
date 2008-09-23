@@ -1116,7 +1116,7 @@ int mp_register_gsi(u32 gsi, int triggering, int polarity)
 {
 	int ioapic;
 	int ioapic_pin;
-#ifdef CONFIG_X86_32
+#if defined(CONFIG_X86_32) && !defined(CONFIG_XEN)
 #define MAX_GSI_NUM	4096
 #define IRQ_COMPRESSION_START	64
 
@@ -1164,7 +1164,7 @@ int mp_register_gsi(u32 gsi, int triggering, int polarity)
 	if (test_bit(ioapic_pin, mp_ioapic_routing[ioapic].pin_programmed)) {
 		pr_debug(KERN_DEBUG "Pin %d-%d already programmed\n",
 			 mp_ioapic_routing[ioapic].apic_id, ioapic_pin);
-#ifdef CONFIG_X86_32
+#if defined(CONFIG_X86_32) && !defined(CONFIG_XEN)
 		return (gsi < IRQ_COMPRESSION_START ? gsi : gsi_to_irq[gsi]);
 #else
 		return gsi;
@@ -1172,7 +1172,7 @@ int mp_register_gsi(u32 gsi, int triggering, int polarity)
 	}
 
 	set_bit(ioapic_pin, mp_ioapic_routing[ioapic].pin_programmed);
-#ifdef CONFIG_X86_32
+#if defined(CONFIG_X86_32) && !defined(CONFIG_XEN)
 	/*
 	 * For GSI >= 64, use IRQ compression
 	 */

@@ -150,17 +150,21 @@ static inline void __send_IPI_dest_field(unsigned long mask, int vector)
  */
 void send_IPI_mask_bitmask(cpumask_t cpumask, int vector)
 {
+#ifndef CONFIG_XEN
 	unsigned long mask = cpus_addr(cpumask)[0];
-	unsigned long flags;
-#ifdef CONFIG_XEN
+#else
+	cpumask_t mask;
 	unsigned int cpu;
 #endif
+	unsigned long flags;
 
 	local_irq_save(flags);
-	WARN_ON(mask & ~cpus_addr(cpu_online_map)[0]);
 #ifndef CONFIG_XEN
+	WARN_ON(mask & ~cpus_addr(cpu_online_map)[0]);
 	__send_IPI_dest_field(mask, vector);
 #else
+	cpus_andnot(mask, cpumask, cpu_online_map);
+	WARN_ON(!cpus_empty(mask));
 	for_each_online_cpu(cpu)
 		if (cpu_isset(cpu, cpumask))
 			__send_IPI_one(cpu, vector);

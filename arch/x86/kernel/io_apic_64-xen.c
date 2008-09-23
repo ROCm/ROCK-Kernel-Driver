@@ -81,6 +81,7 @@ int sis_apic_bug; /* not actually supported, dummy for compile */
 #ifdef CONFIG_XEN
 #include <xen/interface/xen.h>
 #include <xen/interface/physdev.h>
+#include <xen/evtchn.h>
 
 /* Fake i8259 */
 #define make_8259A_irq(_irq)     (io_apic_irqs &= ~(1UL<<(_irq)))
@@ -840,7 +841,7 @@ static void ioapic_register_intr(int irq, unsigned long trigger)
 	}
 }
 #else
-#define ioapic_register_intr(irq,trigger) ((void)0)
+#define ioapic_register_intr(irq, trigger) evtchn_register_pirq(irq)
 #endif /* !CONFIG_XEN */
 
 static void setup_IO_APIC_irq(int apic, int pin, unsigned int irq,

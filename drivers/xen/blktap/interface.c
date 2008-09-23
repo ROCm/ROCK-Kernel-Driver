@@ -162,8 +162,15 @@ void tap_blkif_free(blkif_t *blkif)
 {
 	atomic_dec(&blkif->refcnt);
 	wait_event(blkif->waiting_to_free, atomic_read(&blkif->refcnt) == 0);
+	atomic_inc(&blkif->refcnt);
 
 	tap_blkif_unmap(blkif);
+}
+
+void tap_blkif_kmem_cache_free(blkif_t *blkif)
+{
+	if (!atomic_dec_and_test(&blkif->refcnt))
+		BUG();
 	kmem_cache_free(blkif_cachep, blkif);
 }
 

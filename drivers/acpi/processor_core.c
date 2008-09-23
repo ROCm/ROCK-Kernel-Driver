@@ -645,7 +645,7 @@ static int acpi_processor_get_info(struct acpi_processor *pr, unsigned has_uid)
 	 * of /proc/cpuinfo
 	 */
 	status = acpi_evaluate_object(pr->handle, "_SUN", NULL, &buffer);
-	if (ACPI_SUCCESS(status))
+	if (ACPI_SUCCESS(status) && pr->id != -1)
 		arch_fix_phys_package_id(pr->id, object.integer.value);
 
 	return 0;
@@ -709,9 +709,11 @@ static int __cpuinit acpi_processor_start(struct acpi_device *device)
 	if (result)
 		goto end;
 
-	sysdev = get_cpu_sysdev(pr->id);
-	if (sysfs_create_link(&device->dev.kobj, &sysdev->kobj, "sysdev"))
-		return -EFAULT;
+	if (pr->id != -1) {
+		sysdev = get_cpu_sysdev(pr->id);
+		if (sysfs_create_link(&device->dev.kobj, &sysdev->kobj, "sysdev"))
+			return -EFAULT;
+	}
 
 	status = acpi_install_notify_handler(pr->handle, ACPI_DEVICE_NOTIFY,
 					     acpi_processor_notify, pr);
@@ -859,7 +861,7 @@ static int acpi_processor_remove(struct acpi_device *device, int type)
 
 	pr = acpi_driver_data(device);
 
-	if (pr->id >= nr_cpu_ids) {
+	if (!processor_cntl_external() && pr->id >= nr_cpu_ids) {
 		kfree(pr);
 		return 0;
 	}
@@ -874,7 +876,8 @@ static int acpi_processor_remove(struct acpi_device *device, int type)
 	status = acpi_remove_notify_handler(pr->handle, ACPI_DEVICE_NOTIFY,
 					    acpi_processor_notify);
 
-	sysfs_remove_link(&device->dev.kobj, "sysdev");
+	if (pr->id != -1)
+		sysfs_remove_link(&device->dev.kobj, "sysdev");
 
 	acpi_processor_remove_fs(device);
 
@@ -1028,12 +1031,7 @@ static void __ref acpi_processor_hotplug_notify(acpi_handle handle,
 			return;
 		}
 
-#ifdef CONFIG_XEN
-		if ((pr->id >= 0) && (pr->id < nr_cpu_ids)
-		    && (cpu_present(pr->id)))
-#else
 		if ((pr->id < nr_cpu_ids) && (cpu_present(pr->id)))
-#endif /* CONFIG_XEN */
 			kobject_uevent(&device->dev.kobj, KOBJ_OFFLINE);
 
 		if (processor_cntl_external())

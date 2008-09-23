@@ -603,34 +603,36 @@ static cycle_t cs_last;
 
 static cycle_t xen_clocksource_read(void)
 {
+#ifdef CONFIG_SMP
+	cycle_t last = get64(&cs_last);
 	cycle_t ret = local_clock();
 
-#ifdef CONFIG_SMP
-	for (;;) {
-		cycle_t last = get64(&cs_last);
+	if (unlikely((s64)(ret - last) < 0)) {
+		if (last - ret > permitted_clock_jitter
+		    && printk_ratelimit()) {
+			unsigned int cpu = get_cpu();
+			struct shadow_time_info *shadow = &per_cpu(shadow_time, cpu);
 
-		if ((s64)(ret - last) < 0) {
-			if (last - ret > permitted_clock_jitter
-			    && printk_ratelimit()) {
-				unsigned int cpu = get_cpu();
-				struct shadow_time_info *shadow = &per_cpu(shadow_time, cpu);
-
-				printk(KERN_WARNING "clocksource/%u: "
-				       "Time went backwards: "
-				       "ret=%Lx delta=%Ld shadow=%Lx offset=%Lx\n",
-				       cpu, ret, ret - last,
-				       shadow->system_timestamp,
-				       get_nsec_offset(shadow));
-				put_cpu();
-			}
-			ret = last;
+			printk(KERN_WARNING "clocksource/%u: "
+			       "Time went backwards: "
+			       "ret=%Lx delta=%Ld shadow=%Lx offset=%Lx\n",
+			       cpu, ret, ret - last, shadow->system_timestamp,
+			       get_nsec_offset(shadow));
+			put_cpu();
 		}
-		if (cmpxchg64(&cs_last, last, ret) == last)
-			break;
+		return last;
 	}
-#endif
 
-	return ret;
+	for (;;) {
+		cycle_t cur = cmpxchg64(&cs_last, last, ret);
+
+		if (cur == last || (s64)(ret - cur) < 0)
+			return ret;
+		last = cur;
+	}
+#else
+	return local_clock();
+#endif
 }
 
 static void xen_clocksource_resume(void)

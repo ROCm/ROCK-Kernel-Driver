@@ -32,8 +32,6 @@
 #include <acpi/processor.h>
 #include <asm/hypercall.h>
 
-static int xen_processor_pmbits;
-
 static int xen_cx_notifier(struct acpi_processor *pr, int action)
 {
 	int ret, count = 0, i;
@@ -215,13 +213,15 @@ static struct processor_extcntl_ops xen_extcntl_ops = {
 
 void arch_acpi_processor_init_extcntl(const struct processor_extcntl_ops **ops)
 {
-	xen_processor_pmbits = (xen_start_info->flags & SIF_PM_MASK) >> 8;
+	unsigned int pmbits = (xen_start_info->flags & SIF_PM_MASK) >> 8;
 
-	if (xen_processor_pmbits & XEN_PROCESSOR_PM_CX)
+	if (!pmbits)
+		return;
+	if (pmbits & XEN_PROCESSOR_PM_CX)
 		xen_extcntl_ops.pm_ops[PM_TYPE_IDLE] = xen_cx_notifier;
-	if (xen_processor_pmbits & XEN_PROCESSOR_PM_PX)
+	if (pmbits & XEN_PROCESSOR_PM_PX)
 		xen_extcntl_ops.pm_ops[PM_TYPE_PERF] = xen_px_notifier;
-	if (xen_processor_pmbits & XEN_PROCESSOR_PM_TX)
+	if (pmbits & XEN_PROCESSOR_PM_TX)
 		xen_extcntl_ops.pm_ops[PM_TYPE_THR] = xen_tx_notifier;
 
 	*ops = &xen_extcntl_ops;

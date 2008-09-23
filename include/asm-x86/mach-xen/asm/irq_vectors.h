@@ -18,9 +18,7 @@
  * is limited to 256. For processors other than i386, NR_VECTORS
  * should be changed accordingly.
  */
-#define NR_VECTORS 256
-
-#define FPU_IRQ			13
+#define NR_VECTORS		256
 
 #define	FIRST_VM86_IRQ		3
 #define LAST_VM86_IRQ		15
@@ -37,7 +35,13 @@
  */
 
 #define PIRQ_BASE		0
-#define NR_PIRQS		256
+#if !defined(MAX_IO_APICS)
+# define NR_PIRQS		(NR_VECTORS + 32 * NR_CPUS)
+#elif NR_CPUS < MAX_IO_APICS
+# define NR_PIRQS		(NR_VECTORS + 32 * NR_CPUS)
+#else
+# define NR_PIRQS		(NR_VECTORS + 32 * MAX_IO_APICS)
+#endif
 
 #define DYNIRQ_BASE		(PIRQ_BASE + NR_PIRQS)
 #define NR_DYNIRQS		256

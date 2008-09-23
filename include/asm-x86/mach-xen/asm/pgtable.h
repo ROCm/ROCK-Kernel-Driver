@@ -272,28 +272,39 @@ extern pteval_t __supported_pte_mask;
 
 static inline pte_t pfn_pte(unsigned long page_nr, pgprot_t pgprot)
 {
-	return __pte((((phys_addr_t)page_nr << PAGE_SHIFT) |
-		      pgprot_val(pgprot)) & __supported_pte_mask);
+	pgprotval_t prot = pgprot_val(pgprot); 
+
+	if (prot & _PAGE_PRESENT)
+		prot &= __supported_pte_mask;
+	return __pte(((phys_addr_t)page_nr << PAGE_SHIFT) | prot);
 }
 
 static inline pte_t pfn_pte_ma(unsigned long page_nr, pgprot_t pgprot)
 {
-	return __pte_ma((((phys_addr_t)page_nr << PAGE_SHIFT) |
-			 pgprot_val(pgprot)) & __supported_pte_mask);
+	pgprotval_t prot = pgprot_val(pgprot); 
+
+	if (prot & _PAGE_PRESENT)
+		prot &= __supported_pte_mask;
+	return __pte_ma(((phys_addr_t)page_nr << PAGE_SHIFT) | prot);
 }
 
 static inline pmd_t pfn_pmd(unsigned long page_nr, pgprot_t pgprot)
 {
-	return __pmd((((phys_addr_t)page_nr << PAGE_SHIFT) |
-		      pgprot_val(pgprot)) & __supported_pte_mask);
+	pgprotval_t prot = pgprot_val(pgprot); 
+
+	if (prot & _PAGE_PRESENT)
+		prot &= __supported_pte_mask;
+	return __pmd(((phys_addr_t)page_nr << PAGE_SHIFT) | prot);
 }
 
 static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 {
-	pteval_t val = pte_val(pte);
+	pgprotval_t prot = pgprot_val(newprot);
+	pteval_t val = pte_val(pte) & _PAGE_CHG_MASK;
 
-	val &= _PAGE_CHG_MASK;
-	val |= pgprot_val(newprot) & (~_PAGE_CHG_MASK) & __supported_pte_mask;
+	if (prot & _PAGE_PRESENT)
+		prot &= __supported_pte_mask;
+	val |= prot & ~_PAGE_CHG_MASK;
 
 	return __pte(val);
 }
@@ -309,7 +320,9 @@ static inline pgprot_t pgprot_modify(pgprot_t oldprot, pgprot_t newprot)
 
 #define pte_pgprot(x) __pgprot(pte_flags(x) & PTE_FLAGS_MASK)
 
-#define canon_pgprot(p) __pgprot(pgprot_val(p) & __supported_pte_mask)
+#define canon_pgprot(p) __pgprot(pgprot_val(p) & _PAGE_PRESENT \
+				 ? pgprot_val(p) & __supported_pte_mask \
+				 : pgprot_val(p))
 
 #ifndef __ASSEMBLY__
 #define __HAVE_PHYS_MEM_ACCESS_PROT

@@ -35,8 +35,6 @@ static int fast_suspend;
 static void __shutdown_handler(struct work_struct *unused);
 static DECLARE_DELAYED_WORK(shutdown_work, __shutdown_handler);
 
-static int setup_suspend_evtchn(void);
-
 int __xen_suspend(int fast_suspend, void (*resume_notifier)(int));
 
 static int shutdown_process(void *__unused)
@@ -67,6 +65,8 @@ static int shutdown_process(void *__unused)
 }
 
 #ifdef CONFIG_PM_SLEEP
+
+static int setup_suspend_evtchn(void);
 
 /* Was last suspend request cancelled? */
 static int suspend_cancelled;
@@ -255,6 +255,7 @@ static struct xenbus_watch sysrq_watch = {
 	.callback = sysrq_handler
 };
 
+#ifdef CONFIG_PM_SLEEP
 static irqreturn_t suspend_int(int irq, void* dev_id)
 {
 	switch_shutdown_state(SHUTDOWN_SUSPEND);
@@ -282,6 +283,9 @@ static int setup_suspend_evtchn(void)
 
 	return 0;
 }
+#else
+#define setup_suspend_evtchn() 0
+#endif
 
 static int setup_shutdown_watcher(void)
 {

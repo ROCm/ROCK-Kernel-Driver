@@ -17,6 +17,8 @@
 #include <linux/msi.h>
 #include <linux/smp.h>
 
+#include <xen/evtchn.h>
+
 #include <asm/errno.h>
 #include <asm/io.h>
 
@@ -231,13 +233,15 @@ static int msi_unmap_pirq(struct pci_dev *dev, int pirq)
 	int rc;
 
 	unmap.domid = msi_get_dev_owner(dev);
-	unmap.pirq = pirq;
+	unmap.pirq = evtchn_get_xen_pirq(pirq);
 
 	if ((rc = HYPERVISOR_physdev_op(PHYSDEVOP_unmap_pirq, &unmap)))
 		printk(KERN_WARNING "unmap irq %x failed\n", pirq);
 
 	if (rc < 0)
 		return rc;
+
+	evtchn_map_pirq(pirq, 0);
 	return 0;
 }
 
@@ -272,7 +276,7 @@ static int msi_map_pirq_to_vector(struct pci_dev *dev, int pirq,
 	map_irq.domid = domid;
 	map_irq.type = MAP_PIRQ_TYPE_MSI;
 	map_irq.index = -1;
-	map_irq.pirq = pirq;
+	map_irq.pirq = pirq < 0 ? -1 : evtchn_get_xen_pirq(pirq);
 	map_irq.bus = dev->bus->number;
 	map_irq.devfn = dev->devfn;
 	map_irq.entry_nr = entry_nr;
@@ -283,8 +287,12 @@ static int msi_map_pirq_to_vector(struct pci_dev *dev, int pirq,
 
 	if (rc < 0)
 		return rc;
+	/* This happens when MSI support is not enabled in Xen. */
+	if (rc == 0 && map_irq.pirq < 0)
+		return -ENOSYS;
 
-	return map_irq.pirq;
+	BUG_ON(map_irq.pirq <= 0);
+	return evtchn_map_pirq(pirq, map_irq.pirq);
 }
 
 static int msi_map_vector(struct pci_dev *dev, int entry_nr, u64 table_base)

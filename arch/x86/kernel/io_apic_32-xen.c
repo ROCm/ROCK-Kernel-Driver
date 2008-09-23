@@ -52,6 +52,7 @@
 #ifdef CONFIG_XEN
 #include <xen/interface/xen.h>
 #include <xen/interface/physdev.h>
+#include <xen/evtchn.h>
 
 /* Fake i8259 */
 #define make_8259A_irq(_irq)     (io_apic_irqs &= ~(1UL<<(_irq)))
@@ -1275,7 +1276,7 @@ static void ioapic_register_intr(int irq, int vector, unsigned long trigger)
 	set_intr_gate(vector, interrupt[irq]);
 }
 #else
-#define ioapic_register_intr(_irq,_vector,_trigger) ((void)0)
+#define ioapic_register_intr(irq, vector, trigger) evtchn_register_pirq(irq)
 #endif
 
 static void __init setup_IO_APIC_irqs(void)

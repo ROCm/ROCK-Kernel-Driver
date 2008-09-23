@@ -2,6 +2,7 @@
  * PCI Backend -- Configuration overlay for MSI capability
  */
 #include <linux/pci.h>
+#include <linux/slab.h>
 #include "conf_space.h"
 #include "conf_space_capability.h"
 #include <xen/interface/io/pciif.h>
@@ -37,22 +38,31 @@ int pciback_disable_msi(struct pciback_device *pdev,
 int pciback_enable_msix(struct pciback_device *pdev,
 		struct pci_dev *dev, struct xen_pci_op *op)
 {
-	int result;
+	int i, result;
+	struct msix_entry *entries;
 
 	if (op->value > SH_INFO_MAX_VEC)
 		return -EINVAL;
-	else {
-		struct msix_entry entries[op->value];
-		int i;
 
-		for (i = 0; i < op->value; i++) {
-			entries[i].entry = op->msix_entries[i].entry;
-			entries[i].vector = op->msix_entries[i].vector;
-		}
+	entries = kmalloc(op->value * sizeof(*entries), GFP_KERNEL);
+	if (entries == NULL)
+		return -ENOMEM;
 
-		result = pci_enable_msix(dev, entries, op->value);
-		op->value = result;
+	for (i = 0; i < op->value; i++) {
+		entries[i].entry = op->msix_entries[i].entry;
+		entries[i].vector = op->msix_entries[i].vector;
 	}
+
+	result = pci_enable_msix(dev, entries, op->value);
+
+	for (i = 0; i < op->value; i++) {
+		op->msix_entries[i].entry = entries[i].entry;
+		op->msix_entries[i].vector = entries[i].vector;
+	}
+
+	kfree(entries);
+
+	op->value = result;
 
 	return result;
 }

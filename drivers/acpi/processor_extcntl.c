@@ -195,13 +195,22 @@ static int processor_extcntl_get_performance(struct acpi_processor *pr)
 	 * processor objects to external logic. In this case, it's preferred
 	 * to use ACPI ID instead.
 	 */
-	pr->performance->domain_info.num_processors = 0;
+	pdomain = &pr->performance->domain_info;
+	pdomain->num_processors = 0;
 	ret = acpi_processor_get_psd(pr);
-	if (ret < 0)
-		goto err_out;
+	if (ret < 0) {
+		/*
+		 * _PSD is optional - assume no coordination if absent (or
+		 * broken), matching native kernels' behavior.
+		 */
+		pdomain->num_entries = ACPI_PSD_REV0_ENTRIES;
+		pdomain->revision = ACPI_PSD_REV0_REVISION;
+		pdomain->domain = pr->acpi_id;
+		pdomain->coord_type = DOMAIN_COORD_TYPE_SW_ALL;
+		pdomain->num_processors = 1;
+	}
 
 	/* Some sanity check */
-	pdomain = &pr->performance->domain_info;
 	if ((pdomain->revision != ACPI_PSD_REV0_REVISION) ||
 	    (pdomain->num_entries != ACPI_PSD_REV0_ENTRIES) ||
 	    ((pdomain->coord_type != DOMAIN_COORD_TYPE_SW_ALL) &&

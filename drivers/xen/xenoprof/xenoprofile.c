@@ -35,14 +35,14 @@
 #define MAX_XENOPROF_SAMPLES 16
 
 /* sample buffers shared with Xen */
-xenoprof_buf_t * xenoprof_buf[MAX_VIRT_CPUS];
+static xenoprof_buf_t *xenoprof_buf[MAX_VIRT_CPUS];
 /* Shared buffer area */
-struct xenoprof_shared_buffer shared_buffer;
+static struct xenoprof_shared_buffer shared_buffer;
 
 /* Passive sample buffers shared with Xen */
-xenoprof_buf_t *p_xenoprof_buf[MAX_OPROF_DOMAINS][MAX_VIRT_CPUS];
+static xenoprof_buf_t *p_xenoprof_buf[MAX_OPROF_DOMAINS][MAX_VIRT_CPUS];
 /* Passive shared buffer area */
-struct xenoprof_shared_buffer p_shared_buffer[MAX_OPROF_DOMAINS];
+static struct xenoprof_shared_buffer p_shared_buffer[MAX_OPROF_DOMAINS];
 
 static int xenoprof_start(void);
 static void xenoprof_stop(void);
@@ -54,11 +54,11 @@ static int active_defined;
 extern unsigned long backtrace_depth;
 
 /* Number of buffers in shared area (one per VCPU) */
-int nbuf;
+static int nbuf;
 /* Mappings of VIRQ_XENOPROF to irq number (per cpu) */
-int ovf_irq[NR_CPUS];
+static int ovf_irq[NR_CPUS];
 /* cpu model type string - copied from Xen on XENOPROF_init command */
-char cpu_type[XENOPROF_CPU_TYPE_SIZE];
+static char cpu_type[XENOPROF_CPU_TYPE_SIZE];
 
 #ifdef CONFIG_PM
 
@@ -111,11 +111,11 @@ static void exit_driverfs(void)
 #define exit_driverfs() do { } while (0)
 #endif /* CONFIG_PM */
 
-unsigned long long oprofile_samples = 0;
-unsigned long long p_oprofile_samples = 0;
+static unsigned long long oprofile_samples;
+static unsigned long long p_oprofile_samples;
 
-unsigned int pdomains;
-struct xenoprof_passive passive_domains[MAX_OPROF_DOMAINS];
+static unsigned int pdomains;
+static struct xenoprof_passive passive_domains[MAX_OPROF_DOMAINS];
 
 /* Check whether the given entry is an escape code */
 static int xenoprof_is_escape(xenoprof_buf_t * buf, int tail)
@@ -194,8 +194,7 @@ done:
 		oprofile_add_domain_switch(COORDINATOR_DOMAIN);
 }
 
-static irqreturn_t 
-xenoprof_ovf_interrupt(int irq, void * dev_id)
+static irqreturn_t xenoprof_ovf_interrupt(int irq, void *dev_id)
 {
 	struct xenoprof_buf * buf;
 	static unsigned long flag;
@@ -483,8 +482,7 @@ static void xenoprof_dummy_backtrace(struct pt_regs * const regs,
 }
 
 
-
-struct oprofile_operations xenoprof_ops = {
+static struct oprofile_operations xenoprof_ops = {
 #ifdef HAVE_XENOPROF_CREATE_FILES
 	.create_files 	= xenoprof_create_files,
 #endif

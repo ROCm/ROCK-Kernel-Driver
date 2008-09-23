@@ -209,6 +209,25 @@ HYPERVISOR_poll(
 	return rc;
 }
 
+static inline int __must_check
+HYPERVISOR_poll_no_timeout(
+	evtchn_port_t *ports, unsigned int nr_ports)
+{
+	int rc;
+	struct sched_poll sched_poll = {
+		.nr_ports = nr_ports
+	};
+	set_xen_guest_handle(sched_poll.ports, ports);
+
+	rc = HYPERVISOR_sched_op(SCHEDOP_poll, &sched_poll);
+#if CONFIG_XEN_COMPAT <= 0x030002
+	if (rc == -ENOSYS)
+		rc = HYPERVISOR_sched_op_compat(SCHEDOP_yield, 0);
+#endif
+
+	return rc;
+}
+
 #ifdef CONFIG_XEN
 
 static inline void

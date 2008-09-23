@@ -183,6 +183,7 @@ static int blktap_remove(struct xenbus_device *dev)
 			kthread_stop(be->blkif->xenblkd);
 		signal_tapdisk(be->blkif->dev_num);
 		tap_blkif_free(be->blkif);
+		tap_blkif_kmem_cache_free(be->blkif);
 		be->blkif = NULL;
 	}
 	kfree(be);
@@ -365,6 +366,7 @@ static void tap_frontend_changed(struct xenbus_device *dev,
 			kthread_stop(be->blkif->xenblkd);
 			be->blkif->xenblkd = NULL;
 		}
+		tap_blkif_free(be->blkif);
 		xenbus_switch_state(dev, XenbusStateClosing);
 		break;
 

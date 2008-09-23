@@ -114,9 +114,6 @@ setup_io_tlb_npages(char *str)
 		iotlb_nslabs = simple_strtoul(str, &str, 0) <<
 			(20 - IO_TLB_SHIFT);
 		iotlb_nslabs = ALIGN(iotlb_nslabs, IO_TLB_SEGSIZE);
-		/* Round up to power of two (xen_create_contiguous_region). */
-		while (iotlb_nslabs & (iotlb_nslabs-1))
-			iotlb_nslabs += iotlb_nslabs & ~(iotlb_nslabs-1);
 	}
 	if (*str == ',')
 		++str;
@@ -147,9 +144,6 @@ swiotlb_init_with_default_size(size_t default_size)
 	if (!iotlb_nslabs) {
 		iotlb_nslabs = (default_size >> IO_TLB_SHIFT);
 		iotlb_nslabs = ALIGN(iotlb_nslabs, IO_TLB_SEGSIZE);
-		/* Round up to power of two (xen_create_contiguous_region). */
-		while (iotlb_nslabs & (iotlb_nslabs-1))
-			iotlb_nslabs += iotlb_nslabs & ~(iotlb_nslabs-1);
 	}
 
 	bytes = iotlb_nslabs * (1UL << IO_TLB_SHIFT);
