@@ -52,6 +52,8 @@
 #include <asm/div64.h>
 #include "internal.h"
 
+#include <trace/page_alloc.h>
+
 /*
  * Array of node states.
  */
@@ -511,6 +513,8 @@ static void __free_pages_ok(struct page *page, unsigned int order)
 	unsigned long flags;
 	int i;
 	int reserved = 0;
+
+	trace_page_free(page, order);
 
 #ifdef CONFIG_XEN
 	if (PageForeign(page)) {
@@ -980,6 +984,8 @@ static void free_hot_cold_page(struct page *page, int cold)
 	struct zone *zone = page_zone(page);
 	struct per_cpu_pages *pcp;
 	unsigned long flags;
+
+	trace_page_free(page, 0);
 
 	if (unlikely(PageDiscarded(page))) {
 		if (page_free_discarded(page))
@@ -1664,6 +1670,7 @@ nopage:
 		show_mem();
 	}
 got_pg:
+	trace_page_alloc(page, order);
 	return page;
 }
 EXPORT_SYMBOL(__alloc_pages_internal);

@@ -38,6 +38,7 @@
 #include <linux/rwsem.h>
 #include <linux/nsproxy.h>
 #include <linux/ipc_namespace.h>
+#include <trace/ipc.h>
 
 #include <asm/current.h>
 #include <asm/uaccess.h>
@@ -314,6 +315,7 @@ asmlinkage long sys_msgget(key_t key, int msgflg)
 	struct ipc_namespace *ns;
 	struct ipc_ops msg_ops;
 	struct ipc_params msg_params;
+	long ret;
 
 	ns = current->nsproxy->ipc_ns;
 
@@ -324,7 +326,9 @@ asmlinkage long sys_msgget(key_t key, int msgflg)
 	msg_params.key = key;
 	msg_params.flg = msgflg;
 
-	return ipcget(ns, &msg_ids(ns), &msg_ops, &msg_params);
+	ret = ipcget(ns, &msg_ids(ns), &msg_ops, &msg_params);
+	trace_ipc_msg_create(ret, msgflg);
+	return ret;
 }
 
 static inline unsigned long

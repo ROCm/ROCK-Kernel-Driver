@@ -85,6 +85,7 @@
 
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
+#include <trace/ipv6.h>
 
 /* Set to 3 to get tracing... */
 #define ACONF_DEBUG 2
@@ -652,6 +653,8 @@ ipv6_add_addr(struct inet6_dev *idev, const struct in6_addr *addr, int pfxlen,
 	in6_dev_hold(idev);
 	/* For caller */
 	in6_ifa_hold(ifa);
+
+	trace_ipv6_addr_add(ifa);
 
 	/* Add to big hash table */
 	hash = ipv6_addr_hash(addr);
@@ -2167,6 +2170,7 @@ static int inet6_addr_del(struct net *net, int ifindex, struct in6_addr *pfx,
 			in6_ifa_hold(ifp);
 			read_unlock_bh(&idev->lock);
 
+			trace_ipv6_addr_del(ifp);
 			ipv6_del_addr(ifp);
 
 			/* If the last address is deleted administratively,

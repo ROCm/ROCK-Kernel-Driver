@@ -41,6 +41,7 @@
 #include <linux/bitops.h>
 #include <linux/mpage.h>
 #include <linux/bit_spinlock.h>
+#include <trace/fs.h>
 
 static int fsync_buffers_list(spinlock_t *lock, struct list_head *list);
 
@@ -89,7 +90,9 @@ void unlock_buffer(struct buffer_head *bh)
  */
 void __wait_on_buffer(struct buffer_head * bh)
 {
+	trace_fs_buffer_wait_start(bh);
 	wait_on_bit(&bh->b_state, BH_Lock, sync_buffer, TASK_UNINTERRUPTIBLE);
+	trace_fs_buffer_wait_end(bh);
 }
 
 static void

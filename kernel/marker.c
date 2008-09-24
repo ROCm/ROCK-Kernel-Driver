@@ -103,11 +103,11 @@ void marker_probe_cb(const struct marker *mdata, void *call_private, ...)
 	char ptype;
 
 	/*
-	 * preempt_disable does two things : disabling preemption to make sure
-	 * the teardown of the callbacks can be done correctly when they are in
-	 * modules and they insure RCU read coherency.
+	 * rcu_read_lock_sched does two things : disabling preemption to make
+	 * sure the teardown of the callbacks can be done correctly when they
+	 * are in modules and they insure RCU read coherency.
 	 */
-	preempt_disable();
+	rcu_read_lock_sched();
 	ptype = mdata->ptype;
 	if (likely(!ptype)) {
 		marker_probe_func *func;
@@ -145,7 +145,7 @@ void marker_probe_cb(const struct marker *mdata, void *call_private, ...)
 			va_end(args);
 		}
 	}
-	preempt_enable();
+	rcu_read_unlock_sched();
 }
 EXPORT_SYMBOL_GPL(marker_probe_cb);
 
@@ -162,7 +162,7 @@ void marker_probe_cb_noarg(const struct marker *mdata, void *call_private, ...)
 	va_list args;	/* not initialized */
 	char ptype;
 
-	preempt_disable();
+	rcu_read_lock_sched();
 	ptype = mdata->ptype;
 	if (likely(!ptype)) {
 		marker_probe_func *func;
@@ -195,7 +195,7 @@ void marker_probe_cb_noarg(const struct marker *mdata, void *call_private, ...)
 			multi[i].func(multi[i].probe_private, call_private,
 				mdata->format, &args);
 	}
-	preempt_enable();
+	rcu_read_unlock_sched();
 }
 EXPORT_SYMBOL_GPL(marker_probe_cb_noarg);
 
@@ -560,7 +560,7 @@ static int set_marker(struct marker_entry **entry, struct marker *elem,
  * Disable a marker and its probe callback.
  * Note: only waiting an RCU period after setting elem->call to the empty
  * function insures that the original callback is not used anymore. This insured
- * by preempt_disable around the call site.
+ * by rcu_read_lock_sched around the call site.
  */
 static void disable_marker(struct marker *elem)
 {

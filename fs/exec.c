@@ -50,6 +50,7 @@
 #include <linux/cn_proc.h>
 #include <linux/audit.h>
 #include <linux/tracehook.h>
+#include <trace/fs.h>
 
 #include <asm/uaccess.h>
 #include <asm/mmu_context.h>
@@ -1339,6 +1340,7 @@ int do_execve(char * filename,
 	current->flags &= ~PF_KTHREAD;
 	retval = search_binary_handler(bprm,regs);
 	if (retval >= 0) {
+		trace_fs_exec(filename);
 		/* execve success */
 		security_bprm_free(bprm);
 		acct_update_integrals(current);
