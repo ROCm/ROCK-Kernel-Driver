@@ -518,6 +518,7 @@ static void __free_pages_ok(struct page *page, unsigned int order)
 		return;
 	}
 #endif
+
 	for (i = 0 ; i < (1 << order) ; ++i)
 		reserved += free_pages_check(page + i);
 	if (reserved)

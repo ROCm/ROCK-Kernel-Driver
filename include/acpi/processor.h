@@ -379,7 +379,7 @@ static inline void acpi_thermal_cpufreq_exit(void)
 }
 #endif
 
-/* 
+/*
  * Following are interfaces geared to external processor PM control
  * logic like a VMM
  */
