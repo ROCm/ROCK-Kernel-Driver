@@ -41,16 +41,18 @@ char rpaname[] = "IBM,RPA-Client-Config";
  * it looks at the splpar field at least.  So these values need to be
  * reasonable.
  */
-#define N_RPA_DESCR	8
+#define N_RPA_DESCR	10
 unsigned int rpanote[N_RPA_DESCR] = {
-	0,			/* lparaffinity */
-	64,			/* min_rmo_size */
+	1,			/* lparaffinity */
+	128,			/* min_rmo_size */
 	0,			/* min_rmo_percent */
-	40,			/* max_pft_size */
+	46,			/* max_pft_size */
 	1,			/* splpar */
 	-1,			/* min_load */
-	0,			/* new_mem_def */
-	1,			/* ignore_my_client_config */
+	1,			/* new_mem_def */
+	0,			/* ignore_my_client_config */
+	1,			/* large_page_ready */
+	0,			/* force_alpha_mode */
 };
 
 #define ROUNDUP(len)	(((len) + 3) & ~3)

@@ -682,10 +682,10 @@ static unsigned char ibm_architecture_vec[] = {
 	W(0xffffffff),			/* virt_base */
 	W(0xffffffff),			/* virt_size */
 	W(0xffffffff),			/* load_base */
-	W(64),				/* 128MB min RMA */
+	W(128),				/* 128MB min RMA */
 	W(0xffffffff),			/* full client load */
 	0,				/* min RMA percentage of total RAM */
-	48,				/* max log_2(hash table size) */
+	46,				/* max log_2(hash table size) */
 
 	/* option vector 3: processor options supported */
 	3 - 2,				/* length */
@@ -737,6 +737,8 @@ static struct fake_elf {
 			u32	min_load;
 			u32	new_mem_def;
 			u32	ignore_me;
+			u32	large_page_ready;
+			u32	force_alpha_mode;
 		} rpadesc;
 	} rpanote;
 } fake_elf = {
@@ -781,13 +783,14 @@ static struct fake_elf {
 		.type = 0x12759999,
 		.name = "IBM,RPA-Client-Config",
 		.rpadesc = {
-			.lpar_affinity = 0,
-			.min_rmo_size = 64,	/* in megabytes */
+			.lpar_affinity = 1,
+			.min_rmo_size = 128,	/* in megabytes */
 			.min_rmo_percent = 0,
-			.max_pft_size = 48,	/* 2^48 bytes max PFT size */
+			.max_pft_size = 46,	/* 2^46 bytes max PFT size */
 			.splpar = 1,
 			.min_load = ~0U,
-			.new_mem_def = 0
+			.new_mem_def = 1,
+			.large_page_ready = 1
 		}
 	}
 };
