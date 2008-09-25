@@ -762,5 +762,7 @@ void pci_no_msi(void)
 
 void pci_msi_init_pci_dev(struct pci_dev *dev)
 {
+#ifndef CONFIG_XEN
 	INIT_LIST_HEAD(&dev->msi_list);
+#endif
 }

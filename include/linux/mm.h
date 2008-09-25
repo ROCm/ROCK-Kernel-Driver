@@ -187,7 +187,7 @@ struct vm_operations_struct {
 #ifdef CONFIG_XEN
 	/* Area-specific function for clearing the PTE at @ptep. Returns the
 	 * original value of @ptep. */
-	pte_t (*zap_pte)(struct vm_area_struct *vma,
+	pte_t (*zap_pte)(struct vm_area_struct *vma, 
 			 unsigned long addr, pte_t *ptep, int is_fullmm);
 #endif
 #ifdef CONFIG_NUMA

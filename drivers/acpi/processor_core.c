@@ -669,7 +669,7 @@ static int __cpuinit acpi_processor_start(struct acpi_device *device)
 	pr = acpi_driver_data(device);
 
 	result = acpi_processor_get_info(pr, device->flags.unique_id);
-	if (result ||
+	if (result || 
 	    ((pr->id == -1) && !processor_cntl_external())) {
 		/* Processor is physically not present */
 		return 0;

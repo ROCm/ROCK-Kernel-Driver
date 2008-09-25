@@ -379,7 +379,7 @@ static inline void acpi_thermal_cpufreq_exit(void)
 }
 #endif
 
-/*
+/* 
  * Following are interfaces geared to external processor PM control
  * logic like a VMM
  */
@@ -403,7 +403,7 @@ struct processor_extcntl_ops {
 	/* Transfer processor PM events to external control logic */
 	int (*pm_ops[PM_TYPE_MAX])(struct acpi_processor *pr, int event);
 	/* Notify physical processor status to external control logic */
-	int (*hotplug)(struct acpi_processor *pr, int event);
+	int (*hotplug)(struct acpi_processor *pr, int type);
 };
 extern const struct processor_extcntl_ops *processor_extcntl_ops;
 

@@ -49,10 +49,4 @@
 #define NR_IRQS			(NR_PIRQS + NR_DYNIRQS)
 #define NR_IRQ_VECTORS		NR_IRQS
 
-#define pirq_to_irq(_x)		((_x) + PIRQ_BASE)
-#define irq_to_pirq(_x)		((_x) - PIRQ_BASE)
-
-#define dynirq_to_irq(_x)	((_x) + DYNIRQ_BASE)
-#define irq_to_dynirq(_x)	((_x) - DYNIRQ_BASE)
-
 #endif /* _ASM_IRQ_VECTORS_H */

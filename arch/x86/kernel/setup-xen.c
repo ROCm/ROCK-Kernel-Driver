@@ -789,6 +789,10 @@ void __init setup_arch(char **cmdline_p)
 
 	parse_early_param();
 
+#ifdef CONFIG_X86_64
+	check_efer();
+#endif
+
 #if defined(CONFIG_VMI) && defined(CONFIG_X86_32)
 	/*
 	 * Must be before kernel pagetables are setup
@@ -862,7 +866,6 @@ void __init setup_arch(char **cmdline_p)
 	num_physpages = max_pfn;
 	max_mapnr = max_pfn;
 
-	check_efer();
 
 	/* How many end-of-memory variables you have, grandma! */
 	/* need this before calling reserve_initrd */
@@ -885,7 +888,7 @@ void __init setup_arch(char **cmdline_p)
 						     max_pfn<<PAGE_SHIFT);
 	max_low_pfn_mapped = init_memory_mapping(0, max_low_pfn<<PAGE_SHIFT);
 	if (max_pfn > max_low_pfn)
-		/* can we preseve max_low_pfn ?*/
+		/* can we preserve max_low_pfn ?*/
 		max_low_pfn = max_pfn;
 	else
 		max_pfn_mapped = max_low_pfn_mapped;

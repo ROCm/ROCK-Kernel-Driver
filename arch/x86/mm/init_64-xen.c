@@ -719,7 +719,7 @@ static void __init find_early_table_space(unsigned long end)
 		end, table_start << PAGE_SHIFT, table_end << PAGE_SHIFT);
 }
 
-static void __init xen_finish_init_mapping(void)
+static void __init xen_finish_init_mapping(bool reserve)
 {
 	unsigned long i, start, end;
 
@@ -749,6 +749,7 @@ static void __init xen_finish_init_mapping(void)
 			BUG();
 
 	/* Allocate pte's for initial fixmaps from 'table_cur' allocator. */
+	start = table_cur;
 	table_end = ~0UL;
 
 	/*
@@ -777,6 +778,9 @@ static void __init xen_finish_init_mapping(void)
 
 	/* Disable the 'table_cur' allocator. */
 	table_end = table_cur;
+	if (reserve && table_cur > start)
+		reserve_early(start << PAGE_SHIFT,
+			      table_cur << PAGE_SHIFT, "FIXMAP");
 }
 
 static void __init init_gbpages(void)
@@ -955,14 +959,14 @@ unsigned long __init_refok init_memory_mapping(unsigned long start,
 	BUG_ON(table_cur > table_end);
 	if (start < (table_start << PAGE_SHIFT)) {
 		WARN_ON(table_cur != table_end);
-		xen_finish_init_mapping();
+		xen_finish_init_mapping(!first);
 	}
 
 	__flush_tlb_all();
 
 	if (first && table_end > table_start)
 		reserve_early(table_start << PAGE_SHIFT,
-				 table_end << PAGE_SHIFT, "PGTABLE");
+			      table_end << PAGE_SHIFT, "PGTABLE");
 
 	printk(KERN_INFO "last_map_addr: %lx end: %lx\n",
 			 last_map_addr, end);

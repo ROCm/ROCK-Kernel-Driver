@@ -317,13 +317,11 @@ asmlinkage void evtchn_do_upcall(struct pt_regs *regs)
 static int find_unbound_irq(void)
 {
 	static int warned;
-	int dynirq, irq;
+	int irq;
 
-	for (dynirq = 0; dynirq < NR_DYNIRQS; dynirq++) {
-		irq = dynirq_to_irq(dynirq);
+	for (irq = DYNIRQ_BASE; irq < (DYNIRQ_BASE + NR_DYNIRQS); irq++)
 		if (irq_bindcount[irq] == 0)
 			return irq;
-	}
 
 	if (!warned) {
 		warned = 1;
@@ -751,9 +749,12 @@ void evtchn_register_pirq(int irq)
 	irq_info[irq] = mk_irq_info(IRQT_PIRQ, irq, 0);
 }
 
-#ifndef CONFIG_X86_IO_APIC
-#undef IO_APIC_IRQ
-#define IO_APIC_IRQ(irq) ((irq) >= pirq_to_irq(16))
+#if defined(CONFIG_X86_IO_APIC)
+#define identity_mapped_irq(irq) (!IO_APIC_IRQ((irq) - PIRQ_BASE))
+#elif defined(CONFIG_X86)
+#define identity_mapped_irq(irq) (((irq) - PIRQ_BASE) < 16)
+#else
+#define identity_mapped_irq(irq) (1)
 #endif
 
 int evtchn_map_pirq(int irq, int xen_pirq)
@@ -761,10 +762,10 @@ int evtchn_map_pirq(int irq, int xen_pirq)
 	if (irq < 0) {
 		static DEFINE_SPINLOCK(irq_alloc_lock);
 
-		irq = pirq_to_irq(NR_PIRQS - 1);
+		irq = PIRQ_BASE + NR_PIRQS - 1;
 		spin_lock(&irq_alloc_lock);
 		do {
-			if (!IO_APIC_IRQ(irq))
+			if (identity_mapped_irq(irq))
 				continue;
 			if (!index_from_irq(irq)) {
 				BUG_ON(type_from_irq(irq) != IRQT_UNBOUND);
@@ -772,9 +773,9 @@ int evtchn_map_pirq(int irq, int xen_pirq)
 							    xen_pirq, 0);
 				break;
 			}
-		} while (--irq);
+		} while (--irq >= PIRQ_BASE);
 		spin_unlock(&irq_alloc_lock);
-		if (irq < pirq_to_irq(16))
+		if (irq < PIRQ_BASE)
 			return -ENOSPC;
 	} else if (!xen_pirq) {
 		if (unlikely(type_from_irq(irq) != IRQT_PIRQ))
@@ -793,29 +794,28 @@ int evtchn_map_pirq(int irq, int xen_pirq)
 
 int evtchn_get_xen_pirq(int irq)
 {
-	if (!IO_APIC_IRQ(irq))
+	if (identity_mapped_irq(irq))
 		return irq;
-	if (unlikely(type_from_irq(irq) != IRQT_PIRQ))
-		return 0;
+	BUG_ON(type_from_irq(irq) != IRQT_PIRQ);
 	return index_from_irq(irq);
 }
 
-static inline void pirq_unmask_notify(int pirq)
+static inline void pirq_unmask_notify(int irq)
 {
-	struct physdev_eoi eoi = { .irq = pirq };
-	if (unlikely(test_bit(pirq, pirq_needs_eoi)))
+	struct physdev_eoi eoi = { .irq = evtchn_get_xen_pirq(irq) };
+	if (unlikely(test_bit(irq - PIRQ_BASE, pirq_needs_eoi)))
 		VOID(HYPERVISOR_physdev_op(PHYSDEVOP_eoi, &eoi));
 }
 
-static inline void pirq_query_unmask(int pirq)
+static inline void pirq_query_unmask(int irq)
 {
 	struct physdev_irq_status_query irq_status;
-	irq_status.irq = pirq;
+	irq_status.irq = evtchn_get_xen_pirq(irq);
 	if (HYPERVISOR_physdev_op(PHYSDEVOP_irq_status_query, &irq_status))
 		irq_status.flags = 0;
-	clear_bit(pirq, pirq_needs_eoi);
+	clear_bit(irq - PIRQ_BASE, pirq_needs_eoi);
 	if (irq_status.flags & XENIRQSTAT_needs_eoi)
-		set_bit(pirq, pirq_needs_eoi);
+		set_bit(irq - PIRQ_BASE, pirq_needs_eoi);
 }
 
 /*
@@ -843,7 +843,7 @@ static unsigned int startup_pirq(unsigned int irq)
 	}
 	evtchn = bind_pirq.port;
 
-	pirq_query_unmask(irq_to_pirq(irq));
+	pirq_query_unmask(irq);
 
 	evtchn_to_irq[evtchn] = irq;
 	bind_evtchn_to_cpu(evtchn, 0);
@@ -851,7 +851,7 @@ static unsigned int startup_pirq(unsigned int irq)
 
  out:
 	unmask_evtchn(evtchn);
-	pirq_unmask_notify(irq_to_pirq(irq));
+	pirq_unmask_notify(irq);
 
 	return 0;
 }
@@ -905,7 +905,7 @@ static void end_pirq(unsigned int irq)
 		shutdown_pirq(irq);
 	} else if (VALID_EVTCHN(evtchn)) {
 		unmask_evtchn(evtchn);
-		pirq_unmask_notify(irq_to_pirq(irq));
+		pirq_unmask_notify(irq);
 	}
 }
 
@@ -1091,7 +1091,7 @@ static void restore_cpu_ipis(unsigned int cpu)
 
 void irq_resume(void)
 {
-	unsigned int cpu, pirq, irq, evtchn;
+	unsigned int cpu, irq, evtchn;
 
 	init_evtchn_cpu_bindings();
 
@@ -1100,8 +1100,8 @@ void irq_resume(void)
 		mask_evtchn(evtchn);
 
 	/* Check that no PIRQs are still bound. */
-	for (pirq = 0; pirq < NR_PIRQS; pirq++)
-		BUG_ON(irq_info[pirq_to_irq(pirq)] != IRQ_UNBOUND);
+	for (irq = PIRQ_BASE; irq < (PIRQ_BASE + NR_PIRQS); irq++)
+		BUG_ON(irq_info[irq] != IRQ_UNBOUND);
 
 	/* No IRQ <-> event-channel mappings. */
 	for (irq = 0; irq < NR_IRQS; irq++)
@@ -1131,30 +1131,31 @@ void __init xen_init_IRQ(void)
 		irq_info[i] = IRQ_UNBOUND;
 
 	/* Dynamic IRQ space is currently unbound. Zero the refcnts. */
-	for (i = 0; i < NR_DYNIRQS; i++) {
-		irq_bindcount[dynirq_to_irq(i)] = 0;
+	for (i = DYNIRQ_BASE; i < (DYNIRQ_BASE + NR_DYNIRQS); i++) {
+		irq_bindcount[i] = 0;
 
-		irq_desc[dynirq_to_irq(i)].status = IRQ_DISABLED;
-		irq_desc[dynirq_to_irq(i)].action = NULL;
-		irq_desc[dynirq_to_irq(i)].depth = 1;
-		set_irq_chip_and_handler_name(dynirq_to_irq(i), &dynirq_chip,
+		irq_desc[i].status = IRQ_DISABLED;
+		irq_desc[i].action = NULL;
+		irq_desc[i].depth = 1;
+		set_irq_chip_and_handler_name(i, &dynirq_chip,
 		                              handle_level_irq, "level");
 	}
 
 	/* Phys IRQ space is statically bound (1:1 mapping). Nail refcnts. */
-	for (i = 0; i < NR_PIRQS; i++) {
-		irq_bindcount[pirq_to_irq(i)] = 1;
+	for (i = PIRQ_BASE; i < (PIRQ_BASE + NR_PIRQS); i++) {
+		irq_bindcount[i] = 1;
 
 #ifdef RTC_IRQ
 		/* If not domain 0, force our RTC driver to fail its probe. */
-		if ((i == RTC_IRQ) && !is_initial_xendomain())
+		if (identity_mapped_irq(i) && ((i - PIRQ_BASE) == RTC_IRQ)
+		    && !is_initial_xendomain())
 			continue;
 #endif
 
-		irq_desc[pirq_to_irq(i)].status = IRQ_DISABLED;
-		irq_desc[pirq_to_irq(i)].action = NULL;
-		irq_desc[pirq_to_irq(i)].depth = 1;
-		set_irq_chip_and_handler_name(pirq_to_irq(i), &pirq_chip,
+		irq_desc[i].status = IRQ_DISABLED;
+		irq_desc[i].action = NULL;
+		irq_desc[i].depth = 1;
+		set_irq_chip_and_handler_name(i, &pirq_chip,
 		                              handle_level_irq, "level");
 	}
 }

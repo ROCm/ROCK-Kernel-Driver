@@ -272,7 +272,7 @@ extern pteval_t __supported_pte_mask;
 
 static inline pte_t pfn_pte(unsigned long page_nr, pgprot_t pgprot)
 {
-	pgprotval_t prot = pgprot_val(pgprot); 
+	pgprotval_t prot = pgprot_val(pgprot);
 
 	if (prot & _PAGE_PRESENT)
 		prot &= __supported_pte_mask;
@@ -281,7 +281,7 @@ static inline pte_t pfn_pte(unsigned long page_nr, pgprot_t pgprot)
 
 static inline pte_t pfn_pte_ma(unsigned long page_nr, pgprot_t pgprot)
 {
-	pgprotval_t prot = pgprot_val(pgprot); 
+	pgprotval_t prot = pgprot_val(pgprot);
 
 	if (prot & _PAGE_PRESENT)
 		prot &= __supported_pte_mask;
@@ -290,7 +290,7 @@ static inline pte_t pfn_pte_ma(unsigned long page_nr, pgprot_t pgprot)
 
 static inline pmd_t pfn_pmd(unsigned long page_nr, pgprot_t pgprot)
 {
-	pgprotval_t prot = pgprot_val(pgprot); 
+	pgprotval_t prot = pgprot_val(pgprot);
 
 	if (prot & _PAGE_PRESENT)
 		prot &= __supported_pte_mask;

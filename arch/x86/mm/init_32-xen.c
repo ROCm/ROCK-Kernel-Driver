@@ -64,8 +64,8 @@ static noinline int do_test_wp_bit(void);
 
 
 static unsigned long __initdata table_start;
-static unsigned long __meminitdata table_end;
-static unsigned long __meminitdata table_top;
+static unsigned long __initdata table_end;
+static unsigned long __initdata table_top;
 
 static int __initdata after_init_bootmem;
 
@@ -454,11 +454,7 @@ static void __init pagetable_init(void)
 {
 	pgd_t *pgd_base = (pgd_t *)xen_start_info->pt_base;
 
-	xen_pagetable_setup_start(pgd_base);
-
 	permanent_kmaps_init(pgd_base);
-
-	xen_pagetable_setup_done(pgd_base);
 }
 
 #if defined(CONFIG_ACPI_SLEEP) && !defined(CONFIG_XEN)
@@ -889,7 +885,7 @@ unsigned long __init_refok init_memory_mapping(unsigned long start,
 
 	if (!after_init_bootmem)
 		reserve_early(table_start << PAGE_SHIFT,
-				 table_end << PAGE_SHIFT, "PGTABLE");
+			      table_end << PAGE_SHIFT, "PGTABLE");
 
 	if (!after_init_bootmem)
 		early_memtest(start, end);

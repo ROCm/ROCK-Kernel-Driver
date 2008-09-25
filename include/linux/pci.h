@@ -234,7 +234,7 @@ struct pci_dev {
 	int rom_attr_enabled;		/* has display of the rom attribute been enabled? */
 	struct bin_attribute *res_attr[DEVICE_COUNT_RESOURCE]; /* sysfs file for resources */
 	struct bin_attribute *res_attr_wc[DEVICE_COUNT_RESOURCE]; /* sysfs file for WC mapping of resources */
-#ifdef CONFIG_PCI_MSI
+#if defined(CONFIG_PCI_MSI) && !defined(CONFIG_XEN)
 	struct list_head msi_list;
 #endif
 	struct pci_vpd *vpd;

@@ -141,7 +141,7 @@ static void convert_psd_pack(struct xen_psd_package *xpsd,
 
 static int xen_px_notifier(struct acpi_processor *pr, int action)
 {
-	int ret;
+	int ret = -EINVAL;
 	xen_platform_op_t op = {
 		.cmd			= XENPF_set_processor_pminfo,
 		.interface_version	= XENPF_INTERFACE_VERSION,
@@ -153,48 +153,66 @@ static int xen_px_notifier(struct acpi_processor *pr, int action)
 	struct acpi_processor_performance *px;
 	struct acpi_psd_package *pdomain;
 
-	/* leave dynamic ppc handle in the future */
-	if (action == PROCESSOR_PM_CHANGE)
-		return 0;
+	if (!pr)
+		return -EINVAL;
 
 	perf = &op.u.set_pminfo.perf;
 	px = pr->performance;
 
-	perf->flags = XEN_PX_PPC | 
-		      XEN_PX_PCT | 
-		      XEN_PX_PSS | 
-		      XEN_PX_PSD;
+	switch(action) {
+	case PROCESSOR_PM_CHANGE:
+		/* ppc dynamic handle */
+		perf->flags = XEN_PX_PPC;
+		perf->platform_limit = pr->performance_platform_limit;
 
-	/* ppc */
-	perf->ppc = pr->performance_platform_limit;
+		ret = HYPERVISOR_platform_op(&op);
+		break;
 
-	/* pct */
-	convert_pct_reg(&perf->control_register, &px->control_register);
-	convert_pct_reg(&perf->status_register, &px->status_register);
+	case PROCESSOR_PM_INIT:
+		/* px normal init */
+		perf->flags = XEN_PX_PPC | 
+			      XEN_PX_PCT | 
+			      XEN_PX_PSS | 
+			      XEN_PX_PSD;
 
-	/* pss */
-	perf->state_count = px->state_count;
-	states = kzalloc(px->state_count*sizeof(xen_processor_px_t),GFP_KERNEL);
-	if (!states)
-		return -ENOMEM;
-	convert_pss_states(states, px->states, px->state_count);
-	set_xen_guest_handle(perf->states, states);
+		/* ppc */
+		perf->platform_limit = pr->performance_platform_limit;
 
-	/* psd */
-	pdomain = &px->domain_info;
-	convert_psd_pack(&perf->domain_info, pdomain);
-	if (perf->domain_info.num_processors) {
+		/* pct */
+		convert_pct_reg(&perf->control_register, &px->control_register);
+		convert_pct_reg(&perf->status_register, &px->status_register);
+
+		/* pss */
+		perf->state_count = px->state_count;
+		states = kzalloc(px->state_count*sizeof(xen_processor_px_t),GFP_KERNEL);
+		if (!states)
+			return -ENOMEM;
+		convert_pss_states(states, px->states, px->state_count);
+		set_xen_guest_handle(perf->states, states);
+
+		/* psd */
+		pdomain = &px->domain_info;
+		convert_psd_pack(&perf->domain_info, pdomain);
 		if (pdomain->coord_type == DOMAIN_COORD_TYPE_SW_ALL)
 			perf->shared_type = CPUFREQ_SHARED_TYPE_ALL;
 		else if (pdomain->coord_type == DOMAIN_COORD_TYPE_SW_ANY)
 			perf->shared_type = CPUFREQ_SHARED_TYPE_ANY;
 		else if (pdomain->coord_type == DOMAIN_COORD_TYPE_HW_ALL)
 			perf->shared_type = CPUFREQ_SHARED_TYPE_HW;
-	} else
-		perf->shared_type = CPUFREQ_SHARED_TYPE_NONE;
+		else {
+			ret = -ENODEV;
+			kfree(states);
+			break;
+		}
 
-	ret = HYPERVISOR_platform_op(&op);
-	kfree(states);
+		ret = HYPERVISOR_platform_op(&op);
+		kfree(states);
+		break;
+
+	default:
+		break;
+	}
+
 	return ret;
 }
 

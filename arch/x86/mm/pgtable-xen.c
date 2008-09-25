@@ -469,9 +469,7 @@ static void pgd_ctor(void *p)
 	}
 
 #ifdef CONFIG_X86_64
-	/*
-	 * Set level3_user_pgt for vsyscall area
-	 */
+	/* set level3_user_pgt for vsyscall area */
 	__user_pgd(pgd)[pgd_index(VSYSCALL_START)] =
 		__pgd(__pa_symbol(level3_user_pgt) | _PAGE_TABLE);
 #endif
@@ -573,12 +571,6 @@ static int preallocate_pmds(pmd_t *pmds[], struct mm_struct *mm)
 			failed = true;
 		pmds[i] = pmd;
 	}
-
-	/* Protect against save/restore: move below 4GB under pgd_lock. */
-	if (!failed
-	    && !xen_feature(XENFEAT_pae_pgdir_above_4gb)
-	    && xen_create_contiguous_region((unsigned long)mm->pgd, 0, 32))
-		failed = true;
 
 	if (failed) {
 		free_pmds(pmds, mm, false);
@@ -688,6 +680,15 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
 	 * never see a partially populated pgd.
 	 */
 	spin_lock_irqsave(&pgd_lock, flags);
+
+#ifdef CONFIG_X86_PAE
+	/* Protect against save/restore: move below 4GB under pgd_lock. */
+	if (!xen_feature(XENFEAT_pae_pgdir_above_4gb)
+	    && xen_create_contiguous_region((unsigned long)pgd, 0, 32)) {
+		spin_unlock_irqrestore(&pgd_lock, flags);
+		goto out_free_pmds;
+	}
+#endif
 
 	pgd_ctor(pgd);
 	pgd_prepopulate_pmd(mm, pgd, pmds);
