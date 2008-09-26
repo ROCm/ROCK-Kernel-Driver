@@ -120,6 +120,35 @@ do {											\
 #define __raw_read_can_lock(rw)		(*(volatile int *)(rw) >= 0)
 #define __raw_write_can_lock(rw)	(*(volatile int *)(rw) == 0)
 
+#ifdef ASM_SUPPORTED
+#define __raw_read_lock_flags(rw, flags)					\
+do {										\
+	__asm__ __volatile__ (							\
+		"tbit.nz p6,p0 = %1,%2\n"					\
+		"br.few 3f\n"							\
+		"1:\n"								\
+		"fetchadd4.rel r2 = [%0],-1;;\n"				\
+		"(p6) ssm psr.i\n"						\
+		"2:\n"								\
+		"hint @pause\n"							\
+		"ld4 r2 = [%0];;\n"						\
+		"cmp4.lt p7,p0 = r2,r0\n"					\
+		"(p7) br.cond.spnt.few 2b\n"					\
+		"(p6) rsm psr.i;;\n"						\
+		"3:\n"								\
+		"fetchadd4.acq r2 = [%0],1;;\n"					\
+		"cmp4.lt p7,p0 = r2,r0\n"					\
+		"(p7) br.cond.spnt.few 1b\n"					\
+		:: "r"(rw), "r"(flags), "i"(IA64_PSR_I_BIT)			\
+		: "p6", "p7", "r2", "memory");					\
+} while(0)
+
+#define __raw_read_lock(lock) __raw_read_lock_flags(lock, 0)
+
+#else /* !ASM_SUPPORTED */
+
+#define __raw_read_lock_flags(rw, flags) __raw_read_lock(rw)
+
 #define __raw_read_lock(rw)								\
 do {											\
 	raw_rwlock_t *__read_lock_ptr = (rw);						\
@@ -131,6 +160,8 @@ do {											\
 	}										\
 } while (0)
 
+#endif /* !ASM_SUPPORTED */
+
 #define __raw_read_unlock(rw)					\
 do {								\
 	raw_rwlock_t *__read_lock_ptr = (rw);			\
@@ -138,20 +169,27 @@ do {								\
 } while (0)
 
 #ifdef ASM_SUPPORTED
-#define __raw_write_lock(rw)							\
+#define __raw_write_lock_flags(rw, flags)					\
 do {										\
  	__asm__ __volatile__ (							\
 		"mov ar.ccv = r0\n"						\
+		"tbit.nz p6,p0 = %1,%2\n"					\
 		"dep r29 = -1, r0, 31, 1;;\n"					\
 		"1:\n"								\
+		"(p6) ssm psr.i\n"						\
+		"2:\n"								\
 		"ld4 r2 = [%0];;\n"						\
 		"cmp4.eq p0,p7 = r0,r2\n"					\
-		"(p7) br.cond.spnt.few 1b \n"					\
+		"(p7) br.cond.spnt.few 2b \n"					\
+		"(p6) rsm psr.i;;\n"						\
 		"cmpxchg4.acq r2 = [%0], r29, ar.ccv;;\n"			\
 		"cmp4.eq p0,p7 = r0, r2\n"					\
 		"(p7) br.cond.spnt.few 1b;;\n"					\
-		:: "r"(rw) : "ar.ccv", "p7", "r2", "r29", "memory");		\
+		:: "r"(rw), "r"(flags), "i"(IA64_PSR_I_BIT)			\
+		: "ar.ccv", "p6", "p7", "r2", "r29", "memory");			\
 } while(0)
+
+#define __raw_write_lock(rw) __raw_write_lock_flags(rw, 0)
 
 #define __raw_write_trylock(rw)							\
 ({										\
@@ -173,6 +211,8 @@ static inline void __raw_write_unlock(raw_rwlock_t *x)
 }
 
 #else /* !ASM_SUPPORTED */
+
+#define __raw_write_lock_flags(l, flags) __raw_write_lock(l)
 
 #define __raw_write_lock(l)								\
 ({											\
