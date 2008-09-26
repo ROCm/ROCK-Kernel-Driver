@@ -849,6 +849,20 @@ static int inet6_net_init(struct net *net)
 	net->ipv6.sysctl.ip6_rt_min_advmss = IPV6_MIN_MTU - 20 - 40;
 	net->ipv6.sysctl.icmpv6_time = 1*HZ;
 
+	mem_reserve_init(&net->ipv6.ip6_rt_reserve, "IPv6 route cache",
+			 &net_rx_reserve);
+	/*
+	 * XXX: requires that net->ipv6.ip6_dst_ops is already set-up
+	 *      but afaikt its impossible to order the various
+	 *      pernet_subsys calls so that this one is done after
+	 *      ip6_route_net_init().
+	 */
+	err = mem_reserve_kmem_cache_set(&net->ipv6.ip6_rt_reserve,
+			net->ipv6.ip6_dst_ops->kmem_cachep,
+			net->ipv6.sysctl.ip6_rt_max_size);
+	if (err)
+		goto reserve_fail;
+
 #ifdef CONFIG_PROC_FS
 	err = udp6_proc_init(net);
 	if (err)
@@ -859,8 +873,8 @@ static int inet6_net_init(struct net *net)
 	err = ac6_proc_init(net);
 	if (err)
 		goto proc_ac6_fail;
-out:
 #endif
+out:
 	return err;
 
 #ifdef CONFIG_PROC_FS
@@ -868,8 +882,10 @@ proc_ac6_fail:
 	tcp6_proc_exit(net);
 proc_tcp6_fail:
 	udp6_proc_exit(net);
-	goto out;
 #endif
+reserve_fail:
+	mem_reserve_disconnect(&net->ipv6.ip6_rt_reserve);
+	goto out;
 }
 
 static void inet6_net_exit(struct net *net)

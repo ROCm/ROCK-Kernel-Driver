@@ -107,6 +107,8 @@
 #ifdef CONFIG_SYSCTL
 #include <linux/sysctl.h>
 #endif
+#include <linux/reserve.h>
+#include <linux/mutex.h>
 
 #define RT_FL_TOS(oldflp) \
     ((u32)(oldflp->fl4_tos & (IPTOS_RT_MASK | RTO_ONLINK)))
@@ -391,6 +393,67 @@ static int rt_cache_seq_show(struct seq_file *seq, void *v)
 		seq_printf(seq, "%*s\n", 127 - len, "");
 	}
 	return 0;
+}
+
+static struct mem_reserve ipv4_route_reserve;
+static DEFINE_MUTEX(ipv4_route_lock);
+
+static int proc_dointvec_route(struct ctl_table *table, int write,
+		struct file *filp, void __user *buffer, size_t *lenp,
+		loff_t *ppos)
+{
+	int new_size, ret;
+
+	mutex_lock(&ipv4_route_lock);
+
+	if (write)
+		table->data = &new_size;
+
+	ret = proc_dointvec(table, write, filp, buffer, lenp, ppos);
+
+	if (!ret && write) {
+		ret = mem_reserve_kmem_cache_set(&ipv4_route_reserve,
+				ipv4_dst_ops.kmem_cachep, new_size);
+		if (!ret)
+			ip_rt_max_size = new_size;
+	}
+
+	if (write)
+		table->data = &ip_rt_max_size;
+
+	mutex_unlock(&ipv4_route_lock);
+
+	return ret;
+}
+
+static int sysctl_intvec_route(struct ctl_table *table,
+		int __user *name, int nlen,
+		void __user *oldval, size_t __user *oldlenp,
+		void __user *newval, size_t newlen)
+{
+	int write = (newval && newlen);
+	int new_size, ret;
+
+	mutex_lock(&ipv4_route_lock);
+
+	if (write)
+		table->data = &new_size;
+
+	ret = sysctl_intvec(table, name, nlen, oldval, oldlenp, newval, newlen);
+
+	if (!ret && write) {
+		ret = mem_reserve_kmem_cache_set(&ipv4_route_reserve,
+				ipv4_dst_ops.kmem_cachep, new_size);
+		if (!ret)
+			ip_rt_max_size = new_size;
+	}
+
+	if (write)
+		table->data = &ip_rt_max_size;
+
+	mutex_unlock(&ipv4_route_lock);
+
+	return ret;
 }
 
 static const struct seq_operations rt_cache_seq_ops = {
@@ -2991,7 +3054,8 @@ static ctl_table ipv4_route_table[] = {
 		.data		= &ip_rt_max_size,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
-		.proc_handler	= &proc_dointvec,
+		.proc_handler	= &proc_dointvec_route,
+		.strategy	= &sysctl_intvec_route,
 	},
 	{
 		/*  Deprecated. Use gc_min_interval_ms */
@@ -3269,6 +3333,13 @@ int __init ip_rt_init(void)
 
 	ipv4_dst_ops.gc_thresh = (rt_hash_mask + 1);
 	ip_rt_max_size = (rt_hash_mask + 1) * 16;
+
+	mutex_init(&ipv4_route_lock);
+
+	mem_reserve_init(&ipv4_route_reserve, "IPv4 route cache",
+			&net_rx_reserve);
+	mem_reserve_kmem_cache_set(&ipv4_route_reserve,
+			ipv4_dst_ops.kmem_cachep, ip_rt_max_size);
 
 	devinet_init();
 	ip_fib_init();

@@ -65,6 +65,8 @@ void kmem_cache_free(struct kmem_cache *, void *);
 unsigned int kmem_cache_size(struct kmem_cache *);
 const char *kmem_cache_name(struct kmem_cache *);
 int kmem_ptr_validate(struct kmem_cache *cachep, const void *ptr);
+unsigned kmem_alloc_estimate(struct kmem_cache *cachep,
+			gfp_t flags, int objects);
 
 /*
  * Please use this macro to create slab caches. Simply specify the
@@ -100,6 +102,8 @@ void * __must_check __krealloc(const void *, size_t, gfp_t);
 void * __must_check krealloc(const void *, size_t, gfp_t);
 void kfree(const void *);
 size_t ksize(const void *);
+unsigned kmalloc_estimate_objs(size_t, gfp_t, int);
+unsigned kmalloc_estimate_bytes(gfp_t, size_t);
 
 /*
  * Allocator specific definitions. These are mainly used to establish optimized
@@ -226,12 +230,13 @@ static inline void *kmem_cache_alloc_node(struct kmem_cache *cachep,
  */
 #if defined(CONFIG_DEBUG_SLAB) || defined(CONFIG_SLUB)
 extern void *__kmalloc_track_caller(size_t, gfp_t, void*);
-#define kmalloc_track_caller(size, flags) \
-	__kmalloc_track_caller(size, flags, __builtin_return_address(0))
 #else
-#define kmalloc_track_caller(size, flags) \
+#define __kmalloc_track_caller(size, flags, ip) \
 	__kmalloc(size, flags)
 #endif /* DEBUG_SLAB */
+
+#define kmalloc_track_caller(size, flags) \
+	__kmalloc_track_caller(size, flags, __builtin_return_address(0))
 
 #ifdef CONFIG_NUMA
 /*
@@ -244,20 +249,21 @@ extern void *__kmalloc_track_caller(size_t, gfp_t, void*);
  */
 #if defined(CONFIG_DEBUG_SLAB) || defined(CONFIG_SLUB)
 extern void *__kmalloc_node_track_caller(size_t, gfp_t, int, void *);
-#define kmalloc_node_track_caller(size, flags, node) \
-	__kmalloc_node_track_caller(size, flags, node, \
-			__builtin_return_address(0))
 #else
-#define kmalloc_node_track_caller(size, flags, node) \
+#define __kmalloc_node_track_caller(size, flags, node, ip) \
 	__kmalloc_node(size, flags, node)
 #endif
 
 #else /* CONFIG_NUMA */
 
-#define kmalloc_node_track_caller(size, flags, node) \
-	kmalloc_track_caller(size, flags)
+#define __kmalloc_node_track_caller(size, flags, node, ip) \
+	__kmalloc_track_caller(size, flags, ip)
 
 #endif /* DEBUG_SLAB */
+
+#define kmalloc_node_track_caller(size, flags, node) \
+	__kmalloc_node_track_caller(size, flags, node, \
+			__builtin_return_address(0))
 
 /*
  * Shortcuts
