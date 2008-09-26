@@ -16,6 +16,7 @@
 
 
 #include <linux/kernel.h>
+#include <linux/sched.h>
 #include <linux/pci.h>
 #include <linux/stat.h>
 #include <linux/topology.h>
@@ -517,10 +518,9 @@ pci_mmap_resource(struct kobject *kobj, struct bin_attribute *attr,
 	 * the resource
 	 */
 	if (map_offset + map_len > pci_resource_len(pdev, i)) {
-		printk(KERN_ERR "Out of range mapping: map_offset(%x)"
-			" map_len(%x) resource_len(%x)\n", map_offset,
-			map_len, pci_resource_len(pdev, i));
-		WARN_ON(1);
+		WARN(1, "process \"%s\" tried to map 0x%08lx-0x%08lx on BAR %d (size 0x%08lx)\n",
+		     current->comm, map_offset, map_offset + map_len, i,
+		     (unsigned long)pci_resource_len(pdev, i));
 		return -EINVAL;
 	}
 
