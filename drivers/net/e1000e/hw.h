@@ -874,6 +874,7 @@ struct e1000_hw {
 
 	u8 __iomem *hw_addr;
 	u8 __iomem *flash_address;
+	resource_size_t flash_len;
 
 	struct e1000_mac_info  mac;
 	struct e1000_fc_info   fc;

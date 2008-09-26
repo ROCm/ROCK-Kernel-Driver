@@ -502,6 +502,8 @@ pci_mmap_resource(struct kobject *kobj, struct bin_attribute *attr,
 	struct resource *res = (struct resource *)attr->private;
 	enum pci_mmap_state mmap_type;
 	resource_size_t start, end;
+	unsigned long map_len = vma->vm_end - vma->vm_start;
+	unsigned long map_offset = vma->vm_pgoff << PAGE_SHIFT;
 	int i;
 
 	for (i = 0; i < PCI_ROM_RESOURCE; i++)
@@ -509,6 +511,18 @@ pci_mmap_resource(struct kobject *kobj, struct bin_attribute *attr,
 			break;
 	if (i >= PCI_ROM_RESOURCE)
 		return -ENODEV;
+
+	/*
+	 * Make sure the range the user is trying to map falls within
+	 * the resource
+	 */
+	if (map_offset + map_len > pci_resource_len(pdev, i)) {
+		printk(KERN_ERR "Out of range mapping: map_offset(%x)"
+			" map_len(%x) resource_len(%x)\n", map_offset,
+			map_len, pci_resource_len(pdev, i));
+		WARN_ON(1);
+		return -EINVAL;
+	}
 
 	/* pci_mmap_page_range() expects the same kind of entry as coming
 	 * from /proc/bus/pci/ which is a "user visible" value. If this is
