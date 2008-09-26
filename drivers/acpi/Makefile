@@ -48,7 +48,6 @@ obj-$(CONFIG_ACPI_BATTERY)	+= battery.o
 obj-$(CONFIG_ACPI_BUTTON)	+= button.o
 obj-$(CONFIG_ACPI_FAN)		+= fan.o
 obj-$(CONFIG_ACPI_DOCK)		+= dock.o
-obj-$(CONFIG_ACPI_BAY)		+= bay.o
 
 obj-$(CONFIG_ACPI_VIDEO)	+= video.o
 ifdef CONFIG_ACPI_VIDEO
