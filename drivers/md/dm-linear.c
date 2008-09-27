@@ -52,6 +52,7 @@ static int linear_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 		ti->error = "dm-linear: Device lookup failed";
 		goto bad;
 	}
+	dm_table_support_barrier(ti->table);
 
 	ti->private = lc;
 	return 0;

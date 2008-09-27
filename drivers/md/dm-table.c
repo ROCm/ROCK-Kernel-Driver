@@ -38,6 +38,9 @@ struct dm_table {
 	sector_t *highs;
 	struct dm_target *targets;
 
+	unsigned single_device : 1;
+	unsigned barrier_supported : 1;
+
 	/*
 	 * Indicates the rw permissions for the new logical
 	 * device.  This should be a combination of FMODE_READ
@@ -539,11 +542,20 @@ EXPORT_SYMBOL_GPL(dm_set_device_limits);
 int dm_get_device(struct dm_target *ti, const char *path, sector_t start,
 		  sector_t len, int mode, struct dm_dev **result)
 {
-	int r = __table_get_device(ti->table, ti, path,
+	struct dm_table *t = ti->table;
+	int r = __table_get_device(t, ti, path,
 				   start, len, mode, result);
 
 	if (!r)
 		dm_set_device_limits(ti, (*result)->bdev);
+
+	if (!r) {
+		/* Only got single device? */
+		if (t->devices.next->next == &t->devices)
+			t->single_device = 1;
+		else
+			t->single_device = 0;
+	}
 
 	return r;
 }
@@ -1028,6 +1040,16 @@ struct mapped_device *dm_table_get_md(struct dm_table *t)
 	return t->md;
 }
 
+int dm_table_barrier_ok(struct dm_table *t)
+{
+	return t->single_device && t->barrier_supported;
+}
+
+void dm_table_support_barrier(struct dm_table *t)
+{
+	t->barrier_supported = 1;
+}
+
 EXPORT_SYMBOL(dm_vcalloc);
 EXPORT_SYMBOL(dm_get_device);
 EXPORT_SYMBOL(dm_put_device);
@@ -1038,5 +1060,7 @@ EXPORT_SYMBOL(dm_table_get_md);
 EXPORT_SYMBOL(dm_table_put);
 EXPORT_SYMBOL(dm_table_get);
 EXPORT_SYMBOL(dm_table_unplug_all);
+EXPORT_SYMBOL(dm_table_barrier_ok);
+EXPORT_SYMBOL(dm_table_support_barrier);
 EXPORT_SYMBOL(dm_table_request_based);
 EXPORT_SYMBOL(dm_table_set_request_based);

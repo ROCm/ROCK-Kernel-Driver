@@ -57,6 +57,8 @@ int dm_table_request_based(struct dm_table *t);
  * To check the return value from dm_table_find_target().
  */
 #define dm_target_is_valid(t) ((t)->table)
+int dm_table_barrier_ok(struct dm_table *t);
+void dm_table_support_barrier(struct dm_table *t);
 
 /*-----------------------------------------------------------------
  * A registry of target types.
