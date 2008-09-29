@@ -42,8 +42,6 @@
 #include <linux/udp.h>
 #include <linux/inet.h>
 #include <linux/netfilter_ipv4.h>
-#include <linux/reserve.h>
-#include <linux/nsproxy.h>
 
 /* NOTE. Logic of IP defragmentation is parallel to corresponding IPv6
  * code now. If you change something here, _PLEASE_ update ipv6/reassembly.c
@@ -601,66 +599,6 @@ int ip_defrag(struct sk_buff *skb, u32 user)
 }
 
 #ifdef CONFIG_SYSCTL
-static int proc_dointvec_fragment(struct ctl_table *table, int write,
-		struct file *filp, void __user *buffer, size_t *lenp,
-		loff_t *ppos)
-{
-	struct net *net = current->nsproxy->net_ns;
-	int new_bytes, ret;
-
-	mutex_lock(&net->ipv4.frags.lock);
-
-	if (write)
-		table->data = &new_bytes;
-
-	ret = proc_dointvec(table, write, filp, buffer, lenp, ppos);
-
-	if (!ret && write) {
-		ret = mem_reserve_kmalloc_set(&net->ipv4.frags.reserve,
-				new_bytes);
-		if (!ret)
-			net->ipv4.frags.high_thresh = new_bytes;
-	}
-
-	if (write)
-		table->data = &net->ipv4.frags.high_thresh;
-
-	mutex_unlock(&net->ipv4.frags.lock);
-
-	return ret;
-}
-
-static int sysctl_intvec_fragment(struct ctl_table *table,
-		int __user *name, int nlen,
-		void __user *oldval, size_t __user *oldlenp,
-		void __user *newval, size_t newlen)
-{
-	struct net *net = current->nsproxy->net_ns;
-	int write = (newval && newlen);
-	int new_bytes, ret;
-
-	mutex_lock(&net->ipv4.frags.lock);
-
-	if (write)
-		table->data = &new_bytes;
-
-	ret = sysctl_intvec(table, name, nlen, oldval, oldlenp, newval, newlen);
-
-	if (!ret && write) {
-		ret = mem_reserve_kmalloc_set(&net->ipv4.frags.reserve,
-				new_bytes);
-		if (!ret)
-			net->ipv4.frags.high_thresh = new_bytes;
-	}
-
-	if (write)
-		table->data = &net->ipv4.frags.high_thresh;
-
-	mutex_unlock(&net->ipv4.frags.lock);
-
-	return ret;
-}
-
 static int zero;
 
 static struct ctl_table ip4_frags_ns_ctl_table[] = {
@@ -670,8 +608,7 @@ static struct ctl_table ip4_frags_ns_ctl_table[] = {
 		.data		= &init_net.ipv4.frags.high_thresh,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
-		.proc_handler	= &proc_dointvec_fragment,
-		.strategy	= &sysctl_intvec_fragment,
+		.proc_handler	= &proc_dointvec
 	},
 	{
 		.ctl_name	= NET_IPV4_IPFRAG_LOW_THRESH,
@@ -774,8 +711,6 @@ static inline void ip4_frags_ctl_register(void)
 
 static int ipv4_frags_init_net(struct net *net)
 {
-	int ret;
-
 	/*
 	 * Fragment cache limits. We will commit 256K at one time. Should we
 	 * cross that limit we will prune down to 192K. This should cope with
@@ -793,31 +728,11 @@ static int ipv4_frags_init_net(struct net *net)
 
 	inet_frags_init_net(&net->ipv4.frags);
 
-	ret = ip4_frags_ns_ctl_register(net);
-	if (ret)
-		goto out_reg;
-
-	mem_reserve_init(&net->ipv4.frags.reserve, "IPv4 fragment cache",
-			&net_skb_reserve);
-	ret = mem_reserve_kmalloc_set(&net->ipv4.frags.reserve,
-			net->ipv4.frags.high_thresh);
-	if (ret)
-		goto out_reserve;
-
-	return 0;
-
-out_reserve:
-	mem_reserve_disconnect(&net->ipv4.frags.reserve);
-	ip4_frags_ns_ctl_unregister(net);
-out_reg:
-	inet_frags_exit_net(&net->ipv4.frags, &ip4_frags);
-
-	return ret;
+	return ip4_frags_ns_ctl_register(net);
 }
 
 static void ipv4_frags_exit_net(struct net *net)
 {
-	mem_reserve_disconnect(&net->ipv4.frags.reserve);
 	ip4_frags_ns_ctl_unregister(net);
 	inet_frags_exit_net(&net->ipv4.frags, &ip4_frags);
 }

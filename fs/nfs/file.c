@@ -413,7 +413,7 @@ static void nfs_invalidate_page(struct page *page, unsigned long offset)
 	if (offset != 0)
 		return;
 	/* Cancel any unstarted writes on this page */
-	nfs_wb_page_cancel(page_file_mapping(page)->host, page);
+	nfs_wb_page_cancel(page->mapping->host, page);
 }
 
 static int nfs_release_page(struct page *page, gfp_t gfp)
@@ -426,25 +426,13 @@ static int nfs_release_page(struct page *page, gfp_t gfp)
 
 static int nfs_launder_page(struct page *page)
 {
-	struct inode *inode = page_file_mapping(page)->host;
+	struct inode *inode = page->mapping->host;
 
 	dfprintk(PAGECACHE, "NFS: launder_page(%ld, %llu)\n",
 		inode->i_ino, (long long)page_offset(page));
 
 	return nfs_wb_page(inode, page);
 }
-
-#ifdef CONFIG_NFS_SWAP
-static int nfs_swapon(struct file *file)
-{
-	return xs_swapper(NFS_CLIENT(file->f_mapping->host)->cl_xprt, 1);
-}
-
-static int nfs_swapoff(struct file *file)
-{
-	return xs_swapper(NFS_CLIENT(file->f_mapping->host)->cl_xprt, 0);
-}
-#endif
 
 const struct address_space_operations nfs_file_aops = {
 	.readpage = nfs_readpage,
@@ -458,12 +446,6 @@ const struct address_space_operations nfs_file_aops = {
 	.releasepage = nfs_release_page,
 	.direct_IO = nfs_direct_IO,
 	.launder_page = nfs_launder_page,
-#ifdef CONFIG_NFS_SWAP
-	.swapon = nfs_swapon,
-	.swapoff = nfs_swapoff,
-	.swap_out = nfs_swap_out,
-	.swap_in = nfs_readpage,
-#endif
 };
 
 static int nfs_vm_page_mkwrite(struct vm_area_struct *vma, struct page *page)
@@ -480,7 +462,7 @@ static int nfs_vm_page_mkwrite(struct vm_area_struct *vma, struct page *page)
 		(long long)page_offset(page));
 
 	lock_page(page);
-	mapping = page_file_mapping(page);
+	mapping = page->mapping;
 	if (mapping != dentry->d_inode->i_mapping)
 		goto out_unlock;
 

@@ -513,15 +513,6 @@ struct address_space_operations {
 	int (*launder_page) (struct page *);
 	int (*is_partially_uptodate) (struct page *, read_descriptor_t *,
 					unsigned long);
-
-	/*
-	 * swapfile support
-	 */
-	int (*swapon)(struct file *file);
-	int (*swapoff)(struct file *file);
-	int (*swap_out)(struct file *file, struct page *page,
-			struct writeback_control *wbc);
-	int (*swap_in)(struct file *file, struct page *page);
 };
 
 /*

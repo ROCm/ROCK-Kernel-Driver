@@ -258,7 +258,7 @@ static void e1000_alloc_rx_buffers_ps(struct e1000_adapter *adapter,
 				continue;
 			}
 			if (!ps_page->page) {
-				ps_page->page = netdev_alloc_page(netdev);
+				ps_page->page = alloc_page(GFP_ATOMIC);
 				if (!ps_page->page) {
 					adapter->alloc_rx_buff_failed++;
 					goto no_buffers;
@@ -818,8 +818,11 @@ static bool e1000_clean_rx_irq_ps(struct e1000_adapter *adapter,
 			pci_unmap_page(pdev, ps_page->dma, PAGE_SIZE,
 				       PCI_DMA_FROMDEVICE);
 			ps_page->dma = 0;
-			skb_add_rx_frag(skb, j, ps_page->page, 0, length);
+			skb_fill_page_desc(skb, j, ps_page->page, 0, length);
 			ps_page->page = NULL;
+			skb->len += length;
+			skb->data_len += length;
+			skb->truesize += length;
 		}
 
 copydone:

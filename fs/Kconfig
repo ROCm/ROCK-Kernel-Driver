@@ -1716,18 +1716,6 @@ config ROOT_NFS
 
 	  Most people say N here.
 
-config NFS_SWAP
-	bool "Provide swap over NFS support"
-	default n
-	depends on NFS_FS
-	select SUNRPC_SWAP
-	help
-	  This option enables swapon to work on files located on NFS mounts.
-
-	  For more details, see Documentation/network-swap.txt
-
-	  If unsure, say N.
-
 config NFSD
 	tristate "NFS server support"
 	depends on INET
@@ -1848,11 +1836,6 @@ config SUNRPC_XPRT_RDMA
 	  choose M here: the module will be called xprtrdma.
 
 	  If unsure, say N.
-
-config SUNRPC_SWAP
-	def_bool n
-	depends on SUNRPC
-	select NETVM
 
 config RPCSEC_GSS_KRB5
 	tristate "Secure RPC: Kerberos V mechanism (EXPERIMENTAL)"

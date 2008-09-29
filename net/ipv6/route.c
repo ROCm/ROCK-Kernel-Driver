@@ -37,7 +37,6 @@
 #include <linux/mroute6.h>
 #include <linux/init.h>
 #include <linux/if_arp.h>
-#include <linux/reserve.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 #include <linux/nsproxy.h>
@@ -2474,66 +2473,6 @@ int ipv6_sysctl_rtcache_flush(ctl_table *ctl, int write, struct file * filp,
 		return -EINVAL;
 }
 
-static int proc_dointvec_route(struct ctl_table *table, int write,
-		struct file *filp, void __user *buffer, size_t *lenp,
-		loff_t *ppos)
-{
-	struct net *net = current->nsproxy->net_ns;
-	int new_size, ret;
-
-	mutex_lock(&net->ipv6.sysctl.ip6_rt_lock);
-
-	if (write)
-		table->data = &new_size;
-
-	ret = proc_dointvec(table, write, filp, buffer, lenp, ppos);
-
-	if (!ret && write) {
-		ret = mem_reserve_kmem_cache_set(&net->ipv6.ip6_rt_reserve,
-				net->ipv6.ip6_dst_ops->kmem_cachep, new_size);
-		if (!ret)
-			net->ipv6.sysctl.ip6_rt_max_size = new_size;
-	}
-
-	if (write)
-		table->data = &net->ipv6.sysctl.ip6_rt_max_size;
-
-	mutex_unlock(&net->ipv6.sysctl.ip6_rt_lock);
-
-	return ret;
-}
-
-static int sysctl_intvec_route(struct ctl_table *table,
-		int __user *name, int nlen,
-		void __user *oldval, size_t __user *oldlenp,
-		void __user *newval, size_t newlen)
-{
-	struct net *net = current->nsproxy->net_ns;
-	int write = (newval && newlen);
-	int new_size, ret;
-
-	mutex_lock(&net->ipv6.sysctl.ip6_rt_lock);
-
-	if (write)
-		table->data = &new_size;
-
-	ret = sysctl_intvec(table, name, nlen, oldval, oldlenp, newval, newlen);
-
-	if (!ret && write) {
-		ret = mem_reserve_kmem_cache_set(&net->ipv6.ip6_rt_reserve,
-				net->ipv6.ip6_dst_ops->kmem_cachep, new_size);
-		if (!ret)
-			net->ipv6.sysctl.ip6_rt_max_size = new_size;
-	}
-
-	if (write)
-		table->data = &net->ipv6.sysctl.ip6_rt_max_size;
-
-	mutex_unlock(&net->ipv6.sysctl.ip6_rt_lock);
-
-	return ret;
-}
-
 ctl_table ipv6_route_table_template[] = {
 	{
 		.procname	=	"flush",
@@ -2556,8 +2495,7 @@ ctl_table ipv6_route_table_template[] = {
 		.data		=	&init_net.ipv6.sysctl.ip6_rt_max_size,
 		.maxlen		=	sizeof(int),
 		.mode		=	0644,
-		.proc_handler	=	&proc_dointvec_route,
-		.strategy	= 	&sysctl_intvec_route,
+		.proc_handler	=	&proc_dointvec,
 	},
 	{
 		.ctl_name	=	NET_IPV6_ROUTE_GC_MIN_INTERVAL,
@@ -2644,8 +2582,6 @@ struct ctl_table *ipv6_route_sysctl_init(struct net *net)
 		table[7].data = &net->ipv6.sysctl.ip6_rt_mtu_expires;
 		table[8].data = &net->ipv6.sysctl.ip6_rt_min_advmss;
 	}
-
-	mutex_init(&net->ipv6.sysctl.ip6_rt_lock);
 
 	return table;
 }

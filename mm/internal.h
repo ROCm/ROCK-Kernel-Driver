@@ -64,16 +64,6 @@ static inline unsigned long page_order(struct page *page)
 #define __paginginit __init
 #endif
 
-#define ALLOC_HARDER		0x01 /* try to alloc harder */
-#define ALLOC_HIGH		0x02 /* __GFP_HIGH set */
-#define ALLOC_WMARK_MIN		0x04 /* use pages_min watermark */
-#define ALLOC_WMARK_LOW		0x08 /* use pages_low watermark */
-#define ALLOC_WMARK_HIGH	0x10 /* use pages_high watermark */
-#define ALLOC_NO_WATERMARKS	0x20 /* don't check watermarks at all */
-#define ALLOC_CPUSET		0x40 /* check for correct cpuset */
-
-int gfp_to_alloc_flags(gfp_t gfp_mask);
-
 /* Memory initialisation debug and verification */
 enum mminit_level {
 	MMINIT_WARNING,

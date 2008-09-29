@@ -4347,8 +4347,12 @@ static bool e1000_clean_rx_irq_ps(struct e1000_adapter *adapter,
 			pci_unmap_page(pdev, ps_page_dma->ps_page_dma[j],
 					PAGE_SIZE, PCI_DMA_FROMDEVICE);
 			ps_page_dma->ps_page_dma[j] = 0;
-			skb_add_rx_frag(skb, j, ps_page->ps_page[j], 0, length);
+			skb_fill_page_desc(skb, j, ps_page->ps_page[j], 0,
+			                   length);
 			ps_page->ps_page[j] = NULL;
+			skb->len += length;
+			skb->data_len += length;
+			skb->truesize += length;
 		}
 
 		/* strip the ethernet crc, problem is we're using pages now so
@@ -4547,7 +4551,7 @@ static void e1000_alloc_rx_buffers_ps(struct e1000_adapter *adapter,
 			if (j < adapter->rx_ps_pages) {
 				if (likely(!ps_page->ps_page[j])) {
 					ps_page->ps_page[j] =
-						netdev_alloc_page(netdev);
+						alloc_page(GFP_ATOMIC);
 					if (unlikely(!ps_page->ps_page[j])) {
 						adapter->alloc_rx_buff_failed++;
 						goto no_buffers;

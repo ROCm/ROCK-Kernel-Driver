@@ -2232,30 +2232,6 @@ void netif_nit_deliver(struct sk_buff *skb)
 	rcu_read_unlock();
 }
 
-/*
- * Filter the protocols for which the reserves are adequate.
- *
- * Before adding a protocol make sure that it is either covered by the existing
- * reserves, or add reserves covering the memory need of the new protocol's
- * packet processing.
- */
-static int skb_emergency_protocol(struct sk_buff *skb)
-{
-	if (skb_emergency(skb))
-		switch (skb->protocol) {
-		case __constant_htons(ETH_P_ARP):
-		case __constant_htons(ETH_P_IP):
-		case __constant_htons(ETH_P_IPV6):
-		case __constant_htons(ETH_P_8021Q):
-			break;
-
-		default:
-			return 0;
-		}
-
-	return 1;
-}
-
 /**
  *	netif_receive_skb - process receive buffer from network
  *	@skb: buffer to process
@@ -2278,23 +2254,10 @@ int netif_receive_skb(struct sk_buff *skb)
 	struct net_device *null_or_orig;
 	int ret = NET_RX_DROP;
 	__be16 type;
-	unsigned long pflags = current->flags;
-
-	/* Emergency skb are special, they should
-	 *  - be delivered to SOCK_MEMALLOC sockets only
-	 *  - stay away from userspace
-	 *  - have bounded memory usage
-	 *
-	 * Use PF_MEMALLOC as a poor mans memory pool - the grouping kind.
-	 * This saves us from propagating the allocation context down to all
-	 * allocation sites.
-	 */
-	if (skb_emergency(skb))
-		current->flags |= PF_MEMALLOC;
 
 	/* if we've gotten here through NAPI, check netpoll */
 	if (netpoll_receive_skb(skb))
-		goto out;
+		return NET_RX_DROP;
 
 	if (!skb->tstamp.tv64)
 		net_timestamp(skb);
@@ -2333,9 +2296,6 @@ int netif_receive_skb(struct sk_buff *skb)
 	}
 #endif
 
-	if (skb_emergency(skb))
-		goto skip_taps;
-
 #ifdef CONFIG_XEN
 	switch (skb->ip_summed) {
 	case CHECKSUM_UNNECESSARY:
@@ -2358,23 +2318,19 @@ int netif_receive_skb(struct sk_buff *skb)
 		}
 	}
 
-skip_taps:
 #ifdef CONFIG_NET_CLS_ACT
 	skb = handle_ing(skb, &pt_prev, &ret, orig_dev);
 	if (!skb)
-		goto unlock;
+		goto out;
 ncls:
 #endif
 
-	if (!skb_emergency_protocol(skb))
-		goto drop;
-
 	skb = handle_bridge(skb, &pt_prev, &ret, orig_dev);
 	if (!skb)
-		goto unlock;
+		goto out;
 	skb = handle_macvlan(skb, &pt_prev, &ret, orig_dev);
 	if (!skb)
-		goto unlock;
+		goto out;
 
 	type = skb->protocol;
 	list_for_each_entry_rcu(ptype,
@@ -2391,7 +2347,6 @@ ncls:
 	if (pt_prev) {
 		ret = pt_prev->func(skb, skb->dev, pt_prev, orig_dev);
 	} else {
-drop:
 		kfree_skb(skb);
 		/* Jamal, now you will not able to escape explaining
 		 * me how you were going to use this. :-)
@@ -2399,10 +2354,8 @@ drop:
 		ret = NET_RX_DROP;
 	}
 
-unlock:
-	rcu_read_unlock();
 out:
-	tsk_restore_flags(current, pflags, PF_MEMALLOC);
+	rcu_read_unlock();
 	return ret;
 }
 

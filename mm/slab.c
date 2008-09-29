@@ -116,8 +116,6 @@
 #include	<asm/tlbflush.h>
 #include	<asm/page.h>
 
-#include 	"internal.h"
-
 /*
  * DEBUG	- 1 for kmem_cache_create() to honour; SLAB_RED_ZONE & SLAB_POISON.
  *		  0 for faster, smaller code (especially in the critical paths).
@@ -266,8 +264,7 @@ struct array_cache {
 	unsigned int avail;
 	unsigned int limit;
 	unsigned int batchcount;
-	unsigned int touched:1,
-		     reserve:1;
+	unsigned int touched;
 	spinlock_t lock;
 	void *entry[];	/*
 			 * Must have this definition in here for the proper
@@ -763,27 +760,6 @@ static inline struct array_cache *cpu_cache_get(struct kmem_cache *cachep)
 	return cachep->array[smp_processor_id()];
 }
 
-/*
- * If the last page came from the reserves, and the current allocation context
- * does not have access to them, force an allocation to test the watermarks.
- */
-static inline int slab_force_alloc(struct kmem_cache *cachep, gfp_t flags)
-{
-	if (unlikely(cpu_cache_get(cachep)->reserve) &&
-			!(gfp_to_alloc_flags(flags) & ALLOC_NO_WATERMARKS))
-		return 1;
-
-	return 0;
-}
-
-static inline void slab_set_reserve(struct kmem_cache *cachep, int reserve)
-{
-	struct array_cache *ac = cpu_cache_get(cachep);
-
-	if (unlikely(ac->reserve != reserve))
-		ac->reserve = reserve;
-}
-
 static inline struct kmem_cache *__find_general_cachep(size_t size,
 							gfp_t gfpflags)
 {
@@ -983,7 +959,6 @@ static struct array_cache *alloc_arraycache(int node, int entries,
 		nc->limit = entries;
 		nc->batchcount = batchcount;
 		nc->touched = 0;
-		nc->reserve = 0;
 		spin_lock_init(&nc->lock);
 	}
 	return nc;
@@ -1686,8 +1661,7 @@ __initcall(cpucache_init);
  * did not request dmaable memory, we might get it, but that
  * would be relatively rare and ignorable.
  */
-static void *kmem_getpages(struct kmem_cache *cachep, gfp_t flags, int nodeid,
-		int *reserve)
+static void *kmem_getpages(struct kmem_cache *cachep, gfp_t flags, int nodeid)
 {
 	struct page *page;
 	int nr_pages;
@@ -1709,7 +1683,6 @@ static void *kmem_getpages(struct kmem_cache *cachep, gfp_t flags, int nodeid,
 	if (!page)
 		return NULL;
 
-	*reserve = page->reserve;
 	nr_pages = (1 << cachep->gfporder);
 	if (cachep->flags & SLAB_RECLAIM_ACCOUNT)
 		add_zone_page_state(page_zone(page),
@@ -2130,7 +2103,6 @@ static int __init_refok setup_cpu_cache(struct kmem_cache *cachep)
 	cpu_cache_get(cachep)->limit = BOOT_CPUCACHE_ENTRIES;
 	cpu_cache_get(cachep)->batchcount = 1;
 	cpu_cache_get(cachep)->touched = 0;
-	cpu_cache_get(cachep)->reserve = 0;
 	cachep->batchcount = 1;
 	cachep->limit = BOOT_CPUCACHE_ENTRIES;
 	return 0;
@@ -2785,7 +2757,6 @@ static int cache_grow(struct kmem_cache *cachep,
 	size_t offset;
 	gfp_t local_flags;
 	struct kmem_list3 *l3;
-	int reserve;
 
 	/*
 	 * Be lazy and only check for valid flags here,  keeping it out of the
@@ -2824,7 +2795,7 @@ static int cache_grow(struct kmem_cache *cachep,
 	 * 'nodeid'.
 	 */
 	if (!objp)
-		objp = kmem_getpages(cachep, local_flags, nodeid, &reserve);
+		objp = kmem_getpages(cachep, local_flags, nodeid);
 	if (!objp)
 		goto failed;
 
@@ -2841,7 +2812,6 @@ static int cache_grow(struct kmem_cache *cachep,
 	if (local_flags & __GFP_WAIT)
 		local_irq_disable();
 	check_irq_off();
-	slab_set_reserve(cachep, reserve);
 	spin_lock(&l3->list_lock);
 
 	/* Make slab active. */
@@ -2976,8 +2946,7 @@ bad:
 #define check_slabp(x,y) do { } while(0)
 #endif
 
-static void *cache_alloc_refill(struct kmem_cache *cachep,
-		gfp_t flags, int must_refill)
+static void *cache_alloc_refill(struct kmem_cache *cachep, gfp_t flags)
 {
 	int batchcount;
 	struct kmem_list3 *l3;
@@ -2987,8 +2956,6 @@ static void *cache_alloc_refill(struct kmem_cache *cachep,
 retry:
 	check_irq_off();
 	node = numa_node_id();
-	if (unlikely(must_refill))
-		goto force_grow;
 	ac = cpu_cache_get(cachep);
 	batchcount = ac->batchcount;
 	if (!ac->touched && batchcount > BATCHREFILL_LIMIT) {
@@ -3056,14 +3023,11 @@ alloc_done:
 
 	if (unlikely(!ac->avail)) {
 		int x;
-force_grow:
 		x = cache_grow(cachep, flags | GFP_THISNODE, node, NULL);
 
 		/* cache_grow can reenable interrupts, then ac could change. */
 		ac = cpu_cache_get(cachep);
-
-		/* no objects in sight? abort */
-		if (!x && (ac->avail == 0 || must_refill))
+		if (!x && ac->avail == 0)	/* no objects in sight? abort */
 			return NULL;
 
 		if (!ac->avail)		/* objects refilled by interrupt? */
@@ -3218,18 +3182,17 @@ static inline void *____cache_alloc(struct kmem_cache *cachep, gfp_t flags)
 {
 	void *objp;
 	struct array_cache *ac;
-	int must_refill = slab_force_alloc(cachep, flags);
 
 	check_irq_off();
 
 	ac = cpu_cache_get(cachep);
-	if (likely(ac->avail && !must_refill)) {
+	if (likely(ac->avail)) {
 		STATS_INC_ALLOCHIT(cachep);
 		ac->touched = 1;
 		objp = ac->entry[--ac->avail];
 	} else {
 		STATS_INC_ALLOCMISS(cachep);
-		objp = cache_alloc_refill(cachep, flags, must_refill);
+		objp = cache_alloc_refill(cachep, flags);
 	}
 	return objp;
 }
@@ -3273,7 +3236,7 @@ static void *fallback_alloc(struct kmem_cache *cache, gfp_t flags)
 	struct zone *zone;
 	enum zone_type high_zoneidx = gfp_zone(flags);
 	void *obj = NULL;
-	int nid, reserve;
+	int nid;
 
 	if (flags & __GFP_THISNODE)
 		return NULL;
@@ -3309,11 +3272,10 @@ retry:
 		if (local_flags & __GFP_WAIT)
 			local_irq_enable();
 		kmem_flagcheck(cache, flags);
-		obj = kmem_getpages(cache, local_flags, -1, &reserve);
+		obj = kmem_getpages(cache, local_flags, -1);
 		if (local_flags & __GFP_WAIT)
 			local_irq_disable();
 		if (obj) {
-			slab_set_reserve(cache, reserve);
 			/*
 			 * Insert into the appropriate per node queues
 			 */
@@ -3352,9 +3314,6 @@ static void *____cache_alloc_node(struct kmem_cache *cachep, gfp_t flags,
 	l3 = cachep->nodelists[nodeid];
 	BUG_ON(!l3);
 
-	if (unlikely(slab_force_alloc(cachep, flags)))
-		goto force_grow;
-
 retry:
 	check_irq_off();
 	spin_lock(&l3->list_lock);
@@ -3392,7 +3351,6 @@ retry:
 
 must_grow:
 	spin_unlock(&l3->list_lock);
-force_grow:
 	x = cache_grow(cachep, flags | GFP_THISNODE, nodeid, NULL);
 	if (x)
 		goto retry;
@@ -3843,81 +3801,6 @@ const char *kmem_cache_name(struct kmem_cache *cachep)
 	return cachep->name;
 }
 EXPORT_SYMBOL_GPL(kmem_cache_name);
-
-/*
- * Calculate the upper bound of pages required to sequentially allocate
- * @objects objects from @cachep.
- */
-unsigned kmem_alloc_estimate(struct kmem_cache *cachep,
-		gfp_t flags, int objects)
-{
-	/*
-	 * (1) memory for objects,
-	 */
-	unsigned nr_slabs = DIV_ROUND_UP(objects, cachep->num);
-	unsigned nr_pages = nr_slabs << cachep->gfporder;
-
-	/*
-	 * (2) memory for each per-cpu queue (nr_cpu_ids),
-	 * (3) memory for each per-node alien queues (nr_cpu_ids), and
-	 * (4) some amount of memory for the slab management structures
-	 *
-	 * XXX: truely account these
-	 */
-	nr_pages += 1 + ilog2(nr_pages);
-
-	return nr_pages;
-}
-
-/*
- * Calculate the upper bound of pages required to sequentially allocate
- * @count objects of @size bytes from kmalloc given @flags.
- */
-unsigned kmalloc_estimate_objs(size_t size, gfp_t flags, int count)
-{
-	struct kmem_cache *s = kmem_find_general_cachep(size, flags);
-	if (!s)
-		return 0;
-
-	return kmem_alloc_estimate(s, flags, count);
-}
-EXPORT_SYMBOL_GPL(kmalloc_estimate_objs);
-
-/*
- * Calculate the upper bound of pages requires to sequentially allocate @bytes
- * from kmalloc in an unspecified number of allocations of nonuniform size.
- */
-unsigned kmalloc_estimate_bytes(gfp_t flags, size_t bytes)
-{
-	unsigned long pages;
-	struct cache_sizes *csizep = malloc_sizes;
-
-	/*
-	 * multiply by two, in order to account the worst case slack space
-	 * due to the power-of-two allocation sizes.
-	 */
-	pages = DIV_ROUND_UP(2 * bytes, PAGE_SIZE);
-
-	/*
-	 * add the kmem_cache overhead of each possible kmalloc cache
-	 */
-	for (csizep = malloc_sizes; csizep->cs_cachep; csizep++) {
-		struct kmem_cache *s;
-
-#ifdef CONFIG_ZONE_DMA
-		if (unlikely(flags & __GFP_DMA))
-			s = csizep->cs_dmacachep;
-		else
-#endif
-			s = csizep->cs_cachep;
-
-		if (s)
-			pages += kmem_alloc_estimate(s, flags, 0);
-	}
-
-	return pages;
-}
-EXPORT_SYMBOL_GPL(kmalloc_estimate_bytes);
 
 /*
  * This initializes kmem_list3 or resizes various caches for all nodes.
