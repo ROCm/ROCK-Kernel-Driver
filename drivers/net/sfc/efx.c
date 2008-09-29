@@ -1427,6 +1427,11 @@ static int efx_change_mtu(struct net_device *net_dev, int new_mtu)
 
 	efx_stop_all(efx);
 
+	/* Ask driverlink client if we can change MTU */
+	rc = EFX_DL_CALLBACK(efx, request_mtu, new_mtu);
+	if (rc)
+		goto out;
+
 	EFX_LOG(efx, "changing MTU to %d\n", new_mtu);
 
 	efx_fini_channels(efx);
@@ -1435,6 +1440,10 @@ static int efx_change_mtu(struct net_device *net_dev, int new_mtu)
 	if (rc)
 		goto fail;
 
+	/* Notify driverlink client of new MTU */
+	EFX_DL_CALLBACK(efx, mtu_changed, new_mtu);
+
+ out:
 	efx_start_all(efx);
 	return rc;
 
@@ -1587,6 +1596,25 @@ static void efx_unregister_netdev(struct efx_nic *efx)
  * Device reset and suspend
  *
  **************************************************************************/
+#ifdef CONFIG_SFC_DRIVERLINK
+/* Serialise access to the driverlink callbacks, by quiescing event processing
+ * (without flushing the descriptor queues), and acquiring the rtnl_lock */
+void efx_suspend(struct efx_nic *efx)
+{
+	EFX_LOG(efx, "suspending operations\n");
+
+	rtnl_lock();
+	efx_stop_all(efx);
+}
+
+void efx_resume(struct efx_nic *efx)
+{
+	EFX_LOG(efx, "resuming operations\n");
+
+	efx_start_all(efx);
+	rtnl_unlock();
+}
+#endif
 
 /* The final hardware and software finalisation before reset. */
 static int efx_reset_down(struct efx_nic *efx, struct ethtool_cmd *ecmd)
@@ -1649,8 +1677,8 @@ static int efx_reset(struct efx_nic *efx)
 	enum reset_type method = efx->reset_pending;
 	int rc;
 
-	/* Serialise with kernel interfaces */
 	rtnl_lock();
+	efx_dl_reset_suspend(efx);
 
 	/* If we're not RUNNING then don't reset. Leave the reset_pending
 	 * flag set so that efx_pci_probe_main will be retried */
@@ -1717,6 +1745,7 @@ static int efx_reset(struct efx_nic *efx)
 	efx_start_all(efx);
 
  unlock_rtnl:
+	efx_dl_reset_resume(efx, 1);
 	rtnl_unlock();
 	return 0;
 
@@ -1729,6 +1758,7 @@ static int efx_reset(struct efx_nic *efx)
 	efx->state = STATE_DISABLED;
 
 	mutex_unlock(&efx->mac_lock);
+	efx_dl_reset_resume(efx, 0);
 	rtnl_unlock();
 	efx_unregister_netdev(efx);
 	efx_fini_port(efx);
@@ -1871,6 +1901,11 @@ static int efx_init_struct(struct efx_nic *efx, struct efx_nic_type *type,
 	mutex_init(&efx->mac_lock);
 	efx->phy_op = &efx_dummy_phy_operations;
 	efx->mii.dev = net_dev;
+#ifdef CONFIG_SFC_DRIVERLINK
+	INIT_LIST_HEAD(&efx->dl_node);
+	INIT_LIST_HEAD(&efx->dl_device_list);
+	efx->dl_cb = efx_default_callbacks;
+#endif
 	INIT_WORK(&efx->reconfigure_work, efx_reconfigure_work);
 	atomic_set(&efx->netif_stop_count, 1);
 
@@ -1990,6 +2025,7 @@ static void efx_pci_remove(struct pci_dev *pci_dev)
 	efx = pci_get_drvdata(pci_dev);
 	if (!efx)
 		return;
+	efx_dl_unregister_nic(efx);
 
 	/* Mark the NIC as fini, then stop the interface */
 	rtnl_lock();
@@ -2157,8 +2193,15 @@ static int __devinit efx_pci_probe(struct pci_dev *pci_dev,
 
 	EFX_LOG(efx, "initialisation successful\n");
 
+	/* Register with driverlink layer */
+	rc = efx_dl_register_nic(efx);
+	if (rc)
+		goto fail6;
+
 	return 0;
 
+ fail6:
+	efx_unregister_netdev(efx);
  fail5:
 	efx_pci_remove_main(efx);
  fail4:

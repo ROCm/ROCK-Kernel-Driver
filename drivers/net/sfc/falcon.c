@@ -37,11 +37,16 @@
 /**
  * struct falcon_nic_data - Falcon NIC state
  * @next_buffer_table: First available buffer table id
+ * @resources: Resource information for driverlink client
  * @pci_dev2: The secondary PCI device if present
  * @i2c_data: Operations and state for I2C bit-bashing algorithm
  */
 struct falcon_nic_data {
+#ifndef CONFIG_SFC_DRIVERLINK
 	unsigned next_buffer_table;
+#else
+	struct efx_dl_falcon_resources resources;
+#endif
 	struct pci_dev *pci_dev2;
 	struct i2c_algo_bit_data i2c_data;
 };
@@ -322,8 +327,13 @@ static int falcon_alloc_special_buffer(struct efx_nic *efx,
 	memset(buffer->addr, 0xff, len);
 
 	/* Select new buffer ID */
+#ifndef CONFIG_SFC_DRIVERLINK
 	buffer->index = nic_data->next_buffer_table;
 	nic_data->next_buffer_table += buffer->entries;
+#else
+	buffer->index = nic_data->resources.buffer_table_min;
+	nic_data->resources.buffer_table_min += buffer->entries;
+#endif
 
 	EFX_LOG(efx, "allocating special buffers %d-%d at %llx+%x "
 		"(virt %p phys %lx)\n", buffer->index,
@@ -1115,10 +1125,12 @@ static void falcon_handle_driver_event(struct efx_channel *channel,
 	case TX_DESCQ_FLS_DONE_EV_DECODE:
 		EFX_TRACE(efx, "channel %d TXQ %d flushed\n",
 			  channel->channel, ev_sub_data);
+		EFX_DL_CALLBACK(efx, event, event);
 		break;
 	case RX_DESCQ_FLS_DONE_EV_DECODE:
 		EFX_TRACE(efx, "channel %d RXQ %d flushed\n",
 			  channel->channel, ev_sub_data);
+		EFX_DL_CALLBACK(efx, event, event);
 		break;
 	case EVQ_INIT_DONE_EV_DECODE:
 		EFX_LOG(efx, "channel %d EVQ %d initialised\n",
@@ -1127,14 +1139,17 @@ static void falcon_handle_driver_event(struct efx_channel *channel,
 	case SRM_UPD_DONE_EV_DECODE:
 		EFX_TRACE(efx, "channel %d SRAM update done\n",
 			  channel->channel);
+		EFX_DL_CALLBACK(efx, event, event);
 		break;
 	case WAKE_UP_EV_DECODE:
 		EFX_TRACE(efx, "channel %d RXQ %d wakeup event\n",
 			  channel->channel, ev_sub_data);
+		EFX_DL_CALLBACK(efx, event, event);
 		break;
 	case TIMER_EV_DECODE:
 		EFX_TRACE(efx, "channel %d RX queue %d timer expired\n",
 			  channel->channel, ev_sub_data);
+		EFX_DL_CALLBACK(efx, event, event);
 		break;
 	case RX_RECOVERY_EV_DECODE:
 		EFX_ERR(efx, "channel %d seen DRIVER RX_RESET event. "
@@ -1159,6 +1174,7 @@ static void falcon_handle_driver_event(struct efx_channel *channel,
 		EFX_TRACE(efx, "channel %d unknown driver event code %d "
 			  "data %04x\n", channel->channel, ev_sub_code,
 			  ev_sub_data);
+		EFX_DL_CALLBACK(efx, event, event);
 		break;
 	}
 }
@@ -2371,6 +2387,61 @@ static int falcon_probe_nvconfig(struct efx_nic *efx)
 	return rc;
 }
 
+/* Looks at available SRAM resources and silicon revision, and works out
+ * how many queues we can support, and where things like descriptor caches
+ * should live. */
+static int falcon_dimension_resources(struct efx_nic *efx)
+{
+#ifdef CONFIG_SFC_DRIVERLINK
+	unsigned internal_dcs_entries;
+	struct falcon_nic_data *nic_data = efx->nic_data;
+	struct efx_dl_falcon_resources *res = &nic_data->resources;
+
+	/* Fill out the driverlink resource list */
+	res->hdr.type = EFX_DL_FALCON_RESOURCES;
+	res->biu_lock = &efx->biu_lock;
+	efx->dl_info = &res->hdr;
+
+	/* NB. The minimum values get increased as this driver initialises
+	 * its resources, so this should prevent any overlap.
+	 */
+	switch (falcon_rev(efx)) {
+	case FALCON_REV_A1:
+		res->rxq_min = 16;
+		res->txq_min = 16;
+		res->evq_int_min = 4;
+		res->evq_int_lim = 5;
+		res->evq_timer_min = 5;
+		res->evq_timer_lim = 4096;
+		internal_dcs_entries = 8192;
+		break;
+	case FALCON_REV_B0:
+	default:
+		res->rxq_min = 0;
+		res->txq_min = 0;
+		res->evq_int_min = 0;
+		res->evq_int_lim = 64;
+		res->evq_timer_min = 64;
+		res->evq_timer_lim = 4096;
+		internal_dcs_entries = 4096;
+		break;
+	}
+
+	/* Internal SRAM only for now */
+	res->rxq_lim = internal_dcs_entries / RX_DC_ENTRIES;
+	res->txq_lim = internal_dcs_entries / TX_DC_ENTRIES;
+	res->buffer_table_lim = 8192;
+
+	if (FALCON_IS_DUAL_FUNC(efx))
+		res->flags |= EFX_DL_FALCON_DUAL_FUNC;
+
+	if (EFX_INT_MODE_USE_MSI(efx))
+		res->flags |= EFX_DL_FALCON_USE_MSI;
+#endif
+
+	return 0;
+}
+
 /* Probe the NIC variant (revision, ASIC vs FPGA, function count, port
  * count, port speed).  Set workaround and feature flags accordingly.
  */
@@ -2403,10 +2474,12 @@ static int falcon_probe_nic_variant(struct efx_nic *efx)
 			EFX_ERR(efx, "1G mode not supported\n");
 			return -ENODEV;
 		}
+		efx->silicon_rev = "falcon/a1";
 		break;
 	}
 
 	case FALCON_REV_B0:
+		efx->silicon_rev = "falcon/b0";
 		break;
 
 	default:
@@ -2472,6 +2545,10 @@ int falcon_probe_nic(struct efx_nic *efx)
 	if (rc)
 		goto fail5;
 
+	rc = falcon_dimension_resources(efx);
+	if (rc)
+		goto fail6;
+
 	/* Initialise I2C adapter */
  	efx->i2c_adap.owner = THIS_MODULE;
 	nic_data->i2c_data = falcon_i2c_bit_operations;
@@ -2481,10 +2558,14 @@ int falcon_probe_nic(struct efx_nic *efx)
 	strlcpy(efx->i2c_adap.name, "SFC4000 GPIO", sizeof(efx->i2c_adap.name));
 	rc = i2c_bit_add_bus(&efx->i2c_adap);
 	if (rc)
-		goto fail5;
+		goto fail6;
 
 	return 0;
 
+ fail6:
+#ifdef CONFIG_SFC_DRIVERLINK
+	efx->dl_info = NULL;
+#endif
  fail5:
 	falcon_free_buffer(efx, &efx->irq_status);
  fail4:
@@ -2675,6 +2756,9 @@ void falcon_remove_nic(struct efx_nic *efx)
 	/* Tear down the private nic state */
 	kfree(efx->nic_data);
 	efx->nic_data = NULL;
+#ifdef CONFIG_SFC_DRIVERLINK
+	efx->dl_info = NULL;
+#endif
 }
 
 void falcon_update_nic_stats(struct efx_nic *efx)
