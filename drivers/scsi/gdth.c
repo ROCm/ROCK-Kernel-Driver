@@ -588,7 +588,7 @@ static struct pci_driver gdth_pci_driver = {
 	.remove		= gdth_pci_remove_one,
 };
 
-static void gdth_pci_remove_one(struct pci_dev *pdev)
+static void __devexit gdth_pci_remove_one(struct pci_dev *pdev)
 {
 	gdth_ha_str *ha = pci_get_drvdata(pdev);
 
@@ -600,7 +600,7 @@ static void gdth_pci_remove_one(struct pci_dev *pdev)
 	pci_disable_device(pdev);
 }
 
-static int gdth_pci_init_one(struct pci_dev *pdev,
+static int __devinit gdth_pci_init_one(struct pci_dev *pdev,
 				       const struct pci_device_id *ent)
 {
 	ushort vendor = pdev->vendor;
@@ -658,7 +658,7 @@ static int gdth_pci_init_one(struct pci_dev *pdev,
 #endif /* CONFIG_PCI */
 
 #ifdef CONFIG_EISA
-static int __init gdth_init_eisa(ushort eisa_adr,gdth_ha_str *ha)
+static int __devinit gdth_init_eisa(ushort eisa_adr,gdth_ha_str *ha)
 {
     ulong32 retries,id;
     unchar prot_ver,eisacf,i,irq_found;
@@ -752,7 +752,7 @@ static int __init gdth_init_eisa(ushort eisa_adr,gdth_ha_str *ha)
 #endif /* CONFIG_EISA */
 
 #ifdef CONFIG_ISA
-static int __init gdth_init_isa(ulong32 bios_adr,gdth_ha_str *ha)
+static int __devinit gdth_init_isa(ulong32 bios_adr,gdth_ha_str *ha)
 {
     register gdt2_dpram_str __iomem *dp2_ptr;
     int i;
@@ -853,7 +853,7 @@ static int __init gdth_init_isa(ulong32 bios_adr,gdth_ha_str *ha)
 #endif /* CONFIG_ISA */
 
 #ifdef CONFIG_PCI
-static int gdth_init_pci(struct pci_dev *pdev, gdth_pci_str *pcistr,
+static int __devinit gdth_init_pci(struct pci_dev *pdev, gdth_pci_str *pcistr,
 				   gdth_ha_str *ha)
 {
     register gdt6_dpram_str __iomem *dp6_ptr;
@@ -1553,7 +1553,7 @@ static int gdth_internal_cmd(gdth_ha_str *ha, unchar service, ushort opcode,
 
 /* search for devices */
 
-static int __init gdth_search_drives(gdth_ha_str *ha)
+static int __devinit gdth_search_drives(gdth_ha_str *ha)
 {
     ushort cdev_cnt, i;
     int ok;
@@ -4670,7 +4670,7 @@ static struct scsi_host_template gdth_template = {
 };
 
 #ifdef CONFIG_ISA
-static int __init gdth_isa_probe_one(ulong32 isa_bios)
+static int __devinit gdth_isa_probe_one(ulong32 isa_bios)
 {
 	struct Scsi_Host *shp;
 	gdth_ha_str *ha;
@@ -4802,7 +4802,7 @@ static int __init gdth_isa_probe_one(ulong32 isa_bios)
 #endif /* CONFIG_ISA */
 
 #ifdef CONFIG_EISA
-static int __init gdth_eisa_probe_one(ushort eisa_slot)
+static int __devinit gdth_eisa_probe_one(ushort eisa_slot)
 {
 	struct Scsi_Host *shp;
 	gdth_ha_str *ha;
@@ -4935,7 +4935,7 @@ static int __init gdth_eisa_probe_one(ushort eisa_slot)
 #endif /* CONFIG_EISA */
 
 #ifdef CONFIG_PCI
-static int gdth_pci_probe_one(gdth_pci_str *pcistr,
+static int __devinit gdth_pci_probe_one(gdth_pci_str *pcistr,
 			     gdth_ha_str **ha_out)
 {
 	struct Scsi_Host *shp;
@@ -5138,7 +5138,7 @@ static struct notifier_block gdth_notifier = {
     gdth_halt, NULL, 0
 };
 
-static int __init gdth_init(void)
+static int __devinit gdth_init(void)
 {
 	if (disable) {
 		printk("GDT-HA: Controller driver disabled from"
@@ -5192,7 +5192,7 @@ static int __init gdth_init(void)
 	return 0;
 }
 
-static void __exit gdth_exit(void)
+static void __devexit gdth_exit(void)
 {
 	gdth_ha_str *ha;
 

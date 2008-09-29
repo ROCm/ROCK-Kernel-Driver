@@ -665,11 +665,8 @@ mptfc_qcmd(struct scsi_cmnd *SCpnt, void (*done)(struct scsi_cmnd *))
 
 	/* dd_data is null until finished adding target */
 	ri = *((struct mptfc_rport_info **)rport->dd_data);
-	if (unlikely(!ri)) {
-		SCpnt->result = DID_IMM_RETRY << 16;
-		done(SCpnt);
-		return 0;
-	}
+	if (unlikely(!ri))
+		return SCSI_MLQUEUE_HOST_BUSY;
 
 	return mptscsih_qcmd(SCpnt,done);
 }

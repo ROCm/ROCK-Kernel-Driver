@@ -2518,8 +2518,7 @@ err_tx_ring_allocation:
  * Attempt to configure the interrupts using the best available
  * capabilities of the hardware and the kernel.
  **/
-static int __devinit ixgbe_set_interrupt_capability(struct ixgbe_adapter
-                                                    *adapter)
+static int ixgbe_set_interrupt_capability(struct ixgbe_adapter *adapter)
 {
 	int err = 0;
 	int vector, v_budget;
