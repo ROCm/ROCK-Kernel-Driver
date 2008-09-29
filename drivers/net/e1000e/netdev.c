@@ -4930,6 +4930,7 @@ static int __devinit e1000_probe(struct pci_dev *pdev,
 			 * `ip link set address`
 			 */
 			memset(hw->mac.addr, 0, netdev->addr_len);
+			break;
 		}
 	}
 
