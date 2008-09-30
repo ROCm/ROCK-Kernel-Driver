@@ -50,9 +50,10 @@
 /*{-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
 struct mptsas_target_reset_event {
-	struct list_head 	list;
-	EVENT_DATA_SAS_DEVICE_STATUS_CHANGE sas_event_data;
+	struct list_head	list;
+	MpiEventDataSasDeviceStatusChange_t sas_event_data;
 	u8	target_reset_issued;
+	unsigned long	 time_count;
 };
 
 enum mptsas_hotplug_action {
@@ -61,11 +62,34 @@ enum mptsas_hotplug_action {
 	MPTSAS_ADD_RAID,
 	MPTSAS_DEL_RAID,
 	MPTSAS_ADD_INACTIVE_VOLUME,
+	MPTSAS_ADD_PHYSDISK,
+	MPTSAS_ADD_PHYSDISK_REPROBE,
+	MPTSAS_DEL_PHYSDISK,
+	MPTSAS_DEL_PHYSDISK_REPROBE,
+	MPTSAS_REQUEUE_EVENT,
 	MPTSAS_IGNORE_EVENT,
 };
 
+struct sas_mapping{
+	u8			id;
+	u8			channel;
+};
+
+struct sas_device_info {
+	struct list_head	list;
+	struct sas_mapping	os;	/* operating system mapping*/
+	struct sas_mapping	fw;	/* firmware mapping */
+	u64			sas_address;
+	u32			device_info; /* specific bits for devices */
+	u16			slot;		/* enclosure slot id */
+	u64			enclosure_logical_id; /*enclosure address */
+	u8			is_logical_volume; /* is this logical volume */
+	u8			is_hidden_raid_component; /* this belongs to volume */
+	u8			volume_id; /* this valid when is_hidden_raid_component set */
+	u8			is_cached;	/* cached data for a removed device */
+};
+
 struct mptsas_hotplug_event {
-	struct work_struct	work;
 	MPT_ADAPTER		*ioc;
 	enum mptsas_hotplug_action event_type;
 	u64			sas_address;
@@ -73,17 +97,28 @@ struct mptsas_hotplug_event {
 	u8			id;
 	u32			device_info;
 	u16			handle;
-	u16			parent_handle;
 	u8			phy_id;
-	u8			phys_disk_num_valid;	/* hrc (hidden raid component) */
 	u8			phys_disk_num;		/* hrc - unique index*/
-	u8			hidden_raid_component;	/* hrc - don't expose*/
+	struct scsi_device	*sdev;
 };
 
-struct mptsas_discovery_event {
+
+struct fw_event_work {
+	struct list_head	list;
+	struct delayed_work	 work;
+	MPT_ADAPTER		*ioc;
+	u32			event;
+	u8			retries;
+	u8			event_data[1];
+};
+
+#if 0
+struct mptsas_link_status_event {
 	struct work_struct	work;
+	MpiEventDataSasPhyLinkStatus_t link_data;
 	MPT_ADAPTER		*ioc;
 };
+#endif
 
 /*
  * SAS topology structures
@@ -113,32 +148,35 @@ struct mptsas_devinfo {
  * Specific details on ports, wide/narrow
  */
 struct mptsas_portinfo_details{
-	u16	num_phys;	/* number of phys belong to this port */
-	u64	phy_bitmask; 	/* TODO, extend support for 255 phys */
-	struct sas_rphy *rphy;	/* transport layer rphy object */
+	u16	num_phys;	/* number of phys beloing to this port */
+	u64	phy_bitmask;	/* this needs extending to support 128 phys */
+	struct sas_rphy *rphy; /* rphy for end devices */
 	struct sas_port *port;	/* transport layer port object */
 	struct scsi_target *starget;
 	struct mptsas_portinfo *port_info;
 };
 
 struct mptsas_phyinfo {
-	u16	handle;			/* unique id to address this */
-	u8	phy_id; 		/* phy index */
-	u8	port_id; 		/* firmware port identifier */
+	u16	handle;			/* handle for this phy */
+	u8	phy_id;			/* phy index */
+	u8	port_id;		/* port number this phy is part of */
 	u8	negotiated_link_rate;	/* nego'd link rate for this phy */
-	u8	hw_link_rate; 		/* hardware max/min phys link rate */
+	u8	hw_link_rate;		/* hardware max/min phys link rate */
 	u8	programmed_link_rate;	/* programmed max/min phy link rate */
 	u8	sas_port_add_phy;	/* flag to request sas_port_add_phy*/
+	u8	change_count;		/* change count of the phy */
+	u8	port_flags;		/* info wrt host sas ports */
+	u32	phy_info;		/* various info wrt the phy */
 	struct mptsas_devinfo identify;	/* point to phy device info */
 	struct mptsas_devinfo attached;	/* point to attached device info */
-	struct sas_phy *phy;		/* transport layer phy object */
+	struct sas_phy *phy;
 	struct mptsas_portinfo *portinfo;
 	struct mptsas_portinfo_details * port_details;
 };
 
 struct mptsas_portinfo {
 	struct list_head list;
-	u16		num_phys;	/* number of phys */
+	u16	num_phys;		/* number of phys */
 	struct mptsas_phyinfo *phy_info;
 };
 
@@ -156,3 +194,4 @@ struct mptsas_enclosure {
 
 /*}-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 #endif
+

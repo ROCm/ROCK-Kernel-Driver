@@ -328,7 +328,7 @@ static int irq[MAXHA] __initdata =
 {0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
  0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff};
 /* disable driver flag */
-static int disable __initdata = 0;
+static int disable = 0;
 /* reserve flag */
 static int reserve_mode = 1;                  
 /* reserve list */
@@ -1237,7 +1237,7 @@ static int __devinit gdth_init_pci(struct pci_dev *pdev, gdth_pci_str *pcistr,
 
 /* controller protocol functions */
 
-static void __init gdth_enable_int(gdth_ha_str *ha)
+static void __devinit gdth_enable_int(gdth_ha_str *ha)
 {
     ulong flags;
     gdt2_dpram_str __iomem *dp2_ptr;

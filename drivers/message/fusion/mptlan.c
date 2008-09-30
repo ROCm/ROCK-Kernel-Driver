@@ -6,7 +6,6 @@
  *
  *  Copyright (c) 2000-2008 LSI Corporation
  *  (mailto:DL-MPTFusionLinux@lsi.com)
- *
  */
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
@@ -165,6 +164,11 @@ DEFINE_RWLOCK(bad_naa_lock);
 #endif
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+/*
+ * Fusion MPT LAN external data
+ */
+
+/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /**
  *	lan_reply - Handle all data sent from the hardware.
  *	@ioc: Pointer to MPT_ADAPTER structure
@@ -190,8 +194,7 @@ lan_reply (MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *reply)
 		u32 tmsg = CAST_PTR_TO_U32(reply);
 
 		dioprintk((KERN_INFO MYNAM ": %s/%s: @lan_reply, tmsg %08x\n",
-				IOC_AND_NETDEV_NAMES_s_s(dev),
-				tmsg));
+		    IOC_AND_NETDEV_NAMES_s_s(dev), tmsg));
 
 		switch (GET_LAN_FORM(tmsg)) {
 
@@ -440,6 +443,7 @@ mpt_lan_open(struct net_device *dev)
 	dlprintk((KERN_INFO MYNAM "/lo: Finished initializing RcvCtl\n"));
 
 	mpt_lan_post_receive_buckets(priv);
+
 	printk(KERN_INFO MYNAM ": %s/%s: interface up & active\n",
 			IOC_AND_NETDEV_NAMES_s_s(dev));
 
@@ -610,7 +614,7 @@ mpt_lan_send_turbo(struct net_device *dev, u32 tmsg)
 
 	dioprintk((KERN_INFO MYNAM ": %s/%s: @%s, skb %p sent.\n",
 			IOC_AND_NETDEV_NAMES_s_s(dev),
-			__func__, sent));
+			__FUNCTION__, sent));
 
 	priv->SendCtl[ctx].skb = NULL;
 	pci_unmap_single(mpt_dev->pcidev, priv->SendCtl[ctx].dma,
@@ -676,7 +680,7 @@ mpt_lan_send_reply(struct net_device *dev, LANSendReply_t *pSendRep)
 
 		dioprintk((KERN_INFO MYNAM ": %s/%s: @%s, skb %p sent.\n",
 				IOC_AND_NETDEV_NAMES_s_s(dev),
-				__func__, sent));
+				__FUNCTION__, sent));
 
 		priv->SendCtl[ctx].skb = NULL;
 		pci_unmap_single(mpt_dev->pcidev, priv->SendCtl[ctx].dma,
@@ -715,7 +719,7 @@ mpt_lan_sdu_send (struct sk_buff *skb, struct net_device *dev)
 	u16 cur_naa = 0x1000;
 
 	dioprintk((KERN_INFO MYNAM ": %s called, skb_addr = %p\n",
-			__func__, skb));
+			__FUNCTION__, skb));
 
 	spin_lock_irqsave(&priv->txfidx_lock, flags);
 	if (priv->mpt_txfidx_tail < 0) {
@@ -723,7 +727,7 @@ mpt_lan_sdu_send (struct sk_buff *skb, struct net_device *dev)
 		spin_unlock_irqrestore(&priv->txfidx_lock, flags);
 
 		printk (KERN_ERR "%s: no tx context available: %u\n",
-			__func__, priv->mpt_txfidx_tail);
+			__FUNCTION__, priv->mpt_txfidx_tail);
 		return 1;
 	}
 
@@ -733,7 +737,7 @@ mpt_lan_sdu_send (struct sk_buff *skb, struct net_device *dev)
 		spin_unlock_irqrestore(&priv->txfidx_lock, flags);
 
 		printk (KERN_ERR "%s: Unable to alloc request frame\n",
-			__func__);
+			__FUNCTION__);
 		return 1;
 	}
 
@@ -780,6 +784,7 @@ mpt_lan_sdu_send (struct sk_buff *skb, struct net_device *dev)
 //			ctx, skb, skb->data));
 
 	mac = skb_mac_header(skb);
+
 #ifdef QLOGIC_NAA_WORKAROUND
 {
 	struct NAA_Hosed *nh;
@@ -805,6 +810,7 @@ mpt_lan_sdu_send (struct sk_buff *skb, struct net_device *dev)
 }
 #endif
 
+
 	pTrans->TransactionDetails[0] = cpu_to_le32((cur_naa         << 16) |
 						    (mac[0] <<  8) |
 						    (mac[1] <<  0));
@@ -828,7 +834,7 @@ mpt_lan_sdu_send (struct sk_buff *skb, struct net_device *dev)
 			  MPI_SGE_FLAGS_END_OF_LIST) << MPI_SGE_FLAGS_SHIFT) |
 			skb->len);
 	pSimple->Address.Low = cpu_to_le32((u32) dma);
-	if (sizeof(dma_addr_t) > sizeof(u32))
+	if (mpt_dev->sg_addr_size > sizeof(u32))
 		pSimple->Address.High = cpu_to_le32((u32) ((u64) dma >> 32));
 	else
 		pSimple->Address.High = 0;
@@ -1117,7 +1123,6 @@ mpt_lan_receive_post_reply(struct net_device *dev,
 					    PCI_DMA_FROMDEVICE);
 
 		skb_copy_from_linear_data(old_skb, skb_put(skb, len), len);
-
 		pci_dma_sync_single_for_device(mpt_dev->pcidev,
 					       priv->RcvCtl[ctx].dma,
 					       priv->RcvCtl[ctx].len,
@@ -1208,7 +1213,7 @@ mpt_lan_post_receive_buckets(struct mpt_lan_priv *priv)
 
 	dioprintk((KERN_INFO MYNAM ": %s/%s: @%s, Start_buckets = %u, buckets_out = %u\n",
 			IOC_AND_NETDEV_NAMES_s_s(dev),
-			__func__, buckets, curr));
+			__FUNCTION__, buckets, curr));
 
 	max = (mpt_dev->req_sz - MPT_LAN_RECEIVE_POST_REQUEST_SIZE) /
 			(MPT_LAN_TRANSACTION32_SIZE + sizeof(SGESimple64_t));
@@ -1217,9 +1222,9 @@ mpt_lan_post_receive_buckets(struct mpt_lan_priv *priv)
 		mf = mpt_get_msg_frame(LanCtx, mpt_dev);
 		if (mf == NULL) {
 			printk (KERN_ERR "%s: Unable to alloc request frame\n",
-				__func__);
+				__FUNCTION__);
 			dioprintk((KERN_ERR "%s: %u buckets remaining\n",
-				 __func__, buckets));
+				 __FUNCTION__, buckets));
 			goto out;
 		}
 		pRecvReq = (LANReceivePostRequest_t *) mf;
@@ -1244,7 +1249,7 @@ mpt_lan_post_receive_buckets(struct mpt_lan_priv *priv)
 			spin_lock_irqsave(&priv->rxfidx_lock, flags);
 			if (priv->mpt_rxfidx_tail < 0) {
 				printk (KERN_ERR "%s: Can't alloc context\n",
-					__func__);
+					__FUNCTION__);
 				spin_unlock_irqrestore(&priv->rxfidx_lock,
 						       flags);
 				break;
@@ -1267,7 +1272,7 @@ mpt_lan_post_receive_buckets(struct mpt_lan_priv *priv)
 				if (skb == NULL) {
 					printk (KERN_WARNING
 						MYNAM "/%s: Can't alloc skb\n",
-						__func__);
+						__FUNCTION__);
 					priv->mpt_rxfidx[++priv->mpt_rxfidx_tail] = ctx;
 					spin_unlock_irqrestore(&priv->rxfidx_lock, flags);
 					break;
@@ -1295,7 +1300,7 @@ mpt_lan_post_receive_buckets(struct mpt_lan_priv *priv)
 				  MPI_SGE_FLAGS_SIMPLE_ELEMENT |
 				  MPI_SGE_FLAGS_64_BIT_ADDRESSING) << MPI_SGE_FLAGS_SHIFT) | len);
 			pSimple->Address.Low = cpu_to_le32((u32) priv->RcvCtl[ctx].dma);
-			if (sizeof(dma_addr_t) > sizeof(u32))
+			if (mpt_dev->sg_addr_size > sizeof(u32))
 				pSimple->Address.High = cpu_to_le32((u32) ((u64) priv->RcvCtl[ctx].dma >> 32));
 			else
 				pSimple->Address.High = 0;
@@ -1305,7 +1310,7 @@ mpt_lan_post_receive_buckets(struct mpt_lan_priv *priv)
 
 		if (pSimple == NULL) {
 /**/			printk (KERN_WARNING MYNAM "/%s: No buckets posted\n",
-/**/				__func__);
+/**/				__FUNCTION__);
 			mpt_free_msg_frame(mpt_dev, mf);
 			goto out;
 		}
@@ -1329,9 +1334,9 @@ mpt_lan_post_receive_buckets(struct mpt_lan_priv *priv)
 
 out:
 	dioprintk((KERN_INFO MYNAM "/%s: End_buckets = %u, priv->buckets_out = %u\n",
-		  __func__, buckets, atomic_read(&priv->buckets_out)));
+		  __FUNCTION__, buckets, atomic_read(&priv->buckets_out)));
 	dioprintk((KERN_INFO MYNAM "/%s: Posted %u buckets and received %u back\n",
-	__func__, priv->total_posted, priv->total_received));
+	__FUNCTION__, priv->total_posted, priv->total_received));
 
 	clear_bit(0, &priv->post_buckets_active);
 }
@@ -1340,18 +1345,17 @@ static void
 mpt_lan_post_receive_buckets_work(struct work_struct *work)
 {
 	mpt_lan_post_receive_buckets(container_of(work, struct mpt_lan_priv,
-						  post_buckets_task.work));
+		post_buckets_task.work));
 }
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 static struct net_device *
 mpt_register_lan_device (MPT_ADAPTER *mpt_dev, int pnum)
 {
-	struct net_device *dev;
-	struct mpt_lan_priv *priv;
+	struct net_device *dev = alloc_fcdev(sizeof(struct mpt_lan_priv));
+	struct mpt_lan_priv *priv = NULL;
 	u8 HWaddr[FC_ALEN], *a;
 
-	dev = alloc_fcdev(sizeof(struct mpt_lan_priv));
 	if (!dev)
 		return NULL;
 
@@ -1363,8 +1367,9 @@ mpt_register_lan_device (MPT_ADAPTER *mpt_dev, int pnum)
 	priv->mpt_dev = mpt_dev;
 	priv->pnum = pnum;
 
+	memset(&priv->post_buckets_task, 0, sizeof(priv->post_buckets_task));
 	INIT_DELAYED_WORK(&priv->post_buckets_task,
-			  mpt_lan_post_receive_buckets_work);
+		mpt_lan_post_receive_buckets_work);
 	priv->post_buckets_active = 0;
 
 	dlprintk((KERN_INFO MYNAM "@%d: bucketlen = %d\n",
@@ -1386,6 +1391,8 @@ mpt_register_lan_device (MPT_ADAPTER *mpt_dev, int pnum)
 	priv->bucketthresh = priv->max_buckets_out * 2 / 3;
 	spin_lock_init(&priv->txfidx_lock);
 	spin_lock_init(&priv->rxfidx_lock);
+
+	memset(&priv->stats, 0, sizeof(priv->stats));
 
 	/*  Grab pre-fetched LANPage1 stuff. :-) */
 	a = (u8 *) &mpt_dev->lan_cnfg_page1.HardwareAddressLow;
@@ -1420,6 +1427,7 @@ mpt_register_lan_device (MPT_ADAPTER *mpt_dev, int pnum)
 
 	dlprintk((KERN_INFO MYNAM ": Finished registering dev "
 		"and setting initial values\n"));
+
 
 	if (register_netdev(dev) != 0) {
 		free_netdev(dev);

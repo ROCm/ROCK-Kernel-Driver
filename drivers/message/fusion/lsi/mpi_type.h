@@ -1,12 +1,12 @@
 /*
- *  Copyright (c) 2000-2004 LSI Corporation.
+ *  Copyright (c) 2000-2008 LSI Corporation.
  *
  *
  *           Name:  mpi_type.h
  *          Title:  MPI Basic type definitions
  *  Creation Date:  June 6, 2000
  *
- *    mpi_type.h Version:  01.05.01
+ *    mpi_type.h Version:  01.05.02
  *
  *  Version History
  *  ---------------
@@ -20,6 +20,7 @@
  *  08-08-01  01.02.01  Original release for v1.2 work.
  *  05-11-04  01.03.01  Original release for MPI v1.3.
  *  08-19-04  01.05.01  Original release for MPI v1.5.
+ *  08-30-05  01.05.02  Added PowerPC option to #ifdef's.
  *  --------------------------------------------------------------------------
  */
 
@@ -49,8 +50,18 @@ typedef signed   short  S16;
 typedef unsigned short  U16;
 
 
-typedef int32_t   S32;
-typedef u_int32_t U32;
+#if defined(unix) || defined(__arm) || defined(ALPHA) || defined(__PPC__) || defined(__ppc)
+
+    typedef signed   int   S32;
+    typedef unsigned int   U32;
+
+#else
+
+    typedef signed   long  S32;
+    typedef unsigned long  U32;
+
+#endif
+
 
 typedef struct _S64
 {

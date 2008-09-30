@@ -17,6 +17,10 @@
  *
  * Example:  (programming for MPT_DEBUG_EVENTS on host 5)
  *
+ * global setting:
+ * echo 8 > /sys/module/mptbase/parameters/mpt_debug_level
+ *
+ * per host setting:
  * echo 8 > /sys/class/scsi_host/host5/debug_level
  *
  * --------------------------------------------------------
@@ -55,9 +59,11 @@
 #define MPT_DEBUG_RESET			0x00008000
 #define MPT_DEBUG_SCSI			0x00010000
 #define MPT_DEBUG_IOCTL			0x00020000
+#define MPT_DEBUG_CSMISAS		0x00040000
 #define MPT_DEBUG_FC			0x00080000
 #define MPT_DEBUG_SAS			0x00100000
 #define MPT_DEBUG_SAS_WIDE		0x00200000
+#define MPT_DEBUG_36GB_MEM		0x00400000
 
 /*
  * CONFIG_FUSION_LOGGING - enabled in Kconfig
@@ -126,6 +132,9 @@
 #define dctlprintk(IOC, CMD)			\
 	MPT_CHECK_LOGGING(IOC, CMD, MPT_DEBUG_IOCTL)
 
+#define dcsmisasprintk(IOC, CMD)		\
+	MPT_CHECK_LOGGING(IOC, CMD, MPT_DEBUG_CSMISAS)
+
 #define dfcprintk(IOC, CMD)			\
 	MPT_CHECK_LOGGING(IOC, CMD, MPT_DEBUG_FC)
 
@@ -135,7 +144,8 @@
 #define dsaswideprintk(IOC, CMD)		\
 	MPT_CHECK_LOGGING(IOC, CMD, MPT_DEBUG_SAS_WIDE)
 
-
+#define d36memprintk(IOC, CMD)		\
+	MPT_CHECK_LOGGING(IOC, CMD, MPT_DEBUG_36GB_MEM)
 
 /*
  * Verbose logging
