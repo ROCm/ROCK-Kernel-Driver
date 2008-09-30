@@ -1516,6 +1516,7 @@ out_fd:
 	goto out_put;
 }
 
+#if 0
 #ifdef HAVE_SET_RESTORE_SIGMASK
 asmlinkage long sys_paccept(int fd, struct sockaddr __user *upeer_sockaddr,
 			    int __user *upeer_addrlen,
@@ -1568,6 +1569,7 @@ asmlinkage long sys_paccept(int fd, struct sockaddr __user *upeer_sockaddr,
 
 	return do_accept(fd, upeer_sockaddr, upeer_addrlen, flags);
 }
+#endif
 #endif
 
 asmlinkage long sys_accept(int fd, struct sockaddr __user *upeer_sockaddr,
