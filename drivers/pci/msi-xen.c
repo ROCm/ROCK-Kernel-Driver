@@ -233,7 +233,11 @@ static int msi_unmap_pirq(struct pci_dev *dev, int pirq)
 	int rc;
 
 	unmap.domid = msi_get_dev_owner(dev);
-	unmap.pirq = evtchn_get_xen_pirq(pirq);
+	/* See comments in msi_map_pirq_to_vector, input parameter pirq
+	 * mean irq number only if the device belongs to dom0 itself.
+	 */
+	unmap.pirq = (unmap.domid != DOMID_SELF)
+		? pirq : evtchn_get_xen_pirq(pirq);
 
 	if ((rc = HYPERVISOR_physdev_op(PHYSDEVOP_unmap_pirq, &unmap)))
 		printk(KERN_WARNING "unmap irq %x failed\n", pirq);
@@ -241,7 +245,9 @@ static int msi_unmap_pirq(struct pci_dev *dev, int pirq)
 	if (rc < 0)
 		return rc;
 
-	evtchn_map_pirq(pirq, 0);
+	if (unmap.domid == DOMID_SELF)
+		evtchn_map_pirq(pirq, 0);
+
 	return 0;
 }
 
@@ -292,7 +298,14 @@ static int msi_map_pirq_to_vector(struct pci_dev *dev, int pirq,
 		return -ENOSYS;
 
 	BUG_ON(map_irq.pirq <= 0);
-	return evtchn_map_pirq(pirq, map_irq.pirq);
+
+	/* If mapping of this particular MSI is on behalf of another domain,
+	 * we do not need to get an irq in dom0. This also implies:
+	 * dev->irq in dom0 will be 'Xen pirq' if this device belongs to
+	 * to another domain, and will be 'Linux irq' if it belongs to dom0.
+	 */
+	return ((domid != DOMID_SELF) ?
+		map_irq.pirq : evtchn_map_pirq(pirq, map_irq.pirq));
 }
 
 static int msi_map_vector(struct pci_dev *dev, int entry_nr, u64 table_base)
@@ -551,6 +564,7 @@ int pci_enable_msi(struct pci_dev* dev)
 		if (ret)
 			return ret;
 
+		dev->irq = evtchn_map_pirq(-1, dev->irq);
 		dev->irq_old = temp;
 
 		return ret;
@@ -584,6 +598,7 @@ void pci_msi_shutdown(struct pci_dev* dev)
 
 #ifdef CONFIG_XEN_PCIDEV_FRONTEND
 	if (!is_initial_xendomain()) {
+		evtchn_map_pirq(dev->irq, 0);
 		pci_frontend_disable_msi(dev);
 		dev->irq = dev->irq_old;
 		return;
@@ -637,7 +652,9 @@ int pci_enable_msix(struct pci_dev* dev, struct msix_entry *entries, int nvec)
 
 #ifdef CONFIG_XEN_PCIDEV_FRONTEND
 	if (!is_initial_xendomain()) {
-		int ret;
+		struct msi_dev_list *msi_dev_entry;
+		struct msi_pirq_entry *pirq_entry;
+		int ret, irq;
 
 		ret = pci_frontend_enable_msix(dev, entries, nvec);
 		if (ret) {
@@ -645,6 +662,25 @@ int pci_enable_msix(struct pci_dev* dev, struct msix_entry *entries, int nvec)
 			return ret;
 		}
 
+		msi_dev_entry = get_msi_dev_pirq_list(dev);
+		for (i = 0; i < nvec; i++) {
+			int mapped = 0;
+
+			list_for_each_entry(pirq_entry, &msi_dev_entry->pirq_list_head, list) {
+				if (pirq_entry->entry_nr == entries[i].entry) {
+					irq = pirq_entry->pirq;
+					BUG_ON(entries[i].vector != evtchn_get_xen_pirq(irq));
+					entries[i].vector = irq;
+					mapped = 1;
+					break;
+				}
+			}
+			if (mapped)
+				continue;
+			irq = evtchn_map_pirq(-1, entries[i].vector);
+			attach_pirq_entry(irq, entries[i].entry, msi_dev_entry);
+			entries[i].vector = irq;
+		}
         return 0;
 	}
 #endif
@@ -696,7 +732,19 @@ void pci_msix_shutdown(struct pci_dev* dev)
 
 #ifdef CONFIG_XEN_PCIDEV_FRONTEND
 	if (!is_initial_xendomain()) {
+		struct msi_dev_list *msi_dev_entry;
+		struct msi_pirq_entry *pirq_entry, *tmp;
+
 		pci_frontend_disable_msix(dev);
+
+		msi_dev_entry = get_msi_dev_pirq_list(dev);
+		list_for_each_entry_safe(pirq_entry, tmp,
+		                         &msi_dev_entry->pirq_list_head, list) {
+			evtchn_map_pirq(pirq_entry->pirq, 0);
+			list_del(&pirq_entry->list);
+			kfree(pirq_entry);
+		}
+
 		dev->irq = dev->irq_old;
 		return;
 	}

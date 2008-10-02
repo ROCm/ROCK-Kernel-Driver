@@ -101,44 +101,6 @@ static int xen_cx_notifier(struct acpi_processor *pr, int action)
 	return ret;
 }
 
-static void convert_pct_reg(struct xen_pct_register *xpct,
-	struct acpi_pct_register *apct)
-{
-	xpct->descriptor = apct->descriptor;
-	xpct->length     = apct->length;
-	xpct->space_id   = apct->space_id;
-	xpct->bit_width  = apct->bit_width;
-	xpct->bit_offset = apct->bit_offset;
-	xpct->reserved   = apct->reserved;
-	xpct->address    = apct->address;
-}
-
-static void convert_pss_states(struct xen_processor_px *xpss, 
-	struct acpi_processor_px *apss, int state_count)
-{
-	int i;
-	for(i=0; i<state_count; i++) {
-		xpss->core_frequency     = apss->core_frequency;
-		xpss->power              = apss->power;
-		xpss->transition_latency = apss->transition_latency;
-		xpss->bus_master_latency = apss->bus_master_latency;
-		xpss->control            = apss->control;
-		xpss->status             = apss->status;
-		xpss++;
-		apss++;
-	}
-}
-
-static void convert_psd_pack(struct xen_psd_package *xpsd,
-	struct acpi_psd_package *apsd)
-{
-	xpsd->num_entries    = apsd->num_entries;
-	xpsd->revision       = apsd->revision;
-	xpsd->domain         = apsd->domain;
-	xpsd->coord_type     = apsd->coord_type;
-	xpsd->num_processors = apsd->num_processors;
-}
-
 static int xen_px_notifier(struct acpi_processor *pr, int action)
 {
 	int ret = -EINVAL;
@@ -179,20 +141,20 @@ static int xen_px_notifier(struct acpi_processor *pr, int action)
 		perf->platform_limit = pr->performance_platform_limit;
 
 		/* pct */
-		convert_pct_reg(&perf->control_register, &px->control_register);
-		convert_pct_reg(&perf->status_register, &px->status_register);
+		xen_convert_pct_reg(&perf->control_register, &px->control_register);
+		xen_convert_pct_reg(&perf->status_register, &px->status_register);
 
 		/* pss */
 		perf->state_count = px->state_count;
 		states = kzalloc(px->state_count*sizeof(xen_processor_px_t),GFP_KERNEL);
 		if (!states)
 			return -ENOMEM;
-		convert_pss_states(states, px->states, px->state_count);
+		xen_convert_pss_states(states, px->states, px->state_count);
 		set_xen_guest_handle(perf->states, states);
 
 		/* psd */
 		pdomain = &px->domain_info;
-		convert_psd_pack(&perf->domain_info, pdomain);
+		xen_convert_psd_pack(&perf->domain_info, pdomain);
 		if (pdomain->coord_type == DOMAIN_COORD_TYPE_SW_ALL)
 			perf->shared_type = CPUFREQ_SHARED_TYPE_ALL;
 		else if (pdomain->coord_type == DOMAIN_COORD_TYPE_SW_ANY)

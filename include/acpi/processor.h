@@ -454,4 +454,45 @@ static inline int processor_extcntl_prepare(struct acpi_processor *pr)
 }
 #endif /* CONFIG_PROCESSOR_EXTERNAL_CONTROL */
 
+#ifdef CONFIG_XEN
+static inline void xen_convert_pct_reg(struct xen_pct_register *xpct,
+	struct acpi_pct_register *apct)
+{
+	xpct->descriptor = apct->descriptor;
+	xpct->length     = apct->length;
+	xpct->space_id   = apct->space_id;
+	xpct->bit_width  = apct->bit_width;
+	xpct->bit_offset = apct->bit_offset;
+	xpct->reserved   = apct->reserved;
+	xpct->address    = apct->address;
+}
+
+static inline void xen_convert_pss_states(struct xen_processor_px *xpss, 
+	struct acpi_processor_px *apss, int state_count)
+{
+	int i;
+	for(i=0; i<state_count; i++) {
+		xpss->core_frequency     = apss->core_frequency;
+		xpss->power              = apss->power;
+		xpss->transition_latency = apss->transition_latency;
+		xpss->bus_master_latency = apss->bus_master_latency;
+		xpss->control            = apss->control;
+		xpss->status             = apss->status;
+		xpss++;
+		apss++;
+	}
+}
+
+static inline void xen_convert_psd_pack(struct xen_psd_package *xpsd,
+	struct acpi_psd_package *apsd)
+{
+	xpsd->num_entries    = apsd->num_entries;
+	xpsd->revision       = apsd->revision;
+	xpsd->domain         = apsd->domain;
+	xpsd->coord_type     = apsd->coord_type;
+	xpsd->num_processors = apsd->num_processors;
+}
+
+#endif /* CONFIG_XEN */
+
 #endif

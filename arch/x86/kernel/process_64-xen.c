@@ -98,6 +98,9 @@ void exit_idle(void)
 static void __ref play_dead(void)
 {
 	idle_task_exit();
+#ifndef CONFIG_XEN
+	c1e_remove_cpu(raw_smp_processor_id());
+#endif
 	local_irq_disable();
 	cpu_clear(smp_processor_id(), cpu_initialized);
 	preempt_enable_no_resched();

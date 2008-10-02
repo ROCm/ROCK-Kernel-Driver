@@ -322,12 +322,11 @@ struct sk_buff {
 #if defined(CONFIG_MAC80211) || defined(CONFIG_MAC80211_MODULE)
 	__u8			do_not_encrypt:1;
 #endif
-	/* 0/13/14 bit hole */
-
 #ifdef CONFIG_XEN
-	__u8                    proto_data_valid:1,
+	__u8			proto_data_valid:1,
 				proto_csum_blank:1;
 #endif
+	/* 0/11/13/14 bit hole */
 
 #ifdef CONFIG_NET_DMA
 	dma_cookie_t		dma_cookie;

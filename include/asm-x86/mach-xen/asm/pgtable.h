@@ -10,7 +10,6 @@
 #define _PAGE_BIT_PCD		4	/* page cache disabled */
 #define _PAGE_BIT_ACCESSED	5	/* was accessed (raised by CPU) */
 #define _PAGE_BIT_DIRTY		6	/* was written to (raised by CPU) */
-#define _PAGE_BIT_FILE		6
 #define _PAGE_BIT_PSE		7	/* 4 MB (or 2MB) page */
 #define _PAGE_BIT_PAT		7	/* on 4KB pages */
 #define _PAGE_BIT_GLOBAL	8	/* Global TLB entry PPro+ */
@@ -21,6 +20,14 @@
 #define _PAGE_BIT_PAT_LARGE	12	/* On 2MB or 1GB pages */
 #define _PAGE_BIT_SPECIAL	_PAGE_BIT_UNUSED1
 #define _PAGE_BIT_NX           63       /* No execute: only valid after cpuid check */
+
+/* If _PAGE_BIT_PRESENT is clear, we use these: */
+
+/* set: nonlinear file mapping, saved PTE; unset:swap */
+#define _PAGE_BIT_FILE		_PAGE_BIT_DIRTY
+
+/* if the user mapped it with PROT_NONE; pte_present gives true */
+#define _PAGE_BIT_PROTNONE	_PAGE_BIT_GLOBAL
 
 #define _PAGE_PRESENT	(_AT(pteval_t, 1) << _PAGE_BIT_PRESENT)
 #define _PAGE_RW	(_AT(pteval_t, 1) << _PAGE_BIT_RW)
@@ -33,11 +40,10 @@
 #define _PAGE_GLOBAL	(_AT(pteval_t, 1) << _PAGE_BIT_GLOBAL)
 #define _PAGE_UNUSED1	(_AT(pteval_t, 1) << _PAGE_BIT_UNUSED1)
 #define _PAGE_UNUSED2	(_AT(pteval_t, 1) << _PAGE_BIT_UNUSED2)
-#define _PAGE_UNUSED3	(_AT(pteval_t, 1) << _PAGE_BIT_UNUSED3)
+#define _PAGE_IO	(_AT(pteval_t, 1) << _PAGE_BIT_IO)
 #define _PAGE_PAT	(_AT(pteval_t, 1) << _PAGE_BIT_PAT)
 #define _PAGE_PAT_LARGE (_AT(pteval_t, 1) << _PAGE_BIT_PAT_LARGE)
 #define _PAGE_SPECIAL	(_AT(pteval_t, 1) << _PAGE_BIT_SPECIAL)
-#define _PAGE_IO	(_AT(pteval_t, 1) << _PAGE_BIT_IO)
 #define __HAVE_ARCH_PTE_SPECIAL
 
 #if defined(CONFIG_X86_64) || defined(CONFIG_X86_PAE)
@@ -46,11 +52,8 @@
 #define _PAGE_NX	(_AT(pteval_t, 0))
 #endif
 
-/* If _PAGE_PRESENT is clear, we use these: */
-#define _PAGE_FILE	_PAGE_DIRTY	/* nonlinear file mapping,
-					 * saved PTE; unset:swap */
-#define _PAGE_PROTNONE	_PAGE_GLOBAL	/* if the user mapped it with PROT_NONE;
-					   pte_present gives true */
+#define _PAGE_FILE	(_AT(pteval_t, 1) << _PAGE_BIT_FILE)
+#define _PAGE_PROTNONE	(_AT(pteval_t, 1) << _PAGE_BIT_PROTNONE)
 
 #ifndef __ASSEMBLY__
 #if defined(CONFIG_X86_64) && CONFIG_XEN_COMPAT <= 0x030002
