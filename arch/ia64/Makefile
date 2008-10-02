@@ -106,4 +106,4 @@ archprepare: make_nr_irqs_h FORCE
 PHONY += make_nr_irqs_h FORCE
 
 make_nr_irqs_h: FORCE
-	$(Q)$(MAKE) $(build)=arch/ia64/kernel include/asm/nr-irqs.h
+	$(Q)$(MAKE) $(build)=arch/ia64/kernel arch/ia64/include/asm/nr-irqs.h
