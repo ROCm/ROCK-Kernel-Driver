@@ -100,11 +100,11 @@ arch/$(SRCARCH)/kernel/nr-irqs.s: $(srctree)/arch/$(SRCARCH)/kernel/nr-irqs.c \
 	$(Q)mkdir -p $(dir $@)
 	$(call if_changed_dep,cc_s_c)
 
-arch/ia64/include/asm/nr-irqs.h: arch/$(SRCARCH)/kernel/nr-irqs.s
+include/asm/nr-irqs.h: arch/$(SRCARCH)/kernel/nr-irqs.s
 	$(Q)mkdir -p $(dir $@)
 	$(call cmd,nr_irqs)
 
-clean-files += $(objtree)/arch/ia64/include/asm/nr-irqs.h
+MRPROPER_FILES += include/asm/nr-irqs.h
 
 #
 # native ivt.S and entry.S
