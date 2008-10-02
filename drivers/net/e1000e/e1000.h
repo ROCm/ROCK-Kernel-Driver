@@ -409,7 +409,7 @@ extern bool e1000e_enable_mng_pass_thru(struct e1000_hw *hw);
 extern bool e1000e_get_laa_state_82571(struct e1000_hw *hw);
 extern void e1000e_set_laa_state_82571(struct e1000_hw *hw, bool state);
 
-extern void e1000e_write_protect_nvm_ich8lan(struct e1000_hw *hw, bool enable);
+extern void e1000e_write_protect_nvm_ich8lan(struct e1000_hw *hw);
 extern void e1000e_set_kmrn_lock_loss_workaround_ich8lan(struct e1000_hw *hw,
 						 bool state);
 extern void e1000e_igp3_phy_powerdown_workaround_ich8lan(struct e1000_hw *hw);

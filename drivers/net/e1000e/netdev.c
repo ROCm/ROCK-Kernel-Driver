@@ -4861,6 +4861,10 @@ static int __devinit e1000_probe(struct pci_dev *pdev,
 	if (err)
 		goto err_hw_init;
 
+	if ((adapter->flags & FLAG_IS_ICH) &&
+	    (adapter->flags & FLAG_READ_ONLY_NVM))
+		e1000e_write_protect_nvm_ich8lan(&adapter->hw);
+
 	hw->mac.ops.get_bus_info(&adapter->hw);
 
 	adapter->hw.phy.autoneg_wait_to_complete = 0;
