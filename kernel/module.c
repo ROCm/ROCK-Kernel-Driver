@@ -800,6 +800,7 @@ sys_delete_module(const char __user *name_user, unsigned int flags)
 	mutex_lock(&module_mutex);
 	/* Store the name of the last unloaded module for diagnostic purposes */
 	strlcpy(last_unloaded_module, mod->name, sizeof(last_unloaded_module));
+	unregister_dynamic_debug_module(mod->name);
 	free_module(mod);
 
  out:
@@ -1801,6 +1802,33 @@ static inline void add_kallsyms(struct module *mod,
 }
 #endif /* CONFIG_KALLSYMS */
 
+#ifdef CONFIG_DYNAMIC_PRINTK_DEBUG
+static void dynamic_printk_setup(Elf_Shdr *sechdrs, unsigned int verboseindex)
+{
+	struct mod_debug *debug_info;
+	unsigned long pos, end;
+	unsigned int num_verbose;
+
+	pos = sechdrs[verboseindex].sh_addr;
+	num_verbose = sechdrs[verboseindex].sh_size /
+				sizeof(struct mod_debug);
+	end = pos + (num_verbose * sizeof(struct mod_debug));
+
+	for (; pos < end; pos += sizeof(struct mod_debug)) {
+		debug_info = (struct mod_debug *)pos;
+		register_dynamic_debug_module(debug_info->modname,
+			debug_info->type, debug_info->logical_modname,
+			debug_info->flag_names, debug_info->hash,
+			debug_info->hash2);
+	}
+}
+#else
+static inline void dynamic_printk_setup(Elf_Shdr *sechdrs,
+					unsigned int verboseindex)
+{
+}
+#endif /* CONFIG_DYNAMIC_PRINTK_DEBUG */
+
 static void *module_alloc_update_bounds(unsigned long size)
 {
 	void *ret = module_alloc(size);
@@ -1851,6 +1879,7 @@ static noinline struct module *load_module(void __user *umod,
 	unsigned int markersstringsindex;
 	unsigned int tracepointsindex;
 	unsigned int tracepointsstringsindex;
+	unsigned int verboseindex;
 	struct module *mod;
 	long err = 0;
 	void *percpu = NULL, *ptr = NULL; /* Stops spurious gcc warning */
@@ -2159,6 +2188,8 @@ static noinline struct module *load_module(void __user *umod,
 	markersindex = find_sec(hdr, sechdrs, secstrings, "__markers");
  	markersstringsindex = find_sec(hdr, sechdrs, secstrings,
 					"__markers_strings");
+	verboseindex = find_sec(hdr, sechdrs, secstrings, "__verbose");
+
 	tracepointsindex = find_sec(hdr, sechdrs, secstrings, "__tracepoints");
 	tracepointsstringsindex = find_sec(hdr, sechdrs, secstrings,
 					"__tracepoints_strings");
@@ -2223,6 +2254,7 @@ static noinline struct module *load_module(void __user *umod,
 			mod->tracepoints + mod->num_tracepoints);
 #endif
 	}
+	dynamic_printk_setup(sechdrs, verboseindex);
 	err = module_finalize(hdr, sechdrs, mod);
 	if (err < 0)
 		goto cleanup;
