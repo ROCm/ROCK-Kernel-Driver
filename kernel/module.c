@@ -1851,7 +1851,8 @@ static noinline struct module *load_module(void __user *umod,
 {
 	Elf_Ehdr *hdr;
 	Elf_Shdr *sechdrs;
-	char *secstrings, *args, *modmagic, *strtab = NULL, *supported;
+	char *secstrings, *args, *modmagic, *strtab = NULL;
+	char *supported;
 	unsigned int i;
 	unsigned int symindex = 0;
 	unsigned int strindex = 0;
@@ -2012,7 +2013,7 @@ static noinline struct module *load_module(void __user *umod,
 	supported = get_modinfo(sechdrs, infoindex, "supported");
 	if (supported) {
 		if (!strcmp(supported, "external"))
-			tainted |= TAINT_EXTERNAL_SUPPORT;
+			add_taint_module(mod, TAINT_EXTERNAL_SUPPORT);
 		else if (strcmp(supported, "yes"))
 			supported = NULL;
 	}
@@ -2024,7 +2025,7 @@ static noinline struct module *load_module(void __user *umod,
 			err = -ENOEXEC;
 			goto free_hdr;
 		}
-		tainted |= TAINT_NO_SUPPORT;
+		add_taint_module(mod, TAINT_NO_SUPPORT);
 		if (unsupported == 1) {
 			printk(KERN_WARNING "%s: module not supported by "
 			       "Novell, setting U taint flag.\n", mod->name);
@@ -2659,6 +2660,10 @@ static char *module_flags(struct module *mod, char *buf)
 			buf[bx++] = 'P';
 		if (mod->taints & TAINT_FORCED_MODULE)
 			buf[bx++] = 'F';
+		if (mod->taints & TAINT_NO_SUPPORT)
+			buf[bx++] = 'N';
+		if (mod->taints & TAINT_EXTERNAL_SUPPORT)
+			buf[bx++] = 'X';
 		/*
 		 * TAINT_FORCED_RMMOD: could be added.
 		 * TAINT_UNSAFE_SMP, TAINT_MACHINE_CHECK, TAINT_BAD_PAGE don't

@@ -262,8 +262,13 @@ extern enum system_states {
 #define TAINT_DIE			(1<<7)
 #define TAINT_OVERRIDDEN_ACPI_TABLE	(1<<8)
 #define TAINT_WARN			(1<<9)
-#define TAINT_NO_SUPPORT		(1<<10)
-#define TAINT_EXTERNAL_SUPPORT		(1<<11)
+
+/*
+ * Take the upper bits to hopefully allow them
+ * to stay the same for more than one release.
+ */
+#define TAINT_NO_SUPPORT		(1<<30)
+#define TAINT_EXTERNAL_SUPPORT		(1<<31)
 
 extern void dump_stack(void) __cold;
 

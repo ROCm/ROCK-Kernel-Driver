@@ -185,7 +185,7 @@ const char *print_tainted(void)
 {
 	static char buf[20];
 	if (tainted) {
-		snprintf(buf, sizeof(buf), "Tainted: %c%c%c%c%c%c%c%c%c%c%c",
+		snprintf(buf, sizeof(buf), "Tainted: %c%c%c%c%c%c%c%c%c%c%c%c",
 			tainted & TAINT_PROPRIETARY_MODULE ? 'P' : 'G',
 			tainted & TAINT_FORCED_MODULE ? 'F' : ' ',
 			tainted & TAINT_UNSAFE_SMP ? 'S' : ' ',
@@ -196,8 +196,8 @@ const char *print_tainted(void)
 			tainted & TAINT_DIE ? 'D' : ' ',
 			tainted & TAINT_OVERRIDDEN_ACPI_TABLE ? 'A' : ' ',
 			tainted & TAINT_WARN ? 'W' : ' ',
-			tainted & TAINT_NO_SUPPORT ? 'N' :
-				(tainted & TAINT_EXTERNAL_SUPPORT ? 'X' : ' '));
+			tainted & TAINT_NO_SUPPORT ? 'N' : ' ',
+			tainted & TAINT_EXTERNAL_SUPPORT ? 'X' : ' ');
 	}
 	else
 		snprintf(buf, sizeof(buf), "Not tainted");
