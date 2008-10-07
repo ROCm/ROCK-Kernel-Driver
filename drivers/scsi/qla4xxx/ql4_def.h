@@ -90,10 +90,10 @@
  ***********************************/
 #define MAX_HBAS		16
 #define MAX_BUSES		1
-#define MAX_TARGETS		(MAX_PRST_DEV_DB_ENTRIES +  MAX_DEV_DB_ENTRIES)
+#define MAX_TARGETS		MAX_DEV_DB_ENTRIES
 #define MAX_LUNS		0xffff
 #define MAX_AEN_ENTRIES		256 /* should be > EXT_DEF_MAX_AEN_QUEUE */
-#define MAX_DDB_ENTRIES		(MAX_PRST_DEV_DB_ENTRIES + MAX_DEV_DB_ENTRIES)
+#define MAX_DDB_ENTRIES		MAX_DEV_DB_ENTRIES
 #define MAX_PDU_ENTRIES		32
 #define INVALID_ENTRY		0xFFFF
 #define MAX_CMDS_TO_RISC	1024
@@ -121,8 +121,9 @@
 #define MAX_REQS_SERVICED_PER_INTR	16
 
 #define ISCSI_IPADDR_SIZE		4	/* IP address size */
-#define ISCSI_ALIAS_SIZE		32	/* ISCSI Alias name size */
-#define ISCSI_NAME_SIZE			0xE0	/* ISCSI Name size */
+#define ISCSI_ALIAS_SIZE		32	/* ISCSI Alais name size */
+#define ISCSI_NAME_SIZE			0xE0	/* ISCSI Name size -
+						 * usually a string */
 
 #define LSDW(x) ((u32)((u64)(x)))
 #define MSDW(x) ((u32)((((u64)(x)) >> 16) >> 16))
@@ -158,6 +159,7 @@ struct srb {
 	struct ddb_entry	*ddb;
 	uint16_t flags;		/* (1) Status flags. */
 
+#define SRB_SCSI_PASSTHRU	BIT_2	/* for scsi passthru cmds */
 #define SRB_DMA_VALID		BIT_3	/* DMA Buffer mapped. */
 #define SRB_GOT_SENSE		BIT_4	/* sense data recieved. */
 	uint8_t state;		/* (1) Status flags. */
@@ -182,25 +184,12 @@ struct srb {
 	uint16_t iocb_tov;
 	uint16_t iocb_cnt;	/* Number of used iocbs */
 	uint16_t cc_stat;
-	u_long r_start;		/* Time we recieve a cmd from OS */
-	u_long u_start;		/* Time when we handed the cmd to F/W */
+	uint32_t dma_len;
 };
 
-/*
- * Asynchronous Event Queue structure
- */
-struct aen {
-        uint32_t mbox_sts[MBOX_AEN_REG_COUNT];
-};
-
-struct ql4_aen_log {
-        int count;
-        struct aen entry[MAX_AEN_ENTRIES];
-};
-
-/*
- * Device Database (DDB) structure
- */
+	/*
+	 * Device Database (DDB) structure
+	 */
 struct ddb_entry {
 	struct list_head list;	/* ddb list */
 	struct scsi_qla_host *ha;
@@ -262,9 +251,19 @@ struct ddb_entry {
 #define DF_RELOGIN		0	/* Relogin to device */
 #define DF_NO_RELOGIN		1	/* Do not relogin if IOCTL
 					 * logged it out */
-#define DF_ISNS_DISCOVERED	2	/* Device was discovered via iSNS */
-#define DF_FO_MASKED		3
+#define DF_SCAN_ISSUED		2
 
+/*
+ * Asynchronous Event Queue structure
+ */
+struct aen {
+	uint32_t mbox_sts[MBOX_AEN_REG_COUNT];
+};
+
+struct ql4_aen_log {
+	int count;
+	struct aen entry[MAX_AEN_ENTRIES];
+};
 
 #include "ql4_fw.h"
 #include "ql4_nvram.h"
@@ -273,16 +272,29 @@ struct ddb_entry {
  * Linux Host Adapter structure
  */
 struct scsi_qla_host {
+	struct klist_node node;
+	uint16_t instance;
+	uint16_t rsvd0;
+
+	/* exported functions */
+	int (*ql4cmd)(struct scsi_qla_host *ha, struct srb * srb);
+	int (*ql4mbx)(struct scsi_qla_host *ha, uint8_t inCount,
+		uint8_t outCount, uint32_t *mbx_cmd, uint32_t *mbx_sts);
+
 	/* Linux adapter configuration data */
+	struct Scsi_Host *host; /* pointer to host data */
+	uint32_t tot_ddbs;
 	unsigned long flags;
 
+#define AF_ISNS_CMD_DONE	     13 /* 0x00002000 */
 #define AF_ONLINE			0 /* 0x00000001 */
 #define AF_INIT_DONE			1 /* 0x00000002 */
 #define AF_MBOX_COMMAND			2 /* 0x00000004 */
 #define AF_MBOX_COMMAND_DONE		3 /* 0x00000008 */
-#define AF_INTERRUPTS_ON		6 /* 0x00000040 */
+#define AF_INTERRUPTS_ON		6 /* 0x00000040 Not Used */
 #define AF_GET_CRASH_RECORD		7 /* 0x00000080 */
 #define AF_LINK_UP			8 /* 0x00000100 */
+#define AF_TOPCAT_CHIP_PRESENT		9 /* 0x00000200 */
 #define AF_IRQ_ATTACHED			10 /* 0x00000400 */
 #define AF_DISABLE_ACB_COMPLETE		11 /* 0x00000800 */
 
@@ -296,9 +308,6 @@ struct scsi_qla_host {
 #define DPC_ISNS_RESTART		7 /* 0x00000080 */
 #define DPC_AEN				9 /* 0x00000200 */
 #define DPC_GET_DHCP_IP_ADDR		15 /* 0x00008000 */
-
-	struct Scsi_Host *host; /* pointer to host data */
-	uint32_t tot_ddbs;
 
 	uint16_t	iocb_cnt;
 	uint16_t	iocb_hiwat;
@@ -324,6 +333,7 @@ struct scsi_qla_host {
 	/* NVRAM registers */
 	struct eeprom_data *nvram;
 	spinlock_t hardware_lock ____cacheline_aligned;
+	spinlock_t list_lock;
 	uint32_t   eeprom_cmd_data;
 
 	/* Counters for general statistics */
@@ -348,7 +358,6 @@ struct scsi_qla_host {
 	uint32_t firmware_version[2];
 	uint32_t patch_number;
 	uint32_t build_number;
-	uint32_t board_id;
 
 	/* --- From Init_FW --- */
 	/* init_cb_t *init_cb; */
@@ -368,6 +377,7 @@ struct scsi_qla_host {
 
 	/* --- From GetFwState --- */
 	uint32_t firmware_state;
+	uint32_t board_id;
 	uint32_t addl_fw_state;
 
 	/* Linux kernel thread */
@@ -389,6 +399,10 @@ struct scsi_qla_host {
 	struct list_head free_srb_q;
 	uint16_t free_srb_q_count;
 	uint16_t num_srbs_allocated;
+
+	/* Active array */
+	struct srb *active_srb_array[MAX_SRBS];
+	uint16_t current_active_index;
 
 	/* DMA Memory Block */
 	void *queues;
@@ -418,12 +432,20 @@ struct scsi_qla_host {
 	uint16_t aen_out;
 	struct aen aen_q[MAX_AEN_ENTRIES];
 
-	struct ql4_aen_log aen_log;/* tracks all aens */
+	/* pdu variables */
+	uint16_t pdu_count;	/* Number of available aen_q entries */
+	uint16_t pdu_in;	/* Current indexes */
+	uint16_t pdu_out;
+	uint16_t pdu_active;
+	struct pdu_entry *free_pdu_top;
+	struct pdu_entry *free_pdu_bottom;
+	struct pdu_entry pdu_queue[MAX_PDU_ENTRIES];
 
 	/* This mutex protects several threads to do mailbox commands
 	 * concurrently.
 	 */
 	struct mutex  mbox_sem;
+	wait_queue_head_t mailbox_wait_queue;
 
 	/* temporary mailbox status registers */
 	volatile uint8_t mbox_status_count;
@@ -434,7 +456,11 @@ struct scsi_qla_host {
 
 	/* Map ddb_list entry by FW ddb index */
 	struct ddb_entry *fw_ddb_index_map[MAX_DDB_ENTRIES];
-
+	struct ql4_aen_log aen_log;
+	void (*ql4getaenlog)(struct scsi_qla_host *ha, struct ql4_aen_log *aenl);
+#define QL_INDICES_PER_ENTRY	32
+#define QL_OSINDEX_ENTRIES	(MAX_DDB_ENTRIES/QL_INDICES_PER_ENTRY)
+	volatile uint32_t os_map[QL_OSINDEX_ENTRIES];
 };
 
 static inline int is_qla4010(struct scsi_qla_host *ha)
@@ -510,6 +536,20 @@ static inline void __iomem * isp_gp_out(struct scsi_qla_host *ha)
 	return (is_qla4010(ha) ?
 		&ha->reg->u2.isp4010.gp_out :
 		&ha->reg->u2.isp4022.p0.gp_out);
+}
+
+static inline void __iomem * isp_probe_mux_addr(struct scsi_qla_host *ha)
+{
+	return (is_qla4010(ha) ?
+		&ha->reg->u2.isp4010.probe_mux_addr :
+		&ha->reg->u2.isp4022.p0.probe_mux_addr);
+}
+
+static inline void __iomem * isp_probe_mux_data(struct scsi_qla_host *ha)
+{
+	return (is_qla4010(ha) ?
+		&ha->reg->u2.isp4010.probe_mux_data :
+		&ha->reg->u2.isp4022.p0.probe_mux_data);
 }
 
 static inline int eeprom_ext_hw_conf_offset(struct scsi_qla_host *ha)
@@ -590,5 +630,6 @@ static inline void ql4xxx_unlock_drvr(struct scsi_qla_host *a)
 #define PROCESS_ALL_AENS	 0
 #define FLUSH_DDB_CHANGED_AENS	 1
 #define RELOGIN_DDB_CHANGED_AENS 2
+#define PROCESS_FOR_PROBE	 3
 
 #endif	/*_QLA4XXX_H */

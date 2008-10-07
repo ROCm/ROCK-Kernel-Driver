@@ -263,7 +263,7 @@ lpfc_reauthentication_handler(struct lpfc_nodelist *ndlp)
 		lpfc_printf_vlog(vport, KERN_ERR, LOG_SECURITY,
 				 "1029 Reauthentication Failure\n");
 		if (vport->auth.auth_state == LPFC_AUTH_SUCCESS)
-			lpfc_port_auth_failed(ndlp);
+			lpfc_port_auth_failed(ndlp, LPFC_AUTH_FAIL);
 	}
 }
 

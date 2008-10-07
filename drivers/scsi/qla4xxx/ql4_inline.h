@@ -24,8 +24,7 @@ qla4xxx_lookup_ddb_by_fw_index(struct scsi_qla_host *ha, uint32_t fw_ddb_index)
 	struct ddb_entry *ddb_entry = NULL;
 
 	if ((fw_ddb_index < MAX_DDB_ENTRIES) &&
-	    (ha->fw_ddb_index_map[fw_ddb_index] !=
-		(struct ddb_entry *) INVALID_ENTRY)) {
+	    (ha->fw_ddb_index_map[fw_ddb_index] != NULL)) {
 		ddb_entry = ha->fw_ddb_index_map[fw_ddb_index];
 	}
 

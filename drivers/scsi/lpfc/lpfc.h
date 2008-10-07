@@ -328,6 +328,11 @@ enum auth_state {
 	LPFC_AUTH_UNKNOWN		=  0,
 	LPFC_AUTH_SUCCESS		=  1,
 	LPFC_AUTH_FAIL			=  2,
+	LPFC_AUTH_FAIL_ELS_TMO		=  3,
+	LPFC_AUTH_FAIL_TRANS_TMO	=  4,
+	LPFC_AUTH_FAIL_LS_RJT_GEN	=  5,
+	LPFC_AUTH_FAIL_LS_RJT_BUSY	=  6,
+	LPFC_AUTH_FAIL_AUTH_RJT		=  7,
 };
 enum auth_msg_state {
 	LPFC_AUTH_NONE			=  0,
@@ -463,8 +468,6 @@ struct lpfc_vport {
 	uint8_t load_flag;
 #define FC_LOADING		0x1	/* HBA in process of loading drvr */
 #define FC_UNLOADING		0x2	/* HBA in process of unloading drvr */
-	char  *vname;		        /* Application assigned name */
-
 	/* Fields used for accessing auth service */
 	struct lpfc_auth auth;
 	uint32_t sc_tran_id;

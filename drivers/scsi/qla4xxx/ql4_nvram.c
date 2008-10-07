@@ -6,6 +6,7 @@
  */
 
 #include "ql4_def.h"
+#include "ql4_version.h"
 #include "ql4_glbl.h"
 #include "ql4_dbg.h"
 #include "ql4_inline.h"

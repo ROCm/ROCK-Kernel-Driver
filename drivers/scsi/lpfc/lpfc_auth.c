@@ -179,9 +179,8 @@ lpfc_dhchap_authenticate(struct Scsi_Host *shost,
 				 ndlp->nlp_DID);
 		lpfc_issue_els_auth_reject(vport, ndlp,
 					   AUTH_ERR, AUTHENTICATION_FAILED);
-		if (vport->auth.auth_state == LPFC_AUTH_SUCCESS) {
-			lpfc_port_auth_failed(ndlp);
-		}
+		if (vport->auth.auth_state == LPFC_AUTH_SUCCESS)
+			lpfc_port_auth_failed(ndlp, LPFC_AUTH_FAIL_AUTH_RJT);
 	}
 
 	kfree(rsp);

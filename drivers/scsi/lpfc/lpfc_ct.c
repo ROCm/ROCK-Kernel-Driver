@@ -1008,8 +1008,10 @@ lpfc_vport_symbolic_port_name(struct lpfc_vport *vport, char *symbol,
 	if (n < size)
 		n += snprintf(symbol + n, size - n, " VPort-%d", vport->vpi);
 
-	if (n < size && vport->vname)
-		n += snprintf(symbol + n, size - n, " VName-%s", vport->vname);
+	if (n < size &&
+	    strlen(vport->fc_vport->symbolic_name))
+		n += snprintf(symbol + n, size - n, " VName-%s",
+			      vport->fc_vport->symbolic_name);
 	return n;
 }
 

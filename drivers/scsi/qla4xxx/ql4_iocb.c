@@ -6,11 +6,12 @@
  */
 
 #include "ql4_def.h"
+#include "ql4_version.h"
 #include "ql4_glbl.h"
 #include "ql4_dbg.h"
 #include "ql4_inline.h"
 
-
+#define VMWARE_CMD_TIMEOUT	30
 #include <scsi/scsi_tcq.h>
 
 /**
@@ -67,9 +68,9 @@ static int qla4xxx_get_req_pkt(struct scsi_qla_host *ha,
  * This routine issues a marker IOCB.
  **/
 int qla4xxx_send_marker_iocb(struct scsi_qla_host *ha,
-	struct ddb_entry *ddb_entry, int lun, uint16_t mrkr_mod)
+			     struct ddb_entry *ddb_entry, int lun)
 {
-	struct qla4_marker_entry *marker_entry;
+	struct marker_entry *marker_entry;
 	unsigned long flags = 0;
 	uint8_t status = QLA_SUCCESS;
 
@@ -87,7 +88,7 @@ int qla4xxx_send_marker_iocb(struct scsi_qla_host *ha,
 	marker_entry->hdr.entryType = ET_MARKER;
 	marker_entry->hdr.entryCount = 1;
 	marker_entry->target = cpu_to_le16(ddb_entry->fw_ddb_index);
-	marker_entry->modifier = cpu_to_le16(mrkr_mod);
+	marker_entry->modifier = cpu_to_le16(MM_LUN_RESET);
 	int_to_scsilun(lun, &marker_entry->lun);
 	wmb();
 
@@ -160,6 +161,13 @@ static void qla4xxx_build_scsi_iocbs(struct srb *srb,
 	avail_dsds = COMMAND_SEG;
 	cur_dsd = (struct data_seg_a64 *) & (cmd_entry->dataseg[0]);
 
+	if (srb->flags & SRB_SCSI_PASSTHRU) {
+		cur_dsd->base.addrLow = cpu_to_le32(LSDW(srb->dma_handle));
+		cur_dsd->base.addrHigh = cpu_to_le32(MSDW(srb->dma_handle));
+		cur_dsd->count = cpu_to_le32(srb->dma_len);
+		return;
+	}
+
 	scsi_for_each_sg(cmd, sg, tot_dsds, i) {
 		dma_addr_t sle_dma;
 
@@ -204,6 +212,7 @@ int qla4xxx_send_command_to_isp(struct scsi_qla_host *ha, struct srb * srb)
 
 	unsigned long flags;
 	uint16_t cnt;
+	uint16_t i;
 	uint32_t index;
 	char tag[2];
 
@@ -215,7 +224,22 @@ int qla4xxx_send_command_to_isp(struct scsi_qla_host *ha, struct srb * srb)
 	/* Acquire hardware specific lock */
 	spin_lock_irqsave(&ha->hardware_lock, flags);
 
-	index = (uint32_t)cmd->request->tag;
+	index = ha->current_active_index;
+	for (i = 0; i < MAX_SRBS; i++) {
+		index++;
+		if (index == MAX_SRBS)
+			index = 1;
+		if (ha->active_srb_array[index] == 0) {
+			ha->current_active_index = index;
+			break;
+		}
+	}
+	if (i >= MAX_SRBS) {
+		printk(KERN_INFO "scsi%ld: %s: NO more SRB entries used "
+		       "iocbs=%d, \n reqs remaining=%d\n", ha->host_no,
+		       __func__, ha->iocb_cnt, ha->req_q_count);
+		goto queuing_error;
+	}
 
 	/* Calculate the number of request entries needed. */
 	nseg = scsi_dma_map(cmd);
@@ -258,8 +282,8 @@ int qla4xxx_send_command_to_isp(struct scsi_qla_host *ha, struct srb * srb)
 
 	/* Set data transfer direction control flags
 	 * NOTE: Look at data_direction bits iff there is data to be
-	 *	 transferred, as the data direction bit is sometimed filled
-	 *	 in when there is no data to be transferred */
+	 *       transferred, as the data direction bit is sometimed filled
+	 *       in when there is no data to be transferred */
 	cmd_entry->control_flags = CF_NO_DATA;
 	if (scsi_bufflen(cmd)) {
 		if (cmd->sc_data_direction == DMA_TO_DEVICE)
@@ -285,7 +309,6 @@ int qla4xxx_send_command_to_isp(struct scsi_qla_host *ha, struct srb * srb)
 			cmd_entry->control_flags |= CF_ORDERED_TAG;
 			break;
 		}
-
 
 	/* Advance request queue pointer */
 	ha->request_in++;
@@ -313,6 +336,7 @@ int qla4xxx_send_command_to_isp(struct scsi_qla_host *ha, struct srb * srb)
 	}
 
 	srb->cmd->host_scribble = (unsigned char *)srb;
+	ha->active_srb_array[index] = srb;
 
 	/* update counters */
 	srb->state = SRB_ACTIVE_STATE;
@@ -331,6 +355,9 @@ int qla4xxx_send_command_to_isp(struct scsi_qla_host *ha, struct srb * srb)
 	return QLA_SUCCESS;
 
 queuing_error:
+	if (srb->flags & SRB_SCSI_PASSTHRU)
+		return QLA_ERROR;
+
 	if (tot_dsds)
 		scsi_dma_unmap(cmd);
 
@@ -338,4 +365,3 @@ queuing_error:
 
 	return QLA_ERROR;
 }
-

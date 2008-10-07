@@ -27,7 +27,11 @@ struct port_ctrl_stat_regs {
 	__le32 rsrvd1[32];	/* 0x60-0xdf */
 	__le32 gp_out;		/* 0xe0 */
 	__le32 gp_in;		/* 0xe4 */
-	__le32 rsrvd2[5];	/* 0xe8-0xfb */
+	__le32 probe_mux_addr;	/* 0xe8 */
+	__le32 probe_mux_data;	/* 0xec */
+	__le32 stats_index;	/* 0xf0 */
+	__le32 stats_read_data_inc;	/* 0xf4 */
+	__le32 stats_read_data_noinc;	/* 0xf8 */
 	__le32 port_err_status; /* 0xfc */
 };
 
@@ -61,7 +65,9 @@ struct isp_reg {
 	__le32 req_q_in;    /* SCSI Request Queue Producer Index */
 	__le32 rsp_q_out;   /* SCSI Completion Queue Consumer Index */
 
-	__le32 reserved2[4];	/* 0x40 */
+	__le32 reserved2[2];	/* 0x40 */
+	__le32 arc_madi_cmd;
+	__le32 arc_madi_data;
 
 	union {
 		struct {
@@ -79,7 +85,10 @@ struct isp_reg {
 			__le32 gp_out; /* 0xe0 */
 			__le32 gp_in;
 
-			__le32 reserved5[5];
+			__le32 probe_mux_addr;
+			__le32 probe_mux_data;
+
+			__le32 reserved5[3];
 
 			__le32 port_err_status; /* 0xfc */
 		} __attribute__ ((packed)) isp4010;
@@ -216,7 +225,6 @@ union external_hw_config_reg {
 #define MBOX_CMD_ABOUT_FW			0x0009
 #define MBOX_CMD_PING				0x000B
 #define MBOX_CMD_LUN_RESET			0x0016
-#define MBOX_CMD_TARGET_WARM_RESET		0x0017
 #define MBOX_CMD_GET_MANAGEMENT_DATA		0x001E
 #define MBOX_CMD_GET_FW_STATUS			0x001F
 #define MBOX_CMD_SET_ISNS_SERVICE		0x0021
@@ -431,8 +439,9 @@ struct init_fw_ctrl_blk {
 
 struct dev_db_entry {
 	uint16_t options;	/* 00-01 */
-#define DDB_OPT_DISC_SESSION  0x10
-#define DDB_OPT_TARGET	      0x02 /* device is a target */
+#define DDB_OPT_DISC_SESSION	0x10
+#define DDB_OPT_TARGET		0x02 /* device is a target */
+#define DDB_OPT_IPV6_DEVICE	0x100
 
 	uint16_t exec_throttle;	/* 02-03 */
 	uint16_t exec_count;	/* 04-05 */
@@ -672,14 +681,13 @@ struct continuation_t1_entry {
 #define ET_CONTINUE	ET_CONT_T1
 
 /* Marker entry structure*/
-struct qla4_marker_entry {
+struct marker_entry {
 	struct qla4_header hdr;	/* 00-03 */
 
 	uint32_t system_defined; /* 04-07 */
 	uint16_t target;	/* 08-09 */
 	uint16_t modifier;	/* 0A-0B */
-#define MM_LUN_RESET		0
-#define MM_TGT_WARM_RESET	1
+#define MM_LUN_RESET	     0
 
 	uint16_t flags;		/* 0C-0D */
 	uint16_t reserved1;	/* 0E-0F */
@@ -731,6 +739,15 @@ struct status_entry {
 	uint32_t maxCmdSeqNum;	/* 1C-1F */
 	uint8_t senseData[IOCB_MAX_SENSEDATA_LEN];	/* 20-3F */
 
+};
+
+struct pdu_entry {
+	uint8_t *Buff;
+	uint32_t BuffLen;
+	uint32_t SendBuffLen;
+	uint32_t RecvBuffLen;
+	struct pdu_entry *Next;
+	dma_addr_t DmaBuff;
 };
 
 struct passthru0 {

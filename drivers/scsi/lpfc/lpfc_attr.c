@@ -1107,6 +1107,17 @@ lpfc_auth_state_show(struct device *dev, struct device_attribute *attr,
 			return snprintf(buf, PAGE_SIZE, "Not Authenticated\n");
 	case LPFC_AUTH_FAIL:
 		return snprintf(buf, PAGE_SIZE, "Failed\n");
+	case LPFC_AUTH_FAIL_ELS_TMO:
+		return snprintf(buf, PAGE_SIZE, "Failed - ELS Timeout\n");
+	case LPFC_AUTH_FAIL_TRANS_TMO:
+		return snprintf(buf, PAGE_SIZE, "Failed - "
+				"Transaction Timeout\n");
+	case LPFC_AUTH_FAIL_LS_RJT_GEN:
+		return snprintf(buf, PAGE_SIZE, "Failed - LS_RJT\n");
+	case LPFC_AUTH_FAIL_LS_RJT_BUSY:
+		return snprintf(buf, PAGE_SIZE, "Failed - LS_RJT Busy\n");
+	case LPFC_AUTH_FAIL_AUTH_RJT:
+		return snprintf(buf, PAGE_SIZE, "Failed - AUTH RJT\n");
 	case LPFC_AUTH_SUCCESS:
 		if (vport->auth.auth_msg_state == LPFC_AUTH_NEGOTIATE ||
 		    vport->auth.auth_msg_state == LPFC_DHCHAP_CHALLENGE ||
@@ -1664,6 +1675,20 @@ static DEVICE_ATTR(auth_dhgroup, S_IRUGO, lpfc_auth_dhgroup_show, NULL);
 static DEVICE_ATTR(auth_hash, S_IRUGO, lpfc_auth_hash_show, NULL);
 static DEVICE_ATTR(auth_last, S_IRUGO, lpfc_auth_last_show, NULL);
 static DEVICE_ATTR(auth_next, S_IRUGO, lpfc_auth_next_show, NULL);
+
+static ssize_t
+lpfc_symbolic_name_show(struct device *dev, struct device_attribute *attr,
+			char *buf)
+{
+	struct Scsi_Host  *shost = class_to_shost(dev);
+	struct lpfc_vport *vport = (struct lpfc_vport *) shost->hostdata;
+	int length;
+	char symbname[256];
+
+	length = lpfc_vport_symbolic_port_name(vport, symbname, 256);
+	return snprintf(buf, PAGE_SIZE, "%s\n", symbname);
+}
+static DEVICE_ATTR(lpfc_symbolic_name, S_IRUGO, lpfc_symbolic_name_show, NULL);
 
 static int
 lpfc_parse_wwn(const char *ns, uint8_t *nm)
@@ -3134,6 +3159,7 @@ struct device_attribute *lpfc_hba_attrs[] = {
 	&dev_attr_auth_hash,
 	&dev_attr_auth_last,
 	&dev_attr_auth_next,
+	&dev_attr_lpfc_symbolic_name,
 	&dev_attr_lpfc_soft_wwnn,
 	&dev_attr_lpfc_soft_wwpn,
 	&dev_attr_lpfc_soft_wwn_enable,
@@ -3171,7 +3197,7 @@ struct device_attribute *lpfc_vport_attrs[] = {
 	&dev_attr_auth_hash,
 	&dev_attr_auth_last,
 	&dev_attr_auth_next,
-
+	&dev_attr_lpfc_symbolic_name,
 	&dev_attr_lpfc_max_scsicmpl_time,
 	&dev_attr_lpfc_stat_data_ctrl,
 	NULL,
@@ -3530,9 +3556,6 @@ sysfs_mbox_write(struct kobject *kobj, struct bin_attribute *bin_attr,
 	struct lpfc_sysfs_mbox *sysfs_mbox;
 	uint8_t *ext;
 	uint32_t size;
-
-	if ((count + off) > MAILBOX_CMD_SIZE)
-		return -ERANGE;
 
 	if (off % 4 ||  count % 4 || (unsigned long)buf % 4)
 		return -EINVAL;
@@ -4137,25 +4160,28 @@ lpfc_alloc_sysfs_attr(struct lpfc_vport *vport)
 	int error;
 
 	error = sysfs_create_bin_file(&shost->shost_dev.kobj,
+				      &sysfs_drvr_stat_data_attr);
+
+	/* Virtual ports do not need ctrl_reg and mbox */
+	if (error || vport->port_type == LPFC_NPIV_PORT)
+		goto out;
+
+	error = sysfs_create_bin_file(&shost->shost_dev.kobj,
 				      &sysfs_ctlreg_attr);
 	if (error)
-		goto out;
+		goto out_remove_stat_attr;
 
 	error = sysfs_create_bin_file(&shost->shost_dev.kobj,
 				      &sysfs_mbox_attr);
 	if (error)
 		goto out_remove_ctlreg_attr;
 
-	error = sysfs_create_bin_file(&shost->shost_dev.kobj,
-				      &sysfs_drvr_stat_data_attr);
-	if (error)
-		goto out_remove_mbox_attr;
-
 	return 0;
-out_remove_mbox_attr:
-	sysfs_remove_bin_file(&shost->shost_dev.kobj, &sysfs_mbox_attr);
 out_remove_ctlreg_attr:
 	sysfs_remove_bin_file(&shost->shost_dev.kobj, &sysfs_ctlreg_attr);
+out_remove_stat_attr:
+	sysfs_remove_bin_file(&shost->shost_dev.kobj,
+			&sysfs_drvr_stat_data_attr);
 out:
 	return error;
 }
@@ -4170,6 +4196,9 @@ lpfc_free_sysfs_attr(struct lpfc_vport *vport)
 	struct Scsi_Host *shost = lpfc_shost_from_vport(vport);
 	sysfs_remove_bin_file(&shost->shost_dev.kobj,
 		&sysfs_drvr_stat_data_attr);
+	/* Virtual ports do not need ctrl_reg and mbox */
+	if (vport->port_type == LPFC_NPIV_PORT)
+		return;
 	sysfs_remove_bin_file(&shost->shost_dev.kobj, &sysfs_mbox_attr);
 	sysfs_remove_bin_file(&shost->shost_dev.kobj, &sysfs_ctlreg_attr);
 	sysfs_remove_bin_file(&shost->shost_dev.kobj, &sysfs_menlo_attr);
@@ -4648,6 +4677,23 @@ lpfc_show_rport_##field (struct device *dev,				\
 	lpfc_rport_show_function(field, format_string, sz, )		\
 static FC_RPORT_ATTR(field, S_IRUGO, lpfc_show_rport_##field, NULL)
 
+/**
+ * lpfc_set_vport_symbolic_name: Set the vport's symbolic name.
+ * @fc_vport: The fc_vport who's symbolic name has been changed.
+ *
+ * Description:
+ * This function is called by the transport after the @fc_vport's symbolic name
+ * has been changed. This function re-registers the symbolic name with the
+ * switch to propogate the change into the fabric if the vport is active.
+ **/
+static void
+lpfc_set_vport_symbolic_name(struct fc_vport *fc_vport)
+{
+	struct lpfc_vport *vport = *(struct lpfc_vport **)fc_vport->dd_data;
+
+	if (vport->port_state == LPFC_VPORT_READY)
+		lpfc_ns_cmd(vport, SLI_CTNS_RSPN_ID, 0, 0);
+}
 
 struct fc_function_template lpfc_transport_functions = {
 	/* fixed attributes the driver supports */
@@ -4657,6 +4703,7 @@ struct fc_function_template lpfc_transport_functions = {
 	.show_host_supported_fc4s = 1,
 	.show_host_supported_speeds = 1,
 	.show_host_maxframe_size = 1,
+	.show_host_symbolic_name = 1,
 
 	/* dynamic attributes the driver supports */
 	.get_host_port_id = lpfc_get_host_port_id,
@@ -4706,6 +4753,10 @@ struct fc_function_template lpfc_transport_functions = {
 	.terminate_rport_io = lpfc_terminate_rport_io,
 
 	.dd_fcvport_size = sizeof(struct lpfc_vport *),
+
+	.vport_disable = lpfc_vport_disable,
+
+	.set_vport_symbolic_name = lpfc_set_vport_symbolic_name,
 };
 
 struct fc_function_template lpfc_vport_transport_functions = {
@@ -4716,6 +4767,7 @@ struct fc_function_template lpfc_vport_transport_functions = {
 	.show_host_supported_fc4s = 1,
 	.show_host_supported_speeds = 1,
 	.show_host_maxframe_size = 1,
+	.show_host_symbolic_name = 1,
 
 	/* dynamic attributes the driver supports */
 	.get_host_port_id = lpfc_get_host_port_id,
@@ -4764,6 +4816,8 @@ struct fc_function_template lpfc_vport_transport_functions = {
 	.terminate_rport_io = lpfc_terminate_rport_io,
 
 	.vport_disable = lpfc_vport_disable,
+
+	.set_vport_symbolic_name = lpfc_set_vport_symbolic_name,
 };
 
 /**
@@ -4791,6 +4845,7 @@ lpfc_get_cfgparam(struct lpfc_hba *phba)
 	phba->cfg_soft_wwpn = 0L;
 	lpfc_sg_seg_cnt_init(phba, lpfc_sg_seg_cnt);
 	/* Also reinitialize the host templates with new values. */
+	lpfc_vport_template.sg_tablesize = phba->cfg_sg_seg_cnt;
 	lpfc_template.sg_tablesize = phba->cfg_sg_seg_cnt;
 	/*
 	 * Since the sg_tablesize is module parameter, the sg_dma_buf_size

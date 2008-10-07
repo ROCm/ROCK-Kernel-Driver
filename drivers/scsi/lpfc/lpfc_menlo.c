@@ -42,6 +42,7 @@
 #include "lpfc_vport.h"
 
 #define MENLO_CMD_FW_DOWNLOAD                   0x00000002
+#define MENLO_CMD_LOOPBACK                   	0x00000014
 
 static void lpfc_menlo_iocb_timeout_cmpl(struct lpfc_hba *,
 			struct lpfc_iocbq *, struct lpfc_iocbq *);
@@ -685,6 +686,16 @@ lpfc_menlo_write(struct lpfc_hba *phba,
 
 		} else
 			memcpy((uint8_t *) mlast->dma.virt, buf, count);
+
+		if (sysfs_menlo->cmdhdr.cmd == MENLO_CMD_LOOPBACK) {
+			if (mlast) {
+				tmpptr = (uint32_t *)mlast->dma.virt;
+				if (*(tmpptr+2))
+					phba->link_flag |= LS_LOOPBACK_MODE;
+				else
+					phba->link_flag &= ~LS_LOOPBACK_MODE;
+			}
+		}
 
 		if (sysfs_menlo->cmdhdr.cmd == MENLO_CMD_FW_DOWNLOAD
 			&& genreq->offset < hdr_offset) {

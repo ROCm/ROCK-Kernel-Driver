@@ -828,10 +828,10 @@ lpfc_ioctl_send_mgmt_cmd(struct lpfc_hba * phba,
 		rc = EIO;
 
 send_mgmt_cmd_free_outdmp:
-	spin_lock_irq(shost->host_lock);
 	dfc_cmd_data_free(phba, outdmp);
 send_mgmt_cmd_free_indmp:
 	dfc_cmd_data_free(phba, indmp);
+	spin_lock_irq(shost->host_lock);
 send_mgmt_cmd_free_bmpvirt:
 	lpfc_mbuf_free(phba, bmp->virt, bmp->phys);
 send_mgmt_cmd_free_bmp:
@@ -2069,14 +2069,14 @@ __dfc_cmd_data_alloc(struct lpfc_hba * phba,
 					cnt)) {
 					goto out;
 				}
-
+			bpl->tus.f.bdeFlags = BUFF_TYPE_BDE_64;
 			pci_dma_sync_single_for_device(phba->pcidev,
 			        dmp->dma.phys, LPFC_BPL_SIZE, PCI_DMA_TODEVICE);
 
-		} else
+		} else {
 			memset((uint8_t *)dmp->dma.virt, 0, cnt);
-		bpl->tus.f.bdeFlags = BUFF_TYPE_BDE_64;
-
+			bpl->tus.f.bdeFlags = BUFF_TYPE_BDE_64I;
+		}
 		/* build buffer ptr list for IOCB */
 		bpl->addrLow = le32_to_cpu(putPaddrLow(dmp->dma.phys));
 		bpl->addrHigh = le32_to_cpu(putPaddrHigh(dmp->dma.phys));

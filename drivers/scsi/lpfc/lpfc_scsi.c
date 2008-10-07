@@ -147,12 +147,19 @@ lpfc_send_sdev_queuedepth_change_event(struct lpfc_hba *phba,
 	return;
 }
 
-/*
- * This function is called with no lock held when there is a resource
- * error in driver or in firmware.
- */
+/**
+ * lpfc_rampdown_queue_depth: Post RAMP_DOWN_QUEUE event to worker thread.
+ * @phba: The Hba for which this call is being executed.
+ *
+ * This routine is called when there is resource error in driver or firmware.
+ * This routine posts WORKER_RAMP_DOWN_QUEUE event for @phba. This routine
+ * posts at most 1 event each second. This routine wakes up worker thread of
+ * @phba to process WORKER_RAM_DOWN_EVENT event.
+ *
+ * This routine should be called with no lock held.
+ **/
 void
-lpfc_adjust_queue_depth(struct lpfc_hba *phba)
+lpfc_rampdown_queue_depth(struct lpfc_hba *phba)
 {
 	unsigned long flags;
 	uint32_t evt_posted;
@@ -331,22 +338,6 @@ lpfc_scsi_dev_block(struct lpfc_hba *phba)
 				rport = starget_to_rport(scsi_target(sdev));
 				fc_remote_port_delete(rport);
 			}
-		}
-	lpfc_destroy_vport_work_array(phba, vports);
-}
-
-void
-lpfc_scsi_dev_rescan(struct lpfc_hba *phba)
-{
-	struct lpfc_vport **vports;
-	struct Scsi_Host  *shost;
-	int i;
-
-	vports = lpfc_create_vport_work_array(phba);
-	if (vports != NULL)
-		for (i = 0; i <= phba->max_vpi && vports[i] != NULL; i++) {
-			shost = lpfc_shost_from_vport(vports[i]);
-			scsi_scan_host(shost);
 		}
 	lpfc_destroy_vport_work_array(phba, vports);
 }
@@ -861,7 +852,8 @@ lpfc_scsi_cmd_iocb_cmpl(struct lpfc_hba *phba, struct lpfc_iocbq *pIocbIn,
 
 	lpfc_cmd->result = pIocbOut->iocb.un.ulpWord[4];
 	lpfc_cmd->status = pIocbOut->iocb.ulpStatus;
-	atomic_dec(&pnode->cmd_pending);
+	if (pnode && NLP_CHK_NODE_ACT(pnode))
+		atomic_dec(&pnode->cmd_pending);
 
 	if (lpfc_cmd->status) {
 		if (lpfc_cmd->status == IOSTAT_LOCAL_REJECT &&
@@ -951,23 +943,31 @@ lpfc_scsi_cmd_iocb_cmpl(struct lpfc_hba *phba, struct lpfc_iocbq *pIocbIn,
 	   time_after(jiffies, lpfc_cmd->start_time +
 		msecs_to_jiffies(vport->cfg_max_scsicmpl_time))) {
 		spin_lock_irqsave(sdev->host->host_lock, flags);
-		if ((pnode->cmd_qdepth > atomic_read(&pnode->cmd_pending) &&
-		    (atomic_read(&pnode->cmd_pending) > LPFC_MIN_TGT_QDEPTH) &&
-		    ((cmd->cmnd[0] == READ_10) || (cmd->cmnd[0] == WRITE_10))))
-			pnode->cmd_qdepth = atomic_read(&pnode->cmd_pending);
+		if (pnode && NLP_CHK_NODE_ACT(pnode)) {
+			if (pnode->cmd_qdepth >
+				atomic_read(&pnode->cmd_pending) &&
+				(atomic_read(&pnode->cmd_pending) >
+				LPFC_MIN_TGT_QDEPTH) &&
+				((cmd->cmnd[0] == READ_10) ||
+				(cmd->cmnd[0] == WRITE_10)))
+				pnode->cmd_qdepth =
+					atomic_read(&pnode->cmd_pending);
 
-		pnode->last_change_time = jiffies;
+			pnode->last_change_time = jiffies;
+		}
 		spin_unlock_irqrestore(sdev->host->host_lock, flags);
-	} else if ((pnode->cmd_qdepth < LPFC_MAX_TGT_QDEPTH) &&
+	} else if (pnode && NLP_CHK_NODE_ACT(pnode)) {
+		if ((pnode->cmd_qdepth < LPFC_MAX_TGT_QDEPTH) &&
 		   time_after(jiffies, pnode->last_change_time +
-			msecs_to_jiffies(LPFC_TGTQ_INTERVAL))) {
-		spin_lock_irqsave(sdev->host->host_lock, flags);
-		pnode->cmd_qdepth += pnode->cmd_qdepth *
-			LPFC_TGTQ_RAMPUP_PCENT / 100;
-		if (pnode->cmd_qdepth > LPFC_MAX_TGT_QDEPTH)
-			pnode->cmd_qdepth = LPFC_MAX_TGT_QDEPTH;
-		pnode->last_change_time = jiffies;
-		spin_unlock_irqrestore(sdev->host->host_lock, flags);
+			      msecs_to_jiffies(LPFC_TGTQ_INTERVAL))) {
+			spin_lock_irqsave(sdev->host->host_lock, flags);
+			pnode->cmd_qdepth += pnode->cmd_qdepth *
+				LPFC_TGTQ_RAMPUP_PCENT / 100;
+			if (pnode->cmd_qdepth > LPFC_MAX_TGT_QDEPTH)
+				pnode->cmd_qdepth = LPFC_MAX_TGT_QDEPTH;
+			pnode->last_change_time = jiffies;
+			spin_unlock_irqrestore(sdev->host->host_lock, flags);
+		}
 	}
 
 	lpfc_scsi_unprep_dma_buf(phba, lpfc_cmd);
@@ -1363,12 +1363,13 @@ lpfc_queuecommand(struct scsi_cmnd *cmnd, void (*done) (struct scsi_cmnd *))
 		cmnd->result = ScsiResult(DID_TRANSPORT_DISRUPTED, 0);
 		goto out_fail_command;
 	}
-	if (atomic_read(&ndlp->cmd_pending) >= ndlp->cmd_qdepth)
+	if (vport->cfg_max_scsicmpl_time &&
+		(atomic_read(&ndlp->cmd_pending) >= ndlp->cmd_qdepth))
 		goto out_host_busy;
 
 	lpfc_cmd = lpfc_get_scsi_buf(phba);
 	if (lpfc_cmd == NULL) {
-		lpfc_adjust_queue_depth(phba);
+		lpfc_rampdown_queue_depth(phba);
 
 		lpfc_printf_vlog(vport, KERN_INFO, LOG_FCP,
 				 "0707 driver's buffer pool is empty, "
@@ -1376,7 +1377,6 @@ lpfc_queuecommand(struct scsi_cmnd *cmnd, void (*done) (struct scsi_cmnd *))
 		goto out_host_busy;
 	}
 
-	lpfc_cmd->start_time = jiffies;
 	/*
 	 * Store the midlayer's command structure for the completion phase
 	 * and complete the command initialization.
@@ -1397,9 +1397,10 @@ lpfc_queuecommand(struct scsi_cmnd *cmnd, void (*done) (struct scsi_cmnd *))
 	atomic_inc(&ndlp->cmd_pending);
 	err = lpfc_sli_issue_iocb(phba, &phba->sli.ring[psli->fcp_ring],
 				  &lpfc_cmd->cur_iocbq, SLI_IOCB_RET_IOCB);
-	if (err)
+	if (err) {
+		atomic_dec(&ndlp->cmd_pending);
 		goto out_host_busy_free_buf;
-
+	}
 	if (phba->cfg_poll & ENABLE_FCP_RING_POLLING) {
 		lpfc_sli_poll_fcp_ring(phba);
 		if (phba->cfg_poll & DISABLE_FCP_RING_INT)
@@ -1409,7 +1410,6 @@ lpfc_queuecommand(struct scsi_cmnd *cmnd, void (*done) (struct scsi_cmnd *))
 	return 0;
 
  out_host_busy_free_buf:
-	atomic_dec(&ndlp->cmd_pending);
 	lpfc_scsi_unprep_dma_buf(phba, lpfc_cmd);
 	lpfc_release_scsi_buf(phba, lpfc_cmd);
  out_host_busy:
@@ -1575,7 +1575,7 @@ lpfc_device_reset_handler(struct scsi_cmnd *cmnd)
 		fc_get_event_number(),
 		sizeof(scsi_event),
 		(char *)&scsi_event,
-		SCSI_NL_VID_TYPE_PCI | PCI_VENDOR_ID_EMULEX);
+		LPFC_NL_VENDOR_ID);
 
 	if (!rdata || pnode->nlp_state != NLP_STE_MAPPED_NODE) {
 		lpfc_printf_vlog(vport, KERN_ERR, LOG_FCP,
@@ -1672,7 +1672,7 @@ lpfc_bus_reset_handler(struct scsi_cmnd *cmnd)
 		fc_get_event_number(),
 		sizeof(scsi_event),
 		(char *)&scsi_event,
-		SCSI_NL_VID_TYPE_PCI | PCI_VENDOR_ID_EMULEX);
+		LPFC_NL_VENDOR_ID);
 
 	lpfc_block_error_handler(cmnd);
 	/*
@@ -1842,7 +1842,7 @@ struct scsi_host_template lpfc_template = {
 	.info			= lpfc_info,
 	.queuecommand		= lpfc_queuecommand,
 	.eh_abort_handler	= lpfc_abort_handler,
-	.eh_device_reset_handler= lpfc_device_reset_handler,
+	.eh_device_reset_handler = lpfc_device_reset_handler,
 	.eh_bus_reset_handler	= lpfc_bus_reset_handler,
 	.slave_alloc		= lpfc_slave_alloc,
 	.slave_configure	= lpfc_slave_configure,
@@ -1856,3 +1856,22 @@ struct scsi_host_template lpfc_template = {
 	.max_sectors		= 0xFFFF,
 };
 
+struct scsi_host_template lpfc_vport_template = {
+	.module			= THIS_MODULE,
+	.name			= LPFC_DRIVER_NAME,
+	.info			= lpfc_info,
+	.queuecommand		= lpfc_queuecommand,
+	.eh_abort_handler	= lpfc_abort_handler,
+	.eh_device_reset_handler = lpfc_device_reset_handler,
+	.eh_bus_reset_handler	= lpfc_bus_reset_handler,
+	.slave_alloc		= lpfc_slave_alloc,
+	.slave_configure	= lpfc_slave_configure,
+	.slave_destroy		= lpfc_slave_destroy,
+	.scan_finished		= lpfc_scan_finished,
+	.this_id		= -1,
+	.sg_tablesize		= LPFC_DEFAULT_SG_SEG_CNT,
+	.cmd_per_lun		= LPFC_CMD_PER_LUN,
+	.use_clustering		= ENABLE_CLUSTERING,
+	.shost_attrs		= lpfc_vport_attrs,
+	.max_sectors		= 0xFFFF,
+};

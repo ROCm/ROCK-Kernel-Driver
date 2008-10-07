@@ -271,6 +271,48 @@ lpfc_config_async_cmpl(struct lpfc_hba * phba, LPFC_MBOXQ_t * pmboxq)
 }
 
 /**
+ * lpfc_dump_wakeup_param_cmpl: Completion handler for dump memory mailbox
+ *     command used for getting wake up parameters.
+ * @phba: pointer to lpfc hba data structure.
+ * @pmboxq: pointer to the driver internal queue element for mailbox command.
+ *
+ * This is the completion handler for dump mailbox command for getting
+ * wake up parameters. When this command complete, the response contain
+ * Option rom version of the HBA. This function translate the version number
+ * into a human readable string and store it in OptionROMVersion.
+ **/
+static void
+lpfc_dump_wakeup_param_cmpl(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmboxq)
+{
+	struct prog_id *prg;
+	uint32_t prog_id_word;
+	char dist = ' ';
+	/* character array used for decoding dist type. */
+	char dist_char[] = "nabx";
+
+	if (pmboxq->mb.mbxStatus != MBX_SUCCESS)
+		return;
+
+	prg = (struct prog_id *) &prog_id_word;
+
+	/* word 7 contain option rom version */
+	prog_id_word = pmboxq->mb.un.varWords[7];
+
+	/* Decode the Option rom version word to a readable string */
+	if (prg->dist < 4)
+		dist = dist_char[prg->dist];
+
+	if ((prg->dist == 3) && (prg->num == 0))
+		sprintf(phba->OptionROMVersion, "%d.%d%d",
+			prg->ver, prg->rev, prg->lev);
+	else
+		sprintf(phba->OptionROMVersion, "%d.%d%d%c%d",
+			prg->ver, prg->rev, prg->lev,
+			dist, prg->num);
+	return;
+}
+
+/**
  * lpfc_config_port_post: Perform lpfc initialization after config port.
  * @phba: pointer to lpfc hba data structure.
  *
@@ -528,6 +570,20 @@ lpfc_config_port_post(struct lpfc_hba *phba)
 				rc);
 		mempool_free(pmb, phba->mbox_mem_pool);
 	}
+
+	/* Get Option rom version */
+	pmb = mempool_alloc(phba->mbox_mem_pool, GFP_KERNEL);
+	lpfc_dump_wakeup_param(phba, pmb);
+	pmb->mbox_cmpl = lpfc_dump_wakeup_param_cmpl;
+	pmb->vport = phba->pport;
+	rc = lpfc_sli_issue_mbox(phba, pmb, MBX_NOWAIT);
+
+	if ((rc != MBX_BUSY) && (rc != MBX_SUCCESS)) {
+		lpfc_printf_log(phba, KERN_ERR, LOG_INIT, "0435 Adapter failed "
+				"to get Option ROM version status x%x\n.", rc);
+		mempool_free(pmb, phba->mbox_mem_pool);
+	}
+
 	return 0;
 }
 
@@ -879,8 +935,7 @@ lpfc_handle_eratt(struct lpfc_hba *phba)
 	fc_host_post_vendor_event(shost, fc_get_event_number(),
 				  sizeof(board_event),
 				  (char *) &board_event,
-				  SCSI_NL_VID_TYPE_PCI
-				  | PCI_VENDOR_ID_EMULEX);
+				  LPFC_NL_VENDOR_ID);
 
 	if (phba->work_hs & HS_FFER6) {
 		/* Re-establishing Link */
@@ -2015,7 +2070,12 @@ lpfc_create_port(struct lpfc_hba *phba, int instance, struct device *dev)
 	struct Scsi_Host  *shost;
 	int error = 0;
 
-	shost = scsi_host_alloc(&lpfc_template, sizeof(struct lpfc_vport));
+	if (dev != &phba->pcidev->dev)
+		shost = scsi_host_alloc(&lpfc_vport_template,
+					sizeof(struct lpfc_vport));
+	else
+		shost = scsi_host_alloc(&lpfc_template,
+					sizeof(struct lpfc_vport));
 	if (!shost)
 		goto out;
 
@@ -2097,8 +2157,6 @@ destroy_port(struct lpfc_vport *vport)
 {
 	struct Scsi_Host *shost = lpfc_shost_from_vport(vport);
 	struct lpfc_hba  *phba = vport->phba;
-
-	kfree(vport->vname);
 
 	lpfc_debugfs_terminate(vport);
 	fc_remove_host(shost);
@@ -2383,6 +2441,98 @@ lpfc_disable_msix(struct lpfc_hba *phba)
 }
 
 /**
+ * lpfc_enable_intr: Enable device interrupt.
+ * @phba: pointer to lpfc hba data structure.
+ *
+ * This routine is invoked to enable device interrupt and associate driver's
+ * interrupt handler(s) to interrupt vector(s). Depends on the interrupt
+ * mode configured to the driver, the driver will try to fallback from the
+ * configured interrupt mode to an interrupt mode which is supported by the
+ * platform, kernel, and device in the order of: MSI-X -> MSI -> IRQ.
+ *
+ * Return codes
+ *   0 - sucessful
+ *   other values - error
+ **/
+static int
+lpfc_enable_intr(struct lpfc_hba *phba)
+{
+	int retval = 0;
+
+	/* Starting point of configuring interrupt method */
+	phba->intr_type = NONE;
+
+	if (phba->cfg_use_msi == 2) {
+		/* Need to issue conf_port mbox cmd before conf_msi mbox cmd */
+		retval = lpfc_sli_config_port(phba, 3);
+		if (retval)
+			lpfc_printf_log(phba, KERN_INFO, LOG_INIT,
+				"0478 Firmware not capable of SLI 3 mode.\n");
+		else {
+			lpfc_printf_log(phba, KERN_INFO, LOG_INIT,
+				"0479 Firmware capable of SLI 3 mode.\n");
+			/* Now, try to enable MSI-X interrupt mode */
+			retval = lpfc_enable_msix(phba);
+			if (!retval) {
+				phba->intr_type = MSIX;
+				lpfc_printf_log(phba, KERN_INFO, LOG_INIT,
+						"0480 enable MSI-X mode.\n");
+			}
+		}
+	}
+
+	/* Fallback to MSI if MSI-X initialization failed */
+	if (phba->cfg_use_msi >= 1 && phba->intr_type == NONE) {
+		retval = pci_enable_msi(phba->pcidev);
+		if (!retval) {
+			phba->intr_type = MSI;
+			lpfc_printf_log(phba, KERN_INFO, LOG_INIT,
+					"0481 enable MSI mode.\n");
+		} else
+			lpfc_printf_log(phba, KERN_INFO, LOG_INIT,
+					"0470 enable IRQ mode.\n");
+	}
+
+	/* MSI-X is the only case the doesn't need to call request_irq */
+	if (phba->intr_type != MSIX) {
+		retval = request_irq(phba->pcidev->irq, lpfc_intr_handler,
+				     IRQF_SHARED, LPFC_DRIVER_NAME, phba);
+		if (retval) {
+			if (phba->intr_type == MSI)
+				pci_disable_msi(phba->pcidev);
+			lpfc_printf_log(phba, KERN_ERR, LOG_INIT,
+					"0471 Enable interrupt handler "
+					"failed\n");
+		} else if (phba->intr_type != MSI)
+			phba->intr_type = INTx;
+	}
+
+	return retval;
+}
+
+/**
+ * lpfc_disable_intr: Disable device interrupt.
+ * @phba: pointer to lpfc hba data structure.
+ *
+ * This routine is invoked to disable device interrupt and disassociate the
+ * driver's interrupt handler(s) from interrupt vector(s). Depending on the
+ * interrupt mode, the driver will release the interrupt vector(s) for the
+ * message signaled interrupt.
+ **/
+static void
+lpfc_disable_intr(struct lpfc_hba *phba)
+{
+	if (phba->intr_type == MSIX)
+		lpfc_disable_msix(phba);
+	else {
+		free_irq(phba->pcidev->irq, phba);
+		if (phba->intr_type == MSI)
+			pci_disable_msi(phba->pcidev);
+	}
+	return;
+}
+
+/**
  * lpfc_pci_probe_one: lpfc PCI probe func to register device to PCI subsystem.
  * @pdev: pointer to PCI device
  * @pid: pointer to PCI device identifier
@@ -2634,7 +2784,6 @@ lpfc_pci_probe_one(struct pci_dev *pdev, const struct pci_device_id *pid)
 	lpfc_debugfs_initialize(vport);
 
 	pci_set_drvdata(pdev, shost);
-	phba->intr_type = NONE;
 
 	phba->MBslimaddr = phba->slim_memmap_p;
 	phba->HAregaddr = phba->ctrl_regs_memmap_p + HA_REG_OFFSET;
@@ -2643,48 +2792,11 @@ lpfc_pci_probe_one(struct pci_dev *pdev, const struct pci_device_id *pid)
 	phba->HCregaddr = phba->ctrl_regs_memmap_p + HC_REG_OFFSET;
 
 	/* Configure and enable interrupt */
-	if (phba->cfg_use_msi == 2) {
-		/* Need to issue conf_port mbox cmd before conf_msi mbox cmd */
-		error = lpfc_sli_config_port(phba, 3);
-		if (error)
-			lpfc_printf_log(phba, KERN_INFO, LOG_INIT,
-				"0427 Firmware not capable of SLI 3 mode.\n");
-		else {
-			lpfc_printf_log(phba, KERN_INFO, LOG_INIT,
-				"0426 Firmware capable of SLI 3 mode.\n");
-			/* Now, try to enable MSI-X interrupt mode */
-			error = lpfc_enable_msix(phba);
-			if (!error) {
-				phba->intr_type = MSIX;
-				lpfc_printf_log(phba, KERN_INFO, LOG_INIT,
-						"0430 enable MSI-X mode.\n");
-			}
-		}
-	}
-
-	/* Fallback to MSI if MSI-X initialization failed */
-	if (phba->cfg_use_msi >= 1 && phba->intr_type == NONE) {
-		retval = pci_enable_msi(phba->pcidev);
-		if (!retval) {
-			phba->intr_type = MSI;
-			lpfc_printf_log(phba, KERN_INFO, LOG_INIT,
-					"0473 enable MSI mode.\n");
-		} else
-			lpfc_printf_log(phba, KERN_INFO, LOG_INIT,
-					"0452 enable IRQ mode.\n");
-	}
-
-	/* MSI-X is the only case the doesn't need to call request_irq */
-	if (phba->intr_type != MSIX) {
-		retval = request_irq(phba->pcidev->irq, lpfc_intr_handler,
-				     IRQF_SHARED, LPFC_DRIVER_NAME, phba);
-		if (retval) {
-			lpfc_printf_log(phba, KERN_ERR, LOG_INIT, "0451 Enable "
-					"interrupt handler failed\n");
-			error = retval;
-			goto out_disable_msi;
-		} else if (phba->intr_type != MSI)
-			phba->intr_type = INTx;
+	error = lpfc_enable_intr(phba);
+	if (error) {
+		lpfc_printf_log(phba, KERN_ERR, LOG_INIT,
+				"0426 Failed to enable interrupt.\n");
+		goto out_destroy_port;
 	}
 
 	phba->dfc_host = lpfcdfc_host_add(pdev, shost, phba);
@@ -2731,7 +2843,7 @@ lpfc_pci_probe_one(struct pci_dev *pdev, const struct pci_device_id *pid)
 	fc_host_post_vendor_event(shost, fc_get_event_number(),
 		sizeof(adapter_event),
 		(char *) &adapter_event,
-		SCSI_NL_VID_TYPE_PCI | PCI_VENDOR_ID_EMULEX);
+		LPFC_NL_VENDOR_ID);
 
 	scsi_scan_host(shost);
 
@@ -2747,15 +2859,8 @@ out_free_irq:
 		lpfcdfc_host_del(phba->dfc_host);
 	lpfc_stop_phba_timers(phba);
 	phba->pport->work_port_events = 0;
-
-	if (phba->intr_type == MSIX)
-		lpfc_disable_msix(phba);
-	else
-		free_irq(phba->pcidev->irq, phba);
-
-out_disable_msi:
-	if (phba->intr_type == MSI)
-		pci_disable_msi(phba->pcidev);
+	lpfc_disable_intr(phba);
+out_destroy_port:
 	destroy_port(vport);
 out_kthread_stop:
 	kthread_stop(phba->worker_thread);
@@ -2796,7 +2901,7 @@ out:
  * @pdev: pointer to PCI device
  *
  * This routine is to be registered to the kernel's PCI subsystem. When an
- * Emulex HBA is removed from PCI bus. It perform all the necessary cleanup
+ * Emulex HBA is removed from PCI bus, it performs all the necessary cleanup
  * for the HBA device to be removed from the PCI subsystem properly.
  **/
 static void __devexit
@@ -2804,12 +2909,11 @@ lpfc_pci_remove_one(struct pci_dev *pdev)
 {
 	struct Scsi_Host  *shost = pci_get_drvdata(pdev);
 	struct lpfc_vport *vport = (struct lpfc_vport *) shost->hostdata;
+	struct lpfc_vport **vports;
 	struct lpfc_hba   *phba = vport->phba;
+	int i;
 	int bars = pci_select_bars(pdev, IORESOURCE_MEM);
 
-	/* In case PCI channel permanently disabled, rescan SCSI devices */
-	if (pdev->error_state == pci_channel_io_perm_failure)
-		lpfc_scsi_dev_rescan(phba);
 	lpfcdfc_host_del(phba->dfc_host);
 	phba->dfc_host = NULL;
 
@@ -2817,11 +2921,18 @@ lpfc_pci_remove_one(struct pci_dev *pdev)
 	vport->load_flag |= FC_UNLOADING;
 	spin_unlock_irq(&phba->hbalock);
 
-	kfree(vport->vname);
 	lpfc_free_sysfs_attr(vport);
 
 	kthread_stop(phba->worker_thread);
 
+	/* Release all the vports against this physical port */
+	vports = lpfc_create_vport_work_array(phba);
+	if (vports != NULL)
+		for (i = 1; i <= phba->max_vpi && vports[i] != NULL; i++)
+			fc_vport_terminate(vports[i]->fc_vport);
+	lpfc_destroy_vport_work_array(phba, vports);
+
+	/* Remove FC host and then SCSI host with the physical port */
 	fc_remove_host(shost);
 	scsi_remove_host(shost);
 	lpfc_cleanup(vport);
@@ -2841,13 +2952,8 @@ lpfc_pci_remove_one(struct pci_dev *pdev)
 
 	lpfc_debugfs_terminate(vport);
 
-	if (phba->intr_type == MSIX)
-		lpfc_disable_msix(phba);
-	else {
-		free_irq(phba->pcidev->irq, phba);
-		if (phba->intr_type == MSI)
-			pci_disable_msi(phba->pcidev);
-	}
+	/* Disable interrupt */
+	lpfc_disable_intr(phba);
 
 	pci_set_drvdata(pdev, NULL);
 	scsi_host_put(shost);
@@ -2876,6 +2982,111 @@ lpfc_pci_remove_one(struct pci_dev *pdev)
 
 	pci_release_selected_regions(pdev, bars);
 	pci_disable_device(pdev);
+}
+
+/**
+ * lpfc_pci_suspend_one: lpfc PCI func to suspend device for power management.
+ * @pdev: pointer to PCI device
+ * @msg: power management message
+ *
+ * This routine is to be registered to the kernel's PCI subsystem to support
+ * system Power Management (PM). When PM invokes this method, it quiesces the
+ * device by stopping the driver's worker thread for the device, turning off
+ * device's interrupt and DMA, and bring the device offline. Note that as the
+ * driver implements the minimum PM requirements to a power-aware driver's PM
+ * support for suspend/resume -- all the possible PM messages (SUSPEND,
+ * HIBERNATE, FREEZE) to the suspend() method call will be treated as SUSPEND
+ * and the driver will fully reinitialize its device during resume() method
+ * call, the driver will set device to PCI_D3hot state in PCI config space
+ * instead of setting it according to the @msg provided by the PM.
+ *
+ * Return code
+ *   0 - driver suspended the device
+ *   Error otherwise
+ **/
+static int
+lpfc_pci_suspend_one(struct pci_dev *pdev, pm_message_t msg)
+{
+	struct Scsi_Host *shost = pci_get_drvdata(pdev);
+	struct lpfc_hba *phba = ((struct lpfc_vport *)shost->hostdata)->phba;
+
+	lpfc_printf_log(phba, KERN_INFO, LOG_INIT,
+			"0473 PCI device Power Management suspend.\n");
+
+	/* Bring down the device */
+	lpfc_offline_prep(phba);
+	lpfc_offline(phba);
+	kthread_stop(phba->worker_thread);
+
+	/* Disable interrupt from device */
+	lpfc_disable_intr(phba);
+
+	/* Save device state to PCI config space */
+	pci_save_state(pdev);
+	pci_set_power_state(pdev, PCI_D3hot);
+
+	return 0;
+}
+
+/**
+ * lpfc_pci_resume_one: lpfc PCI func to resume device for power management.
+ * @pdev: pointer to PCI device
+ *
+ * This routine is to be registered to the kernel's PCI subsystem to support
+ * system Power Management (PM). When PM invokes this method, it restores
+ * the device's PCI config space state and fully reinitializes the device
+ * and brings it online. Note that as the driver implements the minimum PM
+ * requirements to a power-aware driver's PM for suspend/resume -- all
+ * the possible PM messages (SUSPEND, HIBERNATE, FREEZE) to the suspend()
+ * method call will be treated as SUSPEND and the driver will fully
+ * reinitialize its device during resume() method call, the device will be
+ * set to PCI_D0 directly in PCI config space before restoring the state.
+ *
+ * Return code
+ *   0 - driver suspended the device
+ *   Error otherwise
+ **/
+static int
+lpfc_pci_resume_one(struct pci_dev *pdev)
+{
+	struct Scsi_Host *shost = pci_get_drvdata(pdev);
+	struct lpfc_hba *phba = ((struct lpfc_vport *)shost->hostdata)->phba;
+	int error;
+
+	lpfc_printf_log(phba, KERN_INFO, LOG_INIT,
+			"0452 PCI device Power Management resume.\n");
+
+	/* Restore device state from PCI config space */
+	pci_set_power_state(pdev, PCI_D0);
+	pci_restore_state(pdev);
+	if (pdev->is_busmaster)
+		pci_set_master(pdev);
+
+	/* Startup the kernel thread for this host adapter. */
+	phba->worker_thread = kthread_run(lpfc_do_work, phba,
+					"lpfc_worker_%d", phba->brd_no);
+	if (IS_ERR(phba->worker_thread)) {
+		error = PTR_ERR(phba->worker_thread);
+		lpfc_printf_log(phba, KERN_ERR, LOG_INIT,
+				"0434 PM resume failed to start worker "
+				"thread: error=x%x.\n", error);
+		return error;
+	}
+
+	/* Enable interrupt from device */
+	error = lpfc_enable_intr(phba);
+	if (error) {
+		lpfc_printf_log(phba, KERN_ERR, LOG_INIT,
+				"0430 PM resume Failed to enable interrupt: "
+				"error=x%x.\n", error);
+		return error;
+	}
+
+	/* Restart HBA and bring it online */
+	lpfc_sli_brdrestart(phba);
+	lpfc_online(phba);
+
+	return 0;
 }
 
 /**
@@ -2921,13 +3132,8 @@ static pci_ers_result_t lpfc_io_error_detected(struct pci_dev *pdev,
 	pring = &psli->ring[psli->fcp_ring];
 	lpfc_sli_abort_iocb_ring(phba, pring);
 
-	if (phba->intr_type == MSIX)
-		lpfc_disable_msix(phba);
-	else {
-		free_irq(phba->pcidev->irq, phba);
-		if (phba->intr_type == MSI)
-			pci_disable_msi(phba->pcidev);
-	}
+	/* Disable interrupt */
+	lpfc_disable_intr(phba);
 
 	/* Request a slot reset. */
 	return PCI_ERS_RESULT_NEED_RESET;
@@ -2955,7 +3161,7 @@ static pci_ers_result_t lpfc_io_slot_reset(struct pci_dev *pdev)
 	struct Scsi_Host *shost = pci_get_drvdata(pdev);
 	struct lpfc_hba *phba = ((struct lpfc_vport *)shost->hostdata)->phba;
 	struct lpfc_sli *psli = &phba->sli;
-	int error, retval;
+	int error;
 
 	dev_printk(KERN_INFO, &pdev->dev, "recovering from a slot reset.\n");
 	if (pci_enable_device_mem(pdev)) {
@@ -2971,48 +3177,12 @@ static pci_ers_result_t lpfc_io_slot_reset(struct pci_dev *pdev)
 	spin_unlock_irq(&phba->hbalock);
 
 	/* Enable configured interrupt method */
-	phba->intr_type = NONE;
-	if (phba->cfg_use_msi == 2) {
-		/* Need to issue conf_port mbox cmd before conf_msi mbox cmd */
-		error = lpfc_sli_config_port(phba, 3);
-		if (error)
-			lpfc_printf_log(phba, KERN_INFO, LOG_INIT,
-				"0478 Firmware not capable of SLI 3 mode.\n");
-		else {
-			lpfc_printf_log(phba, KERN_INFO, LOG_INIT,
-				"0479 Firmware capable of SLI 3 mode.\n");
-			/* Now, try to enable MSI-X interrupt mode */
-			error = lpfc_enable_msix(phba);
-			if (!error) {
-				phba->intr_type = MSIX;
-				lpfc_printf_log(phba, KERN_INFO, LOG_INIT,
-						"0480 enable MSI-X mode.\n");
-			}
-		}
-	}
-
-	/* Fallback to MSI if MSI-X initialization failed */
-	if (phba->cfg_use_msi >= 1 && phba->intr_type == NONE) {
-		retval = pci_enable_msi(phba->pcidev);
-		if (!retval) {
-			phba->intr_type = MSI;
-			lpfc_printf_log(phba, KERN_INFO, LOG_INIT,
-					"0481 enable MSI mode.\n");
-		} else
-			lpfc_printf_log(phba, KERN_INFO, LOG_INIT,
-					"0470 enable IRQ mode.\n");
-	}
-
-	/* MSI-X is the only case the doesn't need to call request_irq */
-	if (phba->intr_type != MSIX) {
-		retval = request_irq(phba->pcidev->irq, lpfc_intr_handler,
-				     IRQF_SHARED, LPFC_DRIVER_NAME, phba);
-		if (retval) {
-			lpfc_printf_log(phba, KERN_ERR, LOG_INIT,
-					"0471 Enable interrupt handler "
-					"failed\n");
-		} else if (phba->intr_type != MSI)
-			phba->intr_type = INTx;
+	error = lpfc_enable_intr(phba);
+	if (error) {
+		lpfc_printf_log(phba, KERN_ERR, LOG_INIT,
+				"0427 Cannot re-enable interrupt after "
+				"slot reset.\n");
+		return PCI_ERS_RESULT_DISCONNECT;
 	}
 
 	/* Take device offline; this will perform cleanup */
@@ -3130,6 +3300,8 @@ static struct pci_driver lpfc_driver = {
 	.id_table	= lpfc_id_table,
 	.probe		= lpfc_pci_probe_one,
 	.remove		= __devexit_p(lpfc_pci_remove_one),
+	.suspend        = lpfc_pci_suspend_one,
+	.resume         = lpfc_pci_resume_one,
 	.err_handler    = &lpfc_err_handler,
 };
 
