@@ -467,6 +467,13 @@ static int disable_periodic (struct ehci_hcd *ehci)
 	if (--ehci->periodic_sched)
 		return 0;
 
+	/* ehci->periodic_sched isn't an exact shadow of CMD_PSE;
+	* make sure it wasn't already cleared.
+	*/
+	cmd = ehci_readl(ehci, &ehci->regs->command);
+	if (!(cmd & CMD_PSE))
+		return 0;
+
 	/* did setting PSE not take effect yet?
 	 * takes effect only at frame boundaries...
 	 */
