@@ -76,6 +76,10 @@
  * "feature-flush-cache" node!
  */
 #define BLKIF_OP_FLUSH_DISKCACHE   3
+/*
+ * Device specific command packet contained within the request
+ */
+#define BLKIF_OP_PACKET            4
 
 /*
  * Maximum scatter/gather segments per request.

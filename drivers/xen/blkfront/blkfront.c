@@ -372,6 +372,8 @@ static void connect(struct blkfront_info *info)
 	add_disk(info->gd);
 
 	info->is_ready = 1;
+
+	register_vcd(info);
 }
 
 /**
@@ -401,6 +403,8 @@ static void blkfront_closing(struct xenbus_device *dev)
 	flush_scheduled_work();
 
 	xlvbd_sysfs_delif(info);
+
+	unregister_vcd(info);
 
 	xlvbd_del(info);
 
@@ -622,6 +626,8 @@ static int blkif_queue_request(struct request *req)
 		BLKIF_OP_WRITE : BLKIF_OP_READ;
 	if (blk_barrier_rq(req))
 		ring_req->operation = BLKIF_OP_WRITE_BARRIER;
+	if (blk_pc_request(req))
+		ring_req->operation = BLKIF_OP_PACKET;
 
 	ring_req->nr_segments = 0;
 	rq_for_each_segment(bvec, req, iter) {
@@ -678,7 +684,7 @@ void do_blkif_request(struct request_queue *rq)
 
 	while ((req = elv_next_request(rq)) != NULL) {
 		info = req->rq_disk->private_data;
-		if (!blk_fs_request(req)) {
+		if (!blk_fs_request(req) && !blk_pc_request(req)) {
 			end_request(req, 0);
 			continue;
 		}
@@ -755,6 +761,7 @@ static irqreturn_t blkif_int(int irq, void *dev_id)
 			/* fall through */
 		case BLKIF_OP_READ:
 		case BLKIF_OP_WRITE:
+		case BLKIF_OP_PACKET:
 			if (unlikely(bret->status != BLKIF_RSP_OKAY))
 				DPRINTK("Bad return from blkdev data "
 					"request: %x\n", bret->status);

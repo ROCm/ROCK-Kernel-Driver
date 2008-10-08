@@ -154,4 +154,8 @@ static inline void xlvbd_sysfs_delif(struct blkfront_info *info)
 }
 #endif
 
+/* Virtual cdrom block-device */
+extern void register_vcd(struct blkfront_info *info);
+extern void unregister_vcd(struct blkfront_info *info);
+
 #endif /* __XEN_DRIVERS_BLOCK_H__ */

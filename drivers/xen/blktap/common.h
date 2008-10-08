@@ -75,6 +75,7 @@ typedef struct blkif_st {
 	int                 st_rd_req;
 	int                 st_wr_req;
 	int                 st_oo_req;
+	int                 st_pk_req;
 	int                 st_rd_sect;
 	int                 st_wr_sect;
 

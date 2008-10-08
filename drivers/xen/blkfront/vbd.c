@@ -281,8 +281,10 @@ xlvbd_add(blkif_sector_t capacity, int vdevice, u16 vdisk_info,
 		goto out;
 	info->mi = mi;
 
-	if ((minor & ((1 << mi->type->partn_shift) - 1)) == 0)
-		nr_minors = 1 << mi->type->partn_shift;
+	if (!vdisk_info & VDISK_CDROM) {
+		if ((minor & ((1 << mi->type->partn_shift) - 1)) == 0)
+			nr_minors = 1 << mi->type->partn_shift;
+	}
 
 	gd = alloc_disk(nr_minors);
 	if (gd == NULL)
@@ -290,7 +292,7 @@ xlvbd_add(blkif_sector_t capacity, int vdevice, u16 vdisk_info,
 
 	offset =  mi->index * mi->type->disks_per_major +
 			(minor >> mi->type->partn_shift);
-	if (nr_minors > 1) {
+	if (nr_minors > 1 || vdisk_info & VDISK_CDROM) {
 		if (offset < 26) {
 			sprintf(gd->disk_name, "%s%c",
 				 mi->type->diskname, 'a' + offset );

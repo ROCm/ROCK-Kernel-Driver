@@ -1073,13 +1073,14 @@ static void fast_flush_area(pending_req_t *req, int k_idx, int u_idx,
 
 static void print_stats(blkif_t *blkif)
 {
-	printk(KERN_DEBUG "%s: oo %3d  |  rd %4d  |  wr %4d\n",
+	printk(KERN_DEBUG "%s: oo %3d  |  rd %4d  |  wr %4d |  pk %4d\n",
 	       current->comm, blkif->st_oo_req,
-	       blkif->st_rd_req, blkif->st_wr_req);
+	       blkif->st_rd_req, blkif->st_wr_req, blkif->st_pk_req);
 	blkif->st_print = jiffies + msecs_to_jiffies(10 * 1000);
 	blkif->st_rd_req = 0;
 	blkif->st_wr_req = 0;
 	blkif->st_oo_req = 0;
+	blkif->st_pk_req = 0;
 }
 
 int tap_blkif_schedule(void *arg)
@@ -1315,6 +1316,11 @@ static int do_block_io_op(blkif_t *blkif)
 			dispatch_rw_block_io(blkif, &req, pending_req);
 			break;
 
+		case BLKIF_OP_PACKET:
+			blkif->st_pk_req++;
+			dispatch_rw_block_io(blkif, &req, pending_req);
+			break;
+
 		default:
 			/* A good sign something is wrong: sleep for a while to
 			 * avoid excessive CPU consumption by a bad guest. */
@@ -1352,6 +1358,8 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 	uint16_t mmap_idx = pending_req->mem_idx;
 
 	switch (req->operation) {
+	case BLKIF_OP_PACKET:
+		/* Fall through */
 	case BLKIF_OP_READ:
 		operation = READ;
 		break;

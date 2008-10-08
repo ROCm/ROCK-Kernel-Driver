@@ -192,13 +192,15 @@ static void fast_flush_area(pending_req_t *req)
 
 static void print_stats(blkif_t *blkif)
 {
-	printk(KERN_DEBUG "%s: oo %3d  |  rd %4d  |  wr %4d  |  br %4d\n",
+	printk(KERN_DEBUG "%s: oo %3d  |  rd %4d  |  wr %4d  |  br %4d |  pk %4d\n",
 	       current->comm, blkif->st_oo_req,
-	       blkif->st_rd_req, blkif->st_wr_req, blkif->st_br_req);
+	       blkif->st_rd_req, blkif->st_wr_req, blkif->st_br_req,
+	       blkif->st_pk_req);
 	blkif->st_print = jiffies + msecs_to_jiffies(10 * 1000);
 	blkif->st_rd_req = 0;
 	blkif->st_wr_req = 0;
 	blkif->st_oo_req = 0;
+	blkif->st_pk_req = 0;
 }
 
 int blkif_schedule(void *arg)
@@ -357,6 +359,13 @@ static int do_block_io_op(blkif_t *blkif)
 		case BLKIF_OP_WRITE:
 			blkif->st_wr_req++;
 			dispatch_rw_block_io(blkif, &req, pending_req);
+			break;
+		case BLKIF_OP_PACKET:
+			DPRINTK("error: block operation BLKIF_OP_PACKET not implemented\n");
+			blkif->st_pk_req++;
+			make_response(blkif, req.id, req.operation,
+				      BLKIF_RSP_ERROR);
+			free_req(pending_req);
 			break;
 		default:
 			/* A good sign something is wrong: sleep for a while to
