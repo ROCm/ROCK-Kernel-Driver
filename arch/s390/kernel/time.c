@@ -132,6 +132,9 @@ static int s390_next_event(unsigned long delta,
 static void s390_set_mode(enum clock_event_mode mode,
 			  struct clock_event_device *evt)
 {
+#ifdef CONFIG_PAGE_STATES
+	page_shrink_discard_list();
+#endif
 }
 
 /*
@@ -170,9 +173,8 @@ void init_cpu_timer(void)
 
 static void clock_comparator_interrupt(__u16 code)
 {
-#ifdef CONFIG_PAGE_STATES
-	page_shrink_discard_list();
-#endif
+	if (S390_lowcore.clock_comparator == -1ULL)
+		set_clock_comparator(S390_lowcore.clock_comparator);
 }
 
 static void etr_timing_alert(struct etr_irq_parm *);

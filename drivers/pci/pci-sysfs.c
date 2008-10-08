@@ -485,6 +485,21 @@ pci_mmap_legacy_mem(struct kobject *kobj, struct bin_attribute *attr,
 #endif /* HAVE_PCI_LEGACY */
 
 #ifdef HAVE_PCI_MMAP
+
+static int pci_mmap_fits(struct pci_dev *pdev, int resno, struct vm_area_struct *vma)
+{
+	unsigned long nr, start, size;
+
+	nr = (vma->vm_end - vma->vm_start) >> PAGE_SHIFT;
+	start = vma->vm_pgoff;
+	size = pci_resource_len(pdev, resno) >> PAGE_SHIFT;
+	if (start < size && size - start >= nr)
+		return 1;
+	WARN(1, "process \"%s\" tried to map 0x%08lx-0x%08lx on %s BAR %d (size 0x%08lx)\n",
+		current->comm, start, start+nr, pci_name(pdev), resno, size);
+	return 0;
+}
+
 /**
  * pci_mmap_resource - map a PCI resource into user memory space
  * @kobj: kobject for mapping
@@ -503,8 +518,6 @@ pci_mmap_resource(struct kobject *kobj, struct bin_attribute *attr,
 	struct resource *res = (struct resource *)attr->private;
 	enum pci_mmap_state mmap_type;
 	resource_size_t start, end;
-	unsigned long map_len = vma->vm_end - vma->vm_start;
-	unsigned long map_offset = vma->vm_pgoff << PAGE_SHIFT;
 	int i;
 
 	for (i = 0; i < PCI_ROM_RESOURCE; i++)
@@ -513,16 +526,8 @@ pci_mmap_resource(struct kobject *kobj, struct bin_attribute *attr,
 	if (i >= PCI_ROM_RESOURCE)
 		return -ENODEV;
 
-	/*
-	 * Make sure the range the user is trying to map falls within
-	 * the resource
-	 */
-	if (map_offset + map_len > pci_resource_len(pdev, i)) {
-		WARN(1, "process \"%s\" tried to map 0x%08lx-0x%08lx on BAR %d (size 0x%08lx)\n",
-		     current->comm, map_offset, map_offset + map_len, i,
-		     (unsigned long)pci_resource_len(pdev, i));
+	if (!pci_mmap_fits(pdev, i, vma))
 		return -EINVAL;
-	}
 
 	/* pci_mmap_page_range() expects the same kind of entry as coming
 	 * from /proc/bus/pci/ which is a "user visible" value. If this is
