@@ -2271,10 +2271,8 @@ int zfcp_fsf_send_fcp_command_task(struct zfcp_adapter *adapter,
 		goto out;
 	req = zfcp_fsf_req_create(adapter, FSF_QTCB_FCP_CMND, req_flags,
 				  adapter->pool.fsf_req_scsi);
-	if (unlikely(IS_ERR(req))) {
+	if (IS_ERR(req)) {
 		retval = PTR_ERR(req);
-		if (retval == -ENOMEM)
-			atomic_inc(&adapter->out_of_mem);
 		goto out;
 	}
 

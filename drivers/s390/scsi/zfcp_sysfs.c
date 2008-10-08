@@ -487,26 +487,23 @@ ZFCP_SHOST_ATTR(megabytes, "%llu %llu\n",
 ZFCP_SHOST_ATTR(seconds_active, "%llu\n",
 		(unsigned long long) stat_info.seconds_act);
 
-static ssize_t zfcp_sysfs_adapter_err_stat_show(struct device *dev,
-						struct device_attribute *attr,
-						char *buf)
+static ssize_t zfcp_sysfs_adapter_q_full_show(struct device *dev,
+					      struct device_attribute *attr,
+					      char *buf)
 {
 	struct Scsi_Host *scsi_host = class_to_shost(dev);
 	struct zfcp_adapter *adapter =
 		(struct zfcp_adapter *) scsi_host->hostdata[0];
 
-	return sprintf(buf, "%d %d %d\n",
-		       atomic_read(&adapter->qdio_outb_full),
-		       atomic_read(&adapter->out_of_mem),
-		       atomic_read(&adapter->out_of_order));
+	return sprintf(buf, "%d\n", atomic_read(&adapter->qdio_outb_full));
 }
-static DEVICE_ATTR(error_stats, S_IRUGO, zfcp_sysfs_adapter_err_stat_show, NULL);
+static DEVICE_ATTR(queue_full, S_IRUGO, zfcp_sysfs_adapter_q_full_show, NULL);
 
 struct device_attribute *zfcp_sysfs_shost_attrs[] = {
 	&dev_attr_utilization,
 	&dev_attr_requests,
 	&dev_attr_megabytes,
 	&dev_attr_seconds_active,
-	&dev_attr_error_stats,
+	&dev_attr_queue_full,
 	NULL
 };

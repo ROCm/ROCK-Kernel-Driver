@@ -59,12 +59,12 @@ static int zfcp_scsi_slave_configure(struct scsi_device *sdp)
 
 static void zfcp_scsi_command_fail(struct scsi_cmnd *scpnt, int result)
 {
-	struct zfcp_adapter *adapter;
-
-	adapter = (struct zfcp_adapter *)scpnt->device->host->hostdata[0];
-	atomic_inc(&adapter->out_of_order);
 	set_host_byte(scpnt, result);
-	zfcp_scsi_dbf_event_result("fail", 4, adapter, scpnt, NULL);
+	if ((scpnt->device != NULL) && (scpnt->device->host != NULL))
+		zfcp_scsi_dbf_event_result("fail", 4,
+			(struct zfcp_adapter*) scpnt->device->host->hostdata[0],
+			scpnt, NULL);
+	/* return directly */
 	scpnt->scsi_done(scpnt);
 }
 

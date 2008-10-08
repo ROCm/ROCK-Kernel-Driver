@@ -569,8 +569,6 @@ struct zfcp_adapter {
 	unsigned long		stats_reset;
 	struct work_struct	scan_work;
 	atomic_t		qdio_outb_full;	   /* queue full incidents */
-	atomic_t		out_of_mem;
-	atomic_t		out_of_order;
 };
 
 struct zfcp_port {
