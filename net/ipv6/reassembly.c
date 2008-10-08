@@ -41,6 +41,7 @@
 #include <linux/random.h>
 #include <linux/jhash.h>
 #include <linux/skbuff.h>
+#include <linux/reserve.h>
 
 #include <net/sock.h>
 #include <net/snmp.h>
@@ -632,6 +633,64 @@ static struct inet6_protocol frag_protocol =
 };
 
 #ifdef CONFIG_SYSCTL
+static int proc_dointvec_fragment(struct ctl_table *table, int write,
+		struct file *filp, void __user *buffer, size_t *lenp,
+		loff_t *ppos)
+{
+	struct net *net = container_of(table->data, struct net,
+				       ipv6.frags.high_thresh);
+	ctl_table tmp = *table;
+	int new_bytes, ret;
+
+	mutex_lock(&net->ipv6.frags.lock);
+	if (write) {
+		tmp.data = &new_bytes;
+		table = &tmp;
+	}
+
+	ret = proc_dointvec(table, write, filp, buffer, lenp, ppos);
+
+	if (!ret && write) {
+		ret = mem_reserve_kmalloc_set(&net->ipv6.frags.reserve,
+					      new_bytes);
+		if (!ret)
+			net->ipv6.frags.high_thresh = new_bytes;
+	}
+	mutex_unlock(&net->ipv6.frags.lock);
+
+	return ret;
+}
+
+static int sysctl_intvec_fragment(struct ctl_table *table,
+		int __user *name, int nlen,
+		void __user *oldval, size_t __user *oldlenp,
+		void __user *newval, size_t newlen)
+{
+	struct net *net = container_of(table->data, struct net,
+				       ipv6.frags.high_thresh);
+	int write = (newval && newlen);
+	ctl_table tmp = *table;
+	int new_bytes, ret;
+
+	mutex_lock(&net->ipv6.frags.lock);
+	if (write) {
+		tmp.data = &new_bytes;
+		table = &tmp;
+	}
+
+	ret = sysctl_intvec(table, name, nlen, oldval, oldlenp, newval, newlen);
+
+	if (!ret && write) {
+		ret = mem_reserve_kmalloc_set(&net->ipv6.frags.reserve,
+					      new_bytes);
+		if (!ret)
+			net->ipv6.frags.high_thresh = new_bytes;
+	}
+	mutex_unlock(&net->ipv6.frags.lock);
+
+	return ret;
+}
+
 static struct ctl_table ip6_frags_ns_ctl_table[] = {
 	{
 		.ctl_name	= NET_IPV6_IP6FRAG_HIGH_THRESH,
@@ -639,7 +698,8 @@ static struct ctl_table ip6_frags_ns_ctl_table[] = {
 		.data		= &init_net.ipv6.frags.high_thresh,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
-		.proc_handler	= &proc_dointvec
+		.proc_handler	= &proc_dointvec_fragment,
+		.strategy	= &sysctl_intvec_fragment,
 	},
 	{
 		.ctl_name	= NET_IPV6_IP6FRAG_LOW_THRESH,
@@ -748,17 +808,39 @@ static inline void ip6_frags_sysctl_unregister(void)
 
 static int ipv6_frags_init_net(struct net *net)
 {
+	int ret;
+
 	net->ipv6.frags.high_thresh = 256 * 1024;
 	net->ipv6.frags.low_thresh = 192 * 1024;
 	net->ipv6.frags.timeout = IPV6_FRAG_TIMEOUT;
 
 	inet_frags_init_net(&net->ipv6.frags);
 
-	return ip6_frags_ns_sysctl_register(net);
+	ret = ip6_frags_ns_sysctl_register(net);
+	if (ret)
+		goto out_reg;
+
+	mem_reserve_init(&net->ipv6.frags.reserve, "IPv6 fragment cache",
+			 &net_skb_reserve);
+	ret = mem_reserve_kmalloc_set(&net->ipv6.frags.reserve,
+				      net->ipv6.frags.high_thresh);
+	if (ret)
+		goto out_reserve;
+
+	return 0;
+
+out_reserve:
+	mem_reserve_disconnect(&net->ipv6.frags.reserve);
+	ip6_frags_ns_sysctl_unregister(net);
+out_reg:
+	inet_frags_exit_net(&net->ipv6.frags, &ip6_frags);
+
+	return ret;
 }
 
 static void ipv6_frags_exit_net(struct net *net)
 {
+	mem_reserve_disconnect(&net->ipv6.frags.reserve);
 	ip6_frags_ns_sysctl_unregister(net);
 	inet_frags_exit_net(&net->ipv6.frags, &ip6_frags);
 }

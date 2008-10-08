@@ -110,6 +110,7 @@
 #include <linux/tcp.h>
 #include <linux/init.h>
 #include <linux/highmem.h>
+#include <linux/reserve.h>
 
 #include <asm/uaccess.h>
 #include <asm/system.h>
@@ -211,6 +212,121 @@ __u32 sysctl_rmem_default __read_mostly = SK_RMEM_MAX;
 /* Maximal space eaten by iovec or ancilliary data plus some space */
 int sysctl_optmem_max __read_mostly = sizeof(unsigned long)*(2*UIO_MAXIOV+512);
 
+static struct mem_reserve net_reserve;
+struct mem_reserve net_rx_reserve;
+EXPORT_SYMBOL_GPL(net_rx_reserve); /* modular ipv6 only */
+struct mem_reserve net_skb_reserve;
+EXPORT_SYMBOL_GPL(net_skb_reserve); /* modular ipv6 only */
+static struct mem_reserve net_tx_reserve;
+static struct mem_reserve net_tx_pages;
+
+#ifdef CONFIG_NETVM
+static DEFINE_MUTEX(memalloc_socks_lock);
+int memalloc_socks;
+
+/**
+ *	sk_adjust_memalloc - adjust the global memalloc reserve for critical RX
+ *	@socks: number of new %SOCK_MEMALLOC sockets
+ *	@tx_resserve_pages: number of pages to (un)reserve for TX
+ *
+ *	This function adjusts the memalloc reserve based on system demand.
+ *	The RX reserve is a limit, and only added once, not for each socket.
+ *
+ *	NOTE:
+ *	   @tx_reserve_pages is an upper-bound of memory used for TX hence
+ *	   we need not account the pages like we do for RX pages.
+ */
+int sk_adjust_memalloc(int socks, long tx_reserve_pages)
+{
+	int err;
+
+	mutex_lock(&memalloc_socks_lock);
+	err = mem_reserve_pages_add(&net_tx_pages, tx_reserve_pages);
+	if (err)
+		goto unlock;
+
+	/*
+	 * either socks is positive and we need to check for 0 -> !0
+	 * transition and connect the reserve tree when we observe it.
+	 */
+	if (!memalloc_socks && socks > 0) {
+		err = mem_reserve_connect(&net_reserve, &mem_reserve_root);
+		if (err) {
+			/*
+			 * if we failed to connect the tree, undo the tx
+			 * reserve so that failure has no side effects.
+			 */
+			mem_reserve_pages_add(&net_tx_pages, -tx_reserve_pages);
+			goto unlock;
+		}
+	}
+	memalloc_socks += socks;
+	/*
+	 * or socks is negative and we must observe the !0 -> 0 transition
+	 * and disconnect the reserve tree.
+	 */
+	if (!memalloc_socks && socks)
+		mem_reserve_disconnect(&net_reserve);
+
+unlock:
+	mutex_unlock(&memalloc_socks_lock);
+
+	return err;
+}
+EXPORT_SYMBOL_GPL(sk_adjust_memalloc);
+
+/**
+ *	sk_set_memalloc - sets %SOCK_MEMALLOC
+ *	@sk: socket to set it on
+ *
+ *	Set %SOCK_MEMALLOC on a socket and increase the memalloc reserve
+ *	accordingly.
+ */
+int sk_set_memalloc(struct sock *sk)
+{
+	int set = sock_flag(sk, SOCK_MEMALLOC);
+
+	if (!set) {
+		int err = sk_adjust_memalloc(1, 0);
+		if (err)
+			return err;
+
+		sock_set_flag(sk, SOCK_MEMALLOC);
+		sk->sk_allocation |= __GFP_MEMALLOC;
+	}
+	return !set;
+}
+EXPORT_SYMBOL_GPL(sk_set_memalloc);
+
+int sk_clear_memalloc(struct sock *sk)
+{
+	int set = sock_flag(sk, SOCK_MEMALLOC);
+	if (set) {
+		sk_adjust_memalloc(-1, 0);
+		sock_reset_flag(sk, SOCK_MEMALLOC);
+		sk->sk_allocation &= ~__GFP_MEMALLOC;
+	}
+	return set;
+}
+EXPORT_SYMBOL_GPL(sk_clear_memalloc);
+
+int __sk_backlog_rcv(struct sock *sk, struct sk_buff *skb)
+{
+	int ret;
+	unsigned long pflags = current->flags;
+
+	/* these should have been dropped before queueing */
+	BUG_ON(!sk_has_memalloc(sk));
+
+	current->flags |= PF_MEMALLOC;
+	ret = sk->sk_backlog_rcv(sk, skb);
+	tsk_restore_flags(current, pflags, PF_MEMALLOC);
+
+	return ret;
+}
+EXPORT_SYMBOL(__sk_backlog_rcv);
+#endif
+
 static int sock_set_timeout(long *timeo_p, char __user *optval, int optlen)
 {
 	struct timeval tv;
@@ -281,7 +397,7 @@ int sock_queue_rcv_skb(struct sock *sk, struct sk_buff *skb)
 	if (err)
 		goto out;
 
-	if (!sk_rmem_schedule(sk, skb->truesize)) {
+	if (!sk_rmem_schedule(sk, skb)) {
 		err = -ENOBUFS;
 		goto out;
 	}
@@ -324,7 +440,7 @@ int sk_receive_skb(struct sock *sk, struct sk_buff *skb, const int nested)
 		 */
 		mutex_acquire(&sk->sk_lock.dep_map, 0, 1, _RET_IP_);
 
-		rc = sk->sk_backlog_rcv(sk, skb);
+		rc = sk_backlog_rcv(sk, skb);
 
 		mutex_release(&sk->sk_lock.dep_map, 1, _RET_IP_);
 	} else
@@ -957,6 +1073,7 @@ void sk_free(struct sock *sk)
 {
 	struct sk_filter *filter;
 
+	sk_clear_memalloc(sk);
 	if (sk->sk_destruct)
 		sk->sk_destruct(sk);
 
@@ -1106,6 +1223,12 @@ void __init sk_init(void)
 		sysctl_wmem_max = 131071;
 		sysctl_rmem_max = 131071;
 	}
+
+	mem_reserve_init(&net_reserve, "total network reserve", NULL);
+	mem_reserve_init(&net_rx_reserve, "network RX reserve", &net_reserve);
+	mem_reserve_init(&net_skb_reserve, "SKB data reserve", &net_rx_reserve);
+	mem_reserve_init(&net_tx_reserve, "network TX reserve", &net_reserve);
+	mem_reserve_init(&net_tx_pages, "protocol TX pages", &net_tx_reserve);
 }
 
 /*
@@ -1371,7 +1494,7 @@ static void __release_sock(struct sock *sk)
 			struct sk_buff *next = skb->next;
 
 			skb->next = NULL;
-			sk->sk_backlog_rcv(sk, skb);
+			sk_backlog_rcv(sk, skb);
 
 			/*
 			 * We are in process context here with softirqs

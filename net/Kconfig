@@ -249,4 +249,7 @@ endmenu
 source "net/rfkill/Kconfig"
 source "net/9p/Kconfig"
 
+config NETVM
+	def_bool n
+
 endif   # if NET

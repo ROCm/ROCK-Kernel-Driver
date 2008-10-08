@@ -169,6 +169,10 @@ prototypes:
 	int (*direct_IO)(int, struct kiocb *, const struct iovec *iov,
 			loff_t offset, unsigned long nr_segs);
 	int (*launder_page) (struct page *);
+	int (*swapon) (struct file *);
+	int (*swapoff) (struct file *);
+	int (*swap_out) (struct file *, struct page *, struct writeback_control *);
+	int (*swap_in)  (struct file *, struct page *);
 
 locking rules:
 	All except set_page_dirty may block
@@ -190,6 +194,10 @@ invalidatepage:		no	yes
 releasepage:		no	yes
 direct_IO:		no
 launder_page:		no	yes
+swapon			no
+swapoff			no
+swap_out		no	yes, unlocks
+swap_in			no	yes, unlocks
 
 	->prepare_write(), ->commit_write(), ->sync_page() and ->readpage()
 may be called from the request handler (/dev/loop).
@@ -288,6 +296,20 @@ it is still found to be dirty. It returns zero if the page was successfully
 cleaned, or an error value if not. Note that in order to prevent the page
 getting mapped back in and redirtied, it needs to be kept locked
 across the entire operation.
+
+	->swapon() will be called with a non-zero argument on files backing
+(non block device backed) swapfiles. A return value of zero indicates success,
+in which case this file can be used for backing swapspace. The swapspace
+operations will be proxied to the address space operations.
+
+	->swapoff() will be called in the sys_swapoff() path when ->swapon()
+returned success.
+
+	->swap_out() when swapon() returned success, this method is used to
+write the swap page.
+
+	->swap_in() when swapon() returned success, this method is used to
+read the swap page.
 
 	Note: currently almost all instances of address_space methods are
 using BKL for internal serialization and that's one of the worst sources
