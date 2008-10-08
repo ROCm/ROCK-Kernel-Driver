@@ -83,17 +83,15 @@ ifeq ($(GCC_BROKEN_VEC),y)
 	KBUILD_CFLAGS += $(call cc-option,-mcpu=970)
 else
 	KBUILD_CFLAGS += $(call cc-option,-mcpu=power4)
-# GCC_BROKEN_VEC
 endif
 else
 	KBUILD_CFLAGS += $(call cc-option,-mcpu=power4)
-# CONFIG_ALTIVEC
 endif
 else
 	KBUILD_CFLAGS += $(call cc-option,-mtune=power4)
-# CONFIG_POWER4_ONLY
 endif
-# CONFIG_PPC64
+else
+LDFLAGS_MODULE_PREREQ += arch/powerpc/lib/crtsavres.o
 endif
 
 ifeq ($(CONFIG_TUNE_CELL),y)
