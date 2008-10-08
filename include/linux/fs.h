@@ -339,6 +339,7 @@ typedef void (dio_iodone_t)(struct kiocb *iocb, loff_t offset,
 #define ATTR_KILL_PRIV	(1 << 14)
 #define ATTR_OPEN	(1 << 15) /* Truncating from open(O_TRUNC) */
 #define ATTR_TIMES_SET	(1 << 16)
+#define ATTR_NO_BLOCK 	(1 << 17) /* Return EAGAIN and don't block on long truncates */
 
 /*
  * This is the Inode Attributes structure, used for notify_change().  It
@@ -1289,6 +1290,8 @@ struct file_operations {
 	int (*flock) (struct file *, int, struct file_lock *);
 	ssize_t (*splice_write)(struct pipe_inode_info *, struct file *, loff_t *, size_t, unsigned int);
 	ssize_t (*splice_read)(struct file *, loff_t *, struct pipe_inode_info *, size_t, unsigned int);
+#define HAVE_FOP_OPEN_EXEC
+	int (*open_exec) (struct inode *);
 	int (*setlease)(struct file *, long, struct file_lock **);
 	int (*fsetattr)(struct file *, struct iattr *);
 };

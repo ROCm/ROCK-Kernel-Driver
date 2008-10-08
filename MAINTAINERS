@@ -4578,6 +4578,13 @@ W:	http://oss.sgi.com/projects/xfs
 T:	git git://oss.sgi.com:8090/xfs/xfs-2.6.git
 S:	Supported
 
+DMAPI
+P:	Silicon Graphics Inc
+M:	xfs-masters@oss.sgi.com
+L:	xfs@oss.sgi.com
+W:	http://oss.sgi.com/projects/xfs
+S:	Supported
+
 XILINX SYSTEMACE DRIVER
 P:	Grant Likely
 M:	grant.likely@secretlab.ca

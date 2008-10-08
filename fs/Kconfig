@@ -559,6 +559,25 @@ config INOTIFY_USER
 
 	  If unsure, say Y.
 
+config DMAPI
+	tristate "DMAPI support"
+	help
+	  The Data Management API is a system interface used to implement
+	  the interface defined in the X/Open document:
+	  "Systems Management: Data Storage Management (XDSM) API",
+	  dated February 1997.  This interface is used by hierarchical
+	  storage management systems.
+
+	  If any DMAPI-capable filesystem is built into the kernel, then
+	  DMAPI must also be built into the kernel.
+
+config DMAPI_DEBUG
+	bool "DMAPI debugging support"
+	depends on DMAPI
+	help
+	  If you don't know whether you need it, then you don't need it:
+	  answer N.
+
 config QUOTA
 	bool "Quota support"
 	help

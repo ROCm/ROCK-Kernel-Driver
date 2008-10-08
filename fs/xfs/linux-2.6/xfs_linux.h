@@ -180,6 +180,10 @@
 #define xfs_itruncate_data(ip, off)	\
 	(-vmtruncate(VFS_I(ip), (off)))
 
+#undef HAVE_DMAPI
+#if defined(CONFIG_XFS_DMAPI) || defined(CONFIG_XFS_DMAPI_MODULE)
+#define HAVE_DMAPI
+#endif
 
 /* Move the kernel do_div definition off to one side */
 

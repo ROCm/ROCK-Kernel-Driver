@@ -691,6 +691,14 @@ struct file *open_exec(const char *name)
 	if (IS_ERR(file))
 		return file;
 
+	if (file->f_op && file->f_op->open_exec) {
+		err = file->f_op->open_exec(nd.path.dentry->d_inode);
+		if (err) {
+			fput(file);
+			goto out;
+		}
+	}
+
 	err = deny_write_access(file);
 	if (err) {
 		fput(file);

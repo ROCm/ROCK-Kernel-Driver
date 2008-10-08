@@ -35,6 +35,19 @@ config XFS_QUOTA
 	  with or without the generic quota support enabled (CONFIG_QUOTA) -
 	  they are completely independent subsystems.
 
+config XFS_DMAPI
+	bool "XFS DMAPI support"
+	depends on XFS_FS
+	select DMAPI
+	help
+	  The Data Management API is a system interface used to implement
+	  the interface defined in the X/Open document:
+	  "Systems Management: Data Storage Management (XDSM) API",
+	  dated February 1997.  This interface is used by hierarchical
+	  storage management systems.
+
+	  If unsure, say N.
+
 config XFS_POSIX_ACL
 	bool "XFS POSIX ACL support"
 	depends on XFS_FS

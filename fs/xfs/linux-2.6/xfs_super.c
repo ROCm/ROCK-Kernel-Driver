@@ -1835,8 +1835,16 @@ xfs_fs_get_sb(
 	void			*data,
 	struct vfsmount		*mnt)
 {
-	return get_sb_bdev(fs_type, flags, dev_name, data, xfs_fs_fill_super,
+	int error;
+
+	error = get_sb_bdev(fs_type, flags, dev_name, data, xfs_fs_fill_super,
 			   mnt);
+	if (!error) {
+		xfs_mount_t *mp = XFS_M(mnt->mnt_sb);
+		mp->m_vfsmount = mnt;
+	}
+
+	return error;
 }
 
 static struct super_operations xfs_super_operations = {
@@ -1861,13 +1869,14 @@ static struct quotactl_ops xfs_quotactl_operations = {
 	.set_xquota		= xfs_fs_setxquota,
 };
 
-static struct file_system_type xfs_fs_type = {
+struct file_system_type xfs_fs_type = {
 	.owner			= THIS_MODULE,
 	.name			= "xfs",
 	.get_sb			= xfs_fs_get_sb,
 	.kill_sb		= kill_block_super,
 	.fs_flags		= FS_REQUIRES_DEV,
 };
+EXPORT_SYMBOL(xfs_fs_type);
 
 STATIC int __init
 xfs_alloc_trace_bufs(void)
