@@ -3543,9 +3543,14 @@ static int do_md_run(mddev_t * mddev)
 			return -EINVAL;
 		}
 		if (chunk_size < PAGE_SIZE) {
+			if (mddev->level) {
 			printk(KERN_ERR "too small chunk_size: %d < %ld\n",
 				chunk_size, PAGE_SIZE);
 			return -EINVAL;
+			} else {
+				printk(KERN_ERR "too small chunk_size: %d < %ld, but continuing anyway on raid0. Good luck!\n",
+					chunk_size, PAGE_SIZE);
+			}
 		}
 
 		/* devices must have minimum size of one chunk */
