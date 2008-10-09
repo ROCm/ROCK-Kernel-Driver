@@ -498,7 +498,6 @@ struct kdb_usb_kbd_info {
 #ifdef CONFIG_KDB_KDUMP
 #define KDUMP_REASON_RESET	0
 extern void kdba_kdump_shutdown_slave(struct pt_regs *);
-extern int kdb_kdump_reason;
 #endif /* CONFIG_KDB_KDUMP */
 
 #endif	/* !_KDBPRIVATE_H */

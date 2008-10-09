@@ -1218,7 +1218,6 @@ kdb_reboot(int argc, const char **argv)
 #ifdef CONFIG_KDB_KDUMP
 
 int kdb_kdump_state = KDB_KDUMP_RESET;	/* KDB kdump state */
-int kdb_kdump_reason = 0;	/* values as defined KDB entry reasons */
 
 static int kdb_cpu(int argc, const char **argv);
 
@@ -1408,8 +1407,6 @@ kdb_local(kdb_reason_t reason, int error, struct pt_regs *regs, kdb_dbtrap_t db_
 		if (KDB_STATE(KEYBOARD))
 			kdb_printf("due to Keyboard Entry\n");
 		else {
-			if (!kdb_kdump_reason)
-				kdb_kdump_reason = reason;
 			kdb_printf("due to KDB_ENTER()\n");
 		}
 		break;
@@ -1427,15 +1424,11 @@ kdb_local(kdb_reason_t reason, int error, struct pt_regs *regs, kdb_dbtrap_t db_
 		}
 		break;
 	case KDB_REASON_OOPS:
-		if (!kdb_kdump_reason)
-			kdb_kdump_reason = reason;
 		kdb_printf("Oops: %s\n", kdb_diemsg);
 		kdb_printf("due to oops @ " kdb_machreg_fmt "\n", kdba_getpc(regs));
 		kdba_dumpregs(regs, NULL, NULL);
 		break;
 	case KDB_REASON_NMI:
-		if (!kdb_kdump_reason)
-			kdb_kdump_reason = reason;
 		kdb_printf("due to NonMaskable Interrupt @ " kdb_machreg_fmt "\n",
 			  kdba_getpc(regs));
 		kdba_dumpregs(regs, NULL, NULL);

@@ -1708,8 +1708,6 @@ kdba_kdump_prepare(struct pt_regs *fixed_regs)
 		KDB_STATE_SET_CPU(KEXEC, i);
 	}
 
-	/* delaying for 5 seconds ... */
-	udelay(5*1000000);
 	machine_crash_shutdown(fixed_regs);
 }
 
