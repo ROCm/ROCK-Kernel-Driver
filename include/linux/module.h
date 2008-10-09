@@ -368,6 +368,7 @@ static inline int module_is_live(struct module *mod)
 struct module *module_text_address(unsigned long addr);
 struct module *__module_text_address(unsigned long addr);
 int is_module_address(unsigned long addr);
+const char *supported_printable(int taint);
 
 /* Returns 0 and fills in value, defined and namebuf, or -ERANGE if
    symnum out of range. */

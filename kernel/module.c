@@ -925,10 +925,36 @@ static struct module_attribute initstate = {
 	.show = show_initstate,
 };
 
+static void setup_modinfo_supported(struct module *mod, const char *s)
+{
+	if (!s) {
+		mod->taints |= TAINT_NO_SUPPORT;
+		return;
+	}
+
+	if (strcmp(s, "external") == 0)
+		mod->taints |= TAINT_EXTERNAL_SUPPORT;
+	else if (strcmp(s, "yes"))
+		mod->taints |= TAINT_NO_SUPPORT;
+}
+
+static ssize_t show_modinfo_supported(struct module_attribute *mattr,
+	                struct module *mod, char *buffer)
+{
+	return sprintf(buffer, "%s\n", supported_printable(mod->taints));
+}
+
+static struct module_attribute modinfo_supported = {
+	.attr = { .name = "supported", .mode = 0444 },
+	.show = show_modinfo_supported,
+	.setup = setup_modinfo_supported,
+};
+
 static struct module_attribute *modinfo_attrs[] = {
 	&modinfo_version,
 	&modinfo_srcversion,
 	&initstate,
+	&modinfo_supported,
 #ifdef CONFIG_MODULE_UNLOAD
 	&refcnt,
 #endif
@@ -1852,7 +1878,6 @@ static noinline struct module *load_module(void __user *umod,
 	Elf_Ehdr *hdr;
 	Elf_Shdr *sechdrs;
 	char *secstrings, *args, *modmagic, *strtab = NULL;
-	char *supported;
 	unsigned int i;
 	unsigned int symindex = 0;
 	unsigned int strindex = 0;
@@ -2008,28 +2033,6 @@ static noinline struct module *load_module(void __user *umod,
 		       mod->name, modmagic, vermagic);
 		err = -ENOEXEC;
 		goto free_hdr;
-	}
-
-	supported = get_modinfo(sechdrs, infoindex, "supported");
-	if (supported) {
-		if (!strcmp(supported, "external"))
-			add_taint_module(mod, TAINT_EXTERNAL_SUPPORT);
-		else if (strcmp(supported, "yes"))
-			supported = NULL;
-	}
-	if (!supported) {
-		if (unsupported == 0) {
-			printk(KERN_WARNING "%s: module not supported by "
-			       "Novell, refusing to load. To override, echo "
-			       "1 > /proc/sys/kernel/unsupported\n", mod->name);
-			err = -ENOEXEC;
-			goto free_hdr;
-		}
-		add_taint_module(mod, TAINT_NO_SUPPORT);
-		if (unsupported == 1) {
-			printk(KERN_WARNING "%s: module not supported by "
-			       "Novell, setting U taint flag.\n", mod->name);
-		}
 	}
 
 	/* Now copy in args */
@@ -2307,6 +2310,26 @@ static noinline struct module *load_module(void __user *umod,
 		goto unlink;
 	add_sect_attrs(mod, hdr->e_shnum, secstrings, sechdrs);
 	add_notes_attrs(mod, hdr->e_shnum, secstrings, sechdrs);
+
+	/* We don't use add_taint() here because it also disables lockdep. */
+	if (mod->taints & TAINT_EXTERNAL_SUPPORT)
+		tainted |= TAINT_EXTERNAL_SUPPORT;
+	else if (mod->taints == TAINT_NO_SUPPORT) {
+		if (unsupported == 0) {
+			printk(KERN_WARNING "%s: module not supported by "
+			       "Novell, refusing to load. To override, echo "
+			       "1 > /proc/sys/kernel/unsupported\n", mod->name);
+			err = -ENOEXEC;
+			goto free_hdr;
+		}
+		tainted |= TAINT_NO_SUPPORT;
+		if (unsupported == 1) {
+			printk(KERN_WARNING "%s: module is not supported by "
+			       "Novell. Novell Technical Services may decline "
+			       "your support request if it involves a kernel "
+			       "fault.\n", mod->name);
+		}
+	}
 
 	/* Size of section 0 is 0, so this works well if no unwind info. */
 	mod->unwind_info = unwind_add_table(mod,
@@ -2792,6 +2815,16 @@ struct module *module_text_address(unsigned long addr)
 	return mod;
 }
 
+const char *supported_printable(int taint)
+{
+	if (taint & TAINT_NO_SUPPORT)
+		return "No";
+	else if (taint & TAINT_EXTERNAL_SUPPORT)
+		return "Yes, External";
+	else
+		return "Yes";
+}
+
 /* Don't grab lock, we're oopsing. */
 void print_modules(void)
 {
@@ -2804,6 +2837,7 @@ void print_modules(void)
 	if (last_unloaded_module[0])
 		printk(" [last unloaded: %s]", last_unloaded_module);
 	printk("\n");
+	printk("Supported: %s\n", supported_printable(tainted));
 }
 
 #ifdef CONFIG_MODVERSIONS
