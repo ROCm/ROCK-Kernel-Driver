@@ -104,6 +104,16 @@ static struct bin_attribute notes_attr = {
 struct kobject *kernel_kobj;
 EXPORT_SYMBOL_GPL(kernel_kobj);
 
+const char *supported_printable(int taint)
+{
+	if (taint & TAINT_NO_SUPPORT)
+		return "No";
+	else if (taint & TAINT_EXTERNAL_SUPPORT)
+		return "Yes, External";
+	else
+		return "Yes";
+}
+
 static ssize_t supported_show(struct kobject *kobj,
 			      struct kobj_attribute *attr, char *buf)
 {

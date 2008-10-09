@@ -2815,16 +2815,6 @@ struct module *module_text_address(unsigned long addr)
 	return mod;
 }
 
-const char *supported_printable(int taint)
-{
-	if (taint & TAINT_NO_SUPPORT)
-		return "No";
-	else if (taint & TAINT_EXTERNAL_SUPPORT)
-		return "Yes, External";
-	else
-		return "Yes";
-}
-
 /* Don't grab lock, we're oopsing. */
 void print_modules(void)
 {
