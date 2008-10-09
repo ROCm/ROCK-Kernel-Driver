@@ -2648,8 +2648,21 @@ generic_file_buffered_write(struct kiocb *iocb, const struct iovec *iov,
 	 * to buffered writes (block instantiation inside i_size).  So we sync
 	 * the file data here, to try to honour O_DIRECT expectations.
 	 */
-	if (unlikely(file->f_flags & O_DIRECT) && written)
+	if (unlikely(file->f_flags & O_DIRECT) && status >= 0 && written)
 		status = filemap_write_and_wait(mapping);
+
+	/*
+	 * We must let know userspace if something hasn't been written
+	 * correctly. If we got an I/O error it means we got an hardware
+	 * failure, anything can be happening to the on-disk data,
+	 * letting know userspace that a bit of data might have been
+	 * written correctly on disk is a very low priority, compared
+	 * to letting know userspace that some data has _not_ been
+	 * written at all.
+	 */
+	if (unlikely(status == -EIO))
+		return status;
+	*ppos = pos;
 
 	return written ? written : status;
 }
