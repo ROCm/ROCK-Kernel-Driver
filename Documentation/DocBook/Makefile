@@ -7,7 +7,7 @@
 # list of DOCBOOKS.
 
 DOCBOOKS := wanbook.xml z8530book.xml mcabook.xml videobook.xml \
-	    kernel-hacking.xml kernel-locking.xml deviceiobook.xml \
+	    kernel-hacking.xml kernel-locking.xml deviceiobook.xml utrace.xml \
 	    procfs-guide.xml writing_usb_driver.xml networking.xml \
 	    kernel-api.xml filesystems.xml lsm.xml usb.xml kgdb.xml \
 	    gadget.xml libata.xml mtdnand.xml librs.xml rapidio.xml \

@@ -909,6 +909,16 @@ config STOP_MACHINE
 	help
 	  Need stop_machine() primitive.
 
+menuconfig UTRACE
+	bool "Infrastructure for tracing and debugging user processes"
+	depends on EXPERIMENTAL
+	depends on HAVE_ARCH_TRACEHOOK
+	depends on MODULES
+	help
+	  Enable the utrace process tracing interface.  This is an internal
+	  kernel interface exported to kernel modules, to track events in
+	  user threads, extract and change user thread state.
+
 source "block/Kconfig"
 
 config PREEMPT_NOTIFIERS

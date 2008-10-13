@@ -1196,6 +1196,11 @@ struct task_struct {
 #endif
 	seccomp_t seccomp;
 
+#ifdef CONFIG_UTRACE
+	struct utrace *utrace;
+	unsigned long utrace_flags;
+#endif
+
 /* Thread group tracking */
    	u32 parent_exec_id;
    	u32 self_exec_id;
