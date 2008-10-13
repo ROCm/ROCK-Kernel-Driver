@@ -1878,6 +1878,7 @@ static noinline struct module *load_module(void __user *umod,
 	Elf_Ehdr *hdr;
 	Elf_Shdr *sechdrs;
 	char *secstrings, *args, *modmagic, *strtab = NULL;
+	char *staging;
 	unsigned int i;
 	unsigned int symindex = 0;
 	unsigned int strindex = 0;
@@ -2033,6 +2034,14 @@ static noinline struct module *load_module(void __user *umod,
 		       mod->name, modmagic, vermagic);
 		err = -ENOEXEC;
 		goto free_hdr;
+	}
+
+	staging = get_modinfo(sechdrs, infoindex, "staging");
+	if (staging) {
+		add_taint_module(mod, TAINT_CRAP);
+		printk(KERN_WARNING "%s: module is from the staging directory,"
+		       " the quality is unknown, you have been warned.\n",
+		       mod->name);
 	}
 
 	/* Now copy in args */
@@ -2683,6 +2692,8 @@ static char *module_flags(struct module *mod, char *buf)
 			buf[bx++] = 'P';
 		if (mod->taints & TAINT_FORCED_MODULE)
 			buf[bx++] = 'F';
+		if (mod->taints & TAINT_CRAP)
+			buf[bx++] = 'C';
 		if (mod->taints & TAINT_NO_SUPPORT)
 			buf[bx++] = 'N';
 		if (mod->taints & TAINT_EXTERNAL_SUPPORT)

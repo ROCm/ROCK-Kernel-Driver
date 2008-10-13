@@ -1775,6 +1775,14 @@ void add_supported_flag(struct buffer *b, struct module *mod)
 		buf_printf(b, "\nMODULE_INFO(supported, \"%s\");\n", how);
 }
 
+void add_staging_flag(struct buffer *b, const char *name)
+{
+	static const char *staging_dir = "drivers/staging";
+
+	if (strncmp(staging_dir, name, strlen(staging_dir)) == 0)
+		buf_printf(b, "\nMODULE_INFO(staging, \"Y\");\n");
+}
+
 /**
  * Record CRCs for unresolved symbols
  **/
@@ -2197,6 +2205,7 @@ int main(int argc, char **argv)
 		buf.pos = 0;
 
 		add_header(&buf, mod);
+		add_staging_flag(&buf, mod->name);
 		add_supported_flag(&buf, mod);
 		err |= add_versions(&buf, mod);
 		add_depends(&buf, mod, modules);

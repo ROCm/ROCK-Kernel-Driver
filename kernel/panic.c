@@ -175,6 +175,7 @@ EXPORT_SYMBOL(panic);
  *  'U' - Userspace-defined naughtiness.
  *  'A' - ACPI table overridden.
  *  'W' - Taint on warning.
+ *  'C' - modules from drivers/staging are loaded.
  *  'N' - Unsuported modules loaded.
  *  'X' - Modules with external support loaded.
  *
@@ -185,7 +186,7 @@ const char *print_tainted(void)
 {
 	static char buf[20];
 	if (tainted) {
-		snprintf(buf, sizeof(buf), "Tainted: %c%c%c%c%c%c%c%c%c%c%c%c",
+		snprintf(buf, sizeof(buf), "Tainted: %c%c%c%c%c%c%c%c%c%c%c%c%c",
 			tainted & TAINT_PROPRIETARY_MODULE ? 'P' : 'G',
 			tainted & TAINT_FORCED_MODULE ? 'F' : ' ',
 			tainted & TAINT_UNSAFE_SMP ? 'S' : ' ',
@@ -196,6 +197,7 @@ const char *print_tainted(void)
 			tainted & TAINT_DIE ? 'D' : ' ',
 			tainted & TAINT_OVERRIDDEN_ACPI_TABLE ? 'A' : ' ',
 			tainted & TAINT_WARN ? 'W' : ' ',
+			tainted & TAINT_CRAP ? 'C' : ' ',
 			tainted & TAINT_NO_SUPPORT ? 'N' : ' ',
 			tainted & TAINT_EXTERNAL_SUPPORT ? 'X' : ' ');
 	}
