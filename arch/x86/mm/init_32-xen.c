@@ -741,6 +741,7 @@ static unsigned long __init extend_init_mapping(unsigned long tables_space)
 		if (pmd_none(*pmd)) {
 			unsigned long pa = start_pfn++ << PAGE_SHIFT;
 
+			memset(__va(pa), 0, PAGE_SIZE);
 			make_lowmem_page_readonly(__va(pa),
 						  XENFEAT_writable_page_tables);
 			xen_l2_entry_update(pmd, __pmd(pa | _KERNPG_TABLE));
