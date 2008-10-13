@@ -467,7 +467,7 @@ EXPORT_SYMBOL_GPL(mem_reserve_kmem_cache_charge);
  * kmalloc/kfree
  */
 
-void *___kmalloc_reserve(size_t size, gfp_t flags, int node, unsigned long ip,
+void *___kmalloc_reserve(size_t size, gfp_t flags, int node, void *ip,
 			 struct mem_reserve *res, int *emerg)
 {
 	void *obj;

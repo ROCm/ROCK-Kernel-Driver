@@ -236,7 +236,7 @@ extern void *__kmalloc_track_caller(size_t, gfp_t, void*);
 #endif /* DEBUG_SLAB */
 
 #define kmalloc_track_caller(size, flags) \
-	__kmalloc_track_caller(size, flags, _RET_IP_)
+	__kmalloc_track_caller(size, flags, __builtin_return_address(0))
 
 #ifdef CONFIG_NUMA
 /*
@@ -263,7 +263,7 @@ extern void *__kmalloc_node_track_caller(size_t, gfp_t, int, void *);
 
 #define kmalloc_node_track_caller(size, flags, node) \
 	__kmalloc_node_track_caller(size, flags, node, \
-			_RET_IP_)
+			__builtin_return_address(0))
 
 /*
  * Shortcuts
