@@ -63,7 +63,7 @@ void *__kmalloc_reserve(size_t size, gfp_t flags, int node, unsigned long ip,
 	void *obj;
 
 	obj = __kmalloc_node_track_caller(size,
-			flags | __GFP_NOMEMALLOC | __GFP_NOWARN, node, ip);
+			flags | __GFP_NOMEMALLOC | __GFP_NOWARN, node, (void *)ip);
 	if (!obj)
 		obj = ___kmalloc_reserve(size, flags, node, ip, res, emerg);
 
