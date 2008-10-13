@@ -328,7 +328,7 @@ struct stats dx_show_entries(struct dx_hash_info *hinfo, struct inode *dir,
 		brelse(bh);
 	}
 	if (bcount)
-		printk(KERN_DEBUG "%snames %u, fullness %u (%u%%)\n", 
+		printk(KERN_DEBUG "%snames %u, fullness %u (%u%%)\n",
 		       levels ? "" : "   ", names, space/bcount,
 		       (space/bcount)*100/blocksize);
 	return (struct stats) { names, space, bcount};
@@ -636,7 +636,7 @@ int ext4_htree_fill_tree(struct file *dir_file, __u32 start_hash,
 	int ret, err;
 	__u32 hashval;
 
-	dxtrace(printk(KERN_DEBUG "In htree_fill_tree, start hash: %x:%x\n", 
+	dxtrace(printk(KERN_DEBUG "In htree_fill_tree, start hash: %x:%x\n",
 		       start_hash, start_minor_hash));
 	dir = dir_file->f_path.dentry->d_inode;
 	if (!(EXT4_I(dir)->i_flags & EXT4_INDEX_FL)) {
