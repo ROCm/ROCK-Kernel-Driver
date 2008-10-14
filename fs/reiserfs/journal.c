@@ -3953,7 +3953,7 @@ static int do_journal_end(struct reiserfs_transaction_handle *th,
 
 	/* protect flush_older_commits from doing mistakes if the
            transaction ID counter gets overflowed.  */
-	if (th->t_trans_id == ~0UL)
+	if (th->t_trans_id == ~0U)
 		flags |= FLUSH_ALL | COMMIT_NOW | WAIT;
 	flush = flags & FLUSH_ALL;
 	wait_on_commit = flags & WAIT;
