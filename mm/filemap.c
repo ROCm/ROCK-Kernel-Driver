@@ -2630,7 +2630,7 @@ generic_file_buffered_write(struct kiocb *iocb, const struct iovec *iov,
 
 	if (likely(status >= 0)) {
 		written += status;
-		*ppos = pos + status;
+		pos += status;
 
 		/*
 		 * For now, when the user asks for O_SYNC, we'll actually give
