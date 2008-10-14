@@ -384,7 +384,9 @@ static inline void tracehook_finish_release_task(struct task_struct *task)
 {
 #ifdef CONFIG_UTRACE
 	int bad = 0;
+#endif
 	ptrace_release_task(task);
+#ifdef CONFIG_UTRACE
 	BUG_ON(task->exit_state != EXIT_DEAD);
 	if (unlikely(task_utrace_struct(task) != NULL)) {
 		/*
@@ -562,6 +564,7 @@ static inline int tracehook_notify_death(struct task_struct *task,
 {
 #ifdef CONFIG_UTRACE
 	*death_cookie = task_utrace_struct(task);
+#endif
 
 	if (task->exit_signal == -1)
 		return task->ptrace ? SIGCHLD : DEATH_REAP;
@@ -575,7 +578,6 @@ static inline int tracehook_notify_death(struct task_struct *task,
 		return task->exit_signal;
 
 	return task->ptrace ? SIGCHLD : DEATH_DELAYED_GROUP_LEADER;
-#endif
 }
 
 /**
