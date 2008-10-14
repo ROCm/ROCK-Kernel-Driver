@@ -746,7 +746,16 @@ static struct irq_chip dynirq_chip = {
 
 void evtchn_register_pirq(int irq)
 {
+	struct irq_desc *desc;
+	unsigned long flags;
+
 	irq_info[irq] = mk_irq_info(IRQT_PIRQ, irq, 0);
+
+	/* Cannot call set_irq_probe(), as that's marked __init. */
+	desc = irq_desc + irq;
+	spin_lock_irqsave(&desc->lock, flags);
+	desc->status &= ~IRQ_NOPROBE;
+	spin_unlock_irqrestore(&desc->lock, flags);
 }
 
 #if defined(CONFIG_X86_IO_APIC)
@@ -1134,7 +1143,7 @@ void __init xen_init_IRQ(void)
 	for (i = DYNIRQ_BASE; i < (DYNIRQ_BASE + NR_DYNIRQS); i++) {
 		irq_bindcount[i] = 0;
 
-		irq_desc[i].status = IRQ_DISABLED;
+		irq_desc[i].status = IRQ_DISABLED|IRQ_NOPROBE;
 		irq_desc[i].action = NULL;
 		irq_desc[i].depth = 1;
 		set_irq_chip_and_handler_name(i, &dynirq_chip,
@@ -1153,6 +1162,8 @@ void __init xen_init_IRQ(void)
 #endif
 
 		irq_desc[i].status = IRQ_DISABLED;
+		if (!identity_mapped_irq(i))
+			irq_desc[i].status |= IRQ_NOPROBE;
 		irq_desc[i].action = NULL;
 		irq_desc[i].depth = 1;
 		set_irq_chip_and_handler_name(i, &pirq_chip,
