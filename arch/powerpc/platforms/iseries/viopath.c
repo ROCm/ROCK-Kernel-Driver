@@ -113,6 +113,7 @@ static vio_event_handler_t *vio_handler[VIO_MAX_SUBTYPES];
 static int proc_viopath_show(struct seq_file *m, void *v)
 {
 	char *buf;
+	u16 vlanMap;
 	dma_addr_t handle;
 	HvLpEvent_Rc hvrc;
 	DECLARE_COMPLETION(done);
@@ -139,6 +140,7 @@ static int proc_viopath_show(struct seq_file *m, void *v)
 
 	wait_for_completion(&done);
 
+	vlanMap = HvLpConfig_getVirtualLanIndexMap();
 
 	buf[HW_PAGE_SIZE-1] = '\0';
 	seq_printf(m, "%s", buf);
@@ -146,6 +148,7 @@ static int proc_viopath_show(struct seq_file *m, void *v)
 	iseries_hv_unmap(handle, HW_PAGE_SIZE, DMA_FROM_DEVICE);
 	kfree(buf);
 
+	seq_printf(m, "AVAILABLE_VETH=%x\n", vlanMap);
 
 	node = of_find_node_by_path("/");
 	sysid = NULL;
