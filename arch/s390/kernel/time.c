@@ -258,15 +258,15 @@ void __init time_init(void)
 					      &ext_int_etr_cc) != 0)
 		panic("Couldn't request external interrupt 0x1406");
 
-#ifdef CONFIG_PAGE_STATES
-	page_discard_init();
-#endif
-
 	/* Enable TOD clock interrupts on the boot cpu. */
 	init_cpu_timer();
 
 #ifdef CONFIG_VIRT_TIMER
 	vtime_init();
+#endif
+
+#ifdef CONFIG_PAGE_STATES
+	page_discard_init();
 #endif
 }
 
