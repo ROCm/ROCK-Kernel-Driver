@@ -3330,7 +3330,7 @@ int __init ip_rt_init(void)
 	ipv4_dst_ops.gc_thresh = (rt_hash_mask + 1);
 	ip_rt_max_size = (rt_hash_mask + 1) * 16;
 
-#ifdef CONFIG_PROCFS
+#ifdef CONFIG_PROC_FS
 	mutex_init(&ipv4_route_lock);
 #endif
 
