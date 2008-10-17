@@ -8,8 +8,10 @@ obj-$(CONFIG_OCFS2_FS) += 	\
 
 obj-$(CONFIG_OCFS2_FS_O2CB) += ocfs2_stack_o2cb.o
 obj-$(CONFIG_OCFS2_FS_USERSPACE_CLUSTER) += ocfs2_stack_user.o
+obj-$(CONFIG_OCFS2_FS_POSIX_ACL) += acl.o
 
 ocfs2-objs := \
+	acl.o			\
 	alloc.o 		\
 	aops.o 			\
 	buffer_head_io.o	\

@@ -61,6 +61,7 @@
 #include "sysfile.h"
 #include "uptodate.h"
 #include "xattr.h"
+#include "acl.h"
 
 #include "buffer_head_io.h"
 
@@ -298,6 +299,18 @@ static int ocfs2_mknod(struct inode *dir,
 			goto leave;
 		}
 		inc_nlink(dir);
+	}
+
+	status = ocfs2_init_acl(handle, inode, dir, new_fe_bh, parent_fe_bh);
+	if (status < 0) {
+		mlog_errno(status);
+		goto leave;
+	}
+
+	status = ocfs2_init_security(handle, inode, dir, new_fe_bh);
+	if (status < 0) {
+		mlog_errno(status);
+		goto leave;
 	}
 
 	status = ocfs2_add_entry(handle, dentry, inode,

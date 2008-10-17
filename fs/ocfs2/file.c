@@ -56,6 +56,7 @@
 #include "suballoc.h"
 #include "super.h"
 #include "xattr.h"
+#include "acl.h"
 
 #include "buffer_head_io.h"
 
@@ -976,6 +977,14 @@ int ocfs2_setattr(struct dentry *dentry, struct iattr *attr)
 		goto bail_commit;
 	}
 
+	if (attr->ia_valid & ATTR_MODE) {
+		status = ocfs2_acl_chmod(handle, inode, bh);
+		if (status < 0) {
+			mlog_errno(status);
+			goto bail_commit;
+		}
+	}
+
 	status = ocfs2_mark_inode_dirty(handle, inode, bh);
 	if (status < 0)
 		mlog_errno(status);
@@ -1036,7 +1045,7 @@ int ocfs2_permission(struct inode *inode, int mask)
 		goto out;
 	}
 
-	ret = generic_permission(inode, mask, NULL);
+	ret = generic_permission(inode, mask, ocfs2_check_acl);
 
 	ocfs2_inode_unlock(inode, 0);
 out:

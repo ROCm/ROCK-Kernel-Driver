@@ -40,36 +40,22 @@ enum ocfs2_xattr_type {
 
 extern struct xattr_handler ocfs2_xattr_user_handler;
 extern struct xattr_handler ocfs2_xattr_trusted_handler;
+extern struct xattr_handler ocfs2_xattr_security_handler;
 #ifdef CONFIG_OCFS2_FS_POSIX_ACL
 extern struct xattr_handler ocfs2_xattr_acl_access_handler;
 extern struct xattr_handler ocfs2_xattr_acl_default_handler;
 #endif
-#ifdef CONFIG_OCFS2_FS_SECURITY
-extern struct xattr_handler ocfs2_xattr_security_handler;
-#endif
-
-extern ssize_t ocfs2_listxattr(struct dentry *, char *, size_t);
-extern int ocfs2_xattr_get(struct inode *, int, const char *, void *, size_t);
-extern int ocfs2_xattr_set(struct inode *, int, const char *, const void *,
-			   size_t, int);
-extern int ocfs2_xattr_remove(struct inode *inode, struct buffer_head *di_bh);
 extern struct xattr_handler *ocfs2_xattr_handlers[];
 
-static inline u16 ocfs2_xattr_buckets_per_cluster(struct ocfs2_super *osb)
-{
-	return (1 << osb->s_clustersize_bits) / OCFS2_XATTR_BUCKET_SIZE;
-}
+ssize_t ocfs2_listxattr(struct dentry *, char *, size_t);
+int ocfs2_xattr_get_nolock(struct inode *, struct buffer_head *, int,
+			   const char *, void *, size_t);
+int ocfs2_xattr_set(struct inode *, int, const char *, const void *,
+		    size_t, int);
+int ocfs2_xattr_set_handle(handle_t *, struct inode *, struct buffer_head *,
+			   int, const char *, const void *, size_t, int);
+int ocfs2_xattr_remove(struct inode *, struct buffer_head *);
+int ocfs2_init_security(handle_t *, struct inode *, struct inode *,
+			struct buffer_head *);
 
-static inline u16 ocfs2_blocks_per_xattr_bucket(struct super_block *sb)
-{
-	return OCFS2_XATTR_BUCKET_SIZE / (1 << sb->s_blocksize_bits);
-}
-
-static inline u16 ocfs2_xattr_max_xe_in_bucket(struct super_block *sb)
-{
-	u16 len = sb->s_blocksize -
-		 offsetof(struct ocfs2_xattr_header, xh_entries);
-
-	return len / sizeof(struct ocfs2_xattr_entry);
-}
 #endif /* OCFS2_XATTR_H */

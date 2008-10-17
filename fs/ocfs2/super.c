@@ -158,6 +158,8 @@ enum {
 	Opt_user_xattr,
 	Opt_nouser_xattr,
 	Opt_inode64,
+	Opt_acl,
+	Opt_noacl,
 	Opt_err,
 };
 
@@ -180,6 +182,8 @@ static match_table_t tokens = {
 	{Opt_user_xattr, "user_xattr"},
 	{Opt_nouser_xattr, "nouser_xattr"},
 	{Opt_inode64, "inode64"},
+	{Opt_acl, "acl"},
+	{Opt_noacl, "noacl"},
 	{Opt_err, NULL}
 };
 
@@ -466,6 +470,10 @@ unlock_osb:
 	if (!ret) {
 		/* Only save off the new mount options in case of a successful
 		 * remount. */
+		if (!(osb->s_feature_incompat & OCFS2_FEATURE_INCOMPAT_XATTR))
+			parsed_options.mount_opt &= ~OCFS2_MOUNT_POSIX_ACL;
+		if (parsed_options.mount_opt & OCFS2_MOUNT_POSIX_ACL)
+			sb->s_flags |= MS_POSIXACL;
 		osb->s_mount_opt = parsed_options.mount_opt;
 		osb->s_atime_quantum = parsed_options.atime_quantum;
 		osb->preferred_slot = parsed_options.slot;
@@ -651,6 +659,10 @@ static int ocfs2_fill_super(struct super_block *sb, void *data, int silent)
 	}
 	brelse(bh);
 	bh = NULL;
+
+	if (!(osb->s_feature_incompat & OCFS2_FEATURE_INCOMPAT_XATTR))
+		parsed_options.mount_opt &= ~OCFS2_MOUNT_POSIX_ACL;
+
 	osb->s_mount_opt = parsed_options.mount_opt;
 	osb->s_atime_quantum = parsed_options.atime_quantum;
 	osb->preferred_slot = parsed_options.slot;
@@ -663,6 +675,10 @@ static int ocfs2_fill_super(struct super_block *sb, void *data, int silent)
 		goto read_super_error;
 
 	sb->s_magic = OCFS2_SUPER_MAGIC;
+
+	sb->s_flags &= ~MS_POSIXACL;
+	if (osb->s_mount_opt & OCFS2_MOUNT_POSIX_ACL)
+		sb->s_flags |= MS_POSIXACL;
 
 	/* Hard readonly mode only if: bdev_read_only, MS_RDONLY,
 	 * heartbeat=none */
@@ -945,6 +961,19 @@ static int ocfs2_parse_options(struct super_block *sb,
 		case Opt_inode64:
 			mopt->mount_opt |= OCFS2_MOUNT_INODE64;
 			break;
+#ifdef CONFIG_OCFS2_FS_POSIX_ACL
+		case Opt_acl:
+			mopt->mount_opt |= OCFS2_MOUNT_POSIX_ACL;
+			break;
+		case Opt_noacl:
+			mopt->mount_opt &= ~OCFS2_MOUNT_POSIX_ACL;
+			break;
+#else
+		case Opt_acl:
+		case Opt_noacl:
+			printk(KERN_INFO "ocfs2 (no)acl options not supported\n");
+			break;
+#endif
 		default:
 			mlog(ML_ERROR,
 			     "Unrecognized mount option \"%s\" "
@@ -1016,6 +1045,13 @@ static int ocfs2_show_options(struct seq_file *s, struct vfsmount *mnt)
 
 	if (opts & OCFS2_MOUNT_INODE64)
 		seq_printf(s, ",inode64");
+
+#ifdef CONFIG_OCFS2_FS_POSIX_ACL
+	if (opts & OCFS2_MOUNT_POSIX_ACL)
+		seq_printf(s, ",acl");
+	else
+		seq_printf(s, ",noacl");
+#endif
 
 	return 0;
 }

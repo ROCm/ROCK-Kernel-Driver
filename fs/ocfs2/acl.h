@@ -1,0 +1,43 @@
+/* -*- mode: c; c-basic-offset: 8; -*-
+ * vim: noexpandtab sw=8 ts=8 sts=0:
+ *
+ * acl.h
+ *
+ * Function prototypes
+ *
+ * Copyright (C) 2008 Oracle.  All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public
+ * License as published by the Free Software Foundation; either
+ * version 2 of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public
+ * License along with this program; if not, write to the
+ * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+ * Boston, MA 021110-1307, USA.
+ */
+
+#ifndef OCFS2_ACL_H
+#define OCFS2_ACL_H
+
+#include <linux/posix_acl_xattr.h>
+
+struct ocfs2_acl_entry {
+	__le16 e_tag;
+	__le16 e_perm;
+	__le32 e_id;
+};
+
+int ocfs2_check_acl(struct inode *inode, int mask);
+int ocfs2_init_acl(handle_t *handle, struct inode *inode, struct inode *dir,
+		   struct buffer_head *di_bh, struct buffer_head *dir_bh);
+int ocfs2_acl_chmod(handle_t *handle, struct inode *inode,
+		    struct buffer_head *di_bh);
+
+#endif /* OCFS2_ACL_H */
