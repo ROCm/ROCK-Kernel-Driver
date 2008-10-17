@@ -117,7 +117,7 @@ static int ocfs2_reserve_clusters_with_limit(struct ocfs2_super *osb,
 					     u32 bits_wanted, u64 max_block,
 					     struct ocfs2_alloc_context **ac);
 
-static void ocfs2_free_ac_resource(struct ocfs2_alloc_context *ac)
+void ocfs2_free_ac_resource(struct ocfs2_alloc_context *ac)
 {
 	struct inode *inode = ac->ac_inode;
 
@@ -709,21 +709,11 @@ static int ocfs2_reserve_clusters_with_limit(struct ocfs2_super *osb,
 		status = ocfs2_reserve_local_alloc_bits(osb,
 							bits_wanted,
 							*ac);
-		if (status == -ENOSPC) {
-			/* reserve_local_bits will return enospc with
-			 * the local alloc inode still locked, so we
-			 * can change this safely here. */
-			mlog(0, "Disabling local alloc\n");
-			/* We set to OCFS2_LA_DISABLED so that umount
-			 * can clean up what's left of the local
-			 * allocation */
-			osb->local_alloc_state = OCFS2_LA_DISABLED;
-		} else if (status == -EFBIG) {
+		if (status == -EFBIG) {
 			/* The local alloc window is outside ac_max_block.
-			 * use the main bitmap, but don't disable
-			 * local alloc. */
+			 * use the main bitmap. */
 			status = -ENOSPC;
-		} else if (status < 0) {
+		} else if ((status < 0) && (status != -ENOSPC)) {
 			mlog_errno(status);
 			goto bail;
 		}
@@ -1045,6 +1035,7 @@ static int ocfs2_cluster_group_search(struct inode *inode,
 	int ret;
 	u64 blkoff;
 	struct ocfs2_group_desc *gd = (struct ocfs2_group_desc *) group_bh->b_data;
+	struct ocfs2_super *osb = OCFS2_SB(inode->i_sb);
 	u16 tmp_off, tmp_found;
 	unsigned int max_bits, gd_cluster_off;
 
@@ -1096,6 +1087,12 @@ static int ocfs2_cluster_group_search(struct inode *inode,
 			*bit_off = tmp_off;
 			*bits_found = tmp_found;
 			search = 0; /* success */
+		} else if (tmp_found) {
+			/*
+			 * Don't show bits which we'll be returning
+			 * for allocation to the local alloc bitmap.
+			 */
+			ocfs2_local_alloc_seen_free_bits(osb, tmp_found);
 		}
 	}
 
@@ -1902,9 +1899,15 @@ int ocfs2_free_clusters(handle_t *handle,
 	status = ocfs2_free_suballoc_bits(handle, bitmap_inode, bitmap_bh,
 					  bg_start_bit, bg_blkno,
 					  num_clusters);
-	if (status < 0)
+	if (status < 0) {
 		mlog_errno(status);
+		goto out;
+	}
 
+	ocfs2_local_alloc_seen_free_bits(OCFS2_SB(bitmap_inode->i_sb),
+					 num_clusters);
+
+out:
 	mlog_exit(status);
 	return status;
 }
