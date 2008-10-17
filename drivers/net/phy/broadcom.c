@@ -402,14 +402,29 @@ static struct phy_driver bcm5481_driver = {
 };
 
 static struct phy_driver bcm5482_driver = {
+	.phy_id		= 0x03625d90,
+	.phy_id_mask	= 0xfffffff0,
+	.name		= "Broadcom BCM57780",
+	.features	= PHY_GBIT_FEATURES |
+			  SUPPORTED_Pause | SUPPORTED_Asym_Pause,
+	.flags		= PHY_HAS_MAGICANEG | PHY_HAS_INTERRUPT,
+	.config_init	= bcm5482_config_init,
+	.config_aneg	= genphy_config_aneg,
+	.read_status	= bcm5482_read_status,
+	.ack_interrupt	= bcm54xx_ack_interrupt,
+	.config_intr	= bcm54xx_config_intr,
+	.driver 	= { .owner = THIS_MODULE },
+};
+
+static struct phy_driver bcm57780_driver = {
 	.phy_id		= 0x0143bcb0,
 	.phy_id_mask	= 0xfffffff0,
 	.name		= "Broadcom BCM5482",
 	.features	= PHY_GBIT_FEATURES,
 	.flags		= PHY_HAS_MAGICANEG | PHY_HAS_INTERRUPT,
-	.config_init	= bcm5482_config_init,
+	.config_init	= bcm54xx_config_init,
 	.config_aneg	= genphy_config_aneg,
-	.read_status	= bcm5482_read_status,
+	.read_status	= genphy_read_status,
 	.ack_interrupt	= bcm54xx_ack_interrupt,
 	.config_intr	= bcm54xx_config_intr,
 	.driver 	= { .owner = THIS_MODULE },
@@ -437,8 +452,13 @@ static int __init broadcom_init(void)
 	ret = phy_driver_register(&bcm5482_driver);
 	if (ret)
 		goto out_5482;
+	ret = phy_driver_register(&bcm57780_driver);
+	if (ret)
+		goto out_57780;
 	return ret;
 
+out_57780:
+	phy_driver_unregister(&bcm5482_driver);
 out_5482:
 	phy_driver_unregister(&bcm5481_driver);
 out_5481:
