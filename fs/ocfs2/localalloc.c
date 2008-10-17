@@ -76,8 +76,6 @@ static int ocfs2_local_alloc_slide_window(struct ocfs2_super *osb,
 
 #ifdef CONFIG_OCFS2_FS_STATS
 
-DEFINE_MUTEX(la_debug_mutex);
-
 static int ocfs2_la_debug_open(struct inode *inode, struct file *file)
 {
 	file->private_data = inode->i_private;
@@ -89,6 +87,7 @@ static int ocfs2_la_debug_open(struct inode *inode, struct file *file)
 static ssize_t ocfs2_la_debug_read(struct file *file, char __user *userbuf,
 				   size_t count, loff_t *ppos)
 {
+	static DEFINE_MUTEX(la_debug_mutex);
 	struct ocfs2_super *osb = file->private_data;
 	int written, ret;
 	char *buf = osb->local_alloc_debug_buf;
@@ -249,8 +248,8 @@ int ocfs2_load_local_alloc(struct ocfs2_super *osb)
 		goto bail;
 	}
 
-	status = ocfs2_read_block(osb, OCFS2_I(inode)->ip_blkno,
-				  &alloc_bh, 0, inode);
+	status = ocfs2_read_blocks(inode, OCFS2_I(inode)->ip_blkno, 1,
+				   &alloc_bh, OCFS2_BH_IGNORE_CACHE);
 	if (status < 0) {
 		mlog_errno(status);
 		goto bail;
@@ -295,8 +294,7 @@ int ocfs2_load_local_alloc(struct ocfs2_super *osb)
 
 bail:
 	if (status < 0)
-		if (alloc_bh)
-			brelse(alloc_bh);
+		brelse(alloc_bh);
 	if (inode)
 		iput(inode);
 
@@ -412,8 +410,7 @@ out_commit:
 	ocfs2_commit_trans(osb, handle);
 
 out_unlock:
-	if (main_bm_bh)
-		brelse(main_bm_bh);
+	brelse(main_bm_bh);
 
 	ocfs2_inode_unlock(main_bm_inode, 1);
 
@@ -462,8 +459,8 @@ int ocfs2_begin_local_alloc_recovery(struct ocfs2_super *osb,
 
 	mutex_lock(&inode->i_mutex);
 
-	status = ocfs2_read_block(osb, OCFS2_I(inode)->ip_blkno,
-				  &alloc_bh, 0, inode);
+	status = ocfs2_read_blocks(inode, OCFS2_I(inode)->ip_blkno, 1,
+				   &alloc_bh, OCFS2_BH_IGNORE_CACHE);
 	if (status < 0) {
 		mlog_errno(status);
 		goto bail;
@@ -489,8 +486,7 @@ bail:
 		*alloc_copy = NULL;
 	}
 
-	if (alloc_bh)
-		brelse(alloc_bh);
+	brelse(alloc_bh);
 
 	if (inode) {
 		mutex_unlock(&inode->i_mutex);
@@ -558,8 +554,7 @@ out_unlock:
 out_mutex:
 	mutex_unlock(&main_bm_inode->i_mutex);
 
-	if (main_bm_bh)
-		brelse(main_bm_bh);
+	brelse(main_bm_bh);
 
 	iput(main_bm_inode);
 
@@ -1282,8 +1277,7 @@ bail:
 	if (handle)
 		ocfs2_commit_trans(osb, handle);
 
-	if (main_bm_bh)
-		brelse(main_bm_bh);
+	brelse(main_bm_bh);
 
 	if (main_bm_inode)
 		iput(main_bm_inode);

@@ -460,8 +460,11 @@ static int ocfs2_read_locked_inode(struct inode *inode,
 		}
 	}
 
-	status = ocfs2_read_block(osb, args->fi_blkno, &bh, 0,
-				  can_lock ? inode : NULL);
+	if (can_lock)
+		status = ocfs2_read_blocks(inode, args->fi_blkno, 1, &bh,
+					   OCFS2_BH_IGNORE_CACHE);
+	else
+		status = ocfs2_read_blocks_sync(osb, args->fi_blkno, 1, &bh);
 	if (status < 0) {
 		mlog_errno(status);
 		goto bail;
@@ -1128,58 +1131,6 @@ void ocfs2_drop_inode(struct inode *inode)
 		generic_drop_inode(inode);
 
 	mlog_exit_void();
-}
-
-/*
- * TODO: this should probably be merged into ocfs2_get_block
- *
- * However, you now need to pay attention to the cont_prepare_write()
- * stuff in ocfs2_get_block (that is, ocfs2_get_block pretty much
- * expects never to extend).
- */
-struct buffer_head *ocfs2_bread(struct inode *inode,
-				int block, int *err, int reada)
-{
-	struct buffer_head *bh = NULL;
-	int tmperr;
-	u64 p_blkno;
-	int readflags = OCFS2_BH_CACHED;
-
-	if (reada)
-		readflags |= OCFS2_BH_READAHEAD;
-
-	if (((u64)block << inode->i_sb->s_blocksize_bits) >=
-	    i_size_read(inode)) {
-		BUG_ON(!reada);
-		return NULL;
-	}
-
-	down_read(&OCFS2_I(inode)->ip_alloc_sem);
-	tmperr = ocfs2_extent_map_get_blocks(inode, block, &p_blkno, NULL,
-					     NULL);
-	up_read(&OCFS2_I(inode)->ip_alloc_sem);
-	if (tmperr < 0) {
-		mlog_errno(tmperr);
-		goto fail;
-	}
-
-	tmperr = ocfs2_read_block(OCFS2_SB(inode->i_sb), p_blkno, &bh,
-				  readflags, inode);
-	if (tmperr < 0)
-		goto fail;
-
-	tmperr = 0;
-
-	*err = 0;
-	return bh;
-
-fail:
-	if (bh) {
-		brelse(bh);
-		bh = NULL;
-	}
-	*err = -EIO;
-	return NULL;
 }
 
 /*

@@ -545,8 +545,7 @@ static int __ocfs2_extend_allocation(struct inode *inode, u32 logical_start,
 	 */
 	BUG_ON(mark_unwritten && !ocfs2_sparse_alloc(osb));
 
-	status = ocfs2_read_block(osb, OCFS2_I(inode)->ip_blkno, &bh,
-				  OCFS2_BH_CACHED, inode);
+	status = ocfs2_read_block(inode, OCFS2_I(inode)->ip_blkno, &bh);
 	if (status < 0) {
 		mlog_errno(status);
 		goto leave;
@@ -671,10 +670,8 @@ leave:
 		restart_func = 0;
 		goto restart_all;
 	}
-	if (bh) {
-		brelse(bh);
-		bh = NULL;
-	}
+	brelse(bh);
+	bh = NULL;
 
 	mlog_exit(status);
 	return status;
@@ -991,8 +988,7 @@ bail_unlock_rw:
 	if (size_change)
 		ocfs2_rw_unlock(inode, 1);
 bail:
-	if (bh)
-		brelse(bh);
+	brelse(bh);
 
 	mlog_exit(status);
 	return status;
@@ -1135,8 +1131,7 @@ static int ocfs2_write_remove_suid(struct inode *inode)
 	struct buffer_head *bh = NULL;
 	struct ocfs2_inode_info *oi = OCFS2_I(inode);
 
-	ret = ocfs2_read_block(OCFS2_SB(inode->i_sb),
-			       oi->ip_blkno, &bh, OCFS2_BH_CACHED, inode);
+	ret = ocfs2_read_block(inode, oi->ip_blkno, &bh);
 	if (ret < 0) {
 		mlog_errno(ret);
 		goto out;
@@ -1162,9 +1157,8 @@ static int ocfs2_allocate_unwritten_extents(struct inode *inode,
 	struct buffer_head *di_bh = NULL;
 
 	if (OCFS2_I(inode)->ip_dyn_features & OCFS2_INLINE_DATA_FL) {
-		ret = ocfs2_read_block(OCFS2_SB(inode->i_sb),
-				       OCFS2_I(inode)->ip_blkno, &di_bh,
-				       OCFS2_BH_CACHED, inode);
+		ret = ocfs2_read_block(inode, OCFS2_I(inode)->ip_blkno,
+				       &di_bh);
 		if (ret) {
 			mlog_errno(ret);
 			goto out;

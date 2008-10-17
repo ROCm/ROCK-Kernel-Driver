@@ -82,6 +82,49 @@ static int ocfs2_do_extend_dir(struct super_block *sb,
 			       struct ocfs2_alloc_context *meta_ac,
 			       struct buffer_head **new_bh);
 
+static struct buffer_head *ocfs2_bread(struct inode *inode,
+				       int block, int *err, int reada)
+{
+	struct buffer_head *bh = NULL;
+	int tmperr;
+	u64 p_blkno;
+	int readflags = 0;
+
+	if (reada)
+		readflags |= OCFS2_BH_READAHEAD;
+
+	if (((u64)block << inode->i_sb->s_blocksize_bits) >=
+	    i_size_read(inode)) {
+		BUG_ON(!reada);
+		return NULL;
+	}
+
+	down_read(&OCFS2_I(inode)->ip_alloc_sem);
+	tmperr = ocfs2_extent_map_get_blocks(inode, block, &p_blkno, NULL,
+					     NULL);
+	up_read(&OCFS2_I(inode)->ip_alloc_sem);
+	if (tmperr < 0) {
+		mlog_errno(tmperr);
+		goto fail;
+	}
+
+	tmperr = ocfs2_read_blocks(inode, p_blkno, 1, &bh, readflags);
+	if (tmperr < 0)
+		goto fail;
+
+	tmperr = 0;
+
+	*err = 0;
+	return bh;
+
+fail:
+	brelse(bh);
+	bh = NULL;
+
+	*err = -EIO;
+	return NULL;
+}
+
 /*
  * bh passed here can be an inode block or a dir data block, depending
  * on the inode inline data flag.
@@ -188,8 +231,7 @@ static struct buffer_head *ocfs2_find_entry_id(const char *name,
 	struct ocfs2_dinode *di;
 	struct ocfs2_inline_data *data;
 
-	ret = ocfs2_read_block(OCFS2_SB(dir->i_sb), OCFS2_I(dir)->ip_blkno,
-			       &di_bh, OCFS2_BH_CACHED, dir);
+	ret = ocfs2_read_block(dir, OCFS2_I(dir)->ip_blkno, &di_bh);
 	if (ret) {
 		mlog_errno(ret);
 		goto out;
@@ -260,14 +302,13 @@ restart:
 		}
 		if ((bh = bh_use[ra_ptr++]) == NULL)
 			goto next;
-		wait_on_buffer(bh);
-		if (!buffer_uptodate(bh)) {
-			/* read error, skip block & hope for the best */
+		if (ocfs2_read_block(dir, block, &bh)) {
+			/* read error, skip block & hope for the best.
+			 * ocfs2_read_block() has released the bh. */
 			ocfs2_error(dir->i_sb, "reading directory %llu, "
 				    "offset %lu\n",
 				    (unsigned long long)OCFS2_I(dir)->ip_blkno,
 				    block);
-			brelse(bh);
 			goto next;
 		}
 		i = ocfs2_search_dirblock(bh, dir, name, namelen,
@@ -417,8 +458,7 @@ static inline int ocfs2_delete_entry_id(handle_t *handle,
 	struct ocfs2_dinode *di;
 	struct ocfs2_inline_data *data;
 
-	ret = ocfs2_read_block(OCFS2_SB(dir->i_sb), OCFS2_I(dir)->ip_blkno,
-			       &di_bh, OCFS2_BH_CACHED, dir);
+	ret = ocfs2_read_block(dir, OCFS2_I(dir)->ip_blkno, &di_bh);
 	if (ret) {
 		mlog_errno(ret);
 		goto out;
@@ -596,8 +636,7 @@ static int ocfs2_dir_foreach_blk_id(struct inode *inode,
 	struct ocfs2_inline_data *data;
 	struct ocfs2_dir_entry *de;
 
-	ret = ocfs2_read_block(OCFS2_SB(inode->i_sb), OCFS2_I(inode)->ip_blkno,
-			       &di_bh, OCFS2_BH_CACHED, inode);
+	ret = ocfs2_read_block(inode, OCFS2_I(inode)->ip_blkno, &di_bh);
 	if (ret) {
 		mlog(ML_ERROR, "Unable to read inode block for dir %llu\n",
 		     (unsigned long long)OCFS2_I(inode)->ip_blkno);
@@ -716,8 +755,7 @@ static int ocfs2_dir_foreach_blk_el(struct inode *inode,
 			for (i = ra_sectors >> (sb->s_blocksize_bits - 9);
 			     i > 0; i--) {
 				tmp = ocfs2_bread(inode, ++blk, &err, 1);
-				if (tmp)
-					brelse(tmp);
+				brelse(tmp);
 			}
 			last_ra_blk = blk;
 			ra_sectors = 8;
@@ -899,10 +937,8 @@ int ocfs2_find_files_on_disk(const char *name,
 leave:
 	if (status < 0) {
 		*dirent = NULL;
-		if (*dirent_bh) {
-			brelse(*dirent_bh);
-			*dirent_bh = NULL;
-		}
+		brelse(*dirent_bh);
+		*dirent_bh = NULL;
 	}
 
 	mlog_exit(status);
@@ -951,8 +987,7 @@ int ocfs2_check_dir_for_entry(struct inode *dir,
 
 	ret = 0;
 bail:
-	if (dirent_bh)
-		brelse(dirent_bh);
+	brelse(dirent_bh);
 
 	mlog_exit(ret);
 	return ret;
@@ -1127,8 +1162,7 @@ static int ocfs2_fill_new_dir_el(struct ocfs2_super *osb,
 
 	status = 0;
 bail:
-	if (new_bh)
-		brelse(new_bh);
+	brelse(new_bh);
 
 	mlog_exit(status);
 	return status;
@@ -1574,8 +1608,7 @@ bail:
 	if (meta_ac)
 		ocfs2_free_alloc_context(meta_ac);
 
-	if (new_bh)
-		brelse(new_bh);
+	brelse(new_bh);
 
 	mlog_exit(status);
 	return status;
@@ -1702,8 +1735,7 @@ static int ocfs2_find_dir_space_el(struct inode *dir, const char *name,
 
 	status = 0;
 bail:
-	if (bh)
-		brelse(bh);
+	brelse(bh);
 
 	mlog_exit(status);
 	return status;
@@ -1762,7 +1794,6 @@ int ocfs2_prepare_dir_for_insert(struct ocfs2_super *osb,
 	*ret_de_bh = bh;
 	bh = NULL;
 out:
-	if (bh)
-		brelse(bh);
+	brelse(bh);
 	return ret;
 }

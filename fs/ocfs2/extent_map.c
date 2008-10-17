@@ -335,9 +335,9 @@ static int ocfs2_figure_hole_clusters(struct inode *inode,
 		if (le64_to_cpu(eb->h_next_leaf_blk) == 0ULL)
 			goto no_more_extents;
 
-		ret = ocfs2_read_block(OCFS2_SB(inode->i_sb),
+		ret = ocfs2_read_block(inode,
 				       le64_to_cpu(eb->h_next_leaf_blk),
-				       &next_eb_bh, OCFS2_BH_CACHED, inode);
+				       &next_eb_bh);
 		if (ret) {
 			mlog_errno(ret);
 			goto out;
@@ -458,8 +458,7 @@ int ocfs2_get_clusters(struct inode *inode, u32 v_cluster,
 	if (ret == 0)
 		goto out;
 
-	ret = ocfs2_read_block(OCFS2_SB(inode->i_sb), OCFS2_I(inode)->ip_blkno,
-			       &di_bh, OCFS2_BH_CACHED, inode);
+	ret = ocfs2_read_block(inode, OCFS2_I(inode)->ip_blkno, &di_bh);
 	if (ret) {
 		mlog_errno(ret);
 		goto out;

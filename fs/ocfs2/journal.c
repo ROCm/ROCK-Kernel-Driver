@@ -554,8 +554,7 @@ done:
 	if (status < 0) {
 		if (inode_lock)
 			ocfs2_inode_unlock(inode, 1);
-		if (bh != NULL)
-			brelse(bh);
+		brelse(bh);
 		if (inode) {
 			OCFS2_I(inode)->ip_open_count--;
 			iput(inode);
@@ -851,9 +850,8 @@ static int ocfs2_force_read_journal(struct inode *inode)
 
 		/* We are reading journal data which should not
 		 * be put in the uptodate cache */
-		status = ocfs2_read_blocks(OCFS2_SB(inode->i_sb),
-					   p_blkno, p_blocks, bhs, 0,
-					   NULL);
+		status = ocfs2_read_blocks_sync(OCFS2_SB(inode->i_sb),
+						p_blkno, p_blocks, bhs);
 		if (status < 0) {
 			mlog_errno(status);
 			goto bail;
@@ -869,8 +867,7 @@ static int ocfs2_force_read_journal(struct inode *inode)
 
 bail:
 	for(i = 0; i < CONCURRENT_JOURNAL_FILL; i++)
-		if (bhs[i])
-			brelse(bhs[i]);
+		brelse(bhs[i]);
 	mlog_exit(status);
 	return status;
 }
@@ -1137,7 +1134,8 @@ static int ocfs2_read_journal_inode(struct ocfs2_super *osb,
 	}
 	SET_INODE_JOURNAL(inode);
 
-	status = ocfs2_read_block(osb, OCFS2_I(inode)->ip_blkno, bh, 0, inode);
+	status = ocfs2_read_blocks(inode, OCFS2_I(inode)->ip_blkno, 1, bh,
+				   OCFS2_BH_IGNORE_CACHE);
 	if (status < 0) {
 		mlog_errno(status);
 		goto bail;
@@ -1286,8 +1284,7 @@ done:
 	if (inode)
 		iput(inode);
 
-	if (bh)
-		brelse(bh);
+	brelse(bh);
 
 	mlog_exit(status);
 	return status;
