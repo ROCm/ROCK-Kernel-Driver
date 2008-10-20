@@ -10,6 +10,8 @@
 #undef DEBUGDATA
 #undef DEBUGCCW
 
+#define KMSG_COMPONENT "ctcm"
+
 #include <linux/sysfs.h>
 #include "ctcm_main.h"
 

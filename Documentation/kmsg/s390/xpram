@@ -1,0 +1,61 @@
+/*?
+ * Tag: xpram.ab9aa4
+ * Text: "%d is not a valid number of XPRAM devices\n"
+ * Severity: Error
+ * Parameter:
+ *   @1: number of partitions
+ * Description:
+ * The number of XPRAM partitions specified for the 'devs' module parameter
+ * or with the 'xpram.parts' kernel parameter must be an integer in the
+ * range 1 to 32. The XPRAM device driver created a maximum of 32 partitions
+ * that are probably not configured as intended.
+ * User action:
+ * If the XPRAM device driver has been compiled as a separate module,
+ * unload the module and load it again with a correct value for the
+ * 'devs' module parameter. If the XPRAM device driver has been compiled
+ * into the kernel, correct the 'xpram.parts' parameter in the kernel
+ * command line and restart Linux.
+ */
+
+/*?
+ * Tag: xpram.f004d1
+ * Text: "Not enough expanded memory available\n"
+ * Severity: Error
+ * Description:
+ * The amount of expanded memory required to set up your XPRAM partitions
+ * depends on the 'sizes' parameter specified for the xpram module or on
+ * the specifications for the 'xpram.parts' parameter if the XPRAM device
+ * driver has been compiled into the kernel. Your
+ * current specification exceed the amount of available expanded memory.
+ * Your XPRAM partitions are probably not configured as intended.
+ * User action:
+ * If the XPRAM device driver has been compiled as a separate module,
+ * unload the xpram module and load it again with an appropriate value
+ * for the 'sizes' module parameter. If the XPRAM device driver has been
+ * compiled into the kernel, adjust the 'xpram.parts' parameter in the
+ * kernel command line and restart Linux. If you need more than the
+ * available expanded memory, increase the expanded memory allocation for
+ * your virtual hardware or LPAR.
+ */
+
+/*?
+ * Tag: xpram.f6ae78
+ * Text: "No expanded memory available\n"
+ * Severity: Error
+ * Description:
+ * The XPRAM device driver has been loaded in a Linux instance that runs
+ * in an LPAR or virtual hardware without expanded memory.
+ * are created.
+ * User action:
+ * Allocate expanded memory for your LPAR or virtual hardware or do not
+ * load the xpram module. You can ignore this message, if you do not want
+ * to create XPRAM partitions.
+ */
+
+/*? Tag: xpram.fc5e30 Text: "  number of devices (partitions): %d \n" */
+/*? Tag: xpram.9a3d44 Text: "  size of partition %d: %u kB\n" */
+/*? Tag: xpram.d1b9da Text: "  size of partition %d to be set automatically\n" */
+/*? Tag: xpram.758fd6 Text: "  memory needed (for sized partitions): %lu kB\n" */
+/*? Tag: xpram.3fc92b Text: "  partitions to be sized automatically: %d\n" */
+/*? Tag: xpram.6cdcc1 Text: "  automatically determined partition size: %lu kB\n" */
+/*? Tag: xpram.546055 Text: "  %u pages expanded memory found (%lu KB).\n" */

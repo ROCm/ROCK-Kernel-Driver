@@ -2,9 +2,11 @@
  *  arch/s390/hypfs/inode.c
  *    Hypervisor filesystem for Linux on s390.
  *
- *    Copyright (C) IBM Corp. 2006
+ *    Copyright IBM Corp. 2006, 2008
  *    Author(s): Michael Holzheu <holzheu@de.ibm.com>
  */
+
+#define KMSG_COMPONENT "hypfs"
 
 #include <linux/types.h>
 #include <linux/errno.h>
@@ -19,6 +21,7 @@
 #include <linux/module.h>
 #include <linux/seq_file.h>
 #include <linux/mount.h>
+#include <linux/kmsg.h>
 #include <asm/ebcdic.h>
 #include "hypfs.h"
 
@@ -200,7 +203,7 @@ static ssize_t hypfs_aio_write(struct kiocb *iocb, const struct iovec *iov,
 	else
 		rc = hypfs_diag_create_files(sb, sb->s_root);
 	if (rc) {
-		printk(KERN_ERR "hypfs: Update failed\n");
+		kmsg_err("Updating the hypfs tree failed\n");
 		hypfs_delete_tree(sb->s_root);
 		goto out;
 	}
@@ -252,8 +255,7 @@ static int hypfs_parse_options(char *options, struct super_block *sb)
 			break;
 		case opt_err:
 		default:
-			printk(KERN_ERR "hypfs: Unrecognized mount option "
-			       "\"%s\" or missing value\n", str);
+			kmsg_err("%s is not a valid mount option\n", str);
 			return -EINVAL;
 		}
 	}
@@ -317,7 +319,7 @@ static int hypfs_fill_super(struct super_block *sb, void *data, int silent)
 	}
 	hypfs_update_update(sb);
 	sb->s_root = root_dentry;
-	printk(KERN_INFO "hypfs: Hypervisor filesystem mounted\n");
+	kmsg_info("Hypervisor filesystem mounted\n");
 	return 0;
 
 err_tree:
@@ -513,7 +515,7 @@ fail_sysfs:
 	if (!MACHINE_IS_VM)
 		hypfs_diag_exit();
 fail_diag:
-	printk(KERN_ERR "hypfs: Initialization failed with rc = %i.\n", rc);
+	kmsg_err("Initialization of hypfs failed with rc=%i\n", rc);
 	return rc;
 }
 

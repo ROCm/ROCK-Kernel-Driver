@@ -7,12 +7,15 @@
  *               Christian Borntraeger (cborntra@de.ibm.com),
  */
 
+#define KMSG_COMPONENT "cpcmd"
+
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/stddef.h>
 #include <linux/string.h>
+#include <linux/kmsg.h>
 #include <asm/ebcdic.h>
 #include <asm/cpcmd.h>
 #include <asm/system.h>
@@ -104,8 +107,8 @@ int cpcmd(const char *cmd, char *response, int rlen, int *response_code)
 			(((unsigned long)response + rlen) >> 31)) {
 		lowbuf = kmalloc(rlen, GFP_KERNEL | GFP_DMA);
 		if (!lowbuf) {
-			printk(KERN_WARNING
-				"cpcmd: could not allocate response buffer\n");
+			kmsg_warn("The cpcmd kernel function failed to "
+				     "allocate a response buffer\n");
 			return -ENOMEM;
 		}
 		spin_lock_irqsave(&cpcmd_lock, flags);

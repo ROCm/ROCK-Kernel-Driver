@@ -8,6 +8,8 @@
  * Author(s): Melissa Howland <Melissa.Howland@us.ibm.com>
  */
 
+#define KMSG_COMPONENT "monwriter"
+
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/init.h>
@@ -19,6 +21,7 @@
 #include <linux/ctype.h>
 #include <linux/poll.h>
 #include <linux/mutex.h>
+#include <linux/kmsg.h>
 #include <asm/uaccess.h>
 #include <asm/ebcdic.h>
 #include <asm/io.h>
@@ -64,9 +67,9 @@ static int monwrite_diag(struct monwrite_hdr *myhdr, char *buffer, int fcn)
 	rc = appldata_asm(&id, fcn, (void *) buffer, myhdr->datalen);
 	if (rc <= 0)
 		return rc;
+	kmsg_err("Writing monitor data failed with rc=%i\n", rc);
 	if (rc == 5)
 		return -EPERM;
-	printk("DIAG X'DC' error with return code: %i\n", rc);
 	return -EINVAL;
 }
 

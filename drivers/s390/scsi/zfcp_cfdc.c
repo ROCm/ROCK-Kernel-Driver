@@ -7,6 +7,8 @@
  * Copyright IBM Corporation 2008
  */
 
+#define KMSG_COMPONENT "zfcp"
+
 #include <linux/types.h>
 #include <linux/miscdevice.h>
 #include <asm/ccwdev.h>

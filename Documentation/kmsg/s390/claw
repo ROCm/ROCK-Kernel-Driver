@@ -1,0 +1,727 @@
+/*?
+ * Tag: claw.e346bf
+ * Text: "%s: add_files failed\n"
+ * Severity: Warning
+ * Parameter:
+ *   @1: Device
+ * Description:
+ * sysfs_create_group() failed to create the
+ * /proc/... files for the new device.
+ * This could be a result of the /proc file
+ * system not being available or it could be
+ * a symptom of a more serious problem.
+ * User action:
+ * The device will not start. Re-start the device
+ * If the /proc file system is not available CLAW
+ * devices cannot be used.
+ */
+
+/*?
+ * Tag: claw.6c9750
+ * Text: "%s: unsolicited interrupt for device received c-%02x d-%02x\n"
+ * Severity: Warning
+ * Parameter:
+ *   @1: Channel Device address
+ *   @2: Returned SubChannel Status word
+ *   @3: Returned Device Status word
+ * Description:
+ * An IRQ (channel interrupt) was received for a device that
+ * was not in a state to receive data.  The IRQ will be
+ * ignored.
+ * User action:
+ * This can happen as devices come on and off line.
+ * If the problem persists or the device will not
+ * activate, channel tracing or device traces may be
+ * used to diagnose the problem.
+ */
+
+/*?
+ * Tag: claw.0d87d4
+ * Text: "%s: Can't determine channel for interrupt\n"
+ * Severity: Warning
+ * Parameter:
+ *   @1: Channel Device address
+ * Description:
+ * The interrupt device was not the READ or WRITE device
+ * for the CLAW device.  The bus address of the interrupt
+ * is displayed.  This should not occur and indicates a
+ * a problem in the CCW driver in the kernel.
+ * User action:
+ * If the problem persists check if an incorrect device type
+ * has been assigned to a CLAW channel.
+ */
+
+/*?
+ * Tag: claw.4
+ * Text: "%s: unsolicited interrupt for device received c-%02x d-%02x"
+ * Severity: Warning
+ * Parameter:
+ *   @1: Channel Device address
+ *   @2: Returned Sub Channel Status word
+ *   @3: Returned Device Status word
+ * Description:
+ * An IRQ (channel interrupt) was received for a device that
+ * was not in a state to receive data.  The IRQ will be
+ * ignored.
+ * User action:
+ * This can happen normally as devices come on and off line.
+ * If the problem persists or the device will not
+ * activate channel tracing or device traces may be
+ * used to diagnose the problem.
+ */
+
+/*?
+ * Tag: claw.39773d
+ * Text: "%s: %s: wrong selection code - irq state=%d\n"
+ * Severity: Warning
+ * Parameter:
+ *   @1: Channel Device Address
+ *   @2: network device name (eg. claw0)
+ *   @3: Current CLAW device status
+ * Description:
+ * The CLAW device is in an invalid CCW state
+ * to handle IO.  The interrupt will be ignored.
+ * User action:
+ * The device may need to be restarted.  If the problem
+ * persists s390dbf traces and CCW traces may be used
+ * to diagnose the problem.
+ * The CLAW status is a number from 0 to 4 indicating the device
+ * driver's view of the read or write channel state.
+ * Channel status values:
+ * 0	The channel is inactive
+ * 1 	The channel is ready to start
+ * 2	RESERVED
+ * 3	The channel is started for READ
+ * 4	The channel is started for WRITE
+ */
+
+/*?
+ * Tag: claw.ccfe27
+ * Text: "%s: %s: channel problems during close - read: %02x -  write: %02x\n"
+ * Severity: Warning
+ * Parameter:
+ *   @1: Channel Device Address
+ *   @2: network device name (eg. claw0)
+ *   @3: Saved CLAW Read sub channel Device Status
+ *   @4: Saved CLAW Write sub channel Device Status
+ * Description:
+ * claw_release() has freed all of the storage
+ * for the device. The device state is expected to be
+ * DEVICE END and CHANNEL END and it was not.
+ * The device may not restart cleanly.
+ * User action:
+ * The device should restart after varying it
+ * on and offline.  If not it, power the CLAW device off
+ * and on and retry.
+ */
+
+/*?
+ * Tag: claw.9daf61
+ * Text: "%s: Device not found for IO ENODEV\n"
+ * Severity: Error
+ * Parameter:
+ *   @1: Channel Device Address
+ * Description:
+ * A Channel Command Word was executed and returned
+ * a non-zero return code (ERRNO) was returned by
+ * the Common IO Layer.
+ * User action:
+ * The ERRNO indicated was ENODEV.  This indicates that the
+ * Device was offline or not operational.
+ * Check the status of the device and restart the device.
+ */
+
+/*?
+ * Tag: claw.9b5723
+ * Text: "%s: Status pending... EIO \n"
+ * Severity: Error
+ * Parameter:
+ *   @1: Channel Device Address
+ * Description:
+ * The Common IO Layer returned an EIO ERRNO
+ * when a CCW was executed.
+ * A 'sub-channel check for device:' message may
+ * also be seen with the cstat and other device status.
+ * User action:
+ * The device may be in an invalid state.  Check the
+ * device status and restart the device if needed.
+ */
+
+/*?
+ * Tag: claw.fa1695
+ * Text: "%s: Invalid Dev State EINVAL \n"
+ * Severity: Error
+ * Parameter:
+ *   @1: Channel Device Address
+ * Description:
+ * The Common IO Layer returned an EINVAL ERRNO
+ * when a CCW was executed.
+ * A 'sub-channel check for device:' message may
+ * also be seen with the cstat and other device status.
+ * User action:
+ * The ERRNO indicated was ENODEV.  This indicates that the
+ * Device was offline or not operational.
+ * Check the status of the device and restart the device.
+ */
+
+/*?
+ * Tag: claw.919e27
+ * Text: "%s: Unknown error in Do_IO %d\n"
+ * Severity: Error
+ * Parameter:
+ *   @1: ERRNO
+ * Description:
+ * The Common IO Layer returned an unexpected ERRNO
+ * when a CCW was executed.
+ * A 'sub-channel check for device:' message may
+ * also be seen with the cstat and other device status.
+ * User action:
+ * Determine the ERRNO issued and restart the device.
+ * If the problem remains a sub-channel trace may be needed.
+ */
+
+/*?
+ * Tag: claw.d02204
+ * Text: "%s: %s: Interface disconnect or Selective reset occurred (remote side)\n"
+ * Severity: Warning
+ * Parameter:
+ *   @1: Channel Device Address
+ *   @2: network device name (eg. claw0)
+ * Description:
+ * The CCW completed with the Returned Device Status word
+ * having DEV_STAT_UNIT_CHECK set.  The Sense code contained 0x41
+ * User action:
+ * The CLAW device has been reset or the CLAW device's
+ * channel card has been reset.
+ * Once the device is back in service restart the device.
+ */
+
+/*?
+ * Tag: claw.980336
+ * Text: "%s: %s: System reset occurred (remote side)\n"
+ * Severity: Warning
+ * Parameter:
+ *   @1: Channel Device Address
+ *   @2: network device name (eg. claw0)
+ * Description:
+ * The CCW completed with the Returned Device Status word
+ * having DEV_STAT_UNIT_CHECK set.  The Sense code contained 0x40
+ * User action:
+ * The CLAW device has been reset or the CLAW device's
+ * channel card has been reset.
+ * Once the device is back in service restart the device.
+ */
+
+/*?
+ * Tag: claw.08179a
+ * Text: "%s: %s: Data-streaming timeout)\n"
+ * Severity: Warning
+ * Parameter:
+ *   @1: Channel Device Address
+ *   @2: network device name (eg. claw0)
+ * Description:
+ * The CCW completed with the Returned Device Status word
+ * having DEV_STAT_UNIT_CHECK set.  The Sense code contained 0x24
+ * User action:
+ * The device may be having errors or the channel is not operating
+ * properly.  CCW trace may be needed to diagnose.  Restart
+ * the device.
+ */
+
+/*?
+ * Tag: claw.8e4754
+ * Text: "%s: %s: Data-transfer parity error\n"
+ * Severity: Warning
+ * Parameter:
+ *   @1: Channel Device Address
+ *   @1: network device name (eg. claw0)
+ * Description:
+ * The CCW completed with the Returned Device Status word
+ * having DEV_STAT_UNIT_CHECK set.  The Sense code contained 0x20
+ * User action:
+ * The device may be having errors or the channel is not operating
+ * properly.  CCW trace may be needed to diagnose.  Restart
+ * the device.
+ */
+
+/*?
+ * Tag: claw.9ff943
+ * Text: "%s: %s: Hardware malfunction (remote side)\n"
+ * Severity: Warning
+ * Parameter:
+ *   @1: Channel Device Address
+ *   @2: network device name (eg. claw0)
+ * Description:
+ * The CCW completed with the Returned Device Status word
+ * having DEV_STAT_UNIT_CHECK set.  The Sense code contained 0x30
+ * User action:
+ * The CLAW Device may be in error. Check the device and restart.
+ * If the problem continues CCW traces and device
+ * diagnosis will be needed.
+ */
+
+/*?
+ * Tag: claw.1de3a7
+ * Text: "%s: %s: read-data parity error (remote side)\n"
+ * Severity: Warning
+ * Parameter:
+ *   @1: Channel Device Address
+ *   @2: network device name (eg. claw0)
+ * Description:
+ * The CCW completed with the Returned Device Status word
+ * having DEV_STAT_UNIT_CHECK set.  The Sense code contained 0x10
+ * User action:
+ * The CLAW Device may be in error. Check the device and restart.
+ * If the problem continues CCW traces and device
+ * diagnosis will be needed.
+ */
+
+/*?
+ * Tag: claw.be83da
+ * Text: "%s: %s: %d is wrong version id. Expected %d\n"
+ * Severity: Informational
+ * Parameter:
+ *   @1: Channel Device Address
+ *   @2: network device name (eg. claw0)
+ *   @3: CLAW API version  (must be '2')
+ *   @4: 2
+ * Description:
+ * The claw device driver received a
+ * SYSTEM_VALIDATE_REQUEST packet with a mismatched version ID
+ * claw expects all packets to be version 2.
+ * User action:
+ * The CLAW device has sent an invalid packet.  Check the device
+ * and if needed trace the channel to determine the cause.
+ */
+
+/*?
+ * Tag: claw.cec268
+ * Text: "%s: %s: Host name mismatch. Received: %s expected: %s\n"
+ * Severity: Informational
+ * Parameter:
+ *   @1: Channel Device Address
+ *   @2: network device name (eg. claw0)
+ *   @3: The 1 to 8 character host name received
+ *   @4: The 1 to 8 character host name configured
+ * Description:
+ * The HOSTNAME portion of the CLAW parameters does not match the
+ * HOSTNAME received on a control packet from the CLAW Device.
+ * The 1 to 8 character host name received is the received host name.
+ * User action:
+ * Check the claw device parameters and the CLAW device definitions.
+ * Correct the parameter so the parameters match and
+ * restart the device.
+ */
+
+/*?
+ * Tag: claw.e912da
+ * Text: "%s: %s: WS name mismatch. Received: %s expected: %s\n"
+ * Severity: Informational
+ * Parameter:
+ *   @1: Channel Device Address
+ *   @1: network device name (eg. claw0)
+ *   @2: The 1 to 8 character Work Station Name received
+ *   @3: The 1 to 8 character Work Station Name configured
+ * Description:
+ * The Work Station name portion of the CLAW parameters does not match the
+ * WSNAME received on a control packet from the CLAW Device.
+ * The received Work Station name is in The 1 to 8 character Work Station Name received.
+ * User action:
+ * Check the claw device parameters and the CLAW device definitions.
+ * Correct the parameter so the parameters match and
+ * restart the device.
+ */
+
+/*?
+ * Tag: claw.484eea
+ * Text: "%s: host write size is too small\n"
+ * Severity: Informational
+ * Parameter:
+ *   @1: Channel Device Address
+ * Description:
+ * The write buffer size received from the
+ * CLAW device is smaller than the
+ * write buffer size that the parameters the
+ * device was defined with.
+ * User action:
+ * Check the setup of the device and the
+ * claw device parameters and correct the
+ * difference.
+ */
+
+/*?
+ * Tag: claw.e5f839
+ * Text: "%s: host read size is too small\n"
+ * Severity: Informational
+ * Parameter:
+ *   @1: Channel Device Address
+ * Description:
+ * * The read buffer size received from the
+ * CLAW device is smaller than the
+ * read buffer size in the parameters the
+ * device was defined with.
+ * User action:
+ * Check the setup of the device and the
+ * claw device parameters and correct the
+ * difference.
+ */
+
+/*?
+ * Tag: claw.f812a3
+ * Text: "%s: %s: Recv Sys Validate Resp: Vers=%d,Corr=%d,RC=%d,WS name=%.8s,Host name=%.8s\n"
+ * Severity: Informational
+ * Parameter:
+ *   @1: Channel Device Address
+ *   @2: network device name (eg. claw0)
+ *   @3: CLAW API version  (must be '2')
+ *   @4: CLAW device identifier
+ *   @5: Return code received from CLAW device
+ *   @6: The 1 to 8 character Work Station Name received
+ *   @7: The 1 to 8 character Host Name received
+ * Description:
+ * A System Validate packet was sent to the device and
+ * a response was received.  The message summarizes
+ * the content of the response.
+ * User action:
+ * Check for expected values.
+ */
+
+/*?
+ * Tag: claw.c38291
+ * Text: "%s: %s: Sys Validate Resp : Host, WS name is mismatch\n"
+ * Severity: Informational
+ * Parameter:
+ *   @1: Channel Device Address
+ *   @2: network device name (eg. claw0)
+ * Description:
+ * A System validate request sent to the CLAW
+ * device has been rejected due to
+ * mismatched parameters. The device will not start.
+ * User action:
+ * Check the CLAW device parameters and ensure
+ * they match the CLAW devices definitions.
+ */
+
+/*?
+ * Tag: claw.cf8d2b
+ * Text: "%s: %s: Sys Validate Resp : Wrong version\n"
+ * Severity: Informational
+ * Parameter:
+ *   @1: Channel Device Address
+ *   @2: network device name (eg. claw0)
+ * Description:
+ * A System validate request sent to the CLAW
+ * device has been rejected due to
+ * mismatched parameters. The device will not start.
+ * User action:
+ * Check the CLAW device parameters and ensure
+ * they match the CLAW devices definitions.
+ */
+
+/*?
+ * Tag: claw.d31686
+ * Text: "%s: %s: Sys Validate Resp : bad frame size\n"
+ * Severity: Informational
+ * Parameter:
+ *   @1: Channel Device Address
+ *   @2: network device name (eg. claw0)
+ * Description:
+ * A System validate request sent to the CLAW
+ * device has been rejected due to
+ * mismatched parameters. The device will not start.
+ * User action:
+ * Check the CLAW device parameters and ensure
+ * they match the CLAW devices definitions.
+ */
+
+/*?
+ * Tag: claw.cee4a3
+ * Text: "%s: %s: Sys Validate error code=%d \n"
+ * Severity: Informational
+ * Parameter:
+ *   @1: Channel Device Address
+ *   @2: network device name (eg. claw0)
+ *   @3: Return code received
+ * Description:
+ * A System validate request sent to the CLAW
+ * device has been rejected due to
+ * mismatched parameters. The device will not start.
+ * User action:
+ * Check the CLAW device parameters and ensure
+ * they match the CLAW devices definitions.
+ */
+
+/*?
+ * Tag: claw.b3fff2
+ * Text: "%s: %s: Conn Req error : already logical link is active \n"
+ * Severity: Informational
+ * Parameter:
+ *   @1: Channel Device Address
+ *   @2: network device name (eg. claw0)
+ * Description:
+ * A connection request has been received but the
+ * logical link is already active.
+ * User action:
+ * This can be a timing error.  If the device
+ * fails to connect a restart may be needed.
+ */
+
+/*?
+ * Tag: claw.f07391
+ * Text: "%s: %s: Conn Req error : req logical link id is not 1\n"
+ * Severity: Informational
+ * Parameter:
+ *   @1: Channel Device Address
+ *   @2: network device name (eg. claw0)
+ * Description:
+ * The current CLAW design allows only logical link 1
+ * A device attempted to connect with a Log Link ID
+ * other than 1.  The connection will be rejected.
+ * User action:
+ * Check the device setup and restart the device.
+ */
+
+/*?
+ * Tag: claw.3fedb9
+ * Text: "%s: %s: Conn Req error : req appl name does not match\n"
+ * Severity: Informational
+ * Parameter:
+ *   @1: Channel Device Address
+ *   @1: network device name (eg. claw0)
+ * Description:
+ * A Connection Request was received with a mismatched
+ * WS Application name.
+ * User action:
+ * Check the device driver setup and restart the device.
+ */
+
+/*?
+ * Tag: claw.2253bd
+ * Text: "%s: %s: Conn Resp error: rc=%d \n"
+ * Severity: Informational
+ * Parameter:
+ *   @1: Channel Device Address
+ *   @1: network device name (eg. claw0)
+ *   @2: Return code received
+ * Description:
+ * An error was detected by the CLAW device in
+ * the Connection Request packet it processed.
+ * User action:
+ * Check the device parameters and restart.
+ */
+
+/*?
+ * Tag: claw.622bd4
+ * Text: "%s: %s: Conn Resp error: req appl name does not match\n"
+ * Severity: Informational
+ * Parameter:
+ *   @1: Channel Device Address
+ *   @2: network device name (eg. claw0)
+ * Description:
+ * The CLAW device received a Connection Request with
+ * a mismatched Application ID.  The connection will
+ * not be started.
+ * User action:
+ * Check the definitions in the device and the device driver
+ * and correct errors.
+ */
+
+/*?
+ * Tag: claw.76b1d7
+ * Text: "%s: %s: Conn confirm: unexpected linkid=%d \n"
+ * Severity: Informational
+ * Parameter:
+ *   @1: Channel Device Address
+ *   @2: network device name (eg. claw0)
+ *   @3: p_ctlbk->linkid
+ * Description:
+ * A Connection Confirmed packet was received
+ * with a different link Id than the default
+ * User action:
+ * The link will not become active.  A restart
+ * is required after checking the device parameters.
+ */
+
+/*?
+ * Tag: claw.2999f9
+ * Text: "%s: %s: CLAW ERROR detected\n"
+ * Severity: Informational
+ * Parameter:
+ *   @1: Channel Device Address
+ *   @2: network device name (eg. claw0)
+ * Description:
+ * The CLAW device detected an error condition
+ * User action:
+ * Check the logs and traces on the device.
+ * If the problem persists diagnostic traces may be
+ * needed
+ */
+
+/*?
+ * Tag: claw.5661ca
+ * Text: "%s: %s: Unexpected command code=%d \n"
+ * Severity: Informational
+ * Parameter:
+ *   @1: Channel Device Address
+ *   @2: network device name (eg. claw0)
+ *   @3: CLAW command code received
+ * Description:
+ * This should not occur.  An undefined command code
+ * was received in a control packet from the CLAW
+ * device.
+ * User action:
+ * Restart the device.  If the problem persists
+ * tracing of the connection and diagnosis of the
+ * device may be needed.
+ */
+
+/*?
+ * Tag: claw.44ec31
+ * Text: "%s: %s: Invalid frame detected length is %02x\n"
+ * Severity: Informational
+ * Parameter:
+ *   @1: Channel Device Address
+ *   @2: network device name (eg. claw0)
+ *   @3: Data packet frame length value
+ * Description:
+ * Claw data packet was received with an invalid length field.
+ * the header length is shown.  This can be the result of
+ * data errors or invalid packing.
+ * User action:
+ * restart the device and if the problem persists trace the
+ * device or channel interface.
+ */
+
+/*?
+ * Tag: claw.aa6ab0
+ * Text: "%s: buffer allocate failed on receive\n"
+ * Severity: Informational
+ * Parameter:
+ *   @1: Channel Device Address
+ * Description:
+ * Claw data packet was received but allocate for the recevie buffer
+ * failed.  this can be a low memory condition.
+ * the data packet will be dropped.
+ * User action:
+ * Restart the device if the problem persists.
+ */
+
+/*?
+ * Tag: claw.8649df
+ * Text: "%s: add channel failed with ret = %d\n"
+ * Severity: Warning
+ * Parameter:
+ *   @1: Channel Device Address
+ *   @2: ERRNO
+ * Description:
+ * add_channel() failed with return code rc.
+ * This is most likely an ENOMEM errno returned from
+ * an attempt to allocate an IRB for the CLAW
+ * channel device structure.
+ * User action:
+ * Check the return code and take action as needed.
+ * If this is caused by a low memory condition in the
+ * kernel itself several other messages and symptoms
+ * may appear.  if the problem persists expert assistance
+ * in kernel diagosis may be needed.
+ */
+
+/*?
+ * Tag: claw.6a7946
+ * Text: "%s: device set online READ failed with ret = %d\n"
+ * Severity: Warning
+ * Parameter:
+ *   @1: Channel Device Address
+ *   @2: ret
+ * Description:
+ * A non zero return code was the result of an attempt to
+ * set the device online.  The device cannot be activated.
+ * User action:
+ * Check the device driver parameters and the system definitions.
+ */
+
+/*?
+ * Tag: claw.3f8cd5
+ * Text: "%s: device set online WRITE failed with ret = %d\n"
+ * Severity: Warning
+ * Parameter:
+ *   @1: Channel Device Address
+ *   @2: ret
+ * Description:
+ * A non zero return code was the result of an attempt to
+ * set the device online.  The device cannot be activated.
+ * User action:
+ * Check the device driver parameters and the system definitions.
+ */
+
+/*?
+ * Tag: claw.b1e9fd
+ * Text: "%s: failed creating network device\n"
+ * Severity: Warning
+ * Parameter:
+ *   @1: Channel Device Address
+ * Description:
+ * Creation of a network claw device failed.
+ * no pointer to a new device was returned.
+ * User action:
+ * Check for errors in the Linux system.
+ * This can result from memory shortage or
+ * errors in setup.
+ */
+
+/*?
+ * Tag: claw.b2eaaf
+ * Text: "debug_register failed %d\n"
+ * Severity: Warning
+ * Parameter:
+ *   @1: ret
+ * Description:
+ * The claw driver failed to register with the ccw
+ * s390dbf facility. No DBF traces will be available.
+ * User action:
+ * Check the state of the dbf facility unload the
+ * the device driver and reload.
+ */
+
+/*?
+ * Tag: claw.43
+ * Text: "register_cu3088_discipline() failed rc=%d"
+ * Severity: Warning
+ * Parameter:
+ *   @1: ret
+ * Description:
+ * The claw driver failed to register with the
+ * channel subsystem drivers.  cu3088 driver
+ * may not be loaded or may not be operational.
+ * User action:
+ * Check the state of the cu3088 facility unload the
+ * the device driver and reload.
+ */
+
+/*? Tag: claw.c50275 Text: "%s: %s: CLAW device %.8s: Received Control Packet\n" */
+/*? Tag: claw.7929bb Text: "%s: %s: CLAW device %.8s: System validate completed.\n" */
+/*? Tag: claw.2db596 Text: "%s: %s: CLAW device %.8s: Connection completed link_id=%d.\n" */
+/*? Tag: claw.6fb687 Text: "%s: %s: remote side is not ready\n" */
+/*? Tag: claw.2c6ecc Text: "%s: %s: Unit Check with sense byte:0x%04x\n" */
+/*? Tag: claw.6711df Text: "%s: %s: write connection restarting\n" */
+/*? Tag: claw.6471cd Text: "%s: %s: subchannel check for device: %04x - Sch Stat %02x  Dev Stat %02x CPA - %04x\n" */
+/*? Tag: claw.4d0d65 Text: "%s: %s: Unit Exception occurred in write channel\n" */
+/*? Tag: claw.7c7e40 Text: "%s: %s: Resetting Event occurred:\n" */
+/*? Tag: claw.0ea64e Text: "%s: %s: Recv Conn Confirm:Vers=%d,link_id=%d,Corr=%d,Host appl=%.8s,WS appl=%.8s\n" */
+/*? Tag: claw.9f3041 Text: "%s: %s: Recv Conn Req: Vers=%d,link_id=%d,Corr=%d,HOST appl=%.8s,WS appl=%.8s\n" */
+/*? Tag: claw.6d4410 Text: "%s: %s: Recv Sys Validate Request: Vers=%d,link_id=%d,Corr=%d,WS name=%.8s,Host name=%.8s\n" */
+/*? Tag: claw.998f1b Text: "%s: %s: Confirmed Now packing\n" */
+/*? Tag: claw.8a8cb8 Text: "%s: %s: Unit Check Occured in write channel\n" */
+/*? Tag: claw.97d6f6 Text: "%s: %s: Restart is required after remote side recovers \n" */
+/*? Tag: claw.da648b Text: "%s: %s: sys Validate Rsize:%d Wsize:%d\n" */
+/*? Tag: claw.9a59f8 Text: "%s: %s:readsize=%d  writesize=%d readbuffer=%d writebuffer=%d read=0x%04x write=0x%04x\n" */
+/*? Tag: claw.5fc55e Text: "%s: %s:host_name:%.8s, adapter_name :%.8s api_type: %.8s\n" */
+/*? Tag: claw.a0b4c6 Text: "Driver unloaded\n" */
+/*? Tag: claw.35862f Text: "Loading %s\n" */
+/*? Tag: claw.bfd5d0 Text: "%s:  will be removed.\n" */
+/*? Tag: claw.f59f19 Text: "register_cu3088_discipline() failed rc=%d\n" */
+/*? Tag: claw.665fe2 Text: "%s: add for %s\n" */
+/*? Tag: claw.669957 Text: "%s: %s: shutting down \n" */
+/*? Tag: claw.6e82dd Text: "%s: CLAW device %.8s: System validate completed.\n" */
+/*? Tag: claw.e96f72 Text: "%s: %s: Disconnect: Vers=%d,link_id=%d,Corr=%d\n" */
+/*? Tag: claw.f56e75 Text: "%s: %s: Revc Conn Resp: Vers=%d,link_id=%d,Corr=%d,RC=%d,Host appl=%.8s, WS appl=%.8s\n" */

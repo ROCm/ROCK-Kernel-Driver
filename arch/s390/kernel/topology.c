@@ -3,6 +3,8 @@
  *    Author(s): Heiko Carstens <heiko.carstens@de.ibm.com>
  */
 
+#define KMSG_COMPONENT "cpu"
+
 #include <linux/kernel.h>
 #include <linux/mm.h>
 #include <linux/init.h>
@@ -12,6 +14,7 @@
 #include <linux/workqueue.h>
 #include <linux/cpu.h>
 #include <linux/smp.h>
+#include <linux/kmsg.h>
 #include <asm/delay.h>
 #include <asm/s390_ext.h>
 #include <asm/sysinfo.h>
@@ -308,7 +311,7 @@ void __init s390_init_cpu_topology(void)
 	for (i = 0; i < info->mnest - 2; i++)
 		nr_cores *= info->mag[NR_MAG - 3 - i];
 
-	printk(KERN_INFO "CPU topology:");
+	kmsg_info("The CPU configuration topology of the machine is:");
 	for (i = 0; i < NR_MAG; i++)
 		printk(" %d", info->mag[i]);
 	printk(" / %d\n", info->mnest);

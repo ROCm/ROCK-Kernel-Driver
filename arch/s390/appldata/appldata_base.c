@@ -10,6 +10,8 @@
  * Author: Gerald Schaefer <gerald.schaefer@de.ibm.com>
  */
 
+#define KMSG_COMPONENT	"appldata"
+
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/slab.h>
@@ -23,6 +25,7 @@
 #include <linux/notifier.h>
 #include <linux/cpu.h>
 #include <linux/workqueue.h>
+#include <linux/kmsg.h>
 #include <asm/appldata.h>
 #include <asm/timer.h>
 #include <asm/uaccess.h>
@@ -32,7 +35,6 @@
 #include "appldata.h"
 
 
-#define MY_PRINT_NAME	"appldata"		/* for debug messages, etc. */
 #define APPLDATA_CPU_INTERVAL	10000		/* default (CPU) time for
 						   sampling interval in
 						   milliseconds */
@@ -390,8 +392,8 @@ appldata_generic_handler(ctl_table *ctl, int write, struct file *filp,
 					(unsigned long) ops->data, ops->size,
 					ops->mod_lvl);
 		if (rc != 0) {
-			P_ERROR("START DIAG 0xDC for %s failed, "
-				"return code: %d\n", ops->name, rc);
+			kmsg_err("Starting the data collection for %s "
+				 "failed with rc=%d\n", ops->name, rc);
 			module_put(ops->owner);
 		} else
 			ops->active = 1;
@@ -401,8 +403,8 @@ appldata_generic_handler(ctl_table *ctl, int write, struct file *filp,
 				(unsigned long) ops->data, ops->size,
 				ops->mod_lvl);
 		if (rc != 0)
-			P_ERROR("STOP DIAG 0xDC for %s failed, "
-				"return code: %d\n", ops->name, rc);
+			kmsg_err("Stopping the data collection for %s "
+				 "failed with rc=%d\n", ops->name, rc);
 		module_put(ops->owner);
 	}
 	spin_unlock(&appldata_ops_lock);

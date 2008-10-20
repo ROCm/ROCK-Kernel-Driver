@@ -1,0 +1,6 @@
+/*? Tag: sclp_cmd.523bd1 Text: "sync request failed (cmd=0x%08x, status=0x%02x)\n" */
+/*? Tag: sclp_cmd.c95a7c Text: "readcpuinfo failed (response=0x%04x)\n" */
+/*? Tag: sclp_cmd.d5892c Text: "configure cpu failed (cmd=0x%08x, response=0x%04x)\n" */
+/*? Tag: sclp_cmd.e39ba3 Text: "configure channel-path failed (cmd=0x%08x, response=0x%04x)\n" */
+/*? Tag: sclp_cmd.abe1ce Text: "read channel-path info failed (response=0x%04x)\n" */
+

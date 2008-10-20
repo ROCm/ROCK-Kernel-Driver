@@ -1,0 +1,5 @@
+/*? Tag: vmlogrdr.3ee871 Text: "vmlogrdr: failed to start recording automatically\n" */
+/*? Tag: vmlogrdr.b3d9d5 Text: "vmlogrdr: connection severed with reason %i\n" */
+/*? Tag: vmlogrdr.b96662 Text: "vmlogrdr: iucv connection to %s failed with rc %i \n" */
+/*? Tag: vmlogrdr.07808a Text: "vmlogrdr: failed to stop recording automatically\n" */
+/*? Tag: vmlogrdr.4e2790 Text: "not running under VM, driver not loaded.\n" */

@@ -520,43 +520,56 @@ extern void sysdev_shutdown(void);
 
 /* debugging and troubleshooting/diagnostic helpers. */
 extern const char *dev_driver_string(const struct device *dev);
-#define dev_printk(level, dev, format, arg...)	\
+#define dev_printk(level, dev, format, ...)	\
 	printk(level "%s %s: " format , dev_driver_string(dev) , \
-	       dev_name(dev) , ## arg)
+	       dev_name(dev) , ##__VA_ARGS__)
 
-#define dev_emerg(dev, format, arg...)		\
-	dev_printk(KERN_EMERG , dev , format , ## arg)
-#define dev_alert(dev, format, arg...)		\
-	dev_printk(KERN_ALERT , dev , format , ## arg)
-#define dev_crit(dev, format, arg...)		\
-	dev_printk(KERN_CRIT , dev , format , ## arg)
-#define dev_err(dev, format, arg...)		\
-	dev_printk(KERN_ERR , dev , format , ## arg)
-#define dev_warn(dev, format, arg...)		\
-	dev_printk(KERN_WARNING , dev , format , ## arg)
-#define dev_notice(dev, format, arg...)		\
-	dev_printk(KERN_NOTICE , dev , format , ## arg)
-#define dev_info(dev, format, arg...)		\
-	dev_printk(KERN_INFO , dev , format , ## arg)
+/* dev_printk_hash for message documentation */
+#if defined(__KMSG_CHECKER) && defined(KMSG_COMPONENT)
+/* generate magic string for scripts/kmsg-doc to parse */
+#define dev_printk_hash(level, dev, format, ...) \
+	__KMSG_DEV(level _FMT_ format _ARGS_ dev, ##__VA_ARGS__ _END_)
+#elif defined(CONFIG_KMSG_IDS) && defined(KMSG_COMPONENT)
+int printk_dev_hash(const char *, const struct device *, const char *, ...);
+#define dev_printk_hash(level, dev, format, ...) \
+	printk_dev_hash(level "%s.%06x: %s: ", dev, format, ##__VA_ARGS__)
+#else /* !defined(CONFIG_KMSG_IDS) */
+#define dev_printk_hash dev_printk
+#endif
+
+#define dev_emerg(dev, format, ...)		\
+	dev_printk_hash(KERN_EMERG , dev , format , ##__VA_ARGS__)
+#define dev_alert(dev, format, ...)		\
+	dev_printk_hash(KERN_ALERT , dev , format , ##__VA_ARGS__)
+#define dev_crit(dev, format, ...)		\
+	dev_printk_hash(KERN_CRIT , dev , format , ##__VA_ARGS__)
+#define dev_err(dev, format, ...)		\
+	dev_printk_hash(KERN_ERR , dev , format , ##__VA_ARGS__)
+#define dev_warn(dev, format, ...)		\
+	dev_printk_hash(KERN_WARNING , dev , format , ##__VA_ARGS__)
+#define dev_notice(dev, format, ...)		\
+	dev_printk_hash(KERN_NOTICE , dev , format , ##__VA_ARGS__)
+#define dev_info(dev, format, ...)		\
+	dev_printk_hash(KERN_INFO , dev , format , ##__VA_ARGS__)
 
 #if defined(CONFIG_DYNAMIC_PRINTK_DEBUG)
 #define dev_dbg(dev, format, ...) do { \
 	dynamic_dev_dbg(dev, format, ##__VA_ARGS__); \
 	} while (0)
 #elif defined(DEBUG)
-#define dev_dbg(dev, format, arg...)		\
-	dev_printk(KERN_DEBUG , dev , format , ## arg)
+#define dev_dbg(dev, format, ...)		\
+	dev_printk(KERN_DEBUG , dev , format , ##__VA_ARGS__)
 #else
-#define dev_dbg(dev, format, arg...)		\
-	({ if (0) dev_printk(KERN_DEBUG, dev, format, ##arg); 0; })
+#define dev_dbg(dev, format, ...)		\
+	({ if (0) dev_printk(KERN_DEBUG, dev, format, ##__VA_ARGS__); 0; })
 #endif
 
 #ifdef VERBOSE_DEBUG
 #define dev_vdbg	dev_dbg
 #else
 
-#define dev_vdbg(dev, format, arg...)		\
-	({ if (0) dev_printk(KERN_DEBUG, dev, format, ##arg); 0; })
+#define dev_vdbg(dev, format, ...)		\
+	({ if (0) dev_printk(KERN_DEBUG, dev, format, ##__VA_ARGS__); 0; })
 #endif
 
 /* Create alias, so I can be autoloaded. */

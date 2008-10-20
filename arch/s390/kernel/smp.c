@@ -20,6 +20,8 @@
  * cpu_number_map in other architectures.
  */
 
+#define KMSG_COMPONENT "cpu"
+
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/mm.h>
@@ -32,6 +34,7 @@
 #include <linux/cpu.h>
 #include <linux/timex.h>
 #include <linux/bootmem.h>
+#include <linux/kmsg.h>
 #include <asm/ipl.h>
 #include <asm/setup.h>
 #include <asm/sigp.h>
@@ -388,8 +391,8 @@ static void __init smp_get_save_area(unsigned int cpu, unsigned int phy_cpu)
 	if (ipl_info.type != IPL_TYPE_FCP_DUMP)
 		return;
 	if (cpu >= NR_CPUS) {
-		printk(KERN_WARNING "Registers for cpu %i not saved since dump "
-		       "kernel was compiled with NR_CPUS=%i\n", cpu, NR_CPUS);
+		kmsg_warn("CPU %i exceeds the maximum %i and is excluded from "
+			  "the dump\n", cpu, NR_CPUS - 1);
 		return;
 	}
 	zfcpdump_save_areas[cpu] = kmalloc(sizeof(union save_area), GFP_KERNEL);
@@ -562,7 +565,7 @@ static void __init smp_detect_cpus(void)
 	}
 out:
 	kfree(info);
-	printk(KERN_INFO "CPUs: %d configured, %d standby\n", c_cpus, s_cpus);
+	kmsg_info("%d configured CPUs, %d standby CPUs\n", c_cpus, s_cpus);
 	get_online_cpus();
 	__smp_rescan_cpus();
 	put_online_cpus();
@@ -688,12 +691,8 @@ int __cpuinit __cpu_up(unsigned int cpu)
 
 	ccode = signal_processor_p((__u32)(unsigned long)(lowcore_ptr[cpu]),
 				   cpu, sigp_set_prefix);
-	if (ccode) {
-		printk("sigp_set_prefix failed for cpu %d "
-		       "with condition code %d\n",
-		       (int) cpu, (int) ccode);
+	if (ccode)
 		return -EIO;
-	}
 
 	idle = current_set[cpu];
 	cpu_lowcore = lowcore_ptr[cpu];
@@ -776,7 +775,7 @@ void __cpu_die(unsigned int cpu)
 	while (!smp_cpu_not_running(cpu))
 		cpu_relax();
 	smp_free_lowcore(cpu);
-	printk(KERN_INFO "Processor %d spun down\n", cpu);
+	kmsg_info("Processor %d stopped\n", cpu);
 }
 
 void cpu_die(void)

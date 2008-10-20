@@ -23,6 +23,8 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#define KMSG_COMPONENT "ap"
+
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/delay.h>
@@ -32,6 +34,7 @@
 #include <linux/notifier.h>
 #include <linux/kthread.h>
 #include <linux/mutex.h>
+#include <linux/kmsg.h>
 #include <asm/s390_rdev.h>
 #include <asm/reset.h>
 #include <linux/hrtimer.h>
@@ -1337,12 +1340,13 @@ int __init ap_module_init(void)
 	int rc, i;
 
 	if (ap_domain_index < -1 || ap_domain_index >= AP_DOMAINS) {
-		printk(KERN_WARNING "Invalid param: domain = %d. "
-		       " Not loading.\n", ap_domain_index);
+		kmsg_warn("%d is not a valid cryptographic domain\n",
+			  ap_domain_index);
 		return -EINVAL;
 	}
 	if (ap_instructions_available() != 0) {
-		printk(KERN_WARNING "AP instructions not installed.\n");
+		kmsg_warn("The hardware system does not support "
+			  "AP instructions\n");
 		return -ENODEV;
 	}
 	register_reset_call(&ap_reset_call);

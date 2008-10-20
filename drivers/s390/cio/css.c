@@ -6,6 +6,9 @@
  *    Author(s): Arnd Bergmann (arndb@de.ibm.com)
  *		 Cornelia Huck (cornelia.huck@de.ibm.com)
  */
+
+#define KMSG_COMPONENT "cio"
+
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/device.h>
@@ -13,6 +16,7 @@
 #include <linux/errno.h>
 #include <linux/list.h>
 #include <linux/reboot.h>
+#include <linux/kmsg.h>
 #include <asm/isc.h>
 
 #include "../s390mach.h"
@@ -844,8 +848,8 @@ out:
 	s390_unregister_crw_handler(CRW_RSC_CSS);
 	chsc_free_sei_area();
 	kfree(slow_subchannel_set);
-	printk(KERN_WARNING"cio: failed to initialize css driver (%d)!\n",
-	       ret);
+	kmsg_alert("The CSS device driver initialization failed with "
+		   "errno=%d\n", ret);
 	return ret;
 }
 

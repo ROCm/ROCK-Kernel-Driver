@@ -1,0 +1,21 @@
+/*?
+ * Tag: iucv.beb348
+ * Text: "Defining an interrupt buffer on CPU %i failed with 0x%02x (%s)\n"
+ * Severity: Warning
+ * Parameter:
+ *   @1: CPU number
+ *   @2: hexadecimal error value
+ *   @3: short error code explanation
+ * Description:
+ * Defining an interrupt buffer for external interrupts failed. Error
+ * value 0x03 indicates a problem with the z/VM directory entry of the
+ * z/VM guest virtual machine. This problem can also be caused by a
+ * program error.
+ * User action:
+ * If the error value is 0x03, examine the z/VM directory entry of your
+ * z/VM guest virtual machine. If the directory entry is correct or if the
+ * error value is not 0x03, report this problem to your support organization.
+ */
+
+/*? Tag: iucv.2a8b71 Text: "iucv_external_interrupt: out of memory\n" */
+
