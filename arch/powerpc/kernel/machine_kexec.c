@@ -49,8 +49,6 @@ void arch_crash_save_vmcoreinfo(void)
 #ifdef CONFIG_NEED_MULTIPLE_NODES
 	VMCOREINFO_SYMBOL(node_data);
 	VMCOREINFO_LENGTH(node_data, MAX_NUMNODES);
-#else
-	VMCOREINFO_SYMBOL(contig_page_data);
 #endif
 }
 
