@@ -30,6 +30,7 @@
 #include <linux/pm.h>
 #include <linux/cpu.h>
 #include <linux/console.h>
+#include <linux/sysctl.h>
 
 #include <asm/page.h>
 #include <asm/uaccess.h>
@@ -45,6 +46,7 @@
 
 /* Per cpu memory for storing cpu states in case of system crash. */
 note_buf_t* crash_notes;
+int dump_after_notifier;
 
 /* vmcoreinfo stuff */
 unsigned char vmcoreinfo_data[VMCOREINFO_BYTES];
@@ -1195,6 +1197,30 @@ void crash_save_cpu(struct pt_regs *regs, int cpu)
 	final_note(buf);
 }
 
+#ifdef CONFIG_SYSCTL
+static ctl_table dump_after_notifier_table[] = {
+	{
+		.ctl_name = KERN_DUMP_AFTER_NOTIFIER,
+		.procname = "dump_after_notifier",
+		.data = &dump_after_notifier,
+		.maxlen = sizeof(int),
+		.mode = 0644,
+		.proc_handler = &proc_dointvec,
+	},
+	{ .ctl_name = 0 }
+};
+
+static ctl_table kexec_sys_table[] = {
+	{
+		.ctl_name = CTL_KERN,
+		.procname = "kernel",
+		.mode = 0555,
+		.child = dump_after_notifier_table,
+	},
+	{ .ctl_name = 0 }
+};
+#endif
+
 static int __init crash_notes_memory_init(void)
 {
 	/* Allocate memory for saving cpu registers. */
@@ -1204,6 +1230,9 @@ static int __init crash_notes_memory_init(void)
 		" states failed\n");
 		return -ENOMEM;
 	}
+#ifdef CONFIG_SYSCTL
+	register_sysctl_table(kexec_sys_table);
+#endif
 	return 0;
 }
 module_init(crash_notes_memory_init)

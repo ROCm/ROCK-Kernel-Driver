@@ -95,7 +95,8 @@ NORET_TYPE void panic(const char * fmt, ...)
 	 * everything else.
 	 * Do we want to call this before we try to display a message?
 	 */
-	crash_kexec(NULL);
+	if (!dump_after_notifier)
+		crash_kexec(NULL);
 
 #ifdef CONFIG_SMP
 	/*
@@ -107,6 +108,8 @@ NORET_TYPE void panic(const char * fmt, ...)
 #endif
 
 	atomic_notifier_call_chain(&panic_notifier_list, 0, buf);
+
+	crash_kexec(NULL);
 
 	if (!panic_blink)
 		panic_blink = no_blink;

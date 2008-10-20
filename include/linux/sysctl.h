@@ -165,6 +165,7 @@ enum
 	KERN_NMI_WATCHDOG=75, /* int: enable/disable nmi watchdog */
 	KERN_PANIC_ON_NMI=76, /* int: whether we will panic on an unrecovered */
 	KERN_KDB=77,		/* int: kdb on/off */
+	KERN_DUMP_AFTER_NOTIFIER=78, /* int: kdump after panic_notifier (SUSE only) */
 };
 
 

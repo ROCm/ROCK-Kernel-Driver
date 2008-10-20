@@ -167,6 +167,7 @@ unsigned long paddr_vmcoreinfo_note(void);
 
 extern struct kimage *kexec_image;
 extern struct kimage *kexec_crash_image;
+extern int dump_after_notifier;
 
 #ifndef kexec_flush_icache_page
 #define kexec_flush_icache_page(page)
@@ -221,5 +222,6 @@ struct pt_regs;
 struct task_struct;
 static inline void crash_kexec(struct pt_regs *regs) { }
 static inline int kexec_should_crash(struct task_struct *p) { return 0; }
+#define dump_after_notifier 0
 #endif /* CONFIG_KEXEC */
 #endif /* LINUX_KEXEC_H */
