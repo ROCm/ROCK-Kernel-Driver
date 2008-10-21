@@ -678,7 +678,7 @@ int scsi_dispatch_cmd(struct scsi_cmnd *cmd)
 		 * suspend state.
 		 */
 
-		scsi_queue_retry(cmd, SCSI_MLQUEUE_DEVICE_BUSY);
+		scsi_queue_insert(cmd, SCSI_MLQUEUE_DEVICE_BUSY);
 
 		SCSI_LOG_MLQUEUE(3, printk("queuecommand : device blocked \n"));
 
@@ -758,7 +758,7 @@ int scsi_dispatch_cmd(struct scsi_cmnd *cmd)
 		    rtn != SCSI_MLQUEUE_TARGET_BUSY)
 			rtn = SCSI_MLQUEUE_HOST_BUSY;
 
-		scsi_queue_retry(cmd, rtn);
+		scsi_queue_insert(cmd, rtn);
 
 		SCSI_LOG_MLQUEUE(3,
 		    printk("queuecommand : request rejected\n"));

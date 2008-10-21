@@ -11,11 +11,8 @@
  * blk_delete_timer - Delete/cancel timer for a given function.
  * @req:	request that we are canceling timer for
  *
- * Return value:
- *     1 if we were able to detach the timer.  0 if we blew it, and the
- *     timer function has already started to run. Caller must hold queue lock.
  */
-int blk_delete_timer(struct request *req)
+void blk_delete_timer(struct request *req)
 {
 	struct request_queue *q = req->q;
 
@@ -23,22 +20,13 @@ int blk_delete_timer(struct request *req)
 	 * Nothing to detach
 	 */
 	if (!q->rq_timed_out_fn || !req->deadline)
-		return 1;
-
-	/*
-	 * Not on the list, must have already been scheduled (or never added)
-	 */
-	if (list_empty(&req->timeout_list))
-		return 0;
+		return;
 
 	list_del_init(&req->timeout_list);
 
 	if (list_empty(&q->timeout_list))
 		del_timer(&q->timeout);
-
-	return 1;
 }
-EXPORT_SYMBOL_GPL(blk_delete_timer);
 
 static void blk_rq_timed_out(struct request *req)
 {
@@ -48,9 +36,10 @@ static void blk_rq_timed_out(struct request *req)
 	ret = q->rq_timed_out_fn(req);
 	switch (ret) {
 	case BLK_EH_HANDLED:
-		blk_complete_request(req);
+		__blk_complete_request(req);
 		break;
 	case BLK_EH_RESET_TIMER:
+		blk_clear_rq_complete(req);
 		blk_add_timer(req);
 		break;
 	case BLK_EH_NOT_HANDLED:
@@ -80,11 +69,11 @@ void blk_rq_timed_out_timer(unsigned long data)
 			list_del_init(&rq->timeout_list);
 
 			/*
-			 * if rq->bio is now NULL, then IO completion did
-			 * run on this request and we simply raced to get here
+			 * Check if we raced with end io completion
 			 */
-			if (rq->bio)
-				blk_rq_timed_out(rq);
+			if (blk_mark_rq_complete(rq))
+				continue;
+			blk_rq_timed_out(rq);
 		}
 		if (!next_set) {
 			next = rq->deadline;
@@ -110,8 +99,9 @@ void blk_rq_timed_out_timer(unsigned long data)
  */
 void blk_abort_request(struct request *req)
 {
-	if (!blk_delete_timer(req))
+	if (blk_mark_rq_complete(req))
 		return;
+	blk_delete_timer(req);
 	blk_rq_timed_out(req);
 }
 EXPORT_SYMBOL_GPL(blk_abort_request);
@@ -129,13 +119,22 @@ void blk_add_timer(struct request *req)
 	struct request_queue *q = req->q;
 	unsigned long expiry;
 
+	if (!q->rq_timed_out_fn)
+		return;
+
 	BUG_ON(!list_empty(&req->timeout_list));
+	BUG_ON(test_bit(REQ_ATOM_COMPLETE, &req->atomic_flags));
 
 	if (req->timeout)
 		req->deadline = jiffies + req->timeout;
-	else
+	else {
 		req->deadline = jiffies + q->rq_timeout;
-
+		/*
+		 * Some LLDs, like scsi, peek at the timeout to prevent
+		 * a command from being retried forever.
+		 */
+		req->timeout = q->rq_timeout;
+	}
 	list_add_tail(&req->timeout_list, &q->timeout_list);
 
 	/*

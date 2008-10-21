@@ -173,29 +173,6 @@ int scsi_queue_insert(struct scsi_cmnd *cmd, int reason)
 }
 
 /**
- * scsi_queue_retry - Try inserting a command in the midlevel queue.
- *
- * @cmd:	command that we are adding to queue.
- * @reason:	why we are inserting command to queue.
- *
- * Notes:       This is very similar to scsi_queue_insert except that we
- *              call this function when we don't know if the blk layer timer
- *              is active or not. We could implement this either by calling
- *              blk_delete_timer and inserting in the midlevel queue if we
- *              successfully delete the timer OR setting appropriate result
- *              field in the cmd and letting it go through the normal done
- *              routines which will retry the command. For now, We call
- *              blk_delete_timer!
- */
-void scsi_queue_retry(struct scsi_cmnd *cmd, int reason)
-{
-	if (blk_delete_timer(cmd->request)) {
-		atomic_inc(&cmd->device->iodone_cnt);
-		scsi_queue_insert(cmd, reason);
-	}
-}
-
-/**
  * scsi_execute - insert request and wait for the result
  * @sdev:	scsi device
  * @cmd:	scsi command

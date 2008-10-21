@@ -911,6 +911,7 @@ EXPORT_SYMBOL(blk_start_queueing);
 void blk_requeue_request(struct request_queue *q, struct request *rq)
 {
 	blk_delete_timer(rq);
+	blk_clear_rq_complete(rq);
 	blk_add_trace_rq(q, rq, BLK_TA_REQUEUE);
 
 	if (blk_rq_tagged(rq))
@@ -1040,9 +1041,6 @@ void __blk_put_request(struct request_queue *q, struct request *req)
 	if (unlikely(!q))
 		return;
 	if (unlikely(--req->ref_count))
-		return;
-
-	if (!blk_delete_timer(req))
 		return;
 
 	elv_completed_request(q, req);
@@ -1778,7 +1776,7 @@ static struct notifier_block blk_cpu_notifier __cpuinitdata = {
  *     callback through blk_queue_softirq_done().
  **/
 
-void blk_complete_request(struct request *req)
+void __blk_complete_request(struct request *req)
 {
 	struct list_head *cpu_list;
 	unsigned long flags;
@@ -1793,6 +1791,24 @@ void blk_complete_request(struct request *req)
 
 	local_irq_restore(flags);
 }
+
+/**
+ * blk_complete_request - end I/O on a request
+ * @req:      the request being processed
+ *
+ * Description:
+ *     Ends all I/O on a request. It does not handle partial completions,
+ *     unless the driver actually implements this in its completion callback
+ *     through requeueing. The actual completion happens out-of-order,
+ *     through a softirq handler. The user must have registered a completion
+ *     callback through blk_queue_softirq_done().
+ **/
+
+void blk_complete_request(struct request *req)
+{
+	if (!blk_mark_rq_complete(req))
+		__blk_complete_request(req);
+}
 EXPORT_SYMBOL(blk_complete_request);
 
 /*
@@ -1801,6 +1817,8 @@ EXPORT_SYMBOL(blk_complete_request);
 static void end_that_request_last(struct request *req, int error)
 {
 	struct gendisk *disk = req->rq_disk;
+
+	blk_delete_timer(req);
 
 	if (blk_rq_tagged(req))
 		blk_queue_end_tag(req->q, req);
