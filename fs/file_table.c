@@ -34,11 +34,17 @@ __cacheline_aligned_in_smp DEFINE_SPINLOCK(files_lock);
 
 static struct percpu_counter nr_files __cacheline_aligned_in_smp;
 
+static inline void file_free_rcu(struct rcu_head *head)
+{
+	struct file *f =  container_of(head, struct file, f_u.fu_rcuhead);
+	kmem_cache_free(filp_cachep, f);
+}
+
 static inline void file_free(struct file *f)
 {
 	percpu_counter_dec(&nr_files);
 	file_check_state(f);
-	kmem_cache_free(filp_cachep, f);
+	call_rcu(&f->f_u.fu_rcuhead, file_free_rcu);
 }
 
 /*
