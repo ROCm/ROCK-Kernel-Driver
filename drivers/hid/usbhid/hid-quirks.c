@@ -384,6 +384,7 @@
 #define USB_DEVICE_ID_SAMSUNG_IR_REMOTE	0x0001
 
 #define USB_VENDOR_ID_SONY			0x054c
+#define USB_DEVICE_ID_SONY_VAIO_VGX_MOUSE	0x024b
 #define USB_DEVICE_ID_SONY_PS3_CONTROLLER	0x0268
 
 #define USB_VENDOR_ID_SOUNDGRAPH	0x15c2
@@ -763,6 +764,8 @@ static const struct hid_rdesc_blacklist {
 
 	{ USB_VENDOR_ID_SUNPLUS, USB_DEVICE_ID_SUNPLUS_WDESKTOP, HID_QUIRK_RDESC_SUNPLUS_WDESKTOP },
 
+	{ USB_VENDOR_ID_SONY, USB_DEVICE_ID_SONY_VAIO_VGX_MOUSE, HID_QUIRK_RDESC_SONY_VAIO_VGX },
+
 	{ USB_VENDOR_ID_CYPRESS, USB_DEVICE_ID_CYPRESS_BARCODE_1, HID_QUIRK_RDESC_SWAPPED_MIN_MAX },
 	{ USB_VENDOR_ID_CYPRESS, USB_DEVICE_ID_CYPRESS_BARCODE_2, HID_QUIRK_RDESC_SWAPPED_MIN_MAX },
 
@@ -1135,6 +1138,16 @@ static void usbhid_fixup_button_consumer_descriptor(unsigned char *rdesc, int rs
 	}
 }
 
+/* Sony Vaio VGX has wrongly mouse pointer declared as constant */
+static void usbhid_fixup_sony_vaio_vgx(unsigned char *rdesc, int rsize)
+{
+	if (rsize >= 56 && rdesc[54] == 0x81
+			&& rdesc[55] == 0x07) {
+		printk(KERN_INFO "Fixing up Sony Vaio VGX report descriptor\n");
+		rdesc[55] = 0x06;
+	}
+}
+
 /*
  * Microsoft Wireless Desktop Receiver (Model 1028) has several
  * 'Usage Min/Max' where it ought to have 'Physical Min/Max'
@@ -1185,6 +1198,9 @@ static void __usbhid_fixup_report_descriptor(__u32 quirks, char *rdesc, unsigned
 
 	if (quirks & HID_QUIRK_RDESC_SUNPLUS_WDESKTOP)
 		usbhid_fixup_sunplus_wdesktop(rdesc, rsize);
+
+	if (quirks & HID_QUIRK_RDESC_SONY_VAIO_VGX)
+		usbhid_fixup_sony_vaio_vgx(rdesc, rsize);
 }
 
 /**

@@ -298,6 +298,7 @@ struct hid_item {
 #define HID_QUIRK_RDESC_SAMSUNG_REMOTE		0x00000040
 #define HID_QUIRK_RDESC_MICROSOFT_RECV_1028	0x00000080
 #define HID_QUIRK_RDESC_SUNPLUS_WDESKTOP	0x00000100
+#define HID_QUIRK_RDESC_SONY_VAIO_VGX		0x00000200
 
 /*
  * This is the global environment of the parser. This information is
