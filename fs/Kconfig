@@ -1399,17 +1399,17 @@ config CRAMFS
 	  If unsure, say N.
 
 config SQUASHFS
-	tristate "SquashFS 3.3 - Squashed file system support"
+	tristate "SquashFS 3.4 - Squashed file system support"
 	select ZLIB_INFLATE
 	help
-	  Saying Y here includes support for SquashFS 3.3 (a Compressed
+	  Saying Y here includes support for SquashFS 3.4 (a Compressed
 	  Read-Only File System).  Squashfs is a highly compressed read-only
 	  filesystem for Linux.  It uses zlib compression to compress both
 	  files, inodes and directories.  Inodes in the system are very small
 	  and all blocks are packed to minimise data overhead. Block sizes
 	  greater than 4K are supported up to a maximum of 1 Mbytes (default
 	  block size 128K).  SquashFS 3.3 supports 64 bit filesystems and files
-	  (larger than 4GB), full uid/gid information, hard links and timestamps.
+	  (larger than 4GB), full uid/gid information, hard links and timestamps.  
 
 	  Squashfs is intended for general read-only filesystem use, for
 	  archival use (i.e. in cases where a .tar.gz file may be used), and in
@@ -1426,7 +1426,7 @@ config SQUASHFS
 
 config SQUASHFS_EMBEDDED
 
-	bool "Additional option for memory-constrained systems"
+	bool "Additional option for memory-constrained systems" 
 	depends on SQUASHFS
 	default n
 	help

@@ -4,7 +4,7 @@
 /*
  * Squashfs
  *
- * Copyright (c) 2002, 2003, 2004, 2005, 2006, 2007
+ * Copyright (c) 2002, 2003, 2004, 2005, 2006, 2007, 2008
  * Phillip Lougher <phillip@lougher.demon.co.uk>
  *
  * This program is free software; you can redistribute it and/or
@@ -28,7 +28,7 @@
 #define CONFIG_SQUASHFS_2_0_COMPATIBILITY
 #endif
 
-#define SQUASHFS_CACHED_FRAGMENTS	CONFIG_SQUASHFS_FRAGMENT_CACHE_SIZE
+#define SQUASHFS_CACHED_FRAGMENTS	CONFIG_SQUASHFS_FRAGMENT_CACHE_SIZE	
 #define SQUASHFS_MAJOR			3
 #define SQUASHFS_MINOR			1
 #define SQUASHFS_MAGIC			0x73717368
@@ -94,7 +94,7 @@
 						SQUASHFS_CHECK)
 
 #define SQUASHFS_MKFLAGS(noi, nod, check_data, nof, no_frag, always_frag, \
-		duplicate_checking, exortable)	(noi | (nod << 1) | (check_data << 2) \
+		duplicate_checking, exportable)	(noi | (nod << 1) | (check_data << 2) \
 		| (nof << 3) | (no_frag << 4) | (always_frag << 5) | \
 		(duplicate_checking << 6) | (exportable << 7))
 
@@ -279,7 +279,7 @@ struct squashfs_dev_inode_header {
 	unsigned int		nlink;
 	unsigned short		rdev;
 } __attribute__ ((packed));
-
+	
 struct squashfs_symlink_inode_header {
 	SQUASHFS_BASE_INODE_HEADER;
 	unsigned int		nlink;
@@ -336,7 +336,7 @@ union squashfs_inode_header {
 	struct squashfs_ldir_inode_header	ldir;
 	struct squashfs_ipc_inode_header	ipc;
 };
-
+	
 struct squashfs_dir_entry {
 	unsigned int		offset:13;
 	unsigned int		type:3;
@@ -354,7 +354,7 @@ struct squashfs_dir_header {
 struct squashfs_fragment_entry {
 	long long		start_block;
 	unsigned int		size;
-	unsigned int		pending;
+	unsigned int		unused;
 } __attribute__ ((packed));
 
 extern int squashfs_uncompress_block(void *d, int dstlen, void *s, int srclen);
@@ -589,7 +589,7 @@ struct squashfs_dev_inode_header_1 {
 	unsigned int		guid:4; /* index into guid table */
 	unsigned short		rdev;
 } __attribute__ ((packed));
-
+	
 struct squashfs_symlink_inode_header_1 {
 	unsigned int		inode_type:4;
 	unsigned int		mode:12; /* protection */
@@ -715,7 +715,7 @@ struct squashfs_dev_inode_header_2 {
 	unsigned int		guid:8; /* index into guid table */
 	unsigned short		rdev;
 } __attribute__ ((packed));
-
+	
 struct squashfs_symlink_inode_header_2 {
 	unsigned int		inode_type:4;
 	unsigned int		mode:12; /* protection */
@@ -771,7 +771,7 @@ union squashfs_inode_header_2 {
 	struct squashfs_ldir_inode_header_2	ldir;
 	struct squashfs_ipc_inode_header_2	ipc;
 };
-
+	
 struct squashfs_dir_header_2 {
 	unsigned int		count:8;
 	unsigned int		start_block:24;
@@ -914,7 +914,7 @@ struct squashfs_fragment_entry_2 {
 #define SQUASHFS_SWAP(value, p, pos, tbits) _SQUASHFS_SWAP(value, p, pos, \
 		tbits, b_pos)
 #else
-	/* convert from big endian to little endian */
+	/* convert from big endian to little endian */ 
 #define SQUASHFS_SWAP(value, p, pos, tbits) _SQUASHFS_SWAP(value, p, pos, \
 		tbits, 64 - tbits - b_pos)
 #endif
