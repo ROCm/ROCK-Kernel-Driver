@@ -29,7 +29,6 @@
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <linux/user.h>
-#include <linux/page-states.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
 #include <linux/reboot.h>
@@ -84,9 +83,6 @@ static int s390_idle_enter(void)
 {
 	struct s390_idle_data *idle;
 
-#ifdef CONFIG_PAGE_STATES
-	page_shrink_discard_list();
-#endif
 	idle = &__get_cpu_var(s390_idle);
 	spin_lock(&idle->lock);
 	idle->idle_count++;

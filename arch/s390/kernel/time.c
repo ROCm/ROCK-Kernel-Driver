@@ -35,7 +35,6 @@
 #include <linux/clocksource.h>
 #include <linux/clockchips.h>
 #include <linux/bootmem.h>
-#include <linux/page-states.h>
 #include <asm/uaccess.h>
 #include <asm/delay.h>
 #include <asm/s390_ext.h>
@@ -135,9 +134,6 @@ static int s390_next_event(unsigned long delta,
 static void s390_set_mode(enum clock_event_mode mode,
 			  struct clock_event_device *evt)
 {
-#ifdef CONFIG_PAGE_STATES
-	page_shrink_discard_list();
-#endif
 }
 
 /*
@@ -260,10 +256,6 @@ void __init time_init(void)
 					      timing_alert_interrupt,
 					      &ext_int_etr_cc) != 0)
 		panic("Couldn't request external interrupt 0x1406");
-
-#ifdef CONFIG_PAGE_STATES
-	page_discard_init();
-#endif
 
 	/* Enable TOD clock interrupts on the boot cpu. */
 	init_cpu_timer();

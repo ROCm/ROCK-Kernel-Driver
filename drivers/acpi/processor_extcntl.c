@@ -66,7 +66,7 @@ static int processor_notify_smm(void)
 
 	status = acpi_os_write_port(acpi_gbl_FADT.smi_command,
 				    acpi_gbl_FADT.pstate_control, 8);
-	if (ACPI_FAILURE(status)) 
+	if (ACPI_FAILURE(status))
 		return status;
 
 	is_done = 1;
@@ -163,7 +163,7 @@ static int processor_extcntl_parse_csd(struct acpi_processor *pr)
  * Existing ACPI module does parse performance states at some point,
  * when acpi-cpufreq driver is loaded which however is something
  * we'd like to disable to avoid confliction with external control
- * logic. So we have to collect raw performance information here 
+ * logic. So we have to collect raw performance information here
  * when ACPI processor object is found and started.
  */
 static int processor_extcntl_get_performance(struct acpi_processor *pr)
@@ -189,7 +189,7 @@ static int processor_extcntl_get_performance(struct acpi_processor *pr)
 	 * Well, here we need retrieve performance dependency information
 	 * from _PSD object. The reason why existing interface is not used
 	 * is due to the reason that existing interface sticks to Linux cpu
-	 * id to construct some bitmap, however we want to split ACPI 
+	 * id to construct some bitmap, however we want to split ACPI
 	 * processor objects from Linux cpu id logic. For example, even
 	 * when Linux is configured as UP, we still want to parse all ACPI
 	 * processor objects to external logic. In this case, it's preferred

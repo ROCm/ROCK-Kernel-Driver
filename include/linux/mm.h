@@ -190,7 +190,7 @@ struct vm_operations_struct {
 #ifdef CONFIG_XEN
 	/* Area-specific function for clearing the PTE at @ptep. Returns the
 	 * original value of @ptep. */
-	pte_t (*zap_pte)(struct vm_area_struct *vma, 
+	pte_t (*zap_pte)(struct vm_area_struct *vma,
 			 unsigned long addr, pte_t *ptep, int is_fullmm);
 #endif
 #ifdef CONFIG_NUMA
@@ -326,7 +326,6 @@ static inline void init_page_count(struct page *page)
 }
 
 void put_page(struct page *page);
-void put_page_check(struct page *page);
 void put_pages_list(struct list_head *pages);
 
 void split_page(struct page *page, unsigned int order);
