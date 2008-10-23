@@ -1003,6 +1003,15 @@ config X86_PAE
 	  has the cost of more pagetable lookup overhead, and also
 	  consumes more pagetable space per process.
 
+config DIRECT_GBPAGES
+	bool "Enable 1GB pages for kernel pagetables" if EMBEDDED
+	default y
+	depends on X86_64 && !XEN
+	help
+	  Allow the kernel linear mapping to use 1GB pages on CPUs that
+	  support it. This can improve the kernel's performance a tiny bit by
+	  reducing TLB pressure. If in doubt, say "Y".
+
 # Common NUMA Features
 config NUMA
 	bool "Numa Memory Allocation and Scheduler Support (EXPERIMENTAL)"
