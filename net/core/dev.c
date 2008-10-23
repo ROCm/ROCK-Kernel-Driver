@@ -931,7 +931,7 @@ int dev_change_name(struct net_device *dev, char *newname)
 	else
 	{
 		if (strncmp(newname, dev->name, IFNAMSIZ))
-			printk(KERN_INFO "%s renamed to %s\n", dev->name, newname);
+			printk(KERN_INFO "%s renamed to %s by %s [%u]\n", dev->name, newname, current->comm, current->pid);
 		strlcpy(dev->name, newname, IFNAMSIZ);
 	}
 
