@@ -35,8 +35,6 @@ void kdba_kdump_prepare(struct pt_regs *regs)
 	if (regs == NULL)
 		regs = &r;
 
-	machine_crash_shutdown_begin();
-
 	for (i = 1; i < NR_CPUS; ++i) {
 		if (!cpu_online(i))
 			continue;
@@ -44,7 +42,7 @@ void kdba_kdump_prepare(struct pt_regs *regs)
 		KDB_STATE_SET_CPU(KEXEC, i);
 	}
 
-	machine_crash_shutdown_end(regs);
+	machine_crash_shutdown(regs);
 }
 
 extern void halt_current_cpu(struct pt_regs *);
