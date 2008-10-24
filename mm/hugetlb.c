@@ -358,11 +358,12 @@ static void clear_huge_page(struct page *page,
 			unsigned long addr, unsigned long sz)
 {
 	int i;
+	struct page *p = page;
 
 	might_sleep();
-	for (i = 0; i < sz/PAGE_SIZE; i++) {
+	for (i = 0; i < sz/PAGE_SIZE; i++, p = mem_map_next(p, page, i)) {
 		cond_resched();
-		clear_user_highpage(page + i, addr + i * PAGE_SIZE);
+		clear_user_highpage(p, addr + i * PAGE_SIZE);
 	}
 }
 
@@ -371,11 +372,15 @@ static void copy_huge_page(struct page *dst, struct page *src,
 {
 	int i;
 	struct hstate *h = hstate_vma(vma);
+	struct page *dst_base = dst;
+	struct page *src_base = src;
 
 	might_sleep();
-	for (i = 0; i < pages_per_huge_page(h); i++) {
+	for (i = 0; i < pages_per_huge_page(h); i++,
+				dst = mem_map_next(dst, dst_base, i),
+				src = mem_map_next(src, src_base, i)) {
 		cond_resched();
-		copy_user_highpage(dst + i, src + i, addr + i*PAGE_SIZE, vma);
+		copy_user_highpage(dst, src, addr + i*PAGE_SIZE, vma);
 	}
 }
 
@@ -455,6 +460,8 @@ static struct page *dequeue_huge_page_vma(struct hstate *h,
 static void update_and_free_page(struct hstate *h, struct page *page)
 {
 	int i;
+
+	BUG_ON(h->order >= MAX_ORDER);
 
 	trace_hugetlb_page_release(page);
 	h->nr_huge_pages--;
@@ -989,7 +996,7 @@ static void __init gather_bootmem_prealloc(void)
 		struct hstate *h = m->hstate;
 		__ClearPageReserved(page);
 		WARN_ON(page_count(page) != 1);
-		prep_compound_page(page, h->order);
+		prep_compound_gigantic_page(page, h->order);
 		prep_new_huge_page(h, page, page_to_nid(page));
 	}
 }
@@ -2135,7 +2142,7 @@ int follow_hugetlb_page(struct mm_struct *mm, struct vm_area_struct *vma,
 same_page:
 		if (pages) {
 			get_page(page);
-			pages[i] = page + pfn_offset;
+			pages[i] = mem_map_offset(page, pfn_offset);
 		}
 
 		if (vmas)
