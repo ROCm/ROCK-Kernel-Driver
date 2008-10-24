@@ -23,6 +23,13 @@
 #define DM_SUSPEND_NOFLUSH_FLAG		(1 << 1)
 
 /*
+ * Type of table and mapped_device's mempool
+ */
+#define DM_TYPE_NONE		0
+#define DM_TYPE_BIO_BASED	1
+#define DM_TYPE_REQUEST_BASED	2
+
+/*
  * List of devices that a metadevice uses and should open/close.
  */
 struct dm_dev {
@@ -49,9 +56,11 @@ void dm_table_presuspend_targets(struct dm_table *t);
 void dm_table_postsuspend_targets(struct dm_table *t);
 int dm_table_resume_targets(struct dm_table *t);
 int dm_table_any_congested(struct dm_table *t, int bdi_bits);
-void dm_table_unplug_all(struct dm_table *t);
-void dm_table_set_request_based(struct dm_table *t);
+int dm_table_any_busy_target(struct dm_table *t);
+int dm_table_set_type(struct dm_table *t);
+int dm_table_get_type(struct dm_table *t);
 int dm_table_request_based(struct dm_table *t);
+void dm_table_unplug_all(struct dm_table *t);
 
 /*
  * To check the return value from dm_table_find_target().
@@ -69,13 +78,6 @@ struct target_type *dm_get_target_type(const char *name);
 void dm_put_target_type(struct target_type *t);
 int dm_target_iterate(void (*iter_func)(struct target_type *tt,
 					void *param), void *param);
-
-/*-----------------------------------------------------------------
- * Helper for block layer and dm core operations
- *---------------------------------------------------------------*/
-void dm_dispatch_request(struct request *rq);
-void dm_end_request(struct request *rq, int error);
-int dm_underlying_device_congested(struct request_queue *q);
 
 /*-----------------------------------------------------------------
  * Useful inlines.
@@ -106,9 +108,9 @@ void dm_stripe_exit(void);
 
 void *dm_vcalloc(unsigned long nmemb, unsigned long elem_size);
 union map_info *dm_get_mapinfo(struct bio *bio);
-union map_info *dm_get_rq_mapinfo(struct request *rq);
 int dm_open_count(struct mapped_device *md);
 int dm_lock_for_deletion(struct mapped_device *md);
+union map_info *dm_get_rq_mapinfo(struct request *rq);
 
 void dm_kobject_uevent(struct mapped_device *md);
 
@@ -116,11 +118,8 @@ int dm_kcopyd_init(void);
 void dm_kcopyd_exit(void);
 
 /*
- * Initializer for request-based/bio-based device
+ * Mempool initializer for a mapped_device
  */
-int dm_set_md_request_based(struct mapped_device *md);
-int dm_set_md_bio_based(struct mapped_device *md);
-void dm_set_request_based(struct mapped_device *md);
-int dm_init_md(struct mapped_device *md);
+int dm_init_md_mempool(struct mapped_device *md, int type);
 
 #endif

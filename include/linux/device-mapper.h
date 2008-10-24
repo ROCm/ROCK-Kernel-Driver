@@ -11,7 +11,6 @@
 #include <linux/bio.h>
 #include <linux/blkdev.h>
 
-struct request;
 struct dm_target;
 struct dm_table;
 struct dm_dev;
@@ -47,7 +46,6 @@ typedef void (*dm_dtr_fn) (struct dm_target *ti);
  */
 typedef int (*dm_map_fn) (struct dm_target *ti, struct bio *bio,
 			  union map_info *map_context);
-
 typedef int (*dm_map_request_fn) (struct dm_target *ti, struct request *clone,
 				  union map_info *map_context);
 
@@ -62,7 +60,6 @@ typedef int (*dm_map_request_fn) (struct dm_target *ti, struct request *clone,
 typedef int (*dm_endio_fn) (struct dm_target *ti,
 			    struct bio *bio, int error,
 			    union map_info *map_context);
-
 typedef int (*dm_request_endio_fn) (struct dm_target *ti,
 				    struct request *clone, int error,
 				    union map_info *map_context);
@@ -81,10 +78,16 @@ typedef int (*dm_message_fn) (struct dm_target *ti, unsigned argc, char **argv);
 typedef int (*dm_ioctl_fn) (struct dm_target *ti, struct inode *inode,
 			    struct file *filp, unsigned int cmd,
 			    unsigned long arg);
-typedef int (*dm_congested_fn) (struct dm_target *ti);
 
 typedef int (*dm_merge_fn) (struct dm_target *ti, struct bvec_merge_data *bvm,
 			    struct bio_vec *biovec, int max_size);
+
+/*
+ * Returns:
+ *    0: The target can handle the next I/O immediately.
+ *    1: The target can't handle the next I/O immediately.
+ */
+typedef int (*dm_busy_fn) (struct dm_target *ti);
 
 void dm_error(const char *message);
 
@@ -124,7 +127,7 @@ struct target_type {
 	dm_message_fn message;
 	dm_ioctl_fn ioctl;
 	dm_merge_fn merge;
-	dm_congested_fn congested;
+	dm_busy_fn busy;
 };
 
 struct io_restrictions {
@@ -137,7 +140,7 @@ struct io_restrictions {
 	unsigned short max_hw_segments;
 	unsigned short max_phys_segments;
 	unsigned char no_cluster; /* inverted so that 0 is default */
-	unsigned char no_request_stacking; /* inverted so that 0 is default */
+	unsigned char no_request_stacking;
 };
 
 struct dm_target {
@@ -214,7 +217,6 @@ const char *dm_device_name(struct mapped_device *md);
 int dm_copy_name_and_uuid(struct mapped_device *md, char *name, char *uuid);
 struct gendisk *dm_disk(struct mapped_device *md);
 int dm_suspended(struct mapped_device *md);
-int dm_request_based(struct mapped_device *md);
 int dm_noflush_suspending(struct dm_target *ti);
 
 /*
@@ -361,5 +363,13 @@ static inline unsigned long to_bytes(sector_t n)
 {
 	return (n << SECTOR_SHIFT);
 }
+
+/*-----------------------------------------------------------------
+ * Helper for block layer and dm core operations
+ *---------------------------------------------------------------*/
+void dm_dispatch_request(struct request *rq);
+void dm_requeue_request(struct request *rq);
+void dm_kill_request(struct request *rq, int error);
+int dm_underlying_device_busy(struct request_queue *q);
 
 #endif	/* _LINUX_DEVICE_MAPPER_H */

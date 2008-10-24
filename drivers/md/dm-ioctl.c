@@ -1045,6 +1045,12 @@ static int populate_table(struct dm_table *table,
 		next = spec->next;
 	}
 
+	r = dm_table_set_type(table);
+	if (r) {
+		DMWARN("unable to set table type");
+		return r;
+	}
+
 	return dm_table_complete(table);
 }
 
@@ -1065,6 +1071,13 @@ static int table_load(struct dm_ioctl *param, size_t param_size)
 
 	r = populate_table(t, param, param_size);
 	if (r) {
+		dm_table_put(t);
+		goto out;
+	}
+
+	r = dm_init_md_mempool(md, dm_table_get_type(t));
+	if (r) {
+		DMWARN("unable to initialize the md mempools for this table");
 		dm_table_put(t);
 		goto out;
 	}

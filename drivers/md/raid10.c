@@ -1345,9 +1345,6 @@ static void sync_request_write(mddev_t *mddev, r10bio_t *r10_bio)
 		tbio->bi_size = r10_bio->sectors << 9;
 		tbio->bi_idx = 0;
 		tbio->bi_phys_segments = 0;
-		tbio->bi_hw_segments = 0;
-		tbio->bi_hw_front_size = 0;
-		tbio->bi_hw_back_size = 0;
 		tbio->bi_flags &= ~(BIO_POOL_MASK - 1);
 		tbio->bi_flags |= 1 << BIO_UPTODATE;
 		tbio->bi_next = NULL;
@@ -1947,7 +1944,6 @@ static sector_t sync_request(mddev_t *mddev, sector_t sector_nr, int *skipped, i
 		bio->bi_vcnt = 0;
 		bio->bi_idx = 0;
 		bio->bi_phys_segments = 0;
-		bio->bi_hw_segments = 0;
 		bio->bi_size = 0;
 	}
 

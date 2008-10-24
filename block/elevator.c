@@ -34,8 +34,7 @@
 #include <linux/delay.h>
 #include <linux/blktrace_api.h>
 #include <linux/hash.h>
-
-#include <asm/uaccess.h>
+#include <linux/uaccess.h>
 
 #include "blk.h"
 
@@ -74,6 +73,12 @@ static int elv_iosched_allow_merge(struct request *rq, struct bio *bio)
 int elv_rq_merge_ok(struct request *rq, struct bio *bio)
 {
 	if (!rq_mergeable(rq))
+		return 0;
+
+	/*
+	 * Don't merge file system requests and discard requests
+	 */
+	if (bio_discard(bio) != bio_discard(rq->bio))
 		return 0;
 
 	/*
@@ -304,9 +309,6 @@ static void elv_activate_rq(struct request_queue *q, struct request *rq)
 
 	if (e->ops->elevator_activate_req_fn)
 		e->ops->elevator_activate_req_fn(q, rq);
-
-	if (q->rq_timed_out_fn)
-		blk_add_timer(rq);
 }
 
 static void elv_deactivate_rq(struct request_queue *q, struct request *rq)
@@ -315,9 +317,6 @@ static void elv_deactivate_rq(struct request_queue *q, struct request *rq)
 
 	if (e->ops->elevator_deactivate_req_fn)
 		e->ops->elevator_deactivate_req_fn(q, rq);
-
-	if (q->rq_timed_out_fn)
-		blk_delete_timer(rq);
 }
 
 static inline void __elv_rqhash_del(struct request *rq)
@@ -446,6 +445,8 @@ void elv_dispatch_sort(struct request_queue *q, struct request *rq)
 	list_for_each_prev(entry, &q->queue_head) {
 		struct request *pos = list_entry_rq(entry);
 
+		if (blk_discard_rq(rq) != blk_discard_rq(pos))
+			break;
 		if (rq_data_dir(rq) != rq_data_dir(pos))
 			break;
 		if (pos->cmd_flags & stop_flags)
@@ -615,7 +616,7 @@ void elv_insert(struct request_queue *q, struct request *rq, int where)
 		break;
 
 	case ELEVATOR_INSERT_SORT:
-		BUG_ON(!blk_fs_request(rq));
+		BUG_ON(!blk_fs_request(rq) && !blk_discard_rq(rq));
 		rq->cmd_flags |= REQ_SORTED;
 		q->nr_sorted++;
 		if (rq_mergeable(rq)) {
@@ -700,7 +701,7 @@ void __elv_add_request(struct request_queue *q, struct request *rq, int where,
 		 * this request is scheduling boundary, update
 		 * end_sector
 		 */
-		if (blk_fs_request(rq)) {
+		if (blk_fs_request(rq) || blk_discard_rq(rq)) {
 			q->end_sector = rq_end_sector(rq);
 			q->boundary_rq = rq;
 		}
@@ -772,6 +773,12 @@ struct request *elv_next_request(struct request_queue *q)
 			 */
 			rq->cmd_flags |= REQ_STARTED;
 			blk_add_trace_rq(q, rq, BLK_TA_ISSUE);
+
+			/*
+			 * We are now handing the request to the hardware,
+			 * add the timeout handler
+			 */
+			blk_add_timer(rq);
 		}
 
 		if (!q->boundary_rq || q->boundary_rq == rq) {
@@ -790,7 +797,6 @@ struct request *elv_next_request(struct request_queue *q)
 			 * device can handle
 			 */
 			rq->nr_phys_segments++;
-			rq->nr_hw_segments++;
 		}
 
 		if (!q->prep_rq_fn)
@@ -813,7 +819,6 @@ struct request *elv_next_request(struct request_queue *q)
 				 * so that we don't add it again
 				 */
 				--rq->nr_phys_segments;
-				--rq->nr_hw_segments;
 			}
 
 			rq = NULL;

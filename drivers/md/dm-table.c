@@ -442,12 +442,6 @@ static int __table_get_device(struct dm_table *t, struct dm_target *ti,
 			return r;
 	}
 
-	r = dm_init_md(t->md);
-	if (r) {
-		DMWARN("Cannot initialize device %s, error %d", path, r);
-		return r;
-	}
-
 	dd = find_device(&t->devices, dev);
 	if (!dd) {
 		dd = kmalloc(sizeof(*dd), GFP_KERNEL);
@@ -534,8 +528,7 @@ void dm_set_device_limits(struct dm_target *ti, struct block_device *bdev)
 
 	rs->no_cluster |= !test_bit(QUEUE_FLAG_CLUSTER, &q->queue_flags);
 
-	if (!q->request_fn)
-		rs->no_request_stacking = 1;
+	rs->no_request_stacking |= !blk_queue_stackable(q);
 }
 EXPORT_SYMBOL_GPL(dm_set_device_limits);
 
@@ -671,12 +664,8 @@ int dm_split_args(int *argc, char ***argvp, char *input)
 	return 0;
 }
 
-static int check_for_valid_limits(struct io_restrictions *rs,
-				  struct mapped_device *md)
+static void check_for_valid_limits(struct io_restrictions *rs)
 {
-	int r = 0;
-	struct dm_table *t;
-
 	if (!rs->max_sectors)
 		rs->max_sectors = SAFE_MAX_SECTORS;
 	if (!rs->max_hw_sectors)
@@ -693,39 +682,6 @@ static int check_for_valid_limits(struct io_restrictions *rs,
 		rs->seg_boundary_mask = -1;
 	if (!rs->bounce_pfn)
 		rs->bounce_pfn = -1;
-
-	if (!dm_request_based(md))
-		return 0;
-
-	/* Allows to load only request stackable tables */
-	if (rs->no_request_stacking) {
-		DMERR("table load rejected: including non-request-stackable "
-		      "devices");
-		return -EINVAL;
-	}
-
-	t = dm_get_table(md);
-
-	/* Initial table loading must be allowed */
-	if (!t)
-		return 0;
-
-	if ((rs->max_sectors < t->limits.max_sectors) ||
-	    (rs->max_hw_sectors < t->limits.max_hw_sectors) ||
-	    (rs->max_phys_segments < t->limits.max_phys_segments) ||
-	    (rs->max_hw_segments < t->limits.max_hw_segments) ||
-	    (rs->hardsect_size > t->limits.hardsect_size) ||
-	    (rs->max_segment_size < t->limits.max_segment_size) ||
-	    (rs->seg_boundary_mask < t->limits.seg_boundary_mask) ||
-	    (rs->bounce_pfn < t->limits.bounce_pfn) ||
-	    (rs->no_cluster && !t->limits.no_cluster)) {
-		DMERR("table load rejected: shrinking current restriction");
-		r = -EINVAL;
-	}
-
-	dm_table_put(t);
-
-	return r;
 }
 
 int dm_table_add_target(struct dm_table *t, const char *type,
@@ -791,14 +747,64 @@ int dm_table_add_target(struct dm_table *t, const char *type,
 	return r;
 }
 
-void dm_table_set_request_based(struct dm_table *t)
+int dm_table_set_type(struct dm_table *t)
 {
-	dm_set_request_based(t->md);
+	int i;
+	int bio_based = 0, request_based = 0;
+	struct dm_target *tgt;
+
+	for (i = 0; i < t->num_targets; i++) {
+		tgt = t->targets + i;
+		if (tgt->type->map_rq)
+			request_based = 1;
+		else
+			bio_based = 1;
+
+		if (bio_based && request_based) {
+			DMWARN("Inconsistent table: different target types"
+			       " can't be mixed up");
+			return -EINVAL;
+		}
+	}
+
+	if (bio_based) {
+		/* We must use this table as bio-based */
+		t->limits.no_request_stacking = 1;
+		return 0;
+	}
+
+	BUG_ON(!request_based); /* No targets in this table */
+
+	/* Non-request-stackable devices can't be used for request-based dm */
+	if (t->limits.no_request_stacking) {
+		DMWARN("table load rejected: including non-request-stackable"
+		       " devices");
+		return -EINVAL;
+	}
+
+	/*
+	 * Request-based dm supports only tables that have a single target now.
+	 * To support multiple targets, request splitting support is needed,
+	 * and that needs lots of changes in the block-layer.
+	 * (e.g. request completion process for partial completion.)
+	 */
+	if (t->num_targets > 1) {
+		DMWARN("Request-based dm doesn't support multiple targets yet");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+int dm_table_get_type(struct dm_table *t)
+{
+	return t->limits.no_request_stacking ?
+		DM_TYPE_BIO_BASED : DM_TYPE_REQUEST_BASED;
 }
 
 int dm_table_request_based(struct dm_table *t)
 {
-	return dm_request_based(t->md);
+	return dm_table_get_type(t) == DM_TYPE_REQUEST_BASED;
 }
 
 static int setup_indexes(struct dm_table *t)
@@ -835,9 +841,7 @@ int dm_table_complete(struct dm_table *t)
 	int r = 0;
 	unsigned int leaf_nodes;
 
-	r = check_for_valid_limits(&t->limits, t->md);
-	if (r)
-		return r;
+	check_for_valid_limits(&t->limits);
 
 	/* how many indexes will the btree have ? */
 	leaf_nodes = dm_div_up(t->num_targets, KEYS_PER_NODE);
@@ -933,6 +937,10 @@ void dm_table_set_restrictions(struct dm_table *t, struct request_queue *q)
 	else
 		queue_flag_set_unlocked(QUEUE_FLAG_CLUSTER, q);
 
+	if (t->limits.no_request_stacking)
+		queue_flag_clear_unlocked(QUEUE_FLAG_STACKABLE, q);
+	else
+		queue_flag_set_unlocked(QUEUE_FLAG_STACKABLE, q);
 }
 
 unsigned int dm_table_get_num_targets(struct dm_table *t)
@@ -1021,6 +1029,20 @@ int dm_table_any_congested(struct dm_table *t, int bdi_bits)
 	return r;
 }
 
+int dm_table_any_busy_target(struct dm_table *t)
+{
+	int i;
+	struct dm_target *ti;
+
+	for (i = 0; i < t->num_targets; i++) {
+		ti = t->targets + i;
+		if (ti->type->busy && ti->type->busy(ti))
+			return 1;
+	}
+
+	return 0;
+}
+
 void dm_table_unplug_all(struct dm_table *t)
 {
 	struct dm_dev *dd;
@@ -1062,5 +1084,3 @@ EXPORT_SYMBOL(dm_table_get);
 EXPORT_SYMBOL(dm_table_unplug_all);
 EXPORT_SYMBOL(dm_table_barrier_ok);
 EXPORT_SYMBOL(dm_table_support_barrier);
-EXPORT_SYMBOL(dm_table_request_based);
-EXPORT_SYMBOL(dm_table_set_request_based);
