@@ -176,7 +176,7 @@ bad_entry:
 Eend:
 	if (!quiet) {
 		p = (ext2_dirent *)(kaddr + offs);
-		ext2_error (sb, "ext2_check_page",
+		ext2_error(sb, "ext2_check_page",
 			"entry in directory #%lu spans the page boundary"
 			"offset=%lu, inode=%lu",
 			dir->i_ino, (page->index<<PAGE_CACHE_SHIFT)+offs,

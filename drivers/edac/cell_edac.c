@@ -9,7 +9,6 @@
  */
 #undef DEBUG
 
-#include <linux/edac.h>
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/platform_device.h>
@@ -164,8 +163,6 @@ static int __devinit cell_edac_probe(struct platform_device *pdev)
 	regs = cbe_get_cpu_mic_tm_regs(cbe_node_to_cpu(pdev->id));
 	if (regs == NULL)
 		return -ENODEV;
-
-	edac_op_state = EDAC_OPSTATE_POLL;
 
 	/* Get channel population */
 	reg = in_be64(&regs->mic_mnt_cfg);
