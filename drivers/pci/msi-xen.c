@@ -140,7 +140,7 @@ static struct msi_dev_list *get_msi_dev_pirq_list(struct pci_dev *dev)
 	}
 
 	/* Has not allocate msi_dev until now. */
-	ret = kmalloc(sizeof(struct msi_dev_list), GFP_ATOMIC);
+	ret = kzalloc(sizeof(struct msi_dev_list), GFP_ATOMIC);
 
 	/* Failed to allocate msi_dev structure */
 	if ( !ret ) {
@@ -148,6 +148,7 @@ static struct msi_dev_list *get_msi_dev_pirq_list(struct pci_dev *dev)
 		return NULL;
 	}
 
+	ret->dev = dev;
 	spin_lock_init(&ret->pirq_list_lock);
 	INIT_LIST_HEAD(&ret->pirq_list_head);
 	list_add_tail(&ret->list, &msi_dev_head);

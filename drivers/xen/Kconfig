@@ -14,6 +14,7 @@ menu "XEN"
 
 config XEN_PRIVILEGED_GUEST
 	bool "Privileged Guest (domain 0)"
+	select PCI_REASSIGN if PCI
 	help
 	  Support for privileged operation (domain 0)
 
@@ -238,12 +239,6 @@ config XEN_KEYBOARD
 	  domain.  If you've said Y to CONFIG_XEN_FRAMEBUFFER, you probably
 	  want to say Y here.
 
-config XEN_CONSOLE
-	bool "Xen virtual console"
-	default y
-	help
-	  The Xen virtual console is ...
-
 config XEN_DISABLE_SERIAL
 	bool "Disable serial port drivers"
 	default y
@@ -272,6 +267,9 @@ choice
 	config XEN_COMPAT_030100_AND_LATER
 		bool "3.1.0 and later"
 
+	config XEN_COMPAT_030200_AND_LATER
+		bool "3.2.0 and later"
+
 	config XEN_COMPAT_LATEST_ONLY
 		bool "no compatibility code"
 
@@ -280,6 +278,7 @@ endchoice
 config XEN_COMPAT
 	hex
 	default 0xffffff if XEN_COMPAT_LATEST_ONLY
+	default 0x030200 if XEN_COMPAT_030200_AND_LATER
 	default 0x030100 if XEN_COMPAT_030100_AND_LATER
 	default 0x030004 if XEN_COMPAT_030004_AND_LATER
 	default 0x030002 if XEN_COMPAT_030002_AND_LATER

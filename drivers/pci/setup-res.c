@@ -126,6 +126,21 @@ int pci_claim_resource(struct pci_dev *dev, int resource)
 	return err;
 }
 
+#ifdef CONFIG_PCI_REASSIGN
+void pci_disable_bridge_window(struct pci_dev *dev)
+{
+	dev_dbg(&dev->dev, "disable bridge window\n");
+
+	/* MMIO Base/Limit */
+	pci_write_config_dword(dev, PCI_MEMORY_BASE, 0x0000fff0);
+
+	/* Prefetchable MMIO Base/Limit */
+	pci_write_config_dword(dev, PCI_PREF_LIMIT_UPPER32, 0);
+	pci_write_config_dword(dev, PCI_PREF_MEMORY_BASE, 0x0000fff0);
+	pci_write_config_dword(dev, PCI_PREF_BASE_UPPER32, 0xffffffff);
+}
+#endif
+
 int pci_assign_resource(struct pci_dev *dev, int resno)
 {
 	struct pci_bus *bus = dev->bus;
@@ -144,6 +159,10 @@ int pci_assign_resource(struct pci_dev *dev, int resno)
 			(unsigned long long)res->end, res->flags);
 		return -EINVAL;
 	}
+	if (resno < PCI_BRIDGE_RESOURCES
+	    && is_reassigndev(dev)
+	    && (res->flags & IORESOURCE_MEM))
+		align = ALIGN(align, PAGE_SIZE);
 
 	/* First, try exact prefetching match.. */
 	ret = pci_bus_alloc_resource(bus, res, size, align, min,
@@ -169,8 +188,13 @@ int pci_assign_resource(struct pci_dev *dev, int resno)
 			(unsigned long long)res->end);
 	} else {
 		res->flags &= ~IORESOURCE_STARTALIGN;
-		if (resno < PCI_BRIDGE_RESOURCES)
+		if (resno < PCI_BRIDGE_RESOURCES) {
+			dev_dbg(&dev->dev, "assign resource(%d) "
+				"%016llx - %016llx\n", resno,
+				(unsigned long long)res->start,
+				(unsigned long long)res->end);
 			pci_update_resource(dev, res, resno);
+		}
 	}
 
 	return ret;
@@ -208,6 +232,10 @@ int pci_assign_resource_fixed(struct pci_dev *dev, int resno)
 			(unsigned long long)res->start,
 			(unsigned long long)res->end);
 	} else if (resno < PCI_BRIDGE_RESOURCES) {
+		dev_dbg(&dev->dev, "assign resource(%d) "
+			"%016llx - %016llx\n", resno,
+			(unsigned long long)res->start,
+			(unsigned long long)res->end);
 		pci_update_resource(dev, res, resno);
 	}
 

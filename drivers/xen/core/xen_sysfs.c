@@ -334,9 +334,6 @@ static void xen_properties_destroy(void)
 
 static ssize_t vmcoreinfo_show(struct hyp_sysfs_attr *attr, char *page)
 {
-	extern size_t vmcoreinfo_size_xen;
-	extern unsigned long paddr_vmcoreinfo_xen;
-
 	return sprintf(page, "%lx %zx\n",
 		paddr_vmcoreinfo_xen, vmcoreinfo_size_xen);
 }
@@ -353,11 +350,6 @@ static void xen_sysfs_vmcoreinfo_destroy(void)
 {
 	sysfs_remove_file(&hypervisor_subsys.kobj, &vmcoreinfo_attr.attr);
 }
-
-#else
-
-#define xen_sysfs_vmcoreinfo_init()	0
-#define xen_sysfs_vmcoreinfo_destroy()	((void)0)
 
 #endif
 
@@ -383,10 +375,19 @@ static int __init hyper_sysfs_init(void)
 	ret = xen_properties_init();
 	if (ret)
 		goto prop_out;
-	ret = xen_sysfs_vmcoreinfo_init();
-	if (!ret)
-		goto out;
+#ifdef CONFIG_KEXEC
+	if (vmcoreinfo_size_xen != 0) {
+		ret = xen_sysfs_vmcoreinfo_init();
+		if (ret)
+			goto vmcoreinfo_out;
+	}
+#endif
 
+	goto out;
+
+#ifdef CONFIG_KEXEC
+vmcoreinfo_out:
+#endif
 	xen_properties_destroy();
 prop_out:
 	xen_sysfs_uuid_destroy();
@@ -402,7 +403,10 @@ out:
 
 static void __exit hyper_sysfs_exit(void)
 {
-	xen_sysfs_vmcoreinfo_destroy();
+#ifdef CONFIG_KEXEC
+	if (vmcoreinfo_size_xen != 0)
+		xen_sysfs_vmcoreinfo_destroy();
+#endif
 	xen_properties_destroy();
 	xen_compilation_destroy();
 	xen_sysfs_uuid_destroy();

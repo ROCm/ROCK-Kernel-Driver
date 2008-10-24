@@ -423,6 +423,6 @@ config ACPI_PV_SLEEP
 
 config PROCESSOR_EXTERNAL_CONTROL
 	bool
-	depends on X86 && XEN
+	depends on (X86 || IA64) && XEN
 	default y
 endif	# ACPI

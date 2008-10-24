@@ -146,6 +146,8 @@ HYPERVISOR_mmu_update(
 	mmu_update_t *req, unsigned int count, unsigned int *success_count,
 	domid_t domid)
 {
+	if (arch_use_lazy_mmu_mode())
+		return xen_multi_mmu_update(req, count, success_count, domid);
 	return _hypercall4(int, mmu_update, req, count, success_count, domid);
 }
 
@@ -154,6 +156,8 @@ HYPERVISOR_mmuext_op(
 	struct mmuext_op *op, unsigned int count, unsigned int *success_count,
 	domid_t domid)
 {
+	if (arch_use_lazy_mmu_mode())
+		return xen_multi_mmuext_op(op, count, success_count, domid);
 	return _hypercall4(int, mmuext_op, op, count, success_count, domid);
 }
 
@@ -255,6 +259,8 @@ static inline int __must_check
 HYPERVISOR_update_va_mapping(
 	unsigned long va, pte_t new_val, unsigned long flags)
 {
+	if (arch_use_lazy_mmu_mode())
+		return xen_multi_update_va_mapping(va, new_val, flags);
 	return _hypercall3(int, update_va_mapping, va, new_val.pte, flags);
 }
 
@@ -321,6 +327,8 @@ static inline int __must_check
 HYPERVISOR_grant_table_op(
 	unsigned int cmd, void *uop, unsigned int count)
 {
+	if (arch_use_lazy_mmu_mode())
+		xen_multicall_flush(false);
 	return _hypercall3(int, grant_table_op, cmd, uop, count);
 }
 

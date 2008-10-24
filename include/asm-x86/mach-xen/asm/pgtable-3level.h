@@ -113,13 +113,13 @@ static inline void __xen_pud_clear(pud_t *pudp)
 	: (void)(*__pudp = __pud(0));		\
 })
 
-#define pud_page(pud) ((struct page *) __va(pud_val(pud) & PTE_PFN_MASK))
+#define pud_page(pud) pfn_to_page(pud_val(pud) >> PAGE_SHIFT)
 
 #define pud_page_vaddr(pud) ((unsigned long) __va(pud_val(pud) & PTE_PFN_MASK))
 
 
 /* Find an entry in the second-level page table.. */
-#define pmd_offset(pud, address) ((pmd_t *)pud_page(*(pud)) +	\
+#define pmd_offset(pud, address) ((pmd_t *)pud_page_vaddr(*(pud)) +	\
 				  pmd_index(address))
 
 #ifdef CONFIG_SMP

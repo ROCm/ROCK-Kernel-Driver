@@ -561,9 +561,6 @@ static inline void clone_pgd_range(pgd_t *dst, pgd_t *src, int count)
        memcpy(dst, src, count * sizeof(pgd_t));
 }
 
-#define arch_change_pte_range(mm, pmd, addr, end, newprot, dirty_accountable) \
-	xen_change_pte_range(mm, pmd, addr, end, newprot, dirty_accountable)
-
 #define arbitrary_virt_to_machine(va)					\
 ({									\
 	unsigned int __lvl;						\
@@ -572,6 +569,44 @@ static inline void clone_pgd_range(pgd_t *dst, pgd_t *src, int count)
 	(((maddr_t)pte_mfn(*__ptep) << PAGE_SHIFT)			\
 	 | ((unsigned long)(va) & (PAGE_SIZE - 1)));			\
 })
+
+#define __HAVE_ARCH_PTEP_MODIFY_PROT_TRANSACTION
+static inline pte_t ptep_modify_prot_start(struct mm_struct *mm, unsigned long addr,
+					   pte_t *ptep)
+{
+#if CONFIG_XEN_COMPAT < 0x030300
+	if (unlikely(!xen_feature(XENFEAT_mmu_pt_update_preserve_ad)))
+		return ptep_get_and_clear(mm, addr, ptep);
+#endif
+	return *ptep;
+}
+
+#ifdef CONFIG_HIGHPTE
+extern void *high_memory;
+#endif
+
+static inline void ptep_modify_prot_commit(struct mm_struct *mm, unsigned long addr,
+					   pte_t *ptep, pte_t pte)
+{
+	mmu_update_t u;
+
+#if CONFIG_XEN_COMPAT < 0x030300
+	if (unlikely(!xen_feature(XENFEAT_mmu_pt_update_preserve_ad))) {
+		set_pte_at(mm, addr, ptep, pte);
+		return;
+	}
+#endif
+#ifdef CONFIG_HIGHPTE
+	if ((void *)ptep > high_memory)
+		u.ptr = arbitrary_virt_to_machine(ptep)
+		        | MMU_PT_UPDATE_PRESERVE_AD;
+	else
+#endif
+		u.ptr = virt_to_machine(ptep) | MMU_PT_UPDATE_PRESERVE_AD;
+	u.val = __pte_val(pte);
+	if (HYPERVISOR_mmu_update(&u, 1, NULL, DOMID_SELF))
+		BUG();
+}
 
 #include <asm-generic/pgtable.h>
 
@@ -600,10 +635,6 @@ int create_lookup_pte_addr(struct mm_struct *mm,
 int touch_pte_range(struct mm_struct *mm,
                     unsigned long address,
                     unsigned long size);
-
-int xen_change_pte_range(struct mm_struct *mm, pmd_t *pmd,
-		unsigned long addr, unsigned long end, pgprot_t newprot,
-		int dirty_accountable);
 
 #endif	/* __ASSEMBLY__ */
 

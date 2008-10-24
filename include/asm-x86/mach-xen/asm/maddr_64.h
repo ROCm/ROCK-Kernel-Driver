@@ -25,17 +25,19 @@ extern unsigned int   machine_to_phys_order;
 
 static inline unsigned long pfn_to_mfn(unsigned long pfn)
 {
-	if (xen_feature(XENFEAT_auto_translated_physmap))
+	if (unlikely(xen_feature(XENFEAT_auto_translated_physmap)))
 		return pfn;
-	BUG_ON(max_mapnr && pfn >= max_mapnr);
+	if (likely(max_mapnr))
+		BUG_ON(pfn >= max_mapnr);
 	return phys_to_machine_mapping[pfn] & ~FOREIGN_FRAME_BIT;
 }
 
 static inline int phys_to_machine_mapping_valid(unsigned long pfn)
 {
-	if (xen_feature(XENFEAT_auto_translated_physmap))
+	if (unlikely(xen_feature(XENFEAT_auto_translated_physmap)))
 		return 1;
-	BUG_ON(max_mapnr && pfn >= max_mapnr);
+	if (likely(max_mapnr))
+		BUG_ON(pfn >= max_mapnr);
 	return (phys_to_machine_mapping[pfn] != INVALID_P2M_ENTRY);
 }
 
@@ -43,7 +45,7 @@ static inline unsigned long mfn_to_pfn(unsigned long mfn)
 {
 	unsigned long pfn;
 
-	if (xen_feature(XENFEAT_auto_translated_physmap))
+	if (unlikely(xen_feature(XENFEAT_auto_translated_physmap)))
 		return mfn;
 
 	if (unlikely((mfn >> machine_to_phys_order) != 0))
@@ -90,17 +92,18 @@ static inline unsigned long mfn_to_pfn(unsigned long mfn)
 static inline unsigned long mfn_to_local_pfn(unsigned long mfn)
 {
 	unsigned long pfn = mfn_to_pfn(mfn);
-	if ((pfn < max_mapnr)
-	    && !xen_feature(XENFEAT_auto_translated_physmap)
-	    && (phys_to_machine_mapping[pfn] != mfn))
+	if (likely(pfn < max_mapnr)
+	    && likely(!xen_feature(XENFEAT_auto_translated_physmap))
+	    && unlikely(phys_to_machine_mapping[pfn] != mfn))
 		return max_mapnr; /* force !pfn_valid() */
 	return pfn;
 }
 
 static inline void set_phys_to_machine(unsigned long pfn, unsigned long mfn)
 {
-	BUG_ON(max_mapnr && pfn >= max_mapnr);
-	if (xen_feature(XENFEAT_auto_translated_physmap)) {
+	if (likely(max_mapnr))
+		BUG_ON(pfn >= max_mapnr);
+	if (unlikely(xen_feature(XENFEAT_auto_translated_physmap))) {
 		BUG_ON(pfn != mfn && mfn != INVALID_P2M_ENTRY);
 		return;
 	}

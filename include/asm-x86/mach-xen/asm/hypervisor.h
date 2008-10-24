@@ -44,6 +44,7 @@
 #include <xen/interface/nmi.h>
 #include <asm/ptrace.h>
 #include <asm/page.h>
+#include <asm/percpu.h>
 
 extern shared_info_t *HYPERVISOR_shared_info;
 
@@ -126,6 +127,54 @@ void scrub_pages(void *, unsigned int);
 #else
 #define scrub_pages(_p,_n) ((void)0)
 #endif
+
+#ifdef CONFIG_XEN
+
+DECLARE_PER_CPU(bool, xen_lazy_mmu);
+
+int xen_multicall_flush(bool);
+bool xen_use_lazy_mmu_mode(void);
+
+int __must_check xen_multi_update_va_mapping(unsigned long va, pte_t,
+					     unsigned long flags);
+int __must_check xen_multi_mmu_update(mmu_update_t *, unsigned int count,
+				      unsigned int *success_count, domid_t);
+int __must_check xen_multi_mmuext_op(struct mmuext_op *, unsigned int count,
+				     unsigned int *success_count, domid_t);
+
+#define __HAVE_ARCH_ENTER_LAZY_MMU_MODE
+static inline void arch_enter_lazy_mmu_mode(void)
+{
+	__get_cpu_var(xen_lazy_mmu) = true;
+}
+
+static inline void arch_leave_lazy_mmu_mode(void)
+{
+	__get_cpu_var(xen_lazy_mmu) = false;
+	xen_multicall_flush(false);
+}
+
+static inline void arch_flush_lazy_mmu_mode(void)
+{
+	if (unlikely(__get_cpu_var(xen_lazy_mmu)))
+		xen_multicall_flush(false);
+}
+
+static inline bool arch_use_lazy_mmu_mode(void)
+{
+	return unlikely(__get_cpu_var(xen_lazy_mmu))
+	       && xen_use_lazy_mmu_mode();
+}
+
+#else /* CONFIG_XEN */
+
+static inline void xen_multicall_flush(bool ignore) {}
+static inline bool arch_use_lazy_mmu_mode(void) { return false; }
+#define xen_multi_update_va_mapping ({ BUG(); -ENOSYS; })
+#define xen_multi_mmu_update ({ BUG(); -ENOSYS; })
+#define xen_multi_mmuext_op ({ BUG(); -ENOSYS; })
+
+#endif /* CONFIG_XEN */
 
 #include <xen/hypercall.h>
 

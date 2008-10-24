@@ -20,10 +20,15 @@ static char spinlock_name[NR_CPUS][15];
 struct spinning {
 	raw_spinlock_t *lock;
 	unsigned int ticket;
+	struct spinning *prev;
 };
-static DEFINE_PER_CPU(struct spinning, spinning);
-static DEFINE_PER_CPU(struct spinning, spinning_bh);
-static DEFINE_PER_CPU(struct spinning, spinning_irq);
+static DEFINE_PER_CPU(struct spinning *, spinning);
+/*
+ * Protect removal of objects: Addition can be done lockless, and even
+ * removal itself doesn't need protection - what needs to be prevented is
+ * removed objects going out of scope (as they're allocated on the stack.
+ */
+static DEFINE_PER_CPU(raw_rwlock_t, spinning_rm_lock) = __RAW_RW_LOCK_UNLOCKED;
 
 int __cpuinit xen_spinlock_init(unsigned int cpu)
 {
@@ -54,31 +59,23 @@ void __cpuinit xen_spinlock_cleanup(unsigned int cpu)
 
 int xen_spin_wait(raw_spinlock_t *lock, unsigned int token)
 {
-	struct spinning *spinning;
 	int rc = 0, irq = __get_cpu_var(spinlock_irq);
+	raw_rwlock_t *rm_lock;
+	unsigned long flags;
+	struct spinning spinning;
 
 	/* If kicker interrupt not initialized yet, just spin. */
-	if (irq < 0)
+	if (unlikely(irq < 0))
 		return 0;
 
 	token >>= TICKET_SHIFT;
 
 	/* announce we're spinning */
-	spinning = &__get_cpu_var(spinning);
-	if (spinning->lock) {
-		BUG_ON(spinning->lock == lock);
-		if(raw_irqs_disabled()) {
-			BUG_ON(__get_cpu_var(spinning_bh).lock == lock);
-			spinning = &__get_cpu_var(spinning_irq);
-		} else {
-			BUG_ON(!in_softirq());
-			spinning = &__get_cpu_var(spinning_bh);
-		}
-		BUG_ON(spinning->lock);
-	}
-	spinning->ticket = token;
+	spinning.ticket = token;
+	spinning.lock = lock;
+	spinning.prev = __get_cpu_var(spinning);
 	smp_wmb();
-	spinning->lock = lock;
+	__get_cpu_var(spinning) = &spinning;
 
 	/* clear pending */
 	xen_clear_irq_pending(irq);
@@ -90,7 +87,7 @@ int xen_spin_wait(raw_spinlock_t *lock, unsigned int token)
 			/* If we interrupted another spinlock while it was
 			 * blocking, make sure it doesn't block (again)
 			 * without rechecking the lock. */
-			if (spinning != &__get_cpu_var(spinning))
+			if (spinning.prev)
 				xen_set_irq_pending(irq);
 			rc = 1;
 			break;
@@ -105,7 +102,12 @@ int xen_spin_wait(raw_spinlock_t *lock, unsigned int token)
 	kstat_this_cpu.irqs[irq] += !rc;
 
 	/* announce we're done */
-	spinning->lock = NULL;
+	__get_cpu_var(spinning) = spinning.prev;
+	rm_lock = &__get_cpu_var(spinning_rm_lock);
+	raw_local_irq_save(flags);
+	__raw_write_lock(rm_lock);
+	__raw_write_unlock(rm_lock);
+	raw_local_irq_restore(flags);
 
 	return rc;
 }
@@ -124,34 +126,39 @@ int xen_spin_wait_flags(raw_spinlock_t *lock, unsigned int *token,
 }
 EXPORT_SYMBOL(xen_spin_wait_flags);
 
-static inline int spinning(const struct spinning *spinning, unsigned int cpu,
-			   raw_spinlock_t *lock, unsigned int ticket)
-{
-	if (spinning->lock != lock)
-		return 0;
-	smp_rmb();
-	if (spinning->ticket != ticket)
-		return 0;
-	notify_remote_via_irq(per_cpu(spinlock_irq, cpu));
-	return 1;
-}
-
 void xen_spin_kick(raw_spinlock_t *lock, unsigned int token)
 {
 	unsigned int cpu;
 
 	token &= (1U << TICKET_SHIFT) - 1;
 	for_each_online_cpu(cpu) {
+		raw_rwlock_t *rm_lock;
+		unsigned long flags;
+		struct spinning *spinning;
+
 		if (cpu == raw_smp_processor_id())
 			continue;
-		if (spinning(&per_cpu(spinning, cpu), cpu, lock, token))
+
+		rm_lock = &per_cpu(spinning_rm_lock, cpu);
+		raw_local_irq_save(flags);
+		__raw_read_lock(rm_lock);
+
+		spinning = per_cpu(spinning, cpu);
+		smp_rmb();
+		while (spinning) {
+			if (spinning->lock == lock
+			    && spinning->ticket == token)
+				break;
+			spinning = spinning->prev;
+		}
+
+		__raw_read_unlock(rm_lock);
+		raw_local_irq_restore(flags);
+
+		if (spinning) {
+			notify_remote_via_irq(per_cpu(spinlock_irq, cpu));
 			return;
-		if (in_interrupt()
-		    && spinning(&per_cpu(spinning_bh, cpu), cpu, lock, token))
-			return;
-		if (raw_irqs_disabled()
-		    && spinning(&per_cpu(spinning_irq, cpu), cpu, lock, token))
-			return;
+		}
 	}
 }
 EXPORT_SYMBOL(xen_spin_kick);

@@ -4,6 +4,7 @@
 
 obj-y		+= access.o bus.o probe.o remove.o pci.o quirks.o slot.o \
 			pci-driver.o search.o pci-sysfs.o rom.o setup-res.o
+obj-$(CONFIG_PCI_REASSIGN) += reassigndev.o
 obj-$(CONFIG_PROC_FS) += proc.o
 
 # Build PCI Express stuff if needed

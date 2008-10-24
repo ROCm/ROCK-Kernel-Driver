@@ -554,8 +554,10 @@ void pda_init(int cpu)
 	pda->irqcount = -1;
 	pda->kernelstack = (unsigned long)stack_thread_info() -
 				 PDA_STACKOFFSET + THREAD_SIZE;
+#ifndef CONFIG_XEN
 	pda->active_mm = &init_mm;
 	pda->mmu_state = 0;
+#endif
 
 	if (cpu == 0) {
 		/* others are initialized in smpboot.c */
@@ -761,7 +763,9 @@ void __cpuinit cpu_init(void)
 
 	fpu_init();
 
-	raw_local_save_flags(kernel_eflags);
+	asm ("pushfq; popq %0" : "=rm" (kernel_eflags));
+	if (raw_irqs_disabled())
+		kernel_eflags &= ~X86_EFLAGS_IF;
 
 	if (is_uv_system())
 		uv_cpu_init();

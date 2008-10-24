@@ -27,6 +27,7 @@ void __init xen_machine_kexec_setup_resources(void)
 	xen_kexec_range_t range;
 	struct resource *res;
 	int k = 0;
+	int rc;
 
 	if (strstr(boot_command_line, "crashkernel="))
 		printk(KERN_WARNING "Ignoring crashkernel command line, "
@@ -110,12 +111,26 @@ void __init xen_machine_kexec_setup_resources(void)
 	memset(&range, 0, sizeof(range));
 	range.range = KEXEC_RANGE_MA_VMCOREINFO;
 
-	if (HYPERVISOR_kexec_op(KEXEC_CMD_kexec_get_range, &range))
-		return;
+	rc = HYPERVISOR_kexec_op(KEXEC_CMD_kexec_get_range, &range);
 
-	if (range.size) {
-		paddr_vmcoreinfo_xen = range.start;
+	if (rc == 0) {
+		/* Hypercall succeeded */
 		vmcoreinfo_size_xen = range.size;
+		paddr_vmcoreinfo_xen = range.start;
+
+	} else {
+		/* Hypercall failed.
+		 * Indicate not to create sysfs file by resetting globals
+		 */
+		vmcoreinfo_size_xen = 0;
+		paddr_vmcoreinfo_xen = 0;
+		
+		/* The KEXEC_CMD_kexec_get_range hypercall did not implement
+		 * KEXEC_RANGE_MA_VMCOREINFO until Xen 3.3.
+		 * Do not bail out if it fails for this reason.
+		 */
+		if (rc != -EINVAL)
+			return;
 	}
 
 	if (machine_kexec_setup_resources(&xen_hypervisor_res, xen_phys_cpus,

@@ -46,11 +46,8 @@ do {								\
 void xen_safe_halt(void);
 
 void xen_halt(void);
-#endif
 
-#ifndef __ASSEMBLY__
-
-#define __raw_local_save_flags(void) xen_save_fl()
+#define __raw_local_save_flags() xen_save_fl()
 
 #define raw_local_irq_restore(flags) xen_restore_fl(flags)
 

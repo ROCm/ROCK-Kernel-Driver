@@ -82,6 +82,7 @@ static inline void flush_tlb_range(struct vm_area_struct *vma,
 	flush_tlb_mm(vma->vm_mm);
 }
 
+#ifndef CONFIG_XEN
 #define TLBSTATE_OK	1
 #define TLBSTATE_LAZY	2
 
@@ -92,6 +93,7 @@ struct tlb_state {
 	char __cacheline_padding[L1_CACHE_BYTES-8];
 };
 DECLARE_PER_CPU(struct tlb_state, cpu_tlbstate);
+#endif
 #endif
 
 #endif	/* SMP */

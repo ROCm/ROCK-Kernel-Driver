@@ -31,6 +31,7 @@
  */
 
 #include <linux/sched.h>
+#include <linux/hardirq.h>
 #include <linux/mm.h>
 #include <linux/vmalloc.h>
 #include <asm/page.h>
@@ -44,6 +45,291 @@
 #include <linux/highmem.h>
 #include <asm/tlbflush.h>
 #include <linux/highmem.h>
+
+#define NR_MC     BITS_PER_LONG
+#define NR_MMU    BITS_PER_LONG
+#define NR_MMUEXT (BITS_PER_LONG / 4)
+
+DEFINE_PER_CPU(bool, xen_lazy_mmu);
+EXPORT_PER_CPU_SYMBOL(xen_lazy_mmu);
+struct lazy_mmu {
+	unsigned int nr_mc, nr_mmu, nr_mmuext;
+	multicall_entry_t mc[NR_MC];
+	mmu_update_t mmu[NR_MMU];
+	struct mmuext_op mmuext[NR_MMUEXT];
+};
+static DEFINE_PER_CPU(struct lazy_mmu, lazy_mmu);
+
+int xen_multicall_flush(bool ret_last) {
+	struct lazy_mmu *lazy = &__get_cpu_var(lazy_mmu);
+	multicall_entry_t *mc = lazy->mc;
+	unsigned int count = lazy->nr_mc;
+
+	if (!count)
+		return 0;
+
+	lazy->nr_mc = 0;
+	lazy->nr_mmu = 0;
+	lazy->nr_mmuext = 0;
+
+	if (count == 1) {
+		int rc;
+
+		/*todo adjust hypercall macros to accept non-immediate
+		       hypercall number */
+		switch (mc->op) {
+		case __HYPERVISOR_update_va_mapping:
+			rc = _hypercall4(int, update_va_mapping,
+					 mc->args[0], mc->args[1],
+					 mc->args[2], mc->args[3]);
+			break;
+		case __HYPERVISOR_mmu_update:
+			rc = _hypercall4(int, mmu_update,
+					 mc->args[0], mc->args[1],
+					 mc->args[2], mc->args[3]);
+			break;
+		case __HYPERVISOR_mmuext_op:
+			rc = _hypercall4(int, mmuext_op,
+					 mc->args[0], mc->args[1],
+					 mc->args[2], mc->args[3]);
+			break;
+		default:
+			BUG();
+		}
+		if (ret_last)
+			return rc;
+		BUG_ON(rc);
+	} else {
+		if (HYPERVISOR_multicall(mc, count))
+			BUG();
+		while (count-- > ret_last)
+			if (unlikely(mc++->result)) {
+				--mc;
+				printk(KERN_EMERG
+				       "hypercall(%lu, %lx, %lx, %lx, %lx)"
+				       " failed: %ld\n",
+				       mc->op, mc->args[0], mc->args[1],
+				       mc->args[2], mc->args[3], mc->result);
+				BUG();
+			}
+		if (ret_last)
+			return mc->result;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(xen_multicall_flush);
+
+bool xen_use_lazy_mmu_mode(void)
+{
+#ifdef CONFIG_PREEMPT
+	if (!preempt_count())
+		return false;
+#endif
+	return !irq_count();
+}
+EXPORT_SYMBOL(xen_use_lazy_mmu_mode);
+
+int xen_multi_update_va_mapping(unsigned long va, pte_t pte,
+				unsigned long flags)
+{
+	struct lazy_mmu *lazy = &__get_cpu_var(lazy_mmu);
+	multicall_entry_t *mc;
+
+	if (unlikely(lazy->nr_mc == NR_MC))
+		xen_multicall_flush(false);
+	mc = lazy->mc + lazy->nr_mc++;
+	mc->op = __HYPERVISOR_update_va_mapping;
+	mc->args[0] = va;
+#ifndef CONFIG_X86_PAE
+	mc->args[1] = pte.pte;
+#else
+	mc->args[1] = pte.pte_low;
+	mc->args[2] = pte.pte_high;
+#endif
+	mc->args[MULTI_UVMFLAGS_INDEX] = flags;
+	return 0;
+}
+
+int xen_multi_mmu_update(mmu_update_t *src, unsigned int count,
+			 unsigned int *success_count, domid_t domid)
+{
+	struct lazy_mmu *lazy = &__get_cpu_var(lazy_mmu);
+	multicall_entry_t *mc = lazy->mc + lazy->nr_mc;
+	mmu_update_t *dst = lazy->mmu + lazy->nr_mmu;
+	bool commit = (lazy->nr_mmu += count) > NR_MMU || success_count;
+	bool merge = lazy->nr_mc && mc[-1].op == __HYPERVISOR_mmu_update
+		     && !commit && !mc[-1].args[2] && mc[-1].args[3] == domid;
+
+	if (unlikely(lazy->nr_mc == NR_MC) && !merge) {
+		xen_multicall_flush(false);
+		mc = lazy->mc;
+		dst = lazy->mmu;
+		lazy->nr_mmu = count;
+		commit = count > NR_MMU || success_count;
+	}
+
+	if (!lazy->nr_mc && commit)
+		return _hypercall4(int, mmu_update, src, count, success_count, domid);
+
+	if (merge) {
+		mc[-1].args[1] += count;
+		memcpy(dst, src, count * sizeof(*src));
+	} else {
+		++lazy->nr_mc;
+		mc->op = __HYPERVISOR_mmu_update;
+		if (!commit) {
+			mc->args[0] = (unsigned long)dst;
+			memcpy(dst, src, count * sizeof(*src));
+		} else
+			mc->args[0] = (unsigned long)src;
+		mc->args[1] = count;
+		mc->args[2] = (unsigned long)success_count;
+		mc->args[3] = domid;
+	}
+
+	while (!commit && count--)
+		switch (src++->ptr & (sizeof(pteval_t) - 1)) {
+		case MMU_NORMAL_PT_UPDATE:
+		case MMU_PT_UPDATE_PRESERVE_AD:
+			break;
+		default:
+			commit = true;
+			break;
+		}
+	if (commit)
+		return xen_multicall_flush(true);
+
+	return 0;
+}
+
+int xen_multi_mmuext_op(struct mmuext_op *src, unsigned int count,
+			unsigned int *success_count, domid_t domid)
+{
+	struct lazy_mmu *lazy = &__get_cpu_var(lazy_mmu);
+	multicall_entry_t *mc;
+	struct mmuext_op *dst;
+	bool commit, merge;
+
+	/*
+	 * While it could be useful in theory, I've never seen the body of
+	 * this conditional to be reached, hence it seems more reasonable
+	 * to disable it for the time being.
+	 */
+	if (0 && likely(count)
+	    && likely(!success_count)
+	    && likely(domid == DOMID_SELF)
+	    && likely(lazy->nr_mc)
+	    && lazy->mc[lazy->nr_mc - 1].op == __HYPERVISOR_update_va_mapping) {
+		unsigned long oldf, newf = UVMF_NONE;
+
+		switch (src->cmd) {
+		case MMUEXT_TLB_FLUSH_ALL:
+			newf = UVMF_TLB_FLUSH | UVMF_ALL;
+			break;
+		case MMUEXT_INVLPG_ALL:
+			newf = UVMF_INVLPG | UVMF_ALL;
+			break;
+		case MMUEXT_TLB_FLUSH_MULTI:
+			newf = UVMF_TLB_FLUSH | UVMF_MULTI
+			       | (unsigned long)src->arg2.vcpumask.p;
+			break;
+		case MMUEXT_INVLPG_MULTI:
+			newf = UVMF_INVLPG | UVMF_MULTI
+			       | (unsigned long)src->arg2.vcpumask.p;
+			break;
+		case MMUEXT_TLB_FLUSH_LOCAL:
+			newf = UVMF_TLB_FLUSH | UVMF_LOCAL;
+			break;
+		case MMUEXT_INVLPG_LOCAL:
+			newf = UVMF_INVLPG | UVMF_LOCAL;
+			break;
+		}
+		mc = lazy->mc + lazy->nr_mc - 1;
+		oldf = mc->args[MULTI_UVMFLAGS_INDEX];
+		if (newf == UVMF_NONE || oldf == UVMF_NONE
+		    || newf == (UVMF_TLB_FLUSH | UVMF_ALL))
+			;
+		else if (oldf == (UVMF_TLB_FLUSH | UVMF_ALL))
+			newf = UVMF_TLB_FLUSH | UVMF_ALL;
+		else if ((newf & UVMF_FLUSHTYPE_MASK) == UVMF_INVLPG
+			 && (oldf & UVMF_FLUSHTYPE_MASK) == UVMF_INVLPG
+			 && ((src->arg1.linear_addr ^ mc->args[0])
+			     >> PAGE_SHIFT))
+			newf = UVMF_NONE;
+		else if (((oldf | newf) & UVMF_ALL)
+			 && !((oldf ^ newf) & UVMF_FLUSHTYPE_MASK))
+			newf |= UVMF_ALL;
+		else if ((oldf ^ newf) & ~UVMF_FLUSHTYPE_MASK)
+			newf = UVMF_NONE;
+		else if ((oldf & UVMF_FLUSHTYPE_MASK) == UVMF_TLB_FLUSH)
+			newf = (newf & ~UVMF_FLUSHTYPE_MASK) | UVMF_TLB_FLUSH;
+		else if ((newf & UVMF_FLUSHTYPE_MASK) != UVMF_TLB_FLUSH
+			 && ((newf ^ oldf) & UVMF_FLUSHTYPE_MASK))
+			newf = UVMF_NONE;
+		if (newf != UVMF_NONE) {
+			mc->args[MULTI_UVMFLAGS_INDEX] = newf;
+			++src;
+			if (!--count)
+				return 0;
+		}
+	}
+
+	mc = lazy->mc + lazy->nr_mc;
+	dst = lazy->mmuext + lazy->nr_mmuext;
+	commit = (lazy->nr_mmuext += count) > NR_MMUEXT || success_count;
+	merge = lazy->nr_mc && mc[-1].op == __HYPERVISOR_mmuext_op
+		&& !commit && !mc[-1].args[2] && mc[-1].args[3] == domid;
+	if (unlikely(lazy->nr_mc == NR_MC) && !merge) {
+		xen_multicall_flush(false);
+		mc = lazy->mc;
+		dst = lazy->mmuext;
+		lazy->nr_mmuext = count;
+		commit = count > NR_MMUEXT || success_count;
+	}
+
+	if (!lazy->nr_mc && commit)
+		return _hypercall4(int, mmuext_op, src, count, success_count, domid);
+
+	if (merge) {
+		mc[-1].args[1] += count;
+		memcpy(dst, src, count * sizeof(*src));
+	} else {
+		++lazy->nr_mc;
+		mc->op = __HYPERVISOR_mmuext_op;
+		if (!commit) {
+			mc->args[0] = (unsigned long)dst;
+			memcpy(dst, src, count * sizeof(*src));
+		} else
+			mc->args[0] = (unsigned long)src;
+		mc->args[1] = count;
+		mc->args[2] = (unsigned long)success_count;
+		mc->args[3] = domid;
+	}
+
+	while (!commit && count--)
+		switch (src++->cmd) {
+		case MMUEXT_PIN_L1_TABLE:
+		case MMUEXT_PIN_L2_TABLE:
+		case MMUEXT_PIN_L3_TABLE:
+		case MMUEXT_PIN_L4_TABLE:
+		case MMUEXT_UNPIN_TABLE:
+		case MMUEXT_TLB_FLUSH_LOCAL:
+		case MMUEXT_INVLPG_LOCAL:
+		case MMUEXT_TLB_FLUSH_MULTI:
+		case MMUEXT_INVLPG_MULTI:
+		case MMUEXT_TLB_FLUSH_ALL:
+		case MMUEXT_INVLPG_ALL:
+			break;
+		default:
+			commit = true;
+			break;
+		}
+	if (commit)
+		return xen_multicall_flush(true);
+
+	return 0;
+}
 
 void xen_l1_entry_update(pte_t *ptr, pte_t val)
 {
@@ -733,44 +1019,4 @@ int write_gdt_entry(struct desc_struct *gdt, int entry, const void *desc,
 {
 	maddr_t mach_gp = virt_to_machine(gdt + entry);
 	return HYPERVISOR_update_descriptor(mach_gp, *(const u64*)desc);
-}
-
-#define MAX_BATCHED_FULL_PTES 32
-
-int xen_change_pte_range(struct mm_struct *mm, pmd_t *pmd,
-			 unsigned long addr, unsigned long end, pgprot_t newprot,
-			 int dirty_accountable)
-{
-	int rc = 0, i = 0;
-	mmu_update_t u[MAX_BATCHED_FULL_PTES];
-	pte_t *pte;
-	spinlock_t *ptl;
-
-	if (!xen_feature(XENFEAT_mmu_pt_update_preserve_ad))
-		return 0;
-
-	pte = pte_offset_map_lock(mm, pmd, addr, &ptl);
-	do {
-		if (pte_present(*pte)) {
-			pte_t ptent = pte_modify(*pte, newprot);
-
-			if (dirty_accountable && pte_dirty(ptent))
-				ptent = pte_mkwrite(ptent);
-			u[i].ptr = (__pmd_val(*pmd) & PHYSICAL_PAGE_MASK)
-				   | ((unsigned long)pte & ~PAGE_MASK)
-				   | MMU_PT_UPDATE_PRESERVE_AD;
-			u[i].val = __pte_val(ptent);
-			if (++i == MAX_BATCHED_FULL_PTES) {
-				if ((rc = HYPERVISOR_mmu_update(
-					&u[0], i, NULL, DOMID_SELF)) != 0)
-					break;
-				i = 0;
-			}
-		}
-	} while (pte++, addr += PAGE_SIZE, addr != end);
-	if (i)
-		rc = HYPERVISOR_mmu_update( &u[0], i, NULL, DOMID_SELF);
-	pte_unmap_unlock(pte - 1, ptl);
-	BUG_ON(rc && rc != -ENOSYS);
-	return !rc;
 }

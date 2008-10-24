@@ -1768,6 +1768,7 @@ config DMAR_FLOPPY_WA
 config INTR_REMAP
 	bool "Support for Interrupt Remapping (EXPERIMENTAL)"
 	depends on X86_64 && X86_IO_APIC && PCI_MSI && ACPI && EXPERIMENTAL
+	depends on !XEN
 	help
 	 Supports Interrupt remapping for IO-APIC and MSI devices.
 	 To use x2apic mode in the CPU's which support x2APIC enhancements or

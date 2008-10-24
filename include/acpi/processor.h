@@ -379,7 +379,7 @@ static inline void acpi_thermal_cpufreq_exit(void)
 }
 #endif
 
-/*
+/* 
  * Following are interfaces geared to external processor PM control
  * logic like a VMM
  */
@@ -467,7 +467,7 @@ static inline void xen_convert_pct_reg(struct xen_pct_register *xpct,
 	xpct->address    = apct->address;
 }
 
-static inline void xen_convert_pss_states(struct xen_processor_px *xpss,
+static inline void xen_convert_pss_states(struct xen_processor_px *xpss, 
 	struct acpi_processor_px *apss, int state_count)
 {
 	int i;

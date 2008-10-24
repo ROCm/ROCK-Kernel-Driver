@@ -402,27 +402,44 @@ void arch_dup_mmap(struct mm_struct *oldmm, struct mm_struct *mm)
 		mm_pin(mm);
 }
 
-void arch_exit_mmap(struct mm_struct *mm)
+/*
+ * We aggressively remove defunct pgd from cr3. We execute unmap_vmas() *much*
+ * faster this way, as no hypercalls are needed for the page table updates.
+ */
+static void leave_active_mm(struct task_struct *tsk, struct mm_struct *mm)
+	__releases(tsk->alloc_lock)
 {
-	struct task_struct *tsk = current;
-
-	task_lock(tsk);
-
-	/*
-	 * We aggressively remove defunct pgd from cr3. We execute unmap_vmas()
-	 * *much* faster this way, as no tlb flushes means bigger wrpt batches.
-	 */
 	if (tsk->active_mm == mm) {
 		tsk->active_mm = &init_mm;
 		atomic_inc(&init_mm.mm_count);
 
 		switch_mm(mm, &init_mm, tsk);
 
-		atomic_dec(&mm->mm_count);
-		BUG_ON(atomic_read(&mm->mm_count) == 0);
+		if (atomic_dec_and_test(&mm->mm_count))
+			BUG();
 	}
 
 	task_unlock(tsk);
+}
+
+static void _leave_active_mm(void *mm)
+{
+	struct task_struct *tsk = current;
+
+	if (spin_trylock(&tsk->alloc_lock))
+		leave_active_mm(tsk, mm);
+}
+
+void arch_exit_mmap(struct mm_struct *mm)
+{
+	struct task_struct *tsk = current;
+
+	task_lock(tsk);
+	leave_active_mm(tsk, mm);
+
+	preempt_disable();
+	smp_call_function_mask(mm->cpu_vm_mask, _leave_active_mm, mm, 1);
+	preempt_enable();
 
 	if (PagePinned(virt_to_page(mm->pgd))
 	    && atomic_read(&mm->mm_count) == 1

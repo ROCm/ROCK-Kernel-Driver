@@ -175,6 +175,8 @@ void vmcoreinfo_append_str(const char *fmt, ...)
 #define VMCOREINFO_OFFSET_ALIAS(name, field, alias) \
        vmcoreinfo_append_str("OFFSET(%s.%s)=%lu\n", #name, #alias, \
                              (unsigned long)offsetof(struct name, field))
+extern size_t vmcoreinfo_size_xen;
+extern unsigned long paddr_vmcoreinfo_xen;
 
 #endif /* _XEN_PUBLIC_KEXEC_H */
 

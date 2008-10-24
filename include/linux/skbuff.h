@@ -329,7 +329,7 @@ struct sk_buff {
 	__u8			proto_data_valid:1,
 				proto_csum_blank:1;
 #endif
-	/* 0/11/13/14 bit hole */
+	/* 10-16 bit hole */
 
 #ifdef CONFIG_NET_DMA
 	dma_cookie_t		dma_cookie;

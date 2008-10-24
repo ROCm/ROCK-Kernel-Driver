@@ -26,6 +26,7 @@
 #include <linux/cache.h>
 #include <linux/slab.h>
 
+#include "pci.h"
 
 static void pbus_assign_resources_sorted(struct pci_bus *bus)
 {
@@ -343,7 +344,8 @@ static int pbus_size_mem(struct pci_bus *bus, unsigned long mask, unsigned long 
 
 	list_for_each_entry(dev, &bus->devices, bus_list) {
 		int i;
-		
+		int reassign = is_reassigndev(dev);
+
 		for (i = 0; i < PCI_NUM_RESOURCES; i++) {
 			struct resource *r = &dev->resource[i];
 			resource_size_t r_size;
@@ -351,6 +353,10 @@ static int pbus_size_mem(struct pci_bus *bus, unsigned long mask, unsigned long 
 			if (r->parent || (r->flags & mask) != type)
 				continue;
 			r_size = r->end - r->start + 1;
+
+			if (reassign)
+				r_size = ALIGN(r_size, PAGE_SIZE);
+
 			/* For bridges size != alignment */
 			align = resource_alignment(r);
 			order = __ffs(align) - 20;

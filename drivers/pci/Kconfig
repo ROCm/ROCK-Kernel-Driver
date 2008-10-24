@@ -21,6 +21,9 @@ config PCI_MSI
 
 	   If you don't know what to do here, say N.
 
+config PCI_REASSIGN
+	bool
+
 config PCI_LEGACY
 	bool "Enable deprecated pci_find_* API"
 	depends on PCI
