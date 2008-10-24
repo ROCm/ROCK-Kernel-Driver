@@ -88,7 +88,7 @@ static int ol_dqblk_chunk_off(struct super_block *sb, int c, loff_t off)
 
 	return ((off >> sb->s_blocksize_bits) -
 			ol_quota_chunk_block(sb, c) - 1) * epb
-	       + (off & ((1 << sb->s_blocksize_bits) - 1)) /
+	       + ((unsigned int)(off & ((1 << sb->s_blocksize_bits) - 1))) /
 		 sizeof(struct ocfs2_local_disk_dqblk);
 }
 
