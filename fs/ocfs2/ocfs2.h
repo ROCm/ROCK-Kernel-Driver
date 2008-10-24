@@ -161,6 +161,7 @@ enum ocfs2_vol_state
 {
 	VOLUME_INIT = 0,
 	VOLUME_MOUNTED,
+	VOLUME_MOUNTED_QUOTAS,
 	VOLUME_DISMOUNTED,
 	VOLUME_DISABLED
 };
@@ -196,6 +197,8 @@ enum ocfs2_mount_options
 	OCFS2_MOUNT_NOUSERXATTR = 1 << 6, /* No user xattr */
 	OCFS2_MOUNT_INODE64 = 1 << 7,	/* Allow inode numbers > 2^32 */
 	OCFS2_MOUNT_POSIX_ACL = 1 << 8,	/* POSIX access control lists */
+	OCFS2_MOUNT_USRQUOTA = 1 << 9, /* We support user quotas */
+	OCFS2_MOUNT_GRPQUOTA = 1 << 10, /* We support group quotas */
 };
 
 #define OCFS2_OSB_SOFT_RO	0x0001
@@ -206,6 +209,7 @@ enum ocfs2_mount_options
 struct ocfs2_journal;
 struct ocfs2_slot_info;
 struct ocfs2_recovery_map;
+struct ocfs2_quota_recovery;
 struct ocfs2_super
 {
 	struct task_struct *commit_task;
@@ -287,10 +291,11 @@ struct ocfs2_super
 	char *local_alloc_debug_buf;
 #endif
 
-	/* Next two fields are for local node slot recovery during
+	/* Next three fields are for local node slot recovery during
 	 * mount. */
 	int dirty;
 	struct ocfs2_dinode *local_alloc_copy;
+	struct ocfs2_quota_recovery *quota_rec;
 
 	struct ocfs2_alloc_stats alloc_stats;
 	char dev_str[20];		/* "major,minor" of the device */

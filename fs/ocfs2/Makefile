@@ -37,6 +37,8 @@ ocfs2-objs := \
 	sysfile.o 		\
 	uptodate.o		\
 	ver.o			\
+	quota_local.o		\
+	quota_global.o		\
 	xattr.o
 
 ocfs2_stackglue-objs := stackglue.o

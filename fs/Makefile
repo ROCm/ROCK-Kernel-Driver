@@ -57,6 +57,7 @@ nfs4acl-y			:= nfs4acl_base.o nfs4acl_xattr.o \
 obj-$(CONFIG_QUOTA)		+= dquot.o
 obj-$(CONFIG_QFMT_V1)		+= quota_v1.o
 obj-$(CONFIG_QFMT_V2)		+= quota_v2.o
+obj-$(CONFIG_QUOTA_TREE)	+= quota_tree.o
 obj-$(CONFIG_QUOTACTL)		+= quota.o
 
 obj-$(CONFIG_DMAPI)		+= dmapi/

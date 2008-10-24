@@ -223,6 +223,7 @@ int pdflush_operation(void (*fn)(unsigned long), unsigned long arg0)
 
 	return ret;
 }
+EXPORT_SYMBOL(pdflush_operation);
 
 static void start_one_pdflush_thread(void)
 {

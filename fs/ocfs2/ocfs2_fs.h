@@ -93,7 +93,9 @@
 					 | OCFS2_FEATURE_INCOMPAT_EXTENDED_SLOT_MAP \
 					 | OCFS2_FEATURE_INCOMPAT_USERSPACE_STACK \
 					 | OCFS2_FEATURE_INCOMPAT_XATTR)
-#define OCFS2_FEATURE_RO_COMPAT_SUPP	OCFS2_FEATURE_RO_COMPAT_UNWRITTEN
+#define OCFS2_FEATURE_RO_COMPAT_SUPP	(OCFS2_FEATURE_RO_COMPAT_UNWRITTEN \
+					 | OCFS2_FEATURE_RO_COMPAT_USRQUOTA \
+					 | OCFS2_FEATURE_RO_COMPAT_GRPQUOTA)
 
 /*
  * Heartbeat-only devices are missing journals and other files.  The
@@ -157,6 +159,12 @@
  */
 #define OCFS2_FEATURE_RO_COMPAT_UNWRITTEN	0x0001
 
+/*
+ * Maintain quota information for this filesystem
+ */
+#define OCFS2_FEATURE_RO_COMPAT_USRQUOTA	0x0002
+#define OCFS2_FEATURE_RO_COMPAT_GRPQUOTA	0x0004
+
 /* The byte offset of the first backup block will be 1G.
  * The following will be 4G, 16G, 64G, 256G and 1T.
  */
@@ -186,6 +194,7 @@
 #define OCFS2_HEARTBEAT_FL	(0x00000200)	/* Heartbeat area */
 #define OCFS2_CHAIN_FL		(0x00000400)	/* Chain allocator */
 #define OCFS2_DEALLOC_FL	(0x00000800)	/* Truncate log */
+#define OCFS2_QUOTA_FL		(0x00001000)	/* Quota file */
 
 /*
  * Flags on ocfs2_dinode.i_dyn_features
@@ -323,13 +332,17 @@ enum {
 #define OCFS2_FIRST_ONLINE_SYSTEM_INODE SLOT_MAP_SYSTEM_INODE
 	HEARTBEAT_SYSTEM_INODE,
 	GLOBAL_BITMAP_SYSTEM_INODE,
-#define OCFS2_LAST_GLOBAL_SYSTEM_INODE GLOBAL_BITMAP_SYSTEM_INODE
+	USER_QUOTA_SYSTEM_INODE,
+	GROUP_QUOTA_SYSTEM_INODE,
+#define OCFS2_LAST_GLOBAL_SYSTEM_INODE GROUP_QUOTA_SYSTEM_INODE
 	ORPHAN_DIR_SYSTEM_INODE,
 	EXTENT_ALLOC_SYSTEM_INODE,
 	INODE_ALLOC_SYSTEM_INODE,
 	JOURNAL_SYSTEM_INODE,
 	LOCAL_ALLOC_SYSTEM_INODE,
 	TRUNCATE_LOG_SYSTEM_INODE,
+	LOCAL_USER_QUOTA_SYSTEM_INODE,
+	LOCAL_GROUP_QUOTA_SYSTEM_INODE,
 	NUM_SYSTEM_INODES
 };
 
@@ -343,6 +356,8 @@ static struct ocfs2_system_inode_info ocfs2_system_inodes[NUM_SYSTEM_INODES] = {
 	[SLOT_MAP_SYSTEM_INODE]			= { "slot_map", 0, S_IFREG | 0644 },
 	[HEARTBEAT_SYSTEM_INODE]		= { "heartbeat", OCFS2_HEARTBEAT_FL, S_IFREG | 0644 },
 	[GLOBAL_BITMAP_SYSTEM_INODE]		= { "global_bitmap", 0, S_IFREG | 0644 },
+	[USER_QUOTA_SYSTEM_INODE]		= { "aquota.user", OCFS2_QUOTA_FL, S_IFREG | 0644 },
+	[GROUP_QUOTA_SYSTEM_INODE]		= { "aquota.group", OCFS2_QUOTA_FL, S_IFREG | 0644 },
 
 	/* Slot-specific system inodes (one copy per slot) */
 	[ORPHAN_DIR_SYSTEM_INODE]		= { "orphan_dir:%04d", 0, S_IFDIR | 0755 },
@@ -350,7 +365,9 @@ static struct ocfs2_system_inode_info ocfs2_system_inodes[NUM_SYSTEM_INODES] = {
 	[INODE_ALLOC_SYSTEM_INODE]		= { "inode_alloc:%04d", OCFS2_BITMAP_FL | OCFS2_CHAIN_FL, S_IFREG | 0644 },
 	[JOURNAL_SYSTEM_INODE]			= { "journal:%04d", OCFS2_JOURNAL_FL, S_IFREG | 0644 },
 	[LOCAL_ALLOC_SYSTEM_INODE]		= { "local_alloc:%04d", OCFS2_BITMAP_FL | OCFS2_LOCAL_ALLOC_FL, S_IFREG | 0644 },
-	[TRUNCATE_LOG_SYSTEM_INODE]		= { "truncate_log:%04d", OCFS2_DEALLOC_FL, S_IFREG | 0644 }
+	[TRUNCATE_LOG_SYSTEM_INODE]		= { "truncate_log:%04d", OCFS2_DEALLOC_FL, S_IFREG | 0644 },
+	[LOCAL_USER_QUOTA_SYSTEM_INODE]		= { "aquota%04d.user", OCFS2_QUOTA_FL, S_IFREG | 0644 },
+	[LOCAL_GROUP_QUOTA_SYSTEM_INODE]	= { "aquota%04d.group", OCFS2_QUOTA_FL, S_IFREG | 0644 },
 };
 
 /* Parameter passed from mount.ocfs2 to module */
@@ -833,6 +850,101 @@ struct ocfs2_xattr_block {
 							block cotains xattr
 							tree. */
 	} xb_attrs;
+};
+
+/*
+ *  On disk structures for global quota file
+ */
+
+/* Magic numbers and known versions for global quota files */
+#define OCFS2_GLOBAL_QMAGICS {\
+	0x0cf52470, /* USRQUOTA */ \
+	0x0cf52471  /* GRPQUOTA */ \
+}
+
+#define OCFS2_GLOBAL_QVERSIONS {\
+	0, \
+	0, \
+}
+
+/* Generic header of all quota files */
+struct ocfs2_disk_dqheader {
+	__le32 dqh_magic;	/* Magic number identifying file */
+	__le32 dqh_version;	/* Quota format version */
+};
+
+#define OCFS2_GLOBAL_INFO_OFF (sizeof(struct ocfs2_disk_dqheader))
+
+/* Information header of global quota file (immediately follows the generic
+ * header) */
+struct ocfs2_global_disk_dqinfo {
+/*00*/	__le32 dqi_bgrace;
+	__le32 dqi_igrace;
+	__le32 dqi_syncms;
+	__le32 dqi_blocks;
+/*10*/	__le32 dqi_free_blk;
+	__le32 dqi_free_entry;
+};
+
+/* Structure with global user / group information. We reserve some space
+ * for future use. */
+struct ocfs2_global_disk_dqblk {
+/*00*/	__le32 dqb_id;          /* ID the structure belongs to */
+	__le32 dqb_use_count;   /* Number of nodes having reference to this structure */
+	__le64 dqb_ihardlimit;  /* absolute limit on allocated inodes */
+/*10*/	__le64 dqb_isoftlimit;  /* preferred inode limit */
+	__le64 dqb_curinodes;   /* current # allocated inodes */
+/*20*/	__le64 dqb_bhardlimit;  /* absolute limit on disk space */
+	__le64 dqb_bsoftlimit;  /* preferred limit on disk space */
+/*30*/	__le64 dqb_curspace;    /* current space occupied */
+	__le64 dqb_btime;       /* time limit for excessive disk use */
+/*40*/	__le64 dqb_itime;       /* time limit for excessive inode use */
+	__le64 dqb_pad1;
+/*50*/	__le64 dqb_pad2;
+};
+
+/*
+ *  On-disk structures for local quota file
+ */
+
+/* Magic numbers and known versions for local quota files */
+#define OCFS2_LOCAL_QMAGICS {\
+	0x0cf524c0, /* USRQUOTA */ \
+	0x0cf524c1  /* GRPQUOTA */ \
+}
+
+#define OCFS2_LOCAL_QVERSIONS {\
+	0, \
+	0, \
+}
+
+/* Quota flags in dqinfo header */
+#define OLQF_CLEAN	0x0001	/* Quota file is empty (this should be after\
+				 * quota has been cleanly turned off) */
+
+#define OCFS2_LOCAL_INFO_OFF (sizeof(struct ocfs2_disk_dqheader))
+
+/* Information header of local quota file (immediately follows the generic
+ * header) */
+struct ocfs2_local_disk_dqinfo {
+	__le32 dqi_flags;	/* Flags for quota file */
+	__le32 dqi_chunks;	/* Number of chunks of quota structures
+				 * with a bitmap */
+	__le32 dqi_blocks;	/* Number of blocks allocated for quota file */
+};
+
+/* Header of one chunk of a quota file */
+struct ocfs2_local_disk_chunk {
+	__le32 dqc_free;	/* Number of free entries in the bitmap */
+	u8 dqc_bitmap[0];	/* Bitmap of entries in the corresponding
+				 * chunk of quota file */
+};
+
+/* One entry in local quota file */
+struct ocfs2_local_disk_dqblk {
+/*00*/	__le64 dqb_id;		/* id this quota applies to */
+	__le64 dqb_spacemod;	/* Change in the amount of used space */
+/*10*/	__le64 dqb_inodemod;	/* Change in the amount of used inodes */
 };
 
 #define OCFS2_XATTR_ENTRY_LOCAL		0x80

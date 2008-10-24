@@ -329,7 +329,7 @@ static int __ocfs2_remove_xattr_range(struct inode *inode,
 	ocfs2_init_xattr_value_extent_tree(&et, inode, root_bh, xv);
 
 	ret = ocfs2_extend_trans(handle,
-				 OCFS2_REMOVE_EXTENT_CREDITS +
+				 ocfs2_remove_extent_credits(osb->sb) +
 				 handle->h_buffer_credits);
 	if (ret) {
 		mlog_errno(ret);
@@ -4494,7 +4494,7 @@ static int ocfs2_rm_xattr_cluster(struct inode *inode,
 		}
 	}
 
-	handle = ocfs2_start_trans(osb, OCFS2_REMOVE_EXTENT_CREDITS);
+	handle = ocfs2_start_trans(osb, ocfs2_remove_extent_credits(osb->sb));
 	if (handle == NULL) {
 		ret = -ENOMEM;
 		mlog_errno(ret);
