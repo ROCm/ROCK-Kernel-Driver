@@ -269,6 +269,17 @@ ioc4_variant(struct ioc4_driver_data *idd)
 	return IOC4_VARIANT_PCI_RT;
 }
 
+static void
+ioc4_load_modules(struct work_struct *work)
+{
+	/* arg just has to be freed */
+
+	request_module("sgiioc4");
+	request_module("ioc4_serial");
+
+	kfree(work);
+}
+
 /* Adds a new instance of an IOC4 card */
 static int
 ioc4_probe(struct pci_dev *pdev, const struct pci_device_id *pci_id)
@@ -377,6 +388,22 @@ ioc4_probe(struct pci_dev *pdev, const struct pci_device_id *pci_id)
 		}
 	}
 	mutex_unlock(&ioc4_mutex);
+
+	if (idd->idd_variant != IOC4_VARIANT_PCI_RT) {
+		struct work_struct *work;
+		work = kzalloc(sizeof(struct work_struct), GFP_KERNEL);
+		if (!work) {
+			printk(KERN_WARNING
+			       "%s: IOC4 unable to allocate memory for "
+			       "load of sub-modules.\n",
+			       __FUNCTION__);
+		}
+		else {
+			printk(KERN_INFO "IOC4 loading ioc4 submodule\n");
+			INIT_WORK(work, ioc4_load_modules);
+			schedule_work(work);
+		}
+	}
 
 	return 0;
 
