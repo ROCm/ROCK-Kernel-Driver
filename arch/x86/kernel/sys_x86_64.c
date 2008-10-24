@@ -106,6 +106,8 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr,
 
 full_search:
 	for (vma = find_vma(mm, addr); ; vma = vma->vm_next) {
+		unsigned long guard;
+
 		/* At this point:  (!vma || addr < vma->vm_end). */
 		if (end - len < addr) {
 			/*
@@ -119,7 +121,14 @@ full_search:
 			}
 			return -ENOMEM;
 		}
-		if (!vma || addr + len <= vma->vm_start) {
+		if (!vma)
+			goto got_it;
+		guard = 0;
+		if (vma->vm_flags & VM_GROWSDOWN)
+			guard = min(end - (addr + len),
+				(unsigned long)heap_stack_gap << PAGE_SHIFT);
+		if (addr + len + guard <= vma->vm_start) {
+got_it:
 			/*
 			 * Remember the place where we stopped the search:
 			 */
@@ -186,15 +195,25 @@ arch_get_unmapped_area_topdown(struct file *filp, const unsigned long addr0,
 	addr = mm->mmap_base-len;
 
 	do {
+		unsigned long guard;
 		/*
 		 * Lookup failure means no vma is above this address,
 		 * else if new region fits below vma->vm_start,
 		 * return with success:
 		 */
 		vma = find_vma(mm, addr);
-		if (!vma || addr+len <= vma->vm_start)
+		if (!vma)
+			goto got_it;
+		guard = 0;
+		if (vma->vm_flags & VM_GROWSDOWN)
+			guard = min(TASK_SIZE - (addr + len),
+				(unsigned long)heap_stack_gap << PAGE_SHIFT);
+		if (addr + len + guard <= vma->vm_start) {
+got_it:
 			/* remember the address as a hint for next time */
-			return (mm->free_area_cache = addr);
+			mm->free_area_cache = addr;
+			return addr;
+		}
 
 		/* remember the largest hole we saw so far */
 		if (addr + mm->cached_hole_size < vma->vm_start)
