@@ -397,7 +397,8 @@ static int qeth_l2_stop_card(struct qeth_card *card, int recovery_mode)
 	}
 	if (card->state == CARD_STATE_SOFTSETUP) {
 		qeth_l2_process_vlans(card, 1);
-		qeth_l2_del_all_mc(card);
+		if (!card->use_hard_stop)
+			qeth_l2_del_all_mc(card);
 		qeth_clear_ipacmd_list(card);
 		card->state = CARD_STATE_HARDSETUP;
 	}
@@ -452,12 +453,15 @@ static void qeth_l2_process_inbound_buffer(struct qeth_card *card,
 			netif_rx(skb);
 			break;
 		case QETH_HEADER_TYPE_OSN:
-			skb_push(skb, sizeof(struct qeth_hdr));
-			skb_copy_to_linear_data(skb, hdr,
+			if (card->info.type == QETH_CARD_TYPE_OSN) {
+				skb_push(skb, sizeof(struct qeth_hdr));
+				skb_copy_to_linear_data(skb, hdr,
 						sizeof(struct qeth_hdr));
-			len = skb->len;
-			card->osn_info.data_cb(skb);
-			break;
+				len = skb->len;
+				card->osn_info.data_cb(skb);
+				break;
+			}
+			/* else unknown */
 		default:
 			dev_kfree_skb_any(skb);
 			QETH_DBF_TEXT(TRACE, 3, "inbunkno");
@@ -562,7 +566,8 @@ static int qeth_l2_request_initial_mac(struct qeth_card *card)
 			"device %s: x%x\n", CARD_BUS_ID(card), rc);
 	}
 
-	if (card->info.guestlan) {
+	if ((card->info.type == QETH_CARD_TYPE_IQD) ||
+	    (card->info.guestlan)) {
 		rc = qeth_setadpparms_change_macaddr(card);
 		if (rc) {
 			QETH_DBF_MESSAGE(2, "couldn't get MAC address on "
@@ -828,7 +833,6 @@ static int qeth_l2_open(struct net_device *dev)
 	}
 	card->data.state = CH_STATE_UP;
 	card->state = CARD_STATE_UP;
-	card->dev->flags |= IFF_UP;
 	netif_start_queue(dev);
 
 	if (!card->lan_online && netif_carrier_ok(dev))
@@ -843,7 +847,6 @@ static int qeth_l2_stop(struct net_device *dev)
 
 	QETH_DBF_TEXT(TRACE, 4, "qethstop");
 	netif_tx_disable(dev);
-	card->dev->flags &= ~IFF_UP;
 	if (card->state == CARD_STATE_UP)
 		card->state = CARD_STATE_SOFTSETUP;
 	return 0;
@@ -1135,9 +1138,13 @@ static int qeth_l2_recover(void *ptr)
 	if (!rc)
 		dev_info(&card->gdev->dev,
 			"Device successfully recovered!\n");
-	else
+	else {
+		rtnl_lock();
+		dev_close(card->dev);
+		rtnl_unlock();
 		dev_warn(&card->gdev->dev, "The qeth device driver "
 			"failed to recover an error on the device\n");
+	}
 	return 0;
 }
 
