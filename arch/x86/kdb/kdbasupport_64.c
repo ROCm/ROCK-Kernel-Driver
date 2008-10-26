@@ -500,6 +500,11 @@ kdba_dumpregs(struct pt_regs *regs,
 		struct kdbregs *rlp;
 		kdb_machreg_t contents;
 
+		if (!regs) {
+			kdb_printf("%s: pt_regs not available, use bt* or pid to select a different task\n", __FUNCTION__);
+			return KDB_BADREG;
+		}
+
 		for (i=0, rlp=kdbreglist; i<nkdbreglist; i++,rlp++) {
 			kdb_printf("%8s = ", rlp->reg_name);
 			kdba_getregcontents(rlp->reg_name, regs, &contents);
@@ -553,7 +558,7 @@ EXPORT_SYMBOL(kdba_dumpregs);
 kdb_machreg_t
 kdba_getpc(struct pt_regs *regs)
 {
-	return regs->ip;
+	return regs ? regs->ip : 0;
 }
 
 int
