@@ -553,7 +553,7 @@ int fat_free_clusters(struct inode *inode, int cluster)
 			goto error;
 		}
 
-		/* 
+		/*
 		 * Issue discard for the sectors we no longer care about,
 		 * batching contiguous clusters into one request
 		 */

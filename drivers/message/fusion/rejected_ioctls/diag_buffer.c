@@ -467,7 +467,7 @@ mptctl_query_diag_buffer (unsigned long arg)
 		    "buffer_type=%x\n", ioc->name, __FUNCTION__, buffer_type);
 		goto out;
 	}
-	
+
 	rc = 0;
 	if (buffer_type == MPI_DIAG_BUF_TYPE_EXTENDED) {
 		if (karg.data.ExtendedType != ioc->ExtendedType[buffer_type])

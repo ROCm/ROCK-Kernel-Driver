@@ -1095,7 +1095,7 @@ mpt_add_chain_64bit(char *pAddr, u8 next, u16 length, dma_addr_t dma_addr)
 		u32 tmp = dma_addr & 0xFFFFFFFF;
 
 		pChain->Length = cpu_to_le16(length);
-		pChain->Flags = (MPI_SGE_FLAGS_CHAIN_ELEMENT | 
+		pChain->Flags = (MPI_SGE_FLAGS_CHAIN_ELEMENT |
 				 MPI_SGE_FLAGS_64_BIT_ADDRESSING);
 
 		pChain->NextChainOffset = next;
@@ -2092,7 +2092,7 @@ mpt_resume(struct pci_dev *pdev)
 	err = mpt_mapresources(ioc);
 	if (err)
 		return err;
-	
+
 	if (ioc->dma_mask == DMA_64BIT_MASK) {
 		if (pdev->device == MPI_MANUFACTPAGE_DEVID_SAS1078)
 			ioc->add_sge = &mpt_add_sge_64bit_1078;
@@ -6895,13 +6895,13 @@ void
 mpt_halt_firmware(MPT_ADAPTER *ioc)
 {
 	u32	 ioc_raw_state;
-	
+
 	ioc_raw_state = mpt_GetIocState(ioc, 0);
-	
+
 	if ((ioc_raw_state & MPI_IOC_STATE_MASK) == MPI_IOC_STATE_FAULT) {
 		printk(MYIOC_s_ERR_FMT "IOC is in FAULT state (%04xh)!!!\n",
 			ioc->name, ioc_raw_state & MPI_DOORBELL_DATA_MASK);
-		if(mpt_fwfault_debug == 2) 
+		if(mpt_fwfault_debug == 2)
 			for(;;);
 		else
 			panic("%s: IOC Fault (%04xh)!!!\n",ioc->name,
@@ -6909,7 +6909,7 @@ mpt_halt_firmware(MPT_ADAPTER *ioc)
 	} else {
 		CHIPREG_WRITE32(&ioc->chip->Doorbell, 0xC0FFEE00);
 		if(mpt_fwfault_debug == 2) {
-			printk("%s: Firmware is halted due to command timeout\n" 
+			printk("%s: Firmware is halted due to command timeout\n"
 					,ioc->name);
 			for(;;);
 		}
@@ -6982,7 +6982,7 @@ mpt_SoftResetHandler(MPT_ADAPTER *ioc, int sleepFlag)
 		if (MptResetHandlers[cb_idx])
 			mpt_signal_reset(cb_idx, ioc, MPT_IOC_PRE_RESET);
 	}
-	
+
 	if (rc)
 		goto out;
 
@@ -7694,7 +7694,7 @@ ProcessEventNotification(MPT_ADAPTER *ioc, EventNotificationReply_t *pEventReply
 	 */
 	for (cb_idx = MPT_MAX_PROTOCOL_DRIVERS-1; cb_idx; cb_idx--) {
 		if (MptEvHandlers[cb_idx]) {
-			devtverboseprintk(ioc, printk(MYIOC_s_DEBUG_FMT 
+			devtverboseprintk(ioc, printk(MYIOC_s_DEBUG_FMT
 			    "Routing Event to event handler #%d\n", ioc->name, cb_idx));
 			r += (*(MptEvHandlers[cb_idx]))(ioc, pEventReply);
 			handlers++;

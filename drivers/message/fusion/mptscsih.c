@@ -735,7 +735,7 @@ mptscsih_io_done(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *mr)
 			sc->result = DID_RESET << 16;
 
 		case MPI_IOCSTATUS_SCSI_EXT_TERMINATED:		/* 0x004C */
-			if ( ioc->bus_type == FC ) 
+			if ( ioc->bus_type == FC )
 				sc->result = DID_ERROR << 16;
 			else
 				sc->result = DID_RESET << 16;

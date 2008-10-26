@@ -2829,7 +2829,7 @@ csmisas_stp_passthru(unsigned long arg)
 		printk(KERN_ERR "%s@%d::%s() - "
 			"Unable to malloc CSMI_SAS_STP_PASSTHRU_BUFFER "
 			"malloc_data_sz=%d memory_pages=%d\n",
-			__FILE__, __LINE__, __FUNCTION__, 
+			__FILE__, __LINE__, __FUNCTION__,
 			malloc_data_sz, memory_pages);
 		return -ENOMEM;
 	}
@@ -3510,7 +3510,7 @@ csmisas_get_raid_config(unsigned long arg)
 		printk(KERN_ERR "%s@%d::%s() - "
 		    "Unable to malloc RAID_CONFIG_BUFFER "
 			"csmi_sas_raid_config_buffer_sz=%d memory_pages=%d\n",
-			__FILE__, __LINE__, __FUNCTION__, 
+			__FILE__, __LINE__, __FUNCTION__,
 			csmi_sas_raid_config_buffer_sz, memory_pages);
 		return -ENOMEM;
 	}
@@ -4139,7 +4139,7 @@ csmisas_get_raid_features(unsigned long arg)
 		printk(KERN_ERR "%s@%d::%s() - "
 		    "Unable to malloc RAID_FEATURES_BUFFER "
 			"csmi_sas_raid_features_buffer_sz=%d memory_pages=%d\n",
-			__FILE__, __LINE__, __FUNCTION__, 
+			__FILE__, __LINE__, __FUNCTION__,
 			csmi_sas_raid_features_buffer_sz, memory_pages);
 		return -ENOMEM;
 	}
@@ -4260,7 +4260,7 @@ csmisas_set_raid_control(unsigned long arg)
 		printk(KERN_ERR "%s@%d::%s() - "
 		    "Unable to malloc RAID_CONTROL_BUFFER "
 			"csmi_sas_raid_control_buffer_sz=%d memory_pages=%d\n",
-			__FILE__, __LINE__, __FUNCTION__, 
+			__FILE__, __LINE__, __FUNCTION__,
 			csmi_sas_raid_control_buffer_sz, memory_pages);
 		return -ENOMEM;
 	}
@@ -4906,7 +4906,7 @@ csmisas_phy_control(unsigned long arg)
 		printk(KERN_ERR "%s@%d::%s() - "
 		    "Unable to malloc SAS_PHY_CONTROL_BUFFER "
 			"csmi_sas_phy_control_buffer_sz=%d memory_pages=%d\n",
-			__FILE__, __LINE__, __FUNCTION__, 
+			__FILE__, __LINE__, __FUNCTION__,
 			csmi_sas_phy_control_buffer_sz, memory_pages);
 		return -ENOMEM;
 	}
@@ -5791,7 +5791,7 @@ csmisas_get_location(unsigned long arg)
 		printk(KERN_ERR "%s@%d::%s() - "
 			"Unable to malloc GET_LOCATION_BUFFER "
 			"csmi_sas_get_location_sz=%d memory_pages=%d\n",
-			__FILE__, __LINE__, __FUNCTION__, 
+			__FILE__, __LINE__, __FUNCTION__,
 			csmi_sas_get_location_sz, memory_pages);
 		return -ENOMEM;
 	}

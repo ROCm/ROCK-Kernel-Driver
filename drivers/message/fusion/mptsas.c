@@ -435,7 +435,7 @@ mptsas_find_portinfo_by_sas_address(MPT_ADAPTER *ioc, u64 sas_address)
 {
 	struct mptsas_portinfo *port_info, *rc=NULL;
 	int i;
-	
+
 	if (sas_address >= ioc->hba_port_sas_addr &&
 	    sas_address < (ioc->hba_port_sas_addr +
 	    ioc->hba_port_num_phy))
@@ -655,7 +655,7 @@ mptsas_add_device_component(MPT_ADAPTER *ioc, u8 channel, u8 id,
 	struct scsi_device 	*sdev;
 	struct scsi_target	*starget;
 	struct sas_rphy		*rphy;
-	
+
 	/*
 	 * Delete all matching devices out of the list
 	 */
@@ -759,7 +759,7 @@ mptsas_add_device_component_starget_ir(MPT_ADAPTER *ioc, struct scsi_target *sta
 	memset(&hdr, 0 , sizeof(ConfigPageHeader_t));
 	hdr.PageType = MPI_CONFIG_PAGETYPE_RAID_VOLUME;
 	/* assumption that all volumes on channel = 0 */
-	cfg.pageAddr = starget->id; 
+	cfg.pageAddr = starget->id;
 	cfg.cfghdr.hdr = &hdr;
 	cfg.action = MPI_CONFIG_ACTION_PAGE_HEADER;
 	cfg.timeout = SAS_CONFIG_PAGE_TIMEOUT;
@@ -1078,7 +1078,7 @@ mptsas_find_vtarget(MPT_ADAPTER *ioc, u8 channel, u8 id)
 }
 
 static void
-mptsas_queue_device_delete(MPT_ADAPTER *ioc, 
+mptsas_queue_device_delete(MPT_ADAPTER *ioc,
     MpiEventDataSasDeviceStatusChange_t *sas_event_data)
 {
 	struct fw_event_work *fw_event;
@@ -1159,7 +1159,7 @@ mptsas_target_reset(MPT_ADAPTER *ioc, u8 channel, u8 id)
 
 	DBG_DUMP_TM_REQUEST_FRAME(ioc, (u32 *)mf);
 
-	dtmprintk(ioc, printk(MYIOC_s_DEBUG_FMT 
+	dtmprintk(ioc, printk(MYIOC_s_DEBUG_FMT
 	   "TaskMgmt type=%d (sas device delete) fw_channel = %d fw_id = %d)\n",
 	   ioc->name, MPI_SCSITASKMGMT_TASKTYPE_TARGET_RESET, channel, id));
 
@@ -1752,7 +1752,7 @@ mptsas_slave_configure(struct scsi_device *sdev)
 	MPT_SCSI_HOST		*hd = shost_priv(host);
 	MPT_ADAPTER 		*ioc = hd->ioc;
 	VirtDevice		*vdevice = sdev->hostdata;
-	
+
 
 	if (vdevice->vtarget->deleted) {
 		sdev_printk(KERN_INFO, sdev, "clearing deleted flag\n");
@@ -2740,7 +2740,7 @@ mptsas_sas_expander_pg1(MPT_ADAPTER *ioc, struct mptsas_phyinfo *phy_info,
 		error = -ENODEV;
 		goto out;
 	}
-	
+
 	if (error)
 		goto out_free_consistent;
 
@@ -3201,12 +3201,12 @@ mptsas_find_phyinfo_by_phys_disk_num(MPT_ADAPTER *ioc, u8 phys_disk_num,
 		goto out;
 	mpt_raid_phys_disk_pg1(ioc, phys_disk_num, phys_disk);
 	for (i = 0; i < num_paths; i++) {
-		if ((phys_disk->Path[i].Flags & 1) != 0) 
+		if ((phys_disk->Path[i].Flags & 1) != 0)
 			/* entry no longer valid */
 			continue;
 		if ((id == phys_disk->Path[i].PhysDiskID) &&
 		    (channel == phys_disk->Path[i].PhysDiskBus)) {
-			memcpy(&sas_address, &phys_disk->Path[i].WWID, 
+			memcpy(&sas_address, &phys_disk->Path[i].WWID,
 				sizeof(u64));
 			phy_info = mptsas_find_phyinfo_by_sas_address(ioc, sas_address);
 			goto out;
@@ -3474,7 +3474,7 @@ mptsas_del_end_device(MPT_ADAPTER *ioc, struct mptsas_phyinfo *phy_info)
 		ds = "sata";
 
 	starget = mptsas_get_starget(phy_info);
-	
+
 	printk(MYIOC_s_INFO_FMT "removing %s device: fw_channel %d,"
 	    " fw_id %d, phy %d, sas_addr 0x%llx\n", ioc->name, ds,
 	    phy_info->attached.channel, phy_info->attached.id,
@@ -3502,7 +3502,7 @@ mptsas_del_end_device(MPT_ADAPTER *ioc, struct mptsas_phyinfo *phy_info)
 		    phy_info_parent->phy);
 		sas_port_delete_phy(port, phy_info_parent->phy);
 	}
-	
+
 	dev_printk(KERN_DEBUG, &port->dev, MYIOC_s_FMT
 	    "delete port %d, sas_addr (0x%llx)\n", ioc->name,
 	     port->port_identifier, (unsigned long long)sas_address);
@@ -4587,7 +4587,7 @@ mptsas_handle_queue_full_event(struct fw_event_work *fw_event)
 	fw_id = qfull_data->TargetID;
 	fw_channel = qfull_data->Bus;
 	current_depth = le16_to_cpu(qfull_data->CurrentDepth);
-	
+
 	/* if hidden raid component, look for the volume id */
 	down(&ioc->sas_device_info_mutex);
 	if (mptscsih_is_phys_disk(ioc, fw_channel, fw_id)) {
@@ -4623,7 +4623,7 @@ mptsas_handle_queue_full_event(struct fw_event_work *fw_event)
 
  out:
 	up(&ioc->sas_device_info_mutex);
-	
+
 	if (id != -1) {
 		shost_for_each_device(sdev, ioc->sh) {
 			if (sdev->id == id && sdev->channel == channel) {

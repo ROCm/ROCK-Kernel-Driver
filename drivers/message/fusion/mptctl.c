@@ -502,7 +502,7 @@ mptctl_timeout_expired(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf)
 
 	if(mpt_fwfault_debug)
 		mpt_halt_firmware(ioc);
-	
+
 	spin_lock_irqsave(&ioc->taskmgmt_lock, flags);
 	if (ioc->ioc_reset_in_progress) {
 		spin_unlock_irqrestore(&ioc->taskmgmt_lock, flags);
@@ -2663,7 +2663,7 @@ mptctl_hp_hostinfo(unsigned long arg, unsigned int data_size)
 		goto out;
 	}
 
-	/* 
+	/*
 	 *ISTWI Data Definition
 	 * pbuf[0] = FW_VERSION = 0x4
 	 * pbuf[1] = Bay Count = 6 or 4 or 2, depending on
