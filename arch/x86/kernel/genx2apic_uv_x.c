@@ -17,7 +17,6 @@
 #include <linux/ctype.h>
 #include <linux/init.h>
 #include <linux/sched.h>
-#include <linux/bootmem.h>
 #include <linux/module.h>
 #include <linux/hardirq.h>
 #include <asm/idle.h>
@@ -205,12 +204,10 @@ static unsigned int phys_pkg_id(int index_msb)
 	return uv_read_apic_id() >> index_msb;
 }
 
-#ifdef ZZZ		/* Needs x2apic patch */
 static void uv_send_IPI_self(int vector)
 {
 	apic_write(APIC_SELF_IPI, vector);
 }
-#endif
 
 struct genapic apic_x2apic_uv_x = {
 	.name = "UV large system",
@@ -224,7 +221,7 @@ struct genapic apic_x2apic_uv_x = {
 	.send_IPI_all = uv_send_IPI_all,
 	.send_IPI_allbutself = uv_send_IPI_allbutself,
 	.send_IPI_mask = uv_send_IPI_mask,
-	/* ZZZ.send_IPI_self = uv_send_IPI_self, */
+	.send_IPI_self = uv_send_IPI_self,
 	.cpu_mask_to_apicid = uv_cpu_mask_to_apicid,
 	.phys_pkg_id = phys_pkg_id,	/* Fixme ZZZ */
 	.get_apic_id = get_apic_id,
@@ -289,12 +286,13 @@ static __init void map_low_mmrs(void)
 
 enum map_type {map_wb, map_uc};
 
-static __init void map_high(char *id, unsigned long base, int shift, enum map_type map_type)
+static __init void map_high(char *id, unsigned long base, int shift,
+			    int max_pnode, enum map_type map_type)
 {
 	unsigned long bytes, paddr;
 
 	paddr = base << shift;
-	bytes = (1UL << shift);
+	bytes = (1UL << shift) * (max_pnode + 1);
 	printk(KERN_INFO "UV: Map %s_HI 0x%lx - 0x%lx\n", id, paddr,
 	       					paddr + bytes);
 	if (map_type == map_uc)
@@ -310,7 +308,7 @@ static __init void map_gru_high(int max_pnode)
 
 	gru.v = uv_read_local_mmr(UVH_RH_GAM_GRU_OVERLAY_CONFIG_MMR);
 	if (gru.s.enable)
-		map_high("GRU", gru.s.base, shift, map_wb);
+		map_high("GRU", gru.s.base, shift, max_pnode, map_wb);
 }
 
 static __init void map_config_high(int max_pnode)
@@ -320,7 +318,7 @@ static __init void map_config_high(int max_pnode)
 
 	cfg.v = uv_read_local_mmr(UVH_RH_GAM_CFG_OVERLAY_CONFIG_MMR);
 	if (cfg.s.enable)
-		map_high("CONFIG", cfg.s.base, shift, map_uc);
+		map_high("CONFIG", cfg.s.base, shift, max_pnode, map_uc);
 }
 
 static __init void map_mmr_high(int max_pnode)
@@ -330,7 +328,7 @@ static __init void map_mmr_high(int max_pnode)
 
 	mmr.v = uv_read_local_mmr(UVH_RH_GAM_MMR_OVERLAY_CONFIG_MMR);
 	if (mmr.s.enable)
-		map_high("MMR", mmr.s.base, shift, map_uc);
+		map_high("MMR", mmr.s.base, shift, max_pnode, map_uc);
 }
 
 static __init void map_mmioh_high(int max_pnode)
@@ -340,7 +338,7 @@ static __init void map_mmioh_high(int max_pnode)
 
 	mmioh.v = uv_read_local_mmr(UVH_RH_GAM_MMIOH_OVERLAY_CONFIG_MMR);
 	if (mmioh.s.enable)
-		map_high("MMIOH", mmioh.s.base, shift, map_uc);
+		map_high("MMIOH", mmioh.s.base, shift, max_pnode, map_uc);
 }
 
 static __init void uv_rtc_init(void)
@@ -379,7 +377,22 @@ static void uv_display_heartbeat(void)
 }
 #endif
 
-static bool uv_system_inited;
+/*
+ * Called on each cpu to initialize the per_cpu UV data area.
+ * 	ZZZ hotplug not supported yet
+ */
+void __cpuinit uv_cpu_init(void)
+{
+	/* CPU 0 initilization will be done via uv_system_init. */
+	if (!uv_blade_info)
+		return;
+
+	uv_blade_info[uv_numa_blade_id()].nr_online_cpus++;
+
+	if (get_uv_system_type() == UV_NON_UNIQUE_APIC)
+		set_x2apic_extra_bits(uv_hub_info->pnode);
+}
+
 
 void __init uv_system_init(void)
 {
@@ -406,16 +419,16 @@ void __init uv_system_init(void)
 	printk(KERN_DEBUG "UV: Found %d blades\n", uv_num_possible_blades());
 
 	bytes = sizeof(struct uv_blade_info) * uv_num_possible_blades();
-	uv_blade_info = alloc_bootmem_pages(bytes);
+	uv_blade_info = kmalloc(bytes, GFP_KERNEL);
 
 	get_lowmem_redirect(&lowmem_redir_base, &lowmem_redir_size);
 
 	bytes = sizeof(uv_node_to_blade[0]) * num_possible_nodes();
-	uv_node_to_blade = alloc_bootmem_pages(bytes);
+	uv_node_to_blade = kmalloc(bytes, GFP_KERNEL);
 	memset(uv_node_to_blade, 255, bytes);
 
 	bytes = sizeof(uv_cpu_to_blade[0]) * num_possible_cpus();
-	uv_cpu_to_blade = alloc_bootmem_pages(bytes);
+	uv_cpu_to_blade = kmalloc(bytes, GFP_KERNEL);
 	memset(uv_cpu_to_blade, 255, bytes);
 
 	blade = 0;
@@ -474,10 +487,11 @@ void __init uv_system_init(void)
 	map_mmr_high(max_pnode);
 	map_config_high(max_pnode);
 	map_mmioh_high(max_pnode);
-	uv_system_inited = true;
 
 	/* enable post-smp_cpus_done processing */
 	smp_cpus_done_system = uv_start_system;
+
+	uv_cpu_init();
 
 #ifdef CONFIG_CLOCKSOURCE_WATCHDOG
 	/* enable heartbeat display callback */
@@ -486,20 +500,6 @@ void __init uv_system_init(void)
 	printk(KERN_NOTICE "UV: CLOCKSOURCE_WATCHDOG not configured, "
 			   "LED Heartbeat NOT enabled\n");
 #endif
-}
-
-/*
- * Called on each cpu to initialize the per_cpu UV data area.
- * 	ZZZ hotplug not supported yet
- */
-void __cpuinit uv_cpu_init(void)
-{
-	BUG_ON(!uv_system_inited);
-
-	uv_blade_info[uv_numa_blade_id()].nr_online_cpus++;
-
-	if (get_uv_system_type() == UV_NON_UNIQUE_APIC)
-		set_x2apic_extra_bits(uv_hub_info->pnode);
 }
 
 /*
