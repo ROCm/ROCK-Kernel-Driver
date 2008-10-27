@@ -43,6 +43,4 @@ source "drivers/staging/echo/Kconfig"
 
 source "drivers/staging/at76_usb/Kconfig"
 
-source "drivers/staging/pcc-acpi/Kconfig"
-
 endif # STAGING
