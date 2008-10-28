@@ -234,9 +234,7 @@ extern void pcibios_remove_pci_devices(struct pci_bus *bus);
 
 /** Discover new pci devices under this bus, and add them */
 extern void pcibios_add_pci_devices(struct pci_bus *bus);
-extern void pcibios_fixup_new_pci_devices(struct pci_bus *bus);
-
-extern int pcibios_remove_root_bus(struct pci_controller *phb);
+extern void pcibios_finish_adding_new_bus(struct pci_bus *bus);
 
 static inline struct pci_controller *pci_bus_to_host(const struct pci_bus *bus)
 {

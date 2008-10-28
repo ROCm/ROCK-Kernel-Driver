@@ -418,7 +418,7 @@ static int __init pcibios_init(void)
 
 subsys_initcall(pcibios_init);
 
-void __devinit pcibios_do_bus_setup(struct pci_bus *bus)
+void __devinit pcibios_do_bus_setup_self(struct pci_bus *bus)
 {
 	struct pci_controller *hose = (struct pci_controller *) bus->sysdata;
 	unsigned long io_offset;
@@ -457,6 +457,10 @@ void __devinit pcibios_do_bus_setup(struct pci_bus *bus)
 			bus->resource[i+1] = res;
 		}
 	}
+}
+
+void __devinit pcibios_do_bus_setup_devices(struct pci_bus *bus)
+{
 }
 
 /* the next one is stolen from the alpha port... */

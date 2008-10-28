@@ -789,63 +789,76 @@ static void __devinit pcibios_fixup_resources(struct pci_dev *dev)
 }
 DECLARE_PCI_FIXUP_HEADER(PCI_ANY_ID, PCI_ANY_ID, pcibios_fixup_resources);
 
-static void __devinit __pcibios_fixup_bus(struct pci_bus *bus)
+void __devinit pcibios_fixup_bus_self(struct pci_bus *bus)
 {
 	struct pci_controller *hose = pci_bus_to_host(bus);
 	struct pci_dev *dev = bus->self;
+	struct resource *res;
+	int i;
 
-	pr_debug("PCI: Fixup bus %d (%s)\n", bus->number, dev ? pci_name(dev) : "PHB");
+	pr_debug("PCI: Fixup bus resources %d (%s)\n",
+		 bus->number, dev ? pci_name(dev) : "PHB");
 
 	/* Fixup PCI<->PCI bridges. Host bridges are handled separately, for
 	 * now differently between 32 and 64 bits.
 	 */
-	if (dev != NULL) {
-		struct resource *res;
-		int i;
+	if (dev == NULL)
+		return;
 
-		for (i = 0; i < PCI_BUS_NUM_RESOURCES; ++i) {
-			if ((res = bus->resource[i]) == NULL)
-				continue;
-			if (!res->flags)
-				continue;
-			if (i >= 3 && bus->self->transparent)
-				continue;
-			/* On PowerMac, Apple leaves bridge windows open over
-			 * an inaccessible region of memory space (0...fffff)
-			 * which is somewhat bogus, but that's what they think
-			 * means disabled...
-			 *
-			 * We clear those to force them to be reallocated later
-			 *
-			 * We detect such regions by the fact that the base is
-			 * equal to the pci_mem_offset of the host bridge and
-			 * their size is smaller than 1M.
-			 */
-			if (res->flags & IORESOURCE_MEM &&
-			    res->start == hose->pci_mem_offset &&
-			    res->end < 0x100000) {
-				printk(KERN_INFO
-				       "PCI: Closing bogus Apple Firmware"
-				       " region %d on bus 0x%02x\n",
-				       i, bus->number);
-				res->flags = 0;
-				continue;
-			}
+	for (i = 0; i < PCI_BUS_NUM_RESOURCES; ++i) {
+		if ((res = bus->resource[i]) == NULL)
+			continue;
+		if (!res->flags)
+			continue;
+		if (i >= 3 && bus->self->transparent)
+			continue;
 
-			pr_debug("PCI:%s Bus rsrc %d %016llx-%016llx [%x] fixup...\n",
-				 pci_name(dev), i,
-				 (unsigned long long)res->start,\
-				 (unsigned long long)res->end,
-				 (unsigned int)res->flags);
-
-			fixup_resource(res, dev);
+		/* On PowerMac, Apple leaves bridge windows open over
+		 * an inaccessible region of memory space (0...fffff)
+		 * which is somewhat bogus, but that's what they think
+		 * means disabled...
+		 *
+		 * We clear those to force them to be reallocated later
+		 *
+		 * We detect such regions by the fact that the base is
+		 * equal to the pci_mem_offset of the host bridge and
+		 * their size is smaller than 1M.
+		 */
+		if (res->flags & IORESOURCE_MEM &&
+		    res->start == hose->pci_mem_offset &&
+		    res->end < 0x100000) {
+			printk(KERN_INFO
+			       "PCI: Closing bogus Apple Firmware"
+			       " region %d on bus 0x%02x\n",
+			       i, bus->number);
+			res->flags = 0;
+			continue;
 		}
+
+		pr_debug("PCI:%s Bus rsrc %d %016llx-%016llx [%x] fixup...\n",
+			 pci_name(dev), i,
+			 (unsigned long long)res->start,\
+			 (unsigned long long)res->end,
+			 (unsigned int)res->flags);
+
+		fixup_resource(res, dev);
 	}
 
 	/* Additional setup that is different between 32 and 64 bits for now */
-	pcibios_do_bus_setup(bus);
+	pcibios_do_bus_setup_self(bus);
+}
 
-	/* Platform specific bus fixups */
+void __devinit pcibios_fixup_bus_devices(struct pci_bus *bus)
+{
+	struct pci_dev *dev = bus->self;
+
+	pr_debug("PCI: Fixup bus devices %d (%s)\n",
+		 bus->number, dev ? pci_name(dev) : "PHB");
+
+	/* Additional setup that is different between 32 and 64 bits for now */
+	pcibios_do_bus_setup_devices(bus);
+
+	/* Platform specific bus fixups (XXX Get rid of these !) */
 	if (ppc_md.pcibios_fixup_bus)
 		ppc_md.pcibios_fixup_bus(bus);
 
@@ -864,18 +877,10 @@ void __devinit pcibios_fixup_bus(struct pci_bus *bus)
 	 */
 	if (bus->self != NULL)
 		pci_read_bridge_bases(bus);
-	__pcibios_fixup_bus(bus);
+	pcibios_fixup_bus_self(bus);
+	pcibios_fixup_bus_devices(bus);
 }
 EXPORT_SYMBOL(pcibios_fixup_bus);
-
-/* When building a bus from the OF tree rather than probing, we need a
- * slightly different version of the fixup which doesn't read the
- * bridge bases using config space accesses
- */
-void __devinit pcibios_fixup_of_probed_bus(struct pci_bus *bus)
-{
-	__pcibios_fixup_bus(bus);
-}
 
 static int skip_isa_ioresource_align(struct pci_dev *dev)
 {
@@ -986,70 +991,71 @@ static int __init reparent_resources(struct resource *parent,
  *	    as well.
  */
 
-static void __init pcibios_allocate_bus_resources(struct list_head *bus_list)
+void pcibios_allocate_bus_resources(struct pci_bus *bus)
 {
-	struct pci_bus *bus;
+	struct pci_bus *b;
 	int i;
 	struct resource *res, *pr;
 
-	/* Depth-First Search on bus tree */
-	list_for_each_entry(bus, bus_list, node) {
-		for (i = 0; i < PCI_BUS_NUM_RESOURCES; ++i) {
-			if ((res = bus->resource[i]) == NULL || !res->flags
-			    || res->start > res->end)
+	DBG("PCI: Allocating bus resources for %04x:%02x...\n",
+	    pci_domain_nr(bus), bus->number);
+
+	for (i = 0; i < PCI_BUS_NUM_RESOURCES; ++i) {
+		if ((res = bus->resource[i]) == NULL || !res->flags
+		    || res->start > res->end || res->parent)
+			continue;
+		if (bus->parent == NULL)
+			pr = (res->flags & IORESOURCE_IO) ?
+				&ioport_resource : &iomem_resource;
+		else {
+			/* Don't bother with non-root busses when
+			 * re-assigning all resources. We clear the
+			 * resource flags as if they were colliding
+			 * and as such ensure proper re-allocation
+			 * later.
+			 */
+			if (ppc_pci_flags & PPC_PCI_REASSIGN_ALL_RSRC)
+				goto clear_resource;
+			pr = pci_find_parent_resource(bus->self, res);
+			if (pr == res) {
+				/* this happens when the generic PCI
+				 * code (wrongly) decides that this
+				 * bridge is transparent  -- paulus
+				 */
 				continue;
-			if (bus->parent == NULL)
-				pr = (res->flags & IORESOURCE_IO) ?
-					&ioport_resource : &iomem_resource;
-			else {
-				/* Don't bother with non-root busses when
-				 * re-assigning all resources. We clear the
-				 * resource flags as if they were colliding
-				 * and as such ensure proper re-allocation
-				 * later.
-				 */
-				if (ppc_pci_flags & PPC_PCI_REASSIGN_ALL_RSRC)
-					goto clear_resource;
-				pr = pci_find_parent_resource(bus->self, res);
-				if (pr == res) {
-					/* this happens when the generic PCI
-					 * code (wrongly) decides that this
-					 * bridge is transparent  -- paulus
-					 */
-					continue;
-				}
 			}
-
-			DBG("PCI: %s (bus %d) bridge rsrc %d: %016llx-%016llx "
-			    "[0x%x], parent %p (%s)\n",
-			    bus->self ? pci_name(bus->self) : "PHB",
-			    bus->number, i,
-			    (unsigned long long)res->start,
-			    (unsigned long long)res->end,
-			    (unsigned int)res->flags,
-			    pr, (pr && pr->name) ? pr->name : "nil");
-
-			if (pr && !(pr->flags & IORESOURCE_UNSET)) {
-				if (request_resource(pr, res) == 0)
-					continue;
-				/*
-				 * Must be a conflict with an existing entry.
-				 * Move that entry (or entries) under the
-				 * bridge resource and try again.
-				 */
-				if (reparent_resources(pr, res) == 0)
-					continue;
-			}
-			printk(KERN_WARNING
-			       "PCI: Cannot allocate resource region "
-			       "%d of PCI bridge %d, will remap\n",
-			       i, bus->number);
-clear_resource:
-			res->flags = 0;
 		}
-		pcibios_allocate_bus_resources(&bus->children);
+
+		DBG("PCI: %s (bus %d) bridge rsrc %d: %016llx-%016llx "
+		    "[0x%x], parent %p (%s)\n",
+		    bus->self ? pci_name(bus->self) : "PHB",
+		    bus->number, i,
+		    (unsigned long long)res->start,
+		    (unsigned long long)res->end,
+		    (unsigned int)res->flags,
+		    pr, (pr && pr->name) ? pr->name : "nil");
+
+		if (pr && !(pr->flags & IORESOURCE_UNSET)) {
+			if (request_resource(pr, res) == 0)
+				continue;
+			/*
+			 * Must be a conflict with an existing entry.
+			 * Move that entry (or entries) under the
+			 * bridge resource and try again.
+			 */
+			if (reparent_resources(pr, res) == 0)
+				continue;
+		}
+		printk(KERN_WARNING "PCI: Cannot allocate resource region "
+		       "%d of PCI bridge %d, will remap\n", i, bus->number);
+clear_resource:
+		res->flags = 0;
 	}
+
+	list_for_each_entry(b, &bus->children, node)
+		pcibios_allocate_bus_resources(b);
 }
+EXPORT_SYMBOL_GPL(pcibios_allocate_bus_resources);
 
 static inline void __devinit alloc_resource(struct pci_dev *dev, int idx)
 {
@@ -1119,10 +1125,13 @@ static void __init pcibios_allocate_resources(int pass)
 
 void __init pcibios_resource_survey(void)
 {
+	struct pci_bus *b;
+
 	/* Allocate and assign resources. If we re-assign everything, then
 	 * we skip the allocate phase
 	 */
-	pcibios_allocate_bus_resources(&pci_root_buses);
+	list_for_each_entry(b, &pci_root_buses, node)
+		pcibios_allocate_bus_resources(b);
 
 	if (!(ppc_pci_flags & PPC_PCI_REASSIGN_ALL_RSRC)) {
 		pcibios_allocate_resources(0);
@@ -1157,6 +1166,13 @@ void __devinit pcibios_claim_one_bus(struct pci_bus *bus)
 
 			if (r->parent || !r->start || !r->flags)
 				continue;
+
+			DBG("PCI: Claiming %s: Resource %d: %016llx..%016llx [%x]\n",
+			    pci_name(dev), i,
+			    (unsigned long long)r->start,
+			    (unsigned long long)r->end,
+			    (unsigned int)r->flags);
+
 			pci_claim_resource(dev, i);
 		}
 	}

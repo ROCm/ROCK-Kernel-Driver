@@ -225,14 +225,16 @@ struct pci_dev *of_create_pci_dev(struct device_node *node,
 EXPORT_SYMBOL(of_create_pci_dev);
 
 void __devinit of_scan_bus(struct device_node *node,
-			   struct pci_bus *bus)
+			   struct pci_bus *bus,
+			   int rescan_existing)
 {
 	struct device_node *child;
 	const u32 *reg;
 	int reglen, devfn;
 	struct pci_dev *dev;
 
-	DBG("of_scan_bus(%s) bus no %d... \n", node->full_name, bus->number);
+	DBG("of_scan_bus(%s) %s bus no %d... \n", node->full_name,
+	    rescan_existing ? "existing" : "new", bus->number);
 
 	/* Scan direct children */
 	for_each_child_of_node(node, child) {
@@ -249,8 +251,12 @@ void __devinit of_scan_bus(struct device_node *node,
 		DBG("    dev header type: %x\n", dev->hdr_type);
 	}
 
-	/* Ally all fixups */
-	pcibios_fixup_of_probed_bus(bus);
+	/* Apply all fixups necessary. We don't fixup the bus "self"
+	 * for an existing bridge that is being rescanned
+	 */
+	if (!rescan_existing)
+		pcibios_fixup_bus_self(bus);
+	pcibios_fixup_bus_devices(bus);
 
 	/* Now scan child busses */
 	list_for_each_entry(dev, &bus->devices, bus_list) {
@@ -346,7 +352,7 @@ void __devinit of_scan_pci_bridge(struct device_node *node,
 	DBG("    probe mode: %d\n", mode);
 
 	if (mode == PCI_PROBE_DEVTREE)
-		of_scan_bus(node, bus);
+		of_scan_bus(node, bus, 0);
 	else if (mode == PCI_PROBE_NORMAL)
 		pci_scan_child_bus(bus);
 }
@@ -396,7 +402,7 @@ void __devinit scan_phb(struct pci_controller *hose)
 	DBG("    probe mode: %d\n", mode);
 	if (mode == PCI_PROBE_DEVTREE) {
 		bus->subordinate = hose->last_busno;
-		of_scan_bus(node, bus);
+		of_scan_bus(node, bus, 0);
 	}
 
 	if (mode == PCI_PROBE_NORMAL)
@@ -568,12 +574,15 @@ void __devinit pcibios_setup_new_device(struct pci_dev *dev)
 }
 EXPORT_SYMBOL(pcibios_setup_new_device);
 
-void __devinit pcibios_do_bus_setup(struct pci_bus *bus)
+void __devinit pcibios_do_bus_setup_self(struct pci_bus *bus)
 {
-	struct pci_dev *dev;
-
 	if (ppc_md.pci_dma_bus_setup)
 		ppc_md.pci_dma_bus_setup(bus);
+}
+
+void __devinit pcibios_do_bus_setup_devices(struct pci_bus *bus)
+{
+	struct pci_dev *dev;
 
 	list_for_each_entry(dev, &bus->devices, bus_list)
 		pcibios_setup_new_device(dev);
