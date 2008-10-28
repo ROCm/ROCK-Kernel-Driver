@@ -622,7 +622,9 @@ static bool ixgbe_clean_rx_irq(struct ixgbe_adapter *adapter,
 			               PAGE_SIZE / 2, PCI_DMA_FROMDEVICE);
 			rx_buffer_info->page_dma = 0;
 			skb_add_rx_frag(skb, skb_shinfo(skb)->nr_frags,
-					rx_buffer_info->page, 0, upper_len);
+					rx_buffer_info->page,
+					rx_buffer_info->page_offset,
+					upper_len);
 
 			if ((rx_ring->rx_buf_len > (PAGE_SIZE / 2)) ||
 			    (page_count(rx_buffer_info->page) != 1))
