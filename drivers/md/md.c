@@ -3898,6 +3898,7 @@ static int do_md_stop(mddev_t * mddev, int mode, int is_open)
 	if (mode == 0) {
 		mdk_rdev_t *rdev;
 		struct list_head *tmp;
+		struct block_device *bdev;
 
 		printk(KERN_INFO "md: %s stopped.\n", mdname(mddev));
 
@@ -3954,6 +3955,13 @@ static int do_md_stop(mddev_t * mddev, int mode, int is_open)
 		mddev->degraded = 0;
 		mddev->barriers_work = 0;
 		mddev->safemode = 0;
+
+		bdev = bdget_disk(mddev->gendisk, 0);
+		if (bdev) {
+			blkdev_ioctl(bdev->bd_inode, NULL, BLKRRPART, 0);
+			bdput(bdev);
+		}
+		kobject_uevent(&mddev->gendisk->dev.kobj, KOBJ_CHANGE);
 
 	} else if (mddev->pers)
 		printk(KERN_INFO "md: %s switched to read-only mode.\n",
