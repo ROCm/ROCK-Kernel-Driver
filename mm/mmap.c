@@ -85,7 +85,6 @@ int sysctl_overcommit_memory = OVERCOMMIT_GUESS;  /* heuristic overcommit */
 int sysctl_overcommit_ratio = 50;	/* default is 50% */
 int sysctl_max_map_count __read_mostly = DEFAULT_MAX_MAP_COUNT;
 atomic_long_t vm_committed_space = ATOMIC_LONG_INIT(0);
-int heap_stack_gap __read_mostly = 1;
 
 /*
  * Check that a process has enough memory to allocate a new virtual
@@ -1292,7 +1291,6 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr,
 full_search:
 	for (vma = find_vma(mm, addr); ; vma = vma->vm_next) {
 		/* At this point:  (!vma || addr < vma->vm_end). */
-		unsigned long guard;
 		if (TASK_SIZE - len < addr) {
 			/*
 			 * Start a new search - just in case we missed
@@ -1306,14 +1304,7 @@ full_search:
 			}
 			return -ENOMEM;
 		}
-		if (!vma)
-			goto got_it;
-		guard = 0;
-		if (vma->vm_flags & VM_GROWSDOWN)
-			guard = min(TASK_SIZE - (addr + len),
-				(unsigned long)heap_stack_gap << PAGE_SHIFT);
-		if (addr + len + guard <= vma->vm_start) {
-got_it:
+		if (!vma || addr + len <= vma->vm_start) {
 			/*
 			 * Remember the place where we stopped the search:
 			 */
@@ -1391,25 +1382,15 @@ arch_get_unmapped_area_topdown(struct file *filp, const unsigned long addr0,
 	addr = mm->mmap_base-len;
 
 	do {
-		unsigned long guard;
 		/*
 		 * Lookup failure means no vma is above this address,
 		 * else if new region fits below vma->vm_start,
 		 * return with success:
 		 */
 		vma = find_vma(mm, addr);
-		if (!vma)
-			goto got_it;
-		guard = 0;
-		if (vma->vm_flags & VM_GROWSDOWN)
-			guard = min(TASK_SIZE - (addr + len),
-				(unsigned long)heap_stack_gap << PAGE_SHIFT);
-		if (addr + len + guard <= vma->vm_start) {
-got_it:
+		if (!vma || addr+len <= vma->vm_start)
 			/* remember the address as a hint for next time */
-			mm->free_area_cache = addr;
-			return addr;
-		}
+			return (mm->free_area_cache = addr);
 
  		/* remember the largest hole we saw so far */
  		if (addr + mm->cached_hole_size < vma->vm_start)
@@ -1639,19 +1620,6 @@ int expand_upwards(struct vm_area_struct *vma, unsigned long address)
 	/* Somebody else might have raced and expanded it already */
 	if (address > vma->vm_end) {
 		unsigned long size, grow;
-#ifdef CONFIG_STACK_GROWSUP
-		unsigned long guard;
-		struct vm_area_struct *vm_next;
-
-		error = -ENOMEM;
-		guard = min(TASK_SIZE - address,
-				(unsigned long)heap_stack_gap << PAGE_SHIFT);
-		vm_next = find_vma(vma->vm_mm, address + guard);
-		if (unlikely(vm_next && vm_next != vma)) {
-			/* stack collision with another vma */
-			goto out_unlock;
-		}
-#endif
 
 		size = address - vma->vm_start;
 		grow = (address - vma->vm_end) >> PAGE_SHIFT;
@@ -1660,7 +1628,6 @@ int expand_upwards(struct vm_area_struct *vma, unsigned long address)
 		if (!error)
 			vma->vm_end = address;
 	}
-out_unlock:
 	anon_vma_unlock(vma);
 	return error;
 }
@@ -1697,21 +1664,7 @@ static inline int expand_downwards(struct vm_area_struct *vma,
 	/* Somebody else might have raced and expanded it already */
 	if (address < vma->vm_start) {
 		unsigned long size, grow;
-		struct vm_area_struct *prev_vma;
 
-		find_vma_prev(vma->vm_mm, address, &prev_vma);
-
-		error = -ENOMEM;
-		if (prev_vma) {
-			unsigned long guard;
-
-			guard = min(TASK_SIZE - prev_vma->vm_end,
-				(unsigned long)heap_stack_gap << PAGE_SHIFT);
-			if (unlikely(prev_vma->vm_end + guard > address)) {
-				/* stack collision with another vma */
-				goto out_unlock;
-			}
-		}
 		size = vma->vm_end - address;
 		grow = (vma->vm_start - address) >> PAGE_SHIFT;
 
@@ -1721,7 +1674,6 @@ static inline int expand_downwards(struct vm_area_struct *vma,
 			vma->vm_pgoff -= grow;
 		}
 	}
- out_unlock:
 	anon_vma_unlock(vma);
 	return error;
 }

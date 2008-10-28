@@ -242,8 +242,6 @@ static unsigned long slice_find_area_bottomup(struct mm_struct *mm,
 
 full_search:
 	for (;;) {
-		unsigned long guard;
-
 		addr = _ALIGN_UP(addr, 1ul << pshift);
 		if ((TASK_SIZE - len) < addr)
 			break;
@@ -258,14 +256,7 @@ full_search:
 				addr = _ALIGN_UP(addr + 1,  1ul << SLICE_HIGH_SHIFT);
 			continue;
 		}
-		if (!vma)
-			goto got_it;
-		guard = 0;
-		if (vma->vm_flags & VM_GROWSDOWN)
-			guard = min(TASK_SIZE - (addr + len),
-				(unsigned long)heap_stack_gap << PAGE_SHIFT);
-		if (addr + len + guard <= vma->vm_start) {
-got_it:
+		if (!vma || addr + len <= vma->vm_start) {
 			/*
 			 * Remember the place where we stopped the search:
 			 */
@@ -293,23 +284,37 @@ static unsigned long slice_find_area_topdown(struct mm_struct *mm,
 					     int psize, int use_cache)
 {
 	struct vm_area_struct *vma;
-	unsigned long start_addr, addr;
+	unsigned long addr;
 	struct slice_mask mask;
 	int pshift = max_t(int, mmu_psize_defs[psize].shift, PAGE_SHIFT);
 
+	/* check if free_area_cache is useful for us */
 	if (use_cache) {
 		if (len <= mm->cached_hole_size) {
-			start_addr = addr = mm->mmap_base;
 			mm->cached_hole_size = 0;
-		} else
-			start_addr = addr = mm->free_area_cache;
-	} else
-		start_addr = addr = mm->mmap_base;
+			mm->free_area_cache = mm->mmap_base;
+		}
 
-full_search:
+		/* either no address requested or can't fit in requested
+		 * address hole
+		 */
+		addr = mm->free_area_cache;
+
+		/* make sure it can fit in the remaining address space */
+		if (addr > len) {
+			addr = _ALIGN_DOWN(addr - len, 1ul << pshift);
+			mask = slice_range_to_mask(addr, len);
+			if (slice_check_fit(mask, available) &&
+			    slice_area_is_free(mm, addr, len))
+					/* remember the address as a hint for
+					 * next time
+					 */
+					return (mm->free_area_cache = addr);
+		}
+	}
+
+	addr = mm->mmap_base;
 	while (addr > len) {
-		unsigned long guard;
-
 		/* Go down by chunk size */
 		addr = _ALIGN_DOWN(addr - len, 1ul << pshift);
 
@@ -331,15 +336,7 @@ full_search:
 		 * return with success:
 		 */
 		vma = find_vma(mm, addr);
-
-		if (!vma)
-			goto got_it;
-		guard = 0;
-		if (vma->vm_flags & VM_GROWSDOWN)
-			guard = min(TASK_SIZE - (addr + len),
-				(unsigned long)heap_stack_gap << PAGE_SHIFT);
-		if (addr + len + guard <= vma->vm_start) {
-got_it:
+		if (!vma || (addr + len) <= vma->vm_start) {
 			/* remember the address as a hint for next time */
 			if (use_cache)
 				mm->free_area_cache = addr;
@@ -352,11 +349,6 @@ got_it:
 
 		/* try just below the current vma->vm_start */
 		addr = vma->vm_start;
-	}
-	if (start_addr != mm->mmap_base) {
-		start_addr = addr = mm->mmap_base;
-		mm->cached_hole_size = 0;
-		goto full_search;
 	}
 
 	/*
