@@ -13,3 +13,6 @@ obj-$(CONFIG_W35UND)		+= winbond/
 obj-$(CONFIG_PRISM2_USB)	+= wlan-ng/
 obj-$(CONFIG_ECHO)		+= echo/
 obj-$(CONFIG_USB_ATMEL)		+= at76_usb/
+obj-$(CONFIG_AGNX)		+= agnx/
+obj-$(CONFIG_OTUS)		+= otus/
+obj-$(CONFIG_RTL2860)		+= rtl2860/
