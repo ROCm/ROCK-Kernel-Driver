@@ -47,6 +47,6 @@ source "drivers/staging/agnx/Kconfig"
 
 source "drivers/staging/otus/Kconfig"
 
-source "drivers/staging/rtl2860/Kconfig"
+source "drivers/staging/rt2860/Kconfig"
 
 endif # STAGING

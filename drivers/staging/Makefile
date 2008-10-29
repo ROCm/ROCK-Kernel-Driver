@@ -15,4 +15,4 @@ obj-$(CONFIG_ECHO)		+= echo/
 obj-$(CONFIG_USB_ATMEL)		+= at76_usb/
 obj-$(CONFIG_AGNX)		+= agnx/
 obj-$(CONFIG_OTUS)		+= otus/
-obj-$(CONFIG_RTL2860)		+= rtl2860/
+obj-$(CONFIG_RT2860)		+= rt2860/

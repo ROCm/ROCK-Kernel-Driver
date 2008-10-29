@@ -1,4 +1,4 @@
-obj-$(CONFIG_RTL2860)	+= rt2860sta.o
+obj-$(CONFIG_RT2860)	+= rt2860sta.o
 
 # TODO: all of these should be removed
 EXTRA_CFLAGS += -DLINUX -DAGGREGATION_SUPPORT -DPIGGYBACK_SUPPORT -DWMM_SUPPORT
