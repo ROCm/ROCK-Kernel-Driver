@@ -328,4 +328,9 @@ MULTI_grant_table_op(multicall_entry_t *mcl, unsigned int cmd,
 
 #endif
 
+#ifdef LINUX
+/* drivers/staging/rtl2860/ uses Windows-style types, including VOID */
+#undef VOID
+#endif
+
 #endif /* __HYPERVISOR_H__ */
