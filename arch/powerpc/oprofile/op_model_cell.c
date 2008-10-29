@@ -855,7 +855,7 @@ static int pm_rtas_activate_spu_profiling(u32 node)
 
 	ret = rtas_ibm_cbe_perftools(SUBFUNC_ACTIVATE,
 				     PASSTHRU_ENABLE, pm_signal_local,
-				     (NUM_SPUS_PER_NODE
+				     (ARRAY_SIZE(pm_signal_local)
 				      * sizeof(struct pm_signal)));
 
 	if (unlikely(ret)) {
