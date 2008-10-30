@@ -571,6 +571,13 @@ static void intel_i830_init_gtt_entries(void)
 	} else {
 		switch (gmch_ctrl & I855_GMCH_GMS_MASK) {
 		case I855_GMCH_GMS_STOLEN_1M:
+			if (IS_G33) {
+				size = 0;
+				printk(KERN_WARNING PFX
+				       "Warning: G33 chipset with 1MB"
+					" allocated. Older X.org Intel drivers"
+					" will not work.\n");
+			}
 			gtt_entries = MB(1) - KB(size);
 			break;
 		case I855_GMCH_GMS_STOLEN_4M:
