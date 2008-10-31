@@ -418,22 +418,35 @@ int __ocfs2_sync_dquot(struct dquot *dquot, int freeing)
 		dquot->dq_dqb.dqb_curspace += spacechange;
 	if (!test_bit(DQ_LASTSET_B + QIF_INODES_B, &dquot->dq_flags))
 		dquot->dq_dqb.dqb_curinodes += inodechange;
-	/* Now merge grace time changes... */
-	if (!test_bit(DQ_LASTSET_B + QIF_BTIME_B, &dquot->dq_flags) &&
-	    oldbtime > 0) {
-		if (dquot->dq_dqb.dqb_btime > 0)
-			dquot->dq_dqb.dqb_btime =
+	/* Set properly space grace time... */
+	if (dquot->dq_dqb.dqb_bsoftlimit &&
+	    dquot->dq_dqb.dqb_curspace > dquot->dq_dqb.dqb_bsoftlimit) {
+		if (!test_bit(DQ_LASTSET_B + QIF_BTIME_B, &dquot->dq_flags) &&
+		    oldbtime > 0) {
+			if (dquot->dq_dqb.dqb_btime > 0)
+				dquot->dq_dqb.dqb_btime =
 					min(dquot->dq_dqb.dqb_btime, oldbtime);
-		else
-			dquot->dq_dqb.dqb_btime = oldbtime;
+			else
+				dquot->dq_dqb.dqb_btime = oldbtime;
+		}
+	} else {
+		dquot->dq_dqb.dqb_btime = 0;
+		clear_bit(DQ_BLKS_B, &dquot->dq_flags);
 	}
-	if (!test_bit(DQ_LASTSET_B + QIF_ITIME_B, &dquot->dq_flags) &&
-	    olditime > 0) {
-		if (dquot->dq_dqb.dqb_itime > 0)
-			dquot->dq_dqb.dqb_itime =
+	/* Set properly inode grace time... */
+	if (dquot->dq_dqb.dqb_isoftlimit &&
+	    dquot->dq_dqb.dqb_curinodes > dquot->dq_dqb.dqb_isoftlimit) {
+		if (!test_bit(DQ_LASTSET_B + QIF_ITIME_B, &dquot->dq_flags) &&
+		    olditime > 0) {
+			if (dquot->dq_dqb.dqb_itime > 0)
+				dquot->dq_dqb.dqb_itime =
 					min(dquot->dq_dqb.dqb_itime, olditime);
-		else
-			dquot->dq_dqb.dqb_itime = olditime;
+			else
+				dquot->dq_dqb.dqb_itime = olditime;
+		}
+	} else {
+		dquot->dq_dqb.dqb_itime = 0;
+		clear_bit(DQ_INODES_B, &dquot->dq_flags);
 	}
 	/* All information is properly updated, clear the flags */
 	__clear_bit(DQ_LASTSET_B + QIF_SPACE_B, &dquot->dq_flags);

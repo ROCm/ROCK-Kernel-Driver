@@ -1134,6 +1134,7 @@ skip_recovery:
 		if (IS_ERR(qrec)) {
 			status = PTR_ERR(qrec);
 			mlog_errno(status);
+			continue;
 		}
 		ocfs2_queue_recovery_completion(osb->journal, rm_quota[i],
 						NULL, NULL, qrec);

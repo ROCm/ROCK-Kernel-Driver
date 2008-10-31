@@ -365,7 +365,7 @@ struct ocfs2_quota_recovery *ocfs2_begin_quota_recovery(
 	struct inode *lqinode;
 	struct buffer_head *bh;
 	int type;
-	int status;
+	int status = 0;
 	struct ocfs2_quota_recovery *rec;
 
 	mlog(ML_NOTICE, "Beginning quota recovery in slot %u\n", slot_num);

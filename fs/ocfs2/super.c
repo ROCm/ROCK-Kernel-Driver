@@ -972,8 +972,13 @@ static int ocfs2_fill_super(struct super_block *sb, void *data, int silent)
 	if (!(sb->s_flags & MS_RDONLY)) {
 		status = ocfs2_enable_quotas(osb);
 		if (status < 0) {
+			/* We have to err-out specially here because
+			 * s_root is already set */
 			mlog_errno(status);
-			goto read_super_error;
+			atomic_set(&osb->vol_state, VOLUME_DISABLED);
+			wake_up(&osb->osb_mount_event);
+			mlog_exit(status);
+			return status;
 		}
 	}
 
