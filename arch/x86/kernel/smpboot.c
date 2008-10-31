@@ -1239,9 +1239,6 @@ void __init native_smp_prepare_boot_cpu(void)
 	per_cpu(cpu_state, me) = CPU_ONLINE;
 }
 
-/* post-smp_cpus_done processing */
-void (*smp_cpus_done_system)(void);
-
 void __init native_smp_cpus_done(unsigned int max_cpus)
 {
 	pr_debug("Boot done.\n");
@@ -1252,9 +1249,6 @@ void __init native_smp_cpus_done(unsigned int max_cpus)
 	setup_ioapic_dest();
 #endif
 	check_nmi_watchdog();
-
-	if (smp_cpus_done_system)
-		smp_cpus_done_system();
 }
 
 #ifdef CONFIG_HOTPLUG_CPU

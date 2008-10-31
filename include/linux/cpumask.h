@@ -109,6 +109,7 @@
  *
  * for_each_cpu_mask(cpu, mask)		for-loop cpu over mask using NR_CPUS
  * for_each_cpu_mask_nr(cpu, mask)	for-loop cpu over mask using nr_cpu_ids
+ * for_each_cpu_mask_and(cpu, mask, and) for-loop cpu over (mask & and).
  *
  * int num_online_cpus()		Number of online CPUs
  * int num_possible_cpus()		Number of all possible CPUs
@@ -400,28 +401,40 @@ static inline void __cpus_fold(cpumask_t *dstp, const cpumask_t *origp,
 
 #if NR_CPUS == 1
 
-#define nr_cpu_ids		1
-#define first_cpu(src)		({ (void)(src); 0; })
-#define next_cpu(n, src)	({ (void)(src); 1; })
-#define any_online_cpu(mask)	0
-#define for_each_cpu_mask(cpu, mask)	\
+#define nr_cpu_ids			1
+#define first_cpu(src)			({ (void)(src); 0; })
+#define next_cpu(n, src)		({ (void)(src); 1; })
+#define cpumask_next_and(n, srcp, andp)	({ (void)(srcp), (void)(andp); 1; })
+#define any_online_cpu(mask)		0
+
+#define for_each_cpu_mask(cpu, mask)		\
 	for ((cpu) = 0; (cpu) < 1; (cpu)++, (void)mask)
+#define for_each_cpu_mask_and(cpu, mask, and)	\
+	for ((cpu) = 0; (cpu) < 1; (cpu)++, (void)mask, (void)and)
 
 #else /* NR_CPUS > 1 */
 
 extern int nr_cpu_ids;
 int __first_cpu(const cpumask_t *srcp);
 int __next_cpu(int n, const cpumask_t *srcp);
+int cpumask_next_and(int n, const cpumask_t *srcp, const cpumask_t *andp);
 int __any_online_cpu(const cpumask_t *mask);
 
 #define first_cpu(src)		__first_cpu(&(src))
 #define next_cpu(n, src)	__next_cpu((n), &(src))
 #define any_online_cpu(mask) __any_online_cpu(&(mask))
+
 #define for_each_cpu_mask(cpu, mask)			\
 	for ((cpu) = -1;				\
 		(cpu) = next_cpu((cpu), (mask)),	\
-		(cpu) < NR_CPUS; )
+		(cpu) < NR_CPUS;)
+#define for_each_cpu_mask_and(cpu, mask, and)				\
+	for ((cpu) = -1;						\
+		(cpu) = cpumask_next_and((cpu), &(mask), &(and)),	\
+		(cpu) < nr_cpu_ids;)
 #endif
+
+#define cpumask_first_and(mask, and) cpumask_next_and(-1, (mask), (and))
 
 #if NR_CPUS <= 64
 
@@ -432,12 +445,14 @@ int __any_online_cpu(const cpumask_t *mask);
 #else /* NR_CPUS > 64 */
 
 int __next_cpu_nr(int n, const cpumask_t *srcp);
-#define next_cpu_nr(n, src)	__next_cpu_nr((n), &(src))
-#define cpus_weight_nr(cpumask)	__cpus_weight(&(cpumask), nr_cpu_ids)
+
+#define next_cpu_nr(n, src)		__next_cpu_nr((n), &(src))
+#define cpus_weight_nr(cpumask)		__cpus_weight(&(cpumask), nr_cpu_ids)
+
 #define for_each_cpu_mask_nr(cpu, mask)			\
 	for ((cpu) = -1;				\
 		(cpu) = next_cpu_nr((cpu), (mask)),	\
-		(cpu) < nr_cpu_ids; )
+		(cpu) < nr_cpu_ids;)
 
 #endif /* NR_CPUS > 64 */
 

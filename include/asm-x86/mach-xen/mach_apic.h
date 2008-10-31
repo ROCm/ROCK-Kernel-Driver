@@ -19,9 +19,9 @@ extern void setup_apic_routing(void);
 #else
 
 #ifdef CONFIG_SMP
-#define TARGET_CPUS cpu_online_map
+#define TARGET_CPUS &cpu_online_map
 #else
-#define TARGET_CPUS cpumask_of_cpu(0)
+#define TARGET_CPUS &cpumask_of_cpu(0)
 #endif
 
 #define INT_DELIVERY_MODE dest_LowestPrio
@@ -46,9 +46,9 @@ static inline int apicid_to_node(int logical_apicid)
 	return 0;
 }
 
-static inline unsigned int cpu_mask_to_apicid(cpumask_t cpumask)
+static inline unsigned int cpu_mask_to_apicid(const cpumask_t *cpumask)
 {
-	return cpus_addr(cpumask)[0];
+	return cpus_addr(*cpumask)[0];
 }
 
 #endif /* CONFIG_X86_64 */

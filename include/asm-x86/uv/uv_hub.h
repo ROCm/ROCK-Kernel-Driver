@@ -13,6 +13,7 @@
 
 #include <linux/numa.h>
 #include <linux/percpu.h>
+#include <linux/timer.h>
 #include <asm/types.h>
 #include <asm/percpu.h>
 
@@ -112,6 +113,16 @@
  */
 #define UV_MAX_NASID_VALUE	(UV_MAX_NUMALINK_NODES * 2)
 
+struct uv_scir_s {
+	struct timer_list timer;
+	unsigned long	offset;
+	unsigned long	last;
+	unsigned long	idle_on;
+	unsigned long	idle_off;
+	unsigned char	state;
+	unsigned char	enabled;
+};
+
 /*
  * The following defines attributes of the HUB chip. These attributes are
  * frequently referenced and are kept in the per-cpu data areas of each cpu.
@@ -123,8 +134,6 @@ struct uv_hub_info_s {
 	unsigned long	gnode_upper;
 	unsigned long	lowmem_remap_top;
 	unsigned long	lowmem_remap_base;
-	unsigned long	led_offset;
-	unsigned int	led_heartbeat_count;
 	unsigned short	pnode;
 	unsigned short	pnode_mask;
 	unsigned short	coherency_domain_number;
@@ -132,8 +141,9 @@ struct uv_hub_info_s {
 	unsigned char	blade_processor_id;
 	unsigned char	m_val;
 	unsigned char	n_val;
-	unsigned char	led_state;
+	struct uv_scir_s scir;
 };
+
 DECLARE_PER_CPU(struct uv_hub_info_s, __uv_hub_info);
 #define uv_hub_info 		(&__get_cpu_var(__uv_hub_info))
 #define uv_cpu_hub_info(cpu)	(&per_cpu(__uv_hub_info, cpu))
@@ -164,19 +174,30 @@ DECLARE_PER_CPU(struct uv_hub_info_s, __uv_hub_info);
 	((unsigned long)(p) << UV_GLOBAL_MMR64_PNODE_SHIFT)
 
 #define UV_APIC_PNODE_SHIFT	6
+
 /* Local Bus from cpu's perspective */
 #define LOCAL_BUS_BASE		0x1c00000
 #define LOCAL_BUS_SIZE		(4 * 1024 * 1024)
 
-/* LED windows - located at top of ACPI MMR space */
-#define LED_WINDOW_COUNT	64
-#define LED_LOCAL_MMR_BASE	(LOCAL_BUS_BASE + LOCAL_BUS_SIZE - \
-							LED_WINDOW_COUNT)
+/*
+ * System Controller Interface Reg
+ *
+ * Note there are NO leds on a UV system.  This register is only
+ * used by the system controller to monitor system-wide operation.
+ * There are 64 regs per node.  With Nahelem cpus (2 cores per node,
+ * 8 cpus per core, 2 threads per cpu) there are 32 cpu threads on
+ * a node.
+ *
+ * The window is located at top of ACPI MMR space
+ */
+#define SCIR_WINDOW_COUNT	64
+#define SCIR_LOCAL_MMR_BASE	(LOCAL_BUS_BASE + \
+				 LOCAL_BUS_SIZE - \
+				 SCIR_WINDOW_COUNT)
 
-#define LED_CPU_HEARTBEAT	0x01	/* timer interrupt */
-#define LED_CPU_ACTIVITY	0x02	/* not idle */
-#define LED_CPU_BLINK		0xffff	/* blink led */
-#define LED_CPU_HB_INTERVAL	(HZ/2)	/* blink once per second */
+#define SCIR_CPU_HEARTBEAT	0x01	/* timer interrupt */
+#define SCIR_CPU_ACTIVITY	0x02	/* not idle */
+#define SCIR_CPU_HB_INTERVAL	(HZ)	/* once per second */
 
 /*
  * Macros for converting between kernel virtual addresses, socket local physical
@@ -376,38 +397,21 @@ static inline int uv_num_possible_blades(void)
 	return uv_possible_blades;
 }
 
-/* Light up the leds */
-static inline void uv_set_led_bits(unsigned short value, unsigned char mask)
+/* Update SCIR state */
+static inline void uv_set_scir_bits(unsigned char value)
 {
-	unsigned char state = uv_hub_info->led_state;
-
-	if (value == LED_CPU_BLINK)
-		state ^= mask;
-	else
-		state = (state & ~mask) | (value & mask);
-
-	if (uv_hub_info->led_state != state) {
-		uv_hub_info->led_state = state;
-		uv_write_local_mmr8(uv_hub_info->led_offset, state);
+	if (uv_hub_info->scir.state != value) {
+		uv_hub_info->scir.state = value;
+		uv_write_local_mmr8(uv_hub_info->scir.offset, value);
 	}
 }
-
-/* Light up the leds */
-static inline void uv_set_led_bits_on(int cpu, unsigned short value,
-					       unsigned char mask)
-
+static inline void uv_set_cpu_scir_bits(int cpu, unsigned char value)
 {
-	unsigned char state = uv_cpu_hub_info(cpu)->led_state;
-
-	if (value == LED_CPU_BLINK)
-		state ^= mask;
-	else
-		state = (state & ~mask) | (value & mask);
-
-	if (uv_cpu_hub_info(cpu)->led_state != state) {
-		uv_cpu_hub_info(cpu)->led_state = state;
-		uv_write_local_mmr8(uv_cpu_hub_info(cpu)->led_offset, state);
+	if (uv_cpu_hub_info(cpu)->scir.state != value) {
+		uv_cpu_hub_info(cpu)->scir.state = value;
+		uv_write_local_mmr8(uv_cpu_hub_info(cpu)->scir.offset, value);
 	}
 }
 
 #endif /* __ASM_X86_UV_HUB__ */
+

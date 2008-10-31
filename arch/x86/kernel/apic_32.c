@@ -319,7 +319,7 @@ static void lapic_timer_setup(enum clock_event_mode mode,
 static void lapic_timer_broadcast(cpumask_t mask)
 {
 #ifdef CONFIG_SMP
-	send_IPI_mask(mask, LOCAL_TIMER_VECTOR);
+	send_IPI_mask(&mask, LOCAL_TIMER_VECTOR);
 #endif
 }
 

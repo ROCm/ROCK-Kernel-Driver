@@ -1077,7 +1077,7 @@ kdba_wait_for_cpus(void)
 	for_each_online_cpu(c) {
 		if (kdb_running_process[c].seqno < kdb_seqno - 1) {
 			kdb_printf(" %d", c);
-			send_IPI_mask(cpumask_of_cpu(c), NMI_VECTOR);
+			send_IPI_mask(&cpumask_of_cpu(c), NMI_VECTOR);
 		}
 	}
 	kdb_printf(".\n");

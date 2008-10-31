@@ -4,6 +4,7 @@
 #include <asm/genapic.h>
 
 #define send_IPI_mask (genapic->send_IPI_mask)
+#define send_IPI_mask_allbutself (genapic->send_IPI_mask_allbutself)
 #define send_IPI_allbutself (genapic->send_IPI_allbutself)
 #define send_IPI_all (genapic->send_IPI_all)
 

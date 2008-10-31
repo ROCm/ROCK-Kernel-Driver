@@ -287,7 +287,7 @@ static void quiesce_dummy(void *unused)
  * If a faster scheme can be made, we could go back to preferring stack based
  * data -- the data allocation/free is non-zero cost.
  */
-static void smp_call_function_mask_quiesce_stack(cpumask_t mask)
+static void smp_call_function_mask_quiesce_stack(const cpumask_t *mask)
 {
 	struct call_single_data data;
 	int cpu;
@@ -295,7 +295,7 @@ static void smp_call_function_mask_quiesce_stack(cpumask_t mask)
 	data.func = quiesce_dummy;
 	data.info = NULL;
 
-	for_each_cpu_mask(cpu, mask) {
+	for_each_cpu_mask_nr(cpu, *mask) {
 		data.flags = CSD_FLAG_WAIT;
 		generic_exec_single(cpu, &data);
 	}
@@ -323,7 +323,6 @@ int smp_call_function_mask(cpumask_t mask, void (*func)(void *), void *info,
 {
 	struct call_function_data d;
 	struct call_function_data *data = NULL;
-	cpumask_t allbutself;
 	unsigned long flags;
 	int cpu, num_cpus;
 	int slowpath = 0;
@@ -332,9 +331,8 @@ int smp_call_function_mask(cpumask_t mask, void (*func)(void *), void *info,
 	WARN_ON(irqs_disabled());
 
 	cpu = smp_processor_id();
-	allbutself = cpu_online_map;
-	cpu_clear(cpu, allbutself);
-	cpus_and(mask, mask, allbutself);
+	cpus_and(mask, mask, cpu_online_map);
+	cpu_clear(cpu, mask);
 	num_cpus = cpus_weight(mask);
 
 	/*
@@ -377,7 +375,7 @@ int smp_call_function_mask(cpumask_t mask, void (*func)(void *), void *info,
 	if (wait) {
 		csd_flag_wait(&data->csd);
 		if (unlikely(slowpath))
-			smp_call_function_mask_quiesce_stack(mask);
+			smp_call_function_mask_quiesce_stack(&mask);
 	}
 
 	return 0;

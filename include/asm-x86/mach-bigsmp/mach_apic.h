@@ -10,7 +10,7 @@ static inline int apic_id_registered(void)
 }
 
 /* Round robin the irqs amoung the online cpus */
-static inline cpumask_t target_cpus(void)
+static inline const cpumask_t *target_cpus(void)
 { 
 	static unsigned long cpu = NR_CPUS;
 	do {
@@ -19,7 +19,7 @@ static inline cpumask_t target_cpus(void)
 		else
 			cpu = next_cpu(cpu, cpu_online_map);
 	} while (cpu >= NR_CPUS);
-	return cpumask_of_cpu(cpu);
+	return &cpumask_of_cpu(cpu);
 }
 
 #undef APIC_DEST_LOGICAL
@@ -126,7 +126,7 @@ static inline int check_phys_apicid_present(int boot_cpu_physical_apicid)
 }
 
 /* As we are using single CPU as destination, pick only one CPU here */
-static inline unsigned int cpu_mask_to_apicid(cpumask_t cpumask)
+static inline unsigned int cpu_mask_to_apicid(const cpumask_t *cpumask)
 {
 	int cpu;
 	int apicid;	

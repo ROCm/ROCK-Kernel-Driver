@@ -148,12 +148,11 @@ static inline void __send_IPI_dest_field(unsigned long mask, int vector)
 /*
  * This is only used on smaller machines.
  */
-void send_IPI_mask_bitmask(cpumask_t cpumask, int vector)
+void send_IPI_mask_bitmask(const cpumask_t *cpumask, int vector)
 {
 #ifndef CONFIG_XEN
-	unsigned long mask = cpus_addr(cpumask)[0];
+	unsigned long mask = cpus_addr(*cpumask)[0];
 #else
-	cpumask_t mask;
 	unsigned int cpu;
 #endif
 	unsigned long flags;
@@ -163,16 +162,14 @@ void send_IPI_mask_bitmask(cpumask_t cpumask, int vector)
 	WARN_ON(mask & ~cpus_addr(cpu_online_map)[0]);
 	__send_IPI_dest_field(mask, vector);
 #else
-	cpus_andnot(mask, cpumask, cpu_online_map);
-	WARN_ON(!cpus_empty(mask));
-	for_each_online_cpu(cpu)
-		if (cpu_isset(cpu, cpumask))
-			__send_IPI_one(cpu, vector);
+	WARN_ON(!cpus_subset(*cpumask, cpu_online_map));
+	for_each_cpu_mask_and(cpu, *cpumask, cpu_online_map)
+		__send_IPI_one(cpu, vector);
 #endif
 	local_irq_restore(flags);
 }
 
-void send_IPI_mask_sequence(cpumask_t mask, int vector)
+void send_IPI_mask_sequence(const cpumask_t *mask, int vector)
 {
 #ifndef CONFIG_XEN
 	unsigned long flags;
@@ -185,12 +182,9 @@ void send_IPI_mask_sequence(cpumask_t mask, int vector)
 	 */
 
 	local_irq_save(flags);
-	for_each_possible_cpu(query_cpu) {
-		if (cpu_isset(query_cpu, mask)) {
-			__send_IPI_dest_field(cpu_to_logical_apicid(query_cpu),
-					      vector);
-		}
-	}
+	for_each_cpu_mask(query_cpu, *mask)
+		__send_IPI_dest_field(cpu_to_logical_apicid(query_cpu), vector);
+
 	local_irq_restore(flags);
 #else
 	send_IPI_mask_bitmask(mask, vector);

@@ -53,7 +53,7 @@ struct smp_ops {
 	void (*smp_send_stop)(void);
 	void (*smp_send_reschedule)(int cpu);
 
-	void (*send_call_func_ipi)(cpumask_t mask);
+	void (*send_call_func_ipi)(const cpumask_t *mask);
 	void (*send_call_func_single_ipi)(int cpu);
 };
 
@@ -103,14 +103,14 @@ static inline void arch_send_call_function_single_ipi(int cpu)
 
 static inline void arch_send_call_function_ipi(cpumask_t mask)
 {
-	smp_ops.send_call_func_ipi(mask);
+	smp_ops.send_call_func_ipi(&mask);
 }
 
 void native_smp_prepare_boot_cpu(void);
 void native_smp_prepare_cpus(unsigned int max_cpus);
 void native_smp_cpus_done(unsigned int max_cpus);
 int native_cpu_up(unsigned int cpunum);
-void native_send_call_func_ipi(cpumask_t mask);
+void native_send_call_func_ipi(const cpumask_t *mask);
 void native_send_call_func_single_ipi(int cpu);
 
 extern int __cpu_disable(void);

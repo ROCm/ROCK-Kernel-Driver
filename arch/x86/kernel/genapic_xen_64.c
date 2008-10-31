@@ -64,14 +64,15 @@ void xen_send_IPI_shortcut(unsigned int shortcut, int vector)
 	}
 }
 
-static cpumask_t xen_target_cpus(void)
+static cpumask_t* xen_target_cpus(cpumask_t *retmask)
 {
-	return cpu_online_map;
+	return &cpu_online_map;
 }
 
-static cpumask_t xen_vector_allocation_domain(int cpu)
+static void xen_vector_allocation_domain(int cpu, cpumask_t *retmask)
 {
-	return cpumask_of_cpu(cpu);
+	cpus_clear(*retmask);
+	cpu_set(cpu, *retmask);
 }
 
 /*
@@ -98,9 +99,9 @@ static void xen_send_IPI_all(int vector)
 	xen_send_IPI_shortcut(APIC_DEST_ALLINC, vector);
 }
 
-static void xen_send_IPI_mask(cpumask_t cpumask, int vector)
+static void xen_send_IPI_mask(const cpumask_t *cpumask, int vector)
 {
-	unsigned long mask = cpus_addr(cpumask)[0];
+	unsigned long mask = cpus_addr(*cpumask)[0];
 	unsigned int cpu;
 	unsigned long flags;
 
@@ -108,7 +109,7 @@ static void xen_send_IPI_mask(cpumask_t cpumask, int vector)
 	WARN_ON(mask & ~cpus_addr(cpu_online_map)[0]);
 
 	for_each_possible_cpu(cpu) {
-		if (cpu_isset(cpu, cpumask)) {
+		if (cpu_isset(cpu, *cpumask)) {
 			__send_IPI_one(cpu, vector);
 		}
 	}
@@ -123,9 +124,9 @@ static int xen_apic_id_registered(void)
 }
 #endif
 
-static unsigned int xen_cpu_mask_to_apicid(cpumask_t cpumask)
+static unsigned int xen_cpu_mask_to_apicid(const cpumask_t *cpumask)
 {
-	return cpus_addr(cpumask)[0];
+	return cpus_addr(*cpumask)[0];
 }
 
 static unsigned int phys_pkg_id(int index_msb)

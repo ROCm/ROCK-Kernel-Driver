@@ -118,17 +118,17 @@ void xen_smp_send_reschedule(int cpu)
 		WARN_ON(1);
 		return;
 	}
-	send_IPI_mask(cpumask_of_cpu(cpu), RESCHEDULE_VECTOR);
+	send_IPI_mask(&cpumask_of_cpu(cpu), RESCHEDULE_VECTOR);
 }
 
 void xen_send_call_func_single_ipi(int cpu)
 {
-	send_IPI_mask(cpumask_of_cpu(cpu), CALL_FUNC_SINGLE_VECTOR);
+	send_IPI_mask(&cpumask_of_cpu(cpu), CALL_FUNC_SINGLE_VECTOR);
 }
 
 void xen_send_call_func_ipi(cpumask_t mask)
 {
-	send_IPI_mask(mask, CALL_FUNCTION_VECTOR);
+	send_IPI_mask(&mask, CALL_FUNCTION_VECTOR);
 }
 
 static void stop_this_cpu(void *dummy)

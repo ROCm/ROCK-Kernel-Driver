@@ -15,6 +15,15 @@ int __next_cpu(int n, const cpumask_t *srcp)
 }
 EXPORT_SYMBOL(__next_cpu);
 
+int cpumask_next_and(int n, const cpumask_t *srcp, const cpumask_t *andp)
+{
+	while ((n = next_cpu_nr(n, *srcp)) < nr_cpu_ids)
+		if (cpu_isset(n, *andp))
+			break;
+	return n;
+}
+EXPORT_SYMBOL(cpumask_next_and);
+
 #if NR_CPUS > 64
 int __next_cpu_nr(int n, const cpumask_t *srcp)
 {

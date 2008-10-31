@@ -854,7 +854,7 @@ static void setup_IO_APIC_irq(int apic, int pin, unsigned int irq,
 	if (!IO_APIC_IRQ(irq))
 		return;
 
-	mask = TARGET_CPUS;
+	mask = *TARGET_CPUS;
 	if (assign_irq_vector(irq, mask))
 		return;
 
@@ -875,7 +875,7 @@ static void setup_IO_APIC_irq(int apic, int pin, unsigned int irq,
 
 	entry.delivery_mode = INT_DELIVERY_MODE;
 	entry.dest_mode = INT_DEST_MODE;
-	entry.dest = cpu_mask_to_apicid(mask);
+	entry.dest = cpu_mask_to_apicid(&mask);
 	entry.mask = 0;				/* enable IRQ */
 	entry.trigger = trigger;
 	entry.polarity = polarity;
@@ -1381,7 +1381,7 @@ static int ioapic_retrigger_irq(unsigned int irq)
 	unsigned long flags;
 
 	spin_lock_irqsave(&vector_lock, flags);
-	send_IPI_mask(cpumask_of_cpu(first_cpu(cfg->domain)), cfg->vector);
+	send_IPI_mask(&cpumask_of_cpu(first_cpu(cfg->domain)), cfg->vector);
 	spin_unlock_irqrestore(&vector_lock, flags);
 
 	return 1;
@@ -1446,7 +1446,7 @@ static void irq_complete_move(unsigned int irq)
 
 		cpus_and(cleanup_mask, cfg->old_domain, cpu_online_map);
 		cfg->move_cleanup_count = cpus_weight(cleanup_mask);
-		send_IPI_mask(cleanup_mask, IRQ_MOVE_CLEANUP_VECTOR);
+		send_IPI_mask(&cleanup_mask, IRQ_MOVE_CLEANUP_VECTOR);
 		cfg->move_in_progress = 0;
 	}
 }

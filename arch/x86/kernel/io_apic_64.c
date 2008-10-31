@@ -87,7 +87,7 @@ static struct irq_cfg irq_cfg[NR_IRQS] __read_mostly = {
 	[15] = { .domain = CPU_MASK_ALL, .vector = IRQ15_VECTOR, },
 };
 
-static int assign_irq_vector(int irq, cpumask_t mask);
+static int assign_irq_vector(int irq, const cpumask_t *mask);
 
 int first_system_vector = 0xfe;
 
@@ -339,11 +339,11 @@ static void set_ioapic_affinity_irq(unsigned int irq, cpumask_t mask)
 	if (cpus_empty(tmp))
 		return;
 
-	if (assign_irq_vector(irq, mask))
+	if (assign_irq_vector(irq, &mask))
 		return;
 
 	cpus_and(tmp, cfg->domain, mask);
-	dest = cpu_mask_to_apicid(tmp);
+	dest = cpu_mask_to_apicid(&tmp);
 
 	/*
 	 * Only the high 8 bits are valid.
@@ -802,7 +802,7 @@ void unlock_vector_lock(void)
 	spin_unlock(&vector_lock);
 }
 
-static int __assign_irq_vector(int irq, cpumask_t mask)
+static int __assign_irq_vector(int irq, const cpumask_t *mask)
 {
 	/*
 	 * NOTE! The local APIC isn't very good at handling
@@ -819,31 +819,28 @@ static int __assign_irq_vector(int irq, cpumask_t mask)
 	unsigned int old_vector;
 	int cpu;
 	struct irq_cfg *cfg;
+	cpumask_t tmp_mask;
 
 	BUG_ON((unsigned)irq >= NR_IRQS);
 	cfg = &irq_cfg[irq];
-
-	/* Only try and allocate irqs on cpus that are present */
-	cpus_and(mask, mask, cpu_online_map);
 
 	if ((cfg->move_in_progress) || cfg->move_cleanup_count)
 		return -EBUSY;
 
 	old_vector = cfg->vector;
 	if (old_vector) {
-		cpumask_t tmp;
-		cpus_and(tmp, cfg->domain, mask);
-		if (!cpus_empty(tmp))
+		cpus_and(tmp_mask, *mask, cpu_online_map);
+		cpus_and(tmp_mask, cfg->domain, tmp_mask);
+		if (!cpus_empty(tmp_mask))
 			return 0;
 	}
 
-	for_each_cpu_mask_nr(cpu, mask) {
-		cpumask_t domain, new_mask;
+	/* Only try and allocate irqs on cpus that are present */
+	for_each_cpu_mask_and(cpu, *mask, cpu_online_map) {
 		int new_cpu;
 		int vector, offset;
 
-		domain = vector_allocation_domain(cpu);
-		cpus_and(new_mask, domain, cpu_online_map);
+		vector_allocation_domain(cpu, &tmp_mask);
 
 		vector = current_vector;
 		offset = current_offset;
@@ -862,7 +859,7 @@ next:
 		if (vector == KDBENTER_VECTOR)
 			goto next;
 #endif	/* CONFIG_KDB */
-		for_each_cpu_mask_nr(new_cpu, new_mask)
+		for_each_cpu_mask_and(new_cpu, tmp_mask, cpu_online_map)
 			if (per_cpu(vector_irq, new_cpu)[vector] != -1)
 				goto next;
 		/* Found one! */
@@ -872,16 +869,16 @@ next:
 			cfg->move_in_progress = 1;
 			cfg->old_domain = cfg->domain;
 		}
-		for_each_cpu_mask_nr(new_cpu, new_mask)
+		for_each_cpu_mask_and(new_cpu, tmp_mask, cpu_online_map)
 			per_cpu(vector_irq, new_cpu)[vector] = irq;
 		cfg->vector = vector;
-		cfg->domain = domain;
+		cfg->domain = tmp_mask;
 		return 0;
 	}
 	return -ENOSPC;
 }
 
-static int assign_irq_vector(int irq, cpumask_t mask)
+static int assign_irq_vector(int irq, const cpumask_t *mask)
 {
 	int err;
 	unsigned long flags;
@@ -1039,8 +1036,8 @@ static void setup_IO_APIC_irq(int apic, int pin, unsigned int irq,
 	if (!IO_APIC_IRQ(irq))
 		return;
 
-	mask = TARGET_CPUS;
-	if (assign_irq_vector(irq, mask))
+	mask = *TARGET_CPUS;
+	if (assign_irq_vector(irq, &mask))
 		return;
 
 	cpus_and(mask, cfg->domain, mask);
@@ -1053,7 +1050,7 @@ static void setup_IO_APIC_irq(int apic, int pin, unsigned int irq,
 
 
 	if (setup_ioapic_entry(mp_ioapics[apic].mp_apicid, irq, &entry,
-			       cpu_mask_to_apicid(mask), trigger, polarity,
+			       cpu_mask_to_apicid(&mask), trigger, polarity,
 			       cfg->vector)) {
 		printk("Failed to setup ioapic entry for ioapic  %d, pin %d\n",
 		       mp_ioapics[apic].mp_apicid, pin);
@@ -1551,7 +1548,7 @@ static int ioapic_retrigger_irq(unsigned int irq)
 	unsigned long flags;
 
 	spin_lock_irqsave(&vector_lock, flags);
-	send_IPI_mask(cpumask_of_cpu(first_cpu(cfg->domain)), cfg->vector);
+	send_IPI_mask(&cpumask_of_cpu(first_cpu(cfg->domain)), cfg->vector);
 	spin_unlock_irqrestore(&vector_lock, flags);
 
 	return 1;
@@ -1596,7 +1593,7 @@ static void migrate_ioapic_irq(int irq, cpumask_t mask)
 {
 	struct irq_cfg *cfg = irq_cfg + irq;
 	struct irq_desc *desc = irq_desc + irq;
-	cpumask_t tmp, cleanup_mask;
+	cpumask_t tmp;
 	struct irte irte;
 	int modify_ioapic_rte = desc->status & IRQ_LEVEL;
 	unsigned int dest;
@@ -1609,11 +1606,11 @@ static void migrate_ioapic_irq(int irq, cpumask_t mask)
 	if (get_irte(irq, &irte))
 		return;
 
-	if (assign_irq_vector(irq, mask))
+	if (assign_irq_vector(irq, &mask))
 		return;
 
 	cpus_and(tmp, cfg->domain, mask);
-	dest = cpu_mask_to_apicid(tmp);
+	dest = cpu_mask_to_apicid(&tmp);
 
 	if (modify_ioapic_rte) {
 		spin_lock_irqsave(&ioapic_lock, flags);
@@ -1630,9 +1627,9 @@ static void migrate_ioapic_irq(int irq, cpumask_t mask)
 	modify_irte(irq, &irte);
 
 	if (cfg->move_in_progress) {
-		cpus_and(cleanup_mask, cfg->old_domain, cpu_online_map);
-		cfg->move_cleanup_count = cpus_weight(cleanup_mask);
-		send_IPI_mask(cleanup_mask, IRQ_MOVE_CLEANUP_VECTOR);
+		cpus_and(tmp, cfg->old_domain, cpu_online_map);
+		cfg->move_cleanup_count = cpus_weight(tmp);
+		send_IPI_mask(&tmp, IRQ_MOVE_CLEANUP_VECTOR);
 		cfg->move_in_progress = 0;
 	}
 
@@ -1757,7 +1754,7 @@ static void irq_complete_move(unsigned int irq)
 
 		cpus_and(cleanup_mask, cfg->old_domain, cpu_online_map);
 		cfg->move_cleanup_count = cpus_weight(cleanup_mask);
-		send_IPI_mask(cleanup_mask, IRQ_MOVE_CLEANUP_VECTOR);
+		send_IPI_mask(&cleanup_mask, IRQ_MOVE_CLEANUP_VECTOR);
 		cfg->move_in_progress = 0;
 	}
 }
@@ -2337,13 +2334,13 @@ static int msi_compose_msg(struct pci_dev *pdev, unsigned int irq, struct msi_ms
 	unsigned dest;
 	cpumask_t tmp;
 
-	tmp = TARGET_CPUS;
-	err = assign_irq_vector(irq, tmp);
+	tmp = *TARGET_CPUS;
+	err = assign_irq_vector(irq, &tmp);
 	if (err)
 		return err;
 
 	cpus_and(tmp, cfg->domain, tmp);
-	dest = cpu_mask_to_apicid(tmp);
+	dest = cpu_mask_to_apicid(&tmp);
 
 #ifdef CONFIG_INTR_REMAP
 	if (irq_remapped(irq)) {
@@ -2408,11 +2405,11 @@ static void set_msi_irq_affinity(unsigned int irq, cpumask_t mask)
 	if (cpus_empty(tmp))
 		return;
 
-	if (assign_irq_vector(irq, mask))
+	if (assign_irq_vector(irq, &mask))
 		return;
 
 	cpus_and(tmp, cfg->domain, mask);
-	dest = cpu_mask_to_apicid(tmp);
+	dest = cpu_mask_to_apicid(&tmp);
 
 	read_msi_msg(irq, &msg);
 
@@ -2434,7 +2431,7 @@ static void ir_set_msi_irq_affinity(unsigned int irq, cpumask_t mask)
 {
 	struct irq_cfg *cfg = irq_cfg + irq;
 	unsigned int dest;
-	cpumask_t tmp, cleanup_mask;
+	cpumask_t tmp;
 	struct irte irte;
 
 	cpus_and(tmp, mask, cpu_online_map);
@@ -2444,11 +2441,11 @@ static void ir_set_msi_irq_affinity(unsigned int irq, cpumask_t mask)
 	if (get_irte(irq, &irte))
 		return;
 
-	if (assign_irq_vector(irq, mask))
+	if (assign_irq_vector(irq, &mask))
 		return;
 
 	cpus_and(tmp, cfg->domain, mask);
-	dest = cpu_mask_to_apicid(tmp);
+	dest = cpu_mask_to_apicid(&tmp);
 
 	irte.vector = cfg->vector;
 	irte.dest_id = IRTE_DEST(dest);
@@ -2464,9 +2461,9 @@ static void ir_set_msi_irq_affinity(unsigned int irq, cpumask_t mask)
 	 * vector allocation.
 	 */
 	if (cfg->move_in_progress) {
-		cpus_and(cleanup_mask, cfg->old_domain, cpu_online_map);
-		cfg->move_cleanup_count = cpus_weight(cleanup_mask);
-		send_IPI_mask(cleanup_mask, IRQ_MOVE_CLEANUP_VECTOR);
+		cpus_and(tmp, cfg->old_domain, cpu_online_map);
+		cfg->move_cleanup_count = cpus_weight(tmp);
+		send_IPI_mask(&tmp, IRQ_MOVE_CLEANUP_VECTOR);
 		cfg->move_in_progress = 0;
 	}
 
@@ -2661,11 +2658,11 @@ static void dmar_msi_set_affinity(unsigned int irq, cpumask_t mask)
 	if (cpus_empty(tmp))
 		return;
 
-	if (assign_irq_vector(irq, mask))
+	if (assign_irq_vector(irq, &mask))
 		return;
 
 	cpus_and(tmp, cfg->domain, mask);
-	dest = cpu_mask_to_apicid(tmp);
+	dest = cpu_mask_to_apicid(&tmp);
 
 	dmar_msi_read(irq, &msg);
 
@@ -2737,11 +2734,11 @@ static void set_ht_irq_affinity(unsigned int irq, cpumask_t mask)
 	if (cpus_empty(tmp))
 		return;
 
-	if (assign_irq_vector(irq, mask))
+	if (assign_irq_vector(irq, &mask))
 		return;
 
 	cpus_and(tmp, cfg->domain, mask);
-	dest = cpu_mask_to_apicid(tmp);
+	dest = cpu_mask_to_apicid(&tmp);
 
 	target_ht_irq(irq, dest, cfg->vector);
 	irq_desc[irq].affinity = mask;
@@ -2765,14 +2762,14 @@ int arch_setup_ht_irq(unsigned int irq, struct pci_dev *dev)
 	int err;
 	cpumask_t tmp;
 
-	tmp = TARGET_CPUS;
-	err = assign_irq_vector(irq, tmp);
+	tmp = *TARGET_CPUS;
+	err = assign_irq_vector(irq, &tmp);
 	if (!err) {
 		struct ht_irq_msg msg;
 		unsigned dest;
 
 		cpus_and(tmp, cfg->domain, tmp);
-		dest = cpu_mask_to_apicid(tmp);
+		dest = cpu_mask_to_apicid(&tmp);
 
 		msg.address_hi = HT_IRQ_HIGH_DEST_ID(dest);
 
@@ -2890,10 +2887,10 @@ void __init setup_ioapic_dest(void)
 						  irq_polarity(irq_entry));
 #ifdef CONFIG_INTR_REMAP
 			else if (intr_remapping_enabled)
-				set_ir_ioapic_affinity_irq(irq, TARGET_CPUS);
+				set_ir_ioapic_affinity_irq(irq, *TARGET_CPUS);
 #endif
 			else
-				set_ioapic_affinity_irq(irq, TARGET_CPUS);
+				set_ioapic_affinity_irq(irq, *TARGET_CPUS);
 		}
 
 	}
