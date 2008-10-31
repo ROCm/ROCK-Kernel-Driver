@@ -182,7 +182,9 @@ static struct net_device *get_iff_from_mac(struct adapter *adapter,
 static int cxgb_ulp_iscsi_ctl(struct adapter *adapter, unsigned int req,
 			      void *data)
 {
+	int i;
 	int ret = 0;
+	unsigned int val = 0;
 	struct ulp_iscsi_info *uiip = data;
 
 	switch (req) {
@@ -191,31 +193,36 @@ static int cxgb_ulp_iscsi_ctl(struct adapter *adapter, unsigned int req,
 		uiip->llimit = t3_read_reg(adapter, A_ULPRX_ISCSI_LLIMIT);
 		uiip->ulimit = t3_read_reg(adapter, A_ULPRX_ISCSI_ULIMIT);
 		uiip->tagmask = t3_read_reg(adapter, A_ULPRX_ISCSI_TAGMASK);
+		val = t3_read_reg(adapter, A_ULPRX_ISCSI_PSZ);
+		for (i = 0; i < 4; i++, val >>= 8)
+			uiip->pgsz_factor[i] = val & 0xFF;
 		/*
 		 * On tx, the iscsi pdu has to be <= tx page size and has to
 		 * fit into the Tx PM FIFO.
 		 */
 		uiip->max_txsz = min(adapter->params.tp.tx_pg_size,
 				     t3_read_reg(adapter, A_PM1_TX_CFG) >> 17);
-		/* on rx, the iscsi pdu has to be < rx page size and the
-		   whole pdu + cpl headers has to fit into one sge buffer */
-		uiip->max_rxsz = min_t(unsigned int,
-				       adapter->params.tp.rx_pg_size,
-				       (adapter->sge.qs[0].fl[1].buf_size -
-					sizeof(struct cpl_rx_data) * 2 -
-					sizeof(struct cpl_rx_data_ddp)));
+		/*
+		 * on rx, the iscsi pdu has to be < rx page size and the
+		 * the max rx data length programmed in TP
+		 */
+		uiip->max_rxsz = min(adapter->params.tp.rx_pg_size,
+				     ((t3_read_reg(adapter, A_TP_PARA_REG2))
+					>> S_MAXRXDATA) & M_MAXRXDATA);
 		break;
 	case ULP_ISCSI_SET_PARAMS:
 		t3_write_reg(adapter, A_ULPRX_ISCSI_TAGMASK, uiip->tagmask);
 		/* set MaxRxData and MaxCoalesceSize to 16224 */
 		t3_write_reg(adapter, A_TP_PARA_REG2, 0x3f603f60);
 		/* program the ddp page sizes */
-		{
-			int i;
-			unsigned int val = 0;
-			for (i = 0; i < 4; i++)
-				val |= (uiip->pgsz_factor[i] & 0xF) << (8 * i);
-			if (val)
+		for (val = 0, i = 0; i < 4; i++)
+			val |= (uiip->pgsz_factor[i] & 0xF) << (8 * i);
+		if (val && (val != t3_read_reg(adapter, A_ULPRX_ISCSI_PSZ))) {
+			printk(KERN_INFO
+				"%s, setting iscsi pgsz 0x%x, %u,%u,%u,%u.\n",
+				adapter->name, val, uiip->pgsz_factor[0],
+				uiip->pgsz_factor[1], uiip->pgsz_factor[2],
+				uiip->pgsz_factor[3]);
 				t3_write_reg(adapter, A_ULPRX_ISCSI_PSZ, val);
 		}
 		break;
@@ -407,6 +414,18 @@ static int cxgb_offload_ctl(struct t3cdev *tdev, unsigned int req, void *data)
 		rx_page_info->page_size = tp->rx_pg_size;
 		rx_page_info->num = tp->rx_num_pgs;
 		break;
+	case GET_ISCSI_IPV4ADDR: {
+		struct iscsi_ipv4addr *p = data;
+		struct port_info *pi = netdev_priv(p->dev);
+		p->ipv4addr = pi->iscsi_ipv4addr;
+		break;
+	}
+	case SET_ISCSI_IPV4ADDR: {
+		struct iscsi_ipv4addr *p = data;
+		struct port_info *pi = netdev_priv(p->dev);
+		pi->iscsi_ipv4addr = p->ipv4addr;
+		break;
+	}
 	default:
 		return -EOPNOTSUPP;
 	}

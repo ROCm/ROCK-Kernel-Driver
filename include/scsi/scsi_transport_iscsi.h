@@ -56,6 +56,9 @@ struct sockaddr;
  *			is not supported, and a -Exx value on other error
  * @start_conn:		set connection to be operational
  * @stop_conn:		suspend/recover/terminate connection
+ * @parse_itt:		parse the itt rcv'ed in BHS
+ * @reserve_itt:	construct a task itt to be sent in BHS
+ * @release_itt:	release a itt (constructed by reserve_itt)
  * @send_pdu:		send iSCSI PDU, Login, Logout, NOP-Out, Reject, Text.
  * @session_recovery_timedout: notify LLD a block during recovery timed out
  * @init_task:		Initialize a iscsi_task and any internal structs.
@@ -109,6 +112,10 @@ struct iscsi_transport {
 	int (*set_host_param) (struct Scsi_Host *shost,
 			       enum iscsi_host_param param, char *buf,
 			       int buflen);
+	void (*parse_itt)(struct iscsi_conn *conn, itt_t hdr_itt,
+			  int *idx, int *age);
+	int (*reserve_itt)(struct iscsi_task *task, itt_t *hdr_itt);
+	void (*release_itt)(struct iscsi_task *task, itt_t hdr_itt);
 	int (*send_pdu) (struct iscsi_cls_conn *conn, struct iscsi_hdr *hdr,
 			 char *data, uint32_t data_size);
 	void (*get_stats) (struct iscsi_cls_conn *conn,
@@ -207,7 +214,7 @@ extern void iscsi_host_for_each_session(struct Scsi_Host *shost,
 struct iscsi_endpoint {
 	void *dd_data;			/* LLD private data */
 	struct device dev;
-	unsigned int id;
+	uint64_t id;
 };
 
 /*

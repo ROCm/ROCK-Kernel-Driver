@@ -75,7 +75,7 @@ enum {
 /* this must be a power of two greater than ISCSI_MGMT_CMDS_MAX */
 #define ISCSI_TOTAL_CMDS_MIN		16
 #define ISCSI_AGE_SHIFT			28
-#define ISCSI_AGE_MASK			(0xf << ISCSI_AGE_SHIFT)
+#define ISCSI_AGE_MASK			0xf
 
 #define ISCSI_ADDRESS_BUF_LEN		64
 
@@ -287,6 +287,10 @@ struct iscsi_session {
 	struct iscsi_pool	cmdpool;	/* PDU's pool */
 };
 
+enum {
+	ISCSI_HOST_SETUP,
+	ISCSI_HOST_REMOVED,
+};
 struct iscsi_host {
 	char			*initiatorname;
 	/* hw address or netdev iscsi connection is bound to */
@@ -297,7 +301,11 @@ struct iscsi_host {
 	char			local_address[ISCSI_ADDRESS_BUF_LEN];
 
 	wait_queue_head_t	session_removal_wq;
-	atomic_t		num_sessions;
+
+	/* protects sessions and state */
+	spinlock_t		lock;
+	int			num_sessions;
+	int			state;
 };
 
 /*

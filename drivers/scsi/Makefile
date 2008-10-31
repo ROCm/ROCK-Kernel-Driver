@@ -40,6 +40,7 @@ obj-$(CONFIG_LIBFC)		+= libfc/
 obj-$(CONFIG_FCOE) 		+= fcoe/
 obj-$(CONFIG_ISCSI_TCP) 	+= libiscsi.o	iscsi_tcp.o
 obj-$(CONFIG_INFINIBAND_ISER) 	+= libiscsi.o
+obj-$(CONFIG_SCSI_CXGB3_ISCSI)	+= iscsi_tcp.o	cxgb3i/
 obj-$(CONFIG_SCSI_A4000T)	+= 53c700.o	a4000t.o
 obj-$(CONFIG_SCSI_ZORRO7XX)	+= 53c700.o	zorro7xx.o
 obj-$(CONFIG_A3000_SCSI)	+= a3000.o	wd33c93.o

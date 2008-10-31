@@ -44,6 +44,7 @@
 #include <linux/rtnetlink.h>
 #include <linux/firmware.h>
 #include <linux/log2.h>
+#include <linux/inet.h>
 #include <asm/uaccess.h>
 
 #include "common.h"
@@ -688,6 +689,47 @@ static struct attribute *offload_attrs[] = {
 
 static struct attribute_group offload_attr_group = {.attrs = offload_attrs };
 
+static ssize_t iscsi_ipv4addr_attr_show(struct device *d, char *buf)
+{
+	struct port_info *pi = netdev_priv(to_net_dev(d));
+
+	__be32 a = pi->iscsi_ipv4addr;
+	return sprintf(buf, NIPQUAD_FMT "\n", NIPQUAD(a));
+}
+
+static ssize_t iscsi_ipv4addr_attr_store(struct device *d,
+					 const char *buf, size_t len)
+{
+	struct port_info *pi = netdev_priv(to_net_dev(d));
+
+	pi->iscsi_ipv4addr = in_aton(buf);
+	return len;
+}
+
+#define ISCSI_IPADDR_ATTR(name) \
+static ssize_t show_##name(struct device *d, struct device_attribute *attr, \
+			   char *buf) \
+{ \
+	return iscsi_ipv4addr_attr_show(d, buf); \
+} \
+static ssize_t store_##name(struct device *d, struct device_attribute *attr, \
+			    const char *buf, size_t len) \
+{ \
+	return iscsi_ipv4addr_attr_store(d, buf, len); \
+} \
+static DEVICE_ATTR(name, S_IRUGO | S_IWUSR, show_##name, store_##name)
+
+ISCSI_IPADDR_ATTR(iscsi_ipv4addr);
+
+static struct attribute *iscsi_offload_attrs[] = {
+	&dev_attr_iscsi_ipv4addr.attr,
+	NULL
+};
+
+static struct attribute_group iscsi_offload_attr_group = {
+	.attrs = iscsi_offload_attrs
+};
+
 /*
  * Sends an sk_buff to an offload queue driver
  * after dealing with any active network taps.
@@ -1079,6 +1121,7 @@ static int cxgb_open(struct net_device *dev)
 		if (err)
 			printk(KERN_WARNING
 			       "Could not initialize offload capabilities\n");
+		sysfs_create_group(&dev->dev.kobj, &iscsi_offload_attr_group);
 	}
 
 	link_start(dev);
@@ -1100,6 +1143,9 @@ static int cxgb_close(struct net_device *dev)
 	pi->phy.ops->power_down(&pi->phy, 1);
 	netif_carrier_off(dev);
 	t3_mac_disable(&pi->mac, MAC_DIRECTION_TX | MAC_DIRECTION_RX);
+
+	if (is_offload(adapter) && !ofld_disable)
+		sysfs_remove_group(&dev->dev.kobj, &iscsi_offload_attr_group);
 
 	spin_lock(&adapter->work_lock);	/* sync with update task */
 	clear_bit(pi->port_id, &adapter->open_device_map);

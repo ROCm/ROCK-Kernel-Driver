@@ -218,7 +218,12 @@ static int iscsi_prep_scsi_cmd_pdu(struct iscsi_task *task)
 	hdr->opcode = ISCSI_OP_SCSI_CMD;
 	hdr->flags = ISCSI_ATTR_SIMPLE;
 	int_to_scsilun(sc->device->lun, (struct scsi_lun *)hdr->lun);
-	hdr->itt = build_itt(task->itt, session->age);
+	if (session->tt->reserve_itt) {
+		rc = session->tt->reserve_itt(task, &hdr->itt);
+		if (rc)
+			return rc;
+	} else
+		hdr->itt = build_itt(task->itt, session->age);
 	hdr->cmdsn = cpu_to_be32(session->cmdsn);
 	session->cmdsn++;
 	hdr->exp_statsn = cpu_to_be32(conn->exp_statsn);
@@ -332,6 +337,9 @@ static void iscsi_complete_command(struct iscsi_task *task)
 	struct iscsi_session *session = conn->session;
 	struct scsi_cmnd *sc = task->sc;
 
+	if (session->tt->release_itt)
+		session->tt->release_itt(task, task->hdr->itt);
+
 	list_del_init(&task->running);
 	task->state = ISCSI_TASK_COMPLETED;
 	task->sc = NULL;
@@ -443,7 +451,12 @@ static int iscsi_prep_mgmt_task(struct iscsi_conn *conn,
 	 */
 	nop->cmdsn = cpu_to_be32(session->cmdsn);
 	if (hdr->itt != RESERVED_ITT) {
-		hdr->itt = build_itt(task->itt, session->age);
+		if (session->tt->reserve_itt) {
+			int rc = session->tt->reserve_itt(task, &hdr->itt);
+			if (rc)
+				return rc;
+		} else
+			hdr->itt = build_itt(task->itt, session->age);
 		/*
 		 * TODO: We always use immediate, so we never hit this.
 		 * If we start to send tmfs or nops as non-immediate then
@@ -692,7 +705,13 @@ static int iscsi_handle_reject(struct iscsi_conn *conn, struct iscsi_hdr *hdr,
 
 		if (ntoh24(reject->dlength) >= sizeof(struct iscsi_hdr)) {
 			memcpy(&rejected_pdu, data, sizeof(struct iscsi_hdr));
-			itt = get_itt(rejected_pdu.itt);
+			if (conn->session->tt->parse_itt)
+				conn->session->tt->parse_itt(conn,
+							     rejected_pdu.itt,
+							     &itt,
+							     NULL);
+			else
+				itt = get_itt(rejected_pdu.itt);
 			iscsi_conn_printk(KERN_ERR, conn,
 					  "itt 0x%x had pdu (op 0x%x) rejected "
 					  "due to DataDigest error.\n", itt,
@@ -720,7 +739,10 @@ struct iscsi_task *iscsi_itt_to_task(struct iscsi_conn *conn, itt_t itt)
 	if (itt == RESERVED_ITT)
 		return NULL;
 
-	i = get_itt(itt);
+	if (conn->session->tt->parse_itt)
+		conn->session->tt->parse_itt(conn, itt, &i, NULL);
+	else
+		i = get_itt(itt);
 	if (i >= session->cmds_max)
 		return NULL;
 
@@ -752,9 +774,13 @@ int __iscsi_complete_pdu(struct iscsi_conn *conn, struct iscsi_hdr *hdr,
 	if (rc)
 		return rc;
 
-	if (hdr->itt != RESERVED_ITT)
-		itt = get_itt(hdr->itt);
-	else
+	if (hdr->itt != RESERVED_ITT) {
+		if (conn->session->tt->parse_itt)
+			conn->session->tt->parse_itt(conn, hdr->itt,
+						     &itt, NULL);
+		else
+			itt = get_itt(hdr->itt);
+	} else
 		itt = ~0U;
 
 	debug_scsi("[op 0x%x cid %d itt 0x%x len %d]\n",
@@ -901,20 +927,25 @@ EXPORT_SYMBOL_GPL(iscsi_complete_pdu);
 int iscsi_verify_itt(struct iscsi_conn *conn, itt_t itt)
 {
 	struct iscsi_session *session = conn->session;
-	uint32_t i;
+	uint32_t i, age;
 
 	if (itt == RESERVED_ITT)
 		return 0;
 
-	if (((__force u32)itt & ISCSI_AGE_MASK) !=
-	    (session->age << ISCSI_AGE_SHIFT)) {
+	if (conn->session->tt->parse_itt)
+		conn->session->tt->parse_itt(conn, itt, &i, &age);
+	else {
+		i = get_itt(itt);
+		age = ((__force u32)itt >> ISCSI_AGE_SHIFT) & ISCSI_AGE_MASK;
+	}
+
+	if (age != session->age) {
 		iscsi_conn_printk(KERN_ERR, conn,
 				  "received itt %x expected session age (%x)\n",
 				  (__force u32)itt, session->age);
 		return ISCSI_ERR_BAD_ITT;
 	}
 
-	i = get_itt(itt);
 	if (i >= session->cmds_max) {
 		iscsi_conn_printk(KERN_ERR, conn,
 				  "received invalid itt index %u (max cmds "
@@ -1928,13 +1959,15 @@ struct Scsi_Host *iscsi_host_alloc(struct scsi_host_template *sht,
 	shost->cmd_per_lun = qdepth;
 
 	ihost = shost_priv(shost);
-	atomic_set(&ihost->num_sessions, 0);
+	spin_lock_init(&ihost->lock);
+	ihost->state = ISCSI_HOST_SETUP;
+	ihost->num_sessions = 0;
 	init_waitqueue_head(&ihost->session_removal_wq);
 	return shost;
 }
 EXPORT_SYMBOL_GPL(iscsi_host_alloc);
 
-static void iscsi_kill_session(struct iscsi_cls_session *cls_session)
+static void iscsi_notify_host_removed(struct iscsi_cls_session *cls_session)
 {
 	iscsi_session_failure(cls_session, ISCSI_ERR_INVALID_HOST);
 }
@@ -1949,10 +1982,15 @@ static void iscsi_kill_session(struct iscsi_cls_session *cls_session)
 void iscsi_host_remove(struct Scsi_Host *shost)
 {
 	struct iscsi_host *ihost = shost_priv(shost);
+	unsigned long flags;
 
-	iscsi_host_for_each_session(shost, iscsi_kill_session);
+	spin_lock_irqsave(&ihost->lock, flags);
+	ihost->state = ISCSI_HOST_REMOVED;
+	spin_unlock_irqrestore(&ihost->lock, flags);
+
+	iscsi_host_for_each_session(shost, iscsi_notify_host_removed);
 	wait_event_interruptible(ihost->session_removal_wq,
-				 atomic_read(&ihost->num_sessions) == 0);
+				 ihost->num_sessions == 0);
 	if (signal_pending(current))
 		flush_signals(current);
 
@@ -1970,6 +2008,27 @@ void iscsi_host_free(struct Scsi_Host *shost)
 	scsi_host_put(shost);
 }
 EXPORT_SYMBOL_GPL(iscsi_host_free);
+
+static void iscsi_host_dec_session_cnt(struct Scsi_Host *shost)
+{
+	struct iscsi_host *ihost = shost_priv(shost);
+	unsigned long flags;
+
+	shost = scsi_host_get(shost);
+	if (!shost) {
+		printk(KERN_ERR "Invalid state. Cannot notify host removal "
+		       "of session teardown event because host already "
+		       "removed.\n");
+		return;
+	}
+
+	spin_lock_irqsave(&ihost->lock, flags);
+	ihost->num_sessions--;
+	if (ihost->num_sessions == 0)
+		wake_up(&ihost->session_removal_wq);
+	spin_unlock_irqrestore(&ihost->lock, flags);
+	scsi_host_put(shost);
+}
 
 /**
  * iscsi_session_setup - create iscsi cls session and host and session
@@ -1995,6 +2054,15 @@ iscsi_session_setup(struct iscsi_transport *iscsit, struct Scsi_Host *shost,
 	struct iscsi_session *session;
 	struct iscsi_cls_session *cls_session;
 	int cmd_i, scsi_cmds, total_cmds = cmds_max;
+	unsigned long flags;
+
+	spin_lock_irqsave(&ihost->lock, flags);
+	if (ihost->state == ISCSI_HOST_REMOVED) {
+		spin_unlock_irqrestore(&ihost->lock, flags);
+		return NULL;
+	}
+	ihost->num_sessions++;
+	spin_unlock_irqrestore(&ihost->lock, flags);
 
 	if (!total_cmds)
 		total_cmds = ISCSI_DEF_XMIT_CMDS_MAX;
@@ -2007,7 +2075,7 @@ iscsi_session_setup(struct iscsi_transport *iscsit, struct Scsi_Host *shost,
 		printk(KERN_ERR "iscsi: invalid can_queue of %d. can_queue "
 		       "must be a power of two that is at least %d.\n",
 		       total_cmds, ISCSI_TOTAL_CMDS_MIN);
-		return NULL;
+		goto dec_session_count;
 	}
 
 	if (total_cmds > ISCSI_TOTAL_CMDS_MAX) {
@@ -2031,7 +2099,7 @@ iscsi_session_setup(struct iscsi_transport *iscsit, struct Scsi_Host *shost,
 	cls_session = iscsi_alloc_session(shost, iscsit,
 					  sizeof(struct iscsi_session));
 	if (!cls_session)
-		return NULL;
+		goto dec_session_count;
 	session = cls_session->dd_data;
 	session->cls_session = cls_session;
 	session->host = shost;
@@ -2071,7 +2139,6 @@ iscsi_session_setup(struct iscsi_transport *iscsit, struct Scsi_Host *shost,
 	if (iscsi_add_session(cls_session, id))
 		goto cls_session_fail;
 
-	atomic_inc(&ihost->num_sessions);
 	return cls_session;
 
 cls_session_fail:
@@ -2080,6 +2147,8 @@ module_get_fail:
 	iscsi_pool_free(&session->cmdpool);
 cmdpool_alloc_fail:
 	iscsi_free_session(cls_session);
+dec_session_count:
+	iscsi_host_dec_session_cnt(shost);
 	return NULL;
 }
 EXPORT_SYMBOL_GPL(iscsi_session_setup);
@@ -2094,8 +2163,8 @@ EXPORT_SYMBOL_GPL(iscsi_session_setup);
 void iscsi_session_teardown(struct iscsi_cls_session *cls_session)
 {
 	struct iscsi_session *session = cls_session->dd_data;
-	struct iscsi_host *ihost = shost_priv(session->host);
 	struct module *owner = cls_session->transport->owner;
+	struct Scsi_Host *shost = session->host;
 
 	iscsi_pool_free(&session->cmdpool);
 
@@ -2109,9 +2178,7 @@ void iscsi_session_teardown(struct iscsi_cls_session *cls_session)
 
 	iscsi_destroy_session(cls_session);
 
-	atomic_dec(&ihost->num_sessions);
-	wake_up(&ihost->session_removal_wq);
-
+	iscsi_host_dec_session_cnt(shost);
 	module_put(owner);
 }
 EXPORT_SYMBOL_GPL(iscsi_session_teardown);

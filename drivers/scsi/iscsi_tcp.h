@@ -32,7 +32,9 @@ struct iscsi_segment;
 typedef int iscsi_segment_done_fn_t(struct iscsi_tcp_conn *,
 				    struct iscsi_segment *);
 
+#define ISCSI_SEGMENT_DGST_ERR 0x1
 struct iscsi_segment {
+	unsigned int		status;
 	unsigned char		*data;
 	unsigned int		size;
 	unsigned int		copied;
@@ -95,6 +97,8 @@ struct iscsi_tcp_conn {
 
 	int			error;
 
+	/* segment transmit */
+	int (*xmit_segment)(struct iscsi_conn *);
 	ssize_t (*sendpage)(struct socket *, struct page *, int, size_t, int);
 };
 
@@ -129,5 +133,17 @@ struct iscsi_tcp_task {
 	struct kfifo		*r2tqueue;
 	struct iscsi_data_task	unsol_dtask;	/* Data-Out header buf */
 };
+
+void iscsi_tcp_segment_init_sg(struct iscsi_segment *, struct scatterlist *,
+			       unsigned int);
+void iscsi_tcp_segment_map(struct iscsi_segment *, int);
+void iscsi_tcp_segment_unmap(struct iscsi_segment *);
+void iscsi_tcp_hdr_recv_prep(struct iscsi_tcp_conn *);
+void iscsi_tcp_cleanup_task(struct iscsi_conn *, struct iscsi_task *);
+int iscsi_tcp_hdr_dissect(struct iscsi_conn *conn, struct iscsi_hdr *);
+int iscsi_tcp_task_init(struct iscsi_task *);
+int iscsi_tcp_task_xmit(struct iscsi_task *);
+int iscsi_r2tpool_alloc(struct iscsi_session *);
+void iscsi_r2tpool_free(struct iscsi_session *);
 
 #endif /* ISCSI_H */
