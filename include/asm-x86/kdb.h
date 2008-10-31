@@ -131,4 +131,8 @@ kdba_funcptr_value(void *fp)
 	return (unsigned long)fp;
 }
 
+#ifdef CONFIG_SMP
+extern void kdba_giveback_vector(int);
+#endif
+
 #endif	/* !_ASM_KDB_H */

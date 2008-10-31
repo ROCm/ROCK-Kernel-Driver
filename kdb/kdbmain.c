@@ -1666,6 +1666,8 @@ kdb_wait_for_cpus(void)
 					wait == 1 ? " is" : "s are",
 					wait == 1 ? "its" : "their");
 	}
+	/* give back the vector we took over in smp_kdb_stop */
+	kdba_giveback_vector(KDB_VECTOR);
 #endif	/* CONFIG_SMP */
 }
 

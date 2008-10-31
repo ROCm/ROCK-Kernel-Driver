@@ -21,6 +21,7 @@
 #include <linux/interrupt.h>
 #include <linux/module.h>
 #include <linux/kdebug.h>
+#include <linux/cpumask.h>
 #include <asm/processor.h>
 #include <asm/msr.h>
 #include <asm/uaccess.h>
@@ -905,9 +906,6 @@ kdba_cpu_up(void)
 static int __init
 kdba_arch_init(void)
 {
-#ifdef	CONFIG_SMP
-	set_intr_gate(KDB_VECTOR, kdb_interrupt);
-#endif
 	set_intr_gate(KDBENTER_VECTOR, kdb_call);
 	return 0;
 }
@@ -981,14 +979,31 @@ kdba_set_current_task(const struct task_struct *p)
 
 #include <mach_ipi.h>
 
+gate_desc save_idt[NR_VECTORS];
+
+void kdba_takeover_vector(int vector)
+{
+	memcpy(&save_idt[vector], &idt_table[vector], sizeof(gate_desc));
+	set_intr_gate(KDB_VECTOR, kdb_interrupt);
+	return;
+}
+
+void kdba_giveback_vector(int vector)
+{
+	native_write_idt_entry(idt_table, vector, &save_idt[vector]);
+	return;
+}
+
 /* When first entering KDB, try a normal IPI.  That reduces backtrace problems
  * on the other cpus.
  */
 void
 smp_kdb_stop(void)
 {
-	if (!KDB_FLAG(NOIPI))
+	if (!KDB_FLAG(NOIPI)) {
+		kdba_takeover_vector(KDB_VECTOR);
 		send_IPI_allbutself(KDB_VECTOR);
+	}
 }
 
 /* The normal KDB IPI handler */

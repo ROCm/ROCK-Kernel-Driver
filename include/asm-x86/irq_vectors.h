@@ -66,7 +66,6 @@
 # define RESCHEDULE_VECTOR		0xfc
 # define CALL_FUNCTION_VECTOR		0xfb
 # define CALL_FUNCTION_SINGLE_VECTOR	0xfa
-#define	KDB_VECTOR			0xf9
 # define THERMAL_APIC_VECTOR		0xf0
 
 #else
@@ -79,16 +78,18 @@
 #define THERMAL_APIC_VECTOR		0xfa
 #define THRESHOLD_APIC_VECTOR		0xf9
 #define UV_BAU_MESSAGE			0xf8
-/* Overload KDB_VECTOR with UV_BAU_MESSAGE. By the time the UV hardware is
- * ready, we should have moved to a dynamically allocated vector scheme.
- */
-#define KDB_VECTOR			0xf8
 #define INVALIDATE_TLB_VECTOR_END	0xf7
 #define INVALIDATE_TLB_VECTOR_START	0xf0	/* f0-f7 used for TLB flush */
 
 #define NUM_INVALIDATE_TLB_VECTORS	8
 
 #endif
+
+/*
+ * KDB_VECTOR will take over vector 0xfe when it is needed, as in theory
+ * it should not be used anyway.
+ */
+#define KDB_VECTOR			0xfe
 
 /*
  * Local APIC timer IRQ vector is on a different priority level,
