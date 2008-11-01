@@ -3717,13 +3717,14 @@ kdb_per_cpu(int argc, const char **argv)
 {
 	char buf[256], fmtstr[64];
 	kdb_symtab_t symtab;
-	cpumask_t suppress = CPU_MASK_NONE;
+	cpumask_t suppress;
 	int cpu, diag;
 	unsigned long addr, val, bytesperword = 0, whichcpu = ~0UL;
 
 	if (argc < 1 || argc > 3)
 		return KDB_ARGCOUNT;
 
+	cpus_clear(suppress);
 	snprintf(buf, sizeof(buf), "per_cpu__%s", argv[1]);
 	if (!kdbgetsymval(buf, &symtab)) {
 		kdb_printf("%s is not a per_cpu variable\n", argv[1]);
@@ -3781,7 +3782,7 @@ kdb_per_cpu(int argc, const char **argv)
 	if (cpus_weight(suppress) == 0)
 		return 0;
 	kdb_printf("Zero suppressed cpu(s):");
-	for (cpu = first_cpu(suppress); cpu < NR_CPUS; cpu = next_cpu(cpu, suppress)) {
+	for_each_cpu_mask(cpu, suppress) {
 		kdb_printf(" %d", cpu);
 		if (cpu == NR_CPUS-1 || next_cpu(cpu, suppress) != cpu + 1)
 			continue;
@@ -4236,10 +4237,9 @@ kdb_cpu_callback(struct notifier_block *nfb, unsigned long action, void *hcpu)
 	if (action == CPU_ONLINE) {
 		int cpu =(unsigned long)hcpu;
 		cpumask_t save_cpus_allowed = current->cpus_allowed;
-		cpumask_t new_cpus_allowed = cpumask_of_cpu(cpu);
-		set_cpus_allowed(current, new_cpus_allowed);
-		kdb(KDB_REASON_CPU_UP, 0, NULL);	/* do kdb setup on this cpu */
-		set_cpus_allowed(current, save_cpus_allowed);
+		set_cpus_allowed_ptr(current, &cpumask_of_cpu(cpu));
+		kdb(KDB_REASON_CPU_UP, 0, NULL); /* do kdb setup on this cpu */
+		set_cpus_allowed_ptr(current, &save_cpus_allowed);
 	}
 	return NOTIFY_OK;
 }

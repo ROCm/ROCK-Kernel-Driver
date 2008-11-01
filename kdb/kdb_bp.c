@@ -285,7 +285,7 @@ kdb_bp(int argc, const char **argv)
 	char *symname = NULL;
 	long offset = 0ul;
 	int nextarg;
-	kdb_bp_t template = {0};
+	static kdb_bp_t kdb_bp_template;
 
 	if (argc == 0) {
 		/*
@@ -300,21 +300,23 @@ kdb_bp(int argc, const char **argv)
 		return 0;
 	}
 
-	template.bp_global = ((strcmp(argv[0], "bpa") == 0)
+	memset(&kdb_bp_template, 0, sizeof(kdb_bp_template));
+
+	kdb_bp_template.bp_global = ((strcmp(argv[0], "bpa") == 0)
 			   || (strcmp(argv[0], "bpha") == 0));
-	template.bp_forcehw = ((strcmp(argv[0], "bph") == 0)
+	kdb_bp_template.bp_forcehw = ((strcmp(argv[0], "bph") == 0)
 			   || (strcmp(argv[0], "bpha") == 0));
 
 	/* Fix me: "bp" is treated as "bpa" to avoid system freeze. -jlan */
 	if (strcmp(argv[0], "bp") == 0)
-		template.bp_global = 1;
+		kdb_bp_template.bp_global = 1;
 
 	nextarg = 1;
-	diag = kdbgetaddrarg(argc, argv, &nextarg, &template.bp_addr,
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &kdb_bp_template.bp_addr,
 			     &offset, &symname);
 	if (diag)
 		return diag;
-	if (!template.bp_addr)
+	if (!kdb_bp_template.bp_addr)
 		return KDB_BADINT;
 
 	/*
@@ -333,7 +335,7 @@ kdb_bp(int argc, const char **argv)
 	/*
 	 * Handle architecture dependent parsing
 	 */
-	diag = kdba_parsebp(argc, argv, &nextarg, &template);
+	diag = kdba_parsebp(argc, argv, &nextarg, &kdb_bp_template);
 	if (diag) {
 		return diag;
 	}
@@ -348,20 +350,21 @@ kdb_bp(int argc, const char **argv)
 	 */
 	for(i=0,bp_check=kdb_breakpoints; i<KDB_MAXBPT; i++,bp_check++) {
 		if (!bp_check->bp_free &&
-		    bp_check->bp_addr == template.bp_addr &&
+		    bp_check->bp_addr == kdb_bp_template.bp_addr &&
 		    (bp_check->bp_global ||
-		     bp_check->bp_cpu == template.bp_cpu)) {
-			kdb_printf("You already have a breakpoint at " kdb_bfd_vma_fmt0 "\n", template.bp_addr);
+		     bp_check->bp_cpu == kdb_bp_template.bp_cpu)) {
+			kdb_printf("You already have a breakpoint at "
+				kdb_bfd_vma_fmt0 "\n", kdb_bp_template.bp_addr);
 			return KDB_DUPBPT;
 		}
 	}
 
-	template.bp_enabled = 1;
+	kdb_bp_template.bp_enabled = 1;
 
 	/*
 	 * Actually allocate the breakpoint found earlier
 	 */
-	*bp = template;
+	*bp = kdb_bp_template;
 	bp->bp_free = 0;
 
 	if (!bp->bp_global) {
