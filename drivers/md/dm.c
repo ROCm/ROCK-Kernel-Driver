@@ -1151,6 +1151,7 @@ static int __split_bio(struct mapped_device *md, struct bio *bio)
 		return -EIO;
 	if (unlikely(bio_barrier(bio) && !dm_table_barrier_ok(ci.map))) {
 		bio_endio(bio, -EOPNOTSUPP);
+		dm_table_put(ci.map);
 		return 0;
 	}
 	ci.md = md;
